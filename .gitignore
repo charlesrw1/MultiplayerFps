@@ -1,0 +1,5 @@
+.vs/
+Debug/
+Release/
+imgui.ini
+SDL2.dll
