@@ -19,22 +19,27 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Animation.cpp" />
+    <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\External\glad.c" />
+    <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\MeshBuilder.cpp" />
     <ClCompile Include="Source\Model.cpp" />
+    <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Shader.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
+    <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Model.h" />
     <ClInclude Include="Source\MathLib.h" />
+    <ClInclude Include="Source\Physics.h" />
     <ClInclude Include="Source\Shader.h" />
     <ClInclude Include="Source\Texture.h" />
     <ClInclude Include="Source\Util.h" />
     <ClInclude Include="Source\MeshBuilder.h" />
+    <ClInclude Include="Source\GlmInclude.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

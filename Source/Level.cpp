@@ -1,0 +1,156 @@
+#include "Level.h"
+#include "Model.h"
+#include "tiny_gltf.h"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/ext/matrix_transform.hpp"
+
+static const char* const level_directory = "Data\\Models\\";
+
+bool IsMaterialCollidable() {
+	return true;
+}
+
+static void LoadCollisionData(Level* level, tinygltf::Model& scene, tinygltf::Mesh& mesh, glm::mat4 transform)
+{
+	Level::CollisionData& out_data = level->collision_data;
+	for (int part = 0; part < mesh.primitives.size(); part++)
+	{
+		const int vertex_offset = out_data.vertex_list.size();
+
+		tinygltf::Primitive& primitive = mesh.primitives[part];
+		ASSERT(primitive.attributes.find("POSITION") != primitive.attributes.end());
+		tinygltf::Accessor& position_ac = scene.accessors[primitive.attributes["POSITION"]];
+		tinygltf::BufferView& position_bv = scene.bufferViews[position_ac.bufferView];
+		tinygltf::Buffer& pos_buffer = scene.buffers[position_bv.buffer];
+		int pos_stride = position_ac.ByteStride(position_bv);
+		ASSERT(position_ac.type == TINYGLTF_TYPE_VEC3 && position_ac.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+		ASSERT(position_ac.byteOffset == 0&&position_bv.byteStride==0);
+		unsigned char* pos_start = &pos_buffer.data.at(position_bv.byteOffset);
+		for (int v = 0; v < position_ac.count; v++) {
+			glm::vec3 data = *(glm::vec3*)(pos_start + v * pos_stride);
+			out_data.vertex_list.push_back(data);
+		}
+
+		// Transform verts
+		if (transform != glm::mat4(1)) {
+			for (int v = 0; v < position_ac.count; v++) {
+				out_data.vertex_list[vertex_offset + v] = transform * glm::vec4(out_data.vertex_list[vertex_offset + v],1.0);
+			}
+		}
+
+		tinygltf::Accessor& index_ac = scene.accessors[primitive.indices];
+		tinygltf::BufferView& index_bv = scene.bufferViews[index_ac.bufferView];
+		tinygltf::Buffer& index_buffer = scene.buffers[index_bv.buffer];
+		int index_stride = index_ac.ByteStride(index_bv);
+		ASSERT(index_ac.byteOffset == 0 && index_bv.byteStride == 0);
+		unsigned char* index_start = &index_buffer.data.at(index_bv.byteOffset);
+		for (int i = 0; i < index_ac.count; i+=3) {
+			Level::CollisionTri ct;
+			if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+				ct.indicies[0] = *(unsigned int*)(index_start + index_stride * i);
+				ct.indicies[1] = *(unsigned int*)(index_start + index_stride * (i+1));
+				ct.indicies[2] = *(unsigned int*)(index_start + index_stride * (i+2));
+			}
+			else if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+				ct.indicies[0] = *(unsigned short*)(index_start + index_stride * i);
+				ct.indicies[1] = *(unsigned short*)(index_start + index_stride * (i+1));
+				ct.indicies[2] = *(unsigned short*)(index_start + index_stride * (i+2));
+			}
+			ct.indicies[0] += vertex_offset;
+			ct.indicies[1] += vertex_offset;
+			ct.indicies[2] += vertex_offset;
+
+			glm::vec3 verts[3];
+			for (int j = 0; j < 3; j++)
+				verts[j] = out_data.vertex_list.at(ct.indicies[j]);
+			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
+			ct.face_normal = face_normal;
+			ct.plane_offset = -glm::dot(face_normal, verts[0]);
+
+			// TODO: surface flags
+			
+			out_data.collision_tris.push_back(ct);
+		}
+	}
+}
+
+static void LookThroughNodeTree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, glm::mat4 global_transform)
+{
+	glm::mat4 local_transform = glm::mat4(1);
+	if (node.matrix.size() == 16) {
+		double* m = node.matrix.data();
+		local_transform = glm::mat4(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
+			m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
+	}
+	else {
+		glm::vec3 translation = glm::vec3(0.f);
+		glm::vec3 scale = glm::vec3(1.f);
+		glm::quat rot = glm::quat(1.f, 0.f, 0.f, 0.f);
+		if (node.translation.size() != 0)
+			translation = glm::make_vec3<double>(node.translation.data());
+		if (node.rotation.size() != 0)
+			rot = glm::make_quat<double>(node.rotation.data());
+		if (node.scale.size() != 0)
+			scale = glm::make_vec3<double>(node.scale.data());
+		local_transform = glm::translate(glm::mat4(1), translation);
+		local_transform = local_transform * glm::mat4_cast(rot);
+		local_transform = glm::scale(local_transform, scale);
+	}
+	global_transform = global_transform * local_transform;
+	bool statically_drawn = true;
+	bool has_collision = true;
+	if (node.mesh != -1) {
+		if (statically_drawn) {
+			Level::StaticInstance sm;
+			sm.model_index = node.mesh;
+			sm.transform = global_transform;
+			level->render_data.instances.push_back(sm);
+		}
+		if (has_collision) {
+			LoadCollisionData(level, scene, scene.meshes[node.mesh], global_transform);
+		}
+	}
+
+	for (int i = 0; i < node.children.size(); i++)
+		LookThroughNodeTree(level, scene, scene.nodes[node.children[i]], global_transform);
+}
+
+static void GatherRenderData(Level* level, tinygltf::Model& scene)
+{
+	for (int i = 0; i < scene.meshes.size(); i++) {
+		Model* m = new Model;
+		std::map<int, int> mapping;
+		AppendGltfMeshToModel(m, scene, scene.meshes[i], mapping);
+		level->render_data.embedded_meshes.push_back(m);
+		// TODO: materials
+	}
+}
+
+Level* LoadLevelFile(const char* level_name)
+{
+	std::string path;
+	path.reserve(256);
+	path += level_directory;
+	path += level_name;
+
+	tinygltf::Model scene;
+	tinygltf::TinyGLTF loader;
+	std::string errStr;
+	std::string warnStr;
+	bool res = loader.LoadBinaryFromFile(&scene, &errStr, &warnStr, path);
+	if (!res) {
+		printf("Couldn't load level: %s\n", path.c_str());
+		return nullptr;
+	}
+
+	Level* level = new Level;
+	GatherRenderData(level, scene);
+
+	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
+	for (int i = 0; i < defscene.nodes.size(); i++) {
+		LookThroughNodeTree(level, scene, scene.nodes[defscene.nodes[i]], glm::mat4(1));
+	}
+
+	return level;
+
+}

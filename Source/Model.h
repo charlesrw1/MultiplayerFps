@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <string>
 #include <memory>
+#include <map>
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Util.h"
+#include "Animation.h"
 
 #define MAX_BONES 256
 
@@ -33,7 +35,8 @@ struct MeshPart
 	int element_offset = 0;	// in bytes
 	int element_count = 0;
 	int element_type = 0;	// unsigned_short, unsigned_int
-	int material_idx = 0;
+	short material_idx = 0;
+	short layout = 0;
 };
 struct Texture;
 struct MeshMaterial
@@ -42,7 +45,6 @@ struct MeshMaterial
 	Texture* t1 = nullptr;
 };
 
-class AnimationSet;
 class Model
 {
 public:
@@ -70,5 +72,12 @@ public:
 
 void FreeLoadedModels();
 Model* FindOrLoadModel(const char* filename);
+
+// So the level loader can have access
+namespace tinygltf {
+	class Model;
+	class Mesh;
+}
+void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygltf::Mesh& mesh, std::map<int, int>& buffer_view_to_buffer);
 
 #endif // !MODEL_H

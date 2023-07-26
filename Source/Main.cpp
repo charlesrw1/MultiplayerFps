@@ -8,7 +8,7 @@
 #include "Shader.h"
 #include "Texture.h"
 #include "MathLib.h"
-#include "glm/glm.hpp"
+#include "GlmInclude.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -16,29 +16,8 @@
 #include "MeshBuilder.h"
 #include "Util.h"
 #include "Animation.h"
-
-using glm::vec3;
-using glm::vec2;
-using glm::mat4;
-using glm::mat3;
-using glm::vec4;
-using glm::ivec2;
-using glm::uvec2;
-using glm::ivec3;
-
-using glm::dot;
-using glm::cross;
-using glm::normalize;
-using glm::length;
-
-const float PI = 3.1415926536;
-const float TWOPI = PI * 2.f;
-const float HALFPI = PI * 0.5f;
-const float INV_PI = 1.f / PI;
-const float SQRT2 = 1.41421362;
-const float INV_SQRT2 = 1 / SQRT2;
-
-
+#include "Level.h"
+#include "Physics.h"
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -207,20 +186,60 @@ FlyCamera fly_cam;
 Shader simple;
 Shader textured;
 Shader animated;
+Shader static_wrld;
 Texture* mytexture;
 Model* m = nullptr;
 Animator animator;
+Level* temp_level;
 bool update_camera = false;
+Level* TEMP_LEVEL;
+Model* gun;
 
 double GetTime()
 {
 	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
 }
 
-void Update()
+void Update(double dt)
 {
 	if(update_camera)
 		fly_cam.UpdateFromInput(keyboard, mouse_delta_x, mouse_delta_y, scroll_delta);
+	fly_cam.position.y -= 0.4f*dt;
+	Capsule c;
+	c.base = glm::vec3(0, -0.5, 0);
+	c.tip = glm::vec3(0, 0.5, 0);
+	c.radius = 0.5;
+	for (int i = 0; i < 4; i++) {
+		ColliderCastResult res;
+		TraceCapsule(fly_cam.position, c, &res);
+		if (res.found) {
+			printf("INTERSECT\n");
+			glm::vec3 newdest = fly_cam.position + res.penetration_normal * (res.penetration_depth+0.001f);////trace.0.001f + slide_velocity * dt;
+			fly_cam.position = newdest;
+		}
+	}
+}
+
+void DrawTempLevel()
+{
+	mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
+	if (static_wrld.ID == 0)
+		Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt","VERTEX_COLOR");
+	static_wrld.use();
+	static_wrld.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
+
+	for (int m = 0; m < temp_level->render_data.instances.size(); m++) {
+		Level::StaticInstance& sm = temp_level->render_data.instances[m];
+		Model* model = temp_level->render_data.embedded_meshes[sm.model_index];
+		static_wrld.set_mat4("Model", sm.transform);
+		static_wrld.set_mat4("InverseModel", glm::inverse(sm.transform));
+		for (int p = 0; p < model->parts.size(); p++) {
+			MeshPart& mp = model->parts[p];
+			glBindVertexArray(mp.vao);
+			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+		}
+	}
+
 }
 
 void Render(double dt)
@@ -230,6 +249,12 @@ void Render(double dt)
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
+
+	simple.use();
+	simple.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
+	simple.set_mat4("Model", mat4(1.f));
+	DrawCollisionWorld();
+
 
 	textured.use();
 	textured.set_mat4("ViewProj", perspective*fly_cam.GetViewMatrix());
@@ -249,7 +274,6 @@ void Render(double dt)
 	animator.SetupBones();
 	animator.ConcatWithInvPose();
 	//
-
 
 	animated.use();
 	animated.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
@@ -275,6 +299,7 @@ void Render(double dt)
 	}
 	glCheckError();
 
+	DrawTempLevel();
 	SDL_GL_SwapWindow(window);
 
 }
@@ -296,7 +321,12 @@ int main(int argc, char** argv)
 	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
 	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
+
+	gun = FindOrLoadModel("m16.glb");
 	m = FindOrLoadModel("CT.glb");
+	temp_level = LoadLevelFile("world0.glb");
+	TEMP_LEVEL = temp_level;
+
 	ASSERT(mytexture != nullptr);
 	ASSERT(glCheckError() == 0);
 	InitGlState();
@@ -349,7 +379,7 @@ int main(int argc, char** argv)
 
 			}
 		}
-		Update();
+		Update(delta_t);
 		Render(delta_t);
 	}
 

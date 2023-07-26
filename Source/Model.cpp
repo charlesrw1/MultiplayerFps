@@ -41,7 +41,7 @@ static uint32_t MakeOrFindGpuBuffer(Model* m, int buf_view_index, tinygltf::Mode
 	return index;
 }
 
-static void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygltf::Mesh& mesh, std::map<int,int>& buffer_view_to_buffer)
+void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygltf::Mesh& mesh, std::map<int,int>& buffer_view_to_buffer)
 {
 	for (int i = 0; i < mesh.primitives.size(); i++)
 	{
@@ -91,7 +91,7 @@ static void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const
 				found_joints_attrib = true;
 
 			glEnableVertexAttribArray(location);
-			if (accessor.componentType >= GL_BYTE && accessor.componentType <= GL_UNSIGNED_INT) {
+			if (location==JOINT_LOC) {
 				glVertexAttribIPointer(location, accessor.type, accessor.componentType,
 					byte_stride, (void*)accessor.byteOffset);
 			}
@@ -99,6 +99,9 @@ static void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const
 				glVertexAttribPointer(location, accessor.type, accessor.componentType,
 					accessor.normalized, byte_stride, (void*)accessor.byteOffset);
 			}
+
+			part.layout |= (1 << location);
+
 			glCheckError();
 		}
 

@@ -22,4 +22,11 @@ struct Color32
 #define COLOR_BLUE Color32{0,0,0xff,0xff}
 #define COLOR_RED Color32{0xff,0,0,0xff}
 
+const float PI = 3.1415926536;
+const float TWOPI = PI * 2.f;
+const float HALFPI = PI * 0.5f;
+const float INV_PI = 1.f / PI;
+const float SQRT2 = 1.41421362;
+const float INV_SQRT2 = 1 / SQRT2;
+
 #endif // !UTIL_H
