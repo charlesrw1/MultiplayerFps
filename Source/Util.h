@@ -21,6 +21,8 @@ struct Color32
 #define COLOR_BLACK Color32{0,0,0,0xff}
 #define COLOR_BLUE Color32{0,0,0xff,0xff}
 #define COLOR_RED Color32{0xff,0,0,0xff}
+#define COLOR_GREEN Color32{0,0xff,0,0xff}
+#define COLOR_PINK Color32{0xff,0,0xff,0xff}
 
 const float PI = 3.1415926536;
 const float TWOPI = PI * 2.f;

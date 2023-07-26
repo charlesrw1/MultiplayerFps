@@ -12,12 +12,16 @@ void DrawCollisionWorld()
 {
 	if (!has_built) {
 		world_collision.Begin();
+		int basev = world_collision.GetBaseVertex();
 		Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+		for (int i = 0; i < cd.vertex_list.size(); i++) {
+			world_collision.AddVertex(MbVertex(cd.vertex_list[i], COLOR_RED));
+		}
 		for (int i = 0; i < cd.collision_tris.size(); i++) {
 			Level::CollisionTri& ct = cd.collision_tris[i];
-			world_collision.PushLine(cd.vertex_list[ct.indicies[0]], cd.vertex_list[ct.indicies[1]], COLOR_RED);
-			world_collision.PushLine(cd.vertex_list[ct.indicies[1]], cd.vertex_list[ct.indicies[2]], COLOR_RED);
-			world_collision.PushLine(cd.vertex_list[ct.indicies[2]], cd.vertex_list[ct.indicies[0]], COLOR_RED);
+			world_collision.AddLine(basev + ct.indicies[0], basev + ct.indicies[1]);
+			world_collision.AddLine(basev + ct.indicies[1], basev + ct.indicies[2]);
+			world_collision.AddLine(basev + ct.indicies[2], basev + ct.indicies[0]);
 
 			glm::vec3 center = cd.vertex_list[ct.indicies[0]] + cd.vertex_list[ct.indicies[1]] + cd.vertex_list[ct.indicies[2]];
 			center /= 3.f;
@@ -154,7 +158,7 @@ vec3 CapsuleGetReferencePoint(const Level::CollisionData& cd, const Level::Colli
 }
 
 bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
-	const Capsule& cap, vec3 origin, ColliderCastResult* out)
+	const Capsule& cap, ColliderCastResult* out)
 {
 	vec3 cap_normal = normalize(cap.tip - cap.base);
 	vec3 line_end_ofs = cap_normal * cap.radius;
@@ -189,10 +193,6 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 
 void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out)
 {
-	//if (!colctx.static_scene)
-	//	return;
-	//CollisionMeshData* world = colctx.static_scene;
-
 	Level::CollisionData& cd = TEMP_LEVEL->collision_data;
 
 	Capsule adjusted_cap = cap;
@@ -206,7 +206,8 @@ void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out)
 	ColliderCastResult temp;
 	for (int i = 0; i < cd.collision_tris.size(); i++) {
 		const Level::CollisionTri& tri = cd.collision_tris[i];
-		bool res = SphereVsTriangle(cd,tri, pos, cap.radius, &temp);
+
+		bool res = CapsuleVsTriangle(cd, tri, adjusted_cap, &temp);
 		if (res) {
 			found_ground |= dot(temp.surf_normal, vec3(0, 1, 0)) > 0.7;
 		}
@@ -214,15 +215,36 @@ void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out)
 			best_len_total = temp.intersect_len;
 			*out = temp;
 		}
-
-		//bool res = CapsuleVsTriangle(cd, tri, adjusted_cap, vec3(0), &temp);
-		//if (res) {
-		//	found_ground |= dot(temp.surf_normal, vec3(0, 1, 0)) > 0.7;
-		//}
-		//if (res && temp.intersect_len < best_len_total) {
-		//	best_len_total = temp.intersect_len;
-		//	*out = temp;
-		//}
 	}
 	out->touched_ground = found_ground;
+}
+
+void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out)
+{
+	Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+
+	float best_len_total = INFINITY;
+
+	bool found_ground = false;
+	ColliderCastResult temp;
+	for (int i = 0; i < cd.collision_tris.size(); i++) {
+		const Level::CollisionTri& tri = cd.collision_tris[i];
+		bool res = SphereVsTriangle(cd, tri, org, radius, &temp);
+		if (res) {
+			found_ground |= dot(temp.surf_normal, vec3(0, 1, 0)) > 0.7;
+		}
+		if (res && temp.intersect_len < best_len_total) {
+			best_len_total = temp.intersect_len;
+			*out = temp;
+		}
+	}
+	out->touched_ground = found_ground;
+}
+
+void Capsule::GetSphereCenters(vec3& a, vec3& b)
+{
+	vec3 cap_normal = normalize(tip - base);
+	vec3 line_end_ofs = cap_normal * radius;
+	a = base + line_end_ofs;
+	b = tip - line_end_ofs;
 }

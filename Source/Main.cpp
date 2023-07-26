@@ -195,6 +195,39 @@ bool update_camera = false;
 Level* TEMP_LEVEL;
 Model* gun;
 
+struct Player
+{
+	Player() {
+		collider.base = vec3(0, 0.0, 0);
+		collider.radius = 0.4f;
+		collider.tip = vec3(0, 1.0, 0);
+	}
+	glm::vec3 position=vec3(0.0);
+	Capsule collider;
+	float move_speed = 0.1f;
+	void UpdateMovement(bool keys[], int scroll) {
+		vec3 front = fly_cam.front;
+		vec3 up = vec3(0, 1, 0);
+		vec3 right = cross(up, front);
+		if (keys[SDL_SCANCODE_W])
+			position += move_speed * front;
+		if (keys[SDL_SCANCODE_S])
+			position -= move_speed * front;
+		if (keys[SDL_SCANCODE_A])
+			position += right * move_speed;
+		if (keys[SDL_SCANCODE_D])
+			position -= right * move_speed;
+		if (keys[SDL_SCANCODE_Z])
+			position += move_speed * up;
+		if (keys[SDL_SCANCODE_X])
+			position -= move_speed * up;
+		move_speed += (move_speed * 0.5) * scroll;
+		if (abs(move_speed) < 0.000001)
+			move_speed = 0.0001;
+	}
+};
+Player the_player;
+
 double GetTime()
 {
 	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
@@ -202,31 +235,38 @@ double GetTime()
 
 void Update(double dt)
 {
+	vec3 old_pos = fly_cam.position;
+
+	the_player.UpdateMovement(keyboard, scroll_delta);
+
 	if(update_camera)
 		fly_cam.UpdateFromInput(keyboard, mouse_delta_x, mouse_delta_y, scroll_delta);
-	fly_cam.position.y -= 0.4f*dt;
-	Capsule c;
-	c.base = glm::vec3(0, -0.5, 0);
-	c.tip = glm::vec3(0, 0.5, 0);
-	c.radius = 0.5;
+	the_player.position.y -= 0.9f * dt;
+	vec3 delta = the_player.position - old_pos;
+	Capsule c = the_player.collider;
 	for (int i = 0; i < 4; i++) {
 		ColliderCastResult res;
-		TraceCapsule(fly_cam.position, c, &res);
+		vec3 check_pos = old_pos + delta / 4.f * (i + 1.f);
+		TraceCapsule(check_pos, c, &res);
 		if (res.found) {
-			printf("INTERSECT\n");
-			glm::vec3 newdest = fly_cam.position + res.penetration_normal * (res.penetration_depth+0.001f);////trace.0.001f + slide_velocity * dt;
-			fly_cam.position = newdest;
+			the_player.position = check_pos + res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
+		}
+	}
+	for (int i = 0; i < 4; i++) {
+		ColliderCastResult res;
+		TraceCapsule(the_player.position, c, &res);
+		if (res.found) {
+			the_player.position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
 		}
 	}
 }
 
-void DrawTempLevel()
+void DrawTempLevel(mat4 viewproj)
 {
-	mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
 	if (static_wrld.ID == 0)
 		Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt","VERTEX_COLOR");
 	static_wrld.use();
-	static_wrld.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
+	static_wrld.set_mat4("ViewProj", viewproj);
 
 	for (int m = 0; m < temp_level->render_data.instances.size(); m++) {
 		Level::StaticInstance& sm = temp_level->render_data.instances[m];
@@ -249,25 +289,39 @@ void Render(double dt)
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
+	mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
+	mat4 viewproj = perspective * view;
 
+	MeshBuilder mb;
 	simple.use();
-	simple.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
+	simple.set_mat4("ViewProj", viewproj);
 	simple.set_mat4("Model", mat4(1.f));
 	DrawCollisionWorld();
+	mb.Begin();
+	mb.PushLineBox(vec3(-1), vec3(1), COLOR_PINK);
+	mb.End();
+	mb.Draw(GL_LINES);
+	mb.Begin();
+	vec3 a, b;
+	the_player.collider.GetSphereCenters(a, b);
+	mb.AddSphere(the_player.position+a,the_player.collider.radius, 10, 7, COLOR_BLACK);
+	mb.AddSphere(the_player.position + b, the_player.collider.radius, 10, 7, COLOR_BLACK);
 
+	mb.End();
+	mb.Draw(GL_LINES);
 
 	textured.use();
-	textured.set_mat4("ViewProj", perspective*fly_cam.GetViewMatrix());
+	textured.set_mat4("ViewProj", viewproj);
 	textured.set_mat4("Model", mat4(1));
 	
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, mytexture->gl_id);
 
-	MeshBuilder mb;
 	mb.Begin();
 	mb.Push2dQuad(vec2(-1),vec2(2),vec2(0),vec2(1),COLOR_WHITE);
 	mb.End();
 	mb.Draw(GL_TRIANGLES);
+	mb.Free();
 	
 	// Update animation
 	animator.AdvanceFrame(dt);
@@ -276,7 +330,7 @@ void Render(double dt)
 	//
 
 	animated.use();
-	animated.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
+	animated.set_mat4("ViewProj", viewproj);
 	animated.set_mat4("Model", mat4(1));
 	animated.set_mat4("InverseModel", mat4(1));
 
@@ -295,11 +349,11 @@ void Render(double dt)
 	{
 		MeshPart* part = &m->parts[i];
 		glBindVertexArray(part->vao);
-		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
+		//glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
 	}
 	glCheckError();
 
-	DrawTempLevel();
+	//DrawTempLevel(viewproj);
 	SDL_GL_SwapWindow(window);
 
 }
@@ -317,7 +371,7 @@ int main(int argc, char** argv)
 {
 	CreateWindow();
 	printf("hello world");
-	mytexture = FindOrLoadTexture("test2.jpg");
+	mytexture = FindOrLoadTexture("test.png");
 	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
 	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");

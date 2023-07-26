@@ -43,8 +43,11 @@ struct Capsule
 	void GetSphereCenters(glm::vec3& a, glm::vec3& b);
 };
 
+
 void DrawCollisionWorld();
 void TraceCapsule(glm::vec3 org, const Capsule& capsule, ColliderCastResult* out);
+void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out);
+
 
 
 #endif // !PHYSICS_H

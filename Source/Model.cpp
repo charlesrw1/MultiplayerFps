@@ -11,6 +11,7 @@
 static const char* const model_folder_path = "Data\\Models\\";
 static std::vector<Model*> models;
 
+// Hardcoded attribute locations for shaders
 const int POSITION_LOC = 0;
 const int UV_LOC = 1;
 const int NORMAL_LOC = 2;
