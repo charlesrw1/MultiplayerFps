@@ -11,9 +11,11 @@
 #include "glm/glm.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "Model.h"
 #include "MeshBuilder.h"
 #include "Util.h"
+#include "Animation.h"
 
 using glm::vec3;
 using glm::vec2;
@@ -207,7 +209,13 @@ Shader textured;
 Shader animated;
 Texture* mytexture;
 Model* m = nullptr;
+Animator animator;
 bool update_camera = false;
+
+double GetTime()
+{
+	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+}
 
 void Update()
 {
@@ -215,7 +223,7 @@ void Update()
 		fly_cam.UpdateFromInput(keyboard, mouse_delta_x, mouse_delta_y, scroll_delta);
 }
 
-void Render()
+void Render(double dt)
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClearColor(1.f, 1.f, 0.f, 1.f);
@@ -236,10 +244,27 @@ void Render()
 	mb.End();
 	mb.Draw(GL_TRIANGLES);
 	
+	// Update animation
+	animator.AdvanceFrame(dt);
+	animator.SetupBones();
+	animator.ConcatWithInvPose();
+	//
+
+
 	animated.use();
 	animated.set_mat4("ViewProj", perspective * fly_cam.GetViewMatrix());
 	animated.set_mat4("Model", mat4(1));
 	animated.set_mat4("InverseModel", mat4(1));
+
+	const std::vector<mat4>& bones = animator.GetBones();
+
+	const uint32_t bone_matrix_loc = glGetUniformLocation(animated.ID, "BoneTransform[0]");
+
+	for (int j = 0; j < bones.size(); j++)
+		glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
+
+	glCheckError();
+
 
 	glDisable(GL_CULL_FACE);
 	for (int i = 0; i < m->parts.size(); i++)
@@ -275,8 +300,24 @@ int main(int argc, char** argv)
 	ASSERT(mytexture != nullptr);
 	ASSERT(glCheckError() == 0);
 	InitGlState();
+	
+	animator.Init(m);
+	animator.SetAnim(0, 2);
+	animator.GetLayer(0).active = true;
+
+	int bone = m->BoneForName("upper_arm.R");
+	int anim = m->animations->FindClipFromName("act_run");
+	if (anim != -1)
+		animator.SetAnim(0, anim);
+
+	double delta_t = 0.1;
+	double last = GetTime();
 	for(;;)
 	{
+		double now = GetTime();
+		delta_t = now - last;
+		last = now;
+
 		mouse_delta_x = mouse_delta_y = scroll_delta = 0;
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
@@ -309,7 +350,7 @@ int main(int argc, char** argv)
 			}
 		}
 		Update();
-		Render();
+		Render(delta_t);
 	}
 
 	Shutdown();

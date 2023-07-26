@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include "glm/glm.hpp"
+#include "glm/gtc/quaternion.hpp"
 #include "Util.h"
 
 #define MAX_BONES 256
@@ -21,6 +22,7 @@ struct Bone
 	int name_table_ofs;
 	glm::mat4x3 posematrix;	// bone space -> mesh space
 	glm::mat4x3 invposematrix; // mesh space -> bone space
+	glm::quat rot;
 };
 
 struct MeshPart
@@ -62,6 +64,8 @@ public:
 	std::vector<GpuBuffer> buffers;
 
 	std::vector<MeshMaterial> materials;
+
+	int BoneForName(const char* name);
 };
 
 void FreeLoadedModels();

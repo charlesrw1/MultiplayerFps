@@ -162,6 +162,9 @@ static void LoadGltfSkeleton(tinygltf::Model& scene, Model* model, tinygltf::Ski
 			model->bone_string_table.push_back(c);
 		model->bone_string_table.push_back('\0');
 
+		// needed when animations dont have any keyframes, cause gltf exports nothing when its euler angles ???
+		b.rot = glm::quat_cast(glm::mat4(b.posematrix));
+
 		bone_to_index.insert({ node.name, model->bones.size() });
 		model->bones.push_back(b);
 	}
@@ -257,7 +260,7 @@ static AnimationSet* LoadGltfAnimations(tinygltf::Model& scene, tinygltf::Skin& 
 		my_anim.num_pos = set->positions.size() - my_anim.pos_offset;
 		my_anim.num_rot = set->rotations.size() - my_anim.rot_offset;
 		my_anim.num_scale = set->scales.size() - my_anim.scale_offset;
-
+		my_anim.fps = 1.0;
 		set->clips.push_back(my_anim);
 	}
 
@@ -296,6 +299,15 @@ static bool DoLoadGltfModel(const std::string& filepath, Model* model)
 void Model::GpuBuffer::Bind()
 {
 	glBindBuffer(target, handle);
+}
+
+int Model::BoneForName(const char* name)
+{
+	for (int i = 0; i < bones.size(); i++) {
+		if (strcmp(&bone_string_table.at(bones[i].name_table_ofs), name) == 0)
+			return i;
+	}
+	return -1;
 }
 
 void FreeLoadedModels()

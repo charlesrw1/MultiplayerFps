@@ -13,7 +13,7 @@ using glm::dot;
 using glm::cross;
 using glm::normalize;
 
-int AnimationSet::FirstPositionKeyframe(int frame, int channel_num, int clip) const
+int AnimationSet::FirstPositionKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
 
@@ -33,7 +33,7 @@ int AnimationSet::FirstPositionKeyframe(int frame, int channel_num, int clip) co
 
 	return chan.num_positions - 1;
 }
-int AnimationSet::FirstRotationKeyframe(int frame, int channel_num, int clip) const
+int AnimationSet::FirstRotationKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
 	assert(channel_num < channels.size());
@@ -49,7 +49,7 @@ int AnimationSet::FirstRotationKeyframe(int frame, int channel_num, int clip) co
 
 	return chan.num_rotations - 1;
 }
-int AnimationSet::FirstScaleKeyframe(int frame, int channel_num, int clip) const
+int AnimationSet::FirstScaleKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
 	assert(channel_num < channels.size());
@@ -90,6 +90,16 @@ const AnimChannel& AnimationSet::GetChannel(int clip, int channel) const {
 	return channels[clips[clip].channel_offset + channel];
 }
 
+int AnimationSet::FindClipFromName(const char* name)
+{
+	for (int i = 0; i < clips.size(); i++) {
+		if (clips[i].name == name)
+			return i;
+	}
+	return -1;
+}
+
+
 void Animator::AdvanceFrame(float elapsed)
 {
 	if (!model || !model->animations)
@@ -104,10 +114,10 @@ void Animator::AdvanceFrame(float elapsed)
 		layer.cur_frame += clip.fps * elapsed * layer.playing_speed;
 		if (layer.cur_frame > clip.total_duration || layer.cur_frame < 0)
 		{
-			if (layer.looping)
+			//if (layer.looping)
 				layer.cur_frame = fmod(fmod(layer.cur_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			else
-				layer.cur_frame = clip.total_duration;
+			//else
+			//	layer.cur_frame = clip.total_duration;
 		}
 		if (0)
 		{
@@ -182,7 +192,7 @@ void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float cu
 
 		vec3 interp_pos{};
 		if (pos_idx == -1)
-			interp_pos = glm::vec3(0);
+			interp_pos = model->bones.at(i).posematrix[3];
 		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
 			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
 		else {
@@ -196,7 +206,7 @@ void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float cu
 
 		glm::quat interp_rot{};
 		if (rot_idx == -1)
-			interp_rot = glm::quat(1, 0, 0, 0);
+			interp_rot = model->bones.at(i).rot;
 		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
 			interp_rot = set->GetRot(i, pos_idx, clip_index).val;
 		else {

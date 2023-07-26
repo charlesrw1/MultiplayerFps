@@ -59,15 +59,17 @@ public:
 	std::vector<Animation> clips;
 
 	// Returns index to use with GetX(), -1 if no keyframes
-	int FirstPositionKeyframe(int frame, int channel, int clip) const;
-	int FirstRotationKeyframe(int frame, int channel, int clip) const;
-	int FirstScaleKeyframe(int frame, int channel, int clip) const;
+	int FirstPositionKeyframe(float frame, int channel, int clip) const;
+	int FirstRotationKeyframe(float frame, int channel, int clip) const;
+	int FirstScaleKeyframe(float frame, int channel, int clip) const;
 
 	const PosKeyframe& GetPos(int channel, int index, int clip) const;
 	const RotKeyframe& GetRot(int channel, int index, int clip) const;
 	const ScaleKeyframe& GetScale(int channel, int index, int clip) const;
 
 	const AnimChannel& GetChannel(int clip, int channel) const;
+
+	int FindClipFromName(const char* name);
 };
 
 
