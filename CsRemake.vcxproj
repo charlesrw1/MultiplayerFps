@@ -27,15 +27,19 @@
     <ClCompile Include="Source\Model.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Shader.cpp" />
+    <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
+    <ClInclude Include="Source\Actor.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Model.h" />
     <ClInclude Include="Source\MathLib.h" />
+    <ClInclude Include="Source\Network.h" />
     <ClInclude Include="Source\Physics.h" />
     <ClInclude Include="Source\Shader.h" />
+    <ClInclude Include="Source\Socket.h" />
     <ClInclude Include="Source\Texture.h" />
     <ClInclude Include="Source\Util.h" />
     <ClInclude Include="Source\MeshBuilder.h" />
@@ -116,7 +120,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -148,7 +152,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

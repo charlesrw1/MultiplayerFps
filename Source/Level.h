@@ -29,9 +29,26 @@ public:
 		std::vector<CollisionTri> collision_tris;
 		std::vector<glm::vec3> vertex_list;
 	};
+	struct PlayerSpawn
+	{
+		glm::vec3 position;
+		float angle = 0.f;
+		short team = 0;
+		short mode = 0;
+	};
+	struct Trigger
+	{
+		glm::mat4x3 inv_transform;	// aabb is then 1x1x1 cube
+		glm::vec3 size = glm::vec3(1);
+		short shape_type = 0;
+		short type = 0;
+		short param1 = 0;
+	};
 
 	CollisionData collision_data;
 	RenderData render_data;
+	std::vector<PlayerSpawn> spawns;
+	std::vector<Trigger> triggers;
 };
 
 Level* LoadLevelFile(const char* level);

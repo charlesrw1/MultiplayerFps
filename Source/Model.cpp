@@ -318,6 +318,7 @@ void FreeLoadedModels()
 {
 	for (int i = 0; i < models.size(); i++) {
 		Model* m = models[i];
+		printf("Freeing model: %s\n", m->name.c_str());
 		for (int p = 0; p < m->parts.size(); p++) {
 			glDeleteVertexArrays(1, &m->parts[p].vao);
 		}

@@ -74,6 +74,62 @@ static void LoadCollisionData(Level* level, tinygltf::Model& scene, tinygltf::Me
 	}
 }
 
+static void ParseObject(Level* level, const tinygltf::Node& node, glm::mat4 transform, bool& should_collide, bool& should_render)
+{
+	should_collide = should_render = false;
+	size_t endpos = node.name.find(']');
+	if (endpos == std::string::npos || endpos==1) {
+		printf("Bad object: %s\n", node.name.c_str());
+		return;
+	}
+	glm::vec3 euler_angles = glm::vec3(0);
+	if (node.rotation.size() == 4) {
+		glm::quat quat = glm::make_quat<double>(node.rotation.data());
+		euler_angles = glm::eulerAngles(quat);
+	}
+	std::string type_name = node.name.substr(1, endpos-1);
+	bool is_trig = type_name.find("trig:") != std::string::npos;
+	if (is_trig) {
+		type_name = type_name.substr(5);
+		Level::Trigger trig{};
+		if (type_name == "spawn_zone") {
+			trig.type = 0;
+		}
+		else {
+			printf("Bad trigger type: %s\n", node.name.c_str());
+			return;
+		}
+		trig.size = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
+		transform[0] /= trig.size.x;
+		transform[1] /= trig.size.y;
+		transform[2] /= trig.size.z;
+
+		trig.inv_transform = glm::inverse(transform);
+		trig.shape_type = 0;	// for later use (spheres)
+
+		level->triggers.push_back(trig);
+	}
+	else
+	{
+		if (type_name == "player_spawn")
+		{
+			Level::PlayerSpawn spawn;
+			spawn.angle = euler_angles.y;
+			spawn.position = transform[3];
+			spawn.team = 0;
+			spawn.mode = 0;
+			level->spawns.push_back(spawn);
+		}
+		else
+		{
+			printf("Unknown obj type: %s\n", node.name.c_str());
+			return;
+		}
+
+	}
+	
+}
+
 static void LookThroughNodeTree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, glm::mat4 global_transform)
 {
 	glm::mat4 local_transform = glm::mat4(1);
@@ -99,6 +155,10 @@ static void LookThroughNodeTree(Level* level, tinygltf::Model& scene, tinygltf::
 	global_transform = global_transform * local_transform;
 	bool statically_drawn = true;
 	bool has_collision = true;
+
+	if (node.name.size() > 0 && node.name[0] == '[')
+		ParseObject(level,node,global_transform,has_collision, statically_drawn);
+
 	if (node.mesh != -1) {
 		if (statically_drawn) {
 			Level::StaticInstance sm;

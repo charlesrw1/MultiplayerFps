@@ -16,6 +16,9 @@
     <Filter Include="Source Files\External">
       <UniqueIdentifier>{7dd26c09-769b-49ec-b681-84d812313e61}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Utils">
+      <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\External\glad.c">
@@ -44,6 +47,9 @@
     </ClCompile>
     <ClCompile Include="Source\Level.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Socket.cpp">
+      <Filter>Source Files\Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -76,6 +82,15 @@
     </ClInclude>
     <ClInclude Include="Source\Level.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Actor.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Network.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Socket.h">
+      <Filter>Source Files\Utils</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

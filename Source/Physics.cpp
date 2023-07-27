@@ -25,7 +25,7 @@ void DrawCollisionWorld()
 
 			glm::vec3 center = cd.vertex_list[ct.indicies[0]] + cd.vertex_list[ct.indicies[1]] + cd.vertex_list[ct.indicies[2]];
 			center /= 3.f;
-			world_collision.PushLine(center, center + ct.face_normal, COLOR_BLUE);
+			world_collision.PushLine(center, center + ct.face_normal*0.25f, COLOR_BLUE);
 		}
 		world_collision.End();
 		has_built = true;

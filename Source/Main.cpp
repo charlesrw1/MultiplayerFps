@@ -18,6 +18,7 @@
 #include "Animation.h"
 #include "Level.h"
 #include "Physics.h"
+#include "Actor.h"
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -53,16 +54,175 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	return has_error;
 }
 
-SDL_Window* window = nullptr;
-SDL_GLContext context;
-int vid_width = 800;
-int vid_height = 600;
-bool keyboard[SDL_NUM_SCANCODES];
-int mouse_delta_x = 0;
-int mouse_delta_y = 0;
-int scroll_delta = 0;
+struct Entity
+{
+	EntType type = EntType::INVALID;
+	bool active = false;
+	glm::vec3 position=glm::vec3(0);
+	glm::vec3 rotation=glm::vec3(0);
+	glm::vec3 scale = glm::vec3(1.f);
+	const Model* model = nullptr;
+	Capsule collider;
+	
+	glm::vec3 velocity=glm::vec3(0);
+};
 
-const float fov = glm::radians(75.f);
+const int MAX_GAME_ENTS = 256;
+class Game
+{
+public:
+	Game() {
+		memset(spawnids, 0, sizeof(spawnids));
+	}
+	int SpawnActor(EntType type);
+	Entity* GetByIndex(int index) {
+		if (index >= MAX_GAME_ENTS|| index < 0 || !ents[index].active)
+			return nullptr;
+		return &ents[index];
+	}
+	Entity* GetPlayer() { 
+		Entity* e = GetByIndex(0);
+		ASSERT(!e || e->type == EntType::PLAYER);
+		return e;
+	}
+
+	Entity ents[MAX_GAME_ENTS];
+	short spawnids[MAX_GAME_ENTS];
+	int num_actors = 0;
+	int first_free_network = 0;
+	int first_free_local = 0;
+	
+	Level* level = nullptr;
+};
+
+int Game::SpawnActor(EntType type)
+{
+	// temp
+	ents[num_actors].type = type;
+	ents[num_actors++].active = true;
+	return num_actors - 1;
+}
+
+class FlyCamera
+{
+public:
+	vec3 position = vec3(0);
+	vec3 front = vec3(1, 0, 0);
+	vec3 up = vec3(0, 1, 0);
+	float move_speed = 0.1f;
+	float yaw = 0, pitch = 0;
+
+	void UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll);
+	void UpdateVectors() {
+		front = AnglesToVector(pitch, yaw);
+	}
+	mat4 GetViewMatrix() const {
+		return glm::lookAt(position, position + front, up);
+	}
+};
+
+struct ViewSetup
+{
+	vec3 vieworigin;
+	vec3 viewfront;
+	float viewfov;
+	mat4 view_mat;
+	mat4 proj_mat;
+	mat4 viewproj;
+	int x, y, width, height;
+};
+
+static bool update_camera = false;
+class ViewMgr
+{
+public:
+	void Init();
+	void Update();
+	const ViewSetup& GetSceneView() {
+		return setup;
+	}
+
+	bool third_person = true;
+	bool debug_fly = false;
+
+	float z_near = 0.01f;
+	float z_far = 100.f;
+	float fov = glm::radians(70.f);
+
+	FlyCamera fly_cam;
+	ViewSetup setup;
+};
+
+
+const int DEFAULT_WIDTH = 1200;
+const int DEFAULT_HEIGHT = 800;
+class Core
+{
+public:
+	SDL_Window* window = nullptr;
+	SDL_GLContext context = nullptr;
+	int vid_width = DEFAULT_WIDTH;
+	int vid_height = DEFAULT_HEIGHT;
+
+	struct InputState
+	{
+		bool keyboard[SDL_NUM_SCANCODES];
+		int mouse_delta_x = 0;
+		int mouse_delta_y = 0;
+		int scroll_delta = 0;
+	};
+	InputState input;
+	Game game;
+	ViewMgr view;
+};
+Core core;
+
+static void Cleanup()
+{
+	FreeLoadedModels();
+	FreeLoadedTextures();
+	SDL_GL_DeleteContext(core.context);
+	SDL_DestroyWindow(core.window);
+	SDL_Quit();
+}
+
+void Quit()
+{
+	printf("Quiting...\n");
+	Cleanup();
+	exit(0);
+}
+
+void Fatal(const char* msg)
+{
+	Cleanup();
+	exit(-1);
+}
+
+
+
+void ViewMgr::Init()
+{
+	setup.height = core.vid_height;
+	setup.width = core.vid_width;
+	setup.viewfov = fov;
+	setup.x = setup.y = 0;
+	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
+}
+
+void ViewMgr::Update()
+{
+	Core::InputState& input = core.input;
+	if (update_camera) {
+		fly_cam.UpdateFromInput(input.keyboard, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
+	}
+	if (third_person) {
+		Entity* player = core.game.GetPlayer();
+		fly_cam.position = player->position - fly_cam.front * 3.f;
+	}
+	setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
+	setup.viewproj = setup.proj_mat * setup.view_mat;
+}
 
 
 void SDLError(const char* msg)
@@ -74,7 +234,7 @@ void SDLError(const char* msg)
 
 bool CreateWindow()
 {
-	if (window)
+	if (core.window)
 		return true;
 
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
@@ -88,16 +248,14 @@ bool CreateWindow()
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-	uint32_t win_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;// | SDL_WINDOW_FULLSCREEN;
-
-	window = SDL_CreateWindow("CsRemake",
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, vid_width, vid_height, win_flags);
-	if (window == nullptr) {
+	core.window = SDL_CreateWindow("CsRemake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
+		core.vid_width, core.vid_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	if (core.window == nullptr) {
 		SDLError("SDL failed to create window");
 		return false;
 	}
 
-	context = SDL_GL_CreateContext(window);
+	core.context = SDL_GL_CreateContext(core.window);
 	printf("OpenGL loaded\n");
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
 	printf("Vendor: %s\n", glGetString(GL_VENDOR));
@@ -109,33 +267,7 @@ bool CreateWindow()
 	return true;
 }
 
-void Shutdown()
-{
-	SDL_GL_DeleteContext(context);
-	SDL_DestroyWindow(window);
-	SDL_Quit();
-}
-
-class FlyCamera
-{
-public:
-	vec3 position = vec3(0);
-	vec3 front = vec3(1, 0, 0);
-	vec3 up = vec3(0, 1, 0);
-
-	float move_speed = 0.1f;
-	float yaw = 0, pitch = 0;
-
-	void UpdateFromInput(bool keys[], int mouse_dx, int mouse_dy, int scroll);
-	void UpdateVectors() {
-		front = AnglesToVector(pitch, yaw);
-	}
-	mat4 GetViewMatrix() const {
-		return glm::lookAt(position, position + front, up);
-	}
-};
-
-void FlyCamera::UpdateFromInput(bool keys[], int mouse_dx, int mouse_dy, int scroll)
+void FlyCamera::UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll)
 {
 	int xpos, ypos;
 	xpos = mouse_dx;
@@ -182,7 +314,6 @@ void FlyCamera::UpdateFromInput(bool keys[], int mouse_dx, int mouse_dy, int scr
 		move_speed = 0.0001;
 }
 
-FlyCamera fly_cam;
 Shader simple;
 Shader textured;
 Shader animated;
@@ -190,75 +321,68 @@ Shader static_wrld;
 Texture* mytexture;
 Model* m = nullptr;
 Animator animator;
-Level* temp_level;
-bool update_camera = false;
 Level* TEMP_LEVEL;
 Model* gun;
 
-struct Player
-{
-	Player() {
-		collider.base = vec3(0, 0.0, 0);
-		collider.radius = 0.4f;
-		collider.tip = vec3(0, 1.0, 0);
-	}
-	glm::vec3 position=vec3(0.0);
-	Capsule collider;
-	float move_speed = 0.1f;
-	void UpdateMovement(bool keys[], int scroll) {
-		vec3 front = fly_cam.front;
-		vec3 up = vec3(0, 1, 0);
-		vec3 right = cross(up, front);
-		if (keys[SDL_SCANCODE_W])
-			position += move_speed * front;
-		if (keys[SDL_SCANCODE_S])
-			position -= move_speed * front;
-		if (keys[SDL_SCANCODE_A])
-			position += right * move_speed;
-		if (keys[SDL_SCANCODE_D])
-			position -= right * move_speed;
-		if (keys[SDL_SCANCODE_Z])
-			position += move_speed * up;
-		if (keys[SDL_SCANCODE_X])
-			position -= move_speed * up;
-		move_speed += (move_speed * 0.5) * scroll;
-		if (abs(move_speed) < 0.000001)
-			move_speed = 0.0001;
-	}
+const Capsule DEFAULT_COLLIDER = {
+	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
 };
-Player the_player;
+const float DEFAULT_MOVESPEED = 0.1f;
 
 double GetTime()
 {
 	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
 }
 
+static float move_speed_player = 0.1f;
+
+static void UpdatePlayer(const Core::InputState& input, double dt)
+{
+	const bool* keys = input.keyboard;
+	const int scroll = input.scroll_delta;
+	
+	Entity* player = core.game.GetPlayer();
+	vec3 position = player->position;
+	float move_speed = move_speed_player;
+
+	vec3 front = core.view.fly_cam.front;
+	vec3 up = vec3(0, 1, 0);
+	vec3 right = cross(up, front);
+	if (keys[SDL_SCANCODE_W])
+		position += move_speed * front;
+	if (keys[SDL_SCANCODE_S])
+		position -= move_speed * front;
+	if (keys[SDL_SCANCODE_A])
+		position += right * move_speed;
+	if (keys[SDL_SCANCODE_D])
+		position -= right * move_speed;
+	if (keys[SDL_SCANCODE_Z])
+		position += move_speed * up;
+	if (keys[SDL_SCANCODE_X])
+		position -= move_speed * up;
+	move_speed += (move_speed * 0.5) * scroll;
+	if (abs(move_speed) < 0.000001)
+		move_speed = 0.0001;
+
+	position.y -= 0.9f * dt;
+
+	Capsule collider = player->collider;
+	for (int i = 0; i < 4; i++) {
+		ColliderCastResult res;
+		TraceCapsule(position, collider, &res);
+		if (res.found) {
+			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
+		}
+	}
+
+	player->position = position;
+	move_speed_player = move_speed;
+}
+
 void Update(double dt)
 {
-	vec3 old_pos = fly_cam.position;
-
-	the_player.UpdateMovement(keyboard, scroll_delta);
-
-	if(update_camera)
-		fly_cam.UpdateFromInput(keyboard, mouse_delta_x, mouse_delta_y, scroll_delta);
-	the_player.position.y -= 0.9f * dt;
-	vec3 delta = the_player.position - old_pos;
-	Capsule c = the_player.collider;
-	for (int i = 0; i < 4; i++) {
-		ColliderCastResult res;
-		vec3 check_pos = old_pos + delta / 4.f * (i + 1.f);
-		TraceCapsule(check_pos, c, &res);
-		if (res.found) {
-			the_player.position = check_pos + res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-		}
-	}
-	for (int i = 0; i < 4; i++) {
-		ColliderCastResult res;
-		TraceCapsule(the_player.position, c, &res);
-		if (res.found) {
-			the_player.position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-		}
-	}
+	UpdatePlayer(core.input, dt);
+	core.view.Update();
 }
 
 void DrawTempLevel(mat4 viewproj)
@@ -268,9 +392,10 @@ void DrawTempLevel(mat4 viewproj)
 	static_wrld.use();
 	static_wrld.set_mat4("ViewProj", viewproj);
 
-	for (int m = 0; m < temp_level->render_data.instances.size(); m++) {
-		Level::StaticInstance& sm = temp_level->render_data.instances[m];
-		Model* model = temp_level->render_data.embedded_meshes[sm.model_index];
+	Level* level = core.game.level;
+	for (int m = 0; m < level->render_data.instances.size(); m++) {
+		Level::StaticInstance& sm = level->render_data.instances[m];
+		Model* model = level->render_data.embedded_meshes[sm.model_index];
 		static_wrld.set_mat4("Model", sm.transform);
 		static_wrld.set_mat4("InverseModel", glm::inverse(sm.transform));
 		for (int p = 0; p < model->parts.size(); p++) {
@@ -279,7 +404,44 @@ void DrawTempLevel(mat4 viewproj)
 			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
 		}
 	}
+}
 
+static void DrawPlayer(mat4 viewproj)
+{
+	Entity* player = core.game.GetPlayer();
+	vec3 origin = player->position;
+	float radius = player->collider.radius;
+	vec3 a, b;
+	player->collider.GetSphereCenters(a, b);
+
+	MeshBuilder mb;
+	mb.Begin();
+	mb.AddSphere(origin + a, player->collider.radius, 10, 7, COLOR_GREEN);
+	mb.AddSphere(origin + b, player->collider.radius, 10, 7, COLOR_GREEN);
+	mb.End();
+	mb.Draw(GL_LINES);
+	mb.Free();
+}
+
+void InitGlState()
+{
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glClearColor(0.5f, 0.3f, 0.2f, 1.f);
+	glEnable(GL_MULTISAMPLE);
+	glDepthFunc(GL_LEQUAL);
+}
+
+void RenderInit()
+{
+	InitGlState();
+	mytexture = FindOrLoadTexture("test.png");
+	gun = FindOrLoadModel("m16.glb");
+	m = FindOrLoadModel("CT.glb");
+	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
+	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
+	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
 }
 
 void Render(double dt)
@@ -288,9 +450,12 @@ void Render(double dt)
 	glClearColor(1.f, 1.f, 0.f, 1.f);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-	mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
-	mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
-	mat4 viewproj = perspective * view;
+
+	ViewSetup view = core.view.GetSceneView();
+	//mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
+	//mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
+	glViewport(view.x, view.y, view.width, view.height);
+	mat4 viewproj = view.viewproj;
 
 	MeshBuilder mb;
 	simple.use();
@@ -301,14 +466,7 @@ void Render(double dt)
 	mb.PushLineBox(vec3(-1), vec3(1), COLOR_PINK);
 	mb.End();
 	mb.Draw(GL_LINES);
-	mb.Begin();
-	vec3 a, b;
-	the_player.collider.GetSphereCenters(a, b);
-	mb.AddSphere(the_player.position+a,the_player.collider.radius, 10, 7, COLOR_BLACK);
-	mb.AddSphere(the_player.position + b, the_player.collider.radius, 10, 7, COLOR_BLACK);
-
-	mb.End();
-	mb.Draw(GL_LINES);
+	DrawPlayer(viewproj);
 
 	textured.use();
 	textured.set_mat4("ViewProj", viewproj);
@@ -344,7 +502,7 @@ void Render(double dt)
 	glCheckError();
 
 
-	glDisable(GL_CULL_FACE);
+	//glDisable(GL_CULL_FACE);
 	for (int i = 0; i < m->parts.size(); i++)
 	{
 		MeshPart* part = &m->parts[i];
@@ -353,38 +511,29 @@ void Render(double dt)
 	}
 	glCheckError();
 
-	//DrawTempLevel(viewproj);
-	SDL_GL_SwapWindow(window);
+	DrawTempLevel(viewproj);
+	SDL_GL_SwapWindow(core.window);
 
 }
-void InitGlState()
-{
-	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glClearColor(0.5f, 0.3f, 0.2f, 1.f);
-	glEnable(GL_MULTISAMPLE);
-	glDepthFunc(GL_LEQUAL);
-}
 
-int main(int argc, char** argv)
+void MiscInit()
 {
-	CreateWindow();
-	printf("hello world");
-	mytexture = FindOrLoadTexture("test.png");
-	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
-	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
-	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
+	core.game.level = LoadLevelFile("world0.glb");
+	TEMP_LEVEL = core.game.level;
 
-	gun = FindOrLoadModel("m16.glb");
-	m = FindOrLoadModel("CT.glb");
-	temp_level = LoadLevelFile("world0.glb");
-	TEMP_LEVEL = temp_level;
+	int p_index = core.game.SpawnActor(EntType::PLAYER);
+	Entity* player = core.game.GetPlayer();
+	player->collider = DEFAULT_COLLIDER;
+
+	if (!core.game.level->spawns.empty()) {
+		Level::PlayerSpawn& spawn = core.game.level->spawns[0];
+		player->position = spawn.position;
+		core.view.fly_cam.yaw = spawn.angle;
+	}
 
 	ASSERT(mytexture != nullptr);
 	ASSERT(glCheckError() == 0);
-	InitGlState();
-	
+
 	animator.Init(m);
 	animator.SetAnim(0, 2);
 	animator.GetLayer(0).active = true;
@@ -393,35 +542,39 @@ int main(int argc, char** argv)
 	int anim = m->animations->FindClipFromName("act_run");
 	if (anim != -1)
 		animator.SetAnim(0, anim);
+}
 
+int Run()
+{
 	double delta_t = 0.1;
 	double last = GetTime();
-	for(;;)
+	for (;;)
 	{
 		double now = GetTime();
 		delta_t = now - last;
 		last = now;
 
-		mouse_delta_x = mouse_delta_y = scroll_delta = 0;
+		Core::InputState& input = core.input;
+		input.mouse_delta_x = input.mouse_delta_y = input.scroll_delta = 0;
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
 			switch (event.type)
 			{
 			case SDL_QUIT:
-				Shutdown();
+				Quit();
 				return 1;
 				break;
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:
-				keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
+				input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
 				break;
 			case SDL_MOUSEMOTION:
-				mouse_delta_x += event.motion.xrel;
-				mouse_delta_y += event.motion.yrel;
+				input.mouse_delta_x += event.motion.xrel;
+				input.mouse_delta_y += event.motion.yrel;
 				break;
 			case SDL_MOUSEWHEEL:
-				scroll_delta += event.wheel.y;
+				input.scroll_delta += event.wheel.y;
 			case SDL_MOUSEBUTTONDOWN:
 				SDL_SetRelativeMouseMode(SDL_TRUE);
 				update_camera = true;
@@ -430,14 +583,25 @@ int main(int argc, char** argv)
 				SDL_SetRelativeMouseMode(SDL_FALSE);
 				update_camera = false;
 				break;
-
+		
 			}
 		}
 		Update(delta_t);
 		Render(delta_t);
 	}
+}
 
-	Shutdown();
+int main(int argc, char** argv)
+{
+	printf("Starting...\n");
+	CreateWindow();
+	core.view.Init();
+	RenderInit();
+	MiscInit();
 
+	Run();
+	
+	Quit();
+	
 	return 0;
 }
