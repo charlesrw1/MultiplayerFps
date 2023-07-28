@@ -99,8 +99,8 @@ public:
 
 	// Main function
 	void SetupBones();
-
 	void ConcatWithInvPose();
+
 	void AdvanceFrame(float elapsed_time);
 	//void ResetAllLayers();
 	void ResetAnimLayer(int layer);

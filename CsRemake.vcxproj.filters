@@ -16,7 +16,7 @@
     <Filter Include="Source Files\External">
       <UniqueIdentifier>{7dd26c09-769b-49ec-b681-84d812313e61}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Utils">
+    <Filter Include="Source Files\Network">
       <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -49,7 +49,13 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Socket.cpp">
-      <Filter>Source Files\Utils</Filter>
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Connection.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ClientNServer.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -83,14 +89,23 @@
     <ClInclude Include="Source\Level.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Actor.h">
+    <ClInclude Include="Source\Entity.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Network.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Socket.h">
-      <Filter>Source Files\Utils</Filter>
+      <Filter>Source Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Connection.h">
+      <Filter>Source Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Serialize.h">
+      <Filter>Source Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ClientNServer.h">
+      <Filter>Source Files\Network</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

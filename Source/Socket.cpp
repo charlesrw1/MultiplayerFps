@@ -64,12 +64,12 @@ void Socket::Init(int port)
 		sockaddr_in addr;
 		int len = sizeof(addr);
 		if (getsockname(handle, (sockaddr*)&addr, &len) == -1) {
-			printf("getsockname() failed: 0x%08x\n", WSAGetLastError());
+			printf("getsockname() failed: %d\n", WSAGetLastError());
 			exit(-1);
 		}
 		local_addr.ip = ntohl(addr.sin_addr.s_addr);
 		local_addr.port = ntohs(addr.sin_port);
-		printf("Connected to %s\n", local_addr.ToString().c_str());
+		printf("IP Address: %s\n", local_addr.ToString().c_str());
 	}
 }
 
@@ -87,7 +87,7 @@ bool Socket::Send(void* data, size_t length, const IPAndPort& to)
 
 	sockaddr_in addr = ToSockaddr(to);
 	if (sendto(handle, (char*)data, length, 0, (sockaddr*)&addr, sizeof(addr)) == -1) {
-		printf("Socket::Send error: 0x%08x\n", WSAGetLastError());
+		printf("Socket::Send error: %d\n", WSAGetLastError());
 		return false;
 	}
 	return true;

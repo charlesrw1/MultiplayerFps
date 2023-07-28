@@ -9,6 +9,7 @@
 
 bool CheckGlErrorInternal_(const char* file, int line);
 #define glCheckError() CheckGlErrorInternal_(__FILE__,__LINE__)
+double GetTime();
 
 struct Color32
 {

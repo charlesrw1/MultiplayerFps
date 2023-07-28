@@ -20,6 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Animation.cpp" />
+    <ClCompile Include="Source\ClientNServer.cpp" />
+    <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />
@@ -32,7 +34,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
-    <ClInclude Include="Source\Actor.h" />
+    <ClInclude Include="Source\ClientNServer.h" />
+    <ClInclude Include="Source\Entity.h" />
+    <ClInclude Include="Source\Serialize.h" />
+    <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Model.h" />
     <ClInclude Include="Source\MathLib.h" />

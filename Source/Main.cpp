@@ -18,7 +18,8 @@
 #include "Animation.h"
 #include "Level.h"
 #include "Physics.h"
-#include "Actor.h"
+#include "Entity.h"
+#include "ClientNServer.h"
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -174,6 +175,8 @@ public:
 	InputState input;
 	Game game;
 	ViewMgr view;
+	Client client;
+	Server server;
 };
 Core core;
 
@@ -181,6 +184,7 @@ static void Cleanup()
 {
 	FreeLoadedModels();
 	FreeLoadedTextures();
+	NetworkQuit();
 	SDL_GL_DeleteContext(core.context);
 	SDL_DestroyWindow(core.window);
 	SDL_Quit();
@@ -327,6 +331,9 @@ Model* gun;
 const Capsule DEFAULT_COLLIDER = {
 	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
 };
+const Capsule CROUCH_COLLIDER = {
+	0.2f, glm::vec3(0,0,0),glm::vec3(0,0.75,0.0)
+};
 const float DEFAULT_MOVESPEED = 0.1f;
 
 double GetTime()
@@ -363,6 +370,11 @@ static void UpdatePlayer(const Core::InputState& input, double dt)
 	move_speed += (move_speed * 0.5) * scroll;
 	if (abs(move_speed) < 0.000001)
 		move_speed = 0.0001;
+
+	if (keys[SDL_SCANCODE_LSHIFT])
+		player->collider = CROUCH_COLLIDER;
+	else
+		player->collider = DEFAULT_COLLIDER;
 
 	position.y -= 0.9f * dt;
 
@@ -586,6 +598,10 @@ int Run()
 		
 			}
 		}
+		// Service net
+		core.client.TrySendingConnect();
+		core.server.ReadMessages();
+
 		Update(delta_t);
 		Render(delta_t);
 	}
@@ -597,6 +613,13 @@ int main(int argc, char** argv)
 	CreateWindow();
 	core.view.Init();
 	RenderInit();
+	NetworkInit();
+	core.server.Start();
+	core.client.Start();
+	IPAndPort serv_addr;
+	serv_addr.SetIp(127, 0, 0, 1);
+	serv_addr.port = SERVER_PORT;
+	core.client.Connect(serv_addr);
 	MiscInit();
 
 	Run();
