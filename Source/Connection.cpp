@@ -25,6 +25,18 @@ Connection::Connection()
 	reliable_unacked.resize(MAX_DATAGRAM_SIZE);
 }
 
+void Connection::Init(Socket* sock, IPAndPort addr)
+{
+	this->sock = sock;
+	remote_addr = addr;
+	out_sequence = 0;
+	out_sequence_ak = -1;
+	in_sequence = -1;
+	last_recieved = 0.0;
+	reliable_out_len = 0;
+	reliable_unacked_len = 0;
+}
+
 int Connection::NewPacket(const uint8_t* data, int length)
 {
 	if (length < PACKET_HEADER_SIZE)

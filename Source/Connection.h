@@ -11,7 +11,7 @@ class Connection
 {
 public:
 	Connection();
-	void Init(Socket* sock);
+	void Init(Socket* sock, IPAndPort addr);
 
 	// returns the offset to where payload starts, -1 if this packet should be skipped
 	int NewPacket(const uint8_t* data, int length);
@@ -30,8 +30,4 @@ public:
 	int reliable_unacked_len = 0;
 	std::vector<uint8_t> reliable_unacked;	// un-acked data to send each packet
 };
-
-
-
-
 #endif // !CONNECTION_H
