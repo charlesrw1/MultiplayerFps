@@ -27,7 +27,7 @@ Core core;
 
 static double program_time_start;
 static bool update_camera = false;
-const char* map_file = "maze.glb";
+const char* map_file = "creek.glb";
 static bool mouse_grabbed = false;
 
 bool CheckGlErrorInternal_(const char* file, int line)
@@ -241,9 +241,20 @@ void ViewMgr::Update()
 	if (third_person) {
 		Entity* player = core.game.LocalPlayer();
 		fly_cam.position = player->position+vec3(0,0.5,0) - fly_cam.front * 3.f;
+		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
+		setup.viewproj = setup.proj_mat * setup.view_mat;
 	}
-	setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
-	setup.viewproj = setup.proj_mat * setup.view_mat;
+	else
+	{
+		Entity* player = core.game.LocalPlayer();
+		float view_height = (player->ducking) ? 0.65 : 1.2;
+		vec3 cam_position = player->position + vec3(0, view_height, 0);
+		vec3 front = AnglesToVector(core.client.view_angles.x,core.client.view_angles.y);
+		setup.view_mat = glm::lookAt(cam_position, cam_position + front, vec3(0, 1, 0));
+		setup.viewproj = setup.proj_mat * setup.view_mat;
+		setup.vieworigin = cam_position;
+		setup.viewfront = front;
+	}
 }
 
 static void SDLError(const char* msg)
@@ -356,15 +367,18 @@ static bool gravity = true;
 static bool col_response = true;
 static int col_iters = 5;
 static bool col_closest = true;
-static bool new_physics = false;
+static bool new_physics = true;
 
 static double TEMP_DT = 0.0;
 
-static float friction = 6;
-static float gravityamt = 2;
-static float acceleration = 10;
+static float ground_friction = 10;
+static float air_friction = 0.2;
+static float gravityamt = 16;
+static float ground_accel = 6;
+static float air_accel = 3;
 static float minspeed = 1;
 static float maxspeed = 30;
+static float jumpimpulse = 3.f;
 
 class PlayerPhysics
 {
@@ -373,13 +387,15 @@ public:
 
 private:
 	void DoStandardPhysics();
-	void ApplyFriction();
+	void ApplyFriction(float friction_val);
 	void GroundMove();
 	void AirMove();
 	void FlyMove();
 	void CheckJump();
 	void CheckDuck();
 	void CheckNans();
+	void MoveAndSlide(vec3 delta);
+	void CheckGroundState();
 
 	float deltat;
 	Entity* player;
@@ -409,70 +425,107 @@ void PlayerPhysics::CheckNans()
 
 void PlayerPhysics::CheckJump()
 {
-	//if (player->onground && inp.buttonmask & B_JUMP)
-	///	player->velocity.y += 5;
+	if (player->on_ground && inp.button_mask & CmdBtn_Jump) {
+		player->velocity.y += jumpimpulse;
+		player->on_ground = false;
+	}
 }
 void PlayerPhysics::CheckDuck()
 {
 	if (inp.button_mask & CmdBtn_Duck) {
-		player->ducking = true;
-		return;
+		if (player->on_ground) {
+			player->ducking = true;
+		}
+		else if(!player->on_ground&&!player->ducking){
+			const Capsule& st = DEFAULT_COLLIDER;
+			const Capsule& cr = CROUCH_COLLIDER;
+			// Move legs of player up
+			player->position.y += st.tip.y - cr.tip.y;
+			player->ducking = true;
+		}
 	}
 	else if (!(inp.button_mask & CmdBtn_Duck) && player->ducking) {
-		Capsule collider = CROUCH_COLLIDER;
-		ColliderCastResult res;
-		TraceCapsule(player->position, collider, &res, false);
-		if (!res.found || (res.found && dot(res.surf_normal, vec3(0, 1, 0)) > 0))
+		int steps = 2;
+		float step = 0.f;
+		float sphere_radius = 0.f;
+		vec3 offset = vec3(0.f);
+		vec3 a, b, c, d;
+		DEFAULT_COLLIDER.GetSphereCenters(a, b);
+		CROUCH_COLLIDER.GetSphereCenters(c, d);
+		float len = b.y - d.y;
+		sphere_radius = CROUCH_COLLIDER.radius;
+		if (player->on_ground) {
+			step = len / (float)steps;
+			offset = d;
+		}
+		else {
+			// testing downwards to ground
+			step = -(len+0.1) / (float)steps;
+			offset = c;
+		}
+		int i = 0;
+		for (; i < steps; i++) {
+			ColliderCastResult res;
+			vec3 where = player->position + offset + vec3(0, (i + 1) * step, 0);
+			TraceSphere(where, sphere_radius, &res, true, false);
+			if (res.found) {
+				phys_debug.AddSphere(where, sphere_radius, 10, 8, COLOR_RED);
+				break;
+			}
+		}
+		if (i == steps) {
 			player->ducking = false;
+			if (!player->on_ground) {
+				player->position.y -= len;
+			}
+		}
+
+#if 0
+		if (player->on_ground) {
+			Capsule collider = DEFAULT_COLLIDER;
+			vec3 a, b, c, d;
+			DEFAULT_COLLIDER.GetSphereCenters(a, b);
+			CROUCH_COLLIDER.GetSphereCenters(c, d);
+			float len = b.y - d.y;
+			int steps = 2;
+			float step = len / (float)steps;
+			int i = 0;
+			for (; i < steps; i++) {
+				ColliderCastResult res;
+				vec3 where = player->position + d + vec3(0, (i + 1) * step, 0);
+				TraceSphere(where, CROUCH_COLLIDER.radius, &res, true, false);
+				if (res.found) {
+					phys_debug.AddSphere(where, CROUCH_COLLIDER.radius, 10, 8, COLOR_RED);
+					break;
+				}
+			}
+			if (i == steps)
+				player->ducking = false;
+		}
+#endif
 	}
 }
 
-void PlayerPhysics::ApplyFriction()
+void PlayerPhysics::ApplyFriction(float friction_val)
 {
-	if (!player->on_ground)
-		return;
-
 	float speed = length(player->velocity);
 	if (speed < 0.0001)
 		return;
 
-	float dropamt = friction * speed * deltat;
+	float dropamt = friction_val * speed * deltat;
 
 	float newspd = speed - dropamt;
 	if (newspd < 0)
 		newspd = 0;
 	float factor = newspd / speed;
 
-	player->velocity *= factor;
+	player->velocity.x *= factor;
+	player->velocity.z *= factor;
+
 }
-
-void PlayerPhysics::GroundMove()
+void PlayerPhysics::MoveAndSlide(vec3 delta)
 {
-	vec3 wishdir = (look_front * inp_dir.x + look_side * inp_dir.y);
-	wishdir.y = 0;
-	float wishspeed = inp_len * maxspeed;
-	float addspeed = wishspeed - dot(player->velocity, wishdir);
-	float accelspeed = acceleration * wishspeed;
-	if (accelspeed > addspeed)
-		accelspeed = addspeed;
-	player->velocity += accelspeed * wishdir * deltat;
-
-	float len = length(player->velocity);
-	if (len > maxspeed)
-		player->velocity = player->velocity * (maxspeed / len);
-	if (len < 0.3 && accelspeed < 0.0001)
-		player->velocity = vec3(0);
-
-	CheckJump();
-	CheckDuck();
-
-	player->velocity += vec3(0, -1, 0) * gravityamt * deltat;
-
-	vec3 delta = player->velocity * deltat;
-
-
-	player->on_ground = false;
-	Capsule cap = (player->ducking)?CROUCH_COLLIDER:DEFAULT_COLLIDER;
+	Capsule cap = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
 	vec3 position = player->position;
 	vec3 step = delta / (float)col_iters;
 	for (int i = 0; i < col_iters; i++)
@@ -486,12 +539,76 @@ void PlayerPhysics::GroundMove()
 			vec3 slide_velocity = player->velocity - penetration_velocity;
 			position += trace.penetration_normal * trace.penetration_depth;////trace.0.001f + slide_velocity * dt;
 			player->velocity = slide_velocity;
-
-			if (trace.surf_normal.y > 0.2)
-				player->on_ground = true;
+		}
+	}
+	// Gets player out of surfaces
+	for (int i = 0; i < 2; i++) {
+		ColliderCastResult res;
+		TraceCapsule(position, cap, &res, col_closest);
+		if (res.found) {
+			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
 		}
 	}
 	player->position = position;
+}
+
+void PlayerPhysics::CheckGroundState()
+{
+	if (player->velocity.y > 10) {
+		player->on_ground = true;
+		return;
+	}
+	ColliderCastResult result;
+	TraceSphere(player->position-vec3(0,0.02f,0), 0.1f, &result, false,true);
+	if (!result.found)
+		player->on_ground = false;
+	else if (result.surf_normal.y < 0.6)
+		player->on_ground = false;
+	else {
+		player->on_ground = true;
+		phys_debug.AddSphere(player->position, 0.1f, 8, 6, COLOR_BLUE);
+	}
+}
+
+float max_ground_speed = 10;
+float max_air_speed = 2;
+
+void PlayerPhysics::GroundMove()
+{
+	float acceleation_val = (player->on_ground) ? ground_accel : air_accel;
+	float maxspeed_val = (player->on_ground) ? max_ground_speed : max_air_speed;
+
+	vec3 wishdir = (look_front * inp_dir.x + look_side * inp_dir.y);
+	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
+	vec3 xz_velocity = vec3(player->velocity.x, 0, player->velocity.z);
+
+	float wishspeed = inp_len * maxspeed_val;
+	float addspeed = wishspeed - dot(xz_velocity, wishdir);
+	addspeed = glm::max(addspeed, 0.f);
+	float accelspeed = acceleation_val * wishspeed*deltat;
+	accelspeed = glm::min(accelspeed, addspeed);
+	xz_velocity += accelspeed * wishdir;
+
+	float len = length(xz_velocity);
+	//if (len > maxspeed)
+	//	xz_velocity = xz_velocity * (maxspeed / len);
+	if (len < 0.3 && accelspeed < 0.0001)
+		xz_velocity = vec3(0);
+	player->velocity = vec3(xz_velocity.x, player->velocity.y, xz_velocity.z);
+	
+
+	CheckJump();
+	CheckDuck();
+	if(!player->on_ground)
+		player->velocity.y -= gravityamt * deltat;
+
+	vec3 delta = player->velocity * deltat;
+
+	MoveAndSlide(delta);
+}
+void PlayerPhysics::AirMove()
+{
+
 }
 static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt);
 void PlayerPhysics::Run(Entity* p, MoveCommand cmd, float dt)
@@ -518,10 +635,12 @@ void PlayerPhysics::Run(Entity* p, MoveCommand cmd, float dt)
 	look_front = AnglesToVector(inp.view_angles.x, inp.view_angles.y);
 	look_side = -cross(look_front, vec3(0, 1, 0));
 
-	ApplyFriction();
 
 
 	if (new_physics) {
+		CheckGroundState();
+		float fric_val = (player->on_ground) ? ground_friction : air_friction;
+		ApplyFriction(fric_val);
 		GroundMove();
 	}
 	else {
@@ -534,9 +653,9 @@ void PlayerPhysics::Run(Entity* p, MoveCommand cmd, float dt)
 
 static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 {
+	player->velocity = vec3(0.f);
 	vec3 position = player->position;
-	if(gravity)
-		player->velocity.y -= 0.02f * dt;
+	
 	position += player->velocity;
 	float move_speed = move_speed_player;
 
@@ -559,7 +678,6 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	if (cmd.button_mask & CmdBtn_Duck)
 		player->ducking = true;
 
-	phys_debug.Begin();
 	vec3 step = (position - player->position) / (float)col_iters;
 	position = player->position;
 	Capsule collider = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
@@ -588,7 +706,6 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	collider.tip += position;
 	Bounds cap_b = CapsuleToAABB(collider);
 	phys_debug.PushLineBox(cap_b.bmin, cap_b.bmax, COLOR_PINK);
-	phys_debug.End();
 
 	player->position = position;
 	move_speed_player = move_speed;
@@ -596,8 +713,10 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 
 void Game::ExecuteCommand(MoveCommand cmd, Entity* ent)
 {
+	phys_debug.Begin();
 	PlayerPhysics physics;
 	physics.Run(ent, cmd, TEMP_DT);
+	phys_debug.End();
 }
 
 void CreateMoveCommand()
@@ -891,6 +1010,8 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_1) {
 				new_physics = !new_physics;
 			}
+			if (scancode == SDL_SCANCODE_T)
+				core.view.third_person = !core.view.third_person;
 		}
 		case SDL_KEYUP:
 			input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
@@ -936,6 +1057,8 @@ int main(int argc, char** argv)
 		delta_t = now - last;
 		last = now;
 
+		if (delta_t > 0.1)
+			delta_t = 0.1;
 		TEMP_DT = delta_t;
 		HandleInput();
 		ClientUpdate(delta_t);

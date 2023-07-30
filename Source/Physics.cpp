@@ -146,10 +146,10 @@ static void IntersectWorld(Functor&& do_intersect, BVH& bvh, Bounds box)
 }
 
 bool SphereVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
-	glm::vec3 pos, float radius, ColliderCastResult* out)
+	glm::vec3 pos, float radius, ColliderCastResult* out, bool doublesided)
 {
 	float dist = dot(pos, tri.face_normal) + tri.plane_offset;
-	if (dist < 0)
+	if (dist < 0 && !doublesided)
 		return false;
 	if (dist > radius)
 		return false;
@@ -300,7 +300,7 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 
 		//phys_debug.AddSphere(sphere_center, 0.1f, 8, 6, COLOR_PINK);
 		// Finish with a sphere/triangle test
-		return SphereVsTriangle(cd, tri, sphere_center, cap.radius, out);
+		return SphereVsTriangle(cd, tri, sphere_center, cap.radius, out, false);
 	}
 	else
 	{
@@ -319,14 +319,14 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 			vec3 sphere_center = closest_point_on_line(A, B, ref_high);
 
 		//	phys_debug.AddSphere(sphere_center, 0.1f, 8, 6, COLOR_PINK);
-			if (SphereVsTriangle(cd, tri, sphere_center, cap.radius, out))
+			if (SphereVsTriangle(cd, tri, sphere_center, cap.radius, out, false))
 				return true;
 		}
 		{
 			vec3 sphere_center = closest_point_on_line(A, B, ref_low);
 
 			//phys_debug.AddSphere(sphere_center, 0.1f, 8, 6, COLOR_PINK);
-			return (SphereVsTriangle(cd, tri, sphere_center, cap.radius, out));
+			return (SphereVsTriangle(cd, tri, sphere_center, cap.radius, out, false));
 		}
 
 	}
@@ -397,54 +397,28 @@ void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bo
 
 	out->touched_ground = found_ground;
 }
-void TraceCapsuleMultiple(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, int num_results)
-{
-	Level::CollisionData& cd = core.game.level->collision_data;
 
-	Capsule adjusted_cap = cap;
-	adjusted_cap.base += pos;
-	adjusted_cap.tip += pos;
-
-
-	float best_len_total = INFINITY;
-
-	bool found_ground = false;
-	ColliderCastResult temp;
-	int res_idx = 0;
-	for (int i = 0; i < cd.collision_tris.size(); i++) {
-		const Level::CollisionTri& tri = cd.collision_tris[i];
-
-		bool res = CapsuleVsTriangle(cd, tri, adjusted_cap, &temp);
-		
-		if (res) {
-			best_len_total = temp.intersect_len;
-			out[res_idx++] = temp;
-			if (res_idx >= num_results)
-				return;
-		}
-	}
-}
-
-void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out)
+void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided)
 {
 	Level::CollisionData& cd = core.game.level->collision_data;
 
 	float best_len_total = INFINITY;
 
-	bool found_ground = false;
 	ColliderCastResult temp;
-	for (int i = 0; i < cd.collision_tris.size(); i++) {
-		const Level::CollisionTri& tri = cd.collision_tris[i];
-		bool res = SphereVsTriangle(cd, tri, org, radius, &temp);
-		if (res) {
-			found_ground |= dot(temp.surf_normal, vec3(0, 1, 0)) > 0.7;
-		}
+	auto sphere_intersect_functor = [&](int index)->bool {
+		ASSERT(index < cd.collision_tris.size());
+		const Level::CollisionTri& tri = cd.collision_tris[index];
+		bool res = SphereVsTriangle(cd, tri, org, radius, &temp, double_sided);
 		if (res && temp.intersect_len < best_len_total) {
 			best_len_total = temp.intersect_len;
 			*out = temp;
+			if (!closest)
+				return true;
 		}
-	}
-	out->touched_ground = found_ground;
+		return false;
+	};
+	Bounds sphere(vec3(-radius + org), vec3(radius + org));
+	IntersectWorld(sphere_intersect_functor, world_bvh, sphere);
 }
 
 void Capsule::GetSphereCenters(vec3& a, vec3& b) const

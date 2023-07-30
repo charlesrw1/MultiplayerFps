@@ -47,8 +47,7 @@ struct Capsule
 void DrawCollisionWorld();
 Bounds CapsuleToAABB(const Capsule& cap);
 void TraceCapsule(glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
-void TraceCapsuleMultiple(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, int num_results);
-void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out);
+void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
 void InitWorldCollision();
 
 

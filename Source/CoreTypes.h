@@ -53,7 +53,7 @@ public:
 		return setup;
 	}
 
-	bool third_person = true;
+	bool third_person = false;
 	bool using_debug_cam = false;
 
 	float z_near = 0.01f;
