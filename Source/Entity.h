@@ -3,11 +3,11 @@
 #include "glm/glm.hpp"
 #include "Physics.h"
 
-enum class EntType
+enum EntType
 {
-	PLAYER,
-	DUMMY,
-	INVALID = 0xff,
+	Ent_Player,
+	Ent_Dummy,
+	Ent_Free = 0xff,
 };
 
 #endif // !GAME_H

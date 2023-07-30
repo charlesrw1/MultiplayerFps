@@ -6,6 +6,7 @@
 #include "MeshBuilder.h"
 #include "glad/glad.h"
 #include "BVH.h"
+#include "CoreTypes.h"
 
 static BVH world_bvh;
 
@@ -18,7 +19,7 @@ void DrawCollisionWorld()
 	if (!has_built) {
 		world_collision.Begin();
 		int basev = world_collision.GetBaseVertex();
-		Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+		Level::CollisionData& cd = core.game.level->collision_data;
 		for (int i = 0; i < cd.vertex_list.size(); i++) {
 			world_collision.AddVertex(MbVertex(cd.vertex_list[i], COLOR_RED));
 		}
@@ -47,8 +48,10 @@ void DrawCollisionWorld()
 }
 void InitWorldCollision()
 {
+	has_built = false;
+
 	std::vector<Bounds> bound_vec;
-	Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+	Level::CollisionData& cd = core.game.level->collision_data;
 	for (int i = 0; i < cd.collision_tris.size(); i++) {
 		Level::CollisionTri& tri = cd.collision_tris[i];
 		glm::vec3 corners[3];
@@ -339,7 +342,7 @@ Bounds CapsuleToAABB(const Capsule& cap)
 }
 void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bool closest)
 {
-	Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+	Level::CollisionData& cd = core.game.level->collision_data;
 
 	Capsule adjusted_cap = cap;
 	adjusted_cap.base += pos;
@@ -396,7 +399,7 @@ void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bo
 }
 void TraceCapsuleMultiple(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, int num_results)
 {
-	Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+	Level::CollisionData& cd = core.game.level->collision_data;
 
 	Capsule adjusted_cap = cap;
 	adjusted_cap.base += pos;
@@ -424,7 +427,7 @@ void TraceCapsuleMultiple(glm::vec3 pos, const Capsule& cap, ColliderCastResult*
 
 void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out)
 {
-	Level::CollisionData& cd = TEMP_LEVEL->collision_data;
+	Level::CollisionData& cd = core.game.level->collision_data;
 
 	float best_len_total = INFINITY;
 
@@ -444,7 +447,7 @@ void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out)
 	out->touched_ground = found_ground;
 }
 
-void Capsule::GetSphereCenters(vec3& a, vec3& b)
+void Capsule::GetSphereCenters(vec3& a, vec3& b) const
 {
 	vec3 cap_normal = normalize(tip - base);
 	vec3 line_end_ofs = cap_normal * radius;

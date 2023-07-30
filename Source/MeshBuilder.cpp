@@ -210,13 +210,3 @@ void MeshBuilder::AddSphere(vec3 origin, float radius, int xsegments, int ysegme
 
 
 }
-
-void MeshBuilder::AddHemisphere(vec3 origin, vec3 orientation, float radius, int xsegments, int ysegments, Color32 color)
-{
-
-}
-
-void MeshBuilder::AddCapsule(vec3 base, vec3 tip, float radius)
-{
-
-}

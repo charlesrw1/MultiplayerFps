@@ -40,7 +40,7 @@ struct Capsule
 	glm::vec3 base = glm::vec3(0.0,2.0,0.0);
 	glm::vec3 tip=glm::vec3(0.0);
 
-	void GetSphereCenters(glm::vec3& a, glm::vec3& b);
+	void GetSphereCenters(glm::vec3& a, glm::vec3& b) const;
 };
 
 

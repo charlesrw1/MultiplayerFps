@@ -459,6 +459,7 @@ void Animator::SetAnim(int animlayer, int anim)
 	ResetAnimLayer(animlayer);
 	AnimationLayer& layer = layers[animlayer];
 	layer.set_index = anim;
+	layer.active = true;
 }
 
 void Animator::Init(const Model* mod)

@@ -20,7 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Animation.cpp" />
-    <ClCompile Include="Source\ClientNServer.cpp" />
+    <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\Level.cpp" />
@@ -28,6 +28,7 @@
     <ClCompile Include="Source\MeshBuilder.cpp" />
     <ClCompile Include="Source\Model.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
+    <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\Shader.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
@@ -35,9 +36,10 @@
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
-    <ClInclude Include="Source\ClientNServer.h" />
+    <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\Entity.h" />
     <ClInclude Include="Source\CoreTypes.h" />
+    <ClInclude Include="Source\MoveCommand.h" />
     <ClInclude Include="Source\Serialize.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\Level.h" />

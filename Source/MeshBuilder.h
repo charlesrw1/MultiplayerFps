@@ -3,18 +3,18 @@
 #include <vector>
 #include "glm/glm.hpp"
 #include "Util.h"
-// FIXME:
-using glm::vec3;
-using glm::vec2;
+
 struct MbVertex
 {
-	MbVertex(vec3 position, Color32 color) : position(position), color(color) {}
+	MbVertex(glm::vec3 position, Color32 color) : position(position), color(color) {}
 	MbVertex() {}
-	vec3 position;
-	Color32 color;
-	vec2 uv;
+	glm::vec3 position = glm::vec3(0);
+	Color32 color = COLOR_WHITE;
+	glm::vec2 uv = glm::vec2(0);
 };
 
+using glm::vec3;
+using glm::vec2;
 class MeshBuilder
 {
 public:
@@ -47,11 +47,8 @@ public:
 	void PushSolidBox(vec3 box_min, vec3 box_max, Color32 color);
 	void PushLineBox(vec3 box_min, vec3 box_max, Color32 color);
 	void PushOrientedLineBox(vec3 box_min, vec3 box_max, glm::mat4 transform, Color32 color);
-
+	// line sphere
 	void AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color);
-	// Must be vertical
-	void AddCapsule(vec3 base, vec3 tip, float radius);
-	void AddHemisphere(vec3 origin, vec3 orientation, float radius, int xsegments, int ysegments, Color32 color);
 
 	// GL_TRIANGLES,etc.
 	void Draw(uint32_t gl_type);

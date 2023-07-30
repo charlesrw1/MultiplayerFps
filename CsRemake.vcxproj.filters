@@ -54,7 +54,10 @@
     <ClCompile Include="Source\Connection.cpp">
       <Filter>Source Files\Network</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ClientNServer.cpp">
+    <ClCompile Include="Source\Server.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Client.cpp">
       <Filter>Source Files\Network</Filter>
     </ClCompile>
   </ItemGroup>
@@ -104,13 +107,16 @@
     <ClInclude Include="Source\Serialize.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ClientNServer.h">
+    <ClInclude Include="Source\Net.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
     <ClInclude Include="Source\CoreTypes.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\BVH.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MoveCommand.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

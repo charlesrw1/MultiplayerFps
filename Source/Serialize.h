@@ -20,7 +20,7 @@ public:
 			data_ptr += 2;
 		}
 	}
-	void WriteDword(uint32_t dword) {
+	void WriteLong(uint32_t dword) {
 		if (!CheckOverrun(4)) {
 			data[data_ptr] = dword & 0xff;
 			data[data_ptr + 1] = (dword >> 8) & 0xff;
@@ -35,7 +35,7 @@ public:
 			float fval;
 		}x;
 		x.fval = f;
-		WriteDword(x.ival);
+		WriteLong(x.ival);
 	}
 	void WriteBytes(const uint8_t* src, int num_bytes) {
 		if (!CheckOverrun(num_bytes)) {
@@ -78,7 +78,7 @@ public:
 		data_ptr += 2;
 		return o;
 	}
-	uint32_t ReadDword() {
+	uint32_t ReadLong() {
 		if (CheckOverrun(4))
 			return 0;
 		uint32_t o = data[data_ptr] | data[data_ptr + 1] << 8
@@ -91,7 +91,7 @@ public:
 			uint32_t ival;
 			float fval;
 		}x;
-		x.ival = ReadDword();
+		x.ival = ReadLong();
 		return x.fval;
 	}
 	void ReadBytes(uint8_t* dest, int num_bytes) {

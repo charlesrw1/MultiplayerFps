@@ -1,13 +1,23 @@
 #ifndef GAMETYPE_H
 #define GAMETYPE_H
 #include <SDL2/SDL.h>
-#include "ClientNServer.h"
+#include "Net.h"
 #include "Entity.h"
 #include "Util.h"
+#include "Animation.h"
 
 const int DEFAULT_WIDTH = 1200;
 const int DEFAULT_HEIGHT = 800;
 const int MAX_GAME_ENTS = 256;
+
+enum MoveCmdButtons
+{
+	CmdBtn_Sprint=1,
+	CmdBtn_Jump=2,
+	CmdBtn_Duck=4,
+	CmdBtn_Misc1 = 8,
+	CmdBtn_Misc2 = 16,
+};
 
 class FlyCamera
 {
@@ -44,7 +54,7 @@ public:
 	}
 
 	bool third_person = true;
-	bool debug_fly = false;
+	bool using_debug_cam = false;
 
 	float z_near = 0.01f;
 	float z_far = 100.f;
@@ -54,37 +64,39 @@ public:
 	ViewSetup setup;
 };
 
+class Model;
 struct Entity
 {
-	EntType type = EntType::INVALID;
-	bool active = false;
+	EntType type = Ent_Free;
+	int index = 0;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	glm::vec3 scale = glm::vec3(1.f);
+	glm::vec3 velocity = glm::vec3(0);
+	bool ducking = false;
 	const Model* model = nullptr;
 	Animator animator;
-	Capsule collider;
-
-	glm::vec3 velocity = glm::vec3(0);
+	bool on_ground = false;
 };
 
+class Level;
 class Game
 {
 public:
 	Game() {
 		memset(spawnids, 0, sizeof(spawnids));
 	}
-	int SpawnEnt(EntType type);
 	Entity* GetByIndex(int index) {
-		if (index >= MAX_GAME_ENTS || index < 0 || !ents[index].active)
+		if (index >= MAX_GAME_ENTS || index < 0 || ents[index].type==Ent_Free)
 			return nullptr;
 		return &ents[index];
 	}
-	Entity* GetPlayer() {
-		Entity* e = GetByIndex(0);
-		ASSERT(!e || e->type == EntType::PLAYER);
-		return e;
-	}
+	Entity* LocalPlayer();
+	void SpawnNewClient(int clientnum);
+	bool DoNewMap(const char* mapname);
+	int SpawnNewEntity(EntType type, glm::vec3 position, glm::vec3 rotation);
+	void ClearAllEnts();
+	void ExecuteCommand(MoveCommand cmd, Entity* ent);	// temp interface
 
 	Entity ents[MAX_GAME_ENTS];
 	short spawnids[MAX_GAME_ENTS];
@@ -103,6 +115,12 @@ public:
 	int vid_width = DEFAULT_WIDTH;
 	int vid_height = DEFAULT_HEIGHT;
 
+	// Time vals
+	double game_time = 0.0;
+	double frame_time = 0.0;
+	double frame_remainder = 0.0;
+	double frame_alpha = 0.0;
+
 	struct InputState
 	{
 		bool keyboard[SDL_NUM_SCANCODES];
@@ -117,6 +135,9 @@ public:
 	Server server;
 };
 extern Core core;
+
+bool ClientInGame();
+bool ServerIsActive();
 
 
 #endif // !GAMETYPE_H

@@ -52,6 +52,5 @@ public:
 };
 
 Level* LoadLevelFile(const char* level);
-extern Level* TEMP_LEVEL;
 
 #endif // !LEVEL_H
