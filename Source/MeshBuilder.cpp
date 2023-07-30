@@ -42,7 +42,7 @@ void MeshBuilder::End()
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	}
 	glBufferData(GL_ARRAY_BUFFER, verticies.size() * sizeof(MbVertex), verticies.data(), GL_STREAM_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicies.size() * sizeof(uint16_t), indicies.data(), GL_STREAM_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicies.size() * sizeof(uint32_t), indicies.data(), GL_STREAM_DRAW);
 	glBindVertexArray(0);
 }
 
@@ -50,7 +50,7 @@ void MeshBuilder::Draw(uint32_t gl_type)
 {
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glDrawElements((GLenum)gl_type, indicies.size(), GL_UNSIGNED_SHORT, (void*)0);
+	glDrawElements((GLenum)gl_type, indicies.size(), GL_UNSIGNED_INT, (void*)0);
 }
 
 void MeshBuilder::PushLine(vec3 start, vec3 end, Color32 color)

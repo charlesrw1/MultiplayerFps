@@ -3,4 +3,4 @@ Debug/
 Release/
 Data/
 imgui.ini
-SDL2.dll
+*.dll

@@ -1,7 +1,7 @@
 #include "Socket.h"
 #include <Winsock.h>
 #include <cstdio>
-#include <cassert>
+#include "Util.h"
 std::string IPAndPort::ToString() const
 {
 	std::string out;
@@ -32,20 +32,17 @@ static SOCKET MakeSocket(int port)
 {
 	SOCKET handle = socket(PF_INET, SOCK_DGRAM, 0);
 	if (handle == INVALID_SOCKET) {
-		printf("socket() failed: %d\n", WSAGetLastError());
-		return handle;
+		Fatalf("socket() failed: %d\n", WSAGetLastError());
 	}
 	int yes = 1;
 	if (setsockopt(handle, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<char*>(&yes), sizeof(yes)) == -1) {
-		printf("setsockopt() failed: %d\n", WSAGetLastError());
-		return INVALID_SOCKET;
+		Fatalf("setsockopt() failed: %d\n", WSAGetLastError());
 	}
 
 	sockaddr_in addr = ToSockaddr(IPAndPort(0, port));
 
 	if (bind(handle, (sockaddr*)&addr, sizeof(addr)) == -1) {
-		printf("bind() failed: %d\n", WSAGetLastError());
-		return INVALID_SOCKET;
+		Fatalf("bind() failed: %d\n", WSAGetLastError());
 	}
 
 	return handle;
@@ -55,8 +52,7 @@ void Socket::Init(int port)
 {
 	if (handle == INVALID_SOCKET) {
 		handle = MakeSocket(port);
-		if (handle == INVALID_SOCKET)
-			exit(-1);
+		ASSERT(handle != INVALID_SOCKET);
 
 		u_long blocking = 1;
 		ioctlsocket(handle, static_cast<long>(FIONBIO), &blocking);
@@ -64,8 +60,7 @@ void Socket::Init(int port)
 		sockaddr_in addr;
 		int len = sizeof(addr);
 		if (getsockname(handle, (sockaddr*)&addr, &len) == -1) {
-			printf("getsockname() failed: %d\n", WSAGetLastError());
-			exit(-1);
+			Fatalf("getsockname() failed: %d\n", WSAGetLastError());
 		}
 		local_addr.ip = ntohl(addr.sin_addr.s_addr);
 		local_addr.port = ntohs(addr.sin_port);
@@ -83,7 +78,7 @@ void Socket::Shutdown()
 
 bool Socket::Send(void* data, size_t length, const IPAndPort& to)
 {
-	assert(handle != INVALID_SOCKET);
+	ASSERT(handle != INVALID_SOCKET);
 
 	sockaddr_in addr = ToSockaddr(to);
 	if (sendto(handle, (char*)data, length, 0, (sockaddr*)&addr, sizeof(addr)) == -1) {

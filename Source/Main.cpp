@@ -20,6 +20,13 @@
 #include "Physics.h"
 #include "Entity.h"
 #include "ClientNServer.h"
+#include "CoreTypes.h"
+
+MeshBuilder phys_debug;
+Core core;
+static double program_time_start;
+
+static bool update_camera = false;
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -55,130 +62,20 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	return has_error;
 }
 
-struct Entity
-{
-	EntType type = EntType::INVALID;
-	bool active = false;
-	glm::vec3 position=glm::vec3(0);
-	glm::vec3 rotation=glm::vec3(0);
-	glm::vec3 scale = glm::vec3(1.f);
-	const Model* model = nullptr;
-	Capsule collider;
-	
-	glm::vec3 velocity=glm::vec3(0);
-};
-
-const int MAX_GAME_ENTS = 256;
-class Game
-{
-public:
-	Game() {
-		memset(spawnids, 0, sizeof(spawnids));
-	}
-	int SpawnActor(EntType type);
-	Entity* GetByIndex(int index) {
-		if (index >= MAX_GAME_ENTS|| index < 0 || !ents[index].active)
-			return nullptr;
-		return &ents[index];
-	}
-	Entity* GetPlayer() { 
-		Entity* e = GetByIndex(0);
-		ASSERT(!e || e->type == EntType::PLAYER);
-		return e;
-	}
-
-	Entity ents[MAX_GAME_ENTS];
-	short spawnids[MAX_GAME_ENTS];
-	int num_actors = 0;
-	int first_free_network = 0;
-	int first_free_local = 0;
-	
-	Level* level = nullptr;
-};
-
-int Game::SpawnActor(EntType type)
+int Game::SpawnEnt(EntType type)
 {
 	// temp
-	ents[num_actors].type = type;
-	ents[num_actors++].active = true;
-	return num_actors - 1;
+	ents[num_ents].type = type;
+	ents[num_ents++].active = true;
+	return num_ents - 1;
 }
 
-class FlyCamera
-{
-public:
-	vec3 position = vec3(0);
-	vec3 front = vec3(1, 0, 0);
-	vec3 up = vec3(0, 1, 0);
-	float move_speed = 0.1f;
-	float yaw = 0, pitch = 0;
-
-	void UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll);
-	void UpdateVectors() {
-		front = AnglesToVector(pitch, yaw);
-	}
-	mat4 GetViewMatrix() const {
-		return glm::lookAt(position, position + front, up);
-	}
-};
-
-struct ViewSetup
-{
-	vec3 vieworigin;
-	vec3 viewfront;
-	float viewfov;
-	mat4 view_mat;
-	mat4 proj_mat;
-	mat4 viewproj;
-	int x, y, width, height;
-};
-
-static bool update_camera = false;
-class ViewMgr
-{
-public:
-	void Init();
-	void Update();
-	const ViewSetup& GetSceneView() {
-		return setup;
-	}
-
-	bool third_person = true;
-	bool debug_fly = false;
-
-	float z_near = 0.01f;
-	float z_far = 100.f;
-	float fov = glm::radians(70.f);
-
-	FlyCamera fly_cam;
-	ViewSetup setup;
-};
-
-
-const int DEFAULT_WIDTH = 1200;
-const int DEFAULT_HEIGHT = 800;
-class Core
-{
-public:
-	SDL_Window* window = nullptr;
-	SDL_GLContext context = nullptr;
-	int vid_width = DEFAULT_WIDTH;
-	int vid_height = DEFAULT_HEIGHT;
-
-	struct InputState
-	{
-		bool keyboard[SDL_NUM_SCANCODES];
-		int mouse_delta_x = 0;
-		int mouse_delta_y = 0;
-		int scroll_delta = 0;
-	};
-	InputState input;
-	Game game;
-	ViewMgr view;
-	Client client;
-	Server server;
-};
-Core core;
+void FlyCamera::UpdateVectors() {
+	front = AnglesToVector(pitch, yaw);
+}
+glm::mat4 FlyCamera::GetViewMatrix() const {
+	return glm::lookAt(position, position + front, up);
+}
 
 static void Cleanup()
 {
@@ -197,13 +94,16 @@ void Quit()
 	exit(0);
 }
 
-void Fatal(const char* msg)
+void Fatalf(const char* format, ...)
 {
+	va_list list;
+	va_start(list, format);
+	vprintf(format, list);
+	va_end(list);
+	fflush(stdout);
 	Cleanup();
 	exit(-1);
 }
-
-
 
 void ViewMgr::Init()
 {
@@ -222,7 +122,7 @@ void ViewMgr::Update()
 	}
 	if (third_person) {
 		Entity* player = core.game.GetPlayer();
-		fly_cam.position = player->position - fly_cam.front * 3.f;
+		fly_cam.position = player->position+vec3(0,0.5,0) - fly_cam.front * 3.f;
 	}
 	setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
 	setup.viewproj = setup.proj_mat * setup.view_mat;
@@ -245,6 +145,8 @@ bool CreateWindow()
 		SDLError("SDL init failed");
 		return false;
 	}
+
+	program_time_start = GetTime();
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -340,8 +242,16 @@ double GetTime()
 {
 	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
 }
+double TimeSinceStart()
+{
+	return GetTime() - program_time_start;
+}
 
 static float move_speed_player = 0.1f;
+static bool gravity = false;
+static bool col_response = false;
+static int col_iters = 5;
+static bool col_closest = false;
 
 static void UpdatePlayer(const Core::InputState& input, double dt)
 {
@@ -376,16 +286,26 @@ static void UpdatePlayer(const Core::InputState& input, double dt)
 	else
 		player->collider = DEFAULT_COLLIDER;
 
-	position.y -= 0.9f * dt;
+	if(gravity)
+		position.y -= 5.f * dt;
 
+	phys_debug.Begin();
 	Capsule collider = player->collider;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < col_iters; i++) {
 		ColliderCastResult res;
-		TraceCapsule(position, collider, &res);
+		TraceCapsule(position, collider, &res,col_closest);
 		if (res.found) {
-			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
+			if(col_response)
+				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
+			phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
 		}
 	}
+
+	collider.base += position;
+	collider.tip += position;
+	Bounds cap_b = CapsuleToAABB(collider);
+	phys_debug.PushLineBox(cap_b.bmin, cap_b.bmax, COLOR_PINK);
+	phys_debug.End();
 
 	player->position = position;
 	move_speed_player = move_speed;
@@ -433,6 +353,7 @@ static void DrawPlayer(mat4 viewproj)
 	mb.End();
 	mb.Draw(GL_LINES);
 	mb.Free();
+	phys_debug.Draw(GL_LINES);
 }
 
 void InitGlState()
@@ -519,7 +440,7 @@ void Render(double dt)
 	{
 		MeshPart* part = &m->parts[i];
 		glBindVertexArray(part->vao);
-		//glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
+		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
 	}
 	glCheckError();
 
@@ -532,8 +453,9 @@ void MiscInit()
 {
 	core.game.level = LoadLevelFile("world0.glb");
 	TEMP_LEVEL = core.game.level;
+	InitWorldCollision();
 
-	int p_index = core.game.SpawnActor(EntType::PLAYER);
+	int p_index = core.game.SpawnEnt(EntType::PLAYER);
 	Entity* player = core.game.GetPlayer();
 	player->collider = DEFAULT_COLLIDER;
 
@@ -551,7 +473,7 @@ void MiscInit()
 	animator.GetLayer(0).active = true;
 
 	int bone = m->BoneForName("upper_arm.R");
-	int anim = m->animations->FindClipFromName("act_run");
+	int anim = m->animations->FindClipFromName("act_idle");
 	if (anim != -1)
 		animator.SetAnim(0, anim);
 }
@@ -578,6 +500,30 @@ int Run()
 				return 1;
 				break;
 			case SDL_KEYDOWN:
+			{
+				auto scancode = event.key.keysym.scancode;
+				int col_iter_old = col_iters;
+				if (scancode == SDL_SCANCODE_LEFT)
+					col_iters--;
+				if (scancode == SDL_SCANCODE_RIGHT)
+					col_iters++;
+				if (col_iters <= 0) col_iters = 1;
+				if(col_iters!=col_iter_old)
+					printf("col iters %d\n", col_iters);
+				if (scancode == SDL_SCANCODE_G) {
+					gravity = !gravity;
+					printf("gravity %s\n", (gravity) ? "on" : "off");
+				}
+				if (scancode == SDL_SCANCODE_C) {
+					col_response = !col_response;
+					printf("col_response %s\n", (col_response) ? "on" : "off");
+				}
+				if (scancode == SDL_SCANCODE_V) {
+					col_closest = !col_closest;
+					printf("col_closest %s\n", (col_closest) ? "on" : "off");
+				}
+
+			}
 			case SDL_KEYUP:
 				input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
 				break;
@@ -600,7 +546,11 @@ int Run()
 		}
 		// Service net
 		core.client.TrySendingConnect();
-		core.server.ReadMessages();
+		core.client.ReadPackets();
+		core.server.ReadPackets();
+
+		if (TimeSinceStart() > 5.f)
+			core.client.Disconnect();
 
 		Update(delta_t);
 		Render(delta_t);
@@ -611,9 +561,9 @@ int main(int argc, char** argv)
 {
 	printf("Starting...\n");
 	CreateWindow();
-	core.view.Init();
-	RenderInit();
 	NetworkInit();
+	RenderInit();
+	core.view.Init();
 	core.server.Start();
 	core.client.Start();
 	IPAndPort serv_addr;
@@ -621,7 +571,6 @@ int main(int argc, char** argv)
 	serv_addr.port = SERVER_PORT;
 	core.client.Connect(serv_addr);
 	MiscInit();
-
 	Run();
 	
 	Quit();

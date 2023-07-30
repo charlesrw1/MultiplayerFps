@@ -151,7 +151,6 @@ static void LoadGltfSkeleton(tinygltf::Model& scene, Model* model, tinygltf::Ski
 	tinygltf::BufferView& invbind_bv = scene.bufferViews[invbind_acc.bufferView];
 	for (int i = 0; i < skin.joints.size(); i++) {
 		tinygltf::Node& node = scene.nodes[skin.joints[i]];
-		printf("Bone: %s\n", node.name.c_str());
 		Bone b;
 		b.parent = -1;
 		float* start =(float*)(&scene.buffers[invbind_bv.buffer].data.at(invbind_bv.byteOffset) + sizeof(float)*16*i);

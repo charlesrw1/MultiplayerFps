@@ -107,5 +107,11 @@
     <ClInclude Include="Source\ClientNServer.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
+    <ClInclude Include="Source\CoreTypes.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\BVH.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,7 +1,7 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 #include "glm/glm.hpp"
-
+#include "MathLib.h"
 struct ColliderCastResult
 {
 	glm::vec3 penetration_normal;
@@ -45,9 +45,11 @@ struct Capsule
 
 
 void DrawCollisionWorld();
-void TraceCapsule(glm::vec3 org, const Capsule& capsule, ColliderCastResult* out);
+Bounds CapsuleToAABB(const Capsule& cap);
+void TraceCapsule(glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
+void TraceCapsuleMultiple(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, int num_results);
 void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out);
-
+void InitWorldCollision();
 
 
 #endif // !PHYSICS_H

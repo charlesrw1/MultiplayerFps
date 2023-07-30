@@ -58,7 +58,7 @@ public:
 private:
 	uint32_t VBO = 0, VAO = 0, EBO = 0;
 	std::vector<MbVertex> verticies;
-	std::vector<uint16_t> indicies;
+	std::vector<uint32_t> indicies;
 };
 
 #endif // !MESHBUILDER_H

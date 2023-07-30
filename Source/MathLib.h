@@ -37,10 +37,22 @@ struct Bounds
 			bmin.z <= p.z + size && bmax.z >= p.z - size;
 	}
 	bool intersect(const Bounds& other) const {
-		return bmin.x <= other.bmax.x && bmax.x >= other.bmin.x &&
-			bmin.y <= other.bmax.y && bmax.y >= other.bmin.y &&
-			bmin.z <= other.bmax.z && bmax.x >= other.bmin.z;
+		bool xoverlap = bmin.x <= other.bmax.x && bmax.x >= other.bmin.x;
+		bool yoverlap = bmin.y <= other.bmax.y && bmax.y >= other.bmin.y;
+		bool zoverlap = bmin.z <= other.bmax.z && bmax.z >= other.bmin.z;
+
+		return xoverlap && yoverlap && zoverlap;
 	}
+
+	// To help with templated bvh
+	bool intersect(const Bounds& other, float& t_out) const {
+		t_out = 0.f;
+		return
+			bmin.x <= other.bmax.x && bmax.x >= other.bmin.x &&
+			bmin.y <= other.bmax.y && bmax.y >= other.bmin.y &&
+			bmin.z <= other.bmax.z && bmax.z >= other.bmin.z;
+	}
+
 
 	bool intersect(const Ray& r, float& t_out) const {
 		glm::vec3 inv_dir = 1.f / r.dir;
@@ -56,7 +68,6 @@ struct Bounds
 			return false;
 		t_out = tnear;
 		return true;
-
 	}
 
 	glm::vec3 get_center() const {

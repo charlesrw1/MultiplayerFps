@@ -1,31 +1,35 @@
 #include "ClientNServer.h"
 #include "Util.h"
+#include <cstdarg>
 
-static void SendStringToAddress(const std::string& str, IPAndPort where, Socket* socket)
+static void NetDebugPrintf(const char* fmt, ...)
 {
-	uint8_t buffer[4+1+256];
-	if (str.size() > 256)
-		return;
-	ByteWriter buf(buffer, 4 + 1 + 256);
-	buf.WriteDword(CONNECTIONLESS_SEQUENCE);
-	buf.WriteByte(str.size());
-	for (auto c : str)
-		buf.WriteByte(c);
-	socket->Send(buffer, buf.BytesWritten(), where);
+	va_list ap;
+	va_start(ap, fmt);
+	
+	char buffer[2048];
+	float time_since_start = TimeSinceStart();
+	int l = sprintf_s(buffer, "%8.2f: ", time_since_start);
+	vsnprintf(buffer + l, 2048 - l, fmt, ap);
+	printf(buffer);
+	
+	va_end(ap);
 }
+
+#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
 
 void Server::Start()
 {
 	printf("Starting server...\n");
 	socket.Init(SERVER_PORT);
 	clients.resize(MAX_CLIENTS);
-	active = true;
+	initialized = true;
 }
 void Server::Quit()
 {
 	// Alert clients
 	socket.Shutdown();
-	active = false;
+	initialized = false;
 }
 int Server::FindClient(const IPAndPort& addr) const
 {
@@ -35,89 +39,161 @@ int Server::FindClient(const IPAndPort& addr) const
 	}
 	return -1;
 }
+
+static void RejectConnectRequest(Socket* sock, IPAndPort addr, const char* why)
+{
+	uint8_t buffer[512];
+	ByteWriter writer(buffer, 512);
+	writer.WriteDword(CONNECTIONLESS_SEQUENCE);
+	writer.WriteByte(Msg_RejectConnection);
+	int len = strlen(why);
+	if (len >= 256) {
+		ASSERT(0);
+		return;
+	}
+	writer.WriteByte(len);
+	for (int i = 0; i < len; i++)
+		writer.WriteByte(why[i]);
+	int pad_bytes = 8 - writer.BytesWritten();
+	for (int i = 0; i < pad_bytes; i++)
+		writer.WriteByte(0);
+	sock->Send(buffer, writer.BytesWritten(), addr);
+}
+
 void Server::HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf)
 {
-	int does_client_exist = FindClient(addr);
-	if (does_client_exist != -1)
-		return;
-
-	printf("Connectionless packet recieved from %s\n", addr.ToString().c_str());
-	int str_len = buf.ReadByte();
-	std::string command;
-	for (int i = 0; i < str_len; i++)
-		command.push_back(buf.ReadByte());
-	if (buf.HasFailed())
-		return;
-	if (command == "connect")
-		ConnectNewClient(addr);
-	else
-		printf("Unknown connectionless packet\n");
+	DebugOut("Connectionless packet recieved from %s\n", addr.ToString().c_str());
+	uint8_t command = buf.ReadByte();
+	if (command == Msg_ConnectRequest) {
+		ConnectNewClient(addr, buf);
+	}
+	else {
+		DebugOut("Unknown connectionless packet\n");
+	}
 }
-void Server::ConnectNewClient(const IPAndPort& addr)
+void Server::ConnectNewClient(const IPAndPort& addr, ByteReader& buf)
 {
 	int spot = 0;
+	bool already_connected = false;
 	for (; spot < clients.size(); spot++) {
-		// I checked this earlier but might as well make sure
-		if (clients[spot].state != RemoteClient::Dead && clients[spot].connection.remote_addr == addr)
-			return;
+		// if the "accept" response was dropped, client might send a connect again
+		if (clients[spot].state == RemoteClient::Connected && clients[spot].connection.remote_addr == addr) {
+			already_connected = true;
+			break;
+		}
 		if (clients[spot].state == RemoteClient::Dead)
 			break;
 	}
 	if (spot == clients.size()) {
-		SendStringToAddress("response 'server is full'", addr, &socket);
+		RejectConnectRequest(&socket, addr, "Server is full");
 		return;
 	}
+	int name_len = buf.ReadByte();
+	char name_str[256 + 1];
+	for (int i = 0; i < name_len; i++) {
+		name_str[i] = buf.ReadByte();
+	}
+	name_str[name_len] = 0;
+	if(!already_connected)
+		DebugOut("Connected new client, %s; IP: %s\n", name_str, addr.ToString().c_str());
 
-	SendStringToAddress("accepted", addr, &socket);
-	printf("Connected new client %s", addr.ToString().c_str());
+	uint8_t accept_buf[32];
+	ByteWriter writer(accept_buf, 32);
+	writer.WriteDword(CONNECTIONLESS_SEQUENCE);
+	writer.WriteByte(Msg_AcceptConnection);
+	int pad_bytes = 8 - writer.BytesWritten();
+	for (int i = 0; i < pad_bytes; i++)
+		writer.WriteByte(0);
+	socket.Send(accept_buf, writer.BytesWritten(), addr);
+
 	RemoteClient& new_client = clients[spot];
-	new_client.state = RemoteClient::Connecting;
+	new_client.state = RemoteClient::Connected;
 	new_client.connection.Init(&socket, addr);
-	// Now communicate using the Connection interface
+	// Further communication is done with sequenced packets
 }
 
 void Server::DisconnectClient(RemoteClient& client)
 {
-	printf("Disconnecting client %s\n", client.connection.remote_addr.ToString().c_str());
-	
-
-	if (client.state == RemoteClient::Connected) {
+	ASSERT(client.state != RemoteClient::Dead);
+	DebugOut("Disconnecting client %s\n", client.connection.remote_addr.ToString().c_str());
+	if (client.state == RemoteClient::Spawned) {
 		// remove entitiy from game, call game logic ...
 	}
 	client.state = RemoteClient::Dead;
-	client.connection.remote_addr = IPAndPort();
+	client.connection.Clear();
 }
 
-void Server::HandlePacket(RemoteClient& client, ByteReader& buf)
+void Server::ReadClientCommand(RemoteClient& client, ByteReader& buf)
+{
+	uint8_t cmd_len = buf.ReadByte();
+	std::string cmd;
+	cmd.resize(cmd_len);
+	buf.ReadBytes((uint8_t*)&cmd[0], cmd_len);
+	if (buf.HasFailed())
+		DisconnectClient(client);
+	if (cmd == "init") {
+		SendInitData(client);
+	}
+}
+
+// Send initial data to the client such as the map, client index, so on
+void Server::SendInitData(RemoteClient& client)
+{
+	if (client.state != RemoteClient::Connected)
+		return;
+
+	uint8_t buffer[MAX_PAYLOAD_SIZE];
+	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
+	writer.WriteByte(SvMessageInitial);
+	int client_index = (&client) - clients.data();
+	writer.WriteByte(client_index);
+	const char* map_name = "world0.glb";
+	writer.WriteByte(strlen(map_name));
+	writer.WriteBytes((uint8_t*)map_name, strlen(map_name));
+
+	// FIXME: must be reliable!
+	client.connection.Send(buffer, writer.BytesWritten());
+}
+
+
+void Server::ReadClientPacket(RemoteClient& client, ByteReader& buf)
 {
 	while (!buf.IsEof())
 	{
 		uint8_t command = buf.ReadByte();
 		if (buf.HasFailed()) {
+			DebugOut("Read fail\n");
 			DisconnectClient(client);
 			return;
 		}
 		switch (command)
 		{
+		case ClNop:
+			break;
 		case ClMessageInput:
 			break;
 		case ClMessageQuit:
+			DisconnectClient(client);
 			break;
 		case ClMessageText:
 			break;
 		case ClMessageTick:
 			break;
+		case ClMessageCommand:
+			ReadClientCommand(client, buf);
+			break;
 		default:
+			DebugOut("Unknown message\n");
 			DisconnectClient(client);
 			return;
 			break;
 		}
 	}
 }
-void Server::ReadMessages()
+void Server::ReadPackets()
 {
-	ASSERT(active);
-	uint8_t inbuffer[MAX_DATAGRAM_SIZE + PACKET_HEADER_SIZE];
+	ASSERT(initialized);
+	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
 	IPAndPort from;
 
@@ -133,7 +209,7 @@ void Server::ReadMessages()
 
 		int cl_index = FindClient(from);
 		if (cl_index == -1) {
-			printf("Packet from unknown source: %s\n", from.ToString().c_str());
+			DebugOut("Packet from unknown source: %s\n", from.ToString().c_str());
 			continue;
 		}
 
@@ -142,7 +218,18 @@ void Server::ReadMessages()
 		int header = client.connection.NewPacket(inbuffer, recv_len);
 		if (header != -1) {
 			ByteReader reader(inbuffer + header, recv_len - header);
-			HandlePacket(client, reader);
+			ReadClientPacket(client, reader);
+		}
+	}
+
+	// check timeouts
+	for (int i = 0; i < clients.size(); i++) {
+		auto& cl = clients[i];
+		if (cl.state != RemoteClient::Spawned && cl.state != RemoteClient::Connected)
+			continue;
+		if (GetTime() - cl.connection.last_recieved > MAX_TIME_OUT) {
+			printf("Client, %s, timed out\n", cl.connection.remote_addr.ToString().c_str());
+			DisconnectClient(cl);
 		}
 	}
 }
@@ -151,7 +238,7 @@ void Client::Start()
 {
 	printf("Starting client...\n");
 	socket.Init(0);
-	active = true;
+	initialized = true;
 }
 void Client::Connect(const IPAndPort& where)
 {
@@ -168,7 +255,7 @@ void Client::TrySendingConnect()
 	if (state != TryingConnect)
 		return;
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
-		printf("Unable to connect to server\n");
+		DebugOut("Unable to connect to server\n");
 		state = Disconnected;
 		return;
 	}
@@ -177,14 +264,23 @@ void Client::TrySendingConnect()
 		return;
 	attempt_time = GetTime();
 	connect_attempts++;
-	printf("Sending connection request\n");
-	SendStringToAddress("connect", server.remote_addr, &socket);
+	DebugOut("Sending connection request\n");
+
+	uint8_t buffer[256];
+	ByteWriter writer(buffer, 256);
+	writer.WriteDword(CONNECTIONLESS_SEQUENCE);
+	writer.WriteByte(Msg_ConnectRequest);
+	const char name[] = "Charlie";
+	writer.WriteByte(sizeof(name) - 1);
+	writer.WriteBytes((uint8_t*)name, sizeof(name) - 1);
+
+	socket.Send(buffer, writer.BytesWritten(), server.remote_addr);
 }
 
-void Client::ReadMessages()
+void Client::ReadPackets()
 {
-	ASSERT(active);
-	uint8_t inbuffer[MAX_DATAGRAM_SIZE + PACKET_HEADER_SIZE];
+	ASSERT(initialized);
+	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
 	IPAndPort from;
 
@@ -198,27 +294,96 @@ void Client::ReadMessages()
 			continue;
 		}
 
-		if (state != Disconnected && state != TryingConnect && from == server.remote_addr) {
+		if ((state==Connected||state==Spawned) && from == server.remote_addr) {
 			int header = server.NewPacket(inbuffer, recv_len);
 			if (header != -1) {
 				ByteReader reader(inbuffer + header, recv_len - header);
-				HandlePacket(reader);
+				ReadServerPacket(reader);
 			}
 		}
 	}
+
+	if (state == Connected || state == Spawned) {
+		if (GetTime() - server.last_recieved > MAX_TIME_OUT) {
+			printf("Server timed out\n");
+			Disconnect();
+		}
+	}
+
 }
 
 void Client::Disconnect()
 {
+	if (state == Disconnected)
+		return;
+	if (state!=TryingConnect) {
+		uint8_t buffer[8];
+		ByteWriter write(buffer, 8);
+		write.WriteByte(ClMessageQuit);
+		server.Send(buffer, write.BytesWritten());
+	}
 
+
+	state = Disconnected;
 }
 
 void Client::HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf)
 {
+	uint8_t type = buf.ReadByte();
+	if (type == Msg_AcceptConnection) {
+		if (state != TryingConnect)
+			return;
+		DoConnect();
+	}
+	else if (type == Msg_RejectConnection) {
+		if (state != TryingConnect)
+			return;
 
+		uint8_t len = buf.ReadByte();
+		char reason[256 + 1];
+		for (int i = 0; i < len; i++) {
+			reason[i] = buf.ReadByte();
+		}
+		reason[len] = '\0';
+		if(!buf.HasFailed())
+			printf("Connection rejected: %s\n", reason);
+		Disconnect();
+	}
+	else {
+		DebugOut("Unknown connectionless packet type\n");
+	}
 }
 
-void Client::HandlePacket(ByteReader& buf)
+void Client::DoConnect()
+{
+	// We now have a valid connection with the server
+	server.Init(&socket, server.remote_addr);
+	state = Connected;
+	// Request the next step in the setup
+	uint8_t buffer[256];
+	ByteWriter writer(buffer, 256);
+	writer.WriteByte(ClMessageCommand);
+	const char init_str[] = "init";
+	writer.WriteByte(sizeof(init_str) - 1);
+	writer.WriteBytes((uint8_t*)init_str, sizeof(init_str) - 1);
+	int pad_bytes = 8 - writer.BytesWritten();
+	for (int i = 0; i < pad_bytes; i++)
+		writer.WriteByte(0);
+
+	// FIXME!!: this must go through reliable, do this later
+	server.Send(buffer, writer.BytesWritten());
+}
+
+void Client::ReadInitData(ByteReader& buf)
+{
+	player_num = buf.ReadByte();
+	int map_len = buf.ReadByte();
+	std::string mapname(map_len,0);
+	buf.ReadBytes((uint8_t*)&mapname[0], map_len);
+	printf("Player num: %d, Map: %s\n", player_num, mapname.c_str());
+}
+
+void Client::ReadServerPacket(ByteReader& buf)
 {
 	while (!buf.IsEof())
 	{
@@ -229,7 +394,10 @@ void Client::HandlePacket(ByteReader& buf)
 		}
 		switch (command)
 		{
-		case SvMessageStart:
+		case SvNop:
+			break;
+		case SvMessageInitial:
+			ReadInitData(buf);
 			break;
 		case SvMessageSnapshot:
 			break;
@@ -239,9 +407,8 @@ void Client::HandlePacket(ByteReader& buf)
 			break;
 		case SvMessageTick:
 			break;
-		case NetMessageEnd:
-			break;
 		default:
+			DebugOut("Unknown message, disconnecting\n");
 			Disconnect();
 			return;
 			break;

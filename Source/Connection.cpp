@@ -21,8 +21,8 @@ static void WriteInt(uint8_t* data, unsigned i)
 
 Connection::Connection()
 {
-	reliable_out.resize(MAX_DATAGRAM_SIZE);
-	reliable_unacked.resize(MAX_DATAGRAM_SIZE);
+	reliable_out.resize(MAX_PAYLOAD_SIZE);
+	reliable_unacked.resize(MAX_PAYLOAD_SIZE);
 }
 
 void Connection::Init(Socket* sock, IPAndPort addr)
@@ -32,9 +32,14 @@ void Connection::Init(Socket* sock, IPAndPort addr)
 	out_sequence = 0;
 	out_sequence_ak = -1;
 	in_sequence = -1;
-	last_recieved = 0.0;
+	last_recieved = GetTime();
 	reliable_out_len = 0;
 	reliable_unacked_len = 0;
+}
+void Connection::Clear()
+{
+	sock = nullptr;
+	remote_addr = IPAndPort();
 }
 
 int Connection::NewPacket(const uint8_t* data, int length)
@@ -46,7 +51,7 @@ int Connection::NewPacket(const uint8_t* data, int length)
 	unsigned new_seq_ak = ReadInt(data + 4);
 
 	int dropped = new_seq - (in_sequence + 1);
-	if (new_seq <= in_sequence) {
+	if (new_seq <= in_sequence && in_sequence!=-1) {
 		printf("duplicate or out of order packets\n");
 		return -1;
 	}
@@ -76,12 +81,12 @@ int Connection::NewPacket(const uint8_t* data, int length)
 void Connection::Send(const uint8_t* data, int len)
 {
 	ASSERT(sock);
-	uint8_t msg_buffer[MAX_DATAGRAM_SIZE + PACKET_HEADER_SIZE];
+	uint8_t msg_buffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	WriteInt(msg_buffer, out_sequence);
 	WriteInt(msg_buffer+4, in_sequence);
 
 	// Write reliable data here, for now skip and just copy unreliable
-	if (len < MAX_DATAGRAM_SIZE) {
+	if (len < MAX_PAYLOAD_SIZE) {
 		memcpy(msg_buffer + PACKET_HEADER_SIZE, data, len);
 	}
 	else {
@@ -90,4 +95,5 @@ void Connection::Send(const uint8_t* data, int len)
 	}
 
 	bool good = sock->Send(msg_buffer, len + PACKET_HEADER_SIZE, remote_addr);
+	out_sequence++;
 }
