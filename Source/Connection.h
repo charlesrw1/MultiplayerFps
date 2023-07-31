@@ -6,7 +6,6 @@
 const int MAX_PAYLOAD_SIZE = 1400;
 const int PACKET_HEADER_SIZE = 8;
 
-
 class Connection
 {
 public:

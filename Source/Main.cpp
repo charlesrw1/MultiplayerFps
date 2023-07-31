@@ -21,6 +21,8 @@
 #include "Entity.h"
 #include "Net.h"
 #include "CoreTypes.h"
+#include "Client.h"
+#include "Server.h"
 
 MeshBuilder phys_debug;
 Core core;
@@ -96,121 +98,6 @@ double TimeSinceStart()
 {
 	return GetTime() - program_time_start;
 }
-bool ClientInGame()
-{
-	return core.client.initialized && core.client.state == Client::Spawned;
-}
-bool ServerIsActive()
-{
-	return core.server.active;
-}
-
-void GetPlayerSpawnPoisiton(Entity* ent)
-{
-	Level* level = core.game.level;
-	if (level->spawns.size() > 0) {
-		ent->position = level->spawns[0].position;
-		ent->rotation.y = level->spawns[0].angle;
-	}
-	else {
-		ent->position = glm::vec3(0);
-		ent->rotation = glm::vec3(0);
-	}
-}
-
-void PlayerSpawn(Entity* ent)
-{
-	ASSERT(ent->type == Ent_Player);
-	ent->model = FindOrLoadModel("CT.glb");
-	if (ent->model) {
-		int idle = ent->model->animations->FindClipFromName("act_idle");
-		ent->animator.Init(ent->model);
-		ent->animator.SetAnim(LOWERBODY_LAYER, idle);
-	}
-	GetPlayerSpawnPoisiton(ent);
-	ent->ducking = false;
-}
-
-void DummySpawn(Entity* ent)
-{
-
-}
-
-Entity* InitNewEnt(EntType type, int index)
-{
-	Entity* ent = &core.game.ents[index];
-	core.game.spawnids[index]++;
-	ASSERT(ent->type==Ent_Free);
-	ent->type = type;
-	ent->index = index;
-	ent->ducking = false;
-	ent->model = nullptr;
-	ent->animator = Animator();
-	ent->position = glm::vec3(0.f);
-	ent->velocity = glm::vec3(0.f);
-	ent->rotation = glm::vec3(0.f);
-	ent->scale = glm::vec3(1.f);
-	return ent;
-}
-
-void Game::SpawnNewClient(int client)
-{
-	Entity* ent = InitNewEnt(Ent_Player, client);
-	PlayerSpawn(ent);
-	core.game.num_ents++;
-	printf("spawned client %d into game\n", client);
-}
-Entity* Game::LocalPlayer()
-{
-	ASSERT(ClientInGame());
-	Entity* ent = GetByIndex(core.client.player_num);
-	ASSERT(ent && ent->type == Ent_Player);
-	return ent;
-}
-int Game::SpawnNewEntity(EntType type, vec3 pos, vec3 rot)
-{
-	if (type == Ent_Player)
-		return -1;
-	int slot = MAX_CLIENTS;
-	for (; slot < MAX_GAME_ENTS; slot++) {
-		if (ents[slot].type == Ent_Free)
-			break;
-	}
-	if (slot == MAX_GAME_ENTS)
-		return -1;
-	Entity* ent = InitNewEnt(type, slot);
-	core.game.num_ents++;
-	printf("spawning ent in slot %d\n", slot);
-
-	switch (type)
-	{
-	case Ent_Dummy:
-		DummySpawn(ent);
-		break;
-	}
-	return slot;
-}
-void Game::ClearAllEnts()
-{
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		ents[i].type = Ent_Free;
-		spawnids[i] = 0;
-	}
-	num_ents = 0;
-}
-bool Game::DoNewMap(const char* mapname)
-{
-	if (level) {
-		ClearAllEnts();
-		// free references in engine
-		delete level;
-	}
-	level = LoadLevelFile(mapname);
-	if (!level)
-		return false;
-	InitWorldCollision();
-	return true;
-}
 
 
 void FlyCamera::UpdateVectors() {
@@ -219,7 +106,6 @@ void FlyCamera::UpdateVectors() {
 glm::mat4 FlyCamera::GetViewMatrix() const {
 	return glm::lookAt(position, position + front, up);
 }
-
 
 void ViewMgr::Init()
 {
@@ -232,24 +118,26 @@ void ViewMgr::Init()
 
 void ViewMgr::Update()
 {
-	if (!ClientInGame())
+	if (!ClientIsInGame())
 		return;
 	Core::InputState& input = core.input;
 	if (update_camera) {
 		fly_cam.UpdateFromInput(input.keyboard, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
 	}
 	if (third_person) {
-		Entity* player = core.game.LocalPlayer();
-		fly_cam.position = player->position+vec3(0,0.5,0) - fly_cam.front * 3.f;
+		ClientEntity* player = ClientGetLocalPlayer();
+		Entity* ent = ServerEntForIndex(0);
+		fly_cam.position = ent->position+vec3(0,0.5,0) - fly_cam.front * 3.f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 	}
 	else
 	{
-		Entity* player = core.game.LocalPlayer();
-		float view_height = (player->ducking) ? 0.65 : 1.2;
-		vec3 cam_position = player->position + vec3(0, view_height, 0);
-		vec3 front = AnglesToVector(core.client.view_angles.x,core.client.view_angles.y);
+		ClientEntity* player = ClientGetLocalPlayer();
+		EntityState* pstate = &player->state;
+		float view_height = (pstate->ducking) ? 0.65 : 1.2;
+		vec3 cam_position = pstate->position + vec3(0, view_height, 0);
+		vec3 front = AnglesToVector(client.view_angles.x,client.view_angles.y);
 		setup.view_mat = glm::lookAt(cam_position, cam_position + front, vec3(0, 1, 0));
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 		setup.vieworigin = cam_position;
@@ -378,12 +266,12 @@ static float ground_accel = 6;
 static float air_accel = 3;
 static float minspeed = 1;
 static float maxspeed = 30;
-static float jumpimpulse = 3.f;
+static float jumpimpulse = 5.f;
 
 class PlayerPhysics
 {
 public:
-	void Run(Entity* p, MoveCommand cmd, float dt);
+	void Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt);
 
 private:
 	void DoStandardPhysics();
@@ -397,6 +285,7 @@ private:
 	void MoveAndSlide(vec3 delta);
 	void CheckGroundState();
 
+	const Level* level;
 	float deltat;
 	Entity* player;
 	MoveCommand inp;
@@ -467,7 +356,7 @@ void PlayerPhysics::CheckDuck()
 		for (; i < steps; i++) {
 			ColliderCastResult res;
 			vec3 where = player->position + offset + vec3(0, (i + 1) * step, 0);
-			TraceSphere(where, sphere_radius, &res, true, false);
+			TraceSphere(level,where, sphere_radius, &res, true, false);
 			if (res.found) {
 				phys_debug.AddSphere(where, sphere_radius, 10, 8, COLOR_RED);
 				break;
@@ -479,30 +368,6 @@ void PlayerPhysics::CheckDuck()
 				player->position.y -= len;
 			}
 		}
-
-#if 0
-		if (player->on_ground) {
-			Capsule collider = DEFAULT_COLLIDER;
-			vec3 a, b, c, d;
-			DEFAULT_COLLIDER.GetSphereCenters(a, b);
-			CROUCH_COLLIDER.GetSphereCenters(c, d);
-			float len = b.y - d.y;
-			int steps = 2;
-			float step = len / (float)steps;
-			int i = 0;
-			for (; i < steps; i++) {
-				ColliderCastResult res;
-				vec3 where = player->position + d + vec3(0, (i + 1) * step, 0);
-				TraceSphere(where, CROUCH_COLLIDER.radius, &res, true, false);
-				if (res.found) {
-					phys_debug.AddSphere(where, CROUCH_COLLIDER.radius, 10, 8, COLOR_RED);
-					break;
-				}
-			}
-			if (i == steps)
-				player->ducking = false;
-		}
-#endif
 	}
 }
 
@@ -532,7 +397,7 @@ void PlayerPhysics::MoveAndSlide(vec3 delta)
 	{
 		position += step;
 		ColliderCastResult trace;
-		TraceCapsule(position, cap, &trace, col_closest);
+		TraceCapsule(level,position, cap, &trace, col_closest);
 		if (trace.found)
 		{
 			vec3 penetration_velocity = dot(player->velocity, trace.penetration_normal) * trace.penetration_normal;
@@ -544,7 +409,7 @@ void PlayerPhysics::MoveAndSlide(vec3 delta)
 	// Gets player out of surfaces
 	for (int i = 0; i < 2; i++) {
 		ColliderCastResult res;
-		TraceCapsule(position, cap, &res, col_closest);
+		TraceCapsule(level,position, cap, &res, col_closest);
 		if (res.found) {
 			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
 		}
@@ -559,14 +424,16 @@ void PlayerPhysics::CheckGroundState()
 		return;
 	}
 	ColliderCastResult result;
-	TraceSphere(player->position-vec3(0,0.02f,0), 0.1f, &result, false,true);
+	vec3 where = player->position - vec3(0, 0.015, 0);
+	float radius = 0.06f;
+	TraceSphere(level,where,radius, &result, false,true);
 	if (!result.found)
 		player->on_ground = false;
 	else if (result.surf_normal.y < 0.6)
 		player->on_ground = false;
 	else {
 		player->on_ground = true;
-		phys_debug.AddSphere(player->position, 0.1f, 8, 6, COLOR_BLUE);
+		phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
 	}
 }
 
@@ -599,7 +466,7 @@ void PlayerPhysics::GroundMove()
 
 	CheckJump();
 	CheckDuck();
-	if(!player->on_ground)
+	if (!player->on_ground)
 		player->velocity.y -= gravityamt * deltat;
 
 	vec3 delta = player->velocity * deltat;
@@ -611,11 +478,11 @@ void PlayerPhysics::AirMove()
 
 }
 static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt);
-void PlayerPhysics::Run(Entity* p, MoveCommand cmd, float dt)
+void PlayerPhysics::Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt)
 {
 	if (!p)
 		return;
-
+	level = lvl;
 	deltat = dt;
 	player = p;
 	inp = cmd;// TheGame.lastinput;
@@ -659,7 +526,7 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	position += player->velocity;
 	float move_speed = move_speed_player;
 
-	vec3 front = core.view.fly_cam.front;
+	vec3 front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
 	vec3 up = vec3(0, 1, 0);
 	vec3 right = cross(up, front);
 	position += move_speed * front * cmd.forward_move;
@@ -684,7 +551,7 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	for (int i = 0; i < col_iters; i++) {
 		ColliderCastResult res;
 		position += step;
-		TraceCapsule(position, collider, &res,col_closest);
+		TraceCapsule(server.sv_game.level,position, collider, &res,col_closest);
 		if (res.found) {
 			player->velocity = vec3(0);
 			if(col_response)
@@ -694,7 +561,7 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	}
 	for (int i = 0; i < 3; i++) {
 		ColliderCastResult res;
-		TraceCapsule(position, collider, &res, col_closest);
+		TraceCapsule(server.sv_game.level,position, collider, &res, col_closest);
 		if (res.found) {
 			if (col_response)
 				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
@@ -711,11 +578,11 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	move_speed_player = move_speed;
 }
 
-void Game::ExecuteCommand(MoveCommand cmd, Entity* ent)
+void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
 	phys_debug.Begin();
 	PlayerPhysics physics;
-	physics.Run(ent, cmd, TEMP_DT);
+	physics.Run(level,ent, cmd, TEMP_DT);
 	phys_debug.End();
 }
 
@@ -728,16 +595,16 @@ void CreateMoveCommand()
 		x_off *= sensitivity;
 		y_off *= sensitivity;
 
-		glm::vec3 view_angles = core.client.view_angles;
+		glm::vec3 view_angles = client.view_angles;
 		view_angles.x -= y_off;	// pitch
 		view_angles.y += x_off;	// yaw
 		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
 		view_angles.y = fmod(view_angles.y, TWOPI);
 
-		core.client.view_angles = view_angles;
+		client.view_angles = view_angles;
 	}
 	MoveCommand new_cmd{};
-	new_cmd.view_angles = core.client.view_angles;
+	new_cmd.view_angles = client.view_angles;
 	bool* keys = core.input.keyboard;
 	if (keys[SDL_SCANCODE_W])
 		new_cmd.forward_move += 1.f;
@@ -762,7 +629,7 @@ void CreateMoveCommand()
 
 	new_cmd.tick = 0;	// TODO
 
-	core.client.commands[core.client.GetOutSequence() % CLIENT_MOVE_HISTORY] = new_cmd;
+	*client.GetCommand(client.GetCurrentSequence()) = new_cmd;
 }
 
 
@@ -773,9 +640,9 @@ void DrawTempLevel(mat4 viewproj)
 	static_wrld.use();
 	static_wrld.set_mat4("ViewProj", viewproj);
 
-	Level* level = core.game.level;
+	const Level* level = client.cl_game.level;
 	for (int m = 0; m < level->render_data.instances.size(); m++) {
-		Level::StaticInstance& sm = level->render_data.instances[m];
+		const Level::StaticInstance& sm = level->render_data.instances[m];
 		Model* model = level->render_data.embedded_meshes[sm.model_index];
 		static_wrld.set_mat4("Model", sm.transform);
 		static_wrld.set_mat4("InverseModel", glm::inverse(sm.transform));
@@ -789,7 +656,7 @@ void DrawTempLevel(mat4 viewproj)
 
 static void DrawPlayer(mat4 viewproj)
 {
-	Entity* player = core.game.LocalPlayer();
+	EntityState* player = &ClientGetLocalPlayer()->state;
 	vec3 origin = player->position;
 
 	const Capsule& c = (player->ducking)? CROUCH_COLLIDER : DEFAULT_COLLIDER;
@@ -831,7 +698,7 @@ void RenderInit()
 
 void Render(double dt)
 {
-	ViewSetup view = core.view.GetSceneView();
+	ViewSetup view = client.view_mgr.GetSceneView();
 	//mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
 	//mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
 	glViewport(view.x, view.y, view.width, view.height);
@@ -841,7 +708,7 @@ void Render(double dt)
 	simple.use();
 	simple.set_mat4("ViewProj", viewproj);
 	simple.set_mat4("Model", mat4(1.f));
-	DrawCollisionWorld();
+	DrawCollisionWorld(client.cl_game.level);
 	mb.Begin();
 	mb.PushLineBox(vec3(-1), vec3(1), COLOR_PINK);
 	mb.End();
@@ -901,17 +768,10 @@ void DrawScreen(double dt)
 	glClearColor(1.f, 1.f, 0.f, 1.f);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-	if (ClientInGame())
+	if (ClientIsInGame())
 		Render(dt);
 
 	SDL_GL_SwapWindow(core.window);
-}
-
-void MiscInit()
-{
-	core.game.DoNewMap("maze.glb");
-
-	ASSERT(glCheckError() == 0);
 }
 
 
@@ -925,51 +785,58 @@ void DoGameUpdate(double dt)
 	
 }
 
-void SpawnServer(const char* mapname)
-{
-	printf("Spawning server\n");
-	bool good = core.game.DoNewMap(mapname);
-	if (!good)
-		return;
-	core.server.active = true;
-}
-
 void CheckLocalServerRunning()
 {
-	if (core.client.state == Client::Disconnected && ServerIsActive()) {
+	if (ClientGetState() == Disconnected && ServerIsActive()) {
 		// connect to the local server
 		IPAndPort serv_addr;
 		serv_addr.SetIp(127, 0, 0, 1);
 		serv_addr.port = SERVER_PORT;
-		core.client.Connect(serv_addr);
+		client.server_mgr.Connect(serv_addr);
 	}
 }
 
 void ClientUpdate(double dt)
 {
-	Client* client = &core.client;
-	if (!client->initialized)
+	if (!client.initialized)
 		return;
 	// make command
-	if (client->state >= Client::Connected)
+	if (ClientGetState()>=Connected)
 		CreateMoveCommand();
 	CheckLocalServerRunning();
-	client->TrySendingConnect();
-	client->SendCommands();
-	client->ReadPackets();
+	client.server_mgr.TrySendingConnect();
+	client.server_mgr.SendMovesAndMessages();
+	client.server_mgr.ReadPackets();
 	DoClientGameUpdate(dt);
-	if (core.game.num_ents > 0)
-		client->state = Client::Spawned;
 }
 
 void ServerUpdate(double dt)
 {
-	Server* server = &core.server;
-	if (!server->active)
+	if (!server.active)
 		return;
-	server->ReadPackets();
+	server.client_mgr.ReadPackets();
 	DoGameUpdate(dt);
-	server->SendSnapshots();
+	server.client_mgr.SendSnapshots();
+}
+
+void ListenServerUpdate(double dt)
+{
+	if (client.initialized) {
+		if (ClientGetState() >= Connected)
+			CreateMoveCommand();
+		CheckLocalServerRunning();
+		client.server_mgr.TrySendingConnect();
+		client.server_mgr.SendMovesAndMessages();
+	}
+	if (server.active) {
+		server.client_mgr.ReadPackets();
+		DoGameUpdate(dt);
+		server.client_mgr.SendSnapshots();
+	}
+	if (client.initialized) {
+		client.server_mgr.ReadPackets();
+		DoClientGameUpdate(dt);
+	}
 }
 
 void HandleInput()
@@ -1011,7 +878,7 @@ void HandleInput()
 				new_physics = !new_physics;
 			}
 			if (scancode == SDL_SCANCODE_T)
-				core.view.third_person = !core.view.third_person;
+				client.view_mgr.third_person = !client.view_mgr.third_person;
 		}
 		case SDL_KEYUP:
 			input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
@@ -1044,10 +911,9 @@ int main(int argc, char** argv)
 	CreateWindow();
 	NetworkInit();
 	RenderInit();
-	core.view.Init();
-	core.server.Start();
-	core.client.Start();
-	SpawnServer(map_file);
+	ServerInit();
+	ClientInit();
+	ServerSpawn(map_file);
 
 	double delta_t = 0.1;
 	double last = GetTime();
@@ -1061,10 +927,11 @@ int main(int argc, char** argv)
 			delta_t = 0.1;
 		TEMP_DT = delta_t;
 		HandleInput();
-		ClientUpdate(delta_t);
-		ServerUpdate(delta_t);
-		if (core.client.initialized) {
-			core.view.Update();
+		//ClientUpdate(delta_t);
+		//ServerUpdate(delta_t);
+		ListenServerUpdate(delta_t);
+		if (client.initialized) {
+			client.view_mgr.Update();
 			DrawScreen(delta_t);
 		}
 	}

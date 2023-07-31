@@ -81,6 +81,11 @@ int Connection::NewPacket(const uint8_t* data, int length)
 void Connection::Send(const uint8_t* data, int len)
 {
 	ASSERT(sock);
+
+	// until reliable msgs are implmented
+	if (data == nullptr)
+		return;
+
 	uint8_t msg_buffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	WriteInt(msg_buffer, out_sequence);
 	WriteInt(msg_buffer+4, in_sequence);

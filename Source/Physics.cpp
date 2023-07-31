@@ -8,23 +8,20 @@
 #include "BVH.h"
 #include "CoreTypes.h"
 
-static BVH world_bvh;
-
 extern MeshBuilder phys_debug;
-
 static MeshBuilder world_collision;
 static bool has_built = false;
-void DrawCollisionWorld()
+void DrawCollisionWorld(const Level* lvl)
 {
 	if (!has_built) {
 		world_collision.Begin();
 		int basev = world_collision.GetBaseVertex();
-		Level::CollisionData& cd = core.game.level->collision_data;
+		const Level::CollisionData& cd = lvl->collision_data;
 		for (int i = 0; i < cd.vertex_list.size(); i++) {
 			world_collision.AddVertex(MbVertex(cd.vertex_list[i], COLOR_RED));
 		}
 		for (int i = 0; i < cd.collision_tris.size(); i++) {
-			Level::CollisionTri& ct = cd.collision_tris[i];
+			const Level::CollisionTri& ct = cd.collision_tris[i];
 			world_collision.AddLine(basev + ct.indicies[0], basev + ct.indicies[1]);
 			world_collision.AddLine(basev + ct.indicies[1], basev + ct.indicies[2]);
 			world_collision.AddLine(basev + ct.indicies[2], basev + ct.indicies[0]);
@@ -34,9 +31,9 @@ void DrawCollisionWorld()
 			world_collision.PushLine(center, center + ct.face_normal*0.25f, COLOR_BLUE);
 		}
 
-		for (int i = 0; i < world_bvh.nodes.size(); i++)
+		for (int i = 0; i < lvl->static_geo_bvh.nodes.size(); i++)
 		{
-			BVHNode& node = world_bvh.nodes[i];
+			const BVHNode& node = lvl->static_geo_bvh.nodes[i];
 			//world_collision.PushLineBox(node.aabb.bmin, node.aabb.bmax, COLOR_PINK);
 		}
 
@@ -46,12 +43,12 @@ void DrawCollisionWorld()
 	}
 	world_collision.Draw(GL_LINES);
 }
-void InitWorldCollision()
+void InitStaticGeoBvh(Level* level)
 {
-	has_built = false;
+	has_built = false;	// this is just for debug mesh
 
 	std::vector<Bounds> bound_vec;
-	Level::CollisionData& cd = core.game.level->collision_data;
+	Level::CollisionData& cd = level->collision_data;
 	for (int i = 0; i < cd.collision_tris.size(); i++) {
 		Level::CollisionTri& tri = cd.collision_tris[i];
 		glm::vec3 corners[3];
@@ -67,12 +64,12 @@ void InitWorldCollision()
 	}
 
 	float time_start = GetTime();
-	world_bvh = BVH::build(bound_vec, 1, BVH_SAH);
+	level->static_geo_bvh = BVH::build(bound_vec, 1, BVH_SAH);
 	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
 template<typename Functor>
-static void IntersectWorld(Functor&& do_intersect, BVH& bvh, Bounds box)
+static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 {
 	const BVHNode* stack[64];
 	stack[0] = &bvh.nodes[0];
@@ -340,9 +337,9 @@ Bounds CapsuleToAABB(const Capsule& cap)
 	return bounds_union(Bounds(centertip - vec3(cap.radius), centertip + vec3(cap.radius)),
 		Bounds(centerbase - vec3(cap.radius), centerbase + vec3(cap.radius)));
 }
-void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bool closest)
+void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bool closest)
 {
-	Level::CollisionData& cd = core.game.level->collision_data;
+	const Level::CollisionData& cd = lvl->collision_data;
 
 	Capsule adjusted_cap = cap;
 	adjusted_cap.base += pos;
@@ -392,15 +389,15 @@ void TraceCapsule(glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bo
 		}
 	}
 #else
-	IntersectWorld(capsule_intersect_functor, world_bvh, b2);
+	IntersectWorld(capsule_intersect_functor, lvl->static_geo_bvh, b2);
 #endif
 
 	out->touched_ground = found_ground;
 }
 
-void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided)
+void TraceSphere(const Level* level, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided)
 {
-	Level::CollisionData& cd = core.game.level->collision_data;
+	const Level::CollisionData& cd = level->collision_data;
 
 	float best_len_total = INFINITY;
 
@@ -418,7 +415,7 @@ void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out, bool clos
 		return false;
 	};
 	Bounds sphere(vec3(-radius + org), vec3(radius + org));
-	IntersectWorld(sphere_intersect_functor, world_bvh, sphere);
+	IntersectWorld(sphere_intersect_functor, level->static_geo_bvh, sphere);
 }
 
 void Capsule::GetSphereCenters(vec3& a, vec3& b) const

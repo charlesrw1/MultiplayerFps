@@ -19,6 +19,15 @@
     <Filter Include="Source Files\Network">
       <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Server">
+      <UniqueIdentifier>{2e16c947-a6ae-4609-8a2f-070d7ddc0b93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Client">
+      <UniqueIdentifier>{06581487-72a2-4122-95bf-b3bf1258e2b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shared">
+      <UniqueIdentifier>{cef035e7-a0e4-44b6-a66a-7038ec306a67}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\External\glad.c">
@@ -54,11 +63,20 @@
     <ClCompile Include="Source\Connection.cpp">
       <Filter>Source Files\Network</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Server.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Client.cpp">
-      <Filter>Source Files\Network</Filter>
+      <Filter>Source Files\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Server.cpp">
+      <Filter>Source Files\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Game.cpp">
+      <Filter>Source Files\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="source\ClientGame.cpp">
+      <Filter>Source Files\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="BVHBuild.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -104,7 +122,7 @@
     <ClInclude Include="Source\Connection.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Serialize.h">
+    <ClInclude Include="Source\Bytepacker.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
     <ClInclude Include="Source\Net.h">
@@ -118,6 +136,12 @@
     </ClInclude>
     <ClInclude Include="Source\MoveCommand.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Server.h">
+      <Filter>Source Files\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Client.h">
+      <Filter>Source Files\Client</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

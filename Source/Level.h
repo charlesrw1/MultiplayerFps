@@ -2,7 +2,7 @@
 #define LEVEL_H
 #include <vector>
 #include "Model.h"
-
+#include "BVH.h"
 class Level
 {
 public:
@@ -44,13 +44,17 @@ public:
 		short type = 0;
 		short param1 = 0;
 	};
-
+	BVH static_geo_bvh;
 	CollisionData collision_data;
 	RenderData render_data;
 	std::vector<PlayerSpawn> spawns;
 	std::vector<Trigger> triggers;
+	std::string name;
+
+	int ref_count = 0;	// to manage case of server/client accessing same level
 };
 
-Level* LoadLevelFile(const char* level);
+const Level* LoadLevelFile(const char* level);
+void FreeLevel(const Level* level);
 
 #endif // !LEVEL_H

@@ -1,7 +1,9 @@
-#include "Net.h"
+#include "Server.h"
 #include "Util.h"
 #include "CoreTypes.h"
 #include <cstdarg>
+
+Server server;
 
 void NetDebugPrintf(const char* fmt, ...)
 {
@@ -17,20 +19,50 @@ void NetDebugPrintf(const char* fmt, ...)
 	va_end(ap);
 }
 
-#define DebugOut(fmt, ...)
-//#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
+#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
 
-void Server::Start()
+void ServerInit()
+{
+	server.Init();
+}
+void ServerQuit()
+{
+	server.Shutdown();
+}
+void ServerSpawn(const char* mapname)
+{
+	printf("Spawning server\n");
+	bool good = server.sv_game.DoNewMap(mapname);
+	if (!good)
+		return;
+	server.map_name = mapname;
+	server.active = true;
+}
+bool ServerIsActive()
+{
+	return server.active;
+}
+
+void Server::Init()
+{
+	client_mgr.Init();
+	sv_game.Init();
+}
+void Server::Shutdown()
+{
+	if (!active)
+		return;
+	client_mgr.ShutdownServer();
+	server.active = false;
+}
+
+void ClientMgr::Init()
 {
 	socket.Init(SERVER_PORT);
 	clients.resize(MAX_CLIENTS);
 }
-void Server::Quit()
-{
-	// Alert clients
-	socket.Shutdown();
-}
-int Server::FindClient(const IPAndPort& addr) const
+
+int ClientMgr::FindClient(IPAndPort addr) const
 {
 	for (int i = 0; i < clients.size(); i++) {
 		if (clients[i].state != RemoteClient::Dead && clients[i].connection.remote_addr == addr)
@@ -38,7 +70,7 @@ int Server::FindClient(const IPAndPort& addr) const
 	}
 	return -1;
 }
-int Server::GetClientIndex(RemoteClient& client) const
+int ClientMgr::GetClientIndex(const RemoteClient& client) const
 {
 	return (&client) - clients.data();
 }
@@ -63,7 +95,7 @@ static void RejectConnectRequest(Socket* sock, IPAndPort addr, const char* why)
 	sock->Send(buffer, writer.BytesWritten(), addr);
 }
 
-void Server::HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf)
+void ClientMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
 {
 	DebugOut("Connectionless packet recieved from %s\n", addr.ToString().c_str());
 	uint8_t command = buf.ReadByte();
@@ -74,7 +106,7 @@ void Server::HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf)
 		DebugOut("Unknown connectionless packet\n");
 	}
 }
-void Server::ConnectNewClient(const IPAndPort& addr, ByteReader& buf)
+void ClientMgr::ConnectNewClient(IPAndPort addr, ByteReader& buf)
 {
 	int spot = 0;
 	bool already_connected = false;
@@ -115,7 +147,7 @@ void Server::ConnectNewClient(const IPAndPort& addr, ByteReader& buf)
 	// Further communication is done with sequenced packets
 }
 
-void Server::DisconnectClient(RemoteClient& client)
+void ClientMgr::DisconnectClient(RemoteClient& client)
 {
 	ASSERT(client.state != RemoteClient::Dead);
 	DebugOut("Disconnecting client %s\n", client.connection.remote_addr.ToString().c_str());
@@ -126,7 +158,7 @@ void Server::DisconnectClient(RemoteClient& client)
 	client.connection.Clear();
 }
 
-void Server::ReadClientText(RemoteClient& client, ByteReader& buf)
+void ClientMgr::ParseClientText(RemoteClient& client, ByteReader& buf)
 {
 	uint8_t cmd_len = buf.ReadByte();
 	std::string cmd;
@@ -140,13 +172,15 @@ void Server::ReadClientText(RemoteClient& client, ByteReader& buf)
 	else if (cmd == "spawn") {
 		if (client.state != RemoteClient::Spawned) {
 			client.state = RemoteClient::Spawned;
-			core.game.SpawnNewClient(GetClientIndex(client));
+
+			server.sv_game.SpawnNewClient(GetClientIndex(client));
+
 			DebugOut("Spawned client, %s\n", client.connection.remote_addr.ToString().c_str());
 		}
 	}
 }
 
-void Server::ReadClientInput(RemoteClient& client, ByteReader& buf)
+void ClientMgr::ParseClientMove(RemoteClient& client, ByteReader& buf)
 {
 	DebugOut("Recieved client input from %s\n", client.connection.remote_addr.ToString().c_str());
 
@@ -162,12 +196,13 @@ void Server::ReadClientInput(RemoteClient& client, ByteReader& buf)
 	if (client.state != RemoteClient::Spawned)
 		return;
 
-	Entity* ent = core.game.GetByIndex(GetClientIndex(client));
-	core.game.ExecuteCommand(cmd, ent);
+	Entity* ent = ServerEntForIndex(GetClientIndex(client));
+	ASSERT(ent && ent->type == Ent_Player);
+	server.sv_game.ExecutePlayerMove(ent, cmd);
 }
 
 // Send initial data to the client such as the map, client index, so on
-void Server::SendInitData(RemoteClient& client)
+void ClientMgr::SendInitData(RemoteClient& client)
 {
 	if (client.state != RemoteClient::Connected)
 		return;
@@ -177,16 +212,15 @@ void Server::SendInitData(RemoteClient& client)
 	writer.WriteByte(SvMessageInitial);
 	int client_index = (&client) - clients.data();
 	writer.WriteByte(client_index);
-	const char* map_name = "world0.glb";
-	writer.WriteByte(strlen(map_name));
-	writer.WriteBytes((uint8_t*)map_name, strlen(map_name));
+	writer.WriteByte(server.map_name.size());
+	writer.WriteBytes((uint8_t*)server.map_name.data(), server.map_name.size());
 
 	// FIXME: must be reliable!
 	client.connection.Send(buffer, writer.BytesWritten());
 }
 
 
-void Server::ReadClientPacket(RemoteClient& client, ByteReader& buf)
+void ClientMgr::HandleClientPacket(RemoteClient& client, ByteReader& buf)
 {
 	while (!buf.IsEof())
 	{
@@ -201,7 +235,7 @@ void Server::ReadClientPacket(RemoteClient& client, ByteReader& buf)
 		case ClNop:
 			break;
 		case ClMessageInput:
-			ReadClientInput(client, buf);
+			ParseClientMove(client, buf);
 			break;
 		case ClMessageQuit:
 			DisconnectClient(client);
@@ -209,7 +243,7 @@ void Server::ReadClientPacket(RemoteClient& client, ByteReader& buf)
 		case ClMessageTick:
 			break;
 		case ClMessageText:
-			ReadClientText(client, buf);
+			ParseClientText(client, buf);
 			break;
 		default:
 			DebugOut("Unknown message\n");
@@ -220,7 +254,7 @@ void Server::ReadClientPacket(RemoteClient& client, ByteReader& buf)
 	}
 }
 
-void Server::ReadPackets()
+void ClientMgr::ReadPackets()
 {
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
@@ -247,7 +281,7 @@ void Server::ReadPackets()
 		int header = client.connection.NewPacket(inbuffer, recv_len);
 		if (header != -1) {
 			ByteReader reader(inbuffer + header, recv_len - header);
-			ReadClientPacket(client, reader);
+			HandleClientPacket(client, reader);
 		}
 	}
 
@@ -263,7 +297,65 @@ void Server::ReadPackets()
 	}
 }
 
-void Server::SendSnapshots()
+void ClientMgr::SendSnapshots()
 {
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		if (clients[i].state < RemoteClient::Connected)
+			continue;
 
+		if (clients[i].state == RemoteClient::Spawned)
+			SendSnapshotUpdate(clients[i]);
+		else
+			clients[i].connection.Send(nullptr, 0);
+	}
+}
+
+void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
+{
+	ASSERT(client.state == RemoteClient::Spawned);
+
+	Game& game = server.sv_game;
+
+	uint8_t buffer[MAX_PAYLOAD_SIZE];
+	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
+	// for now, just dump the entities
+	uint32_t bitmask = 0;
+	writer.WriteByte(SvMessageSnapshot);
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity& ent = game.ents[i];
+		if (ent.type != Ent_Free)
+			bitmask |= (1 << (i % 32));
+		if (i % 32 == 31)
+			writer.WriteLong(bitmask);
+	}
+	// entity states
+	for (int i = 0; i < 1; i++) {
+		Entity& ent = game.ents[i];
+		//if (ent.type == Ent_Free)
+		//	continue;
+		writer.WriteWord(i);
+		writer.WriteByte(ent.type);
+		writer.WriteFloat(ent.position.x);
+		writer.WriteFloat(ent.position.y);
+		writer.WriteFloat(ent.position.z);
+		writer.WriteByte(ent.ducking);
+	}
+	// local player specific state
+	Entity& ent = game.ents[GetClientIndex(client)];
+	writer.WriteByte(SvMessagePlayerState);
+	writer.WriteFloat(ent.velocity.x);
+	writer.WriteFloat(ent.velocity.y);
+	writer.WriteFloat(ent.velocity.z);
+
+	client.connection.Send(buffer, writer.BytesWritten());
+	//DebugOut("sent %d bytes to %s\n", writer.BytesWritten(), client.connection.remote_addr.ToString().c_str());
+}
+
+void ClientMgr::ShutdownServer()
+{
+	for (int i = 0; i < clients.size(); i++) {
+		if (clients[i].state >= RemoteClient::Connected)
+			DisconnectClient(clients[i]);
+	}
+	socket.Shutdown();
 }

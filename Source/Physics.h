@@ -43,12 +43,14 @@ struct Capsule
 	void GetSphereCenters(glm::vec3& a, glm::vec3& b) const;
 };
 
-
-void DrawCollisionWorld();
+class Level;
+void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
-void TraceCapsule(glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
-void TraceSphere(glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
-void InitWorldCollision();
+void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
+void TraceSphere(const Level* lvl, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
+
+// Called by the level loader to init the bvh
+void InitStaticGeoBvh(Level* input);
 
 
 #endif // !PHYSICS_H

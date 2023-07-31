@@ -1,17 +1,57 @@
 #include "Net.h"
 #include "Util.h"
+#include "Client.h"
+#include "CoreTypes.h"
 
-//#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
-#define DebugOut(fmt, ...)
-void Client::Start()
+Client client;
+
+#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
+//#define DebugOut(fmt, ...)
+
+void ClientInit()
 {
-	printf("Starting client...\n");
-	socket.Init(0);
+	client.Init();
+}
+void ClientDisconnect()
+{
+	if (ClientGetState() == Disconnected)
+		return;
+	client.server_mgr.Disconnect();
+	client.cl_game.Clear();
+}
+ClientConnectionState ClientGetState()
+{
+	return client.server_mgr.state;
+}
+int ClientGetPlayerNum()
+{
+	return client.server_mgr.client_num;
+}
+
+
+MoveCommand* Client::GetCommand(int sequence) {
+	return &out_commands.at(sequence % out_commands.size());
+}
+void Client::Init()
+{
+	server_mgr.Init();
+	view_mgr.Init();
+	cl_game.Init();
+	out_commands.resize(CLIENT_MOVE_HISTORY);
 	initialized = true;
 }
-void Client::Connect(const IPAndPort& where)
+int Client::GetCurrentSequence() const
 {
-	// if connected, disconnect
+	return server_mgr.server.out_sequence;
+}
+
+
+void ClServerMgr::Init()
+{
+	sock.Init(0);
+}
+void ClServerMgr::Connect(const IPAndPort& where)
+{
 	printf("Connecting to server: %s\n", where.ToString().c_str());
 	server.remote_addr = where;
 	connect_attempts = 0;
@@ -19,7 +59,7 @@ void Client::Connect(const IPAndPort& where)
 	state = TryingConnect;
 	TrySendingConnect();
 }
-void Client::TrySendingConnect()
+void ClServerMgr::TrySendingConnect()
 {
 	if (state != TryingConnect)
 		return;
@@ -42,18 +82,32 @@ void Client::TrySendingConnect()
 	const char name[] = "Charlie";
 	writer.WriteByte(sizeof(name) - 1);
 	writer.WriteBytes((uint8_t*)name, sizeof(name) - 1);
+	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
+}
+void ClServerMgr::Disconnect()
+{
+	if (state == Disconnected)
+		return;
+	if (state != TryingConnect) {
+		uint8_t buffer[8];
+		ByteWriter write(buffer, 8);
+		write.WriteByte(ClMessageQuit);
+		server.Send(buffer, write.BytesWritten());
+	}
+	state = Disconnected;
 
-	socket.Send(buffer, writer.BytesWritten(), server.remote_addr);
+	client_num = -1;
+	server.remote_addr = IPAndPort();
 }
 
-void Client::ReadPackets()
+void ClServerMgr::ReadPackets()
 {
-	ASSERT(initialized);
+	ASSERT(client.initialized);
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
 	IPAndPort from;
 
-	while (socket.Recieve(inbuffer, sizeof(inbuffer), recv_len, from))
+	while (sock.Recieve(inbuffer, sizeof(inbuffer), recv_len, from))
 	{
 		if (recv_len < PACKET_HEADER_SIZE)
 			continue;
@@ -67,7 +121,7 @@ void Client::ReadPackets()
 			int header = server.NewPacket(inbuffer, recv_len);
 			if (header != -1) {
 				ByteReader reader(inbuffer + header, recv_len - header);
-				ReadServerPacket(reader);
+				HandleServerPacket(reader);
 			}
 		}
 	}
@@ -75,34 +129,20 @@ void Client::ReadPackets()
 	if (state == Connected || state == Spawned) {
 		if (GetTime() - server.last_recieved > MAX_TIME_OUT) {
 			printf("Server timed out\n");
-			Disconnect();
+			::ClientDisconnect();
 		}
 	}
 
 }
 
-void Client::Disconnect()
-{
-	if (state == Disconnected)
-		return;
-	if (state != TryingConnect) {
-		uint8_t buffer[8];
-		ByteWriter write(buffer, 8);
-		write.WriteByte(ClMessageQuit);
-		server.Send(buffer, write.BytesWritten());
-	}
 
-
-	state = Disconnected;
-}
-
-void Client::HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf)
+void ClServerMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
 {
 	uint8_t type = buf.ReadByte();
 	if (type == Msg_AcceptConnection) {
 		if (state != TryingConnect)
 			return;
-		DoConnect();
+		StartConnection();
 	}
 	else if (type == Msg_RejectConnection) {
 		if (state != TryingConnect)
@@ -116,17 +156,17 @@ void Client::HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf)
 		reason[len] = '\0';
 		if (!buf.HasFailed())
 			printf("Connection rejected: %s\n", reason);
-		Disconnect();
+		::ClientDisconnect();
 	}
 	else {
 		DebugOut("Unknown connectionless packet type\n");
 	}
 }
 
-void Client::DoConnect()
+void ClServerMgr::StartConnection()
 {
 	// We now have a valid connection with the server
-	server.Init(&socket, server.remote_addr);
+	server.Init(&sock, server.remote_addr);
 	state = Connected;
 	// Request the next step in the setup
 	uint8_t buffer[256];
@@ -140,15 +180,17 @@ void Client::DoConnect()
 	server.Send(buffer, writer.BytesWritten());
 }
 
-void Client::ReadInitData(ByteReader& buf)
+void ClServerMgr::ParseServerInit(ByteReader& buf)
 {
-	player_num = buf.ReadByte();
+	client_num = buf.ReadByte();
 	int map_len = buf.ReadByte();
 	std::string mapname(map_len, 0);
 	buf.ReadBytes((uint8_t*)&mapname[0], map_len);
-	printf("Player num: %d, Map: %s\n", player_num, mapname.c_str());
+	DebugOut("Player num: %d, Map: %s\n", client_num, mapname.c_str());
 
 	// Load map and game data here
+	printf("Client: Loading map...\n");
+	client.cl_game.NewMap(mapname.c_str());
 
 	// Tell server to spawn us in
 	uint8_t buffer[64];
@@ -160,13 +202,13 @@ void Client::ReadInitData(ByteReader& buf)
 	server.Send(buffer, writer.BytesWritten());
 }
 
-void Client::ReadServerPacket(ByteReader& buf)
+void ClServerMgr::HandleServerPacket(ByteReader& buf)
 {
 	while (!buf.IsEof())
 	{
 		uint8_t command = buf.ReadByte();
 		if (buf.HasFailed()) {
-			Disconnect();
+			::ClientDisconnect();
 			return;
 		}
 		switch (command)
@@ -174,9 +216,16 @@ void Client::ReadServerPacket(ByteReader& buf)
 		case SvNop:
 			break;
 		case SvMessageInitial:
-			ReadInitData(buf);
+			ParseServerInit(buf);
 			break;
 		case SvMessageSnapshot:
+			if (state == Connected) {
+				state = Spawned;
+			}
+			ParseEntSnapshot(buf);
+			break;
+		case SvMessagePlayerState:
+			ParsePlayerData(buf);
 			break;
 		case SvMessageDisconnect:
 			break;
@@ -186,22 +235,22 @@ void Client::ReadServerPacket(ByteReader& buf)
 			break;
 		default:
 			DebugOut("Unknown message, disconnecting\n");
-			Disconnect();
+			::ClientDisconnect();
 			return;
 			break;
 		}
 	}
 }
 
-void Client::SendCommands()
+void ClServerMgr::SendMovesAndMessages()
 {
 	if (state < Connected)
 		return;
 
-	DebugOut("Wrote move to server\n");
+	//DebugOut("Wrote move to server\n");
 
 	// Send move
-	const MoveCommand& lastmove = commands[server.out_sequence % CLIENT_MOVE_HISTORY];
+	MoveCommand lastmove = *client.GetCommand(server.out_sequence);
 
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
@@ -214,4 +263,30 @@ void Client::SendCommands()
 	writer.WriteLong(lastmove.button_mask);
 
 	server.Send(buffer, writer.BytesWritten());
+}
+
+void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
+{
+	// TEMPORARY
+	uint32_t is_spawned[8];
+	for (int i = 0; i < 8; i++)
+		is_spawned[i] = msg.ReadLong();
+	EntityState state;
+	for (int i = 0; i < 1; i++) {
+		int index = msg.ReadWord();
+		int type = msg.ReadByte();
+		state.position.x = msg.ReadFloat();
+		state.position.y = msg.ReadFloat();
+		state.position.z = msg.ReadFloat();
+		state.ducking = msg.ReadByte();
+		if(i==0)
+			ClientGetLocalPlayer()->state = state;
+	}
+}
+
+void ClServerMgr::ParsePlayerData(ByteReader& buf)
+{
+	buf.ReadFloat();
+	buf.ReadFloat();
+	buf.ReadFloat();
 }

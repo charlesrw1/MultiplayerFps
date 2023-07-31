@@ -3,13 +3,14 @@
 #include "tiny_gltf.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/ext/matrix_transform.hpp"
-
+#include "Physics.h"
+#include <array>
 static const char* const level_directory = "Data\\Models\\";
+static std::array<Level*, 2> loaded_levels;
 
 bool IsMaterialCollidable() {
 	return true;
 }
-
 static void LoadCollisionData(Level* level, tinygltf::Model& scene, tinygltf::Mesh& mesh, glm::mat4 transform)
 {
 	Level::CollisionData& out_data = level->collision_data;
@@ -186,8 +187,18 @@ static void GatherRenderData(Level* level, tinygltf::Model& scene)
 	}
 }
 
-Level* LoadLevelFile(const char* level_name)
+const Level* LoadLevelFile(const char* level_name)
 {
+	for (int i = 0; i < loaded_levels.size(); i++) {
+		if (loaded_levels[i]&&loaded_levels[i]->name == level_name) {
+			loaded_levels[i]->ref_count++;
+			return loaded_levels[i];
+		}
+	}
+	if (loaded_levels[0] && loaded_levels[1])
+		Fatalf("attempting to load 3 levels into memory");
+	int open_slot = (loaded_levels[0]) ? 1 : 0;
+
 	std::string path;
 	path.reserve(256);
 	path += level_directory;
@@ -204,13 +215,31 @@ Level* LoadLevelFile(const char* level_name)
 	}
 
 	Level* level = new Level;
+	level->name = level_name;
 	GatherRenderData(level, scene);
-
 	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
 	for (int i = 0; i < defscene.nodes.size(); i++) {
 		LookThroughNodeTree(level, scene, scene.nodes[defscene.nodes[i]], glm::mat4(1));
 	}
-
+	InitStaticGeoBvh(level);
+	level->ref_count = 1;
+	loaded_levels[open_slot] = level;
 	return level;
+}
 
+void FreeLevel(const Level* level)
+{
+	ASSERT(level->ref_count != 0);
+	int i = 0;
+	for (; i < loaded_levels.size(); i++) {
+		if (loaded_levels[i] == level)
+			break;
+	}
+	if (i == loaded_levels.size())
+		Fatalf("free called on already freed level");
+	loaded_levels[i]->ref_count--;
+	if (loaded_levels[i]->ref_count <= 0) {
+		delete loaded_levels[i];
+		loaded_levels[i] = nullptr;
+	}
 }

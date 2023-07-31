@@ -2,6 +2,15 @@
 #define MOVECOMMAND_H
 #include "glm/glm.hpp"
 
+enum MoveCmdButtons
+{
+	CmdBtn_Sprint = 1,
+	CmdBtn_Jump = 2,
+	CmdBtn_Duck = 4,
+	CmdBtn_Misc1 = 8,
+	CmdBtn_Misc2 = 16,
+};
+
 struct MoveCommand
 {
 	int tick = 0;
