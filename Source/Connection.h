@@ -1,10 +1,8 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
 #include "Socket.h"
+#include "Net.h"
 #include <vector>
-
-const int MAX_PAYLOAD_SIZE = 1400;
-const int PACKET_HEADER_SIZE = 8;
 
 class Connection
 {
@@ -18,7 +16,8 @@ public:
 	// data= unreliable data, reliable data should be added to reliable_out
 	void Send(const uint8_t* data, int length);
 
-	Socket* sock = nullptr;		// owners socket to use
+	Socket* sock = nullptr;
+
 	IPAndPort remote_addr;
 	int out_sequence = 0;		// current local sequence
 	int out_sequence_ak = -1;	// last acked sequence

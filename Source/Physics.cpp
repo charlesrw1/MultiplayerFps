@@ -328,6 +328,22 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 
 	}
 }
+static void SphereVsAABB(vec3 center, float radius, Bounds aabb, ColliderCastResult* out)
+{
+	glm::vec3 closest_point = glm::clamp(center, aabb.bmin, aabb.bmax);
+	float len = glm::length(closest_point - center);
+	if (len < radius) {
+		out->found = false;
+		return;
+	}
+	out->found = true;
+	out->intersect_len = len;
+	out->intersect_point = closest_point;
+	out->penetration_depth = (radius - len);
+	out->penetration_normal = (center-closest_point) / len;
+	out->surf_normal = out->penetration_normal;
+}
+
 
 Bounds CapsuleToAABB(const Capsule& cap)
 {
@@ -337,6 +353,8 @@ Bounds CapsuleToAABB(const Capsule& cap)
 	return bounds_union(Bounds(centertip - vec3(cap.radius), centertip + vec3(cap.radius)),
 		Bounds(centerbase - vec3(cap.radius), centerbase + vec3(cap.radius)));
 }
+
+
 void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bool closest)
 {
 	const Level::CollisionData& cd = lvl->collision_data;

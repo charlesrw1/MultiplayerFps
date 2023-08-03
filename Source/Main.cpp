@@ -18,7 +18,6 @@
 #include "Animation.h"
 #include "Level.h"
 #include "Physics.h"
-#include "Entity.h"
 #include "Net.h"
 #include "CoreTypes.h"
 #include "Client.h"
@@ -31,6 +30,8 @@ static double program_time_start;
 static bool update_camera = false;
 const char* map_file = "creek.glb";
 static bool mouse_grabbed = false;
+
+const char* map_file_names[] = { "creek.glb","maze.glb","world0.glb" };
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -182,7 +183,7 @@ void CreateWindow()
 	printf("Renderer: %s\n", glGetString(GL_RENDERER));
 	printf("Version: %s\n\n", glGetString(GL_VERSION));
 
-	SDL_GL_SetSwapInterval(1);
+	SDL_GL_SetSwapInterval(0);
 }
 
 void FlyCamera::UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll)
@@ -257,10 +258,8 @@ static int col_iters = 5;
 static bool col_closest = true;
 static bool new_physics = true;
 
-static double TEMP_DT = 0.0;
-
 static float ground_friction = 10;
-static float air_friction = 0.2;
+static float air_friction = 0.01;
 static float gravityamt = 16;
 static float ground_accel = 6;
 static float air_accel = 3;
@@ -315,6 +314,7 @@ void PlayerPhysics::CheckNans()
 void PlayerPhysics::CheckJump()
 {
 	if (player->on_ground && inp.button_mask & CmdBtn_Jump) {
+		printf("jump\n");
 		player->velocity.y += jumpimpulse;
 		player->on_ground = false;
 	}
@@ -348,6 +348,7 @@ void PlayerPhysics::CheckDuck()
 			offset = d;
 		}
 		else {
+			steps = 3;
 			// testing downwards to ground
 			step = -(len+0.1) / (float)steps;
 			offset = c;
@@ -419,17 +420,17 @@ void PlayerPhysics::MoveAndSlide(vec3 delta)
 
 void PlayerPhysics::CheckGroundState()
 {
-	if (player->velocity.y > 10) {
-		player->on_ground = true;
+	if (player->velocity.y > 2.f) {
+		player->on_ground = false;
 		return;
 	}
 	ColliderCastResult result;
-	vec3 where = player->position - vec3(0, 0.015, 0);
-	float radius = 0.06f;
-	TraceSphere(level,where,radius, &result, false,true);
+	vec3 where = player->position - vec3(0, 0.005-DEFAULT_COLLIDER.radius, 0);
+	float radius = DEFAULT_COLLIDER.radius;
+	TraceSphere(level,where,radius, &result,true,true);
 	if (!result.found)
 		player->on_ground = false;
-	else if (result.surf_normal.y < 0.6)
+	else if (result.surf_normal.y < 0.3)
 		player->on_ground = false;
 	else {
 		player->on_ground = true;
@@ -485,7 +486,7 @@ void PlayerPhysics::Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt)
 	level = lvl;
 	deltat = dt;
 	player = p;
-	inp = cmd;// TheGame.lastinput;
+	inp = cmd;
 
 	vec2 inputvec = vec2(inp.forward_move, inp.lateral_move);
 	inp_len = length(inputvec);
@@ -505,9 +506,9 @@ void PlayerPhysics::Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt)
 
 
 	if (new_physics) {
-		CheckGroundState();
 		float fric_val = (player->on_ground) ? ground_friction : air_friction;
 		ApplyFriction(fric_val);
+		CheckGroundState();	// check ground after applying friction, like quake
 		GroundMove();
 	}
 	else {
@@ -580,9 +581,11 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
+	if (paused)
+		return;
 	phys_debug.Begin();
 	PlayerPhysics physics;
-	physics.Run(level,ent, cmd, TEMP_DT);
+	physics.Run(level,ent, cmd, core.tick_interval);
 	phys_debug.End();
 }
 
@@ -627,7 +630,7 @@ void CreateMoveCommand()
 	if (keys[SDL_SCANCODE_X])
 		new_cmd.up_move -= 1.f;
 
-	new_cmd.tick = 0;	// TODO
+	new_cmd.tick = client.tick;
 
 	*client.GetCommand(client.GetCurrentSequence()) = new_cmd;
 }
@@ -839,6 +842,31 @@ void ListenServerUpdate(double dt)
 	}
 }
 
+bool using_arrows_to_select_map = false;
+int map_selection = 0;
+
+bool DoMapSelect(SDL_Scancode key)
+{
+	if (key == SDL_SCANCODE_SLASH) {
+		using_arrows_to_select_map = !using_arrows_to_select_map;
+		printf("selecting map: %s\n", (using_arrows_to_select_map) ? "on" : "off");
+		return true;
+	}
+	if (!using_arrows_to_select_map)
+		return false;
+	int map_select_old = map_selection;
+	if (key == SDL_SCANCODE_LEFT)
+		map_selection--;
+	if (key == SDL_SCANCODE_RIGHT)
+		map_selection++;
+	if (map_selection < 0) map_selection = 0;
+	else if (map_selection >= sizeof(map_file_names) / sizeof(char*)) map_selection = (sizeof(map_file_names) / sizeof(char*)-1);
+	if (map_select_old != map_selection) {
+		printf("map selected: %s\n", map_file_names[map_selection]);
+	}
+	return true;
+}
+
 void HandleInput()
 {
 	Core::InputState& input = core.input;
@@ -854,6 +882,8 @@ void HandleInput()
 		case SDL_KEYDOWN:
 		{
 			auto scancode = event.key.keysym.scancode;
+			if (!DoMapSelect(scancode)) {
+
 			int col_iter_old = col_iters;
 			if (scancode == SDL_SCANCODE_LEFT)
 				col_iters--;
@@ -862,6 +892,7 @@ void HandleInput()
 			if (col_iters <= 0) col_iters = 1;
 			if (col_iters != col_iter_old)
 				printf("col iters %d\n", col_iters);
+			}
 			if (scancode == SDL_SCANCODE_G) {
 				gravity = !gravity;
 				printf("gravity %s\n", (gravity) ? "on" : "off");
@@ -874,11 +905,25 @@ void HandleInput()
 				col_closest = !col_closest;
 				printf("col_closest %s\n", (col_closest) ? "on" : "off");
 			}
-			if (scancode == SDL_SCANCODE_1) {
+			if (scancode == SDL_SCANCODE_APOSTROPHE) {
 				new_physics = !new_physics;
 			}
 			if (scancode == SDL_SCANCODE_T)
 				client.view_mgr.third_person = !client.view_mgr.third_person;
+			if (scancode == SDL_SCANCODE_Q)
+				server.sv_game.paused = !server.sv_game.paused;
+			if(scancode == SDL_SCANCODE_1)
+				ClientDisconnect();
+			if (scancode == SDL_SCANCODE_2)
+				ClientReconnect();
+			if (scancode == SDL_SCANCODE_3)
+				ServerEnd();
+			if (scancode == SDL_SCANCODE_4)
+				ServerSpawn(map_file_names[map_selection]);
+			if (scancode == SDL_SCANCODE_5)
+				core.tick_interval = 1.0 / 30;
+			if (scancode == SDL_SCANCODE_6)
+				core.tick_interval = 1.0 / 128;
 		}
 		case SDL_KEYUP:
 			input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
@@ -905,6 +950,56 @@ void HandleInput()
 	}
 }
 
+void ClientFixedUpdateInput(double dt)
+{
+	if (!client.initialized)
+		return;
+	// make command and run prediction
+	if (ClientGetState() >= Connected)
+		CreateMoveCommand();
+	client.server_mgr.SendMovesAndMessages();
+	CheckLocalServerRunning();
+	client.server_mgr.TrySendingConnect();
+}
+void ClientFixedUpdateRead(double dt)
+{
+	if (!client.initialized)
+		return;
+	if (ClientGetState() >= Spawned)
+		client.tick += 1;
+	client.server_mgr.ReadPackets();
+}
+void ServerFixedUpdate(double dt)
+{
+	if (!server.active)
+		return;
+	server.client_mgr.ReadPackets();
+	DoGameUpdate(dt);
+	server.client_mgr.SendSnapshots();
+
+	server.tick += 1;
+}
+
+
+void MainLoop(double frametime)
+{
+	double secs_per_tick = core.tick_interval;
+	core.frame_remainder += frametime;
+	int num_ticks = (int)floor(core.frame_remainder / secs_per_tick);
+	core.frame_remainder -= num_ticks * secs_per_tick;
+	for (int i = 0; i < num_ticks; i++)
+	{
+		HandleInput();
+		ClientFixedUpdateInput(secs_per_tick);
+		ServerFixedUpdate(secs_per_tick);
+		ClientFixedUpdateRead(secs_per_tick);
+		client.view_mgr.Update();
+	}
+	
+	DoClientGameUpdate(frametime);
+	DrawScreen(frametime);
+}
+
 int main(int argc, char** argv)
 {
 	printf("Starting game\n");
@@ -914,26 +1009,27 @@ int main(int argc, char** argv)
 	ServerInit();
 	ClientInit();
 	ServerSpawn(map_file);
-
-	double delta_t = 0.1;
-	double last = GetTime();
+	core.tick_interval = 1.0 / 128.0;	// hardcoded
+	double last = GetTime()-0.1;
 	for (;;)
 	{
 		double now = GetTime();
-		delta_t = now - last;
+		double dt = now - last;
 		last = now;
-
-		if (delta_t > 0.1)
-			delta_t = 0.1;
-		TEMP_DT = delta_t;
-		HandleInput();
+		if (dt > 0.1)
+			dt = 0.1;
+		core.frame_time = dt;
+		MainLoop(dt);
+		//if (delta_t > 0.1)
+		//	delta_t = 0.1;
+		//TEMP_DT = delta_t;
+		//HandleInput();
 		//ClientUpdate(delta_t);
 		//ServerUpdate(delta_t);
-		ListenServerUpdate(delta_t);
-		if (client.initialized) {
-			client.view_mgr.Update();
-			DrawScreen(delta_t);
-		}
+		//if (client.initialized) {
+		//	client.view_mgr.Update();
+		//	DrawScreen(delta_t);
+		//}
 	}
 	
 	return 0;

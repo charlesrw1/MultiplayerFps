@@ -1,5 +1,6 @@
 #include "Connection.h"
 #include "Util.h"
+#include "CoreTypes.h"
 
 static unsigned ReadInt(const uint8_t* data)
 {
@@ -61,6 +62,7 @@ int Connection::NewPacket(const uint8_t* data, int length)
 
 	in_sequence = new_seq;
 	out_sequence_ak = new_seq_ak;
+	last_recieved = GetTime();
 	//last_recieved = host.realtime;
 	//last_packet_size = inmsg.size_in_bytes();
 

@@ -332,6 +332,11 @@ void FreeLoadedModels()
 
 Model* FindOrLoadModel(const char* filename)
 {
+	for (int i = 0; i < models.size(); i++) {
+		if (models[i]->name == filename)
+			return models[i];
+	}
+
 	std::string path;
 	path.reserve(256);
 	path += model_folder_path;
@@ -344,7 +349,7 @@ Model* FindOrLoadModel(const char* filename)
 		return nullptr;
 	}
 
-	model->name = std::move(path);
+	model->name = filename;
 	models.push_back(model);
 
 	return model;

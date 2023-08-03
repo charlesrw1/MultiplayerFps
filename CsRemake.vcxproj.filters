@@ -16,9 +16,6 @@
     <Filter Include="Source Files\External">
       <UniqueIdentifier>{7dd26c09-769b-49ec-b681-84d812313e61}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Network">
-      <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Server">
       <UniqueIdentifier>{2e16c947-a6ae-4609-8a2f-070d7ddc0b93}</UniqueIdentifier>
     </Filter>
@@ -27,6 +24,9 @@
     </Filter>
     <Filter Include="Source Files\Shared">
       <UniqueIdentifier>{cef035e7-a0e4-44b6-a66a-7038ec306a67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network">
+      <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -110,12 +110,6 @@
     <ClInclude Include="Source\Level.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Entity.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Network.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Socket.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
@@ -142,6 +136,9 @@
     </ClInclude>
     <ClInclude Include="source\Client.h">
       <Filter>Source Files\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LagEmulator.h">
+      <Filter>Source Files\Network</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

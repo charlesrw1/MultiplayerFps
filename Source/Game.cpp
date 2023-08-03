@@ -64,6 +64,14 @@ void Game::SpawnNewClient(int client)
 	printf("spawned client %d into game\n", client);
 }
 
+void Game::OnClientLeave(int client)
+{
+	Entity* ent = &ents[client];
+	ent->type = Ent_Free;
+	num_ents--;
+	printf("remove client %d from game\n", client);
+}
+
 int Game::MakeNewEntity(EntType type, glm::vec3 pos, glm::vec3 rot)
 {
 	if (type == Ent_Player)
@@ -95,19 +103,19 @@ void Game::Init()
 	level = nullptr;
 }
 
-void Game::ClearAllEnts()
+void Game::ClearState()
 {
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		ents[i].type = Ent_Free;
-		//spawnids[i] = 0;
 	}
 	num_ents = 0;
+	FreeLevel(level);
+	level = nullptr;
 }
 bool Game::DoNewMap(const char* mapname)
 {
 	if (level) {
-		ClearAllEnts();
-		FreeLevel(level);
+		ClearState();
 	}
 	level = LoadLevelFile(mapname);
 	if (!level)

@@ -3,12 +3,25 @@
 #include "Net.h"
 #include "Animation.h"
 #include "Level.h"
+#include <array>
+
+const int NUM_TRANSFORM_ENTRIES = 8;
+struct TransformEntry
+{
+	int tick = 0;
+	glm::vec3 origin;
+	glm::vec3 angles;
+};
 // Client side version of an entity
 struct ClientEntity
 {
 	bool active = false;
 	EntityState state;
 	Animator anims;
+	// position/angle history for interpolation
+	std::array<TransformEntry, NUM_TRANSFORM_ENTRIES> transform_hist;
+	int current_hist_index = 0;
+
 	const Model* model = nullptr;
 };
 
@@ -59,13 +72,13 @@ enum ClientConnectionState {
 };
 
 void ClientInit();
+void ClientConnect(IPAndPort where);
 void ClientDisconnect();
+void ClientReconnect();
 ClientConnectionState ClientGetState();
 int ClientGetPlayerNum();
 ClientEntity* ClientGetLocalPlayer();
 bool ClientIsInGame();
-void ClientSendMove();
-void ClientReadPackets();
 
 class FlyCamera
 {
@@ -116,7 +129,7 @@ class ClientGame
 {
 public:
 	void Init();
-	void Clear();
+	void ClearState();
 	void NewMap(const char* mapname);
 
 	PlayerState player;	// local player data
@@ -127,6 +140,7 @@ public:
 class ClServerMgr
 {
 public:
+	ClServerMgr();
 	void Init();
 	void Connect(const IPAndPort& port);
 	void Disconnect();
@@ -150,6 +164,7 @@ public:
 	ClientConnectionState state;
 	Socket sock;
 	Connection server;
+	//LagEmulator sock_emulator;
 };
 
 class UIMgr
@@ -170,10 +185,12 @@ public:
 	glm::vec3 view_angles;
 	std::vector<MoveCommand> out_commands;
 
+	int tick = 0;
+	double time=0.0;
 public:
-	void Init();
 	MoveCommand* GetCommand(int sequence);
 	int GetCurrentSequence() const;
+	int GetLastSequenceAcked() const;
 };
 extern Client client;
 

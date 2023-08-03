@@ -239,6 +239,7 @@ void FreeLevel(const Level* level)
 		Fatalf("free called on already freed level");
 	loaded_levels[i]->ref_count--;
 	if (loaded_levels[i]->ref_count <= 0) {
+		printf("deleting level, %s\n", loaded_levels[i]->name.c_str());
 		delete loaded_levels[i];
 		loaded_levels[i] = nullptr;
 	}

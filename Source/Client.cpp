@@ -5,19 +5,41 @@
 
 Client client;
 
-#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
+#define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
 void ClientInit()
 {
-	client.Init();
+	client.server_mgr.Init();
+	client.view_mgr.Init();
+	client.cl_game.Init();
+	client.out_commands.resize(CLIENT_MOVE_HISTORY);
+	client.time = 0.0;
+	client.tick = 0;
+
+	client.initialized = true;
 }
 void ClientDisconnect()
 {
+	DebugOut("disconnecting\n");
 	if (ClientGetState() == Disconnected)
 		return;
 	client.server_mgr.Disconnect();
-	client.cl_game.Clear();
+	client.cl_game.ClearState();
+	client.tick = 0;
+	client.time = 0.0;
+}
+void ClientReconnect()
+{
+	DebugOut("reconnecting\n");
+	IPAndPort addr = client.server_mgr.server.remote_addr;
+	::ClientDisconnect();
+	::ClientConnect(addr);
+}
+void ClientConnect(IPAndPort addr)
+{
+	DebugOut("connecting to %s", addr.ToString().c_str());
+	client.server_mgr.Connect(addr);
 }
 ClientConnectionState ClientGetState()
 {
@@ -28,21 +50,22 @@ int ClientGetPlayerNum()
 	return client.server_mgr.client_num;
 }
 
-
 MoveCommand* Client::GetCommand(int sequence) {
 	return &out_commands.at(sequence % out_commands.size());
 }
-void Client::Init()
-{
-	server_mgr.Init();
-	view_mgr.Init();
-	cl_game.Init();
-	out_commands.resize(CLIENT_MOVE_HISTORY);
-	initialized = true;
-}
+
 int Client::GetCurrentSequence() const
 {
 	return server_mgr.server.out_sequence;
+}
+int Client::GetLastSequenceAcked() const
+{
+	return server_mgr.server.out_sequence_ak;
+}
+
+ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
+{
+
 }
 
 
@@ -52,13 +75,14 @@ void ClServerMgr::Init()
 }
 void ClServerMgr::Connect(const IPAndPort& where)
 {
-	printf("Connecting to server: %s\n", where.ToString().c_str());
+	DebugOut("connecting to server: %s\n", where.ToString().c_str());
 	server.remote_addr = where;
 	connect_attempts = 0;
 	attempt_time = -1000.f;
 	state = TryingConnect;
 	TrySendingConnect();
 }
+
 void ClServerMgr::TrySendingConnect()
 {
 	if (state != TryingConnect)
@@ -189,7 +213,7 @@ void ClServerMgr::ParseServerInit(ByteReader& buf)
 	DebugOut("Player num: %d, Map: %s\n", client_num, mapname.c_str());
 
 	// Load map and game data here
-	printf("Client: Loading map...\n");
+	DebugOut("loading map...\n");
 	client.cl_game.NewMap(mapname.c_str());
 
 	// Tell server to spawn us in
@@ -228,11 +252,19 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 			ParsePlayerData(buf);
 			break;
 		case SvMessageDisconnect:
+			DebugOut("disconnected by server\n");
+			::ClientDisconnect();
 			break;
 		case SvMessageText:
 			break;
 		case SvMessageTick:
-			break;
+		{
+			// just force it for now
+			int server_tick = buf.ReadLong();
+			if(server_tick-client.tick!=0)
+				DebugOut("delta tick %d\n", server_tick-client.tick);
+			client.tick = server_tick;
+		}break;
 		default:
 			DebugOut("Unknown message, disconnecting\n");
 			::ClientDisconnect();

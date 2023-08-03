@@ -19,19 +19,34 @@ void NetDebugPrintf(const char* fmt, ...)
 	va_end(ap);
 }
 
-#define DebugOut(fmt, ...) NetDebugPrintf(fmt, __VA_ARGS__)
+#define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
 
 void ServerInit()
 {
-	server.Init();
+	printf("initializing server\n");
+	server.client_mgr.Init();
+	server.sv_game.Init();
 }
-void ServerQuit()
+void ServerEnd()
 {
-	server.Shutdown();
+	if (!server.active)
+		return;
+	DebugOut("ending server\n");
+	server.client_mgr.ShutdownServer();
+	server.sv_game.ClearState();
+	server.active = false;
+	server.tick = 0;
+	server.time = 0.0;
+	server.map_name = {};
 }
 void ServerSpawn(const char* mapname)
 {
-	printf("Spawning server\n");
+	if (server.active) {
+		ServerEnd();
+	}
+	server.tick = 0;
+	server.time = 0.0;
+	DebugOut("spawning with map %s\n", mapname);
 	bool good = server.sv_game.DoNewMap(mapname);
 	if (!good)
 		return;
@@ -43,17 +58,9 @@ bool ServerIsActive()
 	return server.active;
 }
 
-void Server::Init()
+ClientMgr::ClientMgr() //: sock_emulator(&socket)
 {
-	client_mgr.Init();
-	sv_game.Init();
-}
-void Server::Shutdown()
-{
-	if (!active)
-		return;
-	client_mgr.ShutdownServer();
-	server.active = false;
+
 }
 
 void ClientMgr::Init()
@@ -152,10 +159,17 @@ void ClientMgr::DisconnectClient(RemoteClient& client)
 	ASSERT(client.state != RemoteClient::Dead);
 	DebugOut("Disconnecting client %s\n", client.connection.remote_addr.ToString().c_str());
 	if (client.state == RemoteClient::Spawned) {
+		server.sv_game.OnClientLeave(GetClientIndex(client));
 		// remove entitiy from game, call game logic ...
 	}
+	uint8_t buffer[8];
+	ByteWriter writer(buffer, 8);
+	writer.WriteByte(SvMessageDisconnect);
+	client.connection.Send(buffer, writer.BytesWritten());
+
 	client.state = RemoteClient::Dead;
 	client.connection.Clear();
+
 }
 
 void ClientMgr::ParseClientText(RemoteClient& client, ByteReader& buf)
@@ -182,7 +196,7 @@ void ClientMgr::ParseClientText(RemoteClient& client, ByteReader& buf)
 
 void ClientMgr::ParseClientMove(RemoteClient& client, ByteReader& buf)
 {
-	DebugOut("Recieved client input from %s\n", client.connection.remote_addr.ToString().c_str());
+	//DebugOut("Recieved client input from %s\n", client.connection.remote_addr.ToString().c_str());
 
 	MoveCommand cmd{};
 	cmd.forward_move = buf.ReadFloat();
@@ -318,6 +332,8 @@ void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
 
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
+	writer.WriteByte(SvMessageTick);
+	writer.WriteLong(server.tick);
 	// for now, just dump the entities
 	uint32_t bitmask = 0;
 	writer.WriteByte(SvMessageSnapshot);
@@ -357,5 +373,5 @@ void ClientMgr::ShutdownServer()
 		if (clients[i].state >= RemoteClient::Connected)
 			DisconnectClient(clients[i]);
 	}
-	socket.Shutdown();
+	//socket.Shutdown();
 }

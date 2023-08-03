@@ -18,11 +18,10 @@ public:
 	int vid_width = DEFAULT_WIDTH;
 	int vid_height = DEFAULT_HEIGHT;
 
-	// Time vals
-	double game_time = 0.0;
-	double frame_time = 0.0;
-	double frame_remainder = 0.0;
-	double frame_alpha = 0.0;
+	double time = 0.0;			// time since program start
+	double frame_time = 0.0;	// total frame time of program
+	double frame_remainder = 0.0;	// frame time accumulator
+	double tick_interval = 0.0;	// 1/tick_rate
 
 	struct InputState
 	{

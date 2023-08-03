@@ -29,8 +29,8 @@ struct Entity
 };
 
 void ServerInit();
-void ServerQuit();
 void ServerSpawn(const char* mapname);
+void ServerEnd();
 bool ServerIsActive();
 Entity* ServerEntForIndex(int index);
 
@@ -39,13 +39,16 @@ class Game
 {
 public:
 	void Init();
-	void ClearAllEnts();
+	void ClearState();
 	bool DoNewMap(const char* mapname);
 	void SpawnNewClient(int clientnum);
+	void OnClientLeave(int clientnum);
+
 	int MakeNewEntity(EntType type, glm::vec3 pos, glm::vec3 rot);
 	void GetPlayerSpawnPoisiton(Entity* ent);
 	void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
 
+	bool paused = false;
 	std::vector<Entity> ents;
 	int num_ents = 0;
 	const Level* level = nullptr;
@@ -66,15 +69,17 @@ struct RemoteClient {
 class ClientMgr
 {
 public:
+	ClientMgr();
 	void Init();
 	void ReadPackets();
 	void SendSnapshots();
 	void ShutdownServer();
 
 	std::vector<RemoteClient> clients;
-	Socket socket;
 
+	//LagEmulator sock_emulator;
 private:
+	Socket socket;
 	int FindClient(IPAndPort who) const;
 	int GetClientIndex(const RemoteClient& client) const;
 
@@ -99,9 +104,9 @@ public:
 	ClientMgr client_mgr;
 	Game sv_game;
 
+	int tick = 0;
+	double time = 0.0;
 public:
-	void Init();
-	void Shutdown();
 	int FindClient(const IPAndPort& addr) const;
 };
 
