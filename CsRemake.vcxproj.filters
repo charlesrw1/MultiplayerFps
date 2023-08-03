@@ -137,7 +137,7 @@
     <ClInclude Include="source\Client.h">
       <Filter>Source Files\Client</Filter>
     </ClInclude>
-    <ClInclude Include="Source\LagEmulator.h">
+    <ClInclude Include="Source\EmulatedSocket.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
   </ItemGroup>

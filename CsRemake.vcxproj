@@ -40,7 +40,7 @@
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
-    <ClInclude Include="Source\LagEmulator.h" />
+    <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\CoreTypes.h" />
     <ClInclude Include="Source\MoveCommand.h" />

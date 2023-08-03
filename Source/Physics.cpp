@@ -10,10 +10,10 @@
 
 extern MeshBuilder phys_debug;
 static MeshBuilder world_collision;
-static bool has_built = false;
 void DrawCollisionWorld(const Level* lvl)
 {
-	if (!has_built) {
+	static std::string lvl_that_was_built;
+	if (lvl_that_was_built != lvl->name) {
 		world_collision.Begin();
 		int basev = world_collision.GetBaseVertex();
 		const Level::CollisionData& cd = lvl->collision_data;
@@ -39,14 +39,12 @@ void DrawCollisionWorld(const Level* lvl)
 
 
 		world_collision.End();
-		has_built = true;
+		lvl_that_was_built = lvl->name;
 	}
 	world_collision.Draw(GL_LINES);
 }
 void InitStaticGeoBvh(Level* level)
 {
-	has_built = false;	// this is just for debug mesh
-
 	std::vector<Bounds> bound_vec;
 	Level::CollisionData& cd = level->collision_data;
 	for (int i = 0; i < cd.collision_tris.size(); i++) {
@@ -94,7 +92,7 @@ static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 				//vec3 bary_temp = vec3(0);
 				//vec3 N_temp;
 				//float t_temp = -1;
-				phys_debug.PushLineBox(node->aabb.bmin,node->aabb.bmax,COLOR_CYAN);
+				//phys_debug.PushLineBox(node->aabb.bmin,node->aabb.bmax,COLOR_CYAN);
 				int index = bvh.indicies[index_start + i];
 				bool should_exit = do_intersect(index);
 				if (should_exit)

@@ -3,6 +3,7 @@
 #include "Net.h"
 #include "Animation.h"
 #include "Level.h"
+#include "EmulatedSocket.h"
 #include <array>
 
 const int NUM_TRANSFORM_ENTRIES = 8;
@@ -17,6 +18,7 @@ struct ClientEntity
 {
 	bool active = false;
 	EntityState state;
+	EntityState state2;
 	Animator anims;
 	// position/angle history for interpolation
 	std::array<TransformEntry, NUM_TRANSFORM_ENTRIES> transform_hist;
@@ -25,44 +27,20 @@ struct ClientEntity
 	const Model* model = nullptr;
 };
 
-#if 0
-class Client
+struct Snapshot
 {
-public:
-
-	void Start();
-	void Quit();
-	void ReadPackets();
-	void SendCommands();
-
-	void Disconnect();
-	void Connect(const IPAndPort& who);
-	void TrySendingConnect();
-
-	std::vector<ClientEntity> entities;
-
-	int connect_attempts = 0;
-	double attempt_time = 0.f;
-
-	int GetOutSequence() const { return server.out_sequence; }
-	MoveCommand commands[CLIENT_MOVE_HISTORY];
-	glm::vec3 view_angles = glm::vec3(0.f);		// local view angles
-
-	bool initialized = false;
-	int player_num = -1;	// what index are we
-	ConnectionState state = Disconnected;
-	Connection server;
-private:
-	bool waiting_for_first_snapshot = false;
-	void DoConnect();
-	void HandleUnknownPacket(const IPAndPort& addr, ByteReader& buf);
-	void ReadServerPacket(ByteReader& buf);
-	void ReadInitData(ByteReader& buf);
-	void ReadEntitySnapshot(ByteReader& buf);
-	void ReadPlayerData(ByteReader& buf);
-	Socket socket;
+	int tick = 0;				// what client tick did we receive on
+	EntityState entities[16];	// keep it small for now
+	PlayerState pstate;			// local player state, for prediction stuff
 };
-#endif
+
+// used for prediction frames
+struct PredictionState
+{
+	PlayerState pstate;
+	EntityState estate;
+};
+
 
 enum ClientConnectionState {
 	Disconnected,
@@ -134,6 +112,7 @@ public:
 
 	PlayerState player;	// local player data
 	std::vector<ClientEntity> entities;
+	std::vector<Snapshot> snapshots;
 	const Level* level = nullptr;
 };
 
@@ -162,9 +141,8 @@ public:
 	int connect_attempts;
 	double attempt_time;
 	ClientConnectionState state;
-	Socket sock;
+	EmulatedSocket sock;
 	Connection server;
-	//LagEmulator sock_emulator;
 };
 
 class UIMgr

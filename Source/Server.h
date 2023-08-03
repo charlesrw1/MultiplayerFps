@@ -2,13 +2,6 @@
 #define SERVER_H
 #include "Net.h"
 
-enum EntType
-{
-	Ent_Player,
-	Ent_Dummy,
-	Ent_Free = 0xff,
-};
-
 class Model;
 struct Entity
 {

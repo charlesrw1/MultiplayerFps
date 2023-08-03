@@ -121,14 +121,18 @@ void ViewMgr::Update()
 {
 	if (!ClientIsInGame())
 		return;
+	setup.height = core.vid_height;
+	setup.width = core.vid_width;
+	setup.viewfov = fov;
+	setup.x = setup.y = 0;
+	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
 	Core::InputState& input = core.input;
 	if (update_camera) {
 		fly_cam.UpdateFromInput(input.keyboard, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
 	}
 	if (third_person) {
 		ClientEntity* player = ClientGetLocalPlayer();
-		Entity* ent = ServerEntForIndex(0);
-		fly_cam.position = ent->position+vec3(0,0.5,0) - fly_cam.front * 3.f;
+		fly_cam.position = player->state.position+vec3(0,0.5,0) - fly_cam.front * 3.f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 	}
@@ -434,7 +438,7 @@ void PlayerPhysics::CheckGroundState()
 		player->on_ground = false;
 	else {
 		player->on_ground = true;
-		phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
+		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
 	}
 }
 
@@ -557,7 +561,7 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 			player->velocity = vec3(0);
 			if(col_response)
 				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-			phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
+			//phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
 		}
 	}
 	for (int i = 0; i < 3; i++) {
@@ -566,7 +570,7 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 		if (res.found) {
 			if (col_response)
 				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-			phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
+			//phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
 		}
 	}
 
@@ -657,20 +661,40 @@ void DrawTempLevel(mat4 viewproj)
 	}
 }
 
-static void DrawPlayer(mat4 viewproj)
+static void DrawState(EntityState* player, Color32 color, MeshBuilder& mb)
 {
-	EntityState* player = &ClientGetLocalPlayer()->state;
 	vec3 origin = player->position;
-
-	const Capsule& c = (player->ducking)? CROUCH_COLLIDER : DEFAULT_COLLIDER;
+	const Capsule& c = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
 	float radius = c.radius;
 	vec3 a, b;
 	c.GetSphereCenters(a, b);
+	mb.AddSphere(origin + a, radius, 10, 7, color);
+	mb.AddSphere(origin + b, radius, 10, 7, color);
+}
 
+static void DrawPlayer(mat4 viewproj)
+{
 	MeshBuilder mb;
 	mb.Begin();
-	mb.AddSphere(origin + a, radius, 10, 7, COLOR_GREEN);
-	mb.AddSphere(origin + b, radius, 10, 7, COLOR_GREEN);
+	DrawState(&ClientGetLocalPlayer()->state, COLOR_GREEN, mb);
+
+	for (int i = 0; i < client.cl_game.entities.size(); i++) {
+		auto& ent = client.cl_game.entities[i];
+		if (ent.state.type != Ent_Free && i != ClientGetPlayerNum()) {
+			DrawState(&ent.state, COLOR_BLUE, mb);
+		}
+	}
+
+	if (server.active) {
+		vec3 origin2 = ServerEntForIndex(0)->position;
+		const Capsule& c2 = (ServerEntForIndex(0)->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
+		float radius = c2.radius;
+		vec3 a, b;
+		c2.GetSphereCenters(a, b);
+
+		mb.AddSphere(origin2 + a, radius, 10, 7, COLOR_CYAN);
+		mb.AddSphere(origin2 + b, radius, 10, 7, COLOR_CYAN);
+	}
 	mb.End();
 	mb.Draw(GL_LINES);
 	mb.Free();
@@ -786,6 +810,54 @@ void DoClientGameUpdate(double dt)
 void DoGameUpdate(double dt)
 {
 	
+}
+
+void RunClientPhysics(const PredictionState* in, PredictionState* out, const MoveCommand* cmd)
+{
+	PlayerPhysics physics;
+	Entity ent;
+	ent.ducking = in->estate.ducking;
+	ent.position = in->estate.position;
+	ent.rotation = in->estate.angles;
+	ent.velocity = in->pstate.velocity;
+	ent.on_ground = in->pstate.on_ground;
+
+	physics.Run(client.cl_game.level, &ent, *cmd, core.tick_interval);
+
+	out->estate.ducking = ent.ducking;
+	out->estate.position = ent.position;
+	out->estate.angles = ent.rotation;
+
+	out->pstate.on_ground = ent.on_ground;
+	out->pstate.velocity = ent.velocity;
+}
+
+void DoClientPrediction()
+{
+	if (ClientGetState() != Spawned)
+		return;
+	// restore state to last authoritative snapshot 
+	int incoming_seq = client.server_mgr.server.in_sequence;
+	Snapshot* last_auth_state = &client.cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	PredictionState pred_state;
+	pred_state.estate = last_auth_state->entities[client.server_mgr.client_num];
+	pred_state.pstate = last_auth_state->pstate;
+	// predict commands from outgoing ack'ed to current outgoing
+	// TODO: dont repeat commands unless a new snapshot arrived
+	int start = client.server_mgr.server.out_sequence_ak;	// start at the new cmd
+	int end = client.server_mgr.server.out_sequence;
+	int commands_to_run = end - start;
+	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
+		return;
+	for (int i = start+1; i < end; i++) {
+		MoveCommand* cmd = client.GetCommand(i);
+		PredictionState next_state;
+		RunClientPhysics(&pred_state, &next_state, cmd);
+		pred_state = next_state;
+	}
+	
+	ClientEntity* ent = ClientGetLocalPlayer();
+	ent->state = pred_state.estate;
 }
 
 void CheckLocalServerRunning()
@@ -924,6 +996,13 @@ void HandleInput()
 				core.tick_interval = 1.0 / 30;
 			if (scancode == SDL_SCANCODE_6)
 				core.tick_interval = 1.0 / 128;
+			if (scancode == SDL_SCANCODE_7) {
+				IPAndPort ip;
+				ip.SetIp(127, 0, 0, 1);
+				ip.port = SERVER_PORT;
+				ClientConnect(ip);
+			}
+
 		}
 		case SDL_KEYUP:
 			input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
@@ -945,6 +1024,12 @@ void HandleInput()
 			mouse_grabbed = false;
 			update_camera = false;
 			break;
+		case SDL_WINDOWEVENT:
+			if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+				core.vid_height = event.window.data2;
+				core.vid_width = event.window.data1;
+			}
+			break;
 
 		}
 	}
@@ -955,9 +1040,11 @@ void ClientFixedUpdateInput(double dt)
 	if (!client.initialized)
 		return;
 	// make command and run prediction
-	if (ClientGetState() >= Connected)
+	if (ClientGetState() >= Connected) {
 		CreateMoveCommand();
+	}
 	client.server_mgr.SendMovesAndMessages();
+	//printf("tick %d\n", client.tick);
 	CheckLocalServerRunning();
 	client.server_mgr.TrySendingConnect();
 }
@@ -965,9 +1052,10 @@ void ClientFixedUpdateRead(double dt)
 {
 	if (!client.initialized)
 		return;
-	if (ClientGetState() >= Spawned)
+	if (ClientGetState() == Spawned)
 		client.tick += 1;
 	client.server_mgr.ReadPackets();
+	DoClientPrediction();
 }
 void ServerFixedUpdate(double dt)
 {
@@ -1000,15 +1088,28 @@ void MainLoop(double frametime)
 	DrawScreen(frametime);
 }
 
+static bool run_client_only = false;
+
 int main(int argc, char** argv)
 {
 	printf("Starting game\n");
+	if (argc == 2 && strcmp(argv[1], "-client") == 0)
+		run_client_only = true;
 	CreateWindow();
 	NetworkInit();
 	RenderInit();
-	ServerInit();
+	if (!run_client_only) {
+		ServerInit();
+		ServerSpawn(map_file);
+	}
 	ClientInit();
-	ServerSpawn(map_file);
+	if (run_client_only) {
+		printf("Running client only\n");
+		IPAndPort ip;
+		ip.SetIp(127, 0, 0, 1);
+		ip.port = SERVER_PORT;
+		ClientConnect(ip);
+	}
 	core.tick_interval = 1.0 / 128.0;	// hardcoded
 	double last = GetTime()-0.1;
 	for (;;)

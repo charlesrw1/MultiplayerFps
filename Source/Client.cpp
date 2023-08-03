@@ -65,7 +65,8 @@ int Client::GetLastSequenceAcked() const
 
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-
+	sock.enabled = true;
+	sock.lag = 50;
 }
 
 
@@ -131,7 +132,7 @@ void ClServerMgr::ReadPackets()
 	size_t recv_len = 0;
 	IPAndPort from;
 
-	while (sock.Recieve(inbuffer, sizeof(inbuffer), recv_len, from))
+	while (sock.Receive(inbuffer, sizeof(inbuffer), recv_len, from))
 	{
 		if (recv_len < PACKET_HEADER_SIZE)
 			continue;
@@ -261,8 +262,8 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		{
 			// just force it for now
 			int server_tick = buf.ReadLong();
-			if(server_tick-client.tick!=0)
-				DebugOut("delta tick %d\n", server_tick-client.tick);
+			//if(server_tick-client.tick!=0)
+			//	DebugOut("delta tick %d\n", server_tick-client.tick);
 			client.tick = server_tick;
 		}break;
 		default:
@@ -299,26 +300,29 @@ void ClServerMgr::SendMovesAndMessages()
 
 void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 {
-	// TEMPORARY
-	uint32_t is_spawned[8];
-	for (int i = 0; i < 8; i++)
-		is_spawned[i] = msg.ReadLong();
-	EntityState state;
-	for (int i = 0; i < 1; i++) {
+	// TEMPORARY!!
+	Snapshot* snapshot = &client.cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
+	for (int i = 0; i < 8; i++) {
 		int index = msg.ReadWord();
-		int type = msg.ReadByte();
-		state.position.x = msg.ReadFloat();
-		state.position.y = msg.ReadFloat();
-		state.position.z = msg.ReadFloat();
-		state.ducking = msg.ReadByte();
-		if(i==0)
-			ClientGetLocalPlayer()->state = state;
+		ASSERT(index < 16);
+		EntityState* state = &snapshot->entities[index];
+		state->type = msg.ReadByte();
+		state->position.x = msg.ReadFloat();
+		state->position.y = msg.ReadFloat();
+		state->position.z = msg.ReadFloat();
+		state->ducking = msg.ReadByte();
+	}
+	for (int i = 0; i < 8; i++) {
+		client.cl_game.entities[i].state = snapshot->entities[i];
 	}
 }
 
 void ClServerMgr::ParsePlayerData(ByteReader& buf)
 {
-	buf.ReadFloat();
-	buf.ReadFloat();
-	buf.ReadFloat();
+	Snapshot* snapshot = &client.cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
+	PlayerState* pstate = &snapshot->pstate;
+	pstate->velocity.x=buf.ReadFloat();
+	pstate->velocity.y=buf.ReadFloat();
+	pstate->velocity.z=buf.ReadFloat();
+	pstate->on_ground=buf.ReadByte();
 }

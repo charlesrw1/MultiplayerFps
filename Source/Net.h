@@ -7,6 +7,8 @@
 #include "MoveCommand.h"
 #include <queue>
 
+const int CLIENT_SNAPSHOT_HISTORY = 16;	// buffer last 16 snapshots
+
 const int MAX_PAYLOAD_SIZE = 1400;
 const int PACKET_HEADER_SIZE = 8;
 
@@ -17,7 +19,7 @@ const unsigned CONNECTIONLESS_SEQUENCE = 0xffffffff;
 const int MAX_CONNECT_ATTEMPTS = 10;
 const float CONNECT_RETRY_TIME = 2.f;
 const double MAX_TIME_OUT = 5.f;
-const int CLIENT_MOVE_HISTORY = 16;
+const int CLIENT_MOVE_HISTORY = 32;
 
 const int DEFAULT_UPDATE_RATE = 60;	// server+client ticks 60 times a second
 const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
@@ -60,10 +62,17 @@ enum InitialMessageTypes
 	Msg_RejectConnection = 'r'
 };
 
+enum EntType
+{
+	Ent_Player,
+	Ent_Dummy,
+	Ent_Free = 0xff,
+};
+
 // State that is transmitted to clients
 struct EntityState
 {
-	int type = 0;
+	int type = Ent_Free;
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
 	bool ducking = false;
@@ -72,8 +81,10 @@ struct EntityState
 struct PlayerState
 {
 	glm::vec3 velocity;
+	bool on_ground = false;
 };
 
 void NetDebugPrintf(const char* fmt, ...);
+
 
 #endif

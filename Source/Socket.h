@@ -24,13 +24,14 @@ public:
 	}
 };
 
-struct Socket
+class Socket
 {
+public:
 	Socket();
 	void Init(int port);
 	void Shutdown();
-	bool Send(void* data, size_t length, const IPAndPort& to);
-	bool Recieve(void* data, size_t buffer_size, size_t& recv_len, IPAndPort& from);
+	virtual bool Send(void* data, size_t length, const IPAndPort& to);
+	virtual bool Receive(void* data, size_t buffer_size, size_t& recv_len, IPAndPort& from);
 
 	IPAndPort local_addr;
 	uintptr_t handle = -1;

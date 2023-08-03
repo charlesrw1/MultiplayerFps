@@ -6,17 +6,17 @@
 #include "MathLib.h"
 #include "Util.h"
 
-class LagEmulator
+class EmulatedSocket : public Socket
 {
 public:
-	LagEmulator(Socket* sock) : socket(sock), rand_device(time(NULL)) {}
+	EmulatedSocket() : rand_device(time(NULL)) {}
 	int lag = 0;	// ms of lag
 	int loss = 0;	// % of packets to drop
 	int jitter = 0;	// ms of + of packet jitter
 	bool enabled = false;
-	bool Send(uint8_t* data, int len, IPAndPort to) {
+	bool Send(void* data, size_t len, const IPAndPort& to) override {
 		if (!enabled) {
-			return socket->Send(data, len, to);
+			return Socket::Send(data, len, to);
 		}
 
 		if (len >= MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE)
@@ -33,20 +33,20 @@ public:
 		while (!outgoing.empty() && outgoing.front().arrival_time < GetTime())
 		{
 			LagPacket& pack = outgoing.front();
-			socket->Send(pack.data, pack.size, pack.addr);
+			Socket::Send(pack.data, pack.size, pack.addr);
 			outgoing.pop();
 		}
 		return true;
 	}
-	bool Receive(uint8_t* buffer, int buffer_size, size_t& len, IPAndPort& from) {
+	bool Receive(void* buffer, size_t buffer_size, size_t& len, IPAndPort& from) override {
 		if (!enabled) {
-			return socket->Recieve(buffer, buffer_size, len, from);
+			return Socket::Receive(buffer, buffer_size, len, from);
 		}
 
 		for (;;) {
 			LagPacket packet;
-			bool good = socket->Recieve(packet.data, MAX_PAYLOAD_SIZE+PACKET_HEADER_SIZE, packet.size, packet.addr);
-			if (len == 0 || !good)
+			bool good = Socket::Receive(packet.data, MAX_PAYLOAD_SIZE+PACKET_HEADER_SIZE, packet.size, packet.addr);
+			if (packet.size == 0 || !good)
 				break;
 			if (ShouldDropThis() || packet.size > buffer_size)
 				continue;
@@ -59,11 +59,12 @@ public:
 			len = packet.size;
 			memcpy(buffer, packet.data, packet.size);
 			incoming.pop();
+			return true;
 		}
 		else {
 			len = 0;
+			return false;
 		}
-		return true;
 	}
 private:
 	bool ShouldDropThis() {
@@ -78,9 +79,9 @@ private:
 		uint8_t data[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 		size_t size = 0;
 		IPAndPort addr;
+		Socket* sock = nullptr;
 		double arrival_time = 0.0;
 	};
-	Socket* socket = nullptr;
 	Random rand_device;
 	std::queue<LagPacket> outgoing;
 	std::queue<LagPacket> incoming;

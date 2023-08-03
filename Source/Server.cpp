@@ -274,7 +274,7 @@ void ClientMgr::ReadPackets()
 	size_t recv_len = 0;
 	IPAndPort from;
 
-	while (socket.Recieve(inbuffer, sizeof(inbuffer), recv_len, from))
+	while (socket.Receive(inbuffer, sizeof(inbuffer), recv_len, from))
 	{
 		if (recv_len < PACKET_HEADER_SIZE)
 			continue;
@@ -334,22 +334,17 @@ void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
 	writer.WriteByte(SvMessageTick);
 	writer.WriteLong(server.tick);
-	// for now, just dump the entities
-	uint32_t bitmask = 0;
 	writer.WriteByte(SvMessageSnapshot);
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& ent = game.ents[i];
-		if (ent.type != Ent_Free)
-			bitmask |= (1 << (i % 32));
-		if (i % 32 == 31)
-			writer.WriteLong(bitmask);
-	}
+	// for now, just dump the entities
 	// entity states
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 8; i++) {
 		Entity& ent = game.ents[i];
+		int index = i;
+	
+		writer.WriteWord(index);
 		//if (ent.type == Ent_Free)
 		//	continue;
-		writer.WriteWord(i);
+
 		writer.WriteByte(ent.type);
 		writer.WriteFloat(ent.position.x);
 		writer.WriteFloat(ent.position.y);
@@ -362,6 +357,7 @@ void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
 	writer.WriteFloat(ent.velocity.x);
 	writer.WriteFloat(ent.velocity.y);
 	writer.WriteFloat(ent.velocity.z);
+	writer.WriteByte(ent.on_ground);
 
 	client.connection.Send(buffer, writer.BytesWritten());
 	//DebugOut("sent %d bytes to %s\n", writer.BytesWritten(), client.connection.remote_addr.ToString().c_str());
