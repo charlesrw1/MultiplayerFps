@@ -18,11 +18,15 @@ struct ClientEntity
 {
 	bool active = false;
 	EntityState state;
-	EntityState state2;
+	EntityState prev_state;
 	Animator anims;
+
 	// position/angle history for interpolation
 	std::array<TransformEntry, NUM_TRANSFORM_ENTRIES> transform_hist;
 	int current_hist_index = 0;
+
+	glm::vec3 lerp_origin=glm::vec3(0.f);
+	glm::vec3 lerp_angles=glm::vec3(0.f);
 
 	const Model* model = nullptr;
 };
@@ -110,8 +114,10 @@ public:
 	void ClearState();
 	void NewMap(const char* mapname);
 
+	glm::vec3 interpolated_origin;		// origin to render the eye at
+	PredictionState last_predicted;
 	PlayerState player;	// local player data
-	std::vector<ClientEntity> entities;
+	std::vector<ClientEntity> entities;	// client side data
 	std::vector<Snapshot> snapshots;
 	const Level* level = nullptr;
 };
@@ -137,6 +143,7 @@ private:
 	void ParseServerInit(ByteReader& msg);
 	void ParsePlayerData(ByteReader& msg);
 public:
+	bool new_packet_arrived = false;
 	int client_num;
 	int connect_attempts;
 	double attempt_time;

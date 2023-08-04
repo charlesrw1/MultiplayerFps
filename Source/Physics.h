@@ -18,22 +18,6 @@ struct ColliderCastResult
 	bool touched_ground = false;
 };
 
-class Actor;
-struct RayCastResult
-{
-	glm::vec3 startpos;
-	glm::vec3 endpos;
-	glm::vec3 dir;
-	float t;	// -1 hit sky
-
-	// plane of surface
-	glm::vec3 hitnormal;
-	float hitd;
-
-	Actor* hitactor = nullptr;	// null if hit world
-	int model_hitbox = -1;	// if applicable
-};
-
 struct Capsule
 {
 	float radius = 1.0f;;
@@ -43,11 +27,14 @@ struct Capsule
 	void GetSphereCenters(glm::vec3& a, glm::vec3& b) const;
 };
 
+
 class Level;
 void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
 void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
 void TraceSphere(const Level* lvl, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
+
+void TraceRay(const Level* lvl, Ray r, ColliderCastResult* out, float tmax, bool closest);
 
 // Called by the level loader to init the bvh
 void InitStaticGeoBvh(Level* input);

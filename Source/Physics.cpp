@@ -364,8 +364,6 @@ void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderC
 	b2.bmin -= vec3(0.05);
 	b2.bmax += vec3(0.05);
 
-
-
 	float best_len_total = INFINITY;
 
 	bool found_ground = false;
@@ -383,30 +381,7 @@ void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderC
 		}
 		return false;
 	};
-#if 0
-	for (int i = 0; i < cd.collision_tris.size(); i++) {
-		const Level::CollisionTri& tri = cd.collision_tris[i];
-		Bounds b;
-		b=bounds_union(b, cd.vertex_list[tri.indicies[0]]);
-		b=bounds_union(b, cd.vertex_list[tri.indicies[1]]);
-		b=bounds_union(b, cd.vertex_list[tri.indicies[2]]);
-		if (!bounds_intersect(b, b2))
-			continue;
-
-		bool res = CapsuleVsTriangle(cd, tri, adjusted_cap, &temp);
-		if (res) {
-			found_ground |= dot(temp.surf_normal, vec3(0, 1, 0)) > 0.7;
-		}
-		if (res && temp.intersect_len < best_len_total) {
-			best_len_total = temp.intersect_len;
-			*out = temp;
-			if (!closest)
-				return;
-		}
-	}
-#else
 	IntersectWorld(capsule_intersect_functor, lvl->static_geo_bvh, b2);
-#endif
 
 	out->touched_ground = found_ground;
 }

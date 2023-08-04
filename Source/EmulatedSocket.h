@@ -10,7 +10,7 @@ class EmulatedSocket : public Socket
 {
 public:
 	EmulatedSocket() : rand_device(time(NULL)) {}
-	int lag = 0;	// ms of lag
+	int lag = 0;	// ms of half RTT
 	int loss = 0;	// % of packets to drop
 	int jitter = 0;	// ms of + of packet jitter
 	bool enabled = false;

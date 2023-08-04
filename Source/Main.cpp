@@ -31,7 +31,7 @@ static bool update_camera = false;
 const char* map_file = "creek.glb";
 static bool mouse_grabbed = false;
 
-const char* map_file_names[] = { "creek.glb","maze.glb","world0.glb" };
+const char* map_file_names[] = { "creek.glb","maze.glb","nuke.glb" };
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -117,6 +117,14 @@ void ViewMgr::Init()
 	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
 }
 
+vec3 GetLocalPlayerInterpedOrigin()
+{
+	ClientEntity* ent = ClientGetLocalPlayer();
+	return ent->state.position;
+	float alpha =  core.frame_remainder / core.tick_interval;
+	return ent->prev_state.position * (1-alpha) + ent->state.position * ( alpha);
+}
+
 void ViewMgr::Update()
 {
 	if (!ClientIsInGame())
@@ -132,8 +140,9 @@ void ViewMgr::Update()
 	}
 	if (third_person) {
 		ClientEntity* player = ClientGetLocalPlayer();
-		fly_cam.position = player->state.position+vec3(0,0.5,0) - fly_cam.front * 3.f;
-		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + fly_cam.front, fly_cam.up);
+		vec3 front = AnglesToVector(client.view_angles.x, client.view_angles.y);
+		fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
+		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 	}
 	else
@@ -258,7 +267,7 @@ const float DEFAULT_MOVESPEED = 0.1f;
 static float move_speed_player = 0.1f;
 static bool gravity = true;
 static bool col_response = true;
-static int col_iters = 5;
+static int col_iters = 2;
 static bool col_closest = true;
 static bool new_physics = true;
 
@@ -294,6 +303,9 @@ private:
 	MoveCommand inp;
 	vec2 inp_dir;
 	float inp_len;
+
+	void(*trace_func)(int) = nullptr;
+	void(*impact_func)(int, int) = nullptr;
 
 	vec3 look_front;
 	vec3 look_side;
@@ -583,6 +595,21 @@ static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
 	move_speed_player = move_speed;
 }
 
+void ShootGunAgainstWorld(ColliderCastResult* result, Ray r)
+{
+
+}
+
+
+void DoGunLogic(Entity* ent, MoveCommand cmd)
+{
+	if (cmd.button_mask & CmdBtn_Misc1 && ent->next_shoot_time <= server.time) {
+		Ray gun_ray;
+		gun_ray.dir = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
+		gun_ray.pos = ent->position + vec3(0, 0.5, 0);
+	}
+}
+
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
 	if (paused)
@@ -591,6 +618,8 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	PlayerPhysics physics;
 	physics.Run(level,ent, cmd, core.tick_interval);
 	phys_debug.End();
+	DoGunLogic(ent, cmd);
+	
 }
 
 void CreateMoveCommand()
@@ -676,7 +705,10 @@ static void DrawPlayer(mat4 viewproj)
 {
 	MeshBuilder mb;
 	mb.Begin();
-	DrawState(&ClientGetLocalPlayer()->state, COLOR_GREEN, mb);
+	EntityState interp = ClientGetLocalPlayer()->state;
+	interp.position = GetLocalPlayerInterpedOrigin();
+	
+	DrawState(&interp, COLOR_GREEN, mb);
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
@@ -836,12 +868,6 @@ void DoClientPrediction()
 {
 	if (ClientGetState() != Spawned)
 		return;
-	// restore state to last authoritative snapshot 
-	int incoming_seq = client.server_mgr.server.in_sequence;
-	Snapshot* last_auth_state = &client.cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	PredictionState pred_state;
-	pred_state.estate = last_auth_state->entities[client.server_mgr.client_num];
-	pred_state.pstate = last_auth_state->pstate;
 	// predict commands from outgoing ack'ed to current outgoing
 	// TODO: dont repeat commands unless a new snapshot arrived
 	int start = client.server_mgr.server.out_sequence_ak;	// start at the new cmd
@@ -849,15 +875,25 @@ void DoClientPrediction()
 	int commands_to_run = end - start;
 	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
 		return;
+	// restore state to last authoritative snapshot 
+	int incoming_seq = client.server_mgr.server.in_sequence;
+	Snapshot* last_auth_state = &client.cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	PredictionState pred_state;
+	pred_state.estate = last_auth_state->entities[client.server_mgr.client_num];
+	pred_state.pstate = last_auth_state->pstate;
+	PredictionState next_state;
 	for (int i = start+1; i < end; i++) {
 		MoveCommand* cmd = client.GetCommand(i);
-		PredictionState next_state;
 		RunClientPhysics(&pred_state, &next_state, cmd);
 		pred_state = next_state;
 	}
 	
 	ClientEntity* ent = ClientGetLocalPlayer();
 	ent->state = pred_state.estate;
+	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
+	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
+	//ent->current_hist_index++;
+	//ent->current_hist_index %= ent->transform_hist.size();
 }
 
 void CheckLocalServerRunning()
@@ -868,49 +904,6 @@ void CheckLocalServerRunning()
 		serv_addr.SetIp(127, 0, 0, 1);
 		serv_addr.port = SERVER_PORT;
 		client.server_mgr.Connect(serv_addr);
-	}
-}
-
-void ClientUpdate(double dt)
-{
-	if (!client.initialized)
-		return;
-	// make command
-	if (ClientGetState()>=Connected)
-		CreateMoveCommand();
-	CheckLocalServerRunning();
-	client.server_mgr.TrySendingConnect();
-	client.server_mgr.SendMovesAndMessages();
-	client.server_mgr.ReadPackets();
-	DoClientGameUpdate(dt);
-}
-
-void ServerUpdate(double dt)
-{
-	if (!server.active)
-		return;
-	server.client_mgr.ReadPackets();
-	DoGameUpdate(dt);
-	server.client_mgr.SendSnapshots();
-}
-
-void ListenServerUpdate(double dt)
-{
-	if (client.initialized) {
-		if (ClientGetState() >= Connected)
-			CreateMoveCommand();
-		CheckLocalServerRunning();
-		client.server_mgr.TrySendingConnect();
-		client.server_mgr.SendMovesAndMessages();
-	}
-	if (server.active) {
-		server.client_mgr.ReadPackets();
-		DoGameUpdate(dt);
-		server.client_mgr.SendSnapshots();
-	}
-	if (client.initialized) {
-		client.server_mgr.ReadPackets();
-		DoClientGameUpdate(dt);
 	}
 }
 
@@ -993,9 +986,9 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_4)
 				ServerSpawn(map_file_names[map_selection]);
 			if (scancode == SDL_SCANCODE_5)
-				core.tick_interval = 1.0 / 30;
+				core.tick_interval = 1.0 / 15;
 			if (scancode == SDL_SCANCODE_6)
-				core.tick_interval = 1.0 / 128;
+				core.tick_interval = 1.0 / 66.66;
 			if (scancode == SDL_SCANCODE_7) {
 				IPAndPort ip;
 				ip.SetIp(127, 0, 0, 1);
@@ -1081,9 +1074,9 @@ void MainLoop(double frametime)
 		ClientFixedUpdateInput(secs_per_tick);
 		ServerFixedUpdate(secs_per_tick);
 		ClientFixedUpdateRead(secs_per_tick);
-		client.view_mgr.Update();
 	}
 	
+	client.view_mgr.Update();
 	DoClientGameUpdate(frametime);
 	DrawScreen(frametime);
 }
@@ -1110,7 +1103,7 @@ int main(int argc, char** argv)
 		ip.port = SERVER_PORT;
 		ClientConnect(ip);
 	}
-	core.tick_interval = 1.0 / 128.0;	// hardcoded
+	core.tick_interval = 1.0 / DEFAULT_UPDATE_RATE;	// hardcoded
 	double last = GetTime()-0.1;
 	for (;;)
 	{
@@ -1121,6 +1114,13 @@ int main(int argc, char** argv)
 			dt = 0.1;
 		core.frame_time = dt;
 		MainLoop(dt);
+
+		static int next_print = 0.0;
+		if (next_print < GetTime()) {
+			printf("frame %f\n", dt);
+			next_print = GetTime() + 1.0;
+		}
+
 		//if (delta_t > 0.1)
 		//	delta_t = 0.1;
 		//TEMP_DT = delta_t;

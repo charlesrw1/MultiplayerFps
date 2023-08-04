@@ -15,6 +15,7 @@ struct Entity
 	float animation_time = 0.f;
 	int gun_type = 0;
 
+	float next_shoot_time = -100.0f;
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
 	bool ducking = false;

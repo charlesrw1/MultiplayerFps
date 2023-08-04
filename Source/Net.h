@@ -19,9 +19,9 @@ const unsigned CONNECTIONLESS_SEQUENCE = 0xffffffff;
 const int MAX_CONNECT_ATTEMPTS = 10;
 const float CONNECT_RETRY_TIME = 2.f;
 const double MAX_TIME_OUT = 5.f;
-const int CLIENT_MOVE_HISTORY = 32;
+const int CLIENT_MOVE_HISTORY = 36;
 
-const int DEFAULT_UPDATE_RATE = 60;	// server+client ticks 60 times a second
+const double DEFAULT_UPDATE_RATE = 66.66;	// server+client ticks 66 times a second
 const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
 const int DEFAULT_SNAPSHOT_RATE = 30;	// send 30 snapshots a second
 

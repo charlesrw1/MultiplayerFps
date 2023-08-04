@@ -66,7 +66,8 @@ int Client::GetLastSequenceAcked() const
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
 	sock.enabled = true;
-	sock.lag = 50;
+	sock.lag = 150;
+	sock.jitter = 5;
 }
 
 
@@ -127,6 +128,7 @@ void ClServerMgr::Disconnect()
 
 void ClServerMgr::ReadPackets()
 {
+	new_packet_arrived = false;
 	ASSERT(client.initialized);
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
@@ -157,6 +159,10 @@ void ClServerMgr::ReadPackets()
 			::ClientDisconnect();
 		}
 	}
+
+	int last_sequence = server.out_sequence_ak;
+	int tick_delta = client.tick - client.GetCommand(last_sequence)->tick;
+	//printf("RTT: %f\n", (tick_delta)*core.tick_interval);
 
 }
 
@@ -262,9 +268,10 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		{
 			// just force it for now
 			int server_tick = buf.ReadLong();
-			//if(server_tick-client.tick!=0)
-			//	DebugOut("delta tick %d\n", server_tick-client.tick);
-			client.tick = server_tick;
+			if (abs(server_tick - client.tick) > 1) {
+				DebugOut("delta tick %d\n", server_tick - client.tick);
+				client.tick = server_tick;
+			}
 		}break;
 		default:
 			DebugOut("Unknown message, disconnecting\n");
@@ -313,8 +320,10 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 		state->ducking = msg.ReadByte();
 	}
 	for (int i = 0; i < 8; i++) {
+		client.cl_game.entities[i].prev_state = client.cl_game.entities[i].state;
 		client.cl_game.entities[i].state = snapshot->entities[i];
 	}
+	new_packet_arrived = true;
 }
 
 void ClServerMgr::ParsePlayerData(ByteReader& buf)
