@@ -1,0 +1,72 @@
+#version 430 core
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec2 VS_IN_TexCoord;
+layout (location = 2) in vec3 VS_IN_Normal;
+#ifdef ANIMATED
+layout (location = 3) in ivec4 VS_IN_BoneIndicies;
+layout (location = 4) in vec4 VS_IN_BoneWeights;
+#endif
+#ifdef VERTEX_COLOR
+layout (location = 5) in vec4 VS_IN_Color;
+#endif
+
+out vec3 FS_IN_FragPos;
+out vec3 FS_IN_Normal;
+out vec2 FS_IN_Texcoord;
+out vec3 FS_IN_BoneColor;
+
+#ifdef VERTEX_COLOR
+out vec4 FS_IN_Color;
+#endif
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+#ifdef ANIMATED
+#define MAX_BONES 128
+uniform mat4 BoneTransform[MAX_BONES];
+#endif
+
+uniform mat4 Model;
+uniform mat4 InverseModel;
+uniform mat4 ViewProj;
+
+void main()
+{
+#ifdef ANIMATED
+	vec3 local_pos = vec3(0.0);
+	vec3 local_normal = vec3(0.0);
+	for(int i=0;i<4;i++) {
+		if(VS_IN_BoneIndicies[i]==-1)
+			continue;
+		vec3 posadded = vec3(BoneTransform[VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
+		local_pos += posadded * VS_IN_BoneWeights[i];
+		
+		vec3 normaladded = mat3(BoneTransform[VS_IN_BoneIndicies[i]])*VS_IN_Normal;
+		
+		local_normal += normaladded * VS_IN_BoneWeights[i];
+	}
+#else
+	vec3 local_pos = VS_IN_Postion;
+	vec3 local_normal = VS_IN_Normal;
+#endif
+
+
+//	vec3 local_pos = vec3(BoneTransform[VS_IN_Bone]*vec4(VS_IN_Postion,1.0));
+	FS_IN_FragPos = vec3(Model * vec4(local_pos,1.0));
+#ifdef ANIMATED
+	FS_IN_BoneColor = randColor(VS_IN_BoneIndicies.x)*VS_IN_BoneWeights.x+
+		randColor(VS_IN_BoneIndicies.y)*VS_IN_BoneWeights.y+
+		randColor(VS_IN_BoneIndicies.z)*VS_IN_BoneWeights.z+
+		randColor(VS_IN_BoneIndicies.w)*VS_IN_BoneWeights.w;
+#endif
+    FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
+    
+#ifdef VERTEX_COLOR
+	FS_IN_Color = VS_IN_Color;
+#endif
+	
+    gl_Position = ViewProj * vec4(FS_IN_FragPos, 1.0);
+	FS_IN_Texcoord = VS_IN_TexCoord;
+}

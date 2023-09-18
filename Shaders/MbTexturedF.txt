@@ -1,0 +1,15 @@
+#version 330 core
+
+out vec4 FS_OUT_Color;
+
+in vec4 FS_IN_Color;
+in vec2 FS_IN_TexCoord;
+
+uniform sampler2D Image;
+
+void main()
+{
+	vec4 color = texture(Image,FS_IN_TexCoord);
+	FS_OUT_Color = color*FS_IN_Color;
+}
+	

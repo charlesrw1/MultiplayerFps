@@ -1,0 +1,17 @@
+#version 330 core
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec4 VS_IN_Color;
+layout (location = 2) in vec2 VS_IN_TexCoord;
+
+out vec4 FS_IN_Color;
+out vec2 FS_IN_TexCoord;
+
+uniform mat4 ViewProj;
+uniform mat4 Model;
+
+void main()
+{
+	FS_IN_Color = VS_IN_Color;
+    FS_IN_TexCoord = VS_IN_TexCoord;
+    gl_Position = ViewProj * Model * vec4(VS_IN_Postion, 1.0);
+}

@@ -1,0 +1,22 @@
+#version 330 core
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec4 VS_IN_Color;
+layout (location = 2) in vec2 VS_IN_TexCoord;
+
+out vec4 FS_IN_Color;
+
+layout(std140) uniform FrameConstants
+{
+	mat4 view_projection;
+	mat4 inv_view_projection;
+	vec4 view_pos;
+}GlobalUBO;
+
+uniform mat4 ViewProj;
+
+void main()
+{
+	FS_IN_Color = VS_IN_Color;
+    
+    gl_Position = ViewProj * vec4(VS_IN_Postion, 1.0);
+}
