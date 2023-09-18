@@ -317,6 +317,7 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 		state->position.x = msg.ReadFloat();
 		state->position.y = msg.ReadFloat();
 		state->position.z = msg.ReadFloat();
+		state->angles.x = msg.ReadFloat();
 		state->ducking = msg.ReadByte();
 	}
 	for (int i = 0; i < 8; i++) {

@@ -41,6 +41,7 @@
     <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\Shader.cpp" />
+    <ClCompile Include="Source\Shared.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
   </ItemGroup>
@@ -60,6 +61,7 @@
     <ClInclude Include="Source\Physics.h" />
     <ClInclude Include="source\Server.h" />
     <ClInclude Include="Source\Shader.h" />
+    <ClInclude Include="Source\Shared.h" />
     <ClInclude Include="Source\Socket.h" />
     <ClInclude Include="Source\Texture.h" />
     <ClInclude Include="Source\Util.h" />

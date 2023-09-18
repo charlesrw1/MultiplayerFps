@@ -255,30 +255,16 @@ Model* m = nullptr;
 Animator animator;
 Model* gun;
 
-const Capsule DEFAULT_COLLIDER = {
-	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
-};
-const Capsule CROUCH_COLLIDER = {
-	0.2f, glm::vec3(0,0,0),glm::vec3(0,0.75,0.0)
-};
+
 const float DEFAULT_MOVESPEED = 0.1f;
 
 
-static float move_speed_player = 0.1f;
-static bool gravity = true;
-static bool col_response = true;
-static int col_iters = 2;
-static bool col_closest = true;
-static bool new_physics = true;
-
-static float ground_friction = 10;
-static float air_friction = 0.01;
-static float gravityamt = 16;
-static float ground_accel = 6;
-static float air_accel = 3;
-static float minspeed = 1;
-static float maxspeed = 30;
-static float jumpimpulse = 5.f;
+float move_speed_player = 0.1f;
+bool gravity = true;
+bool col_response = true;
+int col_iters = 2;
+bool col_closest = true;
+bool new_physics = true;
 
 class PlayerPhysics
 {
@@ -304,296 +290,16 @@ private:
 	vec2 inp_dir;
 	float inp_len;
 
-	void(*trace_func)(int) = nullptr;
+	int num_touch = 0;
+	int touch_ents[16];	// index into client or server entities for all touches that occured
+	// trace function callbacks
+	void(*trace)(int) = nullptr;
 	void(*impact_func)(int, int) = nullptr;
 
 	vec3 look_front;
 	vec3 look_side;
 };
 
-void PlayerPhysics::CheckNans()
-{
-	if (player->position.x != player->position.x || player->position.y != player->position.y ||
-		player->position.z != player->position.z)
-	{
-		printf("origin nan found in PlayerPhysics\n");
-		player->position = vec3(0);
-	}
-	if (player->velocity.x != player->velocity.x
-		|| player->velocity.y != player->velocity.y || player->velocity.z != player->velocity.z)
-	{
-		printf("velocity nan found in PlayerPhysics\n");
-		player->velocity = vec3(0);
-	}
-}
-
-void PlayerPhysics::CheckJump()
-{
-	if (player->on_ground && inp.button_mask & CmdBtn_Jump) {
-		printf("jump\n");
-		player->velocity.y += jumpimpulse;
-		player->on_ground = false;
-	}
-}
-void PlayerPhysics::CheckDuck()
-{
-	if (inp.button_mask & CmdBtn_Duck) {
-		if (player->on_ground) {
-			player->ducking = true;
-		}
-		else if(!player->on_ground&&!player->ducking){
-			const Capsule& st = DEFAULT_COLLIDER;
-			const Capsule& cr = CROUCH_COLLIDER;
-			// Move legs of player up
-			player->position.y += st.tip.y - cr.tip.y;
-			player->ducking = true;
-		}
-	}
-	else if (!(inp.button_mask & CmdBtn_Duck) && player->ducking) {
-		int steps = 2;
-		float step = 0.f;
-		float sphere_radius = 0.f;
-		vec3 offset = vec3(0.f);
-		vec3 a, b, c, d;
-		DEFAULT_COLLIDER.GetSphereCenters(a, b);
-		CROUCH_COLLIDER.GetSphereCenters(c, d);
-		float len = b.y - d.y;
-		sphere_radius = CROUCH_COLLIDER.radius;
-		if (player->on_ground) {
-			step = len / (float)steps;
-			offset = d;
-		}
-		else {
-			steps = 3;
-			// testing downwards to ground
-			step = -(len+0.1) / (float)steps;
-			offset = c;
-		}
-		int i = 0;
-		for (; i < steps; i++) {
-			ColliderCastResult res;
-			vec3 where = player->position + offset + vec3(0, (i + 1) * step, 0);
-			TraceSphere(level,where, sphere_radius, &res, true, false);
-			if (res.found) {
-				phys_debug.AddSphere(where, sphere_radius, 10, 8, COLOR_RED);
-				break;
-			}
-		}
-		if (i == steps) {
-			player->ducking = false;
-			if (!player->on_ground) {
-				player->position.y -= len;
-			}
-		}
-	}
-}
-
-void PlayerPhysics::ApplyFriction(float friction_val)
-{
-	float speed = length(player->velocity);
-	if (speed < 0.0001)
-		return;
-
-	float dropamt = friction_val * speed * deltat;
-
-	float newspd = speed - dropamt;
-	if (newspd < 0)
-		newspd = 0;
-	float factor = newspd / speed;
-
-	player->velocity.x *= factor;
-	player->velocity.z *= factor;
-
-}
-void PlayerPhysics::MoveAndSlide(vec3 delta)
-{
-	Capsule cap = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-	vec3 position = player->position;
-	vec3 step = delta / (float)col_iters;
-	for (int i = 0; i < col_iters; i++)
-	{
-		position += step;
-		ColliderCastResult trace;
-		TraceCapsule(level,position, cap, &trace, col_closest);
-		if (trace.found)
-		{
-			vec3 penetration_velocity = dot(player->velocity, trace.penetration_normal) * trace.penetration_normal;
-			vec3 slide_velocity = player->velocity - penetration_velocity;
-			position += trace.penetration_normal * trace.penetration_depth;////trace.0.001f + slide_velocity * dt;
-			player->velocity = slide_velocity;
-		}
-	}
-	// Gets player out of surfaces
-	for (int i = 0; i < 2; i++) {
-		ColliderCastResult res;
-		TraceCapsule(level,position, cap, &res, col_closest);
-		if (res.found) {
-			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-		}
-	}
-	player->position = position;
-}
-
-void PlayerPhysics::CheckGroundState()
-{
-	if (player->velocity.y > 2.f) {
-		player->on_ground = false;
-		return;
-	}
-	ColliderCastResult result;
-	vec3 where = player->position - vec3(0, 0.005-DEFAULT_COLLIDER.radius, 0);
-	float radius = DEFAULT_COLLIDER.radius;
-	TraceSphere(level,where,radius, &result,true,true);
-	if (!result.found)
-		player->on_ground = false;
-	else if (result.surf_normal.y < 0.3)
-		player->on_ground = false;
-	else {
-		player->on_ground = true;
-		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
-	}
-}
-
-float max_ground_speed = 10;
-float max_air_speed = 2;
-
-void PlayerPhysics::GroundMove()
-{
-	float acceleation_val = (player->on_ground) ? ground_accel : air_accel;
-	float maxspeed_val = (player->on_ground) ? max_ground_speed : max_air_speed;
-
-	vec3 wishdir = (look_front * inp_dir.x + look_side * inp_dir.y);
-	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
-	vec3 xz_velocity = vec3(player->velocity.x, 0, player->velocity.z);
-
-	float wishspeed = inp_len * maxspeed_val;
-	float addspeed = wishspeed - dot(xz_velocity, wishdir);
-	addspeed = glm::max(addspeed, 0.f);
-	float accelspeed = acceleation_val * wishspeed*deltat;
-	accelspeed = glm::min(accelspeed, addspeed);
-	xz_velocity += accelspeed * wishdir;
-
-	float len = length(xz_velocity);
-	//if (len > maxspeed)
-	//	xz_velocity = xz_velocity * (maxspeed / len);
-	if (len < 0.3 && accelspeed < 0.0001)
-		xz_velocity = vec3(0);
-	player->velocity = vec3(xz_velocity.x, player->velocity.y, xz_velocity.z);
-	
-
-	CheckJump();
-	CheckDuck();
-	if (!player->on_ground)
-		player->velocity.y -= gravityamt * deltat;
-
-	vec3 delta = player->velocity * deltat;
-
-	MoveAndSlide(delta);
-}
-void PlayerPhysics::AirMove()
-{
-
-}
-static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt);
-void PlayerPhysics::Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt)
-{
-	if (!p)
-		return;
-	level = lvl;
-	deltat = dt;
-	player = p;
-	inp = cmd;
-
-	vec2 inputvec = vec2(inp.forward_move, inp.lateral_move);
-	inp_len = length(inputvec);
-	if (inp_len > 0.00001)
-		inp_dir = inputvec / inp_len;
-	if (inp_len > 1)
-		inp_len = 1;
-
-	// Store off last values for interpolation
-	//p->lastorigin = p->origin;
-	//p->lastangles = p->angles;
-
-	//player->viewangles = inp.desired_view_angles;
-	look_front = AnglesToVector(inp.view_angles.x, inp.view_angles.y);
-	look_side = -cross(look_front, vec3(0, 1, 0));
-
-
-
-	if (new_physics) {
-		float fric_val = (player->on_ground) ? ground_friction : air_friction;
-		ApplyFriction(fric_val);
-		CheckGroundState();	// check ground after applying friction, like quake
-		GroundMove();
-	}
-	else {
-		// Old function
-		UpdatePlayer(player, cmd, dt);
-	}
-	CheckNans();
-}
-
-
-static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
-{
-	player->velocity = vec3(0.f);
-	vec3 position = player->position;
-	
-	position += player->velocity;
-	float move_speed = move_speed_player;
-
-	vec3 front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-	vec3 up = vec3(0, 1, 0);
-	vec3 right = cross(up, front);
-	position += move_speed * front * cmd.forward_move;
-	position += move_speed * right * cmd.lateral_move;
-	position += move_speed * up * cmd.up_move;
-
-	if(cmd.button_mask&CmdBtn_Misc1)
-		move_speed += (move_speed * 0.5);
-	else if(cmd.button_mask&CmdBtn_Misc2)
-		move_speed -= (move_speed * 0.5);
-
-	if (abs(move_speed) < 0.000001)
-		move_speed = 0.0001;
-
-	player->ducking = false;
-	if (cmd.button_mask & CmdBtn_Duck)
-		player->ducking = true;
-
-	vec3 step = (position - player->position) / (float)col_iters;
-	position = player->position;
-	Capsule collider = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-	for (int i = 0; i < col_iters; i++) {
-		ColliderCastResult res;
-		position += step;
-		TraceCapsule(server.sv_game.level,position, collider, &res,col_closest);
-		if (res.found) {
-			player->velocity = vec3(0);
-			if(col_response)
-				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-			//phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
-		}
-	}
-	for (int i = 0; i < 3; i++) {
-		ColliderCastResult res;
-		TraceCapsule(server.sv_game.level,position, collider, &res, col_closest);
-		if (res.found) {
-			if (col_response)
-				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-			//phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
-		}
-	}
-
-	collider.base += position;
-	collider.tip += position;
-	Bounds cap_b = CapsuleToAABB(collider);
-	phys_debug.PushLineBox(cap_b.bmin, cap_b.bmax, COLOR_PINK);
-
-	player->position = position;
-	move_speed_player = move_speed;
-}
 
 void ShootGunAgainstWorld(ColliderCastResult* result, Ray r)
 {
@@ -699,6 +405,7 @@ static void DrawState(EntityState* player, Color32 color, MeshBuilder& mb)
 	c.GetSphereCenters(a, b);
 	mb.AddSphere(origin + a, radius, 10, 7, color);
 	mb.AddSphere(origin + b, radius, 10, 7, color);
+
 }
 
 static void DrawPlayer(mat4 viewproj)
@@ -853,6 +560,7 @@ void RunClientPhysics(const PredictionState* in, PredictionState* out, const Mov
 	ent.rotation = in->estate.angles;
 	ent.velocity = in->pstate.velocity;
 	ent.on_ground = in->pstate.on_ground;
+	ent.rotation = in->estate.angles;
 
 	physics.Run(client.cl_game.level, &ent, *cmd, core.tick_interval);
 
@@ -862,6 +570,7 @@ void RunClientPhysics(const PredictionState* in, PredictionState* out, const Mov
 
 	out->pstate.on_ground = ent.on_ground;
 	out->pstate.velocity = ent.velocity;
+	out->estate.angles = ent.rotation;
 }
 
 void DoClientPrediction()

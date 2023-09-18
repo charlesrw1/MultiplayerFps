@@ -1,6 +1,7 @@
 #include "Server.h"
 #include "Util.h"
 #include "CoreTypes.h"
+#include "Shared.h"
 #include <cstdarg>
 
 Server server;
@@ -349,6 +350,7 @@ void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
 		writer.WriteFloat(ent.position.x);
 		writer.WriteFloat(ent.position.y);
 		writer.WriteFloat(ent.position.z);
+		writer.WriteFloat(ent.rotation.x);
 		writer.WriteByte(ent.ducking);
 	}
 	// local player specific state

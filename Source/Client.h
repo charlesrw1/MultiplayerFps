@@ -4,6 +4,7 @@
 #include "Animation.h"
 #include "Level.h"
 #include "EmulatedSocket.h"
+#include "Shared.h"
 #include <array>
 
 const int NUM_TRANSFORM_ENTRIES = 8;

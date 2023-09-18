@@ -62,28 +62,6 @@ enum InitialMessageTypes
 	Msg_RejectConnection = 'r'
 };
 
-enum EntType
-{
-	Ent_Player,
-	Ent_Dummy,
-	Ent_Free = 0xff,
-};
-
-// State that is transmitted to clients
-struct EntityState
-{
-	int type = Ent_Free;
-	glm::vec3 position=glm::vec3(0.f);
-	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
-	bool ducking = false;
-};
-// State specific to the client's player that is transmitted
-struct PlayerState
-{
-	glm::vec3 velocity;
-	bool on_ground = false;
-};
-
 void NetDebugPrintf(const char* fmt, ...);
 
 
