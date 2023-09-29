@@ -138,8 +138,6 @@ void PlayerMovement::ApplyFriction(float friction_val)
 void PlayerMovement::MoveAndSlide(vec3 delta)
 {
 	Capsule cap = (player.ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-	cap.base += player.position;
-	cap.tip += player.position;
 	PhysContainer obj;
 	obj.type = PhysContainer::CapsuleType;
 	obj.cap = cap;
@@ -150,6 +148,9 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 	{
 		position += step;
 		ColliderCastResult trace;
+		obj.cap = cap;
+		obj.cap.tip += position;
+		obj.cap.base += position;
 	
 		trace_callback(&trace, obj, col_closest, false);
 
@@ -165,6 +166,9 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 	// Gets player out of surfaces
 	for (int i = 0; i < 2; i++) {
 		ColliderCastResult res;
+		obj.cap = cap;
+		obj.cap.tip += position;
+		obj.cap.base += position;
 
 		trace_callback(&res, obj, col_closest, false);
 		//TraceCapsule(level, position, cap, &res, col_closest);

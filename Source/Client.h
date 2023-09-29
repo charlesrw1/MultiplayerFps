@@ -38,14 +38,6 @@ struct Snapshot
 	PlayerState pstate;			// local player state, for prediction stuff
 };
 
-// used for prediction frames
-struct PredictionState
-{
-	PlayerState pstate;
-	EntityState estate;
-};
-
-
 enum ClientConnectionState {
 	Disconnected,
 	TryingConnect,	// trying to connect to server
@@ -106,7 +98,7 @@ public:
 	void NewMap(const char* mapname);
 
 	glm::vec3 interpolated_origin;		// origin to render the eye at
-	PredictionState last_predicted;
+	PlayerState last_predicted;
 	PlayerState player;	// local player data
 	std::vector<ClientEntity> entities;	// client side data
 	std::vector<Snapshot> snapshots;

@@ -22,6 +22,7 @@
 #include "CoreTypes.h"
 #include "Client.h"
 #include "Server.h"
+#include "Movement.h"
 
 MeshBuilder phys_debug;
 Core core;
@@ -280,325 +281,6 @@ static float minspeed = 1;
 static float maxspeed = 30;
 static float jumpimpulse = 5.f;
 
-class PlayerPhysics
-{
-public:
-	void Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt);
-
-private:
-	void DoStandardPhysics();
-	void ApplyFriction(float friction_val);
-	void GroundMove();
-	void AirMove();
-	void FlyMove();
-	void CheckJump();
-	void CheckDuck();
-	void CheckNans();
-	void MoveAndSlide(vec3 delta);
-	void CheckGroundState();
-
-	const Level* level;
-	float deltat;
-	Entity* player;
-	MoveCommand inp;
-	vec2 inp_dir;
-	float inp_len;
-
-	void(*trace_func)(int) = nullptr;
-	void(*impact_func)(int, int) = nullptr;
-
-	vec3 look_front;
-	vec3 look_side;
-};
-
-void PlayerPhysics::CheckNans()
-{
-	if (player->position.x != player->position.x || player->position.y != player->position.y ||
-		player->position.z != player->position.z)
-	{
-		printf("origin nan found in PlayerPhysics\n");
-		player->position = vec3(0);
-	}
-	if (player->velocity.x != player->velocity.x
-		|| player->velocity.y != player->velocity.y || player->velocity.z != player->velocity.z)
-	{
-		printf("velocity nan found in PlayerPhysics\n");
-		player->velocity = vec3(0);
-	}
-}
-
-void PlayerPhysics::CheckJump()
-{
-	if (player->on_ground && inp.button_mask & CmdBtn_Jump) {
-		printf("jump\n");
-		player->velocity.y += jumpimpulse;
-		player->on_ground = false;
-	}
-}
-void PlayerPhysics::CheckDuck()
-{
-	if (inp.button_mask & CmdBtn_Duck) {
-		if (player->on_ground) {
-			player->ducking = true;
-		}
-		else if(!player->on_ground&&!player->ducking){
-			const Capsule& st = DEFAULT_COLLIDER;
-			const Capsule& cr = CROUCH_COLLIDER;
-			// Move legs of player up
-			player->position.y += st.tip.y - cr.tip.y;
-			player->ducking = true;
-		}
-	}
-	else if (!(inp.button_mask & CmdBtn_Duck) && player->ducking) {
-		int steps = 2;
-		float step = 0.f;
-		float sphere_radius = 0.f;
-		vec3 offset = vec3(0.f);
-		vec3 a, b, c, d;
-		DEFAULT_COLLIDER.GetSphereCenters(a, b);
-		CROUCH_COLLIDER.GetSphereCenters(c, d);
-		float len = b.y - d.y;
-		sphere_radius = CROUCH_COLLIDER.radius;
-		if (player->on_ground) {
-			step = len / (float)steps;
-			offset = d;
-		}
-		else {
-			steps = 3;
-			// testing downwards to ground
-			step = -(len+0.1) / (float)steps;
-			offset = c;
-		}
-		int i = 0;
-		for (; i < steps; i++) {
-			ColliderCastResult res;
-			vec3 where = player->position + offset + vec3(0, (i + 1) * step, 0);
-			TraceSphere(level,where, sphere_radius, &res, true, false);
-			if (res.found) {
-				phys_debug.AddSphere(where, sphere_radius, 10, 8, COLOR_RED);
-				break;
-			}
-		}
-		if (i == steps) {
-			player->ducking = false;
-			if (!player->on_ground) {
-				player->position.y -= len;
-			}
-		}
-	}
-}
-
-void PlayerPhysics::ApplyFriction(float friction_val)
-{
-	float speed = length(player->velocity);
-	if (speed < 0.0001)
-		return;
-
-	float dropamt = friction_val * speed * deltat;
-
-	float newspd = speed - dropamt;
-	if (newspd < 0)
-		newspd = 0;
-	float factor = newspd / speed;
-
-	player->velocity.x *= factor;
-	player->velocity.z *= factor;
-
-}
-void PlayerPhysics::MoveAndSlide(vec3 delta)
-{
-	Capsule cap = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-	vec3 position = player->position;
-	vec3 step = delta / (float)col_iters;
-	for (int i = 0; i < col_iters; i++)
-	{
-		position += step;
-		ColliderCastResult trace;
-		TraceCapsule(level,position, cap, &trace, col_closest);
-		if (trace.found)
-		{
-			vec3 penetration_velocity = dot(player->velocity, trace.penetration_normal) * trace.penetration_normal;
-			vec3 slide_velocity = player->velocity - penetration_velocity;
-			position += trace.penetration_normal * trace.penetration_depth;////trace.0.001f + slide_velocity * dt;
-			player->velocity = slide_velocity;
-		}
-	}
-	// Gets player out of surfaces
-	for (int i = 0; i < 2; i++) {
-		ColliderCastResult res;
-		TraceCapsule(level,position, cap, &res, col_closest);
-		if (res.found) {
-			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-		}
-	}
-	player->position = position;
-}
-
-void PlayerPhysics::CheckGroundState()
-{
-	if (player->velocity.y > 2.f) {
-		player->on_ground = false;
-		return;
-	}
-	ColliderCastResult result;
-	vec3 where = player->position - vec3(0, 0.005-DEFAULT_COLLIDER.radius, 0);
-	float radius = DEFAULT_COLLIDER.radius;
-	TraceSphere(level,where,radius, &result,true,true);
-	if (!result.found)
-		player->on_ground = false;
-	else if (result.surf_normal.y < 0.3)
-		player->on_ground = false;
-	else {
-		player->on_ground = true;
-		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
-	}
-}
-
-static float max_ground_speed = 10;
-static float max_air_speed = 2;
-
-void PlayerPhysics::GroundMove()
-{
-	float acceleation_val = (player->on_ground) ? ground_accel : air_accel;
-	float maxspeed_val = (player->on_ground) ? max_ground_speed : max_air_speed;
-
-	vec3 wishdir = (look_front * inp_dir.x + look_side * inp_dir.y);
-	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
-	vec3 xz_velocity = vec3(player->velocity.x, 0, player->velocity.z);
-
-	float wishspeed = inp_len * maxspeed_val;
-	float addspeed = wishspeed - dot(xz_velocity, wishdir);
-	addspeed = glm::max(addspeed, 0.f);
-	float accelspeed = acceleation_val * wishspeed*deltat;
-	accelspeed = glm::min(accelspeed, addspeed);
-	xz_velocity += accelspeed * wishdir;
-
-	float len = length(xz_velocity);
-	//if (len > maxspeed)
-	//	xz_velocity = xz_velocity * (maxspeed / len);
-	if (len < 0.3 && accelspeed < 0.0001)
-		xz_velocity = vec3(0);
-	player->velocity = vec3(xz_velocity.x, player->velocity.y, xz_velocity.z);
-	
-
-	CheckJump();
-	CheckDuck();
-	if (!player->on_ground)
-		player->velocity.y -= gravityamt * deltat;
-
-	vec3 delta = player->velocity * deltat;
-
-	MoveAndSlide(delta);
-}
-void PlayerPhysics::AirMove()
-{
-
-}
-static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt);
-void PlayerPhysics::Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt)
-{
-	if (!p)
-		return;
-	level = lvl;
-	deltat = dt;
-	player = p;
-	inp = cmd;
-
-	vec2 inputvec = vec2(inp.forward_move, inp.lateral_move);
-	inp_len = length(inputvec);
-	if (inp_len > 0.00001)
-		inp_dir = inputvec / inp_len;
-	if (inp_len > 1)
-		inp_len = 1;
-
-	phys_debug.PushLine(p->position, p->position + glm::vec3(inputvec.x, 0.2f,inputvec.y), COLOR_WHITE);
-
-	// Store off last values for interpolation
-	//p->lastorigin = p->origin;
-	//p->lastangles = p->angles;
-
-	//player->viewangles = inp.desired_view_angles;
-	look_front = AnglesToVector(inp.view_angles.x, inp.view_angles.y);
-	look_front.y = 0;
-	look_front = normalize(look_front);
-	look_side = -cross(look_front, vec3(0, 1, 0));
-
-
-
-	if (new_physics) {
-		float fric_val = (player->on_ground) ? ground_friction : air_friction;
-		ApplyFriction(fric_val);
-		CheckGroundState();	// check ground after applying friction, like quake
-		GroundMove();
-	}
-	else {
-		// Old function
-		UpdatePlayer(player, cmd, dt);
-	}
-	CheckNans();
-}
-
-
-static void UpdatePlayer(Entity* player, MoveCommand cmd, double dt)
-{
-	player->velocity = vec3(0.f);
-	vec3 position = player->position;
-	
-	position += player->velocity;
-	float move_speed = move_speed_player;
-
-	vec3 front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-	vec3 up = vec3(0, 1, 0);
-	vec3 right = cross(up, front);
-	position += move_speed * front * cmd.forward_move;
-	position += move_speed * right * cmd.lateral_move;
-	position += move_speed * up * cmd.up_move;
-
-	if(cmd.button_mask&CmdBtn_Misc1)
-		move_speed += (move_speed * 0.5);
-	else if(cmd.button_mask&CmdBtn_Misc2)
-		move_speed -= (move_speed * 0.5);
-
-	if (abs(move_speed) < 0.000001)
-		move_speed = 0.0001;
-
-	player->ducking = false;
-	if (cmd.button_mask & CmdBtn_Duck)
-		player->ducking = true;
-
-	vec3 step = (position - player->position) / (float)col_iters;
-	position = player->position;
-	Capsule collider = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-	for (int i = 0; i < col_iters; i++) {
-		ColliderCastResult res;
-		position += step;
-		TraceCapsule(server.sv_game.level,position, collider, &res,col_closest);
-		if (res.found) {
-			player->velocity = vec3(0);
-			if(col_response)
-				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-			//phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
-		}
-	}
-	for (int i = 0; i < 3; i++) {
-		ColliderCastResult res;
-		TraceCapsule(server.sv_game.level,position, collider, &res, col_closest);
-		if (res.found) {
-			if (col_response)
-				position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
-			//phys_debug.AddSphere(res.intersect_point, 0.1, 8, 6, COLOR_BLUE);
-		}
-	}
-
-	collider.base += position;
-	collider.tip += position;
-	Bounds cap_b = CapsuleToAABB(collider);
-	phys_debug.PushLineBox(cap_b.bmin, cap_b.bmax, COLOR_PINK);
-
-	player->position = position;
-	move_speed_player = move_speed;
-}
-
 void ShootGunAgainstWorld(ColliderCastResult* result, Ray r)
 {
 
@@ -613,7 +295,6 @@ void DoGunLogic(Entity* ent, MoveCommand cmd)
 		gun_ray.pos = ent->position + vec3(0, 0.5, 0);
 	}
 }
-#include "Movement.h"
 
 
 void Server_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
@@ -641,22 +322,23 @@ void PlayerStateToEnt(Entity* ent, PlayerState* state)
 
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
-	if (paused)
-		return;
+	//if (paused)
+	//	return;
+	//phys_debug.Begin();
+	//PlayerPhysics physics;
+	//physics.Run(level,ent, cmd, core.tick_interval);
+	//phys_debug.End();
+
 	phys_debug.Begin();
-	PlayerPhysics physics;
-	physics.Run(level,ent, cmd, core.tick_interval);
+	PlayerMovement move;
+	move.cmd = cmd;
+	move.deltat = core.tick_interval;
+	move.phys_debug = &phys_debug;
+	move.trace_callback = Server_TraceCallback;
+	EntToPlayerState(&move.in_state, ent);
+	move.Run();
+	PlayerStateToEnt(ent, move.GetOutputState());
 	phys_debug.End();
-
-	//PlayerMovement move;
-	//move.cmd = cmd;
-	//move.deltat = core.tick_interval;
-	//move.phys_debug = &phys_debug;
-	//move.trace_callback = Server_TraceCallback;
-	//EntToPlayerState(&move.in_state, ent);
-	//move.Run();
-	//PlayerStateToEnt(ent, move.GetOutputState());
-
 	
 
 	DoGunLogic(ent, cmd);
@@ -888,69 +570,18 @@ void Client_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool close
 {
 	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
 }
-void RunClientPhysics(const PredictionState* in, PredictionState* out, const MoveCommand* cmd)
+void RunClientPhysics(const PlayerState* in, PlayerState* out, const MoveCommand* cmd)
 {
-	PlayerPhysics physics;
-	Entity ent;
-	ent.ducking = in->estate.ducking;
-	ent.position = in->estate.position;
-	ent.rotation = in->estate.angles;
-	ent.velocity = in->pstate.velocity;
-	ent.on_ground = in->pstate.on_ground;
-
-	physics.Run(client.cl_game.level, &ent, *cmd, core.tick_interval);
-
-	out->estate.ducking = ent.ducking;
-	out->estate.position = ent.position;
-	out->estate.angles = ent.rotation;
-
-	out->pstate.on_ground = ent.on_ground;
-	out->pstate.velocity = ent.velocity;
-
-	//PlayerMovement move;
-	//move.cmd = *cmd;
-	//move.deltat = core.tick_interval;
-	//move.phys_debug = &phys_debug;
-	//move.in_state = in->pstate;
-	//move.trace_callback = Client_TraceCallback;
-	//move.Run();
-	//
-	//out->pstate = *move.GetOutputState();
-}
-
-void DoClientPrediction()
-{
-	if (client.GetConState() != Spawned)
-		return;
-	// predict commands from outgoing ack'ed to current outgoing
-	// TODO: dont repeat commands unless a new snapshot arrived
-	int start = client.server_mgr.server.out_sequence_ak;	// start at the new cmd
-	int end = client.server_mgr.server.out_sequence;
-	int commands_to_run = end - start;
-	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
-		return;
-	// restore state to last authoritative snapshot 
-	int incoming_seq = client.server_mgr.server.in_sequence;
-	Snapshot* last_auth_state = &client.cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	PredictionState pred_state;
-	pred_state.estate = last_auth_state->entities[client.server_mgr.client_num];
-	pred_state.pstate = last_auth_state->pstate;
-	PredictionState next_state;
-	for (int i = start+1; i < end; i++) {
-		MoveCommand* cmd = client.GetCommand(i);
-		RunClientPhysics(&pred_state, &next_state, cmd);
-		pred_state = next_state;
-	}
+	PlayerMovement move;
+	move.cmd = *cmd;
+	move.deltat = core.tick_interval;
+	move.phys_debug = &phys_debug;
+	move.in_state = *in;
+	move.trace_callback = Client_TraceCallback;
+	move.Run();
 	
-	ClientEntity* ent = client.GetLocalPlayer();
-	ent->state = pred_state.estate;
-	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
-	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
-	//ent->current_hist_index++;
-	//ent->current_hist_index %= ent->transform_hist.size();
+	*out = *move.GetOutputState();
 }
-
-
 bool using_arrows_to_select_map = false;
 int map_selection = 0;
 
@@ -1083,6 +714,14 @@ void Client::CheckLocalServerIsRunning()
 	}
 }
 
+void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
+{
+	entstate->position = state->position;
+	entstate->angles = state->angles;
+	entstate->ducking = state->ducking;
+	entstate->type = Ent_Player;
+}
+
 void Client::RunPrediction()
 {
 	if (GetConState() != Spawned)
@@ -1097,18 +736,26 @@ void Client::RunPrediction()
 	// restore state to last authoritative snapshot 
 	int incoming_seq = server_mgr.InSequence();
 	Snapshot* last_auth_state = &cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	PredictionState pred_state;
-	pred_state.estate = last_auth_state->entities[GetPlayerNum()];
-	pred_state.pstate = last_auth_state->pstate;
-	PredictionState next_state;
+	PlayerState pred_state;
+	
+	// FIXME:
+	EntityState* TEMP = &last_auth_state->entities[GetPlayerNum()];
+	pred_state = last_auth_state->pstate;
+	pred_state.position = TEMP->position;
+	pred_state.angles = TEMP->angles;
+	pred_state.ducking = TEMP->ducking;
+
 	for (int i = start + 1; i < end; i++) {
 		MoveCommand* cmd = GetCommand(i);
+		PlayerState next_state;
 		RunClientPhysics(&pred_state, &next_state, cmd);
 		pred_state = next_state;
 	}
 
 	ClientEntity* ent = GetLocalPlayer();
-	ent->state = pred_state.estate;
+	PlayerStateToClEntState(&ent->state, &pred_state);
+
+	//ent->state = pred_state.estate;
 	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
 	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
 	//ent->current_hist_index++;
@@ -1140,41 +787,6 @@ void Client::PreRenderUpdate(double frametime)
 	view_mgr.Update();
 	DoClientGameUpdate(frametime);
 }
-
-#if 0
-void ClientFixedUpdateInput(double dt)
-{
-	if (!client.initialized)
-		return;
-	// make command and run prediction
-	if (ClientGetState() >= Connected) {
-		CreateMoveCommand();
-	}
-	client.server_mgr.SendMovesAndMessages();
-	//printf("tick %d\n", client.tick);
-	CheckLocalServerRunning();
-	client.server_mgr.TrySendingConnect();
-}
-void ClientFixedUpdateRead(double dt)
-{
-	if (!client.initialized)
-		return;
-	if (ClientGetState() == Spawned)
-		client.tick += 1;
-	client.server_mgr.ReadPackets();
-	DoClientPrediction();
-}
-void ServerFixedUpdate(double dt)
-{
-	if (!server.active)
-		return;
-	server.client_mgr.ReadPackets();
-	DoGameUpdate(dt);
-	server.client_mgr.SendSnapshots();
-
-	server.tick += 1;
-}
-#endif
 
 void Server::FixedUpdate(double dt)
 {
