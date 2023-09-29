@@ -21,41 +21,41 @@ void NetDebugPrintf(const char* fmt, ...)
 
 #define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
 
-void ServerInit()
+void Server::Init()
 {
 	printf("initializing server\n");
-	server.client_mgr.Init();
-	server.sv_game.Init();
+	client_mgr.Init();
+	sv_game.Init();
 }
-void ServerEnd()
+void Server::End()
 {
-	if (!server.active)
+	if (!IsActive())
 		return;
 	DebugOut("ending server\n");
-	server.client_mgr.ShutdownServer();
-	server.sv_game.ClearState();
-	server.active = false;
-	server.tick = 0;
-	server.time = 0.0;
-	server.map_name = {};
+	client_mgr.ShutdownServer();
+	sv_game.ClearState();
+	active = false;
+	tick = 0;
+	time = 0.0;
+	map_name = {};
 }
-void ServerSpawn(const char* mapname)
+void Server::Spawn(const char* mapname)
 {
-	if (server.active) {
-		ServerEnd();
+	if (IsActive()) {
+		End();
 	}
-	server.tick = 0;
-	server.time = 0.0;
+	tick = 0;
+	time = 0.0;
 	DebugOut("spawning with map %s\n", mapname);
-	bool good = server.sv_game.DoNewMap(mapname);
+	bool good = sv_game.DoNewMap(mapname);
 	if (!good)
 		return;
-	server.map_name = mapname;
-	server.active = true;
+	map_name = mapname;
+	active = true;
 }
-bool ServerIsActive()
+bool Server::IsActive() const
 {
-	return server.active;
+	return active;
 }
 
 ClientMgr::ClientMgr() //: sock_emulator(&socket)

@@ -8,46 +8,47 @@ Client client;
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
-void ClientInit()
+void Client::Init()
 {
-	client.server_mgr.Init();
-	client.view_mgr.Init();
-	client.cl_game.Init();
-	client.out_commands.resize(CLIENT_MOVE_HISTORY);
-	client.time = 0.0;
-	client.tick = 0;
+	server_mgr.Init(this);
+	view_mgr.Init();
+	cl_game.Init();
+	out_commands.resize(CLIENT_MOVE_HISTORY);
+	time = 0.0;
+	tick = 0;
 
-	client.initialized = true;
+	initialized = true;
 }
-void ClientDisconnect()
+
+void Client::Disconnect()
 {
 	DebugOut("disconnecting\n");
-	if (ClientGetState() == Disconnected)
+	if (GetConState() == Disconnected)
 		return;
-	client.server_mgr.Disconnect();
-	client.cl_game.ClearState();
-	client.tick = 0;
-	client.time = 0.0;
+	server_mgr.Disconnect();
+	cl_game.ClearState();
+	tick = 0;
+	time = 0.0;
 }
-void ClientReconnect()
+void Client::Reconnect()
 {
 	DebugOut("reconnecting\n");
-	IPAndPort addr = client.server_mgr.server.remote_addr;
-	::ClientDisconnect();
-	::ClientConnect(addr);
+	IPAndPort addr = server_mgr.server.remote_addr;
+	Disconnect();
+	Connect(addr);
 }
-void ClientConnect(IPAndPort addr)
+void Client::Connect(IPAndPort addr)
 {
 	DebugOut("connecting to %s", addr.ToString().c_str());
-	client.server_mgr.Connect(addr);
+	server_mgr.Connect(addr);
 }
-ClientConnectionState ClientGetState()
+ClientConnectionState Client::GetConState() const
 {
-	return client.server_mgr.state;
+	return server_mgr.state;
 }
-int ClientGetPlayerNum()
+int Client::GetPlayerNum() const
 {
-	return client.server_mgr.client_num;
+	return server_mgr.client_num;
 }
 
 MoveCommand* Client::GetCommand(int sequence) {
@@ -71,9 +72,10 @@ ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 }
 
 
-void ClServerMgr::Init()
+void ClServerMgr::Init(Client* parent)
 {
 	sock.Init(0);
+	myclient = parent;
 }
 void ClServerMgr::Connect(const IPAndPort& where)
 {
@@ -129,7 +131,7 @@ void ClServerMgr::Disconnect()
 void ClServerMgr::ReadPackets()
 {
 	new_packet_arrived = false;
-	ASSERT(client.initialized);
+	ASSERT(myclient->initialized);
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
 	IPAndPort from;
@@ -156,12 +158,12 @@ void ClServerMgr::ReadPackets()
 	if (state == Connected || state == Spawned) {
 		if (GetTime() - server.last_recieved > MAX_TIME_OUT) {
 			printf("Server timed out\n");
-			::ClientDisconnect();
+			myclient->Disconnect();
 		}
 	}
 
 	int last_sequence = server.out_sequence_ak;
-	int tick_delta = client.tick - client.GetCommand(last_sequence)->tick;
+	int tick_delta = myclient->tick - myclient->GetCommand(last_sequence)->tick;
 	//printf("RTT: %f\n", (tick_delta)*core.tick_interval);
 
 }
@@ -187,7 +189,7 @@ void ClServerMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
 		reason[len] = '\0';
 		if (!buf.HasFailed())
 			printf("Connection rejected: %s\n", reason);
-		::ClientDisconnect();
+		myclient->Disconnect();
 	}
 	else {
 		DebugOut("Unknown connectionless packet type\n");
@@ -221,7 +223,7 @@ void ClServerMgr::ParseServerInit(ByteReader& buf)
 
 	// Load map and game data here
 	DebugOut("loading map...\n");
-	client.cl_game.NewMap(mapname.c_str());
+	myclient->cl_game.NewMap(mapname.c_str());
 
 	// Tell server to spawn us in
 	uint8_t buffer[64];
@@ -239,7 +241,7 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 	{
 		uint8_t command = buf.ReadByte();
 		if (buf.HasFailed()) {
-			::ClientDisconnect();
+			myclient->Disconnect();
 			return;
 		}
 		switch (command)
@@ -260,7 +262,7 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 			break;
 		case SvMessageDisconnect:
 			DebugOut("disconnected by server\n");
-			::ClientDisconnect();
+			myclient->Disconnect();
 			break;
 		case SvMessageText:
 			break;
@@ -268,14 +270,14 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		{
 			// just force it for now
 			int server_tick = buf.ReadLong();
-			if (abs(server_tick - client.tick) > 1) {
-				DebugOut("delta tick %d\n", server_tick - client.tick);
-				client.tick = server_tick;
+			if (abs(server_tick - myclient->tick) > 1) {
+				DebugOut("delta tick %d\n", server_tick - myclient->tick);
+				myclient->tick = server_tick;
 			}
 		}break;
 		default:
 			DebugOut("Unknown message, disconnecting\n");
-			::ClientDisconnect();
+			myclient->Disconnect();
 			return;
 			break;
 		}
@@ -290,7 +292,7 @@ void ClServerMgr::SendMovesAndMessages()
 	//DebugOut("Wrote move to server\n");
 
 	// Send move
-	MoveCommand lastmove = *client.GetCommand(server.out_sequence);
+	MoveCommand lastmove = *myclient->GetCommand(server.out_sequence);
 
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
@@ -308,7 +310,9 @@ void ClServerMgr::SendMovesAndMessages()
 void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 {
 	// TEMPORARY!!
-	Snapshot* snapshot = &client.cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
+	ClientGame* game = &myclient->cl_game;
+
+	Snapshot* snapshot = &game->snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
 	for (int i = 0; i < 8; i++) {
 		int index = msg.ReadWord();
 		ASSERT(index < 16);
@@ -320,15 +324,15 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 		state->ducking = msg.ReadByte();
 	}
 	for (int i = 0; i < 8; i++) {
-		client.cl_game.entities[i].prev_state = client.cl_game.entities[i].state;
-		client.cl_game.entities[i].state = snapshot->entities[i];
+		game->entities[i].prev_state = game->entities[i].state;
+		game->entities[i].state = snapshot->entities[i];
 	}
 	new_packet_arrived = true;
 }
 
 void ClServerMgr::ParsePlayerData(ByteReader& buf)
 {
-	Snapshot* snapshot = &client.cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
+	Snapshot* snapshot = &myclient->cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
 	PlayerState* pstate = &snapshot->pstate;
 	pstate->velocity.x=buf.ReadFloat();
 	pstate->velocity.y=buf.ReadFloat();

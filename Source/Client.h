@@ -53,15 +53,6 @@ enum ClientConnectionState {
 	Spawned,		// in server as normal
 };
 
-void ClientInit();
-void ClientConnect(IPAndPort where);
-void ClientDisconnect();
-void ClientReconnect();
-ClientConnectionState ClientGetState();
-int ClientGetPlayerNum();
-ClientEntity* ClientGetLocalPlayer();
-bool ClientIsInGame();
-
 class FlyCamera
 {
 public:
@@ -122,17 +113,28 @@ public:
 	const Level* level = nullptr;
 };
 
+class Client;
 class ClServerMgr
 {
 public:
 	ClServerMgr();
-	void Init();
+	void Init(Client* parent);
 	void Connect(const IPAndPort& port);
 	void Disconnect();
 	void TrySendingConnect();
 
 	void ReadPackets();
 	void SendMovesAndMessages();
+
+	int OutSequenceAk() const {
+		return server.out_sequence_ak;
+	}
+	int OutSequence() const {
+		return server.out_sequence;
+	}
+	int InSequence() const {
+		return server.in_sequence;
+	}
 private:
 	void HandleUnknownPacket(IPAndPort from, ByteReader& msg);
 	void HandleServerPacket(ByteReader& msg);
@@ -150,6 +152,7 @@ public:
 	ClientConnectionState state;
 	EmulatedSocket sock;
 	Connection server;
+	Client* myclient = nullptr;
 };
 
 class UIMgr
@@ -160,6 +163,25 @@ class UIMgr
 
 class Client
 {
+public:
+	void Init();
+	void Connect(IPAndPort where);
+	void Disconnect();
+	void Reconnect();
+
+	ClientConnectionState GetConState() const;
+	int GetPlayerNum() const;
+	ClientEntity* GetLocalPlayer();
+	bool IsInGame() const;
+
+	void FixedUpdateInput(double dt);
+	void FixedUpdateRead(double dt);
+	void PreRenderUpdate(double dt);
+
+	void RunPrediction();
+
+	void CreateMoveCmd();
+
 public:
 	bool initialized = false;
 	ViewMgr view_mgr;
@@ -176,6 +198,9 @@ public:
 	MoveCommand* GetCommand(int sequence);
 	int GetCurrentSequence() const;
 	int GetLastSequenceAcked() const;
+
+private:
+	void CheckLocalServerIsRunning();
 };
 extern Client client;
 

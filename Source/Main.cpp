@@ -119,7 +119,7 @@ void ViewMgr::Init()
 
 vec3 GetLocalPlayerInterpedOrigin()
 {
-	ClientEntity* ent = ClientGetLocalPlayer();
+	ClientEntity* ent = client.GetLocalPlayer();
 	return ent->state.position;
 	float alpha =  core.frame_remainder / core.tick_interval;
 	return ent->prev_state.position * (1-alpha) + ent->state.position * ( alpha);
@@ -127,7 +127,7 @@ vec3 GetLocalPlayerInterpedOrigin()
 
 void ViewMgr::Update()
 {
-	if (!ClientIsInGame())
+	if (!client.IsInGame())
 		return;
 	setup.height = core.vid_height;
 	setup.width = core.vid_width;
@@ -139,7 +139,7 @@ void ViewMgr::Update()
 		fly_cam.UpdateFromInput(input.keyboard, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
 	}
 	if (third_person) {
-		ClientEntity* player = ClientGetLocalPlayer();
+		ClientEntity* player = client.GetLocalPlayer();
 		vec3 front = AnglesToVector(client.view_angles.x, client.view_angles.y);
 		fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
@@ -147,7 +147,7 @@ void ViewMgr::Update()
 	}
 	else
 	{
-		ClientEntity* player = ClientGetLocalPlayer();
+		ClientEntity* player = client.GetLocalPlayer();
 		EntityState* pstate = &player->state;
 		float view_height = (pstate->ducking) ? 0.65 : 1.2;
 		vec3 cam_position = pstate->position + vec3(0, view_height, 0);
@@ -454,8 +454,8 @@ void PlayerPhysics::CheckGroundState()
 	}
 }
 
-float max_ground_speed = 10;
-float max_air_speed = 2;
+static float max_ground_speed = 10;
+static float max_air_speed = 2;
 
 void PlayerPhysics::GroundMove()
 {
@@ -613,6 +613,31 @@ void DoGunLogic(Entity* ent, MoveCommand cmd)
 		gun_ray.pos = ent->position + vec3(0, 0.5, 0);
 	}
 }
+#include "Movement.h"
+
+
+void Server_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
+{
+	TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
+}
+
+void EntToPlayerState(PlayerState* state, Entity* ent)
+{
+	state->position = ent->position;
+	state->angles = ent->view_angles;
+	state->ducking = ent->ducking;
+	state->on_ground = ent->on_ground;
+	state->velocity = ent->velocity;
+}
+void PlayerStateToEnt(Entity* ent, PlayerState* state)
+{
+	ent->position = state->position;
+	//
+	ent->ducking = state->ducking;
+	ent->on_ground = state->on_ground;
+	ent->velocity = state->velocity;
+}
+
 
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
@@ -622,11 +647,23 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	PlayerPhysics physics;
 	physics.Run(level,ent, cmd, core.tick_interval);
 	phys_debug.End();
+
+	//PlayerMovement move;
+	//move.cmd = cmd;
+	//move.deltat = core.tick_interval;
+	//move.phys_debug = &phys_debug;
+	//move.trace_callback = Server_TraceCallback;
+	//EntToPlayerState(&move.in_state, ent);
+	//move.Run();
+	//PlayerStateToEnt(ent, move.GetOutputState());
+
+	
+
 	DoGunLogic(ent, cmd);
 	
 }
 
-void CreateMoveCommand()
+void Client::CreateMoveCmd()
 {
 	if (mouse_grabbed) {
 		float x_off = core.input.mouse_delta_x;
@@ -635,16 +672,15 @@ void CreateMoveCommand()
 		x_off *= sensitivity;
 		y_off *= sensitivity;
 
-		glm::vec3 view_angles = client.view_angles;
+		glm::vec3 view_angles = this->view_angles;
 		view_angles.x -= y_off;	// pitch
 		view_angles.y += x_off;	// yaw
 		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
 		view_angles.y = fmod(view_angles.y, TWOPI);
-
-		client.view_angles = view_angles;
+		this->view_angles = view_angles;
 	}
 	MoveCommand new_cmd{};
-	new_cmd.view_angles = client.view_angles;
+	new_cmd.view_angles = view_angles;
 	bool* keys = core.input.keyboard;
 	if (keys[SDL_SCANCODE_W])
 		new_cmd.forward_move += 1.f;
@@ -667,11 +703,10 @@ void CreateMoveCommand()
 	if (keys[SDL_SCANCODE_X])
 		new_cmd.up_move -= 1.f;
 
-	new_cmd.tick = client.tick;
+	new_cmd.tick = tick;
 
-	*client.GetCommand(client.GetCurrentSequence()) = new_cmd;
+	*GetCommand(GetCurrentSequence()) = new_cmd;
 }
-
 
 void DrawTempLevel(mat4 viewproj)
 {
@@ -709,14 +744,14 @@ static void DrawPlayer(mat4 viewproj)
 {
 	MeshBuilder mb;
 	mb.Begin();
-	EntityState interp = ClientGetLocalPlayer()->state;
+	EntityState interp = client.GetLocalPlayer()->state;
 	//interp.position = GetLocalPlayerInterpedOrigin();
 	
 	DrawState(&interp, COLOR_GREEN, mb);
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
-		if (ent.state.type != Ent_Free && i != ClientGetPlayerNum()) {
+		if (ent.state.type != Ent_Free && i != client.GetPlayerNum()) {
 			DrawState(&ent.state, COLOR_BLUE, mb);
 		}
 	}
@@ -832,7 +867,7 @@ void DrawScreen(double dt)
 	glClearColor(1.f, 1.f, 0.f, 1.f);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-	if (ClientIsInGame())
+	if (client.IsInGame())
 		Render(dt);
 
 	SDL_GL_SwapWindow(core.window);
@@ -849,6 +884,10 @@ void DoGameUpdate(double dt)
 	
 }
 
+void Client_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
+{
+	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
+}
 void RunClientPhysics(const PredictionState* in, PredictionState* out, const MoveCommand* cmd)
 {
 	PlayerPhysics physics;
@@ -867,11 +906,21 @@ void RunClientPhysics(const PredictionState* in, PredictionState* out, const Mov
 
 	out->pstate.on_ground = ent.on_ground;
 	out->pstate.velocity = ent.velocity;
+
+	//PlayerMovement move;
+	//move.cmd = *cmd;
+	//move.deltat = core.tick_interval;
+	//move.phys_debug = &phys_debug;
+	//move.in_state = in->pstate;
+	//move.trace_callback = Client_TraceCallback;
+	//move.Run();
+	//
+	//out->pstate = *move.GetOutputState();
 }
 
 void DoClientPrediction()
 {
-	if (ClientGetState() != Spawned)
+	if (client.GetConState() != Spawned)
 		return;
 	// predict commands from outgoing ack'ed to current outgoing
 	// TODO: dont repeat commands unless a new snapshot arrived
@@ -893,7 +942,7 @@ void DoClientPrediction()
 		pred_state = next_state;
 	}
 	
-	ClientEntity* ent = ClientGetLocalPlayer();
+	ClientEntity* ent = client.GetLocalPlayer();
 	ent->state = pred_state.estate;
 	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
 	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
@@ -901,16 +950,6 @@ void DoClientPrediction()
 	//ent->current_hist_index %= ent->transform_hist.size();
 }
 
-void CheckLocalServerRunning()
-{
-	if (ClientGetState() == Disconnected && ServerIsActive()) {
-		// connect to the local server
-		IPAndPort serv_addr;
-		serv_addr.SetIp(127, 0, 0, 1);
-		serv_addr.port = SERVER_PORT;
-		client.server_mgr.Connect(serv_addr);
-	}
-}
 
 bool using_arrows_to_select_map = false;
 int map_selection = 0;
@@ -983,13 +1022,13 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_Q)
 				server.sv_game.paused = !server.sv_game.paused;
 			if(scancode == SDL_SCANCODE_1)
-				ClientDisconnect();
+				client.Disconnect();
 			if (scancode == SDL_SCANCODE_2)
-				ClientReconnect();
+				client.Reconnect();
 			if (scancode == SDL_SCANCODE_3)
-				ServerEnd();
+				server.End();
 			if (scancode == SDL_SCANCODE_4)
-				ServerSpawn(map_file_names[map_selection]);
+				server.Spawn(map_file_names[map_selection]);
 			if (scancode == SDL_SCANCODE_5)
 				core.tick_interval = 1.0 / 15;
 			if (scancode == SDL_SCANCODE_6)
@@ -998,7 +1037,7 @@ void HandleInput()
 				IPAndPort ip;
 				ip.SetIp(127, 0, 0, 1);
 				ip.port = SERVER_PORT;
-				ClientConnect(ip);
+				client.Connect(ip);
 			}
 
 		}
@@ -1033,6 +1072,76 @@ void HandleInput()
 	}
 }
 
+void Client::CheckLocalServerIsRunning()
+{
+	if (GetConState() == Disconnected && server.IsActive()) {
+		// connect to the local server
+		IPAndPort serv_addr;
+		serv_addr.SetIp(127, 0, 0, 1);
+		serv_addr.port = SERVER_PORT;
+		server_mgr.Connect(serv_addr);
+	}
+}
+
+void Client::RunPrediction()
+{
+	if (GetConState() != Spawned)
+		return;
+	// predict commands from outgoing ack'ed to current outgoing
+	// TODO: dont repeat commands unless a new snapshot arrived
+	int start = server_mgr.OutSequenceAk();	// start at the new cmd
+	int end = server_mgr.OutSequence();
+	int commands_to_run = end - start;
+	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
+		return;
+	// restore state to last authoritative snapshot 
+	int incoming_seq = server_mgr.InSequence();
+	Snapshot* last_auth_state = &cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	PredictionState pred_state;
+	pred_state.estate = last_auth_state->entities[GetPlayerNum()];
+	pred_state.pstate = last_auth_state->pstate;
+	PredictionState next_state;
+	for (int i = start + 1; i < end; i++) {
+		MoveCommand* cmd = GetCommand(i);
+		RunClientPhysics(&pred_state, &next_state, cmd);
+		pred_state = next_state;
+	}
+
+	ClientEntity* ent = GetLocalPlayer();
+	ent->state = pred_state.estate;
+	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
+	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
+	//ent->current_hist_index++;
+	//ent->current_hist_index %= ent->transform_hist.size();
+}
+
+void Client::FixedUpdateInput(double dt)
+{
+	if (!initialized)
+		return;
+	if (GetConState() >= Connected) {
+		CreateMoveCmd();
+	}
+	server_mgr.SendMovesAndMessages();
+	CheckLocalServerIsRunning();
+	server_mgr.TrySendingConnect();
+}
+void Client::FixedUpdateRead(double dt)
+{
+	if (!initialized)
+		return;
+	if (GetConState() == Spawned)
+		client.tick += 1;
+	server_mgr.ReadPackets();
+	RunPrediction();
+}
+void Client::PreRenderUpdate(double frametime)
+{
+	view_mgr.Update();
+	DoClientGameUpdate(frametime);
+}
+
+#if 0
 void ClientFixedUpdateInput(double dt)
 {
 	if (!client.initialized)
@@ -1065,7 +1174,17 @@ void ServerFixedUpdate(double dt)
 
 	server.tick += 1;
 }
+#endif
 
+void Server::FixedUpdate(double dt)
+{
+	if (!IsActive())
+		return;
+	client_mgr.ReadPackets();
+	DoGameUpdate(dt);
+	client_mgr.SendSnapshots();
+	tick += 1;
+}
 
 void MainLoop(double frametime)
 {
@@ -1076,13 +1195,12 @@ void MainLoop(double frametime)
 	for (int i = 0; i < num_ticks; i++)
 	{
 		HandleInput();
-		ClientFixedUpdateInput(secs_per_tick);
-		ServerFixedUpdate(secs_per_tick);
-		ClientFixedUpdateRead(secs_per_tick);
+		client.FixedUpdateInput(secs_per_tick);
+		server.FixedUpdate(secs_per_tick);
+		client.FixedUpdateRead(secs_per_tick);
 	}
 	
-	client.view_mgr.Update();
-	DoClientGameUpdate(frametime);
+	client.PreRenderUpdate(frametime);
 	DrawScreen(frametime);
 }
 
@@ -1097,16 +1215,16 @@ int main(int argc, char** argv)
 	NetworkInit();
 	RenderInit();
 	if (!run_client_only) {
-		ServerInit();
-		ServerSpawn(map_file);
+		server.Init();
+		server.Spawn(map_file);
 	}
-	ClientInit();
+	client.Init();
 	if (run_client_only) {
 		printf("Running client only\n");
 		IPAndPort ip;
 		ip.SetIp(127, 0, 0, 1);
 		ip.port = SERVER_PORT;
-		ClientConnect(ip);
+		client.Connect(ip);
 	}
 	core.tick_interval = 1.0 / DEFAULT_UPDATE_RATE;	// hardcoded
 	double last = GetTime()-0.1;
@@ -1125,17 +1243,6 @@ int main(int argc, char** argv)
 			printf("frame %f\n", dt);
 			next_print = GetTime() + 1.0;
 		}
-
-		//if (delta_t > 0.1)
-		//	delta_t = 0.1;
-		//TEMP_DT = delta_t;
-		//HandleInput();
-		//ClientUpdate(delta_t);
-		//ServerUpdate(delta_t);
-		//if (client.initialized) {
-		//	client.view_mgr.Update();
-		//	DrawScreen(delta_t);
-		//}
 	}
 	
 	return 0;

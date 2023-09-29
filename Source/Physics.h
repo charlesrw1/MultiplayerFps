@@ -20,17 +20,37 @@ struct ColliderCastResult
 
 struct Capsule
 {
-	float radius = 1.0f;;
-	glm::vec3 base = glm::vec3(0.0,2.0,0.0);
-	glm::vec3 tip=glm::vec3(0.0);
+	float radius;
+	glm::vec3 base;
+	glm::vec3 tip;
 
 	void GetSphereCenters(glm::vec3& a, glm::vec3& b) const;
 };
+struct Sphere
+{
+	float radius;
+	glm::vec3 origin;
+};
+
+struct PhysContainer {
+	enum Type {
+		CapsuleType,
+		SphereType
+	} type;
+	union {
+		Capsule cap;
+		Sphere sph;
+	};
+};
+
 
 
 class Level;
 void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
+
+void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided);
+
 void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
 void TraceSphere(const Level* lvl, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
 

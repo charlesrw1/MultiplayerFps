@@ -2,16 +2,18 @@
 #include "Util.h"
 #include "CoreTypes.h"
 
-bool ClientIsInGame()
+bool Client::IsInGame() const
 {
-	return ClientGetState() == Spawned;
+	return GetConState() == Spawned;
 }
-ClientEntity* ClientGetLocalPlayer()
+
+ClientEntity* Client::GetLocalPlayer()
 {
-	ASSERT(ClientIsInGame());
-	int index = ClientGetPlayerNum();
-	return &client.cl_game.entities[index];
+	ASSERT(IsInGame());
+	int index = GetPlayerNum();
+	return &cl_game.entities[index];
 }
+
 void ClientGame::Init()
 {
 	entities.resize(MAX_GAME_ENTS);

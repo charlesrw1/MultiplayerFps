@@ -22,10 +22,7 @@ struct Entity
 	bool on_ground = false;
 };
 
-void ServerInit();
-void ServerSpawn(const char* mapname);
-void ServerEnd();
-bool ServerIsActive();
+
 Entity* ServerEntForIndex(int index);
 
 class Level;
@@ -93,6 +90,15 @@ private:
 class Server
 {
 public:
+	void Init();
+	void Spawn(const char* mapname);
+	void End();
+	bool IsActive() const;
+	
+	Entity* EntForIndex(int index);
+
+	void FixedUpdate(double dt);
+
 	bool active = false;
 	std::string map_name;
 	ClientMgr client_mgr;

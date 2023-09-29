@@ -409,6 +409,22 @@ void TraceSphere(const Level* level, glm::vec3 org, float radius, ColliderCastRe
 	IntersectWorld(sphere_intersect_functor, level->static_geo_bvh, sphere);
 }
 
+void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
+{
+	switch (obj.type)
+	{
+	case PhysContainer::CapsuleType:
+		TraceCapsule(lvl, glm::vec3(0.f), obj.cap, out, closest);
+		break;
+	case PhysContainer::SphereType:
+		TraceSphere(lvl, obj.sph.origin, obj.sph.radius, out, closest, double_sided);
+		break;
+	default:
+		ASSERT(0);
+	}
+}
+
+
 void Capsule::GetSphereCenters(vec3& a, vec3& b) const
 {
 	vec3 cap_normal = normalize(tip - base);
