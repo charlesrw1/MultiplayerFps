@@ -28,7 +28,7 @@ Core core;
 
 static double program_time_start;
 static bool update_camera = false;
-const char* map_file = "creek.glb";
+const char* map_file = "test_level2.glb";
 static bool mouse_grabbed = false;
 
 const char* map_file_names[] = { "creek.glb","maze.glb","nuke.glb" };
@@ -511,12 +511,16 @@ void PlayerPhysics::Run(const Level* lvl, Entity* p, MoveCommand cmd, float dt)
 	if (inp_len > 1)
 		inp_len = 1;
 
+	phys_debug.PushLine(p->position, p->position + glm::vec3(inputvec.x, 0.2f,inputvec.y), COLOR_WHITE);
+
 	// Store off last values for interpolation
 	//p->lastorigin = p->origin;
 	//p->lastangles = p->angles;
 
 	//player->viewangles = inp.desired_view_angles;
 	look_front = AnglesToVector(inp.view_angles.x, inp.view_angles.y);
+	look_front.y = 0;
+	look_front = normalize(look_front);
 	look_side = -cross(look_front, vec3(0, 1, 0));
 
 
@@ -706,7 +710,7 @@ static void DrawPlayer(mat4 viewproj)
 	MeshBuilder mb;
 	mb.Begin();
 	EntityState interp = ClientGetLocalPlayer()->state;
-	interp.position = GetLocalPlayerInterpedOrigin();
+	//interp.position = GetLocalPlayerInterpedOrigin();
 	
 	DrawState(&interp, COLOR_GREEN, mb);
 
@@ -772,8 +776,10 @@ void Render(double dt)
 	mb.PushLineBox(vec3(-1), vec3(1), COLOR_PINK);
 	mb.End();
 	mb.Draw(GL_LINES);
+	mb.Free();
 	DrawPlayer(viewproj);
 
+#if 0
 	textured.use();
 	textured.set_mat4("ViewProj", viewproj);
 	textured.set_mat4("Model", mat4(1));
@@ -787,7 +793,6 @@ void Render(double dt)
 	mb.Draw(GL_TRIANGLES);
 	mb.Free();
 	
-#if 0
 	// Update animation
 	animator.AdvanceFrame(dt);
 	animator.SetupBones();

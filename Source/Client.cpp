@@ -65,7 +65,7 @@ int Client::GetLastSequenceAcked() const
 
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-	sock.enabled = true;
+	sock.enabled = false;
 	sock.lag = 150;
 	sock.jitter = 5;
 }
