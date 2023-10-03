@@ -262,17 +262,31 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 	ClientGame* game = &myclient->cl_game;
 
 	Snapshot* snapshot = &game->snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 17; i++) {
 		int index = msg.ReadWord();
-		ASSERT(index < 16);
+		ASSERT(index < 17);
 		EntityState* state = &snapshot->entities[index];
 		state->type = msg.ReadByte();
 		state->position.x = msg.ReadFloat();
 		state->position.y = msg.ReadFloat();
 		state->position.z = msg.ReadFloat();
+
+		state->leganim = msg.ReadWord();
+		int quantized_leganim_frame = msg.ReadWord();
+		state->leganim_frame = (float)quantized_leganim_frame / 100.f;
+
+		// unquantize rotation
+		char rot[3];
+		rot[0] = msg.ReadByte();
+		rot[1] = msg.ReadByte();
+		rot[2] = msg.ReadByte();
+		state->angles.x = (float)rot[0] * (2 * PI) / 256.0;
+		state->angles.y = (float)rot[1] * (2 * PI) / 256.0;
+		state->angles.z = (float)rot[2] * (2 * PI) / 256.0;
+
 		state->ducking = msg.ReadByte();
 	}
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 17; i++) {
 		game->entities[i].prev_state = game->entities[i].state;
 		game->entities[i].state = snapshot->entities[i];
 	}

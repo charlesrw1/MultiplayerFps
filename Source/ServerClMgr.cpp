@@ -280,7 +280,7 @@ void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
 	writer.WriteByte(SvMessageSnapshot);
 	// for now, just dump the entities
 	// entity states
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 17; i++) {
 		Entity& ent = game.ents[i];
 		int index = i;
 
@@ -292,6 +292,21 @@ void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
 		writer.WriteFloat(ent.position.x);
 		writer.WriteFloat(ent.position.y);
 		writer.WriteFloat(ent.position.z);
+
+		writer.WriteWord(ent.anim.leganim);
+		int quantized_frame = ent.anim.leganim_frame * 100;
+		writer.WriteWord(quantized_frame);
+
+		// quantize rot to bytes
+		char rot[3];
+		rot[0] = ent.rotation.x / (2 * PI) * 256;
+		rot[1] = ent.rotation.y / (2 * PI) * 256;
+		rot[2] = ent.rotation.z / (2 * PI) * 256;
+		writer.WriteByte(rot[0]);
+		writer.WriteByte(rot[1]);
+		writer.WriteByte(rot[2]);
+
+
 		writer.WriteByte(ent.ducking);
 	}
 	// local player specific state

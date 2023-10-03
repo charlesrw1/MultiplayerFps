@@ -70,10 +70,10 @@ void PlayerUpdateAnimations(double dt, Entity* ent)
 
 	int leg_anim = 0;
 	if (groundspeed > grnd_speed_threshold) {
-		leg_anim = playeranims->FindClipFromName("run");
+		leg_anim = playeranims->FindClipFromName("act_run");
 	}
 	else {
-		leg_anim = playeranims->FindClipFromName("idle");
+		leg_anim = playeranims->FindClipFromName("act_idle");
 	}
 
 	if (leg_anim != ent->anim.leganim) {
@@ -93,6 +93,12 @@ void DoGameUpdate(double dt)
 	for (int i = 0; i < game->ents.size(); i++) {
 		if (game->ents[i].type == Ent_Player) {
 			PlayerUpdate(dt,&game->ents[i]);
+		}
+
+
+
+		if (game->ents[i].type != Ent_Free) {
+			game->ents[i].anim.AdvanceFrame(dt);
 		}
 	}
 

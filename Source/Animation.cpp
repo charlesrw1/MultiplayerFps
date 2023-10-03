@@ -104,31 +104,35 @@ void Animator::AdvanceFrame(float elapsed)
 {
 	if (!model || !model->animations)
 		return;
-	for (int i = 0; i < NUM_ANIMATION_LAYERS; i++) {
-		AnimationLayer& layer = layers[i];
-		if (!layer.active || layer.set_index == -1)
-			continue;
-		ASSERT(layer.set_index < model->animations->clips.size());
-		const Animation& clip = model->animations->clips[layer.set_index];	// will always have 0 clip
 
-		layer.cur_frame += clip.fps * elapsed * layer.playing_speed;
-		if (layer.cur_frame > clip.total_duration || layer.cur_frame < 0)
-		{
-			//if (layer.looping)
-				layer.cur_frame = fmod(fmod(layer.cur_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			//else
-			//	layer.cur_frame = clip.total_duration;
-		}
-		if (0)
-		{
-
-			static int timer = 0;
-			if (i == 0 && timer == 0) {
-				timer = 200;
-				printf("Anim frame: %f\n", layer.cur_frame);
+	{
+		if (mainanim != -1) {
+			ASSERT(mainanim < model->animations->clips.size());
+			const Animation& clip = model->animations->clips[mainanim];
+			mainanim_frame += clip.fps * elapsed * 1.f;
+			if (mainanim_frame > clip.total_duration || mainanim_frame < 0.f) {
+				mainanim_frame = fmod(fmod(mainanim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 			}
-			if (i == 0)
+		}
+	}
+	{
+		if (leganim != -1) {
+			ASSERT(leganim < model->animations->clips.size());
+			const Animation& clip = model->animations->clips[leganim];
+			leganim_frame += clip.fps * elapsed * leganim_speed;
+			if (leganim_frame > clip.total_duration || leganim_frame < 0.f) {
+				leganim_frame = fmod(fmod(leganim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+			}
+			if (1)
+			{
+
+				static int timer = 0;
+				if (timer == 0) {
+					timer = 200;
+					printf("Anim frame: %f\n", leganim_frame);
+				}
 				timer--;
+			}
 		}
 	}
 }
@@ -320,11 +324,11 @@ void Animator::SetupBones()
 	glm::vec3 pos[MAX_BONES];
 	glm::vec3 scl[MAX_BONES];
 
-	if (layers[0].set_index < 0 || layers[0].set_index >= model->animations->clips.size())
-		layers[0].set_index = INVALID_ANIMATION;
+	if (mainanim < 0 || mainanim >= model->animations->clips.size())
+		mainanim = INVALID_ANIMATION;
 
 	// Just t-pose if no proper animations
-	if (layers[0].set_index == INVALID_ANIMATION)
+	if (mainanim == INVALID_ANIMATION)
 	{
 		for (int i = 0; i < cached_bonemats.size(); i++)
 			cached_bonemats[i] = model->bones[i].posematrix;
@@ -332,7 +336,7 @@ void Animator::SetupBones()
 	}
 
 	// Setup base layer
-	CalcRotations(q, pos, layers[0].set_index, layers[0].cur_frame);
+	CalcRotations(q, pos, mainanim, mainanim_frame);
 
 	//if (actor_owner && actor_owner->IsPlayer())
 	//{
@@ -444,23 +448,6 @@ void Animator::ConcatWithInvPose()
 	}
 }
 
-void Animator::ResetAnimLayer(int idx)
-{
-	ASSERT(idx < NUM_ANIMATION_LAYERS);
-	AnimationLayer& layer = layers[idx];
-	layer.cur_frame = 0;
-	layer.finished = false;
-	layer.playing_speed = 1.f;
-}
-void Animator::SetAnim(int animlayer, int anim)
-{
-	ASSERT(animlayer < NUM_ANIMATION_LAYERS);
-	ASSERT(anim < set->clips.size());
-	ResetAnimLayer(animlayer);
-	AnimationLayer& layer = layers[animlayer];
-	layer.set_index = anim;
-	layer.active = true;
-}
 
 void Animator::Init(const Model* mod)
 {

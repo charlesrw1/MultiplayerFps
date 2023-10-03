@@ -34,7 +34,7 @@ struct ClientEntity
 struct Snapshot
 {
 	int tick = 0;				// what client tick did we receive on
-	EntityState entities[16];	// keep it small for now
+	EntityState entities[24];	// keep it small for now
 	PlayerState pstate;			// local player state, for prediction stuff
 };
 

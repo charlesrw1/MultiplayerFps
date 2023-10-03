@@ -76,7 +76,7 @@ struct EntityState
 	int type = Ent_Free;
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
-	
+
 	int mainanim = 0;
 	float mainanim_frame = 0.f;	// quantized
 	int leganim = 0;

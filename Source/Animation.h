@@ -99,15 +99,13 @@ public:
 	void SetupBones();
 	void ConcatWithInvPose();
 
+	const std::vector<glm::mat4x4> GetBones() const { return cached_bonemats; }
 	void AdvanceFrame(float elapsed_time);
-	//void ResetAllLayers();
-	void ResetAnimLayer(int layer);
-	void SetAnim(int layer, int index);
-	AnimationLayer& GetLayer(int index) {
-		assert(index < NUM_ANIMATION_LAYERS);
-		return layers[index];
+	void ResetLayers() {
+		mainanim = leganim = -1;
+		mainanim_frame = leganim_frame = 0.f;
+		leganim_speed = 1.f;
 	}
-
 	void SetMainAnim(int anim) {
 		mainanim = anim;
 		mainanim_frame = 0.f;
@@ -118,20 +116,19 @@ public:
 		leganim_speed = speed;
 	}
 
-	int mainanim;
+	int mainanim=-1;
 	float mainanim_frame;
 
 	// for players
-	int leganim;
+	int leganim=-1;
 	float leganim_frame;
 	float leganim_speed;
 
-	AnimationLayer layers[NUM_ANIMATION_LAYERS];
+	//AnimationLayer layers[NUM_ANIMATION_LAYERS];
 
 	const Model* model = nullptr;
 	const AnimationSet* set = nullptr;
 
-	const std::vector<glm::mat4x4> GetBones() const { return cached_bonemats; }
 
 private:
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);

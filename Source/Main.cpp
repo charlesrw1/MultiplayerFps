@@ -11,6 +11,7 @@
 #include "GlmInclude.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "Model.h"
 #include "MeshBuilder.h"
@@ -26,6 +27,19 @@
 
 MeshBuilder phys_debug;
 Core core;
+
+struct Media
+{
+	Model* playermod;
+	Model* gun;
+	Texture* testtex;
+
+	Shader simple;
+	Shader textured;
+	Shader animated;
+};
+
+static Media media;
 
 static double program_time_start;
 static bool update_camera = false;
@@ -177,7 +191,7 @@ static void SDLError(const char* msg)
 	exit(-1);
 }
 
-void CreateWindow()
+void CreateWindow(int x, int y)
 {
 	if (core.window)
 		return;
@@ -194,7 +208,7 @@ void CreateWindow()
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-	core.window = SDL_CreateWindow("CsRemake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
+	core.window = SDL_CreateWindow("CsRemake", x, y, 
 		core.vid_width, core.vid_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (core.window == nullptr) {
 		SDLError("SDL failed to create window");
@@ -261,10 +275,7 @@ Shader simple;
 Shader textured;
 Shader animated;
 Shader static_wrld;
-Texture* mytexture;
-Model* m = nullptr;
-Animator animator;
-Model* gun;
+
 
 const Capsule DEFAULT_COLLIDER = {
 	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
@@ -323,6 +334,7 @@ void EntToPlayerState(PlayerState* state, Entity* ent)
 void PlayerStateToEnt(Entity* ent, PlayerState* state)
 {
 	ent->position = state->position;
+	ent->rotation = state->angles;
 	//
 	ent->ducking = state->ducking;
 	ent->on_ground = state->on_ground;
@@ -386,19 +398,68 @@ static void DrawState(EntityState* player, Color32 color, MeshBuilder& mb)
 	mb.AddSphere(origin + b, radius, 10, 7, color);
 }
 
-static void DrawPlayer(mat4 viewproj)
+static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* mb, mat4 viewproj)
+{
+	glCheckError();
+
+	EntityState* cur = &cent->state;
+	Animator ca;
+	ca.Init(media.playermod);
+	ca.ResetLayers();
+	ca.mainanim = cur->leganim;
+	ca.mainanim_frame = cur->leganim_frame;
+
+	DrawState(cur, c, *mb);
+
+	glCheckError();
+
+	animated.use();
+	animated.set_mat4("ViewProj", viewproj);
+
+	mat4 model = glm::translate(mat4(1), cur->position);
+	model = model*glm::eulerAngleXYZ(cur->angles.x, cur->angles.y, cur->angles.z);
+	model = glm::scale(model, vec3(0.018f));
+
+	animated.set_mat4("Model", model);
+	animated.set_mat4("InverseModel", mat4(1));
+	
+	glCheckError();
+
+	ca.SetupBones();
+	ca.ConcatWithInvPose();
+	const std::vector<mat4>& bones = ca.GetBones();
+
+	const uint32_t bone_matrix_loc = glGetUniformLocation(animated.ID, "BoneTransform[0]");
+
+	glCheckError();
+
+	for (int j = 0; j < bones.size(); j++)
+		glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
+	glCheckError();
+
+
+	//glDisable(GL_CULL_FACE);
+	for (int i = 0; i < media.playermod->parts.size(); i++)
+	{
+		MeshPart* part = &media.playermod->parts[i];
+		glBindVertexArray(part->vao);
+		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
+	}
+	glCheckError();
+}
+
+
+static void DrawWorldEnts(mat4 viewproj)
 {
 	MeshBuilder mb;
 	mb.Begin();
-	EntityState interp = client.GetLocalPlayer()->state;
-	//interp.position = GetLocalPlayerInterpedOrigin();
-	
-	DrawState(&interp, COLOR_GREEN, mb);
+
+	glCheckError();
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
-		if (ent.state.type != Ent_Free && i != client.GetPlayerNum()) {
-			DrawState(&ent.state, COLOR_BLUE, mb);
+		if (ent.state.type != Ent_Free && (i != client.GetPlayerNum()|| client.view_mgr.third_person)) {
+			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
 		}
 	}
 
@@ -413,11 +474,23 @@ static void DrawPlayer(mat4 viewproj)
 		mb.AddSphere(origin2 + b, radius, 10, 7, COLOR_CYAN);
 	}
 	mb.End();
+	
+	simple.use();
+	simple.set_mat4("ViewProj", viewproj);
+	simple.set_mat4("Model", mat4(1.f));
+	
 	mb.Draw(GL_LINES);
 	mb.Free();
 
-	phys_debug.Draw(GL_LINES);
+	if(IsServerActive())
+		phys_debug.Draw(GL_LINES);
 }
+
+static void DrawLocalPlayer(mat4 viewproj)
+{
+
+}
+
 
 void InitGlState()
 {
@@ -429,19 +502,6 @@ void InitGlState()
 	glDepthFunc(GL_LEQUAL);
 }
 
-
-struct Media
-{
-	Model* playermod;
-	Model* gun;
-	Texture* testtex;
-
-	Shader simple;
-	Shader textured;
-	Shader animated;
-};
-
-static Media media;
 
 void RenderInit()
 {
@@ -457,11 +517,15 @@ void RenderInit()
 
 void Render(double dt)
 {
+	glCheckError();
+
 	ViewSetup view = client.view_mgr.GetSceneView();
 	//mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
 	//mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
 	glViewport(view.x, view.y, view.width, view.height);
 	mat4 viewproj = view.viewproj;
+
+	glCheckError();
 
 	MeshBuilder mb;
 	simple.use();
@@ -473,7 +537,12 @@ void Render(double dt)
 	mb.End();
 	mb.Draw(GL_LINES);
 	mb.Free();
-	DrawPlayer(viewproj);
+
+	glCheckError();
+	
+
+	DrawWorldEnts(viewproj);
+	glCheckError();
 
 #if 0
 	textured.use();
@@ -519,19 +588,25 @@ void Render(double dt)
 	glCheckError();
 
 #endif
+	glCheckError();
 	DrawTempLevel(viewproj);
+	glCheckError();
 }
 
 void DrawScreen(double dt)
 {
+	glCheckError();
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClearColor(1.f, 1.f, 0.f, 1.f);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	if (client.IsInGame())
 		Render(dt);
-
+	glCheckError();
 	SDL_GL_SwapWindow(core.window);
+	glCheckError();
+
 }
 
 
@@ -676,13 +751,37 @@ void MainLoop(double frametime)
 }
 
 static bool run_client_only = false;
-
 int main(int argc, char** argv)
 {
 	printf("Starting game\n");
-	if (argc == 2 && strcmp(argv[1], "-client") == 0)
-		run_client_only = true;
-	CreateWindow();
+
+	int starth = DEFAULT_HEIGHT;
+	int startw = DEFAULT_WIDTH;
+	int startx = SDL_WINDOWPOS_UNDEFINED;
+	int starty = SDL_WINDOWPOS_UNDEFINED;
+
+	for (int i = 1; i < argc; i++)
+	{
+		if (strcmp(argv[i], "-client") == 0)
+			run_client_only = true;
+		else if (strcmp(argv[i], "-x") == 0) {
+			startx = atoi(argv[++i]);
+		}
+		else if (strcmp(argv[i], "-y") == 0) {
+			starty = atoi(argv[++i]);
+		}
+		else if (strcmp(argv[i], "-w") == 0) {
+			startw = atoi(argv[++i]);
+		}
+		else if (strcmp(argv[i], "-h") == 0) {
+			starth = atoi(argv[++i]);
+		}
+	}
+	core.vid_width = startw;
+	core.vid_height = starth;
+
+
+	CreateWindow(startx,starty);
 	NetworkInit();
 	RenderInit();
 	if (!run_client_only) {

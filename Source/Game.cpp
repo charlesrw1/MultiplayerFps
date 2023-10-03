@@ -25,6 +25,8 @@ void PlayerSpawn(Entity* ent)
 {
 	ASSERT(ent->type == Ent_Player);
 	ent->model = FindOrLoadModel("CT.glb");
+	ent->anim.Init(ent->model);
+	ent->anim.ResetLayers();
 	if (ent->model) {
 		int idle = ent->model->animations->FindClipFromName("act_idle");
 	}
@@ -34,7 +36,10 @@ void PlayerSpawn(Entity* ent)
 
 void DummySpawn(Entity* ent)
 {
-
+	ent->model = FindOrLoadModel("CT.glb");
+	ent->anim.Init(ent->model);
+	if (ent->model)
+		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"),1.f);
 }
 
 Entity* Game::InitNewEnt(EntType type, int index)
@@ -116,5 +121,8 @@ bool Game::DoNewMap(const char* mapname)
 	level = LoadLevelFile(mapname);
 	if (!level)
 		Fatalf("level not loaded\n");
+
+	MakeNewEntity(Ent_Dummy, glm::vec3(0.f), glm::vec3(0.f));
+
 	return true;
 }

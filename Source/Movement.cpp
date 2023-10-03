@@ -241,6 +241,9 @@ void PlayerMovement::GroundMove()
 	vec3 delta = player.velocity * deltat;
 
 	MoveAndSlide(delta);
+
+	player.angles = vec3(0.f);
+	player.angles.y = HALFPI-cmd.view_angles.y;
 }
 void PlayerMovement::AirMove()
 {
