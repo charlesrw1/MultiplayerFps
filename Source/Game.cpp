@@ -27,8 +27,6 @@ void PlayerSpawn(Entity* ent)
 	ent->model = FindOrLoadModel("CT.glb");
 	if (ent->model) {
 		int idle = ent->model->animations->FindClipFromName("act_idle");
-		ent->animation_num = idle;
-		ent->animation_time = 0.f;
 	}
 	//server.sv_game.GetPlayerSpawnPoisiton(ent);
 	ent->ducking = false;
@@ -51,8 +49,6 @@ Entity* Game::InitNewEnt(EntType type, int index)
 	ent->velocity = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
 	ent->scale = 1.f;
-	ent->animation_num = 0;
-	ent->animation_time = 0.f;
 	return ent;
 }
 

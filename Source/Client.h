@@ -19,7 +19,6 @@ struct ClientEntity
 	bool active = false;
 	EntityState state;
 	EntityState prev_state;
-	Animator anims;
 
 	// position/angle history for interpolation
 	std::array<TransformEntry, NUM_TRANSFORM_ENTRIES> transform_hist;
@@ -28,6 +27,7 @@ struct ClientEntity
 	glm::vec3 lerp_origin=glm::vec3(0.f);
 	glm::vec3 lerp_angles=glm::vec3(0.f);
 
+	Animator animator;
 	const Model* model = nullptr;
 };
 
@@ -115,6 +115,9 @@ public:
 	void Disconnect();
 	void TrySendingConnect();
 
+	void DisableLag();
+	void EnableLag(int jitter, int lag, int loss);
+
 	void ReadPackets();
 	void SendMovesAndMessages();
 
@@ -173,6 +176,7 @@ public:
 	void RunPrediction();
 
 	void CreateMoveCmd();
+
 
 public:
 	bool initialized = false;

@@ -90,7 +90,7 @@ const AnimChannel& AnimationSet::GetChannel(int clip, int channel) const {
 	return channels[clips[clip].channel_offset + channel];
 }
 
-int AnimationSet::FindClipFromName(const char* name)
+int AnimationSet::FindClipFromName(const char* name) const
 {
 	for (int i = 0; i < clips.size(); i++) {
 		if (clips[i].name == name)

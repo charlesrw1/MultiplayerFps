@@ -43,18 +43,14 @@ struct PhysContainer {
 	};
 };
 
-
-
 class Level;
 void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
 
 void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided);
-
 void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
 void TraceSphere(const Level* lvl, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
-
-void TraceRay(const Level* lvl, Ray r, ColliderCastResult* out, float tmax, bool closest);
+void TraceLine(const Level* lvl, Ray r, ColliderCastResult* out, float tmax, bool closest);
 
 // Called by the level loader to init the bvh
 void InitStaticGeoBvh(Level* input);

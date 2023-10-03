@@ -13,6 +13,9 @@ double GetTime();
 double TimeSinceStart();
 void Fatalf(const char* format, ...);
 
+bool IsServerActive();
+bool IsClientActive();
+
 struct Color32
 {
 	uint8_t r = 0;

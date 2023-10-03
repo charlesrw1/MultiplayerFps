@@ -4,6 +4,7 @@
 #include "Net.h"
 #include "Physics.h"
 class MeshBuilder;
+class AnimationSet;
 class PlayerMovement
 {
 public:

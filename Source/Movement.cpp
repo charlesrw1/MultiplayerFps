@@ -2,6 +2,7 @@
 #include "Util.h"
 #include "Physics.h"
 #include "MeshBuilder.h"
+#include "Animation.h"
 
 const Capsule DEFAULT_COLLIDER = {
 	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
@@ -268,16 +269,10 @@ void PlayerMovement::Run()
 	look_side = -cross(look_front, vec3(0, 1, 0));
 
 
-
-	if (new_physics) {
-		float fric_val = (player.on_ground) ? ground_friction : air_friction;
-		ApplyFriction(fric_val);
-		CheckGroundState();	// check ground after applying friction, like quake
-		GroundMove();
-	}
-	else {
-		// Old function
-		//UpdatePlayer(player, cmd, dt);
-	}
+	float fric_val = (player.on_ground) ? ground_friction : air_friction;
+	ApplyFriction(fric_val);
+	CheckGroundState();	// check ground after applying friction, like quake
+	GroundMove();
 	CheckNans();
+
 }

@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 #include "Net.h"
+#include "Animation.h"
 
 class Model;
 struct Entity
@@ -10,9 +11,6 @@ struct Entity
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	float scale = 0.f;
-	const Model* model = nullptr;
-	int animation_num = 0;
-	float animation_time = 0.f;
 	int gun_type = 0;
 
 	float next_shoot_time = -100.0f;
@@ -20,6 +18,10 @@ struct Entity
 	glm::vec3 view_angles = glm::vec3(0.f);
 	bool ducking = false;
 	bool on_ground = false;
+	bool alive = true;
+
+	const Model* model = nullptr;
+	Animator anim;
 };
 
 
@@ -57,6 +59,7 @@ struct RemoteClient {
 	Connection connection;
 };
 
+class Server;
 class ClientMgr
 {
 public:
@@ -68,9 +71,10 @@ public:
 
 	std::vector<RemoteClient> clients;
 
-	//LagEmulator sock_emulator;
 private:
 	Socket socket;
+	Server* myserver = nullptr;
+
 	int FindClient(IPAndPort who) const;
 	int GetClientIndex(const RemoteClient& client) const;
 

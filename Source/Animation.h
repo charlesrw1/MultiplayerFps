@@ -51,25 +51,23 @@ public:
 class AnimationSet
 {
 public:
+	int FindClipFromName(const char* name) const;
+
+	// Returns index to use with GetX(), -1 if no keyframes
+	int FirstPositionKeyframe(float frame, int channel, int clip) const;
+	int FirstRotationKeyframe(float frame, int channel, int clip) const;
+	int FirstScaleKeyframe(float frame, int channel, int clip) const;
+	const PosKeyframe& GetPos(int channel, int index, int clip) const;
+	const RotKeyframe& GetRot(int channel, int index, int clip) const;
+	const ScaleKeyframe& GetScale(int channel, int index, int clip) const;
+	const AnimChannel& GetChannel(int clip, int channel) const;
+public:
 	int num_channels = 0;
 	std::vector<AnimChannel> channels;
 	std::vector<PosKeyframe> positions;
 	std::vector<RotKeyframe> rotations;
 	std::vector<ScaleKeyframe> scales;
 	std::vector<Animation> clips;
-
-	// Returns index to use with GetX(), -1 if no keyframes
-	int FirstPositionKeyframe(float frame, int channel, int clip) const;
-	int FirstRotationKeyframe(float frame, int channel, int clip) const;
-	int FirstScaleKeyframe(float frame, int channel, int clip) const;
-
-	const PosKeyframe& GetPos(int channel, int index, int clip) const;
-	const RotKeyframe& GetRot(int channel, int index, int clip) const;
-	const ScaleKeyframe& GetScale(int channel, int index, int clip) const;
-
-	const AnimChannel& GetChannel(int clip, int channel) const;
-
-	int FindClipFromName(const char* name);
 };
 
 
@@ -109,6 +107,24 @@ public:
 		assert(index < NUM_ANIMATION_LAYERS);
 		return layers[index];
 	}
+
+	void SetMainAnim(int anim) {
+		mainanim = anim;
+		mainanim_frame = 0.f;
+	}
+	void SetLegAnim(int anim, float speed = 1.f) {
+		leganim = anim;
+		leganim_frame = 0.f;
+		leganim_speed = speed;
+	}
+
+	int mainanim;
+	float mainanim_frame;
+
+	// for players
+	int leganim;
+	float leganim_frame;
+	float leganim_speed;
 
 	AnimationLayer layers[NUM_ANIMATION_LAYERS];
 

@@ -424,6 +424,11 @@ void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer 
 	}
 }
 
+void TraceLine()
+{
+
+}
+
 
 void Capsule::GetSphereCenters(vec3& a, vec3& b) const
 {

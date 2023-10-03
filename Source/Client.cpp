@@ -2,6 +2,8 @@
 #include "Util.h"
 #include "Client.h"
 #include "CoreTypes.h"
+#include "Movement.h"
+#include "MeshBuilder.h"
 
 Client client;
 
@@ -63,279 +65,156 @@ int Client::GetLastSequenceAcked() const
 {
 	return server_mgr.server.out_sequence_ak;
 }
-
-ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
+void Client::CheckLocalServerIsRunning()
 {
-	sock.enabled = false;
-	sock.lag = 150;
-	sock.jitter = 5;
+	if (GetConState() == Disconnected && IsServerActive()) {
+		// connect to the local server
+		IPAndPort serv_addr;
+		serv_addr.SetIp(127, 0, 0, 1);
+		serv_addr.port = SERVER_PORT;
+		server_mgr.Connect(serv_addr);
+	}
+}
+void Client_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
+{
+	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
+}
+void RunClientPhysics(const PlayerState* in, PlayerState* out, const MoveCommand* cmd)
+{
+	MeshBuilder b;
+
+	PlayerMovement move;
+	move.cmd = *cmd;
+	move.deltat = core.tick_interval;
+	move.phys_debug = &b;
+	move.in_state = *in;
+	move.trace_callback = Client_TraceCallback;
+	move.Run();
+
+
+	*out = *move.GetOutputState();
+}
+void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
+{
+	entstate->position = state->position;
+	entstate->angles = state->angles;
+	entstate->ducking = state->ducking;
+	entstate->type = Ent_Player;
+}
+void DoClientGameUpdate(double dt)
+{
+
 }
 
 
-void ClServerMgr::Init(Client* parent)
+void Client::CreateMoveCmd()
 {
-	sock.Init(0);
-	myclient = parent;
-}
-void ClServerMgr::Connect(const IPAndPort& where)
-{
-	DebugOut("connecting to server: %s\n", where.ToString().c_str());
-	server.remote_addr = where;
-	connect_attempts = 0;
-	attempt_time = -1000.f;
-	state = TryingConnect;
-	TrySendingConnect();
+	if (core.mouse_grabbed) {
+		float x_off = core.input.mouse_delta_x;
+		float y_off = core.input.mouse_delta_y;
+		const float sensitivity = 0.01;
+		x_off *= sensitivity;
+		y_off *= sensitivity;
+
+		glm::vec3 view_angles = this->view_angles;
+		view_angles.x -= y_off;	// pitch
+		view_angles.y += x_off;	// yaw
+		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+		view_angles.y = fmod(view_angles.y, TWOPI);
+		this->view_angles = view_angles;
+	}
+	MoveCommand new_cmd{};
+	new_cmd.view_angles = view_angles;
+	bool* keys = core.input.keyboard;
+	if (keys[SDL_SCANCODE_W])
+		new_cmd.forward_move += 1.f;
+	if (keys[SDL_SCANCODE_S])
+		new_cmd.forward_move -= 1.f;
+	if (keys[SDL_SCANCODE_A])
+		new_cmd.lateral_move += 1.f;
+	if (keys[SDL_SCANCODE_D])
+		new_cmd.lateral_move -= 1.f;
+	if (keys[SDL_SCANCODE_SPACE])
+		new_cmd.button_mask |= CmdBtn_Jump;
+	if (keys[SDL_SCANCODE_LSHIFT])
+		new_cmd.button_mask |= CmdBtn_Duck;
+	if (keys[SDL_SCANCODE_Q])
+		new_cmd.button_mask |= CmdBtn_Misc1;
+	if (keys[SDL_SCANCODE_E])
+		new_cmd.button_mask |= CmdBtn_Misc2;
+	if (keys[SDL_SCANCODE_Z])
+		new_cmd.up_move += 1.f;
+	if (keys[SDL_SCANCODE_X])
+		new_cmd.up_move -= 1.f;
+
+	new_cmd.tick = tick;
+
+	*GetCommand(GetCurrentSequence()) = new_cmd;
 }
 
-void ClServerMgr::TrySendingConnect()
+
+void Client::RunPrediction()
 {
-	if (state != TryingConnect)
+	if (GetConState() != Spawned)
 		return;
-	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
-		DebugOut("Unable to connect to server\n");
-		state = Disconnected;
+	// predict commands from outgoing ack'ed to current outgoing
+	// TODO: dont repeat commands unless a new snapshot arrived
+	int start = server_mgr.OutSequenceAk();	// start at the new cmd
+	int end = server_mgr.OutSequence();
+	int commands_to_run = end - start;
+	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
 		return;
+	// restore state to last authoritative snapshot 
+	int incoming_seq = server_mgr.InSequence();
+	Snapshot* last_auth_state = &cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	PlayerState pred_state;
+
+	// FIXME:
+	EntityState* TEMP = &last_auth_state->entities[GetPlayerNum()];
+	pred_state = last_auth_state->pstate;
+	pred_state.position = TEMP->position;
+	pred_state.angles = TEMP->angles;
+	pred_state.ducking = TEMP->ducking;
+
+	for (int i = start + 1; i < end; i++) {
+		MoveCommand* cmd = GetCommand(i);
+		PlayerState next_state;
+		RunClientPhysics(&pred_state, &next_state, cmd);
+		pred_state = next_state;
 	}
-	double delta = GetTime() - attempt_time;
-	if (delta < CONNECT_RETRY_TIME)
+
+	ClientEntity* ent = GetLocalPlayer();
+	PlayerStateToClEntState(&ent->state, &pred_state);
+
+	//ent->state = pred_state.estate;
+	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
+	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
+	//ent->current_hist_index++;
+	//ent->current_hist_index %= ent->transform_hist.size();
+}
+
+void Client::FixedUpdateInput(double dt)
+{
+	if (!initialized)
 		return;
-	attempt_time = GetTime();
-	connect_attempts++;
-	DebugOut("Sending connection request\n");
-
-	uint8_t buffer[256];
-	ByteWriter writer(buffer, 256);
-	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(Msg_ConnectRequest);
-	const char name[] = "Charlie";
-	writer.WriteByte(sizeof(name) - 1);
-	writer.WriteBytes((uint8_t*)name, sizeof(name) - 1);
-	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
+	if (GetConState() >= Connected) {
+		CreateMoveCmd();
+	}
+	server_mgr.SendMovesAndMessages();
+	CheckLocalServerIsRunning();
+	server_mgr.TrySendingConnect();
 }
-void ClServerMgr::Disconnect()
+void Client::FixedUpdateRead(double dt)
 {
-	if (state == Disconnected)
+	if (!initialized)
 		return;
-	if (state != TryingConnect) {
-		uint8_t buffer[8];
-		ByteWriter write(buffer, 8);
-		write.WriteByte(ClMessageQuit);
-		server.Send(buffer, write.BytesWritten());
-	}
-	state = Disconnected;
-
-	client_num = -1;
-	server.remote_addr = IPAndPort();
+	if (GetConState() == Spawned)
+		client.tick += 1;
+	server_mgr.ReadPackets();
+	RunPrediction();
 }
-
-void ClServerMgr::ReadPackets()
+void Client::PreRenderUpdate(double frametime)
 {
-	new_packet_arrived = false;
-	ASSERT(myclient->initialized);
-	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
-	size_t recv_len = 0;
-	IPAndPort from;
-
-	while (sock.Receive(inbuffer, sizeof(inbuffer), recv_len, from))
-	{
-		if (recv_len < PACKET_HEADER_SIZE)
-			continue;
-		if (*(uint32_t*)inbuffer == CONNECTIONLESS_SEQUENCE) {
-			ByteReader reader(inbuffer + 4, recv_len - 4);
-			HandleUnknownPacket(from, reader);
-			continue;
-		}
-
-		if ((state == Connected || state == Spawned) && from == server.remote_addr) {
-			int header = server.NewPacket(inbuffer, recv_len);
-			if (header != -1) {
-				ByteReader reader(inbuffer + header, recv_len - header);
-				HandleServerPacket(reader);
-			}
-		}
-	}
-
-	if (state == Connected || state == Spawned) {
-		if (GetTime() - server.last_recieved > MAX_TIME_OUT) {
-			printf("Server timed out\n");
-			myclient->Disconnect();
-		}
-	}
-
-	int last_sequence = server.out_sequence_ak;
-	int tick_delta = myclient->tick - myclient->GetCommand(last_sequence)->tick;
-	//printf("RTT: %f\n", (tick_delta)*core.tick_interval);
-
-}
-
-
-void ClServerMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
-{
-	uint8_t type = buf.ReadByte();
-	if (type == Msg_AcceptConnection) {
-		if (state != TryingConnect)
-			return;
-		StartConnection();
-	}
-	else if (type == Msg_RejectConnection) {
-		if (state != TryingConnect)
-			return;
-
-		uint8_t len = buf.ReadByte();
-		char reason[256 + 1];
-		for (int i = 0; i < len; i++) {
-			reason[i] = buf.ReadByte();
-		}
-		reason[len] = '\0';
-		if (!buf.HasFailed())
-			printf("Connection rejected: %s\n", reason);
-		myclient->Disconnect();
-	}
-	else {
-		DebugOut("Unknown connectionless packet type\n");
-	}
-}
-
-void ClServerMgr::StartConnection()
-{
-	// We now have a valid connection with the server
-	server.Init(&sock, server.remote_addr);
-	state = Connected;
-	// Request the next step in the setup
-	uint8_t buffer[256];
-	ByteWriter writer(buffer, 256);
-	writer.WriteByte(ClMessageText);
-	const char init_str[] = "init";
-	writer.WriteByte(sizeof(init_str) - 1);
-	writer.WriteBytes((uint8_t*)init_str, sizeof(init_str) - 1);
-
-	// FIXME!!: this must go through reliable, do this later
-	server.Send(buffer, writer.BytesWritten());
-}
-
-void ClServerMgr::ParseServerInit(ByteReader& buf)
-{
-	client_num = buf.ReadByte();
-	int map_len = buf.ReadByte();
-	std::string mapname(map_len, 0);
-	buf.ReadBytes((uint8_t*)&mapname[0], map_len);
-	DebugOut("Player num: %d, Map: %s\n", client_num, mapname.c_str());
-
-	// Load map and game data here
-	DebugOut("loading map...\n");
-	myclient->cl_game.NewMap(mapname.c_str());
-
-	// Tell server to spawn us in
-	uint8_t buffer[64];
-	ByteWriter writer(buffer, 64);
-	writer.WriteByte(ClMessageText);
-	const char spawn_str[] = "spawn";
-	writer.WriteByte(sizeof(spawn_str) - 1);
-	writer.WriteBytes((uint8_t*)spawn_str, sizeof(spawn_str) - 1);
-	server.Send(buffer, writer.BytesWritten());
-}
-
-void ClServerMgr::HandleServerPacket(ByteReader& buf)
-{
-	while (!buf.IsEof())
-	{
-		uint8_t command = buf.ReadByte();
-		if (buf.HasFailed()) {
-			myclient->Disconnect();
-			return;
-		}
-		switch (command)
-		{
-		case SvNop:
-			break;
-		case SvMessageInitial:
-			ParseServerInit(buf);
-			break;
-		case SvMessageSnapshot:
-			if (state == Connected) {
-				state = Spawned;
-			}
-			ParseEntSnapshot(buf);
-			break;
-		case SvMessagePlayerState:
-			ParsePlayerData(buf);
-			break;
-		case SvMessageDisconnect:
-			DebugOut("disconnected by server\n");
-			myclient->Disconnect();
-			break;
-		case SvMessageText:
-			break;
-		case SvMessageTick:
-		{
-			// just force it for now
-			int server_tick = buf.ReadLong();
-			if (abs(server_tick - myclient->tick) > 1) {
-				DebugOut("delta tick %d\n", server_tick - myclient->tick);
-				myclient->tick = server_tick;
-			}
-		}break;
-		default:
-			DebugOut("Unknown message, disconnecting\n");
-			myclient->Disconnect();
-			return;
-			break;
-		}
-	}
-}
-
-void ClServerMgr::SendMovesAndMessages()
-{
-	if (state < Connected)
-		return;
-
-	//DebugOut("Wrote move to server\n");
-
-	// Send move
-	MoveCommand lastmove = *myclient->GetCommand(server.out_sequence);
-
-	uint8_t buffer[128];
-	ByteWriter writer(buffer, 128);
-	writer.WriteByte(ClMessageInput);
-	writer.WriteFloat(lastmove.forward_move);
-	writer.WriteFloat(lastmove.lateral_move);
-	writer.WriteFloat(lastmove.up_move);
-	writer.WriteFloat(lastmove.view_angles.x);
-	writer.WriteFloat(lastmove.view_angles.y);
-	writer.WriteLong(lastmove.button_mask);
-
-	server.Send(buffer, writer.BytesWritten());
-}
-
-void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
-{
-	// TEMPORARY!!
-	ClientGame* game = &myclient->cl_game;
-
-	Snapshot* snapshot = &game->snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
-	for (int i = 0; i < 8; i++) {
-		int index = msg.ReadWord();
-		ASSERT(index < 16);
-		EntityState* state = &snapshot->entities[index];
-		state->type = msg.ReadByte();
-		state->position.x = msg.ReadFloat();
-		state->position.y = msg.ReadFloat();
-		state->position.z = msg.ReadFloat();
-		state->ducking = msg.ReadByte();
-	}
-	for (int i = 0; i < 8; i++) {
-		game->entities[i].prev_state = game->entities[i].state;
-		game->entities[i].state = snapshot->entities[i];
-	}
-	new_packet_arrived = true;
-}
-
-void ClServerMgr::ParsePlayerData(ByteReader& buf)
-{
-	Snapshot* snapshot = &myclient->cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
-	PlayerState* pstate = &snapshot->pstate;
-	pstate->velocity.x=buf.ReadFloat();
-	pstate->velocity.y=buf.ReadFloat();
-	pstate->velocity.z=buf.ReadFloat();
-	pstate->on_ground=buf.ReadByte();
+	view_mgr.Update();
+	DoClientGameUpdate(frametime);
 }

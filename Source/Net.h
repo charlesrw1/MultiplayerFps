@@ -65,6 +65,7 @@ enum InitialMessageTypes
 enum EntType
 {
 	Ent_Player,
+	Ent_Item,
 	Ent_Dummy,
 	Ent_Free = 0xff,
 };
@@ -75,6 +76,12 @@ struct EntityState
 	int type = Ent_Free;
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
+	
+	int mainanim = 0;
+	float mainanim_frame = 0.f;	// quantized
+	int leganim = 0;
+	float leganim_frame = 0.f;
+
 
 	bool ducking = false;
 };
@@ -86,6 +93,7 @@ struct PlayerState
 	glm::vec3 velocity;
 	bool on_ground = false;
 	bool ducking = false;
+
 };
 
 void NetDebugPrintf(const char* fmt, ...);

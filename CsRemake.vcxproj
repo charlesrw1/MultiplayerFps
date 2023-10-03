@@ -30,6 +30,7 @@
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="source\ClientGame.cpp" />
+    <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="source\Game.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
@@ -40,6 +41,7 @@
     <ClCompile Include="Source\Model.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Client.cpp" />
+    <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Shader.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Movement.cpp" />

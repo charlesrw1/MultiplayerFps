@@ -30,6 +30,7 @@ public:
 		int mouse_delta_y = 0;
 		int scroll_delta = 0;
 	};
+	bool mouse_grabbed = false;
 	InputState input;
 };
 extern Core core;

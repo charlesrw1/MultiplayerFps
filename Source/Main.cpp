@@ -30,7 +30,6 @@ Core core;
 static double program_time_start;
 static bool update_camera = false;
 const char* map_file = "test_level2.glb";
-static bool mouse_grabbed = false;
 
 const char* map_file_names[] = { "creek.glb","maze.glb","nuke.glb" };
 
@@ -67,6 +66,17 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	}
 	return has_error;
 }
+
+bool IsServerActive()
+{
+	return server.IsActive();
+}
+bool IsClientActive()
+{
+	return client.initialized;
+}
+
+
 static void Cleanup()
 {
 	FreeLoadedModels();
@@ -344,52 +354,6 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	DoGunLogic(ent, cmd);
 	
 }
-
-void Client::CreateMoveCmd()
-{
-	if (mouse_grabbed) {
-		float x_off = core.input.mouse_delta_x;
-		float y_off = core.input.mouse_delta_y;
-		const float sensitivity = 0.01;
-		x_off *= sensitivity;
-		y_off *= sensitivity;
-
-		glm::vec3 view_angles = this->view_angles;
-		view_angles.x -= y_off;	// pitch
-		view_angles.y += x_off;	// yaw
-		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
-		view_angles.y = fmod(view_angles.y, TWOPI);
-		this->view_angles = view_angles;
-	}
-	MoveCommand new_cmd{};
-	new_cmd.view_angles = view_angles;
-	bool* keys = core.input.keyboard;
-	if (keys[SDL_SCANCODE_W])
-		new_cmd.forward_move += 1.f;
-	if (keys[SDL_SCANCODE_S])
-		new_cmd.forward_move -= 1.f;
-	if (keys[SDL_SCANCODE_A])
-		new_cmd.lateral_move += 1.f;
-	if (keys[SDL_SCANCODE_D])
-		new_cmd.lateral_move -= 1.f;
-	if (keys[SDL_SCANCODE_SPACE])
-		new_cmd.button_mask |= CmdBtn_Jump;
-	if (keys[SDL_SCANCODE_LSHIFT])
-		new_cmd.button_mask |= CmdBtn_Duck;
-	if (keys[SDL_SCANCODE_Q])
-		new_cmd.button_mask |= CmdBtn_Misc1;
-	if (keys[SDL_SCANCODE_E])
-		new_cmd.button_mask |= CmdBtn_Misc2;
-	if (keys[SDL_SCANCODE_Z])
-		new_cmd.up_move += 1.f;
-	if (keys[SDL_SCANCODE_X])
-		new_cmd.up_move -= 1.f;
-
-	new_cmd.tick = tick;
-
-	*GetCommand(GetCurrentSequence()) = new_cmd;
-}
-
 void DrawTempLevel(mat4 viewproj)
 {
 	if (static_wrld.ID == 0)
@@ -465,12 +429,27 @@ void InitGlState()
 	glDepthFunc(GL_LEQUAL);
 }
 
+
+struct Media
+{
+	Model* playermod;
+	Model* gun;
+	Texture* testtex;
+
+	Shader simple;
+	Shader textured;
+	Shader animated;
+};
+
+static Media media;
+
 void RenderInit()
 {
 	InitGlState();
-	mytexture = FindOrLoadTexture("test.png");
-	gun = FindOrLoadModel("m16.glb");
-	m = FindOrLoadModel("CT.glb");
+	media.gun = FindOrLoadModel("m16.glb");
+	media.playermod = FindOrLoadModel("CT.glb");
+	media.testtex = FindOrLoadTexture("test.png");
+
 	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
 	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
@@ -556,32 +535,6 @@ void DrawScreen(double dt)
 }
 
 
-void DoClientGameUpdate(double dt)
-{
-	
-}
-
-void DoGameUpdate(double dt)
-{
-	
-}
-
-void Client_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
-{
-	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
-}
-void RunClientPhysics(const PlayerState* in, PlayerState* out, const MoveCommand* cmd)
-{
-	PlayerMovement move;
-	move.cmd = *cmd;
-	move.deltat = core.tick_interval;
-	move.phys_debug = &phys_debug;
-	move.in_state = *in;
-	move.trace_callback = Client_TraceCallback;
-	move.Run();
-	
-	*out = *move.GetOutputState();
-}
 bool using_arrows_to_select_map = false;
 int map_selection = 0;
 
@@ -684,12 +637,12 @@ void HandleInput()
 			break;
 		case SDL_MOUSEBUTTONDOWN:
 			SDL_SetRelativeMouseMode(SDL_TRUE);
-			mouse_grabbed = true;
+			core.mouse_grabbed = true;
 			update_camera = true;
 			break;
 		case SDL_MOUSEBUTTONUP:
 			SDL_SetRelativeMouseMode(SDL_FALSE);
-			mouse_grabbed = false;
+			core.mouse_grabbed = false;
 			update_camera = false;
 			break;
 		case SDL_WINDOWEVENT:
@@ -703,100 +656,6 @@ void HandleInput()
 	}
 }
 
-void Client::CheckLocalServerIsRunning()
-{
-	if (GetConState() == Disconnected && server.IsActive()) {
-		// connect to the local server
-		IPAndPort serv_addr;
-		serv_addr.SetIp(127, 0, 0, 1);
-		serv_addr.port = SERVER_PORT;
-		server_mgr.Connect(serv_addr);
-	}
-}
-
-void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
-{
-	entstate->position = state->position;
-	entstate->angles = state->angles;
-	entstate->ducking = state->ducking;
-	entstate->type = Ent_Player;
-}
-
-void Client::RunPrediction()
-{
-	if (GetConState() != Spawned)
-		return;
-	// predict commands from outgoing ack'ed to current outgoing
-	// TODO: dont repeat commands unless a new snapshot arrived
-	int start = server_mgr.OutSequenceAk();	// start at the new cmd
-	int end = server_mgr.OutSequence();
-	int commands_to_run = end - start;
-	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
-		return;
-	// restore state to last authoritative snapshot 
-	int incoming_seq = server_mgr.InSequence();
-	Snapshot* last_auth_state = &cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	PlayerState pred_state;
-	
-	// FIXME:
-	EntityState* TEMP = &last_auth_state->entities[GetPlayerNum()];
-	pred_state = last_auth_state->pstate;
-	pred_state.position = TEMP->position;
-	pred_state.angles = TEMP->angles;
-	pred_state.ducking = TEMP->ducking;
-
-	for (int i = start + 1; i < end; i++) {
-		MoveCommand* cmd = GetCommand(i);
-		PlayerState next_state;
-		RunClientPhysics(&pred_state, &next_state, cmd);
-		pred_state = next_state;
-	}
-
-	ClientEntity* ent = GetLocalPlayer();
-	PlayerStateToClEntState(&ent->state, &pred_state);
-
-	//ent->state = pred_state.estate;
-	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
-	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
-	//ent->current_hist_index++;
-	//ent->current_hist_index %= ent->transform_hist.size();
-}
-
-void Client::FixedUpdateInput(double dt)
-{
-	if (!initialized)
-		return;
-	if (GetConState() >= Connected) {
-		CreateMoveCmd();
-	}
-	server_mgr.SendMovesAndMessages();
-	CheckLocalServerIsRunning();
-	server_mgr.TrySendingConnect();
-}
-void Client::FixedUpdateRead(double dt)
-{
-	if (!initialized)
-		return;
-	if (GetConState() == Spawned)
-		client.tick += 1;
-	server_mgr.ReadPackets();
-	RunPrediction();
-}
-void Client::PreRenderUpdate(double frametime)
-{
-	view_mgr.Update();
-	DoClientGameUpdate(frametime);
-}
-
-void Server::FixedUpdate(double dt)
-{
-	if (!IsActive())
-		return;
-	client_mgr.ReadPackets();
-	DoGameUpdate(dt);
-	client_mgr.SendSnapshots();
-	tick += 1;
-}
 
 void MainLoop(double frametime)
 {
