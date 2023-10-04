@@ -19,6 +19,8 @@ void Client::Init()
 	time = 0.0;
 	tick = 0;
 
+	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
+
 	initialized = true;
 }
 
@@ -149,6 +151,12 @@ void Client::CreateMoveCmd()
 
 	new_cmd.tick = tick;
 
+	// quantize and unquantize 
+	//new_cmd.forward_move = float(char(new_cmd.forward_move * 128.f)) / 128.f;
+	//new_cmd.up_move = float(char(new_cmd.up_move * 128.f)) / 128.f;
+	//new_cmd.lateral_move = float(char(new_cmd.lateral_move * 128.f)) / 128.f;
+
+
 	*GetCommand(GetCurrentSequence()) = new_cmd;
 }
 
@@ -166,7 +174,7 @@ void Client::RunPrediction()
 		return;
 	// restore state to last authoritative snapshot 
 	int incoming_seq = server_mgr.InSequence();
-	Snapshot* last_auth_state = &cl_game.snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 	PlayerState pred_state;
 
 	// FIXME:
@@ -218,3 +226,11 @@ void Client::PreRenderUpdate(double frametime)
 	view_mgr.Update();
 	DoClientGameUpdate(frametime);
 }
+
+void Client::OnRecieveNewSnapshot()
+{
+	Snapshot* snapshot = &snapshots.at(server_mgr.InSequence() % CLIENT_SNAPSHOT_HISTORY);
+	
+
+}
+

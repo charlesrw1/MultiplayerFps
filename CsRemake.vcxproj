@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BVHBuild.cpp" />
+    <ClCompile Include="Encode.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="source\ClientGame.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />

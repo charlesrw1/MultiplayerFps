@@ -6,7 +6,6 @@
 #include "EmulatedSocket.h"
 #include <array>
 
-const int NUM_TRANSFORM_ENTRIES = 8;
 struct TransformEntry
 {
 	int tick = 0;
@@ -16,12 +15,15 @@ struct TransformEntry
 // Client side version of an entity
 struct ClientEntity
 {
+	const static int TRANSFORM_HIST = 8;
+	typedef std::array<TransformEntry, TRANSFORM_HIST> TransformHist;
+
 	bool active = false;
 	EntityState state;
 	EntityState prev_state;
 
 	// position/angle history for interpolation
-	std::array<TransformEntry, NUM_TRANSFORM_ENTRIES> transform_hist;
+	TransformHist transform_hist;
 	int current_hist_index = 0;
 
 	glm::vec3 lerp_origin=glm::vec3(0.f);
@@ -101,7 +103,7 @@ public:
 	PlayerState last_predicted;
 	PlayerState player;	// local player data
 	std::vector<ClientEntity> entities;	// client side data
-	std::vector<Snapshot> snapshots;
+
 	const Level* level = nullptr;
 };
 
@@ -138,7 +140,6 @@ private:
 	
 	void ParseEntSnapshot(ByteReader& msg);
 	void ParseServerInit(ByteReader& msg);
-	void ParsePlayerData(ByteReader& msg);
 public:
 	bool new_packet_arrived = false;
 	int client_num;
@@ -177,7 +178,7 @@ public:
 
 	void CreateMoveCmd();
 
-
+	void OnRecieveNewSnapshot();
 public:
 	bool initialized = false;
 	ViewMgr view_mgr;
@@ -187,6 +188,10 @@ public:
 
 	glm::vec3 view_angles;
 	std::vector<MoveCommand> out_commands;
+
+	int delta_idx = 0;
+	int cur_snapshot_idx = 0;
+	std::vector<Snapshot> snapshots;
 
 	int tick = 0;
 	double time=0.0;

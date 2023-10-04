@@ -1,0 +1,13 @@
+shooting mechanics
+win/lose states
+triggers for buy zone and bomb planting
+
+tech updates:
+delta snapshot encoding (mostly done 10/4)
+reliable messages (not very difficult now) 
+entity interpolation on clients with pos history
+lag compensation on server
+(Maybe): buffer inputs on server to avoid simming 2 inputs in one packet
+update physics to detect collisions between objs and response
+
+gfx:

@@ -46,6 +46,7 @@ enum ClientToServer
 	ClMessageQuit,
 	ClMessageText,
 	ClMessageTick,
+	ClMessageDelta,
 };
 
 // Connection initilization
@@ -88,13 +89,18 @@ struct EntityState
 // State specific to the client's player that is transmitted
 struct PlayerState
 {
-	glm::vec3 position;
-	glm::vec3 angles;
-	glm::vec3 velocity;
+	glm::vec3 position=glm::vec3(0.f);
+	glm::vec3 angles = glm::vec3(0.f);
+	glm::vec3 velocity = glm::vec3(0.f);
 	bool on_ground = false;
 	bool ducking = false;
 
 };
+
+// in serverclmgr for now
+bool WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg);
+void ReadDeltaEntState(EntityState* to, ByteReader& msg);
+void ReadDeltaPState(PlayerState* to, ByteReader& msg);
 
 void NetDebugPrintf(const char* fmt, ...);
 

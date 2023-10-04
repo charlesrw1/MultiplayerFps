@@ -206,9 +206,6 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 			}
 			ParseEntSnapshot(buf);
 			break;
-		case SvMessagePlayerState:
-			ParsePlayerData(buf);
-			break;
 		case SvMessageDisconnect:
 			DebugOut("disconnected by server\n");
 			myclient->Disconnect();
@@ -232,6 +229,8 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		}
 	}
 }
+
+
 
 void ClServerMgr::SendMovesAndMessages()
 {
@@ -261,44 +260,36 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 	// TEMPORARY!!
 	ClientGame* game = &myclient->cl_game;
 
-	Snapshot* snapshot = &game->snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
-	for (int i = 0; i < 17; i++) {
-		int index = msg.ReadWord();
-		ASSERT(index < 17);
-		EntityState* state = &snapshot->entities[index];
-		state->type = msg.ReadByte();
-		state->position.x = msg.ReadFloat();
-		state->position.y = msg.ReadFloat();
-		state->position.z = msg.ReadFloat();
+	Snapshot* snapshot = &myclient->snapshots.at(InSequence() % CLIENT_SNAPSHOT_HISTORY);
 
-		state->leganim = msg.ReadWord();
-		int quantized_leganim_frame = msg.ReadWord();
-		state->leganim_frame = (float)quantized_leganim_frame / 100.f;
-
-		// unquantize rotation
-		char rot[3];
-		rot[0] = msg.ReadByte();
-		rot[1] = msg.ReadByte();
-		rot[2] = msg.ReadByte();
-		state->angles.x = (float)rot[0] * (2 * PI) / 256.0;
-		state->angles.y = (float)rot[1] * (2 * PI) / 256.0;
-		state->angles.z = (float)rot[2] * (2 * PI) / 256.0;
-
-		state->ducking = msg.ReadByte();
+	int delta_frame_index = msg.ReadLong();		// unused rn
+	ASSERT(delta_frame_index == -1);
+	for (;;) {
+		uint8_t index = msg.ReadByte();
+		if (index == 0xff)
+			break;
+		if (msg.HasFailed())
+			break;
+		if (index >= 24)
+			break;
+		EntityState* es = &snapshot->entities[index];
+		*es = EntityState();
+		ReadDeltaEntState(es, msg);
 	}
-	for (int i = 0; i < 17; i++) {
-		game->entities[i].prev_state = game->entities[i].state;
-		game->entities[i].state = snapshot->entities[i];
+
+	int val = msg.ReadLong();
+	ASSERT(val == 0xabababab);
+
+	PlayerState* ps = &snapshot->pstate;
+	*ps = PlayerState();
+	ReadDeltaPState(ps, msg);
+
+	myclient->OnRecieveNewSnapshot();
+	// Apply entity updates
+	for (int i = 0; i < 24; i++) {
+		ClientEntity* ce = &game->entities[i];
+		ce->prev_state = ce->state;
+		ce->state = snapshot->entities[i];
 	}
 	new_packet_arrived = true;
-}
-
-void ClServerMgr::ParsePlayerData(ByteReader& buf)
-{
-	Snapshot* snapshot = &myclient->cl_game.snapshots.at(server.in_sequence % CLIENT_SNAPSHOT_HISTORY);
-	PlayerState* pstate = &snapshot->pstate;
-	pstate->velocity.x = buf.ReadFloat();
-	pstate->velocity.y = buf.ReadFloat();
-	pstate->velocity.z = buf.ReadFloat();
-	pstate->on_ground = buf.ReadByte();
 }

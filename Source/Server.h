@@ -22,8 +22,11 @@ struct Entity
 
 	const Model* model = nullptr;
 	Animator anim;
-};
 
+	PlayerState ToPlayerState() const;
+	void FromPlayerState(PlayerState* ps);
+	EntityState ToEntState() const;
+};
 
 Entity* ServerEntForIndex(int index);
 
@@ -59,12 +62,21 @@ struct RemoteClient {
 	Connection connection;
 };
 
+// stores game state to delta encode to clients
+struct Frame {
+	static const int MAX_FRAME_ENTS = 64;
+	int tick = 0;
+	EntityState states[MAX_FRAME_ENTS];
+	PlayerState ps_states[MAX_CLIENTS];
+};
+
 class Server;
 class ClientMgr
 {
 public:
 	ClientMgr();
 	void Init();
+
 	void ReadPackets();
 	void SendSnapshots();
 	void ShutdownServer();
@@ -74,6 +86,7 @@ public:
 private:
 	Socket socket;
 	Server* myserver = nullptr;
+	Frame nullframe;
 
 	int FindClient(IPAndPort who) const;
 	int GetClientIndex(const RemoteClient& client) const;
@@ -85,6 +98,8 @@ private:
 	void ParseClientText(RemoteClient& from, ByteReader& msg);
 
 	void SendSnapshotUpdate(RemoteClient& to);
+	void WriteDeltaSnapshot(Frame* from, Frame* to, ByteWriter& msg, int client_index);
+
 
 	void DisconnectClient(RemoteClient& client);
 	void ConnectNewClient(IPAndPort who, ByteReader& msg);
@@ -94,6 +109,8 @@ private:
 class Server
 {
 public:
+	static const int MAX_FRAME_HIST = 32;
+
 	void Init();
 	void Spawn(const char* mapname);
 	void End();
@@ -108,10 +125,23 @@ public:
 	ClientMgr client_mgr;
 	Game sv_game;
 
+
+	Frame* GetLastSnapshotFrame() {
+		int i = cur_frame_idx - 1;
+		if (i < 0) i += MAX_FRAME_HIST;
+		return &frames.at(i);
+	}
+
+	int cur_frame_idx = 0;
+	std::vector<Frame> frames;
+
 	int tick = 0;
 	double time = 0.0;
 public:
 	int FindClient(const IPAndPort& addr) const;
+
+private:
+	void BuildSnapshotFrame();
 };
 
 extern Server server;

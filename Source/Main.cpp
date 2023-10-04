@@ -323,24 +323,40 @@ void Server_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool close
 	TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
 }
 
-void EntToPlayerState(PlayerState* state, Entity* ent)
-{
-	state->position = ent->position;
-	state->angles = ent->view_angles;
-	state->ducking = ent->ducking;
-	state->on_ground = ent->on_ground;
-	state->velocity = ent->velocity;
-}
-void PlayerStateToEnt(Entity* ent, PlayerState* state)
-{
-	ent->position = state->position;
-	ent->rotation = state->angles;
-	//
-	ent->ducking = state->ducking;
-	ent->on_ground = state->on_ground;
-	ent->velocity = state->velocity;
-}
 
+PlayerState Entity::ToPlayerState() const
+{
+	PlayerState ps{};
+	ps.position = position;
+	ps.angles = view_angles;
+	ps.ducking = ducking;
+	ps.on_ground = on_ground;
+	ps.velocity = velocity;
+
+	return ps;
+}
+void Entity::FromPlayerState(PlayerState* ps)
+{
+	position = ps->position;
+	rotation = ps->angles;
+	ducking = ps->ducking;
+	on_ground = ps->on_ground;
+	velocity = ps->velocity;
+}
+EntityState Entity::ToEntState() const
+{
+	EntityState es{};
+	es.angles = rotation;
+	es.ducking = ducking;
+	es.leganim = anim.leganim;
+	es.leganim_frame = anim.leganim_frame;
+	es.mainanim = anim.mainanim;
+	es.mainanim_frame = anim.mainanim_frame;
+	es.position = position;
+	es.type = type;
+
+	return es;
+}
 
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
@@ -357,9 +373,9 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.deltat = core.tick_interval;
 	move.phys_debug = &phys_debug;
 	move.trace_callback = Server_TraceCallback;
-	EntToPlayerState(&move.in_state, ent);
+	move.in_state = ent->ToPlayerState();
 	move.Run();
-	PlayerStateToEnt(ent, move.GetOutputState());
+	ent->FromPlayerState(move.GetOutputState());
 	phys_debug.End();
 	
 

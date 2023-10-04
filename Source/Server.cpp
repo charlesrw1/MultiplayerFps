@@ -27,6 +27,10 @@ void Server::Init()
 	printf("initializing server\n");
 	client_mgr.Init();
 	sv_game.Init();
+
+	cur_frame_idx = 0;
+	frames.clear();
+	frames.resize(MAX_FRAME_HIST);
 }
 void Server::End()
 {
@@ -70,7 +74,10 @@ void PlayerUpdateAnimations(double dt, Entity* ent)
 
 	int leg_anim = 0;
 	if (groundspeed > grnd_speed_threshold) {
-		leg_anim = playeranims->FindClipFromName("act_run");
+		if (ent->ducking)
+			leg_anim = playeranims->FindClipFromName("act_crouch_walk");
+		else
+			leg_anim = playeranims->FindClipFromName("act_run");
 	}
 	else {
 		leg_anim = playeranims->FindClipFromName("act_idle");
@@ -110,6 +117,22 @@ void Server::FixedUpdate(double dt)
 		return;
 	client_mgr.ReadPackets();
 	DoGameUpdate(dt);
+	BuildSnapshotFrame();
 	client_mgr.SendSnapshots();
 	tick += 1;
+}
+
+void Server::BuildSnapshotFrame()
+{
+	Frame* frame = &frames.at(cur_frame_idx);
+	Game* game = &sv_game;
+	frame->tick = tick;
+	for (int i = 0; i < MAX_CLIENTS; i++) {
+		frame->ps_states[i] = game->ents[i].ToPlayerState();
+	}
+	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
+		frame->states[i] = game->ents[i].ToEntState();
+	}
+
+	cur_frame_idx = (cur_frame_idx + 1) % frames.size();
 }

@@ -17,7 +17,6 @@ ClientEntity* Client::GetLocalPlayer()
 void ClientGame::Init()
 {
 	entities.resize(MAX_GAME_ENTS);
-	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
 	level = nullptr;
 }
 void ClientGame::ClearState()
