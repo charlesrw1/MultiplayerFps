@@ -142,6 +142,7 @@ void ViewMgr::Init()
 	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
 }
 
+#if 0
 vec3 GetLocalPlayerInterpedOrigin()
 {
 	ClientEntity* ent = client.GetLocalPlayer();
@@ -149,6 +150,7 @@ vec3 GetLocalPlayerInterpedOrigin()
 	float alpha =  core.frame_remainder / core.tick_interval;
 	return ent->prev_state.position * (1-alpha) + ent->state.position * ( alpha);
 }
+#endif
 
 void ViewMgr::Update()
 {
@@ -160,20 +162,23 @@ void ViewMgr::Update()
 	setup.x = setup.y = 0;
 	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
 	Core::InputState& input = core.input;
+
 	if (update_camera) {
 		fly_cam.UpdateFromInput(input.keyboard, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
 	}
+
 	if (third_person) {
 		ClientEntity* player = client.GetLocalPlayer();
 		vec3 front = AnglesToVector(client.view_angles.x, client.view_angles.y);
-		fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
+		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
+		fly_cam.position = player->interpstate.position + vec3(0, 0.5, 0) - front * 3.f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 	}
 	else
 	{
 		ClientEntity* player = client.GetLocalPlayer();
-		EntityState* pstate = &player->state;
+		EntityState* pstate = &player->interpstate;
 		float view_height = (pstate->ducking) ? 0.65 : 1.2;
 		vec3 cam_position = pstate->position + vec3(0, view_height, 0);
 		vec3 front = AnglesToVector(client.view_angles.x,client.view_angles.y);
@@ -418,7 +423,7 @@ static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* m
 {
 	glCheckError();
 
-	EntityState* cur = &cent->state;
+	EntityState* cur = &cent->interpstate;
 	Animator ca;
 	ca.Init(media.playermod);
 	ca.ResetLayers();
@@ -474,7 +479,7 @@ static void DrawWorldEnts(mat4 viewproj)
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
-		if (ent.state.type != Ent_Free && (i != client.GetPlayerNum()|| client.view_mgr.third_person)) {
+		if (ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.view_mgr.third_person)) {
 			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
 		}
 	}
@@ -558,52 +563,7 @@ void Render(double dt)
 	
 
 	DrawWorldEnts(viewproj);
-	glCheckError();
 
-#if 0
-	textured.use();
-	textured.set_mat4("ViewProj", viewproj);
-	textured.set_mat4("Model", mat4(1));
-	
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, mytexture->gl_id);
-
-	mb.Begin();
-	mb.Push2dQuad(vec2(-1),vec2(2),vec2(0),vec2(1),COLOR_WHITE);
-	mb.End();
-	mb.Draw(GL_TRIANGLES);
-	mb.Free();
-	
-	// Update animation
-	animator.AdvanceFrame(dt);
-	animator.SetupBones();
-	animator.ConcatWithInvPose();
-	//
-
-	animated.use();
-	animated.set_mat4("ViewProj", viewproj);
-	animated.set_mat4("Model", mat4(1));
-	animated.set_mat4("InverseModel", mat4(1));
-
-	const std::vector<mat4>& bones = animator.GetBones();
-
-	const uint32_t bone_matrix_loc = glGetUniformLocation(animated.ID, "BoneTransform[0]");
-
-	for (int j = 0; j < bones.size(); j++)
-		glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
-	glCheckError();
-
-
-	//glDisable(GL_CULL_FACE);
-	for (int i = 0; i < m->parts.size(); i++)
-	{
-		MeshPart* part = &m->parts[i];
-		glBindVertexArray(part->vao);
-		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
-	}
-	glCheckError();
-
-#endif
 	glCheckError();
 	DrawTempLevel(viewproj);
 	glCheckError();

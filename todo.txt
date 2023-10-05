@@ -1,6 +1,7 @@
 shooting mechanics
 win/lose states
 triggers for buy zone and bomb planting
+game states for menu/in game/ etc
 
 tech updates:
 delta snapshot encoding (mostly done 10/4)
@@ -11,3 +12,6 @@ lag compensation on server
 update physics to detect collisions between objs and response
 
 gfx:
+textured models (easy)
+ui rendering, font loading
+

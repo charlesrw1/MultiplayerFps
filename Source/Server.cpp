@@ -93,6 +93,11 @@ void PlayerUpdate(double dt, Entity* ent)
 	if(ent->alive)
 		PlayerUpdateAnimations(dt, ent);
 }
+void DummyUpdate(double dt, Entity* ent)
+{
+	ent->position.y = sin(GetTime())*2.f+2.f;
+	ent->position.x = 0.f;
+}
 
 void DoGameUpdate(double dt)
 {
@@ -101,7 +106,9 @@ void DoGameUpdate(double dt)
 		if (game->ents[i].type == Ent_Player) {
 			PlayerUpdate(dt,&game->ents[i]);
 		}
-
+		else if (game->ents[i].type == Ent_Dummy) {
+			DummyUpdate(dt, &game->ents[i]);
+		}
 
 
 		if (game->ents[i].type != Ent_Free) {

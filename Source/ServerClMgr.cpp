@@ -260,8 +260,10 @@ void ClientMgr::SendSnapshots()
 		if (clients[i].state < RemoteClient::Connected)
 			continue;
 
-		if (clients[i].state == RemoteClient::Spawned) {
+		clients[i].next_snapshot_time -= core.tick_interval;
+		if (clients[i].state == RemoteClient::Spawned && clients[i].next_snapshot_time < 0.f) {
 			SendSnapshotUpdate(clients[i]);
+			clients[i].next_snapshot_time += (1 / 30.0);	// 20hz update rate
 		}
 		else
 			clients[i].connection.Send(nullptr, 0);	// update reliable

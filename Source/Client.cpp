@@ -106,24 +106,31 @@ void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 void DoClientGameUpdate(double dt)
 {
 
+
+
 }
 
+
+void Client::DoViewAngleUpdate()
+{
+	float x_off = core.input.mouse_delta_x;
+	float y_off = core.input.mouse_delta_y;
+	const float sensitivity = 0.01;
+	x_off *= sensitivity;
+	y_off *= sensitivity;
+
+	glm::vec3 view_angles = this->view_angles;
+	view_angles.x -= y_off;	// pitch
+	view_angles.y += x_off;	// yaw
+	view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+	view_angles.y = fmod(view_angles.y, TWOPI);
+	this->view_angles = view_angles;
+}
 
 void Client::CreateMoveCmd()
 {
 	if (core.mouse_grabbed) {
-		float x_off = core.input.mouse_delta_x;
-		float y_off = core.input.mouse_delta_y;
-		const float sensitivity = 0.01;
-		x_off *= sensitivity;
-		y_off *= sensitivity;
-
-		glm::vec3 view_angles = this->view_angles;
-		view_angles.x -= y_off;	// pitch
-		view_angles.y += x_off;	// yaw
-		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
-		view_angles.y = fmod(view_angles.y, TWOPI);
-		this->view_angles = view_angles;
+		DoViewAngleUpdate();
 	}
 	MoveCommand new_cmd{};
 	new_cmd.view_angles = view_angles;
@@ -175,14 +182,13 @@ void Client::RunPrediction()
 	// restore state to last authoritative snapshot 
 	int incoming_seq = server_mgr.InSequence();
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	PlayerState pred_state;
 
 	// FIXME:
-	EntityState* TEMP = &last_auth_state->entities[GetPlayerNum()];
-	pred_state = last_auth_state->pstate;
-	pred_state.position = TEMP->position;
-	pred_state.angles = TEMP->angles;
-	pred_state.ducking = TEMP->ducking;
+	EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
+	PlayerState pred_state = last_auth_state->pstate;
+	pred_state.position =last_estate.position;
+	pred_state.angles = last_estate.angles;
+	pred_state.ducking = last_estate.ducking;
 
 	for (int i = start + 1; i < end; i++) {
 		MoveCommand* cmd = GetCommand(i);
@@ -192,7 +198,8 @@ void Client::RunPrediction()
 	}
 
 	ClientEntity* ent = GetLocalPlayer();
-	PlayerStateToClEntState(&ent->state, &pred_state);
+	PlayerStateToClEntState(&last_estate, &pred_state);
+	ent->AddStateToHist(&last_estate, tick);
 
 	//ent->state = pred_state.estate;
 	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
@@ -223,14 +230,139 @@ void Client::FixedUpdateRead(double dt)
 }
 void Client::PreRenderUpdate(double frametime)
 {
-	view_mgr.Update();
 	DoClientGameUpdate(frametime);
+	
+	if (IsClientActive() && IsInGame()) {
+		// interpoalte entities for rendering
+		ClientGame* game = &cl_game;
+		const double cl_interp = 2.0/DEFAULT_SNAPSHOT_RATE;
+		double rendering_time = client.tick * core.tick_interval - cl_interp;
+		for (int i = 0; i < game->entities.size(); i++) {
+			if (game->entities[i].active && i != GetPlayerNum()) {
+				game->entities[i].InterpolateState(rendering_time, core.tick_interval);
+			}
+		}
+
+		double rendering_time_client = client.tick * core.tick_interval - core.frame_remainder;
+		ClientEntity* local = GetLocalPlayer();
+		local->interpstate = local->GetLastState()->state;
+		//local->InterpolateState(rendering_time_client, core.tick_interval);
+	}
+
+	//if(core.mouse_grabbed)
+	//	DoViewAngleUpdate();	// one last time before render
+	view_mgr.Update();
+}
+
+
+static int NegModulo(int a, int b)
+{
+	return (b + (a % b)) % b;
+}
+static float MidLerp(float min, float max, float mid_val)
+{
+	return (mid_val - min) / (max - min);
+}
+
+StateEntry* ClientEntity::GetLastState()
+{
+	return &hist.at(NegModulo(current_hist_index - 1, NUM_STORED_STATES));
+}
+
+bool IsDistanceATeleport(vec3 a, vec3 b, float maxspeed, float dt)
+{
+	float len = glm::length(a - b);
+	float t = len / maxspeed;
+	return dt < t;
+}
+
+StateEntry* ClientEntity::GetStateFromIndex(int index)
+{
+	return &hist.at(NegModulo(index, NUM_STORED_STATES));
+}
+
+// Called every graphics frame
+void ClientEntity::InterpolateState(double time, double tickinterval) {
+	if (!active)
+		return;
+	
+	//interpstate = GetLastState()->state;
+	//return;
+
+	int i = 0;
+	int last_entry = NegModulo(current_hist_index - 1, NUM_STORED_STATES);
+	for (; i < NUM_STORED_STATES; i++) {
+		auto e = GetStateFromIndex(current_hist_index - 1 - i);
+		if (time >= e->tick*tickinterval) {
+			break;
+		}
+	}
+
+	// could extrpolate here, or just set it to last state
+	if (i == 0 || i == NUM_STORED_STATES) {
+		interpstate = GetLastState()->state;
+		printf("extrapolate\n");
+		double abc = GetStateFromIndex(last_entry - i)->tick * tickinterval;
+		return;
+	}
+	// else, interpolate
+	StateEntry* s1 = GetStateFromIndex(last_entry - i);
+	StateEntry* s2 = GetStateFromIndex(last_entry - i + 1);
+
+	if (s1->tick == -1) {
+		interpstate = EntityState{};
+		return;
+	}
+	else if (s2->tick == -1 || s2->tick <= s1->tick) {
+		interpstate = s1->state;
+		printf("no next frame\n");
+		return;
+	}
+
+
+	ASSERT(s1->tick < s2->tick);
+	ASSERT(s1->tick * tickinterval <= time && s2->tick * tickinterval >= time);
+
+	float midlerp = MidLerp(s1->tick * tickinterval, s2->tick * tickinterval, time);
+
+	//printf("interpolating properly\n");
+	interpstate = s1->state;
+	//if(!IsDistanceATeleport(s1->state.position,s2->state.position, 20.0, tickinterval))
+	interpstate.position = glm::mix(s1->state.position, s2->state.position, midlerp);
+	if (s1->state.leganim == s2->state.leganim) {
+		//interpstate.leganim_frame = glm::mix(s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
+		
+	}
+	if (s1->state.mainanim == s2->state.mainanim) {
+		// fixme
+	}
+
+
 }
 
 void Client::OnRecieveNewSnapshot()
 {
 	Snapshot* snapshot = &snapshots.at(server_mgr.InSequence() % CLIENT_SNAPSHOT_HISTORY);
-	
+	ClientGame* game = &cl_game;
+	for (int i = 0; i < 24; i++) {
+		ClientEntity* ce = &game->entities[i];
 
+		// local player doesnt fill interp history here
+		if (i == GetPlayerNum())
+			continue;
+
+		StateEntry* lastentry = ce->GetLastState();
+		if (lastentry->state.type != Ent_Free && snapshot->entities[i].type == Ent_Free) {
+			ce->active = false;
+			continue;
+		}
+
+		if (lastentry->state.type == Ent_Free && snapshot->entities[i].type != Ent_Free) {
+			ce->ClearState();
+			ce->active = true;
+		}
+		ce->AddStateToHist(&snapshot->entities[i], tick);
+		ce->laststate = snapshot->entities[i];
+	}
 }
 

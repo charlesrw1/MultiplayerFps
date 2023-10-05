@@ -5,7 +5,7 @@
 
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-	EnableLag(150, 0, 0);
+	EnableLag(50, 4, 0);
 }
 
 
@@ -79,7 +79,6 @@ void ClServerMgr::Disconnect()
 
 void ClServerMgr::ReadPackets()
 {
-	new_packet_arrived = false;
 	ASSERT(myclient->initialized);
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
@@ -285,11 +284,4 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 	ReadDeltaPState(ps, msg);
 
 	myclient->OnRecieveNewSnapshot();
-	// Apply entity updates
-	for (int i = 0; i < 24; i++) {
-		ClientEntity* ce = &game->entities[i];
-		ce->prev_state = ce->state;
-		ce->state = snapshot->entities[i];
-	}
-	new_packet_arrived = true;
 }

@@ -6,24 +6,24 @@
 #include "EmulatedSocket.h"
 #include <array>
 
-struct TransformEntry
+// Client side version of an entity
+struct StateEntry
 {
 	int tick = 0;
-	glm::vec3 origin;
-	glm::vec3 angles;
+	EntityState state;
 };
-// Client side version of an entity
+
 struct ClientEntity
 {
-	const static int TRANSFORM_HIST = 8;
-	typedef std::array<TransformEntry, TRANSFORM_HIST> TransformHist;
+	const static int NUM_STORED_STATES = 25;
+	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
 
 	bool active = false;
-	EntityState state;
-	EntityState prev_state;
+	EntityState laststate;
+	EntityState interpstate;
 
-	// position/angle history for interpolation
-	TransformHist transform_hist;
+	// history of updates for interpolation
+	StateHist hist;
 	int current_hist_index = 0;
 
 	glm::vec3 lerp_origin=glm::vec3(0.f);
@@ -31,6 +31,18 @@ struct ClientEntity
 
 	Animator animator;
 	const Model* model = nullptr;
+
+	StateEntry* GetStateFromIndex(int index);
+	StateEntry* GetLastState();
+	void AddStateToHist(const EntityState* state, int tick) {
+		hist.at(current_hist_index) = { tick, *state };
+		current_hist_index = (current_hist_index + 1) % hist.size();
+	}
+	void InterpolateState(double time, double tickrate);
+	void ClearState() {
+		for (int i = 0; i < hist.size(); i++)
+			hist.at(i) = { -1, {} };
+	}
 };
 
 struct Snapshot
@@ -141,7 +153,6 @@ private:
 	void ParseEntSnapshot(ByteReader& msg);
 	void ParseServerInit(ByteReader& msg);
 public:
-	bool new_packet_arrived = false;
 	int client_num;
 	int connect_attempts;
 	double attempt_time;
@@ -193,6 +204,8 @@ public:
 	int cur_snapshot_idx = 0;
 	std::vector<Snapshot> snapshots;
 
+	PlayerState lastpredicted;
+
 	int tick = 0;
 	double time=0.0;
 public:
@@ -201,6 +214,7 @@ public:
 	int GetLastSequenceAcked() const;
 
 private:
+	void DoViewAngleUpdate();
 	void CheckLocalServerIsRunning();
 };
 extern Client client;

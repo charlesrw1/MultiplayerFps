@@ -60,6 +60,8 @@ struct RemoteClient {
 	};
 	ConnectionState state = Dead;
 	Connection connection;
+
+	float next_snapshot_time = 0.f;
 };
 
 // stores game state to delta encode to clients
