@@ -155,5 +155,8 @@
     <ClInclude Include="Source\MoveCommand.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GameData.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

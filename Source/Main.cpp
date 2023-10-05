@@ -28,6 +28,10 @@
 MeshBuilder phys_debug;
 Core core;
 
+enum CharModTypes {
+	CtStandard,
+};
+
 struct Media
 {
 	Model* playermod;
@@ -80,7 +84,6 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	}
 	return has_error;
 }
-
 bool IsServerActive()
 {
 	return server.IsActive();
@@ -132,16 +135,6 @@ void FlyCamera::UpdateVectors() {
 glm::mat4 FlyCamera::GetViewMatrix() const {
 	return glm::lookAt(position, position + front, up);
 }
-
-void ViewMgr::Init()
-{
-	setup.height = core.vid_height;
-	setup.width = core.vid_width;
-	setup.viewfov = fov;
-	setup.x = setup.y = 0;
-	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
-}
-
 #if 0
 vec3 GetLocalPlayerInterpedOrigin()
 {
@@ -152,10 +145,12 @@ vec3 GetLocalPlayerInterpedOrigin()
 }
 #endif
 
-void ViewMgr::Update()
+void ClientGame::UpdateCamera()
 {
 	if (!client.IsInGame())
 		return;
+	ViewSetup setup;
+
 	setup.height = core.vid_height;
 	setup.width = core.vid_width;
 	setup.viewfov = fov;
@@ -179,7 +174,7 @@ void ViewMgr::Update()
 	{
 		ClientEntity* player = client.GetLocalPlayer();
 		EntityState* pstate = &player->interpstate;
-		float view_height = (pstate->ducking) ? 0.65 : 1.2;
+		float view_height = (pstate->ducking) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
 		vec3 cam_position = pstate->position + vec3(0, view_height, 0);
 		vec3 front = AnglesToVector(client.view_angles.x,client.view_angles.y);
 		setup.view_mat = glm::lookAt(cam_position, cam_position + front, vec3(0, 1, 0));
@@ -187,6 +182,8 @@ void ViewMgr::Update()
 		setup.vieworigin = cam_position;
 		setup.viewfront = front;
 	}
+
+	last_view = setup;
 }
 
 static void SDLError(const char* msg)
@@ -282,14 +279,6 @@ Shader animated;
 Shader static_wrld;
 
 
-const Capsule DEFAULT_COLLIDER = {
-	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
-};
-const Capsule CROUCH_COLLIDER = {
-	0.2f, glm::vec3(0,0,0),glm::vec3(0,0.75,0.0)
-};
-const float DEFAULT_MOVESPEED = 0.1f;
-
 
 static float move_speed_player = 0.1f;
 static bool gravity = true;
@@ -307,86 +296,12 @@ static float minspeed = 1;
 static float maxspeed = 30;
 static float jumpimpulse = 5.f;
 
-void ShootGunAgainstWorld(ColliderCastResult* result, Ray r)
+void ShootGunAgainstWorld(GeomContact* result, Ray r)
 {
 
 }
 
 
-void DoGunLogic(Entity* ent, MoveCommand cmd)
-{
-	if (cmd.button_mask & CmdBtn_Misc1 && ent->next_shoot_time <= server.time) {
-		Ray gun_ray;
-		gun_ray.dir = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-		gun_ray.pos = ent->position + vec3(0, 0.5, 0);
-	}
-}
-
-
-void Server_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
-{
-	TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
-}
-
-
-PlayerState Entity::ToPlayerState() const
-{
-	PlayerState ps{};
-	ps.position = position;
-	ps.angles = view_angles;
-	ps.ducking = ducking;
-	ps.on_ground = on_ground;
-	ps.velocity = velocity;
-
-	return ps;
-}
-void Entity::FromPlayerState(PlayerState* ps)
-{
-	position = ps->position;
-	rotation = ps->angles;
-	ducking = ps->ducking;
-	on_ground = ps->on_ground;
-	velocity = ps->velocity;
-}
-EntityState Entity::ToEntState() const
-{
-	EntityState es{};
-	es.angles = rotation;
-	es.ducking = ducking;
-	es.leganim = anim.leganim;
-	es.leganim_frame = anim.leganim_frame;
-	es.mainanim = anim.mainanim;
-	es.mainanim_frame = anim.mainanim_frame;
-	es.position = position;
-	es.type = type;
-
-	return es;
-}
-
-void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
-{
-	//if (paused)
-	//	return;
-	//phys_debug.Begin();
-	//PlayerPhysics physics;
-	//physics.Run(level,ent, cmd, core.tick_interval);
-	//phys_debug.End();
-
-	phys_debug.Begin();
-	PlayerMovement move;
-	move.cmd = cmd;
-	move.deltat = core.tick_interval;
-	move.phys_debug = &phys_debug;
-	move.trace_callback = Server_TraceCallback;
-	move.in_state = ent->ToPlayerState();
-	move.Run();
-	ent->FromPlayerState(move.GetOutputState());
-	phys_debug.End();
-	
-
-	DoGunLogic(ent, cmd);
-	
-}
 void DrawTempLevel(mat4 viewproj)
 {
 	if (static_wrld.ID == 0)
@@ -411,12 +326,15 @@ void DrawTempLevel(mat4 viewproj)
 static void DrawState(EntityState* player, Color32 color, MeshBuilder& mb)
 {
 	vec3 origin = player->position;
-	const Capsule& c = (player->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-	float radius = c.radius;
+	Capsule c;
+	c.base = origin;
+	c.tip = origin + vec3(0, (player->ducking)?CHAR_CROUCING_HB_HEIGHT:CHAR_STANDING_HB_HEIGHT, 0);
+	c.radius = CHAR_HITBOX_RADIUS;
+	float radius = CHAR_HITBOX_RADIUS;
 	vec3 a, b;
 	c.GetSphereCenters(a, b);
-	mb.AddSphere(origin + a, radius, 10, 7, color);
-	mb.AddSphere(origin + b, radius, 10, 7, color);
+	mb.AddSphere(a, radius, 10, 7, color);
+	mb.AddSphere(b, radius, 10, 7, color);
 }
 
 static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* mb, mat4 viewproj)
@@ -479,20 +397,14 @@ static void DrawWorldEnts(mat4 viewproj)
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
-		if (ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.view_mgr.third_person)) {
+		if (ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.cl_game.third_person)) {
 			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
 		}
 	}
 
 	if (server.active) {
-		vec3 origin2 = ServerEntForIndex(0)->position;
-		const Capsule& c2 = (ServerEntForIndex(0)->ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
-		float radius = c2.radius;
-		vec3 a, b;
-		c2.GetSphereCenters(a, b);
-
-		mb.AddSphere(origin2 + a, radius, 10, 7, COLOR_CYAN);
-		mb.AddSphere(origin2 + b, radius, 10, 7, COLOR_CYAN);
+		EntityState es = ServerEntForIndex(0)->ToEntState();
+		DrawState(&es, COLOR_CYAN, mb);
 	}
 	mb.End();
 	
@@ -503,8 +415,17 @@ static void DrawWorldEnts(mat4 viewproj)
 	mb.Draw(GL_LINES);
 	mb.Free();
 
+	glCheckError();
+	Game* g = &server.sv_game;
+	g->rays.End();
+	g->rays.Draw(GL_LINES);
+	glCheckError();
+
+	phys_debug.End();
 	if(IsServerActive())
 		phys_debug.Draw(GL_LINES);
+
+
 }
 
 static void DrawLocalPlayer(mat4 viewproj)
@@ -540,7 +461,7 @@ void Render(double dt)
 {
 	glCheckError();
 
-	ViewSetup view = client.view_mgr.GetSceneView();
+	ViewSetup view = client.cl_game.GetSceneView();
 	//mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
 	//mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
 	glViewport(view.x, view.y, view.width, view.height);
@@ -653,7 +574,7 @@ void HandleInput()
 				new_physics = !new_physics;
 			}
 			if (scancode == SDL_SCANCODE_T)
-				client.view_mgr.third_person = !client.view_mgr.third_person;
+				client.cl_game.third_person = !client.cl_game.third_person;
 			if (scancode == SDL_SCANCODE_Q)
 				server.sv_game.paused = !server.sv_game.paused;
 			if(scancode == SDL_SCANCODE_1)

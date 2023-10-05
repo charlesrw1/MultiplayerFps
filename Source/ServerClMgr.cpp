@@ -142,6 +142,7 @@ void ClientMgr::ParseClientMove(RemoteClient& client, ByteReader& buf)
 	//DebugOut("Recieved client input from %s\n", client.connection.remote_addr.ToString().c_str());
 
 	MoveCommand cmd{};
+	cmd.tick = buf.ReadLong();
 	cmd.forward_move = buf.ReadFloat();
 	cmd.lateral_move = buf.ReadFloat();
 	cmd.up_move = buf.ReadFloat();

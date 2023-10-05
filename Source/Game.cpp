@@ -1,7 +1,7 @@
 #include "Server.h"
 #include "CoreTypes.h"
 #include "Level.h"
-
+#include "Movement.h"
 
 Entity* ServerEntForIndex(int index)
 {
@@ -125,4 +125,120 @@ bool Game::DoNewMap(const char* mapname)
 	MakeNewEntity(Ent_Dummy, glm::vec3(0.f), glm::vec3(0.f));
 
 	return true;
+}
+
+void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
+{
+	printf("Shooting bullets\n");
+	Ray r;
+	r.dir = dir;
+	r.pos = org;
+	RayHit hit;
+	TraceRayAgainstLevel(level, r, &hit, false);
+	if (hit.dist >= 0.f)
+		rays.PushLine(org, hit.pos, COLOR_WHITE);
+}
+
+void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents)
+{
+	
+
+
+}
+
+
+void PlayerItemUpdate(Entity* ent, MoveCommand cmd)
+{
+	bool wants_shoot = cmd.button_mask & CmdBtn_Misc1;
+	bool wants_reload = cmd.button_mask & CmdBtn_Misc2;
+
+	// unarmed
+	//if (ent->gun_id == -1)
+	//	return;
+	//
+	//if (ent->reloading && ent->gun_timer < server.time) {
+	//	ent->reloading = false;
+	//	int amt = glm::min((short)10, ent->ammo[ent->gun_id]);
+	//	ent->clip[ent->gun_id] += amt;
+	//	ent->ammo[ent->gun_id] -= amt;
+	//	printf("reloaded\n");
+	//}
+	//
+	
+	if (ent->reloading || ent->gun_timer >= server.simtime)
+		return;
+
+	if (wants_shoot){// && ent->clip[ent->gun_id] > 0) {
+		server.sv_game.ShootBullets(ent, 
+			AnglesToVector(cmd.view_angles.x, cmd.view_angles.y), 
+			ent->position+glm::vec3(0,STANDING_EYE_OFFSET,0));
+		ent->gun_timer = server.simtime + 0.1f;
+		ent->clip[ent->gun_id]--;
+	}
+	else if ((ent->clip[ent->gun_id] <= 0 || wants_reload) && ent->ammo[ent->gun_id] > 0) {
+		ent->reloading = true;
+		ent->gun_timer += 1.0f;
+	}
+}
+
+
+void Server_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided)
+{
+	TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
+}
+
+
+PlayerState Entity::ToPlayerState() const
+{
+	PlayerState ps{};
+	ps.position = position;
+	ps.angles = view_angles;
+	ps.ducking = ducking;
+	ps.on_ground = on_ground;
+	ps.velocity = velocity;
+
+	return ps;
+}
+void Entity::FromPlayerState(PlayerState* ps)
+{
+	position = ps->position;
+	rotation = ps->angles;
+	ducking = ps->ducking;
+	on_ground = ps->on_ground;
+	velocity = ps->velocity;
+}
+EntityState Entity::ToEntState() const
+{
+	EntityState es{};
+	es.angles = rotation;
+	es.ducking = ducking;
+	es.leganim = anim.leganim;
+	es.leganim_frame = anim.leganim_frame;
+	es.mainanim = anim.mainanim;
+	es.mainanim_frame = anim.mainanim_frame;
+	es.position = position;
+	es.type = type;
+
+	return es;
+}
+#include "MeshBuilder.h"
+void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
+{
+	MeshBuilder mb;
+	//phys_debug.Begin();
+	PlayerMovement move;
+	move.cmd = cmd;
+	move.deltat = core.tick_interval;
+	move.phys_debug = &mb;
+	move.trace_callback = Server_TraceCallback;
+	move.in_state = ent->ToPlayerState();
+	move.Run();
+	ent->FromPlayerState(move.GetOutputState());
+
+	double oldtime = server.simtime;
+	server.simtime = cmd.tick * core.tick_interval;
+	PlayerItemUpdate(ent, cmd);
+	server.simtime = oldtime;
+	//phys_debug.End();
+
 }

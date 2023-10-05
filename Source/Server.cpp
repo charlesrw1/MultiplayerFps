@@ -41,7 +41,7 @@ void Server::End()
 	sv_game.ClearState();
 	active = false;
 	tick = 0;
-	time = 0.0;
+	simtime = 0.0;
 	map_name = {};
 }
 void Server::Spawn(const char* mapname)
@@ -50,7 +50,7 @@ void Server::Spawn(const char* mapname)
 		End();
 	}
 	tick = 0;
-	time = 0.0;
+	simtime = 0.0;
 	DebugOut("spawning with map %s\n", mapname);
 	bool good = sv_game.DoNewMap(mapname);
 	if (!good)
@@ -101,6 +101,7 @@ void DummyUpdate(double dt, Entity* ent)
 
 void DoGameUpdate(double dt)
 {
+	server.simtime = server.tick * core.tick_interval;
 	Game* game = &server.sv_game;
 	for (int i = 0; i < game->ents.size(); i++) {
 		if (game->ents[i].type == Ent_Player) {

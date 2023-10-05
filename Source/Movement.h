@@ -11,7 +11,7 @@ public:
 	// caller sets these vars
 	MeshBuilder* phys_debug = nullptr;
 	//void* user_arg = nullptr;
-	void(*trace_callback)(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided) = nullptr;
+	void(*trace_callback)(GeomContact* out, PhysContainer obj, bool closest, bool double_sided) = nullptr;
 	//void(*impact_func)(int, int) = nullptr;
 	MoveCommand cmd;
 	PlayerState in_state;

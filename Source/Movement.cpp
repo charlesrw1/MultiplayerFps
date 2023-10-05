@@ -3,14 +3,10 @@
 #include "Physics.h"
 #include "MeshBuilder.h"
 #include "Animation.h"
+#include "GameData.h"
 
-const Capsule DEFAULT_COLLIDER = {
-	0.2f, glm::vec3(0,0,0),glm::vec3(0,1.3,0.0)
-};
-const Capsule CROUCH_COLLIDER = {
-	0.2f, glm::vec3(0,0,0),glm::vec3(0,0.75,0.0)
-};
-const float DEFAULT_MOVESPEED = 0.1f;
+static const Capsule standing_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_STANDING_HB_HEIGHT,0) };
+static const Capsule crouch_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_CROUCING_HB_HEIGHT,0) };
 
 
 static float move_speed_player = 0.1f;
@@ -65,8 +61,8 @@ void PlayerMovement::CheckDuck()
 			player.ducking = true;
 		}
 		else if (!player.on_ground && !player.ducking) {
-			const Capsule& st = DEFAULT_COLLIDER;
-			const Capsule& cr = CROUCH_COLLIDER;
+			const Capsule& st = standing_capsule;
+			const Capsule& cr = crouch_capsule;
 			// Move legs of player up
 			player.position.y += st.tip.y - cr.tip.y;
 			player.ducking = true;
@@ -78,10 +74,10 @@ void PlayerMovement::CheckDuck()
 		float sphere_radius = 0.f;
 		vec3 offset = vec3(0.f);
 		vec3 a, b, c, d;
-		DEFAULT_COLLIDER.GetSphereCenters(a, b);
-		CROUCH_COLLIDER.GetSphereCenters(c, d);
+		standing_capsule.GetSphereCenters(a, b);
+		crouch_capsule.GetSphereCenters(c, d);
 		float len = b.y - d.y;
-		sphere_radius = CROUCH_COLLIDER.radius;
+		sphere_radius = crouch_capsule.radius;
 		if (player.on_ground) {
 			step = len / (float)steps;
 			offset = d;
@@ -94,7 +90,7 @@ void PlayerMovement::CheckDuck()
 		}
 		int i = 0;
 		for (; i < steps; i++) {
-			ColliderCastResult res;
+			GeomContact res;
 			vec3 where = player.position + offset + vec3(0, (i + 1) * step, 0);
 
 			PhysContainer obj;
@@ -138,7 +134,7 @@ void PlayerMovement::ApplyFriction(float friction_val)
 }
 void PlayerMovement::MoveAndSlide(vec3 delta)
 {
-	Capsule cap = (player.ducking) ? CROUCH_COLLIDER : DEFAULT_COLLIDER;
+	Capsule cap = (player.ducking) ? crouch_capsule : standing_capsule;
 	PhysContainer obj;
 	obj.type = PhysContainer::CapsuleType;
 	obj.cap = cap;
@@ -148,7 +144,7 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 	for (int i = 0; i < col_iters; i++)
 	{
 		position += step;
-		ColliderCastResult trace;
+		GeomContact trace;
 		obj.cap = cap;
 		obj.cap.tip += position;
 		obj.cap.base += position;
@@ -166,7 +162,7 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 	}
 	// Gets player out of surfaces
 	for (int i = 0; i < 2; i++) {
-		ColliderCastResult res;
+		GeomContact res;
 		obj.cap = cap;
 		obj.cap.tip += position;
 		obj.cap.base += position;
@@ -186,12 +182,12 @@ void PlayerMovement::CheckGroundState()
 		player.on_ground = false;
 		return;
 	}
-	ColliderCastResult result;
-	vec3 where = player.position - vec3(0, 0.005 - DEFAULT_COLLIDER.radius, 0);
+	GeomContact result;
+	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
 	PhysContainer obj;
 	obj.type = PhysContainer::SphereType;
 	obj.sph.origin = where;
-	obj.sph.radius = DEFAULT_COLLIDER.radius;
+	obj.sph.radius = standing_capsule.radius;
 
 	trace_callback(&result, obj, true, true);
 

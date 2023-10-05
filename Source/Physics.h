@@ -2,7 +2,18 @@
 #define PHYSICS_H
 #include "glm/glm.hpp"
 #include "MathLib.h"
-struct ColliderCastResult
+
+struct RayHit
+{
+	float dist=-1.f;
+	glm::vec3 pos;
+	glm::vec3 normal;
+	int id = 0;
+	int part_id = 0;
+	int surf_type = 0;
+};
+
+struct GeomContact
 {
 	glm::vec3 penetration_normal;
 	glm::vec3 intersect_point;
@@ -47,10 +58,10 @@ class Level;
 void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
 
-void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided);
-void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, ColliderCastResult* out, bool closest);
-void TraceSphere(const Level* lvl, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided);
-void TraceLine(const Level* lvl, Ray r, ColliderCastResult* out, float tmax, bool closest);
+void TraceAgainstLevel(const Level* lvl, GeomContact* out, PhysContainer obj, bool closest, bool double_sided);
+void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, GeomContact* out, bool closest);
+void TraceSphere(const Level* lvl, glm::vec3 org, float radius, GeomContact* out, bool closest, bool double_sided);
+void TraceRayAgainstLevel(const Level* lvl, Ray r, RayHit* out, bool closest);
 
 // Called by the level loader to init the bvh
 void InitStaticGeoBvh(Level* input);

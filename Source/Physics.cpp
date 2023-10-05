@@ -141,7 +141,7 @@ static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 }
 
 bool SphereVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
-	glm::vec3 pos, float radius, ColliderCastResult* out, bool doublesided)
+	glm::vec3 pos, float radius, GeomContact* out, bool doublesided)
 {
 	float dist = dot(pos, tri.face_normal) + tri.plane_offset;
 	if (dist < 0 && !doublesided)
@@ -266,7 +266,7 @@ vec3 CapsuleGetReferencePoint(const Level::CollisionData& cd, const Level::Colli
 }
 
 bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
-	const Capsule& cap, ColliderCastResult* out)
+	const Capsule& cap, GeomContact* out)
 {
 	vec3 cap_normal = normalize(cap.tip - cap.base);
 	vec3 line_end_ofs = cap_normal * cap.radius;
@@ -326,7 +326,7 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 
 	}
 }
-static void SphereVsAABB(vec3 center, float radius, Bounds aabb, ColliderCastResult* out)
+static void SphereVsAABB(vec3 center, float radius, Bounds aabb, GeomContact* out)
 {
 	glm::vec3 closest_point = glm::clamp(center, aabb.bmin, aabb.bmax);
 	float len = glm::length(closest_point - center);
@@ -353,7 +353,7 @@ Bounds CapsuleToAABB(const Capsule& cap)
 }
 
 
-void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderCastResult* out, bool closest)
+void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, GeomContact* out, bool closest)
 {
 	const Level::CollisionData& cd = lvl->collision_data;
 
@@ -367,7 +367,7 @@ void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderC
 	float best_len_total = INFINITY;
 
 	bool found_ground = false;
-	ColliderCastResult temp;
+	GeomContact temp;
 
 	auto capsule_intersect_functor = [&](int index) -> bool {
 		ASSERT(index < cd.collision_tris.size());
@@ -386,13 +386,13 @@ void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, ColliderC
 	out->touched_ground = found_ground;
 }
 
-void TraceSphere(const Level* level, glm::vec3 org, float radius, ColliderCastResult* out, bool closest, bool double_sided)
+void TraceSphere(const Level* level, glm::vec3 org, float radius, GeomContact* out, bool closest, bool double_sided)
 {
 	const Level::CollisionData& cd = level->collision_data;
 
 	float best_len_total = INFINITY;
 
-	ColliderCastResult temp;
+	GeomContact temp;
 	auto sphere_intersect_functor = [&](int index)->bool {
 		ASSERT(index < cd.collision_tris.size());
 		const Level::CollisionTri& tri = cd.collision_tris[index];
@@ -409,7 +409,7 @@ void TraceSphere(const Level* level, glm::vec3 org, float radius, ColliderCastRe
 	IntersectWorld(sphere_intersect_functor, level->static_geo_bvh, sphere);
 }
 
-void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
+void TraceAgainstLevel(const Level* lvl, GeomContact* out, PhysContainer obj, bool closest, bool double_sided)
 {
 	switch (obj.type)
 	{
@@ -424,11 +424,113 @@ void TraceAgainstLevel(const Level* lvl, ColliderCastResult* out, PhysContainer 
 	}
 }
 
-void TraceLine()
+inline void IntersectTriRay2(const Ray& r, const vec3& v0, const vec3& v1, const vec3& v2, float& t_out, vec3& bary_out)
 {
+	const vec3 edge1 = v1 - v0;
+	const vec3 edge2 = v2 - v0;
+	const vec3 h = cross(r.dir, edge2);
+	const float a = dot(edge1, h);
+	if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
+	const float f = 1 / a;
+	const vec3 s = r.pos - v0;
+	const float u = f * dot(s, h);
+	if (u < 0 || u > 1) return;
+	const vec3 q = cross(s, edge1);
+	const float v = f * dot(r.dir, q);
+	if (v < 0 || u + v > 1) return;
+	const float t = f * dot(edge2, q);
+	if (t > 0.0001f) {
+		t_out = t;
+		bary_out = vec3(u, v, 1 - u - v);
+	}
+}
+bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bvh, const Level* level)
+{
+	const BVHNode* stack[64];
+	stack[0] = &bvh.nodes[0];
+	int stack_count = 1;
+	const BVHNode* node = nullptr;
+	float t = INFINITY;
+	vec3 bary = vec3(0);
+	int triindex = -1;
+	const Level::CollisionData& cd = level->collision_data;
+	while (stack_count > 0)
+	{
+		node = stack[--stack_count];
 
+		if (node->count != BVH_BRANCH)
+		{
+			int index_count = node->count;
+			int index_start = node->left_node;
+			for (int i = 0; i < index_count; i++) {
+				vec3 bary_temp = vec3(0);
+				vec3 N_temp;
+				float t_temp = -1;
+
+				int mesh_element_index = bvh.indicies[index_start + i];
+
+				ASSERT(mesh_element_index < cd.collision_tris.size());
+				const Level::CollisionTri& tri = cd.collision_tris[mesh_element_index];
+
+				IntersectTriRay2(r, cd.vertex_list[tri.indicies[0]],
+					cd.vertex_list[tri.indicies[1]],
+					cd.vertex_list[tri.indicies[2]], t_temp, bary_temp);
+				bool res = t_temp > 0;
+
+
+				if (!res || t_temp > tmax || t_temp < tmin)
+					continue;
+				tmax = t_temp;
+				t = t_temp;
+				triindex = mesh_element_index;
+			}
+			continue;
+		}
+
+		float left_dist, right_dist;
+		bool left_aabb = bvh.nodes[node->left_node].aabb.intersect(r, left_dist);
+		bool right_aabb = bvh.nodes[node->left_node + 1].aabb.intersect(r, right_dist);
+		left_aabb = left_aabb && left_dist < t;
+		right_aabb = right_aabb && right_dist < t;
+
+		if (left_aabb && right_aabb) {
+			if (left_dist < right_dist) {
+				stack[stack_count++] = &bvh.nodes[node->left_node + 1];
+				stack[stack_count++] = &bvh.nodes[node->left_node];
+			}
+			else {
+				stack[stack_count++] = &bvh.nodes[node->left_node];
+				stack[stack_count++] = &bvh.nodes[node->left_node + 1];
+			}
+		}
+		else if (left_aabb) {
+			stack[stack_count++] = &bvh.nodes[node->left_node];
+		}
+		else if (right_aabb) {
+			stack[stack_count++] = &bvh.nodes[node->left_node + 1];
+		}
+	}
+
+	if (!std::isfinite(t)) {
+		return false;
+	}
+
+	out->pos = r.at(t);
+	const auto& tri = cd.collision_tris.at(triindex);
+	out->normal = tri.face_normal;
+	out->part_id = 0;
+	out->surf_type = tri.surf_type;
+	out->dist = t;
+	out->id = 0;
+
+	return true;
 }
 
+void TraceRayAgainstLevel(const Level* level, Ray r, RayHit* out, bool closest)
+{
+	out->dist = -1.f;
+	IntersectRayWorld(r, 0.f, 1000.f, out, level->static_geo_bvh, level);
+}
 
 void Capsule::GetSphereCenters(vec3& a, vec3& b) const
 {

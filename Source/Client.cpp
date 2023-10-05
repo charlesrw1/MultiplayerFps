@@ -13,7 +13,6 @@ Client client;
 void Client::Init()
 {
 	server_mgr.Init(this);
-	view_mgr.Init();
 	cl_game.Init();
 	out_commands.resize(CLIENT_MOVE_HISTORY);
 	time = 0.0;
@@ -77,7 +76,7 @@ void Client::CheckLocalServerIsRunning()
 		server_mgr.Connect(serv_addr);
 	}
 }
-void Client_TraceCallback(ColliderCastResult* out, PhysContainer obj, bool closest, bool double_sided)
+void Client_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided)
 {
 	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
 }
@@ -251,7 +250,7 @@ void Client::PreRenderUpdate(double frametime)
 
 	//if(core.mouse_grabbed)
 	//	DoViewAngleUpdate();	// one last time before render
-	view_mgr.Update();
+	cl_game.UpdateCamera();
 }
 
 

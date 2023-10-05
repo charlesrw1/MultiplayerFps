@@ -5,7 +5,7 @@
 
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-	EnableLag(50, 4, 0);
+	EnableLag(150, 4, 0);
 }
 
 
@@ -244,6 +244,7 @@ void ClServerMgr::SendMovesAndMessages()
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
 	writer.WriteByte(ClMessageInput);
+	writer.WriteLong(client.tick);
 	writer.WriteFloat(lastmove.forward_move);
 	writer.WriteFloat(lastmove.lateral_move);
 	writer.WriteFloat(lastmove.up_move);

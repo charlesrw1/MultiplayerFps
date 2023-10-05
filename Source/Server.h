@@ -2,6 +2,8 @@
 #define SERVER_H
 #include "Net.h"
 #include "Animation.h"
+#include "Physics.h"
+#include "GameData.h"
 
 class Model;
 struct Entity
@@ -11,14 +13,20 @@ struct Entity
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	float scale = 0.f;
-	int gun_type = 0;
 
-	float next_shoot_time = -100.0f;
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
 	bool ducking = false;
 	bool on_ground = false;
 	bool alive = true;
+
+	int health = 0;
+
+	int gun_id = 0;
+	short ammo[NUM_WPNS];
+	short clip[NUM_WPNS];
+	bool reloading = false;
+	float gun_timer = 0.f;
 
 	const Model* model = nullptr;
 	Animator anim;
@@ -29,7 +37,7 @@ struct Entity
 };
 
 Entity* ServerEntForIndex(int index);
-
+#include "MeshBuilder.h"
 class Level;
 class Game
 {
@@ -44,12 +52,21 @@ public:
 	void GetPlayerSpawnPoisiton(Entity* ent);
 	void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
 
+	void RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents);
+	void TraceWorld();
+	void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
+
+	MeshBuilder rays;
+
 	bool paused = false;
 	std::vector<Entity> ents;
 	int num_ents = 0;
 	const Level* level = nullptr;
 private:
 	Entity* InitNewEnt(EntType type, int index);
+	void BeginLagCompensation();
+	void EndLagCompensation();
+
 };
 
 struct RemoteClient {
@@ -60,7 +77,6 @@ struct RemoteClient {
 	};
 	ConnectionState state = Dead;
 	Connection connection;
-
 	float next_snapshot_time = 0.f;
 };
 
@@ -117,16 +133,12 @@ public:
 	void Spawn(const char* mapname);
 	void End();
 	bool IsActive() const;
-	
-	Entity* EntForIndex(int index);
-
 	void FixedUpdate(double dt);
 
 	bool active = false;
 	std::string map_name;
 	ClientMgr client_mgr;
 	Game sv_game;
-
 
 	Frame* GetLastSnapshotFrame() {
 		int i = cur_frame_idx - 1;
@@ -138,7 +150,9 @@ public:
 	std::vector<Frame> frames;
 
 	int tick = 0;
-	double time = 0.0;
+
+	// global time var that is swapped to aid with simming client cmds
+	double simtime = 0.0;
 public:
 	int FindClient(const IPAndPort& addr) const;
 

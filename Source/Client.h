@@ -6,7 +6,6 @@
 #include "EmulatedSocket.h"
 #include <array>
 
-// Client side version of an entity
 struct StateEntry
 {
 	int tick = 0;
@@ -25,9 +24,6 @@ struct ClientEntity
 	// history of updates for interpolation
 	StateHist hist;
 	int current_hist_index = 0;
-
-	glm::vec3 lerp_origin=glm::vec3(0.f);
-	glm::vec3 lerp_angles=glm::vec3(0.f);
 
 	Animator animator;
 	const Model* model = nullptr;
@@ -84,13 +80,25 @@ struct ViewSetup
 	int x, y, width, height;
 };
 
-class ViewMgr
+class ClientGame
 {
 public:
 	void Init();
-	void Update();
-	const ViewSetup& GetSceneView() {
-		return setup;
+
+	void ClearState();
+	void NewMap(const char* mapname);
+
+	glm::vec3 interpolated_origin;		// origin to render the eye at
+	PlayerState last_predicted;
+	PlayerState player;	// local player data
+	std::vector<ClientEntity> entities;	// client side data
+
+	const Level* level = nullptr;
+
+public:
+	void UpdateCamera();
+
+	const ViewSetup& GetSceneView() { return last_view;
 	}
 
 	bool third_person = false;
@@ -101,22 +109,8 @@ public:
 	float fov = glm::radians(70.f);
 
 	FlyCamera fly_cam;
-	ViewSetup setup;
-};
+	ViewSetup last_view;
 
-class ClientGame
-{
-public:
-	void Init();
-	void ClearState();
-	void NewMap(const char* mapname);
-
-	glm::vec3 interpolated_origin;		// origin to render the eye at
-	PlayerState last_predicted;
-	PlayerState player;	// local player data
-	std::vector<ClientEntity> entities;	// client side data
-
-	const Level* level = nullptr;
 };
 
 class Client;
@@ -192,7 +186,6 @@ public:
 	void OnRecieveNewSnapshot();
 public:
 	bool initialized = false;
-	ViewMgr view_mgr;
 	ClientGame cl_game;
 	ClServerMgr server_mgr;
 	UIMgr ui_mgr;
