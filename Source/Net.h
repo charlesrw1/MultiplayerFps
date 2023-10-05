@@ -67,9 +67,13 @@ enum EntType
 {
 	Ent_Player,
 	Ent_Item,
+	Ent_Grenade,
 	Ent_Dummy,
 	Ent_Free = 0xff,
 };
+
+// If you modify EntityState or PlayerState, then you have to 
+// modify the Entity::assignment func's and the read/write delta funcs to function properly
 
 // General state that is transmitted to clients
 struct EntityState
@@ -94,7 +98,7 @@ struct PlayerState
 	glm::vec3 velocity = glm::vec3(0.f);
 	bool on_ground = false;
 	bool ducking = false;
-
+	bool alive = false;
 };
 
 // in serverclmgr for now

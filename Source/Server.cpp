@@ -62,69 +62,13 @@ bool Server::IsActive() const
 {
 	return active;
 }
-
-const float fall_speed_threshold = -0.05f;
-const float grnd_speed_threshold = 0.1f;
-
-void PlayerUpdateAnimations(double dt, Entity* ent)
-{
-	auto playeranims = ent->model->animations.get();
-	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
-	bool falling = ent->velocity.y < fall_speed_threshold;
-
-	int leg_anim = 0;
-	if (groundspeed > grnd_speed_threshold) {
-		if (ent->ducking)
-			leg_anim = playeranims->FindClipFromName("act_crouch_walk");
-		else
-			leg_anim = playeranims->FindClipFromName("act_run");
-	}
-	else {
-		leg_anim = playeranims->FindClipFromName("act_idle");
-	}
-
-	if (leg_anim != ent->anim.leganim) {
-		ent->anim.SetLegAnim(leg_anim, 1.f);
-	}
-}
-
-void PlayerUpdate(double dt, Entity* ent)
-{
-	if(ent->alive)
-		PlayerUpdateAnimations(dt, ent);
-}
-void DummyUpdate(double dt, Entity* ent)
-{
-	ent->position.y = sin(GetTime())*2.f+2.f;
-	ent->position.x = 0.f;
-}
-
-void DoGameUpdate(double dt)
-{
-	server.simtime = server.tick * core.tick_interval;
-	Game* game = &server.sv_game;
-	for (int i = 0; i < game->ents.size(); i++) {
-		if (game->ents[i].type == Ent_Player) {
-			PlayerUpdate(dt,&game->ents[i]);
-		}
-		else if (game->ents[i].type == Ent_Dummy) {
-			DummyUpdate(dt, &game->ents[i]);
-		}
-
-
-		if (game->ents[i].type != Ent_Free) {
-			game->ents[i].anim.AdvanceFrame(dt);
-		}
-	}
-
-
-}
 void Server::FixedUpdate(double dt)
 {
 	if (!IsActive())
 		return;
+	simtime = tick * core.tick_interval;
 	client_mgr.ReadPackets();
-	DoGameUpdate(dt);
+	sv_game.Update();
 	BuildSnapshotFrame();
 	client_mgr.SendSnapshots();
 	tick += 1;

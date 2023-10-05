@@ -76,7 +76,7 @@ void Client::CheckLocalServerIsRunning()
 		server_mgr.Connect(serv_addr);
 	}
 }
-void Client_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided)
+void Client_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
 {
 	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
 }
@@ -347,21 +347,22 @@ void Client::OnRecieveNewSnapshot()
 		ClientEntity* ce = &game->entities[i];
 
 		// local player doesnt fill interp history here
-		if (i == GetPlayerNum())
+		if (i == GetPlayerNum()) {
+			ce->active = true;
 			continue;
+		}
 
-		StateEntry* lastentry = ce->GetLastState();
-		if (lastentry->state.type != Ent_Free && snapshot->entities[i].type == Ent_Free) {
+		if (snapshot->entities[i].type == Ent_Free) {
 			ce->active = false;
 			continue;
 		}
+		ce->active = true;
 
-		if (lastentry->state.type == Ent_Free && snapshot->entities[i].type != Ent_Free) {
+		StateEntry* lastentry = ce->GetLastState();
+		if (lastentry->state.type == Ent_Free) {
 			ce->ClearState();
-			ce->active = true;
 		}
 		ce->AddStateToHist(&snapshot->entities[i], tick);
-		ce->laststate = snapshot->entities[i];
 	}
 }
 

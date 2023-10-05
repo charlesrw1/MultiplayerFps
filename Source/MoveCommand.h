@@ -9,6 +9,8 @@ enum MoveCmdButtons
 	CmdBtn_Duck = 4,
 	CmdBtn_Misc1 = 8,
 	CmdBtn_Misc2 = 16,
+	CmdBtn_PFire = 32,
+	CmdBtn_SFire = 64,
 };
 
 struct MoveCommand

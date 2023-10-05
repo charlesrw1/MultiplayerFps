@@ -28,14 +28,12 @@
 MeshBuilder phys_debug;
 Core core;
 
-enum CharModTypes {
-	CtStandard,
-};
 
 struct Media
 {
 	Model* playermod;
 	Model* gun;
+	Model* grenade_he;
 	Texture* testtex;
 
 	Shader simple;
@@ -101,7 +99,7 @@ static void Cleanup()
 	NetworkQuit();
 	SDL_GL_DeleteContext(core.context);
 	SDL_DestroyWindow(core.window);
-	SDL_Quit();
+	//SDL_Quit();
 }
 void Quit()
 {
@@ -277,6 +275,7 @@ Shader simple;
 Shader textured;
 Shader animated;
 Shader static_wrld;
+Shader basic_mod;
 
 
 
@@ -387,6 +386,27 @@ static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* m
 	glCheckError();
 }
 
+static void DrawModel(EntityState* ent, Model* m, mat4 viewproj)
+{
+	basic_mod.use();
+	basic_mod.set_mat4("ViewProj", viewproj);
+
+	mat4 model = glm::translate(mat4(1), ent->position);
+	model = model * glm::eulerAngleXYZ(ent->angles.x, ent->angles.y, ent->angles.z);
+	model = glm::scale(model, vec3(0.5f));
+
+	basic_mod.set_mat4("Model", model);
+	basic_mod.set_mat4("InverseModel", mat4(1));
+
+	glCheckError();
+	//glDisable(GL_CULL_FACE);
+	for (int i = 0; i < m->parts.size(); i++)
+	{
+		MeshPart* part = &m->parts[i];
+		glBindVertexArray(part->vao);
+		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
+	}
+}
 
 static void DrawWorldEnts(mat4 viewproj)
 {
@@ -397,7 +417,10 @@ static void DrawWorldEnts(mat4 viewproj)
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
-		if (ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.cl_game.third_person)) {
+		if (ent.active && ent.interpstate.type == Ent_Grenade) {
+			DrawModel(&ent.interpstate, media.grenade_he, viewproj);
+		}
+		else if (ent.active && ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.cl_game.third_person)) {
 			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
 		}
 	}
@@ -451,10 +474,13 @@ void RenderInit()
 	media.gun = FindOrLoadModel("m16.glb");
 	media.playermod = FindOrLoadModel("CT.glb");
 	media.testtex = FindOrLoadTexture("test.png");
+	media.grenade_he = FindOrLoadModel("grenade_he.glb");
 
 	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
 	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
+	Shader::compile(&basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
+
 }
 
 void Render(double dt)
@@ -571,7 +597,10 @@ void HandleInput()
 				printf("col_closest %s\n", (col_closest) ? "on" : "off");
 			}
 			if (scancode == SDL_SCANCODE_APOSTROPHE) {
-				new_physics = !new_physics;
+				Game* g = &server.sv_game;
+				g->KillEnt(g->ents.data() + 0);
+
+
 			}
 			if (scancode == SDL_SCANCODE_T)
 				client.cl_game.third_person = !client.cl_game.third_person;
@@ -704,12 +733,6 @@ int main(int argc, char** argv)
 			dt = 0.1;
 		core.frame_time = dt;
 		MainLoop(dt);
-
-		static int next_print = 0.0;
-		if (next_print < GetTime()) {
-			printf("frame %f\n", dt);
-			next_print = GetTime() + 1.0;
-		}
 	}
 	
 	return 0;

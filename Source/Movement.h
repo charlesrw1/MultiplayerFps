@@ -11,11 +11,12 @@ public:
 	// caller sets these vars
 	MeshBuilder* phys_debug = nullptr;
 	//void* user_arg = nullptr;
-	void(*trace_callback)(GeomContact* out, PhysContainer obj, bool closest, bool double_sided) = nullptr;
+	void(*trace_callback)(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent) = nullptr;
 	//void(*impact_func)(int, int) = nullptr;
 	MoveCommand cmd;
 	PlayerState in_state;
 	float deltat;
+	int ignore_ent;
 
 	void Run();
 	PlayerState* GetOutputState() {

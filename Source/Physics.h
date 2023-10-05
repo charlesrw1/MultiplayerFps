@@ -8,9 +8,10 @@ struct RayHit
 	float dist=-1.f;
 	glm::vec3 pos;
 	glm::vec3 normal;
-	int id = 0;
+	int ent_id = 0;
 	int part_id = 0;
 	int surf_type = 0;
+	bool hit_world = false;
 };
 
 struct GeomContact
@@ -58,6 +59,7 @@ class Level;
 void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
 
+void CylinderCylinderIntersect(float r1, glm::vec3 o1, float h1, float r2, glm::vec3 o2, float h2, GeomContact* out);
 void TraceAgainstLevel(const Level* lvl, GeomContact* out, PhysContainer obj, bool closest, bool double_sided);
 void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, GeomContact* out, bool closest);
 void TraceSphere(const Level* lvl, glm::vec3 org, float radius, GeomContact* out, bool closest, bool double_sided);

@@ -3,6 +3,22 @@
 #include "Level.h"
 #include "Movement.h"
 
+void PlayerDeathUpdate(Entity* ent);
+void PlayerUpdate(Entity* ent);
+void PlayerUpdateAnimations(Entity* ent);
+void PlayerSpawn(Entity* ent);
+void PlayerItemUpdate(Entity* ent, MoveCommand cmd);
+
+void DummyUpdate(Entity* ent);
+void DummySpawn(Entity* ent);
+
+Entity* CreateGrenade(Entity* from, glm::vec3 org, glm::vec3 vel, int gtype);
+void GrenadeUpdate(Entity* ent);
+
+void PostEntUpdate(Entity* ent);
+
+void EntTakeDamage(Entity* ent, Entity* from, int amt);
+
 Entity* ServerEntForIndex(int index)
 {
 	ASSERT(index >= 0 && index < MAX_GAME_ENTS);
@@ -20,28 +36,6 @@ void Game::GetPlayerSpawnPoisiton(Entity* ent)
 		ent->rotation = glm::vec3(0);
 	}
 }
-
-void PlayerSpawn(Entity* ent)
-{
-	ASSERT(ent->type == Ent_Player);
-	ent->model = FindOrLoadModel("CT.glb");
-	ent->anim.Init(ent->model);
-	ent->anim.ResetLayers();
-	if (ent->model) {
-		int idle = ent->model->animations->FindClipFromName("act_idle");
-	}
-	//server.sv_game.GetPlayerSpawnPoisiton(ent);
-	ent->ducking = false;
-}
-
-void DummySpawn(Entity* ent)
-{
-	ent->model = FindOrLoadModel("CT.glb");
-	ent->anim.Init(ent->model);
-	if (ent->model)
-		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"),1.f);
-}
-
 Entity* Game::InitNewEnt(EntType type, int index)
 {
 	Entity* ent = &ents[index];
@@ -54,6 +48,11 @@ Entity* Game::InitNewEnt(EntType type, int index)
 	ent->velocity = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
 	ent->scale = 1.f;
+
+	ent->alive = false;
+	ent->health = 0;
+	ent->on_ground = false;
+
 	return ent;
 }
 
@@ -68,15 +67,16 @@ void Game::SpawnNewClient(int client)
 void Game::OnClientLeave(int client)
 {
 	Entity* ent = &ents[client];
-	ent->type = Ent_Free;
-	num_ents--;
+	RemoveEntity(ent);
 	printf("remove client %d from game\n", client);
 }
 
 int Game::MakeNewEntity(EntType type, glm::vec3 pos, glm::vec3 rot)
 {
-	if (type == Ent_Player)
+	if (type == Ent_Player) {
+		printf("can't make player with makenewentity\n");
 		return -1;
+	}
 	int slot = MAX_CLIENTS;
 	for (; slot < MAX_GAME_ENTS; slot++) {
 		if (ents[slot].type == Ent_Free)
@@ -134,16 +134,123 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	r.dir = dir;
 	r.pos = org;
 	RayHit hit;
-	TraceRayAgainstLevel(level, r, &hit, false);
-	if (hit.dist >= 0.f)
+	//TraceRayAgainstLevel(level, r, &hit, false);
+
+	RayWorldIntersect(r, &hit, GetEntIndex(from), false);
+
+	// >>>
+	CreateGrenade(from, org + dir * 0.1f, dir * 18.f, 0);
+	// <<<
+
+	if (hit.hit_world)
+		return;
+
+	Entity* ent = ents.data() + hit.ent_id;
+	EntTakeDamage(ent, from, 26);
+	
+
+	if (hit.dist >= 0.f) {
 		rays.PushLine(org, hit.pos, COLOR_WHITE);
+		rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
+	}
 }
 
 void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents)
 {
-	
+	TraceRayAgainstLevel(level, r, out, true);
+	if (out->dist >= 0.f)
+		out->hit_world = true;
+	if (!noents) {
+		for (int i = 0; i < ents.size(); i++) {
+			if (ents[i].type == Ent_Free) continue;
+			Entity* ent = ents.data() + i;
+			if (ent->type != Ent_Player && ent->type != Ent_Dummy)
+				continue;
+			if (i == skipent)
+				continue;
+
+			Bounds b;
+			b.bmin = vec3(-CHAR_HITBOX_RADIUS, 0, -CHAR_HITBOX_RADIUS);
+			b.bmax = vec3(CHAR_HITBOX_RADIUS, CHAR_STANDING_HB_HEIGHT, CHAR_HITBOX_RADIUS);
+			if (ent->ducking) {
+				b.bmax.y = CHAR_CROUCING_HB_HEIGHT;
+			}
+			b.bmin += ent->position;
+			b.bmax += ent->position;
 
 
+			float t_out = -1.f;
+			bool has_hit = b.intersect(r, t_out);
+
+			if (has_hit) {
+				out->dist = t_out;
+				out->ent_id = i;
+				out->hit_world = false;
+				out->pos = r.at(t_out);
+			}
+		}
+	}
+}
+
+void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, bool noents)
+{
+	contact->found = false;
+	contact->penetration_depth = -INFINITY;
+	TraceAgainstLevel(level, contact, obj, true, true);
+	if (noents)
+		return;
+	for (int i = 0; i < ents.size(); i++) {
+		if (ents[i].type == Ent_Free || i == skipent) {
+			continue;
+		}
+		if (ents[i].type == Ent_Grenade)
+			continue;
+		GeomContact c;
+		CylinderCylinderIntersect(obj.cap.radius, obj.cap.base, obj.cap.tip.y - obj.cap.base.y, 
+			CHAR_HITBOX_RADIUS, ents[i].position, CHAR_STANDING_HB_HEIGHT, &c);
+		if (c.found && c.penetration_depth > contact->penetration_depth)
+			*contact = c;
+	}
+}
+
+void PlayerSpawn(Entity* ent)
+{
+	ASSERT(ent->type == Ent_Player);
+	ent->model = FindOrLoadModel("CT.glb");
+	ent->anim.Init(ent->model);
+	ent->anim.ResetLayers();
+
+	if (ent->model) {
+		int idle = ent->model->animations->FindClipFromName("act_idle");
+	}
+	//server.sv_game.GetPlayerSpawnPoisiton(ent);
+	ent->ducking = false;
+	ent->health = 100;
+	ent->alive = true;
+	server.sv_game.GetPlayerSpawnPoisiton(ent);
+}
+
+void DummySpawn(Entity* ent)
+{
+	ent->model = FindOrLoadModel("CT.glb");
+	ent->anim.Init(ent->model);
+	if (ent->model)
+		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"), 1.f);
+}
+
+void EntTakeDamage(Entity* ent, Entity* from, int amt)
+{
+	if (!ent->alive)
+		return;
+	ent->health -= amt;
+	if (ent->health <= 0) {
+		ent->alive = false;
+		ent->death_time = server.simtime + 3.0;
+
+		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"), 1.f);
+		ent->anim.dont_loop = true;
+		printf("died!\n");
+	}
 }
 
 
@@ -182,9 +289,12 @@ void PlayerItemUpdate(Entity* ent, MoveCommand cmd)
 }
 
 
-void Server_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided)
+void Server_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
 {
-	TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
+
+	server.sv_game.PhysWorldTrace(obj, out, ignore_ent, false);
+
+	//TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
 }
 
 
@@ -196,7 +306,7 @@ PlayerState Entity::ToPlayerState() const
 	ps.ducking = ducking;
 	ps.on_ground = on_ground;
 	ps.velocity = velocity;
-
+	ps.alive = alive;
 	return ps;
 }
 void Entity::FromPlayerState(PlayerState* ps)
@@ -232,6 +342,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.phys_debug = &mb;
 	move.trace_callback = Server_TraceCallback;
 	move.in_state = ent->ToPlayerState();
+	move.ignore_ent = GetEntIndex(ent);
 	move.Run();
 	ent->FromPlayerState(move.GetOutputState());
 
@@ -240,5 +351,157 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	PlayerItemUpdate(ent, cmd);
 	server.simtime = oldtime;
 	//phys_debug.End();
+}
 
+const float fall_speed_threshold = -0.05f;
+const float grnd_speed_threshold = 0.1f;
+
+void PlayerUpdateAnimations(Entity* ent)
+{
+	auto playeranims = ent->model->animations.get();
+	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
+	bool falling = ent->velocity.y < fall_speed_threshold;
+	ent->anim.dont_loop = false;
+	int leg_anim = 0;
+	if (groundspeed > grnd_speed_threshold) {
+		if (ent->ducking)
+			leg_anim = playeranims->FindClipFromName("act_crouch_walk");
+		else
+			leg_anim = playeranims->FindClipFromName("act_run");
+	}
+	else {
+		leg_anim = playeranims->FindClipFromName("act_idle");
+	}
+
+	if (leg_anim != ent->anim.leganim) {
+		ent->anim.SetLegAnim(leg_anim, 1.f);
+	}
+}
+
+void PlayerDeathUpdate(Entity* ent)
+{
+	if (ent->death_time < server.simtime) {
+		ent->health = 100;
+		ent->alive = true;
+		server.sv_game.GetPlayerSpawnPoisiton(ent);
+	}
+}
+
+void Game::KillEnt(Entity* ent)
+{
+	ent->alive = false;
+	ent->death_time = server.simtime + 5.0;
+	ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"), 1.f);
+	ent->anim.dont_loop = true;
+}
+
+void PlayerUpdate(Entity* ent)
+{
+	if (ent->alive)
+		PlayerUpdateAnimations(ent);
+	else
+		PlayerDeathUpdate(ent);
+
+	if (ent->position.y < -50 && ent->alive) {
+		ent->alive = false;
+		ent->death_time = server.simtime + 0.5f;
+	}
+}
+void DummyUpdate(Entity* ent)
+{
+	//ent->position.y = sin(GetTime()) * 2.f + 2.f;
+	ent->position.x = 0.f;
+}
+
+Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int grenade_type)
+{
+	ASSERT(thrower);
+	Game* g = &server.sv_game;
+	int eidx = g->MakeNewEntity(Ent_Grenade, org, glm::vec3(0.f));
+	Entity* e = &g->ents[eidx];
+
+	e->owner_index = thrower->index;
+	e->position = org;
+	e->velocity = start_vel;
+	e->sub_type = grenade_type;
+	e->alive = true;
+	e->death_time = server.simtime + 5.f;
+	return e;
+}
+
+void RunProjectilePhysics(Entity* ent)
+{
+	Game* g = &server.sv_game;
+	// update physics, detonate if ready
+	float dt = core.tick_interval;
+	ent->velocity.y -= 12.f * dt;// gravity
+	glm::vec3 next_position = ent->position + ent->velocity * dt;
+	float len = glm::length(ent->velocity * dt);
+	RayHit rh;
+	Ray r;
+	r.dir = (ent->velocity * dt) / len;
+	r.pos = ent->position;
+	g->RayWorldIntersect(r, &rh, ent->owner_index, false);
+	if (rh.hit_world && rh.dist < len) {
+		ent->position = r.at(rh.dist) + rh.normal * 0.01f;
+		ent->velocity = glm::reflect(ent->velocity, rh.normal);
+		ent->velocity *= 0.6f;
+	}
+	else {
+		ent->position = next_position;
+	}
+}
+
+
+void GrenadeUpdate(Entity* ent)
+{
+	Game* g = &server.sv_game;
+	RunProjectilePhysics(ent);
+	// spin grenade based on velocity
+	float dt = core.tick_interval;
+	ent->rotation.x += 1.5 * dt * ent->velocity.y;
+	ent->rotation.y -= 2.13 * dt * ent->velocity.y;
+	ent->rotation.z += 0.2 * dt * ent->velocity.y;
+
+	if (ent->death_time < server.simtime) {
+		printf("BOOM\n");
+		g->RemoveEntity(ent);
+	}
+}
+
+void PostEntUpdate(Entity* ent) {
+	ent->anim.AdvanceFrame(core.tick_interval);
+}
+
+void Game::Update()
+{
+	double dt = core.tick_interval;
+	for (int i = 0; i < ents.size(); i++) {
+		Entity* e = &ents[i];
+		if (e->type == Ent_Free)
+			continue;
+
+		switch (e->type) {
+		case Ent_Player:
+			PlayerUpdate(e);
+			break;
+		case Ent_Dummy:
+			DummyUpdate(e);
+			break;
+		case Ent_Grenade:
+			GrenadeUpdate(e);
+			break;
+		}
+		PostEntUpdate(e);
+	}
+}
+
+void Game::RemoveEntity(Entity* ent)
+{
+	ent->type = Ent_Free;
+	ent->alive = false;
+	ent->model = nullptr;
+	ent->anim.ResetLayers();
+
+	num_ents--;
 }

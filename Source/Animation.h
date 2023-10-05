@@ -76,18 +76,6 @@ public:
 #define LOWERBODY_LAYER 1
 #define FULLBODY_LAYER 0
 
-struct AnimationLayer
-{
-public:
-	int set_index = -1;
-	float playing_speed = 1.f;
-	float cur_frame = 0.f;
-	double starttime = 0.0;
-	bool finished = true;
-	bool active = false;
-	bool looping = true;
-};
-
 class Model;
 class Animator
 {
@@ -123,6 +111,7 @@ public:
 	int leganim=-1;
 	float leganim_frame;
 	float leganim_speed;
+	bool dont_loop = false;
 
 	//AnimationLayer layers[NUM_ANIMATION_LAYERS];
 

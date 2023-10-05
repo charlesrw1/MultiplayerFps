@@ -66,6 +66,41 @@ void InitStaticGeoBvh(Level* level)
 	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
+void CylinderCylinderIntersect(float r1, glm::vec3 o1, float h1, float r2, glm::vec3 o2, float h2, GeomContact* out)
+{
+	out->found = false;
+	bool y_overlap = o1.y <= o2.y + h2 && o1.y + h1 >= o2.y;
+	float yoverlap_amt = glm::min(glm::abs(o2.y + h2 - o1.y), glm::abs(o1.y + h1 - o2.y));
+	glm::vec3 yintersectvect = glm::vec3(0, o1.y - (o2.y + h2), 0);
+	glm::vec3 yintersectvec2 = glm::vec3(0, o2.y - (o1.y + h1), 0);
+	if (glm::abs(yintersectvec2.y) < glm::abs(yintersectvect.y))
+		yintersectvect = yintersectvec2;
+
+	glm::vec3 xzintersectvec = glm::vec3(o1.x - o2.x, 0, o1.z - o2.z);
+	float xz_dist = glm::length(xzintersectvec);
+	bool xzoverlap = xz_dist <= r1 + r2;
+
+	if (!y_overlap || !xzoverlap)
+		return;
+
+	//if(xz_dist < glm::abs(yintersectvect.y)) {
+		out->found = true;
+		out->penetration_depth = r1+r2-xz_dist;
+		out->penetration_normal = xzintersectvec/xz_dist;
+		out->intersect_len = r1 - out->penetration_depth;
+	//}
+	//else{
+	//	out->found = true;
+	//	out->penetration_depth = glm::abs(yintersectvect.y);
+	//	out->penetration_normal = yintersectvect / glm::abs(yintersectvect.y);
+	//	out->intersect_len = out->penetration_depth;
+	//	printf("intersect y \n");
+	//}
+
+	
+
+}
+
 template<typename Functor>
 static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 {
@@ -521,7 +556,7 @@ bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bv
 	out->part_id = 0;
 	out->surf_type = tri.surf_type;
 	out->dist = t;
-	out->id = 0;
+	out->ent_id = 0;
 
 	return true;
 }

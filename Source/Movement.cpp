@@ -98,7 +98,7 @@ void PlayerMovement::CheckDuck()
 			obj.sph.origin = where;
 			obj.sph.radius = sphere_radius;
 
-			trace_callback(&res, obj, true, false);
+			trace_callback(&res, obj, true, false, ignore_ent);
 
 			//TraceSphere(level, where, sphere_radius, &res, true, false);
 			if (res.found) {
@@ -149,7 +149,7 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 		obj.cap.tip += position;
 		obj.cap.base += position;
 	
-		trace_callback(&trace, obj, col_closest, false);
+		trace_callback(&trace, obj, col_closest, false, ignore_ent);
 
 		//TraceCapsule(level, position, cap, &trace, col_closest);
 		if (trace.found)
@@ -167,7 +167,7 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 		obj.cap.tip += position;
 		obj.cap.base += position;
 
-		trace_callback(&res, obj, col_closest, false);
+		trace_callback(&res, obj, col_closest, false, ignore_ent);
 		//TraceCapsule(level, position, cap, &res, col_closest);
 		if (res.found) {
 			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
@@ -189,7 +189,7 @@ void PlayerMovement::CheckGroundState()
 	obj.sph.origin = where;
 	obj.sph.radius = standing_capsule.radius;
 
-	trace_callback(&result, obj, true, true);
+	trace_callback(&result, obj, true, true, ignore_ent);
 
 	//TraceSphere(level, where, radius, &result, true, true);
 	if (!result.found)
@@ -238,8 +238,10 @@ void PlayerMovement::GroundMove()
 
 	MoveAndSlide(delta);
 
-	player.angles = vec3(0.f);
-	player.angles.y = HALFPI-cmd.view_angles.y;
+	if (player.alive) {
+		player.angles = vec3(0.f);
+		player.angles.y = HALFPI - cmd.view_angles.y;
+	}
 }
 void PlayerMovement::AirMove()
 {
@@ -248,6 +250,11 @@ void PlayerMovement::AirMove()
 void PlayerMovement::Run()
 {
 	player = in_state;
+	if (!player.alive) {
+		cmd.forward_move = 0;
+		cmd.lateral_move = 0;
+		cmd.up_move = 0;
+	}
 	vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
 	inp_len = length(inputvec);
 	if (inp_len > 0.00001)
@@ -266,6 +273,7 @@ void PlayerMovement::Run()
 	look_front.y = 0;
 	look_front = normalize(look_front);
 	look_side = -cross(look_front, vec3(0, 1, 0));
+
 
 
 	float fric_val = (player.on_ground) ? ground_friction : air_friction;

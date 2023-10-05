@@ -5,7 +5,7 @@
 
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-	EnableLag(150, 4, 0);
+	EnableLag(20, 1, 0);
 }
 
 

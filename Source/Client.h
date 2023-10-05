@@ -14,11 +14,10 @@ struct StateEntry
 
 struct ClientEntity
 {
-	const static int NUM_STORED_STATES = 25;
+	const static int NUM_STORED_STATES = 8;
 	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
 
 	bool active = false;
-	EntityState laststate;
 	EntityState interpstate;
 
 	// history of updates for interpolation

@@ -121,17 +121,10 @@ void Animator::AdvanceFrame(float elapsed)
 			const Animation& clip = model->animations->clips[leganim];
 			leganim_frame += clip.fps * elapsed * leganim_speed;
 			if (leganim_frame > clip.total_duration || leganim_frame < 0.f) {
-				leganim_frame = fmod(fmod(leganim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			}
-			if (1)
-			{
-
-				static int timer = 0;
-				if (timer == 0) {
-					timer = 200;
-					printf("Anim frame: %f\n", leganim_frame);
-				}
-				timer--;
+				if (dont_loop)
+					leganim_frame = clip.total_duration;
+				else
+					leganim_frame = fmod(fmod(leganim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 			}
 		}
 	}

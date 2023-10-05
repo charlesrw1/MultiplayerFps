@@ -21,9 +21,12 @@ void ClientGame::Init()
 }
 void ClientGame::ClearState()
 {
-	for (int i = 0; i < MAX_GAME_ENTS; i++)
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		entities[i].active = false;
-	FreeLevel(level);
+		entities[i].ClearState();
+	}
+	if(level)
+		FreeLevel(level);
 	level = nullptr;
 }
 void ClientGame::NewMap(const char* mapname)

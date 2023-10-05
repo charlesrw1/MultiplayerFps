@@ -2,11 +2,18 @@ shooting mechanics
 	-when player presses fire the following happens
 		-local client side effects (gun animation, firing sound)
 		-server rolls back entities to the players perspective (their tick - cl interp) does a raycast and determines if anything is hit. If a player is hit, decrease their health. If their health is at 0, call a respawn routine in the multiplayer game rules. Also when other players fire, send sound/particle event to other clients to play. Also need team system for friendly fire and such
+	
+	
+	
 	-for the bomb item, a flag is kept server side if player is in bomb zone, if they are, then animation starts
+	
+basic grenade physics (10/5)	
+
 win/lose states
 	-multiplayer game rules handles the round timers
 triggers for buy zone and bomb planting
 game states for menu/in game/ etc
+particle effects/trails: server sends them over and can have optional owner entity to grab pos from
 
 tech updates:
 delta snapshot encoding (mostly done 10/4)
@@ -14,7 +21,7 @@ reliable messages (not very difficult now)
 entity interpolation on clients with pos history (done 10/4)
 lag compensation on server
 (Maybe): buffer inputs on server to avoid simming 2 inputs in one packet
-update physics to detect collisions between objs and response
+update physics to detect collisions between objs and response (started 10/5)
 
 gfx:
 textured models (easy)

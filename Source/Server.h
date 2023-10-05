@@ -19,9 +19,14 @@ struct Entity
 	bool ducking = false;
 	bool on_ground = false;
 	bool alive = true;
+	bool frozen = false;
 
-	int health = 0;
+	// ent specific vars
+	int owner_index = 0;
+	int sub_type = 0;
 
+	float death_time = 0.0;
+	int health = 100;
 	int gun_id = 0;
 	short ammo[NUM_WPNS];
 	short clip[NUM_WPNS];
@@ -37,7 +42,9 @@ struct Entity
 };
 
 Entity* ServerEntForIndex(int index);
+
 #include "MeshBuilder.h"
+
 class Level;
 class Game
 {
@@ -45,16 +52,28 @@ public:
 	void Init();
 	void ClearState();
 	bool DoNewMap(const char* mapname);
+	void Update();
+
 	void SpawnNewClient(int clientnum);
 	void OnClientLeave(int clientnum);
 
 	int MakeNewEntity(EntType type, glm::vec3 pos, glm::vec3 rot);
+	void RemoveEntity(Entity* ent);
+
+	void KillEnt(Entity* ent);
+
 	void GetPlayerSpawnPoisiton(Entity* ent);
 	void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
+	void OnPlayerKilled(Entity* ent);
 
 	void RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents);
-	void TraceWorld();
+	void PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, bool noents);
 	void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
+
+	Entity* EntForIndex(int index) {
+		ASSERT(index < ents.size() && index >= 0);
+		return &ents[index]; 
+	}
 
 	MeshBuilder rays;
 
@@ -63,10 +82,12 @@ public:
 	int num_ents = 0;
 	const Level* level = nullptr;
 private:
+	int GetEntIndex(Entity* ent) const {
+		return (ent - ents.data());
+	}
 	Entity* InitNewEnt(EntType type, int index);
 	void BeginLagCompensation();
 	void EndLagCompensation();
-
 };
 
 struct RemoteClient {
