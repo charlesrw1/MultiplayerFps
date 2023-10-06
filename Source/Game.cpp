@@ -10,7 +10,7 @@ void PlayerSpawn(Entity* ent);
 void PlayerItemUpdate(Entity* ent, MoveCommand cmd);
 
 void DummyUpdate(Entity* ent);
-void DummySpawn(Entity* ent);
+Entity* CreateDummy();
 
 Entity* CreateGrenade(Entity* from, glm::vec3 org, glm::vec3 vel, int gtype);
 void GrenadeUpdate(Entity* ent);
@@ -71,30 +71,19 @@ void Game::OnClientLeave(int client)
 	printf("remove client %d from game\n", client);
 }
 
-int Game::MakeNewEntity(EntType type, glm::vec3 pos, glm::vec3 rot)
+Entity* Game::MakeNewEntity(EntType type)
 {
-	if (type == Ent_Player) {
-		printf("can't make player with makenewentity\n");
-		return -1;
-	}
 	int slot = MAX_CLIENTS;
 	for (; slot < MAX_GAME_ENTS; slot++) {
 		if (ents[slot].type == Ent_Free)
 			break;
 	}
 	if (slot == MAX_GAME_ENTS)
-		return -1;
+		return nullptr;
 	Entity* ent = InitNewEnt(type, slot);
 	num_ents++;
 	printf("spawning ent in slot %d\n", slot);
-
-	switch (type)
-	{
-	case Ent_Dummy:
-		DummySpawn(ent);
-		break;
-	}
-	return slot;
+	return ent;
 }
 
 void Game::Init()
@@ -110,7 +99,8 @@ void Game::ClearState()
 		ents[i].type = Ent_Free;
 	}
 	num_ents = 0;
-	FreeLevel(level);
+	if(level)
+		FreeLevel(level);
 	level = nullptr;
 }
 bool Game::DoNewMap(const char* mapname)
@@ -122,7 +112,7 @@ bool Game::DoNewMap(const char* mapname)
 	if (!level)
 		Fatalf("level not loaded\n");
 
-	MakeNewEntity(Ent_Dummy, glm::vec3(0.f), glm::vec3(0.f));
+	CreateDummy();
 
 	return true;
 }
@@ -136,7 +126,7 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	RayHit hit;
 	//TraceRayAgainstLevel(level, r, &hit, false);
 
-	RayWorldIntersect(r, &hit, GetEntIndex(from), false);
+	RayWorldIntersect(r, &hit, GetEntIndex(from), Pf_All);
 
 	// >>>
 	CreateGrenade(from, org + dir * 0.1f, dir * 18.f, 0);
@@ -155,12 +145,12 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	}
 }
 
-void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents)
+void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags filter)
 {
 	TraceRayAgainstLevel(level, r, out, true);
 	if (out->dist >= 0.f)
 		out->hit_world = true;
-	if (!noents) {
+	if (filter & (Pf_Players|Pf_Nonplayers)) {
 		for (int i = 0; i < ents.size(); i++) {
 			if (ents[i].type == Ent_Free) continue;
 			Entity* ent = ents.data() + i;
@@ -192,12 +182,12 @@ void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents)
 	}
 }
 
-void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, bool noents)
+void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, PhysFilterFlags filter)
 {
 	contact->found = false;
 	contact->penetration_depth = -INFINITY;
 	TraceAgainstLevel(level, contact, obj, true, true);
-	if (noents)
+	if (!(filter & (Pf_Players|Pf_Nonplayers)))
 		return;
 	for (int i = 0; i < ents.size(); i++) {
 		if (ents[i].type == Ent_Free || i == skipent) {
@@ -230,12 +220,19 @@ void PlayerSpawn(Entity* ent)
 	server.sv_game.GetPlayerSpawnPoisiton(ent);
 }
 
-void DummySpawn(Entity* ent)
+Entity* CreateDummy()
 {
+	Entity* ent = server.sv_game.MakeNewEntity(Ent_Dummy);
+	ent->position = glm::vec3(0.f);
+	ent->rotation = glm::vec3(0.f);
+	ent->alive = true;
+	ent->health = 100;
 	ent->model = FindOrLoadModel("CT.glb");
 	ent->anim.Init(ent->model);
 	if (ent->model)
-		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"), 1.f);
+		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"));
+
+	return ent;
 }
 
 void EntTakeDamage(Entity* ent, Entity* from, int amt)
@@ -247,54 +244,34 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 		ent->alive = false;
 		ent->death_time = server.simtime + 3.0;
 
-		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"), 1.f);
+		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"));
 		ent->anim.dont_loop = true;
 		printf("died!\n");
 	}
 }
 
 
-void PlayerItemUpdate(Entity* ent, MoveCommand cmd)
+void RunEntityEvents(Entity* ent, EntityEvent* ev, int num_events)
 {
-	bool wants_shoot = cmd.button_mask & CmdBtn_Misc1;
-	bool wants_reload = cmd.button_mask & CmdBtn_Misc2;
-
-	// unarmed
-	//if (ent->gun_id == -1)
-	//	return;
-	//
-	//if (ent->reloading && ent->gun_timer < server.time) {
-	//	ent->reloading = false;
-	//	int amt = glm::min((short)10, ent->ammo[ent->gun_id]);
-	//	ent->clip[ent->gun_id] += amt;
-	//	ent->ammo[ent->gun_id] -= amt;
-	//	printf("reloaded\n");
-	//}
-	//
-	
-	if (ent->reloading || ent->gun_timer >= server.simtime)
-		return;
-
-	if (wants_shoot){// && ent->clip[ent->gun_id] > 0) {
-		server.sv_game.ShootBullets(ent, 
-			AnglesToVector(cmd.view_angles.x, cmd.view_angles.y), 
-			ent->position+glm::vec3(0,STANDING_EYE_OFFSET,0));
-		ent->gun_timer = server.simtime + 0.1f;
-		ent->clip[ent->gun_id]--;
-	}
-	else if ((ent->clip[ent->gun_id] <= 0 || wants_reload) && ent->ammo[ent->gun_id] > 0) {
-		ent->reloading = true;
-		ent->gun_timer += 1.0f;
+	for (int i = 0; i < num_events;i++)
+	{
+		switch (ev[i])
+		{
+		case Ev_FirePrimary: {
+			glm::vec3 shoot_vec = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
+			server.sv_game.ShootBullets(ent, shoot_vec,
+				ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
+		}break;
+		case Ev_Reload:
+			break;
+		}
 	}
 }
 
 
 void Server_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
 {
-
-	server.sv_game.PhysWorldTrace(obj, out, ignore_ent, false);
-
-	//TraceAgainstLevel(server.sv_game.level, out, obj, closest, double_sided);
+	server.sv_game.PhysWorldTrace(obj, out, ignore_ent, Pf_All);
 }
 
 
@@ -307,6 +284,9 @@ PlayerState Entity::ToPlayerState() const
 	ps.on_ground = on_ground;
 	ps.velocity = velocity;
 	ps.alive = alive;
+
+	ps.weapons = wpns;
+	ps.in_jump = in_jump;
 	return ps;
 }
 void Entity::FromPlayerState(PlayerState* ps)
@@ -316,6 +296,9 @@ void Entity::FromPlayerState(PlayerState* ps)
 	ducking = ps->ducking;
 	on_ground = ps->on_ground;
 	velocity = ps->velocity;
+
+	wpns = ps->weapons;
+	in_jump = ps->in_jump;
 }
 EntityState Entity::ToEntState() const
 {
@@ -334,6 +317,7 @@ EntityState Entity::ToEntState() const
 #include "MeshBuilder.h"
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
+	ent->view_angles = cmd.view_angles;
 	MeshBuilder mb;
 	//phys_debug.Begin();
 	PlayerMovement move;
@@ -344,38 +328,71 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.in_state = ent->ToPlayerState();
 	move.ignore_ent = GetEntIndex(ent);
 	move.Run();
-	ent->FromPlayerState(move.GetOutputState());
 
 	double oldtime = server.simtime;
 	server.simtime = cmd.tick * core.tick_interval;
-	PlayerItemUpdate(ent, cmd);
+
+	WeaponController weaponcontroller;
+	weaponcontroller.cmd = cmd;
+	weaponcontroller.deltat = core.tick_interval;
+	weaponcontroller.simtime = server.simtime;
+	weaponcontroller.state = *move.GetOutputState();
+	weaponcontroller.Run();
+
+	RunEntityEvents(ent, weaponcontroller.events, weaponcontroller.num_events);
+
+	ent->FromPlayerState(&weaponcontroller.state);
+
 	server.simtime = oldtime;
+
 	//phys_debug.End();
 }
 
 const float fall_speed_threshold = -0.05f;
-const float grnd_speed_threshold = 0.1f;
+const float grnd_speed_threshold = 0.025f;
 
 void PlayerUpdateAnimations(Entity* ent)
 {
+	glm::vec3 ent_face_dir = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
+
+
 	auto playeranims = ent->model->animations.get();
 	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
 	bool falling = ent->velocity.y < fall_speed_threshold;
 	ent->anim.dont_loop = false;
 	int leg_anim = 0;
-	if (groundspeed > grnd_speed_threshold) {
+	float speed = 1.f;
+
+	const char* newanim = "null";
+	if (ent->in_jump) {
+		newanim = "act_jump";
+	}
+	else if (groundspeed > grnd_speed_threshold) {
 		if (ent->ducking)
-			leg_anim = playeranims->FindClipFromName("act_crouch_walk");
-		else
-			leg_anim = playeranims->FindClipFromName("act_run");
+			newanim = "act_crouch_walk";
+		else {
+			newanim = "act_run";
+			speed = ((groundspeed-grnd_speed_threshold) /6.f) + 1.f;
+
+			if (dot(ent_face_dir, ent->velocity) < -0.25) {
+				speed = -speed;
+			}
+
+		}
 	}
 	else {
-		leg_anim = playeranims->FindClipFromName("act_idle");
+		if (ent->ducking)
+			newanim = "act_crouch_idle";
+		else
+			newanim = "act_idle";
 	}
 
+	leg_anim = ent->model->animations->FindClipFromName(newanim);
+
 	if (leg_anim != ent->anim.leganim) {
-		ent->anim.SetLegAnim(leg_anim, 1.f);
+		ent->anim.SetLegAnim(leg_anim);
 	}
+	ent->anim.SetLegAnimSpeed(speed);
 }
 
 void PlayerDeathUpdate(Entity* ent)
@@ -385,14 +402,6 @@ void PlayerDeathUpdate(Entity* ent)
 		ent->alive = true;
 		server.sv_game.GetPlayerSpawnPoisiton(ent);
 	}
-}
-
-void Game::KillEnt(Entity* ent)
-{
-	ent->alive = false;
-	ent->death_time = server.simtime + 5.0;
-	ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"), 1.f);
-	ent->anim.dont_loop = true;
 }
 
 void PlayerUpdate(Entity* ent)
@@ -411,14 +420,15 @@ void DummyUpdate(Entity* ent)
 {
 	//ent->position.y = sin(GetTime()) * 2.f + 2.f;
 	ent->position.x = 0.f;
+	if (!ent->alive)
+		server.sv_game.RemoveEntity(ent);
 }
 
 Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int grenade_type)
 {
 	ASSERT(thrower);
 	Game* g = &server.sv_game;
-	int eidx = g->MakeNewEntity(Ent_Grenade, org, glm::vec3(0.f));
-	Entity* e = &g->ents[eidx];
+	Entity* e = g->MakeNewEntity(Ent_Grenade);
 
 	e->owner_index = thrower->index;
 	e->position = org;
@@ -441,7 +451,7 @@ void RunProjectilePhysics(Entity* ent)
 	Ray r;
 	r.dir = (ent->velocity * dt) / len;
 	r.pos = ent->position;
-	g->RayWorldIntersect(r, &rh, ent->owner_index, false);
+	g->RayWorldIntersect(r, &rh, ent->owner_index, Pf_All);
 	if (rh.hit_world && rh.dist < len) {
 		ent->position = r.at(rh.dist) + rh.normal * 0.01f;
 		ent->velocity = glm::reflect(ent->velocity, rh.normal);
@@ -504,4 +514,12 @@ void Game::RemoveEntity(Entity* ent)
 	ent->anim.ResetLayers();
 
 	num_ents--;
+}
+
+void Game::KillEnt(Entity* ent)
+{
+	ent->alive = false;
+	ent->death_time = server.simtime + 5.0;
+	ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"));
+	ent->anim.dont_loop = true;
 }

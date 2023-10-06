@@ -5,6 +5,10 @@
 #include "Animation.h"
 #include "GameData.h"
 
+//
+//	PLAYER MOVEMENT CODE
+//
+
 static const Capsule standing_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_STANDING_HB_HEIGHT,0) };
 static const Capsule crouch_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_CROUCING_HB_HEIGHT,0) };
 
@@ -19,7 +23,8 @@ static bool new_physics = true;
 static float ground_friction = 10;
 static float air_friction = 0.01;
 static float gravityamt = 16;
-static float ground_accel = 5;
+static float ground_accel = 6;
+static float ground_accel_crouch = 4;
 static float air_accel = 3;
 static float minspeed = 1;
 static float maxspeed = 30;
@@ -29,6 +34,18 @@ using glm::vec3;
 using glm::vec2;
 using glm::dot;
 using glm::cross;
+
+void PlayerMovement::TriggerEvent(EntityEvent ev, int parm)
+{
+	if (num_events < MAX_EVENTS) {
+		triggered_events[num_events] = ev;
+		trig_event_parms[num_events] = parm;
+		num_events++;
+	}
+	else {
+		printf("playermovement: event overflow\n");
+	}
+}
 
 void PlayerMovement::CheckNans()
 {
@@ -52,6 +69,8 @@ void PlayerMovement::CheckJump()
 		printf("jump\n");
 		player.velocity.y += jumpimpulse;
 		player.on_ground = false;
+
+		player.in_jump = true;
 	}
 }
 void PlayerMovement::CheckDuck()
@@ -200,6 +219,9 @@ void PlayerMovement::CheckGroundState()
 		player.on_ground = true;
 		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
 	}
+
+	if (player.on_ground)
+		player.in_jump = false;
 }
 
 static float max_ground_speed = 10;
@@ -208,6 +230,7 @@ static float max_air_speed = 2;
 void PlayerMovement::GroundMove()
 {
 	float acceleation_val = (player.on_ground) ? ground_accel : air_accel;
+	acceleation_val = (player.ducking) ? ground_accel_crouch : acceleation_val;
 	float maxspeed_val = (player.on_ground) ? max_ground_speed : max_air_speed;
 
 	vec3 wishdir = (look_front * inp_dir.x + look_side * inp_dir.y);
@@ -249,6 +272,8 @@ void PlayerMovement::AirMove()
 }
 void PlayerMovement::Run()
 {
+	num_events = 0;
+
 	player = in_state;
 	if (!player.alive) {
 		cmd.forward_move = 0;
@@ -282,4 +307,59 @@ void PlayerMovement::Run()
 	GroundMove();
 	CheckNans();
 
+}
+
+//
+//	WEAPON CONTROLLER CODE
+//
+void WeaponController::TriggerEvent(EntityEvent ev, int parm)
+{
+	if (num_events < MAX_EVENTS) {
+		events[num_events] = ev;
+		event_parms[num_events] = parm;
+		num_events++;
+	}
+	else {
+		printf("weapon controller: events full\n");
+	}
+}
+void WeaponController::Run()
+{
+	num_events = 0;
+	shoot_vec = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
+
+	bool wants_shoot = cmd.button_mask & CmdBtn_Misc1;
+	bool wants_reload = cmd.button_mask & CmdBtn_Misc2;
+
+	// unarmed
+	//if (ent->gun_id == -1)
+	//	return;
+	//
+	//if (ent->reloading && ent->gun_timer < server.time) {
+	//	ent->reloading = false;
+	//	int amt = glm::min((short)10, ent->ammo[ent->gun_id]);
+	//	ent->clip[ent->gun_id] += amt;
+	//	ent->ammo[ent->gun_id] -= amt;
+	//	printf("reloaded\n");
+	//}
+	//
+
+	WpnState* w = &state.weapons;
+
+	if (w->reloading || w->gun_timer >= simtime)
+		return;
+
+	if (wants_shoot) {// && ent->clip[ent->gun_id] > 0) {
+		//server.sv_game.ShootBullets(ent,
+		//	AnglesToVector(cmd.view_angles.x, cmd.view_angles.y),
+		//	ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
+		TriggerEvent(Ev_FirePrimary);
+		w->gun_timer = simtime + 0.1f;
+		w->clip[w->gun_id]--;
+	}
+	else if ((w->clip[w->gun_id] <= 0 || wants_reload) && w->ammo[w->gun_id] > 0) {
+		TriggerEvent(Ev_Reload);
+		w->reloading = true;
+		w->gun_timer += 1.0f;
+	}
 }

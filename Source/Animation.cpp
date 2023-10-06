@@ -105,27 +105,28 @@ void Animator::AdvanceFrame(float elapsed)
 	if (!model || !model->animations)
 		return;
 
-	{
-		if (mainanim != -1) {
-			ASSERT(mainanim < model->animations->clips.size());
-			const Animation& clip = model->animations->clips[mainanim];
-			mainanim_frame += clip.fps * elapsed * 1.f;
-			if (mainanim_frame > clip.total_duration || mainanim_frame < 0.f) {
-				mainanim_frame = fmod(fmod(mainanim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			}
+	if (mainanim < 0 || mainanim >= model->animations->clips.size())
+		mainanim = -1;
+	if (leganim < 0 || leganim >= model->animations->clips.size())
+		leganim = -1;
+
+	if (mainanim != -1) {
+		ASSERT(mainanim < model->animations->clips.size());
+		const Animation& clip = model->animations->clips[mainanim];
+		mainanim_frame += clip.fps * elapsed * 1.f;
+		if (mainanim_frame > clip.total_duration || mainanim_frame < 0.f) {
+			mainanim_frame = fmod(fmod(mainanim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 		}
 	}
-	{
-		if (leganim != -1) {
-			ASSERT(leganim < model->animations->clips.size());
-			const Animation& clip = model->animations->clips[leganim];
-			leganim_frame += clip.fps * elapsed * leganim_speed;
-			if (leganim_frame > clip.total_duration || leganim_frame < 0.f) {
-				if (dont_loop)
-					leganim_frame = clip.total_duration;
-				else
-					leganim_frame = fmod(fmod(leganim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			}
+	if (leganim != -1) {
+		ASSERT(leganim < model->animations->clips.size());
+		const Animation& clip = model->animations->clips[leganim];
+		leganim_frame += clip.fps * elapsed * leganim_speed;
+		if (leganim_frame > clip.total_duration || leganim_frame < 0.f) {
+			if (dont_loop)
+				leganim_frame = clip.total_duration;
+			else
+				leganim_frame = fmod(fmod(leganim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 		}
 	}
 }

@@ -406,6 +406,7 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 		to->velocity.z = msg.ReadFloat();
 	}
 	to->alive = msg.ReadByte();
+	to->in_jump = msg.ReadByte();
 }
 
 void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
@@ -450,6 +451,7 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 		msg.WriteFloat(to->velocity.z);
 	}
 	msg.WriteByte(to->alive);
+	msg.WriteByte(to->in_jump);
 }
 
 

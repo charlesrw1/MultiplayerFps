@@ -45,6 +45,19 @@ struct MeshMaterial
 	Texture* t1 = nullptr;
 };
 
+struct ModelAttachment
+{
+	int str_table_start = 0;
+	int bone_parent = 0;
+	glm::mat4x3 transform;
+};
+struct ModelHitbox
+{
+	int str_table_start = 0;
+	int bone_parent = 0;
+	glm::vec3 size;
+};
+
 class Model
 {
 public:
@@ -60,6 +73,8 @@ public:
 	std::vector<Bone> bones;
 	std::vector<char> bone_string_table;
 	std::unique_ptr<AnimationSet> animations;
+	std::vector<ModelHitbox> hitboxes;
+	std::vector<ModelAttachment> attachments;
 
 	VertexFormat format=VertexFormat::Static;
 	std::vector<MeshPart> parts;
@@ -72,6 +87,7 @@ public:
 
 void FreeLoadedModels();
 Model* FindOrLoadModel(const char* filename);
+void ReloadModel(Model* m);
 
 // So the level loader can have access
 namespace tinygltf {

@@ -43,7 +43,6 @@ struct Sphere
 	float radius;
 	glm::vec3 origin;
 };
-
 struct PhysContainer {
 	enum Type {
 		CapsuleType,
@@ -53,6 +52,15 @@ struct PhysContainer {
 		Capsule cap;
 		Sphere sph;
 	};
+};
+
+enum PhysFilterFlags
+{
+	Pf_World= 1,
+	Pf_Players = 2,
+	Pf_Nonplayers = 4,
+
+	Pf_All = Pf_World | Pf_Players | Pf_Nonplayers
 };
 
 class Level;

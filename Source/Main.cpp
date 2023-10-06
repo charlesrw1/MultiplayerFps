@@ -34,6 +34,7 @@ struct Media
 	Model* playermod;
 	Model* gun;
 	Model* grenade_he;
+	Media* gun_basic;
 	Texture* testtex;
 
 	Shader simple;
@@ -164,9 +165,11 @@ void ClientGame::UpdateCamera()
 		ClientEntity* player = client.GetLocalPlayer();
 		vec3 front = AnglesToVector(client.view_angles.x, client.view_angles.y);
 		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
-		fly_cam.position = player->interpstate.position + vec3(0, 0.5, 0) - front * 3.f;
+		fly_cam.position = player->interpstate.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 4.5f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
 		setup.viewproj = setup.proj_mat * setup.view_mat;
+		setup.viewfront = front;
+		setup.vieworigin = fly_cam.position;
 	}
 	else
 	{
@@ -277,6 +280,19 @@ Shader animated;
 Shader static_wrld;
 Shader basic_mod;
 
+class Renderer
+{
+public:
+	void FrameDraw();
+
+	void DrawTexturedQuad();
+	void DrawText();
+
+
+	Texture white;
+	Texture black;
+};
+
 
 
 static float move_speed_player = 0.1f;
@@ -356,7 +372,7 @@ static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* m
 
 	mat4 model = glm::translate(mat4(1), cur->position);
 	model = model*glm::eulerAngleXYZ(cur->angles.x, cur->angles.y, cur->angles.z);
-	model = glm::scale(model, vec3(0.018f));
+	model = glm::scale(model, vec3(1.f));
 
 	animated.set_mat4("Model", model);
 	animated.set_mat4("InverseModel", mat4(1));
@@ -393,7 +409,7 @@ static void DrawModel(EntityState* ent, Model* m, mat4 viewproj)
 
 	mat4 model = glm::translate(mat4(1), ent->position);
 	model = model * glm::eulerAngleXYZ(ent->angles.x, ent->angles.y, ent->angles.z);
-	model = glm::scale(model, vec3(0.5f));
+	model = glm::scale(model, vec3(1.f));
 
 	basic_mod.set_mat4("Model", model);
 	basic_mod.set_mat4("InverseModel", mat4(1));
@@ -408,6 +424,35 @@ static void DrawModel(EntityState* ent, Model* m, mat4 viewproj)
 	}
 }
 
+static void DrawViewModel(Model* m, glm::vec3 offset, glm::vec3 scale, mat4 invview, mat4 viewproj, ViewSetup& view)
+{
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	basic_mod.use();
+	basic_mod.set_mat4("ViewProj", viewproj);
+
+	mat4 model = glm::translate(mat4(1),view.vieworigin+5.f*view.viewfront);
+	model = glm::scale(model, vec3(1.f));
+
+	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25
+	));
+	model2 = model2*glm::eulerAngleY(PI + PI/24.f);
+	//model2 = model2 * invview;
+
+	basic_mod.set_mat4("Model", model2);
+	basic_mod.set_mat4("InverseModel", mat4(1));
+
+	glCheckError();
+	//glDisable(GL_CULL_FACE);
+	for (int i = 0; i < m->parts.size(); i++)
+	{
+		MeshPart* part = &m->parts[i];
+		glBindVertexArray(part->vao);
+		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
+	}
+}
+
+
 static void DrawWorldEnts(mat4 viewproj)
 {
 	MeshBuilder mb;
@@ -417,9 +462,13 @@ static void DrawWorldEnts(mat4 viewproj)
 
 	for (int i = 0; i < client.cl_game.entities.size(); i++) {
 		auto& ent = client.cl_game.entities[i];
-		if (ent.active && ent.interpstate.type == Ent_Grenade) {
+		if (!ent.active)
+			continue;
+		if (ent.interpstate.type == Ent_Grenade) {
 			DrawModel(&ent.interpstate, media.grenade_he, viewproj);
 		}
+		else if (ent.interpstate.type == Ent_Dummy)
+			DrawModel(&ent.interpstate, media.gun, viewproj);
 		else if (ent.active && ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.cl_game.third_person)) {
 			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
 		}
@@ -510,10 +559,14 @@ void Render(double dt)
 	
 
 	DrawWorldEnts(viewproj);
+	
 
 	glCheckError();
 	DrawTempLevel(viewproj);
 	glCheckError();
+	glm::mat4 invview = glm::inverse(view.view_mat);
+	if(!client.cl_game.third_person)
+		DrawViewModel(media.gun, glm::vec3(0, 0, 2), glm::vec3(1.f), invview, view.viewproj, view);
 }
 
 void DrawScreen(double dt)
@@ -593,8 +646,7 @@ void HandleInput()
 				printf("col_response %s\n", (col_response) ? "on" : "off");
 			}
 			if (scancode == SDL_SCANCODE_V) {
-				col_closest = !col_closest;
-				printf("col_closest %s\n", (col_closest) ? "on" : "off");
+				ReloadModel(media.playermod);
 			}
 			if (scancode == SDL_SCANCODE_APOSTROPHE) {
 				Game* g = &server.sv_game;

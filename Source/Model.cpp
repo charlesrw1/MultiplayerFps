@@ -329,7 +329,23 @@ void FreeLoadedModels()
 	}
 	models.clear();
 }
+void ReloadModel(Model* m)
+{
+	std::string path;
+	path.reserve(256);
+	path += model_folder_path;
+	path += m->name;
 
+	for (int p = 0; p < m->parts.size(); p++) {
+		glDeleteVertexArrays(1, &m->parts[p].vao);
+	}
+	for (int b = 0; b < m->buffers.size(); b++) {
+		glDeleteBuffers(1, &m->buffers[b].handle);
+	}
+
+	*m = Model{};
+	bool res = DoLoadGltfModel(path, m);
+}
 Model* FindOrLoadModel(const char* filename)
 {
 	for (int i = 0; i < models.size(); i++) {

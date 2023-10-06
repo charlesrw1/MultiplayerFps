@@ -5,6 +5,12 @@
 #include "Physics.h"
 #include "GameData.h"
 
+// If you want to add a replicated variable you must:
+//	add it to entitystate or playerstate depending on its use
+//	modify the ToX and FromX functions
+//	modify the read/write functions that encode the state
+// blech
+
 class Model;
 struct Entity
 {
@@ -20,6 +26,7 @@ struct Entity
 	bool on_ground = false;
 	bool alive = true;
 	bool frozen = false;
+	bool in_jump = false;
 
 	// ent specific vars
 	int owner_index = 0;
@@ -27,14 +34,10 @@ struct Entity
 
 	float death_time = 0.0;
 	int health = 100;
-	int gun_id = 0;
-	short ammo[NUM_WPNS];
-	short clip[NUM_WPNS];
-	bool reloading = false;
-	float gun_timer = 0.f;
+	WpnState wpns;
 
-	const Model* model = nullptr;
 	Animator anim;
+	const Model* model = nullptr;
 
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
@@ -57,7 +60,7 @@ public:
 	void SpawnNewClient(int clientnum);
 	void OnClientLeave(int clientnum);
 
-	int MakeNewEntity(EntType type, glm::vec3 pos, glm::vec3 rot);
+	Entity* MakeNewEntity(EntType type);
 	void RemoveEntity(Entity* ent);
 
 	void KillEnt(Entity* ent);
@@ -66,8 +69,8 @@ public:
 	void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
 	void OnPlayerKilled(Entity* ent);
 
-	void RayWorldIntersect(Ray r, RayHit* out, int skipent, bool noents);
-	void PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, bool noents);
+	void RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags filter);
+	void PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, PhysFilterFlags filter);
 	void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
 
 	Entity* EntForIndex(int index) {
@@ -156,16 +159,16 @@ public:
 	bool IsActive() const;
 	void FixedUpdate(double dt);
 
-	bool active = false;
-	std::string map_name;
-	ClientMgr client_mgr;
-	Game sv_game;
-
 	Frame* GetLastSnapshotFrame() {
 		int i = cur_frame_idx - 1;
 		if (i < 0) i += MAX_FRAME_HIST;
 		return &frames.at(i);
 	}
+
+	bool active = false;
+	std::string map_name;
+	ClientMgr client_mgr;
+	Game sv_game;
 
 	int cur_frame_idx = 0;
 	std::vector<Frame> frames;
@@ -174,8 +177,6 @@ public:
 
 	// global time var that is swapped to aid with simming client cmds
 	double simtime = 0.0;
-public:
-	int FindClient(const IPAndPort& addr) const;
 
 private:
 	void BuildSnapshotFrame();

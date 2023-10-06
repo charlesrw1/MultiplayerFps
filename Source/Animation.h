@@ -70,24 +70,17 @@ public:
 	std::vector<Animation> clips;
 };
 
-
-#define NUM_ANIMATION_LAYERS 2
-#define UPPERBODY_LAYER 0
-#define LOWERBODY_LAYER 1
-#define FULLBODY_LAYER 0
-
 class Model;
 class Animator
 {
 public:
-	// Actor can be null
 	void Init(const Model* model);
-
-	// Main function
 	void SetupBones();
 	void ConcatWithInvPose();
+	const std::vector<glm::mat4x4> GetBones() const { 
+		return cached_bonemats; 
+	}
 
-	const std::vector<glm::mat4x4> GetBones() const { return cached_bonemats; }
 	void AdvanceFrame(float elapsed_time);
 	void ResetLayers() {
 		mainanim = leganim = -1;
@@ -98,27 +91,25 @@ public:
 		mainanim = anim;
 		mainanim_frame = 0.f;
 	}
-	void SetLegAnim(int anim, float speed = 1.f) {
+	void SetLegAnim(int anim) {
 		leganim = anim;
 		leganim_frame = 0.f;
+		leganim_speed = 1.f;
+	}
+	void SetLegAnimSpeed(float speed) {
 		leganim_speed = speed;
 	}
 
 	int mainanim=-1;
 	float mainanim_frame;
-
-	// for players
 	int leganim=-1;
 	float leganim_frame;
+	// only server side vars
 	float leganim_speed;
 	bool dont_loop = false;
 
-	//AnimationLayer layers[NUM_ANIMATION_LAYERS];
-
 	const Model* model = nullptr;
 	const AnimationSet* set = nullptr;
-
-
 private:
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);

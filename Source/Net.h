@@ -72,9 +72,6 @@ enum EntType
 	Ent_Free = 0xff,
 };
 
-// If you modify EntityState or PlayerState, then you have to 
-// modify the Entity::assignment func's and the read/write delta funcs to function properly
-
 // General state that is transmitted to clients
 struct EntityState
 {
@@ -90,6 +87,16 @@ struct EntityState
 
 	bool ducking = false;
 };
+
+struct WpnState
+{
+	int gun_id = 0;			// activley held item
+	short ammo[2];
+	short clip[2];
+	bool reloading = false;
+	float gun_timer = 0.f;
+};
+
 // State specific to the client's player that is transmitted
 struct PlayerState
 {
@@ -99,6 +106,27 @@ struct PlayerState
 	bool on_ground = false;
 	bool ducking = false;
 	bool alive = false;
+	bool in_jump = false;
+
+	WpnState weapons;
+};
+
+// taken from quake 3, a nice idea
+enum EntityEvent
+{
+	Ev_FirePrimary,
+	Ev_FireSecondary,
+	Ev_Reload,
+	Ev_Jump,
+	Ev_HardLanding,
+
+	Ev_Footstep,
+
+	Ev_Hurt,
+	Ev_Death,
+
+	Ev_Sound,
+	Ev_Explode
 };
 
 // in serverclmgr for now

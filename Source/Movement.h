@@ -5,9 +5,12 @@
 #include "Physics.h"
 class MeshBuilder;
 class AnimationSet;
+// Shared movement code
 class PlayerMovement
 {
 public:
+	static const int MAX_EVENTS = 4;
+
 	// caller sets these vars
 	MeshBuilder* phys_debug = nullptr;
 	//void* user_arg = nullptr;
@@ -17,6 +20,10 @@ public:
 	PlayerState in_state;
 	float deltat;
 	int ignore_ent;
+
+	int num_events = 0;
+	EntityEvent triggered_events[MAX_EVENTS];
+	int trig_event_parms[MAX_EVENTS];
 
 	void Run();
 	PlayerState* GetOutputState() {
@@ -29,6 +36,7 @@ private:
 	glm::vec3 look_side;
 	PlayerState player;
 
+	void TriggerEvent(EntityEvent type, int parm = 0);
 
 	void ApplyFriction(float friction_val);
 	void GroundMove();
@@ -40,5 +48,30 @@ private:
 	void MoveAndSlide(glm::vec3 delta);
 	void CheckGroundState();
 };
+
+// Shared weapon code
+class WeaponController
+{
+public:
+	static const int MAX_EVENTS = 2;
+
+	// output events
+	EntityEvent events[MAX_EVENTS];
+	int event_parms[MAX_EVENTS];
+	int num_events;
+
+	PlayerState state;
+	MoveCommand cmd;
+	float deltat;
+	float simtime;
+
+	glm::vec3 shoot_vec;
+
+	void Run();
+private:
+	void TriggerEvent(EntityEvent type, int parm = 0);
+};
+
+
 
 #endif // !PLAYERMOVE_H
