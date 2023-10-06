@@ -434,9 +434,9 @@ static void DrawViewModel(Model* m, glm::vec3 offset, glm::vec3 scale, mat4 invv
 	mat4 model = glm::translate(mat4(1),view.vieworigin+5.f*view.viewfront);
 	model = glm::scale(model, vec3(1.f));
 
-	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25
-	));
-	model2 = model2*glm::eulerAngleY(PI + PI/24.f);
+
+	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + client.cl_game.viewmodel_offsets);
+	model2 = model2*glm::eulerAngleY(PI + PI/128.f);
 	//model2 = model2 * invview;
 
 	basic_mod.set_mat4("Model", model2);

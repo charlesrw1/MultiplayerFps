@@ -96,19 +96,19 @@ public:
 
 public:
 	void UpdateCamera();
-
+	void UpdateViewModelOffsets();
 	const ViewSetup& GetSceneView() { return last_view;
 	}
 
 	bool third_person = false;
 	bool using_debug_cam = false;
-
 	float z_near = 0.01f;
 	float z_far = 100.f;
 	float fov = glm::radians(70.f);
-
 	FlyCamera fly_cam;
 	ViewSetup last_view;
+
+	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
 
 };
 
@@ -137,6 +137,15 @@ public:
 	int InSequence() const {
 		return server.in_sequence;
 	}
+	int ClientNum() const {
+		return client_num;
+	}
+	ClientConnectionState GetState() const {
+		return state;
+	}
+	IPAndPort GetCurrentServerAddr() const {
+		return server.remote_addr;
+	}
 private:
 	void HandleUnknownPacket(IPAndPort from, ByteReader& msg);
 	void HandleServerPacket(ByteReader& msg);
@@ -145,7 +154,7 @@ private:
 	
 	void ParseEntSnapshot(ByteReader& msg);
 	void ParseServerInit(ByteReader& msg);
-public:
+private:
 	int client_num;
 	int connect_attempts;
 	double attempt_time;
@@ -154,12 +163,6 @@ public:
 	Connection server;
 	Client* myclient = nullptr;
 };
-
-class UIMgr
-{
-
-};
-
 
 class Client
 {
@@ -186,8 +189,6 @@ public:
 public:
 	bool initialized = false;
 	ClientGame cl_game;
-	ClServerMgr server_mgr;
-	UIMgr ui_mgr;
 
 	glm::vec3 view_angles;
 	std::vector<MoveCommand> out_commands;
@@ -206,6 +207,7 @@ public:
 	int GetLastSequenceAcked() const;
 
 private:
+	ClServerMgr server_mgr;
 	void DoViewAngleUpdate();
 	void CheckLocalServerIsRunning();
 };

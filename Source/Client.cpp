@@ -36,7 +36,7 @@ void Client::Disconnect()
 void Client::Reconnect()
 {
 	DebugOut("reconnecting\n");
-	IPAndPort addr = server_mgr.server.remote_addr;
+	IPAndPort addr = server_mgr.GetCurrentServerAddr();
 	Disconnect();
 	Connect(addr);
 }
@@ -47,11 +47,11 @@ void Client::Connect(IPAndPort addr)
 }
 ClientConnectionState Client::GetConState() const
 {
-	return server_mgr.state;
+	return server_mgr.GetState();
 }
 int Client::GetPlayerNum() const
 {
-	return server_mgr.client_num;
+	return server_mgr.ClientNum();
 }
 
 MoveCommand* Client::GetCommand(int sequence) {
@@ -60,11 +60,11 @@ MoveCommand* Client::GetCommand(int sequence) {
 
 int Client::GetCurrentSequence() const
 {
-	return server_mgr.server.out_sequence;
+	return server_mgr.OutSequence();
 }
 int Client::GetLastSequenceAcked() const
 {
-	return server_mgr.server.out_sequence_ak;
+	return server_mgr.OutSequenceAk();
 }
 void Client::CheckLocalServerIsRunning()
 {
@@ -199,6 +199,7 @@ void Client::RunPrediction()
 	ClientEntity* ent = GetLocalPlayer();
 	PlayerStateToClEntState(&last_estate, &pred_state);
 	ent->AddStateToHist(&last_estate, tick);
+	lastpredicted = pred_state;
 
 	//ent->state = pred_state.estate;
 	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
@@ -226,6 +227,8 @@ void Client::FixedUpdateRead(double dt)
 		client.tick += 1;
 	server_mgr.ReadPackets();
 	RunPrediction();
+
+	cl_game.UpdateViewModelOffsets();
 }
 void Client::PreRenderUpdate(double frametime)
 {
@@ -365,4 +368,3 @@ void Client::OnRecieveNewSnapshot()
 		ce->AddStateToHist(&snapshot->entities[i], tick);
 	}
 }
-
