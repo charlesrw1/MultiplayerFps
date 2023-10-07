@@ -92,8 +92,37 @@ private:
 	void BeginLagCompensation();
 	void EndLagCompensation();
 };
+class Server;
+class RemoteClient
+{
+public:
+	RemoteClient(Server* sv, int slot);
 
-struct RemoteClient {
+	void InitConnection(IPAndPort address);
+	void Disconnect();
+
+	void OnPacket(ByteReader& msg);
+	void OnMoveCmd(ByteReader& msg);
+	void OnTextCommand(ByteReader& msg);
+
+	void Update();		// sends snapshot and/or sends reliable
+	void SendInitData();
+
+	void SendReliableMsg(ByteWriter& msg);
+
+	std::string GetIPStr() const {
+		return connection.remote_addr.ToString();
+	}
+	float LastRecieved() const {
+		return connection.last_recieved;
+	}
+	bool IsConnected() const {
+		return state >= Connected;
+	}
+	bool IsSpawned() const {
+		return state == Spawned;
+	}
+
 	enum ConnectionState {
 		Dead,		// unused slot
 		Connected,	// connected and sending initial state
@@ -102,6 +131,8 @@ struct RemoteClient {
 	ConnectionState state = Dead;
 	Connection connection;
 	float next_snapshot_time = 0.f;
+	int client_num = 0;
+	Server* myserver = nullptr;
 };
 
 // stores game state to delta encode to clients
@@ -112,52 +143,25 @@ struct Frame {
 	PlayerState ps_states[MAX_CLIENTS];
 };
 
-class Server;
-class ClientMgr
-{
-public:
-	ClientMgr();
-	void Init();
-
-	void ReadPackets();
-	void SendSnapshots();
-	void ShutdownServer();
-
-	std::vector<RemoteClient> clients;
-
-private:
-	Socket socket;
-	Server* myserver = nullptr;
-	Frame nullframe;
-
-	int FindClient(IPAndPort who) const;
-	int GetClientIndex(const RemoteClient& client) const;
-
-	void HandleUnknownPacket(IPAndPort from, ByteReader& msg);
-	void HandleClientPacket(RemoteClient& from, ByteReader& msg);
-
-	void ParseClientMove(RemoteClient& from, ByteReader& msg);
-	void ParseClientText(RemoteClient& from, ByteReader& msg);
-
-	void SendSnapshotUpdate(RemoteClient& to);
-	void WriteDeltaSnapshot(Frame* from, Frame* to, ByteWriter& msg, int client_index);
-
-
-	void DisconnectClient(RemoteClient& client);
-	void ConnectNewClient(IPAndPort who, ByteReader& msg);
-	void SendInitData(RemoteClient& client);
-};
-
 class Server
 {
 public:
 	static const int MAX_FRAME_HIST = 32;
-
+	Server() {
+	}
 	void Init();
 	void Spawn(const char* mapname);
 	void End();
 	bool IsActive() const;
 	void FixedUpdate(double dt);
+
+	// client interface functions
+	Socket* GetSock() { return &socket; }
+	void RunMoveCmd(int client, MoveCommand cmd);
+	void SpawnClientInGame(int client);
+	void RemoveClient(int client);
+	void WriteServerInfo(ByteWriter& msg);
+	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
 	Frame* GetLastSnapshotFrame() {
 		int i = cur_frame_idx - 1;
@@ -167,11 +171,12 @@ public:
 
 	bool active = false;
 	std::string map_name;
-	ClientMgr client_mgr;
+	//ClientMgr client_mgr;
 	Game sv_game;
 
 	int cur_frame_idx = 0;
 	std::vector<Frame> frames;
+	Frame nullframe;
 
 	int tick = 0;
 
@@ -179,6 +184,15 @@ public:
 	double simtime = 0.0;
 
 private:
+	Socket socket;
+	std::vector<RemoteClient> clients;
+	
+	void ReadPackets();
+	void UpdateClients();
+
+	int FindClient(IPAndPort addr) const;
+	void ConnectNewClient(ByteReader& msg, IPAndPort recv);
+	void UnknownPacket(ByteReader& msg, IPAndPort recv);
 	void BuildSnapshotFrame();
 };
 

@@ -1,191 +1,130 @@
 #include "Server.h"
 #include "CoreTypes.h"
 #define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
-ClientMgr::ClientMgr() //: sock_emulator(&socket)
-{
 
+RemoteClient::RemoteClient(Server* sv, int slot)
+{
+	myserver = sv;
+	client_num = slot;
 }
 
-void ClientMgr::Init()
+void RemoteClient::InitConnection(IPAndPort address)
 {
-	socket.Init(SERVER_PORT);
-	clients.resize(MAX_CLIENTS);
+	connection.Clear();
+	state = Connected;
+	connection.Init(myserver->GetSock(), address);
 }
 
-int ClientMgr::FindClient(IPAndPort addr) const
+void RemoteClient::Disconnect()
 {
-	for (int i = 0; i < clients.size(); i++) {
-		if (clients[i].state != RemoteClient::Dead && clients[i].connection.remote_addr == addr)
-			return i;
-	}
-	return -1;
-}
-int ClientMgr::GetClientIndex(const RemoteClient& client) const
-{
-	return (&client) - clients.data();
-}
-
-static void RejectConnectRequest(Socket* sock, IPAndPort addr, const char* why)
-{
-	uint8_t buffer[512];
-	ByteWriter writer(buffer, 512);
-	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(Msg_RejectConnection);
-	int len = strlen(why);
-	if (len >= 256) {
-		ASSERT(0);
+	if (state == Dead)
 		return;
-	}
-	writer.WriteByte(len);
-	for (int i = 0; i < len; i++)
-		writer.WriteByte(why[i]);
-	int pad_bytes = 8 - writer.BytesWritten();
-	for (int i = 0; i < pad_bytes; i++)
-		writer.WriteByte(0);
-	sock->Send(buffer, writer.BytesWritten(), addr);
-}
+	DebugOut("Disconnecting client %s\n", connection.remote_addr.ToString().c_str());
 
-void ClientMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
-{
-	DebugOut("Connectionless packet recieved from %s\n", addr.ToString().c_str());
-	uint8_t command = buf.ReadByte();
-	if (command == Msg_ConnectRequest) {
-		ConnectNewClient(addr, buf);
+	if (state == Spawned) {
+		myserver->RemoveClient(client_num);
 	}
-	else {
-		DebugOut("Unknown connectionless packet\n");
-	}
-}
-void ClientMgr::ConnectNewClient(IPAndPort addr, ByteReader& buf)
-{
-	int spot = 0;
-	bool already_connected = false;
-	for (; spot < clients.size(); spot++) {
-		// if the "accept" response was dropped, client might send a connect again
-		if (clients[spot].state == RemoteClient::Connected && clients[spot].connection.remote_addr == addr) {
-			already_connected = true;
-			break;
-		}
-		if (clients[spot].state == RemoteClient::Dead)
-			break;
-	}
-	if (spot == clients.size()) {
-		RejectConnectRequest(&socket, addr, "Server is full");
-		return;
-	}
-	int name_len = buf.ReadByte();
-	char name_str[256 + 1];
-	for (int i = 0; i < name_len; i++) {
-		name_str[i] = buf.ReadByte();
-	}
-	name_str[name_len] = 0;
-	if (!already_connected)
-		DebugOut("Connected new client, %s; IP: %s\n", name_str, addr.ToString().c_str());
 
-	uint8_t accept_buf[32];
-	ByteWriter writer(accept_buf, 32);
-	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(Msg_AcceptConnection);
-	int pad_bytes = 8 - writer.BytesWritten();
-	for (int i = 0; i < pad_bytes; i++)
-		writer.WriteByte(0);
-	socket.Send(accept_buf, writer.BytesWritten(), addr);
-
-	RemoteClient& new_client = clients[spot];
-	new_client.state = RemoteClient::Connected;
-	new_client.connection.Init(&socket, addr);
-	// Further communication is done with sequenced packets
-}
-
-void ClientMgr::DisconnectClient(RemoteClient& client)
-{
-	ASSERT(client.state != RemoteClient::Dead);
-	DebugOut("Disconnecting client %s\n", client.connection.remote_addr.ToString().c_str());
-	if (client.state == RemoteClient::Spawned) {
-		server.sv_game.OnClientLeave(GetClientIndex(client));
-		// remove entitiy from game, call game logic ...
-	}
 	uint8_t buffer[8];
 	ByteWriter writer(buffer, 8);
 	writer.WriteByte(SvMessageDisconnect);
-	client.connection.Send(buffer, writer.BytesWritten());
+	connection.Send(buffer, writer.BytesWritten());
 
-	client.state = RemoteClient::Dead;
-	client.connection.Clear();
-
+	state = Dead;
+	connection.Clear();
 }
 
-void ClientMgr::ParseClientText(RemoteClient& client, ByteReader& buf)
+void RemoteClient::OnMoveCmd(ByteReader& msg)
 {
-	uint8_t cmd_len = buf.ReadByte();
+
+	MoveCommand cmd{};
+	cmd.tick = msg.ReadLong();
+	cmd.forward_move = msg.ReadFloat();
+	cmd.lateral_move = msg.ReadFloat();
+	cmd.up_move = msg.ReadFloat();
+	cmd.view_angles.x = msg.ReadFloat();
+	cmd.view_angles.y = msg.ReadFloat();
+	cmd.button_mask = msg.ReadLong();
+
+	// Not ready to run the input yet
+	if (!IsSpawned())
+		return;
+
+	myserver->RunMoveCmd(client_num, cmd);
+}
+
+void RemoteClient::OnTextCommand(ByteReader& msg)
+{
+	uint8_t cmd_len = msg.ReadByte();
 	std::string cmd;
 	cmd.resize(cmd_len);
-	buf.ReadBytes((uint8_t*)&cmd[0], cmd_len);
-	if (buf.HasFailed())
-		DisconnectClient(client);
+	msg.ReadBytes((uint8_t*)&cmd[0], cmd_len);
+
+	if (msg.HasFailed())
+		Disconnect();
 	if (cmd == "init") {
-		SendInitData(client);
+		SendInitData();
 	}
 	else if (cmd == "spawn") {
-		if (client.state != RemoteClient::Spawned) {
-			client.state = RemoteClient::Spawned;
-
-			server.sv_game.SpawnNewClient(GetClientIndex(client));
-
-			DebugOut("Spawned client, %s\n", client.connection.remote_addr.ToString().c_str());
+		if (state != RemoteClient::Spawned) {
+			state = RemoteClient::Spawned;
+			myserver->SpawnClientInGame(client_num);
 		}
 	}
 }
 
-void ClientMgr::ParseClientMove(RemoteClient& client, ByteReader& buf)
+void RemoteClient::SendInitData()
 {
-	//DebugOut("Recieved client input from %s\n", client.connection.remote_addr.ToString().c_str());
-
-	MoveCommand cmd{};
-	cmd.tick = buf.ReadLong();
-	cmd.forward_move = buf.ReadFloat();
-	cmd.lateral_move = buf.ReadFloat();
-	cmd.up_move = buf.ReadFloat();
-	cmd.view_angles.x = buf.ReadFloat();
-	cmd.view_angles.y = buf.ReadFloat();
-	cmd.button_mask = buf.ReadLong();
-
-	// Not ready to run the input yet
-	if (client.state != RemoteClient::Spawned)
-		return;
-
-	Entity* ent = ServerEntForIndex(GetClientIndex(client));
-	ASSERT(ent && ent->type == Ent_Player);
-	server.sv_game.ExecutePlayerMove(ent, cmd);
-}
-
-// Send initial data to the client such as the map, client index, so on
-void ClientMgr::SendInitData(RemoteClient& client)
-{
-	if (client.state != RemoteClient::Connected)
+	if (state != Connected)
 		return;
 
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
-	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
-	writer.WriteByte(SvMessageInitial);
-	int client_index = (&client) - clients.data();
-	writer.WriteByte(client_index);
-	writer.WriteByte(server.map_name.size());
-	writer.WriteBytes((uint8_t*)server.map_name.data(), server.map_name.size());
+	ByteWriter msg(buffer, MAX_PAYLOAD_SIZE);
 
-	// FIXME: must be reliable!
-	client.connection.Send(buffer, writer.BytesWritten());
+	msg.WriteByte(SvMessageInitial);
+	msg.WriteByte(client_num);
+	myserver->WriteServerInfo(msg);		// let server fill in data
+
+	connection.Send(buffer, msg.BytesWritten());
 }
 
+void RemoteClient::Update()
+{
+	if (!IsConnected())
+		return;
 
-void ClientMgr::HandleClientPacket(RemoteClient& client, ByteReader& buf)
+	if (!IsSpawned()) {
+		connection.Send(nullptr, 0);
+		return;
+	}
+
+	next_snapshot_time -= core.tick_interval;
+	if (next_snapshot_time > 0.f)
+		return;
+
+	next_snapshot_time += (1 / 30.f);
+
+	uint8_t buffer[MAX_PAYLOAD_SIZE];
+	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
+
+	writer.WriteByte(SvMessageTick);
+	writer.WriteLong(myserver->tick);
+
+	writer.WriteByte(SvMessageSnapshot);
+	writer.WriteLong(-1);
+	myserver->WriteDeltaSnapshot(writer, -1, client_num);
+
+	connection.Send(buffer, writer.BytesWritten());
+}
+
+void RemoteClient::OnPacket(ByteReader& buf)
 {
 	while (!buf.IsEof())
 	{
 		uint8_t command = buf.ReadByte();
 		if (buf.HasFailed()) {
 			DebugOut("Read fail\n");
-			DisconnectClient(client);
+			Disconnect();
 			return;
 		}
 		switch (command)
@@ -193,83 +132,25 @@ void ClientMgr::HandleClientPacket(RemoteClient& client, ByteReader& buf)
 		case ClNop:
 			break;
 		case ClMessageInput:
-			ParseClientMove(client, buf);
+			OnMoveCmd(buf);
 			break;
 		case ClMessageQuit:
-			DisconnectClient(client);
+			Disconnect();
 			break;
 		case ClMessageTick:
 			break;
 		case ClMessageText:
-			ParseClientText(client, buf);
+			OnTextCommand(buf);
 			break;
 		default:
 			DebugOut("Unknown message\n");
-			DisconnectClient(client);
+			Disconnect();
 			return;
 			break;
 		}
 	}
 }
 
-void ClientMgr::ReadPackets()
-{
-	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
-	size_t recv_len = 0;
-	IPAndPort from;
-
-	while (socket.Receive(inbuffer, sizeof(inbuffer), recv_len, from))
-	{
-		if (recv_len < PACKET_HEADER_SIZE)
-			continue;
-		if (*(uint32_t*)inbuffer == CONNECTIONLESS_SEQUENCE) {
-			ByteReader reader(inbuffer + 4, recv_len - 4);
-			HandleUnknownPacket(from, reader);
-			continue;
-		}
-
-		int cl_index = FindClient(from);
-		if (cl_index == -1) {
-			DebugOut("Packet from unknown source: %s\n", from.ToString().c_str());
-			continue;
-		}
-
-		RemoteClient& client = clients.at(cl_index);
-		// handle packet sequencing
-		int header = client.connection.NewPacket(inbuffer, recv_len);
-		if (header != -1) {
-			ByteReader reader(inbuffer + header, recv_len - header);
-			HandleClientPacket(client, reader);
-		}
-	}
-
-	// check timeouts
-	for (int i = 0; i < clients.size(); i++) {
-		auto& cl = clients[i];
-		if (cl.state != RemoteClient::Spawned && cl.state != RemoteClient::Connected)
-			continue;
-		if (GetTime() - cl.connection.last_recieved > MAX_TIME_OUT) {
-			printf("Client, %s, timed out\n", cl.connection.remote_addr.ToString().c_str());
-			DisconnectClient(cl);
-		}
-	}
-}
-
-void ClientMgr::SendSnapshots()
-{
-	for (int i = 0; i < MAX_CLIENTS; i++) {
-		if (clients[i].state < RemoteClient::Connected)
-			continue;
-
-		clients[i].next_snapshot_time -= core.tick_interval;
-		if (clients[i].state == RemoteClient::Spawned && clients[i].next_snapshot_time < 0.f) {
-			SendSnapshotUpdate(clients[i]);
-			clients[i].next_snapshot_time += (1 / 30.0);	// 20hz update rate
-		}
-		else
-			clients[i].connection.Send(nullptr, 0);	// update reliable
-	}
-}
 // horrid
 void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uint8_t index)
 {
@@ -454,9 +335,11 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 	msg.WriteByte(to->in_jump);
 }
 
-
-void ClientMgr::WriteDeltaSnapshot(Frame* from, Frame* to, ByteWriter& msg, int client_idx)
+void Server::WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int client_idx)
 {
+	Frame* to = GetLastSnapshotFrame();
+	Frame* from = &nullframe;
+
 	for (int i = 0; i < 24; i++) {
 		WriteDeltaEntState(&from->states[i], &to->states[i], msg, i);
 	}
@@ -465,33 +348,4 @@ void ClientMgr::WriteDeltaSnapshot(Frame* from, Frame* to, ByteWriter& msg, int 
 	msg.WriteLong(0xabababab);
 
 	WriteDeltaPState(&from->ps_states[client_idx], &to->ps_states[client_idx], msg);
-}
-
-void ClientMgr::SendSnapshotUpdate(RemoteClient& client)
-{
-	ASSERT(client.state == RemoteClient::Spawned);
-
-	Game& game = server.sv_game;
-
-	uint8_t buffer[MAX_PAYLOAD_SIZE];
-	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
-	writer.WriteByte(SvMessageTick);
-	writer.WriteLong(server.tick);
-
-	writer.WriteByte(SvMessageSnapshot);
-
-	writer.WriteLong(-1);
-	WriteDeltaSnapshot(&nullframe, server.GetLastSnapshotFrame(), writer, GetClientIndex(client));
-
-	client.connection.Send(buffer, writer.BytesWritten());
-	//DebugOut("sent %d bytes to %s\n", writer.BytesWritten(), client.connection.remote_addr.ToString().c_str());
-}
-
-void ClientMgr::ShutdownServer()
-{
-	for (int i = 0; i < clients.size(); i++) {
-		if (clients[i].state >= RemoteClient::Connected)
-			DisconnectClient(clients[i]);
-	}
-	//socket.Shutdown();
 }
