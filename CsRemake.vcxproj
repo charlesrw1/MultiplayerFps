@@ -52,6 +52,7 @@
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
+    <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\GameData.h" />
     <ClInclude Include="Source\Movement.h" />

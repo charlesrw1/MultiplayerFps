@@ -3,9 +3,13 @@
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
+static const int MAX_CONNECT_ATTEMPTS = 10;
+static const float CONNECT_RETRY = 1.f;
+
+
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-	EnableLag(20, 1, 0);
+	DisableLag();
 }
 
 
@@ -46,7 +50,7 @@ void ClServerMgr::TrySendingConnect()
 		return;
 	}
 	double delta = GetTime() - attempt_time;
-	if (delta < CONNECT_RETRY_TIME)
+	if (delta < CONNECT_RETRY)
 		return;
 	attempt_time = GetTime();
 	connect_attempts++;
@@ -80,6 +84,14 @@ void ClServerMgr::Disconnect()
 void ClServerMgr::ReadPackets()
 {
 	ASSERT(myclient->initialized);
+	
+	// check cfg var updates
+	if (*myclient->cfg_fake_lag == 0 && *myclient->cfg_fake_loss == 0)
+		DisableLag();
+	else
+		EnableLag(*myclient->cfg_fake_lag, 0, *myclient->cfg_fake_loss);
+	
+	
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
 	IPAndPort from;
@@ -104,7 +116,7 @@ void ClServerMgr::ReadPackets()
 	}
 
 	if (state == Connected || state == Spawned) {
-		if (GetTime() - server.last_recieved > MAX_TIME_OUT) {
+		if (GetTime() - server.last_recieved > *myclient->cfg_cl_time_out) {
 			printf("Server timed out\n");
 			myclient->Disconnect();
 		}
@@ -161,13 +173,18 @@ void ClServerMgr::StartConnection()
 	server.Send(buffer, writer.BytesWritten());
 }
 
-void ClServerMgr::ParseServerInit(ByteReader& buf)
+void ClServerMgr::OnServerInit(ByteReader& buf)
 {
 	client_num = buf.ReadByte();
+
 	int map_len = buf.ReadByte();
 	std::string mapname(map_len, 0);
 	buf.ReadBytes((uint8_t*)&mapname[0], map_len);
-	DebugOut("Player num: %d, Map: %s\n", client_num, mapname.c_str());
+
+	float sv_tick_rate = buf.ReadFloat();
+	myclient->SetNewTickRate(sv_tick_rate);
+
+	DebugOut("Player num: %d, Map: %s, tickrate %f\n", client_num, mapname.c_str(), sv_tick_rate);
 
 	// Load map and game data here
 	DebugOut("loading map...\n");
@@ -197,13 +214,13 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		case SvNop:
 			break;
 		case SvMessageInitial:
-			ParseServerInit(buf);
+			OnServerInit(buf);
 			break;
 		case SvMessageSnapshot:
 			if (state == Connected) {
 				state = Spawned;
 			}
-			ParseEntSnapshot(buf);
+			OnEntSnapshot(buf);
 			break;
 		case SvMessageDisconnect:
 			DebugOut("disconnected by server\n");
@@ -255,12 +272,10 @@ void ClServerMgr::SendMovesAndMessages()
 	server.Send(buffer, writer.BytesWritten());
 }
 
-void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
+void ClServerMgr::OnEntSnapshot(ByteReader& msg)
 {
-	// TEMPORARY!!
-	ClientGame* game = &myclient->cl_game;
-
-	Snapshot* snapshot = &myclient->snapshots.at(InSequence() % CLIENT_SNAPSHOT_HISTORY);
+	Snapshot* snapshot = myclient->GetCurrentSnapshot();
+	*snapshot = Snapshot();
 
 	int delta_frame_index = msg.ReadLong();		// unused rn
 	ASSERT(delta_frame_index == -1);
@@ -270,7 +285,7 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 			break;
 		if (msg.HasFailed())
 			break;
-		if (index >= 24)
+		if (index >= Snapshot::MAX_ENTS)
 			break;
 		EntityState* es = &snapshot->entities[index];
 		*es = EntityState();
@@ -284,5 +299,5 @@ void ClServerMgr::ParseEntSnapshot(ByteReader& msg)
 	*ps = PlayerState();
 	ReadDeltaPState(ps, msg);
 
-	myclient->OnRecieveNewSnapshot();
+	myclient->SetupSnapshot(snapshot);
 }

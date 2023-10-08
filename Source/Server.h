@@ -137,18 +137,16 @@ public:
 
 // stores game state to delta encode to clients
 struct Frame {
-	static const int MAX_FRAME_ENTS = 64;
+	static const int MAX_FRAME_ENTS = 256;
 	int tick = 0;
 	EntityState states[MAX_FRAME_ENTS];
 	PlayerState ps_states[MAX_CLIENTS];
 };
-
 class Server
 {
 public:
 	static const int MAX_FRAME_HIST = 32;
-	Server() {
-	}
+
 	void Init();
 	void Spawn(const char* mapname);
 	void End();
@@ -171,17 +169,20 @@ public:
 
 	bool active = false;
 	std::string map_name;
-	//ClientMgr client_mgr;
-	Game sv_game;
 
 	int cur_frame_idx = 0;
 	std::vector<Frame> frames;
 	Frame nullframe;
 
-	int tick = 0;
-
 	// global time var that is swapped to aid with simming client cmds
+	int tick = 0;
 	double simtime = 0.0;
+
+	// CONFIG VARS
+	float* cfg_snapshot_rate;
+	float* cfg_tick_rate;
+	float* cfg_max_time_out;
+	int* cfg_sv_port;
 
 private:
 	Socket socket;
@@ -197,5 +198,6 @@ private:
 };
 
 extern Server server;
+extern Game game;
 
 #endif // !SERVER_H

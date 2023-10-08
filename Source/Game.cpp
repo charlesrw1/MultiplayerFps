@@ -3,6 +3,8 @@
 #include "Level.h"
 #include "Movement.h"
 
+Game game;
+
 void PlayerDeathUpdate(Entity* ent);
 void PlayerUpdate(Entity* ent);
 void PlayerUpdateAnimations(Entity* ent);
@@ -22,7 +24,7 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt);
 Entity* ServerEntForIndex(int index)
 {
 	ASSERT(index >= 0 && index < MAX_GAME_ENTS);
-	return &server.sv_game.ents[index];
+	return &game.ents[index];
 }
 
 void Game::GetPlayerSpawnPoisiton(Entity* ent)
@@ -217,12 +219,12 @@ void PlayerSpawn(Entity* ent)
 	ent->ducking = false;
 	ent->health = 100;
 	ent->alive = true;
-	server.sv_game.GetPlayerSpawnPoisiton(ent);
+	game.GetPlayerSpawnPoisiton(ent);
 }
 
 Entity* CreateDummy()
 {
-	Entity* ent = server.sv_game.MakeNewEntity(Ent_Dummy);
+	Entity* ent = game.MakeNewEntity(Ent_Dummy);
 	ent->position = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
 	ent->alive = true;
@@ -259,7 +261,7 @@ void RunEntityEvents(Entity* ent, EntityEvent* ev, int num_events)
 		{
 		case Ev_FirePrimary: {
 			glm::vec3 shoot_vec = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
-			server.sv_game.ShootBullets(ent, shoot_vec,
+			game.ShootBullets(ent, shoot_vec,
 				ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
 		}break;
 		case Ev_Reload:
@@ -269,9 +271,9 @@ void RunEntityEvents(Entity* ent, EntityEvent* ev, int num_events)
 }
 
 
-void Server_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
+void ServerGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
 {
-	server.sv_game.PhysWorldTrace(obj, out, ignore_ent, Pf_All);
+	game.PhysWorldTrace(obj, out, ignore_ent, Pf_All);
 }
 
 
@@ -279,7 +281,7 @@ PlayerState Entity::ToPlayerState() const
 {
 	PlayerState ps{};
 	ps.position = position;
-	ps.angles = view_angles;
+	ps.angles = rotation;
 	ps.ducking = ducking;
 	ps.on_ground = on_ground;
 	ps.velocity = velocity;
@@ -296,6 +298,7 @@ void Entity::FromPlayerState(PlayerState* ps)
 	ducking = ps->ducking;
 	on_ground = ps->on_ground;
 	velocity = ps->velocity;
+	alive = ps->alive;
 
 	wpns = ps->weapons;
 	in_jump = ps->in_jump;
@@ -324,7 +327,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.cmd = cmd;
 	move.deltat = core.tick_interval;
 	move.phys_debug = &mb;
-	move.trace_callback = Server_TraceCallback;
+	move.trace_callback = ServerGameTraceCallback;
 	move.in_state = ent->ToPlayerState();
 	move.ignore_ent = GetEntIndex(ent);
 	move.Run();
@@ -400,7 +403,7 @@ void PlayerDeathUpdate(Entity* ent)
 	if (ent->death_time < server.simtime) {
 		ent->health = 100;
 		ent->alive = true;
-		server.sv_game.GetPlayerSpawnPoisiton(ent);
+		game.GetPlayerSpawnPoisiton(ent);
 	}
 }
 
@@ -421,13 +424,13 @@ void DummyUpdate(Entity* ent)
 	//ent->position.y = sin(GetTime()) * 2.f + 2.f;
 	ent->position.x = 0.f;
 	if (!ent->alive)
-		server.sv_game.RemoveEntity(ent);
+		game.RemoveEntity(ent);
 }
 
 Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int grenade_type)
 {
 	ASSERT(thrower);
-	Game* g = &server.sv_game;
+	Game* g = &game;
 	Entity* e = g->MakeNewEntity(Ent_Grenade);
 
 	e->owner_index = thrower->index;
@@ -441,7 +444,7 @@ Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int g
 
 void RunProjectilePhysics(Entity* ent)
 {
-	Game* g = &server.sv_game;
+	Game* g = &game;
 	// update physics, detonate if ready
 	float dt = core.tick_interval;
 	ent->velocity.y -= 12.f * dt;// gravity
@@ -465,13 +468,15 @@ void RunProjectilePhysics(Entity* ent)
 
 void GrenadeUpdate(Entity* ent)
 {
-	Game* g = &server.sv_game;
+	Game* g = &game;
 	RunProjectilePhysics(ent);
 	// spin grenade based on velocity
 	float dt = core.tick_interval;
-	ent->rotation.x += 1.5 * dt * ent->velocity.y;
-	ent->rotation.y -= 2.13 * dt * ent->velocity.y;
-	ent->rotation.z += 0.2 * dt * ent->velocity.y;
+
+	float vel = glm::length(ent->velocity);
+
+	ent->rotation.x += 0.7 * dt * vel;
+	ent->rotation.y -= 1.3 * dt * vel;
 
 	if (ent->death_time < server.simtime) {
 		printf("BOOM\n");

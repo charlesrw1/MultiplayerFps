@@ -14,7 +14,7 @@ struct StateEntry
 
 struct ClientEntity
 {
-	const static int NUM_STORED_STATES = 8;
+	const static int NUM_STORED_STATES = 25;
 	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
 
 	bool active = false;
@@ -42,8 +42,10 @@ struct ClientEntity
 
 struct Snapshot
 {
+	static const int MAX_ENTS = 256;
+
 	int tick = 0;				// what client tick did we receive on
-	EntityState entities[24];	// keep it small for now
+	EntityState entities[MAX_ENTS];	// keep it small for now
 	PlayerState pstate;			// local player state, for prediction stuff
 };
 
@@ -128,32 +130,21 @@ public:
 	void ReadPackets();
 	void SendMovesAndMessages();
 
-	int OutSequenceAk() const {
-		return server.out_sequence_ak;
-	}
-	int OutSequence() const {
-		return server.out_sequence;
-	}
-	int InSequence() const {
-		return server.in_sequence;
-	}
-	int ClientNum() const {
-		return client_num;
-	}
-	ClientConnectionState GetState() const {
-		return state;
-	}
-	IPAndPort GetCurrentServerAddr() const {
-		return server.remote_addr;
-	}
+	int OutSequenceAk() const { return server.out_sequence_ak; }
+	int OutSequence() const { return server.out_sequence; }
+	int InSequence() const { return server.in_sequence; }
+	int ClientNum() const { return client_num; }
+	ClientConnectionState GetState() const { return state; }
+	IPAndPort GetCurrentServerAddr() const { return server.remote_addr; }
+
 private:
 	void HandleUnknownPacket(IPAndPort from, ByteReader& msg);
 	void HandleServerPacket(ByteReader& msg);
 
 	void StartConnection();
 	
-	void ParseEntSnapshot(ByteReader& msg);
-	void ParseServerInit(ByteReader& msg);
+	void OnEntSnapshot(ByteReader& msg);
+	void OnServerInit(ByteReader& msg);
 private:
 	int client_num;
 	int connect_attempts;
@@ -168,6 +159,7 @@ class Client
 {
 public:
 	void Init();
+
 	void Connect(IPAndPort where);
 	void Disconnect();
 	void Reconnect();
@@ -181,12 +173,15 @@ public:
 	void FixedUpdateRead(double dt);
 	void PreRenderUpdate(double dt);
 
-	void RunPrediction();
+	void ClearEntsThatDidntUpdate(int what_tick);
+	void SetupSnapshot(Snapshot* s);
+	MoveCommand* GetCommand(int sequence);
+	int GetCurrentSequence() const;
+	int GetLastSequenceAcked() const;
+	void SetNewTickRate(float tick_rate);
 
-	void CreateMoveCmd();
+	Snapshot* GetCurrentSnapshot();
 
-	void OnRecieveNewSnapshot();
-public:
 	bool initialized = false;
 	ClientGame cl_game;
 
@@ -201,15 +196,21 @@ public:
 
 	int tick = 0;
 	double time=0.0;
-public:
-	MoveCommand* GetCommand(int sequence);
-	int GetCurrentSequence() const;
-	int GetLastSequenceAcked() const;
+
+	// CONFIG VALS
+	float* cfg_interp_time;
+	int* cfg_fake_lag;
+	int* cfg_fake_loss;
+	float* cfg_cl_time_out;
+
 
 private:
-	ClServerMgr server_mgr;
+	void RunPrediction();
+	void CreateMoveCmd();
 	void DoViewAngleUpdate();
 	void CheckLocalServerIsRunning();
+
+	ClServerMgr server_mgr;
 };
 extern Client client;
 

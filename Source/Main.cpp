@@ -4,7 +4,8 @@
 #include <cstdio>
 #include <vector>
 #include <string>
-
+#include <fstream>
+#include <sstream>
 #include "Shader.h"
 #include "Texture.h"
 #include "MathLib.h"
@@ -24,10 +25,128 @@
 #include "Client.h"
 #include "Server.h"
 #include "Movement.h"
+#include "Config.h"
 
 MeshBuilder phys_debug;
 Core core;
+ConfigMgr cfg;
 
+
+int* ConfigMgr::MakeI(const char* name, int default_val)
+{
+	GlobalVar* gv = FindInList(name);
+	if (gv) {
+		if (gv->type != GlobalVar::Int)
+			Fatalf("ConfigMgr::get called with mismatched types: %s\n", name);
+		return &gv->ival;
+	}
+	GlobalVar* v = InitNewVar(name);
+	v->type = GlobalVar::Int;
+	v->ival = default_val;
+	return &v->ival;
+}
+float* ConfigMgr::MakeF(const char* name, float default_val)
+{
+	GlobalVar* gv = FindInList(name);
+	if (gv) {
+		if (gv->type != GlobalVar::Float)
+			Fatalf("ConfigMgr::get called with mismatched types: %s\n", name);
+		return &gv->fval;
+	}
+	GlobalVar* v = InitNewVar(name);
+	v->type = GlobalVar::Float;
+	v->fval = default_val;
+	return &v->fval;
+}
+
+GlobalVar* ConfigMgr::InitNewVar(const char* name)
+{
+	GlobalVar* v = new GlobalVar;
+	int namelen = strlen(name);
+	if (namelen >= GlobalVar::NAME_LEN) {
+		Fatalf("configmgr: name too long, %s\n", name);
+	}
+	memcpy(v->name, name, namelen);
+	v->name[namelen] = '\0';
+	v->next = nullptr;
+	if (tail) {
+		tail->next = v;
+		tail = v;
+	}
+	else {
+		head = tail = v;
+	}
+	return v;
+}
+
+int ConfigMgr::GetI(const char* name)
+{
+	auto gv = FindInList(name);
+	ASSERT(gv);
+	ASSERT(gv->type == GlobalVar::Int);
+	return gv->ival;
+}
+float ConfigMgr::GetF(const char* name)
+{
+	auto gv = FindInList(name);
+	ASSERT(gv);
+	ASSERT(gv->type == GlobalVar::Float);
+	return gv->fval;
+}
+
+void ConfigMgr::SetF(const char* name, float f)
+{
+	float* p = MakeF(name, f);
+	*p = f;
+}
+void ConfigMgr::SetI(const char* name, int i)
+{
+	int* p = MakeI(name, i);
+	*p = i;
+}
+
+
+
+void ConfigMgr::LoadFromDisk(const char* filepath)
+{
+	std::ifstream infile(filepath);
+	if (!infile) {
+		printf("No config file\n");
+	}
+	std::string line;
+	std::string name;
+	std::string val;
+	while (std::getline(infile, line)) {
+		std::stringstream ss;
+		ss << line;
+		ss >> name >> val;
+
+		try {
+			if (val.find('.') != std::string::npos) {
+				SetF(name.c_str(), std::stof(val));
+			}
+			else {
+				SetI(name.c_str(), std::stoi(val));
+			}
+			printf("Found cfg var: %s : %s\n", name.c_str(), val.c_str());
+		}
+		catch (std::invalid_argument) {
+			printf("Bad cfg value: %s\n", line.c_str());
+		}
+	}
+}
+
+GlobalVar* ConfigMgr::FindInList(const char* name)
+{
+	GlobalVar* p = head;
+	while (p) {
+		if (strcmp(p->name, name) == 0) {
+			return p;
+		}
+		p = p->next;
+	}
+	return nullptr;
+}
 
 struct Media
 {
@@ -91,7 +210,6 @@ bool IsClientActive()
 {
 	return client.initialized;
 }
-
 
 static void Cleanup()
 {
@@ -488,7 +606,7 @@ static void DrawWorldEnts(mat4 viewproj)
 	mb.Free();
 
 	glCheckError();
-	Game* g = &server.sv_game;
+	Game* g = &game;
 	g->rays.End();
 	g->rays.Draw(GL_LINES);
 	glCheckError();
@@ -638,8 +756,7 @@ void HandleInput()
 				printf("col iters %d\n", col_iters);
 			}
 			if (scancode == SDL_SCANCODE_G) {
-				gravity = !gravity;
-				printf("gravity %s\n", (gravity) ? "on" : "off");
+				cfg.LoadFromDisk("config.ini");
 			}
 			if (scancode == SDL_SCANCODE_C) {
 				col_response = !col_response;
@@ -649,7 +766,7 @@ void HandleInput()
 				ReloadModel(media.playermod);
 			}
 			if (scancode == SDL_SCANCODE_APOSTROPHE) {
-				Game* g = &server.sv_game;
+				Game* g = &game;
 				g->KillEnt(g->ents.data() + 0);
 
 
@@ -657,7 +774,7 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_T)
 				client.cl_game.third_person = !client.cl_game.third_person;
 			if (scancode == SDL_SCANCODE_Q)
-				server.sv_game.paused = !server.sv_game.paused;
+				game.paused = !game.paused;
 			if(scancode == SDL_SCANCODE_1)
 				client.Disconnect();
 			if (scancode == SDL_SCANCODE_2)
@@ -673,7 +790,7 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_7) {
 				IPAndPort ip;
 				ip.SetIp(127, 0, 0, 1);
-				ip.port = SERVER_PORT;
+				ip.port = cfg.GetI("sv_port");
 				client.Connect(ip);
 			}
 
@@ -757,24 +874,31 @@ int main(int argc, char** argv)
 	}
 	core.vid_width = startw;
 	core.vid_height = starth;
-
+	core.tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 
 	CreateWindow(startx,starty);
+	cfg.LoadFromDisk("config.ini");
 	NetworkInit();
 	RenderInit();
+
 	if (!run_client_only) {
 		server.Init();
 		server.Spawn(map_file);
 	}
+
 	client.Init();
+
 	if (run_client_only) {
 		printf("Running client only\n");
 		IPAndPort ip;
+
 		ip.SetIp(127, 0, 0, 1);
-		ip.port = SERVER_PORT;
+		ip.port = cfg.GetI("sv_port");
+
 		client.Connect(ip);
 	}
-	core.tick_interval = 1.0 / DEFAULT_UPDATE_RATE;	// hardcoded
+
+
 	double last = GetTime()-0.1;
 	for (;;)
 	{

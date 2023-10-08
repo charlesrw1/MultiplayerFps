@@ -4,6 +4,8 @@
 #include "Model.h"
 #include <cstdarg>
 
+#include "Config.h"
+
 Server server;
 
 void NetDebugPrintf(const char* fmt, ...)
@@ -25,16 +27,31 @@ void NetDebugPrintf(const char* fmt, ...)
 void Server::Init()
 {
 	printf("initializing server\n");
-	sv_game.Init();
+
+	cfg_tick_rate = cfg.MakeF("tick_rate", DEFAULT_UPDATE_RATE);
+	cfg_snapshot_rate = cfg.MakeF("snapshot_rate", 30.0);
+	cfg_max_time_out = cfg.MakeF("max_time_out", 10.f);
+	cfg_sv_port = cfg.MakeI("sv_port", DEFAULT_SERVER_PORT);
+
+	game.Init();
 	//client_mgr.Init();
 
 	cur_frame_idx = 0;
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
 
-	socket.Init(SERVER_PORT);
+	socket.Init(*cfg_sv_port);
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		clients.push_back(RemoteClient(this, i));
+
+	if (*cfg_tick_rate < 30)
+		*cfg_tick_rate = 30;
+	else if (*cfg_tick_rate > 150)
+		*cfg_tick_rate = 150;
+
+	// initialize tick_interval here
+	core.tick_interval = 1.0 / *cfg_tick_rate;
+
 }
 void Server::End()
 {
@@ -45,7 +62,7 @@ void Server::End()
 	for (int i = 0; i < clients.size(); i++)
 		clients[i].Disconnect();
 
-	sv_game.ClearState();
+	game.ClearState();
 	active = false;
 	tick = 0;
 	simtime = 0.0;
@@ -59,7 +76,7 @@ void Server::Spawn(const char* mapname)
 	tick = 0;
 	simtime = 0.0;
 	DebugOut("spawning with map %s\n", mapname);
-	bool good = sv_game.DoNewMap(mapname);
+	bool good = game.DoNewMap(mapname);
 	if (!good)
 		return;
 	map_name = mapname;
@@ -78,7 +95,7 @@ void Server::FixedUpdate(double dt)
 
 	ReadPackets();
 
-	sv_game.Update();
+	game.Update();
 	BuildSnapshotFrame();
 
 	UpdateClients();
@@ -88,19 +105,19 @@ void Server::FixedUpdate(double dt)
 
 void Server::RemoveClient(int client)
 {
-	sv_game.OnClientLeave(client);
+	game.OnClientLeave(client);
 }
 
 void Server::BuildSnapshotFrame()
 {
 	Frame* frame = &frames.at(cur_frame_idx);
-	Game* game = &sv_game;
+	Game* g = &game;
 	frame->tick = tick;
 	for (int i = 0; i < MAX_CLIENTS; i++) {
-		frame->ps_states[i] = game->ents[i].ToPlayerState();
+		frame->ps_states[i] = g->ents[i].ToPlayerState();
 	}
 	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
-		frame->states[i] = game->ents[i].ToEntState();
+		frame->states[i] = g->ents[i].ToEntState();
 	}
 
 	cur_frame_idx = (cur_frame_idx + 1) % frames.size();
@@ -108,12 +125,12 @@ void Server::BuildSnapshotFrame()
 
 void Server::RunMoveCmd(int client, MoveCommand cmd)
 {
-	sv_game.ExecutePlayerMove(sv_game.EntForIndex(client), cmd);
+	game.ExecutePlayerMove(game.EntForIndex(client), cmd);
 }
 
 void Server::SpawnClientInGame(int client)
 {
-	sv_game.SpawnNewClient(client);
+	game.SpawnNewClient(client);
 
 	DebugOut("Spawned client, %s\n", clients[client].GetIPStr().c_str());
 }
@@ -122,6 +139,8 @@ void Server::WriteServerInfo(ByteWriter& msg)
 {
 	msg.WriteByte(map_name.size());
 	msg.WriteBytes((uint8_t*)map_name.data(), map_name.size());
+
+	msg.WriteFloat(*cfg_tick_rate);
 }
 
 
@@ -250,7 +269,7 @@ void Server::ReadPackets()
 		auto& cl = clients[i];
 		if (!cl.IsConnected())
 			continue;
-		if (GetTime() - cl.LastRecieved() > MAX_TIME_OUT) {
+		if (GetTime() - cl.LastRecieved() > *cfg_max_time_out) {
 			printf("Client, %s, timed out\n", cl.GetIPStr().c_str());
 			cl.Disconnect();
 		}

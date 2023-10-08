@@ -5,6 +5,8 @@
 #include "Movement.h"
 #include "MeshBuilder.h"
 
+#include "Config.h"
+
 Client client;
 
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
@@ -12,6 +14,11 @@ Client client;
 
 void Client::Init()
 {
+	cfg_interp_time = cfg.MakeF("interp_time", 0.1);
+	cfg_fake_lag = cfg.MakeI("fake_lag", 0);
+	cfg_fake_loss = cfg.MakeI("fake_loss", 0);
+	cfg_cl_time_out = cfg.MakeF("cl_time_out", 5.f);
+
 	server_mgr.Init(this);
 	cl_game.Init();
 	out_commands.resize(CLIENT_MOVE_HISTORY);
@@ -21,6 +28,7 @@ void Client::Init()
 	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
 
 	initialized = true;
+
 }
 
 void Client::Disconnect()
@@ -72,11 +80,11 @@ void Client::CheckLocalServerIsRunning()
 		// connect to the local server
 		IPAndPort serv_addr;
 		serv_addr.SetIp(127, 0, 0, 1);
-		serv_addr.port = SERVER_PORT;
+		serv_addr.port = cfg.GetI("sv_port");
 		server_mgr.Connect(serv_addr);
 	}
 }
-void Client_TraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
+void ClientGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
 {
 	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
 }
@@ -89,7 +97,7 @@ void RunClientPhysics(const PlayerState* in, PlayerState* out, const MoveCommand
 	move.deltat = core.tick_interval;
 	move.phys_debug = &b;
 	move.in_state = *in;
-	move.trace_callback = Client_TraceCallback;
+	move.trace_callback = ClientGameTraceCallback;
 	move.Run();
 
 
@@ -185,9 +193,6 @@ void Client::RunPrediction()
 	// FIXME:
 	EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
 	PlayerState pred_state = last_auth_state->pstate;
-	pred_state.position =last_estate.position;
-	pred_state.angles = last_estate.angles;
-	pred_state.ducking = last_estate.ducking;
 
 	for (int i = start + 1; i < end; i++) {
 		MoveCommand* cmd = GetCommand(i);
@@ -227,7 +232,6 @@ void Client::FixedUpdateRead(double dt)
 		client.tick += 1;
 	server_mgr.ReadPackets();
 	RunPrediction();
-
 	cl_game.UpdateViewModelOffsets();
 }
 void Client::PreRenderUpdate(double frametime)
@@ -237,8 +241,7 @@ void Client::PreRenderUpdate(double frametime)
 	if (IsClientActive() && IsInGame()) {
 		// interpoalte entities for rendering
 		ClientGame* game = &cl_game;
-		const double cl_interp = 2.0/DEFAULT_SNAPSHOT_RATE;
-		double rendering_time = client.tick * core.tick_interval - cl_interp;
+		double rendering_time = client.tick * core.tick_interval - (*cfg_interp_time);
 		for (int i = 0; i < game->entities.size(); i++) {
 			if (game->entities[i].active && i != GetPlayerNum()) {
 				game->entities[i].InterpolateState(rendering_time, core.tick_interval);
@@ -282,6 +285,26 @@ StateEntry* ClientEntity::GetStateFromIndex(int index)
 {
 	return &hist.at(NegModulo(index, NUM_STORED_STATES));
 }
+
+float InterpolateAnimation(Animation* a, float start, float end, float alpha)
+{
+	// check distances
+	float clip_len = a->total_duration;
+	float d1 = glm::abs(end - start);
+	float d2 = clip_len - d1;
+
+
+	if (d1 <= d2) {
+		return glm::mix(start, end, alpha);
+	}
+	else {
+		if (start >= end)
+			return fmod(start + (alpha * d2), clip_len);
+		else
+			return fmod(end + ((1 - alpha) * d2), clip_len);
+	}
+}
+
 
 // Called every graphics frame
 void ClientEntity::InterpolateState(double time, double tickinterval) {
@@ -334,6 +357,15 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 	if (s1->state.leganim == s2->state.leganim) {
 		//interpstate.leganim_frame = glm::mix(s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
 		
+		Model* m = FindOrLoadModel("CT.glb");
+
+		int anim = s1->state.leganim;
+		if (anim >= 0 && anim < m->animations->clips.size()) {
+
+			interpstate.leganim_frame = InterpolateAnimation(&m->animations->clips[s1->state.leganim],
+				s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
+		}
+
 	}
 	if (s1->state.mainanim == s2->state.mainanim) {
 		// fixme
@@ -342,11 +374,23 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 
 }
 
-void Client::OnRecieveNewSnapshot()
+void Client::SetNewTickRate(float tick_rate)
 {
-	Snapshot* snapshot = &snapshots.at(server_mgr.InSequence() % CLIENT_SNAPSHOT_HISTORY);
+	if (!IsServerActive()) {
+		core.tick_interval = 1.0 / tick_rate;
+	}
+}
+
+Snapshot* Client::GetCurrentSnapshot()
+{
+	return &snapshots.at(server_mgr.InSequence() % CLIENT_SNAPSHOT_HISTORY);
+}
+
+void Client::SetupSnapshot(Snapshot* s)
+{
+	Snapshot* snapshot = s;
 	ClientGame* game = &cl_game;
-	for (int i = 0; i < 24; i++) {
+	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
 		ClientEntity* ce = &game->entities[i];
 
 		// local player doesnt fill interp history here
@@ -366,5 +410,21 @@ void Client::OnRecieveNewSnapshot()
 			ce->ClearState();
 		}
 		ce->AddStateToHist(&snapshot->entities[i], tick);
+	}
+
+	ClearEntsThatDidntUpdate(tick);
+}
+
+void Client::ClearEntsThatDidntUpdate(int what_tick)
+{
+	ClientGame* game = &cl_game;
+	for (int i = 0; i < game->entities.size(); i++) {
+		ClientEntity* ce = &game->entities[i];
+		if (i == GetPlayerNum()) continue;
+		if (ce->active && ce->GetLastState()->tick != what_tick) {
+			game->entities[i].active = false;
+		}
+
+
 	}
 }

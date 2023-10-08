@@ -3,6 +3,8 @@
 #include <cstdio>
 #include "Util.h"
 
+#include "Net.h"
+#include "Config.h"
 
 std::string IPAndPort::ToString() const
 {
@@ -111,6 +113,8 @@ void NetworkInit()
 {
 	WSAData data;
 	WSAStartup(MAKEWORD(2, 2), &data);
+
+	cfg.SetI("sv_port", DEFAULT_SERVER_PORT);
 }
 
 void NetworkQuit()

@@ -12,20 +12,20 @@ const int CLIENT_SNAPSHOT_HISTORY = 16;	// buffer last 16 snapshots
 const int MAX_PAYLOAD_SIZE = 1400;
 const int PACKET_HEADER_SIZE = 8;
 
-const int SERVER_PORT = 24352;
+const int DEFAULT_SERVER_PORT = 24352;
+
 const int MAX_CLIENTS = 16;
 const int MAX_NET_STRING = 256;
 const unsigned CONNECTIONLESS_SEQUENCE = 0xffffffff;
-const int MAX_CONNECT_ATTEMPTS = 10;
-const float CONNECT_RETRY_TIME = 2.f;
-const double MAX_TIME_OUT = 5.f;
+//const int MAX_CONNECT_ATTEMPTS = 10;
+//const float CONNECT_RETRY_TIME = 2.f;
+//const double MAX_TIME_OUT = 5.f;
 const int CLIENT_MOVE_HISTORY = 36;
 
 const double DEFAULT_UPDATE_RATE = 66.66;	// server+client ticks 66 times a second
 const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
-const int DEFAULT_SNAPSHOT_RATE = 30;	// send 30 snapshots a second
+const int DEFAULT_SNAPSHOT_RATE = 30;	// send x snapshots a second
 
-const double DEFAULT_INTERP_TIME = 0.1;	// how far in the past to interpolate for lag compensation
 
 
 // Messages
@@ -80,7 +80,7 @@ struct EntityState
 	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
 
 	int mainanim = 0;
-	float mainanim_frame = 0.f;	// quantized
+	float mainanim_frame = 0.f;	// frames quantized to 16 bits
 	int leganim = 0;
 	float leganim_frame = 0.f;
 
