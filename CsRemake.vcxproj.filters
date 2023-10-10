@@ -161,5 +161,8 @@
     <ClInclude Include="Source\Config.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Media.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

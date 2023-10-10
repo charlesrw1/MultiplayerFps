@@ -113,8 +113,6 @@ void NetworkInit()
 {
 	WSAData data;
 	WSAStartup(MAKEWORD(2, 2), &data);
-
-	cfg.SetI("sv_port", DEFAULT_SERVER_PORT);
 }
 
 void NetworkQuit()

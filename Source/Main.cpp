@@ -26,10 +26,14 @@
 #include "Server.h"
 #include "Movement.h"
 #include "Config.h"
+#include "Media.h"
 
 MeshBuilder phys_debug;
 Core core;
 ConfigMgr cfg;
+Media media;
+
+static int* cfg_draw_server_colliders;
 
 
 int* ConfigMgr::MakeI(const char* name, int default_val)
@@ -105,8 +109,6 @@ void ConfigMgr::SetI(const char* name, int i)
 	*p = i;
 }
 
-
-
 void ConfigMgr::LoadFromDisk(const char* filepath)
 {
 	std::ifstream infile(filepath);
@@ -117,6 +119,11 @@ void ConfigMgr::LoadFromDisk(const char* filepath)
 	std::string name;
 	std::string val;
 	while (std::getline(infile, line)) {
+		if (line.empty())
+			continue;
+		if (line.at(0) == '#')
+			continue;
+
 		std::stringstream ss;
 		ss << line;
 		ss >> name >> val;
@@ -147,21 +154,6 @@ GlobalVar* ConfigMgr::FindInList(const char* name)
 	}
 	return nullptr;
 }
-
-struct Media
-{
-	Model* playermod;
-	Model* gun;
-	Model* grenade_he;
-	Media* gun_basic;
-	Texture* testtex;
-
-	Shader simple;
-	Shader textured;
-	Shader animated;
-};
-
-static Media media;
 
 static double program_time_start;
 static bool update_camera = false;
@@ -475,8 +467,13 @@ static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* m
 	glCheckError();
 
 	EntityState* cur = &cent->interpstate;
-	Animator ca;
-	ca.Init(media.playermod);
+	if (!cent->model)
+		return;
+
+	Animator& ca = cent->animator;
+
+
+	ca.Init(cent->model);
 	ca.ResetLayers();
 	ca.mainanim = cur->leganim;
 	ca.mainanim_frame = cur->leganim_frame;
@@ -511,16 +508,16 @@ static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* m
 
 
 	//glDisable(GL_CULL_FACE);
-	for (int i = 0; i < media.playermod->parts.size(); i++)
+	for (int i = 0; i < cent->model->parts.size(); i++)
 	{
-		MeshPart* part = &media.playermod->parts[i];
+		const MeshPart* part = &cent->model->parts[i];
 		glBindVertexArray(part->vao);
 		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
 	}
 	glCheckError();
 }
 
-static void DrawModel(EntityState* ent, Model* m, mat4 viewproj)
+static void DrawModel(EntityState* ent, const Model* m, mat4 viewproj)
 {
 	basic_mod.use();
 	basic_mod.set_mat4("ViewProj", viewproj);
@@ -536,7 +533,7 @@ static void DrawModel(EntityState* ent, Model* m, mat4 viewproj)
 	//glDisable(GL_CULL_FACE);
 	for (int i = 0; i < m->parts.size(); i++)
 	{
-		MeshPart* part = &m->parts[i];
+		const MeshPart* part = &m->parts[i];
 		glBindVertexArray(part->vao);
 		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
 	}
@@ -582,19 +579,28 @@ static void DrawWorldEnts(mat4 viewproj)
 		auto& ent = client.cl_game.entities[i];
 		if (!ent.active)
 			continue;
-		if (ent.interpstate.type == Ent_Grenade) {
-			DrawModel(&ent.interpstate, media.grenade_he, viewproj);
+		if (!ent.model)
+			continue;
+		bool animated = ent.model->bones.size() > 0;
+
+		if (i == client.GetPlayerNum() && !client.cl_game.third_person)
+			continue;
+
+		if (!animated) {
+			DrawModel(&ent.interpstate, ent.model, viewproj);
 		}
-		else if (ent.interpstate.type == Ent_Dummy)
-			DrawModel(&ent.interpstate, media.gun, viewproj);
-		else if (ent.active && ent.interpstate.type != Ent_Free && (i != client.GetPlayerNum()|| client.cl_game.third_person)) {
+		else {
 			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
 		}
 	}
 
-	if (server.active) {
-		EntityState es = ServerEntForIndex(0)->ToEntState();
-		DrawState(&es, COLOR_CYAN, mb);
+	if (IsServerActive() && *cfg_draw_server_colliders == 1) {
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+			if (game.ents[i].type == Ent_Player) {
+				EntityState es = game.ents[i].ToEntState();
+				DrawState(&es, COLOR_CYAN, mb);
+			}
+		}
 	}
 	mb.End();
 	
@@ -634,14 +640,23 @@ void InitGlState()
 	glDepthFunc(GL_LEQUAL);
 }
 
+void LoadMediaFiles()
+{
+	auto& models = media.gamemodels;
+	models.resize(Mod_NUMMODELS);
+	
+	models[Mod_PlayerCT] = FindOrLoadModel("CT.glb");
+	models[Mod_GunM16] = FindOrLoadModel("m16.glb");
+	models[Mod_Grenade_HE] = FindOrLoadModel("grenade_he.glb");
+
+
+
+
+}
 
 void RenderInit()
 {
 	InitGlState();
-	media.gun = FindOrLoadModel("m16.glb");
-	media.playermod = FindOrLoadModel("CT.glb");
-	media.testtex = FindOrLoadTexture("test.png");
-	media.grenade_he = FindOrLoadModel("grenade_he.glb");
 
 	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
@@ -683,8 +698,11 @@ void Render(double dt)
 	DrawTempLevel(viewproj);
 	glCheckError();
 	glm::mat4 invview = glm::inverse(view.view_mat);
+
+
+
 	if(!client.cl_game.third_person)
-		DrawViewModel(media.gun, glm::vec3(0, 0, 2), glm::vec3(1.f), invview, view.viewproj, view);
+		DrawViewModel(media.gamemodels.at(Mod_GunM16), glm::vec3(0, 0, 2), glm::vec3(1.f), invview, view.viewproj, view);
 }
 
 void DrawScreen(double dt)
@@ -763,7 +781,7 @@ void HandleInput()
 				printf("col_response %s\n", (col_response) ? "on" : "off");
 			}
 			if (scancode == SDL_SCANCODE_V) {
-				ReloadModel(media.playermod);
+				ReloadModel(media.gamemodels[Mod_PlayerCT]);
 			}
 			if (scancode == SDL_SCANCODE_APOSTROPHE) {
 				Game* g = &game;
@@ -790,7 +808,7 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_7) {
 				IPAndPort ip;
 				ip.SetIp(127, 0, 0, 1);
-				ip.port = cfg.GetI("sv_port");
+				ip.port = cfg.GetI("host_port");
 				client.Connect(ip);
 			}
 
@@ -855,6 +873,8 @@ int main(int argc, char** argv)
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
 
+	int host_port = DEFAULT_SERVER_PORT;
+
 	for (int i = 1; i < argc; i++)
 	{
 		if (strcmp(argv[i], "-client") == 0)
@@ -877,9 +897,15 @@ int main(int argc, char** argv)
 	core.tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 
 	CreateWindow(startx,starty);
+
 	cfg.LoadFromDisk("config.ini");
+	cfg.MakeI("host_port", DEFAULT_SERVER_PORT);
+	cfg_draw_server_colliders = cfg.MakeI("draw_server_colliders", 1);
+	cfg.MakeF("max_ground_speed", 10.f);
+
 	NetworkInit();
 	RenderInit();
+	LoadMediaFiles();
 
 	if (!run_client_only) {
 		server.Init();
@@ -893,7 +919,7 @@ int main(int argc, char** argv)
 		IPAndPort ip;
 
 		ip.SetIp(127, 0, 0, 1);
-		ip.port = cfg.GetI("sv_port");
+		ip.port = cfg.GetI("host_port");
 
 		client.Connect(ip);
 	}

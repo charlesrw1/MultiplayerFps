@@ -29,14 +29,13 @@ struct ClientEntity
 
 	StateEntry* GetStateFromIndex(int index);
 	StateEntry* GetLastState();
-	void AddStateToHist(const EntityState* state, int tick) {
-		hist.at(current_hist_index) = { tick, *state };
-		current_hist_index = (current_hist_index + 1) % hist.size();
-	}
+	void OnRecieveUpdate(const EntityState* state, int tick);
 	void InterpolateState(double time, double tickrate);
 	void ClearState() {
 		for (int i = 0; i < hist.size(); i++)
 			hist.at(i) = { -1, {} };
+		model = nullptr;
+		animator.Clear();
 	}
 };
 
@@ -202,7 +201,6 @@ public:
 	int* cfg_fake_lag;
 	int* cfg_fake_loss;
 	float* cfg_cl_time_out;
-
 
 private:
 	void RunPrediction();

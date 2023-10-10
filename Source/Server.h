@@ -4,6 +4,7 @@
 #include "Animation.h"
 #include "Physics.h"
 #include "GameData.h"
+#include "Media.h"
 
 // If you want to add a replicated variable you must:
 //	add it to entitystate or playerstate depending on its use
@@ -36,12 +37,16 @@ struct Entity
 	int health = 100;
 	WpnState wpns;
 
+	int model_index = 0;	// index into media.gamemodels
+
 	Animator anim;
 	const Model* model = nullptr;
 
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
 	EntityState ToEntState() const;
+
+	void SetModel(GameModels modname);
 };
 
 Entity* ServerEntForIndex(int index);
@@ -81,6 +86,9 @@ public:
 	MeshBuilder rays;
 
 	bool paused = false;
+
+	float gravity = 12.f;
+
 	std::vector<Entity> ents;
 	int num_ents = 0;
 	const Level* level = nullptr;

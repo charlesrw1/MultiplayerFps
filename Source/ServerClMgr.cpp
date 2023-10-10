@@ -169,6 +169,9 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		mask |= (1 << 2);
 	}
 	
+	if (from->model_idx != to->model_idx)
+		mask |= (1 << 6);
+
 	if (from->leganim != to->leganim) {
 		mask |= 1 << 7;
 	}
@@ -214,6 +217,9 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		msg.WriteByte(rot[1]);
 		msg.WriteByte(rot[2]);
 	}
+	if (mask & (1 << 6))
+		msg.WriteByte(to->model_idx);
+
 	if (mask & (1 << 7))
 		msg.WriteByte(to->leganim);
 	if (mask & (1 << 8)) {
@@ -257,6 +263,10 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->angles.y = (float)rot[1] * (2 * PI) / 256.0;
 		to->angles.z = (float)rot[2] * (2 * PI) / 256.0;
 	}
+
+	if (mask & (1 << 6))
+		to->model_idx = msg.ReadByte();
+
 	if (mask & (1 << 7))
 		to->leganim = msg.ReadByte();
 	if (mask & (1 << 8)) {

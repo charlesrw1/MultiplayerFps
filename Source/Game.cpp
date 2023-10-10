@@ -208,8 +208,7 @@ void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, 
 void PlayerSpawn(Entity* ent)
 {
 	ASSERT(ent->type == Ent_Player);
-	ent->model = FindOrLoadModel("CT.glb");
-	ent->anim.Init(ent->model);
+	ent->SetModel(Mod_PlayerCT);
 	ent->anim.ResetLayers();
 
 	if (ent->model) {
@@ -229,8 +228,7 @@ Entity* CreateDummy()
 	ent->rotation = glm::vec3(0.f);
 	ent->alive = true;
 	ent->health = 100;
-	ent->model = FindOrLoadModel("CT.glb");
-	ent->anim.Init(ent->model);
+	ent->SetModel(Mod_PlayerCT);
 	if (ent->model)
 		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"));
 
@@ -276,6 +274,12 @@ void ServerGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, 
 	game.PhysWorldTrace(obj, out, ignore_ent, Pf_All);
 }
 
+void Entity::SetModel(GameModels m) {
+	model_index = m;
+	model = media.gamemodels.at(m);
+	if (model && model->bones.size() > 0)
+		anim.Init(model);
+}
 
 PlayerState Entity::ToPlayerState() const
 {
@@ -315,9 +319,12 @@ EntityState Entity::ToEntState() const
 	es.position = position;
 	es.type = type;
 
+	es.model_idx = model_index;
+
 	return es;
 }
 #include "MeshBuilder.h"
+#include "Config.h"
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
 	ent->view_angles = cmd.view_angles;
@@ -330,6 +337,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.trace_callback = ServerGameTraceCallback;
 	move.in_state = ent->ToPlayerState();
 	move.ignore_ent = GetEntIndex(ent);
+	move.max_ground_speed = cfg.GetF("max_ground_speed");
 	move.Run();
 
 	double oldtime = server.simtime;
@@ -433,6 +441,7 @@ Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int g
 	Game* g = &game;
 	Entity* e = g->MakeNewEntity(Ent_Grenade);
 
+	e->SetModel(Mod_Grenade_HE);
 	e->owner_index = thrower->index;
 	e->position = org;
 	e->velocity = start_vel;
@@ -447,7 +456,7 @@ void RunProjectilePhysics(Entity* ent)
 	Game* g = &game;
 	// update physics, detonate if ready
 	float dt = core.tick_interval;
-	ent->velocity.y -= 12.f * dt;// gravity
+	ent->velocity.y -= game.gravity * dt;// gravity
 	glm::vec3 next_position = ent->position + ent->velocity * dt;
 	float len = glm::length(ent->velocity * dt);
 	RayHit rh;
@@ -516,7 +525,7 @@ void Game::RemoveEntity(Entity* ent)
 	ent->type = Ent_Free;
 	ent->alive = false;
 	ent->model = nullptr;
-	ent->anim.ResetLayers();
+	ent->anim.Clear();
 
 	num_ents--;
 }

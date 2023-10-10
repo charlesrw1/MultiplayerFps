@@ -79,6 +79,7 @@ struct EntityState
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
 
+	int model_idx = 0;
 	int mainanim = 0;
 	float mainanim_frame = 0.f;	// frames quantized to 16 bits
 	int leganim = 0;

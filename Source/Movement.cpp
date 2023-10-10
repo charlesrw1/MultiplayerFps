@@ -224,9 +224,6 @@ void PlayerMovement::CheckGroundState()
 		player.in_jump = false;
 }
 
-static float max_ground_speed = 10;
-static float max_air_speed = 2;
-
 void PlayerMovement::GroundMove()
 {
 	float acceleation_val = (player.on_ground) ? ground_accel : air_accel;

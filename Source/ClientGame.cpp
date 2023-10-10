@@ -36,6 +36,7 @@ void ClientGame::NewMap(const char* mapname)
 		FreeLevel(level);
 		level = nullptr;
 	}
+	ClearState();	// cleansup game state
 	level = LoadLevelFile(mapname);
 }
 

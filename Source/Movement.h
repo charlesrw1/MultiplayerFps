@@ -21,6 +21,9 @@ public:
 	float deltat;
 	int ignore_ent;
 
+	float max_ground_speed = 10;
+	float max_air_speed = 2;
+
 	int num_events = 0;
 	EntityEvent triggered_events[MAX_EVENTS];
 	int trig_event_parms[MAX_EVENTS];

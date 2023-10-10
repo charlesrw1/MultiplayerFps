@@ -4,7 +4,7 @@
 #include "CoreTypes.h"
 #include "Movement.h"
 #include "MeshBuilder.h"
-
+#include "Media.h"
 #include "Config.h"
 
 Client client;
@@ -80,7 +80,7 @@ void Client::CheckLocalServerIsRunning()
 		// connect to the local server
 		IPAndPort serv_addr;
 		serv_addr.SetIp(127, 0, 0, 1);
-		serv_addr.port = cfg.GetI("sv_port");
+		serv_addr.port = cfg.GetI("host_port");
 		server_mgr.Connect(serv_addr);
 	}
 }
@@ -98,6 +98,7 @@ void RunClientPhysics(const PlayerState* in, PlayerState* out, const MoveCommand
 	move.phys_debug = &b;
 	move.in_state = *in;
 	move.trace_callback = ClientGameTraceCallback;
+	move.max_ground_speed = cfg.GetF("max_ground_speed");
 	move.Run();
 
 
@@ -203,7 +204,7 @@ void Client::RunPrediction()
 
 	ClientEntity* ent = GetLocalPlayer();
 	PlayerStateToClEntState(&last_estate, &pred_state);
-	ent->AddStateToHist(&last_estate, tick);
+	ent->OnRecieveUpdate(&last_estate, tick);
 	lastpredicted = pred_state;
 
 	//ent->state = pred_state.estate;
@@ -272,6 +273,21 @@ static float MidLerp(float min, float max, float mid_val)
 StateEntry* ClientEntity::GetLastState()
 {
 	return &hist.at(NegModulo(current_hist_index - 1, NUM_STORED_STATES));
+}
+
+void ClientEntity::OnRecieveUpdate(const EntityState* state, int tick)
+{
+	hist.at(current_hist_index) = { tick, *state };
+	current_hist_index = (current_hist_index + 1) % hist.size();
+
+	if (state->model_idx != interpstate.model_idx || model==nullptr) {
+		if (state->model_idx >= 0 && state->model_idx < media.gamemodels.size()) {
+			model = media.gamemodels.at(state->model_idx);
+		}
+		else {
+			printf("client: recieved invalid model_index (%d)\n", state->model_idx);
+		}
+	}
 }
 
 bool IsDistanceATeleport(vec3 a, vec3 b, float maxspeed, float dt)
@@ -354,10 +370,14 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 	interpstate = s1->state;
 	//if(!IsDistanceATeleport(s1->state.position,s2->state.position, 20.0, tickinterval))
 	interpstate.position = glm::mix(s1->state.position, s2->state.position, midlerp);
+
+	const Model* m = model;
+	if (!m || !m->animations)
+		return;
+
 	if (s1->state.leganim == s2->state.leganim) {
 		//interpstate.leganim_frame = glm::mix(s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
-		
-		Model* m = FindOrLoadModel("CT.glb");
+	
 
 		int anim = s1->state.leganim;
 		if (anim >= 0 && anim < m->animations->clips.size()) {
@@ -409,7 +429,7 @@ void Client::SetupSnapshot(Snapshot* s)
 		if (lastentry->state.type == Ent_Free) {
 			ce->ClearState();
 		}
-		ce->AddStateToHist(&snapshot->entities[i], tick);
+		ce->OnRecieveUpdate(&snapshot->entities[i], tick);
 	}
 
 	ClearEntsThatDidntUpdate(tick);

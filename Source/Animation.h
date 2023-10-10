@@ -74,6 +74,11 @@ class Model;
 class Animator
 {
 public:
+	void Clear() {
+		model = nullptr;
+		set = nullptr;
+		ResetLayers();
+	}
 	void Init(const Model* model);
 	void SetupBones();
 	void ConcatWithInvPose();

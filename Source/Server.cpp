@@ -31,7 +31,7 @@ void Server::Init()
 	cfg_tick_rate = cfg.MakeF("tick_rate", DEFAULT_UPDATE_RATE);
 	cfg_snapshot_rate = cfg.MakeF("snapshot_rate", 30.0);
 	cfg_max_time_out = cfg.MakeF("max_time_out", 10.f);
-	cfg_sv_port = cfg.MakeI("sv_port", DEFAULT_SERVER_PORT);
+	cfg_sv_port = cfg.MakeI("host_port", DEFAULT_SERVER_PORT);
 
 	game.Init();
 	//client_mgr.Init();
