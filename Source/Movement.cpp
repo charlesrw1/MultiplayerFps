@@ -35,18 +35,6 @@ using glm::vec2;
 using glm::dot;
 using glm::cross;
 
-void PlayerMovement::TriggerEvent(EntityEvent ev, int parm)
-{
-	if (num_events < MAX_EVENTS) {
-		triggered_events[num_events] = ev;
-		trig_event_parms[num_events] = parm;
-		num_events++;
-	}
-	else {
-		printf("playermovement: event overflow\n");
-	}
-}
-
 void PlayerMovement::CheckNans()
 {
 	if (player.position.x != player.position.x || player.position.y != player.position.y ||
@@ -117,7 +105,7 @@ void PlayerMovement::CheckDuck()
 			obj.sph.origin = where;
 			obj.sph.radius = sphere_radius;
 
-			trace_callback(&res, obj, true, false, ignore_ent);
+			obj_trace(&res, obj, true, false, entindex);
 
 			//TraceSphere(level, where, sphere_radius, &res, true, false);
 			if (res.found) {
@@ -168,7 +156,7 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 		obj.cap.tip += position;
 		obj.cap.base += position;
 	
-		trace_callback(&trace, obj, col_closest, false, ignore_ent);
+		obj_trace(&trace, obj, col_closest, false, entindex);
 
 		//TraceCapsule(level, position, cap, &trace, col_closest);
 		if (trace.found)
@@ -186,7 +174,7 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 		obj.cap.tip += position;
 		obj.cap.base += position;
 
-		trace_callback(&res, obj, col_closest, false, ignore_ent);
+		obj_trace(&res, obj, col_closest, false, entindex);
 		//TraceCapsule(level, position, cap, &res, col_closest);
 		if (res.found) {
 			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
@@ -208,7 +196,7 @@ void PlayerMovement::CheckGroundState()
 	obj.sph.origin = where;
 	obj.sph.radius = standing_capsule.radius;
 
-	trace_callback(&result, obj, true, true, ignore_ent);
+	obj_trace(&result, obj, true, true, entindex);
 
 	//TraceSphere(level, where, radius, &result, true, true);
 	if (!result.found)
@@ -269,9 +257,6 @@ void PlayerMovement::AirMove()
 }
 void PlayerMovement::Run()
 {
-	num_events = 0;
-
-	player = in_state;
 	if (!player.alive) {
 		cmd.forward_move = 0;
 		cmd.lateral_move = 0;
@@ -296,67 +281,48 @@ void PlayerMovement::Run()
 	look_front = normalize(look_front);
 	look_side = -cross(look_front, vec3(0, 1, 0));
 
-
-
 	float fric_val = (player.on_ground) ? ground_friction : air_friction;
 	ApplyFriction(fric_val);
 	CheckGroundState();	// check ground after applying friction, like quake
 	GroundMove();
 	CheckNans();
 
+	RunItemCode();
 }
 
-//
-//	WEAPON CONTROLLER CODE
-//
-void WeaponController::TriggerEvent(EntityEvent ev, int parm)
+void PlayerMovement::RunItemCode()
 {
-	if (num_events < MAX_EVENTS) {
-		events[num_events] = ev;
-		event_parms[num_events] = parm;
-		num_events++;
+	vec3 shoot_vec = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
+
+	bool wants_shoot = cmd.button_mask & CmdBtn_PFire;
+	bool wants_reload = cmd.button_mask & CmdBtn_Reload;
+
+	ItemState* w = &player.items;
+	if (!(w->active_item >= 0 && w->active_item < ItemState::MAX_ITEMS)) {
+		printf("invalid active_item\n");
+		return;
 	}
-	else {
-		printf("weapon controller: events full\n");
-	}
-}
-void WeaponController::Run()
-{
-	num_events = 0;
-	shoot_vec = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-
-	bool wants_shoot = cmd.button_mask & CmdBtn_Misc1;
-	bool wants_reload = cmd.button_mask & CmdBtn_Misc2;
-
-	// unarmed
-	//if (ent->gun_id == -1)
-	//	return;
-	//
-	//if (ent->reloading && ent->gun_timer < server.time) {
-	//	ent->reloading = false;
-	//	int amt = glm::min((short)10, ent->ammo[ent->gun_id]);
-	//	ent->clip[ent->gun_id] += amt;
-	//	ent->ammo[ent->gun_id] -= amt;
-	//	printf("reloaded\n");
-	//}
-	//
-
-	WpnState* w = &state.weapons;
 
 	if (w->reloading || w->gun_timer >= simtime)
 		return;
 
-	if (wants_shoot) {// && ent->clip[ent->gun_id] > 0) {
-		//server.sv_game.ShootBullets(ent,
-		//	AnglesToVector(cmd.view_angles.x, cmd.view_angles.y),
-		//	ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
-		TriggerEvent(Ev_FirePrimary);
+	if (wants_shoot) {
+		if (fire_weapon)
+			fire_weapon(entindex, false);
+
 		w->gun_timer = simtime + 0.1f;
-		w->clip[w->gun_id]--;
+		w->clip[w->active_item]--;
+		w->state = Item_InFire;
+
+		//view_recoil_add.x = PI / 16.f;
 	}
-	else if ((w->clip[w->gun_id] <= 0 || wants_reload) && w->ammo[w->gun_id] > 0) {
-		TriggerEvent(Ev_Reload);
+	else if ((w->clip[w->active_item] <= 0 || wants_reload) && w->ammo[w->active_item] > 0) {
 		w->reloading = true;
 		w->gun_timer += 1.0f;
+		w->state = Item_Reload;
+	}
+	else {
+		w->state = Item_Idle;
+		w->reloading = false;
 	}
 }

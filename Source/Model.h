@@ -41,8 +41,8 @@ struct MeshPart
 struct Texture;
 struct MeshMaterial
 {
-	// TODO:
 	Texture* t1 = nullptr;
+	Texture* t2 = nullptr;
 };
 
 struct ModelAttachment
@@ -79,7 +79,6 @@ public:
 	VertexFormat format=VertexFormat::Static;
 	std::vector<MeshPart> parts;
 	std::vector<GpuBuffer> buffers;
-
 	std::vector<MeshMaterial> materials;
 
 	int BoneForName(const char* name);
@@ -95,5 +94,4 @@ namespace tinygltf {
 	class Mesh;
 }
 void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygltf::Mesh& mesh, std::map<int, int>& buffer_view_to_buffer);
-
 #endif // !MODEL_H

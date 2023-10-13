@@ -4,6 +4,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "Physics.h"
+#include "Texture.h"
 #include <array>
 static const char* const level_directory = "Data\\Models\\";
 static std::array<Level*, 2> loaded_levels;
@@ -176,14 +177,42 @@ static void LookThroughNodeTree(Level* level, tinygltf::Model& scene, tinygltf::
 		LookThroughNodeTree(level, scene, scene.nodes[node.children[i]], global_transform);
 }
 
+static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
+{
+	tinygltf::BufferView& bv = scene.bufferViews[i.bufferView];
+	tinygltf::Buffer& b = scene.buffers[bv.buffer];
+	ASSERT(bv.byteStride == 0);
+
+	return CreateTextureFromImgFormat(&b.data.at(bv.byteOffset), bv.byteLength, i.name);
+}
+
 static void GatherRenderData(Level* level, tinygltf::Model& scene)
 {
+	std::vector<MeshMaterial> mm;
+
+	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
+		tinygltf::Material& mat = scene.materials[matidx];
+		MeshMaterial mymat;
+		if (mat.pbrMetallicRoughness.baseColorTexture.index != -1) {
+			mymat.t1 = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+		}
+		mm.push_back(mymat);
+	}
+
 	for (int i = 0; i < scene.meshes.size(); i++) {
 		Model* m = new Model;
 		std::map<int, int> mapping;
 		AppendGltfMeshToModel(m, scene, scene.meshes[i], mapping);
 		level->render_data.embedded_meshes.push_back(m);
 		// TODO: materials
+
+		for (int i = 0; i < m->parts.size(); i++) {
+			auto& part = m->parts[i];
+			if (part.material_idx != -1) {
+				m->materials.push_back(mm.at(part.material_idx));
+				part.material_idx = m->materials.size() - 1;
+			}
+		}
 	}
 }
 

@@ -93,6 +93,7 @@ void Game::Init()
 	ents.resize(MAX_GAME_ENTS);
 	num_ents = 0;
 	level = nullptr;
+
 }
 
 void Game::ClearState()
@@ -104,6 +105,7 @@ void Game::ClearState()
 	if(level)
 		FreeLevel(level);
 	level = nullptr;
+
 }
 bool Game::DoNewMap(const char* mapname)
 {
@@ -113,8 +115,6 @@ bool Game::DoNewMap(const char* mapname)
 	level = LoadLevelFile(mapname);
 	if (!level)
 		Fatalf("level not loaded\n");
-
-	CreateDummy();
 
 	return true;
 }
@@ -251,28 +251,28 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 }
 
 
-void RunEntityEvents(Entity* ent, EntityEvent* ev, int num_events)
-{
-	for (int i = 0; i < num_events;i++)
-	{
-		switch (ev[i])
-		{
-		case Ev_FirePrimary: {
-			glm::vec3 shoot_vec = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
-			game.ShootBullets(ent, shoot_vec,
-				ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
-		}break;
-		case Ev_Reload:
-			break;
-		}
-	}
-}
-
-
 void ServerGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
 {
 	game.PhysWorldTrace(obj, out, ignore_ent, Pf_All);
 }
+
+void ServerGameShootCallback(int entindex, bool altfire)
+{
+	Entity* ent = game.EntForIndex(entindex);
+	glm::vec3 shoot_vec = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
+
+	game.ShootBullets(ent, shoot_vec,
+		ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
+	
+}
+void ServerPlaySoundCallback(vec3 org, int snd_idx)
+{
+	printf("play sound: %d\n", snd_idx);
+}
+void ServerViewmodelCallback(const char* str) { /* null */ }
+
+
+
 
 void Entity::SetModel(GameModels m) {
 	model_index = m;
@@ -291,7 +291,7 @@ PlayerState Entity::ToPlayerState() const
 	ps.velocity = velocity;
 	ps.alive = alive;
 
-	ps.weapons = wpns;
+	ps.items = wpns;
 	ps.in_jump = in_jump;
 	return ps;
 }
@@ -304,7 +304,7 @@ void Entity::FromPlayerState(PlayerState* ps)
 	velocity = ps->velocity;
 	alive = ps->alive;
 
-	wpns = ps->weapons;
+	wpns = ps->items;
 	in_jump = ps->in_jump;
 }
 EntityState Entity::ToEntState() const
@@ -327,6 +327,9 @@ EntityState Entity::ToEntState() const
 #include "Config.h"
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
+	double oldtime = server.simtime;
+	server.simtime = cmd.tick * core.tick_interval;
+
 	ent->view_angles = cmd.view_angles;
 	MeshBuilder mb;
 	//phys_debug.Begin();
@@ -334,25 +337,18 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.cmd = cmd;
 	move.deltat = core.tick_interval;
 	move.phys_debug = &mb;
-	move.trace_callback = ServerGameTraceCallback;
-	move.in_state = ent->ToPlayerState();
-	move.ignore_ent = GetEntIndex(ent);
+	move.obj_trace = ServerGameTraceCallback;
+	move.fire_weapon = ServerGameShootCallback;
+	move.play_sound = ServerPlaySoundCallback;
+	move.set_viewmodel_animation = ServerViewmodelCallback;
+
+	move.player = ent->ToPlayerState();
+	move.entindex = GetEntIndex(ent);
 	move.max_ground_speed = cfg.GetF("max_ground_speed");
+	move.simtime = server.simtime;
 	move.Run();
 
-	double oldtime = server.simtime;
-	server.simtime = cmd.tick * core.tick_interval;
-
-	WeaponController weaponcontroller;
-	weaponcontroller.cmd = cmd;
-	weaponcontroller.deltat = core.tick_interval;
-	weaponcontroller.simtime = server.simtime;
-	weaponcontroller.state = *move.GetOutputState();
-	weaponcontroller.Run();
-
-	RunEntityEvents(ent, weaponcontroller.events, weaponcontroller.num_events);
-
-	ent->FromPlayerState(&weaponcontroller.state);
+	ent->FromPlayerState(&move.player);
 
 	server.simtime = oldtime;
 
@@ -365,7 +361,6 @@ const float grnd_speed_threshold = 0.025f;
 void PlayerUpdateAnimations(Entity* ent)
 {
 	glm::vec3 ent_face_dir = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
-
 
 	auto playeranims = ent->model->animations.get();
 	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
@@ -397,6 +392,9 @@ void PlayerUpdateAnimations(Entity* ent)
 		else
 			newanim = "act_idle";
 	}
+
+	// pick out upper body animations here
+	// shooting, reloading, etc.
 
 	leg_anim = ent->model->animations->FindClipFromName(newanim);
 

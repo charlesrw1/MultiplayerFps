@@ -33,9 +33,6 @@ Core core;
 ConfigMgr cfg;
 Media media;
 
-static int* cfg_draw_server_colliders;
-
-
 int* ConfigMgr::MakeI(const char* name, int default_val)
 {
 	GlobalVar* gv = FindInList(name);
@@ -244,15 +241,6 @@ void FlyCamera::UpdateVectors() {
 glm::mat4 FlyCamera::GetViewMatrix() const {
 	return glm::lookAt(position, position + front, up);
 }
-#if 0
-vec3 GetLocalPlayerInterpedOrigin()
-{
-	ClientEntity* ent = client.GetLocalPlayer();
-	return ent->state.position;
-	float alpha =  core.frame_remainder / core.tick_interval;
-	return ent->prev_state.position * (1-alpha) + ent->state.position * ( alpha);
-}
-#endif
 
 void ClientGame::UpdateCamera()
 {
@@ -260,11 +248,23 @@ void ClientGame::UpdateCamera()
 		return;
 	ViewSetup setup;
 
+	// decay view_recoil
+	view_recoil.x = view_recoil.x * 0.9f;
+
+	vec3 true_viewangles = client.view_angles + view_recoil;
+
+	if(view_recoil.y != 0)
+		printf("view_recoil: %f\n", view_recoil.y);
+
+	vec3 true_front = AnglesToVector(true_viewangles.x, true_viewangles.y);
+
 	setup.height = core.vid_height;
 	setup.width = core.vid_width;
 	setup.viewfov = fov;
 	setup.x = setup.y = 0;
 	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
+	setup.near = z_near;
+	setup.far = z_far;
 	Core::InputState& input = core.input;
 
 	if (update_camera) {
@@ -287,11 +287,10 @@ void ClientGame::UpdateCamera()
 		EntityState* pstate = &player->interpstate;
 		float view_height = (pstate->ducking) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
 		vec3 cam_position = pstate->position + vec3(0, view_height, 0);
-		vec3 front = AnglesToVector(client.view_angles.x,client.view_angles.y);
-		setup.view_mat = glm::lookAt(cam_position, cam_position + front, vec3(0, 1, 0));
+		setup.view_mat = glm::lookAt(cam_position, cam_position + true_front, vec3(0, 1, 0));
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 		setup.vieworigin = cam_position;
-		setup.viewfront = front;
+		setup.viewfront = true_front;
 	}
 
 	last_view = setup;
@@ -384,253 +383,78 @@ void FlyCamera::UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, i
 		move_speed = 0.0001;
 }
 
-Shader simple;
-Shader textured;
-Shader animated;
-Shader static_wrld;
-Shader basic_mod;
+struct RenderAttachments
+{
+	uint32_t scene_color;
+	uint32_t scene_depthstencil;
+	uint32_t ssao_color;
+};
+
+struct RenderFBOs
+{
+	uint32_t scene;
+	uint32_t ssao;
+};
+
 
 class Renderer
 {
 public:
+	struct DrawEntry {
+		const Model* m;
+		const Animator* a;
+		mat4 matrix;
+	};
+
+	void Init();
 	void FrameDraw();
 
 	void DrawTexturedQuad();
 	void DrawText();
 
+	void DrawModel(const Model* m, mat4 transform, const Animator* a = nullptr);
+	void AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Color32 color);
 
-	Texture white;
-	Texture black;
+	// shaders
+	Shader simple;
+	Shader textured;
+	Shader animated;
+	Shader static_wrld;
+	Shader basic_mod;
+
+	// std textures
+	uint32_t white_texture;
+	uint32_t black_texture;
+
+	RenderFBOs fbo;
+	RenderAttachments textures;
+
+	// config vars
+	int* cfg_draw_collision_tris;
+	int* cfg_draw_sv_colliders;
+	int* cfg_draw_viewmodel;
+private:
+	void InitGlState();
+	void InitFramebuffers();
+
+	void DrawEnts();
+	void DrawLevel();
+	void DrawPlayerViewmodel();
+
+	void BindTexture(int bind, int id);
+	void SetStdShaderConstants(Shader* s);
+
+	int cur_w = 0;
+	int cur_h = 0;
+	int cur_shader = -1;
+	ViewSetup vs;
+
+	int cur_img_1 = -1;
+
+	ClientGame* cgame = nullptr;
 };
 
-
-
-static float move_speed_player = 0.1f;
-static bool gravity = true;
-static bool col_response = true;
-static int col_iters = 2;
-static bool col_closest = true;
-static bool new_physics = true;
-
-static float ground_friction = 10;
-static float air_friction = 0.01;
-static float gravityamt = 16;
-static float ground_accel = 6;
-static float air_accel = 3;
-static float minspeed = 1;
-static float maxspeed = 30;
-static float jumpimpulse = 5.f;
-
-void ShootGunAgainstWorld(GeomContact* result, Ray r)
-{
-
-}
-
-
-void DrawTempLevel(mat4 viewproj)
-{
-	if (static_wrld.ID == 0)
-		Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt","VERTEX_COLOR");
-	static_wrld.use();
-	static_wrld.set_mat4("ViewProj", viewproj);
-
-	const Level* level = client.cl_game.level;
-	for (int m = 0; m < level->render_data.instances.size(); m++) {
-		const Level::StaticInstance& sm = level->render_data.instances[m];
-		Model* model = level->render_data.embedded_meshes[sm.model_index];
-		static_wrld.set_mat4("Model", sm.transform);
-		static_wrld.set_mat4("InverseModel", glm::inverse(sm.transform));
-		for (int p = 0; p < model->parts.size(); p++) {
-			MeshPart& mp = model->parts[p];
-			glBindVertexArray(mp.vao);
-			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
-		}
-	}
-}
-
-static void DrawState(EntityState* player, Color32 color, MeshBuilder& mb)
-{
-	vec3 origin = player->position;
-	Capsule c;
-	c.base = origin;
-	c.tip = origin + vec3(0, (player->ducking)?CHAR_CROUCING_HB_HEIGHT:CHAR_STANDING_HB_HEIGHT, 0);
-	c.radius = CHAR_HITBOX_RADIUS;
-	float radius = CHAR_HITBOX_RADIUS;
-	vec3 a, b;
-	c.GetSphereCenters(a, b);
-	mb.AddSphere(a, radius, 10, 7, color);
-	mb.AddSphere(b, radius, 10, 7, color);
-}
-
-static void DrawInterpolatedEntity(ClientEntity* cent, Color32 c, MeshBuilder* mb, mat4 viewproj)
-{
-	glCheckError();
-
-	EntityState* cur = &cent->interpstate;
-	if (!cent->model)
-		return;
-
-	Animator& ca = cent->animator;
-
-
-	ca.Init(cent->model);
-	ca.ResetLayers();
-	ca.mainanim = cur->leganim;
-	ca.mainanim_frame = cur->leganim_frame;
-
-	DrawState(cur, c, *mb);
-
-	glCheckError();
-
-	animated.use();
-	animated.set_mat4("ViewProj", viewproj);
-
-	mat4 model = glm::translate(mat4(1), cur->position);
-	model = model*glm::eulerAngleXYZ(cur->angles.x, cur->angles.y, cur->angles.z);
-	model = glm::scale(model, vec3(1.f));
-
-	animated.set_mat4("Model", model);
-	animated.set_mat4("InverseModel", mat4(1));
-	
-	glCheckError();
-
-	ca.SetupBones();
-	ca.ConcatWithInvPose();
-	const std::vector<mat4>& bones = ca.GetBones();
-
-	const uint32_t bone_matrix_loc = glGetUniformLocation(animated.ID, "BoneTransform[0]");
-
-	glCheckError();
-
-	for (int j = 0; j < bones.size(); j++)
-		glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
-	glCheckError();
-
-
-	//glDisable(GL_CULL_FACE);
-	for (int i = 0; i < cent->model->parts.size(); i++)
-	{
-		const MeshPart* part = &cent->model->parts[i];
-		glBindVertexArray(part->vao);
-		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
-	}
-	glCheckError();
-}
-
-static void DrawModel(EntityState* ent, const Model* m, mat4 viewproj)
-{
-	basic_mod.use();
-	basic_mod.set_mat4("ViewProj", viewproj);
-
-	mat4 model = glm::translate(mat4(1), ent->position);
-	model = model * glm::eulerAngleXYZ(ent->angles.x, ent->angles.y, ent->angles.z);
-	model = glm::scale(model, vec3(1.f));
-
-	basic_mod.set_mat4("Model", model);
-	basic_mod.set_mat4("InverseModel", mat4(1));
-
-	glCheckError();
-	//glDisable(GL_CULL_FACE);
-	for (int i = 0; i < m->parts.size(); i++)
-	{
-		const MeshPart* part = &m->parts[i];
-		glBindVertexArray(part->vao);
-		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
-	}
-}
-
-static void DrawViewModel(Model* m, glm::vec3 offset, glm::vec3 scale, mat4 invview, mat4 viewproj, ViewSetup& view)
-{
-	glClear(GL_DEPTH_BUFFER_BIT);
-
-	basic_mod.use();
-	basic_mod.set_mat4("ViewProj", viewproj);
-
-	mat4 model = glm::translate(mat4(1),view.vieworigin+5.f*view.viewfront);
-	model = glm::scale(model, vec3(1.f));
-
-
-	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + client.cl_game.viewmodel_offsets);
-	model2 = model2*glm::eulerAngleY(PI + PI/128.f);
-	//model2 = model2 * invview;
-
-	basic_mod.set_mat4("Model", model2);
-	basic_mod.set_mat4("InverseModel", mat4(1));
-
-	glCheckError();
-	//glDisable(GL_CULL_FACE);
-	for (int i = 0; i < m->parts.size(); i++)
-	{
-		MeshPart* part = &m->parts[i];
-		glBindVertexArray(part->vao);
-		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
-	}
-}
-
-
-static void DrawWorldEnts(mat4 viewproj)
-{
-	MeshBuilder mb;
-	mb.Begin();
-
-	glCheckError();
-
-	for (int i = 0; i < client.cl_game.entities.size(); i++) {
-		auto& ent = client.cl_game.entities[i];
-		if (!ent.active)
-			continue;
-		if (!ent.model)
-			continue;
-		bool animated = ent.model->bones.size() > 0;
-
-		if (i == client.GetPlayerNum() && !client.cl_game.third_person)
-			continue;
-
-		if (!animated) {
-			DrawModel(&ent.interpstate, ent.model, viewproj);
-		}
-		else {
-			DrawInterpolatedEntity(&ent, COLOR_BLUE, &mb, viewproj);
-		}
-	}
-
-	if (IsServerActive() && *cfg_draw_server_colliders == 1) {
-		for (int i = 0; i < MAX_CLIENTS; i++) {
-			if (game.ents[i].type == Ent_Player) {
-				EntityState es = game.ents[i].ToEntState();
-				DrawState(&es, COLOR_CYAN, mb);
-			}
-		}
-	}
-	mb.End();
-	
-	simple.use();
-	simple.set_mat4("ViewProj", viewproj);
-	simple.set_mat4("Model", mat4(1.f));
-	
-	mb.Draw(GL_LINES);
-	mb.Free();
-
-	glCheckError();
-	Game* g = &game;
-	g->rays.End();
-	g->rays.Draw(GL_LINES);
-	glCheckError();
-
-	phys_debug.End();
-	if(IsServerActive())
-		phys_debug.Draw(GL_LINES);
-
-
-}
-
-static void DrawLocalPlayer(mat4 viewproj)
-{
-
-}
-
-
-void InitGlState()
+void Renderer::InitGlState()
 {
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	glEnable(GL_DEPTH_TEST);
@@ -638,6 +462,314 @@ void InitGlState()
 	glClearColor(0.5f, 0.3f, 0.2f, 1.f);
 	glEnable(GL_MULTISAMPLE);
 	glDepthFunc(GL_LEQUAL);
+}
+
+Renderer rndr;
+
+void Renderer::BindTexture(int bind, int id)
+{
+	if (id != cur_img_1) {
+		glActiveTexture(GL_TEXTURE0 + bind);
+		glBindTexture(GL_TEXTURE_2D, id);
+		cur_img_1 = id;
+	}
+}
+
+void Renderer::SetStdShaderConstants(Shader* s)
+{
+	s->set_mat4("ViewProj", vs.viewproj);
+	
+	// fog vars
+	s->set_float("near", vs.near);
+	s->set_float("far", vs.far);
+	s->set_float("fog_max_density", 1.0);
+	s->set_vec3("fog_color", vec3(0.7));
+	s->set_float("fog_start", 10.f);
+	s->set_float("fog_end", 30.f);
+
+	s->set_vec3("view_front", vs.viewfront);
+	s->set_vec3("light_dir", glm::normalize(-vec3(1)));
+
+}
+
+void Renderer::Init()
+{
+	InitGlState();
+	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
+	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
+	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
+	Shader::compile(&basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
+	Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt", "VERTEX_COLOR");
+
+	const uint8_t wdata[] = { 0xff,0xff,0xff };
+	const uint8_t bdata[] = { 0x0,0x0,0x0 };
+	glGenTextures(1, &white_texture);
+	glBindTexture(GL_TEXTURE_2D, white_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, wdata);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glGenTextures(1, &black_texture);
+	glBindTexture(GL_TEXTURE_2D, black_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, bdata);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	cfg_draw_collision_tris = cfg.MakeI("draw_collision_tris", 0);
+	cfg_draw_sv_colliders = cfg.MakeI("draw_sv_colliders", 0);
+	cfg_draw_viewmodel = cfg.MakeI("draw_viewmodel", 1);
+
+	fbo.scene = fbo.ssao = 0;
+	textures.scene_color = textures.scene_depthstencil = textures.ssao_color = 0;
+	InitFramebuffers();
+
+	cgame = &client.cl_game;
+}
+
+void Renderer::InitFramebuffers()
+{
+	const int s_w = core.vid_width;
+	const int s_h = core.vid_height;
+
+	glDeleteTextures(1, &textures.scene_color);
+	glGenTextures(1, &textures.scene_color);
+	glBindTexture(GL_TEXTURE_2D, textures.scene_color);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, s_w, s_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glCheckError();
+
+	glDeleteTextures(1, &textures.scene_depthstencil);
+	glGenTextures(1, &textures.scene_depthstencil);
+	glBindTexture(GL_TEXTURE_2D, textures.scene_depthstencil);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, s_w, s_h, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glCheckError();
+
+	glDeleteFramebuffers(1, &fbo.scene);
+	glGenFramebuffers(1, &fbo.scene);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures.scene_color, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, textures.scene_depthstencil, 0);
+	glCheckError();
+
+	glDeleteTextures(1, &textures.ssao_color);
+	glGenTextures(1, &textures.ssao_color);
+	glBindTexture(GL_TEXTURE_2D, textures.ssao_color);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, s_w, s_h, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glCheckError();
+
+	glDeleteFramebuffers(1, &fbo.ssao);
+	glGenFramebuffers(1, &fbo.ssao);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.ssao);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures.ssao_color, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glCheckError();
+
+	cur_w = s_w;
+	cur_h = s_h;
+}
+
+
+void Renderer::FrameDraw()
+{
+	cur_shader = 0;
+	cur_img_1 = 0;
+	if (cur_w != core.vid_width || cur_h != core.vid_height)
+		InitFramebuffers();
+
+	vs = cgame->GetSceneView();
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
+	glViewport(vs.x, vs.y, vs.width, vs.height);
+	glClearColor(1.f, 1.f, 0.f, 1.f);
+	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+	DrawEnts();
+	DrawLevel();
+
+	int x = vs.width;
+	int y = vs.height;
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo.scene);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	MeshBuilder mb;
+	mb.Begin();
+	if (IsServerActive() && *cfg_draw_sv_colliders == 1) {
+		for (int i = 0; i < MAX_CLIENTS; i++) {
+			// FIXME: leaking server code into client code
+			if (game.ents[i].type == Ent_Player) {
+				EntityState es = game.ents[i].ToEntState();
+				AddPlayerDebugCapsule(&es, &mb, COLOR_CYAN);
+			}
+		}
+	}
+
+	mb.End();
+	simple.use();
+	simple.set_mat4("ViewProj", vs.viewproj);
+	simple.set_mat4("Model", mat4(1.f));
+
+	if(*cfg_draw_collision_tris)
+		DrawCollisionWorld(cgame->level);
+
+	mb.Draw(GL_LINES);
+	game.rays.End();
+	game.rays.Draw(GL_LINES);
+	if (IsServerActive()) {
+		phys_debug.End();
+		phys_debug.Draw(GL_LINES);
+	}
+	mb.Free();
+
+	glCheckError();
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	if(cgame->ShouldDrawViewModel() && *cfg_draw_viewmodel)
+		DrawPlayerViewmodel();
+}
+
+void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
+{
+	ASSERT(m);
+	const bool isanimated = a != nullptr;
+	Shader* s;
+	if (isanimated)
+		s = &animated;
+	else
+		s = &basic_mod;
+
+	if (s->ID != cur_shader) {
+		s->use();
+		SetStdShaderConstants(s);
+		cur_shader = s->ID;
+	}
+	glCheckError();
+	s->set_mat4("Model", transform);
+	s->set_mat4("InverseModel", glm::inverse(transform));
+
+	if (isanimated) {
+		const std::vector<mat4>& bones = a->GetBones();
+		const uint32_t bone_matrix_loc = glGetUniformLocation(s->ID, "BoneTransform[0]");
+		for (int j = 0; j < bones.size(); j++)
+			glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
+		glCheckError();
+	}
+
+	for (int i = 0; i < m->parts.size(); i++)
+	{
+		const MeshPart* part = &m->parts[i];
+
+		if (part->material_idx==-1) {
+			BindTexture(0, white_texture);
+		}
+		else {
+			const MeshMaterial& mm = m->materials.at(part->material_idx);
+			if (mm.t1)
+				BindTexture(0, mm.t1->gl_id);
+			else
+				BindTexture(0, white_texture);
+		}
+
+		glBindVertexArray(part->vao);
+		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
+	}
+
+}
+
+void Renderer::DrawEnts()
+{
+	for (int i = 0; i < cgame->entities.size(); i++) {
+		auto& ent = cgame->entities[i];
+		if (!ent.active)
+			continue;
+		if (!ent.model)
+			continue;
+
+		if (i == client.GetPlayerNum() && !cgame->third_person)
+			continue;
+
+		EntityState* cur = &ent.interpstate;
+
+		mat4 model = glm::translate(mat4(1), cur->position);
+		model = model * glm::eulerAngleXYZ(cur->angles.x, cur->angles.y, cur->angles.z);
+		model = glm::scale(model, vec3(1.f));
+
+		const Animator* a = (ent.model->animations) ? &ent.animator : nullptr;
+		DrawModel(ent.model, model, a);
+	}
+
+}
+
+void Renderer::DrawLevel()
+{
+	static_wrld.use();
+	SetStdShaderConstants(&static_wrld);
+
+	const Level* level = cgame->level;
+	for (int m = 0; m < level->render_data.instances.size(); m++) {
+		const Level::StaticInstance& sm = level->render_data.instances[m];
+		ASSERT(level->render_data.embedded_meshes[sm.model_index]);
+		const Model& model = *level->render_data.embedded_meshes[sm.model_index];
+
+		static_wrld.set_mat4("Model", sm.transform);
+		static_wrld.set_mat4("InverseModel", glm::inverse(sm.transform));
+
+
+		for (int p = 0; p < model.parts.size(); p++) {
+			const MeshPart& mp = model.parts[p];
+
+			if (mp.material_idx != -1) {
+				const auto& mm = model.materials[mp.material_idx];
+				if (mm.t1)
+					BindTexture(0, mm.t1->gl_id);
+				else
+					BindTexture(0, white_texture);
+			}
+			else
+				BindTexture(0, white_texture);
+
+			glBindVertexArray(mp.vao);
+			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+		}
+	}
+}
+
+
+void Renderer::AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Color32 color)
+{
+	vec3 origin = es->position;
+	Capsule c;
+	c.base = origin;
+	c.tip = origin + vec3(0, (es->ducking) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
+	c.radius = CHAR_HITBOX_RADIUS;
+	float radius = CHAR_HITBOX_RADIUS;
+	vec3 a, b;
+	c.GetSphereCenters(a, b);
+	mb->AddSphere(a, radius, 10, 7, color);
+	mb->AddSphere(b, radius, 10, 7, color);
+	mb->AddSphere((a + b) / 2.f, (c.tip.y - c.base.y)/2.f, 10, 7, COLOR_RED);
+}
+
+void Renderer::DrawPlayerViewmodel()
+{
+	mat4 invview = glm::inverse(vs.view_mat);
+
+	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + cgame->viewmodel_offsets + cgame->viewmodel_recoil_ofs);
+	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
+
+	cur_shader = -1;
+	DrawModel(media.gamemodels[Mod_GunM16], model2);
 }
 
 void LoadMediaFiles()
@@ -648,61 +780,6 @@ void LoadMediaFiles()
 	models[Mod_PlayerCT] = FindOrLoadModel("CT.glb");
 	models[Mod_GunM16] = FindOrLoadModel("m16.glb");
 	models[Mod_Grenade_HE] = FindOrLoadModel("grenade_he.glb");
-
-
-
-
-}
-
-void RenderInit()
-{
-	InitGlState();
-
-	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
-	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
-	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
-	Shader::compile(&basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
-
-}
-
-void Render(double dt)
-{
-	glCheckError();
-
-	ViewSetup view = client.cl_game.GetSceneView();
-	//mat4 perspective = glm::perspective(fov, (float)vid_width / vid_height, 0.01f, 100.0f);
-	//mat4 view = glm::lookAt(the_player.position - fly_cam.front * 2.f, the_player.position, vec3(0, 1, 0));
-	glViewport(view.x, view.y, view.width, view.height);
-	mat4 viewproj = view.viewproj;
-
-	glCheckError();
-
-	MeshBuilder mb;
-	simple.use();
-	simple.set_mat4("ViewProj", viewproj);
-	simple.set_mat4("Model", mat4(1.f));
-	DrawCollisionWorld(client.cl_game.level);
-	mb.Begin();
-	mb.PushLineBox(vec3(-1), vec3(1), COLOR_PINK);
-	mb.End();
-	mb.Draw(GL_LINES);
-	mb.Free();
-
-	glCheckError();
-	
-
-	DrawWorldEnts(viewproj);
-	
-
-	glCheckError();
-	DrawTempLevel(viewproj);
-	glCheckError();
-	glm::mat4 invview = glm::inverse(view.view_mat);
-
-
-
-	if(!client.cl_game.third_person)
-		DrawViewModel(media.gamemodels.at(Mod_GunM16), glm::vec3(0, 0, 2), glm::vec3(1.f), invview, view.viewproj, view);
 }
 
 void DrawScreen(double dt)
@@ -710,11 +787,9 @@ void DrawScreen(double dt)
 	glCheckError();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClearColor(1.f, 1.f, 0.f, 1.f);
-	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	if (client.IsInGame())
-		Render(dt);
+		rndr.FrameDraw();
 	glCheckError();
 	SDL_GL_SwapWindow(core.window);
 	glCheckError();
@@ -762,23 +837,8 @@ void HandleInput()
 		case SDL_KEYDOWN:
 		{
 			auto scancode = event.key.keysym.scancode;
-			if (!DoMapSelect(scancode)) {
-
-			int col_iter_old = col_iters;
-			if (scancode == SDL_SCANCODE_LEFT)
-				col_iters--;
-			if (scancode == SDL_SCANCODE_RIGHT)
-				col_iters++;
-			if (col_iters <= 0) col_iters = 1;
-			if (col_iters != col_iter_old)
-				printf("col iters %d\n", col_iters);
-			}
 			if (scancode == SDL_SCANCODE_G) {
 				cfg.LoadFromDisk("config.ini");
-			}
-			if (scancode == SDL_SCANCODE_C) {
-				col_response = !col_response;
-				printf("col_response %s\n", (col_response) ? "on" : "off");
 			}
 			if (scancode == SDL_SCANCODE_V) {
 				ReloadModel(media.gamemodels[Mod_PlayerCT]);
@@ -900,11 +960,10 @@ int main(int argc, char** argv)
 
 	cfg.LoadFromDisk("config.ini");
 	cfg.MakeI("host_port", DEFAULT_SERVER_PORT);
-	cfg_draw_server_colliders = cfg.MakeI("draw_server_colliders", 1);
 	cfg.MakeF("max_ground_speed", 10.f);
 
 	NetworkInit();
-	RenderInit();
+	rndr.Init();
 	LoadMediaFiles();
 
 	if (!run_client_only) {

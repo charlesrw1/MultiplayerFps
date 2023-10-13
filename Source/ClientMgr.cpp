@@ -262,9 +262,10 @@ void ClServerMgr::SendMovesAndMessages()
 	ByteWriter writer(buffer, 128);
 	writer.WriteByte(ClMessageInput);
 	writer.WriteLong(client.tick);
-	writer.WriteFloat(lastmove.forward_move);
-	writer.WriteFloat(lastmove.lateral_move);
-	writer.WriteFloat(lastmove.up_move);
+	writer.WriteByte(MoveCommand::quantize(lastmove.forward_move));
+	writer.WriteByte(MoveCommand::quantize(lastmove.lateral_move));
+	writer.WriteByte(MoveCommand::quantize(lastmove.up_move));
+
 	writer.WriteFloat(lastmove.view_angles.x);
 	writer.WriteFloat(lastmove.view_angles.y);
 	writer.WriteLong(lastmove.button_mask);

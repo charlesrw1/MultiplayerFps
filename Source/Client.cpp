@@ -18,6 +18,7 @@ void Client::Init()
 	cfg_fake_lag = cfg.MakeI("fake_lag", 0);
 	cfg_fake_loss = cfg.MakeI("fake_loss", 0);
 	cfg_cl_time_out = cfg.MakeF("cl_time_out", 5.f);
+	cfg_mouse_sensitivity = cfg.MakeF("mouse_sensitivity", 0.01);
 
 	server_mgr.Init(this);
 	cl_game.Init();
@@ -84,26 +85,6 @@ void Client::CheckLocalServerIsRunning()
 		server_mgr.Connect(serv_addr);
 	}
 }
-void ClientGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
-{
-	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
-}
-void RunClientPhysics(const PlayerState* in, PlayerState* out, const MoveCommand* cmd)
-{
-	MeshBuilder b;
-
-	PlayerMovement move;
-	move.cmd = *cmd;
-	move.deltat = core.tick_interval;
-	move.phys_debug = &b;
-	move.in_state = *in;
-	move.trace_callback = ClientGameTraceCallback;
-	move.max_ground_speed = cfg.GetF("max_ground_speed");
-	move.Run();
-
-
-	*out = *move.GetOutputState();
-}
 void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 {
 	entstate->position = state->position;
@@ -111,21 +92,14 @@ void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 	entstate->ducking = state->ducking;
 	entstate->type = Ent_Player;
 }
-void DoClientGameUpdate(double dt)
-{
-
-
-
-}
 
 
 void Client::DoViewAngleUpdate()
 {
 	float x_off = core.input.mouse_delta_x;
 	float y_off = core.input.mouse_delta_y;
-	const float sensitivity = 0.01;
-	x_off *= sensitivity;
-	y_off *= sensitivity;
+	x_off *= *cfg_mouse_sensitivity;
+	y_off *= *cfg_mouse_sensitivity;
 
 	glm::vec3 view_angles = this->view_angles;
 	view_angles.x -= y_off;	// pitch
@@ -140,8 +114,10 @@ void Client::CreateMoveCmd()
 	if (core.mouse_grabbed) {
 		DoViewAngleUpdate();
 	}
+
 	MoveCommand new_cmd{};
 	new_cmd.view_angles = view_angles;
+
 	bool* keys = core.input.keyboard;
 	if (keys[SDL_SCANCODE_W])
 		new_cmd.forward_move += 1.f;
@@ -156,9 +132,9 @@ void Client::CreateMoveCmd()
 	if (keys[SDL_SCANCODE_LSHIFT])
 		new_cmd.button_mask |= CmdBtn_Duck;
 	if (keys[SDL_SCANCODE_Q])
-		new_cmd.button_mask |= CmdBtn_Misc1;
+		new_cmd.button_mask |= CmdBtn_PFire;
 	if (keys[SDL_SCANCODE_E])
-		new_cmd.button_mask |= CmdBtn_Misc2;
+		new_cmd.button_mask |= CmdBtn_Reload;
 	if (keys[SDL_SCANCODE_Z])
 		new_cmd.up_move += 1.f;
 	if (keys[SDL_SCANCODE_X])
@@ -166,11 +142,10 @@ void Client::CreateMoveCmd()
 
 	new_cmd.tick = tick;
 
-	// quantize and unquantize 
-	//new_cmd.forward_move = float(char(new_cmd.forward_move * 128.f)) / 128.f;
-	//new_cmd.up_move = float(char(new_cmd.up_move * 128.f)) / 128.f;
-	//new_cmd.lateral_move = float(char(new_cmd.lateral_move * 128.f)) / 128.f;
-
+	// quantize and unquantize for local prediction
+	new_cmd.forward_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.forward_move));
+	new_cmd.lateral_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.lateral_move));
+	new_cmd.up_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.up_move));
 
 	*GetCommand(GetCurrentSequence()) = new_cmd;
 }
@@ -198,7 +173,7 @@ void Client::RunPrediction()
 	for (int i = start + 1; i < end; i++) {
 		MoveCommand* cmd = GetCommand(i);
 		PlayerState next_state;
-		RunClientPhysics(&pred_state, &next_state, cmd);
+		cl_game.RunCommand(&pred_state, &next_state, *cmd, i==(end-1));
 		pred_state = next_state;
 	}
 
@@ -206,12 +181,6 @@ void Client::RunPrediction()
 	PlayerStateToClEntState(&last_estate, &pred_state);
 	ent->OnRecieveUpdate(&last_estate, tick);
 	lastpredicted = pred_state;
-
-	//ent->state = pred_state.estate;
-	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).tick = client.tick;
-	//ent->transform_hist.at(ent->current_hist_index % ent->transform_hist.size()).origin = ent->state.position;
-	//ent->current_hist_index++;
-	//ent->current_hist_index %= ent->transform_hist.size();
 }
 
 void Client::FixedUpdateInput(double dt)
@@ -229,34 +198,22 @@ void Client::FixedUpdateRead(double dt)
 {
 	if (!initialized)
 		return;
-	if (GetConState() == Spawned)
+	if (GetConState() == Spawned) {
 		client.tick += 1;
+		client.time += core.tick_interval;
+	}
 	server_mgr.ReadPackets();
 	RunPrediction();
 	cl_game.UpdateViewModelOffsets();
+	cl_game.UpdateViewmodelAnimation();
 }
 void Client::PreRenderUpdate(double frametime)
 {
-	DoClientGameUpdate(frametime);
-	
 	if (IsClientActive() && IsInGame()) {
 		// interpoalte entities for rendering
-		ClientGame* game = &cl_game;
-		double rendering_time = client.tick * core.tick_interval - (*cfg_interp_time);
-		for (int i = 0; i < game->entities.size(); i++) {
-			if (game->entities[i].active && i != GetPlayerNum()) {
-				game->entities[i].InterpolateState(rendering_time, core.tick_interval);
-			}
-		}
-
-		double rendering_time_client = client.tick * core.tick_interval - core.frame_remainder;
-		ClientEntity* local = GetLocalPlayer();
-		local->interpstate = local->GetLastState()->state;
-		//local->InterpolateState(rendering_time_client, core.tick_interval);
+		cl_game.InterpolateEntStates();
+		cl_game.ComputeAnimationMatricies();
 	}
-
-	//if(core.mouse_grabbed)
-	//	DoViewAngleUpdate();	// one last time before render
 	cl_game.UpdateCamera();
 }
 

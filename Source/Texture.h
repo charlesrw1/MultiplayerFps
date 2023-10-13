@@ -15,5 +15,6 @@ struct Texture
 
 void FreeLoadedTextures();
 Texture* FindOrLoadTexture(const char* filename);
+Texture* CreateTextureFromImgFormat(uint8_t* data, int datalen, std::string name);
 
 #endif // !TEXTURE_H

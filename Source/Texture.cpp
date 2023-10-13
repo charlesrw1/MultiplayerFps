@@ -8,17 +8,8 @@ static const char* const texture_folder_path = "Data\\Textures\\";
 
 static std::vector<Texture*> textures;
 
-static Texture* AddTexture(std::string& path)
+static Texture* MakeFromData(int x, int y, int channels, uint8_t* data)
 {
-	int width, height, channels;
-
-	stbi_set_flip_vertically_on_load(false);
-	uint8_t* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
-	if (!data) {
-		printf("Couldn't find image: %s\n", path.c_str());
-		return nullptr;
-	}
-
 	Texture* output = new Texture;
 
 	glGenTextures(1, &output->gl_id);
@@ -40,15 +31,31 @@ static Texture* AddTexture(std::string& path)
 		delete output;
 		return nullptr;
 	}
-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, GL_UNSIGNED_BYTE, data);
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	output->width = width;
-	output->height = height;
-	output->name = std::move(path);
+	output->width = x;
+	output->height = y;
 	output->channels = channels;
+
+	return output;
+}
+
+static Texture* AddTexture(std::string& path)
+{
+	int width, height, channels;
+
+	stbi_set_flip_vertically_on_load(false);
+	uint8_t* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+	if (!data) {
+		printf("Couldn't find image: %s\n", path.c_str());
+		return nullptr;
+	}
+
+	Texture* output = MakeFromData(width, height, channels, data);
+	output->name = std::move(path);
 
 	stbi_image_free(data);
 	textures.push_back(output);
@@ -83,4 +90,26 @@ Texture* FindOrLoadTexture(const char* filename)
 		}
 	}
 	return AddTexture(path);
+}
+
+Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name)
+{
+	for (int i = 0; i < textures.size(); i++) {
+		if (textures[i]->name == name) {
+			return textures[i];
+		}
+	}
+	
+	int width, height, channels;
+	uint8_t* data = stbi_load_from_memory(inpdata, datalen, &width, &height, &channels, 0);
+	if (!data) {
+		printf("Couldn't load from memory: %s", name.c_str());
+		return nullptr;
+	}
+
+	Texture* t = MakeFromData(width, height, channels, data);
+	stbi_image_free(data);
+	t->name = std::move(name);
+	textures.push_back(t);
+	return t;
 }

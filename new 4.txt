@@ -1,0 +1,20 @@
+draw scene (color and depth) to scene fbo
+make ssao texture
+	-input (scene color and depth, noise texture)
+	-output (color ssao texture)
+combine scene color and ssao texture to make output color texture
+	also add fog here
+
+then use output color and original scene depth:
+	draw transparents, sprites, debug graphics, ui, etc.
+
+textures needed:
+	scene_color
+	scene_depth
+	ssao_color
+	output_color
+	
+	scene_fbo (sc, sd)
+	ssao_fbo (ssaot)
+	final_fbo (ot, sd)
+	

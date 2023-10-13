@@ -3,8 +3,6 @@ shooting mechanics
 		-local client side effects (gun animation, firing sound)
 		-server rolls back entities to the players perspective (their tick - cl interp) does a raycast and determines if anything is hit. If a player is hit, decrease their health. If their health is at 0, call a respawn routine in the multiplayer game rules. Also when other players fire, send sound/particle event to other clients to play. Also need team system for friendly fire and such
 	
-	
-	
 	-for the bomb item, a flag is kept server side if player is in bomb zone, if they are, then animation starts
 	
 basic grenade physics (10/5)	
@@ -24,6 +22,21 @@ lag compensation on server
 update physics to detect collisions between objs and response (started 10/5)
 
 gfx:
-textured models (easy)
+textured models (easy) (done 10/10)
 ui rendering, font loading
+
+todo:
+ui, fonts, etc.
+server and client side shooting
+lag compensation
+reliable messages
+particles
+shadows for players
+sounds
+viewmodel animations (can be procedural)
+view recoil
+bomb zone trigger
+
+
+
 

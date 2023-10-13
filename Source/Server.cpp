@@ -91,15 +91,10 @@ void Server::FixedUpdate(double dt)
 	if (!IsActive())
 		return;
 	simtime = tick * core.tick_interval;
-	//client_mgr.ReadPackets();
-
 	ReadPackets();
-
 	game.Update();
 	BuildSnapshotFrame();
-
 	UpdateClients();
-	//client_mgr.SendSnapshots();
 	tick += 1;
 }
 
@@ -119,7 +114,6 @@ void Server::BuildSnapshotFrame()
 	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
 		frame->states[i] = g->ents[i].ToEntState();
 	}
-
 	cur_frame_idx = (cur_frame_idx + 1) % frames.size();
 }
 

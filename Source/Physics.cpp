@@ -66,6 +66,7 @@ void InitStaticGeoBvh(Level* level)
 	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
+// only does xz plane collisions
 void CylinderCylinderIntersect(float r1, glm::vec3 o1, float h1, float r2, glm::vec3 o2, float h2, GeomContact* out)
 {
 	out->found = false;
@@ -83,22 +84,10 @@ void CylinderCylinderIntersect(float r1, glm::vec3 o1, float h1, float r2, glm::
 	if (!y_overlap || !xzoverlap)
 		return;
 
-	//if(xz_dist < glm::abs(yintersectvect.y)) {
-		out->found = true;
-		out->penetration_depth = r1+r2-xz_dist;
-		out->penetration_normal = xzintersectvec/xz_dist;
-		out->intersect_len = r1 - out->penetration_depth;
-	//}
-	//else{
-	//	out->found = true;
-	//	out->penetration_depth = glm::abs(yintersectvect.y);
-	//	out->penetration_normal = yintersectvect / glm::abs(yintersectvect.y);
-	//	out->intersect_len = out->penetration_depth;
-	//	printf("intersect y \n");
-	//}
-
-	
-
+	out->found = true;
+	out->penetration_depth = r1+r2-xz_dist;
+	out->penetration_normal = xzintersectvec/xz_dist;
+	out->intersect_len = r1 - out->penetration_depth;
 }
 
 template<typename Functor>
@@ -123,30 +112,10 @@ static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 			int index_count = node->count;
 			int index_start = node->left_node;
 			for (int i = 0; i < index_count; i++) {
-
-				//vec3 bary_temp = vec3(0);
-				//vec3 N_temp;
-				//float t_temp = -1;
-				//phys_debug.PushLineBox(node->aabb.bmin,node->aabb.bmax,COLOR_CYAN);
 				int index = bvh.indicies[index_start + i];
 				bool should_exit = do_intersect(index);
 				if (should_exit)
 					return;
-				//vec3 v0 = mesh->verticies[mesh->indicies[mesh_element_index]].position;
-				//vec3 v1 = mesh->verticies[mesh->indicies[mesh_element_index + 1]].position;
-				//vec3 v2 = mesh->verticies[mesh->indicies[mesh_element_index + 2]].position;
-				//IntersectTriRay2(r, v0,
-				//	v1,
-				//	v2, t_temp, bary_temp);
-				//bool res = t_temp > 0;
-
-
-				//if (!res || t_temp > tmax || t_temp < tmin)
-				//	continue;
-				//tmax = t_temp;
-				//t = t_temp;
-				//tri_vert_start = mesh_element_index;
-				//bary = vec3(bary_temp.z, bary_temp.x, bary_temp.y);
 			}
 			continue;
 		}
@@ -161,18 +130,6 @@ static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 			stack[stack_count++] = &bvh.nodes[node->left_node + 1];
 		}
 	}
-
-	//if (!std::isfinite(t)) {
-	//	return false;
-	//}
-	//
-	//si->point = r.at(t);
-	//vec3 N = bary.u * mesh->verticies[mesh->indicies[tri_vert_start]].normal +
-	//	bary.v * mesh->verticies[mesh->indicies[tri_vert_start + 1]].normal +
-	//	bary.w * mesh->verticies[mesh->indicies[tri_vert_start + 2]].normal;
-	//si->set_face_normal(r, normalize(N));
-	//si->t = t;
-	//return true;
 }
 
 bool SphereVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 

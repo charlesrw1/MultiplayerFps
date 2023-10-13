@@ -7,6 +7,7 @@
 #include "glad/glad.h"
 #include "Util.h"
 #include "Animation.h"
+#include "Texture.h"
 
 static const char* const model_folder_path = "Data\\Models\\";
 static std::vector<Model*> models;
@@ -118,11 +119,26 @@ void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygl
 	}
 }
 
+static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
+{
+	tinygltf::BufferView& bv = scene.bufferViews[i.bufferView];
+	tinygltf::Buffer& b = scene.buffers[bv.buffer];
+	ASSERT(bv.byteStride == 0);
+
+	return CreateTextureFromImgFormat(&b.data.at(bv.byteOffset), bv.byteLength, i.name);
+}
+
 static void LoadMaterials(Model* m, tinygltf::Model& scene)
 {
 	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
 		tinygltf::Material& mat = scene.materials[matidx];
-		//mat.pbrMetallicRoughness.baseColorTexture.index
+		MeshMaterial mymat;
+		if (mat.pbrMetallicRoughness.baseColorTexture.index != -1) {
+			mymat.t1 = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+		}
+
+		m->materials.push_back(mymat);
+		
 	}
 }
 
@@ -293,6 +309,7 @@ static bool DoLoadGltfModel(const std::string& filepath, Model* model)
 	for (int i = 0; i < scene.meshes.size(); i++) {
 		AppendGltfMeshToModel(model, scene, scene.meshes.at(i),buf_view_to_buffers);
 	}
+	LoadMaterials(model, scene);
 
 
 	return res;

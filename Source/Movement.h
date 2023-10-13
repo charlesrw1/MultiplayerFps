@@ -5,42 +5,54 @@
 #include "Physics.h"
 class MeshBuilder;
 class AnimationSet;
-// Shared movement code
+// Shared movement+item code
+
+class ItemController
+{
+	// callbacks
+	void(*shoot_bullets) = nullptr;
+	void(*spawn_item) = nullptr;
+	void(*play_sound) = nullptr;
+	void(*set_viewmodel_animation) = nullptr;
+	void(*send_game_event)(uint8_t* data, int datalen) = nullptr;
+
+
+};
+
 class PlayerMovement
 {
 public:
 	static const int MAX_EVENTS = 4;
 
+	// client/server callbacks
+	void(*obj_trace)(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent) = nullptr;
+	void(*fire_weapon)(int entindex, bool altfire) = nullptr;
+	void(*play_sound)(glm::vec3 org, int snd_idx) = nullptr;
+	void(*set_viewmodel_animation)(const char* str) = nullptr;
+
 	// caller sets these vars
 	MeshBuilder* phys_debug = nullptr;
-	//void* user_arg = nullptr;
-	void(*trace_callback)(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent) = nullptr;
-	//void(*impact_func)(int, int) = nullptr;
 	MoveCommand cmd;
-	PlayerState in_state;
 	float deltat;
-	int ignore_ent;
+	int entindex;
+	float simtime;
+	PlayerState player;
+	bool isclient = false;	// for debugging
 
 	float max_ground_speed = 10;
 	float max_air_speed = 2;
 
-	int num_events = 0;
-	EntityEvent triggered_events[MAX_EVENTS];
-	int trig_event_parms[MAX_EVENTS];
+	// output vars
+	glm::vec3 view_recoil_add;
 
 	void Run();
-	PlayerState* GetOutputState() {
-		return &player;
-	}
 private:
 	glm::vec2 inp_dir;
 	float inp_len;
 	glm::vec3 look_front;
 	glm::vec3 look_side;
-	PlayerState player;
 
-	void TriggerEvent(EntityEvent type, int parm = 0);
-
+	// movement code
 	void ApplyFriction(float friction_val);
 	void GroundMove();
 	void AirMove();
@@ -50,31 +62,9 @@ private:
 	void CheckNans();
 	void MoveAndSlide(glm::vec3 delta);
 	void CheckGroundState();
+
+	// item code
+	void RunItemCode();
 };
-
-// Shared weapon code
-class WeaponController
-{
-public:
-	static const int MAX_EVENTS = 2;
-
-	// output events
-	EntityEvent events[MAX_EVENTS];
-	int event_parms[MAX_EVENTS];
-	int num_events;
-
-	PlayerState state;
-	MoveCommand cmd;
-	float deltat;
-	float simtime;
-
-	glm::vec3 shoot_vec;
-
-	void Run();
-private:
-	void TriggerEvent(EntityEvent type, int parm = 0);
-};
-
-
 
 #endif // !PLAYERMOVE_H

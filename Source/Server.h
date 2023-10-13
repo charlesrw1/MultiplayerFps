@@ -35,7 +35,7 @@ struct Entity
 
 	float death_time = 0.0;
 	int health = 100;
-	WpnState wpns;
+	ItemState wpns;
 
 	int model_index = 0;	// index into media.gamemodels
 
@@ -57,6 +57,8 @@ class Level;
 class Game
 {
 public:
+	const static int GV_BUFFER_SIZE = 256;
+
 	void Init();
 	void ClearState();
 	bool DoNewMap(const char* mapname);
@@ -86,7 +88,6 @@ public:
 	MeshBuilder rays;
 
 	bool paused = false;
-
 	float gravity = 12.f;
 
 	std::vector<Entity> ents;

@@ -86,16 +86,42 @@ struct EntityState
 	float leganim_frame = 0.f;
 
 
+	int item = 0;	// FIXME: haven't added it to state
+
 	bool ducking = false;
 };
 
-struct WpnState
+
+enum ItemUseState
 {
-	int gun_id = 0;			// activley held item
-	short ammo[2];
-	short clip[2];
+	Item_Idle,
+	Item_InFire,
+	Item_InSecFire,
+	Item_Reload,
+	Item_Scoped,
+	Item_Raising,
+	Item_Lowering,
+};
+
+struct ItemState
+{
+	ItemState() {
+		memset(ammo, 0, sizeof(ammo));
+		memset(clip, 0, sizeof(clip));
+	}
+
+	const static int MAX_ITEMS = 32;
+
+	int item_bitmask = 0;
+	int active_item = 0;
+
+	short item_id[MAX_ITEMS];
+	short ammo[MAX_ITEMS];
+	short clip[MAX_ITEMS];
+
 	bool reloading = false;
 	float gun_timer = 0.f;
+	ItemUseState state = Item_Idle;
 };
 
 // State specific to the client's player that is transmitted
@@ -104,12 +130,13 @@ struct PlayerState
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles = glm::vec3(0.f);
 	glm::vec3 velocity = glm::vec3(0.f);
+	
 	bool on_ground = false;
 	bool ducking = false;
 	bool alive = false;
 	bool in_jump = false;
 
-	WpnState weapons;
+	ItemState items;
 };
 
 // taken from quake 3, a nice idea
@@ -128,6 +155,13 @@ enum EntityEvent
 
 	Ev_Sound,
 	Ev_Explode
+};
+
+struct GameEvent
+{
+	const static int MAX_PARAMS = 32;
+	uint8_t num_params = 0;
+	uint8_t params[MAX_PARAMS];
 };
 
 // in serverclmgr for now

@@ -39,9 +39,11 @@ void RemoteClient::OnMoveCmd(ByteReader& msg)
 
 	MoveCommand cmd{};
 	cmd.tick = msg.ReadLong();
-	cmd.forward_move = msg.ReadFloat();
-	cmd.lateral_move = msg.ReadFloat();
-	cmd.up_move = msg.ReadFloat();
+
+	cmd.forward_move = MoveCommand::unquantize(msg.ReadByte());
+	cmd.lateral_move = MoveCommand::unquantize(msg.ReadByte());
+	cmd.up_move = MoveCommand::unquantize(msg.ReadByte());
+
 	cmd.view_angles.x = msg.ReadFloat();
 	cmd.view_angles.y = msg.ReadFloat();
 	cmd.button_mask = msg.ReadLong();
@@ -50,6 +52,7 @@ void RemoteClient::OnMoveCmd(ByteReader& msg)
 	if (!IsSpawned())
 		return;
 
+	// FIXME vulnerable to 
 	myserver->RunMoveCmd(client_num, cmd);
 }
 
@@ -193,7 +196,7 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		return;
 
 	msg.WriteByte(index);
-	msg.WriteWord(mask);
+	msg.WriteShort(mask);
 
 	if (mask & 1)
 		msg.WriteByte(to->type);
@@ -203,9 +206,9 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		pos[1] = to->position.y * 20.f;
 		pos[2] = to->position.z * 20.f;
 
-		msg.WriteWord(pos[0]);
-		msg.WriteWord(pos[1]);
-		msg.WriteWord(pos[2]);
+		msg.WriteShort(pos[0]);
+		msg.WriteShort(pos[1]);
+		msg.WriteShort(pos[2]);
 
 	}
 	if (mask & (1 << 2)) {
@@ -224,20 +227,20 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		msg.WriteByte(to->leganim);
 	if (mask & (1 << 8)) {
 		int quantized_frame = to->leganim_frame * 100;
-		msg.WriteWord(quantized_frame);
+		msg.WriteShort(quantized_frame);
 	}
 	if (mask & (1 << 10))
 		msg.WriteByte(to->mainanim);
 	if (mask & (1 << 11)) {
 		int quantized_frame = to->mainanim_frame * 100;
-		msg.WriteWord(quantized_frame);
+		msg.WriteShort(quantized_frame);
 	}
 	
 }
 
 void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 {
-	uint16_t mask = msg.ReadWord();
+	uint16_t mask = msg.ReadShort();
 
 	to->ducking = (mask & (1 << 9));
 
@@ -245,9 +248,9 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->type = msg.ReadByte();
 	if (mask & (1 << 1)) {
 		short pos[3];
-		pos[0] = msg.ReadWord();
-		pos[1] = msg.ReadWord();
-		pos[2] = msg.ReadWord();
+		pos[0] = msg.ReadShort();
+		pos[1] = msg.ReadShort();
+		pos[2] = msg.ReadShort();
 
 		to->position.x = pos[0] / 20.f;
 		to->position.y = pos[1] / 20.f;
@@ -270,13 +273,13 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 	if (mask & (1 << 7))
 		to->leganim = msg.ReadByte();
 	if (mask & (1 << 8)) {
-		int quantized_frame = msg.ReadWord();
+		int quantized_frame = msg.ReadShort();
 		to->leganim_frame = quantized_frame / 100.0;
 	}
 	if (mask & (1 << 10))
 		to->mainanim = msg.ReadByte();
 	if (mask & (1 << 11)) {
-		int quantized_frame = msg.ReadWord();
+		int quantized_frame = msg.ReadShort();
 		to->mainanim_frame = quantized_frame / 100.0;
 	}
 }
@@ -300,6 +303,24 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 		to->velocity.y = msg.ReadFloat();
 		to->velocity.z = msg.ReadFloat();
 	}
+
+
+	// items >>>
+
+	to->items.active_item = msg.ReadByte();
+	to->items.item_bitmask = msg.ReadLong();
+
+	for (int i = 0; i < ItemState::MAX_ITEMS; i++) {
+		if (!(to->items.item_bitmask & (1 << i)))
+			continue;
+		to->items.item_id[i] = msg.ReadByte();
+		to->items.ammo[i] = msg.ReadShort();
+		to->items.clip[i] = msg.ReadShort();
+	}
+	to->items.gun_timer = msg.ReadFloat();
+	to->items.state = (ItemUseState)msg.ReadByte();
+
+	// items <<<
 
 	to->ducking = mask & (1 << 3);
 	to->on_ground = mask & (1 << 4);
@@ -347,6 +368,23 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 		msg.WriteFloat(to->velocity.y);
 		msg.WriteFloat(to->velocity.z);
 	}
+
+	// items
+
+	msg.WriteByte(to->items.active_item);
+	msg.WriteLong(to->items.item_bitmask);
+
+	for (int i = 0; i < ItemState::MAX_ITEMS; i++) {
+		if (!(to->items.item_bitmask & (1 << i)))
+			continue;
+		msg.WriteByte(to->items.item_id[i]);
+		msg.WriteShort(to->items.ammo[i]);
+		msg.WriteShort(to->items.clip[i]);
+	}
+
+	msg.WriteFloat(to->items.gun_timer);
+	msg.WriteByte(to->items.state);
+
 }
 
 void Server::WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int client_idx)

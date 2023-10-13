@@ -2,6 +2,10 @@
 #include "Util.h"
 #include "CoreTypes.h"
 #include "GlmInclude.h"
+#include "Movement.h"
+#include "MeshBuilder.h"
+#include "Config.h"
+
 bool Client::IsInGame() const
 {
 	return GetConState() == Spawned;
@@ -39,6 +43,174 @@ void ClientGame::NewMap(const char* mapname)
 	ClearState();	// cleansup game state
 	level = LoadLevelFile(mapname);
 }
+
+void ClientGame::ComputeAnimationMatricies()
+{
+	for (int i = 0; i < entities.size(); i++) {
+		ClientEntity& ce = entities[i];
+		if (!ce.active)
+			continue;
+		if (!ce.model || !ce.model->animations)
+			continue;
+
+		// TEMP:
+		ce.animator.Init(ce.model);
+		ce.animator.ResetLayers();
+		ce.animator.mainanim = ce.interpstate.leganim;
+		ce.animator.mainanim_frame = ce.interpstate.leganim_frame;
+
+		ce.animator.SetupBones();
+		ce.animator.ConcatWithInvPose();
+	}
+}
+
+void ClientGame::InterpolateEntStates()
+{
+	double rendering_time = client.tick * core.tick_interval - (*client.cfg_interp_time);
+	for (int i = 0; i < entities.size(); i++) {
+		if (entities[i].active && i != client.GetPlayerNum()) {
+			entities[i].InterpolateState(rendering_time, core.tick_interval);
+		}
+	}
+
+	double rendering_time_client = client.tick * core.tick_interval - core.frame_remainder;
+	ClientEntity* local = client.GetLocalPlayer();
+	local->interpstate = local->GetLastState()->state;
+}
+
+void ClientGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
+{
+	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
+}
+void ClientSetViewmodelCallback(const char* str)
+{
+	/* null */
+}
+void ClientGameShootCallback(int entindex, bool altfire)
+{
+	/* null */
+	printf("client: shoot\n");
+}
+void ClientPlaySoundCallback(vec3 org, int snd_idx)
+{
+	/* null */
+}
+
+ByteWriter GetGameeventBuffer()
+{
+	static uint8_t bytes[1500];
+	ByteWriter bw(bytes, 1500);
+	return bw;
+}
+
+
+void MakeSoundEvent(vec3 loc, int soundidx)
+{
+	ByteWriter bw = GetGameeventBuffer();
+
+	bw.WriteByte(Ev_Sound);
+	bw.WriteShort(soundidx);
+	bw.WriteShort((loc.x) * 20.f);
+	bw.WriteShort((loc.y) * 20.f);
+	bw.WriteShort((loc.z) * 20.f);
+}
+
+void MakeDecalEvent(vec3 loc, int decalidx)
+{
+	ByteWriter bw = GetGameeventBuffer();
+
+	bw.WriteByte(Ev_Sound);
+	bw.WriteShort(decalidx);
+	bw.WriteShort((loc.x) * 20.f);
+	bw.WriteShort((loc.y) * 20.f);
+	bw.WriteShort((loc.z) * 20.f);
+}
+
+void MakeBulletEvent(vec3 start, vec3 end, bool tracer)
+{
+	ByteWriter bw = GetGameeventBuffer();
+	bw.WriteByte(Ev_FirePrimary);
+	bw.WriteByte(tracer);
+	bw.WriteShort((start.x) * 20.f);
+}
+
+void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx)
+{
+	MeshBuilder b;
+
+	PlayerMovement move;
+	move.cmd = cmd;
+	move.deltat = core.tick_interval;
+	move.phys_debug = &b;
+	move.player = *in;
+	move.max_ground_speed = cfg.GetF("max_ground_speed");
+	move.simtime = cmd.tick * core.tick_interval;
+	move.isclient = true;
+	move.obj_trace = ClientGameTraceCallback;
+	move.fire_weapon = ClientGameShootCallback;
+	move.set_viewmodel_animation = ClientSetViewmodelCallback;
+	move.play_sound = ClientPlaySoundCallback;
+	move.Run();
+
+	*out = move.player;
+	
+	if (run_fx) {
+		view_recoil.x += move.view_recoil_add.x;
+	}
+
+}
+
+glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
+{
+	float p = (1 / (peakt - 1));
+
+	if (t < peakt)
+		return maxrecoil * (1/peakt)* t;
+	else
+		return maxrecoil * (p * t - p);
+
+}
+
+
+void ClientGame::UpdateViewmodelAnimation()
+{
+	PlayerState* p = &client.lastpredicted;
+	printf("state: %d\n", p->items.state);
+	if (p->items.state != prev_item_state)
+	{
+		switch (p->items.state)
+		{
+		case Item_Idle:
+			viewmodel_recoil_ofs = viewmodel_recoil_ang = glm::vec3(0.f);
+			vm_recoil_end_time = vm_recoil_start_time = 0.f;
+			break;
+		case Item_InFire:
+			vm_recoil_start_time = client.time;
+			vm_recoil_end_time = p->items.gun_timer;	// FIXME: read from current item data
+			break;
+		case Item_Reload:
+			break;
+
+		}
+
+		prev_item_state = p->items.state;
+	}
+	switch (p->items.state)
+	{
+	case Item_InFire: {
+		float end = p->items.gun_timer;
+		if (end > vm_recoil_end_time) {
+			vm_recoil_end_time = end;
+			vm_recoil_start_time = client.time;
+		}
+
+		float t = (client.time - vm_recoil_start_time)/ (vm_recoil_end_time - vm_recoil_start_time);
+		t = glm::clamp(t, 0.f, 1.f);
+		viewmodel_recoil_ofs = GetRecoilAmtTriangle(vec3(0.0, 0, 0.3), t, 0.4f);
+	}break;
+	}
+}
+
 
 void ClientGame::UpdateViewModelOffsets()
 {

@@ -78,6 +78,8 @@ struct ViewSetup
 	glm::mat4 proj_mat;
 	glm::mat4 viewproj;
 	int x, y, width, height;
+	float near;
+	float far;
 };
 
 class ClientGame
@@ -87,16 +89,27 @@ public:
 
 	void ClearState();
 	void NewMap(const char* mapname);
+	void ComputeAnimationMatricies();
+	void InterpolateEntStates();
+
+	void RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx);
+
+	ClientEntity* EntForIndex(int index) {
+		ASSERT(index >= 0 && index < entities.size());
+		return &entities[index];
+	}
 
 	glm::vec3 interpolated_origin;		// origin to render the eye at
-	PlayerState last_predicted;
-	PlayerState player;	// local player data
 	std::vector<ClientEntity> entities;	// client side data
 
 	const Level* level = nullptr;
-
 public:
+	bool ShouldDrawViewModel() {
+		return !third_person;
+	}
+
 	void UpdateCamera();
+	void UpdateViewmodelAnimation();
 	void UpdateViewModelOffsets();
 	const ViewSetup& GetSceneView() { return last_view;
 	}
@@ -109,8 +122,17 @@ public:
 	FlyCamera fly_cam;
 	ViewSetup last_view;
 
+	ItemUseState prev_item_state = Item_Idle;
 	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
-
+	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
+	
+	float vm_reload_start = 0.f;
+	float vm_reload_end = 0.f;
+	float vm_recoil_start_time = 0.f;
+	float vm_recoil_end_time = 0.f;
+	glm::vec3 viewmodel_recoil_ofs = glm::vec3(0.f);
+	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
+private:
 };
 
 class Client;
@@ -201,6 +223,8 @@ public:
 	int* cfg_fake_lag;
 	int* cfg_fake_loss;
 	float* cfg_cl_time_out;
+
+	float* cfg_mouse_sensitivity;
 
 private:
 	void RunPrediction();

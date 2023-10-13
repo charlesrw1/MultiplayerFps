@@ -13,7 +13,7 @@ public:
 			data[data_ptr++] = byte;
 		}
 	}
-	void WriteWord(uint16_t word) {
+	void WriteShort(uint16_t word) {
 		if (!CheckOverrun(2)) {
 			data[data_ptr] = word & 0xff;
 			data[data_ptr + 1] = (word >> 8) & 0xff;
@@ -71,7 +71,7 @@ public:
 			return 0;
 		return data[data_ptr++];
 	}
-	uint16_t ReadWord() {
+	uint16_t ReadShort() {
 		if (CheckOverrun(2))
 			return 0;
 		uint16_t o = data[data_ptr] | data[data_ptr + 1] << 8;
