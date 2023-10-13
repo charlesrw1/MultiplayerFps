@@ -102,6 +102,7 @@ void Game::ClearState()
 		ents[i].type = Ent_Free;
 	}
 	num_ents = 0;
+	phys.ClearObjs();
 	if(level)
 		FreeLevel(level);
 	level = nullptr;
@@ -116,6 +117,8 @@ bool Game::DoNewMap(const char* mapname)
 	if (!level)
 		Fatalf("level not loaded\n");
 
+	BuildPhysicsWorld(0.f);
+
 	return true;
 }
 
@@ -128,7 +131,9 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	RayHit hit;
 	//TraceRayAgainstLevel(level, r, &hit, false);
 
-	RayWorldIntersect(r, &hit, GetEntIndex(from), Pf_All);
+	phys.TraceRay(r, &hit, GetEntIndex(from), Pf_All);
+
+	//RayWorldIntersect(r, &hit, GetEntIndex(from), Pf_All);
 
 	// >>>
 	CreateGrenade(from, org + dir * 0.1f, dir * 18.f, 0);
@@ -146,7 +151,7 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 		rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
 	}
 }
-
+#if 0
 void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags filter)
 {
 	TraceRayAgainstLevel(level, r, out, true);
@@ -183,7 +188,9 @@ void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags fi
 		}
 	}
 }
+#endif
 
+#if 0
 void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, PhysFilterFlags filter)
 {
 	contact->found = false;
@@ -204,6 +211,7 @@ void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, 
 			*contact = c;
 	}
 }
+#endif
 
 void PlayerSpawn(Entity* ent)
 {
@@ -250,11 +258,6 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 	}
 }
 
-
-void ServerGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
-{
-	game.PhysWorldTrace(obj, out, ignore_ent, Pf_All);
-}
 
 void ServerGameShootCallback(int entindex, bool altfire)
 {
@@ -337,7 +340,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.cmd = cmd;
 	move.deltat = core.tick_interval;
 	move.phys_debug = &mb;
-	move.obj_trace = ServerGameTraceCallback;
+	move.phys = &phys;
 	move.fire_weapon = ServerGameShootCallback;
 	move.play_sound = ServerPlaySoundCallback;
 	move.set_viewmodel_animation = ServerViewmodelCallback;
@@ -461,7 +464,8 @@ void RunProjectilePhysics(Entity* ent)
 	Ray r;
 	r.dir = (ent->velocity * dt) / len;
 	r.pos = ent->position;
-	g->RayWorldIntersect(r, &rh, ent->owner_index, Pf_All);
+	g->phys.TraceRay(r, &rh, ent->owner_index, Pf_All);
+	//g->RayWorldIntersect(r, &rh, ent->owner_index, Pf_All);
 	if (rh.hit_world && rh.dist < len) {
 		ent->position = r.at(rh.dist) + rh.normal * 0.01f;
 		ent->velocity = glm::reflect(ent->velocity, rh.normal);
@@ -495,8 +499,36 @@ void PostEntUpdate(Entity* ent) {
 	ent->anim.AdvanceFrame(core.tick_interval);
 }
 
+void Game::BuildPhysicsWorld(float time)
+{
+	phys.ClearObjs();
+	phys.AddLevel(level);
+
+	for (int i = 0; i < ents.size(); i++) {
+		Entity& ce = ents[i];
+		if (ce.type != Ent_Player) continue;
+
+		CharacterShape cs;
+		cs.a = &ce.anim;
+		cs.m = ce.model;
+		cs.org = ce.position;
+		cs.radius = CHAR_HITBOX_RADIUS;
+		cs.height = (!ce.ducking) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
+		PhysicsObject po;
+		po.shape = PhysicsObject::Character;
+		po.character = cs;
+		po.userindex = i;
+		po.player = true;
+
+		phys.AddObj(po);
+	}
+}
+
+
 void Game::Update()
 {
+	BuildPhysicsWorld(0.f);
+
 	double dt = core.tick_interval;
 	for (int i = 0; i < ents.size(); i++) {
 		Entity* e = &ents[i];

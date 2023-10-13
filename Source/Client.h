@@ -4,6 +4,7 @@
 #include "Animation.h"
 #include "Level.h"
 #include "EmulatedSocket.h"
+#include "Physics.h"
 #include <array>
 
 struct StateEntry
@@ -99,6 +100,9 @@ public:
 		return &entities[index];
 	}
 
+	void BuildPhysicsWorld();
+
+	PhysicsWorld phys;
 	glm::vec3 interpolated_origin;		// origin to render the eye at
 	std::vector<ClientEntity> entities;	// client side data
 

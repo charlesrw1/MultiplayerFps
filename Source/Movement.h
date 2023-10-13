@@ -25,7 +25,7 @@ public:
 	static const int MAX_EVENTS = 4;
 
 	// client/server callbacks
-	void(*obj_trace)(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent) = nullptr;
+	PhysicsWorld* phys = nullptr;
 	void(*fire_weapon)(int entindex, bool altfire) = nullptr;
 	void(*play_sound)(glm::vec3 org, int snd_idx) = nullptr;
 	void(*set_viewmodel_animation)(const char* str) = nullptr;

@@ -2,6 +2,8 @@
 #define PHYSICS_H
 #include "glm/glm.hpp"
 #include "MathLib.h"
+#include <vector>
+#include "Level.h"
 
 struct RayHit
 {
@@ -38,21 +40,77 @@ struct Capsule
 
 	void GetSphereCenters(glm::vec3& a, glm::vec3& b) const;
 };
-struct Sphere
+
+struct TriangleShape
 {
+	int indicies[3];
+	glm::vec3 face_normal;
+	float plane_offset = 0.f;
+	short surf_flags = 0;
+	short surf_type = 0;
+};
+
+
+class BVH;
+struct MeshShape
+{
+	const std::vector<glm::vec3>* verticies;
+	const std::vector<Level::CollisionTri>* tris;
+	const BVH* structure;
+};
+
+struct CharacterShape
+{
+	glm::vec3 org;
+	float height;
 	float radius;
+
+	const Animator* a;
+	const Model* m;
+
+	Bounds ToBounds();
+};
+struct SphereShape
+{
+	SphereShape() {}
+	SphereShape(glm::vec3 origin, float r) 
+		: origin(origin), radius(r) {}
+
 	glm::vec3 origin;
+	float radius;
+	Bounds ToBounds();
 };
-struct PhysContainer {
+struct BoxShape
+{
+	glm::vec3 min;
+	glm::vec3 max;
+	glm::mat3 rot;
+	Bounds ToBounds();
+};
+
+struct PhysicsObject
+{
+	PhysicsObject() {
+
+	}
 	enum Type {
-		CapsuleType,
-		SphereType
-	} type;
+		Sphere,
+		Character,
+		Box,
+		Mesh,
+	} shape;
 	union {
-		Capsule cap;
-		Sphere sph;
+		CharacterShape character;
+		SphereShape sphere;
+		BoxShape box;
+		MeshShape mesh;
 	};
+	int userindex = -1;
+	bool player = false;
+	bool solid = true;
+	bool is_level = false;
 };
+
 
 enum PhysFilterFlags
 {
@@ -64,14 +122,30 @@ enum PhysFilterFlags
 };
 
 class Level;
+class PhysicsWorld
+{
+public:
+
+	void AddLevel(const Level* l);
+	void AddObj(PhysicsObject obj);
+	void ClearObjs();
+
+	void TraceRay(Ray r, RayHit* out, int ignore_index, int filter_flags);
+	void TraceCharacter(CharacterShape shape, GeomContact* c, int ignore_index, int filter_flags);	// capsule shaped character
+	void TraceSphere(SphereShape shape, GeomContact* c, int ignore_index, int filter_flags);
+	void GetObjectsInBox(int* indicies, int buffer_len, Bounds box, int filter_flags);
+	void GetObjectsInRadius(int* indicies, int buffer_len, glm::vec3 org, float r, int filter_flags);
+
+	PhysicsObject& GetObj(int index);
+private:
+	bool FilterObj(PhysicsObject* po, int ignore_index, int filter_flags);
+
+	std::vector<PhysicsObject> objs;
+};
+
+class Level;
 void DrawCollisionWorld(const Level* lvl);
 Bounds CapsuleToAABB(const Capsule& cap);
-
-void CylinderCylinderIntersect(float r1, glm::vec3 o1, float h1, float r2, glm::vec3 o2, float h2, GeomContact* out);
-void TraceAgainstLevel(const Level* lvl, GeomContact* out, PhysContainer obj, bool closest, bool double_sided);
-void TraceCapsule(const Level* lvl, glm::vec3 org, const Capsule& capsule, GeomContact* out, bool closest);
-void TraceSphere(const Level* lvl, glm::vec3 org, float radius, GeomContact* out, bool closest, bool double_sided);
-void TraceRayAgainstLevel(const Level* lvl, Ray r, RayHit* out, bool closest);
 
 // Called by the level loader to init the bvh
 void InitStaticGeoBvh(Level* input);

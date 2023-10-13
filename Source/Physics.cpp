@@ -132,24 +132,20 @@ static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 	}
 }
 
-bool SphereVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
+bool SphereVsTriangle(glm::vec3 corners[], glm::vec3 facen, float plantofs, 
 	glm::vec3 pos, float radius, GeomContact* out, bool doublesided)
 {
-	float dist = dot(pos, tri.face_normal) + tri.plane_offset;
+	float dist = dot(pos, facen) + plantofs;
 	if (dist < 0 && !doublesided)
 		return false;
 	if (dist > radius)
 		return false;
 
-	vec3 corners[3];
-	for (int i = 0; i < 3; i++)
-		corners[i] = cd.vertex_list[tri.indicies[i]];
-
-	vec3 pointontri = pos - tri.face_normal * dist;
+	vec3 pointontri = pos - facen * dist;
 	vec3 c0 = cross(pointontri - corners[0], corners[1] - corners[0]);
 	vec3 c1 = cross(pointontri - corners[1], corners[2] - corners[1]);
 	vec3 c2 = cross(pointontri - corners[2], corners[0] - corners[2]);
-	bool inside = dot(c0, tri.face_normal) <= 0 && dot(c1, tri.face_normal) <= 0 && dot(c2, tri.face_normal) <= 0;
+	bool inside = dot(c0, facen) <= 0 && dot(c1, facen) <= 0 && dot(c2, facen) <= 0;
 
 	float radius2 = radius * radius;
 	vec3 p1 = closest_point_on_line(corners[0], corners[1], pos);
@@ -207,23 +203,20 @@ bool SphereVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri&
 	out->penetration_normal = intersect_normal;
 	out->penetration_depth = intersect_depth;
 	out->intersect_point = best_point;
-	out->surf_normal = tri.face_normal;
+	out->surf_normal = facen;
 
 	return true;
 }
 
-vec3 CapsuleGetReferencePoint(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
+vec3 CapsuleGetReferencePoint(glm::vec3 corners[], glm::vec3 facen,
 	const Capsule& cap, vec3 line_plane_intersect)
 {
-	glm::vec3 corners[3];
-	for (int i = 0; i < 3; i++)
-		corners[i] = cd.vertex_list[tri.indicies[i]];
 
 	// Determine if intersection point is inside triangle
 	vec3 c0 = cross(line_plane_intersect - corners[0], corners[1] - corners[0]);
 	vec3 c1 = cross(line_plane_intersect - corners[1], corners[2] - corners[1]);
 	vec3 c2 = cross(line_plane_intersect - corners[2], corners[0] - corners[2]);
-	bool inside = dot(c0, tri.face_normal) <= 0 && dot(c1, tri.face_normal) <= 0 && dot(c2, tri.face_normal) <= 0;
+	bool inside = dot(c0, facen) <= 0 && dot(c1, facen) <= 0 && dot(c2, facen) <= 0;
 
 	vec3 reference_point = line_plane_intersect;
 
@@ -257,7 +250,7 @@ vec3 CapsuleGetReferencePoint(const Level::CollisionData& cd, const Level::Colli
 	return reference_point;
 }
 
-bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri& tri, 
+bool CapsuleVsTriangle(glm::vec3 corners[], glm::vec3 facen, float planeofs, 
 	const Capsule& cap, GeomContact* out)
 {
 	vec3 cap_normal = normalize(cap.tip - cap.base);
@@ -265,29 +258,24 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 	vec3 A = cap.base + line_end_ofs;
 	vec3 B = cap.tip - line_end_ofs;
 
-	glm::vec3 corners[3];
-	for (int i = 0; i < 3; i++)
-		corners[i]=cd.vertex_list[tri.indicies[i]];
+	//glm::vec3 corners[3];
+	//for (int i = 0; i < 3; i++)
+	//	corners[i]=(*mesh->verticies)[tri.indicies[i]];
 
-	float denom = dot(tri.face_normal, cap_normal);
+	float denom = dot(facen, cap_normal);
 
 	// Intersect capsule normal (line segment from base to tip) with triangle's plane
 	if (abs(denom) > 0.15) {	// such a high epsilon to deal with weird issues
-		float planedist = dot(tri.face_normal, cap.base) + tri.plane_offset;
+		float planedist = dot(facen, cap.base) + planeofs;
 		float time = -planedist / denom;
 		vec3 line_plane_intersect = cap.base + cap_normal * time;
 
-		vec3 reference_point = CapsuleGetReferencePoint(cd,tri, cap, line_plane_intersect);
-
-		//phys_debug.AddSphere(line_plane_intersect, 0.1f, 8, 6, COLOR_BLUE);
-
-		//phys_debug.AddSphere(reference_point, 0.1f, 8, 6, COLOR_RED);
+		vec3 reference_point = CapsuleGetReferencePoint(corners,facen, cap, line_plane_intersect);
 
 		vec3 sphere_center = closest_point_on_line(A, B, reference_point);
 
-		//phys_debug.AddSphere(sphere_center, 0.1f, 8, 6, COLOR_PINK);
 		// Finish with a sphere/triangle test
-		return SphereVsTriangle(cd, tri, sphere_center, cap.radius, out, false);
+		return SphereVsTriangle(corners,facen,planeofs, sphere_center, cap.radius, out, false);
 	}
 	else
 	{
@@ -304,16 +292,12 @@ bool CapsuleVsTriangle(const Level::CollisionData& cd, const Level::CollisionTri
 			ref_low = corners[2];
 		{
 			vec3 sphere_center = closest_point_on_line(A, B, ref_high);
-
-		//	phys_debug.AddSphere(sphere_center, 0.1f, 8, 6, COLOR_PINK);
-			if (SphereVsTriangle(cd, tri, sphere_center, cap.radius, out, false))
+			if (SphereVsTriangle(corners, facen, planeofs, sphere_center, cap.radius, out, false))
 				return true;
 		}
 		{
 			vec3 sphere_center = closest_point_on_line(A, B, ref_low);
-
-			//phys_debug.AddSphere(sphere_center, 0.1f, 8, 6, COLOR_PINK);
-			return (SphereVsTriangle(cd, tri, sphere_center, cap.radius, out, false));
+			return (SphereVsTriangle(corners, facen, planeofs, sphere_center, cap.radius, out, false));
 		}
 
 	}
@@ -344,78 +328,6 @@ Bounds CapsuleToAABB(const Capsule& cap)
 		Bounds(centerbase - vec3(cap.radius), centerbase + vec3(cap.radius)));
 }
 
-
-void TraceCapsule(const Level* lvl, glm::vec3 pos, const Capsule& cap, GeomContact* out, bool closest)
-{
-	const Level::CollisionData& cd = lvl->collision_data;
-
-	Capsule adjusted_cap = cap;
-	adjusted_cap.base += pos;
-	adjusted_cap.tip += pos;
-	Bounds b2 = CapsuleToAABB(adjusted_cap);
-	b2.bmin -= vec3(0.05);
-	b2.bmax += vec3(0.05);
-
-	float best_len_total = INFINITY;
-
-	bool found_ground = false;
-	GeomContact temp;
-
-	auto capsule_intersect_functor = [&](int index) -> bool {
-		ASSERT(index < cd.collision_tris.size());
-		const Level::CollisionTri& tri = cd.collision_tris[index];
-		bool res = CapsuleVsTriangle(cd, tri, adjusted_cap, &temp);
-		if (res && temp.intersect_len < best_len_total) {
-			best_len_total = temp.intersect_len;
-			*out = temp;
-			if (!closest)
-				return true;
-		}
-		return false;
-	};
-	IntersectWorld(capsule_intersect_functor, lvl->static_geo_bvh, b2);
-
-	out->touched_ground = found_ground;
-}
-
-void TraceSphere(const Level* level, glm::vec3 org, float radius, GeomContact* out, bool closest, bool double_sided)
-{
-	const Level::CollisionData& cd = level->collision_data;
-
-	float best_len_total = INFINITY;
-
-	GeomContact temp;
-	auto sphere_intersect_functor = [&](int index)->bool {
-		ASSERT(index < cd.collision_tris.size());
-		const Level::CollisionTri& tri = cd.collision_tris[index];
-		bool res = SphereVsTriangle(cd, tri, org, radius, &temp, double_sided);
-		if (res && temp.intersect_len < best_len_total) {
-			best_len_total = temp.intersect_len;
-			*out = temp;
-			if (!closest)
-				return true;
-		}
-		return false;
-	};
-	Bounds sphere(vec3(-radius + org), vec3(radius + org));
-	IntersectWorld(sphere_intersect_functor, level->static_geo_bvh, sphere);
-}
-
-void TraceAgainstLevel(const Level* lvl, GeomContact* out, PhysContainer obj, bool closest, bool double_sided)
-{
-	switch (obj.type)
-	{
-	case PhysContainer::CapsuleType:
-		TraceCapsule(lvl, glm::vec3(0.f), obj.cap, out, closest);
-		break;
-	case PhysContainer::SphereType:
-		TraceSphere(lvl, obj.sph.origin, obj.sph.radius, out, closest, double_sided);
-		break;
-	default:
-		ASSERT(0);
-	}
-}
-
 inline void IntersectTriRay2(const Ray& r, const vec3& v0, const vec3& v1, const vec3& v2, float& t_out, vec3& bary_out)
 {
 	const vec3 edge1 = v1 - v0;
@@ -436,8 +348,113 @@ inline void IntersectTriRay2(const Ray& r, const vec3& v0, const vec3& v1, const
 		bary_out = vec3(u, v, 1 - u - v);
 	}
 }
-bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bvh, const Level* level)
+
+void Capsule::GetSphereCenters(vec3& a, vec3& b) const
 {
+	vec3 cap_normal = normalize(tip - base);
+	vec3 line_end_ofs = cap_normal * radius;
+	a = base + line_end_ofs;
+	b = tip - line_end_ofs;
+}
+
+Bounds CharacterShape::ToBounds()
+{
+	Bounds b;
+	b.bmin = org - glm::vec3(radius, 0, radius);
+	b.bmax = org + glm::vec3(radius, height, radius);
+	return b;
+}
+Bounds BoxShape::ToBounds()
+{
+	Bounds b;
+	b.bmin = min;
+	b.bmax = max;
+	return b;
+}
+Bounds SphereShape::ToBounds()
+{
+	Bounds b;
+	b.bmin = origin - glm::vec3(radius);
+	b.bmax = origin + glm::vec3(radius);
+	return b;
+}
+
+void SphereVsTriMesh(SphereShape* s, MeshShape* mesh, GeomContact* gc)
+{
+	float best_len_total = INFINITY;
+
+	GeomContact temp;
+	auto sphere_intersect_functor = [&](int index)->bool {
+		ASSERT(index < (mesh->verticies->size()));
+		const Level::CollisionTri& tri = (*mesh->tris)[index];
+		glm::vec3 corners[3];
+		for (int i = 0; i < 3; i++)
+			corners[i] = (*mesh->verticies)[tri.indicies[i]];
+		bool res = SphereVsTriangle(corners, tri.face_normal,tri.plane_offset, s->origin, s->radius, &temp, true);
+		if (res && temp.intersect_len < best_len_total) {
+			best_len_total = temp.intersect_len;
+			*gc = temp;
+			//if (!closest)
+			//	return true;
+		}
+		return false;
+	};
+	Bounds sphere(vec3(-s->radius + s->origin), vec3(s->radius + s->origin));
+	IntersectWorld(sphere_intersect_functor, *mesh->structure, sphere);
+}
+
+void SphereVsBox()
+{
+
+}
+
+void SphereVsCharShape(SphereShape* s, CharacterShape* cs, GeomContact* gc)
+{
+	SphereVsBox();
+}
+
+
+void CharShapeVsTriMesh(CharacterShape* cs, MeshShape* mesh, GeomContact* gc)
+{
+	Capsule cap;
+	cap.base = cs->org;
+	cap.radius = cs->radius;
+	cap.tip = cap.base + vec3(0, cs->height, 0);
+
+	Bounds b2 = CapsuleToAABB(cap);
+	b2.bmin -= vec3(0.05);
+	b2.bmax += vec3(0.05);
+
+	float best_len_total = INFINITY;
+
+	bool found_ground = false;
+	GeomContact temp;
+
+	auto capsule_intersect_functor = [&](int index) -> bool {
+		ASSERT(index < mesh->tris->size());
+		const Level::CollisionTri& tri = (*mesh->tris)[index];
+
+		glm::vec3 corners[3];
+		for (int i = 0; i < 3; i++)
+			corners[i] = (*mesh->verticies)[tri.indicies[i]];
+
+		bool res = CapsuleVsTriangle(corners, tri.face_normal, tri.plane_offset,cap, &temp);
+		if (res && temp.intersect_len < best_len_total) {
+			best_len_total = temp.intersect_len;
+			*gc = temp;
+			//if (!closest)
+			//	return true;
+		}
+		return false;
+	};
+	IntersectWorld(capsule_intersect_functor, *mesh->structure, b2);
+
+	gc->touched_ground = found_ground;
+}
+
+bool IntersectRayMesh(Ray r, float tmin, float tmax, RayHit* out, MeshShape* s)
+{
+	const BVH& bvh = *s->structure;
 	const BVHNode* stack[64];
 	stack[0] = &bvh.nodes[0];
 	int stack_count = 1;
@@ -445,7 +462,6 @@ bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bv
 	float t = INFINITY;
 	vec3 bary = vec3(0);
 	int triindex = -1;
-	const Level::CollisionData& cd = level->collision_data;
 	while (stack_count > 0)
 	{
 		node = stack[--stack_count];
@@ -461,12 +477,12 @@ bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bv
 
 				int mesh_element_index = bvh.indicies[index_start + i];
 
-				ASSERT(mesh_element_index < cd.collision_tris.size());
-				const Level::CollisionTri& tri = cd.collision_tris[mesh_element_index];
+				ASSERT(mesh_element_index <(s->tris->size()));
+				const Level::CollisionTri& tri =(*s->tris)[mesh_element_index];
 
-				IntersectTriRay2(r, cd.vertex_list[tri.indicies[0]],
-					cd.vertex_list[tri.indicies[1]],
-					cd.vertex_list[tri.indicies[2]], t_temp, bary_temp);
+				IntersectTriRay2(r, (*s->verticies)[tri.indicies[0]],
+					(*s->verticies)[tri.indicies[1]],
+					(*s->verticies)[tri.indicies[2]], t_temp, bary_temp);
 				bool res = t_temp > 0;
 
 
@@ -508,7 +524,7 @@ bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bv
 	}
 
 	out->pos = r.at(t);
-	const auto& tri = cd.collision_tris.at(triindex);
+	const auto& tri = s->tris->at(triindex);
 	out->normal = tri.face_normal;
 	out->part_id = 0;
 	out->surf_type = tri.surf_type;
@@ -518,16 +534,180 @@ bool IntersectRayWorld(Ray r, float tmin, float tmax, RayHit* out, const BVH& bv
 	return true;
 }
 
-void TraceRayAgainstLevel(const Level* level, Ray r, RayHit* out, bool closest)
+void RayVsTriMesh(Ray r, RayHit* rh, PhysicsObject* mesh)
 {
-	out->dist = -1.f;
-	IntersectRayWorld(r, 0.f, 1000.f, out, level->static_geo_bvh, level);
+	IntersectRayMesh(r, 0, INFINITY, rh, &mesh->mesh);
+	if (rh->dist > 0 && mesh->is_level)
+		rh->hit_world = true;
 }
 
-void Capsule::GetSphereCenters(vec3& a, vec3& b) const
+void RayVsBox()
 {
-	vec3 cap_normal = normalize(tip - base);
-	vec3 line_end_ofs = cap_normal * radius;
-	a = base + line_end_ofs;
-	b = tip - line_end_ofs;
+
+}
+
+void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out)
+{
+	//bool xoverlap = bmin.x <= other.bmax.x && bmax.x >= other.bmin.x;
+	//bool yoverlap = bmin.y <= other.bmax.y && bmax.y >= other.bmin.y;
+	//bool zoverlap = bmin.z <= other.bmax.z && bmax.z >= other.bmin.z;
+}
+
+void RayVsCharShape(PhysicsObject* character, Ray r, RayHit* rh)
+{
+	CharacterShape* cs = &character->character;
+	Bounds b = cs->ToBounds();
+	float t_out=0.0;
+	bool intersects = b.intersect(r, t_out);
+
+	if (intersects) {
+		rh->dist = t_out;
+		rh->ent_id = character->userindex;
+		rh->hit_world = false;
+		rh->pos = r.at(t_out);
+	}
+
+
+}
+
+void CharShapeVsCharShape(CharacterShape* cs, CharacterShape* cs2, GeomContact* out)
+{
+	//BoxVsBox(cs->ToBounds(), cs2->ToBounds(), out);
+	CylinderCylinderIntersect(cs->radius, cs->org, cs->height, cs2->radius, cs2->org, cs2->height, out);
+}
+
+void CharShapeVsBox(CharacterShape* cs, BoxShape* b, GeomContact* out)
+{
+	BoxVsBox(cs->ToBounds(), b->ToBounds(), out);
+}
+
+void PhysicsWorld::AddObj(PhysicsObject obj)
+{
+	objs.push_back(obj);
+}
+void PhysicsWorld::ClearObjs()
+{
+	objs.clear();
+}
+void PhysicsWorld::AddLevel(const Level* l)
+{
+	PhysicsObject obj;
+	obj.shape = PhysicsObject::Mesh;
+	obj.is_level = true;
+	obj.solid = true;
+
+	obj.mesh.structure = &l->static_geo_bvh;
+	obj.mesh.verticies = &l->collision_data.vertex_list;
+	obj.mesh.tris = &l->collision_data.collision_tris;
+
+	objs.push_back(obj);
+}
+
+
+void PhysicsWorld::TraceCharacter(CharacterShape c, GeomContact* gc, int ignore_index, int filter_flags)
+{
+	gc->found = false;
+	gc->intersect_len = INFINITY;
+
+	for (int i = 0; i < objs.size(); i++)
+	{
+		GeomContact contact;
+
+		if (FilterObj(&objs[i], ignore_index, filter_flags))
+			continue;
+
+		switch (objs[i].shape)
+		{
+		//case PhysicsObject::Box:
+		//	CharShapeVsBox(&c, &objs[i].box, &contact);
+		//	break;
+		case PhysicsObject::Character:
+			CharShapeVsCharShape(&c, &objs[i].character, &contact);
+			break;
+		case PhysicsObject::Mesh:
+			CharShapeVsTriMesh(&c, &objs[i].mesh, &contact);
+			break;
+		default:
+			printf("unsupported TraceRay() type\n");
+			break;
+		}
+
+		if (contact.found && contact.intersect_len < gc->intersect_len)
+			*gc = contact;
+
+	}
+}
+
+void PhysicsWorld::TraceSphere(SphereShape shape, GeomContact* gc, int ignore_index, int filter_flags)
+{
+	gc->found = false;
+	gc->intersect_len = INFINITY;
+
+	for (int i = 0; i < objs.size(); i++)
+	{
+		GeomContact contact;
+
+		if (FilterObj(&objs[i], ignore_index, filter_flags))
+			continue;
+
+		switch (objs[i].shape)
+		{
+			//case PhysicsObject::Box:
+			//	CharShapeVsBox(&c, &objs[i].box, &contact);
+			//	break;
+		case PhysicsObject::Character:
+			SphereVsCharShape(&shape, &objs[i].character, &contact);
+			break;
+		case PhysicsObject::Mesh:
+			SphereVsTriMesh(&shape, &objs[i].mesh, &contact);
+			break;
+		default:
+			printf("unsupported TraceRay() type\n");
+			break;
+		}
+
+		if (contact.found && contact.intersect_len < gc->intersect_len)
+			*gc = contact;
+
+	}
+}
+
+void PhysicsWorld::TraceRay(Ray r, RayHit* rh, int ignore_index, int filter_flags)
+{
+	for (int i = 0; i < objs.size(); i++)
+	{
+		auto& obj = objs[i];
+
+		if (FilterObj(&obj, ignore_index, filter_flags))
+			continue;
+
+		switch (obj.shape)
+		{
+		//case PhysicsObject::Box:
+		//	RayVsBox();
+		//	break;
+		case PhysicsObject::Character:
+			RayVsCharShape(&obj, r, rh);
+			break;
+		case PhysicsObject::Mesh:
+			RayVsTriMesh(r,rh, &obj);
+			break;
+		default:
+			printf("unsupported TraceRay() type\n");
+			break;
+		}
+
+
+	}
+}
+
+bool PhysicsWorld::FilterObj(PhysicsObject* o, int ig_ent, int filter_flags)
+{
+	if (o->userindex == ig_ent)
+		return true;
+	if (o->player && !(filter_flags & Pf_Players))
+		return true;
+	if (o->player && !(filter_flags & Pf_World))
+		return true;
+	return false;
 }

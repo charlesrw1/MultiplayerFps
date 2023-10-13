@@ -5,6 +5,7 @@
 #include "Movement.h"
 #include "MeshBuilder.h"
 #include "Config.h"
+#include "GameData.h"
 
 bool Client::IsInGame() const
 {
@@ -29,6 +30,8 @@ void ClientGame::ClearState()
 		entities[i].active = false;
 		entities[i].ClearState();
 	}
+	phys.ClearObjs();
+
 	if(level)
 		FreeLevel(level);
 	level = nullptr;
@@ -78,10 +81,7 @@ void ClientGame::InterpolateEntStates()
 	local->interpstate = local->GetLastState()->state;
 }
 
-void ClientGameTraceCallback(GeomContact* out, PhysContainer obj, bool closest, bool double_sided, int ignore_ent)
-{
-	TraceAgainstLevel(client.cl_game.level, out, obj, closest, double_sided);
-}
+
 void ClientSetViewmodelCallback(const char* str)
 {
 	/* null */
@@ -134,6 +134,35 @@ void MakeBulletEvent(vec3 start, vec3 end, bool tracer)
 	bw.WriteShort((start.x) * 20.f);
 }
 
+void ClientGame::BuildPhysicsWorld()
+{
+	phys.ClearObjs();
+	phys.AddLevel(level);
+	
+	for (int i = 0; i < entities.size(); i++) {
+		ClientEntity& ce = entities[i];
+		if (!ce.active) continue;
+		
+		StateEntry* s = ce.GetLastState();
+		if (s->state.type != Ent_Player)
+			continue;
+
+		CharacterShape cs;
+		cs.a = &ce.animator;
+		cs.m = ce.model;
+		cs.org = s->state.position;
+		cs.radius = CHAR_HITBOX_RADIUS;
+		cs.height = (!s->state.ducking) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
+		PhysicsObject po;
+		po.shape = PhysicsObject::Character;
+		po.character = cs;
+		po.userindex = i;
+		po.player = true;
+
+		phys.AddObj(po);
+	}
+}
+
 void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx)
 {
 	MeshBuilder b;
@@ -146,10 +175,11 @@ void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand
 	move.max_ground_speed = cfg.GetF("max_ground_speed");
 	move.simtime = cmd.tick * core.tick_interval;
 	move.isclient = true;
-	move.obj_trace = ClientGameTraceCallback;
+	move.phys = &phys;
 	move.fire_weapon = ClientGameShootCallback;
 	move.set_viewmodel_animation = ClientSetViewmodelCallback;
 	move.play_sound = ClientPlaySoundCallback;
+	move.entindex = client.GetPlayerNum();
 	move.Run();
 
 	*out = move.player;

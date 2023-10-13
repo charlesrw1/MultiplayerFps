@@ -166,6 +166,8 @@ void Client::RunPrediction()
 	int incoming_seq = server_mgr.InSequence();
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 
+	cl_game.BuildPhysicsWorld();
+
 	// FIXME:
 	EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
 	PlayerState pred_state = last_auth_state->pstate;

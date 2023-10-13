@@ -76,8 +76,8 @@ public:
 	void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
 	void OnPlayerKilled(Entity* ent);
 
-	void RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags filter);
-	void PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, PhysFilterFlags filter);
+	void BuildPhysicsWorld(float time);
+
 	void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
 
 	Entity* EntForIndex(int index) {
@@ -90,6 +90,7 @@ public:
 	bool paused = false;
 	float gravity = 12.f;
 
+	PhysicsWorld phys;
 	std::vector<Entity> ents;
 	int num_ents = 0;
 	const Level* level = nullptr;

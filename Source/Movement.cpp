@@ -100,12 +100,14 @@ void PlayerMovement::CheckDuck()
 			GeomContact res;
 			vec3 where = player.position + offset + vec3(0, (i + 1) * step, 0);
 
-			PhysContainer obj;
-			obj.type = PhysContainer::SphereType;
-			obj.sph.origin = where;
-			obj.sph.radius = sphere_radius;
+			//PhysContainer obj;
+			//obj.type = PhysContainer::SphereType;
+			//obj.sph.origin = where;
+			//obj.sph.radius = sphere_radius;
 
-			obj_trace(&res, obj, true, false, entindex);
+
+			phys->TraceSphere(SphereShape(where, sphere_radius), &res, entindex, Pf_All);
+			//obj_trace(&res, obj, true, false, entindex);
 
 			//TraceSphere(level, where, sphere_radius, &res, true, false);
 			if (res.found) {
@@ -141,10 +143,14 @@ void PlayerMovement::ApplyFriction(float friction_val)
 }
 void PlayerMovement::MoveAndSlide(vec3 delta)
 {
-	Capsule cap = (player.ducking) ? crouch_capsule : standing_capsule;
-	PhysContainer obj;
-	obj.type = PhysContainer::CapsuleType;
-	obj.cap = cap;
+
+	CharacterShape character;
+	character.height = (player.ducking)? CHAR_CROUCING_HB_HEIGHT :  CHAR_STANDING_HB_HEIGHT;
+	character.org = glm::vec3(0.f);
+	character.m = nullptr;
+	character.a = nullptr;
+	character.radius = CHAR_HITBOX_RADIUS;
+
 
 	vec3 position = player.position;
 	vec3 step = delta / (float)col_iters;
@@ -152,11 +158,12 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 	{
 		position += step;
 		GeomContact trace;
-		obj.cap = cap;
-		obj.cap.tip += position;
-		obj.cap.base += position;
-	
-		obj_trace(&trace, obj, col_closest, false, entindex);
+
+		character.org = position;
+
+		phys->TraceCharacter(character, &trace, entindex, Pf_All);
+
+		//obj_trace(&trace, obj, col_closest, false, entindex);
 
 		//TraceCapsule(level, position, cap, &trace, col_closest);
 		if (trace.found)
@@ -170,11 +177,11 @@ void PlayerMovement::MoveAndSlide(vec3 delta)
 	// Gets player out of surfaces
 	for (int i = 0; i < 2; i++) {
 		GeomContact res;
-		obj.cap = cap;
-		obj.cap.tip += position;
-		obj.cap.base += position;
+		
+		character.org = position;
+		phys->TraceCharacter(character, &res, entindex, Pf_All);
 
-		obj_trace(&res, obj, col_closest, false, entindex);
+		//obj_trace(&res, obj, col_closest, false, entindex);
 		//TraceCapsule(level, position, cap, &res, col_closest);
 		if (res.found) {
 			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
@@ -191,12 +198,8 @@ void PlayerMovement::CheckGroundState()
 	}
 	GeomContact result;
 	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
-	PhysContainer obj;
-	obj.type = PhysContainer::SphereType;
-	obj.sph.origin = where;
-	obj.sph.radius = standing_capsule.radius;
 
-	obj_trace(&result, obj, true, true, entindex);
+	phys->TraceSphere(SphereShape(where, CHAR_HITBOX_RADIUS), &result, entindex, Pf_All);
 
 	//TraceSphere(level, where, radius, &result, true, true);
 	if (!result.found)
