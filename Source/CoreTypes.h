@@ -2,9 +2,7 @@
 #define GAMETYPE_H
 #include <SDL2/SDL.h>
 #include "Net.h"
-#include "Physics.h"
 #include "Util.h"
-#include "Animation.h"
 
 const int DEFAULT_WIDTH = 1200;
 const int DEFAULT_HEIGHT = 800;
@@ -13,6 +11,7 @@ const int MAX_GAME_ENTS = 256;
 class Core
 {
 public:
+	
 	SDL_Window* window = nullptr;
 	SDL_GLContext context = nullptr;
 	int vid_width = DEFAULT_WIDTH;

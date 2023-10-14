@@ -170,13 +170,16 @@ public:
 	ClientConnectionState GetState() const { return state; }
 	IPAndPort GetCurrentServerAddr() const { return server.remote_addr; }
 
+	void ForceFullUpdate() {
+		force_full_update = true;
+	}
 private:
 	void HandleUnknownPacket(IPAndPort from, ByteReader& msg);
 	void HandleServerPacket(ByteReader& msg);
 
 	void StartConnection();
 	
-	void OnEntSnapshot(ByteReader& msg);
+	bool OnEntSnapshot(ByteReader& msg);
 	void OnServerInit(ByteReader& msg);
 private:
 	int client_num;
@@ -186,6 +189,7 @@ private:
 	EmulatedSocket sock;
 	Connection server;
 	Client* myclient = nullptr;
+	bool force_full_update = false;
 };
 
 class Client
@@ -213,6 +217,7 @@ public:
 	int GetLastSequenceAcked() const;
 	void SetNewTickRate(float tick_rate);
 
+	Snapshot* FindSnapshotForTick(int tick);
 	Snapshot* GetCurrentSnapshot();
 
 	bool initialized = false;
@@ -221,7 +226,7 @@ public:
 	glm::vec3 view_angles;
 	std::vector<MoveCommand> out_commands;
 
-	int delta_idx = 0;
+	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
 	std::vector<Snapshot> snapshots;
 
@@ -237,6 +242,8 @@ public:
 	float* cfg_cl_time_out;
 	float* cfg_mouse_sensitivity;
 
+
+	void ForceFullUpdate() { server_mgr.ForceFullUpdate(); }
 private:
 	void RunPrediction();
 	void CreateMoveCmd();

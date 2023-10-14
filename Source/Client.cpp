@@ -28,6 +28,9 @@ void Client::Init()
 
 	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
 
+	last_recieved_server_tick = -1;
+	cur_snapshot_idx = 0;
+
 	initialized = true;
 
 }
@@ -365,6 +368,14 @@ Snapshot* Client::GetCurrentSnapshot()
 {
 	return &snapshots.at(server_mgr.InSequence() % CLIENT_SNAPSHOT_HISTORY);
 }
+Snapshot* Client::FindSnapshotForTick(int tick)
+{
+	for (int i = 0; i < snapshots.size(); i++) {
+		if (snapshots[i].tick == tick)
+			return &snapshots[i];
+	}
+	return nullptr;
+}
 
 void Client::SetupSnapshot(Snapshot* s)
 {
@@ -372,6 +383,7 @@ void Client::SetupSnapshot(Snapshot* s)
 	ClientGame* game = &cl_game;
 	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
 		ClientEntity* ce = &game->entities[i];
+
 
 		// local player doesnt fill interp history here
 		if (i == GetPlayerNum()) {
@@ -386,6 +398,9 @@ void Client::SetupSnapshot(Snapshot* s)
 		ce->active = true;
 
 		StateEntry* lastentry = ce->GetLastState();
+		if (i == MAX_CLIENTS) {
+			printf("slot2: %d\n", lastentry->state.model_idx);
+		}
 		if (lastentry->state.type == Ent_Free) {
 			ce->ClearState();
 		}

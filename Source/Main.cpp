@@ -28,6 +28,11 @@
 #include "Config.h"
 #include "Media.h"
 
+#include "imgui.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl2.h"
+
+ImGuiContext* imgui_ctx;
 MeshBuilder phys_debug;
 Core core;
 ConfigMgr cfg;
@@ -157,6 +162,14 @@ static bool update_camera = false;
 const char* map_file = "test_level2.glb";
 
 const char* map_file_names[] = { "creek.glb","maze.glb","nuke.glb" };
+
+void InitDebugInterface()
+{
+	imgui_ctx = ImGui::CreateContext();
+	ImGui::SetCurrentContext(imgui_ctx);
+	ImGui_ImplSDL2_InitForOpenGL(core.window, core.context);
+	ImGui_ImplOpenGL3_Init();
+}
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -915,6 +928,8 @@ void HandleInput()
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+		ImGui_ImplSDL2_ProcessEvent(&event);
+
 		switch (event.type)
 		{
 		case SDL_QUIT:
@@ -938,7 +953,7 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_T)
 				client.cl_game.third_person = !client.cl_game.third_person;
 			if (scancode == SDL_SCANCODE_Q)
-				game.paused = !game.paused;
+				client.ForceFullUpdate();
 			if(scancode == SDL_SCANCODE_1)
 				client.Disconnect();
 			if (scancode == SDL_SCANCODE_2)
@@ -1051,6 +1066,7 @@ int main(int argc, char** argv)
 	NetworkInit();
 	rndr.Init();
 	LoadMediaFiles();
+	InitDebugInterface();
 
 	if (!run_client_only) {
 		server.Init();

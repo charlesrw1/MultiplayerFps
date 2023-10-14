@@ -45,8 +45,8 @@ enum ClientToServer
 	ClMessageInput,
 	ClMessageQuit,
 	ClMessageText,
-	ClMessageTick,
 	ClMessageDelta,
+	ClMessageSetBaseline,
 };
 
 // Connection initilization

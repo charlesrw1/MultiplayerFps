@@ -28,6 +28,7 @@ void RemoteClient::Disconnect()
 	uint8_t buffer[8];
 	ByteWriter writer(buffer, 8);
 	writer.WriteByte(SvMessageDisconnect);
+	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
 
 	state = Dead;
@@ -87,7 +88,7 @@ void RemoteClient::SendInitData()
 	msg.WriteByte(SvMessageInitial);
 	msg.WriteByte(client_num);
 	myserver->WriteServerInfo(msg);		// let server fill in data
-
+	msg.EndWrite();
 	connection.Send(buffer, msg.BytesWritten());
 }
 
@@ -114,22 +115,25 @@ void RemoteClient::Update()
 	writer.WriteLong(myserver->tick);
 
 	writer.WriteByte(SvMessageSnapshot);
-	writer.WriteLong(-1);
-	myserver->WriteDeltaSnapshot(writer, -1, client_num);
-
+	myserver->WriteDeltaSnapshot(writer, baseline, client_num);
+	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
 }
 
 void RemoteClient::OnPacket(ByteReader& buf)
 {
-	while (!buf.IsEof())
+	for(;;)
 	{
-		uint8_t command = buf.ReadByte();
+		buf.AlignToByteBoundary();
+		if (buf.IsEof())
+			return;
 		if (buf.HasFailed()) {
 			DebugOut("Read fail\n");
 			Disconnect();
 			return;
 		}
+
+		uint8_t command = buf.ReadByte();
 		switch (command)
 		{
 		case ClNop:
@@ -140,7 +144,10 @@ void RemoteClient::OnPacket(ByteReader& buf)
 		case ClMessageQuit:
 			Disconnect();
 			break;
-		case ClMessageTick:
+		case ClMessageSetBaseline: {
+			int newbaseline = buf.ReadLong();
+			baseline = newbaseline;
+		}
 			break;
 		case ClMessageText:
 			OnTextCommand(buf);
@@ -161,46 +168,18 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 	if (from->type == to->type && from->type == Ent_Free)
 		return;
 
-	uint16_t mask = 0;
-	if (from->type != to->type) {
-		mask |= 1;
-	}
-	if (from->position != to->position) {
-		mask |= (1 << 1);
-	}
-	if (from->angles != to->angles) {
-		mask |= (1 << 2);
-	}
-	
-	if (from->model_idx != to->model_idx)
-		mask |= (1 << 6);
-
-	if (from->leganim != to->leganim) {
-		mask |= 1 << 7;
-	}
-	if (from->leganim_frame != to->leganim_frame) {
-		mask |= 1 << 8;
-	}
-
-	if (to->ducking)
-		mask |= 1 << 9;
-
-	if (from->mainanim != to->mainanim) {
-		mask |= 1 << 10;
-	}
-	if (from->mainanim_frame != to->mainanim_frame) {
-		mask |= 1 << 11;
-	}
-
-	if (mask == 0)
-		return;
-
 	msg.WriteByte(index);
-	msg.WriteShort(mask);
 
-	if (mask & 1)
+	if (from->type != to->type) {
+		msg.WriteBool(1);
 		msg.WriteByte(to->type);
-	if (mask & (1 << 1)) {
+	}
+	else
+		msg.WriteBool(0);
+
+	if (from->position != to->position) {
+		msg.WriteBool(1);
+		
 		short pos[3];
 		pos[0] = to->position.x * 20.f;
 		pos[1] = to->position.y * 20.f;
@@ -209,9 +188,13 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		msg.WriteShort(pos[0]);
 		msg.WriteShort(pos[1]);
 		msg.WriteShort(pos[2]);
-
 	}
-	if (mask & (1 << 2)) {
+	else
+		msg.WriteBool(0);
+
+	if (from->angles != to->angles) {
+		msg.WriteBool(1);
+
 		char rot[3];
 		rot[0] = to->angles.x / (2 * PI) * 256;
 		rot[1] = to->angles.y / (2 * PI) * 256;
@@ -220,33 +203,55 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 		msg.WriteByte(rot[1]);
 		msg.WriteByte(rot[2]);
 	}
-	if (mask & (1 << 6))
-		msg.WriteByte(to->model_idx);
+	else
+		msg.WriteBool(0);
+	
+	if (from->model_idx != to->model_idx) {
+		msg.WriteBool(1);
 
-	if (mask & (1 << 7))
+		msg.WriteByte(to->model_idx);
+	}
+	else
+		msg.WriteBool(0);
+
+	if (from->leganim != to->leganim) {
+		msg.WriteBool(1);
 		msg.WriteByte(to->leganim);
-	if (mask & (1 << 8)) {
+	}
+	else
+		msg.WriteBool(0);
+
+	if (from->leganim_frame != to->leganim_frame) {
+		msg.WriteBool(1);
 		int quantized_frame = to->leganim_frame * 100;
 		msg.WriteShort(quantized_frame);
 	}
-	if (mask & (1 << 10))
+	else
+		msg.WriteBool(0);
+
+	if (from->mainanim != to->mainanim) {
+		msg.WriteBool(1);
 		msg.WriteByte(to->mainanim);
-	if (mask & (1 << 11)) {
+	}
+	else
+		msg.WriteBool(0);
+
+	if (from->mainanim_frame != to->mainanim_frame) {
+		msg.WriteBool(1);
 		int quantized_frame = to->mainanim_frame * 100;
 		msg.WriteShort(quantized_frame);
 	}
-	
+	else
+		msg.WriteBool(0);
+
+	msg.WriteBool(to->ducking);
 }
 
 void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 {
-	uint16_t mask = msg.ReadShort();
-
-	to->ducking = (mask & (1 << 9));
-
-	if (mask & 1)
+	if (msg.ReadBool())
 		to->type = msg.ReadByte();
-	if (mask & (1 << 1)) {
+	if (msg.ReadBool()) {
 		short pos[3];
 		pos[0] = msg.ReadShort();
 		pos[1] = msg.ReadShort();
@@ -257,7 +262,7 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->position.z = pos[2] / 20.f;
 
 	}
-	if (mask & (1 << 2)) {
+	if (msg.ReadBool()) {
 		char rot[3];
 		rot[0] = msg.ReadByte();
 		rot[1] = msg.ReadByte();
@@ -267,43 +272,42 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->angles.z = (float)rot[2] * (2 * PI) / 256.0;
 	}
 
-	if (mask & (1 << 6))
+	if (msg.ReadBool())
 		to->model_idx = msg.ReadByte();
 
-	if (mask & (1 << 7))
+	if (msg.ReadBool())
 		to->leganim = msg.ReadByte();
-	if (mask & (1 << 8)) {
+	if (msg.ReadBool()) {
 		int quantized_frame = msg.ReadShort();
 		to->leganim_frame = quantized_frame / 100.0;
 	}
-	if (mask & (1 << 10))
+	if (msg.ReadBool())
 		to->mainanim = msg.ReadByte();
-	if (mask & (1 << 11)) {
+	if (msg.ReadBool()) {
 		int quantized_frame = msg.ReadShort();
 		to->mainanim_frame = quantized_frame / 100.0;
 	}
+
+	to->ducking = msg.ReadBool();
 }
 
 void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 {
-	uint8_t mask = msg.ReadByte();
-	if (mask & 1) {
-		to->position.x = msg.ReadFloat();
-		to->position.y = msg.ReadFloat();
-		to->position.z= msg.ReadFloat();
+	if (msg.ReadBool()) {
+		to->position = msg.ReadVec3();
 
 	}
-	if (mask & (1 << 1)) {
-		to->angles.x = msg.ReadFloat();
-		to->angles.y = msg.ReadFloat();
-		to->angles.z = msg.ReadFloat();
+	if (msg.ReadBool()) {
+		to->velocity = msg.ReadVec3();
 	}
-	if (mask & (1 << 2)) {
-		to->velocity.x = msg.ReadFloat();
-		to->velocity.y = msg.ReadFloat();
-		to->velocity.z = msg.ReadFloat();
+	if (msg.ReadBool()) {
+		to->angles = msg.ReadVec3();
 	}
 
+	to->ducking = msg.ReadBool();
+	to->on_ground = msg.ReadBool();
+	to->alive = msg.ReadBool();
+	to->in_jump = msg.ReadBool();
 
 	// items >>>
 
@@ -321,53 +325,35 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 	to->items.state = (ItemUseState)msg.ReadByte();
 
 	// items <<<
-
-	to->ducking = mask & (1 << 3);
-	to->on_ground = mask & (1 << 4);
-	to->alive = mask & (1 << 5);
-	to->in_jump = mask & (1 << 6);
 }
 
 void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 {
-	uint8_t mask_and_flags = 0;
 	if (from->position != to->position) {
-		mask_and_flags |= 1;
+		msg.WriteBool(1);
+		msg.WriteVec3(to->position);
 	}
-	if (from->angles != to->angles) {
-		mask_and_flags |= (1 << 1);
-	}
+	else
+		msg.WriteBool(0);
+
 	if (from->velocity != to->velocity) {
-		mask_and_flags |= (1 << 2);
+		msg.WriteBool(1);
+		msg.WriteVec3(to->velocity);
 	}
+	else
+		msg.WriteBool(0);
 
-	if (to->ducking)
-		mask_and_flags |= (1 << 3);
-	if (to->on_ground)
-		mask_and_flags |= (1 << 4);
-	if (to->alive)
-		mask_and_flags |= (1 << 5);
-	if (to->in_jump)
-		mask_and_flags |= (1 << 6);
-
-
-
-	msg.WriteByte(mask_and_flags);
-	if (mask_and_flags & 1) {
-		msg.WriteFloat(to->position.x);
-		msg.WriteFloat(to->position.y);
-		msg.WriteFloat(to->position.z);
+	if (from->angles != to->angles) {
+		msg.WriteBool(1);
+		msg.WriteVec3(to->angles);
 	}
-	if (mask_and_flags & (1 << 1)) {
-		msg.WriteFloat(to->angles.x);
-		msg.WriteFloat(to->angles.y);
-		msg.WriteFloat(to->angles.z);
-	}
-	if (mask_and_flags & (1 << 2)) {
-		msg.WriteFloat(to->velocity.x);
-		msg.WriteFloat(to->velocity.y);
-		msg.WriteFloat(to->velocity.z);
-	}
+	else
+		msg.WriteBool(0);
+
+	msg.WriteBool(to->ducking);
+	msg.WriteBool(to->on_ground);
+	msg.WriteBool(to->alive);
+	msg.WriteBool(to->in_jump);
 
 	// items
 
@@ -387,17 +373,30 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 
 }
 
+static EntityState null_estate;
+static PlayerState null_pstate;
+
+
 void Server::WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int client_idx)
 {
-	Frame* to = GetLastSnapshotFrame();
-	Frame* from = &nullframe;
+	Frame* to = GetSnapshotFrame();
+	Frame* from = nullptr;
+	if (deltatick > 0)
+		from = GetSnapshotFrameForTick(deltatick);
+	
+	if (!from)
+		msg.WriteLong(-1);
+	else
+		msg.WriteLong(deltatick);
 
 	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
-		WriteDeltaEntState(&from->states[i], &to->states[i], msg, i);
+		EntityState* fromstate = (from) ? &from->states[i] : &null_estate;
+		WriteDeltaEntState(fromstate, &to->states[i], msg, i);
 	}
 	msg.WriteByte(-1);	// sentinal
 
 	msg.WriteLong(0xabababab);
 
-	WriteDeltaPState(&from->ps_states[client_idx], &to->ps_states[client_idx], msg);
+	PlayerState* fromp = (from) ? &from->ps_states[client_idx] : &null_pstate;
+	WriteDeltaPState(fromp, &to->ps_states[client_idx], msg);
 }

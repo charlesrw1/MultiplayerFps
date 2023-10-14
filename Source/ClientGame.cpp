@@ -223,7 +223,6 @@ void ClientGame::PreRenderUpdate()
 void ClientGame::UpdateViewmodelAnimation()
 {
 	PlayerState* p = &client.lastpredicted;
-	printf("state: %d\n", p->items.state);
 	if (p->items.state != prev_item_state)
 	{
 		switch (p->items.state)

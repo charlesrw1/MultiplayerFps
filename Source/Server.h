@@ -147,6 +147,8 @@ public:
 	float next_snapshot_time = 0.f;
 	int client_num = 0;
 	Server* myserver = nullptr;
+
+	int baseline = -1;	// what tick to delta encode from
 };
 
 // stores game state to delta encode to clients
@@ -175,16 +177,19 @@ public:
 	void WriteServerInfo(ByteWriter& msg);
 	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
-	Frame* GetLastSnapshotFrame() {
-		int i = cur_frame_idx - 1;
-		if (i < 0) i += MAX_FRAME_HIST;
-		return &frames.at(i);
+	Frame* GetSnapshotFrame() {
+		return &frames.at(this->tick % MAX_FRAME_HIST);
+	}
+	Frame* GetSnapshotFrameForTick(int tick) {
+		Frame* f = &frames.at(tick % MAX_FRAME_HIST);
+		if (f->tick != tick)
+			return nullptr;
+		return f;
 	}
 
 	bool active = false;
 	std::string map_name;
 
-	int cur_frame_idx = 0;
 	std::vector<Frame> frames;
 	Frame nullframe;
 

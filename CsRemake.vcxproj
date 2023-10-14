@@ -32,6 +32,13 @@
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="source\ClientGame.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
+    <ClCompile Include="Source\External\imgui.cpp" />
+    <ClCompile Include="Source\External\imgui_demo.cpp" />
+    <ClCompile Include="Source\External\imgui_draw.cpp" />
+    <ClCompile Include="Source\External\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="Source\External\imgui_impl_sdl2.cpp" />
+    <ClCompile Include="Source\External\imgui_tables.cpp" />
+    <ClCompile Include="Source\External\imgui_widgets.cpp" />
     <ClCompile Include="source\Game.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
     <ClCompile Include="Source\Server.cpp" />

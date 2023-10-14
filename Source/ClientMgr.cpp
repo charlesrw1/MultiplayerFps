@@ -63,6 +63,7 @@ void ClServerMgr::TrySendingConnect()
 	const char name[] = "Charlie";
 	writer.WriteByte(sizeof(name) - 1);
 	writer.WriteBytes((uint8_t*)name, sizeof(name) - 1);
+	writer.EndWrite();
 	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
 }
 void ClServerMgr::Disconnect()
@@ -73,6 +74,7 @@ void ClServerMgr::Disconnect()
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
 		write.WriteByte(ClMessageQuit);
+		write.EndWrite();
 		server.Send(buffer, write.BytesWritten());
 	}
 	state = Disconnected;
@@ -168,7 +170,7 @@ void ClServerMgr::StartConnection()
 	const char init_str[] = "init";
 	writer.WriteByte(sizeof(init_str) - 1);
 	writer.WriteBytes((uint8_t*)init_str, sizeof(init_str) - 1);
-
+	writer.EndWrite();
 	// FIXME!!: this must go through reliable, do this later
 	server.Send(buffer, writer.BytesWritten());
 }
@@ -197,18 +199,23 @@ void ClServerMgr::OnServerInit(ByteReader& buf)
 	const char spawn_str[] = "spawn";
 	writer.WriteByte(sizeof(spawn_str) - 1);
 	writer.WriteBytes((uint8_t*)spawn_str, sizeof(spawn_str) - 1);
+	writer.EndWrite();
 	server.Send(buffer, writer.BytesWritten());
 }
 
 void ClServerMgr::HandleServerPacket(ByteReader& buf)
 {
-	while (!buf.IsEof())
+	for (;;)
 	{
-		uint8_t command = buf.ReadByte();
+		buf.AlignToByteBoundary();
+		if (buf.IsEof())
+			return;
 		if (buf.HasFailed()) {
 			myclient->Disconnect();
 			return;
 		}
+		
+		uint8_t command = buf.ReadByte();
 		switch (command)
 		{
 		case SvNop:
@@ -216,12 +223,14 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		case SvMessageInitial:
 			OnServerInit(buf);
 			break;
-		case SvMessageSnapshot:
+		case SvMessageSnapshot: {
 			if (state == Connected) {
 				state = Spawned;
 			}
-			OnEntSnapshot(buf);
-			break;
+			bool ignore_packet = OnEntSnapshot(buf);
+			if (ignore_packet)
+				return;
+		}break;
 		case SvMessageDisconnect:
 			DebugOut("disconnected by server\n");
 			myclient->Disconnect();
@@ -236,6 +245,7 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 				DebugOut("delta tick %d\n", server_tick - myclient->tick);
 				myclient->tick = server_tick;
 			}
+			myclient->last_recieved_server_tick = server_tick;
 		}break;
 		default:
 			DebugOut("Unknown message, disconnecting\n");
@@ -270,16 +280,51 @@ void ClServerMgr::SendMovesAndMessages()
 	writer.WriteFloat(lastmove.view_angles.y);
 	writer.WriteLong(lastmove.button_mask);
 
+	writer.WriteByte(ClMessageSetBaseline);
+	if (force_full_update)
+		writer.WriteLong(-1);
+	else
+		writer.WriteLong(myclient->last_recieved_server_tick);
+
+	writer.EndWrite();
 	server.Send(buffer, writer.BytesWritten());
 }
 
-void ClServerMgr::OnEntSnapshot(ByteReader& msg)
-{
-	Snapshot* snapshot = myclient->GetCurrentSnapshot();
-	*snapshot = Snapshot();
+static EntityState null_estate;
+static PlayerState null_pstate;
 
-	int delta_frame_index = msg.ReadLong();		// unused rn
-	ASSERT(delta_frame_index == -1);
+bool ClServerMgr::OnEntSnapshot(ByteReader& msg)
+{
+	int delta_tick = msg.ReadLong();
+
+	if (delta_tick == -1) {
+		printf("client: recieved full update\n");
+		if (force_full_update)
+			force_full_update = false;
+	}
+	
+	
+	Snapshot* nextsnapshot = myclient->GetCurrentSnapshot();
+	nextsnapshot->tick = myclient->last_recieved_server_tick;
+	Snapshot* from = nullptr;
+
+	if (delta_tick != -1) {
+		from = myclient->FindSnapshotForTick(delta_tick);
+		if (!from) {
+			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, myclient->tick);
+			return true;
+		}
+	}
+
+	// set new snapshot to old snapshot
+	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
+		EntityState* old = &null_estate;
+		if (from)
+			old = &from->entities[i];
+		nextsnapshot->entities[i] = *old;
+	}
+
+
 	for (;;) {
 		uint8_t index = msg.ReadByte();
 		if (index == 0xff)
@@ -288,17 +333,23 @@ void ClServerMgr::OnEntSnapshot(ByteReader& msg)
 			break;
 		if (index >= Snapshot::MAX_ENTS)
 			break;
-		EntityState* es = &snapshot->entities[index];
-		*es = EntityState();
+
+		EntityState* es = &nextsnapshot->entities[index];
 		ReadDeltaEntState(es, msg);
 	}
 
 	int val = msg.ReadLong();
 	ASSERT(val == 0xabababab);
 
-	PlayerState* ps = &snapshot->pstate;
-	*ps = PlayerState();
+	PlayerState* ps = &nextsnapshot->pstate;
+	if (from)
+		*ps = from->pstate;
+	else
+		*ps = null_pstate;
+
 	ReadDeltaPState(ps, msg);
 
-	myclient->SetupSnapshot(snapshot);
+	myclient->SetupSnapshot(nextsnapshot);
+
+	return false;
 }

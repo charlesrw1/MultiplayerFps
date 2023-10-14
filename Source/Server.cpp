@@ -36,7 +36,6 @@ void Server::Init()
 	game.Init();
 	//client_mgr.Init();
 
-	cur_frame_idx = 0;
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
 
@@ -105,7 +104,7 @@ void Server::RemoveClient(int client)
 
 void Server::BuildSnapshotFrame()
 {
-	Frame* frame = &frames.at(cur_frame_idx);
+	Frame* frame = GetSnapshotFrame();
 	Game* g = &game;
 	frame->tick = tick;
 	for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -114,7 +113,6 @@ void Server::BuildSnapshotFrame()
 	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
 		frame->states[i] = g->ents[i].ToEntState();
 	}
-	cur_frame_idx = (cur_frame_idx + 1) % frames.size();
 }
 
 void Server::RunMoveCmd(int client, MoveCommand cmd)
@@ -171,6 +169,7 @@ static void RejectConnectRequest(Socket* sock, IPAndPort addr, const char* why)
 	int pad_bytes = 8 - writer.BytesWritten();
 	for (int i = 0; i < pad_bytes; i++)
 		writer.WriteByte(0);
+	writer.EndWrite();
 	sock->Send(buffer, writer.BytesWritten(), addr);
 }
 
@@ -219,6 +218,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	int pad_bytes = 8 - writer.BytesWritten();
 	for (int i = 0; i < pad_bytes; i++)
 		writer.WriteByte(0);
+	writer.EndWrite();
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
 
 	RemoteClient& new_client = clients[spot];
