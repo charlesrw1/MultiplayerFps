@@ -33,6 +33,7 @@
     <ClCompile Include="source\ClientGame.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="source\Game.cpp" />
+    <ClCompile Include="Source\Particles.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\External\glad.c" />
@@ -52,6 +53,7 @@
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
+    <ClInclude Include="Source\Particles.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\GameData.h" />

@@ -202,12 +202,10 @@ void Client::FixedUpdateRead(double dt)
 		return;
 	if (GetConState() == Spawned) {
 		client.tick += 1;
-		client.time += core.tick_interval;
+		client.time = client.tick * core.tick_interval;
 	}
 	server_mgr.ReadPackets();
 	RunPrediction();
-	cl_game.UpdateViewModelOffsets();
-	cl_game.UpdateViewmodelAnimation();
 }
 void Client::PreRenderUpdate(double frametime)
 {
@@ -215,6 +213,9 @@ void Client::PreRenderUpdate(double frametime)
 		// interpoalte entities for rendering
 		cl_game.InterpolateEntStates();
 		cl_game.ComputeAnimationMatricies();
+
+		cl_game.UpdateViewModelOffsets();
+		cl_game.UpdateViewmodelAnimation();
 	}
 	cl_game.UpdateCamera();
 }

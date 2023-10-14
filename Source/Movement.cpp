@@ -84,7 +84,7 @@ void PlayerMovement::CheckDuck()
 		standing_capsule.GetSphereCenters(a, b);
 		crouch_capsule.GetSphereCenters(c, d);
 		float len = b.y - d.y;
-		sphere_radius = crouch_capsule.radius;
+		sphere_radius = crouch_capsule.radius-0.05;
 		if (player.on_ground) {
 			step = len / (float)steps;
 			offset = d;

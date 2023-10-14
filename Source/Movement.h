@@ -7,18 +7,6 @@ class MeshBuilder;
 class AnimationSet;
 // Shared movement+item code
 
-class ItemController
-{
-	// callbacks
-	void(*shoot_bullets) = nullptr;
-	void(*spawn_item) = nullptr;
-	void(*play_sound) = nullptr;
-	void(*set_viewmodel_animation) = nullptr;
-	void(*send_game_event)(uint8_t* data, int datalen) = nullptr;
-
-
-};
-
 class PlayerMovement
 {
 public:

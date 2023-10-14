@@ -19,22 +19,24 @@ reliable messages (not very difficult now)
 entity interpolation on clients with pos history (done 10/4)
 lag compensation on server
 (Maybe): buffer inputs on server to avoid simming 2 inputs in one packet
-update physics to detect collisions between objs and response (started 10/5)
+update physics to detect collisions between objs and response (started 10/5) (10/13)
 
 gfx:
 textured models (easy) (done 10/10)
-ui rendering, font loading
 
 todo:
+
+Goal: finish project by 10/17
 ui, fonts, etc.
-server and client side shooting
+server and client side shooting (mostly done, now needs more weapons and weapon stats, and hitbox)
+physics rework (done 10/13)
 lag compensation
 reliable messages
 particles
-shadows for players
+shadows for players (done 10/13)
 sounds
-viewmodel animations (can be procedural)
-view recoil
+viewmodel animations (can be procedural) (started 10/13)
+view recoil (same as above, 10/13)
 bomb zone trigger
 
 

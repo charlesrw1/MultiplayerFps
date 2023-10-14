@@ -51,6 +51,8 @@ Entity* Game::InitNewEnt(EntType type, int index)
 	ent->rotation = glm::vec3(0.f);
 	ent->scale = 1.f;
 
+	ent->id = next_id++;
+
 	ent->alive = false;
 	ent->health = 0;
 	ent->on_ground = false;
@@ -106,6 +108,7 @@ void Game::ClearState()
 	if(level)
 		FreeLevel(level);
 	level = nullptr;
+	next_id = 0;
 
 }
 bool Game::DoNewMap(const char* mapname)

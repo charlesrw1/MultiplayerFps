@@ -5,6 +5,8 @@
 #include "Level.h"
 #include "EmulatedSocket.h"
 #include "Physics.h"
+#include "Client.h"
+#include "Particles.h"
 #include <array>
 
 struct StateEntry
@@ -18,12 +20,13 @@ struct ClientEntity
 	const static int NUM_STORED_STATES = 25;
 	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
 
+	short id = 0;
 	bool active = false;
-	EntityState interpstate;
 
 	// history of updates for interpolation
 	StateHist hist;
 	int current_hist_index = 0;
+	EntityState interpstate;
 
 	Animator animator;
 	const Model* model = nullptr;
@@ -86,6 +89,7 @@ struct ViewSetup
 class ClientGame
 {
 public:
+	ClientGame();
 	void Init();
 
 	void ClearState();
@@ -95,6 +99,8 @@ public:
 
 	void RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx);
 
+	void PreRenderUpdate();	// update client side stuff
+
 	ClientEntity* EntForIndex(int index) {
 		ASSERT(index >= 0 && index < entities.size());
 		return &entities[index];
@@ -102,8 +108,10 @@ public:
 
 	void BuildPhysicsWorld();
 
+	Random rand;	// only use for client-side effects
 	PhysicsWorld phys;
-	glm::vec3 interpolated_origin;		// origin to render the eye at
+	ParticleMgr particles;
+
 	std::vector<ClientEntity> entities;	// client side data
 
 	const Level* level = nullptr;
@@ -227,7 +235,6 @@ public:
 	int* cfg_fake_lag;
 	int* cfg_fake_loss;
 	float* cfg_cl_time_out;
-
 	float* cfg_mouse_sensitivity;
 
 private:

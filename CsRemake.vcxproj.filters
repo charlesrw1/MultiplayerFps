@@ -90,6 +90,9 @@
     <ClCompile Include="Encode.cpp">
       <Filter>Source Files\Network</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Particles.cpp">
+      <Filter>Source Files\Client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Texture.h">
@@ -163,6 +166,9 @@
     </ClInclude>
     <ClInclude Include="Source\Media.h">
       <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Particles.h">
+      <Filter>Source Files\Client</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

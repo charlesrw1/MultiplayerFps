@@ -12,6 +12,10 @@ bool Client::IsInGame() const
 	return GetConState() == Spawned;
 }
 
+ClientGame::ClientGame() : rand(time(NULL)) {
+
+}
+
 ClientEntity* Client::GetLocalPlayer()
 {
 	ASSERT(IsInGame());
@@ -23,6 +27,7 @@ void ClientGame::Init()
 {
 	entities.resize(MAX_GAME_ENTS);
 	level = nullptr;
+	particles.Init(this, &client);
 }
 void ClientGame::ClearState()
 {
@@ -31,6 +36,7 @@ void ClientGame::ClearState()
 		entities[i].ClearState();
 	}
 	phys.ClearObjs();
+	particles.ClearAll();
 
 	if(level)
 		FreeLevel(level);
@@ -202,6 +208,18 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 }
 
 
+void ClientGame::PreRenderUpdate()
+{ 
+	particles.Update(core.frame_time);
+	InterpolateEntStates();
+	ComputeAnimationMatricies();
+
+	UpdateViewmodelAnimation();
+	UpdateViewModelOffsets();
+
+	UpdateCamera();
+}
+
 void ClientGame::UpdateViewmodelAnimation()
 {
 	PlayerState* p = &client.lastpredicted;
@@ -261,5 +279,7 @@ void ClientGame::UpdateViewModelOffsets()
 	if (lastp->ducking)
 		up_ofs_ideal += 0.04;
 
-	viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
+	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, core.frame_time*100.f);
+
+	//viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
 }

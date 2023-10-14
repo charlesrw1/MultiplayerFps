@@ -161,6 +161,13 @@ inline glm::vec3 hashed_color(int num)
 	return glm::vec3(has & 0xFF, (has >> 8) & 0xFF, (has >> 16) & 0xFF) / 255.f;
 }
 
+// damp function useable with variable update rates
+template<typename T>
+inline T damp(T source, T target, float smoothing, float dt)
+{
+	return glm::mix(source, target, 1 - glm::pow(smoothing, dt));
+}
+
 class Random
 {
 public:

@@ -23,9 +23,7 @@ struct Media
 	std::vector<Model*> gamemodels;
 	Texture* testtex;
 
-	Shader simple;
-	Shader textured;
-	Shader animated;
+	Texture* blobshadow;
 };
 
 extern Media media;

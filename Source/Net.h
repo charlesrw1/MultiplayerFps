@@ -111,6 +111,7 @@ struct ItemState
 	}
 
 	const static int MAX_ITEMS = 32;
+	const static int EMPTY_SLOT = -1;
 
 	int item_bitmask = 0;
 	int active_item = 0;

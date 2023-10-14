@@ -16,6 +16,8 @@ class Model;
 struct Entity
 {
 	EntType type = Ent_Free;
+	short id = 0;
+
 	int index = 0;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
@@ -101,6 +103,8 @@ private:
 	Entity* InitNewEnt(EntType type, int index);
 	void BeginLagCompensation();
 	void EndLagCompensation();
+
+	short next_id = 0;
 };
 class Server;
 class RemoteClient

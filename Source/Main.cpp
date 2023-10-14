@@ -421,6 +421,7 @@ public:
 	Shader animated;
 	Shader static_wrld;
 	Shader basic_mod;
+	Shader particle_basic;
 
 	// std textures
 	uint32_t white_texture;
@@ -441,6 +442,9 @@ private:
 	void DrawLevel();
 	void DrawPlayerViewmodel();
 
+	void DrawEntBlobShadows();
+	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
+
 	void BindTexture(int bind, int id);
 	void SetStdShaderConstants(Shader* s);
 
@@ -452,6 +456,8 @@ private:
 	int cur_img_1 = -1;
 
 	ClientGame* cgame = nullptr;
+
+	MeshBuilder shadowverts;
 };
 
 void Renderer::InitGlState()
@@ -465,6 +471,31 @@ void Renderer::InitGlState()
 }
 
 Renderer rndr;
+
+void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
+{
+	MbVertex corners[4];
+
+	glm::vec3 side = (glm::abs(normal.x)<0.999)?cross(normal, vec3(1, 0, 0)): cross(normal,vec3(0,1,0));
+	side = glm::normalize(side);
+	glm::vec3 side2 = cross(side, normal);
+
+	float halfwidth = width / 2.f;
+
+	corners[0].position = org + side * halfwidth + side2 * halfwidth;
+	corners[1].position = org - side * halfwidth + side2 * halfwidth;
+	corners[2].position = org - side * halfwidth - side2 * halfwidth;
+	corners[3].position = org + side * halfwidth - side2 * halfwidth;
+	corners[0].uv = glm::vec2(0);
+	corners[1].uv = glm::vec2(0,1);
+	corners[2].uv = glm::vec2(1,1);
+	corners[3].uv = glm::vec2(1,0);
+	int base = shadowverts.GetBaseVertex();
+	for (int i = 0; i < 4; i++) {
+		shadowverts.AddVertex(corners[i]);
+	}
+	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
+}
 
 void Renderer::BindTexture(int bind, int id)
 {
@@ -500,6 +531,9 @@ void Renderer::Init()
 	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
 	Shader::compile(&basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
 	Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt", "VERTEX_COLOR");
+	Shader::compile(&particle_basic, "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+
+
 
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
@@ -594,6 +628,7 @@ void Renderer::FrameDraw()
 
 	DrawEnts();
 	DrawLevel();
+	DrawEntBlobShadows();
 
 	int x = vs.width;
 	int y = vs.height;
@@ -637,6 +672,55 @@ void Renderer::FrameDraw()
 
 	if(cgame->ShouldDrawViewModel() && *cfg_draw_viewmodel)
 		DrawPlayerViewmodel();
+}
+
+void Renderer::DrawEntBlobShadows()
+{
+	shadowverts.Begin();
+
+	for (int i = 0; i < cgame->entities.size(); i++)
+	{
+		ClientEntity* ce = &cgame->entities[i];
+		if (!ce->active) continue;
+		EntityState* s = &ce->interpstate;
+		
+		RayHit rh;
+		Ray r;
+		r.pos = s->position + glm::vec3(0,0.1f,0);
+		r.dir = glm::vec3(0, -1, 0);
+		cgame->phys.TraceRay(r, &rh, i, Pf_World);
+
+		if (rh.dist < 0)
+			continue;
+
+		AddBlobShadow(rh.pos + vec3(0,0.05,0), rh.normal, CHAR_HITBOX_RADIUS * 2.5f);
+	}
+	glCheckError();
+
+	shadowverts.End();
+	glCheckError();
+
+	particle_basic.use();
+	particle_basic.set_mat4("ViewProj", vs.viewproj);
+	particle_basic.set_mat4("Model", mat4(1.0));
+	particle_basic.set_vec4("tint_color", vec4(0,0,0,1));
+	glCheckError();
+
+	BindTexture(0, media.blobshadow->gl_id);
+	glDepthMask(GL_FALSE);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	shadowverts.Draw(GL_TRIANGLES);
+
+	glDisable(GL_BLEND);
+	glEnable(GL_CULL_FACE);
+	glDepthMask(GL_TRUE);
+
+	cur_shader = -1;
+	glCheckError();
+
 }
 
 void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
@@ -780,6 +864,8 @@ void LoadMediaFiles()
 	models[Mod_PlayerCT] = FindOrLoadModel("CT.glb");
 	models[Mod_GunM16] = FindOrLoadModel("m16.glb");
 	models[Mod_Grenade_HE] = FindOrLoadModel("grenade_he.glb");
+
+	media.blobshadow = FindOrLoadTexture("blob_shadow_temp.png");
 }
 
 void DrawScreen(double dt)
