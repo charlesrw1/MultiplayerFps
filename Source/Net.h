@@ -11,7 +11,7 @@ const int CLIENT_SNAPSHOT_HISTORY = 16;	// buffer last 16 snapshots
 const int MAX_PAYLOAD_SIZE = 1400;
 const int PACKET_HEADER_SIZE = 8;
 
-const int DEFAULT_SERVER_PORT = 24352;
+const int DEFAULT_SERVER_PORT = 47000;
 
 const int MAX_CLIENTS = 16;
 const int MAX_NET_STRING = 256;

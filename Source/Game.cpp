@@ -30,9 +30,9 @@ Entity* ServerEntForIndex(int index)
 
 void Game::GetPlayerSpawnPoisiton(Entity* ent)
 {
-	if (level->spawns.size() > 0) {
-		ent->position = level->spawns[0].position;
-		ent->rotation.y = level->spawns[0].angle;
+	if (engine.level->spawns.size() > 0) {
+		ent->position = engine.level->spawns[0].position;
+		ent->rotation.y = engine.level->spawns[0].angle;
 	}
 	else {
 		ent->position = glm::vec3(0);
@@ -57,8 +57,6 @@ Entity* Game::InitNewEnt(EntType type, int index)
 	ent->velocity = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
 	ent->scale = 1.f;
-
-	ent->id = next_id++;
 
 	ent->alive = false;
 	ent->health = 0;
@@ -100,36 +98,10 @@ Entity* Game::MakeNewEntity(EntType type)
 void Game::Init()
 {
 	engine.num_entities = 0;
-	level = nullptr;
+	engine.level = nullptr;
 
 }
 
-void Game::ClearState()
-{
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		engine.ents[i].type = Ent_Free;
-	}
-	engine.num_entities = 0;
-	phys.ClearObjs();
-	if(level)
-		FreeLevel(level);
-	level = nullptr;
-	next_id = 0;
-
-}
-bool Game::DoNewMap(const char* mapname)
-{
-	if (level) {
-		ClearState();
-	}
-	level = LoadLevelFile(mapname);
-	if (!level)
-		Fatalf("level not loaded\n");
-
-	BuildPhysicsWorld(0.f);
-
-	return true;
-}
 
 void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 {
@@ -140,7 +112,7 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	RayHit hit;
 	//TraceRayAgainstLevel(level, r, &hit, false);
 
-	phys.TraceRay(r, &hit, GetEntIndex(from), Pf_All);
+	engine.phys.TraceRay(r, &hit, GetEntIndex(from), Pf_All);
 
 	//RayWorldIntersect(r, &hit, GetEntIndex(from), Pf_All);
 
@@ -356,7 +328,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.cmd = cmd;
 	move.deltat = engine.tick_interval;
 	move.phys_debug = &mb;
-	move.phys = &phys;
+	move.phys = &engine.phys;
 	move.fire_weapon = ServerGameShootCallback;
 	move.play_sound = ServerPlaySoundCallback;
 	move.set_viewmodel_animation = ServerViewmodelCallback;
@@ -473,14 +445,14 @@ void RunProjectilePhysics(Entity* ent)
 	Game* g = &game;
 	// update physics, detonate if ready
 	float dt = engine.tick_interval;
-	ent->velocity.y -= game.gravity * dt;// gravity
+	ent->velocity.y -= 12.f * dt;// gravity
 	glm::vec3 next_position = ent->position + ent->velocity * dt;
 	float len = glm::length(ent->velocity * dt);
 	RayHit rh;
 	Ray r;
 	r.dir = (ent->velocity * dt) / len;
 	r.pos = ent->position;
-	g->phys.TraceRay(r, &rh, ent->owner_index, Pf_All);
+	engine.phys.TraceRay(r, &rh, ent->owner_index, Pf_All);
 	//g->RayWorldIntersect(r, &rh, ent->owner_index, Pf_All);
 	if (rh.hit_world && rh.dist < len) {
 		ent->position = r.at(rh.dist) + rh.normal * 0.01f;
@@ -517,8 +489,8 @@ void PostEntUpdate(Entity* ent) {
 
 void Game::BuildPhysicsWorld(float time)
 {
-	phys.ClearObjs();
-	phys.AddLevel(level);
+	engine.phys.ClearObjs();
+	engine.phys.AddLevel(engine.level);
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		Entity& ce = engine.ents[i];
@@ -536,7 +508,7 @@ void Game::BuildPhysicsWorld(float time)
 		po.userindex = i;
 		po.player = true;
 
-		phys.AddObj(po);
+		engine.phys.AddObj(po);
 	}
 }
 

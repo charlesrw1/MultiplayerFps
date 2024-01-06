@@ -39,7 +39,6 @@ void Server::Init()
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
 
-	socket.Init(cfg_sv_port->integer);
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		clients.push_back(RemoteClient(this, i));
 
@@ -61,10 +60,10 @@ void Server::end()
 	for (int i = 0; i < clients.size(); i++)
 		clients[i].Disconnect();
 
-	game.ClearState();
 	active = false;
 	tick = 0;
 	simtime = 0.0;
+	socket.Shutdown();
 }
 
 void Server::start()
@@ -73,10 +72,9 @@ void Server::start()
 		end();
 	tick = 0;
 	simtime = 0.0;
+	socket.Init(cfg_sv_port->integer);
+
 	DebugOut("spawning with map %s\n", engine.mapname.c_str());
-	bool good = game.DoNewMap(engine.mapname.c_str());
-	if (!good)
-		return;
 	active = true;
 }
 bool Server::IsActive() const

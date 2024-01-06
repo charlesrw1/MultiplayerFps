@@ -26,7 +26,6 @@ ClientEntity* Client::GetLocalPlayer()
 void ClientGame::Init()
 {
 	entities.resize(MAX_GAME_ENTS);
-	level = nullptr;
 	particles.Init(this, &client);
 
 	thirdperson_camera = cfg.get_var("thirdperson_camera", "0", true);
@@ -37,22 +36,22 @@ void ClientGame::ClearState()
 		entities[i].active = false;
 		entities[i].ClearState();
 	}
-	phys.ClearObjs();
+	engine.phys.ClearObjs();
 	particles.ClearAll();
 
-	if(level)
-		FreeLevel(level);
-	level = nullptr;
+	if(engine.level)
+		FreeLevel(engine.level);
+	engine.level = nullptr;
 }
 void ClientGame::NewMap(const char* mapname)
 {
-	if (level) {
-		printf("Client: freeing level\n");
-		FreeLevel(level);
-		level = nullptr;
+	if (engine.level) {
+		printf("Client: freeing engine.level\n");
+		FreeLevel(engine.level);
+		engine.level = nullptr;
 	}
 	ClearState();	// cleansup game state
-	level = LoadLevelFile(mapname);
+	engine.level = LoadLevelFile(mapname);
 }
 
 void ClientGame::ComputeAnimationMatricies()
@@ -144,8 +143,8 @@ void MakeBulletEvent(vec3 start, vec3 end, bool tracer)
 
 void ClientGame::BuildPhysicsWorld()
 {
-	phys.ClearObjs();
-	phys.AddLevel(level);
+	engine.phys.ClearObjs();
+	engine.phys.AddLevel(engine.level);
 	
 	for (int i = 0; i < entities.size(); i++) {
 		ClientEntity& ce = entities[i];
@@ -167,7 +166,7 @@ void ClientGame::BuildPhysicsWorld()
 		po.userindex = i;
 		po.player = true;
 
-		phys.AddObj(po);
+		engine.phys.AddObj(po);
 	}
 }
 
@@ -183,7 +182,7 @@ void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand
 	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
 	move.simtime = cmd.tick * engine.tick_interval;
 	move.isclient = true;
-	move.phys = &phys;
+	move.phys = &engine.phys;
 	move.fire_weapon = ClientGameShootCallback;
 	move.set_viewmodel_animation = ClientSetViewmodelCallback;
 	move.play_sound = ClientPlaySoundCallback;

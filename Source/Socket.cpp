@@ -27,7 +27,7 @@ void IPAndPort::set(string net)
 		net.substr(0, colon);
 	}
 	if (net == "localhost") {
-		ip = 0;
+		ip = 127 << 24 | 1;
 		return;
 	}
 	std::stringstream s(net);

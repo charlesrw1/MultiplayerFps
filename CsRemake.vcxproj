@@ -32,6 +32,7 @@
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="source\ClientGame.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
+    <ClCompile Include="Source\Config.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="Source\External\imgui_demo.cpp" />
     <ClCompile Include="Source\External\imgui_draw.cpp" />

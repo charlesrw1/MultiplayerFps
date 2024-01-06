@@ -39,140 +39,7 @@ Engine_Config cfg;
 Media media;
 Game_Engine engine;
 
-Config_Var* Engine_Config::get_var(const char* name, const char* value, bool persist)
-{
-	Config_Var* var = find_var(name);
-	if (var) {
-		return var;
-	}
-
-	if (num_vars >= MAX_VARS) {
-		printf("Engine_Config::get_var Max Vars Reached\n");
-		return nullptr;
-	}
-	var = &vars[num_vars++];
-
-	var->name = name;
-	var->value = value;
-	var->persist = persist;
-	var->integer = std::atoi(value);
-	var->real = std::atof(value);
-	
-	return var;
-}
-void Engine_Config::set_var(const char* name, const char* value)
-{
-	Config_Var* var = find_var(name);
-	if (var) {
-		var->value = value;
-		var->integer = std::atoi(value);
-		var->real = std::atof(value);
-		return;
-	}
-	var = get_var(name, value, true);
-}
-
-void Engine_Config::set_command(const char* name, Engine_Cmd_Function cmd)
-{
-	if (find_cmd(name)) {
-		printf("Engine_Config::set_command Duplicate command %s\n", name);
-		return;
-	}
-	if (num_cmds >= MAX_CMDS) {
-		printf("Engine_Config::set_command Max commands reached\n");
-		return;
-	}
-	Engine_Cmd* command = &cmds[num_cmds++];
-	command->cmd = cmd;
-	command->name = name;
-}
-
-void tokenize_string(string& input, std::vector<string>& out)
-{
-	string token;
-	bool in_quotes = false;
-	for (char c : input) {
-		if (c == ' ' && !in_quotes) {
-			if (!token.empty()) {
-				out.push_back(token);
-				token.clear();
-			}
-		}
-		else if (c == '"') {
-			in_quotes = !in_quotes;
-			if (!token.empty()) {
-				out.push_back(token);
-				token.clear();
-			}
-		}
-		else {
-			token += c;
-		}
-	}
-	if (!token.empty()) {
-		out.push_back(token);
-		token.clear();
-	}
-}
-
-void Engine_Config::execute(string command)
-{
-	args.clear();
-	tokenize_string(command, args);
-	if (args.size() == 0) return;
-	Engine_Cmd* ec = find_cmd(args[0].c_str());
-	if (ec) {
-		ec->cmd();
-	}
-	else {
-		Config_Var* var = find_var(args[0].c_str());
-		if (var && args.size() == 1)
-			printf("%s %s\n", var->name, var->value);
-		else if (!var && args.size() == 1)
-			printf(__FUNCTION__": no Config_Var for %s\n", args[0].c_str());
-		else
-			set_var(args[0].c_str(), args[1].c_str());
-	}
-}
-
-void Engine_Config::execute_file(const char* filepath)
-{
-	std::ifstream infile(filepath);
-	if (!infile) {
-		printf(__FUNCTION__": couldn't open file\n");
-		return;
-	}
-	std::string line;
-	while (std::getline(infile, line)) {
-		if (line.empty())
-			continue;
-		if (line.at(0) == '#')
-			continue;
-		execute(line);
-	}
-}
-
-Config_Var* Engine_Config::find_var(const char* name)
-{
-	for (int i = 0; i < num_vars; i++) {
-		if (vars[i].name == name) return &vars[i];
-	}
-	return nullptr;
-}
-Engine_Cmd* Engine_Config::find_cmd(const char* name)
-{
-	for (int i = 0; i < num_cmds; i++) {
-		if (cmds[i].name == name) return &cmds[i];
-	}
-	return nullptr;
-}
-
 static double program_time_start;
-static bool update_camera = false;
-const char* map_file = "test_level2.glb";
-
-const char* map_file_names[] = { "creek.glb","maze.glb","nuke.glb" };
-
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -279,12 +146,13 @@ void ClientGame::UpdateCamera()
 
 	if (thirdperson_camera->integer) {
 		ClientEntity* player = client.GetLocalPlayer();
+		Entity& playerreal = engine.ents[0];
 
 		vec3 view_angles = engine.local.view_angles;
 
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
-		fly_cam.position = player->interpstate.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 4.5f;
+		fly_cam.position = playerreal.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 4.5f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
 		setup.viewproj = setup.proj_mat * setup.view_mat;
 		setup.viewfront = front;
@@ -335,7 +203,8 @@ void Game_Engine::make_move()
 	command.tick = tick;
 
 	if (!game_focused) {
-		local.get_command(client.GetCurrentSequence()) = command;
+		if(is_host) local.last_command = command;
+		else local.get_command(client.GetCurrentSequence()) = command;
 		return;
 	}
 
@@ -367,7 +236,8 @@ void Game_Engine::make_move()
 	command.up_move			= MoveCommand::unquantize(MoveCommand::quantize(command.up_move));
 	
 	// FIXME:
-	local.get_command(client.GetCurrentSequence()) = command;
+	if(is_host) local.last_command = command;
+	else local.get_command(client.GetCurrentSequence()) = command;
 }
 
 void Game_Engine::init_sdl_window()
@@ -468,17 +338,11 @@ struct RenderFBOs
 class Renderer
 {
 public:
-	struct DrawEntry {
-		const Model* m;
-		const Animator* a;
-		mat4 matrix;
-	};
-
 	void Init();
 	void FrameDraw();
 
-	void DrawTexturedQuad();
-	void DrawText();
+	void draw_text();
+	void draw_rect();
 
 	void DrawModel(const Model* m, mat4 transform, const Animator* a = nullptr);
 	void AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Color32 color);
@@ -539,7 +403,7 @@ void Renderer::InitGlState()
 	glDepthFunc(GL_LEQUAL);
 }
 
-Renderer rndr;
+Renderer draw;
 
 void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 {
@@ -726,7 +590,7 @@ void Renderer::FrameDraw()
 	simple.set_mat4("Model", mat4(1.f));
 
 	if(cfg_draw_collision_tris->integer)
-		DrawCollisionWorld(cgame->level);
+		DrawCollisionWorld(engine.level);
 
 	mb.Draw(GL_LINES);
 	game.rays.End();
@@ -758,7 +622,7 @@ void Renderer::DrawEntBlobShadows()
 		Ray r;
 		r.pos = s->position + glm::vec3(0,0.1f,0);
 		r.dir = glm::vec3(0, -1, 0);
-		cgame->phys.TraceRay(r, &rh, i, Pf_World);
+		engine.phys.TraceRay(r, &rh, i, Pf_World);
 
 		if (rh.dist < 0)
 			continue;
@@ -871,7 +735,7 @@ void Renderer::DrawLevel()
 	static_wrld.use();
 	SetStdShaderConstants(&static_wrld);
 
-	const Level* level = cgame->level;
+	const Level* level = engine.level;
 	for (int m = 0; m < level->render_data.instances.size(); m++) {
 		const Level::StaticInstance& sm = level->render_data.instances[m];
 		ASSERT(level->render_data.embedded_meshes[sm.model_index]);
@@ -956,15 +820,22 @@ void cmd_bind()
 		engine.bind_key(scancode, args[2].c_str());
 }
 
+void cmd_server_end()
+{
+	engine.exit_map();
+}
 void cmd_client_connect()
 {
 	auto& args = cfg.get_arg_list();
 	if (args.size() < 2) return;
+
+	if (engine.is_host)
+		cmd_server_end();
+
 	IPAndPort ip;
 	ip.set(args.at(1));
 	if (ip.port == 0) ip.port = DEFAULT_SERVER_PORT;
 	client.Connect(ip);
-
 }
 void cmd_client_disconnect()
 {
@@ -980,12 +851,7 @@ void cmd_load_map()
 		printf(__FUNCTION__": needs map\n");
 	}
 
-	engine.mapname = cfg.get_arg_list().at(1);
-	server.start();
-}
-void cmd_server_end()
-{
-	server.end();
+	engine.start_map(cfg.get_arg_list().at(1));
 }
 void cmd_game_input_callback()
 {
@@ -1018,12 +884,36 @@ void Game_Engine::start_map(string map)
 	// starting new map
 	mapname = map;
 	FreeLevel(level);
-	level = LoadLevelFile(mapname.c_str());
 	phys.ClearObjs();
-
-
+	for (int i = 0; i < MAX_GAME_ENTS; i++)
+		ents[i] = Entity();
+	num_entities = 0;
+	level = LoadLevelFile(mapname.c_str());
+	if (!level) 
+		return;
+	
 	server.start();
+
+	engine.is_host = true;
+	engine.engine_state = SPAWNED;
+
+	server.connect_local_client();
+	client.server_mgr.force_into_local_game();
 }
+
+void Game_Engine::exit_map()
+{
+	FreeLevel(level);
+	level = nullptr;
+
+	server.end();
+
+	engine_state = MAINMENU;
+	is_host = false;
+	client.Disconnect();
+
+}
+
 
 void Game_Engine::key_event(SDL_Event event)
 {
@@ -1077,8 +967,9 @@ void Game_Engine::draw_screen()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	glClear(GL_COLOR_BUFFER_BIT);
 	if (engine_state == SPAWNED)
-		rndr.FrameDraw();
+		draw.FrameDraw();
 	glCheckError();
 	SDL_GL_SwapWindow(window);
 	glCheckError();
@@ -1114,11 +1005,12 @@ void DummyUpdate(Entity* e);
 void GrenadeUpdate(Entity* e);
 
 
-void Game_Engine::update_game()
+void Game_Engine::update_game_tick()
 {
-	build_physics_world(0.f);
+	// update local player
+	game.ExecutePlayerMove(&ents[0], local.last_command);
+	game.BuildPhysicsWorld(0.f);
 
-	double dt = engine.tick_interval;
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		Entity* e = &ents[i];
 		if (e->type == Ent_Free)
@@ -1162,8 +1054,8 @@ void Game_Engine::init()
 	
 	// engine commands
 	cfg.set_command("connect", cmd_client_connect);
-	cfg.set_command("client_reconnect", cmd_client_reconnect);
-	cfg.set_command("client_disconnect", cmd_client_disconnect);
+	cfg.set_command("reconnect", cmd_client_reconnect);
+	cfg.set_command("disconnect", cmd_client_disconnect);
 	cfg.set_command("map", cmd_load_map);
 	cfg.set_command("sv_end", cmd_server_end);
 	cfg.set_command("bind", cmd_bind);
@@ -1173,7 +1065,7 @@ void Game_Engine::init()
 	// engine initilization
 	init_sdl_window();
 	network_init();
-	rndr.Init();
+	draw.Init();
 	LoadMediaFiles();
 
 	client.Init();
@@ -1189,9 +1081,10 @@ void Game_Engine::init()
 
 	// key binds
 	bind_key(SDL_SCANCODE_Y, "thirdperson_camera 0");
-	bind_key(SDL_SCANCODE_2, "client_reconnect");
-	bind_key(SDL_SCANCODE_1, "client_disconnect");
+	bind_key(SDL_SCANCODE_2, "reconnect");
+	bind_key(SDL_SCANCODE_1, "disconnect");
 	bind_key(SDL_SCANCODE_3, "sv_end");
+
 
 	cfg.execute_file("vars.txt");	// load config vars
 	cfg.execute_file("init.txt");	// load startup script
@@ -1284,22 +1177,24 @@ void Game_Engine::loop()
 			if(engine_state >= LOADING)
 				make_move();
 			
-			//if(!is_host)
-			client.server_mgr.SendMovesAndMessages();
-
-			if (client.GetConState() == Disconnected && server.active) {
-				// connect to the local server
-				IPAndPort serv_addr;
-				serv_addr.SetIp(127, 0, 0, 1);
-				serv_addr.port = cfg.find_var("host_port")->integer;
-				client.Connect(serv_addr);
+			if (!is_host) {
+				client.server_mgr.SendMovesAndMessages();
+				//if (client.GetConState() == Disconnected && server.active) {
+				//	// connect to the local server
+				//	IPAndPort serv_addr;
+				//	serv_addr.SetIp(127, 0, 0, 1);
+				//	serv_addr.port = cfg.find_var("host_port")->integer;
+				//	client.Connect(serv_addr);
+				//}
+				client.server_mgr.TrySendingConnect();
 			}
-			client.server_mgr.TrySendingConnect();
 
-			if (server.active) {
+			if (is_host) {
 				server.simtime = tick * engine.tick_interval;
 				server.ReadPackets();
-				game.Update();
+
+				update_game_tick();
+
 				server.BuildSnapshotFrame();
 				for (int i = 0; i < server.clients.size(); i++)
 					server.clients[i].Update();
@@ -1310,19 +1205,20 @@ void Game_Engine::loop()
 				client.tick += 1;
 				client.time = client.tick * engine.tick_interval;
 			}
-			client.server_mgr.ReadPackets();
-			client.RunPrediction();
 
-			switch (client.GetConState()) {
-			case Disconnected: 
-			case TryingConnect:engine_state = MAINMENU; break;
-			case Connected: engine_state = LOADING; break;
-			case Spawned: engine_state = SPAWNED; break;
+			if (!is_host) {
+				client.server_mgr.ReadPackets();
+				client.RunPrediction();
+				switch (client.GetConState()) {
+				case Disconnected: 
+				case TryingConnect:engine_state = MAINMENU; break;
+				case Connected: engine_state = LOADING; break;
+				case Spawned: engine_state = SPAWNED; break;
+				}
 			}
 		}
 		pre_render_update();
 		draw_screen();
-		
 	}
 }
 
@@ -1330,7 +1226,8 @@ void Game_Engine::pre_render_update()
 {
 	if (engine_state == SPAWNED) {
 		// interpolate entities for rendering
-		client.cl_game.InterpolateEntStates();
+		if(!is_host)
+			client.cl_game.InterpolateEntStates();
 
 		//cl_game.ComputeAnimationMatricies();
 		for (int i = 0; i < MAX_GAME_ENTS; i++) {

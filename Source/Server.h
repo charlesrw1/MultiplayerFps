@@ -17,14 +17,15 @@
 class Model;
 struct Entity
 {
-	EntType type = Ent_Free;
-	short id = 0;
-
 	int index = 0;
+
+	// Entity State Vars
+	EntType type = Ent_Free;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
-	float scale = 0.f;
+	int model_index = 0;	// index into media.gamemodels
 
+	float scale = 0.f;
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
 	bool ducking = false;
@@ -41,7 +42,6 @@ struct Entity
 	int health = 100;
 	ItemState wpns;
 
-	int model_index = 0;	// index into media.gamemodels
 
 	Animator anim;
 	const Model* model = nullptr;
@@ -65,8 +65,6 @@ public:
 	const static int GV_BUFFER_SIZE = 256;
 
 	void Init();
-	void ClearState();
-	bool DoNewMap(const char* mapname);
 	void Update();
 
 	void SpawnNewClient(int clientnum);
@@ -88,12 +86,6 @@ public:
 	Entity* EntForIndex(int index);
 
 	MeshBuilder rays;
-
-	bool paused = false;
-	float gravity = 12.f;
-
-	PhysicsWorld phys;
-	const Level* level = nullptr;
 private:
 	int GetEntIndex(Entity* ent) const;
 	Entity* InitNewEnt(EntType type, int index);

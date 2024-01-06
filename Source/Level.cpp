@@ -258,6 +258,7 @@ Level* LoadLevelFile(const char* level_name)
 
 void FreeLevel(const Level* level)
 {
+	if (!level) return;
 	ASSERT(level->ref_count != 0);
 	int i = 0;
 	for (; i < loaded_levels.size(); i++) {

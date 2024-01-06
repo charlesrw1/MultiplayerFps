@@ -1,1 +1,1 @@
-.\x64\Debug\CsRemake.exe -client
+.\x64\Debug\CsRemake.exe -connect localhost

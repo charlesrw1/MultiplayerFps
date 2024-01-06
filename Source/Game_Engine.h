@@ -4,23 +4,24 @@
 
 using std::vector;
 
-class Local_State
-{
-public:
-	vec3 view_angles;
-	vector<MoveCommand> commands;
-
-	void init();
-	MoveCommand& get_command(int sequence) {
-		return commands.at(sequence % commands.size());
-	}
-};
-
 enum Engine_State
 {
 	MAINMENU,
 	LOADING,
 	SPAWNED,
+};
+
+class Local_State
+{
+public:
+	vec3 view_angles;
+	vector<MoveCommand> commands;
+	MoveCommand last_command;
+
+	void init();
+	MoveCommand& get_command(int sequence) {
+		return commands.at(sequence % commands.size());
+	}
 };
 
 
@@ -33,9 +34,10 @@ public:
 	void draw_screen();
 
 	void start_map(string map);
+	void exit_map();
 
 	void build_physics_world(float time);
-	void update_game();
+	void update_game_tick();
 	void execute_player_move(Entity* ent, MoveCommand cmd);
 
 	void pre_render_update();

@@ -110,12 +110,10 @@ public:
 	void BuildPhysicsWorld();
 
 	Random rand;	// only use for client-side effects
-	PhysicsWorld phys;
+	//PhysicsWorld phys;
 	ParticleMgr particles;
 
 	std::vector<ClientEntity> entities;	// client side data
-
-	const Level* level = nullptr;
 public:
 	bool ShouldDrawViewModel() {
 		return !thirdperson_camera->integer;
@@ -156,6 +154,11 @@ public:
 	ClServerMgr();
 	void Init(Client* parent);
 
+	void force_into_local_game() {
+		client_num = 0;
+		state = Spawned;
+		server.Init(&sock, IPAndPort());
+	}
 
 	void Connect(const IPAndPort& port);
 	void Disconnect();
