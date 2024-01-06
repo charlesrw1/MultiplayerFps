@@ -1,6 +1,6 @@
 #include "Server.h"
 #include "Util.h"
-#include "CoreTypes.h"
+#include "Game_Engine.h"
 #include "Model.h"
 #include <cstdarg>
 
@@ -49,7 +49,7 @@ void Server::Init()
 		cfg.set_var("tick_rate", "150.0");
 
 	// initialize tick_interval here
-	core.tick_interval = 1.0 / cfg_tick_rate->real;
+	engine.tick_interval = 1.0 / cfg_tick_rate->real;
 
 }
 void Server::End()
@@ -89,7 +89,7 @@ void Server::FixedUpdate(double dt)
 {
 	if (!IsActive())
 		return;
-	simtime = tick * core.tick_interval;
+	simtime = tick * engine.tick_interval;
 	ReadPackets();
 	game.Update();
 	BuildSnapshotFrame();

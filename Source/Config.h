@@ -37,7 +37,12 @@ public:
 	void execute_file(const char* path);
 
 	// called by Engine_Cmd_Function callbacks
-	const std::vector<string>& get_arg_list();
+	const std::vector<string>& get_arg_list() { return args; }
+	void print_vars() {
+		for (int i = 0; i < num_vars; i++) {
+			printf("%--36s %s\n", vars[i].name.c_str(), vars[i].value.c_str());
+		}
+	}
 private:
 	Engine_Cmd* find_cmd(const char* name);
 

@@ -6,7 +6,6 @@
 	do { if(!(x)) {	\
 	printf("Assertion failed: %s", #x); std::abort(); \
 	} }while (0);
-
 bool CheckGlErrorInternal_(const char* file, int line);
 #define glCheckError() CheckGlErrorInternal_(__FILE__,__LINE__)
 double GetTime();

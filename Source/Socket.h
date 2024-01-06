@@ -2,7 +2,7 @@
 #define SOCKET123_H
 #include <cstdint>
 #include <string>
-
+using std::string;
 class IPAndPort
 {
 public:
@@ -11,6 +11,8 @@ public:
 	void SetIp(int a, int b, int c, int d) {
 		ip = a << 24 | b << 16 | c << 8 | d;
 	}
+	void set(string net);
+
 	std::string ToString() const;
 	// Host byte order
 	unsigned int ip = 0;
@@ -37,7 +39,7 @@ public:
 	uintptr_t handle = -1;
 };
 
-void NetworkInit();
+void network_init();
 void NetworkQuit();
 
 

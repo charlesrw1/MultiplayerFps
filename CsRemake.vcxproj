@@ -60,6 +60,7 @@
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
+    <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\Particles.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
@@ -67,7 +68,7 @@
     <ClInclude Include="Source\Media.h" />
     <ClInclude Include="Source\Movement.h" />
     <ClInclude Include="Source\Net.h" />
-    <ClInclude Include="Source\CoreTypes.h" />
+    <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\MoveCommand.h" />
     <ClInclude Include="Source\Bytepacker.h" />
     <ClInclude Include="Source\Connection.h" />

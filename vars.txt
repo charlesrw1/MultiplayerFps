@@ -4,7 +4,6 @@ snapshot_rate 15.0
 interp_time 0.1
 fake_lag 100
 fake_loss 0
-host_port 47000
 
 #phys vars
 max_ground_speed 10.0

@@ -170,7 +170,7 @@
     <ClInclude Include="Source\MathLib.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\CoreTypes.h">
+    <ClInclude Include="Source\Types.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\GlmInclude.h">
@@ -190,6 +190,9 @@
     </ClInclude>
     <ClInclude Include="Source\Particles.h">
       <Filter>Source Files\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game_Engine.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

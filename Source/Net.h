@@ -1,7 +1,6 @@
 #ifndef NET_H
 #define NET_H
 
-#include "Socket.h"
 #include "Bytepacker.h"
 #include "Connection.h"
 #include "MoveCommand.h"
@@ -164,6 +163,7 @@ struct GameEvent
 	uint8_t num_params = 0;
 	uint8_t params[MAX_PARAMS];
 };
+
 
 // in serverclmgr for now
 bool WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg);

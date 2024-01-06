@@ -1,6 +1,6 @@
 #include "Connection.h"
 #include "Util.h"
-#include "CoreTypes.h"
+#include "Types.h"
 
 
 static unsigned ReadInt(const uint8_t* data)

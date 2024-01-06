@@ -1,7 +1,7 @@
 #include "Net.h"
 #include "Util.h"
 #include "Client.h"
-#include "CoreTypes.h"
+#include "Game_Engine.h"
 #include "Movement.h"
 #include "MeshBuilder.h"
 #include "Media.h"
@@ -99,8 +99,11 @@ void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 
 void Client::DoViewAngleUpdate()
 {
-	float x_off = core.input.mouse_delta_x;
-	float y_off = core.input.mouse_delta_y;
+	int x, y;
+	SDL_GetRelativeMouseState(&x, &y);
+
+	float x_off = x;
+	float y_off = y;
 	x_off *= cfg_mouse_sensitivity->real;
 	y_off *= cfg_mouse_sensitivity->real;
 
@@ -114,14 +117,14 @@ void Client::DoViewAngleUpdate()
 
 void Client::CreateMoveCmd()
 {
-	if (core.mouse_grabbed) {
+	if (engine.game_focused) {
 		DoViewAngleUpdate();
 	}
 
 	MoveCommand new_cmd{};
 	new_cmd.view_angles = view_angles;
 
-	bool* keys = core.input.keyboard;
+	bool* keys = engine.keys;
 	if (keys[SDL_SCANCODE_W])
 		new_cmd.forward_move += 1.f;
 	if (keys[SDL_SCANCODE_S])
@@ -205,7 +208,7 @@ void Client::FixedUpdateRead(double dt)
 		return;
 	if (GetConState() == Spawned) {
 		client.tick += 1;
-		client.time = client.tick * core.tick_interval;
+		client.time = client.tick * engine.tick_interval;
 	}
 	server_mgr.ReadPackets();
 	RunPrediction();
@@ -360,7 +363,7 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 void Client::SetNewTickRate(float tick_rate)
 {
 	if (!IsServerActive()) {
-		core.tick_interval = 1.0 / tick_rate;
+		engine.tick_interval = 1.0 / tick_rate;
 	}
 }
 

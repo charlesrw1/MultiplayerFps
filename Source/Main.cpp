@@ -21,7 +21,8 @@
 #include "Level.h"
 #include "Physics.h"
 #include "Net.h"
-#include "CoreTypes.h"
+#include "Game_Engine.h"
+#include "Types.h"
 #include "Client.h"
 #include "Server.h"
 #include "Movement.h"
@@ -34,9 +35,9 @@
 
 ImGuiContext* imgui_ctx;
 MeshBuilder phys_debug;
-Core core;
 Engine_Config cfg;
 Media media;
+Game_Engine engine;
 
 Config_Var* Engine_Config::get_var(const char* name, const char* value, bool persist)
 {
@@ -172,13 +173,6 @@ const char* map_file = "test_level2.glb";
 
 const char* map_file_names[] = { "creek.glb","maze.glb","nuke.glb" };
 
-void InitDebugInterface()
-{
-	imgui_ctx = ImGui::CreateContext();
-	ImGui::SetCurrentContext(imgui_ctx);
-	ImGui_ImplSDL2_InitForOpenGL(core.window, core.context);
-	ImGui_ImplOpenGL3_Init();
-}
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {
@@ -222,19 +216,10 @@ bool IsClientActive()
 	return client.initialized;
 }
 
-static void Cleanup()
-{
-	FreeLoadedModels();
-	FreeLoadedTextures();
-	NetworkQuit();
-	SDL_GL_DeleteContext(core.context);
-	SDL_DestroyWindow(core.window);
-	//SDL_Quit();
-}
 void Quit()
 {
 	printf("Quiting...\n");
-	Cleanup();
+	engine.cleanup();
 	exit(0);
 }
 void Fatalf(const char* format, ...)
@@ -244,7 +229,7 @@ void Fatalf(const char* format, ...)
 	vprintf(format, list);
 	va_end(list);
 	fflush(stdout);
-	Cleanup();
+	engine.cleanup();
 	exit(-1);
 }
 double GetTime()
@@ -280,20 +265,19 @@ void ClientGame::UpdateCamera()
 
 	vec3 true_front = AnglesToVector(true_viewangles.x, true_viewangles.y);
 
-	setup.height = core.vid_height;
-	setup.width = core.vid_width;
+	setup.height = engine.window_h->integer;
+	setup.width = engine.window_w->integer;
 	setup.viewfov = fov;
 	setup.x = setup.y = 0;
 	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
 	setup.near = z_near;
 	setup.far = z_far;
-	Core::InputState& input = core.input;
 
-	if (update_camera) {
-		fly_cam.UpdateFromInput(input.keyboard, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
-	}
+	//if (update_camera) {
+	//	fly_cam.UpdateFromInput(engine.keys, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
+	//}
 
-	if (third_person) {
+	if (thirdperson_camera->integer) {
 		ClientEntity* player = client.GetLocalPlayer();
 		vec3 front = AnglesToVector(client.view_angles.x, client.view_angles.y);
 		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
@@ -325,13 +309,13 @@ static void SDLError(const char* msg)
 	exit(-1);
 }
 
-void CreateWindow(int x, int y)
+void Game_Engine::init_sdl_window()
 {
-	if (core.window)
-		return;
+	ASSERT(!window);
 
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
-		SDLError("SDL init failed");
+		printf(__FUNCTION__": %s\n", SDL_GetError());
+		exit(-1);
 	}
 
 	program_time_start = GetTime();
@@ -342,14 +326,15 @@ void CreateWindow(int x, int y)
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-	core.window = SDL_CreateWindow("CsRemake", x, y, 
-		core.vid_width, core.vid_height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	if (core.window == nullptr) {
-		SDLError("SDL failed to create window");
+	window = SDL_CreateWindow("CsRemake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		window_w->integer, window_h->integer, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	if (!window) {
+		printf(__FUNCTION__": %s\n", SDL_GetError());
+		exit(-1);
 	}
 
-	core.context = SDL_GL_CreateContext(core.window);
-	printf("OpenGL loaded\n");
+	gl_context = SDL_GL_CreateContext(window);
+	printf(__FUNCTION__": OpenGL loaded\n");
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
 	printf("Vendor: %s\n", glGetString(GL_VENDOR));
 	printf("Renderer: %s\n", glGetString(GL_RENDERER));
@@ -456,6 +441,7 @@ public:
 	Config_Var* cfg_draw_collision_tris;
 	Config_Var* cfg_draw_sv_colliders;
 	Config_Var* cfg_draw_viewmodel;
+	Config_Var* cfg_vsync;
 private:
 	void InitGlState();
 	void InitFramebuffers();
@@ -574,8 +560,9 @@ void Renderer::Init()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	cfg_draw_collision_tris = cfg.get_var("draw_collision_tris", "0");
-	cfg_draw_sv_colliders = cfg.get_var("draw_sv_colliders", "0");
-	cfg_draw_viewmodel = cfg.get_var("draw_viewmodel", "1");
+	cfg_draw_sv_colliders	= cfg.get_var("draw_sv_colliders", "0");
+	cfg_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
+	cfg_vsync				= cfg.get_var("vsync", "0");
 
 	fbo.scene = fbo.ssao = 0;
 	textures.scene_color = textures.scene_depthstencil = textures.ssao_color = 0;
@@ -586,8 +573,8 @@ void Renderer::Init()
 
 void Renderer::InitFramebuffers()
 {
-	const int s_w = core.vid_width;
-	const int s_h = core.vid_height;
+	const int s_w = engine.window_w->integer;
+	const int s_h = engine.window_h->integer;
 
 	glDeleteTextures(1, &textures.scene_color);
 	glGenTextures(1, &textures.scene_color);
@@ -639,7 +626,7 @@ void Renderer::FrameDraw()
 {
 	cur_shader = 0;
 	cur_img_1 = 0;
-	if (cur_w != core.vid_width || cur_h != core.vid_height)
+	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
 		InitFramebuffers();
 
 	vs = cgame->GetSceneView();
@@ -802,7 +789,7 @@ void Renderer::DrawEnts()
 		if (!ent.model)
 			continue;
 
-		if (i == client.GetPlayerNum() && !cgame->third_person)
+		if (i == client.GetPlayerNum() && !cgame->thirdperson_camera->integer)
 			continue;
 
 		EntityState* cur = &ent.interpstate;
@@ -890,49 +877,54 @@ void LoadMediaFiles()
 	media.blobshadow = FindOrLoadTexture("blob_shadow_temp.png");
 }
 
-void DrawScreen(double dt)
+
+void cmd_quit()
 {
-	glCheckError();
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	if (client.IsInGame())
-		rndr.FrameDraw();
-	glCheckError();
-	SDL_GL_SwapWindow(core.window);
-	glCheckError();
-
+	Quit();
+}
+void cmd_bind()
+{
+	auto& args = cfg.get_arg_list();
+	if (args.size() < 2) return;
+	int scancode = SDL_GetScancodeFromName(args[1].c_str());
+	if (scancode == SDL_SCANCODE_UNKNOWN) return;
+	if (args.size() < 3)
+		engine.bind_key(scancode, "");
+	else
+		engine.bind_key(scancode, args[2].c_str());
 }
 
-
-bool using_arrows_to_select_map = false;
-int map_selection = 0;
-
-bool DoMapSelect(SDL_Scancode key)
+void cmd_client_connect()
 {
-	if (key == SDL_SCANCODE_SLASH) {
-		using_arrows_to_select_map = !using_arrows_to_select_map;
-		printf("selecting map: %s\n", (using_arrows_to_select_map) ? "on" : "off");
-		return true;
+	auto& args = cfg.get_arg_list();
+	if (args.size() < 2) return;
+	IPAndPort ip;
+	ip.set(args.at(1));
+	if (ip.port == 0) ip.port = DEFAULT_SERVER_PORT;
+	client.Connect(ip);
+
+}
+void cmd_client_disconnect()
+{
+	client.Disconnect();
+}
+void cmd_client_reconnect()
+{
+	client.Reconnect();
+}
+void cmd_load_map()
+{
+	if (cfg.get_arg_list().size() < 2) {
+		printf(__FUNCTION__": needs map\n");
 	}
-	if (!using_arrows_to_select_map)
-		return false;
-	int map_select_old = map_selection;
-	if (key == SDL_SCANCODE_LEFT)
-		map_selection--;
-	if (key == SDL_SCANCODE_RIGHT)
-		map_selection++;
-	if (map_selection < 0) map_selection = 0;
-	else if (map_selection >= sizeof(map_file_names) / sizeof(char*)) map_selection = (sizeof(map_file_names) / sizeof(char*)-1);
-	if (map_select_old != map_selection) {
-		printf("map selected: %s\n", map_file_names[map_selection]);
-	}
-	return true;
+	server.Spawn(cfg.get_arg_list().at(1).c_str());
+}
+void cmd_server_end()
+{
+	server.End();
 }
 
-static Config_Var* host_port;
-
-
+#if 0
 void HandleInput()
 {
 	Core::InputState& input = core.input;
@@ -1017,7 +1009,6 @@ void HandleInput()
 	}
 }
 
-
 void MainLoop(double frametime)
 {
 	double secs_per_tick = core.tick_interval;
@@ -1033,70 +1024,202 @@ void MainLoop(double frametime)
 	}
 	
 	client.PreRenderUpdate(frametime);
-	DrawScreen(frametime);
+	//DrawScreen(frametime);
 }
+#endif
 
-static bool run_client_only = false;
 int main(int argc, char** argv)
 {
-	printf("Starting game\n");
+	printf("Starting engine...\n");
 
-	int starth = DEFAULT_HEIGHT;
-	int startw = DEFAULT_WIDTH;
+	engine.argc = argc;
+	engine.argv = argv;
+	engine.init();
+
+	//CreateWindow(startx,starty);
+	//cfg.execute_file("config.ini");
+	//host_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	//cfg.set_var("max_ground_speed", "10.0");
+
+	//network_init();
+	//rndr.Init();
+	//LoadMediaFiles();
+	//InitDebugInterface();
+
+	//if (!run_client_only) {
+	//	server.Init();
+	//	server.Spawn(map_file);
+	//}
+	//
+	//client.Init();
+	//
+	//if (run_client_only) {
+	//	printf("Running client only\n");
+	//	IPAndPort ip;
+	//	ip.SetIp(127, 0, 0, 1);
+	//	ip.port = DEFAULT_SERVER_PORT;
+	//
+	//	client.Connect(ip);
+	//}
+
+
+	engine.loop();
+
+	engine.cleanup();
+	
+	return 0;
+}
+
+void Game_Engine::key_event(SDL_Event event)
+{
+	if (event.type == SDL_KEYDOWN) {
+		int scancode = event.key.keysym.scancode;
+		keys[scancode] = true;
+
+		if (binds[scancode]) {
+			cfg.execute(*binds[scancode]);
+		}
+	}
+	else if (event.type == SDL_KEYUP) {
+		keys[event.key.keysym.scancode] = false;
+	}
+	else if (event.type == SDL_MOUSEBUTTONDOWN) {
+		SDL_SetRelativeMouseMode(SDL_TRUE);
+		int x, y;
+		SDL_GetRelativeMouseState(&x, &y);
+		engine.game_focused = true;
+	}
+	else if (event.type == SDL_MOUSEBUTTONUP) {
+		SDL_SetRelativeMouseMode(SDL_FALSE);
+		engine.game_focused = false;
+	}
+}
+
+void Game_Engine::bind_key(int key, string command)
+{
+	ASSERT(key >= 0 && key < SDL_NUM_SCANCODES);
+	if (!binds[key])
+		binds[key] = new string;
+	*binds[key] = std::move(command);
+}
+
+void Game_Engine::cleanup()
+{
+	FreeLoadedModels();
+	FreeLoadedTextures();
+	NetworkQuit();
+	SDL_GL_DeleteContext(gl_context);
+	SDL_DestroyWindow(window);
+
+	for (int i = 0; i < SDL_NUM_SCANCODES; i++) {
+		delete binds[i];
+	}
+}
+
+void Game_Engine::draw_screen()
+{
+	glCheckError();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	if (client.IsInGame())
+		rndr.FrameDraw();
+	glCheckError();
+	SDL_GL_SwapWindow(window);
+	glCheckError();
+}
+
+void Game_Engine::init()
+{
+	memset(keys, 0, sizeof(keys));
+	memset(binds, 0, sizeof(binds));
+	num_entities = 0;
+	level = nullptr;
+	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
+
+	// config vars
+	window_w			= cfg.get_var("window_w", "1200", true);
+	window_h			= cfg.get_var("window_h", "800", true);
+	window_fullscreen	= cfg.get_var("window_fullscreen", "0", true);
+	host_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	cfg.set_var("max_ground_speed", "10.0");	// ???
+
+	
+	// engine commands
+	cfg.set_command("connect", cmd_client_connect);
+	cfg.set_command("client_reconnect", cmd_client_reconnect);
+	cfg.set_command("client_disconnect", cmd_client_disconnect);
+	cfg.set_command("map", cmd_load_map);
+	cfg.set_command("server_end", cmd_server_end);
+	cfg.set_command("bind", cmd_bind);
+	cfg.set_command("quit", cmd_quit);
+
+	
+	// engine initilization
+	init_sdl_window();
+	network_init();
+	rndr.Init();
+	LoadMediaFiles();
+
+	client.Init();
+	server.Init();
+
+	// debug interface
+	imgui_ctx = ImGui::CreateContext();
+	ImGui::SetCurrentContext(imgui_ctx);
+	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+	ImGui_ImplOpenGL3_Init();
+
+	// key binds
+	bind_key(SDL_SCANCODE_T, "thirdperson_camera 1");
+	bind_key(SDL_SCANCODE_Y, "thirdperson_camera 0");
+	bind_key(SDL_SCANCODE_2, "client_reconnect");
+	bind_key(SDL_SCANCODE_1, "client_disconnect");
+	bind_key(SDL_SCANCODE_3, "server_end");
+
+	cfg.execute_file("vars.txt");	// load config vars
+	cfg.execute_file("init.txt");	// load startup script
+
+
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
-
+	std::vector<string> buffered_commands;
 	for (int i = 1; i < argc; i++)
 	{
-		if (strcmp(argv[i], "-client") == 0)
-			run_client_only = true;
-		else if (strcmp(argv[i], "-x") == 0) {
+		if (strcmp(argv[i], "-x") == 0) {
 			startx = atoi(argv[++i]);
 		}
 		else if (strcmp(argv[i], "-y") == 0) {
 			starty = atoi(argv[++i]);
 		}
 		else if (strcmp(argv[i], "-w") == 0) {
-			startw = atoi(argv[++i]);
+			cfg.set_var("window_w", argv[++i]);
 		}
 		else if (strcmp(argv[i], "-h") == 0) {
-			starth = atoi(argv[++i]);
+			cfg.set_var("window_h", argv[++i]);
+		}
+		else if (argv[i][0] == '-') {
+			string cmd;
+			cmd += argv[i++][1];
+			while (i < argc && argv[i][0] != '-') {
+				cmd += ' ';
+				cmd += argv[i++];
+			}
+			buffered_commands.push_back(cmd);
 		}
 	}
-	core.vid_width = startw;
-	core.vid_height = starth;
-	core.tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 
-	CreateWindow(startx,starty);
+	SDL_SetWindowPosition(window, startx, starty);
+	SDL_SetWindowSize(window, window_w->integer, window_h->integer);
+	for (const auto& cmd : buffered_commands)
+		cfg.execute(cmd);
 
-	cfg.execute_file("config.ini");
-	host_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-	cfg.set_var("max_ground_speed", "10.0");
+	cfg.print_vars();
+}
 
-	NetworkInit();
-	rndr.Init();
-	LoadMediaFiles();
-	InitDebugInterface();
-
-	if (!run_client_only) {
-		server.Init();
-		server.Spawn(map_file);
-	}
-
-	client.Init();
-
-	if (run_client_only) {
-		printf("Running client only\n");
-		IPAndPort ip;
-
-		ip.SetIp(127, 0, 0, 1);
-		ip.port = host_port->integer;
-
-		client.Connect(ip);
-	}
-
-
-	double last = GetTime()-0.1;
+void Game_Engine::loop()
+{
+	double last = GetTime() - 0.1;
 	for (;;)
 	{
 		double now = GetTime();
@@ -1104,9 +1227,38 @@ int main(int argc, char** argv)
 		last = now;
 		if (dt > 0.1)
 			dt = 0.1;
-		core.frame_time = dt;
-		MainLoop(dt);
+		frame_time = dt;
+
+		SDL_Event event;
+		while (SDL_PollEvent(&event))
+		{
+			switch (event.type) {
+			case SDL_QUIT:
+				::Quit();
+				break;
+			case SDL_KEYUP:
+			case SDL_KEYDOWN:
+			case SDL_MOUSEBUTTONDOWN:
+			case SDL_MOUSEBUTTONUP:
+			case SDL_MOUSEWHEEL:
+				key_event(event);
+				break;
+			}
+		}
+
+		double secs_per_tick = tick_interval;
+		frame_remainder += dt;
+		int num_ticks = (int)floor(frame_remainder / secs_per_tick);
+		frame_remainder -= num_ticks * secs_per_tick;
+
+		for (int i = 0; i < num_ticks; i++)
+		{
+			client.FixedUpdateInput(secs_per_tick);
+			server.FixedUpdate(secs_per_tick);
+			client.FixedUpdateRead(secs_per_tick);
+		}
+
+		client.PreRenderUpdate(dt);
+		draw_screen();
 	}
-	
-	return 0;
 }

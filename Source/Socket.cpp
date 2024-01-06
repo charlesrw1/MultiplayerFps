@@ -1,6 +1,7 @@
 #include "Socket.h"
 #include <Winsock.h>
 #include <cstdio>
+#include <sstream>
 #include "Util.h"
 
 #include "Net.h"
@@ -18,10 +19,31 @@ std::string IPAndPort::ToString() const
 	return out;
 }
 
+void IPAndPort::set(string net)
+{
+	size_t colon = net.rfind(':');
+	if (colon != string::npos) {
+		port = std::atoi(net.substr(colon).c_str());
+		net.substr(0, colon);
+	}
+	if (net == "localhost") {
+		ip = 0;
+		return;
+	}
+	std::stringstream s(net);
+	int a, b, c, d; //to store the 4 ints
+	char ch; //to temporarily store the '.'
+	s >> a >> ch >> b >> ch >> c >> ch >> d;
+	ip = a << 24 | b << 16 | c << 8 | d;
+}
+
+
 Socket::Socket()
 {
 	handle = INVALID_SOCKET;
 }
+
+
 
 static sockaddr_in ToSockaddr(const IPAndPort& ip)
 {
@@ -109,7 +131,7 @@ bool Socket::Receive(void* data, size_t buffer_size, size_t& recv_len, IPAndPort
 	return true;
 }
 
-void NetworkInit()
+void network_init()
 {
 	WSAData data;
 	WSAStartup(MAKEWORD(2, 2), &data);

@@ -6,7 +6,7 @@
 #include "MeshBuilder.h"
 #include "glad/glad.h"
 #include "BVH.h"
-#include "CoreTypes.h"
+#include "Types.h"
 
 extern MeshBuilder phys_debug;
 static MeshBuilder world_collision;

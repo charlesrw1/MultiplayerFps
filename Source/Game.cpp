@@ -1,7 +1,8 @@
 #include "Server.h"
-#include "CoreTypes.h"
+#include "Types.h"
 #include "Level.h"
 #include "Movement.h"
+#include "Game_Engine.h"
 
 Game game;
 
@@ -334,14 +335,14 @@ EntityState Entity::ToEntState() const
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
 	double oldtime = server.simtime;
-	server.simtime = cmd.tick * core.tick_interval;
+	server.simtime = cmd.tick * engine.tick_interval;
 
 	ent->view_angles = cmd.view_angles;
 	MeshBuilder mb;
 	//phys_debug.Begin();
 	PlayerMovement move;
 	move.cmd = cmd;
-	move.deltat = core.tick_interval;
+	move.deltat = engine.tick_interval;
 	move.phys_debug = &mb;
 	move.phys = &phys;
 	move.fire_weapon = ServerGameShootCallback;
@@ -459,7 +460,7 @@ void RunProjectilePhysics(Entity* ent)
 {
 	Game* g = &game;
 	// update physics, detonate if ready
-	float dt = core.tick_interval;
+	float dt = engine.tick_interval;
 	ent->velocity.y -= game.gravity * dt;// gravity
 	glm::vec3 next_position = ent->position + ent->velocity * dt;
 	float len = glm::length(ent->velocity * dt);
@@ -485,7 +486,7 @@ void GrenadeUpdate(Entity* ent)
 	Game* g = &game;
 	RunProjectilePhysics(ent);
 	// spin grenade based on velocity
-	float dt = core.tick_interval;
+	float dt = engine.tick_interval;
 
 	float vel = glm::length(ent->velocity);
 
@@ -499,7 +500,7 @@ void GrenadeUpdate(Entity* ent)
 }
 
 void PostEntUpdate(Entity* ent) {
-	ent->anim.AdvanceFrame(core.tick_interval);
+	ent->anim.AdvanceFrame(engine.tick_interval);
 }
 
 void Game::BuildPhysicsWorld(float time)
@@ -532,7 +533,7 @@ void Game::Update()
 {
 	BuildPhysicsWorld(0.f);
 
-	double dt = core.tick_interval;
+	double dt = engine.tick_interval;
 	for (int i = 0; i < ents.size(); i++) {
 		Entity* e = &ents[i];
 		if (e->type == Ent_Free)

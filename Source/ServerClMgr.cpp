@@ -1,5 +1,5 @@
 #include "Server.h"
-#include "CoreTypes.h"
+#include "Game_Engine.h"
 #define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
 
 RemoteClient::RemoteClient(Server* sv, int slot)
@@ -102,7 +102,7 @@ void RemoteClient::Update()
 		return;
 	}
 
-	next_snapshot_time -= core.tick_interval;
+	next_snapshot_time -= engine.tick_interval;
 	if (next_snapshot_time > 0.f)
 		return;
 

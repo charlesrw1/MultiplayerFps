@@ -1,6 +1,6 @@
 #include "Client.h"
 #include "Util.h"
-#include "CoreTypes.h"
+#include "Game_Engine.h"
 #include "GlmInclude.h"
 #include "Movement.h"
 #include "MeshBuilder.h"
@@ -28,6 +28,8 @@ void ClientGame::Init()
 	entities.resize(MAX_GAME_ENTS);
 	level = nullptr;
 	particles.Init(this, &client);
+
+	thirdperson_camera = cfg.get_var("thirdperson_camera", "0", true);
 }
 void ClientGame::ClearState()
 {
@@ -75,14 +77,14 @@ void ClientGame::ComputeAnimationMatricies()
 
 void ClientGame::InterpolateEntStates()
 {
-	double rendering_time = client.tick * core.tick_interval - (client.cfg_interp_time->real);
+	double rendering_time = client.tick * engine.tick_interval - (client.cfg_interp_time->real);
 	for (int i = 0; i < entities.size(); i++) {
 		if (entities[i].active && i != client.GetPlayerNum()) {
-			entities[i].InterpolateState(rendering_time, core.tick_interval);
+			entities[i].InterpolateState(rendering_time, engine.tick_interval);
 		}
 	}
 
-	double rendering_time_client = client.tick * core.tick_interval - core.frame_remainder;
+	double rendering_time_client = client.tick * engine.tick_interval - engine.frame_remainder;
 	ClientEntity* local = client.GetLocalPlayer();
 	local->interpstate = local->GetLastState()->state;
 }
@@ -175,11 +177,11 @@ void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand
 
 	PlayerMovement move;
 	move.cmd = cmd;
-	move.deltat = core.tick_interval;
+	move.deltat = engine.tick_interval;
 	move.phys_debug = &b;
 	move.player = *in;
 	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
-	move.simtime = cmd.tick * core.tick_interval;
+	move.simtime = cmd.tick * engine.tick_interval;
 	move.isclient = true;
 	move.phys = &phys;
 	move.fire_weapon = ClientGameShootCallback;
@@ -210,7 +212,7 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 
 void ClientGame::PreRenderUpdate()
 { 
-	particles.Update(core.frame_time);
+	particles.Update(engine.frame_time);
 	InterpolateEntStates();
 	ComputeAnimationMatricies();
 
@@ -278,7 +280,7 @@ void ClientGame::UpdateViewModelOffsets()
 	if (lastp->ducking)
 		up_ofs_ideal += 0.04;
 
-	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, core.frame_time*100.f);
+	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, engine.frame_time*100.f);
 
 	//viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
 }

@@ -2,8 +2,8 @@
 #define SERIALIZATION_H
 #include <cstdint>
 #include <cstring>
-#include "CoreTypes.h"
 #include "glm/glm.hpp"
+#include "Util.h"
 
 class ByteWriter
 {

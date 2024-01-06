@@ -118,7 +118,7 @@ public:
 	const Level* level = nullptr;
 public:
 	bool ShouldDrawViewModel() {
-		return !third_person;
+		return !thirdperson_camera->integer;
 	}
 
 	void UpdateCamera();
@@ -127,7 +127,8 @@ public:
 	const ViewSetup& GetSceneView() { return last_view;
 	}
 
-	bool third_person = false;
+
+	Config_Var* thirdperson_camera;
 	bool using_debug_cam = false;
 	float z_near = 0.01f;
 	float z_far = 100.f;
