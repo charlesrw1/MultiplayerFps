@@ -22,7 +22,7 @@ void Client::Init()
 
 	server_mgr.Init(this);
 	cl_game.Init();
-	out_commands.resize(CLIENT_MOVE_HISTORY);
+	//out_commands.resize(CLIENT_MOVE_HISTORY);
 	time = 0.0;
 	tick = 0;
 
@@ -30,9 +30,6 @@ void Client::Init()
 
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
-
-	initialized = true;
-
 }
 
 void Client::Disconnect()
@@ -67,7 +64,7 @@ int Client::GetPlayerNum() const
 }
 
 MoveCommand* Client::GetCommand(int sequence) {
-	return &out_commands.at(sequence % out_commands.size());
+	return &engine.local.commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
 
 int Client::GetCurrentSequence() const
@@ -107,12 +104,12 @@ void Client::DoViewAngleUpdate()
 	x_off *= cfg_mouse_sensitivity->real;
 	y_off *= cfg_mouse_sensitivity->real;
 
-	glm::vec3 view_angles = this->view_angles;
+	glm::vec3 view_angles = engine.local.view_angles;
 	view_angles.x -= y_off;	// pitch
 	view_angles.y += x_off;	// yaw
 	view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
 	view_angles.y = fmod(view_angles.y, TWOPI);
-	this->view_angles = view_angles;
+	engine.local.view_angles = view_angles;
 }
 
 void Client::CreateMoveCmd()
@@ -122,7 +119,7 @@ void Client::CreateMoveCmd()
 	}
 
 	MoveCommand new_cmd{};
-	new_cmd.view_angles = view_angles;
+	new_cmd.view_angles = engine.local.view_angles;
 
 	bool* keys = engine.keys;
 	if (keys[SDL_SCANCODE_W])
@@ -193,8 +190,6 @@ void Client::RunPrediction()
 
 void Client::FixedUpdateInput(double dt)
 {
-	if (!initialized)
-		return;
 	if (GetConState() >= Connected) {
 		CreateMoveCmd();
 	}
@@ -204,8 +199,6 @@ void Client::FixedUpdateInput(double dt)
 }
 void Client::FixedUpdateRead(double dt)
 {
-	if (!initialized)
-		return;
 	if (GetConState() == Spawned) {
 		client.tick += 1;
 		client.time = client.tick * engine.tick_interval;

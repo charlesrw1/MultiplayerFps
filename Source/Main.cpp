@@ -213,7 +213,7 @@ bool IsServerActive()
 }
 bool IsClientActive()
 {
-	return client.initialized;
+	return true;
 }
 
 void Quit()
@@ -258,7 +258,7 @@ void ClientGame::UpdateCamera()
 	// decay view_recoil
 	view_recoil.x = view_recoil.x * 0.9f;
 
-	vec3 true_viewangles = client.view_angles + view_recoil;
+	vec3 true_viewangles = engine.local.view_angles + view_recoil;
 
 	if(view_recoil.y != 0)
 		printf("view_recoil: %f\n", view_recoil.y);
@@ -279,7 +279,10 @@ void ClientGame::UpdateCamera()
 
 	if (thirdperson_camera->integer) {
 		ClientEntity* player = client.GetLocalPlayer();
-		vec3 front = AnglesToVector(client.view_angles.x, client.view_angles.y);
+
+		vec3 view_angles = engine.local.view_angles;
+
+		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
 		fly_cam.position = player->interpstate.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 4.5f;
 		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
@@ -307,6 +310,64 @@ static void SDLError(const char* msg)
 	printf(" % s: % s\n", msg, SDL_GetError());
 	SDL_Quit();
 	exit(-1);
+}
+
+
+void Game_Engine::view_angle_update()
+{
+	int x, y;
+	SDL_GetRelativeMouseState(&x, &y);
+	float x_off = engine.mouse_sensitivity->real * x;
+	float y_off = engine.mouse_sensitivity->real * y;
+
+	vec3 view_angles = local.view_angles;
+	view_angles.x -= y_off;	// pitch
+	view_angles.y += x_off;	// yaw
+	view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+	view_angles.y = fmod(view_angles.y, TWOPI);
+	local.view_angles = view_angles;
+}
+
+void Game_Engine::make_move()
+{
+	MoveCommand command;
+	command.view_angles = local.view_angles;
+	command.tick = tick;
+
+	if (!game_focused) {
+		local.get_command(client.GetCurrentSequence()) = command;
+		return;
+	}
+
+	view_angle_update();
+	if (keys[SDL_SCANCODE_W])
+		command.forward_move += 1.f;
+	if (keys[SDL_SCANCODE_S])
+		command.forward_move -= 1.f;
+	if (keys[SDL_SCANCODE_A])
+		command.lateral_move += 1.f;
+	if (keys[SDL_SCANCODE_D])
+		command.lateral_move -= 1.f;
+	if (keys[SDL_SCANCODE_SPACE])
+		command.button_mask |= CmdBtn_Jump;
+	if (keys[SDL_SCANCODE_LSHIFT])
+		command.button_mask |= CmdBtn_Duck;
+	if (keys[SDL_SCANCODE_Q])
+		command.button_mask |= CmdBtn_PFire;
+	if (keys[SDL_SCANCODE_E])
+		command.button_mask |= CmdBtn_Reload;
+	if (keys[SDL_SCANCODE_Z])
+		command.up_move += 1.f;
+	if (keys[SDL_SCANCODE_X])
+		command.up_move -= 1.f;
+
+	// quantize and unquantize for local prediction
+	command.forward_move	= MoveCommand::unquantize(MoveCommand::quantize(command.forward_move));
+	command.lateral_move	= MoveCommand::unquantize(MoveCommand::quantize(command.lateral_move));
+	command.up_move			= MoveCommand::unquantize(MoveCommand::quantize(command.up_move));
+	
+	// FIXME:
+	local.get_command(client.GetCurrentSequence()) = command;
 }
 
 void Game_Engine::init_sdl_window()
@@ -652,8 +713,8 @@ void Renderer::FrameDraw()
 	if (IsServerActive() && cfg_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			// FIXME: leaking server code into client code
-			if (game.ents[i].type == Ent_Player) {
-				EntityState es = game.ents[i].ToEntState();
+			if (engine.ents[i].type == Ent_Player) {
+				EntityState es = engine.ents[i].ToEntState();
 				AddPlayerDebugCapsule(&es, &mb, COLOR_CYAN);
 			}
 		}
@@ -782,9 +843,10 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 
 void Renderer::DrawEnts()
 {
-	for (int i = 0; i < cgame->entities.size(); i++) {
-		auto& ent = cgame->entities[i];
-		if (!ent.active)
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		auto& ent = engine.ents[i];
+		//auto& ent = cgame->entities[i];
+		if (!ent.active())
 			continue;
 		if (!ent.model)
 			continue;
@@ -792,13 +854,13 @@ void Renderer::DrawEnts()
 		if (i == client.GetPlayerNum() && !cgame->thirdperson_camera->integer)
 			continue;
 
-		EntityState* cur = &ent.interpstate;
+		//EntityState* cur = &ent.interpstate;
 
-		mat4 model = glm::translate(mat4(1), cur->position);
-		model = model * glm::eulerAngleXYZ(cur->angles.x, cur->angles.y, cur->angles.z);
+		mat4 model = glm::translate(mat4(1), ent.position);
+		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
 		model = glm::scale(model, vec3(1.f));
 
-		const Animator* a = (ent.model->animations) ? &ent.animator : nullptr;
+		const Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
 		DrawModel(ent.model, model, a);
 	}
 
@@ -917,116 +979,18 @@ void cmd_load_map()
 	if (cfg.get_arg_list().size() < 2) {
 		printf(__FUNCTION__": needs map\n");
 	}
-	server.Spawn(cfg.get_arg_list().at(1).c_str());
+
+	engine.mapname = cfg.get_arg_list().at(1);
+	server.start();
 }
 void cmd_server_end()
 {
-	server.End();
+	server.end();
 }
-
-#if 0
-void HandleInput()
+void cmd_game_input_callback()
 {
-	Core::InputState& input = core.input;
-	input.mouse_delta_x = input.mouse_delta_y = input.scroll_delta = 0;
-	SDL_Event event;
-	while (SDL_PollEvent(&event))
-	{
-		ImGui_ImplSDL2_ProcessEvent(&event);
 
-		switch (event.type)
-		{
-		case SDL_QUIT:
-			Quit();
-			break;
-		case SDL_KEYDOWN:
-		{
-			auto scancode = event.key.keysym.scancode;
-			if (scancode == SDL_SCANCODE_G) {
-				cfg.execute_file("config.ini");
-			}
-			if (scancode == SDL_SCANCODE_V) {
-				ReloadModel(media.gamemodels[Mod_PlayerCT]);
-			}
-			if (scancode == SDL_SCANCODE_APOSTROPHE) {
-				Game* g = &game;
-				g->KillEnt(g->ents.data() + 0);
-
-
-			}
-			if (scancode == SDL_SCANCODE_T)
-				client.cl_game.third_person = !client.cl_game.third_person;
-			if (scancode == SDL_SCANCODE_Q)
-				client.ForceFullUpdate();
-			if(scancode == SDL_SCANCODE_1)
-				client.Disconnect();
-			if (scancode == SDL_SCANCODE_2)
-				client.Reconnect();
-			if (scancode == SDL_SCANCODE_3)
-				server.End();
-			if (scancode == SDL_SCANCODE_4)
-				server.Spawn(map_file_names[map_selection]);
-			if (scancode == SDL_SCANCODE_5)
-				core.tick_interval = 1.0 / 15;
-			if (scancode == SDL_SCANCODE_6)
-				core.tick_interval = 1.0 / 66.66;
-			if (scancode == SDL_SCANCODE_7) {
-				IPAndPort ip;
-				ip.SetIp(127, 0, 0, 1);
-				ip.port = host_port->integer;
-				client.Connect(ip);
-			}
-
-		}
-		case SDL_KEYUP:
-			input.keyboard[event.key.keysym.scancode] = event.key.type == SDL_KEYDOWN;
-			break;
-		case SDL_MOUSEMOTION:
-			input.mouse_delta_x += event.motion.xrel;
-			input.mouse_delta_y += event.motion.yrel;
-			break;
-		case SDL_MOUSEWHEEL:
-			input.scroll_delta += event.wheel.y;
-			break;
-		case SDL_MOUSEBUTTONDOWN:
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-			core.mouse_grabbed = true;
-			update_camera = true;
-			break;
-		case SDL_MOUSEBUTTONUP:
-			SDL_SetRelativeMouseMode(SDL_FALSE);
-			core.mouse_grabbed = false;
-			update_camera = false;
-			break;
-		case SDL_WINDOWEVENT:
-			if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-				core.vid_height = event.window.data2;
-				core.vid_width = event.window.data1;
-			}
-			break;
-
-		}
-	}
 }
-
-void MainLoop(double frametime)
-{
-	double secs_per_tick = core.tick_interval;
-	core.frame_remainder += frametime;
-	int num_ticks = (int)floor(core.frame_remainder / secs_per_tick);
-	core.frame_remainder -= num_ticks * secs_per_tick;
-	for (int i = 0; i < num_ticks; i++)
-	{
-		HandleInput();
-		client.FixedUpdateInput(secs_per_tick);
-		server.FixedUpdate(secs_per_tick);
-		client.FixedUpdateRead(secs_per_tick);
-	}
-	
-	client.PreRenderUpdate(frametime);
-	//DrawScreen(frametime);
-}
-#endif
 
 int main(int argc, char** argv)
 {
@@ -1036,38 +1000,29 @@ int main(int argc, char** argv)
 	engine.argv = argv;
 	engine.init();
 
-	//CreateWindow(startx,starty);
-	//cfg.execute_file("config.ini");
-	//host_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-	//cfg.set_var("max_ground_speed", "10.0");
-
-	//network_init();
-	//rndr.Init();
-	//LoadMediaFiles();
-	//InitDebugInterface();
-
-	//if (!run_client_only) {
-	//	server.Init();
-	//	server.Spawn(map_file);
-	//}
-	//
-	//client.Init();
-	//
-	//if (run_client_only) {
-	//	printf("Running client only\n");
-	//	IPAndPort ip;
-	//	ip.SetIp(127, 0, 0, 1);
-	//	ip.port = DEFAULT_SERVER_PORT;
-	//
-	//	client.Connect(ip);
-	//}
-
-
 	engine.loop();
 
 	engine.cleanup();
 	
 	return 0;
+}
+
+void Local_State::init()
+{
+	view_angles = glm::vec3(0.f);
+	commands.resize(CLIENT_MOVE_HISTORY);
+}
+
+void Game_Engine::start_map(string map)
+{
+	// starting new map
+	mapname = map;
+	FreeLevel(level);
+	level = LoadLevelFile(mapname.c_str());
+	phys.ClearObjs();
+
+
+	server.start();
 }
 
 void Game_Engine::key_event(SDL_Event event)
@@ -1122,12 +1077,69 @@ void Game_Engine::draw_screen()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	if (client.IsInGame())
+	if (engine_state == SPAWNED)
 		rndr.FrameDraw();
 	glCheckError();
 	SDL_GL_SwapWindow(window);
 	glCheckError();
 }
+
+void Game_Engine::build_physics_world(float time)
+{
+	phys.ClearObjs();
+	phys.AddLevel(level);
+
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity& ce = ents[i];
+		if (ce.type != Ent_Player) continue;
+
+		CharacterShape cs;
+		cs.a = &ce.anim;
+		cs.m = ce.model;
+		cs.org = ce.position;
+		cs.radius = CHAR_HITBOX_RADIUS;
+		cs.height = (!ce.ducking) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
+		PhysicsObject po;
+		po.shape = PhysicsObject::Character;
+		po.character = cs;
+		po.userindex = i;
+		po.player = true;
+
+		phys.AddObj(po);
+	}
+}
+
+void PlayerUpdate(Entity* e);
+void DummyUpdate(Entity* e);
+void GrenadeUpdate(Entity* e);
+
+
+void Game_Engine::update_game()
+{
+	build_physics_world(0.f);
+
+	double dt = engine.tick_interval;
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity* e = &ents[i];
+		if (e->type == Ent_Free)
+			continue;
+
+		switch (e->type) {
+		case Ent_Player:
+			PlayerUpdate(e);
+			break;
+		case Ent_Dummy:
+			DummyUpdate(e);
+			break;
+		case Ent_Grenade:
+			GrenadeUpdate(e);
+			break;
+		}
+		e->anim.AdvanceFrame(engine.tick_interval);
+
+	}
+}
+
 
 void Game_Engine::init()
 {
@@ -1136,12 +1148,15 @@ void Game_Engine::init()
 	num_entities = 0;
 	level = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
+	engine_state = MAINMENU;
+	is_host = false;
 
 	// config vars
 	window_w			= cfg.get_var("window_w", "1200", true);
 	window_h			= cfg.get_var("window_h", "800", true);
 	window_fullscreen	= cfg.get_var("window_fullscreen", "0", true);
 	host_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	mouse_sensitivity	= cfg.get_var("mouse_sensitivity", "0.01");
 	cfg.set_var("max_ground_speed", "10.0");	// ???
 
 	
@@ -1150,7 +1165,7 @@ void Game_Engine::init()
 	cfg.set_command("client_reconnect", cmd_client_reconnect);
 	cfg.set_command("client_disconnect", cmd_client_disconnect);
 	cfg.set_command("map", cmd_load_map);
-	cfg.set_command("server_end", cmd_server_end);
+	cfg.set_command("sv_end", cmd_server_end);
 	cfg.set_command("bind", cmd_bind);
 	cfg.set_command("quit", cmd_quit);
 
@@ -1164,6 +1179,8 @@ void Game_Engine::init()
 	client.Init();
 	server.Init();
 
+	local.init();
+
 	// debug interface
 	imgui_ctx = ImGui::CreateContext();
 	ImGui::SetCurrentContext(imgui_ctx);
@@ -1171,15 +1188,13 @@ void Game_Engine::init()
 	ImGui_ImplOpenGL3_Init();
 
 	// key binds
-	bind_key(SDL_SCANCODE_T, "thirdperson_camera 1");
 	bind_key(SDL_SCANCODE_Y, "thirdperson_camera 0");
 	bind_key(SDL_SCANCODE_2, "client_reconnect");
 	bind_key(SDL_SCANCODE_1, "client_disconnect");
-	bind_key(SDL_SCANCODE_3, "server_end");
+	bind_key(SDL_SCANCODE_3, "sv_end");
 
 	cfg.execute_file("vars.txt");	// load config vars
 	cfg.execute_file("init.txt");	// load startup script
-
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -1251,14 +1266,89 @@ void Game_Engine::loop()
 		int num_ticks = (int)floor(frame_remainder / secs_per_tick);
 		frame_remainder -= num_ticks * secs_per_tick;
 
+		/*
+		make input (both listen and clients)
+		client send input to server (listens do not)
+
+		listens read packets from clients
+		listens update game (sim local character with frame's input)
+		listen build a snapshot frame for sending to clients
+
+		listens dont have packets to "read" from server, stuff like sounds/particles are just branched when they are created on sim frames
+		listens dont run prediction for local player
+		*/
+
+
 		for (int i = 0; i < num_ticks; i++)
 		{
-			client.FixedUpdateInput(secs_per_tick);
-			server.FixedUpdate(secs_per_tick);
-			client.FixedUpdateRead(secs_per_tick);
+			if(engine_state >= LOADING)
+				make_move();
+			
+			//if(!is_host)
+			client.server_mgr.SendMovesAndMessages();
+
+			if (client.GetConState() == Disconnected && server.active) {
+				// connect to the local server
+				IPAndPort serv_addr;
+				serv_addr.SetIp(127, 0, 0, 1);
+				serv_addr.port = cfg.find_var("host_port")->integer;
+				client.Connect(serv_addr);
+			}
+			client.server_mgr.TrySendingConnect();
+
+			if (server.active) {
+				server.simtime = tick * engine.tick_interval;
+				server.ReadPackets();
+				game.Update();
+				server.BuildSnapshotFrame();
+				for (int i = 0; i < server.clients.size(); i++)
+					server.clients[i].Update();
+				server.tick += 1;
+			}
+
+			if (client.GetConState() == Spawned) {
+				client.tick += 1;
+				client.time = client.tick * engine.tick_interval;
+			}
+			client.server_mgr.ReadPackets();
+			client.RunPrediction();
+
+			switch (client.GetConState()) {
+			case Disconnected: 
+			case TryingConnect:engine_state = MAINMENU; break;
+			case Connected: engine_state = LOADING; break;
+			case Spawned: engine_state = SPAWNED; break;
+			}
+		}
+		pre_render_update();
+		draw_screen();
+		
+	}
+}
+
+void Game_Engine::pre_render_update()
+{
+	if (engine_state == SPAWNED) {
+		// interpolate entities for rendering
+		client.cl_game.InterpolateEntStates();
+
+		//cl_game.ComputeAnimationMatricies();
+		for (int i = 0; i < MAX_GAME_ENTS; i++) {
+			Entity& ent = ents[i];
+			if (!ent.active())
+				continue;
+			if (!ent.model || !ent.model->animations)
+				continue;
+
+			ent.anim.mainanim = ent.anim.leganim;
+			ent.anim.mainanim_frame = ent.anim.leganim_frame;
+
+			ent.anim.SetupBones();
+			ent.anim.ConcatWithInvPose();
 		}
 
-		client.PreRenderUpdate(dt);
-		draw_screen();
+		client.cl_game.UpdateViewModelOffsets();
+		client.cl_game.UpdateViewmodelAnimation();
 	}
+	client.cl_game.UpdateCamera();
 }

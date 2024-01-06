@@ -155,6 +155,8 @@ class ClServerMgr
 public:
 	ClServerMgr();
 	void Init(Client* parent);
+
+
 	void Connect(const IPAndPort& port);
 	void Disconnect();
 	void TrySendingConnect();
@@ -203,6 +205,8 @@ public:
 	void Disconnect();
 	void Reconnect();
 
+
+
 	ClientConnectionState GetConState() const;
 	int GetPlayerNum() const;
 	ClientEntity* GetLocalPlayer();
@@ -222,11 +226,7 @@ public:
 	Snapshot* FindSnapshotForTick(int tick);
 	Snapshot* GetCurrentSnapshot();
 
-	bool initialized = false;
 	ClientGame cl_game;
-
-	glm::vec3 view_angles;
-	std::vector<MoveCommand> out_commands;
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
@@ -246,15 +246,16 @@ public:
 
 
 	void ForceFullUpdate() { server_mgr.ForceFullUpdate(); }
-private:
+	ClServerMgr server_mgr;
 	void RunPrediction();
+private:
 	void CreateMoveCmd();
 	void DoViewAngleUpdate();
 	void CheckLocalServerIsRunning();
 
-	ClServerMgr server_mgr;
 };
 extern Client client;
+extern ClServerMgr client2;
 
 
 

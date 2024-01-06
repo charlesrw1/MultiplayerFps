@@ -216,7 +216,7 @@ static void GatherRenderData(Level* level, tinygltf::Model& scene)
 	}
 }
 
-const Level* LoadLevelFile(const char* level_name)
+Level* LoadLevelFile(const char* level_name)
 {
 	for (int i = 0; i < loaded_levels.size(); i++) {
 		if (loaded_levels[i]&&loaded_levels[i]->name == level_name) {

@@ -264,7 +264,7 @@ void ClientGame::UpdateViewmodelAnimation()
 void ClientGame::UpdateViewModelOffsets()
 {
 	PlayerState* lastp = &client.lastpredicted;
-	glm::vec3 view_front = AnglesToVector(client.view_angles.x, client.view_angles.y);
+	glm::vec3 view_front = AnglesToVector(engine.local.view_angles.x, engine.local.view_angles.y);
 	view_front.y = 0;
 	glm::vec3 side_grnd = glm::normalize(glm::cross(view_front, vec3(0, 1, 0)));
 	float spd_side = dot(side_grnd, lastp->velocity);

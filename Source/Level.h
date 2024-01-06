@@ -54,7 +54,7 @@ public:
 	int ref_count = 0;	// to manage case of server/client accessing same level
 };
 
-const Level* LoadLevelFile(const char* level);
+Level* LoadLevelFile(const char* level);
 void FreeLevel(const Level* level);
 
 #endif // !LEVEL_H

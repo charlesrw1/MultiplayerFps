@@ -25,7 +25,7 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt);
 Entity* ServerEntForIndex(int index)
 {
 	ASSERT(index >= 0 && index < MAX_GAME_ENTS);
-	return &game.ents[index];
+	return &engine.ents[index];
 }
 
 void Game::GetPlayerSpawnPoisiton(Entity* ent)
@@ -39,9 +39,15 @@ void Game::GetPlayerSpawnPoisiton(Entity* ent)
 		ent->rotation = glm::vec3(0);
 	}
 }
+int Game::GetEntIndex(Entity* ent) const
+{
+	{
+		return (ent - engine.ents);
+	}
+}
 Entity* Game::InitNewEnt(EntType type, int index)
 {
-	Entity* ent = &ents[index];
+	Entity* ent = &engine.ents[index];
 	ASSERT(ent->type == Ent_Free);
 	ent->type = type;
 	ent->index = index;
@@ -65,13 +71,13 @@ void Game::SpawnNewClient(int client)
 {
 	Entity* ent = InitNewEnt(Ent_Player, client);
 	PlayerSpawn(ent);
-	num_ents++;
+	engine.num_entities++;
 	printf("spawned client %d into game\n", client);
 }
 
 void Game::OnClientLeave(int client)
 {
-	Entity* ent = &ents[client];
+	Entity* ent = &engine.ents[client];
 	RemoveEntity(ent);
 	printf("remove client %d from game\n", client);
 }
@@ -80,21 +86,20 @@ Entity* Game::MakeNewEntity(EntType type)
 {
 	int slot = MAX_CLIENTS;
 	for (; slot < MAX_GAME_ENTS; slot++) {
-		if (ents[slot].type == Ent_Free)
+		if (engine.ents[slot].type == Ent_Free)
 			break;
 	}
 	if (slot == MAX_GAME_ENTS)
 		return nullptr;
 	Entity* ent = InitNewEnt(type, slot);
-	num_ents++;
+	engine.num_entities++;
 	printf("spawning ent in slot %d\n", slot);
 	return ent;
 }
 
 void Game::Init()
 {
-	ents.resize(MAX_GAME_ENTS);
-	num_ents = 0;
+	engine.num_entities = 0;
 	level = nullptr;
 
 }
@@ -102,9 +107,9 @@ void Game::Init()
 void Game::ClearState()
 {
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		ents[i].type = Ent_Free;
+		engine.ents[i].type = Ent_Free;
 	}
-	num_ents = 0;
+	engine.num_entities = 0;
 	phys.ClearObjs();
 	if(level)
 		FreeLevel(level);
@@ -146,13 +151,20 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	if (hit.hit_world)
 		return;
 
-	Entity* ent = ents.data() + hit.ent_id;
+	Entity* ent = engine.ents + hit.ent_id;
 	EntTakeDamage(ent, from, 26);
 	
 
 	if (hit.dist >= 0.f) {
 		rays.PushLine(org, hit.pos, COLOR_WHITE);
 		rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
+	}
+}
+Entity* Game::EntForIndex(int index)
+{
+	{
+		ASSERT(index < MAX_GAME_ENTS&& index >= 0);
+		return &engine.ents[index];
 	}
 }
 #if 0
@@ -508,8 +520,8 @@ void Game::BuildPhysicsWorld(float time)
 	phys.ClearObjs();
 	phys.AddLevel(level);
 
-	for (int i = 0; i < ents.size(); i++) {
-		Entity& ce = ents[i];
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity& ce = engine.ents[i];
 		if (ce.type != Ent_Player) continue;
 
 		CharacterShape cs;
@@ -534,8 +546,8 @@ void Game::Update()
 	BuildPhysicsWorld(0.f);
 
 	double dt = engine.tick_interval;
-	for (int i = 0; i < ents.size(); i++) {
-		Entity* e = &ents[i];
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity* e = &engine.ents[i];
 		if (e->type == Ent_Free)
 			continue;
 
@@ -561,7 +573,7 @@ void Game::RemoveEntity(Entity* ent)
 	ent->model = nullptr;
 	ent->anim.Clear();
 
-	num_ents--;
+	engine.num_entities--;
 }
 
 void Game::KillEnt(Entity* ent)

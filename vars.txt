@@ -1,3 +1,6 @@
+bind T "thirdperson_camera 1"
+bind 4 "map test_level2.glb"
+
 #net vars
 tick_rate 66.0
 snapshot_rate 15.0

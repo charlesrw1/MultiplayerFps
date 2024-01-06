@@ -52,7 +52,7 @@ void Server::Init()
 	engine.tick_interval = 1.0 / cfg_tick_rate->real;
 
 }
-void Server::End()
+void Server::end()
 {
 	if (!IsActive())
 		return;
@@ -65,20 +65,18 @@ void Server::End()
 	active = false;
 	tick = 0;
 	simtime = 0.0;
-	map_name = {};
 }
-void Server::Spawn(const char* mapname)
+
+void Server::start()
 {
-	if (IsActive()) {
-		End();
-	}
+	if (active)
+		end();
 	tick = 0;
 	simtime = 0.0;
-	DebugOut("spawning with map %s\n", mapname);
-	bool good = game.DoNewMap(mapname);
+	DebugOut("spawning with map %s\n", engine.mapname.c_str());
+	bool good = game.DoNewMap(engine.mapname.c_str());
 	if (!good)
 		return;
-	map_name = mapname;
 	active = true;
 }
 bool Server::IsActive() const
@@ -108,10 +106,10 @@ void Server::BuildSnapshotFrame()
 	Game* g = &game;
 	frame->tick = tick;
 	for (int i = 0; i < MAX_CLIENTS; i++) {
-		frame->ps_states[i] = g->ents[i].ToPlayerState();
+		frame->ps_states[i] = engine.ents[i].ToPlayerState();
 	}
 	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
-		frame->states[i] = g->ents[i].ToEntState();
+		frame->states[i] = engine.ents[i].ToEntState();
 	}
 }
 
@@ -129,8 +127,8 @@ void Server::SpawnClientInGame(int client)
 
 void Server::WriteServerInfo(ByteWriter& msg)
 {
-	msg.WriteByte(map_name.size());
-	msg.WriteBytes((uint8_t*)map_name.data(), map_name.size());
+	msg.WriteByte(engine.mapname.size());
+	msg.WriteBytes((uint8_t*)engine.mapname.data(), engine.mapname.size());
 
 	msg.WriteFloat(cfg_tick_rate->real);
 }
@@ -142,7 +140,23 @@ void Server::UpdateClients()
 		clients[i].Update();
 }
 
+void Server::connect_local_client()
+{
+	printf("putting local client in server\n");
 
+	if (clients[0].IsConnected()) {
+		printf(__FUNCTION__": clients[0] is taken??\n");
+		clients[0].Disconnect();
+	}
+	clients[0].client_num = 0;
+	clients[0].state = RemoteClient::Spawned;
+	IPAndPort ip;
+	ip.set("localhost");
+	clients[0].connection.Init(&socket, ip);
+	clients[0].local_client = true;
+
+	SpawnClientInGame(0);
+}
 
 int Server::FindClient(IPAndPort addr) const {
 	for (int i = 0; i < clients.size(); i++) {
@@ -261,7 +275,7 @@ void Server::ReadPackets()
 	// check timeouts
 	for (int i = 0; i < clients.size(); i++) {
 		auto& cl = clients[i];
-		if (!cl.IsConnected())
+		if (!cl.IsConnected()||cl.local_client)
 			continue;
 		if (GetTime() - cl.LastRecieved() > cfg_max_time_out->real) {
 			printf("Client, %s, timed out\n", cl.GetIPStr().c_str());

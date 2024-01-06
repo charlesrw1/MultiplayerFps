@@ -13,6 +13,7 @@ void RemoteClient::InitConnection(IPAndPort address)
 	connection.Clear();
 	state = Connected;
 	connection.Init(myserver->GetSock(), address);
+	local_client = false;
 }
 
 void RemoteClient::Disconnect()
@@ -94,7 +95,7 @@ void RemoteClient::SendInitData()
 
 void RemoteClient::Update()
 {
-	if (!IsConnected())
+	if (!IsConnected() || local_client)
 		return;
 
 	if (!IsSpawned()) {

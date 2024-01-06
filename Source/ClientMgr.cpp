@@ -85,7 +85,7 @@ void ClServerMgr::Disconnect()
 
 void ClServerMgr::ReadPackets()
 {
-	ASSERT(myclient->initialized);
+	//ASSERT(myclient->initialized);
 	
 	// check cfg var updates
 	if (myclient->cfg_fake_lag->integer == 0 && myclient->cfg_fake_loss->integer == 0)
@@ -124,8 +124,8 @@ void ClServerMgr::ReadPackets()
 		}
 	}
 
-	int last_sequence = server.out_sequence_ak;
-	int tick_delta = myclient->tick - myclient->GetCommand(last_sequence)->tick;
+	//int last_sequence = server.out_sequence_ak;
+	//int tick_delta = myclient->tick - myclient->GetCommand(last_sequence)->tick;
 	//printf("RTT: %f\n", (tick_delta)*core.tick_interval);
 
 }

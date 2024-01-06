@@ -6,6 +6,7 @@
 #include "GameData.h"
 #include "Media.h"
 #include "Config.h"
+#include "Types.h"
 
 // If you want to add a replicated variable you must:
 //	add it to entitystate or playerstate depending on its use
@@ -45,6 +46,7 @@ struct Entity
 	Animator anim;
 	const Model* model = nullptr;
 
+	bool active() { return type != Ent_Free; }
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
 	EntityState ToEntState() const;
@@ -83,10 +85,7 @@ public:
 
 	void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
 
-	Entity* EntForIndex(int index) {
-		ASSERT(index < ents.size() && index >= 0);
-		return &ents[index]; 
-	}
+	Entity* EntForIndex(int index);
 
 	MeshBuilder rays;
 
@@ -94,13 +93,9 @@ public:
 	float gravity = 12.f;
 
 	PhysicsWorld phys;
-	std::vector<Entity> ents;
-	int num_ents = 0;
 	const Level* level = nullptr;
 private:
-	int GetEntIndex(Entity* ent) const {
-		return (ent - ents.data());
-	}
+	int GetEntIndex(Entity* ent) const;
 	Entity* InitNewEnt(EntType type, int index);
 	void BeginLagCompensation();
 	void EndLagCompensation();
@@ -147,6 +142,7 @@ public:
 	Connection connection;
 	float next_snapshot_time = 0.f;
 	int client_num = 0;
+	bool local_client = false;
 	Server* myserver = nullptr;
 
 	int baseline = -1;	// what tick to delta encode from
@@ -165,8 +161,12 @@ public:
 	static const int MAX_FRAME_HIST = 32;
 
 	void Init();
-	void Spawn(const char* mapname);
-	void End();
+
+	void start();
+	void end();
+
+	void connect_local_client();
+
 	bool IsActive() const;
 	void FixedUpdate(double dt);
 
@@ -188,8 +188,7 @@ public:
 		return f;
 	}
 
-	bool active = false;
-	std::string map_name;
+	bool active = false;	// is this server running
 
 	std::vector<Frame> frames;
 	Frame nullframe;
@@ -204,17 +203,18 @@ public:
 	Config_Var* cfg_max_time_out;
 	Config_Var* cfg_sv_port;
 
-private:
-	Socket socket;
-	std::vector<RemoteClient> clients;
-	
 	void ReadPackets();
 	void UpdateClients();
+	void BuildSnapshotFrame();
+
+	std::vector<RemoteClient> clients;
+private:
+	Socket socket;
+	
 
 	int FindClient(IPAndPort addr) const;
 	void ConnectNewClient(ByteReader& msg, IPAndPort recv);
 	void UnknownPacket(ByteReader& msg, IPAndPort recv);
-	void BuildSnapshotFrame();
 };
 
 extern Server server;
