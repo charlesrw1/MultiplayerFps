@@ -5,6 +5,7 @@
 #include "Physics.h"
 #include "GameData.h"
 #include "Media.h"
+#include "Config.h"
 
 // If you want to add a replicated variable you must:
 //	add it to entitystate or playerstate depending on its use
@@ -198,10 +199,10 @@ public:
 	double simtime = 0.0;
 
 	// CONFIG VARS
-	float* cfg_snapshot_rate;
-	float* cfg_tick_rate;
-	float* cfg_max_time_out;
-	int* cfg_sv_port;
+	Config_Var* cfg_snapshot_rate;
+	Config_Var* cfg_tick_rate;
+	Config_Var* cfg_max_time_out;
+	Config_Var* cfg_sv_port;
 
 private:
 	Socket socket;

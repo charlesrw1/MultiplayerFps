@@ -106,7 +106,7 @@ void RemoteClient::Update()
 	if (next_snapshot_time > 0.f)
 		return;
 
-	next_snapshot_time += (1.0 / *myserver->cfg_snapshot_rate);
+	next_snapshot_time += (1.0 / myserver->cfg_snapshot_rate->real);
 
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);

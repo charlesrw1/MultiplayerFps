@@ -14,11 +14,11 @@ Client client;
 
 void Client::Init()
 {
-	cfg_interp_time = cfg.MakeF("interp_time", 0.1);
-	cfg_fake_lag = cfg.MakeI("fake_lag", 0);
-	cfg_fake_loss = cfg.MakeI("fake_loss", 0);
-	cfg_cl_time_out = cfg.MakeF("cl_time_out", 5.f);
-	cfg_mouse_sensitivity = cfg.MakeF("mouse_sensitivity", 0.01);
+	cfg_interp_time = cfg.get_var("interp_time", "0.1");
+	cfg_fake_lag = cfg.get_var("fake_lag", "0");
+	cfg_fake_loss = cfg.get_var("fake_loss", "0");
+	cfg_cl_time_out = cfg.get_var("cl_time_out", "5.f");
+	cfg_mouse_sensitivity = cfg.get_var("mouse_sensitivity", "0.01");
 
 	server_mgr.Init(this);
 	cl_game.Init();
@@ -84,7 +84,7 @@ void Client::CheckLocalServerIsRunning()
 		// connect to the local server
 		IPAndPort serv_addr;
 		serv_addr.SetIp(127, 0, 0, 1);
-		serv_addr.port = cfg.GetI("host_port");
+		serv_addr.port = cfg.find_var("host_port")->integer;
 		server_mgr.Connect(serv_addr);
 	}
 }
@@ -101,8 +101,8 @@ void Client::DoViewAngleUpdate()
 {
 	float x_off = core.input.mouse_delta_x;
 	float y_off = core.input.mouse_delta_y;
-	x_off *= *cfg_mouse_sensitivity;
-	y_off *= *cfg_mouse_sensitivity;
+	x_off *= cfg_mouse_sensitivity->real;
+	y_off *= cfg_mouse_sensitivity->real;
 
 	glm::vec3 view_angles = this->view_angles;
 	view_angles.x -= y_off;	// pitch

@@ -350,7 +350,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 
 	move.player = ent->ToPlayerState();
 	move.entindex = GetEntIndex(ent);
-	move.max_ground_speed = cfg.GetF("max_ground_speed");
+	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
 	move.simtime = server.simtime;
 	move.Run();
 

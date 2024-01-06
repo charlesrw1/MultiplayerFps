@@ -1,41 +1,55 @@
-#pragma once
+#ifndef CONFIG_H
+#define CONFIG_H
 
-class GlobalVar
+#include <string>
+#include <vector>
+
+using std::string;
+
+struct Config_Var
 {
-public:
-	const static int NAME_LEN = 32;
-	char name[NAME_LEN +1];
-	union {
-		int ival;
-		float fval;
-	};
-	enum Type { Int, Float };
-	Type type;
-	bool changed = false;
-
-	GlobalVar* next = nullptr;
+	string name;
+	string value;
+	bool persist = true;
+	int integer = 0;
+	float real = 0.0;
 };
 
-class ConfigMgr
+typedef void(*Engine_Cmd_Function)();
+
+struct Engine_Cmd
+{
+	string name;
+	Engine_Cmd_Function cmd;
+};
+
+class Engine_Config
 {
 public:
-	int* MakeI(const char* name, int default_val);
-	float* MakeF(const char* name, float default_val);
+	void set_var(const char* name, const char* value);
+	Config_Var* get_var(const char* name, const char* init_value, bool persist = true);
+	Config_Var* find_var(const char* name);
+	void set_command(const char* name, Engine_Cmd_Function cmd);
 
-	int GetI(const char* name);
-	float GetF(const char* name);
-	void SetI(const char* name, int val);
-	void SetF(const char* name, float val);
+	void write_to_disk(const char* path);
 
+	void execute(string cmd);
+	void execute_file(const char* path);
 
-	void LoadFromDisk(const char* path);
-	void WriteToDisk(const char* path);
-
+	// called by Engine_Cmd_Function callbacks
+	const std::vector<string>& get_arg_list();
 private:
-	GlobalVar* FindInList(const char* name);
-	GlobalVar* InitNewVar(const char* name);
-	GlobalVar* head = nullptr;
-	GlobalVar* tail = nullptr;
+	Engine_Cmd* find_cmd(const char* name);
+
+	static const int MAX_VARS = 256;
+	static const int MAX_CMDS = 64;
+	Engine_Cmd cmds[MAX_CMDS];
+	int num_cmds = 0;
+	Config_Var vars[MAX_VARS];
+	int num_vars = 0;
+
+	std::vector<string> args;
 };
 
-extern ConfigMgr cfg;
+extern Engine_Config cfg;
+#endif // !CONFIG_H

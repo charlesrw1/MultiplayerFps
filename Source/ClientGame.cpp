@@ -75,7 +75,7 @@ void ClientGame::ComputeAnimationMatricies()
 
 void ClientGame::InterpolateEntStates()
 {
-	double rendering_time = client.tick * core.tick_interval - (*client.cfg_interp_time);
+	double rendering_time = client.tick * core.tick_interval - (client.cfg_interp_time->real);
 	for (int i = 0; i < entities.size(); i++) {
 		if (entities[i].active && i != client.GetPlayerNum()) {
 			entities[i].InterpolateState(rendering_time, core.tick_interval);
@@ -178,7 +178,7 @@ void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand
 	move.deltat = core.tick_interval;
 	move.phys_debug = &b;
 	move.player = *in;
-	move.max_ground_speed = cfg.GetF("max_ground_speed");
+	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
 	move.simtime = cmd.tick * core.tick_interval;
 	move.isclient = true;
 	move.phys = &phys;

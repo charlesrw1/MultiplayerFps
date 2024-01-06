@@ -88,10 +88,10 @@ void ClServerMgr::ReadPackets()
 	ASSERT(myclient->initialized);
 	
 	// check cfg var updates
-	if (*myclient->cfg_fake_lag == 0 && *myclient->cfg_fake_loss == 0)
+	if (myclient->cfg_fake_lag->integer == 0 && myclient->cfg_fake_loss->integer == 0)
 		DisableLag();
 	else
-		EnableLag(*myclient->cfg_fake_lag, 0, *myclient->cfg_fake_loss);
+		EnableLag(myclient->cfg_fake_lag->integer, 0, myclient->cfg_fake_loss->integer);
 	
 	
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
@@ -118,7 +118,7 @@ void ClServerMgr::ReadPackets()
 	}
 
 	if (state == Connected || state == Spawned) {
-		if (GetTime() - server.last_recieved > *myclient->cfg_cl_time_out) {
+		if (GetTime() - server.last_recieved > myclient->cfg_cl_time_out->real) {
 			printf("Server timed out\n");
 			myclient->Disconnect();
 		}

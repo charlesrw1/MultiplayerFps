@@ -28,10 +28,10 @@ void Server::Init()
 {
 	printf("initializing server\n");
 
-	cfg_tick_rate = cfg.MakeF("tick_rate", DEFAULT_UPDATE_RATE);
-	cfg_snapshot_rate = cfg.MakeF("snapshot_rate", 30.0);
-	cfg_max_time_out = cfg.MakeF("max_time_out", 10.f);
-	cfg_sv_port = cfg.MakeI("host_port", DEFAULT_SERVER_PORT);
+	cfg_tick_rate = cfg.get_var("tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
+	cfg_snapshot_rate = cfg.get_var("snapshot_rate", "30.0");
+	cfg_max_time_out = cfg.get_var("max_time_out", "10.f");
+	cfg_sv_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
 
 	game.Init();
 	//client_mgr.Init();
@@ -39,17 +39,17 @@ void Server::Init()
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
 
-	socket.Init(*cfg_sv_port);
+	socket.Init(cfg_sv_port->integer);
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		clients.push_back(RemoteClient(this, i));
 
-	if (*cfg_tick_rate < 30)
-		*cfg_tick_rate = 30;
-	else if (*cfg_tick_rate > 150)
-		*cfg_tick_rate = 150;
+	if (cfg_tick_rate->real < 30)
+		cfg.set_var("tick_rate", "30.0");
+	else if (cfg_tick_rate->real > 150)
+		cfg.set_var("tick_rate", "150.0");
 
 	// initialize tick_interval here
-	core.tick_interval = 1.0 / *cfg_tick_rate;
+	core.tick_interval = 1.0 / cfg_tick_rate->real;
 
 }
 void Server::End()
@@ -132,7 +132,7 @@ void Server::WriteServerInfo(ByteWriter& msg)
 	msg.WriteByte(map_name.size());
 	msg.WriteBytes((uint8_t*)map_name.data(), map_name.size());
 
-	msg.WriteFloat(*cfg_tick_rate);
+	msg.WriteFloat(cfg_tick_rate->real);
 }
 
 
@@ -263,7 +263,7 @@ void Server::ReadPackets()
 		auto& cl = clients[i];
 		if (!cl.IsConnected())
 			continue;
-		if (GetTime() - cl.LastRecieved() > *cfg_max_time_out) {
+		if (GetTime() - cl.LastRecieved() > cfg_max_time_out->real) {
 			printf("Client, %s, timed out\n", cl.GetIPStr().c_str());
 			cl.Disconnect();
 		}

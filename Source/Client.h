@@ -8,6 +8,7 @@
 #include "Client.h"
 #include "Particles.h"
 #include <array>
+#include "Config.h"
 
 struct StateEntry
 {
@@ -236,11 +237,11 @@ public:
 	double time=0.0;
 
 	// CONFIG VALS
-	float* cfg_interp_time;
-	int* cfg_fake_lag;
-	int* cfg_fake_loss;
-	float* cfg_cl_time_out;
-	float* cfg_mouse_sensitivity;
+	Config_Var* cfg_interp_time;
+	Config_Var* cfg_fake_lag;
+	Config_Var* cfg_fake_loss;
+	Config_Var* cfg_cl_time_out;
+	Config_Var* cfg_mouse_sensitivity;
 
 
 	void ForceFullUpdate() { server_mgr.ForceFullUpdate(); }

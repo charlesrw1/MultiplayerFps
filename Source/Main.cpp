@@ -35,124 +35,133 @@
 ImGuiContext* imgui_ctx;
 MeshBuilder phys_debug;
 Core core;
-ConfigMgr cfg;
+Engine_Config cfg;
 Media media;
 
-int* ConfigMgr::MakeI(const char* name, int default_val)
+Config_Var* Engine_Config::get_var(const char* name, const char* value, bool persist)
 {
-	GlobalVar* gv = FindInList(name);
-	if (gv) {
-		if (gv->type != GlobalVar::Int)
-			Fatalf("ConfigMgr::get called with mismatched types: %s\n", name);
-		return &gv->ival;
+	Config_Var* var = find_var(name);
+	if (var) {
+		return var;
 	}
-	GlobalVar* v = InitNewVar(name);
-	v->type = GlobalVar::Int;
-	v->ival = default_val;
-	return &v->ival;
+
+	if (num_vars >= MAX_VARS) {
+		printf("Engine_Config::get_var Max Vars Reached\n");
+		return nullptr;
+	}
+	var = &vars[num_vars++];
+
+	var->name = name;
+	var->value = value;
+	var->persist = persist;
+	var->integer = std::atoi(value);
+	var->real = std::atof(value);
+	
+	return var;
 }
-float* ConfigMgr::MakeF(const char* name, float default_val)
+void Engine_Config::set_var(const char* name, const char* value)
 {
-	GlobalVar* gv = FindInList(name);
-	if (gv) {
-		if (gv->type != GlobalVar::Float)
-			Fatalf("ConfigMgr::get called with mismatched types: %s\n", name);
-		return &gv->fval;
+	Config_Var* var = find_var(name);
+	if (var) {
+		var->value = value;
+		var->integer = std::atoi(value);
+		var->real = std::atof(value);
+		return;
 	}
-	GlobalVar* v = InitNewVar(name);
-	v->type = GlobalVar::Float;
-	v->fval = default_val;
-	return &v->fval;
+	var = get_var(name, value, true);
 }
 
-GlobalVar* ConfigMgr::InitNewVar(const char* name)
+void Engine_Config::set_command(const char* name, Engine_Cmd_Function cmd)
 {
-	GlobalVar* v = new GlobalVar;
-	int namelen = strlen(name);
-	if (namelen >= GlobalVar::NAME_LEN) {
-		Fatalf("configmgr: name too long, %s\n", name);
+	if (find_cmd(name)) {
+		printf("Engine_Config::set_command Duplicate command %s\n", name);
+		return;
 	}
-	memcpy(v->name, name, namelen);
-	v->name[namelen] = '\0';
-	v->next = nullptr;
-	if (tail) {
-		tail->next = v;
-		tail = v;
+	if (num_cmds >= MAX_CMDS) {
+		printf("Engine_Config::set_command Max commands reached\n");
+		return;
+	}
+	Engine_Cmd* command = &cmds[num_cmds++];
+	command->cmd = cmd;
+	command->name = name;
+}
+
+void tokenize_string(string& input, std::vector<string>& out)
+{
+	string token;
+	bool in_quotes = false;
+	for (char c : input) {
+		if (c == ' ' && !in_quotes) {
+			if (!token.empty()) {
+				out.push_back(token);
+				token.clear();
+			}
+		}
+		else if (c == '"') {
+			in_quotes = !in_quotes;
+			if (!token.empty()) {
+				out.push_back(token);
+				token.clear();
+			}
+		}
+		else {
+			token += c;
+		}
+	}
+	if (!token.empty()) {
+		out.push_back(token);
+		token.clear();
+	}
+}
+
+void Engine_Config::execute(string command)
+{
+	args.clear();
+	tokenize_string(command, args);
+	if (args.size() == 0) return;
+	Engine_Cmd* ec = find_cmd(args[0].c_str());
+	if (ec) {
+		ec->cmd();
 	}
 	else {
-		head = tail = v;
+		Config_Var* var = find_var(args[0].c_str());
+		if (var && args.size() == 1)
+			printf("%s %s\n", var->name, var->value);
+		else if (!var && args.size() == 1)
+			printf(__FUNCTION__": no Config_Var for %s\n", args[0].c_str());
+		else
+			set_var(args[0].c_str(), args[1].c_str());
 	}
-	return v;
 }
 
-int ConfigMgr::GetI(const char* name)
-{
-	auto gv = FindInList(name);
-	ASSERT(gv);
-	ASSERT(gv->type == GlobalVar::Int);
-	return gv->ival;
-}
-float ConfigMgr::GetF(const char* name)
-{
-	auto gv = FindInList(name);
-	ASSERT(gv);
-	ASSERT(gv->type == GlobalVar::Float);
-	return gv->fval;
-}
-
-void ConfigMgr::SetF(const char* name, float f)
-{
-	float* p = MakeF(name, f);
-	*p = f;
-}
-void ConfigMgr::SetI(const char* name, int i)
-{
-	int* p = MakeI(name, i);
-	*p = i;
-}
-
-void ConfigMgr::LoadFromDisk(const char* filepath)
+void Engine_Config::execute_file(const char* filepath)
 {
 	std::ifstream infile(filepath);
 	if (!infile) {
-		printf("No config file\n");
+		printf(__FUNCTION__": couldn't open file\n");
+		return;
 	}
 	std::string line;
-	std::string name;
-	std::string val;
 	while (std::getline(infile, line)) {
 		if (line.empty())
 			continue;
 		if (line.at(0) == '#')
 			continue;
-
-		std::stringstream ss;
-		ss << line;
-		ss >> name >> val;
-
-		try {
-			if (val.find('.') != std::string::npos) {
-				SetF(name.c_str(), std::stof(val));
-			}
-			else {
-				SetI(name.c_str(), std::stoi(val));
-			}
-			printf("Found cfg var: %s : %s\n", name.c_str(), val.c_str());
-		}
-		catch (std::invalid_argument) {
-			printf("Bad cfg value: %s\n", line.c_str());
-		}
+		execute(line);
 	}
 }
 
-GlobalVar* ConfigMgr::FindInList(const char* name)
+Config_Var* Engine_Config::find_var(const char* name)
 {
-	GlobalVar* p = head;
-	while (p) {
-		if (strcmp(p->name, name) == 0) {
-			return p;
-		}
-		p = p->next;
+	for (int i = 0; i < num_vars; i++) {
+		if (vars[i].name == name) return &vars[i];
+	}
+	return nullptr;
+}
+Engine_Cmd* Engine_Config::find_cmd(const char* name)
+{
+	for (int i = 0; i < num_cmds; i++) {
+		if (cmds[i].name == name) return &cmds[i];
 	}
 	return nullptr;
 }
@@ -444,9 +453,9 @@ public:
 	RenderAttachments textures;
 
 	// config vars
-	int* cfg_draw_collision_tris;
-	int* cfg_draw_sv_colliders;
-	int* cfg_draw_viewmodel;
+	Config_Var* cfg_draw_collision_tris;
+	Config_Var* cfg_draw_sv_colliders;
+	Config_Var* cfg_draw_viewmodel;
 private:
 	void InitGlState();
 	void InitFramebuffers();
@@ -564,9 +573,9 @@ void Renderer::Init()
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	cfg_draw_collision_tris = cfg.MakeI("draw_collision_tris", 0);
-	cfg_draw_sv_colliders = cfg.MakeI("draw_sv_colliders", 0);
-	cfg_draw_viewmodel = cfg.MakeI("draw_viewmodel", 1);
+	cfg_draw_collision_tris = cfg.get_var("draw_collision_tris", "0");
+	cfg_draw_sv_colliders = cfg.get_var("draw_sv_colliders", "0");
+	cfg_draw_viewmodel = cfg.get_var("draw_viewmodel", "1");
 
 	fbo.scene = fbo.ssao = 0;
 	textures.scene_color = textures.scene_depthstencil = textures.ssao_color = 0;
@@ -653,7 +662,7 @@ void Renderer::FrameDraw()
 
 	MeshBuilder mb;
 	mb.Begin();
-	if (IsServerActive() && *cfg_draw_sv_colliders == 1) {
+	if (IsServerActive() && cfg_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			// FIXME: leaking server code into client code
 			if (game.ents[i].type == Ent_Player) {
@@ -668,7 +677,7 @@ void Renderer::FrameDraw()
 	simple.set_mat4("ViewProj", vs.viewproj);
 	simple.set_mat4("Model", mat4(1.f));
 
-	if(*cfg_draw_collision_tris)
+	if(cfg_draw_collision_tris->integer)
 		DrawCollisionWorld(cgame->level);
 
 	mb.Draw(GL_LINES);
@@ -683,7 +692,7 @@ void Renderer::FrameDraw()
 	glCheckError();
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	if(cgame->ShouldDrawViewModel() && *cfg_draw_viewmodel)
+	if(cgame->ShouldDrawViewModel() && cfg_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
 }
 
@@ -921,6 +930,9 @@ bool DoMapSelect(SDL_Scancode key)
 	return true;
 }
 
+static Config_Var* host_port;
+
+
 void HandleInput()
 {
 	Core::InputState& input = core.input;
@@ -939,7 +951,7 @@ void HandleInput()
 		{
 			auto scancode = event.key.keysym.scancode;
 			if (scancode == SDL_SCANCODE_G) {
-				cfg.LoadFromDisk("config.ini");
+				cfg.execute_file("config.ini");
 			}
 			if (scancode == SDL_SCANCODE_V) {
 				ReloadModel(media.gamemodels[Mod_PlayerCT]);
@@ -969,7 +981,7 @@ void HandleInput()
 			if (scancode == SDL_SCANCODE_7) {
 				IPAndPort ip;
 				ip.SetIp(127, 0, 0, 1);
-				ip.port = cfg.GetI("host_port");
+				ip.port = host_port->integer;
 				client.Connect(ip);
 			}
 
@@ -1034,8 +1046,6 @@ int main(int argc, char** argv)
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
 
-	int host_port = DEFAULT_SERVER_PORT;
-
 	for (int i = 1; i < argc; i++)
 	{
 		if (strcmp(argv[i], "-client") == 0)
@@ -1059,9 +1069,9 @@ int main(int argc, char** argv)
 
 	CreateWindow(startx,starty);
 
-	cfg.LoadFromDisk("config.ini");
-	cfg.MakeI("host_port", DEFAULT_SERVER_PORT);
-	cfg.MakeF("max_ground_speed", 10.f);
+	cfg.execute_file("config.ini");
+	host_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	cfg.set_var("max_ground_speed", "10.0");
 
 	NetworkInit();
 	rndr.Init();
@@ -1080,7 +1090,7 @@ int main(int argc, char** argv)
 		IPAndPort ip;
 
 		ip.SetIp(127, 0, 0, 1);
-		ip.port = cfg.GetI("host_port");
+		ip.port = host_port->integer;
 
 		client.Connect(ip);
 	}
