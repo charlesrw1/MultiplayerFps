@@ -7,8 +7,6 @@
 #include "Media.h"
 #include "Config.h"
 
-Client client;
-
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
@@ -38,7 +36,7 @@ void Client::Disconnect()
 	if (GetConState() == Disconnected)
 		return;
 	server_mgr.Disconnect();
-	cl_game.ClearState();
+	//cl_game.ClearState();
 	tick = 0;
 	time = 0.0;
 }
@@ -169,7 +167,7 @@ void Client::RunPrediction()
 	int incoming_seq = server_mgr.InSequence();
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 
-	cl_game.BuildPhysicsWorld();
+	engine.build_physics_world(0.f);
 
 	// FIXME:
 	EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
@@ -187,7 +185,7 @@ void Client::RunPrediction()
 	ent->OnRecieveUpdate(&last_estate, tick);
 	lastpredicted = pred_state;
 }
-
+#if 0
 void Client::FixedUpdateInput(double dt)
 {
 	if (GetConState() >= Connected) {
@@ -218,7 +216,7 @@ void Client::PreRenderUpdate(double frametime)
 	}
 	cl_game.UpdateCamera();
 }
-
+#endif
 
 static int NegModulo(int a, int b)
 {

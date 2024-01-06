@@ -17,6 +17,8 @@
 class Model;
 struct Entity
 {
+	const static int TRANSFORM_HIST = 8;
+
 	int index = 0;
 
 	// Entity State Vars

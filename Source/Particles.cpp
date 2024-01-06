@@ -13,6 +13,7 @@ void ParticleMgr::ClearAll()
 }
 
 void ParticleMgr::Update(float deltat) {
+#if 0
 	for (int i = 0; i < num_particles; i++) {
 		ParticleFx& p = particles[i];
 		if (p.life_end < client.time) {
@@ -29,6 +30,7 @@ void ParticleMgr::Update(float deltat) {
 				p.think(&p);
 		}
 	}
+#endif
 }
 
 const static float tracer_speed = 10.f;
@@ -41,8 +43,8 @@ void ParticleMgr::AddTracer(glm::vec3 org, glm::vec3 end) {
 	glm::vec3 dir = glm::normalize(end - org);
 	p->origin = org;
 	p->velocity = dir * 10.f;
-	p->life_start = client.time;
-	p->life_end = client.time + tracer_life;
+	//p->life_start = client.time;
+	//p->life_end = client.time + tracer_life;
 	p->gravity = 0.0;
 	p->think = nullptr;
 	p->billboarded = false;

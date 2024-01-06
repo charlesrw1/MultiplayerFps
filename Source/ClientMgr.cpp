@@ -1,4 +1,5 @@
 #include "Client.h"
+#include "Game_Engine.h"
 
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
@@ -190,7 +191,8 @@ void ClServerMgr::OnServerInit(ByteReader& buf)
 
 	// Load map and game data here
 	DebugOut("loading map...\n");
-	myclient->cl_game.NewMap(mapname.c_str());
+	//myclient->cl_game.NewMap(mapname.c_str());
+	engine.start_map(mapname.c_str(), true);
 
 	// Tell server to spawn us in
 	uint8_t buffer[64];
@@ -271,7 +273,7 @@ void ClServerMgr::SendMovesAndMessages()
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
 	writer.WriteByte(ClMessageInput);
-	writer.WriteLong(client.tick);
+	writer.WriteLong(myclient->tick);
 	writer.WriteByte(MoveCommand::quantize(lastmove.forward_move));
 	writer.WriteByte(MoveCommand::quantize(lastmove.lateral_move));
 	writer.WriteByte(MoveCommand::quantize(lastmove.up_move));

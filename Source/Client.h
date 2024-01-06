@@ -9,6 +9,7 @@
 #include "Particles.h"
 #include <array>
 #include "Config.h"
+#include "Types.h"
 
 struct StateEntry
 {
@@ -59,55 +60,28 @@ enum ClientConnectionState {
 	Connected,		// connected and receiving inital state
 	Spawned,		// in server as normal
 };
-
-class FlyCamera
-{
-public:
-	glm::vec3 position = glm::vec3(0);
-	glm::vec3 front = glm::vec3(1, 0, 0);
-	glm::vec3 up = glm::vec3(0, 1, 0);
-	float move_speed = 0.1f;
-	float yaw = 0, pitch = 0;
-
-	void UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll);
-	void UpdateVectors();
-	glm::mat4 GetViewMatrix() const;
-};
-
-struct ViewSetup
-{
-	glm::vec3 vieworigin;
-	glm::vec3 viewfront;
-	float viewfov;
-	glm::mat4 view_mat;
-	glm::mat4 proj_mat;
-	glm::mat4 viewproj;
-	int x, y, width, height;
-	float near;
-	float far;
-};
-
 class ClientGame
 {
 public:
 	ClientGame();
 	void Init();
 
-	void ClearState();
-	void NewMap(const char* mapname);
+	//void ClearState();
+	//void NewMap(const char* mapname);
+	
 	void ComputeAnimationMatricies();
 	void InterpolateEntStates();
 
 	void RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx);
 
-	void PreRenderUpdate();	// update client side stuff
+	//void PreRenderUpdate();	// update client side stuff
 
 	ClientEntity* EntForIndex(int index) {
 		ASSERT(index >= 0 && index < entities.size());
 		return &entities[index];
 	}
 
-	void BuildPhysicsWorld();
+	//void BuildPhysicsWorld();
 
 	Random rand;	// only use for client-side effects
 	//PhysicsWorld phys;
@@ -115,36 +89,7 @@ public:
 
 	std::vector<ClientEntity> entities;	// client side data
 public:
-	bool ShouldDrawViewModel() {
-		return !thirdperson_camera->integer;
-	}
 
-	void UpdateCamera();
-	void UpdateViewmodelAnimation();
-	void UpdateViewModelOffsets();
-	const ViewSetup& GetSceneView() { return last_view;
-	}
-
-
-	Config_Var* thirdperson_camera;
-	bool using_debug_cam = false;
-	float z_near = 0.01f;
-	float z_far = 100.f;
-	float fov = glm::radians(70.f);
-	FlyCamera fly_cam;
-	ViewSetup last_view;
-
-	ItemUseState prev_item_state = Item_Idle;
-	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
-	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
-	
-	float vm_reload_start = 0.f;
-	float vm_reload_end = 0.f;
-	float vm_recoil_start_time = 0.f;
-	float vm_recoil_end_time = 0.f;
-	glm::vec3 viewmodel_recoil_ofs = glm::vec3(0.f);
-	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
-private:
 };
 
 class Client;
@@ -199,6 +144,7 @@ private:
 	bool force_full_update = false;
 };
 
+
 class Client
 {
 public:
@@ -209,15 +155,10 @@ public:
 	void Reconnect();
 
 
-
 	ClientConnectionState GetConState() const;
 	int GetPlayerNum() const;
 	ClientEntity* GetLocalPlayer();
 	bool IsInGame() const;
-
-	void FixedUpdateInput(double dt);
-	void FixedUpdateRead(double dt);
-	void PreRenderUpdate(double dt);
 
 	void ClearEntsThatDidntUpdate(int what_tick);
 	void SetupSnapshot(Snapshot* s);
@@ -234,8 +175,9 @@ public:
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
 	std::vector<Snapshot> snapshots;
-
 	PlayerState lastpredicted;
+	ClientEntity interpolation_data[MAX_GAME_ENTS];
+
 
 	int tick = 0;
 	double time=0.0;
@@ -257,9 +199,6 @@ private:
 	void CheckLocalServerIsRunning();
 
 };
-extern Client client;
-extern ClServerMgr client2;
-
 
 
 #endif // !CLIENT_H

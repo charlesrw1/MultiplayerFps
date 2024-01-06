@@ -26,10 +26,12 @@ ClientEntity* Client::GetLocalPlayer()
 void ClientGame::Init()
 {
 	entities.resize(MAX_GAME_ENTS);
-	particles.Init(this, &client);
+	//particles.Init(this, &client);
 
-	thirdperson_camera = cfg.get_var("thirdperson_camera", "0", true);
+	//thirdperson_camera = cfg.get_var("thirdperson_camera", "0", true);
 }
+
+#if 0
 void ClientGame::ClearState()
 {
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
@@ -53,6 +55,7 @@ void ClientGame::NewMap(const char* mapname)
 	ClearState();	// cleansup game state
 	engine.level = LoadLevelFile(mapname);
 }
+#endif
 
 void ClientGame::ComputeAnimationMatricies()
 {
@@ -76,15 +79,16 @@ void ClientGame::ComputeAnimationMatricies()
 
 void ClientGame::InterpolateEntStates()
 {
-	double rendering_time = client.tick * engine.tick_interval - (client.cfg_interp_time->real);
+	auto cl = engine.cl;
+	double rendering_time = engine.cl->tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
 	for (int i = 0; i < entities.size(); i++) {
-		if (entities[i].active && i != client.GetPlayerNum()) {
+		if (entities[i].active && i != cl->GetPlayerNum()) {
 			entities[i].InterpolateState(rendering_time, engine.tick_interval);
 		}
 	}
 
-	double rendering_time_client = client.tick * engine.tick_interval - engine.frame_remainder;
-	ClientEntity* local = client.GetLocalPlayer();
+	double rendering_time_client = cl->tick * engine.tick_interval - engine.frame_remainder;
+	ClientEntity* local = cl->GetLocalPlayer();
 	local->interpstate = local->GetLastState()->state;
 }
 
@@ -141,6 +145,8 @@ void MakeBulletEvent(vec3 start, vec3 end, bool tracer)
 	bw.WriteShort((start.x) * 20.f);
 }
 
+
+#if 0
 void ClientGame::BuildPhysicsWorld()
 {
 	engine.phys.ClearObjs();
@@ -169,6 +175,7 @@ void ClientGame::BuildPhysicsWorld()
 		engine.phys.AddObj(po);
 	}
 }
+#endif
 
 void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx)
 {
@@ -186,14 +193,14 @@ void ClientGame::RunCommand(const PlayerState* in, PlayerState* out, MoveCommand
 	move.fire_weapon = ClientGameShootCallback;
 	move.set_viewmodel_animation = ClientSetViewmodelCallback;
 	move.play_sound = ClientPlaySoundCallback;
-	move.entindex = client.GetPlayerNum();
+	move.entindex = engine.cl->GetPlayerNum();
 	move.Run();
 
 	*out = move.player;
 	
-	if (run_fx) {
-		view_recoil.x += move.view_recoil_add.x;
-	}
+	//if (run_fx) {
+	//	view_recoil.x += move.view_recoil_add.x;
+	//}
 
 }
 
@@ -208,7 +215,7 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 
 }
 
-
+#if 0
 void ClientGame::PreRenderUpdate()
 { 
 	particles.Update(engine.frame_time);
@@ -220,7 +227,67 @@ void ClientGame::PreRenderUpdate()
 
 	UpdateCamera();
 }
+#endif
 
+void Game_Local::update_viewmodel()
+{
+	PlayerState* p = &last_player_state;
+	glm::vec3 view_front = AnglesToVector(engine.local.view_angles.x, engine.local.view_angles.y);
+	view_front.y = 0;
+	glm::vec3 side_grnd = glm::normalize(glm::cross(view_front, vec3(0, 1, 0)));
+	float spd_side = dot(side_grnd, p->velocity);
+	float side_ofs_ideal = -spd_side / 200.f;
+	glm::clamp(side_ofs_ideal, -0.005f, 0.005f);
+	float spd_front = dot(view_front, p->velocity);
+	float front_ofs_ideal = spd_front / 200.f;
+	glm::clamp(front_ofs_ideal, -0.007f, 0.007f);
+	float up_spd = p->velocity.y;
+	float up_ofs_ideal = -up_spd / 200.f;
+	glm::clamp(up_ofs_ideal, -0.007f, 0.007f);
+
+	if (p->ducking)
+		up_ofs_ideal += 0.04;
+
+	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, engine.frame_time * 100.f);
+
+	//viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
+
+	if (p->items.state != prev_item_state)
+	{
+		switch (p->items.state)
+		{
+		case Item_Idle:
+			viewmodel_recoil_ofs = viewmodel_recoil_ang = glm::vec3(0.f);
+			vm_recoil_end_time = vm_recoil_start_time = 0.f;
+			break;
+		case Item_InFire:
+			vm_recoil_start_time = engine.time;
+			vm_recoil_end_time = p->items.gun_timer;	// FIXME: read from current item data
+			break;
+		case Item_Reload:
+			break;
+
+		}
+
+		prev_item_state = p->items.state;
+	}
+	switch (p->items.state)
+	{
+	case Item_InFire: {
+		float end = p->items.gun_timer;
+		if (end > vm_recoil_end_time) {
+			vm_recoil_end_time = end;
+			vm_recoil_start_time = engine.time;
+		}
+
+		float t = (engine.time - vm_recoil_start_time) / (vm_recoil_end_time - vm_recoil_start_time);
+		t = glm::clamp(t, 0.f, 1.f);
+		viewmodel_recoil_ofs = GetRecoilAmtTriangle(vec3(0.0, 0, 0.3), t, 0.4f);
+	}break;
+	}
+}
+
+#if 0
 void ClientGame::UpdateViewmodelAnimation()
 {
 	PlayerState* p = &client.lastpredicted;
@@ -283,3 +350,5 @@ void ClientGame::UpdateViewModelOffsets()
 
 	//viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
 }
+
+#endif
