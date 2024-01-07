@@ -33,4 +33,5 @@ struct View_Setup
 
 
 
+
 #endif // !GAMETYPE_H

@@ -201,7 +201,7 @@ void Game_Engine::make_move()
 
 	if (!game_focused) {
 		local.last_command = command;
-		if(cl) cl->get_command(cl->GetCurrentSequence()) = command;
+		if(cl) cl->get_command(cl->OutSequence()) = command;
 		return;
 	}
 
@@ -234,7 +234,7 @@ void Game_Engine::make_move()
 	
 	// FIXME:
 	local.last_command = command;
-	if(cl) cl->get_command(cl->GetCurrentSequence()) = command;
+	if(cl) cl->get_command(cl->OutSequence()) = command;
 }
 
 void Game_Engine::init_sdl_window()
@@ -917,6 +917,9 @@ void Game_Engine::start_map(string map, bool is_client)
 	time = 0;
 	
 	if (!is_client) {
+		if(cl)
+			end_client();
+
 		server.start();
 		engine.is_host = true;
 		engine.engine_state = SPAWNED;
@@ -1166,7 +1169,8 @@ void Game_Engine::startup_client()
 
 void Game_Engine::end_client()
 {
-	cl->Disconnect();
+	if(cl->state!=CS_DISCONNECTED)
+		cl->Disconnect();
 	delete cl;
 	cl = nullptr;
 }
@@ -1224,8 +1228,8 @@ void Game_Engine::loop()
 				make_move();
 
 			if (!is_host && cl) {
-				cl->server_mgr.SendMovesAndMessages();
-				cl->server_mgr.TrySendingConnect();
+				cl->SendMovesAndMessages();
+				cl->TrySendingConnect();
 			}
 
 			time = tick * tick_interval;
@@ -1239,28 +1243,26 @@ void Game_Engine::loop()
 				for (int i = 0; i < server.clients.size(); i++)
 					server.clients[i].Update();
 				tick += 1;
-				//server.tick += 1;
 			}
-
 
 			if (!is_host && cl) {
 				if (cl->get_state() == CS_SPAWNED) {
 					tick += 1;
 					time = tick * tick_interval;
-					//cl->tick += 1;
-					//cl->time = cl->tick * engine.tick_interval;
 				}
-				cl->server_mgr.ReadPackets();
-				cl->run_prediction();
-
-				switch (cl->get_state()) {
-				case CS_DISCONNECTED:
-				case CS_TRYINGCONNECT:engine_state = MAINMENU; break;
-				case CS_CONNECTED: engine_state = LOADING; break;
-				case CS_SPAWNED: engine_state = SPAWNED; break;
-				}
+				cl->ReadPackets();
+				cl->run_prediction();		
 			}
+
+			// free client when its disconnected
+			if (cl && cl->get_state() == CS_DISCONNECTED)
+				end_client();
+			if ((cl && cl->state == CS_SPAWNED) || is_host)
+				engine_state = SPAWNED;
+			else
+				engine_state = MAINMENU;
 		}
+
 		pre_render_update();
 		draw_screen();
 	}

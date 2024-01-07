@@ -18,7 +18,8 @@ void Client::Init()
 	cfg_cl_time_out = cfg.get_var("cl_time_out", "5.f");
 	cfg_mouse_sensitivity = cfg.get_var("mouse_sensitivity", "0.01");
 
-	server_mgr.Init(this);
+	sock.Init(0);
+
 	//out_commands.resize(CLIENT_MOVE_HISTORY);
 
 	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
@@ -28,46 +29,22 @@ void Client::Init()
 	cur_snapshot_idx = 0;
 }
 
-void Client::Disconnect()
-{
-	DebugOut("disconnecting\n");
-	if (get_state() == CS_DISCONNECTED)
-		return;
-	server_mgr.Disconnect();
-	//cl_game.ClearState();
-}
 void Client::Reconnect()
 {
-	DebugOut("reconnecting\n");
-	//IPAndPort addr = server_mgr.GetCurrentServerAddr();
+	DebugOut("Reconnecting\n");
+
+	string address = std::move(serveraddr);
 	Disconnect();
-	connect(server_mgr.serveraddr);
+	connect(address);
 }
-void Client::connect(string address)
-{
-	DebugOut("connecting to %s", address.c_str());
-	server_mgr.connect(address);
-}
-Client_State Client::get_state() const
-{
-	return server_mgr.GetState();
-}
+
 int Client::GetPlayerNum() const
 {
-	return server_mgr.ClientNum();
+	return client_num;
 }
 
 MoveCommand& Client::get_command(int sequence) {
 	return commands.at(sequence % CLIENT_MOVE_HISTORY);
-}
-
-int Client::GetCurrentSequence() const
-{
-	return server_mgr.OutSequence();
-}
-int Client::GetLastSequenceAcked() const
-{
-	return server_mgr.OutSequenceAk();
 }
 
 void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
@@ -84,13 +61,13 @@ void Client::run_prediction()
 		return;
 	// predict commands from outgoing ack'ed to current outgoing
 	// TODO: dont repeat commands unless a new snapshot arrived
-	int start = server_mgr.OutSequenceAk();	// start at the new cmd
-	int end = server_mgr.OutSequence();
+	int start = OutSequenceAk();	// start at the new cmd
+	int end = OutSequence();
 	int commands_to_run = end - start;
 	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
 		return;
 	// restore state to last authoritative snapshot 
-	int incoming_seq = server_mgr.InSequence();
+	int incoming_seq = InSequence();
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 
 	engine.build_physics_world(0.f);
@@ -127,38 +104,6 @@ void Client::run_prediction()
 	ent.from_entity_state(last_estate);
 	lastpredicted = predicted_player;
 }
-#if 0
-void Client::FixedUpdateInput(double dt)
-{
-	if (GetConState() >= Connected) {
-		CreateMoveCmd();
-	}
-	server_mgr.SendMovesAndMessages();
-	CheckLocalServerIsRunning();
-	server_mgr.TrySendingConnect();
-}
-void Client::FixedUpdateRead(double dt)
-{
-	if (GetConState() == Spawned) {
-		client.tick += 1;
-		client.time = client.tick * engine.tick_interval;
-	}
-	server_mgr.ReadPackets();
-	RunPrediction();
-}
-void Client::PreRenderUpdate(double frametime)
-{
-	if (IsClientActive() && IsInGame()) {
-		// interpoalte entities for rendering
-		cl_game.InterpolateEntStates();
-		cl_game.ComputeAnimationMatricies();
-
-		cl_game.UpdateViewModelOffsets();
-		cl_game.UpdateViewmodelAnimation();
-	}
-	cl_game.UpdateCamera();
-}
-#endif
 
 static int NegModulo(int a, int b)
 {
@@ -359,16 +304,9 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 }
 #endif
 
-void Client::SetNewTickRate(float tick_rate)
-{
-	if (!IsServerActive()) {
-		engine.tick_interval = 1.0 / tick_rate;
-	}
-}
-
 Snapshot* Client::GetCurrentSnapshot()
 {
-	return &snapshots.at(server_mgr.InSequence() % CLIENT_SNAPSHOT_HISTORY);
+	return &snapshots.at(InSequence() % CLIENT_SNAPSHOT_HISTORY);
 }
 Snapshot* Client::FindSnapshotForTick(int tick)
 {

@@ -8,17 +8,7 @@ static const int MAX_CONNECT_ATTEMPTS = 10;
 static const float CONNECT_RETRY = 1.f;
 
 
-ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
-{
-	sock.enabled = false;
-}
-
-void ClServerMgr::Init(Client* parent)
-{
-	sock.Init(0);
-	myclient = parent;
-}
-void ClServerMgr::connect(string address)
+void Client::connect(string address)
 {
 	DebugOut("connecting to server: %s\n", address.c_str());
 
@@ -35,7 +25,7 @@ void ClServerMgr::connect(string address)
 	TrySendingConnect();
 }
 
-void ClServerMgr::TrySendingConnect()
+void Client::TrySendingConnect()
 {
 	if (state != CS_TRYINGCONNECT)
 		return;
@@ -58,8 +48,9 @@ void ClServerMgr::TrySendingConnect()
 	writer.EndWrite();
 	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
 }
-void ClServerMgr::Disconnect()
+void Client::Disconnect()
 {
+	DebugOut("Disconnecting\n");
 	if (state == CS_DISCONNECTED)
 		return;
 	if (state != CS_TRYINGCONNECT) {
@@ -69,20 +60,22 @@ void ClServerMgr::Disconnect()
 		write.EndWrite();
 		server.Send(buffer, write.BytesWritten());
 	}
-	state = CS_DISCONNECTED;
 
+	state = CS_DISCONNECTED;
+	serveraddr = "";
 	client_num = -1;
-	server.remote_addr = IPAndPort();
+	server = Connection();
+	cur_snapshot_idx = 0;
 }
 
 
-void ClServerMgr::ReadPackets()
+void Client::ReadPackets()
 {
 	//ASSERT(myclient->initialized);
 	
 	// check cfg var updates
-	sock.loss = myclient->cfg_fake_loss->integer;
-	sock.lag = myclient->cfg_fake_lag->integer;
+	sock.loss = cfg_fake_loss->integer;
+	sock.lag = cfg_fake_lag->integer;
 	sock.jitter = 0;
 	sock.enabled = !(sock.loss == 0 && sock.lag == 0 && sock.jitter == 0);
 
@@ -123,7 +116,7 @@ void ClServerMgr::ReadPackets()
 			}
 			else if (msg == "reject" && state == CS_TRYINGCONNECT) {
 				printf("Connection rejected\n");
-				myclient->Disconnect();
+				Disconnect();
 			}
 			else {
 				DebugOut("Unknown connectionless packet type\n");
@@ -142,9 +135,9 @@ void ClServerMgr::ReadPackets()
 	}
 
 	if (state >= CS_CONNECTED) {
-		if (GetTime() - server.last_recieved > myclient->cfg_cl_time_out->real) {
+		if (GetTime() - server.last_recieved > cfg_cl_time_out->real) {
 			printf("Server timed out\n");
-			myclient->Disconnect();
+			Disconnect();
 		}
 	}
 
@@ -154,58 +147,7 @@ void ClServerMgr::ReadPackets()
 
 }
 
-#if 0
-
-void ClServerMgr::StartConnection()
-{
-	// We now have a valid connection with the server
-	server.Init(&sock, server.remote_addr);
-	state = Connected;
-	// Request the next step in the setup
-	uint8_t buffer[256];
-	ByteWriter writer(buffer, 256);
-	writer.WriteByte(CL_TEXT);
-	const char init_str[] = "init";
-	writer.WriteByte(sizeof(init_str) - 1);
-	writer.WriteBytes((uint8_t*)init_str, sizeof(init_str) - 1);
-	writer.EndWrite();
-	// FIXME!!: this must go through reliable, do this later
-	server.Send(buffer, writer.BytesWritten());
-}
-
-void ClServerMgr::OnServerInit(ByteReader& buf)
-{
-	ASSERT(0);
-	client_num = buf.ReadByte();
-
-	int map_len = buf.ReadByte();
-	std::string mapname(map_len, 0);
-	buf.ReadBytes((uint8_t*)&mapname[0], map_len);
-
-	float sv_tick_rate = buf.ReadFloat();
-	myclient->SetNewTickRate(sv_tick_rate);
-
-	DebugOut("Player num: %d, Map: %s, tickrate %f\n", client_num, mapname.c_str(), sv_tick_rate);
-
-	// Load map and game data here
-	DebugOut("loading map...\n");
-	//myclient->cl_game.NewMap(mapname.c_str());
-	engine.start_map(mapname.c_str(), true);
-
-	// Tell server to spawn us in
-	uint8_t buffer[64];
-	ByteWriter writer(buffer, 64);
-	writer.WriteByte(CL_TEXT);
-	const char spawn_str[] = "spawn";
-	writer.WriteByte(sizeof(spawn_str) - 1);
-	writer.WriteBytes((uint8_t*)spawn_str, sizeof(spawn_str) - 1);
-	writer.EndWrite();
-	server.Send(buffer, writer.BytesWritten());
-}
-
-#endif
-
-void ClServerMgr::HandleServerPacket(ByteReader& buf)
+void Client::HandleServerPacket(ByteReader& buf)
 {
 	for (;;)
 	{
@@ -213,7 +155,7 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		if (buf.IsEof())
 			return;
 		if (buf.HasFailed()) {
-			myclient->Disconnect();
+			Disconnect();
 			return;
 		}
 		
@@ -236,7 +178,7 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		}break;
 		case SV_DISCONNECT:
 			DebugOut("disconnected by server\n");
-			myclient->Disconnect();
+			Disconnect();
 			break;
 		case SV_TEXT:
 			break;
@@ -249,26 +191,24 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 				
 				engine.tick = server_tick;
 			}
-			myclient->last_recieved_server_tick = server_tick;
+			last_recieved_server_tick = server_tick;
 		}break;
 		default:
 			DebugOut("Unknown message, disconnecting\n");
-			myclient->Disconnect();
+			Disconnect();
 			return;
 			break;
 		}
 	}
 }
 
-
-
-void ClServerMgr::SendMovesAndMessages()
+void Client::SendMovesAndMessages()
 {
 	if (state < CS_CONNECTED)
 		return;
 
 	// Send move
-	MoveCommand lastmove = myclient->get_command(server.out_sequence);
+	MoveCommand lastmove = get_command(server.out_sequence);
 
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
@@ -286,7 +226,7 @@ void ClServerMgr::SendMovesAndMessages()
 	if (force_full_update)
 		writer.WriteLong(-1);
 	else
-		writer.WriteLong(myclient->last_recieved_server_tick);
+		writer.WriteLong(last_recieved_server_tick);
 
 	writer.EndWrite();
 	server.Send(buffer, writer.BytesWritten());
@@ -295,7 +235,7 @@ void ClServerMgr::SendMovesAndMessages()
 static EntityState null_estate;
 static PlayerState null_pstate;
 
-bool ClServerMgr::OnEntSnapshot(ByteReader& msg)
+bool Client::OnEntSnapshot(ByteReader& msg)
 {
 	int delta_tick = msg.ReadLong();
 
@@ -306,12 +246,12 @@ bool ClServerMgr::OnEntSnapshot(ByteReader& msg)
 	}
 	
 	
-	Snapshot* nextsnapshot = myclient->GetCurrentSnapshot();
-	nextsnapshot->tick = myclient->last_recieved_server_tick;
+	Snapshot* nextsnapshot = GetCurrentSnapshot();
+	nextsnapshot->tick = last_recieved_server_tick;
 	Snapshot* from = nullptr;
 
 	if (delta_tick != -1) {
-		from = myclient->FindSnapshotForTick(delta_tick);
+		from = FindSnapshotForTick(delta_tick);
 		if (!from) {
 			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, engine.tick);
 			return true;
@@ -351,7 +291,7 @@ bool ClServerMgr::OnEntSnapshot(ByteReader& msg)
 
 	ReadDeltaPState(ps, msg);
 
-	myclient->read_snapshot(nextsnapshot);
+	read_snapshot(nextsnapshot);
 
 	return false;
 }
