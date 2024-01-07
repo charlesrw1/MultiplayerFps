@@ -23,17 +23,12 @@ public:
 	glm::mat4 GetViewMatrix() const;
 };
 
-struct ViewSetup
+struct View_Setup
 {
-	glm::vec3 vieworigin;
-	glm::vec3 viewfront;
-	float viewfov;
-	glm::mat4 view_mat;
-	glm::mat4 proj_mat;
-	glm::mat4 viewproj;
-	int x, y, width, height;
-	float near;
-	float far;
+	glm::vec3 origin, front;
+	glm::mat4 view, proj, viewproj;
+	float fov, near, far;
+	int width, height;
 };
 
 

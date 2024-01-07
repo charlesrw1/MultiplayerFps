@@ -56,7 +56,6 @@ Entity* Game::InitNewEnt(EntType type, int index)
 	ent->position = glm::vec3(0.f);
 	ent->velocity = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
-	ent->scale = 1.f;
 
 	ent->alive = false;
 	ent->health = 0;
@@ -238,7 +237,7 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 	ent->health -= amt;
 	if (ent->health <= 0) {
 		ent->alive = false;
-		ent->death_time = server.simtime + 3.0;
+		ent->death_time = engine.time + 3.0;
 
 		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"));
 		ent->anim.dont_loop = true;
@@ -272,6 +271,25 @@ void Entity::SetModel(GameModels m) {
 		anim.Init(model);
 }
 
+void Entity::from_entity_state(EntityState es)
+{
+	position = es.position;
+	rotation = es.angles;
+
+	model_index = es.model_idx;
+	
+	if (model_index >= 0 && model_index < media.gamemodels.size())
+		model = media.gamemodels.at(model_index);
+	
+	if(model&&model->bones.size()>0)
+		anim.Init(model);
+
+	anim.leganim = es.leganim;
+	anim.leganim_frame = es.leganim_frame;
+	anim.mainanim = es.mainanim;
+	anim.mainanim_frame = es.mainanim_frame;
+}
+
 PlayerState Entity::ToPlayerState() const
 {
 	PlayerState ps{};
@@ -282,7 +300,7 @@ PlayerState Entity::ToPlayerState() const
 	ps.velocity = velocity;
 	ps.alive = alive;
 
-	ps.items = wpns;
+	ps.items = items;
 	ps.in_jump = in_jump;
 	return ps;
 }
@@ -295,7 +313,7 @@ void Entity::FromPlayerState(PlayerState* ps)
 	velocity = ps->velocity;
 	alive = ps->alive;
 
-	wpns = ps->items;
+	items = ps->items;
 	in_jump = ps->in_jump;
 }
 EntityState Entity::ToEntState() const
@@ -318,8 +336,8 @@ EntityState Entity::ToEntState() const
 #include "Config.h"
 void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
-	double oldtime = server.simtime;
-	server.simtime = cmd.tick * engine.tick_interval;
+	double oldtime = engine.time;
+	engine.time = cmd.tick * engine.tick_interval;
 
 	ent->view_angles = cmd.view_angles;
 	MeshBuilder mb;
@@ -336,12 +354,12 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.player = ent->ToPlayerState();
 	move.entindex = GetEntIndex(ent);
 	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
-	move.simtime = server.simtime;
+	move.simtime = engine.time;
 	move.Run();
 
 	ent->FromPlayerState(&move.player);
 
-	server.simtime = oldtime;
+	engine.time = oldtime;
 
 	//phys_debug.End();
 }
@@ -397,7 +415,7 @@ void PlayerUpdateAnimations(Entity* ent)
 
 void PlayerDeathUpdate(Entity* ent)
 {
-	if (ent->death_time < server.simtime) {
+	if (ent->death_time < engine.time) {
 		ent->health = 100;
 		ent->alive = true;
 		game.GetPlayerSpawnPoisiton(ent);
@@ -413,7 +431,7 @@ void PlayerUpdate(Entity* ent)
 
 	if (ent->position.y < -50 && ent->alive) {
 		ent->alive = false;
-		ent->death_time = server.simtime + 0.5f;
+		ent->death_time = engine.time + 0.5f;
 	}
 }
 void DummyUpdate(Entity* ent)
@@ -436,7 +454,7 @@ Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int g
 	e->velocity = start_vel;
 	e->sub_type = grenade_type;
 	e->alive = true;
-	e->death_time = server.simtime + 5.f;
+	e->death_time = engine.time + 5.f;
 	return e;
 }
 
@@ -477,7 +495,7 @@ void GrenadeUpdate(Entity* ent)
 	ent->rotation.x += 0.7 * dt * vel;
 	ent->rotation.y -= 1.3 * dt * vel;
 
-	if (ent->death_time < server.simtime) {
+	if (ent->death_time < engine.time) {
 		printf("BOOM\n");
 		g->RemoveEntity(ent);
 	}
@@ -551,7 +569,7 @@ void Game::RemoveEntity(Entity* ent)
 void Game::KillEnt(Entity* ent)
 {
 	ent->alive = false;
-	ent->death_time = server.simtime + 5.0;
+	ent->death_time = engine.time + 5.0;
 	ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"));
 	ent->anim.dont_loop = true;
 }

@@ -19,12 +19,10 @@ void Client::Init()
 	cfg_mouse_sensitivity = cfg.get_var("mouse_sensitivity", "0.01");
 
 	server_mgr.Init(this);
-	cl_game.Init();
 	//out_commands.resize(CLIENT_MOVE_HISTORY);
-	time = 0.0;
-	tick = 0;
 
 	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
+	commands.resize(CLIENT_MOVE_HISTORY);
 
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
@@ -37,8 +35,6 @@ void Client::Disconnect()
 		return;
 	server_mgr.Disconnect();
 	//cl_game.ClearState();
-	tick = 0;
-	time = 0.0;
 }
 void Client::Reconnect()
 {
@@ -61,8 +57,8 @@ int Client::GetPlayerNum() const
 	return server_mgr.ClientNum();
 }
 
-MoveCommand* Client::GetCommand(int sequence) {
-	return &engine.local.commands.at(sequence % CLIENT_MOVE_HISTORY);
+MoveCommand& Client::get_command(int sequence) {
+	return commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
 
 int Client::GetCurrentSequence() const
@@ -141,18 +137,18 @@ void Client::CreateMoveCmd()
 	if (keys[SDL_SCANCODE_X])
 		new_cmd.up_move -= 1.f;
 
-	new_cmd.tick = tick;
+	new_cmd.tick = engine.tick;
 
 	// quantize and unquantize for local prediction
 	new_cmd.forward_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.forward_move));
 	new_cmd.lateral_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.lateral_move));
 	new_cmd.up_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.up_move));
 
-	*GetCommand(GetCurrentSequence()) = new_cmd;
+	get_command(GetCurrentSequence()) = new_cmd;
 }
 
 
-void Client::RunPrediction()
+void Client::run_prediction()
 {
 	if (GetConState() != Spawned)
 		return;
@@ -171,19 +167,35 @@ void Client::RunPrediction()
 
 	// FIXME:
 	EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
-	PlayerState pred_state = last_auth_state->pstate;
+	PlayerState predicted_player = last_auth_state->pstate;
 
 	for (int i = start + 1; i < end; i++) {
-		MoveCommand* cmd = GetCommand(i);
-		PlayerState next_state;
-		cl_game.RunCommand(&pred_state, &next_state, *cmd, i==(end-1));
-		pred_state = next_state;
+		MoveCommand& cmd = get_command(i);
+		bool run_fx = i == (end - 1);
+
+		//cl_game.RunCommand(&pred_state, &next_state, cmd, i==(end-1));
+
+		MeshBuilder b;
+		PlayerMovement move;
+		move.cmd = cmd;
+		move.deltat = engine.tick_interval;
+		move.phys_debug = &b;
+		move.player = predicted_player;
+		move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
+		move.simtime = cmd.tick * engine.tick_interval;
+		move.isclient = true;
+		move.phys = &engine.phys;
+		move.entindex = engine.cl->GetPlayerNum();
+		move.Run();
+
+		predicted_player = move.player;
 	}
 
-	ClientEntity* ent = GetLocalPlayer();
-	PlayerStateToClEntState(&last_estate, &pred_state);
-	ent->OnRecieveUpdate(&last_estate, tick);
-	lastpredicted = pred_state;
+	Entity* ent = engine.local_player();
+
+	PlayerStateToClEntState(&last_estate, &predicted_player);
+	ent->from_entity_state(last_estate);
+	lastpredicted = predicted_player;
 }
 #if 0
 void Client::FixedUpdateInput(double dt)
@@ -229,24 +241,8 @@ static float MidLerp(float min, float max, float mid_val)
 
 StateEntry* ClientEntity::GetLastState()
 {
-	return &hist.at(NegModulo(current_hist_index - 1, NUM_STORED_STATES));
+	return &hist.at(NegModulo(hist_index - 1, NUM_STORED_STATES));
 }
-
-void ClientEntity::OnRecieveUpdate(const EntityState* state, int tick)
-{
-	hist.at(current_hist_index) = { tick, *state };
-	current_hist_index = (current_hist_index + 1) % hist.size();
-
-	if (state->model_idx != interpstate.model_idx || model==nullptr) {
-		if (state->model_idx >= 0 && state->model_idx < media.gamemodels.size()) {
-			model = media.gamemodels.at(state->model_idx);
-		}
-		else {
-			printf("client: recieved invalid model_index (%d)\n", state->model_idx);
-		}
-	}
-}
-
 bool IsDistanceATeleport(vec3 a, vec3 b, float maxspeed, float dt)
 {
 	float len = glm::length(a - b);
@@ -279,6 +275,87 @@ float InterpolateAnimation(Animation* a, float start, float end, float alpha)
 }
 
 
+void Client::interpolate_states()
+{
+	auto cl = engine.cl;
+	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		if (!engine.ents[i].active() || i == engine.player_num())
+			continue;
+
+		ClientEntity& ce = interpolation_data[i];
+		Entity& ent = engine.ents[i];
+
+		int entry_index = 0;
+		int last_entry = NegModulo(ce.hist_index - 1, ClientEntity::NUM_STORED_STATES);
+		for (; entry_index < ClientEntity::NUM_STORED_STATES; entry_index++) {
+			auto e = ce.GetStateFromIndex(ce.hist_index - 1 - entry_index);
+			if (rendering_time >= e->tick * engine.tick_interval) {
+				break;
+			}
+		}
+
+		// could extrpolate here, or just set it to last state
+		if (entry_index == 0 || entry_index == ClientEntity::NUM_STORED_STATES) {
+			//interpstate = GetLastState()->state;
+
+			ent.from_entity_state(ce.GetLastState()->state);
+			printf("extrapolate\n");
+			//double abc = GetStateFromIndex(last_entry - entry_index)->tick * tickinterval;
+			return;
+		}
+		// else, interpolate
+		StateEntry* s1 = ce.GetStateFromIndex(last_entry - entry_index);
+		StateEntry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
+
+		if (s1->tick == -1) {
+			ent.from_entity_state(EntityState{});
+			return;
+		}
+		else if (s2->tick == -1 || s2->tick <= s1->tick) {
+			ent.from_entity_state(s1->state);
+			printf("no next frame\n");
+			return;
+		}
+
+
+		ASSERT(s1->tick < s2->tick);
+		ASSERT(s1->tick * engine.tick_interval <= rendering_time && s2->tick * engine.tick_interval >= rendering_time);
+
+		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
+
+
+		EntityState interpstate = s1->state;
+		//if(!IsDistanceATeleport(s1->state.position,s2->state.position, 20.0, tickinterval))
+		interpstate.position = glm::mix(s1->state.position, s2->state.position, midlerp);
+
+
+		if (ent.model && ent.model->animations && s1->state.leganim == s2->state.leganim) {
+			//interpstate.leganim_frame = glm::mix(s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
+
+
+			int anim = s1->state.leganim;
+			if (anim >= 0 && anim < ent.model->animations->clips.size()) {
+
+				interpstate.leganim_frame = InterpolateAnimation(&ent.model->animations->clips[s1->state.leganim],
+					s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
+			}
+
+		}
+		if (s1->state.mainanim == s2->state.mainanim) {
+			// fixme
+		}
+
+		ent.from_entity_state(interpstate);
+	}
+
+	//double rendering_time_client = cl->tick * engine.tick_interval - engine.frame_remainder;
+	//ClientEntity* local = cl->GetLocalPlayer();
+	//local->interpstate = local->GetLastState()->state;
+}
+
+
+#if 0
 // Called every graphics frame
 void ClientEntity::InterpolateState(double time, double tickinterval) {
 	if (!active)
@@ -288,9 +365,9 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 	//return;
 
 	int i = 0;
-	int last_entry = NegModulo(current_hist_index - 1, NUM_STORED_STATES);
+	int last_entry = NegModulo(hist_index - 1, NUM_STORED_STATES);
 	for (; i < NUM_STORED_STATES; i++) {
-		auto e = GetStateFromIndex(current_hist_index - 1 - i);
+		auto e = GetStateFromIndex(hist_index - 1 - i);
 		if (time >= e->tick*tickinterval) {
 			break;
 		}
@@ -350,6 +427,7 @@ void ClientEntity::InterpolateState(double time, double tickinterval) {
 
 
 }
+#endif
 
 void Client::SetNewTickRate(float tick_rate)
 {
@@ -371,41 +449,57 @@ Snapshot* Client::FindSnapshotForTick(int tick)
 	return nullptr;
 }
 
-void Client::SetupSnapshot(Snapshot* s)
+/*
+when clients recieve snapshot from server
+they mark entities in engine.ents as active or inactive (maybe will have some more complicated initilization/destruction)
+replicate standard fields over to entity
+fill the network transform history in client.interpolation_history
+
+later in frame:
+interpolate_state() fills the entities position/rotation with interpolated values for rendering
+*/
+
+
+void Client::read_snapshot(Snapshot* s)
 {
 	Snapshot* snapshot = s;
-	ClientGame* game = &cl_game;
 	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
-		ClientEntity* ce = &game->entities[i];
+		ClientEntity* ce = &interpolation_data[i];
+		Entity* e = &engine.ents[i];
+		EntityState* state = &snapshot->entities[i];
 
+		int lasttype = e->type;
 
 		// local player doesnt fill interp history here
-		if (i == GetPlayerNum()) {
-			ce->active = true;
+		if (i == engine.player_num()) {
+			e->type = Ent_Player;
 			continue;
 		}
 
-		if (snapshot->entities[i].type == Ent_Free) {
-			ce->active = false;
+		if (state->type == Ent_Free) {
+			e->type = Ent_Free;
 			continue;
 		}
-		ce->active = true;
 
-		StateEntry* lastentry = ce->GetLastState();
-		if (i == MAX_CLIENTS) {
-			printf("slot2: %d\n", lastentry->state.model_idx);
+		if (lasttype == Ent_Free) {
+			*e = Entity();
+			*ce = ClientEntity();
+			e->type = (EntType)snapshot->entities[i].type;
 		}
-		if (lastentry->state.type == Ent_Free) {
-			ce->ClearState();
-		}
-		ce->OnRecieveUpdate(&snapshot->entities[i], tick);
+
+		ce->hist.at(ce->hist_index) = { engine.tick, *state };
+		ce->hist_index = (ce->hist_index + 1) % ce->hist.size();
+
+		if (state->model_idx >= 0 && state->model_idx < media.gamemodels.size())
+			e->model = media.gamemodels.at(state->model_idx);
 	}
 
-	ClearEntsThatDidntUpdate(tick);
+	ClearEntsThatDidntUpdate(engine.tick);
 }
 
 void Client::ClearEntsThatDidntUpdate(int what_tick)
 {
+#if 0
 	ClientGame* game = &cl_game;
 	for (int i = 0; i < game->entities.size(); i++) {
 		ClientEntity* ce = &game->entities[i];
@@ -416,4 +510,5 @@ void Client::ClearEntsThatDidntUpdate(int what_tick)
 
 
 	}
+#endif
 }

@@ -1,0 +1,1 @@
+.\x64\Debug\CsRemake.exe -map test_level2.glb

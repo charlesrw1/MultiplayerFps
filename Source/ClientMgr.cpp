@@ -60,7 +60,7 @@ void ClServerMgr::TrySendingConnect()
 	uint8_t buffer[256];
 	ByteWriter writer(buffer, 256);
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(Msg_ConnectRequest);
+	writer.WriteByte(CONNECT_REQUEST);
 	const char name[] = "Charlie";
 	writer.WriteByte(sizeof(name) - 1);
 	writer.WriteBytes((uint8_t*)name, sizeof(name) - 1);
@@ -74,7 +74,7 @@ void ClServerMgr::Disconnect()
 	if (state != TryingConnect) {
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
-		write.WriteByte(ClMessageQuit);
+		write.WriteByte(CL_QUIT);
 		write.EndWrite();
 		server.Send(buffer, write.BytesWritten());
 	}
@@ -135,12 +135,12 @@ void ClServerMgr::ReadPackets()
 void ClServerMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
 {
 	uint8_t type = buf.ReadByte();
-	if (type == Msg_AcceptConnection) {
+	if (type == ACCEPT_CONNECT) {
 		if (state != TryingConnect)
 			return;
 		StartConnection();
 	}
-	else if (type == Msg_RejectConnection) {
+	else if (type == REJECT_CONNECT) {
 		if (state != TryingConnect)
 			return;
 
@@ -167,7 +167,7 @@ void ClServerMgr::StartConnection()
 	// Request the next step in the setup
 	uint8_t buffer[256];
 	ByteWriter writer(buffer, 256);
-	writer.WriteByte(ClMessageText);
+	writer.WriteByte(CL_TEXT);
 	const char init_str[] = "init";
 	writer.WriteByte(sizeof(init_str) - 1);
 	writer.WriteBytes((uint8_t*)init_str, sizeof(init_str) - 1);
@@ -197,7 +197,7 @@ void ClServerMgr::OnServerInit(ByteReader& buf)
 	// Tell server to spawn us in
 	uint8_t buffer[64];
 	ByteWriter writer(buffer, 64);
-	writer.WriteByte(ClMessageText);
+	writer.WriteByte(CL_TEXT);
 	const char spawn_str[] = "spawn";
 	writer.WriteByte(sizeof(spawn_str) - 1);
 	writer.WriteBytes((uint8_t*)spawn_str, sizeof(spawn_str) - 1);
@@ -220,12 +220,12 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		uint8_t command = buf.ReadByte();
 		switch (command)
 		{
-		case SvNop:
+		case SV_NOP:
 			break;
-		case SvMessageInitial:
+		case SV_INITIAL:
 			OnServerInit(buf);
 			break;
-		case SvMessageSnapshot: {
+		case SV_SNAPSHOT: {
 			if (state == Connected) {
 				state = Spawned;
 			}
@@ -233,19 +233,20 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 			if (ignore_packet)
 				return;
 		}break;
-		case SvMessageDisconnect:
+		case SV_DISCONNECT:
 			DebugOut("disconnected by server\n");
 			myclient->Disconnect();
 			break;
-		case SvMessageText:
+		case SV_TEXT:
 			break;
-		case SvMessageTick:
+		case SV_TICK:
 		{
 			// just force it for now
 			int server_tick = buf.ReadLong();
-			if (abs(server_tick - myclient->tick) > 1) {
-				DebugOut("delta tick %d\n", server_tick - myclient->tick);
-				myclient->tick = server_tick;
+			if (abs(server_tick - engine.tick) > 1) {
+				DebugOut("delta tick %d\n", server_tick - engine.tick);
+				
+				engine.tick = server_tick;
 			}
 			myclient->last_recieved_server_tick = server_tick;
 		}break;
@@ -265,15 +266,13 @@ void ClServerMgr::SendMovesAndMessages()
 	if (state < Connected)
 		return;
 
-	//DebugOut("Wrote move to server\n");
-
 	// Send move
-	MoveCommand lastmove = *myclient->GetCommand(server.out_sequence);
+	MoveCommand lastmove = myclient->get_command(server.out_sequence);
 
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
-	writer.WriteByte(ClMessageInput);
-	writer.WriteLong(myclient->tick);
+	writer.WriteByte(CL_INPUT);
+	writer.WriteLong(engine.tick);
 	writer.WriteByte(MoveCommand::quantize(lastmove.forward_move));
 	writer.WriteByte(MoveCommand::quantize(lastmove.lateral_move));
 	writer.WriteByte(MoveCommand::quantize(lastmove.up_move));
@@ -282,7 +281,7 @@ void ClServerMgr::SendMovesAndMessages()
 	writer.WriteFloat(lastmove.view_angles.y);
 	writer.WriteLong(lastmove.button_mask);
 
-	writer.WriteByte(ClMessageSetBaseline);
+	writer.WriteByte(CL_SET_BASELINE);
 	if (force_full_update)
 		writer.WriteLong(-1);
 	else
@@ -313,7 +312,7 @@ bool ClServerMgr::OnEntSnapshot(ByteReader& msg)
 	if (delta_tick != -1) {
 		from = myclient->FindSnapshotForTick(delta_tick);
 		if (!from) {
-			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, myclient->tick);
+			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, engine.tick);
 			return true;
 		}
 	}
@@ -351,7 +350,7 @@ bool ClServerMgr::OnEntSnapshot(ByteReader& msg)
 
 	ReadDeltaPState(ps, msg);
 
-	myclient->SetupSnapshot(nextsnapshot);
+	myclient->read_snapshot(nextsnapshot);
 
 	return false;
 }

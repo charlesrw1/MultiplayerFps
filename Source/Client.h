@@ -22,26 +22,16 @@ struct ClientEntity
 	const static int NUM_STORED_STATES = 25;
 	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
 
-	short id = 0;
-	bool active = false;
-
 	// history of updates for interpolation
 	StateHist hist;
-	int current_hist_index = 0;
+	int hist_index = 0;
 	EntityState interpstate;
-
-	Animator animator;
-	const Model* model = nullptr;
 
 	StateEntry* GetStateFromIndex(int index);
 	StateEntry* GetLastState();
-	void OnRecieveUpdate(const EntityState* state, int tick);
-	void InterpolateState(double time, double tickrate);
 	void ClearState() {
 		for (int i = 0; i < hist.size(); i++)
 			hist.at(i) = { -1, {} };
-		model = nullptr;
-		animator.Clear();
 	}
 };
 
@@ -59,37 +49,6 @@ enum ClientConnectionState {
 	TryingConnect,	// trying to connect to server
 	Connected,		// connected and receiving inital state
 	Spawned,		// in server as normal
-};
-class ClientGame
-{
-public:
-	ClientGame();
-	void Init();
-
-	//void ClearState();
-	//void NewMap(const char* mapname);
-	
-	void ComputeAnimationMatricies();
-	void InterpolateEntStates();
-
-	void RunCommand(const PlayerState* in, PlayerState* out, MoveCommand cmd, bool run_fx);
-
-	//void PreRenderUpdate();	// update client side stuff
-
-	ClientEntity* EntForIndex(int index) {
-		ASSERT(index >= 0 && index < entities.size());
-		return &entities[index];
-	}
-
-	//void BuildPhysicsWorld();
-
-	Random rand;	// only use for client-side effects
-	//PhysicsWorld phys;
-	ParticleMgr particles;
-
-	std::vector<ClientEntity> entities;	// client side data
-public:
-
 };
 
 class Client;
@@ -154,15 +113,17 @@ public:
 	void Disconnect();
 	void Reconnect();
 
+	void read_packets();
+	void interpolate_states();
+	void read_snapshot(Snapshot* s);
+	void run_prediction();
+	MoveCommand& get_command(int sequence);
 
 	ClientConnectionState GetConState() const;
 	int GetPlayerNum() const;
-	ClientEntity* GetLocalPlayer();
 	bool IsInGame() const;
 
 	void ClearEntsThatDidntUpdate(int what_tick);
-	void SetupSnapshot(Snapshot* s);
-	MoveCommand* GetCommand(int sequence);
 	int GetCurrentSequence() const;
 	int GetLastSequenceAcked() const;
 	void SetNewTickRate(float tick_rate);
@@ -170,17 +131,12 @@ public:
 	Snapshot* FindSnapshotForTick(int tick);
 	Snapshot* GetCurrentSnapshot();
 
-	ClientGame cl_game;
-
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
-	std::vector<Snapshot> snapshots;
+	vector<Snapshot> snapshots;
 	PlayerState lastpredicted;
 	ClientEntity interpolation_data[MAX_GAME_ENTS];
-
-
-	int tick = 0;
-	double time=0.0;
+	vector<MoveCommand> commands;
 
 	// CONFIG VALS
 	Config_Var* cfg_interp_time;
@@ -192,7 +148,6 @@ public:
 
 	void ForceFullUpdate() { server_mgr.ForceFullUpdate(); }
 	ClServerMgr server_mgr;
-	void RunPrediction();
 private:
 	void CreateMoveCmd();
 	void DoViewAngleUpdate();

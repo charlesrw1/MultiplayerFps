@@ -27,7 +27,6 @@ struct Entity
 	glm::vec3 rotation = glm::vec3(0);
 	int model_index = 0;	// index into media.gamemodels
 
-	float scale = 0.f;
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
 	bool ducking = false;
@@ -42,13 +41,14 @@ struct Entity
 
 	float death_time = 0.0;
 	int health = 100;
-	ItemState wpns;
+	Item_State items;
 
 
 	Animator anim;
 	const Model* model = nullptr;
 
 	bool active() { return type != Ent_Free; }
+	void from_entity_state(EntityState es);
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
 	EntityState ToEntState() const;
@@ -172,9 +172,7 @@ public:
 	void WriteServerInfo(ByteWriter& msg);
 	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
-	Frame* GetSnapshotFrame() {
-		return &frames.at(this->tick % MAX_FRAME_HIST);
-	}
+	Frame* GetSnapshotFrame();
 	Frame* GetSnapshotFrameForTick(int tick) {
 		Frame* f = &frames.at(tick % MAX_FRAME_HIST);
 		if (f->tick != tick)
@@ -186,10 +184,6 @@ public:
 
 	std::vector<Frame> frames;
 	Frame nullframe;
-
-	// global time var that is swapped to aid with simming client cmds
-	int tick = 0;
-	double simtime = 0.0;
 
 	// CONFIG VARS
 	Config_Var* cfg_snapshot_rate;

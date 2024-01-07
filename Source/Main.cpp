@@ -121,7 +121,6 @@ void Game_Local::update_view()
 {
 	if (engine.engine_state != SPAWNED)
 		return;
-	ViewSetup setup;
 
 	// decay view_recoil
 	view_recoil.x = view_recoil.x * 0.9f;
@@ -133,13 +132,11 @@ void Game_Local::update_view()
 
 	vec3 true_front = AnglesToVector(true_viewangles.x, true_viewangles.y);
 
+	View_Setup setup;
 	setup.height = engine.window_h->integer;
 	setup.width = engine.window_w->integer;
-	setup.viewfov = fov;
-	setup.x = setup.y = 0;
-	setup.proj_mat = glm::perspective(setup.viewfov, (float)setup.width / setup.height, z_near, z_far);
-	setup.near = z_near;
-	setup.far = z_far;
+	setup.fov = glm::radians(fov->real);
+	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, 0.01f, 100.0f);
 
 	//if (update_camera) {
 	//	fly_cam.UpdateFromInput(engine.keys, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
@@ -147,30 +144,28 @@ void Game_Local::update_view()
 
 	if (thirdperson_camera->integer) {
 		//ClientEntity* player = client.GetLocalPlayer();
-		Entity& playerreal = engine.ents[0];
+		Entity& playerreal = engine.local_player();
 
 		vec3 view_angles = engine.local.view_angles;
 
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
 		fly_cam.position = playerreal.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 4.5f;
-		setup.view_mat = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
-		setup.viewproj = setup.proj_mat * setup.view_mat;
-		setup.viewfront = front;
-		setup.vieworigin = fly_cam.position;
+		setup.view = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
+		setup.front = front;
+		setup.origin = fly_cam.position;
 	}
-	else if (engine.cl)
+	else
 	{
-		ClientEntity* player = engine.cl->GetLocalPlayer();
-		EntityState* pstate = &player->interpstate;
-		float view_height = (pstate->ducking) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
-		vec3 cam_position = pstate->position + vec3(0, view_height, 0);
-		setup.view_mat = glm::lookAt(cam_position, cam_position + true_front, vec3(0, 1, 0));
-		setup.viewproj = setup.proj_mat * setup.view_mat;
-		setup.vieworigin = cam_position;
-		setup.viewfront = true_front;
+		Entity& player = engine.local_player();
+		float view_height = (player.ducking) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
+		vec3 cam_position = player.position + vec3(0, view_height, 0);
+		setup.view = glm::lookAt(cam_position, cam_position + true_front, vec3(0, 1, 0));
+		setup.origin = cam_position;
+		setup.front = true_front;
 	}
 
+	setup.viewproj = setup.proj * setup.view;
 	last_view = setup;
 
 }
@@ -205,8 +200,8 @@ void Game_Engine::make_move()
 	command.tick = tick;
 
 	if (!game_focused) {
-		if(is_host) local.last_command = command;
-		else local.get_command(cl->GetCurrentSequence()) = command;
+		local.last_command = command;
+		if(cl) cl->get_command(cl->GetCurrentSequence()) = command;
 		return;
 	}
 
@@ -238,8 +233,8 @@ void Game_Engine::make_move()
 	command.up_move			= MoveCommand::unquantize(MoveCommand::quantize(command.up_move));
 	
 	// FIXME:
-	if(is_host) local.last_command = command;
-	else local.get_command(cl->GetCurrentSequence()) = command;
+	local.last_command = command;
+	if(cl) cl->get_command(cl->GetCurrentSequence()) = command;
 }
 
 void Game_Engine::init_sdl_window()
@@ -357,7 +352,6 @@ public:
 	Shader basic_mod;
 	Shader particle_basic;
 
-	// std textures
 	uint32_t white_texture;
 	uint32_t black_texture;
 
@@ -386,7 +380,7 @@ private:
 	int cur_w = 0;
 	int cur_h = 0;
 	int cur_shader = -1;
-	ViewSetup vs;
+	View_Setup vs;
 
 	int cur_img_1 = -1;
 
@@ -453,7 +447,7 @@ void Renderer::SetStdShaderConstants(Shader* s)
 	s->set_float("fog_start", 10.f);
 	s->set_float("fog_end", 30.f);
 
-	s->set_vec3("view_front", vs.viewfront);
+	s->set_vec3("view_front", vs.front);
 	s->set_vec3("light_dir", glm::normalize(-vec3(1)));
 
 }
@@ -558,7 +552,7 @@ void Renderer::FrameDraw()
 
 	vs = gamel->last_view;
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	glViewport(vs.x, vs.y, vs.width, vs.height);
+	glViewport(0, 0, vs.width, vs.height);
 	glClearColor(1.f, 1.f, 0.f, 1.f);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
@@ -613,22 +607,16 @@ void Renderer::FrameDraw()
 
 void Renderer::DrawEntBlobShadows()
 {
-	if (!engine.cl)
-		return;
-
 	shadowverts.Begin();
 
-
-	auto cgame = &engine.cl->cl_game;
-	for (int i = 0; i < cgame->entities.size(); i++)
+	for (int i = 0; i <MAX_GAME_ENTS; i++)
 	{
-		ClientEntity* ce = &cgame->entities[i];
-		if (!ce->active) continue;
-		EntityState* s = &ce->interpstate;
+		Entity* e = &engine.ents[i];
+		if (!e->active()) continue;
 		
 		RayHit rh;
 		Ray r;
-		r.pos = s->position + glm::vec3(0,0.1f,0);
+		r.pos = e->position + glm::vec3(0,0.1f,0);
 		r.dir = glm::vec3(0, -1, 0);
 		engine.phys.TraceRay(r, &rh, i, Pf_World);
 
@@ -790,7 +778,7 @@ void Renderer::AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Col
 
 void Renderer::DrawPlayerViewmodel()
 {
-	mat4 invview = glm::inverse(vs.view_mat);
+	mat4 invview = glm::inverse(vs.view);
 
 	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
 	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
@@ -820,10 +808,14 @@ int Game_Engine::player_num()
 	ASSERT(0);
 	return 0;
 }
+Entity& Game_Engine::local_player()
+{
+	ASSERT(engine_state >= LOADING);
+	return ents[player_num()];
+}
 
 void Game_Engine::connect_to(string address)
 {
-
 	if (is_host)
 		exit_map();
 	if (cl)
@@ -908,8 +900,8 @@ int main(int argc, char** argv)
 void Game_Local::init()
 {
 	view_angles = glm::vec3(0.f);
-	commands.resize(CLIENT_MOVE_HISTORY);
 	thirdperson_camera = cfg.get_var("thirdperson_camera", "1");
+	fov = cfg.get_var("fov", "70.0");
 }
 
 void Game_Engine::start_map(string map, bool is_client)
@@ -924,6 +916,9 @@ void Game_Engine::start_map(string map, bool is_client)
 	level = LoadLevelFile(mapname.c_str());
 	if (!level) 
 		return;
+
+	tick = 0;
+	time = 0;
 	
 	if (!is_client) {
 		server.start();
@@ -1071,6 +1066,7 @@ void Game_Engine::init()
 	memset(binds, 0, sizeof(binds));
 	num_entities = 0;
 	level = nullptr;
+	cl = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 	engine_state = MAINMENU;
 	is_host = false;
@@ -1224,18 +1220,12 @@ void Game_Engine::loop()
 
 			if (!is_host && cl) {
 				cl->server_mgr.SendMovesAndMessages();
-				//if (client.GetConState() == Disconnected && server.active) {
-				//	// connect to the local server
-				//	IPAndPort serv_addr;
-				//	serv_addr.SetIp(127, 0, 0, 1);
-				//	serv_addr.port = cfg.find_var("host_port")->integer;
-				//	client.Connect(serv_addr);
-				//}
 				cl->server_mgr.TrySendingConnect();
 			}
 
+			time = tick * tick_interval;
 			if (is_host) {
-				server.simtime = tick * engine.tick_interval;
+				//server.simtime = tick * engine.tick_interval;
 				server.ReadPackets();
 
 				update_game_tick();
@@ -1243,17 +1233,21 @@ void Game_Engine::loop()
 				server.BuildSnapshotFrame();
 				for (int i = 0; i < server.clients.size(); i++)
 					server.clients[i].Update();
-				server.tick += 1;
+				tick += 1;
+				//server.tick += 1;
 			}
 
 
 			if (!is_host && cl) {
 				if (cl->GetConState() == Spawned) {
-					cl->tick += 1;
-					cl->time = cl->tick * engine.tick_interval;
+					tick += 1;
+					time = tick * tick_interval;
+					//cl->tick += 1;
+					//cl->time = cl->tick * engine.tick_interval;
 				}
 				cl->server_mgr.ReadPackets();
-				cl->RunPrediction();
+				cl->run_prediction();
+
 				switch (cl->GetConState()) {
 				case Disconnected:
 				case TryingConnect:engine_state = MAINMENU; break;
@@ -1271,8 +1265,8 @@ void Game_Engine::pre_render_update()
 {
 	if (engine_state == SPAWNED) {
 		// interpolate entities for rendering
-		if(!is_host)
-			cl->cl_game.InterpolateEntStates();
+		if (!is_host)
+			cl->interpolate_states();
 
 		//cl_game.ComputeAnimationMatricies();
 		for (int i = 0; i < MAX_GAME_ENTS; i++) {
@@ -1289,10 +1283,7 @@ void Game_Engine::pre_render_update()
 			ent.anim.ConcatWithInvPose();
 		}
 
-		//cl->cl_game.UpdateViewModelOffsets();
-		//cl->cl_game.UpdateViewmodelAnimation();
 		local.update_viewmodel();
 	}
 	local.update_view();
-	//cl->cl_game.UpdateCamera();
 }

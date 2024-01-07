@@ -26,26 +26,24 @@ const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
 const int DEFAULT_SNAPSHOT_RATE = 30;	// send x snapshots a second
 
 
-
 // Messages
-enum ServerToClient
+enum Server_To_Client
 {
-	SvNop = 0,
-	SvMessageInitial,	// first message to send back to client
-	SvMessageTick,
-	SvMessageSnapshot,	
-	SvMessagePlayerState,
-	SvMessageDisconnect,
-	SvMessageText,
+	SV_NOP = 0,
+	SV_INITIAL,	// first message to send back to client
+	SV_TICK,
+	SV_SNAPSHOT,	
+	SV_DISCONNECT,
+	SV_TEXT,
 };
-enum ClientToServer
+enum Client_To_Server
 {
-	ClNop = 0,
-	ClMessageInput,
-	ClMessageQuit,
-	ClMessageText,
-	ClMessageDelta,
-	ClMessageSetBaseline,
+	CL_NOP = 0,
+	CL_INPUT,
+	CL_QUIT,
+	CL_TEXT,
+	CL_DELTA,
+	CL_SET_BASELINE,
 };
 
 // Connection initilization
@@ -55,11 +53,11 @@ enum ClientToServer
 // client sends "init" cmd
 // server sends back inital server data to client
 // client then sends "spawn" cmd and server sends regular snapshots
-enum InitialMessageTypes
+enum Initial_Messages
 {
-	Msg_ConnectRequest = 'c',
-	Msg_AcceptConnection = 'a',
-	Msg_RejectConnection = 'r'
+	CONNECT_REQUEST = 'c',
+	ACCEPT_CONNECT = 'a',
+	REJECT_CONNECT = 'r'
 };
 
 enum EntType
@@ -91,9 +89,9 @@ struct EntityState
 };
 
 
-enum ItemUseState
+enum Item_Use_State
 {
-	Item_Idle,
+	ITEM_IDLE,
 	Item_InFire,
 	Item_InSecFire,
 	Item_Reload,
@@ -102,9 +100,9 @@ enum ItemUseState
 	Item_Lowering,
 };
 
-struct ItemState
+struct Item_State
 {
-	ItemState() {
+	Item_State() {
 		memset(ammo, 0, sizeof(ammo));
 		memset(clip, 0, sizeof(clip));
 	}
@@ -121,7 +119,7 @@ struct ItemState
 
 	bool reloading = false;
 	float gun_timer = 0.f;
-	ItemUseState state = Item_Idle;
+	Item_Use_State state = ITEM_IDLE;
 };
 
 // State specific to the client's player that is transmitted
@@ -136,7 +134,7 @@ struct PlayerState
 	bool alive = false;
 	bool in_jump = false;
 
-	ItemState items;
+	Item_State items;
 };
 
 // taken from quake 3, a nice idea

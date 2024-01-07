@@ -10,6 +10,9 @@
 #include "Util.h"
 #include "Animation.h"
 
+using std::string;
+using std::vector;
+
 #define MAX_BONES 256
 
 enum class VertexFormat
@@ -68,18 +71,18 @@ public:
 		uint32_t size = 0;
 		void Bind();
 	};
-	std::string name;
+	string name;
 
-	std::vector<Bone> bones;
-	std::vector<char> bone_string_table;
+	vector<Bone> bones;
+	vector<char> bone_string_table;
 	std::unique_ptr<AnimationSet> animations;
-	std::vector<ModelHitbox> hitboxes;
-	std::vector<ModelAttachment> attachments;
+	vector<ModelHitbox> hitboxes;
+	vector<ModelAttachment> attachments;
 
 	VertexFormat format=VertexFormat::Static;
-	std::vector<MeshPart> parts;
-	std::vector<GpuBuffer> buffers;
-	std::vector<MeshMaterial> materials;
+	vector<MeshPart> parts;
+	vector<GpuBuffer> buffers;
+	vector<MeshMaterial> materials;
 
 	int BoneForName(const char* name);
 };

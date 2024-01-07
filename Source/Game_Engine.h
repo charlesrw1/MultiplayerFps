@@ -14,24 +14,22 @@ enum Engine_State
 class Game_Local
 {
 public:
-	// >>>
-	PlayerState last_player_state;
-	// <<<
-
-	vec3 view_angles;
-	vector<MoveCommand> commands;
-	MoveCommand last_command;
+	void init();
+	void update_view();
+	void update_viewmodel();
 
 	Config_Var* thirdperson_camera;
+	Config_Var* fov;
+
+	PlayerState last_player_state;
+	vec3 view_angles;
+	MoveCommand last_command;
+	View_Setup last_view;
 
 	bool using_debug_cam = false;
-	float z_near = 0.01f;
-	float z_far = 100.f;
-	float fov = glm::radians(70.f);
 	FlyCamera fly_cam;
-	ViewSetup last_view;
 
-	ItemUseState prev_item_state = Item_Idle;
+	Item_Use_State prev_item_state = ITEM_IDLE;
 	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
 	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
 
@@ -41,17 +39,6 @@ public:
 	float vm_recoil_end_time = 0.f;
 	glm::vec3 viewmodel_recoil_ofs = glm::vec3(0.f);
 	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
-
-public:
-	void init();
-	void update_view();
-	void update_viewmodel();
-	bool should_draw_viewmodel() { }
-
-	MoveCommand& get_command(int sequence) {
-		return commands.at(sequence % commands.size());
-	}
-	
 };
 
 class Client;
@@ -76,6 +63,8 @@ public:
 
 	void connect_to(string address);
 	int player_num();
+	Entity& local_player();
+
 public:
 	Client* cl;
 

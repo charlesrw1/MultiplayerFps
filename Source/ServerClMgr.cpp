@@ -28,7 +28,7 @@ void RemoteClient::Disconnect()
 
 	uint8_t buffer[8];
 	ByteWriter writer(buffer, 8);
-	writer.WriteByte(SvMessageDisconnect);
+	writer.WriteByte(SV_DISCONNECT);
 	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
 
@@ -86,7 +86,7 @@ void RemoteClient::SendInitData()
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter msg(buffer, MAX_PAYLOAD_SIZE);
 
-	msg.WriteByte(SvMessageInitial);
+	msg.WriteByte(SV_INITIAL);
 	msg.WriteByte(client_num);
 	myserver->WriteServerInfo(msg);		// let server fill in data
 	msg.EndWrite();
@@ -112,10 +112,10 @@ void RemoteClient::Update()
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
 
-	writer.WriteByte(SvMessageTick);
-	writer.WriteLong(myserver->tick);
+	writer.WriteByte(SV_TICK);
+	writer.WriteLong(engine.tick);
 
-	writer.WriteByte(SvMessageSnapshot);
+	writer.WriteByte(SV_SNAPSHOT);
 	myserver->WriteDeltaSnapshot(writer, baseline, client_num);
 	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
@@ -137,20 +137,20 @@ void RemoteClient::OnPacket(ByteReader& buf)
 		uint8_t command = buf.ReadByte();
 		switch (command)
 		{
-		case ClNop:
+		case CL_NOP:
 			break;
-		case ClMessageInput:
+		case CL_INPUT:
 			OnMoveCmd(buf);
 			break;
-		case ClMessageQuit:
+		case CL_QUIT:
 			Disconnect();
 			break;
-		case ClMessageSetBaseline: {
+		case CL_SET_BASELINE: {
 			int newbaseline = buf.ReadLong();
 			baseline = newbaseline;
 		}
 			break;
-		case ClMessageText:
+		case CL_TEXT:
 			OnTextCommand(buf);
 			break;
 		default:
@@ -315,7 +315,7 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 	to->items.active_item = msg.ReadByte();
 	to->items.item_bitmask = msg.ReadLong();
 
-	for (int i = 0; i < ItemState::MAX_ITEMS; i++) {
+	for (int i = 0; i < Item_State::MAX_ITEMS; i++) {
 		if (!(to->items.item_bitmask & (1 << i)))
 			continue;
 		to->items.item_id[i] = msg.ReadByte();
@@ -323,7 +323,7 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 		to->items.clip[i] = msg.ReadShort();
 	}
 	to->items.gun_timer = msg.ReadFloat();
-	to->items.state = (ItemUseState)msg.ReadByte();
+	to->items.state = (Item_Use_State)msg.ReadByte();
 
 	// items <<<
 }
@@ -361,7 +361,7 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 	msg.WriteByte(to->items.active_item);
 	msg.WriteLong(to->items.item_bitmask);
 
-	for (int i = 0; i < ItemState::MAX_ITEMS; i++) {
+	for (int i = 0; i < Item_State::MAX_ITEMS; i++) {
 		if (!(to->items.item_bitmask & (1 << i)))
 			continue;
 		msg.WriteByte(to->items.item_id[i]);

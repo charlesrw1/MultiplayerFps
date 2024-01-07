@@ -300,8 +300,8 @@ void PlayerMovement::RunItemCode()
 	bool wants_shoot = cmd.button_mask & CmdBtn_PFire;
 	bool wants_reload = cmd.button_mask & CmdBtn_Reload;
 
-	ItemState* w = &player.items;
-	if (!(w->active_item >= 0 && w->active_item < ItemState::MAX_ITEMS)) {
+	Item_State* w = &player.items;
+	if (!(w->active_item >= 0 && w->active_item < Item_State::MAX_ITEMS)) {
 		printf("invalid active_item\n");
 		return;
 	}
@@ -325,7 +325,7 @@ void PlayerMovement::RunItemCode()
 		w->state = Item_Reload;
 	}
 	else {
-		w->state = Item_Idle;
+		w->state = ITEM_IDLE;
 		w->reloading = false;
 	}
 }

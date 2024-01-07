@@ -61,8 +61,6 @@ void Server::end()
 		clients[i].Disconnect();
 
 	active = false;
-	tick = 0;
-	simtime = 0.0;
 	socket.Shutdown();
 }
 
@@ -70,8 +68,6 @@ void Server::start()
 {
 	if (active)
 		end();
-	tick = 0;
-	simtime = 0.0;
 	socket.Init(cfg_sv_port->integer);
 
 	DebugOut("spawning with map %s\n", engine.mapname.c_str());
@@ -85,12 +81,12 @@ void Server::FixedUpdate(double dt)
 {
 	if (!IsActive())
 		return;
-	simtime = tick * engine.tick_interval;
+	//simtime = tick * engine.tick_interval;
 	ReadPackets();
 	game.Update();
 	BuildSnapshotFrame();
 	UpdateClients();
-	tick += 1;
+	//tick += 1;
 }
 
 void Server::RemoveClient(int client)
@@ -98,11 +94,16 @@ void Server::RemoveClient(int client)
 	game.OnClientLeave(client);
 }
 
+Frame* Server::GetSnapshotFrame()
+{
+	return &frames.at(engine.tick % MAX_FRAME_HIST);
+}
+
 void Server::BuildSnapshotFrame()
 {
 	Frame* frame = GetSnapshotFrame();
 	Game* g = &game;
-	frame->tick = tick;
+	frame->tick = engine.tick;
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 		frame->ps_states[i] = engine.ents[i].ToPlayerState();
 	}
@@ -169,7 +170,7 @@ static void RejectConnectRequest(Socket* sock, IPAndPort addr, const char* why)
 	uint8_t buffer[512];
 	ByteWriter writer(buffer, 512);
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(Msg_RejectConnection);
+	writer.WriteByte(REJECT_CONNECT);
 	int len = strlen(why);
 	if (len >= 256) {
 		ASSERT(0);
@@ -189,7 +190,7 @@ void Server::UnknownPacket(ByteReader& buf, IPAndPort addr)
 {
 	DebugOut("Connectionless packet recieved from %s\n", addr.ToString().c_str());
 	uint8_t command = buf.ReadByte();
-	if (command == Msg_ConnectRequest) {
+	if (command == CONNECT_REQUEST) {
 		ConnectNewClient(buf, addr);
 	}
 	else {
@@ -226,7 +227,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	uint8_t accept_buf[32];
 	ByteWriter writer(accept_buf, 32);
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(Msg_AcceptConnection);
+	writer.WriteByte(ACCEPT_CONNECT);
 	int pad_bytes = 8 - writer.BytesWritten();
 	for (int i = 0; i < pad_bytes; i++)
 		writer.WriteByte(0);

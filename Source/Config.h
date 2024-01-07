@@ -5,6 +5,7 @@
 #include <vector>
 
 using std::string;
+using std::vector;
 
 struct Config_Var
 {
@@ -37,7 +38,7 @@ public:
 	void execute_file(const char* path);
 
 	// called by Engine_Cmd_Function callbacks
-	const std::vector<string>& get_arg_list() { return args; }
+	const vector<string>& get_arg_list() { return args; }
 	void print_vars() {
 		for (int i = 0; i < num_vars; i++) {
 			printf("%--36s %s\n", vars[i].name.c_str(), vars[i].value.c_str());
@@ -53,7 +54,7 @@ private:
 	Config_Var vars[MAX_VARS];
 	int num_vars = 0;
 
-	std::vector<string> args;
+	vector<string> args;
 };
 
 extern Engine_Config cfg;
