@@ -10,20 +10,7 @@ static const float CONNECT_RETRY = 1.f;
 
 ClServerMgr::ClServerMgr()// : sock_emulator(&sock)
 {
-	DisableLag();
-}
-
-
-void ClServerMgr::DisableLag()
-{
 	sock.enabled = false;
-}
-void ClServerMgr::EnableLag(int lag, int jitter, int loss)
-{
-	sock.enabled = true;
-	sock.lag = lag;
-	sock.jitter = jitter;
-	sock.loss = loss;
 }
 
 void ClServerMgr::Init(Client* parent)
@@ -31,23 +18,30 @@ void ClServerMgr::Init(Client* parent)
 	sock.Init(0);
 	myclient = parent;
 }
-void ClServerMgr::Connect(const IPAndPort& where)
+void ClServerMgr::connect(string address)
 {
-	DebugOut("connecting to server: %s\n", where.ToString().c_str());
-	server.remote_addr = where;
+	DebugOut("connecting to server: %s\n", address.c_str());
+
+	serveraddr = address;
+	IPAndPort ip;
+	ip.set(address);
+	if (ip.port == 0)ip.port = DEFAULT_SERVER_PORT;
+	server.remote_addr = ip;
 	connect_attempts = 0;
 	attempt_time = -1000.f;
-	state = TryingConnect;
+	state = CS_TRYINGCONNECT;
+	client_num = -1;
+
 	TrySendingConnect();
 }
 
 void ClServerMgr::TrySendingConnect()
 {
-	if (state != TryingConnect)
+	if (state != CS_TRYINGCONNECT)
 		return;
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
 		DebugOut("Unable to connect to server\n");
-		state = Disconnected;
+		state = CS_DISCONNECTED;
 		return;
 	}
 	double delta = GetTime() - attempt_time;
@@ -60,41 +54,38 @@ void ClServerMgr::TrySendingConnect()
 	uint8_t buffer[256];
 	ByteWriter writer(buffer, 256);
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(CONNECT_REQUEST);
-	const char name[] = "Charlie";
-	writer.WriteByte(sizeof(name) - 1);
-	writer.WriteBytes((uint8_t*)name, sizeof(name) - 1);
+	writer.write_string("connect");
 	writer.EndWrite();
 	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
 }
 void ClServerMgr::Disconnect()
 {
-	if (state == Disconnected)
+	if (state == CS_DISCONNECTED)
 		return;
-	if (state != TryingConnect) {
+	if (state != CS_TRYINGCONNECT) {
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
 		write.WriteByte(CL_QUIT);
 		write.EndWrite();
 		server.Send(buffer, write.BytesWritten());
 	}
-	state = Disconnected;
+	state = CS_DISCONNECTED;
 
 	client_num = -1;
 	server.remote_addr = IPAndPort();
 }
+
 
 void ClServerMgr::ReadPackets()
 {
 	//ASSERT(myclient->initialized);
 	
 	// check cfg var updates
-	if (myclient->cfg_fake_lag->integer == 0 && myclient->cfg_fake_loss->integer == 0)
-		DisableLag();
-	else
-		EnableLag(myclient->cfg_fake_lag->integer, 0, myclient->cfg_fake_loss->integer);
-	
-	
+	sock.loss = myclient->cfg_fake_loss->integer;
+	sock.lag = myclient->cfg_fake_lag->integer;
+	sock.jitter = 0;
+	sock.enabled = !(sock.loss == 0 && sock.lag == 0 && sock.jitter == 0);
+
 	uint8_t inbuffer[MAX_PAYLOAD_SIZE + PACKET_HEADER_SIZE];
 	size_t recv_len = 0;
 	IPAndPort from;
@@ -103,13 +94,45 @@ void ClServerMgr::ReadPackets()
 	{
 		if (recv_len < PACKET_HEADER_SIZE)
 			continue;
+
+		// connectionless packet
 		if (*(uint32_t*)inbuffer == CONNECTIONLESS_SEQUENCE) {
-			ByteReader reader(inbuffer + 4, recv_len - 4);
-			HandleUnknownPacket(from, reader);
+			ByteReader buf(inbuffer + 4, recv_len - 4);
+			
+			string msg;
+			buf.read_string(msg);
+
+			if (msg == "accept" && state == CS_TRYINGCONNECT) {
+				int client_num_ = buf.ReadByte();
+				string mapname;
+				buf.read_string(mapname);
+				int tick = buf.ReadLong();
+				float tickrate = buf.ReadFloat();
+
+
+				DebugOut("Player num: %d, Map: %s, tickrate %f\n", client_num, mapname.c_str(), tickrate);
+				DebugOut("loading map...\n");
+
+				// We now have a valid connection with the server
+				server.Init(&sock, server.remote_addr);
+				state = CS_CONNECTED;
+				engine.start_map(mapname, true);
+				engine.set_tick_rate(tickrate);
+				engine.tick = tick;
+				client_num = client_num_;
+			}
+			else if (msg == "reject" && state == CS_TRYINGCONNECT) {
+				printf("Connection rejected\n");
+				myclient->Disconnect();
+			}
+			else {
+				DebugOut("Unknown connectionless packet type\n");
+			}
+
 			continue;
 		}
 
-		if ((state == Connected || state == Spawned) && from == server.remote_addr) {
+		if (state >= CS_CONNECTED && from == server.remote_addr) {
 			int header = server.NewPacket(inbuffer, recv_len);
 			if (header != -1) {
 				ByteReader reader(inbuffer + header, recv_len - header);
@@ -118,7 +141,7 @@ void ClServerMgr::ReadPackets()
 		}
 	}
 
-	if (state == Connected || state == Spawned) {
+	if (state >= CS_CONNECTED) {
 		if (GetTime() - server.last_recieved > myclient->cfg_cl_time_out->real) {
 			printf("Server timed out\n");
 			myclient->Disconnect();
@@ -131,33 +154,7 @@ void ClServerMgr::ReadPackets()
 
 }
 
-
-void ClServerMgr::HandleUnknownPacket(IPAndPort addr, ByteReader& buf)
-{
-	uint8_t type = buf.ReadByte();
-	if (type == ACCEPT_CONNECT) {
-		if (state != TryingConnect)
-			return;
-		StartConnection();
-	}
-	else if (type == REJECT_CONNECT) {
-		if (state != TryingConnect)
-			return;
-
-		uint8_t len = buf.ReadByte();
-		char reason[256 + 1];
-		for (int i = 0; i < len; i++) {
-			reason[i] = buf.ReadByte();
-		}
-		reason[len] = '\0';
-		if (!buf.HasFailed())
-			printf("Connection rejected: %s\n", reason);
-		myclient->Disconnect();
-	}
-	else {
-		DebugOut("Unknown connectionless packet type\n");
-	}
-}
+#if 0
 
 void ClServerMgr::StartConnection()
 {
@@ -178,6 +175,7 @@ void ClServerMgr::StartConnection()
 
 void ClServerMgr::OnServerInit(ByteReader& buf)
 {
+	ASSERT(0);
 	client_num = buf.ReadByte();
 
 	int map_len = buf.ReadByte();
@@ -205,6 +203,8 @@ void ClServerMgr::OnServerInit(ByteReader& buf)
 	server.Send(buffer, writer.BytesWritten());
 }
 
+#endif
+
 void ClServerMgr::HandleServerPacket(ByteReader& buf)
 {
 	for (;;)
@@ -223,11 +223,12 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 		case SV_NOP:
 			break;
 		case SV_INITIAL:
-			OnServerInit(buf);
+			ASSERT(0);
+			//OnServerInit(buf);
 			break;
 		case SV_SNAPSHOT: {
-			if (state == Connected) {
-				state = Spawned;
+			if (state == CS_CONNECTED) {
+				state = CS_SPAWNED;
 			}
 			bool ignore_packet = OnEntSnapshot(buf);
 			if (ignore_packet)
@@ -263,7 +264,7 @@ void ClServerMgr::HandleServerPacket(ByteReader& buf)
 
 void ClServerMgr::SendMovesAndMessages()
 {
-	if (state < Connected)
+	if (state < CS_CONNECTED)
 		return;
 
 	// Send move

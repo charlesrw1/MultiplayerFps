@@ -31,7 +31,7 @@ void Client::Init()
 void Client::Disconnect()
 {
 	DebugOut("disconnecting\n");
-	if (GetConState() == Disconnected)
+	if (get_state() == CS_DISCONNECTED)
 		return;
 	server_mgr.Disconnect();
 	//cl_game.ClearState();
@@ -39,16 +39,16 @@ void Client::Disconnect()
 void Client::Reconnect()
 {
 	DebugOut("reconnecting\n");
-	IPAndPort addr = server_mgr.GetCurrentServerAddr();
+	//IPAndPort addr = server_mgr.GetCurrentServerAddr();
 	Disconnect();
-	Connect(addr);
+	connect(server_mgr.serveraddr);
 }
-void Client::Connect(IPAndPort addr)
+void Client::connect(string address)
 {
-	DebugOut("connecting to %s", addr.ToString().c_str());
-	server_mgr.Connect(addr);
+	DebugOut("connecting to %s", address.c_str());
+	server_mgr.connect(address);
 }
-ClientConnectionState Client::GetConState() const
+Client_State Client::get_state() const
 {
 	return server_mgr.GetState();
 }
@@ -69,16 +69,7 @@ int Client::GetLastSequenceAcked() const
 {
 	return server_mgr.OutSequenceAk();
 }
-void Client::CheckLocalServerIsRunning()
-{
-	if (GetConState() == Disconnected && IsServerActive()) {
-		// connect to the local server
-		IPAndPort serv_addr;
-		serv_addr.SetIp(127, 0, 0, 1);
-		serv_addr.port = cfg.find_var("host_port")->integer;
-		server_mgr.Connect(serv_addr);
-	}
-}
+
 void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 {
 	entstate->position = state->position;
@@ -87,70 +78,9 @@ void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 	entstate->type = Ent_Player;
 }
 
-
-void Client::DoViewAngleUpdate()
-{
-	int x, y;
-	SDL_GetRelativeMouseState(&x, &y);
-
-	float x_off = x;
-	float y_off = y;
-	x_off *= cfg_mouse_sensitivity->real;
-	y_off *= cfg_mouse_sensitivity->real;
-
-	glm::vec3 view_angles = engine.local.view_angles;
-	view_angles.x -= y_off;	// pitch
-	view_angles.y += x_off;	// yaw
-	view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
-	view_angles.y = fmod(view_angles.y, TWOPI);
-	engine.local.view_angles = view_angles;
-}
-
-void Client::CreateMoveCmd()
-{
-	if (engine.game_focused) {
-		DoViewAngleUpdate();
-	}
-
-	MoveCommand new_cmd{};
-	new_cmd.view_angles = engine.local.view_angles;
-
-	bool* keys = engine.keys;
-	if (keys[SDL_SCANCODE_W])
-		new_cmd.forward_move += 1.f;
-	if (keys[SDL_SCANCODE_S])
-		new_cmd.forward_move -= 1.f;
-	if (keys[SDL_SCANCODE_A])
-		new_cmd.lateral_move += 1.f;
-	if (keys[SDL_SCANCODE_D])
-		new_cmd.lateral_move -= 1.f;
-	if (keys[SDL_SCANCODE_SPACE])
-		new_cmd.button_mask |= CmdBtn_Jump;
-	if (keys[SDL_SCANCODE_LSHIFT])
-		new_cmd.button_mask |= CmdBtn_Duck;
-	if (keys[SDL_SCANCODE_Q])
-		new_cmd.button_mask |= CmdBtn_PFire;
-	if (keys[SDL_SCANCODE_E])
-		new_cmd.button_mask |= CmdBtn_Reload;
-	if (keys[SDL_SCANCODE_Z])
-		new_cmd.up_move += 1.f;
-	if (keys[SDL_SCANCODE_X])
-		new_cmd.up_move -= 1.f;
-
-	new_cmd.tick = engine.tick;
-
-	// quantize and unquantize for local prediction
-	new_cmd.forward_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.forward_move));
-	new_cmd.lateral_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.lateral_move));
-	new_cmd.up_move = MoveCommand::unquantize(MoveCommand::quantize(new_cmd.up_move));
-
-	get_command(GetCurrentSequence()) = new_cmd;
-}
-
-
 void Client::run_prediction()
 {
-	if (GetConState() != Spawned)
+	if (get_state() != CS_SPAWNED)
 		return;
 	// predict commands from outgoing ack'ed to current outgoing
 	// TODO: dont repeat commands unless a new snapshot arrived
@@ -191,10 +121,10 @@ void Client::run_prediction()
 		predicted_player = move.player;
 	}
 
-	Entity* ent = engine.local_player();
+	Entity& ent = engine.local_player();
 
 	PlayerStateToClEntState(&last_estate, &predicted_player);
-	ent->from_entity_state(last_estate);
+	ent.from_entity_state(last_estate);
 	lastpredicted = predicted_player;
 }
 #if 0
@@ -458,6 +388,7 @@ fill the network transform history in client.interpolation_history
 later in frame:
 interpolate_state() fills the entities position/rotation with interpolated values for rendering
 */
+
 
 
 void Client::read_snapshot(Snapshot* s)

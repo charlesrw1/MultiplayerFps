@@ -77,17 +77,7 @@ bool Server::IsActive() const
 {
 	return active;
 }
-void Server::FixedUpdate(double dt)
-{
-	if (!IsActive())
-		return;
-	//simtime = tick * engine.tick_interval;
-	ReadPackets();
-	game.Update();
-	BuildSnapshotFrame();
-	UpdateClients();
-	//tick += 1;
-}
+
 
 void Server::RemoveClient(int client)
 {
@@ -124,14 +114,6 @@ void Server::SpawnClientInGame(int client)
 	DebugOut("Spawned client, %s\n", clients[client].GetIPStr().c_str());
 }
 
-void Server::WriteServerInfo(ByteWriter& msg)
-{
-	msg.WriteByte(engine.mapname.size());
-	msg.WriteBytes((uint8_t*)engine.mapname.data(), engine.mapname.size());
-
-	msg.WriteFloat(cfg_tick_rate->real);
-}
-
 
 void Server::UpdateClients()
 {
@@ -148,7 +130,7 @@ void Server::connect_local_client()
 		clients[0].Disconnect();
 	}
 	clients[0].client_num = 0;
-	clients[0].state = RemoteClient::Spawned;
+	clients[0].state = SCS_SPAWNED;
 	IPAndPort ip;
 	ip.set("localhost");
 	clients[0].connection.Init(&socket, ip);
@@ -165,38 +147,6 @@ int Server::FindClient(IPAndPort addr) const {
 	return -1;
 }
 
-static void RejectConnectRequest(Socket* sock, IPAndPort addr, const char* why)
-{
-	uint8_t buffer[512];
-	ByteWriter writer(buffer, 512);
-	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(REJECT_CONNECT);
-	int len = strlen(why);
-	if (len >= 256) {
-		ASSERT(0);
-		return;
-	}
-	writer.WriteByte(len);
-	for (int i = 0; i < len; i++)
-		writer.WriteByte(why[i]);
-	int pad_bytes = 8 - writer.BytesWritten();
-	for (int i = 0; i < pad_bytes; i++)
-		writer.WriteByte(0);
-	writer.EndWrite();
-	sock->Send(buffer, writer.BytesWritten(), addr);
-}
-
-void Server::UnknownPacket(ByteReader& buf, IPAndPort addr)
-{
-	DebugOut("Connectionless packet recieved from %s\n", addr.ToString().c_str());
-	uint8_t command = buf.ReadByte();
-	if (command == CONNECT_REQUEST) {
-		ConnectNewClient(buf, addr);
-	}
-	else {
-		DebugOut("Unknown connectionless packet\n");
-	}
-}
 
 void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 {
@@ -204,33 +154,34 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	bool already_connected = false;
 	for (; spot < clients.size(); spot++) {
 		// if the "accept" response was dropped, client might send a connect again
-		if (clients[spot].state == RemoteClient::Connected && clients[spot].connection.remote_addr == addr) {
+		if (clients[spot].state >= SCS_CONNECTED && clients[spot].connection.remote_addr == addr) {
 			already_connected = true;
 			break;
 		}
-		if (clients[spot].state == RemoteClient::Dead)
+		if (clients[spot].state == SCS_DEAD)
 			break;
 	}
 	if (spot == clients.size()) {
-		RejectConnectRequest(&socket, addr, "Server is full");
+		uint8_t buffer[64];
+		ByteWriter writer(buffer, 64);
+		writer.WriteLong(CONNECTIONLESS_SEQUENCE);
+		writer.write_string("reject");
+		writer.EndWrite();
+		socket.Send(buffer, writer.BytesWritten(), addr);
+
 		return;
 	}
-	int name_len = buf.ReadByte();
-	char name_str[256 + 1];
-	for (int i = 0; i < name_len; i++) {
-		name_str[i] = buf.ReadByte();
-	}
-	name_str[name_len] = 0;
 	if (!already_connected)
-		DebugOut("Connected new client, %s; IP: %s\n", name_str, addr.ToString().c_str());
+		DebugOut("Connected new client; IP: %s\n", addr.ToString().c_str());
 
-	uint8_t accept_buf[32];
-	ByteWriter writer(accept_buf, 32);
+	uint8_t accept_buf[256];
+	ByteWriter writer(accept_buf, 256);
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.WriteByte(ACCEPT_CONNECT);
-	int pad_bytes = 8 - writer.BytesWritten();
-	for (int i = 0; i < pad_bytes; i++)
-		writer.WriteByte(0);
+	writer.write_string("accept");
+	writer.WriteByte(spot);
+	writer.write_string(engine.mapname);
+	writer.WriteLong(engine.tick);
+	writer.WriteFloat(cfg_tick_rate->real);
 	writer.EndWrite();
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
 
@@ -250,8 +201,18 @@ void Server::ReadPackets()
 		if (recv_len < PACKET_HEADER_SIZE)
 			continue;
 		if (*(uint32_t*)inbuffer == CONNECTIONLESS_SEQUENCE) {
-			ByteReader reader(inbuffer + 4, recv_len - 4);
-			UnknownPacket(reader, from);
+			ByteReader buf(inbuffer + 4, recv_len - 4);
+			
+			DebugOut("Connectionless packet recieved from %s\n", from.ToString().c_str());
+			string msg;
+			buf.read_string(msg);
+			if (msg == "connect") {
+				ConnectNewClient(buf, from);
+			}
+			else {
+				DebugOut("Unknown connectionless packet\n");
+			}
+
 			continue;
 		}
 

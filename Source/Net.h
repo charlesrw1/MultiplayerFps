@@ -46,20 +46,6 @@ enum Client_To_Server
 	CL_SET_BASELINE,
 };
 
-// Connection initilization
-// client sends "connect" msg until given a response or times out
-// server sends back "accepted" or "rejected"
-// Now communication happens through the sequenced 'Connection' class
-// client sends "init" cmd
-// server sends back inital server data to client
-// client then sends "spawn" cmd and server sends regular snapshots
-enum Initial_Messages
-{
-	CONNECT_REQUEST = 'c',
-	ACCEPT_CONNECT = 'a',
-	REJECT_CONNECT = 'r'
-};
-
 enum EntType
 {
 	Ent_Player,

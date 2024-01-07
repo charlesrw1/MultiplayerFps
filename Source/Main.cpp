@@ -821,12 +821,8 @@ void Game_Engine::connect_to(string address)
 	if (cl)
 		end_client();
 
-	IPAndPort ip;
-	ip.set(address);
-	if (ip.port == 0) ip.port = DEFAULT_SERVER_PORT;
-
 	startup_client();	// (cl = new Client)
-	cl->Connect(ip);
+	cl->connect(address);
 }
 
 void cmd_quit()
@@ -927,6 +923,15 @@ void Game_Engine::start_map(string map, bool is_client)
 		server.connect_local_client();
 	}
 	//client.server_mgr.force_into_local_game();
+}
+
+void Game_Engine::set_tick_rate(float tick_rate)
+{
+	if (is_host) {
+		printf("can't change tick rate while server is running\n");
+		return;
+	}
+	tick_interval = 1.0 / tick_rate;
 }
 
 void Game_Engine::exit_map()
@@ -1239,7 +1244,7 @@ void Game_Engine::loop()
 
 
 			if (!is_host && cl) {
-				if (cl->GetConState() == Spawned) {
+				if (cl->get_state() == CS_SPAWNED) {
 					tick += 1;
 					time = tick * tick_interval;
 					//cl->tick += 1;
@@ -1248,11 +1253,11 @@ void Game_Engine::loop()
 				cl->server_mgr.ReadPackets();
 				cl->run_prediction();
 
-				switch (cl->GetConState()) {
-				case Disconnected:
-				case TryingConnect:engine_state = MAINMENU; break;
-				case Connected: engine_state = LOADING; break;
-				case Spawned: engine_state = SPAWNED; break;
+				switch (cl->get_state()) {
+				case CS_DISCONNECTED:
+				case CS_TRYINGCONNECT:engine_state = MAINMENU; break;
+				case CS_CONNECTED: engine_state = LOADING; break;
+				case CS_SPAWNED: engine_state = SPAWNED; break;
 				}
 			}
 		}

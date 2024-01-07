@@ -65,6 +65,7 @@ public:
 	int player_num();
 	Entity& local_player();
 
+	void set_tick_rate(float tick_rate);
 public:
 	Client* cl;
 

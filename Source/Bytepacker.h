@@ -2,8 +2,11 @@
 #define SERIALIZATION_H
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include "glm/glm.hpp"
 #include "Util.h"
+
+using std::string;
 
 class ByteWriter
 {
@@ -99,6 +102,14 @@ public:
 		WriteBits(0, bits_to_align);
 		ASSERT(((8 - (scratch_bits % 8)) % 8) == 0);
 	}
+
+	void write_string(const string& str, int maxlen=512)
+	{
+		int size_bits = ceil(log2(maxlen));
+		WriteBits(str.size(), size_bits);
+		WriteBytes((uint8_t*)&str[0], str.size());
+	}
+
 private:
 	bool CheckOverrun(int bits_to_write) {
 		int bits_in_scratch = scratch_bits + bits_to_write;
@@ -192,6 +203,19 @@ public:
 				printf("bitreader read align failed\n");
 			}
 		}
+	}
+	void read_string(string& str, int maxlen = 512) 
+	{
+		int sizebits = ceil(log2(maxlen));
+		int length = ReadBits(sizebits);
+
+		if (length > maxlen) {
+			failed = true;
+			return;
+		}
+
+		str.resize(length);
+		ReadBytes((uint8_t*)&str[0], length);
 	}
 
 private:

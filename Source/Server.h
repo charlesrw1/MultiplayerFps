@@ -96,6 +96,13 @@ private:
 
 	short next_id = 0;
 };
+
+
+enum Server_Client_State {
+	SCS_DEAD,		// unused slot
+	SCS_CONNECTED,	// connected and sending initial state
+	SCS_SPAWNED		// spawned and sending snapshots
+};
 class Server;
 class RemoteClient
 {
@@ -110,8 +117,7 @@ public:
 	void OnTextCommand(ByteReader& msg);
 
 	void Update();		// sends snapshot and/or sends reliable
-	void SendInitData();
-
+	
 	void SendReliableMsg(ByteWriter& msg);
 
 	std::string GetIPStr() const {
@@ -121,18 +127,13 @@ public:
 		return connection.last_recieved;
 	}
 	bool IsConnected() const {
-		return state >= Connected;
+		return state >= SCS_CONNECTED;
 	}
 	bool IsSpawned() const {
-		return state == Spawned;
+		return state == SCS_SPAWNED;
 	}
 
-	enum ConnectionState {
-		Dead,		// unused slot
-		Connected,	// connected and sending initial state
-		Spawned		// spawned and sending snapshots
-	};
-	ConnectionState state = Dead;
+	Server_Client_State state = SCS_DEAD;
 	Connection connection;
 	float next_snapshot_time = 0.f;
 	int client_num = 0;
@@ -162,14 +163,12 @@ public:
 	void connect_local_client();
 
 	bool IsActive() const;
-	void FixedUpdate(double dt);
 
 	// client interface functions
 	Socket* GetSock() { return &socket; }
 	void RunMoveCmd(int client, MoveCommand cmd);
 	void SpawnClientInGame(int client);
 	void RemoveClient(int client);
-	void WriteServerInfo(ByteWriter& msg);
 	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
 	Frame* GetSnapshotFrame();
@@ -199,10 +198,8 @@ public:
 private:
 	Socket socket;
 	
-
 	int FindClient(IPAndPort addr) const;
 	void ConnectNewClient(ByteReader& msg, IPAndPort recv);
-	void UnknownPacket(ByteReader& msg, IPAndPort recv);
 };
 
 extern Server server;

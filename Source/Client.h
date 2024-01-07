@@ -44,11 +44,11 @@ struct Snapshot
 	PlayerState pstate;			// local player state, for prediction stuff
 };
 
-enum ClientConnectionState {
-	Disconnected,
-	TryingConnect,	// trying to connect to server
-	Connected,		// connected and receiving inital state
-	Spawned,		// in server as normal
+enum Client_State {
+	CS_DISCONNECTED,
+	CS_TRYINGCONNECT,	// trying to connect to server
+	CS_CONNECTED,		// connected and receiving inital state
+	CS_SPAWNED,			// in server as normal
 };
 
 class Client;
@@ -60,16 +60,14 @@ public:
 
 	void force_into_local_game() {
 		client_num = 0;
-		state = Spawned;
+		state = CS_SPAWNED;
 		server.Init(&sock, IPAndPort());
 	}
 
-	void Connect(const IPAndPort& port);
+	void connect(string address);
+
 	void Disconnect();
 	void TrySendingConnect();
-
-	void DisableLag();
-	void EnableLag(int jitter, int lag, int loss);
 
 	void ReadPackets();
 	void SendMovesAndMessages();
@@ -78,25 +76,23 @@ public:
 	int OutSequence() const { return server.out_sequence; }
 	int InSequence() const { return server.in_sequence; }
 	int ClientNum() const { return client_num; }
-	ClientConnectionState GetState() const { return state; }
+	Client_State GetState() const { return state; }
 	IPAndPort GetCurrentServerAddr() const { return server.remote_addr; }
 
 	void ForceFullUpdate() {
 		force_full_update = true;
 	}
-private:
-	void HandleUnknownPacket(IPAndPort from, ByteReader& msg);
+
 	void HandleServerPacket(ByteReader& msg);
 
-	void StartConnection();
-	
 	bool OnEntSnapshot(ByteReader& msg);
-	void OnServerInit(ByteReader& msg);
-private:
-	int client_num;
+
+	string serveraddr;
+	bool send_client_info = false;
+	int client_num = -1;
 	int connect_attempts;
 	double attempt_time;
-	ClientConnectionState state;
+	Client_State state;
 	EmulatedSocket sock;
 	Connection server;
 	Client* myclient = nullptr;
@@ -109,19 +105,17 @@ class Client
 public:
 	void Init();
 
-	void Connect(IPAndPort where);
+	void connect(string address);
 	void Disconnect();
 	void Reconnect();
 
-	void read_packets();
 	void interpolate_states();
 	void read_snapshot(Snapshot* s);
 	void run_prediction();
 	MoveCommand& get_command(int sequence);
 
-	ClientConnectionState GetConState() const;
+	Client_State get_state() const;
 	int GetPlayerNum() const;
-	bool IsInGame() const;
 
 	void ClearEntsThatDidntUpdate(int what_tick);
 	int GetCurrentSequence() const;
@@ -145,14 +139,8 @@ public:
 	Config_Var* cfg_cl_time_out;
 	Config_Var* cfg_mouse_sensitivity;
 
-
 	void ForceFullUpdate() { server_mgr.ForceFullUpdate(); }
 	ClServerMgr server_mgr;
-private:
-	void CreateMoveCmd();
-	void DoViewAngleUpdate();
-	void CheckLocalServerIsRunning();
-
 };
 
 

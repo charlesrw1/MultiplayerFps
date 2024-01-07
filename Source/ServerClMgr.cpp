@@ -10,19 +10,21 @@ RemoteClient::RemoteClient(Server* sv, int slot)
 
 void RemoteClient::InitConnection(IPAndPort address)
 {
-	connection.Clear();
-	state = Connected;
+	state = SCS_CONNECTED;
+	connection = Connection();
 	connection.Init(myserver->GetSock(), address);
 	local_client = false;
+	baseline = -1;
+	next_snapshot_time = 0.f;
 }
 
 void RemoteClient::Disconnect()
 {
-	if (state == Dead)
+	if (state == SCS_DEAD)
 		return;
 	DebugOut("Disconnecting client %s\n", connection.remote_addr.ToString().c_str());
 
-	if (state == Spawned) {
+	if (state == SCS_SPAWNED) {
 		myserver->RemoveClient(client_num);
 	}
 
@@ -32,7 +34,7 @@ void RemoteClient::Disconnect()
 	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
 
-	state = Dead;
+	state = SCS_DEAD;
 	connection.Clear();
 }
 
@@ -67,30 +69,6 @@ void RemoteClient::OnTextCommand(ByteReader& msg)
 
 	if (msg.HasFailed())
 		Disconnect();
-	if (cmd == "init") {
-		SendInitData();
-	}
-	else if (cmd == "spawn") {
-		if (state != RemoteClient::Spawned) {
-			state = RemoteClient::Spawned;
-			myserver->SpawnClientInGame(client_num);
-		}
-	}
-}
-
-void RemoteClient::SendInitData()
-{
-	if (state != Connected)
-		return;
-
-	uint8_t buffer[MAX_PAYLOAD_SIZE];
-	ByteWriter msg(buffer, MAX_PAYLOAD_SIZE);
-
-	msg.WriteByte(SV_INITIAL);
-	msg.WriteByte(client_num);
-	myserver->WriteServerInfo(msg);		// let server fill in data
-	msg.EndWrite();
-	connection.Send(buffer, msg.BytesWritten());
 }
 
 void RemoteClient::Update()
@@ -123,6 +101,12 @@ void RemoteClient::Update()
 
 void RemoteClient::OnPacket(ByteReader& buf)
 {
+	if (state != SCS_SPAWNED) {
+		state = SCS_SPAWNED;
+		myserver->SpawnClientInGame(client_num);
+	}
+
+
 	for(;;)
 	{
 		buf.AlignToByteBoundary();

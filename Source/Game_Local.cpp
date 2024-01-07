@@ -8,11 +8,6 @@
 #include "Config.h"
 #include "GameData.h"
 
-bool Client::IsInGame() const
-{
-	return GetConState() == Spawned;
-}
-
 
 glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 {
