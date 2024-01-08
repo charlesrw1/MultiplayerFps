@@ -20,6 +20,7 @@ public:
 
 	Config_Var* thirdperson_camera;
 	Config_Var* fov;
+	Config_Var* mouse_sensitivity;
 
 	PlayerState last_player_state;
 	vec3 view_angles;
@@ -41,6 +42,7 @@ public:
 	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
 };
 
+struct ImGuiContext;
 class Client;
 class Game_Engine
 {
@@ -54,7 +56,6 @@ public:
 	void exit_map();
 
 	void build_physics_world(float time);
-	void update_game_tick();
 	void execute_player_move(Entity* ent, MoveCommand cmd);
 
 	void pre_render_update();
@@ -64,10 +65,17 @@ public:
 	void connect_to(string address);
 	int player_num();
 	Entity& local_player();
-
 	void set_tick_rate(float tick_rate);
+
+	// Host functions
+	Entity* new_entity();
+	void free_entity(Entity* e);
+	void make_client(int num);
+	void client_leave(int num);
+	void update_game_tick();
 public:
 	Client* cl;
+	Server* sv;
 
 	string mapname;
 	Level* level;
@@ -84,13 +92,13 @@ public:
 	double tick_interval = 0.0;	// 1/tick_rate
 	int tick = 0;
 
+	ImGuiContext* imgui_context;
 	SDL_Window* window;
 	SDL_GLContext gl_context;
 	Config_Var* window_w;
 	Config_Var* window_h;
 	Config_Var* window_fullscreen;
 	Config_Var* host_port;
-	Config_Var* mouse_sensitivity;
 
 	bool dedicated_server = false;
 	bool keys[SDL_NUM_SCANCODES];
@@ -102,9 +110,6 @@ public:
 	int argc;
 	char** argv;
 private:
-	void startup_client();
-	void end_client();
-
 	void view_angle_update();
 	void make_move();
 	void init_sdl_window();

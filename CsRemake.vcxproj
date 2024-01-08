@@ -30,10 +30,10 @@
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Encode.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
+    <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="source\Game_Local.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Config.cpp" />
-    <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="Source\External\imgui_demo.cpp" />
     <ClCompile Include="Source\External\imgui_draw.cpp" />
     <ClCompile Include="Source\External\imgui_impl_opengl3.cpp" />

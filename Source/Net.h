@@ -52,6 +52,7 @@ enum EntType
 	Ent_Item,
 	Ent_Grenade,
 	Ent_Dummy,
+	Ent_InUse,
 	Ent_Free = 0xff,
 };
 

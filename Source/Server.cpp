@@ -6,8 +6,6 @@
 
 #include "Config.h"
 
-Server server;
-
 void NetDebugPrintf(const char* fmt, ...)
 {
 	va_list ap;
@@ -24,7 +22,7 @@ void NetDebugPrintf(const char* fmt, ...)
 
 #define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
 
-void Server::Init()
+void Server::init()
 {
 	printf("initializing server\n");
 
@@ -32,9 +30,6 @@ void Server::Init()
 	cfg_snapshot_rate = cfg.get_var("snapshot_rate", "30.0");
 	cfg_max_time_out = cfg.get_var("max_time_out", "10.f");
 	cfg_sv_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-
-	game.Init();
-	//client_mgr.Init();
 
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
@@ -53,35 +48,26 @@ void Server::Init()
 }
 void Server::end()
 {
-	if (!IsActive())
-		return;
 	DebugOut("ending server\n");
-	
 	for (int i = 0; i < clients.size(); i++)
 		clients[i].Disconnect();
-
-	active = false;
 	socket.Shutdown();
+	initialized = false;
 }
 
 void Server::start()
 {
-	if (active)
+	DebugOut("starting server with map %s\n", engine.mapname.c_str());
+	if(initialized)
 		end();
 	socket.Init(cfg_sv_port->integer);
-
-	DebugOut("spawning with map %s\n", engine.mapname.c_str());
-	active = true;
-}
-bool Server::IsActive() const
-{
-	return active;
+	initialized = true;
 }
 
 
 void Server::RemoveClient(int client)
 {
-	game.OnClientLeave(client);
+	engine.client_leave(client);
 }
 
 Frame* Server::GetSnapshotFrame()
@@ -92,7 +78,6 @@ Frame* Server::GetSnapshotFrame()
 void Server::BuildSnapshotFrame()
 {
 	Frame* frame = GetSnapshotFrame();
-	Game* g = &game;
 	frame->tick = engine.tick;
 	for (int i = 0; i < MAX_CLIENTS; i++) {
 		frame->ps_states[i] = engine.ents[i].ToPlayerState();
@@ -104,21 +89,13 @@ void Server::BuildSnapshotFrame()
 
 void Server::RunMoveCmd(int client, MoveCommand cmd)
 {
-	game.ExecutePlayerMove(game.EntForIndex(client), cmd);
+	ExecutePlayerMove(&engine.ents[client], cmd);
 }
 
 void Server::SpawnClientInGame(int client)
 {
-	game.SpawnNewClient(client);
-
+	engine.make_client(client);
 	DebugOut("Spawned client, %s\n", clients[client].GetIPStr().c_str());
-}
-
-
-void Server::UpdateClients()
-{
-	for (int i = 0; i < clients.size(); i++)
-		clients[i].Update();
 }
 
 void Server::connect_local_client()

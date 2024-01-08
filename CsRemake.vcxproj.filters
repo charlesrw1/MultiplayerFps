@@ -90,9 +90,6 @@
     <ClCompile Include="Source\Particles.cpp">
       <Filter>Source Files\Client</Filter>
     </ClCompile>
-    <ClCompile Include="Source\External\imgui.cpp">
-      <Filter>Source Files\External</Filter>
-    </ClCompile>
     <ClCompile Include="Source\External\imgui_demo.cpp">
       <Filter>Source Files\External</Filter>
     </ClCompile>
@@ -116,6 +113,9 @@
     </ClCompile>
     <ClCompile Include="source\Game_Local.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui.cpp">
+      <Filter>Source Files\External</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

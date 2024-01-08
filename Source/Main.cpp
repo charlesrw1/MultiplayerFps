@@ -33,7 +33,6 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
 
-ImGuiContext* imgui_ctx;
 MeshBuilder phys_debug;
 Engine_Config cfg;
 Media media;
@@ -73,14 +72,6 @@ bool CheckGlErrorInternal_(const char* file, int line)
 		error_code = glGetError();
 	}
 	return has_error;
-}
-bool IsServerActive()
-{
-	return server.IsActive();
-}
-bool IsClientActive()
-{
-	return true;
 }
 
 void Quit()
@@ -182,8 +173,8 @@ void Game_Engine::view_angle_update()
 {
 	int x, y;
 	SDL_GetRelativeMouseState(&x, &y);
-	float x_off = engine.mouse_sensitivity->real * x;
-	float y_off = engine.mouse_sensitivity->real * y;
+	float x_off = engine.local.mouse_sensitivity->real * x;
+	float y_off = engine.local.mouse_sensitivity->real * y;
 
 	vec3 view_angles = local.view_angles;
 	view_angles.x -= y_off;	// pitch
@@ -201,7 +192,7 @@ void Game_Engine::make_move()
 
 	if (!game_focused) {
 		local.last_command = command;
-		if(cl) cl->get_command(cl->OutSequence()) = command;
+		if(cl->get_state()>=CS_CONNECTED) cl->get_command(cl->OutSequence()) = command;
 		return;
 	}
 
@@ -234,7 +225,7 @@ void Game_Engine::make_move()
 	
 	// FIXME:
 	local.last_command = command;
-	if(cl) cl->get_command(cl->OutSequence()) = command;
+	if(cl->get_state()>=CS_CONNECTED) cl->get_command(cl->OutSequence()) = command;
 }
 
 void Game_Engine::init_sdl_window()
@@ -570,7 +561,7 @@ void Renderer::FrameDraw()
 
 	MeshBuilder mb;
 	mb.Begin();
-	if (IsServerActive() && cfg_draw_sv_colliders->integer == 1) {
+	if (engine.is_host && cfg_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			// FIXME: leaking server code into client code
 			if (engine.ents[i].type == Ent_Player) {
@@ -589,9 +580,9 @@ void Renderer::FrameDraw()
 		DrawCollisionWorld(engine.level);
 
 	mb.Draw(GL_LINES);
-	game.rays.End();
-	game.rays.Draw(GL_LINES);
-	if (IsServerActive()) {
+	//game.rays.End();
+	//game.rays.Draw(GL_LINES);
+	if (engine.is_host) {
 		phys_debug.End();
 		phys_debug.Draw(GL_LINES);
 	}
@@ -603,6 +594,15 @@ void Renderer::FrameDraw()
 
 	if(!gamel->thirdperson_camera->integer && cfg_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
+
+
+	ImGui_ImplSDL2_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui::NewFrame();
+
+	ImGui::ShowDemoWindow();
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void Renderer::DrawEntBlobShadows()
@@ -714,8 +714,6 @@ void Renderer::DrawEnts()
 		if (i == engine.player_num() && !gamel->thirdperson_camera->integer)
 			continue;
 
-		//EntityState* cur = &ent.interpstate;
-
 		mat4 model = glm::translate(mat4(1), ent.position);
 		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
 		model = glm::scale(model, vec3(1.f));
@@ -810,7 +808,7 @@ int Game_Engine::player_num()
 }
 Entity& Game_Engine::local_player()
 {
-	ASSERT(engine_state >= LOADING);
+	//ASSERT(engine_state >= LOADING);
 	return ents[player_num()];
 }
 
@@ -818,10 +816,8 @@ void Game_Engine::connect_to(string address)
 {
 	if (is_host)
 		exit_map();
-	if (cl)
-		end_client();
-
-	startup_client();	// (cl = new Client)
+	else if (cl->get_state() != CS_DISCONNECTED)
+		cl->Disconnect();
 	cl->connect(address);
 }
 
@@ -854,15 +850,12 @@ void cmd_client_connect()
 }
 void cmd_client_disconnect()
 {
-	if (engine.cl) {
+	if (engine.cl->get_state()!=CS_DISCONNECTED)
 		engine.cl->Disconnect();
-	}
-
-	//client.Disconnect();
 }
 void cmd_client_reconnect()
 {
-	if(engine.cl)
+	if(engine.cl->get_state() != CS_DISCONNECTED)
 		engine.cl->Reconnect();
 }
 void cmd_load_map()
@@ -896,8 +889,9 @@ int main(int argc, char** argv)
 void Game_Local::init()
 {
 	view_angles = glm::vec3(0.f);
-	thirdperson_camera = cfg.get_var("thirdperson_camera", "1");
-	fov = cfg.get_var("fov", "70.0");
+	thirdperson_camera	= cfg.get_var("thirdperson_camera", "1");
+	fov					= cfg.get_var("fov", "70.0");
+	mouse_sensitivity	= cfg.get_var("mouse_sensitivity", "0.01");
 }
 
 void Game_Engine::start_map(string map, bool is_client)
@@ -912,20 +906,18 @@ void Game_Engine::start_map(string map, bool is_client)
 	level = LoadLevelFile(mapname.c_str());
 	if (!level) 
 		return;
-
 	tick = 0;
 	time = 0;
 	
 	if (!is_client) {
-		if(cl)
-			end_client();
+		if (cl->get_state() != CS_DISCONNECTED)
+			cl->Disconnect();
 
-		server.start();
+		sv->start();
 		engine.is_host = true;
 		engine.engine_state = SPAWNED;
-		server.connect_local_client();
+		sv->connect_local_client();
 	}
-	//client.server_mgr.force_into_local_game();
 }
 
 void Game_Engine::set_tick_rate(float tick_rate)
@@ -941,12 +933,9 @@ void Game_Engine::exit_map()
 {
 	FreeLevel(level);
 	level = nullptr;
-
-	server.end();
-
+	sv->end();
 	engine_state = MAINMENU;
 	is_host = false;
-	//client.Disconnect();
 }
 
 
@@ -1035,7 +1024,7 @@ void Game_Engine::build_physics_world(float time)
 	}
 }
 
-void PlayerUpdate(Entity* e);
+void player_update(Entity* e);
 void DummyUpdate(Entity* e);
 void GrenadeUpdate(Entity* e);
 
@@ -1043,27 +1032,13 @@ void GrenadeUpdate(Entity* e);
 void Game_Engine::update_game_tick()
 {
 	// update local player
-	game.ExecutePlayerMove(&ents[0], local.last_command);
-	game.BuildPhysicsWorld(0.f);
+	ExecutePlayerMove(&ents[0], local.last_command);
+	build_physics_world(0.f);
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity* e = &ents[i];
-		if (e->type == Ent_Free)
-			continue;
-
-		switch (e->type) {
-		case Ent_Player:
-			PlayerUpdate(e);
-			break;
-		case Ent_Dummy:
-			DummyUpdate(e);
-			break;
-		case Ent_Grenade:
-			GrenadeUpdate(e);
-			break;
-		}
-		e->anim.AdvanceFrame(engine.tick_interval);
-
+		if (ents[i].active() && ents[i].update)
+			ents[i].update(&ents[i]);
+		ents[i].anim.AdvanceFrame(tick_interval);
 	}
 }
 
@@ -1074,17 +1049,17 @@ void Game_Engine::init()
 	memset(binds, 0, sizeof(binds));
 	num_entities = 0;
 	level = nullptr;
-	cl = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 	engine_state = MAINMENU;
 	is_host = false;
+	sv = new Server;
+	cl = new Client;
 
 	// config vars
 	window_w			= cfg.get_var("window_w", "1200", true);
 	window_h			= cfg.get_var("window_h", "800", true);
 	window_fullscreen	= cfg.get_var("window_fullscreen", "0", true);
 	host_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-	mouse_sensitivity	= cfg.get_var("mouse_sensitivity", "0.01");
 	cfg.set_var("max_ground_speed", "10.0");	// ???
 
 	
@@ -1104,14 +1079,13 @@ void Game_Engine::init()
 	draw.Init();
 	LoadMediaFiles();
 
-	//client.Init();
-	server.Init();
-
+	cl->init();
+	sv->init();
 	local.init();
 
 	// debug interface
-	imgui_ctx = ImGui::CreateContext();
-	ImGui::SetCurrentContext(imgui_ctx);
+	imgui_context = ImGui::CreateContext();
+	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
 
@@ -1161,21 +1135,6 @@ void Game_Engine::init()
 	cfg.print_vars();
 }
 
-void Game_Engine::startup_client()
-{
-	cl = new Client;
-	cl->Init();
-}
-
-void Game_Engine::end_client()
-{
-	if(cl->state!=CS_DISCONNECTED)
-		cl->Disconnect();
-	delete cl;
-	cl = nullptr;
-}
-
-
 void Game_Engine::loop()
 {
 	double last = GetTime() - 0.1;
@@ -1191,6 +1150,8 @@ void Game_Engine::loop()
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
+			ImGui_ImplSDL2_ProcessEvent(&event);
+
 			switch (event.type) {
 			case SDL_QUIT:
 				::Quit();
@@ -1235,13 +1196,13 @@ void Game_Engine::loop()
 			time = tick * tick_interval;
 			if (is_host) {
 				//server.simtime = tick * engine.tick_interval;
-				server.ReadPackets();
+				sv->ReadPackets();
 
 				update_game_tick();
 
-				server.BuildSnapshotFrame();
-				for (int i = 0; i < server.clients.size(); i++)
-					server.clients[i].Update();
+				sv->BuildSnapshotFrame();
+				for (int i = 0; i < sv->clients.size(); i++)
+					sv->clients[i].Update();
 				tick += 1;
 			}
 
@@ -1254,15 +1215,11 @@ void Game_Engine::loop()
 				cl->run_prediction();		
 			}
 
-			// free client when its disconnected
-			if (cl && cl->get_state() == CS_DISCONNECTED)
-				end_client();
 			if ((cl && cl->state == CS_SPAWNED) || is_host)
 				engine_state = SPAWNED;
 			else
 				engine_state = MAINMENU;
 		}
-
 		pre_render_update();
 		draw_screen();
 	}

@@ -12,7 +12,7 @@ void RemoteClient::InitConnection(IPAndPort address)
 {
 	state = SCS_CONNECTED;
 	connection = Connection();
-	connection.Init(myserver->GetSock(), address);
+	connection.Init(&myserver->socket, address);
 	local_client = false;
 	baseline = -1;
 	next_snapshot_time = 0.f;
@@ -191,13 +191,13 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 	else
 		msg.WriteBool(0);
 	
-	if (from->model_idx != to->model_idx) {
+	//if (from->model_idx != to->model_idx) {
 		msg.WriteBool(1);
 
 		msg.WriteByte(to->model_idx);
-	}
-	else
-		msg.WriteBool(0);
+	//}
+	//else
+	//	msg.WriteBool(0);
 
 	if (from->leganim != to->leganim) {
 		msg.WriteBool(1);

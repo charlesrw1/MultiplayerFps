@@ -14,6 +14,8 @@
 //	modify the read/write functions that encode the state
 // blech
 
+
+
 class Model;
 struct Entity
 {
@@ -43,6 +45,7 @@ struct Entity
 	int health = 100;
 	Item_State items;
 
+	void(*update)(Entity*) = nullptr;
 
 	Animator anim;
 	const Model* model = nullptr;
@@ -56,47 +59,13 @@ struct Entity
 	void SetModel(GameModels modname);
 };
 
-Entity* ServerEntForIndex(int index);
-
 #include "MeshBuilder.h"
 
-class Level;
-class Game
-{
-public:
-	const static int GV_BUFFER_SIZE = 256;
 
-	void Init();
-	void Update();
-
-	void SpawnNewClient(int clientnum);
-	void OnClientLeave(int clientnum);
-
-	Entity* MakeNewEntity(EntType type);
-	void RemoveEntity(Entity* ent);
-
-	void KillEnt(Entity* ent);
-
-	void GetPlayerSpawnPoisiton(Entity* ent);
-	void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
-	void OnPlayerKilled(Entity* ent);
-
-	void BuildPhysicsWorld(float time);
-
-	void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
-
-	Entity* EntForIndex(int index);
-
-	MeshBuilder rays;
-private:
-	int GetEntIndex(Entity* ent) const;
-	Entity* InitNewEnt(EntType type, int index);
-	void BeginLagCompensation();
-	void EndLagCompensation();
-
-	short next_id = 0;
-};
-
+void GetPlayerSpawnPoisiton(Entity* ent);
+void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
+void KillEnt(Entity* ent);
+void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
 
 enum Server_Client_State {
 	SCS_DEAD,		// unused slot
@@ -154,18 +123,11 @@ class Server
 {
 public:
 	static const int MAX_FRAME_HIST = 32;
-
-	void Init();
-
+	void init();	// called on engine startup
 	void start();
 	void end();
-
 	void connect_local_client();
 
-	bool IsActive() const;
-
-	// client interface functions
-	Socket* GetSock() { return &socket; }
 	void RunMoveCmd(int client, MoveCommand cmd);
 	void SpawnClientInGame(int client);
 	void RemoveClient(int client);
@@ -178,11 +140,14 @@ public:
 			return nullptr;
 		return f;
 	}
+	void ReadPackets();
+	void BuildSnapshotFrame();
 
-	bool active = false;	// is this server running
-
+	bool initialized = false;
 	std::vector<Frame> frames;
 	Frame nullframe;
+	std::vector<RemoteClient> clients;
+	Socket socket;
 
 	// CONFIG VARS
 	Config_Var* cfg_snapshot_rate;
@@ -190,19 +155,10 @@ public:
 	Config_Var* cfg_max_time_out;
 	Config_Var* cfg_sv_port;
 
-	void ReadPackets();
-	void UpdateClients();
-	void BuildSnapshotFrame();
-
-	std::vector<RemoteClient> clients;
 private:
-	Socket socket;
-	
 	int FindClient(IPAndPort addr) const;
 	void ConnectNewClient(ByteReader& msg, IPAndPort recv);
 };
 
-extern Server server;
-extern Game game;
 
 #endif // !SERVER_H

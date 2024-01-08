@@ -13,13 +13,13 @@
 
 struct StateEntry
 {
-	int tick = 0;
+	int tick = -1;
 	EntityState state;
 };
 
 struct ClientEntity
 {
-	const static int NUM_STORED_STATES = 25;
+	const static int NUM_STORED_STATES = 10;
 	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
 
 	// history of updates for interpolation
@@ -54,7 +54,7 @@ enum Client_State {
 class Client
 {
 public:
-	void Init();
+	void init();
 	void connect(string address);
 	void Disconnect();
 	void Reconnect();
@@ -87,6 +87,10 @@ public:
 	void HandleServerPacket(ByteReader& msg);
 	bool OnEntSnapshot(ByteReader& msg);
 
+	Config_Var* cfg_interp_time;
+	Config_Var* cfg_fake_lag;
+	Config_Var* cfg_fake_loss;
+	Config_Var* cfg_cl_time_out;
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
@@ -95,14 +99,7 @@ public:
 	ClientEntity interpolation_data[MAX_GAME_ENTS];
 	vector<MoveCommand> commands;
 
-	Config_Var* cfg_interp_time;
-	Config_Var* cfg_fake_lag;
-	Config_Var* cfg_fake_loss;
-	Config_Var* cfg_cl_time_out;
-	Config_Var* cfg_mouse_sensitivity;
-
 	string serveraddr;
-	bool send_client_info = false;
 	int client_num = -1;
 	int connect_attempts;
 	double attempt_time;

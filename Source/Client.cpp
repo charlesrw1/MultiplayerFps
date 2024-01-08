@@ -10,24 +10,91 @@
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
-void Client::Init()
+void Client::init()
 {
 	cfg_interp_time = cfg.get_var("interp_time", "0.1");
 	cfg_fake_lag = cfg.get_var("fake_lag", "0");
 	cfg_fake_loss = cfg.get_var("fake_loss", "0");
 	cfg_cl_time_out = cfg.get_var("cl_time_out", "5.f");
-	cfg_mouse_sensitivity = cfg.get_var("mouse_sensitivity", "0.01");
 
 	sock.Init(0);
+}
 
-	//out_commands.resize(CLIENT_MOVE_HISTORY);
+void Client::connect(string address)
+{
+	DebugOut("connecting to server: %s\n", address.c_str());
 
+	serveraddr = address;
+	IPAndPort ip;
+	ip.set(address);
+	if (ip.port == 0)ip.port = DEFAULT_SERVER_PORT;
+	server.remote_addr = ip;
+	connect_attempts = 0;
+	attempt_time = -1000.f;
+	state = CS_TRYINGCONNECT;
+	client_num = -1;
+	force_full_update = false;
+
+	snapshots.clear();
+	commands.clear();
 	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
 	commands.resize(CLIENT_MOVE_HISTORY);
 
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
+	for (int i = 0; i < MAX_GAME_ENTS; i++)
+		interpolation_data[i] = ClientEntity();
+	lastpredicted = PlayerState();
+
+	TrySendingConnect();
 }
+
+void Client::TrySendingConnect()
+{
+	const int MAX_CONNECT_ATTEMPTS = 10;
+	const float CONNECT_RETRY = 1.f;
+
+	if (state != CS_TRYINGCONNECT)
+		return;
+	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
+		DebugOut("Unable to connect to server\n");
+		state = CS_DISCONNECTED;
+		return;
+	}
+	double delta = GetTime() - attempt_time;
+	if (delta < CONNECT_RETRY)
+		return;
+	attempt_time = GetTime();
+	connect_attempts++;
+	DebugOut("Sending connection request\n");
+
+	uint8_t buffer[256];
+	ByteWriter writer(buffer, 256);
+	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
+	writer.write_string("connect");
+	writer.EndWrite();
+	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
+}
+void Client::Disconnect()
+{
+	DebugOut("Disconnecting\n");
+	if (state == CS_DISCONNECTED)
+		return;
+	if (state != CS_TRYINGCONNECT) {
+		uint8_t buffer[8];
+		ByteWriter write(buffer, 8);
+		write.WriteByte(CL_QUIT);
+		write.EndWrite();
+		server.Send(buffer, write.BytesWritten());
+	}
+
+	state = CS_DISCONNECTED;
+	serveraddr = "";
+	client_num = -1;
+	server = Connection();
+	cur_snapshot_idx = 0;
+}
+
 
 void Client::Reconnect()
 {
@@ -154,6 +221,7 @@ void Client::interpolate_states()
 {
 	auto cl = engine.cl;
 	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
+	
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		if (!engine.ents[i].active() || i == engine.player_num())
 			continue;
@@ -172,27 +240,28 @@ void Client::interpolate_states()
 
 		// could extrpolate here, or just set it to last state
 		if (entry_index == 0 || entry_index == ClientEntity::NUM_STORED_STATES) {
-			//interpstate = GetLastState()->state;
-
 			ent.from_entity_state(ce.GetLastState()->state);
-			printf("extrapolate\n");
-			//double abc = GetStateFromIndex(last_entry - entry_index)->tick * tickinterval;
-			return;
+			//printf("extrapolate\n");
+			continue;
 		}
 		// else, interpolate
 		StateEntry* s1 = ce.GetStateFromIndex(last_entry - entry_index);
 		StateEntry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
 
-		if (s1->tick == -1) {
+
+		if (s1->tick == -1 && s2->tick == -1) {
 			ent.from_entity_state(EntityState{});
-			return;
+			printf("no state to use\n");
+			continue;
+		}
+		else if (s1->tick == -1) {
+			ent.from_entity_state(s2->state);
+			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
 			ent.from_entity_state(s1->state);
-			printf("no next frame\n");
-			return;
+			continue;
 		}
-
 
 		ASSERT(s1->tick < s2->tick);
 		ASSERT(s1->tick * engine.tick_interval <= rendering_time && s2->tick * engine.tick_interval >= rendering_time);
@@ -223,6 +292,7 @@ void Client::interpolate_states()
 
 		ent.from_entity_state(interpstate);
 	}
+
 
 	//double rendering_time_client = cl->tick * engine.tick_interval - engine.frame_remainder;
 	//ClientEntity* local = cl->GetLocalPlayer();
@@ -361,6 +431,9 @@ void Client::read_snapshot(Snapshot* s)
 
 		if (state->model_idx >= 0 && state->model_idx < media.gamemodels.size())
 			e->model = media.gamemodels.at(state->model_idx);
+
+		if (e->model && e->model->name == "CT.glb" && e->type != Ent_Player)
+			printf(__FUNCTION__": model mismatch %d tick %d\n", i, engine.tick);
 	}
 
 	ClearEntsThatDidntUpdate(engine.tick);

@@ -4,16 +4,12 @@
 #include "Movement.h"
 #include "Game_Engine.h"
 
-Game game;
-
 void PlayerDeathUpdate(Entity* ent);
-void PlayerUpdate(Entity* ent);
+void player_update(Entity* ent);
+void player_spawn(Entity* ent);
 void PlayerUpdateAnimations(Entity* ent);
-void PlayerSpawn(Entity* ent);
 void PlayerItemUpdate(Entity* ent, MoveCommand cmd);
-
-void DummyUpdate(Entity* ent);
-Entity* CreateDummy();
+void dummy_update(Entity* ent);
 
 Entity* CreateGrenade(Entity* from, glm::vec3 org, glm::vec3 vel, int gtype);
 void GrenadeUpdate(Entity* ent);
@@ -28,7 +24,7 @@ Entity* ServerEntForIndex(int index)
 	return &engine.ents[index];
 }
 
-void Game::GetPlayerSpawnPoisiton(Entity* ent)
+void GetPlayerSpawnPoisiton(Entity* ent)
 {
 	if (engine.level->spawns.size() > 0) {
 		ent->position = engine.level->spawns[0].position;
@@ -39,12 +35,8 @@ void Game::GetPlayerSpawnPoisiton(Entity* ent)
 		ent->rotation = glm::vec3(0);
 	}
 }
-int Game::GetEntIndex(Entity* ent) const
-{
-	{
-		return (ent - engine.ents);
-	}
-}
+
+#if 0
 Entity* Game::InitNewEnt(EntType type, int index)
 {
 	Entity* ent = &engine.ents[index];
@@ -63,22 +55,49 @@ Entity* Game::InitNewEnt(EntType type, int index)
 
 	return ent;
 }
+#endif
 
-void Game::SpawnNewClient(int client)
+void Game_Engine::client_leave(int slot)
 {
-	Entity* ent = InitNewEnt(Ent_Player, client);
-	PlayerSpawn(ent);
-	engine.num_entities++;
-	printf("spawned client %d into game\n", client);
+	printf("removing client %d from game\n", slot);
+	Entity& ent = ents[slot];
+	free_entity(&ent);
 }
 
-void Game::OnClientLeave(int client)
+void Game_Engine::make_client(int slot)
 {
-	Entity* ent = &engine.ents[client];
-	RemoveEntity(ent);
-	printf("remove client %d from game\n", client);
+	printf("spawning client %d into game\n", slot);
+	Entity& e = ents[slot];
+	if (e.active()) printf("player slot %d already in use?\n", slot);
+	e = Entity();
+	e.index = slot;
+	
+	player_spawn(&e);
 }
 
+Entity* Game_Engine::new_entity()
+{
+	int slot = MAX_CLIENTS;
+	for (; slot < MAX_GAME_ENTS; slot++) {
+		if (ents[slot].type == Ent_Free)
+			break;
+	}
+	if (slot == MAX_GAME_ENTS) return nullptr;
+	num_entities++;
+	Entity& e = ents[slot];
+	e = Entity();
+	e.type = Ent_InUse;	// hack
+	e.index = slot;
+	return &e;
+}
+
+void Game_Engine::free_entity(Entity* ent)
+{
+	*ent = Entity();
+}
+
+
+#if 0
 Entity* Game::MakeNewEntity(EntType type)
 {
 	int slot = MAX_CLIENTS;
@@ -93,16 +112,10 @@ Entity* Game::MakeNewEntity(EntType type)
 	printf("spawning ent in slot %d\n", slot);
 	return ent;
 }
-
-void Game::Init()
-{
-	engine.num_entities = 0;
-	engine.level = nullptr;
-
-}
+#endif
 
 
-void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
+void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 {
 	printf("Shooting bullets\n");
 	Ray r;
@@ -111,7 +124,7 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	RayHit hit;
 	//TraceRayAgainstLevel(level, r, &hit, false);
 
-	engine.phys.TraceRay(r, &hit, GetEntIndex(from), Pf_All);
+	engine.phys.TraceRay(r, &hit, from->index, Pf_All);
 
 	//RayWorldIntersect(r, &hit, GetEntIndex(from), Pf_All);
 
@@ -126,18 +139,12 @@ void Game::ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	EntTakeDamage(ent, from, 26);
 	
 
-	if (hit.dist >= 0.f) {
-		rays.PushLine(org, hit.pos, COLOR_WHITE);
-		rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
-	}
+	//if (hit.dist >= 0.f) {
+	//	rays.PushLine(org, hit.pos, COLOR_WHITE);
+	//	rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
+	//}
 }
-Entity* Game::EntForIndex(int index)
-{
-	{
-		ASSERT(index < MAX_GAME_ENTS&& index >= 0);
-		return &engine.ents[index];
-	}
-}
+
 #if 0
 void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags filter)
 {
@@ -200,9 +207,10 @@ void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, 
 }
 #endif
 
-void PlayerSpawn(Entity* ent)
+void player_spawn(Entity* ent)
 {
-	ASSERT(ent->type == Ent_Player);
+	ent->type = Ent_Player;
+	ent->model_index = Mod_PlayerCT;
 	ent->SetModel(Mod_PlayerCT);
 	ent->anim.ResetLayers();
 
@@ -213,12 +221,15 @@ void PlayerSpawn(Entity* ent)
 	ent->ducking = false;
 	ent->health = 100;
 	ent->alive = true;
-	game.GetPlayerSpawnPoisiton(ent);
+	GetPlayerSpawnPoisiton(ent);
+
+	ent->update = player_update;
 }
 
-Entity* CreateDummy()
+Entity* dummy_spawn()
 {
-	Entity* ent = game.MakeNewEntity(Ent_Dummy);
+	Entity* ent = engine.new_entity();
+	ent->type = Ent_Dummy;
 	ent->position = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
 	ent->alive = true;
@@ -226,6 +237,8 @@ Entity* CreateDummy()
 	ent->SetModel(Mod_PlayerCT);
 	if (ent->model)
 		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"));
+
+	ent->update = dummy_update;
 
 	return ent;
 }
@@ -248,11 +261,11 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 
 void ServerGameShootCallback(int entindex, bool altfire)
 {
-	Entity* ent = game.EntForIndex(entindex);
-	glm::vec3 shoot_vec = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
+	Entity& ent = engine.ents[entindex];
+	glm::vec3 shoot_vec = AnglesToVector(ent.view_angles.x, ent.view_angles.y);
 
-	game.ShootBullets(ent, shoot_vec,
-		ent->position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
+	ShootBullets(&ent, shoot_vec,
+		ent.position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
 	
 }
 void ServerPlaySoundCallback(vec3 org, int snd_idx)
@@ -334,7 +347,7 @@ EntityState Entity::ToEntState() const
 }
 #include "MeshBuilder.h"
 #include "Config.h"
-void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
+void ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 {
 	double oldtime = engine.time;
 	engine.time = cmd.tick * engine.tick_interval;
@@ -352,7 +365,7 @@ void Game::ExecutePlayerMove(Entity* ent, MoveCommand cmd)
 	move.set_viewmodel_animation = ServerViewmodelCallback;
 
 	move.player = ent->ToPlayerState();
-	move.entindex = GetEntIndex(ent);
+	move.entindex = ent->index;
 	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
 	move.simtime = engine.time;
 	move.Run();
@@ -418,11 +431,11 @@ void PlayerDeathUpdate(Entity* ent)
 	if (ent->death_time < engine.time) {
 		ent->health = 100;
 		ent->alive = true;
-		game.GetPlayerSpawnPoisiton(ent);
+		GetPlayerSpawnPoisiton(ent);
 	}
 }
 
-void PlayerUpdate(Entity* ent)
+void player_update(Entity* ent)
 {
 	if (ent->alive)
 		PlayerUpdateAnimations(ent);
@@ -434,19 +447,19 @@ void PlayerUpdate(Entity* ent)
 		ent->death_time = engine.time + 0.5f;
 	}
 }
-void DummyUpdate(Entity* ent)
+void dummy_update(Entity* ent)
 {
 	//ent->position.y = sin(GetTime()) * 2.f + 2.f;
 	ent->position.x = 0.f;
 	if (!ent->alive)
-		game.RemoveEntity(ent);
+		engine.free_entity(ent);
 }
 
 Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int grenade_type)
 {
 	ASSERT(thrower);
-	Game* g = &game;
-	Entity* e = g->MakeNewEntity(Ent_Grenade);
+	Entity* e = engine.new_entity();
+	e->type = Ent_Grenade;
 
 	e->SetModel(Mod_Grenade_HE);
 	e->owner_index = thrower->index;
@@ -455,12 +468,13 @@ Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int g
 	e->sub_type = grenade_type;
 	e->alive = true;
 	e->death_time = engine.time + 5.f;
+
+	e->update = GrenadeUpdate;
 	return e;
 }
 
 void RunProjectilePhysics(Entity* ent)
 {
-	Game* g = &game;
 	// update physics, detonate if ready
 	float dt = engine.tick_interval;
 	ent->velocity.y -= 12.f * dt;// gravity
@@ -485,7 +499,6 @@ void RunProjectilePhysics(Entity* ent)
 
 void GrenadeUpdate(Entity* ent)
 {
-	Game* g = &game;
 	RunProjectilePhysics(ent);
 	// spin grenade based on velocity
 	float dt = engine.tick_interval;
@@ -497,65 +510,12 @@ void GrenadeUpdate(Entity* ent)
 
 	if (ent->death_time < engine.time) {
 		printf("BOOM\n");
-		g->RemoveEntity(ent);
-	}
-}
-
-void PostEntUpdate(Entity* ent) {
-	ent->anim.AdvanceFrame(engine.tick_interval);
-}
-
-void Game::BuildPhysicsWorld(float time)
-{
-	engine.phys.ClearObjs();
-	engine.phys.AddLevel(engine.level);
-
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& ce = engine.ents[i];
-		if (ce.type != Ent_Player) continue;
-
-		CharacterShape cs;
-		cs.a = &ce.anim;
-		cs.m = ce.model;
-		cs.org = ce.position;
-		cs.radius = CHAR_HITBOX_RADIUS;
-		cs.height = (!ce.ducking) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
-		PhysicsObject po;
-		po.shape = PhysicsObject::Character;
-		po.character = cs;
-		po.userindex = i;
-		po.player = true;
-
-		engine.phys.AddObj(po);
+		engine.free_entity(ent);
 	}
 }
 
 
-void Game::Update()
-{
-	BuildPhysicsWorld(0.f);
-
-	double dt = engine.tick_interval;
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity* e = &engine.ents[i];
-		if (e->type == Ent_Free)
-			continue;
-
-		switch (e->type) {
-		case Ent_Player:
-			PlayerUpdate(e);
-			break;
-		case Ent_Dummy:
-			DummyUpdate(e);
-			break;
-		case Ent_Grenade:
-			GrenadeUpdate(e);
-			break;
-		}
-		PostEntUpdate(e);
-	}
-}
-
+#if 0
 void Game::RemoveEntity(Entity* ent)
 {
 	ent->type = Ent_Free;
@@ -565,8 +525,9 @@ void Game::RemoveEntity(Entity* ent)
 
 	engine.num_entities--;
 }
+#endif
 
-void Game::KillEnt(Entity* ent)
+void KillEnt(Entity* ent)
 {
 	ent->alive = false;
 	ent->death_time = engine.time + 5.0;

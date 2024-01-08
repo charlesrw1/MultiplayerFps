@@ -4,70 +4,6 @@
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
-static const int MAX_CONNECT_ATTEMPTS = 10;
-static const float CONNECT_RETRY = 1.f;
-
-
-void Client::connect(string address)
-{
-	DebugOut("connecting to server: %s\n", address.c_str());
-
-	serveraddr = address;
-	IPAndPort ip;
-	ip.set(address);
-	if (ip.port == 0)ip.port = DEFAULT_SERVER_PORT;
-	server.remote_addr = ip;
-	connect_attempts = 0;
-	attempt_time = -1000.f;
-	state = CS_TRYINGCONNECT;
-	client_num = -1;
-
-	TrySendingConnect();
-}
-
-void Client::TrySendingConnect()
-{
-	if (state != CS_TRYINGCONNECT)
-		return;
-	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
-		DebugOut("Unable to connect to server\n");
-		state = CS_DISCONNECTED;
-		return;
-	}
-	double delta = GetTime() - attempt_time;
-	if (delta < CONNECT_RETRY)
-		return;
-	attempt_time = GetTime();
-	connect_attempts++;
-	DebugOut("Sending connection request\n");
-
-	uint8_t buffer[256];
-	ByteWriter writer(buffer, 256);
-	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
-	writer.write_string("connect");
-	writer.EndWrite();
-	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
-}
-void Client::Disconnect()
-{
-	DebugOut("Disconnecting\n");
-	if (state == CS_DISCONNECTED)
-		return;
-	if (state != CS_TRYINGCONNECT) {
-		uint8_t buffer[8];
-		ByteWriter write(buffer, 8);
-		write.WriteByte(CL_QUIT);
-		write.EndWrite();
-		server.Send(buffer, write.BytesWritten());
-	}
-
-	state = CS_DISCONNECTED;
-	serveraddr = "";
-	client_num = -1;
-	server = Connection();
-	cur_snapshot_idx = 0;
-}
-
 
 void Client::ReadPackets()
 {
@@ -247,6 +183,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	
 	
 	Snapshot* nextsnapshot = GetCurrentSnapshot();
+	*nextsnapshot = Snapshot();
 	nextsnapshot->tick = last_recieved_server_tick;
 	Snapshot* from = nullptr;
 
