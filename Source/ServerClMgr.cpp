@@ -41,12 +41,12 @@ void RemoteClient::Disconnect()
 void RemoteClient::OnMoveCmd(ByteReader& msg)
 {
 
-	MoveCommand cmd{};
+	Move_Command cmd{};
 	cmd.tick = msg.ReadLong();
 
-	cmd.forward_move = MoveCommand::unquantize(msg.ReadByte());
-	cmd.lateral_move = MoveCommand::unquantize(msg.ReadByte());
-	cmd.up_move = MoveCommand::unquantize(msg.ReadByte());
+	cmd.forward_move = Move_Command::unquantize(msg.ReadByte());
+	cmd.lateral_move = Move_Command::unquantize(msg.ReadByte());
+	cmd.up_move = Move_Command::unquantize(msg.ReadByte());
 
 	cmd.view_angles.x = msg.ReadFloat();
 	cmd.view_angles.y = msg.ReadFloat();
@@ -228,8 +228,7 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 	}
 	else
 		msg.WriteBool(0);
-
-	msg.WriteBool(to->ducking);
+	msg.WriteLong(to->solid);
 }
 
 void ReadDeltaEntState(EntityState* to, ByteReader& msg)
@@ -273,7 +272,7 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->mainanim_frame = quantized_frame / 100.0;
 	}
 
-	to->ducking = msg.ReadBool();
+	to->solid = msg.ReadLong();
 }
 
 void ReadDeltaPState(PlayerState* to, ByteReader& msg)

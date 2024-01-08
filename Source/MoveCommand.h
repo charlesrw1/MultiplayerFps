@@ -2,19 +2,19 @@
 #define MOVECOMMAND_H
 #include "glm/glm.hpp"
 
-enum MoveCmdButtons
+enum Game_Command_Buttons
 {
-	CmdBtn_Sprint = 1,
-	CmdBtn_Jump = 2,
-	CmdBtn_Duck = 4,
-	CmdBtn_PFire = 8,
-	CmdBtn_SFire = 16,
-	CmdBtn_Misc1 = 32,
-	CmdBtn_Misc2 = 64,
-	CmdBtn_Reload = 128,
+	BUTTON_SPRINT = 1,
+	BUTTON_JUMP = 2,
+	BUTTON_DUCK = 4,
+	BUTTON_FIRE1 = 8,
+	BUTTON_FIRE2 = 16,
+	BUTTON_MISC1 = 32,
+	BUTTON_MISC2 = 64,
+	BUTTON_RELOAD = 128,
 };
 
-struct MoveCommand
+struct Move_Command
 {
 	int tick = 0;
 	float forward_move = 0.f;

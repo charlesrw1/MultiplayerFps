@@ -24,7 +24,7 @@ public:
 
 	PlayerState last_player_state;
 	vec3 view_angles;
-	MoveCommand last_command;
+	Move_Command last_command;
 	View_Setup last_view;
 
 	bool using_debug_cam = false;
@@ -56,7 +56,7 @@ public:
 	void exit_map();
 
 	void build_physics_world(float time);
-	void execute_player_move(Entity* ent, MoveCommand cmd);
+	void execute_player_move(Entity* ent, Move_Command cmd);
 
 	void pre_render_update();
 

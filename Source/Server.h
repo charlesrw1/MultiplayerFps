@@ -7,65 +7,13 @@
 #include "Media.h"
 #include "Config.h"
 #include "Types.h"
-
-// If you want to add a replicated variable you must:
-//	add it to entitystate or playerstate depending on its use
-//	modify the ToX and FromX functions
-//	modify the read/write functions that encode the state
-// blech
-
-
-
-class Model;
-struct Entity
-{
-	const static int TRANSFORM_HIST = 8;
-
-	int index = 0;
-
-	// Entity State Vars
-	EntType type = Ent_Free;
-	glm::vec3 position = glm::vec3(0);
-	glm::vec3 rotation = glm::vec3(0);
-	int model_index = 0;	// index into media.gamemodels
-
-	glm::vec3 velocity = glm::vec3(0);
-	glm::vec3 view_angles = glm::vec3(0.f);
-	bool ducking = false;
-	bool on_ground = false;
-	bool alive = true;
-	bool frozen = false;
-	bool in_jump = false;
-
-	// ent specific vars
-	int owner_index = 0;
-	int sub_type = 0;
-
-	float death_time = 0.0;
-	int health = 100;
-	Item_State items;
-
-	void(*update)(Entity*) = nullptr;
-
-	Animator anim;
-	const Model* model = nullptr;
-
-	bool active() { return type != Ent_Free; }
-	void from_entity_state(EntityState es);
-	PlayerState ToPlayerState() const;
-	void FromPlayerState(PlayerState* ps);
-	EntityState ToEntState() const;
-
-	void SetModel(GameModels modname);
-};
-
 #include "MeshBuilder.h"
 
 
 void GetPlayerSpawnPoisiton(Entity* ent);
 void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
 void KillEnt(Entity* ent);
-void ExecutePlayerMove(Entity* ent, MoveCommand cmd);
+void ExecutePlayerMove(Entity* ent, Move_Command cmd);
 
 enum Server_Client_State {
 	SCS_DEAD,		// unused slot
@@ -128,7 +76,7 @@ public:
 	void end();
 	void connect_local_client();
 
-	void RunMoveCmd(int client, MoveCommand cmd);
+	void RunMoveCmd(int client, Move_Command cmd);
 	void SpawnClientInGame(int client);
 	void RemoveClient(int client);
 	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);

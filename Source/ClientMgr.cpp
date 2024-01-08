@@ -144,15 +144,15 @@ void Client::SendMovesAndMessages()
 		return;
 
 	// Send move
-	MoveCommand lastmove = get_command(server.out_sequence);
+	Move_Command lastmove = get_command(server.out_sequence);
 
 	uint8_t buffer[128];
 	ByteWriter writer(buffer, 128);
 	writer.WriteByte(CL_INPUT);
 	writer.WriteLong(engine.tick);
-	writer.WriteByte(MoveCommand::quantize(lastmove.forward_move));
-	writer.WriteByte(MoveCommand::quantize(lastmove.lateral_move));
-	writer.WriteByte(MoveCommand::quantize(lastmove.up_move));
+	writer.WriteByte(Move_Command::quantize(lastmove.forward_move));
+	writer.WriteByte(Move_Command::quantize(lastmove.lateral_move));
+	writer.WriteByte(Move_Command::quantize(lastmove.up_move));
 
 	writer.WriteFloat(lastmove.view_angles.x);
 	writer.WriteFloat(lastmove.view_angles.y);

@@ -83,11 +83,11 @@ void Server::BuildSnapshotFrame()
 		frame->ps_states[i] = engine.ents[i].ToPlayerState();
 	}
 	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
-		frame->states[i] = engine.ents[i].ToEntState();
+		frame->states[i] = engine.ents[i].to_entity_state();
 	}
 }
 
-void Server::RunMoveCmd(int client, MoveCommand cmd)
+void Server::RunMoveCmd(int client, Move_Command cmd)
 {
 	ExecutePlayerMove(&engine.ents[client], cmd);
 }

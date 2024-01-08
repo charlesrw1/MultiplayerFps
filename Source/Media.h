@@ -2,19 +2,7 @@
 #define MEDIA_H
 #include <vector>
 #include "Shader.h"
-
-enum GameModels
-{
-	Mod_PlayerCT,
-	Mod_GunM16,
-	Mod_Grenade_HE,
-	Mod_Grenade_Smoke,
-
-	Mod_Door1,
-	Mod_Door2,
-
-	Mod_NUMMODELS
-};
+#include "Net.h"
 
 class Model;
 class Texture;

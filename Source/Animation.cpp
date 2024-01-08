@@ -443,7 +443,7 @@ void Animator::ConcatWithInvPose()
 }
 
 
-void Animator::Init(const Model* mod)
+void Animator::set_model(const Model* mod)
 {
 	ASSERT(mod);
 	if (!(mod->bones.size() > 0 && mod->animations && mod->bones.size() == mod->animations->num_channels)) {

@@ -186,7 +186,7 @@ void Game_Engine::view_angle_update()
 
 void Game_Engine::make_move()
 {
-	MoveCommand command;
+	Move_Command command;
 	command.view_angles = local.view_angles;
 	command.tick = tick;
 
@@ -205,23 +205,23 @@ void Game_Engine::make_move()
 		command.lateral_move += 1.f;
 	if (keys[SDL_SCANCODE_D])
 		command.lateral_move -= 1.f;
-	if (keys[SDL_SCANCODE_SPACE])
-		command.button_mask |= CmdBtn_Jump;
-	if (keys[SDL_SCANCODE_LSHIFT])
-		command.button_mask |= CmdBtn_Duck;
-	if (keys[SDL_SCANCODE_Q])
-		command.button_mask |= CmdBtn_PFire;
-	if (keys[SDL_SCANCODE_E])
-		command.button_mask |= CmdBtn_Reload;
 	if (keys[SDL_SCANCODE_Z])
 		command.up_move += 1.f;
 	if (keys[SDL_SCANCODE_X])
 		command.up_move -= 1.f;
+	if (keys[SDL_SCANCODE_SPACE])
+		command.button_mask |= BUTTON_JUMP;
+	if (keys[SDL_SCANCODE_LSHIFT])
+		command.button_mask |= BUTTON_DUCK;
+	if (keys[SDL_SCANCODE_Q])
+		command.button_mask |= BUTTON_FIRE1;
+	if (keys[SDL_SCANCODE_E])
+		command.button_mask |= BUTTON_RELOAD;
 
 	// quantize and unquantize for local prediction
-	command.forward_move	= MoveCommand::unquantize(MoveCommand::quantize(command.forward_move));
-	command.lateral_move	= MoveCommand::unquantize(MoveCommand::quantize(command.lateral_move));
-	command.up_move			= MoveCommand::unquantize(MoveCommand::quantize(command.up_move));
+	command.forward_move	= Move_Command::unquantize(Move_Command::quantize(command.forward_move));
+	command.lateral_move	= Move_Command::unquantize(Move_Command::quantize(command.lateral_move));
+	command.up_move			= Move_Command::unquantize(Move_Command::quantize(command.up_move));
 	
 	// FIXME:
 	local.last_command = command;
@@ -565,7 +565,7 @@ void Renderer::FrameDraw()
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			// FIXME: leaking server code into client code
 			if (engine.ents[i].type == Ent_Player) {
-				EntityState es = engine.ents[i].ToEntState();
+				EntityState es = engine.ents[i].to_entity_state();
 				AddPlayerDebugCapsule(&es, &mb, COLOR_CYAN);
 			}
 		}
@@ -764,7 +764,7 @@ void Renderer::AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Col
 	vec3 origin = es->position;
 	Capsule c;
 	c.base = origin;
-	c.tip = origin + vec3(0, (es->ducking) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
+	c.tip = origin + vec3(0, (es->solid) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
 	c.radius = CHAR_HITBOX_RADIUS;
 	float radius = CHAR_HITBOX_RADIUS;
 	vec3 a, b;

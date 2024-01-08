@@ -3,12 +3,13 @@
 #include "Level.h"
 #include "Movement.h"
 #include "Game_Engine.h"
+#include "Net.h"
 
 void PlayerDeathUpdate(Entity* ent);
 void player_update(Entity* ent);
 void player_spawn(Entity* ent);
 void PlayerUpdateAnimations(Entity* ent);
-void PlayerItemUpdate(Entity* ent, MoveCommand cmd);
+void PlayerItemUpdate(Entity* ent, Move_Command cmd);
 void dummy_update(Entity* ent);
 
 Entity* CreateGrenade(Entity* from, glm::vec3 org, glm::vec3 vel, int gtype);
@@ -35,27 +36,6 @@ void GetPlayerSpawnPoisiton(Entity* ent)
 		ent->rotation = glm::vec3(0);
 	}
 }
-
-#if 0
-Entity* Game::InitNewEnt(EntType type, int index)
-{
-	Entity* ent = &engine.ents[index];
-	ASSERT(ent->type == Ent_Free);
-	ent->type = type;
-	ent->index = index;
-	ent->ducking = false;
-	ent->model = nullptr;
-	ent->position = glm::vec3(0.f);
-	ent->velocity = glm::vec3(0.f);
-	ent->rotation = glm::vec3(0.f);
-
-	ent->alive = false;
-	ent->health = 0;
-	ent->on_ground = false;
-
-	return ent;
-}
-#endif
 
 void Game_Engine::client_leave(int slot)
 {
@@ -97,24 +77,6 @@ void Game_Engine::free_entity(Entity* ent)
 }
 
 
-#if 0
-Entity* Game::MakeNewEntity(EntType type)
-{
-	int slot = MAX_CLIENTS;
-	for (; slot < MAX_GAME_ENTS; slot++) {
-		if (engine.ents[slot].type == Ent_Free)
-			break;
-	}
-	if (slot == MAX_GAME_ENTS)
-		return nullptr;
-	Entity* ent = InitNewEnt(type, slot);
-	engine.num_entities++;
-	printf("spawning ent in slot %d\n", slot);
-	return ent;
-}
-#endif
-
-
 void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 {
 	printf("Shooting bullets\n");
@@ -144,68 +106,6 @@ void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	//	rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
 	//}
 }
-
-#if 0
-void Game::RayWorldIntersect(Ray r, RayHit* out, int skipent, PhysFilterFlags filter)
-{
-	TraceRayAgainstLevel(level, r, out, true);
-	if (out->dist >= 0.f)
-		out->hit_world = true;
-	if (filter & (Pf_Players|Pf_Nonplayers)) {
-		for (int i = 0; i < ents.size(); i++) {
-			if (ents[i].type == Ent_Free) continue;
-			Entity* ent = ents.data() + i;
-			if (ent->type != Ent_Player && ent->type != Ent_Dummy)
-				continue;
-			if (i == skipent)
-				continue;
-
-			Bounds b;
-			b.bmin = vec3(-CHAR_HITBOX_RADIUS, 0, -CHAR_HITBOX_RADIUS);
-			b.bmax = vec3(CHAR_HITBOX_RADIUS, CHAR_STANDING_HB_HEIGHT, CHAR_HITBOX_RADIUS);
-			if (ent->ducking) {
-				b.bmax.y = CHAR_CROUCING_HB_HEIGHT;
-			}
-			b.bmin += ent->position;
-			b.bmax += ent->position;
-
-
-			float t_out = -1.f;
-			bool has_hit = b.intersect(r, t_out);
-
-			if (has_hit) {
-				out->dist = t_out;
-				out->ent_id = i;
-				out->hit_world = false;
-				out->pos = r.at(t_out);
-			}
-		}
-	}
-}
-#endif
-
-#if 0
-void Game::PhysWorldTrace(PhysContainer obj, GeomContact* contact, int skipent, PhysFilterFlags filter)
-{
-	contact->found = false;
-	contact->penetration_depth = -INFINITY;
-	TraceAgainstLevel(level, contact, obj, true, true);
-	if (!(filter & (Pf_Players|Pf_Nonplayers)))
-		return;
-	for (int i = 0; i < ents.size(); i++) {
-		if (ents[i].type == Ent_Free || i == skipent) {
-			continue;
-		}
-		if (ents[i].type == Ent_Grenade)
-			continue;
-		GeomContact c;
-		CylinderCylinderIntersect(obj.cap.radius, obj.cap.base, obj.cap.tip.y - obj.cap.base.y, 
-			CHAR_HITBOX_RADIUS, ents[i].position, CHAR_STANDING_HB_HEIGHT, &c);
-		if (c.found && c.penetration_depth > contact->penetration_depth)
-			*contact = c;
-	}
-}
-#endif
 
 void player_spawn(Entity* ent)
 {
@@ -281,21 +181,24 @@ void Entity::SetModel(GameModels m) {
 	model_index = m;
 	model = media.gamemodels.at(m);
 	if (model && model->bones.size() > 0)
-		anim.Init(model);
+		anim.set_model(model);
 }
 
-void Entity::from_entity_state(EntityState es)
+void Entity::from_entity_state(EntityState& es)
 {
+	type = (EntType)es.type;
 	position = es.position;
 	rotation = es.angles;
-
 	model_index = es.model_idx;
 	
+	item = es.item;
+	solid = es.solid;
+
 	if (model_index >= 0 && model_index < media.gamemodels.size())
 		model = media.gamemodels.at(model_index);
 	
 	if(model&&model->bones.size()>0)
-		anim.Init(model);
+		anim.set_model(model);
 
 	anim.leganim = es.leganim;
 	anim.leganim_frame = es.leganim_frame;
@@ -329,25 +232,26 @@ void Entity::FromPlayerState(PlayerState* ps)
 	items = ps->items;
 	in_jump = ps->in_jump;
 }
-EntityState Entity::ToEntState() const
+EntityState Entity::to_entity_state()
 {
-	EntityState es{};
+	EntityState es;
+	es.type = type;
+	es.position = position;
 	es.angles = rotation;
-	es.ducking = ducking;
+	es.model_idx = model_index;
+	es.solid = solid;
 	es.leganim = anim.leganim;
 	es.leganim_frame = anim.leganim_frame;
 	es.mainanim = anim.mainanim;
 	es.mainanim_frame = anim.mainanim_frame;
-	es.position = position;
-	es.type = type;
-
-	es.model_idx = model_index;
 
 	return es;
 }
+
+
 #include "MeshBuilder.h"
 #include "Config.h"
-void ExecutePlayerMove(Entity* ent, MoveCommand cmd)
+void ExecutePlayerMove(Entity* ent, Move_Command cmd)
 {
 	double oldtime = engine.time;
 	engine.time = cmd.tick * engine.tick_interval;

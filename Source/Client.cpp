@@ -16,6 +16,7 @@ void Client::init()
 	cfg_fake_lag = cfg.get_var("fake_lag", "0");
 	cfg_fake_loss = cfg.get_var("fake_loss", "0");
 	cfg_cl_time_out = cfg.get_var("cl_time_out", "5.f");
+	interpolate = cfg.get_var("interpolate", "1");
 
 	sock.Init(0);
 }
@@ -43,7 +44,7 @@ void Client::connect(string address)
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
-		interpolation_data[i] = ClientEntity();
+		interpolation_data[i] = Entity_Interp();
 	lastpredicted = PlayerState();
 
 	TrySendingConnect();
@@ -110,7 +111,7 @@ int Client::GetPlayerNum() const
 	return client_num;
 }
 
-MoveCommand& Client::get_command(int sequence) {
+Move_Command& Client::get_command(int sequence) {
 	return commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
 
@@ -118,7 +119,7 @@ void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 {
 	entstate->position = state->position;
 	entstate->angles = state->angles;
-	entstate->ducking = state->ducking;
+	entstate->solid = state->ducking;
 	entstate->type = Ent_Player;
 }
 
@@ -144,7 +145,7 @@ void Client::run_prediction()
 	PlayerState predicted_player = last_auth_state->pstate;
 
 	for (int i = start + 1; i < end; i++) {
-		MoveCommand& cmd = get_command(i);
+		Move_Command& cmd = get_command(i);
 		bool run_fx = i == (end - 1);
 
 		//cl_game.RunCommand(&pred_state, &next_state, cmd, i==(end-1));
@@ -181,9 +182,9 @@ static float MidLerp(float min, float max, float mid_val)
 	return (mid_val - min) / (max - min);
 }
 
-StateEntry* ClientEntity::GetLastState()
+Interp_Entry* Entity_Interp::GetLastState()
 {
-	return &hist.at(NegModulo(hist_index - 1, NUM_STORED_STATES));
+	return &hist[NegModulo(hist_index - 1, HIST_SIZE)];
 }
 bool IsDistanceATeleport(vec3 a, vec3 b, float maxspeed, float dt)
 {
@@ -192,9 +193,9 @@ bool IsDistanceATeleport(vec3 a, vec3 b, float maxspeed, float dt)
 	return dt < t;
 }
 
-StateEntry* ClientEntity::GetStateFromIndex(int index)
+Interp_Entry* Entity_Interp::GetStateFromIndex(int index)
 {
-	return &hist.at(NegModulo(index, NUM_STORED_STATES));
+	return &hist[NegModulo(index, HIST_SIZE)];
 }
 
 float InterpolateAnimation(Animation* a, float start, float end, float alpha)
@@ -216,9 +217,22 @@ float InterpolateAnimation(Animation* a, float start, float end, float alpha)
 	}
 }
 
+void set_entity_interp_vars(Entity& e, Interp_Entry& i)
+{
+	e.position = i.position;
+	e.rotation = i.angles;
+	e.anim.leganim = i.legs_anim;
+	e.anim.mainanim = i.main_anim;
+	e.anim.leganim_frame = i.la_frame;
+	e.anim.mainanim_frame = i.ma_frame;
+}
+
 
 void Client::interpolate_states()
 {
+	if (!interpolate->integer)
+		return;
+
 	auto cl = engine.cl;
 	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
 	
@@ -226,12 +240,12 @@ void Client::interpolate_states()
 		if (!engine.ents[i].active() || i == engine.player_num())
 			continue;
 
-		ClientEntity& ce = interpolation_data[i];
+		Entity_Interp& ce = interpolation_data[i];
 		Entity& ent = engine.ents[i];
 
 		int entry_index = 0;
-		int last_entry = NegModulo(ce.hist_index - 1, ClientEntity::NUM_STORED_STATES);
-		for (; entry_index < ClientEntity::NUM_STORED_STATES; entry_index++) {
+		int last_entry = NegModulo(ce.hist_index - 1, Entity_Interp::HIST_SIZE);
+		for (; entry_index < Entity_Interp::HIST_SIZE; entry_index++) {
 			auto e = ce.GetStateFromIndex(ce.hist_index - 1 - entry_index);
 			if (rendering_time >= e->tick * engine.tick_interval) {
 				break;
@@ -239,27 +253,30 @@ void Client::interpolate_states()
 		}
 
 		// could extrpolate here, or just set it to last state
-		if (entry_index == 0 || entry_index == ClientEntity::NUM_STORED_STATES) {
-			ent.from_entity_state(ce.GetLastState()->state);
+		if (entry_index == 0 || entry_index == Entity_Interp::HIST_SIZE) {
+			//ent.from_entity_state(ce.GetLastState()->state);
+			set_entity_interp_vars(ent, *ce.GetLastState());
 			//printf("extrapolate\n");
 			continue;
 		}
 		// else, interpolate
-		StateEntry* s1 = ce.GetStateFromIndex(last_entry - entry_index);
-		StateEntry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
+		Interp_Entry* s1 = ce.GetStateFromIndex(last_entry - entry_index);
+		Interp_Entry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
 
 
 		if (s1->tick == -1 && s2->tick == -1) {
-			ent.from_entity_state(EntityState{});
+			//ent.from_entity_state(EntityState{});
 			printf("no state to use\n");
 			continue;
 		}
 		else if (s1->tick == -1) {
-			ent.from_entity_state(s2->state);
+			//ent.from_entity_state(s2->state);
+			set_entity_interp_vars(ent, *s2);
 			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
-			ent.from_entity_state(s1->state);
+			set_entity_interp_vars(ent, *s1);
+			//ent.from_entity_state(s1->state);
 			continue;
 		}
 
@@ -269,28 +286,26 @@ void Client::interpolate_states()
 		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
 
 
-		EntityState interpstate = s1->state;
+		Interp_Entry interpstate = *s1;
 		//if(!IsDistanceATeleport(s1->state.position,s2->state.position, 20.0, tickinterval))
-		interpstate.position = glm::mix(s1->state.position, s2->state.position, midlerp);
+		interpstate.position = glm::mix(s1->position, s2->position, midlerp);
 
+		if (ent.model && ent.model->animations && s1->legs_anim == s2->legs_anim) {
 
-		if (ent.model && ent.model->animations && s1->state.leganim == s2->state.leganim) {
-			//interpstate.leganim_frame = glm::mix(s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
-
-
-			int anim = s1->state.leganim;
+			int anim = s1->legs_anim;
 			if (anim >= 0 && anim < ent.model->animations->clips.size()) {
 
-				interpstate.leganim_frame = InterpolateAnimation(&ent.model->animations->clips[s1->state.leganim],
-					s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
+				interpstate.la_frame = InterpolateAnimation(&ent.model->animations->clips[s1->legs_anim],
+					s1->la_frame, s2->la_frame, midlerp);
 			}
 
 		}
-		if (s1->state.mainanim == s2->state.mainanim) {
-			// fixme
-		}
+		//if (s1->state.mainanim == s2->state.mainanim) {
+		//	// fixme
+		//}
 
-		ent.from_entity_state(interpstate);
+		set_entity_interp_vars(ent, interpstate);
+		//ent.from_entity_state(interpstate);
 	}
 
 
@@ -403,37 +418,40 @@ void Client::read_snapshot(Snapshot* s)
 {
 	Snapshot* snapshot = s;
 	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
-		ClientEntity* ce = &interpolation_data[i];
-		Entity* e = &engine.ents[i];
-		EntityState* state = &snapshot->entities[i];
+		Entity_Interp& interp = interpolation_data[i];
+		Entity& e = engine.ents[i];
+		EntityState& state = snapshot->entities[i];
 
-		int lasttype = e->type;
+		int lasttype = e.type;
 
 		// local player doesnt fill interp history here
 		if (i == engine.player_num()) {
-			e->type = Ent_Player;
+			// FIXME
+			e.type = Ent_Player;
 			continue;
 		}
 
-		if (state->type == Ent_Free) {
-			e->type = Ent_Free;
+		if (state.type == Ent_Free) {
+			e.type = Ent_Free;
 			continue;
 		}
 
 		if (lasttype == Ent_Free) {
-			*e = Entity();
-			*ce = ClientEntity();
-			e->type = (EntType)snapshot->entities[i].type;
+			e = Entity();
+			interp = Entity_Interp();
 		}
-
-		ce->hist.at(ce->hist_index) = { engine.tick, *state };
-		ce->hist_index = (ce->hist_index + 1) % ce->hist.size();
-
-		if (state->model_idx >= 0 && state->model_idx < media.gamemodels.size())
-			e->model = media.gamemodels.at(state->model_idx);
-
-		if (e->model && e->model->name == "CT.glb" && e->type != Ent_Player)
-			printf(__FUNCTION__": model mismatch %d tick %d\n", i, engine.tick);
+		// replicate variables to entity
+		e.from_entity_state(state);
+		// save off some vars for rendering interpolation
+		Interp_Entry& entry = interp.hist[interp.hist_index];
+		entry.tick = engine.tick;
+		entry.position = state.position;
+		entry.angles = state.angles;
+		entry.main_anim = state.mainanim;
+		entry.legs_anim = state.leganim;
+		entry.ma_frame = state.mainanim_frame;
+		entry.la_frame = state.leganim_frame;
+		interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
 	}
 
 	ClearEntsThatDidntUpdate(engine.tick);

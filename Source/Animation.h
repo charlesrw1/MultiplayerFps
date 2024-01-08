@@ -79,7 +79,7 @@ public:
 		set = nullptr;
 		ResetLayers();
 	}
-	void Init(const Model* model);
+	void set_model(const Model* model);
 	void SetupBones();
 	void ConcatWithInvPose();
 	const std::vector<glm::mat4x4> GetBones() const { 

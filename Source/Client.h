@@ -11,27 +11,26 @@
 #include "Config.h"
 #include "Types.h"
 
-struct StateEntry
+
+struct Interp_Entry
 {
 	int tick = -1;
-	EntityState state;
+	glm::vec3 position, angles;
+	int main_anim, legs_anim;
+	float ma_frame, la_frame;
 };
 
-struct ClientEntity
+
+struct Entity_Interp
 {
-	const static int NUM_STORED_STATES = 10;
-	typedef std::array<StateEntry, NUM_STORED_STATES> StateHist;
-
-	// history of updates for interpolation
-	StateHist hist;
+	const static int HIST_SIZE = 10;
+	Interp_Entry hist[HIST_SIZE];
 	int hist_index = 0;
-	EntityState interpstate;
 
-	StateEntry* GetStateFromIndex(int index);
-	StateEntry* GetLastState();
-	void ClearState() {
-		for (int i = 0; i < hist.size(); i++)
-			hist.at(i) = { -1, {} };
+	Interp_Entry* GetStateFromIndex(int index);
+	Interp_Entry* GetLastState();
+	void clear() {
+		for (int i = 0; i < HIST_SIZE; i++) hist[i].tick = -1;
 	}
 };
 
@@ -62,7 +61,7 @@ public:
 	void interpolate_states();
 	void read_snapshot(Snapshot* s);
 	void run_prediction();
-	MoveCommand& get_command(int sequence);
+	Move_Command& get_command(int sequence);
 
 	void TrySendingConnect();
 	int GetPlayerNum() const;
@@ -91,13 +90,14 @@ public:
 	Config_Var* cfg_fake_lag;
 	Config_Var* cfg_fake_loss;
 	Config_Var* cfg_cl_time_out;
+	Config_Var* interpolate;
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
 	vector<Snapshot> snapshots;
 	PlayerState lastpredicted;
-	ClientEntity interpolation_data[MAX_GAME_ENTS];
-	vector<MoveCommand> commands;
+	Entity_Interp interpolation_data[MAX_GAME_ENTS];
+	vector<Move_Command> commands;
 
 	string serveraddr;
 	int client_num = -1;

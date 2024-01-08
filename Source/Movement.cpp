@@ -53,7 +53,7 @@ void PlayerMovement::CheckNans()
 
 void PlayerMovement::CheckJump()
 {
-	if (player.on_ground && cmd.button_mask & CmdBtn_Jump) {
+	if (player.on_ground && cmd.button_mask & BUTTON_JUMP) {
 		printf("jump\n");
 		player.velocity.y += jumpimpulse;
 		player.on_ground = false;
@@ -63,7 +63,7 @@ void PlayerMovement::CheckJump()
 }
 void PlayerMovement::CheckDuck()
 {
-	if (cmd.button_mask & CmdBtn_Duck) {
+	if (cmd.button_mask & BUTTON_DUCK) {
 		if (player.on_ground) {
 			player.ducking = true;
 		}
@@ -75,7 +75,7 @@ void PlayerMovement::CheckDuck()
 			player.ducking = true;
 		}
 	}
-	else if (!(cmd.button_mask & CmdBtn_Duck) && player.ducking) {
+	else if (!(cmd.button_mask & BUTTON_DUCK) && player.ducking) {
 		int steps = 2;
 		float step = 0.f;
 		float sphere_radius = 0.f;
@@ -297,8 +297,8 @@ void PlayerMovement::RunItemCode()
 {
 	vec3 shoot_vec = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
 
-	bool wants_shoot = cmd.button_mask & CmdBtn_PFire;
-	bool wants_reload = cmd.button_mask & CmdBtn_Reload;
+	bool wants_shoot = cmd.button_mask & BUTTON_FIRE1;
+	bool wants_reload = cmd.button_mask & BUTTON_RELOAD;
 
 	Item_State* w = &player.items;
 	if (!(w->active_item >= 0 && w->active_item < Item_State::MAX_ITEMS)) {

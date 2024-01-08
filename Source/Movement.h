@@ -20,7 +20,7 @@ public:
 
 	// caller sets these vars
 	MeshBuilder* phys_debug = nullptr;
-	MoveCommand cmd;
+	Move_Command cmd;
 	float deltat;
 	int entindex;
 	float simtime;
