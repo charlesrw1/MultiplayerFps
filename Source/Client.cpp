@@ -141,6 +141,11 @@ void Client::run_prediction()
 	int incoming_seq = InSequence();
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 
+	// FIXME
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		if (engine.ents[i].active())
+			engine.ents[i].position = last_auth_state->entities[i].position;
+	}
 	engine.build_physics_world(0.f);
 
 	// FIXME

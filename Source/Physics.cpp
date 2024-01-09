@@ -66,30 +66,6 @@ void InitStaticGeoBvh(Level* level)
 	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
-// only does xz plane collisions
-void CylinderCylinderIntersect(float r1, glm::vec3 o1, float h1, float r2, glm::vec3 o2, float h2, GeomContact* out)
-{
-	out->found = false;
-	bool y_overlap = o1.y <= o2.y + h2 && o1.y + h1 >= o2.y;
-	float yoverlap_amt = glm::min(glm::abs(o2.y + h2 - o1.y), glm::abs(o1.y + h1 - o2.y));
-	glm::vec3 yintersectvect = glm::vec3(0, o1.y - (o2.y + h2), 0);
-	glm::vec3 yintersectvec2 = glm::vec3(0, o2.y - (o1.y + h1), 0);
-	if (glm::abs(yintersectvec2.y) < glm::abs(yintersectvect.y))
-		yintersectvect = yintersectvec2;
-
-	glm::vec3 xzintersectvec = glm::vec3(o1.x - o2.x, 0, o1.z - o2.z);
-	float xz_dist = glm::length(xzintersectvec);
-	bool xzoverlap = xz_dist <= r1 + r2;
-
-	if (!y_overlap || !xzoverlap)
-		return;
-
-	out->found = true;
-	out->penetration_depth = r1+r2-xz_dist;
-	out->penetration_normal = xzintersectvec/xz_dist;
-	out->intersect_len = r1 - out->penetration_depth;
-}
-
 template<typename Functor>
 static void IntersectWorld(Functor&& do_intersect, const BVH& bvh, Bounds box)
 {
@@ -548,6 +524,42 @@ void RayVsBox()
 
 void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out)
 {
+	out->found = false;
+	float x1 = b1.bmax.x - b2.bmin.x;
+	float x2 = b2.bmax.x - b1.bmin.x;
+	float y1 = b1.bmax.y - b2.bmin.y;
+	float y2 = b2.bmax.y - b1.bmin.y;
+	float z1 = b1.bmax.z - b2.bmin.z;
+	float z2 = b2.bmax.z - b1.bmin.z;
+
+	bool boxoverlap = x1 >= 0 && x2 >= 0 
+		&& y1 >= 0 && y2 >= 0 
+		&& z1 >= 0 && z2 >= 0;
+	if (!boxoverlap)
+		return;
+
+	out->found = true;
+	// if it overlaps, the best side to push out is the smallest overlap one
+	float smallest = glm::min(glm::min(glm::min(glm::min(glm::min(x1, x2), y1), y2), z1), z2);
+	if (x1 == smallest)
+		out->penetration_normal = vec3(1, 0, 0);
+	else if (x2 == smallest)
+		out->penetration_normal = vec3(-1, 0, 0);
+	else if (y1 == smallest)
+		out->penetration_normal = vec3(0, 1, 0);
+	else if (y2 == smallest)
+		out->penetration_normal = vec3(0, -1, 0);
+	else if (z1 == smallest)
+		out->penetration_normal = vec3(0, 0, 1);
+	else if (z2 == smallest)
+		out->penetration_normal = vec3(0, 0, -1);
+	out->penetration_normal *= -1;
+	out->penetration_depth = smallest;
+	out->surf_normal = -out->penetration_normal;
+	out->intersect_len = dot((b1.bmax - b1.bmin)*0.5f * glm::abs(out->penetration_normal),vec3(1))-out->penetration_depth;
+
+
+
 	//bool xoverlap = bmin.x <= other.bmax.x && bmax.x >= other.bmin.x;
 	//bool yoverlap = bmin.y <= other.bmax.y && bmax.y >= other.bmin.y;
 	//bool zoverlap = bmin.z <= other.bmax.z && bmax.z >= other.bmin.z;
@@ -573,7 +585,10 @@ void RayVsCharShape(PhysicsObject* character, Ray r, RayHit* rh)
 void CharShapeVsCharShape(CharacterShape* cs, CharacterShape* cs2, GeomContact* out)
 {
 	//BoxVsBox(cs->ToBounds(), cs2->ToBounds(), out);
-	CylinderCylinderIntersect(cs->radius, cs->org, cs->height, cs2->radius, cs2->org, cs2->height, out);
+	//CylinderCylinderIntersect(cs->radius, cs->org, cs->height, cs2->radius, cs2->org, cs2->height, out);
+
+	BoxVsBox(cs->ToBounds(), cs2->ToBounds(), out);
+
 }
 
 void CharShapeVsBox(CharacterShape* cs, BoxShape* b, GeomContact* out)

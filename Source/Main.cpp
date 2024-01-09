@@ -1010,6 +1010,7 @@ void Game_Engine::draw_debug_interface()
 {
 	if(show_console)
 		console.draw();
+	move_variables_menu();
 }
 
 void Game_Engine::draw_screen()

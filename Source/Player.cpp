@@ -6,6 +6,7 @@
 #include "GameData.h"
 #include "Game_Engine.h"
 
+#include "imgui.h"
 
 //
 //	PLAYER MOVEMENT CODE
@@ -22,7 +23,7 @@ static int col_iters = 2;
 static bool col_closest = true;
 static bool new_physics = true;
 
-static float ground_friction = 10;
+static float ground_friction = 7.2;
 static float air_friction = 0.01;
 static float gravityamt = 16;
 static float ground_accel = 6;
@@ -31,8 +32,28 @@ static float air_accel = 3;
 static float minspeed = 1;
 static float maxspeed = 30;
 static float jumpimpulse = 5.f;
-static float max_ground_speed = 10;
+static float max_ground_speed = 5.7;
 static float max_air_speed = 2;
+
+void move_variables_menu()
+{
+	if (!ImGui::Begin("Move Vars")) {
+		ImGui::End();
+		return;
+	}
+
+	ImGui::SliderFloat("ground_friction", &ground_friction, 0, 20);
+	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
+	ImGui::SliderFloat("gravityamt", &gravityamt, 0, 30);
+	ImGui::SliderFloat("ground_accel", &ground_accel, 1, 10);
+	ImGui::SliderFloat("air_accel", &air_accel, 0, 10);
+	ImGui::SliderFloat("minspeed", &minspeed, 0, 10);
+	ImGui::SliderFloat("maxspeed", &maxspeed, 5, 35);
+	ImGui::SliderFloat("max_ground_speed", &max_ground_speed, 2, 20);
+	ImGui::SliderFloat("max_air_speed", &max_air_speed, 0, 10);
+
+	ImGui::End();
+}
 
 using glm::vec3;
 using glm::vec2;
