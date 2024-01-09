@@ -91,6 +91,7 @@ public:
 	Config_Var* cfg_fake_loss;
 	Config_Var* cfg_cl_time_out;
 	Config_Var* interpolate;
+	Config_Var* cfg_do_predict;
 	Config_Var* smooth_error_time;
 
 	int last_recieved_server_tick = 0;

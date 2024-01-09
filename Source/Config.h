@@ -44,6 +44,8 @@ public:
 			printf("%--36s %s\n", vars[i].name.c_str(), vars[i].value.c_str());
 		}
 	}
+
+	bool set_unknown_variables = false;	
 private:
 	Engine_Cmd* find_cmd(const char* name);
 

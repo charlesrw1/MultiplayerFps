@@ -10,7 +10,9 @@ bool CheckGlErrorInternal_(const char* file, int line);
 #define glCheckError() CheckGlErrorInternal_(__FILE__,__LINE__)
 double GetTime();
 double TimeSinceStart();
+
 void Fatalf(const char* format, ...);
+void console_printf(const char* fmt, ...);
 
 struct Color32
 {

@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "Util.h"
 #include <fstream>
 
 Config_Var* Engine_Config::get_var(const char* name, const char* value, bool persist)
@@ -89,11 +90,11 @@ void Engine_Config::execute(string command)
 	else {
 		Config_Var* var = find_var(args[0].c_str());
 		if (var && args.size() == 1)
-			printf("%s %s\n", var->name, var->value);
-		else if (!var && args.size() == 1)
-			printf(__FUNCTION__": no Config_Var for %s\n", args[0].c_str());
-		else
+			console_printf("%s %s\n", var->name.c_str(), var->value.c_str());
+		else if((var || (!var && set_unknown_variables)) && args.size()==2)
 			set_var(args[0].c_str(), args[1].c_str());
+		else
+			console_printf("unknown command: %s\n", args[0].c_str());
 	}
 }
 

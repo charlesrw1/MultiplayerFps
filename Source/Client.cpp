@@ -18,13 +18,12 @@ void Client::init()
 	cfg_cl_time_out		= cfg.get_var("cl_time_out", "5.f");
 	interpolate			= cfg.get_var("interpolate", "1");
 	smooth_error_time	= cfg.get_var("smooth_error", "1.0");
+	cfg_do_predict		= cfg.get_var("do_predict", "1");
 	sock.Init(0);
 }
 
 void Client::connect(string address)
 {
-	DebugOut("connecting to server: %s\n", address.c_str());
-
 	serveraddr = address;
 	IPAndPort ip;
 	ip.set(address);
@@ -60,7 +59,7 @@ void Client::TrySendingConnect()
 	if (state != CS_TRYINGCONNECT)
 		return;
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
-		DebugOut("Unable to connect to server\n");
+		console_printf("Couldn't connect to server\n");
 		state = CS_DISCONNECTED;
 		return;
 	}
@@ -69,7 +68,6 @@ void Client::TrySendingConnect()
 		return;
 	attempt_time = GetTime();
 	connect_attempts++;
-	DebugOut("Sending connection request\n");
 
 	uint8_t buffer[256];
 	ByteWriter writer(buffer, 256);
@@ -80,9 +78,9 @@ void Client::TrySendingConnect()
 }
 void Client::Disconnect()
 {
-	DebugOut("Disconnecting\n");
 	if (state == CS_DISCONNECTED)
 		return;
+	console_printf("Disconnecting...\n");
 	if (state != CS_TRYINGCONNECT) {
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
@@ -101,9 +99,8 @@ void Client::Disconnect()
 
 void Client::Reconnect()
 {
-	DebugOut("Reconnecting\n");
-
 	string address = std::move(serveraddr);
+	console_printf("Reconnecting to server: %s\n", address);
 	Disconnect();
 	connect(address);
 }
@@ -128,6 +125,9 @@ void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
 void Client::run_prediction()
 {
 	if (get_state() != CS_SPAWNED)
+		return;
+
+	if (!cfg_do_predict->integer)
 		return;
 
 	// predict commands from outgoing ack'ed to current outgoing

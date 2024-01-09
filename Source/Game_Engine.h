@@ -43,6 +43,19 @@ public:
 	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
 };
 
+class Debug_Console
+{
+public:
+	void draw();
+	void print(const char* fmt, ...);
+	void print_args(const char* fmt, va_list list);
+	vector<string> lines;
+	bool auto_scroll = true;
+	bool scroll_to_bottom = false;
+	bool set_keyboard_focus = false;
+	char input_buffer[256];
+};
+
 struct ImGuiContext;
 class Client;
 class Game_Engine
@@ -100,6 +113,8 @@ public:
 	Config_Var* window_h;
 	Config_Var* window_fullscreen;
 	Config_Var* host_port;
+	Debug_Console console;
+	bool show_console = false;
 
 	bool dedicated_server = false;
 	bool keys[SDL_NUM_SCANCODES];
@@ -115,6 +130,8 @@ private:
 	void make_move();
 	void init_sdl_window();
 	void key_event(SDL_Event event);
+
+	void draw_debug_interface();
 };
 
 extern Game_Engine engine;

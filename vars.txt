@@ -4,7 +4,7 @@ bind C "connect localhost"
 
 #net vars
 tick_rate 66.0
-snapshot_rate 15.0
+snapshot_rate 20.0
 interp_time 0.1
 fake_lag 75
 fake_loss 0

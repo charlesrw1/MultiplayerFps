@@ -80,6 +80,13 @@ void Quit()
 	engine.cleanup();
 	exit(0);
 }
+void console_printf(const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	engine.console.print_args(fmt, args);
+	va_end(args);
+}
 void Fatalf(const char* format, ...)
 {
 	va_list list;
@@ -355,10 +362,10 @@ public:
 	RenderAttachments textures;
 
 	// config vars
-	Config_Var* cfg_draw_collision_tris;
-	Config_Var* cfg_draw_sv_colliders;
-	Config_Var* cfg_draw_viewmodel;
-	Config_Var* cfg_vsync;
+	Config_Var* r_draw_collision_tris;
+	Config_Var* r_draw_sv_colliders;
+	Config_Var* r_draw_viewmodel;
+	Config_Var* vsync;
 private:
 	void InitGlState();
 	void InitFramebuffers();
@@ -458,8 +465,6 @@ void Renderer::Init()
 	Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt", "VERTEX_COLOR");
 	Shader::compile(&particle_basic, "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
-
-
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
 	glGenTextures(1, &white_texture);
@@ -476,10 +481,10 @@ void Renderer::Init()
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	cfg_draw_collision_tris = cfg.get_var("draw_collision_tris", "0");
-	cfg_draw_sv_colliders	= cfg.get_var("draw_sv_colliders", "0");
-	cfg_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
-	cfg_vsync				= cfg.get_var("vsync", "0");
+	r_draw_collision_tris	= cfg.get_var("draw_collision_tris", "0");
+	r_draw_sv_colliders		= cfg.get_var("draw_sv_colliders", "1");
+	r_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
+	vsync					= cfg.get_var("vsync", "0");
 
 	fbo.scene = fbo.ssao = 0;
 	textures.scene_color = textures.scene_depthstencil = textures.ssao_color = 0;
@@ -566,9 +571,8 @@ void Renderer::FrameDraw()
 
 	MeshBuilder mb;
 	mb.Begin();
-	if (engine.is_host && cfg_draw_sv_colliders->integer == 1) {
+	if (r_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
-			// FIXME: leaking server code into client code
 			if (engine.ents[i].type == Ent_Player) {
 				EntityState es = engine.ents[i].to_entity_state();
 				AddPlayerDebugCapsule(&es, &mb, COLOR_CYAN);
@@ -581,7 +585,7 @@ void Renderer::FrameDraw()
 	simple.set_mat4("ViewProj", vs.viewproj);
 	simple.set_mat4("Model", mat4(1.f));
 
-	if(cfg_draw_collision_tris->integer)
+	if(r_draw_collision_tris->integer)
 		DrawCollisionWorld(engine.level);
 
 	mb.Draw(GL_LINES);
@@ -597,17 +601,8 @@ void Renderer::FrameDraw()
 	glClear(GL_DEPTH_BUFFER_BIT);
 
 
-	if(!gamel->thirdperson_camera->integer && cfg_draw_viewmodel->integer)
+	if(!gamel->thirdperson_camera->integer && r_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
-
-
-	ImGui_ImplSDL2_NewFrame();
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui::NewFrame();
-
-	ImGui::ShowDemoWindow();
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void Renderer::DrawEntBlobShadows()
@@ -823,6 +818,7 @@ void Game_Engine::connect_to(string address)
 		exit_map();
 	else if (cl->get_state() != CS_DISCONNECTED)
 		cl->Disconnect();
+	console_printf("Connecting to server (%s)\n", address.c_str());
 	cl->connect(address);
 }
 
@@ -849,7 +845,10 @@ void cmd_server_end()
 void cmd_client_connect()
 {
 	auto& args = cfg.get_arg_list();
-	if (args.size() < 2) return;
+	if (args.size() < 2) {
+		console_printf("usage connect <address>");
+		return;
+	}
 
 	engine.connect_to(args.at(1));
 }
@@ -866,7 +865,8 @@ void cmd_client_reconnect()
 void cmd_load_map()
 {
 	if (cfg.get_arg_list().size() < 2) {
-		printf(__FUNCTION__": needs map\n");
+		console_printf("usage map <map name>");
+		return;
 	}
 
 	engine.start_map(cfg.get_arg_list().at(1), false);
@@ -906,6 +906,7 @@ void Game_Local::init()
 
 void Game_Engine::start_map(string map, bool is_client)
 {
+	console_printf("Starting map %s\n", map.c_str());
 	// starting new map
 	mapname = map;
 	FreeLevel(level);
@@ -933,7 +934,7 @@ void Game_Engine::start_map(string map, bool is_client)
 void Game_Engine::set_tick_rate(float tick_rate)
 {
 	if (is_host) {
-		printf("can't change tick rate while server is running\n");
+		console_printf("Can't change tick rate while server is running\n");
 		return;
 	}
 	tick_interval = 1.0 / tick_rate;
@@ -951,6 +952,16 @@ void Game_Engine::exit_map()
 
 void Game_Engine::key_event(SDL_Event event)
 {
+	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
+		show_console = !show_console;
+		console.set_keyboard_focus = show_console;
+	}
+
+	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
+		return;
+	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
+		return;
+
 	if (event.type == SDL_KEYDOWN) {
 		int scancode = event.key.keysym.scancode;
 		keys[scancode] = true;
@@ -995,15 +1006,39 @@ void Game_Engine::cleanup()
 	}
 }
 
+void Game_Engine::draw_debug_interface()
+{
+	if(show_console)
+		console.draw();
+}
+
 void Game_Engine::draw_screen()
 {
 	glCheckError();
+	int x, y;
+	SDL_GetWindowSize(window, &x, &y);
+	cfg.set_var("window_w", std::to_string(x).c_str());
+	cfg.set_var("window_h", std::to_string(y).c_str());
+	if (draw.vsync->integer != 0 && draw.vsync->integer != 1)
+		cfg.set_var("vsync", "0");
+	SDL_GL_SetSwapInterval(draw.vsync->integer);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	if (engine_state == SPAWNED)
 		draw.FrameDraw();
+
+	ImGui_ImplSDL2_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui::NewFrame();
+
+	draw_debug_interface();
+	//ImGui::ShowDemoWindow();
+
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
 	glCheckError();
 	SDL_GL_SwapWindow(window);
 	glCheckError();
@@ -1071,6 +1106,7 @@ void Game_Engine::init()
 	is_host = false;
 	sv = new Server;
 	cl = new Client;
+	cfg.set_unknown_variables = true;
 
 	// config vars
 	window_w			= cfg.get_var("window_w", "1200", true);
@@ -1120,9 +1156,6 @@ void Game_Engine::init()
 	bind_key(SDL_SCANCODE_9, "counter 0");
 	bind_key(SDL_SCANCODE_0, "counter 1");
 
-
-
-
 	cfg.execute_file("vars.txt");	// load config vars
 	cfg.execute_file("init.txt");	// load startup script
 
@@ -1160,6 +1193,7 @@ void Game_Engine::init()
 		cfg.execute(cmd);
 
 	cfg.print_vars();
+	cfg.set_unknown_variables = false;
 }
 
 void Game_Engine::loop()
@@ -1277,4 +1311,80 @@ void Game_Engine::pre_render_update()
 		local.update_viewmodel();
 	}
 	local.update_view();
+}
+
+void Debug_Console::draw()
+{
+	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Console")) {
+		ImGui::End();
+		return;
+	}
+	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar))
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+		for (int i = 0; i < lines.size(); i++)
+		{
+			ImVec4 color;
+			bool has_color = false;
+			if (!lines[i].empty() && lines[i][0]=='#') { color = ImVec4(1.0f, 0.8f, 0.6f, 1.0f); has_color = true; }
+			if (has_color)
+				ImGui::PushStyleColor(ImGuiCol_Text, color);
+			ImGui::TextUnformatted(lines[i].c_str());
+			if (has_color)
+				ImGui::PopStyleColor();
+		}
+		if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
+			ImGui::SetScrollHereY(1.0f);
+		scroll_to_bottom = false;
+
+		ImGui::PopStyleVar();
+	}
+	ImGui::EndChild();
+	ImGui::Separator();
+
+	// Command-line
+	bool reclaim_focus = false;
+	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll;
+	if (set_keyboard_focus) {
+		ImGui::SetKeyboardFocusHere();
+		set_keyboard_focus = false;
+	}
+	if (ImGui::InputText("Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags))
+	{
+		char* s = input_buffer;
+		if (s[0]) {
+			print("#%s", input_buffer);
+			cfg.execute(input_buffer);
+			scroll_to_bottom = true;
+		}
+		s[0] = 0;
+		reclaim_focus = true;
+	}
+
+	// Auto-focus on window apparition
+	ImGui::SetItemDefaultFocus();
+	if (reclaim_focus)
+		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+
+	ImGui::End();
+}
+void Debug_Console::print_args(const char* fmt, va_list args)
+{
+	char buf[1024];
+	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
+	buf[IM_ARRAYSIZE(buf) - 1] = 0;
+	lines.push_back(buf);
+}
+
+void Debug_Console::print(const char* fmt, ...)
+{
+	char buf[1024];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
+	buf[IM_ARRAYSIZE(buf) - 1] = 0;
+	va_end(args);
+	lines.push_back(buf);
 }

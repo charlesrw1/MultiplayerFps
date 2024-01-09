@@ -46,7 +46,7 @@ void Game_Engine::client_leave(int slot)
 
 void Game_Engine::make_client(int slot)
 {
-	printf("spawning client %d into game\n", slot);
+	console_printf("Spawning client %d into game\n", slot);
 	Entity& e = ents[slot];
 	if (e.active()) printf("player slot %d already in use?\n", slot);
 	e = Entity();

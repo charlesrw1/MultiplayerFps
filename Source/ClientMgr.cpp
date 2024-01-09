@@ -122,7 +122,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 		{
 			// just force it for now
 			int server_tick = buf.ReadLong();
-			if (abs(server_tick - engine.tick) > 1) {
+			if (abs(server_tick - engine.tick) > 4) {
 				DebugOut("delta tick %d\n", server_tick - engine.tick);
 				
 				engine.tick = server_tick;

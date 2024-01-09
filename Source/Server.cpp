@@ -62,6 +62,7 @@ void Server::start()
 		end();
 	socket.Init(cfg_sv_port->integer);
 	initialized = true;
+	engine.tick_interval = 1.0 / cfg_tick_rate->real;
 }
 
 
@@ -133,7 +134,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 		return;
 	}
 	if (!already_connected)
-		DebugOut("Connected new client; IP: %s\n", addr.ToString().c_str());
+		console_printf("New client connected %s\n", addr.ToString().c_str());
 
 	uint8_t accept_buf[256];
 	ByteWriter writer(accept_buf, 256);
@@ -179,7 +180,7 @@ void Server::ReadPackets()
 
 		int cl_index = FindClient(from);
 		if (cl_index == -1) {
-			DebugOut("Packet from unknown source: %s\n", from.ToString().c_str());
+			console_printf("Packet recieved from unknown source: %s\n", from.ToString().c_str());
 			continue;
 		}
 
@@ -199,7 +200,7 @@ void Server::ReadPackets()
 		if (!cl.IsConnected()||cl.local_client)
 			continue;
 		if (GetTime() - cl.LastRecieved() > cfg_max_time_out->real) {
-			printf("Client, %s, timed out\n", cl.GetIPStr().c_str());
+			console_printf("Client %d %s timed out\n", i, cl.GetIPStr().c_str());
 			cl.Disconnect();
 		}
 	}
