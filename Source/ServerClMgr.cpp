@@ -8,7 +8,18 @@ RemoteClient::RemoteClient(Server* sv, int slot)
 	client_num = slot;
 }
 
-void RemoteClient::InitConnection(IPAndPort address)
+/*
+client sends input to server
+server queues it in a buffer
+
+server goes to update clients player and uses the inputs that have buffered up
+if the buffer is empty for X ticks, then start duplicating last command
+when updating character
+
+
+*/
+
+void RemoteClient::init(IPAndPort address)
 {
 	state = SCS_CONNECTED;
 	connection = Connection();
@@ -16,6 +27,8 @@ void RemoteClient::InitConnection(IPAndPort address)
 	local_client = false;
 	baseline = -1;
 	next_snapshot_time = 0.f;
+
+	commands.resize(5);
 }
 
 void RemoteClient::Disconnect()
@@ -25,7 +38,7 @@ void RemoteClient::Disconnect()
 	DebugOut("Disconnecting client %s\n", connection.remote_addr.ToString().c_str());
 
 	if (state == SCS_SPAWNED) {
-		myserver->RemoveClient(client_num);
+		engine.client_leave(client_num);
 	}
 
 	uint8_t buffer[8];
@@ -40,7 +53,7 @@ void RemoteClient::Disconnect()
 
 void RemoteClient::OnMoveCmd(ByteReader& msg)
 {
-
+	// will have a window of X inputs, if there are packet drops, then fill buffer
 	Move_Command cmd{};
 	cmd.tick = msg.ReadLong();
 
@@ -53,11 +66,11 @@ void RemoteClient::OnMoveCmd(ByteReader& msg)
 	cmd.button_mask = msg.ReadLong();
 
 	// Not ready to run the input yet
-	if (!IsSpawned())
+	if (state != SCS_SPAWNED)
 		return;
+	
 
-	// FIXME vulnerable to 
-	myserver->RunMoveCmd(client_num, cmd);
+	engine.execute_player_move(client_num, cmd);// FIXME
 }
 
 void RemoteClient::OnTextCommand(ByteReader& msg)
@@ -103,7 +116,8 @@ void RemoteClient::OnPacket(ByteReader& buf)
 {
 	if (state != SCS_SPAWNED) {
 		state = SCS_SPAWNED;
-		myserver->SpawnClientInGame(client_num);
+		DebugOut("Spawning client %d : %s\n", client_num, GetIPStr().c_str());
+		engine.make_client(client_num);
 	}
 
 

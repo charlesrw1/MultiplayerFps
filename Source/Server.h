@@ -26,7 +26,7 @@ class RemoteClient
 public:
 	RemoteClient(Server* sv, int slot);
 
-	void InitConnection(IPAndPort address);
+	void init(IPAndPort address);
 	void Disconnect();
 
 	void OnPacket(ByteReader& msg);
@@ -56,8 +56,12 @@ public:
 	int client_num = 0;
 	bool local_client = false;
 	Server* myserver = nullptr;
-
 	int baseline = -1;	// what tick to delta encode from
+
+	int current_tick = 0;
+	int num_commands = 0;
+	vector<Move_Command> commands;
+	Move_Command last_command;
 };
 
 // stores game state to delta encode to clients
@@ -76,9 +80,6 @@ public:
 	void end();
 	void connect_local_client();
 
-	void RunMoveCmd(int client, Move_Command cmd);
-	void SpawnClientInGame(int client);
-	void RemoveClient(int client);
 	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
 	Frame* GetSnapshotFrame();

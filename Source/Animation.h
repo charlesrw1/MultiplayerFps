@@ -112,6 +112,7 @@ public:
 	// only server side vars
 	float leganim_speed;
 	bool dont_loop = false;
+	bool finished = false;
 
 	const Model* model = nullptr;
 	const AnimationSet* set = nullptr;

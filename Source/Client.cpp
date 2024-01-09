@@ -12,12 +12,12 @@
 
 void Client::init()
 {
-	cfg_interp_time = cfg.get_var("interp_time", "0.1");
-	cfg_fake_lag = cfg.get_var("fake_lag", "0");
-	cfg_fake_loss = cfg.get_var("fake_loss", "0");
-	cfg_cl_time_out = cfg.get_var("cl_time_out", "5.f");
-	interpolate = cfg.get_var("interpolate", "1");
-
+	cfg_interp_time		= cfg.get_var("interp_time", "0.1");
+	cfg_fake_lag		= cfg.get_var("fake_lag", "0");
+	cfg_fake_loss		= cfg.get_var("fake_loss", "0");
+	cfg_cl_time_out		= cfg.get_var("cl_time_out", "5.f");
+	interpolate			= cfg.get_var("interpolate", "1");
+	smooth_error_time	= cfg.get_var("smooth_error", "1.0");
 	sock.Init(0);
 }
 
@@ -38,8 +38,10 @@ void Client::connect(string address)
 
 	snapshots.clear();
 	commands.clear();
+	origin_history.clear();
 	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
 	commands.resize(CLIENT_MOVE_HISTORY);
+	origin_history.resize(36);
 
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
@@ -127,6 +129,7 @@ void Client::run_prediction()
 {
 	if (get_state() != CS_SPAWNED)
 		return;
+
 	// predict commands from outgoing ack'ed to current outgoing
 	// TODO: dont repeat commands unless a new snapshot arrived
 	int start = OutSequenceAk();	// start at the new cmd
@@ -140,37 +143,25 @@ void Client::run_prediction()
 
 	engine.build_physics_world(0.f);
 
-	// FIXME:
-	EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
+	// FIXME
+	//EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
 	PlayerState predicted_player = last_auth_state->pstate;
+	//engine.local_player().FromPlayerState(&predicted_player);
+	engine.ents[engine.player_num()].FromPlayerState(&predicted_player);
 
 	for (int i = start + 1; i < end; i++) {
 		Move_Command& cmd = get_command(i);
 		bool run_fx = i == (end - 1);
-
-		//cl_game.RunCommand(&pred_state, &next_state, cmd, i==(end-1));
-
-		MeshBuilder b;
-		PlayerMovement move;
-		move.cmd = cmd;
-		move.deltat = engine.tick_interval;
-		move.phys_debug = &b;
-		move.player = predicted_player;
-		move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
-		move.simtime = cmd.tick * engine.tick_interval;
-		move.isclient = true;
-		move.phys = &engine.phys;
-		move.entindex = engine.cl->GetPlayerNum();
-		move.Run();
-
-		predicted_player = move.player;
+		player_physics_update(&engine.ents[engine.player_num()], cmd);
 	}
 
-	Entity& ent = engine.local_player();
+	// FIXME
+	origin_history.at((end-1)%origin_history.size()) = engine.local_player().position;
 
-	PlayerStateToClEntState(&last_estate, &predicted_player);
-	ent.from_entity_state(last_estate);
-	lastpredicted = predicted_player;
+
+	//Entity& ent = engine.local_player();
+	//ent.FromPlayerState(&predicted_player);
+	//lastpredicted = predicted_player;
 }
 
 static int NegModulo(int a, int b)
@@ -186,7 +177,7 @@ Interp_Entry* Entity_Interp::GetLastState()
 {
 	return &hist[NegModulo(hist_index - 1, HIST_SIZE)];
 }
-bool IsDistanceATeleport(vec3 a, vec3 b, float maxspeed, float dt)
+bool teleport_distance(vec3 a, vec3 b, float maxspeed, float dt)
 {
 	float len = glm::length(a - b);
 	float t = len / maxspeed;
@@ -234,8 +225,25 @@ void Client::interpolate_states()
 		return;
 
 	auto cl = engine.cl;
+	// FIXME
 	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
 	
+	// interpolate local player error
+	if (smooth_time > 0) {
+		if (smooth_time == smooth_error_time->real)
+			printf("starting smooth\n");
+
+		vec3 delta = engine.local_player().position - last_origin;
+		vec3 new_position = last_origin + delta * (1 - (smooth_time / smooth_error_time->real));
+		engine.local_player().position = new_position;
+		smooth_time -= engine.frame_time;
+
+		if (smooth_time <= 0)
+			printf("end smooth\n");
+	}
+	last_origin = engine.local_player().position;
+
+	// interpolate other entities
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		if (!engine.ents[i].active() || i == engine.player_num())
 			continue;
@@ -254,15 +262,12 @@ void Client::interpolate_states()
 
 		// could extrpolate here, or just set it to last state
 		if (entry_index == 0 || entry_index == Entity_Interp::HIST_SIZE) {
-			//ent.from_entity_state(ce.GetLastState()->state);
 			set_entity_interp_vars(ent, *ce.GetLastState());
-			//printf("extrapolate\n");
 			continue;
 		}
 		// else, interpolate
 		Interp_Entry* s1 = ce.GetStateFromIndex(last_entry - entry_index);
 		Interp_Entry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
-
 
 		if (s1->tick == -1 && s2->tick == -1) {
 			//ent.from_entity_state(EntityState{});
@@ -270,24 +275,25 @@ void Client::interpolate_states()
 			continue;
 		}
 		else if (s1->tick == -1) {
-			//ent.from_entity_state(s2->state);
 			set_entity_interp_vars(ent, *s2);
 			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
 			set_entity_interp_vars(ent, *s1);
-			//ent.from_entity_state(s1->state);
 			continue;
 		}
 
 		ASSERT(s1->tick < s2->tick);
 		ASSERT(s1->tick * engine.tick_interval <= rendering_time && s2->tick * engine.tick_interval >= rendering_time);
 
+		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*engine.tick_interval)) {
+			set_entity_interp_vars(ent, *s1);
+			printf("teleport\n");
+			continue;
+		}
+
 		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
-
-
 		Interp_Entry interpstate = *s1;
-		//if(!IsDistanceATeleport(s1->state.position,s2->state.position, 20.0, tickinterval))
 		interpstate.position = glm::mix(s1->position, s2->position, midlerp);
 
 		if (ent.model && ent.model->animations && s1->legs_anim == s2->legs_anim) {
@@ -305,89 +311,8 @@ void Client::interpolate_states()
 		//}
 
 		set_entity_interp_vars(ent, interpstate);
-		//ent.from_entity_state(interpstate);
 	}
-
-
-	//double rendering_time_client = cl->tick * engine.tick_interval - engine.frame_remainder;
-	//ClientEntity* local = cl->GetLocalPlayer();
-	//local->interpstate = local->GetLastState()->state;
 }
-
-
-#if 0
-// Called every graphics frame
-void ClientEntity::InterpolateState(double time, double tickinterval) {
-	if (!active)
-		return;
-	
-	//interpstate = GetLastState()->state;
-	//return;
-
-	int i = 0;
-	int last_entry = NegModulo(hist_index - 1, NUM_STORED_STATES);
-	for (; i < NUM_STORED_STATES; i++) {
-		auto e = GetStateFromIndex(hist_index - 1 - i);
-		if (time >= e->tick*tickinterval) {
-			break;
-		}
-	}
-
-	// could extrpolate here, or just set it to last state
-	if (i == 0 || i == NUM_STORED_STATES) {
-		interpstate = GetLastState()->state;
-		printf("extrapolate\n");
-		double abc = GetStateFromIndex(last_entry - i)->tick * tickinterval;
-		return;
-	}
-	// else, interpolate
-	StateEntry* s1 = GetStateFromIndex(last_entry - i);
-	StateEntry* s2 = GetStateFromIndex(last_entry - i + 1);
-
-	if (s1->tick == -1) {
-		interpstate = EntityState{};
-		return;
-	}
-	else if (s2->tick == -1 || s2->tick <= s1->tick) {
-		interpstate = s1->state;
-		printf("no next frame\n");
-		return;
-	}
-
-
-	ASSERT(s1->tick < s2->tick);
-	ASSERT(s1->tick * tickinterval <= time && s2->tick * tickinterval >= time);
-
-	float midlerp = MidLerp(s1->tick * tickinterval, s2->tick * tickinterval, time);
-
-	//printf("interpolating properly\n");
-	interpstate = s1->state;
-	//if(!IsDistanceATeleport(s1->state.position,s2->state.position, 20.0, tickinterval))
-	interpstate.position = glm::mix(s1->state.position, s2->state.position, midlerp);
-
-	const Model* m = model;
-	if (!m || !m->animations)
-		return;
-
-	if (s1->state.leganim == s2->state.leganim) {
-		//interpstate.leganim_frame = glm::mix(s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
-	
-
-		int anim = s1->state.leganim;
-		if (anim >= 0 && anim < m->animations->clips.size()) {
-
-			interpstate.leganim_frame = InterpolateAnimation(&m->animations->clips[s1->state.leganim],
-				s1->state.leganim_frame, s2->state.leganim_frame, midlerp);
-		}
-
-	}
-	if (s1->state.mainanim == s2->state.mainanim) {
-		// fixme
-	}
-
-
-}
-#endif
 
 Snapshot* Client::GetCurrentSnapshot()
 {
@@ -424,34 +349,36 @@ void Client::read_snapshot(Snapshot* s)
 
 		int lasttype = e.type;
 
-		// local player doesnt fill interp history here
-		if (i == engine.player_num()) {
-			// FIXME
-			e.type = Ent_Player;
-			continue;
-		}
-
 		if (state.type == Ent_Free) {
 			e.type = Ent_Free;
 			continue;
 		}
 
-		if (lasttype == Ent_Free) {
-			e = Entity();
-			interp = Entity_Interp();
-		}
 		// replicate variables to entity
 		e.from_entity_state(state);
-		// save off some vars for rendering interpolation
-		Interp_Entry& entry = interp.hist[interp.hist_index];
-		entry.tick = engine.tick;
-		entry.position = state.position;
-		entry.angles = state.angles;
-		entry.main_anim = state.mainanim;
-		entry.legs_anim = state.leganim;
-		entry.ma_frame = state.mainanim_frame;
-		entry.la_frame = state.leganim_frame;
-		interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
+		e.index = i;
+		// save off some vars for rendering interpolation (not for local clients player)
+		if (i != engine.player_num()) {
+			Interp_Entry& entry = interp.hist[interp.hist_index];
+			entry.tick = engine.tick;
+			entry.position = state.position;
+			entry.angles = state.angles;
+			entry.main_anim = state.mainanim;
+			entry.legs_anim = state.leganim;
+			entry.ma_frame = state.mainanim_frame;
+			entry.la_frame = state.leganim_frame;
+			interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
+		}
+	}
+
+	// update prediction error data
+	int sequence_i_sent = OutSequenceAk();
+	if (OutSequence() - sequence_i_sent < origin_history.size()) {
+		vec3 delta = s->pstate.position - origin_history.at((sequence_i_sent+offset_debug) % origin_history.size());
+		// FIXME check for teleport
+		float len = glm::length(delta);
+		if(len > 0.05 && len < 10 && smooth_time <= 0.0)
+			smooth_time = smooth_error_time->real;
 	}
 
 	ClearEntsThatDidntUpdate(engine.tick);

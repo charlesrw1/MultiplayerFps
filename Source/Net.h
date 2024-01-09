@@ -154,6 +154,7 @@ struct Entity
 	bool alive = true;
 	bool frozen = false;
 	bool in_jump = false;
+	bool forced_animation = false;
 
 	int owner_index = 0;
 	int sub_type = 0;

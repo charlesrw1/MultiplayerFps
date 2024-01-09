@@ -52,7 +52,7 @@ int Connection::NewPacket(const uint8_t* data, int length)
 	unsigned new_seq = ReadInt(data);
 	unsigned new_seq_ak = ReadInt(data + 4);
 
-	int dropped = new_seq - (in_sequence + 1);
+	dropped = new_seq - (in_sequence + 1);
 	if (new_seq <= in_sequence && in_sequence!=-1) {
 		printf("duplicate or out of order packets\n");
 		return -1;

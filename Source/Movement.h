@@ -5,7 +5,12 @@
 #include "Physics.h"
 class MeshBuilder;
 class AnimationSet;
-// Shared movement+item code
+
+// called by server+clients
+void player_physics_update(Entity* player, Move_Command command);
+void player_item_udpate(Entity* player, Move_Command command);
+// server-side function
+void player_update(Entity* player);	
 
 class PlayerMovement
 {

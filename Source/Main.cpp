@@ -190,6 +190,11 @@ void Game_Engine::make_move()
 	command.view_angles = local.view_angles;
 	command.tick = tick;
 
+	if (engine.local.fake_movement_debug->integer != 0)
+		command.lateral_move = std::fmod(GetTime(), 2.f) > 1.f ? -1.f : 1.f;
+	if (engine.local.fake_movement_debug->integer == 2)
+		command.button_mask |= BUTTON_JUMP;
+
 	if (!game_focused) {
 		local.last_command = command;
 		if(cl->get_state()>=CS_CONNECTED) cl->get_command(cl->OutSequence()) = command;
@@ -892,6 +897,11 @@ void Game_Local::init()
 	thirdperson_camera	= cfg.get_var("thirdperson_camera", "1");
 	fov					= cfg.get_var("fov", "70.0");
 	mouse_sensitivity	= cfg.get_var("mouse_sensitivity", "0.01");
+	fake_movement_debug = cfg.get_var("fake_movement_debug", "0");
+	// 1 = left to right
+	// 2 = forwards and back
+	// 3 = 1 with jumping
+	// 4 = 2 with jumping
 }
 
 void Game_Engine::start_map(string map, bool is_client)
@@ -1032,8 +1042,7 @@ void GrenadeUpdate(Entity* e);
 void Game_Engine::update_game_tick()
 {
 	// update local player
-	ExecutePlayerMove(&ents[0], local.last_command);
-	build_physics_world(0.f);
+	execute_player_move(0, local.last_command);
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		if (ents[i].active() && ents[i].update)
@@ -1042,6 +1051,14 @@ void Game_Engine::update_game_tick()
 	}
 }
 
+void cmd_debug_counter()
+{
+	if (cfg.get_arg_list().at(1) == "1")
+		engine.cl->offset_debug++;
+	else
+		engine.cl->offset_debug--;
+	printf("offset client: %d\n", engine.cl->offset_debug);
+}
 
 void Game_Engine::init()
 {
@@ -1071,6 +1088,8 @@ void Game_Engine::init()
 	cfg.set_command("sv_end", cmd_server_end);
 	cfg.set_command("bind", cmd_bind);
 	cfg.set_command("quit", cmd_quit);
+	cfg.set_command("counter", cmd_debug_counter);
+
 
 	
 	// engine initilization
@@ -1090,10 +1109,18 @@ void Game_Engine::init()
 	ImGui_ImplOpenGL3_Init();
 
 	// key binds
-	bind_key(SDL_SCANCODE_Y, "thirdperson_camera 0");
+	bind_key(SDL_SCANCODE_R, "thirdperson_camera 0");
 	bind_key(SDL_SCANCODE_2, "reconnect");
 	bind_key(SDL_SCANCODE_1, "disconnect");
 	bind_key(SDL_SCANCODE_3, "sv_end");
+
+	bind_key(SDL_SCANCODE_Y, "fake_movement_debug 0");
+	bind_key(SDL_SCANCODE_U, "fake_movement_debug 1");
+	bind_key(SDL_SCANCODE_I, "fake_movement_debug 2");
+	bind_key(SDL_SCANCODE_9, "counter 0");
+	bind_key(SDL_SCANCODE_0, "counter 1");
+
+
 
 
 	cfg.execute_file("vars.txt");	// load config vars
@@ -1196,8 +1223,8 @@ void Game_Engine::loop()
 			time = tick * tick_interval;
 			if (is_host) {
 				//server.simtime = tick * engine.tick_interval;
+				build_physics_world(0.f);
 				sv->ReadPackets();
-
 				update_game_tick();
 
 				sv->BuildSnapshotFrame();

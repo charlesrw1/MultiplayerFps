@@ -251,34 +251,16 @@ EntityState Entity::to_entity_state()
 
 #include "MeshBuilder.h"
 #include "Config.h"
-void ExecutePlayerMove(Entity* ent, Move_Command cmd)
+void Game_Engine::execute_player_move(int num, Move_Command cmd)
 {
 	double oldtime = engine.time;
 	engine.time = cmd.tick * engine.tick_interval;
-
-	ent->view_angles = cmd.view_angles;
-	MeshBuilder mb;
-	//phys_debug.Begin();
-	PlayerMovement move;
-	move.cmd = cmd;
-	move.deltat = engine.tick_interval;
-	move.phys_debug = &mb;
-	move.phys = &engine.phys;
-	move.fire_weapon = ServerGameShootCallback;
-	move.play_sound = ServerPlaySoundCallback;
-	move.set_viewmodel_animation = ServerViewmodelCallback;
-
-	move.player = ent->ToPlayerState();
-	move.entindex = ent->index;
-	move.max_ground_speed = cfg.find_var("max_ground_speed")->real;
-	move.simtime = engine.time;
-	move.Run();
-
-	ent->FromPlayerState(&move.player);
+	
+	Entity& ent = engine.ents[num];
+	ent.view_angles = cmd.view_angles;	// FIXME (???)
+	player_physics_update(&ent, cmd);
 
 	engine.time = oldtime;
-
-	//phys_debug.End();
 }
 
 const float fall_speed_threshold = -0.05f;

@@ -91,6 +91,7 @@ public:
 	Config_Var* cfg_fake_loss;
 	Config_Var* cfg_cl_time_out;
 	Config_Var* interpolate;
+	Config_Var* smooth_error_time;
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
@@ -98,6 +99,10 @@ public:
 	PlayerState lastpredicted;
 	Entity_Interp interpolation_data[MAX_GAME_ENTS];
 	vector<Move_Command> commands;
+	vector<glm::vec3> origin_history;
+	glm::vec3 last_origin;
+	float smooth_time = 0.0;
+	int offset_debug = 0;
 
 	string serveraddr;
 	int client_num = -1;

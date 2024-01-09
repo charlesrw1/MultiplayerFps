@@ -65,11 +65,6 @@ void Server::start()
 }
 
 
-void Server::RemoveClient(int client)
-{
-	engine.client_leave(client);
-}
-
 Frame* Server::GetSnapshotFrame()
 {
 	return &frames.at(engine.tick % MAX_FRAME_HIST);
@@ -87,17 +82,6 @@ void Server::BuildSnapshotFrame()
 	}
 }
 
-void Server::RunMoveCmd(int client, Move_Command cmd)
-{
-	ExecutePlayerMove(&engine.ents[client], cmd);
-}
-
-void Server::SpawnClientInGame(int client)
-{
-	engine.make_client(client);
-	DebugOut("Spawned client, %s\n", clients[client].GetIPStr().c_str());
-}
-
 void Server::connect_local_client()
 {
 	printf("putting local client in server\n");
@@ -113,7 +97,7 @@ void Server::connect_local_client()
 	clients[0].connection.Init(&socket, ip);
 	clients[0].local_client = true;
 
-	SpawnClientInGame(0);
+	engine.make_client(0);
 }
 
 int Server::FindClient(IPAndPort addr) const {
@@ -163,7 +147,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
 
 	RemoteClient& new_client = clients[spot];
-	new_client.InitConnection(addr);
+	new_client.init(addr);
 	// Further communication is done with sequenced packets
 }
 

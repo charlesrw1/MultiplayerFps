@@ -75,7 +75,7 @@
     <ClCompile Include="BVHBuild.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Movement.cpp">
+    <ClCompile Include="Source\Player.cpp">
       <Filter>Source Files\Shared</Filter>
     </ClCompile>
     <ClCompile Include="Source\ClientMgr.cpp">

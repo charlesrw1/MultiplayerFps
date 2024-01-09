@@ -21,6 +21,7 @@ public:
 	Config_Var* thirdperson_camera;
 	Config_Var* fov;
 	Config_Var* mouse_sensitivity;
+	Config_Var* fake_movement_debug;
 
 	PlayerState last_player_state;
 	vec3 view_angles;
@@ -56,7 +57,6 @@ public:
 	void exit_map();
 
 	void build_physics_world(float time);
-	void execute_player_move(Entity* ent, Move_Command cmd);
 
 	void pre_render_update();
 
@@ -73,6 +73,7 @@ public:
 	void make_client(int num);
 	void client_leave(int num);
 	void update_game_tick();
+	void execute_player_move(int player, Move_Command command);
 public:
 	Client* cl;
 	Server* sv;

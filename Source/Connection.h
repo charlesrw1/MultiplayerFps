@@ -23,6 +23,7 @@ public:
 	int out_sequence_ak = -1;	// last acked sequence
 	int in_sequence = -1;		// last recieved remote sequence
 	double last_recieved = 0;	// time (sec) since recieved
+	int dropped = 0;
 
 	int reliable_out_len = 0;
 	std::vector<uint8_t> reliable_out;		// "backbuffered" reliable messages to send

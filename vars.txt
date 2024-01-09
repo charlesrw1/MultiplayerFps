@@ -6,7 +6,7 @@ bind C "connect localhost"
 tick_rate 66.0
 snapshot_rate 15.0
 interp_time 0.1
-fake_lag 100
+fake_lag 75
 fake_loss 0
 
 #phys vars

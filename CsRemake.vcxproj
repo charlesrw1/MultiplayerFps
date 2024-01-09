@@ -54,7 +54,7 @@
     <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Shader.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
-    <ClCompile Include="Source\Movement.cpp" />
+    <ClCompile Include="Source\Player.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
