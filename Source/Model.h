@@ -84,7 +84,7 @@ public:
 	vector<GpuBuffer> buffers;
 	vector<MeshMaterial> materials;
 
-	int BoneForName(const char* name);
+	int BoneForName(const char* name) const;
 };
 
 void FreeLoadedModels();

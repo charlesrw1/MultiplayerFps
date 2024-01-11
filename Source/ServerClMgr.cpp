@@ -321,7 +321,7 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 		to->items.ammo[i] = msg.ReadShort();
 		to->items.clip[i] = msg.ReadShort();
 	}
-	to->items.gun_timer = msg.ReadFloat();
+	to->items.timer = msg.ReadFloat();
 	to->items.state = (Item_Use_State)msg.ReadByte();
 
 	// items <<<
@@ -368,7 +368,7 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 		msg.WriteShort(to->items.clip[i]);
 	}
 
-	msg.WriteFloat(to->items.gun_timer);
+	msg.WriteFloat(to->items.timer);
 	msg.WriteByte(to->items.state);
 
 }

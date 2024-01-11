@@ -321,7 +321,7 @@ void Model::GpuBuffer::Bind()
 	glBindBuffer(target, handle);
 }
 
-int Model::BoneForName(const char* name)
+int Model::BoneForName(const char* name) const
 {
 	for (int i = 0; i < bones.size(); i++) {
 		if (strcmp(&bone_string_table.at(bones[i].name_table_ofs), name) == 0)

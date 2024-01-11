@@ -68,7 +68,7 @@
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\GameData.h" />
     <ClInclude Include="Source\Media.h" />
-    <ClInclude Include="Source\Movement.h" />
+    <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\MoveCommand.h" />

@@ -164,7 +164,7 @@
     <ClInclude Include="Source\EmulatedSocket.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Movement.h">
+    <ClInclude Include="Source\Player.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\Util.h">

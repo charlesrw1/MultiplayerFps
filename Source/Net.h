@@ -92,12 +92,11 @@ struct EntityState
 enum Item_Use_State
 {
 	ITEM_IDLE,
-	Item_InFire,
-	Item_InSecFire,
-	Item_Reload,
-	Item_Scoped,
-	Item_Raising,
-	Item_Lowering,
+	ITEM_IN_FIRE,
+	ITEM_RELOAD,
+	ITEM_SCOPED,
+	ITEM_RAISING,
+	ITEM_LOWERING,
 };
 
 struct Item_State
@@ -112,13 +111,10 @@ struct Item_State
 
 	int item_bitmask = 0;
 	int active_item = 0;
-
 	short item_id[MAX_ITEMS];
 	short ammo[MAX_ITEMS];
 	short clip[MAX_ITEMS];
-
-	bool reloading = false;
-	float gun_timer = 0.f;
+	float timer = 0.f;
 	Item_Use_State state = ITEM_IDLE;
 };
 

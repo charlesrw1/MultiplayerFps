@@ -113,7 +113,7 @@ private:
 	// lerps 1->2 and outputs to 1
 	void LerpTransforms(glm::quat q1[], glm::vec3 p1[], glm::quat q2[], glm::vec3 p2[], float factor, int numbones);
 
-	//void AddPlayerUpperbodyLayer(glm::quat q[], glm::vec3 pos[]);
+	void add_legs_layer(glm::quat q[], glm::vec3 pos[]);
 
 	void UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies);
 };

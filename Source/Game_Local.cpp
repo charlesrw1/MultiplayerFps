@@ -3,7 +3,7 @@
 #include "Util.h"
 #include "Game_Engine.h"
 #include "GlmInclude.h"
-#include "Movement.h"
+#include "Player.h"
 #include "MeshBuilder.h"
 #include "Config.h"
 #include "GameData.h"
@@ -52,11 +52,11 @@ void Game_Local::update_viewmodel()
 			viewmodel_recoil_ofs = viewmodel_recoil_ang = glm::vec3(0.f);
 			vm_recoil_end_time = vm_recoil_start_time = 0.f;
 			break;
-		case Item_InFire:
+		case ITEM_IN_FIRE:
 			vm_recoil_start_time = engine.time;
-			vm_recoil_end_time = p->items.gun_timer;	// FIXME: read from current item data
+			vm_recoil_end_time = p->items.timer;	// FIXME: read from current item data
 			break;
-		case Item_Reload:
+		case ITEM_RELOAD:
 			break;
 
 		}
@@ -65,8 +65,8 @@ void Game_Local::update_viewmodel()
 	}
 	switch (p->items.state)
 	{
-	case Item_InFire: {
-		float end = p->items.gun_timer;
+	case ITEM_IN_FIRE: {
+		float end = p->items.timer;
 		if (end > vm_recoil_end_time) {
 			vm_recoil_end_time = end;
 			vm_recoil_start_time = engine.time;

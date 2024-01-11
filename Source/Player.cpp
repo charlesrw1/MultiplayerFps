@@ -1,4 +1,4 @@
-#include "Movement.h"
+#include "Player.h"
 #include "Util.h"
 #include "Physics.h"
 #include "MeshBuilder.h"
@@ -14,6 +14,9 @@
 
 static const Capsule standing_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_STANDING_HB_HEIGHT,0) };
 static const Capsule crouch_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_CROUCING_HB_HEIGHT,0) };
+
+static float fall_speed_threshold = -0.05f;
+static float grnd_speed_threshold = 0.025f;
 
 
 static float move_speed_player = 0.1f;
@@ -171,8 +174,8 @@ void player_physics_check_jump(Entity& player, Move_Command command)
 		player.on_ground = false;
 		player.in_jump = true;
 
-		player.anim.set_anim("act_jump_start", true);
-		player.anim.loop = false;
+		player.anim.set_leg_anim("act_jump_start", true);
+		player.anim.loop_legs = false;
 	}
 }
 void player_physics_check_duck(Entity& player, Move_Command cmd)
@@ -358,6 +361,145 @@ void player_physics_update(Entity* p, Move_Command command)
 	player_physics_check_nans(*p);
 
 	//RunItemCode();
+}
+
+
+// if in the middle of an animation, dont interrupt it
+
+void player_animation_update(Entity* ent)
+{
+	// upper body
+	if (ent->anim.loop || ent->anim.finished)
+	{	
+		// for now, only one
+		ent->anim.set_anim("act_idle", false);
+		ent->anim.loop = true;
+	}
+
+	// lower body
+	glm::vec3 ent_face_dir = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
+	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
+	bool falling = ent->velocity.y < fall_speed_threshold;
+	
+	int leg_anim = 0;
+	float leg_speed = 1.f;
+	bool loop_legs = true;
+	bool set_legs = true;
+
+	const char* next_leg_anim = "null";
+
+	if (ent->in_jump) {
+		set_legs = false;
+		if (ent->anim.finished) {	// wait for act_jump_start
+			next_leg_anim = "act_falling";
+			set_legs = true;
+		}
+	}
+	else if (groundspeed > grnd_speed_threshold) {
+		if (ent->ducking)
+			next_leg_anim = "act_crouch_walk";
+		else {
+			vec3 facing_dir = vec3(cos(ent->view_angles.y), 0, sin(ent->view_angles.y));	// which direction are we facing towards
+			vec3 grnd_velocity = glm::normalize(vec3(ent->velocity.x, 0, ent->velocity.z));
+			float d = dot(facing_dir, grnd_velocity);
+			bool left = cross(facing_dir, grnd_velocity).y < 0;
+			if (abs(d) >= 0.5) { // 60 degrees from look
+				next_leg_anim = "act_run";
+			}
+			else {
+				next_leg_anim = "act_strafe_left_better";
+			}
+
+			leg_speed = ((groundspeed - grnd_speed_threshold) / 6.f) + 1.f;
+
+			if (dot(ent_face_dir, ent->velocity) < -0.25) {
+				leg_speed = -leg_speed;
+			}
+
+		}
+	}
+	else {
+		if (ent->ducking)
+			next_leg_anim = "act_crouch_idle";
+		else
+			next_leg_anim = "act_idle";
+	}
+
+
+	// pick out upper body animations here
+	// shooting, reloading, etc.
+	if (set_legs) {
+		ent->anim.set_leg_anim(next_leg_anim, false);
+		ent->anim.loop_legs = loop_legs;
+		ent->anim.leg_play_speed = leg_speed;
+	}
+}
+
+void player_fire_weapon()
+{
+	// play sounds
+	// play animation (viewmodel for local player)
+	// on server: do raycast and do damage
+	// effects (muzzle flash, gun tracer, ...)
+	// recoil for local player
+}
+
+static float fire_time = 0.1f;
+static float reload_time = 1.f;
+
+void player_item_update(Entity* p, Move_Command command)
+{
+	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
+
+	bool wants_shoot = command.button_mask & BUTTON_FIRE1;
+	bool wants_reload = command.button_mask & BUTTON_RELOAD;
+
+	Item_State& w = p->items;
+	if (!(w.active_item >= 0 && w.active_item < Item_State::MAX_ITEMS)) {
+		printf("invalid active_item\n");
+		return;
+	}
+
+	if (w.timer > 0)
+		w.timer -= engine.tick_interval;
+
+	switch (w.state)
+	{
+	case ITEM_IDLE:
+		if (wants_shoot) {
+			w.timer = fire_time;
+			w.state = ITEM_IN_FIRE;
+
+			p->anim.set_anim("act_shoot", true);
+			p->anim.loop = false;
+		}
+		if (wants_reload) {
+			w.timer = reload_time;
+			w.state = ITEM_RELOAD;
+
+			p->anim.set_anim("act_reload", true);
+			p->anim.loop = false;
+		}
+
+		break;
+	case ITEM_IN_FIRE:
+		if (w.timer <= 0) {
+			w.state = ITEM_IDLE;
+		}
+		break;
+	case ITEM_RELOAD:
+		if (w.timer <= 0) {
+			w.state = ITEM_IDLE;
+		}
+		break;
+	}
+}
+
+// item code and animation updates
+void player_post_physics(Entity* p, Move_Command command)
+{
+	player_item_update(p, command);
+	player_animation_update(p);
 }
 
 #if 0

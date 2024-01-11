@@ -339,7 +339,8 @@ void Animator::SetupBones()
 
 	// Setup base layer
 	CalcRotations(q, pos, anim, frame);
-
+	if (leg_anim != -1)
+		add_legs_layer(q, pos);
 	//if (actor_owner && actor_owner->IsPlayer())
 	//{
 	//	AddPlayerUpperbodyLayer(q, pos);
@@ -367,80 +368,35 @@ void Animator::LerpTransforms(glm::quat q1[], vec3 p1[], glm::quat q2[], glm::ve
 	}
 }
 
-#if 0
-void AnimationController::AddPlayerUpperbodyLayer(glm::quat finalq[], glm::vec3 finalp[])
+void Animator::add_legs_layer(glm::quat finalq[], glm::vec3 finalp[])
 {
-	assert(actor_owner);
-
-	// Dead actors dont move upper body
-	if (actor_owner->is_dead)
-		return;
-
-	const AnimationLayer& layer = GetLayer(UPPERBODY_LAYER);
-	if (layer.set_index == -1 || layer.set_index >= animations->anims.size())
-		return;
-
-	const AnimDesc& desc = animations->anims[layer.set_index];
-	assert(desc.clips.size() == 3);
-
 	glm::quat q1[MAX_BONES];
 	glm::vec3 p1[MAX_BONES];
-	glm::quat q2[MAX_BONES];
-	glm::vec3 p2[MAX_BONES];
 
-	// assume: character angles are oriented "correctly" already: oriented towards velocity
-	//			upper body then needs to be oriented to the angle between view vector and velocity
-
-	const float lowerbodyangle = actor_owner->angles.y;
-	const vec3 lowerbodyvector = vec3(cos(lowerbodyangle), 0, sin(lowerbodyangle));
-
-	const float upperbodyangle = -actor_owner->viewangles.y + PI * 0.5;
-	const vec3 upperbodyvector = vec3(cos(upperbodyangle), 0, sin(upperbodyangle));
-
-	const float anglebetween = acos(dot(upperbodyvector, lowerbodyvector));
-	const bool leftside = cross(upperbodyvector, lowerbodyvector).y > 0;
-	const float interpfactor = anglebetween / (PI * 0.5);
-
-	//	assert(anglebetween >= -0.0001 && anglebetween <= PI*0.5+0.1);
-
-		// First get center angles
-	CalcRotations(q1, p1, *desc.clips[1], layer.cur_frame);
-
-	const AnimClip* otherclip = (leftside) ? desc.clips[0] : desc.clips[2];
-	// Next get other sides angles
-	CalcRotations(q2, p2, *otherclip, layer.cur_frame);
-
-	if (abs(anglebetween) > 0.001) {
-		// Now interpolate
-		LerpTransforms(q1, p1, q2, p2, interpfactor, otherclip->channels.size());
-	}
+	CalcRotations(q1, p1, leg_anim, leg_frame);
 
 	const int root_loc = model->BoneForName("spine");
-	const int spine_loc = model->BoneForName("spine.001");
+	const int pelvis = model->BoneForName("pelvis.L");
 
-	if (root_loc == -1 || spine_loc == -1) {
+	if (root_loc == -1 || pelvis == -1) {
 		printf("Couldn't find spine/root bones\n");
+		leg_anim = -1;
 		return;
 	}
 
-
 	bool copybones = false;
-	// Now overwrite only upperbody
+	// Now overwrite only legs + spine
 	for (int i = 0; i < model->bones.size(); i++)
 	{
-		const GfxBone& bone = model->bones[i];
-		if (i == spine_loc)
+		const Bone& bone = model->bones[i];
+		if (i == pelvis)
 			copybones = true;
-		else if (bone.parent == root_loc)
-			copybones = false;
-		if (copybones) {
+		if (copybones || i == root_loc) {
 			finalq[i] = q1[i];
 			finalp[i] = p1[i];
 		}
 	}
-
 }
-#endif
 
 void Animator::ConcatWithInvPose()
 {

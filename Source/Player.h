@@ -7,10 +7,11 @@ class MeshBuilder;
 class Animation_Set;
 
 // called by server+clients
-void player_physics_update(Entity* player, Move_Command command);
-void player_item_udpate(Entity* player, Move_Command command);
+void player_physics_update(Entity* player, Move_Command command);	// physics movement code
+void player_post_physics(Entity* player, Move_Command command);		// item and animation code
 // server-side function
 void player_update(Entity* player);	
+
 void move_variables_menu();
 
 #endif // !PLAYERMOVE_H
