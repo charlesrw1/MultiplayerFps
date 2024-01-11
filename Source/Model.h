@@ -75,7 +75,7 @@ public:
 
 	vector<Bone> bones;
 	vector<char> bone_string_table;
-	std::unique_ptr<AnimationSet> animations;
+	std::unique_ptr<Animation_Set> animations;
 	vector<ModelHitbox> hitboxes;
 	vector<ModelAttachment> attachments;
 

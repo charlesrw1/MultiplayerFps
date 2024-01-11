@@ -217,10 +217,10 @@ void set_entity_interp_vars(Entity& e, Interp_Entry& i)
 {
 	e.position = i.position;
 	e.rotation = i.angles;
-	e.anim.leganim = i.legs_anim;
-	e.anim.mainanim = i.main_anim;
-	e.anim.leganim_frame = i.la_frame;
-	e.anim.mainanim_frame = i.ma_frame;
+	e.anim.leg_anim = i.legs_anim;
+	e.anim.anim = i.main_anim;
+	e.anim.leg_frame = i.la_frame;
+	e.anim.frame = i.ma_frame;
 }
 
 

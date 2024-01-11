@@ -197,5 +197,8 @@
     <ClInclude Include="Source\Game_Engine.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Edit.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

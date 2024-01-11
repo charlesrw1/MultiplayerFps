@@ -112,10 +112,9 @@ void player_spawn(Entity* ent)
 	ent->type = Ent_Player;
 	ent->model_index = Mod_PlayerCT;
 	ent->SetModel(Mod_PlayerCT);
-	ent->anim.ResetLayers();
 
 	if (ent->model) {
-		int idle = ent->model->animations->FindClipFromName("act_idle");
+		ent->anim.set_anim("act_idle", false);
 	}
 	//server.sv_game.GetPlayerSpawnPoisiton(ent);
 	ent->ducking = false;
@@ -136,7 +135,7 @@ Entity* dummy_spawn()
 	ent->health = 100;
 	ent->SetModel(Mod_PlayerCT);
 	if (ent->model)
-		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_run"));
+		ent->anim.set_anim("act_run", true);
 
 	ent->update = dummy_update;
 
@@ -152,8 +151,9 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 		ent->alive = false;
 		ent->death_time = engine.time + 3.0;
 
-		ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"));
-		ent->anim.dont_loop = true;
+		ent->anim.set_anim("act_die", false);
+		ent->anim.loop = false;
+
 		printf("died!\n");
 	}
 }
@@ -200,10 +200,10 @@ void Entity::from_entity_state(EntityState& es)
 	if(model&&model->bones.size()>0)
 		anim.set_model(model);
 
-	anim.leganim = es.leganim;
-	anim.leganim_frame = es.leganim_frame;
-	anim.mainanim = es.mainanim;
-	anim.mainanim_frame = es.mainanim_frame;
+	anim.leg_anim = es.leganim;
+	anim.leg_frame = es.leganim_frame;
+	anim.anim = es.mainanim;
+	anim.frame = es.mainanim_frame;
 }
 
 PlayerState Entity::ToPlayerState() const
@@ -240,10 +240,10 @@ EntityState Entity::to_entity_state()
 	es.angles = rotation;
 	es.model_idx = model_index;
 	es.solid = solid;
-	es.leganim = anim.leganim;
-	es.leganim_frame = anim.leganim_frame;
-	es.mainanim = anim.mainanim;
-	es.mainanim_frame = anim.mainanim_frame;
+	es.leganim = anim.leg_anim;
+	es.leganim_frame = anim.leg_frame;
+	es.mainanim = anim.anim;
+	es.mainanim_frame = anim.frame;
 
 	return es;
 }
@@ -273,19 +273,33 @@ void PlayerUpdateAnimations(Entity* ent)
 	auto playeranims = ent->model->animations.get();
 	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
 	bool falling = ent->velocity.y < fall_speed_threshold;
-	ent->anim.dont_loop = false;
 	int leg_anim = 0;
 	float speed = 1.f;
-
+	bool should_loop = true;
+	bool dont_set = false;
 	const char* newanim = "null";
 	if (ent->in_jump) {
-		newanim = "act_jump";
+		dont_set = true;
+		if (ent->anim.finished) {	// wait for act_jump_start
+			newanim = "act_falling";
+			dont_set = false;
+		}
 	}
 	else if (groundspeed > grnd_speed_threshold) {
 		if (ent->ducking)
 			newanim = "act_crouch_walk";
 		else {
-			newanim = "act_run";
+			vec3 facing_dir = vec3(cos(ent->view_angles.y), 0, sin(ent->view_angles.y));	// which direction are we facing towards
+			vec3 grnd_velocity = glm::normalize(vec3(ent->velocity.x, 0, ent->velocity.z));
+			float d = dot(facing_dir, grnd_velocity);
+			bool left = cross(facing_dir, grnd_velocity).y < 0;
+			if (abs(d) >= 0.5) { // 60 degrees from look
+				newanim = "act_run";
+			}
+			else {
+				newanim = "act_strafe_left_better";
+			}
+
 			speed = ((groundspeed-grnd_speed_threshold) /6.f) + 1.f;
 
 			if (dot(ent_face_dir, ent->velocity) < -0.25) {
@@ -303,13 +317,11 @@ void PlayerUpdateAnimations(Entity* ent)
 
 	// pick out upper body animations here
 	// shooting, reloading, etc.
-
-	leg_anim = ent->model->animations->FindClipFromName(newanim);
-
-	if (leg_anim != ent->anim.leganim) {
-		ent->anim.SetLegAnim(leg_anim);
+	if (!dont_set) {
+		ent->anim.set_anim(newanim, false);
+		ent->anim.loop = should_loop;
+		ent->anim.play_speed = speed;
 	}
-	ent->anim.SetLegAnimSpeed(speed);
 }
 
 void PlayerDeathUpdate(Entity* ent)
@@ -417,6 +429,6 @@ void KillEnt(Entity* ent)
 {
 	ent->alive = false;
 	ent->death_time = engine.time + 5.0;
-	ent->anim.SetLegAnim(ent->model->animations->FindClipFromName("act_die"));
-	ent->anim.dont_loop = true;
+	ent->anim.set_anim("act_die", false);
+	ent->anim.loop = false;
 }

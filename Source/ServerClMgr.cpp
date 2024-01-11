@@ -179,14 +179,14 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 	if (from->position != to->position) {
 		msg.WriteBool(1);
 		
-		short pos[3];
-		pos[0] = to->position.x * 20.f;
-		pos[1] = to->position.y * 20.f;
-		pos[2] = to->position.z * 20.f;
-
-		msg.WriteShort(pos[0]);
-		msg.WriteShort(pos[1]);
-		msg.WriteShort(pos[2]);
+		//short pos[3];
+		//pos[0] = to->position.x * 50.f;
+		//pos[1] = to->position.y * 50.f;
+		//pos[2] = to->position.z * 50.f;
+		msg.WriteVec3(to->position);
+		//msg.WriteShort(pos[0]);
+		//msg.WriteShort(pos[1]);
+		//msg.WriteShort(pos[2]);
 	}
 	else
 		msg.WriteBool(0);
@@ -251,13 +251,15 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->type = msg.ReadByte();
 	if (msg.ReadBool()) {
 		short pos[3];
-		pos[0] = msg.ReadShort();
-		pos[1] = msg.ReadShort();
-		pos[2] = msg.ReadShort();
+		//pos[0] = msg.ReadShort();
+		//pos[1] = msg.ReadShort();
+		//pos[2] = msg.ReadShort();
+		//
+		//to->position.x = pos[0] / 50.f;
+		//to->position.y = pos[1] / 50.f;
+		//to->position.z = pos[2] / 50.f;
 
-		to->position.x = pos[0] / 20.f;
-		to->position.y = pos[1] / 20.f;
-		to->position.z = pos[2] / 20.f;
+		to->position = msg.ReadVec3();
 
 	}
 	if (msg.ReadBool()) {

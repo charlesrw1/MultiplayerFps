@@ -58,6 +58,7 @@
     <ClCompile Include="Source\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Edit.h" />
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />

@@ -13,7 +13,7 @@ using glm::dot;
 using glm::cross;
 using glm::normalize;
 
-int AnimationSet::FirstPositionKeyframe(float frame, int channel_num, int clip) const
+int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
 
@@ -33,7 +33,7 @@ int AnimationSet::FirstPositionKeyframe(float frame, int channel_num, int clip) 
 
 	return chan.num_positions - 1;
 }
-int AnimationSet::FirstRotationKeyframe(float frame, int channel_num, int clip) const
+int Animation_Set::FirstRotationKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
 	assert(channel_num < channels.size());
@@ -49,7 +49,7 @@ int AnimationSet::FirstRotationKeyframe(float frame, int channel_num, int clip) 
 
 	return chan.num_rotations - 1;
 }
-int AnimationSet::FirstScaleKeyframe(float frame, int channel_num, int clip) const
+int Animation_Set::FirstScaleKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
 	assert(channel_num < channels.size());
@@ -67,30 +67,30 @@ int AnimationSet::FirstScaleKeyframe(float frame, int channel_num, int clip) con
 	return chan.num_scales - 1;
 }
 
-const PosKeyframe& AnimationSet::GetPos(int channel, int index, int clip) const {
+const PosKeyframe& Animation_Set::GetPos(int channel, int index, int clip) const {
 	ASSERT(clip < clips.size());
 	ASSERT(index < channels[clips[clip].channel_offset + channel].num_positions);
 
 	return positions[channels[clips[clip].channel_offset + channel].pos_start + index];
 }
-const RotKeyframe& AnimationSet::GetRot(int channel, int index, int clip) const {
+const RotKeyframe& Animation_Set::GetRot(int channel, int index, int clip) const {
 	ASSERT(clip < clips.size());
 	ASSERT(index < channels[clips[clip].channel_offset + channel].num_rotations);
 	
 	return rotations[channels[clips[clip].channel_offset + channel].rot_start + index];
 }
-const ScaleKeyframe& AnimationSet::GetScale(int channel, int index, int clip) const {
+const ScaleKeyframe& Animation_Set::GetScale(int channel, int index, int clip) const {
 	ASSERT(clip < clips.size());
 	ASSERT(index < channels[clips[clip].channel_offset + channel].num_scales);
 
 	return scales[channels[clips[clip].channel_offset + channel].scale_start + index];
 }
-const AnimChannel& AnimationSet::GetChannel(int clip, int channel) const {
+const AnimChannel& Animation_Set::GetChannel(int clip, int channel) const {
 	ASSERT(clip < clips.size());
 	return channels[clips[clip].channel_offset + channel];
 }
 
-int AnimationSet::FindClipFromName(const char* name) const
+int Animation_Set::find(const char* name) const
 {
 	for (int i = 0; i < clips.size(); i++) {
 		if (clips[i].name == name)
@@ -105,28 +105,35 @@ void Animator::AdvanceFrame(float elapsed)
 	if (!model || !model->animations)
 		return;
 
-	if (mainanim < 0 || mainanim >= model->animations->clips.size())
-		mainanim = -1;
-	if (leganim < 0 || leganim >= model->animations->clips.size())
-		leganim = -1;
+	int num_clips = model->animations->clips.size();
 
-	if (mainanim != -1) {
-		ASSERT(mainanim < model->animations->clips.size());
-		const Animation& clip = model->animations->clips[mainanim];
-		mainanim_frame += clip.fps * elapsed * 1.f;
-		if (mainanim_frame > clip.total_duration || mainanim_frame < 0.f) {
-			mainanim_frame = fmod(fmod(mainanim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+	if (anim < 0 || anim >= num_clips)
+		anim = -1;
+	if (leg_anim < 0 || leg_anim >= num_clips)
+		leg_anim = -1;
+
+	if (anim != -1) {
+		const Animation& clip = model->animations->clips[anim];
+		frame += clip.fps * elapsed * play_speed;
+		if (frame > clip.total_duration || frame < 0.f) {
+			if(loop)
+				frame = fmod(fmod(frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+			else {
+				frame = clip.total_duration-0.001f;
+				finished = true;
+			}
 		}
 	}
-	if (leganim != -1) {
-		ASSERT(leganim < model->animations->clips.size());
-		const Animation& clip = model->animations->clips[leganim];
-		leganim_frame += clip.fps * elapsed * leganim_speed;
-		if (leganim_frame > clip.total_duration || leganim_frame < 0.f) {
-			if (dont_loop)
-				leganim_frame = clip.total_duration;
-			else
-				leganim_frame = fmod(fmod(leganim_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+	if (leg_anim != -1) {
+		const Animation& clip = model->animations->clips[leg_anim];
+		leg_frame += clip.fps * elapsed * leg_play_speed;
+		if (leg_frame > clip.total_duration || leg_frame < 0.f) {
+			if (loop_legs)
+				leg_frame = fmod(fmod(leg_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+			else {
+				leg_frame = clip.total_duration-0.001f;
+				finished = true;
+			}
 		}
 	}
 }
@@ -181,7 +188,7 @@ static float MidLerp(float min, float max, float mid_val)
 
 void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float curframe)
 {
-	const AnimationSet* set = model->animations.get();
+	const Animation_Set* set = model->animations.get();
 	const Animation& clip = set->clips[clip_index];
 
 	for (int i = 0; i < set->num_channels; i++) {
@@ -313,16 +320,17 @@ void Animator::SetupBones()
 	//(animations->animdata[playinganimation].data->channels.size() == model->bones.size());
 
 	assert(cached_bonemats.size() == model->bones.size());
-
 	glm::quat q[MAX_BONES];
 	glm::vec3 pos[MAX_BONES];
 	glm::vec3 scl[MAX_BONES];
 
-	if (mainanim < 0 || mainanim >= model->animations->clips.size())
-		mainanim = INVALID_ANIMATION;
+	if (anim < 0 || anim >= model->animations->clips.size())
+		anim = -1;
+	if (leg_anim < 0 || leg_anim >= model->animations->clips.size())
+		leg_anim = -1;
 
 	// Just t-pose if no proper animations
-	if (mainanim == INVALID_ANIMATION)
+	if (anim == -1)
 	{
 		for (int i = 0; i < cached_bonemats.size(); i++)
 			cached_bonemats[i] = model->bones[i].posematrix;
@@ -330,7 +338,7 @@ void Animator::SetupBones()
 	}
 
 	// Setup base layer
-	CalcRotations(q, pos, mainanim, mainanim_frame);
+	CalcRotations(q, pos, anim, frame);
 
 	//if (actor_owner && actor_owner->IsPlayer())
 	//{
@@ -445,12 +453,47 @@ void Animator::ConcatWithInvPose()
 
 void Animator::set_model(const Model* mod)
 {
-	ASSERT(mod);
-	if (!(mod->bones.size() > 0 && mod->animations && mod->bones.size() == mod->animations->num_channels)) {
-		printf("Animator::Init called with invalid model\n");
-		ASSERT(0);
+	// can be called with nullptr model to reset
+	if (mod && (!mod->animations || mod->bones.size() != mod->animations->num_channels)) {
+		console_printf("Model %s has no animations or invalid skeleton\n", mod->name.c_str());
+		mod = nullptr;
 	}
 	model = mod;
-	set = model->animations.get();
-	cached_bonemats.resize(model->bones.size());
+	if (model) {
+		set = model->animations.get();
+		cached_bonemats.resize(model->bones.size());
+	}
+	anim = -1;
+	leg_anim = -1;
+	frame = 0.f;
+	leg_frame = 0.f;
+	play_speed = 1.f;
+	leg_play_speed = 1.f;
+	loop_legs = true;
+	loop = true;
+	finished = false;
+	legs_finished = false;
+}
+
+void Animator::set_anim(const char* name, bool restart)
+{
+	if (!model) return;
+	int animation = set->find(name);
+	if (animation != anim || restart) {
+		anim = animation;
+		frame = 0.0;
+		finished = false;
+		play_speed = 1.f;
+	}
+}
+void Animator::set_leg_anim(const char* name, bool restart)
+{
+	if (!model) return;
+	int animation = set->find(name);
+	if (animation != leg_anim || restart) {
+		leg_anim = animation;
+		leg_frame = 0.0;
+		legs_finished = false;
+		leg_play_speed = 1.f;
+	}
 }

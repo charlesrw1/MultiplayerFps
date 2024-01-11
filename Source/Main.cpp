@@ -790,7 +790,7 @@ void LoadMediaFiles()
 	auto& models = media.gamemodels;
 	models.resize(Mod_NUMMODELS);
 	
-	models[Mod_PlayerCT] = FindOrLoadModel("CT.glb");
+	models[Mod_PlayerCT] = FindOrLoadModel("player_character.glb");
 	models[Mod_GunM16] = FindOrLoadModel("m16.glb");
 	models[Mod_Grenade_HE] = FindOrLoadModel("grenade_he.glb");
 
@@ -876,9 +876,31 @@ void cmd_game_input_callback()
 
 }
 
+#define FOREACH_ANIMATION(f) \
+        f(RUN_FORWARDS)   \
+        f(RUN_BACKWARDS)  \
+        f(STRAFE_LEFT)   \
+        f(STRAFE_RIGHT)  \
+
+#define GENERATE_ENUM(ENUM) ENUM,
+#define GENERATE_STRING(STRING) #STRING,
+
+enum Game_Animations {
+	FOREACH_ANIMATION(GENERATE_ENUM)
+};
+
+static const char* animimation_string_table[] = {
+	FOREACH_ANIMATION(GENERATE_STRING)
+};
+
+
+Animation* animation_data_table;
+
 int main(int argc, char** argv)
 {
 	printf("Starting engine...\n");
+	for(int i=0;i<sizeof(animimation_string_table)/sizeof(char*); i++)
+		printf("%s\n", animimation_string_table[i]);
 
 	engine.argc = argc;
 	engine.argv = argv;
@@ -1301,9 +1323,6 @@ void Game_Engine::pre_render_update()
 				continue;
 			if (!ent.model || !ent.model->animations)
 				continue;
-
-			ent.anim.mainanim = ent.anim.leganim;
-			ent.anim.mainanim_frame = ent.anim.leganim_frame;
 
 			ent.anim.SetupBones();
 			ent.anim.ConcatWithInvPose();

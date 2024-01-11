@@ -16,10 +16,10 @@ struct AnimChannel
 	int rot_start = 0;
 	int scale_start = 0;
 };
-static_assert(sizeof(AnimChannel) == 24, "AnimChannel wrong size");
 
 template<typename T>
-struct KeyframeBase {
+struct KeyframeBase 
+{
 	T val;
 	float time;
 };
@@ -27,9 +27,7 @@ struct KeyframeBase {
 typedef KeyframeBase<glm::vec3> PosKeyframe;
 typedef KeyframeBase<glm::vec3> ScaleKeyframe;
 typedef KeyframeBase<glm::quat> RotKeyframe;
-static_assert(sizeof(PosKeyframe) == 16, "PosKeyframe wrong size");
-static_assert(sizeof(ScaleKeyframe) == 16, "ScaleKeyframe wrong size");
-static_assert(sizeof(RotKeyframe) == 20, "RotKeyframe wrong size");
+
 
 class Animation
 {
@@ -48,10 +46,10 @@ public:
 	int num_scale = 0;
 };
 
-class AnimationSet
+class Animation_Set
 {
 public:
-	int FindClipFromName(const char* name) const;
+	int find(const char* animation_name) const;
 
 	// Returns index to use with GetX(), -1 if no keyframes
 	int FirstPositionKeyframe(float frame, int channel, int clip) const;
@@ -74,12 +72,11 @@ class Model;
 class Animator
 {
 public:
-	void Clear() {
-		model = nullptr;
-		set = nullptr;
-		ResetLayers();
-	}
 	void set_model(const Model* model);
+	void set_anim(const char* name, bool restart);
+	void set_leg_anim(const char* name, bool restart);
+
+
 	void SetupBones();
 	void ConcatWithInvPose();
 	const std::vector<glm::mat4x4> GetBones() const { 
@@ -87,35 +84,22 @@ public:
 	}
 
 	void AdvanceFrame(float elapsed_time);
-	void ResetLayers() {
-		mainanim = leganim = -1;
-		mainanim_frame = leganim_frame = 0.f;
-		leganim_speed = 1.f;
-	}
-	void SetMainAnim(int anim) {
-		mainanim = anim;
-		mainanim_frame = 0.f;
-	}
-	void SetLegAnim(int anim) {
-		leganim = anim;
-		leganim_frame = 0.f;
-		leganim_speed = 1.f;
-	}
-	void SetLegAnimSpeed(float speed) {
-		leganim_speed = speed;
-	}
 
-	int mainanim=-1;
-	float mainanim_frame;
-	int leganim=-1;
-	float leganim_frame;
-	// only server side vars
-	float leganim_speed;
-	bool dont_loop = false;
+	// replicated vars
+	int anim =-1;
+	float frame;
+	int leg_anim=-1;
+	float leg_frame;
+
+	float play_speed;
+	bool loop = false;
 	bool finished = false;
+	float leg_play_speed;
+	bool loop_legs = false;
+	bool legs_finished = false;
 
 	const Model* model = nullptr;
-	const AnimationSet* set = nullptr;
+	const Animation_Set* set = nullptr;
 private:
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);

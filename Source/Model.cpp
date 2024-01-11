@@ -190,9 +190,9 @@ static void LoadGltfSkeleton(tinygltf::Model& scene, Model* model, tinygltf::Ski
 	RecursiveAddSkeleton(bone_to_index, scene, model, scene.nodes[skin.joints[0]]);
 }
 
-static AnimationSet* LoadGltfAnimations(tinygltf::Model& scene, tinygltf::Skin& skin)
+static Animation_Set* LoadGltfAnimations(tinygltf::Model& scene, tinygltf::Skin& skin)
 {
-	AnimationSet* set = new AnimationSet;
+	Animation_Set* set = new Animation_Set;
 	std::map<int, int> node_to_index;
 	for (int i = 0; i < skin.joints.size(); i++) {
 		node_to_index[skin.joints[i]] = i;
@@ -301,8 +301,8 @@ static bool DoLoadGltfModel(const std::string& filepath, Model* model)
 	if (scene.skins.size() >= 1)
 		LoadGltfSkeleton(scene, model, scene.skins[0]);
 	if (scene.animations.size() >= 1 && scene.skins.size() >= 1) {
-		AnimationSet* set = LoadGltfAnimations(scene, scene.skins[0]);
-		model->animations = std::unique_ptr<AnimationSet>(set);
+		Animation_Set* set = LoadGltfAnimations(scene, scene.skins[0]);
+		model->animations = std::unique_ptr<Animation_Set>(set);
 	}
 
 	std::map<int, int> buf_view_to_buffers;
