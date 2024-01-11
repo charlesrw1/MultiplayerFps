@@ -161,7 +161,11 @@ struct Entity
 	int item = 0;
 	int solid = 0;
 
+	float in_air_time = 0.f;
+
 	void(*update)(Entity*) = nullptr;
+	void(*damage)(Entity* me, Entity* attacker, int amount, int flags) = nullptr;
+
 
 	Animator anim;
 	const Model* model = nullptr;

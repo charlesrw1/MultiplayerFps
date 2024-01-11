@@ -54,6 +54,8 @@ void move_variables_menu()
 	ImGui::SliderFloat("maxspeed", &maxspeed, 5, 35);
 	ImGui::SliderFloat("max_ground_speed", &max_ground_speed, 2, 20);
 	ImGui::SliderFloat("max_air_speed", &max_air_speed, 0, 10);
+	ImGui::SliderFloat("jumpimpulse", &jumpimpulse, 0, 20);
+
 
 	ImGui::End();
 }
@@ -102,7 +104,7 @@ server sends your animation state back
 local animation is not predicted, your character sets its own animation locally
 server sends animation in entity_state which is ignored unless flag is set
 
-Your character dies on server, server functions set youre animation to death one with server animation override flag
+Your character dies on server, server functions set your animation to death one with server animation override flag
 
 
 */
@@ -114,35 +116,9 @@ bool item_state_changed = false;
 bool finished = false;
 bool force_animation = false;
 
-void player_update_()
+void player_physics_check_ground(Entity& player, vec3 pre_update_velocity)
 {
-	// run physics for input
-	// run item code for input (this will update animations as well)
-	// run server-only think code
-}
-void player_predict_()
-{
-	// set entity to last player state (only physics vars, item code has special predict update)
-	// for inputs since last state
-	//    run physics (effects flag = true on current input)
-	// run item code for current input
-}
 
-void player_set_anim(Entity* p, Player_Item_State state)
-{
-	// now calculate player state (running, standing, crouched,...)
-	// combine them
-}
-
-void player_update_animation(Entity* p)
-{
-	if (finished && !force_animation)
-		player_set_anim(p, ITEM_STATE_IDLE);
-}
-
-
-void player_physics_check_ground(Entity& player)
-{
 	if (player.velocity.y > 2.f) {
 		player.on_ground = false;
 		return;
@@ -150,7 +126,7 @@ void player_physics_check_ground(Entity& player)
 	GeomContact result;
 	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
 
-	engine.phys.TraceSphere(SphereShape(where, CHAR_HITBOX_RADIUS), &result, player.index, Pf_All);
+	engine.phys.TraceSphere(SphereShape(where, CHAR_HITBOX_RADIUS), &result, player.index, PF_ALL);
 
 	//TraceSphere(level, where, radius, &result, true, true);
 	if (!result.found)
@@ -158,12 +134,21 @@ void player_physics_check_ground(Entity& player)
 	else if (result.surf_normal.y < 0.3)
 		player.on_ground = false;
 	else {
+		if (!player.on_ground && pre_update_velocity.y < -2.f) {
+			player.anim.set_leg_anim("act_land", false);
+ 			player.anim.loop_legs = false;
+		}
 		player.on_ground = true;
 		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
 	}
 
 	if (player.on_ground)
 		player.in_jump = false;
+
+	if (!player.on_ground)
+		player.in_air_time += engine.tick_interval;	// WARNING!!!
+	else
+		player.in_air_time = 0.f;
 }
 
 void player_physics_check_jump(Entity& player, Move_Command command)
@@ -217,7 +202,7 @@ void player_physics_check_duck(Entity& player, Move_Command cmd)
 			GeomContact res;
 			vec3 where = player.position + offset + vec3(0, (i + 1) * step, 0);
 
-			engine.phys.TraceSphere(SphereShape(where, sphere_radius), &res, player.index, Pf_All);
+			engine.phys.TraceSphere(SphereShape(where, sphere_radius), &res, player.index, PF_ALL);
 		}
 		if (i == steps) {
 			player.ducking = false;
@@ -249,7 +234,7 @@ void player_physics_move(Entity& player)
 
 		character.org = position;
 
-		engine.phys.TraceCharacter(character, &trace, player.index, Pf_All);
+		engine.phys.TraceCharacter(character, &trace, player.index, PF_ALL);
 		if (trace.found)
 		{
 			vec3 penetration_velocity = dot(player.velocity, trace.penetration_normal) * trace.penetration_normal;
@@ -263,7 +248,7 @@ void player_physics_move(Entity& player)
 		GeomContact res;
 
 		character.org = position;
-		engine.phys.TraceCharacter(character, &res, player.index, Pf_All);
+		engine.phys.TraceCharacter(character, &res, player.index, PF_ALL);
 
 		if (res.found) {
 			position += res.penetration_normal * (res.penetration_depth);////trace.0.001f + slide_velocity * dt;
@@ -343,6 +328,7 @@ void player_physics_update(Entity* p, Move_Command command)
 		command.lateral_move = 0;
 		command.up_move = 0;
 	}
+	vec3 pre_update_velocity = p->velocity;
 	
 	// Friction
 	float friction_value = (p->on_ground) ? ground_friction : air_friction;
@@ -356,8 +342,10 @@ void player_physics_update(Entity* p, Move_Command command)
 		p->velocity.x *= factor;
 		p->velocity.z *= factor;
 	}
-	player_physics_check_ground(*p);
+
+
 	player_physics_ground_move(*p, command);
+	player_physics_check_ground(*p, pre_update_velocity);
 	player_physics_check_nans(*p);
 
 	//RunItemCode();
@@ -368,6 +356,10 @@ void player_physics_update(Entity* p, Move_Command command)
 
 void player_animation_update(Entity* ent)
 {
+	// dead players stick with death animation till respawn
+	if (!ent->alive)
+		return;
+
 	// upper body
 	if (ent->anim.loop || ent->anim.finished)
 	{	
@@ -387,13 +379,14 @@ void player_animation_update(Entity* ent)
 	bool set_legs = true;
 
 	const char* next_leg_anim = "null";
+	if (ent->anim.leg_anim == -1)
+		ent->anim.legs_finished = true;
 
-	if (ent->in_jump) {
+	if (!ent->anim.loop_legs && !ent->anim.legs_finished)
 		set_legs = false;
-		if (ent->anim.finished) {	// wait for act_jump_start
-			next_leg_anim = "act_falling";
-			set_legs = true;
-		}
+
+	if (ent->in_jump || (!ent->on_ground && ent->in_air_time > 0.3f)) {
+		next_leg_anim = "act_falling";
 	}
 	else if (groundspeed > grnd_speed_threshold) {
 		if (ent->ducking)
@@ -442,6 +435,7 @@ void player_fire_weapon()
 	// on server: do raycast and do damage
 	// effects (muzzle flash, gun tracer, ...)
 	// recoil for local player
+
 }
 
 static float fire_time = 0.1f;
@@ -472,6 +466,8 @@ void player_item_update(Entity* p, Move_Command command)
 
 			p->anim.set_anim("act_shoot", true);
 			p->anim.loop = false;
+
+			engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 		}
 		if (wants_reload) {
 			w.timer = reload_time;
@@ -479,6 +475,7 @@ void player_item_update(Entity* p, Move_Command command)
 
 			p->anim.set_anim("act_reload", true);
 			p->anim.loop = false;
+			p->anim.play_speed = 0.7f;
 		}
 
 		break;
@@ -501,42 +498,3 @@ void player_post_physics(Entity* p, Move_Command command)
 	player_item_update(p, command);
 	player_animation_update(p);
 }
-
-#if 0
-void PlayerMovement::RunItemCode()
-{
-	vec3 shoot_vec = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-
-	bool wants_shoot = cmd.button_mask & BUTTON_FIRE1;
-	bool wants_reload = cmd.button_mask & BUTTON_RELOAD;
-
-	Item_State* w = &player.items;
-	if (!(w->active_item >= 0 && w->active_item < Item_State::MAX_ITEMS)) {
-		printf("invalid active_item\n");
-		return;
-	}
-
-	if (w->reloading || w->gun_timer >= simtime)
-		return;
-
-	if (wants_shoot) {
-		if (fire_weapon)
-			fire_weapon(entindex, false);
-
-		w->gun_timer = simtime + 0.1f;
-		w->clip[w->active_item]--;
-		w->state = Item_InFire;
-
-		//view_recoil_add.x = PI / 16.f;
-	}
-	else if ((w->clip[w->active_item] <= 0 || wants_reload) && w->ammo[w->active_item] > 0) {
-		w->reloading = true;
-		w->gun_timer += 1.0f;
-		w->state = Item_Reload;
-	}
-	else {
-		w->state = ITEM_IDLE;
-		w->reloading = false;
-	}
-}
-#endif

@@ -132,7 +132,7 @@ void Animator::AdvanceFrame(float elapsed)
 				leg_frame = fmod(fmod(leg_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 			else {
 				leg_frame = clip.total_duration-0.001f;
-				finished = true;
+				legs_finished = true;
 			}
 		}
 	}

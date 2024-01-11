@@ -80,6 +80,8 @@ public:
 	Entity& local_player();
 	void set_tick_rate(float tick_rate);
 
+	void fire_bullet(Entity* p, vec3 direction, vec3 origin);
+
 	// Host functions
 	Entity* new_entity();
 	void free_entity(Entity* e);
@@ -87,6 +89,7 @@ public:
 	void client_leave(int num);
 	void update_game_tick();
 	void execute_player_move(int player, Move_Command command);
+	void damage(Entity* inflictor, Entity* target, int amount, int flags);
 public:
 	Client* cl;
 	Server* sv;

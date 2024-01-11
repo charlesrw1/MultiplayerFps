@@ -85,9 +85,9 @@ void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	RayHit hit;
 	//TraceRayAgainstLevel(level, r, &hit, false);
 
-	engine.phys.TraceRay(r, &hit, from->index, Pf_All);
+	engine.phys.TraceRay(r, &hit, from->index, PF_ALL);
 
-	//RayWorldIntersect(r, &hit, GetEntIndex(from), Pf_All);
+	//RayWorldIntersect(r, &hit, GetEntIndex(from), PF_ALL);
 
 	// >>>
 	CreateGrenade(from, org + dir * 0.1f, dir * 18.f, 0);
@@ -106,6 +106,39 @@ void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
 	//}
 }
 
+
+void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
+{
+	if (!is_host)
+		return;
+
+	Ray r(origin, direction);
+	RayHit hit;
+	engine.phys.TraceRay(r, &hit, from->index, PF_ALL);
+	if (hit.hit_world) {
+		// add particles + decals here
+	}
+	else if(hit.ent_id!=-1){
+		Entity& hit_entitiy = engine.ents[hit.ent_id];
+		if (hit_entitiy.damage)
+			hit_entitiy.damage(&hit_entitiy, from, 100, 0);
+	}
+}
+
+
+void player_damage(Entity* self, Entity* attacker, int damage, int flags)
+{
+	self->health -= damage;
+	if (self->health <= 0) {
+		self->alive = false;
+		self->death_time = engine.time+5.f;
+
+		self->anim.set_anim("act_die_1", true);
+		self->anim.loop = false;
+		self->anim.leg_anim = -1;
+	}
+}
+
 void player_spawn(Entity* ent)
 {
 	ent->type = Ent_Player;
@@ -122,6 +155,7 @@ void player_spawn(Entity* ent)
 	GetPlayerSpawnPoisiton(ent);
 
 	ent->update = player_update;
+	ent->damage = player_damage;
 }
 
 Entity* dummy_spawn()
@@ -274,8 +308,13 @@ void PlayerDeathUpdate(Entity* ent)
 
 void player_update(Entity* ent)
 {
-	if (!ent->alive)
-		PlayerDeathUpdate(ent);
+	if (!ent->alive) {
+		if (ent->death_time < engine.time) {
+			ent->health = 100;
+			ent->alive = true;
+			GetPlayerSpawnPoisiton(ent);
+		}
+	}
 
 	if (ent->position.y < -50 && ent->alive) {
 		ent->alive = false;
@@ -319,8 +358,8 @@ void RunProjectilePhysics(Entity* ent)
 	Ray r;
 	r.dir = (ent->velocity * dt) / len;
 	r.pos = ent->position;
-	engine.phys.TraceRay(r, &rh, ent->owner_index, Pf_All);
-	//g->RayWorldIntersect(r, &rh, ent->owner_index, Pf_All);
+	engine.phys.TraceRay(r, &rh, ent->owner_index, PF_ALL);
+	//g->RayWorldIntersect(r, &rh, ent->owner_index, PF_ALL);
 	if (rh.hit_world && rh.dist < len) {
 		ent->position = r.at(rh.dist) + rh.normal * 0.01f;
 		ent->velocity = glm::reflect(ent->velocity, rh.normal);

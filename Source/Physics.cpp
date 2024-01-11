@@ -720,9 +720,9 @@ bool PhysicsWorld::FilterObj(PhysicsObject* o, int ig_ent, int filter_flags)
 {
 	if (o->userindex == ig_ent)
 		return true;
-	if (o->player && !(filter_flags & Pf_Players))
+	if (o->player && !(filter_flags & PF_PLAYERS))
 		return true;
-	if (o->player && !(filter_flags & Pf_World))
+	if (o->player && !(filter_flags & PF_WORLD))
 		return true;
 	return false;
 }

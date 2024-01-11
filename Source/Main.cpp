@@ -618,7 +618,7 @@ void Renderer::DrawEntBlobShadows()
 		Ray r;
 		r.pos = e->position + glm::vec3(0,0.1f,0);
 		r.dir = glm::vec3(0, -1, 0);
-		engine.phys.TraceRay(r, &rh, i, Pf_World);
+		engine.phys.TraceRay(r, &rh, i, PF_WORLD);
 
 		if (rh.dist < 0)
 			continue;

@@ -10,8 +10,8 @@ struct RayHit
 	float dist=-1.f;
 	glm::vec3 pos;
 	glm::vec3 normal;
-	int ent_id = 0;
-	int part_id = 0;
+	int ent_id = -1;
+	int part_id = -1;
 	int surf_type = 0;
 	bool hit_world = false;
 };
@@ -112,13 +112,13 @@ struct PhysicsObject
 };
 
 
-enum PhysFilterFlags
+enum Physics_Filter_Flags
 {
-	Pf_World= 1,
-	Pf_Players = 2,
-	Pf_Nonplayers = 4,
+	PF_WORLD = 1,
+	PF_PLAYERS = 2,
+	PF_NONPLAYERS = 4,
 
-	Pf_All = Pf_World | Pf_Players | Pf_Nonplayers
+	PF_ALL = PF_WORLD | PF_PLAYERS | PF_NONPLAYERS
 };
 
 class Level;

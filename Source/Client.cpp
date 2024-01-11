@@ -194,12 +194,10 @@ Interp_Entry* Entity_Interp::GetStateFromIndex(int index)
 	return &hist[NegModulo(index, HIST_SIZE)];
 }
 
-float InterpolateAnimation(Animation* a, float start, float end, float alpha)
+float interpolate_modulo(float start, float end, float mod, float alpha)
 {
-	// check distances
-	float clip_len = a->total_duration;
 	float d1 = glm::abs(end - start);
-	float d2 = clip_len - d1;
+	float d2 = mod - d1;
 
 
 	if (d1 <= d2) {
@@ -207,10 +205,17 @@ float InterpolateAnimation(Animation* a, float start, float end, float alpha)
 	}
 	else {
 		if (start >= end)
-			return fmod(start + (alpha * d2), clip_len);
+			return fmod(start + (alpha * d2), mod);
 		else
-			return fmod(end + ((1 - alpha) * d2), clip_len);
+			return fmod(end + ((1 - alpha) * d2), mod);
 	}
+}
+
+float InterpolateAnimation(Animation* a, float start, float end, float alpha)
+{
+	// check distances
+	float clip_len = a->total_duration;
+	return interpolate_modulo(start, end, clip_len, alpha);
 }
 
 void set_entity_interp_vars(Entity& e, Interp_Entry& i)
@@ -300,9 +305,13 @@ void Client::interpolate_states()
 		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
 		Interp_Entry interpstate = *s1;
 		interpstate.position = glm::mix(s1->position, s2->position, midlerp);
+		
+		for (int i = 0; i < 3; i++) {
+			float d = s1->angles[i] - s2->angles[i];
+			interpstate.angles[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
+		}
 
 		if (ent.model && ent.model->animations && s1->legs_anim == s2->legs_anim) {
-
 			int anim = s1->legs_anim;
 			if (anim >= 0 && anim < ent.model->animations->clips.size()) {
 
@@ -311,9 +320,14 @@ void Client::interpolate_states()
 			}
 
 		}
-		//if (s1->state.mainanim == s2->state.mainanim) {
-		//	// fixme
-		//}
+		if (ent.model && ent.model->animations && s1->main_anim == s2->main_anim) {
+			int anim = s1->main_anim;
+			if (anim >= 0 && anim < ent.model->animations->clips.size()) {
+
+				interpstate.ma_frame = InterpolateAnimation(&ent.model->animations->clips[s1->main_anim],
+					s1->ma_frame, s2->ma_frame, midlerp);
+			}
+		}
 
 		set_entity_interp_vars(ent, interpstate);
 	}
