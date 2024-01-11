@@ -116,11 +116,11 @@ bool item_state_changed = false;
 bool finished = false;
 bool force_animation = false;
 
-void player_physics_check_ground(Entity& player, vec3 pre_update_velocity)
+void player_physics_check_ground(Entity& player, vec3 pre_update_velocity, Move_Command command)
 {
 
 	if (player.velocity.y > 2.f) {
-		player.on_ground = false;
+		player.state &= ~PMS_GROUND;
 		return;
 	}
 	GeomContact result;
@@ -130,54 +130,56 @@ void player_physics_check_ground(Entity& player, vec3 pre_update_velocity)
 
 	//TraceSphere(level, where, radius, &result, true, true);
 	if (!result.found)
-		player.on_ground = false;
+		player.state &= ~PMS_GROUND;
 	else if (result.surf_normal.y < 0.3)
-		player.on_ground = false;
+		player.state &= ~PMS_GROUND;
 	else {
-		if (!player.on_ground && pre_update_velocity.y < -2.f) {
+		if (command.first_sim && !(player.state & PMS_GROUND) && pre_update_velocity.y < -2.f) {
 			player.anim.set_leg_anim("act_land", false);
  			player.anim.loop_legs = false;
 		}
-		player.on_ground = true;
+		player.state |= PMS_GROUND;
 		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
 	}
 
-	if (player.on_ground)
-		player.in_jump = false;
+	if (player.state & PMS_GROUND)
+		player.state &= ~PMS_JUMPING;
 
-	if (!player.on_ground)
-		player.in_air_time += engine.tick_interval;	// WARNING!!!
-	else
+	if ((player.state & PMS_GROUND))
 		player.in_air_time = 0.f;
+	else if (command.first_sim)
+		player.in_air_time += engine.tick_interval;
 }
 
 void player_physics_check_jump(Entity& player, Move_Command command)
 {
-	if (player.on_ground && command.button_mask & BUTTON_JUMP) {
+	if ((player.state & PMS_GROUND) && command.button_mask & BUTTON_JUMP) {
 		printf("jump\n");
 		player.velocity.y += jumpimpulse;
-		player.on_ground = false;
-		player.in_jump = true;
+		player.state &= ~PMS_GROUND;
+		player.state |= PMS_JUMPING;
 
-		player.anim.set_leg_anim("act_jump_start", true);
-		player.anim.loop_legs = false;
+		if (command.first_sim) {
+			player.anim.set_leg_anim("act_jump_start", true);
+			player.anim.loop_legs = false;
+		}
 	}
 }
 void player_physics_check_duck(Entity& player, Move_Command cmd)
 {
 	if (cmd.button_mask & BUTTON_DUCK) {
-		if (player.on_ground) {
-			player.ducking = true;
+		if (player.state & PMS_GROUND) {
+			player.state |= PMS_CROUCHING;
 		}
-		else if (!player.on_ground && !player.ducking) {
+		else if (!(player.state & PMS_GROUND) && !(player.state & PMS_CROUCHING)) {
 			const Capsule& st = standing_capsule;
 			const Capsule& cr = crouch_capsule;
 			// Move legs of player up
 			player.position.y += st.tip.y - cr.tip.y;
-			player.ducking = true;
+			player.state |= PMS_CROUCHING;
 		}
 	}
-	else if (!(cmd.button_mask & BUTTON_DUCK) && player.ducking) {
+	else if (!(cmd.button_mask & BUTTON_DUCK) && (player.state & PMS_CROUCHING)) {
 		int steps = 2;
 		float step = 0.f;
 		float sphere_radius = 0.f;
@@ -187,7 +189,7 @@ void player_physics_check_duck(Entity& player, Move_Command cmd)
 		crouch_capsule.GetSphereCenters(c, d);
 		float len = b.y - d.y;
 		sphere_radius = crouch_capsule.radius - 0.05;
-		if (player.on_ground) {
+		if (player.state & PMS_GROUND) {
 			step = len / (float)steps;
 			offset = d;
 		}
@@ -205,8 +207,8 @@ void player_physics_check_duck(Entity& player, Move_Command cmd)
 			engine.phys.TraceSphere(SphereShape(where, sphere_radius), &res, player.index, PF_ALL);
 		}
 		if (i == steps) {
-			player.ducking = false;
-			if (!player.on_ground) {
+			player.state &= ~PMS_CROUCHING;
+			if (!(player.state & PMS_GROUND)) {
 				player.position.y -= len;
 			}
 		}
@@ -217,7 +219,7 @@ void player_physics_move(Entity& player)
 {
 
 	CharacterShape character;
-	character.height = (player.ducking) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
+	character.height = (player.state & PMS_CROUCHING) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
 	character.org = glm::vec3(0.f);
 	character.m = nullptr;
 	character.a = nullptr;
@@ -271,9 +273,9 @@ void player_physics_ground_move(Entity& player, Move_Command command)
 	look_front = normalize(look_front);
 	vec3 look_side = -cross(look_front, vec3(0, 1, 0));
 
-	float acceleation_val = (player.on_ground) ? ground_accel : air_accel;
-	acceleation_val = (player.ducking) ? ground_accel_crouch : acceleation_val;
-	float maxspeed_val = (player.on_ground) ? max_ground_speed : max_air_speed;
+	float acceleation_val = (player.state & PMS_GROUND) ? ground_accel : air_accel;
+	acceleation_val = (player.state & PMS_CROUCHING) ? ground_accel_crouch : acceleation_val;
+	float maxspeed_val = (player.state & PMS_GROUND) ? max_ground_speed : max_air_speed;
 
 	vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
@@ -295,10 +297,10 @@ void player_physics_ground_move(Entity& player, Move_Command command)
 
 	player_physics_check_jump(player, command);
 	player_physics_check_duck(player, command);
-	if (!player.on_ground)
+	if (!(player.state & PMS_GROUND))
 		player.velocity.y -= gravityamt * engine.tick_interval;
 	player_physics_move(player);
-	if (player.alive) {
+	if (!(player.flags & EF_DEAD)) {
 		player.rotation = vec3(0.f);
 		player.rotation .y = HALFPI - command.view_angles.y;
 	}
@@ -323,15 +325,17 @@ void player_physics_check_nans(Entity& player)
 
 void player_physics_update(Entity* p, Move_Command command)
 {
-	if (!p->alive) {
+	if (p->flags & EF_DEAD) {
 		command.forward_move = 0;
 		command.lateral_move = 0;
 		command.up_move = 0;
 	}
+	p->view_angles = command.view_angles;
+
 	vec3 pre_update_velocity = p->velocity;
 	
 	// Friction
-	float friction_value = (p->on_ground) ? ground_friction : air_friction;
+	float friction_value = (p->state & PMS_GROUND) ? ground_friction : air_friction;
 	float speed = length(p->velocity);
 	if (speed >= 0.0001) {
 		float dropamt = friction_value * speed * engine.tick_interval;
@@ -345,7 +349,7 @@ void player_physics_update(Entity* p, Move_Command command)
 
 
 	player_physics_ground_move(*p, command);
-	player_physics_check_ground(*p, pre_update_velocity);
+	player_physics_check_ground(*p, pre_update_velocity, command);
 	player_physics_check_nans(*p);
 
 	//RunItemCode();
@@ -357,7 +361,7 @@ void player_physics_update(Entity* p, Move_Command command)
 void player_animation_update(Entity* ent)
 {
 	// dead players stick with death animation till respawn
-	if (!ent->alive)
+	if (ent->flags & EF_DEAD)
 		return;
 
 	// upper body
@@ -385,11 +389,11 @@ void player_animation_update(Entity* ent)
 	if (!ent->anim.loop_legs && !ent->anim.legs_finished)
 		set_legs = false;
 
-	if (ent->in_jump || (!ent->on_ground && ent->in_air_time > 0.3f)) {
+	if (ent->state & PMS_JUMPING || (!(ent->state & PMS_GROUND) && ent->in_air_time > 0.3f)) {
 		next_leg_anim = "act_falling";
 	}
 	else if (groundspeed > grnd_speed_threshold) {
-		if (ent->ducking)
+		if (ent->state & PMS_CROUCHING)
 			next_leg_anim = "act_crouch_walk";
 		else {
 			vec3 facing_dir = vec3(cos(ent->view_angles.y), 0, sin(ent->view_angles.y));	// which direction are we facing towards
@@ -412,7 +416,7 @@ void player_animation_update(Entity* ent)
 		}
 	}
 	else {
-		if (ent->ducking)
+		if (ent->state & PMS_CROUCHING)
 			next_leg_anim = "act_crouch_idle";
 		else
 			next_leg_anim = "act_idle";

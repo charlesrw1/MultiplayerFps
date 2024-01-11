@@ -23,6 +23,8 @@ struct Move_Command
 	int button_mask = 0;
 	glm::vec3 view_angles = glm::vec3(0.f);
 
+	bool first_sim = true;	// not replicated, used in player_updates
+
 	static uint8_t quantize(float f) {
 		return glm::clamp(int((f + 1.0) * 128.f),0,255);
 	}

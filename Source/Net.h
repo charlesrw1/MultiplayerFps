@@ -58,26 +58,28 @@ enum Client_To_Server
 	CL_SET_BASELINE,
 };
 
-enum EntType
+enum Ent_Type
 {
-	Ent_Player,
-	Ent_Item,
-	Ent_Grenade,
-	Ent_Dummy,
-	Ent_InUse,
-	Ent_Free = 0xff,
+	ET_PLAYER,
+	ET_ITEM,
+	ET_GRENADE,
+	ET_DUMMY,
+	ET_USED = 254,
+	ET_FREE = 0xff,
 };
 
-// If you want to add a replicated variable you must:
-//	add it to entitystate or playerstate depending on its use
-//	modify the ToX and FromX functions
-//	modify the read/write functions that encode the state
-// blech
+enum Entity_Flags
+{
+	EF_DEAD = 1,
+	EF_FORCED_ANIMATION = 2,
+	EF_HIDDEN = 4,
+	EF_HIDE_ITEM = 8,
+};
 
 // Entity state replicated to clients
 struct EntityState
 {
-	int type = Ent_Free;
+	int type = ET_FREE;
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
 	int model_idx = 0;
@@ -85,6 +87,7 @@ struct EntityState
 	float mainanim_frame = 0.f;	// frames quantized to 16 bits
 	int leganim = 0;
 	float leganim_frame = 0.f;
+	short flags = 0;	// Entity_Flags
 	int item = 0;
 	int solid = 0;	// encodes physical object shape
 };
@@ -118,39 +121,38 @@ struct Item_State
 	Item_Use_State state = ITEM_IDLE;
 };
 
+enum Player_Movement_State
+{
+	PMS_GROUND = 1,		// on ground, else in air
+	PMS_CROUCHING = 2,	// crouching in air or on ground
+	PMS_JUMPING = 4,	// first part of jump
+};
+
 // Player state replicated only to player's client for prediction
 struct PlayerState
 {
 	glm::vec3 position=glm::vec3(0.f);
 	glm::vec3 angles = glm::vec3(0.f);
 	glm::vec3 velocity = glm::vec3(0.f);
-
-
-	bool on_ground = false;
-	bool ducking = false;
-	bool alive = false;
-	bool in_jump = false;
-
+	short state = 0;	// Player_Movement_State
 	Item_State items;
 };
+
 
 class Model;
 struct Entity
 {
 	int index = 0;	// engine.ents[]
-	EntType type = Ent_Free;
+	Ent_Type type = ET_FREE;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	int model_index = 0;	// media.gamemodels[]
 
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
-	bool ducking = false;
-	bool on_ground = false;
-	bool alive = true;
-	bool frozen = false;
-	bool in_jump = false;
-	bool forced_animation = false;
+
+	short state = 0;	// For players: Player_Movement_State
+	short flags = 0;	// Entity_Flags
 
 	int owner_index = 0;
 	int sub_type = 0;
@@ -170,7 +172,7 @@ struct Entity
 	Animator anim;
 	const Model* model = nullptr;
 
-	bool active() { return type != Ent_Free; }
+	bool active() { return type != ET_FREE; }
 	EntityState to_entity_state();
 	void from_entity_state(EntityState& es);
 

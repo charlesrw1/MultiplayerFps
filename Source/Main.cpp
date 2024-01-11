@@ -156,7 +156,7 @@ void Game_Local::update_view()
 	else
 	{
 		Entity& player = engine.local_player();
-		float view_height = (player.ducking) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
+		float view_height = (player.state & PMS_CROUCHING) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
 		vec3 cam_position = player.position + vec3(0, view_height, 0);
 		setup.view = glm::lookAt(cam_position, cam_position + true_front, vec3(0, 1, 0));
 		setup.origin = cam_position;
@@ -573,7 +573,7 @@ void Renderer::FrameDraw()
 	mb.Begin();
 	if (r_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
-			if (engine.ents[i].type == Ent_Player) {
+			if (engine.ents[i].type == ET_PLAYER) {
 				EntityState es = engine.ents[i].to_entity_state();
 				AddPlayerDebugCapsule(&es, &mb, COLOR_CYAN);
 			}
@@ -876,32 +876,8 @@ void cmd_game_input_callback()
 
 }
 
-#define FOREACH_ANIMATION(f) \
-        f(RUN_FORWARDS)   \
-        f(RUN_BACKWARDS)  \
-        f(STRAFE_LEFT)   \
-        f(STRAFE_RIGHT)  \
-
-#define GENERATE_ENUM(ENUM) ENUM,
-#define GENERATE_STRING(STRING) #STRING,
-
-enum Game_Animations {
-	FOREACH_ANIMATION(GENERATE_ENUM)
-};
-
-static const char* animimation_string_table[] = {
-	FOREACH_ANIMATION(GENERATE_STRING)
-};
-
-
-Animation* animation_data_table;
-
 int main(int argc, char** argv)
 {
-	printf("Starting engine...\n");
-	for(int i=0;i<sizeof(animimation_string_table)/sizeof(char*); i++)
-		printf("%s\n", animimation_string_table[i]);
-
 	engine.argc = argc;
 	engine.argv = argv;
 	engine.init();
@@ -1074,14 +1050,14 @@ void Game_Engine::build_physics_world(float time)
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		Entity& ce = ents[i];
-		if (ce.type != Ent_Player) continue;
+		if (ce.type != ET_PLAYER) continue;
 
 		CharacterShape cs;
 		cs.a = &ce.anim;
 		cs.m = ce.model;
 		cs.org = ce.position;
 		cs.radius = CHAR_HITBOX_RADIUS;
-		cs.height = (!ce.ducking) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
+		cs.height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
 		PhysicsObject po;
 		po.shape = PhysicsObject::Character;
 		po.character = cs;

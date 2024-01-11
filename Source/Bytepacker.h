@@ -99,7 +99,8 @@ public:
 
 	void AlignToByteBoundary() {
 		int bits_to_align = (8 - (scratch_bits % 8)) % 8;
-		WriteBits(0, bits_to_align);
+		if(bits_to_align!=0)
+			WriteBits(0, bits_to_align);
 		ASSERT(((8 - (scratch_bits % 8)) % 8) == 0);
 	}
 

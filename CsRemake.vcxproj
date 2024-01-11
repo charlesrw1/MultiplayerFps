@@ -28,7 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BVHBuild.cpp" />
-    <ClCompile Include="Encode.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="source\Game_Local.cpp" />

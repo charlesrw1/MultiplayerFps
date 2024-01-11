@@ -58,14 +58,14 @@ Entity* Game_Engine::new_entity()
 {
 	int slot = MAX_CLIENTS;
 	for (; slot < MAX_GAME_ENTS; slot++) {
-		if (ents[slot].type == Ent_Free)
+		if (ents[slot].type == ET_FREE)
 			break;
 	}
 	if (slot == MAX_GAME_ENTS) return nullptr;
 	num_entities++;
 	Entity& e = ents[slot];
 	e = Entity();
-	e.type = Ent_InUse;	// hack
+	e.type = ET_USED;	// hack
 	e.index = slot;
 	return &e;
 }
@@ -130,18 +130,20 @@ void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 {
 	self->health -= damage;
 	if (self->health <= 0) {
-		self->alive = false;
+		self->flags |= EF_DEAD;
 		self->death_time = engine.time+5.f;
 
 		self->anim.set_anim("act_die_1", true);
 		self->anim.loop = false;
 		self->anim.leg_anim = -1;
+
+		self->flags |= EF_FORCED_ANIMATION;
 	}
 }
 
 void player_spawn(Entity* ent)
 {
-	ent->type = Ent_Player;
+	ent->type = ET_PLAYER;
 	ent->model_index = Mod_PlayerCT;
 	ent->SetModel(Mod_PlayerCT);
 
@@ -149,9 +151,10 @@ void player_spawn(Entity* ent)
 		ent->anim.set_anim("act_idle", false);
 	}
 	//server.sv_game.GetPlayerSpawnPoisiton(ent);
-	ent->ducking = false;
+	ent->state = PMS_GROUND;
+	ent->flags = 0;
+
 	ent->health = 100;
-	ent->alive = true;
 	GetPlayerSpawnPoisiton(ent);
 
 	ent->update = player_update;
@@ -161,10 +164,10 @@ void player_spawn(Entity* ent)
 Entity* dummy_spawn()
 {
 	Entity* ent = engine.new_entity();
-	ent->type = Ent_Dummy;
+	ent->type = ET_DUMMY;
 	ent->position = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
-	ent->alive = true;
+	ent->flags = 0;
 	ent->health = 100;
 	ent->SetModel(Mod_PlayerCT);
 	if (ent->model)
@@ -177,11 +180,11 @@ Entity* dummy_spawn()
 
 void EntTakeDamage(Entity* ent, Entity* from, int amt)
 {
-	if (!ent->alive)
+	if (ent->flags & EF_DEAD)
 		return;
 	ent->health -= amt;
 	if (ent->health <= 0) {
-		ent->alive = false;
+		ent->flags |= EF_DEAD;
 		ent->death_time = engine.time + 3.0;
 
 		ent->anim.set_anim("act_die", false);
@@ -219,7 +222,7 @@ void Entity::SetModel(GameModels m) {
 
 void Entity::from_entity_state(EntityState& es)
 {
-	type = (EntType)es.type;
+	type = (Ent_Type)es.type;
 	position = es.position;
 	rotation = es.angles;
 	model_index = es.model_idx;
@@ -237,6 +240,7 @@ void Entity::from_entity_state(EntityState& es)
 	anim.leg_frame = es.leganim_frame;
 	anim.anim = es.mainanim;
 	anim.frame = es.mainanim_frame;
+	flags = es.flags;
 }
 
 PlayerState Entity::ToPlayerState() const
@@ -244,26 +248,22 @@ PlayerState Entity::ToPlayerState() const
 	PlayerState ps{};
 	ps.position = position;
 	ps.angles = rotation;
-	ps.ducking = ducking;
-	ps.on_ground = on_ground;
 	ps.velocity = velocity;
-	ps.alive = alive;
+
+	ps.state = state;
 
 	ps.items = items;
-	ps.in_jump = in_jump;
 	return ps;
 }
 void Entity::FromPlayerState(PlayerState* ps)
 {
 	position = ps->position;
 	rotation = ps->angles;
-	ducking = ps->ducking;
-	on_ground = ps->on_ground;
 	velocity = ps->velocity;
-	alive = ps->alive;
+
+	state = ps->state;
 
 	items = ps->items;
-	in_jump = ps->in_jump;
 }
 EntityState Entity::to_entity_state()
 {
@@ -277,6 +277,7 @@ EntityState Entity::to_entity_state()
 	es.leganim_frame = anim.leg_frame;
 	es.mainanim = anim.anim;
 	es.mainanim_frame = anim.frame;
+	es.flags = flags;
 
 	return es;
 }
@@ -290,7 +291,6 @@ void Game_Engine::execute_player_move(int num, Move_Command cmd)
 	engine.time = cmd.tick * engine.tick_interval;
 	
 	Entity& ent = engine.ents[num];
-	ent.view_angles = cmd.view_angles;	// FIXME (???)
 	player_physics_update(&ent, cmd);
 	player_post_physics(&ent, cmd);
 
@@ -301,23 +301,21 @@ void PlayerDeathUpdate(Entity* ent)
 {
 	if (ent->death_time < engine.time) {
 		ent->health = 100;
-		ent->alive = true;
+		ent->flags &= ~EF_DEAD;
 		GetPlayerSpawnPoisiton(ent);
 	}
 }
 
 void player_update(Entity* ent)
 {
-	if (!ent->alive) {
+	if (ent->flags & EF_DEAD) {
 		if (ent->death_time < engine.time) {
-			ent->health = 100;
-			ent->alive = true;
-			GetPlayerSpawnPoisiton(ent);
+			player_spawn(ent);
 		}
 	}
 
-	if (ent->position.y < -50 && ent->alive) {
-		ent->alive = false;
+	if (ent->position.y < -50 && !(ent->flags & EF_DEAD)) {
+		ent->flags |= EF_DEAD;
 		ent->death_time = engine.time + 0.5f;
 	}
 }
@@ -325,7 +323,7 @@ void dummy_update(Entity* ent)
 {
 	//ent->position.y = sin(GetTime()) * 2.f + 2.f;
 	ent->position.x = 0.f;
-	if (!ent->alive)
+	if (ent->flags & EF_DEAD)
 		engine.free_entity(ent);
 }
 
@@ -333,14 +331,14 @@ Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int g
 {
 	ASSERT(thrower);
 	Entity* e = engine.new_entity();
-	e->type = Ent_Grenade;
+	e->type = ET_GRENADE;
 
 	e->SetModel(Mod_Grenade_HE);
 	e->owner_index = thrower->index;
 	e->position = org;
 	e->velocity = start_vel;
 	e->sub_type = grenade_type;
-	e->alive = true;
+	e->flags = 0;
 	e->death_time = engine.time + 5.f;
 
 	e->update = GrenadeUpdate;
@@ -403,7 +401,7 @@ void Game::RemoveEntity(Entity* ent)
 
 void KillEnt(Entity* ent)
 {
-	ent->alive = false;
+	ent->flags |= EF_DEAD;
 	ent->death_time = engine.time + 5.0;
 	ent->anim.set_anim("act_die", false);
 	ent->anim.loop = false;

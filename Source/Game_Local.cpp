@@ -37,7 +37,7 @@ void Game_Local::update_viewmodel()
 	float up_ofs_ideal = -up_spd / 200.f;
 	glm::clamp(up_ofs_ideal, -0.007f, 0.007f);
 
-	if (p->ducking)
+	if (p->state & PMS_CROUCHING)
 		up_ofs_ideal += 0.04;
 
 	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, engine.frame_time * 100.f);

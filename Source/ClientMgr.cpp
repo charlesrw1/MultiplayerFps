@@ -138,6 +138,50 @@ void Client::HandleServerPacket(ByteReader& buf)
 	}
 }
 
+void write_delta_move_command(ByteWriter& msg, Move_Command from, Move_Command to)
+{
+	if (to.lateral_move != from.lateral_move || to.forward_move != from.forward_move || to.up_move != from.up_move) {
+		msg.WriteBool(1);
+		msg.WriteByte(Move_Command::quantize(to.forward_move));
+		msg.WriteByte(Move_Command::quantize(to.lateral_move));
+		msg.WriteByte(Move_Command::quantize(to.up_move));
+	}
+	else
+		msg.WriteBool(0);
+
+	if (to.view_angles.x != from.view_angles.x || to.view_angles.y != from.view_angles.y) {
+		msg.WriteBool(1);
+		msg.WriteFloat(to.view_angles.x);
+		msg.WriteFloat(to.view_angles.y);
+	}
+	else
+		msg.WriteBool(0);
+
+	if (to.button_mask != from.button_mask) {
+		msg.WriteBool(1);
+		msg.WriteLong(to.button_mask);
+	}
+	else
+		msg.WriteBool(0);
+}
+
+void read_delta_move_command(ByteReader& msg, Move_Command& to)
+{
+	if (msg.ReadBool()) {
+		to.forward_move  = Move_Command::unquantize(msg.ReadByte());
+		to.lateral_move = Move_Command::unquantize(msg.ReadByte());
+		to.up_move = Move_Command::unquantize(msg.ReadByte());
+	}
+	if (msg.ReadBool()) {
+		to.view_angles.x = msg.ReadFloat();
+		to.view_angles.y = msg.ReadFloat();
+	}
+	if (msg.ReadBool()) {
+		to.button_mask = msg.ReadLong();
+	}
+}
+
+
 void Client::SendMovesAndMessages()
 {
 	if (state < CS_CONNECTED)
@@ -146,17 +190,33 @@ void Client::SendMovesAndMessages()
 	// Send move
 	Move_Command lastmove = get_command(server.out_sequence);
 
-	uint8_t buffer[128];
-	ByteWriter writer(buffer, 128);
+	uint8_t buffer[512];
+	ByteWriter writer(buffer, 512);
 	writer.WriteByte(CL_INPUT);
+	// input format
+	// tick of command
+	// num commands total
 	writer.WriteLong(engine.tick);
-	writer.WriteByte(Move_Command::quantize(lastmove.forward_move));
-	writer.WriteByte(Move_Command::quantize(lastmove.lateral_move));
-	writer.WriteByte(Move_Command::quantize(lastmove.up_move));
 
-	writer.WriteFloat(lastmove.view_angles.x);
-	writer.WriteFloat(lastmove.view_angles.y);
-	writer.WriteLong(lastmove.button_mask);
+
+	int total_commands =  glm::min(server.out_sequence + 1, 8);
+	writer.WriteByte(total_commands);
+
+	Move_Command last = Move_Command();
+	for (int i = 0; i < total_commands; i++) {
+		write_delta_move_command(writer, last, get_command(server.out_sequence - i));	// FIXME negative index edge case!!
+		last = get_command(server.out_sequence - i);
+	}
+
+	//writer.WriteByte(Move_Command::quantize(lastmove.forward_move));
+	//writer.WriteByte(Move_Command::quantize(lastmove.lateral_move));
+	//writer.WriteByte(Move_Command::quantize(lastmove.up_move));
+	//
+	//writer.WriteFloat(lastmove.view_angles.x);
+	//writer.WriteFloat(lastmove.view_angles.y);
+	//writer.WriteLong(lastmove.button_mask);
+
+	writer.AlignToByteBoundary();
 
 	writer.WriteByte(CL_SET_BASELINE);
 	if (force_full_update)

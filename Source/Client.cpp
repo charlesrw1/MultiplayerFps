@@ -114,14 +114,6 @@ Move_Command& Client::get_command(int sequence) {
 	return commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
 
-void PlayerStateToClEntState(EntityState* entstate, PlayerState* state)
-{
-	entstate->position = state->position;
-	entstate->angles = state->angles;
-	entstate->solid = state->ducking;
-	entstate->type = Ent_Player;
-}
-
 void Client::run_prediction()
 {
 	if (get_state() != CS_SPAWNED)
@@ -132,41 +124,34 @@ void Client::run_prediction()
 
 	// predict commands from outgoing ack'ed to current outgoing
 	// TODO: dont repeat commands unless a new snapshot arrived
-	int start = OutSequenceAk();	// start at the new cmd
-	int end = OutSequence();
+	int start = OutSequenceAk();	// last command server has recieved
+	int end = OutSequence();		// current frame's command
 	int commands_to_run = end - start;
 	if (commands_to_run > CLIENT_MOVE_HISTORY)	// overflow
 		return;
-	// restore state to last authoritative snapshot 
+
+	// restore local player's state to last authoritative snapshot 
 	int incoming_seq = InSequence();
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-
-	// FIXME
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		if (engine.ents[i].active())
-			engine.ents[i].position = last_auth_state->entities[i].position;
-	}
-	engine.build_physics_world(0.f);
-
-	// FIXME
-	//EntityState last_estate = last_auth_state->entities[GetPlayerNum()];
 	PlayerState predicted_player = last_auth_state->pstate;
-	//engine.local_player().FromPlayerState(&predicted_player);
-	engine.ents[engine.player_num()].FromPlayerState(&predicted_player);
+	Entity& player = engine.ents[engine.player_num()];
+	player.FromPlayerState(&predicted_player);
 
+	// run physics code for commands yet to recieve a snapshot for
 	for (int i = start + 1; i < end; i++) {
 		Move_Command& cmd = get_command(i);
-		bool run_fx = i == (end - 1);
-		player_physics_update(&engine.ents[engine.player_num()], cmd);
+		cmd.first_sim = i == (end - 1);		// flag so only local effects are created once
+		player_physics_update(&player, cmd);
 	}
+	// runs animation and item code for current frame only
+	player_post_physics(&player, get_command(end - 1));
+	
+	// dont advance frames if animation is being controlled server side
+	if(!(player.flags & EF_FORCED_ANIMATION))
+		player.anim.AdvanceFrame(engine.tick_interval);
 
-	// FIXME
+	// for prediction errors
 	origin_history.at((end-1)%origin_history.size()) = engine.local_player().position;
-
-
-	//Entity& ent = engine.local_player();
-	//ent.FromPlayerState(&predicted_player);
-	//lastpredicted = predicted_player;
 }
 
 static int NegModulo(int a, int b)
@@ -356,7 +341,36 @@ later in frame:
 interpolate_state() fills the entities position/rotation with interpolated values for rendering
 */
 
+// has extra logic to properly replicate
+void local_player_on_new_entity_state(EntityState& es, Entity& p)
+{
+	p.type = (Ent_Type)es.type;
+	p.position = es.position;
+	p.rotation = es.angles;
 
+	p.item = es.item;
+	p.solid = es.solid;
+
+	p.flags = es.flags;
+
+	// if we already have a model, dont override the animations
+	p.model_index = es.model_idx;
+	const Model* next_model = nullptr;
+	if (p.model_index >= 0 && p.model_index < media.gamemodels.size())
+		next_model = media.gamemodels.at(p.model_index);
+	if (next_model != p.model) {
+		p.model = next_model;
+		if (p.model && p.model->bones.size() > 0)
+			p.anim.set_model(p.model);
+	}
+	// force animation if server is requesting it
+	if (p.flags & EF_FORCED_ANIMATION) {
+		p.anim.leg_anim = es.leganim;
+		p.anim.leg_frame = es.leganim_frame;
+		p.anim.anim = es.mainanim;
+		p.anim.frame = es.mainanim_frame;
+	}
+}
 
 void Client::read_snapshot(Snapshot* s)
 {
@@ -368,14 +382,18 @@ void Client::read_snapshot(Snapshot* s)
 
 		int lasttype = e.type;
 
-		if (state.type == Ent_Free) {
-			e.type = Ent_Free;
+		if (state.type == ET_FREE) {
+			e.type = ET_FREE;
 			continue;
 		}
 
-		// replicate variables to entity
-		e.from_entity_state(state);
 		e.index = i;
+		// replicate variables to entity
+		if (i == engine.player_num())
+			local_player_on_new_entity_state(state, e);
+		else
+			e.from_entity_state(state);
+
 		// save off some vars for rendering interpolation (not for local clients player)
 		if (i != engine.player_num()) {
 			Interp_Entry& entry = interp.hist[interp.hist_index];
@@ -401,6 +419,9 @@ void Client::read_snapshot(Snapshot* s)
 	}
 
 	ClearEntsThatDidntUpdate(engine.tick);
+
+	// build physics world for prediction updates
+	engine.build_physics_world(0.f);
 }
 
 void Client::ClearEntsThatDidntUpdate(int what_tick)

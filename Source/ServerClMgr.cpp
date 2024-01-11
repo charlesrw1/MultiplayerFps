@@ -51,26 +51,40 @@ void RemoteClient::Disconnect()
 	connection.Clear();
 }
 
+extern void read_delta_move_command(ByteReader& msg, Move_Command& to);	// defined in clientmgr.cpp
+
 void RemoteClient::OnMoveCmd(ByteReader& msg)
 {
-	// will have a window of X inputs, if there are packet drops, then fill buffer
-	Move_Command cmd{};
-	cmd.tick = msg.ReadLong();
-
-	cmd.forward_move = Move_Command::unquantize(msg.ReadByte());
-	cmd.lateral_move = Move_Command::unquantize(msg.ReadByte());
-	cmd.up_move = Move_Command::unquantize(msg.ReadByte());
-
-	cmd.view_angles.x = msg.ReadFloat();
-	cmd.view_angles.y = msg.ReadFloat();
-	cmd.button_mask = msg.ReadLong();
+	Move_Command commands[16];
+	int tick = msg.ReadLong();
+	int num_commands = msg.ReadByte();
+	if (num_commands > 16 || num_commands <= 0) {
+		printf("Invalid command count \n");
+		return;
+	}
+	Move_Command last = Move_Command();
+	for (int i = 0; i < num_commands; i++) {
+		commands[i] = last;
+		commands[i].tick = tick - i;
+		read_delta_move_command(msg, commands[i]);
+		last = commands[i];
+	}
 
 	// Not ready to run the input yet
 	if (state != SCS_SPAWNED)
 		return;
-	
 
-	engine.execute_player_move(client_num, cmd);// FIXME
+	int commands_to_run = 1 + connection.dropped;	// FIXME: have to run more than 1 command if client send rate is less than tick rate
+	commands_to_run = glm::min(commands_to_run, num_commands);
+
+	if (commands_to_run > 1) {
+		printf("simming dropped %d cmds\n", commands_to_run - 1);
+	}
+	// FIXME: exploit to send inputs at increased rate
+	for (int i = commands_to_run - 1; i >= 0; i--) {
+		Move_Command c = commands[i];
+		engine.execute_player_move(client_num, c);
+	}
 }
 
 void RemoteClient::OnTextCommand(ByteReader& msg)
@@ -164,7 +178,7 @@ void RemoteClient::OnPacket(ByteReader& buf)
 void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uint8_t index)
 {
 
-	if (from->type == to->type && from->type == Ent_Free)
+	if (from->type == to->type && from->type == ET_FREE)
 		return;
 
 	msg.WriteByte(index);
@@ -242,6 +256,14 @@ void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uin
 	}
 	else
 		msg.WriteBool(0);
+
+	if (from->flags != to->flags) {
+		msg.WriteBool(1);
+		msg.WriteShort(to->flags);
+	}
+	else
+		msg.WriteBool(0);
+
 	msg.WriteLong(to->solid);
 }
 
@@ -288,6 +310,10 @@ void ReadDeltaEntState(EntityState* to, ByteReader& msg)
 		to->mainanim_frame = quantized_frame / 100.0;
 	}
 
+	if (msg.ReadBool()) {
+		to->flags = msg.ReadShort();
+	}
+
 	to->solid = msg.ReadLong();
 }
 
@@ -304,11 +330,9 @@ void ReadDeltaPState(PlayerState* to, ByteReader& msg)
 		to->angles = msg.ReadVec3();
 	}
 
-	to->ducking = msg.ReadBool();
-	to->on_ground = msg.ReadBool();
-	to->alive = msg.ReadBool();
-	to->in_jump = msg.ReadBool();
-
+	if (msg.ReadBool()) {
+		to->state = msg.ReadShort();
+	}
 	// items >>>
 
 	to->items.active_item = msg.ReadByte();
@@ -350,10 +374,12 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 	else
 		msg.WriteBool(0);
 
-	msg.WriteBool(to->ducking);
-	msg.WriteBool(to->on_ground);
-	msg.WriteBool(to->alive);
-	msg.WriteBool(to->in_jump);
+	if (from->state != to->state) {
+		msg.WriteBool(1);
+		msg.WriteShort(to->state);
+	}
+	else
+		msg.WriteBool(0);
 
 	// items
 
