@@ -273,10 +273,14 @@ EntityState Entity::to_entity_state()
 	es.angles = rotation;
 	es.model_idx = model_index;
 	es.solid = solid;
+
+	es.item = items.active_item;
+
 	es.leganim = anim.leg_anim;
 	es.leganim_frame = anim.leg_frame;
 	es.mainanim = anim.anim;
 	es.mainanim_frame = anim.frame;
+
 	es.flags = flags;
 
 	return es;

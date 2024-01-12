@@ -360,8 +360,8 @@ void player_physics_update(Entity* p, Move_Command command)
 
 void player_animation_update(Entity* ent)
 {
-	// dead players stick with death animation till respawn
-	if (ent->flags & EF_DEAD)
+	// animation is being controlled server side
+	if (ent->flags & EF_FORCED_ANIMATION)
 		return;
 
 	// upper body

@@ -4,17 +4,14 @@ bind C "connect localhost"
 
 #net vars
 tick_rate 66.0
-snapshot_rate 20.0
-interp_time 0.1
+snapshot_rate 30.0
+interp_time 0.05
 fake_lag 75
 fake_loss 0
 
-#phys vars
-max_ground_speed 10.0
-
 #render vars
 draw_collision_tris 0
-draw_sv_colliders 1
+draw_sv_colliders 0
 draw_viewmodel 1
 
 #game vars

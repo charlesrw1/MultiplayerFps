@@ -42,9 +42,6 @@
     <ClCompile Include="Source\Shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\MeshBuilder.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Animation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -74,9 +71,6 @@
     </ClCompile>
     <ClCompile Include="BVHBuild.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Player.cpp">
-      <Filter>Source Files\Shared</Filter>
     </ClCompile>
     <ClCompile Include="Source\ClientMgr.cpp">
       <Filter>Source Files\Client</Filter>
@@ -114,12 +108,15 @@
     <ClCompile Include="Source\External\imgui.cpp">
       <Filter>Source Files\External</Filter>
     </ClCompile>
+    <ClCompile Include="Source\MeshBuilder.cpp">
+      <Filter>Source Files\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Player.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Texture.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MeshBuilder.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Model.h">
@@ -161,9 +158,6 @@
     <ClInclude Include="Source\EmulatedSocket.h">
       <Filter>Source Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Player.h">
-      <Filter>Source Files\Shared</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Util.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
@@ -195,6 +189,12 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Edit.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MeshBuilder.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Player.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

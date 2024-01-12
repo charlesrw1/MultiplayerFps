@@ -26,10 +26,10 @@ void Server::init()
 {
 	printf("initializing server\n");
 
-	cfg_tick_rate = cfg.get_var("tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
-	cfg_snapshot_rate = cfg.get_var("snapshot_rate", "30.0");
-	cfg_max_time_out = cfg.get_var("max_time_out", "10.f");
-	cfg_sv_port = cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	cfg_tick_rate		= cfg.get_var("tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
+	cfg_snapshot_rate	= cfg.get_var("snapshot_rate", "30.0");
+	cfg_max_time_out	= cfg.get_var("max_time_out", "10.f");
+	cfg_sv_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
 
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);

@@ -71,12 +71,15 @@ int Connection::NewPacket(const uint8_t* data, int length)
 	//if (entry.sequence == new_seq_ak)
 	//	seq_history.AccumulateRtt(host.realtime - entry.time_sent);
 
-	static int timer = 0;
-	if (timer == 0) {
-		//printf("rtt avg: %f\n", seq_history.rtt_avg);
-		timer = 10;
+	// update rtt of packets
+	float packet_rtt = 1.f;
+	if (out_sequence - out_sequence_ak < 64) {
+		packet_rtt = GetTime() - time_sent_history[out_sequence_ak % 64];
 	}
-	timer--;
+	rtt = rtt * 0.9 + packet_rtt * 0.1;
+
+	incoming[incoming_hist_index++] = { (float)GetTime(), length };
+	incoming_hist_index %= 64;
 
 	return PACKET_HEADER_SIZE;
 }
@@ -101,6 +104,8 @@ void Connection::Send(const uint8_t* data, int len)
 		printf("Couldn't write unreliable\n");
 		return;
 	}
+
+	time_sent_history[out_sequence % 64] = GetTime();
 
 	bool good = sock->Send(msg_buffer, len + PACKET_HEADER_SIZE, remote_addr);
 	out_sequence++;

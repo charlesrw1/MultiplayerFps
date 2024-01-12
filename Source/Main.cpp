@@ -32,6 +32,7 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
+#include "implot.h"
 
 MeshBuilder phys_debug;
 Engine_Config cfg;
@@ -482,9 +483,9 @@ void Renderer::Init()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	r_draw_collision_tris	= cfg.get_var("draw_collision_tris", "0");
-	r_draw_sv_colliders		= cfg.get_var("draw_sv_colliders", "1");
+	r_draw_sv_colliders		= cfg.get_var("draw_sv_colliders", "0");
 	r_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
-	vsync					= cfg.get_var("vsync", "0");
+	vsync					= cfg.get_var("vsync", "1");
 
 	fbo.scene = fbo.ssao = 0;
 	textures.scene_color = textures.scene_depthstencil = textures.ssao_color = 0;
@@ -801,9 +802,9 @@ int Game_Engine::player_num()
 {
 	if (is_host)
 		return 0;
-	if (cl)
-		return cl->GetPlayerNum();
-	ASSERT(0);
+	if (cl && cl->client_num != -1)
+		return cl->client_num;
+	ASSERT(0 && "player num called without game running");
 	return 0;
 }
 Entity& Game_Engine::local_player()
@@ -871,6 +872,29 @@ void cmd_load_map()
 
 	engine.start_map(cfg.get_arg_list().at(1), false);
 }
+
+void cmd_print_client_net_stats()
+{
+	float mintime = INFINITY;
+	float maxtime = -INFINITY;
+	int maxbytes = -5000;
+	int totalbytes = 0;
+	for (int i = 0; i < 64; i++) {
+		auto& entry = engine.cl->server.incoming[i];
+		maxbytes = glm::max(maxbytes, entry.bytes);
+		totalbytes += entry.bytes;
+		mintime = glm::min(mintime, entry.time);
+		maxtime = glm::max(maxtime, entry.time);
+	}
+
+	console_printf("Client Network Stats:\n");
+	console_printf("%--15s %f\n", "Rtt", engine.cl->server.rtt);
+	console_printf("%--15s %f\n", "Interval", maxtime - mintime);
+	console_printf("%--15s %d\n", "Biggest packet", maxbytes);
+	console_printf("%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
+	console_printf("%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
+}
+
 void cmd_game_input_callback()
 {
 
@@ -1112,9 +1136,7 @@ void Game_Engine::init()
 	window_h			= cfg.get_var("window_h", "800", true);
 	window_fullscreen	= cfg.get_var("window_fullscreen", "0", true);
 	host_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-	cfg.set_var("max_ground_speed", "10.0");	// ???
 
-	
 	// engine commands
 	cfg.set_command("connect", cmd_client_connect);
 	cfg.set_command("reconnect", cmd_client_reconnect);
@@ -1124,9 +1146,8 @@ void Game_Engine::init()
 	cfg.set_command("bind", cmd_bind);
 	cfg.set_command("quit", cmd_quit);
 	cfg.set_command("counter", cmd_debug_counter);
+	cfg.set_command("net_stat", cmd_print_client_net_stats);
 
-
-	
 	// engine initilization
 	init_sdl_window();
 	network_init();
@@ -1255,7 +1276,7 @@ void Game_Engine::loop()
 
 			time = tick * tick_interval;
 			if (is_host) {
-				//server.simtime = tick * engine.tick_interval;
+				// build physics world now as ReadPackets() executes player commands
 				build_physics_world(0.f);
 				sv->ReadPackets();
 				update_game_tick();
@@ -1292,7 +1313,6 @@ void Game_Engine::pre_render_update()
 		if (!is_host)
 			cl->interpolate_states();
 
-		//cl_game.ComputeAnimationMatricies();
 		for (int i = 0; i < MAX_GAME_ENTS; i++) {
 			Entity& ent = ents[i];
 			if (!ent.active())

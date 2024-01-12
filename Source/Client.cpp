@@ -105,11 +105,6 @@ void Client::Reconnect()
 	connect(address);
 }
 
-int Client::GetPlayerNum() const
-{
-	return client_num;
-}
-
 Move_Command& Client::get_command(int sequence) {
 	return commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
@@ -418,24 +413,6 @@ void Client::read_snapshot(Snapshot* s)
 			smooth_time = smooth_error_time->real;
 	}
 
-	ClearEntsThatDidntUpdate(engine.tick);
-
-	// build physics world for prediction updates
+	// build physics world for prediction updates later in frame AND subsequent frames until next packet
 	engine.build_physics_world(0.f);
-}
-
-void Client::ClearEntsThatDidntUpdate(int what_tick)
-{
-#if 0
-	ClientGame* game = &cl_game;
-	for (int i = 0; i < game->entities.size(); i++) {
-		ClientEntity* ce = &game->entities[i];
-		if (i == GetPlayerNum()) continue;
-		if (ce->active && ce->GetLastState()->tick != what_tick) {
-			game->entities[i].active = false;
-		}
-
-
-	}
-#endif
 }

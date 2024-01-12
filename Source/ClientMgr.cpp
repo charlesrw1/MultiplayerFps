@@ -7,8 +7,6 @@
 
 void Client::ReadPackets()
 {
-	//ASSERT(myclient->initialized);
-	
 	// check cfg var updates
 	sock.loss = cfg_fake_loss->integer;
 	sock.lag = cfg_fake_lag->integer;
@@ -76,6 +74,10 @@ void Client::ReadPackets()
 			Disconnect();
 		}
 	}
+
+	// update packet stats
+	
+
 
 	//int last_sequence = server.out_sequence_ak;
 	//int tick_delta = myclient->tick - myclient->GetCommand(last_sequence)->tick;
@@ -228,8 +230,6 @@ void Client::SendMovesAndMessages()
 	server.Send(buffer, writer.BytesWritten());
 }
 
-static EntityState null_estate;
-static PlayerState null_pstate;
 
 bool Client::OnEntSnapshot(ByteReader& msg)
 {
@@ -257,10 +257,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 
 	// set new snapshot to old snapshot
 	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
-		EntityState* old = &null_estate;
-		if (from)
-			old = &from->entities[i];
-		nextsnapshot->entities[i] = *old;
+		nextsnapshot->entities[i] = (from) ? from->entities[i] : EntityState();
 	}
 
 
@@ -281,11 +278,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	ASSERT(val == 0xabababab);
 
 	PlayerState* ps = &nextsnapshot->pstate;
-	if (from)
-		*ps = from->pstate;
-	else
-		*ps = null_pstate;
-
+	*ps = (from) ? from->pstate : PlayerState();
 	ReadDeltaPState(ps, msg);
 
 	read_snapshot(nextsnapshot);

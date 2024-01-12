@@ -316,10 +316,8 @@ void Animator::UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 l
 void Animator::SetupBones()
 {
 	ASSERT(model->animations && model);
-	//assert(animations->animdata);
-	//(animations->animdata[playinganimation].data->channels.size() == model->bones.size());
+	ASSERT(cached_bonemats.size() == model->bones.size());
 
-	assert(cached_bonemats.size() == model->bones.size());
 	glm::quat q[MAX_BONES];
 	glm::vec3 pos[MAX_BONES];
 	glm::vec3 scl[MAX_BONES];
@@ -337,15 +335,10 @@ void Animator::SetupBones()
 		return;
 	}
 
-	// Setup base layer
+	// Setup main layer
 	CalcRotations(q, pos, anim, frame);
 	if (leg_anim != -1)
 		add_legs_layer(q, pos);
-	//if (actor_owner && actor_owner->IsPlayer())
-	//{
-	//	AddPlayerUpperbodyLayer(q, pos);
-	//}
-
 	UpdateGlobalMatricies(q, pos, cached_bonemats);
 
 	// Inverse kinematics

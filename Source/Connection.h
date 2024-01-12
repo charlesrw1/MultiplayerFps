@@ -24,6 +24,12 @@ public:
 	int in_sequence = -1;		// last recieved remote sequence
 	double last_recieved = 0;	// time (sec) since recieved
 	int dropped = 0;
+	float rtt = 0.f;
+	float time_sent_history[64];
+
+	struct Packet_Hist { float time=0.f; int bytes=0; };
+	Packet_Hist incoming[64];
+	int incoming_hist_index = 0;
 
 	int reliable_out_len = 0;
 	std::vector<uint8_t> reliable_out;		// "backbuffered" reliable messages to send

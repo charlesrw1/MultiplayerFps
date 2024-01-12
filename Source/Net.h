@@ -118,6 +118,9 @@ struct Item_State
 	short ammo[MAX_ITEMS];
 	short clip[MAX_ITEMS];
 	float timer = 0.f;
+
+	char inventory[MAX_ITEMS];
+
 	Item_Use_State state = ITEM_IDLE;
 };
 

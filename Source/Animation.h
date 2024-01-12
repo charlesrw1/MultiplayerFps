@@ -104,8 +104,6 @@ private:
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 
-	//const Actor* actor_owner = nullptr;
-
 	std::vector<glm::mat4x4> cached_bonemats;		// final transform matricies, meshspace->bonespace->meshspace
 
 	void CalcRotations(glm::quat q[], glm::vec3 pos[], int clip_index, float curframe);

@@ -64,8 +64,6 @@ public:
 	Move_Command& get_command(int sequence);
 
 	void TrySendingConnect();
-	int GetPlayerNum() const;
-	void ClearEntsThatDidntUpdate(int what_tick);
 
 	Snapshot* FindSnapshotForTick(int tick);
 	Snapshot* GetCurrentSnapshot();
@@ -77,7 +75,6 @@ public:
 	int OutSequence() const { return server.out_sequence; }
 	int InSequence() const { return server.in_sequence; }
 
-	int ClientNum() const { return client_num; }
 	Client_State get_state() const { return state; }
 	IPAndPort GetCurrentServerAddr() const { return server.remote_addr; }
 
