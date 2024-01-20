@@ -25,19 +25,6 @@ const double DEFAULT_UPDATE_RATE = 66.66;	// server+client ticks 66 times a seco
 const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
 const int DEFAULT_SNAPSHOT_RATE = 30;	// send x snapshots a second
 
-enum GameModels
-{
-	Mod_PlayerCT,
-	Mod_GunM16,
-	Mod_Grenade_HE,
-	Mod_Grenade_Smoke,
-
-	Mod_Door1,
-	Mod_Door2,
-
-	Mod_NUMMODELS
-};
-
 // Messages
 enum Server_To_Client
 {
@@ -183,7 +170,7 @@ struct Entity
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
 
-	void SetModel(GameModels modname);
+	void set_model(const char* model);
 };
 
 

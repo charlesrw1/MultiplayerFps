@@ -90,6 +90,7 @@ public:
 	Config_Var* interpolate;
 	Config_Var* cfg_do_predict;
 	Config_Var* smooth_error_time;
+	Config_Var* dont_replicate_player;
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;

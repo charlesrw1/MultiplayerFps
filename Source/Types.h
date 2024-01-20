@@ -9,7 +9,7 @@ const int DEFAULT_HEIGHT = 800;
 const int MAX_GAME_ENTS = 256;
 
 
-class FlyCamera
+class Fly_Camera
 {
 public:
 	glm::vec3 position = glm::vec3(0);
@@ -18,9 +18,9 @@ public:
 	float move_speed = 0.1f;
 	float yaw = 0, pitch = 0;
 
-	void UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll);
-	void UpdateVectors();
-	glm::mat4 GetViewMatrix() const;
+	void scroll_speed(int amt);
+	void update_from_input(const bool keys[], int mouse_dx, int mouse_dy);
+	glm::mat4 get_view_matrix() const;
 };
 
 struct View_Setup

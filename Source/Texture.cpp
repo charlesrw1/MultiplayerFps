@@ -43,6 +43,28 @@ static Texture* MakeFromData(int x, int y, int channels, uint8_t* data)
 	return output;
 }
 
+using std::string;
+using std::vector;
+
+
+// handles case of using root file system and package file system
+class Archive
+{
+	struct File
+	{
+		string name;
+		int offset, len;
+	};
+	vector<File> files;
+};
+class File_System
+{
+	
+
+
+	vector<string> networked_strings;	// for model and sound names
+};
+
 static Texture* AddTexture(std::string& path)
 {
 	int width, height, channels;

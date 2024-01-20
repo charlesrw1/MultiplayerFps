@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BVHBuild.cpp" />
+    <ClCompile Include="Edit.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="source\Game_Local.cpp" />
@@ -66,7 +67,6 @@
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\GameData.h" />
-    <ClInclude Include="Source\Media.h" />
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\Types.h" />

@@ -27,7 +27,6 @@
 #include "Server.h"
 #include "Player.h"
 #include "Config.h"
-#include "Media.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -36,8 +35,8 @@
 
 MeshBuilder phys_debug;
 Engine_Config cfg;
-Media media;
 Game_Engine engine;
+Game_Media media;
 
 static double program_time_start;
 
@@ -106,15 +105,6 @@ double TimeSinceStart()
 {
 	return GetTime() - program_time_start;
 }
-
-
-void FlyCamera::UpdateVectors() {
-	front = AnglesToVector(pitch, yaw);
-}
-glm::mat4 FlyCamera::GetViewMatrix() const {
-	return glm::lookAt(position, position + front, up);
-}
-
 
 void Game_Local::update_view()
 {
@@ -275,7 +265,17 @@ void Game_Engine::init_sdl_window()
 	SDL_GL_SetSwapInterval(0);
 }
 
-void FlyCamera::UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, int scroll)
+glm::mat4 Fly_Camera::get_view_matrix() const {
+	return glm::lookAt(position, position + front, up);
+}
+
+void Fly_Camera::scroll_speed(int amt)
+{
+	move_speed += (move_speed * 0.5) * amt;
+	if (abs(move_speed) < 0.000001)
+		move_speed = 0.0001;
+}
+void Fly_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy)
 {
 	int xpos, ypos;
 	xpos = mouse_dx;
@@ -301,7 +301,7 @@ void FlyCamera::UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, i
 	if (yaw < 0) {
 		yaw += TWOPI;
 	}
-	UpdateVectors();
+	front = AnglesToVector(pitch, yaw);
 
 	vec3 right = cross(up, front);
 	if (keys[SDL_SCANCODE_W])
@@ -316,10 +316,6 @@ void FlyCamera::UpdateFromInput(const bool keys[], int mouse_dx, int mouse_dy, i
 		position += move_speed * up;
 	if (keys[SDL_SCANCODE_X])
 		position -= move_speed * up;
-
-	move_speed += (move_speed * 0.5) * scroll;
-	if (abs(move_speed) < 0.000001)
-		move_speed = 0.0001;
 }
 
 struct RenderAttachments
@@ -637,7 +633,7 @@ void Renderer::DrawEntBlobShadows()
 	particle_basic.set_vec4("tint_color", vec4(0,0,0,1));
 	glCheckError();
 
-	BindTexture(0, media.blobshadow->gl_id);
+	BindTexture(0, media.blob_shadow->gl_id);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -783,20 +779,72 @@ void Renderer::DrawPlayerViewmodel()
 	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
 
 	cur_shader = -1;
-	DrawModel(media.gamemodels[Mod_GunM16], model2);
+
+	const Model* viewmodel = media.get_game_model("m16.glb");
+
+	DrawModel(viewmodel, model2);
 }
 
-void LoadMediaFiles()
+const char* game_sound_names[] =
 {
-	auto& models = media.gamemodels;
-	models.resize(Mod_NUMMODELS);
-	
-	models[Mod_PlayerCT] = FindOrLoadModel("player_character.glb");
-	models[Mod_GunM16] = FindOrLoadModel("m16.glb");
-	models[Mod_Grenade_HE] = FindOrLoadModel("grenade_he.glb");
+	"gunshot1.wav",
+};
 
-	media.blobshadow = FindOrLoadTexture("blob_shadow_temp.png");
+const char* game_model_names[] =
+{
+	"player_character.glb",
+	"m16.glb",
+	"grenade_he.glb"
+};
+const int NUM_GAME_MODELS = sizeof(game_model_names) / sizeof(char*);
+
+
+void Game_Media::load()
+{
+	game_models.resize(NUM_GAME_MODELS);
+	for (int i = 0; i < NUM_GAME_MODELS; i++)
+		game_models[i] = FindOrLoadModel(game_model_names[i]);
+
+	blob_shadow = FindOrLoadTexture("blob_shadow_temp.png");
 }
+
+const Model* Game_Media::get_game_model(const char* model, int* out_index)
+{
+	int i = 0;
+	for (; i < NUM_GAME_MODELS; i++) {
+		if (strcmp(game_model_names[i], model) == 0)
+			break;
+	}
+
+	if (i == NUM_GAME_MODELS) {
+		if (out_index) *out_index = -1;
+		return nullptr;
+	}
+	else {
+		if (out_index) *out_index = i;
+		return game_models[i];
+	}
+}
+const Model* Game_Media::get_game_model_from_index(int index)
+{
+	if (index >= 0 && index < game_models.size())
+		return game_models[index];
+	return nullptr;
+}
+
+void Entity::set_model(const char* model_name)
+{
+	model = media.get_game_model(model_name, &model_index);
+	if (model && model->bones.size() > 0)
+		anim.set_model(model);
+}
+
+
+struct Sound
+{
+	char* buffer;
+	int length;
+};
 
 int Game_Engine::player_num()
 {
@@ -902,6 +950,7 @@ void cmd_game_input_callback()
 
 int main(int argc, char** argv)
 {
+
 	engine.argc = argc;
 	engine.argv = argv;
 	engine.init();
@@ -1152,7 +1201,7 @@ void Game_Engine::init()
 	init_sdl_window();
 	network_init();
 	draw.Init();
-	LoadMediaFiles();
+	media.load();
 
 	cl->init();
 	sv->init();
@@ -1175,6 +1224,10 @@ void Game_Engine::init()
 	bind_key(SDL_SCANCODE_I, "fake_movement_debug 2");
 	bind_key(SDL_SCANCODE_9, "counter 0");
 	bind_key(SDL_SCANCODE_0, "counter 1");
+
+	bind_key(SDL_SCANCODE_LEFT, "dont_replicate_player 1");
+	bind_key(SDL_SCANCODE_RIGHT, "dont_replicate_player 0");
+
 
 	cfg.execute_file("vars.txt");	// load config vars
 	cfg.execute_file("init.txt");	// load startup script

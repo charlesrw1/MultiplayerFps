@@ -4,6 +4,19 @@
 
 using std::vector;
 
+class Game_Media
+{
+public:
+	void load();
+	const Model* get_game_model(const char* name, int* index = nullptr);
+	const Model* get_game_model_from_index(int index);
+
+	vector<const Model*> game_models;	// non-owning list of models for entities
+	Texture* blob_shadow;
+};
+
+
+
 enum Engine_State
 {
 	MAINMENU,
@@ -29,7 +42,7 @@ public:
 	View_Setup last_view;
 
 	bool using_debug_cam = false;
-	FlyCamera fly_cam;
+	Fly_Camera fly_cam;
 
 	Item_Use_State prev_item_state = ITEM_IDLE;
 	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
@@ -137,4 +150,5 @@ private:
 	void draw_debug_interface();
 };
 
+extern Game_Media media;
 extern Game_Engine engine;

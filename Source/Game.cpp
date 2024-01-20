@@ -5,16 +5,14 @@
 #include "Game_Engine.h"
 #include "Net.h"
 
-void PlayerDeathUpdate(Entity* ent);
 void player_update(Entity* ent);
 void player_spawn(Entity* ent);
-void PlayerItemUpdate(Entity* ent, Move_Command cmd);
+
 void dummy_update(Entity* ent);
 
-Entity* CreateGrenade(Entity* from, glm::vec3 org, glm::vec3 vel, int gtype);
+Entity* create_grenade(Entity* from, glm::vec3 org, glm::vec3 vel);
 void GrenadeUpdate(Entity* ent);
 
-void PostEntUpdate(Entity* ent);
 
 void EntTakeDamage(Entity* ent, Entity* from, int amt);
 
@@ -75,38 +73,6 @@ void Game_Engine::free_entity(Entity* ent)
 	*ent = Entity();
 }
 
-
-void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org)
-{
-	printf("Shooting bullets\n");
-	Ray r;
-	r.dir = dir;
-	r.pos = org;
-	RayHit hit;
-	//TraceRayAgainstLevel(level, r, &hit, false);
-
-	engine.phys.TraceRay(r, &hit, from->index, PF_ALL);
-
-	//RayWorldIntersect(r, &hit, GetEntIndex(from), PF_ALL);
-
-	// >>>
-	CreateGrenade(from, org + dir * 0.1f, dir * 18.f, 0);
-	// <<<
-
-	if (hit.hit_world)
-		return;
-
-	Entity* ent = engine.ents + hit.ent_id;
-	EntTakeDamage(ent, from, 26);
-	
-
-	//if (hit.dist >= 0.f) {
-	//	rays.PushLine(org, hit.pos, COLOR_WHITE);
-	//	rays.AddSphere(hit.pos, 0.1f, 5, 6, COLOR_BLACK);
-	//}
-}
-
-
 void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 {
 	if (!is_host)
@@ -123,6 +89,8 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 		if (hit_entitiy.damage)
 			hit_entitiy.damage(&hit_entitiy, from, 100, 0);
 	}
+
+	create_grenade(from, origin + direction * 0.1f, direction * 18.f);
 }
 
 
@@ -144,8 +112,8 @@ void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 void player_spawn(Entity* ent)
 {
 	ent->type = ET_PLAYER;
-	ent->model_index = Mod_PlayerCT;
-	ent->SetModel(Mod_PlayerCT);
+
+	ent->set_model("player_character.glb");
 
 	if (ent->model) {
 		ent->anim.set_anim("act_idle", false);
@@ -169,7 +137,7 @@ Entity* dummy_spawn()
 	ent->rotation = glm::vec3(0.f);
 	ent->flags = 0;
 	ent->health = 100;
-	ent->SetModel(Mod_PlayerCT);
+	ent->set_model("player_character.glb");
 	if (ent->model)
 		ent->anim.set_anim("act_run", true);
 
@@ -195,44 +163,18 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 }
 
 
-void ServerGameShootCallback(int entindex, bool altfire)
-{
-	Entity& ent = engine.ents[entindex];
-	glm::vec3 shoot_vec = AnglesToVector(ent.view_angles.x, ent.view_angles.y);
-
-	ShootBullets(&ent, shoot_vec,
-		ent.position + glm::vec3(0, STANDING_EYE_OFFSET, 0));
-	
-}
-void ServerPlaySoundCallback(vec3 org, int snd_idx)
-{
-	printf("play sound: %d\n", snd_idx);
-}
-void ServerViewmodelCallback(const char* str) { /* null */ }
-
-
-
-
-void Entity::SetModel(GameModels m) {
-	model_index = m;
-	model = media.gamemodels.at(m);
-	if (model && model->bones.size() > 0)
-		anim.set_model(model);
-}
-
 void Entity::from_entity_state(EntityState& es)
 {
 	type = (Ent_Type)es.type;
 	position = es.position;
 	rotation = es.angles;
 	model_index = es.model_idx;
-	
 	item = es.item;
 	solid = es.solid;
 
-	if (model_index >= 0 && model_index < media.gamemodels.size())
-		model = media.gamemodels.at(model_index);
-	
+	// update model
+	if (model_index != -1)
+		model = media.get_game_model_from_index(model_index);
 	if(model&&model->bones.size()>0)
 		anim.set_model(model);
 
@@ -301,15 +243,6 @@ void Game_Engine::execute_player_move(int num, Move_Command cmd)
 	engine.time = oldtime;
 }
 
-void PlayerDeathUpdate(Entity* ent)
-{
-	if (ent->death_time < engine.time) {
-		ent->health = 100;
-		ent->flags &= ~EF_DEAD;
-		GetPlayerSpawnPoisiton(ent);
-	}
-}
-
 void player_update(Entity* ent)
 {
 	if (ent->flags & EF_DEAD) {
@@ -331,17 +264,15 @@ void dummy_update(Entity* ent)
 		engine.free_entity(ent);
 }
 
-Entity* CreateGrenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel, int grenade_type)
+Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel)
 {
 	ASSERT(thrower);
 	Entity* e = engine.new_entity();
 	e->type = ET_GRENADE;
-
-	e->SetModel(Mod_Grenade_HE);
+	e->set_model("grenade_he.glb");
 	e->owner_index = thrower->index;
 	e->position = org;
 	e->velocity = start_vel;
-	e->sub_type = grenade_type;
 	e->flags = 0;
 	e->death_time = engine.time + 5.f;
 
@@ -388,25 +319,4 @@ void GrenadeUpdate(Entity* ent)
 		printf("BOOM\n");
 		engine.free_entity(ent);
 	}
-}
-
-
-#if 0
-void Game::RemoveEntity(Entity* ent)
-{
-	ent->type = Ent_Free;
-	ent->alive = false;
-	ent->model = nullptr;
-	ent->anim.Clear();
-
-	engine.num_entities--;
-}
-#endif
-
-void KillEnt(Entity* ent)
-{
-	ent->flags |= EF_DEAD;
-	ent->death_time = engine.time + 5.0;
-	ent->anim.set_anim("act_die", false);
-	ent->anim.loop = false;
 }

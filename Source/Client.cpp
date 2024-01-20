@@ -4,7 +4,6 @@
 #include "Game_Engine.h"
 #include "Player.h"
 #include "MeshBuilder.h"
-#include "Media.h"
 #include "Config.h"
 
 #define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
@@ -19,6 +18,7 @@ void Client::init()
 	interpolate			= cfg.get_var("interpolate", "1");
 	smooth_error_time	= cfg.get_var("smooth_error", "1.0");
 	cfg_do_predict		= cfg.get_var("do_predict", "1");
+	dont_replicate_player = cfg.get_var("dont_replicate_player", "0");
 	sock.Init(0);
 }
 
@@ -130,7 +130,11 @@ void Client::run_prediction()
 	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 	PlayerState predicted_player = last_auth_state->pstate;
 	Entity& player = engine.ents[engine.player_num()];
-	player.FromPlayerState(&predicted_player);
+	
+	if (dont_replicate_player->integer)
+		start = end - 2;	// only sim current frame
+	else
+		player.FromPlayerState(&predicted_player);
 
 	// run physics code for commands yet to recieve a snapshot for
 	for (int i = start + 1; i < end; i++) {
@@ -219,7 +223,7 @@ void Client::interpolate_states()
 	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
 	
 	// interpolate local player error
-	if (smooth_time > 0) {
+	if (smooth_time > 0 && dont_replicate_player->integer == 0) {
 		if (smooth_time == smooth_error_time->real)
 			printf("starting smooth\n");
 
@@ -351,8 +355,8 @@ void local_player_on_new_entity_state(EntityState& es, Entity& p)
 	// if we already have a model, dont override the animations
 	p.model_index = es.model_idx;
 	const Model* next_model = nullptr;
-	if (p.model_index >= 0 && p.model_index < media.gamemodels.size())
-		next_model = media.gamemodels.at(p.model_index);
+	if (p.model_index != -1)
+		next_model = media.get_game_model_from_index(p.model_index);
 	if (next_model != p.model) {
 		p.model = next_model;
 		if (p.model && p.model->bones.size() > 0)
@@ -384,10 +388,10 @@ void Client::read_snapshot(Snapshot* s)
 
 		e.index = i;
 		// replicate variables to entity
-		if (i == engine.player_num())
-			local_player_on_new_entity_state(state, e);
-		else
+		if (i != engine.player_num())
 			e.from_entity_state(state);
+		else if(dont_replicate_player->integer == 0)
+			local_player_on_new_entity_state(state, e);
 
 		// save off some vars for rendering interpolation (not for local clients player)
 		if (i != engine.player_num()) {

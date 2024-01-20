@@ -52,6 +52,9 @@ public:
 
 	// GL_TRIANGLES,etc.
 	void Draw(uint32_t gl_type);
+
+	const std::vector<MbVertex>& get_v() { return verticies; }
+	const std::vector<uint32_t>& get_i() { return indicies; }
 private:
 	uint32_t VBO = 0, VAO = 0, EBO = 0;
 	std::vector<MbVertex> verticies;

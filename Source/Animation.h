@@ -68,6 +68,7 @@ public:
 	std::vector<Animation> clips;
 };
 
+
 class Model;
 class Animator
 {
