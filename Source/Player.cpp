@@ -136,7 +136,7 @@ void player_physics_check_ground(Entity& player, vec3 pre_update_velocity, Move_
 	else {
 		if (command.first_sim && !(player.state & PMS_GROUND) && pre_update_velocity.y < -2.f) {
 			player.anim.set_leg_anim("act_land", false);
- 			player.anim.loop_legs = false;
+ 			player.anim.legs.loop = false;
 		}
 		player.state |= PMS_GROUND;
 		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
@@ -161,7 +161,7 @@ void player_physics_check_jump(Entity& player, Move_Command command)
 
 		if (command.first_sim) {
 			player.anim.set_leg_anim("act_jump_start", true);
-			player.anim.loop_legs = false;
+			player.anim.legs.loop = false;
 		}
 	}
 }
@@ -357,7 +357,6 @@ void player_physics_update(Entity* p, Move_Command command)
 
 
 // if in the middle of an animation, dont interrupt it
-
 void player_animation_update(Entity* ent)
 {
 	// animation is being controlled server side
@@ -365,11 +364,11 @@ void player_animation_update(Entity* ent)
 		return;
 
 	// upper body
-	if (ent->anim.loop || ent->anim.finished)
+	if (ent->anim.m.loop || ent->anim.m.finished)
 	{	
 		// for now, only one
 		ent->anim.set_anim("act_idle", false);
-		ent->anim.loop = true;
+		ent->anim.m.loop = true;
 	}
 
 	// lower body
@@ -383,10 +382,10 @@ void player_animation_update(Entity* ent)
 	bool set_legs = true;
 
 	const char* next_leg_anim = "null";
-	if (ent->anim.leg_anim == -1)
-		ent->anim.legs_finished = true;
+	if (ent->anim.legs.anim == -1)
+		ent->anim.legs.finished = true;
 
-	if (!ent->anim.loop_legs && !ent->anim.legs_finished)
+	if (!ent->anim.legs.loop && !ent->anim.legs.finished)
 		set_legs = false;
 
 	if (ent->state & PMS_JUMPING || (!(ent->state & PMS_GROUND) && ent->in_air_time > 0.3f)) {
@@ -426,9 +425,12 @@ void player_animation_update(Entity* ent)
 	// pick out upper body animations here
 	// shooting, reloading, etc.
 	if (set_legs) {
-		ent->anim.set_leg_anim(next_leg_anim, false);
-		ent->anim.loop_legs = loop_legs;
-		ent->anim.leg_play_speed = leg_speed;
+
+		static Config_Var* anim_blend_running = cfg.get_var("abr", "0.15");
+
+		ent->anim.set_leg_anim(next_leg_anim, false, anim_blend_running->real);
+		ent->anim.legs.loop = loop_legs;
+		ent->anim.legs.speed = leg_speed;
 	}
 }
 
@@ -460,7 +462,7 @@ void player_item_update(Entity* p, Move_Command command)
 
 	if (w.timer > 0)
 		w.timer -= engine.tick_interval;
-
+	float blend = cfg.get_var("abr", "0.15")->real;
 	switch (w.state)
 	{
 	case ITEM_IDLE:
@@ -468,8 +470,8 @@ void player_item_update(Entity* p, Move_Command command)
 			w.timer = fire_time;
 			w.state = ITEM_IN_FIRE;
 
-			p->anim.set_anim("act_shoot", true);
-			p->anim.loop = false;
+			p->anim.set_anim("act_shoot", true, blend);
+			p->anim.m.loop = false;
 
 			engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 		}
@@ -477,9 +479,9 @@ void player_item_update(Entity* p, Move_Command command)
 			w.timer = reload_time;
 			w.state = ITEM_RELOAD;
 
-			p->anim.set_anim("act_reload", true);
-			p->anim.loop = false;
-			p->anim.play_speed = 0.7f;
+			p->anim.set_anim("act_reload", true, blend);
+			p->anim.m.loop = false;
+			p->anim.m.speed = 0.7f;
 		}
 
 		break;

@@ -68,14 +68,28 @@ public:
 	std::vector<Animation> clips;
 };
 
+struct Animator_Layer
+{
+	int anim = -1;
+	float frame = 0;
+	float speed = 1;
+	bool finished = false;
+	bool loop = false;
+	int blend_anim = -1;
+	float blend_frame = 1;
+	float blend_remaining = 0;
+	float blend_time = 0;
+
+	void update(float dt, const Animation& clip);
+};
 
 class Model;
 class Animator
 {
 public:
 	void set_model(const Model* model);
-	void set_anim(const char* name, bool restart);
-	void set_leg_anim(const char* name, bool restart);
+	void set_anim(const char* name, bool restart, float blend = 0.1f);
+	void set_leg_anim(const char* name, bool restart, float blend = 0.1f);
 
 
 	void SetupBones();
@@ -86,18 +100,8 @@ public:
 
 	void AdvanceFrame(float elapsed_time);
 
-	// replicated vars
-	int anim =-1;
-	float frame;
-	int leg_anim=-1;
-	float leg_frame;
-
-	float play_speed;
-	bool loop = false;
-	bool finished = false;
-	float leg_play_speed;
-	bool loop_legs = false;
-	bool legs_finished = false;
+	Animator_Layer m;		// main animimation, upper body
+	Animator_Layer legs;	// legs
 
 	const Model* model = nullptr;
 	const Animation_Set* set = nullptr;

@@ -174,6 +174,44 @@ void RemoteClient::OnPacket(ByteReader& buf)
 	}
 }
 
+#define ESP(x) #x,(int)&((Entity*)0)->x
+
+Net_Prop entity_state_props[] =
+{
+	{ESP(type), 32, 8},
+	{ESP(position), NPROP_VEC3},
+
+	{ESP(rotation), NPROP_VEC3, 8, (2 * PI) * 256, Net_Prop::NOT_PLAYER},
+
+	{ESP(model_index), 32, 8},
+	{ESP(anim.m.anim), 32, 8},
+	{ESP(anim.m.frame), NPROP_FLOAT, 16, 100.f},
+	{ESP(anim.legs.anim), 32, 8},
+	{ESP(anim.legs.frame), NPROP_FLOAT, 16, 100.f},
+
+	{ESP(anim.legs.blend_anim), 32, 8},
+	{ESP(anim.legs.blend_frame), NPROP_FLOAT, 16, 100.f},
+	{ESP(anim.legs.blend_remaining), NPROP_FLOAT, 16, 100.f},
+	{ESP(anim.legs.blend_time), NPROP_FLOAT, 16, 100.f},
+	
+	{ESP(anim.m.blend_anim), 32, 8},
+	{ESP(anim.m.blend_frame), NPROP_FLOAT, 16, 100.f},
+	{ESP(anim.m.blend_remaining), NPROP_FLOAT, 16, 100.f},
+	{ESP(anim.m.blend_time), NPROP_FLOAT, 16, 100.f},
+
+	{ESP(flags), 16},
+	//{ESP(item), 32},
+	{ESP(solid), 32},
+
+
+	// for owning players only
+	{ESP(rotation), NPROP_VEC3, -1, 1.f, Net_Prop::ONLY_PLAYER},	// dont quantize for predicting player
+	{ESP(velocity), NPROP_VEC3, -1, 1.f, Net_Prop::ONLY_PLAYER},
+	{ESP(state), 16, -1, 1.f, Net_Prop::ONLY_PLAYER},
+};
+
+
+
 // horrid
 void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uint8_t index)
 {

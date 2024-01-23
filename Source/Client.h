@@ -18,12 +18,15 @@ struct Interp_Entry
 	glm::vec3 position, angles;
 	int main_anim, legs_anim;
 	float ma_frame, la_frame;
+	int main_blend, legs_blend;
+	float main_blend_frame, legs_blend_frame;
+	float main_blend_left, main_blend_time, legs_blend_left, legs_blend_time;
 };
 
 
 struct Entity_Interp
 {
-	const static int HIST_SIZE = 10;
+	const static int HIST_SIZE = 5;
 	Interp_Entry hist[HIST_SIZE];
 	int hist_index = 0;
 

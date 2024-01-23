@@ -74,6 +74,16 @@ struct EntityState
 	float mainanim_frame = 0.f;	// frames quantized to 16 bits
 	int leganim = 0;
 	float leganim_frame = 0.f;
+
+	int legblend = 0;
+	float legblendframe = 0.f;
+	float legblendleft = 0.f;
+	float legsblendtime = 0.f;
+	int torsoblend = 0;
+	float torsoblendframe = 0.f;
+	float torsoblendleft = 0.f;
+	float torsoblendtime = 0.f;
+
 	short flags = 0;	// Entity_Flags
 	int item = 0;
 	int solid = 0;	// encodes physical object shape
@@ -128,7 +138,6 @@ struct PlayerState
 	Item_State items;
 };
 
-
 class Model;
 struct Entity
 {
@@ -173,30 +182,30 @@ struct Entity
 	void set_model(const char* model);
 };
 
-
-// taken from quake 3, a nice idea
-enum EntityEvent
+struct Net_Prop
 {
-	Ev_FirePrimary,
-	Ev_FireSecondary,
-	Ev_Reload,
-	Ev_Jump,
-	Ev_HardLanding,
+	const char* name;
+	int offset;
+	int input_bits;
+	int output_bits = -1; 
+	float quantize = 1.f;
+	short condition = 0;
+	// -1 = same as input, vals above 65 are special types, 
+	//if output is given in bits but input is float, output is quantized
 
-	Ev_Footstep,
-
-	Ev_Hurt,
-	Ev_Death,
-
-	Ev_Sound,
-	Ev_Explode
+	enum Conditions
+	{
+		ALL = 0,
+		ONLY_PLAYER = 1,
+		NOT_PLAYER = 2,
+	};
 };
 
-struct GameEvent
+
+enum Net_Prop_Special_Types
 {
-	const static int MAX_PARAMS = 32;
-	uint8_t num_params = 0;
-	uint8_t params[MAX_PARAMS];
+	NPROP_FLOAT = 65,
+	NPROP_VEC3,
 };
 
 

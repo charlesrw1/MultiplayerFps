@@ -96,14 +96,17 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 
 void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 {
+	if (self->flags & EF_DEAD)
+		return;
+
 	self->health -= damage;
 	if (self->health <= 0) {
 		self->flags |= EF_DEAD;
 		self->death_time = engine.time+5.f;
 
 		self->anim.set_anim("act_die_1", true);
-		self->anim.loop = false;
-		self->anim.leg_anim = -1;
+		self->anim.m.loop = false;
+		self->anim.legs.anim = -1;
 
 		self->flags |= EF_FORCED_ANIMATION;
 	}
@@ -156,7 +159,7 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 		ent->death_time = engine.time + 3.0;
 
 		ent->anim.set_anim("act_die", false);
-		ent->anim.loop = false;
+		ent->anim.m.loop = false;
 
 		printf("died!\n");
 	}
@@ -178,10 +181,8 @@ void Entity::from_entity_state(EntityState& es)
 	if(model&&model->bones.size()>0)
 		anim.set_model(model);
 
-	anim.leg_anim = es.leganim;
-	anim.leg_frame = es.leganim_frame;
-	anim.anim = es.mainanim;
-	anim.frame = es.mainanim_frame;
+	// animation set when lerping
+
 	flags = es.flags;
 }
 
@@ -217,13 +218,22 @@ EntityState Entity::to_entity_state()
 	es.solid = solid;
 
 	es.item = items.active_item;
-
-	es.leganim = anim.leg_anim;
-	es.leganim_frame = anim.leg_frame;
-	es.mainanim = anim.anim;
-	es.mainanim_frame = anim.frame;
-
 	es.flags = flags;
+
+	es.leganim = anim.legs.anim;
+	es.leganim_frame = anim.legs.frame;
+	es.legblend = anim.legs.blend_anim;
+	es.leganim_frame = anim.legs.blend_frame;
+	es.legblendleft = anim.legs.blend_remaining;
+	es.legsblendtime = anim.legs.blend_time;
+
+	es.mainanim = anim.m.anim;
+	es.mainanim_frame = anim.m.frame;
+	es.torsoblend = anim.m.blend_anim;
+	es.torsoblendframe = anim.m.blend_frame;
+	es.torsoblendleft = anim.m.blend_remaining;
+	es.torsoblendtime = anim.m.blend_time;
+
 
 	return es;
 }

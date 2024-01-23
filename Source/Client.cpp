@@ -206,10 +206,22 @@ void set_entity_interp_vars(Entity& e, Interp_Entry& i)
 {
 	e.position = i.position;
 	e.rotation = i.angles;
-	e.anim.leg_anim = i.legs_anim;
-	e.anim.anim = i.main_anim;
-	e.anim.leg_frame = i.la_frame;
-	e.anim.frame = i.ma_frame;
+
+	auto& legs = e.anim.legs;
+	legs.anim = i.legs_anim;
+	legs.frame = i.la_frame;
+	legs.blend_anim = i.legs_blend;
+	legs.blend_remaining = i.legs_blend_left;
+	legs.blend_time = i.legs_blend_time;
+	legs.blend_frame = i.legs_blend_frame;
+	
+	auto& up = e.anim.m;
+	up.anim = i.main_anim;
+	up.frame = i.ma_frame;
+	up.blend_anim = i.main_blend;
+	up.blend_remaining = i.main_blend_left;
+	up.blend_time = i.main_blend_time;
+	up.blend_frame = i.main_blend_frame;
 }
 
 
@@ -294,23 +306,27 @@ void Client::interpolate_states()
 			float d = s1->angles[i] - s2->angles[i];
 			interpstate.angles[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
 		}
+		if (ent.model && ent.model->animations) {
+			if (s1->legs_anim == s2->legs_anim) {
+				int anim = s1->legs_anim;
+				if (anim >= 0 && anim < ent.model->animations->clips.size()) {
 
-		if (ent.model && ent.model->animations && s1->legs_anim == s2->legs_anim) {
-			int anim = s1->legs_anim;
-			if (anim >= 0 && anim < ent.model->animations->clips.size()) {
+					interpstate.la_frame = InterpolateAnimation(&ent.model->animations->clips[s1->legs_anim],
+						s1->la_frame, s2->la_frame, midlerp);
+				}
+			}
+			if (s1->main_anim == s2->main_anim) {
+				int anim = s1->main_anim;
+				if (anim >= 0 && anim < ent.model->animations->clips.size()) {
 
-				interpstate.la_frame = InterpolateAnimation(&ent.model->animations->clips[s1->legs_anim],
-					s1->la_frame, s2->la_frame, midlerp);
+					interpstate.ma_frame = InterpolateAnimation(&ent.model->animations->clips[s1->main_anim],
+						s1->ma_frame, s2->ma_frame, midlerp);
+				}
 			}
 
-		}
-		if (ent.model && ent.model->animations && s1->main_anim == s2->main_anim) {
-			int anim = s1->main_anim;
-			if (anim >= 0 && anim < ent.model->animations->clips.size()) {
+			// set blending information:
 
-				interpstate.ma_frame = InterpolateAnimation(&ent.model->animations->clips[s1->main_anim],
-					s1->ma_frame, s2->ma_frame, midlerp);
-			}
+
 		}
 
 		set_entity_interp_vars(ent, interpstate);
@@ -364,10 +380,21 @@ void local_player_on_new_entity_state(EntityState& es, Entity& p)
 	}
 	// force animation if server is requesting it
 	if (p.flags & EF_FORCED_ANIMATION) {
-		p.anim.leg_anim = es.leganim;
-		p.anim.leg_frame = es.leganim_frame;
-		p.anim.anim = es.mainanim;
-		p.anim.frame = es.mainanim_frame;
+		auto& legs = p.anim.legs;
+		legs.anim = es.leganim;
+		legs.frame = es.leganim_frame;
+		legs.blend_frame = es.legblendframe;
+		legs.blend_anim = es.legblend;
+		legs.blend_remaining = es.legblendleft;
+		legs.blend_time = es.legsblendtime;
+
+		auto& up = p.anim.m;
+		up.anim = es.mainanim;
+		up.frame = es.mainanim_frame;
+		up.blend_anim = es.torsoblend;
+		up.blend_frame = es.torsoblendframe;
+		up.blend_remaining = es.torsoblendleft;
+		up.blend_time = es.torsoblendtime;
 	}
 }
 
@@ -387,24 +414,34 @@ void Client::read_snapshot(Snapshot* s)
 		}
 
 		e.index = i;
-		// replicate variables to entity
-		if (i != engine.player_num())
-			e.from_entity_state(state);
-		else if(dont_replicate_player->integer == 0)
-			local_player_on_new_entity_state(state, e);
-
+		// replicate variables to entity and
 		// save off some vars for rendering interpolation (not for local clients player)
 		if (i != engine.player_num()) {
+			e.from_entity_state(state);
+
 			Interp_Entry& entry = interp.hist[interp.hist_index];
 			entry.tick = engine.tick;
 			entry.position = state.position;
 			entry.angles = state.angles;
+
 			entry.main_anim = state.mainanim;
-			entry.legs_anim = state.leganim;
 			entry.ma_frame = state.mainanim_frame;
+			entry.main_blend = state.torsoblend;
+			entry.main_blend_frame = state.torsoblendframe;
+			entry.main_blend_left = state.torsoblendleft;
+			entry.main_blend_time = state.torsoblendtime;
+
+			entry.legs_anim = state.leganim;
 			entry.la_frame = state.leganim_frame;
+			entry.legs_blend = state.legblend;
+			entry.legs_blend_left = state.legblendleft;
+			entry.legs_blend_time = state.legsblendtime;
+			entry.legs_blend_frame = state.legblendframe;
+
 			interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
 		}
+		else if(dont_replicate_player->integer == 0)
+			local_player_on_new_entity_state(state, e);
 	}
 
 	// update prediction error data

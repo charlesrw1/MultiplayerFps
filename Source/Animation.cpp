@@ -1,6 +1,7 @@
 #include "Animation.h"
 #include "Util.h"
 #include "Model.h"
+#include "Game_Engine.h"
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -99,6 +100,24 @@ int Animation_Set::find(const char* name) const
 	return -1;
 }
 
+void Animator_Layer::update(float elapsed, const Animation& clip)
+{
+	frame += clip.fps * elapsed * speed;
+	if (frame > clip.total_duration || frame < 0.f) {
+		if (loop)
+			frame = fmod(fmod(frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+		else {
+			frame = clip.total_duration - 0.001f;
+			finished = true;
+		}
+	}
+	if (blend_anim != -1) {
+		blend_remaining -= elapsed;
+		if (blend_remaining <= 0) {
+			blend_anim = -1;
+		}
+	}
+}
 
 void Animator::AdvanceFrame(float elapsed)
 {
@@ -107,34 +126,18 @@ void Animator::AdvanceFrame(float elapsed)
 
 	int num_clips = model->animations->clips.size();
 
-	if (anim < 0 || anim >= num_clips)
-		anim = -1;
-	if (leg_anim < 0 || leg_anim >= num_clips)
-		leg_anim = -1;
+	if (m.anim < 0 || m.anim >= num_clips)
+		m.anim = -1;
+	if (legs.anim < 0 || legs.anim >= num_clips)
+		legs.anim = -1;
 
-	if (anim != -1) {
-		const Animation& clip = model->animations->clips[anim];
-		frame += clip.fps * elapsed * play_speed;
-		if (frame > clip.total_duration || frame < 0.f) {
-			if(loop)
-				frame = fmod(fmod(frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			else {
-				frame = clip.total_duration-0.001f;
-				finished = true;
-			}
-		}
+	if (m.anim != -1) {
+		const Animation& clip = model->animations->clips[m.anim];
+		m.update(elapsed, clip);
 	}
-	if (leg_anim != -1) {
-		const Animation& clip = model->animations->clips[leg_anim];
-		leg_frame += clip.fps * elapsed * leg_play_speed;
-		if (leg_frame > clip.total_duration || leg_frame < 0.f) {
-			if (loop_legs)
-				leg_frame = fmod(fmod(leg_frame, clip.total_duration) + clip.total_duration, clip.total_duration);
-			else {
-				leg_frame = clip.total_duration-0.001f;
-				legs_finished = true;
-			}
-		}
+	if (legs.anim != -1) {
+		const Animation& clip = model->animations->clips[legs.anim];
+		legs.update(elapsed, clip);
 	}
 }
 
@@ -213,7 +216,7 @@ void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float cu
 		if (rot_idx == -1)
 			interp_rot = model->bones.at(i).rot;
 		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
-			interp_rot = set->GetRot(i, pos_idx, clip_index).val;
+			interp_rot = set->GetRot(i, rot_idx, clip_index).val;
 		else {
 			int index0 = rot_idx;
 			int index1 = rot_idx + 1;
@@ -318,17 +321,20 @@ void Animator::SetupBones()
 	ASSERT(model->animations && model);
 	ASSERT(cached_bonemats.size() == model->bones.size());
 
-	glm::quat q[MAX_BONES];
-	glm::vec3 pos[MAX_BONES];
-	glm::vec3 scl[MAX_BONES];
+	static glm::quat q[MAX_BONES];
+	static glm::vec3 pos[MAX_BONES];
 
-	if (anim < 0 || anim >= model->animations->clips.size())
-		anim = -1;
-	if (leg_anim < 0 || leg_anim >= model->animations->clips.size())
-		leg_anim = -1;
+	if (m.anim < 0 || m.anim >= model->animations->clips.size())
+		m.anim = -1;
+	if (legs.anim < 0 || legs.anim >= model->animations->clips.size())
+		legs.anim = -1;
+	if (m.blend_anim < 0 || m.blend_anim >= model->animations->clips.size())
+		m.blend_anim = -1;
+	if (legs.blend_anim < 0 || legs.blend_anim >= model->animations->clips.size())
+		legs.blend_anim = -1;
 
 	// Just t-pose if no proper animations
-	if (anim == -1)
+	if (m.anim == -1)
 	{
 		for (int i = 0; i < cached_bonemats.size(); i++)
 			cached_bonemats[i] = model->bones[i].posematrix;
@@ -336,20 +342,19 @@ void Animator::SetupBones()
 	}
 
 	// Setup main layer
-	CalcRotations(q, pos, anim, frame);
-	if (leg_anim != -1)
+	CalcRotations(q, pos, m.anim, m.frame);
+	if (m.blend_anim != -1)
+	{
+		static glm::quat q2[MAX_BONES];
+		static glm::vec3 pos2[MAX_BONES];
+		CalcRotations(q2, pos2, m.blend_anim, m.blend_frame);
+		float frac = m.blend_remaining / m.blend_time;
+		LerpTransforms(q, pos, q2, pos2, frac, model->bones.size());
+	}
+
+	if (legs.anim != -1)
 		add_legs_layer(q, pos);
 	UpdateGlobalMatricies(q, pos, cached_bonemats);
-
-	// Inverse kinematics
-	//if (!actor_owner)
-	//{
-	//	DoHandIK(q, pos, cached_bonemats);
-	//}
-	//if (actor_owner && actor_owner->IsPlayer() && !actor_owner->is_dead)
-	//{
-	//	DoPlayerHandToGunIK(q, pos, cached_bonemats);
-	//}
 }
 void Animator::LerpTransforms(glm::quat q1[], vec3 p1[], glm::quat q2[], glm::vec3 p2[], float factor, int numbones)
 {
@@ -363,17 +368,26 @@ void Animator::LerpTransforms(glm::quat q1[], vec3 p1[], glm::quat q2[], glm::ve
 
 void Animator::add_legs_layer(glm::quat finalq[], glm::vec3 finalp[])
 {
-	glm::quat q1[MAX_BONES];
-	glm::vec3 p1[MAX_BONES];
+	static glm::quat q1[MAX_BONES];
+	static glm::vec3 p1[MAX_BONES];
 
-	CalcRotations(q1, p1, leg_anim, leg_frame);
+	CalcRotations(q1, p1, legs.anim, legs.frame);
+
+	if (legs.blend_anim != -1)
+	{
+		static glm::quat q2[MAX_BONES];
+		static glm::vec3 pos2[MAX_BONES];
+		CalcRotations(q2, pos2, legs.blend_anim, legs.blend_frame);
+		float frac = legs.blend_remaining / legs.blend_time;
+		LerpTransforms(q1, p1, q2, pos2, frac, model->bones.size());
+	}
 
 	const int root_loc = model->BoneForName("spine");
 	const int pelvis = model->BoneForName("pelvis.L");
 
 	if (root_loc == -1 || pelvis == -1) {
 		printf("Couldn't find spine/root bones\n");
-		leg_anim = -1;
+		legs.anim = -1;
 		return;
 	}
 
@@ -412,37 +426,47 @@ void Animator::set_model(const Model* mod)
 		set = model->animations.get();
 		cached_bonemats.resize(model->bones.size());
 	}
-	anim = -1;
-	leg_anim = -1;
-	frame = 0.f;
-	leg_frame = 0.f;
-	play_speed = 1.f;
-	leg_play_speed = 1.f;
-	loop_legs = true;
-	loop = true;
-	finished = false;
-	legs_finished = false;
+
+	legs = Animator_Layer();
+	m = Animator_Layer();
 }
 
-void Animator::set_anim(const char* name, bool restart)
+void Animator::set_anim(const char* name, bool restart, float blend)
 {
 	if (!model) return;
 	int animation = set->find(name);
-	if (animation != anim || restart) {
-		anim = animation;
-		frame = 0.0;
-		finished = false;
-		play_speed = 1.f;
+
+	if (animation != m.anim || restart) {
+		if (blend > 0.f) {
+			m.blend_anim = m.anim;
+			m.blend_frame = m.frame;
+			m.blend_remaining = blend;
+			m.blend_time = blend;	// FIXME
+		}
+		m.anim = animation;
+		m.frame = 0.0;
+		m.finished = false;
+		m.speed = 1.f;
 	}
 }
-void Animator::set_leg_anim(const char* name, bool restart)
+void Animator::set_leg_anim(const char* name, bool restart, float blend)
 {
 	if (!model) return;
 	int animation = set->find(name);
-	if (animation != leg_anim || restart) {
-		leg_anim = animation;
-		leg_frame = 0.0;
-		legs_finished = false;
-		leg_play_speed = 1.f;
+
+
+	if (animation != legs.anim || restart) {
+		
+		if (blend > 0.f) {
+			legs.blend_anim = legs.anim;
+			legs.blend_frame = legs.frame;
+			legs.blend_remaining = blend;
+			legs.blend_time = blend;	// FIXME
+		}
+
+		legs.anim = animation;
+		legs.frame = 0.0;
+		legs.finished = false;
+		legs.speed = 1.f;
 	}
 }
