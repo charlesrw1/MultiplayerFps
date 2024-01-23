@@ -39,11 +39,17 @@ struct Entity_Interp
 
 struct Snapshot
 {
-	static const int MAX_ENTS = 256;
+	//static const int MAX_ENTS = 256;
 
 	int tick = 0;				// what client tick did we receive on
-	EntityState entities[MAX_ENTS];	// keep it small for now
-	PlayerState pstate;			// local player state, for prediction stuff
+	//EntityState entities[MAX_ENTS];	// keep it small for now
+	//PlayerState pstate;			// local player state, for prediction stuff
+
+	static const int MAX_SNAPSHOT_DATA = 8000;
+	uint8_t data[MAX_SNAPSHOT_DATA];
+	int player_data_offset = 0;		// offset to where local player data resides
+	int num_ents = 0;
+
 };
 
 enum Client_State {
@@ -98,7 +104,6 @@ public:
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
 	vector<Snapshot> snapshots;
-	PlayerState lastpredicted;
 	Entity_Interp interpolation_data[MAX_GAME_ENTS];
 	vector<Move_Command> commands;
 	vector<glm::vec3> origin_history;

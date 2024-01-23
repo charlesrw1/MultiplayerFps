@@ -950,6 +950,8 @@ void cmd_game_input_callback()
 
 int main(int argc, char** argv)
 {
+	new_entity_fields_test();
+	return 0;
 
 	engine.argc = argc;
 	engine.argv = argv;
@@ -1334,7 +1336,8 @@ void Game_Engine::loop()
 				sv->ReadPackets();
 				update_game_tick();
 
-				sv->BuildSnapshotFrame();
+				//sv->BuildSnapshotFrame();
+				sv->make_snapshot();
 				for (int i = 0; i < sv->clients.size(); i++)
 					sv->clients[i].Update();
 				tick += 1;

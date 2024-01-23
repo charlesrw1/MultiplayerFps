@@ -71,17 +71,6 @@ Frame* Server::GetSnapshotFrame()
 	return &frames.at(engine.tick % MAX_FRAME_HIST);
 }
 
-void Server::BuildSnapshotFrame()
-{
-	Frame* frame = GetSnapshotFrame();
-	frame->tick = engine.tick;
-	for (int i = 0; i < MAX_CLIENTS; i++) {
-		frame->ps_states[i] = engine.ents[i].ToPlayerState();
-	}
-	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
-		frame->states[i] = engine.ents[i].to_entity_state();
-	}
-}
 
 void Server::connect_local_client()
 {

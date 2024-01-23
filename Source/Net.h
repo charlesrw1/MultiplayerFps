@@ -21,6 +21,9 @@ const unsigned CONNECTIONLESS_SEQUENCE = 0xffffffff;
 //const double MAX_TIME_OUT = 5.f;
 const int CLIENT_MOVE_HISTORY = 36;
 
+const int ENTITY_BITS = 8;
+const int NUM_GAME_ENTS = 1 << ENTITY_BITS;
+
 const double DEFAULT_UPDATE_RATE = 66.66;	// server+client ticks 66 times a second
 const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
 const int DEFAULT_SNAPSHOT_RATE = 30;	// send x snapshots a second
@@ -175,6 +178,7 @@ struct Entity
 	EntityState to_entity_state();
 	void from_entity_state(EntityState& es);
 
+	void post_recieve_snapshot();
 
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
@@ -189,25 +193,33 @@ struct Net_Prop
 	int input_bits;
 	int output_bits = -1; 
 	float quantize = 1.f;
-	short condition = 0;
-	// -1 = same as input, vals above 65 are special types, 
+	short condition = 0xffff;
+
+	// -1 = same as input, 0 = float, 
 	//if output is given in bits but input is float, output is quantized
 
 	enum Conditions
 	{
-		ALL = 0,
+		ALL = 0xffff,
 		ONLY_PLAYER = 1,
 		NOT_PLAYER = 2,
 	};
 };
 
+// Network serialization functions
 
-enum Net_Prop_Special_Types
+void write_full_entity(Entity* e, ByteWriter& msg);
+void read_entity(Entity* e, ByteReader& msg, int condition, bool is_delta);
+void set_entity_props_from_entity(Entity* from, Entity* to, int condition);
+void write_delta_entity(ByteWriter& msg, ByteReader& s0, ByteReader& s1, int condition);
+
+struct Entity_Baseline
 {
-	NPROP_FLOAT = 65,
-	NPROP_VEC3,
+	uint8_t master[1000];
+	int bytes;
 };
 
+Entity_Baseline* get_entity_baseline();
 
 // in serverclmgr for now
 bool WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg);

@@ -63,13 +63,46 @@ public:
 	Move_Command last_command;
 };
 
+struct Frame;
+struct Packed_Entity
+{
+	Packed_Entity(Frame* f, int offset);
+
+	int index = 0;
+	int len = 0;
+	int buf_offset = 0;
+
+	Frame* f;
+
+	ByteReader operator*();
+	Packed_Entity& operator++();
+	bool operator!=(Packed_Entity& other) {
+		return index != other.index;
+	}
+};
+
+
 // stores game state to delta encode to clients
 struct Frame {
 	static const int MAX_FRAME_ENTS = 256;
 	int tick = 0;
 	EntityState states[MAX_FRAME_ENTS];
 	PlayerState ps_states[MAX_CLIENTS];
+
+	static const int MAX_FRAME_SNAPSHOT_DATA = 8000;
+
+	// format: ent_index 10 bits
+	//			ent_data: variable
+	int num_ents_this_frame = 0;
+	uint8_t data[MAX_FRAME_SNAPSHOT_DATA];
+
+	Packed_Entity begin();
+	Packed_Entity end();
 };
+
+
+void new_entity_fields_test();
+
 class Server
 {
 public:
@@ -79,7 +112,7 @@ public:
 	void end();
 	void connect_local_client();
 
-	void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
+	//void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
 	Frame* GetSnapshotFrame();
 	Frame* GetSnapshotFrameForTick(int tick) {
@@ -89,11 +122,12 @@ public:
 		return f;
 	}
 	void ReadPackets();
-	void BuildSnapshotFrame();
+
+	void make_snapshot();
+	void write_delta_entities_to_client(ByteWriter& msg, int deltatick, int client);
 
 	bool initialized = false;
 	std::vector<Frame> frames;
-	Frame nullframe;
 	std::vector<RemoteClient> clients;
 	Socket socket;
 

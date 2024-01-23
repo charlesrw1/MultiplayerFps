@@ -233,6 +233,7 @@ void Client::SendMovesAndMessages()
 
 bool Client::OnEntSnapshot(ByteReader& msg)
 {
+#if 0
 	int delta_tick = msg.ReadLong();
 
 	if (delta_tick == -1) {
@@ -284,4 +285,74 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	read_snapshot(nextsnapshot);
 
 	return false;
+#else
+	int delta_tick = msg.ReadLong();
+
+	if (delta_tick == -1) {
+		printf("client: recieved full update\n");
+		if (force_full_update)
+			force_full_update = false;
+	}
+
+	Snapshot* s = GetCurrentSnapshot();
+	s->tick = last_recieved_server_tick;
+	s->player_data_offset = 0;
+	s->num_ents = 0;
+
+	Snapshot* from = nullptr;
+
+	if (delta_tick != -1) {
+		from = FindSnapshotForTick(delta_tick);
+		if (!from) {
+			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, engine.tick);
+			// discard packet
+			return true;
+		}
+	}
+
+	int index1 = msg.ReadByte();
+
+	if (from) {
+		ByteReader s0(from->data, Snapshot::MAX_SNAPSHOT_DATA);
+		int index0 = s0.ReadByte();
+		while (index0 != 0xff && index1 != 0xff && !msg.HasFailed() && !s0.HasFailed()) {
+			int condition = (index1 == client_num) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
+			if (index0 < index1) {
+				// entities that are deleted now, skip them
+				s0.AdvanceBytes(null_entity_state_bytes);
+				index0 = s0.ReadByte();
+			}
+			else if (index0 > index1) {
+				// new entity, delta from null
+				ByteReader nullstate(null_entity_state, null_entity_state_bytes);
+				msg.WriteByte(index1);
+				write_delta_entity(msg, nullstate, s1, condition);
+				msg.AlignToByteBoundary();
+				index1 = s1.ReadByte();
+			}
+			else {
+				// delta entity
+				msg.WriteByte(index1);
+				write_delta_entity(msg, s0, s1, condition);
+				msg.AlignToByteBoundary();
+				index0 = s0.ReadByte();
+				index1 = s1.ReadByte();
+			}
+
+		}
+	}
+	msg.WriteLong(0xabababab);
+	// now: there may be more new entities, so finish the list
+	while (index1 != 0xff && !s1.HasFailed())
+	{
+		int condition = (index1 == client_idx) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
+		ByteReader nullstate(null_entity_state, null_entity_state_bytes);
+		msg.WriteByte(index1);
+		write_delta_entity(msg, nullstate, s1, condition);
+		msg.AlignToByteBoundary();
+		index1 = s1.ReadByte();
+	}
+
+	return false;
+#endif
 }

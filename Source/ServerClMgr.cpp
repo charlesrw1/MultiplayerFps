@@ -121,7 +121,8 @@ void RemoteClient::Update()
 	writer.WriteLong(engine.tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
-	myserver->WriteDeltaSnapshot(writer, baseline, client_num);
+	myserver->write_delta_entities_to_client(writer, baseline, client_num);
+	//myserver->WriteDeltaSnapshot(writer, baseline, client_num);
 	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
 }
@@ -173,44 +174,6 @@ void RemoteClient::OnPacket(ByteReader& buf)
 		}
 	}
 }
-
-#define ESP(x) #x,(int)&((Entity*)0)->x
-
-Net_Prop entity_state_props[] =
-{
-	{ESP(type), 32, 8},
-	{ESP(position), NPROP_VEC3},
-
-	{ESP(rotation), NPROP_VEC3, 8, (2 * PI) * 256, Net_Prop::NOT_PLAYER},
-
-	{ESP(model_index), 32, 8},
-	{ESP(anim.m.anim), 32, 8},
-	{ESP(anim.m.frame), NPROP_FLOAT, 16, 100.f},
-	{ESP(anim.legs.anim), 32, 8},
-	{ESP(anim.legs.frame), NPROP_FLOAT, 16, 100.f},
-
-	{ESP(anim.legs.blend_anim), 32, 8},
-	{ESP(anim.legs.blend_frame), NPROP_FLOAT, 16, 100.f},
-	{ESP(anim.legs.blend_remaining), NPROP_FLOAT, 16, 100.f},
-	{ESP(anim.legs.blend_time), NPROP_FLOAT, 16, 100.f},
-	
-	{ESP(anim.m.blend_anim), 32, 8},
-	{ESP(anim.m.blend_frame), NPROP_FLOAT, 16, 100.f},
-	{ESP(anim.m.blend_remaining), NPROP_FLOAT, 16, 100.f},
-	{ESP(anim.m.blend_time), NPROP_FLOAT, 16, 100.f},
-
-	{ESP(flags), 16},
-	//{ESP(item), 32},
-	{ESP(solid), 32},
-
-
-	// for owning players only
-	{ESP(rotation), NPROP_VEC3, -1, 1.f, Net_Prop::ONLY_PLAYER},	// dont quantize for predicting player
-	{ESP(velocity), NPROP_VEC3, -1, 1.f, Net_Prop::ONLY_PLAYER},
-	{ESP(state), 16, -1, 1.f, Net_Prop::ONLY_PLAYER},
-};
-
-
 
 // horrid
 void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uint8_t index)
@@ -437,30 +400,198 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 
 }
 
-static EntityState null_estate;
-static PlayerState null_pstate;
-
-
-void Server::WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int client_idx)
+void new_entity_fields_test()
 {
+	// test 1: 
+	{
+		Entity e1 = Entity();
+		e1.model_index = 10;
+		e1.rotation.x = PI;
+		e1.flags = EF_DEAD;
+		Entity e2 = Entity();
+		e2.flags = EF_FORCED_ANIMATION;
+		e2.position.x = 10.f;
+		e2.model_index = 9;
+
+		Frame* f = new Frame;
+		ByteWriter writer(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+		writer.WriteBits(0, 10);
+		write_full_entity(&e1, writer);
+		writer.AlignToByteBoundary();
+		writer.WriteBits(1, 10);
+		write_full_entity(&e2, writer);
+		writer.EndWrite();
+
+		ByteReader reader(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+		reader.ReadBits(10);
+		Entity e1r = Entity();
+		read_entity(&e1r, reader, Net_Prop::ALL, false);
+		reader.AlignToByteBoundary();
+		Entity e2r = Entity();
+		e2r.index = reader.ReadBits(10);
+		read_entity(&e2r, reader, Net_Prop::ALL, false);
+		reader.AlignToByteBoundary();
+
+
+		if (e2r.index != 1 || e1r.model_index != e1.model_index || e1r.flags != e1.flags
+			|| abs(e1r.rotation.x - e1.rotation.x) > 0.01 || e2r.flags != e2.flags || e2r.model_index != e2.model_index) {
+			printf("TEST 1 FAILED\n");
+		}
+	}
+	// test 2: delta encoding
+	{
+		Entity e1 = Entity();
+		e1.model_index = 5;
+		e1.flags = EF_DEAD;
+
+		Entity e2 = Entity();
+		e2.model_index = 9;
+		e2.flags = EF_HIDDEN;
+
+
+		Frame* f = new Frame;
+		ByteWriter writer(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+		write_full_entity(&e1, writer);
+		writer.EndWrite();
+
+		Frame* f2 = new Frame;
+		ByteWriter w2(f2->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+		write_full_entity(&e2, w2);
+		w2.EndWrite();
+
+		uint8_t* buffer = new uint8_t[1000];
+		ByteWriter wd(buffer, 1000);
+		ByteReader r1(f->data, 1000);
+		ByteReader r2(f2->data, 1000);
+
+		write_delta_entity(wd, r1, r2, Net_Prop::ALL);
+		wd.EndWrite();
+
+		ByteReader rd(buffer, 1000);
+		read_entity(&e1, rd, Net_Prop::ALL, true);
+
+
+		if (e1.model_index != e2.model_index || e1.flags != e2.flags) {
+			printf("TEST 2 FAILED\n");
+		}
+	}
+
+}
+
+void Server::make_snapshot()
+{
+	Frame* f = GetSnapshotFrame();
+	f->tick = engine.tick;
+
+	ByteWriter writer(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+	f->num_ents_this_frame = 0;
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity& e = engine.ents[i];
+		if (!e.active())
+			continue;	// unactive ents dont go in snapshot
+
+		// TODO: hidden ents dont go in snapshot either
+
+		writer.WriteByte(i);
+		write_full_entity(&e, writer);
+		writer.AlignToByteBoundary();
+		f->num_ents_this_frame++;
+	}
+	writer.WriteByte(0xff);	// sentinal index
+
+	if (writer.HasFailed())
+		printf("make_snapshot buffer failed\n");
+}
+Packed_Entity::Packed_Entity(Frame* f, int offset) : f(f)
+{
+	buf_offset = offset;
+	ByteReader r(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+	r.AdvanceBytes(buf_offset);
+	index = r.ReadByte();
+	if (index != 0xff) {
+		len = r.ReadBits(10);
+	}
+}
+
+
+ByteReader Packed_Entity::operator*()
+{
+	ByteReader r(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+	r.AdvanceBytes(buf_offset);
+}
+Packed_Entity& Packed_Entity::operator++()
+{
+	*this = Packed_Entity(f, buf_offset + len);
+	return *this;
+}
+
+Packed_Entity Frame::begin()
+{
+	return Packed_Entity(this, 0);
+}
+Packed_Entity Frame::end()
+{
+	Packed_Entity pe(this, 0);
+	pe.index = 0xff;	// FIXME: ent index
+	return pe;
+}
+
+void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int client_idx)
+{
+	Entity_Baseline* baseline = get_entity_baseline();
+
+
 	Frame* to = GetSnapshotFrame();
 	Frame* from = nullptr;
 	if (deltatick > 0)
 		from = GetSnapshotFrameForTick(deltatick);
-	
+
 	if (!from)
 		msg.WriteLong(-1);
 	else
 		msg.WriteLong(deltatick);
+		
+	ByteReader s1(to->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+	int index1 = s1.ReadByte();
+	
+	if (from) {
+		ByteReader s0(from->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+		int index0 = s0.ReadByte();
+		while (index0 != 0xff && index1 != 0xff && !s1.HasFailed() && !s0.HasFailed()) {
+			int condition = (index1 == client_idx) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
+			if (index0 < index1) {
+				// entities that are deleted now, skip them
+				s0.AdvanceBytes(null_entity_state_bytes);
+				index0 = s0.ReadByte();
+			}
+			else if (index0 > index1) {
+				// new entity, delta from null
+				ByteReader nullstate(null_entity_state, null_entity_state_bytes);
+				msg.WriteByte(index1);
+				write_delta_entity(msg, nullstate, s1, condition);
+				msg.AlignToByteBoundary();
+				index1 = s1.ReadByte();
+			}
+			else {
+				// delta entity
+				msg.WriteByte(index1);
+				write_delta_entity(msg, s0, s1, condition);
+				msg.AlignToByteBoundary();
+				index0 = s0.ReadByte();
+				index1 = s1.ReadByte();
+			}
 
-	for (int i = 0; i < Frame::MAX_FRAME_ENTS; i++) {
-		EntityState* fromstate = (from) ? &from->states[i] : &null_estate;
-		WriteDeltaEntState(fromstate, &to->states[i], msg, i);
+		}
 	}
-	msg.WriteByte(-1);	// sentinal
-
 	msg.WriteLong(0xabababab);
-
-	PlayerState* fromp = (from) ? &from->ps_states[client_idx] : &null_pstate;
-	WriteDeltaPState(fromp, &to->ps_states[client_idx], msg);
+	// now: there may be more new entities, so finish the list
+	while (index1 != 0xff && !s1.HasFailed())
+	{
+		int condition = (index1 == client_idx) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
+		ByteReader nullstate(null_entity_state, null_entity_state_bytes);
+		msg.WriteByte(index1);
+		write_delta_entity(msg, nullstate, s1, condition);
+		msg.AlignToByteBoundary();
+		index1 = s1.ReadByte();
+	}
 }

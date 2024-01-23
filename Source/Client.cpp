@@ -46,8 +46,6 @@ void Client::connect(string address)
 	cur_snapshot_idx = 0;
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 		interpolation_data[i] = Entity_Interp();
-	lastpredicted = PlayerState();
-
 	TrySendingConnect();
 }
 
@@ -127,14 +125,17 @@ void Client::run_prediction()
 
 	// restore local player's state to last authoritative snapshot 
 	int incoming_seq = InSequence();
-	Snapshot* last_auth_state = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	PlayerState predicted_player = last_auth_state->pstate;
+	Snapshot* auth = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	//PlayerState predicted_player = last_auth_state->pstate;
 	Entity& player = engine.ents[engine.player_num()];
 	
 	if (dont_replicate_player->integer)
 		start = end - 2;	// only sim current frame
 	else
-		player.FromPlayerState(&predicted_player);
+	{
+		ByteReader buf(auth->snapshot_data + auth->player_data_offset, Snapshot::MAX_SNAPSHOT_DATA - auth->player_data_offset);
+		read_entity(&player, buf, Net_Prop::ONLY_PLAYER, false);
+	}
 
 	// run physics code for commands yet to recieve a snapshot for
 	for (int i = start + 1; i < end; i++) {
@@ -400,6 +401,7 @@ void local_player_on_new_entity_state(EntityState& es, Entity& p)
 
 void Client::read_snapshot(Snapshot* s)
 {
+#if 0
 	Snapshot* snapshot = s;
 	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
 		Entity_Interp& interp = interpolation_data[i];
@@ -456,4 +458,7 @@ void Client::read_snapshot(Snapshot* s)
 
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet
 	engine.build_physics_world(0.f);
+#else
+
+#endif
 }
