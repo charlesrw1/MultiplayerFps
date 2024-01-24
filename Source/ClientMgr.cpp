@@ -295,8 +295,10 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 				if (dont_replicate_player->integer) {
 					read_entity(&null_ent, msg, prop_mask, true);
 				}
-				else
-					read_entity(ent, msg, prop_mask, true);
+				else {
+					read_entity(ent, from_state, prop_mask, false);	// reset
+					read_entity(ent, msg, prop_mask, true);			// update delta
+				}
 
 				msg.AlignToByteBoundary();
 				to_index = msg.ReadBits(ENTITY_BITS);

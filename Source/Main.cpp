@@ -1104,6 +1104,19 @@ void Game_Engine::draw_debug_interface()
 	if(show_console)
 		console.draw();
 	move_variables_menu();
+
+
+	if (engine_state == SPAWNED) {
+
+		// player menu
+		if (ImGui::Begin("player")) {
+			Entity& p = engine.local_player();
+			ImGui::DragFloat3("pos", &p.position.x);
+			ImGui::DragFloat3("vel", &p.velocity.x);
+			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
+			ImGui::End();
+		}
+	}
 }
 
 void Game_Engine::draw_screen()

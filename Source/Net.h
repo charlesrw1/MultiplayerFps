@@ -205,13 +205,6 @@ struct Frame {
 	Packed_Entity end();
 
 	int player_offset = 0;	// used by clients, HACK!!!
-
-
-	// FIXING:
-	glm::vec3 position;
-	glm::vec3 velocity;
-	glm::vec3 rotation;
-	short state;
 };
 
 

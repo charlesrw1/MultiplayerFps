@@ -140,12 +140,7 @@ void Client::run_prediction()
 		ByteReader buf = pe.get_buf();
 		// sanity check
 		ASSERT(pe.index == client_num);
-		//read_entity(&player, buf, Net_Prop::PLAYER_PROP, false);		// replicate player props
-		player.position = auth->position;
-		player.velocity = auth->velocity;
-		player.rotation = auth->rotation;
-		player.state = auth->state;
-
+		read_entity(&player, buf, Net_Prop::PLAYER_PROP, false);		// replicate player props
 	}
 
 	// run physics code for commands yet to recieve a snapshot for
@@ -375,13 +370,6 @@ interpolate_state() fills the entities position/rotation with interpolated value
 void Client::read_snapshot(Frame* snapshot)
 {
 	// now: build a local state packet to delta entities from
-	Entity& p = engine.ents[client_num];
-	snapshot->position = p.position;
-	snapshot->rotation = p.rotation;
-	snapshot->state = p.state;
-	snapshot->velocity = p.velocity;
-
-
 	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
