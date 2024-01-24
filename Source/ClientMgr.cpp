@@ -229,59 +229,6 @@ void Client::SendMovesAndMessages()
 
 bool Client::OnEntSnapshot(ByteReader& msg)
 {
-#if 0
-	int delta_tick = msg.ReadLong();
-
-	if (delta_tick == -1) {
-		printf("client: recieved full update\n");
-		if (force_full_update)
-			force_full_update = false;
-	}
-	
-	
-	Snapshot* nextsnapshot = GetCurrentSnapshot();
-	*nextsnapshot = Snapshot();
-	nextsnapshot->tick = last_recieved_server_tick;
-	Snapshot* from = nullptr;
-
-	if (delta_tick != -1) {
-		from = FindSnapshotForTick(delta_tick);
-		if (!from) {
-			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, engine.tick);
-			return true;
-		}
-	}
-
-	// set new snapshot to old snapshot
-	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
-		nextsnapshot->entities[i] = (from) ? from->entities[i] : EntityState();
-	}
-
-
-	for (;;) {
-		uint8_t index = msg.ReadByte();
-		if (index == 0xff)
-			break;
-		if (msg.HasFailed())
-			break;
-		if (index >= Snapshot::MAX_ENTS)
-			break;
-
-		EntityState* es = &nextsnapshot->entities[index];
-		ReadDeltaEntState(es, msg);
-	}
-
-	int val = msg.ReadLong();
-	ASSERT(val == 0xabababab);
-
-	PlayerState* ps = &nextsnapshot->pstate;
-	*ps = (from) ? from->pstate : PlayerState();
-	ReadDeltaPState(ps, msg);
-
-	read_snapshot(nextsnapshot);
-
-	return false;
-#else
 	int delta_tick = msg.ReadLong();
 
 	if (delta_tick == -1) {
@@ -386,5 +333,4 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	read_snapshot(to);
 
 	return false;
-#endif
 }

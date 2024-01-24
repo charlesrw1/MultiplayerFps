@@ -365,108 +365,9 @@ interpolate_state() fills the entities position/rotation with interpolated value
 */
 
 // has extra logic to properly replicate
-#if 0
-void local_player_on_new_entity_state(EntityState& es, Entity& p)
-{
-	p.type = (Ent_Type)es.type;
-	p.position = es.position;
-	p.rotation = es.angles;
 
-	p.item = es.item;
-	p.solid = es.solid;
-
-	p.flags = es.flags;
-
-	// if we already have a model, dont override the animations
-	p.model_index = es.model_idx;
-	const Model* next_model = nullptr;
-	if (p.model_index != -1)
-		next_model = media.get_game_model_from_index(p.model_index);
-	if (next_model != p.model) {
-		p.model = next_model;
-		if (p.model && p.model->bones.size() > 0)
-			p.anim.set_model(p.model);
-	}
-	// force animation if server is requesting it
-	if (p.flags & EF_FORCED_ANIMATION) {
-		auto& legs = p.anim.legs;
-		legs.anim = es.leganim;
-		legs.frame = es.leganim_frame;
-		legs.blend_frame = es.legblendframe;
-		legs.blend_anim = es.legblend;
-		legs.blend_remaining = es.legblendleft;
-		legs.blend_time = es.legsblendtime;
-
-		auto& up = p.anim.m;
-		up.anim = es.mainanim;
-		up.frame = es.mainanim_frame;
-		up.blend_anim = es.torsoblend;
-		up.blend_frame = es.torsoblendframe;
-		up.blend_remaining = es.torsoblendleft;
-		up.blend_time = es.torsoblendtime;
-	}
-}
-#endif
 void Client::read_snapshot(Frame* snapshot)
 {
-#if 0
-	Snapshot* snapshot = s;
-	for (int i = 0; i < Snapshot::MAX_ENTS; i++) {
-		Entity_Interp& interp = interpolation_data[i];
-		Entity& e = engine.ents[i];
-		EntityState& state = snapshot->entities[i];
-
-		int lasttype = e.type;
-
-		if (state.type == ET_FREE) {
-			e.type = ET_FREE;
-			continue;
-		}
-
-		e.index = i;
-		// replicate variables to entity and
-		// save off some vars for rendering interpolation (not for local clients player)
-		if (i != engine.player_num()) {
-			e.from_entity_state(state);
-
-			Interp_Entry& entry = interp.hist[interp.hist_index];
-			entry.tick = engine.tick;
-			entry.position = state.position;
-			entry.angles = state.angles;
-
-			entry.main_anim = state.mainanim;
-			entry.ma_frame = state.mainanim_frame;
-			entry.main_blend = state.torsoblend;
-			entry.main_blend_frame = state.torsoblendframe;
-			entry.main_blend_left = state.torsoblendleft;
-			entry.main_blend_time = state.torsoblendtime;
-
-			entry.legs_anim = state.leganim;
-			entry.la_frame = state.leganim_frame;
-			entry.legs_blend = state.legblend;
-			entry.legs_blend_left = state.legblendleft;
-			entry.legs_blend_time = state.legsblendtime;
-			entry.legs_blend_frame = state.legblendframe;
-
-			interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
-		}
-		else if(dont_replicate_player->integer == 0)
-			local_player_on_new_entity_state(state, e);
-	}
-
-	// update prediction error data
-	int sequence_i_sent = OutSequenceAk();
-	if (OutSequence() - sequence_i_sent < origin_history.size()) {
-		vec3 delta = s->pstate.position - origin_history.at((sequence_i_sent+offset_debug) % origin_history.size());
-		// FIXME check for teleport
-		float len = glm::length(delta);
-		if(len > 0.05 && len < 10 && smooth_time <= 0.0)
-			smooth_time = smooth_error_time->real;
-	}
-
-	// build physics world for prediction updates later in frame AND subsequent frames until next packet
-	engine.build_physics_world(0.f);
-#else
 	// now: build a local state packet to delta entities from
 	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 
@@ -526,5 +427,4 @@ void Client::read_snapshot(Frame* snapshot)
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet
 	engine.build_physics_world(0.f);
 
-#endif
 }

@@ -67,32 +67,6 @@ enum Entity_Flags
 	EF_HIDE_ITEM = 8,
 };
 
-// Entity state replicated to clients
-//struct EntityState
-//{
-//	int type = ET_FREE;
-//	glm::vec3 position=glm::vec3(0.f);
-//	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
-//	int model_idx = 0;
-//	int mainanim = 0;
-//	float mainanim_frame = 0.f;	// frames quantized to 16 bits
-//	int leganim = 0;
-//	float leganim_frame = 0.f;
-//
-//	int legblend = 0;
-//	float legblendframe = 0.f;
-//	float legblendleft = 0.f;
-//	float legsblendtime = 0.f;
-//	int torsoblend = 0;
-//	float torsoblendframe = 0.f;
-//	float torsoblendleft = 0.f;
-//	float torsoblendtime = 0.f;
-//
-//	short flags = 0;	// Entity_Flags
-//	int item = 0;
-//	int solid = 0;	// encodes physical object shape
-//};
-
 enum Item_Use_State
 {
 	ITEM_IDLE,
@@ -132,16 +106,6 @@ enum Player_Movement_State
 	PMS_JUMPING = 4,	// first part of jump
 };
 
-// Player state replicated only to player's client for prediction
-//struct PlayerState
-//{
-//	glm::vec3 position=glm::vec3(0.f);
-//	glm::vec3 angles = glm::vec3(0.f);
-//	glm::vec3 velocity = glm::vec3(0.f);
-//	short state = 0;	// Player_Movement_State
-//	Item_State items;
-//};
-
 class Model;
 struct Entity
 {
@@ -177,15 +141,6 @@ struct Entity
 
 	void set_inactive() { type = ET_FREE; }
 	bool active() { return type != ET_FREE; }
-#if 0
-	EntityState to_entity_state();
-	void from_entity_state(EntityState& es);
-
-	void post_recieve_snapshot();
-
-	PlayerState ToPlayerState() const;
-	void FromPlayerState(PlayerState* ps);
-#endif
 
 	void set_model(const char* model);
 };
@@ -273,15 +228,6 @@ struct Entity_Baseline
 };
 
 Entity_Baseline* get_entity_baseline();
-
-// in serverclmgr for now
-#if 0
-bool WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg);
-void ReadDeltaEntState(EntityState* to, ByteReader& msg);
-void ReadDeltaPState(PlayerState* to, ByteReader& msg);
-#endif
-
-void NetDebugPrintf(const char* fmt, ...);
 
 
 #endif
