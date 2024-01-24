@@ -16,11 +16,8 @@ struct Interp_Entry
 {
 	int tick = -1;
 	glm::vec3 position, angles;
-	int main_anim, legs_anim;
-	float ma_frame, la_frame;
-	int main_blend, legs_blend;
-	float main_blend_frame, legs_blend_frame;
-	float main_blend_left, main_blend_time, legs_blend_left, legs_blend_time;
+	Animator_Layer torso;
+	Animator_Layer legs;
 };
 
 
@@ -37,20 +34,6 @@ struct Entity_Interp
 	}
 };
 
-struct Snapshot
-{
-	//static const int MAX_ENTS = 256;
-
-	int tick = 0;				// what client tick did we receive on
-	//EntityState entities[MAX_ENTS];	// keep it small for now
-	//PlayerState pstate;			// local player state, for prediction stuff
-
-	static const int MAX_SNAPSHOT_DATA = 8000;
-	uint8_t data[MAX_SNAPSHOT_DATA];
-	int player_data_offset = 0;		// offset to where local player data resides
-	int num_ents = 0;
-
-};
 
 enum Client_State {
 	CS_DISCONNECTED,
@@ -64,18 +47,18 @@ class Client
 public:
 	void init();
 	void connect(string address);
-	void Disconnect();
+	void Disconnect(const char* log_reason);
 	void Reconnect();
 
 	void interpolate_states();
-	void read_snapshot(Snapshot* s);
+	void read_snapshot(Frame* s);
 	void run_prediction();
 	Move_Command& get_command(int sequence);
 
 	void TrySendingConnect();
 
-	Snapshot* FindSnapshotForTick(int tick);
-	Snapshot* GetCurrentSnapshot();
+	Frame* FindSnapshotForTick(int tick);
+	Frame* GetCurrentSnapshot();
 
 	void ReadPackets();
 	void SendMovesAndMessages();
@@ -103,7 +86,7 @@ public:
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
-	vector<Snapshot> snapshots;
+	vector<Frame> snapshots;
 	Entity_Interp interpolation_data[MAX_GAME_ENTS];
 	vector<Move_Command> commands;
 	vector<glm::vec3> origin_history;

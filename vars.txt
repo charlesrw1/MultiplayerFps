@@ -8,6 +8,7 @@ snapshot_rate 30.0
 interp_time 0.05
 fake_lag 75
 fake_loss 0
+do_predict 0
 
 #render vars
 draw_collision_tris 0
@@ -16,3 +17,4 @@ draw_viewmodel 1
 
 #game vars
 mouse_sensitivity 0.005
+

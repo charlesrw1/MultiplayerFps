@@ -20,7 +20,6 @@ void NetDebugPrintf(const char* fmt, ...)
 	va_end(ap);
 }
 
-#define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
 
 void Server::init()
 {
@@ -46,20 +45,20 @@ void Server::init()
 	engine.tick_interval = 1.0 / cfg_tick_rate->real;
 
 }
-void Server::end()
+void Server::end(const char* log_reason)
 {
-	DebugOut("ending server\n");
+	sys_print("Ending server because %s\n", log_reason);
 	for (int i = 0; i < clients.size(); i++)
-		clients[i].Disconnect();
+		clients[i].Disconnect("server is ending");
 	socket.Shutdown();
 	initialized = false;
 }
 
 void Server::start()
 {
-	DebugOut("starting server with map %s\n", engine.mapname.c_str());
-	if(initialized)
-		end();
+	if (initialized)
+		end("restarting server");;
+	sys_print("Starting server...\n");
 	socket.Init(cfg_sv_port->integer);
 	initialized = true;
 	engine.tick_interval = 1.0 / cfg_tick_rate->real;
@@ -74,11 +73,11 @@ Frame* Server::GetSnapshotFrame()
 
 void Server::connect_local_client()
 {
-	printf("putting local client in server\n");
+	sys_print("Putting local client in server\n");
 
 	if (clients[0].IsConnected()) {
-		printf(__FUNCTION__": clients[0] is taken??\n");
-		clients[0].Disconnect();
+		sys_print(__FUNCTION__": clients[0] is taken??\n");
+		clients[0].Disconnect("client[0] shouldn't be here");
 	}
 	clients[0].client_num = 0;
 	clients[0].state = SCS_SPAWNED;
@@ -123,7 +122,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 		return;
 	}
 	if (!already_connected)
-		console_printf("New client connected %s\n", addr.ToString().c_str());
+		sys_print("New client connected %s\n", addr.ToString().c_str());
 
 	uint8_t accept_buf[256];
 	ByteWriter writer(accept_buf, 256);
@@ -152,16 +151,17 @@ void Server::ReadPackets()
 		if (recv_len < PACKET_HEADER_SIZE)
 			continue;
 		if (*(uint32_t*)inbuffer == CONNECTIONLESS_SEQUENCE) {
-			ByteReader buf(inbuffer + 4, recv_len - 4);
+			ByteReader buf(inbuffer, recv_len, sizeof(inbuffer));
+			buf.ReadLong();	// skip header
 			
-			DebugOut("Connectionless packet recieved from %s\n", from.ToString().c_str());
+			sys_print("Connectionless packet recieved from %s\n", from.ToString().c_str());
 			string msg;
 			buf.read_string(msg);
 			if (msg == "connect") {
 				ConnectNewClient(buf, from);
 			}
 			else {
-				DebugOut("Unknown connectionless packet\n");
+				sys_print("Unknown connectionless packet\n");
 			}
 
 			continue;
@@ -169,15 +169,17 @@ void Server::ReadPackets()
 
 		int cl_index = FindClient(from);
 		if (cl_index == -1) {
-			console_printf("Packet recieved from unknown source: %s\n", from.ToString().c_str());
+			sys_print("Packet recieved from unknown source: %s\n", from.ToString().c_str());
 			continue;
 		}
 
 		RemoteClient* client = &clients.at(cl_index);
 		// handle packet sequencing
-		int header = client->connection.NewPacket(inbuffer, recv_len);
-		if (header != -1) {
-			ByteReader reader(inbuffer + header, recv_len - header);
+		int header_len = client->connection.NewPacket(inbuffer, recv_len);
+		if (header_len != -1) {
+			ByteReader reader(inbuffer, recv_len, sizeof(inbuffer));
+			reader.AdvanceBytes(header_len);	// skip packet header
+
 			client->OnPacket(reader);
 			//HandleClientPacket(client, reader);
 		}
@@ -189,8 +191,7 @@ void Server::ReadPackets()
 		if (!cl.IsConnected()||cl.local_client)
 			continue;
 		if (GetTime() - cl.LastRecieved() > cfg_max_time_out->real) {
-			console_printf("Client %d %s timed out\n", i, cl.GetIPStr().c_str());
-			cl.Disconnect();
+			cl.Disconnect("client timed out");
 		}
 	}
 }

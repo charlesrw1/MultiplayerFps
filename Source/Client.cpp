@@ -6,7 +6,6 @@
 #include "MeshBuilder.h"
 #include "Config.h"
 
-#define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
 void Client::init()
@@ -57,7 +56,7 @@ void Client::TrySendingConnect()
 	if (state != CS_TRYINGCONNECT)
 		return;
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
-		console_printf("Couldn't connect to server\n");
+		sys_print("Couldn't connect to server\n");
 		state = CS_DISCONNECTED;
 		return;
 	}
@@ -74,11 +73,11 @@ void Client::TrySendingConnect()
 	writer.EndWrite();
 	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
 }
-void Client::Disconnect()
+void Client::Disconnect(const char* debug_reason)
 {
 	if (state == CS_DISCONNECTED)
 		return;
-	console_printf("Disconnecting...\n");
+	sys_print("Disconnecting from server because %s\n", debug_reason);
 	if (state != CS_TRYINGCONNECT) {
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
@@ -98,8 +97,8 @@ void Client::Disconnect()
 void Client::Reconnect()
 {
 	string address = std::move(serveraddr);
-	console_printf("Reconnecting to server: %s\n", address);
-	Disconnect();
+	sys_print("Reconnecting to server: %s\n", address);
+	Disconnect("reconnecting");
 	connect(address);
 }
 
@@ -109,6 +108,8 @@ Move_Command& Client::get_command(int sequence) {
 
 void Client::run_prediction()
 {
+	return;
+
 	if (get_state() != CS_SPAWNED)
 		return;
 
@@ -125,7 +126,7 @@ void Client::run_prediction()
 
 	// restore local player's state to last authoritative snapshot 
 	int incoming_seq = InSequence();
-	Snapshot* auth = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
+	Frame* auth = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 	//PlayerState predicted_player = last_auth_state->pstate;
 	Entity& player = engine.ents[engine.player_num()];
 	
@@ -133,8 +134,12 @@ void Client::run_prediction()
 		start = end - 2;	// only sim current frame
 	else
 	{
-		ByteReader buf(auth->snapshot_data + auth->player_data_offset, Snapshot::MAX_SNAPSHOT_DATA - auth->player_data_offset);
-		read_entity(&player, buf, Net_Prop::ONLY_PLAYER, false);
+		Packed_Entity pe(auth, auth->player_offset, get_entity_baseline()->num_bytes_including_index);	// FIXME:
+		ByteReader buf = pe.get_buf();
+		int index = buf.ReadBits(ENTITY_BITS);
+		// sanity check
+		ASSERT(index == client_num);
+		read_entity(&player, buf, Net_Prop::PLAYER_PROP_MASK, false);		// replicate player props
 	}
 
 	// run physics code for commands yet to recieve a snapshot for
@@ -203,26 +208,45 @@ float InterpolateAnimation(Animation* a, float start, float end, float alpha)
 	return interpolate_modulo(start, end, clip_len, alpha);
 }
 
-void set_entity_interp_vars(Entity& e, Interp_Entry& i)
+void set_entity_from_interp(Entity& e, Interp_Entry& i)
 {
 	e.position = i.position;
 	e.rotation = i.angles;
+	e.anim.m = i.torso;
+	e.anim.legs = i.legs;
+}
+void set_interp_from_entity(Interp_Entry& i, Entity& e)
+{
+	i.legs = e.anim.legs;
+	i.torso = e.anim.m;
+	i.position = e.position;
+	i.angles = e.rotation;
+}
 
-	auto& legs = e.anim.legs;
-	legs.anim = i.legs_anim;
-	legs.frame = i.la_frame;
-	legs.blend_anim = i.legs_blend;
-	legs.blend_remaining = i.legs_blend_left;
-	legs.blend_time = i.legs_blend_time;
-	legs.blend_frame = i.legs_blend_frame;
-	
-	auto& up = e.anim.m;
-	up.anim = i.main_anim;
-	up.frame = i.ma_frame;
-	up.blend_anim = i.main_blend;
-	up.blend_remaining = i.main_blend_left;
-	up.blend_time = i.main_blend_time;
-	up.blend_frame = i.main_blend_frame;
+// this isnt perfect, whatev
+void interp_animator_layer(Animator_Layer& l1, Animator_Layer& l2, const Model* model, float midlerp, Animator_Layer& interp)
+{
+	if (l1.anim == l2.anim) {
+		int anim = l1.anim;
+		interp.anim = l1.anim;
+		if (anim >= 0 && anim < model->animations->clips.size()) {
+			
+			interp.frame = InterpolateAnimation(&model->animations->clips[anim],
+				l1.frame, l2.frame, midlerp);
+		}
+
+		interp.blend_anim = l2.blend_anim;
+		interp.blend_frame = l2.blend_frame;
+		interp.blend_time = l2.blend_time;
+		if (l1.blend_anim == l2.blend_anim)
+			interp.blend_remaining = glm::mix(l1.blend_remaining, l2.blend_remaining, midlerp);
+		else
+			interp.blend_remaining = l2.blend_remaining;
+	}
+	else
+	{
+		interp = l2;
+	}
 }
 
 
@@ -252,6 +276,7 @@ void Client::interpolate_states()
 
 	// interpolate other entities
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		// local player doesn't interpolate
 		if (!engine.ents[i].active() || i == engine.player_num())
 			continue;
 
@@ -269,7 +294,7 @@ void Client::interpolate_states()
 
 		// could extrpolate here, or just set it to last state
 		if (entry_index == 0 || entry_index == Entity_Interp::HIST_SIZE) {
-			set_entity_interp_vars(ent, *ce.GetLastState());
+			set_entity_from_interp(ent, *ce.GetLastState());
 			continue;
 		}
 		// else, interpolate
@@ -282,11 +307,11 @@ void Client::interpolate_states()
 			continue;
 		}
 		else if (s1->tick == -1) {
-			set_entity_interp_vars(ent, *s2);
+			set_entity_from_interp(ent, *s2);
 			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
-			set_entity_interp_vars(ent, *s1);
+			set_entity_from_interp(ent, *s1);
 			continue;
 		}
 
@@ -294,7 +319,7 @@ void Client::interpolate_states()
 		ASSERT(s1->tick * engine.tick_interval <= rendering_time && s2->tick * engine.tick_interval >= rendering_time);
 
 		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*engine.tick_interval)) {
-			set_entity_interp_vars(ent, *s1);
+			set_entity_from_interp(ent, *s1);
 			printf("teleport\n");
 			continue;
 		}
@@ -308,37 +333,19 @@ void Client::interpolate_states()
 			interpstate.angles[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
 		}
 		if (ent.model && ent.model->animations) {
-			if (s1->legs_anim == s2->legs_anim) {
-				int anim = s1->legs_anim;
-				if (anim >= 0 && anim < ent.model->animations->clips.size()) {
-
-					interpstate.la_frame = InterpolateAnimation(&ent.model->animations->clips[s1->legs_anim],
-						s1->la_frame, s2->la_frame, midlerp);
-				}
-			}
-			if (s1->main_anim == s2->main_anim) {
-				int anim = s1->main_anim;
-				if (anim >= 0 && anim < ent.model->animations->clips.size()) {
-
-					interpstate.ma_frame = InterpolateAnimation(&ent.model->animations->clips[s1->main_anim],
-						s1->ma_frame, s2->ma_frame, midlerp);
-				}
-			}
-
-			// set blending information:
-
-
+			interp_animator_layer(s1->legs, s2->legs, ent.model, midlerp, interpstate.legs);
+			interp_animator_layer(s1->torso, s2->torso, ent.model, midlerp, interpstate.torso);
 		}
 
-		set_entity_interp_vars(ent, interpstate);
+		set_entity_from_interp(ent, interpstate);
 	}
 }
 
-Snapshot* Client::GetCurrentSnapshot()
+Frame* Client::GetCurrentSnapshot()
 {
 	return &snapshots.at(InSequence() % CLIENT_SNAPSHOT_HISTORY);
 }
-Snapshot* Client::FindSnapshotForTick(int tick)
+Frame* Client::FindSnapshotForTick(int tick)
 {
 	for (int i = 0; i < snapshots.size(); i++) {
 		if (snapshots[i].tick == tick)
@@ -358,6 +365,7 @@ interpolate_state() fills the entities position/rotation with interpolated value
 */
 
 // has extra logic to properly replicate
+#if 0
 void local_player_on_new_entity_state(EntityState& es, Entity& p)
 {
 	p.type = (Ent_Type)es.type;
@@ -398,8 +406,8 @@ void local_player_on_new_entity_state(EntityState& es, Entity& p)
 		up.blend_time = es.torsoblendtime;
 	}
 }
-
-void Client::read_snapshot(Snapshot* s)
+#endif
+void Client::read_snapshot(Frame* snapshot)
 {
 #if 0
 	Snapshot* snapshot = s;
@@ -459,6 +467,64 @@ void Client::read_snapshot(Snapshot* s)
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet
 	engine.build_physics_world(0.f);
 #else
+	// now: build a local state packet to delta entities from
+	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
+
+	for (int i = 0; i < NUM_GAME_ENTS; i++) {
+		Entity& e = engine.ents[i];
+		if (!e.active()) continue;
+
+		if (i == client_num) {
+			snapshot->player_offset = wr.BytesWritten();
+		}
+
+		wr.WriteBits(i, ENTITY_BITS);
+		write_full_entity(&e, wr);
+		wr.AlignToByteBoundary();
+
+		snapshot->num_ents_this_frame++;
+	}
+	wr.WriteBits(ENTITY_SENTINAL, ENTITY_BITS);
+	wr.EndWrite();
+
+	for (int i = 0; i < MAX_GAME_ENTS; i++)
+	{
+		Entity& e = engine.ents[i];
+		Entity_Interp& interp = interpolation_data[i];
+		e.index = i;	// FIXME
+
+		const Model* next_model = nullptr;
+		if (e.model_index != -1)
+			next_model = media.get_game_model_from_index(e.model_index);
+		if (next_model != e.model) {
+			e.model = next_model;
+			if (e.model && e.model->bones.size() > 0)
+				e.anim.set_model(e.model);
+		}
+
+
+		if (i != engine.player_num()) {
+			Interp_Entry& entry = interp.hist[interp.hist_index];
+			entry.tick = engine.tick;
+			set_interp_from_entity(entry, e);
+
+			interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
+		}
+	}
+
+	// update prediction error data
+	int sequence_i_sent = OutSequenceAk();
+	if (OutSequence() - sequence_i_sent < origin_history.size()) {
+		Entity& player = engine.ents[client_num];
+		vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
+		// FIXME check for teleport
+		float len = glm::length(delta);
+		if (len > 0.05 && len < 10 && smooth_time <= 0.0)
+			smooth_time = smooth_error_time->real;
+	}
+
+	// build physics world for prediction updates later in frame AND subsequent frames until next packet
+	engine.build_physics_world(0.f);
 
 #endif
 }

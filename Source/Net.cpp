@@ -11,45 +11,56 @@ Net_Prop entity_state_props[] =
 
 	{ESP(model_index),		32, 8},
 
-	{ESP(rotation.x), 0, 8, (2 * PI) * 256, Net_Prop::NOT_PLAYER},
-	{ESP(rotation.y), 0, 8, (2 * PI) * 256, Net_Prop::NOT_PLAYER},
-	{ESP(rotation.z), 0, 8, (2 * PI) * 256, Net_Prop::NOT_PLAYER},
+	{ESP(rotation.x), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
+	{ESP(rotation.y), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
+	{ESP(rotation.z), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
 
-	{ESP(anim.m.anim),		32, 8},
-	{ESP(anim.m.frame),		0, 16, 100.f},
-	{ESP(anim.legs.anim),	32, 8},
-	{ESP(anim.legs.frame),	0, 16, 100.f},
-
+	{ESP(anim.m.anim),		32,		8},
+	{ESP(anim.m.frame),		0,		16, 100.f},
+	{ESP(anim.legs.anim),	32,		8},
+	{ESP(anim.legs.frame),	0,		16, 100.f},
+	//
 	{ESP(anim.legs.blend_anim), 32, 8},
 	{ESP(anim.legs.blend_frame), 0, 16, 100.f},
 	{ESP(anim.legs.blend_remaining), 0, 16, 100.f},
 	{ESP(anim.legs.blend_time), 0, 16, 100.f},
-
+	
 	{ESP(anim.m.blend_anim), 32, 8},
 	{ESP(anim.m.blend_frame), 0, 16, 100.f},
 	{ESP(anim.m.blend_remaining), 0, 16, 100.f},
 	{ESP(anim.m.blend_time), 0, 16, 100.f},
 
 	{ESP(flags), 16},
-	//{ESP(item), 32},
+	{ESP(item), 32},
 	{ESP(solid), 32},
 
-
 	// for owning players only
-	{ESP(rotation.x), 0, -1, 1.f, Net_Prop::ONLY_PLAYER},	// dont quantize for predicting player
-	{ESP(rotation.y), 0, -1, 1.f, Net_Prop::ONLY_PLAYER},	// dont quantize for predicting player
-	{ESP(rotation.z), 0, -1, 1.f, Net_Prop::ONLY_PLAYER},	// dont quantize for predicting player
-
-	{ESP(velocity.x), 0, -1, 1.f, Net_Prop::ONLY_PLAYER},
-	{ESP(velocity.y), 0, -1, 1.f, Net_Prop::ONLY_PLAYER},
-	{ESP(velocity.z), 0, -1, 1.f, Net_Prop::ONLY_PLAYER},
-
-	{ESP(state), 16, -1, 1.f, Net_Prop::ONLY_PLAYER},
+	//{ESP(rotation.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
+	//{ESP(rotation.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
+	//{ESP(rotation.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
+	//
+	//{ESP(velocity.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	//{ESP(velocity.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	//{ESP(velocity.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	//
+	//{ESP(state), 16, -1, 1.f, Net_Prop::PLAYER_PROP},
 };
 
+//#define NET_PROP_DBG
+int net_prop_out_bits(Net_Prop& prop)
+{
+	int bits = prop.output_bits;
+	if (bits == -1) bits = prop.input_bits;
+	if (bits == 0) bits = 32;
+
+#ifdef NET_PROP_DBG
+	bits += 8*(1+strlen(prop.name));
+#endif // NET_PROP_DBG
 
 
-#define NET_PROP_DBG
+	return bits;
+}
+
 void write_net_prop_name(Net_Prop& prop, ByteWriter& msg)
 {
 	int len = strlen(prop.name);
@@ -115,7 +126,7 @@ void net_prop_field_read(ByteReader& msg, void* output, Net_Prop& prop, int cond
 		if (out_bits == 0)
 			*(float*)prop_start = msg.ReadFloat();
 		else
-			*(float*)prop_start = msg.ReadBits(out_bits) * prop.quantize;
+			*(float*)prop_start = msg.ReadBits(out_bits) / prop.quantize;
 		break;
 	}
 }
@@ -149,7 +160,7 @@ void net_prop_field_write(Net_Prop& prop, void* output, ByteWriter& msg)
 			msg.WriteFloat(p);
 		}
 		else {
-			int quantized = p / prop.quantize;
+			int quantized = p * prop.quantize;
 			msg.WriteBits(quantized, out_bits);
 		}
 	}break;
@@ -265,11 +276,19 @@ Entity_Baseline* get_entity_baseline()
 		// FIXME: never gets freed
 		baseline = new Entity_Baseline;
 		Entity baseline_ent = Entity();	// use initialized vars as baseline
-		ByteWriter w(baseline->master, 1000);
+		ByteWriter w(baseline->data, 1000);
 		write_full_entity(&baseline_ent, w);
 		w.EndWrite();
 		ASSERT(!w.HasFailed());
-		baseline->bytes = w.BytesWritten();
+		baseline->num_bytes_in_data = w.BytesWritten();
+		
+		int total_bits = ENTITY_BITS;
+		int props = sizeof(entity_state_props) / sizeof(Net_Prop);
+		for (int i = 0; i < props; i++)
+			total_bits += net_prop_out_bits(entity_state_props[i]);
+
+		baseline->num_bytes_including_index = (total_bits / 8) + ((total_bits % 8) != 0);
+
 	}
 	return baseline;
 }

@@ -67,7 +67,7 @@ bool CheckGlErrorInternal_(const char* file, int line)
 		default:
 			break;
 		}
-		printf("%s | %s (%d)\n", error_name, file, line);
+		sys_print("%s | %s (%d)\n", error_name, file, line);
 
 		error_code = glGetError();
 	}
@@ -76,22 +76,30 @@ bool CheckGlErrorInternal_(const char* file, int line)
 
 void Quit()
 {
-	printf("Quiting...\n");
+	sys_print("Quiting...\n");
 	engine.cleanup();
 	exit(0);
 }
-void console_printf(const char* fmt, ...)
+void sys_print(const char* fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
+	vprintf(fmt, args);
 	engine.console.print_args(fmt, args);
 	va_end(args);
 }
+
+void sys_vprint(const char* fmt, va_list args)
+{
+	vprintf(fmt, args);
+	engine.console.print_args(fmt, args);
+}
+
 void Fatalf(const char* format, ...)
 {
 	va_list list;
 	va_start(list, format);
-	vprintf(format, list);
+	sys_vprint(format, list);
 	va_end(list);
 	fflush(stdout);
 	engine.cleanup();
@@ -256,11 +264,11 @@ void Game_Engine::init_sdl_window()
 	}
 
 	gl_context = SDL_GL_CreateContext(window);
-	printf(__FUNCTION__": OpenGL loaded\n");
+	sys_print("OpenGL loaded\n");
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
-	printf("Vendor: %s\n", glGetString(GL_VENDOR));
-	printf("Renderer: %s\n", glGetString(GL_RENDERER));
-	printf("Version: %s\n\n", glGetString(GL_VERSION));
+	sys_print("Vendor: %s\n", glGetString(GL_VENDOR));
+	sys_print("Renderer: %s\n", glGetString(GL_RENDERER));
+	sys_print("Version: %s\n\n", glGetString(GL_VERSION));
 
 	SDL_GL_SetSwapInterval(0);
 }
@@ -342,7 +350,7 @@ public:
 	void draw_rect();
 
 	void DrawModel(const Model* m, mat4 transform, const Animator* a = nullptr);
-	void AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Color32 color);
+	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	// shaders
 	Shader simple;
@@ -571,8 +579,7 @@ void Renderer::FrameDraw()
 	if (r_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			if (engine.ents[i].type == ET_PLAYER) {
-				EntityState es = engine.ents[i].to_entity_state();
-				AddPlayerDebugCapsule(&es, &mb, COLOR_CYAN);
+				AddPlayerDebugCapsule(engine.ents[i], &mb, COLOR_CYAN);
 			}
 		}
 	}
@@ -756,12 +763,12 @@ void Renderer::DrawLevel()
 }
 
 
-void Renderer::AddPlayerDebugCapsule(const EntityState* es, MeshBuilder* mb, Color32 color)
+void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 {
-	vec3 origin = es->position;
+	vec3 origin = e.position;
 	Capsule c;
 	c.base = origin;
-	c.tip = origin + vec3(0, (es->solid) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
+	c.tip = origin + vec3(0, (e.solid) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
 	c.radius = CHAR_HITBOX_RADIUS;
 	float radius = CHAR_HITBOX_RADIUS;
 	vec3 a, b;
@@ -866,8 +873,8 @@ void Game_Engine::connect_to(string address)
 	if (is_host)
 		exit_map();
 	else if (cl->get_state() != CS_DISCONNECTED)
-		cl->Disconnect();
-	console_printf("Connecting to server (%s)\n", address.c_str());
+		cl->Disconnect("connecting to another server");
+	sys_print("Connecting to server %s\n", address.c_str());
 	cl->connect(address);
 }
 
@@ -891,11 +898,15 @@ void cmd_server_end()
 {
 	engine.exit_map();
 }
+void cmd_client_force_update()
+{
+	engine.cl->ForceFullUpdate();
+}
 void cmd_client_connect()
 {
 	auto& args = cfg.get_arg_list();
 	if (args.size() < 2) {
-		console_printf("usage connect <address>");
+		sys_print("usage connect <address>");
 		return;
 	}
 
@@ -904,7 +915,7 @@ void cmd_client_connect()
 void cmd_client_disconnect()
 {
 	if (engine.cl->get_state()!=CS_DISCONNECTED)
-		engine.cl->Disconnect();
+		engine.cl->Disconnect("client command");
 }
 void cmd_client_reconnect()
 {
@@ -914,7 +925,7 @@ void cmd_client_reconnect()
 void cmd_load_map()
 {
 	if (cfg.get_arg_list().size() < 2) {
-		console_printf("usage map <map name>");
+		sys_print("usage map <map name>");
 		return;
 	}
 
@@ -935,12 +946,22 @@ void cmd_print_client_net_stats()
 		maxtime = glm::max(maxtime, entry.time);
 	}
 
-	console_printf("Client Network Stats:\n");
-	console_printf("%--15s %f\n", "Rtt", engine.cl->server.rtt);
-	console_printf("%--15s %f\n", "Interval", maxtime - mintime);
-	console_printf("%--15s %d\n", "Biggest packet", maxbytes);
-	console_printf("%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
-	console_printf("%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
+	sys_print("Client Network Stats:\n");
+	sys_print("%--15s %f\n", "Rtt", engine.cl->server.rtt);
+	sys_print("%--15s %f\n", "Interval", maxtime - mintime);
+	sys_print("%--15s %d\n", "Biggest packet", maxbytes);
+	sys_print("%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
+	sys_print("%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
+}
+
+void cmd_print_entities()
+{
+	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
+	for (int i = 0; i < NUM_GAME_ENTS; i++) {
+		auto& e = engine.ents[i];
+		if (!e.active()) continue;
+		sys_print("%-15d %-15d %-15f %-15f %-15d\n", i, e.type, e.position.x, e.position.z, (int)e.model);
+	}
 }
 
 void cmd_game_input_callback()
@@ -951,7 +972,6 @@ void cmd_game_input_callback()
 int main(int argc, char** argv)
 {
 	new_entity_fields_test();
-	return 0;
 
 	engine.argc = argc;
 	engine.argv = argv;
@@ -979,7 +999,7 @@ void Game_Local::init()
 
 void Game_Engine::start_map(string map, bool is_client)
 {
-	console_printf("Starting map %s\n", map.c_str());
+	sys_print("Starting map %s\n", map.c_str());
 	// starting new map
 	mapname = map;
 	FreeLevel(level);
@@ -995,7 +1015,7 @@ void Game_Engine::start_map(string map, bool is_client)
 	
 	if (!is_client) {
 		if (cl->get_state() != CS_DISCONNECTED)
-			cl->Disconnect();
+			cl->Disconnect("starting a local server");
 
 		sv->start();
 		engine.is_host = true;
@@ -1007,7 +1027,7 @@ void Game_Engine::start_map(string map, bool is_client)
 void Game_Engine::set_tick_rate(float tick_rate)
 {
 	if (is_host) {
-		console_printf("Can't change tick rate while server is running\n");
+		sys_print("Can't change tick rate while server is running\n");
 		return;
 	}
 	tick_interval = 1.0 / tick_rate;
@@ -1017,7 +1037,7 @@ void Game_Engine::exit_map()
 {
 	FreeLevel(level);
 	level = nullptr;
-	sv->end();
+	sv->end("exiting to menu");
 	engine_state = MAINMENU;
 	is_host = false;
 }
@@ -1198,6 +1218,9 @@ void Game_Engine::init()
 	cfg.set_command("quit", cmd_quit);
 	cfg.set_command("counter", cmd_debug_counter);
 	cfg.set_command("net_stat", cmd_print_client_net_stats);
+	cfg.set_command("cl_full_update", cmd_client_force_update);
+	cfg.set_command("print_ents", cmd_print_entities);
+
 
 	// engine initilization
 	init_sdl_window();
@@ -1250,6 +1273,9 @@ void Game_Engine::init()
 		}
 		else if (strcmp(argv[i], "-h") == 0) {
 			cfg.set_var("window_h", argv[++i]);
+		}
+		else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
+			SDL_SetWindowTitle(window, "CsRemake - VISUAL STUDIO\n");
 		}
 		else if (argv[i][0] == '-') {
 			string cmd;

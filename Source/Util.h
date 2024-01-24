@@ -12,7 +12,7 @@ double GetTime();
 double TimeSinceStart();
 
 void Fatalf(const char* format, ...);
-void console_printf(const char* fmt, ...);
+void sys_print(const char* fmt, ...);
 
 struct Color32
 {

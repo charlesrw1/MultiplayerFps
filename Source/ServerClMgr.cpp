@@ -1,6 +1,5 @@
 #include "Server.h"
 #include "Game_Engine.h"
-#define DebugOut(fmt, ...) NetDebugPrintf("server: " fmt, __VA_ARGS__)
 
 RemoteClient::RemoteClient(Server* sv, int slot)
 {
@@ -31,11 +30,11 @@ void RemoteClient::init(IPAndPort address)
 	commands.resize(5);
 }
 
-void RemoteClient::Disconnect()
+void RemoteClient::Disconnect(const char* debug_reason)
 {
 	if (state == SCS_DEAD)
 		return;
-	DebugOut("Disconnecting client %s\n", connection.remote_addr.ToString().c_str());
+	sys_print("Disconnecting client %s because %s\n", connection.remote_addr.ToString().c_str(), debug_reason);
 
 	if (state == SCS_SPAWNED) {
 		engine.client_leave(client_num);
@@ -53,14 +52,14 @@ void RemoteClient::Disconnect()
 
 extern void read_delta_move_command(ByteReader& msg, Move_Command& to);	// defined in clientmgr.cpp
 
-void RemoteClient::OnMoveCmd(ByteReader& msg)
+bool RemoteClient::OnMoveCmd(ByteReader& msg)
 {
 	Move_Command commands[16];
 	int tick = msg.ReadLong();
 	int num_commands = msg.ReadByte();
 	if (num_commands > 16 || num_commands <= 0) {
-		printf("Invalid command count \n");
-		return;
+		Disconnect("invalid command count");
+		return false;
 	}
 	Move_Command last = Move_Command();
 	for (int i = 0; i < num_commands; i++) {
@@ -72,7 +71,7 @@ void RemoteClient::OnMoveCmd(ByteReader& msg)
 
 	// Not ready to run the input yet
 	if (state != SCS_SPAWNED)
-		return;
+		return true;
 
 	int commands_to_run = 1 + connection.dropped;	// FIXME: have to run more than 1 command if client send rate is less than tick rate
 	commands_to_run = glm::min(commands_to_run, num_commands);
@@ -85,6 +84,8 @@ void RemoteClient::OnMoveCmd(ByteReader& msg)
 		Move_Command c = commands[i];
 		engine.execute_player_move(client_num, c);
 	}
+
+	return true;
 }
 
 void RemoteClient::OnTextCommand(ByteReader& msg)
@@ -95,7 +96,7 @@ void RemoteClient::OnTextCommand(ByteReader& msg)
 	msg.ReadBytes((uint8_t*)&cmd[0], cmd_len);
 
 	if (msg.HasFailed())
-		Disconnect();
+		Disconnect("text command failed");
 }
 
 void RemoteClient::Update()
@@ -121,7 +122,9 @@ void RemoteClient::Update()
 	writer.WriteLong(engine.tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
-	myserver->write_delta_entities_to_client(writer, baseline, client_num);
+	//myserver->write_delta_entities_to_client(writer, baseline, client_num);
+	myserver->write_delta_entities_to_client(writer, -1, client_num);
+
 	//myserver->WriteDeltaSnapshot(writer, baseline, client_num);
 	writer.EndWrite();
 	connection.Send(buffer, writer.BytesWritten());
@@ -131,7 +134,7 @@ void RemoteClient::OnPacket(ByteReader& buf)
 {
 	if (state != SCS_SPAWNED) {
 		state = SCS_SPAWNED;
-		DebugOut("Spawning client %d : %s\n", client_num, GetIPStr().c_str());
+		sys_print("Spawning client %d : %s\n", client_num, GetIPStr().c_str());
 		engine.make_client(client_num);
 	}
 
@@ -142,8 +145,7 @@ void RemoteClient::OnPacket(ByteReader& buf)
 		if (buf.IsEof())
 			return;
 		if (buf.HasFailed()) {
-			DebugOut("Read fail\n");
-			Disconnect();
+			Disconnect("OnPacket read fail");
 			return;
 		}
 
@@ -153,10 +155,11 @@ void RemoteClient::OnPacket(ByteReader& buf)
 		case CL_NOP:
 			break;
 		case CL_INPUT:
-			OnMoveCmd(buf);
+			if (!OnMoveCmd(buf))
+				return;
 			break;
 		case CL_QUIT:
-			Disconnect();
+			Disconnect("closed connection");
 			break;
 		case CL_SET_BASELINE: {
 			int newbaseline = buf.ReadLong();
@@ -167,14 +170,14 @@ void RemoteClient::OnPacket(ByteReader& buf)
 			OnTextCommand(buf);
 			break;
 		default:
-			DebugOut("Unknown message\n");
-			Disconnect();
+			Disconnect("unknown message");
 			return;
 			break;
 		}
 	}
 }
 
+#if 0
 // horrid
 void WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg, uint8_t index)
 {
@@ -399,9 +402,33 @@ void WriteDeltaPState(PlayerState* from, PlayerState* to, ByteWriter& msg)
 	msg.WriteByte(to->items.state);
 
 }
-
+#endif
 void new_entity_fields_test()
 {
+
+	{
+		uint8_t accept_buf[256];
+		ByteWriter writer(accept_buf, 256);
+		writer.WriteLong(CONNECTIONLESS_SEQUENCE);
+		writer.write_string("accept");
+		writer.WriteByte(10);
+		writer.write_string(engine.mapname);
+		writer.WriteLong(engine.tick);
+		writer.WriteFloat(66.0);
+		writer.EndWrite();
+
+		int bytes_written = writer.BytesWritten();
+
+		ByteReader reader(accept_buf, 256);
+		reader.ReadLong();
+		string s;
+		reader.read_string(s);
+		int b = reader.ReadByte();
+		reader.read_string(s);
+		int t = reader.ReadLong();
+		float f = reader.ReadFloat();
+	}
+
 	// test 1: 
 	{
 		Entity e1 = Entity();
@@ -425,11 +452,11 @@ void new_entity_fields_test()
 		ByteReader reader(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 		reader.ReadBits(10);
 		Entity e1r = Entity();
-		read_entity(&e1r, reader, Net_Prop::ALL, false);
+		read_entity(&e1r, reader, Net_Prop::ALL_PROP_MASK, false);
 		reader.AlignToByteBoundary();
 		Entity e2r = Entity();
 		e2r.index = reader.ReadBits(10);
-		read_entity(&e2r, reader, Net_Prop::ALL, false);
+		read_entity(&e2r, reader, Net_Prop::ALL_PROP_MASK, false);
 		reader.AlignToByteBoundary();
 
 
@@ -464,11 +491,11 @@ void new_entity_fields_test()
 		ByteReader r1(f->data, 1000);
 		ByteReader r2(f2->data, 1000);
 
-		write_delta_entity(wd, r1, r2, Net_Prop::ALL);
+		write_delta_entity(wd, r1, r2, Net_Prop::ALL_PROP_MASK);
 		wd.EndWrite();
 
 		ByteReader rd(buffer, 1000);
-		read_entity(&e1, rd, Net_Prop::ALL, true);
+		read_entity(&e1, rd, Net_Prop::ALL_PROP_MASK, true);
 
 
 		if (e1.model_index != e2.model_index || e1.flags != e2.flags) {
@@ -492,7 +519,7 @@ void Server::make_snapshot()
 
 		// TODO: hidden ents dont go in snapshot either
 
-		writer.WriteByte(i);
+		writer.WriteBits(i, ENTITY_BITS);
 		write_full_entity(&e, writer);
 		writer.AlignToByteBoundary();
 		f->num_ents_this_frame++;
@@ -500,39 +527,44 @@ void Server::make_snapshot()
 	writer.WriteByte(0xff);	// sentinal index
 
 	if (writer.HasFailed())
-		printf("make_snapshot buffer failed\n");
+		sys_print("make_snapshot buffer failed\n");
 }
-Packed_Entity::Packed_Entity(Frame* f, int offset) : f(f)
+Packed_Entity::Packed_Entity(Frame* f, int offset, int length) : f(f)
 {
 	buf_offset = offset;
+	len = length;
 	ByteReader r(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 	r.AdvanceBytes(buf_offset);
-	index = r.ReadByte();
-	if (index != 0xff) {
-		len = r.ReadBits(10);
-	}
+	index = r.ReadBits(ENTITY_BITS);
+	if (r.HasFailed()) failed = true;
 }
 
 
-ByteReader Packed_Entity::operator*()
+ByteReader Packed_Entity::get_buf()
 {
 	ByteReader r(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 	r.AdvanceBytes(buf_offset);
+	// read off index bits
+	r.ReadBits(ENTITY_BITS);
+
+	if (r.HasFailed()) failed = true;
+	return r;
 }
-Packed_Entity& Packed_Entity::operator++()
+void Packed_Entity::increment()
 {
-	*this = Packed_Entity(f, buf_offset + len);
-	return *this;
+	*this = Packed_Entity(f, buf_offset + len, len);
 }
 
 Packed_Entity Frame::begin()
 {
-	return Packed_Entity(this, 0);
+	int packet_ent_length = get_entity_baseline()->num_bytes_including_index;
+
+	return Packed_Entity(this, 0, packet_ent_length);
 }
 Packed_Entity Frame::end()
 {
-	Packed_Entity pe(this, 0);
-	pe.index = 0xff;	// FIXME: ent index
+	Packed_Entity pe(this, 0, 0);
+	pe.index = ENTITY_SENTINAL;
 	return pe;
 }
 
@@ -550,48 +582,68 @@ void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int 
 		msg.WriteLong(-1);
 	else
 		msg.WriteLong(deltatick);
-		
-	ByteReader s1(to->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
-	int index1 = s1.ReadByte();
 	
+	msg.WriteLong(0xabcdabcd);
+
+	Packed_Entity p1 = to->begin();
+
 	if (from) {
-		ByteReader s0(from->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
-		int index0 = s0.ReadByte();
-		while (index0 != 0xff && index1 != 0xff && !s1.HasFailed() && !s0.HasFailed()) {
-			int condition = (index1 == client_idx) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
-			if (index0 < index1) {
-				// entities that are deleted now, skip them
-				s0.AdvanceBytes(null_entity_state_bytes);
-				index0 = s0.ReadByte();
+		Packed_Entity p0 = from->begin();
+
+		while (p0.index != ENTITY_SENTINAL && p1.index != ENTITY_SENTINAL && !p0.failed && !p1.failed) {
+			int prop_mask = (p1.index == client_idx) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+			
+			if (p0.index < p1.index) {
+				// old entity that is now deleted
+				// TODO: write out entity so it gets deleted properly
+
+				p0.increment();	// advance p0 to the next Packed_Entity
 			}
-			else if (index0 > index1) {
+			else if (p0.index > p1.index) {
 				// new entity, delta from null
-				ByteReader nullstate(null_entity_state, null_entity_state_bytes);
-				msg.WriteByte(index1);
-				write_delta_entity(msg, nullstate, s1, condition);
+				ByteReader nullstate = baseline->get_buf();	// FIXME: bytes not multiple of 4
+				ByteReader to_state = p1.get_buf();
+
+				msg.WriteBits(p1.index, ENTITY_BITS);
+				write_delta_entity(msg, nullstate, to_state, prop_mask);	// FIXME: baseline will have more fields than Packed_Entities
 				msg.AlignToByteBoundary();
-				index1 = s1.ReadByte();
+				
+				p1.increment();
 			}
 			else {
 				// delta entity
-				msg.WriteByte(index1);
-				write_delta_entity(msg, s0, s1, condition);
+				ByteReader from_state = p0.get_buf();
+				ByteReader to_state = p1.get_buf();
+
+				msg.WriteBits(p1.index, ENTITY_BITS);
+				write_delta_entity(msg, from_state, to_state, prop_mask);
 				msg.AlignToByteBoundary();
-				index0 = s0.ReadByte();
-				index1 = s1.ReadByte();
+				
+				p0.increment();
+				p1.increment();
 			}
 
 		}
 	}
-	msg.WriteLong(0xabababab);
+
 	// now: there may be more new entities, so finish the list
-	while (index1 != 0xff && !s1.HasFailed())
+	while (p1.index != ENTITY_SENTINAL && !p1.failed)
 	{
-		int condition = (index1 == client_idx) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
-		ByteReader nullstate(null_entity_state, null_entity_state_bytes);
-		msg.WriteByte(index1);
-		write_delta_entity(msg, nullstate, s1, condition);
+		int condition = (p1.index == client_idx) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+		condition = Net_Prop::ALL_PROP_MASK;
+		ByteReader nullstate = baseline->get_buf();	// FIXME: bytes not multiple of 4
+		ByteReader to_state = p1.get_buf();
+
 		msg.AlignToByteBoundary();
-		index1 = s1.ReadByte();
+		msg.WriteBits(p1.index, ENTITY_BITS);
+		write_delta_entity(msg, nullstate, to_state, condition);	// FIXME: baseline will have more fields than Packed_Entities
+
+		p1.increment();
 	}
+
+	// MOTHER FUCKER!!!!
+	msg.AlignToByteBoundary();
+	msg.WriteBits(ENTITY_SENTINAL, ENTITY_BITS);
+
+	msg.WriteLong(0xef12ef12);
 }

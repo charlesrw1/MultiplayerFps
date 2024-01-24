@@ -149,16 +149,20 @@ private:
 	int actual_bytes_written = 0;
 };
 
+
 class ByteReader
 {
 public:
-	ByteReader(const uint8_t* data, int data_len) {
-		if (data_len % 4 != 0) {
+	ByteReader(const uint8_t* data, int data_len, int buffer_len_ = -1) {
+		if (buffer_len_ == -1)
+			buffer_len_ = data_len;
+		
+		if (buffer_len_ % 4 != 0) {
 			printf("bitreader buffer must be multiple of 4 bytes\n");
 			failed = true;
 		}
 		total_bits = data_len * 8;
-		buffer_len = data_len / 4;
+		buffer_len = buffer_len_ / 4;
 		ASSERT(buffer_len != 0);
 		buffer = (uint32_t*)data;
 	}
@@ -168,14 +172,14 @@ public:
 	}
 
 	void AdvanceBytes(int bytes) {
-		if (bytes == 0) return;
-
-		int full_words = bytes / 4;
-		if (CheckOverrun(full_words * 32))
-			return;
-		word_index = word_index + full_words;
-		num_bits_read += full_words * 32;
-		ReadNextWord();	// fill scratch
+		if (bytes >= 4) {
+			int full_words = bytes / 4;
+			if (CheckOverrun(full_words * 32))
+				return;
+			word_index = word_index + full_words;
+			num_bits_read += full_words * 32;
+			ReadNextWord();	// fill scratch
+		}
 		int extra_bytes = bytes % 4;
 		if(extra_bytes!=0)
 			ReadBits(extra_bytes * 8);	// empty extra bytes

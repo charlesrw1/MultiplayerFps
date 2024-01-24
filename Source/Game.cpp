@@ -36,16 +36,14 @@ void GetPlayerSpawnPoisiton(Entity* ent)
 
 void Game_Engine::client_leave(int slot)
 {
-	printf("removing client %d from game\n", slot);
 	Entity& ent = ents[slot];
 	free_entity(&ent);
 }
 
 void Game_Engine::make_client(int slot)
 {
-	console_printf("Spawning client %d into game\n", slot);
 	Entity& e = ents[slot];
-	if (e.active()) printf("player slot %d already in use?\n", slot);
+	if (e.active()) sys_print("player slot %d already in use?\n", slot);
 	e = Entity();
 	e.index = slot;
 	
@@ -165,7 +163,7 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 	}
 }
 
-
+#if 0
 void Entity::from_entity_state(EntityState& es)
 {
 	type = (Ent_Type)es.type;
@@ -237,6 +235,7 @@ EntityState Entity::to_entity_state()
 
 	return es;
 }
+#endif
 
 
 #include "MeshBuilder.h"
@@ -326,7 +325,7 @@ void GrenadeUpdate(Entity* ent)
 	ent->rotation.y -= 1.3 * dt * vel;
 
 	if (ent->death_time < engine.time) {
-		printf("BOOM\n");
+		sys_print("BOOM\n");
 		engine.free_entity(ent);
 	}
 }

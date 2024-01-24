@@ -26,10 +26,10 @@ public:
 	RemoteClient(Server* sv, int slot);
 
 	void init(IPAndPort address);
-	void Disconnect();
+	void Disconnect(const char* log_reason);
 
 	void OnPacket(ByteReader& msg);
-	void OnMoveCmd(ByteReader& msg);
+	bool OnMoveCmd(ByteReader& msg);
 	void OnTextCommand(ByteReader& msg);
 
 	void Update();		// sends snapshot and/or sends reliable
@@ -63,53 +63,13 @@ public:
 	Move_Command last_command;
 };
 
-struct Frame;
-struct Packed_Entity
-{
-	Packed_Entity(Frame* f, int offset);
-
-	int index = 0;
-	int len = 0;
-	int buf_offset = 0;
-
-	Frame* f;
-
-	ByteReader operator*();
-	Packed_Entity& operator++();
-	bool operator!=(Packed_Entity& other) {
-		return index != other.index;
-	}
-};
-
-
-// stores game state to delta encode to clients
-struct Frame {
-	static const int MAX_FRAME_ENTS = 256;
-	int tick = 0;
-	EntityState states[MAX_FRAME_ENTS];
-	PlayerState ps_states[MAX_CLIENTS];
-
-	static const int MAX_FRAME_SNAPSHOT_DATA = 8000;
-
-	// format: ent_index 10 bits
-	//			ent_data: variable
-	int num_ents_this_frame = 0;
-	uint8_t data[MAX_FRAME_SNAPSHOT_DATA];
-
-	Packed_Entity begin();
-	Packed_Entity end();
-};
-
-
-void new_entity_fields_test();
-
 class Server
 {
 public:
 	static const int MAX_FRAME_HIST = 32;
 	void init();	// called on engine startup
 	void start();
-	void end();
+	void end(const char* log_reason);
 	void connect_local_client();
 
 	//void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);

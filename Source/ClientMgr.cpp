@@ -1,7 +1,6 @@
 #include "Client.h"
 #include "Game_Engine.h"
 
-#define DebugOut(fmt, ...) NetDebugPrintf("client: " fmt, __VA_ARGS__)
 //#define DebugOut(fmt, ...)
 
 
@@ -24,7 +23,8 @@ void Client::ReadPackets()
 
 		// connectionless packet
 		if (*(uint32_t*)inbuffer == CONNECTIONLESS_SEQUENCE) {
-			ByteReader buf(inbuffer + 4, recv_len - 4);
+			ByteReader buf(inbuffer, recv_len, sizeof(inbuffer));
+			buf.ReadLong();	// skip header
 			
 			string msg;
 			buf.read_string(msg);
@@ -37,8 +37,7 @@ void Client::ReadPackets()
 				float tickrate = buf.ReadFloat();
 
 
-				DebugOut("Player num: %d, Map: %s, tickrate %f\n", client_num, mapname.c_str(), tickrate);
-				DebugOut("loading map...\n");
+				sys_print("Accepted into server. Player#: %d. Map: %s. Tickrate %f.\n", client_num, mapname.c_str(), tickrate);
 
 				// We now have a valid connection with the server
 				server.Init(&sock, server.remote_addr);
@@ -49,20 +48,20 @@ void Client::ReadPackets()
 				client_num = client_num_;
 			}
 			else if (msg == "reject" && state == CS_TRYINGCONNECT) {
-				printf("Connection rejected\n");
-				Disconnect();
+				Disconnect("rejected by server");
 			}
 			else {
-				DebugOut("Unknown connectionless packet type\n");
+				sys_print("Unknown connectionless packet type\n");
 			}
 
 			continue;
 		}
 
 		if (state >= CS_CONNECTED && from == server.remote_addr) {
-			int header = server.NewPacket(inbuffer, recv_len);
-			if (header != -1) {
-				ByteReader reader(inbuffer + header, recv_len - header);
+			int header_len = server.NewPacket(inbuffer, recv_len);
+			if (header_len != -1) {
+				ByteReader reader(inbuffer, recv_len, sizeof(inbuffer));
+				reader.AdvanceBytes(header_len);
 				HandleServerPacket(reader);
 			}
 		}
@@ -70,8 +69,7 @@ void Client::ReadPackets()
 
 	if (state >= CS_CONNECTED) {
 		if (GetTime() - server.last_recieved > cfg_cl_time_out->real) {
-			printf("Server timed out\n");
-			Disconnect();
+			Disconnect("server timed out");
 		}
 	}
 
@@ -93,7 +91,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 		if (buf.IsEof())
 			return;
 		if (buf.HasFailed()) {
-			Disconnect();
+			Disconnect("HandleServerPacket read fail");
 			return;
 		}
 		
@@ -115,8 +113,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 				return;
 		}break;
 		case SV_DISCONNECT:
-			DebugOut("disconnected by server\n");
-			Disconnect();
+			Disconnect("server closed connection");
 			break;
 		case SV_TEXT:
 			break;
@@ -125,15 +122,14 @@ void Client::HandleServerPacket(ByteReader& buf)
 			// just force it for now
 			int server_tick = buf.ReadLong();
 			if (abs(server_tick - engine.tick) > 4) {
-				DebugOut("delta tick %d\n", server_tick - engine.tick);
+				sys_print("delta tick %d\n", server_tick - engine.tick);
 				
 				engine.tick = server_tick;
 			}
 			last_recieved_server_tick = server_tick;
 		}break;
 		default:
-			DebugOut("Unknown message, disconnecting\n");
-			Disconnect();
+			Disconnect("of recieving an unknown message");
 			return;
 			break;
 		}
@@ -294,64 +290,100 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			force_full_update = false;
 	}
 
-	Snapshot* s = GetCurrentSnapshot();
-	s->tick = last_recieved_server_tick;
-	s->player_data_offset = 0;
-	s->num_ents = 0;
-
-	Snapshot* from = nullptr;
+	Frame* from = nullptr;
 
 	if (delta_tick != -1) {
 		from = FindSnapshotForTick(delta_tick);
 		if (!from) {
 			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, engine.tick);
+			ForceFullUpdate();
 			// discard packet
 			return true;
 		}
 	}
 
-	int index1 = msg.ReadByte();
+	Entity_Baseline* baseline = get_entity_baseline();
+	
+	int sent1 = msg.ReadLong();
+	if (sent1 != 0xabcdabcd) {
+		sys_print("wrong sentinal\n");
+		return true;
+	}
+
+	msg.AlignToByteBoundary();
+	int to_index = msg.ReadBits(ENTITY_BITS);
 
 	if (from) {
-		ByteReader s0(from->data, Snapshot::MAX_SNAPSHOT_DATA);
-		int index0 = s0.ReadByte();
-		while (index0 != 0xff && index1 != 0xff && !msg.HasFailed() && !s0.HasFailed()) {
-			int condition = (index1 == client_num) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
-			if (index0 < index1) {
-				// entities that are deleted now, skip them
-				s0.AdvanceBytes(null_entity_state_bytes);
-				index0 = s0.ReadByte();
+		Packed_Entity from_ent = from->begin();
+
+		while (from_ent.index != ENTITY_SENTINAL && to_index != ENTITY_SENTINAL
+			&& !msg.HasFailed() && !from_ent.failed) {
+			
+			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
+			int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+
+			if (from_ent.index < to_index) {
+				// old entity, now gone
+				Entity* oldent = &engine.ents[from_ent.index];	// FIXME: have to do more stuff like reset interp
+				oldent->set_inactive();
+				from_ent.increment();	// advance from_state to the next Packed_Entity
 			}
-			else if (index0 > index1) {
-				// new entity, delta from null
-				ByteReader nullstate(null_entity_state, null_entity_state_bytes);
-				msg.WriteByte(index1);
-				write_delta_entity(msg, nullstate, s1, condition);
+			else if (from_ent.index > to_index) {
+				// new entity:
+				// set state to the baseline/null
+				ByteReader base = baseline->get_buf();
+				read_entity(ent, base, prop_mask, false);
+				// now add in the delta entries
+				read_entity(ent, msg, prop_mask, true);
+
 				msg.AlignToByteBoundary();
-				index1 = s1.ReadByte();
+				to_index = msg.ReadBits(ENTITY_BITS);
 			}
 			else {
 				// delta entity
-				msg.WriteByte(index1);
-				write_delta_entity(msg, s0, s1, condition);
+				ByteReader from_state = from_ent.get_buf();
+
+				read_entity(ent, msg, prop_mask, true);
+
 				msg.AlignToByteBoundary();
-				index0 = s0.ReadByte();
-				index1 = s1.ReadByte();
+				to_index = msg.ReadBits(ENTITY_BITS);
+				from_ent.increment();
 			}
 
 		}
 	}
-	msg.WriteLong(0xabababab);
-	// now: there may be more new entities, so finish the list
-	while (index1 != 0xff && !s1.HasFailed())
+
+	// now: there may be more *new* entities, so finish the list
+	while (to_index != ENTITY_SENTINAL && !msg.HasFailed())
 	{
-		int condition = (index1 == client_idx) ? Net_Prop::ONLY_PLAYER : Net_Prop::NOT_PLAYER;
-		ByteReader nullstate(null_entity_state, null_entity_state_bytes);
-		msg.WriteByte(index1);
-		write_delta_entity(msg, nullstate, s1, condition);
+
+		Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
+		int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+		prop_mask = Net_Prop::ALL_PROP_MASK;
+
+		// reset to baseline:
+		ByteReader base = baseline->get_buf();
+		read_entity(ent, base, prop_mask, false);
+		
+		// delta props:
+		read_entity(ent, msg, prop_mask, true);
+
 		msg.AlignToByteBoundary();
-		index1 = s1.ReadByte();
+		to_index = msg.ReadBits(ENTITY_BITS);
 	}
+
+	int sent2 = msg.ReadLong();
+	if (sent2 != 0xef12ef12) {
+		sys_print("wrong sentinal\n");
+		return true;
+	}
+
+	// process updates from snapshot
+	Frame* to = GetCurrentSnapshot();
+	to->tick = last_recieved_server_tick;
+	to->player_offset = 0;
+	to->num_ents_this_frame = 0;
+	read_snapshot(to);
 
 	return false;
 #endif

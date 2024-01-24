@@ -23,6 +23,7 @@ const int CLIENT_MOVE_HISTORY = 36;
 
 const int ENTITY_BITS = 8;
 const int NUM_GAME_ENTS = 1 << ENTITY_BITS;
+const int ENTITY_SENTINAL = NUM_GAME_ENTS - 1;
 
 const double DEFAULT_UPDATE_RATE = 66.66;	// server+client ticks 66 times a second
 const int DEFAULT_MOVECMD_RATE = 60;	// send inputs (multiple) 60 times a second
@@ -67,30 +68,30 @@ enum Entity_Flags
 };
 
 // Entity state replicated to clients
-struct EntityState
-{
-	int type = ET_FREE;
-	glm::vec3 position=glm::vec3(0.f);
-	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
-	int model_idx = 0;
-	int mainanim = 0;
-	float mainanim_frame = 0.f;	// frames quantized to 16 bits
-	int leganim = 0;
-	float leganim_frame = 0.f;
-
-	int legblend = 0;
-	float legblendframe = 0.f;
-	float legblendleft = 0.f;
-	float legsblendtime = 0.f;
-	int torsoblend = 0;
-	float torsoblendframe = 0.f;
-	float torsoblendleft = 0.f;
-	float torsoblendtime = 0.f;
-
-	short flags = 0;	// Entity_Flags
-	int item = 0;
-	int solid = 0;	// encodes physical object shape
-};
+//struct EntityState
+//{
+//	int type = ET_FREE;
+//	glm::vec3 position=glm::vec3(0.f);
+//	glm::vec3 angles=glm::vec3(0.f);	// for players, these are view angles
+//	int model_idx = 0;
+//	int mainanim = 0;
+//	float mainanim_frame = 0.f;	// frames quantized to 16 bits
+//	int leganim = 0;
+//	float leganim_frame = 0.f;
+//
+//	int legblend = 0;
+//	float legblendframe = 0.f;
+//	float legblendleft = 0.f;
+//	float legsblendtime = 0.f;
+//	int torsoblend = 0;
+//	float torsoblendframe = 0.f;
+//	float torsoblendleft = 0.f;
+//	float torsoblendtime = 0.f;
+//
+//	short flags = 0;	// Entity_Flags
+//	int item = 0;
+//	int solid = 0;	// encodes physical object shape
+//};
 
 enum Item_Use_State
 {
@@ -132,14 +133,14 @@ enum Player_Movement_State
 };
 
 // Player state replicated only to player's client for prediction
-struct PlayerState
-{
-	glm::vec3 position=glm::vec3(0.f);
-	glm::vec3 angles = glm::vec3(0.f);
-	glm::vec3 velocity = glm::vec3(0.f);
-	short state = 0;	// Player_Movement_State
-	Item_State items;
-};
+//struct PlayerState
+//{
+//	glm::vec3 position=glm::vec3(0.f);
+//	glm::vec3 angles = glm::vec3(0.f);
+//	glm::vec3 velocity = glm::vec3(0.f);
+//	short state = 0;	// Player_Movement_State
+//	Item_State items;
+//};
 
 class Model;
 struct Entity
@@ -174,7 +175,9 @@ struct Entity
 	Animator anim;
 	const Model* model = nullptr;
 
+	void set_inactive() { type = ET_FREE; }
 	bool active() { return type != ET_FREE; }
+#if 0
 	EntityState to_entity_state();
 	void from_entity_state(EntityState& es);
 
@@ -182,6 +185,7 @@ struct Entity
 
 	PlayerState ToPlayerState() const;
 	void FromPlayerState(PlayerState* ps);
+#endif
 
 	void set_model(const char* model);
 };
@@ -193,18 +197,63 @@ struct Net_Prop
 	int input_bits;
 	int output_bits = -1; 
 	float quantize = 1.f;
-	short condition = 0xffff;
+	short condition = DEFAULT_PROP;
 
 	// -1 = same as input, 0 = float, 
 	//if output is given in bits but input is float, output is quantized
 
 	enum Conditions
 	{
-		ALL = 0xffff,
-		ONLY_PLAYER = 1,
-		NOT_PLAYER = 2,
+		DEFAULT_PROP = 1,		// rep to both owning/non-owning
+		PLAYER_PROP = 2,		// only rep to owning player
+		NON_PLAYER_PROP = 4,	// only rep to non-owning player
+
+		PLAYER_PROP_MASK = PLAYER_PROP | DEFAULT_PROP,
+		NON_PLAYER_PROP_MASK = NON_PLAYER_PROP | DEFAULT_PROP,
+
+		ALL_PROP_MASK = DEFAULT_PROP | PLAYER_PROP | NON_PLAYER_PROP
 	};
 };
+
+
+struct Frame;
+struct Packed_Entity
+{
+	Packed_Entity(Frame* f, int offset, int length);
+
+	int index = 0;		// index of entity
+	int len = 0;		// length of entity data in bytes
+	int buf_offset = 0;	// offset in buffer
+	bool failed = false;
+	Frame* f;
+
+	ByteReader get_buf();
+	void increment();
+};
+
+
+// stores binary data of the game state, used by client and server
+struct Frame {
+	//static const int MAX_FRAME_ENTS = 256;
+	int tick = 0;
+	//EntityState states[MAX_FRAME_ENTS];
+	//PlayerState ps_states[MAX_CLIENTS];
+
+	static const int MAX_FRAME_SNAPSHOT_DATA = 8000;
+
+	// format: ent_index 10 bits
+	//			ent_data: variable
+	int num_ents_this_frame = 0;
+	uint8_t data[MAX_FRAME_SNAPSHOT_DATA];
+
+	Packed_Entity begin();
+	Packed_Entity end();
+
+	int player_offset = 0;	// used by clients, HACK!!!
+};
+
+
+void new_entity_fields_test();
 
 // Network serialization functions
 
@@ -215,16 +264,22 @@ void write_delta_entity(ByteWriter& msg, ByteReader& s0, ByteReader& s1, int con
 
 struct Entity_Baseline
 {
-	uint8_t master[1000];
-	int bytes;
+	uint8_t data[1000];
+	int num_bytes_in_data;			// length of data[]
+	int num_bytes_including_index;	// includes the x index bits in the rounding
+	ByteReader get_buf() {
+		return ByteReader(data, num_bytes_in_data, sizeof(data));
+	}
 };
 
 Entity_Baseline* get_entity_baseline();
 
 // in serverclmgr for now
+#if 0
 bool WriteDeltaEntState(EntityState* from, EntityState* to, ByteWriter& msg);
 void ReadDeltaEntState(EntityState* to, ByteReader& msg);
 void ReadDeltaPState(PlayerState* to, ByteReader& msg);
+#endif
 
 void NetDebugPrintf(const char* fmt, ...);
 

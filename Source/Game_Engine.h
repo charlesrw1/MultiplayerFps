@@ -36,7 +36,7 @@ public:
 	Config_Var* mouse_sensitivity;
 	Config_Var* fake_movement_debug;
 
-	PlayerState last_player_state;
+	//PlayerState last_player_state;
 	vec3 view_angles;
 	Move_Command last_command;
 	View_Setup last_view;

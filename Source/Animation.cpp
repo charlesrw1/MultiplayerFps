@@ -2,6 +2,7 @@
 #include "Util.h"
 #include "Model.h"
 #include "Game_Engine.h"
+#include "Config.h"
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -332,6 +333,10 @@ void Animator::SetupBones()
 		m.blend_anim = -1;
 	if (legs.blend_anim < 0 || legs.blend_anim >= model->animations->clips.size())
 		legs.blend_anim = -1;
+	
+	static Config_Var* disable_blend = cfg.get_var("disable_blend", "0");
+	if(disable_blend->integer)
+		m.blend_anim = legs.blend_anim = -1;
 
 	// Just t-pose if no proper animations
 	if (m.anim == -1)
@@ -418,7 +423,7 @@ void Animator::set_model(const Model* mod)
 {
 	// can be called with nullptr model to reset
 	if (mod && (!mod->animations || mod->bones.size() != mod->animations->num_channels)) {
-		console_printf("Model %s has no animations or invalid skeleton\n", mod->name.c_str());
+		sys_print("Model %s has no animations or invalid skeleton\n", mod->name.c_str());
 		mod = nullptr;
 	}
 	model = mod;
