@@ -8,7 +8,8 @@ snapshot_rate 30.0
 interp_time 0.05
 fake_lag 75
 fake_loss 0
-do_predict 0
+#do_predict 0
+smooth_error_time -1.0
 
 #render vars
 draw_collision_tris 0

@@ -122,8 +122,10 @@ void RemoteClient::Update()
 	writer.WriteLong(engine.tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
-	//myserver->write_delta_entities_to_client(writer, baseline, client_num);
-	myserver->write_delta_entities_to_client(writer, -1, client_num);
+
+	static Config_Var* never_delta = cfg.get_var("sv_never_delta", "0");
+	int delta_frame = (never_delta->integer) ? -1 : baseline;
+	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
 	//myserver->WriteDeltaSnapshot(writer, baseline, client_num);
 	writer.EndWrite();
@@ -366,6 +368,7 @@ void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int 
 
 		while (p0.index != ENTITY_SENTINAL && p1.index != ENTITY_SENTINAL && !p0.failed && !p1.failed) {
 			int prop_mask = (p1.index == client_idx) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+			//prop_mask = Net_Prop::ALL_PROP_MASK;
 			
 			if (p0.index < p1.index) {
 				// old entity that is now deleted
@@ -404,7 +407,8 @@ void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int 
 	while (p1.index != ENTITY_SENTINAL && !p1.failed)
 	{
 		int condition = (p1.index == client_idx) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
-		condition = Net_Prop::ALL_PROP_MASK;
+		//condition = Net_Prop::ALL_PROP_MASK;
+		
 		ByteReader nullstate = baseline->get_buf();	// FIXME: bytes not multiple of 4
 		ByteReader to_state = p1.get_buf();
 

@@ -226,6 +226,7 @@ void Client::SendMovesAndMessages()
 	server.Send(buffer, writer.BytesWritten());
 }
 
+static Entity null_ent;
 
 bool Client::OnEntSnapshot(ByteReader& msg)
 {
@@ -242,7 +243,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	if (delta_tick != -1) {
 		from = FindSnapshotForTick(delta_tick);
 		if (!from) {
-			printf("client: delta snapshot not found! (snapshot: %d, current: %d)", delta_tick, engine.tick);
+			sys_print("Delta snapshot not found, requested: %d, current: %d", delta_tick, engine.tick);
 			ForceFullUpdate();
 			// discard packet
 			return true;
@@ -268,6 +269,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			
 			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
 			int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+			//prop_mask = Net_Prop::ALL_PROP_MASK;
 
 			if (from_ent.index < to_index) {
 				// old entity, now gone
@@ -290,13 +292,26 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 				// delta entity
 				ByteReader from_state = from_ent.get_buf();
 
-				read_entity(ent, msg, prop_mask, true);
+				if (dont_replicate_player->integer) {
+					read_entity(&null_ent, msg, prop_mask, true);
+				}
+				else
+					read_entity(ent, msg, prop_mask, true);
 
 				msg.AlignToByteBoundary();
 				to_index = msg.ReadBits(ENTITY_BITS);
 				from_ent.increment();
 			}
 
+		}
+
+		//  these are *old* entities in the baseline that didnt find a partner in 
+		// the delta packet :(, remove them
+		while (from_ent.index != ENTITY_SENTINAL && !from_ent.failed)
+		{
+			Entity* ent =  &engine.ents[from_ent.index];
+			ent->set_inactive();
+			from_ent.increment();
 		}
 	}
 
@@ -306,7 +321,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 
 		Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
 		int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
-		prop_mask = Net_Prop::ALL_PROP_MASK;
+		//prop_mask = Net_Prop::ALL_PROP_MASK;
 
 		// reset to baseline:
 		ByteReader base = baseline->get_buf();
@@ -328,7 +343,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	// process updates from snapshot
 	Frame* to = GetCurrentSnapshot();
 	to->tick = last_recieved_server_tick;
-	to->player_offset = 0;
+	to->player_offset = -1;
 	to->num_ents_this_frame = 0;
 	read_snapshot(to);
 

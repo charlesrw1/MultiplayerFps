@@ -108,8 +108,6 @@ Move_Command& Client::get_command(int sequence) {
 
 void Client::run_prediction()
 {
-	return;
-
 	if (get_state() != CS_SPAWNED)
 		return;
 
@@ -132,14 +130,22 @@ void Client::run_prediction()
 	
 	if (dont_replicate_player->integer)
 		start = end - 2;	// only sim current frame
+	else if (auth->player_offset == -1) {
+		sys_print("player state not in packet?, skipping prediction\n");
+		return;
+	}
 	else
 	{
 		Packed_Entity pe(auth, auth->player_offset, get_entity_baseline()->num_bytes_including_index);	// FIXME:
 		ByteReader buf = pe.get_buf();
-		int index = buf.ReadBits(ENTITY_BITS);
 		// sanity check
-		ASSERT(index == client_num);
-		read_entity(&player, buf, Net_Prop::PLAYER_PROP_MASK, false);		// replicate player props
+		ASSERT(pe.index == client_num);
+		//read_entity(&player, buf, Net_Prop::PLAYER_PROP, false);		// replicate player props
+		player.position = auth->position;
+		player.velocity = auth->velocity;
+		player.rotation = auth->rotation;
+		player.state = auth->state;
+
 	}
 
 	// run physics code for commands yet to recieve a snapshot for
@@ -149,7 +155,7 @@ void Client::run_prediction()
 		player_physics_update(&player, cmd);
 	}
 	// runs animation and item code for current frame only
-	player_post_physics(&player, get_command(end - 1));
+	//player_post_physics(&player, get_command(end - 1));
 	
 	// dont advance frames if animation is being controlled server side
 	if(!(player.flags & EF_FORCED_ANIMATION))
@@ -369,6 +375,13 @@ interpolate_state() fills the entities position/rotation with interpolated value
 void Client::read_snapshot(Frame* snapshot)
 {
 	// now: build a local state packet to delta entities from
+	Entity& p = engine.ents[client_num];
+	snapshot->position = p.position;
+	snapshot->rotation = p.rotation;
+	snapshot->state = p.state;
+	snapshot->velocity = p.velocity;
+
+
 	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
@@ -415,14 +428,14 @@ void Client::read_snapshot(Frame* snapshot)
 
 	// update prediction error data
 	int sequence_i_sent = OutSequenceAk();
-	if (OutSequence() - sequence_i_sent < origin_history.size()) {
-		Entity& player = engine.ents[client_num];
-		vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
-		// FIXME check for teleport
-		float len = glm::length(delta);
-		if (len > 0.05 && len < 10 && smooth_time <= 0.0)
-			smooth_time = smooth_error_time->real;
-	}
+	//if (OutSequence() - sequence_i_sent < origin_history.size()) {
+	//	Entity& player = engine.ents[client_num];
+	//	vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
+	//	// FIXME check for teleport
+	//	float len = glm::length(delta);
+	//	if (len > 0.05 && len < 10 && smooth_time <= 0.0)
+	//		smooth_time = smooth_error_time->real;
+	//}
 
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet
 	engine.build_physics_world(0.f);

@@ -5,9 +5,9 @@
 Net_Prop entity_state_props[] =
 {
 	{ESP(type), 32, 8},
-	{ESP(position.x), 0},
-	{ESP(position.y), 0},
-	{ESP(position.z), 0},
+	{ESP(position.x), 0, -1, 1.f, Net_Prop::DEFAULT_PROP | Net_Prop::PLAYER_PROP},
+	{ESP(position.y), 0, -1, 1.f, Net_Prop::DEFAULT_PROP | Net_Prop::PLAYER_PROP},
+	{ESP(position.z), 0, -1, 1.f, Net_Prop::DEFAULT_PROP | Net_Prop::PLAYER_PROP},
 
 	{ESP(model_index),		32, 8},
 
@@ -35,15 +35,15 @@ Net_Prop entity_state_props[] =
 	{ESP(solid), 32},
 
 	// for owning players only
-	//{ESP(rotation.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
-	//{ESP(rotation.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
-	//{ESP(rotation.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
+	{ESP(state), 16, 16, 1.f, Net_Prop::PLAYER_PROP_MASK},
+	{ESP(rotation.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
+	{ESP(rotation.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	{ESP(rotation.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
 	//
-	//{ESP(velocity.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	//{ESP(velocity.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	//{ESP(velocity.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	{ESP(velocity.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	{ESP(velocity.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
+	{ESP(velocity.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
 	//
-	//{ESP(state), 16, -1, 1.f, Net_Prop::PLAYER_PROP},
 };
 
 //#define NET_PROP_DBG
@@ -89,27 +89,29 @@ bool validate_net_prop_name(Net_Prop& prop, ByteReader& msg)
 void net_prop_field_read(ByteReader& msg, void* output, Net_Prop& prop, int condition, bool is_delta)
 {
 	bool should_read = prop.condition & condition;
-
-	if (is_delta && !msg.ReadBool())
-		return;
-	if (is_delta && !should_read)
-		return;
-
 	uint8_t* prop_start = ((uint8_t*)(output)+prop.offset);
-
 	int out_bits = (prop.output_bits == -1) ? prop.input_bits : prop.output_bits;
 	int in_bits = prop.input_bits;
+
+	if (is_delta) {
+		if (should_read) {
+			if (!msg.ReadBool())
+				return;
+		}
+		else
+			return;
+	}
+	else if (!should_read) {
+		out_bits = (out_bits == 0) ? 32 : out_bits;
+		msg.ReadBits(out_bits);
+		return;
+	}
+
 
 #ifdef  NET_PROP_DBG
 	validate_net_prop_name(prop, msg);
 #endif //  NET_PROP_DBG
 
-	// if not a delta and shouldnt read this, then skip it
-	if (!is_delta && !should_read) {
-		out_bits = (out_bits == 0) ? 32 : out_bits;
-		msg.ReadBits(out_bits);
-		return;
-	}
 
 	switch (in_bits)
 	{
@@ -207,6 +209,8 @@ void write_full_entity(Entity* e, ByteWriter& msg)
 		net_prop_field_write(prop, e, msg);
 	}
 }
+
+// msg is a buffer that either has a full state binary layout, or a delta layout
 void read_entity(Entity* e, ByteReader& msg, int condition, bool is_delta)
 {
 	int num_props = sizeof(entity_state_props) / sizeof(Net_Prop);
