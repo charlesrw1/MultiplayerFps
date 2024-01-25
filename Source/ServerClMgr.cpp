@@ -34,7 +34,7 @@ void RemoteClient::Disconnect(const char* debug_reason)
 {
 	if (state == SCS_DEAD)
 		return;
-	sys_print("Disconnecting client %s because %s\n", connection.remote_addr.ToString().c_str(), debug_reason);
+	sys_print("Disconnecting client %d because %s\n", client_num, debug_reason);
 
 	if (state == SCS_SPAWNED) {
 		engine.client_leave(client_num);
@@ -113,7 +113,7 @@ void RemoteClient::Update()
 	if (next_snapshot_time > 0.f)
 		return;
 
-	next_snapshot_time += (1.0 / myserver->cfg_snapshot_rate->real);
+	next_snapshot_time += (1.0 / myserver->snapshot_rate->real);
 
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
@@ -134,13 +134,6 @@ void RemoteClient::Update()
 
 void RemoteClient::OnPacket(ByteReader& buf)
 {
-	if (state != SCS_SPAWNED) {
-		state = SCS_SPAWNED;
-		sys_print("Spawning client %d : %s\n", client_num, GetIPStr().c_str());
-		engine.make_client(client_num);
-	}
-
-
 	for(;;)
 	{
 		buf.AlignToByteBoundary();

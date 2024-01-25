@@ -92,10 +92,10 @@ public:
 	Socket socket;
 
 	// CONFIG VARS
-	Config_Var* cfg_snapshot_rate;
-	Config_Var* cfg_tick_rate;
-	Config_Var* cfg_max_time_out;
-	Config_Var* cfg_sv_port;
+	Config_Var* snapshot_rate;
+	Config_Var* tick_rate;
+	Config_Var* max_time_out;
+	Config_Var* host_port;
 
 private:
 	int FindClient(IPAndPort addr) const;

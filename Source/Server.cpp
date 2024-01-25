@@ -23,12 +23,11 @@ void NetDebugPrintf(const char* fmt, ...)
 
 void Server::init()
 {
-	printf("initializing server\n");
 
-	cfg_tick_rate		= cfg.get_var("tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
-	cfg_snapshot_rate	= cfg.get_var("snapshot_rate", "30.0");
-	cfg_max_time_out	= cfg.get_var("max_time_out", "10.f");
-	cfg_sv_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	tick_rate		= cfg.get_var("tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
+	snapshot_rate	= cfg.get_var("snapshot_rate", "30.0");
+	max_time_out	= cfg.get_var("max_time_out", "10.f");
+	host_port		= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
 
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
@@ -36,14 +35,13 @@ void Server::init()
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		clients.push_back(RemoteClient(this, i));
 
-	if (cfg_tick_rate->real < 30)
+	if (tick_rate->real < 30)
 		cfg.set_var("tick_rate", "30.0");
-	else if (cfg_tick_rate->real > 150)
+	else if (tick_rate->real > 150)
 		cfg.set_var("tick_rate", "150.0");
 
 	// initialize tick_interval here
-	engine.tick_interval = 1.0 / cfg_tick_rate->real;
-
+	engine.tick_interval = 1.0 / tick_rate->real;
 }
 void Server::end(const char* log_reason)
 {
@@ -52,6 +50,8 @@ void Server::end(const char* log_reason)
 		clients[i].Disconnect("server is ending");
 	socket.Shutdown();
 	initialized = false;
+
+	engine.set_state(ENGINE_MENU);
 }
 
 void Server::start()
@@ -59,9 +59,9 @@ void Server::start()
 	if (initialized)
 		end("restarting server");;
 	sys_print("Starting server...\n");
-	socket.Init(cfg_sv_port->integer);
+	socket.Init(host_port->integer);
 	initialized = true;
-	engine.tick_interval = 1.0 / cfg_tick_rate->real;
+	engine.tick_interval = 1.0 / tick_rate->real;
 }
 
 
@@ -131,13 +131,17 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	writer.WriteByte(spot);
 	writer.write_string(engine.mapname);
 	writer.WriteLong(engine.tick);
-	writer.WriteFloat(cfg_tick_rate->real);
+	writer.WriteFloat(tick_rate->real);
 	writer.EndWrite();
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
 
 	RemoteClient& new_client = clients[spot];
-	new_client.init(addr);
-	// Further communication is done with sequenced packets
+	if (!already_connected) {
+		new_client.init(addr);
+		new_client.state = SCS_SPAWNED;
+		sys_print("Spawning client %d : %s\n", spot, addr.ToString().c_str());
+		engine.make_client(spot);
+	}
 }
 
 void Server::ReadPackets()
@@ -181,7 +185,6 @@ void Server::ReadPackets()
 			reader.AdvanceBytes(header_len);	// skip packet header
 
 			client->OnPacket(reader);
-			//HandleClientPacket(client, reader);
 		}
 	}
 
@@ -190,7 +193,7 @@ void Server::ReadPackets()
 		auto& cl = clients[i];
 		if (!cl.IsConnected()||cl.local_client)
 			continue;
-		if (GetTime() - cl.LastRecieved() > cfg_max_time_out->real) {
+		if (GetTime() - cl.LastRecieved() > max_time_out->real) {
 			cl.Disconnect("client timed out");
 		}
 	}

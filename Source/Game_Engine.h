@@ -17,13 +17,6 @@ public:
 
 
 
-enum Engine_State
-{
-	MAINMENU,
-	LOADING,
-	SPAWNED,
-};
-
 class Game_Local
 {
 public:
@@ -71,6 +64,13 @@ public:
 	char input_buffer[256];
 };
 
+enum Engine_State
+{
+	ENGINE_MENU,
+	ENGINE_LOADING,
+	ENGINE_GAME,
+};
+
 struct ImGuiContext;
 class Client;
 class Game_Engine
@@ -81,7 +81,9 @@ public:
 	void loop();
 	void draw_screen();
 
-	void start_map(string map, bool is_client = false);
+	void set_state(Engine_State state);
+
+	bool start_map(string map, bool is_client = false);
 	void exit_map();
 
 	void build_physics_world(float time);
@@ -114,7 +116,7 @@ public:
 	PhysicsWorld phys;
 	Entity ents[MAX_GAME_ENTS];
 	int num_entities;
-	Engine_State engine_state;
+	Engine_State state;
 	bool is_host;
 	Game_Local local;
 
@@ -144,12 +146,16 @@ public:
 	int argc;
 	char** argv;
 private:
+	Engine_State next_state;
+
 	void view_angle_update();
 	void make_move();
 	void init_sdl_window();
 	void key_event(SDL_Event event);
 
 	void draw_debug_interface();
+
+	void game_update_tick();
 };
 
 extern Game_Media media;

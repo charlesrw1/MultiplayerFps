@@ -10,13 +10,13 @@
 
 void Client::init()
 {
-	cfg_interp_time		= cfg.get_var("interp_time", "0.1");
-	cfg_fake_lag		= cfg.get_var("fake_lag", "0");
-	cfg_fake_loss		= cfg.get_var("fake_loss", "0");
-	cfg_cl_time_out		= cfg.get_var("cl_time_out", "5.f");
+	interp_time			= cfg.get_var("interp_time", "0.1");
+	fake_lag			= cfg.get_var("fake_lag", "0");
+	fake_loss			= cfg.get_var("fake_loss", "0");
+	cl_time_out			= cfg.get_var("cl_time_out", "5.f");
 	interpolate			= cfg.get_var("interpolate", "1");
 	smooth_error_time	= cfg.get_var("smooth_error", "1.0");
-	cfg_do_predict		= cfg.get_var("do_predict", "1");
+	client_predict		= cfg.get_var("client_predict", "1");
 	dont_replicate_player = cfg.get_var("dont_replicate_player", "0");
 	time_reset_threshold = cfg.get_var("time_reset_threshold", "0.1");
 	sock.Init(0);
@@ -46,11 +46,16 @@ void Client::connect(string address)
 	cur_snapshot_idx = 0;
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 		interpolation_data[i] = Entity_Interp();
+
+	engine.set_state(ENGINE_LOADING);
+
 	TrySendingConnect();
 }
 
 void Client::TrySendingConnect()
 {
+	ASSERT(engine.state == ENGINE_LOADING);
+
 	const int MAX_CONNECT_ATTEMPTS = 10;
 	const float CONNECT_RETRY = 1.f;
 
@@ -59,6 +64,8 @@ void Client::TrySendingConnect()
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
 		sys_print("Couldn't connect to server\n");
 		state = CS_DISCONNECTED;
+
+		engine.set_state(ENGINE_MENU);
 		return;
 	}
 	double delta = GetTime() - attempt_time;
@@ -92,6 +99,8 @@ void Client::Disconnect(const char* debug_reason)
 	client_num = -1;
 	server = Connection();
 	cur_snapshot_idx = 0;
+
+	engine.set_state(ENGINE_MENU);
 }
 
 
@@ -112,7 +121,9 @@ void Client::run_prediction()
 	if (get_state() != CS_SPAWNED)
 		return;
 
-	if (!cfg_do_predict->integer)
+
+
+	if (!client_predict->integer)
 		return;
 
 	// predict commands from outgoing ack'ed to current outgoing
@@ -259,7 +270,7 @@ void Client::interpolate_states()
 
 	auto cl = engine.cl;
 	// FIXME
-	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->cfg_interp_time->real);
+	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->interp_time->real);
 	
 	// interpolate local player error
 	if (smooth_time > 0 && dont_replicate_player->integer == 0) {

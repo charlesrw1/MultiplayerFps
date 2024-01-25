@@ -116,8 +116,6 @@ double TimeSinceStart()
 
 void Game_Local::update_view()
 {
-	if (engine.engine_state != SPAWNED)
-		return;
 
 	// decay view_recoil
 	view_recoil.x = view_recoil.x * 0.9f;
@@ -915,7 +913,7 @@ void cmd_client_connect()
 void cmd_client_disconnect()
 {
 	if (engine.cl->get_state()!=CS_DISCONNECTED)
-		engine.cl->Disconnect("client command");
+		engine.cl->Disconnect("requested");
 }
 void cmd_client_reconnect()
 {
@@ -997,10 +995,9 @@ void Game_Local::init()
 	// 4 = 2 with jumping
 }
 
-void Game_Engine::start_map(string map, bool is_client)
+bool Game_Engine::start_map(string map, bool is_client)
 {
 	sys_print("Starting map %s\n", map.c_str());
-	// starting new map
 	mapname = map;
 	FreeLevel(level);
 	phys.ClearObjs();
@@ -1008,8 +1005,9 @@ void Game_Engine::start_map(string map, bool is_client)
 		ents[i] = Entity();
 	num_entities = 0;
 	level = LoadLevelFile(mapname.c_str());
-	if (!level) 
-		return;
+	if (!level) {
+		return false;
+	}
 	tick = 0;
 	time = 0;
 	
@@ -1019,9 +1017,13 @@ void Game_Engine::start_map(string map, bool is_client)
 
 		sv->start();
 		engine.is_host = true;
-		engine.engine_state = SPAWNED;
+
+		engine.set_state(ENGINE_GAME);
+
 		sv->connect_local_client();
 	}
+
+	return true;
 }
 
 void Game_Engine::set_tick_rate(float tick_rate)
@@ -1038,7 +1040,6 @@ void Game_Engine::exit_map()
 	FreeLevel(level);
 	level = nullptr;
 	sv->end("exiting to menu");
-	engine_state = MAINMENU;
 	is_host = false;
 }
 
@@ -1106,7 +1107,7 @@ void Game_Engine::draw_debug_interface()
 	move_variables_menu();
 
 
-	if (engine_state == SPAWNED) {
+	if (state == ENGINE_GAME) {
 
 		// player menu
 		if (ImGui::Begin("player")) {
@@ -1139,7 +1140,7 @@ void Game_Engine::draw_screen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glClear(GL_COLOR_BUFFER_BIT);
-	if (engine_state == SPAWNED)
+	if (state == ENGINE_GAME)
 		draw.FrameDraw();
 
 	ImGui_ImplSDL2_NewFrame();
@@ -1155,6 +1156,15 @@ void Game_Engine::draw_screen()
 	glCheckError();
 	SDL_GL_SwapWindow(window);
 	glCheckError();
+}
+
+void Game_Engine::set_state(Engine_State state)
+{
+	const char* engine_strs[] = { "menu", "loading", "game" };
+
+	if (this->state != state)
+		sys_print("Engine going to %s state\n", engine_strs[(int)state]);
+	this->state = state;
 }
 
 void Game_Engine::build_physics_world(float time)
@@ -1215,7 +1225,7 @@ void Game_Engine::init()
 	num_entities = 0;
 	level = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
-	engine_state = MAINMENU;
+	state = ENGINE_MENU;
 	is_host = false;
 	sv = new Server;
 	cl = new Client;
@@ -1316,11 +1326,54 @@ void Game_Engine::init()
 	cfg.set_unknown_variables = false;
 }
 
+
+/*
+make input (both listen and clients)
+client send input to server (listens do not)
+
+listens read packets from clients
+listens update game (sim local character with frame's input)
+listen build a snapshot frame for sending to clients
+
+listens dont have packets to "read" from server, stuff like sounds/particles are just branched when they are created on sim frames
+listens dont run prediction for local player
+*/
+
+
+void Game_Engine::game_update_tick()
+{
+	make_move();
+	if (!is_host)
+		cl->SendMovesAndMessages();
+
+	time = tick * tick_interval;
+	if (is_host) {
+		// build physics world now as ReadPackets() executes player commands
+		build_physics_world(0.f);
+		sv->ReadPackets();
+		update_game_tick();
+		sv->make_snapshot();
+		for (int i = 0; i < sv->clients.size(); i++)
+			sv->clients[i].Update();
+		tick += 1;
+	}
+
+	if (!is_host) {
+		tick += 1;
+		time = tick * tick_interval;
+
+		cl->ReadPackets();
+		cl->run_prediction();
+	}
+}
+
 void Game_Engine::loop()
 {
 	double last = GetTime() - 0.1;
+
 	for (;;)
 	{
+		// update time
 		double now = GetTime();
 		double dt = now - last;
 		last = now;
@@ -1328,6 +1381,7 @@ void Game_Engine::loop()
 			dt = 0.1;
 		frame_time = dt;
 
+		// update input
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
@@ -1347,90 +1401,73 @@ void Game_Engine::loop()
 			}
 		}
 
-		double secs_per_tick = tick_interval;
-		frame_remainder += dt;
-		int num_ticks = (int)floor(frame_remainder / secs_per_tick);
-		frame_remainder -= num_ticks * secs_per_tick;
-
-		if (!is_host && cl->get_state() == CS_SPAWNED) {
-			frame_remainder += cl->adjust_time_step(num_ticks);
-		}
-
-		/*
-		make input (both listen and clients)
-		client send input to server (listens do not)
-
-		listens read packets from clients
-		listens update game (sim local character with frame's input)
-		listen build a snapshot frame for sending to clients
-
-		listens dont have packets to "read" from server, stuff like sounds/particles are just branched when they are created on sim frames
-		listens dont run prediction for local player
-		*/
-
-		for (int i = 0; i < num_ticks; i++)
+		// update state
+		switch (state)
 		{
-			if (engine_state >= LOADING)
-				make_move();
+		case ENGINE_MENU:
+			// later, will add menu controls, now all you can do is use the console to change state
+			SDL_Delay(5);
+			break;
+		case ENGINE_LOADING:
+			// here, the client tries to connect and waits for snapshot to arrive before going to game state
+			cl->TrySendingConnect();
+			cl->ReadPackets();
+			SDL_Delay(5);
+			break;
+		case ENGINE_GAME: {
+			ASSERT(cl->get_state() == CS_SPAWNED || is_host);
 
-			if (!is_host && cl) {
-				cl->SendMovesAndMessages();
-				cl->TrySendingConnect();
+			double secs_per_tick = tick_interval;
+			frame_remainder += dt;
+			int num_ticks = (int)floor(frame_remainder / secs_per_tick);
+			frame_remainder -= num_ticks * secs_per_tick;
+
+			if (!is_host) {
+				frame_remainder += cl->adjust_time_step(num_ticks);
 			}
 
-			time = tick * tick_interval;
-			if (is_host) {
-				// build physics world now as ReadPackets() executes player commands
-				build_physics_world(0.f);
-				sv->ReadPackets();
-				update_game_tick();
+			for (int i = 0; i < num_ticks && state == ENGINE_GAME; i++)
+				game_update_tick();
 
-				//sv->BuildSnapshotFrame();
-				sv->make_snapshot();
-				for (int i = 0; i < sv->clients.size(); i++)
-					sv->clients[i].Update();
-				tick += 1;
-			}
-
-			if (!is_host && cl) {
-				if (cl->get_state() == CS_SPAWNED) {
-					tick += 1;
-					time = tick * tick_interval;
-				}
-				cl->ReadPackets();
-				cl->run_prediction();		
-			}
-
-			if ((cl && cl->state == CS_SPAWNED) || is_host)
-				engine_state = SPAWNED;
-			else
-				engine_state = MAINMENU;
+			if(state == ENGINE_GAME)
+				pre_render_update();
+		}break;
 		}
-		pre_render_update();
+
 		draw_screen();
+
+		static float next_print = 0;
+		Config_Var* print_fps = cfg.get_var("print_fps", "0");
+		if (next_print <= 0 && print_fps->integer) {
+			next_print += 2.0;
+			sys_print("fps %f", 1.0 / engine.frame_time);
+		}
+		else if (print_fps->integer)
+			next_print -= engine.frame_time;
 	}
 }
 
 void Game_Engine::pre_render_update()
 {
-	if (engine_state == SPAWNED) {
+	ASSERT(state == ENGINE_GAME);
+
 		// interpolate entities for rendering
-		if (!is_host)
-			cl->interpolate_states();
+	if (!is_host)
+		cl->interpolate_states();
 
-		for (int i = 0; i < MAX_GAME_ENTS; i++) {
-			Entity& ent = ents[i];
-			if (!ent.active())
-				continue;
-			if (!ent.model || !ent.model->animations)
-				continue;
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		Entity& ent = ents[i];
+		if (!ent.active())
+			continue;
+		if (!ent.model || !ent.model->animations)
+			continue;
 
-			ent.anim.SetupBones();
-			ent.anim.ConcatWithInvPose();
-		}
-
-		local.update_viewmodel();
+		ent.anim.SetupBones();
+		ent.anim.ConcatWithInvPose();
 	}
+
+	local.update_viewmodel();
+
 	local.update_view();
 }
 

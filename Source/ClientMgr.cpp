@@ -7,8 +7,8 @@
 void Client::ReadPackets()
 {
 	// check cfg var updates
-	sock.loss = cfg_fake_loss->integer;
-	sock.lag = cfg_fake_lag->integer;
+	sock.loss = fake_loss->integer;
+	sock.lag = fake_lag->integer;
 	sock.jitter = 0;
 	sock.enabled = !(sock.loss == 0 && sock.lag == 0 && sock.jitter == 0);
 
@@ -42,10 +42,14 @@ void Client::ReadPackets()
 				// We now have a valid connection with the server
 				server.Init(&sock, server.remote_addr);
 				state = CS_CONNECTED;
-				engine.start_map(mapname, true);
-				engine.set_tick_rate(tickrate);
-				engine.tick = tick;
-				client_num = client_num_;
+				if (engine.start_map(mapname, true)) {
+					engine.set_tick_rate(tickrate);
+					engine.tick = tick;
+					client_num = client_num_;
+				}
+				else {
+					Disconnect("couldn't start map");
+				}
 			}
 			else if (msg == "reject" && state == CS_TRYINGCONNECT) {
 				Disconnect("rejected by server");
@@ -68,7 +72,7 @@ void Client::ReadPackets()
 	}
 
 	if (state >= CS_CONNECTED) {
-		if (GetTime() - server.last_recieved > cfg_cl_time_out->real) {
+		if (GetTime() - server.last_recieved > cl_time_out->real) {
 			Disconnect("server timed out");
 		}
 	}
@@ -98,6 +102,9 @@ void Client::HandleServerPacket(ByteReader& buf)
 		case SV_SNAPSHOT: {
 			if (state == CS_CONNECTED) {
 				state = CS_SPAWNED;
+
+				// start game state after recieving first snapshot
+				engine.set_state(ENGINE_GAME);
 			}
 			bool ignore_packet = OnEntSnapshot(buf);
 			if (ignore_packet)

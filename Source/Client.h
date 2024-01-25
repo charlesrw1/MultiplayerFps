@@ -77,12 +77,12 @@ public:
 	void HandleServerPacket(ByteReader& msg);
 	bool OnEntSnapshot(ByteReader& msg);
 
-	Config_Var* cfg_interp_time;
-	Config_Var* cfg_fake_lag;
-	Config_Var* cfg_fake_loss;
-	Config_Var* cfg_cl_time_out;
+	Config_Var* interp_time;
+	Config_Var* fake_lag;
+	Config_Var* fake_loss;
+	Config_Var* cl_time_out;
 	Config_Var* interpolate;
-	Config_Var* cfg_do_predict;
+	Config_Var* client_predict;
 	Config_Var* smooth_error_time;
 	Config_Var* dont_replicate_player;
 	Config_Var* time_reset_threshold;
