@@ -63,6 +63,8 @@ public:
 	void print(const char* fmt, ...);
 	void print_args(const char* fmt, va_list list);
 	vector<string> lines;
+	vector<string> history;
+	int history_index = -1;
 	bool auto_scroll = true;
 	bool scroll_to_bottom = false;
 	bool set_keyboard_focus = false;
@@ -116,11 +118,11 @@ public:
 	bool is_host;
 	Game_Local local;
 
-	double time = 0.0;			// time since program start
+	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
+	int tick = 0;				// this is the discretized time tick
 	double frame_time = 0.0;	// total frame time of program
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 0.0;	// 1/tick_rate
-	int tick = 0;
 
 	ImGuiContext* imgui_context;
 	SDL_Window* window;

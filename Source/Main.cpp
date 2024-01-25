@@ -964,9 +964,9 @@ void cmd_print_entities()
 	}
 }
 
-void cmd_game_input_callback()
+void cmd_print_vars()
 {
-
+	cfg.print_vars();
 }
 
 int main(int argc, char** argv)
@@ -1116,6 +1116,12 @@ void Game_Engine::draw_debug_interface()
 			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
 			ImGui::End();
 		}
+		if (!is_host && ImGui::Begin("client")) {
+			ImGui::Text("delta %f", cl->time_delta);
+			ImGui::Text("tick %f", engine.tick);
+			ImGui::Text("frr %f", engine.frame_remainder);
+			ImGui::End();
+		}
 	}
 }
 
@@ -1233,6 +1239,7 @@ void Game_Engine::init()
 	cfg.set_command("net_stat", cmd_print_client_net_stats);
 	cfg.set_command("cl_full_update", cmd_client_force_update);
 	cfg.set_command("print_ents", cmd_print_entities);
+	cfg.set_command("print_vars", cmd_print_vars);
 
 
 	// engine initilization
@@ -1306,7 +1313,6 @@ void Game_Engine::init()
 	for (const auto& cmd : buffered_commands)
 		cfg.execute(cmd);
 
-	cfg.print_vars();
 	cfg.set_unknown_variables = false;
 }
 
@@ -1345,6 +1351,10 @@ void Game_Engine::loop()
 		frame_remainder += dt;
 		int num_ticks = (int)floor(frame_remainder / secs_per_tick);
 		frame_remainder -= num_ticks * secs_per_tick;
+
+		if (!is_host && cl->get_state() == CS_SPAWNED) {
+			frame_remainder += cl->adjust_time_step(num_ticks);
+		}
 
 		/*
 		make input (both listen and clients)
@@ -1424,6 +1434,38 @@ void Game_Engine::pre_render_update()
 	local.update_view();
 }
 
+
+int debug_console_text_callback(ImGuiInputTextCallbackData* data)
+{
+	Debug_Console* console = (Debug_Console*)data->UserData;
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
+		if (data->EventKey == ImGuiKey_UpArrow) {
+			if (console->history_index == -1) {
+				console->history_index = console->history.size() -1 ;
+			}
+			else {
+				console->history_index--;
+				if (console->history_index < 0)
+					console->history_index = 0;
+			}
+		}
+		else if (data->EventKey == ImGuiKey_DownArrow) {
+			if (console->history_index != -1) {
+				console->history_index++;
+				if (console->history_index >= console->history.size())
+					console->history_index = console->history.size() - 1;
+			}
+		}
+		console->scroll_to_bottom = true;
+		if (console->history_index != -1) {
+			auto& hist = console->history[console->history_index];
+			data->DeleteChars(0, data->BufTextLen);
+			data->InsertChars(0, hist.c_str());
+		}
+	}
+	return 0;
+}
+
 void Debug_Console::draw()
 {
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
@@ -1457,18 +1499,22 @@ void Debug_Console::draw()
 
 	// Command-line
 	bool reclaim_focus = false;
-	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll;
+	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | 
+		ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackHistory;
 	if (set_keyboard_focus) {
 		ImGui::SetKeyboardFocusHere();
 		set_keyboard_focus = false;
 	}
-	if (ImGui::InputText("Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags))
+	if (ImGui::InputText("Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags, debug_console_text_callback, this))
 	{
 		char* s = input_buffer;
 		if (s[0]) {
 			print("#%s", input_buffer);
 			cfg.execute(input_buffer);
+			history.push_back(input_buffer);
 			scroll_to_bottom = true;
+
+			history_index = -1;
 		}
 		s[0] = 0;
 		reclaim_focus = true;

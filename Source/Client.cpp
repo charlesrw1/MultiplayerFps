@@ -18,6 +18,7 @@ void Client::init()
 	smooth_error_time	= cfg.get_var("smooth_error", "1.0");
 	cfg_do_predict		= cfg.get_var("do_predict", "1");
 	dont_replicate_player = cfg.get_var("dont_replicate_player", "0");
+	time_reset_threshold = cfg.get_var("time_reset_threshold", "0.1");
 	sock.Init(0);
 }
 
@@ -355,17 +356,41 @@ Frame* Client::FindSnapshotForTick(int tick)
 	return nullptr;
 }
 
-/*
-when clients recieve snapshot from server
-they mark entities in engine.ents as active or inactive (maybe will have some more complicated initilization/destruction)
-replicate standard fields over to entity
-fill the network transform history in client.interpolation_history
+// will add/subtract a small value to adjust the number of ticks running
+float Client::adjust_time_step(int ticks_runnning)
+{
+	static Config_Var* cl_adjust_time = cfg.get_var("cl_adjust_time", "1");
+	static Config_Var* cl_time_adjust = cfg.get_var("cl_max_adjust", "5");
 
-later in frame:
-interpolate_state() fills the entities position/rotation with interpolated values for rendering
-*/
+	if (!cl_adjust_time->integer)
+		return 0.f;
 
-// has extra logic to properly replicate
+	float adjust_total = 0.f;
+	float max_time_adjust = cl_time_adjust->real / 1000.f;
+	
+	for (int i = 0; i < ticks_runnning; i++) {
+		if (abs(time_delta) < 0.0001)
+			break;
+
+
+		if (abs(time_delta) < max_time_adjust) {
+			float adjust = time_delta;
+			time_delta = 0;
+			adjust_total += adjust;
+		}
+		else {
+			float adjust = (time_delta < 0) ? -max_time_adjust : max_time_adjust;
+			time_delta -= adjust;
+			adjust_total += adjust;
+		}
+	}
+
+	static Config_Var* dbg_adjust_neg = cfg.get_var("dbg_aj_t_neg", "1");
+	if (dbg_adjust_neg->integer)
+		return -adjust_total;
+	else
+		return adjust_total;
+}
 
 void Client::read_snapshot(Frame* snapshot)
 {

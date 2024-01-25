@@ -35,6 +35,13 @@ void Engine_Config::set_var(const char* name, const char* value)
 	var = get_var(name, value, true);
 }
 
+void Engine_Config::print_vars()
+{
+	sys_print("%--36s %s", "name", "value");
+	for (int i = 0; i < num_vars; i++)
+		sys_print("%--36s %s\n", vars[i].name.c_str(), vars[i].value.c_str());
+}
+
 void Engine_Config::set_command(const char* name, Engine_Cmd_Function cmd)
 {
 	if (find_cmd(name)) {

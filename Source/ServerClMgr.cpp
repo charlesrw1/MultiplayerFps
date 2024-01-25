@@ -337,12 +337,6 @@ Packed_Entity Frame::begin()
 
 	return Packed_Entity(this, 0, packet_ent_length);
 }
-Packed_Entity Frame::end()
-{
-	Packed_Entity pe(this, 0, 0);
-	pe.index = ENTITY_SENTINAL;
-	return pe;
-}
 
 void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int client_idx)
 {

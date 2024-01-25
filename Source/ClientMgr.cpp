@@ -72,15 +72,6 @@ void Client::ReadPackets()
 			Disconnect("server timed out");
 		}
 	}
-
-	// update packet stats
-	
-
-
-	//int last_sequence = server.out_sequence_ak;
-	//int tick_delta = myclient->tick - myclient->GetCommand(last_sequence)->tick;
-	//printf("RTT: %f\n", (tick_delta)*core.tick_interval);
-
 }
 
 void Client::HandleServerPacket(ByteReader& buf)
@@ -119,12 +110,16 @@ void Client::HandleServerPacket(ByteReader& buf)
 			break;
 		case SV_TICK:
 		{
-			// just force it for now
-			int server_tick = buf.ReadLong();
-			if (abs(server_tick - engine.tick) > 4) {
-				sys_print("delta tick %d\n", server_tick - engine.tick);
-				
+			int server_tick = buf.ReadLong();	// this is the server's current tick
+			float server_time = server_tick * engine.tick_interval;
+			time_delta = engine.time - server_time;
+
+			// hard reset the time values
+			if (abs(time_delta) > time_reset_threshold->real) {
+				sys_print("reset time %f\n", time_delta);
 				engine.tick = server_tick;
+				engine.time = server_time;
+				time_delta = 0.0;
 			}
 			last_recieved_server_tick = server_tick;
 		}break;
@@ -269,7 +264,6 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			
 			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
 			int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
-			//prop_mask = Net_Prop::ALL_PROP_MASK;
 
 			if (from_ent.index < to_index) {
 				// old entity, now gone
@@ -293,7 +287,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 				ByteReader from_state = from_ent.get_buf();
 
 				if (dont_replicate_player->integer) {
-					read_entity(&null_ent, msg, prop_mask, true);
+					read_entity(&null_ent, msg, prop_mask, true);	// FIXME: this is just to advance msg
 				}
 				else {
 					read_entity(ent, from_state, prop_mask, false);	// reset
@@ -323,7 +317,6 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 
 		Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
 		int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
-		//prop_mask = Net_Prop::ALL_PROP_MASK;
 
 		// reset to baseline:
 		ByteReader base = baseline->get_buf();

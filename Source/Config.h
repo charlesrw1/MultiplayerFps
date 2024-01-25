@@ -1,6 +1,5 @@
 #ifndef CONFIG_H
 #define CONFIG_H
-
 #include <string>
 #include <vector>
 
@@ -39,11 +38,7 @@ public:
 
 	// called by Engine_Cmd_Function callbacks
 	const vector<string>& get_arg_list() { return args; }
-	void print_vars() {
-		for (int i = 0; i < num_vars; i++) {
-			printf("%--36s %s\n", vars[i].name.c_str(), vars[i].value.c_str());
-		}
-	}
+	void print_vars();
 
 	bool set_unknown_variables = false;	
 private:

@@ -202,7 +202,6 @@ struct Frame {
 	uint8_t data[MAX_FRAME_SNAPSHOT_DATA];
 
 	Packed_Entity begin();
-	Packed_Entity end();
 
 	int player_offset = 0;	// used by clients, HACK!!!
 };

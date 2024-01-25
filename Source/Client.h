@@ -50,6 +50,8 @@ public:
 	void Disconnect(const char* log_reason);
 	void Reconnect();
 
+	float adjust_time_step(int ticks_running);
+
 	void interpolate_states();
 	void read_snapshot(Frame* s);
 	void run_prediction();
@@ -83,6 +85,7 @@ public:
 	Config_Var* cfg_do_predict;
 	Config_Var* smooth_error_time;
 	Config_Var* dont_replicate_player;
+	Config_Var* time_reset_threshold;
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
@@ -93,6 +96,9 @@ public:
 	glm::vec3 last_origin;
 	float smooth_time = 0.0;
 	int offset_debug = 0;
+
+	int server_tick = 0;
+	float time_delta = 0;
 
 	string serveraddr;
 	int client_num = -1;
