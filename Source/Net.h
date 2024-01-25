@@ -66,6 +66,7 @@ enum Entity_Flags
 	EF_HIDDEN = 4,
 	EF_HIDE_ITEM = 8,
 	EF_BOUNCE = 16,
+	EF_SLIDE = 32,
 };
 
 enum Item_Use_State
@@ -131,13 +132,15 @@ struct Entity
 	short state = 0;	// For players: Player_Movement_State
 	short flags = 0;	// Entity_Flags
 
+	float timer = 0.f;	// multipurpose timer
+
 	int owner_index = 0;
-	float death_time = 0.0;
 	int health = 100;
 	Item_State items;
 
 	int physics = EPHYS_NONE;
-	int collison_shape = 0;
+	float col_radius = 0.f;
+	float col_height = 0;
 	int ground_index = 0;
 
 	// for interpolating entities
@@ -151,10 +154,11 @@ struct Entity
 
 	float in_air_time = 0.f;
 
-	void(*update)(Entity*) = nullptr;
+	void(*update)(Entity* me) = nullptr;
 	void(*damage)(Entity* me, Entity* attacker, int amount, int flags) = nullptr;
-	void(*hit_wall)() = nullptr;
-	bool(*touch)(Entity* other) = nullptr;
+	void(*hit_wall)(Entity* me, glm::vec3 normal) = nullptr;
+	bool(*touch)(Entity* me, Entity* other) = nullptr;
+	void(*timer_callback)(Entity* me) = nullptr;
 
 
 	Animator anim;
@@ -164,7 +168,12 @@ struct Entity
 	bool active() { return type != ET_FREE; }
 	void set_model(const char* model);
 	
+	void clear_pointers();
+
 	void physics_update();
+	void projectile_physics();
+	void gravity_physics();
+	void mover_physics();
 };
 
 struct Net_Prop

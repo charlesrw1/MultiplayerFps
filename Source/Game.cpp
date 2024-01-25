@@ -11,7 +11,7 @@ void player_spawn(Entity* ent);
 void dummy_update(Entity* ent);
 
 Entity* create_grenade(Entity* from, glm::vec3 org, glm::vec3 vel);
-void GrenadeUpdate(Entity* ent);
+void grenade_update(Entity* ent);
 
 
 void EntTakeDamage(Entity* ent, Entity* from, int amt);
@@ -63,6 +63,7 @@ Entity* Game_Engine::new_entity()
 	e = Entity();
 	e.type = ET_USED;	// hack
 	e.index = slot;
+	e.clear_pointers();
 	return &e;
 }
 
@@ -88,7 +89,68 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 			hit_entitiy.damage(&hit_entitiy, from, 100, 0);
 	}
 
-	create_grenade(from, origin + direction * 0.1f, direction * 18.f);
+	create_grenade(from, origin + direction * 0.5f, direction * 18.f);
+}
+
+void Entity::clear_pointers()
+{
+	model = nullptr;
+	hit_wall = nullptr;
+	update = nullptr;
+	damage = nullptr;
+	touch = nullptr;
+}
+
+void Entity::projectile_physics()
+{
+	for (int i = 0; i < 5; i++) {
+
+	}
+}
+void Entity::gravity_physics()
+{
+	bool bounce = flags & EF_BOUNCE;
+	bool slide = flags & EF_SLIDE;
+
+	velocity.y -= (12.f * engine.tick_interval);
+	int iters = 8;
+	vec3 new_pos = position;
+	vec3 delta = (float)engine.tick_interval*velocity / (float)iters;
+	bool called_func = false;
+	for (int i = 0; i < iters; i++) {
+		new_pos += delta;
+		
+		GeomContact contact;
+		CharacterShape s;
+		s.org = new_pos;
+		s.radius = col_radius;
+		s.height = col_radius + 0.1f;
+		engine.phys.TraceCharacter(s, &contact, index, PF_ALL);
+
+		if (contact.found) {
+			new_pos += contact.penetration_normal * (contact.penetration_depth);
+
+			if (bounce) {
+				velocity = glm::reflect(velocity, contact.surf_normal);
+				velocity *= 0.6f;
+			}
+			else if (slide) {
+				vec3 penetration_velocity = dot(velocity, contact.penetration_normal) * contact.penetration_normal;
+				vec3 slide_velocity = velocity - penetration_velocity;
+				velocity = slide_velocity;
+			}
+			else {
+				velocity = vec3(0.f);
+			}
+
+			if (!called_func && hit_wall) {
+				hit_wall(this, contact.surf_normal);
+				called_func = true;
+			}
+			break;
+		}
+	}
+	position = new_pos;
 }
 
 void Entity::physics_update()
@@ -98,8 +160,10 @@ void Entity::physics_update()
 	case EPHYS_MOVER:
 		break;
 	case EPHYS_PROJECTILE:
+		projectile_physics();
 		break;
 	case EPHYS_GRAVITY:
+		gravity_physics();
 		break;
 	}
 }
@@ -112,7 +176,7 @@ void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 	self->health -= damage;
 	if (self->health <= 0) {
 		self->flags |= EF_DEAD;
-		self->death_time = engine.time+5.f;
+		self->timer = 5.f;
 
 		self->anim.set_anim("act_die_1", true);
 		self->anim.m.loop = false;
@@ -166,7 +230,7 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 	ent->health -= amt;
 	if (ent->health <= 0) {
 		ent->flags |= EF_DEAD;
-		ent->death_time = engine.time + 3.0;
+		ent->timer = 3.0;
 
 		ent->anim.set_anim("act_die", false);
 		ent->anim.m.loop = false;
@@ -192,14 +256,14 @@ void Game_Engine::execute_player_move(int num, Move_Command cmd)
 void player_update(Entity* ent)
 {
 	if (ent->flags & EF_DEAD) {
-		if (ent->death_time < engine.time) {
+		if (ent->timer <= 0.f) {
 			player_spawn(ent);
 		}
 	}
 
 	if (ent->position.y < -50 && !(ent->flags & EF_DEAD)) {
 		ent->flags |= EF_DEAD;
-		ent->death_time = engine.time + 0.5f;
+		ent->timer = 0.5f;
 	}
 }
 void dummy_update(Entity* ent)
@@ -210,8 +274,21 @@ void dummy_update(Entity* ent)
 		engine.free_entity(ent);
 }
 
+static Random fxrand = Random(1452345);
+
+void grenade_hit_wall(Entity* ent, glm::vec3 normal)
+{
+	if (glm::length(ent->velocity)>1.f) {
+		ent->rotation = vec3(fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI));
+	}
+}
+
 Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel)
 {
+	static Config_Var* grenade_radius = cfg.get_var("game/grenade_radius", "0.25f");
+	static Config_Var* grenade_slide = cfg.get_var("game/grenade_slide", "0");
+
+
 	ASSERT(thrower);
 	Entity* e = engine.new_entity();
 	e->type = ET_GRENADE;
@@ -219,49 +296,23 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel)
 	e->owner_index = thrower->index;
 	e->position = org;
 	e->velocity = start_vel;
-	e->flags = 0;
-	e->death_time = engine.time + 5.f;
-
-	e->update = GrenadeUpdate;
+	e->flags = grenade_slide->integer ? EF_SLIDE : EF_BOUNCE;
+	e->timer = 5.f;
+	e->physics = EPHYS_GRAVITY;
+	e->col_radius = grenade_radius->real;
+	e->hit_wall = grenade_hit_wall;
+	e->update = grenade_update;
 	return e;
 }
 
-void RunProjectilePhysics(Entity* ent)
+void grenade_update(Entity* ent)
 {
-	// update physics, detonate if ready
-	float dt = engine.tick_interval;
-	ent->velocity.y -= 12.f * dt;// gravity
-	glm::vec3 next_position = ent->position + ent->velocity * dt;
-	float len = glm::length(ent->velocity * dt);
-	RayHit rh;
-	Ray r;
-	r.dir = (ent->velocity * dt) / len;
-	r.pos = ent->position;
-	engine.phys.TraceRay(r, &rh, ent->owner_index, PF_ALL);
-	//g->RayWorldIntersect(r, &rh, ent->owner_index, PF_ALL);
-	if (rh.hit_world && rh.dist < len) {
-		ent->position = r.at(rh.dist) + rh.normal * 0.01f;
-		ent->velocity = glm::reflect(ent->velocity, rh.normal);
-		ent->velocity *= 0.6f;
-	}
-	else {
-		ent->position = next_position;
-	}
-}
-
-
-void GrenadeUpdate(Entity* ent)
-{
-	RunProjectilePhysics(ent);
 	// spin grenade based on velocity
 	float dt = engine.tick_interval;
 
 	float vel = glm::length(ent->velocity);
 
-	ent->rotation.x += 0.7 * dt * vel;
-	ent->rotation.y -= 1.3 * dt * vel;
-
-	if (ent->death_time < engine.time) {
+	if (ent->timer <= 0.f) {
 		sys_print("BOOM\n");
 		engine.free_entity(ent);
 	}

@@ -1204,7 +1204,7 @@ void Game_Engine::build_physics_world(float time)
 
 void player_update(Entity* e);
 void DummyUpdate(Entity* e);
-void GrenadeUpdate(Entity* e);
+void grenade_update(Entity* e);
 
 
 void Game_Engine::update_game_tick()
@@ -1213,9 +1213,21 @@ void Game_Engine::update_game_tick()
 	execute_player_move(0, local.last_command);
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		if (ents[i].active() && ents[i].update)
-			ents[i].update(&ents[i]);
-		ents[i].anim.AdvanceFrame(tick_interval);
+		Entity& e = ents[i];
+		if (!ents[i].active())
+			continue;
+
+		if (e.timer > 0.f) {
+			e.timer -= engine.tick_interval;
+			if (e.timer <= 0.f && e.timer_callback)
+				e.timer_callback(&e);
+		}
+
+		e.physics_update();
+		if (e.update)
+			e.update(&e);
+		if(e.model && e.model->animations)
+			e.anim.AdvanceFrame(tick_interval);
 	}
 }
 

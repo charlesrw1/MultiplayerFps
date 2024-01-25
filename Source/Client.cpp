@@ -159,7 +159,6 @@ void Client::run_prediction()
 		player_physics_update(&player, cmd);
 	}
 	// runs animation and item code for current frame only
-	
 	player_post_physics(&player, get_command(end - 1));
 	
 	// dont advance frames if animation is being controlled server side
