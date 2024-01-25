@@ -929,6 +929,14 @@ void cmd_load_map()
 
 	engine.start_map(cfg.get_arg_list().at(1), false);
 }
+void cmd_exec_file()
+{
+	if (cfg.get_arg_list().size() < 2) {
+		sys_print("usage map <map name>");
+		return;
+	}
+	cfg.execute_file(cfg.get_arg_list().at(1).c_str());
+}
 
 void cmd_print_client_net_stats()
 {
@@ -1115,12 +1123,14 @@ void Game_Engine::draw_debug_interface()
 			ImGui::DragFloat3("pos", &p.position.x);
 			ImGui::DragFloat3("vel", &p.velocity.x);
 			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
-			ImGui::End();
 		}
-		if (!is_host && ImGui::Begin("client")) {
-			ImGui::Text("delta %f", cl->time_delta);
-			ImGui::Text("tick %f", engine.tick);
-			ImGui::Text("frr %f", engine.frame_remainder);
+		ImGui::End();
+		if (is_host) {
+			if (ImGui::Begin("client")) {
+				ImGui::Text("delta %f", cl->time_delta);
+				ImGui::Text("tick %f", engine.tick);
+				ImGui::Text("frr %f", engine.frame_remainder);
+			}
 			ImGui::End();
 		}
 	}
@@ -1250,7 +1260,7 @@ void Game_Engine::init()
 	cfg.set_command("cl_full_update", cmd_client_force_update);
 	cfg.set_command("print_ents", cmd_print_entities);
 	cfg.set_command("print_vars", cmd_print_vars);
-
+	cfg.set_command("exec", cmd_exec_file);
 
 	// engine initilization
 	init_sdl_window();
@@ -1267,25 +1277,6 @@ void Game_Engine::init()
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
-
-	// key binds
-	bind_key(SDL_SCANCODE_R, "thirdperson_camera 0");
-	bind_key(SDL_SCANCODE_2, "reconnect");
-	bind_key(SDL_SCANCODE_1, "disconnect");
-	bind_key(SDL_SCANCODE_3, "sv_end");
-
-	bind_key(SDL_SCANCODE_Y, "fake_movement_debug 0");
-	bind_key(SDL_SCANCODE_U, "fake_movement_debug 1");
-	bind_key(SDL_SCANCODE_I, "fake_movement_debug 2");
-	bind_key(SDL_SCANCODE_9, "counter 0");
-	bind_key(SDL_SCANCODE_0, "counter 1");
-
-	bind_key(SDL_SCANCODE_LEFT, "dont_replicate_player 1");
-	bind_key(SDL_SCANCODE_RIGHT, "dont_replicate_player 0");
-
-
-	cfg.execute_file("vars.txt");	// load config vars
-	cfg.execute_file("init.txt");	// load startup script
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -1307,6 +1298,8 @@ void Game_Engine::init()
 		else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			SDL_SetWindowTitle(window, "CsRemake - VISUAL STUDIO\n");
 		}
+
+
 		else if (argv[i][0] == '-') {
 			string cmd;
 			cmd += &argv[i++][1];
@@ -1317,6 +1310,9 @@ void Game_Engine::init()
 			buffered_commands.push_back(cmd);
 		}
 	}
+
+	cfg.execute_file("vars.txt");	// load config vars
+	cfg.execute_file("init.txt");	// load startup script
 
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, window_w->integer, window_h->integer);
@@ -1359,11 +1355,9 @@ void Game_Engine::game_update_tick()
 	}
 
 	if (!is_host) {
-		tick += 1;
-		time = tick * tick_interval;
-
 		cl->ReadPackets();
 		cl->run_prediction();
+		tick += 1;
 	}
 }
 

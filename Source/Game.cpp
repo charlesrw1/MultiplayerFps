@@ -91,6 +91,18 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 	create_grenade(from, origin + direction * 0.1f, direction * 18.f);
 }
 
+void Entity::physics_update()
+{
+	switch (physics)
+	{
+	case EPHYS_MOVER:
+		break;
+	case EPHYS_PROJECTILE:
+		break;
+	case EPHYS_GRAVITY:
+		break;
+	}
+}
 
 void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 {

@@ -65,6 +65,7 @@ enum Entity_Flags
 	EF_FORCED_ANIMATION = 2,
 	EF_HIDDEN = 4,
 	EF_HIDE_ITEM = 8,
+	EF_BOUNCE = 16,
 };
 
 enum Item_Use_State
@@ -106,6 +107,15 @@ enum Player_Movement_State
 	PMS_JUMPING = 4,	// first part of jump
 };
 
+enum Entity_Physics
+{
+	EPHYS_NONE,
+	EPHYS_PLAYER,
+	EPHYS_GRAVITY,
+	EPHYS_PROJECTILE,
+	EPHYS_MOVER,		// platforms, doors
+};
+
 class Model;
 struct Entity
 {
@@ -122,10 +132,19 @@ struct Entity
 	short flags = 0;	// Entity_Flags
 
 	int owner_index = 0;
-	int sub_type = 0;
 	float death_time = 0.0;
 	int health = 100;
 	Item_State items;
+
+	int physics = EPHYS_NONE;
+	int collison_shape = 0;
+	int ground_index = 0;
+
+	// for interpolating entities
+	glm::vec3 interp_pos;
+	glm::vec3 interp_rot;
+	float interp_remaining;
+	float interp_time;
 
 	int item = 0;
 	int solid = 0;
@@ -134,6 +153,8 @@ struct Entity
 
 	void(*update)(Entity*) = nullptr;
 	void(*damage)(Entity* me, Entity* attacker, int amount, int flags) = nullptr;
+	void(*hit_wall)() = nullptr;
+	bool(*touch)(Entity* other) = nullptr;
 
 
 	Animator anim;
@@ -141,8 +162,9 @@ struct Entity
 
 	void set_inactive() { type = ET_FREE; }
 	bool active() { return type != ET_FREE; }
-
 	void set_model(const char* model);
+	
+	void physics_update();
 };
 
 struct Net_Prop
@@ -189,15 +211,9 @@ struct Packed_Entity
 
 // stores binary data of the game state, used by client and server
 struct Frame {
-	//static const int MAX_FRAME_ENTS = 256;
 	int tick = 0;
-	//EntityState states[MAX_FRAME_ENTS];
-	//PlayerState ps_states[MAX_CLIENTS];
-
 	static const int MAX_FRAME_SNAPSHOT_DATA = 8000;
 
-	// format: ent_index 10 bits
-	//			ent_data: variable
 	int num_ents_this_frame = 0;
 	uint8_t data[MAX_FRAME_SNAPSHOT_DATA];
 

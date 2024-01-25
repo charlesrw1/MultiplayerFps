@@ -121,8 +121,6 @@ void Client::run_prediction()
 	if (get_state() != CS_SPAWNED)
 		return;
 
-
-
 	if (!client_predict->integer)
 		return;
 
@@ -137,8 +135,7 @@ void Client::run_prediction()
 	// restore local player's state to last authoritative snapshot 
 	int incoming_seq = InSequence();
 	Frame* auth = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	//PlayerState predicted_player = last_auth_state->pstate;
-	Entity& player = engine.ents[engine.player_num()];
+	Entity& player = engine.local_player();
 	
 	if (dont_replicate_player->integer)
 		start = end - 2;	// only sim current frame
@@ -162,7 +159,8 @@ void Client::run_prediction()
 		player_physics_update(&player, cmd);
 	}
 	// runs animation and item code for current frame only
-	//player_post_physics(&player, get_command(end - 1));
+	
+	player_post_physics(&player, get_command(end - 1));
 	
 	// dont advance frames if animation is being controlled server side
 	if(!(player.flags & EF_FORCED_ANIMATION))
@@ -225,8 +223,8 @@ void set_entity_from_interp(Entity& e, Interp_Entry& i)
 {
 	e.position = i.position;
 	e.rotation = i.angles;
-	e.anim.m = i.torso;
-	e.anim.legs = i.legs;
+	//e.anim.m = i.torso;
+	//e.anim.legs = i.legs;
 }
 void set_interp_from_entity(Interp_Entry& i, Entity& e)
 {
@@ -265,17 +263,19 @@ void interp_animator_layer(Animator_Layer& l1, Animator_Layer& l2, const Model* 
 
 void Client::interpolate_states()
 {
+	static Config_Var* dbg_print = cfg.get_var("dbg_i_state", "0");
+
 	if (!interpolate->integer)
 		return;
 
-	auto cl = engine.cl;
+	auto& cl = engine.cl;
 	// FIXME
 	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->interp_time->real);
 	
 	// interpolate local player error
 	if (smooth_time > 0 && dont_replicate_player->integer == 0) {
 		if (smooth_time == smooth_error_time->real)
-			printf("starting smooth\n");
+			sys_print("starting smooth\n");
 
 		vec3 delta = engine.local_player().position - last_origin;
 		vec3 new_position = last_origin + delta * (1 - (smooth_time / smooth_error_time->real));
@@ -283,7 +283,7 @@ void Client::interpolate_states()
 		smooth_time -= engine.frame_time;
 
 		if (smooth_time <= 0)
-			printf("end smooth\n");
+			sys_print("end smooth\n");
 	}
 	last_origin = engine.local_player().position;
 
@@ -307,6 +307,8 @@ void Client::interpolate_states()
 
 		// could extrpolate here, or just set it to last state
 		if (entry_index == 0 || entry_index == Entity_Interp::HIST_SIZE) {
+			if (dbg_print->integer)
+				sys_print("using last state\n");
 			set_entity_from_interp(ent, *ce.GetLastState());
 			continue;
 		}
@@ -315,15 +317,19 @@ void Client::interpolate_states()
 		Interp_Entry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
 
 		if (s1->tick == -1 && s2->tick == -1) {
-			//ent.from_entity_state(EntityState{});
-			printf("no state to use\n");
+			if (dbg_print->integer)
+				sys_print("no state\n");
 			continue;
 		}
 		else if (s1->tick == -1) {
+			if (dbg_print->integer)
+				sys_print("no start state\n");
 			set_entity_from_interp(ent, *s2);
 			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
+			if (dbg_print->integer)
+				sys_print("no end state\n");
 			set_entity_from_interp(ent, *s1);
 			continue;
 		}
@@ -333,13 +339,23 @@ void Client::interpolate_states()
 
 		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*engine.tick_interval)) {
 			set_entity_from_interp(ent, *s1);
-			printf("teleport\n");
+			if (dbg_print->integer)
+				sys_print("teleport\n");
 			continue;
 		}
 
 		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
 		Interp_Entry interpstate = *s1;
-		interpstate.position = glm::mix(s1->position, s2->position, midlerp);
+
+		Config_Var* interp_force = cfg.get_var("dbg_interp_force", "0");
+		if (interp_force->integer == 0)
+			interpstate.position = glm::mix(s1->position, s2->position, midlerp);
+		else if (interp_force->integer == 1)
+			interpstate.position = s1->position;
+		else if (interp_force->integer == 2)
+			interpstate.position = s2->position;
+		else
+			interpstate.position = glm::mix(s1->position, s2->position,1 - midlerp);
 		
 		for (int i = 0; i < 3; i++) {
 			float d = s1->angles[i] - s2->angles[i];
@@ -371,7 +387,7 @@ Frame* Client::FindSnapshotForTick(int tick)
 float Client::adjust_time_step(int ticks_runnning)
 {
 	static Config_Var* cl_adjust_time = cfg.get_var("cl_adjust_time", "1");
-	static Config_Var* cl_time_adjust = cfg.get_var("cl_max_adjust", "5");
+	static Config_Var* cl_time_adjust = cfg.get_var("cl_max_adjust", "1");
 
 	if (!cl_adjust_time->integer)
 		return 0.f;
@@ -428,6 +444,8 @@ void Client::read_snapshot(Frame* snapshot)
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 	{
 		Entity& e = engine.ents[i];
+		if (!e.active()) continue;
+
 		Entity_Interp& interp = interpolation_data[i];
 		e.index = i;	// FIXME
 
@@ -443,7 +461,7 @@ void Client::read_snapshot(Frame* snapshot)
 
 		if (i != engine.player_num()) {
 			Interp_Entry& entry = interp.hist[interp.hist_index];
-			entry.tick = engine.tick;
+			entry.tick = snapshot->tick;
 			set_interp_from_entity(entry, e);
 
 			interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
@@ -452,14 +470,14 @@ void Client::read_snapshot(Frame* snapshot)
 
 	// update prediction error data
 	int sequence_i_sent = OutSequenceAk();
-	//if (OutSequence() - sequence_i_sent < origin_history.size()) {
-	//	Entity& player = engine.ents[client_num];
-	//	vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
-	//	// FIXME check for teleport
-	//	float len = glm::length(delta);
-	//	if (len > 0.05 && len < 10 && smooth_time <= 0.0)
-	//		smooth_time = smooth_error_time->real;
-	//}
+	if (OutSequence() - sequence_i_sent < origin_history.size()) {
+		Entity& player = engine.ents[client_num];
+		vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
+		// FIXME check for teleport
+		float len = glm::length(delta);
+		if (len > 0.05 && len < 10 && smooth_time <= 0.0)
+			smooth_time = smooth_error_time->real;
+	}
 
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet
 	engine.build_physics_world(0.f);

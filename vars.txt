@@ -1,15 +1,22 @@
 bind T "thirdperson_camera 1"
-bind 4 "map test_level2.glb"
-bind C "connect localhost"
+bind R "thirdperson_camera 0"
+
+bind 1 "map test_level2.glb"
+bind 2 "connect localhost"
+bind 3 "disconnect"
+bind 4 "sv_end"
+bind 5 "reconnect"
+
+bind 6 "fake_movement_debug 0"
+bind 7 "fake_movement_debug 1"
+bind 8 "fake_movement_debug 2"
 
 #net vars
 tick_rate 66.0
 snapshot_rate 30.0
-interp_time 0.05
-fake_lag 75
+interp_time 0.07
+fake_lag 50
 fake_loss 0
-#do_predict 0
-smooth_error_time -1.0
 
 #render vars
 draw_collision_tris 0

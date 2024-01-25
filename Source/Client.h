@@ -23,7 +23,7 @@ struct Interp_Entry
 
 struct Entity_Interp
 {
-	const static int HIST_SIZE = 5;
+	const static int HIST_SIZE = 20;
 	Interp_Entry hist[HIST_SIZE];
 	int hist_index = 0;
 
