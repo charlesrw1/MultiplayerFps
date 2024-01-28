@@ -28,7 +28,6 @@ static bool new_physics = true;
 
 static float ground_friction = 7.2;
 static float air_friction = 0.01;
-static float gravityamt = 16;
 static float ground_accel = 6;
 static float ground_accel_crouch = 4;
 static float air_accel = 3;
@@ -47,7 +46,6 @@ void move_variables_menu()
 
 	ImGui::SliderFloat("ground_friction", &ground_friction, 0, 20);
 	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
-	ImGui::SliderFloat("gravityamt", &gravityamt, 0, 30);
 	ImGui::SliderFloat("ground_accel", &ground_accel, 1, 10);
 	ImGui::SliderFloat("air_accel", &air_accel, 0, 10);
 	ImGui::SliderFloat("minspeed", &minspeed, 0, 10);
@@ -215,41 +213,84 @@ void player_physics_check_duck(Entity& player, Move_Command cmd)
 	}
 }
 
-void player_physics_move(Entity& player)
+vec3 player_physics_clip_velocity(vec3 in_vel, vec3 plane_normal)
 {
+	return in_vel - dot(in_vel, plane_normal) * plane_normal;
+}
 
+GeomContact player_physics_trace_character(Entity& player, vec3 end)
+{
 	CharacterShape character;
 	character.height = (player.state & PMS_CROUCHING) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
-	character.org = glm::vec3(0.f);
+	character.org = end;
 	character.m = nullptr;
 	character.a = nullptr;
 	character.radius = CHAR_HITBOX_RADIUS;
 
+	GeomContact c;
+	engine.phys.TraceCharacter(character, &c, player.index, PF_ALL);
+	return c;
+}
+#if 0
+// sorry this is all just stripped from quake
+void player_physics_move2(Entity& player)
+{
+	static Config_Var* skin = cfg.get_var("game/skin", "0.01");
+
 	vec3 delta = player.velocity * (float)engine.tick_interval;
 
-	vec3 position = player.position;
-	vec3 step = delta / (float)col_iters;
-	for (int i = 0; i < col_iters; i++)
+	vec3 original_velocity = player.velocity;
+	vec3 original_position = player.position;
+
+	vec3 planes[4];
+	int num_planes = 0;
+
+	int num_bumps = 4;
+
+	vec3 step = delta / (float)4.f;
+
+	float time_remaining = engine.tick_interval;
+
+	for (int i = 0; i < num_bumps; i++)
 	{
-		position += step;
-		GeomContact trace;
-
-		character.org = position;
-
-		engine.phys.TraceCharacter(character, &trace, player.index, PF_ALL);
+		vec3 end = player.position + player.velocity * time_remaining;
+		GeomContact trace = player_physics_trace_character(player, end);
 		if (trace.found)
 		{
+			vec3 end_pos = player.position + trace.penetration_normal * trace.penetration_depth;
+			float frac =
+
+
+				planes[num_planes++] = trace.penetration_normal;
+			bool stop = false;
+			for (int j = 0; j < num_planes - 1; j++)
+				if (dot(planes[j], planes[num_planes - 1]) < -0.01f)
+					stop = true;
+
+			// if youre trying to nudge into a corner, just cut velocity
+			if (stop) {
+				//player.velocity = glm::vec3(0.f);
+				//position = player.position;
+				//break;
+			}
+
 			vec3 penetration_velocity = dot(player.velocity, trace.penetration_normal) * trace.penetration_normal;
 			vec3 slide_velocity = player.velocity - penetration_velocity;
 			position += trace.penetration_normal * trace.penetration_depth;////trace.0.001f + slide_velocity * dt;
 			player.velocity = slide_velocity;
+
+		}
+		else {
+			// moved entire distance
+			break;
 		}
 	}
 	// Gets player out of surfaces
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 0; i++) {
 		GeomContact res;
 
 		character.org = position;
+		character.radius -= skin->real;
 		engine.phys.TraceCharacter(character, &res, player.index, PF_ALL);
 
 		if (res.found) {
@@ -257,6 +298,54 @@ void player_physics_move(Entity& player)
 		}
 	}
 	player.position = position;
+}
+#endif
+
+void player_physics_move(Entity& player)
+{
+	vec3 orig_velocity = player.velocity;
+	vec3 orig_position = player.position;
+
+	int num_bumps = 4;
+
+	float move_time = engine.tick_interval;
+
+	for (int i = 0; i < num_bumps; i++)
+	{
+		vec3 end = player.position + player.velocity * (move_time/num_bumps);
+
+		GeomContact trace = player_physics_trace_character(player, end);
+
+		if (trace.found) {
+			vec3 penetration_velocity = dot(player.velocity, trace.penetration_normal) * trace.penetration_normal;
+			vec3 slide_velocity = player.velocity - penetration_velocity;
+			
+			vec3 neg_vunit = -glm::normalize(player.velocity);
+			float d = dot(trace.penetration_normal, neg_vunit);
+			
+			//if (abs(d) > 0.001f) {
+			//	float push_out_depth = trace.penetration_depth / d;
+			//	player.position = end + push_out_depth * neg_vunit;
+			//}
+			//else {
+				player.position = end + trace.penetration_normal * trace.penetration_depth;
+			//}
+			player.velocity = slide_velocity;
+			if (dot(player.velocity, orig_velocity) < 0) {
+				sys_print("opposite velocity\n");
+				player.velocity = vec3(0.f);
+				break;
+			}
+		}
+		else {
+			player.position = end;
+		}
+	}
+}
+
+float lensquared_noy(vec3 v)
+{
+	return v.x * v.x + v.z * v.z;
 }
 
 void player_physics_ground_move(Entity& player, Move_Command command)
@@ -297,9 +386,16 @@ void player_physics_ground_move(Entity& player, Move_Command command)
 
 	player_physics_check_jump(player, command);
 	player_physics_check_duck(player, command);
+
+	static Config_Var* phys_gravity = cfg.get_var("phys/gravity", "16.0");
+
 	if (!(player.state & PMS_GROUND))
-		player.velocity.y -= gravityamt * engine.tick_interval;
+		player.velocity.y -= phys_gravity->real * engine.tick_interval;
+	
+	static Config_Var* phys_stair = cfg.get_var("phys/stair", "0.5");
+
 	player_physics_move(player);
+
 	if (!(player.flags & EF_DEAD)) {
 		player.rotation = vec3(0.f);
 		player.rotation .y = HALFPI - command.view_angles.y;
