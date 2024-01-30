@@ -718,7 +718,7 @@ void PhysicsWorld::TraceRay(Ray r, RayHit* rh, int ignore_index, int filter_flag
 
 bool PhysicsWorld::FilterObj(PhysicsObject* o, int ig_ent, int filter_flags)
 {
-	if (o->userindex == ig_ent)
+	if (!o->is_level && o->userindex == ig_ent)
 		return true;
 	if (o->player && !(filter_flags & PF_PLAYERS))
 		return true;

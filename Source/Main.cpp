@@ -1045,6 +1045,9 @@ void Game_Engine::set_tick_rate(float tick_rate)
 
 void Game_Engine::exit_map()
 {
+	if (!sv->initialized)
+		return;
+
 	FreeLevel(level);
 	level = nullptr;
 	sv->end("exiting to menu");

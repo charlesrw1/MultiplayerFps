@@ -106,6 +106,8 @@ enum Player_Movement_State
 	PMS_GROUND = 1,		// on ground, else in air
 	PMS_CROUCHING = 2,	// crouching in air or on ground
 	PMS_JUMPING = 4,	// first part of jump
+
+	PMS_PERCHED = 8,
 };
 
 enum Entity_Physics
