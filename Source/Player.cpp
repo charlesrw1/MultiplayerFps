@@ -130,7 +130,7 @@ void check_perch(Entity& player)
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
-		engine.phys.TraceRay(ray, &rh, -1, PF_WORLD);
+		rh = engine.phys.trace_ray(ray, -1, PF_WORLD);
 
 		// perched on ledge
 		if (rh.hit_world) {
@@ -162,8 +162,7 @@ void check_ground_state(Entity& player, Move_Command command)
 
 	GeomContact result;
 	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
-
-	engine.phys.TraceSphere(SphereShape(where, CHAR_HITBOX_RADIUS), &result, player.index, PF_ALL);
+	result = engine.phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), player.index, PF_ALL);
 
 	if (!result.found || result.surf_normal.y < 0.3)
 		player.state &= ~PMS_GROUND;
@@ -238,16 +237,8 @@ void check_duck(Entity& player, Move_Command cmd)
 
 GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
 {
-	CharacterShape character;
-	character.height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
-	character.org = end;
-	character.m = nullptr;
-	character.a = nullptr;
-	character.radius = CHAR_HITBOX_RADIUS;
-
-	GeomContact c;
-	engine.phys.TraceCharacter(character, &c, index, PF_ALL);
-	return c;
+	float height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
+	return engine.phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
 }
 
 void player_physics_move(Entity& player)

@@ -620,7 +620,7 @@ void Renderer::DrawEntBlobShadows()
 		Ray r;
 		r.pos = e->position + glm::vec3(0,0.1f,0);
 		r.dir = glm::vec3(0, -1, 0);
-		engine.phys.TraceRay(r, &rh, i, PF_WORLD);
+		rh = engine.phys.trace_ray(r, i, PF_WORLD);
 
 		if (rh.dist < 0)
 			continue;
@@ -1193,15 +1193,12 @@ void Game_Engine::build_physics_world(float time)
 		Entity& ce = ents[i];
 		if (ce.type != ET_PLAYER) continue;
 
-		CharacterShape cs;
-		cs.a = &ce.anim;
-		cs.m = ce.model;
-		cs.org = ce.position;
-		cs.radius = CHAR_HITBOX_RADIUS;
-		cs.height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
-		PhysicsObject po;
-		po.shape = PhysicsObject::Character;
-		po.character = cs;
+		PhysicsObject po;		
+		float height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
+		vec3 mins = ce.position - vec3(CHAR_HITBOX_RADIUS, 0, CHAR_HITBOX_RADIUS);
+		vec3 maxs = ce.position + vec3(CHAR_HITBOX_RADIUS, height, CHAR_HITBOX_RADIUS);
+		po.max = maxs;
+		po.min_or_origin = mins;
 		po.userindex = i;
 		po.player = true;
 

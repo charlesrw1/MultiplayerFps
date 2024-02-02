@@ -78,8 +78,7 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 		return;
 
 	Ray r(origin, direction);
-	RayHit hit;
-	engine.phys.TraceRay(r, &hit, from->index, PF_ALL);
+	RayHit hit = engine.phys.trace_ray(r, from->index, PF_ALL);
 	if (hit.hit_world) {
 		// add particles + decals here
 	}
@@ -120,12 +119,7 @@ void Entity::gravity_physics()
 	for (int i = 0; i < iters; i++) {
 		new_pos += delta;
 		
-		GeomContact contact;
-		CharacterShape s;
-		s.org = new_pos;
-		s.radius = col_radius;
-		s.height = col_radius + 0.1f;
-		engine.phys.TraceCharacter(s, &contact, index, PF_WORLD);
+		GeomContact contact = engine.phys.trace_shape(Trace_Shape(new_pos, col_radius), index, PF_WORLD);
 
 		if (contact.found) {
 			new_pos += contact.penetration_normal * (contact.penetration_depth);

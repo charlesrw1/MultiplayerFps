@@ -41,16 +41,6 @@ struct Capsule
 	void GetSphereCenters(glm::vec3& a, glm::vec3& b) const;
 };
 
-struct TriangleShape
-{
-	int indicies[3];
-	glm::vec3 face_normal;
-	float plane_offset = 0.f;
-	short surf_flags = 0;
-	short surf_type = 0;
-};
-
-
 class BVH;
 struct MeshShape
 {
@@ -59,58 +49,36 @@ struct MeshShape
 	const BVH* structure;
 };
 
-struct CharacterShape
-{
-	glm::vec3 org;
-	float height;
-	float radius;
-
-	const Animator* a;
-	const Model* m;
-
-	Bounds ToBounds();
-};
-struct SphereShape
-{
-	SphereShape() {}
-	SphereShape(glm::vec3 origin, float r) 
-		: origin(origin), radius(r) {}
-
-	glm::vec3 origin;
-	float radius;
-	Bounds ToBounds();
-};
-struct BoxShape
-{
-	glm::vec3 min;
-	glm::vec3 max;
-	glm::mat3 rot;
-	Bounds ToBounds();
-};
-
 struct PhysicsObject
 {
-	PhysicsObject() {
+	bool is_mesh = false;
+	MeshShape mesh;
+	glm::vec3 max;
+	glm::vec3 min_or_origin;
+	const Animator* a = nullptr;
+	const Model* m = nullptr;
 
-	}
-	enum Type {
-		Sphere,
-		Character,
-		Box,
-		Mesh,
-	} shape;
-	union {
-		CharacterShape character;
-		SphereShape sphere;
-		BoxShape box;
-		MeshShape mesh;
-	};
 	int userindex = -1;
 	bool player = false;
 	bool solid = true;
 	bool is_level = false;
+
+	Bounds to_bounds();
 };
 
+struct Trace_Shape
+{
+	Trace_Shape();
+	Trace_Shape(glm::vec3 center, float radius);
+	Trace_Shape(glm::vec3 org, float radius, float height);
+
+	Bounds to_bounds();
+
+	glm::vec3 pos;
+	float radius;
+	float height;
+	bool sphere;
+};
 
 enum Physics_Filter_Flags
 {
@@ -130,11 +98,9 @@ public:
 	void AddObj(PhysicsObject obj);
 	void ClearObjs();
 
-	void TraceRay(Ray r, RayHit* out, int ignore_index, int filter_flags);
-	void TraceCharacter(CharacterShape shape, GeomContact* c, int ignore_index, int filter_flags);	// capsule shaped character
-	void TraceSphere(SphereShape shape, GeomContact* c, int ignore_index, int filter_flags);
-	void GetObjectsInBox(int* indicies, int buffer_len, Bounds box, int filter_flags);
-	void GetObjectsInRadius(int* indicies, int buffer_len, glm::vec3 org, float r, int filter_flags);
+	RayHit trace_ray(Ray r, int ignore_index, int filter_flags);
+	GeomContact trace_shape(Trace_Shape shape, int ignore_index, int filter_flags);
+
 
 	PhysicsObject& GetObj(int index);
 private:
