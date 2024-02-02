@@ -27,6 +27,7 @@
 #include "Server.h"
 #include "Player.h"
 #include "Config.h"
+#include "Draw.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -324,76 +325,6 @@ void Fly_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy
 		position -= move_speed * up;
 }
 
-struct RenderAttachments
-{
-	uint32_t scene_color;
-	uint32_t scene_depthstencil;
-	uint32_t ssao_color;
-};
-
-struct RenderFBOs
-{
-	uint32_t scene;
-	uint32_t ssao;
-};
-
-
-class Renderer
-{
-public:
-	void Init();
-	void FrameDraw();
-
-	void draw_text();
-	void draw_rect();
-
-	void DrawModel(const Model* m, mat4 transform, const Animator* a = nullptr);
-	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
-
-	// shaders
-	Shader simple;
-	Shader textured;
-	Shader animated;
-	Shader static_wrld;
-	Shader basic_mod;
-	Shader particle_basic;
-
-	uint32_t white_texture;
-	uint32_t black_texture;
-
-	RenderFBOs fbo;
-	RenderAttachments textures;
-
-	// config vars
-	Config_Var* r_draw_collision_tris;
-	Config_Var* r_draw_sv_colliders;
-	Config_Var* r_draw_viewmodel;
-	Config_Var* vsync;
-private:
-	void InitGlState();
-	void InitFramebuffers();
-
-	void DrawEnts();
-	void DrawLevel();
-	void DrawPlayerViewmodel();
-
-	void DrawEntBlobShadows();
-	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
-
-	void BindTexture(int bind, int id);
-	void SetStdShaderConstants(Shader* s);
-
-	int cur_w = 0;
-	int cur_h = 0;
-	int cur_shader = -1;
-	View_Setup vs;
-
-	int cur_img_1 = -1;
-
-	MeshBuilder shadowverts;
-
-	Game_Local* gamel;
-};
 
 void Renderer::InitGlState()
 {
@@ -432,41 +363,41 @@ void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
 }
 
-void Renderer::BindTexture(int bind, int id)
+void Renderer::bind_texture(int bind, int id)
 {
-	if (id != cur_img_1) {
+	ASSERT(bind >= 0 && bind < 4);
+	if (cur_tex[bind] != id) {
 		glActiveTexture(GL_TEXTURE0 + bind);
 		glBindTexture(GL_TEXTURE_2D, id);
-		cur_img_1 = id;
+		cur_tex[bind] = id;
 	}
 }
 
-void Renderer::SetStdShaderConstants(Shader* s)
+void Renderer::set_shader_constants()
 {
-	s->set_mat4("ViewProj", vs.viewproj);
+	shader().set_mat4("ViewProj", vs.viewproj);
 	
 	// fog vars
-	s->set_float("near", vs.near);
-	s->set_float("far", vs.far);
-	s->set_float("fog_max_density", 1.0);
-	s->set_vec3("fog_color", vec3(0.7));
-	s->set_float("fog_start", 10.f);
-	s->set_float("fog_end", 30.f);
-
-	s->set_vec3("view_front", vs.front);
-	s->set_vec3("light_dir", glm::normalize(-vec3(1)));
+	shader().set_float("near", vs.near);
+	shader().set_float("far", vs.far);
+	shader().set_float("fog_max_density", 1.0);
+	shader().set_vec3("fog_color", vec3(0.7));
+	shader().set_float("fog_start", 10.f);
+	shader().set_float("fog_end", 30.f);
+	shader().set_vec3("view_front", vs.front);
+	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
 
 }
 
 void Renderer::Init()
 {
 	InitGlState();
-	Shader::compile(&simple, "MbSimpleV.txt", "MbSimpleF.txt");
-	Shader::compile(&textured, "MbTexturedV.txt", "MbTexturedF.txt");
-	Shader::compile(&animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
-	Shader::compile(&basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
-	Shader::compile(&static_wrld, "AnimBasicV.txt", "AnimBasicF.txt", "VERTEX_COLOR");
-	Shader::compile(&particle_basic, "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	Shader::compile(&shade.simple, "MbSimpleV.txt", "MbSimpleF.txt");
+	Shader::compile(&shade.textured, "MbTexturedV.txt", "MbTexturedF.txt");
+	Shader::compile(&shade.animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
+	Shader::compile(&shade.basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
+	Shader::compile(&shade.static_wrld, "AnimBasicV.txt", "AnimBasicF.txt", "VERTEX_COLOR");
+	Shader::compile(&shade.particle_basic, "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
@@ -489,11 +420,9 @@ void Renderer::Init()
 	r_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
 	vsync					= cfg.get_var("vsync", "1");
 
-	fbo.scene = fbo.ssao = 0;
-	textures.scene_color = textures.scene_depthstencil = textures.ssao_color = 0;
+	fbo.scene = 0;
+	tex.scene_color = tex.scene_depthstencil = 0;
 	InitFramebuffers();
-
-	gamel = &engine.local;
 }
 
 void Renderer::InitFramebuffers()
@@ -501,17 +430,17 @@ void Renderer::InitFramebuffers()
 	const int s_w = engine.window_w->integer;
 	const int s_h = engine.window_h->integer;
 
-	glDeleteTextures(1, &textures.scene_color);
-	glGenTextures(1, &textures.scene_color);
-	glBindTexture(GL_TEXTURE_2D, textures.scene_color);
+	glDeleteTextures(1, &tex.scene_color);
+	glGenTextures(1, &tex.scene_color);
+	glBindTexture(GL_TEXTURE_2D, tex.scene_color);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, s_w, s_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glCheckError();
 
-	glDeleteTextures(1, &textures.scene_depthstencil);
-	glGenTextures(1, &textures.scene_depthstencil);
-	glBindTexture(GL_TEXTURE_2D, textures.scene_depthstencil);
+	glDeleteTextures(1, &tex.scene_depthstencil);
+	glGenTextures(1, &tex.scene_depthstencil);
+	glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, s_w, s_h, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -520,22 +449,9 @@ void Renderer::InitFramebuffers()
 	glDeleteFramebuffers(1, &fbo.scene);
 	glGenFramebuffers(1, &fbo.scene);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures.scene_color, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, textures.scene_depthstencil, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.scene_color, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, tex.scene_depthstencil, 0);
 	glCheckError();
-
-	glDeleteTextures(1, &textures.ssao_color);
-	glGenTextures(1, &textures.ssao_color);
-	glBindTexture(GL_TEXTURE_2D, textures.ssao_color);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, s_w, s_h, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glCheckError();
-
-	glDeleteFramebuffers(1, &fbo.ssao);
-	glGenFramebuffers(1, &fbo.ssao);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.ssao);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures.ssao_color, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -550,11 +466,11 @@ void Renderer::InitFramebuffers()
 void Renderer::FrameDraw()
 {
 	cur_shader = 0;
-	cur_img_1 = 0;
+	cur_tex[0] = cur_tex[1] = cur_tex[2] = cur_tex[3] = 0;
 	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
 		InitFramebuffers();
 
-	vs = gamel->last_view;
+	vs = engine.local.last_view;
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	glViewport(0, 0, vs.width, vs.height);
 	glClearColor(1.f, 1.f, 0.f, 1.f);
@@ -563,6 +479,8 @@ void Renderer::FrameDraw()
 	DrawEnts();
 	DrawLevel();
 	DrawEntBlobShadows();
+
+	engine.local.pm.draw_particles();
 
 	int x = vs.width;
 	int y = vs.height;
@@ -583,9 +501,9 @@ void Renderer::FrameDraw()
 	}
 
 	mb.End();
-	simple.use();
-	simple.set_mat4("ViewProj", vs.viewproj);
-	simple.set_mat4("Model", mat4(1.f));
+	set_shader(shade.simple);
+	shader().set_mat4("ViewProj", vs.viewproj);
+	shader().set_mat4("Model", mat4(1.f));
 
 	if(r_draw_collision_tris->integer)
 		DrawCollisionWorld(engine.level);
@@ -603,8 +521,15 @@ void Renderer::FrameDraw()
 	glClear(GL_DEPTH_BUFFER_BIT);
 
 
-	if(!gamel->thirdperson_camera->integer && r_draw_viewmodel->integer)
+	if(!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
+}
+
+Shader& Renderer::shader()
+{
+	static Shader stemp;
+	stemp.ID = cur_shader;
+	return stemp;	// Shader is just a wrapper around an id anyways
 }
 
 void Renderer::DrawEntBlobShadows()
@@ -632,13 +557,13 @@ void Renderer::DrawEntBlobShadows()
 	shadowverts.End();
 	glCheckError();
 
-	particle_basic.use();
-	particle_basic.set_mat4("ViewProj", vs.viewproj);
-	particle_basic.set_mat4("Model", mat4(1.0));
-	particle_basic.set_vec4("tint_color", vec4(0,0,0,1));
+	set_shader(shade.particle_basic);
+	shader().set_mat4("ViewProj", vs.viewproj);
+	shader().set_mat4("Model", mat4(1.0));
+	shader().set_vec4("tint_color", vec4(0,0,0,1));
 	glCheckError();
 
-	BindTexture(0, media.blob_shadow->gl_id);
+	bind_texture(0, media.blob_shadow->gl_id);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -659,24 +584,21 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 {
 	ASSERT(m);
 	const bool isanimated = a != nullptr;
-	Shader* s;
-	if (isanimated)
-		s = &animated;
-	else
-		s = &basic_mod;
 
-	if (s->ID != cur_shader) {
-		s->use();
-		SetStdShaderConstants(s);
-		cur_shader = s->ID;
-	}
+	if (isanimated)
+		set_shader(shade.animated);
+	else
+		set_shader(shade.basic_mod);
+
+	set_shader_constants();
+	
 	glCheckError();
-	s->set_mat4("Model", transform);
-	s->set_mat4("InverseModel", glm::inverse(transform));
+	shader().set_mat4("Model", transform);
+	shader().set_mat4("InverseModel", glm::inverse(transform));
 
 	if (isanimated) {
 		const std::vector<mat4>& bones = a->GetBones();
-		const uint32_t bone_matrix_loc = glGetUniformLocation(s->ID, "BoneTransform[0]");
+		const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
 		for (int j = 0; j < bones.size(); j++)
 			glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
 		glCheckError();
@@ -687,14 +609,14 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 		const MeshPart* part = &m->parts[i];
 
 		if (part->material_idx==-1) {
-			BindTexture(0, white_texture);
+			bind_texture(0, white_texture);
 		}
 		else {
 			const MeshMaterial& mm = m->materials.at(part->material_idx);
 			if (mm.t1)
-				BindTexture(0, mm.t1->gl_id);
+				bind_texture(0, mm.t1->gl_id);
 			else
-				BindTexture(0, white_texture);
+				bind_texture(0, white_texture);
 		}
 
 		glBindVertexArray(part->vao);
@@ -713,7 +635,7 @@ void Renderer::DrawEnts()
 		if (!ent.model)
 			continue;
 
-		if (i == engine.player_num() && !gamel->thirdperson_camera->integer)
+		if (i == engine.player_num() && !engine.local.thirdperson_camera->integer)
 			continue;
 
 		mat4 model = glm::translate(mat4(1), ent.position);
@@ -728,8 +650,8 @@ void Renderer::DrawEnts()
 
 void Renderer::DrawLevel()
 {
-	static_wrld.use();
-	SetStdShaderConstants(&static_wrld);
+	set_shader(shade.static_wrld);
+	set_shader_constants();
 
 	const Level* level = engine.level;
 	for (int m = 0; m < level->render_data.instances.size(); m++) {
@@ -737,8 +659,8 @@ void Renderer::DrawLevel()
 		ASSERT(level->render_data.embedded_meshes[sm.model_index]);
 		const Model& model = *level->render_data.embedded_meshes[sm.model_index];
 
-		static_wrld.set_mat4("Model", sm.transform);
-		static_wrld.set_mat4("InverseModel", glm::inverse(sm.transform));
+		shader().set_mat4("Model", sm.transform);
+		shader().set_mat4("InverseModel", glm::inverse(sm.transform));
 
 
 		for (int p = 0; p < model.parts.size(); p++) {
@@ -747,12 +669,12 @@ void Renderer::DrawLevel()
 			if (mp.material_idx != -1) {
 				const auto& mm = model.materials[mp.material_idx];
 				if (mm.t1)
-					BindTexture(0, mm.t1->gl_id);
+					bind_texture(0, mm.t1->gl_id);
 				else
-					BindTexture(0, white_texture);
+					bind_texture(0, white_texture);
 			}
 			else
-				BindTexture(0, white_texture);
+				bind_texture(0, white_texture);
 
 			glBindVertexArray(mp.vao);
 			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
@@ -780,6 +702,7 @@ void Renderer::DrawPlayerViewmodel()
 {
 	mat4 invview = glm::inverse(vs.view);
 
+	Game_Local* gamel = &engine.local;
 	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
 	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
 
@@ -1001,10 +924,8 @@ void Game_Local::init()
 	fov					= cfg.get_var("fov", "70.0");
 	mouse_sensitivity	= cfg.get_var("mouse_sensitivity", "0.01");
 	fake_movement_debug = cfg.get_var("fake_movement_debug", "0");
-	// 1 = left to right
-	// 2 = forwards and back
-	// 3 = 1 with jumping
-	// 4 = 2 with jumping
+	
+	pm.init();
 }
 
 bool Game_Engine::start_map(string map, bool is_client)
@@ -1475,6 +1396,8 @@ void Game_Engine::pre_render_update()
 		ent.anim.SetupBones();
 		ent.anim.ConcatWithInvPose();
 	}
+
+	local.pm.tick(engine.frame_time);
 
 	local.update_viewmodel();
 

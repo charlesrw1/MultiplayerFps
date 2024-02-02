@@ -1,61 +1,158 @@
 #include "Particles.h"
 #include "Client.h"
+#include "Game_Engine.h"
+#include "MathLib.h"
+#include "Draw.h"
+#include "glad/glad.h"
 
-void ParticleMgr::Init(ClientGame* cgame, Client* client) {
+void Particle_Manager::init() {
 	particles.resize(MAX_PARTICLES);
-	num_particles = 0;
-	this->cgame = cgame;
-	myclient = client;
+	particle_count = 0;
+
+	sprites[BLOODSMALL] = FindOrLoadTexture("fx/bloodsmall.png");
+	sprites[DIRT1] = FindOrLoadTexture("fx/dirt_01.png");
+	sprites[SMOKE1] = FindOrLoadTexture("fx/smoke_01.png");
+
+	rand = new Random(2345808);
 }
-void ParticleMgr::ClearAll()
+
+void Particle_Manager::shutdown()
 {
-	num_particles = 0;
+	delete rand;
 }
 
-void ParticleMgr::Update(float deltat) {
-#if 0
-	for (int i = 0; i < num_particles; i++) {
-		ParticleFx& p = particles[i];
-		if (p.life_end < client.time) {
-			if (i != num_particles - 1) {
-				p = particles.at(num_particles - 1);
-				i--;// update the particle we just moved next iteration
-			}
-			num_particles--;
+void Particle_Manager::clear_all()
+{
+	particle_count = 0;
+}
+
+float Particle_Manager::get_time()
+{
+	return engine.time;
+}
+
+void Particle_Manager::tick(float deltat)
+{
+	for (int i = 0; i < particle_count; i++) {
+		Particle& p = particles[i];
+		if (p.life_end <= get_time()) {
+			p = particles[particle_count - 1];
+			particle_count--;
+			i--;
+			continue;
 		}
-		else if (p.life_start >= client.time) {
-			p.velocity.y += p.gravity * deltat;
-			p.origin += p.velocity * deltat;
-			if(p.think)
-				p.think(&p);
-		}
+		// fixme
+		p.velocity.x *= 1 - (p.friction * deltat);
+		p.velocity.z *= 1 - (p.friction * deltat);
+
+		p.velocity.y += p.gravity * deltat;
+		p.origin += p.velocity * (float)deltat;
+		p.rotation += p.rotation_vel * deltat;
 	}
-#endif
 }
 
-const static float tracer_speed = 10.f;
-const static float tracer_life = 0.5f;
-const static float tracer_width = 0.2f;
-const static float tracer_length = 1.f;
+void Particle_Manager::draw_particles()
+{
+	int sprite = -2;
+	bool additive = false;
 
-void ParticleMgr::AddTracer(glm::vec3 org, glm::vec3 end) {
-	ParticleFx* p = AllocNewParticle();
-	glm::vec3 dir = glm::normalize(end - org);
+	draw.set_shader(draw.shade.particle_basic);
+	draw.shader().set_mat4("ViewProj", draw.vs.viewproj);
+	draw.shader().set_mat4("Model", glm::mat4(1));
+	draw.shader().set_vec4("tint", glm::vec4(1.f));
+
+	glm::vec3 side = cross(draw.vs.front, vec3(0.f, 1.f, 0.f));
+	glm::vec3 up = cross(side, draw.vs.front);
+
+	glEnable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	verts.Begin();
+	for (int i = 0; i < particle_count; i++)
+	{
+		Particle& p = particles[i];
+		if (p.sprite != sprite || p.additive != additive) {
+			if (verts.GetBaseVertex() > 0) {
+				verts.End();
+				verts.Draw(GL_TRIANGLES);
+			}
+			verts.Begin();
+
+			if (p.additive != additive) {
+				if (p.additive)
+					glBlendFunc(GL_ONE, GL_ONE);
+				else
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				additive = p.additive;
+			}
+			if (sprite != p.sprite) {
+				sprite = p.sprite;
+				draw.bind_texture(0, (p.sprite < 0) ? draw.white_texture : sprites[p.sprite]->gl_id);
+			}
+		}
+
+		Color32 color = p.color_start;
+
+		int base = verts.GetBaseVertex();
+		glm::vec2 uvbase = glm::vec2(0);
+		glm::vec2 uvsize = glm::vec2(1);
+
+		MbVertex v[4];
+		v[0].position = p.origin - p.size_x * side + p.size_y*up;
+		v[3].position = p.origin + p.size_x * side + p.size_y * up;
+		v[2].position = p.origin + p.size_x * side - p.size_y * up;
+		v[1].position = p.origin - p.size_x * side - p.size_y * up;
+		v[0].uv = uvbase;
+		v[3].uv = glm::vec2(uvbase.x+uvsize.x, uvbase.y);
+		v[2].uv = uvbase + uvsize;
+		v[1].uv = glm::vec2(uvbase.x,uvbase.y+uvsize.y);
+		for (int j = 0; j < 4; j++) v[j].color = color;
+		for (int j = 0; j < 4; j++)verts.AddVertex(v[j]);
+		verts.AddQuad(base, base + 1, base + 2, base + 3);
+	}
+
+	if (verts.GetBaseVertex() > 0) {
+		verts.End();
+		verts.Draw(GL_TRIANGLES);
+	}
+
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+}
+
+void Particle_Manager::add_dust_hit(glm::vec3 org)
+{
+	float life = 1.5f;
+	Particle* p = new_particle();
 	p->origin = org;
-	p->velocity = dir * 10.f;
-	//p->life_start = client.time;
-	//p->life_end = client.time + tracer_life;
-	p->gravity = 0.0;
-	p->think = nullptr;
-	p->billboarded = false;
-	p->billboard_around_face_axis = true;
-	p->dimensions.x = tracer_width;
-	p->dimensions.y = tracer_length;
-	p->sprite = nullptr;	// default to white for now
+	p->life_start = get_time();
+	p->life_end = get_time() + life;
+	p->size_x = 1.0;
+	p->size_y = 0.75;
+
+
+	p->sprite = SMOKE1;
+	p->color_start = Color32{ 190, 145,70,255 };
+	p->color_end = Color32{ 89,69,51,128 };
+
+	p->rotation_vel = 0.7f;
+	p->rotation = rand->RandF(0, TWOPI);
+	p->gravity = 0.02f;	// positive gravity
 }
 
-inline ParticleFx* ParticleMgr::AllocNewParticle() {
-	if (num_particles >= particles.size())
-		return nullptr;
-	return &particles[num_particles++];
+Particle* Particle_Manager::new_particle()
+{
+	static Particle useless;
+	if (particle_count >= MAX_PARTICLES) {
+		sys_print("particles full\n");
+		return &useless;
+	}
+	return &particles[particle_count++];
 }
+
+void Particle_Manager::add_blood_effect(glm::vec3 org, glm::vec3 normal)
+{
+
+}
+

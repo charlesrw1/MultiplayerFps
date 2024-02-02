@@ -1,6 +1,7 @@
 #pragma once
 #include "Server.h"
 #include "Types.h"
+#include "Particles.h"
 
 using std::vector;
 
@@ -29,7 +30,7 @@ public:
 	Config_Var* mouse_sensitivity;
 	Config_Var* fake_movement_debug;
 
-	//PlayerState last_player_state;
+	Particle_Manager pm;
 	vec3 view_angles;
 	Move_Command last_command;
 	View_Setup last_view;

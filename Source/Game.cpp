@@ -80,6 +80,7 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 	Ray r(origin, direction);
 	RayHit hit = engine.phys.trace_ray(r, from->index, PF_ALL);
 	if (hit.hit_world) {
+		local.pm.add_dust_hit(hit.pos-direction*0.1f);
 		// add particles + decals here
 	}
 	else if(hit.ent_id!=-1){
@@ -274,6 +275,7 @@ void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 {
 	if (glm::length(ent->velocity)>1.f) {
 		ent->rotation = vec3(fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI));
+		engine.local.pm.add_dust_hit(ent->position + normal * 0.1f);
 	}
 }
 

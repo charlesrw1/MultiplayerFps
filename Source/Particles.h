@@ -2,54 +2,73 @@
 #include "Texture.h"
 #include "glm/glm.hpp"
 #include <vector>
+#include "Util.h"
+#include "Shader.h"
+#include "MeshBuilder.h"
 
-
-struct ParticleFx
+class Particle
 {
+public:
 	glm::vec3 origin=glm::vec3(0.f);
+
+	float size_x = 0.5f;
+	float size_y = 0.5f;
+
 	glm::vec3 velocity = glm::vec3(0.f);
-	glm::vec3 facing = glm::vec3(0.f);
-	glm::vec2 dimensions = glm::vec2(0.f);
 	float gravity = 0.f;
+	float friction = 0.f;
+
+	float rotation = 0.f;
+	float rotation_vel = 0.f;
+
 	float life_start = 0.f;
 	float life_end = 0.f;
-	bool billboarded = false;
-	bool billboard_around_face_axis = true;
-	Texture* sprite = nullptr;
 
-	void(*think)(ParticleFx* fx) = nullptr;
+	bool billboard = true;
+	//bool billboard_around_axis = true;
+	glm::vec3 facing = glm::vec3(0.f);
+
+	bool additive = false;
+	Color32 color_start = COLOR_WHITE;
+	Color32 color_end = COLOR_WHITE;
+
+	short sprite = -1;
 };
 
-class ClientGame;
-class Client;
-class ParticleMgr
+class Random;
+class Particle_Manager
 {
 public:
 	const static int MAX_PARTICLES = 512;
-	void Init(ClientGame* cgame, Client* client);
-	void ClearAll();
 
-	void Update(float deltat);
+	void init();
+	void shutdown();
+	void clear_all();
 
-	void AddTracer(glm::vec3 org, glm::vec3 end);
+	void tick(float dt);
+	void draw_particles();
 
-	void AddSpark(glm::vec3 org, glm::vec3 dir, float spd);
-	void MakeSparkEffect(glm::vec3 org, glm::vec3 n, int num);
+	void add_dust_hit(glm::vec3 org);
+	void add_footstep(glm::vec3 org, glm::vec3 velocity);
+	void add_blood_effect(glm::vec3 org, glm::vec3 normal);
 
-	void MakeBloodEffect(glm::vec3 org);
+	int particle_count = 0;
+	std::vector<Particle> particles;
+	Particle* new_particle();
+	float get_time();
 
-	void AddBloodHit();
-	void AddGunshotHit();
-	void AddMuzzleFlash();
-	void AddGrenadeExplosion();
+	Random* rand;
 
-	void AddTrailEffect();
+	// i just want this done...
+	enum Sprites {
+		BLOODSMALL, DIRT1, DIRT2, DIRT3,
+		FIRE1, MUZZLE1, MUZZLE2, MUZZLE3,
+		SMOKE1,SMOKE2,SMOKE3,SMOKE4,
+		TRACE1,TRACE2,TRACE3,
+		NUMSPRITES,
+	};
+	Texture* sprites[NUMSPRITES];
 
-	ParticleFx* AllocNewParticle();
-
-	int num_particles = 0;
-	std::vector<ParticleFx> particles;
-	
-	ClientGame* cgame = nullptr;
-	Client* myclient = nullptr;
+	Shader shader;
+	MeshBuilder verts;
 };
