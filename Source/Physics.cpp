@@ -338,14 +338,15 @@ GeomContact shape_vs_tri_mesh(Trace_Shape shape, MeshShape* mesh)
 			glm::vec3 corners[3];
 			for (int i = 0; i < 3; i++)
 				corners[i] = (*mesh->verticies)[tri.indicies[i]];
-			bool res = SphereVsTriangle(corners, tri.face_normal, tri.plane_offset, shape.pos, shape.radius, &temp, true);
+
+			bool res = SphereVsTriangle(corners, tri.face_normal, tri.plane_offset, shape.pos, shape.radius, &temp, false);
 			if (res && temp.intersect_len < best_len_total) {
 				best_len_total = temp.intersect_len;
 				final = temp;
 			}
 			return false;
 		};
-		Bounds sphere(vec3(-shape.radius + shape.pos), vec3(shape.radius + shape.pos));
+		Bounds sphere(vec3(-shape.radius)+shape.pos, vec3(shape.radius)+shape.pos);
 		IntersectWorld(sphere_intersect_functor, *mesh->structure, sphere);
 
 	}
