@@ -10,15 +10,15 @@
 
 void Client::init()
 {
-	interp_time			= cfg.get_var("interp_time", "0.1");
-	fake_lag			= cfg.get_var("fake_lag", "0");
-	fake_loss			= cfg.get_var("fake_loss", "0");
-	cl_time_out			= cfg.get_var("cl_time_out", "5.f");
-	interpolate			= cfg.get_var("interpolate", "1");
-	smooth_error_time	= cfg.get_var("smooth_error", "1.0");
-	client_predict		= cfg.get_var("client_predict", "1");
-	dont_replicate_player = cfg.get_var("dont_replicate_player", "0");
-	time_reset_threshold = cfg.get_var("time_reset_threshold", "0.1");
+	interp_time			= cfg.get_var("client/interp_time", "0.1");
+	fake_lag			= cfg.get_var("client/fake_lag", "0");
+	fake_loss			= cfg.get_var("client/fake_loss", "0");
+	time_out			= cfg.get_var("client/time_out", "5.f");
+	interpolate			= cfg.get_var("client/interpolate", "1");
+	smooth_error_time	= cfg.get_var("client/smooth_error", "1.0");
+	predict				= cfg.get_var("client/predict", "1");
+	dont_replicate_player = cfg.get_var("client/dont_replicate_player", "0");
+	time_reset_threshold = cfg.get_var("client/time_reset_threshold", "0.1");
 	sock.Init(0);
 }
 
@@ -121,7 +121,7 @@ void Client::run_prediction()
 	if (get_state() != CS_SPAWNED)
 		return;
 
-	if (!client_predict->integer)
+	if (!predict->integer)
 		return;
 
 	// predict commands from outgoing ack'ed to current outgoing

@@ -24,10 +24,10 @@ void NetDebugPrintf(const char* fmt, ...)
 void Server::init()
 {
 
-	tick_rate		= cfg.get_var("tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
-	snapshot_rate	= cfg.get_var("snapshot_rate", "30.0");
-	max_time_out	= cfg.get_var("max_time_out", "10.f");
-	host_port		= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
+	tick_rate		= cfg.get_var("server/tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
+	snapshot_rate	= cfg.get_var("server/snapshot_rate", "30.0");
+	max_time_out	= cfg.get_var("server/max_time_out", "10.f");
+	host_port		= cfg.get_var("server/host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
 
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);

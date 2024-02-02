@@ -89,7 +89,7 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 			hit_entitiy.damage(&hit_entitiy, from, 100, 0);
 	}
 
-	create_grenade(from, origin + direction * 0.5f, direction * 18.f);
+	create_grenade(from, origin + direction * 0.5f, direction);
 }
 
 void Entity::clear_pointers()
@@ -125,7 +125,7 @@ void Entity::gravity_physics()
 		s.org = new_pos;
 		s.radius = col_radius;
 		s.height = col_radius + 0.1f;
-		engine.phys.TraceCharacter(s, &contact, index, PF_ALL);
+		engine.phys.TraceCharacter(s, &contact, index, PF_WORLD);
 
 		if (contact.found) {
 			new_pos += contact.penetration_normal * (contact.penetration_depth);
@@ -143,7 +143,7 @@ void Entity::gravity_physics()
 				velocity = vec3(0.f);
 			}
 
-			if (!called_func && hit_wall) {
+			if (bounce && !called_func && hit_wall) {
 				hit_wall(this, contact.surf_normal);
 				called_func = true;
 			}
@@ -283,11 +283,11 @@ void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 	}
 }
 
-Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel)
+Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 {
 	static Config_Var* grenade_radius = cfg.get_var("game/grenade_radius", "0.25f");
 	static Config_Var* grenade_slide = cfg.get_var("game/grenade_slide", "0");
-
+	static Config_Var* grenade_vel = cfg.get_var("game/grenade_vel", "18.0");
 
 	ASSERT(thrower);
 	Entity* e = engine.new_entity();
@@ -295,7 +295,7 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 start_vel)
 	e->set_model("grenade_he.glb");
 	e->owner_index = thrower->index;
 	e->position = org;
-	e->velocity = start_vel;
+	e->velocity = direction * grenade_vel->real;
 	e->flags = grenade_slide->integer ? EF_SLIDE : EF_BOUNCE;
 	e->timer = 5.f;
 	e->physics = EPHYS_GRAVITY;

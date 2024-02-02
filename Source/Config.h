@@ -38,7 +38,7 @@ public:
 
 	// called by Engine_Cmd_Function callbacks
 	const vector<string>& get_arg_list() { return args; }
-	void print_vars();
+	void print_vars(const char* match);
 
 	bool set_unknown_variables = false;	
 private:

@@ -115,7 +115,7 @@ bool finished = false;
 bool force_animation = false;
 
 // hacky way to move up stairs
-bool check_perch(Entity& player)
+void check_perch(Entity& player)
 {
 	static Config_Var* min_stair = cfg.get_var("phys/min_stair", "0.25");
 	static Config_Var* max_stair = cfg.get_var("phys/max_stair", "0.5");
@@ -134,27 +134,25 @@ bool check_perch(Entity& player)
 
 		// perched on ledge
 		if (rh.hit_world) {
-			if (((height - rh.dist) >= min_stair->real) && (height - rh.dist) <= max_stair->real) {
+			if (((height - rh.dist) >= min_stair->real) && (height - rh.dist) <= max_stair->real && rh.normal.y > 0.9) {
 				player.position.y = player.position.y + (height - rh.dist);
 				player.state |= PMS_GROUND;
 				player.state &= ~PMS_JUMPING;
-				player.state |= PMS_PERCHED;
 				player.velocity.y = 0;
 				sys_print("perched\n");
-				return true;
+				return;
 			}
-			else if (player.state & PMS_PERCHED && abs(height - rh.dist) < 0.01) {
+			else if (abs(height - rh.dist) < 0.01) {
 				// stay in perched state
-				return true;
+				player.state |= PMS_GROUND;
 			}
 		}
 	}
-
-	player.state &= ~PMS_PERCHED;
-	return false;
 }
 
-void player_physics_check_ground(Entity& player, vec3 pre_update_velocity, Move_Command command)
+
+
+void check_ground_state(Entity& player, Move_Command command)
 {
 
 	if (player.velocity.y > 2.f) {
@@ -162,44 +160,39 @@ void player_physics_check_ground(Entity& player, vec3 pre_update_velocity, Move_
 		return;
 	}
 
-	if (player.state & PMS_GROUND && check_perch(player))
-		return;
-
 	GeomContact result;
 	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
 
 	engine.phys.TraceSphere(SphereShape(where, CHAR_HITBOX_RADIUS), &result, player.index, PF_ALL);
 
-	//TraceSphere(level, where, radius, &result, true, true);
-	if (!result.found)
-		player.state &= ~PMS_GROUND;
-	else if (result.surf_normal.y < 0.3)
+	if (!result.found || result.surf_normal.y < 0.3)
 		player.state &= ~PMS_GROUND;
 	else {
-		if (command.first_sim && !(player.state & PMS_GROUND) && pre_update_velocity.y < -2.f) {
+		if (command.first_sim && !(player.state & PMS_GROUND) && player.velocity.y < -2.f) {
 			player.anim.set_leg_anim("act_land", false);
  			player.anim.legs.loop = false;
 		}
-		player.state |= PMS_GROUND;
-		//phys_debug.AddSphere(where, radius, 8, 6, COLOR_BLUE);
+		player.state |= PMS_GROUND;	
 	}
 
-	if (player.state & PMS_GROUND)
-		player.state &= ~PMS_JUMPING;
+	if(!(player.state & PMS_JUMPING))
+		check_perch(player);
 
-	if ((player.state & PMS_GROUND))
+	if (player.state & PMS_GROUND) {
+		player.state &= ~PMS_JUMPING;
 		player.in_air_time = 0.f;
+	}
 	else if (command.first_sim)
 		player.in_air_time += engine.tick_interval;
 }
 
-void player_physics_check_jump(Entity& player, Move_Command command)
+void check_jump(Entity& player, Move_Command command)
 {
 	if ((player.state & PMS_GROUND) && command.button_mask & BUTTON_JUMP) {
 		printf("jump\n");
-		player.velocity.y += jumpimpulse;
-		player.state &= ~PMS_GROUND;
+		player.velocity.y = jumpimpulse;
 		player.state |= PMS_JUMPING;
+		player.state &= ~PMS_GROUND;
 
 		if (command.first_sim) {
 			player.anim.set_leg_anim("act_jump_start", true);
@@ -207,67 +200,53 @@ void player_physics_check_jump(Entity& player, Move_Command command)
 		}
 	}
 }
-void player_physics_check_duck(Entity& player, Move_Command cmd)
-{
-	if (cmd.button_mask & BUTTON_DUCK) {
-		if (player.state & PMS_GROUND) {
-			player.state |= PMS_CROUCHING;
-		}
-		else if (!(player.state & PMS_GROUND) && !(player.state & PMS_CROUCHING)) {
-			const Capsule& st = standing_capsule;
-			const Capsule& cr = crouch_capsule;
-			// Move legs of player up
-			player.position.y += st.tip.y - cr.tip.y;
-			player.state |= PMS_CROUCHING;
-		}
-	}
-	else if (!(cmd.button_mask & BUTTON_DUCK) && (player.state & PMS_CROUCHING)) {
-		int steps = 2;
-		float step = 0.f;
-		float sphere_radius = 0.f;
-		vec3 offset = vec3(0.f);
-		vec3 a, b, c, d;
-		standing_capsule.GetSphereCenters(a, b);
-		crouch_capsule.GetSphereCenters(c, d);
-		float len = b.y - d.y;
-		sphere_radius = crouch_capsule.radius - 0.05;
-		if (player.state & PMS_GROUND) {
-			step = len / (float)steps;
-			offset = d;
-		}
-		else {
-			steps = 3;
-			// testing downwards to ground
-			step = -(len + 0.1) / (float)steps;
-			offset = c;
-		}
-		int i = 0;
-		for (; i < steps; i++) {
-			GeomContact res;
-			vec3 where = player.position + offset + vec3(0, (i + 1) * step, 0);
 
-			engine.phys.TraceSphere(SphereShape(where, sphere_radius), &res, player.index, PF_ALL);
-		}
-		if (i == steps) {
-			player.state &= ~PMS_CROUCHING;
-			if (!(player.state & PMS_GROUND)) {
-				player.position.y -= len;
+GeomContact player_physics_trace_character(int index, bool crouching, vec3 end);
+void check_duck(Entity& player, Move_Command cmd)
+{
+	const float diff = CHAR_STANDING_HB_HEIGHT - CHAR_CROUCING_HB_HEIGHT;
+
+	if (cmd.button_mask & BUTTON_DUCK) {
+		if (!(player.state & PMS_GROUND) && !(player.state & PMS_CROUCHING)) {
+			// Move legs of player up
+			player.position.y += diff;		}
+
+		player.state |= PMS_CROUCHING;
+	}
+	else {
+		if (player.state & PMS_CROUCHING) {
+			// uncrouch
+
+			if (player.state & PMS_GROUND) {
+				auto gc = player_physics_trace_character(player.index, false, player.position+vec3(0,0.001,0));
+
+				if (!gc.found)
+					player.state &= ~PMS_CROUCHING;
+			}
+			else {
+				vec3 end = player.position - vec3(0, diff, 0) + vec3(0,0.001,0);
+				auto gc = player_physics_trace_character(player.index, false, end);
+
+				if (!gc.found) {
+					player.state &= ~PMS_CROUCHING;
+					player.position.y -= diff;
+				}
 			}
 		}
 	}
 }
 
-GeomContact player_physics_trace_character(Entity& player, vec3 end)
+GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
 {
 	CharacterShape character;
-	character.height = (player.state & PMS_CROUCHING) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
+	character.height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
 	character.org = end;
 	character.m = nullptr;
 	character.a = nullptr;
 	character.radius = CHAR_HITBOX_RADIUS;
 
 	GeomContact c;
-	engine.phys.TraceCharacter(character, &c, player.index, PF_ALL);
+	engine.phys.TraceCharacter(character, &c, index, PF_ALL);
 	return c;
 }
 
@@ -284,7 +263,7 @@ void player_physics_move(Entity& player)
 	{
 		vec3 end = player.position + player.velocity * (move_time/num_bumps);
 
-		GeomContact trace = player_physics_trace_character(player, end);
+		GeomContact trace = player_physics_trace_character(player.index, player.state & PMS_CROUCHING, end);
 
 		if (trace.found) {
 			vec3 penetration_velocity = dot(player.velocity, trace.penetration_normal) * trace.penetration_normal;
@@ -320,6 +299,10 @@ float lensquared_noy(vec3 v)
 
 void player_physics_ground_move(Entity& player, Move_Command command)
 {
+	check_jump(player, command);
+	check_duck(player, command);
+
+
 	vec3 prevel = player.velocity;
 
 	vec2 inputvec = vec2(command.forward_move, command.lateral_move);
@@ -355,11 +338,6 @@ void player_physics_ground_move(Entity& player, Move_Command command)
 	if (len < 0.3 && accelspeed < 0.0001)
 		xz_velocity = vec3(0);
 	player.velocity = vec3(xz_velocity.x, player.velocity.y, xz_velocity.z);
-
-	player_physics_check_ground(player, prevel, command);
-
-	player_physics_check_jump(player, command);
-	player_physics_check_duck(player, command);
 
 	static Config_Var* phys_gravity = cfg.get_var("phys/gravity", "16.0");
 
@@ -420,11 +398,10 @@ void player_physics_update(Entity* p, Move_Command command)
 		p->velocity.z *= factor;
 	}
 
-
+	check_ground_state(*p, command);
 	player_physics_ground_move(*p, command);
 	player_physics_check_nans(*p);
 
-	//RunItemCode();
 }
 
 

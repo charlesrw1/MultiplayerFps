@@ -972,7 +972,11 @@ void cmd_print_entities()
 
 void cmd_print_vars()
 {
-	cfg.print_vars();
+	auto& args = cfg.get_arg_list();
+	if (args.size() == 1)
+		cfg.print_vars(nullptr);
+	else
+		cfg.print_vars(args.at(1).c_str());
 }
 
 int main(int argc, char** argv)

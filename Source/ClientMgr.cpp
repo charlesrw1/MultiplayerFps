@@ -72,7 +72,7 @@ void Client::ReadPackets()
 	}
 
 	if (state >= CS_CONNECTED) {
-		if (GetTime() - server.last_recieved > cl_time_out->real) {
+		if (GetTime() - server.last_recieved > time_out->real) {
 			Disconnect("server timed out");
 		}
 	}

@@ -80,9 +80,9 @@ public:
 	Config_Var* interp_time;
 	Config_Var* fake_lag;
 	Config_Var* fake_loss;
-	Config_Var* cl_time_out;
+	Config_Var* time_out;
 	Config_Var* interpolate;
-	Config_Var* client_predict;
+	Config_Var* predict;
 	Config_Var* smooth_error_time;
 	Config_Var* dont_replicate_player;
 	Config_Var* time_reset_threshold;
