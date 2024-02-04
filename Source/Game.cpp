@@ -80,13 +80,17 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 	Ray r(origin, direction);
 	RayHit hit = engine.phys.trace_ray(r, from->index, PF_ALL);
 	if (hit.hit_world) {
-		local.pm.add_dust_hit(hit.pos-direction*0.1f);
+		//local.pm.add_dust_hit(hit.pos-direction*0.1f);
 		// add particles + decals here
+
+		local.pm.add_blood_effect(hit.pos, -direction);
 	}
 	else if(hit.ent_id!=-1){
 		Entity& hit_entitiy = engine.ents[hit.ent_id];
 		if (hit_entitiy.damage)
 			hit_entitiy.damage(&hit_entitiy, from, 100, 0);
+
+		local.pm.add_blood_effect(hit.pos, -direction);
 	}
 
 	create_grenade(from, origin + direction * 0.5f, direction);
@@ -169,6 +173,7 @@ void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 		return;
 
 	self->health -= damage;
+
 	if (self->health <= 0) {
 		self->flags |= EF_DEAD;
 		self->timer = 5.f;

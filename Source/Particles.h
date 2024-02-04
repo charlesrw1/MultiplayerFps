@@ -69,6 +69,5 @@ public:
 	};
 	Texture* sprites[NUMSPRITES];
 
-	Shader shader;
 	MeshBuilder verts;
 };

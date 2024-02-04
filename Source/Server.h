@@ -8,6 +8,9 @@
 #include "Types.h"
 #include "MeshBuilder.h"
 
+// what i want:
+// game_event: make particle, make sound, etc. events
+// 
 
 void GetPlayerSpawnPoisiton(Entity* ent);
 void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
