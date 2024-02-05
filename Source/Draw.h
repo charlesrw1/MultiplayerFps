@@ -4,6 +4,7 @@
 #include "Util.h"
 class Model;
 class Animator;
+class Texture;
 class Entity;
 class Renderer
 {
@@ -12,9 +13,11 @@ public:
 	void FrameDraw();
 
 	void draw_text();
-	void draw_rect();
+	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
+		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
 
 	void reload_shaders();
+	void ui_render();
 
 	void DrawModel(const Model* m, glm::mat4 transform, const Animator* a = nullptr);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
@@ -81,6 +84,8 @@ private:
 	uint32_t cur_shader = 0;
 	uint32_t cur_tex[NUM_SAMPLERS];
 
+	MeshBuilder ui_builder;
+	uint32_t building_ui_texture;
 
 	MeshBuilder shadowverts;
 };

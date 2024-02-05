@@ -28,6 +28,7 @@ public:
 	struct Entity_Spawn
 	{
 		std::string name;
+		std::string classname;
 		glm::vec3 position;
 		glm::vec3 rotation;
 		glm::vec3 scale;

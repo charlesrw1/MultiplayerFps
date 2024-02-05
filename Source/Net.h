@@ -125,6 +125,7 @@ struct Entity
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	int model_index = 0;	// media.gamemodels[]
+	const char* classname="";
 
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);

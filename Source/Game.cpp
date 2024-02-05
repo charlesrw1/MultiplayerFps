@@ -34,6 +34,85 @@ void GetPlayerSpawnPoisiton(Entity* ent)
 	//}
 }
 
+enum Door_State
+{
+	DOOR_CLOSED,
+	DOOR_OPENING,
+	DOOR_OPENED
+};
+
+void spawn_door(Level::Entity_Spawn& spawn)
+{
+	Entity& e = *engine.new_entity();
+	e.type = ET_USED;
+	e.position = spawn.position;
+	e.rotation = spawn.rotation;
+	e.physics = EPHYS_MOVER;
+	e.classname = "door";
+	e.state = DOOR_CLOSED;
+
+	for (auto kv : spawn.key_values) {
+		if (kv.at(0) == "linked_mesh") {
+			// this is unique, all other model_index setting goes through Game_Media
+			int index = std::atoi(kv.at(1).c_str());
+			e.model = engine.level->linked_meshes.at(index);
+			e.model_index = index;
+		}
+	}
+
+
+
+}
+void spawn_spawn_point(Level::Entity_Spawn& spawn)
+{
+	Entity& e = *engine.new_entity();
+	e.type = ET_USED;
+	e.classname = "player_spawn";
+	e.position = spawn.position;
+	e.rotation = spawn.rotation;
+	e.physics = EPHYS_NONE;
+
+	for (auto kv : spawn.key_values) {
+		if (kv.at(0) == "team") {
+			int index = std::atoi(kv.at(1).c_str());
+		}
+	}
+}
+
+
+struct Spawn_Link
+{
+	const char* name;
+	void(*spawn)(Level::Entity_Spawn& spawn);
+};
+
+Spawn_Link links[]
+{
+	{"door", spawn_door},
+	{"player_spawn", spawn_spawn_point}
+};
+
+
+void Game_Engine::on_game_start()
+{
+	// call spawn functions
+	for (int i = 0; i < level->espawns.size(); i++)
+	{
+		Level::Entity_Spawn& es = level->espawns.at(i);
+		int n = sizeof(links) / sizeof(Spawn_Link);
+		int j = 0;
+		for (; j < n; j++) {
+			if (es.classname == links[j].name) {
+				links[j].spawn(es);
+				break;
+			}
+		}
+		if (j == n) {
+			sys_print("Couldn't find spawn function for Entity_Spawn %s", es.name);
+		}
+	}
+}
+
 void Game_Engine::client_leave(int slot)
 {
 	Entity& ent = ents[slot];

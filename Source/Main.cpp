@@ -490,7 +490,57 @@ void Renderer::InitFramebuffers()
 	cur_h = s_h;
 }
 
+void Renderer::ui_render()
+{
+	set_shader(shade[S_TEXTURED]);
+	shader().set_mat4("Model", mat4(1));
+	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
+	shader().set_mat4("ViewProj", proj);
+	building_ui_texture = 0;
+	ui_builder.Begin();
+	glEnable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
+	Texture* t = mats.find_texture("frog.jpg");
+	int centerx = 0;
+	int centery = cur_h - 200;
 
+
+	draw_rect(centerx, centery, 200, 200, { 0xff, 0xff, 0xff, 128 }, t, t->width, t->height);
+
+
+
+	if (ui_builder.GetBaseVertex() > 0){
+		bind_texture(BASE0_SAMPLER, building_ui_texture);
+		ui_builder.End();
+		ui_builder.Draw(GL_TRIANGLES);
+	}
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+}
+
+void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, float srcw, float srch, float srcx, float srcy)
+{
+	h = -h;	// adjust for coordinates
+	y = -y;
+
+	int texnum = (t) ? t->gl_id : white_texture;
+	float tw = (t) ? t->width : 1;
+	float th = (t) ? t->height : 1;
+
+	if (texnum != building_ui_texture && ui_builder.GetBaseVertex() > 0) {
+		bind_texture(BASE0_SAMPLER, building_ui_texture);
+		ui_builder.End();
+		ui_builder.Draw(GL_TRIANGLES);
+		ui_builder.Begin();
+	}
+	building_ui_texture = texnum;
+	ui_builder.Push2dQuad(glm::vec2(x, y), glm::vec2(w, h), glm::vec2(srcx / tw, srcy / th),
+		glm::vec2(srcw / tw, srch / th), color);
+}
 void Renderer::FrameDraw()
 {
 	cur_shader = 0;
@@ -547,19 +597,8 @@ void Renderer::FrameDraw()
 		phys_debug.Draw(GL_LINES);
 	}
 
-	mb.Begin();
-	mb.Push2dQuad(vec2(-1, 1), vec2(1,-1));
-	mb.End();
-	set_shader(shade[S_TEXTURED]);
-	shader().set_mat4("ViewProj",mat4(1.f));
-	shader().set_mat4("Model", mat4(1.f));
-	Texture* t = mats.find_texture("frog.jpg");
-	bind_texture(BASE0_SAMPLER, t->gl_id);
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	mb.Draw(GL_TRIANGLES);
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH_TEST);
+	ui_render();
+
 	mb.Free();
 
 	glCheckError();
@@ -800,25 +839,19 @@ void Renderer::DrawPlayerViewmodel()
 	DrawModel(viewmodel, model2);
 }
 
-const char* game_sound_names[] =
-{
-	"gunshot1.wav",
-};
-
-const char* game_model_names[] =
-{
-	"player_character.glb",
-	"m16.glb",
-	"grenade_he.glb"
-};
-const int NUM_GAME_MODELS = sizeof(game_model_names) / sizeof(char*);
-
-
 void Game_Media::load()
 {
-	game_models.resize(NUM_GAME_MODELS);
-	for (int i = 0; i < NUM_GAME_MODELS; i++)
-		game_models[i] = FindOrLoadModel(game_model_names[i]);
+	model_manifest.clear();
+
+	std::ifstream manifest_f("./Data/Models/manifest.txt");
+	if (!manifest_f) {
+		sys_print("Couldn't open model manifest\n");
+		return;
+	}
+	std::string line;
+	while (std::getline(manifest_f, line))
+		model_manifest.push_back(line);
+	model_cache.resize(model_manifest.size());
 
 	blob_shadow = FindOrLoadTexture("blob_shadow_temp.png");
 }
@@ -826,25 +859,32 @@ void Game_Media::load()
 const Model* Game_Media::get_game_model(const char* model, int* out_index)
 {
 	int i = 0;
-	for (; i < NUM_GAME_MODELS; i++) {
-		if (strcmp(game_model_names[i], model) == 0)
+	for (; i < model_manifest.size(); i++) {
+		if (model_manifest[i] == model)
 			break;
 	}
-
-	if (i == NUM_GAME_MODELS) {
+	if (i == model_manifest.size()) {
+		sys_print("Model %s not in manifest\n", model);
 		if (out_index) *out_index = -1;
 		return nullptr;
 	}
-	else {
-		if (out_index) *out_index = i;
-		return game_models[i];
-	}
+
+	if(out_index) *out_index = i+engine.level->linked_meshes.size();
+	if (model_cache[i]) return model_cache[i];
+	model_cache[i] = FindOrLoadModel(model);
+	return model_cache[i];
 }
 const Model* Game_Media::get_game_model_from_index(int index)
 {
-	if (index >= 0 && index < game_models.size())
-		return game_models[index];
-	return nullptr;
+	// check linked meshes
+	if (index >= 0 && index < engine.level->linked_meshes.size())
+		return engine.level->linked_meshes.at(index);
+	index -= engine.level->linked_meshes.size();
+
+	if (index < 0 || index >= model_manifest.size()) return nullptr;
+	if (model_cache[index]) return model_cache[index];
+	model_cache[index] = FindOrLoadModel(model_manifest[index].c_str());
+	return model_cache[index];
 }
 
 void Entity::set_model(const char* model_name)
@@ -1045,6 +1085,8 @@ bool Game_Engine::start_map(string map, bool is_client)
 		engine.set_state(ENGINE_GAME);
 
 		sv->connect_local_client();
+
+		on_game_start();
 	}
 
 	return true;

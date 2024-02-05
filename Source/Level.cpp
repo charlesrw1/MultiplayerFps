@@ -19,6 +19,7 @@ extern void load_model_materials(std::vector<Game_Shader*>& materials, const std
 void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 {
 	Level::Entity_Spawn es;
+	es.classname = node.extras.Get("classname").Get<std::string>();
 	es.name = node.name;
 	es.position = transform[3];
 	es.rotation = glm::vec3(0.f);
@@ -48,7 +49,7 @@ void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 		kv.push_back(std::to_string(level->linked_meshes.size()));
 	}
 
-
+	level->espawns.push_back(es);
 }
 
 void add_level_light(Level* l, tinygltf::Model& scene, glm::mat4 transform, int index)

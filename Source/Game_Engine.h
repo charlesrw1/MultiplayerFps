@@ -11,8 +11,10 @@ public:
 	void load();
 	const Model* get_game_model(const char* name, int* index = nullptr);
 	const Model* get_game_model_from_index(int index);
-
-	vector<const Model*> game_models;	// non-owning list of models for entities
+	
+	vector<string> model_manifest;
+	vector<Model*> model_cache;
+	vector<string> sound_manifest;
 	Texture* blob_shadow;
 };
 
@@ -157,6 +159,8 @@ private:
 	void draw_debug_interface();
 
 	void game_update_tick();
+
+	void on_game_start();
 };
 
 extern Game_Media media;
