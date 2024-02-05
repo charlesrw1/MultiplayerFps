@@ -12,7 +12,7 @@
 // game_event: make particle, make sound, etc. events
 // 
 
-void GetPlayerSpawnPoisiton(Entity* ent);
+void find_spawn_position(Entity* ent);
 void ShootBullets(Entity* from, glm::vec3 dir, glm::vec3 org);
 void KillEnt(Entity* ent);
 void ExecutePlayerMove(Entity* ent, Move_Command cmd);

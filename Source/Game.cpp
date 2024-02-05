@@ -22,16 +22,27 @@ Entity* ServerEntForIndex(int index)
 	return &engine.ents[index];
 }
 
-void GetPlayerSpawnPoisiton(Entity* ent)
+void find_spawn_position(Entity* ent)
 {
-	//if (engine.level->spawns.size() > 0) {
-	//	ent->position = engine.level->spawns[0].position;
-	//	ent->rotation.y = engine.level->spawns[0].angle;
-	//}
-	//else {
-		ent->position = glm::vec3(0);
-		ent->rotation = glm::vec3(0);
-	//}
+	int index = engine.find_by_classname(0, "player_spawn");
+	bool found = false;
+	while (index != -1) {
+		Entity& e = engine.ents[index];
+
+		// do a small test for nearby players
+		GeomContact contact = engine.phys.trace_shape(Trace_Shape(e.position, CHAR_HITBOX_RADIUS), ent->index, PF_PLAYERS);
+
+		if (!contact.found) {
+			ent->position = e.position;
+			ent->rotation = e.rotation;
+			return;
+		}
+		
+		index = engine.find_by_classname(index+1, "player_spawn");
+	}
+
+	ent->position = glm::vec3(0);
+	ent->rotation = glm::vec3(0);
 }
 
 enum Door_State
@@ -40,6 +51,11 @@ enum Door_State
 	DOOR_OPENING,
 	DOOR_OPENED
 };
+
+void door_update(Entity* e)
+{
+	e->rotation.y = engine.time;
+}
 
 void spawn_door(Level::Entity_Spawn& spawn)
 {
@@ -50,6 +66,9 @@ void spawn_door(Level::Entity_Spawn& spawn)
 	e.physics = EPHYS_MOVER;
 	e.classname = "door";
 	e.state = DOOR_CLOSED;
+	e.flags = 0;
+	e.flags |= EF_SOLID;
+	e.update = door_update;
 
 	for (auto kv : spawn.key_values) {
 		if (kv.at(0) == "linked_mesh") {
@@ -71,6 +90,7 @@ void spawn_spawn_point(Level::Entity_Spawn& spawn)
 	e.position = spawn.position;
 	e.rotation = spawn.rotation;
 	e.physics = EPHYS_NONE;
+
 
 	for (auto kv : spawn.key_values) {
 		if (kv.at(0) == "team") {
@@ -146,6 +166,15 @@ Entity* Game_Engine::new_entity()
 	return &e;
 }
 
+int Game_Engine::find_by_classname(int index, const char* classname)
+{
+	for (int i = index; i < MAX_GAME_ENTS; i++) {
+		if (!ents[i].active()) continue;
+		if (strcmp(ents[i].classname, classname) == 0) return i;
+	}
+	return -1;
+}
+
 void Game_Engine::free_entity(Entity* ent)
 {
 	*ent = Entity();
@@ -196,39 +225,40 @@ void Entity::gravity_physics()
 	bool slide = flags & EF_SLIDE;
 
 	velocity.y -= (12.f * engine.tick_interval);
-	int iters = 8;
-	vec3 new_pos = position;
-	vec3 delta = (float)engine.tick_interval*velocity / (float)iters;
-	bool called_func = false;
-	for (int i = 0; i < iters; i++) {
-		new_pos += delta;
+	int bumps = 4;
+	bool hit_a_wall = false;
+	float time = engine.tick_interval;
+	vec3 pre_velocity = velocity;
+	glm::vec3 first_n;
+	for (int i = 0; i < bumps; i++) {
+		vec3 end = position + velocity * (time / bumps);
 		
-		GeomContact contact = engine.phys.trace_shape(Trace_Shape(new_pos, col_radius), index, PF_WORLD);
+		GeomContact contact = engine.phys.trace_shape(Trace_Shape(end, col_radius), index, PF_WORLD);
 
 		if (contact.found) {
-			new_pos += contact.penetration_normal * (contact.penetration_depth);
+			position = end + contact.penetration_normal * (contact.penetration_depth);
 
-			if (bounce) {
-				velocity = glm::reflect(velocity, contact.surf_normal);
-				velocity *= 0.6f;
+			if (!hit_a_wall) {
+				hit_a_wall = true;
 			}
-			else if (slide) {
+			first_n = contact.surf_normal;
+
+			if (1) {
 				vec3 penetration_velocity = dot(velocity, contact.penetration_normal) * contact.penetration_normal;
 				vec3 slide_velocity = velocity - penetration_velocity;
 				velocity = slide_velocity;
 			}
-			else {
-				velocity = vec3(0.f);
-			}
-
-			if (bounce && !called_func && hit_wall) {
-				hit_wall(this, contact.surf_normal);
-				called_func = true;
-			}
-			break;
+		}
+		else position = end;
+	}
+	if (hit_a_wall) {
+		if (hit_wall)
+			hit_wall(this, first_n);
+		if (bounce) {
+			velocity = glm::reflect(pre_velocity, first_n);
+			velocity *= 0.6f;
 		}
 	}
-	position = new_pos;
 }
 
 void Entity::physics_update()
@@ -260,8 +290,11 @@ void player_damage(Entity* self, Entity* attacker, int damage, int flags)
 		self->anim.set_anim("act_die_1", true);
 		self->anim.m.loop = false;
 		self->anim.legs.anim = -1;
+		self->flags &= ~EF_SOLID;
 
 		self->flags |= EF_FORCED_ANIMATION;
+
+		self->flags |= EF_FROZEN_VIEW;
 	}
 }
 
@@ -277,12 +310,17 @@ void player_spawn(Entity* ent)
 	//server.sv_game.GetPlayerSpawnPoisiton(ent);
 	ent->state = PMS_GROUND;
 	ent->flags = 0;
+	
+	ent->flags |= EF_SOLID;
 
 	ent->health = 100;
-	GetPlayerSpawnPoisiton(ent);
+	find_spawn_position(ent);
 
 	ent->update = player_update;
 	ent->damage = player_damage;
+
+	ent->force_angles = 1;
+	ent->diff_angles = glm::vec3(0.f, ent->rotation.y, 0.f);
 }
 
 Entity* dummy_spawn()

@@ -113,6 +113,10 @@ void Client::HandleServerPacket(ByteReader& buf)
 		case SV_DISCONNECT:
 			Disconnect("server closed connection");
 			break;
+		case SV_UPDATE_VIEW:
+			glm::vec3 new_angles = buf.ReadVec3();
+			engine.local.view_angles = new_angles;
+			break;
 		case SV_TEXT:
 			break;
 		case SV_TICK:

@@ -27,7 +27,6 @@ struct GeomContact
 	glm::vec3 surf_normal;
 	float surf_d;
 	short surf_type;
-	short surf_flags;
 	bool found = false;
 
 	bool touched_ground = false;
@@ -50,10 +49,11 @@ struct MeshShape
 	const BVH* structure;
 };
 
-
 struct PhysicsObject
 {
 	bool is_mesh = false;
+	glm::mat4 inverse_transform;
+	glm::mat4 transform;
 	MeshShape mesh;
 	glm::vec3 max;
 	glm::vec3 min_or_origin;
@@ -95,8 +95,6 @@ class Level;
 class PhysicsWorld
 {
 public:
-
-	void AddLevel(const Level* l);
 	void AddObj(PhysicsObject obj);
 	void ClearObjs();
 
@@ -105,6 +103,7 @@ public:
 
 
 	PhysicsObject& GetObj(int index);
+
 private:
 	bool FilterObj(PhysicsObject* po, int ignore_index, int filter_flags);
 

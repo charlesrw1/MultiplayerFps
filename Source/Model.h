@@ -9,6 +9,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "Util.h"
 #include "Animation.h"
+#include "BVH.h"
 
 using std::string;
 using std::vector;
@@ -59,6 +60,9 @@ struct Physics_Mesh
 {
 	std::vector<glm::vec3> verticies;
 	std::vector<Physics_Triangle> tris;
+	BVH bvh;
+
+	void build();
 };
 
 struct Texture;

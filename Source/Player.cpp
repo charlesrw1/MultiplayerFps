@@ -130,7 +130,7 @@ void check_perch(Entity& player)
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
-		rh = engine.phys.trace_ray(ray, -1, PF_WORLD);
+		rh = engine.phys.trace_ray(ray, player.index, PF_WORLD);
 
 		// perched on ledge
 		if (rh.hit_world) {

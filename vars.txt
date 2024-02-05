@@ -12,11 +12,11 @@ bind 7 "fake_movement_debug 1"
 bind 8 "fake_movement_debug 2"
 
 #net vars
-tick_rate 66.0
-snapshot_rate 30.0
-interp_time 0.07
-fake_lag 50
-fake_loss 0
+server/tick_rate 66.0
+server/snapshot_rate 30.0
+client/interp_time 0.07
+client/fake_lag 50
+client/fake_loss 0
 
 #render vars
 draw_collision_tris 0

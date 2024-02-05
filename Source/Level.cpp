@@ -127,8 +127,11 @@ static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& 
 			add_node_mesh_to_model(m, scene, node, mapping, false, false, mm, nullptr, glm::mat4(1));
 			if (!m->collision && m->parts.size() == 0)
 				delete m;
-			else
+			else {
+				if (m->collision)
+					m->collision->build();
 				level->linked_meshes.push_back(m);
+			}
 		}
 		else
 		{
@@ -174,15 +177,14 @@ static void map_materials_to_models(Level* level, tinygltf::Model& scene, std::v
 	}
 }
 
-void init_collision_bvh(Level* level)
+void Physics_Mesh::build()
 {
 	std::vector<Bounds> bound_vec;
-	Physics_Mesh& pm = level->collision;
-	for (int i = 0; i < pm.tris.size(); i++) {
-		Physics_Triangle& tri = pm.tris[i];
+	for (int i = 0; i < tris.size(); i++) {
+		Physics_Triangle& tri = tris[i];
 		glm::vec3 corners[3];
 		for (int i = 0; i < 3; i++)
-			corners[i] = pm.verticies[tri.indicies[i]];
+			corners[i] = verticies[tri.indicies[i]];
 		Bounds b(corners[0]);
 		b = bounds_union(b, corners[1]);
 		b = bounds_union(b, corners[2]);
@@ -193,8 +195,8 @@ void init_collision_bvh(Level* level)
 	}
 
 	float time_start = GetTime();
-	level->static_geo_bvh = BVH::build(bound_vec, 1, BVH_SAH);
-	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
+	bvh = BVH::build(bound_vec, 1, BVH_SAH);
+	printf("Built bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
 void load_level_lights(Level* l, tinygltf::Model& scene)
@@ -244,7 +246,7 @@ Level* LoadLevelFile(const char* level_name)
 	std::string lightmap_path = map_dir + "lightmap.hdr";
 	level->lightmap = mats.find_texture(lightmap_path.c_str(), false, true);
 
-	init_collision_bvh(level);
+	level->collision.build();
 
 	return level;
 }

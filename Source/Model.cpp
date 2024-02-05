@@ -447,6 +447,8 @@ static bool DoLoadGltfModel(const std::string& filepath, Model* model)
 	for (int i = 0; i < defscene.nodes.size(); i++) {
 		traverse_model_nodes(model, scene, scene.nodes.at(defscene.nodes.at(i)), buf_view_to_buffers);
 	}
+	if (model->collision)
+		model->collision->build();
 
 
 

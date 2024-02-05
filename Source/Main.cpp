@@ -191,6 +191,13 @@ void Game_Engine::view_angle_update()
 
 void Game_Engine::make_move()
 {
+	// hack for local players
+	Entity& e = local_player();
+	if (e.force_angles == 1) {
+		local.view_angles = e.diff_angles;
+		e.force_angles = 0;
+	}
+
 	Move_Command command;
 	command.view_angles = local.view_angles;
 	command.tick = tick;
@@ -206,7 +213,9 @@ void Game_Engine::make_move()
 		return;
 	}
 
-	view_angle_update();
+	if(!(e.flags & EF_FROZEN_VIEW))	
+		view_angle_update();
+
 	if (keys[SDL_SCANCODE_W])
 		command.forward_move += 1.f;
 	if (keys[SDL_SCANCODE_S])
@@ -1081,12 +1090,9 @@ bool Game_Engine::start_map(string map, bool is_client)
 
 		sv->start();
 		engine.is_host = true;
-
 		engine.set_state(ENGINE_GAME);
-
-		sv->connect_local_client();
-
 		on_game_start();
+		sv->connect_local_client();
 	}
 
 	return true;
@@ -1240,21 +1246,52 @@ void Game_Engine::set_state(Engine_State state)
 
 void Game_Engine::build_physics_world(float time)
 {
+	static Config_Var* only_world = cfg.get_var("phys/only_world", "0");
+
 	phys.ClearObjs();
-	phys.AddLevel(level);
+	{
+		PhysicsObject obj;
+		obj.is_level = true;
+		obj.solid = true;
+		obj.is_mesh = true;
+		obj.mesh.structure = &level->collision.bvh;
+		obj.mesh.verticies = &level->collision.verticies;
+		obj.mesh.tris = &level->collision.tris;
+
+		phys.AddObj(obj);
+	}
+	if (only_world->integer) return;
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		Entity& ce = ents[i];
-		if (ce.type != ET_PLAYER) continue;
+		if (ce.type == ET_FREE) continue;
 
-		PhysicsObject po;		
-		float height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
-		vec3 mins = ce.position - vec3(CHAR_HITBOX_RADIUS, 0, CHAR_HITBOX_RADIUS);
-		vec3 maxs = ce.position + vec3(CHAR_HITBOX_RADIUS, height, CHAR_HITBOX_RADIUS);
-		po.max = maxs;
-		po.min_or_origin = mins;
+		if (!(ce.flags & EF_SOLID)) continue;
+
+		PhysicsObject po;
 		po.userindex = i;
-		po.player = true;
+		if (ce.type == ET_PLAYER) {
+			float height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
+			vec3 mins = ce.position - vec3(CHAR_HITBOX_RADIUS, 0, CHAR_HITBOX_RADIUS);
+			vec3 maxs = ce.position + vec3(CHAR_HITBOX_RADIUS, height, CHAR_HITBOX_RADIUS);
+			po.max = maxs;
+			po.min_or_origin = mins;
+			po.player = true;
+		}
+		else if (ce.physics == EPHYS_MOVER && ce.model && ce.model->collision) {
+			// have to transform the verts... bad bad bad
+			mat4 model = glm::translate(mat4(1), ce.position);
+			model = model * glm::eulerAngleXYZ(0.f, ce.rotation.y, 0.f);
+			po.transform = model;
+			po.inverse_transform = glm::inverse(model);
+
+			po.is_mesh = true;
+			po.mesh.verticies = &ce.model->collision->verticies;
+			po.mesh.tris = &ce.model->collision->tris;
+			po.mesh.structure = &ce.model->collision->bvh;
+		}
+		else
+			continue;
 
 		phys.AddObj(po);
 	}

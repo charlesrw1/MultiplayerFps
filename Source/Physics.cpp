@@ -491,8 +491,10 @@ bool IntersectRayMesh(Ray r, float tmin, float tmax, RayHit* out, MeshShape* s)
 void ray_vs_mesh(Ray r, RayHit* rh, PhysicsObject* mesh)
 {
 	IntersectRayMesh(r, 0, INFINITY, rh, &mesh->mesh);
-	if (rh->dist > 0 && mesh->is_level)
-		rh->hit_world = true;
+	if (rh->dist > 0) {
+		if (mesh->is_level) rh->hit_world = true;
+		rh->ent_id = mesh->userindex;
+	}
 }
 
 
@@ -564,18 +566,6 @@ void PhysicsWorld::ClearObjs()
 {
 	objs.clear();
 }
-void PhysicsWorld::AddLevel(const Level* l)
-{
-	PhysicsObject obj;
-	obj.is_level = true;
-	obj.solid = true;
-	obj.is_mesh = true;
-	obj.mesh.structure = &l->static_geo_bvh;
-	obj.mesh.verticies = &l->collision.verticies;
-	obj.mesh.tris = &l->collision.tris;
-
-	objs.push_back(obj);
-}
 
 GeomContact PhysicsWorld::trace_shape(Trace_Shape shape, int ig, int filt)
 {
@@ -589,8 +579,18 @@ GeomContact PhysicsWorld::trace_shape(Trace_Shape shape, int ig, int filt)
 			continue;
 
 		GeomContact contact;
-		if (objs[i].is_mesh)
-			contact = shape_vs_tri_mesh(shape, &objs[i].mesh);
+		if (objs[i].is_mesh) {
+			Trace_Shape shape2 = shape;
+			if (!objs[i].is_level) {
+				shape2.pos = objs[i].inverse_transform * vec4(shape2.pos, 1.0);
+			}
+			contact = shape_vs_tri_mesh(shape2, &objs[i].mesh);
+			if (contact.found && !objs[i].is_level) {
+				contact.penetration_normal = mat3(objs[i].transform) * vec3(contact.penetration_normal);
+				contact.surf_normal = mat3(objs[i].transform) * vec3(contact.surf_normal);
+				contact.intersect_point = objs[i].transform * vec4(contact.intersect_point,1.0);
+			}
+		}
 		else
 			contact = shape_vs_bounds(shape, objs[i]);
 
@@ -615,8 +615,18 @@ RayHit PhysicsWorld::trace_ray(Ray r, int ignore_index, int filter_flags)
 			continue;
 
 		RayHit hit;
-		if (obj.is_mesh)
-			ray_vs_mesh(r, &hit, &obj);
+		if (obj.is_mesh) {
+			Ray r2 = r;
+			if (!objs[i].is_level) {
+				r2.pos = objs[i].inverse_transform * vec4(r2.pos, 1.0);
+				r2.dir = mat3(objs[i].inverse_transform) * r2.dir;
+			}
+			ray_vs_mesh(r2, &hit, &obj);
+			if (hit.dist > 0 && !objs[i].is_level) {
+				hit.pos = objs[i].transform * vec4(hit.pos,1.0);
+				hit.normal = mat3(objs[i].transform) * hit.normal;
+			}
+		}
 		else
 			ray_vs_shape(r, obj, &hit);
 
@@ -633,7 +643,9 @@ bool PhysicsWorld::FilterObj(PhysicsObject* o, int ig_ent, int filter_flags)
 		return true;
 	if (o->player && !(filter_flags & PF_PLAYERS))
 		return true;
-	if (o->player && !(filter_flags & PF_WORLD))
+	if (o->is_level && !(filter_flags & PF_WORLD))
+		return true;
+	if (!(o->player || o->is_level) && !(filter_flags & PF_NONPLAYERS))
 		return true;
 	return false;
 }

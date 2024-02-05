@@ -122,10 +122,18 @@ void RemoteClient::Update()
 	writer.WriteLong(engine.tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
-
 	static Config_Var* never_delta = cfg.get_var("sv_never_delta", "0");
 	int delta_frame = (never_delta->integer) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
+
+	Entity& e = engine.ents[client_num];
+	if (e.force_angles == 1) {
+		writer.WriteByte(SV_UPDATE_VIEW);
+		writer.WriteVec3(e.diff_angles);
+
+		e.force_angles = 0;
+	}
+
 
 	//myserver->WriteDeltaSnapshot(writer, baseline, client_num);
 	writer.EndWrite();
@@ -285,8 +293,8 @@ void Server::make_snapshot()
 		Entity& e = engine.ents[i];
 		if (!e.active())
 			continue;	// unactive ents dont go in snapshot
-
-		// TODO: hidden ents dont go in snapshot either
+		if (i >= MAX_CLIENTS && (!e.model || e.flags & EF_HIDDEN))
+			continue;
 
 		writer.WriteBits(i, ENTITY_BITS);
 		write_full_entity(&e, writer);

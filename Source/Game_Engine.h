@@ -110,6 +110,9 @@ public:
 	void update_game_tick();
 	void execute_player_move(int player, Move_Command command);
 	void damage(Entity* inflictor, Entity* target, int amount, int flags);
+
+	// entity accessor functions
+	int find_by_classname(int start, const char* classname);
 public:
 	Client* cl;
 	Server* sv;

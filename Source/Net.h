@@ -37,6 +37,7 @@ enum Server_To_Client
 	SV_TICK,
 	SV_SNAPSHOT,	
 	SV_DISCONNECT,
+	SV_UPDATE_VIEW,
 	SV_TEXT,
 };
 enum Client_To_Server
@@ -67,6 +68,9 @@ enum Entity_Flags
 	EF_HIDE_ITEM = 8,
 	EF_BOUNCE = 16,
 	EF_SLIDE = 32,
+	EF_SOLID = 64,
+
+	EF_FROZEN_VIEW = 128,
 };
 
 enum Item_Use_State
@@ -150,10 +154,15 @@ struct Entity
 	float interp_remaining;
 	float interp_time;
 
+	int target_ent = -1;
+
 	int item = 0;
 	int solid = 0;
 
 	float in_air_time = 0.f;
+
+	int force_angles = 0;	// 1=force, 2=add
+	glm::vec3 diff_angles=glm::vec3(0.f);
 
 	void(*update)(Entity* me) = nullptr;
 	void(*damage)(Entity* me, Entity* attacker, int amount, int flags) = nullptr;

@@ -35,7 +35,6 @@ public:
 		std::vector<std::vector<std::string>> key_values;
 	};
 
-	BVH static_geo_bvh;
 	Physics_Mesh collision;	// union of all level_meshes collision data
 
 	std::vector<Level_Light> lights;
