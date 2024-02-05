@@ -68,6 +68,7 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				ENSURE(2);
 				string& t = line.at(1);
 				if (t == "blend2") gs->shader_type = Game_Shader::S_2WAYBLEND;
+				else if (t == "sway") gs->shader_type = Game_Shader::S_WINDSWAY;
 			}
 			else if (key == "alpha") {
 				ENSURE(2);
@@ -78,6 +79,17 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 			}
 			else if (key == "showbackface") {
 				gs->backface = true;
+			}
+			else if (key == "fresnel_transparency") {
+				gs->fresnel_transparency = true;
+			}
+			else if (key == "uscroll") {
+				ENSURE(2);
+				gs->uscroll = std::atof(line.at(1).c_str());
+			}
+			else if (key == "vscroll") {
+				ENSURE(2);
+				gs->vscroll = std::atof(line.at(1).c_str());
 			}
 		}
 

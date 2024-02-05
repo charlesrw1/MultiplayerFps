@@ -16,9 +16,7 @@ void main()
 	//if(color.r < 0.2)
 	//	discard;
 	
-	FS_OUT_Color = FS_IN_Color*vec4(color.r);
-	
-	
+	FS_OUT_Color = vec4(FS_IN_Color.rgb, FS_IN_Color.a*color.r);
 #else
 	FS_OUT_Color = color*FS_IN_Color;
 #endif

@@ -8,7 +8,7 @@ class Animation_Set;
 
 // called by server+clients
 void player_physics_update(Entity* player, Move_Command command);	// physics movement code
-void player_post_physics(Entity* player, Move_Command command);		// item and animation code
+void player_post_physics(Entity* player, Move_Command command, bool is_local);		// item and animation code
 // server-side function
 void player_update(Entity* player);	
 

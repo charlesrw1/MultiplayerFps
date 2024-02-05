@@ -365,7 +365,7 @@ void Game_Engine::execute_player_move(int num, Move_Command cmd)
 	
 	Entity& ent = engine.ents[num];
 	player_physics_update(&ent, cmd);
-	player_post_physics(&ent, cmd);
+	player_post_physics(&ent, cmd, num == player_num());
 
 	engine.time = oldtime;
 }

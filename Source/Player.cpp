@@ -485,9 +485,9 @@ void player_fire_weapon()
 }
 
 static float fire_time = 0.1f;
-static float reload_time = 1.f;
+static float reload_time = 1.9f;
 
-void player_item_update(Entity* p, Move_Command command)
+void player_item_update(Entity* p, Move_Command command, bool is_local)
 {
 	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
 
@@ -500,12 +500,22 @@ void player_item_update(Entity* p, Move_Command command)
 		return;
 	}
 
+	if (is_local) {
+		if (engine.local.viewmodel == nullptr) {
+			engine.local.viewmodel = FindOrLoadModel("m16_fp.glb");
+			engine.local.viewmodel_animator.set_model(engine.local.viewmodel);
+		}
+	}
+
 	if (w.timer > 0)
 		w.timer -= engine.tick_interval;
 	float blend = cfg.get_var("abr", "0.15")->real;
 	switch (w.state)
 	{
 	case ITEM_IDLE:
+		if (is_local) {
+			engine.local.viewmodel_animator.set_anim("act_idle", false);
+		}
 		if (wants_shoot) {
 			w.timer = fire_time;
 			w.state = ITEM_IN_FIRE;
@@ -514,6 +524,11 @@ void player_item_update(Entity* p, Move_Command command)
 			p->anim.m.loop = false;
 
 			engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+
+			if (is_local) {
+				engine.local.viewmodel_animator.set_anim("act_shoot", true);
+				engine.local.viewmodel_animator.m.loop = false;
+			}
 		}
 		if (wants_reload) {
 			w.timer = reload_time;
@@ -521,7 +536,14 @@ void player_item_update(Entity* p, Move_Command command)
 
 			p->anim.set_anim("act_reload", true, blend);
 			p->anim.m.loop = false;
-			p->anim.m.speed = 0.7f;
+			p->anim.m.speed = 0.5f;
+
+			if (is_local) {
+				engine.local.viewmodel_animator.set_anim("act_reload", true);
+				engine.local.viewmodel_animator.m.loop = false;
+				engine.local.viewmodel_animator.m.speed = 2.5f;
+
+			}
 		}
 
 		break;
@@ -539,8 +561,8 @@ void player_item_update(Entity* p, Move_Command command)
 }
 
 // item code and animation updates
-void player_post_physics(Entity* p, Move_Command command)
+void player_post_physics(Entity* p, Move_Command command, bool is_local)
 {
-	player_item_update(p, command);
+	player_item_update(p, command, is_local);
 	player_animation_update(p);
 }

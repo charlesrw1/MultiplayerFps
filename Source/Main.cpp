@@ -232,7 +232,7 @@ void Game_Engine::make_move()
 		command.button_mask |= BUTTON_JUMP;
 	if (keys[SDL_SCANCODE_LSHIFT])
 		command.button_mask |= BUTTON_DUCK;
-	if (keys[SDL_SCANCODE_Q])
+	if (mousekeys & (1<<1))
 		command.button_mask |= BUTTON_FIRE1;
 	if (keys[SDL_SCANCODE_E])
 		command.button_mask |= BUTTON_RELOAD;
@@ -357,6 +357,7 @@ void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 
 	float halfwidth = width / 2.f;
 
+	for (int i = 0; i < 4; i++) corners[i].color = COLOR_BLACK;
 	corners[0].position = org + side * halfwidth + side2 * halfwidth;
 	corners[1].position = org - side * halfwidth + side2 * halfwidth;
 	corners[2].position = org - side * halfwidth - side2 * halfwidth;
@@ -405,6 +406,7 @@ void Renderer::set_shader_constants()
 	shader().set_float("fog_start", 10.f);
 	shader().set_float("fog_end", 30.f);
 	shader().set_vec3("view_front", vs.front);
+	shader().set_vec3("view_pos", vs.origin);
 	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
 }
 
@@ -512,12 +514,17 @@ void Renderer::ui_render()
 	glDisable(GL_CULL_FACE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	Texture* t = mats.find_texture("frog.jpg");
-	int centerx = 0;
-	int centery = cur_h - 200;
+	Texture* t = mats.find_texture("crosshair007.png");
+	int centerx = cur_w / 2;
+	int centery = cur_h / 2;
+
+	float crosshair_scale = 0.7f;
+	Color32 crosshair_color = { 0, 0xff, 0, 0xff };
+	float width = t->width * crosshair_scale;
+	float height = t->height * crosshair_scale;
 
 
-	draw_rect(centerx, centery, 200, 200, { 0xff, 0xff, 0xff, 128 }, t, t->width, t->height);
+	draw_rect(centerx- width /2, centery-height/2, width, height, crosshair_color, t, t->width, t->height);
 
 
 
@@ -645,7 +652,7 @@ void Renderer::DrawEntBlobShadows()
 		if (rh.dist < 0)
 			continue;
 
-		AddBlobShadow(rh.pos + vec3(0,0.05,0), rh.normal, CHAR_HITBOX_RADIUS * 2.5f);
+		AddBlobShadow(rh.pos + vec3(0,0.05,0), rh.normal, CHAR_HITBOX_RADIUS * 4.5f);
 	}
 	glCheckError();
 
@@ -750,6 +757,9 @@ void Renderer::DrawLevel()
 	bool force_set = true;
 	bool is_alpha_test = false;
 	bool is_lightmapped = false;
+	int last_alpha = -1;
+	int backfaces = -1;
+
 	int shader_type = Game_Shader::S_DEFAULT;
 
 	for (int m = 0; m < level->instances.size(); m++) {
@@ -798,9 +808,40 @@ void Renderer::DrawLevel()
 						bind_texture(LIGHTMAP_SAMPLER, white_texture);
 				}
 			}
+
+			if (last_alpha != gs->alpha_type) {
+				last_alpha = gs->alpha_type;
+				if (last_alpha == Game_Shader::A_NONE || last_alpha == Game_Shader::A_TEST) {
+					glDisable(GL_BLEND);
+				}
+				else if (last_alpha == Game_Shader::A_BLEND) {
+					glEnable(GL_BLEND);
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				}
+				else if (last_alpha == Game_Shader::A_ADD) {
+					glEnable(GL_BLEND);
+					glBlendFunc(GL_ONE, GL_ONE);
+				}
+			}
+			if (backfaces != (int)gs->backface) {
+				backfaces = gs->backface;
+				if (backfaces) {
+					glDisable(GL_CULL_FACE);
+				}
+				else
+					glEnable(GL_CULL_FACE);
+			}
+
 			shader().set_mat4("Model", sm.transform);
 			shader().set_mat4("InverseModel", glm::inverse(sm.transform));
 
+			shader().set_bool("has_glassfresnel", gs->fresnel_transparency);
+			shader().set_float("glassfresnel_opacity", 0.6f);
+
+			bool has_uv_scroll = gs->uscroll != 0.f || gs->vscroll != 0.f;
+			shader().set_bool("has_uv_scroll", has_uv_scroll);
+			if(has_uv_scroll)
+				shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
 
 			if (gs->images[gs->BASE1])
 				bind_texture(BASE0_SAMPLER, gs->images[gs->BASE1]->gl_id);
@@ -839,13 +880,16 @@ void Renderer::DrawPlayerViewmodel()
 
 	Game_Local* gamel = &engine.local;
 	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
+	
+	
+	model2 = glm::translate(model2, gamel->vm_offset);
 	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
 
 	cur_shader = -1;
 
 	const Model* viewmodel = media.get_game_model("m16.glb");
 
-	DrawModel(viewmodel, model2);
+	DrawModel(engine.local.viewmodel, model2, &engine.local.viewmodel_animator);
 }
 
 void Game_Media::load()
@@ -862,7 +906,7 @@ void Game_Media::load()
 		model_manifest.push_back(line);
 	model_cache.resize(model_manifest.size());
 
-	blob_shadow = FindOrLoadTexture("blob_shadow_temp.png");
+	blob_shadow = FindOrLoadTexture("blob_shadow.png");
 }
 
 const Model* Game_Media::get_game_model(const char* model, int* out_index)
@@ -1066,6 +1110,9 @@ void Game_Local::init()
 	fake_movement_debug = cfg.get_var("fake_movement_debug", "0");
 	
 	pm.init();
+
+	viewmodel = FindOrLoadModel("m16_fp.glb");
+	viewmodel_animator.set_model(viewmodel);
 }
 
 bool Game_Engine::start_map(string map, bool is_client)
@@ -1143,14 +1190,20 @@ void Game_Engine::key_event(SDL_Event event)
 		keys[event.key.keysym.scancode] = false;
 	}
 	else if (event.type == SDL_MOUSEBUTTONDOWN) {
-		SDL_SetRelativeMouseMode(SDL_TRUE);
-		int x, y;
-		SDL_GetRelativeMouseState(&x, &y);
-		engine.game_focused = true;
+		if (event.button.button == 3) {
+			SDL_SetRelativeMouseMode(SDL_TRUE);
+			int x, y;
+			SDL_GetRelativeMouseState(&x, &y);
+			engine.game_focused = true;
+		}
+		mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
-		SDL_SetRelativeMouseMode(SDL_FALSE);
-		engine.game_focused = false;
+		if (event.button.button == 3) {
+			SDL_SetRelativeMouseMode(SDL_FALSE);
+			engine.game_focused = false;
+		}
+		mousekeys &= ~(1 << event.button.button);
 	}
 }
 
@@ -1187,6 +1240,7 @@ void Game_Engine::draw_debug_interface()
 		// player menu
 		if (ImGui::Begin("player")) {
 			Entity& p = engine.local_player();
+			ImGui::DragFloat3("vm", &engine.local.vm_offset[0],0.02f);
 			ImGui::DragFloat3("pos", &p.position.x);
 			ImGui::DragFloat3("vel", &p.velocity.x);
 			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
@@ -1339,6 +1393,7 @@ void Game_Engine::init()
 {
 	memset(keys, 0, sizeof(keys));
 	memset(binds, 0, sizeof(binds));
+	mousekeys = 0;
 	num_entities = 0;
 	level = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;

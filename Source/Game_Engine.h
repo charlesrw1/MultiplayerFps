@@ -44,6 +44,11 @@ public:
 	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
 	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
 
+	Animator viewmodel_animator;
+	Model* viewmodel=nullptr;
+
+	glm::vec3 vm_offset = glm::vec3(0.f,-2.9f,0.f);
+
 	float vm_reload_start = 0.f;
 	float vm_reload_end = 0.f;
 	float vm_recoil_start_time = 0.f;

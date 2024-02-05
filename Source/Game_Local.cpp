@@ -29,7 +29,7 @@ void Game_Local::update_viewmodel()
 	glm::vec3 side_grnd = glm::normalize(glm::cross(view_front, vec3(0, 1, 0)));
 	float spd_side = dot(side_grnd, e.velocity);
 	float side_ofs_ideal = -spd_side / 200.f;
-	glm::clamp(side_ofs_ideal, -0.005f, 0.005f);
+	glm::clamp(side_ofs_ideal, -0.007f, 0.007f);
 	float spd_front = dot(view_front, e.velocity);
 	float front_ofs_ideal = spd_front / 200.f;
 	glm::clamp(front_ofs_ideal, -0.007f, 0.007f);
@@ -77,4 +77,9 @@ void Game_Local::update_viewmodel()
 		viewmodel_recoil_ofs = GetRecoilAmtTriangle(vec3(0.0, 0, 0.3), t, 0.4f);
 	}break;
 	}
+
+	viewmodel_animator.AdvanceFrame(engine.frame_time);
+	viewmodel_animator.SetupBones();
+	viewmodel_animator.ConcatWithInvPose();
+
 }

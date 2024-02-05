@@ -315,7 +315,10 @@ static void LoadGltfSkeleton(tinygltf::Model& scene, Model* model, tinygltf::Ski
 		bone_to_index.insert({ node.name, model->bones.size() });
 		model->bones.push_back(b);
 	}
-	RecursiveAddSkeleton(bone_to_index, scene, model, scene.nodes[skin.joints[0]]);
+	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
+	for (int i = 0; i < defscene.nodes.size(); i++) {
+		RecursiveAddSkeleton(bone_to_index, scene, model, scene.nodes[defscene.nodes.at(i)]);
+	}
 }
 
 static Animation_Set* LoadGltfAnimations(tinygltf::Model& scene, tinygltf::Skin& skin)

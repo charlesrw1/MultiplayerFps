@@ -28,8 +28,12 @@ public:
 	int alpha_type = A_NONE;
 	bool backface = false;
 
-	enum {S_DEFAULT, S_2WAYBLEND};
+	enum {S_DEFAULT, S_2WAYBLEND, S_WINDSWAY };
 	int shader_type = S_DEFAULT;
+
+	float uscroll = 0.0;
+	float vscroll = 0.0;
+	bool fresnel_transparency = false;
 
 	int physics = 0;	// physics of surface
 };
