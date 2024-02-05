@@ -44,7 +44,6 @@ public:
 
 extern Game_Material_Manager mats;
 
-
 void FreeLoadedTextures();
 Texture* FindOrLoadTexture(const char* filename);
 Texture* CreateTextureFromImgFormat(uint8_t* data, int datalen, std::string name);

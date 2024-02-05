@@ -654,10 +654,11 @@ void Renderer::DrawLevel()
 	set_shader_constants();
 
 	const Level* level = engine.level;
-	for (int m = 0; m < level->render_data.instances.size(); m++) {
-		const Level::StaticInstance& sm = level->render_data.instances[m];
-		ASSERT(level->render_data.embedded_meshes[sm.model_index]);
-		const Model& model = *level->render_data.embedded_meshes[sm.model_index];
+	for (int m = 0; m < level->instances.size(); m++) {
+		const Level::StaticInstance& sm = level->instances[m];
+		if (sm.collision_only) continue;
+		ASSERT(level->static_meshes[sm.model_index]);
+		const Model& model = *level->static_meshes[sm.model_index];
 
 		shader().set_mat4("Model", sm.transform);
 		shader().set_mat4("InverseModel", glm::inverse(sm.transform));

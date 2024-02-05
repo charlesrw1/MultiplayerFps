@@ -24,14 +24,14 @@ Entity* ServerEntForIndex(int index)
 
 void GetPlayerSpawnPoisiton(Entity* ent)
 {
-	if (engine.level->spawns.size() > 0) {
-		ent->position = engine.level->spawns[0].position;
-		ent->rotation.y = engine.level->spawns[0].angle;
-	}
-	else {
+	//if (engine.level->spawns.size() > 0) {
+	//	ent->position = engine.level->spawns[0].position;
+	//	ent->rotation.y = engine.level->spawns[0].angle;
+	//}
+	//else {
 		ent->position = glm::vec3(0);
 		ent->rotation = glm::vec3(0);
-	}
+	//}
 }
 
 void Game_Engine::client_leave(int slot)

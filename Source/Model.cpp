@@ -19,6 +19,9 @@ const int NORMAL_LOC = 2;
 const int JOINT_LOC = 3;
 const int WEIGHT_LOC = 4;
 const int COLOR_LOC = 5;
+const int UV2_LOC = 6;
+const int TANGENT_LOC = 7;
+const int BITANGENT_LOC = 8;
 
 static uint32_t MakeOrFindGpuBuffer(Model* m, int buf_view_index, tinygltf::Model& model, std::map<int, int>& buffer_view_to_buffer)
 {
@@ -43,8 +46,111 @@ static uint32_t MakeOrFindGpuBuffer(Model* m, int buf_view_index, tinygltf::Mode
 	return index;
 }
 
-void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygltf::Mesh& mesh, std::map<int,int>& buffer_view_to_buffer)
+void append_collision_data(Model* m, tinygltf::Model& scene, tinygltf::Mesh& mesh, std::vector<Game_Shader*>& materials, 
+	Physics_Mesh* phys, const glm::mat4& transform)
 {
+	if (!phys && !m->collision)
+		m->collision = std::make_unique<Physics_Mesh>();
+
+	Physics_Mesh* pm = (phys) ? phys : m->collision.get();
+
+	for (int part = 0; part < mesh.primitives.size(); part++)
+	{
+		const int vertex_offset = pm->verticies.size();
+
+		tinygltf::Primitive& primitive = mesh.primitives[part];
+		ASSERT(primitive.attributes.find("POSITION") != primitive.attributes.end());
+		tinygltf::Accessor& position_ac = scene.accessors[primitive.attributes["POSITION"]];
+		tinygltf::BufferView& position_bv = scene.bufferViews[position_ac.bufferView];
+		tinygltf::Buffer& pos_buffer = scene.buffers[position_bv.buffer];
+		int pos_stride = position_ac.ByteStride(position_bv);
+		ASSERT(position_ac.type == TINYGLTF_TYPE_VEC3 && position_ac.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+		ASSERT(position_ac.byteOffset == 0 && position_bv.byteStride == 0);
+		unsigned char* pos_start = &pos_buffer.data.at(position_bv.byteOffset);
+		for (int v = 0; v < position_ac.count; v++) {
+			glm::vec3 data = *(glm::vec3*)(pos_start + v * pos_stride);
+			pm->verticies.push_back(data);
+		}
+
+		// Transform verts
+		if (transform != glm::mat4(1)) {
+			for (int v = 0; v < position_ac.count; v++) {
+				pm->verticies[vertex_offset + v] = transform * glm::vec4(pm->verticies[vertex_offset + v], 1.0);
+			}
+		}
+
+		tinygltf::Accessor& index_ac = scene.accessors[primitive.indices];
+		tinygltf::BufferView& index_bv = scene.bufferViews[index_ac.bufferView];
+		tinygltf::Buffer& index_buffer = scene.buffers[index_bv.buffer];
+		int index_stride = index_ac.ByteStride(index_bv);
+		ASSERT(index_ac.byteOffset == 0 && index_bv.byteStride == 0);
+		unsigned char* index_start = &index_buffer.data.at(index_bv.byteOffset);
+		for (int i = 0; i < index_ac.count; i += 3) {
+			Physics_Triangle ct;
+			if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+				ct.indicies[0] = *(unsigned int*)(index_start + index_stride * i);
+				ct.indicies[1] = *(unsigned int*)(index_start + index_stride * (i + 1));
+				ct.indicies[2] = *(unsigned int*)(index_start + index_stride * (i + 2));
+			}
+			else if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+				ct.indicies[0] = *(unsigned short*)(index_start + index_stride * i);
+				ct.indicies[1] = *(unsigned short*)(index_start + index_stride * (i + 1));
+				ct.indicies[2] = *(unsigned short*)(index_start + index_stride * (i + 2));
+			}
+			ct.indicies[0] += vertex_offset;
+			ct.indicies[1] += vertex_offset;
+			ct.indicies[2] += vertex_offset;
+
+			glm::vec3 verts[3];
+			for (int j = 0; j < 3; j++)
+				verts[j] = pm->verticies.at(ct.indicies[j]);
+			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
+			ct.face_normal = face_normal;
+			ct.plane_offset = -glm::dot(face_normal, verts[0]);	
+			if (primitive.material != 1) {
+				ct.surf_type = materials.at(primitive.material)->physics;
+			}
+			pm->tris.push_back(ct);
+		}
+	}
+}
+
+// for level meshes: default renderable = true, collidable = true (so detail props should be XXX_!r!nc)
+// for level entities: default renderable = false, collidable = false (so a door should be XXX_!r!c)
+// for regular meshes: default renderable = true, collidable = false (so collision_mesh should be XXX_!nr!c)
+
+// physics_mesh can be nullptr, then it creates/uses model->collision
+void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::Node& node, 
+	std::map<int,int>& buffer_view_to_buffer, bool render_default, bool collide_default, std::vector<Game_Shader*>& materials, 
+	Physics_Mesh* physics, const glm::mat4& phys_transform)
+{
+	ASSERT(node.mesh != -1);
+	bool renderable = render_default;
+	bool collidable = collide_default;
+
+	if (node.name.find("_!r!c") != std::string::npos) {
+		renderable = true;
+		collidable = true;
+	}
+	else if (node.name.find("_!nr!c") != std::string::npos) {
+		renderable = false;
+		collidable = true;
+	}
+	else if (node.name.find("_!r!nc") != std::string::npos) {
+		renderable = true;
+		collidable = false;
+	}
+
+	if (!renderable && !collidable)
+		return;
+
+	tinygltf::Mesh& mesh = inputMod.meshes[node.mesh];
+
+	if (collidable)
+		append_collision_data(model, inputMod, mesh, materials, physics, phys_transform);
+	if (!renderable)
+		return;
+
 	for (int i = 0; i < mesh.primitives.size(); i++)
 	{
 		const tinygltf::Primitive& prim = mesh.primitives[i];
@@ -93,7 +199,7 @@ void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygl
 				found_joints_attrib = true;
 
 			glEnableVertexAttribArray(location);
-			if (location==JOINT_LOC) {
+			if (location == JOINT_LOC) {
 				glVertexAttribIPointer(location, accessor.type, accessor.componentType,
 					byte_stride, (void*)accessor.byteOffset);
 			}
@@ -117,6 +223,8 @@ void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygl
 
 		glCheckError();
 	}
+
+
 }
 
 static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
@@ -128,16 +236,16 @@ static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
 	return CreateTextureFromImgFormat(&b.data.at(bv.byteOffset), bv.byteLength, i.name);
 }
 
-static void LoadMaterials(Model* m, tinygltf::Model& scene)
+void load_model_materials(std::vector<Game_Shader*>& materials, const std::string& fallbackname, tinygltf::Model& scene)
 {
 	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
 		tinygltf::Material& mat = scene.materials[matidx];
 		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
 		if(!gs) {
-			gs = mats.create_temp_shader((m->name + mat.name).c_str());
+			gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
 			gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
 		}
-		m->materials.push_back(gs);
+		materials.push_back(gs);
 	}
 }
 
@@ -285,6 +393,14 @@ static Animation_Set* LoadGltfAnimations(tinygltf::Model& scene, tinygltf::Skin&
 	return set;
 }
 
+static void traverse_model_nodes(Model* model, tinygltf::Model& scene, tinygltf::Node& node, std::map<int, int>& buffer_view_to_buffer)
+{
+	if (node.mesh != -1)
+		add_node_mesh_to_model(model, scene, node, buffer_view_to_buffer, true, false, model->materials, nullptr, glm::mat4(1));
+	for (int i = 0; i < node.children.size(); i++)
+		traverse_model_nodes(model, scene, scene.nodes[node.children[i]], buffer_view_to_buffer);
+}
+
 static bool DoLoadGltfModel(const std::string& filepath, Model* model)
 {
 	tinygltf::Model scene;
@@ -304,11 +420,13 @@ static bool DoLoadGltfModel(const std::string& filepath, Model* model)
 		model->animations = std::unique_ptr<Animation_Set>(set);
 	}
 
+	load_model_materials(model->materials, model->name, scene);
 	std::map<int, int> buf_view_to_buffers;
-	for (int i = 0; i < scene.meshes.size(); i++) {
-		AppendGltfMeshToModel(model, scene, scene.meshes.at(i),buf_view_to_buffers);
+	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
+	for (int i = 0; i < defscene.nodes.size(); i++) {
+		traverse_model_nodes(model, scene, scene.nodes.at(defscene.nodes.at(i)), buf_view_to_buffers);
 	}
-	LoadMaterials(model, scene);
+
 
 
 	return res;

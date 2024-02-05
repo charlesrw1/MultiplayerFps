@@ -1,68 +1,53 @@
 #ifndef LEVEL_H
 #define LEVEL_H
 #include <vector>
-#include "Model.h"
 #include "BVH.h"
+#include "Model.h"
 
+struct Level_Light
+{
+	enum { POINT, SPOT, DIRECTIONAL };
+	glm::vec3 position;
+	glm::vec3 direction;
+	glm::vec3 color; // rgb*intensity
+	float spot_angle;
+	int type;
+};
 
+class Model;
+class Texture;
 class Level
 {
 public:
-	struct CollisionTri
-	{
-		int indicies[3];
-		glm::vec3 face_normal;
-		float plane_offset = 0.f;
-		short surf_flags = 0;
-		short surf_type = 0;
-	};
 	struct StaticInstance
 	{
 		int model_index;
 		glm::mat4 transform;
+		bool collision_only = false;
 	};
-	struct RenderData
-	{
-		std::vector<StaticInstance> instances;
-		std::vector<Model*> embedded_meshes;
-	};
-	struct CollisionData
-	{
-		std::vector<CollisionTri> collision_tris;
-		std::vector<glm::vec3> vertex_list;
-	};
-	struct PlayerSpawn
-	{
-		glm::vec3 position;
-		float angle = 0.f;
-		short team = 0;
-		short mode = 0;
-	};
-	struct Trigger
-	{
-		glm::mat4x3 inv_transform;	// aabb is then 1x1x1 cube
-		glm::vec3 size = glm::vec3(1);
-		short shape_type = 0;
-		short type = 0;
-		short param1 = 0;
-	};
-
 	struct Entity_Spawn
 	{
 		std::string name;
 		glm::vec3 position;
 		glm::vec3 rotation;
+		glm::vec3 scale;
 		std::vector<std::vector<std::string>> key_values;
 	};
 
 	BVH static_geo_bvh;
-	CollisionData collision_data;
-	RenderData render_data;
-	std::vector<PlayerSpawn> spawns;
-	std::vector<Trigger> triggers;
+	Physics_Mesh collision;	// union of all level_meshes collision data
+
+	//CollisionData collision_data;
+	//RenderData render_data;
+
+	std::vector<Level_Light> lights;
+	std::vector<Model*> linked_meshes;	// custom embedded meshes that are linked to an entity like doors, not included in static_meshes
+	std::vector<StaticInstance> instances;	// instances, index into static_meshes
+	std::vector<Model*> static_meshes;
+	Texture* lightmap;
 
 	std::vector<Entity_Spawn> espawns;
-
+	
 	std::string name;
 
 	int ref_count = 0;	// to manage case of server/client accessing same level

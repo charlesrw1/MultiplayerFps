@@ -9,130 +9,51 @@
 static const char* const level_directory = "Data\\Models\\";
 static std::array<Level*, 2> loaded_levels;
 
-bool IsMaterialCollidable() {
-	return true;
-}
-static void LoadCollisionData(Level* level, tinygltf::Model& scene, tinygltf::Mesh& mesh, glm::mat4 transform)
+
+// Model.cpp
+extern void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::Node& node,
+	std::map<int, int>& buffer_view_to_buffer, bool render_default, bool collide_default, std::vector<Game_Shader*>& mm,
+	Physics_Mesh* physics, const glm::mat4& phys_transform);
+extern void load_model_materials(std::vector<Game_Shader*>& materials, const std::string& fallbackname, tinygltf::Model& scene);
+
+
+void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 {
-	Level::CollisionData& out_data = level->collision_data;
-	for (int part = 0; part < mesh.primitives.size(); part++)
-	{
-		const int vertex_offset = out_data.vertex_list.size();
-
-		tinygltf::Primitive& primitive = mesh.primitives[part];
-		ASSERT(primitive.attributes.find("POSITION") != primitive.attributes.end());
-		tinygltf::Accessor& position_ac = scene.accessors[primitive.attributes["POSITION"]];
-		tinygltf::BufferView& position_bv = scene.bufferViews[position_ac.bufferView];
-		tinygltf::Buffer& pos_buffer = scene.buffers[position_bv.buffer];
-		int pos_stride = position_ac.ByteStride(position_bv);
-		ASSERT(position_ac.type == TINYGLTF_TYPE_VEC3 && position_ac.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-		ASSERT(position_ac.byteOffset == 0&&position_bv.byteStride==0);
-		unsigned char* pos_start = &pos_buffer.data.at(position_bv.byteOffset);
-		for (int v = 0; v < position_ac.count; v++) {
-			glm::vec3 data = *(glm::vec3*)(pos_start + v * pos_stride);
-			out_data.vertex_list.push_back(data);
-		}
-
-		// Transform verts
-		if (transform != glm::mat4(1)) {
-			for (int v = 0; v < position_ac.count; v++) {
-				out_data.vertex_list[vertex_offset + v] = transform * glm::vec4(out_data.vertex_list[vertex_offset + v],1.0);
-			}
-		}
-
-		tinygltf::Accessor& index_ac = scene.accessors[primitive.indices];
-		tinygltf::BufferView& index_bv = scene.bufferViews[index_ac.bufferView];
-		tinygltf::Buffer& index_buffer = scene.buffers[index_bv.buffer];
-		int index_stride = index_ac.ByteStride(index_bv);
-		ASSERT(index_ac.byteOffset == 0 && index_bv.byteStride == 0);
-		unsigned char* index_start = &index_buffer.data.at(index_bv.byteOffset);
-		for (int i = 0; i < index_ac.count; i+=3) {
-			Level::CollisionTri ct;
-			if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-				ct.indicies[0] = *(unsigned int*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned int*)(index_start + index_stride * (i+1));
-				ct.indicies[2] = *(unsigned int*)(index_start + index_stride * (i+2));
-			}
-			else if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-				ct.indicies[0] = *(unsigned short*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned short*)(index_start + index_stride * (i+1));
-				ct.indicies[2] = *(unsigned short*)(index_start + index_stride * (i+2));
-			}
-			ct.indicies[0] += vertex_offset;
-			ct.indicies[1] += vertex_offset;
-			ct.indicies[2] += vertex_offset;
-
-			glm::vec3 verts[3];
-			for (int j = 0; j < 3; j++)
-				verts[j] = out_data.vertex_list.at(ct.indicies[j]);
-			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
-			ct.face_normal = face_normal;
-			ct.plane_offset = -glm::dot(face_normal, verts[0]);
-
-			// TODO: surface flags
-			
-			out_data.collision_tris.push_back(ct);
-		}
-	}
-}
-
-static void ParseObject(Level* level, const tinygltf::Node& node, glm::mat4 transform, bool& should_collide, bool& should_render)
-{
-	should_collide = should_render = false;
-	size_t endpos = node.name.find(']');
-	if (endpos == std::string::npos || endpos==1) {
-		printf("Bad object: %s\n", node.name.c_str());
-		return;
-	}
-	glm::vec3 euler_angles = glm::vec3(0);
+	Level::Entity_Spawn es;
+	es.name = node.name;
+	es.position = transform[3];
+	es.rotation = glm::vec3(0.f);
 	if (node.rotation.size() == 4) {
 		glm::quat quat = glm::make_quat<double>(node.rotation.data());
-		euler_angles = glm::eulerAngles(quat);
+		es.rotation = glm::eulerAngles(quat);
 	}
-	std::string type_name = node.name.substr(1, endpos-1);
-	bool is_trig = type_name.find("trig:") != std::string::npos;
-	if (is_trig) {
-		type_name = type_name.substr(5);
-		Level::Trigger trig{};
-		if (type_name == "spawn_zone") {
-			trig.type = 0;
-		}
-		else {
-			printf("Bad trigger type: %s\n", node.name.c_str());
-			return;
-		}
-		trig.size = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-		transform[0] /= trig.size.x;
-		transform[1] /= trig.size.y;
-		transform[2] /= trig.size.z;
-
-		trig.inv_transform = glm::inverse(transform);
-		trig.shape_type = 0;	// for later use (spheres)
-
-		level->triggers.push_back(trig);
-	}
-	else
-	{
-		if (type_name == "player_spawn")
-		{
-			Level::PlayerSpawn spawn;
-			spawn.angle = euler_angles.y;
-			spawn.position = transform[3];
-			spawn.team = 0;
-			spawn.mode = 0;
-			level->spawns.push_back(spawn);
-		}
-		else
-		{
-			printf("Unknown obj type: %s\n", node.name.c_str());
-			return;
-		}
-
-	}
+	es.scale = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
 	
+	auto keys = node.extras.Keys();
+	for (int i = 0; i < keys.size(); i++) {
+		int s = es.key_values.size();
+		es.key_values.resize(s + 1);
+		
+		auto& kv = es.key_values.at(s);
+		kv.push_back(keys.at(i));
+		auto& v = node.extras.Get(keys.at(i));
+		kv.push_back(v.Get<std::string>());
+	}
+
+	if (node.mesh != -1) {
+		int s = es.key_values.size();
+		es.key_values.resize(s + 1);
+
+		auto& kv = es.key_values.at(s);
+		kv.push_back("linked_mesh");
+		kv.push_back(std::to_string(level->linked_meshes.size()));
+	}
+
+
 }
 
-static void LookThroughNodeTree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, glm::mat4 global_transform)
+static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, 
+	glm::mat4 global_transform, std::vector<Game_Shader*>& mm)
 {
 	glm::mat4 local_transform = glm::mat4(1);
 	if (node.matrix.size() == 16) {
@@ -155,58 +76,62 @@ static void LookThroughNodeTree(Level* level, tinygltf::Model& scene, tinygltf::
 		local_transform = glm::scale(local_transform, scale);
 	}
 	global_transform = global_transform * local_transform;
-	bool statically_drawn = true;
-	bool has_collision = true;
 
-	if (node.name.size() > 0 && node.name[0] == '[')
-		ParseObject(level,node,global_transform,has_collision, statically_drawn);
+	bool is_entity = false;
+
+	// if its an entity, default is no collision/rendering
+	if (node.extras.IsObject() && node.extras.Has("classname")) {
+		is_entity = true;
+
+		parse_entity(level, node, global_transform);
+	}
 
 	if (node.mesh != -1) {
-		if (statically_drawn) {
-			Level::StaticInstance sm;
-			sm.model_index = node.mesh;
-			sm.transform = global_transform;
-			level->render_data.instances.push_back(sm);
+		// ASSUMPTION: (FIXME!!) meshes are only used by one node
+		if (is_entity)
+		{
+			Model* m = new Model;
+			std::map<int, int> mapping;
+			add_node_mesh_to_model(m, scene, node, mapping, false, false, mm, nullptr, glm::mat4(1));
+			if (!m->collision && m->parts.size() == 0)
+				delete m;
+			else
+				level->linked_meshes.push_back(m);
 		}
-		if (has_collision) {
-			LoadCollisionData(level, scene, scene.meshes[node.mesh], global_transform);
+		else
+		{
+			Level::StaticInstance sm;
+			sm.model_index = level->static_meshes.size();
+			sm.transform = global_transform;
+			
+			Model* m = new Model;
+			std::map<int, int> mapping;
+			add_node_mesh_to_model(m, scene, node, mapping, true, true, mm, &level->collision, global_transform);
+			level->static_meshes.push_back(m);
+			
+			sm.collision_only = m->collision && m->parts.size() == 0;
+			level->instances.push_back(sm);
 		}
 	}
 
 	for (int i = 0; i < node.children.size(); i++)
-		LookThroughNodeTree(level, scene, scene.nodes[node.children[i]], global_transform);
+		traverse_tree(level, scene, scene.nodes[node.children[i]], global_transform,mm);
 }
 
-static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
+static void map_materials_to_models(Level* level, tinygltf::Model& scene, std::vector<Game_Shader*>& mm)
 {
-	tinygltf::BufferView& bv = scene.bufferViews[i.bufferView];
-	tinygltf::Buffer& b = scene.buffers[bv.buffer];
-	ASSERT(bv.byteStride == 0);
-
-	return CreateTextureFromImgFormat(&b.data.at(bv.byteOffset), bv.byteLength, i.name);
-}
-
-static void GatherRenderData(Level* level, tinygltf::Model& scene)
-{
-	std::vector<Game_Shader*> mm;
-
-	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
-		tinygltf::Material& mat = scene.materials[matidx];
-		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
-		if (!gs) {
-			gs = mats.create_temp_shader((level->name + mat.name).c_str());
-			gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+	for (int i = 0; i < level->linked_meshes.size(); i++) {
+		Model* m = level->linked_meshes.at(i);
+		for (int i = 0; i < m->parts.size(); i++) {
+			auto& part = m->parts[i];
+			if (part.material_idx != -1) {
+				m->materials.push_back(mm.at(part.material_idx));
+				part.material_idx = m->materials.size() - 1;
+			}
 		}
-		mm.push_back(gs);
 	}
-
-	for (int i = 0; i < scene.meshes.size(); i++) {
-		Model* m = new Model;
-		std::map<int, int> mapping;
-		AppendGltfMeshToModel(m, scene, scene.meshes[i], mapping);
-		level->render_data.embedded_meshes.push_back(m);
-		// TODO: materials
-
+	for (int i = 0; i < level->static_meshes.size(); i++) {
+		Model* m = level->static_meshes.at(i);
 		for (int i = 0; i < m->parts.size(); i++) {
 			auto& part = m->parts[i];
 			if (part.material_idx != -1) {
@@ -216,6 +141,30 @@ static void GatherRenderData(Level* level, tinygltf::Model& scene)
 		}
 	}
 }
+
+void init_collision_bvh(Level* level)
+{
+	std::vector<Bounds> bound_vec;
+	Physics_Mesh& pm = level->collision;
+	for (int i = 0; i < pm.tris.size(); i++) {
+		Physics_Triangle& tri = pm.tris[i];
+		glm::vec3 corners[3];
+		for (int i = 0; i < 3; i++)
+			corners[i] = pm.verticies[tri.indicies[i]];
+		Bounds b(corners[0]);
+		b = bounds_union(b, corners[1]);
+		b = bounds_union(b, corners[2]);
+		b.bmin -= glm::vec3(0.01);
+		b.bmax += glm::vec3(0.01);
+
+		bound_vec.push_back(b);
+	}
+
+	float time_start = GetTime();
+	level->static_geo_bvh = BVH::build(bound_vec, 1, BVH_SAH);
+	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
+}
+
 
 Level* LoadLevelFile(const char* level_name)
 {
@@ -246,12 +195,18 @@ Level* LoadLevelFile(const char* level_name)
 
 	Level* level = new Level;
 	level->name = level_name;
-	GatherRenderData(level, scene);
+
+	std::vector<Game_Shader*> mm;
+	load_model_materials(mm, level->name, scene);
+
 	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
 	for (int i = 0; i < defscene.nodes.size(); i++) {
-		LookThroughNodeTree(level, scene, scene.nodes[defscene.nodes[i]], glm::mat4(1));
+		traverse_tree(level, scene, scene.nodes[defscene.nodes[i]], glm::mat4(1), mm);
 	}
-	InitStaticGeoBvh(level);
+	map_materials_to_models(level, scene, mm);
+
+	init_collision_bvh(level);
+
 	level->ref_count = 1;
 	loaded_levels[open_slot] = level;
 	return level;

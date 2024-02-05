@@ -7,6 +7,7 @@
 #include "glad/glad.h"
 #include "BVH.h"
 #include "Types.h"
+#include "Model.h"
 
 void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out);
 
@@ -14,6 +15,7 @@ extern MeshBuilder phys_debug;
 static MeshBuilder world_collision;
 void DrawCollisionWorld(const Level* lvl)
 {
+#if 0
 	static std::string lvl_that_was_built;
 	if (lvl_that_was_built != lvl->name) {
 		world_collision.Begin();
@@ -44,28 +46,7 @@ void DrawCollisionWorld(const Level* lvl)
 		lvl_that_was_built = lvl->name;
 	}
 	world_collision.Draw(GL_LINES);
-}
-void InitStaticGeoBvh(Level* level)
-{
-	std::vector<Bounds> bound_vec;
-	Level::CollisionData& cd = level->collision_data;
-	for (int i = 0; i < cd.collision_tris.size(); i++) {
-		Level::CollisionTri& tri = cd.collision_tris[i];
-		glm::vec3 corners[3];
-		for (int i = 0; i < 3; i++)
-			corners[i] = cd.vertex_list[tri.indicies[i]];
-		Bounds b(corners[0]);
-		b = bounds_union(b, corners[1]);
-		b = bounds_union(b, corners[2]);
-		b.bmin -= vec3(0.01);
-		b.bmax += vec3(0.01);
-
-		bound_vec.push_back(b);
-	}
-
-	float time_start = GetTime();
-	level->static_geo_bvh = BVH::build(bound_vec, 1, BVH_SAH);
-	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
+#endif
 }
 
 template<typename Functor>
@@ -334,7 +315,7 @@ GeomContact shape_vs_tri_mesh(Trace_Shape shape, MeshShape* mesh)
 
 		auto sphere_intersect_functor = [&](int index)->bool {
 			ASSERT(index < (mesh->verticies->size()));
-			const Level::CollisionTri& tri = (*mesh->tris)[index];
+			const Physics_Triangle& tri = (*mesh->tris)[index];
 			glm::vec3 corners[3];
 			for (int i = 0; i < 3; i++)
 				corners[i] = (*mesh->verticies)[tri.indicies[i]];
@@ -365,7 +346,7 @@ GeomContact shape_vs_tri_mesh(Trace_Shape shape, MeshShape* mesh)
 
 		auto capsule_intersect_functor = [&](int index) -> bool {
 			ASSERT(index < mesh->tris->size());
-			const Level::CollisionTri& tri = (*mesh->tris)[index];
+			const Physics_Triangle& tri = (*mesh->tris)[index];
 
 			glm::vec3 corners[3];
 			for (int i = 0; i < 3; i++)
@@ -451,7 +432,7 @@ bool IntersectRayMesh(Ray r, float tmin, float tmax, RayHit* out, MeshShape* s)
 				int mesh_element_index = bvh.indicies[index_start + i];
 
 				ASSERT(mesh_element_index <(s->tris->size()));
-				const Level::CollisionTri& tri =(*s->tris)[mesh_element_index];
+				const Physics_Triangle& tri =(*s->tris)[mesh_element_index];
 
 				IntersectTriRay2(r, (*s->verticies)[tri.indicies[0]],
 					(*s->verticies)[tri.indicies[1]],
@@ -590,8 +571,8 @@ void PhysicsWorld::AddLevel(const Level* l)
 	obj.solid = true;
 	obj.is_mesh = true;
 	obj.mesh.structure = &l->static_geo_bvh;
-	obj.mesh.verticies = &l->collision_data.vertex_list;
-	obj.mesh.tris = &l->collision_data.collision_tris;
+	obj.mesh.verticies = &l->collision.verticies;
+	obj.mesh.tris = &l->collision.tris;
 
 	objs.push_back(obj);
 }

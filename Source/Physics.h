@@ -4,6 +4,7 @@
 #include "MathLib.h"
 #include <vector>
 #include "Level.h"
+#include "Model.h"
 
 struct RayHit
 {
@@ -45,9 +46,10 @@ class BVH;
 struct MeshShape
 {
 	const std::vector<glm::vec3>* verticies;
-	const std::vector<Level::CollisionTri>* tris;
+	const std::vector<Physics_Triangle>* tris;
 	const BVH* structure;
 };
+
 
 struct PhysicsObject
 {

@@ -17,8 +17,9 @@ using std::vector;
 
 enum class VertexFormat
 {
-	Static,
-	Skinned
+	Static,		// pos,uv,normal, color(optional)
+	Skinned,	// pos,uv,normal,bone,weight
+	Lightmapped,// pos,uv,normal,uv2, color(optional)
 };
 
 struct Bone
@@ -41,6 +42,21 @@ struct MeshPart
 	short material_idx = 0;
 	short layout = 0;
 };
+
+struct Physics_Triangle
+{
+	int indicies[3];
+	glm::vec3 face_normal;
+	float plane_offset = 0.f;
+	int surf_type = 0;
+};
+
+struct Physics_Mesh
+{
+	std::vector<glm::vec3> verticies;
+	std::vector<Physics_Triangle> tris;
+};
+
 struct Texture;
 class Game_Shader;
 struct ModelAttachment
@@ -79,6 +95,8 @@ public:
 	vector<GpuBuffer> buffers;
 	vector<Game_Shader*> materials;
 
+	std::unique_ptr<Physics_Mesh> collision;
+
 	int BoneForName(const char* name) const;
 };
 
@@ -91,5 +109,4 @@ namespace tinygltf {
 	class Model;
 	class Mesh;
 }
-void AppendGltfMeshToModel(Model* model, tinygltf::Model& inputMod, const tinygltf::Mesh& mesh, std::map<int, int>& buffer_view_to_buffer);
 #endif // !MODEL_H
