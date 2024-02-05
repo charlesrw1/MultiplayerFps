@@ -132,13 +132,12 @@ static void LoadMaterials(Model* m, tinygltf::Model& scene)
 {
 	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
 		tinygltf::Material& mat = scene.materials[matidx];
-		MeshMaterial mymat;
-		if (mat.pbrMetallicRoughness.baseColorTexture.index != -1) {
-			mymat.t1 = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
+		if(!gs) {
+			gs = mats.create_temp_shader((m->name + mat.name).c_str());
+			gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
 		}
-
-		m->materials.push_back(mymat);
-		
+		m->materials.push_back(gs);
 	}
 }
 
@@ -376,13 +375,13 @@ Model* FindOrLoadModel(const char* filename)
 	path += filename;
 
 	Model* model = new Model;
+	model->name = filename;
 	bool res = DoLoadGltfModel(path, model);
 	if (!res) {
 		delete model;
 		return nullptr;
 	}
 
-	model->name = filename;
 	models.push_back(model);
 
 	return model;

@@ -612,9 +612,9 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 			bind_texture(0, white_texture);
 		}
 		else {
-			const MeshMaterial& mm = m->materials.at(part->material_idx);
-			if (mm.t1)
-				bind_texture(0, mm.t1->gl_id);
+			const Game_Shader* mm = m->materials.at(part->material_idx);
+			if (mm->images[Game_Shader::BASE1])
+				bind_texture(0, mm->images[Game_Shader::BASE1]->gl_id);
 			else
 				bind_texture(0, white_texture);
 		}
@@ -667,9 +667,9 @@ void Renderer::DrawLevel()
 			const MeshPart& mp = model.parts[p];
 
 			if (mp.material_idx != -1) {
-				const auto& mm = model.materials[mp.material_idx];
-				if (mm.t1)
-					bind_texture(0, mm.t1->gl_id);
+				const Game_Shader* mm = model.materials.at(mp.material_idx);
+				if (mm->images[Game_Shader::BASE1])
+					bind_texture(0, mm->images[Game_Shader::BASE1]->gl_id);
 				else
 					bind_texture(0, white_texture);
 			}
@@ -1208,6 +1208,10 @@ void Game_Engine::init()
 	cl->init();
 	sv->init();
 	local.init();
+
+	mats.init();
+
+	mats.load_material_file_directory("./Data/Materials/");
 
 	// debug interface
 	imgui_context = ImGui::CreateContext();

@@ -3,6 +3,8 @@
 #include <vector>
 #include "Model.h"
 #include "BVH.h"
+
+
 class Level
 {
 public:
@@ -44,11 +46,23 @@ public:
 		short type = 0;
 		short param1 = 0;
 	};
+
+	struct Entity_Spawn
+	{
+		std::string name;
+		glm::vec3 position;
+		glm::vec3 rotation;
+		std::vector<std::vector<std::string>> key_values;
+	};
+
 	BVH static_geo_bvh;
 	CollisionData collision_data;
 	RenderData render_data;
 	std::vector<PlayerSpawn> spawns;
 	std::vector<Trigger> triggers;
+
+	std::vector<Entity_Spawn> espawns;
+
 	std::string name;
 
 	int ref_count = 0;	// to manage case of server/client accessing same level

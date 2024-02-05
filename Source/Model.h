@@ -42,12 +42,7 @@ struct MeshPart
 	short layout = 0;
 };
 struct Texture;
-struct MeshMaterial
-{
-	Texture* t1 = nullptr;
-	Texture* t2 = nullptr;
-};
-
+class Game_Shader;
 struct ModelAttachment
 {
 	int str_table_start = 0;
@@ -82,7 +77,7 @@ public:
 	VertexFormat format=VertexFormat::Static;
 	vector<MeshPart> parts;
 	vector<GpuBuffer> buffers;
-	vector<MeshMaterial> materials;
+	vector<Game_Shader*> materials;
 
 	int BoneForName(const char* name) const;
 };

@@ -63,7 +63,7 @@ void tokenize_string(string& input, std::vector<string>& out)
 	string token;
 	bool in_quotes = false;
 	for (char c : input) {
-		if (c == ' ' && !in_quotes) {
+		if ((c == ' ' || c == '\t') && !in_quotes) {
 			if (!token.empty()) {
 				out.push_back(token);
 				token.clear();

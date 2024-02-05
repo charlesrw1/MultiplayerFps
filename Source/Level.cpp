@@ -188,15 +188,16 @@ static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
 
 static void GatherRenderData(Level* level, tinygltf::Model& scene)
 {
-	std::vector<MeshMaterial> mm;
+	std::vector<Game_Shader*> mm;
 
 	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
 		tinygltf::Material& mat = scene.materials[matidx];
-		MeshMaterial mymat;
-		if (mat.pbrMetallicRoughness.baseColorTexture.index != -1) {
-			mymat.t1 = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
+		if (!gs) {
+			gs = mats.create_temp_shader((level->name + mat.name).c_str());
+			gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
 		}
-		mm.push_back(mymat);
+		mm.push_back(gs);
 	}
 
 	for (int i = 0; i < scene.meshes.size(); i++) {

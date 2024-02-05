@@ -203,5 +203,8 @@
     <ClInclude Include="Source\Draw.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Key_Value_File.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
