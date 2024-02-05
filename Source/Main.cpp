@@ -418,6 +418,8 @@ void Renderer::reload_shaders()
 	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
 	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", "AnimBasicF.txt");
 	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", "AnimBasicF.txt", "ALPHATEST");
+	Shader::compile(&shade[S_WIND], "AnimBasicV.txt", "AnimBasicF.txt", "WIND");
+	Shader::compile(&shade[S_WIND_AT], "AnimBasicV.txt", "AnimBasicF.txt", "WIND, ALPHATEST");
 
 	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED");
 	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED, ALPHATEST");
@@ -750,6 +752,35 @@ void Renderer::DrawEnts()
 
 }
 
+
+static float wsheight = 3.0;
+static float wsradius = 1.5;
+static float wsstartheight = 0.2;
+static float wsstartradius = 0.2;
+static vec3 wswind_dir = glm::vec3(1,0,0);
+static float speed = 1.0;
+
+void Renderer::set_wind_constants()
+{
+	shader().set_float("time", engine.time);
+	shader().set_float("height", wsheight);
+	shader().set_float("radius", wsradius);
+	shader().set_float("startheight", wsstartheight);
+	shader().set_float("startradius", wsstartradius);
+	shader().set_vec3("wind_dir", wswind_dir);
+	shader().set_float("speed", speed);
+}
+
+void draw_wind_menu()
+{
+	ImGui::DragFloat3("wind dir", &wswind_dir.x, 0.04);
+	ImGui::DragFloat("speed", &speed, 0.04);
+	ImGui::DragFloat("height", &wsheight, 0.04);
+	ImGui::DragFloat("radius", &wsradius, 0.04);
+	ImGui::DragFloat("startheight", &wsstartheight, 0.04,0.f,1.f);
+	ImGui::DragFloat("startradius", &wsstartradius, 0.04, 0.f, 1.f);
+}
+
 void Renderer::DrawLevel()
 {
 	const Level* level = engine.level;
@@ -797,6 +828,14 @@ void Renderer::DrawLevel()
 				}
 				else if (shader_type == gs->S_2WAYBLEND) {
 					set_shader(shade[S_LIGHTMAPPED_BLEND2]);
+				}
+				else if (shader_type == gs->S_WINDSWAY) {
+					if (is_alpha_test)
+						set_shader(shade[S_WIND_AT]);
+					else
+						set_shader(shade[S_WIND]);
+
+					set_wind_constants();
 				}
 
 				set_shader_constants();
@@ -1238,22 +1277,23 @@ void Game_Engine::draw_debug_interface()
 	if (state == ENGINE_GAME) {
 
 		// player menu
-		if (ImGui::Begin("player")) {
+		if (ImGui::Begin("Game")) {
+			draw_wind_menu();
+
 			Entity& p = engine.local_player();
 			ImGui::DragFloat3("vm", &engine.local.vm_offset[0],0.02f);
 			ImGui::DragFloat3("pos", &p.position.x);
 			ImGui::DragFloat3("vel", &p.velocity.x);
 			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
+
+
+			if (is_host) {
+					ImGui::Text("delta %f", cl->time_delta);
+					ImGui::Text("tick %f", engine.tick);
+					ImGui::Text("frr %f", engine.frame_remainder);
+			}
 		}
 		ImGui::End();
-		if (is_host) {
-			if (ImGui::Begin("client")) {
-				ImGui::Text("delta %f", cl->time_delta);
-				ImGui::Text("tick %f", engine.tick);
-				ImGui::Text("frr %f", engine.frame_remainder);
-			}
-			ImGui::End();
-		}
 	}
 }
 

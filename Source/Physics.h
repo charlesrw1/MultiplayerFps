@@ -82,6 +82,18 @@ struct Trace_Shape
 	bool sphere;
 };
 
+enum Physics_Property
+{
+	PHY_DIRT,
+	PHY_METAL,
+	PHY_CONCRETE,
+	PHY_ROCK,
+	PHY_WATER,
+	PHY_GLASS,
+	PHY_ICE,
+	PHY_SNOW,
+};
+
 enum Physics_Filter_Flags
 {
 	PF_WORLD = 1,

@@ -34,7 +34,7 @@ public:
 	enum { 
 		S_SIMPLE, S_TEXTURED, S_ANIMATED, 
 		
-		S_STATIC, S_STATIC_AT,
+		S_STATIC, S_STATIC_AT, S_WIND, S_WIND_AT,
 		S_LIGHTMAPPED, S_LIGHTMAPPED_AT, S_LIGHTMAPPED_BLEND2,
 		
 		S_PARTICLE_BASIC, S_NUM
@@ -78,6 +78,7 @@ private:
 	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
 
 	void set_shader_sampler_locations();
+	void set_wind_constants();
 
 	int cur_w = 0;
 	int cur_h = 0;

@@ -115,11 +115,13 @@ bool finished = false;
 bool force_animation = false;
 
 // hacky way to move up stairs
-void check_perch(Entity& player)
+void check_perch(Entity& player, bool& dont_add_grav)
 {
 	static Config_Var* min_stair = cfg.get_var("phys/min_stair", "0.25");
 	static Config_Var* max_stair = cfg.get_var("phys/max_stair", "0.5");
 	static Config_Var* stair_rad = cfg.get_var("phys/stair_radius", "0.01");
+
+	dont_add_grav = false;
 
 	glm::vec2 dirs[8] = { vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1),
 		vec2(SQRT2,SQRT2),vec2(SQRT2,-SQRT2), vec2(-SQRT2,-SQRT2), vec2(-SQRT2,SQRT2) };
@@ -134,17 +136,19 @@ void check_perch(Entity& player)
 
 		// perched on ledge
 		if (rh.hit_world) {
-			if (((height - rh.dist) >= min_stair->real) && (height - rh.dist) <= max_stair->real && rh.normal.y > 0.9) {
+			if (((height - rh.dist) >= min_stair->real) && (height - rh.dist) <= max_stair->real && rh.normal.y > 0.98) {
 				player.position.y = player.position.y + (height - rh.dist);
 				player.state |= PMS_GROUND;
 				player.state &= ~PMS_JUMPING;
 				player.velocity.y = 0;
 				sys_print("perched\n");
+				dont_add_grav = true;
 				return;
 			}
-			else if (abs(height - rh.dist) < 0.01) {
+			else if (abs(height - rh.dist) < 0.005) {
 				// stay in perched state
 				player.state |= PMS_GROUND;
+				dont_add_grav = true;
 			}
 		}
 	}
@@ -152,7 +156,7 @@ void check_perch(Entity& player)
 
 
 
-void check_ground_state(Entity& player, Move_Command command)
+void check_ground_state(Entity& player, Move_Command command, bool& dont_add_grav)
 {
 
 	if (player.velocity.y > 2.f) {
@@ -175,7 +179,7 @@ void check_ground_state(Entity& player, Move_Command command)
 	}
 
 	if(!(player.state & PMS_JUMPING))
-		check_perch(player);
+		check_perch(player, dont_add_grav);
 
 	if (player.state & PMS_GROUND) {
 		player.state &= ~PMS_JUMPING;
@@ -288,7 +292,7 @@ float lensquared_noy(vec3 v)
 	return v.x * v.x + v.z * v.z;
 }
 
-void player_physics_ground_move(Entity& player, Move_Command command)
+void player_physics_ground_move(Entity& player, Move_Command command, bool dont_add_grav)
 {
 	check_jump(player, command);
 	check_duck(player, command);
@@ -333,9 +337,8 @@ void player_physics_ground_move(Entity& player, Move_Command command)
 	static Config_Var* phys_gravity = cfg.get_var("phys/gravity", "16.0");
 
 
-	if (!(player.state & PMS_GROUND)) {
+	if (!dont_add_grav) {
 		player.velocity.y -= phys_gravity->real * engine.tick_interval;
-		sys_print("gravity applied");
 	}
 	
 	static Config_Var* phys_stair = cfg.get_var("phys/stair", "0.5");
@@ -389,8 +392,9 @@ void player_physics_update(Entity* p, Move_Command command)
 		p->velocity.z *= factor;
 	}
 
-	check_ground_state(*p, command);
-	player_physics_ground_move(*p, command);
+	bool dont_add_grav = false;
+	check_ground_state(*p, command,dont_add_grav);
+	player_physics_ground_move(*p, command, dont_add_grav);
 	player_physics_check_nans(*p);
 
 }

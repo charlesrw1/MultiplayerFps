@@ -38,6 +38,33 @@ uniform mat4 Model;
 uniform mat4 InverseModel;
 uniform mat4 ViewProj;
 
+
+#ifdef WIND
+uniform float height;
+uniform float startheight;
+uniform vec3 wind_dir;
+uniform float time;
+uniform float speed;
+
+vec3 do_wind_sway(vec3 pos)
+{
+	vec3 wind_dir_local = wind_dir;
+	float height_scale = smoothstep(height*startheight, pos.y, height);
+	height_scale = pow(height_scale, 1.2);
+
+	float sway_time = (time + dot(vec4(1),Model[3]) + pos.y)*speed;
+	vec4 sines = sin(vec4(1.5,1.2,0.7,0.635)*sway_time);
+	sines.xy = mix(sines.xy, sines.zw, 0.5);
+	vec3 pos_offset = wind_dir_local*height_scale*mix(sines.x,sines.y, 0.4)*pow(length(pos.xz),1.5);
+	
+	return pos +  pos_offset*0.05;
+}
+
+#endif
+
+
+
+
 void main()
 {
 #ifdef ANIMATED
@@ -58,6 +85,10 @@ void main()
 	vec3 local_normal = VS_IN_Normal;
 #endif
 
+#ifdef WIND
+	local_pos = do_wind_sway(local_pos);
+#endif
+
 
 //	vec3 local_pos = vec3(BoneTransform[VS_IN_Bone]*vec4(VS_IN_Postion,1.0));
 	FS_IN_FragPos = vec3(Model * vec4(local_pos,1.0));
@@ -69,6 +100,7 @@ void main()
 #endif
     FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
     
+	
 #ifdef VERTEX_COLOR
 	FS_IN_Color = VS_IN_Color;
 #endif
