@@ -365,12 +365,23 @@ void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 
 void Renderer::bind_texture(int bind, int id)
 {
-	ASSERT(bind >= 0 && bind < 4);
+	ASSERT(bind >= 0 && bind < NUM_SAMPLERS);
 	if (cur_tex[bind] != id) {
 		glActiveTexture(GL_TEXTURE0 + bind);
 		glBindTexture(GL_TEXTURE_2D, id);
 		cur_tex[bind] = id;
 	}
+}
+
+
+void Renderer::set_shader_sampler_locations()
+{
+	shader().set_int("basecolor", BASE0_SAMPLER);
+	shader().set_int("auxcolor", AUX0_SAMPLER);
+	shader().set_int("basecolor2", BASE1_SAMPLER);
+	shader().set_int("auxcolor2", AUX1_SAMPLER);
+	shader().set_int("lightmap", LIGHTMAP_SAMPLER);
+	shader().set_int("special", SPECIAL_SAMPLER);
 }
 
 void Renderer::set_shader_constants()
@@ -386,18 +397,35 @@ void Renderer::set_shader_constants()
 	shader().set_float("fog_end", 30.f);
 	shader().set_vec3("view_front", vs.front);
 	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
+}
 
+void Renderer::reload_shaders()
+{
+	Shader::compile(&shade[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
+	Shader::compile(&shade[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
+
+	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
+	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", "AnimBasicF.txt");
+	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", "AnimBasicF.txt", "ALPHATEST");
+
+	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED");
+	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED, ALPHATEST");
+	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
+
+
+	Shader::compile(&shade[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	glCheckError();
+	for (int i = 0; i < S_NUM; i++) {
+		set_shader(shade[i]);
+		set_shader_sampler_locations();
+	}
 }
 
 void Renderer::Init()
 {
+	glCheckError();
 	InitGlState();
-	Shader::compile(&shade.simple, "MbSimpleV.txt", "MbSimpleF.txt");
-	Shader::compile(&shade.textured, "MbTexturedV.txt", "MbTexturedF.txt");
-	Shader::compile(&shade.animated, "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
-	Shader::compile(&shade.basic_mod, "AnimBasicV.txt", "AnimBasicF.txt");
-	Shader::compile(&shade.static_wrld, "AnimBasicV.txt", "AnimBasicF.txt", "VERTEX_COLOR");
-	Shader::compile(&shade.particle_basic, "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	reload_shaders();
 
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
@@ -466,7 +494,8 @@ void Renderer::InitFramebuffers()
 void Renderer::FrameDraw()
 {
 	cur_shader = 0;
-	cur_tex[0] = cur_tex[1] = cur_tex[2] = cur_tex[3] = 0;
+	for (int i = 0; i < NUM_SAMPLERS;i++)
+		cur_tex[i] = 0;
 	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
 		InitFramebuffers();
 
@@ -501,7 +530,7 @@ void Renderer::FrameDraw()
 	}
 
 	mb.End();
-	set_shader(shade.simple);
+	set_shader(shade[S_SIMPLE]);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
@@ -509,12 +538,28 @@ void Renderer::FrameDraw()
 		DrawCollisionWorld(engine.level);
 
 	mb.Draw(GL_LINES);
+
+
 	//game.rays.End();
 	//game.rays.Draw(GL_LINES);
 	if (engine.is_host) {
 		phys_debug.End();
 		phys_debug.Draw(GL_LINES);
 	}
+
+	mb.Begin();
+	mb.Push2dQuad(vec2(-1, 1), vec2(1,-1));
+	mb.End();
+	set_shader(shade[S_TEXTURED]);
+	shader().set_mat4("ViewProj",mat4(1.f));
+	shader().set_mat4("Model", mat4(1.f));
+	Texture* t = mats.find_texture("frog.jpg");
+	bind_texture(BASE0_SAMPLER, t->gl_id);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	mb.Draw(GL_TRIANGLES);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
 	mb.Free();
 
 	glCheckError();
@@ -523,6 +568,8 @@ void Renderer::FrameDraw()
 
 	if(!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
+
+	
 }
 
 Shader& Renderer::shader()
@@ -557,7 +604,7 @@ void Renderer::DrawEntBlobShadows()
 	shadowverts.End();
 	glCheckError();
 
-	set_shader(shade.particle_basic);
+	set_shader(shade[S_PARTICLE_BASIC]);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.0));
 	shader().set_vec4("tint_color", vec4(0,0,0,1));
@@ -586,9 +633,9 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 	const bool isanimated = a != nullptr;
 
 	if (isanimated)
-		set_shader(shade.animated);
+		set_shader(shade[S_ANIMATED]);
 	else
-		set_shader(shade.basic_mod);
+		set_shader(shade[S_STATIC]);
 
 	set_shader_constants();
 	
@@ -614,9 +661,9 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 		else {
 			const Game_Shader* mm = m->materials.at(part->material_idx);
 			if (mm->images[Game_Shader::BASE1])
-				bind_texture(0, mm->images[Game_Shader::BASE1]->gl_id);
+				bind_texture(BASE0_SAMPLER, mm->images[Game_Shader::BASE1]->gl_id);
 			else
-				bind_texture(0, white_texture);
+				bind_texture(BASE0_SAMPLER, white_texture);
 		}
 
 		glBindVertexArray(part->vao);
@@ -650,32 +697,71 @@ void Renderer::DrawEnts()
 
 void Renderer::DrawLevel()
 {
-	set_shader(shade.static_wrld);
-	set_shader_constants();
-
 	const Level* level = engine.level;
+
+	bool force_set = true;
+	bool is_alpha_test = false;
+	bool is_lightmapped = false;
+	int shader_type = Game_Shader::S_DEFAULT;
+
 	for (int m = 0; m < level->instances.size(); m++) {
 		const Level::StaticInstance& sm = level->instances[m];
 		if (sm.collision_only) continue;
 		ASSERT(level->static_meshes[sm.model_index]);
-		const Model& model = *level->static_meshes[sm.model_index];
-
-		shader().set_mat4("Model", sm.transform);
-		shader().set_mat4("InverseModel", glm::inverse(sm.transform));
-
+		Model& model = *level->static_meshes[sm.model_index];
 
 		for (int p = 0; p < model.parts.size(); p++) {
-			const MeshPart& mp = model.parts[p];
+			MeshPart& mp = model.parts[p];
+			Game_Shader* gs = (mp.material_idx != -1) ? model.materials.at(mp.material_idx) : &mats.fallback;
+			bool mat_is_at = gs->alpha_type == gs->A_TEST;
+			bool mat_lightmapped = mp.has_lightmap_coords();
+			bool mat_colors = mp.has_colors();
+			int mat_shader_type = gs->shader_type;
+			if (force_set || is_alpha_test != mat_is_at || is_lightmapped != mat_lightmapped || shader_type!=mat_shader_type) {
+				is_alpha_test = mat_is_at;
+				is_lightmapped = mat_lightmapped;
+				shader_type = mat_shader_type;
+				force_set = false;
 
-			if (mp.material_idx != -1) {
-				const Game_Shader* mm = model.materials.at(mp.material_idx);
-				if (mm->images[Game_Shader::BASE1])
-					bind_texture(0, mm->images[Game_Shader::BASE1]->gl_id);
-				else
-					bind_texture(0, white_texture);
+				if (shader_type == gs->S_2WAYBLEND && (!is_lightmapped || !mat_colors))
+					force_set = true;
+
+				if (force_set)
+					continue;
+
+				if (shader_type == gs->S_DEFAULT) {
+					if (is_lightmapped)
+						set_shader(shade[S_LIGHTMAPPED]);
+					else if (!is_lightmapped && !is_alpha_test)
+						set_shader(shade[S_STATIC]);
+					else if (!is_lightmapped && is_alpha_test)
+						set_shader(shade[S_STATIC_AT]);
+				}
+				else if (shader_type == gs->S_2WAYBLEND) {
+					set_shader(shade[S_LIGHTMAPPED_BLEND2]);
+				}
+
+				set_shader_constants();
+
+				if (is_lightmapped) {
+					if (engine.level->lightmap)
+						bind_texture(LIGHTMAP_SAMPLER, engine.level->lightmap->gl_id);
+					else
+						bind_texture(LIGHTMAP_SAMPLER, white_texture);
+				}
 			}
+			shader().set_mat4("Model", sm.transform);
+			shader().set_mat4("InverseModel", glm::inverse(sm.transform));
+
+
+			if (gs->images[gs->BASE1])
+				bind_texture(BASE0_SAMPLER, gs->images[gs->BASE1]->gl_id);
 			else
-				bind_texture(0, white_texture);
+				bind_texture(BASE0_SAMPLER, white_texture);
+			if (shader_type == Game_Shader::S_2WAYBLEND) {
+				bind_texture(BASE1_SAMPLER, gs->images[gs->BASE2]->gl_id);
+				bind_texture(SPECIAL_SAMPLER, gs->images[gs->SPECIAL]->gl_id);
+			}
 
 			glBindVertexArray(mp.vao);
 			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
@@ -901,6 +987,10 @@ void cmd_print_vars()
 		cfg.print_vars(nullptr);
 	else
 		cfg.print_vars(args.at(1).c_str());
+}
+void cmd_reload_shaders()
+{
+	draw.reload_shaders();
 }
 
 int main(int argc, char** argv)
@@ -1199,6 +1289,8 @@ void Game_Engine::init()
 	cfg.set_command("print_ents", cmd_print_entities);
 	cfg.set_command("print_vars", cmd_print_vars);
 	cfg.set_command("exec", cmd_exec_file);
+	cfg.set_command("reload_shaders", cmd_reload_shaders);
+
 
 	// engine initilization
 	init_sdl_window();

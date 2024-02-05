@@ -10,7 +10,6 @@
 
 static const char* const texture_folder_path = "Data\\Textures\\";
 
-static std::vector<Texture*> textures;
 Game_Material_Manager mats;
 
 #define ENSURE(num) if(line.size() < num) { sys_print("bad material %s", line); continue;}
@@ -66,7 +65,9 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				// TODO
 			}
 			else if (key == "shader") {
-				// TODO
+				ENSURE(2);
+				string& t = line.at(1);
+				if (t == "blend2") gs->shader_type = Game_Shader::S_2WAYBLEND;
 			}
 			else if (key == "alpha") {
 				ENSURE(2);
@@ -122,9 +123,13 @@ void Game_Material_Manager::load_material_file_directory(const char* directory)
 
 Game_Shader* Game_Material_Manager::create_temp_shader(const char* name)
 {
-	ASSERT(find_for_name(name)==nullptr);
-	Game_Shader* gs = new Game_Shader;
-	shaders.push_back(gs);
+	Game_Shader* gs = find_for_name(name);
+	if (!gs) {
+		gs = new Game_Shader;
+		shaders.push_back(gs);
+	}
+	else
+		*gs = Game_Shader();
 	gs->name = name;
 	return gs;
 }
@@ -142,10 +147,8 @@ void Game_Material_Manager::init()
 }
 
 
-static Texture* MakeFromData(int x, int y, int channels, uint8_t* data)
+static bool make_from_data(Texture* output, int x, int y, int channels, void* data, bool is_float)
 {
-	Texture* output = new Texture;
-
 	glGenTextures(1, &output->gl_id);
 	glBindTexture(GL_TEXTURE_2D, output->gl_id);
 
@@ -153,19 +156,26 @@ static Texture* MakeFromData(int x, int y, int channels, uint8_t* data)
 	GLenum format;
 
 	if (channels == 4) {
-		internal_format = GL_RGBA;
+		if (is_float)
+			internal_format = GL_RGBA16F;
+		else
+			internal_format = GL_RGBA;
+
 		format = GL_RGBA;
 	}
 	else if (channels == 3) {
-		internal_format = GL_RGB;
+		if (is_float)
+			internal_format = GL_RGB16F;
+		else
+			internal_format = GL_RGB;
 		format = GL_RGB;
 	}
 	else {
-		printf("Unsupported channel count\n");
-		delete output;
-		return nullptr;
+		sys_print("Unsupported channel count\n");
+		return false;
 	}
-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, GL_UNSIGNED_BYTE, data);
+	uint32_t type = (is_float) ? GL_FLOAT : GL_UNSIGNED_BYTE;
+	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, type, data);
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -173,40 +183,25 @@ static Texture* MakeFromData(int x, int y, int channels, uint8_t* data)
 	output->width = x;
 	output->height = y;
 	output->channels = channels;
+	output->is_float = is_float;
 
-	return output;
+	return true;
 }
 
 using std::string;
 using std::vector;
 
-
-static Texture* AddTexture(std::string& path)
+void FreeTexture(Texture* t)
 {
-	int width, height, channels;
-
-	stbi_set_flip_vertically_on_load(false);
-	uint8_t* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
-	if (!data) {
-		printf("Couldn't find image: %s\n", path.c_str());
-		return nullptr;
-	}
-
-	Texture* output = MakeFromData(width, height, channels, data);
-	output->name = std::move(path);
-
-	stbi_image_free(data);
-	textures.push_back(output);
-	return output;
-}
-
-static void FreeTexture(Texture* t)
-{
-	printf("Freeing texture: %s\n", t->name.c_str());
+	sys_print("Freeing texture: %s\n", t->name.c_str());
 	glDeleteTextures(1, &t->gl_id);
 }
 
 void FreeLoadedTextures()
+{
+	mats.free_all();
+}
+void Game_Material_Manager::free_all()
 {
 	for (int i = 0; i < textures.size(); i++) {
 		FreeTexture(textures[i]);
@@ -214,40 +209,89 @@ void FreeLoadedTextures()
 	}
 	textures.clear();
 }
+Texture* Game_Material_Manager::load_texture(const std::string& path)
+{
+	int x, y, channels;
+	stbi_set_flip_vertically_on_load(false);
+	void* data = nullptr;
+	bool good = false;
+	bool is_float = false;
+	if (path.find(".hdr") != std::string::npos) {
+		data = stbi_loadf(path.c_str(), &x, &y, &channels, 0);
+		is_float = true;
+	}
+	else {
+		data = stbi_load(path.c_str(), &x, &y, &channels, 0);
+		is_float = false;
+	}
+	if (data == nullptr) {
+		sys_print("Couldn't load texture: %s", path.c_str());
+		return nullptr;
+	}
 
-Texture* FindOrLoadTexture(const char* filename)
+	Texture* t = new Texture;
+	good = make_from_data(t, x, y, channels, data, is_float);
+	stbi_image_free(data);
+	t->name = path;
+
+	if (!good) {
+		delete t;
+		return nullptr;
+	}
+
+	return t;
+}
+
+Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_directory, bool owner)
 {
 	std::string path;
 	path.reserve(256);
-	path += texture_folder_path;
-	path += filename;
+	if(search_img_directory)
+		path += texture_folder_path;
+	path += file;
 
-	for (int i = 0; i < textures.size(); i++) {
-		if (textures[i]->name == path) {
-			return textures[i];
+	if (!owner) {
+		for (int i = 0; i < textures.size(); i++) {
+			if (textures[i]->name == path) {
+				return textures[i];
+			}
 		}
 	}
-	return AddTexture(path);
+	Texture* t = load_texture(path);
+	if (!owner && t)
+		textures.push_back(t);
+	return t;
 }
 
-Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name)
+Texture* FindOrLoadTexture(const char* filename)
+{
+	return mats.find_texture(filename, true, false);
+}
+
+Texture* Game_Material_Manager::create_texture_from_memory(const char* name, const uint8_t* data, int data_len)
 {
 	for (int i = 0; i < textures.size(); i++) {
 		if (textures[i]->name == name) {
 			return textures[i];
 		}
 	}
-	
+
 	int width, height, channels;
-	uint8_t* data = stbi_load_from_memory(inpdata, datalen, &width, &height, &channels, 0);
-	if (!data) {
-		printf("Couldn't load from memory: %s", name.c_str());
+	uint8_t* imgdat = stbi_load_from_memory(data, data_len, &width, &height, &channels, 0);
+	if (!imgdat) {
+		printf("Couldn't load from memory: %s", name);
 		return nullptr;
 	}
 
-	Texture* t = MakeFromData(width, height, channels, data);
-	stbi_image_free(data);
-	t->name = std::move(name);
+	Texture* t = new Texture;
+	bool good = make_from_data(t, width, height, channels, (void*)imgdat, false);
+	stbi_image_free((void*)imgdat);
+	t->name = name;
+
 	textures.push_back(t);
 	return t;
+}
+Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name)
+{
+	return mats.create_texture_from_memory(name.c_str(), inpdata, datalen);
 }

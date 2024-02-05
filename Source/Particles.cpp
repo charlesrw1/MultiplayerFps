@@ -56,7 +56,7 @@ void Particle_Manager::draw_particles()
 	int sprite = -2;
 	bool additive = false;
 
-	draw.set_shader(draw.shade.particle_basic);
+	draw.set_shader(draw.shade[draw.S_PARTICLE_BASIC]);
 	draw.shader().set_mat4("ViewProj", draw.vs.viewproj);
 	draw.shader().set_mat4("Model", glm::mat4(1));
 	draw.shader().set_vec4("tint", glm::vec4(1.f));
@@ -125,6 +125,7 @@ void Particle_Manager::add_dust_hit(glm::vec3 org)
 {
 	float life = 1.5f;
 	Particle* p = new_particle();
+	*p = Particle();
 	p->origin = org;
 	p->life_start = get_time();
 	p->life_end = get_time() + life;

@@ -5,7 +5,7 @@
 #include "glad/glad.h"
 #include <glm/gtc/type_ptr.hpp>
 
-const char* const SHADER_PATH = "Data\\Shaders\\";
+const char* const SHADER_PATH = "Shaders\\";
 const char* const INCLUDE_SPECIFIER = "#include";
 
 

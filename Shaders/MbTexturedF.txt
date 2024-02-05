@@ -1,0 +1,26 @@
+#version 330 core
+
+out vec4 FS_OUT_Color;
+
+in vec4 FS_IN_Color;
+in vec2 FS_IN_TexCoord;
+
+uniform sampler2D basecolor;
+
+uniform vec4 tint;
+
+void main()
+{
+	vec4 color = texture(basecolor,FS_IN_TexCoord);
+#ifdef PARTICLE_SHADER
+	//if(color.r < 0.2)
+	//	discard;
+	
+	FS_OUT_Color = FS_IN_Color*vec4(color.r);
+	
+	
+#else
+	FS_OUT_Color = color*FS_IN_Color;
+#endif
+}
+	

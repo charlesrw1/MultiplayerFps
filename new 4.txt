@@ -25,7 +25,6 @@ mymaterial
 	image: base.png
 	normal: basen.png
 	alpha: test
-	
 
 
 

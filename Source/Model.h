@@ -40,7 +40,11 @@ struct MeshPart
 	int element_count = 0;
 	int element_type = 0;	// unsigned_short, unsigned_int
 	short material_idx = 0;
-	short layout = 0;
+	short attributes = 0;
+
+	bool has_lightmap_coords();
+	bool has_colors();
+	bool has_bones();
 };
 
 struct Physics_Triangle
@@ -90,7 +94,8 @@ public:
 	vector<ModelHitbox> hitboxes;
 	vector<ModelAttachment> attachments;
 
-	VertexFormat format=VertexFormat::Static;
+	int attribute_mask = 0;	// bitmask of POS,UV,NORMAL,...
+
 	vector<MeshPart> parts;
 	vector<GpuBuffer> buffers;
 	vector<Game_Shader*> materials;

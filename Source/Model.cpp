@@ -23,6 +23,23 @@ const int UV2_LOC = 6;
 const int TANGENT_LOC = 7;
 const int BITANGENT_LOC = 8;
 
+
+bool MeshPart::has_lightmap_coords()
+{
+	return attributes & (1<<UV2_LOC);
+}
+
+bool MeshPart::has_bones()
+{
+	return attributes & (1<<JOINT_LOC);
+}
+
+bool MeshPart::has_colors()
+{
+	return attributes & (1<<COLOR_LOC);
+}
+
+
 static uint32_t MakeOrFindGpuBuffer(Model* m, int buf_view_index, tinygltf::Model& model, std::map<int, int>& buffer_view_to_buffer)
 {
 	if (buffer_view_to_buffer.find(buf_view_index) != buffer_view_to_buffer.end())
@@ -107,7 +124,7 @@ void append_collision_data(Model* m, tinygltf::Model& scene, tinygltf::Mesh& mes
 			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
 			ct.face_normal = face_normal;
 			ct.plane_offset = -glm::dot(face_normal, verts[0]);	
-			if (primitive.material != 1) {
+			if (primitive.material != -1) {
 				ct.surf_type = materials.at(primitive.material)->physics;
 			}
 			pm->tris.push_back(ct);
@@ -185,16 +202,14 @@ void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::N
 			int location = -1;
 			if (attrb.first == "POSITION") location = POSITION_LOC;
 			else if (attrb.first == "TEXCOORD_0") location = UV_LOC;
+			else if (attrb.first == "TEXCOORD_1") location = UV2_LOC;
 			else if (attrb.first == "NORMAL") location = NORMAL_LOC;
 			else if (attrb.first == "JOINTS_0") location = JOINT_LOC;
 			else if (attrb.first == "WEIGHTS_0") location = WEIGHT_LOC;
 			else if (attrb.first == "COLOR_0") location = COLOR_LOC;
 
 			if (location == -1) continue;
-			if (model->format == VertexFormat::Skinned && location == COLOR_LOC) {
-				printf("Unused color channel on model\n");
-				continue;
-			}
+			
 			if (location == JOINT_LOC)
 				found_joints_attrib = true;
 
@@ -208,16 +223,17 @@ void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::N
 					accessor.normalized, byte_stride, (void*)accessor.byteOffset);
 			}
 
-			part.layout |= (1 << location);
+			part.attributes |= (1 << location);
 
 			glCheckError();
 		}
 
-		if (!found_joints_attrib && model->format == VertexFormat::Skinned) {
-			printf("Conflicting vertex types in model, incoming errors\n");
-		}
-
 		glBindVertexArray(0);
+
+
+		if (!(part.attributes & (1<< POSITION_LOC)) || !(part.attributes & (1<<UV_LOC)) || !(part.attributes & (1<<NORMAL_LOC))) {
+			sys_print("Model %s is missing nessecary vertex attributes\n", model->name.c_str());
+		}
 
 		model->parts.push_back(part);
 
@@ -242,8 +258,13 @@ void load_model_materials(std::vector<Game_Shader*>& materials, const std::strin
 		tinygltf::Material& mat = scene.materials[matidx];
 		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
 		if(!gs) {
-			gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
-			gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+			int baseindex = mat.pbrMetallicRoughness.baseColorTexture.index;
+			if (baseindex != -1 && baseindex < scene.images.size()) {
+				gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
+				gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+			}
+			else
+				gs = &mats.fallback;
 		}
 		materials.push_back(gs);
 	}

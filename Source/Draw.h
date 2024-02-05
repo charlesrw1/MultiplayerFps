@@ -14,17 +14,29 @@ public:
 	void draw_text();
 	void draw_rect();
 
+	void reload_shaders();
+
 	void DrawModel(const Model* m, glm::mat4 transform, const Animator* a = nullptr);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	uint32_t white_texture;
 	uint32_t black_texture;
 	
+	enum {
+		BASE0_SAMPLER, AUX0_SAMPLER, BASE1_SAMPLER,
+		AUX1_SAMPLER, SPECIAL_SAMPLER, LIGHTMAP_SAMPLER, NUM_SAMPLERS
+	};
+
 	// shaders
-	struct {
-		Shader simple, textured, animated,
-			static_wrld, basic_mod, particle_basic;
-	}shade;
+	enum { 
+		S_SIMPLE, S_TEXTURED, S_ANIMATED, 
+		
+		S_STATIC, S_STATIC_AT,
+		S_LIGHTMAPPED, S_LIGHTMAPPED_AT, S_LIGHTMAPPED_BLEND2,
+		
+		S_PARTICLE_BASIC, S_NUM
+	};
+	Shader shade[S_NUM];
 
 	struct {
 		uint32_t scene;
@@ -62,11 +74,12 @@ private:
 	void DrawEntBlobShadows();
 	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
 
+	void set_shader_sampler_locations();
 
 	int cur_w = 0;
 	int cur_h = 0;
 	uint32_t cur_shader = 0;
-	uint32_t cur_tex[4] = { 0,0,0,0 };
+	uint32_t cur_tex[NUM_SAMPLERS];
 
 
 	MeshBuilder shadowverts;

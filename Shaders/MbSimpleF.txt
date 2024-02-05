@@ -1,0 +1,12 @@
+#version 330 core
+
+out vec4 FS_OUT_Color;
+
+in vec4 FS_IN_Color;
+
+
+void main()
+{
+	FS_OUT_Color = vec4(FS_IN_Color.rgb,1.0);
+}
+	

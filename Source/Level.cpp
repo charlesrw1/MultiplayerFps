@@ -7,8 +7,7 @@
 #include "Texture.h"
 #include <array>
 static const char* const level_directory = "Data\\Models\\";
-static std::array<Level*, 2> loaded_levels;
-
+static const char* const maps_directory = "./Data/Maps/";
 
 // Model.cpp
 extern void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::Node& node,
@@ -52,6 +51,31 @@ void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 
 }
 
+void add_level_light(Level* l, tinygltf::Model& scene, glm::mat4 transform, int index)
+{
+	Level_Light ll;
+	tinygltf::Light& light = scene.lights.at(index);
+	ll.position = transform[3];
+	ll.direction = transform[2];	// fixme
+	ll.type = ll.POINT;
+	ll.color = glm::vec3(light.color[0], light.color[1], light.color[2]) * (float)light.intensity;
+	if (light.type == "directional") {
+		ll.type = ll.DIRECTIONAL;
+	}
+	else if (light.type == "point") {
+		
+	}
+	else if (light.type == "spot"){
+		ll.type = ll.SPOT;
+		ll.spot_angle = light.spot.outerConeAngle;
+	}
+	else {
+		sys_print("bad light type %s", light.type.c_str());
+	}
+	
+
+}
+
 static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, 
 	glm::mat4 global_transform, std::vector<Game_Shader*>& mm)
 {
@@ -78,6 +102,13 @@ static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& 
 	global_transform = global_transform * local_transform;
 
 	bool is_entity = false;
+
+	if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()) {
+		auto v = node.extensions.find("KHR_lights_punctual")->second.Get("light");
+		int light_index = v.GetNumberAsInt();
+		add_level_light(level, scene, global_transform, light_index);
+	}
+
 
 	// if its an entity, default is no collision/rendering
 	if (node.extras.IsObject() && node.extras.Has("classname")) {
@@ -165,31 +196,33 @@ void init_collision_bvh(Level* level)
 	printf("Built world bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
+void load_level_lights(Level* l, tinygltf::Model& scene)
+{
+	for (int i = 0; i < scene.lights.size(); i++) {
+		tinygltf::Light& light = scene.lights[i];
+		
+		Level_Light ll;
+
+	}
+}
 
 Level* LoadLevelFile(const char* level_name)
 {
-	for (int i = 0; i < loaded_levels.size(); i++) {
-		if (loaded_levels[i]&&loaded_levels[i]->name == level_name) {
-			loaded_levels[i]->ref_count++;
-			return loaded_levels[i];
-		}
-	}
-	if (loaded_levels[0] && loaded_levels[1])
-		Fatalf("attempting to load 3 levels into memory");
-	int open_slot = (loaded_levels[0]) ? 1 : 0;
+	std::string map_dir;
+	map_dir.reserve(256);
 
-	std::string path;
-	path.reserve(256);
-	path += level_directory;
-	path += level_name;
+	map_dir += maps_directory;
+	map_dir += level_name;
+	map_dir += "/";
 
+	std::string levelmesh_path = map_dir + "levelmesh.glb";
 	tinygltf::Model scene;
 	tinygltf::TinyGLTF loader;
 	std::string errStr;
 	std::string warnStr;
-	bool res = loader.LoadBinaryFromFile(&scene, &errStr, &warnStr, path);
+	bool res = loader.LoadBinaryFromFile(&scene, &errStr, &warnStr, levelmesh_path);
 	if (!res) {
-		printf("Couldn't load level: %s\n", path.c_str());
+		printf("Couldn't load level: %s\n", level_name);
 		return nullptr;
 	}
 
@@ -205,28 +238,17 @@ Level* LoadLevelFile(const char* level_name)
 	}
 	map_materials_to_models(level, scene, mm);
 
+	// load ents.txt
+
+	std::string lightmap_path = map_dir + "lightmap.hdr";
+	level->lightmap = mats.find_texture(lightmap_path.c_str(), false, true);
+
 	init_collision_bvh(level);
 
-	level->ref_count = 1;
-	loaded_levels[open_slot] = level;
 	return level;
 }
 
 void FreeLevel(const Level* level)
 {
-	if (!level) return;
-	ASSERT(level->ref_count != 0);
-	int i = 0;
-	for (; i < loaded_levels.size(); i++) {
-		if (loaded_levels[i] == level)
-			break;
-	}
-	if (i == loaded_levels.size())
-		Fatalf("free called on already freed level");
-	loaded_levels[i]->ref_count--;
-	if (loaded_levels[i]->ref_count <= 0) {
-		printf("deleting level, %s\n", loaded_levels[i]->name.c_str());
-		delete loaded_levels[i];
-		loaded_levels[i] = nullptr;
-	}
+	delete level;
 }

@@ -37,9 +37,6 @@ public:
 	BVH static_geo_bvh;
 	Physics_Mesh collision;	// union of all level_meshes collision data
 
-	//CollisionData collision_data;
-	//RenderData render_data;
-
 	std::vector<Level_Light> lights;
 	std::vector<Model*> linked_meshes;	// custom embedded meshes that are linked to an entity like doors, not included in static_meshes
 	std::vector<StaticInstance> instances;	// instances, index into static_meshes
@@ -49,8 +46,6 @@ public:
 	std::vector<Entity_Spawn> espawns;
 	
 	std::string name;
-
-	int ref_count = 0;	// to manage case of server/client accessing same level
 };
 
 Level* LoadLevelFile(const char* level);
