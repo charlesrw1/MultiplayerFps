@@ -79,10 +79,14 @@ bool RemoteClient::OnMoveCmd(ByteReader& msg)
 	if (commands_to_run > 1) {
 		printf("simming dropped %d cmds\n", commands_to_run - 1);
 	}
+
+	Entity& e = engine.get_ent(client_num);
 	// FIXME: exploit to send inputs at increased rate
 	for (int i = commands_to_run - 1; i >= 0; i--) {
 		Move_Command c = commands[i];
 		engine.execute_player_move(client_num, c);
+
+		e.add_to_last();
 	}
 
 	return true;
@@ -295,6 +299,19 @@ void Server::make_snapshot()
 			continue;	// unactive ents dont go in snapshot
 		if (i >= MAX_CLIENTS && (!e.model || e.flags & EF_HIDDEN))
 			continue;
+
+		// hack!
+		if (e.model && e.model->animations) {
+			auto& a = e.anim;
+			a.m.staging_anim = a.m.anim;
+			a.m.staging_frame = a.m.frame;
+			a.m.staging_loop = a.m.loop;
+			a.m.staging_speed = a.m.speed;
+			a.legs.staging_anim = a.legs.anim;
+			a.legs.staging_frame = a.legs.frame;
+			a.legs.staging_loop = a.legs.loop;
+			a.legs.staging_speed = a.legs.speed;
+		}
 
 		writer.WriteBits(i, ENTITY_BITS);
 		write_full_entity(&e, writer);

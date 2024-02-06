@@ -86,26 +86,23 @@ class Game_Engine
 public:
 	void init();
 	void cleanup();
+
 	void loop();
 	void draw_screen();
-
-	void set_state(Engine_State state);
-
-	bool start_map(string map, bool is_client = false);
-	void exit_map();
-
-	void build_physics_world(float time);
-
 	void pre_render_update();
 
 	void bind_key(int key, string command);	// binds key to command
 
-	void connect_to(string address);
-	int player_num();
-	Entity& local_player();
-	void set_tick_rate(float tick_rate);
-
+	// game functions
 	void fire_bullet(Entity* p, vec3 direction, vec3 origin);
+	void build_physics_world(float time);
+
+	// state relevant functions
+	void connect_to(string address);
+	void set_tick_rate(float tick_rate);
+	bool start_map(string map, bool is_client = false);
+	void set_state(Engine_State state);
+	void exit_map();
 
 	// Host functions
 	Entity* new_entity();
@@ -117,6 +114,9 @@ public:
 	void damage(Entity* inflictor, Entity* target, int amount, int flags);
 
 	// entity accessor functions
+	Entity& local_player();
+	int player_num();
+	Entity& get_ent(int index);
 	int find_by_classname(int start, const char* classname);
 public:
 	Client* cl;

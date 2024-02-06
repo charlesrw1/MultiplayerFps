@@ -742,7 +742,11 @@ void Renderer::DrawEnts()
 		if (i == engine.player_num() && !engine.local.thirdperson_camera->integer)
 			continue;
 
-		mat4 model = glm::translate(mat4(1), ent.position);
+		mat4 model;
+		if(ent.using_interpolated_pos_and_rot)
+			model = glm::translate(mat4(1), ent.local_sv_interpolated_pos);
+		else
+			model = glm::translate(mat4(1), ent.position);
 		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
 		model = glm::scale(model, vec3(1.f));
 
@@ -1418,6 +1422,12 @@ void Game_Engine::update_game_tick()
 		if(e.model && e.model->animations)
 			e.anim.AdvanceFrame(tick_interval);
 	}
+
+	// for local server interpolation
+	for (int i = 1; i < MAX_CLIENTS; i++) {
+		if (get_ent(i).active())
+			get_ent(i).shift_last();
+	}
 }
 
 void cmd_debug_counter()
@@ -1649,6 +1659,12 @@ void Game_Engine::loop()
 	}
 }
 
+Entity& Game_Engine::get_ent(int index)
+{
+	ASSERT(index >= 0 && index < MAX_GAME_ENTS);
+	return ents[index];
+}
+
 void Game_Engine::pre_render_update()
 {
 	ASSERT(state == ENGINE_GAME);
@@ -1656,6 +1672,22 @@ void Game_Engine::pre_render_update()
 		// interpolate entities for rendering
 	if (!is_host)
 		cl->interpolate_states();
+	else {
+		for (int i = 1; i < MAX_CLIENTS; i++) {
+			if (!get_ent(i).active()) continue;
+			auto& e = get_ent(i);
+			e.using_interpolated_pos_and_rot = true;	// FIXME
+			static Config_Var* use_sv_interp = cfg.get_var("sv.use_interp","1");
+			if (e.last[0].used && use_sv_interp->integer) {
+				e.local_sv_interpolated_pos = e.last[0].o;
+				e.local_sv_interpolated_rot = e.last[0].r;
+			}
+			else {
+				e.local_sv_interpolated_pos = e.position;
+				e.local_sv_interpolated_rot = e.rotation;
+			}
+		}
+	}
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		Entity& ent = ents[i];

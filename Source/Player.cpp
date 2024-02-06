@@ -294,8 +294,10 @@ float lensquared_noy(vec3 v)
 
 void player_physics_ground_move(Entity& player, Move_Command command, bool dont_add_grav)
 {
-	check_jump(player, command);
-	check_duck(player, command);
+	if (!(player.flags & EF_DEAD)) {
+		check_jump(player, command);
+		check_duck(player, command);
+	}
 
 
 	vec3 prevel = player.velocity;
@@ -374,6 +376,8 @@ void player_physics_update(Entity* p, Move_Command command)
 		command.forward_move = 0;
 		command.lateral_move = 0;
 		command.up_move = 0;
+
+		command.button_mask = 0;
 	}
 	p->view_angles = command.view_angles;
 

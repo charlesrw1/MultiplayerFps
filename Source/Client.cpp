@@ -162,8 +162,7 @@ void Client::run_prediction()
 	player_post_physics(&player, get_command(end - 1), true);
 	
 	// dont advance frames if animation is being controlled server side
-	if(!(player.flags & EF_FORCED_ANIMATION))
-		player.anim.AdvanceFrame(engine.tick_interval);
+	player.anim.AdvanceFrame(engine.tick_interval);
 
 	// for prediction errors
 	origin_history.at((end-1)%origin_history.size()) = engine.local_player().position;
@@ -218,20 +217,6 @@ float InterpolateAnimation(Animation* a, float start, float end, float alpha)
 	return interpolate_modulo(start, end, clip_len, alpha);
 }
 
-void set_entity_from_interp(Entity& e, Interp_Entry& i)
-{
-	e.position = i.position;
-	e.rotation = i.angles;
-	//e.anim.m = i.torso;
-	//e.anim.legs = i.legs;
-}
-void set_interp_from_entity(Interp_Entry& i, Entity& e)
-{
-	i.legs = e.anim.legs;
-	i.torso = e.anim.m;
-	i.position = e.position;
-	i.angles = e.rotation;
-}
 
 // this isnt perfect, whatev
 void interp_animator_layer(Animator_Layer& l1, Animator_Layer& l2, const Model* model, float midlerp, Animator_Layer& interp)
@@ -259,6 +244,12 @@ void interp_animator_layer(Animator_Layer& l1, Animator_Layer& l2, const Model* 
 	}
 }
 
+
+void set_entity_interp_vars(Entity& e, Interp_Entry& ie)
+{
+	e.position = ie.position;
+	e.rotation = ie.angles;
+}
 
 void Client::interpolate_states()
 {
@@ -295,6 +286,18 @@ void Client::interpolate_states()
 		Entity_Interp& ce = interpolation_data[i];
 		Entity& ent = engine.ents[i];
 
+		// now: with other players animations find the two sandwhich snapshots
+		// if they differ, then blend into the second at the midway point
+		// otherwise AdvanceFrame() of current anim
+		// if anim is non-looping, but the next snapshot is behind the current one while speed > 0 (or vice versa), then
+		// restart the anim assuming it got restarted server side like gun shooting animations
+
+		// and interpolate positions/rotations
+
+		// advance entity animations, not interpolated!
+		if (ent.model && ent.model->animations)
+			ent.anim.AdvanceFrame(engine.frame_time);
+
 		int entry_index = 0;
 		int last_entry = NegModulo(ce.hist_index - 1, Entity_Interp::HIST_SIZE);
 		for (; entry_index < Entity_Interp::HIST_SIZE; entry_index++) {
@@ -308,7 +311,7 @@ void Client::interpolate_states()
 		if (entry_index == 0 || entry_index == Entity_Interp::HIST_SIZE) {
 			if (dbg_print->integer)
 				sys_print("using last state\n");
-			set_entity_from_interp(ent, *ce.GetLastState());
+			set_entity_interp_vars(ent, *ce.GetLastState());
 			continue;
 		}
 		// else, interpolate
@@ -323,13 +326,13 @@ void Client::interpolate_states()
 		else if (s1->tick == -1) {
 			if (dbg_print->integer)
 				sys_print("no start state\n");
-			set_entity_from_interp(ent, *s2);
+			set_entity_interp_vars(ent, *s2);
 			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
 			if (dbg_print->integer)
 				sys_print("no end state\n");
-			set_entity_from_interp(ent, *s1);
+			set_entity_interp_vars(ent, *s1);
 			continue;
 		}
 
@@ -337,7 +340,7 @@ void Client::interpolate_states()
 		ASSERT(s1->tick * engine.tick_interval <= rendering_time && s2->tick * engine.tick_interval >= rendering_time);
 
 		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*engine.tick_interval)) {
-			set_entity_from_interp(ent, *s1);
+			set_entity_interp_vars(ent, *s1);
 			if (dbg_print->integer)
 				sys_print("teleport\n");
 			continue;
@@ -345,27 +348,31 @@ void Client::interpolate_states()
 
 		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
 		Interp_Entry interpstate = *s1;
-
-		Config_Var* interp_force = cfg.get_var("dbg_interp_force", "0");
-		if (interp_force->integer == 0)
-			interpstate.position = glm::mix(s1->position, s2->position, midlerp);
-		else if (interp_force->integer == 1)
-			interpstate.position = s1->position;
-		else if (interp_force->integer == 2)
-			interpstate.position = s2->position;
-		else
-			interpstate.position = glm::mix(s1->position, s2->position,1 - midlerp);
-		
+		ent.position = glm::mix(s1->position, s2->position, midlerp);
 		for (int i = 0; i < 3; i++) {
 			float d = s1->angles[i] - s2->angles[i];
-			interpstate.angles[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
+			ent.rotation[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
 		}
-		if (ent.model && ent.model->animations) {
-			interp_animator_layer(s1->legs, s2->legs, ent.model, midlerp, interpstate.legs);
-			interp_animator_layer(s1->torso, s2->torso, ent.model, midlerp, interpstate.torso);
-		}
-
-		set_entity_from_interp(ent, interpstate);
+		//if (s1->legs.anim != s2->legs.anim) {
+		//	if (midlerp > 0.5 && ent.anim.legs.anim != s2->legs.anim) {
+		//		ent.anim.set_anim_from_index(ent.anim.legs,s2->legs.anim,false);
+		//		ent.anim.legs.speed = s2->legs.speed;
+		//		ent.anim.legs.loop = s2->legs.loop;
+		//	}
+		//}
+		//if (s1->torso.anim != s2->torso.anim) {
+		//	if (midlerp > 0.5 && ent.anim.m.anim != s2->torso.anim) {
+		//		ent.anim.set_anim_from_index(ent.anim.m, s2->torso.anim, false);
+		//		ent.anim.m.speed = s2->torso.speed;
+		//		ent.anim.m.loop = s2->torso.loop;
+		//	}
+		//}
+		//
+		//if (ent.anim.m.finished && ent.anim.m.anim == s2->torso.anim && s2->torso.frame + 0.1 < ent.anim.m.frame) {
+		//	ent.anim.set_anim_from_index(ent.anim.m, ent.anim.m.anim, true);
+		//	ent.anim.m.speed = s2->torso.speed;
+		//	ent.anim.m.loop = s2->torso.loop;
+		//}
 	}
 }
 
@@ -440,32 +447,6 @@ void Client::read_snapshot(Frame* snapshot)
 	wr.WriteBits(ENTITY_SENTINAL, ENTITY_BITS);
 	wr.EndWrite();
 
-	for (int i = 0; i < MAX_GAME_ENTS; i++)
-	{
-		Entity& e = engine.ents[i];
-		if (!e.active()) continue;
-
-		Entity_Interp& interp = interpolation_data[i];
-		e.index = i;	// FIXME
-
-		const Model* next_model = nullptr;
-		if (e.model_index != -1)
-			next_model = media.get_game_model_from_index(e.model_index);
-		if (next_model != e.model) {
-			e.model = next_model;
-			if (e.model && e.model->bones.size() > 0)
-				e.anim.set_model(e.model);
-		}
-
-
-		if (i != engine.player_num()) {
-			Interp_Entry& entry = interp.hist[interp.hist_index];
-			entry.tick = snapshot->tick;
-			set_interp_from_entity(entry, e);
-
-			interp.hist_index = (interp.hist_index + 1) % Entity_Interp::HIST_SIZE;
-		}
-	}
 
 	// update prediction error data
 	int sequence_i_sent = OutSequenceAk();

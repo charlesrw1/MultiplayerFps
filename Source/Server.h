@@ -60,6 +60,8 @@ public:
 	Server* myserver = nullptr;
 	int baseline = -1;	// what tick to delta encode from
 
+	int commands_ran_this_frame = 0;
+
 	int highest_tick_recieved = 0;
 	int num_commands = 0;
 	vector<Move_Command> commands;

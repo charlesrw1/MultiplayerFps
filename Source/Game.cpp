@@ -212,6 +212,26 @@ void Entity::clear_pointers()
 	damage = nullptr;
 	touch = nullptr;
 }
+void Entity::add_to_last()
+{
+	Transform_Hist* l = &last[0];
+	int index = 0;
+	if (last[0].used) {
+		if (last[1].used)
+			l = &last[2];
+		else
+			l = &last[1];
+	}
+	l->used = true;
+	l->o = position;
+	l->r = rotation;
+}
+void Entity::shift_last()
+{
+	last[0] = last[1];
+	last[1] = last[2];
+	last[2].used = false;
+}
 
 void Entity::projectile_physics()
 {

@@ -80,6 +80,12 @@ struct Animator_Layer
 	float blend_remaining = 0;
 	float blend_time = 0;
 
+	// horrible hacky fix for networking
+	int staging_anim = -1;
+	float staging_frame = 0;
+	bool staging_loop = false;
+	float staging_speed = 1.f;
+
 	void update(float dt, const Animation& clip);
 };
 
@@ -89,8 +95,8 @@ class Animator
 public:
 	void set_model(const Model* model);
 	void set_anim(const char* name, bool restart, float blend = 0.1f);
+	void set_anim_from_index(Animator_Layer& l, int animation, bool restart, float blend = 0.1f);
 	void set_leg_anim(const char* name, bool restart, float blend = 0.1f);
-
 
 	void SetupBones();
 	void ConcatWithInvPose();

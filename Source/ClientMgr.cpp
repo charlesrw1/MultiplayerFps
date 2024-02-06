@@ -234,6 +234,74 @@ void Client::SendMovesAndMessages()
 
 static Entity null_ent;
 
+void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, bool is_delta, ByteReader* from_ent, int tick)
+{
+	ent->index = index;
+
+	Entity_Baseline* baseline = get_entity_baseline();
+	bool is_local_player = client_num == index;
+	int prop_mask = (is_local_player) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
+	
+	if (is_delta) {
+		read_entity(ent, *from_ent, prop_mask, false);	// reset
+		read_entity(ent, msg, prop_mask, true);			// update delta
+	}
+	else {
+		ByteReader base = baseline->get_buf();
+		read_entity(ent, base, prop_mask, false); // reset to baseline
+		read_entity(ent, msg, prop_mask, true); // now add in the delta entries
+	}
+
+	const Model* next_model = nullptr;
+	if (ent->model_index != -1)
+		next_model = media.get_game_model_from_index(ent->model_index);
+	if (next_model != ent->model) {
+		ent->model = next_model;
+		if (ent->model && ent->model->bones.size() > 0)
+			ent->anim.set_model(ent->model);
+	}
+
+	// if requesting forced animation on local player, then goto it
+	if (is_local_player && ent->flags & EF_FORCED_ANIMATION) {
+		// transition animations
+		ent->anim.set_anim_from_index(ent->anim.m, ent->anim.m.staging_anim, false);
+		ent->anim.set_anim_from_index(ent->anim.legs, ent->anim.legs.staging_anim, false);
+		ent->anim.m.loop = ent->anim.m.staging_loop;
+		ent->anim.m.speed = ent->anim.m.staging_speed;
+		ent->anim.legs.loop = ent->anim.legs.staging_loop;
+		ent->anim.legs.speed = ent->anim.legs.staging_speed;
+	}
+
+	if (!is_local_player) {
+		Entity_Interp& interp = interpolation_data[index];
+		if (ent->flags & EF_TELEPORTED)
+			interp.clear();
+
+		auto& l1 = ent->anim.m;
+		auto& l2 = ent->anim.legs;
+
+		auto functor = [](Entity* ent, Animator_Layer& l) {
+			if (l.staging_anim == l.anim && l.speed > 0 && !l.loop && l.staging_frame < l.frame - 0.05) {
+				ent->anim.set_anim_from_index(l, l.anim, true);	// restart the anim
+			}
+			else if (l.staging_anim != l.anim) {
+				ent->anim.set_anim_from_index(l, l.staging_anim, false);
+			}
+			l.loop = l.staging_loop;
+			l.speed = l.staging_speed;
+		};
+		functor(ent, l1);
+		functor(ent, l2);
+
+		Interp_Entry& entry = interp.hist[interp.hist_index];
+		entry.tick = tick;
+		entry.position = ent->position;
+		entry.angles = ent->rotation;
+
+		interp.increment_index();
+	}
+}
+
 bool Client::OnEntSnapshot(ByteReader& msg)
 {
 	int delta_tick = msg.ReadLong();
@@ -284,11 +352,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			}
 			else if (from_ent.index > to_index) {
 				// new entity:
-				// set state to the baseline/null
-				ByteReader base = baseline->get_buf();
-				read_entity(ent, base, prop_mask, false);
-				// now add in the delta entries
-				read_entity(ent, msg, prop_mask, true);
+				read_entity_from_snapshot(ent, to_index, msg, false, nullptr, last_recieved_server_tick);
 
 				msg.AlignToByteBoundary();
 				to_index = msg.ReadBits(ENTITY_BITS);
@@ -296,14 +360,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			else {
 				// delta entity
 				ByteReader from_state = from_ent.get_buf();
-
-				if (dont_replicate_player->integer) {
-					read_entity(&null_ent, msg, prop_mask, true);	// FIXME: this is just to advance msg
-				}
-				else {
-					read_entity(ent, from_state, prop_mask, false);	// reset
-					read_entity(ent, msg, prop_mask, true);			// update delta
-				}
+				read_entity_from_snapshot(ent, to_index, msg, true, &from_state, last_recieved_server_tick);
 
 				msg.AlignToByteBoundary();
 				to_index = msg.ReadBits(ENTITY_BITS);
@@ -325,16 +382,8 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	// now: there may be more *new* entities, so finish the list
 	while (to_index != ENTITY_SENTINAL && !msg.HasFailed())
 	{
-
 		Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
-		int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
-
-		// reset to baseline:
-		ByteReader base = baseline->get_buf();
-		read_entity(ent, base, prop_mask, false);
-		
-		// delta props:
-		read_entity(ent, msg, prop_mask, true);
+		read_entity_from_snapshot(ent, to_index, msg, false, nullptr, last_recieved_server_tick);
 
 		msg.AlignToByteBoundary();
 		to_index = msg.ReadBits(ENTITY_BITS);

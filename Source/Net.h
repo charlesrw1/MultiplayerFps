@@ -69,8 +69,8 @@ enum Entity_Flags
 	EF_BOUNCE = 16,
 	EF_SLIDE = 32,
 	EF_SOLID = 64,
-
 	EF_FROZEN_VIEW = 128,
+	EF_TELEPORTED = 256,
 };
 
 enum Item_Use_State
@@ -121,6 +121,7 @@ enum Entity_Physics
 	EPHYS_MOVER,		// platforms, doors
 };
 
+
 class Model;
 struct Entity
 {
@@ -170,9 +171,17 @@ struct Entity
 	bool(*touch)(Entity* me, Entity* other) = nullptr;
 	void(*timer_callback)(Entity* me) = nullptr;
 
-
 	Animator anim;
 	const Model* model = nullptr;
+
+	// used for 1 frame interpolation on the local server host for PLAYERS
+	bool using_interpolated_pos_and_rot = false;
+	glm::vec3 local_sv_interpolated_pos;
+	glm::vec3 local_sv_interpolated_rot;
+	struct Transform_Hist { bool used; glm::vec3 o; glm::vec3 r; };
+	Transform_Hist last[3];
+	void add_to_last();
+	void shift_last();
 
 	void set_inactive() { type = ET_FREE; }
 	bool active() { return type != ET_FREE; }

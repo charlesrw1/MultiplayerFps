@@ -16,10 +16,9 @@ struct Interp_Entry
 {
 	int tick = -1;
 	glm::vec3 position, angles;
-	Animator_Layer torso;
-	Animator_Layer legs;
+	struct Interp_Anim_Layer { int anim; float frame; float speed; bool loop; };
+	Interp_Anim_Layer torso, legs;
 };
-
 
 struct Entity_Interp
 {
@@ -32,6 +31,7 @@ struct Entity_Interp
 	void clear() {
 		for (int i = 0; i < HIST_SIZE; i++) hist[i].tick = -1;
 	}
+	void increment_index() { hist_index++; hist_index %= HIST_SIZE; }
 };
 
 
@@ -76,6 +76,8 @@ public:
 
 	void HandleServerPacket(ByteReader& msg);
 	bool OnEntSnapshot(ByteReader& msg);
+	void read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, bool is_delta, 
+		ByteReader* from_ent, int tick);
 
 	Config_Var* interp_time;
 	Config_Var* fake_lag;

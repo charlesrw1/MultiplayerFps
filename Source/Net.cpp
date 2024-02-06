@@ -1,6 +1,7 @@
 #include "Net.h"
 
 #define ESP(x) #x,(int)&((Entity*)0)->x
+#define ESPO(x) (int)&((Entity*)0)->x
 
 Net_Prop entity_state_props[] =
 {
@@ -15,20 +16,14 @@ Net_Prop entity_state_props[] =
 	{ESP(rotation.y), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
 	{ESP(rotation.z), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
 
-	{ESP(anim.m.anim),		32,		8},
-	{ESP(anim.m.frame),		0,		16, 100.f},
-	{ESP(anim.legs.anim),	32,		8},
-	{ESP(anim.legs.frame),	0,		16, 100.f},
-	//
-	{ESP(anim.legs.blend_anim), 32, 8},
-	{ESP(anim.legs.blend_frame), 0, 16, 100.f},
-	{ESP(anim.legs.blend_remaining), 0, 16, 100.f},
-	{ESP(anim.legs.blend_time), 0, 16, 100.f},
-	
-	{ESP(anim.m.blend_anim), 32, 8},
-	{ESP(anim.m.blend_frame), 0, 16, 100.f},
-	{ESP(anim.m.blend_remaining), 0, 16, 100.f},
-	{ESP(anim.m.blend_time), 0, 16, 100.f},
+	{ESP(anim.m.staging_anim),		32,		8,		1.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.m.staging_speed),		0,		8,		-10.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.m.staging_loop),		8,		1,		1.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.m.staging_frame),		0,		16,		100.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.legs.staging_anim),	32,		8,		1.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.legs.staging_speed),	0,		8,		-10.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.legs.staging_loop),	8,		1,		1.f,	Net_Prop::DEFAULT_PROP},
+	{ESP(anim.legs.staging_frame),	0,		16,		100.f,	Net_Prop::DEFAULT_PROP},
 
 	{ESP(flags), 16},
 	{ESP(item), 32},
@@ -127,8 +122,15 @@ void net_prop_field_read(ByteReader& msg, void* output, Net_Prop& prop, int cond
 	case 0:
 		if (out_bits == 0)
 			*(float*)prop_start = msg.ReadFloat();
-		else
-			*(float*)prop_start = msg.ReadBits(out_bits) / prop.quantize;
+		else {
+			if (prop.quantize < 0) {
+				int bits = msg.ReadBits(out_bits);
+				bits -= (1 << (out_bits-1));
+				*(float*)prop_start = bits / -prop.quantize;
+			}
+			else
+				*(float*)prop_start = msg.ReadBits(out_bits) / prop.quantize;
+		}
 		break;
 	}
 }
@@ -162,8 +164,15 @@ void net_prop_field_write(Net_Prop& prop, void* output, ByteWriter& msg)
 			msg.WriteFloat(p);
 		}
 		else {
-			int quantized = p * prop.quantize;
-			msg.WriteBits(quantized, out_bits);
+			if (prop.quantize < 0) {
+				int quantized = p * -prop.quantize;
+				quantized += (1 << (out_bits-1));
+				msg.WriteBits(quantized, out_bits);
+			}
+			else {
+				int quantized = p * prop.quantize;
+				msg.WriteBits(quantized, out_bits);
+			}
 		}
 	}break;
 	default:

@@ -136,10 +136,14 @@ void Animator::AdvanceFrame(float elapsed)
 		const Animation& clip = model->animations->clips[m.anim];
 		m.update(elapsed, clip);
 	}
+	else
+		m.finished = true;
 	if (legs.anim != -1) {
 		const Animation& clip = model->animations->clips[legs.anim];
 		legs.update(elapsed, clip);
 	}
+	else
+		legs.finished = true;
 }
 
 #if 0
@@ -440,38 +444,28 @@ void Animator::set_anim(const char* name, bool restart, float blend)
 {
 	if (!model) return;
 	int animation = set->find(name);
+	set_anim_from_index(m,animation, restart, blend);
+}
 
-	if (animation != m.anim || restart) {
+void Animator::set_anim_from_index(Animator_Layer& l, int animation, bool restart, float blend)
+{
+	if (animation != l.anim || restart) {
 		if (blend > 0.f) {
-			m.blend_anim = m.anim;
-			m.blend_frame = m.frame;
-			m.blend_remaining = blend;
-			m.blend_time = blend;	// FIXME
+			l.blend_anim = l.anim;
+			l.blend_frame = l.frame;
+			l.blend_remaining = blend;
+			l.blend_time = blend;	// FIXME
 		}
-		m.anim = animation;
-		m.frame = 0.0;
-		m.finished = false;
-		m.speed = 1.f;
+		l.anim = animation;
+		l.frame = 0.0;
+		l.finished = false;
+		l.speed = 1.f;
 	}
 }
+
 void Animator::set_leg_anim(const char* name, bool restart, float blend)
 {
 	if (!model) return;
 	int animation = set->find(name);
-
-
-	if (animation != legs.anim || restart) {
-		
-		if (blend > 0.f) {
-			legs.blend_anim = legs.anim;
-			legs.blend_frame = legs.frame;
-			legs.blend_remaining = blend;
-			legs.blend_time = blend;	// FIXME
-		}
-
-		legs.anim = animation;
-		legs.frame = 0.0;
-		legs.finished = false;
-		legs.speed = 1.f;
-	}
+	set_anim_from_index(legs, animation, restart, blend);
 }
