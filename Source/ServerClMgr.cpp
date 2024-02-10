@@ -130,7 +130,7 @@ void RemoteClient::Update()
 	int delta_frame = (never_delta->integer) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
-	Entity& e = engine.ents[client_num];
+	Entity& e = engine.get_ent(client_num);
 	if (e.force_angles == 1) {
 		writer.WriteByte(SV_UPDATE_VIEW);
 		writer.WriteVec3(e.diff_angles);
@@ -294,7 +294,7 @@ void Server::make_snapshot()
 	ByteWriter writer(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 	f->num_ents_this_frame = 0;
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& e = engine.ents[i];
+		Entity& e = engine.get_ent(i);
 		if (!e.active())
 			continue;	// unactive ents dont go in snapshot
 		if (i >= MAX_CLIENTS && (!e.model || e.flags & EF_HIDDEN))

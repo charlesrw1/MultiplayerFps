@@ -52,6 +52,7 @@ void Client::connect(string address)
 	TrySendingConnect();
 }
 
+
 void Client::TrySendingConnect()
 {
 	ASSERT(engine.state == ENGINE_LOADING);
@@ -280,11 +281,11 @@ void Client::interpolate_states()
 	// interpolate other entities
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		// local player doesn't interpolate
-		if (!engine.ents[i].active() || i == engine.player_num())
+		if (!engine.get_ent(i).active() || i == engine.player_num())
 			continue;
 
 		Entity_Interp& ce = interpolation_data[i];
-		Entity& ent = engine.ents[i];
+		Entity& ent = engine.get_ent(i);
 
 		// now: with other players animations find the two sandwhich snapshots
 		// if they differ, then blend into the second at the midway point
@@ -431,7 +432,7 @@ void Client::read_snapshot(Frame* snapshot)
 	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
-		Entity& e = engine.ents[i];
+		Entity& e = engine.get_ent(i);
 		if (!e.active()) continue;
 
 		if (i == client_num) {
@@ -451,7 +452,7 @@ void Client::read_snapshot(Frame* snapshot)
 	// update prediction error data
 	int sequence_i_sent = OutSequenceAk();
 	if (OutSequence() - sequence_i_sent < origin_history.size()) {
-		Entity& player = engine.ents[client_num];
+		Entity& player = engine.get_ent(client_num);
 		vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
 		// FIXME check for teleport
 		float len = glm::length(delta);

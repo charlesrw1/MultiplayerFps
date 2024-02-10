@@ -6,6 +6,7 @@ class Model;
 class Animator;
 class Texture;
 class Entity;
+
 class Renderer
 {
 public:
@@ -39,6 +40,10 @@ public:
 		
 		S_PARTICLE_BASIC, S_NUM
 	};
+	enum Model_Shader_Flags 
+	{ MSF_AT = 1, MSF_LM = 1<<1, MSF_AN = 1<<2, MSF_BLEND2 = 1<<3, MSF_WIND = 1<<4, NUM_MSF=1<<5 };
+	Shader model_shaders[NUM_MSF];
+
 	Shader shade[S_NUM];
 
 	struct {
@@ -63,9 +68,38 @@ public:
 			cur_shader = s.ID; 
 		}
 	}
+
+	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
+		bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face);
+
 	Shader& shader();
 	void set_shader_constants();
 private:
+
+	struct Sprite_Drawing_State {
+		bool force_set = true;
+		bool in_world_space = false;
+		bool additive = false;
+		uint32_t current_t = 0;
+	}sprite_state;
+	void draw_sprite_buffer();
+
+	struct Model_Drawing_State {
+		bool is_transparent_pass = false;
+		bool initial_set = false;
+		bool is_lightmapped = false;
+		bool is_animated = false;
+		bool is_alpha_tested = false;
+		bool backfaces = false;
+		int alpha_type = -1;
+		int shader_type = -1;
+
+		bool set_model_params = false;
+		// light, cubemap, decal list
+	};
+	void draw_model_real(Model_Drawing_State* state, const Model* m, int part, glm::mat4 transform, 
+		const Entity* e = nullptr, const Animator* a = nullptr, Game_Shader* override_mat = nullptr);
+
 
 	void InitGlState();
 	void InitFramebuffers();

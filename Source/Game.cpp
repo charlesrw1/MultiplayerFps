@@ -27,7 +27,7 @@ void find_spawn_position(Entity* ent)
 	int index = engine.find_by_classname(0, "player_spawn");
 	bool found = false;
 	while (index != -1) {
-		Entity& e = engine.ents[index];
+		Entity& e = engine.get_ent(index);
 
 		// do a small test for nearby players
 		GeomContact contact = engine.phys.trace_shape(Trace_Shape(e.position, CHAR_HITBOX_RADIUS), ent->index, PF_PLAYERS);
@@ -40,6 +40,8 @@ void find_spawn_position(Entity* ent)
 		
 		index = engine.find_by_classname(index+1, "player_spawn");
 	}
+
+	sys_print("No valid spawn positions for entity\n");
 
 	ent->position = glm::vec3(0);
 	ent->rotation = glm::vec3(0);
@@ -99,6 +101,20 @@ void spawn_spawn_point(Level::Entity_Spawn& spawn)
 	}
 }
 
+void spawn_zone(Level::Entity_Spawn& spawn)
+{
+	Entity& e = *engine.new_entity();
+	e.type = ET_USED;
+	if (spawn.classname == "bomb_area")
+		e.classname = "bomb_area";
+	else if (spawn.classname == "spawn_area")
+		e.classname = "spawn_area";
+	e.position = spawn.position;
+	e.rotation = spawn.rotation;
+	e.col_size = spawn.scale;
+
+
+}
 
 struct Spawn_Link
 {
@@ -109,7 +125,9 @@ struct Spawn_Link
 Spawn_Link links[]
 {
 	{"door", spawn_door},
-	{"player_spawn", spawn_spawn_point}
+	{"player_spawn", spawn_spawn_point},
+	{"bomb_area", spawn_zone},
+	{"spawn_area", spawn_zone},
 };
 
 
@@ -128,7 +146,7 @@ void Game_Engine::on_game_start()
 			}
 		}
 		if (j == n) {
-			sys_print("Couldn't find spawn function for Entity_Spawn %s", es.name);
+			sys_print("Couldn't find spawn function for Entity_Spawn %s", es.classname.c_str());
 		}
 	}
 }
@@ -383,7 +401,7 @@ void Game_Engine::execute_player_move(int num, Move_Command cmd)
 	double oldtime = engine.time;
 	engine.time = cmd.tick * engine.tick_interval;
 	
-	Entity& ent = engine.ents[num];
+	Entity& ent = get_ent(num);
 	player_physics_update(&ent, cmd);
 	player_post_physics(&ent, cmd, num == player_num());
 

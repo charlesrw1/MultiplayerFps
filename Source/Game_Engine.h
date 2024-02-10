@@ -48,7 +48,7 @@ public:
 	Model* viewmodel=nullptr;
 
 	glm::vec3 vm_offset = glm::vec3(0.f,-2.9f,0.f);
-
+	glm::vec3 vm_scale = glm::vec3(1.f);
 	float vm_reload_start = 0.f;
 	float vm_reload_end = 0.f;
 	float vm_recoil_start_time = 0.f;

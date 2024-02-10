@@ -91,6 +91,9 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				ENSURE(2);
 				gs->vscroll = std::atof(line.at(1).c_str());
 			}
+			else if (key == "emmisive") {
+				gs->emmisive = true;	
+			}
 		}
 
 		sys_print("loaded material %s\n", gs->name.c_str());

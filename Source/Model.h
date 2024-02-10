@@ -43,9 +43,9 @@ struct MeshPart
 	short material_idx = 0;
 	short attributes = 0;
 
-	bool has_lightmap_coords();
-	bool has_colors();
-	bool has_bones();
+	bool has_lightmap_coords() const;
+	bool has_colors() const;
+	bool has_bones() const;
 };
 
 struct Physics_Triangle

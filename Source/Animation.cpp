@@ -391,26 +391,32 @@ void Animator::add_legs_layer(glm::quat finalq[], glm::vec3 finalp[])
 		LerpTransforms(q1, p1, q2, pos2, frac, model->bones.size());
 	}
 
-	const int root_loc = model->BoneForName("spine");
-	const int pelvis = model->BoneForName("pelvis.L");
+	const int root_loc = model->BoneForName("mixamorig:Hips");
+	const int thigh_loc = model->BoneForName("mixamorig:LeftUpLeg");
+	const int spine_loc = model->BoneForName("mixamorig:Spine");
+	const int toe_end = model->BoneForName("mixamorig:RightToe_End");
 
-	if (root_loc == -1 || pelvis == -1) {
+
+
+	if (root_loc == -1 || thigh_loc == -1 || spine_loc == -1 || toe_end == -1) {
 		printf("Couldn't find spine/root bones\n");
 		legs.anim = -1;
 		return;
 	}
 
 	bool copybones = false;
-	// Now overwrite only legs + spine
+	// Now overwrite only legs + root + low spine
 	for (int i = 0; i < model->bones.size(); i++)
 	{
 		const Bone& bone = model->bones[i];
-		if (i == pelvis)
+		if (i == thigh_loc)
 			copybones = true;
-		if (copybones || i == root_loc) {
+		if (copybones || i == root_loc || i == spine_loc) {
 			finalq[i] = q1[i];
 			finalp[i] = p1[i];
 		}
+		if (i == toe_end)
+			copybones = false;
 	}
 }
 

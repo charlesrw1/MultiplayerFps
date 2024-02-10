@@ -7,11 +7,11 @@
 struct Level_Light
 {
 	enum { POINT, SPOT, DIRECTIONAL };
+	int type;
 	glm::vec3 position;
 	glm::vec3 direction;
 	glm::vec3 color; // rgb*intensity
 	float spot_angle;
-	int type;
 };
 
 class Model;

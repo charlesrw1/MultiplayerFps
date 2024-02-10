@@ -27,10 +27,9 @@ public:
 	enum { A_NONE, A_ADD, A_BLEND, A_TEST };
 	int alpha_type = A_NONE;
 	bool backface = false;
-
+	bool emmisive = false;	// dont recieve lighting
 	enum {S_DEFAULT, S_2WAYBLEND, S_WINDSWAY };
 	int shader_type = S_DEFAULT;
-
 	float uscroll = 0.0;
 	float vscroll = 0.0;
 	bool fresnel_transparency = false;

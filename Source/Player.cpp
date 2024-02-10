@@ -26,13 +26,11 @@ static int col_iters = 2;
 static bool col_closest = true;
 static bool new_physics = true;
 
-static float ground_friction = 7.2;
+static float ground_friction = 8.2;
 static float air_friction = 0.01;
 static float ground_accel = 6;
 static float ground_accel_crouch = 4;
 static float air_accel = 3;
-static float minspeed = 1;
-static float maxspeed = 30;
 static float jumpimpulse = 5.f;
 static float max_ground_speed = 5.7;
 static float max_air_speed = 2;
@@ -48,8 +46,6 @@ void move_variables_menu()
 	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
 	ImGui::SliderFloat("ground_accel", &ground_accel, 1, 10);
 	ImGui::SliderFloat("air_accel", &air_accel, 0, 10);
-	ImGui::SliderFloat("minspeed", &minspeed, 0, 10);
-	ImGui::SliderFloat("maxspeed", &maxspeed, 5, 35);
 	ImGui::SliderFloat("max_ground_speed", &max_ground_speed, 2, 20);
 	ImGui::SliderFloat("max_air_speed", &max_air_speed, 0, 10);
 	ImGui::SliderFloat("jumpimpulse", &jumpimpulse, 0, 20);
@@ -223,16 +219,25 @@ void check_duck(Entity& player, Move_Command cmd)
 			if (player.state & PMS_GROUND) {
 				auto gc = player_physics_trace_character(player.index, false, player.position+vec3(0,0.001,0));
 
-				if (!gc.found)
+				if (!gc.found) {
 					player.state &= ~PMS_CROUCHING;
+				}
 			}
 			else {
 				vec3 end = player.position - vec3(0, diff, 0) + vec3(0,0.001,0);
 				auto gc = player_physics_trace_character(player.index, false, end);
 
 				if (!gc.found) {
-					player.state &= ~PMS_CROUCHING;
-					player.position.y -= diff;
+					// one more check
+					Ray r;
+					r.pos = player.position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
+					r.dir = vec3(0, -1, 0);
+					auto tc = engine.phys.trace_ray(r, player.index, PF_ALL);
+					if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
+						player.state &= ~PMS_CROUCHING;
+						player.position.y -= diff;
+						sys_print("passed");
+					}
 				}
 			}
 		}
@@ -415,7 +420,11 @@ void player_animation_update(Entity* ent)
 	if (ent->anim.m.loop || ent->anim.m.finished)
 	{	
 		// for now, only one
-		ent->anim.set_anim("act_idle", false);
+		static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
+		if (m24->integer)
+			ent->anim.set_anim("act_idle_sniper",false);
+		else
+			ent->anim.set_anim("act_idle", false);
 		ent->anim.m.loop = true;
 	}
 
@@ -447,18 +456,17 @@ void player_animation_update(Entity* ent)
 			vec3 grnd_velocity = glm::normalize(vec3(ent->velocity.x, 0, ent->velocity.z));
 			float d = dot(facing_dir, grnd_velocity);
 			bool left = cross(facing_dir, grnd_velocity).y < 0;
+			bool backwards = dot(ent_face_dir, ent->velocity) < -0.25;
 			if (abs(d) >= 0.5) { // 60 degrees from look
-				next_leg_anim = "act_run";
+				if (backwards) next_leg_anim = "act_run_back";
+				else next_leg_anim = "act_run";
 			}
 			else {
-				next_leg_anim = "act_strafe_left_better";
+				if (left) next_leg_anim = "act_strafe_left";
+				else next_leg_anim = "act_strafe";
 			}
 
 			leg_speed = ((groundspeed - grnd_speed_threshold) / 6.f) + 1.f;
-
-			if (dot(ent_face_dir, ent->velocity) < -0.25) {
-				leg_speed = -leg_speed;
-			}
 
 		}
 	}
@@ -492,11 +500,12 @@ void player_fire_weapon()
 
 }
 
-static float fire_time = 0.1f;
+static float fire_time = 0.15f;
 static float reload_time = 1.9f;
 
 void player_item_update(Entity* p, Move_Command command, bool is_local)
 {
+	static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
 	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
 
 	bool wants_shoot = command.button_mask & BUTTON_FIRE1;
@@ -528,8 +537,15 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 			w.timer = fire_time;
 			w.state = ITEM_IN_FIRE;
 
-			p->anim.set_anim("act_shoot", true, blend);
-			p->anim.m.loop = false;
+			if (m24->integer) {
+				p->anim.set_anim("act_shoot_sniper", true);
+				p->anim.m.loop = false;
+			}
+			else {
+				p->anim.set_anim("act_shoot", true, blend);
+				p->anim.m.speed = 1.5f;
+				p->anim.m.loop = false;
+			}
 
 			engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 
@@ -544,7 +560,7 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 
 			p->anim.set_anim("act_reload", true, blend);
 			p->anim.m.loop = false;
-			p->anim.m.speed = 0.5f;
+			p->anim.m.speed = 0.8f;
 
 			if (is_local) {
 				engine.local.viewmodel_animator.set_anim("act_reload", true);

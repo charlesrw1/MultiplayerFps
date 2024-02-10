@@ -98,6 +98,9 @@ void Particle_Manager::draw_particles()
 		glm::vec2 uvbase = glm::vec2(0);
 		glm::vec2 uvsize = glm::vec2(1);
 
+		
+
+
 		MbVertex v[4];
 		v[0].position = p.origin - p.size_x * side + p.size_y*up;
 		v[3].position = p.origin + p.size_x * side + p.size_y * up;
@@ -167,7 +170,7 @@ void Particle_Manager::add_blood_effect(glm::vec3 org, glm::vec3 normal)
 
 		vec3 dir = glm::normalize(normal + disk.x * up + disk.y * side);
 		Particle* p = new_particle();
-		p->sprite = -1;
+		p->sprite = BLOODSMALL;
 		p->color_start = { 143,5,5,255 };
 		p->gravity = blood_grav->real;
 		p->life_start = get_time();
@@ -177,8 +180,9 @@ void Particle_Manager::add_blood_effect(glm::vec3 org, glm::vec3 normal)
 		float speed = rand->RandF(3, 5);
 		p->velocity = dir * speed;
 
-		p->size_x = 0.15;
-		p->size_y = 0.15;
+		float size = rand->RandF(0.075, 0.2);
+		p->size_x = size;
+		p->size_y = size;
 	}
 }
 

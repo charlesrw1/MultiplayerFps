@@ -24,17 +24,17 @@ const int TANGENT_LOC = 7;
 const int BITANGENT_LOC = 8;
 
 
-bool MeshPart::has_lightmap_coords()
+bool MeshPart::has_lightmap_coords() const
 {
 	return attributes & (1<<UV2_LOC);
 }
 
-bool MeshPart::has_bones()
+bool MeshPart::has_bones() const
 {
 	return attributes & (1<<JOINT_LOC);
 }
 
-bool MeshPart::has_colors()
+bool MeshPart::has_colors() const
 {
 	return attributes & (1<<COLOR_LOC);
 }
@@ -256,6 +256,11 @@ void load_model_materials(std::vector<Game_Shader*>& materials, const std::strin
 {
 	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
 		tinygltf::Material& mat = scene.materials[matidx];
+		size_t find = mat.name.rfind('.');	// remove the .001 shit that blender adds
+		if (find != std::string::npos) {
+			mat.name = mat.name.substr(0, find);
+		}
+
 		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
 		if(!gs) {
 			int baseindex = mat.pbrMetallicRoughness.baseColorTexture.index;

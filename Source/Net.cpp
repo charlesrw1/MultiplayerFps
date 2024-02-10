@@ -27,7 +27,6 @@ Net_Prop entity_state_props[] =
 
 	{ESP(flags), 16},
 	{ESP(item), 32},
-	{ESP(solid), 32},
 
 	// for owning players only
 	{ESP(state), 16, 16, 1.f, Net_Prop::PLAYER_PROP_MASK},

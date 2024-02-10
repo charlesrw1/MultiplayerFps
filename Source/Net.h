@@ -145,6 +145,7 @@ struct Entity
 	Item_State items;
 
 	int physics = EPHYS_NONE;
+	glm::vec3 col_size;	// for characters, .x=radius,.y=height; for zones, it is an aabb
 	float col_radius = 0.f;
 	float col_height = 0;
 	int ground_index = 0;
@@ -158,7 +159,6 @@ struct Entity
 	int target_ent = -1;
 
 	int item = 0;
-	int solid = 0;
 
 	float in_air_time = 0.f;
 

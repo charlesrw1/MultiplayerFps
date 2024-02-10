@@ -346,6 +346,84 @@ void Renderer::InitGlState()
 }
 
 Renderer draw;
+void Renderer::draw_sprite_buffer()
+{
+	if (shadowverts.GetBaseVertex() == 0)
+		return;
+	shadowverts.End();
+	if (sprite_state.in_world_space)
+		shader().set_mat4("ViewProj", vs.viewproj);
+	else
+		shader().set_mat4("ViewProj", mat4(1));
+
+	shadowverts.Draw(GL_TRIANGLES);
+	shadowverts.Begin();
+
+}
+void Renderer::draw_sprite(glm::vec3 origin, Color32 color, glm::vec2 size, Texture* mat,
+	bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face)
+{
+	int tex = (mat) ? mat->gl_id : white_texture;
+	if ((in_world_space != sprite_state.in_world_space || tex != sprite_state.current_t 
+		|| additive != sprite_state.additive))
+		draw_sprite_buffer();
+
+	sprite_state.in_world_space = in_world_space;
+	if (sprite_state.current_t != tex || sprite_state.force_set) {
+		bind_texture(BASE0_SAMPLER, tex);
+		sprite_state.current_t = tex;
+	}
+	if (sprite_state.additive != additive || sprite_state.force_set) {
+		if (additive) {
+			glBlendFunc(GL_ONE, GL_ONE);
+		}
+		else {
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+		sprite_state.additive = additive;
+	}
+	sprite_state.force_set = false;
+
+	MbVertex v[4];
+	glm::vec3 side1;
+	glm::vec3 side2;
+	if (in_world_space)
+	{
+		if (billboard)
+		{
+			side1 = cross(draw.vs.front, vec3(0.f, 1.f, 0.f));
+			side2 = cross(side1, draw.vs.front);
+		}
+		else
+		{
+			side1 = (glm::abs(orient_face.x) < 0.999) ? cross(orient_face, vec3(1, 0, 0)) : cross(orient_face, vec3(0, 1, 0));
+			side2 = cross(side1, orient_face);
+		}
+	}
+	else
+	{
+		side1 = glm::vec3(1, 0,0);
+		side2 = glm::vec3(0, 1,0);
+		glm::vec4 neworigin = vs.viewproj * vec4(origin, 1.0);
+		neworigin /= neworigin.w;
+		origin = neworigin;
+	}
+	int base = shadowverts.GetBaseVertex();
+	glm::vec2 uvbase = glm::vec2(0);
+	glm::vec2 uvsize = glm::vec2(1);
+
+	v[0].position = origin - size.x * side1 + size.y * side2;
+	v[3].position = origin + size.x * side1 + size.y * side2;
+	v[2].position = origin + size.x * side1 - size.y * side2;
+	v[1].position = origin - size.x * side1 - size.y * side2;
+	v[0].uv = uvbase;
+	v[3].uv = glm::vec2(uvbase.x + uvsize.x, uvbase.y);
+	v[2].uv = uvbase + uvsize;
+	v[1].uv = glm::vec2(uvbase.x, uvbase.y + uvsize.y);
+	for (int j = 0; j < 4; j++) v[j].color = color;
+	for (int j = 0; j < 4; j++)shadowverts.AddVertex(v[j]);
+	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
+}
 
 void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 {
@@ -410,10 +488,49 @@ void Renderer::set_shader_constants()
 	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
 }
 
+static int combine_flags_type(int flags, int type, int flag_bits)
+{
+	return flags + (type >> flag_bits);
+}
+
 void Renderer::reload_shaders()
 {
+	const char* vert = "AnimBasicV.txt";
+	const char* frag = "AnimBasicF.txt";
+	const char* flag_strs[] = { "ALPHATEST,","LIGHTMAPPED,","ANIMATED,","BLEND2,","WIND," };
+	bool valid[NUM_MSF];
+	memset(valid, 0, NUM_MSF);
+	valid[0] = true;
+	// all alpha tests are valid
+	for (int i = 0; i < NUM_MSF; i++)
+		if (i & MSF_AT) valid[i] = true;
+	valid[MSF_LM] = true;
+	valid[MSF_LM | MSF_BLEND2] = true;
+	valid[MSF_AN] = true;
+	valid[MSF_WIND] = true;
+	valid[MSF_BLEND2] = true;
+
+	std::string defines;
+	int temp = NUM_MSF;
+	int bits = 0;
+	while (temp >>= 1) bits++;
+	for (int i = 0; i < NUM_MSF; i++) {
+		if (!valid[i]) continue;
+		defines.clear();
+		for (int j = 0; j < bits; j++) {
+			if (i & (1 << j)) {
+				defines += flag_strs[j];
+			}
+		}
+		if (!defines.empty())defines.pop_back();
+		Shader::compile(&shade[i], vert, frag, defines);
+	}
+
+
+
 	Shader::compile(&shade[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&shade[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
+
 
 	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
 	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", "AnimBasicF.txt");
@@ -528,6 +645,9 @@ void Renderer::ui_render()
 
 	draw_rect(centerx- width /2, centery-height/2, width, height, crosshair_color, t, t->width, t->height);
 
+	draw_rect(0, 0, 300, 300, COLOR_WHITE, mats.find_for_name("tree_leaves")->images[0],1000,1000,0,0);
+	draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
+
 
 
 	if (ui_builder.GetBaseVertex() > 0){
@@ -559,6 +679,7 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 	ui_builder.Push2dQuad(glm::vec2(x, y), glm::vec2(w, h), glm::vec2(srcx / tw, srcy / th),
 		glm::vec2(srcw / tw, srch / th), color);
 }
+
 void Renderer::FrameDraw()
 {
 	cur_shader = 0;
@@ -684,6 +805,91 @@ void Renderer::DrawEntBlobShadows()
 
 }
 
+// shader_key 8 bits
+// 3 bits
+// animated/not animated
+// lightmapped/not lightmapped
+// alpha test/not alpha test
+
+// 2wayblend, windsway, none
+
+
+#define BADSHADERIF(x) if(x) { sys_print("bad shader combo %s\n", #x); return; }
+#define WHITEIFNULL(x) ((x)?x->gl_id : white_texture)
+void Renderer::draw_model_real(Model_Drawing_State* s, const Model* m, int part_n, glm::mat4 transform,
+	const Entity* e, const Animator* a, Game_Shader* override_mat)
+{
+	const MeshPart& part = m->parts[part_n];
+	const Game_Shader& gs = (override_mat) ? *override_mat : *m->materials.at(part.material_idx);
+	const bool is_transparent = gs.alpha_type == Game_Shader::A_ADD || gs.alpha_type == Game_Shader::A_BLEND;
+	if (is_transparent != s->is_transparent_pass)
+		return;
+	const bool is_animated = (a);
+	const bool is_lightmapped = part.has_lightmap_coords();
+	const bool is_at = gs.alpha_type == Game_Shader::A_TEST;
+	const bool has_colors = part.has_colors();
+	const bool show_backface = gs.backface;
+	// ahhhhhhh
+	if (is_lightmapped) {
+		BADSHADERIF(is_animated);
+		BADSHADERIF(gs.shader_type == Game_Shader::S_WINDSWAY);
+		if (gs.shader_type == Game_Shader::S_2WAYBLEND) {
+			set_shader(shade[S_LIGHTMAPPED_BLEND2]);
+			bind_texture(BASE1_SAMPLER, WHITEIFNULL(gs.images[gs.BASE2]));
+			bind_texture(SPECIAL_SAMPLER, WHITEIFNULL(gs.images[gs.SPECIAL]));
+		}
+		else if (is_at)
+			set_shader(shade[S_LIGHTMAPPED_AT]);
+		else
+			set_shader(shade[S_LIGHTMAPPED]);
+
+		bind_texture(LIGHTMAP_SAMPLER, WHITEIFNULL(engine.level->lightmap));
+		bind_texture(BASE0_SAMPLER, WHITEIFNULL(gs.images[gs.BASE1]));
+	}
+	else {
+		if (is_animated) {
+			BADSHADERIF(gs.shader_type == Game_Shader::S_WINDSWAY);
+			if (is_at) {
+				BADSHADERIF(0);
+			}
+			else
+				set_shader(shade[S_ANIMATED]);
+
+			if (s->set_model_params) {
+				const std::vector<mat4>& bones = a->GetBones();
+				const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
+				for (int j = 0; j < bones.size(); j++)
+					glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
+				glCheckError();
+			}
+
+		}
+		else {
+			if (gs.shader_type == Game_Shader::S_WINDSWAY) {
+				if (is_at) 
+					set_shader(shade[S_WIND_AT]);
+				else
+					set_shader(shade[S_WIND]);
+			}
+			else {
+				if (is_at)
+					set_shader(shade[S_STATIC_AT]);
+				else
+					set_shader(shade[S_STATIC]);
+			}
+		}
+
+		bind_texture(BASE0_SAMPLER, WHITEIFNULL(gs.images[gs.BASE1]));
+	}
+
+	shader().set_mat4("Model", transform);
+	shader().set_mat4("InverseModel", glm::inverse(transform));
+
+	glBindVertexArray(part.vao);
+	glDrawElements(GL_TRIANGLES, part.element_count, part.element_type, (void*)part.element_offset);
+}
+
+
 void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 {
 	ASSERT(m);
@@ -699,6 +905,7 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 	glCheckError();
 	shader().set_mat4("Model", transform);
 	shader().set_mat4("InverseModel", glm::inverse(transform));
+
 
 	if (isanimated) {
 		const std::vector<mat4>& bones = a->GetBones();
@@ -717,6 +924,7 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 		}
 		else {
 			const Game_Shader* mm = m->materials.at(part->material_idx);
+			shader().set_bool("has_uv_scroll", false);
 			if (mm->images[Game_Shader::BASE1])
 				bind_texture(BASE0_SAMPLER, mm->images[Game_Shader::BASE1]->gl_id);
 			else
@@ -732,7 +940,7 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 void Renderer::DrawEnts()
 {
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		auto& ent = engine.ents[i];
+		auto& ent = engine.get_ent(i);
 		//auto& ent = cgame->entities[i];
 		if (!ent.active())
 			continue;
@@ -752,6 +960,35 @@ void Renderer::DrawEnts()
 
 		const Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
 		DrawModel(ent.model, model, a);
+
+
+		if (ent.type == ET_PLAYER && a) {
+
+			static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
+
+
+			Model* m = FindOrLoadModel("m16.glb");
+			Model* mag = FindOrLoadModel("m16_mag.glb");
+			if (m24->integer) {
+				m = FindOrLoadModel("m24.glb");
+			}
+			int index = ent.model->BoneForName("weapon");
+			int index2 = ent.model->BoneForName("magazine");
+			glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
+			if (index==-1||index2==-1) {
+				sys_print("no weapon bone\n");
+				continue;
+			}
+			const Bone& b = ent.model->bones.at(index);
+			glm::mat4 transform = a->GetBones()[index];
+			transform = model*transform*mat4(b.posematrix)*rotate;
+			DrawModel(m, transform);
+
+			const Bone& mag_bone = ent.model->bones.at(index2);
+			transform = a->GetBones()[index2];
+			transform = model * transform * mat4(mag_bone.posematrix)*rotate;
+			DrawModel(mag, transform);
+		}
 	}
 
 }
@@ -881,10 +1118,11 @@ void Renderer::DrawLevel()
 			shader().set_bool("has_glassfresnel", gs->fresnel_transparency);
 			shader().set_float("glassfresnel_opacity", 0.6f);
 
+			shader().set_bool("no_light", gs->emmisive);
+
 			bool has_uv_scroll = gs->uscroll != 0.f || gs->vscroll != 0.f;
 			shader().set_bool("has_uv_scroll", has_uv_scroll);
-			if(has_uv_scroll)
-				shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
+			shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
 
 			if (gs->images[gs->BASE1])
 				bind_texture(BASE0_SAMPLER, gs->images[gs->BASE1]->gl_id);
@@ -907,7 +1145,7 @@ void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 	vec3 origin = e.position;
 	Capsule c;
 	c.base = origin;
-	c.tip = origin + vec3(0, (e.solid) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
+	c.tip = origin + vec3(0, (false) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
 	c.radius = CHAR_HITBOX_RADIUS;
 	float radius = CHAR_HITBOX_RADIUS;
 	vec3 a, b;
@@ -923,6 +1161,7 @@ void Renderer::DrawPlayerViewmodel()
 
 	Game_Local* gamel = &engine.local;
 	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
+	//model2 = model2 * glm::scale(model2, glm::vec3(gamel->vm_scale.x));
 	
 	
 	model2 = glm::translate(model2, gamel->vm_offset);
@@ -1110,7 +1349,7 @@ void cmd_print_entities()
 {
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
-		auto& e = engine.ents[i];
+		auto& e = engine.get_ent(i);
 		if (!e.active()) continue;
 		sys_print("%-15d %-15d %-15f %-15f %-15d\n", i, e.type, e.position.x, e.position.z, (int)e.model);
 	}
@@ -1154,7 +1393,7 @@ void Game_Local::init()
 	
 	pm.init();
 
-	viewmodel = FindOrLoadModel("m16_fp.glb");
+	viewmodel = FindOrLoadModel("arms.glb");
 	viewmodel_animator.set_model(viewmodel);
 }
 
@@ -1286,6 +1525,8 @@ void Game_Engine::draw_debug_interface()
 
 			Entity& p = engine.local_player();
 			ImGui::DragFloat3("vm", &engine.local.vm_offset[0],0.02f);
+			ImGui::DragFloat3("vm2", &engine.local.vm_scale[0], 0.02f);
+
 			ImGui::DragFloat3("pos", &p.position.x);
 			ImGui::DragFloat3("vel", &p.velocity.x);
 			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
