@@ -30,6 +30,7 @@
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Edit.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
+    <ClCompile Include="Source\EnvProbe.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="source\Game_Local.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
@@ -64,6 +65,7 @@
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
     <ClInclude Include="Source\Draw.h" />
+    <ClInclude Include="Source\EnvProbe.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
     <ClInclude Include="Source\Particles.h" />

@@ -3,6 +3,7 @@
 #include <vector>
 #include "BVH.h"
 #include "Model.h"
+#include "EnvProbe.h"
 
 struct Level_Light
 {
@@ -46,6 +47,9 @@ public:
 	std::vector<Entity_Spawn> espawns;
 	
 	std::string name;
+
+	// >>> PBR BRANCH
+	EnvCubemap cubemap;
 };
 
 Level* LoadLevelFile(const char* level);

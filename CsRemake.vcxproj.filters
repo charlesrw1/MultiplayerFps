@@ -120,6 +120,9 @@
     <ClCompile Include="Source\Net.cpp">
       <Filter>Source Files\Network</Filter>
     </ClCompile>
+    <ClCompile Include="Source\EnvProbe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Texture.h">
@@ -205,6 +208,9 @@
     </ClInclude>
     <ClInclude Include="Source\Key_Value_File.h">
       <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EnvProbe.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

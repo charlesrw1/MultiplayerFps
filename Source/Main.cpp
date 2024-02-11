@@ -254,6 +254,66 @@ void Game_Engine::make_move()
 	if(cl->get_state()>=CS_CONNECTED) cl->get_command(cl->OutSequence()) = command;
 }
 
+void Renderer::on_level_start()
+{
+	// >>> PBR BRANCH
+	// render cubemap and integrate it
+	glm::vec3 probe_pos = glm::vec3(0, 1.0, 0);
+
+	uint32_t fbo, rbo;
+	glGenFramebuffers(1, &fbo);
+	glGenRenderbuffers(1, &rbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_SIZE, CUBEMAP_SIZE);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+	EnvCubemap cubemap;
+	cubemap.size = CUBEMAP_SIZE;
+
+	uint32_t cm_id;
+
+	glGenTextures(1, &cm_id);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cm_id);
+	for (int i = 0; i < 6; i++)
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_SIZE, CUBEMAP_SIZE, 0, GL_RGB, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glCheckError();
+	auto& helper = EnviornmentMapHelper::get();
+	for (int i = 0; i < 6; i++) {
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, 0);
+		View_Setup cubemap_view;
+		cubemap_view.front = helper.cubemap_views[i][0];
+		cubemap_view.view = helper.cubemap_views[i];
+		cubemap_view.view[3] = glm::vec4(probe_pos, 1.0);
+		cubemap_view.origin = probe_pos;
+		cubemap_view.width = CUBEMAP_SIZE;
+		cubemap_view.height = CUBEMAP_SIZE;
+		cubemap_view.far = 100.f;
+		cubemap_view.near = 0.001f;
+		
+		cubemap_view.proj = helper.cubemap_projection;
+		cubemap_view.viewproj = cubemap_view.proj * cubemap_view.view;
+		glCheckError();
+
+		render_level_to_target(cubemap_view, fbo, true, false);
+		glCheckError();
+
+	}
+	cubemap.original_cubemap = cm_id;
+
+	helper.convolute_irradiance(&cubemap);
+	helper.compute_specular(&cubemap);
+
+
+	this->cubemap = cubemap;
+}
+
 void Game_Engine::init_sdl_window()
 {
 	ASSERT(!window);
@@ -477,6 +537,11 @@ void Renderer::set_shader_sampler_locations()
 	shader().set_int("auxcolor2", AUX1_SAMPLER);
 	shader().set_int("lightmap", LIGHTMAP_SAMPLER);
 	shader().set_int("special", SPECIAL_SAMPLER);
+
+	// >>> PBR BRANCH
+	shader().set_int("PBR_irradiance", LIGHTMAP_SAMPLER + 1);
+	shader().set_int("PBR_prefiltered_specular", LIGHTMAP_SAMPLER + 2);
+	shader().set_int("PBR_brdflut", LIGHTMAP_SAMPLER+3);
 }
 
 void Renderer::set_shader_constants()
@@ -493,6 +558,14 @@ void Renderer::set_shader_constants()
 	shader().set_vec3("view_front", vs.front);
 	shader().set_vec3("view_pos", vs.origin);
 	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
+
+	// >>> PBR BRANCH
+	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 1);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap.irradiance_cm);
+	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 2);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap.prefiltered_specular_cm);
+	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER+3);
+	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
 }
 
 static int combine_flags_type(int flags, int type, int flag_bits)
@@ -502,6 +575,7 @@ static int combine_flags_type(int flags, int type, int flag_bits)
 
 void Renderer::reload_shaders()
 {
+#if 0
 	const char* vert = "AnimBasicV.txt";
 	const char* frag = "AnimBasicF.txt";
 	const char* flag_strs[] = { "ALPHATEST,","LIGHTMAPPED,","ANIMATED,","BLEND2,","WIND," };
@@ -533,21 +607,23 @@ void Renderer::reload_shaders()
 		Shader::compile(&shade[i], vert, frag, defines);
 	}
 
-
+#endif
+	// >>> PBR BRANCH
+	const char* frag = "PbrBasicF.txt";
 
 	Shader::compile(&shade[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&shade[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
 
 
-	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", "AnimBasicF.txt", "ANIMATED");
-	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", "AnimBasicF.txt");
-	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", "AnimBasicF.txt", "ALPHATEST");
-	Shader::compile(&shade[S_WIND], "AnimBasicV.txt", "AnimBasicF.txt", "WIND");
-	Shader::compile(&shade[S_WIND_AT], "AnimBasicV.txt", "AnimBasicF.txt", "WIND, ALPHATEST");
+	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", frag, "ANIMATED");
+	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", frag);
+	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", frag, "ALPHATEST");
+	Shader::compile(&shade[S_WIND], "AnimBasicV.txt", frag, "WIND");
+	Shader::compile(&shade[S_WIND_AT], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
 
-	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED");
-	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED, ALPHATEST");
-	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", "AnimBasicF.txt", "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
+	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", frag, "LIGHTMAPPED");
+	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST");
+	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
 
 
 	Shader::compile(&shade[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
@@ -588,6 +664,12 @@ void Renderer::Init()
 	fbo.scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
 	InitFramebuffers();
+
+	// >>> PBR BRANCH
+	EnviornmentMapHelper::get().init();
+	cubemap = EnviornmentMapHelper::get().create_from_file("hdr_sky.hdr");
+	EnviornmentMapHelper::get().convolute_irradiance(&cubemap);
+	EnviornmentMapHelper::get().compute_specular(&cubemap);
 }
 
 void Renderer::InitFramebuffers()
@@ -627,6 +709,39 @@ void Renderer::InitFramebuffers()
 	cur_h = s_h;
 }
 
+void Renderer::init_bloom_buffers()
+{
+	glDeleteFramebuffers(1, &fbo.bloom);
+	glDeleteTextures(1, &tex.bloom_chain);
+	glDeleteTextures(1, &tex.bloom_depth);
+
+	glGenTextures(1, &tex.bloom_chain);
+	glBindTexture(GL_TEXTURE_2D, tex.bloom_chain);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, cur_w/2, cur_h/2, 0, GL_RGB, GL_FLOAT, NULL);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+
+
+
+}
+
+void Renderer::render_level_to_target(View_Setup setup, uint32_t output_target, bool clear, bool draw_ents)
+{
+	vs = setup;
+	glBindFramebuffer(GL_FRAMEBUFFER, output_target);
+	glViewport(0, 0, vs.width, vs.height);
+	if (clear) {
+		glClearColor(1.f, 1.f, 0.f, 1.f);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+	}
+	DrawLevel();
+	if (draw_ents) {
+		DrawEnts();
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void Renderer::ui_render()
 {
 	set_shader(shade[S_TEXTURED]);
@@ -652,7 +767,12 @@ void Renderer::ui_render()
 
 	draw_rect(centerx- width /2, centery-height/2, width, height, crosshair_color, t, t->width, t->height);
 
-	//draw_rect(0, 0, 300, 300, COLOR_WHITE, mats.find_for_name("tree_leaves")->images[0],1000,1000,0,0);
+	Texture tex;
+	tex.gl_id = EnviornmentMapHelper::get().integrator.lut_id;
+	tex.width = BRDF_PREINTEGRATE_LUT_SIZE;
+	tex.height = BRDF_PREINTEGRATE_LUT_SIZE;
+
+	draw_rect(0, 0, 300, 300, COLOR_WHITE, &tex,1000,1000,0,0);
 	//draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
 
 
@@ -696,20 +816,15 @@ void Renderer::FrameDraw()
 		InitFramebuffers();
 
 	vs = engine.local.last_view;
+	render_level_to_target(engine.local.last_view, fbo.scene, true, true);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	glViewport(0, 0, vs.width, vs.height);
-	glClearColor(1.f, 1.f, 0.f, 1.f);
-	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-	DrawEnts();
-	DrawLevel();
 	DrawEntBlobShadows();
-
 	engine.local.pm.draw_particles();
+	glCheckError();
 
 	int x = vs.width;
 	int y = vs.height;
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo.scene);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER,fbo.scene);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
@@ -897,7 +1012,7 @@ void Renderer::draw_model_real(Model_Drawing_State* s, const Model* m, int part_
 }
 
 
-void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
+void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a, float rough, float metal)
 {
 	ASSERT(m);
 	const bool isanimated = a != nullptr;
@@ -908,6 +1023,8 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 		set_shader(shade[S_STATIC]);
 
 	set_shader_constants();
+	shader().set_float("in_roughness", rough);
+	shader().set_float("in_metalness", metal);
 	
 	glCheckError();
 	shader().set_mat4("Model", transform);
@@ -1009,6 +1126,17 @@ void Renderer::DrawEnts()
 		}
 	}
 
+
+	Model* sphere = FindOrLoadModel("sphere.glb");
+	for (int x = 0; x < 10; x++) {
+		for (int y = 0; y < 10; y++) {
+			mat4 transform = glm::translate(mat4(1), vec3((x - 5) * 0.75, 0, (y - 5) * 0.75));
+			transform = glm::scale(transform, vec3(0.4));
+			DrawModel(sphere, transform, nullptr, (9 - x) / 9.f, (9 - y) / 9.f);
+		}
+	}
+
+
 }
 
 
@@ -1032,12 +1160,17 @@ void Renderer::set_wind_constants()
 
 void draw_wind_menu()
 {
+	ImGui::DragFloat("roughness", &draw.rough, 0.02);
+	ImGui::DragFloat("metalness", &draw.metal, 0.02);
+
 	ImGui::DragFloat3("wind dir", &wswind_dir.x, 0.04);
 	ImGui::DragFloat("speed", &speed, 0.04);
 	ImGui::DragFloat("height", &wsheight, 0.04);
 	ImGui::DragFloat("radius", &wsradius, 0.04);
 	ImGui::DragFloat("startheight", &wsstartheight, 0.04,0.f,1.f);
 	ImGui::DragFloat("startradius", &wsstartradius, 0.04, 0.f, 1.f);
+
+	ImGui::Image((ImTextureID)EnviornmentMapHelper::get().integrator.lut_id, ImVec2(512, 512));
 }
 
 void Renderer::DrawLevel()
@@ -1135,6 +1268,9 @@ void Renderer::DrawLevel()
 
 			shader().set_bool("has_glassfresnel", gs->fresnel_transparency);
 			shader().set_float("glassfresnel_opacity", 0.6f);
+
+			shader().set_float("in_roughness", rough);
+			shader().set_float("in_metalness", metal);
 
 			shader().set_bool("no_light", gs->emmisive);
 
@@ -1440,6 +1576,8 @@ bool Game_Engine::start_map(string map, bool is_client)
 		on_game_start();
 		sv->connect_local_client();
 	}
+
+	draw.on_level_start();
 
 	return true;
 }

@@ -2,16 +2,21 @@
 #include "Config.h"
 #include "glm/glm.hpp"
 #include "Util.h"
+#include "Types.h"
 class Model;
 class Animator;
 class Texture;
 class Entity;
+
+const int BLOOM_MIPS = 6;
 
 class Renderer
 {
 public:
 	void Init();
 	void FrameDraw();
+
+	void render_level_to_target(View_Setup setup, uint32_t output_framebuffer, bool clear, bool draw_ents);
 
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
@@ -20,7 +25,9 @@ public:
 	void reload_shaders();
 	void ui_render();
 
-	void DrawModel(const Model* m, glm::mat4 transform, const Animator* a = nullptr);
+	void on_level_start();
+
+	void DrawModel(const Model* m, glm::mat4 transform, const Animator* a = nullptr, float rough=1.0, float metal=0.0);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	uint32_t white_texture;
@@ -33,25 +40,38 @@ public:
 
 	// shaders
 	enum { 
-		S_SIMPLE, S_TEXTURED, S_ANIMATED, 
+		// meshbuilder's
+		S_SIMPLE, S_TEXTURED, 
 		
+		// model's
+		S_ANIMATED, 
 		S_STATIC, S_STATIC_AT, S_WIND, S_WIND_AT,
 		S_LIGHTMAPPED, S_LIGHTMAPPED_AT, S_LIGHTMAPPED_BLEND2,
+
+		// z-prepass'
+		S_PREPASS, S_AT_PREPASS, S_ANIMATED_PREPASS, S_WIND_PREPASS, S_WIND_AT_PREPASS,
 		
-		S_PARTICLE_BASIC, S_NUM
+		S_PARTICLE_BASIC,
+
+		// other
+		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE,
+
+		S_NUM
 	};
-	enum Model_Shader_Flags 
-	{ MSF_AT = 1, MSF_LM = 1<<1, MSF_AN = 1<<2, MSF_BLEND2 = 1<<3, MSF_WIND = 1<<4, NUM_MSF=1<<5 };
-	Shader model_shaders[NUM_MSF];
 
 	Shader shade[S_NUM];
 
 	struct {
 		uint32_t scene;
+
+		uint32_t bloom;
 	}fbo;
 	struct {
 		uint32_t scene_color;
 		uint32_t scene_depthstencil;
+
+		uint32_t bloom_depth;
+		uint32_t bloom_chain;
 	}tex;
 	View_Setup vs;
 	
@@ -74,6 +94,12 @@ public:
 
 	Shader& shader();
 	void set_shader_constants();
+
+	// >>> PBR BRANCH
+	EnvCubemap cubemap;
+	float rough = 1.f;
+	float metal = 0.f;
+
 private:
 	struct Sprite_Drawing_State {
 		bool force_set = true;
@@ -99,6 +125,7 @@ private:
 	void draw_model_real(Model_Drawing_State* state, const Model* m, int part, glm::mat4 transform, 
 		const Entity* e = nullptr, const Animator* a = nullptr, Game_Shader* override_mat = nullptr);
 
+	void init_bloom_buffers();
 
 	void InitGlState();
 	void InitFramebuffers();
@@ -122,6 +149,7 @@ private:
 	uint32_t building_ui_texture;
 
 	MeshBuilder shadowverts;
+
 };
 
 extern Renderer draw;

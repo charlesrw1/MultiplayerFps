@@ -1,0 +1,23 @@
+#version 430 core
+
+in vec3 FS_IN_Fragpos;
+out vec4 FS_OUT_FragColor;
+
+uniform sampler2D equirectangular_img;
+
+const vec2 inv_atan = vec2(0.1591, 0.3183);
+vec2 sample_spherical(vec3 V)
+{
+	vec2 uv = vec2(atan(V.z,V.x),asin(V.y));
+	uv *= inv_atan;
+	uv += 0.5;
+	return uv;
+}
+
+void main()
+{
+	vec3 Dir = normalize(FS_IN_Fragpos);
+	vec2 uv = sample_spherical(Dir);
+
+	FS_OUT_FragColor = texture(equirectangular_img,uv);
+}

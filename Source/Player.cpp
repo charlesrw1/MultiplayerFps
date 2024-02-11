@@ -16,7 +16,7 @@ static const Capsule standing_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CH
 static const Capsule crouch_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_CROUCING_HB_HEIGHT,0) };
 
 static float fall_speed_threshold = -0.05f;
-static float grnd_speed_threshold = 0.025f;
+static float grnd_speed_threshold = 0.6f;
 
 
 static float move_speed_player = 0.1f;
