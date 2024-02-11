@@ -130,6 +130,7 @@ public:
 	Engine_State state;
 	bool is_host;
 	Game_Local local;
+	Game_Media media;
 
 	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
 	int tick = 0;				// this is the discretized time tick
@@ -172,5 +173,4 @@ private:
 	void on_game_start();
 };
 
-extern Game_Media media;
 extern Game_Engine engine;

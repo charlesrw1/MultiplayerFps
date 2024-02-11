@@ -246,7 +246,7 @@ void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, 
 
 	const Model* next_model = nullptr;
 	if (ent->model_index != -1)
-		next_model = media.get_game_model_from_index(ent->model_index);
+		next_model = engine.media.get_game_model_from_index(ent->model_index);
 	if (next_model != ent->model) {
 		ent->model = next_model;
 		if (ent->model && ent->model->bones.size() > 0)

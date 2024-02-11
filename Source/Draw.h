@@ -75,7 +75,6 @@ public:
 	Shader& shader();
 	void set_shader_constants();
 private:
-
 	struct Sprite_Drawing_State {
 		bool force_set = true;
 		bool in_world_space = false;

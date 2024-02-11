@@ -37,7 +37,6 @@
 MeshBuilder phys_debug;
 Engine_Config cfg;
 Game_Engine engine;
-Game_Media media;
 
 static double program_time_start;
 
@@ -796,7 +795,7 @@ void Renderer::DrawEntBlobShadows()
 	shader().set_vec4("tint_color", vec4(0,0,0,1));
 	glCheckError();
 
-	bind_texture(0, media.blob_shadow->gl_id);
+	bind_texture(0, engine.media.blob_shadow->gl_id);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -944,6 +943,9 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a)
 	}
 
 }
+
+
+
 
 void Renderer::DrawEnts()
 {
@@ -1185,7 +1187,6 @@ void Renderer::DrawPlayerViewmodel()
 
 	cur_shader = -1;
 
-	const Model* viewmodel = media.get_game_model("m16.glb");
 
 	DrawModel(engine.local.viewmodel, model2, &engine.local.viewmodel_animator);
 }
@@ -1240,7 +1241,7 @@ const Model* Game_Media::get_game_model_from_index(int index)
 
 void Entity::set_model(const char* model_name)
 {
-	model = media.get_game_model(model_name, &model_index);
+	model = engine.media.get_game_model(model_name, &model_index);
 	if (model && model->bones.size() > 0)
 		anim.set_model(model);
 }

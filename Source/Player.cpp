@@ -493,7 +493,7 @@ Game_Item_Stats stats[Game_Inventory::NUM_GAME_ITEMS] = {
 	{"m24", "m24.glb", "", ITEM_CAT_BOLT_ACTION, 0, 0.7, 3.0, 0.1, 0.1, 75, 0, 30, 0.0},
 	{"knife", "knife.glb", "", ITEM_CAT_MELEE, 0, 2.0},
 	{"bomb", "bomb.glb", "", ITEM_CAT_BOMB},
-	{"grenade"}
+	{"grenade","grenade_he.glb", "", ITEM_CAT_THROWABLE, 0}
 };
 Game_Item_Stats* get_item_stats()
 {

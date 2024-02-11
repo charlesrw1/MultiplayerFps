@@ -192,9 +192,6 @@ struct Entity
 	float interp_time;
 
 	int target_ent = -1;
-
-	int item = 0;
-
 	float in_air_time = 0.f;
 
 	int force_angles = 0;	// 1=force, 2=add

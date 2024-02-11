@@ -354,26 +354,6 @@ void Client::interpolate_states()
 			float d = s1->angles[i] - s2->angles[i];
 			ent.rotation[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
 		}
-		//if (s1->legs.anim != s2->legs.anim) {
-		//	if (midlerp > 0.5 && ent.anim.legs.anim != s2->legs.anim) {
-		//		ent.anim.set_anim_from_index(ent.anim.legs,s2->legs.anim,false);
-		//		ent.anim.legs.speed = s2->legs.speed;
-		//		ent.anim.legs.loop = s2->legs.loop;
-		//	}
-		//}
-		//if (s1->torso.anim != s2->torso.anim) {
-		//	if (midlerp > 0.5 && ent.anim.m.anim != s2->torso.anim) {
-		//		ent.anim.set_anim_from_index(ent.anim.m, s2->torso.anim, false);
-		//		ent.anim.m.speed = s2->torso.speed;
-		//		ent.anim.m.loop = s2->torso.loop;
-		//	}
-		//}
-		//
-		//if (ent.anim.m.finished && ent.anim.m.anim == s2->torso.anim && s2->torso.frame + 0.1 < ent.anim.m.frame) {
-		//	ent.anim.set_anim_from_index(ent.anim.m, ent.anim.m.anim, true);
-		//	ent.anim.m.speed = s2->torso.speed;
-		//	ent.anim.m.loop = s2->torso.loop;
-		//}
 	}
 }
 
