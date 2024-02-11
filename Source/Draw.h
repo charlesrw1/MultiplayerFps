@@ -8,7 +8,7 @@ class Animator;
 class Texture;
 class Entity;
 
-const int BLOOM_MIPS = 6;
+const int BLOOM_MIPS = 8;
 
 class Renderer
 {
@@ -54,7 +54,7 @@ public:
 		S_PARTICLE_BASIC,
 
 		// other
-		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE,
+		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE, S_COMBINE,
 
 		S_NUM
 	};
@@ -71,7 +71,10 @@ public:
 		uint32_t scene_depthstencil;
 
 		uint32_t bloom_depth;
-		uint32_t bloom_chain;
+		uint32_t bloom_chain[BLOOM_MIPS];
+		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
+		glm::vec2 bloom_chain_size[BLOOM_MIPS];
+
 	}tex;
 	View_Setup vs;
 	
@@ -126,6 +129,7 @@ private:
 		const Entity* e = nullptr, const Animator* a = nullptr, Game_Shader* override_mat = nullptr);
 
 	void init_bloom_buffers();
+	void render_bloom_chain();
 
 	void InitGlState();
 	void InitFramebuffers();

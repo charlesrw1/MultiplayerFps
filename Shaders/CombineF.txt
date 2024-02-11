@@ -1,0 +1,17 @@
+#version 430
+out vec3 FS_OUT_Color;
+in vec2 FS_IN_TexCoord;
+
+uniform sampler2D scene_lit;
+uniform sampler2D bloom;
+
+void main()
+{
+	vec3 scene = texture(scene_lit, FS_IN_TexCoord).rgb;
+	vec3 bloom_add = texture(bloom, FS_IN_TexCoord).rgb;
+	
+	vec3 both = mix(scene,bloom_add,0.02);
+	vec3 srgb = pow(both,vec3(1/2.2));
+	
+	FS_OUT_Color = srgb;
+}

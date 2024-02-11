@@ -68,7 +68,7 @@ void main()
 	vec3 R = reflect(-V,N);
 	const float MAX_REFLECTION_LOD = 4.0;
 	vec3 prefiltered_color = textureLod(PBR_prefiltered_specular,R,Roughness*MAX_REFLECTION_LOD).rgb;
-	prefiltered_color = pow(prefiltered_color,vec3(2.2));
+	//prefiltered_color = pow(prefiltered_color,vec3(2.2));
 	
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0,Albedo,Metalness);
@@ -79,9 +79,9 @@ void main()
 	float ao = 1.0;
 	vec3 irradiance = texture(PBR_irradiance,N).rgb;
 	irradiance = textureLod(PBR_prefiltered_specular,N,4.0).rgb;
-	irradiance = pow(irradiance, vec3(2.2));
+	//irradiance = pow(irradiance, vec3(2.2));
 #ifdef LIGHTMAPPED
-	//irradiance = texture(lightmap, FS_IN_TexCoord2).rgb;
+	irradiance = texture(lightmap, FS_IN_TexCoord2).rgb;
 #endif
 	vec3 diffuse = irradiance*Albedo;
 
@@ -92,7 +92,13 @@ void main()
 	
 	vec3 ambient =(kD*diffuse+specular)*ao;
 	vec3 out_color = ambient;
-	out_color = pow(out_color,vec3(1/2.2));
+	
+	#ifdef ANIMATED
+	out_color += vec3(1,10,1);
+	#endif
+	
+	//out_color = pow(out_color,vec3(1/2.2));
+	
 
 	FS_OUT_Color = vec4(out_color ,1.0);//vec4(pow(diffuse+ambient,vec3(1/2.2)),1);//abs(Albedo-((N+vec3(1))*0.5)),1.0);	
 }	

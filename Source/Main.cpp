@@ -620,15 +620,29 @@ void Renderer::reload_shaders()
 	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", frag, "ALPHATEST");
 	Shader::compile(&shade[S_WIND], "AnimBasicV.txt", frag, "WIND");
 	Shader::compile(&shade[S_WIND_AT], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
-
 	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", frag, "LIGHTMAPPED");
 	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST");
 	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
 
 
+
 	Shader::compile(&shade[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	
+	
+	Shader::compile(&shade[S_BLOOM_DOWNSAMPLE], "MbTexturedV.txt", "BloomDownsampleF.txt");
+	Shader::compile(&shade[S_BLOOM_UPSAMPLE], "MbTexturedV.txt", "BloomUpsampleF.txt");
+	Shader::compile(&shade[S_COMBINE], "MbTexturedV.txt", "CombineF.txt");
+	set_shader(shade[S_COMBINE]);
+	shader().set_int("scene_lit", 0);
+	shader().set_int("bloom", 1);
+
+
+
 	glCheckError();
-	for (int i = 0; i < S_NUM; i++) {
+	
+	int start = S_ANIMATED;
+	int end = S_LIGHTMAPPED_BLEND2;
+	for (int i = start; i <= end; i++) {
 		set_shader(shade[i]);
 		set_shader_sampler_locations();
 	}
@@ -680,7 +694,7 @@ void Renderer::InitFramebuffers()
 	glDeleteTextures(1, &tex.scene_color);
 	glGenTextures(1, &tex.scene_color);
 	glBindTexture(GL_TEXTURE_2D, tex.scene_color);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, s_w, s_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, s_w, s_h, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glCheckError();
@@ -707,22 +721,119 @@ void Renderer::InitFramebuffers()
 
 	cur_w = s_w;
 	cur_h = s_h;
+
+	init_bloom_buffers();
 }
 
 void Renderer::init_bloom_buffers()
 {
 	glDeleteFramebuffers(1, &fbo.bloom);
-	glDeleteTextures(1, &tex.bloom_chain);
-	glDeleteTextures(1, &tex.bloom_depth);
+	glDeleteTextures(BLOOM_MIPS, tex.bloom_chain);
+	glDeleteRenderbuffers(1, &tex.bloom_depth);
 
-	glGenTextures(1, &tex.bloom_chain);
-	glBindTexture(GL_TEXTURE_2D, tex.bloom_chain);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, cur_w/2, cur_h/2, 0, GL_RGB, GL_FLOAT, NULL);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	glGenFramebuffers(1, &fbo.bloom);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
+
+	glGenTextures(BLOOM_MIPS, tex.bloom_chain);
+	int x = cur_w / 2;
+	int y = cur_h / 2;
+	float fx = x;
+	float fy = y;
+	for (int i = 0; i < BLOOM_MIPS; i++) {
+		tex.bloom_chain_isize[i] = { x,y };
+		tex.bloom_chain_size[i] = { fx,fy };
+		glBindTexture(GL_TEXTURE_2D, tex.bloom_chain[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, x, y, 0, GL_RGB, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		x /= 2;
+		y /= 2;
+		fx *= 0.5;
+		fy *= 0.5;
+	}
+
+	glGenRenderbuffers(1, &tex.bloom_depth);
+	glBindRenderbuffer(GL_RENDERBUFFER, tex.bloom_depth);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, cur_w/2, cur_h/2);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, tex.bloom_depth);
+
+	glCheckError();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
 
+static bool bloom_stop = false;
+static int bloom_layer = 0;
 
+void Renderer::render_bloom_chain()
+{
 
+	glDisable(GL_CULL_FACE);
+
+	MeshBuilder mb;
+	mb.Begin();
+	mb.Push2dQuad(vec2(-1, -1), vec2(2, 2));
+	mb.End();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
+	glActiveTexture(GL_TEXTURE0);
+	set_shader(shade[S_BLOOM_DOWNSAMPLE]);
+	shader().set_mat4("Model", mat4(1));
+	shader().set_mat4("ViewProj", mat4(1));
+	float src_x = cur_w;
+	float src_y = cur_h;
+
+	glBindTexture(GL_TEXTURE_2D, tex.scene_color);
+	glDisable(GL_DEPTH_TEST);
+	glClearColor(0, 0, 0, 1);
+	for (int i = 0; i < BLOOM_MIPS; i++)
+	{
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.bloom_chain[i],0);
+		shader().set_vec2("srcResolution", vec2(src_x, src_y));
+		src_x = tex.bloom_chain_size[i].x;
+		src_y = tex.bloom_chain_size[i].y;
+
+		glViewport(0, 0, src_x, src_y);	// dest size
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+		mb.Draw(GL_TRIANGLES);
+		
+		glBindTexture(GL_TEXTURE_2D, tex.bloom_chain[i]);
+	}
+
+	if (bloom_stop) {
+		mb.Free();
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		return;
+	}
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	set_shader(shade[S_BLOOM_UPSAMPLE]);
+	shader().set_mat4("Model", mat4(1));
+	shader().set_mat4("ViewProj", mat4(1));
+	for (int i = BLOOM_MIPS - 1; i > 0; i--)
+	{
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.bloom_chain[i-1],0);
+		vec2 destsize = tex.bloom_chain_size[i - 1];
+		glViewport(0, 0, destsize.x, destsize.y);
+		//glClear(GL_COLOR_BUFFER_BIT);
+		glBindTexture(GL_TEXTURE_2D, tex.bloom_chain[i]);
+		shader().set_float("filterRadius",0.0001f);
+
+		mb.Draw(GL_TRIANGLES);
+	}
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	mb.Free();
+	glEnable(GL_CULL_FACE);
+
+	glCheckError();
 }
 
 void Renderer::render_level_to_target(View_Setup setup, uint32_t output_target, bool clear, bool draw_ents)
@@ -731,7 +842,7 @@ void Renderer::render_level_to_target(View_Setup setup, uint32_t output_target, 
 	glBindFramebuffer(GL_FRAMEBUFFER, output_target);
 	glViewport(0, 0, vs.width, vs.height);
 	if (clear) {
-		glClearColor(1.f, 1.f, 0.f, 1.f);
+		glClearColor(0.f, 0.f, 0.f, 1.f);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
 	DrawLevel();
@@ -767,12 +878,6 @@ void Renderer::ui_render()
 
 	draw_rect(centerx- width /2, centery-height/2, width, height, crosshair_color, t, t->width, t->height);
 
-	Texture tex;
-	tex.gl_id = EnviornmentMapHelper::get().integrator.lut_id;
-	tex.width = BRDF_PREINTEGRATE_LUT_SIZE;
-	tex.height = BRDF_PREINTEGRATE_LUT_SIZE;
-
-	draw_rect(0, 0, 300, 300, COLOR_WHITE, &tex,1000,1000,0,0);
 	//draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
 
 
@@ -822,15 +927,34 @@ void Renderer::FrameDraw()
 	engine.local.pm.draw_particles();
 	glCheckError();
 
+
+	render_bloom_chain();
+
 	int x = vs.width;
 	int y = vs.height;
-	glBindFramebuffer(GL_READ_FRAMEBUFFER,fbo.scene);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-	glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 	MeshBuilder mb;
+	mb.Begin();
+	mb.Push2dQuad(vec2(-1, -1), vec2(2, 2));
+	mb.End();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, cur_w, cur_h);
+	glDisable(GL_CULL_FACE);
+	set_shader(shade[S_COMBINE]);
+	shader().set_mat4("Model", mat4(1));
+	shader().set_mat4("ViewProj", mat4(1));
+	bind_texture(0, tex.scene_color);
+	bind_texture(1, tex.bloom_chain[0]);
+	mb.Draw(GL_TRIANGLES);
+
+	glEnable(GL_CULL_FACE);
+
+	//glBindFramebuffer(GL_READ_FRAMEBUFFER,fbo.scene);
+	//glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	//glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	//glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 	mb.Begin();
 	if (r_draw_sv_colliders->integer == 1) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -1162,6 +1286,12 @@ void draw_wind_menu()
 {
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
 	ImGui::DragFloat("metalness", &draw.metal, 0.02);
+
+	ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
+	ImGui::Checkbox("upscale", &bloom_stop);
+	ImGui::Image(ImTextureID(draw.tex.bloom_chain[bloom_layer]), ImVec2(256, 256));
+
+
 
 	ImGui::DragFloat3("wind dir", &wswind_dir.x, 0.04);
 	ImGui::DragFloat("speed", &speed, 0.04);
