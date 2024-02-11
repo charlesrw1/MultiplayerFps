@@ -12,7 +12,6 @@ struct Texture
 	int channels = 0;
 	bool is_float = false;
 	uint32_t gl_id = 0;
-	uint32_t gl_flags = 0;
 };
 
 class Game_Shader

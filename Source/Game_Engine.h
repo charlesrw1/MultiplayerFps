@@ -40,7 +40,7 @@ public:
 	bool using_debug_cam = false;
 	Fly_Camera fly_cam;
 
-	Item_Use_State prev_item_state = ITEM_IDLE;
+	int prev_item_state = ITEM_IDLE;
 	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
 	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
 
@@ -149,6 +149,7 @@ public:
 
 	bool dedicated_server = false;
 	bool keys[SDL_NUM_SCANCODES];
+	bool keychanges[SDL_NUM_SCANCODES];
 	int mousekeys;
 	bool game_focused = false;
 

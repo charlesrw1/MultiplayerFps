@@ -4,14 +4,20 @@
 
 enum Game_Command_Buttons
 {
-	BUTTON_SPRINT = 1,
-	BUTTON_JUMP = 2,
-	BUTTON_DUCK = 4,
-	BUTTON_FIRE1 = 8,
-	BUTTON_FIRE2 = 16,
-	BUTTON_MISC1 = 32,
-	BUTTON_MISC2 = 64,
-	BUTTON_RELOAD = 128,
+	BUTTON_JUMP = (1),
+	BUTTON_DUCK = (1<<2),
+	BUTTON_FIRE1 = (1<<3),
+	BUTTON_FIRE2 = (1<<4),
+	BUTTON_RELOAD = (1<<5),
+	BUTTON_USE = (1<<6),
+
+	BUTTON_ITEM1 = (1 << 8),
+	BUTTON_ITEM2 = (1 << 9),
+	BUTTON_ITEM3 = (1 << 10),
+	BUTTON_ITEM4 = (1 << 11),
+	BUTTON_ITEM5 = (1 << 12),
+	BUTTON_ITEM_NEXT = (1 << 12),
+	BUTTON_ITEM_PREV = (1 << 13),
 };
 
 struct Move_Command

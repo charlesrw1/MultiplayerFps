@@ -212,14 +212,6 @@ void Client::SendMovesAndMessages()
 		last = get_command(server.out_sequence - i);
 	}
 
-	//writer.WriteByte(Move_Command::quantize(lastmove.forward_move));
-	//writer.WriteByte(Move_Command::quantize(lastmove.lateral_move));
-	//writer.WriteByte(Move_Command::quantize(lastmove.up_move));
-	//
-	//writer.WriteFloat(lastmove.view_angles.x);
-	//writer.WriteFloat(lastmove.view_angles.y);
-	//writer.WriteLong(lastmove.button_mask);
-
 	writer.AlignToByteBoundary();
 
 	writer.WriteByte(CL_SET_BASELINE);

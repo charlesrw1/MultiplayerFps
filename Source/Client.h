@@ -16,8 +16,6 @@ struct Interp_Entry
 {
 	int tick = -1;
 	glm::vec3 position, angles;
-	struct Interp_Anim_Layer { int anim; float frame; float speed; bool loop; };
-	Interp_Anim_Layer torso, legs;
 };
 
 struct Entity_Interp

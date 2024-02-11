@@ -81,29 +81,65 @@ enum Item_Use_State
 	ITEM_SCOPED,
 	ITEM_RAISING,
 	ITEM_LOWERING,
+	ITEM_USING,
 };
 
-struct Item_State
+enum Game_Item_Category
 {
-	Item_State() {
-		memset(ammo, 0, sizeof(ammo));
-		memset(clip, 0, sizeof(clip));
-	}
+	ITEM_CAT_RIFLE,
+	ITEM_CAT_BOLT_ACTION,
+	ITEM_CAT_BOMB,
+	ITEM_CAT_MELEE,
+	ITEM_CAT_THROWABLE,
+};
 
-	const static int MAX_ITEMS = 32;
-	const static int EMPTY_SLOT = -1;
+struct Game_Item_Stats
+{
+	const char* name = "";
+	const char* world_model = "";
+	const char* view_model = "";
+	int category = 0;
+	int param = 0;
 
-	int item_bitmask = 0;
-	int active_item = 0;
-	short item_id[MAX_ITEMS];
-	short ammo[MAX_ITEMS];
-	short clip[MAX_ITEMS];
+	float fire_rate=1.f;
+	float reload_time=0.0;
+	float holster_time=0.0;
+	float draw_time=0.0;
+	int damage=0;
+	int clip_size=0;
+	int start_ammo=0;
+	float spread=0.f;
+};
+
+struct Game_Inventory
+{
+	enum {
+		UNEQUIP = 0,
+		GUN_M16,
+		GUN_AK47,
+		GUN_M24,
+		MELEE_KNIFE,
+		ITEM_BOMB,
+		ITEM_HE_GRENADE,
+
+		NUM_GAME_ITEMS
+	};
+
+	int active_item = UNEQUIP;
+	int item_mask = 0;
+	int ammo[NUM_GAME_ITEMS];
+	int clip[NUM_GAME_ITEMS];
+	int state = ITEM_IDLE;
 	float timer = 0.f;
 
-	char inventory[MAX_ITEMS];
+	int pending_item = -1;
 
-	Item_Use_State state = ITEM_IDLE;
+	int staging_item = 0;
+	int staging_ammo = 0;
+	int staging_clip = 0;
+
 };
+Game_Item_Stats* get_item_stats();	// size = NUM_GAME_ITEMS
 
 enum Player_Movement_State
 {
@@ -120,7 +156,6 @@ enum Entity_Physics
 	EPHYS_PROJECTILE,
 	EPHYS_MOVER,		// platforms, doors
 };
-
 
 class Model;
 struct Entity
@@ -142,7 +177,7 @@ struct Entity
 
 	int owner_index = 0;
 	int health = 100;
-	Item_State items;
+	Game_Inventory inv;
 
 	int physics = EPHYS_NONE;
 	glm::vec3 col_size;	// for characters, .x=radius,.y=height; for zones, it is an aabb

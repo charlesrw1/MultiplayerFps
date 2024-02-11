@@ -216,9 +216,13 @@ void Game_Engine::make_move()
 	if(!(e.flags & EF_FROZEN_VIEW))	
 		view_angle_update();
 
-	if (keys[SDL_SCANCODE_W])
+
+	int forwards_key = SDL_SCANCODE_W;
+	int back_key = SDL_SCANCODE_S;
+
+	if (keys[forwards_key])
 		command.forward_move += 1.f;
-	if (keys[SDL_SCANCODE_S])
+	if (keys[back_key])
 		command.forward_move -= 1.f;
 	if (keys[SDL_SCANCODE_A])
 		command.lateral_move += 1.f;
@@ -236,6 +240,10 @@ void Game_Engine::make_move()
 		command.button_mask |= BUTTON_FIRE1;
 	if (keys[SDL_SCANCODE_E])
 		command.button_mask |= BUTTON_RELOAD;
+	if (keychanges[SDL_SCANCODE_LEFTBRACKET])
+		command.button_mask |= BUTTON_ITEM_PREV;
+	if (keychanges[SDL_SCANCODE_RIGHTBRACKET])
+		command.button_mask |= BUTTON_ITEM_NEXT;
 
 	// quantize and unquantize for local prediction
 	command.forward_move	= Move_Command::unquantize(Move_Command::quantize(command.forward_move));
@@ -645,8 +653,8 @@ void Renderer::ui_render()
 
 	draw_rect(centerx- width /2, centery-height/2, width, height, crosshair_color, t, t->width, t->height);
 
-	draw_rect(0, 0, 300, 300, COLOR_WHITE, mats.find_for_name("tree_leaves")->images[0],1000,1000,0,0);
-	draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
+	//draw_rect(0, 0, 300, 300, COLOR_WHITE, mats.find_for_name("tree_leaves")->images[0],1000,1000,0,0);
+	//draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
 
 
 
@@ -962,16 +970,16 @@ void Renderer::DrawEnts()
 		DrawModel(ent.model, model, a);
 
 
-		if (ent.type == ET_PLAYER && a) {
+		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
 
 			static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
 
+			Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
 
-			Model* m = FindOrLoadModel("m16.glb");
-			Model* mag = FindOrLoadModel("m16_mag.glb");
-			if (m24->integer) {
-				m = FindOrLoadModel("m24.glb");
-			}
+
+			Model* m = FindOrLoadModel(stat.world_model);
+			if (!m) continue;
+
 			int index = ent.model->BoneForName("weapon");
 			int index2 = ent.model->BoneForName("magazine");
 			glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
@@ -984,10 +992,18 @@ void Renderer::DrawEnts()
 			transform = model*transform*mat4(b.posematrix)*rotate;
 			DrawModel(m, transform);
 
-			const Bone& mag_bone = ent.model->bones.at(index2);
-			transform = a->GetBones()[index2];
-			transform = model * transform * mat4(mag_bone.posematrix)*rotate;
-			DrawModel(mag, transform);
+			if (stat.category == ITEM_CAT_RIFLE) {
+				std::string mod = stat.world_model;
+				mod = mod.substr(0, mod.rfind('.'));
+				mod += "_mag.glb";
+				Model* mag_mod = FindOrLoadModel(mod.c_str());
+				if (mag_mod) {
+					const Bone& mag_bone = ent.model->bones.at(index2);
+					transform = a->GetBones()[index2];
+					transform = model * transform * mat4(mag_bone.posematrix) * rotate;
+					DrawModel(mag_mod, transform);
+				}
+			}
 		}
 	}
 
@@ -1463,6 +1479,7 @@ void Game_Engine::key_event(SDL_Event event)
 	if (event.type == SDL_KEYDOWN) {
 		int scancode = event.key.keysym.scancode;
 		keys[scancode] = true;
+		keychanges[scancode] = true;
 
 		if (binds[scancode]) {
 			cfg.execute(*binds[scancode]);
@@ -1683,6 +1700,7 @@ void cmd_debug_counter()
 void Game_Engine::init()
 {
 	memset(keys, 0, sizeof(keys));
+	memset(keychanges, 0, sizeof(keychanges));
 	memset(binds, 0, sizeof(binds));
 	mousekeys = 0;
 	num_entities = 0;
@@ -1835,6 +1853,7 @@ void Game_Engine::loop()
 		frame_time = dt;
 
 		// update input
+		memset(keychanges, 0, sizeof keychanges);
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{

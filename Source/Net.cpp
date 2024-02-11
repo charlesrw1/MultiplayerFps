@@ -25,6 +25,8 @@ Net_Prop entity_state_props[] =
 	{ESP(anim.legs.staging_loop),	8,		1,		1.f,	Net_Prop::DEFAULT_PROP},
 	{ESP(anim.legs.staging_frame),	0,		16,		100.f,	Net_Prop::DEFAULT_PROP},
 
+	{ESP(inv.active_item),	32,		5,		1.f,	Net_Prop::DEFAULT_PROP},
+
 	{ESP(flags), 16},
 	{ESP(item), 32},
 

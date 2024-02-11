@@ -412,22 +412,6 @@ void player_physics_update(Entity* p, Move_Command command)
 // if in the middle of an animation, dont interrupt it
 void player_animation_update(Entity* ent)
 {
-	// animation is being controlled server side
-	if (ent->flags & EF_FORCED_ANIMATION)
-		return;
-
-	// upper body
-	if (ent->anim.m.loop || ent->anim.m.finished)
-	{	
-		// for now, only one
-		static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
-		if (m24->integer)
-			ent->anim.set_anim("act_idle_sniper",false);
-		else
-			ent->anim.set_anim("act_idle", false);
-		ent->anim.m.loop = true;
-	}
-
 	// lower body
 	glm::vec3 ent_face_dir = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
 	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
@@ -500,21 +484,76 @@ void player_fire_weapon()
 
 }
 
+
+
+Game_Item_Stats stats[Game_Inventory::NUM_GAME_ITEMS] = {
+	{"unequip","","",ITEM_CAT_MELEE},
+	{"m16", "m16.glb","",ITEM_CAT_RIFLE, 0, 13.0, 2.0, 0.1,0.1,10,30,90,0.5},
+	{"ak47","ak47.glb","",ITEM_CAT_RIFLE, 0, 10.0, 2.0, 0.1, 0.1, 12, 30, 90, 0.5},
+	{"m24", "m24.glb", "", ITEM_CAT_BOLT_ACTION, 0, 0.7, 3.0, 0.1, 0.1, 75, 0, 30, 0.0},
+	{"knife", "knife.glb", "", ITEM_CAT_MELEE, 0, 2.0},
+	{"bomb", "bomb.glb", "", ITEM_CAT_BOMB},
+	{"grenade"}
+};
+Game_Item_Stats* get_item_stats()
+{
+	return stats;
+}
+
 static float fire_time = 0.15f;
 static float reload_time = 1.9f;
+
+
+void change_to_item(Entity& p, int next_item)
+{
+	ASSERT(next_item >= 0 && next_item < Game_Inventory::NUM_GAME_ITEMS);
+	ASSERT(p.inv.active_item >= 0 && p.inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
+
+	if (next_item == p.inv.active_item)
+		return;
+	if (next_item == p.inv.pending_item)
+		return;
+	if (p.inv.state == ITEM_RAISING) {
+		Game_Item_Stats& next = get_item_stats()[next_item];
+		p.inv.active_item = next_item;
+		p.inv.state = ITEM_RAISING;
+		p.inv.timer = next.draw_time;
+		p.inv.pending_item = -1;
+		return;
+	}
+
+	Game_Item_Stats& cur = get_item_stats()[p.inv.active_item];
+	p.inv.pending_item = next_item;
+	p.inv.state = ITEM_LOWERING;
+	p.inv.timer = cur.holster_time;
+}
 
 void player_item_update(Entity* p, Move_Command command, bool is_local)
 {
 	static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
-	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
+	Game_Inventory& inv = p->inv;
 
-	bool wants_shoot = command.button_mask & BUTTON_FIRE1;
-	bool wants_reload = command.button_mask & BUTTON_RELOAD;
+	if (inv.active_item < 0 || inv.active_item >= Game_Inventory::NUM_GAME_ITEMS) {
+		sys_print("invalid item");
+		inv.active_item = Game_Inventory::UNEQUIP;
+		inv.state = ITEM_IDLE;
+		inv.timer = 0.f;
+	}
 
-	Item_State& w = p->items;
-	if (!(w.active_item >= 0 && w.active_item < Item_State::MAX_ITEMS)) {
-		printf("invalid active_item\n");
-		return;
+	if (inv.pending_item != -1 && inv.state != ITEM_LOWERING) {
+		sys_print("pending but lowering?\n");
+		inv.pending_item = -1;
+	}
+
+	// check swaps
+	if (command.button_mask & BUTTON_ITEM_PREV) {
+		int next_item = inv.active_item - 1;
+		if (next_item < 0) next_item = Game_Inventory::NUM_GAME_ITEMS - 1;
+		change_to_item(*p, next_item);
+	}
+	else if (command.button_mask & BUTTON_ITEM_NEXT) {
+		int next_item = (inv.active_item + 1) % Game_Inventory::NUM_GAME_ITEMS;
+		change_to_item(*p, next_item);
 	}
 
 	if (is_local) {
@@ -524,41 +563,59 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 		}
 	}
 
-	if (w.timer > 0)
-		w.timer -= engine.tick_interval;
-	float blend = cfg.get_var("abr", "0.15")->real;
-	switch (w.state)
+	// tick timer
+	if (inv.timer > 0)
+		inv.timer -= engine.tick_interval;
+
+	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
+	bool wants_shoot = command.button_mask & BUTTON_FIRE1;
+	bool wants_reload = command.button_mask & BUTTON_RELOAD;
+	Game_Item_Stats& item_stats = get_item_stats()[inv.active_item];
+	int cat = item_stats.category;
+
+	if (inv.clip[inv.active_item] <= 0) wants_reload = true;
+
+	switch (inv.state)
 	{
 	case ITEM_IDLE:
-		if (is_local) {
-			engine.local.viewmodel_animator.set_anim("act_idle", false);
-		}
 		if (wants_shoot) {
-			w.timer = fire_time;
-			w.state = ITEM_IN_FIRE;
-
-			if (m24->integer) {
-				p->anim.set_anim("act_shoot_sniper", true);
-				p->anim.m.loop = false;
+			if (cat == ITEM_CAT_RIFLE && inv.clip[inv.active_item] <= 0) {
+				// empty sound
 			}
-			else {
-				p->anim.set_anim("act_shoot", true, blend);
-				p->anim.m.speed = 1.5f;
+			else if (cat == ITEM_CAT_RIFLE || cat == ITEM_CAT_MELEE || cat == ITEM_CAT_BOLT_ACTION) {
+				inv.timer = 1.0 / item_stats.fire_rate;
+				inv.state = ITEM_IN_FIRE;
+
+				if (item_stats.category == ITEM_CAT_RIFLE) {
+					p->anim.set_anim("act_shoot", true);
+					engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+				}
+				else if (item_stats.category == ITEM_CAT_BOLT_ACTION) {
+					p->anim.set_anim("act_shoot_sniper", true);
+					engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+				}
+				else if (item_stats.category == ITEM_CAT_MELEE) {
+					p->anim.set_anim("act_knife_attack", true);
+				}
 				p->anim.m.loop = false;
+
+
+				if (is_local) {
+					engine.local.viewmodel_animator.set_anim("act_shoot", true);
+					engine.local.viewmodel_animator.m.loop = false;
+				}
+
+				break;
 			}
-
-			engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
-
-			if (is_local) {
-				engine.local.viewmodel_animator.set_anim("act_shoot", true);
-				engine.local.viewmodel_animator.m.loop = false;
+			else if (cat == ITEM_CAT_BOMB || cat == ITEM_CAT_THROWABLE) {
+				// todo
 			}
 		}
-		if (wants_reload) {
-			w.timer = reload_time;
-			w.state = ITEM_RELOAD;
+		else if (wants_reload && cat == ITEM_CAT_RIFLE && inv.ammo[inv.active_item] > 0) {
+			inv.timer = item_stats.reload_time;
+			inv.state = ITEM_RELOAD;
 
-			p->anim.set_anim("act_reload", true, blend);
+			p->anim.set_anim("act_reload", true);
 			p->anim.m.loop = false;
 			p->anim.m.speed = 0.8f;
 
@@ -569,17 +626,57 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 
 			}
 		}
+		else {
+			if (cat == ITEM_CAT_RIFLE) {
+				p->anim.set_anim("act_idle", false);
+			}
+			else if (cat == ITEM_CAT_BOLT_ACTION) {
+				p->anim.set_anim("act_idle_sniper", false);
+			}
+			else if (cat == ITEM_CAT_MELEE) {
+				p->anim.set_anim("act_idle_knife", true);
+			}
+			else if (cat == ITEM_CAT_BOMB || cat == ITEM_CAT_THROWABLE) {
+				p->anim.set_anim("act_idle_item", true);
+			}
+			p->anim.m.loop = true;
 
+		}
+			break;
+	case ITEM_LOWERING:
+		if (inv.timer <= 0) {
+			ASSERT(inv.pending_item >= 0 && inv.pending_item < Game_Inventory::NUM_GAME_ITEMS);
+			Game_Item_Stats& next = get_item_stats()[inv.pending_item];
+			inv.active_item = inv.pending_item;
+			inv.pending_item = -1;
+			inv.state = ITEM_RAISING;
+			inv.timer = next.draw_time;
+			sys_print("changed to raising: %d\n", inv.active_item);
+		}
 		break;
-	case ITEM_IN_FIRE:
-		if (w.timer <= 0) {
-			w.state = ITEM_IDLE;
+	case ITEM_RAISING:
+		if (inv.timer <= 0) {
+			inv.state = ITEM_IDLE;
+			sys_print("changed to: %d\n", inv.active_item);
 		}
 		break;
 	case ITEM_RELOAD:
-		if (w.timer <= 0) {
-			w.state = ITEM_IDLE;
+		if (inv.timer <= 0) {
+			inv.ammo[inv.active_item] += inv.clip[inv.active_item];
+			inv.clip[inv.active_item] = 0;
+			int reload = glm::min(item_stats.clip_size, inv.ammo[inv.active_item]);
+			inv.clip[inv.active_item] += reload;
+			inv.ammo[inv.active_item] -= reload;
+
+			sys_print("reloaded %d %d\n", inv.active_item, inv.clip[inv.active_item]);
+
+			inv.state = ITEM_IDLE;
 		}
+		break;
+	case ITEM_IN_FIRE:
+		if (inv.timer <= 0) inv.state = ITEM_IDLE;
+		break;
+	case ITEM_USING:
 		break;
 	}
 }
@@ -587,6 +684,9 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 // item code and animation updates
 void player_post_physics(Entity* p, Move_Command command, bool is_local)
 {
-	player_item_update(p, command, is_local);
-	player_animation_update(p);
+	// animation is being controlled server side
+	if (!(p->flags & EF_FORCED_ANIMATION)) {
+		player_item_update(p, command, is_local);
+		player_animation_update(p);
+	}
 }

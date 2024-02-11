@@ -357,6 +357,9 @@ void player_spawn(Entity* ent)
 	ent->update = player_update;
 	ent->damage = player_damage;
 
+	for (int i = 0; i < Game_Inventory::NUM_GAME_ITEMS; i++)
+		ent->inv.ammo[i] = 200;
+
 	ent->force_angles = 1;
 	ent->diff_angles = glm::vec3(0.f, ent->rotation.y, 0.f);
 }

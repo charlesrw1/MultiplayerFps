@@ -16,13 +16,6 @@ using std::vector;
 
 #define MAX_BONES 256
 
-enum class VertexFormat
-{
-	Static,		// pos,uv,normal, color(optional)
-	Skinned,	// pos,uv,normal,bone,weight
-	Lightmapped,// pos,uv,normal,uv2, color(optional)
-};
-
 struct Bone
 {
 	int parent;
@@ -97,9 +90,6 @@ public:
 	std::unique_ptr<Animation_Set> animations;
 	vector<ModelHitbox> hitboxes;
 	vector<ModelAttachment> attachments;
-
-	int attribute_mask = 0;	// bitmask of POS,UV,NORMAL,...
-
 	vector<MeshPart> parts;
 	vector<GpuBuffer> buffers;
 	vector<Game_Shader*> materials;

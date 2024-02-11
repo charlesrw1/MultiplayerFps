@@ -44,9 +44,9 @@ void Game_Local::update_viewmodel()
 
 	//viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
 
-	if (e.items.state != prev_item_state)
+	if (e.inv.state != prev_item_state)
 	{
-		switch (e.items.state)
+		switch (e.inv.state)
 		{
 		case ITEM_IDLE:
 			viewmodel_recoil_ofs = viewmodel_recoil_ang = glm::vec3(0.f);
@@ -54,19 +54,19 @@ void Game_Local::update_viewmodel()
 			break;
 		case ITEM_IN_FIRE:
 			vm_recoil_start_time = engine.time;
-			vm_recoil_end_time = e.items.timer;	// FIXME: read from current item data
+			vm_recoil_end_time = e.inv.timer;	// FIXME: read from current item data
 			break;
 		case ITEM_RELOAD:
 			break;
 
 		}
 
-		prev_item_state = e.items.state;
+		prev_item_state = e.inv.state;
 	}
-	switch (e.items.state)
+	switch (e.inv.state)
 	{
 	case ITEM_IN_FIRE: {
-		float end = e.items.timer;
+		float end = e.inv.timer;
 		if (end > vm_recoil_end_time) {
 			vm_recoil_end_time = end;
 			vm_recoil_start_time = engine.time;
