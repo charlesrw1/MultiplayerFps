@@ -23,8 +23,8 @@ uniform samplerCube PBR_prefiltered_specular;
 uniform sampler2D PBR_brdflut;
 
 uniform sampler3D volumetric_fog;
-uniform float near;
-uniform float far;
+uniform float znear;
+uniform float zfar;
 
 struct Vfog_Params
 {
@@ -40,31 +40,18 @@ float linearize_depth(float d,float zNear,float zFar)
     float z_n = 2.0 * d - 1.0;
     return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
 }
-#define NEWWAY
-vec3 ApplyVolumetricFog(vec3 incolor, vec3 NDC)
-{
-	float lineardepth = linearize_depth(NDC.z*0.5+0.5,near,far);
-	
-	float slices = 128;
-	
-	float scale = slices/log2(far/near);
-	float bias = (slices*log2(near))/log2(far/near);
-	
-	float ztile = (max(log2(lineardepth)*scale - bias,0.0));
-	vec2 xy = (NDC.xy+vec2(1.0))*0.5;
-	vec3 texturecoord = vec3(xy,ztile/slices);
-	
-#ifdef NEWWAY
-	texturecoord.z = pow((lineardepth-near) / fogparam.spread_frustumend.y,1.0/fogparam.spread_frustumend.x);
-#endif
-	
-	
-	vec4 scatteredlight = textureLod(volumetric_fog,texturecoord,0.0);
-	vec3 inscattering = scatteredlight.rgb;
-	float transmittance = scatteredlight.a;//exp(-scatteredlight.a);
-	return incolor*transmittance + inscattering;
-}
 
+vec3 apply_volumetric_fog(vec3 incolor, vec3 NDC)
+{
+	// have xz of screen coords and z
+	float z = linearize_depth(NDC.z,znear,zfar);
+	vec2 screencoords = vec2(NDC.xy)*0.5 + vec2(0.5);
+	vec3 coords = vec3(screencoords, z/100.0);
+	coords.z = -coords.z;//-pow(coords.z, 1.0/fogparam.spread_frustumend.x);
+	vec4 fog = texture(volumetric_fog, coords);	// clamps to edge for coords.z>1
+
+	return incolor; fog.rgb;
+}
 
 
 #ifdef VERTEX_COLOR
@@ -190,7 +177,7 @@ void main()
 	
 	vec3 NDC = FS_IN_NDC.xyz/FS_IN_NDC.w;
 	vec3 out_color = ambient;
-	out_color = ApplyVolumetricFog(ambient,NDC);
+	out_color = apply_volumetric_fog(ambient,NDC);
 	
 	#ifdef ANIMATED
 	out_color += vec3(1,10,1);

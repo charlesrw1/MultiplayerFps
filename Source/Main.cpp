@@ -658,6 +658,8 @@ void Renderer::reload_shaders()
 
 	Shader::compute_compile(&volfog.lightcalc, "VfogScatteringC.txt");
 	Shader::compute_compile(&volfog.raymarch, "VfogRaymarchC.txt");
+	Shader::compute_compile(&volfog.reproject, "VfogScatteringC.txt", "REPROJECTION");
+
 
 
 	glCheckError();
@@ -699,7 +701,7 @@ void Renderer::upload_ubo_view_constants()
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
-static const ivec3 volfog_sizes[] = { {0,0,0},{160,90,128},{240,135,64} };
+static const ivec3 volfog_sizes[] = { {0,0,0},{160,90,128},{80,45,64} };
 
 struct Vfog_Light
 {
@@ -711,6 +713,8 @@ struct Vfog_Params
 {
 	glm::ivec4 volumesize;
 	glm::vec4 volspread_frustumend;
+	glm::vec4 reprojection;
+	glm::mat4 last_frame_viewproj;
 };
 
 void Volumetric_Fog_System::init()
@@ -718,10 +722,17 @@ void Volumetric_Fog_System::init()
 	if (quality == 0)
 		return;
 
-	voltexturesize = volfog_sizes[1];
+	voltexturesize = volfog_sizes[2];
 
 	glGenTextures(1, &voltexture);
 	glBindTexture(GL_TEXTURE_3D, voltexture);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glGenTextures(1, &voltexture_prev);
+	glBindTexture(GL_TEXTURE_3D, voltexture_prev);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -754,6 +765,8 @@ void Volumetric_Fog_System::compute()
 	Vfog_Params params;
 	params.volumesize = glm::ivec4(voltexturesize, 0);
 	params.volspread_frustumend = vec4(spread, frustum_end, 0, 0);
+	params.last_frame_viewproj = draw.lastframe_vs.viewproj;
+	params.reprojection = vec4(temporal_sequence, 0.1, 0, 0);
 	glBindBuffer(GL_UNIFORM_BUFFER, param_ubo);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof Vfog_Params, &params, GL_DYNAMIC_DRAW);
 	
@@ -783,7 +796,8 @@ void Volumetric_Fog_System::compute()
 		lightcalc.set_float("spotlightangle", 0.5);
 		lightcalc.set_vec3("spotlightcolor", vec3(10.f));
 
-
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_3D, voltexture_prev);
 
 		lightcalc.set_int("num_lights", 0);
 		glCheckError();
@@ -803,12 +817,20 @@ void Volumetric_Fog_System::compute()
 		raymarch.set_float("zfar", draw.vs.far);
 		glUniform3i(glGetUniformLocation(raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
 
-		glBindImageTexture(2, voltexture, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA16F);
+		glBindImageTexture(5, voltexture_prev, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(2, voltexture, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA16F);
 
 		glDispatchCompute(groups.x, groups.y, 1);
+
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 		glCheckError();
+
+		// swap, rendering with voltexture
+		std::swap(voltexture, voltexture_prev);
 	}
 
+
+	temporal_sequence = (temporal_sequence + 1) % 16;
 }
 
 
@@ -1117,6 +1139,7 @@ void Renderer::FrameDraw()
 		cur_tex[i] = 0;
 	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
 		InitFramebuffers();
+	lastframe_vs = vs;
 	vs = engine.local.last_view;
 	// temp!!
 	auto& e = engine.local_player();
@@ -1194,8 +1217,6 @@ void Renderer::FrameDraw()
 
 	if(!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
-
-	
 }
 
 Shader& Renderer::shader()

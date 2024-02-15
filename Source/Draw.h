@@ -16,8 +16,10 @@ class Volumetric_Fog_System
 public:
 	int quality = 2;
 	uint32_t voltexture = 0;
+	uint32_t voltexture_prev = 0;
 	glm::ivec3 voltexturesize;
 
+	Shader reproject;
 	Shader lightcalc;
 	Shader raymarch;
 
@@ -25,6 +27,7 @@ public:
 	float anisotropy = 0.7;
 	float spread = 1.0;
 	float frustum_end = 50.f;
+	int temporal_sequence = 0;
 
 	uint32_t light_ssbo;
 	uint32_t param_ubo;
@@ -107,7 +110,8 @@ public:
 	}ubo;
 
 	View_Setup vs;
-	
+	View_Setup lastframe_vs;
+
 	// config vars
 	Config_Var* r_draw_collision_tris;
 	Config_Var* r_draw_sv_colliders;
