@@ -21,6 +21,11 @@ public:
 		const char* fragment_path,
 		std::string shader_defines = {}
 	);
+	static ShaderResult compute_compile(
+		Shader* shader,
+		const char* compute_path,
+		std::string shader_defines = {}
+	);
 
 	void use();
 

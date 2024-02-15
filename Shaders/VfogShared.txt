@@ -1,0 +1,30 @@
+
+uniform sampler3D volumetricfog;
+uniform float near;
+uniform float far;
+
+float linearize_depth(float d,float zNear,float zFar)
+{
+    float z_n = 2.0 * d - 1.0;
+    return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+}
+
+vec3 ApplyVolumetricFog(vec3 incolor, vec3 NDC)
+{
+	float lineardepth = linearize_depth(gl_FragCoord.z,near,far);
+	
+	float slices = 128;
+	
+	float scale = slices/log2(far/near);
+	float bias = (slices*log2(near))/log2(far/near);
+	
+	float ztile = (max(log2(lineardepth)*scale - bias,0.0));
+	vec2 xy = (NDC.xy+vec2(1.0))*0.5;
+	vec3 texturecoord = vec3(xy,ztile/slices);
+	
+	vec4 scatteredlight = textureLod(volumetricfog,texturecoord,0.0);
+	vec3 inscattering = scatteredlight.rgb;
+	float transmittance = scatteredlight.a;//exp(-scatteredlight.a);
+	return incolor*transmittance + inscattering;
+}
+

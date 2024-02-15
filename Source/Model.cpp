@@ -23,6 +23,19 @@ const int UV2_LOC = 6;
 const int TANGENT_LOC = 7;
 const int BITANGENT_LOC = 8;
 
+struct Super_Vert
+{
+	glm::vec3 position;
+	glm::vec2 uv0;
+	glm::vec3 normal;
+	glm::ivec4 joint;
+	glm::vec4 weight;
+	glm::vec3 color;
+	glm::vec2 uv1;
+	glm::vec3 tangent;
+	glm::vec3 bitangent;
+};
+
 
 bool MeshPart::has_lightmap_coords() const
 {
@@ -535,4 +548,99 @@ Model* FindOrLoadModel(const char* filename)
 
 	return model;
 
+}
+
+struct Attribute_Info { int type; int component; int stride; };
+Attribute_Info at_info[Model_Manager::NUM_ATTRIBUTES]{
+	{3,GL_FLOAT, 12},
+	{2, GL_FLOAT, 8},
+	{3, GL_FLOAT,12},
+	{4, GL_UNSIGNED_BYTE,4}
+};
+
+void Model_Manager::check_vaos()
+{
+	for (int i = 0; i < NUM_VERT_FORMATS; i++) {
+		if (formats[i].vao_16 == 0) {
+			glGenVertexArrays(1, &formats[i].vao_16);
+		}
+		if (formats[i].vao_32 == 0) {
+			glGenVertexArrays(1, &formats[i].vao_32);
+		}
+		for(int k=0;k<2;k++) {
+			if (k == 0)
+				glBindVertexArray(formats[i].vao_16);
+			else
+				glBindVertexArray(formats[i].vao_32);
+			for (int j = 0; j < NUM_ATTRIBUTES; j++) {
+				auto& b = formats[i].buffers[j];
+				if (b.dirty) {
+					glBindBuffer(GL_ARRAY_BUFFER, b.id);
+
+					glEnableVertexAttribArray(j);
+					if (j == INDICIES) {
+						glVertexAttribIPointer(j, at_info[j].type, at_info[j].component,
+							at_info[j].stride, (void*)0);
+					}
+					else {
+						glVertexAttribPointer(j, at_info[j].type, at_info[j].component, GL_FALSE,
+							at_info[j].stride, (void*)0);
+					}
+
+					if (k == 1) b.dirty = false;
+				}
+			}
+
+			glBindVertexArray(0);
+		}
+		if (index[INT16].dirty) {
+			glBindVertexArray(formats[i].vao_16);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index[INT16].id);
+			index[INT16].dirty = false;
+			glBindVertexArray(0);
+		}
+		if (index[INT32].dirty) {
+			glBindVertexArray(formats[i].vao_32);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index[INT32].id);
+			index[INT32].dirty = false;
+			glBindVertexArray(0);
+		}
+
+	}
+}
+
+void Model_Manager::Buffer::append_data(void* d, int in_stride, uint32_t in_len, int out_stride)
+{
+	ASSERT(in_stride == out_stride);
+	// FIXME:
+	uint32_t in_size_bytes = in_len * out_stride;
+	uint32_t target = is_index_target ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
+	if (id == 0) {
+		glGenBuffers(1, &id);
+		glBindBuffer(target, id);
+		size = glm::max((int)pow(ceil(log2f(in_size_bytes)), 2.f), 16384);
+		glBufferData(target, size, NULL, GL_STATIC_DRAW);
+
+		dirty = true;
+	}
+	if (in_size_bytes + used > size) {
+		if (used != 0) {
+			uint32_t next_buffer;
+			uint32_t next_size = pow(ceil(log2f(used + in_size_bytes)),2.f);
+			glGenBuffers(1, &next_buffer);
+			glBindBuffer(is_index_target, next_buffer);
+			glBufferData(target, next_size, NULL, GL_STATIC_DRAW);
+			glCopyBufferSubData(id, next_buffer, 0, 0, used);
+
+			glDeleteBuffers(1, &id);
+			id = next_buffer;
+			size = next_size;
+
+			dirty = true;
+		}
+	}
+	glBufferSubData(target, used, in_size_bytes, d);
+	used += in_size_bytes;
+
+	glBindBuffer(target, 0);
 }

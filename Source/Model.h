@@ -99,6 +99,58 @@ public:
 	int BoneForName(const char* name) const;
 };
 
+class Model_Manager
+{
+public:
+
+	enum Attribute_Types {
+		POS,
+		UV0,
+		NORMAL,
+		INDICIES,
+		WEIGHTS,
+		UV1,
+		COLOR,
+		TANGENT,
+		NUM_ATTRIBUTES
+	};
+	enum Vertex_Format_Types {
+		POS_UV0_NORMAL,
+		POS_UV0_NORMAL_BONES,
+		POS_UV0_NORMAL_COLOR,
+		POS_UV0_NORMAL_UV1,
+		POS_UV0_NORMAL_UV1_COLOR,
+		NUM_VERT_FORMATS,
+	};
+	enum Index_Formats {
+		INT16,
+		INT32,
+		NUM_INDEX_FORMATS
+	};
+	struct Buffer {
+		uint32_t size = 0;
+		uint32_t used = 0;
+		uint32_t id = 0;
+		bool is_index_target = false;
+		bool dirty = false;
+		int stride = 0;
+
+		void append_data(void* data, int input_stride, uint32_t input_len, int output_stride);
+	};
+
+	struct Per_Format {
+		Buffer buffers[NUM_ATTRIBUTES];	// per attribute
+		uint32_t vao_16;
+		uint32_t vao_32;
+	};
+	Per_Format formats[NUM_VERT_FORMATS];
+	Buffer index[NUM_INDEX_FORMATS];
+
+	void check_vaos();
+
+	std::vector<char> staging_buffer;
+};
+
 void FreeLoadedModels();
 Model* FindOrLoadModel(const char* filename);
 void ReloadModel(Model* m);

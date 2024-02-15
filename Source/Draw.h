@@ -3,12 +3,38 @@
 #include "glm/glm.hpp"
 #include "Util.h"
 #include "Types.h"
+#include "Level.h"
 class Model;
 class Animator;
 class Texture;
 class Entity;
 
-const int BLOOM_MIPS = 8;
+const int BLOOM_MIPS = 6;
+
+class Volumetric_Fog_System
+{
+public:
+	int quality = 2;
+	uint32_t voltexture = 0;
+	glm::ivec3 voltexturesize;
+
+	Shader lightcalc;
+	Shader raymarch;
+
+	float density = 0.5;
+	float anisotropy = 0.7;
+	float spread = 1.0;
+	float frustum_end = 50.f;
+
+	uint32_t light_ssbo;
+	uint32_t param_ubo;
+
+	void init();
+	void shutdown();
+	void compute();
+};
+
+typedef int Light_Handle;
 
 class Renderer
 {
@@ -41,7 +67,7 @@ public:
 	// shaders
 	enum { 
 		// meshbuilder's
-		S_SIMPLE, S_TEXTURED, 
+		S_SIMPLE, S_TEXTURED, S_TEXTURED3D,
 		
 		// model's
 		S_ANIMATED, 
@@ -76,6 +102,10 @@ public:
 		glm::vec2 bloom_chain_size[BLOOM_MIPS];
 
 	}tex;
+	struct {
+		uint32_t view_constants;
+	}ubo;
+
 	View_Setup vs;
 	
 	// config vars
@@ -83,6 +113,7 @@ public:
 	Config_Var* r_draw_sv_colliders;
 	Config_Var* r_draw_viewmodel;
 	Config_Var* vsync;
+	Config_Var* r_bloom;
 
 	void bind_texture(int bind, int id);
 	void set_shader(Shader& s) { 
@@ -102,7 +133,15 @@ public:
 	EnvCubemap cubemap;
 	float rough = 1.f;
 	float metal = 0.f;
+	glm::vec3 aosphere;
+	glm::vec2 vfog;
+	glm::vec3 ambientvfog;
 
+	Texture* lens_dirt;
+
+	Volumetric_Fog_System volfog;
+	float slice_3d=0.0;
+	Level_Light dyn_light;
 private:
 	struct Sprite_Drawing_State {
 		bool force_set = true;
@@ -127,6 +166,8 @@ private:
 	};
 	void draw_model_real(Model_Drawing_State* state, const Model* m, int part, glm::mat4 transform, 
 		const Entity* e = nullptr, const Animator* a = nullptr, Game_Shader* override_mat = nullptr);
+
+	void upload_ubo_view_constants();
 
 	void init_bloom_buffers();
 	void render_bloom_chain();

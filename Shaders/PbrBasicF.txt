@@ -6,6 +6,7 @@ in vec3 FS_IN_FragPos;
 in vec3 FS_IN_Normal;
 in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_BoneColor;
+in vec4 FS_IN_NDC;
 
 uniform vec3 view_pos;
 uniform vec3 view_front;
@@ -21,6 +22,38 @@ uniform samplerCube PBR_irradiance;
 uniform samplerCube PBR_prefiltered_specular;
 uniform sampler2D PBR_brdflut;
 
+uniform sampler3D volumetric_fog;
+uniform float znear;
+uniform float zfar;
+
+struct Vfog_Params
+{
+	ivec4 volumesize;
+	vec4 spread_frustumend;
+};
+layout (binding = 4, std140) uniform Vfog_Param_Buffer {
+	Vfog_Params fogparam;
+};
+
+float linearize_depth(float d,float zNear,float zFar)
+{
+    float z_n = 2.0 * d - 1.0;
+    return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+}
+
+vec3 apply_volumetric_fog(vec3 incolor, vec3 NDC)
+{
+	// have xz of screen coords and z
+	float z = linearize_depth(NDC.z,znear,zfar);
+	vec2 screencoords = vec2(NDC.xy)*0.5 + vec2(0.5);
+	vec3 coords = vec3(screencoords, z/100.0);
+	coords.z = -coords.z;//-pow(coords.z, 1.0/fogparam.spread_frustumend.x);
+	vec4 fog = texture(volumetric_fog, coords);	// clamps to edge for coords.z>1
+
+	return incolor; fog.rgb;
+}
+
+
 #ifdef VERTEX_COLOR
 in vec4 FS_IN_Color;
 #endif
@@ -30,8 +63,55 @@ in vec2 FS_IN_TexCoord2;
 uniform sampler2D lightmap;
 #endif
 
+#define AOPROXY
+#ifdef AOPROXY
+uniform vec4 aoproxy_sphere;
+uniform float aoproxy_scale_factor;
+float eliOcclusion( in vec3 pos, in vec3 nor, in vec4 sph )
+{
+    vec3  r = (sph.xyz - pos)/sph.w;
+    float l = length(r);
+	if(l < 1.0) l = 1.0;
+    return dot(nor,r)/(l*l*l);
+}
+
+// from https://www.shadertoy.com/view/4djSDy
+float sphOcclusion( in vec3 pos, in vec3 nor, in vec4 sph )
+{
+    vec3  di = sph.xyz - pos;
+    float l  = length(di);
+    float nl = dot(nor,di/l);
+    float h  = l/sph.w;
+    float h2 = h*h;
+    float k2 = 1.0 - h2*nl*nl;
+    
+    if(l<sph.w) return 1.0;
+    //else return 1.0;
+    // above/below horizon
+    // EXACT: Quilez - https://iquilezles.org/articles/sphereao
+    float res = max(0.0,nl)/h2;
+    
+    // intersecting horizon 
+    if( k2 > 0.1 ) 
+    {
+        #if 1
+            // EXACT : Lagarde/de Rousiers - https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
+            res = nl*acos(-nl*sqrt( (h2-1.0)/(1.0-nl*nl) )) - sqrt(k2*(h2-1.0));
+            res = res/h2 + atan( sqrt(k2/(h2-1.0)));
+            res /= 3.141593;
+        #else
+            // APPROXIMATED : Quilez - https://iquilezles.org/articles/sphereao
+            res = (nl*h+1.0)/h2;
+            res = 0.33*res*res;
+        #endif
+    }
+	res = pow(res,aoproxy_scale_factor);
+
+    return res;
+}
 
 
+#endif
 
 vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
 {
@@ -49,6 +129,7 @@ vec3 decode_normal(vec2 e)
 
 void main()
 {
+
 	vec4 tex = texture(basecolor, FS_IN_Texcoord);
 	tex.rgb = pow(tex.rgb,vec3(2.2));
 #ifdef ALPHATEST
@@ -77,6 +158,8 @@ void main()
 	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(N,V),0.0),Roughness)).rg;
 	vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
 	float ao = 1.0;
+	
+	
 	vec3 irradiance = texture(PBR_irradiance,N).rgb;
 	irradiance = textureLod(PBR_prefiltered_specular,N,4.0).rgb;
 	//irradiance = pow(irradiance, vec3(2.2));
@@ -85,17 +168,21 @@ void main()
 #endif
 	vec3 diffuse = irradiance*Albedo;
 
-
+	float dist = length(view_pos-FS_IN_FragPos);
 	
 	vec3 kS = F;
 	vec3 kD = (1.0-kS)*(1.0-Metalness);
 	
-	vec3 ambient =(kD*diffuse+specular)*ao;
+	vec3 ambient =(kD*diffuse+ specular)*ao;
+	
+	vec3 NDC = FS_IN_NDC.xyz/FS_IN_NDC.w;
 	vec3 out_color = ambient;
+	out_color = apply_volumetric_fog(ambient,NDC);
 	
 	#ifdef ANIMATED
 	out_color += vec3(1,10,1);
 	#endif
+
 	
 	//out_color = pow(out_color,vec3(1/2.2));
 	

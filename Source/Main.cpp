@@ -132,6 +132,8 @@ void Game_Local::update_view()
 	setup.width = engine.window_w->integer;
 	setup.fov = glm::radians(fov->real);
 	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, 0.01f, 100.0f);
+	setup.near = 0.01f;
+	setup.far = 100.f;
 
 	//if (update_camera) {
 	//	fly_cam.UpdateFromInput(engine.keys, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
@@ -325,7 +327,7 @@ void Game_Engine::init_sdl_window()
 
 	program_time_start = GetTime();
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
@@ -542,6 +544,7 @@ void Renderer::set_shader_sampler_locations()
 	shader().set_int("PBR_irradiance", LIGHTMAP_SAMPLER + 1);
 	shader().set_int("PBR_prefiltered_specular", LIGHTMAP_SAMPLER + 2);
 	shader().set_int("PBR_brdflut", LIGHTMAP_SAMPLER+3);
+	shader().set_int("volumetric_fog", LIGHTMAP_SAMPLER + 4);
 }
 
 void Renderer::set_shader_constants()
@@ -549,8 +552,10 @@ void Renderer::set_shader_constants()
 	shader().set_mat4("ViewProj", vs.viewproj);
 	
 	// fog vars
-	shader().set_float("near", vs.near);
-	shader().set_float("far", vs.far);
+	shader().set_float("znear", vs.near);
+	shader().set_float("zfar", vs.far);
+
+
 	shader().set_float("fog_max_density", 1.0);
 	shader().set_vec3("fog_color", vec3(0.7));
 	shader().set_float("fog_start", 10.f);
@@ -559,6 +564,8 @@ void Renderer::set_shader_constants()
 	shader().set_vec3("view_pos", vs.origin);
 	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
 
+
+
 	// >>> PBR BRANCH
 	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 1);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap.irradiance_cm);
@@ -566,6 +573,14 @@ void Renderer::set_shader_constants()
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap.prefiltered_specular_cm);
 	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER+3);
 	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
+
+	shader().set_vec4("aoproxy_sphere", vec4(engine.local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
+	shader().set_float("aoproxy_scale_factor", aosphere.z);
+
+	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 4);
+	glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
+
+	glBindBufferBase(GL_UNIFORM_BUFFER, 4, volfog.param_ubo);
 }
 
 static int combine_flags_type(int flags, int type, int flag_bits)
@@ -613,6 +628,8 @@ void Renderer::reload_shaders()
 
 	Shader::compile(&shade[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&shade[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
+	Shader::compile(&shade[S_TEXTURED3D], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
+
 
 
 	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", frag, "ANIMATED");
@@ -635,7 +652,12 @@ void Renderer::reload_shaders()
 	set_shader(shade[S_COMBINE]);
 	shader().set_int("scene_lit", 0);
 	shader().set_int("bloom", 1);
+	shader().set_int("lens_dirt", 2);
 
+
+
+	Shader::compute_compile(&volfog.lightcalc, "VfogScatteringC.txt");
+	Shader::compute_compile(&volfog.raymarch, "VfogRaymarchC.txt");
 
 
 	glCheckError();
@@ -647,6 +669,142 @@ void Renderer::reload_shaders()
 		set_shader_sampler_locations();
 	}
 }
+
+struct Ubo_View_Constants_Struct
+{
+	glm::mat4 view;
+	glm::mat4 viewproj;
+	glm::vec4 viewpos_time;
+	glm::vec4 viewfront;
+
+	glm::vec4 near_far;
+
+	glm::vec4 fogcolor;
+	glm::vec4 fogparams;
+};
+
+void Renderer::upload_ubo_view_constants()
+{
+	Ubo_View_Constants_Struct constants;
+	constants.view = vs.view;
+	constants.viewproj = vs.viewproj;
+	constants.viewpos_time = glm::vec4(vs.origin, engine.time);
+	constants.viewfront = glm::vec4(vs.front, 0.0);
+	constants.near_far = glm::vec4(vs.near, vs.far, 0, 0);
+	constants.fogcolor = vec4(vec3(0.7), 1);
+	constants.fogparams = vec4(10, 30, 0, 0);
+
+	glBindBuffer(GL_UNIFORM_BUFFER, ubo.view_constants);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
+static const ivec3 volfog_sizes[] = { {0,0,0},{160,90,128},{240,135,64} };
+
+struct Vfog_Light
+{
+	glm::vec4 position_type;
+	glm::vec4 color;
+	glm::vec4 direction_coneangle;
+};
+struct Vfog_Params
+{
+	glm::ivec4 volumesize;
+	glm::vec4 volspread_frustumend;
+};
+
+void Volumetric_Fog_System::init()
+{
+	if (quality == 0)
+		return;
+
+	voltexturesize = volfog_sizes[1];
+
+	glGenTextures(1, &voltexture);
+	glBindTexture(GL_TEXTURE_3D, voltexture);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	glGenBuffers(1, &light_ssbo);
+	glGenBuffers(1, &param_ubo);
+	
+	glCheckError();
+}
+
+void Volumetric_Fog_System::compute()
+{
+	static Vfog_Light light_buffer[64];
+	int num_lights = 0;
+	{
+		Level_Light& l = draw.dyn_light;
+		Vfog_Light& vfl = light_buffer[num_lights++];
+		float type = (l.type == l.POINT) ? 0.0 : 1.0;
+		vfl.position_type = vec4(l.position, type);
+		vfl.color = vec4(l.color, 0.0);
+		vfl.direction_coneangle = vec4(l.direction, l.spot_angle);
+	}
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, light_ssbo);
+	if(num_lights > 0)
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vfog_Light) * num_lights, light_buffer, GL_DYNAMIC_DRAW);
+
+	Vfog_Params params;
+	params.volumesize = glm::ivec4(voltexturesize, 0);
+	params.volspread_frustumend = vec4(spread, frustum_end, 0, 0);
+	glBindBuffer(GL_UNIFORM_BUFFER, param_ubo);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof Vfog_Params, &params, GL_DYNAMIC_DRAW);
+	
+
+	glBindBufferBase(GL_UNIFORM_BUFFER, 4, param_ubo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, light_ssbo);
+	glCheckError();
+	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
+	{
+		lightcalc.use();
+
+		lightcalc.set_mat4("InvViewProj", glm::inverse(draw.vs.viewproj));
+		lightcalc.set_vec3("ViewPos", draw.vs.origin);
+		glUniform3i(glGetUniformLocation(lightcalc.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
+
+		lightcalc.set_float("znear", draw.vs.near);
+		lightcalc.set_float("zfar", draw.vs.far);
+		lightcalc.set_mat4("InvView", glm::inverse(draw.vs.view));
+		lightcalc.set_mat4("InvProjection", glm::inverse(draw.vs.proj));
+
+		lightcalc.set_float("density", draw.vfog.x);
+		lightcalc.set_float("anisotropy", draw.vfog.y);
+		lightcalc.set_vec3("ambient", draw.ambientvfog);
+
+		lightcalc.set_int("num_lights", 0);
+		glCheckError();
+
+		glBindImageTexture(2, voltexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+
+		glDispatchCompute(groups.x, groups.y, groups.z);
+
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glCheckError();
+
+	}
+	static Config_Var* fog_raymarch = cfg.get_var("dbg/raymarch", "1");
+	if(fog_raymarch->integer){
+		raymarch.use();
+		raymarch.set_float("znear", draw.vs.near);
+		raymarch.set_float("zfar", draw.vs.far);
+		glUniform3i(glGetUniformLocation(raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
+
+		glBindImageTexture(2, voltexture, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA16F);
+
+		glDispatchCompute(groups.x, groups.y, 1);
+		glCheckError();
+	}
+
+}
+
+
 
 void Renderer::Init()
 {
@@ -674,6 +832,8 @@ void Renderer::Init()
 	r_draw_sv_colliders		= cfg.get_var("draw_sv_colliders", "0");
 	r_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
 	vsync					= cfg.get_var("vsync", "1");
+	r_bloom					= cfg.get_var("r_bloom", "1");
+
 
 	fbo.scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
@@ -684,6 +844,12 @@ void Renderer::Init()
 	cubemap = EnviornmentMapHelper::get().create_from_file("hdr_sky.hdr");
 	EnviornmentMapHelper::get().convolute_irradiance(&cubemap);
 	EnviornmentMapHelper::get().compute_specular(&cubemap);
+
+	lens_dirt = mats.find_texture("lens_dirt.jpg");
+
+	glGenBuffers(1, &ubo.view_constants);
+
+	volfog.init();
 }
 
 void Renderer::InitFramebuffers()
@@ -769,6 +935,9 @@ static int bloom_layer = 0;
 
 void Renderer::render_bloom_chain()
 {
+	if (!r_bloom->integer)
+		return;
+
 
 	glDisable(GL_CULL_FACE);
 
@@ -881,12 +1050,34 @@ void Renderer::ui_render()
 	//draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
 
 
-
 	if (ui_builder.GetBaseVertex() > 0){
 		bind_texture(BASE0_SAMPLER, building_ui_texture);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 	}
+
+
+	glDisable(GL_BLEND);
+	{
+		set_shader(shade[S_TEXTURED3D]);
+		shader().set_mat4("Model", mat4(1));
+		glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
+		shader().set_mat4("ViewProj", mat4(1));
+		shader().set_float("slice", slice_3d);
+
+		ui_builder.Begin();
+		ui_builder.Push2dQuad(glm::vec2(-1, 1), glm::vec2(1, -1), glm::vec2(0, 0),
+			glm::vec2(1, 1), COLOR_WHITE);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
+		ui_builder.End();
+		ui_builder.Draw(GL_TRIANGLES);
+
+		glCheckError();
+	}
+
+
+
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_BLEND);
@@ -919,8 +1110,15 @@ void Renderer::FrameDraw()
 		cur_tex[i] = 0;
 	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
 		InitFramebuffers();
-
 	vs = engine.local.last_view;
+	// temp!!
+	auto& e = engine.local_player();
+	dyn_light.position = vec3(0, 2, 0);
+	dyn_light.type = Level_Light::POINT;
+	dyn_light.color = vec3(10, 10, 0);
+	// endtemp
+	volfog.compute();
+
 	render_level_to_target(engine.local.last_view, fbo.scene, true, true);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	DrawEntBlobShadows();
@@ -943,17 +1141,14 @@ void Renderer::FrameDraw()
 	set_shader(shade[S_COMBINE]);
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
+	uint32_t bloom_tex = tex.bloom_chain[0];
+	if (!r_bloom->integer) bloom_tex = black_texture;
 	bind_texture(0, tex.scene_color);
-	bind_texture(1, tex.bloom_chain[0]);
+	bind_texture(1, bloom_tex);
+	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
 
 	glEnable(GL_CULL_FACE);
-
-	//glBindFramebuffer(GL_READ_FRAMEBUFFER,fbo.scene);
-	//glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-	//glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	//glBlitFramebuffer(0, 0, x, y, 0, 0, x, y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	mb.Begin();
 	if (r_draw_sv_colliders->integer == 1) {
@@ -1286,6 +1481,15 @@ void draw_wind_menu()
 {
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
 	ImGui::DragFloat("metalness", &draw.metal, 0.02);
+	ImGui::DragFloat3("aosphere", &draw.aosphere.x, 0.02);
+	ImGui::DragFloat2("vfog", &draw.vfog.x, 0.02);
+	ImGui::DragFloat3("ambient", &draw.ambientvfog.x, 0.02);
+	ImGui::DragFloat("spread", &draw.volfog.spread, 0.02);
+	ImGui::DragFloat("frustum", &draw.volfog.frustum_end, 0.02);
+	ImGui::DragFloat("slice", &draw.slice_3d, 0.02, 0,1);
+
+
+
 
 	ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
 	ImGui::Checkbox("upscale", &bloom_stop);
@@ -1814,6 +2018,8 @@ void Game_Engine::draw_debug_interface()
 			ImGui::DragFloat3("vm2", &engine.local.vm_scale[0], 0.02f);
 
 			ImGui::DragFloat3("pos", &p.position.x);
+			ImGui::DragFloat3("dir", &engine.local.view_angles.x);
+
 			ImGui::DragFloat3("vel", &p.velocity.x);
 			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
 

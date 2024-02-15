@@ -42,6 +42,46 @@ static bool read_and_add_recursive(std::string filepath, std::string& text)
 	return true;
 }
 
+
+static std::string get_definess_with_directive(std::string& defines)
+{
+	std::stringstream ss(defines);
+	std::string temp_define;
+	std::string defines_with_directive;
+	while (std::getline(ss, temp_define, ',') && temp_define.size() > 0) {
+		defines_with_directive.append("#define " + temp_define + '\n');
+	}
+	return defines_with_directive;
+}
+static std::string get_source(const char* path, const std::string& defines)
+{
+	std::string source;
+	bool result = read_and_add_recursive(path, source);
+	if (!result) {
+		return {};
+	}
+	size_t version_line = source.find("#version");
+	version_line = source.find('\n', version_line);
+	source.insert(version_line + 1, defines);
+
+	return source;
+}
+static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, char* error_buf, int error_buf_size)
+{
+	int success = 0;
+
+	*gl_shader = glCreateShader(type);
+	glShaderSource(*gl_shader, 1, &source, NULL);
+	glCompileShader(*gl_shader);
+
+	glGetShaderiv(*gl_shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(*gl_shader, error_buf_size, NULL, error_buf);
+		return false;
+	}
+	return true;
+}
+
 ShaderResult Shader::compile(
 	Shader* shader,
 	const char* vertex_path,
@@ -52,62 +92,29 @@ ShaderResult Shader::compile(
 	glDeleteShader(shader->ID);
 	shader->ID = 0;
 
-	std::string vertex_source;
-	std::string fragment_source;
+	std::string defines_with_directive = get_definess_with_directive(shader_defines);
+	std::string vertex_source = get_source(vertex_path, defines_with_directive);
+	std::string fragment_source = get_source(fragment_path, defines_with_directive);
 
-	std::stringstream ss(shader_defines);
-	std::string temp_define;
-	std::string defines_with_directive;
-	while (std::getline(ss, temp_define, ',') && temp_define.size() > 0) {
-		defines_with_directive.append("#define " + temp_define + '\n');
-	}
-
-	bool result = read_and_add_recursive(vertex_path, vertex_source);
-	if (!result) {
+	if (vertex_source.empty() || fragment_source.empty()) {
+		printf("Parse fail %s %s\n", vertex_path, fragment_path);
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
-	size_t version_line = vertex_source.find("#version");
-	version_line = vertex_source.find('\n', version_line);
-	vertex_source.insert(version_line + 1, defines_with_directive);
-
-	result = read_and_add_recursive(fragment_path, fragment_source);
-	if (!result) {
-		return ShaderResult::SHADER_PARSE_FAIL;
-	}
-	version_line = fragment_source.find("#version");
-	version_line = fragment_source.find('\n', version_line);
-	fragment_source.insert(version_line + 1, defines_with_directive);
 
 	unsigned int vertex;
 	unsigned int fragment;
-	unsigned int geometry = 0;
 	unsigned int program;
-	const char* vsource_c = vertex_source.c_str();
-	const char* fsource_c = fragment_source.c_str();
 	int success = 0;
 	char infolog[512];
 
-	vertex = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertex, 1, &vsource_c, NULL);
-	glCompileShader(vertex);
-
-	glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(vertex, 512, NULL, infolog);
+	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
+	if (!good) {
 		printf("Error: vertex shader (%s) compiliation failed: %s\n", vertex_path, infolog);
-
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
-
-	fragment = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragment, 1, &fsource_c, NULL);
-	glCompileShader(fragment);
-
-	glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragment, 512, NULL, infolog);
+	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
+	if (!good) {
 		printf("Error: fragment shader (%s) compiliation failed: %s\n", fragment_path, infolog);
-
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 
@@ -126,9 +133,63 @@ ShaderResult Shader::compile(
 
 	glDeleteShader(vertex);
 	glDeleteShader(fragment);
-	glDeleteShader(geometry);
 
 	shader->ID = program;
+
+	return ShaderResult::SHADER_SUCCESS;
+}
+
+ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, std::string shader_defines)
+{
+	glDeleteShader(shader->ID);
+	shader->ID = 0;
+
+	char infolog[512];
+	int success = 0;
+	std::string compute_source;
+	bool result = read_and_add_recursive(compute_path, compute_source);
+	if (!result) {
+		return ShaderResult::SHADER_PARSE_FAIL;
+	}
+
+	std::stringstream ss(shader_defines);
+	std::string temp_define;
+	std::string defines_with_directive;
+	while (std::getline(ss, temp_define, ',')) {
+		defines_with_directive.append("#define " + temp_define + '\n');
+	}
+	size_t version_line = compute_source.find("#version");
+	version_line = compute_source.find('\n', version_line);
+	compute_source.insert(version_line + 1, defines_with_directive);
+
+
+
+	const char* source_c = compute_source.c_str();
+	uint32_t compute = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(compute, 1, &source_c, NULL);
+	glCompileShader(compute);
+
+	glGetShaderiv(compute, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(compute, 512, NULL, infolog);
+		printf("Error: compute shader (%s) compiliation failed: %s\n", compute_path, infolog);
+
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+
+	shader->ID = glCreateProgram();
+	glAttachShader(shader->ID, compute);
+	glLinkProgram(shader->ID);
+
+	glGetProgramiv(shader->ID, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(shader->ID, 512, NULL, infolog);
+		printf("Error: shader program link failed: %s\n", infolog);
+
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+
+	glDeleteShader(compute);
 
 	return ShaderResult::SHADER_SUCCESS;
 }

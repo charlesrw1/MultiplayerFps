@@ -18,6 +18,7 @@ out vec3 FS_IN_FragPos;
 out vec3 FS_IN_Normal;
 out vec2 FS_IN_Texcoord;
 out vec3 FS_IN_BoneColor;
+out vec4 FS_IN_NDC;
 #ifdef VERTEX_COLOR
 out vec4 FS_IN_Color;
 #endif
@@ -109,6 +110,7 @@ void main()
 	FS_IN_TexCoord2 = VS_IN_TexCoord2;
 #endif
 	
-    gl_Position = ViewProj * vec4(FS_IN_FragPos, 1.0);
+    FS_IN_NDC = ViewProj * vec4(FS_IN_FragPos, 1.0);
+	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
 }

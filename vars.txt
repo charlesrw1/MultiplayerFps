@@ -6,6 +6,7 @@ bind 2 "connect localhost"
 bind 3 "disconnect"
 bind 4 "sv_end"
 bind 5 "reconnect"
+bind Z reload_shaders
 
 bind 6 "fake_movement_debug 0"
 bind 7 "fake_movement_debug 1"
