@@ -11,6 +11,13 @@ class Entity;
 
 const int BLOOM_MIPS = 6;
 
+struct Texture3d
+{
+	glm::ivec3 size;
+	uint32_t id = 0;
+};
+Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
+
 class Volumetric_Fog_System
 {
 public:
@@ -36,6 +43,50 @@ public:
 	void shutdown();
 	void compute();
 };
+class Shadow_Map_System
+{
+public:
+	void init();
+	void update();
+	void make_csm_rendertargets();
+	void update_cascade(int idx, const View_Setup& vs, glm::vec3 directional_dir);
+
+	const static int MAXCASCADES = 4;
+	glm::vec4 split_distances;
+	glm::mat4x4 matricies[MAXCASCADES];
+	float nearplanes[MAXCASCADES];
+	float farplanes[MAXCASCADES];
+	uint32_t csm_ubo;
+	int csm_resolution = 0;
+
+	uint32_t shadow_map_array;
+	uint32_t framebuffer;
+	// Parameters
+	bool cull_front_faces = false;
+	bool fit_to_scene = true;
+	bool reduce_shimmering = true;
+	float log_lin_lerp_factor = 0.5;
+	float max_shadow_dist = 80.f;
+	float epsilon = 0.002f;
+	float poly_units = 4;
+	float poly_factor = 1.1;
+	float z_dist_scaling = 1.f;
+	int quality = 3;
+	bool targets_dirty = false;
+};
+
+struct Render_Level_Params {
+	View_Setup view;
+	uint32_t output_framebuffer;
+	bool clear_framebuffer = true;
+	bool draw_level = true;
+	bool draw_ents = true;
+	enum Pass_Type { STANDARD, DEPTH, SHADOWMAP };
+	Pass_Type pass = STANDARD;
+	bool cull_front_face = false;
+	bool force_no_backface=false;
+};
+
 
 typedef int Light_Handle;
 
@@ -45,7 +96,7 @@ public:
 	void Init();
 	void FrameDraw();
 
-	void render_level_to_target(View_Setup setup, uint32_t output_framebuffer, bool clear, bool draw_ents);
+	void render_level_to_target(Render_Level_Params params);
 
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
@@ -56,11 +107,12 @@ public:
 
 	void on_level_start();
 
-	void DrawModel(const Model* m, glm::mat4 transform, const Animator* a = nullptr, float rough=1.0, float metal=0.0);
+	void DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, glm::mat4 transform, const Animator* a = nullptr, float rough=1.0, float metal=0.0);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	uint32_t white_texture;
 	uint32_t black_texture;
+	Texture3d perlin3d;
 	
 	enum {
 		BASE0_SAMPLER, AUX0_SAMPLER, BASE1_SAMPLER,
@@ -78,7 +130,7 @@ public:
 		S_LIGHTMAPPED, S_LIGHTMAPPED_AT, S_LIGHTMAPPED_BLEND2,
 
 		// z-prepass'
-		S_PREPASS, S_AT_PREPASS, S_ANIMATED_PREPASS, S_WIND_PREPASS, S_WIND_AT_PREPASS,
+		S_DEPTH, S_AT_DEPTH, S_ANIMATED_DEPTH, S_WIND_DEPTH, S_WIND_AT_DEPTH,
 		
 		S_PARTICLE_BASIC,
 
@@ -109,7 +161,7 @@ public:
 		uint32_t view_constants;
 	}ubo;
 
-	View_Setup vs;
+	View_Setup vs;	// globally accessible view for passes
 	View_Setup lastframe_vs;
 
 	// config vars
@@ -132,6 +184,8 @@ public:
 
 	Shader& shader();
 	void set_shader_constants();
+	void set_depth_shader_constants();
+
 
 	// >>> PBR BRANCH
 	EnvCubemap cubemap;
@@ -143,6 +197,7 @@ public:
 
 	Texture* lens_dirt;
 
+	Shadow_Map_System shadowmap;
 	Volumetric_Fog_System volfog;
 	float slice_3d=0.0;
 	Level_Light dyn_light;
@@ -179,8 +234,10 @@ private:
 	void InitGlState();
 	void InitFramebuffers();
 
-	void DrawEnts();
+	void DrawEnts(Render_Level_Params::Pass_Type pass);
 	void DrawLevel();
+	void DrawLevelDepth();
+
 	void DrawPlayerViewmodel();
 
 	void DrawEntBlobShadows();
@@ -188,6 +245,8 @@ private:
 
 	void set_shader_sampler_locations();
 	void set_wind_constants();
+
+	View_Setup current_frame_main_view;
 
 	int cur_w = 0;
 	int cur_h = 0;

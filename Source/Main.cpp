@@ -303,7 +303,12 @@ void Renderer::on_level_start()
 		cubemap_view.viewproj = cubemap_view.proj * cubemap_view.view;
 		glCheckError();
 
-		render_level_to_target(cubemap_view, fbo, true, false);
+		Render_Level_Params params;
+		params.view = cubemap_view;
+		params.output_framebuffer = fbo;
+		params.draw_ents = false;
+
+		render_level_to_target(params);
 		glCheckError();
 
 	}
@@ -401,6 +406,163 @@ void Fly_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy
 		position += move_speed * up;
 	if (keys[SDL_SCANCODE_X])
 		position -= move_speed * up;
+}
+
+// Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
+uint32_t hash(uint32_t x, uint32_t seed) {
+	const uint32_t m = 0x5bd1e995U;
+	uint32_t hash = seed;
+	// process input
+	uint32_t k = x;
+	k *= m;
+	k ^= k >> 24;
+	k *= m;
+	hash *= m;
+	hash ^= k;
+	// some final mixing
+	hash ^= hash >> 13;
+	hash *= m;
+	hash ^= hash >> 15;
+	return hash;
+}
+
+// implementation of MurmurHash (https://sites.google.com/site/murmurhash/) for a  
+// 3-dimensional unsigned integer input vector.
+
+uint32_t hash(glm::uvec3 x, uint32_t seed) {
+	const uint32_t m = 0x5bd1e995U;
+	uint32_t hash = seed;
+	// process first vector element
+	uint32_t k = x.x;
+	k *= m;
+	k ^= k >> 24;
+	k *= m;
+	hash *= m;
+	hash ^= k;
+	// process second vector element
+	k = x.y;
+	k *= m;
+	k ^= k >> 24;
+	k *= m;
+	hash *= m;
+	hash ^= k;
+	// process third vector element
+	k = x.z;
+	k *= m;
+	k ^= k >> 24;
+	k *= m;
+	hash *= m;
+	hash ^= k;
+	// some final mixing
+	hash ^= hash >> 13;
+	hash *= m;
+	hash ^= hash >> 15;
+	return hash;
+}
+
+
+vec3 gradientDirection(uint32_t hash) {
+	switch (int(hash) & 15) { // look at the last four bits to pick a gradient direction
+	case 0:
+		return vec3(1, 1, 0);
+	case 1:
+		return vec3(-1, 1, 0);
+	case 2:
+		return vec3(1, -1, 0);
+	case 3:
+		return vec3(-1, -1, 0);
+	case 4:
+		return vec3(1, 0, 1);
+	case 5:
+		return vec3(-1, 0, 1);
+	case 6:
+		return vec3(1, 0, -1);
+	case 7:
+		return vec3(-1, 0, -1);
+	case 8:
+		return vec3(0, 1, 1);
+	case 9:
+		return vec3(0, -1, 1);
+	case 10:
+		return vec3(0, 1, -1);
+	case 11:
+		return vec3(0, -1, -1);
+	case 12:
+		return vec3(1, 1, 0);
+	case 13:
+		return vec3(-1, 1, 0);
+	case 14:
+		return vec3(0, -1, 1);
+	case 15:
+		return vec3(0, -1, -1);
+	}
+}
+
+float interpolate(float value1, float value2, float value3, float value4, float value5, float value6, float value7, float value8, vec3 t) {
+	using glm::mix;
+	return mix(
+		mix(mix(value1, value2, t.x), mix(value3, value4, t.x), t.y),
+		mix(mix(value5, value6, t.x), mix(value7, value8, t.x), t.y),
+		t.z
+	);
+}
+
+vec3 fade(vec3 t) {
+	// 6t^5 - 15t^4 + 10t^3
+	return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+}
+
+float perlinNoise(vec3 position, uint32_t seed) {
+	vec3 floorPosition = floor(position);
+	vec3 fractPosition = position - floorPosition;
+	glm::uvec3 cellCoordinates = glm::uvec3(floorPosition);
+	float value1 = dot(gradientDirection(hash(cellCoordinates, seed)), fractPosition);
+	float value2 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(1, 0, 0)), seed)), fractPosition - vec3(1, 0, 0));
+	float value3 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(0, 1, 0)), seed)), fractPosition - vec3(0, 1, 0));
+	float value4 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(1, 1, 0)), seed)), fractPosition - vec3(1, 1, 0));
+	float value5 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(0, 0, 1)), seed)), fractPosition - vec3(0, 0, 1));
+	float value6 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(1, 0, 1)), seed)), fractPosition - vec3(1, 0, 1));
+	float value7 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(0, 1, 1)), seed)), fractPosition - vec3(0, 1, 1));
+	float value8 = dot(gradientDirection(hash((cellCoordinates + glm::uvec3(1, 1, 1)), seed)), fractPosition - vec3(1, 1, 1));
+	return interpolate(value1, value2, value3, value4, value5, value6, value7, value8, fade(fractPosition));
+}
+
+
+Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity)
+{
+	Texture3d newt;
+	glGenTextures(1, &newt.id);
+	newt.size = size;
+	std::vector<uint8_t> values;
+	values.resize(size.x * size.y * size.z);
+	for (int z = 0; z < size.z; z++) {
+		for (int y = 0; y < size.y; y++) {
+			for (int x = 0; x < size.x; x++) {
+				glm::ivec3 coord{ x,y,z };
+				vec3 coordf = vec3(float(x) / size.x, float(y) / size.y, float(z) / size.z);
+				float value = 0.0;
+				float amplitude = 1.0;
+				float current_frequency = float(frequency);
+				uint32_t current_seed = seed;
+				for (int oct = 0; oct < octaves; oct++) {
+					current_seed = hash(current_seed, 0x0U);
+					value += perlinNoise(coordf * current_frequency, current_seed) * amplitude;
+					amplitude *= persistence;
+					current_frequency *= lacunarity;
+				}
+				int ivalue = value * 255;
+				glm::clamp(ivalue, 0, 255);
+				values[size.y * size.x * z + size.x * y + x] = ivalue;
+			}
+		}
+	}
+	glBindTexture(GL_TEXTURE_3D, newt.id);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, size.x, size.y, size.y, 0, GL_RED, GL_UNSIGNED_BYTE, values.data());
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_3D, 0);
+	
+	return newt;
 }
 
 
@@ -547,6 +709,11 @@ void Renderer::set_shader_sampler_locations()
 	shader().set_int("volumetric_fog", LIGHTMAP_SAMPLER + 4);
 }
 
+void Renderer::set_depth_shader_constants()
+{
+	shader().set_mat4("ViewProj", vs.viewproj);
+}
+
 void Renderer::set_shader_constants()
 {
 	shader().set_mat4("ViewProj", vs.viewproj);
@@ -641,7 +808,12 @@ void Renderer::reload_shaders()
 	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST");
 	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
 
-
+	frag = "DepthF.txt";
+	Shader::compile(&shade[S_ANIMATED_DEPTH], "AnimBasicV.txt", frag, "ANIMATED");
+	Shader::compile(&shade[S_DEPTH], "AnimBasicV.txt", frag);
+	Shader::compile(&shade[S_AT_DEPTH], "AnimBasicV.txt", frag, "ALPHATEST");
+	Shader::compile(&shade[S_WIND_DEPTH], "AnimBasicV.txt", frag, "WIND");
+	Shader::compile(&shade[S_WIND_AT_DEPTH], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
 
 	Shader::compile(&shade[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 	
@@ -659,13 +831,16 @@ void Renderer::reload_shaders()
 	Shader::compute_compile(&volfog.lightcalc, "VfogScatteringC.txt");
 	Shader::compute_compile(&volfog.raymarch, "VfogRaymarchC.txt");
 	Shader::compute_compile(&volfog.reproject, "VfogScatteringC.txt", "REPROJECTION");
-
+	volfog.lightcalc.use();
+	volfog.lightcalc.set_int("previous_volume", 0);
+	volfog.lightcalc.set_int("perlin_noise", 1);
+	glUseProgram(0);
 
 
 	glCheckError();
 	
 	int start = S_ANIMATED;
-	int end = S_LIGHTMAPPED_BLEND2;
+	int end = S_WIND_AT_DEPTH;
 	for (int i = start; i <= end; i++) {
 		set_shader(shade[i]);
 		set_shader_sampler_locations();
@@ -701,6 +876,262 @@ void Renderer::upload_ubo_view_constants()
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
+const static int csm_resolutions[] = { 0, 256, 512, 1024 };
+
+
+void Shadow_Map_System::init()
+{
+	make_csm_rendertargets();
+	glGenBuffers(1, &csm_ubo);
+}
+void Shadow_Map_System::make_csm_rendertargets()
+{
+	csm_resolution = csm_resolutions[(int)quality];
+
+	if (quality == 0)
+		return;
+
+	glGenTextures(1, &shadow_map_array);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_map_array);
+	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+	bool hardware_filtering = true;
+	if (hardware_filtering) {
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
+	}
+	else {
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float bordercolor[] = { 1.0,1.0,1.0,1.0 };
+	glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, bordercolor);
+	glCheckError();
+
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glCheckError();
+
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0);
+	glCheckError();
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		printf("GBuffer framebuffer not complete!\n");
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+	glCheckError();
+}
+
+
+static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
+{
+	float zratio = far / near;
+	float zrange = far - near;
+
+	const float bias = 0.0001f;
+
+	glm::vec4 planedistances;
+	for (int i = 0; i < 4; i++)
+	{
+		float x = (i + 1) / 4.f;
+		float log = near * pow(zratio, x);
+		float linear = near + zrange * x;
+		planedistances[i] = log_lin_lerp * (log - linear) + linear + bias;
+	}
+
+	return planedistances;
+}
+
+void Shadow_Map_System::update()
+{
+	if (targets_dirty) {
+		glDeleteTextures(1, &shadow_map_array);
+		glDeleteFramebuffers(1, &framebuffer);
+		make_csm_rendertargets();
+		targets_dirty = false;
+	}
+	if (quality == 0)
+		return;
+
+	glm::vec3 directional_dir = vec3(0.f);
+	bool found = false;
+	for (int i = 0; i < engine.level->lights.size(); i++) {
+		if (engine.level->lights[i].type == Level_Light::DIRECTIONAL) {
+			directional_dir = engine.level->lights[i].direction;
+			found = true;
+			break;
+		}
+	}
+	if (!found) {
+		return;
+	}
+
+	const View_Setup& view = draw.vs;
+
+	float near = view.near;
+	float far = glm::min(view.far, max_shadow_dist);
+
+	split_distances = CalcPlaneSplits(near, far, log_lin_lerp_factor);
+	for (int i = 0; i < MAXCASCADES; i++)
+		update_cascade(i, view, directional_dir);
+
+	struct Shadowmap_Csm_Ubo_Struct
+	{
+		mat4 data[4];
+		vec4 near_planes;
+		vec4 far_planes;
+	}upload_data;
+
+	for (int i = 0; i < 4; i++) {
+		upload_data.data[i] = matricies[i];
+		upload_data.near_planes[i] = nearplanes[i];
+		upload_data.far_planes[i] = farplanes[i];
+	}
+
+	glBindBuffer(GL_UNIFORM_BUFFER, csm_ubo);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+
+	// now setup scene for rendering
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	for (int i = 0; i < 4; i++) {
+		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0, i);
+
+		Render_Level_Params params;
+		params.output_framebuffer = framebuffer;
+		params.pass = Render_Level_Params::SHADOWMAP;
+		
+		View_Setup setup;
+		setup.width = csm_resolution;
+		setup.height = csm_resolution;
+		setup.near = nearplanes[i];
+		setup.far = farplanes[i];
+		setup.viewproj = matricies[i];
+		setup.view = setup.proj = mat4(1);
+		params.view = setup;
+
+		draw.render_level_to_target(params);
+	}
+}
+
+
+
+static std::vector<vec3> GetFrustumCorners(const mat4& view, const mat4& projection)
+{
+	mat4 inv_viewproj = glm::inverse(projection * view);
+	std::vector<vec3> corners;
+	for (int x = 0; x < 2; x++) {
+		for (int y = 0; y < 2; y++) {
+			for (int z = 0; z < 2; z++) {
+				vec4 ndc_coords = vec4(2 * x - 1, 2 * y - 1, 2 * z - 1, 1);
+				vec4 world_space = inv_viewproj * ndc_coords;
+				world_space /= world_space.w;
+				corners.push_back(vec3(world_space));
+			}
+		}
+	}
+
+	return corners;
+}
+
+
+void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, vec3 directionalDir)
+{
+	float far = split_distances[cascade_idx];
+	float near = (cascade_idx == 0) ? view.near : split_distances[cascade_idx - 1];
+	if (fit_to_scene)
+		near = view.near;
+
+	mat4 camera_cascaded_proj = glm::perspective(
+		glm::radians(view.near),
+		(float)view.width / view.height,
+		near, far);
+	// World space corners
+	auto corners = GetFrustumCorners(view.view, camera_cascaded_proj);
+	vec3 frustum_center = vec3(0);
+	for (int i = 0; i < corners.size(); i++)
+		frustum_center += corners[i];
+	frustum_center /= 8.f;
+
+	mat4 light_cascade_view = glm::lookAt(frustum_center - directionalDir, frustum_center, vec3(0, 1, 0));
+	vec3 viewspace_min = vec3(INFINITY);
+	vec3 viewspace_max = vec3(-INFINITY);
+	if (reduce_shimmering)
+	{
+		float sphere_radius = 0.f;
+		for (int i = 0; i < 8; i++) {
+			float dist = glm::length(corners[i] - frustum_center);
+			sphere_radius = glm::max(sphere_radius, dist);
+		}
+		sphere_radius = ceil(sphere_radius);
+		vec3 world_max = frustum_center + vec3(sphere_radius);
+		vec3 world_min = frustum_center - vec3(sphere_radius);
+
+		vec3 v_max = light_cascade_view * vec4(world_max, 1.0);
+		vec3 v_min = light_cascade_view * vec4(world_min, 1.0);
+		viewspace_max = glm::max(v_max, v_min);
+		viewspace_min = glm::min(v_max, v_min);
+		viewspace_max = vec3(sphere_radius);
+		viewspace_min = -viewspace_max;
+	}
+	else {
+		for (int i = 0; i < 8; i++) {
+			vec3 viewspace_corner = light_cascade_view * vec4(corners[i], 1.0);
+			viewspace_min = glm::min(viewspace_min, viewspace_corner);
+			viewspace_max = glm::max(viewspace_max, viewspace_corner);
+		}
+
+		// insert scaling for pcf filtering here
+
+	}
+	if (viewspace_min.z < 0)
+		viewspace_min.z *= z_dist_scaling;
+	else
+		viewspace_min.z /= z_dist_scaling;
+
+	if (viewspace_max.z < 0)
+		viewspace_max.z /= z_dist_scaling;
+	else
+		viewspace_max.z *= z_dist_scaling;
+
+	vec3 cascade_extent = viewspace_max - viewspace_min;
+
+	mat4 light_cascade_proj = glm::ortho(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y, viewspace_min.z, viewspace_max.z);
+	mat4 shadow_matrix = light_cascade_proj * light_cascade_view;
+	if (reduce_shimmering)
+	{
+		vec4 shadow_origin = vec4(0, 0, 0, 1);
+		shadow_origin = shadow_matrix * shadow_origin;
+		float w = shadow_origin.w;
+		shadow_origin *= csm_resolution / 2.0f;
+
+		vec4 rounded_origin = glm::round(shadow_origin);
+		vec4 rounded_offset = rounded_origin - shadow_origin;
+		rounded_offset *= 2.0f / csm_resolution;
+		rounded_offset.z = 0;
+		rounded_offset.w = 0;
+
+		mat4 shadow_cascade_proj = light_cascade_proj;
+		shadow_cascade_proj[3] += rounded_offset;
+
+		shadow_matrix = shadow_cascade_proj * light_cascade_view;
+	}
+
+
+	matricies[cascade_idx] = shadow_matrix;// light_cascade_proj* light_cascade_view;
+	nearplanes[cascade_idx] = viewspace_min.z;
+	farplanes[cascade_idx] = viewspace_max.z;
+}
+
+
 static const ivec3 volfog_sizes[] = { {0,0,0},{160,90,128},{80,45,64} };
 
 struct Vfog_Light
@@ -722,7 +1153,7 @@ void Volumetric_Fog_System::init()
 	if (quality == 0)
 		return;
 
-	voltexturesize = volfog_sizes[2];
+	voltexturesize = volfog_sizes[1];
 
 	glGenTextures(1, &voltexture);
 	glBindTexture(GL_TEXTURE_3D, voltexture);
@@ -798,6 +1229,10 @@ void Volumetric_Fog_System::compute()
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_3D, voltexture_prev);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
+		lightcalc.set_vec3("perlin_offset", glm::vec3(engine.time*0.2, 0, engine.time));
+
 
 		lightcalc.set_int("num_lights", 0);
 		glCheckError();
@@ -864,6 +1299,8 @@ void Renderer::Init()
 	r_bloom					= cfg.get_var("r_bloom", "1");
 
 
+	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
+
 	fbo.scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
 	InitFramebuffers();
@@ -879,6 +1316,7 @@ void Renderer::Init()
 	glGenBuffers(1, &ubo.view_constants);
 
 	volfog.init();
+	shadowmap.init();
 }
 
 void Renderer::InitFramebuffers()
@@ -1034,21 +1472,23 @@ void Renderer::render_bloom_chain()
 	glCheckError();
 }
 
-void Renderer::render_level_to_target(View_Setup setup, uint32_t output_target, bool clear, bool draw_ents)
+void Renderer::render_level_to_target(Render_Level_Params params)
 {
-	vs = setup;
-	glBindFramebuffer(GL_FRAMEBUFFER, output_target);
+	vs = params.view;
+	glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
 	glViewport(0, 0, vs.width, vs.height);
-	if (clear) {
+	if (params.clear_framebuffer) {
 		glClearColor(0.f, 0.f, 0.f, 1.f);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
-	DrawLevel();
-	if (draw_ents) {
-		DrawEnts();
+	if (params.draw_level) {
+		if (params.pass == Render_Level_Params::STANDARD)
+			DrawLevel();
+		else
+			DrawLevelDepth();
 	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	if (params.draw_ents)
+		DrawEnts(params.pass);
 }
 
 void Renderer::ui_render()
@@ -1139,8 +1579,11 @@ void Renderer::FrameDraw()
 		cur_tex[i] = 0;
 	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
 		InitFramebuffers();
-	lastframe_vs = vs;
-	vs = engine.local.last_view;
+	lastframe_vs = current_frame_main_view;
+	current_frame_main_view = engine.local.last_view;
+	
+	shadowmap.update();
+	
 	// temp!!
 	auto& e = engine.local_player();
 	dyn_light.position = vec3(0, 2, 0);
@@ -1149,7 +1592,13 @@ void Renderer::FrameDraw()
 	// endtemp
 	volfog.compute();
 
-	render_level_to_target(engine.local.last_view, fbo.scene, true, true);
+	// main level render
+	Render_Level_Params params;
+	params.output_framebuffer = fbo.scene;
+	params.view = current_frame_main_view;
+	params.pass = Render_Level_Params::STANDARD;
+
+	render_level_to_target(params);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	DrawEntBlobShadows();
 	engine.local.pm.draw_particles();
@@ -1359,19 +1808,30 @@ void Renderer::draw_model_real(Model_Drawing_State* s, const Model* m, int part_
 }
 
 
-void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a, float rough, float metal)
+void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, mat4 transform, const Animator* a, float rough, float metal)
 {
 	ASSERT(m);
 	const bool isanimated = a != nullptr;
 
-	if (isanimated)
-		set_shader(shade[S_ANIMATED]);
-	else
-		set_shader(shade[S_STATIC]);
+	if (pass == Render_Level_Params::DEPTH || pass == Render_Level_Params::SHADOWMAP) {
+		if (isanimated)
+			set_shader(shade[S_ANIMATED_DEPTH]);
+		else
+			set_shader(shade[S_DEPTH]);
+	
+		set_depth_shader_constants();
+	}
+	else {
+		if (isanimated)
+			set_shader(shade[S_ANIMATED]);
+		else
+			set_shader(shade[S_STATIC]);
+		
+		set_shader_constants();
+		shader().set_float("in_roughness", rough);
+		shader().set_float("in_metalness", metal);
+	}
 
-	set_shader_constants();
-	shader().set_float("in_roughness", rough);
-	shader().set_float("in_metalness", metal);
 	
 	glCheckError();
 	shader().set_mat4("Model", transform);
@@ -1389,17 +1849,21 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a, floa
 	for (int i = 0; i < m->parts.size(); i++)
 	{
 		const MeshPart* part = &m->parts[i];
-
-		if (part->material_idx==-1) {
-			bind_texture(0, white_texture);
-		}
-		else {
-			const Game_Shader* mm = m->materials.at(part->material_idx);
-			shader().set_bool("has_uv_scroll", false);
-			if (mm->images[Game_Shader::BASE1])
-				bind_texture(BASE0_SAMPLER, mm->images[Game_Shader::BASE1]->gl_id);
-			else
-				bind_texture(BASE0_SAMPLER, white_texture);
+		const Game_Shader* mm = nullptr;
+		if(part->material_idx!=-1)
+			mm = m->materials.at(part->material_idx);
+		if (pass == Render_Level_Params::STANDARD || (mm && mm->alpha_type == Game_Shader::A_TEST)) {
+			if (part->material_idx == -1) {
+				bind_texture(0, white_texture);
+			}
+			else {
+				const Game_Shader* mm = m->materials.at(part->material_idx);
+				shader().set_bool("has_uv_scroll", false);
+				if (mm->images[Game_Shader::BASE1])
+					bind_texture(BASE0_SAMPLER, mm->images[Game_Shader::BASE1]->gl_id);
+				else
+					bind_texture(BASE0_SAMPLER, white_texture);
+			}
 		}
 
 		glBindVertexArray(part->vao);
@@ -1411,7 +1875,7 @@ void Renderer::DrawModel(const Model* m, mat4 transform, const Animator* a, floa
 
 
 
-void Renderer::DrawEnts()
+void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 {
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		auto& ent = engine.get_ent(i);
@@ -1433,7 +1897,7 @@ void Renderer::DrawEnts()
 		model = glm::scale(model, vec3(1.f));
 
 		const Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
-		DrawModel(ent.model, model, a);
+		DrawModel(pass, ent.model, model, a);
 
 
 		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
@@ -1456,7 +1920,7 @@ void Renderer::DrawEnts()
 			const Bone& b = ent.model->bones.at(index);
 			glm::mat4 transform = a->GetBones()[index];
 			transform = model*transform*mat4(b.posematrix)*rotate;
-			DrawModel(m, transform);
+			DrawModel(pass, m, transform);
 
 			if (stat.category == ITEM_CAT_RIFLE) {
 				std::string mod = stat.world_model;
@@ -1467,7 +1931,7 @@ void Renderer::DrawEnts()
 					const Bone& mag_bone = ent.model->bones.at(index2);
 					transform = a->GetBones()[index2];
 					transform = model * transform * mat4(mag_bone.posematrix) * rotate;
-					DrawModel(mag_mod, transform);
+					DrawModel(pass, mag_mod, transform);
 				}
 			}
 		}
@@ -1479,7 +1943,7 @@ void Renderer::DrawEnts()
 		for (int y = 0; y < 10; y++) {
 			mat4 transform = glm::translate(mat4(1), vec3((x - 5) * 0.75, 0, (y - 5) * 0.75));
 			transform = glm::scale(transform, vec3(0.4));
-			DrawModel(sphere, transform, nullptr, (9 - x) / 9.f, (9 - y) / 9.f);
+			DrawModel(Render_Level_Params::STANDARD, sphere, transform, nullptr, (9 - x) / 9.f, (9 - y) / 9.f);
 		}
 	}
 
@@ -1533,6 +1997,73 @@ void draw_wind_menu()
 	ImGui::DragFloat("startradius", &wsstartradius, 0.04, 0.f, 1.f);
 
 	ImGui::Image((ImTextureID)EnviornmentMapHelper::get().integrator.lut_id, ImVec2(512, 512));
+}
+
+void Renderer::DrawLevelDepth()
+{
+	const Level* level = engine.level;
+	bool force_set = true;
+	int backfaces = -1;
+
+	glDisable(GL_BLEND);
+	for (int m = 0; m < level->instances.size(); m++) {
+		const Level::StaticInstance& sm = level->instances[m];
+		if (sm.collision_only) continue;
+		ASSERT(level->static_meshes[sm.model_index]);
+		Model& model = *level->static_meshes[sm.model_index];
+
+		for (int p = 0; p < model.parts.size(); p++) {
+			MeshPart& mp = model.parts[p];
+			Game_Shader* gs = (mp.material_idx != -1) ? model.materials.at(mp.material_idx) : &mats.fallback;
+			if (!(gs->alpha_type == Game_Shader::A_NONE || gs->alpha_type == Game_Shader::A_TEST))
+				continue;
+
+			bool mat_is_at = gs->alpha_type == gs->A_TEST;
+			bool mat_lightmapped = mp.has_lightmap_coords();
+			bool mat_colors = mp.has_colors();
+			int mat_shader_type = gs->shader_type;
+
+			if (mat_shader_type == Game_Shader::S_WINDSWAY)
+			{
+				if (mat_is_at)
+					set_shader(shade[S_WIND_AT_DEPTH]);
+				else 
+					set_shader(shade[S_WIND_DEPTH]);
+			}
+			else
+			{
+				if (mat_is_at)
+					set_shader(shade[S_AT_DEPTH]);
+				else
+					set_shader(shade[S_DEPTH]);
+			}
+
+			set_depth_shader_constants();
+
+			if (backfaces != (int)gs->backface) {
+				backfaces = gs->backface;
+				if (backfaces) {
+					glDisable(GL_CULL_FACE);
+				}
+				else
+					glEnable(GL_CULL_FACE);
+			}
+
+			shader().set_mat4("Model", sm.transform);
+			shader().set_mat4("InverseModel", glm::inverse(sm.transform));
+
+			if (gs->alpha_type == Game_Shader::A_TEST) {
+
+				if (gs->images[gs->BASE1])
+					bind_texture(BASE0_SAMPLER, gs->images[gs->BASE1]->gl_id);
+				else
+					bind_texture(BASE0_SAMPLER, white_texture);
+			}
+			glBindVertexArray(mp.vao);
+			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+		}
+	}
+
 }
 
 void Renderer::DrawLevel()
@@ -1686,7 +2217,7 @@ void Renderer::DrawPlayerViewmodel()
 	cur_shader = -1;
 
 
-	DrawModel(engine.local.viewmodel, model2, &engine.local.viewmodel_animator);
+	DrawModel(Render_Level_Params::STANDARD, engine.local.viewmodel, model2, &engine.local.viewmodel_animator);
 }
 
 void Game_Media::load()

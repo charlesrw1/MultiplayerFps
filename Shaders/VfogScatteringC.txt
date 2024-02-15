@@ -158,10 +158,10 @@ void main()
 	float spotlen = length(spotdir);
 	spotdir = spotdir/spotlen;
 	vec3 spotadd = vec3(0.05);
-	//if(dot(spotdir,spotlightnormal)>spotlightangle) {
-		spotadd = phase_function(raydir,spotdir,anisotropy)*vec3(5,4,10)*20.0/(spotlen*spotlen);
+	if(dot(spotdir,spotlightnormal)>spotlightangle) {
+		spotadd = phase_function(raydir,spotdir,anisotropy)*vec3(5,4,10)*10.0/(spotlen*spotlen);
 		spotadd = min(spotadd, 50.0);
-	//}
+	}
 	inscattering += spotadd;
 	
 	
