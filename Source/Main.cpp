@@ -552,8 +552,8 @@ void Renderer::set_shader_constants()
 	shader().set_mat4("ViewProj", vs.viewproj);
 	
 	// fog vars
-	shader().set_float("znear", vs.near);
-	shader().set_float("zfar", vs.far);
+	shader().set_float("near", vs.near);
+	shader().set_float("far", vs.far);
 
 
 	shader().set_float("fog_max_density", 1.0);
@@ -777,6 +777,13 @@ void Volumetric_Fog_System::compute()
 		lightcalc.set_float("density", draw.vfog.x);
 		lightcalc.set_float("anisotropy", draw.vfog.y);
 		lightcalc.set_vec3("ambient", draw.ambientvfog);
+
+		lightcalc.set_vec3("spotlightpos", vec3(0,2,0));
+		lightcalc.set_vec3("spotlightnormal", vec3(0,-1,0));
+		lightcalc.set_float("spotlightangle", 0.5);
+		lightcalc.set_vec3("spotlightcolor", vec3(10.f));
+
+
 
 		lightcalc.set_int("num_lights", 0);
 		glCheckError();
@@ -1058,7 +1065,7 @@ void Renderer::ui_render()
 
 
 	glDisable(GL_BLEND);
-	{
+	if(0){
 		set_shader(shade[S_TEXTURED3D]);
 		shader().set_mat4("Model", mat4(1));
 		glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
