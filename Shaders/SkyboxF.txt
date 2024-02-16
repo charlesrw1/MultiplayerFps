@@ -7,7 +7,7 @@ uniform samplerCube cube;
 
 uniform sampler3D volumetric_fog;
 uniform vec2 screen_size;
-uniform bool apply_fog = true;
+uniform bool apply_fog = false;
 
 vec3 ApplyVolumetricFog(vec3 incolor)
 {

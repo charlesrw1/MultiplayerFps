@@ -350,6 +350,28 @@ void Renderer::on_level_start()
 		}
 	}
 
+	tex.levelcubemap_num = engine.level->cubemaps.size();
+	glGenTextures(1, &tex.levelcubemapspecular_array);
+	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, tex.levelcubemapspecular_array);
+	glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_R11F_G11F_B10F, CUBEMAP_SIZE, CUBEMAP_SIZE, 6 * tex.levelcubemap_num, 0, GL_RGB, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);
+	glCheckError();
+	glGenTextures(1, &tex.levelcubemapirradiance_array);
+	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, tex.levelcubemapirradiance_array);
+	glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_R11F_G11F_B10F, 32, 32, 6 * tex.levelcubemap_num, 0, GL_RGB, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);
+	glCheckError();
+
 	uint32_t cmfbo, cmrbo;
 	glGenFramebuffers(1, &cmfbo);
 	glGenRenderbuffers(1, &cmrbo);
@@ -359,12 +381,14 @@ void Renderer::on_level_start()
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, cmrbo);
 
 	Level* l = engine.level;
+	draw.using_skybox_for_specular = true;
 	for (int i = 0; i < l->cubemaps.size(); i++) {
 		Level::Box_Cubemap& bc = l->cubemaps[i];
 		if (!bc.has_probe_pos) continue;
 
 		render_world_cubemap(bc.position, &bc.cube, cmfbo, CUBEMAP_SIZE);
 	}
+	draw.using_skybox_for_specular = false;
 
 	glDeleteRenderbuffers(1, &cmrbo);
 	glDeleteFramebuffers(1, &cmfbo);
@@ -769,11 +793,20 @@ void set_standard_draw_data()
 {
 	int start = Renderer::LIGHTMAP_SAMPLER;
 	// >>> PBR BRANCH
-	glActiveTexture(GL_TEXTURE0 + start + 1);
 	auto& cm = engine.level->cubemaps[draw.cubemap_index];
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cm.cube.irradiance_cm);
-	glActiveTexture(GL_TEXTURE0 + start + 2);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cm.cube.prefiltered_specular_cm);
+
+	if (draw.using_skybox_for_specular) {
+		glActiveTexture(GL_TEXTURE0 + start + 1);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, draw.skybox.irradiance_cm);
+		glActiveTexture(GL_TEXTURE0 + start + 2);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, draw.skybox.prefiltered_specular_cm);
+	}
+	else {
+		glActiveTexture(GL_TEXTURE0 + start + 1);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cm.cube.irradiance_cm);
+		glActiveTexture(GL_TEXTURE0 + start + 2);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cm.cube.prefiltered_specular_cm);
+	}
 	glActiveTexture(GL_TEXTURE0 + start + 3);
 	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
 
@@ -1555,9 +1588,10 @@ void Renderer::DrawSkybox()
 
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, engine.level->cubemaps[1].cube.original_cubemap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.original_cubemap);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
+
 
 	glDisable(GL_CULL_FACE);
 	mb.Draw(GL_TRIANGLES);

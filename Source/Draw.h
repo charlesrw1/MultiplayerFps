@@ -207,7 +207,8 @@ public:
 		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
 		glm::vec2 bloom_chain_size[BLOOM_MIPS];
 
-		uint32_t levelcubemap_array = 0;
+		uint32_t levelcubemapirradiance_array = 0;
+		uint32_t levelcubemapspecular_array = 0;
 		int levelcubemap_num = 0;
 	}tex;
 	struct {
@@ -250,6 +251,7 @@ public:
 	glm::vec3 aosphere;
 	glm::vec2 vfog = glm::vec2(10,0.0);
 	glm::vec3 ambientvfog;
+	bool using_skybox_for_specular = false;
 
 	Texture* lens_dirt;
 

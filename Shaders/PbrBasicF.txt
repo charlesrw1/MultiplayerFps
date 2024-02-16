@@ -383,7 +383,7 @@ void main()
 	vec3 NDC = FS_IN_NDC.xyz/FS_IN_NDC.w;
 	vec3 out_color = ambient;
 	
-	out_color = ApplyVolumetricFog(ambient,NDC);
+	//out_color = ApplyVolumetricFog(ambient,NDC);
 	
 	#ifdef ANIMATED
 	//out_color += vec3(1,10,1);
