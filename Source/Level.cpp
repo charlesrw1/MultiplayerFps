@@ -58,16 +58,16 @@ void add_level_light(Level* l, tinygltf::Model& scene, glm::mat4 transform, int 
 	tinygltf::Light& light = scene.lights.at(index);
 	ll.position = transform[3];
 	ll.direction = -transform[2];	// fixme
-	ll.type = ll.POINT;
+	ll.type = LIGHT_POINT;
 	ll.color = glm::vec3(light.color[0], light.color[1], light.color[2]) * (float)light.intensity;
 	if (light.type == "directional") {
-		ll.type = ll.DIRECTIONAL;
+		ll.type = LIGHT_DIRECTIONAL;
 	}
 	else if (light.type == "point") {
 		
 	}
 	else if (light.type == "spot"){
-		ll.type = ll.SPOT;
+		ll.type = LIGHT_SPOT;
 		ll.spot_angle = light.spot.outerConeAngle;
 	}
 	else {

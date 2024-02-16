@@ -4,6 +4,8 @@
 #include "Util.h"
 #include "Types.h"
 #include "Level.h"
+#include "GlmInclude.h"
+#include "MeshBuilder.h"
 class Model;
 class Animator;
 class Texture;
@@ -90,6 +92,7 @@ struct Render_Level_Params {
 	bool force_backface=false;
 	bool upload_constants = false;
 	bool include_lightmapped = true;
+	bool force_skybox_probe = false;
 	uint32_t provied_constant_buffer = 0;
 };
 
@@ -134,6 +137,42 @@ public:
 	void add_item(Render_Item item, bool cast_shadows);
 };
 
+struct Render_Light
+{
+	vec3 position;
+	vec3 normal;
+	vec3 color;
+	float conemin;
+	float conemax;
+	bool casts_shadow = false;
+	int shadow_array_index = 0;
+	int type = 0;
+};
+
+struct Render_Box_Cubemap
+{
+	vec3 boxmin;
+	vec3 boxmax;
+	vec3 probe_pos = vec3(0.f);
+	int priority = 0;
+	bool found_probe_flag = false;
+	int id = -1;
+};
+
+class Render_Scene
+{
+public:
+	uint32_t skybox = 0;
+	std::vector<Render_Box_Cubemap> cubemaps;
+	uint32_t cubemap_ssbo;
+	uint32_t levelcubemapirradiance_array = 0;
+	uint32_t levelcubemapspecular_array = 0;
+	int levelcubemap_num = 0;
+
+	int directional_index = -1;
+	std::vector<Render_Light> lights;
+	uint32_t light_ssbo;
+};
 
 class Renderer
 {
@@ -151,7 +190,7 @@ public:
 	void ui_render();
 
 	void on_level_start();
-	void render_world_cubemap(vec3 position, EnvCubemap* out, uint32_t fbo, int size);
+	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
 
 	void cubemap_positions_debug();
 
@@ -206,10 +245,6 @@ public:
 		uint32_t bloom_chain[BLOOM_MIPS];
 		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
 		glm::vec2 bloom_chain_size[BLOOM_MIPS];
-
-		uint32_t levelcubemapirradiance_array = 0;
-		uint32_t levelcubemapspecular_array = 0;
-		int levelcubemap_num = 0;
 	}tex;
 	struct {
 		uint32_t current_frame;
@@ -259,6 +294,8 @@ public:
 	Volumetric_Fog_System volfog;
 	float slice_3d=0.0;
 	Level_Light dyn_light;
+
+	Render_Scene scene;
 private:
 	struct Sprite_Drawing_State {
 		bool force_set = true;

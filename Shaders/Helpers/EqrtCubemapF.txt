@@ -19,5 +19,5 @@ void main()
 	vec3 Dir = normalize(FS_IN_Fragpos);
 	vec2 uv = sample_spherical(Dir);
 
-	FS_OUT_FragColor = texture(equirectangular_img,uv);
+	FS_OUT_FragColor = min(texture(equirectangular_img,uv),vec4(30.0));	// Because when the pixels get to bright shit breaks...
 }

@@ -5,10 +5,15 @@
 #include "Model.h"
 #include "EnvProbe.h"
 
+enum {
+	LIGHT_DIRECTIONAL, 
+	LIGHT_POINT, 
+	LIGHT_SPOT,
+};
+
 struct Level_Light
 {
-	enum { POINT, SPOT, DIRECTIONAL };
-	int type;
+	int type = 0;
 	glm::vec3 position;
 	glm::vec3 direction;
 	glm::vec3 color; // rgb*intensity
@@ -20,16 +25,6 @@ class Texture;
 class Level
 {
 public:
-	struct Box_Cubemap
-	{
-		glm::vec3 position;
-		glm::vec3 boxmin;
-		glm::vec3 boxmax;
-		int priority = 0;
-		EnvCubemap cube;
-		bool has_probe_pos = false;
-	};
-
 	struct StaticInstance
 	{
 		int model_index;
@@ -47,8 +42,6 @@ public:
 	};
 
 	Physics_Mesh collision;	// union of all level_meshes collision data
-
-	std::vector<Box_Cubemap> cubemaps;
 	std::vector<Level_Light> lights;
 	std::vector<Model*> linked_meshes;	// custom embedded meshes that are linked to an entity like doors, not included in static_meshes
 	std::vector<StaticInstance> instances;	// instances, index into static_meshes

@@ -45,6 +45,9 @@ public:
 	void convolute_irradiance(EnvCubemap* env_map);
 	void compute_specular(EnvCubemap* env_map);
 
+	void convolute_irradiance_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size);
+	void compute_specular_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size);
+
 
 	BRDFIntegration integrator;
 	glm::mat4 cubemap_projection;

@@ -49,12 +49,22 @@ struct Ubo_View_Constants_Struct
 	vec4 viewfront;
 	vec4 viewport_size;
 
-	vec4 near_far_shadowmapepsilon;
+	float near;
+	float far;
+	float shadowmap_epsilon;
+	float padding1;
+	
 	vec4 fogcolor;
 	vec4 fogparams;
 	vec4 directional_light_dir_and_used;
 	vec4 directional_light_color;
+	
+	float numcubemaps;
+	float numlights;
+	float forcecubemap;
+	float padding2;
 };
+
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;

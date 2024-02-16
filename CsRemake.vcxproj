@@ -30,6 +30,7 @@
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Edit.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
+    <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="source\Game_Local.cpp" />

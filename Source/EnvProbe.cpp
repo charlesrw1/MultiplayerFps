@@ -232,6 +232,51 @@ void EnviornmentMapHelper::compute_specular(EnvCubemap* env_map)
 
     env_map->prefiltered_specular_cm = cm_id;
 }
+void EnviornmentMapHelper::convolute_irradiance_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size)
+{
+    prefilter_irradiance.use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, input_cubemap);
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glViewport(0, 0, output_size, output_size);
+    glBindVertexArray(vao);
+    glDisable(GL_CULL_FACE);
+    for (int i = 0; i < 6; i++) {
+        prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, output_array, 0, 6 * output_index + i);
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+    glEnable(GL_CULL_FACE);
+}
+void EnviornmentMapHelper::compute_specular_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size)
+{
+    prefilter_specular.use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,input_cubemap);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glBindVertexArray(vao);
+    glDisable(GL_CULL_FACE);
+    int size = output_size;
+    for (int mip = 0; mip < MAX_MIP_ROUGHNESS; mip++)
+    {
+        glViewport(0, 0, size, size);
+        float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
+        prefilter_specular.set_float("roughness", roughness);
+
+        for (int i = 0; i < 6; i++) {
+            prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, output_array, mip, 6 * output_index + i);
+            glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        size /= 2;
+    }
+}
 static const float quad_verts[] =
 {
     -1,-1,0,
