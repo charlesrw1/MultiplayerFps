@@ -172,7 +172,7 @@ float linearize_depth(float d,float zNear,float zFar)
 vec3 ApplyVolumetricFog(vec3 incolor, vec3 NDC)
 {
 	float near = g.near;
-	float far = g.near;
+	float far = g.far;
 
 	float lineardepth = linearize_depth(NDC.z*0.5+0.5,near,far);
 	vec2 xy = (NDC.xy+vec2(1.0))*0.5;

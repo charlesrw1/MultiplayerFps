@@ -426,20 +426,14 @@ struct Ubo_View_Constants_Struct
 	glm::vec4 viewfront;
 	glm::vec4 viewport_size;
 
-	float near;
-	float far;
-	float shadowmap_epsilon;
-	float padding1;
-
+	glm::vec4 near_far_epsilon;
+	
 	glm::vec4 fogcolor;
 	glm::vec4 fogparams;
 	glm::vec4 directional_light_dir_and_used;
 	glm::vec4 directional_light_color;
 
-	float numcubemaps;
-	float numlights;
-	float forcecubemap;
-	float padding2;
+	glm::vec4 ncubemaps_nlights_forcecubemap;
 };
 
 void Renderer::upload_ubo_view_constants(uint32_t ubo)
@@ -453,9 +447,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo)
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
 
-	constants.near = vs.near;
-	constants.far = vs.far;
-	constants.shadowmap_epsilon = shadowmap.epsilon;
+	constants.near_far_epsilon = vec4(vs.near, vs.far, shadowmap.epsilon, 0.0);
 
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
@@ -469,12 +461,11 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo)
 	else
 		constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
 
-	constants.numcubemaps = scene.cubemaps.size();
-	constants.numlights = scene.lights.size();
+	constants.ncubemaps_nlights_forcecubemap = vec4(scene.cubemaps.size(), scene.lights.size(), 0, 0);
 	if (using_skybox_for_specular)
-		constants.forcecubemap = 0.0;
+		constants.ncubemaps_nlights_forcecubemap.z = 0.0;
 	else
-		constants.forcecubemap = -1.0;
+		constants.ncubemaps_nlights_forcecubemap.z = -1.0;
 
 	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);

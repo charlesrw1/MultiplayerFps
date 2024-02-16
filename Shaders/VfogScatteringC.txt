@@ -161,7 +161,7 @@ void main()
 	vec4 reprojected_value = vec4(0.0);
 	float reprojected_mix = 0.0;
 	
-#if 0
+#if 1
 	reprojected_ndc/=reprojected_ndc.w;
  	if (all(greaterThanEqual(reprojected_ndc.xyz, vec3(-1.0))) && all(lessThanEqual(reprojected_ndc.xyz, vec3(1.0)))) {
 		// good reprojection
