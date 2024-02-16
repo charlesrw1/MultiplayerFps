@@ -176,19 +176,19 @@ void main()
 	vec3 raydir = normalize(worldpos-g.viewpos_time.xyz);
 	vec3 inscattering = vec3(0.0);
 	
-	vec3 spotdir = worldpos-spot_pos;
+	vec3 spotdir = worldpos-(spot_pos+vec3(2,0,0));
 	float spotlen = length(spotdir);
 	spotdir = spotdir/spotlen;
 	vec3 spotadd = vec3(0.51);
-	if(dot(spotdir,spotlightnormal)>0.5) {
-		spotadd = phase_function(raydir,spotdir,anisotropy)*vec3(5,4,3)*500.0/(spotlen*spotlen);
+	//if(dot(spotdir,spotlightnormal)>0.5) {
+		spotadd = phase_function(raydir,spotdir,anisotropy)*vec3(5,4,3)*10.0/(spotlen*spotlen);
 		spotadd = min(spotadd, 100.0);
-	}
+	//}
 	inscattering += spotadd;
 	
 	float real_density = (texture(perlin_noise, worldpos*0.2+perlin_offset*0.1).r - 1.0)*5.0+density;// + texture(perlin_noise, worldpos*0.8+perlin_offset*0.2).r;
-	real_density  = real_density * exp(-max(worldpos.y*0.1,0.0));
-	float edensity = max(exp(-real_density),0.000001);
+	real_density  = real_density;
+	float edensity = max(exp(-real_density),0.000001)* exp(-max(worldpos.y*2.0,0.0));
 	vec4 coloranddensity = vec4(inscattering*edensity,edensity);
 	//ComputeScattering(dot(raydir,-sun_dir));
 	
