@@ -37,14 +37,34 @@ uniform mat4 BoneTransform[MAX_BONES];
 
 uniform mat4 Model;
 uniform mat4 InverseModel;
-uniform mat4 ViewProj;
+
+
+struct Ubo_View_Constants_Struct
+{
+	mat4 view;
+	mat4 viewproj;
+	mat4 invview;
+	mat4 invproj;
+	vec4 viewpos_time;
+	vec4 viewfront;
+	vec4 viewport_size;
+
+	vec4 near_far_shadowmapepsilon;
+	vec4 fogcolor;
+	vec4 fogparams;
+	vec4 directional_light_dir_and_used;
+	vec4 directional_light_color;
+};
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
 
 
 #ifdef WIND
 uniform float height;
 uniform float startheight;
 uniform vec3 wind_dir;
-uniform float time;
 uniform float speed;
 
 vec3 do_wind_sway(vec3 pos)
@@ -53,7 +73,7 @@ vec3 do_wind_sway(vec3 pos)
 	float height_scale = smoothstep(height*startheight, pos.y, height);
 	height_scale = pow(height_scale, 1.2);
 
-	float sway_time = (time + dot(vec4(1),Model[3]) + pos.y)*speed;
+	float sway_time = (g.viewpos_time.w + dot(vec4(1),Model[3]) + pos.y)*speed;
 	vec4 sines = sin(vec4(1.5,1.2,0.7,0.635)*sway_time);
 	sines.xy = mix(sines.xy, sines.zw, 0.5);
 	vec3 pos_offset = wind_dir_local*height_scale*mix(sines.x,sines.y, 0.4)*pow(length(pos.xz),1.5);
@@ -110,7 +130,7 @@ void main()
 	FS_IN_TexCoord2 = VS_IN_TexCoord2;
 #endif
 	
-    FS_IN_NDC = ViewProj * vec4(FS_IN_FragPos, 1.0);
+    FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
 }

@@ -1,0 +1,16 @@
+#version 430 core
+
+#ifdef ALPHATEST
+in vec2 FS_IN_Texcoord;
+uniform sampler2D basecolor;
+#endif
+
+void main()
+{
+#ifdef ALPHATEST
+	vec4 tex = texture(basecolor, FS_IN_Texcoord);
+	if(tex.a < 0.5)
+		discard;
+#endif
+}
+	

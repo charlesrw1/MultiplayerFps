@@ -30,7 +30,7 @@ public:
 	Shader lightcalc;
 	Shader raymarch;
 
-	float density = 0.5;
+	float density = 10.0;
 	float anisotropy = 0.7;
 	float spread = 1.0;
 	float frustum_end = 50.f;
@@ -52,12 +52,15 @@ public:
 	void update_cascade(int idx, const View_Setup& vs, glm::vec3 directional_dir);
 
 	const static int MAXCASCADES = 4;
+	uint32_t frame_view_ubos[4];
 	glm::vec4 split_distances;
 	glm::mat4x4 matricies[MAXCASCADES];
 	float nearplanes[MAXCASCADES];
 	float farplanes[MAXCASCADES];
 	uint32_t csm_ubo;
 	int csm_resolution = 0;
+	bool enabled = false;
+	Level_Light current_sun;
 
 	uint32_t shadow_map_array;
 	uint32_t framebuffer;
@@ -67,11 +70,11 @@ public:
 	bool reduce_shimmering = true;
 	float log_lin_lerp_factor = 0.5;
 	float max_shadow_dist = 80.f;
-	float epsilon = 0.002f;
+	float epsilon = 0.008f;
 	float poly_units = 4;
 	float poly_factor = 1.1;
 	float z_dist_scaling = 1.f;
-	int quality = 3;
+	int quality = 2;
 	bool targets_dirty = false;
 };
 
@@ -84,11 +87,53 @@ struct Render_Level_Params {
 	enum Pass_Type { STANDARD, DEPTH, SHADOWMAP };
 	Pass_Type pass = STANDARD;
 	bool cull_front_face = false;
-	bool force_no_backface=false;
+	bool force_backface=false;
+	bool upload_constants = false;
+	bool include_lightmapped = true;
+	uint32_t provied_constant_buffer = 0;
 };
 
 
 typedef int Light_Handle;
+
+struct Render_Item
+{
+	Model* model;
+	uint32_t part_index;
+	Game_Shader* material;
+	glm::mat4 transform;
+	Entity* ent = nullptr;
+	Animator* animator = nullptr;
+};
+
+class Object_Cull_Job
+{
+
+};
+
+struct Render_Key
+{
+	int viewport_layer : 2;
+	int shader : 8;
+	int texture0 : 12;
+	int blending_mode : 2;
+	int backface_mode : 1;
+	int vao : 13;
+	int depth : 18;
+	int obj_index;
+};
+
+class Render_Lists
+{
+public:
+	std::vector<Render_Key> transparents;
+	std::vector<Render_Key> opaques;
+	std::vector<Render_Key> shadow_casters;
+	std::vector<Render_Item> items;
+
+	void add_item(Render_Item item, bool cast_shadows);
+};
+
 
 class Renderer
 {
@@ -106,6 +151,10 @@ public:
 	void ui_render();
 
 	void on_level_start();
+	void render_world_cubemap(vec3 position, EnvCubemap* out, uint32_t fbo, int size);
+
+	void cubemap_positions_debug();
+
 
 	void DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, glm::mat4 transform, const Animator* a = nullptr, float rough=1.0, float metal=0.0);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
@@ -114,6 +163,8 @@ public:
 	uint32_t black_texture;
 	Texture3d perlin3d;
 	
+	int cubemap_index = 0;
+
 	enum {
 		BASE0_SAMPLER, AUX0_SAMPLER, BASE1_SAMPLER,
 		AUX1_SAMPLER, SPECIAL_SAMPLER, LIGHTMAP_SAMPLER, NUM_SAMPLERS
@@ -122,7 +173,7 @@ public:
 	// shaders
 	enum { 
 		// meshbuilder's
-		S_SIMPLE, S_TEXTURED, S_TEXTURED3D,
+		S_SIMPLE, S_TEXTURED, S_TEXTURED3D, S_TEXTUREDARRAY, S_SKYBOXCUBE,
 		
 		// model's
 		S_ANIMATED, 
@@ -156,20 +207,25 @@ public:
 		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
 		glm::vec2 bloom_chain_size[BLOOM_MIPS];
 
+		uint32_t levelcubemap_array = 0;
+		int levelcubemap_num = 0;
 	}tex;
 	struct {
-		uint32_t view_constants;
+		uint32_t current_frame;
 	}ubo;
 
+	uint32_t active_constants_ubo = 0;
 	View_Setup vs;	// globally accessible view for passes
 	View_Setup lastframe_vs;
 
-	// config vars
+	// graphics_settings
 	Config_Var* r_draw_collision_tris;
 	Config_Var* r_draw_sv_colliders;
 	Config_Var* r_draw_viewmodel;
 	Config_Var* vsync;
+	Config_Var* r_shadow_quality;
 	Config_Var* r_bloom;
+	Config_Var* r_volumetric_fog;
 
 	void bind_texture(int bind, int id);
 	void set_shader(Shader& s) { 
@@ -188,11 +244,11 @@ public:
 
 
 	// >>> PBR BRANCH
-	EnvCubemap cubemap;
+	EnvCubemap skybox;
 	float rough = 1.f;
 	float metal = 0.f;
 	glm::vec3 aosphere;
-	glm::vec2 vfog;
+	glm::vec2 vfog = glm::vec2(10,0.0);
 	glm::vec3 ambientvfog;
 
 	Texture* lens_dirt;
@@ -226,7 +282,7 @@ private:
 	void draw_model_real(Model_Drawing_State* state, const Model* m, int part, glm::mat4 transform, 
 		const Entity* e = nullptr, const Animator* a = nullptr, Game_Shader* override_mat = nullptr);
 
-	void upload_ubo_view_constants();
+	void upload_ubo_view_constants(uint32_t ubo);
 
 	void init_bloom_buffers();
 	void render_bloom_chain();
@@ -236,7 +292,8 @@ private:
 
 	void DrawEnts(Render_Level_Params::Pass_Type pass);
 	void DrawLevel();
-	void DrawLevelDepth();
+	void DrawLevelDepth(const Render_Level_Params& params);
+	void DrawSkybox();
 
 	void DrawPlayerViewmodel();
 

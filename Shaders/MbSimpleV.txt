@@ -4,19 +4,20 @@ layout (location = 1) in vec4 VS_IN_Color;
 layout (location = 2) in vec2 VS_IN_TexCoord;
 
 out vec4 FS_IN_Color;
-
-layout(std140) uniform FrameConstants
-{
-	mat4 view_projection;
-	mat4 inv_view_projection;
-	vec4 view_pos;
-}GlobalUBO;
+out vec3 FS_IN_Fragpos;
 
 uniform mat4 ViewProj;
+
 
 void main()
 {
 	FS_IN_Color = VS_IN_Color;
-    
-    gl_Position = ViewProj * vec4(VS_IN_Postion, 1.0);
+	FS_IN_Fragpos = VS_IN_Postion;
+	vec4 pos = ViewProj * vec4(VS_IN_Postion, 1.0);
+	
+	#ifdef SKYBOX
+	gl_Position = pos.xyww;	// so z will always = 1
+	#else
+	gl_Position = pos;
+	#endif
 }

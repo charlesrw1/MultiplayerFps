@@ -33,6 +33,8 @@ public:
 	float vscroll = 0.0;
 	bool fresnel_transparency = false;
 
+	uint64_t cached_render_key = -1;
+
 	int physics = 0;	// physics of surface
 };
 

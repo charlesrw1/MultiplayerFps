@@ -5,9 +5,9 @@ out vec4 FS_OUT_Color;
 in vec4 FS_IN_Color;
 in vec2 FS_IN_TexCoord;
 
-#ifdef TEXTURE3D
-uniform sampler3D basecolor;
-uniform float slice;
+#ifdef TEXTUREARRAY
+uniform sampler2DArray basecolor;
+uniform int slice;
 #else
 uniform sampler2D basecolor;
 #endif
@@ -16,11 +16,12 @@ uniform vec4 tint;
 
 void main()
 {
-#ifdef TEXTURE3D
+#ifdef TEXTUREARRAY
 	vec4 color = texture(basecolor, vec3(FS_IN_TexCoord, slice));
-	FS_OUT_Color = color;
+	FS_OUT_Color = vec4(color.r,0,0,1.0);
 #else
 	vec4 color = texture(basecolor,FS_IN_TexCoord);
+
 #ifdef PARTICLE_SHADER
 	//if(color.r < 0.2)
 	//	discard;
@@ -29,6 +30,7 @@ void main()
 #else
 	FS_OUT_Color = color*FS_IN_Color;
 #endif
-#endif	// TEXTURE3D
+
+#endif
 }
 	

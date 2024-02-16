@@ -8,8 +8,93 @@ in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_BoneColor;
 in vec4 FS_IN_NDC;
 
-uniform vec3 view_pos;
-uniform vec3 view_front;
+
+struct Ubo_View_Constants_Struct
+{
+	mat4 view;
+	mat4 viewproj;
+	mat4 invview;
+	mat4 invproj;
+	vec4 viewpos_time;
+	vec4 viewfront;
+	vec4 viewport_size;
+
+	vec4 near_far_shadowmapepsilon;
+	vec4 fogcolor;
+	vec4 fogparams;
+	vec4 directional_light_dir_and_used;
+	vec4 directional_light_color;
+};
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout (std140, binding = 8) uniform LightSpaceMatrices
+{
+    mat4 Mat[4];
+	vec4 NearPlanes;
+	vec4 FarPlanes;
+}CascadeMats;
+
+//#define CHEAP_PCF
+#ifdef CHEAP_PCF
+uniform sampler2DArray cascade_shadow_map;
+#else
+uniform sampler2DArrayShadow cascade_shadow_map;
+#endif
+
+float sample_sun_shadow(vec3 WorldSpace)
+{
+	int layer = 3;
+	
+	
+	for(int i=0;i<4;i++) {
+	// This adds some instructions but it looks so much better than just checking the plane distance since cascades overlap
+		vec4 frag_pos_light_space = CascadeMats.Mat[i]*vec4(WorldSpace,1.0);
+		vec3 proj_coords=frag_pos_light_space.xyz/frag_pos_light_space.w;
+		if(proj_coords.x>-0.99&&proj_coords.x<0.99&&proj_coords.y>-0.99&&proj_coords.y<0.99 && proj_coords.z >-0.99 && proj_coords.z < 0.99) {
+			layer=i;
+			break;
+		}
+	}
+	
+	
+	vec4 frag_pos_light_space = CascadeMats.Mat[layer]*vec4(WorldSpace,1.0);
+	vec3 proj_coords=frag_pos_light_space.xyz/frag_pos_light_space.w;
+	proj_coords=proj_coords*0.5+0.5;
+	float depth_light_space=proj_coords.z;
+	if(depth_light_space>1.05)
+		return 1.0;
+	
+	float bias = g.near_far_shadowmapepsilon.z;
+	
+	float shadow = 0.0;
+	vec2 texelSize = 1.0 / vec2(textureSize(cascade_shadow_map, 0));
+	vec2 grad = fract(proj_coords.xy/texelSize);
+	for(int x = -1; x <= 1; ++x)
+	{
+		for(int y = -1; y <=1; ++y)
+		{
+			#ifdef CHEAP_PCF
+		
+				float pcf_depth = texture(
+							cascade_shadow_map,
+							vec3(proj_coords.xy + vec2(x, y) * texelSize,
+							layer)
+							).r; 
+				shadow += (depth_light_space - bias) > pcf_depth ? 1.0 : 0.0;
+			#else	// Bilinear filtered, looks nice
+					shadow += texture(cascade_shadow_map,vec4(proj_coords.xy + vec2(x, y) * texelSize,
+							layer,(depth_light_space-bias)));
+			#endif
+		}    
+	}
+	shadow /= 9.0;
+
+	return 1.0-shadow;
+}
+
 
 uniform sampler2D basecolor;
 uniform sampler2D auxcolor;
@@ -23,8 +108,6 @@ uniform samplerCube PBR_prefiltered_specular;
 uniform sampler2D PBR_brdflut;
 
 uniform sampler3D volumetric_fog;
-uniform float near;
-uniform float far;
 
 struct Vfog_Params
 {
@@ -43,16 +126,12 @@ float linearize_depth(float d,float zNear,float zFar)
 #define NEWWAY
 vec3 ApplyVolumetricFog(vec3 incolor, vec3 NDC)
 {
+	float near = g.near_far_shadowmapepsilon.x;
+	float far = g.near_far_shadowmapepsilon.y;
+
 	float lineardepth = linearize_depth(NDC.z*0.5+0.5,near,far);
-	
-	float slices = 128;
-	
-	float scale = slices/log2(far/near);
-	float bias = (slices*log2(near))/log2(far/near);
-	
-	float ztile = (max(log2(lineardepth)*scale - bias,0.0));
 	vec2 xy = (NDC.xy+vec2(1.0))*0.5;
-	vec3 texturecoord = vec3(xy,ztile/slices);
+	vec3 texturecoord = vec3(xy,0.0);
 	
 #ifdef NEWWAY
 	texturecoord.z = pow((lineardepth-near) / fogparam.spread_frustumend.y,1.0/fogparam.spread_frustumend.x);
@@ -125,6 +204,49 @@ float sphOcclusion( in vec3 pos, in vec3 nor, in vec4 sph )
 
 
 #endif
+// learnopengl code >:)
+#define PI 3.1415927
+// ----------------------------------------------------------------------------
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+
+    float nom   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / max(denom,0.000001);
+}
+// ----------------------------------------------------------------------------
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+// ----------------------------------------------------------------------------
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+// ----------------------------------------------------------------------------
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 
 vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
 {
@@ -140,8 +262,14 @@ vec3 decode_normal(vec2 e)
     return n;
 }
 
+uniform bool transmissive = false;
+
+
 void main()
 {
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_front = g.viewfront.xyz;
+
 
 	vec4 tex = texture(basecolor, FS_IN_Texcoord);
 	tex.rgb = pow(tex.rgb,vec3(2.2));
@@ -150,22 +278,78 @@ void main()
 		discard;
 #endif
 
-
+	vec3 V = normalize(view_pos-FS_IN_FragPos);
 	vec3 N = normalize(FS_IN_Normal);
+	
+#ifdef WIND
+	if(dot(N, V)<0)
+		N = -N;
+#endif
+	
+	// hacky transmissive
+
+	vec3 R = reflect(-V,N);
 	float Roughness = in_roughness;
 	vec3 Albedo = tex.rgb;
 	float Metalness = in_metalness;
-	
-// Lighting
-	vec3 V = normalize(view_pos-FS_IN_FragPos);
-	
-	vec3 R = reflect(-V,N);
-	const float MAX_REFLECTION_LOD = 4.0;
-	vec3 prefiltered_color = textureLod(PBR_prefiltered_specular,R,Roughness*MAX_REFLECTION_LOD).rgb;
-	//prefiltered_color = pow(prefiltered_color,vec3(2.2));
-	
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0,Albedo,Metalness);
+// punctual lights
+	vec3 Lo = vec3(0.0);
+	vec3 L = -g.directional_light_dir_and_used.xyz;
+    vec3 H = normalize(V + L);
+    vec3 radiance = g.directional_light_color.rgb*0.3;
+#ifndef LIGHTMAPPED
+	{
+		vec3 surface_N = N;
+        // Cook-Torrance BRDF
+		
+        float NDF = DistributionGGX(surface_N, H, Roughness);   
+        float G   = GeometrySmith(surface_N, V, L, Roughness);    
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
+        
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(surface_N, V), 0.0) * max(dot(surface_N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+        vec3 specular = numerator / 1.0;
+        
+		float shadow = sample_sun_shadow(FS_IN_FragPos);
+		
+         // kS is equal to Fresnel
+        vec3 kS = F;
+        // for energy conservation, the diffuse and specular light can't
+        // be above 1.0 (unless the surface emits light); to preserve this
+        // relationship the diffuse component (kD) should equal 1.0 - kS.
+        vec3 kD = vec3(1.0) - kS;
+        // multiply kD by the inverse metalness such that only non-metals 
+        // have diffuse lighting, or a linear blend if partly metal (pure metals
+        // have no diffuse light).
+        kD *= 1.0 - Metalness;	                
+            
+        // scale light by NdotL
+		#ifdef WIND
+		{
+			float NdotL = abs(dot(surface_N, L));
+			float strength = 0.5;
+			if(dot(surface_N, L) < 0)
+				specular = vec3(0.0);
+			
+			Lo += (kD * Albedo * strength / PI + specular) * radiance * NdotL * shadow;
+		}
+		#else
+		{
+			float NdotL = max(dot(surface_N, L), 0.0);        
+
+			// add to outgoing radiance Lo
+			Lo += (kD * Albedo / PI + specular) * radiance * NdotL * shadow;
+		}
+		#endif
+	}
+#endif
+
+
+// Lighting
+	const float MAX_REFLECTION_LOD = 4.0;
+	vec3 prefiltered_color = textureLod(PBR_prefiltered_specular,R,Roughness*MAX_REFLECTION_LOD).rgb;
 
 	vec3 F = FresnelSchlickRougness(max(dot(N,V),0.0),F0,Roughness);
 	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(N,V),0.0),Roughness)).rg;
@@ -174,10 +358,9 @@ void main()
 	
 	
 	vec3 irradiance = texture(PBR_irradiance,N).rgb;
-	irradiance = textureLod(PBR_prefiltered_specular,N,4.0).rgb;
-	//irradiance = pow(irradiance, vec3(2.2));
+
 #ifdef LIGHTMAPPED
-	irradiance = texture(lightmap, FS_IN_TexCoord2).rgb;
+	irradiance = texture(lightmap, FS_IN_TexCoord2).rgb*1.5;
 #endif
 	vec3 diffuse = irradiance*Albedo;
 
@@ -188,12 +371,22 @@ void main()
 	
 	vec3 ambient =(kD*diffuse+ specular)*ao;
 	
+#ifdef LIGHTMAPPED
+	float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
+	ambient = mix(ambient*0.2, ambient, sun);
+#endif
+
+	ambient += Lo;
+	
+	
+	
 	vec3 NDC = FS_IN_NDC.xyz/FS_IN_NDC.w;
 	vec3 out_color = ambient;
+	
 	out_color = ApplyVolumetricFog(ambient,NDC);
 	
 	#ifdef ANIMATED
-	out_color += vec3(1,10,1);
+	//out_color += vec3(1,10,1);
 	#endif
 
 	

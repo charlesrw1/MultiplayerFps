@@ -1,0 +1,72 @@
+layout (std140, binding = 8) uniform LightSpaceMatrices
+{
+    mat4 Mat[4];
+	vec4 NearPlanes;
+	vec4 FarPlanes;
+}CascadeMats;
+
+#define CHEAP_PCF
+
+#ifdef CHEAP_PCF
+uniform sampler2DArray cascade_shadow_map;
+#else
+uniform sampler2DArrayShadow cascade_shadow_map;
+#endif
+
+uniform vec3 sun_dir;
+uniform vec3 sun_color;
+uniform vec4 cascade_plane_dist;
+uniform mat4 cascade_dist_matrix;
+uniform float epsilon;
+
+
+float sample_sun_shadow(vec3 WorldSpace)
+{
+	int layer = 3;
+	
+	
+	for(int i=0;i<4;i++) {
+	// This adds some instructions but it looks so much better than just checking the plane distance since cascades overlap
+		vec4 frag_pos_light_space = CascadeMats.Mat[i]*vec4(WorldSpace,1.0);
+		vec3 proj_coords=frag_pos_light_space.xyz/frag_pos_light_space.w;
+		if(proj_coords.x>-0.99&&proj_coords.x<0.99&&proj_coords.y>-0.99&&proj_coords.y<0.99 && proj_coords.z >-0.99 && proj_coords.z < 0.99) {
+			layer=i;
+			break;
+		}
+	}
+	
+	
+	vec4 frag_pos_light_space = CascadeMats.Mat[layer]*vec4(WorldSpace,1.0);
+	vec3 proj_coords=frag_pos_light_space.xyz/frag_pos_light_space.w;
+	proj_coords=proj_coords*0.5+0.5;
+	float depth_light_space=proj_coords.z;
+	if(depth_light_space>1.05)
+		return 1.0;
+	
+	float bias = epsilon;
+	
+	float shadow = 0.0;
+	vec2 texelSize = 1.0 / vec2(textureSize(cascade_shadow_map, 0));
+	vec2 grad = fract(proj_coords.xy/texelSize);
+	for(int x = -1; x <= 1; ++x)
+	{
+		for(int y = -1; y <=1; ++y)
+		{
+			#ifdef CHEAP_PCF
+		
+				float pcf_depth = texture(
+							cascade_shadow_map,
+							vec3(proj_coords.xy + vec2(x, y) * texelSize,
+							layer)
+							).r; 
+				shadow += (depth_light_space - bias) > pcf_depth ? 1.0 : 0.0;
+			#else	// Bilinear filtered, looks nice
+					shadow += texture(cascade_shadow_map,vec4(proj_coords.xy + vec2(x, y) * texelSize,
+							layer,(depth_light_space-bias)));
+			#endif
+		}    
+	}
+	shadow /= 9.0;
+
+	return 1.0-shadow;
+}

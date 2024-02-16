@@ -41,7 +41,7 @@ float GetPlaneDist_New(uint z, float cell_depth)
 {
 	float d = float(z)*cell_depth + cell_depth*0.5;	// d: [0,1]
 	d = pow(d, fogparam.spread_frustumend.x);
-	return d*fogparam.spread_frustumend.y;
+	return d*fogparam.spread_frustumend.y+znear;
 }
 #define NEWWAY
 void main()
@@ -54,25 +54,21 @@ void main()
 	//vec4 currentslice = imageLoad(VolumeTexture,ivec3(OutputCoords.xy,0));
 	//WriteOutput(ivec3(OutputCoords),currentslice);
 	float deltaz = 0.0;
+	float prev_z = 0.0;
 	for(uint z=0;z<128;z++)
 	{
 	
-	#ifdef NEWWAY
-		deltaz =  GetPlaneDist_New(z+1, fog_cell_size.z)-GetPlaneDist_New(z, fog_cell_size.z);
-	#else
-		deltaz = GetPlaneDist(z+1)-GetPlaneDist(z);
-	#endif
-	
-		const vec4 currentslice = imageLoad(VolumeTexture,ivec3(OutputCoords.xy,z));
-		const float transmittance = exp(-currentslice.a*deltaz*0.1);
-		vec3 slice_scattering_integral = currentslice.rgb*(1.0-transmittance)/max(currentslice.a,0.00001);
-		
-		accumulatedscattrans.rgb += slice_scattering_integral*accumulatedscattrans.a;
+		float zslice = GetPlaneDist_New(z,fog_cell_size.z);
+		float dist = abs(zslice-prev_z);
+		vec4 fog = imageLoad(VolumeTexture,ivec3(OutputCoords.xy,z));
+		float transmittance = exp(-fog.a*dist);
+		accumulatedscattrans.rgb += ((fog.rgb-fog.rgb*transmittance)/max(fog.a,0.00001))*accumulatedscattrans.a;
 		accumulatedscattrans.a *= transmittance;
+		prev_z = zslice;
 		
 		//accumulatedscattrans.rgb += currentslice.rgb*accumulatedscattrans.a*deltaz;
 		//accumulatedscattrans.a *= transmittance;
-		imageStore(OutputVolumeTexture,ivec3(OutputCoords.xy,z),accumulatedscattrans);
+		imageStore(OutputVolumeTexture,ivec3(OutputCoords.xy,z),vec4(accumulatedscattrans.rgb,1.0-accumulatedscattrans.a));
 	}
 	//deltaz = GetPlaneDist(1)-GetPlaneDist(0);
 	//for(uint z=1;z<64;z++)

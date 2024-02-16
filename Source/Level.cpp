@@ -57,7 +57,7 @@ void add_level_light(Level* l, tinygltf::Model& scene, glm::mat4 transform, int 
 	Level_Light ll;
 	tinygltf::Light& light = scene.lights.at(index);
 	ll.position = transform[3];
-	ll.direction = transform[2];	// fixme
+	ll.direction = -transform[2];	// fixme
 	ll.type = ll.POINT;
 	ll.color = glm::vec3(light.color[0], light.color[1], light.color[2]) * (float)light.intensity;
 	if (light.type == "directional") {
@@ -73,8 +73,7 @@ void add_level_light(Level* l, tinygltf::Model& scene, glm::mat4 transform, int 
 	else {
 		sys_print("bad light type %s", light.type.c_str());
 	}
-	
-
+	l->lights.push_back(ll);
 }
 
 static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, 

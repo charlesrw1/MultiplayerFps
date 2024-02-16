@@ -5,9 +5,9 @@
 
 enum class ShaderResult
 {
+	SHADER_SUCCESS,
 	SHADER_PARSE_FAIL,
 	SHADER_COMPILE_FAIL,
-	SHADER_SUCCESS
 };
 
 class Shader

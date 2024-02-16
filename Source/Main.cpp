@@ -28,6 +28,7 @@
 #include "Player.h"
 #include "Config.h"
 #include "Draw.h"
+#include "Profilier.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -256,33 +257,21 @@ void Game_Engine::make_move()
 	if(cl->get_state()>=CS_CONNECTED) cl->get_command(cl->OutSequence()) = command;
 }
 
-void Renderer::on_level_start()
+void Renderer::render_world_cubemap(vec3 probe_pos, EnvCubemap* out, uint32_t fbo, int size)
 {
-	// >>> PBR BRANCH
-	// render cubemap and integrate it
-	glm::vec3 probe_pos = glm::vec3(0, 1.0, 0);
-
-	uint32_t fbo, rbo;
-	glGenFramebuffers(1, &fbo);
-	glGenRenderbuffers(1, &rbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_SIZE, CUBEMAP_SIZE);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-	EnvCubemap cubemap;
-	cubemap.size = CUBEMAP_SIZE;
+	out->size = size;
 
 	uint32_t cm_id;
 
 	glGenTextures(1, &cm_id);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cm_id);
 	for (int i = 0; i < 6; i++)
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_SIZE, CUBEMAP_SIZE, 0, GL_RGB, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, size, size, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glCheckError();
 	auto& helper = EnviornmentMapHelper::get();
@@ -294,31 +283,91 @@ void Renderer::on_level_start()
 		cubemap_view.view = helper.cubemap_views[i];
 		cubemap_view.view[3] = glm::vec4(probe_pos, 1.0);
 		cubemap_view.origin = probe_pos;
-		cubemap_view.width = CUBEMAP_SIZE;
-		cubemap_view.height = CUBEMAP_SIZE;
+		cubemap_view.width = size;
+		cubemap_view.height = size;
 		cubemap_view.far = 100.f;
 		cubemap_view.near = 0.001f;
-		
 		cubemap_view.proj = helper.cubemap_projection;
 		cubemap_view.viewproj = cubemap_view.proj * cubemap_view.view;
+
 		glCheckError();
 
 		Render_Level_Params params;
 		params.view = cubemap_view;
 		params.output_framebuffer = fbo;
+		params.draw_level = true;
 		params.draw_ents = false;
+		params.clear_framebuffer = true;
+		params.provied_constant_buffer = 0;
+		params.pass = Render_Level_Params::STANDARD;
+		params.upload_constants = true;
 
 		render_level_to_target(params);
 		glCheckError();
 
 	}
-	cubemap.original_cubemap = cm_id;
+	out->original_cubemap = cm_id;
+	helper.convolute_irradiance(out);
+	helper.compute_specular(out);
+}
 
-	helper.convolute_irradiance(&cubemap);
-	helper.compute_specular(&cubemap);
+void Renderer::on_level_start()
+{
+	// Render cubemaps
+	auto& espawns = engine.level->espawns;
+	for (int i = 0; i < espawns.size(); i++) {
+		if (espawns[i].classname == "cubemap_box") {
+			Level::Box_Cubemap bc;
+			bc.boxmin = espawns[i].position - espawns[i].scale;
+			bc.boxmax = espawns[i].position + espawns[i].scale;
+			
+			if (espawns[i].name.rfind("_!p1"))
+				bc.priority = 1;
+			else if (espawns[i].name.rfind("_!p-1"))
+				bc.priority = -1;
+			engine.level->cubemaps.push_back(bc);
+		}
+	}
+	for (int i = 0; i < espawns.size(); i++) {
+		if (espawns[i].classname == "cubemap") {
+			bool found = false;
+			for (int j = 0; j < engine.level->cubemaps.size(); j++) {
+				auto& bc = engine.level->cubemaps[j];
+				Bounds b(bc.boxmin, bc.boxmax);
+				if (!b.inside(espawns[i].position, 0.0))
+					continue;
+				if (bc.has_probe_pos) {
+					sys_print("Cubemap box with 2 probes\n");
+					continue;
+				}
+				found = true;
+				bc.has_probe_pos = true;
+				bc.position = espawns[i].position;
+			}
+			if (!found) {
+				sys_print("Cubemap not inside box\n");
+			}
+		}
+	}
 
+	uint32_t cmfbo, cmrbo;
+	glGenFramebuffers(1, &cmfbo);
+	glGenRenderbuffers(1, &cmrbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, cmfbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, cmrbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_SIZE, CUBEMAP_SIZE);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, cmrbo);
 
-	this->cubemap = cubemap;
+	Level* l = engine.level;
+	for (int i = 0; i < l->cubemaps.size(); i++) {
+		Level::Box_Cubemap& bc = l->cubemaps[i];
+		if (!bc.has_probe_pos) continue;
+
+		render_world_cubemap(bc.position, &bc.cube, cmfbo, CUBEMAP_SIZE);
+	}
+
+	glDeleteRenderbuffers(1, &cmrbo);
+	glDeleteFramebuffers(1, &cmfbo);
 }
 
 void Game_Engine::init_sdl_window()
@@ -707,47 +756,43 @@ void Renderer::set_shader_sampler_locations()
 	shader().set_int("PBR_prefiltered_specular", LIGHTMAP_SAMPLER + 2);
 	shader().set_int("PBR_brdflut", LIGHTMAP_SAMPLER+3);
 	shader().set_int("volumetric_fog", LIGHTMAP_SAMPLER + 4);
+
+	shader().set_int("cascade_shadow_map", LIGHTMAP_SAMPLER + 5);
 }
 
 void Renderer::set_depth_shader_constants()
 {
-	shader().set_mat4("ViewProj", vs.viewproj);
+	
+}
+
+void set_standard_draw_data()
+{
+	int start = Renderer::LIGHTMAP_SAMPLER;
+	// >>> PBR BRANCH
+	glActiveTexture(GL_TEXTURE0 + start + 1);
+	auto& cm = engine.level->cubemaps[draw.cubemap_index];
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cm.cube.irradiance_cm);
+	glActiveTexture(GL_TEXTURE0 + start + 2);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cm.cube.prefiltered_specular_cm);
+	glActiveTexture(GL_TEXTURE0 + start + 3);
+	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
+
+	glActiveTexture(GL_TEXTURE0 + start + 5);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, draw.shadowmap.shadow_map_array);
+
+	//shader().set_vec4("aoproxy_sphere", vec4(engine.local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
+	//shader().set_float("aoproxy_scale_factor", aosphere.z);
+
+	glActiveTexture(GL_TEXTURE0 + start + 4);
+	glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
+
+	glBindBufferBase(GL_UNIFORM_BUFFER, 4, draw.volfog.param_ubo);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.csm_ubo);
 }
 
 void Renderer::set_shader_constants()
 {
-	shader().set_mat4("ViewProj", vs.viewproj);
-	
-	// fog vars
-	shader().set_float("near", vs.near);
-	shader().set_float("far", vs.far);
-
-
-	shader().set_float("fog_max_density", 1.0);
-	shader().set_vec3("fog_color", vec3(0.7));
-	shader().set_float("fog_start", 10.f);
-	shader().set_float("fog_end", 30.f);
-	shader().set_vec3("view_front", vs.front);
-	shader().set_vec3("view_pos", vs.origin);
 	shader().set_vec3("light_dir", glm::normalize(-vec3(1)));
-
-
-
-	// >>> PBR BRANCH
-	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 1);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap.irradiance_cm);
-	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 2);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap.prefiltered_specular_cm);
-	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER+3);
-	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
-
-	shader().set_vec4("aoproxy_sphere", vec4(engine.local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
-	shader().set_float("aoproxy_scale_factor", aosphere.z);
-
-	glActiveTexture(GL_TEXTURE0 + LIGHTMAP_SAMPLER + 4);
-	glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
-
-	glBindBufferBase(GL_UNIFORM_BUFFER, 4, volfog.param_ubo);
 }
 
 static int combine_flags_type(int flags, int type, int flag_bits)
@@ -757,48 +802,16 @@ static int combine_flags_type(int flags, int type, int flag_bits)
 
 void Renderer::reload_shaders()
 {
-#if 0
-	const char* vert = "AnimBasicV.txt";
-	const char* frag = "AnimBasicF.txt";
-	const char* flag_strs[] = { "ALPHATEST,","LIGHTMAPPED,","ANIMATED,","BLEND2,","WIND," };
-	bool valid[NUM_MSF];
-	memset(valid, 0, NUM_MSF);
-	valid[0] = true;
-	// all alpha tests are valid
-	for (int i = 0; i < NUM_MSF; i++)
-		if (i & MSF_AT) valid[i] = true;
-	valid[MSF_LM] = true;
-	valid[MSF_LM | MSF_BLEND2] = true;
-	valid[MSF_AN] = true;
-	valid[MSF_WIND] = true;
-	valid[MSF_BLEND2] = true;
-
-	std::string defines;
-	int temp = NUM_MSF;
-	int bits = 0;
-	while (temp >>= 1) bits++;
-	for (int i = 0; i < NUM_MSF; i++) {
-		if (!valid[i]) continue;
-		defines.clear();
-		for (int j = 0; j < bits; j++) {
-			if (i & (1 << j)) {
-				defines += flag_strs[j];
-			}
-		}
-		if (!defines.empty())defines.pop_back();
-		Shader::compile(&shade[i], vert, frag, defines);
-	}
-
-#endif
 	// >>> PBR BRANCH
-	const char* frag = "PbrBasicF.txt";
 
 	Shader::compile(&shade[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&shade[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
 	Shader::compile(&shade[S_TEXTURED3D], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
+	Shader::compile(&shade[S_TEXTUREDARRAY], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
+	Shader::compile(&shade[S_SKYBOXCUBE], "MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
 
 
-
+	const char* frag = "PbrBasicF.txt";
 	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", frag, "ANIMATED");
 	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", frag);
 	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", frag, "ALPHATEST");
@@ -851,27 +864,40 @@ struct Ubo_View_Constants_Struct
 {
 	glm::mat4 view;
 	glm::mat4 viewproj;
+	glm::mat4 invview;
+	glm::mat4 invproj;
 	glm::vec4 viewpos_time;
 	glm::vec4 viewfront;
+	glm::vec4 viewport_size;
 
-	glm::vec4 near_far;
-
+	glm::vec4 near_far_shadowmapepsilon;
 	glm::vec4 fogcolor;
 	glm::vec4 fogparams;
+	glm::vec4 directional_light_dir_and_used;
+	glm::vec4 directional_light_color;
 };
 
-void Renderer::upload_ubo_view_constants()
+void Renderer::upload_ubo_view_constants(uint32_t ubo)
 {
 	Ubo_View_Constants_Struct constants;
 	constants.view = vs.view;
 	constants.viewproj = vs.viewproj;
+	constants.invview = glm::inverse(vs.view);
+	constants.invproj = glm::inverse(vs.proj);
 	constants.viewpos_time = glm::vec4(vs.origin, engine.time);
 	constants.viewfront = glm::vec4(vs.front, 0.0);
-	constants.near_far = glm::vec4(vs.near, vs.far, 0, 0);
+	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
+
+	constants.near_far_shadowmapepsilon = glm::vec4(vs.near, vs.far, shadowmap.epsilon, 0);
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
 
-	glBindBuffer(GL_UNIFORM_BUFFER, ubo.view_constants);
+	constants.directional_light_dir_and_used = vec4(shadowmap.current_sun.direction,0.0);
+	if (shadowmap.enabled)
+		constants.directional_light_dir_and_used.w = 1.0;
+	constants.directional_light_color = vec4(shadowmap.current_sun.color, 0.0);
+
+	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
@@ -883,13 +909,13 @@ void Shadow_Map_System::init()
 {
 	make_csm_rendertargets();
 	glGenBuffers(1, &csm_ubo);
+	glGenBuffers(4, frame_view_ubos);
 }
 void Shadow_Map_System::make_csm_rendertargets()
 {
-	csm_resolution = csm_resolutions[(int)quality];
-
 	if (quality == 0)
 		return;
+	csm_resolution = csm_resolutions[(int)quality];
 
 	glGenTextures(1, &shadow_map_array);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_map_array);
@@ -951,6 +977,13 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 
 void Shadow_Map_System::update()
 {
+	if (draw.r_shadow_quality->integer < 0) cfg.set_var("r_shadow_quality", "0");
+	else if (draw.r_shadow_quality->integer > 3) cfg.set_var("r_shadow_quality", "3");
+	if (quality != draw.r_shadow_quality->integer) {
+		quality = draw.r_shadow_quality->integer;
+		targets_dirty = true;
+	}
+
 	if (targets_dirty) {
 		glDeleteTextures(1, &shadow_map_array);
 		glDeleteFramebuffers(1, &framebuffer);
@@ -960,11 +993,14 @@ void Shadow_Map_System::update()
 	if (quality == 0)
 		return;
 
+	GPUFUNCTIONSTART;
+
 	glm::vec3 directional_dir = vec3(0.f);
 	bool found = false;
 	for (int i = 0; i < engine.level->lights.size(); i++) {
 		if (engine.level->lights[i].type == Level_Light::DIRECTIONAL) {
 			directional_dir = engine.level->lights[i].direction;
+			current_sun = engine.level->lights[i];
 			found = true;
 			break;
 		}
@@ -999,16 +1035,17 @@ void Shadow_Map_System::update()
 	glBufferData(GL_UNIFORM_BUFFER, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-
 	// now setup scene for rendering
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 	for (int i = 0; i < 4; i++) {
+		GPUSCOPESTART("Render csm layer");
+
 		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0, i);
 
 		Render_Level_Params params;
 		params.output_framebuffer = framebuffer;
 		params.pass = Render_Level_Params::SHADOWMAP;
-		
+		params.include_lightmapped = false;
 		View_Setup setup;
 		setup.width = csm_resolution;
 		setup.height = csm_resolution;
@@ -1017,6 +1054,10 @@ void Shadow_Map_System::update()
 		setup.viewproj = matricies[i];
 		setup.view = setup.proj = mat4(1);
 		params.view = setup;
+		params.cull_front_face = true;
+		params.force_backface = true;
+		params.provied_constant_buffer = frame_view_ubos[i];
+		params.upload_constants = true;
 
 		draw.render_level_to_target(params);
 	}
@@ -1162,6 +1203,8 @@ void Volumetric_Fog_System::init()
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+
 	glGenTextures(1, &voltexture_prev);
 	glBindTexture(GL_TEXTURE_3D, voltexture_prev);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -1169,6 +1212,8 @@ void Volumetric_Fog_System::init()
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);	// REEE!!!!!!!!!!!!!
+
 
 	glGenBuffers(1, &light_ssbo);
 	glGenBuffers(1, &param_ubo);
@@ -1178,6 +1223,11 @@ void Volumetric_Fog_System::init()
 
 void Volumetric_Fog_System::compute()
 {
+	if (!draw.r_volumetric_fog->integer)
+		return;
+
+	GPUFUNCTIONSTART;
+
 	static Vfog_Light light_buffer[64];
 	int num_lights = 0;
 	{
@@ -1204,6 +1254,7 @@ void Volumetric_Fog_System::compute()
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, 4, param_ubo);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, light_ssbo);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.active_constants_ubo);
 	glCheckError();
 	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
 	{
@@ -1297,6 +1348,9 @@ void Renderer::Init()
 	r_draw_viewmodel		= cfg.get_var("draw_viewmodel", "1");
 	vsync					= cfg.get_var("vsync", "1");
 	r_bloom					= cfg.get_var("r_bloom", "1");
+	r_shadow_quality = cfg.get_var("r_shadow_quality", "1");
+	r_volumetric_fog = cfg.get_var("r_volumetric_fog", "1");
+
 
 
 	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
@@ -1307,13 +1361,14 @@ void Renderer::Init()
 
 	// >>> PBR BRANCH
 	EnviornmentMapHelper::get().init();
-	cubemap = EnviornmentMapHelper::get().create_from_file("hdr_sky.hdr");
-	EnviornmentMapHelper::get().convolute_irradiance(&cubemap);
-	EnviornmentMapHelper::get().compute_specular(&cubemap);
+	skybox = EnviornmentMapHelper::get().create_from_file("hdr_sky1.hdr");
+	EnviornmentMapHelper::get().convolute_irradiance(&skybox);
+	EnviornmentMapHelper::get().compute_specular(&skybox);
 
 	lens_dirt = mats.find_texture("lens_dirt.jpg");
 
-	glGenBuffers(1, &ubo.view_constants);
+	glGenBuffers(1, &ubo.current_frame);
+
 
 	volfog.init();
 	shadowmap.init();
@@ -1330,6 +1385,8 @@ void Renderer::InitFramebuffers()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, s_w, s_h, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glCheckError();
 
 	glDeleteTextures(1, &tex.scene_depthstencil);
@@ -1338,6 +1395,8 @@ void Renderer::InitFramebuffers()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, s_w, s_h, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glCheckError();
 
 	glDeleteFramebuffers(1, &fbo.scene);
@@ -1402,6 +1461,8 @@ static int bloom_layer = 0;
 
 void Renderer::render_bloom_chain()
 {
+	GPUFUNCTIONSTART;
+
 	if (!r_bloom->integer)
 		return;
 
@@ -1428,6 +1489,7 @@ void Renderer::render_bloom_chain()
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.bloom_chain[i],0);
 		shader().set_vec2("srcResolution", vec2(src_x, src_y));
+		shader().set_int("mipLevel", i); 
 		src_x = tex.bloom_chain_size[i].x;
 		src_y = tex.bloom_chain_size[i].y;
 
@@ -1472,27 +1534,99 @@ void Renderer::render_bloom_chain()
 	glCheckError();
 }
 
+void Renderer::DrawSkybox()
+{
+	static Config_Var* draw_skybox = cfg.get_var("r_skybox", "1");
+	if (!draw_skybox->integer)
+		return;
+
+	MeshBuilder mb;
+	mb.Begin();
+	mb.PushSolidBox(-vec3(1), vec3(1), COLOR_WHITE);
+	mb.End();
+
+	set_shader(shade[S_SKYBOXCUBE]);
+	glm::mat4 view = vs.view;
+	view[3] = vec4(0, 0, 0, 1);	// remove translation
+	shader().set_mat4("ViewProj", vs.proj * view);
+	shader().set_vec2("screen_size", vec2(vs.width, vs.height));
+	shader().set_int("volumetric_fog", 1);
+	shader().set_int("cube", 0);
+
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, engine.level->cubemaps[1].cube.original_cubemap);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
+
+	glDisable(GL_CULL_FACE);
+	mb.Draw(GL_TRIANGLES);
+	glEnable(GL_CULL_FACE);
+	mb.Free();
+}
+
 void Renderer::render_level_to_target(Render_Level_Params params)
 {
 	vs = params.view;
+	
+	static Config_Var* upload_ubo = cfg.get_var("dbg/uubo", "1");
+	if (upload_ubo->integer) {
+		uint32_t view_ubo = params.provied_constant_buffer;
+		bool upload = params.upload_constants;
+		if (params.provied_constant_buffer == 0) {
+			view_ubo = ubo.current_frame;
+			upload = true;
+		}
+		if (upload)
+			upload_ubo_view_constants(view_ubo);
+		active_constants_ubo = view_ubo;
+	}
+
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+	set_standard_draw_data();
+
 	glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
 	glViewport(0, 0, vs.width, vs.height);
 	if (params.clear_framebuffer) {
 		glClearColor(0.f, 0.f, 0.f, 1.f);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
+
+	if (params.cull_front_face) {
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(shadowmap.poly_factor, shadowmap.poly_units);
+		glCullFace(GL_FRONT);
+	}
+	if (params.force_backface)
+		glDisable(GL_CULL_FACE);
+
+
 	if (params.draw_level) {
 		if (params.pass == Render_Level_Params::STANDARD)
 			DrawLevel();
 		else
-			DrawLevelDepth();
+			DrawLevelDepth(params);
 	}
 	if (params.draw_ents)
 		DrawEnts(params.pass);
+
+	if (params.pass == Render_Level_Params::STANDARD) {
+		DrawSkybox();
+	}
+
+
+	if (params.cull_front_face) {
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		glCullFace(GL_BACK);
+	}
+	if (params.force_backface)
+		glEnable(GL_CULL_FACE);
 }
 
 void Renderer::ui_render()
 {
+	GPUFUNCTIONSTART;
+
 	set_shader(shade[S_TEXTURED]);
 	shader().set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
@@ -1525,20 +1659,27 @@ void Renderer::ui_render()
 		ui_builder.Draw(GL_TRIANGLES);
 	}
 
+	glCheckError();
+
 
 	glDisable(GL_BLEND);
 	if(0){
-		set_shader(shade[S_TEXTURED3D]);
+		set_shader(shade[S_TEXTUREDARRAY]);
+		glCheckError();
+
 		shader().set_mat4("Model", mat4(1));
 		glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
 		shader().set_mat4("ViewProj", mat4(1));
-		shader().set_float("slice", slice_3d);
+		shader().set_int("slice", (int)slice_3d);
 
 		ui_builder.Begin();
 		ui_builder.Push2dQuad(glm::vec2(-1, 1), glm::vec2(1, -1), glm::vec2(0, 0),
 			glm::vec2(1, 1), COLOR_WHITE);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, shadowmap.shadow_map_array);
+
+		glCheckError();
+
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 
@@ -1574,6 +1715,8 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 
 void Renderer::FrameDraw()
 {
+	GPUFUNCTIONSTART;
+
 	cur_shader = 0;
 	for (int i = 0; i < NUM_SAMPLERS;i++)
 		cur_tex[i] = 0;
@@ -1581,30 +1724,44 @@ void Renderer::FrameDraw()
 		InitFramebuffers();
 	lastframe_vs = current_frame_main_view;
 	current_frame_main_view = engine.local.last_view;
-	
+	vs = current_frame_main_view;
+
+	// Shadow map updates
 	shadowmap.update();
 	
+	// Volumetric fog updates
 	// temp!!
 	auto& e = engine.local_player();
 	dyn_light.position = vec3(0, 2, 0);
 	dyn_light.type = Level_Light::POINT;
 	dyn_light.color = vec3(10, 10, 0);
 	// endtemp
+
+	vs = current_frame_main_view;
+	upload_ubo_view_constants(ubo.current_frame);
+	active_constants_ubo = ubo.current_frame;
+
 	volfog.compute();
 
-	// main level render
-	Render_Level_Params params;
-	params.output_framebuffer = fbo.scene;
-	params.view = current_frame_main_view;
-	params.pass = Render_Level_Params::STANDARD;
 
-	render_level_to_target(params);
+	// main level render
+	{
+		GPUSCOPESTART("Main level render");
+		Render_Level_Params params;
+		params.output_framebuffer = fbo.scene;
+		params.view = current_frame_main_view;
+		params.pass = Render_Level_Params::STANDARD;
+		params.upload_constants = false;
+		params.provied_constant_buffer = ubo.current_frame;
+		render_level_to_target(params);
+	}
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	DrawEntBlobShadows();
 	engine.local.pm.draw_particles();
 	glCheckError();
 
 
+	// Bloom update
 	render_bloom_chain();
 
 	int x = vs.width;
@@ -1660,12 +1817,44 @@ void Renderer::FrameDraw()
 
 	mb.Free();
 
+	cubemap_positions_debug();
+
 	glCheckError();
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-
+	// FIXME: ubo view constant buffer might be wrong since its changed around a lot (bad design)
 	if(!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
 		DrawPlayerViewmodel();
+}
+
+void Renderer::cubemap_positions_debug()
+{
+	set_shader(shade[S_SIMPLE]);
+	shader().set_mat4("ViewProj", vs.viewproj);
+	shader().set_mat4("Model", mat4(1.f));
+	
+	MeshBuilder mb;
+	mb.Begin();
+	Level* l = engine.level;
+	for (int i = 0; i < l->cubemaps.size(); i++) {
+		auto& cube = l->cubemaps[i];
+		if (!cube.has_probe_pos) continue;
+		mb.PushLineBox(cube.boxmin, cube.boxmax, COLOR_CYAN);
+		mb.AddSphere(cube.position, 1.0, 5, 5, COLOR_RED);
+	}
+	mb.End();
+	glDisable(GL_DEPTH_TEST);
+	mb.Draw(GL_LINES);
+	glEnable(GL_DEPTH_TEST);
+	mb.Free();
+
+	for (int i = 0; i < l->cubemaps.size(); i++) {
+		auto& cube = l->cubemaps[i];
+		if (!cube.has_probe_pos) continue;
+		glm::mat4 model = glm::translate(mat4(1), cube.position);
+		DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), model, nullptr, 0.0, 1.0);
+	}
+
 }
 
 Shader& Renderer::shader()
@@ -1978,7 +2167,17 @@ void draw_wind_menu()
 	ImGui::DragFloat3("ambient", &draw.ambientvfog.x, 0.02);
 	ImGui::DragFloat("spread", &draw.volfog.spread, 0.02);
 	ImGui::DragFloat("frustum", &draw.volfog.frustum_end, 0.02);
-	ImGui::DragFloat("slice", &draw.slice_3d, 0.02, 0,1);
+	ImGui::DragFloat("slice", &draw.slice_3d, 0.04, 0,4);
+	ImGui::DragFloat("epsilon", &draw.shadowmap.epsilon, 0.0002, 0, 0.5);
+	ImGui::DragFloat("log_lin_lerp_factor", &draw.shadowmap.log_lin_lerp_factor, 0.02, 0, 1.0);
+	ImGui::DragFloat("poly_factor", &draw.shadowmap.poly_factor, 0.02, 0, 8.0);
+	ImGui::DragFloat("poly_units", &draw.shadowmap.poly_units, 0.02, 0, 8.0);
+	ImGui::DragFloat("z_dist_scaling", &draw.shadowmap.z_dist_scaling, 0.02, 0, 8.0);
+	ImGui::SliderInt("cubemap index", &draw.cubemap_index, 0, 12);
+
+
+
+
 
 
 
@@ -1999,7 +2198,7 @@ void draw_wind_menu()
 	ImGui::Image((ImTextureID)EnviornmentMapHelper::get().integrator.lut_id, ImVec2(512, 512));
 }
 
-void Renderer::DrawLevelDepth()
+void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 {
 	const Level* level = engine.level;
 	bool force_set = true;
@@ -2023,12 +2222,17 @@ void Renderer::DrawLevelDepth()
 			bool mat_colors = mp.has_colors();
 			int mat_shader_type = gs->shader_type;
 
+			if (!params.include_lightmapped && mat_lightmapped)
+				continue;
+
 			if (mat_shader_type == Game_Shader::S_WINDSWAY)
 			{
 				if (mat_is_at)
 					set_shader(shade[S_WIND_AT_DEPTH]);
 				else 
 					set_shader(shade[S_WIND_DEPTH]);
+
+				set_wind_constants();
 			}
 			else
 			{
@@ -2216,7 +2420,7 @@ void Renderer::DrawPlayerViewmodel()
 
 	cur_shader = -1;
 
-
+	set_standard_draw_data();
 	DrawModel(Render_Level_Params::STANDARD, engine.local.viewmodel, model2, &engine.local.viewmodel_animator);
 }
 
@@ -2565,6 +2769,7 @@ void Game_Engine::draw_debug_interface()
 		console.draw();
 	move_variables_menu();
 
+	Profilier::get_instance().draw_imgui_window();
 
 	if (state == ENGINE_GAME) {
 
@@ -2595,6 +2800,8 @@ void Game_Engine::draw_debug_interface()
 
 void Game_Engine::draw_screen()
 {
+	GPUFUNCTIONSTART;
+
 	glCheckError();
 	int x, y;
 	SDL_GetWindowSize(window, &x, &y);
@@ -2615,13 +2822,16 @@ void Game_Engine::draw_screen()
 	ImGui::NewFrame();
 
 	draw_debug_interface();
-	//ImGui::ShowDemoWindow();
+	ImGui::ShowDemoWindow();
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	glCheckError();
-	SDL_GL_SwapWindow(window);
+	{
+		GPUSCOPESTART("SDL_GL_SwapWindow");
+		SDL_GL_SwapWindow(window);
+	}
 	glCheckError();
 }
 
@@ -2849,6 +3059,8 @@ listens dont run prediction for local player
 
 void Game_Engine::game_update_tick()
 {
+	CPUFUNCTIONSTART;
+
 	make_move();
 	if (!is_host)
 		cl->SendMovesAndMessages();
@@ -2950,6 +3162,8 @@ void Game_Engine::loop()
 		}
 		else if (print_fps->integer)
 			next_print -= engine.frame_time;
+
+		Profilier::get_instance().end_frame_tick();
 	}
 }
 
@@ -3096,6 +3310,9 @@ void Debug_Console::draw()
 }
 void Debug_Console::print_args(const char* fmt, va_list args)
 {
+	if (lines.size() > 1000)
+		lines.clear();
+
 	char buf[1024];
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
