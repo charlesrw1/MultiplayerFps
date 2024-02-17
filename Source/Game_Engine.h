@@ -36,7 +36,7 @@ public:
 	vec3 view_angles;
 	Move_Command last_command;
 	View_Setup last_view;
-
+	bool has_run_tick = false;
 	bool using_debug_cam = false;
 	Fly_Camera fly_cam;
 
@@ -128,6 +128,8 @@ public:
 	Entity ents[MAX_GAME_ENTS];
 	int num_entities;
 	Engine_State state;
+	bool pending_state = false;
+	Engine_State nextstate;
 	bool is_host;
 	Game_Local local;
 	Game_Media media;

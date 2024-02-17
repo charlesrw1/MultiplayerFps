@@ -200,24 +200,31 @@ public:
 
 	uint32_t white_texture;
 	uint32_t black_texture;
+	uint32_t default_normal_texture;
+
 	Texture3d perlin3d;
 	
 	int cubemap_index = 0;
 
 	enum {
-		BASE0_SAMPLER, AUX0_SAMPLER, BASE1_SAMPLER,
-		AUX1_SAMPLER, SPECIAL_SAMPLER, LIGHTMAP_SAMPLER, NUM_SAMPLERS
+		SAMPLER_BASE1, SAMPLER_AUX1, SAMPLER_NORM1, SAMPLER_BASE2, SAMPLER_AUX2, SAMPLER_NORM2,
+		SAMPLER_SPECIAL, SAMPLER_LIGHTMAP, NUM_SAMPLERS
 	};
 
 	// shaders
-	enum { 
+	enum Shader_List { 
 		// meshbuilder's
 		S_SIMPLE, S_TEXTURED, S_TEXTURED3D, S_TEXTUREDARRAY, S_SKYBOXCUBE,
 		
 		// model's
-		S_ANIMATED, 
-		S_STATIC, S_STATIC_AT, S_WIND, S_WIND_AT,
-		S_LIGHTMAPPED, S_LIGHTMAPPED_AT, S_LIGHTMAPPED_BLEND2,
+		S_ANIMATED, S_ANIMATED_NORM,
+		S_STATIC, S_STATIC_NORM, 
+		S_STATIC_AT, S_STATIC_AT_NORM, 
+		S_WIND, S_WIND_NORM, 
+		S_WIND_AT, S_WIND_AT_NORM,
+		S_LIGHTMAPPED, S_LIGHTMAPPED_NORM,
+		S_LIGHTMAPPED_AT, S_LIGHTMAPPED_AT_NORM,
+		S_LIGHTMAPPED_BLEND2, S_LIGHTMAPPED_BLEND2_NORM,
 
 		// z-prepass'
 		S_DEPTH, S_AT_DEPTH, S_ANIMATED_DEPTH, S_WIND_DEPTH, S_WIND_AT_DEPTH,
@@ -306,20 +313,16 @@ private:
 	void draw_sprite_buffer();
 
 	struct Model_Drawing_State {
-		bool is_transparent_pass = false;
-		bool initial_set = false;
-		bool is_lightmapped = false;
-		bool is_animated = false;
-		bool is_alpha_tested = false;
-		bool backfaces = false;
-		int alpha_type = -1;
-		int shader_type = -1;
-
-		bool set_model_params = false;
-		// light, cubemap, decal list
+		bool initial_set = true;
+		int current_shader = 0;	// S_ANIMATED, S_STATIC, ...
+		bool initial_model = true;
+		int current_alpha_state = 0;
+		int current_backface_state = 0;
+		Render_Level_Params::Pass_Type pass = Render_Level_Params::STANDARD;
 	};
-	void draw_model_real(Model_Drawing_State* state, const Model* m, int part, glm::mat4 transform, 
-		const Entity* e = nullptr, const Animator* a = nullptr, Game_Shader* override_mat = nullptr);
+
+	void draw_model_real(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
+		Model_Drawing_State& state);
 
 	void upload_ubo_view_constants(uint32_t ubo);
 

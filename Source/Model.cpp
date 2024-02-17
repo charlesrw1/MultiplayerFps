@@ -21,7 +21,6 @@ const int WEIGHT_LOC = 4;
 const int COLOR_LOC = 5;
 const int UV2_LOC = 6;
 const int TANGENT_LOC = 7;
-const int BITANGENT_LOC = 8;
 
 struct Super_Vert
 {
@@ -52,6 +51,10 @@ bool MeshPart::has_colors() const
 	return attributes & (1<<COLOR_LOC);
 }
 
+bool MeshPart::has_tangents() const
+{
+	return attributes & (1 << TANGENT_LOC);
+}
 
 static uint32_t MakeOrFindGpuBuffer(Model* m, int buf_view_index, tinygltf::Model& model, std::map<int, int>& buffer_view_to_buffer)
 {
@@ -220,6 +223,8 @@ void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::N
 			else if (attrb.first == "JOINTS_0") location = JOINT_LOC;
 			else if (attrb.first == "WEIGHTS_0") location = WEIGHT_LOC;
 			else if (attrb.first == "COLOR_0") location = COLOR_LOC;
+			else if (attrb.first == "TANGENT") location = TANGENT_LOC;
+
 
 			if (location == -1) continue;
 			

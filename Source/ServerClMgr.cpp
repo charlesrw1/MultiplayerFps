@@ -312,6 +312,13 @@ void Server::make_snapshot()
 			a.legs.staging_loop = a.legs.loop;
 			a.legs.staging_speed = a.legs.speed;
 		}
+		if (i < MAX_CLIENTS) {
+			// for players
+			ASSERT(e.inv.active_item >= 0 && e.inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
+			e.inv.staging_item = e.inv.active_item;
+			e.inv.staging_clip = e.inv.clip[e.inv.active_item];
+			e.inv.staging_ammo = e.inv.ammo[e.inv.active_item];
+		}
 
 		writer.WriteBits(i, ENTITY_BITS);
 		write_full_entity(&e, writer);

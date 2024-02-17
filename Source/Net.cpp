@@ -25,7 +25,11 @@ Net_Prop entity_state_props[] =
 	{ESP(anim.legs.staging_loop),	8,		1,		1.f,	Net_Prop::DEFAULT_PROP},
 	{ESP(anim.legs.staging_frame),	0,		16,		100.f,	Net_Prop::DEFAULT_PROP},
 
-	{ESP(inv.active_item),	32,		5},
+	{ESP(inv.active_item),	32,		5, 1.f, Net_Prop::NON_PLAYER_PROP},
+	{ESP(inv.staging_item),	32,		5, 1.f, Net_Prop::PLAYER_PROP},
+	{ESP(inv.staging_clip),	32,		8, 1.f, Net_Prop::PLAYER_PROP},
+	{ESP(inv.staging_ammo),	32,		10, 1.f, Net_Prop::PLAYER_PROP},
+
 	{ESP(flags), 16},
 
 	// for owning players only

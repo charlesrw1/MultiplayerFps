@@ -204,7 +204,7 @@ void Renderer::draw_sprite(glm::vec3 origin, Color32 color, glm::vec2 size, Text
 
 	sprite_state.in_world_space = in_world_space;
 	if (sprite_state.current_t != tex || sprite_state.force_set) {
-		bind_texture(BASE0_SAMPLER, tex);
+		bind_texture(SAMPLER_BASE1, tex);
 		sprite_state.current_t = tex;
 	}
 	if (sprite_state.additive != additive || sprite_state.force_set) {
@@ -298,19 +298,23 @@ void Renderer::bind_texture(int bind, int id)
 
 void Renderer::set_shader_sampler_locations()
 {
-	shader().set_int("basecolor", BASE0_SAMPLER);
-	shader().set_int("auxcolor", AUX0_SAMPLER);
-	shader().set_int("basecolor2", BASE1_SAMPLER);
-	shader().set_int("auxcolor2", AUX1_SAMPLER);
-	shader().set_int("lightmap", LIGHTMAP_SAMPLER);
-	shader().set_int("special", SPECIAL_SAMPLER);
+	shader().set_int("basecolor", SAMPLER_BASE1);
+	shader().set_int("auxcolor", SAMPLER_AUX1);
+	shader().set_int("normalmap", SAMPLER_NORM1);
+
+	shader().set_int("basecolor2", SAMPLER_BASE2);
+	shader().set_int("auxcolor2", SAMPLER_AUX2);
+	shader().set_int("normalmap2", SAMPLER_NORM2);
+
+	shader().set_int("special", SAMPLER_SPECIAL);
+	shader().set_int("lightmap", SAMPLER_LIGHTMAP);
 
 	// >>> PBR BRANCH
-	shader().set_int("pbr_irradiance_cubemaps", LIGHTMAP_SAMPLER + 1);
-	shader().set_int("pbr_specular_cubemaps", LIGHTMAP_SAMPLER + 2);
-	shader().set_int("PBR_brdflut", LIGHTMAP_SAMPLER + 3);
-	shader().set_int("volumetric_fog", LIGHTMAP_SAMPLER + 4);
-	shader().set_int("cascade_shadow_map", LIGHTMAP_SAMPLER + 5);
+	shader().set_int("pbr_irradiance_cubemaps", SAMPLER_LIGHTMAP + 1);
+	shader().set_int("pbr_specular_cubemaps", SAMPLER_LIGHTMAP + 2);
+	shader().set_int("PBR_brdflut", SAMPLER_LIGHTMAP + 3);
+	shader().set_int("volumetric_fog", SAMPLER_LIGHTMAP + 4);
+	shader().set_int("cascade_shadow_map", SAMPLER_LIGHTMAP + 5);
 }
 
 void Renderer::set_depth_shader_constants()
@@ -320,7 +324,7 @@ void Renderer::set_depth_shader_constants()
 
 void set_standard_draw_data()
 {
-	int start = Renderer::LIGHTMAP_SAMPLER;
+	int start = Renderer::SAMPLER_LIGHTMAP;
 	// >>> PBR BRANCH
 	glActiveTexture(GL_TEXTURE0 + start + 1);
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, draw.scene.levelcubemapirradiance_array);
@@ -328,7 +332,7 @@ void set_standard_draw_data()
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, draw.scene.levelcubemapspecular_array);
 
 	glActiveTexture(GL_TEXTURE0 + start + 3);
-	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
+	glBindTexture(GL_TEXTURE_2D, FindOrLoadTexture("lightwarpshit.png")->gl_id);
 
 	glActiveTexture(GL_TEXTURE0 + start + 5);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, draw.shadowmap.shadow_map_array);
@@ -366,7 +370,7 @@ void Renderer::reload_shaders()
 	Shader::compile(&shade[S_TEXTUREDARRAY], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
 	Shader::compile(&shade[S_SKYBOXCUBE], "MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
 
-
+	// okay this is getting out of hand
 	const char* frag = "PbrBasicF.txt";
 	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", frag, "ANIMATED");
 	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", frag);
@@ -376,6 +380,15 @@ void Renderer::reload_shaders()
 	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", frag, "LIGHTMAPPED");
 	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST");
 	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
+	
+	Shader::compile(&shade[S_ANIMATED_NORM], "AnimBasicV.txt", frag, "ANIMATED, NORMALMAPPED");
+	Shader::compile(&shade[S_STATIC_NORM], "AnimBasicV.txt", frag, "NORMALMAPPED");
+	Shader::compile(&shade[S_STATIC_AT_NORM], "AnimBasicV.txt", frag, "ALPHATEST, NORMALMAPPED");
+	Shader::compile(&shade[S_WIND_NORM], "AnimBasicV.txt", frag, "WIND, NORMALMAPPED");
+	Shader::compile(&shade[S_WIND_AT_NORM], "AnimBasicV.txt", frag, "WIND, ALPHATEST, NORMALMAPPED");
+	Shader::compile(&shade[S_LIGHTMAPPED_NORM], "AnimBasicV.txt", frag, "LIGHTMAPPED, NORMALMAPPED");
+	Shader::compile(&shade[S_LIGHTMAPPED_AT_NORM], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST, NORMALMAPPED");
+	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2_NORM], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR, NORMALMAPPED");
 
 	frag = "DepthF.txt";
 	Shader::compile(&shade[S_ANIMATED_DEPTH], "AnimBasicV.txt", frag, "ANIMATED");
@@ -605,7 +618,7 @@ void Shadow_Map_System::update()
 		Render_Level_Params params;
 		params.output_framebuffer = framebuffer;
 		params.pass = Render_Level_Params::SHADOWMAP;
-		params.include_lightmapped = false;
+		params.include_lightmapped = true;
 		View_Setup setup;
 		setup.width = csm_resolution;
 		setup.height = csm_resolution;
@@ -889,6 +902,7 @@ void Renderer::Init()
 
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
+	const uint8_t normaldata[] = { 128,128,255 };
 	glGenTextures(1, &white_texture);
 	glBindTexture(GL_TEXTURE_2D, white_texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, wdata);
@@ -898,6 +912,13 @@ void Renderer::Init()
 	glGenTextures(1, &black_texture);
 	glBindTexture(GL_TEXTURE_2D, black_texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, bdata);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glGenTextures(1, &default_normal_texture);
+	glBindTexture(GL_TEXTURE_2D, default_normal_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, normaldata);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glGenerateMipmap(GL_TEXTURE_2D);
@@ -1216,7 +1237,7 @@ void Renderer::ui_render()
 
 
 	if (ui_builder.GetBaseVertex() > 0) {
-		bind_texture(BASE0_SAMPLER, building_ui_texture);
+		bind_texture(SAMPLER_BASE1, building_ui_texture);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 	}
@@ -1265,7 +1286,7 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 	float th = (t) ? t->height : 1;
 
 	if (texnum != building_ui_texture && ui_builder.GetBaseVertex() > 0) {
-		bind_texture(BASE0_SAMPLER, building_ui_texture);
+		bind_texture(SAMPLER_BASE1, building_ui_texture);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 		ui_builder.Begin();
@@ -1295,7 +1316,7 @@ void Renderer::FrameDraw()
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
 
-	volfog.compute();
+	//volfog.compute();
 
 	// main level render
 	{
@@ -1370,7 +1391,7 @@ void Renderer::FrameDraw()
 
 	mb.Free();
 
-	cubemap_positions_debug();
+	//cubemap_positions_debug();
 
 	glCheckError();
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -1454,89 +1475,6 @@ void Renderer::DrawEntBlobShadows()
 
 }
 
-// shader_key 8 bits
-// 3 bits
-// animated/not animated
-// lightmapped/not lightmapped
-// alpha test/not alpha test
-
-// 2wayblend, windsway, none
-
-
-#define BADSHADERIF(x) if(x) { sys_print("bad shader combo %s\n", #x); return; }
-#define WHITEIFNULL(x) ((x)?x->gl_id : white_texture)
-void Renderer::draw_model_real(Model_Drawing_State* s, const Model* m, int part_n, glm::mat4 transform,
-	const Entity* e, const Animator* a, Game_Shader* override_mat)
-{
-	const MeshPart& part = m->parts[part_n];
-	const Game_Shader& gs = (override_mat) ? *override_mat : *m->materials.at(part.material_idx);
-	const bool is_transparent = gs.alpha_type == Game_Shader::A_ADD || gs.alpha_type == Game_Shader::A_BLEND;
-	if (is_transparent != s->is_transparent_pass)
-		return;
-	const bool is_animated = (a);
-	const bool is_lightmapped = part.has_lightmap_coords();
-	const bool is_at = gs.alpha_type == Game_Shader::A_TEST;
-	const bool has_colors = part.has_colors();
-	const bool show_backface = gs.backface;
-	// ahhhhhhh
-	if (is_lightmapped) {
-		BADSHADERIF(is_animated);
-		BADSHADERIF(gs.shader_type == Game_Shader::S_WINDSWAY);
-		if (gs.shader_type == Game_Shader::S_2WAYBLEND) {
-			set_shader(shade[S_LIGHTMAPPED_BLEND2]);
-			bind_texture(BASE1_SAMPLER, WHITEIFNULL(gs.images[gs.BASE2]));
-			bind_texture(SPECIAL_SAMPLER, WHITEIFNULL(gs.images[gs.SPECIAL]));
-		}
-		else if (is_at)
-			set_shader(shade[S_LIGHTMAPPED_AT]);
-		else
-			set_shader(shade[S_LIGHTMAPPED]);
-
-		bind_texture(LIGHTMAP_SAMPLER, WHITEIFNULL(engine.level->lightmap));
-		bind_texture(BASE0_SAMPLER, WHITEIFNULL(gs.images[gs.BASE1]));
-	}
-	else {
-		if (is_animated) {
-			BADSHADERIF(gs.shader_type == Game_Shader::S_WINDSWAY);
-			if (is_at) {
-				BADSHADERIF(0);
-			}
-			else
-				set_shader(shade[S_ANIMATED]);
-
-			if (s->set_model_params) {
-				const std::vector<mat4>& bones = a->GetBones();
-				const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
-				for (int j = 0; j < bones.size(); j++)
-					glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
-				glCheckError();
-			}
-
-		}
-		else {
-			if (gs.shader_type == Game_Shader::S_WINDSWAY) {
-				if (is_at)
-					set_shader(shade[S_WIND_AT]);
-				else
-					set_shader(shade[S_WIND]);
-			}
-			else {
-				if (is_at)
-					set_shader(shade[S_STATIC_AT]);
-				else
-					set_shader(shade[S_STATIC]);
-			}
-		}
-
-		bind_texture(BASE0_SAMPLER, WHITEIFNULL(gs.images[gs.BASE1]));
-	}
-
-	shader().set_mat4("Model", transform);
-	shader().set_mat4("InverseModel", glm::inverse(transform));
-
-	glBindVertexArray(part.vao);
-	glDrawElements(GL_TRIANGLES, part.element_count, part.element_type, (void*)part.element_offset);
-}
 
 
 void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, mat4 transform, const Animator* a, float rough, float metal)
@@ -1591,9 +1529,9 @@ void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, ma
 				const Game_Shader* mm = m->materials.at(part->material_idx);
 				shader().set_bool("has_uv_scroll", false);
 				if (mm->images[Game_Shader::BASE1])
-					bind_texture(BASE0_SAMPLER, mm->images[Game_Shader::BASE1]->gl_id);
+					bind_texture(SAMPLER_BASE1, mm->images[Game_Shader::BASE1]->gl_id);
 				else
-					bind_texture(BASE0_SAMPLER, white_texture);
+					bind_texture(SAMPLER_BASE1, white_texture);
 			}
 		}
 
@@ -1608,6 +1546,8 @@ void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, ma
 
 void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 {
+	Model_Drawing_State state;
+
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		auto& ent = engine.get_ent(i);
 		//auto& ent = cgame->entities[i];
@@ -1628,8 +1568,9 @@ void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 		model = glm::scale(model, vec3(1.f));
 
 		const Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
-		DrawModel(pass, ent.model, model, a);
+		//DrawModel(pass, ent.model, model, a);
 
+		draw_model_real(ent.model, model, &ent, a, state);
 
 		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
 
@@ -1651,7 +1592,7 @@ void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 			const Bone& b = ent.model->bones.at(index);
 			glm::mat4 transform = a->GetBones()[index];
 			transform = model * transform * mat4(b.posematrix) * rotate;
-			DrawModel(pass, m, transform);
+			draw_model_real(m, transform, nullptr, nullptr, state);
 
 			if (stat.category == ITEM_CAT_RIFLE) {
 				std::string mod = stat.world_model;
@@ -1662,7 +1603,9 @@ void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 					const Bone& mag_bone = ent.model->bones.at(index2);
 					transform = a->GetBones()[index2];
 					transform = model * transform * mat4(mag_bone.posematrix) * rotate;
-					DrawModel(pass, mag_mod, transform);
+					//DrawModel(pass, mag_mod, transform);
+
+					draw_model_real(mag_mod, transform, nullptr,nullptr, state);
 				}
 			}
 		}
@@ -1763,9 +1706,9 @@ void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 			if (gs->alpha_type == Game_Shader::A_TEST) {
 
 				if (gs->images[gs->BASE1])
-					bind_texture(BASE0_SAMPLER, gs->images[gs->BASE1]->gl_id);
+					bind_texture(SAMPLER_BASE1, gs->images[gs->BASE1]->gl_id);
 				else
-					bind_texture(BASE0_SAMPLER, white_texture);
+					bind_texture(SAMPLER_BASE1, white_texture);
 			}
 			glBindVertexArray(mp.vao);
 			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
@@ -1774,17 +1717,191 @@ void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 
 }
 
+int get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass)
+{
+	bool is_alpha_test = gs.alpha_type == gs.A_TEST;
+	bool is_lightmapped = part.has_lightmap_coords();
+	bool has_colors = part.has_colors();
+	int shader_type = gs.shader_type;
+	bool is_normal_mapped = part.has_tangents();
+	bool is_animated = part.has_bones();
+
+	int shader_index = -1;
+
+	using sl = Renderer::Shader_List;
+	if (depth_pass) {
+		if (shader_type == gs.S_WINDSWAY) {
+			shader_index = sl::S_WIND_DEPTH;
+			if (is_alpha_test)
+				shader_index = sl::S_WIND_AT_DEPTH;
+		}
+		else {
+			if (is_animated) {
+				shader_type = sl::S_ANIMATED_DEPTH;
+			}
+			else {
+				if (is_alpha_test)
+					shader_type = sl::S_AT_DEPTH;
+				else
+					shader_type = sl::S_DEPTH;
+			}
+		}
+	}
+	else {
+		if (gs.shader_type == Game_Shader::S_DEFAULT) {
+			shader_index = sl::S_STATIC;
+
+			if (!is_animated) {
+				if (is_lightmapped)
+					shader_index = sl::S_LIGHTMAPPED;
+				else if (!is_lightmapped && is_alpha_test)
+					shader_index = sl::S_STATIC_AT;
+			}
+			else {
+				shader_index = sl::S_ANIMATED;
+			}
+		}
+		else if (shader_type == gs.S_2WAYBLEND) {
+			if (has_colors) {
+				shader_index = sl::S_LIGHTMAPPED_BLEND2;
+			}
+		}
+		else if (shader_type == gs.S_WINDSWAY) {
+			shader_index = sl::S_WIND;
+			if (is_alpha_test)
+				shader_index = sl::S_WIND_AT;
+		}
+		if (is_normal_mapped) shader_index += 1;
+	}
+
+	return shader_index;
+}
+
+
+void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
+	Model_Drawing_State& state)
+{
+
+	for (int part = 0; part < model->parts.size(); part++) {
+
+		const MeshPart& mp = model->parts[part];
+		Game_Shader* gs = (mp.material_idx != -1) ? model->materials.at(mp.material_idx) : &mats.fallback;
+		bool is_animated = mp.has_bones() && a;
+		int next_shader = get_shader_index(mp, *gs, false);
+
+		if (next_shader == -1) return;
+
+		if (state.initial_set || next_shader != state.current_shader) {
+			state.current_shader = next_shader;
+
+			set_shader(shade[next_shader]);
+
+			if (gs->shader_type == Game_Shader::S_WINDSWAY) {
+				set_wind_constants();
+			}
+			set_shader_constants();
+
+			if (mp.has_lightmap_coords()) {
+				if (engine.level->lightmap)
+					bind_texture(SAMPLER_LIGHTMAP, engine.level->lightmap->gl_id);
+				else
+					bind_texture(SAMPLER_LIGHTMAP, white_texture);
+			}
+		}
+
+		if (state.initial_set || state.current_alpha_state != gs->alpha_type) {
+			state.current_alpha_state = gs->alpha_type;
+			if (state.current_alpha_state == Game_Shader::A_NONE || state.current_alpha_state == Game_Shader::A_TEST) {
+				glDisable(GL_BLEND);
+			}
+			else if (state.current_alpha_state == Game_Shader::A_BLEND) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			}
+			else if (state.current_alpha_state == Game_Shader::A_ADD) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ONE);
+			}
+		}
+		if (state.initial_set || state.current_backface_state != (int)gs->backface) {
+			state.current_backface_state = gs->backface;
+			if (state.current_backface_state)
+				glDisable(GL_CULL_FACE);
+			else
+				glEnable(GL_CULL_FACE);
+		}
+
+		shader().set_mat4("Model", transform);
+		shader().set_mat4("InverseModel", glm::inverse(transform));
+
+		shader().set_bool("has_glassfresnel", gs->fresnel_transparency);
+		shader().set_float("glassfresnel_opacity", 0.6f);
+
+		shader().set_float("in_roughness", rough);
+		shader().set_float("in_metalness", metal);
+
+		shader().set_bool("no_light", gs->emmisive);
+
+		bool has_uv_scroll = gs->uscroll != 0.f || gs->vscroll != 0.f;
+		shader().set_bool("has_uv_scroll", has_uv_scroll);
+		shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
+
+		if (gs->images[gs->BASE1])
+			bind_texture(SAMPLER_BASE1, gs->images[gs->BASE1]->gl_id);
+		else
+			bind_texture(SAMPLER_BASE1, white_texture);
+		if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
+			bind_texture(SAMPLER_BASE2, gs->images[gs->BASE2]->gl_id);
+			bind_texture(SAMPLER_SPECIAL, gs->images[gs->SPECIAL]->gl_id);
+		}
+
+		if (mp.has_tangents()) {
+			uint32_t id = default_normal_texture;
+			Texture* t = gs->images[Game_Shader::NORMAL1];
+			if (t) id = t->gl_id;
+			bind_texture(SAMPLER_NORM1, id);
+
+			if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
+				id = default_normal_texture;
+				t = gs->images[Game_Shader::NORMAL2];
+				if (t) id = t->gl_id;
+				bind_texture(SAMPLER_NORM2, id);
+			}
+		}
+
+
+		if (is_animated) {
+			const std::vector<mat4>& bones = a->GetBones();
+			const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
+			for (int j = 0; j < bones.size(); j++)
+				glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
+			glCheckError();
+		}
+
+		bool has_spec_mask = false;
+		if (gs->images[Game_Shader::AUX1]) {
+			has_spec_mask = true;
+			bind_texture(SAMPLER_AUX1, gs->images[Game_Shader::AUX1]->gl_id);
+		}
+		shader().set_bool("has_spec_mask", has_spec_mask);
+
+		shader().set_float("spec_exponent", gs->spec_exponent);
+		shader().set_vec3("specular_tint", gs->spec_tint);
+		shader().set_vec4("color_tint", gs->diffuse_tint);
+
+		glBindVertexArray(mp.vao);
+		glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+
+		state.initial_set = false;
+	}
+}
+
+
 void Renderer::DrawLevel()
 {
 	const Level* level = engine.level;
 
-	bool force_set = true;
-	bool is_alpha_test = false;
-	bool is_lightmapped = false;
-	int last_alpha = -1;
-	int backfaces = -1;
-
-	int shader_type = Game_Shader::S_DEFAULT;
+	Model_Drawing_State state;
 
 	for (int m = 0; m < level->instances.size(); m++) {
 		const Level::StaticInstance& sm = level->instances[m];
@@ -1792,105 +1909,7 @@ void Renderer::DrawLevel()
 		ASSERT(level->static_meshes[sm.model_index]);
 		Model& model = *level->static_meshes[sm.model_index];
 
-		for (int p = 0; p < model.parts.size(); p++) {
-			MeshPart& mp = model.parts[p];
-			Game_Shader* gs = (mp.material_idx != -1) ? model.materials.at(mp.material_idx) : &mats.fallback;
-			bool mat_is_at = gs->alpha_type == gs->A_TEST;
-			bool mat_lightmapped = mp.has_lightmap_coords();
-			bool mat_colors = mp.has_colors();
-			int mat_shader_type = gs->shader_type;
-			if (force_set || is_alpha_test != mat_is_at || is_lightmapped != mat_lightmapped || shader_type != mat_shader_type) {
-				is_alpha_test = mat_is_at;
-				is_lightmapped = mat_lightmapped;
-				shader_type = mat_shader_type;
-				force_set = false;
-
-				if (shader_type == gs->S_2WAYBLEND && (!is_lightmapped || !mat_colors))
-					force_set = true;
-
-				if (force_set)
-					continue;
-
-				if (shader_type == gs->S_DEFAULT) {
-					if (is_lightmapped)
-						set_shader(shade[S_LIGHTMAPPED]);
-					else if (!is_lightmapped && !is_alpha_test)
-						set_shader(shade[S_STATIC]);
-					else if (!is_lightmapped && is_alpha_test)
-						set_shader(shade[S_STATIC_AT]);
-				}
-				else if (shader_type == gs->S_2WAYBLEND) {
-					set_shader(shade[S_LIGHTMAPPED_BLEND2]);
-				}
-				else if (shader_type == gs->S_WINDSWAY) {
-					if (is_alpha_test)
-						set_shader(shade[S_WIND_AT]);
-					else
-						set_shader(shade[S_WIND]);
-
-					set_wind_constants();
-				}
-
-				set_shader_constants();
-
-				if (is_lightmapped) {
-					if (engine.level->lightmap)
-						bind_texture(LIGHTMAP_SAMPLER, engine.level->lightmap->gl_id);
-					else
-						bind_texture(LIGHTMAP_SAMPLER, white_texture);
-				}
-			}
-
-			if (last_alpha != gs->alpha_type) {
-				last_alpha = gs->alpha_type;
-				if (last_alpha == Game_Shader::A_NONE || last_alpha == Game_Shader::A_TEST) {
-					glDisable(GL_BLEND);
-				}
-				else if (last_alpha == Game_Shader::A_BLEND) {
-					glEnable(GL_BLEND);
-					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-				}
-				else if (last_alpha == Game_Shader::A_ADD) {
-					glEnable(GL_BLEND);
-					glBlendFunc(GL_ONE, GL_ONE);
-				}
-			}
-			if (backfaces != (int)gs->backface) {
-				backfaces = gs->backface;
-				if (backfaces) {
-					glDisable(GL_CULL_FACE);
-				}
-				else
-					glEnable(GL_CULL_FACE);
-			}
-
-			shader().set_mat4("Model", sm.transform);
-			shader().set_mat4("InverseModel", glm::inverse(sm.transform));
-
-			shader().set_bool("has_glassfresnel", gs->fresnel_transparency);
-			shader().set_float("glassfresnel_opacity", 0.6f);
-
-			shader().set_float("in_roughness", rough);
-			shader().set_float("in_metalness", metal);
-
-			shader().set_bool("no_light", gs->emmisive);
-
-			bool has_uv_scroll = gs->uscroll != 0.f || gs->vscroll != 0.f;
-			shader().set_bool("has_uv_scroll", has_uv_scroll);
-			shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
-
-			if (gs->images[gs->BASE1])
-				bind_texture(BASE0_SAMPLER, gs->images[gs->BASE1]->gl_id);
-			else
-				bind_texture(BASE0_SAMPLER, white_texture);
-			if (shader_type == Game_Shader::S_2WAYBLEND) {
-				bind_texture(BASE1_SAMPLER, gs->images[gs->BASE2]->gl_id);
-				bind_texture(SPECIAL_SAMPLER, gs->images[gs->SPECIAL]->gl_id);
-			}
-
-			glBindVertexArray(mp.vao);
-			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
-		}
+		draw_model_real(&model, sm.transform, nullptr, nullptr, state);
 	}
 }
 

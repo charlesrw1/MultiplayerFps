@@ -134,6 +134,7 @@ struct Game_Inventory
 
 	int pending_item = -1;
 
+	int tick_for_staging = 0;// horrible hack again
 	int staging_item = 0;
 	int staging_ammo = 0;
 	int staging_clip = 0;

@@ -12,7 +12,7 @@ static const char* const texture_folder_path = "Data\\Textures\\";
 
 Game_Material_Manager mats;
 
-#define ENSURE(num) if(line.size() < num) { sys_print("bad material %s", line); continue;}
+#define ENSURE(num) if(line.size() < num) { sys_print("bad material definition %s @ %d\n", mat.name.c_str(), mat.linenum); continue;}
 void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 {
 	Key_Value_File file;
@@ -45,21 +45,49 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				ENSURE(2);
 				gs->images[Game_Shader::BASE1] = FindOrLoadTexture(line.at(1).c_str());
 			}
-			else if (key == "image1aux") {
+			else if (key == "aux1") {
 				ENSURE(2);
 				gs->images[Game_Shader::AUX1] = FindOrLoadTexture(line.at(1).c_str());
+			}
+			else if (key == "normal1") {
+				ENSURE(2);
+				gs->images[Game_Shader::NORMAL1] = FindOrLoadTexture(line.at(1).c_str());
 			}
 			else if (key == "image2") {
 				ENSURE(2);
 				gs->images[Game_Shader::BASE2] = FindOrLoadTexture(line.at(1).c_str());
 			}
-			else if (key == "image2aux") {
+			else if (key == "aux2") {
 				ENSURE(2);
 				gs->images[Game_Shader::AUX2] = FindOrLoadTexture(line.at(1).c_str());
 			}
-			else if (key == "image3") {
+			else if (key == "normal2") {
+				ENSURE(2);
+				gs->images[Game_Shader::NORMAL2] = FindOrLoadTexture(line.at(1).c_str());
+			}
+			else if (key == "special") {
 				ENSURE(2);
 				gs->images[Game_Shader::SPECIAL] = FindOrLoadTexture(line.at(1).c_str());
+			}
+			else if (key == "spec_exp") {
+				ENSURE(2);
+				gs->spec_exponent = std::atof(line.at(1).c_str());
+			}
+			else if (key == "spec_str") {
+				ENSURE(2);
+				gs->spec_strength = std::atof(line.at(1).c_str());
+			}
+			else if (key == "spec_tint") {
+				ENSURE(4);
+				gs->spec_tint.x = std::atof(line.at(1).c_str());
+				gs->spec_tint.y = std::atof(line.at(2).c_str());
+				gs->spec_tint.z = std::atof(line.at(3).c_str());
+			}
+			else if (key == "tint") {
+				ENSURE(4);
+				gs->diffuse_tint.x = std::atof(line.at(1).c_str());
+				gs->diffuse_tint.y = std::atof(line.at(2).c_str());
+				gs->diffuse_tint.z = std::atof(line.at(3).c_str());
 			}
 			else if (key == "physics") {
 				// TODO
@@ -93,6 +121,9 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 			}
 			else if (key == "emmisive") {
 				gs->emmisive = true;	
+			}
+			else {
+				sys_print("unknown material key %s for %s @ %d", key.c_str(), mat.name.c_str(), mat.linenum);
 			}
 		}
 

@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include "glm/glm.hpp"
 
 struct Texture
 {
@@ -21,11 +22,32 @@ public:
 		memset(images, 0, sizeof images);
 	}
 	std::string name;
-	enum { BASE1, BASE2, AUX1, AUX2, SPECIAL, MAX_IMAGES };
-	Texture* images[MAX_IMAGES];
+	enum { BASE1, BASE2, NORMAL1, NORMAL2, AUX1, AUX2, SPECIAL, MAX_IMAGES };
+	// base = rgb diffuse
+	//		a alpha/mask
+	// aux = r specular exponent
+	//		g specular mask
+	//		b emissive mask
+	// normal = rgb normal map
+	Texture* images[MAX_IMAGES];	
+
+	// Phong material model
+	glm::vec4 diffuse_tint = glm::vec4(1.f);	// with alpha
+	glm::vec3 spec_tint = glm::vec3(0.1);
+	float spec_exponent = 16.0;
+	float spec_strength = 1.0;	// multiplies spec_tint or diffuse
+	float emissive_boost = 1.0;
+	bool backface = false;
+	bool is_masked = false;	// standard alpha mask
+	bool soft_mask = false;	// incorperates a 2 pass blend and alpha test
+
+	// Uv operations
+	glm::vec2 uv_scroll = glm::vec2(0.f);
+
+
+
 	enum { A_NONE, A_ADD, A_BLEND, A_TEST };
 	int alpha_type = A_NONE;
-	bool backface = false;
 	bool emmisive = false;	// dont recieve lighting
 	enum {S_DEFAULT, S_2WAYBLEND, S_WINDSWAY };
 	int shader_type = S_DEFAULT;
@@ -36,6 +58,7 @@ public:
 	uint64_t cached_render_key = -1;
 
 	int physics = 0;	// physics of surface
+	// Pbr material model
 };
 
 class Game_Material_Manager

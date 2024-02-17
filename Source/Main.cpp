@@ -117,6 +117,7 @@ double TimeSinceStart()
 
 void Game_Local::update_view()
 {
+	if (!has_run_tick) has_run_tick = true;
 
 	// decay view_recoil
 	view_recoil.x = view_recoil.x * 0.9f;
@@ -778,7 +779,7 @@ void Game_Engine::draw_screen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glClear(GL_COLOR_BUFFER_BIT);
-	if (state == ENGINE_GAME)
+	if (state == ENGINE_GAME && local.has_run_tick)
 		draw.FrameDraw();
 
 	ImGui_ImplSDL2_NewFrame();
@@ -1128,6 +1129,11 @@ void Game_Engine::loop()
 			next_print -= engine.frame_time;
 
 		Profilier::get_instance().end_frame_tick();
+
+		if (pending_state) {
+			pending_state = false;
+			state = next_state;
+		}
 	}
 }
 

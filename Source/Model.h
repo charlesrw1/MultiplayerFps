@@ -39,6 +39,7 @@ struct MeshPart
 	bool has_lightmap_coords() const;
 	bool has_colors() const;
 	bool has_bones() const;
+	bool has_tangents() const;
 };
 
 struct Physics_Triangle

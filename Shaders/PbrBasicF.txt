@@ -18,6 +18,10 @@ in vec2 FS_IN_TexCoord2;
 uniform sampler2D lightmap;
 #endif
 
+#ifdef NORMALMAPPED
+in mat3 FS_IN_TBN;
+#endif
+
 uniform samplerCubeArray pbr_irradiance_cubemaps;
 uniform samplerCubeArray pbr_specular_cubemaps;
 uniform sampler2D PBR_brdflut;
@@ -31,6 +35,15 @@ uniform sampler2DArrayShadow cascade_shadow_map;
 
 uniform sampler2D basecolor;
 uniform sampler2D auxcolor;
+uniform sampler2D normalmap;
+uniform vec4 color_tint = vec4(1);
+uniform vec3 specular_tint = vec3(1);
+uniform float spec_exponent = 16.0;
+uniform float spec_strength = 1.0;
+uniform bool has_spec_mask = false;	// in auxcolor
+uniform bool specular_enabled = true;
+uniform bool use_spec_tint_on_diffuse = true;
+
 
 uniform float in_roughness;
 uniform float in_metalness;
@@ -281,9 +294,67 @@ float get_cubemap_index(vec3 worldpos)
 	return float(bestindex);
 }
 
-void main()
+float fresnel_term(vec3 N, vec3 V, float power)
 {
-	vec3 view_pos = g.viewpos_time.xyz;
+	return pow(1.0-clamp(dot(N,V),0.0, 1.0),power);
+}
+
+vec4 eval_phong_brdf(vec3 diffuse, vec3 specular, float specular_power, float opacity, vec3 emissive, vec3 N, vec3 transmissive_color)
+{
+	vec3 V = normalize(g.viewpos_time.xyz-FS_IN_FragPos);
+	vec3 L = -g.directional_light_dir_and_used.xyz;
+	float cm_index = get_cubemap_index(FS_IN_FragPos);
+	vec3 ambient_light = vec3(0.0);
+	
+#ifdef LIGHTMAPPED
+	ambient_light = texture(lightmap, FS_IN_TexCoord2).rgb*1.0;
+#else
+	ambient_light = texture(pbr_irradiance_cubemaps,vec4(N, cm_index)).rgb*1.5;
+#endif
+	
+	vec3 direct_diffuse_light = vec3(0.0);
+#ifndef LIGHTMAPPED
+	if(transmissive_color!=vec3(0.0)) {
+		float NdotL = dot(-g.directional_light_dir_and_used.xyz,N);
+		NdotL = NdotL*0.5+0.5;
+		vec3 forward_light = max(0,(NdotL))*diffuse;
+		vec3 back_light = max(0,(1.0-NdotL))*transmissive_color;
+		direct_diffuse_light += (forward_light+back_light)*g.directional_light_color.rgb*0.5;
+	
+		direct_diffuse_light += pow(max(dot(V,-L),0.0),2.0)*transmissive_color*g.directional_light_color.rgb;
+	}
+	else {
+		direct_diffuse_light += max(dot(-g.directional_light_dir_and_used.xyz,N), 0.0)*g.directional_light_color.rgb;
+	}
+#endif
+	float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
+
+	vec3 R = reflect(-V,N);
+	vec3 H = normalize(V + L);
+	
+	vec3 direct_specular_light = vec3(0.0);
+	float NdotH = max(dot(N, H),0.0);
+	float spec =  pow(NdotH,specular_power);
+#ifdef LIGHTMAPPED
+	direct_specular_light = spec*ambient_light*1.0;
+#else
+	direct_specular_light = spec*g.directional_light_color.rgb;
+#endif
+	direct_specular_light *= max(dot(N,L),0.0);
+	//direct_specular_light = pow(direct_specular_light, vec3(2.0));
+	
+	
+	vec4 out_color = vec4(0.0);
+	out_color.rgb = ambient_light*diffuse + direct_diffuse_light*diffuse + direct_specular_light*specular + emissive;
+	out_color.a = opacity;
+	
+	return out_color;
+}
+
+
+vec3 pbr_calculate()
+{
+		vec3 view_pos = g.viewpos_time.xyz;
 	vec3 view_front = g.viewfront.xyz;
 
 
@@ -296,18 +367,12 @@ void main()
 
 	vec3 V = normalize(view_pos-FS_IN_FragPos);
 	vec3 N = normalize(FS_IN_Normal);
-	
-#ifdef WIND
-	if(dot(N, V)<0)
-		N = -N;
-#endif
-	
-	// hacky transmissive
+
 
 	vec3 R = reflect(-V,N);
-	float Roughness = 0.9;
+	float Roughness = 0.1;
 	vec3 Albedo = tex.rgb;
-	float Metalness = in_metalness;
+	float Metalness = 1.0;
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0,Albedo,Metalness);
 // punctual lights
@@ -367,7 +432,7 @@ void main()
 	float cm_index = get_cubemap_index(FS_IN_FragPos);
 	
 	const float MAX_REFLECTION_LOD = 4.0;
-	vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index),Roughness*MAX_REFLECTION_LOD).rgb;
+	vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index),0.0).rgb;
 
 	vec3 F = FresnelSchlickRougness(max(dot(N,V),0.0),F0,Roughness);
 	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(N,V),0.0),Roughness)).rg;
@@ -395,21 +460,79 @@ void main()
 #endif
 
 	ambient += Lo;
-	
-	
-	
-	vec3 NDC = FS_IN_NDC.xyz/FS_IN_NDC.w;
-	vec3 out_color = ambient;
-	
-	out_color = ApplyVolumetricFog(ambient,NDC);
-	
-	#ifdef ANIMATED
-	//out_color += vec3(1,10,1);
-	#endif
 
-	
-	//out_color = pow(out_color,vec3(1/2.2));
-	//out_color = abs(vec3(cubemaps[uint(cm_index)].probepos_priority.w));
+	return ambient;
+}
 
-	FS_OUT_Color = vec4(out_color,1.0);//vec4(pow(diffuse+ambient,vec3(1/2.2)),1);//abs(Albedo-((N+vec3(1))*0.5)),1.0);	
+
+
+void main()
+{
+	vec4 tex = texture(basecolor, FS_IN_Texcoord);
+	tex.rgb = pow(tex.rgb,vec3(2.2));
+	
+	tex *= color_tint;
+	
+#ifdef ALPHATEST
+	if(tex.a < 0.5)
+		discard;
+#endif
+
+	vec3 V = normalize(g.viewpos_time.xyz-FS_IN_FragPos);
+	vec3 N = normalize(FS_IN_Normal);
+	vec3 R = reflect(-V,N);
+	
+	
+#ifdef NORMALMAPPED
+	N = texture(normalmap, FS_IN_Texcoord).rgb;
+	N = N*2 - vec3(1);
+	N = normalize(FS_IN_TBN * N); 
+#endif
+
+// FIXME WITH NORMALMAPS!
+#ifdef WIND
+	if(dot(N, V)<0)
+		N = -N;
+#endif
+
+
+	float cm_index = get_cubemap_index(FS_IN_FragPos);
+	
+	const float MAX_REFLECTION_LOD = 4.0;
+	vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index),0.0).rgb;
+	float f = fresnel_term(N,V, 2.0);
+	float diffuse_mult = (1.0-f)*0.9;
+	vec3 emission = prefiltered_color*tex.rgb*(1-diffuse_mult);
+	vec3 diffuse_term = vec3(tex.rgb)*diffuse_mult;
+	//vec3 diffuse_term = mix(vec3(0.3,0.3,0.3),prefiltered_color.rgb*0.35, fresnel_term(N,V, 0.2));
+
+	//FS_OUT_Color = eval_phong_brdf(Albedo, vec3(0.5,0.3,0.2)*0.2, 5.0, 1.0,vec3(0.0),N, vec3(0.0));
+
+	//FS_OUT_Color = eval_phong_brdf(diffuse_term, vec3(0.1), 2.0, 1.0,vec3(0.0),N, vec3(0.0));//vec4(pow(diffuse+ambient,vec3(1/2.2)),1);//abs(Albedo-((N+vec3(1))*0.5)),1.0);	
+//#ifndef WIND
+	FS_OUT_Color = eval_phong_brdf(tex.rgb, vec3(0.1), 5.0, 1.0, vec3(0.0),N, vec3(0.0));
+//#else
+
+	vec3 specular_color = vec3(0.1);
+	float specmask = 1.0;
+	if(has_spec_mask) {
+		specmask = texture(auxcolor, FS_IN_Texcoord).r*1.0;
+	}
+	if(!specular_enabled)
+		specmask = 0.0;
+		
+	if(specular_tint.r >= 0) {
+		specular_color = vec3(0.15);
+	}
+	else {
+		specular_color = tex.rgb * spec_strength;
+	}
+	specular_color *= specmask;
+
+	//FS_OUT_Color = eval_phong_brdf(diffuse_term, vec3(0.0), spec_exponent, 1.0, emission,N, vec3(0.0));
+	FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, 1.0, vec3(0.0),N, vec3(0.0));
+	//FS_OUT_Color = vec4(N,1.0);
+	//FS_OUT_Color = vec4(specular_color,1.0);
+//#endif
+
 }	

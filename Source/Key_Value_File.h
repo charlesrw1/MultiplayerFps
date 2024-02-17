@@ -12,6 +12,7 @@ public:
 	struct Entry {
 		string name;
 		vector<vector<string>> tokenized_lines;
+		int linenum;
 	};
 	vector<Entry> entries;
 };
@@ -26,8 +27,11 @@ bool Key_Value_File::open(const char* filename)
 
 	std::string line;
 	Entry cur;
+	int linenum = 0;
 	while (std::getline(infile, line))
 	{
+		linenum++;
+
 		// FIXME: white space on lines
 		if (line.empty()) continue;
 		if (line.at(0) == '#') continue;
@@ -37,6 +41,7 @@ bool Key_Value_File::open(const char* filename)
 			}
 			cur.tokenized_lines.clear();
 			cur.name = std::move(line);
+			cur.linenum = linenum;
 		}
 		else {
 			int s = cur.tokenized_lines.size();

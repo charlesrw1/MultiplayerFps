@@ -264,6 +264,19 @@ void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, 
 		ent->anim.legs.speed = ent->anim.legs.staging_speed;
 	}
 
+	// items, more shitty hacks
+	if (is_local_player) {
+		ASSERT(ent->inv.staging_item >= 0 && ent->inv.staging_item < Game_Inventory::NUM_GAME_ITEMS);
+		auto& inv = ent->inv;
+		bool all_inv_fields_equal = inv.staging_item == inv.active_item
+			&& inv.ammo[inv.staging_item] == inv.staging_ammo && inv.clip[inv.staging_item] == inv.staging_clip;
+
+		if (all_inv_fields_equal)
+			ent->inv.tick_for_staging = -1;
+		else if (!all_inv_fields_equal && ent->inv.tick_for_staging == -1)
+			ent->inv.tick_for_staging = engine.tick;
+	}
+
 	if (!is_local_player) {
 		Entity_Interp& interp = interpolation_data[index];
 		if (ent->flags & EF_TELEPORTED)

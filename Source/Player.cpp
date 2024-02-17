@@ -532,6 +532,18 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 {
 	static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
 	Game_Inventory& inv = p->inv;
+	bool is_simulated_client = !engine.is_host;
+
+	if (is_simulated_client && p->inv.tick_for_staging != -1) {
+		int delta = engine.tick - p->inv.tick_for_staging;
+		if (delta > 30) { // 30 ticks since the inventory synced up, assume there was packet loss or something
+			p->inv.active_item = p->inv.staging_item;
+			ASSERT(p->inv.active_item >= 0 && p->inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
+			p->inv.ammo[p->inv.active_item] = p->inv.staging_ammo;
+			p->inv.clip[p->inv.active_item] = p->inv.staging_clip;
+		}
+	}
+
 
 	if (inv.active_item < 0 || inv.active_item >= Game_Inventory::NUM_GAME_ITEMS) {
 		sys_print("invalid item");
