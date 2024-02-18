@@ -16,5 +16,5 @@ void main()
 	vec3 srgb = pow(both,vec3(1/2.2));
 	//scene.r = 1.0;
 	FS_OUT_Color = pow(bloom_add*scene.r,vec3(1/2.2));
-	FS_OUT_Color = scene;
+	//FS_OUT_Color = scene;
 }

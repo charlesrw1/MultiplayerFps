@@ -1008,17 +1008,6 @@ void Renderer::InitFramebuffers()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glCheckError();
 
-
-	glDeleteTextures(1, &tex.scene_viewspace_normals);
-	glGenTextures(1, &tex.scene_viewspace_normals);
-	glBindTexture(GL_TEXTURE_2D, tex.scene_viewspace_normals);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, s_w, s_h, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glCheckError();
-
 	glDeleteTextures(1, &tex.scene_depthstencil);
 	glGenTextures(1, &tex.scene_depthstencil);
 	glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
@@ -1036,11 +1025,10 @@ void Renderer::InitFramebuffers()
 	glGenFramebuffers(1, &fbo.scene);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.scene_color, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, tex.scene_viewspace_normals, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.scene_depthstencil, 0);
 	
-	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, attachments);
+	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers(1, attachments);
 	
 	glCheckError();
 
@@ -1414,7 +1402,7 @@ void Renderer::FrameDraw()
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
 	if (!r_bloom->integer) bloom_tex = black_texture;
-	bind_texture(0, ssao.halfres_texture);
+	bind_texture(0, ssao.fullres2);
 	bind_texture(1, tex.scene_color);
 	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
@@ -2468,9 +2456,6 @@ void SSAO_System::render()
 	else {
 		draw.shader().set_mat4("projection", draw.vs.proj);
 		draw.shader().set_mat4("invprojection", glm::inverse(draw.vs.proj));
-
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, draw.tex.scene_viewspace_normals);
 
 		uint32_t id = draw.shader_list[Renderer::S_SSAO].ID;
 		uint32_t loc = glGetUniformLocation(id, "samples[0]");

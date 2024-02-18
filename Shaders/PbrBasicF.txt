@@ -1,7 +1,6 @@
 #version 430 core
 
 layout (location = 0) out vec4 FS_OUT_Color;
-layout (location = 1) out vec4 FS_OUT_Normal;
 
 in vec3 FS_IN_FragPos;
 in vec3 FS_IN_Normal;
@@ -534,10 +533,7 @@ void main()
 	FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
+	FS_OUT_Color = vec4(1.0);
 //#endif
 
-	vec3 view_space_normal = mat3(g.view)*vec3(N);
-	FS_OUT_Normal = vec4(view_space_normal.xyz,1.0);
-	vec4 view_space_pos = g.view*vec4(FS_IN_FragPos,1.0);
-	FS_OUT_Color = vec4(view_space_pos.xyz,1.0);
 }	
