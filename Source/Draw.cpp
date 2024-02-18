@@ -2412,7 +2412,7 @@ void SSAO_System::render()
 	draw.shader().set_mat4("Model", mat4(1));
 	draw.shader().set_mat4("ViewProj", mat4(1));
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_color);
+	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
 	glActiveTexture(GL_TEXTURE1);
 	if(use_simple_ssao)
 		glBindTexture(GL_TEXTURE_2D, noise_tex2);
