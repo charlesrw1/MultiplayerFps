@@ -15,6 +15,6 @@ void main()
 	vec3 both = mix(scene,bloom_add+bloom_add*dirt*0.5,0.02);
 	vec3 srgb = pow(both,vec3(1/2.2));
 	//scene.r = 1.0;
-	//FS_OUT_Color = pow(bloom_add*scene.r,vec3(1/2.2));
-	FS_OUT_Color = vec3(scene.r);
+	FS_OUT_Color = pow(bloom_add*scene.r,vec3(1/2.2));
+	FS_OUT_Color = scene;
 }

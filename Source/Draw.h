@@ -86,8 +86,10 @@ public:
 	void init();
 	void make_render_targets();
 	void render();
+	void render_basic_ssao();
 
 	uint32_t noise_tex2;
+	glm::vec3 samples[64];
 
 	uint32_t noise_tex;
 	uint32_t fbo;
@@ -251,6 +253,7 @@ public:
 		// other
 		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE, S_COMBINE,
 		S_HBAO, S_XBLUR, S_YBLUR,	// hbao shaders
+		S_SSAO,
 
 
 		NUM_NON_MODEL_SHADERS,

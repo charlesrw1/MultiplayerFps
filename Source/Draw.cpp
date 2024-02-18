@@ -432,9 +432,13 @@ void Renderer::reload_shaders()
 
 	// Hbao shaders
 	Shader::compile(&shader_list[S_HBAO], "MbTexturedV.txt", "HbaoF.txt");
+	Shader::compile(&shader_list[S_SSAO], "MbTexturedV.txt", "SsaoF.txt");
 	Shader::compile(&shader_list[S_XBLUR], "MbTexturedV.txt", "BilateralBlurF.txt");
 	Shader::compile(&shader_list[S_YBLUR], "MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
 	set_shader(S_HBAO);
+	shader().set_int("noise_texture", 1);
+	shader().set_int("scene_depth", 0);
+	set_shader(S_SSAO);
 	shader().set_int("noise_texture", 1);
 	shader().set_int("scene_depth", 0);
 	set_shader(S_XBLUR);
@@ -443,6 +447,7 @@ void Renderer::reload_shaders()
 	set_shader(S_YBLUR);
 	shader().set_int("input", 0);
 	shader().set_int("scene_depth", 1);
+
 
 
 
@@ -1392,7 +1397,7 @@ void Renderer::FrameDraw()
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
 	if (!r_bloom->integer) bloom_tex = black_texture;
-	bind_texture(0, ssao.fullres2);
+	bind_texture(0, ssao.halfres_texture);
 	bind_texture(1, tex.scene_color);
 	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
@@ -2268,6 +2273,42 @@ void SSAO_System::init()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, noise_size, noise_size, 0, GL_RGBA, GL_FLOAT, data.data());
+
+	Random myrand(time(NULL));
+
+	for (unsigned int i = 0; i < 64; ++i)
+	{
+		glm::vec3 sample(myrand.RandF(-1,1),
+			myrand.RandF(-1, 1),
+			myrand.RandF(0, 1));
+		sample = glm::normalize(sample);
+		sample *= glm::linearRand(0.0, 1.0);
+		float scale = float(i) / 64.0f;
+
+		// scale samples s.t. they're more aligned to center of kernel
+		scale = glm::mix(0.1f, 1.0f, scale * scale);
+		sample *= scale;
+		samples[i] = sample;
+	}
+
+
+	std::vector<glm::vec3> ssao_noise;
+	for (unsigned int i = 0; i < 16; i++)
+	{
+		glm::vec3 noise(
+			glm::linearRand(0.0, 1.0) * 2.0 - 1.0,
+			glm::linearRand(0.0, 1.0) * 2.0 - 1.0,
+			0.0f);
+		ssao_noise.push_back(noise);
+	}
+	glGenTextures(1, &noise_tex2);
+	glBindTexture(GL_TEXTURE_2D, noise_tex2);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, ssao_noise.data());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
 }
 
 void SSAO_System::make_render_targets()
@@ -2282,9 +2323,11 @@ void SSAO_System::make_render_targets()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
+	res_scale = 2;
+
 	glGenTextures(1, &halfres_texture);
 	glBindTexture(GL_TEXTURE_2D, halfres_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width/res_scale, height/res_scale, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width/res_scale, height/res_scale, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2316,12 +2359,20 @@ void SSAO_System::make_render_targets()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void SSAO_System::render_basic_ssao()
+{
+
+}
+
 void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;
 
 	if (width != engine.window_w->integer || height != engine.window_h->integer)
 		make_render_targets();
+
+	bool use_simple_ssao = true;
+
 
 	MeshBuilder quad;
 	quad.Begin();
@@ -2335,13 +2386,21 @@ void SSAO_System::render()
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	glViewport(0, 0, width/res_scale, height/res_scale);
 
-	draw.set_shader(Renderer::S_HBAO);
+	if (use_simple_ssao) {
+		draw.set_shader(Renderer::S_SSAO);
+	}
+	else {
+		draw.set_shader(Renderer::S_HBAO);
+	}
 	draw.shader().set_mat4("Model", mat4(1));
 	draw.shader().set_mat4("ViewProj", mat4(1));
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, noise_tex);
+	if(use_simple_ssao)
+		glBindTexture(GL_TEXTURE_2D, noise_tex2);
+	else
+		glBindTexture(GL_TEXTURE_2D, noise_tex);
 
 	float fovRad = draw.vs.fov;
 
@@ -2365,11 +2424,8 @@ void SSAO_System::render()
 	LinMAD[1] = (near + far) / (2.0f * near * far);
 
 	draw.shader().set_vec2("FocalLen", FocalLen);
-
 	draw.shader().set_vec2("UVToViewA", UVToViewA);
-
 	draw.shader().set_vec2("UVToViewB", UVToViewB);
-
 	draw.shader().set_vec2("LinMAD", LinMAD);
 
 
@@ -2383,13 +2439,24 @@ void SSAO_System::render()
 
 	draw.shader().set_vec2("NoiseScale", noise_scale);
 
-	draw.shader().set_float("R", radius);
-	draw.shader().set_float("R2", radius*radius);
-	draw.shader().set_float("NegInvR2", -1.0/(radius * radius));
-	draw.shader().set_float("TanBias", tan(angle_bias * PI / 180.0));
-	draw.shader().set_int("NumDirections",num_directions);
-	draw.shader().set_int("NumSamples", num_samples);
 
+	if (!use_simple_ssao) {
+		draw.shader().set_float("R", radius);
+		draw.shader().set_float("R2", radius * radius);
+		draw.shader().set_float("NegInvR2", -1.0 / (radius * radius));
+		draw.shader().set_float("TanBias", tan(angle_bias * PI / 180.0));
+		draw.shader().set_int("NumDirections", num_directions);
+		draw.shader().set_int("NumSamples", num_samples);
+	}
+	else {
+		draw.shader().set_mat4("projection", draw.vs.proj);
+		draw.shader().set_mat4("invprojection", glm::inverse(draw.vs.proj));
+
+		uint32_t id = draw.shader_list[Renderer::S_SSAO].ID;
+		uint32_t loc = glGetUniformLocation(id, "samples[0]");
+		for (int j = 0; j < 64; j++)
+			draw.shader().set_vec3((std::string("samples[") + std::to_string(j) + "]").c_str(), samples[j]);
+	}
 
 
 	quad.Draw(GL_TRIANGLES);
