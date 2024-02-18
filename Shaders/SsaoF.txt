@@ -7,6 +7,7 @@
 
 uniform sampler2D noise_texture;
 uniform sampler2D scene_depth;
+uniform sampler2D scene_normals;
 
 uniform vec2 AORes;
 uniform vec2 InvAORes;
@@ -21,7 +22,6 @@ uniform mat4 invprojection;
 in vec2 FS_IN_TexCoord;
 out vec3 FS_OUT_frag0;
 
-
 float ViewSpaceZFromDepth(float d)
 {
 	// [0,1] -> [-1,1] clip space
@@ -30,7 +30,6 @@ float ViewSpaceZFromDepth(float d)
 	// Get view space Z
 	return -1.0 / (LinMAD.x * d + LinMAD.y);
 }
-
 
 vec3 UVToViewSpace(vec2 uv, float z)
 {
@@ -45,7 +44,7 @@ vec3 GetViewPos(vec2 uv)
 {
 	//float z = ViewSpaceZFromDepth(texture(scene_depth, uv).r);
 	float z = texture(scene_depth, uv).r;
-	return UVToViewSpace(uv, z);
+	return vec3(UVToViewSpace(uv, z).xyz);//,z);
 }
 
 float Length2(vec3 v)
@@ -57,11 +56,11 @@ vec3 MinDiff(vec3 P, vec3 Pr, vec3 Pl)
 {
     vec3 V1 = Pr - P;
     vec3 V2 = P - Pl;
-    return (Length2(V1) < Length2(V2)) ? V1 : V2;
+    return (dot(V1,V1) < dot(V2,V2)) ? V1 : V2;
 }
 
-float radius = 0.5;
-float bias = 0.02;
+float radius = 0.1;
+float bias = 0.001;
 
 void main()
 {
@@ -78,7 +77,8 @@ void main()
     vec3 dPdu = MinDiff(P, Pr, Pl);
     vec3 dPdv = MinDiff(P, Pt, Pb);// * (AORes.y * InvAORes.x);
 	
-	vec3 view_space_normal = normalize(cross(dPdu, dPdv));
+	//vec3 view_space_normal = normalize(cross(dPdu, dPdv));
+	vec3 view_space_normal =  texture(scene_normals, FS_IN_TexCoord).rgb;
 	vec3 view_space_position = P;
 
     // Get the random samples from the noise texture
@@ -90,7 +90,7 @@ void main()
     // iterate over the sample kernel and calculate occlusion factor
     float occlusion = 0.0;
 
-	for(int i=0;i<32;i++)
+	for(int i=0;i<8;i++)
 	{
 		vec3 samplePos = TBN * samples[i]; // from tangent to view-space
         samplePos = view_space_position + samplePos * radius; 
@@ -108,7 +108,7 @@ void main()
         float rangeCheck = smoothstep(0.0, 1.0, radius / abs(view_space_position.z - sampleDepth));
         occlusion += (sampleDepth >= samplePos.z + bias ? 1.0 : 0.0) * rangeCheck;           
     }
-    occlusion = 1.0-(occlusion / float(32));
+    occlusion = 1.0-(occlusion / float(8));
 
 	FS_OUT_frag0 = vec3(pow(occlusion,1.0));
 }

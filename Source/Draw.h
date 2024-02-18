@@ -285,6 +285,7 @@ public:
 	}fbo;
 	struct {
 		uint32_t scene_color;
+		uint32_t scene_viewspace_normals;
 		uint32_t scene_depthstencil;
 
 		uint32_t bloom_depth;

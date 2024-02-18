@@ -432,15 +432,16 @@ void Renderer::reload_shaders()
 
 	// Hbao shaders
 	Shader::compile(&shader_list[S_HBAO], "MbTexturedV.txt", "HbaoF.txt");
-	Shader::compile(&shader_list[S_SSAO], "MbTexturedV.txt", "SsaoF.txt");
+	Shader::compile(&shader_list[S_SSAO], "MbTexturedV.txt", "SsaoLOGF.txt");
 	Shader::compile(&shader_list[S_XBLUR], "MbTexturedV.txt", "BilateralBlurF.txt");
 	Shader::compile(&shader_list[S_YBLUR], "MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
 	set_shader(S_HBAO);
 	shader().set_int("noise_texture", 1);
 	shader().set_int("scene_depth", 0);
 	set_shader(S_SSAO);
-	shader().set_int("noise_texture", 1);
 	shader().set_int("scene_depth", 0);
+	shader().set_int("noise_texture", 1);
+	shader().set_int("scene_normals", 2);
 	set_shader(S_XBLUR);
 	shader().set_int("input", 0);
 	shader().set_int("scene_depth", 1);
@@ -1007,6 +1008,17 @@ void Renderer::InitFramebuffers()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glCheckError();
 
+
+	glDeleteTextures(1, &tex.scene_viewspace_normals);
+	glGenTextures(1, &tex.scene_viewspace_normals);
+	glBindTexture(GL_TEXTURE_2D, tex.scene_viewspace_normals);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, s_w, s_h, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glCheckError();
+
 	glDeleteTextures(1, &tex.scene_depthstencil);
 	glGenTextures(1, &tex.scene_depthstencil);
 	glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
@@ -1024,7 +1036,12 @@ void Renderer::InitFramebuffers()
 	glGenFramebuffers(1, &fbo.scene);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.scene_color, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, tex.scene_viewspace_normals, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.scene_depthstencil, 0);
+	
+	unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, attachments);
+	
 	glCheckError();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2245,6 +2262,11 @@ void Renderer::on_level_start()
 
 #include "glm/gtc/random.hpp"
 
+float ourLerp(float a, float b, float f)
+{
+	return a + f * (b - a);
+}
+#include <random>
 void SSAO_System::init()
 {
 	glGenFramebuffers(1, &fbo);
@@ -2274,36 +2296,31 @@ void SSAO_System::init()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, noise_size, noise_size, 0, GL_RGBA, GL_FLOAT, data.data());
 
-	Random myrand(time(NULL));
-
+	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
+	std::default_random_engine generator;
 	for (unsigned int i = 0; i < 64; ++i)
 	{
-		glm::vec3 sample(myrand.RandF(-1,1),
-			myrand.RandF(-1, 1),
-			myrand.RandF(0, 1));
+		glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
 		sample = glm::normalize(sample);
-		sample *= glm::linearRand(0.0, 1.0);
+		sample *= randomFloats(generator);
 		float scale = float(i) / 64.0f;
 
 		// scale samples s.t. they're more aligned to center of kernel
-		scale = glm::mix(0.1f, 1.0f, scale * scale);
+		scale = ourLerp(0.1f, 1.0f, scale * scale);
 		sample *= scale;
-		samples[i] = sample;
+		samples[i]=sample;
 	}
 
 
-	std::vector<glm::vec3> ssao_noise;
+	std::vector<glm::vec3> ssaoNoise;
 	for (unsigned int i = 0; i < 16; i++)
 	{
-		glm::vec3 noise(
-			glm::linearRand(0.0, 1.0) * 2.0 - 1.0,
-			glm::linearRand(0.0, 1.0) * 2.0 - 1.0,
-			0.0f);
-		ssao_noise.push_back(noise);
+		glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
+		ssaoNoise.push_back(noise);
 	}
 	glGenTextures(1, &noise_tex2);
 	glBindTexture(GL_TEXTURE_2D, noise_tex2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, ssao_noise.data());
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -2323,7 +2340,7 @@ void SSAO_System::make_render_targets()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-	res_scale = 2;
+	res_scale = 1;
 
 	glGenTextures(1, &halfres_texture);
 	glBindTexture(GL_TEXTURE_2D, halfres_texture);
@@ -2395,7 +2412,7 @@ void SSAO_System::render()
 	draw.shader().set_mat4("Model", mat4(1));
 	draw.shader().set_mat4("ViewProj", mat4(1));
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
+	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_color);
 	glActiveTexture(GL_TEXTURE1);
 	if(use_simple_ssao)
 		glBindTexture(GL_TEXTURE_2D, noise_tex2);
@@ -2451,6 +2468,9 @@ void SSAO_System::render()
 	else {
 		draw.shader().set_mat4("projection", draw.vs.proj);
 		draw.shader().set_mat4("invprojection", glm::inverse(draw.vs.proj));
+
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, draw.tex.scene_viewspace_normals);
 
 		uint32_t id = draw.shader_list[Renderer::S_SSAO].ID;
 		uint32_t loc = glGetUniformLocation(id, "samples[0]");
