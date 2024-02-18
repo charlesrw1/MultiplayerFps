@@ -307,7 +307,7 @@ void BRDFIntegration::drawdebug()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glCheckError();
     glDisable(GL_CULL_FACE);
-    Shader& s = d.shade[d.S_TEXTURED];
+    Shader& s = d.shader_list[d.S_TEXTURED];
     s.use();
     Texture* t = mats.find_texture("frog.jpg");
     glCheckError();

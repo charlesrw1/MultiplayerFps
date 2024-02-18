@@ -360,50 +360,72 @@ static int combine_flags_type(int flags, int type, int flag_bits)
 	return flags + (type >> flag_bits);
 }
 
+static const char* sdp_strs[] = {
+	"ALPHATEST,",
+	"NORMALMAPPED,",
+	"LIGHTMAPPED,",
+	"ANIMATED,",
+	"VERTEX_COLOR,",
+};
+
+void compile_game_shaders(Shader* shader_start, int toggle_params, int mandatory_params, const char* other_defines, const char* vert, const char* frag)
+{
+	std::string shader_defines;
+	int num = 1 << Renderer::NUM_SDP;
+	int not_toggle = ~toggle_params;
+	for (int i = 0; i < num; i++) {
+		if ((i & not_toggle)!=0) continue;
+		if (mandatory_params!=0 && (i & mandatory_params) == 0) continue;
+		for (int j = 0; j < Renderer::NUM_SDP; j++) {
+			if (i & (1 << j)) {
+				shader_defines += sdp_strs[j];
+			}
+		}
+		shader_defines += other_defines;
+		if (!shader_defines.empty()) shader_defines.pop_back();	// remove comma
+
+		Shader::compile(&shader_start[i], vert, frag, shader_defines);
+		shader_defines.clear();
+	}
+}
+
 void Renderer::reload_shaders()
 {
 	// >>> PBR BRANCH
 
-	Shader::compile(&shade[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
-	Shader::compile(&shade[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
-	Shader::compile(&shade[S_TEXTURED3D], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
-	Shader::compile(&shade[S_TEXTUREDARRAY], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
-	Shader::compile(&shade[S_SKYBOXCUBE], "MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
+	Shader::compile(&shader_list[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
+	Shader::compile(&shader_list[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
+	Shader::compile(&shader_list[S_TEXTURED3D], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
+	Shader::compile(&shader_list[S_TEXTUREDARRAY], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
+	Shader::compile(&shader_list[S_SKYBOXCUBE], "MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
 
 	// okay this is getting out of hand
 	const char* frag = "PbrBasicF.txt";
-	Shader::compile(&shade[S_ANIMATED], "AnimBasicV.txt", frag, "ANIMATED");
-	Shader::compile(&shade[S_STATIC], "AnimBasicV.txt", frag);
-	Shader::compile(&shade[S_STATIC_AT], "AnimBasicV.txt", frag, "ALPHATEST");
-	Shader::compile(&shade[S_WIND], "AnimBasicV.txt", frag, "WIND");
-	Shader::compile(&shade[S_WIND_AT], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
-	Shader::compile(&shade[S_LIGHTMAPPED], "AnimBasicV.txt", frag, "LIGHTMAPPED");
-	Shader::compile(&shade[S_LIGHTMAPPED_AT], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST");
-	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR");
-	
-	Shader::compile(&shade[S_ANIMATED_NORM], "AnimBasicV.txt", frag, "ANIMATED, NORMALMAPPED");
-	Shader::compile(&shade[S_STATIC_NORM], "AnimBasicV.txt", frag, "NORMALMAPPED");
-	Shader::compile(&shade[S_STATIC_AT_NORM], "AnimBasicV.txt", frag, "ALPHATEST, NORMALMAPPED");
-	Shader::compile(&shade[S_WIND_NORM], "AnimBasicV.txt", frag, "WIND, NORMALMAPPED");
-	Shader::compile(&shade[S_WIND_AT_NORM], "AnimBasicV.txt", frag, "WIND, ALPHATEST, NORMALMAPPED");
-	Shader::compile(&shade[S_LIGHTMAPPED_NORM], "AnimBasicV.txt", frag, "LIGHTMAPPED, NORMALMAPPED");
-	Shader::compile(&shade[S_LIGHTMAPPED_AT_NORM], "AnimBasicV.txt", frag, "LIGHTMAPPED, ALPHATEST, NORMALMAPPED");
-	Shader::compile(&shade[S_LIGHTMAPPED_BLEND2_NORM], "AnimBasicV.txt", frag, "LIGHTMAPPED, BLEND2, VERTEX_COLOR, NORMALMAPPED");
+
+	int num_per_shader = (1 << NUM_SDP);
+	int standard_toggle_mask = (1 << SDP_ANIMATED) | (1 << SDP_ALPHATESTED) | (1 << SDP_LIGHTMAPPED) | (1<<SDP_NORMALMAPPED);
+	int wind_mask = (1 << SDP_ALPHATESTED) | (1 << SDP_ALPHATESTED) | (1<<SDP_NORMALMAPPED);
+	int blend_toggle_mask = (1 << SDP_LIGHTMAPPED) | (1<<SDP_NORMALMAPPED);
+
+	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_STANDARD * num_per_shader], standard_toggle_mask, 0, "", "AnimBasicV.txt", "PbrBasicF.txt");
+	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_MULTIBLEND * num_per_shader], blend_toggle_mask, (1<<SDP_VERTEXCOLORS), "BLEND2", "AnimBasicV.txt", "PbrBasicF.txt");
+	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_WIND * num_per_shader], wind_mask, 0, "WIND", "AnimBasicV.txt", "PbrBasicF.txt");
+
 
 	frag = "DepthF.txt";
-	Shader::compile(&shade[S_ANIMATED_DEPTH], "AnimBasicV.txt", frag, "ANIMATED");
-	Shader::compile(&shade[S_DEPTH], "AnimBasicV.txt", frag);
-	Shader::compile(&shade[S_AT_DEPTH], "AnimBasicV.txt", frag, "ALPHATEST");
-	Shader::compile(&shade[S_WIND_DEPTH], "AnimBasicV.txt", frag, "WIND");
-	Shader::compile(&shade[S_WIND_AT_DEPTH], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
+	Shader::compile(&shader_list[S_ANIMATED_DEPTH], "AnimBasicV.txt", frag, "ANIMATED");
+	Shader::compile(&shader_list[S_DEPTH], "AnimBasicV.txt", frag);
+	Shader::compile(&shader_list[S_AT_DEPTH], "AnimBasicV.txt", frag, "ALPHATEST");
+	Shader::compile(&shader_list[S_WIND_DEPTH], "AnimBasicV.txt", frag, "WIND");
+	Shader::compile(&shader_list[S_WIND_AT_DEPTH], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
 
-	Shader::compile(&shade[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	Shader::compile(&shader_list[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
 
-	Shader::compile(&shade[S_BLOOM_DOWNSAMPLE], "MbTexturedV.txt", "BloomDownsampleF.txt");
-	Shader::compile(&shade[S_BLOOM_UPSAMPLE], "MbTexturedV.txt", "BloomUpsampleF.txt");
-	Shader::compile(&shade[S_COMBINE], "MbTexturedV.txt", "CombineF.txt");
-	set_shader(shade[S_COMBINE]);
+	Shader::compile(&shader_list[S_BLOOM_DOWNSAMPLE], "MbTexturedV.txt", "BloomDownsampleF.txt");
+	Shader::compile(&shader_list[S_BLOOM_UPSAMPLE], "MbTexturedV.txt", "BloomUpsampleF.txt");
+	Shader::compile(&shader_list[S_COMBINE], "MbTexturedV.txt", "CombineF.txt");
+	set_shader(shader_list[S_COMBINE]);
 	shader().set_int("scene_lit", 0);
 	shader().set_int("bloom", 1);
 	shader().set_int("lens_dirt", 2);
@@ -421,11 +443,13 @@ void Renderer::reload_shaders()
 
 	glCheckError();
 
-	int start = S_ANIMATED;
-	int end = S_WIND_AT_DEPTH;
-	for (int i = start; i <= end; i++) {
-		set_shader(shade[i]);
-		set_shader_sampler_locations();
+	int start = NUM_NON_MODEL_SHADERS;
+	int end = start + NUM_MST * num_per_shader;
+	for (int i = start; i < end; i++) {
+		if (shader_list[i].ID != 0) {
+			set_shader(shader_list[i]);
+			set_shader_sampler_locations();
+		}
 	}
 }
 
@@ -1053,7 +1077,7 @@ void Renderer::render_bloom_chain()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
 	glActiveTexture(GL_TEXTURE0);
-	set_shader(shade[S_BLOOM_DOWNSAMPLE]);
+	set_shader(S_BLOOM_DOWNSAMPLE);
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	float src_x = cur_w;
@@ -1087,7 +1111,7 @@ void Renderer::render_bloom_chain()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	set_shader(shade[S_BLOOM_UPSAMPLE]);
+	set_shader(S_BLOOM_UPSAMPLE);
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	for (int i = BLOOM_MIPS - 1; i > 0; i--)
@@ -1122,7 +1146,7 @@ void Renderer::DrawSkybox()
 	mb.PushSolidBox(-vec3(1), vec3(1), COLOR_WHITE);
 	mb.End();
 
-	set_shader(shade[S_SKYBOXCUBE]);
+	set_shader(S_SKYBOXCUBE);
 	glm::mat4 view = vs.view;
 	view[3] = vec4(0, 0, 0, 1);	// remove translation
 	shader().set_mat4("ViewProj", vs.proj * view);
@@ -1210,7 +1234,7 @@ void Renderer::ui_render()
 {
 	GPUFUNCTIONSTART;
 
-	set_shader(shade[S_TEXTURED]);
+	set_shader(S_TEXTURED);
 	shader().set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
 	shader().set_mat4("ViewProj", proj);
@@ -1247,7 +1271,7 @@ void Renderer::ui_render()
 
 	glDisable(GL_BLEND);
 	if (0) {
-		set_shader(shade[S_TEXTUREDARRAY]);
+		set_shader(S_TEXTUREDARRAY);
 		glCheckError();
 
 		shader().set_mat4("Model", mat4(1));
@@ -1348,7 +1372,7 @@ void Renderer::FrameDraw()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, cur_w, cur_h);
 	glDisable(GL_CULL_FACE);
-	set_shader(shade[S_COMBINE]);
+	set_shader(S_COMBINE);
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
@@ -1370,7 +1394,7 @@ void Renderer::FrameDraw()
 	}
 
 	mb.End();
-	set_shader(shade[S_SIMPLE]);
+	set_shader(S_SIMPLE);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
@@ -1403,7 +1427,7 @@ void Renderer::FrameDraw()
 
 void Renderer::cubemap_positions_debug()
 {
-	set_shader(shade[S_SIMPLE]);
+	set_shader(S_SIMPLE);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
@@ -1452,7 +1476,7 @@ void Renderer::DrawEntBlobShadows()
 	shadowverts.End();
 	glCheckError();
 
-	set_shader(shade[S_PARTICLE_BASIC]);
+	set_shader(S_PARTICLE_BASIC);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.0));
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
@@ -1476,7 +1500,7 @@ void Renderer::DrawEntBlobShadows()
 }
 
 
-
+#if 0
 void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, mat4 transform, const Animator* a, float rough, float metal)
 {
 	ASSERT(m);
@@ -1492,9 +1516,9 @@ void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, ma
 	}
 	else {
 		if (isanimated)
-			set_shader(shade[S_ANIMATED]);
+			set_shader(S_ANIMATED);
 		else
-			set_shader(shade[S_STATIC]);
+			set_shader(S_STATIC);
 
 		set_shader_constants();
 		shader().set_float("in_roughness", rough);
@@ -1540,6 +1564,7 @@ void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, ma
 	}
 
 }
+#endif
 
 
 
@@ -1621,7 +1646,7 @@ void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 	//	}
 	//}
 
-	DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), glm::scale(glm::translate(mat4(1), vec3(0, 2, 0)),vec3(2)), nullptr, 0.0, 1.0);
+	//DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), glm::scale(glm::translate(mat4(1), vec3(0, 2, 0)),vec3(2)), nullptr, 0.0, 1.0);
 
 
 }
@@ -1675,18 +1700,18 @@ void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 			if (mat_shader_type == Game_Shader::S_WINDSWAY)
 			{
 				if (mat_is_at)
-					set_shader(shade[S_WIND_AT_DEPTH]);
+					set_shader(S_WIND_AT_DEPTH);
 				else
-					set_shader(shade[S_WIND_DEPTH]);
+					set_shader(S_WIND_DEPTH);
 
 				set_wind_constants();
 			}
 			else
 			{
 				if (mat_is_at)
-					set_shader(shade[S_AT_DEPTH]);
+					set_shader(S_AT_DEPTH);
 				else
-					set_shader(shade[S_DEPTH]);
+					set_shader(S_DEPTH);
 			}
 
 			set_depth_shader_constants();
@@ -1717,7 +1742,7 @@ void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 
 }
 
-int get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass)
+int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass)
 {
 	bool is_alpha_test = gs.alpha_type == gs.A_TEST;
 	bool is_lightmapped = part.has_lightmap_coords();
@@ -1748,31 +1773,31 @@ int get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pas
 		}
 	}
 	else {
-		if (gs.shader_type == Game_Shader::S_DEFAULT) {
-			shader_index = sl::S_STATIC;
+		int param_bitmask = 0;
+		if (is_animated) param_bitmask |= (1 << SDP_ANIMATED);
+		if (is_alpha_test) param_bitmask |= (1 << SDP_ALPHATESTED);
+		if (is_normal_mapped) param_bitmask |= (1 << SDP_NORMALMAPPED);
+		if (is_lightmapped) param_bitmask |= (1 << SDP_LIGHTMAPPED);
+		if (has_colors) param_bitmask |= (1 << SDP_VERTEXCOLORS);
 
-			if (!is_animated) {
-				if (is_lightmapped)
-					shader_index = sl::S_LIGHTMAPPED;
-				else if (!is_lightmapped && is_alpha_test)
-					shader_index = sl::S_STATIC_AT;
-			}
-			else {
-				shader_index = sl::S_ANIMATED;
-			}
+		int shader_type = 0;
+
+		if (gs.shader_type == Game_Shader::S_DEFAULT) {
+			shader_type = MSHADER_STANDARD;
+			param_bitmask &= ~(1 << SDP_VERTEXCOLORS);
 		}
-		else if (shader_type == gs.S_2WAYBLEND) {
-			if (has_colors) {
-				shader_index = sl::S_LIGHTMAPPED_BLEND2;
-			}
+		else if (shader_type == Game_Shader::S_2WAYBLEND) {
+			shader_type = MSHADER_MULTIBLEND;
 		}
-		else if (shader_type == gs.S_WINDSWAY) {
-			shader_index = sl::S_WIND;
-			if (is_alpha_test)
-				shader_index = sl::S_WIND_AT;
+		else if (shader_type == Game_Shader::S_WINDSWAY) {
+			shader_type = MSHADER_WIND;
+			param_bitmask &= ~(1 << SDP_VERTEXCOLORS);
 		}
-		if (is_normal_mapped) shader_index += 1;
+		shader_index = NUM_NON_MODEL_SHADERS + (shader_type) * (1 << NUM_SDP) + param_bitmask;
 	}
+
+	if (shader_list[shader_index].ID == 0)
+		shader_index = -1;
 
 	return shader_index;
 }
@@ -1794,7 +1819,7 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 		if (state.initial_set || next_shader != state.current_shader) {
 			state.current_shader = next_shader;
 
-			set_shader(shade[next_shader]);
+			set_shader(next_shader);
 
 			if (gs->shader_type == Game_Shader::S_WINDSWAY) {
 				set_wind_constants();
@@ -1944,7 +1969,9 @@ void Renderer::DrawPlayerViewmodel()
 	cur_shader = -1;
 
 	set_standard_draw_data();
-	DrawModel(Render_Level_Params::STANDARD, engine.local.viewmodel, model2, &engine.local.viewmodel_animator);
+
+	Model_Drawing_State state;
+	draw_model_real(engine.local.viewmodel, model2, nullptr, &engine.local.viewmodel_animator, state);
 }
 
 

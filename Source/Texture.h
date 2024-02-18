@@ -15,6 +15,21 @@ struct Texture
 	uint32_t gl_id = 0;
 };
 
+enum Material_Alpha_Mode
+{
+	MALPHA_OPAQUE,
+	MALPHA_ADDITIVE,
+	MALPHA_BLEND,
+	MALPHA_MASKED,
+	MALPHA_SOFTMASKED,
+};
+enum Material_Shader_Category
+{
+	MSHADER_STANDARD,
+	MSHADER_WIND,
+	MSHADER_MULTIBLEND,
+};
+
 class Game_Shader
 {
 public:
@@ -37,11 +52,10 @@ public:
 	float spec_exponent = 16.0;
 	float spec_strength = 1.0;	// multiplies spec_tint or diffuse
 	float emissive_boost = 1.0;
+	float specular_mask_exponent = 1.0;	// mask = pow(mask, exponent), for tweaking
 	bool backface = false;
-	bool is_masked = false;	// standard alpha mask
-	bool soft_mask = false;	// incorperates a 2 pass blend and alpha test
+	Material_Alpha_Mode alpha;
 
-	// Uv operations
 	glm::vec2 uv_scroll = glm::vec2(0.f);
 
 

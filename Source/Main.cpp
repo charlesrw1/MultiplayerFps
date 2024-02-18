@@ -943,19 +943,22 @@ void Game_Engine::init()
 	cfg.set_command("exec", cmd_exec_file);
 	cfg.set_command("reload_shaders", cmd_reload_shaders);
 
-
 	// engine initilization
 	init_sdl_window();
+
 	network_init();
+
 	draw.Init();
+
 	media.load();
 
 	cl->init();
+
 	sv->init();
+
 	local.init();
 
 	mats.init();
-
 	mats.load_material_file_directory("./Data/Materials/");
 
 	// debug interface

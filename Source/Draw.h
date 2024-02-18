@@ -174,6 +174,7 @@ public:
 	uint32_t light_ssbo;
 };
 
+
 class Renderer
 {
 public:
@@ -216,16 +217,6 @@ public:
 		// meshbuilder's
 		S_SIMPLE, S_TEXTURED, S_TEXTURED3D, S_TEXTUREDARRAY, S_SKYBOXCUBE,
 		
-		// model's
-		S_ANIMATED, S_ANIMATED_NORM,
-		S_STATIC, S_STATIC_NORM, 
-		S_STATIC_AT, S_STATIC_AT_NORM, 
-		S_WIND, S_WIND_NORM, 
-		S_WIND_AT, S_WIND_AT_NORM,
-		S_LIGHTMAPPED, S_LIGHTMAPPED_NORM,
-		S_LIGHTMAPPED_AT, S_LIGHTMAPPED_AT_NORM,
-		S_LIGHTMAPPED_BLEND2, S_LIGHTMAPPED_BLEND2_NORM,
-
 		// z-prepass'
 		S_DEPTH, S_AT_DEPTH, S_ANIMATED_DEPTH, S_WIND_DEPTH, S_WIND_AT_DEPTH,
 		
@@ -234,10 +225,27 @@ public:
 		// other
 		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE, S_COMBINE,
 
-		S_NUM
+		NUM_NON_MODEL_SHADERS,
 	};
 
-	Shader shade[S_NUM];
+	enum Shader_Define_Param_Enum
+	{
+		SDP_ALPHATESTED,
+		SDP_NORMALMAPPED,
+		SDP_LIGHTMAPPED,
+		SDP_ANIMATED,
+		SDP_VERTEXCOLORS,
+		NUM_SDP
+	};
+	enum Model_Shader_Types
+	{
+		MST_STANDARD,
+		MST_MULTIBLEND,
+		MST_WINDSWAY,
+		NUM_MST
+	};
+
+	Shader shader_list[NUM_NON_MODEL_SHADERS + NUM_MST * (1 << NUM_SDP)];
 
 	struct {
 		uint32_t scene;
@@ -275,6 +283,14 @@ public:
 		if (s.ID != cur_shader) {
 			s.use();
 			cur_shader = s.ID; 
+		}
+	}
+	void set_shader(int index_into_shader_list) {
+		ASSERT(index_into_shader_list >= 0 && index_into_shader_list < (sizeof shader_list) / (sizeof Shader));
+		Shader& s = shader_list[index_into_shader_list];
+		if (s.ID != cur_shader) {
+			s.use();
+			cur_shader = s.ID;
 		}
 	}
 
@@ -344,6 +360,8 @@ private:
 
 	void set_shader_sampler_locations();
 	void set_wind_constants();
+
+	int get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass);
 
 	View_Setup current_frame_main_view;
 

@@ -516,13 +516,13 @@ void main()
 	vec3 specular_color = vec3(0.1);
 	float specmask = 1.0;
 	if(has_spec_mask) {
-		specmask = texture(auxcolor, FS_IN_Texcoord).r*1.0;
+		specmask = pow(texture(auxcolor, FS_IN_Texcoord).r,2.0);
 	}
 	if(!specular_enabled)
 		specmask = 0.0;
 		
 	if(specular_tint.r >= 0) {
-		specular_color = vec3(0.15);
+		specular_color = vec3(1.1);
 	}
 	else {
 		specular_color = tex.rgb * spec_strength;
@@ -530,7 +530,7 @@ void main()
 	specular_color *= specmask;
 
 	//FS_OUT_Color = eval_phong_brdf(diffuse_term, vec3(0.0), spec_exponent, 1.0, emission,N, vec3(0.0));
-	FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, 1.0, vec3(0.0),N, vec3(0.0));
+	FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
 //#endif
