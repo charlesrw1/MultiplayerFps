@@ -391,17 +391,16 @@ void compile_game_shaders(Shader* shader_start, int toggle_params, int mandatory
 
 void Renderer::reload_shaders()
 {
-	// >>> PBR BRANCH
 
+	// meshbuilder shaders
 	Shader::compile(&shader_list[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
 	Shader::compile(&shader_list[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
 	Shader::compile(&shader_list[S_TEXTURED3D], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
 	Shader::compile(&shader_list[S_TEXTUREDARRAY], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
 	Shader::compile(&shader_list[S_SKYBOXCUBE], "MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
+	Shader::compile(&shader_list[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
-	// okay this is getting out of hand
-	const char* frag = "PbrBasicF.txt";
-
+	// model shaders
 	int num_per_shader = (1 << NUM_SDP);
 	int standard_toggle_mask = (1 << SDP_ANIMATED) | (1 << SDP_ALPHATESTED) | (1 << SDP_LIGHTMAPPED) | (1<<SDP_NORMALMAPPED);
 	int wind_mask = (1 << SDP_ALPHATESTED) | (1 << SDP_ALPHATESTED) | (1<<SDP_NORMALMAPPED);
@@ -412,16 +411,16 @@ void Renderer::reload_shaders()
 	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_WIND * num_per_shader], wind_mask, 0, "WIND", "AnimBasicV.txt", "PbrBasicF.txt");
 
 
-	frag = "DepthF.txt";
+	// depth shaders for models
+	const char* frag = "DepthF.txt";
 	Shader::compile(&shader_list[S_ANIMATED_DEPTH], "AnimBasicV.txt", frag, "ANIMATED");
 	Shader::compile(&shader_list[S_DEPTH], "AnimBasicV.txt", frag);
 	Shader::compile(&shader_list[S_AT_DEPTH], "AnimBasicV.txt", frag, "ALPHATEST");
 	Shader::compile(&shader_list[S_WIND_DEPTH], "AnimBasicV.txt", frag, "WIND");
 	Shader::compile(&shader_list[S_WIND_AT_DEPTH], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
 
-	Shader::compile(&shader_list[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
-
+	// Bloom shaders
 	Shader::compile(&shader_list[S_BLOOM_DOWNSAMPLE], "MbTexturedV.txt", "BloomDownsampleF.txt");
 	Shader::compile(&shader_list[S_BLOOM_UPSAMPLE], "MbTexturedV.txt", "BloomUpsampleF.txt");
 	Shader::compile(&shader_list[S_COMBINE], "MbTexturedV.txt", "CombineF.txt");
@@ -431,18 +430,31 @@ void Renderer::reload_shaders()
 	shader().set_int("lens_dirt", 2);
 
 
+	// Hbao shaders
+	Shader::compile(&shader_list[S_HBAO], "MbTexturedV.txt", "HbaoF.txt");
+	Shader::compile(&shader_list[S_XBLUR], "MbTexturedV.txt", "BilateralBlurF.txt");
+	Shader::compile(&shader_list[S_YBLUR], "MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
+	set_shader(S_HBAO);
+	shader().set_int("noise_texture", 1);
+	shader().set_int("scene_depth", 0);
+	set_shader(S_XBLUR);
+	shader().set_int("input", 0);
+	shader().set_int("scene_depth", 1);
+	set_shader(S_YBLUR);
+	shader().set_int("input", 0);
+	shader().set_int("scene_depth", 1);
 
+
+
+	// volumetric fog shaders
 	Shader::compute_compile(&volfog.lightcalc, "VfogScatteringC.txt");
 	Shader::compute_compile(&volfog.raymarch, "VfogRaymarchC.txt");
 	Shader::compute_compile(&volfog.reproject, "VfogScatteringC.txt", "REPROJECTION");
 	volfog.lightcalc.use();
 	volfog.lightcalc.set_int("previous_volume", 0);
 	volfog.lightcalc.set_int("perlin_noise", 1);
-	glUseProgram(0);
 
-
-	glCheckError();
-
+	// set sampler locations for all model shaders
 	int start = NUM_NON_MODEL_SHADERS;
 	int end = start + NUM_MST * num_per_shader;
 	for (int i = start; i < end; i++) {
@@ -451,6 +463,9 @@ void Renderer::reload_shaders()
 			set_shader_sampler_locations();
 		}
 	}
+	
+	glCheckError();
+	glUseProgram(0);
 }
 
 struct Ubo_View_Constants_Struct
@@ -528,7 +543,7 @@ void Shadow_Map_System::make_csm_rendertargets()
 	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_map_array);
 	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
-	bool hardware_filtering = true;
+	bool hardware_filtering = false;
 	if (hardware_filtering) {
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -956,7 +971,7 @@ void Renderer::Init()
 	r_shadow_quality = cfg.get_var("r_shadow_quality", "1");
 	r_volumetric_fog = cfg.get_var("r_volumetric_fog", "1");
 
-
+	glGenBuffers(1, &ubo.current_frame);
 
 	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
 
@@ -964,16 +979,12 @@ void Renderer::Init()
 	tex.scene_color = tex.scene_depthstencil = 0;
 	InitFramebuffers();
 
-	// >>> PBR BRANCH
 	EnviornmentMapHelper::get().init();
-
-	lens_dirt = mats.find_texture("lens_dirt.jpg");
-
-	glGenBuffers(1, &ubo.current_frame);
-
-
 	volfog.init();
 	shadowmap.init();
+	ssao.init();
+	
+	lens_dirt = mats.find_texture("lens_dirt.jpg");
 }
 
 void Renderer::InitFramebuffers()
@@ -994,22 +1005,24 @@ void Renderer::InitFramebuffers()
 	glDeleteTextures(1, &tex.scene_depthstencil);
 	glGenTextures(1, &tex.scene_depthstencil);
 	glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, s_w, s_h, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, s_w, s_h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+
 	glCheckError();
 
 	glDeleteFramebuffers(1, &fbo.scene);
 	glGenFramebuffers(1, &fbo.scene);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.scene_color, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, tex.scene_depthstencil, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.scene_depthstencil, 0);
 	glCheckError();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glCheckError();
 
@@ -1271,7 +1284,7 @@ void Renderer::ui_render()
 
 	glDisable(GL_BLEND);
 	if (0) {
-		set_shader(S_TEXTUREDARRAY);
+		set_shader(S_TEXTURED);
 		glCheckError();
 
 		shader().set_mat4("Model", mat4(1));
@@ -1283,7 +1296,7 @@ void Renderer::ui_render()
 		ui_builder.Push2dQuad(glm::vec2(-1, 1), glm::vec2(1, -1), glm::vec2(0, 0),
 			glm::vec2(1, 1), COLOR_WHITE);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, shadowmap.shadow_map_array);
+		glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
 
 		glCheckError();
 
@@ -1359,6 +1372,8 @@ void Renderer::FrameDraw()
 	glCheckError();
 
 
+	ssao.render();
+
 	// Bloom update
 	render_bloom_chain();
 
@@ -1377,8 +1392,8 @@ void Renderer::FrameDraw()
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
 	if (!r_bloom->integer) bloom_tex = black_texture;
-	bind_texture(0, tex.scene_color);
-	bind_texture(1, bloom_tex);
+	bind_texture(0, ssao.fullres2);
+	bind_texture(1, tex.scene_color);
 	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
 
@@ -1648,6 +1663,7 @@ void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
 
 	//DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), glm::scale(glm::translate(mat4(1), vec3(0, 2, 0)),vec3(2)), nullptr, 0.0, 1.0);
 
+	draw_model_real(FindOrLoadModel("dragon.glb"), mat4(1), nullptr, nullptr, state);
 
 }
 
@@ -2220,4 +2236,192 @@ void Renderer::on_level_start()
 
 	glBufferData(GL_SHADER_STORAGE_BUFFER, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+#include "glm/gtc/random.hpp"
+
+void SSAO_System::init()
+{
+	glGenFramebuffers(1, &fbo);
+	glGenTextures(1, &noise_tex);
+	glBindTexture(GL_TEXTURE_2D, noise_tex);
+	int noise_size = 4;
+	std::vector<float> data;
+	data.resize(noise_size * noise_size * 4);
+	for (int y = 0; y < noise_size; ++y)
+	{
+		for (int x = 0; x < noise_size; ++x)
+		{
+			vec2 xy = glm::circularRand(1.0f);
+			float z = glm::linearRand(0.0f, 1.0f);
+			float w = glm::linearRand(0.0f, 1.0f);
+
+			int offset = 4 * (y * noise_size + x);
+			data[offset + 0] = xy[0];
+			data[offset + 1] = xy[1];
+			data[offset + 2] = z;
+			data[offset + 3] = w;
+		}
+	}
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, noise_size, noise_size, 0, GL_RGBA, GL_FLOAT, data.data());
+}
+
+void SSAO_System::make_render_targets()
+{
+	glDeleteRenderbuffers(1, &rbo);
+	glDeleteTextures(1, &halfres_texture);
+	glDeleteTextures(1, &fullres1);
+	glDeleteTextures(1, &fullres2);
+
+	width = engine.window_w->integer;
+	height = engine.window_h->integer;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	glGenTextures(1, &halfres_texture);
+	glBindTexture(GL_TEXTURE_2D, halfres_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width/res_scale, height/res_scale, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glGenTextures(1, &fullres1);
+	glBindTexture(GL_TEXTURE_2D, fullres1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glGenTextures(1, &fullres2);
+	glBindTexture(GL_TEXTURE_2D, fullres2);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+
+	glGenRenderbuffers(1, &rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void SSAO_System::render()
+{
+	GPUFUNCTIONSTART;
+
+	if (width != engine.window_w->integer || height != engine.window_h->integer)
+		make_render_targets();
+
+	MeshBuilder quad;
+	quad.Begin();
+	quad.Push2dQuad(vec2(-1, -1), vec2(2, 2));
+	quad.End();
+
+	//glDepthMask(GL_FALSE);
+	glDisable(GL_CULL_FACE);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, halfres_texture, 0);
+	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+	glViewport(0, 0, width/res_scale, height/res_scale);
+
+	draw.set_shader(Renderer::S_HBAO);
+	draw.shader().set_mat4("Model", mat4(1));
+	draw.shader().set_mat4("ViewProj", mat4(1));
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, noise_tex);
+
+	float fovRad = draw.vs.fov;
+
+	vec2 FocalLen, InvFocalLen, UVToViewA, UVToViewB, LinMAD;
+	vec2 ao_res = vec2(width/res_scale, height/res_scale);
+	vec2 inv_res = 1.f / ao_res;
+	float ao_aspect_ratio = ao_res.x / ao_res.y;
+
+	FocalLen[0] = 1.0f / tanf(fovRad * 0.5f) * ao_aspect_ratio;
+	FocalLen[1] = 1.0f / tanf(fovRad * 0.5f);
+	InvFocalLen[0] = 1.0f / FocalLen[0];
+	InvFocalLen[1] = 1.0f / FocalLen[1];
+
+	UVToViewA[0] = -2.0f * InvFocalLen[0];
+	UVToViewA[1] = -2.0f * InvFocalLen[1];
+	UVToViewB[0] = 1.0f * InvFocalLen[0];
+	UVToViewB[1] = 1.0f * InvFocalLen[1];
+
+	float near = draw.vs.near, far = draw.vs.far;
+	LinMAD[0] = (near - far) / (2.0f * near * far);
+	LinMAD[1] = (near + far) / (2.0f * near * far);
+
+	draw.shader().set_vec2("FocalLen", FocalLen);
+
+	draw.shader().set_vec2("UVToViewA", UVToViewA);
+
+	draw.shader().set_vec2("UVToViewB", UVToViewB);
+
+	draw.shader().set_vec2("LinMAD", LinMAD);
+
+
+	draw.shader().set_vec2("AORes", ao_res);
+
+	draw.shader().set_vec2("InvAORes", inv_res);
+
+	draw.shader().set_float("MaxRadiusPixels", max_radius_pixels / ao_aspect_ratio);
+
+	vec2 noise_scale = ao_res / vec2(4.f);
+
+	draw.shader().set_vec2("NoiseScale", noise_scale);
+
+	draw.shader().set_float("R", radius);
+	draw.shader().set_float("R2", radius*radius);
+	draw.shader().set_float("NegInvR2", -1.0/(radius * radius));
+	draw.shader().set_float("TanBias", tan(angle_bias * PI / 180.0));
+	draw.shader().set_int("NumDirections",num_directions);
+	draw.shader().set_int("NumSamples", num_samples);
+
+
+
+	quad.Draw(GL_TRIANGLES);
+
+	if (1) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres1, 0);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		glViewport(0, 0, width, height);
+		draw.set_shader(Renderer::S_XBLUR);
+		draw.shader().set_vec2("InvFullRes", 1.f / vec2(width, height));
+		draw.shader().set_vec2("LinMAD", LinMAD);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, halfres_texture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
+		quad.Draw(GL_TRIANGLES);
+
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres2, 0);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		glViewport(0, 0, width, height);
+		draw.set_shader(Renderer::S_YBLUR);
+		draw.shader().set_vec2("InvFullRes", 1.f / vec2(width, height));
+		draw.shader().set_vec2("LinMAD", LinMAD);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, fullres1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
+		quad.Draw(GL_TRIANGLES);
+	}
+	glEnable(GL_CULL_FACE);
+	//glDepthMask(GL_TRUE);
+	glCheckError();
+
+	quad.Free();
 }

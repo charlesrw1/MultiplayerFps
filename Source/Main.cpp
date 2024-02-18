@@ -696,6 +696,13 @@ extern float speed;
 
 void draw_wind_menu()
 {
+	ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
+	ImGui::DragFloat("angle bias", &draw.ssao.angle_bias, 0.02);
+	ImGui::DragFloat("radius_pixels", &draw.ssao.max_radius_pixels, 0.02);
+	ImGui::DragInt("num directions", &draw.ssao.num_directions);
+	ImGui::DragInt("num samples", &draw.ssao.num_samples);
+
+
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
 	ImGui::DragFloat("metalness", &draw.metal, 0.02);
 	ImGui::DragFloat3("aosphere", &draw.aosphere.x, 0.02);

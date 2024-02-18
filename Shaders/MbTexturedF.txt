@@ -12,6 +12,16 @@ uniform int slice;
 uniform sampler2D basecolor;
 #endif
 
+float near = 0.01; 
+float far  = 100.0; 
+  
+float LinearizeDepth(float depth) 
+{
+    float z = depth * 2.0 - 1.0; // back to NDC 
+    return (2.0 * near * far) / (far + near - z * (far - near));	
+}
+
+
 uniform vec4 tint;
 
 void main()
@@ -21,6 +31,7 @@ void main()
 	FS_OUT_Color = vec4(color.r,0,0,1.0);
 #else
 	vec4 color = texture(basecolor,FS_IN_TexCoord);
+	color.r = LinearizeDepth(color.r)/far;
 
 #ifdef PARTICLE_SHADER
 	//if(color.r < 0.2)

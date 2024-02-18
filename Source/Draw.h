@@ -80,6 +80,32 @@ public:
 	bool targets_dirty = false;
 };
 
+class SSAO_System
+{
+public:
+	void init();
+	void make_render_targets();
+	void render();
+
+	uint32_t noise_tex2;
+
+	uint32_t noise_tex;
+	uint32_t fbo;
+	uint32_t rbo;
+	uint32_t halfres_texture;	// raw ao texture
+	uint32_t fullres1;	// blurx result
+	uint32_t fullres2;	// blury result and final output
+	int width, height;
+
+	float max_radius_pixels = 50;
+	int res_scale = 1;
+	float radius=0.3;
+	float angle_bias = 30.0;
+	int num_directions = 6;
+	int num_samples = 6;
+
+};
+
 struct Render_Level_Params {
 	View_Setup view;
 	uint32_t output_framebuffer;
@@ -224,6 +250,8 @@ public:
 
 		// other
 		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE, S_COMBINE,
+		S_HBAO, S_XBLUR, S_YBLUR,	// hbao shaders
+
 
 		NUM_NON_MODEL_SHADERS,
 	};
@@ -313,6 +341,7 @@ public:
 
 	Texture* lens_dirt;
 
+	SSAO_System ssao;
 	Shadow_Map_System shadowmap;
 	Volumetric_Fog_System volfog;
 	float slice_3d=0.0;

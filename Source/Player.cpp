@@ -317,7 +317,7 @@ void player_physics_ground_move(Entity& player, Move_Command command, bool dont_
 	vec3 look_front = AnglesToVector(command.view_angles.x, command.view_angles.y);
 	look_front.y = 0;
 	look_front = normalize(look_front);
-	vec3 look_side = -cross(look_front, vec3(0, 1, 0));
+	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
 	float acceleation_val = (player.state & PMS_GROUND) ? ground_accel : air_accel;
 	acceleation_val = (player.state & PMS_CROUCHING) ? ground_accel_crouch : acceleation_val;
@@ -377,6 +377,8 @@ void player_physics_check_nans(Entity& player)
 
 void player_physics_update(Entity* p, Move_Command command)
 {
+	static Config_Var* debug_fly = cfg.get_var("dbgfly", "0");
+
 	if (p->flags & EF_DEAD) {
 		command.forward_move = 0;
 		command.lateral_move = 0;
@@ -403,7 +405,27 @@ void player_physics_update(Entity* p, Move_Command command)
 
 	bool dont_add_grav = false;
 	check_ground_state(*p, command,dont_add_grav);
-	player_physics_ground_move(*p, command, dont_add_grav);
+	if (engine.is_host && debug_fly->integer) {
+		p->state = PMS_JUMPING;
+
+		vec2 inputvec = vec2(command.forward_move, command.lateral_move);
+		float inputlen = length(inputvec);
+		if (inputlen > 0.00001)
+			inputvec = inputvec / inputlen;
+		if (inputlen > 1)
+			inputlen = 1;
+
+		vec3 look_front = AnglesToVector(command.view_angles.x, command.view_angles.y);
+		look_front = normalize(look_front);
+		vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
+
+		vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
+
+		p->position += wishdir * 12.0f*(float)engine.tick_interval;
+
+	}
+	else
+		player_physics_ground_move(*p, command, dont_add_grav);
 	player_physics_check_nans(*p);
 
 }
