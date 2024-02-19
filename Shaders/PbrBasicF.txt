@@ -477,6 +477,7 @@ void main()
 	if(tex.a < 0.5)
 		discard;
 #endif
+#if 1
 
 	vec3 V = normalize(g.viewpos_time.xyz-FS_IN_FragPos);
 	vec3 N = normalize(FS_IN_Normal);
@@ -533,7 +534,9 @@ void main()
 	FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
-	FS_OUT_Color = vec4(1.0);
+	//FS_OUT_Color = vec4(1.0);
+#endif
+	//FS_OUT_Color =vec4(0.1,0.1,0,1);
 //#endif
 
 }	

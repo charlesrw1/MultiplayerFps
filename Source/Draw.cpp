@@ -407,8 +407,8 @@ void Renderer::reload_shaders()
 	int blend_toggle_mask = (1 << SDP_LIGHTMAPPED) | (1<<SDP_NORMALMAPPED);
 
 	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_STANDARD * num_per_shader], standard_toggle_mask, 0, "", "AnimBasicV.txt", "PbrBasicF.txt");
-	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_MULTIBLEND * num_per_shader], blend_toggle_mask, (1<<SDP_VERTEXCOLORS), "BLEND2", "AnimBasicV.txt", "PbrBasicF.txt");
-	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_WIND * num_per_shader], wind_mask, 0, "WIND", "AnimBasicV.txt", "PbrBasicF.txt");
+	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_MULTIBLEND * num_per_shader], blend_toggle_mask, (1<<SDP_VERTEXCOLORS), "BLEND2,", "AnimBasicV.txt", "PbrBasicF.txt");
+	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_WIND * num_per_shader], wind_mask, 0, "WIND,", "AnimBasicV.txt", "PbrBasicF.txt");
 
 
 	// depth shaders for models
@@ -430,18 +430,13 @@ void Renderer::reload_shaders()
 	shader().set_int("lens_dirt", 2);
 
 
-	// Hbao shaders
-	Shader::compile(&shader_list[S_HBAO], "MbTexturedV.txt", "HbaoF.txt");
+	// Ssao shaders
 	Shader::compile(&shader_list[S_SSAO], "MbTexturedV.txt", "SsaoLOGF.txt");
 	Shader::compile(&shader_list[S_XBLUR], "MbTexturedV.txt", "BilateralBlurF.txt");
 	Shader::compile(&shader_list[S_YBLUR], "MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
-	set_shader(S_HBAO);
-	shader().set_int("noise_texture", 1);
-	shader().set_int("scene_depth", 0);
 	set_shader(S_SSAO);
 	shader().set_int("scene_depth", 0);
 	shader().set_int("noise_texture", 1);
-	shader().set_int("scene_normals", 2);
 	set_shader(S_XBLUR);
 	shader().set_int("input", 0);
 	shader().set_int("scene_depth", 1);
@@ -976,6 +971,7 @@ void Renderer::Init()
 	r_bloom = cfg.get_var("r_bloom", "1");
 	r_shadow_quality = cfg.get_var("r_shadow_quality", "1");
 	r_volumetric_fog = cfg.get_var("r_volumetric_fog", "1");
+	r_ssao = cfg.get_var("r_ssao", "1");
 
 	glGenBuffers(1, &ubo.current_frame);
 
@@ -1381,8 +1377,11 @@ void Renderer::FrameDraw()
 	engine.local.pm.draw_particles();
 	glCheckError();
 
+	if (!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
+		DrawPlayerViewmodel();
 
-	ssao.render();
+	if(r_ssao->integer)
+		ssao.render();
 
 	// Bloom update
 	render_bloom_chain();
@@ -1446,8 +1445,6 @@ void Renderer::FrameDraw()
 	glClear(GL_DEPTH_BUFFER_BIT);
 
 	// FIXME: ubo view constant buffer might be wrong since its changed around a lot (bad design)
-	if (!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
-		DrawPlayerViewmodel();
 }
 
 void Renderer::cubemap_positions_debug()
@@ -1806,9 +1803,9 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 		if (is_lightmapped) param_bitmask |= (1 << SDP_LIGHTMAPPED);
 		if (has_colors) param_bitmask |= (1 << SDP_VERTEXCOLORS);
 
-		int shader_type = 0;
+		int shader_type = gs.shader_type;
 
-		if (gs.shader_type == Game_Shader::S_DEFAULT) {
+		if (shader_type == Game_Shader::S_DEFAULT) {
 			shader_type = MSHADER_STANDARD;
 			param_bitmask &= ~(1 << SDP_VERTEXCOLORS);
 		}
@@ -1986,7 +1983,7 @@ void Renderer::DrawPlayerViewmodel()
 
 	Game_Local* gamel = &engine.local;
 	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
-	//model2 = model2 * glm::scale(model2, glm::vec3(gamel->vm_scale.x));
+	model2 =  glm::scale(model2, glm::vec3(gamel->vm_scale.x));
 
 
 	model2 = glm::translate(model2, gamel->vm_offset);
@@ -2258,40 +2255,16 @@ float ourLerp(float a, float b, float f)
 void SSAO_System::init()
 {
 	glGenFramebuffers(1, &fbo);
-	glGenTextures(1, &noise_tex);
-	glBindTexture(GL_TEXTURE_2D, noise_tex);
-	int noise_size = 4;
-	std::vector<float> data;
-	data.resize(noise_size * noise_size * 4);
-	for (int y = 0; y < noise_size; ++y)
-	{
-		for (int x = 0; x < noise_size; ++x)
-		{
-			vec2 xy = glm::circularRand(1.0f);
-			float z = glm::linearRand(0.0f, 1.0f);
-			float w = glm::linearRand(0.0f, 1.0f);
-
-			int offset = 4 * (y * noise_size + x);
-			data[offset + 0] = xy[0];
-			data[offset + 1] = xy[1];
-			data[offset + 2] = z;
-			data[offset + 3] = w;
-		}
-	}
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, noise_size, noise_size, 0, GL_RGBA, GL_FLOAT, data.data());
 
 	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
 	std::default_random_engine generator;
-	for (unsigned int i = 0; i < 64; ++i)
+	int kernel_samples =16;
+	for (unsigned int i = 0; i < kernel_samples; ++i)
 	{
 		glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
 		sample = glm::normalize(sample);
 		sample *= randomFloats(generator);
-		float scale = float(i) / 64.0f;
+		float scale = float(i) / kernel_samples;
 
 		// scale samples s.t. they're more aligned to center of kernel
 		scale = ourLerp(0.1f, 1.0f, scale * scale);
@@ -2328,11 +2301,11 @@ void SSAO_System::make_render_targets()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-	res_scale = 1;
+	res_scale = 1;	// halfres breaks ssao and I'm tired of trying to fix it..., something to do with projection matrix
 
 	glGenTextures(1, &halfres_texture);
 	glBindTexture(GL_TEXTURE_2D, halfres_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width/res_scale, height/res_scale, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width/res_scale, height/res_scale, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2364,19 +2337,12 @@ void SSAO_System::make_render_targets()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void SSAO_System::render_basic_ssao()
-{
-
-}
-
 void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;
 
 	if (width != engine.window_w->integer || height != engine.window_h->integer)
 		make_render_targets();
-
-	bool use_simple_ssao = true;
 
 
 	MeshBuilder quad;
@@ -2391,78 +2357,47 @@ void SSAO_System::render()
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	glViewport(0, 0, width/res_scale, height/res_scale);
 
-	if (use_simple_ssao) {
-		draw.set_shader(Renderer::S_SSAO);
-	}
-	else {
-		draw.set_shader(Renderer::S_HBAO);
-	}
+	draw.set_shader(Renderer::S_SSAO);
+
 	draw.shader().set_mat4("Model", mat4(1));
 	draw.shader().set_mat4("ViewProj", mat4(1));
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
 	glActiveTexture(GL_TEXTURE1);
-	if(use_simple_ssao)
-		glBindTexture(GL_TEXTURE_2D, noise_tex2);
-	else
-		glBindTexture(GL_TEXTURE_2D, noise_tex);
+	glBindTexture(GL_TEXTURE_2D, noise_tex2);
 
 	float fovRad = draw.vs.fov;
 
-	vec2 FocalLen, InvFocalLen, UVToViewA, UVToViewB, LinMAD;
-	vec2 ao_res = vec2(width/res_scale, height/res_scale);
+	vec2 LinMAD;
+	vec2 ao_res = vec2(width/(res_scale), height/(res_scale));
+	//ao_res = glm::floor(ao_res);
 	vec2 inv_res = 1.f / ao_res;
 	float ao_aspect_ratio = ao_res.x / ao_res.y;
 
-	FocalLen[0] = 1.0f / tanf(fovRad * 0.5f) * ao_aspect_ratio;
-	FocalLen[1] = 1.0f / tanf(fovRad * 0.5f);
-	InvFocalLen[0] = 1.0f / FocalLen[0];
-	InvFocalLen[1] = 1.0f / FocalLen[1];
-
-	UVToViewA[0] = -2.0f * InvFocalLen[0];
-	UVToViewA[1] = -2.0f * InvFocalLen[1];
-	UVToViewB[0] = 1.0f * InvFocalLen[0];
-	UVToViewB[1] = 1.0f * InvFocalLen[1];
 
 	float near = draw.vs.near, far = draw.vs.far;
 	LinMAD[0] = (near - far) / (2.0f * near * far);
 	LinMAD[1] = (near + far) / (2.0f * near * far);
 
-	draw.shader().set_vec2("FocalLen", FocalLen);
-	draw.shader().set_vec2("UVToViewA", UVToViewA);
-	draw.shader().set_vec2("UVToViewB", UVToViewB);
-	draw.shader().set_vec2("LinMAD", LinMAD);
 
 
 	draw.shader().set_vec2("AORes", ao_res);
-
 	draw.shader().set_vec2("InvAORes", inv_res);
-
-	draw.shader().set_float("MaxRadiusPixels", max_radius_pixels / ao_aspect_ratio);
 
 	vec2 noise_scale = ao_res / vec2(4.f);
 
 	draw.shader().set_vec2("NoiseScale", noise_scale);
 
+	draw.shader().set_mat4("projection", draw.vs.proj);
+		//float aspect = (width / res_scale) / float(height / res_scale);
+		//glm::mat4 newproj = glm::perspective(draw.vs.fov, aspect, draw.vs.near, draw.vs.far);
 
-	if (!use_simple_ssao) {
-		draw.shader().set_float("R", radius);
-		draw.shader().set_float("R2", radius * radius);
-		draw.shader().set_float("NegInvR2", -1.0 / (radius * radius));
-		draw.shader().set_float("TanBias", tan(angle_bias * PI / 180.0));
-		draw.shader().set_int("NumDirections", num_directions);
-		draw.shader().set_int("NumSamples", num_samples);
-	}
-	else {
-		draw.shader().set_mat4("projection", draw.vs.proj);
-		draw.shader().set_mat4("invprojection", glm::inverse(draw.vs.proj));
+	draw.shader().set_mat4("invprojection", glm::inverse(draw.vs.proj));
 
-		uint32_t id = draw.shader_list[Renderer::S_SSAO].ID;
-		uint32_t loc = glGetUniformLocation(id, "samples[0]");
-		for (int j = 0; j < 64; j++)
-			draw.shader().set_vec3((std::string("samples[") + std::to_string(j) + "]").c_str(), samples[j]);
-	}
-
+	uint32_t id = draw.shader_list[Renderer::S_SSAO].ID;
+	uint32_t loc = glGetUniformLocation(id, "samples[0]");
+	for (int j = 0; j < 64; j++)
+		glUniform3f(loc+j, samples[j].x, samples[j].y, samples[j].z);
 
 	quad.Draw(GL_TRIANGLES);
 

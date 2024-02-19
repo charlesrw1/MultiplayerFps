@@ -86,12 +86,9 @@ public:
 	void init();
 	void make_render_targets();
 	void render();
-	void render_basic_ssao();
 
 	uint32_t noise_tex2;
 	glm::vec3 samples[64];
-
-	uint32_t noise_tex;
 	uint32_t fbo;
 	uint32_t rbo;
 	uint32_t halfres_texture;	// raw ao texture
@@ -99,13 +96,9 @@ public:
 	uint32_t fullres2;	// blury result and final output
 	int width, height;
 
-	float max_radius_pixels = 50;
 	int res_scale = 1;
-	float radius=0.3;
-	float angle_bias = 30.0;
-	int num_directions = 6;
-	int num_samples = 6;
-
+	float radius = 0.5;
+	float bias = 0.025;
 };
 
 struct Render_Level_Params {
@@ -308,6 +301,8 @@ public:
 	Config_Var* r_shadow_quality;
 	Config_Var* r_bloom;
 	Config_Var* r_volumetric_fog;
+	Config_Var* r_ssao;
+
 
 	void bind_texture(int bind, int id);
 	void set_shader(Shader& s) { 

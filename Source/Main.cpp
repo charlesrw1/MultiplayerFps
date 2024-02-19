@@ -697,10 +697,7 @@ extern float speed;
 void draw_wind_menu()
 {
 	ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
-	ImGui::DragFloat("angle bias", &draw.ssao.angle_bias, 0.02);
-	ImGui::DragFloat("radius_pixels", &draw.ssao.max_radius_pixels, 0.02);
-	ImGui::DragInt("num directions", &draw.ssao.num_directions);
-	ImGui::DragInt("num samples", &draw.ssao.num_samples);
+	ImGui::DragFloat("angle bias", &draw.ssao.bias, 0.02);
 
 
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
@@ -777,6 +774,10 @@ void Game_Engine::draw_screen()
 	glCheckError();
 	int x, y;
 	SDL_GetWindowSize(window, &x, &y);
+	if (x % 2 == 1)x -= 1;
+	if (y % 2 == 1)y -= 1;
+	SDL_SetWindowSize(window, x, y);
+
 	cfg.set_var("window_w", std::to_string(x).c_str());
 	cfg.set_var("window_h", std::to_string(y).c_str());
 	if (draw.vsync->integer != 0 && draw.vsync->integer != 1)
