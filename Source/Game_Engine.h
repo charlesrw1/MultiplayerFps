@@ -2,6 +2,7 @@
 #include "Server.h"
 #include "Types.h"
 #include "Particles.h"
+#include "Memory.h"
 
 using std::vector;
 
@@ -157,6 +158,15 @@ public:
 	bool game_focused = false;
 
 	string* binds[SDL_NUM_SCANCODES];
+
+	// bottom = strings
+	// top = models, textures, sounds
+	Memory_Arena program_long_mem;
+	// bottom = frame data (cleared on each graphics frame!)
+	// top = per level data (cleared on new level loads)
+	Memory_Arena per_frame_and_level_mem;
+	// temporary storage for loading
+	Memory_Arena loading_mem;
 
 	int argc;
 	char** argv;

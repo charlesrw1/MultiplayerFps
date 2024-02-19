@@ -70,6 +70,7 @@
     <ClInclude Include="Source\EnvProbe.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
+    <ClInclude Include="Source\Memory.h" />
     <ClInclude Include="Source\Particles.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />

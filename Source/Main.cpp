@@ -540,6 +540,8 @@ void cmd_reload_shaders()
 	draw.reload_shaders();
 }
 
+Global_Memory_Context mem_ctx;
+
 int main(int argc, char** argv)
 {
 	new_entity_fields_test();
@@ -914,8 +916,80 @@ void cmd_debug_counter()
 	printf("offset client: %d\n", engine.cl->offset_debug);
 }
 
+
+struct Default_Get_Location
+{
+	static Arena_Loc get() {
+		return Arena_Loc();
+	}
+};
+
+struct Long_Term_String_Get_Location
+{
+	static Arena_Loc get() {
+		return mem_ctx.long_default;
+	}
+};
+
+struct Temp_String_Get_Location
+{
+	static Arena_Loc get() {
+		return mem_ctx.temp_default;
+	}
+};
+
+
+template<typename T, typename LocationGetter = Default_Get_Location>
+class Arena_Allocator
+{
+public:
+	Arena_Allocator() : dest(LocationGetter::get()){
+	}
+	Arena_Allocator(Arena_Loc dest) : dest(dest) {}
+	template<typename U, typename J>
+	Arena_Allocator(const Arena_Allocator<U, J>& other) {}
+	using value_type = T;
+
+
+	void deallocate(T* p, size_t n) {
+	}
+	T* allocate(size_t n) {
+		const Arena_Loc& ad = (dest.arena) ? dest : mem_ctx.temp_default;
+		return (ad.top) ? (T*)ad.arena->alloc_top(sizeof(T) * n) :
+			(T*)ad.arena->alloc_bottom(sizeof(T) * n);
+	}
+	const Arena_Loc dest = Arena_Loc();
+};
+
+template<typename T>
+using avector = std::vector<T, Arena_Allocator<T>>;
+using temp_string = std::basic_string<char, std::char_traits<char>, Arena_Allocator<char, Temp_String_Get_Location>>;
+using long_string = std::basic_string<char, std::char_traits<char>, Arena_Allocator<char, Long_Term_String_Get_Location>>;
+
+static long_string myverylong;
+
 void Game_Engine::init()
 {
+	loading_mem.init("LOADING", 2'000'000);
+	per_frame_and_level_mem.init("FRAME AND LEVEL", 4'000'000);
+	program_long_mem.init("PROGRAM", 4'000'000);
+
+	mem_ctx.temp_default = { &per_frame_and_level_mem, false };
+	mem_ctx.level_default = { &per_frame_and_level_mem, true };
+	mem_ctx.long_default = { &program_long_mem, false };
+	mem_ctx.loading_default = { &loading_mem, false };
+
+	avector<int> myvec;
+	temp_string mystr;
+	mystr = "abc 123";
+	mystr += "adfasdfiadsoihfaosihg aoishfgodfhgs dihfg osidfhgs";
+	temp_string mystr2 = ", now you know your abcs!!";
+	mystr += mystr2;
+	myverylong += mystr.c_str();
+
+	long_string mystrlong = mystr.c_str();
+
+
 	memset(keys, 0, sizeof(keys));
 	memset(keychanges, 0, sizeof(keychanges));
 	memset(binds, 0, sizeof(binds));
