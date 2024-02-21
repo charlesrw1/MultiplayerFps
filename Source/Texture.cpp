@@ -222,7 +222,9 @@ static bool make_from_data(Texture* output, int x, int y, int channels, void* da
 	}
 	uint32_t type = (is_float) ? GL_FLOAT : GL_UNSIGNED_BYTE;
 	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, type, data);
-
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.f);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
 

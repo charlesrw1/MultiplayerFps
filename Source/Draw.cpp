@@ -932,11 +932,30 @@ void Volumetric_Fog_System::compute()
 	temporal_sequence = (temporal_sequence + 1) % 16;
 }
 
-
-
 void Renderer::Init()
 {
+	bool supports_compression = false;
+	bool supports_anisotropic = false;
+	bool supports_sprase_tex = false;
+	bool supports_bindless = false;
+	bool supports_shader_draw_param = false;
+	bool supports_gl_debug = false;
+
 	glCheckError();
+	int num_extensions = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
+	for (int i = 0; i < num_extensions; i++) {
+		const char* ext = (char*)glGetStringi(GL_EXTENSIONS, i);
+		if (strcmp(ext, "GL_ARB_bindless_texture") == 0) supports_bindless = true;
+		else if (strcmp(ext, "GL_EXT_texture_filter_anisotropic") == 0)supports_anisotropic = true;
+		else if (strcmp(ext, "GL_ARB_sparse_texture") == 0)supports_sprase_tex = true;
+		else if (strcmp(ext, "GL_EXT_texture_compression_s3tc") == 0)supports_compression = true;
+	}
+
+	if (!supports_compression) {
+		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
+	}
+	
 	InitGlState();
 	reload_shaders();
 

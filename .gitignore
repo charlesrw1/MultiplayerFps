@@ -4,3 +4,12 @@ Release/
 Data/
 imgui.ini
 *.dll
+
+
+*.obj
+*.pdb
+*.lib
+*.tlog
+*.exe
+
+*.md

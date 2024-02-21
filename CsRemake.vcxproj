@@ -28,7 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BVHBuild.cpp" />
-    <ClCompile Include="Edit.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
@@ -62,12 +61,13 @@
     <ClCompile Include="Source\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Edit.h" />
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
     <ClInclude Include="Source\Draw.h" />
     <ClInclude Include="Source\EnvProbe.h" />
+    <ClInclude Include="Source\External\glad\glad.h" />
+    <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
     <ClInclude Include="Source\Memory.h" />
@@ -93,6 +93,9 @@
     <ClInclude Include="Source\Util.h" />
     <ClInclude Include="Source\MeshBuilder.h" />
     <ClInclude Include="Source\GlmInclude.h" />
+    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon.h" />
+    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_interfaces.h" />
+    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_version.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -234,12 +237,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;$(ProjectDir)steamaudio_4.5.2\steamaudio\lib\windows-x64\phonon.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugClient|x64'">
@@ -248,12 +251,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;$(ProjectDir)steamaudio_4.5.2\steamaudio\lib\windows-x64\phonon.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -264,14 +267,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;$(ProjectDir)steamaudio_4.5.2\steamaudio\lib\windows-x64\phonon.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,4 +1,8 @@
 #include <SDL2/SDL.h>
+
+#include "SDL2/SDL_mixer.h"
+#include "phonon.h"
+
 #include "glad/glad.h"
 #include "stb_image.h"
 #include <cstdio>
@@ -542,6 +546,88 @@ void cmd_reload_shaders()
 
 Global_Memory_Context mem_ctx;
 
+typedef int sound_handle;
+enum Sound_Channels
+{
+	UI_LAYER,
+
+
+};
+
+class Audio_System
+{
+public:
+	void init();
+	sound_handle start_sound(const char* sound, bool looping);
+	void set_sound_position(sound_handle handle, vec3 position);
+	void free_sound(sound_handle* handle);
+
+	
+
+};
+
+Mix_Chunk* gun_sound;
+
+void steam_audio_log_callback(IPLLogLevel level, const char* msg)
+{
+	sys_print("%s\n", msg);
+}
+
+const int AUDIO_SAMPLE_RATE = 44100;
+const int AUDIO_FRAME = 1024;
+
+void Audio_System::init()
+{
+	bool stereo = true;
+
+	int fail = Mix_OpenAudio(44'100, AUDIO_S16SYS, (stereo) ? 2 : 1, 2048);
+	if (fail) {
+		printf("init audio failed\n");
+		return;
+	}
+}
+
+void init_audio()
+{
+	int fail = Mix_OpenAudio(44'100, AUDIO_S16SYS, 1, 2048);
+	if (fail) {
+		printf("init audio failed\n");
+		return;
+	}
+
+	gun_sound = Mix_LoadWAV("Data\\Sounds\\q009\\explosion.ogg");
+
+	IPLContext context = nullptr;
+	IPLContextSettings contextsettings = {};
+	contextsettings.logCallback = steam_audio_log_callback;
+	contextsettings.version = STEAMAUDIO_VERSION;
+	iplContextCreate(&contextsettings, &context);
+
+	IPLHRTFSettings hrtfSettings{};
+	hrtfSettings.type = IPL_HRTFTYPE_DEFAULT;
+
+	IPLAudioSettings audio_settings{};
+	audio_settings.frameSize = AUDIO_FRAME;
+	audio_settings.samplingRate = AUDIO_SAMPLE_RATE;
+
+	IPLHRTF hrtf = nullptr;
+	iplHRTFCreate(context, &audio_settings, &hrtfSettings, &hrtf);
+
+	IPLBinauralEffectSettings effectSettings{};
+	effectSettings.hrtf = hrtf;
+	
+	IPLBinauralEffect effect = nullptr;
+	iplBinauralEffectCreate(context, &audio_settings, &effectSettings, &effect);
+
+
+	if (!gun_sound) {
+		printf("couldn't load sound\n");
+	}
+
+	Mix_PlayChannel(0, gun_sound, 2);
+}
+
+
 int main(int argc, char** argv)
 {
 	new_entity_fields_test();
@@ -784,7 +870,7 @@ void Game_Engine::draw_screen()
 	cfg.set_var("window_h", std::to_string(y).c_str());
 	if (draw.vsync->integer != 0 && draw.vsync->integer != 1)
 		cfg.set_var("vsync", "0");
-	SDL_GL_SetSwapInterval(draw.vsync->integer);
+	SDL_GL_SetSwapInterval(0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -917,57 +1003,6 @@ void cmd_debug_counter()
 }
 
 
-struct Default_Get_Location
-{
-	static Arena_Loc get() {
-		return Arena_Loc();
-	}
-};
-
-struct Long_Term_String_Get_Location
-{
-	static Arena_Loc get() {
-		return mem_ctx.long_default;
-	}
-};
-
-struct Temp_String_Get_Location
-{
-	static Arena_Loc get() {
-		return mem_ctx.temp_default;
-	}
-};
-
-
-template<typename T, typename LocationGetter = Default_Get_Location>
-class Arena_Allocator
-{
-public:
-	Arena_Allocator() : dest(LocationGetter::get()){
-	}
-	Arena_Allocator(Arena_Loc dest) : dest(dest) {}
-	template<typename U, typename J>
-	Arena_Allocator(const Arena_Allocator<U, J>& other) {}
-	using value_type = T;
-
-
-	void deallocate(T* p, size_t n) {
-	}
-	T* allocate(size_t n) {
-		const Arena_Loc& ad = (dest.arena) ? dest : mem_ctx.temp_default;
-		return (ad.top) ? (T*)ad.arena->alloc_top(sizeof(T) * n) :
-			(T*)ad.arena->alloc_bottom(sizeof(T) * n);
-	}
-	const Arena_Loc dest = Arena_Loc();
-};
-
-template<typename T>
-using avector = std::vector<T, Arena_Allocator<T>>;
-using temp_string = std::basic_string<char, std::char_traits<char>, Arena_Allocator<char, Temp_String_Get_Location>>;
-using long_string = std::basic_string<char, std::char_traits<char>, Arena_Allocator<char, Long_Term_String_Get_Location>>;
-
-static long_string myverylong;
-
 void Game_Engine::init()
 {
 	loading_mem.init("LOADING", 2'000'000);
@@ -978,17 +1013,6 @@ void Game_Engine::init()
 	mem_ctx.level_default = { &per_frame_and_level_mem, true };
 	mem_ctx.long_default = { &program_long_mem, false };
 	mem_ctx.loading_default = { &loading_mem, false };
-
-	avector<int> myvec;
-	temp_string mystr;
-	mystr = "abc 123";
-	mystr += "adfasdfiadsoihfaosihg aoishfgodfhgs dihfg osidfhgs";
-	temp_string mystr2 = ", now you know your abcs!!";
-	mystr += mystr2;
-	myverylong += mystr.c_str();
-
-	long_string mystrlong = mystr.c_str();
-
 
 	memset(keys, 0, sizeof(keys));
 	memset(keychanges, 0, sizeof(keychanges));
@@ -1027,6 +1051,8 @@ void Game_Engine::init()
 
 	// engine initilization
 	init_sdl_window();
+
+	init_audio();
 
 	network_init();
 

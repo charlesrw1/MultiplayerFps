@@ -195,7 +195,6 @@ public:
 	uint32_t light_ssbo;
 };
 
-
 class Renderer
 {
 public:

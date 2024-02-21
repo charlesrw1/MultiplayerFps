@@ -28,6 +28,9 @@
     <Filter Include="Source Files\Network">
       <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\External\steamaudio">
+      <UniqueIdentifier>{9bb540b9-417f-4f44-a1ed-d512948e187f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\External\glad.c">
@@ -114,9 +117,6 @@
     <ClCompile Include="Source\Player.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Edit.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Net.cpp">
       <Filter>Source Files\Network</Filter>
     </ClCompile>
@@ -200,9 +200,6 @@
     <ClInclude Include="Source\Game_Engine.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Edit.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\MeshBuilder.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
@@ -223,6 +220,21 @@
     </ClInclude>
     <ClInclude Include="Source\Memory.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon.h">
+      <Filter>Source Files\External\steamaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_interfaces.h">
+      <Filter>Source Files\External\steamaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_version.h">
+      <Filter>Source Files\External\steamaudio</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\glad\glad.h">
+      <Filter>Source Files\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\KHR\khrplatform.h">
+      <Filter>Source Files\External</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

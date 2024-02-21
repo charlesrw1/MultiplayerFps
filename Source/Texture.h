@@ -5,12 +5,37 @@
 #include <vector>
 #include "glm/glm.hpp"
 
+enum Texture_Format
+{
+	TEXFMT_RGBA8,
+	TEXFMT_RGB8,
+	TEXFMT_RG8,
+	TEXFMT_R8,
+	TEXFMT_RGBA16F,
+	TEXFMT_RGB16F,
+	TEXFMT_RGBA8_DXT5,
+	TEXFMT_RGB8_DXT1,	
+	TEXFMT_RGBA8_DXT5NM,
+};
+
+enum Texture_Type
+{
+	TEXTYPE_2D,
+	TEXTYPE_3D,
+	TEXTYPE_CUBEMAP,
+};
+
 struct Texture
 {
 	std::string name;
 	int width = 0;
 	int height = 0;
 	int channels = 0;
+	Texture_Type type;
+	Texture_Format format;
+	bool no_filtering = false;
+	bool has_mips = false;
+
 	bool is_float = false;
 	uint32_t gl_id = 0;
 };
