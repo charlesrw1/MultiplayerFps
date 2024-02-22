@@ -22,6 +22,13 @@ uniform sampler2D lightmap;
 in mat3 FS_IN_TBN;
 #endif
 
+#ifdef BLEND2
+uniform sampler2D basecolor2;
+uniform sampler2D normalmap2;
+uniform sampler2D auxcolor2;
+uniform sampler2D special;
+#endif
+
 uniform samplerCubeArray pbr_irradiance_cubemaps;
 uniform samplerCubeArray pbr_specular_cubemaps;
 uniform sampler2D PBR_brdflut;
@@ -43,7 +50,6 @@ uniform float spec_strength = 1.0;
 uniform bool has_spec_mask = false;	// in auxcolor
 uniform bool specular_enabled = true;
 uniform bool use_spec_tint_on_diffuse = true;
-
 
 uniform float in_roughness;
 uniform float in_metalness;
@@ -324,7 +330,7 @@ vec4 eval_phong_brdf(vec3 diffuse, vec3 specular, float specular_power, float op
 		direct_diffuse_light += pow(max(dot(V,-L),0.0),2.0)*transmissive_color*g.directional_light_color.rgb;
 	}
 	else {
-		direct_diffuse_light += max(dot(-g.directional_light_dir_and_used.xyz,N), 0.0)*g.directional_light_color.rgb;
+		direct_diffuse_light += max(dot(-g.directional_light_dir_and_used.xyz,N), 0.0)*g.directional_light_color.rgb*0.003;
 	}
 #endif
 	float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
@@ -338,7 +344,7 @@ vec4 eval_phong_brdf(vec3 diffuse, vec3 specular, float specular_power, float op
 #ifdef LIGHTMAPPED
 	direct_specular_light = spec*ambient_light*1.0;
 #else
-	direct_specular_light = spec*g.directional_light_color.rgb;
+	direct_specular_light = spec*g.directional_light_color.rgb*0.003;
 #endif
 	direct_specular_light *= max(dot(N,L),0.0);
 	//direct_specular_light = pow(direct_specular_light, vec3(2.0));
@@ -464,11 +470,27 @@ vec3 pbr_calculate()
 	return ambient;
 }
 
-
+#ifdef BLEND2
+float get_blend2_lerp()
+{
+	float vert_color = FS_IN_Color.r;
+	float modulate_tex = 1.0-texture(special, FS_IN_Texcoord).r;
+	float val = 0.3;
+	vec2 bound = clamp(vec2(modulate_tex-val,modulate_tex+val),vec2(0),vec2(1));
+	return smoothstep(bound.x,bound.y, vert_color);
+}
+#endif
 
 void main()
 {
 	vec4 tex = texture(basecolor, FS_IN_Texcoord);
+	
+#ifdef BLEND2
+	float blend2_lerp = get_blend2_lerp();
+	tex = mix(tex,texture(basecolor2, FS_IN_Texcoord), blend2_lerp);
+#endif
+	
+	
 	tex.rgb = pow(tex.rgb,vec3(2.2));
 	
 	tex *= color_tint;
@@ -485,9 +507,14 @@ void main()
 	
 	
 #ifdef NORMALMAPPED
-	//N = texture(normalmap, FS_IN_Texcoord).rgb;
-	//N = N*2 - vec3(1);
-	//N = normalize(FS_IN_TBN * N); 
+	N = texture(normalmap, FS_IN_Texcoord).rgb;
+	
+	#ifdef BLEND2
+	N = mix(N, texture(normalmap2, FS_IN_Texcoord).rgb, blend2_lerp);
+	#endif
+	
+	N = N*2 - vec3(1);
+	N = normalize(FS_IN_TBN * N); 
 #endif
 
 // FIXME WITH NORMALMAPS!
@@ -517,13 +544,17 @@ void main()
 	vec3 specular_color = vec3(0.1);
 	float specmask = 1.0;
 	if(has_spec_mask) {
-		specmask = pow(texture(auxcolor, FS_IN_Texcoord).r,2.0);
+		specmask = texture(auxcolor, FS_IN_Texcoord).r;
+	#ifdef BLEND2
+		specmask = mix(specmask, texture(auxcolor2, FS_IN_Texcoord).r, blend2_lerp);
+	#endif
+		specmask = pow(specmask, 2.0);
 	}
 	if(!specular_enabled)
 		specmask = 0.0;
 		
 	if(specular_tint.r >= 0) {
-		specular_color = vec3(1.1);
+		specular_color = specular_tint;
 	}
 	else {
 		specular_color = tex.rgb * spec_strength;
@@ -535,8 +566,10 @@ void main()
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
 	//FS_OUT_Color = vec4(1.0);
+	#ifdef BLEND2
+	//FS_OUT_Color = vec4(blend2_lerp);
+	#endif
 #endif
-	//FS_OUT_Color =vec4(0.1,0.1,0,1);
 //#endif
 
 }	

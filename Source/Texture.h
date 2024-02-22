@@ -15,7 +15,7 @@ enum Texture_Format
 	TEXFMT_RGB16F,
 	TEXFMT_RGBA8_DXT5,
 	TEXFMT_RGB8_DXT1,	
-	TEXFMT_RGBA8_DXT5NM,
+	TEXFMT_RGBA8_DXT1,
 };
 
 enum Texture_Type

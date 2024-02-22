@@ -282,9 +282,11 @@ void load_model_materials(std::vector<Game_Shader*>& materials, const std::strin
 		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
 		if(!gs) {
 			int baseindex = mat.pbrMetallicRoughness.baseColorTexture.index;
-			if (baseindex != -1 && baseindex < scene.images.size()) {
+			if (baseindex != -1) {
+				tinygltf::Texture& t = scene.textures.at(baseindex);
+
 				gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
-				gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+				gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(t.source), scene);
 			}
 			else
 				gs = &mats.fallback;

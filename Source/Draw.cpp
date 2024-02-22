@@ -372,7 +372,7 @@ void compile_game_shaders(Shader* shader_start, int toggle_params, int mandatory
 {
 	std::string shader_defines;
 	int num = 1 << Renderer::NUM_SDP;
-	int not_toggle = ~toggle_params;
+	int not_toggle = ~(toggle_params|mandatory_params);
 	for (int i = 0; i < num; i++) {
 		if ((i & not_toggle)!=0) continue;
 		if (mandatory_params!=0 && (i & mandatory_params) == 0) continue;
@@ -957,7 +957,10 @@ void Renderer::Init()
 	}
 	
 	InitGlState();
+
+	float start = GetTime();
 	reload_shaders();
+	printf("compiled shaders in %f\n", (float)GetTime() - start);
 
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
@@ -1419,8 +1422,10 @@ void Renderer::FrameDraw()
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
+	uint32_t ssao_tex = ssao.fullres2;
+	if (!r_ssao->integer)ssao_tex = white_texture;
 	if (!r_bloom->integer) bloom_tex = black_texture;
-	bind_texture(0, ssao.fullres2);
+	bind_texture(0, ssao_tex);
 	bind_texture(1, tex.scene_color);
 	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
@@ -1844,6 +1849,10 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 	return shader_index;
 }
 
+#define SET_OR_USE_FALLBACK(texture, where, fallback) \
+if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id); \
+else bind_texture(where, fallback);
+	
 
 void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
@@ -1913,26 +1922,25 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 		shader().set_bool("has_uv_scroll", has_uv_scroll);
 		shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
 
-		if (gs->images[gs->BASE1])
-			bind_texture(SAMPLER_BASE1, gs->images[gs->BASE1]->gl_id);
-		else
-			bind_texture(SAMPLER_BASE1, white_texture);
+
+		SET_OR_USE_FALLBACK(Game_Shader::BASE1, SAMPLER_BASE1, white_texture);
+		bool has_spec_mask = false;
+		if (gs->images[Game_Shader::AUX1]) {
+			has_spec_mask = true;
+			bind_texture(SAMPLER_AUX1, gs->images[Game_Shader::AUX1]->gl_id);
+		}
+		shader().set_bool("has_spec_mask", has_spec_mask);
+	
 		if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-			bind_texture(SAMPLER_BASE2, gs->images[gs->BASE2]->gl_id);
-			bind_texture(SAMPLER_SPECIAL, gs->images[gs->SPECIAL]->gl_id);
+			SET_OR_USE_FALLBACK(Game_Shader::BASE2, SAMPLER_BASE2, white_texture);
+			SET_OR_USE_FALLBACK(Game_Shader::AUX2, SAMPLER_AUX2, white_texture);
+			SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SAMPLER_SPECIAL, white_texture);
 		}
 
 		if (mp.has_tangents()) {
-			uint32_t id = default_normal_texture;
-			Texture* t = gs->images[Game_Shader::NORMAL1];
-			if (t) id = t->gl_id;
-			bind_texture(SAMPLER_NORM1, id);
-
+			SET_OR_USE_FALLBACK(Game_Shader::NORMAL1, SAMPLER_NORM1, default_normal_texture);
 			if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-				id = default_normal_texture;
-				t = gs->images[Game_Shader::NORMAL2];
-				if (t) id = t->gl_id;
-				bind_texture(SAMPLER_NORM2, id);
+				SET_OR_USE_FALLBACK(Game_Shader::NORMAL2, SAMPLER_NORM2, default_normal_texture);
 			}
 		}
 
@@ -1945,12 +1953,6 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 			glCheckError();
 		}
 
-		bool has_spec_mask = false;
-		if (gs->images[Game_Shader::AUX1]) {
-			has_spec_mask = true;
-			bind_texture(SAMPLER_AUX1, gs->images[Game_Shader::AUX1]->gl_id);
-		}
-		shader().set_bool("has_spec_mask", has_spec_mask);
 
 		shader().set_float("spec_exponent", gs->spec_exponent);
 		shader().set_vec3("specular_tint", gs->spec_tint);

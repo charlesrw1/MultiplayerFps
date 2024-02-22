@@ -1,5 +1,7 @@
 #include "Texture.h"
 #include <vector>
+
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "glad/glad.h"
@@ -126,8 +128,6 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				sys_print("unknown material key %s for %s @ %d", key.c_str(), mat.name.c_str(), mat.linenum);
 			}
 		}
-
-		sys_print("loaded material %s\n", gs->name.c_str());
 	}
 }
 #undef ENSURE;
@@ -193,45 +193,242 @@ void Game_Material_Manager::init()
 }
 
 
-static bool make_from_data(Texture* output, int x, int y, int channels, void* data, bool is_float)
+void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
+{
+	if (infmt == TEXFMT_RGBA16F || infmt == TEXFMT_RGB16F)
+		*type = GL_FLOAT;
+	else
+		*type = GL_UNSIGNED_BYTE;
+
+	*compressed = false;
+
+	switch (infmt)
+	{
+	case TEXFMT_RGBA8:
+		*format = GL_RGBA;
+		*internal_format = GL_RGBA8;
+		break;
+	case TEXFMT_RGBA8_DXT1:
+		*format = GL_RGBA;
+		*internal_format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+		*compressed = true;
+		break;
+	case TEXFMT_RGBA8_DXT5:
+		*format = GL_RGBA;
+		*internal_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+		*compressed = true;
+		break;
+	case TEXFMT_RGBA16F:
+		*format = GL_RGBA;
+		*internal_format = GL_RGBA16F;
+		break;
+	case TEXFMT_RGB8:
+		*format = GL_RGB;
+		*internal_format = GL_RGB8;
+		break;
+	case TEXFMT_RGB8_DXT1:
+		*format = GL_RGB;
+		*internal_format = GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
+		*compressed = true;
+		break;
+	case TEXFMT_RGB16F:
+		*format = GL_RGB;
+		*internal_format = GL_RGB16F;
+		break;
+	case TEXFMT_RG8:
+		*format = GL_RG;
+		*internal_format = GL_RG8;
+		break;
+	case TEXFMT_R8:
+		*format = GL_RED;
+		*internal_format = GL_RED;
+		break;
+	};
+
+
+}
+
+// from doom 3 source
+
+// surface description flags
+const unsigned long DDSF_CAPS = 0x00000001l;
+const unsigned long DDSF_HEIGHT = 0x00000002l;
+const unsigned long DDSF_WIDTH = 0x00000004l;
+const unsigned long DDSF_PITCH = 0x00000008l;
+const unsigned long DDSF_PIXELFORMAT = 0x00001000l;
+const unsigned long DDSF_MIPMAPCOUNT = 0x00020000l;
+const unsigned long DDSF_LINEARSIZE = 0x00080000l;
+const unsigned long DDSF_DEPTH = 0x00800000l;
+
+// pixel format flags
+const unsigned long DDSF_ALPHAPIXELS = 0x00000001l;
+const unsigned long DDSF_FOURCC = 0x00000004l;
+const unsigned long DDSF_RGB = 0x00000040l;
+const unsigned long DDSF_RGBA = 0x00000041l;
+
+// our extended flags
+const unsigned long DDSF_ID_INDEXCOLOR = 0x10000000l;
+const unsigned long DDSF_ID_MONOCHROME = 0x20000000l;
+
+// dwCaps1 flags
+const unsigned long DDSF_COMPLEX = 0x00000008l;
+const unsigned long DDSF_TEXTURE = 0x00001000l;
+const unsigned long DDSF_MIPMAP = 0x00400000l;
+
+
+typedef struct {
+	unsigned long Size;
+	unsigned long Flags;
+	unsigned long FourCC;
+	unsigned long RGBBitCount;
+	unsigned long RBitMask;
+	unsigned long GBitMask;
+	unsigned long BBitMask;
+	unsigned long ABitMask;
+} ddsFilePixelFormat_t;
+
+typedef struct
+{
+	unsigned long Size;
+	unsigned long Flags;
+	unsigned long Height;
+	unsigned long Width;
+	unsigned long PitchOrLinearSize;
+	unsigned long Depth;
+	unsigned long MipMapCount;
+	unsigned long Reserved1[11];
+	ddsFilePixelFormat_t ddspf;
+	unsigned long Caps1;
+	unsigned long Caps2;
+	unsigned long Reserved2[3];
+} ddsFileHeader_t;
+
+static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
+static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
+{
+	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
+	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ') return false;
+	// BIG ENDIAN ISSUE:
+	ddsFileHeader_t* header = (ddsFileHeader_t*)(buffer + 4);
+	
+	uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);
+	uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);
+
+	Texture_Format input_format;
+	int input_width = header->Width;
+	int input_height = header->Height;
+
+	if (header->ddspf.Flags & DDSF_FOURCC) {
+		if (header->ddspf.FourCC == dxt1_fourcc) {
+			if (header->ddspf.Flags & DDSF_ALPHAPIXELS)
+				input_format = TEXFMT_RGBA8_DXT1;
+			else
+				input_format = TEXFMT_RGB8_DXT1;
+		}
+		else if (header->ddspf.FourCC == dxt5_fourcc) {
+			input_format = TEXFMT_RGBA8_DXT5;
+		}
+		else
+			ASSERT(0 && "bad fourcc");
+	}
+	else {
+		if (header->ddspf.RGBBitCount == 24)
+			input_format = TEXFMT_RGB8;
+		else if (header->ddspf.RGBBitCount == 32)
+			input_format = TEXFMT_RGBA8;
+		else if (header->ddspf.RGBBitCount == 16)
+			input_format = TEXFMT_RG8;
+		else if (header->ddspf.RGBBitCount == 8)
+			input_format = TEXFMT_R8;
+		else
+			ASSERT(0 && "bad bit count in dds");
+	}
+
+	int numMipmaps = 1;
+	if (header->Flags & DDSF_MIPMAPCOUNT) {
+		numMipmaps = header->MipMapCount;
+	}
+
+	glGenTextures(1, &output->gl_id);
+	glBindTexture(GL_TEXTURE_2D, output->gl_id);
+
+	GLenum type;
+	GLenum internal_format;
+	GLenum format;
+	bool compressed;
+	texture_format_to_gl(input_format, &format, &internal_format, &type, &compressed);
+
+	int ux = input_width;
+	int uy = input_height;
+	uint8_t* data_ptr = (buffer+4+sizeof(ddsFileHeader_t));
+	for (int i = 0; i < numMipmaps; i++) {
+		size_t size = 0;
+		if (compressed) {
+			size = ((ux + 3) / 4) * ((uy + 3) / 4) *
+				(input_format == TEXFMT_RGBA8_DXT5 ? 16 : 8);
+		}
+		else {
+			size = ux*uy* (header->ddspf.RGBBitCount / 8);
+		}
+
+		if (compressed)
+			glCompressedTexImage2D(GL_TEXTURE_2D, i, internal_format, ux, uy, 0, size, data_ptr);
+		else
+			glTexImage2D(GL_TEXTURE_2D, i,  internal_format, ux, uy, 0, format, type, data_ptr);
+
+		data_ptr += size;
+		ux /= 2;
+		uy /= 2;
+		if (ux < 1)ux = 1;
+		if (uy < 1)uy = 1;
+	}
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.f);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	output->width = input_width;
+	output->height = input_height;
+	output->format = input_format;
+
+
+	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
+}
+
+static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat)
 {
 	glGenTextures(1, &output->gl_id);
 	glBindTexture(GL_TEXTURE_2D, output->gl_id);
 
+	GLenum type;
 	GLenum internal_format;
 	GLenum format;
+	bool compressed;
+	texture_format_to_gl(informat, &format, &internal_format, &type, &compressed);
 
-	if (channels == 4) {
-		if (is_float)
-			internal_format = GL_RGBA16F;
-		else
-			internal_format = GL_RGBA;
+	size_t size = 0;
+	if (compressed) {
+		size = ((x + 3) / 4) * ((y + 3) / 4) *
+			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
+	}
 
-		format = GL_RGBA;
-	}
-	else if (channels == 3) {
-		if (is_float)
-			internal_format = GL_RGB16F;
-		else
-			internal_format = GL_RGB;
-		format = GL_RGB;
-	}
-	else {
-		sys_print("Unsupported channel count\n");
-		return false;
-	}
-	uint32_t type = (is_float) ? GL_FLOAT : GL_UNSIGNED_BYTE;
-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, type, data);
+	if (compressed)
+		glCompressedTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, size, data);
+	else
+		glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, type, data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.f);
 	glGenerateMipmap(GL_TEXTURE_2D);
+
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glCheckError();
 
 	output->width = x;
 	output->height = y;
-	output->channels = channels;
-	output->is_float = is_float;
+	output->format = informat;
 
 	return true;
 }
@@ -257,6 +454,20 @@ void Game_Material_Manager::free_all()
 	}
 	textures.clear();
 }
+
+Texture_Format to_format(int n, bool isfloat)
+{
+	if (isfloat) {
+		if (n == 4) return TEXFMT_RGBA16F;
+		else if (n == 3) return TEXFMT_RGB16F;
+	}
+	else {
+		if (n >= 1 && n <= 4) return Texture_Format(TEXFMT_R8 - (n - 1));
+	}
+	return TEXFMT_RGB8;
+}
+
+
 Texture* Game_Material_Manager::load_texture(const std::string& path)
 {
 	int x, y, channels;
@@ -264,21 +475,43 @@ Texture* Game_Material_Manager::load_texture(const std::string& path)
 	void* data = nullptr;
 	bool good = false;
 	bool is_float = false;
-	if (path.find(".hdr") != std::string::npos) {
-		data = stbi_loadf(path.c_str(), &x, &y, &channels, 0);
+
+	std::string path_to_use = path.substr(0, path.rfind('.')) + ".dds";
+
+	if (INVALID_FILE_ATTRIBUTES == GetFileAttributesA(path_to_use.c_str()) && GetLastError() == ERROR_FILE_NOT_FOUND) {
+		path_to_use = path;
+	}
+
+	if (path_to_use.find(".dds") != std::string::npos) {
+		Texture* t = new Texture;
+		std::vector<char> data;
+		std::ifstream infile(path_to_use, std::ios::binary);
+		infile.seekg(0,std::ios::end);
+		size_t len = infile.tellg();
+		data.resize(len);
+		infile.seekg(0);
+		infile.read(data.data(), len);
+		load_dds_file(t, (uint8_t*)data.data(), len);
+
+		return t;
+	}
+	else if (path_to_use.find(".hdr") != std::string::npos) {
+		data = stbi_loadf(path_to_use.c_str(), &x, &y, &channels, 0);
 		is_float = true;
 	}
 	else {
-		data = stbi_load(path.c_str(), &x, &y, &channels, 0);
+		data = stbi_load(path_to_use.c_str(), &x, &y, &channels, 0);
 		is_float = false;
 	}
+
+
 	if (data == nullptr) {
 		sys_print("Couldn't load texture: %s", path.c_str());
 		return nullptr;
 	}
 
 	Texture* t = new Texture;
-	good = make_from_data(t, x, y, channels, data, is_float);
+	good = make_from_data(t, x, y, data, to_format(channels, is_float));
 	stbi_image_free(data);
 	t->name = path;
 
@@ -288,6 +521,43 @@ Texture* Game_Material_Manager::load_texture(const std::string& path)
 	}
 
 	return t;
+}
+
+
+
+void benchmark_run()
+{
+	const char* dds_file = "Data\\Textures\\Cttexturenavy.dds";
+	const char* png_file = "Data\\Textures\\Cttexturenavy.png";
+
+	const int RUNS = 500;
+
+	Texture tex;
+	std::vector<char> data;
+	double start = GetTime();
+	{
+	for (int i = 0; i < RUNS; i++) {
+		int x, y, channels;
+		void*  data = stbi_load(png_file, &x, &y, &channels, 0);
+		make_from_data(&tex, x, y, data, to_format(channels,false));
+		stbi_image_free(data);
+	}
+	}
+	double end = GetTime();
+	printf("PNG: %f\n", float(end - start));
+	start = GetTime();
+		for (int i = 0; i < RUNS; i++) {
+			std::ifstream infile(dds_file, std::ios::binary);
+			infile.seekg(0, std::ios::end);
+			size_t len = infile.tellg();
+			data.resize(len);
+			infile.seekg(0);
+			infile.read(data.data(), len);
+			load_dds_file(&tex, (uint8_t*)data.data(), len);
+		}
+	end = GetTime();
+	printf("DDS: %f\n", float(end - start));
+
 }
 
 Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_directory, bool owner)
@@ -332,7 +602,7 @@ Texture* Game_Material_Manager::create_texture_from_memory(const char* name, con
 	}
 
 	Texture* t = new Texture;
-	bool good = make_from_data(t, width, height, channels, (void*)imgdat, false);
+	bool good = make_from_data(t, width, height, (void*)imgdat, to_format(channels, false));
 	stbi_image_free((void*)imgdat);
 	t->name = name;
 

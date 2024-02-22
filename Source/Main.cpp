@@ -37,7 +37,6 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
-#include "implot.h"
 
 MeshBuilder phys_debug;
 Engine_Config cfg;
@@ -627,6 +626,7 @@ void init_audio()
 	Mix_PlayChannel(0, gun_sound, 2);
 }
 
+extern void benchmark_run();
 
 int main(int argc, char** argv)
 {
@@ -1001,7 +1001,16 @@ void cmd_debug_counter()
 		engine.cl->offset_debug--;
 	printf("offset client: %d\n", engine.cl->offset_debug);
 }
+void cmd_reload_materials()
+{
+	sys_print("reloading materials\n");
+	if (cfg.get_arg_list().size() == 1)
+		mats.load_material_file_directory("./Data/Materials/");
+	else
+		mats.load_material_file_directory(cfg.get_arg_list().at(1).c_str());
+}
 
+#define TIMESTAMP(x) printf("%s in %f\n",x,(float)GetTime()-start); start = GetTime();
 
 void Game_Engine::init()
 {
@@ -1048,26 +1057,37 @@ void Game_Engine::init()
 	cfg.set_command("print_vars", cmd_print_vars);
 	cfg.set_command("exec", cmd_exec_file);
 	cfg.set_command("reload_shaders", cmd_reload_shaders);
+	cfg.set_command("reload_mats", cmd_reload_materials);
 
 	// engine initilization
+	float start = GetTime();
 	init_sdl_window();
+	TIMESTAMP("init sdl window");
 
 	init_audio();
+	TIMESTAMP("init audio");
 
 	network_init();
+	TIMESTAMP("net init");
 
 	draw.Init();
+	TIMESTAMP("draw init");
 
 	media.load();
+	TIMESTAMP("media init");
 
 	cl->init();
+	TIMESTAMP("cl init");
 
 	sv->init();
+	TIMESTAMP("sv init");
 
 	local.init();
+	TIMESTAMP("local init");
 
 	mats.init();
 	mats.load_material_file_directory("./Data/Materials/");
+	TIMESTAMP("mats init");
 
 	// debug interface
 	imgui_context = ImGui::CreateContext();
@@ -1115,6 +1135,7 @@ void Game_Engine::init()
 	SDL_SetWindowSize(window, window_w->integer, window_h->integer);
 	for (const auto& cmd : buffered_commands)
 		cfg.execute(cmd);
+	TIMESTAMP("cfg exectute");
 
 	cfg.set_unknown_variables = false;
 }
