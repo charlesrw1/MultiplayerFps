@@ -627,10 +627,10 @@ void init_audio()
 }
 
 extern void benchmark_run();
+extern void benchmark_gltf();
 
 int main(int argc, char** argv)
 {
-	new_entity_fields_test();
 
 	engine.argc = argc;
 	engine.argv = argv;

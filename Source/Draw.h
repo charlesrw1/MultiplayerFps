@@ -113,7 +113,8 @@ struct Render_Level_Params {
 	bool force_backface=false;
 	bool upload_constants = false;
 	bool include_lightmapped = true;
-	bool force_skybox_probe = false;
+	bool is_probe_render = false;
+	bool draw_viewmodel = false;
 	uint32_t provied_constant_buffer = 0;
 };
 
@@ -365,6 +366,8 @@ private:
 
 	void draw_model_real(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
 		Model_Drawing_State& state);
+	void draw_model_real_depth(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
+		Model_Drawing_State& state);
 
 	void upload_ubo_view_constants(uint32_t ubo);
 
@@ -374,12 +377,12 @@ private:
 	void InitGlState();
 	void InitFramebuffers();
 
-	void DrawEnts(Render_Level_Params::Pass_Type pass);
-	void DrawLevel();
+	void DrawEnts(const Render_Level_Params& params);
+	void DrawLevel(const Render_Level_Params& params);
 	void DrawLevelDepth(const Render_Level_Params& params);
 	void DrawSkybox();
 
-	void DrawPlayerViewmodel();
+	void DrawPlayerViewmodel(const Render_Level_Params& params);
 
 	void DrawEntBlobShadows();
 	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);

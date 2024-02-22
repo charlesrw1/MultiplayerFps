@@ -40,6 +40,8 @@ uniform sampler2DArray cascade_shadow_map;
 uniform sampler2DArrayShadow cascade_shadow_map;
 #endif
 
+uniform sampler2D ssao_tex;
+
 uniform sampler2D basecolor;
 uniform sampler2D auxcolor;
 uniform sampler2D normalmap;
@@ -300,6 +302,11 @@ float get_cubemap_index(vec3 worldpos)
 	return float(bestindex);
 }
 
+float get_ao()
+{
+	return texture(ssao_tex, FS_IN_NDC.xy/FS_IN_NDC.w * 0.5 + 0.5).r;
+}
+
 float fresnel_term(vec3 N, vec3 V, float power)
 {
 	return pow(1.0-clamp(dot(N,V),0.0, 1.0),power);
@@ -354,7 +361,7 @@ vec4 eval_phong_brdf(vec3 diffuse, vec3 specular, float specular_power, float op
 	out_color.rgb = ambient_light*diffuse + direct_diffuse_light*diffuse + direct_specular_light*specular + emissive;
 	out_color.a = opacity;
 	
-	return out_color;
+	return out_color*get_ao();
 }
 
 
@@ -376,16 +383,16 @@ vec3 pbr_calculate()
 
 
 	vec3 R = reflect(-V,N);
-	float Roughness = 0.1;
+	float Roughness = 0.5;
 	vec3 Albedo = tex.rgb;
-	float Metalness = 1.0;
+	float Metalness = 0.0;
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0,Albedo,Metalness);
 // punctual lights
 	vec3 Lo = vec3(0.0);
 	vec3 L = -g.directional_light_dir_and_used.xyz;
     vec3 H = normalize(V + L);
-    vec3 radiance = g.directional_light_color.rgb*8.0;
+    vec3 radiance = g.directional_light_color.rgb*0.004;
 #ifndef LIGHTMAPPED
 	{
 		vec3 surface_N = N;
@@ -443,7 +450,7 @@ vec3 pbr_calculate()
 	vec3 F = FresnelSchlickRougness(max(dot(N,V),0.0),F0,Roughness);
 	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(N,V),0.0),Roughness)).rg;
 	vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
-	float ao = 1.0;
+	float ao = get_ao();
 	
 	
 	vec3 irradiance = texture(pbr_irradiance_cubemaps,vec4(N, cm_index)).rgb*1.5;
@@ -461,8 +468,8 @@ vec3 pbr_calculate()
 	vec3 ambient =(kD*diffuse+ specular)*ao;
 	
 #ifdef LIGHTMAPPED
-	float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
-	ambient = mix(ambient*0.2, ambient, sun);
+	//float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
+	//ambient = mix(ambient*0.2, ambient, sun);
 #endif
 
 	ambient += Lo;
@@ -481,8 +488,12 @@ float get_blend2_lerp()
 }
 #endif
 
+
 void main()
 {
+	FS_OUT_Color = vec4(pbr_calculate(),1.0);
+	return;
+
 	vec4 tex = texture(basecolor, FS_IN_Texcoord);
 	
 #ifdef BLEND2

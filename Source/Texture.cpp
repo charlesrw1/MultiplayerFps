@@ -492,7 +492,7 @@ Texture* Game_Material_Manager::load_texture(const std::string& path)
 		infile.seekg(0);
 		infile.read(data.data(), len);
 		load_dds_file(t, (uint8_t*)data.data(), len);
-
+		t->name = path_to_use;
 		return t;
 	}
 	else if (path_to_use.find(".hdr") != std::string::npos) {

@@ -315,6 +315,8 @@ void Renderer::set_shader_sampler_locations()
 	shader().set_int("PBR_brdflut", SAMPLER_LIGHTMAP + 3);
 	shader().set_int("volumetric_fog", SAMPLER_LIGHTMAP + 4);
 	shader().set_int("cascade_shadow_map", SAMPLER_LIGHTMAP + 5);
+
+	shader().set_int("ssao_tex", SAMPLER_LIGHTMAP + 6);
 }
 
 void Renderer::set_depth_shader_constants()
@@ -322,7 +324,7 @@ void Renderer::set_depth_shader_constants()
 
 }
 
-void set_standard_draw_data()
+void set_standard_draw_data(const Render_Level_Params& params)
 {
 	int start = Renderer::SAMPLER_LIGHTMAP;
 	// >>> PBR BRANCH
@@ -332,13 +334,18 @@ void set_standard_draw_data()
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, draw.scene.levelcubemapspecular_array);
 
 	glActiveTexture(GL_TEXTURE0 + start + 3);
-	glBindTexture(GL_TEXTURE_2D, FindOrLoadTexture("lightwarpshit.png")->gl_id);
+	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
 
 	glActiveTexture(GL_TEXTURE0 + start + 5);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, draw.shadowmap.shadow_map_array);
 
 	//shader().set_vec4("aoproxy_sphere", vec4(engine.local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
 	//shader().set_float("aoproxy_scale_factor", aosphere.z);
+
+	uint32_t ssao_tex = draw.ssao.fullres2;
+	if (params.is_probe_render) ssao_tex = draw.white_texture;
+	glActiveTexture(GL_TEXTURE0 + start + 6);
+	glBindTexture(GL_TEXTURE_2D, ssao_tex);
 
 	glActiveTexture(GL_TEXTURE0 + start + 4);
 	glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
@@ -1212,7 +1219,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 {
 	vs = params.view;
 
-	if (params.force_skybox_probe)
+	if (params.is_probe_render)
 		using_skybox_for_specular = true;
 
 	static Config_Var* upload_ubo = cfg.get_var("dbg/uubo", "1");
@@ -1229,7 +1236,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	}
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
-	set_standard_draw_data();
+	set_standard_draw_data(params);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
 	glViewport(0, 0, vs.width, vs.height);
@@ -1248,15 +1255,15 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 
 
 	if (params.draw_level) {
-		if (params.pass == Render_Level_Params::STANDARD)
-			DrawLevel();
-		else
-			DrawLevelDepth(params);
+		DrawLevel(params);
 	}
 	if (params.draw_ents)
-		DrawEnts(params.pass);
+		DrawEnts(params);
+	if (params.draw_viewmodel)
+		DrawPlayerViewmodel(params);
 
 	if (params.pass == Render_Level_Params::STANDARD) {
+		glDepthFunc(GL_LEQUAL);	// for post z prepass
 		DrawSkybox();
 	}
 
@@ -1383,6 +1390,23 @@ void Renderer::FrameDraw()
 
 	//volfog.compute();
 
+	// depth prepass
+	{
+		GPUSCOPESTART("Depth prepass");
+		Render_Level_Params params;
+		params.output_framebuffer = fbo.scene;
+		params.view = current_frame_main_view;
+		params.pass = Render_Level_Params::DEPTH;
+		params.upload_constants = false;
+		params.provied_constant_buffer = ubo.current_frame;
+		params.draw_viewmodel = true;
+		render_level_to_target(params);
+	}
+
+	// render ssao using prepass buffer
+	if (r_ssao->integer)
+		ssao.render();
+
 	// main level render
 	{
 		GPUSCOPESTART("Main level render");
@@ -1390,21 +1414,23 @@ void Renderer::FrameDraw()
 		params.output_framebuffer = fbo.scene;
 		params.view = current_frame_main_view;
 		params.pass = Render_Level_Params::STANDARD;
+		params.clear_framebuffer = false;
 		params.upload_constants = false;
 		params.provied_constant_buffer = ubo.current_frame;
+		params.draw_viewmodel = true;
+		glDepthMask(GL_FALSE);
+		glDepthFunc(GL_EQUAL);
 		render_level_to_target(params);
+		glDepthFunc(GL_LESS);
+		glDepthMask(GL_TRUE);
 	}
+
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	DrawEntBlobShadows();
 	engine.local.pm.draw_particles();
 	glCheckError();
-
-	if (!engine.local.thirdperson_camera->integer && r_draw_viewmodel->integer)
-		DrawPlayerViewmodel();
-
-	if(r_ssao->integer)
-		ssao.render();
-
+	
 	// Bloom update
 	render_bloom_chain();
 
@@ -1422,11 +1448,9 @@ void Renderer::FrameDraw()
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
-	uint32_t ssao_tex = ssao.fullres2;
-	if (!r_ssao->integer)ssao_tex = white_texture;
 	if (!r_bloom->integer) bloom_tex = black_texture;
-	bind_texture(0, ssao_tex);
-	bind_texture(1, tex.scene_color);
+	bind_texture(0, tex.scene_color);
+	bind_texture(1, bloom_tex);
 	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
 
@@ -1615,9 +1639,10 @@ void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, ma
 
 
 
-void Renderer::DrawEnts(Render_Level_Params::Pass_Type pass)
+void Renderer::DrawEnts(const Render_Level_Params& params)
 {
 	Model_Drawing_State state;
+	state.pass = params.pass;
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		auto& ent = engine.get_ent(i);
@@ -1809,13 +1834,13 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 		}
 		else {
 			if (is_animated) {
-				shader_type = sl::S_ANIMATED_DEPTH;
+				shader_index = sl::S_ANIMATED_DEPTH;
 			}
 			else {
 				if (is_alpha_test)
-					shader_type = sl::S_AT_DEPTH;
+					shader_index = sl::S_AT_DEPTH;
 				else
-					shader_type = sl::S_DEPTH;
+					shader_index = sl::S_DEPTH;
 			}
 		}
 	}
@@ -1853,11 +1878,65 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id); \
 else bind_texture(where, fallback);
 	
+void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
+	Model_Drawing_State& state)
+{
+	for (int part = 0; part < model->parts.size(); part++) {
 
+		const MeshPart& mp = model->parts[part];
+		Game_Shader* gs = (mp.material_idx != -1) ? model->materials.at(mp.material_idx) : &mats.fallback;
+		bool is_animated = mp.has_bones() && a;
+		int next_shader = get_shader_index(mp, *gs, true);
+
+		if (next_shader == -1) return;
+
+		if (state.initial_set || next_shader != state.current_shader) {
+			state.current_shader = next_shader;
+
+			set_shader(next_shader);
+
+			if (gs->shader_type == Game_Shader::S_WINDSWAY) {
+				set_wind_constants();
+			}
+			set_shader_constants();
+
+		}
+
+		if (state.initial_set || state.current_backface_state != (int)gs->backface) {
+			state.current_backface_state = gs->backface;
+			if (state.current_backface_state)
+				glDisable(GL_CULL_FACE);
+			else
+				glEnable(GL_CULL_FACE);
+		}
+
+		shader().set_mat4("Model", transform);
+		shader().set_mat4("InverseModel", glm::inverse(transform));
+
+		SET_OR_USE_FALLBACK(Game_Shader::BASE1, SAMPLER_BASE1, white_texture);
+
+		if (is_animated) {
+			const std::vector<mat4>& bones = a->GetBones();
+			const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
+			for (int j = 0; j < bones.size(); j++)
+				glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
+			glCheckError();
+		}
+
+		glBindVertexArray(mp.vao);
+		glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+
+		state.initial_set = false;
+	}
+}
 void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
 {
-
+	if (state.pass != Render_Level_Params::STANDARD) {
+		draw_model_real_depth(model, transform, e, a, state);
+		return;
+	}
+		
 	for (int part = 0; part < model->parts.size(); part++) {
 
 		const MeshPart& mp = model->parts[part];
@@ -1966,11 +2045,12 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 }
 
 
-void Renderer::DrawLevel()
+void Renderer::DrawLevel(const Render_Level_Params& params)
 {
 	const Level* level = engine.level;
 
 	Model_Drawing_State state;
+	state.pass = params.pass;
 
 	for (int m = 0; m < level->instances.size(); m++) {
 		const Level::StaticInstance& sm = level->instances[m];
@@ -1998,8 +2078,11 @@ void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 	mb->AddSphere((a + b) / 2.f, (c.tip.y - c.base.y) / 2.f, 10, 7, COLOR_RED);
 }
 
-void Renderer::DrawPlayerViewmodel()
+void Renderer::DrawPlayerViewmodel(const Render_Level_Params& params)
 {
+	if (engine.local.thirdperson_camera->integer || r_draw_viewmodel->integer == 0)
+		return;
+
 	mat4 invview = glm::inverse(vs.view);
 
 	Game_Local* gamel = &engine.local;
@@ -2012,9 +2095,10 @@ void Renderer::DrawPlayerViewmodel()
 
 	cur_shader = -1;
 
-	set_standard_draw_data();
+	set_standard_draw_data(params);
 
 	Model_Drawing_State state;
+	state.pass = params.pass;
 	draw_model_real(engine.local.viewmodel, model2, nullptr, &engine.local.viewmodel_animator, state);
 }
 
@@ -2080,7 +2164,7 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 		params.provied_constant_buffer = 0;
 		params.pass = Render_Level_Params::STANDARD;
 		params.upload_constants = true;
-		params.force_skybox_probe = true;
+		params.is_probe_render = true;
 
 		render_level_to_target(params);
 		glCheckError();
