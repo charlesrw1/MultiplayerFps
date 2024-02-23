@@ -629,7 +629,7 @@ void init_audio()
 		printf("couldn't load sound\n");
 	}
 
-	Mix_PlayChannel(0, gun_sound, 2);
+	//Mix_PlayChannel(0, gun_sound, 2);
 }
 
 extern void benchmark_run();
@@ -810,9 +810,12 @@ void draw_wind_menu()
 	ImGui::SliderInt("cubemap index", &draw.cubemap_index, 0, 12);
 
 
+	ImGui::Image(ImTextureID(draw.tex.reflected_color), ImVec2(512, 512));
+	ImGui::Image(ImTextureID(draw.tex.scene_color), ImVec2(512, 512));
 	ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
 	ImGui::Checkbox("upscale", &bloom_stop);
 	ImGui::Image(ImTextureID(draw.tex.bloom_chain[bloom_layer]), ImVec2(256, 256));
+
 
 
 

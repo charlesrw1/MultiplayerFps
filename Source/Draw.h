@@ -101,20 +101,24 @@ public:
 	float bias = 0.025;
 };
 
+// more horribleness
 struct Render_Level_Params {
 	View_Setup view;
 	uint32_t output_framebuffer;
 	bool clear_framebuffer = true;
 	bool draw_level = true;
 	bool draw_ents = true;
-	enum Pass_Type { STANDARD, DEPTH, SHADOWMAP };
-	Pass_Type pass = STANDARD;
+	enum Pass_Type { OPAQUE, TRANSLUCENT, DEPTH, SHADOWMAP };
+	Pass_Type pass = OPAQUE;
 	bool cull_front_face = false;
 	bool force_backface=false;
 	bool upload_constants = false;
 	bool include_lightmapped = true;
 	bool is_probe_render = false;
 	bool draw_viewmodel = false;
+	bool is_water_reflection_pass = false;
+	bool has_clip_plane = false;
+	vec4 custom_clip_plane = vec4(0.f);
 	uint32_t provied_constant_buffer = 0;
 };
 
@@ -241,6 +245,7 @@ public:
 		// z-prepass'
 		S_DEPTH, S_AT_DEPTH, S_ANIMATED_DEPTH, S_WIND_DEPTH, S_WIND_AT_DEPTH,
 		
+		S_WATER,
 		S_PARTICLE_BASIC,
 
 		// other
@@ -273,12 +278,14 @@ public:
 
 	struct {
 		uint32_t scene;
-
+		uint32_t reflected_scene;
 		uint32_t bloom;
 	}fbo;
 	struct {
 		uint32_t scene_color;
 		uint32_t scene_depthstencil;
+		uint32_t reflected_color;
+		uint32_t reflected_depth;
 
 		uint32_t bloom_depth;
 		uint32_t bloom_chain[BLOOM_MIPS];
@@ -302,6 +309,7 @@ public:
 	Config_Var* r_bloom;
 	Config_Var* r_volumetric_fog;
 	Config_Var* r_ssao;
+	Config_Var* r_halfres_reflections;
 
 
 	void bind_texture(int bind, int id);
@@ -362,7 +370,8 @@ private:
 		bool initial_model = true;
 		int current_alpha_state = 0;
 		int current_backface_state = 0;
-		Render_Level_Params::Pass_Type pass = Render_Level_Params::STANDARD;
+		bool is_water_reflection_pass = false;
+		Render_Level_Params::Pass_Type pass = Render_Level_Params::OPAQUE;
 	};
 
 	void draw_model_real(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
@@ -370,10 +379,12 @@ private:
 	void draw_model_real_depth(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
 		Model_Drawing_State& state);
 
-	void upload_ubo_view_constants(uint32_t ubo);
+	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
 
 	void init_bloom_buffers();
 	void render_bloom_chain();
+
+	void planar_reflection_pass();
 
 	void InitGlState();
 	void InitFramebuffers();
@@ -390,6 +401,7 @@ private:
 
 	void set_shader_sampler_locations();
 	void set_wind_constants();
+	void set_water_constants();
 
 	int get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass);
 

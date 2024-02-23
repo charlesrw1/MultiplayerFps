@@ -69,6 +69,8 @@ struct Ubo_View_Constants_Struct
 	float numlights;
 	float forcecubemap;
 	float padding2;
+	
+	vec4 custom_clip_plane;
 };
 
 
@@ -167,4 +169,7 @@ void main()
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
+	
+	// seems to add 0.04ms when not used still
+	gl_ClipDistance[0] = dot(vec4(FS_IN_FragPos,1.0), g.custom_clip_plane);
 }

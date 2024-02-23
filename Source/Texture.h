@@ -53,6 +53,7 @@ enum Material_Shader_Category
 	MSHADER_STANDARD,
 	MSHADER_WIND,
 	MSHADER_MULTIBLEND,
+	MSHADER_WATER,
 };
 
 class Game_Shader
@@ -88,7 +89,7 @@ public:
 	enum { A_NONE, A_ADD, A_BLEND, A_TEST };
 	int alpha_type = A_NONE;
 	bool emmisive = false;	// dont recieve lighting
-	enum {S_DEFAULT, S_2WAYBLEND, S_WINDSWAY };
+	enum {S_DEFAULT, S_2WAYBLEND, S_WINDSWAY, S_WATER };
 	int shader_type = S_DEFAULT;
 	float uscroll = 0.0;
 	float vscroll = 0.0;
@@ -98,6 +99,10 @@ public:
 
 	int physics = 0;	// physics of surface
 	// Pbr material model
+
+	bool is_translucent() const {
+		return alpha_type == A_ADD || alpha_type == A_BLEND;
+	}
 };
 
 class Game_Material_Manager

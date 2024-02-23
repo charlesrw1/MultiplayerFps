@@ -99,6 +99,11 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				string& t = line.at(1);
 				if (t == "blend2") gs->shader_type = Game_Shader::S_2WAYBLEND;
 				else if (t == "wind") gs->shader_type = Game_Shader::S_WINDSWAY;
+				else if (t == "water") {
+					gs->alpha_type = Game_Shader::A_BLEND;
+					gs->shader_type = Game_Shader::S_WATER;
+				}
+				else sys_print("unknown shader type %s\n", t.c_str());
 			}
 			else if (key == "alpha") {
 				ENSURE(2);

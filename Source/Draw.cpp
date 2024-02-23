@@ -345,7 +345,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	//shader().set_float("aoproxy_scale_factor", aosphere.z);
 
 	uint32_t ssao_tex = draw.ssao.fullres2;
-	if (params.is_probe_render) ssao_tex = draw.white_texture;
+	if (params.is_probe_render || params.is_water_reflection_pass) ssao_tex = draw.white_texture;
 	glActiveTexture(GL_TEXTURE0 + start + 6);
 	glBindTexture(GL_TEXTURE_2D, ssao_tex);
 
@@ -467,6 +467,13 @@ void Renderer::reload_shaders()
 	volfog.lightcalc.set_int("previous_volume", 0);
 	volfog.lightcalc.set_int("perlin_noise", 1);
 
+
+	// water shader
+	Shader::compile(&shader_list[S_WATER], "AnimBasicV.txt", "WaterF.txt", "VERTEX_COLOR, NORMALMAPPED");
+	set_shader(S_WATER);
+	set_shader_sampler_locations();
+
+
 	// set sampler locations for all model shaders
 	int start = NUM_NON_MODEL_SHADERS;
 	int end = start + NUM_MST * num_per_shader;
@@ -499,9 +506,11 @@ struct Ubo_View_Constants_Struct
 	glm::vec4 directional_light_color;
 
 	glm::vec4 ncubemaps_nlights_forcecubemap;
+
+	glm::vec4 custom_clip_plane;
 };
 
-void Renderer::upload_ubo_view_constants(uint32_t ubo)
+void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane)
 {
 	Ubo_View_Constants_Struct constants;
 	constants.view = vs.view;
@@ -531,6 +540,8 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo)
 		constants.ncubemaps_nlights_forcecubemap.z = 0.0;
 	else
 		constants.ncubemaps_nlights_forcecubemap.z = -1.0;
+
+	constants.custom_clip_plane = custom_clip_plane;
 
 	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
@@ -1006,13 +1017,16 @@ void Renderer::Init()
 	r_shadow_quality = cfg.get_var("r_shadow_quality", "1");
 	r_volumetric_fog = cfg.get_var("r_volumetric_fog", "1");
 	r_ssao = cfg.get_var("r_ssao", "1");
+	r_halfres_reflections = cfg.get_var("r_halfres_reflection", "1");
 
 	glGenBuffers(1, &ubo.current_frame);
 
 	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
 
 	fbo.scene = 0;
+	fbo.reflected_scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
+	tex.reflected_color = tex.reflected_depth = 0;
 	InitFramebuffers();
 
 	EnviornmentMapHelper::get().init();
@@ -1063,6 +1077,33 @@ void Renderer::InitFramebuffers()
 	
 	glCheckError();
 
+	glDeleteTextures(1, &tex.reflected_color);
+	glGenTextures(1, &tex.reflected_color);
+	glBindTexture(GL_TEXTURE_2D, tex.reflected_color);
+	ivec2 reflect_size = ivec2(s_w, s_h);
+	if (r_halfres_reflections->integer) reflect_size /= 2;
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, reflect_size.x, reflect_size.y, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glCheckError();
+
+	glDeleteTextures(1, &tex.reflected_depth);
+	glGenTextures(1, &tex.reflected_depth);
+	glBindTexture(GL_TEXTURE_2D, tex.reflected_depth);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, reflect_size.x, reflect_size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glDeleteFramebuffers(1, &fbo.reflected_scene);
+	glGenFramebuffers(1, &fbo.reflected_scene);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.reflected_scene);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.reflected_color, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.reflected_depth, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glCheckError();
@@ -1237,7 +1278,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 			upload = true;
 		}
 		if (upload)
-			upload_ubo_view_constants(view_ubo);
+			upload_ubo_view_constants(view_ubo, params.custom_clip_plane);
 		active_constants_ubo = view_ubo;
 	}
 
@@ -1259,6 +1300,10 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	if (params.force_backface)
 		glDisable(GL_CULL_FACE);
 
+	if (params.has_clip_plane) {
+		glEnable(GL_CLIP_DISTANCE0);
+	}
+
 
 	if (params.draw_level) {
 		DrawLevel(params);
@@ -1268,7 +1313,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	if (params.draw_viewmodel)
 		DrawPlayerViewmodel(params);
 
-	if (params.pass == Render_Level_Params::STANDARD) {
+	if (params.pass == Render_Level_Params::OPAQUE) {
 		glDepthFunc(GL_LEQUAL);	// for post z prepass
 		DrawSkybox();
 	}
@@ -1280,6 +1325,9 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	}
 	if (params.force_backface)
 		glEnable(GL_CULL_FACE);
+
+	if (params.has_clip_plane)
+		glDisable(GL_CLIP_DISTANCE0);
 
 	using_skybox_for_specular = false;
 }
@@ -1413,21 +1461,41 @@ void Renderer::FrameDraw()
 	if (r_ssao->integer)
 		ssao.render();
 
+	// planar reflection render
+	{
+		GPUSCOPESTART("Planar reflection");
+		planar_reflection_pass();
+	}
+
 	// main level render
 	{
-		GPUSCOPESTART("Main level render");
+		GPUSCOPESTART("Main level render opaques");
 		Render_Level_Params params;
 		params.output_framebuffer = fbo.scene;
 		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::STANDARD;
+		params.pass = Render_Level_Params::OPAQUE;
 		params.clear_framebuffer = false;
-		params.upload_constants = false;
+		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
 		glDepthMask(GL_FALSE);
 		glDepthFunc(GL_EQUAL);
 		render_level_to_target(params);
 		glDepthFunc(GL_LESS);
+		glDepthMask(GL_TRUE);
+	}
+	{
+		GPUSCOPESTART("Main level translucents");
+		Render_Level_Params params;
+		params.output_framebuffer = fbo.scene;
+		params.view = current_frame_main_view;
+		params.pass = Render_Level_Params::TRANSLUCENT;
+		params.clear_framebuffer = false;
+		params.upload_constants = true;
+		params.provied_constant_buffer = ubo.current_frame;
+		params.draw_viewmodel = true;
+		glDepthMask(GL_FALSE);
+		render_level_to_target(params);
 		glDepthMask(GL_TRUE);
 	}
 
@@ -1748,6 +1816,13 @@ void Renderer::set_wind_constants()
 	shader().set_float("speed", speed);
 }
 
+void Renderer::set_water_constants()
+{
+	// use sampler1 for reflection map, sampler2 for the depth of the current render
+	bind_texture(SAMPLER_BASE1, tex.reflected_color);
+	bind_texture(SAMPLER_BASE2, tex.scene_depthstencil);
+}
+
 void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 {
 	const Level* level = engine.level;
@@ -1871,7 +1946,13 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 			shader_type = MSHADER_WIND;
 			param_bitmask &= ~(1 << SDP_VERTEXCOLORS);
 		}
-		shader_index = NUM_NON_MODEL_SHADERS + (shader_type) * (1 << NUM_SDP) + param_bitmask;
+
+		if (shader_type == Game_Shader::S_WATER) {
+			shader_index = S_WATER;
+		}
+		else {
+			shader_index = NUM_NON_MODEL_SHADERS + (shader_type) * (1 << NUM_SDP) + param_bitmask;
+		}
 	}
 
 	if (shader_list[shader_index].ID == 0)
@@ -1891,6 +1972,11 @@ void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, co
 
 		const MeshPart& mp = model->parts[part];
 		Game_Shader* gs = (mp.material_idx != -1) ? model->materials.at(mp.material_idx) : &mats.fallback;
+		
+		// translucents dont draw depth
+		if (gs->is_translucent())
+			continue;
+
 		bool is_animated = mp.has_bones() && a;
 		int next_shader = get_shader_index(mp, *gs, true);
 
@@ -1935,10 +2021,12 @@ void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, co
 		state.initial_set = false;
 	}
 }
+
+// this function sucks so bad
 void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
 {
-	if (state.pass != Render_Level_Params::STANDARD) {
+	if (state.pass == Render_Level_Params::DEPTH || state.pass == Render_Level_Params::SHADOWMAP) {
 		draw_model_real_depth(model, transform, e, a, state);
 		return;
 	}
@@ -1950,7 +2038,18 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 		bool is_animated = mp.has_bones() && a;
 		int next_shader = get_shader_index(mp, *gs, false);
 
+		if (gs->is_translucent() && state.pass != Render_Level_Params::TRANSLUCENT)
+			continue;
+		else if (!gs->is_translucent() && state.pass != Render_Level_Params::OPAQUE)
+			continue;
+
+		bool is_water = gs->shader_type == Game_Shader::S_WATER;
+
 		if (next_shader == -1) return;
+
+		// water only renders in the real geometry pass
+		if (state.is_water_reflection_pass && is_water)
+			continue;
 
 		if (state.initial_set || next_shader != state.current_shader) {
 			state.current_shader = next_shader;
@@ -1959,6 +2058,9 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 
 			if (gs->shader_type == Game_Shader::S_WINDSWAY) {
 				set_wind_constants();
+			}
+			else if (is_water) {
+				set_water_constants();
 			}
 			set_shader_constants();
 
@@ -1995,11 +2097,6 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 		shader().set_mat4("Model", transform);
 		shader().set_mat4("InverseModel", glm::inverse(transform));
 
-		shader().set_bool("has_glassfresnel", gs->fresnel_transparency);
-		shader().set_float("glassfresnel_opacity", 0.6f);
-
-		shader().set_float("in_roughness", rough);
-		shader().set_float("in_metalness", metal);
 
 		shader().set_bool("no_light", gs->emmisive);
 
@@ -2007,28 +2104,31 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 		shader().set_bool("has_uv_scroll", has_uv_scroll);
 		shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
 
+		// ill find a better way maybe
+		bool shader_doesnt_need_the_textures = is_water;
 
-		SET_OR_USE_FALLBACK(Game_Shader::BASE1, SAMPLER_BASE1, white_texture);
-		bool has_spec_mask = false;
-		if (gs->images[Game_Shader::AUX1]) {
-			has_spec_mask = true;
-			bind_texture(SAMPLER_AUX1, gs->images[Game_Shader::AUX1]->gl_id);
-		}
-		shader().set_bool("has_spec_mask", has_spec_mask);
-	
-		if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-			SET_OR_USE_FALLBACK(Game_Shader::BASE2, SAMPLER_BASE2, white_texture);
-			SET_OR_USE_FALLBACK(Game_Shader::AUX2, SAMPLER_AUX2, white_texture);
-			SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SAMPLER_SPECIAL, white_texture);
-		}
+		if (!shader_doesnt_need_the_textures) {
+			SET_OR_USE_FALLBACK(Game_Shader::BASE1, SAMPLER_BASE1, white_texture);
+			bool has_spec_mask = false;
+			if (gs->images[Game_Shader::AUX1]) {
+				has_spec_mask = true;
+				bind_texture(SAMPLER_AUX1, gs->images[Game_Shader::AUX1]->gl_id);
+			}
+			shader().set_bool("has_spec_mask", has_spec_mask);
 
-		if (mp.has_tangents()) {
-			SET_OR_USE_FALLBACK(Game_Shader::NORMAL1, SAMPLER_NORM1, default_normal_texture);
 			if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-				SET_OR_USE_FALLBACK(Game_Shader::NORMAL2, SAMPLER_NORM2, default_normal_texture);
+				SET_OR_USE_FALLBACK(Game_Shader::BASE2, SAMPLER_BASE2, white_texture);
+				SET_OR_USE_FALLBACK(Game_Shader::AUX2, SAMPLER_AUX2, white_texture);
+				SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SAMPLER_SPECIAL, white_texture);
+			}
+
+			if (mp.has_tangents()) {
+				SET_OR_USE_FALLBACK(Game_Shader::NORMAL1, SAMPLER_NORM1, default_normal_texture);
+				if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
+					SET_OR_USE_FALLBACK(Game_Shader::NORMAL2, SAMPLER_NORM2, default_normal_texture);
+				}
 			}
 		}
-
 
 		if (is_animated) {
 			const std::vector<mat4>& bones = a->GetBones();
@@ -2048,6 +2148,42 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 
 		state.initial_set = false;
 	}
+}
+
+void Renderer::planar_reflection_pass()
+{
+	glm::vec3 plane_n = glm::vec3(0, 1, 0);
+	float plane_d = 1.0;
+
+	View_Setup setup = current_frame_main_view;
+
+	// X-\     /-
+	//	  -\ /-
+	//	----O----------
+	//    -/
+	// C-/
+	setup.front.y *= -1;
+	float dist_to_plane = current_frame_main_view.origin.y + plane_d;
+	setup.origin.y -= dist_to_plane * 2.0f;
+	setup.view = glm::lookAt(setup.origin, setup.origin + setup.front, glm::vec3(0, 1, 0));
+	setup.viewproj = setup.proj * setup.view;
+	if (r_halfres_reflections->integer) {
+		setup.width /= 2;
+		setup.height /= 2;
+	}
+	
+	Render_Level_Params params;
+	params.view = setup;
+	params.has_clip_plane = true;
+	params.custom_clip_plane = vec4(plane_n, plane_d);
+	params.pass = params.OPAQUE;
+	params.clear_framebuffer = true;
+	params.output_framebuffer = fbo.reflected_scene;
+	params.draw_viewmodel = false;
+	params.upload_constants = true;
+	params.is_water_reflection_pass = true;
+
+	render_level_to_target(params);
 }
 
 
@@ -2168,7 +2304,7 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 		params.draw_ents = false;
 		params.clear_framebuffer = true;
 		params.provied_constant_buffer = 0;
-		params.pass = Render_Level_Params::STANDARD;
+		params.pass = Render_Level_Params::OPAQUE;
 		params.upload_constants = true;
 		params.is_probe_render = true;
 
