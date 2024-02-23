@@ -347,6 +347,7 @@ public:
 
 	Texture* lens_dirt;
 	Texture* casutics;
+	Texture* waternormal;
 
 	SSAO_System ssao;
 	Shadow_Map_System shadowmap;

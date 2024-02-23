@@ -1036,6 +1036,7 @@ void Renderer::Init()
 	
 	lens_dirt = mats.find_texture("lens_dirt.jpg");
 	casutics = mats.find_texture("caustics.png");
+	waternormal = mats.find_texture("waternormal.png");
 }
 
 void Renderer::InitFramebuffers()
@@ -1821,6 +1822,7 @@ void Renderer::set_water_constants()
 	// use sampler1 for reflection map, sampler2 for the depth of the current render
 	bind_texture(SAMPLER_BASE1, tex.reflected_color);
 	bind_texture(SAMPLER_BASE2, tex.scene_depthstencil);
+	bind_texture(SAMPLER_NORM1, waternormal->gl_id);
 }
 
 void Renderer::DrawLevelDepth(const Render_Level_Params& params)
@@ -2153,7 +2155,7 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 void Renderer::planar_reflection_pass()
 {
 	glm::vec3 plane_n = glm::vec3(0, 1, 0);
-	float plane_d = 1.0;
+	float plane_d = 2.0;
 
 	View_Setup setup = current_frame_main_view;
 

@@ -608,10 +608,11 @@ void main()
 
 	vec3 emissive = vec3(0.0);
 	
-	if(FS_IN_FragPos.y < -1) {
+	float water_height = -2;
+	if(FS_IN_FragPos.y < water_height) {
 		emissive = TriplanarProjection_float(caustictex, FS_IN_FragPos, N, 0.2, 3.0, 0.1, 0.0 ).rrr*0.9;
 		emissive += TriplanarProjection_float(caustictex, FS_IN_FragPos, N, 0.2, 3.0, 0.1, 2.1 ).rrr*0.9;
-		emissive = pow(emissive,vec3(3.0));
+		emissive = pow(emissive,vec3(3.0)) * smoothstep(water_height,water_height-1,FS_IN_FragPos.y);
 		tex.rgb = mix(tex.rgb, vec3(0.1,0.3,0.6),0.8);
 		specular_color.r *= 0.3;
 	
