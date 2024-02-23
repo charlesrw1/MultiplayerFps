@@ -59,6 +59,9 @@ uniform float in_metalness;
 uniform sampler3D volumetric_fog;
 
 
+uniform sampler2D caustictex;
+
+
 
 struct Cubemap_Box
 {
@@ -269,6 +272,30 @@ vec3 decode_normal(vec2 e)
     return n;
 }
 
+vec3 parallax_sample(float cindex, float roughness, vec3 R)
+{
+	uint num = uint(cindex);
+	
+	// intersect ray with box
+	vec3 pos = FS_IN_FragPos;
+	
+	vec3 inv_dir = 1.f / R;
+	vec3 tmin = (cubemaps[num].boxmin.xyz -  pos) * inv_dir;
+	vec3 tmax = (cubemaps[num].boxmax.xyz - pos) * inv_dir;
+	vec3 t1_ = min(tmin, tmax);
+	vec3 t2_ = max(tmin, tmax);
+	float tnear = max(max(t1_.x, t1_.y), t1_.z);
+	float tfar = min(min(t2_.x, t2_.y), t2_.z);
+	
+	if(tfar>tnear)
+		tnear = tfar;
+	
+	vec3 point = pos + R*tnear;
+	vec3 sampledir = normalize(point-cubemaps[num].probepos_priority.xyz);
+	
+	return textureLod(pbr_specular_cubemaps,vec4(sampledir,cindex), roughness*4.0).rgb;
+}
+
 float get_cubemap_index(vec3 worldpos)
 {
 	if(g.forcecubemap != -1.0)
@@ -340,7 +367,7 @@ vec4 eval_phong_brdf(vec3 diffuse, vec3 specular, float specular_power, float op
 		direct_diffuse_light += max(dot(-g.directional_light_dir_and_used.xyz,N), 0.0)*g.directional_light_color.rgb*0.003;
 	}
 #endif
-	float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
+	float sun = 1.0;// sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
 
 	vec3 R = reflect(-V,N);
 	vec3 H = normalize(V + L);
@@ -365,29 +392,22 @@ vec4 eval_phong_brdf(vec3 diffuse, vec3 specular, float specular_power, float op
 }
 
 
-vec3 pbr_calculate()
+vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float opacity, vec3 emissive)
 {
-		vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_pos = g.viewpos_time.xyz;
 	vec3 view_front = g.viewfront.xyz;
 
 
-	vec4 tex = texture(basecolor, FS_IN_Texcoord);
-	tex.rgb = pow(tex.rgb,vec3(2.2));
-#ifdef ALPHATEST
-	if(tex.a < 0.5)
-		discard;
-#endif
-
 	vec3 V = normalize(view_pos-FS_IN_FragPos);
-	vec3 N = normalize(FS_IN_Normal);
 
 
 	vec3 R = reflect(-V,N);
-	float Roughness = 0.5;
-	vec3 Albedo = tex.rgb;
+	float Roughness = roughness;
+	vec3 Albedo = diffuse;
 	float Metalness = 0.0;
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0,Albedo,Metalness);
+	//F0 = vec3(0.95, 0.64, 0.54);
 // punctual lights
 	vec3 Lo = vec3(0.0);
 	vec3 L = -g.directional_light_dir_and_used.xyz;
@@ -406,7 +426,7 @@ vec3 pbr_calculate()
         float denominator = 4.0 * max(dot(surface_N, V), 0.0) * max(dot(surface_N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
         vec3 specular = numerator / 1.0;
         
-		float shadow = sample_sun_shadow(FS_IN_FragPos);
+		float shadow = 1.0;
 		
          // kS is equal to Fresnel
         vec3 kS = F;
@@ -445,7 +465,8 @@ vec3 pbr_calculate()
 	float cm_index = get_cubemap_index(FS_IN_FragPos);
 	
 	const float MAX_REFLECTION_LOD = 4.0;
-	vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index),0.0).rgb;
+	//vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index), Roughness*MAX_REFLECTION_LOD).rgb;
+	vec3 prefiltered_color = parallax_sample(cm_index, Roughness, R);
 
 	vec3 F = FresnelSchlickRougness(max(dot(N,V),0.0),F0,Roughness);
 	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(N,V),0.0),Roughness)).rg;
@@ -458,23 +479,23 @@ vec3 pbr_calculate()
 #ifdef LIGHTMAPPED
 	irradiance = texture(lightmap, FS_IN_TexCoord2).rgb*1.4;
 #endif
-	vec3 diffuse = irradiance*Albedo;
+	vec3 diffuse_light = irradiance*Albedo;
 
 	float dist = length(view_pos-FS_IN_FragPos);
 	
 	vec3 kS = F;
 	vec3 kD = (1.0-kS)*(1.0-Metalness);
 	
-	vec3 ambient =(kD*diffuse+ specular)*ao;
+	vec3 ambient =(kD*diffuse_light+ specular)*ao;
 	
 #ifdef LIGHTMAPPED
 	//float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
 	//ambient = mix(ambient*0.2, ambient, sun);
 #endif
 
-	ambient += Lo;
+	ambient += Lo + emissive;
 
-	return ambient;
+	return vec4(ambient, opacity);
 }
 
 #ifdef BLEND2
@@ -482,17 +503,43 @@ float get_blend2_lerp()
 {
 	float vert_color = FS_IN_Color.r;
 	float modulate_tex = 1.0-texture(special, FS_IN_Texcoord).r;
-	float val = 0.3;
+	float val = 0.34;
 	vec2 bound = clamp(vec2(modulate_tex-val,modulate_tex+val),vec2(0),vec2(1));
 	return smoothstep(bound.x,bound.y, vert_color);
 }
 #endif
 
 
+vec4 TriplanarProjection_float(
+    sampler2D Texture,
+	vec3 Position,
+    vec3 Normal,           // world space
+    float Tile,
+    float Blend,
+
+    // UV manipulation
+    float Speed,
+    float Rotation
+)
+{
+    vec3 Node_UV = Position * Tile;
+
+    // animate UVs
+    float Offset_UV = g.viewpos_time.w * Speed;
+	vec2 actual_offset = vec2(cos(Rotation)*Offset_UV, sin(Rotation)*Offset_UV);
+
+    vec3 Node_Blend = pow(abs(Normal), vec3(Blend));
+    Node_Blend /= dot(Node_Blend, vec3(1.0));
+
+    vec4 Node_X = texture(Texture,Node_UV.zy+actual_offset); 
+    vec4 Node_Y =  texture(Texture,Node_UV.xz+actual_offset); 
+    vec4 Node_Z = texture(Texture,Node_UV.xy+actual_offset);
+
+    return Node_X * Node_Blend.x + Node_Y * Node_Blend.y + Node_Z * Node_Blend.z;
+}
+
 void main()
 {
-	FS_OUT_Color = vec4(pbr_calculate(),1.0);
-	return;
 
 	vec4 tex = texture(basecolor, FS_IN_Texcoord);
 	
@@ -535,34 +582,18 @@ void main()
 #endif
 
 
-	float cm_index = get_cubemap_index(FS_IN_FragPos);
-	
-	const float MAX_REFLECTION_LOD = 4.0;
-	vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index),0.0).rgb;
-	float f = fresnel_term(N,V, 2.0);
-	float diffuse_mult = (1.0-f)*0.9;
-	vec3 emission = prefiltered_color*tex.rgb*(1-diffuse_mult);
-	vec3 diffuse_term = vec3(tex.rgb)*diffuse_mult;
-	//vec3 diffuse_term = mix(vec3(0.3,0.3,0.3),prefiltered_color.rgb*0.35, fresnel_term(N,V, 0.2));
-
-	//FS_OUT_Color = eval_phong_brdf(Albedo, vec3(0.5,0.3,0.2)*0.2, 5.0, 1.0,vec3(0.0),N, vec3(0.0));
-
-	//FS_OUT_Color = eval_phong_brdf(diffuse_term, vec3(0.1), 2.0, 1.0,vec3(0.0),N, vec3(0.0));//vec4(pow(diffuse+ambient,vec3(1/2.2)),1);//abs(Albedo-((N+vec3(1))*0.5)),1.0);	
-//#ifndef WIND
-	FS_OUT_Color = eval_phong_brdf(tex.rgb, vec3(0.1), 5.0, 1.0, vec3(0.0),N, vec3(0.0));
-//#else
-
 	vec3 specular_color = vec3(0.1);
-	float specmask = 1.0;
+	vec2 specmask_green = vec2(1.0,0.0);
 	if(has_spec_mask) {
-		specmask = texture(auxcolor, FS_IN_Texcoord).r;
+		specmask_green = texture(auxcolor, FS_IN_Texcoord).rg;
+		
 	#ifdef BLEND2
-		specmask = mix(specmask, texture(auxcolor2, FS_IN_Texcoord).r, blend2_lerp);
+		specmask_green = mix(specmask_green, texture(auxcolor2, FS_IN_Texcoord).rg, blend2_lerp);
 	#endif
-		specmask = pow(specmask, 2.0);
+		specmask_green = pow(specmask_green, vec2(2.0));
 	}
 	if(!specular_enabled)
-		specmask = 0.0;
+		specmask_green.r = 0.0;
 		
 	if(specular_tint.r >= 0) {
 		specular_color = specular_tint;
@@ -570,15 +601,29 @@ void main()
 	else {
 		specular_color = tex.rgb * spec_strength;
 	}
-	specular_color *= specmask;
+	specular_color *= specmask_green.r;
+	
+	float fresnel2 = 0.0;//pow( max(1.0-dot(N,V),0.0)  ,2.0);
 
-	//FS_OUT_Color = eval_phong_brdf(diffuse_term, vec3(0.0), spec_exponent, 1.0, emission,N, vec3(0.0));
-	FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
+	vec3 emissive = vec3(0.0);
+	
+	if(FS_IN_FragPos.y < -1) {
+		emissive = TriplanarProjection_float(caustictex, FS_IN_FragPos, N, 0.2, 3.0, 0.1, 0.0 ).rrr*0.9;
+		emissive += TriplanarProjection_float(caustictex, FS_IN_FragPos, N, 0.2, 3.0, 0.1, 2.1 ).rrr*0.9;
+		emissive = pow(emissive,vec3(3.0));
+		tex.rgb = mix(tex.rgb, vec3(0.1,0.3,0.6),0.8);
+		specular_color.r *= 0.3;
+	
+	}
+	
+
+	FS_OUT_Color = pbr_calculate(tex.rgb, (1.0-specular_color.r)*0.5, specmask_green.g, N, 1.0,emissive);
+	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
 	//FS_OUT_Color = vec4(1.0);
 	#ifdef BLEND2
-	//FS_OUT_Color = vec4(blend2_lerp);
+	//FS_OUT_Color = tex;
 	#endif
 #endif
 //#endif

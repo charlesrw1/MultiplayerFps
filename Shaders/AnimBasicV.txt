@@ -150,8 +150,8 @@ void main()
     FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
 	
 #ifdef NORMALMAPPED
-	vec3 world_tangent = mat3(transpose(InverseModel))*normalize(local_tangent);
-	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
+	vec3 world_tangent = -mat3(transpose(InverseModel))*normalize(local_tangent);
+	vec3 world_bitangent = -cross(FS_IN_Normal, world_tangent);
 	FS_IN_TBN = mat3(world_tangent, world_bitangent, FS_IN_Normal);
 #endif
     

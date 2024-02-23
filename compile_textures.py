@@ -10,6 +10,12 @@ TEXTURE_DIR = "./Data/Textures/"
 
 def compile_texture_list(texture_list, alphamode):
     for ttype, path in texture_list:
+        last_modified_time = os.path.getmtime(TEXTURE_DIR+path)
+    
+        dds_file = TEXTURE_DIR + path[0:path.rfind('.')]+".dds"
+        if os.path.isfile(dds_file) and os.path.getmtime(dds_file) > last_modified_time:
+            continue
+
         path_folder = ""
         if path.rfind('/')!=-1:
             path_folder = path[0:path.rfind('/')+1]

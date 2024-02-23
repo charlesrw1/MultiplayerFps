@@ -317,6 +317,8 @@ void Renderer::set_shader_sampler_locations()
 	shader().set_int("cascade_shadow_map", SAMPLER_LIGHTMAP + 5);
 
 	shader().set_int("ssao_tex", SAMPLER_LIGHTMAP + 6);
+
+	shader().set_int("caustictex", SAMPLER_LIGHTMAP + 7);
 }
 
 void Renderer::set_depth_shader_constants()
@@ -346,6 +348,9 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	if (params.is_probe_render) ssao_tex = draw.white_texture;
 	glActiveTexture(GL_TEXTURE0 + start + 6);
 	glBindTexture(GL_TEXTURE_2D, ssao_tex);
+
+	glActiveTexture(GL_TEXTURE0 + start + 7);
+	glBindTexture(GL_TEXTURE_2D, draw.casutics->gl_id);
 
 	glActiveTexture(GL_TEXTURE0 + start + 4);
 	glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
@@ -1016,6 +1021,7 @@ void Renderer::Init()
 	ssao.init();
 	
 	lens_dirt = mats.find_texture("lens_dirt.jpg");
+	casutics = mats.find_texture("caustics.png");
 }
 
 void Renderer::InitFramebuffers()

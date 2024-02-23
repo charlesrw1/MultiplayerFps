@@ -151,8 +151,14 @@ void Game_Local::update_view()
 		vec3 view_angles = engine.local.view_angles;
 
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
+		vec3 side = normalize(cross(front, vec3(0,1,0)));
+
+
+		vec3 camera_pos = playerreal.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
+		
+
 		//fly_cam.position = GetLocalPlayerInterpedOrigin()+vec3(0,0.5,0) - front * 3.f;
-		fly_cam.position = playerreal.position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 4.5f;
+		fly_cam.position = camera_pos;
 		setup.view = glm::lookAt(fly_cam.position, fly_cam.position + front, fly_cam.up);
 		setup.front = front;
 		setup.origin = fly_cam.position;

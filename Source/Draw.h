@@ -338,6 +338,7 @@ public:
 	bool using_skybox_for_specular = false;
 
 	Texture* lens_dirt;
+	Texture* casutics;
 
 	SSAO_System ssao;
 	Shadow_Map_System shadowmap;
