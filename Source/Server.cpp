@@ -20,28 +20,29 @@ void NetDebugPrintf(const char* fmt, ...)
 	va_end(ap);
 }
 
+Server::Server() :
+	tick_rate("sv.tick_rate", (float)DEFAULT_UPDATE_RATE),
+	snapshot_rate("sv.snapshot_rate", 30.f),
+	max_time_out("sv.time_out", 10.f)
+{
+
+}
 
 void Server::init()
 {
-
-	tick_rate		= cfg.get_var("server/tick_rate", std::to_string(DEFAULT_UPDATE_RATE).c_str());
-	snapshot_rate	= cfg.get_var("server/snapshot_rate", "30.0");
-	max_time_out	= cfg.get_var("server/max_time_out", "10.f");
-	host_port		= cfg.get_var("server/host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-
 	frames.clear();
 	frames.resize(MAX_FRAME_HIST);
 
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		clients.push_back(RemoteClient(this, i));
 
-	if (tick_rate->real < 30)
-		cfg.set_var("tick_rate", "30.0");
-	else if (tick_rate->real > 150)
-		cfg.set_var("tick_rate", "150.0");
+	if (tick_rate.real() < 30)
+		tick_rate.real() = 30.f;
+	else if (tick_rate.real() > 150)
+		tick_rate.real() = 150.f;
 
 	// initialize tick_interval here
-	engine.tick_interval = 1.0 / tick_rate->real;
+	engine.tick_interval = 1.0 / tick_rate.real();
 }
 void Server::end(const char* log_reason)
 {
@@ -59,9 +60,12 @@ void Server::start()
 	if (initialized)
 		end("restarting server");;
 	sys_print("Starting server...\n");
-	socket.Init(host_port->integer);
+
+	int host_port = Var_Manager::get()->get_var("net.hostport")->integer;
+
+	socket.Init(host_port);
 	initialized = true;
-	engine.tick_interval = 1.0 / tick_rate->real;
+	engine.tick_interval = 1.0 / tick_rate.real();
 }
 
 
@@ -131,7 +135,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	writer.WriteByte(spot);
 	writer.write_string(engine.mapname);
 	writer.WriteLong(engine.tick);
-	writer.WriteFloat(tick_rate->real);
+	writer.WriteFloat(tick_rate.real());
 	writer.EndWrite();
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
 
@@ -193,7 +197,7 @@ void Server::ReadPackets()
 		auto& cl = clients[i];
 		if (!cl.IsConnected()||cl.local_client)
 			continue;
-		if (GetTime() - cl.LastRecieved() > max_time_out->real) {
+		if (GetTime() - cl.LastRecieved() > max_time_out.real()) {
 			cl.Disconnect("client timed out");
 		}
 	}

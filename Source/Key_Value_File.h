@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include "Config.h"
+
 using std::string;
 using std::vector;
 
@@ -11,13 +13,13 @@ public:
 	bool open(const char* filename);
 	struct Entry {
 		string name;
-		vector<vector<string>> tokenized_lines;
+		vector<Cmd_Args> tokenized_lines;
 		int linenum;
 	};
 	vector<Entry> entries;
 };
 
-extern void tokenize_string(string& input, std::vector<string>& out);
+extern void tokenize_string(string& input, Cmd_Args& out);
 
 bool Key_Value_File::open(const char* filename)
 {
@@ -47,7 +49,7 @@ bool Key_Value_File::open(const char* filename)
 			int s = cur.tokenized_lines.size();
 			cur.tokenized_lines.resize(s + 1);
 			tokenize_string(line, cur.tokenized_lines.at(s));
-			if (cur.tokenized_lines.at(s).empty())
+			if (cur.tokenized_lines.at(s).size() == 0)
 				cur.tokenized_lines.resize(s);
 		}
 	}

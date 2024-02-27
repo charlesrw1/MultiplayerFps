@@ -24,6 +24,9 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 		return;
 	}
 
+
+	string key;
+	string temp2;
 	for (auto& mat : file.entries)
 	{
 		// first check if it exists
@@ -41,76 +44,76 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 
 		for (auto& line : mat.tokenized_lines)
 		{
-			ASSERT(!line.empty());
-			string& key = line.at(0);
+			ASSERT(line.size()!=0);
+			key = line.at(0);
 			if (key == "image1") {
 				ENSURE(2);
-				gs->images[Game_Shader::BASE1] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::BASE1] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "aux1") {
 				ENSURE(2);
-				gs->images[Game_Shader::AUX1] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::AUX1] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "normal1") {
 				ENSURE(2);
-				gs->images[Game_Shader::NORMAL1] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::NORMAL1] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "image2") {
 				ENSURE(2);
-				gs->images[Game_Shader::BASE2] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::BASE2] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "aux2") {
 				ENSURE(2);
-				gs->images[Game_Shader::AUX2] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::AUX2] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "normal2") {
 				ENSURE(2);
-				gs->images[Game_Shader::NORMAL2] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::NORMAL2] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "special") {
 				ENSURE(2);
-				gs->images[Game_Shader::SPECIAL] = FindOrLoadTexture(line.at(1).c_str());
+				gs->images[Game_Shader::SPECIAL] = FindOrLoadTexture(line.at(1));
 			}
 			else if (key == "spec_exp") {
 				ENSURE(2);
-				gs->spec_exponent = std::atof(line.at(1).c_str());
+				gs->spec_exponent = std::atof(line.at(1));
 			}
 			else if (key == "spec_str") {
 				ENSURE(2);
-				gs->spec_strength = std::atof(line.at(1).c_str());
+				gs->spec_strength = std::atof(line.at(1));
 			}
 			else if (key == "spec_tint") {
 				ENSURE(4);
-				gs->spec_tint.x = std::atof(line.at(1).c_str());
-				gs->spec_tint.y = std::atof(line.at(2).c_str());
-				gs->spec_tint.z = std::atof(line.at(3).c_str());
+				gs->spec_tint.x = std::atof(line.at(1));
+				gs->spec_tint.y = std::atof(line.at(2));
+				gs->spec_tint.z = std::atof(line.at(3));
 			}
 			else if (key == "tint") {
 				ENSURE(4);
-				gs->diffuse_tint.x = std::atof(line.at(1).c_str());
-				gs->diffuse_tint.y = std::atof(line.at(2).c_str());
-				gs->diffuse_tint.z = std::atof(line.at(3).c_str());
+				gs->diffuse_tint.x = std::atof(line.at(1));
+				gs->diffuse_tint.y = std::atof(line.at(2));
+				gs->diffuse_tint.z = std::atof(line.at(3));
 			}
 			else if (key == "physics") {
 				// TODO
 			}
 			else if (key == "shader") {
 				ENSURE(2);
-				string& t = line.at(1);
-				if (t == "blend2") gs->shader_type = Game_Shader::S_2WAYBLEND;
-				else if (t == "wind") gs->shader_type = Game_Shader::S_WINDSWAY;
-				else if (t == "water") {
+				temp2 = line.at(1);
+				if (temp2 == "blend2") gs->shader_type = Game_Shader::S_2WAYBLEND;
+				else if (temp2 == "wind") gs->shader_type = Game_Shader::S_WINDSWAY;
+				else if (temp2 == "water") {
 					gs->alpha_type = Game_Shader::A_BLEND;
 					gs->shader_type = Game_Shader::S_WATER;
 				}
-				else sys_print("unknown shader type %s\n", t.c_str());
+				else sys_print("unknown shader type %s\n", temp2.c_str());
 			}
 			else if (key == "alpha") {
 				ENSURE(2);
-				string& t = line.at(1);
-				if (t == "add") gs->alpha_type = Game_Shader::A_ADD;
-				else if (t == "blend") gs->alpha_type = Game_Shader::A_BLEND;
-				else if (t == "test") gs->alpha_type = Game_Shader::A_TEST;
+				temp2 = line.at(1);
+				if (temp2 == "add") gs->alpha_type = Game_Shader::A_ADD;
+				else if (temp2 == "blend") gs->alpha_type = Game_Shader::A_BLEND;
+				else if (temp2 == "test") gs->alpha_type = Game_Shader::A_TEST;
 			}
 			else if (key == "showbackface") {
 				gs->backface = true;
@@ -120,11 +123,11 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 			}
 			else if (key == "uscroll") {
 				ENSURE(2);
-				gs->uscroll = std::atof(line.at(1).c_str());
+				gs->uscroll = std::atof(line.at(1));
 			}
 			else if (key == "vscroll") {
 				ENSURE(2);
-				gs->vscroll = std::atof(line.at(1).c_str());
+				gs->vscroll = std::atof(line.at(1));
 			}
 			else if (key == "emmisive") {
 				gs->emmisive = true;	

@@ -39,7 +39,6 @@
 #include "imgui_impl_sdl2.h"
 
 MeshBuilder phys_debug;
-Engine_Config cfg;
 Game_Engine engine;
 
 static double program_time_start;
@@ -89,14 +88,14 @@ void sys_print(const char* fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 	vprintf(fmt, args);
-	engine.console.print_args(fmt, args);
+	Debug_Console::get()->print_args(fmt, args);
 	va_end(args);
 }
 
 void sys_vprint(const char* fmt, va_list args)
 {
 	vprintf(fmt, args);
-	engine.console.print_args(fmt, args);
+	Debug_Console::get()->print_args(fmt, args);
 }
 
 void Fatalf(const char* format, ...)
@@ -133,9 +132,9 @@ void Game_Local::update_view()
 	vec3 true_front = AnglesToVector(true_viewangles.x, true_viewangles.y);
 
 	View_Setup setup;
-	setup.height = engine.window_h->integer;
-	setup.width = engine.window_w->integer;
-	setup.fov = glm::radians(fov->real);
+	setup.height = engine.window_h.integer();
+	setup.width = engine.window_w.integer();
+	setup.fov = glm::radians(fov.real());
 	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, 0.01f, 100.0f);
 	setup.near = 0.01f;
 	setup.far = 100.f;
@@ -144,7 +143,7 @@ void Game_Local::update_view()
 	//	fly_cam.UpdateFromInput(engine.keys, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
 	//}
 
-	if (thirdperson_camera->integer) {
+	if (thirdperson_camera.integer()) {
 		//ClientEntity* player = client.GetLocalPlayer();
 		Entity& playerreal = engine.local_player();
 
@@ -190,8 +189,8 @@ void Game_Engine::view_angle_update()
 {
 	int x, y;
 	SDL_GetRelativeMouseState(&x, &y);
-	float x_off = engine.local.mouse_sensitivity->real * x;
-	float y_off = engine.local.mouse_sensitivity->real * y;
+	float x_off = engine.local.mouse_sensitivity.real() * x;
+	float y_off = engine.local.mouse_sensitivity.real() * y;
 
 	vec3 view_angles = local.view_angles;
 	view_angles.x -= y_off;	// pitch
@@ -214,9 +213,9 @@ void Game_Engine::make_move()
 	command.view_angles = local.view_angles;
 	command.tick = tick;
 
-	if (engine.local.fake_movement_debug->integer != 0)
+	if (engine.local.fake_movement_debug.integer() != 0)
 		command.lateral_move = std::fmod(GetTime(), 2.f) > 1.f ? -1.f : 1.f;
-	if (engine.local.fake_movement_debug->integer == 2)
+	if (engine.local.fake_movement_debug.integer() == 2)
 		command.button_mask |= BUTTON_JUMP;
 
 	if (!game_focused) {
@@ -285,7 +284,7 @@ void Game_Engine::init_sdl_window()
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
 	window = SDL_CreateWindow("CsRemake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		window_w->integer, window_h->integer, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+		window_w.integer(), window_h.integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
 		printf(__FUNCTION__": %s\n", SDL_GetError());
 		exit(-1);
@@ -442,33 +441,33 @@ void Game_Engine::connect_to(string address)
 	cl->connect(address);
 }
 
-void cmd_quit()
+DECLARE_ENGINE_CMD(quit)
 {
 	Quit();
 }
-void cmd_bind()
+
+DECLARE_ENGINE_CMD(bind)
 {
-	auto& args = cfg.get_arg_list();
 	if (args.size() < 2) return;
-	int scancode = SDL_GetScancodeFromName(args[1].c_str());
+	int scancode = SDL_GetScancodeFromName(args.at(1));
 	if (scancode == SDL_SCANCODE_UNKNOWN) return;
 	if (args.size() < 3)
 		engine.bind_key(scancode, "");
 	else
-		engine.bind_key(scancode, args[2].c_str());
+		engine.bind_key(scancode, args.at(2));
 }
 
-void cmd_server_end()
+DECLARE_ENGINE_CMD_CAT("sv.",end)
 {
 	engine.exit_map();
 }
-void cmd_client_force_update()
+
+DECLARE_ENGINE_CMD_CAT("cl.",force_update)
 {
 	engine.cl->ForceFullUpdate();
 }
-void cmd_client_connect()
+DECLARE_ENGINE_CMD(connect)
 {
-	auto& args = cfg.get_arg_list();
 	if (args.size() < 2) {
 		sys_print("usage connect <address>");
 		return;
@@ -476,35 +475,37 @@ void cmd_client_connect()
 
 	engine.connect_to(args.at(1));
 }
-void cmd_client_disconnect()
+DECLARE_ENGINE_CMD(disconnect)
 {
 	if (engine.cl->get_state()!=CS_DISCONNECTED)
 		engine.cl->Disconnect("requested");
 }
-void cmd_client_reconnect()
+DECLARE_ENGINE_CMD(reconnect)
 {
 	if(engine.cl->get_state() != CS_DISCONNECTED)
 		engine.cl->Reconnect();
 }
-void cmd_load_map()
+
+DECLARE_ENGINE_CMD(map)
 {
-	if (cfg.get_arg_list().size() < 2) {
+	if (args.size() < 2) {
 		sys_print("usage map <map name>");
 		return;
 	}
 
-	engine.start_map(cfg.get_arg_list().at(1), false);
+	engine.start_map(args.at(1), false);
 }
-void cmd_exec_file()
+DECLARE_ENGINE_CMD(exec)
 {
-	if (cfg.get_arg_list().size() < 2) {
+	if (args.size() < 2) {
 		sys_print("usage map <map name>");
 		return;
 	}
-	cfg.execute_file(cfg.get_arg_list().at(1).c_str());
+
+	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
 }
 
-void cmd_print_client_net_stats()
+DECLARE_ENGINE_CMD(net_stat)
 {
 	float mintime = INFINITY;
 	float maxtime = -INFINITY;
@@ -526,7 +527,8 @@ void cmd_print_client_net_stats()
 	sys_print("%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
 }
 
-void cmd_print_entities()
+
+DECLARE_ENGINE_CMD(print_ents)
 {
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
@@ -536,15 +538,15 @@ void cmd_print_entities()
 	}
 }
 
-void cmd_print_vars()
+DECLARE_ENGINE_CMD(print_vars)
 {
-	auto& args = cfg.get_arg_list();
 	if (args.size() == 1)
-		cfg.print_vars(nullptr);
+		Var_Manager::get()->print_vars(nullptr);
 	else
-		cfg.print_vars(args.at(1).c_str());
+		Var_Manager::get()->print_vars(args.at(1));
 }
-void cmd_reload_shaders()
+
+DECLARE_ENGINE_CMD(reload_shaders)
 {
 	draw.reload_shaders();
 }
@@ -649,13 +651,18 @@ int main(int argc, char** argv)
 	return 0;
 }
 
+Game_Local::Game_Local() : 
+	thirdperson_camera("view.tp",1),
+	fov("view.fov", 70.f),
+	mouse_sensitivity("view.sens", 0.01f),
+	fake_movement_debug("game.fakemove",0, (int)CVar_Flags::INTEGER)
+{
+
+}
+
 void Game_Local::init()
 {
 	view_angles = glm::vec3(0.f);
-	thirdperson_camera	= cfg.get_var("thirdperson_camera", "1");
-	fov					= cfg.get_var("fov", "70.0");
-	mouse_sensitivity	= cfg.get_var("mouse_sensitivity", "0.01");
-	fake_movement_debug = cfg.get_var("fake_movement_debug", "0");
 	
 	pm.init();
 
@@ -715,12 +722,11 @@ void Game_Engine::exit_map()
 	is_host = false;
 }
 
-
 void Game_Engine::key_event(SDL_Event event)
 {
 	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
-		console.set_keyboard_focus = show_console;
+		//console.set_keyboard_focus = show_console;
 	}
 
 	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
@@ -734,7 +740,7 @@ void Game_Engine::key_event(SDL_Event event)
 		keychanges[scancode] = true;
 
 		if (binds[scancode]) {
-			cfg.execute(*binds[scancode]);
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, binds[scancode]->c_str());
 		}
 	}
 	else if (event.type == SDL_KEYUP) {
@@ -788,6 +794,114 @@ extern float wsstartradius;
 extern vec3 wswind_dir;
 extern float speed;
 
+
+
+class Debug_Console_Impl : public Debug_Console
+{
+public:
+	Debug_Console_Impl();
+
+	void draw();
+	void print(const char* fmt, ...);
+	void print_args(const char* fmt, va_list list);
+	vector<string> lines;
+	vector<string> history;
+	int history_index = -1;
+	bool auto_scroll = true;
+	bool scroll_to_bottom = false;
+	bool set_keyboard_focus = false;
+	char input_buffer[256];
+};
+
+Debug_Console* Debug_Console::get()
+{
+	static Debug_Console_Impl inst;
+	return &inst;
+}
+
+void draw_console_hook() {
+
+	((Debug_Console_Impl*)Debug_Console::get()->get())->draw();
+}
+
+Debug_Console_Impl::Debug_Console_Impl()
+{
+	Debug_Interface::get()->add_hook("Console", draw_console_hook);
+}
+
+class Debug_Interface_Impl : public Debug_Interface
+{
+public:
+	void add_hook(const char* menu_name, void(*drawfunc)()) {
+		int i = 0;
+		for (; i < hooks.size(); i++) {
+			if (strcmp(menu_name, hooks[i].menu_name) == 0) {
+				Hook_Node* node = new Hook_Node;
+				node->drawfunc = drawfunc;
+				node->next = nullptr;
+				hooks[i].tail->next = node;
+				hooks[i].tail = node;
+				break;
+			}
+		}
+		if (i == hooks.size()) {
+			hooks.push_back(Menu_Hook());
+			auto& hook = hooks.back();
+			hook.menu_name = menu_name;
+			Hook_Node* node = new Hook_Node;
+			node->drawfunc = drawfunc;
+			node->next = nullptr;
+			hook.tail = hook.head = node;
+		}
+	}
+
+	void draw() {
+		ImVec2 winsize = ImGui::GetMainViewport()->Size;
+		int width = 275;
+		ImGui::SetNextWindowPos(ImVec2(winsize.x - width - 10, 50));
+		ImGui::SetNextWindowSize(ImVec2(width, 700));
+		ImGui::SetNextWindowBgAlpha(0.3);
+		ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar |
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+		if (ImGui::Begin("Debug",nullptr, flags)) {
+			ImGui::PushItemWidth(140.f);
+			for (int i = 0; i < hooks.size(); i++) {
+				if (ImGui::CollapsingHeader(hooks[i].menu_name)) {
+					Hook_Node* p = hooks[i].head;
+					while (p) {
+						p->drawfunc();
+						p = p->next;
+					}
+				}
+			}
+
+
+		}
+		ImGui::End();
+	}
+
+
+	struct Hook_Node {
+		Hook_Node* next = nullptr;
+		void(*drawfunc)();
+	};
+
+	struct Menu_Hook {
+		const char* menu_name = "";
+		Hook_Node* head = nullptr;
+		Hook_Node* tail = nullptr;
+	};
+	std::vector<Menu_Hook> hooks;
+};
+
+
+Debug_Interface* Debug_Interface::get()
+{
+	static Debug_Interface_Impl inst;
+	return &inst;
+}
+
+
 void draw_wind_menu()
 {
 	ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
@@ -817,8 +931,6 @@ void draw_wind_menu()
 	ImGui::Image(ImTextureID(draw.tex.bloom_chain[bloom_layer]), ImVec2(256, 256));
 
 
-
-
 	ImGui::DragFloat3("wind dir", &wswind_dir.x, 0.04);
 	ImGui::DragFloat("speed", &speed, 0.04);
 	ImGui::DragFloat("height", &wsheight, 0.04);
@@ -829,39 +941,31 @@ void draw_wind_menu()
 	ImGui::Image((ImTextureID)EnviornmentMapHelper::get().integrator.lut_id, ImVec2(512, 512));
 }
 
+void menu_playervars()
+{
+	if (engine.state != ENGINE_GAME) return;
+
+	Entity& p = engine.local_player();
+	ImGui::DragFloat3("vm", &engine.local.vm_offset[0], 0.02f);
+	ImGui::DragFloat3("vm2", &engine.local.vm_scale[0], 0.02f);
+
+	ImGui::DragFloat3("pos", &p.position.x);
+	ImGui::DragFloat3("dir", &engine.local.view_angles.x);
+
+	ImGui::DragFloat3("vel", &p.velocity.x);
+	ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
+
+
+	if (engine.is_host) {
+		ImGui::Text("delta %f", engine.cl->time_delta);
+		ImGui::Text("tick %f", engine.tick);
+		ImGui::Text("frr %f", engine.frame_remainder);
+	}
+}
+
 void Game_Engine::draw_debug_interface()
 {
-	if(show_console)
-		console.draw();
-	move_variables_menu();
-
-	Profilier::get_instance().draw_imgui_window();
-
-	if (state == ENGINE_GAME) {
-
-		// player menu
-		if (ImGui::Begin("Game")) {
-			draw_wind_menu();
-
-			Entity& p = engine.local_player();
-			ImGui::DragFloat3("vm", &engine.local.vm_offset[0],0.02f);
-			ImGui::DragFloat3("vm2", &engine.local.vm_scale[0], 0.02f);
-
-			ImGui::DragFloat3("pos", &p.position.x);
-			ImGui::DragFloat3("dir", &engine.local.view_angles.x);
-
-			ImGui::DragFloat3("vel", &p.velocity.x);
-			ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
-
-
-			if (is_host) {
-					ImGui::Text("delta %f", cl->time_delta);
-					ImGui::Text("tick %f", engine.tick);
-					ImGui::Text("frr %f", engine.frame_remainder);
-			}
-		}
-		ImGui::End();
-	}
+	Debug_Interface::get()->draw();
 }
 
 void Game_Engine::draw_screen()
@@ -875,10 +979,9 @@ void Game_Engine::draw_screen()
 	if (y % 2 == 1)y -= 1;
 	SDL_SetWindowSize(window, x, y);
 
-	cfg.set_var("window_w", std::to_string(x).c_str());
-	cfg.set_var("window_h", std::to_string(y).c_str());
-	if (draw.vsync->integer != 0 && draw.vsync->integer != 1)
-		cfg.set_var("vsync", "0");
+	window_w.integer() = x;
+	window_h.integer() = y;
+
 	SDL_GL_SetSwapInterval(0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -916,7 +1019,7 @@ void Game_Engine::set_state(Engine_State state)
 
 void Game_Engine::build_physics_world(float time)
 {
-	static Config_Var* only_world = cfg.get_var("phys/only_world", "0");
+	static Auto_Config_Var only_world("dbg.onlyworld",0);
 
 	phys.ClearObjs();
 	{
@@ -930,7 +1033,7 @@ void Game_Engine::build_physics_world(float time)
 
 		phys.AddObj(obj);
 	}
-	if (only_world->integer) return;
+	if (only_world.integer()) return;
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		Entity& ce = ents[i];
@@ -1002,24 +1105,26 @@ void Game_Engine::update_game_tick()
 	}
 }
 
-void cmd_debug_counter()
-{
-	if (cfg.get_arg_list().at(1) == "1")
-		engine.cl->offset_debug++;
-	else
-		engine.cl->offset_debug--;
-	printf("offset client: %d\n", engine.cl->offset_debug);
-}
-void cmd_reload_materials()
+
+DECLARE_ENGINE_CMD(reload_mats)
 {
 	sys_print("reloading materials\n");
-	if (cfg.get_arg_list().size() == 1)
+	if (args.size() == 1)
 		mats.load_material_file_directory("./Data/Materials/");
 	else
-		mats.load_material_file_directory(cfg.get_arg_list().at(1).c_str());
+		mats.load_material_file_directory(args.at(1));
 }
 
 #define TIMESTAMP(x) printf("%s in %f\n",x,(float)GetTime()-start); start = GetTime();
+
+Game_Engine::Game_Engine() :
+	window_w("vid.width", 1200),
+	window_h("vid.height", 800),
+	window_fullscreen("vid.fullscreen", 0),
+	host_port("net.hostport", DEFAULT_SERVER_PORT)
+{
+
+}
 
 void Game_Engine::init()
 {
@@ -1043,30 +1148,13 @@ void Game_Engine::init()
 	is_host = false;
 	sv = new Server;
 	cl = new Client;
-	cfg.set_unknown_variables = true;
+	
+	Cmd_Manager::get()->set_set_unknown_variables(true);
 
-	// config vars
-	window_w			= cfg.get_var("window_w", "1200", true);
-	window_h			= cfg.get_var("window_h", "800", true);
-	window_fullscreen	= cfg.get_var("window_fullscreen", "0", true);
-	host_port			= cfg.get_var("host_port", std::to_string(DEFAULT_SERVER_PORT).c_str());
-
-	// engine commands
-	cfg.set_command("connect", cmd_client_connect);
-	cfg.set_command("reconnect", cmd_client_reconnect);
-	cfg.set_command("disconnect", cmd_client_disconnect);
-	cfg.set_command("map", cmd_load_map);
-	cfg.set_command("sv_end", cmd_server_end);
-	cfg.set_command("bind", cmd_bind);
-	cfg.set_command("quit", cmd_quit);
-	cfg.set_command("counter", cmd_debug_counter);
-	cfg.set_command("net_stat", cmd_print_client_net_stats);
-	cfg.set_command("cl_full_update", cmd_client_force_update);
-	cfg.set_command("print_ents", cmd_print_entities);
-	cfg.set_command("print_vars", cmd_print_vars);
-	cfg.set_command("exec", cmd_exec_file);
-	cfg.set_command("reload_shaders", cmd_reload_shaders);
-	cfg.set_command("reload_mats", cmd_reload_materials);
+	// hook debug menus
+	Debug_Interface::get()->add_hook("Movement Vars", move_variables_menu);
+	Debug_Interface::get()->add_hook("Wind Vars", draw_wind_menu);
+	Debug_Interface::get()->add_hook("Player vars", menu_playervars);
 
 	// engine initilization
 	float start = GetTime();
@@ -1103,10 +1191,15 @@ void Game_Engine::init()
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
+	ImGui::GetIO().Fonts->AddFontFromFileTTF("./Data/Inconsolata-Bold.ttf", 14.0);
+	ImGui::GetIO().Fonts->Build();
 
+	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
+	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
+
+	
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
-	std::vector<string> buffered_commands;
 	for (int i = 1; i < argc; i++)
 	{
 		if (strcmp(argv[i], "-x") == 0) {
@@ -1116,10 +1209,10 @@ void Game_Engine::init()
 			starty = atoi(argv[++i]);
 		}
 		else if (strcmp(argv[i], "-w") == 0) {
-			cfg.set_var("window_w", argv[++i]);
+			window_w.integer() = atoi(argv[++i]);
 		}
 		else if (strcmp(argv[i], "-h") == 0) {
-			cfg.set_var("window_h", argv[++i]);
+			window_h.integer() = atoi(argv[++i]);
 		}
 		else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			SDL_SetWindowTitle(window, "CsRemake - VISUAL STUDIO\n");
@@ -1133,20 +1226,18 @@ void Game_Engine::init()
 				cmd += ' ';
 				cmd += argv[i++];
 			}
-			buffered_commands.push_back(cmd);
+
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
 	}
 
-	cfg.execute_file("vars.txt");	// load config vars
-	cfg.execute_file("init.txt");	// load startup script
 
 	SDL_SetWindowPosition(window, startx, starty);
-	SDL_SetWindowSize(window, window_w->integer, window_h->integer);
-	for (const auto& cmd : buffered_commands)
-		cfg.execute(cmd);
+	SDL_SetWindowSize(window, window_w.integer(), window_h.integer());
 	TIMESTAMP("cfg exectute");
 
-	cfg.set_unknown_variables = false;
+
+	Cmd_Manager::get()->set_set_unknown_variables(false);
 }
 
 
@@ -1261,15 +1352,15 @@ void Game_Engine::loop()
 		draw_screen();
 
 		static float next_print = 0;
-		Config_Var* print_fps = cfg.get_var("print_fps", "0");
-		if (next_print <= 0 && print_fps->integer) {
+		static Auto_Config_Var print_fps("dbg.print_fps", 0);
+		if (next_print <= 0 && print_fps.integer()) {
 			next_print += 2.0;
 			sys_print("fps %f", 1.0 / engine.frame_time);
 		}
-		else if (print_fps->integer)
+		else if (print_fps.integer())
 			next_print -= engine.frame_time;
 
-		Profilier::get_instance().end_frame_tick();
+		Profiler::get_instance()->end_frame_tick();
 
 		if (pending_state) {
 			pending_state = false;
@@ -1296,8 +1387,8 @@ void Game_Engine::pre_render_update()
 			if (!get_ent(i).active()) continue;
 			auto& e = get_ent(i);
 			e.using_interpolated_pos_and_rot = true;	// FIXME
-			static Config_Var* use_sv_interp = cfg.get_var("sv.use_interp","1");
-			if (e.last[0].used && use_sv_interp->integer) {
+			static Auto_Config_Var use_sv_interp("sv.useinterp", 0);
+			if (e.last[0].used && use_sv_interp.integer()) {
 				e.local_sv_interpolated_pos = e.last[0].o;
 				e.local_sv_interpolated_rot = e.last[0].r;
 			}
@@ -1329,7 +1420,7 @@ void Game_Engine::pre_render_update()
 
 int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 {
-	Debug_Console* console = (Debug_Console*)data->UserData;
+	Debug_Console_Impl* console = (Debug_Console_Impl*)data->UserData;
 	if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
 		if (data->EventKey == ImGuiKey_UpArrow) {
 			if (console->history_index == -1) {
@@ -1358,11 +1449,11 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-void Debug_Console::draw()
+void Debug_Console_Impl::draw()
 {
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin("Console")) {
-		ImGui::End();
+	if (!ImGui::BeginChild("Console")) {
+		ImGui::EndChild();
 		return;
 	}
 	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
@@ -1402,7 +1493,9 @@ void Debug_Console::draw()
 		char* s = input_buffer;
 		if (s[0]) {
 			print("#%s", input_buffer);
-			cfg.execute(input_buffer);
+
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, input_buffer);
+
 			history.push_back(input_buffer);
 			scroll_to_bottom = true;
 
@@ -1417,9 +1510,9 @@ void Debug_Console::draw()
 	if (reclaim_focus)
 		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
 
-	ImGui::End();
+	ImGui::EndChild();
 }
-void Debug_Console::print_args(const char* fmt, va_list args)
+void Debug_Console_Impl::print_args(const char* fmt, va_list args)
 {
 	if (lines.size() > 1000)
 		lines.clear();
@@ -1430,7 +1523,7 @@ void Debug_Console::print_args(const char* fmt, va_list args)
 	lines.push_back(buf);
 }
 
-void Debug_Console::print(const char* fmt, ...)
+void Debug_Console_Impl::print(const char* fmt, ...)
 {
 	char buf[1024];
 	va_list args;

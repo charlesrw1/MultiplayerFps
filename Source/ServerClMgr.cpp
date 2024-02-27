@@ -117,7 +117,7 @@ void RemoteClient::Update()
 	if (next_snapshot_time > 0.f)
 		return;
 
-	next_snapshot_time += (1.0 / myserver->snapshot_rate->real);
+	next_snapshot_time += (1.0 / myserver->snapshot_rate.real());
 
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
@@ -126,8 +126,9 @@ void RemoteClient::Update()
 	writer.WriteLong(engine.tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
-	static Config_Var* never_delta = cfg.get_var("sv_never_delta", "0");
-	int delta_frame = (never_delta->integer) ? -1 : baseline;
+	static Auto_Config_Var never_delta("sv.never_delta", 0);
+
+	int delta_frame = (never_delta.integer()) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
 	Entity& e = engine.get_ent(client_num);

@@ -236,5 +236,11 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h">
       <Filter>Source Files\External</Filter>
     </ClInclude>
+    <ClInclude Include="Source\StringUtil.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\StackString.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

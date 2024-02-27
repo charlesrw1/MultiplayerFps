@@ -442,23 +442,23 @@ void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 	}
 }
 
+static Auto_Config_Var grenade_radius("game.gren_rad", 0.25f);
+static Auto_Config_Var grenade_slide("game.gren_slide", 0);
+static Auto_Config_Var grenade_vel("game.gren_vel", 18.f);
+
 Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 {
-	static Config_Var* grenade_radius = cfg.get_var("game/grenade_radius", "0.25f");
-	static Config_Var* grenade_slide = cfg.get_var("game/grenade_slide", "0");
-	static Config_Var* grenade_vel = cfg.get_var("game/grenade_vel", "18.0");
-
 	ASSERT(thrower);
 	Entity* e = engine.new_entity();
 	e->type = ET_GRENADE;
 	e->set_model("grenade_he.glb");
 	e->owner_index = thrower->index;
 	e->position = org;
-	e->velocity = direction * grenade_vel->real;
-	e->flags = grenade_slide->integer ? EF_SLIDE : EF_BOUNCE;
+	e->velocity = direction * grenade_vel.real();
+	e->flags = grenade_slide.integer() ? EF_SLIDE : EF_BOUNCE;
 	e->timer = 5.f;
 	e->physics = EPHYS_GRAVITY;
-	e->col_radius = grenade_radius->real;
+	e->col_radius = grenade_radius.real();
 	e->hit_wall = grenade_hit_wall;
 	e->update = grenade_update;
 	return e;

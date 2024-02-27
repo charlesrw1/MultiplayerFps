@@ -37,11 +37,6 @@ static float max_air_speed = 2;
 
 void move_variables_menu()
 {
-	if (!ImGui::Begin("Move Vars")) {
-		ImGui::End();
-		return;
-	}
-
 	ImGui::SliderFloat("ground_friction", &ground_friction, 0, 20);
 	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
 	ImGui::SliderFloat("ground_accel", &ground_accel, 1, 10);
@@ -49,9 +44,6 @@ void move_variables_menu()
 	ImGui::SliderFloat("max_ground_speed", &max_ground_speed, 2, 20);
 	ImGui::SliderFloat("max_air_speed", &max_air_speed, 0, 10);
 	ImGui::SliderFloat("jumpimpulse", &jumpimpulse, 0, 20);
-
-
-	ImGui::End();
 }
 
 using glm::vec3;
@@ -110,13 +102,15 @@ bool item_state_changed = false;
 bool finished = false;
 bool force_animation = false;
 
+static Auto_Config_Var min_stair("phys.min_stair", 0.25f);
+static Auto_Config_Var max_stair("phys.max_stair", 0.5f);
+static Auto_Config_Var stair_rad("phys.stair_radius", 0.01f);
+static Auto_Config_Var phys_gravity("phys.gravity", 16.f);
+static Auto_Config_Var debug_fly("dbg.fly", 0, 0,"Let player fly around");
+
 // hacky way to move up stairs
 void check_perch(Entity& player, bool& dont_add_grav)
 {
-	static Config_Var* min_stair = cfg.get_var("phys/min_stair", "0.25");
-	static Config_Var* max_stair = cfg.get_var("phys/max_stair", "0.5");
-	static Config_Var* stair_rad = cfg.get_var("phys/stair_radius", "0.01");
-
 	dont_add_grav = false;
 
 	glm::vec2 dirs[8] = { vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1),
@@ -124,7 +118,7 @@ void check_perch(Entity& player, bool& dont_add_grav)
 	for (int i = 0; i < 8; i++) {
 		float height = CHAR_HITBOX_RADIUS;
 		Ray ray;
-		ray.pos = player.position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad->real) + vec3(0, height, 0);
+		ray.pos = player.position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad.real()) + vec3(0, height, 0);
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
@@ -132,7 +126,7 @@ void check_perch(Entity& player, bool& dont_add_grav)
 
 		// perched on ledge
 		if (rh.hit_world) {
-			if (((height - rh.dist) >= min_stair->real) && (height - rh.dist) <= max_stair->real && rh.normal.y > 0.98) {
+			if (((height - rh.dist) >= min_stair.real()) && (height - rh.dist) <= max_stair.real() && rh.normal.y > 0.98) {
 				player.position.y = player.position.y + (height - rh.dist);
 				player.state |= PMS_GROUND;
 				player.state &= ~PMS_JUMPING;
@@ -341,14 +335,10 @@ void player_physics_ground_move(Entity& player, Move_Command command, bool dont_
 		xz_velocity = vec3(0);
 	player.velocity = vec3(xz_velocity.x, player.velocity.y, xz_velocity.z);
 
-	static Config_Var* phys_gravity = cfg.get_var("phys/gravity", "16.0");
-
-
 	if (!dont_add_grav) {
-		player.velocity.y -= phys_gravity->real * engine.tick_interval;
+		player.velocity.y -= phys_gravity.real() * engine.tick_interval;
 	}
 	
-	static Config_Var* phys_stair = cfg.get_var("phys/stair", "0.5");
 
 	player_physics_move(player);
 
@@ -377,7 +367,6 @@ void player_physics_check_nans(Entity& player)
 
 void player_physics_update(Entity* p, Move_Command command)
 {
-	static Config_Var* debug_fly = cfg.get_var("dbgfly", "0");
 
 	if (p->flags & EF_DEAD) {
 		command.forward_move = 0;
@@ -405,7 +394,7 @@ void player_physics_update(Entity* p, Move_Command command)
 
 	bool dont_add_grav = false;
 	check_ground_state(*p, command,dont_add_grav);
-	if (engine.is_host && debug_fly->integer) {
+	if (engine.is_host && debug_fly.integer()) {
 		p->state = PMS_JUMPING;
 
 		vec2 inputvec = vec2(command.forward_move, command.lateral_move);
@@ -488,9 +477,7 @@ void player_animation_update(Entity* ent)
 	// shooting, reloading, etc.
 	if (set_legs) {
 
-		static Config_Var* anim_blend_running = cfg.get_var("abr", "0.15");
-
-		ent->anim.set_leg_anim(next_leg_anim, false, anim_blend_running->real);
+		ent->anim.set_leg_anim(next_leg_anim, false, 0.15);
 		ent->anim.legs.loop = loop_legs;
 		ent->anim.legs.speed = leg_speed;
 	}
@@ -552,7 +539,6 @@ void change_to_item(Entity& p, int next_item)
 
 void player_item_update(Entity* p, Move_Command command, bool is_local)
 {
-	static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
 	Game_Inventory& inv = p->inv;
 	bool is_simulated_client = !engine.is_host;
 

@@ -203,6 +203,8 @@ public:
 class Renderer
 {
 public:
+	Renderer();
+
 	void Init();
 	void FrameDraw();
 
@@ -301,15 +303,16 @@ public:
 	View_Setup lastframe_vs;
 
 	// graphics_settings
-	Config_Var* r_draw_collision_tris;
-	Config_Var* r_draw_sv_colliders;
-	Config_Var* r_draw_viewmodel;
-	Config_Var* vsync;
-	Config_Var* r_shadow_quality;
-	Config_Var* r_bloom;
-	Config_Var* r_volumetric_fog;
-	Config_Var* r_ssao;
-	Config_Var* r_halfres_reflections;
+	
+	Auto_Config_Var draw_collision_tris;
+	Auto_Config_Var draw_sv_colliders;
+	Auto_Config_Var draw_viewmodel;
+	Auto_Config_Var enable_vsync;
+	Auto_Config_Var shadow_quality_setting;
+	Auto_Config_Var enable_bloom;
+	Auto_Config_Var enable_volumetric_fog;
+	Auto_Config_Var enable_ssao;
+	Auto_Config_Var use_halfres_reflections;
 
 
 	void bind_texture(int bind, int id);

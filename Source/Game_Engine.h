@@ -24,14 +24,16 @@ public:
 class Game_Local
 {
 public:
+	Game_Local();
+
 	void init();
 	void update_view();
 	void update_viewmodel();
 
-	Config_Var* thirdperson_camera;
-	Config_Var* fov;
-	Config_Var* mouse_sensitivity;
-	Config_Var* fake_movement_debug;
+	Auto_Config_Var thirdperson_camera;
+	Auto_Config_Var fov;
+	Auto_Config_Var mouse_sensitivity;
+	Auto_Config_Var fake_movement_debug;
 
 	Particle_Manager pm;
 	vec3 view_angles;
@@ -58,19 +60,21 @@ public:
 	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
 };
 
+class Debug_Interface
+{
+public:
+	static Debug_Interface* get();
+
+	virtual void add_hook(const char* menu_name, void(*drawfunc)()) = 0;
+	virtual void draw() = 0;
+};
+
 class Debug_Console
 {
 public:
-	void draw();
-	void print(const char* fmt, ...);
-	void print_args(const char* fmt, va_list list);
-	vector<string> lines;
-	vector<string> history;
-	int history_index = -1;
-	bool auto_scroll = true;
-	bool scroll_to_bottom = false;
-	bool set_keyboard_focus = false;
-	char input_buffer[256];
+	static Debug_Console* get();
+	virtual void print(const char* fmt, ...) = 0;
+	virtual void print_args(const char* fmt, va_list list) = 0;
 };
 
 enum Engine_State
@@ -85,6 +89,8 @@ class Client;
 class Game_Engine
 {
 public:
+	Game_Engine();
+
 	void init();
 	void cleanup();
 
@@ -144,11 +150,10 @@ public:
 	ImGuiContext* imgui_context;
 	SDL_Window* window;
 	SDL_GLContext gl_context;
-	Config_Var* window_w;
-	Config_Var* window_h;
-	Config_Var* window_fullscreen;
-	Config_Var* host_port;
-	Debug_Console console;
+	Auto_Config_Var window_w;
+	Auto_Config_Var window_h;
+	Auto_Config_Var window_fullscreen;
+	Auto_Config_Var host_port;
 	bool show_console = false;
 
 	bool dedicated_server = false;

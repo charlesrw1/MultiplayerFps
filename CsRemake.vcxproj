@@ -78,6 +78,8 @@
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\Profilier.h" />
+    <ClInclude Include="Source\StackString.h" />
+    <ClInclude Include="Source\StringUtil.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\MoveCommand.h" />
     <ClInclude Include="Source\Bytepacker.h" />

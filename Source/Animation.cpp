@@ -338,9 +338,9 @@ void Animator::SetupBones()
 	if (legs.blend_anim < 0 || legs.blend_anim >= model->animations->clips.size())
 		legs.blend_anim = -1;
 	
-	static Config_Var* disable_blend = cfg.get_var("disable_blend", "0");
-	if(disable_blend->integer)
-		m.blend_anim = legs.blend_anim = -1;
+	//static Config_Var* disable_blend = cfg.get_var("disable_blend", "0");
+	//if(disable_blend->integer)
+	//	m.blend_anim = legs.blend_anim = -1;
 
 	// Just t-pose if no proper animations
 	if (m.anim == -1)

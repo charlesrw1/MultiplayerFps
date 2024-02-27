@@ -8,17 +8,24 @@
 
 //#define DebugOut(fmt, ...)
 
+Client::Client() :
+	interp_time("cl.interp", 0.1f, 0, "Interpolation time"),
+	fake_lag("cl.fake_lag", 0, (int)CVar_Flags::INTEGER, "Amount of fake lag in ms(int)"),
+	fake_loss("cl.fake_loss", 0, (int)CVar_Flags::INTEGER, "Amount of fake loss % (int"),
+	time_out("cl.timeout", 5.f),
+	interpolate("cl.do_interp", 1),
+	smooth_error_time("cl.smooth_error", 1.f),
+	predict("cl.predict", 1),
+	dont_replicate_player("cl.dont_rep_player", 0),
+	time_reset_threshold("cl.time_reset", 0.1f),
+	do_adjust_time("cl.do_adjust_time", 1),
+	max_adjust_time("cl.max_adjust", 1.f)
+{
+
+}
+
 void Client::init()
 {
-	interp_time			= cfg.get_var("client/interp_time", "0.1");
-	fake_lag			= cfg.get_var("client/fake_lag", "0");
-	fake_loss			= cfg.get_var("client/fake_loss", "0");
-	time_out			= cfg.get_var("client/time_out", "5.f");
-	interpolate			= cfg.get_var("client/interpolate", "1");
-	smooth_error_time	= cfg.get_var("client/smooth_error", "1.0");
-	predict				= cfg.get_var("client/predict", "1");
-	dont_replicate_player = cfg.get_var("client/dont_replicate_player", "0");
-	time_reset_threshold = cfg.get_var("client/time_reset_threshold", "0.1");
 	sock.Init(0);
 }
 
@@ -122,7 +129,7 @@ void Client::run_prediction()
 	if (get_state() != CS_SPAWNED)
 		return;
 
-	if (!predict->integer)
+	if (!predict.integer())
 		return;
 
 	// predict commands from outgoing ack'ed to current outgoing
@@ -138,7 +145,7 @@ void Client::run_prediction()
 	Frame* auth = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
 	Entity& player = engine.local_player();
 	
-	if (dont_replicate_player->integer)
+	if (dont_replicate_player.integer())
 		start = end - 2;	// only sim current frame
 	else if (auth->player_offset == -1) {
 		sys_print("player state not in packet?, skipping prediction\n");
@@ -254,22 +261,22 @@ void set_entity_interp_vars(Entity& e, Interp_Entry& ie)
 
 void Client::interpolate_states()
 {
-	static Config_Var* dbg_print = cfg.get_var("dbg_i_state", "0");
+	static Auto_Config_Var dbg_print("dbg.print_interp_state", 0);
 
-	if (!interpolate->integer)
+	if (!interpolate.integer())
 		return;
 
 	auto& cl = engine.cl;
 	// FIXME
-	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->interp_time->real);
+	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->interp_time.real());
 	
 	// interpolate local player error
-	if (smooth_time > 0 && dont_replicate_player->integer == 0) {
-		if (smooth_time == smooth_error_time->real)
+	if (smooth_time > 0 && dont_replicate_player.integer() == 0) {
+		if (smooth_time == smooth_error_time.real())
 			sys_print("starting smooth\n");
 
 		vec3 delta = engine.local_player().position - last_origin;
-		vec3 new_position = last_origin + delta * (1 - (smooth_time / smooth_error_time->real));
+		vec3 new_position = last_origin + delta * (1 - (smooth_time / smooth_error_time.real()));
 		engine.local_player().position = new_position;
 		smooth_time -= engine.frame_time;
 
@@ -310,7 +317,7 @@ void Client::interpolate_states()
 
 		// could extrpolate here, or just set it to last state
 		if (entry_index == 0 || entry_index == Entity_Interp::HIST_SIZE) {
-			if (dbg_print->integer)
+			if (dbg_print.integer())
 				sys_print("using last state\n");
 			set_entity_interp_vars(ent, *ce.GetLastState());
 			continue;
@@ -320,18 +327,18 @@ void Client::interpolate_states()
 		Interp_Entry* s2 = ce.GetStateFromIndex(last_entry - entry_index + 1);
 
 		if (s1->tick == -1 && s2->tick == -1) {
-			if (dbg_print->integer)
+			if (dbg_print.integer())
 				sys_print("no state\n");
 			continue;
 		}
 		else if (s1->tick == -1) {
-			if (dbg_print->integer)
+			if (dbg_print.integer())
 				sys_print("no start state\n");
 			set_entity_interp_vars(ent, *s2);
 			continue;
 		}
 		else if (s2->tick == -1 || s2->tick <= s1->tick) {
-			if (dbg_print->integer)
+			if (dbg_print.integer())
 				sys_print("no end state\n");
 			set_entity_interp_vars(ent, *s1);
 			continue;
@@ -342,7 +349,7 @@ void Client::interpolate_states()
 
 		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*engine.tick_interval)) {
 			set_entity_interp_vars(ent, *s1);
-			if (dbg_print->integer)
+			if (dbg_print.integer())
 				sys_print("teleport\n");
 			continue;
 		}
@@ -373,14 +380,11 @@ Frame* Client::FindSnapshotForTick(int tick)
 // will add/subtract a small value to adjust the number of ticks running
 float Client::adjust_time_step(int ticks_runnning)
 {
-	static Config_Var* cl_adjust_time = cfg.get_var("cl_adjust_time", "1");
-	static Config_Var* cl_time_adjust = cfg.get_var("cl_max_adjust", "1");
-
-	if (!cl_adjust_time->integer)
+	if (!do_adjust_time.integer())
 		return 0.f;
 
 	float adjust_total = 0.f;
-	float max_time_adjust = cl_time_adjust->real / 1000.f;
+	float max_time_adjust = max_adjust_time.real() / 1000.f;
 	
 	for (int i = 0; i < ticks_runnning; i++) {
 		if (abs(time_delta) < 0.0001)
@@ -399,11 +403,12 @@ float Client::adjust_time_step(int ticks_runnning)
 		}
 	}
 
-	static Config_Var* dbg_adjust_neg = cfg.get_var("dbg_aj_t_neg", "1");
-	if (dbg_adjust_neg->integer)
-		return -adjust_total;
-	else
-		return adjust_total;
+	//static Config_Var* dbg_adjust_neg = cfg.get_var("dbg_aj_t_neg", "1");
+	//if (dbg_adjust_neg.integer())
+	//	return -adjust_total;
+	//else
+	//	return adjust_total;
+	return -adjust_total;
 }
 
 void Client::read_snapshot(Frame* snapshot)
@@ -437,7 +442,7 @@ void Client::read_snapshot(Frame* snapshot)
 		// FIXME check for teleport
 		float len = glm::length(delta);
 		if (len > 0.05 && len < 10 && smooth_time <= 0.0)
-			smooth_time = smooth_error_time->real;
+			smooth_time = smooth_error_time.real();
 	}
 
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet

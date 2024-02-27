@@ -157,7 +157,6 @@ Particle* Particle_Manager::new_particle()
 
 void Particle_Manager::add_blood_effect(glm::vec3 org, glm::vec3 normal)
 {
-	static Config_Var* blood_grav = cfg.get_var("particle/grav", "-10.0");
 
 	glm::vec3 up = cross(normal, (normal.y>0.999)?vec3(1,0,0): vec3(0, 1, 0));
 	glm::vec3 side = cross(normal, up);
@@ -172,7 +171,7 @@ void Particle_Manager::add_blood_effect(glm::vec3 org, glm::vec3 normal)
 		Particle* p = new_particle();
 		p->sprite = BLOODSMALL;
 		p->color_start = { 143,5,5,255 };
-		p->gravity = blood_grav->real;
+		p->gravity = -10.f;
 		p->life_start = get_time();
 		p->life_end = get_time() + 1.5;
 		p->friction = 0.5;

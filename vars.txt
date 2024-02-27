@@ -4,7 +4,7 @@ bind R "thirdperson_camera 0"
 bind 1 "map Map0"
 bind 2 "connect localhost"
 bind 3 "disconnect"
-bind 4 "sv_end"
+bind 4 "sv.end"
 bind 5 "reconnect"
 bind Z reload_shaders
 
@@ -13,17 +13,17 @@ bind 7 "fake_movement_debug 1"
 bind 8 "fake_movement_debug 2"
 
 #net vars
-server/tick_rate 66.0
-server/snapshot_rate 30.0
-client/interp_time 0.07
-client/fake_lag 50
-client/fake_loss 0
+sv.tick_rate 66.0
+sv.snapshot_rate 30.0
+cl.interp 0.07
+cl.fake_lag 50
+cl.fake_loss 0
 
 #render vars
-draw_collision_tris 0
-draw_sv_colliders 0
-draw_viewmodel 1
+gpu.draw_collision_tris 0
+gpu.draw_sv_colliders 0
+gpu.draw_viewmodel 1
 
 #game vars
-mouse_sensitivity 0.005
+view.sens 0.005
 

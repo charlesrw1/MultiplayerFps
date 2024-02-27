@@ -19,9 +19,9 @@ in mat3 FS_IN_TBN;
 
 uniform sampler2D basecolor;		// scene reflected color
 uniform sampler2D basecolor2;		// scene main view depth
-uniform sampler2D normalmap;
+uniform sampler2D normalmap;		// normalmap for water
+uniform sampler2D special;			// scene reflected depth, for making sure reflection is valid
 uniform sampler2D auxcolor2;
-uniform sampler2D special;
 
 uniform samplerCubeArray pbr_irradiance_cubemaps;
 uniform samplerCubeArray pbr_specular_cubemaps;
@@ -403,7 +403,9 @@ void main()
 	
 	
 	vec2 dudv_offset =get_dudv_offset(FS_IN_FragPos, 0.1, 0.1, -0.5)*2.0-1.0;
-	dudv_offset*=0.03;
+	dudv_offset += get_dudv_offset(FS_IN_FragPos, 0.1, 0.14, -4)*2.0-1.0;
+	
+	dudv_offset*=0.02;
 
 	
 
@@ -415,6 +417,7 @@ void main()
 	vec2 water_coord = NDC.xy * 0.5 + 0.5;
 	float lineardepth = linearize_depth(texture(basecolor2, water_coord).r,g.near,g.far);
 	water_coord.y = 1.0 - water_coord.y;
+	
 	vec4 reflected_color = texture(basecolor, water_coord+dudv_offset);
 	float depth_dist = pow((abs(distance_of_this_coord-lineardepth)/g.far)*10.0,0.2);
 	depth_dist = clamp(depth_dist,0,1);

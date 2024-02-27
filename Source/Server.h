@@ -71,6 +71,8 @@ public:
 class Server
 {
 public:
+	Server();
+
 	static const int MAX_FRAME_HIST = 32;
 	void init();	// called on engine startup
 	void start();
@@ -97,10 +99,9 @@ public:
 	Socket socket;
 
 	// CONFIG VARS
-	Config_Var* snapshot_rate;
-	Config_Var* tick_rate;
-	Config_Var* max_time_out;
-	Config_Var* host_port;
+	Auto_Config_Var snapshot_rate;
+	Auto_Config_Var tick_rate;
+	Auto_Config_Var max_time_out;
 
 private:
 	int FindClient(IPAndPort addr) const;

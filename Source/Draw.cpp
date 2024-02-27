@@ -623,10 +623,13 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 
 void Shadow_Map_System::update()
 {
-	if (draw.r_shadow_quality->integer < 0) cfg.set_var("r_shadow_quality", "0");
-	else if (draw.r_shadow_quality->integer > 3) cfg.set_var("r_shadow_quality", "3");
-	if (quality != draw.r_shadow_quality->integer) {
-		quality = draw.r_shadow_quality->integer;
+	int setting = draw.shadow_quality_setting.integer();
+	if (setting < 0) setting = 0;
+	else if (setting > 3) setting = 3;
+	draw.shadow_quality_setting.integer() = setting;
+
+	if (quality != setting) {
+		quality = setting;
 		targets_dirty = true;
 	}
 
@@ -859,7 +862,7 @@ void Volumetric_Fog_System::init()
 
 void Volumetric_Fog_System::compute()
 {
-	if (!draw.r_volumetric_fog->integer)
+	if (!draw.enable_volumetric_fog.integer())
 		return;
 
 	GPUFUNCTIONSTART;
@@ -932,8 +935,8 @@ void Volumetric_Fog_System::compute()
 		glCheckError();
 
 	}
-	static Config_Var* fog_raymarch = cfg.get_var("dbg/raymarch", "1");
-	if (fog_raymarch->integer) {
+	//static Config_Var* fog_raymarch = cfg.get_var("dbg/raymarch", "1");
+	if (1) {
 		raymarch.use();
 		raymarch.set_float("znear", draw.vs.near);
 		raymarch.set_float("zfar", draw.vs.far);
@@ -953,6 +956,20 @@ void Volumetric_Fog_System::compute()
 
 
 	temporal_sequence = (temporal_sequence + 1) % 16;
+}
+
+Renderer::Renderer()
+	: draw_collision_tris("gpu.draw_collision_tris", 0),
+	draw_sv_colliders("gpu.draw_colliders",0),
+	draw_viewmodel("gpu.draw_viewmodel", 0),
+	enable_vsync("gpu.vsync",0),
+	enable_bloom("gpu.bloom",1),
+	shadow_quality_setting("gpu.shadow_quality",1, (int)CVar_Flags::INTEGER),
+	enable_volumetric_fog("gpu.volfog",1),
+	enable_ssao("gpu.ssao",1),
+	use_halfres_reflections("gpu.halfreswater",1)
+{
+
 }
 
 void Renderer::Init()
@@ -1009,16 +1026,6 @@ void Renderer::Init()
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	r_draw_collision_tris = cfg.get_var("draw_collision_tris", "0");
-	r_draw_sv_colliders = cfg.get_var("draw_sv_colliders", "0");
-	r_draw_viewmodel = cfg.get_var("draw_viewmodel", "1");
-	vsync = cfg.get_var("vsync", "1");
-	r_bloom = cfg.get_var("r_bloom", "1");
-	r_shadow_quality = cfg.get_var("r_shadow_quality", "1");
-	r_volumetric_fog = cfg.get_var("r_volumetric_fog", "1");
-	r_ssao = cfg.get_var("r_ssao", "1");
-	r_halfres_reflections = cfg.get_var("r_halfres_reflection", "1");
-
 	glGenBuffers(1, &ubo.current_frame);
 
 	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
@@ -1041,8 +1048,8 @@ void Renderer::Init()
 
 void Renderer::InitFramebuffers()
 {
-	const int s_w = engine.window_w->integer;
-	const int s_h = engine.window_h->integer;
+	const int s_w = engine.window_w.integer();
+	const int s_h = engine.window_h.integer();
 
 	glDeleteTextures(1, &tex.scene_color);
 	glGenTextures(1, &tex.scene_color);
@@ -1082,7 +1089,7 @@ void Renderer::InitFramebuffers()
 	glGenTextures(1, &tex.reflected_color);
 	glBindTexture(GL_TEXTURE_2D, tex.reflected_color);
 	ivec2 reflect_size = ivec2(s_w, s_h);
-	if (r_halfres_reflections->integer) reflect_size /= 2;
+	if (use_halfres_reflections.integer()) reflect_size /= 2;
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, reflect_size.x, reflect_size.y, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -1160,7 +1167,7 @@ void Renderer::render_bloom_chain()
 {
 	GPUFUNCTIONSTART;
 
-	if (!r_bloom->integer)
+	if (!enable_bloom.integer())
 		return;
 
 
@@ -1233,10 +1240,6 @@ void Renderer::render_bloom_chain()
 
 void Renderer::DrawSkybox()
 {
-	static Config_Var* draw_skybox = cfg.get_var("r_skybox", "1");
-	if (!draw_skybox->integer)
-		return;
-
 	MeshBuilder mb;
 	mb.Begin();
 	mb.PushSolidBox(-vec3(1), vec3(1), COLOR_WHITE);
@@ -1270,8 +1273,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	if (params.is_probe_render)
 		using_skybox_for_specular = true;
 
-	static Config_Var* upload_ubo = cfg.get_var("dbg/uubo", "1");
-	if (upload_ubo->integer) {
+	if (1) {
 		uint32_t view_ubo = params.provied_constant_buffer;
 		bool upload = params.upload_constants;
 		if (params.provied_constant_buffer == 0) {
@@ -1430,7 +1432,7 @@ void Renderer::FrameDraw()
 	cur_shader = 0;
 	for (int i = 0; i < NUM_SAMPLERS; i++)
 		cur_tex[i] = 0;
-	if (cur_w != engine.window_w->integer || cur_h != engine.window_h->integer)
+	if (cur_w != engine.window_w.integer() || cur_h != engine.window_h.integer())
 		InitFramebuffers();
 	lastframe_vs = current_frame_main_view;
 	current_frame_main_view = engine.local.last_view;
@@ -1459,7 +1461,7 @@ void Renderer::FrameDraw()
 	}
 
 	// render ssao using prepass buffer
-	if (r_ssao->integer)
+	if (enable_ssao.integer())
 		ssao.render();
 
 	// planar reflection render
@@ -1523,7 +1525,7 @@ void Renderer::FrameDraw()
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
-	if (!r_bloom->integer) bloom_tex = black_texture;
+	if (!enable_bloom.integer()) bloom_tex = black_texture;
 	bind_texture(0, tex.scene_color);
 	bind_texture(1, bloom_tex);
 	bind_texture(2, lens_dirt->gl_id);
@@ -1532,7 +1534,7 @@ void Renderer::FrameDraw()
 	glEnable(GL_CULL_FACE);
 
 	mb.Begin();
-	if (r_draw_sv_colliders->integer == 1) {
+	if (draw_sv_colliders.integer()) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
 			if (engine.ents[i].type == ET_PLAYER) {
 				AddPlayerDebugCapsule(engine.ents[i], &mb, COLOR_CYAN);
@@ -1545,7 +1547,7 @@ void Renderer::FrameDraw()
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
-	if (r_draw_collision_tris->integer)
+	if (draw_collision_tris.integer())
 		DrawCollisionWorld(engine.level);
 
 	mb.Draw(GL_LINES);
@@ -1727,7 +1729,7 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 		if (!ent.model)
 			continue;
 
-		if (i == engine.player_num() && !engine.local.thirdperson_camera->integer)
+		if (i == engine.player_num() && !engine.local.thirdperson_camera.integer())
 			continue;
 
 		mat4 model;
@@ -1744,8 +1746,6 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 		draw_model_real(ent.model, model, &ent, a, state);
 
 		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
-
-			static Config_Var* m24 = cfg.get_var("dbg_m24", "1");
 
 			Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
 
@@ -1823,6 +1823,7 @@ void Renderer::set_water_constants()
 	bind_texture(SAMPLER_BASE1, tex.reflected_color);
 	bind_texture(SAMPLER_BASE2, tex.scene_depthstencil);
 	bind_texture(SAMPLER_NORM1, waternormal->gl_id);
+	bind_texture(SAMPLER_SPECIAL, tex.reflected_depth);
 }
 
 void Renderer::DrawLevelDepth(const Render_Level_Params& params)
@@ -2169,7 +2170,7 @@ void Renderer::planar_reflection_pass()
 	setup.origin.y -= dist_to_plane * 2.0f;
 	setup.view = glm::lookAt(setup.origin, setup.origin + setup.front, glm::vec3(0, 1, 0));
 	setup.viewproj = setup.proj * setup.view;
-	if (r_halfres_reflections->integer) {
+	if (use_halfres_reflections.integer()) {
 		setup.width /= 2;
 		setup.height /= 2;
 	}
@@ -2224,7 +2225,7 @@ void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 
 void Renderer::DrawPlayerViewmodel(const Render_Level_Params& params)
 {
-	if (engine.local.thirdperson_camera->integer || r_draw_viewmodel->integer == 0)
+	if (engine.local.thirdperson_camera.integer() == 1 || draw_viewmodel.integer() == 0)
 		return;
 
 	mat4 invview = glm::inverse(vs.view);
@@ -2545,8 +2546,8 @@ void SSAO_System::make_render_targets()
 	glDeleteTextures(1, &fullres1);
 	glDeleteTextures(1, &fullres2);
 
-	width = engine.window_w->integer;
-	height = engine.window_h->integer;
+	width = engine.window_w.integer();
+	height = engine.window_h.integer();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
@@ -2590,7 +2591,7 @@ void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;
 
-	if (width != engine.window_w->integer || height != engine.window_h->integer)
+	if (width != engine.window_w.integer() || height != engine.window_h.integer())
 		make_render_targets();
 
 

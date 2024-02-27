@@ -7,8 +7,8 @@
 void Client::ReadPackets()
 {
 	// check cfg var updates
-	sock.loss = fake_loss->integer;
-	sock.lag = fake_lag->integer;
+	sock.loss = fake_loss.integer();
+	sock.lag = fake_lag.integer();
 	sock.jitter = 0;
 	sock.enabled = !(sock.loss == 0 && sock.lag == 0 && sock.jitter == 0);
 
@@ -72,7 +72,7 @@ void Client::ReadPackets()
 	}
 
 	if (state >= CS_CONNECTED) {
-		if (GetTime() - server.last_recieved > time_out->real) {
+		if (GetTime() - server.last_recieved > time_out.real()) {
 			Disconnect("server timed out");
 		}
 	}
@@ -126,7 +126,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 			time_delta = engine.time - server_time;
 
 			// hard reset the time values
-			if (abs(time_delta) > time_reset_threshold->real) {
+			if (abs(time_delta) > time_reset_threshold.real()) {
 				sys_print("reset time %f\n", time_delta);
 				engine.tick = server_tick;
 				engine.time = server_time;

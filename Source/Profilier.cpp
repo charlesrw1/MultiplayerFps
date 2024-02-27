@@ -3,16 +3,102 @@
 #include "imgui.h"
 #include <chrono>
 #include <SDL2/SDL.h>
+#include <vector>
+#include "Game_Engine.h"
 
 using std::chrono::steady_clock;
 using std::chrono::microseconds;
 
-Profilier::Profilier()
+
+struct Profile_Event
 {
-	intervalstart = SDL_GetPerformanceCounter();
+	const char* name = "";
+	bool enabled = false;
+	uint64_t last_interval_time_cpu = 0;
+	uint64_t cpustart = 0;
+	uint64_t cputime = 0;	// microseconds
+	uint32_t accumulated_cpu = 0;
+	bool started = false;
+
+	uint64_t last_interval_time_gpu = 0;
+	uint64_t gputime = 0;	// nanoseconds
+	uint32_t glquery[2];
+	uint32_t accumulated_gpu = 0;
+	bool waiting = false;
+
+	bool is_gpu_event = false;
+	int parent_event = -1;
+};
+
+
+class Profiler_Impl : public Profiler
+{
+public:
+	Profiler_Impl();
+
+	void start_scope(const char* name, bool include_gpu);
+	void end_scope(const char* name);
+	void end_frame_tick();
+
+	std::vector<Profile_Event> events;
+	std::vector<int> stack;
+
+	uint64_t intervalstart = 0;
+	int accumulated = 1;
+};
+
+
+Profiler* Profiler::get_instance() {
+	static Profiler_Impl inst;
+	return &inst;
 }
 
-void Profilier::end_frame_tick()
+// super not optimized lol
+static void draw_node_children(int index)
+{
+	Profiler_Impl* pi = (Profiler_Impl*)Profiler::get_instance();
+
+	Profile_Event& e = pi->events[index];
+	if (ImGui::TreeNodeEx(e.name, ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("CPU: %3.5f\n", e.last_interval_time_cpu / 1000.0);
+		if (e.is_gpu_event) {
+			ImGui::Text("GPU: %3.5f\n", e.last_interval_time_gpu / 1000000.0);
+		}
+
+		auto& events = pi->events;
+		for (int i = 0; i < events.size(); i++) {
+			if (events[i].parent_event == index) {
+				draw_node_children(i);
+			}
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+static void draw_imgui_profile_window()
+{
+	Profiler_Impl* pi = (Profiler_Impl*)Profiler::get_instance();
+	{
+		for (int i = 0; i < pi->events.size(); i++) {
+			if (pi->events[i].parent_event == -1) {
+				draw_node_children(i);
+			}
+		}
+	}
+}
+
+
+
+Profiler_Impl::Profiler_Impl()
+{
+	intervalstart = SDL_GetPerformanceCounter();
+
+	Debug_Interface::get()->add_hook("Profiling", draw_imgui_profile_window);
+
+}
+
+void Profiler_Impl::end_frame_tick()
 {
 	uint64_t timenow = SDL_GetPerformanceCounter();
 	if ((timenow - intervalstart) / (double)SDL_GetPerformanceFrequency() > 1.0) {
@@ -35,13 +121,8 @@ void Profilier::end_frame_tick()
 	}
 }
 
-Profilier& Profilier::get_instance()
-{
-	static Profilier instance = Profilier();
-	return instance;
-}
 
-void Profilier::start_scope(const char* name, bool gpu)
+void Profiler_Impl::start_scope(const char* name, bool gpu)
 {
 	int index = 0;
 	for (; index < events.size(); index++) {
@@ -75,7 +156,7 @@ void Profilier::start_scope(const char* name, bool gpu)
 	glCheckError();
 }
 
-void Profilier::end_scope(const char* name)
+void Profiler_Impl::end_scope(const char* name)
 {
 	int index = 0;
 	for (; index < events.size(); index++) {
@@ -114,37 +195,3 @@ void Profilier::end_scope(const char* name)
 
 	stack.pop_back();
 }
-#if 1
-// super not optimized lol
-static void draw_node_children(int index)
-{
-	Profile_Event& e = Profilier::get_instance().events[index];
-	if (ImGui::TreeNodeEx(e.name, ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::Text("CPU: %3.5f\n", e.last_interval_time_cpu/1000.0);
-		if (e.is_gpu_event) {
-			ImGui::Text("GPU: %3.5f\n", e.last_interval_time_gpu / 1000000.0);
-		}
-		
-		auto& events = Profilier::get_instance().events;
-		for (int i = 0; i < events.size(); i++) {
-			if (events[i].parent_event == index) {
-				draw_node_children(i);
-			}
-		}
-
-		ImGui::TreePop();
-	}
-}
-
-void Profilier::draw_imgui_window()
-{
-	if (ImGui::CollapsingHeader("Profiling"))
-	{
-		for (int i = 0; i < events.size(); i++) {
-			if (events[i].parent_event == -1) {
-				draw_node_children(i);
-			}
-		}
-	}
-}
-#endif
