@@ -634,7 +634,7 @@ IPLAPI void IPLCALL iplRadeonRaysDeviceRelease(IPLRadeonRaysDevice* device);
     \{
 */
 
-/** Application-wide state for the TrueAudio Next convolution engine. A TrueAudio Next device must be created
+/** Application-wide state for the TrueAudio Next convolution eng-> A TrueAudio Next device must be created
     before using any of Steam Audio's TrueAudio Next convolution functionality. In terms of the TrueAudio Next API,
     this object encapsulates an \c amf::TANContext and amf::TANConvolution object. */
 DECLARE_OPAQUE_HANDLE(IPLTrueAudioNextDevice);
@@ -1335,7 +1335,7 @@ IPLAPI void IPLCALL iplAudioBufferDownmix(IPLContext context, IPLAudioBuffer* in
     audio buffer.
 
     Steam Audio's "native" Ambisonic format is N3D, so for best performance, keep all
-    Ambisonic data in N3D format except when exchanging data with your audio engine.
+    Ambisonic data in N3D format except when exchanging data with your audio eng->
 
     \param  context     The context used to initialize Steam Audio.
     \param  inType      Ambisonic format of \c in.

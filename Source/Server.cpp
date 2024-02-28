@@ -42,7 +42,7 @@ void Server::init()
 		tick_rate.real() = 150.f;
 
 	// initialize tick_interval here
-	engine.tick_interval = 1.0 / tick_rate.real();
+	eng->tick_interval = 1.0 / tick_rate.real();
 }
 void Server::end(const char* log_reason)
 {
@@ -52,7 +52,7 @@ void Server::end(const char* log_reason)
 	socket.Shutdown();
 	initialized = false;
 
-	engine.set_state(ENGINE_MENU);
+	eng->set_state(ENGINE_MENU);
 }
 
 void Server::start()
@@ -65,13 +65,13 @@ void Server::start()
 
 	socket.Init(host_port);
 	initialized = true;
-	engine.tick_interval = 1.0 / tick_rate.real();
+	eng->tick_interval = 1.0 / tick_rate.real();
 }
 
 
 Frame* Server::GetSnapshotFrame()
 {
-	return &frames.at(engine.tick % MAX_FRAME_HIST);
+	return &frames.at(eng->tick % MAX_FRAME_HIST);
 }
 
 
@@ -90,7 +90,7 @@ void Server::connect_local_client()
 	clients[0].connection.Init(&socket, ip);
 	clients[0].local_client = true;
 
-	engine.make_client(0);
+	eng->make_client(0);
 }
 
 int Server::FindClient(IPAndPort addr) const {
@@ -133,8 +133,8 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
 	writer.write_string("accept");
 	writer.WriteByte(spot);
-	writer.write_string(engine.mapname);
-	writer.WriteLong(engine.tick);
+	writer.write_string(eng->mapname);
+	writer.WriteLong(eng->tick);
 	writer.WriteFloat(tick_rate.real());
 	writer.EndWrite();
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
@@ -144,7 +144,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 		new_client.init(addr);
 		new_client.state = SCS_SPAWNED;
 		sys_print("Spawning client %d : %s\n", spot, addr.ToString().c_str());
-		engine.make_client(spot);
+		eng->make_client(spot);
 	}
 }
 

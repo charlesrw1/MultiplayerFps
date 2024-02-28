@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
+    <ClCompile Include="Source\Archive.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
@@ -62,9 +63,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
+    <ClInclude Include="Source\Archive.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
     <ClInclude Include="Source\Draw.h" />
+    <ClInclude Include="Source\DynamicArray.h" />
     <ClInclude Include="Source\EnvProbe.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\KHR\khrplatform.h" />

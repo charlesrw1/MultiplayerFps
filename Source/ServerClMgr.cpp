@@ -37,7 +37,7 @@ void RemoteClient::Disconnect(const char* debug_reason)
 	sys_print("Disconnecting client %d because %s\n", client_num, debug_reason);
 
 	if (state == SCS_SPAWNED) {
-		engine.client_leave(client_num);
+		eng->client_leave(client_num);
 	}
 
 	uint8_t buffer[8];
@@ -80,11 +80,11 @@ bool RemoteClient::OnMoveCmd(ByteReader& msg)
 		printf("simming dropped %d cmds\n", commands_to_run - 1);
 	}
 
-	Entity& e = engine.get_ent(client_num);
+	Entity& e = eng->get_ent(client_num);
 	// FIXME: exploit to send inputs at increased rate
 	for (int i = commands_to_run - 1; i >= 0; i--) {
 		Move_Command c = commands[i];
-		engine.execute_player_move(client_num, c);
+		eng->execute_player_move(client_num, c);
 
 		e.add_to_last();
 	}
@@ -113,7 +113,7 @@ void RemoteClient::Update()
 		return;
 	}
 
-	next_snapshot_time -= engine.tick_interval;
+	next_snapshot_time -= eng->tick_interval;
 	if (next_snapshot_time > 0.f)
 		return;
 
@@ -123,7 +123,7 @@ void RemoteClient::Update()
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
 
 	writer.WriteByte(SV_TICK);
-	writer.WriteLong(engine.tick);
+	writer.WriteLong(eng->tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
 	static Auto_Config_Var never_delta("sv.never_delta", 0);
@@ -131,7 +131,7 @@ void RemoteClient::Update()
 	int delta_frame = (never_delta.integer()) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
-	Entity& e = engine.get_ent(client_num);
+	Entity& e = eng->get_ent(client_num);
 	if (e.force_angles == 1) {
 		writer.WriteByte(SV_UPDATE_VIEW);
 		writer.WriteVec3(e.diff_angles);
@@ -194,8 +194,8 @@ void new_entity_fields_test()
 		writer.WriteLong(CONNECTIONLESS_SEQUENCE);
 		writer.write_string("accept");
 		writer.WriteByte(10);
-		writer.write_string(engine.mapname);
-		writer.WriteLong(engine.tick);
+		writer.write_string(eng->mapname);
+		writer.WriteLong(eng->tick);
 		writer.WriteFloat(66.0);
 		writer.EndWrite();
 
@@ -290,12 +290,12 @@ void new_entity_fields_test()
 void Server::make_snapshot()
 {
 	Frame* f = GetSnapshotFrame();
-	f->tick = engine.tick;
+	f->tick = eng->tick;
 
 	ByteWriter writer(f->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 	f->num_ents_this_frame = 0;
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& e = engine.get_ent(i);
+		Entity& e = eng->get_ent(i);
 		if (!e.active())
 			continue;	// unactive ents dont go in snapshot
 		if (i >= MAX_CLIENTS && (!e.model || e.flags & EF_HIDDEN))

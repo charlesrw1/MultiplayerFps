@@ -122,7 +122,7 @@ void check_perch(Entity& player, bool& dont_add_grav)
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
-		rh = engine.phys.trace_ray(ray, player.index, PF_WORLD);
+		rh = eng->phys.trace_ray(ray, player.index, PF_WORLD);
 
 		// perched on ledge
 		if (rh.hit_world) {
@@ -156,7 +156,7 @@ void check_ground_state(Entity& player, Move_Command command, bool& dont_add_gra
 
 	GeomContact result;
 	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
-	result = engine.phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), player.index, PF_ALL);
+	result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), player.index, PF_ALL);
 
 	if (!result.found || result.surf_normal.y < 0.3)
 		player.state &= ~PMS_GROUND;
@@ -176,7 +176,7 @@ void check_ground_state(Entity& player, Move_Command command, bool& dont_add_gra
 		player.in_air_time = 0.f;
 	}
 	else if (command.first_sim)
-		player.in_air_time += engine.tick_interval;
+		player.in_air_time += eng->tick_interval;
 }
 
 void check_jump(Entity& player, Move_Command command)
@@ -226,7 +226,7 @@ void check_duck(Entity& player, Move_Command cmd)
 					Ray r;
 					r.pos = player.position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
 					r.dir = vec3(0, -1, 0);
-					auto tc = engine.phys.trace_ray(r, player.index, PF_ALL);
+					auto tc = eng->phys.trace_ray(r, player.index, PF_ALL);
 					if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
 						player.state &= ~PMS_CROUCHING;
 						player.position.y -= diff;
@@ -241,7 +241,7 @@ void check_duck(Entity& player, Move_Command cmd)
 GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
 {
 	float height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
-	return engine.phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
+	return eng->phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
 }
 
 void player_physics_move(Entity& player)
@@ -251,7 +251,7 @@ void player_physics_move(Entity& player)
 
 	int num_bumps = 4;
 
-	float move_time = engine.tick_interval;
+	float move_time = eng->tick_interval;
 
 	for (int i = 0; i < num_bumps; i++)
 	{
@@ -324,7 +324,7 @@ void player_physics_ground_move(Entity& player, Move_Command command, bool dont_
 	float wishspeed = inputlen * maxspeed_val;
 	float addspeed = wishspeed - dot(xz_velocity, wishdir);
 	addspeed = glm::max(addspeed, 0.f);
-	float accelspeed = acceleation_val * wishspeed * engine.tick_interval;
+	float accelspeed = acceleation_val * wishspeed * eng->tick_interval;
 	accelspeed = glm::min(accelspeed, addspeed);
 	xz_velocity += accelspeed * wishdir;
 
@@ -336,7 +336,7 @@ void player_physics_ground_move(Entity& player, Move_Command command, bool dont_
 	player.velocity = vec3(xz_velocity.x, player.velocity.y, xz_velocity.z);
 
 	if (!dont_add_grav) {
-		player.velocity.y -= phys_gravity.real() * engine.tick_interval;
+		player.velocity.y -= phys_gravity.real() * eng->tick_interval;
 	}
 	
 
@@ -383,7 +383,7 @@ void player_physics_update(Entity* p, Move_Command command)
 	float friction_value = (p->state & PMS_GROUND) ? ground_friction : air_friction;
 	float speed = length(p->velocity);
 	if (speed >= 0.0001) {
-		float dropamt = friction_value * speed * engine.tick_interval;
+		float dropamt = friction_value * speed * eng->tick_interval;
 		float newspd = speed - dropamt;
 		if (newspd < 0)
 			newspd = 0;
@@ -394,7 +394,7 @@ void player_physics_update(Entity* p, Move_Command command)
 
 	bool dont_add_grav = false;
 	check_ground_state(*p, command,dont_add_grav);
-	if (engine.is_host && debug_fly.integer()) {
+	if (eng->is_host && debug_fly.integer()) {
 		p->state = PMS_JUMPING;
 
 		vec2 inputvec = vec2(command.forward_move, command.lateral_move);
@@ -410,7 +410,7 @@ void player_physics_update(Entity* p, Move_Command command)
 
 		vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 
-		p->position += wishdir * 12.0f*(float)engine.tick_interval;
+		p->position += wishdir * 12.0f*(float)eng->tick_interval;
 
 	}
 	else
@@ -540,10 +540,10 @@ void change_to_item(Entity& p, int next_item)
 void player_item_update(Entity* p, Move_Command command, bool is_local)
 {
 	Game_Inventory& inv = p->inv;
-	bool is_simulated_client = !engine.is_host;
+	bool is_simulated_client = !eng->is_host;
 
 	if (is_simulated_client && p->inv.tick_for_staging != -1) {
-		int delta = engine.tick - p->inv.tick_for_staging;
+		int delta = eng->tick - p->inv.tick_for_staging;
 		if (delta > 30) { // 30 ticks since the inventory synced up, assume there was packet loss or something
 			p->inv.active_item = p->inv.staging_item;
 			ASSERT(p->inv.active_item >= 0 && p->inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
@@ -577,15 +577,15 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 	}
 
 	if (is_local) {
-		if (engine.local.viewmodel == nullptr) {
-			engine.local.viewmodel = FindOrLoadModel("m16_fp.glb");
-			engine.local.viewmodel_animator.set_model(engine.local.viewmodel);
+		if (eng->local.viewmodel == nullptr) {
+			eng->local.viewmodel = FindOrLoadModel("m16_fp.glb");
+			eng->local.viewmodel_animator.set_model(eng->local.viewmodel);
 		}
 	}
 
 	// tick timer
 	if (inv.timer > 0)
-		inv.timer -= engine.tick_interval;
+		inv.timer -= eng->tick_interval;
 
 	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
 	bool wants_shoot = command.button_mask & BUTTON_FIRE1;
@@ -608,11 +608,11 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 
 				if (item_stats.category == ITEM_CAT_RIFLE) {
 					p->anim.set_anim("act_shoot", true);
-					engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+					eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 				}
 				else if (item_stats.category == ITEM_CAT_BOLT_ACTION) {
 					p->anim.set_anim("act_shoot_sniper", true);
-					engine.fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+					eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 				}
 				else if (item_stats.category == ITEM_CAT_MELEE) {
 					p->anim.set_anim("act_knife_attack", true);
@@ -621,8 +621,8 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 
 
 				if (is_local) {
-					engine.local.viewmodel_animator.set_anim("act_shoot", true);
-					engine.local.viewmodel_animator.m.loop = false;
+					eng->local.viewmodel_animator.set_anim("act_shoot", true);
+					eng->local.viewmodel_animator.m.loop = false;
 				}
 
 				break;
@@ -640,9 +640,9 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 			p->anim.m.speed = 0.8f;
 
 			if (is_local) {
-				engine.local.viewmodel_animator.set_anim("act_reload", true);
-				engine.local.viewmodel_animator.m.loop = false;
-				engine.local.viewmodel_animator.m.speed = 2.5f;
+				eng->local.viewmodel_animator.set_anim("act_reload", true);
+				eng->local.viewmodel_animator.m.loop = false;
+				eng->local.viewmodel_animator.m.speed = 2.5f;
 
 			}
 		}

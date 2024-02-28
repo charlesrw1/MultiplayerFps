@@ -129,6 +129,9 @@
     <ClCompile Include="Source\Draw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Archive.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Texture.h">
@@ -240,6 +243,12 @@
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\StackString.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DynamicArray.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Archive.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
   </ItemGroup>

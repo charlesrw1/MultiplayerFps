@@ -19,18 +19,18 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt);
 Entity* ServerEntForIndex(int index)
 {
 	ASSERT(index >= 0 && index < MAX_GAME_ENTS);
-	return &engine.ents[index];
+	return &eng->ents[index];
 }
 
 void find_spawn_position(Entity* ent)
 {
-	int index = engine.find_by_classname(0, "player_spawn");
+	int index = eng->find_by_classname(0, "player_spawn");
 	bool found = false;
 	while (index != -1) {
-		Entity& e = engine.get_ent(index);
+		Entity& e = eng->get_ent(index);
 
 		// do a small test for nearby players
-		GeomContact contact = engine.phys.trace_shape(Trace_Shape(e.position, CHAR_HITBOX_RADIUS), ent->index, PF_PLAYERS);
+		GeomContact contact = eng->phys.trace_shape(Trace_Shape(e.position, CHAR_HITBOX_RADIUS), ent->index, PF_PLAYERS);
 
 		if (!contact.found) {
 			ent->position = e.position;
@@ -38,7 +38,7 @@ void find_spawn_position(Entity* ent)
 			return;
 		}
 		
-		index = engine.find_by_classname(index+1, "player_spawn");
+		index = eng->find_by_classname(index+1, "player_spawn");
 	}
 
 	sys_print("No valid spawn positions for entity\n");
@@ -56,12 +56,12 @@ enum Door_State
 
 void door_update(Entity* e)
 {
-	e->rotation.y = engine.time;
+	e->rotation.y = eng->time;
 }
 
 void spawn_door(Level::Entity_Spawn& spawn)
 {
-	Entity& e = *engine.new_entity();
+	Entity& e = *eng->new_entity();
 	e.type = ET_USED;
 	e.position = spawn.position;
 	e.rotation = spawn.rotation;
@@ -76,7 +76,7 @@ void spawn_door(Level::Entity_Spawn& spawn)
 		if (kv.at(0) == "linked_mesh") {
 			// this is unique, all other model_index setting goes through Game_Media
 			int index = std::atoi(kv.at(1).c_str());
-			e.model = engine.level->linked_meshes.at(index);
+			e.model = eng->level->linked_meshes.at(index);
 			e.model_index = index;
 		}
 	}
@@ -86,7 +86,7 @@ void spawn_door(Level::Entity_Spawn& spawn)
 }
 void spawn_spawn_point(Level::Entity_Spawn& spawn)
 {
-	Entity& e = *engine.new_entity();
+	Entity& e = *eng->new_entity();
 	e.type = ET_USED;
 	e.classname = "player_spawn";
 	e.position = spawn.position;
@@ -103,7 +103,7 @@ void spawn_spawn_point(Level::Entity_Spawn& spawn)
 
 void spawn_zone(Level::Entity_Spawn& spawn)
 {
-	Entity& e = *engine.new_entity();
+	Entity& e = *eng->new_entity();
 	e.type = ET_USED;
 	if (spawn.classname == "bomb_area")
 		e.classname = "bomb_area";
@@ -204,7 +204,7 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 		return;
 
 	Ray r(origin, direction);
-	RayHit hit = engine.phys.trace_ray(r, from->index, PF_ALL);
+	RayHit hit = eng->phys.trace_ray(r, from->index, PF_ALL);
 	if (hit.hit_world) {
 		//local.pm.add_dust_hit(hit.pos-direction*0.1f);
 		// add particles + decals here
@@ -212,7 +212,7 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 		local.pm.add_blood_effect(hit.pos, -direction);
 	}
 	else if(hit.ent_id!=-1){
-		Entity& hit_entitiy = engine.ents[hit.ent_id];
+		Entity& hit_entitiy = eng->ents[hit.ent_id];
 		if (hit_entitiy.damage)
 			hit_entitiy.damage(&hit_entitiy, from, 100, 0);
 
@@ -262,16 +262,16 @@ void Entity::gravity_physics()
 	bool bounce = flags & EF_BOUNCE;
 	bool slide = flags & EF_SLIDE;
 
-	velocity.y -= (12.f * engine.tick_interval);
+	velocity.y -= (12.f * eng->tick_interval);
 	int bumps = 4;
 	bool hit_a_wall = false;
-	float time = engine.tick_interval;
+	float time = eng->tick_interval;
 	vec3 pre_velocity = velocity;
 	glm::vec3 first_n;
 	for (int i = 0; i < bumps; i++) {
 		vec3 end = position + velocity * (time / bumps);
 		
-		GeomContact contact = engine.phys.trace_shape(Trace_Shape(end, col_radius), index, PF_WORLD);
+		GeomContact contact = eng->phys.trace_shape(Trace_Shape(end, col_radius), index, PF_WORLD);
 
 		if (contact.found) {
 			position = end + contact.penetration_normal * (contact.penetration_depth);
@@ -366,7 +366,7 @@ void player_spawn(Entity* ent)
 
 Entity* dummy_spawn()
 {
-	Entity* ent = engine.new_entity();
+	Entity* ent = eng->new_entity();
 	ent->type = ET_DUMMY;
 	ent->position = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
@@ -401,14 +401,14 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 #include "Config.h"
 void Game_Engine::execute_player_move(int num, Move_Command cmd)
 {
-	double oldtime = engine.time;
-	engine.time = cmd.tick * engine.tick_interval;
+	double oldtime = eng->time;
+	eng->time = cmd.tick * eng->tick_interval;
 	
 	Entity& ent = get_ent(num);
 	player_physics_update(&ent, cmd);
 	player_post_physics(&ent, cmd, num == player_num());
 
-	engine.time = oldtime;
+	eng->time = oldtime;
 }
 
 void player_update(Entity* ent)
@@ -429,7 +429,7 @@ void dummy_update(Entity* ent)
 	//ent->position.y = sin(GetTime()) * 2.f + 2.f;
 	ent->position.x = 0.f;
 	if (ent->flags & EF_DEAD)
-		engine.free_entity(ent);
+		eng->free_entity(ent);
 }
 
 static Random fxrand = Random(1452345);
@@ -438,7 +438,7 @@ void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 {
 	if (glm::length(ent->velocity)>1.f) {
 		ent->rotation = vec3(fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI));
-		engine.local.pm.add_dust_hit(ent->position + normal * 0.1f);
+		eng->local.pm.add_dust_hit(ent->position + normal * 0.1f);
 	}
 }
 
@@ -449,7 +449,7 @@ static Auto_Config_Var grenade_vel("game.gren_vel", 18.f);
 Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 {
 	ASSERT(thrower);
-	Entity* e = engine.new_entity();
+	Entity* e = eng->new_entity();
 	e->type = ET_GRENADE;
 	e->set_model("grenade_he.glb");
 	e->owner_index = thrower->index;
@@ -467,12 +467,12 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 void grenade_update(Entity* ent)
 {
 	// spin grenade based on velocity
-	float dt = engine.tick_interval;
+	float dt = eng->tick_interval;
 
 	float vel = glm::length(ent->velocity);
 
 	if (ent->timer <= 0.f) {
 		sys_print("BOOM\n");
-		engine.free_entity(ent);
+		eng->free_entity(ent);
 	}
 }

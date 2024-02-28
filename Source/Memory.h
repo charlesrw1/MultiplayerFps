@@ -114,4 +114,19 @@ struct Global_Memory_Context
 	Arena_Loc long_default;
 	Arena_Loc loading_default;
 };
+
+class A_Allocator
+{
+public:
+	A_Allocator(Arena_Loc loc) : dest(loc) {}
+
+	void* allocate(uint32_t n) {
+		return (dest.top) ? dest.arena->alloc_top(n) : dest.arena->alloc_bottom(n);
+	}
+	void deallocate(void* p) {
+	}
+	Arena_Loc dest;
+};
+
+
 extern Global_Memory_Context mem_ctx;

@@ -39,7 +39,7 @@
 #include "imgui_impl_sdl2.h"
 
 MeshBuilder phys_debug;
-Game_Engine engine;
+Game_Engine* eng;
 
 static double program_time_start;
 
@@ -80,7 +80,7 @@ bool CheckGlErrorInternal_(const char* file, int line)
 void Quit()
 {
 	sys_print("Quiting...\n");
-	engine.cleanup();
+	eng->cleanup();
 	exit(0);
 }
 void sys_print(const char* fmt, ...)
@@ -105,7 +105,7 @@ void Fatalf(const char* format, ...)
 	sys_vprint(format, list);
 	va_end(list);
 	fflush(stdout);
-	engine.cleanup();
+	eng->cleanup();
 	exit(-1);
 }
 double GetTime()
@@ -124,7 +124,7 @@ void Game_Local::update_view()
 	// decay view_recoil
 	view_recoil.x = view_recoil.x * 0.9f;
 
-	vec3 true_viewangles = engine.local.view_angles + view_recoil;
+	vec3 true_viewangles = eng->local.view_angles + view_recoil;
 
 	if (view_recoil.y != 0)
 		printf("view_recoil: %f\n", view_recoil.y);
@@ -132,22 +132,22 @@ void Game_Local::update_view()
 	vec3 true_front = AnglesToVector(true_viewangles.x, true_viewangles.y);
 
 	View_Setup setup;
-	setup.height = engine.window_h.integer();
-	setup.width = engine.window_w.integer();
+	setup.height = eng->window_h.integer();
+	setup.width = eng->window_w.integer();
 	setup.fov = glm::radians(fov.real());
 	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, 0.01f, 100.0f);
 	setup.near = 0.01f;
 	setup.far = 100.f;
 
 	//if (update_camera) {
-	//	fly_cam.UpdateFromInput(engine.keys, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
+	//	fly_cam.UpdateFromInput(eng->keys, input.mouse_delta_x, input.mouse_delta_y, input.scroll_delta);
 	//}
 
 	if (thirdperson_camera.integer()) {
 		//ClientEntity* player = client.GetLocalPlayer();
-		Entity& playerreal = engine.local_player();
+		Entity& playerreal = eng->local_player();
 
-		vec3 view_angles = engine.local.view_angles;
+		vec3 view_angles = eng->local.view_angles;
 
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0,1,0)));
@@ -164,7 +164,7 @@ void Game_Local::update_view()
 	}
 	else
 	{
-		Entity& player = engine.local_player();
+		Entity& player = eng->local_player();
 		float view_height = (player.state & PMS_CROUCHING) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
 		vec3 cam_position = player.position + vec3(0, view_height, 0);
 		setup.view = glm::lookAt(cam_position, cam_position + true_front, vec3(0, 1, 0));
@@ -189,8 +189,8 @@ void Game_Engine::view_angle_update()
 {
 	int x, y;
 	SDL_GetRelativeMouseState(&x, &y);
-	float x_off = engine.local.mouse_sensitivity.real() * x;
-	float y_off = engine.local.mouse_sensitivity.real() * y;
+	float x_off = eng->local.mouse_sensitivity.real() * x;
+	float y_off = eng->local.mouse_sensitivity.real() * y;
 
 	vec3 view_angles = local.view_angles;
 	view_angles.x -= y_off;	// pitch
@@ -213,9 +213,9 @@ void Game_Engine::make_move()
 	command.view_angles = local.view_angles;
 	command.tick = tick;
 
-	if (engine.local.fake_movement_debug.integer() != 0)
+	if (eng->local.fake_movement_debug.integer() != 0)
 		command.lateral_move = std::fmod(GetTime(), 2.f) > 1.f ? -1.f : 1.f;
-	if (engine.local.fake_movement_debug.integer() == 2)
+	if (eng->local.fake_movement_debug.integer() == 2)
 		command.button_mask |= BUTTON_JUMP;
 
 	if (!game_focused) {
@@ -384,7 +384,7 @@ const Model* Game_Media::get_game_model(const char* model, int* out_index)
 		return nullptr;
 	}
 
-	if(out_index) *out_index = i+engine.level->linked_meshes.size();
+	if(out_index) *out_index = i+eng->level->linked_meshes.size();
 	if (model_cache[i]) return model_cache[i];
 	model_cache[i] = FindOrLoadModel(model);
 	return model_cache[i];
@@ -392,9 +392,9 @@ const Model* Game_Media::get_game_model(const char* model, int* out_index)
 const Model* Game_Media::get_game_model_from_index(int index)
 {
 	// check linked meshes
-	if (index >= 0 && index < engine.level->linked_meshes.size())
-		return engine.level->linked_meshes.at(index);
-	index -= engine.level->linked_meshes.size();
+	if (index >= 0 && index < eng->level->linked_meshes.size())
+		return eng->level->linked_meshes.at(index);
+	index -= eng->level->linked_meshes.size();
 
 	if (index < 0 || index >= model_manifest.size()) return nullptr;
 	if (model_cache[index]) return model_cache[index];
@@ -404,7 +404,7 @@ const Model* Game_Media::get_game_model_from_index(int index)
 
 void Entity::set_model(const char* model_name)
 {
-	model = engine.media.get_game_model(model_name, &model_index);
+	model = eng->media.get_game_model(model_name, &model_index);
 	if (model && model->bones.size() > 0)
 		anim.set_model(model);
 }
@@ -452,19 +452,19 @@ DECLARE_ENGINE_CMD(bind)
 	int scancode = SDL_GetScancodeFromName(args.at(1));
 	if (scancode == SDL_SCANCODE_UNKNOWN) return;
 	if (args.size() < 3)
-		engine.bind_key(scancode, "");
+		eng->bind_key(scancode, "");
 	else
-		engine.bind_key(scancode, args.at(2));
+		eng->bind_key(scancode, args.at(2));
 }
 
 DECLARE_ENGINE_CMD_CAT("sv.",end)
 {
-	engine.exit_map();
+	eng->exit_map();
 }
 
 DECLARE_ENGINE_CMD_CAT("cl.",force_update)
 {
-	engine.cl->ForceFullUpdate();
+	eng->cl->ForceFullUpdate();
 }
 DECLARE_ENGINE_CMD(connect)
 {
@@ -473,17 +473,17 @@ DECLARE_ENGINE_CMD(connect)
 		return;
 	}
 
-	engine.connect_to(args.at(1));
+	eng->connect_to(args.at(1));
 }
 DECLARE_ENGINE_CMD(disconnect)
 {
-	if (engine.cl->get_state()!=CS_DISCONNECTED)
-		engine.cl->Disconnect("requested");
+	if (eng->cl->get_state()!=CS_DISCONNECTED)
+		eng->cl->Disconnect("requested");
 }
 DECLARE_ENGINE_CMD(reconnect)
 {
-	if(engine.cl->get_state() != CS_DISCONNECTED)
-		engine.cl->Reconnect();
+	if(eng->cl->get_state() != CS_DISCONNECTED)
+		eng->cl->Reconnect();
 }
 
 DECLARE_ENGINE_CMD(map)
@@ -493,7 +493,7 @@ DECLARE_ENGINE_CMD(map)
 		return;
 	}
 
-	engine.start_map(args.at(1), false);
+	eng->start_map(args.at(1), false);
 }
 DECLARE_ENGINE_CMD(exec)
 {
@@ -512,7 +512,7 @@ DECLARE_ENGINE_CMD(net_stat)
 	int maxbytes = -5000;
 	int totalbytes = 0;
 	for (int i = 0; i < 64; i++) {
-		auto& entry = engine.cl->server.incoming[i];
+		auto& entry = eng->cl->server.incoming[i];
 		maxbytes = glm::max(maxbytes, entry.bytes);
 		totalbytes += entry.bytes;
 		mintime = glm::min(mintime, entry.time);
@@ -520,7 +520,7 @@ DECLARE_ENGINE_CMD(net_stat)
 	}
 
 	sys_print("Client Network Stats:\n");
-	sys_print("%--15s %f\n", "Rtt", engine.cl->server.rtt);
+	sys_print("%--15s %f\n", "Rtt", eng->cl->server.rtt);
 	sys_print("%--15s %f\n", "Interval", maxtime - mintime);
 	sys_print("%--15s %d\n", "Biggest packet", maxbytes);
 	sys_print("%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
@@ -532,7 +532,7 @@ DECLARE_ENGINE_CMD(print_ents)
 {
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
-		auto& e = engine.get_ent(i);
+		auto& e = eng->get_ent(i);
 		if (!e.active()) continue;
 		sys_print("%-15d %-15d %-15f %-15f %-15d\n", i, e.type, e.position.x, e.position.z, (int)e.model);
 	}
@@ -636,17 +636,41 @@ void init_audio()
 
 extern void benchmark_run();
 extern void benchmark_gltf();
+#include "DynamicArray.h"
+#include "Memory.h"
 
+
+static Memory_Arena g_arena;
+Arena_Loc get_default_location() { return { &g_arena, false }; }
+
+#include <Windows.h>
+#include "Archive.h"
 int main(int argc, char** argv)
 {
+	Archive archive;
+	archive.create("archive.dat");
 
-	engine.argc = argc;
-	engine.argv = argv;
-	engine.init();
+	g_arena.init("initial", 5'000);
+	Heap_Array<int, A_Allocator> my_ints(get_default_location());
+	my_ints.set_size(1'000);
+	memset(my_ints.get_ptr(), 'X', sizeof(int) * my_ints.size());
 
-	engine.loop();
+	my_ints.free_ptr();
+	g_arena.free_bottom();
+	my_ints.set_size(1'000);
+	my_ints.free_ptr();
+	g_arena.free_bottom();
 
-	engine.cleanup();
+
+	eng = new Game_Engine;
+
+	eng->argc = argc;
+	eng->argv = argv;
+	eng->init();
+
+	eng->loop();
+
+	eng->cleanup();
 	
 	return 0;
 }
@@ -691,8 +715,8 @@ bool Game_Engine::start_map(string map, bool is_client)
 			cl->Disconnect("starting a local server");
 
 		sv->start();
-		engine.is_host = true;
-		engine.set_state(ENGINE_GAME);
+		eng->is_host = true;
+		eng->set_state(ENGINE_GAME);
 		on_game_start();
 		sv->connect_local_client();
 	}
@@ -751,14 +775,14 @@ void Game_Engine::key_event(SDL_Event event)
 			SDL_SetRelativeMouseMode(SDL_TRUE);
 			int x, y;
 			SDL_GetRelativeMouseState(&x, &y);
-			engine.game_focused = true;
+			eng->game_focused = true;
 		}
 		mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
 		if (event.button.button == 3) {
 			SDL_SetRelativeMouseMode(SDL_FALSE);
-			engine.game_focused = false;
+			eng->game_focused = false;
 		}
 		mousekeys &= ~(1 << event.button.button);
 	}
@@ -943,23 +967,23 @@ void draw_wind_menu()
 
 void menu_playervars()
 {
-	if (engine.state != ENGINE_GAME) return;
+	if (eng->state != ENGINE_GAME) return;
 
-	Entity& p = engine.local_player();
-	ImGui::DragFloat3("vm", &engine.local.vm_offset[0], 0.02f);
-	ImGui::DragFloat3("vm2", &engine.local.vm_scale[0], 0.02f);
+	Entity& p = eng->local_player();
+	ImGui::DragFloat3("vm", &eng->local.vm_offset[0], 0.02f);
+	ImGui::DragFloat3("vm2", &eng->local.vm_scale[0], 0.02f);
 
 	ImGui::DragFloat3("pos", &p.position.x);
-	ImGui::DragFloat3("dir", &engine.local.view_angles.x);
+	ImGui::DragFloat3("dir", &eng->local.view_angles.x);
 
 	ImGui::DragFloat3("vel", &p.velocity.x);
 	ImGui::LabelText("jump", "%d", bool(p.state & PMS_JUMPING));
 
 
-	if (engine.is_host) {
-		ImGui::Text("delta %f", engine.cl->time_delta);
-		ImGui::Text("tick %f", engine.tick);
-		ImGui::Text("frr %f", engine.frame_remainder);
+	if (eng->is_host) {
+		ImGui::Text("delta %f", eng->cl->time_delta);
+		ImGui::Text("tick %f", eng->tick);
+		ImGui::Text("frr %f", eng->frame_remainder);
 	}
 }
 
@@ -1086,7 +1110,7 @@ void Game_Engine::update_game_tick()
 			continue;
 
 		if (e.timer > 0.f) {
-			e.timer -= engine.tick_interval;
+			e.timer -= eng->tick_interval;
 			if (e.timer <= 0.f && e.timer_callback)
 				e.timer_callback(&e);
 		}
@@ -1355,10 +1379,10 @@ void Game_Engine::loop()
 		static Auto_Config_Var print_fps("dbg.print_fps", 0);
 		if (next_print <= 0 && print_fps.integer()) {
 			next_print += 2.0;
-			sys_print("fps %f", 1.0 / engine.frame_time);
+			sys_print("fps %f", 1.0 / eng->frame_time);
 		}
 		else if (print_fps.integer())
-			next_print -= engine.frame_time;
+			next_print -= eng->frame_time;
 
 		Profiler::get_instance()->end_frame_tick();
 
@@ -1410,7 +1434,7 @@ void Game_Engine::pre_render_update()
 		ent.anim.ConcatWithInvPose();
 	}
 
-	local.pm.tick(engine.frame_time);
+	local.pm.tick(eng->frame_time);
 
 	local.update_viewmodel();
 

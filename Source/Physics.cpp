@@ -11,7 +11,6 @@
 
 void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out);
 
-extern MeshBuilder phys_debug;
 static MeshBuilder world_collision;
 void DrawCollisionWorld(const Level* lvl)
 {

@@ -23,8 +23,8 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 
 void Game_Local::update_viewmodel()
 {
-	Entity& e = engine.local_player();
-	glm::vec3 view_front = AnglesToVector(engine.local.view_angles.x, engine.local.view_angles.y);
+	Entity& e = eng->local_player();
+	glm::vec3 view_front = AnglesToVector(eng->local.view_angles.x, eng->local.view_angles.y);
 	view_front.y = 0;
 	glm::vec3 side_grnd = glm::normalize(glm::cross(view_front, vec3(0, 1, 0)));
 	float spd_side = dot(side_grnd, e.velocity);
@@ -40,7 +40,7 @@ void Game_Local::update_viewmodel()
 	if (e.state & PMS_CROUCHING)
 		up_ofs_ideal += 0.04;
 
-	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, engine.frame_time * 100.f);
+	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, eng->frame_time * 100.f);
 
 	//viewmodel_offsets = glm::mix(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.4f);
 
@@ -53,7 +53,7 @@ void Game_Local::update_viewmodel()
 			vm_recoil_end_time = vm_recoil_start_time = 0.f;
 			break;
 		case ITEM_IN_FIRE:
-			vm_recoil_start_time = engine.time;
+			vm_recoil_start_time = eng->time;
 			vm_recoil_end_time = e.inv.timer;	// FIXME: read from current item data
 			break;
 		case ITEM_RELOAD:
@@ -69,16 +69,16 @@ void Game_Local::update_viewmodel()
 		float end = e.inv.timer;
 		if (end > vm_recoil_end_time) {
 			vm_recoil_end_time = end;
-			vm_recoil_start_time = engine.time;
+			vm_recoil_start_time = eng->time;
 		}
 
-		float t = (engine.time - vm_recoil_start_time) / (vm_recoil_end_time - vm_recoil_start_time);
+		float t = (eng->time - vm_recoil_start_time) / (vm_recoil_end_time - vm_recoil_start_time);
 		t = glm::clamp(t, 0.f, 1.f);
 		viewmodel_recoil_ofs = GetRecoilAmtTriangle(vec3(0.0, 0, 0.3), t, 0.4f);
 	}break;
 	}
 
-	viewmodel_animator.AdvanceFrame(engine.frame_time);
+	viewmodel_animator.AdvanceFrame(eng->frame_time);
 	viewmodel_animator.SetupBones();
 	viewmodel_animator.ConcatWithInvPose();
 

@@ -161,7 +161,7 @@ enum Entity_Physics
 class Model;
 struct Entity
 {
-	int index = 0;	// engine.ents[]
+	int index = 0;	// eng->ents[]
 	Ent_Type type = ET_FREE;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);

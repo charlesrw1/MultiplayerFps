@@ -341,7 +341,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glActiveTexture(GL_TEXTURE0 + start + 5);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, draw.shadowmap.shadow_map_array);
 
-	//shader().set_vec4("aoproxy_sphere", vec4(engine.local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
+	//shader().set_vec4("aoproxy_sphere", vec4(eng->local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
 	//shader().set_float("aoproxy_scale_factor", aosphere.z);
 
 	uint32_t ssao_tex = draw.ssao.fullres2;
@@ -517,7 +517,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.viewproj = vs.viewproj;
 	constants.invview = glm::inverse(vs.view);
 	constants.invproj = glm::inverse(vs.proj);
-	constants.viewpos_time = glm::vec4(vs.origin, engine.time);
+	constants.viewpos_time = glm::vec4(vs.origin, eng->time);
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
 
@@ -921,7 +921,7 @@ void Volumetric_Fog_System::compute()
 		glBindTexture(GL_TEXTURE_3D, voltexture_prev);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
-		lightcalc.set_vec3("perlin_offset", glm::vec3(engine.time * 0.2, 0, engine.time));
+		lightcalc.set_vec3("perlin_offset", glm::vec3(eng->time * 0.2, 0, eng->time));
 
 
 		lightcalc.set_int("num_lights", 0);
@@ -1048,8 +1048,8 @@ void Renderer::Init()
 
 void Renderer::InitFramebuffers()
 {
-	const int s_w = engine.window_w.integer();
-	const int s_h = engine.window_h.integer();
+	const int s_w = eng->window_w.integer();
+	const int s_h = eng->window_h.integer();
 
 	glDeleteTextures(1, &tex.scene_color);
 	glGenTextures(1, &tex.scene_color);
@@ -1432,10 +1432,10 @@ void Renderer::FrameDraw()
 	cur_shader = 0;
 	for (int i = 0; i < NUM_SAMPLERS; i++)
 		cur_tex[i] = 0;
-	if (cur_w != engine.window_w.integer() || cur_h != engine.window_h.integer())
+	if (cur_w != eng->window_w.integer() || cur_h != eng->window_h.integer())
 		InitFramebuffers();
 	lastframe_vs = current_frame_main_view;
-	current_frame_main_view = engine.local.last_view;
+	current_frame_main_view = eng->local.last_view;
 	vs = current_frame_main_view;
 
 	// Shadow map updates
@@ -1505,7 +1505,7 @@ void Renderer::FrameDraw()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	DrawEntBlobShadows();
-	engine.local.pm.draw_particles();
+	eng->local.pm.draw_particles();
 	glCheckError();
 	
 	// Bloom update
@@ -1536,8 +1536,8 @@ void Renderer::FrameDraw()
 	mb.Begin();
 	if (draw_sv_colliders.integer()) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
-			if (engine.ents[i].type == ET_PLAYER) {
-				AddPlayerDebugCapsule(engine.ents[i], &mb, COLOR_CYAN);
+			if (eng->ents[i].type == ET_PLAYER) {
+				AddPlayerDebugCapsule(eng->ents[i], &mb, COLOR_CYAN);
 			}
 		}
 	}
@@ -1548,14 +1548,14 @@ void Renderer::FrameDraw()
 	shader().set_mat4("Model", mat4(1.f));
 
 	if (draw_collision_tris.integer())
-		DrawCollisionWorld(engine.level);
+		DrawCollisionWorld(eng->level);
 
 	mb.Draw(GL_LINES);
 
 
 	//game.rays.End();
 	//game.rays.Draw(GL_LINES);
-	if (engine.is_host) {
+	if (eng->is_host) {
 		//phys_debug.End();
 		//phys_debug.Draw(GL_LINES);
 	}
@@ -1604,14 +1604,14 @@ void Renderer::DrawEntBlobShadows()
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 	{
-		Entity* e = &engine.ents[i];
+		Entity* e = &eng->ents[i];
 		if (!e->active()) continue;
 
 		RayHit rh;
 		Ray r;
 		r.pos = e->position + glm::vec3(0, 0.1f, 0);
 		r.dir = glm::vec3(0, -1, 0);
-		rh = engine.phys.trace_ray(r, i, PF_WORLD);
+		rh = eng->phys.trace_ray(r, i, PF_WORLD);
 
 		if (rh.dist < 0)
 			continue;
@@ -1629,7 +1629,7 @@ void Renderer::DrawEntBlobShadows()
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
 	glCheckError();
 
-	bind_texture(0, engine.media.blob_shadow->gl_id);
+	bind_texture(0, eng->media.blob_shadow->gl_id);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -1722,14 +1722,14 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 	state.pass = params.pass;
 
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		auto& ent = engine.get_ent(i);
+		auto& ent = eng->get_ent(i);
 		//auto& ent = cgame->entities[i];
 		if (!ent.active())
 			continue;
 		if (!ent.model)
 			continue;
 
-		if (i == engine.player_num() && !engine.local.thirdperson_camera.integer())
+		if (i == eng->player_num() && !eng->local.thirdperson_camera.integer())
 			continue;
 
 		mat4 model;
@@ -1808,7 +1808,7 @@ float speed = 1.0;
 
 void Renderer::set_wind_constants()
 {
-	shader().set_float("time", engine.time);
+	shader().set_float("time", eng->time);
 	shader().set_float("height", wsheight);
 	shader().set_float("radius", wsradius);
 	shader().set_float("startheight", wsstartheight);
@@ -1828,7 +1828,7 @@ void Renderer::set_water_constants()
 
 void Renderer::DrawLevelDepth(const Render_Level_Params& params)
 {
-	const Level* level = engine.level;
+	const Level* level = eng->level;
 	bool force_set = true;
 	int backfaces = -1;
 
@@ -2068,8 +2068,8 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 			set_shader_constants();
 
 			if (mp.has_lightmap_coords()) {
-				if (engine.level->lightmap)
-					bind_texture(SAMPLER_LIGHTMAP, engine.level->lightmap->gl_id);
+				if (eng->level->lightmap)
+					bind_texture(SAMPLER_LIGHTMAP, eng->level->lightmap->gl_id);
 				else
 					bind_texture(SAMPLER_LIGHTMAP, white_texture);
 			}
@@ -2105,7 +2105,7 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 
 		bool has_uv_scroll = gs->uscroll != 0.f || gs->vscroll != 0.f;
 		shader().set_bool("has_uv_scroll", has_uv_scroll);
-		shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)engine.time);
+		shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)eng->time);
 
 		// ill find a better way maybe
 		bool shader_doesnt_need_the_textures = is_water;
@@ -2192,7 +2192,7 @@ void Renderer::planar_reflection_pass()
 
 void Renderer::DrawLevel(const Render_Level_Params& params)
 {
-	const Level* level = engine.level;
+	const Level* level = eng->level;
 
 	Model_Drawing_State state;
 	state.pass = params.pass;
@@ -2225,12 +2225,12 @@ void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 
 void Renderer::DrawPlayerViewmodel(const Render_Level_Params& params)
 {
-	if (engine.local.thirdperson_camera.integer() == 1 || draw_viewmodel.integer() == 0)
+	if (eng->local.thirdperson_camera.integer() == 1 || draw_viewmodel.integer() == 0)
 		return;
 
 	mat4 invview = glm::inverse(vs.view);
 
-	Game_Local* gamel = &engine.local;
+	Game_Local* gamel = &eng->local;
 	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
 	model2 =  glm::scale(model2, glm::vec3(gamel->vm_scale.x));
 
@@ -2244,7 +2244,7 @@ void Renderer::DrawPlayerViewmodel(const Render_Level_Params& params)
 
 	Model_Drawing_State state;
 	state.pass = params.pass;
-	draw_model_real(engine.local.viewmodel, model2, nullptr, &engine.local.viewmodel_animator, state);
+	draw_model_real(eng->local.viewmodel, model2, nullptr, &eng->local.viewmodel_animator, state);
 }
 
 
@@ -2329,7 +2329,7 @@ void Renderer::on_level_start()
 	scene.directional_index = -1;
 
 	// add the lights
-	auto& llights = engine.level->lights;
+	auto& llights = eng->level->lights;
 	for (int i = 0; i < llights.size(); i++) {
 		Level_Light& ll = llights[i];
 		if (ll.type == LIGHT_DIRECTIONAL && scene.directional_index == -1) {
@@ -2351,7 +2351,7 @@ void Renderer::on_level_start()
 	scene.cubemaps.push_back({});		// skybox probe
 	scene.cubemaps[0].found_probe_flag = true;
 
-	auto& espawns = engine.level->espawns;
+	auto& espawns = eng->level->espawns;
 	for (int i = 0; i < espawns.size(); i++) {
 		if (espawns[i].classname == "cubemap_box") {
 			Render_Box_Cubemap bc;
@@ -2546,8 +2546,8 @@ void SSAO_System::make_render_targets()
 	glDeleteTextures(1, &fullres1);
 	glDeleteTextures(1, &fullres2);
 
-	width = engine.window_w.integer();
-	height = engine.window_h.integer();
+	width = eng->window_w.integer();
+	height = eng->window_h.integer();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
@@ -2591,7 +2591,7 @@ void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;
 
-	if (width != engine.window_w.integer() || height != engine.window_h.integer())
+	if (width != eng->window_w.integer() || height != eng->window_h.integer())
 		make_render_targets();
 
 

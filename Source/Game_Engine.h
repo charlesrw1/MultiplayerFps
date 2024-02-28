@@ -190,4 +190,4 @@ private:
 	void on_game_start();
 };
 
-extern Game_Engine engine;
+extern Game_Engine* eng;

@@ -54,7 +54,7 @@ void Client::connect(string address)
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 		interpolation_data[i] = Entity_Interp();
 
-	engine.set_state(ENGINE_LOADING);
+	eng->set_state(ENGINE_LOADING);
 
 	TrySendingConnect();
 }
@@ -62,7 +62,7 @@ void Client::connect(string address)
 
 void Client::TrySendingConnect()
 {
-	ASSERT(engine.state == ENGINE_LOADING);
+	ASSERT(eng->state == ENGINE_LOADING);
 
 	const int MAX_CONNECT_ATTEMPTS = 10;
 	const float CONNECT_RETRY = 1.f;
@@ -73,7 +73,7 @@ void Client::TrySendingConnect()
 		sys_print("Couldn't connect to server\n");
 		state = CS_DISCONNECTED;
 
-		engine.set_state(ENGINE_MENU);
+		eng->set_state(ENGINE_MENU);
 		return;
 	}
 	double delta = GetTime() - attempt_time;
@@ -108,7 +108,7 @@ void Client::Disconnect(const char* debug_reason)
 	server = Connection();
 	cur_snapshot_idx = 0;
 
-	engine.set_state(ENGINE_MENU);
+	eng->set_state(ENGINE_MENU);
 }
 
 
@@ -143,7 +143,7 @@ void Client::run_prediction()
 	// restore local player's state to last authoritative snapshot 
 	int incoming_seq = InSequence();
 	Frame* auth = &snapshots.at(incoming_seq % CLIENT_SNAPSHOT_HISTORY);
-	Entity& player = engine.local_player();
+	Entity& player = eng->local_player();
 	
 	if (dont_replicate_player.integer())
 		start = end - 2;	// only sim current frame
@@ -170,10 +170,10 @@ void Client::run_prediction()
 	player_post_physics(&player, get_command(end - 1), true);
 	
 	// dont advance frames if animation is being controlled server side
-	player.anim.AdvanceFrame(engine.tick_interval);
+	player.anim.AdvanceFrame(eng->tick_interval);
 
 	// for prediction errors
-	origin_history.at((end-1)%origin_history.size()) = engine.local_player().position;
+	origin_history.at((end-1)%origin_history.size()) = eng->local_player().position;
 }
 
 static int NegModulo(int a, int b)
@@ -266,33 +266,33 @@ void Client::interpolate_states()
 	if (!interpolate.integer())
 		return;
 
-	auto& cl = engine.cl;
+	auto& cl = eng->cl;
 	// FIXME
-	double rendering_time = engine.tick * engine.tick_interval - (engine.cl->interp_time.real());
+	double rendering_time = eng->tick * eng->tick_interval - (eng->cl->interp_time.real());
 	
 	// interpolate local player error
 	if (smooth_time > 0 && dont_replicate_player.integer() == 0) {
 		if (smooth_time == smooth_error_time.real())
 			sys_print("starting smooth\n");
 
-		vec3 delta = engine.local_player().position - last_origin;
+		vec3 delta = eng->local_player().position - last_origin;
 		vec3 new_position = last_origin + delta * (1 - (smooth_time / smooth_error_time.real()));
-		engine.local_player().position = new_position;
-		smooth_time -= engine.frame_time;
+		eng->local_player().position = new_position;
+		smooth_time -= eng->frame_time;
 
 		if (smooth_time <= 0)
 			sys_print("end smooth\n");
 	}
-	last_origin = engine.local_player().position;
+	last_origin = eng->local_player().position;
 
 	// interpolate other entities
 	for (int i = 0; i < MAX_GAME_ENTS; i++) {
 		// local player doesn't interpolate
-		if (!engine.get_ent(i).active() || i == engine.player_num())
+		if (!eng->get_ent(i).active() || i == eng->player_num())
 			continue;
 
 		Entity_Interp& ce = interpolation_data[i];
-		Entity& ent = engine.get_ent(i);
+		Entity& ent = eng->get_ent(i);
 
 		// now: with other players animations find the two sandwhich snapshots
 		// if they differ, then blend into the second at the midway point
@@ -304,13 +304,13 @@ void Client::interpolate_states()
 
 		// advance entity animations, not interpolated!
 		if (ent.model && ent.model->animations)
-			ent.anim.AdvanceFrame(engine.frame_time);
+			ent.anim.AdvanceFrame(eng->frame_time);
 
 		int entry_index = 0;
 		int last_entry = NegModulo(ce.hist_index - 1, Entity_Interp::HIST_SIZE);
 		for (; entry_index < Entity_Interp::HIST_SIZE; entry_index++) {
 			auto e = ce.GetStateFromIndex(ce.hist_index - 1 - entry_index);
-			if (rendering_time >= e->tick * engine.tick_interval) {
+			if (rendering_time >= e->tick * eng->tick_interval) {
 				break;
 			}
 		}
@@ -345,16 +345,16 @@ void Client::interpolate_states()
 		}
 
 		ASSERT(s1->tick < s2->tick);
-		ASSERT(s1->tick * engine.tick_interval <= rendering_time && s2->tick * engine.tick_interval >= rendering_time);
+		ASSERT(s1->tick * eng->tick_interval <= rendering_time && s2->tick * eng->tick_interval >= rendering_time);
 
-		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*engine.tick_interval)) {
+		if (teleport_distance(s1->position, s2->position, 20.0, (s2->tick-s1->tick)*eng->tick_interval)) {
 			set_entity_interp_vars(ent, *s1);
 			if (dbg_print.integer())
 				sys_print("teleport\n");
 			continue;
 		}
 
-		float midlerp = MidLerp(s1->tick * engine.tick_interval, s2->tick * engine.tick_interval, rendering_time);
+		float midlerp = MidLerp(s1->tick * eng->tick_interval, s2->tick * eng->tick_interval, rendering_time);
 		Interp_Entry interpstate = *s1;
 		ent.position = glm::mix(s1->position, s2->position, midlerp);
 		for (int i = 0; i < 3; i++) {
@@ -417,7 +417,7 @@ void Client::read_snapshot(Frame* snapshot)
 	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 
 	for (int i = 0; i < NUM_GAME_ENTS; i++) {
-		Entity& e = engine.get_ent(i);
+		Entity& e = eng->get_ent(i);
 		if (!e.active()) continue;
 
 		if (i == client_num) {
@@ -437,7 +437,7 @@ void Client::read_snapshot(Frame* snapshot)
 	// update prediction error data
 	int sequence_i_sent = OutSequenceAk();
 	if (OutSequence() - sequence_i_sent < origin_history.size()) {
-		Entity& player = engine.get_ent(client_num);
+		Entity& player = eng->get_ent(client_num);
 		vec3 delta = player.position - origin_history.at((sequence_i_sent + offset_debug) % origin_history.size());
 		// FIXME check for teleport
 		float len = glm::length(delta);
@@ -446,6 +446,6 @@ void Client::read_snapshot(Frame* snapshot)
 	}
 
 	// build physics world for prediction updates later in frame AND subsequent frames until next packet
-	engine.build_physics_world(0.f);
+	eng->build_physics_world(0.f);
 
 }

@@ -28,7 +28,7 @@ void Particle_Manager::clear_all()
 
 float Particle_Manager::get_time()
 {
-	return engine.time;
+	return eng->time;
 }
 
 void Particle_Manager::tick(float deltat)

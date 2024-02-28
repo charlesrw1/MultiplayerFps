@@ -42,9 +42,9 @@ void Client::ReadPackets()
 				// We now have a valid connection with the server
 				server.Init(&sock, server.remote_addr);
 				state = CS_CONNECTED;
-				if (engine.start_map(mapname, true)) {
-					engine.set_tick_rate(tickrate);
-					engine.tick = tick;
+				if (eng->start_map(mapname, true)) {
+					eng->set_tick_rate(tickrate);
+					eng->tick = tick;
 					client_num = client_num_;
 				}
 				else {
@@ -104,7 +104,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 				state = CS_SPAWNED;
 
 				// start game state after recieving first snapshot
-				engine.set_state(ENGINE_GAME);
+				eng->set_state(ENGINE_GAME);
 			}
 			bool ignore_packet = OnEntSnapshot(buf);
 			if (ignore_packet)
@@ -115,21 +115,21 @@ void Client::HandleServerPacket(ByteReader& buf)
 			break;
 		case SV_UPDATE_VIEW:
 			glm::vec3 new_angles = buf.ReadVec3();
-			engine.local.view_angles = new_angles;
+			eng->local.view_angles = new_angles;
 			break;
 		case SV_TEXT:
 			break;
 		case SV_TICK:
 		{
 			int server_tick = buf.ReadLong();	// this is the server's current tick
-			float server_time = server_tick * engine.tick_interval;
-			time_delta = engine.time - server_time;
+			float server_time = server_tick * eng->tick_interval;
+			time_delta = eng->time - server_time;
 
 			// hard reset the time values
 			if (abs(time_delta) > time_reset_threshold.real()) {
 				sys_print("reset time %f\n", time_delta);
-				engine.tick = server_tick;
-				engine.time = server_time;
+				eng->tick = server_tick;
+				eng->time = server_time;
 				time_delta = 0.0;
 			}
 			last_recieved_server_tick = server_tick;
@@ -200,7 +200,7 @@ void Client::SendMovesAndMessages()
 	// input format
 	// tick of command
 	// num commands total
-	writer.WriteLong(engine.tick);
+	writer.WriteLong(eng->tick);
 
 
 	int total_commands =  glm::min(server.out_sequence + 1, 8);
@@ -246,7 +246,7 @@ void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, 
 
 	const Model* next_model = nullptr;
 	if (ent->model_index != -1)
-		next_model = engine.media.get_game_model_from_index(ent->model_index);
+		next_model = eng->media.get_game_model_from_index(ent->model_index);
 	if (next_model != ent->model) {
 		ent->model = next_model;
 		if (ent->model && ent->model->bones.size() > 0)
@@ -274,7 +274,7 @@ void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, 
 		if (all_inv_fields_equal)
 			ent->inv.tick_for_staging = -1;
 		else if (!all_inv_fields_equal && ent->inv.tick_for_staging == -1)
-			ent->inv.tick_for_staging = engine.tick;
+			ent->inv.tick_for_staging = eng->tick;
 	}
 
 	if (!is_local_player) {
@@ -322,7 +322,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	if (delta_tick != -1) {
 		from = FindSnapshotForTick(delta_tick);
 		if (!from) {
-			sys_print("Delta snapshot not found, requested: %d, current: %d", delta_tick, engine.tick);
+			sys_print("Delta snapshot not found, requested: %d, current: %d", delta_tick, eng->tick);
 			ForceFullUpdate();
 			// discard packet
 			return true;
@@ -346,12 +346,12 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 		while (from_ent.index != ENTITY_SENTINAL && to_index != ENTITY_SENTINAL
 			&& !msg.HasFailed() && !from_ent.failed) {
 			
-			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
+			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &eng->ents[to_index];
 			int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
 
 			if (from_ent.index < to_index) {
 				// old entity, now gone
-				Entity* oldent = &engine.ents[from_ent.index];	// FIXME: have to do more stuff like reset interp
+				Entity* oldent = &eng->ents[from_ent.index];	// FIXME: have to do more stuff like reset interp
 				oldent->set_inactive();
 				from_ent.increment();	// advance from_state to the next Packed_Entity
 			}
@@ -378,7 +378,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 		// the delta packet :(, remove them
 		while (from_ent.index != ENTITY_SENTINAL && !from_ent.failed)
 		{
-			Entity* ent =  &engine.ents[from_ent.index];
+			Entity* ent =  &eng->ents[from_ent.index];
 			ent->set_inactive();
 			from_ent.increment();
 		}
@@ -387,7 +387,7 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	// now: there may be more *new* entities, so finish the list
 	while (to_index != ENTITY_SENTINAL && !msg.HasFailed())
 	{
-		Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &engine.ents[to_index];
+		Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &eng->ents[to_index];
 		read_entity_from_snapshot(ent, to_index, msg, false, nullptr, last_recieved_server_tick);
 
 		msg.AlignToByteBoundary();
