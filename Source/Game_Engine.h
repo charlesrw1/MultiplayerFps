@@ -1,11 +1,12 @@
 #pragma once
-#include "Server.h"
+#include <SDL2/SDL.h>
+#include <string>
 #include "Types.h"
+#include "Config.h"
 #include "Particles.h"
-#include "Memory.h"
+#include "Physics.h"
 
-using std::vector;
-
+class Model;
 class Game_Media
 {
 public:
@@ -13,9 +14,9 @@ public:
 	const Model* get_game_model(const char* name, int* index = nullptr);
 	const Model* get_game_model_from_index(int index);
 	
-	vector<string> model_manifest;
-	vector<Model*> model_cache;
-	vector<string> sound_manifest;
+	std::vector<std::string> model_manifest;
+	std::vector<Model*> model_cache;
+	std::vector<std::string> sound_manifest;
 	Texture* blob_shadow;
 };
 
@@ -60,23 +61,6 @@ public:
 	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
 };
 
-class Debug_Interface
-{
-public:
-	static Debug_Interface* get();
-
-	virtual void add_hook(const char* menu_name, void(*drawfunc)()) = 0;
-	virtual void draw() = 0;
-};
-
-class Debug_Console
-{
-public:
-	static Debug_Console* get();
-	virtual void print(const char* fmt, ...) = 0;
-	virtual void print_args(const char* fmt, va_list list) = 0;
-};
-
 enum Engine_State
 {
 	ENGINE_MENU,
@@ -84,8 +68,13 @@ enum Engine_State
 	ENGINE_GAME,
 };
 
+using std::string;
+
+class Archive;
 struct ImGuiContext;
 class Client;
+class Server;
+class Level;
 class Game_Engine
 {
 public:
@@ -156,6 +145,8 @@ public:
 	Auto_Config_Var host_port;
 	bool show_console = false;
 
+	Archive* data_archive = nullptr;
+
 	bool dedicated_server = false;
 	bool keys[SDL_NUM_SCANCODES];
 	bool keychanges[SDL_NUM_SCANCODES];
@@ -163,15 +154,6 @@ public:
 	bool game_focused = false;
 
 	string* binds[SDL_NUM_SCANCODES];
-
-	// bottom = strings
-	// top = models, textures, sounds
-	Memory_Arena program_long_mem;
-	// bottom = frame data (cleared on each graphics frame!)
-	// top = per level data (cleared on new level loads)
-	Memory_Arena per_frame_and_level_mem;
-	// temporary storage for loading
-	Memory_Arena loading_mem;
 
 	int argc;
 	char** argv;

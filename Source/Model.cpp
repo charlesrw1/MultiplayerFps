@@ -22,7 +22,7 @@
 #define USE_CGLTF
 
 
-static const char* const model_folder_path = "Data\\Models\\";
+static const char* const model_folder_path = "./Data/Models/";
 static std::vector<Model*> models;
 
 // Hardcoded attribute locations for shaders
@@ -958,7 +958,17 @@ static bool load_gltf_model2(const std::string& filepath, Model* model)
 {
 	cgltf_options options = {};
 	cgltf_data* data = NULL;
-	cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
+
+	File_Buffer* infile = Files::open(filepath.c_str());
+	if (!infile) {
+		printf("no such model %s\n", filepath.c_str());
+		return false;
+	}
+
+	cgltf_result result = cgltf_parse(&options, infile->buffer, infile->length, &data);
+	Files::close(infile);
+
+	//cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
 	if (result != cgltf_result_success)
 	{
 		printf("Couldn't load gltf model\n");
@@ -1106,7 +1116,7 @@ Model* FindOrLoadModel(const char* filename)
 
 	Model* model = new Model;
 	model->name = filename;
-	bool res = DoLoadGltfModel(path, model);
+	bool res = load_gltf_model2(path, model);
 	if (!res) {
 		delete model;
 		return nullptr;

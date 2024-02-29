@@ -1,9 +1,9 @@
 #ifndef LEVEL_H
 #define LEVEL_H
 #include <vector>
+#include <string>
 #include "BVH.h"
 #include "Model.h"
-#include "EnvProbe.h"
 
 enum {
 	LIGHT_DIRECTIONAL, 

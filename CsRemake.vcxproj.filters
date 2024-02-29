@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Source Files\External">
-      <UniqueIdentifier>{7dd26c09-769b-49ec-b681-84d812313e61}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Server">
       <UniqueIdentifier>{2e16c947-a6ae-4609-8a2f-070d7ddc0b93}</UniqueIdentifier>
     </Filter>
@@ -27,6 +24,9 @@
     </Filter>
     <Filter Include="Source Files\Network">
       <UniqueIdentifier>{55e4bfbb-611f-468b-88b2-b5e6cdd7851e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\External">
+      <UniqueIdentifier>{7dd26c09-769b-49ec-b681-84d812313e61}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\External\steamaudio">
       <UniqueIdentifier>{9bb540b9-417f-4f44-a1ed-d512948e187f}</UniqueIdentifier>
@@ -57,32 +57,8 @@
     <ClCompile Include="Source\Level.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Socket.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Connection.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Client.cpp">
-      <Filter>Source Files\Client</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Server.cpp">
-      <Filter>Source Files\Server</Filter>
-    </ClCompile>
-    <ClCompile Include="source\Game.cpp">
-      <Filter>Source Files\Server</Filter>
-    </ClCompile>
     <ClCompile Include="BVHBuild.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ClientMgr.cpp">
-      <Filter>Source Files\Client</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ServerClMgr.cpp">
-      <Filter>Source Files\Server</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Particles.cpp">
-      <Filter>Source Files\Client</Filter>
     </ClCompile>
     <ClCompile Include="Source\External\imgui_demo.cpp">
       <Filter>Source Files\External</Filter>
@@ -117,9 +93,6 @@
     <ClCompile Include="Source\Player.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Net.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
     <ClCompile Include="Source\EnvProbe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -129,7 +102,37 @@
     <ClCompile Include="Source\Draw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Archive.cpp">
+    <ClCompile Include="Source\Files.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ClientMgr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Particles.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Connection.cpp">
+      <Filter>Source Files\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Net.cpp">
+      <Filter>Source Files\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Socket.cpp">
+      <Filter>Source Files\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Game.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ServerClMgr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EditorDoc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -152,29 +155,8 @@
     <ClInclude Include="Source\Level.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Socket.h">
-      <Filter>Source Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Connection.h">
-      <Filter>Source Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Bytepacker.h">
-      <Filter>Source Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Net.h">
-      <Filter>Source Files\Network</Filter>
-    </ClInclude>
     <ClInclude Include="Source\BVH.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="source\Server.h">
-      <Filter>Source Files\Server</Filter>
-    </ClInclude>
-    <ClInclude Include="source\Client.h">
-      <Filter>Source Files\Client</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EmulatedSocket.h">
-      <Filter>Source Files\Network</Filter>
     </ClInclude>
     <ClInclude Include="Source\Util.h">
       <Filter>Source Files\Shared</Filter>
@@ -188,17 +170,8 @@
     <ClInclude Include="Source\GlmInclude.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\MoveCommand.h">
-      <Filter>Source Files\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\GameData.h">
-      <Filter>Source Files\Shared</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Config.h">
       <Filter>Source Files\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Particles.h">
-      <Filter>Source Files\Client</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game_Engine.h">
       <Filter>Source Files</Filter>
@@ -216,12 +189,6 @@
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\EnvProbe.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Profilier.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Memory.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon.h">
@@ -242,14 +209,32 @@
     <ClInclude Include="Source\StringUtil.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\StackString.h">
+    <ClInclude Include="source\Client.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Particles.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Bytepacker.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DynamicArray.h">
+    <ClInclude Include="Source\Connection.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Archive.h">
+    <ClInclude Include="Source\EmulatedSocket.h">
       <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Net.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Socket.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="source\Server.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EditorDoc.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

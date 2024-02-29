@@ -6,10 +6,15 @@
 #include "Level.h"
 #include "GlmInclude.h"
 #include "MeshBuilder.h"
+#include "Shader.h"
+#include "EnvProbe.h"
+
+class MeshPart;
 class Model;
 class Animator;
 class Texture;
 class Entity;
+class Game_Shader;
 
 const int BLOOM_MIPS = 6;
 

@@ -1,16 +1,20 @@
 #include "Texture.h"
 #include <vector>
 
-
+#include "glm/glm.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "glad/glad.h"
 #include "Util.h"
 #include "Key_Value_File.h"
 
+#include "Game_Engine.h"
 #include <Windows.h>
+#undef min
+#undef max
 
-static const char* const texture_folder_path = "Data\\Textures\\";
+
+static const char* const texture_folder_path = "./Data/Textures/";
 
 Game_Material_Manager mats;
 
@@ -490,27 +494,28 @@ Texture* Game_Material_Manager::load_texture(const std::string& path)
 		path_to_use = path;
 	}
 
-	if (path_to_use.find(".dds") != std::string::npos) {
+	// check archive
+	File_Buffer* f = Files::open(path_to_use.c_str());
+	if (!f) {
+		sys_print("Couldn't load texture: %s", path.c_str());
+		return nullptr;
+	}
+
+	if (path_to_use.find(".dds")!=std::string::npos) {
 		Texture* t = new Texture;
-		std::vector<char> data;
-		std::ifstream infile(path_to_use, std::ios::binary);
-		infile.seekg(0,std::ios::end);
-		size_t len = infile.tellg();
-		data.resize(len);
-		infile.seekg(0);
-		infile.read(data.data(), len);
-		load_dds_file(t, (uint8_t*)data.data(), len);
+		load_dds_file(t, (uint8_t*)f->buffer, f->length);
 		t->name = path_to_use;
 		return t;
 	}
 	else if (path_to_use.find(".hdr") != std::string::npos) {
-		data = stbi_loadf(path_to_use.c_str(), &x, &y, &channels, 0);
+		data = stbi_loadf_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
 		is_float = true;
 	}
 	else {
-		data = stbi_load(path_to_use.c_str(), &x, &y, &channels, 0);
+		data = stbi_load_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
 		is_float = false;
 	}
+	Files::close(f);
 
 
 	if (data == nullptr) {
@@ -535,6 +540,7 @@ Texture* Game_Material_Manager::load_texture(const std::string& path)
 
 void benchmark_run()
 {
+#if 0
 	const char* dds_file = "Data\\Textures\\Cttexturenavy.dds";
 	const char* png_file = "Data\\Textures\\Cttexturenavy.png";
 
@@ -565,6 +571,7 @@ void benchmark_run()
 		}
 	end = GetTime();
 	printf("DDS: %f\n", float(end - start));
+#endif
 
 }
 

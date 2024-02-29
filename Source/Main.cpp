@@ -32,7 +32,6 @@
 #include "Player.h"
 #include "Config.h"
 #include "Draw.h"
-#include "Profilier.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -77,6 +76,23 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	return has_error;
 }
 
+class Debug_Console
+{
+public:
+	void init();
+	void draw();
+	void print(const char* fmt, ...);
+	void print_args(const char* fmt, va_list list);
+	vector<string> lines;
+	vector<string> history;
+	int history_index = -1;
+	bool auto_scroll = true;
+	bool scroll_to_bottom = false;
+	bool set_keyboard_focus = false;
+	char input_buffer[256];
+};
+static Debug_Console dbg_console;
+
 void Quit()
 {
 	sys_print("Quiting...\n");
@@ -88,14 +104,14 @@ void sys_print(const char* fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 	vprintf(fmt, args);
-	Debug_Console::get()->print_args(fmt, args);
+	dbg_console.print_args(fmt, args);
 	va_end(args);
 }
 
 void sys_vprint(const char* fmt, va_list args)
 {
 	vprintf(fmt, args);
-	Debug_Console::get()->print_args(fmt, args);
+	dbg_console.print_args(fmt, args);
 }
 
 void Fatalf(const char* format, ...)
@@ -275,8 +291,6 @@ void Game_Engine::init_sdl_window()
 		exit(-1);
 	}
 
-	program_time_start = GetTime();
-
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 
@@ -353,19 +367,30 @@ void Fly_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy
 		position -= move_speed * up;
 }
 
-
 void Game_Media::load()
 {
 	model_manifest.clear();
 
-	std::ifstream manifest_f("./Data/Models/manifest.txt");
+	File_Buffer* manifest_f = Files::open("./Data/Models/manifest.txt", Files::TEXT | Files::LOOK_IN_ARCHIVE);
+
+
+	//std::ifstream manifest_f("./Data/Models/manifest.txt");
 	if (!manifest_f) {
 		sys_print("Couldn't open model manifest\n");
 		return;
 	}
-	std::string line;
-	while (std::getline(manifest_f, line))
-		model_manifest.push_back(line);
+	char buffer[256];
+	Buffer str;
+	str.buffer = buffer;
+	str.length = 256;
+	int index = 0;
+	while (file_getline(manifest_f, &str, &index, '\n')) {
+		std::string s = str.buffer;
+		model_manifest.push_back(s);
+	}
+
+	Files::close(manifest_f);
+
 	model_cache.resize(model_manifest.size());
 
 	blob_shadow = FindOrLoadTexture("blob_shadow.png");
@@ -551,7 +576,6 @@ DECLARE_ENGINE_CMD(reload_shaders)
 	draw.reload_shaders();
 }
 
-Global_Memory_Context mem_ctx;
 
 typedef int sound_handle;
 enum Sound_Channels
@@ -636,32 +660,9 @@ void init_audio()
 
 extern void benchmark_run();
 extern void benchmark_gltf();
-#include "DynamicArray.h"
-#include "Memory.h"
 
-
-static Memory_Arena g_arena;
-Arena_Loc get_default_location() { return { &g_arena, false }; }
-
-#include <Windows.h>
-#include "Archive.h"
 int main(int argc, char** argv)
 {
-	Archive archive;
-	archive.create("archive.dat");
-
-	g_arena.init("initial", 5'000);
-	Heap_Array<int, A_Allocator> my_ints(get_default_location());
-	my_ints.set_size(1'000);
-	memset(my_ints.get_ptr(), 'X', sizeof(int) * my_ints.size());
-
-	my_ints.free_ptr();
-	g_arena.free_bottom();
-	my_ints.set_size(1'000);
-	my_ints.free_ptr();
-	g_arena.free_bottom();
-
-
 	eng = new Game_Engine;
 
 	eng->argc = argc;
@@ -819,40 +820,6 @@ extern vec3 wswind_dir;
 extern float speed;
 
 
-
-class Debug_Console_Impl : public Debug_Console
-{
-public:
-	Debug_Console_Impl();
-
-	void draw();
-	void print(const char* fmt, ...);
-	void print_args(const char* fmt, va_list list);
-	vector<string> lines;
-	vector<string> history;
-	int history_index = -1;
-	bool auto_scroll = true;
-	bool scroll_to_bottom = false;
-	bool set_keyboard_focus = false;
-	char input_buffer[256];
-};
-
-Debug_Console* Debug_Console::get()
-{
-	static Debug_Console_Impl inst;
-	return &inst;
-}
-
-void draw_console_hook() {
-
-	((Debug_Console_Impl*)Debug_Console::get()->get())->draw();
-}
-
-Debug_Console_Impl::Debug_Console_Impl()
-{
-	Debug_Interface::get()->add_hook("Console", draw_console_hook);
-}
-
 class Debug_Interface_Impl : public Debug_Interface
 {
 public:
@@ -961,8 +928,6 @@ void draw_wind_menu()
 	ImGui::DragFloat("radius", &wsradius, 0.04);
 	ImGui::DragFloat("startheight", &wsstartheight, 0.04, 0.f, 1.f);
 	ImGui::DragFloat("startradius", &wsstartradius, 0.04, 0.f, 1.f);
-
-	ImGui::Image((ImTextureID)EnviornmentMapHelper::get().integrator.lut_id, ImVec2(512, 512));
 }
 
 void menu_playervars()
@@ -1152,14 +1117,7 @@ Game_Engine::Game_Engine() :
 
 void Game_Engine::init()
 {
-	loading_mem.init("LOADING", 2'000'000);
-	per_frame_and_level_mem.init("FRAME AND LEVEL", 4'000'000);
-	program_long_mem.init("PROGRAM", 4'000'000);
-
-	mem_ctx.temp_default = { &per_frame_and_level_mem, false };
-	mem_ctx.level_default = { &per_frame_and_level_mem, true };
-	mem_ctx.long_default = { &program_long_mem, false };
-	mem_ctx.loading_default = { &loading_mem, false };
+	program_time_start = GetTime();
 
 	memset(keys, 0, sizeof(keys));
 	memset(keychanges, 0, sizeof(keychanges));
@@ -1173,7 +1131,7 @@ void Game_Engine::init()
 	sv = new Server;
 	cl = new Client;
 	
-	Cmd_Manager::get()->set_set_unknown_variables(true);
+	dbg_console.init();
 
 	// hook debug menus
 	Debug_Interface::get()->add_hook("Movement Vars", move_variables_menu);
@@ -1181,9 +1139,13 @@ void Game_Engine::init()
 	Debug_Interface::get()->add_hook("Player vars", menu_playervars);
 
 	// engine initilization
+	float first_start = GetTime();
 	float start = GetTime();
 	init_sdl_window();
 	TIMESTAMP("init sdl window");
+
+	Profiler::init();
+	Files::init();
 
 	init_audio();
 	TIMESTAMP("init audio");
@@ -1218,9 +1180,8 @@ void Game_Engine::init()
 	ImGui::GetIO().Fonts->AddFontFromFileTTF("./Data/Inconsolata-Bold.ttf", 14.0);
 	ImGui::GetIO().Fonts->Build();
 
+	Cmd_Manager::get()->set_set_unknown_variables(true);
 	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
-	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
-
 	
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -1254,6 +1215,7 @@ void Game_Engine::init()
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
 	}
+	Cmd_Manager::get()->set_set_unknown_variables(false);
 
 
 	SDL_SetWindowPosition(window, startx, starty);
@@ -1261,7 +1223,9 @@ void Game_Engine::init()
 	TIMESTAMP("cfg exectute");
 
 
-	Cmd_Manager::get()->set_set_unknown_variables(false);
+	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
+
+	printf("Total execute time: %f\n", GetTime() - first_start);
 }
 
 
@@ -1384,7 +1348,7 @@ void Game_Engine::loop()
 		else if (print_fps.integer())
 			next_print -= eng->frame_time;
 
-		Profiler::get_instance()->end_frame_tick();
+		Profiler::end_frame_tick();
 
 		if (pending_state) {
 			pending_state = false;
@@ -1441,10 +1405,16 @@ void Game_Engine::pre_render_update()
 	local.update_view();
 }
 
+void draw_console_hook() {
+	dbg_console.draw();
+}
+void Debug_Console::init() {
+	Debug_Interface::get()->add_hook("Console", draw_console_hook);
+}
 
 int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 {
-	Debug_Console_Impl* console = (Debug_Console_Impl*)data->UserData;
+	Debug_Console* console = &dbg_console;
 	if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
 		if (data->EventKey == ImGuiKey_UpArrow) {
 			if (console->history_index == -1) {
@@ -1473,11 +1443,11 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-void Debug_Console_Impl::draw()
+void Debug_Console::draw()
 {
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-	if (!ImGui::BeginChild("Console")) {
-		ImGui::EndChild();
+	if (!ImGui::Begin("Console")) {
+		ImGui::End();
 		return;
 	}
 	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
@@ -1534,9 +1504,9 @@ void Debug_Console_Impl::draw()
 	if (reclaim_focus)
 		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
 
-	ImGui::EndChild();
+	ImGui::End();
 }
-void Debug_Console_Impl::print_args(const char* fmt, va_list args)
+void Debug_Console::print_args(const char* fmt, va_list args)
 {
 	if (lines.size() > 1000)
 		lines.clear();
@@ -1547,7 +1517,7 @@ void Debug_Console_Impl::print_args(const char* fmt, va_list args)
 	lines.push_back(buf);
 }
 
-void Debug_Console_Impl::print(const char* fmt, ...)
+void Debug_Console::print(const char* fmt, ...)
 {
 	char buf[1024];
 	va_list args;

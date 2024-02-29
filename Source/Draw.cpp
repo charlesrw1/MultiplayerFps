@@ -3,7 +3,6 @@
 #include "glad/glad.h"
 #include "Texture.h"
 #include "Game_Engine.h"
-#include "Profilier.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -328,6 +327,8 @@ void Renderer::set_depth_shader_constants()
 
 void set_standard_draw_data(const Render_Level_Params& params)
 {
+	glCheckError();
+
 	int start = Renderer::SAMPLER_LIGHTMAP;
 	// >>> PBR BRANCH
 	glActiveTexture(GL_TEXTURE0 + start + 1);
@@ -335,11 +336,15 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glActiveTexture(GL_TEXTURE0 + start + 2);
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, draw.scene.levelcubemapspecular_array);
 
+	glCheckError();
+
 	glActiveTexture(GL_TEXTURE0 + start + 3);
 	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
 
 	glActiveTexture(GL_TEXTURE0 + start + 5);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, draw.shadowmap.shadow_map_array);
+
+	glCheckError();
 
 	//shader().set_vec4("aoproxy_sphere", vec4(eng->local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
 	//shader().set_float("aoproxy_scale_factor", aosphere.z);
@@ -349,17 +354,28 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glActiveTexture(GL_TEXTURE0 + start + 6);
 	glBindTexture(GL_TEXTURE_2D, ssao_tex);
 
+	glCheckError();
+
 	glActiveTexture(GL_TEXTURE0 + start + 7);
 	glBindTexture(GL_TEXTURE_2D, draw.casutics->gl_id);
+
+	glCheckError();
 
 	glActiveTexture(GL_TEXTURE0 + start + 4);
 	glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
 
+	glCheckError();
+
 	glBindBufferBase(GL_UNIFORM_BUFFER, 4, draw.volfog.param_ubo);
+
+	glCheckError();
 	glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.csm_ubo);
+
+	glCheckError();
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, draw.scene.cubemap_ssbo);
 
+	glCheckError();
 }
 
 void Renderer::set_shader_constants()
@@ -1285,8 +1301,15 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		active_constants_ubo = view_ubo;
 	}
 
+	glCheckError();
+
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+	
+	glCheckError();
+	
 	set_standard_draw_data(params);
+
+	glCheckError();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
 	glViewport(0, 0, vs.width, vs.height);
@@ -1294,6 +1317,8 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		glClearColor(0.f, 0.f, 0.f, 1.f);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
+
+	glCheckError();
 
 	if (params.cull_front_face) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
@@ -1307,6 +1332,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		glEnable(GL_CLIP_DISTANCE0);
 	}
 
+	glCheckError();
 
 	if (params.draw_level) {
 		DrawLevel(params);
@@ -1316,10 +1342,14 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	if (params.draw_viewmodel)
 		DrawPlayerViewmodel(params);
 
+	glCheckError();
+
 	if (params.pass == Render_Level_Params::OPAQUE) {
 		glDepthFunc(GL_LEQUAL);	// for post z prepass
 		DrawSkybox();
 	}
+
+	glCheckError();
 
 
 	if (params.cull_front_face) {
@@ -1331,6 +1361,8 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 
 	if (params.has_clip_plane)
 		glDisable(GL_CLIP_DISTANCE0);
+
+	glCheckError();
 
 	using_skybox_for_specular = false;
 }
@@ -2326,6 +2358,8 @@ void Renderer::on_level_start()
 	glDeleteTextures(1, &scene.levelcubemapirradiance_array);
 	glDeleteTextures(1, &scene.levelcubemapspecular_array);
 	glDeleteTextures(1, &scene.skybox);
+	scene.cubemap_ssbo = 0;
+	scene.levelcubemapirradiance_array = scene.levelcubemapspecular_array = 0;
 	scene.directional_index = -1;
 
 	// add the lights

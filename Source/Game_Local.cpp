@@ -6,7 +6,6 @@
 #include "Player.h"
 #include "MeshBuilder.h"
 #include "Config.h"
-#include "GameData.h"
 
 
 glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)

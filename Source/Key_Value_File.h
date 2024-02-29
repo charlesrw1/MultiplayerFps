@@ -1,8 +1,8 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <fstream>
 #include "Config.h"
+#include "Util.h"
 
 using std::string;
 using std::vector;
@@ -23,15 +23,22 @@ extern void tokenize_string(string& input, Cmd_Args& out);
 
 bool Key_Value_File::open(const char* filename)
 {
-	std::ifstream infile(filename);
+	File_Buffer* infile = Files::open(filename, Files::TEXT | Files::LOOK_IN_ARCHIVE);
 	if (!infile)
 		return false;
+
+	char buffer[256];
+	buffer[0] = 0;
+	Buffer str_buffer{ buffer,256 };
+	int getline_index = 0;
 
 	std::string line;
 	Entry cur;
 	int linenum = 0;
-	while (std::getline(infile, line))
+	while (file_getline(infile, &str_buffer, &getline_index,'\n'))
 	{
+		line = buffer;
+
 		linenum++;
 
 		// FIXME: white space on lines

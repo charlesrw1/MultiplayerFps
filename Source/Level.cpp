@@ -6,7 +6,7 @@
 #include "Physics.h"
 #include "Texture.h"
 #include <array>
-static const char* const level_directory = "Data\\Models\\";
+
 static const char* const maps_directory = "./Data/Maps/";
 
 // Model.cpp
@@ -207,7 +207,6 @@ void load_level_lights(Level* l, tinygltf::Model& scene)
 
 	}
 }
-
 Level* LoadLevelFile(const char* level_name)
 {
 	std::string map_dir;
@@ -222,7 +221,13 @@ Level* LoadLevelFile(const char* level_name)
 	tinygltf::TinyGLTF loader;
 	std::string errStr;
 	std::string warnStr;
-	bool res = loader.LoadBinaryFromFile(&scene, &errStr, &warnStr, levelmesh_path);
+	File_Buffer* infile = Files::open(levelmesh_path.c_str());
+	if (!infile) {
+		printf("no level with such name\n");
+		return nullptr;
+	}
+	bool res = loader.LoadBinaryFromMemory(&scene, &errStr, &warnStr,(unsigned char*)infile->buffer,infile->length);
+	Files::close(infile);
 	if (!res) {
 		printf("Couldn't load level: %s\n", level_name);
 		return nullptr;

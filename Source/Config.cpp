@@ -257,18 +257,21 @@ public:
 		}
 	}
 	void execute_file(Cmd_Execute_Mode mode, const char* path) {
-		std::ifstream infile(path);
+		File_Buffer* infile = Files::open(path, Files::TEXT);
+		//std::ifstream infile(path);
 		if (!infile) {
 			printf(__FUNCTION__": couldn't open file\n");
 			return;
 		}
-		std::string line;
-		while (std::getline(infile, line)) {
-			if (line.empty())
+		char buffer[256];
+		Buffer str_buf = { buffer,256 };
+		int index = 0;
+		while (file_getline(infile,&str_buf,&index,'\n')) {
+			if (buffer[0]==0)
 				continue;
-			if (line.at(0) == '#')
+			if (buffer[0]=='#')
 				continue;
-			execute(Cmd_Execute_Mode::NOW, line.c_str());
+			execute(Cmd_Execute_Mode::NOW, buffer);
 		}
 	}
 	void execute_buffer() {

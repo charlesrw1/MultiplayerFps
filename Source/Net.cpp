@@ -1,4 +1,5 @@
 #include "Net.h"
+#include "Types.h"
 
 #define ESP(x) #x,(int)&((Entity*)0)->x
 #define ESPO(x) (int)&((Entity*)0)->x

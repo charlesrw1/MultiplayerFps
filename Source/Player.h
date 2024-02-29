@@ -1,8 +1,7 @@
 #ifndef PLAYERMOVE_H
 #define PLAYERMOVE_H
-#include "MoveCommand.h"
-#include "Net.h"
-#include "Physics.h"
+#include "Types.h"
+class Entity;
 class MeshBuilder;
 class Animation_Set;
 

@@ -1,9 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
-#include "StringUtil.h"
 #include "Util.h"
-#include "StackString.h"
-
+#include "StringUtil.h"
 
 struct Generic_Value
 {
@@ -127,6 +125,16 @@ public:
 		Cmd_Manager::get()->add_command(name, cmd);
 	}
 };
+
+class Debug_Interface
+{
+public:
+	static Debug_Interface* get();
+
+	virtual void add_hook(const char* menu_name, void(*drawfunc)()) = 0;
+	virtual void draw() = 0;
+};
+
 
 #define DECLARE_ENGINE_CMD(func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
 #define DECLARE_ENGINE_CMD_CAT(category, func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(category#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)

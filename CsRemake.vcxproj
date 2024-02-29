@@ -29,7 +29,8 @@
   <ItemGroup>
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
-    <ClCompile Include="Source\Archive.cpp" />
+    <ClCompile Include="Source\EditorDoc.cpp" />
+    <ClCompile Include="Source\Files.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
     <ClCompile Include="Source\External\imgui.cpp" />
@@ -63,28 +64,22 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
-    <ClInclude Include="Source\Archive.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
     <ClInclude Include="Source\Draw.h" />
-    <ClInclude Include="Source\DynamicArray.h" />
+    <ClInclude Include="Source\EditorDoc.h" />
     <ClInclude Include="Source\EnvProbe.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
-    <ClInclude Include="Source\Memory.h" />
     <ClInclude Include="Source\Particles.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
-    <ClInclude Include="Source\GameData.h" />
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
-    <ClInclude Include="Source\Profilier.h" />
-    <ClInclude Include="Source\StackString.h" />
     <ClInclude Include="Source\StringUtil.h" />
     <ClInclude Include="Source\Types.h" />
-    <ClInclude Include="Source\MoveCommand.h" />
     <ClInclude Include="Source\Bytepacker.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\Level.h" />
