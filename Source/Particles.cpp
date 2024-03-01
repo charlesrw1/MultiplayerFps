@@ -88,7 +88,7 @@ void Particle_Manager::draw_particles()
 			}
 			if (sprite != p.sprite) {
 				sprite = p.sprite;
-				draw.bind_texture(0, (p.sprite < 0) ? draw.white_texture : sprites[p.sprite]->gl_id);
+				draw.bind_texture(0, (p.sprite < 0) ? draw.white_texture : sprites[p.sprite]->gl_id, GL_TEXTURE_2D);
 			}
 		}
 

@@ -35,18 +35,40 @@ const int COLOR_LOC = 5;
 const int UV2_LOC = 6;
 const int TANGENT_LOC = 7;
 
-struct Super_Vert
+const int ATTRIB_COUNT = 8;
+
+class Mesh_Manager
 {
-	glm::vec3 position;
-	glm::vec2 uv0;
-	glm::vec3 normal;
-	glm::ivec4 joint;
-	glm::vec4 weight;
-	glm::vec3 color;
-	glm::vec2 uv1;
-	glm::vec3 tangent;
-	glm::vec3 bitangent;
+public:
+	void init();
+
+	enum Formats {
+		FMT_SKINNED, //pos,uv0,normal,tangent,weights,indicies	
+		FMT_STATIC,	// pos,uv0,normal,tangent
+		FMT_STATIC_PLUS,// pos,uv0,normal,tangent, color, uv1
+		NUM_FMTS
+	};
+
+	struct Gpu_Buffer {
+		uint32_t buffer = 0;
+		uint32_t allocated = 0;
+		uint32_t used = 0;
+	};
+
+	struct Vao_Buffer {
+		Gpu_Buffer buffers[ATTRIB_COUNT];	// not all are used
+		Gpu_Buffer index_buffer16;
+		uint32_t vao = 0;
+	};
+	Vao_Buffer fmts[NUM_FMTS];
 };
+
+struct Scratch_Mem
+{
+	std::vector<char> buffers[ATTRIB_COUNT + 1];
+};
+static Scratch_Mem mod_scratch_mem;
+
 
 
 bool MeshPart::has_lightmap_coords() const
@@ -561,7 +583,7 @@ void load_model_materials(std::vector<Game_Shader*>& materials, const std::strin
 			int baseindex = mat.pbrMetallicRoughness.baseColorTexture.index;
 			if (baseindex != -1 && baseindex < scene.images.size()) {
 				gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
-				gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+				gs->images[Game_Shader::DIFFUSE] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
 			
 			}
 			else
@@ -600,12 +622,12 @@ void load_model_materials2(std::vector<Game_Shader*>& materials, const std::stri
 				cgltf_pbr_metallic_roughness& base = mat.pbr_metallic_roughness;
 				if (base.base_color_texture.texture) {
 					gs = mats.create_temp_shader((fallbackname + mat_name).c_str());
-					gs->images[Game_Shader::BASE1] = LoadGltfImage2(base.base_color_texture.texture->image, data);
+					gs->images[Game_Shader::DIFFUSE] = LoadGltfImage2(base.base_color_texture.texture->image, data);
 					if (base.metallic_roughness_texture.texture) {
-						gs->images[Game_Shader::AUX1] = LoadGltfImage2(base.metallic_roughness_texture.texture->image, data);
+						gs->images[Game_Shader::ROUGHNESS] = LoadGltfImage2(base.metallic_roughness_texture.texture->image, data);
 					}
 					if (mat.normal_texture.texture) {
-						gs->images[Game_Shader::NORMAL1] = LoadGltfImage2(mat.normal_texture.texture->image, data);
+						gs->images[Game_Shader::NORMAL] = LoadGltfImage2(mat.normal_texture.texture->image, data);
 					}
 				}
 			}

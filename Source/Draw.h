@@ -252,10 +252,7 @@ public:
 	
 	int cubemap_index = 0;
 
-	enum {
-		SAMPLER_BASE1, SAMPLER_AUX1, SAMPLER_NORM1, SAMPLER_BASE2, SAMPLER_AUX2, SAMPLER_NORM2,
-		SAMPLER_SPECIAL, SAMPLER_LIGHTMAP, NUM_SAMPLERS
-	};
+	static const int MAX_SAMPLER_BINDINGS = 16;
 
 	// shaders
 	enum Shader_List { 
@@ -333,7 +330,7 @@ public:
 	Auto_Config_Var use_halfres_reflections;
 
 
-	void bind_texture(int bind, int id);
+	void bind_texture(int bind, int id, int target);
 	void set_shader(Shader& s) { 
 		if (s.ID != cur_shader) {
 			s.use();
@@ -434,7 +431,7 @@ private:
 	int cur_w = 0;
 	int cur_h = 0;
 	uint32_t cur_shader = 0;
-	uint32_t cur_tex[NUM_SAMPLERS];
+	uint32_t cur_tex[MAX_SAMPLER_BINDINGS];
 
 	MeshBuilder ui_builder;
 	uint32_t building_ui_texture;

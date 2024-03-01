@@ -8,6 +8,12 @@ TEXTURE_DIR = "./Data/Textures/"
 #read mat files, for each texture, determine type (specular/normal/color)
 #if dds doesn't exist or source file modified, generate dds file with nvdxt
 
+ALBEDO_MAX_SIZE = 1024
+NORMAL_MAX_SIZE = 512
+ROUGHNESS_MAX_SIZE = 512
+METALNESS_MAX_SIZE = 512
+AO_MAX_SIZE = 512
+
 def compile_texture_list(texture_list, alphamode):
     for ttype, path in texture_list:
         last_modified_time = os.path.getmtime(TEXTURE_DIR+path)
@@ -26,7 +32,7 @@ def compile_texture_list(texture_list, alphamode):
         #specular textures get dxt1, normalmaps get uncompressed, color textures get dxt1 or dxt5
         args = "-dxt1a"
 
-        if ttype == "image":
+        if ttype == "albedo":
             if alphamode:
                 args = "-dxt5"
             else:
@@ -55,7 +61,7 @@ def compile_texture_list(texture_list, alphamode):
 
 matfiles = os.listdir(MAT_DIR)
 
-IMAGE_DECL = ["image1","image2","aux1","aux2","normal1","normal2","special"]
+IMAGE_DECL = ["albedo","normal","rough","metal","ao","special"]
 
 for matfile in matfiles:
     if os.path.isdir(MAT_DIR+matfile):

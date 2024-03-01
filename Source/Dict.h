@@ -66,6 +66,14 @@ public:
 		int fields = sscanf(find->second.c_str(), "%f %f %f", &o.x, &o.y, &o.z);
 		return o;
 	}
+	glm::vec2 get_vec2(const char* key, glm::vec2 defaultval = glm::vec2(0.f)) {
+		const auto& find = keyvalues.find(key);
+		if (find == keyvalues.end())
+			return defaultval;
+		glm::vec2 o = glm::vec2(0.f);
+		int fields = sscanf(find->second.c_str(), "%f %f", &o.x, &o.y);
+		return o;
+	}
 	float get_float(const char* key, float defaultval = 0.f) {
 		const auto& find = keyvalues.find(key);
 		if (find == keyvalues.end())

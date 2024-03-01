@@ -50,29 +50,66 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 
 		auto& dict = mat.second.dict;
 		const char* str_get = "";
-		if (*(str_get = dict.get_string("image1")) != 0) {
-			gs->images[Game_Shader::BASE1] = FindOrLoadTexture(str_get);
+
+		if (*(str_get = dict.get_string("pbr_full")) != 0) {
+			const char* path = string_format("%s_albedo.png", str_get);
+			gs->images[Game_Shader::DIFFUSE] = FindOrLoadTexture(path);
+			path = string_format("%s_normal-ogl.png", str_get);
+			gs->images[Game_Shader::NORMAL] = FindOrLoadTexture(path);
+			path = string_format("%s_ao.png", str_get);
+			gs->images[Game_Shader::AO] = FindOrLoadTexture(path);
+			path = string_format("%s_roughness.png", str_get);
+			gs->images[Game_Shader::ROUGHNESS] = FindOrLoadTexture(path);
+			path = string_format("%s_metallic.png", str_get);
+			gs->images[Game_Shader::METAL] = FindOrLoadTexture(path);
 		}
-		if (*(str_get = dict.get_string("aux1")) != 0) {
-			gs->images[Game_Shader::AUX1] = FindOrLoadTexture(str_get);
+
+		// assume that ref_shaderX will be defined in the future, so create them if they haven't been
+		if (*(str_get = dict.get_string("ref_shader1")) != 0) {
+			gs->references[0] = find_for_name(str_get);
+			if (!gs->references[0]) {
+				Game_Shader* ref = new Game_Shader;
+				ref->name = str_get;
+				shaders.push_back(ref);
+				gs->references[0] = ref;
+			}
 		}
-		if (*(str_get = dict.get_string("normal1")) != 0) {
-			gs->images[Game_Shader::NORMAL1] = FindOrLoadTexture(str_get);
+		if (*(str_get = dict.get_string("ref_shader2")) != 0) {
+			gs->references[1] = find_for_name(str_get);
+			if (!gs->references[1]) {
+				Game_Shader* ref = new Game_Shader;
+				ref->name = str_get;
+				shaders.push_back(ref);
+				gs->references[1] = ref;
+			}
 		}
-		if (*(str_get = dict.get_string("image2")) != 0) {
-			gs->images[Game_Shader::BASE2] = FindOrLoadTexture(str_get);
+
+		if (*(str_get = dict.get_string("albedo")) != 0) {
+			gs->images[Game_Shader::DIFFUSE] = FindOrLoadTexture(str_get);
 		}
-		if (*(str_get = dict.get_string("aux2")) != 0) {
-			gs->images[Game_Shader::AUX2] = FindOrLoadTexture(str_get);
+		if (*(str_get = dict.get_string("normal")) != 0) {
+			gs->images[Game_Shader::NORMAL] = FindOrLoadTexture(str_get);
 		}
-		if (*(str_get = dict.get_string("normal2")) != 0) {
-			gs->images[Game_Shader::NORMAL2] = FindOrLoadTexture(str_get);
+		if (*(str_get = dict.get_string("ao")) != 0) {
+			gs->images[Game_Shader::AO] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("rough")) != 0) {
+			gs->images[Game_Shader::ROUGHNESS] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("metal")) != 0) {
+			gs->images[Game_Shader::METAL] = FindOrLoadTexture(str_get);
 		}
 		if (*(str_get = dict.get_string("special")) != 0) {
 			gs->images[Game_Shader::SPECIAL] = FindOrLoadTexture(str_get);
 		}
+
 		gs->diffuse_tint = glm::vec4(dict.get_vec3("tint", glm::vec3(1.f)),1.f);
-		gs->spec_tint = dict.get_vec3("spec_tint", glm::vec3(0.5f));
+
+		float default_metal = 0.f;
+		if (gs->images[Game_Shader::METAL]) default_metal = 1.f;
+		gs->metalness_mult = dict.get_float("metal_val", default_metal);
+		gs->roughness_mult = dict.get_float("rough_val", 1.f);
+		gs->roughness_remap_range = dict.get_vec2("rough_remap", glm::vec2(0, 1));
 
 		if (*(str_get = dict.get_string("shader")) != 0) {
 			if (strcmp(str_get,"blend2") == 0) gs->shader_type = Game_Shader::S_2WAYBLEND;

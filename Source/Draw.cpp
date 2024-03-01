@@ -11,6 +11,26 @@
 
 Renderer draw;
 
+static const int ALBEDO1_LOC = 0;
+static const int NORMAL1_LOC = 1;
+static const int ROUGH1_LOC = 2;
+static const int METAL1_LOC = 3;
+static const int AO1_LOC = 4;
+static const int ALBEDO2_LOC = 5;
+static const int NORMAL2_LOC = 3; // if double blending, cant have metal or ao 
+static const int ROUGH2_LOC = 4;
+static const int LIGHTMAP_LOC = 6;
+static const int SPECIAL_LOC = 7;
+
+static const int IRRADIANCE_CM_LOC = 8;
+static const int SPECULAR_CM_LOC = 9;
+static const int BRDF_LUT_LOC = 10;
+static const int SHADOWMAP_LOC = 11;
+static const int CAUSTICS_LOC = 12;
+static const int SSAO_TEX_LOC = 13;
+
+
+
 // Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
 uint32_t hash(uint32_t x, uint32_t seed) {
 	const uint32_t m = 0x5bd1e995U;
@@ -203,7 +223,7 @@ void Renderer::draw_sprite(glm::vec3 origin, Color32 color, glm::vec2 size, Text
 
 	sprite_state.in_world_space = in_world_space;
 	if (sprite_state.current_t != tex || sprite_state.force_set) {
-		bind_texture(SAMPLER_BASE1, tex);
+		bind_texture(ALBEDO1_LOC, tex, GL_TEXTURE_2D);
 		sprite_state.current_t = tex;
 	}
 	if (sprite_state.additive != additive || sprite_state.force_set) {
@@ -284,12 +304,12 @@ void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
 }
 
-void Renderer::bind_texture(int bind, int id)
+void Renderer::bind_texture(int bind, int id, int target)
 {
-	ASSERT(bind >= 0 && bind < NUM_SAMPLERS);
+	ASSERT(bind >= 0 && bind < MAX_SAMPLER_BINDINGS);
 	if (cur_tex[bind] != id) {
 		glActiveTexture(GL_TEXTURE0 + bind);
-		glBindTexture(GL_TEXTURE_2D, id);
+		glBindTexture(target, id);
 		cur_tex[bind] = id;
 	}
 }
@@ -297,27 +317,29 @@ void Renderer::bind_texture(int bind, int id)
 
 void Renderer::set_shader_sampler_locations()
 {
-	shader().set_int("basecolor", SAMPLER_BASE1);
-	shader().set_int("auxcolor", SAMPLER_AUX1);
-	shader().set_int("normalmap", SAMPLER_NORM1);
+	shader().set_int("basecolor", ALBEDO1_LOC);
+	shader().set_int("roughness_tex", ROUGH1_LOC);
+	shader().set_int("normal_tex", NORMAL1_LOC);
+	shader().set_int("metalness_tex", METAL1_LOC);
+	shader().set_int("ao_tex", AO1_LOC);
 
-	shader().set_int("basecolor2", SAMPLER_BASE2);
-	shader().set_int("auxcolor2", SAMPLER_AUX2);
-	shader().set_int("normalmap2", SAMPLER_NORM2);
+//	shader().set_int("basecolor2", ALBEDO2_LOC);
+//	shader().set_int("auxcolor2", ROUGH2_LOC);
+//	shader().set_int("normalmap2", NORMAL2_LOC);
 
-	shader().set_int("special", SAMPLER_SPECIAL);
-	shader().set_int("lightmap", SAMPLER_LIGHTMAP);
+	shader().set_int("special", SPECIAL_LOC);
+	shader().set_int("lightmap", LIGHTMAP_LOC);
 
 	// >>> PBR BRANCH
-	shader().set_int("pbr_irradiance_cubemaps", SAMPLER_LIGHTMAP + 1);
-	shader().set_int("pbr_specular_cubemaps", SAMPLER_LIGHTMAP + 2);
-	shader().set_int("PBR_brdflut", SAMPLER_LIGHTMAP + 3);
-	shader().set_int("volumetric_fog", SAMPLER_LIGHTMAP + 4);
-	shader().set_int("cascade_shadow_map", SAMPLER_LIGHTMAP + 5);
+	shader().set_int("pbr_irradiance_cubemaps", IRRADIANCE_CM_LOC);
+	shader().set_int("pbr_specular_cubemaps", SPECULAR_CM_LOC);
+	shader().set_int("PBR_brdflut", BRDF_LUT_LOC);
+	//shader().set_int("volumetric_fog", SAMPLER_LIGHTMAP + 4);
+	shader().set_int("cascade_shadow_map", SHADOWMAP_LOC);
 
-	shader().set_int("ssao_tex", SAMPLER_LIGHTMAP + 6);
+	shader().set_int("ssao_tex", SSAO_TEX_LOC);
 
-	shader().set_int("caustictex", SAMPLER_LIGHTMAP + 7);
+	shader().set_int("caustictex", CAUSTICS_LOC);
 }
 
 void Renderer::set_depth_shader_constants()
@@ -329,20 +351,14 @@ void set_standard_draw_data(const Render_Level_Params& params)
 {
 	glCheckError();
 
-	int start = Renderer::SAMPLER_LIGHTMAP;
 	// >>> PBR BRANCH
-	glActiveTexture(GL_TEXTURE0 + start + 1);
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, draw.scene.levelcubemapirradiance_array);
-	glActiveTexture(GL_TEXTURE0 + start + 2);
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, draw.scene.levelcubemapspecular_array);
+	draw.bind_texture(IRRADIANCE_CM_LOC, draw.scene.levelcubemapirradiance_array, GL_TEXTURE_CUBE_MAP_ARRAY);
+	draw.bind_texture(SPECULAR_CM_LOC, draw.scene.levelcubemapspecular_array, GL_TEXTURE_CUBE_MAP_ARRAY);
 
 	glCheckError();
+	draw.bind_texture(BRDF_LUT_LOC, EnviornmentMapHelper::get().integrator.lut_id, GL_TEXTURE_2D);
 
-	glActiveTexture(GL_TEXTURE0 + start + 3);
-	glBindTexture(GL_TEXTURE_2D, EnviornmentMapHelper::get().integrator.lut_id);
-
-	glActiveTexture(GL_TEXTURE0 + start + 5);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, draw.shadowmap.shadow_map_array);
+	draw.bind_texture(SHADOWMAP_LOC, draw.shadowmap.shadow_map_array, GL_TEXTURE_2D_ARRAY);
 
 	glCheckError();
 
@@ -351,18 +367,22 @@ void set_standard_draw_data(const Render_Level_Params& params)
 
 	uint32_t ssao_tex = draw.ssao.fullres2;
 	if (params.is_probe_render || params.is_water_reflection_pass) ssao_tex = draw.white_texture;
-	glActiveTexture(GL_TEXTURE0 + start + 6);
-	glBindTexture(GL_TEXTURE_2D, ssao_tex);
+
+	draw.bind_texture(SSAO_TEX_LOC, ssao_tex, GL_TEXTURE_2D);
+	glCheckError();
+
+	draw.bind_texture(CAUSTICS_LOC, draw.casutics->gl_id, GL_TEXTURE_2D);
 
 	glCheckError();
 
-	glActiveTexture(GL_TEXTURE0 + start + 7);
-	glBindTexture(GL_TEXTURE_2D, draw.casutics->gl_id);
 
-	glCheckError();
+	if (eng->level->lightmap)
+		draw.bind_texture(LIGHTMAP_LOC, eng->level->lightmap->gl_id, GL_TEXTURE_2D);
+	else
+		draw.bind_texture(LIGHTMAP_LOC, draw.white_texture, GL_TEXTURE_2D);
 
-	glActiveTexture(GL_TEXTURE0 + start + 4);
-	glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
+	//glActiveTexture(GL_TEXTURE0 + start + 4);
+	//glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
 
 	glCheckError();
 
@@ -1400,7 +1420,7 @@ void Renderer::ui_render()
 
 
 	if (ui_builder.GetBaseVertex() > 0) {
-		bind_texture(SAMPLER_BASE1, building_ui_texture);
+		bind_texture(ALBEDO1_LOC, building_ui_texture, GL_TEXTURE_2D);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 	}
@@ -1449,7 +1469,7 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 	float th = (t) ? t->height : 1;
 
 	if (texnum != building_ui_texture && ui_builder.GetBaseVertex() > 0) {
-		bind_texture(SAMPLER_BASE1, building_ui_texture);
+		bind_texture(ALBEDO1_LOC, building_ui_texture, GL_TEXTURE_2D);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 		ui_builder.Begin();
@@ -1464,7 +1484,7 @@ void Renderer::scene_draw(bool editor_mode)
 	GPUFUNCTIONSTART;
 
 	cur_shader = 0;
-	for (int i = 0; i < NUM_SAMPLERS; i++)
+	for (int i = 0; i < MAX_SAMPLER_BINDINGS; i++)
 		cur_tex[i] = 0;
 	if (cur_w != eng->window_w.integer() || cur_h != eng->window_h.integer())
 		InitFramebuffers();
@@ -1586,9 +1606,9 @@ void Renderer::scene_draw(bool editor_mode)
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
 	if (!enable_bloom.integer()) bloom_tex = black_texture;
-	bind_texture(0, tex.scene_color);
-	bind_texture(1, bloom_tex);
-	bind_texture(2, lens_dirt->gl_id);
+	bind_texture(0, tex.scene_color, GL_TEXTURE_2D);
+	bind_texture(1, bloom_tex, GL_TEXTURE_2D);
+	bind_texture(2, lens_dirt->gl_id, GL_TEXTURE_2D);
 	mb.Draw(GL_TRIANGLES);
 
 	glEnable(GL_CULL_FACE);
@@ -1689,7 +1709,7 @@ void Renderer::DrawEntBlobShadows()
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
 	glCheckError();
 
-	bind_texture(0, eng->media.blob_shadow->gl_id);
+	bind_texture(0, eng->media.blob_shadow->gl_id, GL_TEXTURE_2D);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -1817,10 +1837,10 @@ void Renderer::set_wind_constants()
 void Renderer::set_water_constants()
 {
 	// use sampler1 for reflection map, sampler2 for the depth of the current render
-	bind_texture(SAMPLER_BASE1, tex.reflected_color);
-	bind_texture(SAMPLER_BASE2, tex.scene_depthstencil);
-	bind_texture(SAMPLER_NORM1, waternormal->gl_id);
-	bind_texture(SAMPLER_SPECIAL, tex.reflected_depth);
+	bind_texture(ALBEDO1_LOC, tex.reflected_color, GL_TEXTURE_2D);
+	bind_texture(ROUGH1_LOC, tex.scene_depthstencil, GL_TEXTURE_2D);
+	bind_texture(NORMAL1_LOC, waternormal->gl_id, GL_TEXTURE_2D);
+	bind_texture(SPECIAL_LOC, tex.reflected_depth, GL_TEXTURE_2D);
 }
 
 int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass)
@@ -1869,6 +1889,9 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 		}
 		else if (shader_type == Game_Shader::S_2WAYBLEND) {
 			shader_type = MSHADER_MULTIBLEND;
+
+			if (!gs.references[0] || !gs.references[1])
+				return -1;
 		}
 		else if (shader_type == Game_Shader::S_WINDSWAY) {
 			shader_type = MSHADER_WIND;
@@ -1890,8 +1913,8 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 }
 
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
-if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id); \
-else bind_texture(where, fallback);
+if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id, GL_TEXTURE_2D); \
+else bind_texture(where, fallback, GL_TEXTURE_2D);
 	
 void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
@@ -1933,7 +1956,8 @@ void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, co
 		shader().set_mat4("Model", transform);
 		shader().set_mat4("InverseModel", glm::inverse(transform));
 
-		SET_OR_USE_FALLBACK(Game_Shader::BASE1, SAMPLER_BASE1, white_texture);
+		if(gs->alpha_type == gs->A_TEST)
+			SET_OR_USE_FALLBACK(Game_Shader::DIFFUSE, ALBEDO1_LOC, white_texture);
 
 		if (is_animated) {
 			const std::vector<mat4>& bones = a->GetBones();
@@ -1991,13 +2015,6 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 				set_water_constants();
 			}
 			set_shader_constants();
-
-			if (mp.has_lightmap_coords()) {
-				if (eng->level->lightmap)
-					bind_texture(SAMPLER_LIGHTMAP, eng->level->lightmap->gl_id);
-				else
-					bind_texture(SAMPLER_LIGHTMAP, white_texture);
-			}
 		}
 
 		if (state.initial_set || state.current_alpha_state != gs->alpha_type) {
@@ -2028,32 +2045,40 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 
 		shader().set_bool("no_light", gs->emmisive);
 
-		bool has_uv_scroll = gs->uscroll != 0.f || gs->vscroll != 0.f;
-		shader().set_bool("has_uv_scroll", has_uv_scroll);
-		shader().set_vec2("uv_scroll_offset", glm::vec2(gs->uscroll, gs->vscroll) * (float)eng->time);
-
 		// ill find a better way maybe
 		bool shader_doesnt_need_the_textures = is_water;
 
 		if (!shader_doesnt_need_the_textures) {
-			SET_OR_USE_FALLBACK(Game_Shader::BASE1, SAMPLER_BASE1, white_texture);
-			bool has_spec_mask = false;
-			if (gs->images[Game_Shader::AUX1]) {
-				has_spec_mask = true;
-				bind_texture(SAMPLER_AUX1, gs->images[Game_Shader::AUX1]->gl_id);
-			}
-			shader().set_bool("has_spec_mask", has_spec_mask);
 
 			if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-				SET_OR_USE_FALLBACK(Game_Shader::BASE2, SAMPLER_BASE2, white_texture);
-				SET_OR_USE_FALLBACK(Game_Shader::AUX2, SAMPLER_AUX2, white_texture);
-				SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SAMPLER_SPECIAL, white_texture);
-			}
+				Game_Shader* blend1 = gs->references[0];
+				Game_Shader* blend2 = gs->references[1];
+				if (blend1->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO1_LOC, blend1->images[Game_Shader::DIFFUSE]->gl_id, GL_TEXTURE_2D);
+				else bind_texture(ALBEDO1_LOC, white_texture, GL_TEXTURE_2D);
+				if (blend2->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO2_LOC, blend2->images[Game_Shader::DIFFUSE]->gl_id, GL_TEXTURE_2D);
+				else bind_texture(ALBEDO2_LOC, white_texture, GL_TEXTURE_2D);
+				if (blend1->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH1_LOC, blend1->images[Game_Shader::ROUGHNESS]->gl_id, GL_TEXTURE_2D);
+				else bind_texture(ROUGH1_LOC, white_texture, GL_TEXTURE_2D);
+				if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id, GL_TEXTURE_2D);
+				else bind_texture(ROUGH2_LOC, white_texture, GL_TEXTURE_2D);
 
-			if (mp.has_tangents()) {
-				SET_OR_USE_FALLBACK(Game_Shader::NORMAL1, SAMPLER_NORM1, default_normal_texture);
-				if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-					SET_OR_USE_FALLBACK(Game_Shader::NORMAL2, SAMPLER_NORM2, default_normal_texture);
+				if (mp.has_tangents()) {
+					if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id, GL_TEXTURE_2D);
+					else bind_texture(NORMAL1_LOC, default_normal_texture, GL_TEXTURE_2D);
+					if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id, GL_TEXTURE_2D);
+					else bind_texture(NORMAL2_LOC, default_normal_texture, GL_TEXTURE_2D);
+				}
+
+				SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SPECIAL_LOC, white_texture);
+			}
+			else {
+				SET_OR_USE_FALLBACK(Game_Shader::DIFFUSE, ALBEDO1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(Game_Shader::ROUGHNESS, ROUGH1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(Game_Shader::AO, AO1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
+
+				if (mp.has_tangents()) {
+					SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, default_normal_texture);
 				}
 			}
 		}
@@ -2066,9 +2091,10 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 			glCheckError();
 		}
 
+		shader().set_float("rough_mult", gs->roughness_mult);
+		shader().set_vec2("rough_remap", gs->roughness_remap_range);
+		shader().set_float("metal_mult", gs->metalness_mult);
 
-		shader().set_float("spec_exponent", gs->spec_exponent);
-		shader().set_vec3("specular_tint", gs->spec_tint);
 		shader().set_vec4("color_tint", gs->diffuse_tint);
 
 		glBindVertexArray(mp.vao);
