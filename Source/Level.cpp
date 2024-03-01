@@ -3,6 +3,7 @@
 #include "tiny_gltf.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/ext/matrix_transform.hpp"
+#include "glm/gtx/euler_angles.hpp"
 #include "Physics.h"
 #include "Texture.h"
 #include <array>
@@ -14,13 +15,6 @@ extern void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tiny
 	std::map<int, int>& buffer_view_to_buffer, bool render_default, bool collide_default, std::vector<Game_Shader*>& mm,
 	Physics_Mesh* physics, const glm::mat4& phys_transform);
 extern void load_model_materials(std::vector<Game_Shader*>& materials, const std::string& fallbackname, tinygltf::Model& scene);
-
-// move this out of here
-void parse_ent_file(const char* file)
-{
-
-}
-
 
 void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 {
@@ -46,31 +40,34 @@ void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 		es.spawnargs.set_int("linked_mesh", level->linked_meshes.size());
 	}
 
+	es.spawnargs.set_int("?embedded", 1);
+
 	level->espawns.push_back(es);
 }
 
-void add_level_light(Level* l, tinygltf::Model& scene, glm::mat4 transform, int index)
+// to not go insane, this creates an object dictionary which is then loaded later
+void create_light_obj_from_gltf(Level* l, tinygltf::Model& scene, glm::mat4 transform, int index, const char* name)
 {
+	Level::Entity_Spawn espawn;
+	espawn.classname = "light";
+	espawn.name = name;
+	espawn.position = transform[3];
+	espawn.rotation = -transform[2];	// FIXME
+	
 	Level_Light ll;
 	tinygltf::Light& light = scene.lights.at(index);
-	ll.position = transform[3];
-	ll.direction = -transform[2];	// fixme
-	ll.type = LIGHT_POINT;
-	ll.color = glm::vec3(light.color[0], light.color[1], light.color[2]) * (float)light.intensity;
-	if (light.type == "directional") {
-		ll.type = LIGHT_DIRECTIONAL;
+	espawn.spawnargs.set_string("type", light.type.c_str());
+	glm::vec3 color = glm::vec3(light.color[0], light.color[1], light.color[2]) * (float)light.intensity;
+	espawn.spawnargs.set_vec3("color", color);
+	
+	if (light.type == "spot") {
+		espawn.spawnargs.set_float("outer_cone", light.spot.outerConeAngle);
+		espawn.spawnargs.set_float("inner_cone", light.spot.innerConeAngle);
 	}
-	else if (light.type == "point") {
-		
-	}
-	else if (light.type == "spot"){
-		ll.type = LIGHT_SPOT;
-		ll.spot_angle = light.spot.outerConeAngle;
-	}
-	else {
-		sys_print("bad light type %s", light.type.c_str());
-	}
-	l->lights.push_back(ll);
+
+	espawn.spawnargs.set_int("?embedded", 1);
+
+	l->espawns.push_back(espawn);
 }
 
 static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& node, 
@@ -103,7 +100,7 @@ static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& 
 	if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()) {
 		auto v = node.extensions.find("KHR_lights_punctual")->second.Get("light");
 		int light_index = v.GetNumberAsInt();
-		add_level_light(level, scene, global_transform, light_index);
+		create_light_obj_from_gltf(level, scene, global_transform, light_index, node.name.c_str());
 	}
 
 
@@ -131,17 +128,18 @@ static void traverse_tree(Level* level, tinygltf::Model& scene, tinygltf::Node& 
 		}
 		else
 		{
-			Level::StaticInstance sm;
-			sm.model_index = level->static_meshes.size();
-			sm.transform = global_transform;
-			
 			Model* m = new Model;
 			std::map<int, int> mapping;
 			add_node_mesh_to_model(m, scene, node, mapping, true, true, mm, &level->collision, global_transform);
 			level->static_meshes.push_back(m);
 			
-			sm.collision_only = m->collision && m->parts.size() == 0;
-			level->instances.push_back(sm);
+			if (m->parts.size() > 0) {
+				Static_Mesh_Object smo;
+				smo.model = m;
+				smo.transform = global_transform;
+				smo.is_embedded_mesh = true;
+				level->static_mesh_objs.push_back(smo);
+			}
 		}
 	}
 
@@ -195,15 +193,6 @@ void Physics_Mesh::build()
 	printf("Built bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
-void load_level_lights(Level* l, tinygltf::Model& scene)
-{
-	for (int i = 0; i < scene.lights.size(); i++) {
-		tinygltf::Light& light = scene.lights[i];
-		
-		Level_Light ll;
-
-	}
-}
 #include "Key_Value_File.h"
 void load_ents(Level* l, const std::string& mapdir)
 {
@@ -228,6 +217,86 @@ void load_ents(Level* l, const std::string& mapdir)
 			l->espawns.push_back(espawn);
 		}
 	}
+}
+
+Static_Mesh_Object make_static_mesh_from_dict(Level::Entity_Spawn* obj)
+{
+	Dict* dict = &obj->spawnargs;
+	const char* get_str = "";
+
+	if (*(get_str = dict->get_string("model", "")) != 0) {
+		Static_Mesh_Object smo;
+		smo.model = FindOrLoadModel(get_str);
+		if (smo.model) {
+			glm::mat4 transform = glm::translate(glm::mat4(1), obj->position);
+			transform = transform * glm::eulerAngleXYZ(obj->rotation.x, obj->rotation.y, obj->rotation.z);
+			transform = glm::scale(transform, obj->scale);
+
+			smo.transform = transform;
+
+			smo.casts_shadows = dict->get_int("casts_shadows", 1);
+
+			return smo;
+		}
+	}
+
+	return {};
+}
+
+Level_Light make_light_from_dict(Level::Entity_Spawn* obj)
+{
+	Dict* dict = &obj->spawnargs;
+
+	const char* type = dict->get_string("type", "point");
+	glm::vec3 color = dict->get_vec3("color", glm::vec3(1.f));
+	Level_Light light;
+	light.color = color;
+	light.position = obj->position;
+	light.direction = obj->rotation;
+	if (strcmp(type, "directional") == 0) {
+		light.type = LIGHT_DIRECTIONAL;
+	}
+	else if (strcmp(type, "point") == 0) {
+		light.type = LIGHT_POINT;
+	}
+	else {
+		light.type = LIGHT_SPOT;
+		light.spot_angle = dict->get_float("outer_cone", 0.7f);
+	}
+
+	return light;
+}
+
+void create_statics_from_dicts(Level* level)
+{
+	const char* get_str = "";
+	for (int i = 0; i < level->espawns.size(); i++)
+	{
+		Level::Entity_Spawn* obj = &level->espawns[i];
+		Dict* dict = &obj->spawnargs;
+		if (obj->classname == "static_mesh") {
+			Static_Mesh_Object smo = make_static_mesh_from_dict(obj);
+			if (smo.model) {
+				level->static_mesh_objs.push_back(smo);
+				obj->_ed_varying_index_for_statics = level->static_mesh_objs.size() - 1;
+			}
+		}
+		else if (obj->classname == "light") {
+			level->lights.push_back(make_light_from_dict(obj));
+			obj->_ed_varying_index_for_statics = level->lights.size() - 1;
+		}
+		else if (obj->classname == "decal") {
+
+		}
+		else if (obj->classname == "static_sound") {
+
+		}
+		else if (obj->classname == "static_particle") {
+
+		}
+	}
+
+
 }
 
 Level* LoadLevelFile(const char* level_name)
@@ -268,6 +337,8 @@ Level* LoadLevelFile(const char* level_name)
 	}
 	map_materials_to_models(level, scene, mm);
 	load_ents(level, map_dir);
+	
+	create_statics_from_dicts(level);
 
 	std::string lightmap_path = map_dir + "lightmap.hdr";
 	level->lightmap = mats.find_texture(lightmap_path.c_str(), false, true);

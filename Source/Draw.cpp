@@ -1342,6 +1342,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	if (params.draw_viewmodel)
 		DrawPlayerViewmodel(params);
 
+
 	glCheckError();
 
 	if (params.pass == Render_Level_Params::OPAQUE) {
@@ -1490,6 +1491,10 @@ void Renderer::scene_draw(bool editor_mode)
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
 
+	immediate_draw_calls.clear();
+	if (editor_mode)
+		eng->eddoc->scene_draw_callback();
+
 	//volfog.compute();
 
 	// depth prepass
@@ -1553,8 +1558,6 @@ void Renderer::scene_draw(bool editor_mode)
 	DrawEntBlobShadows();
 	eng->local.pm.draw_particles();
 
-	if (editor_mode)
-		eng->eddoc->scene_draw_callback();
 
 	glCheckError();
 	
@@ -1698,74 +1701,10 @@ void Renderer::DrawEntBlobShadows()
 
 }
 
-
-#if 0
-void Renderer::DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, mat4 transform, const Animator* a, float rough, float metal)
+void Renderer::draw_model_immediate(Draw_Model_Frontend_Params params)
 {
-	ASSERT(m);
-	const bool isanimated = a != nullptr;
-
-	if (pass == Render_Level_Params::DEPTH || pass == Render_Level_Params::SHADOWMAP) {
-		if (isanimated)
-			set_shader(shade[S_ANIMATED_DEPTH]);
-		else
-			set_shader(shade[S_DEPTH]);
-
-		set_depth_shader_constants();
-	}
-	else {
-		if (isanimated)
-			set_shader(S_ANIMATED);
-		else
-			set_shader(S_STATIC);
-
-		set_shader_constants();
-		shader().set_float("in_roughness", rough);
-		shader().set_float("in_metalness", metal);
-	}
-
-
-	glCheckError();
-	shader().set_mat4("Model", transform);
-	shader().set_mat4("InverseModel", glm::inverse(transform));
-
-
-	if (isanimated) {
-		const std::vector<mat4>& bones = a->GetBones();
-		const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
-		for (int j = 0; j < bones.size(); j++)
-			glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
-		glCheckError();
-	}
-
-	for (int i = 0; i < m->parts.size(); i++)
-	{
-		const MeshPart* part = &m->parts[i];
-		const Game_Shader* mm = nullptr;
-		if (part->material_idx != -1)
-			mm = m->materials.at(part->material_idx);
-		if (pass == Render_Level_Params::STANDARD || (mm && mm->alpha_type == Game_Shader::A_TEST)) {
-			if (part->material_idx == -1) {
-				bind_texture(0, white_texture);
-			}
-			else {
-				const Game_Shader* mm = m->materials.at(part->material_idx);
-				shader().set_bool("has_uv_scroll", false);
-				if (mm->images[Game_Shader::BASE1])
-					bind_texture(SAMPLER_BASE1, mm->images[Game_Shader::BASE1]->gl_id);
-				else
-					bind_texture(SAMPLER_BASE1, white_texture);
-			}
-		}
-
-		glBindVertexArray(part->vao);
-		glDrawElements(GL_TRIANGLES, part->element_count, part->element_type, (void*)part->element_offset);
-	}
-
+	immediate_draw_calls.push_back(params);
 }
-#endif
-
-
 
 
 void Renderer::DrawEnts(const Render_Level_Params& params)
@@ -1833,7 +1772,8 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 			}
 		}
 	}
-
+	for (int i = 0; i < immediate_draw_calls.size(); i++)
+		draw_model_real(immediate_draw_calls[i].model, immediate_draw_calls[i].transform, nullptr, nullptr, state);
 
 	//Model* sphere = FindOrLoadModel("sphere.glb");
 	//for (int x = 0; x < 10; x++) {
@@ -1876,78 +1816,6 @@ void Renderer::set_water_constants()
 	bind_texture(SAMPLER_BASE2, tex.scene_depthstencil);
 	bind_texture(SAMPLER_NORM1, waternormal->gl_id);
 	bind_texture(SAMPLER_SPECIAL, tex.reflected_depth);
-}
-
-void Renderer::DrawLevelDepth(const Render_Level_Params& params)
-{
-	const Level* level = eng->level;
-	bool force_set = true;
-	int backfaces = -1;
-
-	glDisable(GL_BLEND);
-	for (int m = 0; m < level->instances.size(); m++) {
-		const Level::StaticInstance& sm = level->instances[m];
-		if (sm.collision_only) continue;
-		ASSERT(level->static_meshes[sm.model_index]);
-		Model& model = *level->static_meshes[sm.model_index];
-
-		for (int p = 0; p < model.parts.size(); p++) {
-			MeshPart& mp = model.parts[p];
-			Game_Shader* gs = (mp.material_idx != -1) ? model.materials.at(mp.material_idx) : &mats.fallback;
-			if (!(gs->alpha_type == Game_Shader::A_NONE || gs->alpha_type == Game_Shader::A_TEST))
-				continue;
-
-			bool mat_is_at = gs->alpha_type == gs->A_TEST;
-			bool mat_lightmapped = mp.has_lightmap_coords();
-			bool mat_colors = mp.has_colors();
-			int mat_shader_type = gs->shader_type;
-
-			if (!params.include_lightmapped && mat_lightmapped)
-				continue;
-
-			if (mat_shader_type == Game_Shader::S_WINDSWAY)
-			{
-				if (mat_is_at)
-					set_shader(S_WIND_AT_DEPTH);
-				else
-					set_shader(S_WIND_DEPTH);
-
-				set_wind_constants();
-			}
-			else
-			{
-				if (mat_is_at)
-					set_shader(S_AT_DEPTH);
-				else
-					set_shader(S_DEPTH);
-			}
-
-			set_depth_shader_constants();
-
-			if (backfaces != (int)gs->backface) {
-				backfaces = gs->backface;
-				if (backfaces) {
-					glDisable(GL_CULL_FACE);
-				}
-				else
-					glEnable(GL_CULL_FACE);
-			}
-
-			shader().set_mat4("Model", sm.transform);
-			shader().set_mat4("InverseModel", glm::inverse(sm.transform));
-
-			if (gs->alpha_type == Game_Shader::A_TEST) {
-
-				if (gs->images[gs->BASE1])
-					bind_texture(SAMPLER_BASE1, gs->images[gs->BASE1]->gl_id);
-				else
-					bind_texture(SAMPLER_BASE1, white_texture);
-			}
-			glBindVertexArray(mp.vao);
-			glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
-		}
-	}
-
 }
 
 int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass)
@@ -2244,18 +2112,15 @@ void Renderer::planar_reflection_pass()
 
 void Renderer::DrawLevel(const Render_Level_Params& params)
 {
-	const Level* level = eng->level;
+	Level* level = eng->level;
 
 	Model_Drawing_State state;
 	state.pass = params.pass;
 
-	for (int m = 0; m < level->instances.size(); m++) {
-		const Level::StaticInstance& sm = level->instances[m];
-		if (sm.collision_only) continue;
-		ASSERT(level->static_meshes[sm.model_index]);
-		Model& model = *level->static_meshes[sm.model_index];
-
-		draw_model_real(&model, sm.transform, nullptr, nullptr, state);
+	for (int m = 0; m < level->static_mesh_objs.size(); m++) {
+		Static_Mesh_Object& smo = level->static_mesh_objs[m];
+		ASSERT(smo.model);
+		draw_model_real(smo.model, smo.transform, nullptr, nullptr, state);
 	}
 }
 

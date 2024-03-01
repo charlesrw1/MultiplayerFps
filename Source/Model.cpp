@@ -463,7 +463,10 @@ void add_node_mesh_to_model2(Model* model, cgltf_data* data, cgltf_node* node,
 		part.element_count = indicies_accessor->count;
 		part.element_type = cgltf_component_type_to_gl(indicies_accessor->component_type);
 		part.base_vertex = 0;
-		part.material_idx = cgltf_material_index(data, prim.material);
+		if (prim.material)
+			part.material_idx = cgltf_material_index(data, prim.material);
+		else
+			part.material_idx = -1;
 
 		glCheckError();
 
@@ -994,6 +997,16 @@ static bool load_gltf_model2(const std::string& filepath, Model* model)
 	if (model->collision)
 		model->collision->build();
 
+	bool appended_null_material = false;
+	for (int i = 0; i < model->parts.size(); i++) {
+		if (model->parts[i].material_idx == -1) {
+			if (!appended_null_material) {
+				model->materials.push_back(&mats.fallback);
+				appended_null_material = true;
+			}
+			model->parts[i].material_idx = model->materials.size() - 1;
+		}
+	}
 
 	cgltf_free(data);
 

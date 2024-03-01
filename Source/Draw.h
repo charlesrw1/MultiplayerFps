@@ -206,6 +206,16 @@ public:
 	uint32_t light_ssbo;
 };
 
+struct Draw_Model_Frontend_Params
+{
+	Model* model = nullptr;
+	glm::mat4 transform;
+	bool wireframe_render;
+	bool solidcolor_render;
+	bool render_additive;
+	glm::vec4 colorparam;
+};
+
 class Renderer
 {
 public:
@@ -221,6 +231,7 @@ public:
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
 		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
+	void draw_model_immediate(Draw_Model_Frontend_Params params);
 
 	void reload_shaders();
 	void ui_render();
@@ -231,7 +242,6 @@ public:
 	void cubemap_positions_debug();
 
 
-	void DrawModel(Render_Level_Params::Pass_Type pass, const Model* m, glm::mat4 transform, const Animator* a = nullptr, float rough=1.0, float metal=0.0);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	uint32_t white_texture;
@@ -368,6 +378,8 @@ public:
 
 	Render_Scene scene;
 private:
+	std::vector<Draw_Model_Frontend_Params> immediate_draw_calls;
+
 	struct Sprite_Drawing_State {
 		bool force_set = true;
 		bool in_world_space = false;

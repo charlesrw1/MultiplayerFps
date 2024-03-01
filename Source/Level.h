@@ -22,17 +22,28 @@ struct Level_Light
 	float spot_angle;
 };
 
+struct Static_Mesh_Object
+{
+	glm::mat4x3 transform;
+	bool is_embedded_mesh = false;
+	bool casts_shadows = true;
+	Model* model = nullptr;
+};
+
+struct Object_Dict
+{
+	Dict dict;
+	glm::vec3 position;
+	glm::vec3 rotation;
+	glm::vec3 scale;
+	const char* name = "";	// referenced from dict
+};
+
 class Model;
 class Texture;
 class Level
 {
 public:
-	struct StaticInstance
-	{
-		int model_index;
-		glm::mat4 transform;
-		bool collision_only = false;
-	};
 	struct Entity_Spawn
 	{
 		std::string name;
@@ -41,16 +52,20 @@ public:
 		glm::vec3 rotation;
 		glm::vec3 scale;
 		Dict spawnargs;
+
+		int _ed_varying_index_for_statics = -1;
 	};
 
-	Physics_Mesh collision;	// union of all level_meshes collision data
+	Physics_Mesh collision;	// merged collision of all level_meshes
 	std::vector<Level_Light> lights;
 	std::vector<Model*> linked_meshes;	// custom embedded meshes that are linked to an entity like doors, not included in static_meshes
-	std::vector<StaticInstance> instances;	// instances, index into static_meshes
-	std::vector<Model*> static_meshes;
+	std::vector<Model*> static_meshes;	// level embedded meshes
+	std::vector<Static_Mesh_Object> static_mesh_objs;
+	std::vector<Entity_Spawn> espawns;
+	std::vector<Object_Dict> objs;
+
 	Texture* lightmap;
 
-	std::vector<Entity_Spawn> espawns;
 	
 	std::string name;
 	uint32_t skybox_cubemap;
