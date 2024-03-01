@@ -48,11 +48,11 @@ void Client::ReadPackets()
 					client_num = client_num_;
 				}
 				else {
-					Disconnect("couldn't start map");
+					disconnect_to_menu("couldn't start map");
 				}
 			}
 			else if (msg == "reject" && state == CS_TRYINGCONNECT) {
-				Disconnect("rejected by server");
+				disconnect_to_menu("rejected by server");
 			}
 			else {
 				sys_print("Unknown connectionless packet type\n");
@@ -73,7 +73,7 @@ void Client::ReadPackets()
 
 	if (state >= CS_CONNECTED) {
 		if (GetTime() - server.last_recieved > time_out.real()) {
-			Disconnect("server timed out");
+			disconnect_to_menu("server timed out");
 		}
 	}
 }
@@ -86,7 +86,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 		if (buf.IsEof())
 			return;
 		if (buf.HasFailed()) {
-			Disconnect("HandleServerPacket read fail");
+			disconnect_to_menu("HandleServerPacket read fail");
 			return;
 		}
 		
@@ -104,14 +104,14 @@ void Client::HandleServerPacket(ByteReader& buf)
 				state = CS_SPAWNED;
 
 				// start game state after recieving first snapshot
-				eng->set_state(ENGINE_GAME);
+				eng->client_enter_into_game();
 			}
 			bool ignore_packet = OnEntSnapshot(buf);
 			if (ignore_packet)
 				return;
 		}break;
 		case SV_DISCONNECT:
-			Disconnect("server closed connection");
+			disconnect_to_menu("server closed connection");
 			break;
 		case SV_UPDATE_VIEW:
 			glm::vec3 new_angles = buf.ReadVec3();
@@ -135,7 +135,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 			last_recieved_server_tick = server_tick;
 		}break;
 		default:
-			Disconnect("of recieving an unknown message");
+			disconnect_to_menu("of recieving an unknown message");
 			return;
 			break;
 		}

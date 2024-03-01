@@ -4,6 +4,8 @@
 #include <string>
 #include "BVH.h"
 #include "Model.h"
+#include "Config.h"
+#include "Dict.h"
 
 enum {
 	LIGHT_DIRECTIONAL, 
@@ -38,7 +40,7 @@ public:
 		glm::vec3 position;
 		glm::vec3 rotation;
 		glm::vec3 scale;
-		std::vector<std::vector<std::string>> key_values;
+		Dict spawnargs;
 	};
 
 	Physics_Mesh collision;	// union of all level_meshes collision data

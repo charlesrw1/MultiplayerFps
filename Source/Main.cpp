@@ -93,6 +93,22 @@ public:
 };
 static Debug_Console dbg_console;
 
+char* string_format(const char* fmt, ...) {
+	va_list argptr;
+	static int index = 0;
+	static char string[4][512];
+	char* buf;
+
+	buf = string[index];
+	index = (index + 1) & 3;
+
+	va_start(argptr, fmt);
+	vsprintf(buf, fmt, argptr);
+	va_end(argptr);
+
+	return buf;
+}
+
 void Quit()
 {
 	sys_print("Quiting...\n");
@@ -447,24 +463,71 @@ int Game_Engine::player_num()
 		return 0;
 	if (cl && cl->client_num != -1)
 		return cl->client_num;
-	ASSERT(0 && "player num called without game running");
-	return 0;
+	return -1;
 }
 Entity& Game_Engine::local_player()
 {
-	//ASSERT(engine_state >= LOADING);
+	if (player_num() < 0) ASSERT(0 && "player not assigned");
 	return ents[player_num()];
 }
 
 void Game_Engine::connect_to(string address)
 {
-	if (is_host)
-		exit_map();
-	else if (cl->get_state() != CS_DISCONNECTED)
-		cl->Disconnect("connecting to another server");
+	if (get_state() != ENGINE_MENU) {
+		// goto menu state first
+		exit_to_menu("connecting to another server");
+	}
 	sys_print("Connecting to server %s\n", address.c_str());
 	cl->connect(address);
 }
+
+#ifdef EDITDOC
+#include "EditorDoc.h"
+
+DECLARE_ENGINE_CMD(editdoc)
+{
+	if (args.size() != 2) {
+		sys_print("Usage: editdoc mapname\n");
+		return;
+	}
+	eng->start_editor(args.at(1));
+}
+
+void Game_Engine::start_editor(const char* map)
+{
+	if (state == ENGINE_EDITOR && map == mapname) {
+		sys_print("already editing that map");
+		return;
+	}
+
+	sys_print("starting editor on map %s\n", map);
+	if (state == ENGINE_GAME) {
+		exit_to_menu("starting editor");
+	}
+	else if (state == ENGINE_EDITOR) {
+		eddoc->close_doc();	// calls save on current document
+		unload_current_level();
+	}
+
+	if (!eddoc) {
+		eddoc = new EditorDoc;
+	}
+
+	mapname = map;
+	level = LoadLevelFile(map);
+	draw.on_level_start();
+
+	eddoc->open_doc(map);
+
+	set_state(ENGINE_EDITOR);
+}
+
+void Game_Engine::close_editor()
+{
+
+}
+
+#endif
 
 DECLARE_ENGINE_CMD(quit)
 {
@@ -484,7 +547,7 @@ DECLARE_ENGINE_CMD(bind)
 
 DECLARE_ENGINE_CMD_CAT("sv.",end)
 {
-	eng->exit_map();
+	eng->exit_to_menu("server is ending");
 }
 
 DECLARE_ENGINE_CMD_CAT("cl.",force_update)
@@ -502,8 +565,7 @@ DECLARE_ENGINE_CMD(connect)
 }
 DECLARE_ENGINE_CMD(disconnect)
 {
-	if (eng->cl->get_state()!=CS_DISCONNECTED)
-		eng->cl->Disconnect("requested");
+	eng->exit_to_menu("disconnecting");
 }
 DECLARE_ENGINE_CMD(reconnect)
 {
@@ -697,9 +759,13 @@ void Game_Local::init()
 
 bool Game_Engine::start_map(string map, bool is_client)
 {
+	if (get_state() != ENGINE_MENU) {
+		exit_to_menu("starting a server");
+	}
+
 	sys_print("Starting map %s\n", map.c_str());
 	mapname = map;
-	FreeLevel(level);
+
 	phys.ClearObjs();
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 		ents[i] = Entity();
@@ -712,9 +778,6 @@ bool Game_Engine::start_map(string map, bool is_client)
 	time = 0;
 	
 	if (!is_client) {
-		if (cl->get_state() != CS_DISCONNECTED)
-			cl->Disconnect("starting a local server");
-
 		sv->start();
 		eng->is_host = true;
 		eng->set_state(ENGINE_GAME);
@@ -736,15 +799,41 @@ void Game_Engine::set_tick_rate(float tick_rate)
 	tick_interval = 1.0 / tick_rate;
 }
 
-void Game_Engine::exit_map()
+void Game_Engine::unload_current_level()
 {
-	if (!sv->initialized)
-		return;
-
 	FreeLevel(level);
 	level = nullptr;
-	sv->end("exiting to menu");
+	phys.ClearObjs();
+	num_entities = 0;
+	tick = 0;
+}
+
+void Game_Engine::client_goto_loading()
+{
+	set_state(ENGINE_LOADING);
+}
+
+void Game_Engine::client_enter_into_game()
+{
+	set_state(ENGINE_GAME);
+}
+
+// my design sucks, client calls exit_to_menu() so only server needs to be ended here
+void Game_Engine::exit_to_menu(const char* reason)
+{
+	if (get_state() == ENGINE_MENU)
+		return;
+
+	if (cl->get_state() != CS_DISCONNECTED) {
+		cl->disconnect_from_server(reason);
+	}
+	if (sv->initialized) {
+		sv->end("exiting to menu");
+	}
+
+	unload_current_level();
 	is_host = false;
+	set_state(ENGINE_MENU);
 }
 
 void Game_Engine::key_event(SDL_Event event)
@@ -932,7 +1021,7 @@ void draw_wind_menu()
 
 void menu_playervars()
 {
-	if (eng->state != ENGINE_GAME) return;
+	if (eng->get_state() != ENGINE_GAME) return;
 
 	Entity& p = eng->local_player();
 	ImGui::DragFloat3("vm", &eng->local.vm_offset[0], 0.02f);
@@ -955,6 +1044,9 @@ void menu_playervars()
 void Game_Engine::draw_debug_interface()
 {
 	Debug_Interface::get()->draw();
+
+	if (state == ENGINE_EDITOR)
+		eddoc->imgui_draw();
 }
 
 void Game_Engine::draw_screen()
@@ -971,13 +1063,13 @@ void Game_Engine::draw_screen()
 	window_w.integer() = x;
 	window_h.integer() = y;
 
-	SDL_GL_SetSwapInterval(0);
-
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	if (state == ENGINE_GAME && local.has_run_tick)
-		draw.FrameDraw();
+		draw.scene_draw(false);
+	else if (state == ENGINE_EDITOR)
+		draw.scene_draw(true);
 
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
@@ -999,7 +1091,7 @@ void Game_Engine::draw_screen()
 
 void Game_Engine::set_state(Engine_State state)
 {
-	const char* engine_strs[] = { "menu", "loading", "game" };
+	const char* engine_strs[] = { "menu", "loading", "game", "editor"};
 
 	if (this->state != state)
 		sys_print("Engine going to %s state\n", engine_strs[(int)state]);
@@ -1203,7 +1295,6 @@ void Game_Engine::init()
 			SDL_SetWindowTitle(window, "CsRemake - VISUAL STUDIO\n");
 		}
 
-
 		else if (argv[i][0] == '-') {
 			string cmd;
 			cmd += &argv[i++][1];
@@ -1302,6 +1393,11 @@ void Game_Engine::loop()
 				key_event(event);
 				break;
 			}
+
+			#ifdef EDITDOC
+			if (state == ENGINE_EDITOR)
+				eddoc->handle_event(event);
+			#endif
 		}
 
 		// update state
@@ -1311,6 +1407,12 @@ void Game_Engine::loop()
 			// later, will add menu controls, now all you can do is use the console to change state
 			SDL_Delay(5);
 			break;
+
+		#ifdef EDITDOC
+		case ENGINE_EDITOR:
+			eng->eddoc->update();
+			break;
+		#endif
 		case ENGINE_LOADING:
 			// here, the client tries to connect and waits for snapshot to arrive before going to game state
 			cl->TrySendingConnect();
@@ -1349,11 +1451,6 @@ void Game_Engine::loop()
 			next_print -= eng->frame_time;
 
 		Profiler::end_frame_tick();
-
-		if (pending_state) {
-			pending_state = false;
-			state = next_state;
-		}
 	}
 }
 

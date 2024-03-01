@@ -3,6 +3,8 @@
 #include "Util.h"
 #include "Animation.h"
 
+#define EDITDOC
+
 const int MAX_CLIENTS = 16;
 const int DEFAULT_WIDTH = 1200;
 const int DEFAULT_HEIGHT = 800;

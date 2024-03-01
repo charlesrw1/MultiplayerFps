@@ -1371,6 +1371,7 @@ void Renderer::ui_render()
 {
 	GPUFUNCTIONSTART;
 
+
 	set_shader(S_TEXTURED);
 	shader().set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
@@ -1456,8 +1457,8 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 	ui_builder.Push2dQuad(glm::vec2(x, y), glm::vec2(w, h), glm::vec2(srcx / tw, srcy / th),
 		glm::vec2(srcw / tw, srch / th), color);
 }
-
-void Renderer::FrameDraw()
+#include "EditorDoc.h"
+void Renderer::scene_draw(bool editor_mode)
 {
 	GPUFUNCTIONSTART;
 
@@ -1467,7 +1468,19 @@ void Renderer::FrameDraw()
 	if (cur_w != eng->window_w.integer() || cur_h != eng->window_h.integer())
 		InitFramebuffers();
 	lastframe_vs = current_frame_main_view;
-	current_frame_main_view = eng->local.last_view;
+
+	if (editor_mode)
+		current_frame_main_view = eng->eddoc->get_vs();
+	else
+		current_frame_main_view = eng->local.last_view;
+
+
+	if (editor_mode || enable_vsync.integer())
+		SDL_GL_SetSwapInterval(1);
+	else
+		SDL_GL_SetSwapInterval(0);
+
+
 	vs = current_frame_main_view;
 
 	// Shadow map updates
@@ -1513,6 +1526,7 @@ void Renderer::FrameDraw()
 		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
+
 		glDepthMask(GL_FALSE);
 		glDepthFunc(GL_EQUAL);
 		render_level_to_target(params);
@@ -1538,6 +1552,10 @@ void Renderer::FrameDraw()
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	DrawEntBlobShadows();
 	eng->local.pm.draw_particles();
+
+	if (editor_mode)
+		eng->eddoc->scene_draw_callback();
+
 	glCheckError();
 	
 	// Bloom update
@@ -1591,8 +1609,10 @@ void Renderer::FrameDraw()
 		//phys_debug.End();
 		//phys_debug.Draw(GL_LINES);
 	}
-
-	ui_render();
+	if (editor_mode)
+		eng->eddoc->overlays_draw();
+	else
+		ui_render();
 
 	mb.Free();
 

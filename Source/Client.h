@@ -47,7 +47,7 @@ public:
 
 	void init();
 	void connect(string address);
-	void Disconnect(const char* log_reason);
+	void disconnect_from_server(const char* reason);
 	void Reconnect();
 
 	float adjust_time_step(int ticks_running);
@@ -112,6 +112,9 @@ public:
 	EmulatedSocket sock;
 	Connection server;
 	bool force_full_update = false;
+
+private:
+	void disconnect_to_menu(const char* log_reason);
 };
 
 

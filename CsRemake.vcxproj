@@ -66,6 +66,7 @@
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
+    <ClInclude Include="Source\Dict.h" />
     <ClInclude Include="Source\Draw.h" />
     <ClInclude Include="Source\EditorDoc.h" />
     <ClInclude Include="Source\EnvProbe.h" />

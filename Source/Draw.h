@@ -25,6 +25,7 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
+
 class Volumetric_Fog_System
 {
 public:
@@ -211,7 +212,9 @@ public:
 	Renderer();
 
 	void Init();
-	void FrameDraw();
+
+	// editor mode doesn't draw UI and it calls the eddoc hook to draw custom stuff
+	void scene_draw(bool editor_mode);
 
 	void render_level_to_target(Render_Level_Params params);
 

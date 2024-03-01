@@ -18,7 +18,7 @@ static const char* const texture_folder_path = "./Data/Textures/";
 
 Game_Material_Manager mats;
 
-#define ENSURE(num) if(line.size() < num) { sys_print("bad material definition %s @ %d\n", mat.name.c_str(), mat.linenum); continue;}
+#define ENSURE(num) if(line.size() < num) { sys_print("bad material definition %s @ %d\n", matname.c_str(), mat.second.linenum); continue;}
 void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 {
 	Key_Value_File file;
@@ -31,148 +31,81 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 
 	string key;
 	string temp2;
-	for (auto& mat : file.entries)
+	for (auto& mat : file.name_to_entry)
 	{
+		const std::string& matname = mat.first;
+
 		// first check if it exists
-		Game_Shader* gs = find_for_name(mat.name.c_str());
+		Game_Shader* gs = find_for_name(matname.c_str());
 		if (gs && !overwrite) continue;
 		else if (gs && overwrite) {
 			*gs = Game_Shader();
-			gs->name = std::move(mat.name);
+			gs->name = (matname);
 		}
 		if (!gs) {
 			gs = new Game_Shader;
-			gs->name = std::move(mat.name);
+			gs->name = matname;
 			shaders.push_back(gs);
 		}
 
-		for (auto& line : mat.tokenized_lines)
-		{
-			ASSERT(line.size()!=0);
-			key = line.at(0);
-			if (key == "image1") {
-				ENSURE(2);
-				gs->images[Game_Shader::BASE1] = FindOrLoadTexture(line.at(1));
+		auto& dict = mat.second.dict;
+		const char* str_get = "";
+		if (*(str_get = dict.get_string("image1")) != 0) {
+			gs->images[Game_Shader::BASE1] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("aux1")) != 0) {
+			gs->images[Game_Shader::AUX1] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("normal1")) != 0) {
+			gs->images[Game_Shader::NORMAL1] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("image2")) != 0) {
+			gs->images[Game_Shader::BASE2] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("aux2")) != 0) {
+			gs->images[Game_Shader::AUX2] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("normal2")) != 0) {
+			gs->images[Game_Shader::NORMAL2] = FindOrLoadTexture(str_get);
+		}
+		if (*(str_get = dict.get_string("special")) != 0) {
+			gs->images[Game_Shader::SPECIAL] = FindOrLoadTexture(str_get);
+		}
+		gs->diffuse_tint = glm::vec4(dict.get_vec3("tint", glm::vec3(1.f)),1.f);
+		gs->spec_tint = dict.get_vec3("spec_tint", glm::vec3(0.5f));
+
+		if (*(str_get = dict.get_string("shader")) != 0) {
+			if (strcmp(str_get,"blend2") == 0) gs->shader_type = Game_Shader::S_2WAYBLEND;
+			else if (strcmp(str_get, "wind")==0) gs->shader_type = Game_Shader::S_WINDSWAY;
+			else if (strcmp(str_get, "water")==0) {
+				gs->alpha_type = Game_Shader::A_BLEND;
+				gs->shader_type = Game_Shader::S_WATER;
 			}
-			else if (key == "aux1") {
-				ENSURE(2);
-				gs->images[Game_Shader::AUX1] = FindOrLoadTexture(line.at(1));
-			}
-			else if (key == "normal1") {
-				ENSURE(2);
-				gs->images[Game_Shader::NORMAL1] = FindOrLoadTexture(line.at(1));
-			}
-			else if (key == "image2") {
-				ENSURE(2);
-				gs->images[Game_Shader::BASE2] = FindOrLoadTexture(line.at(1));
-			}
-			else if (key == "aux2") {
-				ENSURE(2);
-				gs->images[Game_Shader::AUX2] = FindOrLoadTexture(line.at(1));
-			}
-			else if (key == "normal2") {
-				ENSURE(2);
-				gs->images[Game_Shader::NORMAL2] = FindOrLoadTexture(line.at(1));
-			}
-			else if (key == "special") {
-				ENSURE(2);
-				gs->images[Game_Shader::SPECIAL] = FindOrLoadTexture(line.at(1));
-			}
-			else if (key == "spec_exp") {
-				ENSURE(2);
-				gs->spec_exponent = std::atof(line.at(1));
-			}
-			else if (key == "spec_str") {
-				ENSURE(2);
-				gs->spec_strength = std::atof(line.at(1));
-			}
-			else if (key == "spec_tint") {
-				ENSURE(4);
-				gs->spec_tint.x = std::atof(line.at(1));
-				gs->spec_tint.y = std::atof(line.at(2));
-				gs->spec_tint.z = std::atof(line.at(3));
-			}
-			else if (key == "tint") {
-				ENSURE(4);
-				gs->diffuse_tint.x = std::atof(line.at(1));
-				gs->diffuse_tint.y = std::atof(line.at(2));
-				gs->diffuse_tint.z = std::atof(line.at(3));
-			}
-			else if (key == "physics") {
-				// TODO
-			}
-			else if (key == "shader") {
-				ENSURE(2);
-				temp2 = line.at(1);
-				if (temp2 == "blend2") gs->shader_type = Game_Shader::S_2WAYBLEND;
-				else if (temp2 == "wind") gs->shader_type = Game_Shader::S_WINDSWAY;
-				else if (temp2 == "water") {
-					gs->alpha_type = Game_Shader::A_BLEND;
-					gs->shader_type = Game_Shader::S_WATER;
-				}
-				else sys_print("unknown shader type %s\n", temp2.c_str());
-			}
-			else if (key == "alpha") {
-				ENSURE(2);
-				temp2 = line.at(1);
-				if (temp2 == "add") gs->alpha_type = Game_Shader::A_ADD;
-				else if (temp2 == "blend") gs->alpha_type = Game_Shader::A_BLEND;
-				else if (temp2 == "test") gs->alpha_type = Game_Shader::A_TEST;
-			}
-			else if (key == "showbackface") {
-				gs->backface = true;
-			}
-			else if (key == "fresnel_transparency") {
-				gs->fresnel_transparency = true;
-			}
-			else if (key == "uscroll") {
-				ENSURE(2);
-				gs->uscroll = std::atof(line.at(1));
-			}
-			else if (key == "vscroll") {
-				ENSURE(2);
-				gs->vscroll = std::atof(line.at(1));
-			}
-			else if (key == "emmisive") {
-				gs->emmisive = true;	
-			}
-			else {
-				sys_print("unknown material key %s for %s @ %d", key.c_str(), mat.name.c_str(), mat.linenum);
-			}
+			else sys_print("unknown shader type %s\n", str_get);
+		}
+		if (*(str_get = dict.get_string("alpha")) != 0) {
+			if (strcmp(str_get, "add") == 0) gs->alpha_type = Game_Shader::A_ADD;
+			else if (strcmp(str_get, "blend") == 0) gs->alpha_type = Game_Shader::A_BLEND;
+			else if (strcmp(str_get, "test") == 0) gs->alpha_type = Game_Shader::A_TEST;
+		}
+
+		if (*(str_get = dict.get_string("showbackface", "no")) == 0) {
+			gs->backface = true;
 		}
 	}
 }
 #undef ENSURE;
 
 
-bool file_system_get_files(const char* directory, std::vector<string>& out)
-{
-	WIN32_FIND_DATAA findData;
-	HANDLE hFind = FindFirstFileA(directory, &findData);
-	if (hFind == INVALID_HANDLE_VALUE)
-		return false;
-	while (FindNextFileA(hFind, &findData) != 0) {
-		if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY || findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
-			continue;
-		out.push_back(std::string(findData.cFileName));
-	}
-
-	FindClose(hFind);
-
-	return true;
-}
-
 void Game_Material_Manager::load_material_file_directory(const char* directory)
 {
-	std::vector<std::string> files;
 	std::string path = std::string(directory) + '*';
-	bool good = file_system_get_files(path.c_str(), files);
-	if (!good) {
-		sys_print("Couldn't open material directory %s\n", directory);
-		return;
-	}
-	for (auto& file : files) {
-		std::string path = directory + file;
+
+	char buffer[260];
+
+	while (Files::iterate_files_in_dir(path.c_str(), buffer, 260)) {
+		std::string path = directory;
+		path += buffer;
 		load_material_file(path.c_str(), true);
 	}
 

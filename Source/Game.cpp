@@ -72,17 +72,10 @@ void spawn_door(Level::Entity_Spawn& spawn)
 	e.flags |= EF_SOLID;
 	e.update = door_update;
 
-	for (auto kv : spawn.key_values) {
-		if (kv.at(0) == "linked_mesh") {
-			// this is unique, all other model_index setting goes through Game_Media
-			int index = std::atoi(kv.at(1).c_str());
-			e.model = eng->level->linked_meshes.at(index);
-			e.model_index = index;
-		}
+	e.model_index = spawn.spawnargs.get_int("linked_mesh", -1);
+	if (e.model_index != -1) {
+		e.model = eng->level->linked_meshes.at(e.model_index);
 	}
-
-
-
 }
 void spawn_spawn_point(Level::Entity_Spawn& spawn)
 {
@@ -93,12 +86,6 @@ void spawn_spawn_point(Level::Entity_Spawn& spawn)
 	e.rotation = spawn.rotation;
 	e.physics = EPHYS_NONE;
 
-
-	for (auto kv : spawn.key_values) {
-		if (kv.at(0) == "team") {
-			int index = std::atoi(kv.at(1).c_str());
-		}
-	}
 }
 
 void spawn_zone(Level::Entity_Spawn& spawn)
@@ -128,6 +115,8 @@ Spawn_Link links[]
 	{"player_spawn", spawn_spawn_point},
 	{"bomb_area", spawn_zone},
 	{"spawn_area", spawn_zone},
+	{"cubemap", nullptr },
+	{"cubemap_box",nullptr}
 };
 
 
@@ -141,7 +130,8 @@ void Game_Engine::on_game_start()
 		int j = 0;
 		for (; j < n; j++) {
 			if (es.classname == links[j].name) {
-				links[j].spawn(es);
+				if(links[j].spawn)
+					links[j].spawn(es);
 				break;
 			}
 		}

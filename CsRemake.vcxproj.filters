@@ -236,5 +236,8 @@
     <ClInclude Include="Source\EditorDoc.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Dict.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

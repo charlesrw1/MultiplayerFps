@@ -54,7 +54,7 @@ void Client::connect(string address)
 	for (int i = 0; i < MAX_GAME_ENTS; i++)
 		interpolation_data[i] = Entity_Interp();
 
-	eng->set_state(ENGINE_LOADING);
+	eng->client_goto_loading();
 
 	TrySendingConnect();
 }
@@ -62,7 +62,7 @@ void Client::connect(string address)
 
 void Client::TrySendingConnect()
 {
-	ASSERT(eng->state == ENGINE_LOADING);
+	ASSERT(eng->get_state() == ENGINE_LOADING);
 
 	const int MAX_CONNECT_ATTEMPTS = 10;
 	const float CONNECT_RETRY = 1.f;
@@ -70,10 +70,8 @@ void Client::TrySendingConnect()
 	if (state != CS_TRYINGCONNECT)
 		return;
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
-		sys_print("Couldn't connect to server\n");
 		state = CS_DISCONNECTED;
-
-		eng->set_state(ENGINE_MENU);
+		eng->exit_to_menu("Couldn't connect to server\n");
 		return;
 	}
 	double delta = GetTime() - attempt_time;
@@ -89,11 +87,12 @@ void Client::TrySendingConnect()
 	writer.EndWrite();
 	sock.Send(buffer, writer.BytesWritten(), server.remote_addr);
 }
-void Client::Disconnect(const char* debug_reason)
+
+void Client::disconnect_from_server(const char* reason)
 {
 	if (state == CS_DISCONNECTED)
 		return;
-	sys_print("Disconnecting from server because %s\n", debug_reason);
+	sys_print("Disconnecting from server because %s\n", reason);
 	if (state != CS_TRYINGCONNECT) {
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
@@ -108,7 +107,12 @@ void Client::Disconnect(const char* debug_reason)
 	server = Connection();
 	cur_snapshot_idx = 0;
 
-	eng->set_state(ENGINE_MENU);
+}
+
+void Client::disconnect_to_menu(const char* debug_reason)
+{
+	disconnect_from_server(debug_reason);
+	eng->exit_to_menu("client disconnected");
 }
 
 
@@ -116,7 +120,7 @@ void Client::Reconnect()
 {
 	string address = std::move(serveraddr);
 	sys_print("Reconnecting to server: %s\n", address);
-	Disconnect("reconnecting");
+	disconnect_from_server("reconnecting");
 	connect(address);
 }
 

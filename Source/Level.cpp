@@ -15,11 +15,18 @@ extern void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tiny
 	Physics_Mesh* physics, const glm::mat4& phys_transform);
 extern void load_model_materials(std::vector<Game_Shader*>& materials, const std::string& fallbackname, tinygltf::Model& scene);
 
+// move this out of here
+void parse_ent_file(const char* file)
+{
+
+}
+
 
 void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 {
 	Level::Entity_Spawn es;
-	es.classname = node.extras.Get("classname").Get<std::string>();
+	es.spawnargs.set_string("classname", node.extras.Get("classname").Get<std::string>().c_str());
+	es.classname = es.spawnargs.get_string("classname");
 	es.name = node.name;
 	es.position = transform[3];
 	es.rotation = glm::vec3(0.f);
@@ -29,24 +36,14 @@ void parse_entity(Level* level, const tinygltf::Node& node, glm::mat4 transform)
 	}
 	es.scale = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
 	
-	auto keys = node.extras.Keys();
+	const auto& keys = node.extras.Keys();
 	for (int i = 0; i < keys.size(); i++) {
-		int s = es.key_values.size();
-		es.key_values.resize(s + 1);
-		
-		auto& kv = es.key_values.at(s);
-		kv.push_back(keys.at(i));
 		auto& v = node.extras.Get(keys.at(i));
-		kv.push_back(v.Get<std::string>());
+		es.spawnargs.set_string(keys.at(i).c_str(), v.Get<std::string>().c_str());
 	}
 
 	if (node.mesh != -1) {
-		int s = es.key_values.size();
-		es.key_values.resize(s + 1);
-
-		auto& kv = es.key_values.at(s);
-		kv.push_back("linked_mesh");
-		kv.push_back(std::to_string(level->linked_meshes.size()));
+		es.spawnargs.set_int("linked_mesh", level->linked_meshes.size());
 	}
 
 	level->espawns.push_back(es);
@@ -207,6 +204,32 @@ void load_level_lights(Level* l, tinygltf::Model& scene)
 
 	}
 }
+#include "Key_Value_File.h"
+void load_ents(Level* l, const std::string& mapdir)
+{
+	std::string ent_file_name = mapdir + "ents.txt";
+	Key_Value_File ent_file;
+	bool good = ent_file.open(ent_file_name.c_str());
+	if (!good) return;
+	{
+		for (auto& ent : ent_file.name_to_entry) {
+			Level::Entity_Spawn espawn;
+			espawn.spawnargs = std::move(ent.second.dict);
+			espawn.classname = espawn.spawnargs.get_string("classname", "");
+			if (espawn.classname.empty()) {
+				sys_print("Entity without classname, skipping...\n");
+				continue;
+			}
+			espawn.name = ent.first;
+			espawn.position = espawn.spawnargs.get_vec3("position");
+			espawn.rotation = espawn.spawnargs.get_vec3("rotation");
+			espawn.scale = espawn.spawnargs.get_vec3("scale",glm::vec3(1.f));
+
+			l->espawns.push_back(espawn);
+		}
+	}
+}
+
 Level* LoadLevelFile(const char* level_name)
 {
 	std::string map_dir;
@@ -244,8 +267,7 @@ Level* LoadLevelFile(const char* level_name)
 		traverse_tree(level, scene, scene.nodes[defscene.nodes[i]], glm::mat4(1), mm);
 	}
 	map_materials_to_models(level, scene, mm);
-
-	// load ents.txt
+	load_ents(level, map_dir);
 
 	std::string lightmap_path = map_dir + "lightmap.hdr";
 	level->lightmap = mats.find_texture(lightmap_path.c_str(), false, true);

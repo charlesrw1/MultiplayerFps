@@ -66,6 +66,7 @@ enum Engine_State
 	ENGINE_MENU,
 	ENGINE_LOADING,
 	ENGINE_GAME,
+	ENGINE_EDITOR,
 };
 
 using std::string;
@@ -75,6 +76,7 @@ struct ImGuiContext;
 class Client;
 class Server;
 class Level;
+class EditorDoc;
 class Game_Engine
 {
 public:
@@ -97,8 +99,15 @@ public:
 	void connect_to(string address);
 	void set_tick_rate(float tick_rate);
 	bool start_map(string map, bool is_client = false);
-	void set_state(Engine_State state);
-	void exit_map();
+	void client_enter_into_game();
+	void client_goto_loading();
+	void exit_to_menu(const char* log_reason);
+	Engine_State get_state() { return state; }
+
+#ifdef EDITDOC
+	void start_editor(const char* map);
+	void close_editor();
+#endif
 
 	// Host functions
 	Entity* new_entity();
@@ -118,14 +127,15 @@ public:
 	Client* cl;
 	Server* sv;
 
+#ifdef EDITDOC
+	EditorDoc* eddoc = nullptr;
+#endif
+
 	string mapname;
 	Level* level;
 	PhysicsWorld phys;
 	Entity ents[MAX_GAME_ENTS];
 	int num_entities;
-	Engine_State state;
-	bool pending_state = false;
-	Engine_State nextstate;
 	bool is_host;
 	Game_Local local;
 	Game_Media media;
@@ -157,8 +167,11 @@ public:
 
 	int argc;
 	char** argv;
+
 private:
-	Engine_State next_state;
+	Engine_State state;
+	void set_state(Engine_State state);
+	void unload_current_level();
 
 	void view_angle_update();
 	void make_move();

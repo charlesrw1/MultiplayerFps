@@ -88,10 +88,11 @@ public:
 	void add_arg(const char* v, int len);
 	void clear() {
 		argc = 0;
+		buffer_index = 0;
 	}
 private:
 	static const int MAX_ARGS = 8;
-	static const int BUFFER_SIZE = 512;
+	static const int BUFFER_SIZE = 150;
 	int argc = 0;
 	int arg_to_index[MAX_ARGS];
 	int buffer_index = 0;

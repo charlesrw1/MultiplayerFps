@@ -51,8 +51,6 @@ void Server::end(const char* log_reason)
 		clients[i].Disconnect("server is ending");
 	socket.Shutdown();
 	initialized = false;
-
-	eng->set_state(ENGINE_MENU);
 }
 
 void Server::start()

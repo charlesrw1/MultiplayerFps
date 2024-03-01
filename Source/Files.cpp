@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <string>
 #include "StringUtil.h"
+#include <Windows.h>
 
 struct File_Internal
 {
@@ -37,6 +38,7 @@ public:
 void Archive::create(const char* archive_path)
 {
 	file_handle = std::fopen(archive_path, "rb");
+	if (!file_handle) return;
 
 	char magic[4];
 
@@ -133,7 +135,7 @@ File_Buffer* Files::open(const char* file, int flags)
 	std::string name(file);
 	//name = "./Data/";
 	//name = file;
-	bool binary = !(flags & TEXT);
+	bool binary = true;// !(flags & TEXT);
 
 	std::ifstream infile(name.c_str(), (binary) ? std::ios::binary : 1);
 	if (!infile) {
@@ -171,6 +173,35 @@ void Files::init()
 	Archive* a = new Archive;
 	a->create("archive.dat");
 	archives = a;
+}
+
+bool Files::iterate_files_in_dir(const char* dir, char* buffer, int buffer_len)
+{
+	static bool in_middle_of_search = false;
+	static HANDLE hFind = nullptr;
+	static WIN32_FIND_DATAA findData;
+	
+	if (!in_middle_of_search) {
+		findData = {};
+		hFind = FindFirstFileA(dir, &findData);
+		if (hFind == INVALID_HANDLE_VALUE)
+			return false;
+	}
+	in_middle_of_search = true;
+
+	while (FindNextFileA(hFind, &findData) != 0) {
+		if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY || findData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+			continue;
+		int len = strlen(findData.cFileName);
+		if (len + 1 <= buffer_len) {
+			memcpy(buffer, findData.cFileName, len);
+			buffer[len] = 0;
+			return true;
+		}
+	}
+	in_middle_of_search = false;
+	FindClose(hFind);
+	return false;
 }
 
 bool file_getline(const File_Buffer* file, Buffer* str_buffer, int* index, char delimiter)
