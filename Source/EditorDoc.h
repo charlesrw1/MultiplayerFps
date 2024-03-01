@@ -5,6 +5,7 @@
 #include "Level.h"
 #include <SDL2/SDL.h>
 #include <memory>
+#include "Physics.h"
 
 enum EdObjType
 {
@@ -23,14 +24,19 @@ class EditorNode
 public:
 	EditorNode(EditorDoc* doc) : doc(doc) {}
 
-	void make_from_existing(int index);
 
 	virtual void scene_draw() {}
 	virtual void imgui_tick() {}
-	virtual void on_remove();
-	virtual void on_create();
+	
+	void on_remove();
 
+	void init_on_new_espawn();
+
+
+	void make_from_existing(int index);
+	void on_create_from_dict(int index, int varying_index, Dict* d);
 	void save_out_to_level();
+
 
 	void on_transform_change() {}
 	void on_dict_value_change() {}
@@ -38,6 +44,8 @@ public:
 	glm::vec3 position;
 	glm::vec3 rotation;
 	glm::vec3 scale;
+	glm::mat4 get_transform();
+	void set_transform(glm::mat4 newtransform);
 	
 	bool use_sphere_collision = true;
 	glm::vec3 collision_bounds = glm::vec3(0.5f);
@@ -48,11 +56,12 @@ public:
 
 	EdObjType obj = EDOBJ_EMPTY;
 	int dict_index = -1;
-	Dict entity_dict;
 	int _varying_obj_index = -1;
 	
+	Dict& get_dict();
+
 	const char* get_name() {
-		return entity_dict.get_string("name", "no_name");
+		return get_dict().get_string("name", "no_name");
 	}
 };
 
@@ -67,7 +76,7 @@ public:
 class Command
 {
 public:
-	virtual ~Command() = 0;
+	virtual ~Command() {}
 	virtual void execute() = 0;
 	virtual void undo() = 0;
 };
@@ -166,23 +175,34 @@ public:
 	const View_Setup& get_vs();
 
 	void on_add_or_remove_node(int ent_dict_index, EdObjType type, int varying_index, bool is_removal);
-
+	RayHit cast_ray_into_world(Ray* out_ray);
+	
 	enum ToolMode {
-		NONE,
+		TOOL_NONE,	// can select objects in viewport
+		TOOL_SPAWN_MODEL,	// clicking spawns selected model
+		TOOL_SPAWN_OBJ,
+		TOOL_TRANSFORM,	// translation/rotation/scale tool
+	}mode = TOOL_NONE;
 
-		SPAWN_OBJ,
-
-		FOLIAGE_PAINT,
-
-		TRANSLATION,
-		ROTATION,
-		SCALING,
-	}mode = NONE;
+	bool local_transform = false;
+	TransformType transform_tool_type;
+	int axis_bit_mask = 0;
+	glm::vec3 transform_tool_origin;
+	void transform_tool_update();
+	void enter_transform_tool(TransformType type);
+	void leave_transform_tool(bool apply_delta);
 
 	EditorNode* selected_node;
 	
+	// dont want to deal with patching up another index
+	int get_node_index(EditorNode* node) {
+		for (int i = 0; i < nodes.size(); i++) {
+			if (nodes[i].get() == node) return i;
+		}
+		ASSERT(0);
+	}
+	
 	UndoRedoSystem command_mgr;
-	bool assets_open = false;
 	AssetBrowser assets;
 	View_Setup vs_setup;
 	Level* leveldoc = nullptr;

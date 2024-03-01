@@ -42,6 +42,7 @@ def compile_texture_list(texture_list, alphamode):
         nvdxt_args = "-outdir {}".format(TEXTURE_DIR+path_folder)
         nvdxt_args += " " + args
         nvdxt_args += " -file {}".format(TEXTURE_DIR + path)
+        nvdxt_args += " -quick"
 
         print("Executing: nvdxt.exe "+ nvdxt_args)
 

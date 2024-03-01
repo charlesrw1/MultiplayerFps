@@ -64,6 +64,11 @@ public:
 	}
 	std::string name;
 	enum { BASE1, BASE2, NORMAL1, NORMAL2, AUX1, AUX2, SPECIAL, MAX_IMAGES };
+	//enum { DIFFUSE1, NORMAL1, ROUGHNESS1, METAL1, AO1, SPECIAL, MAX_IMAGES };
+
+	enum { MAX_REFERENCES = 2};
+	Game_Shader* references[MAX_REFERENCES];
+
 	// base = rgb diffuse
 	//		a alpha/mask
 	// aux = r specular exponent

@@ -441,6 +441,7 @@ Texture* Game_Material_Manager::load_texture(const std::string& path)
 		return t;
 	}
 	else if (path_to_use.find(".hdr") != std::string::npos) {
+		stbi_set_flip_vertically_on_load(true);
 		data = stbi_loadf_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
 		is_float = true;
 	}

@@ -5,12 +5,11 @@
 #include <string>
 #include <memory>
 #include <map>
-#include "glm/glm.hpp"
+#include "MathLib.h"
 #include "glm/gtc/quaternion.hpp"
 #include "Util.h"
 #include "Animation.h"
 #include "BVH.h"
-
 using std::string;
 using std::vector;
 
@@ -94,6 +93,7 @@ public:
 	vector<MeshPart> parts;
 	vector<GpuBuffer> buffers;
 	vector<Game_Shader*> materials;
+	Bounds aabb;
 
 	std::unique_ptr<Physics_Mesh> collision;
 

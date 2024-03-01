@@ -25,7 +25,7 @@ vec3 ApplyVolumetricFog(vec3 incolor)
 void main()
 {
 
-	vec3 color = texture(cube, normalize(-FS_IN_Fragpos)).rgb;
+	vec3 color = texture(cube, normalize(vec3(FS_IN_Fragpos.x,FS_IN_Fragpos.y,FS_IN_Fragpos.z))).rgb;
 	//if(apply_fog)
 	//	color = ApplyVolumetricFog(color);
 	

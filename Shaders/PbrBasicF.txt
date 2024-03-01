@@ -295,6 +295,7 @@ vec3 parallax_sample(float cindex, float roughness, vec3 R)
 	vec3 sampledir = normalize(point-cubemaps[num].probepos_priority.xyz);
 	
 	return textureLod(pbr_specular_cubemaps,vec4(sampledir,cindex), roughness*4.0).rgb;
+	//return textureLod(pbr_specular_cubemaps,vec4(R,cindex), roughness*4.0).rgb;
 }
 
 float get_cubemap_index(vec3 worldpos)
@@ -404,8 +405,9 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 
 	vec3 R = reflect(-V,N);
 	float Roughness = roughness;
+	
 	vec3 Albedo = diffuse;
-	float Metalness = 0.0;
+	float Metalness = metalness;
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0,Albedo,Metalness);
 	//F0 = vec3(0.95, 0.64, 0.54);
@@ -413,8 +415,8 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	vec3 Lo = vec3(0.0);
 	vec3 L = -g.directional_light_dir_and_used.xyz;
     vec3 H = normalize(V + L);
-    vec3 radiance = g.directional_light_color.rgb*0.007;
-#ifndef LIGHTMAPPED
+    vec3 radiance = g.directional_light_color.rgb*0.002;
+//#ifndef LIGHTMAPPED
 	{
 		vec3 surface_N = N;
         // Cook-Torrance BRDF
@@ -459,12 +461,12 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 		}
 		#endif
 	}
-#endif
+//#endif
 
 
 // Lighting
 	float cm_index = get_cubemap_index(FS_IN_FragPos);
-	
+	//cm_index = 0.f;
 	const float MAX_REFLECTION_LOD = 4.0;
 	//vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index), Roughness*MAX_REFLECTION_LOD).rgb;
 	vec3 prefiltered_color = parallax_sample(cm_index, Roughness, R);
@@ -475,10 +477,10 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	float ao = get_ao();
 	
 	
-	vec3 irradiance = texture(pbr_irradiance_cubemaps,vec4(N, cm_index)).rgb*1.5;
+	vec3 irradiance = texture(pbr_irradiance_cubemaps,vec4(N, cm_index)).rgb;
 
 #ifdef LIGHTMAPPED
-	irradiance = texture(lightmap, FS_IN_TexCoord2).rgb*1.4;
+	//irradiance = texture(lightmap, FS_IN_TexCoord2).rgb*1.4;
 #endif
 	vec3 diffuse_light = irradiance*Albedo;
 
@@ -496,7 +498,9 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 
 	ambient += Lo + emissive;
 
-	return vec4(ambient, opacity);
+	vec4 outc = smoothstep(-0.6,-0.5,N.y)*vec4(1);
+
+	return outc;//vec4(ambient, opacity);
 }
 
 #ifdef BLEND2
@@ -584,17 +588,17 @@ void main()
 
 
 	vec3 specular_color = vec3(0.1);
-	vec2 specmask_green = vec2(1.0,0.0);
+	vec3 specmask_green = vec3(1.0,0.0,0.0);
 	if(has_spec_mask) {
-		specmask_green = texture(auxcolor, FS_IN_Texcoord).rg;
+		specmask_green = texture(auxcolor, FS_IN_Texcoord).rgb;
 		
 	#ifdef BLEND2
-		specmask_green = mix(specmask_green, texture(auxcolor2, FS_IN_Texcoord).rg, blend2_lerp);
+		specmask_green = mix(specmask_green, texture(auxcolor2, FS_IN_Texcoord).rgb, blend2_lerp);
 	#endif
-		specmask_green = pow(specmask_green, vec2(1.5));
+		//specmask_green = pow(specmask_green, vec2(1.5));
 	}
-	if(!specular_enabled)
-		specmask_green.r = 0.0;
+	//if(!specular_enabled)
+	//	specmask_green.r = 0.0;
 		
 	if(specular_tint.r >= 0) {
 		specular_color = specular_tint;
@@ -619,11 +623,12 @@ void main()
 	}
 	
 
-	FS_OUT_Color = pbr_calculate(tex.rgb, (1.0-specular_color.r)*0.5, specmask_green.g, N, 1.0,emissive);
+	FS_OUT_Color = pbr_calculate(tex.rgb, specmask_green.r,0.0, N, 1.0,emissive);
 	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
 	//FS_OUT_Color = vec4(1.0);
+	//FS_OUT_Color = vec4(specmask_green.b);
 	#ifdef BLEND2
 	//FS_OUT_Color = tex;
 	#endif

@@ -759,8 +759,8 @@ void Game_Local::init()
 
 bool Game_Engine::start_map(string map, bool is_client)
 {
-	if (get_state() != ENGINE_MENU) {
-		exit_to_menu("starting a server");
+	if (!is_client && get_state() != ENGINE_MENU) {
+		exit_to_menu("starting a new server");
 	}
 
 	sys_print("Starting map %s\n", map.c_str());

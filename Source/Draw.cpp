@@ -1558,6 +1558,12 @@ void Renderer::scene_draw(bool editor_mode)
 	DrawEntBlobShadows();
 	eng->local.pm.draw_particles();
 
+	set_shader(S_SIMPLE);
+	shader().set_mat4("ViewProj", vs.viewproj);
+	shader().set_mat4("Model", mat4(1.f));
+
+	if (editor_mode)
+		eng->eddoc->overlays_draw();
 
 	glCheckError();
 	
@@ -1570,6 +1576,7 @@ void Renderer::scene_draw(bool editor_mode)
 	mb.Begin();
 	mb.Push2dQuad(vec2(-1, -1), vec2(2, 2));
 	mb.End();
+
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, cur_w, cur_h);
@@ -1585,7 +1592,6 @@ void Renderer::scene_draw(bool editor_mode)
 	mb.Draw(GL_TRIANGLES);
 
 	glEnable(GL_CULL_FACE);
-
 	mb.Begin();
 	if (draw_sv_colliders.integer()) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -1612,9 +1618,8 @@ void Renderer::scene_draw(bool editor_mode)
 		//phys_debug.End();
 		//phys_debug.Draw(GL_LINES);
 	}
-	if (editor_mode)
-		eng->eddoc->overlays_draw();
-	else
+	
+	if(!editor_mode)
 		ui_render();
 
 	mb.Free();
@@ -2372,7 +2377,7 @@ void Renderer::on_level_start()
 	draw.using_skybox_for_specular = true;
 	auto& helper = EnviornmentMapHelper::get();
 
-	scene.skybox = helper.create_from_file("hdr_sky2.hdr").original_cubemap;
+	scene.skybox = helper.create_from_file("hdr_sky.hdr").original_cubemap;
 	// CUBEMAP_SIZE isnt the size of skybox, but its unused anyways
 	helper.convolute_irradiance_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, 0, 32);
 	helper.compute_specular_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapspecular_array, 0, CUBEMAP_SIZE);

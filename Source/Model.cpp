@@ -498,6 +498,12 @@ void add_node_mesh_to_model2(Model* model, cgltf_data* data, cgltf_node* node,
 
 			if (location == -1) continue;
 
+			if (location == POSITION_LOC) {
+				model->aabb = bounds_union(model->aabb, glm::vec3(accessor.min[0], accessor.min[1], accessor.min[2]));
+				model->aabb = bounds_union(model->aabb, glm::vec3(accessor.max[0], accessor.max[1], accessor.max[2]));
+			}
+
+
 			if (location == JOINT_LOC)
 				found_joints_attrib = true;
 
@@ -556,6 +562,7 @@ void load_model_materials(std::vector<Game_Shader*>& materials, const std::strin
 			if (baseindex != -1 && baseindex < scene.images.size()) {
 				gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
 				gs->images[Game_Shader::BASE1] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
+			
 			}
 			else
 				gs = &mats.fallback;
@@ -571,7 +578,10 @@ static Texture* LoadGltfImage2(cgltf_image* i, cgltf_data* data)
 	ASSERT(bv.stride == 0);
 	uint8_t* buffer_bytes = (uint8_t*)b.data;
 
-	return CreateTextureFromImgFormat(buffer_bytes + bv.offset, bv.size, i->name);
+	const char* name = i->name;
+	if (!name) name = "";
+
+	return CreateTextureFromImgFormat(buffer_bytes + bv.offset, bv.size,name);
 }
 
 void load_model_materials2(std::vector<Game_Shader*>& materials, const std::string& fallbackname, cgltf_data* data)
@@ -589,9 +599,14 @@ void load_model_materials2(std::vector<Game_Shader*>& materials, const std::stri
 			if (mat.has_pbr_metallic_roughness) {
 				cgltf_pbr_metallic_roughness& base = mat.pbr_metallic_roughness;
 				if (base.base_color_texture.texture) {
-
 					gs = mats.create_temp_shader((fallbackname + mat_name).c_str());
 					gs->images[Game_Shader::BASE1] = LoadGltfImage2(base.base_color_texture.texture->image, data);
+					if (base.metallic_roughness_texture.texture) {
+						gs->images[Game_Shader::AUX1] = LoadGltfImage2(base.metallic_roughness_texture.texture->image, data);
+					}
+					if (mat.normal_texture.texture) {
+						gs->images[Game_Shader::NORMAL1] = LoadGltfImage2(mat.normal_texture.texture->image, data);
+					}
 				}
 			}
 
