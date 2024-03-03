@@ -147,28 +147,6 @@ class Object_Cull_Job
 
 };
 
-struct Render_Key
-{
-	int viewport_layer : 2;
-	int shader : 8;
-	int texture0 : 12;
-	int blending_mode : 2;
-	int backface_mode : 1;
-	int vao : 13;
-	int depth : 18;
-	int obj_index;
-};
-
-class Render_Lists
-{
-public:
-	std::vector<Render_Key> transparents;
-	std::vector<Render_Key> opaques;
-	std::vector<Render_Key> shadow_casters;
-	std::vector<Render_Item> items;
-
-	void add_item(Render_Item item, bool cast_shadows);
-};
 
 struct Render_Light
 {
@@ -226,11 +204,11 @@ struct Draw_Call_Object
 
 struct Multidraw_Indirect_Command
 {
-	GLuint  count;
-	GLuint  primCount;
-	GLuint  firstIndex;
-	GLint   baseVertex;
-	GLuint  baseInstance;
+	unsigned int  count;
+	unsigned int  primCount;
+	unsigned int  firstIndex;
+	int   baseVertex;
+	unsigned int  baseInstance;
 };
 
 struct Gpu_Material
@@ -244,8 +222,8 @@ struct Gpu_Material
 
 struct Gpu_Object
 {
-	glm::mat4x3 model;
-	glm::mat4x3 invmodel;
+	glm::mat4x4 model;
+	glm::mat4x4 invmodel;
 	glm::vec4 color_val;
 	int anim_matrix_offset = 0;
 	float obj_param1;
@@ -254,30 +232,62 @@ struct Gpu_Object
 };
 
 
-
-// defines shared resources used for gpu driven style rendering
-struct Shared_Gpu_Driven_Resources
-{
-	vector<Gpu_Object> gpu_objects;
-	vector<Gpu_Material> scene_mats;
-	uint32_t scene_mats_ssbo;
-	uint32_t gpu_objs_ssbo;
-	uint32_t anim_matrix_ssbo;
-};
-
 struct Gpu_Batch
 {
 
 };
 
+
+typedef int Renering_Pass_Handle;
+
 // defines the resources needed for each pass (forward, shadow, reflection)
-struct Gpu_Driven_Pass_Resources
+struct Gpu_Mesh_Pass
 {
-	vector<Gpu_Batch> batches;
 	// these is written to by the gpu for culling and drawn
-	uint32_t abc;
+	uint32_t indirect_draw_buffer;
+	uint32_t visibility_buffer;
 };
 
+typedef int Render_Scene_Handle;
+
+struct Draw_Call
+{
+	const Mesh* mesh;
+	Game_Shader* mat;
+	int submesh;
+	int mat_index;
+	int object_index;
+	uint64_t sort;
+};
+
+// defines shared resources used for gpu driven rendering
+struct Shared_Gpu_Driven_Resources
+{
+public:
+	void init();
+
+	void build_draw_calls();
+
+	void make_draw_calls_from(
+		const Mesh* mesh,
+		glm::mat4 transform,
+		vector<Game_Shader*>& mat_list,
+		const Animator* animator,
+		bool casts_shadows,
+		glm::vec4 colorparam);
+
+	vector<Draw_Call> opaques;
+	vector<Draw_Call> transparents;
+	vector<Draw_Call> shadows;
+
+	vector<glm::mat4x4> skinned_matricies;
+	vector<Gpu_Object> gpu_objects;
+	vector<Gpu_Material> scene_mats;
+
+	uint32_t scene_mats_ssbo;
+	uint32_t gpu_objs_ssbo;
+	uint32_t anim_matrix_ssbo;
+};
 
 class Renderer
 {
@@ -288,6 +298,7 @@ public:
 
 	// editor mode doesn't draw UI and it calls the eddoc hook to draw custom stuff
 	void scene_draw(bool editor_mode);
+	void extract_objects();
 
 	void render_level_to_target(Render_Level_Params params);
 
@@ -438,8 +449,10 @@ public:
 	Level_Light dyn_light;
 
 	Render_Scene scene;
-private:
+	Shared_Gpu_Driven_Resources shared;
 	std::vector<Draw_Model_Frontend_Params> immediate_draw_calls;
+	int get_shader_index(const Mesh& part, const Game_Shader& gs, bool depth_pass);
+private:
 
 	struct Sprite_Drawing_State {
 		bool force_set = true;
@@ -451,6 +464,7 @@ private:
 
 	struct Model_Drawing_State {
 		bool initial_set = true;
+		uint32_t current_vao = -1;
 		int current_shader = 0;	// S_ANIMATED, S_STATIC, ...
 		bool initial_model = true;
 		int current_alpha_state = 0;
@@ -459,7 +473,7 @@ private:
 		Render_Level_Params::Pass_Type pass = Render_Level_Params::OPAQUE;
 	};
 
-	void draw_model_real(const Mesh& m, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
+	void draw_model_real(const Draw_Call& dc,
 		Model_Drawing_State& state);
 	void draw_model_real_depth(const Mesh& m, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
 		Model_Drawing_State& state);
@@ -488,7 +502,6 @@ private:
 	void set_wind_constants();
 	void set_water_constants();
 
-	int get_shader_index(const Mesh& part, const Game_Shader& gs, bool depth_pass);
 
 	View_Setup current_frame_main_view;
 

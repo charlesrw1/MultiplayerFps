@@ -412,7 +412,7 @@ void Game_Media::load()
 	blob_shadow = FindOrLoadTexture("blob_shadow.png");
 }
 
-const Model* Game_Media::get_game_model(const char* model, int* out_index)
+Model* Game_Media::get_game_model(const char* model, int* out_index)
 {
 	int i = 0;
 	for (; i < model_manifest.size(); i++) {
@@ -430,7 +430,7 @@ const Model* Game_Media::get_game_model(const char* model, int* out_index)
 	model_cache[i] = FindOrLoadModel(model);
 	return model_cache[i];
 }
-const Model* Game_Media::get_game_model_from_index(int index)
+Model* Game_Media::get_game_model_from_index(int index)
 {
 	if (index < 0 || index >= model_manifest.size()) return nullptr;
 	if (model_cache[index]) return model_cache[index];

@@ -36,14 +36,6 @@ vec3 randColor(int number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
 }
 
-#ifdef ANIMATED
-#define MAX_BONES 128
-uniform mat4 BoneTransform[MAX_BONES];
-#endif
-
-uniform mat4 Model;
-uniform mat4 InverseModel;
-
 
 struct Ubo_View_Constants_Struct
 {
@@ -78,6 +70,26 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
+struct Gpu_Object_Data
+{
+	mat4 model;
+	mat4 invmodel;
+	vec4 colorval;
+	int anim_mat_offset;
+	float obj1;
+	float obj2;
+	float obj3;
+};
+
+layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
+	Gpu_Object_Data g_objects[];
+};
+layout (binding = 3, std140) readonly buffer Object_Skin_Matricies {
+	mat4 g_skin_matricies[];
+};
+
+uniform int obj_index = 0;
+
 
 #ifdef WIND
 uniform float height;
@@ -85,7 +97,7 @@ uniform float startheight;
 uniform vec3 wind_dir;
 uniform float speed;
 
-vec3 do_wind_sway(vec3 pos)
+vec3 do_wind_sway(vec3 pos, mat4 Model)
 {
 	vec3 wind_dir_local = wind_dir;
 	float height_scale = smoothstep(height*startheight, pos.y, height);
@@ -114,23 +126,28 @@ void main()
 	//vec2 VS_IN_TexCoord2 = vec2(0);
 	//vec3 VS_IN_Tangent = vec3(1,0,0);
 
+	mat4 Model = g_objects[obj_index].model;
+	mat4 InverseModel = g_objects[obj_index].invmodel;
+
 #ifdef ANIMATED
 	vec3 local_pos = vec3(0.0);
 	vec3 local_normal = vec3(0.0);
 #ifdef NORMALMAPPED
 	vec3 local_tangent = vec3(0.0);
 #endif
+	int obj_skin_offset = g_objects[obj_index].anim_mat_offset;
+
 	for(int i=0;i<4;i++) {
 		if(VS_IN_BoneIndicies[i]==-1)
 			continue;
-		vec3 posadded = vec3(BoneTransform[VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
+		vec3 posadded = vec3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
 		local_pos += posadded * VS_IN_BoneWeights[i];
 		
-		vec3 normaladded = mat3(BoneTransform[VS_IN_BoneIndicies[i]])*VS_IN_Normal;
+		vec3 normaladded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Normal;
 		local_normal += normaladded * VS_IN_BoneWeights[i];
 		
 	#ifdef NORMALMAPPED
-		vec3 tangentadded = mat3(BoneTransform[VS_IN_BoneIndicies[i]])*VS_IN_Tangent;
+		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Tangent;
 		local_tangent += tangentadded;
 	#endif
 	}
@@ -145,7 +162,7 @@ void main()
 #endif
 
 #ifdef WIND
-	local_pos = do_wind_sway(local_pos);
+	local_pos = do_wind_sway(local_pos, Model);
 #endif
 
 

@@ -244,7 +244,7 @@ void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, 
 		read_entity(ent, msg, prop_mask, true); // now add in the delta entries
 	}
 
-	const Model* next_model = nullptr;
+	Model* next_model = nullptr;
 	if (ent->model_index != -1)
 		next_model = eng->media.get_game_model_from_index(ent->model_index);
 	if (next_model != ent->model) {

@@ -72,7 +72,6 @@ public:
 	float roughness_mult = 1.f;
 	float metalness_mult = 1.f;
 	glm::vec2 roughness_remap_range = glm::vec2(0.f, 1.f);
-
 	bool backface = false;
 
 	enum { A_NONE, A_ADD, A_BLEND, A_TEST };
@@ -87,6 +86,10 @@ public:
 	bool is_translucent() const {
 		return alpha_type == A_ADD || alpha_type == A_BLEND;
 	}
+
+	int current_gpu_mapping = -1;
+	int shader_hash = -1;
+	int params_hash = -1;
 };
 
 class Game_Material_Manager

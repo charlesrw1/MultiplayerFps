@@ -386,7 +386,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 
 	glCheckError();
 
-	glBindBufferBase(GL_UNIFORM_BUFFER, 4, draw.volfog.param_ubo);
+	//glBindBufferBase(GL_UNIFORM_BUFFER, 4, draw.volfog.param_ubo);
 
 	glCheckError();
 	glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.csm_ubo);
@@ -394,6 +394,10 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glCheckError();
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, draw.scene.cubemap_ssbo);
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, draw.shared.scene_mats_ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, draw.shared.gpu_objs_ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, draw.shared.anim_matrix_ssbo);
 
 	glCheckError();
 }
@@ -1079,6 +1083,8 @@ void Renderer::Init()
 	
 	InitGlState();
 
+	shared.init();
+
 	float start = GetTime();
 	reload_shaders();
 	printf("compiled shaders in %f\n", (float)GetTime() - start);
@@ -1382,14 +1388,21 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 
 	glCheckError();
 
-	if (params.draw_level) {
-		DrawLevel(params);
-	}
-	if (params.draw_ents)
-		DrawEnts(params);
-	if (params.draw_viewmodel)
-		DrawPlayerViewmodel(params);
+	
 
+	std::vector<Draw_Call>* list;
+	if (params.is_water_reflection_pass) list = &shared.opaques;
+	else if (params.pass == params.SHADOWMAP) list = &shared.shadows;
+	else if (params.pass == params.TRANSLUCENT) list = &shared.transparents;
+	else  list = &shared.opaques;
+
+	{
+		Model_Drawing_State state;
+		for (int d = 0; d < list->size(); d++) {
+			Draw_Call& dc = (*list)[d];
+			draw_model_real(dc, state);
+		}
+	}
 
 	glCheckError();
 
@@ -1506,6 +1519,218 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 	ui_builder.Push2dQuad(glm::vec2(x, y), glm::vec2(w, h), glm::vec2(srcx / tw, srcy / th),
 		glm::vec2(srcw / tw, srch / th), color);
 }
+
+void Shared_Gpu_Driven_Resources::init()
+{
+	glCreateBuffers(1, &anim_matrix_ssbo);
+	glCreateBuffers(1, &gpu_objs_ssbo);
+	glCreateBuffers(1, &scene_mats_ssbo);
+}
+
+void Shared_Gpu_Driven_Resources::make_draw_calls_from(
+	const Mesh* mesh,
+	glm::mat4 transform,
+	vector<Game_Shader*>& mat_list,
+	const Animator* animator,
+	bool casts_shadows,
+	glm::vec4 colorparam)
+{
+	Gpu_Object obj;
+	
+	if (animator) {
+		obj.anim_matrix_offset = skinned_matricies.size();
+		auto& mats = animator->GetBones();
+		for (int i = 0; i < animator->model->bones.size(); i++) {
+			skinned_matricies.push_back(mats[i]);
+		}
+	}
+
+	obj.model = transform;
+	obj.invmodel = glm::inverse(transform);
+	obj.color_val = colorparam;
+
+	int obj_idx = gpu_objects.size();
+	gpu_objects.push_back(obj);
+
+	for (int s = 0; s < mesh->parts.size(); s++) {
+		Draw_Call dc;
+		dc.mat = mat_list[mesh->parts[s].material_idx];
+		if (1) {
+			// map it to a buffer
+			Gpu_Material gpumat;
+			gpumat.diffuse_tint = dc.mat->diffuse_tint;
+			gpumat.rough_mult = dc.mat->roughness_mult;
+			gpumat.metal_mult = dc.mat->metalness_mult;
+			gpumat.rough_remap_x = dc.mat->roughness_remap_range.x;
+			gpumat.rough_remap_y = dc.mat->roughness_remap_range.y;
+
+			dc.mat_index = scene_mats.size();
+			scene_mats.push_back(gpumat);
+		}
+		dc.object_index = obj_idx;
+		dc.submesh = s;
+		dc.mesh = mesh;
+
+		int shade_index = draw.get_shader_index(*mesh, *dc.mat, false);
+		int tex_index = (dc.mat->images[0]) ? dc.mat->images[0]->gl_id : 0;
+		int alpha_and_other = dc.mat->backface | dc.mat->alpha_type;
+		int vertfmt = mesh->format;
+		dc.sort = (shade_index << 38) | (alpha_and_other<<36) | (tex_index<<4) | vertfmt;
+
+		if (dc.mat->is_translucent()) {
+			transparents.push_back(dc);
+		}
+		else {
+			opaques.push_back(dc);
+			if (casts_shadows) {
+				shade_index = draw.get_shader_index(*mesh, *dc.mat, true);
+				dc.sort = (shade_index << 38) | (alpha_and_other << 36) | (tex_index << 4) | vertfmt;
+				shadows.push_back(dc);
+			}
+		}
+	}
+}
+#include <algorithm>
+void Shared_Gpu_Driven_Resources::build_draw_calls()
+{
+	skinned_matricies.clear();
+	gpu_objects.clear();
+	opaques.clear();
+	transparents.clear();
+	shadows.clear();
+	scene_mats.clear();
+
+	//int scene_pre_size = scene_mats.size();
+
+	Level* level = eng->level;
+
+	for (int m = 0; m < level->static_mesh_objs.size(); m++) {
+		Static_Mesh_Object& smo = level->static_mesh_objs[m];
+		ASSERT(smo.model);
+		make_draw_calls_from(
+			&smo.model->mesh,
+			smo.transform,
+			smo.model->mats,
+			nullptr,
+			true,
+			glm::vec4(1.f)
+		);
+	}
+	for (int m = 0; m < level->level_prefab->nodes.size(); m++) {
+		auto& node = level->level_prefab->nodes[m];
+		auto& mesh = level->level_prefab->meshes[node.mesh_idx];
+		make_draw_calls_from(
+			&mesh,
+			node.transform,
+			level->level_prefab->mats,
+			nullptr,
+			true,
+			glm::vec4(1.f)
+		);
+	}
+
+	for (int i = 0; i < MAX_GAME_ENTS; i++) {
+		auto& ent = eng->get_ent(i);
+		//auto& ent = cgame->entities[i];
+		if (!ent.active())
+			continue;
+		if (!ent.model)
+			continue;
+
+		if (i == eng->player_num() && !eng->local.thirdperson_camera.integer())
+			continue;
+
+		mat4 model;
+		if (ent.using_interpolated_pos_and_rot)
+			model = glm::translate(mat4(1), ent.local_sv_interpolated_pos);
+		else
+			model = glm::translate(mat4(1), ent.position);
+		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
+		model = glm::scale(model, vec3(1.f));
+
+		Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
+
+		make_draw_calls_from(&ent.model->mesh, model, ent.model->mats, a, true, glm::vec4(1.f));
+
+		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
+
+			Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
+
+
+			Model* m = FindOrLoadModel(stat.world_model);
+			if (!m) continue;
+
+			int index = ent.model->bone_for_name("weapon");
+			int index2 = ent.model->bone_for_name("magazine");
+			glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
+			if (index == -1 || index2 == -1) {
+				sys_print("no weapon bone\n");
+				continue;
+			}
+			const Bone& b = ent.model->bones.at(index);
+			glm::mat4 transform = a->GetBones()[index];
+			transform = model * transform * mat4(b.posematrix) * rotate;
+			make_draw_calls_from(&m->mesh, transform,m->mats, nullptr, true, glm::vec4(1.f));
+
+			//if (stat.category == ITEM_CAT_RIFLE) {
+			//	std::string mod = stat.world_model;
+			//	mod = mod.substr(0, mod.rfind('.'));
+			//	mod += "_mag.glb";
+			//	Model* mag_mod = FindOrLoadModel(mod.c_str());
+			//	if (mag_mod) {
+			//		const Bone& mag_bone = ent.model->bones.at(index2);
+			//		transform = a->GetBones()[index2];
+			//		transform = model * transform * mat4(mag_bone.posematrix) * rotate;
+			//		//DrawModel(pass, mag_mod, transform);
+			//
+			//		draw_model_real(mag_mod->mesh, mag_mod->mats, transform, nullptr, nullptr, state);
+			//	}
+			//}
+		}
+	}
+	for (int i = 0; i < draw.immediate_draw_calls.size(); i++) {
+		auto& call = draw.immediate_draw_calls[i];
+		make_draw_calls_from(&call.model->mesh,call.transform,call.model->mats, nullptr,true, glm::vec4(1.f));
+	}
+	draw.immediate_draw_calls.clear();
+
+	if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
+	{
+		mat4 invview = glm::inverse(draw.vs.view);
+
+		Game_Local* gamel = &eng->local;
+		mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
+		model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
+
+
+		model2 = glm::translate(model2, gamel->vm_offset);
+		model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
+
+		make_draw_calls_from(&eng->local.viewmodel->mesh, model2,
+			eng->local.viewmodel->mats, &eng->local.viewmodel_animator, false, glm::vec4(1.f));
+	}
+
+
+	glNamedBufferData(scene_mats_ssbo, sizeof Gpu_Material * scene_mats.size(), scene_mats.data(), GL_STATIC_DRAW);
+	glNamedBufferData(anim_matrix_ssbo, sizeof glm::mat4 * skinned_matricies.size(), skinned_matricies.data(), GL_DYNAMIC_DRAW);
+	glNamedBufferData(gpu_objs_ssbo, sizeof Gpu_Object * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
+
+	auto compare = [](const Draw_Call& a, const Draw_Call& b) {
+		return a.sort < b.sort;
+	};
+
+	std::sort(shadows.begin(), shadows.end(), compare);
+	std::sort(opaques.begin(), opaques.end(), compare);
+	std::sort(transparents.begin(), transparents.end(), compare);
+}
+
+
+
+void Renderer::extract_objects()
+{
+	shared.build_draw_calls();
+}
+
 #include "EditorDoc.h"
 void Renderer::scene_draw(bool editor_mode)
 {
@@ -1523,17 +1748,10 @@ void Renderer::scene_draw(bool editor_mode)
 	else
 		current_frame_main_view = eng->local.last_view;
 
-
 	if (editor_mode || enable_vsync.integer())
 		SDL_GL_SetSwapInterval(1);
 	else
 		SDL_GL_SetSwapInterval(0);
-
-
-	vs = current_frame_main_view;
-
-	// Shadow map updates
-	shadowmap.update();
 
 	vs = current_frame_main_view;
 	upload_ubo_view_constants(ubo.current_frame);
@@ -1542,6 +1760,10 @@ void Renderer::scene_draw(bool editor_mode)
 	immediate_draw_calls.clear();
 	if (editor_mode)
 		eng->eddoc->scene_draw_callback();
+
+	extract_objects();
+
+	//shadowmap.update();
 
 	//volfog.compute();
 
@@ -1565,7 +1787,7 @@ void Renderer::scene_draw(bool editor_mode)
 	// planar reflection render
 	{
 		GPUSCOPESTART("Planar reflection");
-		planar_reflection_pass();
+		//planar_reflection_pass();
 	}
 
 	// main level render
@@ -1758,88 +1980,6 @@ void Renderer::draw_model_immediate(Draw_Model_Frontend_Params params)
 }
 
 
-void Renderer::DrawEnts(const Render_Level_Params& params)
-{
-	Model_Drawing_State state;
-	state.pass = params.pass;
-
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		auto& ent = eng->get_ent(i);
-		//auto& ent = cgame->entities[i];
-		if (!ent.active())
-			continue;
-		if (!ent.model)
-			continue;
-
-		if (i == eng->player_num() && !eng->local.thirdperson_camera.integer())
-			continue;
-
-		mat4 model;
-		if (ent.using_interpolated_pos_and_rot)
-			model = glm::translate(mat4(1), ent.local_sv_interpolated_pos);
-		else
-			model = glm::translate(mat4(1), ent.position);
-		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
-		model = glm::scale(model, vec3(1.f));
-
-		const Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
-		//DrawModel(pass, ent.model, model, a);
-
-		draw_model_real(ent.model->mesh, ent.model->mats,model, &ent, a, state);
-
-		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
-
-			Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
-
-
-			Model* m = FindOrLoadModel(stat.world_model);
-			if (!m) continue;
-
-			int index = ent.model->bone_for_name("weapon");
-			int index2 = ent.model->bone_for_name("magazine");
-			glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
-			if (index == -1 || index2 == -1) {
-				sys_print("no weapon bone\n");
-				continue;
-			}
-			const Bone& b = ent.model->bones.at(index);
-			glm::mat4 transform = a->GetBones()[index];
-			transform = model * transform * mat4(b.posematrix) * rotate;
-			draw_model_real(m->mesh, m->mats, transform, nullptr, nullptr, state);
-
-			if (stat.category == ITEM_CAT_RIFLE) {
-				std::string mod = stat.world_model;
-				mod = mod.substr(0, mod.rfind('.'));
-				mod += "_mag.glb";
-				Model* mag_mod = FindOrLoadModel(mod.c_str());
-				if (mag_mod) {
-					const Bone& mag_bone = ent.model->bones.at(index2);
-					transform = a->GetBones()[index2];
-					transform = model * transform * mat4(mag_bone.posematrix) * rotate;
-					//DrawModel(pass, mag_mod, transform);
-
-					draw_model_real(mag_mod->mesh, mag_mod->mats, transform, nullptr,nullptr, state);
-				}
-			}
-		}
-	}
-	for (int i = 0; i < immediate_draw_calls.size(); i++)
-		draw_model_real(immediate_draw_calls[i].model->mesh, immediate_draw_calls[i].model->mats,
-			immediate_draw_calls[i].transform, nullptr, nullptr, state);
-
-	Model* sphere = FindOrLoadModel("clothoverbox.glb");
-	for (int x = 0; x < 1; x++) {
-		for (int y = 0; y < 1; y++) {
-			mat4 transform = glm::translate(mat4(1), vec3((x - 5) * 0.75, 0, (y - 5) * 0.75));
-			transform = glm::scale(transform, vec3(0.4));
-			draw_model_real(sphere->mesh,sphere->mats, transform, nullptr,nullptr, state);
-		}
-	}
-
-	//DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), glm::scale(glm::translate(mat4(1), vec3(0, 2, 0)),vec3(2)), nullptr, 0.0, 1.0);
-
-}
-
 
 float wsheight = 3.0;
 float wsradius = 1.5;
@@ -2009,139 +2149,114 @@ void Renderer::draw_model_real_depth(const Mesh& mesh, const vector<Game_Shader*
 
 
 // this function sucks so bad
-void Renderer::draw_model_real(const Mesh& mesh, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
+void Renderer::draw_model_real(const Draw_Call& dc,
 	Model_Drawing_State& state)
 {
-	if (state.pass == Render_Level_Params::DEPTH || state.pass == Render_Level_Params::SHADOWMAP) {
-		draw_model_real_depth(mesh,materials, transform, e, a, state);
+	const Submesh& mp = dc.mesh->parts[dc.submesh];
+	Game_Shader* gs = dc.mat;
+	bool is_animated = dc.mesh->has_bones();
+	bool is_depth = state.pass == Render_Level_Params::SHADOWMAP || state.pass == Render_Level_Params::DEPTH;
+	int next_shader = get_shader_index(*dc.mesh, *gs, is_depth);
+
+	bool is_water = gs->shader_type == Game_Shader::S_WATER;
+
+	if (next_shader == -1) return;
+
+	// water only renders in the real geometry pass
+	if (state.is_water_reflection_pass && is_water)
 		return;
+
+	if (state.initial_set || next_shader != state.current_shader) {
+		state.current_shader = next_shader;
+
+		set_shader(next_shader);
+
+		if (gs->shader_type == Game_Shader::S_WINDSWAY) {
+			set_wind_constants();
+		}
+		else if (is_water) {
+			set_water_constants();
+		}
+		set_shader_constants();
 	}
-		
-	for (int part = 0; part < mesh.parts.size(); part++) {
 
-		const Submesh& mp = mesh.parts[part];
-		Game_Shader* gs = (mp.material_idx != -1) ? materials.at(mp.material_idx) : &mats.fallback;
-		bool is_animated = mesh.has_bones() && a;
-		int next_shader = get_shader_index(mesh, *gs, false);
-
-		if (gs->is_translucent() && state.pass != Render_Level_Params::TRANSLUCENT)
-			continue;
-		else if (!gs->is_translucent() && state.pass != Render_Level_Params::OPAQUE)
-			continue;
-
-		bool is_water = gs->shader_type == Game_Shader::S_WATER;
-
-		if (next_shader == -1) return;
-
-		// water only renders in the real geometry pass
-		if (state.is_water_reflection_pass && is_water)
-			continue;
-
-		if (state.initial_set || next_shader != state.current_shader) {
-			state.current_shader = next_shader;
-
-			set_shader(next_shader);
-
-			if (gs->shader_type == Game_Shader::S_WINDSWAY) {
-				set_wind_constants();
-			}
-			else if (is_water) {
-				set_water_constants();
-			}
-			set_shader_constants();
+	if (state.initial_set || state.current_alpha_state != gs->alpha_type) {
+		state.current_alpha_state = gs->alpha_type;
+		if (state.current_alpha_state == Game_Shader::A_NONE || state.current_alpha_state == Game_Shader::A_TEST) {
+			glDisable(GL_BLEND);
 		}
-
-		if (state.initial_set || state.current_alpha_state != gs->alpha_type) {
-			state.current_alpha_state = gs->alpha_type;
-			if (state.current_alpha_state == Game_Shader::A_NONE || state.current_alpha_state == Game_Shader::A_TEST) {
-				glDisable(GL_BLEND);
-			}
-			else if (state.current_alpha_state == Game_Shader::A_BLEND) {
-				glEnable(GL_BLEND);
-				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			}
-			else if (state.current_alpha_state == Game_Shader::A_ADD) {
-				glEnable(GL_BLEND);
-				glBlendFunc(GL_ONE, GL_ONE);
-			}
+		else if (state.current_alpha_state == Game_Shader::A_BLEND) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
-		if (state.initial_set || state.current_backface_state != (int)gs->backface) {
-			state.current_backface_state = gs->backface;
-			if (state.current_backface_state)
-				glDisable(GL_CULL_FACE);
-			else
-				glEnable(GL_CULL_FACE);
+		else if (state.current_alpha_state == Game_Shader::A_ADD) {
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
 		}
-
-		shader().set_mat4("Model", transform);
-		shader().set_mat4("InverseModel", glm::inverse(transform));
-
-
-		shader().set_bool("no_light", gs->emmisive);
-
-		// ill find a better way maybe
-		bool shader_doesnt_need_the_textures = is_water;
-
-		if (!shader_doesnt_need_the_textures) {
-
-			if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-				Game_Shader* blend1 = gs->references[0];
-				Game_Shader* blend2 = gs->references[1];
-				if (blend1->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO1_LOC, blend1->images[Game_Shader::DIFFUSE]->gl_id);
-				else bind_texture(ALBEDO1_LOC, white_texture.gl_id);
-				if (blend2->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO2_LOC, blend2->images[Game_Shader::DIFFUSE]->gl_id);
-				else bind_texture(ALBEDO2_LOC, white_texture.gl_id);
-				if (blend1->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH1_LOC, blend1->images[Game_Shader::ROUGHNESS]->gl_id);
-				else bind_texture(ROUGH1_LOC, white_texture.gl_id);
-				if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id);
-				else bind_texture(ROUGH2_LOC, white_texture.gl_id);
-
-				if (mesh.has_tangents()) {
-					if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id);
-					else bind_texture(NORMAL1_LOC, flat_normal_texture.gl_id);
-					if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id);
-					else bind_texture(NORMAL2_LOC, flat_normal_texture.gl_id);
-				}
-
-				SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SPECIAL_LOC, white_texture);
-			}
-			else {
-				SET_OR_USE_FALLBACK(Game_Shader::DIFFUSE, ALBEDO1_LOC, white_texture);
-				SET_OR_USE_FALLBACK(Game_Shader::ROUGHNESS, ROUGH1_LOC, white_texture);
-				SET_OR_USE_FALLBACK(Game_Shader::AO, AO1_LOC, white_texture);
-				SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
-
-				if (mesh.has_tangents()) {
-					SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, flat_normal_texture);
-				}
-			}
-		}
-		
-		if (is_animated) {
-			const std::vector<mat4>& bones = a->GetBones();
-			const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
-			for (int j = 0; j < bones.size(); j++)
-				glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
-			glCheckError();
-		}
-
-		shader().set_float("rough_mult", gs->roughness_mult);
-		shader().set_vec2("rough_remap", gs->roughness_remap_range);
-		shader().set_float("metal_mult", gs->metalness_mult);
-
-		shader().set_vec4("color_tint", gs->diffuse_tint);
-
-		glBindVertexArray(mesh.vao);
-		glDrawElementsBaseVertex(
-			GL_TRIANGLES,
-			mp.element_count,
-			GL_UNSIGNED_SHORT,
-			(void*)(mesh.merged_index_pointer + mp.element_offset),
-			mesh.merged_vert_offset + mp.base_vertex
-		);
-
-		state.initial_set = false;
 	}
+	if (state.initial_set || state.current_backface_state != (int)gs->backface) {
+		state.current_backface_state = gs->backface;
+		if (state.current_backface_state)
+			glDisable(GL_CULL_FACE);
+		else
+			glEnable(GL_CULL_FACE);
+	}
+
+
+	// ill find a better way maybe
+	bool shader_doesnt_need_the_textures = is_water;
+
+	if (!shader_doesnt_need_the_textures) {
+
+		if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
+			Game_Shader* blend1 = gs->references[0];
+			Game_Shader* blend2 = gs->references[1];
+			if (blend1->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO1_LOC, blend1->images[Game_Shader::DIFFUSE]->gl_id);
+			else bind_texture(ALBEDO1_LOC, white_texture.gl_id);
+			if (blend2->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO2_LOC, blend2->images[Game_Shader::DIFFUSE]->gl_id);
+			else bind_texture(ALBEDO2_LOC, white_texture.gl_id);
+			if (blend1->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH1_LOC, blend1->images[Game_Shader::ROUGHNESS]->gl_id);
+			else bind_texture(ROUGH1_LOC, white_texture.gl_id);
+			if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id);
+			else bind_texture(ROUGH2_LOC, white_texture.gl_id);
+
+			if (dc.mesh->has_tangents()) {
+				if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id);
+				else bind_texture(NORMAL1_LOC, flat_normal_texture.gl_id);
+				if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id);
+				else bind_texture(NORMAL2_LOC, flat_normal_texture.gl_id);
+			}
+
+			SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SPECIAL_LOC, white_texture);
+		}
+		else {
+			SET_OR_USE_FALLBACK(Game_Shader::DIFFUSE, ALBEDO1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(Game_Shader::ROUGHNESS, ROUGH1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(Game_Shader::AO, AO1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
+
+			if (dc.mesh->has_tangents()) {
+				SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, flat_normal_texture);
+			}
+		}
+	}
+
+	shader().set_int("obj_index", dc.object_index);
+	shader().set_int("obj_mat_index", dc.mat_index);
+	
+	if (state.current_vao != dc.mesh->vao) {
+		glBindVertexArray(dc.mesh->vao);
+		state.current_vao = dc.mesh->vao;
+	}
+	glDrawElementsBaseVertex(
+		GL_TRIANGLES,
+		mp.element_count,
+		GL_UNSIGNED_SHORT,
+		(void*)(dc.mesh->merged_index_pointer + mp.element_offset),
+		dc.mesh->merged_vert_offset + mp.base_vertex
+	);
+
+	state.initial_set = false;
 }
 
 void Renderer::planar_reflection_pass()
@@ -2181,26 +2296,6 @@ void Renderer::planar_reflection_pass()
 }
 
 
-void Renderer::DrawLevel(const Render_Level_Params& params)
-{
-	Level* level = eng->level;
-
-	Model_Drawing_State state;
-	state.pass = params.pass;
-
-	for (int m = 0; m < level->static_mesh_objs.size(); m++) {
-		Static_Mesh_Object& smo = level->static_mesh_objs[m];
-		ASSERT(smo.model);
-		draw_model_real(smo.model->mesh,smo.model->mats, smo.transform, nullptr, nullptr, state);
-	}
-	for (int m = 0; m < level->level_prefab->nodes.size(); m++) {
-		auto& node = level->level_prefab->nodes[m];
-		draw_model_real(level->level_prefab->meshes[node.mesh_idx], level->level_prefab->mats, 
-			node.transform, nullptr, nullptr, state);
-	}
-}
-
-
 void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 {
 	vec3 origin = e.position;
@@ -2215,34 +2310,6 @@ void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 	mb->AddSphere(b, radius, 10, 7, color);
 	mb->AddSphere((a + b) / 2.f, (c.tip.y - c.base.y) / 2.f, 10, 7, COLOR_RED);
 }
-
-void Renderer::DrawPlayerViewmodel(const Render_Level_Params& params)
-{
-	if (eng->local.thirdperson_camera.integer() == 1 || draw_viewmodel.integer() == 0)
-		return;
-
-	mat4 invview = glm::inverse(vs.view);
-
-	Game_Local* gamel = &eng->local;
-	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
-	model2 =  glm::scale(model2, glm::vec3(gamel->vm_scale.x));
-
-
-	model2 = glm::translate(model2, gamel->vm_offset);
-	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
-
-	cur_shader = -1;
-
-	set_standard_draw_data(params);
-
-	Model_Drawing_State state;
-	state.pass = params.pass;
-	draw_model_real(eng->local.viewmodel->mesh, 
-		eng->local.viewmodel->mats,
-		model2, nullptr, &eng->local.viewmodel_animator, state);
-}
-
-
 void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front)
 {
 	vec3 up = vec3(0, -1, 0);

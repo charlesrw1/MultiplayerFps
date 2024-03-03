@@ -235,7 +235,7 @@ struct Entity
 	void(*timer_callback)(Entity* me) = nullptr;
 
 	Animator anim;
-	const Model* model = nullptr;
+	Model* model = nullptr;
 
 	// used for 1 frame interpolation on the local server host for PLAYERS
 	bool using_interpolated_pos_and_rot = false;

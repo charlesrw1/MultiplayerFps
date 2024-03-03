@@ -11,8 +11,8 @@ class Game_Media
 {
 public:
 	void load();
-	const Model* get_game_model(const char* name, int* index = nullptr);
-	const Model* get_game_model_from_index(int index);
+	Model* get_game_model(const char* name, int* index = nullptr);
+	Model* get_game_model_from_index(int index);
 	
 	std::vector<std::string> model_manifest;
 	std::vector<Model*> model_cache;

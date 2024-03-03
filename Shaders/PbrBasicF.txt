@@ -47,10 +47,6 @@ uniform sampler2D normal_tex;
 uniform sampler2D roughness_tex;
 uniform sampler2D metalness_tex;
 uniform sampler2D ao_tex;
-uniform vec4 color_tint = vec4(1);
-uniform float metal_mult = 1.0;
-uniform float rough_mult = 1.0;
-uniform vec2 rough_tex_remap = vec2(0,1);
 
 
 uniform sampler3D volumetric_fog;
@@ -124,6 +120,21 @@ layout (std140, binding = 8) uniform LightSpaceMatrices
 	vec4 FarPlanes;
 }CascadeMats;
 
+struct Gpu_Material
+{
+	vec4 diffuse_tint;
+	float rough_mult;
+	float metal_mult;
+	float padding1;
+	float padding2;
+};
+
+layout(binding = 4,std140) readonly buffer Material_Buffer {
+	Gpu_Material g_materials[];
+};
+
+uniform int obj_mat_index = 0;
+
 
 float sample_sun_shadow(vec3 WorldSpace)
 {
@@ -181,7 +192,7 @@ struct Vfog_Params
 	ivec4 volumesize;
 	vec4 spread_frustumend;
 };
-layout (binding = 4, std140) uniform Vfog_Param_Buffer {
+layout (binding = 15, std140) uniform Vfog_Param_Buffer {
 	Vfog_Params fogparam;
 };
 
@@ -496,6 +507,8 @@ void main()
 	
 	tex.rgb = pow(tex.rgb,vec3(2.2));
 	
+	vec4 color_tint = g_materials[obj_mat_index].diffuse_tint;
+	
 	tex *= color_tint;
 	
 #ifdef ALPHATEST
@@ -534,6 +547,10 @@ void main()
 	#ifdef BLEND2
 		roughness = mix(roughness, texture(auxcolor2, FS_IN_Texcoord).r, blend2_lerp);
 	#endif
+	
+	float rough_mult = g_materials[obj_mat_index].rough_mult;
+	float metal_mult = g_materials[obj_mat_index].metal_mult;
+	
 	
 	roughness *= rough_mult;
 	metalness *= metal_mult;
