@@ -39,6 +39,8 @@ struct Object_Dict
 	const char* name = "";	// referenced from dict
 };
 
+using std::vector;
+
 class Model;
 class Texture;
 class Level
@@ -56,13 +58,12 @@ public:
 		int _ed_varying_index_for_statics = -1;
 	};
 
-	Physics_Mesh collision;	// merged collision of all level_meshes
-	std::vector<Level_Light> lights;
-	std::vector<Model*> linked_meshes;	// custom embedded meshes that are linked to an entity like doors, not included in static_meshes
-	std::vector<Model*> static_meshes;	// level embedded meshes
-	std::vector<Static_Mesh_Object> static_mesh_objs;
-	std::vector<Entity_Spawn> espawns;
-	std::vector<Object_Dict> objs;
+	unique_ptr<Physics_Mesh> collision;	// merged collision of all level_meshes
+	vector<Level_Light> lights;
+	vector<Static_Mesh_Object> static_mesh_objs;
+	Prefab_Model* level_prefab;
+	vector<Entity_Spawn> espawns;
+	vector<Object_Dict> objs;
 
 	Texture* lightmap;
 

@@ -1759,7 +1759,7 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 		const Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
 		//DrawModel(pass, ent.model, model, a);
 
-		draw_model_real(ent.model, model, &ent, a, state);
+		draw_model_real(ent.model->mesh, ent.model->mats,model, &ent, a, state);
 
 		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
 
@@ -1769,8 +1769,8 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 			Model* m = FindOrLoadModel(stat.world_model);
 			if (!m) continue;
 
-			int index = ent.model->BoneForName("weapon");
-			int index2 = ent.model->BoneForName("magazine");
+			int index = ent.model->bone_for_name("weapon");
+			int index2 = ent.model->bone_for_name("magazine");
 			glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
 			if (index == -1 || index2 == -1) {
 				sys_print("no weapon bone\n");
@@ -1779,7 +1779,7 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 			const Bone& b = ent.model->bones.at(index);
 			glm::mat4 transform = a->GetBones()[index];
 			transform = model * transform * mat4(b.posematrix) * rotate;
-			draw_model_real(m, transform, nullptr, nullptr, state);
+			draw_model_real(m->mesh, m->mats, transform, nullptr, nullptr, state);
 
 			if (stat.category == ITEM_CAT_RIFLE) {
 				std::string mod = stat.world_model;
@@ -1792,20 +1792,21 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 					transform = model * transform * mat4(mag_bone.posematrix) * rotate;
 					//DrawModel(pass, mag_mod, transform);
 
-					draw_model_real(mag_mod, transform, nullptr,nullptr, state);
+					draw_model_real(mag_mod->mesh, mag_mod->mats, transform, nullptr,nullptr, state);
 				}
 			}
 		}
 	}
 	for (int i = 0; i < immediate_draw_calls.size(); i++)
-		draw_model_real(immediate_draw_calls[i].model, immediate_draw_calls[i].transform, nullptr, nullptr, state);
+		draw_model_real(immediate_draw_calls[i].model->mesh, immediate_draw_calls[i].model->mats,
+			immediate_draw_calls[i].transform, nullptr, nullptr, state);
 
 	Model* sphere = FindOrLoadModel("clothoverbox.glb");
 	for (int x = 0; x < 1; x++) {
 		for (int y = 0; y < 1; y++) {
 			mat4 transform = glm::translate(mat4(1), vec3((x - 5) * 0.75, 0, (y - 5) * 0.75));
 			transform = glm::scale(transform, vec3(0.4));
-			draw_model_real(sphere, transform, nullptr,nullptr, state);
+			draw_model_real(sphere->mesh,sphere->mats, transform, nullptr,nullptr, state);
 		}
 	}
 
@@ -1841,14 +1842,14 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, tex.reflected_depth, GL_TEXTURE_2D);
 }
 
-int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass)
+int Renderer::get_shader_index(const Mesh& mesh, const Game_Shader& gs, bool depth_pass)
 {
 	bool is_alpha_test = gs.alpha_type == gs.A_TEST;
-	bool is_lightmapped = part.has_lightmap_coords();
-	bool has_colors = part.has_colors();
+	bool is_lightmapped = mesh.has_lightmap_coords();
+	bool has_colors = mesh.has_colors();
 	int shader_type = gs.shader_type;
-	bool is_normal_mapped = part.has_tangents();
-	bool is_animated = part.has_bones();
+	bool is_normal_mapped = mesh.has_tangents();
+	bool is_animated = mesh.has_bones();
 
 	int shader_index = -1;
 
@@ -1914,20 +1915,21 @@ int Renderer::get_shader_index(const MeshPart& part, const Game_Shader& gs, bool
 if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id, GL_TEXTURE_2D); \
 else bind_texture(where, fallback, GL_TEXTURE_2D);
 	
-void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
+void Renderer::draw_model_real_depth(const Mesh& mesh, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
 {
-	for (int part = 0; part < model->parts.size(); part++) {
+	bool is_animated = mesh.has_bones() && a;
 
-		const MeshPart& mp = model->parts[part];
-		Game_Shader* gs = (mp.material_idx != -1) ? model->materials.at(mp.material_idx) : &mats.fallback;
+	for (int part = 0; part < mesh.parts.size(); part++) {
+
+		const Submesh& mp = mesh.parts[part];
+		Game_Shader* gs = (mp.material_idx != -1) ? materials.at(mp.material_idx) : &mats.fallback;
 		
 		// translucents dont draw depth
 		if (gs->is_translucent())
 			continue;
 
-		bool is_animated = mp.has_bones() && a;
-		int next_shader = get_shader_index(mp, *gs, true);
+		int next_shader = get_shader_index(mesh, *gs, true);
 
 		if (next_shader == -1) return;
 
@@ -1965,35 +1967,36 @@ void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, co
 			glCheckError();
 		}
 
-		glBindVertexArray(mp.vao);
+		glBindVertexArray(mesh.vao);
 		//glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
 		glDrawElementsBaseVertex(
 			GL_TRIANGLES,
 			mp.element_count,
-			mp.element_type,
-			(void*)(model->merged_index_pointer + mp.element_offset),
-			model->merged_vertex_offset + mp.base_vertex
+			GL_UNSIGNED_SHORT,
+			(void*)(mesh.merged_index_pointer + mp.element_offset),
+			mesh.merged_vert_offset + mp.base_vertex
 		);
 
 		state.initial_set = false;
 	}
 }
 
+
 // this function sucks so bad
-void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const Entity* e, const Animator* a,
+void Renderer::draw_model_real(const Mesh& mesh, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
 {
 	if (state.pass == Render_Level_Params::DEPTH || state.pass == Render_Level_Params::SHADOWMAP) {
-		draw_model_real_depth(model, transform, e, a, state);
+		draw_model_real_depth(mesh,materials, transform, e, a, state);
 		return;
 	}
 		
-	for (int part = 0; part < model->parts.size(); part++) {
+	for (int part = 0; part < mesh.parts.size(); part++) {
 
-		const MeshPart& mp = model->parts[part];
-		Game_Shader* gs = (mp.material_idx != -1) ? model->materials.at(mp.material_idx) : &mats.fallback;
-		bool is_animated = mp.has_bones() && a;
-		int next_shader = get_shader_index(mp, *gs, false);
+		const Submesh& mp = mesh.parts[part];
+		Game_Shader* gs = (mp.material_idx != -1) ? materials.at(mp.material_idx) : &mats.fallback;
+		bool is_animated = mesh.has_bones() && a;
+		int next_shader = get_shader_index(mesh, *gs, false);
 
 		if (gs->is_translucent() && state.pass != Render_Level_Params::TRANSLUCENT)
 			continue;
@@ -2067,7 +2070,7 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 				if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id, GL_TEXTURE_2D);
 				else bind_texture(ROUGH2_LOC, white_texture, GL_TEXTURE_2D);
 
-				if (mp.has_tangents()) {
+				if (mesh.has_tangents()) {
 					if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id, GL_TEXTURE_2D);
 					else bind_texture(NORMAL1_LOC, default_normal_texture, GL_TEXTURE_2D);
 					if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id, GL_TEXTURE_2D);
@@ -2082,7 +2085,7 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 				SET_OR_USE_FALLBACK(Game_Shader::AO, AO1_LOC, white_texture);
 				SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
 
-				if (mp.has_tangents()) {
+				if (mesh.has_tangents()) {
 					SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, default_normal_texture);
 				}
 			}
@@ -2102,13 +2105,13 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 
 		shader().set_vec4("color_tint", gs->diffuse_tint);
 
-		glBindVertexArray(mp.vao);
+		glBindVertexArray(mesh.vao);
 		glDrawElementsBaseVertex(
 			GL_TRIANGLES,
 			mp.element_count,
-			mp.element_type,
-			(void*)(model->merged_index_pointer + mp.element_offset),
-			model->merged_vertex_offset + mp.base_vertex
+			GL_UNSIGNED_SHORT,
+			(void*)(mesh.merged_index_pointer + mp.element_offset),
+			mesh.merged_vert_offset + mp.base_vertex
 		);
 
 		state.initial_set = false;
@@ -2162,7 +2165,12 @@ void Renderer::DrawLevel(const Render_Level_Params& params)
 	for (int m = 0; m < level->static_mesh_objs.size(); m++) {
 		Static_Mesh_Object& smo = level->static_mesh_objs[m];
 		ASSERT(smo.model);
-		draw_model_real(smo.model, smo.transform, nullptr, nullptr, state);
+		draw_model_real(smo.model->mesh,smo.model->mats, smo.transform, nullptr, nullptr, state);
+	}
+	for (int m = 0; m < level->level_prefab->nodes.size(); m++) {
+		auto& node = level->level_prefab->nodes[m];
+		draw_model_real(level->level_prefab->meshes[node.mesh_idx], level->level_prefab->mats, 
+			node.transform, nullptr, nullptr, state);
 	}
 }
 
@@ -2203,7 +2211,9 @@ void Renderer::DrawPlayerViewmodel(const Render_Level_Params& params)
 
 	Model_Drawing_State state;
 	state.pass = params.pass;
-	draw_model_real(eng->local.viewmodel, model2, nullptr, &eng->local.viewmodel_animator, state);
+	draw_model_real(eng->local.viewmodel->mesh, 
+		eng->local.viewmodel->mats,
+		model2, nullptr, &eng->local.viewmodel_animator, state);
 }
 
 

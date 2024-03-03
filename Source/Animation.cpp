@@ -391,10 +391,10 @@ void Animator::add_legs_layer(glm::quat finalq[], glm::vec3 finalp[])
 		LerpTransforms(q1, p1, q2, pos2, frac, model->bones.size());
 	}
 
-	const int root_loc = model->BoneForName("mixamorig:Hips");
-	const int thigh_loc = model->BoneForName("mixamorig:LeftUpLeg");
-	const int spine_loc = model->BoneForName("mixamorig:Spine");
-	const int toe_end = model->BoneForName("mixamorig:RightToe_End");
+	const int root_loc = model->bone_for_name("mixamorig:Hips");
+	const int thigh_loc = model->bone_for_name("mixamorig:LeftUpLeg");
+	const int spine_loc = model->bone_for_name("mixamorig:Spine");
+	const int toe_end = model->bone_for_name("mixamorig:RightToe_End");
 
 
 

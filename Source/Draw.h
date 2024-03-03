@@ -395,9 +395,9 @@ private:
 		Render_Level_Params::Pass_Type pass = Render_Level_Params::OPAQUE;
 	};
 
-	void draw_model_real(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
+	void draw_model_real(const Mesh& m, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
 		Model_Drawing_State& state);
-	void draw_model_real_depth(const Model* m, glm::mat4 transform, const Entity* e, const Animator* a,
+	void draw_model_real_depth(const Mesh& m, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
 		Model_Drawing_State& state);
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
@@ -424,7 +424,7 @@ private:
 	void set_wind_constants();
 	void set_water_constants();
 
-	int get_shader_index(const MeshPart& part, const Game_Shader& gs, bool depth_pass);
+	int get_shader_index(const Mesh& part, const Game_Shader& gs, bool depth_pass);
 
 	View_Setup current_frame_main_view;
 

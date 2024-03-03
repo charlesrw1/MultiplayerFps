@@ -591,9 +591,9 @@ void EditorDoc::update()
 		obj.is_level = true;
 		obj.solid = true;
 		obj.is_mesh = true;
-		obj.mesh.structure = &eng->level->collision.bvh;
-		obj.mesh.verticies = &eng->level->collision.verticies;
-		obj.mesh.tris = &eng->level->collision.tris;
+		obj.mesh.structure = &eng->level->collision->bvh;
+		obj.mesh.verticies = &eng->level->collision->verticies;
+		obj.mesh.tris = &eng->level->collision->tris;
 		obj.userindex = -1;
 
 		eng->phys.AddObj(obj);
@@ -606,7 +606,7 @@ void EditorDoc::update()
 			obj.solid = false;
 			obj.is_mesh = false;
 
-			Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->aabb);
+			Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->mesh.aabb);
 			obj.min_or_origin = b.bmin;
 			obj.max = b.bmax;
 			obj.userindex = i;
@@ -740,7 +740,7 @@ void EditorDoc::overlays_draw()
 		if (selected_node->model) {
 			Model* m = selected_node->model;
 			auto transform = selected_node->get_transform();
-			Bounds b = transform_bounds(transform, m->aabb);
+			Bounds b = transform_bounds(transform, m->mesh.aabb);
 			mb.PushLineBox(b.bmin, b.bmax, COLOR_RED);
 
 

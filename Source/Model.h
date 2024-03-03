@@ -19,29 +19,11 @@ using std::unique_ptr;
 
 struct Bone
 {
+	string name;
 	int parent;
-	int name_table_ofs;
 	glm::mat4x3 posematrix;	// bone space -> mesh space
 	glm::mat4x3 invposematrix; // mesh space -> bone space
 	glm::quat rot;
-	string name;
-};
-
-struct MeshPart
-{
-	// TODO: batch multiple buffers together, for this project its fine though, makes loading easier
-	uint32_t vao = 0;
-	int base_vertex = 0;
-	int element_offset = 0;	// in bytes
-	int element_count = 0;
-	int element_type = 0;	// unsigned_short, unsigned_int
-	short material_idx = 0;
-	short attributes = 0;
-
-	bool has_lightmap_coords() const;
-	bool has_colors() const;
-	bool has_bones() const;
-	bool has_tangents() const;
 };
 
 struct Physics_Triangle
@@ -63,18 +45,6 @@ struct Physics_Mesh
 
 struct Texture;
 class Game_Shader;
-struct ModelAttachment
-{
-	int str_table_start = 0;
-	int bone_parent = 0;
-	glm::mat4x3 transform;
-};
-struct ModelHitbox
-{
-	int str_table_start = 0;
-	int bone_parent = 0;
-	glm::vec3 size;
-};
 
 
 #define MAX_MESH_ATTRIBUTES 8
@@ -105,6 +75,12 @@ public:
 	uint32_t merged_vert_offset = 0;
 	bool is_merged = false;
 	int format = 0;
+	uint32_t vao = 0;
+
+	bool has_lightmap_coords() const;
+	bool has_colors() const;
+	bool has_bones() const;
+	bool has_tangents() const;
 };
 
 struct Model_Tag
@@ -127,7 +103,7 @@ class Mesh_Lod
 	float end_dist;
 };
 
-class Model2
+class Model
 {
 public:
 	string name;
@@ -146,52 +122,20 @@ public:
 	int bone_for_name(const char* name) const;
 };
 
-class Model
-{
-public:
-	struct GpuBuffer
-	{
-		uint32_t target = 0;	// element vs vertex
-		uint32_t handle = 0;
-		uint32_t size = 0;
-		void Bind();
-	};
-
-	string name;
-	vector<Bone> bones;
-	vector<char> bone_string_table;
-	std::unique_ptr<Animation_Set> animations;
-	vector<ModelHitbox> hitboxes;
-	vector<ModelAttachment> attachments;
-	vector<MeshPart> parts;
-	vector<GpuBuffer> buffers;
-	vector<Game_Shader*> materials;
-	Raw_Mesh_Data data;
-	Bounds aabb;
-	int attributes = 0;
-
-	bool is_merged_into_gpu = false;
-	uint32_t merged_vertex_offset = 0;
-	uint32_t merged_index_pointer = 0;	// in bytes
-
-	std::unique_ptr<Physics_Mesh> collision;
-
-	int BoneForName(const char* name) const;
-};
-
+// not sure why i seperated this but :/
 class Prefab_Model
 {
 public:
 	struct Node {
 		string name;
+		glm::mat4 transform;
 		int mesh_idx = -1;
-		int transform_idx = -1;
-		int parent_idx = -1;
 	};
+	string name;
 	vector<Mesh> meshes;
-	vector<glm::mat4> transforms;
 	vector<Node> nodes;
 	vector<Game_Shader*> mats;
+	unique_ptr<Physics_Mesh> physics;
 };
 
 class cgltf_data;
@@ -200,14 +144,14 @@ class Game_Mod_Manager
 {
 public:
 
-	typedef void(*prefab_callback)(cgltf_data* data, cgltf_node* node, glm::mat4 globaltransform);
+	typedef void(*prefab_callback)(void* user, cgltf_data* data, cgltf_node* node, glm::mat4 globaltransform);
 
 	void init();
-	Model2* find_or_load(const char* filename);
-	Prefab_Model* find_or_load_prefab(const char* filename, 
-		prefab_callback callback);
+	Model* find_or_load(const char* filename);
+	Prefab_Model* find_or_load_prefab(const char* filename, bool dont_append_path,
+		prefab_callback callback, void* userdata);
 	void free_prefab(Prefab_Model* prefab);
-	void free_model(Model2* m);
+	void free_model(Model* m);
 	void compact_geometry();
 
 	struct Gpu_Buffer {
@@ -230,7 +174,7 @@ public:
 	};
 
 	std::unordered_map<string, Prefab_Model*> prefabs;
-	std::unordered_map<string, Model2*> models;
+	std::unordered_map<string, Model*> models;
 
 	uint32_t depth_animated_vao = 0;
 	uint32_t depth_static_vao = 0;
@@ -241,6 +185,7 @@ private:
 	bool upload_mesh(Mesh* mesh);
 	bool append_to_buffer(Gpu_Buffer& buf, char* input_data, uint32_t input_length);
 };
+extern Game_Mod_Manager mods;
 
 void FreeLoadedModels();
 Model* FindOrLoadModel(const char* filename);

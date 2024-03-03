@@ -425,18 +425,13 @@ const Model* Game_Media::get_game_model(const char* model, int* out_index)
 		return nullptr;
 	}
 
-	if(out_index) *out_index = i+eng->level->linked_meshes.size();
+	if(out_index) *out_index = i;
 	if (model_cache[i]) return model_cache[i];
 	model_cache[i] = FindOrLoadModel(model);
 	return model_cache[i];
 }
 const Model* Game_Media::get_game_model_from_index(int index)
 {
-	// check linked meshes
-	if (index >= 0 && index < eng->level->linked_meshes.size())
-		return eng->level->linked_meshes.at(index);
-	index -= eng->level->linked_meshes.size();
-
 	if (index < 0 || index >= model_manifest.size()) return nullptr;
 	if (model_cache[index]) return model_cache[index];
 	model_cache[index] = FindOrLoadModel(model_manifest[index].c_str());
@@ -888,7 +883,6 @@ void Game_Engine::bind_key(int key, string command)
 
 void Game_Engine::cleanup()
 {
-	FreeLoadedModels();
 	FreeLoadedTextures();
 	NetworkQuit();
 	SDL_GL_DeleteContext(gl_context);
@@ -1114,9 +1108,9 @@ void Game_Engine::build_physics_world(float time)
 		obj.is_level = true;
 		obj.solid = true;
 		obj.is_mesh = true;
-		obj.mesh.structure = &level->collision.bvh;
-		obj.mesh.verticies = &level->collision.verticies;
-		obj.mesh.tris = &level->collision.tris;
+		obj.mesh.structure = &level->collision->bvh;
+		obj.mesh.verticies = &level->collision->verticies;
+		obj.mesh.tris = &level->collision->tris;
 
 		phys.AddObj(obj);
 	}

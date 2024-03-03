@@ -71,11 +71,6 @@ void spawn_door(Level::Entity_Spawn& spawn)
 	e.flags = 0;
 	e.flags |= EF_SOLID;
 	e.update = door_update;
-
-	e.model_index = spawn.spawnargs.get_int("linked_mesh", -1);
-	if (e.model_index != -1) {
-		e.model = eng->level->linked_meshes.at(e.model_index);
-	}
 }
 void spawn_spawn_point(Level::Entity_Spawn& spawn)
 {

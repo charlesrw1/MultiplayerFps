@@ -291,8 +291,8 @@ vec3 parallax_sample(float cindex, float roughness, vec3 R)
 	vec3 point = pos + R*tnear;
 	vec3 sampledir = normalize(point-cubemaps[num].probepos_priority.xyz);
 	
-	return textureLod(pbr_specular_cubemaps,vec4(sampledir,cindex), roughness*4.0).rgb;
-	//return textureLod(pbr_specular_cubemaps,vec4(R,cindex), roughness*4.0).rgb;
+	//return textureLod(pbr_specular_cubemaps,vec4(sampledir,cindex), roughness*4.0).rgb;
+	return textureLod(pbr_specular_cubemaps,vec4(R,cindex), roughness*4.0).rgb;
 }
 
 float get_cubemap_index(vec3 worldpos)
@@ -411,7 +411,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 
 // Lighting
 	float cm_index = get_cubemap_index(FS_IN_FragPos);
-	//cm_index = 0.f;
+	cm_index = 0.f;
 	const float MAX_REFLECTION_LOD = 4.0;
 	//vec3 prefiltered_color = textureLod(pbr_specular_cubemaps,vec4(R,cm_index), Roughness*MAX_REFLECTION_LOD).rgb;
 	vec3 prefiltered_color = parallax_sample(cm_index, Roughness, R);
@@ -486,7 +486,7 @@ vec4 TriplanarProjection_float(
 void main()
 {
 
-	vec4 tex = texture(basecolor, FS_IN_Texcoord);
+	vec4 tex = texture(basecolor, vec2(FS_IN_Texcoord.x,FS_IN_Texcoord.y));
 	
 #ifdef BLEND2
 	float blend2_lerp = get_blend2_lerp();
@@ -550,8 +550,10 @@ void main()
 	
 	}
 	
+//if(FS_IN_Texcoord.x<0.5)
+//outcolor = vec4(0);
 
-	FS_OUT_Color = tex.rgbb;//pbr_calculate(tex.rgb, roughness , metalness, N, 1.0,emissive, ambient_occlusion);
+	FS_OUT_Color = pbr_calculate(tex.rgb, roughness , metalness, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//\\FS_OUT_Color = vec4(1,0,0,0);
 	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);

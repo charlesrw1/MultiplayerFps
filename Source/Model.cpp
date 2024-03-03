@@ -3,10 +3,7 @@
 #include <vector>
 #include <map>
 #include "glad/glad.h"
-
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "tiny_gltf.h"
+#include "glm/gtc/type_ptr.hpp"
 
 #include "Util.h"
 #include "Animation.h"
@@ -207,7 +204,7 @@ public:
 Format_Descriptor vertex_attribute_formats[MAX_ATTRIBUTES] =
 {
 	Format_Descriptor(CT_FLOAT, 3, false),	// position
-	Format_Descriptor(CT_FLOAT, 2, true),	// uv
+	Format_Descriptor(CT_FLOAT, 2, false),	// uv
 	Format_Descriptor(CT_S16, 3, true),	// normal
 	Format_Descriptor(CT_U8, 4, false),		// joint
 	Format_Descriptor(CT_U8, 4, true),	// weight
@@ -287,306 +284,35 @@ static const int default_index_buffer_size = 3'000'000;
 
 
 
-const int ATTRIB_COUNT = 8;
-
-bool MeshPart::has_lightmap_coords() const
+bool Mesh::has_lightmap_coords() const
 {
-	return attributes & (1<<UV2_LOC);
+	return attributes & (1 << UV2_LOC);
 }
 
-bool MeshPart::has_bones() const
+bool Mesh::has_bones() const
 {
-	return attributes & (1<<JOINT_LOC);
+	return attributes & (1 << JOINT_LOC);
 }
 
-bool MeshPart::has_colors() const
+bool Mesh::has_colors() const
 {
-	return attributes & (1<<COLOR_LOC);
+	return attributes & (1 << COLOR_LOC);
 }
 
-bool MeshPart::has_tangents() const
+bool Mesh::has_tangents() const
 {
 	return attributes & (1 << TANGENT_LOC);
 }
 
 
-
-static uint32_t MakeOrFindGpuBuffer(Model* m, int buf_view_index, tinygltf::Model& model, std::map<int, int>& buffer_view_to_buffer)
-{
-	if (buffer_view_to_buffer.find(buf_view_index) != buffer_view_to_buffer.end())
-		return buffer_view_to_buffer.find(buf_view_index)->second;
-
-	tinygltf::BufferView buffer_view = model.bufferViews.at(buf_view_index);
-	tinygltf::Buffer& gltf_buffer = model.buffers.at(buffer_view.buffer);
-
-	Model::GpuBuffer buffer;
-	glGenBuffers(1, &buffer.handle);
-	glBindBuffer(buffer_view.target, buffer.handle);
-	glBufferData(buffer_view.target, buffer_view.byteLength, &gltf_buffer.data.at(buffer_view.byteOffset), GL_STATIC_DRAW);
-	glBindBuffer(buffer_view.target, 0);
-	buffer.size = buffer_view.byteLength;
-	buffer.target = buffer_view.target;
-
-	m->buffers.push_back(buffer);
-	int index = m->buffers.size() - 1;
-
-	buffer_view_to_buffer[buf_view_index] = index;
-	return index;
-}
-
-void append_collision_data(Model* m, tinygltf::Model& scene, tinygltf::Mesh& mesh, std::vector<Game_Shader*>& materials, 
-	Physics_Mesh* phys, const glm::mat4& transform)
-{
-	if (!phys && !m->collision)
-		m->collision = std::make_unique<Physics_Mesh>();
-
-	Physics_Mesh* pm = (phys) ? phys : m->collision.get();
-
-	for (int part = 0; part < mesh.primitives.size(); part++)
-	{
-		const int vertex_offset = pm->verticies.size();
-
-		tinygltf::Primitive& primitive = mesh.primitives[part];
-		ASSERT(primitive.attributes.find("POSITION") != primitive.attributes.end());
-		tinygltf::Accessor& position_ac = scene.accessors[primitive.attributes["POSITION"]];
-		tinygltf::BufferView& position_bv = scene.bufferViews[position_ac.bufferView];
-		tinygltf::Buffer& pos_buffer = scene.buffers[position_bv.buffer];
-		int pos_stride = position_ac.ByteStride(position_bv);
-		ASSERT(position_ac.type == TINYGLTF_TYPE_VEC3 && position_ac.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-		ASSERT(position_ac.byteOffset == 0 && position_bv.byteStride == 0);
-		unsigned char* pos_start = &pos_buffer.data.at(position_bv.byteOffset);
-		for (int v = 0; v < position_ac.count; v++) {
-			glm::vec3 data = *(glm::vec3*)(pos_start + v * pos_stride);
-			pm->verticies.push_back(data);
-		}
-
-		// Transform verts
-		if (transform != glm::mat4(1)) {
-			for (int v = 0; v < position_ac.count; v++) {
-				pm->verticies[vertex_offset + v] = transform * glm::vec4(pm->verticies[vertex_offset + v], 1.0);
-			}
-		}
-
-		tinygltf::Accessor& index_ac = scene.accessors[primitive.indices];
-		tinygltf::BufferView& index_bv = scene.bufferViews[index_ac.bufferView];
-		tinygltf::Buffer& index_buffer = scene.buffers[index_bv.buffer];
-		int index_stride = index_ac.ByteStride(index_bv);
-		ASSERT(index_ac.byteOffset == 0 && index_bv.byteStride == 0);
-		unsigned char* index_start = &index_buffer.data.at(index_bv.byteOffset);
-		for (int i = 0; i < index_ac.count; i += 3) {
-			Physics_Triangle ct;
-			if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-				ct.indicies[0] = *(unsigned int*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned int*)(index_start + index_stride * (i + 1));
-				ct.indicies[2] = *(unsigned int*)(index_start + index_stride * (i + 2));
-			}
-			else if (index_ac.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-				ct.indicies[0] = *(unsigned short*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned short*)(index_start + index_stride * (i + 1));
-				ct.indicies[2] = *(unsigned short*)(index_start + index_stride * (i + 2));
-			}
-			ct.indicies[0] += vertex_offset;
-			ct.indicies[1] += vertex_offset;
-			ct.indicies[2] += vertex_offset;
-
-			glm::vec3 verts[3];
-			for (int j = 0; j < 3; j++)
-				verts[j] = pm->verticies.at(ct.indicies[j]);
-			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
-			ct.face_normal = face_normal;
-			ct.plane_offset = -glm::dot(face_normal, verts[0]);	
-			if (primitive.material != -1) {
-				ct.surf_type = materials.at(primitive.material)->physics;
-			}
-			pm->tris.push_back(ct);
-		}
-	}
-}
-
-// for level meshes: default renderable = true, collidable = true (so detail props should be XXX_!r!nc)
-// for level entities: default renderable = false, collidable = false (so a door should be XXX_!r!c)
-// for regular meshes: default renderable = true, collidable = false (so collision_mesh should be XXX_!nr!c)
-
-// physics_mesh can be nullptr, then it creates/uses model->collision
-void add_node_mesh_to_model(Model* model, tinygltf::Model& inputMod, tinygltf::Node& node, 
-	std::map<int,int>& buffer_view_to_buffer, bool render_default, bool collide_default, std::vector<Game_Shader*>& materials, 
-	Physics_Mesh* physics, const glm::mat4& phys_transform)
-{
-	ASSERT(node.mesh != -1);
-	bool renderable = render_default;
-	bool collidable = collide_default;
-
-	if (node.name.find("_!r!c") != std::string::npos) {
-		renderable = true;
-		collidable = true;
-	}
-	else if (node.name.find("_!nr!c") != std::string::npos) {
-		renderable = false;
-		collidable = true;
-	}
-	else if (node.name.find("_!r!nc") != std::string::npos) {
-		renderable = true;
-		collidable = false;
-	}
-
-	if (!renderable && !collidable)
-		return;
-
-	tinygltf::Mesh& mesh = inputMod.meshes[node.mesh];
-
-	if (collidable)
-		append_collision_data(model, inputMod, mesh, materials, physics, phys_transform);
-	if (!renderable)
-		return;
-
-	for (int i = 0; i < mesh.primitives.size(); i++)
-	{
-		const tinygltf::Primitive& prim = mesh.primitives[i];
-
-		MeshPart part;
-		glGenVertexArrays(1, &part.vao);
-		glBindVertexArray(part.vao);
-
-		// index buffer
-		const tinygltf::Accessor& indicies_accessor = inputMod.accessors[prim.indices];
-		int index_buffer_index = MakeOrFindGpuBuffer(model, indicies_accessor.bufferView, inputMod, buffer_view_to_buffer);
-		ASSERT(model->buffers[index_buffer_index].target == GL_ELEMENT_ARRAY_BUFFER);
-		model->buffers[index_buffer_index].Bind();
-		part.element_offset = indicies_accessor.byteOffset;
-		part.element_count = indicies_accessor.count;
-		part.element_type = indicies_accessor.componentType;
-		part.base_vertex = 0;
-		part.material_idx = prim.material;
-
-		glCheckError();
-
-		// Now do all the attributes
-		bool found_joints_attrib = false;
-		for (const auto& attrb : prim.attributes)
-		{
-			const tinygltf::Accessor& accessor = inputMod.accessors[attrb.second];
-			int byte_stride = accessor.ByteStride(inputMod.bufferViews[accessor.bufferView]);
-			int buffer_index = MakeOrFindGpuBuffer(model, accessor.bufferView, inputMod, buffer_view_to_buffer);
-			ASSERT(model->buffers[buffer_index].target == GL_ARRAY_BUFFER);
-			model->buffers[buffer_index].Bind();
-
-			int location = -1;
-			if (attrb.first == "POSITION") location = POSITION_LOC;
-			else if (attrb.first == "TEXCOORD_0") location = UV_LOC;
-			else if (attrb.first == "TEXCOORD_1") location = UV2_LOC;
-			else if (attrb.first == "NORMAL") location = NORMAL_LOC;
-			else if (attrb.first == "JOINTS_0") location = JOINT_LOC;
-			else if (attrb.first == "WEIGHTS_0") location = WEIGHT_LOC;
-			else if (attrb.first == "COLOR_0") location = COLOR_LOC;
-			else if (attrb.first == "TANGENT") location = TANGENT_LOC;
-
-
-			if (location == -1) continue;
-			
-			if (location == JOINT_LOC)
-				found_joints_attrib = true;
-
-			glEnableVertexAttribArray(location);
-			if (location == JOINT_LOC) {
-				glVertexAttribIPointer(location, accessor.type, accessor.componentType,
-					byte_stride, (void*)accessor.byteOffset);
-			}
-			else {
-				glVertexAttribPointer(location, accessor.type, accessor.componentType,
-					accessor.normalized, byte_stride, (void*)accessor.byteOffset);
-			}
-
-			part.attributes |= (1 << location);
-
-			glCheckError();
-		}
-
-		glBindVertexArray(0);
-
-
-		if (!(part.attributes & (1<< POSITION_LOC)) || !(part.attributes & (1<<UV_LOC)) || !(part.attributes & (1<<NORMAL_LOC))) {
-			sys_print("Model %s is missing nessecary vertex attributes\n", model->name.c_str());
-		}
-
-		model->parts.push_back(part);
-
-		glCheckError();
-	}
-
-
-}
-
-
-static uint32_t MakeOrFindGpuBuffer2(Model* m, bool index_buffer, cgltf_buffer_view* bv, cgltf_data* data, std::map<int, int>& buffer_view_to_buffer)
-{
-	int bv_index = cgltf_buffer_view_index(data, bv);
-	if (buffer_view_to_buffer.find(bv_index) != buffer_view_to_buffer.end())
-		return buffer_view_to_buffer.find(bv_index)->second;
-
-	cgltf_buffer* gltf_buffer = bv->buffer;
-	char* byte_buffer = (char*)gltf_buffer->data;
-
-	Model::GpuBuffer buffer;
-	glGenBuffers(1, &buffer.handle);
-
-	uint32_t target = (!index_buffer) ? GL_ARRAY_BUFFER : GL_ELEMENT_ARRAY_BUFFER;
-
-	glBindBuffer(target, buffer.handle);
-	glBufferData(target, bv->size, &byte_buffer[bv->offset], GL_STATIC_DRAW);
-	glBindBuffer(target, 0);
-	buffer.size = bv->size;
-	buffer.target = target;
-
-	m->buffers.push_back(buffer);
-	int index = m->buffers.size() - 1;
-
-	buffer_view_to_buffer[bv_index] = index;
-	return index;
-}
-
-
-GLenum cgltf_component_type_to_gl(cgltf_component_type ct)
-{
-	switch (ct)
-	{
-	case cgltf_component_type_r_8: return GL_BYTE; /* BYTE */
-	case cgltf_component_type_r_8u: return GL_UNSIGNED_BYTE; /* UNSIGNED_BYTE */
-	case cgltf_component_type_r_16: return GL_SHORT; /* SHORT */
-	case cgltf_component_type_r_16u: return GL_UNSIGNED_SHORT; /* UNSIGNED_SHORT */
-	case cgltf_component_type_r_32u: return GL_UNSIGNED_INT; /* UNSIGNED_INT */
-	case cgltf_component_type_r_32f: return GL_FLOAT; /* FLOAT */
-	default: return 0;
-	}
-};
-static int get_stride(cgltf_type t, cgltf_component_type ct)
-{
-	const int type_size[cgltf_type_max_enum] = { 0,1,2,3,4,4,9,16 };
-	const int component_bytes[cgltf_component_type_max_enum] = { 0,1,1,2,2,4,4 };
-	return component_bytes[ct] * type_size[t];
-}
-static int get_stride(const cgltf_accessor* a)
-{
-	return get_stride(a->type, a->component_type);
-}
-
-struct Mesh_Raw_Data
-{
-	vector<char> buffers[7];
-	vector<uint16_t> indicies;
-};
-
-
 bool write_out2(vector<char>& out, const cgltf_accessor* in, Format_Descriptor outfmt)
 {
-	if (in->stride != get_stride(in))
-		return false;
-
 	Format_Descriptor infmt(in->component_type, in->type, in->normalized);
 	int new_bytes = outfmt.get_size() * in->count;
 	int start = out.size();
 	char* in_buffer_start = (char*)in->buffer_view->buffer->data + in->buffer_view->offset + in->offset;
 	out.resize(start + new_bytes);
-	if (infmt == outfmt) {
+	if (infmt == outfmt && in->stride == infmt.get_size()) {
 		memcpy(out.data() + start, in_buffer_start, new_bytes);
 		return true;
 	}
@@ -598,27 +324,6 @@ bool write_out2(vector<char>& out, const cgltf_accessor* in, Format_Descriptor o
 	}
 	return true;
 }
-
-bool write_out(vector<char>& out, cgltf_accessor* in, cgltf_type outtype, cgltf_component_type outcomp, int attribute)
-{
-	if (in->offset != 0 || in->buffer_view->stride != 0 || in->stride != get_stride(in))
-		return false;
-
-	size_t new_bytes = get_stride(outtype,outcomp)*in->count;
-	size_t start = out.size();
-	char* in_buffer_start = (char*)in->buffer_view->buffer->data + in->buffer_view->offset;
-	out.resize(start + new_bytes);
-	if (in->type == outtype && in->component_type == outcomp) {
-		memcpy(out.data() + start, in_buffer_start, new_bytes);
-		return true;
-	}
-
-	
-	return true;
-}
-
-
-
 
 void append_collision_data2(Model* m, cgltf_data* data, cgltf_mesh* mesh, std::vector<Game_Shader*>& materials,
 	Physics_Mesh* phys, const glm::mat4& transform)
@@ -790,184 +495,6 @@ void append_collision_data3(unique_ptr<Physics_Mesh>& phys, cgltf_data* data, cg
 }
 
 
-
-// for level meshes: default renderable = true, collidable = true (so detail props should be XXX_!r!nc)
-// for level entities: default renderable = false, collidable = false (so a door should be XXX_!r!c)
-// for regular meshes: default renderable = true, collidable = false (so collision_mesh should be XXX_!nr!c)
-
-// physics_mesh can be nullptr, then it creates/uses model->collision
-void add_node_mesh_to_model2(Model* model, cgltf_data* data, cgltf_node* node,
-	std::map<int, int>& buffer_view_to_buffer, bool render_default, bool collide_default, std::vector<Game_Shader*>& materials,
-	Physics_Mesh* physics, const glm::mat4& phys_transform)
-{
-	ASSERT(node->mesh);
-	bool renderable = render_default;
-	bool collidable = collide_default;
-
-	std::string node_name = node->name;
-
-	if (node_name.find("_!r!c") != std::string::npos) {
-		renderable = true;
-		collidable = true;
-	}
-	else if (node_name.find("_!nr!c") != std::string::npos) {
-		renderable = false;
-		collidable = true;
-	}
-	else if (node_name.find("_!r!nc") != std::string::npos) {
-		renderable = true;
-		collidable = false;
-	}
-
-	if (!renderable && !collidable)
-		return;
-
-	cgltf_mesh* mesh = node->mesh;
-
-	if (collidable)
-		append_collision_data2(model, data, mesh, materials, physics, phys_transform);
-	if (!renderable)
-		return;
-
-	for (int i = 0; i < mesh->primitives_count; i++)
-	{
-		const cgltf_primitive& prim = mesh->primitives[i];
-
-		MeshPart part;
-		glGenVertexArrays(1, &part.vao);
-		glBindVertexArray(part.vao);
-
-		// index buffer
-		//const tinygltf::Accessor& indicies_accessor = inputMod.accessors[prim.indices];
-		cgltf_accessor* indicies_accessor = prim.indices;
-
-		int index_buffer_index = MakeOrFindGpuBuffer2(model, true, indicies_accessor->buffer_view, data, buffer_view_to_buffer);
-		ASSERT(model->buffers[index_buffer_index].target == GL_ELEMENT_ARRAY_BUFFER);
-		model->buffers[index_buffer_index].Bind();
-		part.base_vertex = model->data.buffers[0].size();
-		write_out(model->data.indicies, indicies_accessor, cgltf_type_scalar, cgltf_component_type_r_16u, -1);
-		part.element_offset = indicies_accessor->offset;
-		part.element_count = indicies_accessor->count;
-		part.element_type = cgltf_component_type_to_gl(indicies_accessor->component_type);
-		if (prim.material)
-			part.material_idx = cgltf_material_index(data, prim.material);
-		else
-			part.material_idx = -1;
-
-		glCheckError();
-
-		// Now do all the attributes
-		bool found_joints_attrib = false;
-		for (int at_index=0; at_index <prim.attributes_count; at_index++)
-		{
-			cgltf_attribute& attribute = prim.attributes[at_index];
-			cgltf_accessor& accessor = *attribute.data;
-
-			//const tinygltf::Accessor& accessor = inputMod.accessors[attrb.second];
-			//int byte_stride = accessor.ByteStride(inputMod.bufferViews[accessor.bufferView]);
-			int byte_stride = accessor.stride;
-			//int buffer_index = MakeOrFindGpuBuffer(model, accessor.bufferView, inputMod, buffer_view_to_buffer);
-			int buffer_index = MakeOrFindGpuBuffer2(model, false, accessor.buffer_view, data, buffer_view_to_buffer);
-			ASSERT(model->buffers[buffer_index].target == GL_ARRAY_BUFFER);
-			model->buffers[buffer_index].Bind();
-
-			int location = -1;
-			if (strcmp(attribute.name,"POSITION")==0) location = POSITION_LOC;
-			else if (strcmp(attribute.name,"TEXCOORD_0")== 0)location = UV_LOC;
-			else if (strcmp(attribute.name,"TEXCOORD_1")== 0)location = UV2_LOC;
-			else if (strcmp(attribute.name,"NORMAL")    == 0)location = NORMAL_LOC;
-			else if (strcmp(attribute.name,"JOINTS_0")  == 0)location = JOINT_LOC;
-			else if (strcmp(attribute.name,"WEIGHTS_0") == 0)location = WEIGHT_LOC;
-			else if (strcmp(attribute.name,"COLOR_0")   == 0)location = COLOR_LOC;
-			else if (strcmp(attribute.name,"TANGENT")   == 0) location = TANGENT_LOC;
-
-			if (location == -1) continue;
-
-			if (location == POSITION_LOC) {
-				model->aabb = bounds_union(model->aabb, glm::vec3(accessor.min[0], accessor.min[1], accessor.min[2]));
-				model->aabb = bounds_union(model->aabb, glm::vec3(accessor.max[0], accessor.max[1], accessor.max[2]));
-			}
-
-
-			if (location == JOINT_LOC)
-				found_joints_attrib = true;
-
-			cgltf_type outtype = accessor.type;
-			cgltf_component_type outctype = accessor.component_type;
-
-			write_out(model->data.buffers[location], &accessor, outtype, outctype,location);
-
-			glEnableVertexAttribArray(location);
-			if (location == JOINT_LOC) {
-				glVertexAttribIPointer(location, accessor.type, cgltf_component_type_to_gl(accessor.component_type),
-					byte_stride, (void*)accessor.offset);
-			}
-			else {
-				glVertexAttribPointer(location, accessor.type, cgltf_component_type_to_gl(accessor.component_type),
-					accessor.normalized, byte_stride, (void*)accessor.offset);
-			}
-
-			part.attributes |= (1 << location);
-
-			glCheckError();
-		}
-
-		glBindVertexArray(0);
-
-
-		if (!(part.attributes & (1 << POSITION_LOC)) || !(part.attributes & (1 << UV_LOC)) || !(part.attributes & (1 << NORMAL_LOC))) {
-			sys_print("Model %s is missing nessecary vertex attributes\n", model->name.c_str());
-		}
-
-		model->parts.push_back(part);
-
-		glCheckError();
-	}
-
-
-}
-
-void get_types_for_attribute(cgltf_component_type& ctype, cgltf_type& type, int attribute)
-{
-	switch (attribute) {
-	case POSITION_LOC:
-		ctype = cgltf_component_type_r_32f;
-		type = cgltf_type_vec3;
-		break;
-	case NORMAL_LOC:
-		ctype = cgltf_component_type_r_32f;
-		type = cgltf_type_vec3;
-		break;
-	case UV_LOC:
-		ctype = cgltf_component_type_r_32f;
-		type = cgltf_type_vec2;
-		break;
-	case UV2_LOC:
-		ctype = cgltf_component_type_r_32f;
-		type = cgltf_type_vec2;
-		break;
-	case JOINT_LOC:
-		ctype = cgltf_component_type_r_8u;
-		type = cgltf_type_vec4;
-		break;
-	case WEIGHT_LOC:
-		ctype = cgltf_component_type_r_32f;
-		type = cgltf_type_vec4;
-		break;
-	case TANGENT_LOC:
-		ctype = cgltf_component_type_r_32f;
-		type = cgltf_type_vec3;
-		break;
-	case COLOR_LOC:
-		ctype = cgltf_component_type_r_16u;
-		type = cgltf_type_vec3;
-		break;
-	default:
-		ASSERT(0);
-	}
-}
-
-
 bool add_node_mesh_to_new_mesh(
 	Mesh& outmesh,
 	cgltf_data* data, 
@@ -1079,39 +606,6 @@ bool add_node_mesh_to_new_mesh(
 	return true;
 }
 
-
-static Texture* LoadGltfImage(tinygltf::Image& i, tinygltf::Model& scene)
-{
-	tinygltf::BufferView& bv = scene.bufferViews[i.bufferView];
-	tinygltf::Buffer& b = scene.buffers[bv.buffer];
-	ASSERT(bv.byteStride == 0);
-
-	return CreateTextureFromImgFormat(&b.data.at(bv.byteOffset), bv.byteLength, i.name);
-}
-
-void load_model_materials(std::vector<Game_Shader*>& materials, const std::string& fallbackname, tinygltf::Model& scene)
-{
-	for (int matidx = 0; matidx < scene.materials.size(); matidx++) {
-		tinygltf::Material& mat = scene.materials[matidx];
-		size_t find = mat.name.rfind('.');	// remove the .001 shit that blender adds
-		if (find != std::string::npos) {
-			mat.name = mat.name.substr(0, find);
-		}
-
-		Game_Shader* gs = mats.find_for_name(mat.name.c_str());
-		if(!gs) {
-			int baseindex = mat.pbrMetallicRoughness.baseColorTexture.index;
-			if (baseindex != -1 && baseindex < scene.images.size()) {
-				gs = mats.create_temp_shader((fallbackname + mat.name).c_str());
-				gs->images[Game_Shader::DIFFUSE] = LoadGltfImage(scene.images.at(mat.pbrMetallicRoughness.baseColorTexture.index), scene);
-			
-			}
-			else
-				gs = &mats.fallback;
-		}
-		materials.push_back(gs);
-	}
-}
 static Texture* LoadGltfImage2(cgltf_image* i, cgltf_data* data)
 {
 	cgltf_buffer_view& bv = *i->buffer_view;
@@ -1162,25 +656,8 @@ void load_model_materials2(std::vector<Game_Shader*>& materials, const std::stri
 
 
 #ifdef USE_CGLTF
-static void RecursiveAddSkeleton2(std::map<std::string, int>& bone_to_index, cgltf_data* data, Model* m, cgltf_node* node)
-{
-	std::string name = node->name;
-	if (bone_to_index.find(name) != bone_to_index.end())
-	{
-		int my_index = bone_to_index[name];
-		for (int i = 0; i < node->children_count; i++) {
-			cgltf_node* child = node->children[i];
-			std::string cname = child->name;
-			if (bone_to_index.find(cname) != bone_to_index.end()) {
-				m->bones[bone_to_index[cname]].parent = my_index;
-			}
-		}
-	}
-	for (int i = 0; i < node->children_count; i++) {
-		RecursiveAddSkeleton2(bone_to_index, data, m, node->children[i]);
-	}
-}
-static void RecursiveAddSkeleton3(std::unordered_map<std::string, int>& bone_to_index, cgltf_data* data, Model2* m, cgltf_node* node)
+
+static void RecursiveAddSkeleton3(std::unordered_map<std::string, int>& bone_to_index, cgltf_data* data, Model* m, cgltf_node* node)
 {
 	std::string name = node->name;
 	if (bone_to_index.find(name) != bone_to_index.end())
@@ -1200,101 +677,9 @@ static void RecursiveAddSkeleton3(std::unordered_map<std::string, int>& bone_to_
 }
 #endif
 
-static void RecursiveAddSkeleton(std::map<std::string, int>& bone_to_index, tinygltf::Model& scene, Model* m, tinygltf::Node& node)
-{
-	if (bone_to_index.find(node.name) != bone_to_index.end())
-	{
-		int my_index = bone_to_index[node.name];
-		for (int i = 0; i < node.children.size(); i++) {
-			tinygltf::Node& child = scene.nodes[node.children[i]];
-			if (bone_to_index.find(child.name) != bone_to_index.end()) {
-				m->bones[bone_to_index[child.name]].parent = my_index;
-			}
-		}
-	}
-	for (int i = 0; i < node.children.size(); i++) {
-		RecursiveAddSkeleton(bone_to_index, scene, m, scene.nodes[node.children[i]]);
-	}
-}
-
-static void LoadGltfSkeleton(tinygltf::Model& scene, Model* model, tinygltf::Skin& skin)
-{
-	std::map<std::string, int> bone_to_index;
-	ASSERT(skin.inverseBindMatrices != -1);
-	tinygltf::Accessor& invbind_acc = scene.accessors[skin.inverseBindMatrices];
-	tinygltf::BufferView& invbind_bv = scene.bufferViews[invbind_acc.bufferView];
-	for (int i = 0; i < skin.joints.size(); i++) {
-		tinygltf::Node& node = scene.nodes[skin.joints[i]];
-		Bone b;
-		b.parent = -1;
-		float* start =(float*)(&scene.buffers[invbind_bv.buffer].data.at(invbind_bv.byteOffset) + sizeof(float)*16*i);
-		b.invposematrix = glm::mat4(start[0],start[1],start[2],start[3],
-									start[4],start[5],start[6],start[7],
-									start[8],start[9],start[10],start[11],
-									start[12],start[13],start[14],start[15]);
-		b.posematrix = glm::inverse(glm::mat4(b.invposematrix));
-		
-		b.name_table_ofs = model->bone_string_table.size();
-		for (auto c : node.name)
-			model->bone_string_table.push_back(c);
-		model->bone_string_table.push_back('\0');
-
-		// needed when animations dont have any keyframes, cause gltf exports nothing when its euler angles ???
-		b.rot = glm::quat_cast(glm::mat4(b.posematrix));
-
-		bone_to_index.insert({ node.name, model->bones.size() });
-		model->bones.push_back(b);
-	}
-	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
-	for (int i = 0; i < defscene.nodes.size(); i++) {
-		RecursiveAddSkeleton(bone_to_index, scene, model, scene.nodes[defscene.nodes.at(i)]);
-	}
-}
 #ifdef USE_CGLTF
-static void LoadGltfSkeleton2(cgltf_data* data, Model* model, cgltf_skin* skin)
-{
-	std::map<std::string, int> bone_to_index;
-	ASSERT(skin->inverse_bind_matrices != nullptr);
-	//tinygltf::Accessor& invbind_acc = scene.accessors[skin.inverseBindMatrices];
-	cgltf_accessor* invbind_acc = skin->inverse_bind_matrices;
-	//tinygltf::BufferView& invbind_bv = scene.bufferViews[invbind_acc.bufferView];
-	cgltf_buffer_view* invbind_bv = invbind_acc->buffer_view;
 
-	uint8_t* byte_buffer = (uint8_t*)invbind_bv->buffer->data;
-	for (int i = 0; i <skin->joints_count; i++) {
-		//tinygltf::Node& node = scene.nodes[skin.joints[i]];
-		cgltf_node* node = skin->joints[i];
-		Bone b;
-		b.parent = -1;
-		//float* start = (float*)(&scene.buffers[invbind_bv.buffer].data.at(invbind_bv.byteOffset) + sizeof(float) * 16 * i);
-		float* start = (float*)(&byte_buffer[invbind_bv->offset] + sizeof(float) * 16 * i);
-		b.invposematrix = glm::mat4(start[0], start[1], start[2], start[3],
-			start[4], start[5], start[6], start[7],
-			start[8], start[9], start[10], start[11],
-			start[12], start[13], start[14], start[15]);
-		b.posematrix = glm::inverse(glm::mat4(b.invposematrix));
-
-		b.name_table_ofs = model->bone_string_table.size();
-		char* c = node->name;
-		while (*c) {
-			model->bone_string_table.push_back(*c);
-			c++;//ebic!!
-		}
-		model->bone_string_table.push_back('\0');
-
-		// needed when animations dont have any keyframes, cause gltf exports nothing when its euler angles ???
-		b.rot = glm::quat_cast(glm::mat4(b.posematrix));
-		bone_to_index.insert({ std::string(node->name), model->bones.size() });
-		model->bones.push_back(b);
-	}
-	//tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
-	cgltf_scene* defscene = data->scene;
-	for (int i = 0; i < defscene->nodes_count; i++) {
-		RecursiveAddSkeleton2(bone_to_index, data, model, defscene->nodes[i]);
-		//RecursiveAddSkeleton(bone_to_index, scene, model, scene.nodes[defscene.nodes.at(i)]);
-	}
-}
-static void LoadGltfSkeleton3(cgltf_data* data, Model2* model, cgltf_skin* skin)
+static void LoadGltfSkeleton3(cgltf_data* data, Model* model, cgltf_skin* skin)
 {
 	std::unordered_map<std::string, int> bone_to_index;
 	ASSERT(skin->inverse_bind_matrices != nullptr);
@@ -1332,101 +717,6 @@ static void LoadGltfSkeleton3(cgltf_data* data, Model2* model, cgltf_skin* skin)
 	}
 }
 #endif
-static Animation_Set* LoadGltfAnimations(tinygltf::Model& scene, tinygltf::Skin& skin)
-{
-	Animation_Set* set = new Animation_Set;
-	std::map<int, int> node_to_index;
-	for (int i = 0; i < skin.joints.size(); i++) {
-		node_to_index[skin.joints[i]] = i;
-	}
-	set->num_channels = skin.joints.size();
-	for (int a = 0; a < scene.animations.size(); a++)
-	{
-		tinygltf::Animation& gltf_anim = scene.animations[a];
-
-		Animation my_anim{};
-		my_anim.name = std::move(gltf_anim.name);
-		my_anim.channel_offset = set->channels.size();
-		my_anim.pos_offset = set->positions.size();
-		my_anim.rot_offset = set->rotations.size();
-		my_anim.scale_offset = set->scales.size();
-		set->channels.resize(set->channels.size() + skin.joints.size());
-		for (int c = 0; c < gltf_anim.channels.size(); c++) {
-			tinygltf::AnimationChannel& gltf_channel = gltf_anim.channels[c];
-			int channel_idx = node_to_index[gltf_channel.target_node];
-			AnimChannel& my_channel = set->channels[my_anim.channel_offset + channel_idx];
-			
-			int type = -1;
-			if (gltf_channel.target_path == "translation") type = 0;
-			else if (gltf_channel.target_path == "rotation") type = 1;
-			else if (gltf_channel.target_path == "scale") type = 2;
-			else continue;
-
-			tinygltf::AnimationSampler& sampler = gltf_anim.samplers[gltf_channel.sampler];
-			tinygltf::Accessor& timevals = scene.accessors[sampler.input];
-			tinygltf::Accessor& vals = scene.accessors[sampler.output];
-			ASSERT(timevals.count == vals.count);
-			tinygltf::BufferView& time_bv = scene.bufferViews[timevals.bufferView];
-			tinygltf::BufferView& val_bv = scene.bufferViews[vals.bufferView];
-			ASSERT(time_bv.buffer == val_bv.buffer);
-			tinygltf::Buffer& buffer = scene.buffers[time_bv.buffer];
-			ASSERT(timevals.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);// just make life easier
-			ASSERT(time_bv.byteStride == 0);
-
-			my_anim.total_duration = glm::max(my_anim.total_duration, (float)timevals.maxValues.at(0));
-
-			float* time_buffer = (float*)(&buffer.data.at(time_bv.byteOffset));
-			if (type == 0) {
-				my_channel.pos_start = set->positions.size();
-				ASSERT(vals.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && vals.type == TINYGLTF_TYPE_VEC3);
-				ASSERT(val_bv.byteStride == 0);
-				glm::vec3* pos_buffer = (glm::vec3*)(&buffer.data.at(val_bv.byteOffset));
-				for (int t = 0; t < timevals.count; t++) {
-					PosKeyframe pkf;
-					pkf.time = time_buffer[t];
-					pkf.val = pos_buffer[t];
-					set->positions.push_back(pkf);
-				}
-				my_channel.num_positions = set->positions.size() - my_channel.pos_start;
-
-			}
-			else if (type == 1) {
-				my_channel.rot_start = set->rotations.size();
-				ASSERT(vals.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && vals.type == TINYGLTF_TYPE_VEC4);
-				ASSERT(val_bv.byteStride == 0);
-				glm::quat* rot_buffer = (glm::quat*)(&buffer.data.at(val_bv.byteOffset));
-				for (int t = 0; t < timevals.count; t++) {
-					RotKeyframe rkf;
-					rkf.time = time_buffer[t];
-					rkf.val = rot_buffer[t];
-					set->rotations.push_back(rkf);
-				}
-				my_channel.num_rotations = set->rotations.size() - my_channel.rot_start;
-			}
-			else if (type == 2) {
-				my_channel.scale_start = set->scales.size();
-				ASSERT(vals.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && vals.type == TINYGLTF_TYPE_VEC3);
-				ASSERT(val_bv.byteStride == 0);
-				glm::vec3* scale_buffer = (glm::vec3*)(&buffer.data.at(val_bv.byteOffset));
-				for (int t = 0; t < timevals.count; t++) {
-					ScaleKeyframe skf;
-					skf.time = time_buffer[t];
-					skf.val = scale_buffer[t];
-					set->scales.push_back(skf);
-				}
-				my_channel.num_scales = set->scales.size() - my_channel.scale_start;
-			}
-		}
-
-		my_anim.num_pos = set->positions.size() - my_anim.pos_offset;
-		my_anim.num_rot = set->rotations.size() - my_anim.rot_offset;
-		my_anim.num_scale = set->scales.size() - my_anim.scale_offset;
-		my_anim.fps = 1.0;
-		set->clips.push_back(my_anim);
-	}
-
-	return set;
-}
 
 #ifdef USE_CGLTF
 static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
@@ -1550,25 +840,10 @@ static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
 }
 #endif
 
-static void traverse_model_nodes(Model* model, tinygltf::Model& scene, tinygltf::Node& node, std::map<int, int>& buffer_view_to_buffer)
-{
-	if (node.mesh != -1)
-		add_node_mesh_to_model(model, scene, node, buffer_view_to_buffer, true, false, model->materials, nullptr, glm::mat4(1));
-	for (int i = 0; i < node.children.size(); i++)
-		traverse_model_nodes(model, scene, scene.nodes[node.children[i]], buffer_view_to_buffer);
-}
 
 #ifdef USE_CGLTF
 
-static void traverse_model_nodes2(Model* model, cgltf_data* data, cgltf_node* node, std::map<int, int>& buffer_view_to_buffer)
-{
-	if (node->mesh)
-		add_node_mesh_to_model2(model, data, node, buffer_view_to_buffer, true, false, model->materials, nullptr, glm::mat4(1));
-	for (int i = 0; i < node->children_count; i++)
-		traverse_model_nodes2(model, data, node->children[i], buffer_view_to_buffer);
-}
-
-static void traverse_model_nodes3(Model2* model, cgltf_data* data, cgltf_node* node)
+static void traverse_model_nodes3(Model* model, cgltf_data* data, cgltf_node* node)
 {
 	if (node->mesh) {
 		bool good = add_node_mesh_to_new_mesh(model->mesh, data, node, true, false, model->mats, model->collision, glm::mat4(1));
@@ -1577,64 +852,66 @@ static void traverse_model_nodes3(Model2* model, cgltf_data* data, cgltf_node* n
 		traverse_model_nodes3(model, data, node->children[i]);
 }
 
-static bool load_gltf_model2(const std::string& filepath, Model* model)
+static void traverse_model_nodes3_prefab(Prefab_Model* model, cgltf_data* data, 
+	cgltf_node* node, glm::mat4 global_transform, std::unordered_map<int,int> cgltf_mesh_to_mesh, 
+	Game_Mod_Manager::prefab_callback callback, void* callback_data)
 {
-	cgltf_options options = {};
-	cgltf_data* data = NULL;
-
-	File_Buffer* infile = Files::open(filepath.c_str());
-	if (!infile) {
-		printf("no such model %s\n", filepath.c_str());
-		return false;
+	glm::mat4 local_transform = glm::mat4(1);
+	if (node->has_matrix) {
+		float* m = node->matrix;
+		local_transform = glm::mat4(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
+			m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
 	}
-
-	cgltf_result result = cgltf_parse(&options, infile->buffer, infile->length, &data);
-	Files::close(infile);
-
-	//cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
-	if (result != cgltf_result_success)
-	{
-		printf("Couldn't load gltf model\n");
-		return false;
+	else {
+		glm::vec3 translation = glm::vec3(0.f);
+		glm::vec3 scale = glm::vec3(1.f);
+		glm::quat rot = glm::quat(1.f, 0.f, 0.f, 0.f);
+		if (node->has_translation)
+			translation = glm::make_vec3<float>(node->translation);
+		if (node->has_rotation)
+			rot = glm::make_quat<float>(node->rotation);
+		if (node->has_scale)
+			scale = glm::make_vec3<float>(node->scale);
+		local_transform = glm::translate(glm::mat4(1), translation);
+		local_transform = local_transform * glm::mat4_cast(rot);
+		local_transform = glm::scale(local_transform, scale);
 	}
+	global_transform = global_transform * local_transform;
 
-	cgltf_load_buffers(&options, data, filepath.c_str());
+	if (callback)
+		callback(callback_data, data, node, global_transform);
 
-	if (data->skins_count >= 1)
-		LoadGltfSkeleton2(data, model, &data->skins[0]);
-	if (data->animations_count >= 1 && data->skins_count >= 1) {
-		Animation_Set* set = LoadGltfAnimations2(data, &data->skins[0]);
-		model->animations = std::unique_ptr<Animation_Set>(set);
-	}
+	if (node->mesh) {
+		int mesh_index = -1;
+		auto find = cgltf_mesh_to_mesh.find(cgltf_mesh_index(data, node->mesh));
+		if (find != cgltf_mesh_to_mesh.end())
+			mesh_index = find->second;
 
-	load_model_materials2(model->materials, model->name, data);
-	std::map<int, int> buf_view_to_buffers;
-	cgltf_scene* scene = data->scene;
-	for (int i = 0; i < scene->nodes_count; i++) {
-		cgltf_node* node = scene->nodes[i];
-		traverse_model_nodes2(model, data, node, buf_view_to_buffers);
-	}
-	if (model->collision)
-		model->collision->build();
-
-	bool appended_null_material = false;
-	for (int i = 0; i < model->parts.size(); i++) {
-		if (model->parts[i].material_idx == -1) {
-			if (!appended_null_material) {
-				model->materials.push_back(&mats.fallback);
-				appended_null_material = true;
+		if (mesh_index == -1) {
+			model->meshes.push_back(Mesh());
+			bool good = add_node_mesh_to_new_mesh(model->meshes.back(), data, node, 
+				true, false, model->mats, model->physics, global_transform);
+			if (good) {
+				mesh_index = model->meshes.size() - 1;
+				cgltf_mesh_to_mesh[cgltf_mesh_index(data, node->mesh)] = mesh_index;
 			}
-			model->parts[i].material_idx = model->materials.size() - 1;
+			else
+				model->meshes.pop_back();
+		}
+		if (mesh_index != -1) {
+			Prefab_Model::Node node;
+			node.mesh_idx = mesh_index;
+			node.transform = global_transform;
+			model->nodes.push_back(node);
 		}
 	}
 
-	cgltf_free(data);
-
-	return true;
+	for (int i = 0; i < node->children_count; i++)
+		traverse_model_nodes3_prefab(model, data, node->children[i], global_transform, 
+			cgltf_mesh_to_mesh, callback, callback_data);
 }
 
-
-static bool load_gltf_model3(const std::string& filepath, Model2* model)
+static bool load_gltf_model3(const std::string& filepath, Model* model)
 {
 	cgltf_options options = {};
 	cgltf_data* data = NULL;
@@ -1691,173 +968,81 @@ static bool load_gltf_model3(const std::string& filepath, Model2* model)
 	return true;
 }
 
-#endif
-
-static bool DoLoadGltfModel(const std::string& filepath, Model* model)
+static bool load_gltf_prefab(const std::string& filepath, Prefab_Model* model, 
+	Game_Mod_Manager::prefab_callback callback, void* callback_data)
 {
-	tinygltf::Model scene;
-	tinygltf::TinyGLTF loader;
-	std::string errStr;
-	std::string warnStr;
-	bool res = loader.LoadBinaryFromFile(&scene, &errStr, &warnStr, filepath);
-	if (!res) {
-		printf("Couldn't load gltf model: %s\n", errStr.c_str());
+	cgltf_options options = {};
+	cgltf_data* data = NULL;
+
+	File_Buffer* infile = Files::open(filepath.c_str());
+	if (!infile) {
+		printf("no such model %s\n", filepath.c_str());
 		return false;
 	}
 
-	if (scene.skins.size() >= 1)
-		LoadGltfSkeleton(scene, model, scene.skins[0]);
-	if (scene.animations.size() >= 1 && scene.skins.size() >= 1) {
-		Animation_Set* set = LoadGltfAnimations(scene, scene.skins[0]);
-		model->animations = std::unique_ptr<Animation_Set>(set);
+	cgltf_result result = cgltf_parse(&options, infile->buffer, infile->length, &data);
+	Files::close(infile);
+
+	//cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
+	if (result != cgltf_result_success)
+	{
+		printf("Couldn't load gltf model\n");
+		return false;
 	}
 
-	load_model_materials(model->materials, model->name, scene);
-	std::map<int, int> buf_view_to_buffers;
-	tinygltf::Scene& defscene = scene.scenes[scene.defaultScene];
-	for (int i = 0; i < defscene.nodes.size(); i++) {
-		traverse_model_nodes(model, scene, scene.nodes.at(defscene.nodes.at(i)), buf_view_to_buffers);
+	cgltf_load_buffers(&options, data, filepath.c_str());
+	load_model_materials2(model->mats, model->name, data);
+
+	// i do it this way since theres some collision mesh branching, instead of just looping through cgltf meshes
+	std::unordered_map<int, int> cgltf_mesh_to_my_mesh;
+	cgltf_scene* scene = data->scene;
+	for (int i = 0; i < scene->nodes_count; i++) {
+		cgltf_node* node = scene->nodes[i];
+		traverse_model_nodes3_prefab(model, data, node, glm::mat4(1), cgltf_mesh_to_my_mesh, callback, callback_data);
 	}
-	if (model->collision)
-		model->collision->build();
 
+	// ensure all materials arent null
+	bool appended_null_material = false;
+	for (int i = 0; i < model->meshes.size(); i++) {
+		for (int j = 0; j < model->meshes[i].parts.size(); j++) {
+			if (model->meshes[i].parts[j].material_idx == -1) {
+				if (!appended_null_material) {
+					model->mats.push_back(&mats.fallback);
+					appended_null_material = true;
+				}
+				model->meshes[i].parts[j].material_idx = model->mats.size() - 1;
+			}
+		}
+	}
 
+	cgltf_free(data);
 
-	return res;
+	return true;
 }
 
+#endif
 
-void Model::GpuBuffer::Bind()
-{
-	glBindBuffer(target, handle);
-}
 
-int Model::BoneForName(const char* name) const
+int Model::bone_for_name(const char* name) const
 {
 	for (int i = 0; i < bones.size(); i++) {
 		if (bones[i].name == name)
 			return i;
-		//if (strcmp(&bone_string_table.at(bones[i].name_table_ofs), name) == 0)
-		//	return i;
 	}
 	return -1;
-}
-
-void FreeLoadedModels()
-{
-	for (int i = 0; i < models.size(); i++) {
-		Model* m = models[i];
-		printf("Freeing model: %s\n", m->name.c_str());
-		for (int p = 0; p < m->parts.size(); p++) {
-			glDeleteVertexArrays(1, &m->parts[p].vao);
-		}
-		for (int b = 0; b < m->buffers.size(); b++) {
-			glDeleteBuffers(1, &m->buffers[b].handle);
-		}
-
-		delete m;
-	}
-	models.clear();
-}
-void ReloadModel(Model* m)
-{
-	std::string path;
-	path.reserve(256);
-	path += model_folder_path;
-	path += m->name;
-
-	for (int p = 0; p < m->parts.size(); p++) {
-		glDeleteVertexArrays(1, &m->parts[p].vao);
-	}
-	for (int b = 0; b < m->buffers.size(); b++) {
-		glDeleteBuffers(1, &m->buffers[b].handle);
-	}
-
-	*m = Model{};
-	bool res = load_gltf_model2(path, m);
-}
-
-void benchmark_gltf()
-{
-	const int RUNS = 10;
-	std::string filepath = "./Data/Models/arms.glb";
-	double start = GetTime();
-	for (int i = 0; i < RUNS; i++) {
-		Model m;
-		load_gltf_model2(filepath, &m);
-	}
-	printf("cgltf %f\n", GetTime() - start);
-	start = GetTime();
-
-	for (int i = 0; i < RUNS; i++) {
-		Model m;
-		DoLoadGltfModel(filepath, &m);
-	}
-	printf("tinygltf %f\n", GetTime() - start);
 }
 
 Game_Mod_Manager mods;
 
 Model* FindOrLoadModel(const char* filename)
 {
-	for (int i = 0; i < models.size(); i++) {
-		if (models[i]->name == filename)
-			return models[i];
-	}
-
-	std::string path;
-	path.reserve(256);
-	path += model_folder_path;
-	path += filename;
-
-	Model* model = new Model;
-	model->name = filename;
-
-	{
-
-		bool res = load_gltf_model2(path, model);
-		if (!res) {
-			delete model;
-			return nullptr;
-		}
-
-		{
-			Model2* m = mods.find_or_load(filename);
-			Model* m2 = new Model;
-			for (int i = 0; i < m->mesh.parts.size(); i++) {
-				MeshPart part;
-				part.vao = mods.global_vertex_buffers[m->mesh.format].main_vao;
-				part.base_vertex = m->mesh.parts[i].base_vertex;
-				part.element_count = m->mesh.parts[i].element_count;
-				part.element_offset = m->mesh.parts[i].element_offset;
-				part.element_type = index_attribute_format.get_gl_type();
-				part.attributes = m->mesh.attributes;
-				part.material_idx = m->mesh.parts[i].material_idx;
-				m2->parts.push_back(part);
-			}
-			m2->aabb = m->mesh.aabb;
-			m2->attributes = model->parts[0].attributes;
-			m2->materials = std::move(m->mats);
-			m2->name = m->name;
-			m2->animations = std::move(m->animations);
-			m2->bones = std::move(m->bones);
-			m2->collision = std::move(m->collision);
-			m2->merged_vertex_offset = m->mesh.merged_vert_offset;
-			m2->merged_index_pointer = m->mesh.merged_index_pointer;
-		
-			model = m2;
-		}
-
-	}
-	models.push_back(model);
-
-	return model;
+	return mods.find_or_load(filename);
 }
 
 
 
 
-Model2* Game_Mod_Manager::find_or_load(const char* filename)
+Model* Game_Mod_Manager::find_or_load(const char* filename)
 {
 	auto find = models.find(filename);
 	if (find != models.end()) {
@@ -1866,17 +1051,59 @@ Model2* Game_Mod_Manager::find_or_load(const char* filename)
 	string path(model_folder_path);
 	path += filename;
 
-	Model2* model = new Model2;
+	Model* model = new Model;
 	model->name = filename;
 
 	bool good = load_gltf_model3(path, model);
-	if (!good)
+	if (!good) {
+		delete model;
 		return nullptr;
+	}
 	good = upload_mesh(&model->mesh);
-	if (!good)
+	if (!good) {
+		delete model;
 		return nullptr;
+	}
 
 	models[filename] = model;
+	return model;
+}
+
+void Game_Mod_Manager::free_prefab(Prefab_Model* deleteprefab)
+{
+	for (auto& prefab : prefabs) {
+		if (deleteprefab == prefab.second) {
+			std::string val = prefab.first;
+			prefabs.erase(val);
+			return;
+			// todo: free the buffer memory
+		}
+	}
+}
+
+Prefab_Model* Game_Mod_Manager::find_or_load_prefab(const char* file, bool dont_append_path,prefab_callback callback, void* callback_data)
+{
+	auto find = prefabs.find(file);
+	if (find != prefabs.end()) {
+		return find->second;
+	}
+	string path;
+	if (!dont_append_path)
+		path += model_folder_path;
+	path += file;
+
+	Prefab_Model* model = new Prefab_Model;
+	model->name = file;
+
+	bool good = load_gltf_prefab(path, model, callback, callback_data);
+	if (!good) {
+		delete model;
+		return nullptr;
+	}
+	for (int i = 0; i < model->meshes.size(); i++)
+		upload_mesh(&model->meshes[i]);
+
+	prefabs[file] = model;
 	return model;
 }
 
@@ -1936,6 +1163,8 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 		mesh->data.indicies.size()
 	);
 	glCheckError();
+
+	mesh->vao = global_vertex_buffers[format].main_vao;
 
 	mesh->merged_vert_offset = global_vertex_buffers[format].attributes[0].used / vertex_attribute_formats[0].get_size();
 	int num_verticies = mesh->data.buffers[0].size() / vertex_attribute_formats[0].get_size();
