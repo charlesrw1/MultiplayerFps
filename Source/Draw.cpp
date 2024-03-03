@@ -1800,18 +1800,16 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 	for (int i = 0; i < immediate_draw_calls.size(); i++)
 		draw_model_real(immediate_draw_calls[i].model, immediate_draw_calls[i].transform, nullptr, nullptr, state);
 
-	//Model* sphere = FindOrLoadModel("sphere.glb");
-	//for (int x = 0; x < 10; x++) {
-	//	for (int y = 0; y < 10; y++) {
-	//		mat4 transform = glm::translate(mat4(1), vec3((x - 5) * 0.75, 0, (y - 5) * 0.75));
-	//		transform = glm::scale(transform, vec3(0.4));
-	//		DrawModel(Render_Level_Params::STANDARD, sphere, transform, nullptr, (9 - x) / 9.f, (9 - y) / 9.f);
-	//	}
-	//}
+	Model* sphere = FindOrLoadModel("clothoverbox.glb");
+	for (int x = 0; x < 1; x++) {
+		for (int y = 0; y < 1; y++) {
+			mat4 transform = glm::translate(mat4(1), vec3((x - 5) * 0.75, 0, (y - 5) * 0.75));
+			transform = glm::scale(transform, vec3(0.4));
+			draw_model_real(sphere, transform, nullptr,nullptr, state);
+		}
+	}
 
 	//DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), glm::scale(glm::translate(mat4(1), vec3(0, 2, 0)),vec3(2)), nullptr, 0.0, 1.0);
-
-	draw_model_real(FindOrLoadModel("clothoverbox.glb"), mat4(1), nullptr, nullptr, state);
 
 }
 
@@ -1968,7 +1966,14 @@ void Renderer::draw_model_real_depth(const Model* model, glm::mat4 transform, co
 		}
 
 		glBindVertexArray(mp.vao);
-		glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+		//glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+		glDrawElementsBaseVertex(
+			GL_TRIANGLES,
+			mp.element_count,
+			mp.element_type,
+			(void*)(model->merged_index_pointer + mp.element_offset),
+			model->merged_vertex_offset + mp.base_vertex
+		);
 
 		state.initial_set = false;
 	}
@@ -2098,7 +2103,13 @@ void Renderer::draw_model_real(const Model* model, glm::mat4 transform, const En
 		shader().set_vec4("color_tint", gs->diffuse_tint);
 
 		glBindVertexArray(mp.vao);
-		glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
+		glDrawElementsBaseVertex(
+			GL_TRIANGLES,
+			mp.element_count,
+			mp.element_type,
+			(void*)(model->merged_index_pointer + mp.element_offset),
+			model->merged_vertex_offset + mp.base_vertex
+		);
 
 		state.initial_set = false;
 	}

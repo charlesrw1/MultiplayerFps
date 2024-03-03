@@ -551,7 +551,8 @@ void main()
 	}
 	
 
-	FS_OUT_Color = pbr_calculate(tex.rgb, roughness , metalness, N, 1.0,emissive, ambient_occlusion);
+	FS_OUT_Color = tex.rgbb;//pbr_calculate(tex.rgb, roughness , metalness, N, 1.0,emissive, ambient_occlusion);
+	//\\FS_OUT_Color = vec4(1,0,0,0);
 	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);

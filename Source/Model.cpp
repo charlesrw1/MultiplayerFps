@@ -160,6 +160,10 @@ public:
 				int normalized = glm::clamp(int(f * UINT16_MAX), 0, (int)UINT16_MAX);
 				CAST_TO_AND_INDEX(i, uint16_t, output_buf) = normalized;
 			}
+			else if (type == CT_S16){
+				int normalized = glm::clamp(int(f * INT16_MAX), (int)INT16_MIN, (int)INT16_MAX);
+				CAST_TO_AND_INDEX(i, int16_t, output_buf) = normalized;
+			}
 			else
 				assert(0);
 		}
@@ -203,16 +207,15 @@ public:
 Format_Descriptor vertex_attribute_formats[MAX_ATTRIBUTES] =
 {
 	Format_Descriptor(CT_FLOAT, 3, false),	// position
-	Format_Descriptor(CT_FLOAT, 2, false),	// uv
-	Format_Descriptor(CT_FLOAT, 3, false),	// normal
+	Format_Descriptor(CT_FLOAT, 2, true),	// uv
+	Format_Descriptor(CT_S16, 3, true),	// normal
 	Format_Descriptor(CT_U8, 4, false),		// joint
-	Format_Descriptor(CT_U8, 4, true),		// weight
+	Format_Descriptor(CT_U8, 4, true),	// weight
 	Format_Descriptor(CT_U8, 3, true),		// color
 	Format_Descriptor(CT_U16, 2, true),		// uv2
-	Format_Descriptor(CT_FLOAT, 3, false) // tangent
+	Format_Descriptor(CT_S16, 3, true) // tangent
 };
 Format_Descriptor index_attribute_format = Format_Descriptor(CT_U16, 1, false);
-
 
 class Vertex_Descriptor
 {
@@ -575,25 +578,23 @@ struct Mesh_Raw_Data
 
 bool write_out2(vector<char>& out, const cgltf_accessor* in, Format_Descriptor outfmt)
 {
-	if (in->offset != 0 || in->buffer_view->stride != 0 || in->stride != get_stride(in))
+	if (in->stride != get_stride(in))
 		return false;
 
 	Format_Descriptor infmt(in->component_type, in->type, in->normalized);
-	
 	int new_bytes = outfmt.get_size() * in->count;
 	int start = out.size();
-	char* in_buffer_start = (char*)in->buffer_view->buffer->data + in->buffer_view->offset;
-	if (new_bytes != in->buffer_view->size) {
-		printf("");
-	}
+	char* in_buffer_start = (char*)in->buffer_view->buffer->data + in->buffer_view->offset + in->offset;
 	out.resize(start + new_bytes);
 	if (infmt == outfmt) {
 		memcpy(out.data() + start, in_buffer_start, new_bytes);
 		return true;
 	}
 
+	int out_stride = outfmt.get_size();
+	int in_stride = in->stride;
 	for (int i = 0; i < in->count; i++) {
-		outfmt.convert_this_from_that(in_buffer_start, infmt, out.data() + start);
+		outfmt.convert_this_from_that(in_buffer_start + i*in_stride, infmt, out.data() + start + out_stride*i);
 	}
 	return true;
 }
@@ -1016,16 +1017,16 @@ bool add_node_mesh_to_new_mesh(
 
 		// get base vertex of this new mesh part, uses position vertex buffer to determine size
 		part.base_vertex = outmesh.data.buffers[ATTRIBUTE_POS].size() / vertex_attribute_formats[ATTRIBUTE_POS].get_size();
-		// add indicies to the raw mesh buffer, make sure type is unsigned short (the only type allowed for this renderer)
+		part.element_offset = indicies_accessor->offset + outmesh.data.indicies.size();
+		part.element_count = indicies_accessor->count;
+		
+		// add indicies to the raw mesh buffer, make sure type is unsigned short (the only type allowed for this engine)
 		bool good = write_out2(outmesh.data.indicies, indicies_accessor, index_attribute_format);
 		if (!good) {
 			printf("Bad model index buffer format\n");
 			return false;
 		}
-		
-		// set other submesh info
-		part.element_offset = indicies_accessor->offset;
-		part.element_count = indicies_accessor->count;
+	
 		part.material_idx = -1;
 		if (prim.material)
 			part.material_idx = cgltf_material_index(data, prim.material);
@@ -1734,8 +1735,10 @@ void Model::GpuBuffer::Bind()
 int Model::BoneForName(const char* name) const
 {
 	for (int i = 0; i < bones.size(); i++) {
-		if (strcmp(&bone_string_table.at(bones[i].name_table_ofs), name) == 0)
+		if (bones[i].name == name)
 			return i;
+		//if (strcmp(&bone_string_table.at(bones[i].name_table_ofs), name) == 0)
+		//	return i;
 	}
 	return -1;
 }
@@ -1793,7 +1796,7 @@ void benchmark_gltf()
 	printf("tinygltf %f\n", GetTime() - start);
 }
 
-static Game_Mod_Manager mods;
+Game_Mod_Manager mods;
 
 Model* FindOrLoadModel(const char* filename)
 {
@@ -1818,16 +1821,16 @@ Model* FindOrLoadModel(const char* filename)
 			return nullptr;
 		}
 
-		if (strcmp(filename, "dragon.glb") == 0) {
+		{
 			Model2* m = mods.find_or_load(filename);
 			Model* m2 = new Model;
 			for (int i = 0; i < m->mesh.parts.size(); i++) {
 				MeshPart part;
 				part.vao = mods.global_vertex_buffers[m->mesh.format].main_vao;
-				part.base_vertex = 0;
+				part.base_vertex = m->mesh.parts[i].base_vertex;
 				part.element_count = m->mesh.parts[i].element_count;
 				part.element_offset = m->mesh.parts[i].element_offset;
-				part.element_type = GL_UNSIGNED_SHORT;
+				part.element_type = index_attribute_format.get_gl_type();
 				part.attributes = m->mesh.attributes;
 				part.material_idx = m->mesh.parts[i].material_idx;
 				m2->parts.push_back(part);
@@ -1836,6 +1839,11 @@ Model* FindOrLoadModel(const char* filename)
 			m2->attributes = model->parts[0].attributes;
 			m2->materials = std::move(m->mats);
 			m2->name = m->name;
+			m2->animations = std::move(m->animations);
+			m2->bones = std::move(m->bones);
+			m2->collision = std::move(m->collision);
+			m2->merged_vertex_offset = m->mesh.merged_vert_offset;
+			m2->merged_index_pointer = m->mesh.merged_index_pointer;
 		
 			model = m2;
 		}
@@ -1921,7 +1929,7 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 	else if ((attributes & TO_MASK(ATTRIBUTE_UV2)) || (attributes & TO_MASK(ATTRIBUTE_COLOR)))
 		format = FMT_STATIC_PLUS;
 	mesh->format = format;
-	mesh->merged_index_offset = global_index_buffer.used/index_attribute_format.get_size();
+	mesh->merged_index_pointer = global_index_buffer.used;
 	append_to_buffer(
 		global_index_buffer, 
 		mesh->data.indicies.data(), 
@@ -1929,7 +1937,7 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 	);
 	glCheckError();
 
-	mesh->merged_vert_offset = global_vertex_buffers[0].attributes[0].used / vertex_attribute_formats[0].get_size();
+	mesh->merged_vert_offset = global_vertex_buffers[format].attributes[0].used / vertex_attribute_formats[0].get_size();
 	int num_verticies = mesh->data.buffers[0].size() / vertex_attribute_formats[0].get_size();
 	for (int i = 0; i < MAX_ATTRIBUTES; i++) {
 		if (vertex_buffer_formats[format].mask & (1 << i)) {
@@ -1937,15 +1945,12 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 			int this_attribute_verticies = mesh->data.buffers[i].size() / vertex_attribute_formats[i].get_size();
 			// this can happen and is allowed, like a lightmap mesh not using vertex colors
 			if (this_attribute_verticies == 0) {
-				mesh->data.buffers[i].resize(num_verticies * vertex_attribute_formats[i].get_size());
-				bool good = append_to_buffer(
-					global_vertex_buffers[format].attributes[i],
-					mesh->data.buffers[i].data(),
-					mesh->data.buffers[i].size()
-				);
+				global_vertex_buffers[format].attributes[i].used += num_verticies * vertex_attribute_formats[i].get_size();
 			}
 			else if (this_attribute_verticies != num_verticies){
-				assert(0 && "vertex count mismatch");
+				//assert(0 && "vertex count mismatch");
+				printf("vertex count mismatch\n");
+				return false;
 			}
 			else {
 				bool good = append_to_buffer(

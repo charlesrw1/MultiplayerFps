@@ -101,7 +101,7 @@ public:
 	Raw_Mesh_Data data;
 	Bounds aabb;
 	int attributes = 0;	// bitmask of vertex attributes
-	uint32_t merged_index_offset = 0;
+	uint32_t merged_index_pointer = 0;	// in bytes
 	uint32_t merged_vert_offset = 0;
 	bool is_merged = false;
 	int format = 0;
@@ -172,6 +172,7 @@ public:
 
 	bool is_merged_into_gpu = false;
 	uint32_t merged_vertex_offset = 0;
+	uint32_t merged_index_pointer = 0;	// in bytes
 
 	std::unique_ptr<Physics_Mesh> collision;
 
