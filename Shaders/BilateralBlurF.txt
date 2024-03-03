@@ -8,7 +8,7 @@ uniform vec2 LinMAD;
 
 #define KERNEL_RADIUS 1.0
 
-out float out_frag0;
+out float FS_OUT_Color;
 
 in vec2 FS_IN_TexCoord;
 
@@ -94,5 +94,5 @@ void main(void)
 	}
 
 	float ao = total_ao / total_weight;
-	out_frag0 = ao;
+	FS_OUT_Color = ao;
 }

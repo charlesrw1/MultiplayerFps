@@ -35,7 +35,7 @@ struct Texture
 	Texture_Format format;
 	bool no_filtering = false;
 	bool has_mips = false;
-
+	bool is_loaded_in_memory = false;
 	bool is_float = false;
 	uint32_t gl_id = 0;
 };
@@ -83,6 +83,7 @@ public:
 
 	int physics = 0;	// physics of surface
 
+	bool texture_are_loading_in_memory = false;
 	bool is_translucent() const {
 		return alpha_type == A_ADD || alpha_type == A_BLEND;
 	}
@@ -102,12 +103,14 @@ public:
 	Texture* find_texture(const char* file, bool search_img_directory=true, bool owner=false);
 	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len);
 
+
 	Game_Shader fallback;
 	std::vector<Game_Shader*> shaders;
 	std::vector<Texture*> textures;
-
-	Texture* load_texture(const std::string& path);
 	void free_all();
+private:
+	Texture* create_but_dont_load(const char* filename);
+	bool load_texture(const std::string& path, Texture* t);
 };
 
 extern Game_Material_Manager mats;

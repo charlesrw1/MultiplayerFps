@@ -1004,6 +1004,12 @@ void draw_wind_menu()
 	ImGui::SliderInt("cubemap index", &draw.cubemap_index, 0, 12);
 
 
+	ImGui::Image(ImTextureID(draw.ssao.halfres_texture), ImVec2(256, 256));
+	ImGui::Image(ImTextureID(draw.ssao.fullres1), ImVec2(256, 256));
+	ImGui::Image(ImTextureID(draw.ssao.fullres2), ImVec2(256, 256));
+
+
+
 	ImGui::Image(ImTextureID(draw.tex.reflected_color), ImVec2(512, 512));
 	ImGui::Image(ImTextureID(draw.tex.scene_color), ImVec2(512, 512));
 	ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
@@ -1207,6 +1213,8 @@ Game_Engine::Game_Engine() :
 
 }
 
+extern Game_Mod_Manager mods;
+
 void Game_Engine::init()
 {
 	program_time_start = GetTime();
@@ -1247,6 +1255,8 @@ void Game_Engine::init()
 
 	draw.Init();
 	TIMESTAMP("draw init");
+	mods.init();
+	TIMESTAMP("mods init");
 
 	media.load();
 	TIMESTAMP("media init");

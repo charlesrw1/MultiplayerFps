@@ -108,7 +108,7 @@ void main()
         float rangeCheck = smoothstep(0.0, 1.0, radius / abs(view_space_position.z - sampleDepth));
         occlusion += (sampleDepth >= samplePos.z + bias ? 1.0 : 0.0) * rangeCheck;           
     }
-    occlusion = 1.0-(occlusion / float(8));
-
+    //occlusion = 1.0-(occlusion / float(8));
+	occlusion = 0.0;
 	FS_OUT_frag0 = vec3(pow(occlusion,1.0));
 }

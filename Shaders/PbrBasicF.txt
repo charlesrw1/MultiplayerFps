@@ -360,7 +360,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	vec3 Lo = vec3(0.0);
 	vec3 L = -g.directional_light_dir_and_used.xyz;
     vec3 H = normalize(V + L);
-    vec3 radiance = g.directional_light_color.rgb*0.005;
+    vec3 radiance = g.directional_light_color.rgb*0.002;
 //#ifndef LIGHTMAPPED
 	{
 		vec3 surface_N = N;
@@ -440,7 +440,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 
 	ambient += emissive + Lo;
 
-	return ambient.rgbb;//vec4(ambient, opacity);
+	return vec4(ambient, opacity);//vec4(ambient, opacity);
 }
 
 #ifdef BLEND2
@@ -555,7 +555,7 @@ void main()
 	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(specular_color,1.0);
-	//FS_OUT_Color = vec4(1.0);
+	//FS_OUT_Color = tex.rgbb;
 	#ifdef BLEND2
 	//FS_OUT_Color = tex;
 	#endif

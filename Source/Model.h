@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <map>
+#include <unordered_map>
 #include "MathLib.h"
 #include "glm/gtc/quaternion.hpp"
 #include "Util.h"
@@ -12,6 +13,7 @@
 #include "BVH.h"
 using std::string;
 using std::vector;
+using std::unique_ptr;
 
 #define MAX_BONES 256
 
@@ -22,6 +24,7 @@ struct Bone
 	glm::mat4x3 posematrix;	// bone space -> mesh space
 	glm::mat4x3 invposematrix; // mesh space -> bone space
 	glm::quat rot;
+	string name;
 };
 
 struct MeshPart
@@ -73,6 +76,76 @@ struct ModelHitbox
 	glm::vec3 size;
 };
 
+
+#define MAX_MESH_ATTRIBUTES 8
+
+struct Raw_Mesh_Data
+{
+	vector<char> buffers[MAX_MESH_ATTRIBUTES];
+	vector<char> indicies;
+};
+
+class Submesh
+{
+public:
+	int base_vertex = 0;
+	int element_offset = 0;
+	int element_count = 0;
+	int material_idx = 0;
+};
+
+class Mesh
+{
+public:
+	vector<Submesh> parts;
+	Raw_Mesh_Data data;
+	Bounds aabb;
+	int attributes = 0;	// bitmask of vertex attributes
+	uint32_t merged_index_offset = 0;
+	uint32_t merged_vert_offset = 0;
+	bool is_merged = false;
+	int format = 0;
+};
+
+struct Model_Tag
+{
+	string name;
+	int bone_index = -1;
+	glm::mat4 transform;
+};
+
+struct Collision_Box
+{
+	string name;
+	int bone_idx = -1;
+	Bounds aabb;
+};
+
+class Mesh_Lod
+{
+	Mesh* mesh;
+	float end_dist;
+};
+
+class Model2
+{
+public:
+	string name;
+	Mesh mesh;
+	// skeleton heirarchy
+	vector<Bone> bones;
+	// embedded ainmations
+	unique_ptr<Animation_Set> animations;
+	// tags for attachments etc.
+	vector<Model_Tag> tags;
+	vector<Game_Shader*> mats;
+
+	unique_ptr<Physics_Mesh> collision;
+	vector<Collision_Box> boxes;
+
+	int bone_for_name(const char* name) const;
+};
+
 class Model
 {
 public:
@@ -83,8 +156,8 @@ public:
 		uint32_t size = 0;
 		void Bind();
 	};
-	string name;
 
+	string name;
 	vector<Bone> bones;
 	vector<char> bone_string_table;
 	std::unique_ptr<Animation_Set> animations;
@@ -93,70 +166,83 @@ public:
 	vector<MeshPart> parts;
 	vector<GpuBuffer> buffers;
 	vector<Game_Shader*> materials;
+	Raw_Mesh_Data data;
 	Bounds aabb;
+	int attributes = 0;
+
+	bool is_merged_into_gpu = false;
+	uint32_t merged_vertex_offset = 0;
 
 	std::unique_ptr<Physics_Mesh> collision;
 
 	int BoneForName(const char* name) const;
 };
 
-class Model_Manager
+class Prefab_Model
+{
+public:
+	struct Node {
+		string name;
+		int mesh_idx = -1;
+		int transform_idx = -1;
+		int parent_idx = -1;
+	};
+	vector<Mesh> meshes;
+	vector<glm::mat4> transforms;
+	vector<Node> nodes;
+	vector<Game_Shader*> mats;
+};
+
+class cgltf_data;
+class cgltf_node;
+class Game_Mod_Manager
 {
 public:
 
-	enum Attribute_Types {
-		POS,
-		UV0,
-		NORMAL,
-		INDICIES,
-		WEIGHTS,
-		UV1,
-		COLOR,
-		TANGENT,
-		NUM_ATTRIBUTES
-	};
-	enum Vertex_Format_Types {
-		POS_UV0_NORMAL_COLOR_TANGENT,
-		POS_UV0_NORMAL_BONES_TANGENT,
-		POS_UV0_NORMAL_COLOR_UV1_TANGENT,
-		NUM_VERT_FORMATS,
-	};
-	enum Index_Formats {
-		INT16,
-		INT32,
-		NUM_INDEX_FORMATS
-	};
-	struct Buffer {
-		uint32_t size = 0;
+	typedef void(*prefab_callback)(cgltf_data* data, cgltf_node* node, glm::mat4 globaltransform);
+
+	void init();
+	Model2* find_or_load(const char* filename);
+	Prefab_Model* find_or_load_prefab(const char* filename, 
+		prefab_callback callback);
+	void free_prefab(Prefab_Model* prefab);
+	void free_model(Model2* m);
+	void compact_geometry();
+
+	struct Gpu_Buffer {
+		uint32_t handle = 0;
+		uint32_t allocated = 0;
+		uint32_t target = 0;
 		uint32_t used = 0;
-		uint32_t id = 0;
-		bool is_index_target = false;
-		bool dirty = false;
-		int stride = 0;
-
-		void append_data(void* data, int input_stride, uint32_t input_len, int output_stride);
 	};
 
-	struct Per_Format {
-		Buffer buffers[NUM_ATTRIBUTES];	// per attribute
-		uint32_t vao_16;
-		uint32_t vao_32;
+	struct Shared_Vertex_Buffer {
+		Gpu_Buffer attributes[MAX_MESH_ATTRIBUTES];
+		uint32_t main_vao = 0;
 	};
-	Per_Format formats[NUM_VERT_FORMATS];
-	Buffer index[NUM_INDEX_FORMATS];
 
-	void check_vaos();
+	enum Formats {
+		FMT_SKINNED,	
+		FMT_STATIC,
+		FMT_STATIC_PLUS,
+		NUM_FMT
+	};
 
-	std::vector<char> staging_buffer;
+	std::unordered_map<string, Prefab_Model*> prefabs;
+	std::unordered_map<string, Model2*> models;
+
+	uint32_t depth_animated_vao = 0;
+	uint32_t depth_static_vao = 0;
+	Gpu_Buffer global_index_buffer;
+	Shared_Vertex_Buffer global_vertex_buffers[NUM_FMT];
+
+private:
+	bool upload_mesh(Mesh* mesh);
+	bool append_to_buffer(Gpu_Buffer& buf, char* input_data, uint32_t input_length);
 };
 
 void FreeLoadedModels();
 Model* FindOrLoadModel(const char* filename);
 void ReloadModel(Model* m);
 
-// So the level loader can have access
-namespace tinygltf {
-	class Model;
-	class Mesh;
-}
 #endif // !MODEL_H

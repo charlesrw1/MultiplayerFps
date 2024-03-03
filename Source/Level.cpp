@@ -298,9 +298,18 @@ void create_statics_from_dicts(Level* level)
 
 
 }
-
 Level* LoadLevelFile(const char* level_name)
 {
+	// create instances from prefab
+
+	// load ents
+
+	// build static collision model
+
+	// load level stuff, lightmaps, probes, terrain, etc.
+
+
+
 	std::string map_dir;
 	map_dir.reserve(256);
 

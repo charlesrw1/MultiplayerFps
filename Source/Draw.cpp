@@ -22,12 +22,12 @@ static const int ROUGH2_LOC = 4;
 static const int LIGHTMAP_LOC = 6;
 static const int SPECIAL_LOC = 7;
 
-static const int IRRADIANCE_CM_LOC = 8;
+static const int IRRADIANCE_CM_LOC = 13;
 static const int SPECULAR_CM_LOC = 9;
 static const int BRDF_LUT_LOC = 10;
 static const int SHADOWMAP_LOC = 11;
 static const int CAUSTICS_LOC = 12;
-static const int SSAO_TEX_LOC = 13;
+static const int SSAO_TEX_LOC = 8;
 
 
 
@@ -1811,7 +1811,7 @@ void Renderer::DrawEnts(const Render_Level_Params& params)
 
 	//DrawModel(Render_Level_Params::STANDARD, FindOrLoadModel("sphere.glb"), glm::scale(glm::translate(mat4(1), vec3(0, 2, 0)),vec3(2)), nullptr, 0.0, 1.0);
 
-	draw_model_real(FindOrLoadModel("dragon.glb"), mat4(1), nullptr, nullptr, state);
+	draw_model_real(FindOrLoadModel("clothoverbox.glb"), mat4(1), nullptr, nullptr, state);
 
 }
 
@@ -2600,33 +2600,35 @@ void SSAO_System::render()
 		glUniform3f(loc+j, samples[j].x, samples[j].y, samples[j].z);
 
 	quad.Draw(GL_TRIANGLES);
-
 	if (1) {
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres1, 0);
-		glClear(GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		draw.set_shader(Renderer::S_XBLUR);
 		draw.shader().set_vec2("InvFullRes", 1.f / vec2(width, height));
 		draw.shader().set_vec2("LinMAD", LinMAD);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, halfres_texture);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
+		draw.shader().set_mat4("Model", mat4(1));
+		draw.shader().set_mat4("ViewProj", mat4(1));
+		draw.bind_texture(0, halfres_texture, GL_TEXTURE_2D);
+		draw.bind_texture(1, draw.tex.scene_depthstencil, GL_TEXTURE_2D);
 		quad.Draw(GL_TRIANGLES);
 
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres2, 0);
-		glClear(GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		draw.set_shader(Renderer::S_YBLUR);
 		draw.shader().set_vec2("InvFullRes", 1.f / vec2(width, height));
 		draw.shader().set_vec2("LinMAD", LinMAD);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, fullres1);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
+		draw.shader().set_mat4("Model", mat4(1));
+		draw.shader().set_mat4("ViewProj", mat4(1));
+		draw.bind_texture(0, fullres1, GL_TEXTURE_2D);
+		draw.bind_texture(1, draw.tex.scene_depthstencil, GL_TEXTURE_2D);
 		quad.Draw(GL_TRIANGLES);
 	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
 	//glDepthMask(GL_TRUE);
 	glCheckError();
 
