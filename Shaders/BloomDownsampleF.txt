@@ -102,5 +102,6 @@ void main()
 		break;
 	}
 	
-	FS_OUT_Downsample = downsample;
+	FS_OUT_Downsample = max(downsample,vec3(0));
+	
 }

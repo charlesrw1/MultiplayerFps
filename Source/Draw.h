@@ -113,19 +113,20 @@ struct Render_Level_Params {
 	View_Setup view;
 	uint32_t output_framebuffer;
 	bool clear_framebuffer = true;
-	bool draw_level = true;
-	bool draw_ents = true;
-	enum Pass_Type { OPAQUE, TRANSLUCENT, DEPTH, SHADOWMAP };
+	enum Pass_Type { 
+		OPAQUE, 
+		TRANSLUCENT, 
+		DEPTH, 
+		SHADOWMAP 
+	};
 	Pass_Type pass = OPAQUE;
-	bool cull_front_face = false;
-	bool force_backface=false;
-	bool upload_constants = false;
-	bool include_lightmapped = true;
-	bool is_probe_render = false;
 	bool draw_viewmodel = false;
+	bool is_probe_render = false;
 	bool is_water_reflection_pass = false;
+
 	bool has_clip_plane = false;
 	vec4 custom_clip_plane = vec4(0.f);
+	bool upload_constants = false;
 	uint32_t provied_constant_buffer = 0;
 };
 
@@ -289,6 +290,14 @@ public:
 	uint32_t anim_matrix_ssbo;
 };
 
+struct Render_Stats
+{
+	int textures_bound = 0;
+	int shaders_bound = 0;
+	int tris_drawn = 0;
+	int draw_calls = 0;
+};
+
 class Renderer
 {
 public:
@@ -410,6 +419,8 @@ public:
 		if (s.ID != cur_shader) {
 			s.use();
 			cur_shader = s.ID; 
+
+			stats.shaders_bound++;
 		}
 	}
 	void set_shader(int index_into_shader_list) {
@@ -418,6 +429,7 @@ public:
 		if (s.ID != cur_shader) {
 			s.use();
 			cur_shader = s.ID;
+			stats.shaders_bound++;
 		}
 	}
 
@@ -452,6 +464,7 @@ public:
 	Shared_Gpu_Driven_Resources shared;
 	std::vector<Draw_Model_Frontend_Params> immediate_draw_calls;
 	int get_shader_index(const Mesh& part, const Game_Shader& gs, bool depth_pass);
+	Render_Stats stats;
 private:
 
 	struct Sprite_Drawing_State {
@@ -475,8 +488,6 @@ private:
 
 	void draw_model_real(const Draw_Call& dc,
 		Model_Drawing_State& state);
-	void draw_model_real_depth(const Mesh& m, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
-		Model_Drawing_State& state);
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
 
@@ -488,12 +499,7 @@ private:
 	void InitGlState();
 	void InitFramebuffers();
 
-	void DrawEnts(const Render_Level_Params& params);
-	void DrawLevel(const Render_Level_Params& params);
-	void DrawLevelDepth(const Render_Level_Params& params);
 	void DrawSkybox();
-
-	void DrawPlayerViewmodel(const Render_Level_Params& params);
 
 	void DrawEntBlobShadows();
 	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
@@ -501,7 +507,6 @@ private:
 	void set_shader_sampler_locations();
 	void set_wind_constants();
 	void set_water_constants();
-
 
 	View_Setup current_frame_main_view;
 

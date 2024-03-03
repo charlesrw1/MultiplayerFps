@@ -435,7 +435,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	vec3 irradiance = texture(pbr_irradiance_cubemaps,vec4(N, cm_index)).rgb;
 
 #ifdef LIGHTMAPPED
-	irradiance = texture(lightmap, FS_IN_TexCoord2).rgb*1.4;
+	//irradiance = texture(lightmap, FS_IN_TexCoord2).rgb*1.4;
 #endif
 	vec3 diffuse_light = irradiance*Albedo;
 	

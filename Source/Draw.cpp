@@ -311,6 +311,8 @@ void Renderer::bind_texture(int bind, int id)
 		//glBindTexture(target, id);
 		glBindTextureUnit(bind, id);
 		cur_tex[bind] = id;
+
+		stats.textures_bound++;
 	}
 }
 
@@ -682,75 +684,76 @@ void Shadow_Map_System::update()
 	if (draw.scene.directional_index == -1)
 		return;
 
-	GPUFUNCTIONSTART;
-
-	glm::vec3 directional_dir = draw.scene.lights[draw.scene.directional_index].normal;
-
-	const View_Setup& view = draw.vs;
-
-	float near = view.near;
-	float far = glm::min(view.far, max_shadow_dist);
-
-	split_distances = CalcPlaneSplits(near, far, log_lin_lerp_factor);
-	for (int i = 0; i < MAXCASCADES; i++)
-		update_cascade(i, view, directional_dir);
-
-	struct Shadowmap_Csm_Ubo_Struct
 	{
-		mat4 data[4];
-		vec4 near_planes;
-		vec4 far_planes;
-	}upload_data;
+		GPUSCOPESTART("Csm setup");
 
-	for (int i = 0; i < 4; i++) {
-		upload_data.data[i] = matricies[i];
-		upload_data.near_planes[i] = nearplanes[i];
-		upload_data.far_planes[i] = farplanes[i];
+		glm::vec3 directional_dir = draw.scene.lights[draw.scene.directional_index].normal;
+
+		const View_Setup& view = draw.vs;
+
+		float near = view.near;
+		float far = glm::min(view.far, max_shadow_dist);
+
+		split_distances = CalcPlaneSplits(near, far, log_lin_lerp_factor);
+		for (int i = 0; i < MAXCASCADES; i++)
+			update_cascade(i, view, directional_dir);
+
+		struct Shadowmap_Csm_Ubo_Struct
+		{
+			mat4 data[4];
+			vec4 near_planes;
+			vec4 far_planes;
+		}upload_data;
+
+		for (int i = 0; i < 4; i++) {
+			upload_data.data[i] = matricies[i];
+			upload_data.near_planes[i] = nearplanes[i];
+			upload_data.far_planes[i] = farplanes[i];
+		}
+
+		glNamedBufferData(csm_ubo, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
 	}
-
-	glNamedBufferData(csm_ubo, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
-
 	// now setup scene for rendering
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	for (int i = 0; i < 4; i++) {
+	{
 		GPUSCOPESTART("Render csm layer");
+		for (int i = 0; i < 4; i++) {
 
-		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0, i);
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0, i);
 
-		Render_Level_Params params;
-		params.output_framebuffer = framebuffer;
-		params.pass = Render_Level_Params::SHADOWMAP;
-		params.include_lightmapped = true;
-		View_Setup setup;
-		setup.width = csm_resolution;
-		setup.height = csm_resolution;
-		setup.near = nearplanes[i];
-		setup.far = farplanes[i];
-		setup.viewproj = matricies[i];
-		setup.view = setup.proj = mat4(1);
-		params.view = setup;
-		params.cull_front_face = true;
-		params.force_backface = true;
-		params.provied_constant_buffer = frame_view_ubos[i];
-		params.upload_constants = true;
+			Render_Level_Params params;
+			params.output_framebuffer = framebuffer;
+			params.pass = Render_Level_Params::SHADOWMAP;
+			View_Setup setup;
+			setup.width = csm_resolution;
+			setup.height = csm_resolution;
+			setup.near = nearplanes[i];
+			setup.far = farplanes[i];
+			setup.viewproj = matricies[i];
+			setup.view = setup.proj = mat4(1);
+			params.view = setup;
+			params.provied_constant_buffer = frame_view_ubos[i];
+			params.upload_constants = true;
 
-		draw.render_level_to_target(params);
+			draw.render_level_to_target(params);
+		}
 	}
 }
 
 
 
-static std::vector<vec3> GetFrustumCorners(const mat4& view, const mat4& projection)
+static glm::vec3* GetFrustumCorners(const mat4& view, const mat4& projection)
 {
 	mat4 inv_viewproj = glm::inverse(projection * view);
-	std::vector<vec3> corners;
+	static glm::vec3 corners[8];
+	int i = 0;
 	for (int x = 0; x < 2; x++) {
 		for (int y = 0; y < 2; y++) {
 			for (int z = 0; z < 2; z++) {
 				vec4 ndc_coords = vec4(2 * x - 1, 2 * y - 1, 2 * z - 1, 1);
 				vec4 world_space = inv_viewproj * ndc_coords;
 				world_space /= world_space.w;
-				corners.push_back(vec3(world_space));
+				corners[i++] = world_space;
 			}
 		}
 	}
@@ -771,9 +774,9 @@ void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, 
 		(float)view.width / view.height,
 		near, far);
 	// World space corners
-	auto corners = GetFrustumCorners(view.view, camera_cascaded_proj);
+	glm::vec3* corners = GetFrustumCorners(view.view, camera_cascaded_proj);
 	vec3 frustum_center = vec3(0);
-	for (int i = 0; i < corners.size(); i++)
+	for (int i = 0; i < 8; i++)
 		frustum_center += corners[i];
 	frustum_center /= 8.f;
 
@@ -1048,6 +1051,15 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 	printf("%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
 }
 
+void imgui_stat_hook()
+{
+	ImGui::Text("Draw calls: %d", draw.stats.draw_calls);
+	ImGui::Text("Total tris: %d", draw.stats.tris_drawn);
+	ImGui::Text("Texture binds: %d", draw.stats.textures_bound);
+	ImGui::Text("Shader binds: %d", draw.stats.shaders_bound);
+
+}
+
 void Renderer::Init()
 {
 	bool supports_compression = false;
@@ -1132,6 +1144,8 @@ void Renderer::Init()
 	lens_dirt = mats.find_texture("lens_dirt.jpg");
 	casutics = mats.find_texture("caustics.png");
 	waternormal = mats.find_texture("waternormal.png");
+
+	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
 }
 
 void Renderer::InitFramebuffers()
@@ -1363,7 +1377,6 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	
 	set_standard_draw_data(params);
 
-	glCheckError();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
 	glViewport(0, 0, vs.width, vs.height);
@@ -1372,24 +1385,18 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
 
-	glCheckError();
-
-	if (params.cull_front_face) {
+	if (params.pass == Render_Level_Params::SHADOWMAP) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(shadowmap.poly_factor, shadowmap.poly_units);
 		glCullFace(GL_FRONT);
-	}
-	if (params.force_backface)
 		glDisable(GL_CULL_FACE);
+	}
+
 
 	if (params.has_clip_plane) {
 		glEnable(GL_CLIP_DISTANCE0);
 	}
-
-	glCheckError();
-
 	
-
 	std::vector<Draw_Call>* list;
 	if (params.is_water_reflection_pass) list = &shared.opaques;
 	else if (params.pass == params.SHADOWMAP) list = &shared.shadows;
@@ -1414,12 +1421,11 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	glCheckError();
 
 
-	if (params.cull_front_face) {
+	if (params.pass == Render_Level_Params::SHADOWMAP) {
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glCullFace(GL_BACK);
-	}
-	if (params.force_backface)
 		glEnable(GL_CULL_FACE);
+	}
 
 	if (params.has_clip_plane)
 		glDisable(GL_CLIP_DISTANCE0);
@@ -1728,6 +1734,7 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 
 void Renderer::extract_objects()
 {
+	GPUFUNCTIONSTART;
 	shared.build_draw_calls();
 }
 
@@ -1735,6 +1742,8 @@ void Renderer::extract_objects()
 void Renderer::scene_draw(bool editor_mode)
 {
 	GPUFUNCTIONSTART;
+
+	stats = {};
 
 	cur_shader = 0;
 	for (int i = 0; i < MAX_SAMPLER_BINDINGS; i++)
@@ -1763,7 +1772,7 @@ void Renderer::scene_draw(bool editor_mode)
 
 	extract_objects();
 
-	//shadowmap.update();
+	shadowmap.update();
 
 	//volfog.compute();
 
@@ -1787,7 +1796,7 @@ void Renderer::scene_draw(bool editor_mode)
 	// planar reflection render
 	{
 		GPUSCOPESTART("Planar reflection");
-		//planar_reflection_pass();
+		planar_reflection_pass();
 	}
 
 	// main level render
@@ -2080,72 +2089,6 @@ int Renderer::get_shader_index(const Mesh& mesh, const Game_Shader& gs, bool dep
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
 if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id); \
 else bind_texture(where, fallback.gl_id);
-	
-void Renderer::draw_model_real_depth(const Mesh& mesh, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
-	Model_Drawing_State& state)
-{
-	bool is_animated = mesh.has_bones() && a;
-
-	for (int part = 0; part < mesh.parts.size(); part++) {
-
-		const Submesh& mp = mesh.parts[part];
-		Game_Shader* gs = (mp.material_idx != -1) ? materials.at(mp.material_idx) : &mats.fallback;
-		
-		// translucents dont draw depth
-		if (gs->is_translucent())
-			continue;
-
-		int next_shader = get_shader_index(mesh, *gs, true);
-
-		if (next_shader == -1) return;
-
-		if (state.initial_set || next_shader != state.current_shader) {
-			state.current_shader = next_shader;
-
-			set_shader(next_shader);
-
-			if (gs->shader_type == Game_Shader::S_WINDSWAY) {
-				set_wind_constants();
-			}
-			set_shader_constants();
-
-		}
-
-		if (state.initial_set || state.current_backface_state != (int)gs->backface) {
-			state.current_backface_state = gs->backface;
-			if (state.current_backface_state)
-				glDisable(GL_CULL_FACE);
-			else
-				glEnable(GL_CULL_FACE);
-		}
-
-		shader().set_mat4("Model", transform);
-		shader().set_mat4("InverseModel", glm::inverse(transform));
-
-		if(gs->alpha_type == gs->A_TEST)
-			SET_OR_USE_FALLBACK(Game_Shader::DIFFUSE, ALBEDO1_LOC, white_texture);
-
-		if (is_animated) {
-			const std::vector<mat4>& bones = a->GetBones();
-			const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
-			for (int j = 0; j < bones.size(); j++)
-				glUniformMatrix4fv(bone_matrix_loc + j, 1, GL_FALSE, glm::value_ptr(bones[j]));
-			glCheckError();
-		}
-
-		glBindVertexArray(mesh.vao);
-		//glDrawElements(GL_TRIANGLES, mp.element_count, mp.element_type, (void*)mp.element_offset);
-		glDrawElementsBaseVertex(
-			GL_TRIANGLES,
-			mp.element_count,
-			GL_UNSIGNED_SHORT,
-			(void*)(mesh.merged_index_pointer + mp.element_offset),
-			mesh.merged_vert_offset + mp.base_vertex
-		);
-
-		state.initial_set = false;
-	}
-}
 
 
 // this function sucks so bad
@@ -2204,7 +2147,7 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 
 
 	// ill find a better way maybe
-	bool shader_doesnt_need_the_textures = is_water;
+	bool shader_doesnt_need_the_textures = is_water || is_depth;
 
 	if (!shader_doesnt_need_the_textures) {
 
@@ -2255,6 +2198,8 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 		(void*)(dc.mesh->merged_index_pointer + mp.element_offset),
 		dc.mesh->merged_vert_offset + mp.base_vertex
 	);
+	stats.draw_calls++;
+	stats.tris_drawn += mp.element_count / 3;
 
 	state.initial_set = false;
 }
@@ -2365,8 +2310,6 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 		Render_Level_Params params;
 		params.view = cubemap_view;
 		params.output_framebuffer = fbo;
-		params.draw_level = true;
-		params.draw_ents = false;
 		params.clear_framebuffer = true;
 		params.provied_constant_buffer = 0;
 		params.pass = Render_Level_Params::OPAQUE;
