@@ -101,7 +101,7 @@ public:
 	// @owner, caller manages lifetime if true
 	// @search_img_directory, prefixes the default image directory to file
 	Texture* find_texture(const char* file, bool search_img_directory=true, bool owner=false);
-	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len);
+	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy);
 
 
 	Game_Shader fallback;
@@ -117,7 +117,7 @@ extern Game_Material_Manager mats;
 
 void FreeLoadedTextures();
 Texture* FindOrLoadTexture(const char* filename);
-Texture* CreateTextureFromImgFormat(uint8_t* data, int datalen, std::string name);
+Texture* CreateTextureFromImgFormat(uint8_t* data, int datalen, std::string name, bool flipy);
 void FreeTexture(Texture* t);
 
 #endif // !TEXTURE_H

@@ -494,6 +494,7 @@ bool Game_Material_Manager::load_texture(const std::string& path, Texture* t)
 		is_float = true;
 	}
 	else {
+		stbi_set_flip_vertically_on_load(false);
 		data = stbi_load_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
 		is_float = false;
 	}
@@ -602,7 +603,7 @@ Texture* Game_Material_Manager::create_but_dont_load(const char* file)
 	return t;
 }
 
-Texture* Game_Material_Manager::create_texture_from_memory(const char* name, const uint8_t* data, int data_len)
+Texture* Game_Material_Manager::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
 {
 	for (int i = 0; i < textures.size(); i++) {
 		if (textures[i]->name == name) {
@@ -611,6 +612,7 @@ Texture* Game_Material_Manager::create_texture_from_memory(const char* name, con
 	}
 
 	int width, height, channels;
+	stbi_set_flip_vertically_on_load(flipy);
 	uint8_t* imgdat = stbi_load_from_memory(data, data_len, &width, &height, &channels, 0);
 	if (!imgdat) {
 		printf("Couldn't load from memory: %s", name);
@@ -625,7 +627,7 @@ Texture* Game_Material_Manager::create_texture_from_memory(const char* name, con
 	textures.push_back(t);
 	return t;
 }
-Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name)
+Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name, bool flipy)
 {
-	return mats.create_texture_from_memory(name.c_str(), inpdata, datalen);
+	return mats.create_texture_from_memory(name.c_str(), inpdata, datalen, flipy);
 }

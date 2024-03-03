@@ -209,7 +209,7 @@ Format_Descriptor vertex_attribute_formats[MAX_ATTRIBUTES] =
 	Format_Descriptor(CT_U8, 4, false),		// joint
 	Format_Descriptor(CT_U8, 4, true),	// weight
 	Format_Descriptor(CT_U8, 3, true),		// color
-	Format_Descriptor(CT_U16, 2, true),		// uv2
+	Format_Descriptor(CT_FLOAT, 2, false),		// uv2
 	Format_Descriptor(CT_S16, 3, true) // tangent
 };
 Format_Descriptor index_attribute_format = Format_Descriptor(CT_U16, 1, false);
@@ -255,7 +255,7 @@ Vertex_Descriptor vertex_buffer_formats[Game_Mod_Manager::NUM_FMT] =
 {
 	// skinned format
 	Vertex_Descriptor(
-		1'000'000,
+		100'000,
 		TO_MASK(ATTRIBUTE_POS) |
 		TO_MASK(ATTRIBUTE_UV) |
 		TO_MASK(ATTRIBUTE_NORMAL) |
@@ -264,14 +264,14 @@ Vertex_Descriptor vertex_buffer_formats[Game_Mod_Manager::NUM_FMT] =
 		TO_MASK(ATTRIBUTE_TANGENT)),
 	// static format
 	Vertex_Descriptor(
-		1'000'000,
+		500'000,
 		TO_MASK(ATTRIBUTE_POS) |
 		TO_MASK(ATTRIBUTE_UV) |
 		TO_MASK(ATTRIBUTE_NORMAL)|
 		TO_MASK(ATTRIBUTE_TANGENT)),
 	// static plus format
 	Vertex_Descriptor(
-		1'000'000,
+		500'000,
 		TO_MASK(ATTRIBUTE_POS) |
 		TO_MASK(ATTRIBUTE_UV) |
 		TO_MASK(ATTRIBUTE_NORMAL) |
@@ -279,10 +279,7 @@ Vertex_Descriptor vertex_buffer_formats[Game_Mod_Manager::NUM_FMT] =
 		TO_MASK(ATTRIBUTE_COLOR) |
 		TO_MASK(ATTRIBUTE_UV2)),
 };
-#undef NUM_TO_MASK
 static const int default_index_buffer_size = 3'000'000;
-
-
 
 bool Mesh::has_lightmap_coords() const
 {
@@ -617,7 +614,7 @@ static Texture* LoadGltfImage2(cgltf_image* i, cgltf_data* data)
 	const char* name = i->name;
 	if (!name) name = "";
 
-	return CreateTextureFromImgFormat(buffer_bytes + bv.offset, bv.size,name);
+	return CreateTextureFromImgFormat(buffer_bytes + bv.offset, bv.size,name, false);
 }
 
 void load_model_materials2(std::vector<Game_Shader*>& materials, const std::string& fallbackname, cgltf_data* data)
@@ -1040,6 +1037,102 @@ Model* FindOrLoadModel(const char* filename)
 }
 
 
+#include "Config.h"
+DECLARE_ENGINE_CMD_CAT("gpu.", print_vertex_usage)
+{
+	mods.print_usage();
+}
+
+#include <algorithm>
+
+void Game_Mod_Manager::compact_memory()
+{
+	float start = GetTime();
+
+	vector<Mesh*> indexlist;
+	vector<Mesh*> vertexlist[3];
+	vector<uint32_t> fixups[3];
+	for (auto& model : models) {
+		indexlist.push_back({ &model.second->mesh });
+		vertexlist[model.second->mesh.format].push_back(&model.second->mesh);
+	}
+	for (auto& prefab : prefabs)
+		for (int i = 0; i < prefab.second->meshes.size(); i++) {
+			indexlist.push_back({ &prefab.second->meshes[i] });
+			vertexlist[prefab.second->meshes[i].format].push_back(&prefab.second->meshes[i]);
+		}
+	for (int i = 0; i < 3; i++)fixups[i].resize(vertexlist[i].size());
+
+
+	std::sort(indexlist.begin(), indexlist.end(), [&](const Mesh* a, const Mesh* b) {
+		return a->merged_index_pointer < b->merged_index_pointer;
+		});
+	for (int i = 0; i < 3; i++) {
+		std::sort(vertexlist[i].begin(), vertexlist[i].end(), [&](const Mesh* a, const Mesh* b) {
+			return a->merged_vert_offset < b->merged_vert_offset;
+			});
+	}
+
+	uint32_t first_free = 0;
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, global_index_buffer.handle);
+	for (int i = 0; i < indexlist.size(); i++) {
+		Mesh* m = indexlist[i];
+		if (m->merged_index_pointer > first_free) {
+			glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, first_free, m->data.indicies.size(), m->data.indicies.data());
+		}
+		m->merged_index_pointer = first_free;
+		first_free += m->data.indicies.size();
+	}
+	global_index_buffer.used = first_free;
+
+	for (int j = 0; j < 3; j++) {
+		auto& vb = global_vertex_buffers[j];
+		auto& vl = vertexlist[j];
+		for (int a = 0; a < MAX_ATTRIBUTES; a++) {
+			if (!(vertex_buffer_formats[j].mask & (1<<a)))
+				continue;
+			int a_size = vertex_attribute_formats[a].get_size();
+
+			first_free = 0;
+			glBindBuffer(GL_ARRAY_BUFFER, vb.attributes[a].handle);
+			for (int i = 0; i < vl.size(); i++) {
+				Mesh* m = vl[i];
+				uint32_t vertex_pointer = m->merged_vert_offset * a_size;
+				if (vertex_pointer > first_free && m->data.buffers[a].size() > 0) {
+					glBufferSubData(GL_ARRAY_BUFFER, first_free, m->data.buffers[a].size(), m->data.buffers[a].data());
+				}
+				if (a == 0)
+					fixups[j][i] = first_free / a_size;
+				first_free += m->data.buffers[a].size();
+			}
+			vb.attributes[a].used = first_free;
+		}
+
+		for (int i = 0; i < vl.size(); i++)
+			vl[i]->merged_vert_offset = fixups[j][i];
+	}
+	float end = GetTime();
+
+	printf("compact geometry time: %f\n", end - start);
+}
+
+void Game_Mod_Manager::print_usage()
+{
+	int total_memory_usage = global_index_buffer.allocated;
+	sys_print("Index buffer: %d/%d", global_index_buffer.used, global_index_buffer.allocated);
+	for (int i = 0; i < NUM_FMT; i++) {
+		sys_print("Vertex buffer %i\n", i);
+		int vertex_count = global_vertex_buffers[i].attributes[0].used / 12;
+		int vertex_allocated = global_vertex_buffers[i].attributes[0].allocated / 12;
+
+		sys_print("-Vertex count %d/%d\n", vertex_count, vertex_allocated);
+
+		for (int j = 0; j < MAX_ATTRIBUTES; j++) {
+			total_memory_usage += global_vertex_buffers[i].attributes[j].allocated;
+		}
+	}
+	sys_print("Total memory for ib+vbs: %d\n", total_memory_usage);
+}
 
 
 Model* Game_Mod_Manager::find_or_load(const char* filename)

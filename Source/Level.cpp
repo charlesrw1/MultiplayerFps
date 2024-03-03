@@ -218,4 +218,5 @@ void FreeLevel(const Level* level)
 	mods.free_prefab(level->level_prefab);
 	delete level;
 
+	mods.compact_memory();
 }

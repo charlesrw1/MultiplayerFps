@@ -152,7 +152,8 @@ public:
 		prefab_callback callback, void* userdata);
 	void free_prefab(Prefab_Model* prefab);
 	void free_model(Model* m);
-	void compact_geometry();
+	void compact_memory();
+	void print_usage();
 
 	struct Gpu_Buffer {
 		uint32_t handle = 0;
