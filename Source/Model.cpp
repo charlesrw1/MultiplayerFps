@@ -33,7 +33,7 @@ const int UV2_LOC = 6;
 const int TANGENT_LOC = 7;
 
 
-// screw it, im making this general
+// screw it, im making this generalized
 
 enum Vertex_Attributes
 {

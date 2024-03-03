@@ -8,6 +8,7 @@
 #include "MeshBuilder.h"
 #include "Shader.h"
 #include "EnvProbe.h"
+#include "Texture.h"
 
 class MeshPart;
 class Model;
@@ -216,6 +217,68 @@ struct Draw_Model_Frontend_Params
 	glm::vec4 colorparam;
 };
 
+struct Draw_Call_Object
+{
+	int transform_idx = 0;
+	int mesh_idx = 0;
+	int owner_handle_idx = 0;
+};
+
+struct Multidraw_Indirect_Command
+{
+	GLuint  count;
+	GLuint  primCount;
+	GLuint  firstIndex;
+	GLint   baseVertex;
+	GLuint  baseInstance;
+};
+
+struct Gpu_Material
+{
+	glm::vec4 diffuse_tint;
+	float rough_mult;
+	float metal_mult;
+	float rough_remap_x;
+	float rough_remap_y;
+};
+
+struct Gpu_Object
+{
+	glm::mat4x3 model;
+	glm::mat4x3 invmodel;
+	glm::vec4 color_val;
+	int anim_matrix_offset = 0;
+	float obj_param1;
+	float obj_param2;
+	float padding;
+};
+
+
+
+// defines shared resources used for gpu driven style rendering
+struct Shared_Gpu_Driven_Resources
+{
+	vector<Gpu_Object> gpu_objects;
+	vector<Gpu_Material> scene_mats;
+	uint32_t scene_mats_ssbo;
+	uint32_t gpu_objs_ssbo;
+	uint32_t anim_matrix_ssbo;
+};
+
+struct Gpu_Batch
+{
+
+};
+
+// defines the resources needed for each pass (forward, shadow, reflection)
+struct Gpu_Driven_Pass_Resources
+{
+	vector<Gpu_Batch> batches;
+	// these is written to by the gpu for culling and drawn
+	uint32_t abc;
+};
+
+
 class Renderer
 {
 public:
@@ -244,9 +307,10 @@ public:
 
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
-	uint32_t white_texture;
-	uint32_t black_texture;
-	uint32_t default_normal_texture;
+	Texture white_texture;
+	Texture black_texture;
+	Texture flat_normal_texture;
+
 
 	Texture3d perlin3d;
 	
@@ -330,7 +394,7 @@ public:
 	Auto_Config_Var use_halfres_reflections;
 
 
-	void bind_texture(int bind, int id, int target);
+	void bind_texture(int bind, int id);
 	void set_shader(Shader& s) { 
 		if (s.ID != cur_shader) {
 			s.use();

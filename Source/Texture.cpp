@@ -298,6 +298,11 @@ typedef struct
 	unsigned long Reserved2[3];
 } ddsFileHeader_t;
 
+int get_mip_map_count(int width, int height)
+{
+	return floor(log2(glm::max(width, height))) + 1;
+}
+
 static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
 static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 {
@@ -344,14 +349,15 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		numMipmaps = header->MipMapCount;
 	}
 
-	glGenTextures(1, &output->gl_id);
-	glBindTexture(GL_TEXTURE_2D, output->gl_id);
 
 	GLenum type;
 	GLenum internal_format;
 	GLenum format;
 	bool compressed;
 	texture_format_to_gl(input_format, &format, &internal_format, &type, &compressed);
+
+	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+	glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
 
 	int ux = input_width;
 	int uy = input_height;
@@ -367,9 +373,9 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		}
 
 		if (compressed)
-			glCompressedTexImage2D(GL_TEXTURE_2D, i, internal_format, ux, uy, 0, size, data_ptr);
+			glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
 		else
-			glTexImage2D(GL_TEXTURE_2D, i,  internal_format, ux, uy, 0, format, type, data_ptr);
+			glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
 
 		data_ptr += size;
 		ux /= 2;
@@ -378,10 +384,9 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		if (uy < 1)uy = 1;
 	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.f);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
 
 	output->width = input_width;
 	output->height = input_height;
@@ -393,8 +398,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 
 static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat)
 {
-	glGenTextures(1, &output->gl_id);
-	glBindTexture(GL_TEXTURE_2D, output->gl_id);
+	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
 	GLenum type;
 	GLenum internal_format;
@@ -408,16 +412,15 @@ static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
 	}
 
+	glTextureStorage2D(output->gl_id, get_mip_map_count(x,y), internal_format, x, y);
 	if (compressed)
-		glCompressedTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, size, data);
+		glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
 	else
-		glTexImage2D(GL_TEXTURE_2D, 0, internal_format, x, y, 0, format, type, data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.f);
-	glGenerateMipmap(GL_TEXTURE_2D);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
+		glTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, format, type, data);
+	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+	glGenerateTextureMipmap(output->gl_id);
 
 	glCheckError();
 

@@ -44,12 +44,12 @@
     <ClCompile Include="Source\External\imgui_tables.cpp" />
     <ClCompile Include="Source\External\imgui_widgets.cpp" />
     <ClCompile Include="source\Game.cpp" />
+    <ClCompile Include="Source\glad.c" />
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
     <ClCompile Include="Source\Profilier.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
-    <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\MeshBuilder.cpp" />

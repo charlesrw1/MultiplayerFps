@@ -106,8 +106,8 @@ void MeshBuilder::Push2dQuad(vec2 upper, vec2 size)
 		corners[i].color = COLOR_WHITE;
 	for (int i = 0; i < 4; i++)
 		AddVertex(corners[i]);
-	AddTriangle(start + 0, start + 2, start + 1);
-	AddTriangle(start + 0, start + 3, start + 2);
+	AddTriangle(start + 2, start + 0, start + 1);
+	AddTriangle(start + 3, start + 0, start + 2);
 	//Push3(corners[0], corners[2], corners[1]);
 	//Push3(corners[0], corners[3], corners[2]);
 }

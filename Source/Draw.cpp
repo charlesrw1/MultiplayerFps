@@ -195,7 +195,6 @@ void Renderer::InitGlState()
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glClearColor(0.5f, 0.3f, 0.2f, 1.f);
-	glEnable(GL_MULTISAMPLE);
 	glDepthFunc(GL_LEQUAL);
 }
 
@@ -216,14 +215,14 @@ void Renderer::draw_sprite_buffer()
 void Renderer::draw_sprite(glm::vec3 origin, Color32 color, glm::vec2 size, Texture* mat,
 	bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face)
 {
-	int tex = (mat) ? mat->gl_id : white_texture;
+	int tex = (mat) ? mat->gl_id : white_texture.gl_id;
 	if ((in_world_space != sprite_state.in_world_space || tex != sprite_state.current_t
 		|| additive != sprite_state.additive))
 		draw_sprite_buffer();
 
 	sprite_state.in_world_space = in_world_space;
 	if (sprite_state.current_t != tex || sprite_state.force_set) {
-		bind_texture(ALBEDO1_LOC, tex, GL_TEXTURE_2D);
+		bind_texture(ALBEDO1_LOC, tex);
 		sprite_state.current_t = tex;
 	}
 	if (sprite_state.additive != additive || sprite_state.force_set) {
@@ -304,12 +303,13 @@ void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
 }
 
-void Renderer::bind_texture(int bind, int id, int target)
+void Renderer::bind_texture(int bind, int id)
 {
 	ASSERT(bind >= 0 && bind < MAX_SAMPLER_BINDINGS);
 	if (cur_tex[bind] != id) {
-		glActiveTexture(GL_TEXTURE0 + bind);
-		glBindTexture(target, id);
+		//glActiveTexture(GL_TEXTURE0 + bind);
+		//glBindTexture(target, id);
+		glBindTextureUnit(bind, id);
 		cur_tex[bind] = id;
 	}
 }
@@ -352,13 +352,13 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glCheckError();
 
 	// >>> PBR BRANCH
-	draw.bind_texture(IRRADIANCE_CM_LOC, draw.scene.levelcubemapirradiance_array, GL_TEXTURE_CUBE_MAP_ARRAY);
-	draw.bind_texture(SPECULAR_CM_LOC, draw.scene.levelcubemapspecular_array, GL_TEXTURE_CUBE_MAP_ARRAY);
+	draw.bind_texture(IRRADIANCE_CM_LOC, draw.scene.levelcubemapirradiance_array);
+	draw.bind_texture(SPECULAR_CM_LOC, draw.scene.levelcubemapspecular_array);
 
 	glCheckError();
-	draw.bind_texture(BRDF_LUT_LOC, EnviornmentMapHelper::get().integrator.lut_id, GL_TEXTURE_2D);
+	draw.bind_texture(BRDF_LUT_LOC, EnviornmentMapHelper::get().integrator.lut_id);
 
-	draw.bind_texture(SHADOWMAP_LOC, draw.shadowmap.shadow_map_array, GL_TEXTURE_2D_ARRAY);
+	draw.bind_texture(SHADOWMAP_LOC, draw.shadowmap.shadow_map_array);
 
 	glCheckError();
 
@@ -366,20 +366,20 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	//shader().set_float("aoproxy_scale_factor", aosphere.z);
 
 	uint32_t ssao_tex = draw.ssao.fullres2;
-	if (params.is_probe_render || params.is_water_reflection_pass) ssao_tex = draw.white_texture;
+	if (params.is_probe_render || params.is_water_reflection_pass) ssao_tex = draw.white_texture.gl_id;
 
-	draw.bind_texture(SSAO_TEX_LOC, ssao_tex, GL_TEXTURE_2D);
+	draw.bind_texture(SSAO_TEX_LOC, ssao_tex);
 	glCheckError();
 
-	draw.bind_texture(CAUSTICS_LOC, draw.casutics->gl_id, GL_TEXTURE_2D);
+	draw.bind_texture(CAUSTICS_LOC, draw.casutics->gl_id);
 
 	glCheckError();
 
 
 	if (eng->level->lightmap)
-		draw.bind_texture(LIGHTMAP_LOC, eng->level->lightmap->gl_id, GL_TEXTURE_2D);
+		draw.bind_texture(LIGHTMAP_LOC, eng->level->lightmap->gl_id);
 	else
-		draw.bind_texture(LIGHTMAP_LOC, draw.white_texture, GL_TEXTURE_2D);
+		draw.bind_texture(LIGHTMAP_LOC, draw.white_texture.gl_id);
 
 	//glActiveTexture(GL_TEXTURE0 + start + 4);
 	//glBindTexture(GL_TEXTURE_3D, draw.volfog.voltexture);
@@ -579,9 +579,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 
 	constants.custom_clip_plane = custom_clip_plane;
 
-	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	glNamedBufferData(ubo, sizeof Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
 }
 
 const static int csm_resolutions[] = { 0, 256, 512, 1024 };
@@ -590,8 +588,8 @@ const static int csm_resolutions[] = { 0, 256, 512, 1024 };
 void Shadow_Map_System::init()
 {
 	make_csm_rendertargets();
-	glGenBuffers(1, &csm_ubo);
-	glGenBuffers(4, frame_view_ubos);
+	glCreateBuffers(1, &csm_ubo);
+	glCreateBuffers(4, frame_view_ubos);
 }
 void Shadow_Map_System::make_csm_rendertargets()
 {
@@ -706,9 +704,7 @@ void Shadow_Map_System::update()
 		upload_data.far_planes[i] = farplanes[i];
 	}
 
-	glBindBuffer(GL_UNIFORM_BUFFER, csm_ubo);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	glNamedBufferData(csm_ubo, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
 
 	// now setup scene for rendering
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -890,8 +886,8 @@ void Volumetric_Fog_System::init()
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);	// REEE!!!!!!!!!!!!!
 
 
-	glGenBuffers(1, &light_ssbo);
-	glGenBuffers(1, &param_ubo);
+	glCreateBuffers(1, &light_ssbo);
+	glCreateBuffers(1, &param_ubo);
 
 	glCheckError();
 }
@@ -1008,25 +1004,74 @@ Renderer::Renderer()
 
 }
 
+void debug_message_callback(GLenum source, GLenum type, GLuint id, 
+	GLenum severity, GLsizei length, GLchar const* message, void const* user_param)
+{
+	auto const src_str = [source]() {
+		switch (source)
+		{
+		case GL_DEBUG_SOURCE_API: return "API";
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM: return "WINDOW SYSTEM";
+		case GL_DEBUG_SOURCE_SHADER_COMPILER: return "SHADER COMPILER";
+		case GL_DEBUG_SOURCE_THIRD_PARTY: return "THIRD PARTY";
+		case GL_DEBUG_SOURCE_APPLICATION: return "APPLICATION";
+		case GL_DEBUG_SOURCE_OTHER: return "OTHER";
+		}
+	}();
+
+	auto const type_str = [type]() {
+		switch (type)
+		{
+		case GL_DEBUG_TYPE_ERROR: return "ERROR";
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: return "DEPRECATED_BEHAVIOR";
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: return "UNDEFINED_BEHAVIOR";
+		case GL_DEBUG_TYPE_PORTABILITY: return "PORTABILITY";
+		case GL_DEBUG_TYPE_PERFORMANCE: return "PERFORMANCE";
+		case GL_DEBUG_TYPE_MARKER: return "MARKER";
+		case GL_DEBUG_TYPE_OTHER: return "OTHER";
+		}
+	}();
+
+	auto const severity_str = [severity]() {
+		switch (severity) {
+		case GL_DEBUG_SEVERITY_NOTIFICATION: return "NOTIFICATION";
+		case GL_DEBUG_SEVERITY_LOW: return "LOW";
+		case GL_DEBUG_SEVERITY_MEDIUM: return "MEDIUM";
+		case GL_DEBUG_SEVERITY_HIGH: return "HIGH";
+		}
+	}();
+
+	printf("%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
+}
+
 void Renderer::Init()
 {
 	bool supports_compression = false;
-	bool supports_anisotropic = false;
 	bool supports_sprase_tex = false;
 	bool supports_bindless = false;
-	bool supports_shader_draw_param = false;
-	bool supports_gl_debug = false;
+	bool supports_filter_minmax = false;
 
-	glCheckError();
+#ifdef _DEBUG
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(debug_message_callback, nullptr);
+	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE); 
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+#endif
+
 	int num_extensions = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
 	for (int i = 0; i < num_extensions; i++) {
 		const char* ext = (char*)glGetStringi(GL_EXTENSIONS, i);
 		if (strcmp(ext, "GL_ARB_bindless_texture") == 0) supports_bindless = true;
-		else if (strcmp(ext, "GL_EXT_texture_filter_anisotropic") == 0)supports_anisotropic = true;
 		else if (strcmp(ext, "GL_ARB_sparse_texture") == 0)supports_sprase_tex = true;
 		else if (strcmp(ext, "GL_EXT_texture_compression_s3tc") == 0)supports_compression = true;
+		else if (strcmp(ext, "GL_ARB_texture_filter_minmax") == 0)supports_filter_minmax = true;
 	}
+
+	printf("Extension support:\n");
+	printf("-GL_ARB_bindless_texture: %s\n", (supports_bindless)?"yes":"no");
+	printf("-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
+	printf("-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
 
 	if (!supports_compression) {
 		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
@@ -1041,28 +1086,29 @@ void Renderer::Init()
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
 	const uint8_t normaldata[] = { 128,128,255 };
-	glGenTextures(1, &white_texture);
-	glBindTexture(GL_TEXTURE_2D, white_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, wdata);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glGenTextures(1, &black_texture);
-	glBindTexture(GL_TEXTURE_2D, black_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, bdata);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glGenTextures(1, &default_normal_texture);
-	glBindTexture(GL_TEXTURE_2D, default_normal_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, normaldata);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	
+	glCreateTextures(GL_TEXTURE_2D, 1, &white_texture.gl_id);
+	glTextureStorage2D(white_texture.gl_id, 1, GL_RGB8, 1, 1);
+	glTextureSubImage2D(white_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
+	glTextureParameteri(white_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(white_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateTextureMipmap(white_texture.gl_id);
 
-	glGenBuffers(1, &ubo.current_frame);
+	glCreateTextures(GL_TEXTURE_2D, 1, &black_texture.gl_id);
+	glTextureStorage2D(black_texture.gl_id, 1, GL_RGB8, 1, 1);
+	glTextureSubImage2D(black_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
+	glTextureParameteri(black_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(black_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateTextureMipmap(black_texture.gl_id);
+
+	glCreateTextures(GL_TEXTURE_2D, 1, &flat_normal_texture.gl_id);
+	glTextureStorage2D(flat_normal_texture.gl_id, 1, GL_RGB8, 1, 1);
+	glTextureSubImage2D(flat_normal_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
+	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateTextureMipmap(flat_normal_texture.gl_id);
+
+	glCreateBuffers(1, &ubo.current_frame);
 
 	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
 
@@ -1088,69 +1134,54 @@ void Renderer::InitFramebuffers()
 	const int s_h = eng->window_h.integer();
 
 	glDeleteTextures(1, &tex.scene_color);
-	glGenTextures(1, &tex.scene_color);
-	glBindTexture(GL_TEXTURE_2D, tex.scene_color);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, s_w, s_h, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glCheckError();
+
+	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_color);
+	glTextureStorage2D(tex.scene_color, 1, GL_RGBA16F, s_w, s_h);
+	glTextureParameteri(tex.scene_color, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.scene_color, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.scene_color, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(tex.scene_color, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glDeleteTextures(1, &tex.scene_depthstencil);
-	glGenTextures(1, &tex.scene_depthstencil);
-	glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, s_w, s_h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-
-	glCheckError();
+	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_depthstencil);
+	glTextureStorage2D(tex.scene_depthstencil, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
+	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glDeleteFramebuffers(1, &fbo.scene);
-	glGenFramebuffers(1, &fbo.scene);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.scene_color, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.scene_depthstencil, 0);
+	glCreateFramebuffers(1, &fbo.scene);
+	glNamedFramebufferTexture(fbo.scene, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
+	glNamedFramebufferTexture(fbo.scene, GL_DEPTH_ATTACHMENT, tex.scene_depthstencil, 0);
 	
 	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
-	glDrawBuffers(1, attachments);
+	glNamedFramebufferDrawBuffers(fbo.scene, 1, attachments);
 	
 	glCheckError();
 
 	glDeleteTextures(1, &tex.reflected_color);
-	glGenTextures(1, &tex.reflected_color);
-	glBindTexture(GL_TEXTURE_2D, tex.reflected_color);
+	glCreateTextures(GL_TEXTURE_2D, 1, &tex.reflected_color);
 	ivec2 reflect_size = ivec2(s_w, s_h);
 	if (use_halfres_reflections.integer()) reflect_size /= 2;
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, reflect_size.x, reflect_size.y, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glCheckError();
+	glTextureStorage2D(tex.reflected_color, 1, GL_RGBA16F, reflect_size.x, reflect_size.y);
+	glTextureParameteri(tex.reflected_color, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.reflected_color, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.reflected_color, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(tex.reflected_color, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glDeleteTextures(1, &tex.reflected_depth);
-	glGenTextures(1, &tex.reflected_depth);
-	glBindTexture(GL_TEXTURE_2D, tex.reflected_depth);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, reflect_size.x, reflect_size.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glCreateTextures(GL_TEXTURE_2D, 1, &tex.reflected_depth);
+	glTextureStorage2D(tex.reflected_depth, 1, GL_DEPTH_COMPONENT24, reflect_size.x, reflect_size.y);
+	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glDeleteFramebuffers(1, &fbo.reflected_scene);
-	glGenFramebuffers(1, &fbo.reflected_scene);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.reflected_scene);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.reflected_color, 0);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.reflected_depth, 0);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	glCheckError();
+	glCreateFramebuffers(1, &fbo.reflected_scene);
+	glNamedFramebufferTexture(fbo.reflected_scene, GL_COLOR_ATTACHMENT0, tex.reflected_color, 0);
+	glNamedFramebufferTexture(fbo.reflected_scene, GL_DEPTH_ATTACHMENT, tex.reflected_depth, 0);
 
 	cur_w = s_w;
 	cur_h = s_h;
@@ -1206,8 +1237,6 @@ void Renderer::render_bloom_chain()
 	if (!enable_bloom.integer())
 		return;
 
-
-	glDisable(GL_CULL_FACE);
 
 	MeshBuilder mb;
 	mb.Begin();
@@ -1269,7 +1298,6 @@ void Renderer::render_bloom_chain()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	mb.Free();
-	glEnable(GL_CULL_FACE);
 
 	glCheckError();
 }
@@ -1420,7 +1448,7 @@ void Renderer::ui_render()
 
 
 	if (ui_builder.GetBaseVertex() > 0) {
-		bind_texture(ALBEDO1_LOC, building_ui_texture, GL_TEXTURE_2D);
+		bind_texture(ALBEDO1_LOC, building_ui_texture);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 	}
@@ -1464,12 +1492,12 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 	h = -h;	// adjust for coordinates
 	y = -y;
 
-	int texnum = (t) ? t->gl_id : white_texture;
+	int texnum = (t) ? t->gl_id : white_texture.gl_id;
 	float tw = (t) ? t->width : 1;
 	float th = (t) ? t->height : 1;
 
 	if (texnum != building_ui_texture && ui_builder.GetBaseVertex() > 0) {
-		bind_texture(ALBEDO1_LOC, building_ui_texture, GL_TEXTURE_2D);
+		bind_texture(ALBEDO1_LOC, building_ui_texture);
 		ui_builder.End();
 		ui_builder.Draw(GL_TRIANGLES);
 		ui_builder.Begin();
@@ -1600,18 +1628,17 @@ void Renderer::scene_draw(bool editor_mode)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, cur_w, cur_h);
-	glDisable(GL_CULL_FACE);
+
 	set_shader(S_COMBINE);
 	shader().set_mat4("Model", mat4(1));
 	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
-	if (!enable_bloom.integer()) bloom_tex = black_texture;
-	bind_texture(0, tex.scene_color, GL_TEXTURE_2D);
-	bind_texture(1, bloom_tex, GL_TEXTURE_2D);
-	bind_texture(2, lens_dirt->gl_id, GL_TEXTURE_2D);
+	if (!enable_bloom.integer()) bloom_tex = black_texture.gl_id;
+	bind_texture(0, tex.scene_color);
+	bind_texture(1, bloom_tex);
+	bind_texture(2, lens_dirt->gl_id);
 	mb.Draw(GL_TRIANGLES);
 
-	glEnable(GL_CULL_FACE);
 	mb.Begin();
 	if (draw_sv_colliders.integer()) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -1630,7 +1657,6 @@ void Renderer::scene_draw(bool editor_mode)
 		DrawCollisionWorld(eng->level);
 
 	mb.Draw(GL_LINES);
-
 
 	//game.rays.End();
 	//game.rays.Draw(GL_LINES);
@@ -1709,7 +1735,7 @@ void Renderer::DrawEntBlobShadows()
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
 	glCheckError();
 
-	bind_texture(0, eng->media.blob_shadow->gl_id, GL_TEXTURE_2D);
+	bind_texture(0, eng->media.blob_shadow->gl_id);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -1836,10 +1862,10 @@ void Renderer::set_wind_constants()
 void Renderer::set_water_constants()
 {
 	// use sampler1 for reflection map, sampler2 for the depth of the current render
-	bind_texture(ALBEDO1_LOC, tex.reflected_color, GL_TEXTURE_2D);
-	bind_texture(ROUGH1_LOC, tex.scene_depthstencil, GL_TEXTURE_2D);
-	bind_texture(NORMAL1_LOC, waternormal->gl_id, GL_TEXTURE_2D);
-	bind_texture(SPECIAL_LOC, tex.reflected_depth, GL_TEXTURE_2D);
+	bind_texture(ALBEDO1_LOC, tex.reflected_color);
+	bind_texture(ROUGH1_LOC, tex.scene_depthstencil);
+	bind_texture(NORMAL1_LOC, waternormal->gl_id);
+	bind_texture(SPECIAL_LOC, tex.reflected_depth);
 }
 
 int Renderer::get_shader_index(const Mesh& mesh, const Game_Shader& gs, bool depth_pass)
@@ -1912,8 +1938,8 @@ int Renderer::get_shader_index(const Mesh& mesh, const Game_Shader& gs, bool dep
 }
 
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
-if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id, GL_TEXTURE_2D); \
-else bind_texture(where, fallback, GL_TEXTURE_2D);
+if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id); \
+else bind_texture(where, fallback.gl_id);
 	
 void Renderer::draw_model_real_depth(const Mesh& mesh, const vector<Game_Shader*>& materials, glm::mat4 transform, const Entity* e, const Animator* a,
 	Model_Drawing_State& state)
@@ -2061,20 +2087,20 @@ void Renderer::draw_model_real(const Mesh& mesh, const vector<Game_Shader*>& mat
 			if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
 				Game_Shader* blend1 = gs->references[0];
 				Game_Shader* blend2 = gs->references[1];
-				if (blend1->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO1_LOC, blend1->images[Game_Shader::DIFFUSE]->gl_id, GL_TEXTURE_2D);
-				else bind_texture(ALBEDO1_LOC, white_texture, GL_TEXTURE_2D);
-				if (blend2->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO2_LOC, blend2->images[Game_Shader::DIFFUSE]->gl_id, GL_TEXTURE_2D);
-				else bind_texture(ALBEDO2_LOC, white_texture, GL_TEXTURE_2D);
-				if (blend1->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH1_LOC, blend1->images[Game_Shader::ROUGHNESS]->gl_id, GL_TEXTURE_2D);
-				else bind_texture(ROUGH1_LOC, white_texture, GL_TEXTURE_2D);
-				if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id, GL_TEXTURE_2D);
-				else bind_texture(ROUGH2_LOC, white_texture, GL_TEXTURE_2D);
+				if (blend1->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO1_LOC, blend1->images[Game_Shader::DIFFUSE]->gl_id);
+				else bind_texture(ALBEDO1_LOC, white_texture.gl_id);
+				if (blend2->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO2_LOC, blend2->images[Game_Shader::DIFFUSE]->gl_id);
+				else bind_texture(ALBEDO2_LOC, white_texture.gl_id);
+				if (blend1->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH1_LOC, blend1->images[Game_Shader::ROUGHNESS]->gl_id);
+				else bind_texture(ROUGH1_LOC, white_texture.gl_id);
+				if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id);
+				else bind_texture(ROUGH2_LOC, white_texture.gl_id);
 
 				if (mesh.has_tangents()) {
-					if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id, GL_TEXTURE_2D);
-					else bind_texture(NORMAL1_LOC, default_normal_texture, GL_TEXTURE_2D);
-					if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id, GL_TEXTURE_2D);
-					else bind_texture(NORMAL2_LOC, default_normal_texture, GL_TEXTURE_2D);
+					if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id);
+					else bind_texture(NORMAL1_LOC, flat_normal_texture.gl_id);
+					if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id);
+					else bind_texture(NORMAL2_LOC, flat_normal_texture.gl_id);
 				}
 
 				SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SPECIAL_LOC, white_texture);
@@ -2086,11 +2112,11 @@ void Renderer::draw_model_real(const Mesh& mesh, const vector<Game_Shader*>& mat
 				SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
 
 				if (mesh.has_tangents()) {
-					SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, default_normal_texture);
+					SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, flat_normal_texture);
 				}
 			}
 		}
-
+		
 		if (is_animated) {
 			const std::vector<mat4>& bones = a->GetBones();
 			const uint32_t bone_matrix_loc = glGetUniformLocation(shader().ID, "BoneTransform[0]");
@@ -2447,8 +2473,6 @@ void Renderer::on_level_start()
 	glDeleteTextures(1, &temp_buffer);
 
 
-	glGenBuffers(1, &scene.cubemap_ssbo);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, scene.cubemap_ssbo);
 
 	struct Cubemap_Ssbo_Struct {
 		glm::vec4 bmin;
@@ -2462,8 +2486,8 @@ void Renderer::on_level_start()
 		probes[i].probepos_priority = vec4(scene.cubemaps[i].probe_pos, scene.cubemaps[i].priority);
 	}
 
-	glBufferData(GL_SHADER_STORAGE_BUFFER, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	glCreateBuffers(1, &scene.cubemap_ssbo);
+	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
 }
 
 #include "glm/gtc/random.hpp"
@@ -2571,8 +2595,6 @@ void SSAO_System::render()
 	quad.Push2dQuad(vec2(-1, -1), vec2(2, 2));
 	quad.End();
 
-	//glDepthMask(GL_FALSE);
-	glDisable(GL_CULL_FACE);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, halfres_texture, 0);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
@@ -2630,8 +2652,8 @@ void SSAO_System::render()
 		draw.shader().set_vec2("LinMAD", LinMAD);
 		draw.shader().set_mat4("Model", mat4(1));
 		draw.shader().set_mat4("ViewProj", mat4(1));
-		draw.bind_texture(0, halfres_texture, GL_TEXTURE_2D);
-		draw.bind_texture(1, draw.tex.scene_depthstencil, GL_TEXTURE_2D);
+		draw.bind_texture(0, halfres_texture);
+		draw.bind_texture(1, draw.tex.scene_depthstencil);
 		quad.Draw(GL_TRIANGLES);
 
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres2, 0);
@@ -2642,15 +2664,12 @@ void SSAO_System::render()
 		draw.shader().set_vec2("LinMAD", LinMAD);
 		draw.shader().set_mat4("Model", mat4(1));
 		draw.shader().set_mat4("ViewProj", mat4(1));
-		draw.bind_texture(0, fullres1, GL_TEXTURE_2D);
-		draw.bind_texture(1, draw.tex.scene_depthstencil, GL_TEXTURE_2D);
+		draw.bind_texture(0, fullres1);
+		draw.bind_texture(1, draw.tex.scene_depthstencil);
 		quad.Draw(GL_TRIANGLES);
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH_TEST);
-	//glDepthMask(GL_TRUE);
 	glCheckError();
 
 	quad.Free();
