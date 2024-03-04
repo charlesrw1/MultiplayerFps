@@ -354,6 +354,8 @@ public:
 		S_HBAO, S_XBLUR, S_YBLUR,	// hbao shaders
 		S_SSAO,
 
+		S_MDI_TESTING,
+
 
 		NUM_NON_MODEL_SHADERS,
 	};

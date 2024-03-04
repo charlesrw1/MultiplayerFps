@@ -500,6 +500,8 @@ void Renderer::reload_shaders()
 
 
 
+	Shader::compile(&shader_list[S_MDI_TESTING], "SimpleMeshV.txt", "UnlitF.txt");
+
 
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.lightcalc, "VfogScatteringC.txt");
@@ -1738,6 +1740,78 @@ void Renderer::extract_objects()
 	shared.build_draw_calls();
 }
 
+typedef  struct {
+	GLuint  count;
+	GLuint  primCount;
+	GLuint  firstIndex;
+	GLint   baseVertex;
+	GLuint  baseInstance;
+} DrawElementsIndirectCommand;
+
+
+int num_batches_to_render = 2;
+int num_prims_per_batch = 5;
+
+void mdi_test_imgui()
+{
+	ImGui::SliderInt("batches", &num_batches_to_render, 0, 20);
+	ImGui::SliderInt("prims", &num_prims_per_batch, 0, 20);
+}
+
+void multidraw_testing()
+{
+	static bool has_initialized = false;
+	static uint32_t mdi_buffer;
+	static uint32_t mdi_buffer2;
+	static uint32_t mdi_command_buffer;
+	static Model* sphere;
+	if (!has_initialized) {
+		glCreateBuffers(1, &mdi_buffer);
+		vector<int> a(1000);
+		for (int i = 0; i < 1000; i++)a[i] = i;
+		glNamedBufferStorage(mdi_buffer, 1000 * 4, a.data(), GL_DYNAMIC_STORAGE_BIT);
+		sphere = mods.find_or_load("sphere.glb");
+
+		vector<glm::mat4> mats(1000);
+		for (int i = 0; i < 1000; i++)
+			mats[i] = glm::translate(glm::mat4(1), glm::vec3((float)i, float(i % 10), float(i / 10)));
+		glCreateBuffers(1, &mdi_buffer2);
+		glNamedBufferStorage(mdi_buffer2, 1000 * sizeof(glm::mat4), mats.data(), GL_DYNAMIC_STORAGE_BIT);
+
+		glCreateBuffers(1, &mdi_command_buffer);
+		
+		Debug_Interface::get()->add_hook("mdi testing", mdi_test_imgui);
+
+		has_initialized = true;
+	}
+
+	vector<DrawElementsIndirectCommand> commands;
+
+	for (int i = 0; i < num_batches_to_render; i++) {
+		DrawElementsIndirectCommand cmd;
+		cmd.baseInstance = i* num_prims_per_batch;
+		cmd.baseVertex = sphere->mesh.parts[0].base_vertex + sphere->mesh.merged_vert_offset;
+		cmd.count = sphere->mesh.parts[0].element_count;
+		cmd.firstIndex = sphere->mesh.parts[0].element_offset + sphere->mesh.merged_index_pointer;
+		cmd.firstIndex /= 2; 
+		cmd.primCount = num_prims_per_batch;
+
+		commands.push_back(cmd);
+	}
+
+
+	glNamedBufferData(mdi_command_buffer, sizeof(DrawElementsIndirectCommand)*commands.size(),commands.data(), GL_DYNAMIC_DRAW);
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buffer2);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, mdi_buffer);
+
+	draw.set_shader(draw.S_MDI_TESTING);
+
+	glBindVertexArray(sphere->mesh.vao);
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, mdi_command_buffer);
+	glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, (void*)0, commands.size(), sizeof(DrawElementsIndirectCommand));
+}
+
 #include "EditorDoc.h"
 void Renderer::scene_draw(bool editor_mode)
 {
@@ -1834,8 +1908,12 @@ void Renderer::scene_draw(bool editor_mode)
 
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
+	multidraw_testing();
+
 	DrawEntBlobShadows();
 	eng->local.pm.draw_particles();
+
+
 
 	set_shader(S_SIMPLE);
 	shader().set_mat4("ViewProj", vs.viewproj);
