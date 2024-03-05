@@ -38,6 +38,9 @@ struct Texture
 	bool is_loaded_in_memory = false;
 	bool is_float = false;
 	uint32_t gl_id = 0;
+
+	bool is_resident = false;
+	uint64_t bindless_handle = 0;
 };
 
 enum Material_Alpha_Mode

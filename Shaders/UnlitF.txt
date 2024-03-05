@@ -1,13 +1,23 @@
-#version 430 core
+#version 460 core
+
+#extension GL_ARB_bindless_texture : require
+
 in vec3 FS_IN_FragPos;
 in vec3 FS_IN_Normal;
 in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_ColorHash;
 out vec4 FS_OUT_Color;
 
+in uint FS_IN_DrawID;
 
+
+layout (binding = 3, std140)  readonly buffer bindless_images {
+	uvec4 imghandles[];
+};
 
 void main()
 {
-	FS_OUT_Color = vec4(FS_IN_Texcoord.ggg,1);
+	//vec4 color = texture(uvec2(imghandles.x,imghandles.y), FS_IN_Texcoord);
+
+	FS_OUT_Color = vec4(0,1,0,1);
 }

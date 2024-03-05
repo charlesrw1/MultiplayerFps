@@ -2013,13 +2013,6 @@ void multidraw_testing()
 	glDepthMask(GL_TRUE);
 
 	static bool has_initialized = false;
-	static uint32_t mdi_buffer;
-	static uint32_t mdi_buffer2;
-	static uint32_t mdi_command_buffer;
-
-	static uint32_t mdi_buffer_storage;
-	static uint32_t mdi_buffer2_storage;
-	static uint32_t mdi_command_buffer_storage;
 
 	static Model* spherelod0;
 	static Model* spherelod1;
@@ -2041,12 +2034,23 @@ void multidraw_testing()
 				}
 			}
 		}
+		Texture* textures[5];
+		textures[0] = mats.find_texture("dumb/123.jpg");
+		textures[1] = mats.find_texture("dumb/1640458309791.jpg");
+		textures[2] = mats.find_texture("dumb/1646062318546.jpg");
+		textures[3] = mats.find_texture("dumb/1674915612177470.jpg");
+		textures[4] = mats.find_texture("dumb/1675880726829067.jpg");
+
 		// persistent mapped
 		{
-			mdi_buffer_pm.init(sizeof(int) * MAX_DRAW_CALLS);
-			int* data = (int*)mdi_buffer_pm.wait_and_get_write_ptr();
-			for (int i = 0; i < MAX_DRAW_CALLS; i++) data[i] = i;
-			mdi_buffer_pm.lock_current_range();
+			//Random r(23);
+			//mdi_buffer_pm.init(sizeof(glm::uvec4) * MAX_DRAW_CALLS);
+			//glm::uvec4* data = (glm::uvec4*)mdi_buffer_pm.wait_and_get_write_ptr();
+			//for (int i = 0; i < MAX_DRAW_CALLS; i++) {
+			//	Texture* t = textures[r.RandI(0, 5)];
+			//	data[i] = glm::uvec4(t->bindless_handle & UINT32_MAX, t->bindless_handle >> 32,0, 0);
+			//}
+			//mdi_buffer_pm.lock_current_range();
 
 			mdi_buffer2_pm.init(sizeof(glm::mat4) * MAX_DRAW_CALLS);
 			glm::mat4* mats = (glm::mat4*)mdi_buffer2_pm.wait_and_get_write_ptr();
@@ -2055,30 +2059,6 @@ void multidraw_testing()
 			mdi_buffer2_pm.lock_current_range();
 
 			mdi_command_buf_pm.init(MAX_DRAW_CALLS * sizeof(DrawElementsIndirectCommand));
-		}
-		// immutable buffer storage
-		{
-			glCreateBuffers(1, &mdi_buffer_storage);
-			glCreateBuffers(1, &mdi_buffer2_storage);
-			glCreateBuffers(1, &mdi_command_buffer_storage);
-
-			glNamedBufferStorage(mdi_buffer_storage, MAX_DRAW_CALLS * sizeof(int), nullptr, GL_DYNAMIC_STORAGE_BIT);
-			glNamedBufferStorage(mdi_buffer2_storage, MAX_DRAW_CALLS * sizeof(glm::mat4), nullptr, GL_DYNAMIC_STORAGE_BIT);
-			glNamedBufferStorage(mdi_command_buffer_storage, MAX_DRAW_CALLS * sizeof(DrawElementsIndirectCommand), nullptr, GL_DYNAMIC_STORAGE_BIT);
-		
-			vector<int> a(MAX_DRAW_CALLS);
-			for (int i = 0; i < MAX_DRAW_CALLS; i++)a[i] = i;
-			glNamedBufferSubData(mdi_buffer_storage, 0, sizeof(int) * MAX_DRAW_CALLS, a.data());
-		}
-		// basic buffer
-		{
-			glCreateBuffers(1, &mdi_buffer);
-			vector<int> a(MAX_DRAW_CALLS);
-			for (int i = 0; i < MAX_DRAW_CALLS; i++)a[i] = i;
-			glNamedBufferData(mdi_buffer, MAX_DRAW_CALLS * 4, a.data(), GL_DYNAMIC_DRAW);
-
-			glCreateBuffers(1, &mdi_buffer2);
-			glCreateBuffers(1, &mdi_command_buffer);
 		}
 
 		Shader::compile(&naiveshader, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE");
@@ -2108,7 +2088,7 @@ void multidraw_testing()
 		}
 
 	}
-	else if (use_persistent_mapped) {
+	else {
 		glm::mat4* mats = (glm::mat4*)mdi_buffer2_pm.wait_and_get_write_ptr();
 		for (int i = 0; i < matricies.size(); i++)
 			mats[i] = matricies[i];
@@ -2136,57 +2116,6 @@ void multidraw_testing()
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, mdi_command_buf_pm.get_handle());
 
 		glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, (void*)mdi_command_buf_pm.get_offset(), num_commands, sizeof(DrawElementsIndirectCommand));
-	}
-	else if (use_storage) {
-		glNamedBufferSubData(mdi_buffer2_storage, 0, MAX_DRAW_CALLS * sizeof(glm::mat4), matricies.data());
-		static vector<DrawElementsIndirectCommand> commands;
-		commands.clear();
-		for (int i = 0; i < num_batches_to_render; i++) {
-			DrawElementsIndirectCommand cmd;
-			cmd.baseInstance = i * num_prims_per_batch;
-			cmd.baseVertex = sphere->mesh.parts[0].base_vertex + sphere->mesh.merged_vert_offset;
-			cmd.count = sphere->mesh.parts[0].element_count;
-			cmd.firstIndex = sphere->mesh.parts[0].element_offset + sphere->mesh.merged_index_pointer;
-			cmd.firstIndex /= 2;
-			cmd.primCount = num_prims_per_batch;
-			commands.push_back(cmd);
-		}
-		glNamedBufferSubData(mdi_command_buffer_storage,0, sizeof(DrawElementsIndirectCommand) * commands.size(), commands.data());
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buffer2_storage);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, mdi_buffer_storage);
-		draw.set_shader(draw.S_MDI_TESTING);
-
-		glBindVertexArray(sphere->mesh.vao);
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, mdi_command_buffer_storage);
-
-		glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, (void*)0, commands.size(), sizeof(DrawElementsIndirectCommand));
-	}
-	else {
-		glNamedBufferData(mdi_buffer2,MAX_DRAW_CALLS * sizeof(glm::mat4), matricies.data(), GL_DYNAMIC_DRAW);
-
-		static vector<DrawElementsIndirectCommand> commands;
-		commands.clear();
-		for (int i = 0; i < num_batches_to_render; i++) {
-			DrawElementsIndirectCommand cmd;
-			cmd.baseInstance = i * num_prims_per_batch;
-			cmd.baseVertex = sphere->mesh.parts[0].base_vertex + sphere->mesh.merged_vert_offset;
-			cmd.count = sphere->mesh.parts[0].element_count;
-			cmd.firstIndex = sphere->mesh.parts[0].element_offset + sphere->mesh.merged_index_pointer;
-			cmd.firstIndex /= 2;
-			cmd.primCount = num_prims_per_batch;
-			commands.push_back(cmd);
-		}
-		glNamedBufferData(mdi_command_buffer, sizeof(DrawElementsIndirectCommand) * commands.size(), commands.data(), GL_DYNAMIC_DRAW);
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buffer2);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, mdi_buffer);
-		draw.set_shader(draw.S_MDI_TESTING);
-
-		glBindVertexArray(sphere->mesh.vao);
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, mdi_command_buffer);
-
-		glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, (void*)0, commands.size(), sizeof(DrawElementsIndirectCommand));
 	}
 	draw.stats.tris_drawn = sphere->mesh.parts[0].element_count * num_batches_to_render * num_prims_per_batch / 3;
 }

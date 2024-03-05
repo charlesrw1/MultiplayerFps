@@ -170,7 +170,7 @@ Game_Shader* Game_Material_Manager::find_for_name(const char* name)
 					if (s->images[i] && !s->images[i]->is_loaded_in_memory) {
 						bool good = load_texture(s->images[i]->name, s->images[i]);
 						if (!good) {
-							// memory leak here pretty much fixme
+							// memory leak here pretty much FIXME
 							s->images[i] = nullptr;
 						}
 					}
@@ -519,6 +519,10 @@ bool Game_Material_Manager::load_texture(const std::string& path, Texture* t)
 		return false;
 	}
 	t->is_loaded_in_memory = true;
+
+	//t->bindless_handle = glGetTextureHandleARB(t->gl_id);
+	//glMakeTextureHandleResidentARB(t->bindless_handle);
+
 	return true;
 }
 
