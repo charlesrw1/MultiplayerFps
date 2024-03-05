@@ -5,7 +5,9 @@ in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_ColorHash;
 out vec4 FS_OUT_Color;
 
+
+
 void main()
 {
-	FS_OUT_Color = vec4(FS_IN_ColorHash,1);
+	FS_OUT_Color = vec4(FS_IN_Texcoord.ggg,1);
 }

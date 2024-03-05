@@ -185,6 +185,9 @@ Game_Shader* Game_Material_Manager::find_for_name(const char* name)
 void Game_Material_Manager::init()
 {
 	sys_print("Material Manager initialized\n");
+
+
+	
 }
 
 

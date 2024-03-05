@@ -1,0 +1,83 @@
+#version 460 core
+
+layout (local_size_x = 256) in;
+
+struct Render_Object
+{
+	mat4 transform;
+	vec4 origin_and_radius;
+	int animation_start;
+	float padding1;
+	float padding2;
+	float padding3;
+	vec4 color_param;
+};
+
+struct DrawElementsIndirectCommand
+{
+	uint count;
+	uint primcount;
+	uint firstindex;
+	int basevertex;
+	uint baseinstance;
+};
+
+struct DrawCall
+{
+	int obj_data_index;
+	int mat_data_index;
+	int draw_call_command_index;
+	int padding;
+};
+
+struct Culling_Data_Ubo
+{
+	mat4 view;
+	mat4 proj;
+	float frustum[4];
+	float znear;
+	float zfar;
+	int num_calls;
+	int enable_culling;
+};
+
+layout (binding = 0, std140) uniform Culling_Data_Buffer {
+	Culling_Data_Ubo cull_data;
+};
+
+layout (binding = 1, std140) readonly buffer Render_Object_Buffer {
+	Render_Object data[];
+}render_objs;
+
+layout(binding = 2, std140) buffer DrawElementsIndirectCommand_Buffer {
+	DrawElementsIndirectCommand data[];
+}indirect_calls;
+
+layout(binding = 3, std140) readonly buffer DrawCall_Buffer {
+	DrawCall data[];
+}draw_calls;
+
+layout(binding = 4, std140) buffer Indirect_Dc_Buffer {
+	uint data[];
+}final_indirection;
+
+void main()
+{
+	uint gID = gl_GlobalInvocationID.x;
+	
+	if(gID < cull_data.num_calls)
+	{
+		uint objectID = draw_calls.data[gID].obj_data_index;
+		bool visible = true;
+		
+		if(visible)
+		{
+			uint indirect_call = draw_calls.data[gID].draw_call_command_index;
+			uint count_index = atomicAdd(indirect_calls.data[indirect_call].primcount, 1);
+
+			uint instanceIndex = indirect_calls.data[indirect_call].baseinstance + count_index;
+
+			final_indirection.data[instanceIndex] = objectID;
+		}
+	}
+}

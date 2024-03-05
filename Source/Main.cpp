@@ -1364,8 +1364,27 @@ void Game_Engine::game_update_tick()
 	}
 }
 
+void perf_tracker()
+{
+	static std::vector<float> time(200,0.f);
+	static int index = 0;
+	time.at(index) = eng->frame_time;
+	index = index + 1;
+	index %= 200;
+
+	float avg_ft = 0.f;
+	for (int i = 0; i < time.size(); i++)avg_ft += time.at(i);
+	avg_ft /= 200.f;
+
+	ImGui::Text("Frametime: %f", avg_ft*1000.f);
+
+}
+
+
 void Game_Engine::loop()
 {
+	Debug_Interface::get()->add_hook("Frametime", perf_tracker);
+
 	double last = GetTime() - 0.1;
 
 	for (;;)
