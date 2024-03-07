@@ -1,6 +1,6 @@
 #version 460 core
 
-#extension GL_ARB_bindless_texture : require
+//#extension GL_ARB_bindless_texture : require
 
 in vec3 FS_IN_FragPos;
 in vec3 FS_IN_Normal;
@@ -8,8 +8,39 @@ in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_ColorHash;
 out vec4 FS_OUT_Color;
 
-in uint FS_IN_DrawID;
+flat in uint FS_IN_DrawID;
 
+struct Ubo_View_Constants_Struct
+{
+	mat4 view;
+	mat4 viewproj;
+	mat4 invview;
+	mat4 invproj;
+	vec4 viewpos_time;
+	vec4 viewfront;
+	vec4 viewport_size;
+
+	float near;
+	float far;
+	float shadowmap_epsilon;
+	float padding1;
+	
+	vec4 fogcolor;
+	vec4 fogparams;
+	vec4 directional_light_dir_and_used;
+	vec4 directional_light_color;
+	
+	float numcubemaps;
+	float numlights;
+	float forcecubemap;
+	float padding2;
+	
+	vec4 custom_clip_plane;
+};
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
 
 layout (binding = 3, std140)  readonly buffer bindless_images {
 	uvec4 imghandles[];
@@ -17,7 +48,16 @@ layout (binding = 3, std140)  readonly buffer bindless_images {
 
 void main()
 {
-	//vec4 color = texture(uvec2(imghandles.x,imghandles.y), FS_IN_Texcoord);
+	vec3 v = normalize(FS_IN_FragPos -  g.viewpos_time.xyz);
+	vec3 n = normalize(FS_IN_Normal);
+	float ndotv = max(dot(n, -v), 0.0);
 
-	FS_OUT_Color = vec4(0,1,0,1);
+	uvec2 img_handle = uvec2(imghandles[FS_IN_DrawID].x,imghandles[FS_IN_DrawID].y);
+
+
+	
+	//vec4 color = texture(sampler2D(img_handle),FS_IN_Texcoord);
+
+	//FS_OUT_Color = vec4(FS_IN_ColorHash.rgbb);
+	FS_OUT_Color = vec4(FS_IN_ColorHash*ndotv,1);
 }

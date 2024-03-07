@@ -403,6 +403,9 @@ static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 {
 	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
+	int x_real = x;
+	int y_real = y;
+
 	GLenum type;
 	GLenum internal_format;
 	GLenum format;
@@ -416,6 +419,7 @@ static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 	}
 
 	glTextureStorage2D(output->gl_id, get_mip_map_count(x,y), internal_format, x, y);
+	assert(x == x_real && y == y_real);
 	if (compressed)
 		glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
 	else
@@ -502,6 +506,7 @@ bool Game_Material_Manager::load_texture(const std::string& path, Texture* t)
 	else {
 		stbi_set_flip_vertically_on_load(false);
 		data = stbi_load_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
+		printf("%d %d\n", x, y);
 		is_float = false;
 	}
 	Files::close(f);

@@ -87,6 +87,12 @@ for matfile in matfiles:
                 if tokens:
                     if tokens[0] in IMAGE_DECL:
                         images.append((tokens[0],tokens[1].replace('"','')))
+                    elif tokens[0] == "pbr_full":
+                        images.append(("albedo", tokens[1]+"_albedo.png" ))
+                        images.append(("normal", tokens[1]+"_normal-ogl.png" ))
+                        images.append(("ao", tokens[1]+"_ao.png" ))
+                        images.append(("rough", tokens[1]+"_roughness.png" ))
+                        images.append(("metal", tokens[1]+"_metallic.png" ))
                     elif tokens[0] == "alpha":
                         alphamode = tokens[1]
 

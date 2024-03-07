@@ -1808,6 +1808,7 @@ struct Culling_Data_Ubo
 	int enable_culling;
 };
 
+
 class Persistently_Mapped_Buffer
 {
 public:
@@ -1890,6 +1891,29 @@ public:
 	uint32_t buffer = 0;
 };
 
+// Initialization: 
+// 
+// final_draw_calls is initialized to all the possible meshes of the objects
+//	on cpu: set element offset, element count, vertex base
+// 
+// obj_data is initialized and updated to the objects in the scene
+// 
+// draw_calls are created once when the ObjLevelData is created and aren't 
+// changed unless a material change happens or the obj is deleted
+// 
+// draw_call_indirection is set to the size of draw_calls
+//
+// Per frame:
+// gpu culling executes for each draw call, performs frustum/hi-z (with two pass system later)
+// then, it runs a compaction parallel prefix whatever sum on the final_draw_calls, which should compact them and remove 0 draw call meshes
+// next, it fills the draw_call_indirection buffer
+// the draw_call_indirection buffer is used when drawing an object by indexing it with baseinstance_id + instance_id
+// this then gives you an integer indexinto the draw_calls structure
+//
+// so to fill out this draw_call_indirection buffer, the gpu needs to set the baseinstance_id + instance_offset location of 
+// the indirection buffer to the index of the draw_call
+// since the parallel prefix sum was done, each DrawElementsIndirectCommand now has the correct baseinstance_id
+
 struct Mesh_Pass_Mdi
 {
 	vector<High_Level_Render_Object> high_level_objs;
@@ -1904,31 +1928,15 @@ struct Mesh_Pass_Mdi
 	Gpu_Buf<uint32_t> draw_call_indirection;
 	Gpu_Buf<DrawElementsIndirectCommand> final_draw_calls;
 
+	// draw element indirect commands
+	Persistently_Mapped_Buffer dei_cmds;
+	// draw call objects
+	Persistently_Mapped_Buffer drawcalls;
+	uint32_t drawid_to_obj;
+
+
 
 	uint32_t culling_data_ubo;
-
-	// Initialization: 
-	// 
-	// final_draw_calls is initialized to all the possible meshes of the objects
-	//	on cpu: set element offset, element count, vertex base
-	// 
-	// obj_data is initialized and updated to the objects in the scene
-	// 
-	// draw_calls are created once when the ObjLevelData is created and aren't 
-	// changed unless a material change happens or the obj is deleted
-	// 
-	// draw_call_indirection is set to the size of draw_calls
-	//
-	// Per frame:
-	// gpu culling executes for each draw call, performs frustum/hi-z (with two pass system later)
-	// then, it runs a compaction parallel prefix whatever sum on the final_draw_calls, which should compact them and remove 0 draw call meshes
-	// next, it fills the draw_call_indirection buffer
-	// the draw_call_indirection buffer is used when drawing an object by indexing it with baseinstance_id + instance_id
-	// this then gives you an integer indexinto the draw_calls structure
-	//
-	// so to fill out this draw_call_indirection buffer, the gpu needs to set the baseinstance_id + instance_offset location of 
-	// the indirection buffer to the index of the draw_call
-	// since the parallel prefix sum was done, each DrawElementsIndirectCommand now has the correct baseinstance_id
 
 
 	int add_object(Mesh* mesh, Game_Shader* mat, glm::mat4 transform) {
@@ -1988,9 +1996,10 @@ bool use_simple_sphere = false;
 int num_batches_to_render = 2;
 int num_prims_per_batch = 5;
 bool use_persistent_mapped = true;
-static const int MAX_OBJECTS = 100'000;
+static const int MAX_OBJECTS = 27'000;
 bool mdi_naive = false;
 bool use_storage = false;
+bool wireframe_mdi = false;
 void mdi_test_imgui()
 {
 	ImGui::DragInt("batches", &num_batches_to_render, 1.f,0, 1000);
@@ -1999,12 +2008,15 @@ void mdi_test_imgui()
 	ImGui::Checkbox("storage", &use_storage);
 	ImGui::Checkbox("naive", &mdi_naive);
 	ImGui::Checkbox("simple_sphere", &use_simple_sphere);
+	ImGui::Checkbox("wireframe", &wireframe_mdi);
 
 	if (num_batches_to_render * num_prims_per_batch > MAX_OBJECTS) {
 		num_prims_per_batch = MAX_OBJECTS /num_batches_to_render;
 	}
 }
 
+extern bool use_32_bit_indicies;
+#include "Meshlet.h"
 void multidraw_testing()
 {
 	GPUFUNCTIONSTART;
@@ -2024,33 +2036,36 @@ void multidraw_testing()
 
 	static vector<glm::mat4> matricies;
 
+	static Chunked_Model* meshlet_model;
+
 	if (!has_initialized) {
 
-		for (int y = 0; y < 100; y++) {
-			for (int z = 0; z < 100; z++) {
-				for (int x = 0; x < 10; x++) {
-					matricies.push_back(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f));
+		meshlet_model = get_chunked_mod("monkey.glb");
+
+		for (int y = 0; y < 30; y++) {
+			for (int z = 0; z < 30; z++) {
+				for (int x = 0; x < 30; x++) {
+					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.5)));
 
 				}
 			}
 		}
-		Texture* textures[5];
+		Texture* textures[4];
 		textures[0] = mats.find_texture("dumb/123.jpg");
-		textures[1] = mats.find_texture("dumb/1640458309791.jpg");
+		textures[1] = mats.find_texture("dumb/1675880726829067.jpg");
 		textures[2] = mats.find_texture("dumb/1646062318546.jpg");
 		textures[3] = mats.find_texture("dumb/1674915612177470.jpg");
-		textures[4] = mats.find_texture("dumb/1675880726829067.jpg");
 
 		// persistent mapped
 		{
-			//Random r(23);
-			//mdi_buffer_pm.init(sizeof(glm::uvec4) * MAX_DRAW_CALLS);
-			//glm::uvec4* data = (glm::uvec4*)mdi_buffer_pm.wait_and_get_write_ptr();
-			//for (int i = 0; i < MAX_DRAW_CALLS; i++) {
-			//	Texture* t = textures[r.RandI(0, 5)];
-			//	data[i] = glm::uvec4(t->bindless_handle & UINT32_MAX, t->bindless_handle >> 32,0, 0);
-			//}
-			//mdi_buffer_pm.lock_current_range();
+			Random r(23);
+			mdi_buffer_pm.init(sizeof(glm::uvec4) * MAX_DRAW_CALLS);
+			glm::uvec4* data = (glm::uvec4*)mdi_buffer_pm.wait_and_get_write_ptr();
+			for (int i = 0; i < MAX_DRAW_CALLS; i++) {
+				Texture* t = textures[r.RandI(0, 3)];
+				data[i] = glm::uvec4(t->bindless_handle & UINT32_MAX, t->bindless_handle >> 32,0, 0);
+			}
+			mdi_buffer_pm.lock_current_range();
 
 			mdi_buffer2_pm.init(sizeof(glm::mat4) * MAX_DRAW_CALLS);
 			glm::mat4* mats = (glm::mat4*)mdi_buffer2_pm.wait_and_get_write_ptr();
@@ -2063,7 +2078,7 @@ void multidraw_testing()
 
 		Shader::compile(&naiveshader, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE");
 
-		spherelod0 = mods.find_or_load("sphere.glb");
+		spherelod0 = mods.find_or_load("monkey.glb");
 		spherelod1 = mods.find_or_load("spherelod1.glb");
 		Debug_Interface::get()->add_hook("mdi testing", mdi_test_imgui);
 		has_initialized = true;
@@ -2073,26 +2088,53 @@ void multidraw_testing()
 
 	Model* sphere = (use_simple_sphere) ? spherelod1 : spherelod0;
 
-
+	GLenum index_type = (use_32_bit_indicies) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	bool meshlet = true;
 	if (mdi_naive) {
 
 		naiveshader.use();
-		glBindVertexArray(sphere->mesh.vao);
-		int base_vertex = sphere->mesh.parts[0].base_vertex + sphere->mesh.merged_vert_offset;
-		int count = sphere->mesh.parts[0].element_count;
-		int first_index = sphere->mesh.parts[0].element_offset + sphere->mesh.merged_index_pointer;
-		for (int i = 0; i < num_batches_to_render*num_prims_per_batch; i++) {
-			naiveshader.set_mat4("model", matricies[i]);
-			naiveshader.set_int("integer", i);
-			glDrawElementsBaseVertex(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, (void*)first_index, base_vertex);
+
+		mdi_buffer_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 3);
+		if (!meshlet) {
+			glBindVertexArray(sphere->mesh.vao);
+			int base_vertex = sphere->mesh.parts[0].base_vertex + sphere->mesh.merged_vert_offset;
+			int count = sphere->mesh.parts[0].element_count;
+			int first_index = sphere->mesh.parts[0].element_offset + sphere->mesh.merged_index_pointer;
+			for (int i = 0; i < num_batches_to_render * num_prims_per_batch; i++) {
+				naiveshader.set_mat4("model", matricies[i]);
+				naiveshader.set_int("integer", i);
+				glDrawElementsBaseVertex(GL_TRIANGLES, count, index_type, (void*)first_index, base_vertex);
+			}
+		}
+		else {
+			glBindVertexArray(meshlet_model->vao);
+
+			if (wireframe_mdi)
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+			for (int i = 0; i < num_batches_to_render * num_prims_per_batch; i++) {
+				naiveshader.set_mat4("model", matricies[i]);
+
+				Submesh& submesh = meshlet_model->model->mesh.parts[0];
+				Mesh& orgmesh = meshlet_model->model->mesh;
+				for (int j = 0; j < meshlet_model->chunks.size(); j++) {
+					naiveshader.set_int("integer", j);
+					Chunk& chunk = meshlet_model->chunks[j];
+
+					int base_vertex = submesh.base_vertex + orgmesh.merged_vert_offset;
+					int count = chunk.index_count;
+					int first_index = chunk.index_offset;
+					
+					glDrawElementsBaseVertex(GL_TRIANGLES, count, index_type, (void*)first_index, base_vertex);
+				}
+			}
+
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
 		}
 
 	}
 	else {
-		glm::mat4* mats = (glm::mat4*)mdi_buffer2_pm.wait_and_get_write_ptr();
-		for (int i = 0; i < matricies.size(); i++)
-			mats[i] = matricies[i];
-		mdi_buffer2_pm.lock_current_range();
 
 		DrawElementsIndirectCommand* cmds =  (DrawElementsIndirectCommand*)mdi_command_buf_pm.wait_and_get_write_ptr();
 		int num_commands = num_batches_to_render;
@@ -2102,7 +2144,7 @@ void multidraw_testing()
 			cmd.baseVertex = sphere->mesh.parts[0].base_vertex + sphere->mesh.merged_vert_offset;
 			cmd.count = sphere->mesh.parts[0].element_count;
 			cmd.firstIndex = sphere->mesh.parts[0].element_offset + sphere->mesh.merged_index_pointer;
-			cmd.firstIndex /= 2;
+			cmd.firstIndex /= (use_32_bit_indicies)?4:2;
 			cmd.primCount = num_prims_per_batch;
 		}
 		mdi_command_buf_pm.lock_current_range();
@@ -2115,10 +2157,11 @@ void multidraw_testing()
 		
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, mdi_command_buf_pm.get_handle());
 
-		glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, (void*)mdi_command_buf_pm.get_offset(), num_commands, sizeof(DrawElementsIndirectCommand));
+		glMultiDrawElementsIndirect(GL_TRIANGLES, index_type, (void*)mdi_command_buf_pm.get_offset(), num_commands, sizeof(DrawElementsIndirectCommand));
 	}
 	draw.stats.tris_drawn = sphere->mesh.parts[0].element_count * num_batches_to_render * num_prims_per_batch / 3;
 }
+
 
 #include "EditorDoc.h"
 void Renderer::scene_draw(bool editor_mode)
@@ -2139,7 +2182,7 @@ void Renderer::scene_draw(bool editor_mode)
 	else
 		current_frame_main_view = eng->local.last_view;
 
-	if (editor_mode || enable_vsync.integer())
+	if (enable_vsync.integer())
 		SDL_GL_SetSwapInterval(1);
 	else
 		SDL_GL_SetSwapInterval(0);
@@ -2152,68 +2195,75 @@ void Renderer::scene_draw(bool editor_mode)
 	if (editor_mode)
 		eng->eddoc->scene_draw_callback();
 
-	extract_objects();
+	if (!editor_mode) {
+		extract_objects();
 
-	shadowmap.update();
+		shadowmap.update();
 
-	//volfog.compute();
+		//volfog.compute();
 
-	// depth prepass
-	{
-		GPUSCOPESTART("Depth prepass");
-		Render_Level_Params params;
-		params.output_framebuffer = fbo.scene;
-		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::DEPTH;
-		params.upload_constants = false;
-		params.provied_constant_buffer = ubo.current_frame;
-		params.draw_viewmodel = true;
-		render_level_to_target(params);
+		// depth prepass
+		{
+			GPUSCOPESTART("Depth prepass");
+			Render_Level_Params params;
+			params.output_framebuffer = fbo.scene;
+			params.view = current_frame_main_view;
+			params.pass = Render_Level_Params::DEPTH;
+			params.upload_constants = false;
+			params.provied_constant_buffer = ubo.current_frame;
+			params.draw_viewmodel = true;
+			render_level_to_target(params);
+		}
+
+		// render ssao using prepass buffer
+		if (enable_ssao.integer())
+			ssao.render();
+
+		// planar reflection render
+		{
+			GPUSCOPESTART("Planar reflection");
+			planar_reflection_pass();
+		}
+
+		// main level render
+		{
+			GPUSCOPESTART("Main level render opaques");
+			Render_Level_Params params;
+			params.output_framebuffer = fbo.scene;
+			params.view = current_frame_main_view;
+			params.pass = Render_Level_Params::OPAQUE;
+			params.clear_framebuffer = false;
+			params.upload_constants = true;
+			params.provied_constant_buffer = ubo.current_frame;
+			params.draw_viewmodel = true;
+
+			glDepthMask(GL_FALSE);
+			glDepthFunc(GL_EQUAL);
+			render_level_to_target(params);
+			glDepthFunc(GL_LESS);
+			glDepthMask(GL_TRUE);
+		}
+		{
+			GPUSCOPESTART("Main level translucents");
+			Render_Level_Params params;
+			params.output_framebuffer = fbo.scene;
+			params.view = current_frame_main_view;
+			params.pass = Render_Level_Params::TRANSLUCENT;
+			params.clear_framebuffer = false;
+			params.upload_constants = true;
+			params.provied_constant_buffer = ubo.current_frame;
+			params.draw_viewmodel = true;
+			glDepthMask(GL_FALSE);
+			render_level_to_target(params);
+			glDepthMask(GL_TRUE);
+		}
 	}
-
-	// render ssao using prepass buffer
-	if (enable_ssao.integer())
-		ssao.render();
-
-	// planar reflection render
-	{
-		GPUSCOPESTART("Planar reflection");
-		planar_reflection_pass();
+	else {
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
+		glDisable(GL_BLEND);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
-
-	// main level render
-	{
-		GPUSCOPESTART("Main level render opaques");
-		Render_Level_Params params;
-		params.output_framebuffer = fbo.scene;
-		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::OPAQUE;
-		params.clear_framebuffer = false;
-		params.upload_constants = true;
-		params.provied_constant_buffer = ubo.current_frame;
-		params.draw_viewmodel = true;
-
-		glDepthMask(GL_FALSE);
-		glDepthFunc(GL_EQUAL);
-		render_level_to_target(params);
-		glDepthFunc(GL_LESS);
-		glDepthMask(GL_TRUE);
-	}
-	{
-		GPUSCOPESTART("Main level translucents");
-		Render_Level_Params params;
-		params.output_framebuffer = fbo.scene;
-		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::TRANSLUCENT;
-		params.clear_framebuffer = false;
-		params.upload_constants = true;
-		params.provied_constant_buffer = ubo.current_frame;
-		params.draw_viewmodel = true;
-		glDepthMask(GL_FALSE);
-		render_level_to_target(params);
-		glDepthMask(GL_TRUE);
-	}
-
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	multidraw_testing();
@@ -2577,10 +2627,12 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 		glBindVertexArray(dc.mesh->vao);
 		state.current_vao = dc.mesh->vao;
 	}
+	GLenum index_type = (use_32_bit_indicies) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+
 	glDrawElementsBaseVertex(
 		GL_TRIANGLES,
 		mp.element_count,
-		GL_UNSIGNED_SHORT,
+		index_type,
 		(void*)(dc.mesh->merged_index_pointer + mp.element_offset),
 		dc.mesh->merged_vert_offset + mp.base_vertex
 	);

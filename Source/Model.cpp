@@ -212,7 +212,8 @@ Format_Descriptor vertex_attribute_formats[MAX_ATTRIBUTES] =
 	Format_Descriptor(CT_FLOAT, 2, false),		// uv2
 	Format_Descriptor(CT_S16, 3, true) // tangent
 };
-Format_Descriptor index_attribute_format = Format_Descriptor(CT_U16, 1, false);
+Format_Descriptor index_attribute_format = Format_Descriptor(CT_U32, 1, false);
+bool use_32_bit_indicies = true;
 
 class Vertex_Descriptor
 {

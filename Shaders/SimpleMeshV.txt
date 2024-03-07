@@ -9,7 +9,7 @@ out vec3 FS_IN_Normal;
 out vec2 FS_IN_Texcoord;
 out vec3 FS_IN_ColorHash;
 out vec4 FS_IN_NDC;
-out uint FS_IN_Drawid;
+flat out uint FS_IN_DrawID;
 
 vec3 randColor(int number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
@@ -62,6 +62,8 @@ layout (binding = 2, std140) readonly buffer matricies_obj {
 void main()
 {
 #ifdef NAIVE
+	FS_IN_DrawID = integer % 4;
+
 	FS_IN_ColorHash = randColor(integer);
 	vec4 local_pos = model*vec4(VS_IN_Postion,1.0);
 	vec3 local_normal = VS_IN_Normal;
@@ -71,7 +73,7 @@ void main()
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
 #else
-//	FS_IN_Drawid = gl_DrawID;
+	FS_IN_DrawID = gl_DrawID;
 
 	FS_IN_ColorHash = randColor(gl_InstanceID);
 	vec4 local_pos = matricies[gl_BaseInstance + gl_InstanceID]*vec4(VS_IN_Postion,1.0);

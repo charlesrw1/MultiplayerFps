@@ -1,0 +1,42 @@
+algorithm:
+
+input list of drawcalls that are sorted by mesh!
+
+first compute pass:
+cull each instance, if it survives, increment mesh.surving_count, and set indirect_buffer[mesh.first_instance + mesh.surviving_count] = this_obj_index
+
+second compute pass:
+parallel prefix sum pass on all meshes to output new first index of mesh cluster taking into account num clusters in each mesh
+
+third comptute pass:
+for each cluster in mesh:
+	use globalinvocation id to index into buffer to get obj_index and cluster_index, load cluster data and cull
+	
+	
+MESHES + draw calls are sorted when sent to gpu for culling
+instances dont have to be sorted!
+
+the loop goes like this:
+	find visibile parts for current granularity
+	increment counter, save out indirect index
+	
+	then:
+	partial sum over all counters to their "start location"
+	repeat
+	
+Instance 1: mesh 0
+Instance 2: mesh 0
+Instance 3: mesh 2
+Instance 4: mesh 2
+Instance 5: mesh 1
+
+Then:
+mesh 0 lod 0: start = 0
+mesh 0 lod 1: start = 2 (since mesh 0 lod 0 can have 2 total max)
+mesh 1 lod 0: start = 4
+mesh 1 lod 1: start = 5
+mesh 1 lod 2: start = 6
+mesh 2 lod 0: start = 7
+
+
+

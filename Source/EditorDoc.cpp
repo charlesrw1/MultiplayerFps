@@ -564,9 +564,10 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 
 void EditorDoc::update()
 {
-	if (eng->game_focused) {
-		int x, y;
-		SDL_GetRelativeMouseState(&x, &y);
+	{
+		int x=0, y=0;
+		if(eng->game_focused)
+			SDL_GetRelativeMouseState(&x, &y);
 		camera.update_from_input(eng->keys, x, y);
 	}
 	View_Setup setup;
@@ -786,6 +787,12 @@ void EditorDoc::imgui_draw()
 	uint32_t flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
 	if (ImGui::Begin("EdDoc",nullptr, flags))
 	{
+
+		ImGui::DragFloat3("cam pos", &camera.position.x);
+		ImGui::DragFloat("cam pitch", &camera.pitch);
+		ImGui::DragFloat("cam yaw", &camera.yaw);
+
+
 		uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
         if (ImGui::BeginTable("Entity list",1, ent_list_flags, ImVec2(0, 300.f), 0.f))
         {

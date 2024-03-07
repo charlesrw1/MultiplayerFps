@@ -155,6 +155,9 @@ public:
 	void compact_memory();
 	void print_usage();
 
+
+
+
 	struct Gpu_Buffer {
 		uint32_t handle = 0;
 		uint32_t allocated = 0;
