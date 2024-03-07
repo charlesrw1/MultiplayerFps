@@ -1,8 +1,9 @@
-#version 460 core
+
 layout (location = 0) in vec3 VS_IN_Postion;
 layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
 
+#include "SharedGpuTypes.txt"
 
 out vec3 FS_IN_FragPos;
 out vec3 FS_IN_Normal;
@@ -14,34 +15,6 @@ flat out uint FS_IN_DrawID;
 vec3 randColor(int number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
 }
-
-struct Ubo_View_Constants_Struct
-{
-	mat4 view;
-	mat4 viewproj;
-	mat4 invview;
-	mat4 invproj;
-	vec4 viewpos_time;
-	vec4 viewfront;
-	vec4 viewport_size;
-
-	float near;
-	float far;
-	float shadowmap_epsilon;
-	float padding1;
-	
-	vec4 fogcolor;
-	vec4 fogparams;
-	vec4 directional_light_dir_and_used;
-	vec4 directional_light_color;
-	
-	float numcubemaps;
-	float numlights;
-	float forcecubemap;
-	float padding2;
-	
-	vec4 custom_clip_plane;
-};
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;

@@ -1,4 +1,3 @@
-#version 430 core
 
 #ifdef ALPHATEST
 in vec2 FS_IN_Texcoord;

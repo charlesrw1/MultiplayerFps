@@ -1,4 +1,4 @@
-#version 430 core
+
 layout (location = 0) in vec3 VS_IN_Postion;
 
 out vec3 FS_IN_Fragpos;

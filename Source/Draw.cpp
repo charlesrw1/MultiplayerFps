@@ -492,10 +492,10 @@ void Renderer::reload_shaders()
 	shader().set_int("scene_depth", 0);
 	shader().set_int("noise_texture", 1);
 	set_shader(S_XBLUR);
-	shader().set_int("input", 0);
+	shader().set_int("input_img", 0);
 	shader().set_int("scene_depth", 1);
 	set_shader(S_YBLUR);
-	shader().set_int("input", 0);
+	shader().set_int("input_img", 0);
 	shader().set_int("scene_depth", 1);
 
 
@@ -532,27 +532,7 @@ void Renderer::reload_shaders()
 	glUseProgram(0);
 }
 
-struct Ubo_View_Constants_Struct
-{
-	glm::mat4 view;
-	glm::mat4 viewproj;
-	glm::mat4 invview;
-	glm::mat4 invproj;
-	glm::vec4 viewpos_time;
-	glm::vec4 viewfront;
-	glm::vec4 viewport_size;
-
-	glm::vec4 near_far_epsilon;
-	
-	glm::vec4 fogcolor;
-	glm::vec4 fogparams;
-	glm::vec4 directional_light_dir_and_used;
-	glm::vec4 directional_light_color;
-
-	glm::vec4 ncubemaps_nlights_forcecubemap;
-
-	glm::vec4 custom_clip_plane;
-};
+#include "../Shaders/SharedGpuTypes.txt";
 
 void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane)
 {
@@ -565,7 +545,9 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
 
-	constants.near_far_epsilon = vec4(vs.near, vs.far, shadowmap.epsilon, 0.0);
+	constants.near = vs.near;
+	constants.far = vs.far;
+	constants.shadowmap_epsilon = shadowmap.epsilon;
 
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
@@ -579,11 +561,12 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	else
 		constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
 
-	constants.ncubemaps_nlights_forcecubemap = vec4(scene.cubemaps.size(), scene.lights.size(), 0, 0);
+	constants.numcubemaps = scene.cubemaps.size();
+	constants.numlights = scene.lights.size();
 	if (using_skybox_for_specular)
-		constants.ncubemaps_nlights_forcecubemap.z = 0.0;
+		constants.forcecubemap = 0.0;
 	else
-		constants.ncubemaps_nlights_forcecubemap.z = -1.0;
+		constants.forcecubemap = -1.0;
 
 	constants.custom_clip_plane = custom_clip_plane;
 
@@ -2046,10 +2029,11 @@ void multidraw_testing()
 			for (int z = 0; z < 30; z++) {
 				for (int x = 0; x < 30; x++) {
 					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.5)));
-
 				}
 			}
 		}
+
+
 		Texture* textures[4];
 		textures[0] = mats.find_texture("dumb/123.jpg");
 		textures[1] = mats.find_texture("dumb/1675880726829067.jpg");

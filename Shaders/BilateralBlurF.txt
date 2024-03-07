@@ -1,6 +1,6 @@
-#version 330
 
-uniform sampler2D input;
+
+uniform sampler2D input_img;
 uniform sampler2D scene_depth;
 
 uniform vec2 InvFullRes = 1.0 / vec2(1024.0, 768.0);
@@ -27,7 +27,7 @@ vec2 SampleAOZ(vec2 uv)
 {
 	vec2 outaoz = vec2(0.0);
 	vec2 ruv = FS_IN_TexCoord+uv*InvFullRes;
-	outaoz.x = texture(input, ruv).r;
+	outaoz.x = texture(input_img, ruv).r;
 	outaoz.y = ViewSpaceZFromDepth(texture(scene_depth, ruv).r);
 
     return outaoz;

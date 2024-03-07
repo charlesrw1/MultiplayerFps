@@ -1,4 +1,4 @@
-#version 430 core
+
 
 // from learnopengl, from infinity ward
 

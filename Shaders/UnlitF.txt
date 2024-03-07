@@ -1,4 +1,5 @@
-#version 460 core
+
+#include "SharedGpuTypes.txt"
 
 //#extension GL_ARB_bindless_texture : require
 
@@ -8,35 +9,11 @@ in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_ColorHash;
 out vec4 FS_OUT_Color;
 
+
 flat in uint FS_IN_DrawID;
 
-struct Ubo_View_Constants_Struct
-{
-	mat4 view;
-	mat4 viewproj;
-	mat4 invview;
-	mat4 invproj;
-	vec4 viewpos_time;
-	vec4 viewfront;
-	vec4 viewport_size;
 
-	float near;
-	float far;
-	float shadowmap_epsilon;
-	float padding1;
-	
-	vec4 fogcolor;
-	vec4 fogparams;
-	vec4 directional_light_dir_and_used;
-	vec4 directional_light_color;
-	
-	float numcubemaps;
-	float numlights;
-	float forcecubemap;
-	float padding2;
-	
-	vec4 custom_clip_plane;
-};
+
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;

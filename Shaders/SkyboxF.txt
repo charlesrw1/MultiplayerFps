@@ -1,4 +1,3 @@
-#version 430 core
 
 out vec3 FS_OUT_Color;
 in vec3 FS_IN_Fragpos;

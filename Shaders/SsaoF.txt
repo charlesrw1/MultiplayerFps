@@ -3,7 +3,6 @@
 // This is a HBAO-Shader for OpenGL, based upon nvidias directX implementation
 // supplied in their SampleSDK available from nvidia.com
 
-#version 430
 
 uniform sampler2D noise_texture;
 uniform sampler2D scene_depth;

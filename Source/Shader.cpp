@@ -18,9 +18,15 @@ static bool read_and_add_recursive(std::string filepath, std::string& text)
 		printf("ERROR: Couldn't open path %s\n", filepath.c_str());
 		return false;
 	}
+
+	text += "#line 0 \"";
+	text += filepath;
+	text += "\"\n";
+
 	std::string line;
-	while (std::getline(infile, line))
-	{
+	int linenum = 1;
+	while (std::getline(infile, line)) {
+
 		size_t pos = line.find(INCLUDE_SPECIFIER);
 		if (pos == std::string::npos)
 			text.append(line + '\n');
@@ -36,7 +42,16 @@ static bool read_and_add_recursive(std::string filepath, std::string& text)
 				return false;
 			}
 			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text);
+
+			text += "#line ";
+			text += std::to_string(linenum);
+			text += " \"";
+			text += filepath;
+			text += "\"\n";
 		}
+
+
+		linenum++;
 	}
 
 	return true;
@@ -55,15 +70,12 @@ static std::string get_definess_with_directive(std::string& defines)
 }
 static std::string get_source(const char* path, const std::string& defines)
 {
-	std::string source;
+	std::string source = "#version 460 core\n";;
+	source += defines;
 	bool result = read_and_add_recursive(path, source);
 	if (!result) {
 		return {};
 	}
-	size_t version_line = source.find("#version");
-	version_line = source.find('\n', version_line);
-	source.insert(version_line + 1, defines);
-
 	return source;
 }
 static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, char* error_buf, int error_buf_size)
@@ -146,23 +158,13 @@ ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, s
 
 	char infolog[512];
 	int success = 0;
-	std::string compute_source;
-	bool result = read_and_add_recursive(compute_path, compute_source);
-	if (!result) {
+	std::string defines_with_directive = get_definess_with_directive(shader_defines);
+	std::string compute_source = get_source(compute_path, defines_with_directive);
+
+	if (compute_source.empty()) {
+		printf("Parse fail %s %s\n", compute_source.c_str());
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
-
-	std::stringstream ss(shader_defines);
-	std::string temp_define;
-	std::string defines_with_directive;
-	while (std::getline(ss, temp_define, ',')) {
-		defines_with_directive.append("#define " + temp_define + '\n');
-	}
-	size_t version_line = compute_source.find("#version");
-	version_line = compute_source.find('\n', version_line);
-	compute_source.insert(version_line + 1, defines_with_directive);
-
-
 
 	const char* source_c = compute_source.c_str();
 	uint32_t compute = glCreateShader(GL_COMPUTE_SHADER);
