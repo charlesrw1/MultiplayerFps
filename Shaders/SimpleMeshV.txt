@@ -28,7 +28,7 @@ uniform int integer;
 layout(binding = 2, std140) readonly buffer matricies_obj {
 	mat4 matricies[];
 };
-layout(binding = 4, std140) readonly buffer indirects_buffer {
+layout(binding = 4, std430) readonly buffer indirects_buffer {
 	int indirects[];
 };
 #endif// NAIVE2
@@ -43,7 +43,7 @@ layout (binding = 2, std140) readonly buffer matricies_obj {
 layout (binding = 2, std140) readonly buffer matricies_obj {
 	mat4 matricies[];
 };
-layout(binding = 4, std140) readonly buffer indirects_buffer {
+layout(binding = 4, std430) readonly buffer indirects_buffer {
 	int indirects[];
 };
 #endif

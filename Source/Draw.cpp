@@ -457,6 +457,8 @@ static Shader meshlet_meshlet_cull;
 static Shader naiveshader;
 static Shader naiveshader2;
 static Shader mdi_meshlet_cull_shader;
+static Shader mdi_meshlet_zero_bufs;
+
 
 void Renderer::reload_shaders()
 {
@@ -471,6 +473,7 @@ void Renderer::reload_shaders()
 	Shader::compute_compile(&meshlet_meshlet_cull, "Meshlets/meshlets.txt", "MESHLET_CULLING");
 	Shader::compute_compile(&meshlet_reset_pre_inst, "Meshlets/reset.txt", "RESET_PRE_INSTANCES");
 	Shader::compute_compile(&meshlet_reset_post_inst, "Meshlets/reset.txt", "RESET_POST_INSTANCES");
+	Shader::compute_compile(&mdi_meshlet_zero_bufs, "Meshlets/zerobuf.txt");
 
 	// meshbuilder shaders
 	Shader::compile(&shader_list[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
@@ -2287,6 +2290,11 @@ void multidraw_testing()
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, chunk_buffer);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, drawid_to_instance_buffer);
 
+		mdi_meshlet_zero_bufs.use();
+		glDispatchCompute(100, 1, 1);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+
 		meshlet_reset_pre_inst.use();	// reset the prefix sum buffer
 		glDispatchCompute(1, 1, 1);
 
@@ -2334,7 +2342,7 @@ void multidraw_testing()
 		mdi_buffer2_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 2);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, drawid_to_instance_buffer);
 
-		int draw_call_count = meshlet_model->chunks.size();
+		int draw_call_count = OBJECTS_TO_RENDER*meshlet_model->chunks.size();
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, draw_elements_indirect_buffer);
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
@@ -2343,6 +2351,7 @@ void multidraw_testing()
 			draw_call_count,
 			sizeof(gpu::DrawElementsIndirectCommand)
 		);
+
 	}
 	else if (mdi_modes == MDI_MESHLETS_CULLING_DYNAMIC_INDEX) {
 

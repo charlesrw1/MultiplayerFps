@@ -1,5 +1,5 @@
-#extension GL_NV_shader_atomic_int64 : require
-#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_NV_shader_atomic_int64 : enable
+#extension GL_ARB_gpu_shader_int64 : enable
 layout(local_size_x = 1, local_size_y=1,local_size_z=1) in;
 
 #include "SharedGpuTypes.txt"
@@ -8,8 +8,7 @@ layout(local_size_x = 1, local_size_y=1,local_size_z=1) in;
 #ifdef RESET_PRE_INSTANCES
 void main()
 {
-	buf.counter = 0;
-	buf.item_counter = 0;
+	buf.counter = int64_t(0);
 	num_indirect_calls.x = 0;
 }
 #endif // RESET_PRE_INSTANCES
@@ -18,11 +17,10 @@ void main()
 
 void main()
 {
-	dispatch_indirect.num_groups_x =  (buf.counter == 0)? 1 : (buf.counter-1)/64 + 1;
+	dispatch_indirect.num_groups_x =  (uint(buf.counter) == 0)? 1 : (uint(buf.counter)-1)/64 + 1;
 	dispatch_indirect.num_groups_y = 1;
 	dispatch_indirect.num_groups_z = 1;
 
 }
 
 #endif // RESET_POST_INSTANCES
-

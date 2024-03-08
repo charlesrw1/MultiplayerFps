@@ -27,7 +27,7 @@ void main()
 {
 	vec3 v = normalize(FS_IN_FragPos -  g.viewpos_time.xyz);
 	vec3 n = normalize(FS_IN_Normal);
-	float ndotv = max(dot(n, -v), 0.0);
+	float ndotv = max(dot(n, -v), 0.4);
 
 	uvec2 img_handle = uvec2(imghandles[FS_IN_DrawID].x,imghandles[FS_IN_DrawID].y);
 

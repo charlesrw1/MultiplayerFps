@@ -21,8 +21,7 @@ struct Instance
 };
 
 layout(binding = 1, std430) buffer PrefixSumBuffer {
-    uint counter;
-	uint item_counter;
+	int64_t counter;
 	uint padding2;
 	uint padding3;
     PrefixSumValue values[];

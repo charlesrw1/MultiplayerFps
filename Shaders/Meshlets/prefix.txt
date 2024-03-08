@@ -3,17 +3,18 @@ void prefix_sum_inclusive_append(
     uint index_,
     uint value
 ) {
-	uint buffer_index = atomicAdd(buf.item_counter, 1);
-    uint sum_and_counter = atomicAdd(buf.counter, value);
+	int64_t upper_bits_one = int64_t(1) << int64_t(32);
+    int64_t sum_and_counter = atomicAdd(buf.counter, int64_t( int64_t(value) | upper_bits_one ));
+    uint buffer_index = uint(sum_and_counter >> 32);
 
     buf.values[buffer_index].index_ = index_;
     // Add the current value to make in inclusive rather than exclusive.
-    buf.values[buffer_index].sum = sum_and_counter + value;
+    buf.values[buffer_index].sum = uint(sum_and_counter) + value;
 }
 
 PrefixSumValue prefix_sum_binary_search(uint target) {
 
-    uint count = buf.item_counter;
+    uint count = uint(buf.counter >> 32);
     uint first = 0;
     while (count > 0) {
         uint step_ = (count / 2);
