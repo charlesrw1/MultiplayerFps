@@ -116,3 +116,8 @@ void main()
 }
 
 #endif // MESHLET_CULLING
+
+#ifdef TRI_CULLING
+
+
+#endif // TRI_CULLING

@@ -19,7 +19,7 @@ uniform vec2 AORes = vec2(1024.0, 768.0);
 uniform vec2 InvAORes = vec2(1.0/1024.0, 1.0/768.0);
 uniform vec2 NoiseScale = vec2(1024.0, 768.0) / 4.0;
 
-uniform float AOStrength = 1.9;
+uniform float AOStrength = 1.0;
 uniform float R = 0.3;
 uniform float R2 = 0.3*0.3;
 uniform float NegInvR2 = - 1.0 / (0.3*0.3);

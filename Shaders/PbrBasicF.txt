@@ -545,7 +545,7 @@ void main()
 	//\\FS_OUT_Color = vec4(1,0,0,0);
 	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
 	//FS_OUT_Color = vec4(N,1.0);
-	//FS_OUT_Color = vec4(specular_color,1.0);
+	FS_OUT_Color = vec4(get_ao());
 
 #endif
 //#endif

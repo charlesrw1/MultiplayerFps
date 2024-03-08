@@ -27,6 +27,13 @@ layout(binding = 1, std430) buffer PrefixSumBuffer {
     PrefixSumValue values[];
 }buf;
 
+layout(binding = 11, std430) buffer PrefixSumBuffer_ForFinalTris {
+	int64_t counter;
+	uint padding2;
+	uint padding3;
+    PrefixSumValue values[];
+}buf_2;
+
 layout(binding = 8, std430) buffer Indirect_Dispatch_Buffer {
 	DispatchIndirectCommand dispatch_indirect;
 };

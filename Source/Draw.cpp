@@ -519,6 +519,7 @@ void Renderer::reload_shaders()
 
 	// Ssao shaders
 	Shader::compile(&shader_list[S_SSAO], "MbTexturedV.txt", "SsaoLOGF.txt");
+	Shader::compile(&shader_list[S_HBAO], "MbTexturedV.txt", "HbaoF.txt");
 	Shader::compile(&shader_list[S_XBLUR], "MbTexturedV.txt", "BilateralBlurF.txt");
 	Shader::compile(&shader_list[S_YBLUR], "MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
 	set_shader(S_SSAO);
@@ -530,6 +531,9 @@ void Renderer::reload_shaders()
 	set_shader(S_YBLUR);
 	shader().set_int("input_img", 0);
 	shader().set_int("scene_depth", 1);
+	set_shader(S_HBAO);
+	shader().set_int("scene_depth", 0);
+	shader().set_int("noise_texture", 1);
 
 
 
@@ -2132,7 +2136,6 @@ void multidraw_testing()
 	static Persistently_Mapped_Buffer mdi_command_buf_pm;
 	static Persistently_Mapped_Buffer integer_to_obj;
 
-
 	static uint32_t chunk_buffer;
 	static uint32_t drawid_to_instance_buffer;
 	static uint32_t compute_indirect_buffer;
@@ -2160,7 +2163,7 @@ void multidraw_testing()
 		for (int y = 0; y < 10; y++) {
 			for (int z = 0; z < 10; z++) {
 				for (int x = 0; x < 10; x++) {
-					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.5)));
+					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.2)));
 				}
 			}
 		}
@@ -3221,9 +3224,28 @@ float ourLerp(float a, float b, float f)
 {
 	return a + f * (b - a);
 }
+
+
+static float hbao_radius = 0.3f;
+static int hbao_dirs = 6;
+static int hbao_samples = 4;
+static float hbao_max_radius_pixels = 50.f;
+
+void draw_hbao_menu()
+{
+	ImGui::DragFloat("radius", &hbao_radius, 0.05, 0.f);
+	ImGui::DragInt("dirs", &hbao_dirs, 1.f, 0);
+	ImGui::DragInt("samples", &hbao_samples, 1.f, 0);
+	ImGui::DragFloat("rad pixels", &hbao_max_radius_pixels, 1.f, 0);
+}
+
+static const int NOISE_RES = 4;
+
 #include <random>
 void SSAO_System::init()
 {
+	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
+
 	glGenFramebuffers(1, &fbo);
 
 	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
@@ -3243,19 +3265,41 @@ void SSAO_System::init()
 	}
 
 
-	std::vector<glm::vec3> ssaoNoise;
-	for (unsigned int i = 0; i < 16; i++)
-	{
-		glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
-		ssaoNoise.push_back(noise);
+	//std::vector<glm::vec3> ssaoNoise;
+	//for (unsigned int i = 0; i < 16; i++)
+	//{
+	//	glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
+	//	ssaoNoise.push_back(noise);
+	//}
+	//glGenTextures(1, &noise_tex2);
+	//glBindTexture(GL_TEXTURE_2D, noise_tex2);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glCreateTextures(GL_TEXTURE_2D,1, &noise_tex2);
+	glTextureStorage2D(noise_tex2, 1, GL_RGBA16F, NOISE_RES, NOISE_RES);
+	vector<vec4> floats(NOISE_RES*NOISE_RES);
+	for (int y = 0; y < NOISE_RES; y++) {
+		for (int x = 0; x < NOISE_RES; x++) {
+			vec2 xy = glm::circularRand(1.0f);
+			float z = glm::linearRand(0.0f, 1.0f);
+			float w = glm::linearRand(0.0f, 1.0f);
+			floats[y * NOISE_RES + x] = glm::vec4(
+				xy.x,
+				xy.y,
+				z,
+				w
+			);
+		}
 	}
-	glGenTextures(1, &noise_tex2);
-	glBindTexture(GL_TEXTURE_2D, noise_tex2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTextureSubImage2D(noise_tex2, 0, 0, 0, NOISE_RES, NOISE_RES, GL_RGBA, GL_FLOAT, floats.data());
+	glTextureParameteri(noise_tex2, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(noise_tex2, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(noise_tex2, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTextureParameteri(noise_tex2, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 }
 
@@ -3304,6 +3348,7 @@ void SSAO_System::make_render_targets()
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
 
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -3313,7 +3358,6 @@ void SSAO_System::render()
 
 	if (width != eng->window_w.integer() || height != eng->window_h.integer())
 		make_render_targets();
-
 
 	MeshBuilder quad;
 	quad.Begin();
@@ -3325,7 +3369,9 @@ void SSAO_System::render()
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	glViewport(0, 0, width/res_scale, height/res_scale);
 
-	draw.set_shader(Renderer::S_SSAO);
+	//draw.set_shader(Renderer::S_SSAO);
+
+	draw.set_shader(Renderer::S_HBAO);
 
 	draw.shader().set_mat4("Model", mat4(1));
 	draw.shader().set_mat4("ViewProj", mat4(1));
@@ -3338,36 +3384,46 @@ void SSAO_System::render()
 
 	vec2 LinMAD;
 	vec2 ao_res = vec2(width/(res_scale), height/(res_scale));
-	//ao_res = glm::floor(ao_res);
 	vec2 inv_res = 1.f / ao_res;
 	float ao_aspect_ratio = ao_res.x / ao_res.y;
-
-
 	float near = draw.vs.near, far = draw.vs.far;
 	LinMAD[0] = (near - far) / (2.0f * near * far);
 	LinMAD[1] = (near + far) / (2.0f * near * far);
 
+	vec2 FocalLen = glm::vec2(
+		1.f / tanf(fovRad * 0.5) / ao_aspect_ratio,
+		1.f / tanf(fovRad * 0.5)
+	);
+	vec2 InvFocalLen = 1.0f / FocalLen;
+	vec2 UvToViewA = glm::vec2(
+		-2.0f * InvFocalLen.x,
+		-2.0f * InvFocalLen.y
+	);
+	vec2 UvToViewB = glm::vec2(
+		1.0f * InvFocalLen.x,
+		1.0f * InvFocalLen.y
+	);
+	vec2 noise_scale = ao_res / vec2(NOISE_RES);
+	float radius = hbao_radius;
+	float radius2 = radius * radius;
+	float invradius2 = 1.f / radius2;
 
-
+	draw.shader().set_vec2("FocalLen", FocalLen);
 	draw.shader().set_vec2("AORes", ao_res);
 	draw.shader().set_vec2("InvAORes", inv_res);
-
-	vec2 noise_scale = ao_res / vec2(4.f);
-
+	draw.shader().set_vec2("UvToViewA", UvToViewA);
+	draw.shader().set_vec2("UvToViewB", UvToViewB);
+	draw.shader().set_vec2("LinMAD", LinMAD);
+	draw.shader().set_float("R", radius);
+	draw.shader().set_float("R2", radius2);
+	draw.shader().set_float("NegInvR2", -invradius2);
 	draw.shader().set_vec2("NoiseScale", noise_scale);
-
-	draw.shader().set_mat4("projection", draw.vs.proj);
-		//float aspect = (width / res_scale) / float(height / res_scale);
-		//glm::mat4 newproj = glm::perspective(draw.vs.fov, aspect, draw.vs.near, draw.vs.far);
-
-	draw.shader().set_mat4("invprojection", glm::inverse(draw.vs.proj));
-
-	uint32_t id = draw.shader_list[Renderer::S_SSAO].ID;
-	uint32_t loc = glGetUniformLocation(id, "samples[0]");
-	for (int j = 0; j < 64; j++)
-		glUniform3f(loc+j, samples[j].x, samples[j].y, samples[j].z);
-
+	draw.shader().set_int("NumDirections", hbao_dirs);
+	draw.shader().set_int("NumSamples", hbao_samples);
+	draw.shader().set_float("MaxRadiusPixels", hbao_max_radius_pixels);
 	quad.Draw(GL_TRIANGLES);
+
+
 	if (1) {
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres1, 0);
 		glViewport(0, 0, width, height);
