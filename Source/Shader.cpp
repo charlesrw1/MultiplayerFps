@@ -101,7 +101,8 @@ ShaderResult Shader::compile(
 	std::string shader_defines
 )
 {
-	glDeleteShader(shader->ID);
+	if(shader->ID!=0)
+		glDeleteProgram(shader->ID);
 	shader->ID = 0;
 
 	std::string defines_with_directive = get_definess_with_directive(shader_defines);
@@ -153,7 +154,8 @@ ShaderResult Shader::compile(
 
 ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, std::string shader_defines)
 {
-	glDeleteShader(shader->ID);
+	if(shader->ID!=0)
+		glDeleteProgram(shader->ID);
 	shader->ID = 0;
 
 	char infolog[512];
@@ -162,7 +164,7 @@ ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, s
 	std::string compute_source = get_source(compute_path, defines_with_directive);
 
 	if (compute_source.empty()) {
-		printf("Parse fail %s %s\n", compute_source.c_str());
+		printf("Parse fail %s\n", compute_source.c_str());
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
 

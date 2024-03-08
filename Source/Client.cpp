@@ -128,6 +128,39 @@ Move_Command& Client::get_command(int sequence) {
 	return commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
 
+struct Player_Net_Vars
+{
+	int type;
+	glm::vec3 position;
+	glm::vec3 angles;
+	int flags;
+	int state;
+	int anim_num;
+	float anim_frame;
+};
+
+struct Object_Net_Vars
+{
+	int type;
+	glm::vec3 position;
+	glm::vec3 rotation;
+	int flags;
+	int state;
+	int anim_num;
+	float anim_frame;
+};
+
+void set_player_vars_from_net()
+{
+
+}
+
+void set_entity_vars_from_net()
+{
+	
+}
+
+
 void Client::run_prediction()
 {
 	if (get_state() != CS_SPAWNED)

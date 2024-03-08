@@ -22,39 +22,69 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 #ifdef NAIVE
 uniform mat4 model;
 uniform int integer;
-#else
+#endif // NAIVE
 
+#ifdef NAIVE2
+layout(binding = 2, std140) readonly buffer matricies_obj {
+	mat4 matricies[];
+};
+layout(binding = 4, std140) readonly buffer indirects_buffer {
+	int indirects[];
+};
+#endif// NAIVE2
+
+#ifdef MDI
 layout (binding = 2, std140) readonly buffer matricies_obj {
 	mat4 matricies[];
 };
+#endif	// MDI
 
+#ifdef MDICULL
+layout (binding = 2, std140) readonly buffer matricies_obj {
+	mat4 matricies[];
+};
+layout(binding = 4, std140) readonly buffer indirects_buffer {
+	int indirects[];
+};
 #endif
-
 
 
 void main()
 {
 #ifdef NAIVE
 	FS_IN_DrawID = integer % 4;
-
 	FS_IN_ColorHash = randColor(integer);
 	vec4 local_pos = model*vec4(VS_IN_Postion,1.0);
 	vec3 local_normal = VS_IN_Normal;
-	FS_IN_FragPos = local_pos.xyz;
-	FS_IN_Normal = local_normal;
-    FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
-	gl_Position = FS_IN_NDC;
-	FS_IN_Texcoord = VS_IN_TexCoord;
-#else
-	FS_IN_DrawID = gl_DrawID;
+#endif	// NAIVE	
 
+#ifdef MDICULL
+	FS_IN_DrawID = gl_DrawID % 4;
+	int indirect = indirects[gl_DrawID];
+	FS_IN_ColorHash = randColor(indirect);
+	mat4 model = matricies[indirect];
+	vec4 local_pos = model*vec4(VS_IN_Postion,1.0);
+	vec3 local_normal = VS_IN_Normal;
+#endif
+
+
+#ifdef NAIVE2
+	FS_IN_DrawID = gl_DrawID % 4;//indirects[gl_BaseInstance + gl_InstanceID];
+	FS_IN_ColorHash = randColor(gl_DrawID);
+	vec4 local_pos = matricies[gl_InstanceID]*vec4(VS_IN_Postion,1.0);
+	vec3 local_normal = VS_IN_Normal;
+#endif// NAIVE2
+
+#ifdef MDI
+	FS_IN_DrawID = gl_DrawID;
 	FS_IN_ColorHash = randColor(gl_InstanceID);
 	vec4 local_pos = matricies[gl_BaseInstance + gl_InstanceID]*vec4(VS_IN_Postion,1.0);
 	vec3 local_normal = VS_IN_Normal;
+#endif	// MDI
+
 	FS_IN_FragPos = local_pos.xyz;
 	FS_IN_Normal = local_normal;
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
-#endif
 }

@@ -3,6 +3,7 @@
 
 #ifdef IS_CPLUSPLUS
 using namespace glm;
+typedef uint32_t uint;
 #endif
 
 struct Ubo_View_Constants_Struct
@@ -32,5 +33,33 @@ struct Ubo_View_Constants_Struct
 	
 	vec4 custom_clip_plane;
 };
+
+struct DispatchIndirectCommand 
+{
+	uint  num_groups_x;
+	uint  num_groups_y;
+	uint  num_groups_z;
+};
+
+struct DrawElementsIndirectCommand 
+{
+	uint count;
+	uint primCount;
+	uint firstIndex;
+	int  baseVertex;
+	uint baseInstance;
+};
+
+struct Chunk 
+{
+    vec4 cone_apex;
+    vec4 cone_axis_cutoff;
+    vec4 bounding_sphere;
+    uint index_offset;
+    uint index_count;
+	uint padding1;
+	uint padding2;
+};
+
 
 #endif

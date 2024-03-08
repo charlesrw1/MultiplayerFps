@@ -1,0 +1,27 @@
+
+void prefix_sum_inclusive_append(
+    uint index_,
+    uint value
+) {
+	uint buffer_index = atomicAdd(buf.item_counter, 1);
+    uint sum_and_counter = atomicAdd(buf.counter, value);
+
+    buf.values[buffer_index].index_ = index_;
+    // Add the current value to make in inclusive rather than exclusive.
+    buf.values[buffer_index].sum = sum_and_counter + value;
+}
+
+PrefixSumValue prefix_sum_binary_search(uint target) {
+
+    uint count = buf.item_counter;
+    uint first = 0;
+    while (count > 0) {
+        uint step_ = (count / 2);
+        uint current = first + step_;
+        bool greater = target >= buf.values[current].sum;
+		first = (greater)?current+1:first;
+		count = (greater)?count-(step_+1):step_;
+    }
+    return buf.values[first];
+}
+

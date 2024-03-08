@@ -1,8 +1,8 @@
 #ifndef __khrplatform_h_
 #define __khrplatform_h_
 
-/*
 
+/*
 ** Copyright (c) 2008-2018 The Khronos Group Inc.
 **
 ** Permission is hereby granted, free of charge, to any person obtaining a

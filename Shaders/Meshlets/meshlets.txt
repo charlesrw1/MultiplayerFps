@@ -1,70 +1,61 @@
-
+#extension GL_NV_shader_atomic_int64 : require
 
 layout(local_size_x = 64, local_size_y=1,local_size_z=1) in;
 
-struct DrawElementsIndirectCommand
-{
-	uint count;
-	uint primcount;
-	uint firstindex;
-	int basevertex;
-	uint baseinstance;
-};
+#include "SharedGpuTypes.txt"
+#include "Meshlets/meshlet_shared.txt"
+#include "Meshlets/prefix.txt"
 
 
-struct Chunk {
-    vec4 cone_apex;
-    vec4 cone_axis_cutoff;
-    vec4 bounding_sphere;
-    uint triangle_offset;
-    uint index_offset;
-    uint triangle_count;
-    uint index_count;
-};
-
-struct Chunk_Args
-{
-	uint chunk_idx;
-	uint inst_idx;
-};
-
-layout(binding = 2, std140) buffer DrawElementsIndirectCommand_Buffer {
-	DrawElementsIndirectCommand indirect_calls[];
-};
-
-layout(binding = 3, std140) readonly buffer Meshlet_BUffer {
-	Chunk chunks[];
-};
-
-layout(binding = 7, std140) readonly buffer Index_Buffer {
-	uint index_buffer[];
-};
-
-layout(binding = 4, std140) buffer {
-	uint out_indicies[];
-};
-
-layout(binding = 5, std140) buffer {
-	uint index_to_inst[];
-};
-
-layout(binding = 6, std140) buffer {
-	uint num_chunk_args;
-	Chunk_Args chunk_args[];
-};
-
-uniform uint num_instances = 0;
+uniform int num_instances = 0;
 
 // first pass: expand chunks for instances
 
 // second pass: append to out_indicies
 
+uniform int meshlets_in_mesh = 0;
+uniform int mesh_basevertex = 0;
+
+#ifdef INSTANCE_CULLING
+void main()
+{
+	uint id = gl_GlobalInvocationID.x;
+
+	if(id >= num_instances)
+		return;
+	
+	Instance instance = instances[id];
+	
+	prefix_sum_inclusive_append(id, meshlets_in_mesh);
+}
+#endif // INSTANCE_CULLING
+
+#ifdef MESHLET_CULLING
 
 void main()
 {
-	if(gl_GlobalInvocationID.x >= num_instances)
+	uint id = gl_GlobalInvocationID.x;
+	
+	if(id >= buf.counter)
 		return;
 		
+	PrefixSumValue val = prefix_sum_binary_search(id);
+	uint instance_index = val.index_;
+	uint meshlet_index = val.sum - id;
 	
-
+	Chunk meshlet = chunks[meshlet_index];
+	//
+	uint draw_call_index = atomicAdd(num_indirect_calls.x, 1);
+	//
+	DrawElementsIndirectCommand cmd;
+	cmd.count = meshlet.index_count;
+	cmd.primCount = 1;
+	cmd.firstIndex = meshlet.index_offset;
+	cmd.baseVertex = mesh_basevertex;
+	cmd.baseInstance = 0;
+	//
+	indirect_calls[draw_call_index] = cmd;
+	index_to_inst[draw_call_index] =  instance_index;
 }
+
+#endif // MESHLET_CULLING

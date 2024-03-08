@@ -1,0 +1,50 @@
+
+#define MESHLET_WORKGROUP_SIZE 64
+
+
+struct PrefixSumValue {
+    uint index_;
+    uint sum;
+	uint padding1;
+	uint padding2;
+};
+
+struct Chunk_Reference
+{
+	uint chunk_idx;
+	uint inst_idx;
+};
+
+struct Instance 
+{
+	mat4 transform;
+};
+
+layout(binding = 1, std430) buffer PrefixSumBuffer {
+    uint counter;
+	uint item_counter;
+	uint padding2;
+	uint padding3;
+    PrefixSumValue values[];
+}buf;
+
+layout(binding = 8, std430) buffer Indirect_Dispatch_Buffer {
+	DispatchIndirectCommand dispatch_indirect;
+};
+
+layout(binding = 2, std430) buffer DrawElementsIndirectCommand_Buffer {
+	uvec4 num_indirect_calls;
+	DrawElementsIndirectCommand indirect_calls[];
+};
+
+layout(binding = 9, std430) readonly buffer Instances_Buffer {
+	Instance instances[];
+};
+
+layout(binding = 3, std430) readonly buffer Meshlet_BUffer {
+	Chunk chunks[];
+};
+
+layout(binding = 5, std430) buffer index_to_inst_buffer {
+	uint index_to_inst[];
+};
