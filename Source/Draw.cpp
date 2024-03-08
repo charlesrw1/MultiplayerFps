@@ -453,6 +453,8 @@ static Shader meshlet_reset_pre_inst;
 static Shader meshlet_reset_post_inst;
 static Shader meshlet_inst_cull;
 static Shader meshlet_meshlet_cull;
+static Shader meshlet_compact;
+
 
 static Shader naiveshader;
 static Shader naiveshader2;
@@ -474,6 +476,8 @@ void Renderer::reload_shaders()
 	Shader::compute_compile(&meshlet_reset_pre_inst, "Meshlets/reset.txt", "RESET_PRE_INSTANCES");
 	Shader::compute_compile(&meshlet_reset_post_inst, "Meshlets/reset.txt", "RESET_POST_INSTANCES");
 	Shader::compute_compile(&mdi_meshlet_zero_bufs, "Meshlets/zerobuf.txt");
+	Shader::compute_compile(&meshlet_compact, "Meshlets/compact.txt");
+
 
 	// meshbuilder shaders
 	Shader::compile(&shader_list[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
@@ -2059,7 +2063,8 @@ void create_full_mdi_buffers(Chunked_Model* mod,
 	uint32_t& drawid_to_instance_buffer,
 	uint32_t& compute_indirect_buffer,
 	uint32_t& draw_elements_indirect_buffer,
-	uint32_t& prefix_sum_buffer
+	uint32_t& prefix_sum_buffer,
+	uint32_t& draw_count_buffer
 	)
 {
 	glCreateBuffers(1, &chunk_buffer);
@@ -2089,6 +2094,26 @@ void create_full_mdi_buffers(Chunked_Model* mod,
 
 	glNamedBufferStorage(chunk_buffer, sizeof(gpu::Chunk) * mod->chunks.size(), nullptr, GL_DYNAMIC_STORAGE_BIT);
 	glNamedBufferSubData(chunk_buffer, 0, sizeof(gpu::Chunk) * chunks.size(), chunks.data());
+
+	glCreateBuffers(1, &draw_count_buffer);
+	glNamedBufferStorage(draw_count_buffer, sizeof(int), nullptr, GL_DYNAMIC_STORAGE_BIT);
+}
+
+glm::vec4 normalize_plane(glm::vec4 p)
+{
+	return p / glm::length(glm::vec3(p));
+}
+
+glm::vec4 bounds_to_sphere(Bounds b)
+{
+	glm::vec3 center = b.get_center();
+	glm::vec3 mindiff = center - b.bmin;
+	glm::vec3 maxdiff = b.bmax - center;
+	glm::vec3 diff = glm::max(mindiff, maxdiff);
+	float radius = diff.x;
+	if (diff.y > radius)radius = diff.y;
+	if (diff.z > radius)radius = diff.z;
+	return glm::vec4(center, radius);
 }
 
 void multidraw_testing()
@@ -2113,6 +2138,7 @@ void multidraw_testing()
 	static uint32_t compute_indirect_buffer;
 	static uint32_t draw_elements_indirect_buffer;
 	static uint32_t prefix_sum_buffer;
+	static uint32_t draw_count_buffer;
 
 	const static int MAX_DRAW_CALLS = MAX_OBJECTS;
 
@@ -2128,7 +2154,8 @@ void multidraw_testing()
 			drawid_to_instance_buffer,
 			compute_indirect_buffer,
 			draw_elements_indirect_buffer,
-			prefix_sum_buffer);
+			prefix_sum_buffer,
+			draw_count_buffer);
 
 		for (int y = 0; y < 10; y++) {
 			for (int z = 0; z < 10; z++) {
@@ -2281,76 +2308,111 @@ void multidraw_testing()
 	else if (mdi_modes == MDI_MESHLETS_W_CULLING) {
 		const int OBJECTS_TO_RENDER = num_prims_per_batch * num_batches_to_render;
 
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, prefix_sum_buffer);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, compute_indirect_buffer);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, draw_elements_indirect_buffer);
-		mdi_buffer2_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 9); // "instances" just matricies for now
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, chunk_buffer);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, drawid_to_instance_buffer);
-
-		mdi_meshlet_zero_bufs.use();
-		glDispatchCompute(100, 1, 1);
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-
-		meshlet_reset_pre_inst.use();	// reset the prefix sum buffer
-		glDispatchCompute(1, 1, 1);
-
-		// barrier for reset
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-		// cull instances, append meshlets to prefix sum
-		meshlet_inst_cull.use();
-		meshlet_inst_cull.set_int("num_instances", OBJECTS_TO_RENDER);
-		meshlet_inst_cull.set_int("meshlets_in_mesh", meshlet_model->chunks.size());
+		// from vkguide
+		glm::mat4 projectionT = glm::transpose(draw.vs.proj);
+		glm::vec4 frustumX = normalize_plane(projectionT[3] + projectionT[0]); // x + w < 0
+		glm::vec4 frustumY = normalize_plane(projectionT[3] + projectionT[1]); // y + w < 0
 		{
-			Submesh& submesh = meshlet_model->model->mesh.parts[0];
-			Mesh& orgmesh = meshlet_model->model->mesh;
-			int base_vertex = submesh.base_vertex + orgmesh.merged_vert_offset;
-			meshlet_inst_cull.set_int("mesh_basevertex", base_vertex);
+			GPUSCOPESTART("zero_buf");
+
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, prefix_sum_buffer);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, compute_indirect_buffer);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, draw_elements_indirect_buffer);
+			mdi_buffer2_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 9); // "instances" just matricies for now
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, chunk_buffer);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, drawid_to_instance_buffer);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, draw_count_buffer);
+
+			mdi_meshlet_zero_bufs.use();
+			glDispatchCompute(100, 1, 1);
 		}
-
-		int groupsx = (OBJECTS_TO_RENDER == 0) ? 1 : (OBJECTS_TO_RENDER - 1) / 64 + 1;
-		glDispatchCompute(groupsx, 1, 1);
-
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-		meshlet_reset_post_inst.use();
-		glDispatchCompute(1, 1, 1);
-
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-		meshlet_meshlet_cull.use();
-		meshlet_meshlet_cull.set_int("num_instances", OBJECTS_TO_RENDER);
-		meshlet_meshlet_cull.set_int("meshlets_in_mesh", meshlet_model->chunks.size());
 		{
-			Submesh& submesh = meshlet_model->model->mesh.parts[0];
-			Mesh& orgmesh = meshlet_model->model->mesh;
-			int base_vertex = submesh.base_vertex + orgmesh.merged_vert_offset;
-			meshlet_meshlet_cull.set_int("mesh_basevertex", base_vertex);
+			GPUSCOPESTART("pre inst");
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+
+			meshlet_reset_pre_inst.use();	// reset the prefix sum buffer
+			glDispatchCompute(1, 1, 1);
 		}
-		glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, compute_indirect_buffer);
-		glDispatchComputeIndirect(0);
-
-		glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-		// now draw the shit
-		glBindVertexArray(meshlet_model->vao);
-		mdi_meshlet_cull_shader.use();
-		mdi_buffer2_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 2);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, drawid_to_instance_buffer);
-
-		int draw_call_count = OBJECTS_TO_RENDER*meshlet_model->chunks.size();
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, draw_elements_indirect_buffer);
-		glMultiDrawElementsIndirect(
-			GL_TRIANGLES,
-			GL_UNSIGNED_INT,
-			(void*)sizeof(glm::ivec4),	// offset
-			draw_call_count,
-			sizeof(gpu::DrawElementsIndirectCommand)
+		glm::vec4 cullfrustum = glm::vec4(
+			frustumX.x,
+			frustumX.z,
+			frustumY.y,
+			frustumY.z
 		);
+		{
+			GPUSCOPESTART("cull inst");
+			// barrier for reset
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+			// cull instances, append meshlets to prefix sum
+			meshlet_inst_cull.use();
+			meshlet_inst_cull.set_vec4("frustum_plane", cullfrustum);
+			glm::vec4 meshbounds = bounds_to_sphere(meshlet_model->model->mesh.aabb);
+			meshlet_inst_cull.set_vec4("meshbounds", meshbounds);
+
+			meshlet_inst_cull.set_int("num_instances", OBJECTS_TO_RENDER);
+			meshlet_inst_cull.set_int("meshlets_in_mesh", meshlet_model->chunks.size());
+			{
+				Submesh& submesh = meshlet_model->model->mesh.parts[0];
+				Mesh& orgmesh = meshlet_model->model->mesh;
+				int base_vertex = submesh.base_vertex + orgmesh.merged_vert_offset;
+				meshlet_inst_cull.set_int("mesh_basevertex", base_vertex);
+			}
+
+			int groupsx = (OBJECTS_TO_RENDER == 0) ? 1 : (OBJECTS_TO_RENDER - 1) / 64 + 1;
+			glDispatchCompute(groupsx, 1, 1);
+		}
+		{
+			GPUSCOPESTART("meshlet cull");
+
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+			meshlet_reset_post_inst.use();
+			glDispatchCompute(1, 1, 1);
+
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+			meshlet_meshlet_cull.use();
+
+			meshlet_meshlet_cull.set_vec4("frustum_plane", cullfrustum);
+
+			meshlet_meshlet_cull.set_int("num_instances", OBJECTS_TO_RENDER);
+			meshlet_meshlet_cull.set_int("meshlets_in_mesh", meshlet_model->chunks.size());
+			{
+				Submesh& submesh = meshlet_model->model->mesh.parts[0];
+				Mesh& orgmesh = meshlet_model->model->mesh;
+				int base_vertex = submesh.base_vertex + orgmesh.merged_vert_offset;
+				meshlet_meshlet_cull.set_int("mesh_basevertex", base_vertex);
+			}
+			glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, compute_indirect_buffer);
+			glDispatchComputeIndirect(0);
+		}
+		{
+			GPUSCOPESTART("drawit");
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+			// now draw the shit
+			glBindVertexArray(meshlet_model->vao);
+			mdi_meshlet_cull_shader.use();
+			mdi_buffer2_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 2);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, drawid_to_instance_buffer);
+
+			//glCullFace(GL_FRONT);
+
+			int draw_call_count = OBJECTS_TO_RENDER * meshlet_model->chunks.size();
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, draw_elements_indirect_buffer);
+			glMultiDrawElementsIndirect(
+				GL_TRIANGLES,
+				GL_UNSIGNED_INT,
+				(void*)sizeof(glm::ivec4),	// offset
+				draw_call_count,
+				sizeof(gpu::DrawElementsIndirectCommand)
+			);
+			//glCullFace(GL_BACK);
+		}
+
 
 	}
 	else if (mdi_modes == MDI_MESHLETS_CULLING_DYNAMIC_INDEX) {

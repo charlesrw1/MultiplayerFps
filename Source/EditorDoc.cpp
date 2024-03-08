@@ -532,6 +532,9 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 				command_mgr.undo();
 		}
 	}
+	if(eng->game_focused)
+		if (event.type == SDL_MOUSEWHEEL)
+			camera.scroll_speed(event.wheel.y);
 
 	return true;
 }

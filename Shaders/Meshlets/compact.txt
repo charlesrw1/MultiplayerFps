@@ -1,0 +1,39 @@
+#extension GL_NV_shader_atomic_int64 : enable
+#extension GL_ARB_gpu_shader_int64 : enable
+layout(local_size_x = 256, local_size_y=1,local_size_z=1) in;
+
+#include "SharedGpuTypes.txt"
+#include "Meshlets/meshlet_shared.txt"
+#include "Meshlets/prefix.txt"
+
+shared uint local_valid_draws;
+void main()
+{
+	if(gl_LocalInvocationID.x == 0)
+		local_valid_draws = 0;
+
+	memoryBarrierShared();
+	
+	if(gl_GlobalInvocationID.x >= num_indirect_calls.x)
+		return;
+	DrawElementsIndirectCommand cmd = indirect_calls[gl_GlobalInvocationID.x];
+	uint instance = index_to_inst[gl_GlobalInvocationID.x];
+	
+	uint local_slot = -1;
+	if(cmd.count > 0)
+		local_slot = atomicAdd(local_valid_draws,1);
+	
+	memoryBarrierShared();
+	
+	uint global_slot;
+	if(gl_LocalInvocationID.x == 0)
+		global_slot = atomicAdd(total_compacted_draws, local_valid_draws);
+	
+	memoryBarrierShared();
+	
+	if(local_slot != -1) {
+		indirect_calls[global_slot + local_slot] = cmd;
+		index_to_inst[global_slot + local_slot] = instance;
+	}
+	
+}

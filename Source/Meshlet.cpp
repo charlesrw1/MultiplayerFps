@@ -46,7 +46,7 @@ Chunked_Model* get_chunked_mod(const char* filename)
 			POS_STRIDE,
 			MAX_CHUNK_VERTS,
 			MAX_CHUNK_TRIS,
-			0.9);
+			0.5);
 		const meshopt_Meshlet& last = meshlets[num_meshlets - 1];
 		size_t num_meshlet_indicies = last.vertex_offset + last.vertex_count;
 		size_t num_micro_indicies = last.triangle_offset + last.triangle_count * 3;
