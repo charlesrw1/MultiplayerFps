@@ -61,5 +61,22 @@ struct Chunk
 	uint padding2;
 };
 
+struct Cull_Paramaters
+{
+	mat4 view;
+	mat4 proj;
+	vec4 viewpos;
+	vec4 frustum;
+	
+	float near;
+	float far;
+	int cull_instances;
+	int cull_cone;
+	
+	int cull_frustum;
+	int num_instances;
+	int padding1;
+	int padding2;
+};
 
 #endif

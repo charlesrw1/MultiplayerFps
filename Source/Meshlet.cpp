@@ -6,7 +6,7 @@
 using std::vector;
 
 const static uint32_t MAX_CHUNK_VERTS = 64;
-const static uint32_t MAX_CHUNK_TRIS = 64;
+const static uint32_t MAX_CHUNK_TRIS = 256;
 
 extern bool use_32_bit_indicies;
 // looked at github/lighthugger for inspo

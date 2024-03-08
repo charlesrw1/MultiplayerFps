@@ -9,17 +9,18 @@ layout(local_size_x = 256, local_size_y=1,local_size_z=1) in;
 shared uint local_valid_draws;
 void main()
 {
+	if(gl_GlobalInvocationID.x >= num_indirect_calls.x)
+		return;
+
 	if(gl_LocalInvocationID.x == 0)
 		local_valid_draws = 0;
 
 	memoryBarrierShared();
 	
-	if(gl_GlobalInvocationID.x >= num_indirect_calls.x)
-		return;
 	DrawElementsIndirectCommand cmd = indirect_calls[gl_GlobalInvocationID.x];
 	uint instance = index_to_inst[gl_GlobalInvocationID.x];
 	
-	uint local_slot = -1;
+	uint local_slot = 1000;
 	if(cmd.count > 0)
 		local_slot = atomicAdd(local_valid_draws,1);
 	
@@ -27,11 +28,11 @@ void main()
 	
 	uint global_slot;
 	if(gl_LocalInvocationID.x == 0)
-		global_slot = atomicAdd(total_compacted_draws, local_valid_draws);
+		global_slot = atomicAdd(total_compacted_draws.x, local_valid_draws);
 	
 	memoryBarrierShared();
 	
-	if(local_slot != -1) {
+	if(local_slot != 1000) {
 		indirect_calls[global_slot + local_slot] = cmd;
 		index_to_inst[global_slot + local_slot] = instance;
 	}

@@ -44,7 +44,7 @@ layout(binding = 3, std430) readonly buffer Meshlet_BUffer {
 	Chunk chunks[];
 };
 layout(binding = 10, std430) buffer draw_count_buffer {
-	uint total_compacted_draws;
+	uvec4 total_compacted_draws;
 };
 
 layout(binding = 5, std430) buffer index_to_inst_buffer {

@@ -2096,7 +2096,7 @@ void create_full_mdi_buffers(Chunked_Model* mod,
 	glNamedBufferSubData(chunk_buffer, 0, sizeof(gpu::Chunk) * chunks.size(), chunks.data());
 
 	glCreateBuffers(1, &draw_count_buffer);
-	glNamedBufferStorage(draw_count_buffer, sizeof(int), nullptr, GL_DYNAMIC_STORAGE_BIT);
+	glNamedBufferStorage(draw_count_buffer, sizeof(glm::uvec4), nullptr, GL_DYNAMIC_STORAGE_BIT);
 }
 
 glm::vec4 normalize_plane(glm::vec4 p)
@@ -2389,6 +2389,16 @@ void multidraw_testing()
 			glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, compute_indirect_buffer);
 			glDispatchComputeIndirect(0);
 		}
+
+		//{
+		//	GPUSCOPESTART("compact");
+		//	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		//
+		//	meshlet_compact.use();
+		//	int draw_call_count = OBJECTS_TO_RENDER * meshlet_model->chunks.size();
+		//	glDispatchCompute(draw_call_count / 256 + 1, 1, 1);
+		//}
+
 		{
 			GPUSCOPESTART("drawit");
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -2403,14 +2413,15 @@ void multidraw_testing()
 
 			int draw_call_count = OBJECTS_TO_RENDER * meshlet_model->chunks.size();
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, draw_elements_indirect_buffer);
-			glMultiDrawElementsIndirect(
+			glBindBuffer(GL_PARAMETER_BUFFER, draw_elements_indirect_buffer);
+			glMultiDrawElementsIndirectCount(
 				GL_TRIANGLES,
 				GL_UNSIGNED_INT,
-				(void*)sizeof(glm::ivec4),	// offset
-				draw_call_count,
+				(void*)sizeof(glm::ivec4),	// offset to draw calls
+				0,							// offset to draw count in GL_PARAMETER_BUFFER
+				draw_call_count,			// max draw calls possible
 				sizeof(gpu::DrawElementsIndirectCommand)
 			);
-			//glCullFace(GL_BACK);
 		}
 
 

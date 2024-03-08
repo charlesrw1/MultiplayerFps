@@ -10,7 +10,7 @@ void main()
 {
 	buf.counter = int64_t(0);
 	num_indirect_calls.x = 0;
-	total_compacted_draws = 0;
+	total_compacted_draws.x = 0;
 }
 #endif // RESET_PRE_INSTANCES
 
