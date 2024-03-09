@@ -9,6 +9,7 @@
 #include "Shader.h"
 #include "EnvProbe.h"
 #include "Texture.h"
+#include "../Shaders/SharedGpuTypes.txt";
 
 class MeshPart;
 class Model;
@@ -26,6 +27,9 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
+typedef uint32_t texhandle;
+typedef uint32_t fbohandle;
+typedef uint32_t bufferhandle;
 
 class Volumetric_Fog_System
 {
@@ -91,21 +95,55 @@ class SSAO_System
 {
 public:
 	void init();
-	void make_render_targets();
+	void reload_shaders();
+	void make_render_targets(bool initial);
 	void render();
+	void update_ubo();
 
-	uint32_t noise_tex2;
-	glm::vec3 samples[64];
-	uint32_t fbo;
-	uint32_t rbo;
-	uint32_t halfres_texture;	// raw ao texture
-	uint32_t fullres1;	// blurx result
-	uint32_t fullres2;	// blury result and final output
-	int width, height;
+	int width=0, height=0;
+	const static int RANDOM_ELEMENTS = 16;
 
-	int res_scale = 1;
-	float radius = 0.5;
-	float bias = 0.025;
+	struct framebuffers {
+		fbohandle depthlinear        = 0;
+		fbohandle viewnormal         = 0;
+		fbohandle hbao2_deinterleave = 0;
+		fbohandle hbao2_calc         = 0;
+		fbohandle finalresolve = 0;
+	}fbo;
+
+	struct programs {
+		Shader hbao_calc;
+		Shader linearize_depth;
+		Shader make_viewspace_normals;
+		Shader hbao_blur;
+		Shader hbao_deinterleave;
+		Shader hbao_reinterleave;
+	}prog;
+
+	struct textures {
+		texhandle random	= 0;
+		texhandle result	= 0;
+		texhandle blur		= 0;
+		texhandle viewnormal = 0;
+		texhandle depthlinear = 0;
+		texhandle deptharray = 0;
+		texhandle resultarray = 0;
+		texhandle depthview[RANDOM_ELEMENTS];
+	}texture;
+
+	struct uniform_buffers {
+		bufferhandle data = 0;
+	}ubo;
+
+	struct params {
+		float radius = 2.0;
+		float intensity = 1.5;
+		float bias = 0.1;
+		float blur_sharpness = 40.0;
+	}tweak;
+
+	gpu::HBAOData data = {};
+	glm::vec4 random_elements[RANDOM_ELEMENTS];
 };
 
 // more horribleness

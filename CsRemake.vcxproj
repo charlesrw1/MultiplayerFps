@@ -81,7 +81,6 @@
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
-    <ClInclude Include="Source\SharedGpuTypes.h" />
     <ClInclude Include="Source\StringUtil.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\Bytepacker.h" />

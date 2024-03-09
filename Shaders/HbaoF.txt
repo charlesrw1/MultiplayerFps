@@ -3,11 +3,16 @@
 // This is a HBAO-Shader for OpenGL, based upon nvidias directX implementation
 // supplied in their SampleSDK available from nvidia.com
 
+// This is a HBAO-Shader for OpenGL, based upon nvidias directX implementation
+// supplied in their SampleSDK available from nvidia.com
+// The slides describing the implementation is available at
+// http://www.nvidia.co.uk/object/siggraph-2008-HBAO.html
+
 
 const float PI = 3.14159265;
 
-uniform sampler2D noise_texture;
 uniform sampler2D scene_depth;
+uniform sampler2D noise_texture;
 
 uniform vec2 FocalLen;
 uniform vec2 UVToViewA;
@@ -19,12 +24,12 @@ uniform vec2 AORes = vec2(1024.0, 768.0);
 uniform vec2 InvAORes = vec2(1.0/1024.0, 1.0/768.0);
 uniform vec2 NoiseScale = vec2(1024.0, 768.0) / 4.0;
 
-uniform float AOStrength = 1.0;
+uniform float AOStrength = 1.9;
 uniform float R = 0.3;
 uniform float R2 = 0.3*0.3;
 uniform float NegInvR2 = - 1.0 / (0.3*0.3);
 uniform float TanBias = tan(30.0 * PI / 180.0);
-uniform float MaxRadiusPixels = 50.0;
+uniform float MaxRadiusPixels = 100.0;
 
 uniform int NumDirections = 6;
 uniform int NumSamples = 4;
@@ -51,7 +56,7 @@ vec3 UVToViewSpace(vec2 uv, float z)
 vec3 GetViewPos(vec2 uv)
 {
 	float z = ViewSpaceZFromDepth(texture(scene_depth, uv).r);
-	//float z = texture(scene_depth, uv).r;
+	//float z = texture(texture0, uv).r;
 	return UVToViewSpace(uv, z);
 }
 
@@ -59,7 +64,7 @@ vec3 GetViewPosPoint(ivec2 uv)
 {
 	ivec2 coord = ivec2(gl_FragCoord.xy) + uv;
 	float z = texelFetch(scene_depth, coord, 0).r;
-	return UVToViewSpace(uv, z);
+	return UVToViewSpace(uv, 1.0-z);
 }
 
 float TanToSin(float x)
@@ -117,9 +122,11 @@ float HorizonOcclusion(	vec2 deltaUV,
 						float numSamples)
 {
 	float ao = 0;
-
+	
+	vec2 TexCoord = FS_IN_TexCoord;
+	
 	// Offset the first coord with some noise
-	vec2 uv = FS_IN_TexCoord + SnapUVOffset(randstep*deltaUV);
+	vec2 uv = TexCoord + SnapUVOffset(randstep*deltaUV);
 	deltaUV = SnapUVOffset( deltaUV );
 
 	// Calculate the tangent vector
@@ -186,23 +193,24 @@ void ComputeSteps(inout vec2 stepSizeUv, inout float numSteps, float rayRadiusPi
 
 void main(void)
 {
+	vec2 TexCoord = FS_IN_TexCoord;
 	float numDirections = NumDirections;
 
 	vec3 P, Pr, Pl, Pt, Pb;
-	P 	= GetViewPos(FS_IN_TexCoord);
+	P 	= GetViewPos(TexCoord);
 
 	// Sample neighboring pixels
-    Pr 	= GetViewPos(FS_IN_TexCoord + vec2( InvAORes.x, 0));
-    Pl 	= GetViewPos(FS_IN_TexCoord + vec2(-InvAORes.x, 0));
-    Pt 	= GetViewPos(FS_IN_TexCoord + vec2( 0, InvAORes.y));
-    Pb 	= GetViewPos(FS_IN_TexCoord + vec2( 0,-InvAORes.y));
+    Pr 	= GetViewPos(TexCoord + vec2( InvAORes.x, 0));
+    Pl 	= GetViewPos(TexCoord + vec2(-InvAORes.x, 0));
+    Pt 	= GetViewPos(TexCoord + vec2( 0, InvAORes.y));
+    Pb 	= GetViewPos(TexCoord + vec2( 0,-InvAORes.y));
 
     // Calculate tangent basis vectors using the minimu difference
     vec3 dPdu = MinDiff(P, Pr, Pl);
     vec3 dPdv = MinDiff(P, Pt, Pb) * (AORes.y * InvAORes.x);
 
     // Get the random samples from the noise texture
-	vec3 random = texture(noise_texture, FS_IN_TexCoord.xy * NoiseScale).rgb;
+	vec3 random = texture(noise_texture, TexCoord.xy * NoiseScale).rgb;
 
 	// Calculate the projected size of the hemisphere
     vec2 rayRadiusUV = 0.5 * R * FocalLen / -P.z;
@@ -244,5 +252,5 @@ void main(void)
 		ao = 1.0 - ao / numDirections * AOStrength;
 	}
 
-	FS_OUT_frag0 = ao;
+	FS_OUT_frag0 = ao;//vec2(ao, 30.0 * P.z);
 }

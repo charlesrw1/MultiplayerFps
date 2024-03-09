@@ -119,5 +119,12 @@ void main()
 
 #ifdef TRI_CULLING
 
+void main()
+{
+	// second work buffer for meshlet id + mesh id
+	// pick 
+
+}
+
 
 #endif // TRI_CULLING

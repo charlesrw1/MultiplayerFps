@@ -94,6 +94,75 @@ static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, ch
 	return true;
 }
 
+bool Shader::compile(
+	Shader& shader,
+	const char* vertex_path,
+	const char* fragment_path,
+	const char* geometry_path,
+	std::string shader_defines
+)
+{
+	if (shader.ID != 0)
+		glDeleteProgram(shader.ID);
+	shader.ID = 0;
+
+	std::string defines_with_directive = get_definess_with_directive(shader_defines);
+	std::string vertex_source = get_source(vertex_path, defines_with_directive);
+	std::string fragment_source = get_source(fragment_path, defines_with_directive);
+	std::string geometry_source = get_source(geometry_path, defines_with_directive);
+
+
+	if (vertex_source.empty() || fragment_source.empty() || geometry_source.empty()) {
+		printf("Parse fail %s %s %s\n", vertex_path, fragment_path, geometry_path);
+		return false;
+	}
+
+	unsigned int vertex;
+	unsigned int fragment;
+	unsigned int geometry;
+	unsigned int program;
+	int success = 0;
+	char infolog[512];
+
+	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
+	if (!good) {
+		printf("Error: vertex shader (%s) compiliation failed: %s\n", vertex_path, infolog);
+		return false;
+	}
+	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
+	if (!good) {
+		printf("Error: fragment shader (%s) compiliation failed: %s\n", fragment_path, infolog);
+		return false;
+	}
+	good = make_shader(geometry_source.c_str(), GL_GEOMETRY_SHADER, &geometry, infolog, 512);
+	if (!good) {
+		printf("Error: geometry shader (%s) compiliation failed: %s\n", geometry_path, infolog);
+		return false;
+	}
+
+	program = glCreateProgram();
+	glAttachShader(program, vertex);
+	glAttachShader(program, fragment);
+	glAttachShader(program, geometry);
+	glLinkProgram(program);
+
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(program, 512, NULL, infolog);
+		printf("Error: shader program link failed: %s\n", infolog);
+
+		return false;
+	}
+
+	glDeleteShader(vertex);
+	glDeleteShader(fragment);
+	glDeleteShader(geometry);
+
+	shader.ID = program;
+
+	return true;
+}
+
 ShaderResult Shader::compile(
 	Shader* shader,
 	const char* vertex_path,

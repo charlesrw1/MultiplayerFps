@@ -1,9 +1,10 @@
 #ifndef SHAREDGPU_
 #define SHAREDGPU_
 
-#ifdef IS_CPLUSPLUS
+#ifdef __cplusplus
 using namespace glm;
 typedef uint32_t uint;
+namespace gpu {
 #endif
 
 struct Ubo_View_Constants_Struct
@@ -78,5 +79,34 @@ struct Cull_Paramaters
 	int padding1;
 	int padding2;
 };
+
+
+#define AO_RANDOMTEX_SIZE 4
+// from nvidias gl_ssao
+struct HBAOData {
+  float   RadiusToScreen;	// radius
+  float   R2;     			// 1/radius
+  float   NegInvR2;     	// radius * radius
+  float   NDotVBias;
+ 
+  vec2    InvFullResolution;
+  vec2    InvQuarterResolution;
+  
+  float   AOMultiplier;
+  float   PowExponent;
+  vec2    _pad0;
+  
+  vec4    projInfo;
+  vec2    projScale;
+  int     projOrtho;
+  int     _pad1;
+  
+  vec4    float2Offsets[AO_RANDOMTEX_SIZE*AO_RANDOMTEX_SIZE];
+  vec4    jitters[AO_RANDOMTEX_SIZE*AO_RANDOMTEX_SIZE];
+};
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

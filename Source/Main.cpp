@@ -978,8 +978,8 @@ Debug_Interface* Debug_Interface::get()
 
 void draw_wind_menu()
 {
-	ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
-	ImGui::DragFloat("angle bias", &draw.ssao.bias, 0.02);
+	//ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
+	//ImGui::DragFloat("angle bias", &draw.ssao.bias, 0.02);
 
 
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
@@ -998,9 +998,7 @@ void draw_wind_menu()
 	ImGui::SliderInt("cubemap index", &draw.cubemap_index, 0, 12);
 
 
-	ImGui::Image(ImTextureID(draw.ssao.halfres_texture), ImVec2(256, 256));
-	ImGui::Image(ImTextureID(draw.ssao.fullres1), ImVec2(256, 256));
-	ImGui::Image(ImTextureID(draw.ssao.fullres2), ImVec2(256, 256));
+	ImGui::Image(ImTextureID(draw.ssao.texture.viewnormal), ImVec2(512, 512));
 
 
 

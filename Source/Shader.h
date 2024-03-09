@@ -27,6 +27,13 @@ public:
 		std::string shader_defines = {}
 	);
 
+	static bool compile(
+		Shader& shader,
+		const char* vertex_path,
+		const char* fragment_path,
+		const char* geometry_path,
+		std::string shader_defines = {}
+	);
 	void use();
 
 	void set_bool(const char* name, bool value);

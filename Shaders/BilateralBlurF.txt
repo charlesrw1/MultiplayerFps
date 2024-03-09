@@ -94,5 +94,5 @@ void main(void)
 	}
 
 	float ao = total_ao / total_weight;
-	FS_OUT_Color = ao;
+	FS_OUT_Color = aoz.x;
 }

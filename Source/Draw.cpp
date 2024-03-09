@@ -9,12 +9,6 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-namespace gpu {
-#define IS_CPLUSPLUS
-#include "../Shaders/SharedGpuTypes.txt";
-#undef IS_CPLUSPLUS
-};
-
 Renderer draw;
 
 static const int ALBEDO1_LOC = 0;
@@ -373,7 +367,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	//shader().set_vec4("aoproxy_sphere", vec4(eng->local_player().position + glm::vec3(0,aosphere.y,0), aosphere.x));
 	//shader().set_float("aoproxy_scale_factor", aosphere.z);
 
-	uint32_t ssao_tex = draw.ssao.fullres2;
+	uint32_t ssao_tex = draw.ssao.texture.result;
 	if (params.is_probe_render || params.is_water_reflection_pass) ssao_tex = draw.white_texture.gl_id;
 
 	draw.bind_texture(SSAO_TEX_LOC, ssao_tex);
@@ -464,7 +458,7 @@ static Shader mdi_meshlet_zero_bufs;
 
 void Renderer::reload_shaders()
 {
-
+	ssao.reload_shaders();
 	Shader::compile(&naiveshader, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE");
 		Shader::compile(&naiveshader2, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE2");
 
@@ -3233,123 +3227,236 @@ static float hbao_max_radius_pixels = 50.f;
 
 void draw_hbao_menu()
 {
-	ImGui::DragFloat("radius", &hbao_radius, 0.05, 0.f);
-	ImGui::DragInt("dirs", &hbao_dirs, 1.f, 0);
-	ImGui::DragInt("samples", &hbao_samples, 1.f, 0);
-	ImGui::DragFloat("rad pixels", &hbao_max_radius_pixels, 1.f, 0);
+	ImGui::DragFloat("radius", &draw.ssao.tweak.radius, 0.05, 0.f);
+	ImGui::DragFloat("sharpness", &draw.ssao.tweak.blur_sharpness, 0.05, 0);
+	ImGui::DragFloat("bias", &draw.ssao.tweak.bias, 0.05, 0);
+	ImGui::DragFloat("intensity", &draw.ssao.tweak.intensity, 0.05, 0);
 }
 
 static const int NOISE_RES = 4;
+static const int NUM_MRT = 8;
 
 #include <random>
 void SSAO_System::init()
 {
 	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
 
-	glGenFramebuffers(1, &fbo);
+	make_render_targets(true);
+	reload_shaders();
 
-	std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
-	std::default_random_engine generator;
-	int kernel_samples =16;
-	for (unsigned int i = 0; i < kernel_samples; ++i)
-	{
-		glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
-		sample = glm::normalize(sample);
-		sample *= randomFloats(generator);
-		float scale = float(i) / kernel_samples;
+	glCreateBuffers(1, &ubo.data);
+	glNamedBufferStorage(ubo.data, sizeof(gpu::HBAOData), nullptr, GL_DYNAMIC_STORAGE_BIT);
 
-		// scale samples s.t. they're more aligned to center of kernel
-		scale = ourLerp(0.1f, 1.0f, scale * scale);
-		sample *= scale;
-		samples[i]=sample;
-	}
+	 std::mt19937 rmt;
 
+  float numDir = 8;  // keep in sync to glsl
 
-	//std::vector<glm::vec3> ssaoNoise;
-	//for (unsigned int i = 0; i < 16; i++)
-	//{
-	//	glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
-	//	ssaoNoise.push_back(noise);
-	//}
-	//glGenTextures(1, &noise_tex2);
-	//glBindTexture(GL_TEXTURE_2D, noise_tex2);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  signed short hbaoRandomShort[RANDOM_ELEMENTS * 4];
 
-	glCreateTextures(GL_TEXTURE_2D,1, &noise_tex2);
-	glTextureStorage2D(noise_tex2, 1, GL_RGBA16F, NOISE_RES, NOISE_RES);
-	vector<vec4> floats(NOISE_RES*NOISE_RES);
-	for (int y = 0; y < NOISE_RES; y++) {
-		for (int x = 0; x < NOISE_RES; x++) {
-			vec2 xy = glm::circularRand(1.0f);
-			float z = glm::linearRand(0.0f, 1.0f);
-			float w = glm::linearRand(0.0f, 1.0f);
-			floats[y * NOISE_RES + x] = glm::vec4(
-				xy.x,
-				xy.y,
-				z,
-				w
-			);
-		}
-	}
-	glTextureSubImage2D(noise_tex2, 0, 0, 0, NOISE_RES, NOISE_RES, GL_RGBA, GL_FLOAT, floats.data());
-	glTextureParameteri(noise_tex2, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(noise_tex2, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTextureParameteri(noise_tex2, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTextureParameteri(noise_tex2, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  for(int i = 0; i < RANDOM_ELEMENTS; i++)
+  {
+    float Rand1 = static_cast<float>(rmt()) / 4294967296.0f;
+    float Rand2 = static_cast<float>(rmt()) / 4294967296.0f;
 
+    // Use random rotation angles in [0,2PI/NUM_DIRECTIONS)
+    float Angle       = glm::two_pi<float>() * Rand1 / numDir;
+    random_elements[i].x = cosf(Angle);
+    random_elements[i].y = sinf(Angle);
+    random_elements[i].z = Rand2;
+    random_elements[i].w = 0;
+#define SCALE ((1 << 15))
+    hbaoRandomShort[i * 4 + 0] = (signed short)(SCALE * random_elements[i].x);
+    hbaoRandomShort[i * 4 + 1] = (signed short)(SCALE * random_elements[i].y);
+    hbaoRandomShort[i * 4 + 2] = (signed short)(SCALE * random_elements[i].z);
+    hbaoRandomShort[i * 4 + 3] = (signed short)(SCALE * random_elements[i].w);
+#undef SCALE
+  }
+
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture.random);
+	glTextureStorage2D(texture.random, 1, GL_RGBA16_SNORM, 4, 4);
+	glTextureSubImage2D(texture.random, 0, 0, 0, 4, 4, GL_RGBA, GL_SHORT, hbaoRandomShort);
+	glTextureParameteri(texture.random, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(texture.random, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
-void SSAO_System::make_render_targets()
+Shader make_program(const char* vert, const char* frag, const std::string& defines = "")
 {
-	glDeleteRenderbuffers(1, &rbo);
-	glDeleteTextures(1, &halfres_texture);
-	glDeleteTextures(1, &fullres1);
-	glDeleteTextures(1, &fullres2);
+	Shader ret{};
+	Shader::compile(&ret, vert, frag, defines);
+	return ret;
+}
 
+
+void SSAO_System::reload_shaders()
+{
+	Shader::compile(prog.hbao_calc, "fullscreenquad.txt", "hbao/hbao.txt", "hbao/hbaoG.txt", {});
+	prog.hbao_blur = make_program("fullscreenquad.txt", "hbao/hbaoblur.txt");
+	prog.hbao_deinterleave = make_program("fullscreenquad.txt", "hbao/hbaodeinterleave.txt");
+	prog.hbao_reinterleave = make_program("fullscreenquad.txt", "hbao/hbaoreinterleave.txt");
+	prog.linearize_depth = make_program("fullscreenquad.txt", "hbao/linearizedepth.txt");
+	prog.make_viewspace_normals = make_program("fullscreenquad.txt", "hbao/viewnormal.txt");
+}
+
+
+void SSAO_System::make_render_targets(bool initial)
+{
 	width = eng->window_w.integer();
 	height = eng->window_h.integer();
 
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	if (!initial) {
+		glDeleteTextures(1, &texture.depthlinear);
+		glDeleteTextures(1, &texture.viewnormal);
+		glDeleteFramebuffers(1, &fbo.viewnormal);
+		glDeleteFramebuffers(1, &fbo.depthlinear);
+	}
 
-	res_scale = 1;	// halfres breaks ssao and I'm tired of trying to fix it..., something to do with projection matrix
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture.depthlinear);
+	glTextureStorage2D(texture.depthlinear, 1, GL_RG32F, width, height);
+	glTextureParameteri(texture.depthlinear, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.depthlinear, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.depthlinear, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(texture.depthlinear, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	glGenTextures(1, &halfres_texture);
-	glBindTexture(GL_TEXTURE_2D, halfres_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width/res_scale, height/res_scale, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glCreateFramebuffers(1, &fbo.depthlinear);
+	glNamedFramebufferTexture(fbo.depthlinear, GL_COLOR_ATTACHMENT0, texture.depthlinear, 0);
 
-	glGenTextures(1, &fullres1);
-	glBindTexture(GL_TEXTURE_2D, fullres1);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
+	glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
+	glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	glGenTextures(1, &fullres2);
-	glBindTexture(GL_TEXTURE_2D, fullres2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glCreateFramebuffers(1, &fbo.viewnormal);
+	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal, 0);
 
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
+	glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
+	glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	glGenRenderbuffers(1, &rbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
+	glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
+	glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+	glCreateFramebuffers(1, &fbo.finalresolve);
+	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT0, texture.result, 0);
+	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT1, texture.blur, 0);
 
+	GLenum drawbuffers[NUM_MRT];
+	for(int layer = 0; layer < NUM_MRT; layer++)
+		drawbuffers[layer] = GL_COLOR_ATTACHMENT0 + layer;
+	glCreateFramebuffers(1, &fbo.hbao2_deinterleave);
+	glNamedFramebufferDrawBuffers(fbo.hbao2_deinterleave, NUM_MRT, drawbuffers);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	int quarterWidth  = ((width + 3) / 4);
+	int quarterHeight = ((height + 3) / 4);
+
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.deptharray);
+	glTextureStorage3D(texture.deptharray, 1, GL_R32F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
+	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.deptharray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(texture.deptharray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	for(int i = 0; i < RANDOM_ELEMENTS; i++) {
+		if (texture.depthview[i] != 0)
+			glDeleteTextures(1, &texture.depthview[i]);
+		glGenTextures(1, &texture.depthview[i]);
+		glTextureView(texture.depthview[i], GL_TEXTURE_2D, texture.deptharray, GL_R32F, 0, 1, i, 1);
+		glBindTexture(GL_TEXTURE_2D, texture.depthview[i]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.resultarray);
+	glTextureStorage3D(texture.resultarray, 1, GL_RG16F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
+	glTextureParameteri(texture.resultarray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.resultarray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(texture.resultarray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(texture.resultarray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	glCreateFramebuffers(1, &fbo.hbao2_calc);
+	glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
+
+	// render viewspace normals and linear depth
+	// deinterleave
+	// render hbao for each layer
+	// reinterleave
+	// blur
+
+}
+
+#define USE_AO_LAYERED_SINGLEPASS 2
+const int HBAO_RANDOM_ELEMENTS = 4 * 4;
+
+void SSAO_System::update_ubo()
+{
+	// projection
+	mat4 proj_matrix = draw.vs.proj;
+	float proj_fov = draw.vs.fov;
+
+	const float* P = glm::value_ptr(proj_matrix);
+
+  float projInfoPerspective[] = {
+      2.0f / (P[4 * 0 + 0]),                  // (x) * (R - L)/N
+      2.0f / (P[4 * 1 + 1]),                  // (y) * (T - B)/N
+      -(1.0f - P[4 * 2 + 0]) / P[4 * 0 + 0],  // L/N
+      -(1.0f + P[4 * 2 + 1]) / P[4 * 1 + 1],  // B/N
+  };
+
+  float projInfoOrtho[] = {
+      2.0f / (P[4 * 0 + 0]),                  // ((x) * R - L)
+      2.0f / (P[4 * 1 + 1]),                  // ((y) * T - B)
+      -(1.0f + P[4 * 3 + 0]) / P[4 * 0 + 0],  // L
+      -(1.0f - P[4 * 3 + 1]) / P[4 * 1 + 1],  // B
+  };
+
+  int useOrtho = false;
+  data.projOrtho = useOrtho;
+  data.projInfo  = useOrtho ? glm::make_vec4(projInfoOrtho) : glm::make_vec4(projInfoPerspective);
+
+  float projScale;
+  if(useOrtho)
+  {
+    projScale = float(height) / (projInfoOrtho[1]);
+  }
+  else
+  {
+    projScale = float(height) / (tanf(proj_fov * 0.5f) * 2.0f);
+  }
+
+  // radius
+  float meters2viewspace   = 1.0f;
+  float R                  = tweak.radius * meters2viewspace;
+  data.R2             = R * R;
+  data.NegInvR2       = -1.0f / data.R2;
+  data.RadiusToScreen = R * 0.5f * projScale;
+
+  // ao
+  data.PowExponent  = std::max(tweak.intensity, 0.0f);
+  data.NDotVBias    = std::min(std::max(0.0f, tweak.bias), 1.0f);
+  data.AOMultiplier = 1.0f / (1.0f - data.NDotVBias);
+
+  // resolution
+  int quarterWidth  = ((width + 3) / 4);
+  int quarterHeight = ((height + 3) / 4);
+
+  data.InvQuarterResolution = vec2(1.0f / float(quarterWidth), 1.0f / float(quarterHeight));
+  data.InvFullResolution    = vec2(1.0f / float(width), 1.0f / float(height));
+
+#if USE_AO_LAYERED_SINGLEPASS
+  for(int i = 0; i < HBAO_RANDOM_ELEMENTS; i++)
+  {
+    data.float2Offsets[i] = vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, 0.0f, 0.0f);
+    data.jitters[i]       = random_elements[i];
+  }
+#endif
+
+  glNamedBufferSubData(ubo.data, 0, sizeof(gpu::HBAOData), &data);
 }
 
 void SSAO_System::render()
@@ -3357,101 +3464,115 @@ void SSAO_System::render()
 	GPUFUNCTIONSTART;
 
 	if (width != eng->window_w.integer() || height != eng->window_h.integer())
-		make_render_targets();
+		make_render_targets(false);
 
-	MeshBuilder quad;
-	quad.Begin();
-	quad.Push2dQuad(vec2(-1, -1), vec2(2, 2));
-	quad.End();
+	update_ubo();
 
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, halfres_texture, 0);
-	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-	glViewport(0, 0, width/res_scale, height/res_scale);
+	const int quarterWidth  = ((width + 3) / 4);
+	const int quarterHeight = ((height + 3) / 4);
+	
+	glViewport(0, 0, width, height);
 
-	//draw.set_shader(Renderer::S_SSAO);
+	// linearize depth, writes to texture.depthlinear
+	{
+		float near = draw.vs.near;
+		float far = draw.vs.far;
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthlinear);
+		prog.linearize_depth.use();
+		prog.linearize_depth.set_vec4("clipInfo", glm::vec4(
+			near*far,
+			near-far,
+			far,
+			1.0
+		));
+		glBindTextureUnit(0, draw.tex.scene_depthstencil);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-	draw.set_shader(Renderer::S_HBAO);
-
-	draw.shader().set_mat4("Model", mat4(1));
-	draw.shader().set_mat4("ViewProj", mat4(1));
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, draw.tex.scene_depthstencil);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, noise_tex2);
-
-	float fovRad = draw.vs.fov;
-
-	vec2 LinMAD;
-	vec2 ao_res = vec2(width/(res_scale), height/(res_scale));
-	vec2 inv_res = 1.f / ao_res;
-	float ao_aspect_ratio = ao_res.x / ao_res.y;
-	float near = draw.vs.near, far = draw.vs.far;
-	LinMAD[0] = (near - far) / (2.0f * near * far);
-	LinMAD[1] = (near + far) / (2.0f * near * far);
-
-	vec2 FocalLen = glm::vec2(
-		1.f / tanf(fovRad * 0.5) / ao_aspect_ratio,
-		1.f / tanf(fovRad * 0.5)
-	);
-	vec2 InvFocalLen = 1.0f / FocalLen;
-	vec2 UvToViewA = glm::vec2(
-		-2.0f * InvFocalLen.x,
-		-2.0f * InvFocalLen.y
-	);
-	vec2 UvToViewB = glm::vec2(
-		1.0f * InvFocalLen.x,
-		1.0f * InvFocalLen.y
-	);
-	vec2 noise_scale = ao_res / vec2(NOISE_RES);
-	float radius = hbao_radius;
-	float radius2 = radius * radius;
-	float invradius2 = 1.f / radius2;
-
-	draw.shader().set_vec2("FocalLen", FocalLen);
-	draw.shader().set_vec2("AORes", ao_res);
-	draw.shader().set_vec2("InvAORes", inv_res);
-	draw.shader().set_vec2("UvToViewA", UvToViewA);
-	draw.shader().set_vec2("UvToViewB", UvToViewB);
-	draw.shader().set_vec2("LinMAD", LinMAD);
-	draw.shader().set_float("R", radius);
-	draw.shader().set_float("R2", radius2);
-	draw.shader().set_float("NegInvR2", -invradius2);
-	draw.shader().set_vec2("NoiseScale", noise_scale);
-	draw.shader().set_int("NumDirections", hbao_dirs);
-	draw.shader().set_int("NumSamples", hbao_samples);
-	draw.shader().set_float("MaxRadiusPixels", hbao_max_radius_pixels);
-	quad.Draw(GL_TRIANGLES);
-
-
-	if (1) {
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres1, 0);
-		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		draw.set_shader(Renderer::S_XBLUR);
-		draw.shader().set_vec2("InvFullRes", 1.f / vec2(width, height));
-		draw.shader().set_vec2("LinMAD", LinMAD);
-		draw.shader().set_mat4("Model", mat4(1));
-		draw.shader().set_mat4("ViewProj", mat4(1));
-		draw.bind_texture(0, halfres_texture);
-		draw.bind_texture(1, draw.tex.scene_depthstencil);
-		quad.Draw(GL_TRIANGLES);
-
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullres2, 0);
-		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		draw.set_shader(Renderer::S_YBLUR);
-		draw.shader().set_vec2("InvFullRes", 1.f / vec2(width, height));
-		draw.shader().set_vec2("LinMAD", LinMAD);
-		draw.shader().set_mat4("Model", mat4(1));
-		draw.shader().set_mat4("ViewProj", mat4(1));
-		draw.bind_texture(0, fullres1);
-		draw.bind_texture(1, draw.tex.scene_depthstencil);
-		quad.Draw(GL_TRIANGLES);
+		glCheckError();
 	}
+
+	// create viewspace normals, writes to texture.viewnormal
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.viewnormal);
+		prog.make_viewspace_normals.use();
+		prog.make_viewspace_normals.set_int("projOrtho", 0);
+		prog.make_viewspace_normals.set_vec4("projInfo", data.projInfo);
+		prog.make_viewspace_normals.set_vec2("InvFullResolution", data.InvFullResolution);
+		glBindTextureUnit(0, texture.depthlinear);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+
+	// deinterleave, writes to texture.deptharray
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_deinterleave);
+		glViewport(0, 0, quarterWidth, quarterHeight);
+		glBindTextureUnit(0, texture.depthlinear);
+		prog.hbao_deinterleave.use();
+		// two passes
+		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
+			prog.hbao_deinterleave.set_vec4("info", glm::vec4(
+				float(i % 4) + 0.5f, 
+				float(i / 4) + 0.5f, 
+				data.InvFullResolution.x,
+                data.InvFullResolution.y
+			));
+
+			for(int layer = 0; layer < NUM_MRT; layer++)
+				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
+	}
+
+	// calculate hbao, writes to texture.resultarray
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
+		glViewport(0, 0, quarterWidth, quarterHeight);
+		glBindTextureUnit(0, texture.deptharray);
+		glBindTextureUnit(1, texture.viewnormal);
+
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
+
+		prog.hbao_calc.use();
+
+		glDrawArrays(GL_TRIANGLES, 0, 3 * RANDOM_ELEMENTS);
+	}
+
+	// reinterleave, writes to texture.result
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.finalresolve);
+		glViewport(0, 0, width, height);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		prog.hbao_reinterleave.use();
+
+		glBindTextureUnit(0, texture.resultarray);
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+
+	// depth aware blur, writes to texture.result
+	{
+		prog.hbao_blur.use();
+		// framebuffer = fbo.finalresolve
+		glDrawBuffer(GL_COLOR_ATTACHMENT1);
+		glBindTextureUnit(0, texture.result);
+		prog.hbao_blur.set_float("g_Sharpness",
+			tweak.blur_sharpness);
+		prog.hbao_blur.set_vec2("g_InvResolutionDirection", glm::vec2(
+			1.0f / float(width), 
+			0
+		));
+		glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .result and write to .blur
+
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glBindTextureUnit(0, texture.blur);
+		prog.hbao_blur.set_vec2("g_InvResolutionDirection", glm::vec2(
+			0, 
+			1.0f / float(height)
+		));
+		glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .blur and write to .result
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	glCheckError();
-
-	quad.Free();
+	glEnable(GL_DEPTH_TEST);
+	glUseProgram(0);
 }
