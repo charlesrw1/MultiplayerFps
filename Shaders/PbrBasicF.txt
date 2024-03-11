@@ -418,13 +418,13 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	vec3 ambient =(kD*diffuse_light+ specular)*ao;
 	
 #ifdef LIGHTMAPPED
-	//float sun = sample_sun_shadow(FS_IN_FragPos)*max(dot(-g.directional_light_dir_and_used.xyz,N),0.0);
 	//ambient = mix(ambient*0.2, ambient, sun);
 #endif
 
-	ambient += emissive + Lo;
+	float sun_shadow = sample_sun_shadow(FS_IN_FragPos)*max(dot(N, L),0.0);
+	ambient += emissive + Lo*sun_shadow;
 
-	return vec4(ambient, opacity);//vec4(ambient, opacity);
+	return vec4(ambient, opacity);
 }
 
 #ifdef BLEND2

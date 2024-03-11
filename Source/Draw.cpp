@@ -360,7 +360,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glCheckError();
 	draw.bind_texture(BRDF_LUT_LOC, EnviornmentMapHelper::get().integrator.lut_id);
 
-	draw.bind_texture(SHADOWMAP_LOC, draw.shadowmap.shadow_map_array);
+	draw.bind_texture(SHADOWMAP_LOC, draw.shadowmap.texture.shadow_array);
 
 	glCheckError();
 
@@ -391,7 +391,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	//glBindBufferBase(GL_UNIFORM_BUFFER, 4, draw.volfog.param_ubo);
 
 	glCheckError();
-	glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.csm_ubo);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.ubo.info);
 
 	glCheckError();
 
@@ -502,13 +502,9 @@ void Renderer::reload_shaders()
 
 
 	// Bloom shaders
-	Shader::compile(&shader_list[S_BLOOM_DOWNSAMPLE], "MbTexturedV.txt", "BloomDownsampleF.txt");
-	Shader::compile(&shader_list[S_BLOOM_UPSAMPLE], "MbTexturedV.txt", "BloomUpsampleF.txt");
-	Shader::compile(&shader_list[S_COMBINE], "MbTexturedV.txt", "CombineF.txt");
-	set_shader(shader_list[S_COMBINE]);
-	shader().set_int("scene_lit", 0);
-	shader().set_int("bloom", 1);
-	shader().set_int("lens_dirt", 2);
+	Shader::compile(&shader_list[S_BLOOM_DOWNSAMPLE], "fullscreenquad.txt", "BloomDownsampleF.txt");
+	Shader::compile(&shader_list[S_BLOOM_UPSAMPLE], "fullscreenquad.txt", "BloomUpsampleF.txt");
+	Shader::compile(&shader_list[S_COMBINE], "fullscreenquad.txt", "CombineF.txt");
 
 
 	// Ssao shaders
@@ -535,12 +531,12 @@ void Renderer::reload_shaders()
 
 
 	// volumetric fog shaders
-	Shader::compute_compile(&volfog.lightcalc, "VfogScatteringC.txt");
-	Shader::compute_compile(&volfog.raymarch, "VfogRaymarchC.txt");
-	Shader::compute_compile(&volfog.reproject, "VfogScatteringC.txt", "REPROJECTION");
-	volfog.lightcalc.use();
-	volfog.lightcalc.set_int("previous_volume", 0);
-	volfog.lightcalc.set_int("perlin_noise", 1);
+	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
+	Shader::compute_compile(&volfog.prog.raymarch, "VfogRaymarchC.txt");
+	Shader::compute_compile(&volfog.prog.reproject, "VfogScatteringC.txt", "REPROJECTION");
+	volfog.prog.lightcalc.use();
+	volfog.prog.lightcalc.set_int("previous_volume", 0);
+	volfog.prog.lightcalc.set_int("perlin_noise", 1);
 
 
 	// water shader
@@ -577,7 +573,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 
 	constants.near = vs.near;
 	constants.far = vs.far;
-	constants.shadowmap_epsilon = shadowmap.epsilon;
+	constants.shadowmap_epsilon = shadowmap.tweak.epsilon;
 
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
@@ -605,55 +601,46 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 
 const static int csm_resolutions[] = { 0, 256, 512, 1024 };
 
+void shadow_map_tweaks()
+{
+	auto& tweak = draw.shadowmap.tweak;
+	ImGui::DragFloat("log lin", &tweak.log_lin_lerp_factor,0.02);
+	if (ImGui::SliderInt("quality", &tweak.quality, 0, 4))
+		draw.shadowmap.targets_dirty = true;
+	ImGui::DragFloat("epsilon", &tweak.epsilon, 0.01);
+	ImGui::DragFloat("pfac", &tweak.poly_factor, 0.01);
+	ImGui::DragFloat("punit", &tweak.poly_units, 0.01);
+	ImGui::DragFloat("zscale", &tweak.z_dist_scaling, 0.01);
+
+}
+
 
 void Shadow_Map_System::init()
 {
+	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);
+
 	make_csm_rendertargets();
-	glCreateBuffers(1, &csm_ubo);
-	glCreateBuffers(4, frame_view_ubos);
+	glCreateBuffers(1, &ubo.info);
+	glCreateBuffers(4, ubo.frame_view);
 }
 void Shadow_Map_System::make_csm_rendertargets()
 {
-	if (quality == 0)
+	if (tweak.quality == 0)
 		return;
-	csm_resolution = csm_resolutions[(int)quality];
+	csm_resolution = csm_resolutions[(int)tweak.quality];
 
-	glGenTextures(1, &shadow_map_array);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_map_array);
-	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
-	bool hardware_filtering = false;
-	if (hardware_filtering) {
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
-	}
-	else {
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	}
-
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
+	glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
+	glTextureParameteri(texture.shadow_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(texture.shadow_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(texture.shadow_array, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTextureParameteri(texture.shadow_array, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
+	glTextureParameteri(texture.shadow_array, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTextureParameteri(texture.shadow_array, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	float bordercolor[] = { 1.0,1.0,1.0,1.0 };
-	glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, bordercolor);
-	glCheckError();
+	glTextureParameterfv(texture.shadow_array, GL_TEXTURE_BORDER_COLOR, bordercolor);
 
-	glGenFramebuffers(1, &framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	glCheckError();
-
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0);
-	glCheckError();
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		printf("GBuffer framebuffer not complete!\n");
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-	glCheckError();
+	glCreateFramebuffers(1, &fbo.shadow);
 }
 
 
@@ -678,23 +665,23 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 
 void Shadow_Map_System::update()
 {
-	int setting = draw.shadow_quality_setting.integer();
-	if (setting < 0) setting = 0;
-	else if (setting > 3) setting = 3;
-	draw.shadow_quality_setting.integer() = setting;
+	//int setting = draw.shadow_quality_setting.integer();
+	//if (setting < 0) setting = 0;
+	//else if (setting > 3) setting = 3;
+	//draw.shadow_quality_setting.integer() = setting;
 
-	if (quality != setting) {
-		quality = setting;
-		targets_dirty = true;
-	}
+	//if (tweak.quality != setting) {
+	//	tweak.quality = setting;
+	//	targets_dirty = true;
+	//}
 
 	if (targets_dirty) {
-		glDeleteTextures(1, &shadow_map_array);
-		glDeleteFramebuffers(1, &framebuffer);
+		glDeleteTextures(1, &texture.shadow_array);
+		glDeleteFramebuffers(1, &fbo.shadow);
 		make_csm_rendertargets();
 		targets_dirty = false;
 	}
-	if (quality == 0)
+	if (tweak.quality == 0)
 		return;
 	if (draw.scene.directional_index == -1)
 		return;
@@ -707,9 +694,9 @@ void Shadow_Map_System::update()
 		const View_Setup& view = draw.vs;
 
 		float near = view.near;
-		float far = glm::min(view.far, max_shadow_dist);
+		float far = glm::min(view.far, tweak.max_shadow_dist);
 
-		split_distances = CalcPlaneSplits(near, far, log_lin_lerp_factor);
+		split_distances = CalcPlaneSplits(near, far, tweak.log_lin_lerp_factor);
 		for (int i = 0; i < MAXCASCADES; i++)
 			update_cascade(i, view, directional_dir);
 
@@ -726,18 +713,18 @@ void Shadow_Map_System::update()
 			upload_data.far_planes[i] = farplanes[i];
 		}
 
-		glNamedBufferData(csm_ubo, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
+		glNamedBufferData(ubo.info, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
 	}
 	// now setup scene for rendering
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
 	{
 		GPUSCOPESTART("Render csm layer");
 		for (int i = 0; i < 4; i++) {
 
-			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_array, 0, i);
+			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array, 0, i);
 
 			Render_Level_Params params;
-			params.output_framebuffer = framebuffer;
+			params.output_framebuffer = fbo.shadow;
 			params.pass = Render_Level_Params::SHADOWMAP;
 			View_Setup setup;
 			setup.width = csm_resolution;
@@ -747,7 +734,7 @@ void Shadow_Map_System::update()
 			setup.viewproj = matricies[i];
 			setup.view = setup.proj = mat4(1);
 			params.view = setup;
-			params.provied_constant_buffer = frame_view_ubos[i];
+			params.provied_constant_buffer = ubo.frame_view[i];
 			params.upload_constants = true;
 
 			draw.render_level_to_target(params);
@@ -781,7 +768,7 @@ void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, 
 {
 	float far = split_distances[cascade_idx];
 	float near = (cascade_idx == 0) ? view.near : split_distances[cascade_idx - 1];
-	if (fit_to_scene)
+	if (tweak.fit_to_scene)
 		near = view.near;
 
 	mat4 camera_cascaded_proj = glm::perspective(
@@ -798,7 +785,7 @@ void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, 
 	mat4 light_cascade_view = glm::lookAt(frustum_center - directionalDir, frustum_center, vec3(0, 1, 0));
 	vec3 viewspace_min = vec3(INFINITY);
 	vec3 viewspace_max = vec3(-INFINITY);
-	if (reduce_shimmering)
+	if (tweak.reduce_shimmering)
 	{
 		float sphere_radius = 0.f;
 		for (int i = 0; i < 8; i++) {
@@ -827,20 +814,20 @@ void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, 
 
 	}
 	if (viewspace_min.z < 0)
-		viewspace_min.z *= z_dist_scaling;
+		viewspace_min.z *= tweak.z_dist_scaling;
 	else
-		viewspace_min.z /= z_dist_scaling;
+		viewspace_min.z /= tweak.z_dist_scaling;
 
 	if (viewspace_max.z < 0)
-		viewspace_max.z /= z_dist_scaling;
+		viewspace_max.z /= tweak.z_dist_scaling;
 	else
-		viewspace_max.z *= z_dist_scaling;
+		viewspace_max.z *= tweak.z_dist_scaling;
 
 	vec3 cascade_extent = viewspace_max - viewspace_min;
 
 	mat4 light_cascade_proj = glm::ortho(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y, viewspace_min.z, viewspace_max.z);
 	mat4 shadow_matrix = light_cascade_proj * light_cascade_view;
-	if (reduce_shimmering)
+	if (tweak.reduce_shimmering)
 	{
 		vec4 shadow_origin = vec4(0, 0, 0, 1);
 		shadow_origin = shadow_matrix * shadow_origin;
@@ -889,8 +876,8 @@ void Volumetric_Fog_System::init()
 
 	voltexturesize = volfog_sizes[1];
 
-	glGenTextures(1, &voltexture);
-	glBindTexture(GL_TEXTURE_3D, voltexture);
+	glGenTextures(1, &texture.volume);
+	glBindTexture(GL_TEXTURE_3D, texture.volume);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -898,8 +885,8 @@ void Volumetric_Fog_System::init()
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
 
-	glGenTextures(1, &voltexture_prev);
-	glBindTexture(GL_TEXTURE_3D, voltexture_prev);
+	glGenTextures(1, &texture.last_volume);
+	glBindTexture(GL_TEXTURE_3D, texture.last_volume);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -908,8 +895,8 @@ void Volumetric_Fog_System::init()
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);	// REEE!!!!!!!!!!!!!
 
 
-	glCreateBuffers(1, &light_ssbo);
-	glCreateBuffers(1, &param_ubo);
+	glCreateBuffers(1, &buffer.light);
+	glCreateBuffers(1, &buffer.param);
 
 	glCheckError();
 }
@@ -932,7 +919,7 @@ void Volumetric_Fog_System::compute()
 		vfl.direction_coneangle = vec4(l.direction, l.spot_angle);
 	}
 
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, light_ssbo);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.light);
 	if (num_lights > 0)
 		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vfog_Light) * num_lights, light_buffer, GL_DYNAMIC_DRAW);
 
@@ -941,47 +928,47 @@ void Volumetric_Fog_System::compute()
 	params.volspread_frustumend = vec4(spread, frustum_end, 0, 0);
 	params.last_frame_viewproj = draw.lastframe_vs.viewproj;
 	params.reprojection = vec4(temporal_sequence, 0.1, 0, 0);
-	glBindBuffer(GL_UNIFORM_BUFFER, param_ubo);
+	glBindBuffer(GL_UNIFORM_BUFFER, buffer.param);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof Vfog_Params, &params, GL_DYNAMIC_DRAW);
 
 
-	glBindBufferBase(GL_UNIFORM_BUFFER, 4, param_ubo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, light_ssbo);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 4, buffer.param);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, buffer.light);
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.active_constants_ubo);
 	glCheckError();
 	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
 	{
-		lightcalc.use();
+		prog.lightcalc.use();
 
-		lightcalc.set_mat4("InvViewProj", glm::inverse(draw.vs.viewproj));
-		lightcalc.set_vec3("ViewPos", draw.vs.origin);
-		glUniform3i(glGetUniformLocation(lightcalc.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
+		prog.lightcalc.set_mat4("InvViewProj", glm::inverse(draw.vs.viewproj));
+		prog.lightcalc.set_vec3("ViewPos", draw.vs.origin);
+		glUniform3i(glGetUniformLocation(prog.lightcalc.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
 
-		lightcalc.set_float("znear", draw.vs.near);
-		lightcalc.set_float("zfar", draw.vs.far);
-		lightcalc.set_mat4("InvView", glm::inverse(draw.vs.view));
-		lightcalc.set_mat4("InvProjection", glm::inverse(draw.vs.proj));
+		prog.lightcalc.set_float("znear", draw.vs.near);
+		prog.lightcalc.set_float("zfar", draw.vs.far);
+		prog.lightcalc.set_mat4("InvView", glm::inverse(draw.vs.view));
+		prog.lightcalc.set_mat4("InvProjection", glm::inverse(draw.vs.proj));
 
-		lightcalc.set_float("density", draw.vfog.x);
-		lightcalc.set_float("anisotropy", draw.vfog.y);
-		lightcalc.set_vec3("ambient", draw.ambientvfog);
+		prog.lightcalc.set_float("density", draw.vfog.x);
+		prog.lightcalc.set_float("anisotropy", draw.vfog.y);
+		prog.lightcalc.set_vec3("ambient", draw.ambientvfog);
 
-		lightcalc.set_vec3("spotlightpos", vec3(0, 2, 0));
-		lightcalc.set_vec3("spotlightnormal", vec3(0, -1, 0));
-		lightcalc.set_float("spotlightangle", 0.5);
-		lightcalc.set_vec3("spotlightcolor", vec3(10.f));
+		prog.lightcalc.set_vec3("spotlightpos", vec3(0, 2, 0));
+		prog.lightcalc.set_vec3("spotlightnormal", vec3(0, -1, 0));
+		prog.lightcalc.set_float("spotlightangle", 0.5);
+		prog.lightcalc.set_vec3("spotlightcolor", vec3(10.f));
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_3D, voltexture_prev);
+		glBindTexture(GL_TEXTURE_3D, texture.last_volume);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
-		lightcalc.set_vec3("perlin_offset", glm::vec3(eng->time * 0.2, 0, eng->time));
+		prog.lightcalc.set_vec3("perlin_offset", glm::vec3(eng->time * 0.2, 0, eng->time));
 
 
-		lightcalc.set_int("num_lights", 0);
+		prog.lightcalc.set_int("num_lights", 0);
 		glCheckError();
 
-		glBindImageTexture(2, voltexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(2, texture.volume, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 		glDispatchCompute(groups.x, groups.y, groups.z);
 
@@ -991,13 +978,13 @@ void Volumetric_Fog_System::compute()
 	}
 	//static Config_Var* fog_raymarch = cfg.get_var("dbg/raymarch", "1");
 	if (1) {
-		raymarch.use();
-		raymarch.set_float("znear", draw.vs.near);
-		raymarch.set_float("zfar", draw.vs.far);
-		glUniform3i(glGetUniformLocation(raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
+		prog.raymarch.use();
+		prog.raymarch.set_float("znear", draw.vs.near);
+		prog.raymarch.set_float("zfar", draw.vs.far);
+		glUniform3i(glGetUniformLocation(prog.raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
 
-		glBindImageTexture(5, voltexture_prev, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glBindImageTexture(2, voltexture, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA16F);
+		glBindImageTexture(5, texture.last_volume, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(2, texture.volume, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA16F);
 
 		glDispatchCompute(groups.x, groups.y, 1);
 
@@ -1005,7 +992,7 @@ void Volumetric_Fog_System::compute()
 		glCheckError();
 
 		// swap, rendering with voltexture
-		std::swap(voltexture, voltexture_prev);
+		std::swap(texture.volume, texture.last_volume);
 	}
 
 
@@ -1238,12 +1225,11 @@ void Renderer::init_bloom_buffers()
 {
 	glDeleteFramebuffers(1, &fbo.bloom);
 	glDeleteTextures(BLOOM_MIPS, tex.bloom_chain);
-	glDeleteRenderbuffers(1, &tex.bloom_depth);
 
-	glGenFramebuffers(1, &fbo.bloom);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
+	glCreateFramebuffers(1, &fbo.bloom);
 
-	glGenTextures(BLOOM_MIPS, tex.bloom_chain);
+
+	glCreateTextures(GL_TEXTURE_2D, BLOOM_MIPS, tex.bloom_chain);
 	int x = cur_w / 2;
 	int y = cur_h / 2;
 	float fx = x;
@@ -1251,25 +1237,16 @@ void Renderer::init_bloom_buffers()
 	for (int i = 0; i < BLOOM_MIPS; i++) {
 		tex.bloom_chain_isize[i] = { x,y };
 		tex.bloom_chain_size[i] = { fx,fy };
-		glBindTexture(GL_TEXTURE_2D, tex.bloom_chain[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, x, y, 0, GL_RGB, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTextureStorage2D(tex.bloom_chain[i], 1, GL_R11F_G11F_B10F, x, y);
+		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		x /= 2;
 		y /= 2;
 		fx *= 0.5;
 		fy *= 0.5;
 	}
-
-	glGenRenderbuffers(1, &tex.bloom_depth);
-	glBindRenderbuffer(GL_RENDERBUFFER, tex.bloom_depth);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, cur_w / 2, cur_h / 2);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, tex.bloom_depth);
-
-	glCheckError();
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
@@ -1282,41 +1259,31 @@ void Renderer::render_bloom_chain()
 	if (!enable_bloom.integer())
 		return;
 
-
-	MeshBuilder mb;
-	mb.Begin();
-	mb.Push2dQuad(vec2(-1, -1), vec2(2, 2));
-	mb.End();
-
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
-	glActiveTexture(GL_TEXTURE0);
 	set_shader(S_BLOOM_DOWNSAMPLE);
-	shader().set_mat4("Model", mat4(1));
-	shader().set_mat4("ViewProj", mat4(1));
 	float src_x = cur_w;
 	float src_y = cur_h;
 
-	glBindTexture(GL_TEXTURE_2D, tex.scene_color);
-	glDisable(GL_DEPTH_TEST);
-	glClearColor(0, 0, 0, 1);
+	glBindTextureUnit(0, tex.scene_color);
+	glClearColor(1, 0, 0, 1);
 	for (int i = 0; i < BLOOM_MIPS; i++)
 	{
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.bloom_chain[i], 0);
+		glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i], 0);
+
 		shader().set_vec2("srcResolution", vec2(src_x, src_y));
 		shader().set_int("mipLevel", i);
 		src_x = tex.bloom_chain_size[i].x;
 		src_y = tex.bloom_chain_size[i].y;
 
 		glViewport(0, 0, src_x, src_y);	// dest size
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT);
+		
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		mb.Draw(GL_TRIANGLES);
-
-		glBindTexture(GL_TEXTURE_2D, tex.bloom_chain[i]);
+		glBindTextureUnit(0, tex.bloom_chain[i]);
 	}
 
 	if (bloom_stop) {
-		mb.Free();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		return;
 	}
@@ -1325,25 +1292,21 @@ void Renderer::render_bloom_chain()
 	glBlendFunc(GL_ONE, GL_ONE);
 
 	set_shader(S_BLOOM_UPSAMPLE);
-	shader().set_mat4("Model", mat4(1));
-	shader().set_mat4("ViewProj", mat4(1));
 	for (int i = BLOOM_MIPS - 1; i > 0; i--)
 	{
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex.bloom_chain[i - 1], 0);
+		glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i - 1], 0);
+
 		vec2 destsize = tex.bloom_chain_size[i - 1];
 		glViewport(0, 0, destsize.x, destsize.y);
-		//glClear(GL_COLOR_BUFFER_BIT);
-		glBindTexture(GL_TEXTURE_2D, tex.bloom_chain[i]);
+		glBindTextureUnit(0, tex.bloom_chain[i]);
 		shader().set_float("filterRadius", 0.0001f);
 
-		mb.Draw(GL_TRIANGLES);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
-	glDepthMask(GL_TRUE);
+
 	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	mb.Free();
-
 	glCheckError();
 }
 
@@ -1366,7 +1329,7 @@ void Renderer::DrawSkybox()
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, scene.skybox);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_3D, volfog.voltexture);
+	glBindTexture(GL_TEXTURE_3D, volfog.texture.volume);
 
 
 	glDisable(GL_CULL_FACE);
@@ -1412,7 +1375,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 
 	if (params.pass == Render_Level_Params::SHADOWMAP) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonOffset(shadowmap.poly_factor, shadowmap.poly_units);
+		glPolygonOffset(shadowmap.tweak.poly_factor, shadowmap.tweak.poly_units);
 		glCullFace(GL_FRONT);
 		glDisable(GL_CULL_FACE);
 	}
@@ -2561,25 +2524,20 @@ void Renderer::scene_draw(bool editor_mode)
 
 	int x = vs.width;
 	int y = vs.height;
-	MeshBuilder mb;
-	mb.Begin();
-	mb.Push2dQuad(vec2(-1, -1), vec2(2, 2));
-	mb.End();
 
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, cur_w, cur_h);
 
 	set_shader(S_COMBINE);
-	shader().set_mat4("Model", mat4(1));
-	shader().set_mat4("ViewProj", mat4(1));
 	uint32_t bloom_tex = tex.bloom_chain[0];
 	if (!enable_bloom.integer()) bloom_tex = black_texture.gl_id;
 	bind_texture(0, tex.scene_color);
 	bind_texture(1, bloom_tex);
 	bind_texture(2, lens_dirt->gl_id);
-	mb.Draw(GL_TRIANGLES);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
 
+	MeshBuilder mb;
 	mb.Begin();
 	if (draw_sv_colliders.integer()) {
 		for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -3219,11 +3177,6 @@ float ourLerp(float a, float b, float f)
 	return a + f * (b - a);
 }
 
-
-static float hbao_radius = 0.3f;
-static int hbao_dirs = 6;
-static int hbao_samples = 4;
-static float hbao_max_radius_pixels = 50.f;
 
 void draw_hbao_menu()
 {

@@ -129,6 +129,9 @@ void Profiler::start_scope(const char* name, bool gpu)
 		glQueryCounter(e.glquery[0], GL_TIMESTAMP);
 	}
 
+	if(e.is_gpu_event)
+		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name);
+
 	stack.push_back(index);
 
 	glCheckError();
@@ -170,6 +173,9 @@ void Profiler::end_scope(const char* name)
 			e.waiting = false;
 		}
 	}
+
+	if (e.is_gpu_event)
+		glPopDebugGroup();
 
 	stack.pop_back();
 }

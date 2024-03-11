@@ -11,6 +11,8 @@
 #include "Util.h"
 #include "Animation.h"
 #include "BVH.h"
+#include "DrawTypedefs.h"
+
 using std::string;
 using std::vector;
 using std::unique_ptr;
@@ -75,7 +77,7 @@ public:
 	uint32_t merged_vert_offset = 0;
 	bool is_merged = false;
 	int format = 0;
-	uint32_t vao = 0;
+	vertexarrayhandle vao = 0;
 
 	bool has_lightmap_coords() const;
 	bool has_colors() const;
@@ -159,7 +161,7 @@ public:
 
 
 	struct Gpu_Buffer {
-		uint32_t handle = 0;
+		bufferhandle handle = 0;
 		uint32_t allocated = 0;
 		uint32_t target = 0;
 		uint32_t used = 0;
@@ -180,8 +182,8 @@ public:
 	std::unordered_map<string, Prefab_Model*> prefabs;
 	std::unordered_map<string, Model*> models;
 
-	uint32_t depth_animated_vao = 0;
-	uint32_t depth_static_vao = 0;
+	vertexarrayhandle depth_animated_vao = 0;
+	vertexarrayhandle depth_static_vao = 0;
 	Gpu_Buffer global_index_buffer;
 	Shared_Vertex_Buffer global_vertex_buffers[NUM_FMT];
 

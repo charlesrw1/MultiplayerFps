@@ -69,6 +69,7 @@
     <ClInclude Include="source\Client.h" />
     <ClInclude Include="Source\Dict.h" />
     <ClInclude Include="Source\Draw.h" />
+    <ClInclude Include="Source\DrawTypedefs.h" />
     <ClInclude Include="Source\EditorDoc.h" />
     <ClInclude Include="Source\EnvProbe.h" />
     <ClInclude Include="Source\External\glad\glad.h" />

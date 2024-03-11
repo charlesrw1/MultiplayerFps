@@ -990,12 +990,7 @@ void draw_wind_menu()
 	ImGui::DragFloat("spread", &draw.volfog.spread, 0.02);
 	ImGui::DragFloat("frustum", &draw.volfog.frustum_end, 0.02);
 	ImGui::DragFloat("slice", &draw.slice_3d, 0.04, 0, 4);
-	ImGui::DragFloat("epsilon", &draw.shadowmap.epsilon, 0.0002, 0, 0.5);
-	ImGui::DragFloat("log_lin_lerp_factor", &draw.shadowmap.log_lin_lerp_factor, 0.02, 0, 1.0);
-	ImGui::DragFloat("poly_factor", &draw.shadowmap.poly_factor, 0.02, 0, 8.0);
-	ImGui::DragFloat("poly_units", &draw.shadowmap.poly_units, 0.02, 0, 8.0);
-	ImGui::DragFloat("z_dist_scaling", &draw.shadowmap.z_dist_scaling, 0.02, 0, 8.0);
-	ImGui::SliderInt("cubemap index", &draw.cubemap_index, 0, 12);
+	
 
 
 	ImGui::Image(ImTextureID(draw.ssao.texture.viewnormal), ImVec2(512, 512));

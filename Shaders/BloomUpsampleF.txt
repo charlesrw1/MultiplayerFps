@@ -11,7 +11,7 @@
 uniform sampler2D srcTexture;
 uniform float filterRadius;
 
-in vec2 FS_IN_TexCoord;
+in vec2 texCoord;
 out vec3 FS_OUT_Upsample;
 
 void main()
@@ -20,7 +20,6 @@ void main()
     // coordinates, so that the radius will vary across mip resolutions.
     float x = filterRadius;
     float y = filterRadius;
-	vec2 texCoord = FS_IN_TexCoord;
 
     // Take 9 samples around current texel:
     // a - b - c

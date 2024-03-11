@@ -239,5 +239,8 @@
     <ClInclude Include="Source\EnvProbe.h">
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\DrawTypedefs.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

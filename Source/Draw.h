@@ -10,6 +10,7 @@
 #include "EnvProbe.h"
 #include "Texture.h"
 #include "../Shaders/SharedGpuTypes.txt";
+#include "DrawTypedefs.h"
 
 class MeshPart;
 class Model;
@@ -27,30 +28,33 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
-typedef uint32_t texhandle;
-typedef uint32_t fbohandle;
-typedef uint32_t bufferhandle;
-
 class Volumetric_Fog_System
 {
 public:
 	int quality = 2;
-	uint32_t voltexture = 0;
-	uint32_t voltexture_prev = 0;
+
 	glm::ivec3 voltexturesize;
-
-	Shader reproject;
-	Shader lightcalc;
-	Shader raymarch;
-
 	float density = 10.0;
 	float anisotropy = 0.7;
 	float spread = 1.0;
 	float frustum_end = 50.f;
 	int temporal_sequence = 0;
 
-	uint32_t light_ssbo;
-	uint32_t param_ubo;
+	struct buffers {
+		bufferhandle light;
+		bufferhandle param;
+	}buffer;
+
+	struct programs {
+		Shader reproject;
+		Shader lightcalc;
+		Shader raymarch;
+	}prog;
+
+	struct textures {
+		texhandle volume;
+		texhandle last_volume;
+	}texture;
 
 	void init();
 	void shutdown();
@@ -65,29 +69,40 @@ public:
 	void update_cascade(int idx, const View_Setup& vs, glm::vec3 directional_dir);
 
 	const static int MAXCASCADES = 4;
-	uint32_t frame_view_ubos[4];
+
+	struct uniform_buffers {
+		bufferhandle frame_view[4];
+		bufferhandle info;
+	}ubo;
+
+	struct framebuffers {
+		fbohandle shadow;
+	}fbo;
+
+	struct textures {
+		texhandle shadow_array;
+	}texture;
+
+	struct params {
+		bool cull_front_faces = false;
+		bool fit_to_scene = true;
+		bool reduce_shimmering = true;
+		float log_lin_lerp_factor = 0.5;
+		float max_shadow_dist = 80.f;
+		float epsilon = 0.008f;
+		float poly_units = 4;
+		float poly_factor = 1.1;
+		float z_dist_scaling = 1.f;
+		int quality = 2;
+	}tweak;
+
 	glm::vec4 split_distances;
 	glm::mat4x4 matricies[MAXCASCADES];
 	float nearplanes[MAXCASCADES];
 	float farplanes[MAXCASCADES];
-	uint32_t csm_ubo;
 	int csm_resolution = 0;
 	bool enabled = false;
 	Level_Light current_sun;
-
-	uint32_t shadow_map_array;
-	uint32_t framebuffer;
-	// Parameters
-	bool cull_front_faces = false;
-	bool fit_to_scene = true;
-	bool reduce_shimmering = true;
-	float log_lin_lerp_factor = 0.5;
-	float max_shadow_dist = 80.f;
-	float epsilon = 0.008f;
-	float poly_units = 4;
-	float poly_factor = 1.1;
-	float z_dist_scaling = 1.f;
-	int quality = 2;
 	bool targets_dirty = false;
 };
 
@@ -417,32 +432,32 @@ public:
 
 	Shader shader_list[NUM_NON_MODEL_SHADERS + NUM_MST * (1 << NUM_SDP)];
 
-	struct {
-		uint32_t scene;
-		uint32_t reflected_scene;
-		uint32_t bloom;
+	struct framebuffers {
+		fbohandle scene;
+		fbohandle reflected_scene;
+		fbohandle bloom;
 	}fbo;
-	struct {
-		uint32_t scene_color;
-		uint32_t scene_depthstencil;
-		uint32_t reflected_color;
-		uint32_t reflected_depth;
 
-		uint32_t bloom_depth;
-		uint32_t bloom_chain[BLOOM_MIPS];
+	struct textures {
+		texhandle scene_color;
+		texhandle scene_depthstencil;
+		texhandle reflected_color;
+		texhandle reflected_depth;
+		texhandle bloom_chain[BLOOM_MIPS];
 		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
 		glm::vec2 bloom_chain_size[BLOOM_MIPS];
 	}tex;
-	struct {
-		uint32_t current_frame;
+
+	struct uniform_buffers {
+		bufferhandle current_frame;
 	}ubo;
 
-	uint32_t active_constants_ubo = 0;
+	bufferhandle active_constants_ubo = 0;
+	
 	View_Setup vs;	// globally accessible view for passes
 	View_Setup lastframe_vs;
 
 	// graphics_settings
-	
 	Auto_Config_Var draw_collision_tris;
 	Auto_Config_Var draw_sv_colliders;
 	Auto_Config_Var draw_viewmodel;
@@ -452,7 +467,6 @@ public:
 	Auto_Config_Var enable_volumetric_fog;
 	Auto_Config_Var enable_ssao;
 	Auto_Config_Var use_halfres_reflections;
-
 
 	void bind_texture(int bind, int id);
 	void set_shader(Shader& s) { 
@@ -552,11 +566,11 @@ private:
 
 	int cur_w = 0;
 	int cur_h = 0;
-	uint32_t cur_shader = 0;
-	uint32_t cur_tex[MAX_SAMPLER_BINDINGS];
+	proghandle cur_shader = 0;
+	texhandle cur_tex[MAX_SAMPLER_BINDINGS];
 
 	MeshBuilder ui_builder;
-	uint32_t building_ui_texture;
+	texhandle building_ui_texture;
 
 	MeshBuilder shadowverts;
 

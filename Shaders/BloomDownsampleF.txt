@@ -5,7 +5,7 @@ uniform sampler2D srcTexture;
 uniform vec2 srcResolution;
 uniform int mipLevel;
 
-in vec2 FS_IN_TexCoord;
+in vec2 texCoord;
 out vec3 FS_OUT_Downsample;
 
 vec3 PowVec3(vec3 v, float p)
@@ -33,7 +33,6 @@ void main()
     vec2 srcTexelSize = 1.0 / srcResolution;
     float x = srcTexelSize.x;
     float y = srcTexelSize.y;
-	vec2 texCoord = FS_IN_TexCoord;
 
     // Take 13 samples around current texel:
     // a - b - c
