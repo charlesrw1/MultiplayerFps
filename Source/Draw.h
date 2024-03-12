@@ -443,6 +443,7 @@ public:
 		texhandle scene_depthstencil;
 		texhandle reflected_color;
 		texhandle reflected_depth;
+
 		texhandle bloom_chain[BLOOM_MIPS];
 		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
 		glm::vec2 bloom_chain_size[BLOOM_MIPS];

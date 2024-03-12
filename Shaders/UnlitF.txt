@@ -36,5 +36,5 @@ void main()
 	//vec4 color = texture(sampler2D(img_handle),FS_IN_Texcoord);
 
 	//FS_OUT_Color = vec4(FS_IN_ColorHash.rgbb);
-	FS_OUT_Color = vec4(FS_IN_ColorHash*ndotv*10.f,1);
+	FS_OUT_Color = vec4(FS_IN_ColorHash*ndotv,1);
 }

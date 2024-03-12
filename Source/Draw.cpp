@@ -1265,7 +1265,7 @@ void Renderer::render_bloom_chain()
 	float src_y = cur_h;
 
 	glBindTextureUnit(0, tex.scene_color);
-	glClearColor(1, 0, 0, 1);
+	glClearColor(0, 0, 0, 1);
 	for (int i = 0; i < BLOOM_MIPS; i++)
 	{
 		glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i], 0);
