@@ -146,7 +146,7 @@ void Animator::AdvanceFrame(float elapsed)
 		legs.finished = true;
 }
 
-#if 0
+#if 1
 
 float LawOfCosines(float a, float b, float c)
 {
@@ -475,3 +475,366 @@ void Animator::set_leg_anim(const char* name, bool restart, float blend)
 	int animation = set->find(name);
 	set_anim_from_index(legs, animation, restart, blend);
 }
+
+typedef uint32_t bonehandle;
+
+class IK_Controller
+{
+public:
+	virtual void update() = 0;
+	bonehandle bone1;
+	bonehandle bone2;
+	glm::vec3 targetpos;
+};
+
+class Single_Bone_Controller
+{
+public:
+
+	Model* mod;
+	bonehandle bone;
+};
+
+
+class Pose
+{
+public:
+	Pose(Model* m) : mod(m) {}
+	Model* mod;
+	int bonecount = 0;
+	glm::quat rot[MAX_BONES];
+	glm::vec3 pos[MAX_BONES];
+};
+
+class Pose_Weights
+{
+public:
+	uint64_t mask[MAX_BONES / 64];
+	float weights[MAX_BONES];
+};
+
+typedef uint32_t animhandle;
+
+
+class AnimSeqExt
+{
+public:
+	enum Type
+	{
+		STANDARD,
+		DIRECTIONAL_BLEND,
+		AIM_BLEND,
+		TURN_BLEND
+	}type;
+	enum Turn_Blend_Enums {
+		TURN_45,
+		TURN_NEG45,
+		TURN_90,
+		TURN_NEG90
+	};
+	enum Aim_Blend_Enums {
+		AIM_UP,
+		AIM_DOWN,
+		AIM_LEFT,
+		AIM_RIGHT,
+	};
+	enum Directional_Blend_Enums {
+		DIR_FORWARD,
+		DIR_BACKWARD,
+		DIR_LEFT,
+		DIR_RIGT,
+	}; 
+	int type_enum;
+	int num_clips = 0;
+	float clip_cdf[10];	// type == STANDARD && num_clips > 1
+	animhandle clips[10];
+};
+
+
+// b = b-a
+static void util_subtract(const Pose& a, Pose& b)
+{
+	for (int i = 0; i < a.bonecount; i++) {
+		b.pos[i] = b.pos[i] - a.pos[i];
+		b.rot[i] = b.rot[i] - a.rot[i];
+	}
+
+}
+// b = lerp(a,b,f)
+static void util_blend(const Pose& a, Pose& b, float factor)
+{
+	for (int i = 0; i < a.bonecount; i++) {
+		b.rot[i] = glm::slerp(b.rot[i], a.rot[i], factor);
+		b.rot[i] = glm::normalize(b.rot[i]);
+		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor);
+	}
+}
+// b = b+a
+static void util_add(const Pose& a, Pose& b)
+{
+	for (int i = 0; i < a.bonecount; i++) {
+		b.pos[i] = b.pos[i] + a.pos[i];
+		b.rot[i] = b.rot[i] + a.rot[i];
+	}
+}
+
+static void util_blend_bilinear(const Pose& out, Pose* in, int incount, glm::vec2 interp)
+{
+
+
+}
+
+
+
+static void util_twobone_ik(
+	const vec3& a, const vec3& b, const vec3& c, 
+	const vec3& target, const vec3& pole_vector,
+	const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
+	glm::quat& a_local_rotation, glm::quat& b_local_rotation)
+{
+	float eps = 0.01;
+	float len_ab = length(b - a);
+	float len_cb = length(b - c);
+	float len_at = glm::clamp(length(target - a), eps, len_ab + len_cb - eps);
+
+	// Interior angles of a and b
+	float a_interior_angle = acos(dot(normalize(c - a), normalize(b - a)));
+	float b_interior_angle = acos(dot(normalize(a - b), normalize(c - b)));
+	float c_interior_angle = acos(dot(normalize(c - a), normalize(target - a)));
+
+	// Law of cosines to get the desired angles of the triangle
+	float a_desired_angle = acos(LawOfCosines(len_cb, len_ab, len_at));
+	float b_desired_angle = acos(LawOfCosines(len_at, len_ab, len_cb));
+
+	// Axis to rotate around
+	vec3 axis0 = normalize(cross(c - a, b - a));
+	vec3 axis1 = normalize(cross(c - a, target - a));
+	glm::quat rot0 = glm::angleAxis(a_desired_angle - a_interior_angle, glm::inverse(a_global_rotation) * axis0);
+	glm::quat rot1 = glm::angleAxis(b_desired_angle - b_interior_angle, glm::inverse(b_global_rotation) * axis0);
+	glm::quat rot2 = glm::angleAxis(c_interior_angle, glm::inverse(a_global_rotation) * axis1);
+
+	a_local_rotation = a_local_rotation * (rot0 * rot2);
+	b_local_rotation = b_local_rotation * rot1;
+}
+
+
+class Animation_Tree
+{
+public:
+	Animation_Tree(Model* mod) : mod(mod) {
+		assert(mod->animations);
+	}
+
+	virtual void evaluate_blends() = 0;
+	virtual void evaluate_ik() = 0;
+
+	vector<glm::mat4x3> cached_bonespace;
+	vector<glm::mat4x3> cached_worldspace;
+	Model* mod;
+};
+
+class Default_Tree : Animation_Tree
+{
+public:
+	void update();
+	void playanim(const char* name);
+};
+
+typedef uint32_t modelhandle;
+typedef uint32_t gshaderhandle;
+
+struct RenderData
+{
+	modelhandle model;
+	gshaderhandle override_mat;
+	glm::vec4 varying_param1;
+	uint32_t varying_param2;
+};
+
+struct NetworkHistData
+{
+	glm::vec3 pos[16];
+	glm::vec3 rot[16];
+	int tick[16];
+};
+
+struct Net_Data
+{
+	glm::vec3 pos;
+	glm::vec3 rot;
+	int packed_flags;
+	int packed_state;
+	int model_index;
+	int item_index;
+	/* Filled out by players below */
+	glm::vec3 vel;
+};
+
+
+struct InventoryData
+{
+
+};
+
+struct PhysicsData
+{
+	glm::vec3 size;
+	int shapetype;
+};
+
+struct InterpolatingData
+{
+	int num_interp = 8;
+	glm::vec3 interp_pos[8];
+	glm::vec3 interp_rot[8];
+};
+
+class Character_Data
+{
+
+};
+
+int i = sizeof(InterpolatingData);
+
+typedef uint32_t gameobjhandle;
+typedef uint32_t gameobjtype;
+
+class GameObject
+{
+public:
+	GameObject();
+	gameobjhandle self;
+	gameobjtype type;
+	const char* classname;
+
+	glm::vec3 origin;
+	glm::vec3 angles;
+	glm::vec3 scale;
+
+	int flags = 0;
+
+	RenderData render;
+	PhysicsData phys;
+	unique_ptr<Animation_Tree> atree;
+	unique_ptr<NetworkHistData> nethist;
+	unique_ptr<InventoryData> inv;
+	unique_ptr<Character_Data> character;
+
+	virtual void fill_out_net_data(Net_Data& data);
+	virtual void on_recieve_net_dat(const Net_Data& data);
+
+	virtual void update() = 0;
+	virtual void client_update() = 0;
+};
+
+class Logic_Obj
+{
+public:
+	gameobjhandle container;
+
+};
+
+class GameObjectContainer : GameObject
+{
+	vector<gameobjhandle> handles;
+};
+
+class PlayerObject : GameObject
+{
+	void update() override;
+	void client_update() override;
+};
+
+class Entity2
+{
+public:
+	virtual void update();
+	unique_ptr<Animation_Tree> anim_tree;
+};
+struct Einit
+{
+	Entity2*(*create)()=nullptr;
+	const char* name = "";
+	uint16_t id = 0;
+};
+class Einit_Mgr
+{
+public:
+	static Einit_Mgr& get() {
+		static Einit_Mgr inst;
+		return inst;
+	}
+	void add_enit(Einit e) {
+		e.id = count;
+		einits[count++] = e;
+	}
+	int count = 0;
+	Einit einits[1024];
+};
+
+struct EinitWrapper {
+	EinitWrapper(int a) {
+		Einit_Mgr::get().add_enit({  });
+	}
+};
+
+#define CLASSHEADER(classname) \
+	Entity2* create() { return new classname;}
+#define CLASSSRC(classname) \
+	static EinitWrapper abc(1);
+
+
+
+class Player2 : Entity2
+{
+public:
+	CLASSHEADER(Player2);
+};
+CLASSSRC(Player2);
+
+struct Entity_Init
+{
+	Entity2*(*create)() = nullptr;
+	const char* classname = "";
+};
+
+
+class Ai_Tree : Animation_Tree
+{
+
+};
+
+class Character_Tree : Animation_Tree
+{
+public:
+	virtual void step_frame(float dt);
+	virtual void evaluate_blends();
+	virtual void evaluate_ik();
+private:
+	struct fsm {
+		enum State {
+			fsm_idle,
+			fsm_walking,
+			fsm_turning,
+			fsm_running,
+			fsm_dead
+		}state;
+	}fsm;
+
+	struct input {
+		glm::vec3 desireddir;
+		glm::vec3 facedir;
+		glm::vec3 velocity;
+		bool crouched;
+		bool falling;
+		bool use_rhik;
+		bool use_lhik;
+		glm::vec3 rhandtarget;
+		glm::vec3 lhandtarget;
+		bool useheadlook;
+		glm::vec3 headlook;
+	}input;
+
+	Entity* ent;
+};
+

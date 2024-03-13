@@ -215,8 +215,9 @@ Level* LoadLevelFile(const char* level_name)
 
 void FreeLevel(const Level* level)
 {
-	mods.free_prefab(level->level_prefab);
-	delete level;
-
-	mods.compact_memory();
+	if (level) {
+		mods.free_prefab(level->level_prefab);
+		delete level;
+		mods.compact_memory();
+	}
 }

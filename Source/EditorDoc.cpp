@@ -532,9 +532,15 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 				command_mgr.undo();
 		}
 	}
-	if(eng->game_focused)
-		if (event.type == SDL_MOUSEWHEEL)
-			camera.scroll_speed(event.wheel.y);
+	if (eng->game_focused) {
+		if (event.type == SDL_MOUSEWHEEL) {
+			camera.scroll_callback(event.wheel.y);
+		}
+	}
+	if (event.type == SDL_KEYDOWN) {
+		if (event.key.keysym.scancode == SDL_SCANCODE_O)
+			camera.orbit_mode = !camera.orbit_mode;
+	}
 
 	return true;
 }
@@ -567,25 +573,25 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 
 void EditorDoc::update()
 {
-	{
-		int x=0, y=0;
-		if(eng->game_focused)
-			SDL_GetRelativeMouseState(&x, &y);
-		camera.update_from_input(eng->keys, x, y);
-	}
 	View_Setup setup;
 	setup.fov = glm::radians(70.f);
 	setup.near = 0.01;
 	setup.far = 100.0;
 	setup.height = eng->window_h.integer();
 	setup.width = eng->window_w.integer();
+	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, setup.near, setup.far);
+	{
+		int x=0, y=0;
+		if(eng->game_focused)
+			SDL_GetRelativeMouseState(&x, &y);
+		camera.update_from_input(eng->keys, x, y, glm::inverse(setup.proj));
+	}
+
 	setup.origin = camera.position;
 	setup.front = camera.front;
 	setup.view = camera.get_view_matrix();
-	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, setup.near, setup.far);
 	setup.viewproj = setup.proj * setup.view;
 	vs_setup = setup;
-
 
 	// build physics world
 

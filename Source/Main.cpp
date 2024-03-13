@@ -330,17 +330,28 @@ void Game_Engine::init_sdl_window()
 	SDL_GL_SetSwapInterval(0);
 }
 
-glm::mat4 Fly_Camera::get_view_matrix() const {
+glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
 }
 
-void Fly_Camera::scroll_speed(int amt)
+void User_Camera::scroll_callback(int amt)
 {
-	move_speed += (move_speed * 0.5) * amt;
-	if (abs(move_speed) < 0.000001)
-		move_speed = 0.0001;
+	if(orbit_mode) {
+		float lookatpointdist = dot(position - orbit_target, front);
+		glm::vec3 lookatpoint = position + front * lookatpointdist;
+		lookatpointdist += (lookatpointdist * 0.25) * amt;
+		if (abs(lookatpointdist) < 0.01)
+			lookatpointdist = 0.01;
+		position = (lookatpoint - front * lookatpointdist);
+	}
+	else {
+		move_speed += (move_speed * 0.5) * amt;
+		if (abs(move_speed) < 0.000001)
+			move_speed = 0.0001;
+	}
 }
-void Fly_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy)
+#define PRINTVEC(name,v) printf(name": %f %f %f\n", v.x,v.y,v.z);
+void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, glm::mat4 invproj)
 {
 	int xpos, ypos;
 	xpos = mouse_dx;
@@ -352,35 +363,103 @@ void Fly_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy
 	x_off *= sensitivity;
 	y_off *= sensitivity;
 
-	yaw += x_off;
-	pitch -= y_off;
 
-	if (pitch > HALFPI - 0.01)
-		pitch = HALFPI - 0.01;
-	if (pitch < -HALFPI + 0.01)
-		pitch = -HALFPI + 0.01;
+	bool pan_in_orbit_model = keys[SDL_SCANCODE_LSHIFT];
 
-	if (yaw > TWOPI) {
-		yaw -= TWOPI;
+
+	// position = cam position
+	// orbit target = what you rotate around = constant
+	// front = what dir camera is pointing
+	// dist = dot(front, orbit_target-position)
+	if (orbit_mode)
+	{
+		float lookatpointdist = dot(position - orbit_target, front);	// project target onto front
+		glm::vec3 lookatpoint = position + front * lookatpointdist;
+		glm::vec3 tolookat = lookatpoint - position;
+
+		glm::vec3 otol = tolookat - orbit_target;
+		glm::vec3 toorbit = orbit_target - position;
+		float toorbitdist = length(toorbit);
+
+		glm::vec3 side = glm::normalize(glm::cross(up, front));
+		glm::vec3 up = cross(side, front);
+		if (pan_in_orbit_model) {
+
+			glm::vec4 offsetdeltafrompanning = invproj * glm::vec4(mouse_dx, mouse_dy, lookatpointdist, 1.f);
+			offsetdeltafrompanning /= offsetdeltafrompanning.w;
+			otol += offsetdeltafrompanning.x * side + offsetdeltafrompanning.y * up;
+		}
+		else {
+			yaw += x_off;
+			pitch -= y_off;
+			//glm::clamp(yaw, 0.f, TWOPI);
+			//glm::clamp(pitch, -HALFPI + 0.01f, HALFPI - 0.01f);
+			if (pitch > HALFPI - 0.01)
+			pitch = HALFPI - 0.01;
+			if (pitch < -HALFPI + 0.01)
+				pitch = -HALFPI + 0.01;
+
+			if (yaw > TWOPI) {
+				yaw -= TWOPI;
+			}
+			if (yaw < 0) {
+				yaw += TWOPI;
+			}
+		}
+
+		vec3 newtoorbit = AnglesToVector(pitch, yaw) * toorbitdist;
+		vec3 newposition = orbit_target - newtoorbit;
+
+		vec3 newlookatpoint = newtoorbit - otol;
+		float len_ = glm::length(newlookatpoint - newposition);
+		
+		PRINTVEC("pos          ", newposition);
+		printf(  "lapdist      %f\n", lookatpointdist);
+		PRINTVEC("tolookat     ", tolookat);
+		PRINTVEC("look-at-point", newlookatpoint);
+		PRINTVEC("to-orbit     ", newtoorbit);
+		PRINTVEC("otol         ", otol);
+		if (abs(len_) > 0.000001f) {
+			vec3 oldfront = front;
+			front = (newlookatpoint - newposition) / len_;
+		PRINTVEC("frontdelta   ", (oldfront - front));
+		}
+		printf("----------------------------\n");
+		position = newposition;
 	}
-	if (yaw < 0) {
-		yaw += TWOPI;
-	}
-	front = AnglesToVector(pitch, yaw);
+	else {
+		yaw += x_off;
+		pitch -= y_off;
 
-	vec3 right = cross(up, front);
-	if (keys[SDL_SCANCODE_W])
-		position += move_speed * front;
-	if (keys[SDL_SCANCODE_S])
-		position -= move_speed * front;
-	if (keys[SDL_SCANCODE_A])
-		position += right * move_speed;
-	if (keys[SDL_SCANCODE_D])
-		position -= right * move_speed;
-	if (keys[SDL_SCANCODE_Z])
-		position += move_speed * up;
-	if (keys[SDL_SCANCODE_X])
-		position -= move_speed * up;
+		if (pitch > HALFPI - 0.01)
+			pitch = HALFPI - 0.01;
+		if (pitch < -HALFPI + 0.01)
+			pitch = -HALFPI + 0.01;
+
+		if (yaw > TWOPI) {
+			yaw -= TWOPI;
+		}
+		if (yaw < 0) {
+			yaw += TWOPI;
+		}
+
+		front = AnglesToVector(pitch, yaw);
+		glm::vec3 delta = glm::vec3(0.f);
+		vec3 right = normalize(cross(up, front));
+		if (keys[SDL_SCANCODE_W])
+			delta += move_speed * front;
+		if (keys[SDL_SCANCODE_S])
+			delta -= move_speed * front;
+		if (keys[SDL_SCANCODE_A])
+			delta += right * move_speed;
+		if (keys[SDL_SCANCODE_D])
+			delta -= right * move_speed;
+		if (keys[SDL_SCANCODE_Z])
+			delta += move_speed * up;
+		if (keys[SDL_SCANCODE_X])
+			delta -= move_speed * up;
+		position += delta;
+	}
 }
 
 void Game_Media::load()

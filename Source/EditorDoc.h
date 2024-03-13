@@ -206,7 +206,7 @@ public:
 	AssetBrowser assets;
 	View_Setup vs_setup;
 	Level* leveldoc = nullptr;
-	Fly_Camera camera;
+	User_Camera camera;
 	std::vector<std::shared_ptr<EditorNode>> nodes;
 	std::vector<std::string> ent_files;
 };

@@ -42,7 +42,7 @@ public:
 	View_Setup last_view;
 	bool has_run_tick = false;
 	bool using_debug_cam = false;
-	Fly_Camera fly_cam;
+	User_Camera fly_cam;
 
 	int prev_item_state = ITEM_IDLE;
 	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
