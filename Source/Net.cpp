@@ -4,45 +4,32 @@
 #define ESP(x) #x,(int)&((Entity*)0)->x
 #define ESPO(x) (int)&((Entity*)0)->x
 
+#define OFFSET(type, var) #var,(int)&((type*)0)->var
+#define ONS(var) OFFSET(Obj_Net_State, var)
+
+#define VECTORQUANTIZE(bits, fac) -3, bits, fac 
+#define VECTORPROP -3, -1, 1.f
+#define INT32PROP(outbits) 32, outbits, -1
+#define INT8PROP(outbits) 8, outbits, -1
+#define FLOATPROP 0, -1, 1.f
+#define FLOATQUANTIZE(outbits, fac) 0,outbits,fac
+
+#define SENDFORPLAYERONLY Net_Prop::PLAYER_PROP
+#define SENDFORALL Net_Prop::DEFAULT_PROP
+#define SENDFORALLBUTPLAYER Net_Prop::NON_PLAYER_PROP
+
 Net_Prop entity_state_props[] =
 {
-	{ESP(type), 32, 8},
-	{ESP(position.x), 0, -1, 1.f, Net_Prop::DEFAULT_PROP | Net_Prop::PLAYER_PROP},
-	{ESP(position.y), 0, -1, 1.f, Net_Prop::DEFAULT_PROP | Net_Prop::PLAYER_PROP},
-	{ESP(position.z), 0, -1, 1.f, Net_Prop::DEFAULT_PROP | Net_Prop::PLAYER_PROP},
-
-	{ESP(model_index),		32, 8},
-
-	{ESP(rotation.x), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
-	{ESP(rotation.y), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
-	{ESP(rotation.z), 0, 8, 256.0 / (2 * PI), Net_Prop::NON_PLAYER_PROP},
-
-	{ESP(anim.m.staging_anim),		32,		8,		1.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.m.staging_speed),		0,		8,		-10.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.m.staging_loop),		8,		1,		1.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.m.staging_frame),		0,		16,		100.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.legs.staging_anim),	32,		8,		1.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.legs.staging_speed),	0,		8,		-10.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.legs.staging_loop),	8,		1,		1.f,	Net_Prop::DEFAULT_PROP},
-	{ESP(anim.legs.staging_frame),	0,		16,		100.f,	Net_Prop::DEFAULT_PROP},
-
-	{ESP(inv.active_item),	32,		5, 1.f, Net_Prop::NON_PLAYER_PROP},
-	{ESP(inv.staging_item),	32,		5, 1.f, Net_Prop::PLAYER_PROP},
-	{ESP(inv.staging_clip),	32,		8, 1.f, Net_Prop::PLAYER_PROP},
-	{ESP(inv.staging_ammo),	32,		10, 1.f, Net_Prop::PLAYER_PROP},
-
-	{ESP(flags), 16},
-
-	// for owning players only
-	{ESP(state), 16, 16, 1.f, Net_Prop::PLAYER_PROP_MASK},
-	{ESP(rotation.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},	// dont quantize for predicting player
-	{ESP(rotation.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	{ESP(rotation.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	//
-	{ESP(velocity.x), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	{ESP(velocity.y), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	{ESP(velocity.z), 0, -1, 1.f, Net_Prop::PLAYER_PROP},
-	//
+	{ONS(pos.x),	VECTORPROP,						SENDFORALL},
+	{ONS(rot.x),	VECTORQUANTIZE(8, 256.0/(2*PI)),SENDFORALLBUTPLAYER},
+	{ONS(model),	INT32PROP(12),					SENDFORALL},
+	{ONS(item),		INT32PROP(6),					SENDFORALL},
+	{ONS(state),	INT32PROP(16),					SENDFORALL},
+	{ONS(flags),	INT32PROP(16),					SENDFORALL},
+	{ONS(vel),		VECTORPROP,						SENDFORPLAYERONLY},
+	{ONS(clip),		INT32PROP(9),					SENDFORPLAYERONLY},
+	{ONS(ammo),		INT32PROP(10),					SENDFORPLAYERONLY},
+	{ONS(rot.x),	VECTORPROP,						SENDFORPLAYERONLY}
 };
 
 //#define NET_PROP_DBG
@@ -283,29 +270,4 @@ void write_delta_entity(ByteWriter& msg, ByteReader& s0, ByteReader& s1, int con
 				msg.WriteBool(0);
 		}
 	}
-}
-
-Entity_Baseline* get_entity_baseline()
-{
-	static Entity_Baseline* baseline = nullptr;
-	if (!baseline)
-	{
-		// FIXME: never gets freed
-		baseline = new Entity_Baseline;
-		Entity baseline_ent = Entity();	// use initialized vars as baseline
-		ByteWriter w(baseline->data, 1000);
-		write_full_entity(&baseline_ent, w);
-		w.EndWrite();
-		ASSERT(!w.HasFailed());
-		baseline->num_bytes_in_data = w.BytesWritten();
-		
-		int total_bits = ENTITY_BITS;
-		int props = sizeof(entity_state_props) / sizeof(Net_Prop);
-		for (int i = 0; i < props; i++)
-			total_bits += net_prop_out_bits(entity_state_props[i]);
-
-		baseline->num_bytes_including_index = (total_bits / 8) + ((total_bits % 8) != 0);
-
-	}
-	return baseline;
 }

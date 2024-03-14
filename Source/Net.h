@@ -61,67 +61,94 @@ struct Net_Prop
 		DEFAULT_PROP = 1,		// rep to both owning/non-owning
 		PLAYER_PROP = 2,		// only rep to owning player
 		NON_PLAYER_PROP = 4,	// only rep to non-owning player
-		ANIM_PROP = 8,
 
-		PLAYER_PROP_MASK = PLAYER_PROP | DEFAULT_PROP | ANIM_PROP,
-		NON_PLAYER_PROP_MASK = NON_PLAYER_PROP | DEFAULT_PROP | ANIM_PROP,
-
-		ALL_PROP_MASK = DEFAULT_PROP | PLAYER_PROP | NON_PLAYER_PROP | ANIM_PROP
+		PLAYER_PROP_MASK = PLAYER_PROP | DEFAULT_PROP,
+		NON_PLAYER_PROP_MASK = NON_PLAYER_PROP | DEFAULT_PROP,
 	};
 };
 
+typedef uint32_t entityguid;
+typedef uint32_t entitytype;
 
-struct Frame;
-struct Packed_Entity
+struct Obj_Net_State
 {
-	Packed_Entity(Frame* f, int offset, int length);
+	/* filled out by system */
+	entityguid handle;
+	entitytype type;
 
-	int index = 0;		// index of entity
-	int len = 0;		// length of entity data in bytes
-	int buf_offset = 0;	// offset in buffer
-	bool failed = false;
-	Frame* f;
-
-	ByteReader get_buf();
-	void increment();
+	/* shared props */
+	glm::vec3 pos;
+	glm::vec3 rot;
+	int model;
+	int item;
+	int state;
+	int flags;
+	/* player props below */
+	glm::vec3 vel;
+	int clip;
+	int ammo;
 };
 
-
-// stores binary data of the game state, used by client and server
-struct Frame {
-	int tick = 0;
-	static const int MAX_FRAME_SNAPSHOT_DATA = 8000;
-
-	int num_ents_this_frame = 0;
-	uint8_t data[MAX_FRAME_SNAPSHOT_DATA];
-
-	Packed_Entity begin();
-
-	int player_offset = 0;	// used by clients, HACK!!!
+struct Frame2 {
+	int start=0;
+	int count=0;
+	int tick=0;
+	int localplayerindex = 0;
 };
 
+class Frame_Storage
+{
+public:
+	Frame_Storage(int num_obj_size, int num_frames) 
+		: objs(num_obj_size), frames(num_frames) {
+	}
+	Frame2& get_frame(int index_thats_moduloed) {
+		return frames.at(index_thats_moduloed % frames.size());
+	}
+	Frame2* get_frame_for_tick(int tick) {
+		for (int i = 0; i < frames.size(); i++) 
+			if (frames[i].tick == tick) 
+				return &frames[i];
+		return nullptr;
+	}
+	void allocate_space(Frame2& frame, int obj_count) {
+		frame.start = objhead;
+		frame.count = obj_count;
+		int last = objhead;
+		objhead = (objhead + obj_count) % objs.size();
+		bool wraparound = objhead < frame.start;
+		for (int i = 0; i < frames.size(); i++) {
+			if (&frames[i] != &frame &&
+				(frames[i].start >= frame.start || frames[i].start < objhead)) {
+				frames[i].tick = frames[i].localplayerindex = frames[i].start = -1;
+				frames[i].count = 0;
+			}
+		}
+	}
+	Obj_Net_State& get_state(const Frame2& frame, int index) {
+		assert(index < frame.count);
+		return objs.at((frame.start + index) % objs.size());
+	}
+private:
+	std::vector<Obj_Net_State> objs;
+	std::vector<Frame2> frames;
+	int frameidx = 0;
+	int objhead = 0;
+};
 
 void new_entity_fields_test();
 
 // Network serialization functions
 
 class Entity;
+
 void write_full_entity(Entity* e, ByteWriter& msg);
 void read_entity(Entity* e, ByteReader& msg, int condition, bool is_delta);
 void set_entity_props_from_entity(Entity* from, Entity* to, int condition);
 void write_delta_entity(ByteWriter& msg, ByteReader& s0, ByteReader& s1, int condition);
 
-struct Entity_Baseline
-{
-	uint8_t data[1000];
-	int num_bytes_in_data;			// length of data[]
-	int num_bytes_including_index;	// includes the x index bits in the rounding
-	ByteReader get_buf() {
-		return ByteReader(data, num_bytes_in_data, sizeof(data));
-	}
-};
-
-Entity_Baseline* get_entity_baseline();
+void write_delta_entity(const Obj_Net_State& from, const Obj_Net_State& to, ByteWriter& msg, int condition);
+void read_delta_entity(Obj_Net_State& to, ByteReader& reader, int condition);
 
 
 #endif

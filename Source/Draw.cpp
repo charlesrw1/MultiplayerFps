@@ -1623,15 +1623,13 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 		);
 	}
 
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		auto& ent = eng->get_ent(i);
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+		auto& ent = ei.get();
 		//auto& ent = cgame->entities[i];
-		if (!ent.active())
-			continue;
 		if (!ent.model)
 			continue;
 
-		if (i == eng->player_num() && !eng->local.thirdperson_camera.integer())
+		if (ei.get_index() == eng->player_num() && !eng->local.thirdperson_camera.integer())
 			continue;
 
 		mat4 model;
@@ -2540,11 +2538,11 @@ void Renderer::scene_draw(bool editor_mode)
 	MeshBuilder mb;
 	mb.Begin();
 	if (draw_sv_colliders.integer()) {
-		for (int i = 0; i < MAX_CLIENTS; i++) {
-			if (eng->ents[i].type == ET_PLAYER) {
-				AddPlayerDebugCapsule(eng->ents[i], &mb, COLOR_CYAN);
-			}
-		}
+		//for (int i = 0; i < MAX_CLIENTS; i++) {
+		//	if (eng->ents[i].type == ET_PLAYER) {
+		//		AddPlayerDebugCapsule(eng->ents[i], &mb, COLOR_CYAN);
+		//	}
+		//}
 	}
 
 	mb.End();
@@ -2607,16 +2605,14 @@ void Renderer::DrawEntBlobShadows()
 {
 	shadowverts.Begin();
 
-	for (int i = 0; i < MAX_GAME_ENTS; i++)
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next())
 	{
-		Entity* e = &eng->ents[i];
-		if (!e->active()) continue;
 
 		RayHit rh;
 		Ray r;
-		r.pos = e->position + glm::vec3(0, 0.1f, 0);
+		r.pos = ei.get().position + glm::vec3(0, 0.1f, 0);
 		r.dir = glm::vec3(0, -1, 0);
-		rh = eng->phys.trace_ray(r, i, PF_WORLD);
+		rh = eng->phys.trace_ray(r, ei.get_index(), PF_WORLD);
 
 		if (rh.dist < 0)
 			continue;

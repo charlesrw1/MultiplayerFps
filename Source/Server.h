@@ -80,12 +80,12 @@ public:
 
 	//void WriteDeltaSnapshot(ByteWriter& msg, int deltatick, int clientnum);
 
-	Frame* GetSnapshotFrame();
-	Frame* GetSnapshotFrameForTick(int tick) {
-		Frame* f = &frames.at(tick % MAX_FRAME_HIST);
-		if (f->tick != tick)
+	Frame2* GetSnapshotFrame();
+	Frame2* GetSnapshotFrameForTick(int tick) {
+		Frame2& f = frame_storage.get_frame(tick);
+		if (f.tick != tick)
 			return nullptr;
-		return f;
+		return &f;
 	}
 	void ReadPackets();
 
@@ -93,7 +93,7 @@ public:
 	void write_delta_entities_to_client(ByteWriter& msg, int deltatick, int client);
 
 	bool initialized = false;
-	std::vector<Frame> frames;
+	Frame_Storage frame_storage;
 	std::vector<RemoteClient> clients;
 	Socket socket;
 

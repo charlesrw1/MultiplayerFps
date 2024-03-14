@@ -120,7 +120,7 @@ void check_perch(Entity& player, bool& dont_add_grav)
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
-		rh = eng->phys.trace_ray(ray, player.index, PF_WORLD);
+		rh = eng->phys.trace_ray(ray, player.selfid, PF_WORLD);
 
 		// perched on ledge
 		if (rh.hit_world) {
@@ -154,7 +154,7 @@ void check_ground_state(Entity& player, Move_Command command, bool& dont_add_gra
 
 	GeomContact result;
 	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
-	result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), player.index, PF_ALL);
+	result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), player.selfid, PF_ALL);
 
 	if (!result.found || result.surf_normal.y < 0.3)
 		player.state &= ~PMS_GROUND;
@@ -209,7 +209,7 @@ void check_duck(Entity& player, Move_Command cmd)
 			// uncrouch
 
 			if (player.state & PMS_GROUND) {
-				auto gc = player_physics_trace_character(player.index, false, player.position+vec3(0,0.001,0));
+				auto gc = player_physics_trace_character(player.selfid, false, player.position+vec3(0,0.001,0));
 
 				if (!gc.found) {
 					player.state &= ~PMS_CROUCHING;
@@ -217,14 +217,14 @@ void check_duck(Entity& player, Move_Command cmd)
 			}
 			else {
 				vec3 end = player.position - vec3(0, diff, 0) + vec3(0,0.001,0);
-				auto gc = player_physics_trace_character(player.index, false, end);
+				auto gc = player_physics_trace_character(player.selfid, false, end);
 
 				if (!gc.found) {
 					// one more check
 					Ray r;
 					r.pos = player.position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
 					r.dir = vec3(0, -1, 0);
-					auto tc = eng->phys.trace_ray(r, player.index, PF_ALL);
+					auto tc = eng->phys.trace_ray(r, player.selfid, PF_ALL);
 					if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
 						player.state &= ~PMS_CROUCHING;
 						player.position.y -= diff;
@@ -255,7 +255,7 @@ void player_physics_move(Entity& player)
 	{
 		vec3 end = player.position + player.velocity * (move_time/num_bumps);
 
-		GeomContact trace = player_physics_trace_character(player.index, player.state & PMS_CROUCHING, end);
+		GeomContact trace = player_physics_trace_character(player.selfid, player.state & PMS_CROUCHING, end);
 
 		if (trace.found) {
 			vec3 penetration_velocity = dot(player.velocity, trace.penetration_normal) * trace.penetration_normal;

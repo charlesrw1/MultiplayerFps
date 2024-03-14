@@ -53,14 +53,10 @@ public:
 	float adjust_time_step(int ticks_running);
 
 	void interpolate_states();
-	void read_snapshot(Frame* s);
 	void run_prediction();
 	Move_Command& get_command(int sequence);
 
 	void TrySendingConnect();
-
-	Frame* FindSnapshotForTick(int tick);
-	Frame* GetCurrentSnapshot();
 
 	void ReadPackets();
 	void SendMovesAndMessages();
@@ -93,8 +89,10 @@ public:
 
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
-	vector<Frame> snapshots;
-	Entity_Interp interpolation_data[MAX_GAME_ENTS];
+
+	Frame_Storage frame_storage;
+
+	Entity_Interp interpolation_data[NUM_GAME_ENTS];
 	vector<Move_Command> commands;
 	vector<glm::vec3> origin_history;
 	glm::vec3 last_origin;

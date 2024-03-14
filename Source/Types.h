@@ -8,10 +8,11 @@
 const int MAX_CLIENTS = 16;
 const int DEFAULT_WIDTH = 1200;
 const int DEFAULT_HEIGHT = 800;
-const int MAX_GAME_ENTS = 256;
+
 const int ENTITY_BITS = 8;
 const int NUM_GAME_ENTS = 1 << ENTITY_BITS;
 const int ENTITY_SENTINAL = NUM_GAME_ENTS - 1;
+const int SPAWNID_BITS = 3;
 
 const float STANDING_EYE_OFFSET = 1.6f;
 const float CROUCH_EYE_OFFSET = 1.1f;
@@ -88,8 +89,8 @@ enum Ent_Type
 	ET_ITEM,
 	ET_GRENADE,
 	ET_DUMMY,
-	ET_USED = 254,
-	ET_FREE = 0xff,
+	ET_NONE,
+	ET_NULLTYPE = 0xff,
 };
 
 enum Entity_Flags
@@ -192,14 +193,35 @@ enum Entity_Physics
 };
 
 class Model;
-struct Entity
+
+
+
+enum class entityclass
 {
-	int index = 0;	// eng->ents[]
-	Ent_Type type = ET_FREE;
+	EMPTY,	// no/defaut logic
+	PLAYER,
+	THROWABLE,
+	DOOR,
+	NPC,
+
+	BOMBZONE,
+	SPAWNZONE,
+
+	SPAWNPOINT,
+};
+
+typedef uint32_t entityhandle;
+class GeomContact;
+class Entity
+{
+public:
+	entityhandle selfid = 0;	// eng->ents[]
+	entityclass class_ = entityclass::EMPTY;
+
+	Ent_Type type = ET_NULLTYPE;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	int model_index = 0;	// media.gamemodels[]
-	const char* classname = "";
 
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
@@ -231,12 +253,6 @@ struct Entity
 	int force_angles = 0;	// 1=force, 2=add
 	glm::vec3 diff_angles = glm::vec3(0.f);
 
-	void(*update)(Entity* me) = nullptr;
-	void(*damage)(Entity* me, Entity* attacker, int amount, int flags) = nullptr;
-	void(*hit_wall)(Entity* me, glm::vec3 normal) = nullptr;
-	bool(*touch)(Entity* me, Entity* other) = nullptr;
-	void(*timer_callback)(Entity* me) = nullptr;
-
 	Animator anim;
 	Model* model = nullptr;
 
@@ -249,8 +265,6 @@ struct Entity
 	void add_to_last();
 	void shift_last();
 
-	void set_inactive() { type = ET_FREE; }
-	bool active() { return type != ET_FREE; }
 	void set_model(const char* model);
 
 	void clear_pointers();
@@ -259,8 +273,38 @@ struct Entity
 	void projectile_physics();
 	void gravity_physics();
 	void mover_physics();
+
+	void damage(Entity* inflictor, glm::vec3 from, int amount);
+
+	virtual void update() { }
+	virtual void collide(Entity* other, const GeomContact& gc) {}
 };
 
+
+class Player : public Entity
+{
+	void update() override;
+};
+
+class Door : public Entity
+{
+public:
+	enum {
+		OPEN,
+		CLOSED
+	}doorstate;
+
+	void update() override;
+};
+
+class Grenade : public Entity
+{
+public:
+	Grenade();
+	float timer = 0.f;
+	entityhandle thrower=-1;
+	void update() override;
+};
 
 
 #endif // !GAMETYPE_H

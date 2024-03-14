@@ -242,5 +242,8 @@
     <ClInclude Include="Source\DrawTypedefs.h">
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Entityclasses.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

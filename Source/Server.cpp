@@ -23,15 +23,16 @@ void NetDebugPrintf(const char* fmt, ...)
 Server::Server() :
 	tick_rate("sv.tick_rate", (float)DEFAULT_UPDATE_RATE),
 	snapshot_rate("sv.snapshot_rate", 30.f),
-	max_time_out("sv.time_out", 10.f)
+	max_time_out("sv.time_out", 10.f),
+	frame_storage(NUM_GAME_ENTS*16, MAX_FRAME_HIST)
 {
 
 }
 
 void Server::init()
 {
-	frames.clear();
-	frames.resize(MAX_FRAME_HIST);
+	// FIXME:
+	// frame_storage.clear()
 
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		clients.push_back(RemoteClient(this, i));
@@ -67,9 +68,9 @@ void Server::start()
 }
 
 
-Frame* Server::GetSnapshotFrame()
+Frame2* Server::GetSnapshotFrame()
 {
-	return &frames.at(eng->tick % MAX_FRAME_HIST);
+	return &frame_storage.get_frame(eng->tick);
 }
 
 

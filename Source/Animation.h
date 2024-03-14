@@ -97,7 +97,6 @@ public:
 	void set_anim(const char* name, bool restart, float blend = 0.1f);
 	void set_anim_from_index(Animator_Layer& l, int animation, bool restart, float blend = 0.1f);
 	void set_leg_anim(const char* name, bool restart, float blend = 0.1f);
-
 	void SetupBones();
 	void ConcatWithInvPose();
 	const std::vector<glm::mat4x4> GetBones() const { 

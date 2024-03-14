@@ -71,6 +71,20 @@ enum Engine_State
 
 using std::string;
 
+class Game_Engine;
+struct Ent_Iterator
+{
+	Ent_Iterator(int start = 0, int count = 0);
+	Ent_Iterator& next();
+	bool finished() const;
+	Entity& get();
+	int get_index() const { return index; }
+private:
+	int summed_count = 0;
+	int index = 0;
+};
+
+
 class Archive;
 struct ImGuiContext;
 class Client;
@@ -110,8 +124,9 @@ public:
 #endif
 
 	// Host functions
-	Entity* new_entity();
-	void free_entity(Entity* e);
+	Entity* create_entity(entityclass classtype, int forceslot = -1);
+	void free_entity(entityhandle handle);
+
 	void make_client(int num);
 	void client_leave(int num);
 	void update_game_tick();
@@ -121,8 +136,11 @@ public:
 	// entity accessor functions
 	Entity& local_player();
 	int player_num();
-	Entity& get_ent(int index);
-	int find_by_classname(int start, const char* classname);
+	Entity* get_ent(int index);
+	Entity* get_ent_from_handle(entityhandle id);
+	int find_by_classtype(int start, entityclass classtype);
+	Ent_Iterator get_ent_start();
+
 public:
 	Client* cl;
 	Server* sv;
@@ -130,12 +148,11 @@ public:
 #ifdef EDITDOC
 	EditorDoc* eddoc = nullptr;
 #endif
-
 	string mapname;
 	Level* level;
 	PhysicsWorld phys;
-	Entity ents[MAX_GAME_ENTS];
-	int num_entities;
+
+
 	bool is_host;
 	Game_Local local;
 	Game_Media media;
@@ -168,7 +185,11 @@ public:
 	int argc;
 	char** argv;
 
+
 private:
+	int num_entities;
+	vector<Entity*> ents;
+	vector<char> spawnids;
 	Engine_State state;
 	void set_state(Engine_State state);
 	void unload_current_level();
@@ -183,6 +204,8 @@ private:
 	void game_update_tick();
 
 	void on_game_start();
+
+	friend class Ent_Iterator;
 };
 
 extern Game_Engine* eng;

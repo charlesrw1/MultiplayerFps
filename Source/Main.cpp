@@ -541,8 +541,9 @@ int Game_Engine::player_num()
 }
 Entity& Game_Engine::local_player()
 {
-	if (player_num() < 0) ASSERT(0 && "player not assigned");
-	return ents[player_num()];
+	if (player_num() < 0) ASSERT(!"player not assigned");
+	ASSERT(ents[player_num()]);
+	return *ents[player_num()];
 }
 
 void Game_Engine::connect_to(string address)
@@ -692,10 +693,9 @@ DECLARE_ENGINE_CMD(net_stat)
 DECLARE_ENGINE_CMD(print_ents)
 {
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
-	for (int i = 0; i < NUM_GAME_ENTS; i++) {
-		auto& e = eng->get_ent(i);
-		if (!e.active()) continue;
-		sys_print("%-15d %-15d %-15f %-15f %-15d\n", i, e.type, e.position.x, e.position.z, (int)e.model);
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+		Entity& e = ei.get();
+		sys_print("%-15d %-15d %-15f %-15f %-15d\n", ei.get_index(), e.type, e.position.x, e.position.z, (int)e.model);
 	}
 }
 
@@ -841,8 +841,11 @@ bool Game_Engine::start_map(string map, bool is_client)
 	mapname = map;
 
 	phys.ClearObjs();
-	for (int i = 0; i < MAX_GAME_ENTS; i++)
-		ents[i] = Entity();
+	for (int i = 0; i < NUM_GAME_ENTS; i++) {
+		ents[i] = nullptr;
+		spawnids[i] = 0;
+	}
+
 	num_entities = 0;
 	level = LoadLevelFile(mapname.c_str());
 	if (!level) {
@@ -1188,14 +1191,13 @@ void Game_Engine::build_physics_world(float time)
 	}
 	if (only_world.integer()) return;
 
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& ce = ents[i];
-		if (ce.type == ET_FREE) continue;
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+		Entity& ce = ei.get();
 
 		if (!(ce.flags & EF_SOLID)) continue;
 
 		PhysicsObject po;
-		po.userindex = i;
+		po.userindex = ce.selfid;
 		if (ce.type == ET_PLAYER) {
 			float height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
 			vec3 mins = ce.position - vec3(CHAR_HITBOX_RADIUS, 0, CHAR_HITBOX_RADIUS);
@@ -1233,28 +1235,19 @@ void Game_Engine::update_game_tick()
 	// update local player
 	execute_player_move(0, local.last_command);
 
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& e = ents[i];
-		if (!ents[i].active())
-			continue;
-
-		if (e.timer > 0.f) {
-			e.timer -= eng->tick_interval;
-			if (e.timer <= 0.f && e.timer_callback)
-				e.timer_callback(&e);
-		}
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+		Entity& e = ei.get();
 
 		e.physics_update();
-		if (e.update)
-			e.update(&e);
+		e.update();
 		if(e.model && e.model->animations)
 			e.anim.AdvanceFrame(tick_interval);
 	}
 
 	// for local server interpolation
-	for (int i = 1; i < MAX_CLIENTS; i++) {
-		if (get_ent(i).active())
-			get_ent(i).shift_last();
+	for (auto ei = Ent_Iterator(1); !ei.finished(); ei = ei.next()) {
+		Entity& e = ei.get();
+		e.shift_last();
 	}
 }
 
@@ -1274,7 +1267,9 @@ Game_Engine::Game_Engine() :
 	window_w("vid.width", 1200),
 	window_h("vid.height", 800),
 	window_fullscreen("vid.fullscreen", 0),
-	host_port("net.hostport", DEFAULT_SERVER_PORT)
+	host_port("net.hostport", DEFAULT_SERVER_PORT),
+	ents(NUM_GAME_ENTS, nullptr),
+	spawnids(NUM_GAME_ENTS,0)
 {
 
 }
@@ -1421,11 +1416,11 @@ void Game_Engine::game_update_tick()
 	if (is_host) {
 		// build physics world now as ReadPackets() executes player commands
 		build_physics_world(0.f);
-		sv->ReadPackets();
+		//sv->ReadPackets();
 		update_game_tick();
-		sv->make_snapshot();
-		for (int i = 0; i < sv->clients.size(); i++)
-			sv->clients[i].Update();
+		//sv->make_snapshot();
+		//for (int i = 0; i < sv->clients.size(); i++)
+		//	sv->clients[i].Update();
 		tick += 1;
 	}
 
@@ -1549,9 +1544,41 @@ void Game_Engine::loop()
 	}
 }
 
-Entity& Game_Engine::get_ent(int index)
+bool Ent_Iterator::finished() const
 {
-	ASSERT(index >= 0 && index < MAX_GAME_ENTS);
+	return index == -1;
+}
+Ent_Iterator& Ent_Iterator::next()
+{
+	*this = Ent_Iterator(index + 1, summed_count);
+	return *this;
+}
+Ent_Iterator::Ent_Iterator(int index_, int summed_count_)
+{
+	this->index = -1;
+	this->summed_count = 0;
+	while (index_ < NUM_GAME_ENTS && summed_count_ < eng->num_entities) {
+		if (eng->ents[index_]) {
+			this->index = index_;
+			this->summed_count = summed_count_ + 1;
+			break;
+		}
+		index_++;
+	}
+}
+Entity& Ent_Iterator::get()
+{
+	return *eng->get_ent(index);
+}
+
+Entity* Game_Engine::get_ent(int index)
+{
+	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
+	return ents[index];
+}
+Entity* Game_Engine::get_ent_from_handle(entityguid index)
+{
+	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
 	return ents[index];
 }
 
@@ -1563,9 +1590,8 @@ void Game_Engine::pre_render_update()
 	if (!is_host)
 		cl->interpolate_states();
 	else {
-		for (int i = 1; i < MAX_CLIENTS; i++) {
-			if (!get_ent(i).active()) continue;
-			auto& e = get_ent(i);
+		for (auto ei = Ent_Iterator(1); !ei.finished(); ei = ei.next()) {
+			auto& e = ei.get();
 			e.using_interpolated_pos_and_rot = true;	// FIXME
 			static Auto_Config_Var use_sv_interp("sv.useinterp", 0);
 			if (e.last[0].used && use_sv_interp.integer()) {
@@ -1579,15 +1605,13 @@ void Game_Engine::pre_render_update()
 		}
 	}
 
-	for (int i = 0; i < MAX_GAME_ENTS; i++) {
-		Entity& ent = ents[i];
-		if (!ent.active())
-			continue;
-		if (!ent.model || !ent.model->animations)
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+		Entity& e = ei.get();
+		if (!e.model || !e.model->animations)
 			continue;
 
-		ent.anim.SetupBones();
-		ent.anim.ConcatWithInvPose();
+		e.anim.SetupBones();
+		e.anim.ConcatWithInvPose();
 	}
 
 	local.pm.tick(eng->frame_time);

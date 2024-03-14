@@ -19,7 +19,8 @@ Client::Client() :
 	dont_replicate_player("cl.dont_rep_player", 0),
 	time_reset_threshold("cl.time_reset", 0.1f),
 	do_adjust_time("cl.do_adjust_time", 1),
-	max_adjust_time("cl.max_adjust", 1.f)
+	max_adjust_time("cl.max_adjust", 1.f),
+	frame_storage(CLIENT_SNAPSHOT_HISTORY*256,CLIENT_SNAPSHOT_HISTORY)
 {
 
 }
@@ -42,16 +43,14 @@ void Client::connect(string address)
 	client_num = -1;
 	force_full_update = false;
 
-	snapshots.clear();
 	commands.clear();
 	origin_history.clear();
-	snapshots.resize(CLIENT_SNAPSHOT_HISTORY);
 	commands.resize(CLIENT_MOVE_HISTORY);
 	origin_history.resize(36);
 
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
-	for (int i = 0; i < MAX_GAME_ENTS; i++)
+	for (int i = 0; i < NUM_GAME_ENTS; i++)
 		interpolation_data[i] = Entity_Interp();
 
 	eng->client_goto_loading();
@@ -128,41 +127,12 @@ Move_Command& Client::get_command(int sequence) {
 	return commands.at(sequence % CLIENT_MOVE_HISTORY);
 }
 
-struct Player_Net_Vars
-{
-	int type;
-	glm::vec3 position;
-	glm::vec3 angles;
-	int flags;
-	int state;
-	int anim_num;
-	float anim_frame;
-};
-
-struct Object_Net_Vars
-{
-	int type;
-	glm::vec3 position;
-	glm::vec3 rotation;
-	int flags;
-	int state;
-	int anim_num;
-	float anim_frame;
-};
-
-void set_player_vars_from_net()
-{
-
-}
-
-void set_entity_vars_from_net()
-{
-	
-}
-
 
 void Client::run_prediction()
 {
+	ASSERT(0);
+#if 0
+
 	if (get_state() != CS_SPAWNED)
 		return;
 
@@ -211,6 +181,8 @@ void Client::run_prediction()
 
 	// for prediction errors
 	origin_history.at((end-1)%origin_history.size()) = eng->local_player().position;
+
+#endif
 }
 
 static int NegModulo(int a, int b)
@@ -298,6 +270,9 @@ void set_entity_interp_vars(Entity& e, Interp_Entry& ie)
 
 void Client::interpolate_states()
 {
+	ASSERT(0);
+#if 0
+
 	static Auto_Config_Var dbg_print("dbg.print_interp_state", 0);
 
 	if (!interpolate.integer())
@@ -399,8 +374,9 @@ void Client::interpolate_states()
 			ent.rotation[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
 		}
 	}
+#endif
 }
-
+#if 0
 Frame* Client::GetCurrentSnapshot()
 {
 	return &snapshots.at(InSequence() % CLIENT_SNAPSHOT_HISTORY);
@@ -413,6 +389,7 @@ Frame* Client::FindSnapshotForTick(int tick)
 	}
 	return nullptr;
 }
+#endif
 
 // will add/subtract a small value to adjust the number of ticks running
 float Client::adjust_time_step(int ticks_runnning)
@@ -447,9 +424,10 @@ float Client::adjust_time_step(int ticks_runnning)
 	//	return adjust_total;
 	return -adjust_total;
 }
-
-void Client::read_snapshot(Frame* snapshot)
+#if 0
+void Client::read_snapshot(Frame2* snapshot)
 {
+	ASSERT(0);
 	// now: build a local state packet to delta entities from
 	ByteWriter wr(snapshot->data, Frame::MAX_FRAME_SNAPSHOT_DATA);
 
@@ -486,3 +464,4 @@ void Client::read_snapshot(Frame* snapshot)
 	eng->build_physics_world(0.f);
 
 }
+#endif

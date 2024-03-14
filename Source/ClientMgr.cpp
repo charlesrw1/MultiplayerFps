@@ -228,6 +228,9 @@ static Entity null_ent;
 
 void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, bool is_delta, ByteReader* from_ent, int tick)
 {
+
+	ASSERT(0);
+#if 0
 	ent->index = index;
 
 	Entity_Baseline* baseline = get_entity_baseline();
@@ -305,10 +308,13 @@ void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, 
 
 		interp.increment_index();
 	}
+#endif
 }
 
 bool Client::OnEntSnapshot(ByteReader& msg)
 {
+	ASSERT(0);
+#if 0
 	int delta_tick = msg.ReadLong();
 
 	if (delta_tick == -1) {
@@ -317,10 +323,11 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			force_full_update = false;
 	}
 
-	Frame* from = nullptr;
+
+	Frame2* from = nullptr;
 
 	if (delta_tick != -1) {
-		from = FindSnapshotForTick(delta_tick);
+		from = frame_storage.get_frame_for_tick(delta_tick);
 		if (!from) {
 			sys_print("Delta snapshot not found, requested: %d, current: %d", delta_tick, eng->tick);
 			ForceFullUpdate();
@@ -328,8 +335,6 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 			return true;
 		}
 	}
-
-	Entity_Baseline* baseline = get_entity_baseline();
 	
 	int sent1 = msg.ReadLong();
 	if (sent1 != 0xabcdabcd) {
@@ -338,20 +343,26 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	}
 
 	msg.AlignToByteBoundary();
-	int to_index = msg.ReadBits(ENTITY_BITS);
+
+	entityhandle to_index = msg.ReadBits(ENTITY_BITS);
 
 	if (from) {
-		Packed_Entity from_ent = from->begin();
+		int count_in_from = from->count;
+		int index = 0;
 
-		while (from_ent.index != ENTITY_SENTINAL && to_index != ENTITY_SENTINAL
-			&& !msg.HasFailed() && !from_ent.failed) {
+
+		while (index < count_in_from && to_index != ENTITY_SENTINAL
+			&& !msg.HasFailed()) {
 			
-			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &eng->ents[to_index];
+			Obj_Net_State& from_ent = frame_storage.get_state(*from, index);
+
+			Entity* ent = (to_index == ENTITY_SENTINAL) ? nullptr : &eng->get_ent(to_index);
 			int prop_mask = (to_index == client_num) ? Net_Prop::PLAYER_PROP_MASK : Net_Prop::NON_PLAYER_PROP_MASK;
 
-			if (from_ent.index < to_index) {
+
+			if (from_ent.handle < to_index) {
 				// old entity, now gone
-				Entity* oldent = &eng->ents[from_ent.index];	// FIXME: have to do more stuff like reset interp
+				Entity* oldent = &eng->get_ent(from_ent.handle);	// FIXME: have to do more stuff like reset interp
 				oldent->set_inactive();
 				from_ent.increment();	// advance from_state to the next Packed_Entity
 			}
@@ -407,5 +418,6 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 	to->num_ents_this_frame = 0;
 	read_snapshot(to);
 
+#endif
 	return false;
 }

@@ -71,6 +71,7 @@
     <ClInclude Include="Source\Draw.h" />
     <ClInclude Include="Source\DrawTypedefs.h" />
     <ClInclude Include="Source\EditorDoc.h" />
+    <ClInclude Include="Source\Entityclasses.h" />
     <ClInclude Include="Source\EnvProbe.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\KHR\khrplatform.h" />

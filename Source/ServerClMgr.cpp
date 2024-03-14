@@ -80,7 +80,7 @@ bool RemoteClient::OnMoveCmd(ByteReader& msg)
 		printf("simming dropped %d cmds\n", commands_to_run - 1);
 	}
 
-	Entity& e = eng->get_ent(client_num);
+	Entity& e = *eng->get_ent(client_num);
 	// FIXME: exploit to send inputs at increased rate
 	for (int i = commands_to_run - 1; i >= 0; i--) {
 		Move_Command c = commands[i];
@@ -131,7 +131,7 @@ void RemoteClient::Update()
 	int delta_frame = (never_delta.integer()) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
-	Entity& e = eng->get_ent(client_num);
+	Entity& e = *eng->get_ent(client_num);
 	if (e.force_angles == 1) {
 		writer.WriteByte(SV_UPDATE_VIEW);
 		writer.WriteVec3(e.diff_angles);
@@ -187,7 +187,7 @@ void RemoteClient::OnPacket(ByteReader& buf)
 
 void new_entity_fields_test()
 {
-
+#if 0
 	{
 		uint8_t accept_buf[256];
 		ByteWriter writer(accept_buf, 256);
@@ -284,11 +284,14 @@ void new_entity_fields_test()
 			printf("TEST 2 FAILED\n");
 		}
 	}
+#endif
 
 }
 
 void Server::make_snapshot()
 {
+	ASSERT(0);
+#if 0
 	Frame* f = GetSnapshotFrame();
 	f->tick = eng->tick;
 
@@ -330,7 +333,11 @@ void Server::make_snapshot()
 
 	if (writer.HasFailed())
 		sys_print("make_snapshot buffer failed\n");
+
+#endif
 }
+
+#if 0
 Packed_Entity::Packed_Entity(Frame* f, int offset, int length) : f(f)
 {
 	buf_offset = offset;
@@ -340,7 +347,6 @@ Packed_Entity::Packed_Entity(Frame* f, int offset, int length) : f(f)
 	index = r.ReadBits(ENTITY_BITS);
 	if (r.HasFailed()) failed = true;
 }
-
 
 ByteReader Packed_Entity::get_buf()
 {
@@ -364,8 +370,11 @@ Packed_Entity Frame::begin()
 	return Packed_Entity(this, 0, packet_ent_length);
 }
 
+#endif
 void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int client_idx)
 {
+	ASSERT(0);
+#if 0
 	Entity_Baseline* baseline = get_entity_baseline();
 
 
@@ -444,4 +453,6 @@ void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int 
 	msg.WriteBits(ENTITY_SENTINAL, ENTITY_BITS);
 
 	msg.WriteLong(0xef12ef12);
+
+#endif
 }
