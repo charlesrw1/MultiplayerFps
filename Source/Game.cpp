@@ -58,7 +58,6 @@ void spawn_door(Level::Entity_Spawn& spawn)
 {
 	Door* door = (Door*)eng->create_entity(entityclass::DOOR);
 
-	door->type = ET_NONE;
 	door->position = spawn.position;
 	door->rotation = spawn.rotation;
 	door->physics = EPHYS_MOVER;
@@ -71,7 +70,6 @@ void spawn_door(Level::Entity_Spawn& spawn)
 void spawn_spawn_point(Level::Entity_Spawn& spawn)
 {
 	Entity* sp = eng->create_entity(entityclass::SPAWNPOINT);
-	sp->type = ET_NONE;
 	sp->position = spawn.position;
 	sp->rotation = spawn.rotation;
 	sp->physics = EPHYS_NONE;
@@ -138,6 +136,12 @@ void Game_Engine::make_client(int slot)
 {
 	sys_print("making client %d\n", slot);
 	Player* p = (Player*)create_entity(entityclass::PLAYER, slot);
+
+	// FIXME: put this elsewhere
+	if (eng->is_host) {
+		p->interp = unique_ptr<RenderInterpolationComponent>(new RenderInterpolationComponent(3));
+	}
+
 	player_spawn(p);
 }
 
@@ -145,7 +149,7 @@ Entity* Game_Engine::create_entity(entityclass classtype, int forceslot)
 {
 	int slot = forceslot;
 	if (slot == -1) {
-		for (slot = 0; slot < NUM_GAME_ENTS; slot++) {
+		for (slot = MAX_CLIENTS; slot < NUM_GAME_ENTS; slot++) {
 			if (!ents[slot])
 				break;
 		}
@@ -182,8 +186,6 @@ Entity* Game_Engine::create_entity(entityclass classtype, int forceslot)
 
 	e->class_ = classtype;
 	e->selfid = (entityhandle)slot;
-	e->type = ET_NONE;
-	e->clear_pointers();
 
 	ents[slot] = e;
 
@@ -231,31 +233,132 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 	create_grenade(from, origin + direction * 0.5f, direction);
 }
 
-void Entity::clear_pointers()
+Player* Game_Engine::get_client_player(int slot)
 {
-	model = nullptr;
+	ASSERT(slot < MAX_CLIENTS);
+	if (!ents[slot]) return nullptr;
+	ASSERT(ents[slot]->class_ == entityclass::PLAYER);
+	return (Player*)ents[slot];
 }
 
-void Entity::add_to_last()
+
+RenderInterpolationComponent::InterpolationData& RenderInterpolationComponent::get(int index)
 {
-	Transform_Hist* l = &last[0];
-	int index = 0;
-	if (last[0].used) {
-		if (last[1].used)
-			l = &last[2];
+	int s = interpdata.size();
+	index = ((index % s) + s) % s;
+	return interpdata[index];
+}
+
+static float mid_lerp(float min, float max, float mid_val)
+{
+	return (mid_val - min) / (max - min);
+}
+static float modulo_lerp(float start, float end, float mod, float alpha)
+{
+	float d1 = glm::abs(end - start);
+	float d2 = mod - d1;
+
+
+	if (d1 <= d2)
+		return glm::mix(start, end, alpha);
+	else {
+		if (start >= end)
+			return fmod(start + (alpha * d2), mod);
 		else
-			l = &last[1];
+			return fmod(end + ((1 - alpha) * d2), mod);
 	}
-	l->used = true;
-	l->o = position;
-	l->r = rotation;
 }
-void Entity::shift_last()
+
+void RenderInterpolationComponent::evaluate(float time)
 {
-	last[0] = last[1];
-	last[1] = last[2];
-	last[2].used = false;
+	int entry_index = 0;
+	for (; entry_index < interpdata.size(); entry_index++) {
+		auto& e = get(interpdata_head - 1 - entry_index);
+		if (time >= e.time)
+			break;
+	}
+
+	if (entry_index == interpdata.size()) {
+		printf("all entries greater than time\n");
+		ASSERT(get(interpdata_head - 1).time >= 0.f);
+		lerped_pos = get(interpdata_head - 1).position;
+		lerped_rot = get(interpdata_head - 1).rotation;
+		return;
+	}
+	if (entry_index == 0) {
+		printf("all entries less than time\n");
+		float diff = time - get(interpdata_head - 1).time;
+		ASSERT(diff >= 0.f);
+		if (diff > max_extrapolate_time) {
+			lerped_pos = get(interpdata_head - 1).position;
+			lerped_rot = get(interpdata_head - 1).rotation;
+		}
+		else {
+			printf("extrapolate\n");
+			auto& a = get(interpdata_head - 2);
+			auto& b = get(interpdata_head - 1);
+			float extrap = mid_lerp(a.time, b.time, time);
+			lerped_pos = glm::mix(a.position, b.position, extrap);
+			for (int i = 0; i < 3; i++)
+				lerped_rot[i] = modulo_lerp(a.rotation[i], b.rotation[i], TWOPI, extrap);
+		}
+
+		return;
+	}
+
+	auto& a = get(interpdata_head - 1 - entry_index);
+	auto& b = get(interpdata_head - entry_index);
+
+	if (a.time < 0 && b.time < 0) {
+		printf("no state\n");
+		lerped_pos = glm::vec3(0.f);
+		lerped_rot = glm::vec3(0.f);
+	}
+	else if (a.time < 0) {
+		printf("only one state\n");
+		lerped_pos = b.position;
+		lerped_rot = b.rotation;
+	}
+	else if (b.time < 0) {
+		ASSERT(0);
+	}
+	else {
+		ASSERT(a.time < b.time);
+		ASSERT(a.time <= time && b.time >= time);
+
+		float dist = glm::length(b.position - a.position);
+		float speed = dist / (b.time - a.time);
+
+		if (speed > telport_velocity_threshold) {
+			lerped_pos = b.position;
+			lerped_rot = b.rotation;
+			sys_print("teleport\n");
+		}
+		else {
+			float midlerp = mid_lerp(a.time, b.time, time);
+			lerped_pos = glm::mix(a.position, b.position, midlerp);
+			for (int i = 0; i < 3; i++)
+				lerped_rot[i] = modulo_lerp(a.rotation[i], b.rotation[i], TWOPI, midlerp);
+
+		}
+	}
+
 }
+
+void RenderInterpolationComponent::add_state(float time, vec3 p, vec3 r)
+{
+	auto& element = get(interpdata_head);
+	element.time = time;
+	element.position = p;
+	element.rotation = r;
+	interpdata_head = (interpdata_head + 1) % interpdata.size();
+}
+
+void RenderInterpolationComponent::clear()
+{
+	for (int i = 0; i < interpdata.size(); i++) interpdata[i].time = -1.f;
+}
+
 
 void Entity::projectile_physics()
 {
@@ -344,9 +447,8 @@ void Entity::damage(Entity* attacker, glm::vec3 dir, int damage)
 
 void player_spawn(Entity* ent)
 {
-	ent->type = ET_PLAYER;
 
-	ent->set_model("player_character.glb");
+	ent->set_model("player_FINAL.glb");
 
 	if (ent->model) {
 		ent->anim.set_anim("act_idle", false);
@@ -370,7 +472,6 @@ void player_spawn(Entity* ent)
 Entity* dummy_spawn()
 {
 	Entity* ent = eng->create_entity(entityclass::NPC);
-	ent->type = ET_DUMMY;
 	ent->position = glm::vec3(0.f);
 	ent->rotation = glm::vec3(0.f);
 	ent->flags = 0;
@@ -468,7 +569,6 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 {
 	ASSERT(thrower);
 	Grenade* e = (Grenade*)eng->create_entity(entityclass::THROWABLE);
-	e->type = ET_GRENADE;
 	e->thrower = thrower->selfid;
 	e->position = org;
 	e->velocity = direction * grenade_vel.real();

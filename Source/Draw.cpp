@@ -1633,10 +1633,7 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 			continue;
 
 		mat4 model;
-		if (ent.using_interpolated_pos_and_rot)
-			model = glm::translate(mat4(1), ent.local_sv_interpolated_pos);
-		else
-			model = glm::translate(mat4(1), ent.position);
+		model = glm::translate(mat4(1), ent.position);
 		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
 		model = glm::scale(model, vec3(1.f));
 
@@ -1644,7 +1641,7 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 
 		make_draw_calls_from(&ent.model->mesh, model, ent.model->mats, a, true, glm::vec4(1.f));
 
-		if (ent.type == ET_PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
+		if (ent.class_ == entityclass::PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
 
 			Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
 

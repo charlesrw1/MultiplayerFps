@@ -708,3 +708,44 @@ void player_post_physics(Entity* p, Move_Command command, bool is_local)
 		player_animation_update(p);
 	}
 }
+
+void Player::move_update(Move_Command command)
+{
+	
+}
+
+// player update
+//		for all buffered commands
+//			run movement code
+//			run update code
+//			if fire_bullets and is server and not local player:
+//				for all lagcomped objects
+//					rollback to state
+//				run raycast
+//				restore objects
+
+// server/host side game tick logic
+//		for all objects
+//			update()
+//		update physicsworld data
+//		simulate_physics()
+//		for all objects
+//			postphysics()
+//		
+//		for all animated objects
+//			update animations
+//			pre_ik_update()
+//			update ik and finalize
+//		
+//		for all lagcomped objects
+//			save positon/hitbox data
+
+// client high level
+//		send move commands
+//		recieve state snapshot
+//		predict+update world
+//		interpolate entities
+
+// client side update game logic
+//		for all objects
+//			client update

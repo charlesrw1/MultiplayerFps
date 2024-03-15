@@ -89,6 +89,38 @@ struct Animator_Layer
 	void update(float dt, const Animation& clip);
 };
 
+typedef uint32_t animseqhandle;
+
+
+
+class Anim_Layer
+{
+	Anim_Layer(int maxlayers) :
+		blendlayers(maxlayers) {}
+	struct Sublayer {
+		animseqhandle active;
+		float frame = 0.f;
+		bool looping = false;
+	};
+	float frame = 0.f;
+	bool looping;
+
+	std::vector<Sublayer> blendlayers;	// treated as a queue of layers that get blended
+};
+
+class AnimatorBase
+{
+
+};
+
+class CharacterAnimator : public AnimatorBase
+{
+
+};
+
+
+
+
 class Model;
 class Animator
 {

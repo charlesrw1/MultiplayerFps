@@ -86,7 +86,7 @@ bool RemoteClient::OnMoveCmd(ByteReader& msg)
 		Move_Command c = commands[i];
 		eng->execute_player_move(client_num, c);
 
-		e.add_to_last();
+		//e.add_to_last();
 	}
 
 	return true;

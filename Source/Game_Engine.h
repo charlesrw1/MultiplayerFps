@@ -6,6 +6,7 @@
 #include "Particles.h"
 #include "Physics.h"
 
+class Player;
 class Model;
 class Game_Media
 {
@@ -140,7 +141,7 @@ public:
 	Entity* get_ent_from_handle(entityhandle id);
 	int find_by_classtype(int start, entityclass classtype);
 	Ent_Iterator get_ent_start();
-
+	Player* get_client_player(int slot);
 public:
 	Client* cl;
 	Server* sv;

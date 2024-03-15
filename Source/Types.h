@@ -2,6 +2,8 @@
 #define GAMETYPE_H
 #include "Util.h"
 #include "Animation.h"
+#include <memory>
+using std::unique_ptr;
 
 #define EDITDOC
 
@@ -80,17 +82,6 @@ struct Move_Command
 	static float unquantize(uint8_t c) {
 		return (float(c) - 128.f) / 128.f;
 	}
-};
-
-
-enum Ent_Type
-{
-	ET_PLAYER,
-	ET_ITEM,
-	ET_GRENADE,
-	ET_DUMMY,
-	ET_NONE,
-	ET_NULLTYPE = 0xff,
 };
 
 enum Entity_Flags
@@ -210,15 +201,46 @@ enum class entityclass
 	SPAWNPOINT,
 };
 
+
+struct RenderInterpolationComponent
+{
+	RenderInterpolationComponent(int size) : 
+		interpdata(size), 
+		interpdata_head(0) {}
+	glm::vec3 lerped_pos;
+	glm::vec3 lerped_rot;
+
+	float max_extrapolate_time = 0.2f;
+	float telport_velocity_threshold = 30.f;	// how many units/time before disabling interpolation
+
+	void add_state(float time, glm::vec3 p, glm::vec3 r);
+	void evaluate(float time);
+	void clear();
+
+private:
+	struct InterpolationData
+	{
+		float time;
+		glm::vec3 position;
+		glm::vec3 rotation;
+	};
+	InterpolationData& get(int index);
+	std::vector<InterpolationData> interpdata;
+	int interpdata_head;
+};
+
+
 typedef uint32_t entityhandle;
 class GeomContact;
 class Entity
 {
 public:
+	virtual ~Entity() {
+	}
+
 	entityhandle selfid = 0;	// eng->ents[]
 	entityclass class_ = entityclass::EMPTY;
 
-	Ent_Type type = ET_NULLTYPE;
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
 	int model_index = 0;	// media.gamemodels[]
@@ -256,18 +278,9 @@ public:
 	Animator anim;
 	Model* model = nullptr;
 
-	// used for 1 frame interpolation on the local server host for PLAYERS
-	bool using_interpolated_pos_and_rot = false;
-	glm::vec3 local_sv_interpolated_pos;
-	glm::vec3 local_sv_interpolated_rot;
-	struct Transform_Hist { bool used; glm::vec3 o; glm::vec3 r; };
-	Transform_Hist last[3];
-	void add_to_last();
-	void shift_last();
+	unique_ptr<RenderInterpolationComponent> interp;
 
 	void set_model(const char* model);
-
-	void clear_pointers();
 
 	void physics_update();
 	void projectile_physics();
@@ -278,12 +291,6 @@ public:
 
 	virtual void update() { }
 	virtual void collide(Entity* other, const GeomContact& gc) {}
-};
-
-
-class Player : public Entity
-{
-	void update() override;
 };
 
 class Door : public Entity

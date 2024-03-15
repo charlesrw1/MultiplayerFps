@@ -695,7 +695,7 @@ DECLARE_ENGINE_CMD(print_ents)
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
 	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 		Entity& e = ei.get();
-		sys_print("%-15d %-15d %-15f %-15f %-15d\n", ei.get_index(), e.type, e.position.x, e.position.z, (int)e.model);
+		sys_print("%-15d %-15d %-15f %-15f %-15d\n", ei.get_index(), (int)e.class_, e.position.x, e.position.z, (int)e.model);
 	}
 }
 
@@ -1198,7 +1198,7 @@ void Game_Engine::build_physics_world(float time)
 
 		PhysicsObject po;
 		po.userindex = ce.selfid;
-		if (ce.type == ET_PLAYER) {
+		if (ce.class_ == entityclass::PLAYER) {
 			float height = (!(ce.state & PMS_CROUCHING)) ? CHAR_STANDING_HB_HEIGHT : CHAR_CROUCING_HB_HEIGHT;
 			vec3 mins = ce.position - vec3(CHAR_HITBOX_RADIUS, 0, CHAR_HITBOX_RADIUS);
 			vec3 maxs = ce.position + vec3(CHAR_HITBOX_RADIUS, height, CHAR_HITBOX_RADIUS);
@@ -1244,10 +1244,11 @@ void Game_Engine::update_game_tick()
 			e.anim.AdvanceFrame(tick_interval);
 	}
 
-	// for local server interpolation
-	for (auto ei = Ent_Iterator(1); !ei.finished(); ei = ei.next()) {
-		Entity& e = ei.get();
-		e.shift_last();
+	if (is_host) {
+		// for local server interpolation
+		for (auto ei = Ent_Iterator(1); !ei.finished(); ei = ei.next()) {
+			Entity& e = ei.get();
+		}
 	}
 }
 
@@ -1592,16 +1593,7 @@ void Game_Engine::pre_render_update()
 	else {
 		for (auto ei = Ent_Iterator(1); !ei.finished(); ei = ei.next()) {
 			auto& e = ei.get();
-			e.using_interpolated_pos_and_rot = true;	// FIXME
-			static Auto_Config_Var use_sv_interp("sv.useinterp", 0);
-			if (e.last[0].used && use_sv_interp.integer()) {
-				e.local_sv_interpolated_pos = e.last[0].o;
-				e.local_sv_interpolated_rot = e.last[0].r;
-			}
-			else {
-				e.local_sv_interpolated_pos = e.position;
-				e.local_sv_interpolated_rot = e.rotation;
-			}
+			
 		}
 	}
 
