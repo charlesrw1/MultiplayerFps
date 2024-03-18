@@ -796,9 +796,11 @@ void init_audio()
 
 extern void benchmark_run();
 extern void benchmark_gltf();
-
+extern void at_test();
+#include "LispInterpreter.h"
 int main(int argc, char** argv)
 {
+
 	eng = new Game_Engine;
 
 	eng->argc = argc;
@@ -1596,14 +1598,16 @@ void Game_Engine::pre_render_update()
 			
 		}
 	}
+	{
+		CPUSCOPESTART("animation update");
+		for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+			Entity& e = ei.get();
+			if (!e.model || !e.model->animations)
+				continue;
 
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-		Entity& e = ei.get();
-		if (!e.model || !e.model->animations)
-			continue;
-
-		e.anim.SetupBones();
-		e.anim.ConcatWithInvPose();
+			e.anim.SetupBones();
+			e.anim.ConcatWithInvPose();
+		}
 	}
 
 	local.pm.tick(eng->frame_time);

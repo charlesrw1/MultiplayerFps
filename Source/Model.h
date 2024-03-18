@@ -112,6 +112,8 @@ public:
 	Mesh mesh;
 	// skeleton heirarchy
 	vector<Bone> bones;
+	glm::mat4 skeleton_root_transform;
+	int root_bone_index;
 	// embedded ainmations
 	unique_ptr<Animation_Set> animations;
 	// tags for attachments etc.

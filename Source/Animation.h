@@ -4,6 +4,11 @@
 #include "glm/gtc/quaternion.hpp"
 #include <vector>
 #include <string>
+#include <memory>
+#include <functional>
+class Model;
+using std::vector;
+using std::unique_ptr;
 
 struct AnimChannel
 {
@@ -44,6 +49,8 @@ public:
 	int num_rot = 0;
 	int scale_offset=0;
 	int num_scale = 0;
+	// end - start
+	glm::vec3 root_motion_translation;
 };
 
 class Animation_Set
@@ -89,42 +96,82 @@ struct Animator_Layer
 	void update(float dt, const Animation& clip);
 };
 
-typedef uint32_t animseqhandle;
 
-
-
-class Anim_Layer
+class Pose
 {
-	Anim_Layer(int maxlayers) :
+public:
+	glm::quat q[256];
+	glm::vec3 pos[256];
+};
+
+class PoseMask
+{
+public:
+	PoseMask();
+	void clear_all();
+	bool is_masked(int index);
+	void set(int index, bool masked);
+	uint64_t mask[4];	//256/64
+};
+
+// manages blends between 'layers', either state machine state or play layers
+class Anim_Sequencer
+{
+public:
+	Anim_Sequencer(int maxlayers) :
 		blendlayers(maxlayers) {}
 	struct Sublayer {
-		animseqhandle active;
-		float frame = 0.f;
-		bool looping = false;
+		bool active = false;
+
+		int user_index = 0;
+
+		bool fading_in = false;
+		float fade_time = 0.f;
+		float fade_left = 0.f;
 	};
-	float frame = 0.f;
-	bool looping;
 
-	std::vector<Sublayer> blendlayers;	// treated as a queue of layers that get blended
+	bool global_fade_out = false;
+	float global_fade_time = 0.f;
+	float global_fade_left = 0.f;
+
+	vector<Sublayer> blendlayers;	// treated as a queue of layers that get blended
 };
 
-class AnimatorBase
+struct playing_clip
 {
-
+	int index;
+	float frame;
+	bool looping = false;
 };
 
-class CharacterAnimator : public AnimatorBase
+class Anim_Play_Layer
 {
+public:
+	Anim_Play_Layer(int blendlayers) : sequencer(blendlayers) {}
 
+	Anim_Sequencer sequencer;
+	vector<playing_clip> playing_anims;
+	PoseMask mask;
 };
 
-
-
-
-class Model;
+// hardcoded layers with masks
+enum class animlayer
+{
+	armleft,
+	armright,
+	legleft,
+	legright,
+	upperbody,
+	lowerbody,
+	fullbody,
+	additive_misc
+};
+class Animation_Tree;
 class Animator
 {
 public:
+	Animator();
+
 	void set_model(const Model* model);
 	void set_anim(const char* name, bool restart, float blend = 0.1f);
 	void set_anim_from_index(Animator_Layer& l, int animation, bool restart, float blend = 0.1f);
@@ -137,16 +184,56 @@ public:
 
 	void AdvanceFrame(float elapsed_time);
 
+	void set_model_new(const Model* model);
+	void reset_new();
+	void evaluate_new(float dt);
+
 	Animator_Layer m;		// main animimation, upper body
 	Animator_Layer legs;	// legs
 
 	const Model* model = nullptr;
 	const Animation_Set* set = nullptr;
+	
+	Animation_Tree* tree;
+	vector<Anim_Play_Layer> play_layers;
+
+	struct input {
+		glm::vec3 worldpos;
+		glm::vec3 worldrot;
+
+		glm::vec3 desireddir;
+		glm::vec3 facedir;
+		glm::vec3 velocity;
+		glm::vec2 groundvelocity;
+		bool crouched;
+		bool falling;
+		bool injump;
+		bool ismoving;
+
+		bool use_rhik;
+		bool use_lhik;
+		glm::vec3 rhandtarget;
+		glm::vec3 lhandtarget;
+		bool use_headlook;
+		glm::vec3 headlooktarget;
+	}in;
+
+	struct output {
+		glm::vec3 meshoffset;
+		glm::vec3 rootmotion_angles_delta;
+		glm::vec3 rootmotion_position_delta;
+	}out;
+
 private:
+
+
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 
 	std::vector<glm::mat4x4> cached_bonemats;		// final transform matricies, meshspace->bonespace->meshspace
+	
+	vector<glm::mat4x4> cached_local;
+	vector<glm::mat4x4> cached_global;
 
 	void CalcRotations(glm::quat q[], glm::vec3 pos[], int clip_index, float curframe);
 

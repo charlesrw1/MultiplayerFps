@@ -651,6 +651,30 @@ void load_model_materials2(std::vector<Game_Shader*>& materials, const std::stri
 		materials.push_back(gs);
 	}
 }
+glm::mat4 get_node_transform(cgltf_node* node)
+{
+	glm::mat4 local_transform = glm::mat4(1);
+	if (node->has_matrix) {
+		float* m = node->matrix;
+		local_transform = glm::mat4(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
+			m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
+	}
+	else {
+		glm::vec3 translation = glm::vec3(0.f);
+		glm::vec3 scale = glm::vec3(1.f);
+		glm::quat rot = glm::quat(1.f, 0.f, 0.f, 0.f);
+		if (node->has_translation)
+			translation = glm::make_vec3<float>(node->translation);
+		if (node->has_rotation)
+			rot = glm::make_quat<float>(node->rotation);
+		if (node->has_scale)
+			scale = glm::make_vec3<float>(node->scale);
+		local_transform = glm::translate(glm::mat4(1), translation);
+		local_transform = local_transform * glm::mat4_cast(rot);
+		local_transform = glm::scale(local_transform, scale);
+	}
+	return local_transform;
+}
 
 
 #ifdef USE_CGLTF
@@ -713,14 +737,28 @@ static void LoadGltfSkeleton3(cgltf_data* data, Model* model, cgltf_skin* skin)
 		RecursiveAddSkeleton3(bone_to_index, data, model, defscene->nodes[i]);
 		//RecursiveAddSkeleton(bone_to_index, scene, model, scene.nodes[defscene.nodes.at(i)]);
 	}
+
+	model->skeleton_root_transform = glm::mat4(1);
+	for (int i = 0; i < model->bones.size(); i++) {
+		if (model->bones.at(i).parent == -1) {
+			cgltf_node* node = skin->joints[i];
+			model->root_bone_index = i;	// fixme: models with multiple unparented bones?
+			if (node->parent) {
+				model->skeleton_root_transform = get_node_transform(node->parent);
+				break;
+			}
+		}
+	}
+
+
 }
 #endif
 
 #ifdef USE_CGLTF
-static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
+static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin, int root_index, glm::mat4 root_transform)
 {
 	Animation_Set* set = new Animation_Set;
-	std::map<int, int> node_to_index;
+	std::unordered_map<int, int> node_to_index;
 
 	for (int i = 0; i < skin->joints_count; i++) {
 		node_to_index[cgltf_node_index(data,skin->joints[i])] = i;
@@ -739,52 +777,36 @@ static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
 		my_anim.scale_offset = set->scales.size();
 		set->channels.resize(set->channels.size() + skin->joints_count);
 		for (int c = 0; c < gltf_anim->channels_count; c++) {
-			//tinygltf::AnimationChannel& gltf_channel = gltf_anim.channels[c];
 			cgltf_animation_channel* gltf_channel = &gltf_anim->channels[c];
-			//int channel_idx = node_to_index[gltf_channel.target_node];
 			int channel_idx = node_to_index[cgltf_node_index(data, gltf_channel->target_node)];
 			AnimChannel& my_channel = set->channels[my_anim.channel_offset + channel_idx];
 
 			int type = -1;
-			//if (gltf_channel.target_path == "translation") type = 0;
-			//else if (gltf_channel.target_path == "rotation") type = 1;
-			//else if (gltf_channel.target_path == "scale") type = 2;
-			//else continue;
 			if (gltf_channel->target_path == cgltf_animation_path_type_translation) type = 0;
 			else if (gltf_channel->target_path == cgltf_animation_path_type_rotation) type = 1;
 			else if (gltf_channel->target_path == cgltf_animation_path_type_scale) type = 2;
 			else continue;
 
-
-			//tinygltf::AnimationSampler& sampler = gltf_anim.samplers[gltf_channel.sampler];
 			cgltf_animation_sampler* sampler = gltf_channel->sampler;
 			cgltf_accessor* timevals = sampler->input;
-			//tinygltf::Accessor& timevals = scene.accessors[sampler.input];
-			//tinygltf::Accessor& vals = scene.accessors[sampler.output];
 			cgltf_accessor* vals = sampler->output;
 			ASSERT(timevals->count == vals->count);
-			//tinygltf::BufferView& time_bv = scene.bufferViews[timevals.bufferView];
 			cgltf_buffer_view* time_bv = timevals->buffer_view;
 			cgltf_buffer_view* val_bv = vals->buffer_view;
-			//tinygltf::BufferView& val_bv = scene.bufferViews[vals.bufferView];
 			ASSERT(time_bv->buffer == val_bv->buffer);
-			//tinygltf::Buffer& buffer = scene.buffers[time_bv.buffer];
 			cgltf_buffer* buffer = time_bv->buffer;
 			ASSERT(timevals->component_type == cgltf_component_type_r_32f);// just make life easier
 			ASSERT(time_bv->stride == 0);
 
-			//my_anim.total_duration = glm::max(my_anim.total_duration, (float)timevals.maxValues.at(0));
 			my_anim.total_duration = glm::max(my_anim.total_duration, (float)timevals->max[0]);
 
 			char* buffer_byte_data = (char*)buffer->data;
 
-			//float* time_buffer = (float*)(&buffer.data.at(time_bv.byteOffset));
 			float* time_buffer = (float*)&buffer_byte_data[time_bv->offset];
 			if (type == 0) {
 				my_channel.pos_start = set->positions.size();
 				ASSERT(vals->component_type == cgltf_component_type_r_32f && vals->type == cgltf_type_vec3);
 				ASSERT(val_bv->stride == 0);
-				//glm::vec3* pos_buffer = (glm::vec3*)(&buffer.data.at(val_bv.byteOffset));
 
 				glm::vec3* pos_buffer = (glm::vec3*)&buffer_byte_data[val_bv->offset];
 
@@ -801,7 +823,6 @@ static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
 				my_channel.rot_start = set->rotations.size();
 				ASSERT(vals->component_type == cgltf_component_type_r_32f && vals->type == cgltf_type_vec4);
 				ASSERT(val_bv->stride == 0);
-				//glm::quat* rot_buffer = (glm::quat*)(&buffer.data.at(val_bv.byteOffset));
 				glm::quat* rot_buffer = (glm::quat*)&buffer_byte_data[val_bv->offset];
 				for (int t = 0; t < timevals->count; t++) {
 					RotKeyframe rkf;
@@ -815,7 +836,6 @@ static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
 				my_channel.scale_start = set->scales.size();
 				ASSERT(vals->component_type == cgltf_component_type_r_32f && vals->type == cgltf_type_vec3);
 				ASSERT(val_bv->stride == 0);
-				//glm::vec3* scale_buffer = (glm::vec3*)(&buffer.data.at(val_bv.byteOffset));
 				glm::vec3* scale_buffer = (glm::vec3*)&buffer_byte_data[val_bv->offset];
 				for (int t = 0; t < timevals->count; t++) {
 					ScaleKeyframe skf;
@@ -832,6 +852,19 @@ static Animation_Set* LoadGltfAnimations2(cgltf_data* data, cgltf_skin* skin)
 		my_anim.num_scale = set->scales.size() - my_anim.scale_offset;
 		my_anim.fps = 1.0;
 		set->clips.push_back(my_anim);
+		auto& anim = set->clips.back();
+
+		{
+			int clip_index = set->clips.size() - 1;
+			int start_index = set->FirstPositionKeyframe(0.0, root_index, clip_index);
+			int end_index = set->FirstPositionKeyframe(my_anim.total_duration, root_index, clip_index);
+
+			if (start_index != -1 && end_index != -1) {
+				glm::vec3 pstart = set->GetPos(root_index, start_index, clip_index).val;
+				glm::vec3 pend = set->GetPos(root_index, end_index, clip_index).val;
+				anim.root_motion_translation = root_transform * glm::vec4(pend - pstart, 1.0);
+			}
+		}
 	}
 
 	return set;
@@ -854,26 +887,7 @@ static void traverse_model_nodes3_prefab(Prefab_Model* model, cgltf_data* data,
 	cgltf_node* node, glm::mat4 global_transform, std::unordered_map<int,int> cgltf_mesh_to_mesh, 
 	Game_Mod_Manager::prefab_callback callback, void* callback_data)
 {
-	glm::mat4 local_transform = glm::mat4(1);
-	if (node->has_matrix) {
-		float* m = node->matrix;
-		local_transform = glm::mat4(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
-			m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
-	}
-	else {
-		glm::vec3 translation = glm::vec3(0.f);
-		glm::vec3 scale = glm::vec3(1.f);
-		glm::quat rot = glm::quat(1.f, 0.f, 0.f, 0.f);
-		if (node->has_translation)
-			translation = glm::make_vec3<float>(node->translation);
-		if (node->has_rotation)
-			rot = glm::make_quat<float>(node->rotation);
-		if (node->has_scale)
-			scale = glm::make_vec3<float>(node->scale);
-		local_transform = glm::translate(glm::mat4(1), translation);
-		local_transform = local_transform * glm::mat4_cast(rot);
-		local_transform = glm::scale(local_transform, scale);
-	}
+	glm::mat4 local_transform = get_node_transform(node);
 	global_transform = global_transform * local_transform;
 
 	if (callback)
@@ -935,7 +949,7 @@ static bool load_gltf_model3(const std::string& filepath, Model* model)
 	if (data->skins_count >= 1)
 		LoadGltfSkeleton3(data, model, &data->skins[0]);
 	if (data->animations_count >= 1 && data->skins_count >= 1) {
-		Animation_Set* set = LoadGltfAnimations2(data, &data->skins[0]);
+		Animation_Set* set = LoadGltfAnimations2(data, &data->skins[0], model->root_bone_index, model->skeleton_root_transform);
 		model->animations = std::unique_ptr<Animation_Set>(set);
 	}
 

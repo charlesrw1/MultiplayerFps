@@ -467,7 +467,7 @@ void player_animation_update(Entity* ent)
 		if (ent->state & PMS_CROUCHING)
 			next_leg_anim = "act_crouch_idle";
 		else
-			next_leg_anim = "act_idle";
+			next_leg_anim = "stand_unqeuip_idle";
 	}
 
 

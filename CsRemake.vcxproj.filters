@@ -132,6 +132,9 @@
     <ClCompile Include="Source\EnvProbe.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Source\LispInterpreter.cpp">
+      <Filter>Source Files\Shared</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Texture.h">
@@ -243,6 +246,9 @@
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Source\Entityclasses.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LispInterpreter.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
   </ItemGroup>

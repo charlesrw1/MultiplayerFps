@@ -45,6 +45,7 @@
     <ClCompile Include="Source\External\imgui_widgets.cpp" />
     <ClCompile Include="source\Game.cpp" />
     <ClCompile Include="Source\glad.c" />
+    <ClCompile Include="Source\LispInterpreter.cpp" />
     <ClCompile Include="Source\Meshlet.cpp" />
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
@@ -76,6 +77,7 @@
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\Game_Engine.h" />
+    <ClInclude Include="Source\LispInterpreter.h" />
     <ClInclude Include="Source\Meshlet.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
     <ClInclude Include="Source\Particles.h" />
