@@ -107,7 +107,8 @@ void main()
 	vec3 local_normal = vec3(0.0);
 #ifdef NORMALMAPPED
 	vec3 local_tangent = vec3(0.0);
-#endif
+#endif // NORMALMAPPED
+
 	int obj_skin_offset = g_objects[obj_index].anim_mat_offset;
 
 	for(int i=0;i<4;i++) {
@@ -122,17 +123,18 @@ void main()
 	#ifdef NORMALMAPPED
 		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Tangent;
 		local_tangent += tangentadded;
-	#endif
+	#endif // NORMALMAPPED
 	}
+	
 #else
 	vec3 local_pos = VS_IN_Postion;
 	vec3 local_normal = VS_IN_Normal;
 
 #ifdef NORMALMAPPED
 	vec3 local_tangent = VS_IN_Tangent;
-#endif
+#endif // NORMALMAPPED
 
-#endif
+#endif // ANIMATED
 
 #ifdef WIND
 	local_pos = do_wind_sway(local_pos, Model);
@@ -152,7 +154,7 @@ void main()
 #ifdef NORMALMAPPED
 	vec3 world_tangent = mat3(transpose(InverseModel))*normalize(local_tangent);
 	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
-	FS_IN_TBN = mat3(world_tangent, world_bitangent, FS_IN_Normal);
+	FS_IN_TBN = mat3(local_tangent, world_bitangent, FS_IN_Normal);
 #endif
     
 	

@@ -424,7 +424,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	float sun_shadow = sample_sun_shadow(FS_IN_FragPos)*max(dot(N, L),0.0);
 	ambient += emissive + Lo*sun_shadow;
 
-	return vec4(ambient, opacity);
+	return vec4(N, opacity);
 }
 
 #ifdef BLEND2
@@ -503,7 +503,7 @@ void main()
 	#endif
 	
 	N = N*2 - vec3(1);
-	N = normalize(FS_IN_TBN * N); 
+	N = FS_IN_TBN[0];//normalize(FS_IN_TBN * N); 
 #endif
 
 // FIXME WITH NORMALMAPS!

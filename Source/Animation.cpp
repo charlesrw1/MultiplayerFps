@@ -633,289 +633,11 @@ static vector<int> get_indicies(const Animation_Set* set, const vector<const cha
 #include "LispInterpreter.h"
 
 
-enum opcode : uint16_t
-{
-	ADD_F,
-	ADD_I,
-	SUB_F,
-	SUB_I,
-	MULT_F,
-	MULT_I,
-	DIV_F,
-	DIV_I,
-
-	LT_F,
-	LT_I,
-	LEQ_F,
-	LEQ_I,
-	GT_F,
-	GT_I,
-	GEQ_F,
-	GEQ_I,
-
-	
-	EQ_F,
-	EQ_I,
-	NOTEQ_F,
-	NOTEQ_I,
-
-	AND,
-	OR,
-	NOT,
-	PUSH_CONST_F,
-	PUSH_CONST_I,
-	PUSH_F,
-	PUSH_I,
-	CAST_0_F,
-	CAST_0_I,
-	CAST_1_F,
-	CAST_1_I,
-};
-
-struct stack_val
-{
-	union {
-		int i;
-		float f;
-	};
-};
-
-struct compilied_exp
-{
-	vector<uint8_t> instructions;
-
-	void push_inst(uint8_t c) {
-		instructions.push_back(c);
-	}
-	void push_4bytes(unsigned int x) {
-		instructions.push_back(x & 0xff);
-		instructions.push_back((x >> 8) & 0xff);
-		instructions.push_back((x >> 16) & 0xff);
-		instructions.push_back((x >> 24) & 0xff);
-	}
-	enum type {
-		int_type,
-		float_type
-	};
-
-	uint32_t read_4bytes(int offset) {
-		uint32_t res = (instructions[offset]);
-		res |= ((uint32_t)instructions[offset + 1] << 8);
-		res |= ((uint32_t)instructions[offset + 2] << 16);
-		res |= ((uint32_t)instructions[offset + 3] << 24);
-		return res;
-	}
-	uintptr_t read_8bytes(int offset) {
-		uintptr_t low = read_4bytes(offset);
-		uintptr_t high = read_4bytes(offset + 4);
-		return low | (high << 32);
-	}
-
-	type compile(Exp* exp, const Env* env) {
-		if (exp->type == Exp::atom_type) {
-			if (exp->atom.type == Atom::symbol_type) {
-				const auto& find = env->symbols.find(exp->atom.sym);
-				if (find->second.type == Atom_Or_Proc::atom_type) {
-					if (find->second.a.type == Atom::int_type) {
-						push_inst(PUSH_I);
-						uintptr_t ptr = (uintptr_t)&find->second.a.i;
-						int testi = *(int*)(ptr);
-						push_4bytes(ptr);
-						push_4bytes(ptr>> 32);
-						return type::int_type;
-					}
-					else if (find->second.a.type == Atom::float_type) {
-						push_inst(PUSH_F);
-						push_4bytes((unsigned long long) & find->second.a.f);
-						push_4bytes(((unsigned long long) & find->second.a.f) >> 32);
-						return type::float_type;
-					}
-					else
-						assert(0);
-				}
-			}
-			else {
-				if (exp->atom.type == Atom::int_type) {
-					push_inst(PUSH_CONST_I);
-					push_4bytes(exp->atom.i);
-					return type::int_type;
-				}
-				else if (exp->atom.type == Atom::float_type) {
-					push_inst(PUSH_CONST_F);
-					float f = exp->atom.f;
-					push_4bytes(*(unsigned int*)&f);
-					return type::float_type;
-				}
-				else {
-					assert(0);
-				}
-			}
-		}
-		else {
-			assert(exp->list.at(0)->type == Exp::atom_type);
-			string op = exp->list.at(0)->atom.sym;
-			if (op == "not") {
-				auto type1 = compile(exp->list.at(1).get(), env);
-				if (type1 == type::float_type) {
-					push_inst(CAST_0_I);
-				}
-				push_inst(NOT);
-				return type::int_type;
-			}
-			else if (op == "and" || op == "or") {
-				auto type1 = compile(exp->list.at(1).get(), env);
-				auto type2 = compile(exp->list.at(2).get(), env);
-				if (type1 != int_type)
-					push_inst(CAST_1_I);
-				if (type2 != int_type)
-					push_inst(CAST_0_I);
-				if (op == "and")
-					push_inst(AND);
-				else
-					push_inst(OR);
-				return type::int_type;
-			}
-			else {
-				auto type1 = compile(exp->list.at(1).get(), env);
-				auto type2 = compile(exp->list.at(2).get(), env);
-				bool isfloat = (type1 == float_type || type2 == float_type);
-				if (isfloat && type1 != float_type)
-					push_inst(CAST_1_F);
-				if (isfloat && type2 != float_type)
-					push_inst(CAST_0_F);
-				struct pairs {
-					const char* name;
-					opcode op;
-				};
-				const static pairs p[] = {
-					{"+",ADD_F},
-					{"-",SUB_F},
-					{"*",MULT_F},
-					{"/",DIV_F},
-					{"<",LT_F},
-					{">",GT_F},
-					{"<=",LEQ_F},
-					{">=",GEQ_F},
-					{"==",EQ_F},
-					{"!=",NOTEQ_F}
-				};
-				int i = 0;
-				for (; i < 10; i++) {
-					if (p[i].name == op) {
-						if (isfloat) push_inst(p[i].op);
-						else push_inst(p[i].op + 1);
-						break;
-					}
-				}
-				assert(i != 10);
-
-				return (isfloat) ? float_type : int_type;
-			}
-		}
-	}
-
-#define OPONSTACK(op, typein, typeout) stack[sp-2].typeout = stack[sp-2].typein op stack[sp-1].typein; sp-=1; break;
-#define FLOAT_AND_INT_OP(opcode_, op) case opcode_: OPONSTACK(op, f, f); \
-case (opcode_+1): OPONSTACK(op,i,i);
-#define FLOAT_AND_INT_OP_OUTPUT_INT(opcode_, op) case opcode_: OPONSTACK(op,f, i); \
-case (opcode_+1): OPONSTACK(op,i, i);
-	stack_val run()
-	{
-		stack_val stack[64];
-		int sp = 0;
-
-		for (int pc = 0; pc < instructions.size(); pc++) {
-			uint8_t op = instructions[pc];
-			switch (op)
-			{
-				FLOAT_AND_INT_OP(ADD_F, +);
-				FLOAT_AND_INT_OP(SUB_F, -);
-				FLOAT_AND_INT_OP(MULT_F, *);
-				FLOAT_AND_INT_OP(DIV_F, / );
-				FLOAT_AND_INT_OP_OUTPUT_INT(LT_F, < );
-				FLOAT_AND_INT_OP_OUTPUT_INT(LEQ_F, <= );
-				FLOAT_AND_INT_OP_OUTPUT_INT(GT_F, > );
-				FLOAT_AND_INT_OP_OUTPUT_INT(GEQ_F, >= );
-				FLOAT_AND_INT_OP_OUTPUT_INT(EQ_F, == );
-				FLOAT_AND_INT_OP_OUTPUT_INT(NOTEQ_F, != );
-
-			case NOT:
-				stack[sp-1].i = !stack[sp-1].i;
-				break;
-			case AND:
-				stack[sp - 2].i = stack[sp - 2].i && stack[sp - 1].i;
-				sp -= 1;
-				break;
-			case OR:
-				stack[sp - 2].i = stack[sp - 2].i || stack[sp - 1].i;
-				sp -= 1;
-				break;
-
-			case CAST_0_F:
-				stack[sp-1].f = stack[sp-1].i;
-				break;
-			case CAST_0_I:
-				stack[sp-1].i = stack[sp-1].f;
-				break;
-			case CAST_1_F:
-				stack[sp - 2].f = stack[sp - 2].i;
-				break;
-			case CAST_1_I:
-				stack[sp - 2].i = stack[sp - 2].f;
-				break;
-
-			case PUSH_CONST_F: {
-				union {
-					int i;
-					float f;
-				};
-				i = read_4bytes(pc + 1);
-				stack[sp++].f = f;
-				pc += 4;
-			} break;
-			case PUSH_CONST_I: {
-				int i = read_4bytes(pc + 1);
-				stack[sp++].i = i;
-				pc += 4;
-			}break;
-			case PUSH_F: {
-				unsigned long long ptr = read_8bytes(pc + 1);
-				stack[sp++].f = *((double*)ptr);
-				pc += 8;
-			}break;
-			case PUSH_I: {
-				unsigned long long ptr = read_8bytes(pc + 1);
-				stack[sp++].i = *((int*)ptr);
-				pc += 8;
-			}break;
-			}
-		}
-		assert(sp == 1);
-		return stack[0];
-	}
-};
-#undef FLOAT_AND_INT_OP
-#undef FLOAT_AND_INT_OP_OUTPUT_INT
-#undef OPONSTACK
-
-
 struct State;
 struct State_Transition
 {
-	State_Transition() {
-
-	}
-	~State_Transition() {
-		printf("st descructor\n");
-	}
-	State_Transition(const State_Transition& other) = delete;
-	State_Transition(State_Transition&& other) {
-		transition_state = other.transition_state;
-		compilied = std::move(other.compilied);
-	}
-
 	State* transition_state;
-	compilied_exp compilied;
+	LispBytecode compilied;
 };
 
 struct At_Node
@@ -936,11 +658,15 @@ struct State
 	At_Node* tree = nullptr;
 	vector<State_Transition> transitions;
 
+	float state_duration = -1.0;
+	float time_left = 0.0;
+
 	State* get_next_state(Animator* animator);
 };
 
 struct Animation_Tree
 {
+	Animation_Tree() : ctx(100,&script_vars){}
 	~Animation_Tree() {
 		printf("at destructor\n");
 	}
@@ -978,7 +704,7 @@ State* State::get_next_state(Animator* animator)
 {
 	for (int i = 0; i < transitions.size(); i++) {
 		// evaluate condition
-		if (transitions[i].compilied.run().i)
+		if (transitions[i].compilied.execute().i)
 			return transitions[i].transition_state;
 	}
 	return this;
@@ -1098,7 +824,7 @@ struct Add_Node : public At_Node
 
 	virtual bool get_pose(Pose& pose, float dt) override
 	{
-		float lerp = compilied.run().f;
+		float lerp = compilied.execute().f;
 		Pose* addtemp = Pose_Pool::get().alloc(1);
 		base_pose->get_pose(pose, dt);
 		diff_pose->get_pose(*addtemp, dt);
@@ -1111,7 +837,7 @@ struct Add_Node : public At_Node
 		base_pose->reset();
 	}
 
-	compilied_exp compilied;
+	LispBytecode compilied;
 	At_Node* diff_pose;
 	At_Node* base_pose;
 };
@@ -1121,11 +847,11 @@ struct Boolean_Blend_Node : public At_Node
 	using At_Node::At_Node;
 
 	virtual bool get_pose(Pose& pose, float dt) override {
-		bool b = LispLikeInterpreter::eval(exp.get(), &animator->tree->ctx).a.cast_to_int();
-		if (b)
-			value += dt / blendin;
-		else
-			value -= dt / blendin;
+		//bool b = LispLikeInterpreter::eval(exp.get(), &animator->tree->ctx).asexp().asatom().i;
+		//f (b)
+		//	value += dt / blendin;
+		//lse
+		//	value -= dt / blendin;
 		glm::clamp(value, 0.0f, 1.0f);
 
 		if (value < 0.00001f)
@@ -1148,7 +874,6 @@ struct Boolean_Blend_Node : public At_Node
 	}
 	Pose* temppose = nullptr;
 	At_Node* nodes[2];
-	unique_ptr<Exp> exp;
 	float value = 0.f;
 	float blendin = 0.2;
 };
@@ -1234,110 +959,101 @@ struct Context
 		tree->all_node_list.push_back(unique_ptr<At_Node>(node));
 		return tree->all_node_list.back().get();
 	}
-	State* find_state(string& name) {
+	State* find_state(const string& name) {
 		return &tree->states[name];
 	}
 };
 
 static Context at_ctx;
 
-Atom root_func(Atom* args, int argc)
+LispExp root_func(LispArgs args)
 {
-	for (int i = 0; i < argc; i++) {
-		if (args[i].type == Atom::animation_tree_node_type) {
-			at_ctx.tree->root = (At_Node*)args[i].ptr;	// bubbled up from tree
+	for (int i = 0; i < args.count(); i++) {
+		if (args.args[i].type == LispExp::animation_tree_node_type) {
+			at_ctx.tree->root = (At_Node*)args.args[i].u.ptr;
 			break;
 		}
 	}
 
-	return Atom(0);
+	return LispExp(0);
 }
 
-Atom clip_func(Atom* args, int argc)
+LispExp clip_func(LispArgs args)
 {
-	if (argc != 1) throw "only 1 clip arg";
-
-	Clip_Node* clip = new Clip_Node(args[0].sym.c_str(), at_ctx.animator);
-	return Atom(at_ctx.add_node(clip));
+	Clip_Node* clip = new Clip_Node(args.at(0).as_sym().c_str(), at_ctx.animator);
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(clip));
 }
 
-Atom tree_func(Atom* args, int argc)
+LispExp defstate_func(LispArgs args)
 {
-	// bubble up
-	return args[0];
-}
-
-Atom defstate_func(Atom* args, int argc)
-{
-	if (argc <= 2) throw "bad def state";
-	string& statename = args[0].sym;
+	const string& statename = args.at(0).as_sym();
 	State* s = at_ctx.find_state(statename);
 	s->name = statename.c_str();
 
-	for (int i = 0; i < argc; i++) {
-		if (args[i].type == Atom::animation_transition_type) {
-			s->transitions.push_back(std::move(*((State_Transition*)args[i].ptr)));
-
-			delete args[i].ptr;
-			args[i].ptr = nullptr;
+	for (int i = 1; i < args.count(); i++) {
+		const string& sym = args.at(i).as_sym();
+		if (sym == ":tree") {
+			s->tree = (At_Node*)args.at(i+1).as_custom_type(LispExp::animation_tree_node_type);
+			i += 1;
 		}
-		else if (args[i].type == Atom::animation_tree_node_type) {
-			s->tree = (At_Node*)args[i].ptr;
-			args[i].ptr = nullptr;
+		else if (sym == ":duration") {
+			s->state_duration = args.at(i+1).cast_to_float();
+			i += 1;
+		}
+		else if (sym == ":transitions") {
+			auto& list = args.at(i + 1).as_list();
+			for (int j = 0; j < list.size(); j++) {
+				s->transitions.push_back(
+					*(State_Transition*)list.at(j).as_custom_type(LispExp::animation_transition_type)
+				);
+				delete list.at(j).u.ptr;
+			}
+			i += 1;
 		}
 	}
 
-	return Atom(0);
+	return LispExp(0);
 }
 
-Atom transition_state(Atom* args, int argc)
+LispExp transition_state(LispArgs args)
 {
-	if (argc != 2)throw "2 args for transition";
 	State_Transition* st = new State_Transition;
-	st->transition_state = at_ctx.find_state(args[0].sym);
-	if (args[1].type != Atom::exp_type) throw "expected expression transition";
-	st->compilied.compile(args[1].exp, &at_ctx.tree->script_vars);
-	
-	Atom a;
-	a.type = Atom::animation_transition_type;
-	a.ptr = st;
-	return a;
+	st->transition_state = at_ctx.find_state(args.at(0).as_sym());
+	st->compilied.compile(args.at(1), &at_ctx.tree->script_vars);	// evaluate quoted
+	return LispExp(LispExp::animation_transition_type, st);
 }
 
-Atom move_directional_blend_func(Atom* args, int argc)
+LispExp move_directional_blend_func(LispArgs args)
 {
 	Directionalblend_node* db = new Directionalblend_node(at_ctx.animator);
-	for (int i = 0; i < argc && i < 8; i++) {
-		if (args[i].type != Atom::animation_tree_node_type) throw "expected node";
-		db->directions[i] = (At_Node*)args[i].ptr;
+	for (int i = 0; i < args.count() && i < 8; i++) {
+		db->directions[i] = (At_Node*)args.args[i].as_custom_type(LispExp::animation_tree_node_type);
 	}
-
-	return Atom(at_ctx.add_node(db));
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(db));
 }
 
-Atom statemachine_node(Atom* args, int argc)
+LispExp statemachine_node(LispArgs args)
 {
 	Statemachine_Node* sm = new Statemachine_Node(at_ctx.animator);
-	sm->start_state = at_ctx.find_state(args[0].sym);
-	return Atom(at_ctx.add_node(sm));
+	sm->start_state = at_ctx.find_state(args.at(0).as_sym());
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(sm));
 }
 
-Atom additive_node(Atom* args, int argc)
+LispExp additive_node(LispArgs args)
 {
 	Add_Node* addnode = new Add_Node(at_ctx.animator);
-	addnode->base_pose = (At_Node*)args[0].ptr;
-	addnode->diff_pose = (At_Node*)args[1].ptr;
-	addnode->compilied.compile(args[2].exp, &at_ctx.tree->script_vars);
-	args[2].exp = nullptr;
-	return Atom(at_ctx.add_node(addnode));
+	addnode->base_pose = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	addnode->diff_pose = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+	addnode->compilied.compile( args.at(2) , &at_ctx.tree->script_vars);
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(addnode));
 }
 
-Atom sub_node_create(Atom* args, int argc)
+LispExp sub_node_create(LispArgs args)
 {
 	Subtract_Node* subnode = new Subtract_Node(at_ctx.animator);
-	subnode->source = (At_Node*)args[0].ptr;
-	subnode->ref = (At_Node*)args[1].ptr;
-	return Atom(at_ctx.add_node(subnode));
+	subnode->source = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	subnode->ref = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(subnode));
 }
 
 Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
@@ -1348,33 +1064,34 @@ Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
 	while (std::getline(infile, line)) fullcode += line;
 
 	auto env = LispLikeInterpreter::get_global_env();
-	env.symbols["root"] = root_func;
-	env.symbols["clip"] = clip_func;
-	env.symbols["move-directional-blend"] = move_directional_blend_func;
-	env.symbols["def-state"] = defstate_func;
-	env.symbols["tree"] = tree_func;
-	env.symbols["transition"] = transition_state;
-	env.symbols["statemachine"] = statemachine_node;
-	env.symbols["additive"] = additive_node;
-	env.symbols["subtract"] = sub_node_create;
+	env.symbols["root"].assign(			root_func);
+	env.symbols["clip"].assign(			clip_func);
+	env.symbols["move-directional-blend"].assign( move_directional_blend_func);
+	env.symbols["def-state"].assign( defstate_func);
+	env.symbols["transition"].assign( transition_state);
+	env.symbols["statemachine"].assign( statemachine_node);
+	env.symbols["additive"].assign( additive_node );
+	env.symbols["subtract"].assign( sub_node_create);
 
 	Animation_Tree* tree = new Animation_Tree;
-	tree->ctx.argbuf.resize(128);
 	at_ctx.tree = tree;
 	at_ctx.animator = anim;
 	tree->ctx.arg_head = 0;
 	tree->ctx.env = &env;
 	tree->script_vars = LispLikeInterpreter::get_global_env();
 
-	tree->script_vars.symbols["$moving"] = Atom(0);
-	tree->script_vars.symbols["$alpha"] = Atom(0.f);
-	tree->script_vars.symbols["$jumping"] = Atom(0);
+	tree->script_vars.symbols["$moving"].assign( LispExp(0) );
+	tree->script_vars.symbols["$alpha"].assign( LispExp(0.0) );
+	tree->script_vars.symbols["$jumping"].assign( LispExp(0) );
 
 	try {
-		Atom_Or_Proc val = LispLikeInterpreter::eval(LispLikeInterpreter::parse(fullcode).get(), &tree->ctx);
+		LispExp root = LispLikeInterpreter::parse(fullcode);
+		LispExp val = LispLikeInterpreter::eval(root, &tree->ctx);
 	}
-	catch (const char* str) {
-		printf("error occured %s\n", str);
+	catch (LispError e) {
+		printf("error occured %s\n", e.msg);
+
+		return nullptr;
 	}
 
 	tree->ctx.env = &tree->script_vars;
@@ -1391,9 +1108,9 @@ void Animator::evaluate_new(float dt)
 
 	in.groundvelocity = glm::vec2(player.velocity.x, player.velocity.z);
 
-	tree->script_vars.symbols["$moving"] = Atom(int( glm::length(player.velocity) > 0.1) );
-	tree->script_vars.symbols["$alpha"] = Atom(float( sin(GetTime())));
-	tree->script_vars.symbols["$jumping"] = Atom(int(player.state & PMS_JUMPING));
+	tree->script_vars.symbols["$moving"].assign(	LispExp(int( glm::length(player.velocity) > 0.1) ) );
+	tree->script_vars.symbols["$alpha"].assign(		LispExp(float( sin(GetTime()))));
+	tree->script_vars.symbols["$jumping"].assign(	LispExp(int(player.state & PMS_JUMPING)));
 
 	tree->root->get_pose(*pose, dt);
 
@@ -1401,6 +1118,7 @@ void Animator::evaluate_new(float dt)
 
 	Pose_Pool::get().free(1);
 }
+
 
 void Animator::set_model_new(const Model* m)
 {

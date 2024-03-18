@@ -166,6 +166,7 @@ enum class animlayer
 	fullbody,
 	additive_misc
 };
+
 class Animation_Tree;
 class Animator
 {
