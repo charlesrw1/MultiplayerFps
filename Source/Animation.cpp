@@ -648,6 +648,9 @@ struct At_Node
 
 	virtual bool get_pose(Pose& pose, float dt) = 0;
 	virtual void reset() = 0;
+	virtual bool is_clip_node() {
+		return false;
+	}
 	Animator* animator;
 };
 
@@ -657,6 +660,7 @@ struct State
 	string name;
 	At_Node* tree = nullptr;
 	vector<State_Transition> transitions;
+	State* next_state = nullptr;
 
 	float state_duration = -1.0;
 	float time_left = 0.0;
@@ -758,10 +762,18 @@ void util_set_to_bind_pose(Pose& pose, const Model* model)
 	}
 }
 
+
+
 struct Clip_Node : public At_Node
 {
 	Clip_Node(const char* clipname, Animator* animator) : At_Node(animator) {
 		clip_index = animator->set->find(clipname);
+
+		int root_index = animator->model->root_bone_index;
+		int first_pos = animator->set->FirstPositionKeyframe(0.0, root_index, clip_index);
+		root_pos_first_frame = first_pos != -1 ? 
+			animator->set->GetPos(root_index, first_pos, clip_index).val 
+			: animator->model->bones[root_index].posematrix[3];
 	}
 
 	// Inherited via At_Node
@@ -772,29 +784,56 @@ struct Clip_Node : public At_Node
 			return true;
 		}
 
-		bool keep_playing = true;
 		const Animation& clip = animator->set->clips[clip_index];
-		frame += clip.fps * dt;
+		frame += clip.fps * dt * speed;
 		if (frame > clip.total_duration || frame < 0.f) {
 			if (loop)
 				frame = fmod(fmod(frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 			else {
 				frame = clip.total_duration - 0.001f;
-				keep_playing = false;
+				stopped_flag = true;
 			}
 		}
 		util_calc_rotations(animator->set, frame, clip_index,animator->model, pose);
 
-		return true;
+
+		int root_index = animator->model->root_bone_index;
+		for (int i = 0; i < 3; i++) {
+			if (rootmotion[i] == Remove) {
+				pose.pos[root_index][i] = root_pos_first_frame[i];
+			}
+		}
+
+		return !stopped_flag;
 	}
 
 	virtual void reset() override {
 		frame = 0.f;
+		stopped_flag = false;
+	}
+	
+	enum rootmotion_type {
+		None,
+		Remove
+	}rootmotion[3] = { None,None,None };
+
+	virtual bool is_clip_node() override {
+		return true;
+	}
+	const Animation* get_clip() {
+		const Animation* clip = (clip_index == -1) ? nullptr : &animator->set->clips.at(clip_index);
+		return clip;
+	}
+	void set_frame_by_interp(float frac) {
+		frame = get_clip()->total_duration * frac;
 	}
 
+	glm::vec3 root_pos_first_frame;
 	int clip_index = 0;
 	float frame = 0.f;
 	bool loop = true;
+	float speed = 1.0;
+	bool stopped_flag = false;
 };
 
 struct Subtract_Node : public At_Node
@@ -842,17 +881,92 @@ struct Add_Node : public At_Node
 	At_Node* base_pose;
 };
 
+struct Blend_Node : public At_Node
+{
+	using At_Node::At_Node;
+
+	virtual bool get_pose(Pose& pose, float dt) override
+	{
+		float lerp = compilied.execute().f;
+		Pose* addtemp = Pose_Pool::get().alloc(1);
+		posea->get_pose(pose, dt);
+		poseb->get_pose(*addtemp, dt);
+		util_blend(animator->GetBones().size(), *addtemp, pose, lerp);
+		Pose_Pool::get().free(1);
+		return true;
+	}
+	virtual void reset() override {
+		posea->reset();
+		poseb->reset();
+	}
+
+	LispBytecode compilied;
+	At_Node* posea;
+	At_Node* poseb;
+};
+
+struct Mirror_Node : public At_Node
+{
+	using At_Node::At_Node;
+
+	// Inherited via At_Node
+	virtual bool get_pose(Pose& pose, float dt) override
+	{
+		bool good = exp.execute().i;
+		if (good) 
+			lerp_amt += dt / mirror_lerp_time;
+		else 
+			lerp_amt -= dt / mirror_lerp_time;
+		lerp_amt = glm::clamp(lerp_amt, 0.f, 1.f);
+
+		bool ret = input->get_pose(pose, dt);
+
+
+		if (lerp_amt >= 0.000001) {
+			const Model* m = animator->model;
+			Pose* posemirrored = Pose_Pool::get().alloc(1);
+			// mirror the bones
+			for (int i = 0; i < m->bones.size(); i++) {
+				int from = m->bones[i].remap_index;
+				glm::vec3 frompos = pose.pos[from];
+				posemirrored->pos[i] = glm::vec3(-frompos.x, frompos.y, frompos.z);
+				glm::quat fromquat = pose.q[from];
+				posemirrored->q[i] = glm::quat(fromquat.w, fromquat.x, -fromquat.y, -fromquat.z);
+			}
+
+			util_blend(m->bones.size(), *posemirrored, pose, lerp_amt);
+
+			Pose_Pool::get().free(1);
+			
+		}
+		return ret;
+	}
+
+	virtual void reset() override
+	{
+		lerp_amt = 0.0;
+	}
+	At_Node* input = nullptr;
+	float mirror_lerp_time = 0.2f;
+	float lerp_amt = 0.f;
+	LispBytecode exp;
+};
+
 struct Boolean_Blend_Node : public At_Node
 {
 	using At_Node::At_Node;
 
 	virtual bool get_pose(Pose& pose, float dt) override {
 		//bool b = LispLikeInterpreter::eval(exp.get(), &animator->tree->ctx).asexp().asatom().i;
-		//f (b)
-		//	value += dt / blendin;
-		//lse
-		//	value -= dt / blendin;
-		glm::clamp(value, 0.0f, 1.0f);
+		bool b = exp.execute().i;
+		if (b)
+			value += dt / blendin;
+		else
+			value -= dt / blendin;
+
+		value =glm::clamp(value, 0.0f, 1.0f);
+
+		printf("boolean value: %f\n", value);
 
 		if (value < 0.00001f)
 			return nodes[0]->get_pose(pose, dt);
@@ -864,90 +978,253 @@ struct Boolean_Blend_Node : public At_Node
 			bool r = nodes[0]->get_pose(pose, dt);
 			nodes[1]->get_pose(*pose2, dt);
 
-			util_blend(animator->model->bones.size(), *pose2, pose, 1 - value);
+			util_blend(animator->model->bones.size(), *pose2, pose, value);
 			Pose_Pool::get().free(1);
 			return r;
 		}
 	}
 	virtual void reset() override {
 		value = 0.0;
+		nodes[0]->reset();
+		nodes[1]->reset();
 	}
-	Pose* temppose = nullptr;
+	LispBytecode exp;
 	At_Node* nodes[2];
 	float value = 0.f;
 	float blendin = 0.2;
 };
 
+float ym0 = 0.1;
+float ym1 = 0.05;
+float xm0 = 0.1;
+float xm1 = 0.05;
+float lerp_rot = 0.9;
+float g_fade_out = 0.2;
+float g_walk_fade_in = 5.0;
+
+#include "imgui.h"
+void menu()
+{
+	ImGui::DragFloat("ym0", &ym0, 0.001);
+	ImGui::DragFloat("ym1", &ym1, 0.001);
+	ImGui::DragFloat("xm0", &xm0, 0.001);
+	ImGui::DragFloat("xm1", &xm1, 0.001);
+	ImGui::DragFloat("lerprot", &lerp_rot, 0.005);
+	ImGui::DragFloat("walk fade in", &g_walk_fade_in, 0.05);
+	ImGui::DragFloat("g_fade_out", &g_fade_out, 0.005);
+
+}
+
 struct Statemachine_Node : public At_Node
 {
-	using At_Node::At_Node;
-
+	Statemachine_Node(Animator* a) : At_Node(a) {}
+	
 	virtual bool get_pose(Pose& pose, float dt) override {
 
 		// evaluate state machine
-		if (!active_state) active_state = start_state;
+		if (active_state == nullptr) {
+			active_state = start_state;
+			active_weight = 0.0;
+		}
+		State* next_state;// = (change_to_next_state) ? active_state->next_state : active_state->get_next_state(animator);
+		if (change_to_next_state) next_state = active_state->next_state;
+		else {
+			next_state = active_state->get_next_state(animator);
+			State* next_state2 = next_state->get_next_state(animator);
+			int infinite_loop_check = 0;
+			while (next_state2 != next_state) {
+				next_state = next_state2;
+				next_state2 = next_state->get_next_state(animator);
+				infinite_loop_check++;
 
-		State* next_state = active_state->get_next_state(animator);
+				ASSERT(infinite_loop_check < 100);
+			}
+		}
+
+		change_to_next_state = false;
 		if (active_state != next_state) {
-			active_state = next_state;
-			active_state->tree->reset();
+			if (next_state == fading_out_state) {
+				std::swap(active_state, fading_out_state);
+				active_weight = 1.0 - active_weight;
+			}
+			else {
+				fading_out_state = active_state;
+				active_state = next_state;
+				active_state->tree->reset();
+				fade_in_time = g_fade_out;
+				active_weight = 0.f;
+			}
 			printf("changed to state %s\n", active_state->name.c_str());
 		}
 
-		return active_state->tree->get_pose(pose, dt);
+		active_weight += dt / fade_in_time;
+		if (active_weight > 1.f) {
+			active_weight = 1.f;
+			fading_out_state = nullptr;
+		}
+
+		bool notdone = active_state->tree->get_pose(pose, dt);
+
+		if (fading_out_state) {
+			Pose* fading_out_pose = Pose_Pool::get().alloc(1);
+			fading_out_state->tree->get_pose(*fading_out_pose, 0.f);	// dt == 0
+			printf("%f\n", active_weight);
+			assert(fading_out_state != active_state);
+			util_blend(animator->model->bones.size(), *fading_out_pose, pose, 1.0-active_weight);
+			Pose_Pool::get().free(1);
+		}
+
+		if (!notdone) {	// if done
+			if (active_state->next_state) {
+				change_to_next_state = true;
+				return true;
+			}
+			else {
+				return false;	// bubble up the finished event
+			}
+		}
+		return true;
 	}
+	bool change_to_next_state = false;
+
 	State* start_state = nullptr;
-	State* active_state = nullptr;
 
 	// Inherited via At_Node
 	virtual void reset() override
 	{
-		active_state = start_state;
-		active_state->tree->reset();
+		active_state = nullptr;
+		fading_out_state = nullptr;
+		active_weight = 0.0;
 	}
+
+	State* active_state = nullptr;
+	State* fading_out_state = nullptr;
+	float fade_in_time = 0.f;
+	float active_weight = 0.f;
 };
+
+// y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)
+void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1, Pose& y2, glm::vec2 fac)
+{
+	util_blend(bonecount, x1, x2, fac.x);
+	util_blend(bonecount, y1, y2, fac.x);
+	util_blend(bonecount, x2, y2, fac.y);
+}
 
 
 struct Directionalblend_node : public At_Node
 {
 	Directionalblend_node(Animator* a) : At_Node(a) {
-		memset(directions, 0, sizeof(directions));
+		memset(walk_directions, 0, sizeof(walk_directions));
+		memset(run_directions, 0, sizeof(run_directions));
 	}
 
-	At_Node* directions[8];
+	Clip_Node* idle = nullptr;
+	Clip_Node* walk_directions[8];
+	Clip_Node* run_directions[8];
+	float walk_fade_in = 5.0;
+	float walk_fade_out = 2.0;
+	float run_fade_in = 5.0;
+
+	float current_frame = 0.f;	// what [0,1] "frame" we are on, change this to footstep syncing layer
+
+	bool blend_between_idle_and_walk(float speed)
+	{
+		if (!run_directions[0]) return true;
+		ASSERT(walk_directions[0]);
+		
+		int clip = walk_directions[0]->clip_index;
+		if (clip == -1) return 0;
+		return speed < glm::length(animator->set->clips.at(clip).root_motion_translation);
+	}
+	float get_rootmotion_of_clip(Clip_Node* node)
+	{
+		return glm::length(animator->set->clips.at(node->clip_index).root_motion_translation);
+	}
+
+	void advance_animation_sync_by(Clip_Node* node, float dt, float character_speed)
+	{
+		const Animation* anim = node->get_clip();
+		node->frame = current_frame * anim->total_duration;
+
+		float speed_of_anim = glm::length(anim->root_motion_translation);
+
+		// want to match character_speed and speed_of_anim
+		float speedup = character_speed / speed_of_anim;
+		node->frame += speedup * dt * anim->fps;
+
+		current_frame = node->frame / anim->total_duration;
+	}
 
 	// Inherited via At_Node
 	virtual bool get_pose(Pose& pose, float dt) override
 	{
-		// blend between 2 poses
-		glm::vec2 direction = glm::normalize(animator->in.groundvelocity);
+		walk_fade_in = g_walk_fade_in;
 
+		float character_ground_speed = glm::length( animator->in.groundvelocity );
+
+		// blend between angles
+		glm::vec2 direction = glm::normalize(animator->in.relmovedir);
 		float angle = atan2f(direction.y, direction.x);
-
-		float lerp = 0.0;
+		float anglelerp = 0.0;
 		int pose1=0, pose2=1;
 		for (int i = 0; i < 8; i++) {
 			if (angle <= -PI + PI / 4.0 * (i + 1)) {
 				pose1 = i;
 				pose2 = (i + 1) % 8;
-				lerp = MidLerp(-PI + PI / 4.0 * i, -PI + PI / 4.0 * (i + 1), angle);
+				anglelerp = MidLerp(-PI + PI / 4.0 * i, -PI + PI / 4.0 * (i + 1), angle);
 				break;
 			}
 		}
-		Pose* scratchpose = Pose_Pool::get().alloc(1);
+		// highest weighted pose controls syncing
+		Pose* scratchposes = Pose_Pool::get().alloc(3);
+		if (character_ground_speed <= walk_fade_in) {
+			idle->get_pose(scratchposes[0], dt);
 
-		directions[pose1]->get_pose(pose, dt);
-		directions[pose2]->get_pose(*scratchpose, dt);
+			if (anglelerp <= 0.5) {
+				advance_animation_sync_by(walk_directions[pose1], dt, character_ground_speed);
+				walk_directions[pose2]->set_frame_by_interp(current_frame);
+			}
+			else {
+				advance_animation_sync_by(walk_directions[pose2], dt, character_ground_speed);
+				walk_directions[pose1]->set_frame_by_interp(current_frame);
+			}
 
-		util_blend(animator->model->bones.size(), *scratchpose, pose, lerp);
+			walk_directions[pose2]->get_pose(scratchposes[1], 0.f);
+			walk_directions[pose1]->get_pose(pose, 0.f);
+			util_blend(animator->model->bones.size(), scratchposes[1], pose, anglelerp);
+			float speed_lerp = MidLerp(0.0, walk_fade_in, character_ground_speed);
+			util_blend(animator->model->bones.size(), scratchposes[0], pose, 1.0-speed_lerp);
+		}
+		else {
+			if (anglelerp <= 0.5) {
+				advance_animation_sync_by(walk_directions[pose1], dt, character_ground_speed);
+				walk_directions[pose2]->set_frame_by_interp(current_frame);
+			}
+			else {
+				advance_animation_sync_by(walk_directions[pose2], dt, character_ground_speed);
+				walk_directions[pose1]->set_frame_by_interp(current_frame);
+			}
+			walk_directions[pose1]->get_pose(pose, 0.f);
+			walk_directions[pose2]->get_pose(scratchposes[0], 0.f);
 
-		Pose_Pool::get().free(1);
+			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
+		}
+
+
+		//float frame_synced = 0.f;
+
+		//directions[pose1]->get_pose(pose, dt);
+		//directions[pose2]->get_pose(*scratchpose, dt);
+		//
+		//util_blend(animator->model->bones.size(), *scratchpose, pose, lerp);
+
+		Pose_Pool::get().free(3);
 
 		return true;
 	}
 	virtual void reset() override {
-		for (int i = 0; i < 8; i++)
-			if (directions[i]) directions[i]->reset();
+		//current_frame = 0.0;
 	}
 };
 
@@ -980,7 +1257,35 @@ LispExp root_func(LispArgs args)
 
 LispExp clip_func(LispArgs args)
 {
+
 	Clip_Node* clip = new Clip_Node(args.at(0).as_sym().c_str(), at_ctx.animator);
+	for (int i = 1; i < args.count(); i++) {
+		auto& cmd = args.at(i).as_sym();
+		if (cmd == ":rootx") {
+			auto& x = args.at(i + 1).as_sym();
+			if (x == "del") clip->rootmotion[0] = Clip_Node::Remove;
+			i += 1;
+		}
+		else if (cmd == ":rooty") {
+			auto& x = args.at(i + 1).as_sym();
+			if (x == "del") clip->rootmotion[1] = Clip_Node::Remove;
+			i += 1;
+		}
+		else if (cmd == ":rootz") {
+			auto& x = args.at(i + 1).as_sym();
+			if (x == "del") clip->rootmotion[2] = Clip_Node::Remove;
+			i += 1;
+		}
+		else if (cmd == ":loop") {
+			auto& x = args.at(i + 1).as_sym();
+			if (x == "false") clip->loop = false;
+			i += 1;
+		}
+		else if (cmd == ":rate") {
+			clip->speed = args.at(i + 1).cast_to_float();
+			i += 1;
+		}
+	}
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(clip));
 }
 
@@ -993,11 +1298,15 @@ LispExp defstate_func(LispArgs args)
 	for (int i = 1; i < args.count(); i++) {
 		const string& sym = args.at(i).as_sym();
 		if (sym == ":tree") {
-			s->tree = (At_Node*)args.at(i+1).as_custom_type(LispExp::animation_tree_node_type);
+			s->tree = (At_Node*)args.at(i + 1).as_custom_type(LispExp::animation_tree_node_type);
 			i += 1;
 		}
 		else if (sym == ":duration") {
-			s->state_duration = args.at(i+1).cast_to_float();
+			s->state_duration = args.at(i + 1).cast_to_float();
+			i += 1;
+		}
+		else if (sym == ":transition-done") {
+			s->next_state = at_ctx.find_state(args.at(i+1).as_sym());
 			i += 1;
 		}
 		else if (sym == ":transitions") {
@@ -1010,6 +1319,7 @@ LispExp defstate_func(LispArgs args)
 			}
 			i += 1;
 		}
+		else assert(0);
 	}
 
 	return LispExp(0);
@@ -1026,8 +1336,30 @@ LispExp transition_state(LispArgs args)
 LispExp move_directional_blend_func(LispArgs args)
 {
 	Directionalblend_node* db = new Directionalblend_node(at_ctx.animator);
-	for (int i = 0; i < args.count() && i < 8; i++) {
-		db->directions[i] = (At_Node*)args.args[i].as_custom_type(LispExp::animation_tree_node_type);
+
+	for (int i = 0; i < args.count(); i++) {
+		auto& sym = args.args[i].as_sym();
+		if (sym == ":walk") {
+			auto& list = args.at(++i).as_list();
+			for (int j = 0; j < 8; j++) {
+				At_Node* node = (At_Node*)list.at(j).as_custom_type(LispExp::animation_tree_node_type);
+				if (!node->is_clip_node()) throw "needs clip node type for db walk";
+				db->walk_directions[j] = (Clip_Node*)node;
+			}
+		}
+		else if (sym == ":run") {
+			auto& list = args.at(++i).as_list();
+			for (int j = 0; j < 8; j++) {
+				At_Node* node = (At_Node*)list.at(j).as_custom_type(LispExp::animation_tree_node_type);
+				if (!node->is_clip_node()) throw "needs clip node type for db run";
+				db->run_directions[j] = (Clip_Node*)node;
+			}
+		}
+		else if (sym == ":idle") {
+			At_Node* node = (At_Node*)args.at(++i).as_custom_type(LispExp::animation_tree_node_type);
+			if (!node->is_clip_node()) throw "needs clip node type for db idle";
+			db->idle = (Clip_Node*)node;
+		}
 	}
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(db));
 }
@@ -1055,13 +1387,80 @@ LispExp sub_node_create(LispArgs args)
 	subnode->ref = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(subnode));
 }
+LispExp blend_node_create(LispArgs args)
+{
+	Blend_Node* node = new Blend_Node(at_ctx.animator);
+	node->posea = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	node->poseb = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+	node->compilied.compile( args.at(2) , &at_ctx.tree->script_vars);
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(node));
+}
+LispExp boolean_blend_create(LispArgs args)
+{
+	Boolean_Blend_Node* node = new Boolean_Blend_Node(at_ctx.animator);
+	node->nodes[0] = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	node->nodes[1] = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+	node->exp.compile( args.at(2) , &at_ctx.tree->script_vars);
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(node));
+}
+
+LispExp mirror_node_create(LispArgs args)
+{
+	Mirror_Node* node = new Mirror_Node(at_ctx.animator);
+
+	for (int i = 0; i < args.argc - 1; i++) {
+		string& sym = args.args[i].as_sym();
+		if (sym == ":lerp")
+			node->mirror_lerp_time = args.at(++i).cast_to_float();
+		else if(sym == ":exp")
+			node->exp.compile( args.at(++i), &at_ctx.tree->script_vars);
+	}
+
+	node->input = (At_Node*)args.at(args.argc - 1).as_custom_type(LispExp::animation_tree_node_type);
+	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(node));
+}
+
+
+
+char get_first_token(string& s, char default_='\0')
+{
+	for (auto c : s) {
+		if (c != ' ' && c != '\t' && c != '\n') return c;
+	}
+	return default_;
+}
+
+// LispInterpreter.cpp
+extern vector<string> to_tokens(string& input);
+void load_mirror_remap(Model* model, const char* path)
+{
+	std::ifstream infile(path);
+	string line;
+	for (int i = 0; i < model->bones.size(); i++) model->bones[i].remap_index = i;
+	while (std::getline(infile, line)) {
+		auto tokens = to_tokens(line);
+		int right = model->bone_for_name(tokens.at(0).c_str());
+		int left = model->bone_for_name(tokens.at(1).c_str());
+		ASSERT(right != -1 && left != -1);
+		model->bones[right].remap_index = left;
+		model->bones[left].remap_index = right;
+	}
+}
+
 
 Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
+
+	load_mirror_remap(const_cast<Model*>(anim->model), "./Data/Animations/remap.txt");	// FIXME
 
 	std::ifstream infile(path);
 	std::string line;
 	string fullcode;
-	while (std::getline(infile, line)) fullcode += line;
+	while (std::getline(infile, line)) {
+		if (get_first_token(line) != ';') {
+			fullcode += line;
+			fullcode += ' ';
+		}
+	}
 
 	auto env = LispLikeInterpreter::get_global_env();
 	env.symbols["root"].assign(			root_func);
@@ -1072,6 +1471,10 @@ Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
 	env.symbols["statemachine"].assign( statemachine_node);
 	env.symbols["additive"].assign( additive_node );
 	env.symbols["subtract"].assign( sub_node_create);
+	env.symbols["blend"].assign(blend_node_create);
+	env.symbols["mirror"].assign(mirror_node_create);
+	env.symbols["boolean-blend"].assign(boolean_blend_create);
+
 
 	Animation_Tree* tree = new Animation_Tree;
 	at_ctx.tree = tree;
@@ -1083,7 +1486,8 @@ Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
 	tree->script_vars.symbols["$moving"].assign( LispExp(0) );
 	tree->script_vars.symbols["$alpha"].assign( LispExp(0.0) );
 	tree->script_vars.symbols["$jumping"].assign( LispExp(0) );
-
+	tree->script_vars.symbols["$mirrored"].assign(LispExp(0));
+	tree->script_vars.symbols["$flCrouchLerp"].assign(LispExp(0.f));
 	try {
 		LispExp root = LispLikeInterpreter::parse(fullcode);
 		LispExp val = LispLikeInterpreter::eval(root, &tree->ctx);
@@ -1098,21 +1502,45 @@ Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
 
 	return tree;
 }
+using namespace glm;
+#include <iostream>
+
 
 
 void Animator::evaluate_new(float dt)
 {
+	Entity& player = eng->local_player();
+	bool mirrored = player.state & PMS_CROUCHING;
 	Pose* pose = Pose_Pool::get().alloc(1);
 
-	Entity& player = eng->local_player();
 
-	in.groundvelocity = glm::vec2(player.velocity.x, player.velocity.z);
+	glm::vec2 next_vel = glm::vec2(player.velocity.x, player.velocity.z);
+
+	in.groundvelocity = next_vel;
+
+	bool moving = glm::length(player.velocity) > 0.001;
+		glm::vec2 face_dir = glm::vec2(cos(HALFPI-player.rotation.y), sin(HALFPI-player.rotation.y));
+		glm::vec2 side = glm::vec2(-face_dir.y, face_dir.x);
+		in.relmovedir = glm::vec2(glm::dot(face_dir, in.groundvelocity), glm::dot(side, in.groundvelocity));
+
+		if (mirrored) in.relmovedir.y *= -1;
+
+		glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
+	glm::vec2 relaccel = vec2(dot(face_dir,grndaccel), dot(side,grndaccel));
+
 
 	tree->script_vars.symbols["$moving"].assign(	LispExp(int( glm::length(player.velocity) > 0.1) ) );
-	tree->script_vars.symbols["$alpha"].assign(		LispExp(float( sin(GetTime()))));
+	tree->script_vars.symbols["$alpha"].assign(		LispExp(float( sin(GetTime())*0.5 + 0.5  )));
 	tree->script_vars.symbols["$jumping"].assign(	LispExp(int(player.state & PMS_JUMPING)));
+	bool should_mirror = sin(GetTime() * 0.5 + 2.1) > 0;
+	tree->script_vars.symbols["$mirrored"].assign( LispExp(mirrored));
 
 	tree->root->get_pose(*pose, dt);
+	glm::vec3 rotation_dir = glm::normalize(vec3(atan(relaccel.y*ym0)*ym1, atan(relaccel.x*xm0)*xm1, 1.0f));
+	glm::quat q = glm::quat(rotation_dir, glm::vec3(0, 0, 1));
+	in.player_rot_from_accel = glm::slerp(q, in.player_rot_from_accel, lerp_rot);
+
+	pose->q[player.model->root_bone_index] = in.player_rot_from_accel * pose->q[player.model->root_bone_index];
 
 	UpdateGlobalMatricies(pose->q, pose->pos, cached_bonemats);
 
@@ -1123,6 +1551,7 @@ void Animator::evaluate_new(float dt)
 void Animator::set_model_new(const Model* m)
 {
 	if (m->name == "player_FINAL.glb") {
+		Debug_Interface::get()->add_hook("animation stuff", menu);
 		tree =
 			load_animtion_tree(this,"./Data/Animations/testtree.txt");
 	}

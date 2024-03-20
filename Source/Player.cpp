@@ -365,6 +365,7 @@ void player_physics_check_nans(Entity& player)
 
 void player_physics_update(Entity* p, Move_Command command)
 {
+	glm::vec3 last_velocity = p->velocity;
 
 	if (p->flags & EF_DEAD) {
 		command.forward_move = 0;
@@ -415,6 +416,8 @@ void player_physics_update(Entity* p, Move_Command command)
 		player_physics_ground_move(*p, command, dont_add_grav);
 	player_physics_check_nans(*p);
 
+
+	p->esimated_accel = (p->velocity - last_velocity) / (float)eng->tick_interval;
 }
 
 

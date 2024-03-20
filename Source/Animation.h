@@ -122,17 +122,29 @@ public:
 		blendlayers(maxlayers) {}
 	struct Sublayer {
 		bool active = false;
-
 		int user_index = 0;
-
-		bool fading_in = false;
 		float fade_time = 0.f;
-		float fade_left = 0.f;
+		float weight = 0.f;	//weight +=/-= dt/fade_time
 	};
-
-	bool global_fade_out = false;
 	float global_fade_time = 0.f;
-	float global_fade_left = 0.f;
+	float global_weight = 1.f;
+
+	void push_layer(int user_index, float fade_in_time) {
+		for (int i = 1; i < blendlayers.size(); i++) blendlayers[i] = blendlayers[i - 1];
+
+		blendlayers[0].active = true;
+		blendlayers[0].user_index = user_index;
+		blendlayers[0].fade_time = fade_in_time;
+		blendlayers[0].weight = 0.0;
+	}
+	void push_layer_to_top(int index) {
+		Sublayer layer = blendlayers[index];
+		for (int i = 1; i < blendlayers.size(); i++) blendlayers[i] = blendlayers[i - 1];
+		blendlayers[0] = layer;
+	}
+	void clear() {
+		for (int i = 0; i < blendlayers.size(); i++)blendlayers[i].active = false;
+	}
 
 	vector<Sublayer> blendlayers;	// treated as a queue of layers that get blended
 };
@@ -206,6 +218,10 @@ public:
 		glm::vec3 facedir;
 		glm::vec3 velocity;
 		glm::vec2 groundvelocity;
+		glm::vec2 relmovedir;	//forwards/back etc.
+		
+		glm::quat player_rot_from_accel = glm::quat(1, 0, 0, 1);
+
 		bool crouched;
 		bool falling;
 		bool injump;

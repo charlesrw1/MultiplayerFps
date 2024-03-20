@@ -10,7 +10,7 @@ static void replace(std::string& str, const std::string& from, const std::string
     }
 }
 
-static vector<string> to_tokens(string& input)
+vector<string> to_tokens(string& input)
 {
 	vector<string> output;
 	string token;

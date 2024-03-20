@@ -212,6 +212,7 @@ Format_Descriptor vertex_attribute_formats[MAX_ATTRIBUTES] =
 	Format_Descriptor(CT_FLOAT, 2, false),		// uv2
 	Format_Descriptor(CT_S16, 3, true) // tangent
 };
+
 Format_Descriptor index_attribute_format = Format_Descriptor(CT_U32, 1, false);
 bool use_32_bit_indicies = true;
 
@@ -321,90 +322,6 @@ bool write_out2(vector<char>& out, const cgltf_accessor* in, Format_Descriptor o
 		outfmt.convert_this_from_that(in_buffer_start + i*in_stride, infmt, out.data() + start + out_stride*i);
 	}
 	return true;
-}
-
-void append_collision_data2(Model* m, cgltf_data* data, cgltf_mesh* mesh, std::vector<Game_Shader*>& materials,
-	Physics_Mesh* phys, const glm::mat4& transform)
-{
-	if (!phys && !m->collision)
-		m->collision = std::make_unique<Physics_Mesh>();
-
-	Physics_Mesh* pm = (phys) ? phys : m->collision.get();
-
-	for (int part = 0; part < mesh->primitives_count; part++)
-	{
-		const int vertex_offset = pm->verticies.size();
-		cgltf_primitive& primitive = mesh->primitives[part];
-		
-		cgltf_attribute* position_at = nullptr;
-		for (int j = 0; j < primitive.attributes_count; j++) {
-			if (strcmp("POSITION", primitive.attributes[j].name) == 0) {
-				position_at = primitive.attributes + j;
-				break;
-			}
-		}
-		ASSERT(position_at);
-		cgltf_accessor* position_ac = position_at->data;
-		cgltf_buffer_view* position_bv = position_ac->buffer_view;
-		cgltf_buffer* pos_buffer = position_bv->buffer;
-		uint8_t* byte_buffer = (uint8_t*)pos_buffer->data;
-
-		//int pos_stride = position_ac.ByteStride(position_bv);
-		int pos_stride = position_ac->stride;
-
-		ASSERT(position_ac->type == cgltf_type_vec3 && position_ac->component_type == cgltf_component_type_r_32f);
-		ASSERT(position_ac->offset == 0 && position_bv->stride == 0);
-		unsigned char* pos_start = &byte_buffer[position_bv->offset];
-		for (int v = 0; v < position_ac->count; v++) {
-			glm::vec3 data = *(glm::vec3*)(pos_start + v * pos_stride);
-			pm->verticies.push_back(data);
-		}
-
-		// Transform verts
-		if (transform != glm::mat4(1)) {
-			for (int v = 0; v < position_ac->count; v++) {
-				pm->verticies[vertex_offset + v] = transform * glm::vec4(pm->verticies[vertex_offset + v], 1.0);
-			}
-		}
-
-		cgltf_accessor* index_ac = primitive.indices;
-		cgltf_buffer_view* index_bv = index_ac->buffer_view;
-		cgltf_buffer* index_buffer = index_bv->buffer;
-		int index_stride = index_ac->stride;
-		byte_buffer = (uint8_t*)index_buffer->data;
-
-		ASSERT(index_ac->offset == 0 && index_bv->stride == 0);
-		unsigned char* index_start = &byte_buffer[index_bv->offset];
-		for (int i = 0; i < index_ac->count; i += 3) {
-			Physics_Triangle ct;
-			if (index_ac->component_type == cgltf_component_type_r_32u) {
-				ct.indicies[0] = *(unsigned int*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned int*)(index_start + index_stride * (i + 1));
-				ct.indicies[2] = *(unsigned int*)(index_start + index_stride * (i + 2));
-			}
-			else if (index_ac->component_type == cgltf_component_type_r_16u) {
-				ct.indicies[0] = *(unsigned short*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned short*)(index_start + index_stride * (i + 1));
-				ct.indicies[2] = *(unsigned short*)(index_start + index_stride * (i + 2));
-			}
-			ct.indicies[0] += vertex_offset;
-			ct.indicies[1] += vertex_offset;
-			ct.indicies[2] += vertex_offset;
-
-			glm::vec3 verts[3];
-			for (int j = 0; j < 3; j++)
-				verts[j] = pm->verticies.at(ct.indicies[j]);
-			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
-			ct.face_normal = face_normal;
-			ct.plane_offset = -glm::dot(face_normal, verts[0]);
-			if (primitive.material) {
-				int mat_index = cgltf_material_index(data, primitive.material);
-
-				ct.surf_type = materials.at(mat_index)->physics;
-			}
-			pm->tris.push_back(ct);
-		}
-	}
 }
 
 
@@ -1062,6 +979,7 @@ DECLARE_ENGINE_CMD_CAT("gpu.", print_vertex_usage)
 
 void Game_Mod_Manager::compact_memory()
 {
+	return;
 	float start = GetTime();
 
 	vector<Mesh*> indexlist;

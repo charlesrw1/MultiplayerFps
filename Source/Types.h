@@ -248,6 +248,8 @@ public:
 	glm::vec3 velocity = glm::vec3(0);
 	glm::vec3 view_angles = glm::vec3(0.f);
 
+	glm::vec3 esimated_accel = glm::vec3(0.f);
+
 	short state = 0;	// For players: Player_Movement_State
 	short flags = 0;	// Entity_Flags
 

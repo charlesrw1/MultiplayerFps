@@ -424,7 +424,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	float sun_shadow = sample_sun_shadow(FS_IN_FragPos)*max(dot(N, L),0.0);
 	ambient += emissive + Lo*sun_shadow;
 
-	return vec4(N, opacity);
+	return vec4(irradiance*ao*diffuse, opacity);
 }
 
 #ifdef BLEND2
@@ -503,7 +503,7 @@ void main()
 	#endif
 	
 	N = N*2 - vec3(1);
-	N = FS_IN_TBN[0];//normalize(FS_IN_TBN * N); 
+	N = normalize(FS_IN_TBN * N); 
 #endif
 
 // FIXME WITH NORMALMAPS!
@@ -543,8 +543,6 @@ void main()
 
 	FS_OUT_Color = pbr_calculate(tex.rgb, roughness , metalness, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//\\FS_OUT_Color = vec4(1,0,0,0);
-	//FS_OUT_Color = eval_phong_brdf(tex.rgb, specular_color, spec_exponent, tex.a, vec3(0.0),N, vec3(0.0));
-	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(get_ao());
 
 #endif
