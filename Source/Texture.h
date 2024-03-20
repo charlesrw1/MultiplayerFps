@@ -74,7 +74,7 @@ public:
 	// pbr parameters
 	glm::vec4 diffuse_tint = glm::vec4(1.f);
 	float roughness_mult = 1.f;
-	float metalness_mult = 1.f;
+	float metalness_mult = 0.f;
 	glm::vec2 roughness_remap_range = glm::vec2(0.f, 1.f);
 	bool backface = false;
 

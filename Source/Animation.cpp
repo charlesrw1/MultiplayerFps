@@ -18,6 +18,21 @@ using glm::dot;
 using glm::cross;
 using glm::normalize;
 
+// smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing 
+template<typename T>
+static T damp_dt_independent(T a, T b, float smoothing, float dt)
+{
+	float alpha = pow(smoothing, dt);
+	return glm::mix(a, b, alpha);
+}
+
+template<>
+static glm::quat damp_dt_independent(glm::quat a, glm::quat b, float smoothing, float dt)
+{
+	float alpha = pow(smoothing, dt);
+	return glm::slerp(a, b, alpha);
+}
+
 int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip) const
 {
 	const Animation& an = clips[clip];
@@ -323,7 +338,7 @@ void Animator::UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 l
 		}
 	}
 	for (int i = 0; i < model->bones.size(); i++)
-		out_bone_matricies[i] = model->skeleton_root_transform * out_bone_matricies[i];
+		out_bone_matricies[i] = out_bone_matricies[i];
 }
 
 void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const Model* model)
@@ -342,8 +357,9 @@ void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& o
 		}
 	}
 	for (int i = 0; i < model->bones.size(); i++)
-		out_bone_matricies[i] = model->skeleton_root_transform * out_bone_matricies[i];
+		out_bone_matricies[i] =  out_bone_matricies[i];
 }
+
 
 void Animator::SetupBones()
 {
@@ -616,9 +632,9 @@ static void util_twobone_ik(
 	// Interior angles of a and b
 	float a_interior_angle = acos(dot(normalize(c - a), normalize(b - a)));
 	float b_interior_angle = acos(dot(normalize(a - b), normalize(c - b)));
-	vec3 c_a = normalize(c - a);
+	vec3 c_a = c - a;
 	vec3 target_a = normalize(target - a);
-	float dot_c_a_t_a = dot(c_a, target_a);
+	float dot_c_a_t_a = dot(normalize(c_a), target_a);
 	float c_interior_angle = acos(glm::clamp(dot_c_a_t_a,-0.9999999f,0.9999999f));
 
 	// Law of cosines to get the desired angles of the triangle
@@ -627,16 +643,16 @@ static void util_twobone_ik(
 
 	// Axis to rotate around
 	vec3 d = b_global_rotation * pole_vector;
-	vec3 axis0 =   normalize(cross(c - a, d));
-	vec3 axis1 = normalize(cross(c - a, target - a));
+	//vec3 axis0 =   normalize(cross(c - a, d));
+	vec3 axis0 = normalize(cross(c - a, b - a));
+	vec3 t_a = target - a;
+	vec3 cross_c_a_ta = cross(c_a, t_a);
+	vec3 axis1 = normalize(cross_c_a_ta);
 	glm::quat rot0 = glm::angleAxis(a_desired_angle - a_interior_angle, glm::inverse(a_global_rotation) * axis0);
 	glm::quat rot1 = glm::angleAxis(b_desired_angle - b_interior_angle, glm::inverse(b_global_rotation) * axis0);
 	glm::quat rot2 = glm::angleAxis(c_interior_angle, glm::inverse(a_global_rotation) * axis1);
 
 	a_local_rotation = a_local_rotation * (rot0 * rot2);
-	if (a_local_rotation.x != a_local_rotation.x) {
-		printf("");
-	}
 	b_local_rotation = b_local_rotation * rot1;
 }
 
@@ -660,6 +676,14 @@ static vector<int> get_indicies(const Animation_Set* set, const vector<const cha
 
 #include "LispInterpreter.h"
 
+
+struct Ik_Foot_Lock
+{
+	glm::vec3 locked_rfoot_worldspace;
+	glm::vec3 locked_lfoot_worldspace;
+	bool rfootlocked = false;
+	bool lfootlocked = false;
+};
 
 struct State;
 struct State_Transition
@@ -1028,7 +1052,7 @@ float ym0 = 0.1;
 float ym1 = 0.05;
 float xm0 = 0.1;
 float xm1 = 0.05;
-float lerp_rot = 0.9;
+float lerp_rot = 0.5;
 float g_fade_out = 0.2;
 float g_walk_fade_in = 5.0;
 
@@ -1039,7 +1063,7 @@ void menu()
 	ImGui::DragFloat("ym1", &ym1, 0.001);
 	ImGui::DragFloat("xm0", &xm0, 0.001);
 	ImGui::DragFloat("xm1", &xm1, 0.001);
-	ImGui::DragFloat("lerprot", &lerp_rot, 0.005);
+	ImGui::DragFloat("lerprot", &lerp_rot, 0.0005, 0.0f,1.f);
 	ImGui::DragFloat("walk fade in", &g_walk_fade_in, 0.05);
 	ImGui::DragFloat("g_fade_out", &g_fade_out, 0.005);
 
@@ -1158,6 +1182,7 @@ static float modulo_lerp(float start, float end, float mod, float alpha)
 }
 
 
+
 struct Directionalblend_node : public At_Node
 {
 	Directionalblend_node(Animator* a) : At_Node(a) {
@@ -1172,8 +1197,7 @@ struct Directionalblend_node : public At_Node
 	float walk_fade_out = 2.0;
 	float run_fade_in = 5.0;
 
-	float character_ground_speed = 0.f;
-	float character_angle = 0.f;
+	glm::vec2 character_blend_weights = glm::vec2(0.f);
 
 	float current_frame = 0.f;	// what [0,1] "frame" we are on, change this to footstep syncing layer
 
@@ -1210,16 +1234,20 @@ struct Directionalblend_node : public At_Node
 	{
 		walk_fade_in = g_walk_fade_in;
 
-		character_ground_speed = glm::mix(glm::length( animator->in.groundvelocity ), character_ground_speed, 0.9f);
+		character_blend_weights = damp_dt_independent(character_blend_weights,
+			glm::vec2(animator->in.relmovedir), 0.1, dt);
 
+		float character_ground_speed = glm::length(character_blend_weights);
+
+		float character_angle = PI;
 		// blend between angles
-		float relmovedirlen = glm::length(animator->in.relmovedir);
-		if (relmovedirlen >= 0.0000001f) {
-			glm::vec2 direction = animator->in.relmovedir / relmovedirlen;;
+		if (character_ground_speed >= 0.0000001f) {
+			glm::vec2 direction = character_blend_weights / character_ground_speed;;
 			//character_angle = modulo_lerp(atan2f(direction.y, direction.x) + PI, character_angle, TWOPI, 0.94f);
 			character_angle = atan2f(direction.y, direction.x) + PI;
-
 		}
+
+
 		float anglelerp = 0.0;
 		int pose1=0, pose2=1;
 		for (int i = 0; i < 8; i++) {
@@ -1280,9 +1308,7 @@ struct Directionalblend_node : public At_Node
 	}
 	virtual void reset() override {
 		//current_frame = 0.0;
-		 character_ground_speed = glm::length( animator->in.groundvelocity );
-		 glm::vec2 direction = glm::normalize(animator->in.relmovedir);
-		 character_angle = atan2f(direction.y, direction.x) + PI;
+		 character_blend_weights = animator->in.relmovedir;
 	}
 };
 
@@ -1562,51 +1588,137 @@ Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
 }
 using namespace glm;
 #include <iostream>
+#include <iomanip>
+const int STREAM_WIDTH = 9;
+const int PRECISION_STREAM = 3;
+std::ostream& operator<<(std::ostream& out, glm::vec3 v){
+	out << std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.x  << " " 
+		<< std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.y << " "
+		<< std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.z << " ";
+	return out;
+}
+std::ostream& operator<<(std::ostream& out, glm::quat v){
+	out << std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.w  << " "
+		<< std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.x << " "
+		<< std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.y << " "
+		<< std::setw(STREAM_WIDTH) << std::setprecision(PRECISION_STREAM) << v.z << " ";
+	return out;
+}
 
 
-void Animator::postprocess_animation(Pose& pose)
+void Animator::postprocess_animation(Pose& pose, float dt)
 {
 	Pose* source = Pose_Pool::get().alloc(1);
 	*source = pose;
 
 	util_localspace_to_meshspace(pose, cached_bonemats, model);
-	const int hand = model->bone_for_name("mixamorig:RightHand");
-	glm::vec3 hand_target = cached_bonemats[hand] * vec4(0.0, 0.0, 0.0, 1.0);
-
+	const int rhand = model->bone_for_name("mixamorig:RightHand");
+	const int lhand = model->bone_for_name("mixamorig:LeftHand");
+	glm::vec3 rhand_target = cached_bonemats[rhand] * vec4(0.0, 0.0, 0.0, 1.0);
+	glm::vec3 lhand_target = cached_bonemats[lhand] * vec4(0.0, 0.0, 0.0, 1.0);
+	//hand_target += vec3(0.f, sin(GetTime()*0.2)*5.f, 20.0f * sin(GetTime()*0.5));
+	glm::mat4 ent_transform = eng->local_player().get_world_transform()*model->skeleton_root_transform;
 	{
-		glm::vec3 world_hand = eng->local_player().get_world_transform() * glm::vec4(hand_target, 1.0);
-		Debug::add_sphere(world_hand, 0.5, COLOR_RED, 0.0, true);
+		glm::vec3 world_hand = ent_transform * glm::vec4(rhand_target, 1.0);
+		Debug::add_sphere(world_hand, 0.01, COLOR_RED, 0.0, true);
+		world_hand = ent_transform * glm::vec4(lhand_target, 1.0);
+		Debug::add_sphere(world_hand, 0.01, COLOR_RED, 0.0, true);
 	}
 
 	// procedural acceleration rotation
-	{
+	//{
 		glm::vec3 rotation_dir = glm::normalize(vec3(atan(in.relaccel.y*ym0)*ym1, atan(in.relaccel.x*xm0)*xm1, 1.0f));
-		glm::quat q = glm::quat(rotation_dir, glm::vec3(0, 0, 1));
-		in.player_rot_from_accel = glm::slerp(q, in.player_rot_from_accel, lerp_rot);
+		glm::vec3 worldspace = mat3(ent_transform) * vec3(rotation_dir);
+
+		Debug::add_line(eng->local_player().position, 
+			eng->local_player().position + vec3(worldspace.x,0.f,worldspace.z)*1000.f, 
+			COLOR_PINK, 0.f);
+
+		glm::quat q = glm::quat(rotation_dir, vec3(0,0,1));
+		//in.player_rot_from_accel = glm::slerp(q, in.player_rot_from_accel, lerp_rot);
+		if (in.reset_accel) {
+			in.reset_accel = false;
+			in.player_rot_from_accel = q;
+		}
+		else
+			in.player_rot_from_accel = damp_dt_independent(q, in.player_rot_from_accel, lerp_rot, dt);
 
 		pose.q[model->root_bone_index] = in.player_rot_from_accel * pose.q[model->root_bone_index];
-	}
+	//}
 	util_localspace_to_meshspace(pose, cached_bonemats, model);
 
 
 	// fix up hand ik
-	{
-		const int elbow = model->bone_for_name("mixamorig:RightForeArm");
-		const int shoulder = model->bone_for_name("mixamorig:RightArm");
-		if (hand == -1 || elbow == -1 || shoulder == -1)
+	auto ikfunctor = [&](int joint0, int joint1, int joint2, vec3 target, bool print = false) {
+
+		const float dist_eps = 0.0001f;
+		vec3 a = cached_bonemats[joint2] * vec4(0.0, 0.0, 0.0, 1.0);
+		vec3 b = cached_bonemats[joint1] * vec4(0.0, 0.0, 0.0, 1.0);
+		vec3 c = cached_bonemats[joint0] * vec4(0.0, 0.0, 0.0, 1.0);
+		float dist = length(c - target);
+		if (dist <= dist_eps) {
 			return;
+		}
 
-		const vec3 a = cached_bonemats[shoulder] * vec4(0.0, 0.0, 0.0, 1.0);
-		const vec3 b = cached_bonemats[elbow] * vec4(0.0, 0.0, 0.0, 1.0);
-		const vec3 c = cached_bonemats[hand] * vec4(0.0, 0.0, 0.0, 1.0);
+		Debug::add_sphere(ent_transform*vec4(a,1.0), 0.01, COLOR_GREEN, 0.0, true);
+		Debug::add_sphere(ent_transform*vec4(b,1.0), 0.01, COLOR_BLUE, 0.0, true);
+		Debug::add_sphere(ent_transform*vec4(c,1.0), 0.01, COLOR_CYAN, 0.0, true);
+		glm::quat a_global = glm::quat_cast(cached_bonemats[joint2]);
+		glm::quat b_global = glm::quat_cast(cached_bonemats[joint1]);
+		util_twobone_ik(a, b, c, target, vec3(0.0, 0.0, 1.0), a_global, b_global, pose.q[joint2], pose.q[joint1]);
+	};
+	{
+		const int relbow = model->bone_for_name("mixamorig:RightForeArm");
+		const int rshoulder = model->bone_for_name("mixamorig:RightArm");
+		const int lelbow = model->bone_for_name("mixamorig:LeftForeArm");
+		const int lshoulder = model->bone_for_name("mixamorig:LeftArm");
 
-		const glm::quat a_global = glm::quat_cast(cached_bonemats[shoulder]);
-		const glm::quat b_global = glm::quat_cast(cached_bonemats[elbow]);
-
-
-		util_twobone_ik(a, b, c, hand_target, vec3(0.0,1.0,0.0), a_global, b_global, pose.q[shoulder], pose.q[elbow]);
-		printf("%f %f\n", pose.q[shoulder].x, pose.q[elbow].x);
+		ikfunctor(rhand, relbow, rshoulder, rhand_target);
+		ikfunctor(lhand, lelbow, lshoulder, lhand_target);
 	}
+
+	// feet ik
+	if(!in.ismoving && !in.injump)
+	{
+		const int rightfoot = model->bone_for_name("mixamorig:RightFoot");
+		const int rightleg = model->bone_for_name("mixamorig:RightLeg");
+		const int rightlegupper = model->bone_for_name("mixamorig:RightUpLeg");
+		const int leftfoot = model->bone_for_name("mixamorig:LeftFoot");
+		const int leftleg = model->bone_for_name("mixamorig:LeftLeg");
+		const int leftlegupper = model->bone_for_name("mixamorig:LeftUpLeg");
+
+		glm::vec3 worldspace_rfoot = ent_transform * cached_bonemats[rightfoot] * vec4(0.f, 0.f, 0.f, 1.f);
+		glm::vec3 worldspace_lfoot = ent_transform * cached_bonemats[leftfoot] * vec4(0.f, 0.f, 0.f, 1.f);
+		Ray r;
+		r.pos = worldspace_rfoot+vec3(0,2,0);
+		r.dir = vec3(0, -1, 0);
+		RayHit hit = eng->phys.trace_ray(r, -1, PF_WORLD);
+		Debug::add_box(hit.pos, vec3(0.2), COLOR_PINK, 0.f);
+
+		float rfootheight = hit.pos.y - eng->local_player().position.y;
+		r.pos = worldspace_lfoot + vec3(0, 2, 0);
+		hit = eng->phys.trace_ray(r, -1, PF_WORLD);
+
+		Debug::add_box(hit.pos, vec3(0.2), COLOR_PINK, 0.f);
+
+		float lfootheight = hit.pos.y - eng->local_player().position.y;
+		// now need to offset mesh so that both hiehgts are >= 0
+		float add = glm::min(lfootheight, rfootheight);
+
+		//printf("add %f\n", add);
+		
+		out.meshoffset = glm::vec3(0, add, 0);
+
+		glm::mat4 invent = glm::inverse(ent_transform);
+
+		// now do ik for left and right feet
+		glm::vec3 lfoottarget = invent * vec4(worldspace_lfoot + vec3(0, lfootheight - add, 0), 1.f);
+		glm::vec3 rfoottarget = invent * vec4(worldspace_rfoot + vec3(0, rfootheight - add, 0), 1.f);
+
+		ikfunctor(rightfoot, rightleg, rightlegupper, rfoottarget);
+		ikfunctor(leftfoot, leftleg, leftlegupper, lfoottarget, true);
+	}
+
 	
 	Pose_Pool::get().free(1);
 }
@@ -1616,6 +1728,8 @@ void Animator::evaluate_new(float dt)
 	Entity& player = eng->local_player();
 	bool mirrored = player.state & PMS_CROUCHING;
 	Pose* poses = Pose_Pool::get().alloc(2);
+
+	out.meshoffset = glm::vec3(0.f);
 
 
 	glm::vec2 next_vel = glm::vec2(player.velocity.x, player.velocity.z);
@@ -1632,16 +1746,17 @@ void Animator::evaluate_new(float dt)
 		glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
 		in.relaccel = vec2(dot(face_dir,grndaccel), dot(side,grndaccel));
 
-
-	tree->script_vars.symbols["$moving"].assign(	LispExp(int( glm::length(player.velocity) > 0.1) ) );
+		in.ismoving = glm::length(player.velocity) > 0.1;
+		in.injump = player.state & PMS_JUMPING;
+	tree->script_vars.symbols["$moving"].assign(	LispExp(int(in.ismoving) ) );
 	tree->script_vars.symbols["$alpha"].assign(		LispExp(float( sin(GetTime())*0.5 + 0.5  )));
-	tree->script_vars.symbols["$jumping"].assign(	LispExp(int(player.state & PMS_JUMPING)));
+	tree->script_vars.symbols["$jumping"].assign(	LispExp(int(in.injump)));
 	bool should_mirror = sin(GetTime() * 0.5 + 2.1) > 0;
 	tree->script_vars.symbols["$mirrored"].assign( LispExp(mirrored));
 
 	tree->root->get_pose(poses[0], dt);
 
-	postprocess_animation(poses[0]);
+	postprocess_animation(poses[0], dt);
 
 	UpdateGlobalMatricies(poses[0].q, poses[0].pos, cached_bonemats);
 

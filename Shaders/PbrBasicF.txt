@@ -424,7 +424,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	float sun_shadow = sample_sun_shadow(FS_IN_FragPos)*max(dot(N, L),0.0);
 	ambient += emissive + Lo*sun_shadow;
 
-	return vec4(irradiance*ao*diffuse, opacity);
+	return vec4(ambient, opacity);
 }
 
 #ifdef BLEND2
@@ -544,6 +544,7 @@ void main()
 	FS_OUT_Color = pbr_calculate(tex.rgb, roughness , metalness, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//\\FS_OUT_Color = vec4(1,0,0,0);
 	//FS_OUT_Color = vec4(get_ao());
+	//FS_OUT_Color = vec4(vec3(get_ao()), 1.0);
 
 #endif
 //#endif

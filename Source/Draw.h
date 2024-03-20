@@ -453,6 +453,14 @@ public:
 		bufferhandle current_frame;
 	}ubo;
 
+	struct buffers {
+		bufferhandle default_vb;
+	}buf;
+
+	struct vertex_array_objects {
+		vertexarrayhandle default_;
+	}vao;
+
 	bufferhandle active_constants_ubo = 0;
 	
 	View_Setup vs;	// globally accessible view for passes

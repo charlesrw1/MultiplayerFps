@@ -221,6 +221,7 @@ public:
 		glm::vec2 relmovedir;	//forwards/back etc.
 		glm::vec2 relaccel;
 		
+		bool reset_accel = true;
 		glm::quat player_rot_from_accel = glm::quat(1, 0, 0, 1);
 
 		bool crouched;
@@ -243,7 +244,7 @@ public:
 	}out;
 
 private:
-	void postprocess_animation(Pose& pose);
+	void postprocess_animation(Pose& pose,float dt);
 
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);

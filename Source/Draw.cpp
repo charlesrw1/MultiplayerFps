@@ -1157,6 +1157,8 @@ void Renderer::Init()
 	casutics = mats.find_texture("caustics.png");
 	waternormal = mats.find_texture("waternormal.png");
 
+	glGenVertexArrays(1, &vao.default_);
+
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
 }
 
@@ -1255,6 +1257,8 @@ extern bool bloom_stop;
 void Renderer::render_bloom_chain()
 {
 	GPUFUNCTIONSTART;
+
+	glBindVertexArray(vao.default_);
 
 	if (!enable_bloom.integer())
 		return;
@@ -1588,7 +1592,7 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 glm::mat4 Entity::get_world_transform()
 {
 	mat4 model;
-	model = glm::translate(mat4(1), position);
+	model = glm::translate(mat4(1), position + anim.out.meshoffset);
 	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
 	model = glm::scale(model, vec3(1.f));
 	return model;
@@ -1642,7 +1646,7 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 		if (ei.get_index() == eng->player_num() && !eng->local.thirdperson_camera.integer())
 			continue;
 
-		mat4 model = ent.get_world_transform();
+		mat4 model = ent.get_world_transform()*ent.model->skeleton_root_transform;
 
 		Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
 
@@ -2451,7 +2455,7 @@ void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, 
 void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration, bool fixedupdate)
 {
 	Debug_Shape shape;
-	shape.type = Debug_Shape::box;
+	shape.type = Debug_Shape::sphere;
 	shape.pos = c;
 	shape.size = vec3(radius);
 	shape.color = color;
@@ -2466,7 +2470,6 @@ void Debug::on_fixed_update_start()
 
 void draw_debug_shapes()
 {
-	return;
 	MeshBuilder builder;
 	builder.Begin();
 
@@ -2489,7 +2492,10 @@ void draw_debug_shapes()
 		}
 	}
 	builder.End();
+	glDisable(GL_DEPTH_TEST);
 	builder.Draw(GL_LINES);
+	glEnable(GL_DEPTH_TEST);
+	glCheckError();
 	vector<Debug_Shape>& shapes = *shapearrays[1];
 	for (int i = 0; i < shapes.size(); i++) {
 		shapes[i].lifetime -= eng->frame_time;
