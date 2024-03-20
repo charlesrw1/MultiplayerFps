@@ -1059,12 +1059,13 @@ Debug_Interface* Debug_Interface::get()
 	return &inst;
 }
 
-
+float g_time_speedup = 1.f;
 void draw_wind_menu()
 {
 	//ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
 	//ImGui::DragFloat("angle bias", &draw.ssao.bias, 0.02);
-
+	
+	ImGui::DragFloat("g_time_speedup", &g_time_speedup, 0.01);
 
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
 	ImGui::DragFloat("metalness", &draw.metal, 0.02);
@@ -1411,6 +1412,8 @@ void Game_Engine::game_update_tick()
 {
 	CPUFUNCTIONSTART;
 
+	Debug::on_fixed_update_start();
+
 	make_move();
 	if (!is_host)
 		cl->SendMovesAndMessages();
@@ -1523,12 +1526,31 @@ void Game_Engine::loop()
 			if (!is_host) {
 				frame_remainder += cl->adjust_time_step(num_ticks);
 			}
+			float orig_ft = frame_time;
+			float orig_ti = tick_interval;
+			frame_time *= g_time_speedup;
+			tick_interval *= g_time_speedup;
 
-			for (int i = 0; i < num_ticks && state == ENGINE_GAME; i++)
+			for (int i = 0; i < num_ticks && state == ENGINE_GAME; i++) {
 				game_update_tick();
+				{
+				CPUSCOPESTART("animation update");
+			for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+				Entity& e = ei.get();
+				if (!e.model || !e.model->animations)
+					continue;
+
+				e.anim.SetupBones();
+				e.anim.ConcatWithInvPose();
+			}
+			}
+			}
 
 			if(state == ENGINE_GAME)
 				pre_render_update();
+
+			frame_time = orig_ft;
+			tick_interval = orig_ti;
 		}break;
 		}
 
@@ -1596,17 +1618,6 @@ void Game_Engine::pre_render_update()
 		for (auto ei = Ent_Iterator(1); !ei.finished(); ei = ei.next()) {
 			auto& e = ei.get();
 			
-		}
-	}
-	{
-		CPUSCOPESTART("animation update");
-		for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-			Entity& e = ei.get();
-			if (!e.model || !e.model->animations)
-				continue;
-
-			e.anim.SetupBones();
-			e.anim.ConcatWithInvPose();
 		}
 	}
 

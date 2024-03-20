@@ -219,6 +219,7 @@ public:
 		glm::vec3 velocity;
 		glm::vec2 groundvelocity;
 		glm::vec2 relmovedir;	//forwards/back etc.
+		glm::vec2 relaccel;
 		
 		glm::quat player_rot_from_accel = glm::quat(1, 0, 0, 1);
 
@@ -242,7 +243,7 @@ public:
 	}out;
 
 private:
-
+	void postprocess_animation(Pose& pose);
 
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);

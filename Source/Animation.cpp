@@ -326,10 +326,29 @@ void Animator::UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 l
 		out_bone_matricies[i] = model->skeleton_root_transform * out_bone_matricies[i];
 }
 
+void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const Model* model)
+{
+	for (int i = 0; i < model->bones.size(); i++)
+	{
+		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
+		matrix[3] = glm::vec4(local.pos[i], 1.0);
+
+		if (model->bones[i].parent == ROOT_BONE) {
+			out_bone_matricies[i] = matrix;
+		}
+		else {
+			assert(model->bones[i].parent < model->bones.size());
+			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+		}
+	}
+	for (int i = 0; i < model->bones.size(); i++)
+		out_bone_matricies[i] = model->skeleton_root_transform * out_bone_matricies[i];
+}
+
 void Animator::SetupBones()
 {
 	if (tree) {
-		evaluate_new(eng->frame_time);
+		evaluate_new(eng->tick_interval);
 		return;
 	}
 	
@@ -545,6 +564,8 @@ public:
 };
 
 
+//#pragma optimize( "", on )
+
 // source = source-reference
 static void util_subtract(int bonecount, const Pose& reference, Pose& source)
 {
@@ -595,20 +616,27 @@ static void util_twobone_ik(
 	// Interior angles of a and b
 	float a_interior_angle = acos(dot(normalize(c - a), normalize(b - a)));
 	float b_interior_angle = acos(dot(normalize(a - b), normalize(c - b)));
-	float c_interior_angle = acos(dot(normalize(c - a), normalize(target - a)));
+	vec3 c_a = normalize(c - a);
+	vec3 target_a = normalize(target - a);
+	float dot_c_a_t_a = dot(c_a, target_a);
+	float c_interior_angle = acos(glm::clamp(dot_c_a_t_a,-0.9999999f,0.9999999f));
 
 	// Law of cosines to get the desired angles of the triangle
 	float a_desired_angle = acos(LawOfCosines(len_cb, len_ab, len_at));
 	float b_desired_angle = acos(LawOfCosines(len_at, len_ab, len_cb));
 
 	// Axis to rotate around
-	vec3 axis0 = normalize(cross(c - a, b - a));
+	vec3 d = b_global_rotation * pole_vector;
+	vec3 axis0 =   normalize(cross(c - a, d));
 	vec3 axis1 = normalize(cross(c - a, target - a));
 	glm::quat rot0 = glm::angleAxis(a_desired_angle - a_interior_angle, glm::inverse(a_global_rotation) * axis0);
 	glm::quat rot1 = glm::angleAxis(b_desired_angle - b_interior_angle, glm::inverse(b_global_rotation) * axis0);
 	glm::quat rot2 = glm::angleAxis(c_interior_angle, glm::inverse(a_global_rotation) * axis1);
 
 	a_local_rotation = a_local_rotation * (rot0 * rot2);
+	if (a_local_rotation.x != a_local_rotation.x) {
+		printf("");
+	}
 	b_local_rotation = b_local_rotation * rot1;
 }
 
@@ -762,6 +790,8 @@ void util_set_to_bind_pose(Pose& pose, const Model* model)
 	}
 }
 
+
+//#pragma optimize( "", off )
 
 
 struct Clip_Node : public At_Node
@@ -966,7 +996,7 @@ struct Boolean_Blend_Node : public At_Node
 
 		value =glm::clamp(value, 0.0f, 1.0f);
 
-		printf("boolean value: %f\n", value);
+		//printf("boolean value: %f\n", value);
 
 		if (value < 0.00001f)
 			return nodes[0]->get_pose(pose, dt);
@@ -1068,7 +1098,7 @@ struct Statemachine_Node : public At_Node
 		if (fading_out_state) {
 			Pose* fading_out_pose = Pose_Pool::get().alloc(1);
 			fading_out_state->tree->get_pose(*fading_out_pose, 0.f);	// dt == 0
-			printf("%f\n", active_weight);
+			//printf("%f\n", active_weight);
 			assert(fading_out_state != active_state);
 			util_blend(animator->model->bones.size(), *fading_out_pose, pose, 1.0-active_weight);
 			Pose_Pool::get().free(1);
@@ -1111,6 +1141,22 @@ void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1
 	util_blend(bonecount, x2, y2, fac.y);
 }
 
+static float modulo_lerp(float start, float end, float mod, float alpha)
+{
+	float d1 = glm::abs(end - start);
+	float d2 = mod - d1;
+
+
+	if (d1 <= d2)
+		return glm::mix(start, end, alpha);
+	else {
+		if (start >= end)
+			return fmod(start + (alpha * d2), mod);
+		else
+			return fmod(end + ((1 - alpha) * d2), mod);
+	}
+}
+
 
 struct Directionalblend_node : public At_Node
 {
@@ -1125,6 +1171,9 @@ struct Directionalblend_node : public At_Node
 	float walk_fade_in = 5.0;
 	float walk_fade_out = 2.0;
 	float run_fade_in = 5.0;
+
+	float character_ground_speed = 0.f;
+	float character_angle = 0.f;
 
 	float current_frame = 0.f;	// what [0,1] "frame" we are on, change this to footstep syncing layer
 
@@ -1147,7 +1196,7 @@ struct Directionalblend_node : public At_Node
 		const Animation* anim = node->get_clip();
 		node->frame = current_frame * anim->total_duration;
 
-		float speed_of_anim = glm::length(anim->root_motion_translation);
+		float speed_of_anim = glm::length(anim->root_motion_translation)/(anim->total_duration/anim->fps);
 
 		// want to match character_speed and speed_of_anim
 		float speedup = character_speed / speed_of_anim;
@@ -1161,21 +1210,27 @@ struct Directionalblend_node : public At_Node
 	{
 		walk_fade_in = g_walk_fade_in;
 
-		float character_ground_speed = glm::length( animator->in.groundvelocity );
+		character_ground_speed = glm::mix(glm::length( animator->in.groundvelocity ), character_ground_speed, 0.9f);
 
 		// blend between angles
-		glm::vec2 direction = glm::normalize(animator->in.relmovedir);
-		float angle = atan2f(direction.y, direction.x);
+		float relmovedirlen = glm::length(animator->in.relmovedir);
+		if (relmovedirlen >= 0.0000001f) {
+			glm::vec2 direction = animator->in.relmovedir / relmovedirlen;;
+			//character_angle = modulo_lerp(atan2f(direction.y, direction.x) + PI, character_angle, TWOPI, 0.94f);
+			character_angle = atan2f(direction.y, direction.x) + PI;
+
+		}
 		float anglelerp = 0.0;
 		int pose1=0, pose2=1;
 		for (int i = 0; i < 8; i++) {
-			if (angle <= -PI + PI / 4.0 * (i + 1)) {
+			if (character_angle - PI <= -PI + PI / 4.0 * (i + 1)) {
 				pose1 = i;
 				pose2 = (i + 1) % 8;
-				anglelerp = MidLerp(-PI + PI / 4.0 * i, -PI + PI / 4.0 * (i + 1), angle);
+				anglelerp = MidLerp(-PI + PI / 4.0 * i, -PI + PI / 4.0 * (i + 1), character_angle - PI);
 				break;
 			}
 		}
+		//printf("ANGLE: %f\n", character_angle);
 		// highest weighted pose controls syncing
 		Pose* scratchposes = Pose_Pool::get().alloc(3);
 		if (character_ground_speed <= walk_fade_in) {
@@ -1225,6 +1280,9 @@ struct Directionalblend_node : public At_Node
 	}
 	virtual void reset() override {
 		//current_frame = 0.0;
+		 character_ground_speed = glm::length( animator->in.groundvelocity );
+		 glm::vec2 direction = glm::normalize(animator->in.relmovedir);
+		 character_angle = atan2f(direction.y, direction.x) + PI;
 	}
 };
 
@@ -1506,12 +1564,58 @@ using namespace glm;
 #include <iostream>
 
 
+void Animator::postprocess_animation(Pose& pose)
+{
+	Pose* source = Pose_Pool::get().alloc(1);
+	*source = pose;
+
+	util_localspace_to_meshspace(pose, cached_bonemats, model);
+	const int hand = model->bone_for_name("mixamorig:RightHand");
+	glm::vec3 hand_target = cached_bonemats[hand] * vec4(0.0, 0.0, 0.0, 1.0);
+
+	{
+		glm::vec3 world_hand = eng->local_player().get_world_transform() * glm::vec4(hand_target, 1.0);
+		Debug::add_sphere(world_hand, 0.5, COLOR_RED, 0.0, true);
+	}
+
+	// procedural acceleration rotation
+	{
+		glm::vec3 rotation_dir = glm::normalize(vec3(atan(in.relaccel.y*ym0)*ym1, atan(in.relaccel.x*xm0)*xm1, 1.0f));
+		glm::quat q = glm::quat(rotation_dir, glm::vec3(0, 0, 1));
+		in.player_rot_from_accel = glm::slerp(q, in.player_rot_from_accel, lerp_rot);
+
+		pose.q[model->root_bone_index] = in.player_rot_from_accel * pose.q[model->root_bone_index];
+	}
+	util_localspace_to_meshspace(pose, cached_bonemats, model);
+
+
+	// fix up hand ik
+	{
+		const int elbow = model->bone_for_name("mixamorig:RightForeArm");
+		const int shoulder = model->bone_for_name("mixamorig:RightArm");
+		if (hand == -1 || elbow == -1 || shoulder == -1)
+			return;
+
+		const vec3 a = cached_bonemats[shoulder] * vec4(0.0, 0.0, 0.0, 1.0);
+		const vec3 b = cached_bonemats[elbow] * vec4(0.0, 0.0, 0.0, 1.0);
+		const vec3 c = cached_bonemats[hand] * vec4(0.0, 0.0, 0.0, 1.0);
+
+		const glm::quat a_global = glm::quat_cast(cached_bonemats[shoulder]);
+		const glm::quat b_global = glm::quat_cast(cached_bonemats[elbow]);
+
+
+		util_twobone_ik(a, b, c, hand_target, vec3(0.0,1.0,0.0), a_global, b_global, pose.q[shoulder], pose.q[elbow]);
+		printf("%f %f\n", pose.q[shoulder].x, pose.q[elbow].x);
+	}
+	
+	Pose_Pool::get().free(1);
+}
 
 void Animator::evaluate_new(float dt)
 {
 	Entity& player = eng->local_player();
 	bool mirrored = player.state & PMS_CROUCHING;
-	Pose* pose = Pose_Pool::get().alloc(1);
+	Pose* poses = Pose_Pool::get().alloc(2);
 
 
 	glm::vec2 next_vel = glm::vec2(player.velocity.x, player.velocity.z);
@@ -1526,7 +1630,7 @@ void Animator::evaluate_new(float dt)
 		if (mirrored) in.relmovedir.y *= -1;
 
 		glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
-	glm::vec2 relaccel = vec2(dot(face_dir,grndaccel), dot(side,grndaccel));
+		in.relaccel = vec2(dot(face_dir,grndaccel), dot(side,grndaccel));
 
 
 	tree->script_vars.symbols["$moving"].assign(	LispExp(int( glm::length(player.velocity) > 0.1) ) );
@@ -1535,16 +1639,13 @@ void Animator::evaluate_new(float dt)
 	bool should_mirror = sin(GetTime() * 0.5 + 2.1) > 0;
 	tree->script_vars.symbols["$mirrored"].assign( LispExp(mirrored));
 
-	tree->root->get_pose(*pose, dt);
-	glm::vec3 rotation_dir = glm::normalize(vec3(atan(relaccel.y*ym0)*ym1, atan(relaccel.x*xm0)*xm1, 1.0f));
-	glm::quat q = glm::quat(rotation_dir, glm::vec3(0, 0, 1));
-	in.player_rot_from_accel = glm::slerp(q, in.player_rot_from_accel, lerp_rot);
+	tree->root->get_pose(poses[0], dt);
 
-	pose->q[player.model->root_bone_index] = in.player_rot_from_accel * pose->q[player.model->root_bone_index];
+	postprocess_animation(poses[0]);
 
-	UpdateGlobalMatricies(pose->q, pose->pos, cached_bonemats);
+	UpdateGlobalMatricies(poses[0].q, poses[0].pos, cached_bonemats);
 
-	Pose_Pool::get().free(1);
+	Pose_Pool::get().free(2);
 }
 
 

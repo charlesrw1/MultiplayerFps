@@ -1565,10 +1565,10 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 		dc.submesh = s;
 		dc.mesh = mesh;
 
-		int shade_index = draw.get_shader_index(*mesh, *dc.mat, false);
-		int tex_index = (dc.mat->images[0]) ? dc.mat->images[0]->gl_id : 0;
-		int alpha_and_other = dc.mat->backface | dc.mat->alpha_type;
-		int vertfmt = mesh->format;
+		uint64_t shade_index = draw.get_shader_index(*mesh, *dc.mat, false);
+		uint64_t tex_index = (dc.mat->images[0]) ? dc.mat->images[0]->gl_id : 0;
+		uint64_t alpha_and_other = dc.mat->backface | dc.mat->alpha_type;
+		uint64_t vertfmt = mesh->format;
 		dc.sort = (shade_index << 38) | (alpha_and_other<<36) | (tex_index<<4) | vertfmt;
 
 		if (dc.mat->is_translucent()) {
@@ -1584,6 +1584,16 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 		}
 	}
 }
+
+glm::mat4 Entity::get_world_transform()
+{
+	mat4 model;
+	model = glm::translate(mat4(1), position);
+	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
+	model = glm::scale(model, vec3(1.f));
+	return model;
+}
+
 #include <algorithm>
 void Shared_Gpu_Driven_Resources::build_draw_calls()
 {
@@ -1632,10 +1642,7 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 		if (ei.get_index() == eng->player_num() && !eng->local.thirdperson_camera.integer())
 			continue;
 
-		mat4 model;
-		model = glm::translate(mat4(1), ent.position);
-		model = model * glm::eulerAngleXYZ(ent.rotation.x, ent.rotation.y, ent.rotation.z);
-		model = glm::scale(model, vec3(1.f));
+		mat4 model = ent.get_world_transform();
 
 		Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
 
@@ -2394,6 +2401,107 @@ void multidraw_testing()
 	draw.stats.tris_drawn = sphere->mesh.parts[0].element_count * num_batches_to_render * num_prims_per_batch / 3;
 }
 
+struct Debug_Shape
+{
+	enum type {
+		sphere,
+		line,
+		box
+	}type;
+	glm::vec3 pos;
+	glm::vec3 size;
+	Color32 color;
+	float lifetime = 0.0;
+};
+
+struct Debug_Shape_Ctx
+{
+	vector<Debug_Shape> shapes;
+	vector<Debug_Shape> one_frame_fixedupdate;
+	void add(Debug_Shape shape, bool fixedupdate) {
+		if (shape.lifetime <= 0.f && fixedupdate)
+			one_frame_fixedupdate.push_back(shape);
+		else
+			shapes.push_back(shape);
+	}
+};
+static Debug_Shape_Ctx debug_shapes;
+
+
+void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::line;
+	shape.pos = f;
+	shape.size = to;
+	shape.color = color;
+	shape.lifetime = duration;
+	debug_shapes.add(shape,fixedupdate);
+}
+void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::box;
+	shape.pos = c;
+	shape.size = size;
+	shape.color = color;
+	shape.lifetime = duration;
+	debug_shapes.add(shape,fixedupdate);
+}
+void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::box;
+	shape.pos = c;
+	shape.size = vec3(radius);
+	shape.color = color;
+	shape.lifetime = duration;
+	debug_shapes.add(shape,fixedupdate);
+}
+
+void Debug::on_fixed_update_start()
+{
+	debug_shapes.one_frame_fixedupdate.clear();
+}
+
+void draw_debug_shapes()
+{
+	return;
+	MeshBuilder builder;
+	builder.Begin();
+
+	vector<Debug_Shape>* shapearrays[2] = { &debug_shapes.one_frame_fixedupdate,&debug_shapes.shapes };
+	for (int i = 0; i < 2; i++) {
+		vector<Debug_Shape>& shapes = *shapearrays[i];
+		for (int j = 0; j < shapes.size(); j++) {
+			switch (shapes[j].type)
+			{
+			case Debug_Shape::line:
+				builder.PushLine(shapes[j].pos, shapes[j].size, shapes[j].color);
+				break;
+			case Debug_Shape::box:
+				builder.PushLineBox(shapes[j].pos - shapes[j].size * 0.5f, shapes[j].pos + shapes[j].size * 0.5f, shapes[j].color);
+				break;
+			case Debug_Shape::sphere:
+				builder.AddSphere(shapes[j].pos, shapes[j].size.x, 8, 6, shapes[j].color);
+				break;
+			}
+		}
+	}
+	builder.End();
+	builder.Draw(GL_LINES);
+	vector<Debug_Shape>& shapes = *shapearrays[1];
+	for (int i = 0; i < shapes.size(); i++) {
+		shapes[i].lifetime -= eng->frame_time;
+		if (shapes[i].lifetime <= 0.f) {
+			shapes.erase(shapes.begin() + i);
+		}
+	}
+	builder.Free();
+}
+
+
+
 
 #include "EditorDoc.h"
 void Renderer::scene_draw(bool editor_mode)
@@ -2508,6 +2616,8 @@ void Renderer::scene_draw(bool editor_mode)
 	set_shader(S_SIMPLE);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
+
+	draw_debug_shapes();
 
 	if (editor_mode)
 		eng->eddoc->overlays_draw();

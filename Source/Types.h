@@ -291,6 +291,8 @@ public:
 
 	void damage(Entity* inflictor, glm::vec3 from, int amount);
 
+	glm::mat4 get_world_transform();
+
 	virtual void update() { }
 	virtual void collide(Entity* other, const GeomContact& gc) {}
 };
