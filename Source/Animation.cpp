@@ -783,9 +783,12 @@ void util_calc_rotations(const Animation_Set* set,
 		else {
 			int index0 = pos_idx;
 			int index1 = pos_idx + 1;
+			float t0 = set->GetPos(i, index0, clip_index).time;
+			float t1 = set->GetPos(i, index1, clip_index).time;
+			if (index0 == 0)t0 = 0.f;
 			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
 			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
-			float scale = MidLerp(set->GetPos(i, index0,clip_index).time, set->GetPos(i, index1,clip_index).time, curframe);
+			float scale = MidLerp(t0,t1, curframe);
 			interp_pos = glm::mix(set->GetPos(i, index0,clip_index).val, set->GetPos(i, index1,clip_index).val, scale);
 		}
 
@@ -797,7 +800,12 @@ void util_calc_rotations(const Animation_Set* set,
 		else {
 			int index0 = rot_idx;
 			int index1 = rot_idx + 1;
-			float scale = MidLerp(set->GetRot(i, index0, clip_index).time, set->GetRot(i, index1, clip_index).time, curframe);
+			float t0 = set->GetRot(i, index0, clip_index).time;
+			float t1 = set->GetRot(i, index1, clip_index).time;
+			if (index0 == 0)t0 = 0.f;
+			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
+			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
+			float scale = MidLerp(t0,t1, curframe);
 			interp_rot = glm::slerp(set->GetRot(i, index0, clip_index).val, set->GetRot(i, index1, clip_index).val, scale);
 		}
 		interp_rot = glm::normalize(interp_rot);
@@ -817,7 +825,6 @@ void util_set_to_bind_pose(Pose& pose, const Model* model)
 
 //#pragma optimize( "", off )
 
-float g_frame_force = 0.0;
 struct Clip_Node : public At_Node
 {
 	Clip_Node(const char* clipname, Animator* animator) : At_Node(animator) {
@@ -840,8 +847,6 @@ struct Clip_Node : public At_Node
 
 		const Animation& clip = animator->set->clips[clip_index];
 		frame += clip.fps * dt * speed;
-
-		frame = g_frame_force;
 
 		if (frame > clip.total_duration || frame < 0.f) {
 			if (loop)
@@ -1060,7 +1065,7 @@ float g_fade_out = 0.2;
 float g_walk_fade_in = 2.0;
 float g_walk_fade_out = 3.0;
 float g_run_fade_in = 4.0;
-
+float g_dir_blend = 0.5;
 
 #include "imgui.h"
 void menu()
@@ -1074,8 +1079,10 @@ void menu()
 	ImGui::DragFloat("g_walk_fade_in", &g_walk_fade_in, 0.05);
 	ImGui::DragFloat("g_walk_fade_out", &g_walk_fade_out, 0.05);
 	ImGui::DragFloat("g_run_fade_in", &g_run_fade_in, 0.05);
+	ImGui::DragFloat("g_dir_blend", &g_dir_blend, 0.01);
 
-	ImGui::DragFloat("g_frame_force", &g_frame_force, 0.0005);
+
+//	ImGui::DragFloat("g_frame_force", &g_frame_force, 0.0005);
 }
 
 struct Statemachine_Node : public At_Node
@@ -1245,11 +1252,10 @@ struct Directionalblend_node : public At_Node
 		walk_fade_out = g_walk_fade_out;
 		run_fade_in = g_run_fade_in;
 
-		character_blend_weights = damp_dt_independent(character_blend_weights,
-			glm::vec2(animator->in.relmovedir), 0.1, dt);
+		character_blend_weights = damp_dt_independent(glm::vec2(animator->in.relmovedir),
+			character_blend_weights, g_dir_blend, dt);
 
 		float character_ground_speed = glm::length(character_blend_weights);
-
 		float character_angle = PI;
 		// blend between angles
 		if (character_ground_speed >= 0.0000001f) {
@@ -1359,7 +1365,7 @@ struct Directionalblend_node : public At_Node
 	}
 	virtual void reset() override {
 		//current_frame = 0.0;
-		 character_blend_weights = animator->in.relmovedir;
+		 //character_blend_weights = animator->in.relmovedir;
 	}
 };
 
