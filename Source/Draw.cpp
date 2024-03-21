@@ -1158,6 +1158,8 @@ void Renderer::Init()
 	waternormal = mats.find_texture("waternormal.png");
 
 	glGenVertexArrays(1, &vao.default_);
+	glCreateBuffers(1, &buf.default_vb);
+	glNamedBufferStorage(buf.default_vb, 12 * 3, nullptr, 0);
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
 }
@@ -1259,6 +1261,11 @@ void Renderer::render_bloom_chain()
 	GPUFUNCTIONSTART;
 
 	glBindVertexArray(vao.default_);
+	// to prevent crashes??
+	glBindVertexBuffer(0, buf.default_vb, 0, 0);
+	glBindVertexBuffer(1, buf.default_vb, 0, 0);
+	glBindVertexBuffer(2, buf.default_vb, 0, 0);
+
 
 	if (!enable_bloom.integer())
 		return;

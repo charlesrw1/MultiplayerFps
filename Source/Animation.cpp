@@ -817,7 +817,7 @@ void util_set_to_bind_pose(Pose& pose, const Model* model)
 
 //#pragma optimize( "", off )
 
-
+float g_frame_force = 0.0;
 struct Clip_Node : public At_Node
 {
 	Clip_Node(const char* clipname, Animator* animator) : At_Node(animator) {
@@ -840,6 +840,9 @@ struct Clip_Node : public At_Node
 
 		const Animation& clip = animator->set->clips[clip_index];
 		frame += clip.fps * dt * speed;
+
+		frame = g_frame_force;
+
 		if (frame > clip.total_duration || frame < 0.f) {
 			if (loop)
 				frame = fmod(fmod(frame, clip.total_duration) + clip.total_duration, clip.total_duration);
@@ -1054,7 +1057,10 @@ float xm0 = 0.1;
 float xm1 = 0.05;
 float lerp_rot = 0.5;
 float g_fade_out = 0.2;
-float g_walk_fade_in = 5.0;
+float g_walk_fade_in = 2.0;
+float g_walk_fade_out = 3.0;
+float g_run_fade_in = 4.0;
+
 
 #include "imgui.h"
 void menu()
@@ -1064,9 +1070,12 @@ void menu()
 	ImGui::DragFloat("xm0", &xm0, 0.001);
 	ImGui::DragFloat("xm1", &xm1, 0.001);
 	ImGui::DragFloat("lerprot", &lerp_rot, 0.0005, 0.0f,1.f);
-	ImGui::DragFloat("walk fade in", &g_walk_fade_in, 0.05);
 	ImGui::DragFloat("g_fade_out", &g_fade_out, 0.005);
+	ImGui::DragFloat("g_walk_fade_in", &g_walk_fade_in, 0.05);
+	ImGui::DragFloat("g_walk_fade_out", &g_walk_fade_out, 0.05);
+	ImGui::DragFloat("g_run_fade_in", &g_run_fade_in, 0.05);
 
+	ImGui::DragFloat("g_frame_force", &g_frame_force, 0.0005);
 }
 
 struct Statemachine_Node : public At_Node
@@ -1233,6 +1242,8 @@ struct Directionalblend_node : public At_Node
 	virtual bool get_pose(Pose& pose, float dt) override
 	{
 		walk_fade_in = g_walk_fade_in;
+		walk_fade_out = g_walk_fade_out;
+		run_fade_in = g_run_fade_in;
 
 		character_blend_weights = damp_dt_independent(character_blend_weights,
 			glm::vec2(animator->in.relmovedir), 0.1, dt);
@@ -1279,7 +1290,7 @@ struct Directionalblend_node : public At_Node
 			float speed_lerp = MidLerp(0.0, walk_fade_in, character_ground_speed);
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, 1.0-speed_lerp);
 		}
-		else {
+		else if(character_ground_speed <= walk_fade_out || !run_directions[0]) {
 			if (anglelerp <= 0.5) {
 				advance_animation_sync_by(walk_directions[pose1], dt, character_ground_speed);
 				walk_directions[pose2]->set_frame_by_interp(current_frame);
@@ -1293,7 +1304,47 @@ struct Directionalblend_node : public At_Node
 
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
 		}
+		else if (character_ground_speed <= run_fade_in) {
+			float speed_lerp = MidLerp(walk_fade_out, run_fade_in, character_ground_speed);
+			Clip_Node* masterpose = walk_directions[pose1];
+			if (speed_lerp <= 0.5) {
+				if (anglelerp > 0.5) masterpose = walk_directions[pose2];
+			}
+			else {
+				if (anglelerp > 0.5)masterpose = run_directions[pose2];
+				else masterpose = run_directions[pose1];
+			}
+			advance_animation_sync_by(masterpose, dt, character_ground_speed);
+			walk_directions[pose1]->set_frame_by_interp(current_frame);
+			walk_directions[pose2]->set_frame_by_interp(current_frame);
+			run_directions[pose1]->set_frame_by_interp(current_frame);
+			run_directions[pose2]->set_frame_by_interp(current_frame);
+		
+			walk_directions[pose1]->get_pose(scratchposes[0], 0.f);
+			walk_directions[pose2]->get_pose(scratchposes[1], 0.f);
+			run_directions[pose1]->get_pose(scratchposes[2], 0.f);
+			run_directions[pose2]->get_pose(pose, 0.f);
+		
+			util_bilinear_blend(animator->model->bones.size(), scratchposes[0], scratchposes[1], scratchposes[2], pose,
+				glm::vec2(1-anglelerp, 1- speed_lerp));
+			printf("%f\n", speed_lerp);
+		}
+		else {
+			if (anglelerp <= 0.5) {
+				advance_animation_sync_by(run_directions[pose1], dt, character_ground_speed);
+				run_directions[pose2]->set_frame_by_interp(current_frame);
+			}
+			else {
+				advance_animation_sync_by(run_directions[pose2], dt, character_ground_speed);
+				run_directions[pose1]->set_frame_by_interp(current_frame);
+			}
+			run_directions[pose1]->get_pose(pose, 0.f);
+			run_directions[pose2]->get_pose(scratchposes[0], 0.f);
 
+			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
+
+			printf("%d %d %f\n", pose1, pose2, anglelerp);
+		}
 
 		//float frame_synced = 0.f;
 
@@ -1770,5 +1821,16 @@ void Animator::set_model_new(const Model* m)
 		Debug_Interface::get()->add_hook("animation stuff", menu);
 		tree =
 			load_animtion_tree(this,"./Data/Animations/testtree.txt");
+
+
+		int i = m->animations->find("stand_rifle_walk_n");
+		auto& animation = m->animations->clips.at(i);
+		auto& channel = m->animations->GetChannel(i, 0);
+		for (int j = 0; j < channel.num_rotations; j++) {
+			auto& rot = m->animations->GetRot(0, j, i);
+			printf("%d(%f) %f %f %f %f\n", j, rot.time, rot.val.w, rot.val.x, rot.val.y, rot.val.z);
+		}
+		printf("total: %f\n", animation.total_duration);
+
 	}
 }
