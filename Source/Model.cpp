@@ -640,11 +640,12 @@ static void LoadGltfSkeleton3(cgltf_data* data, Model* model, cgltf_skin* skin)
 			start[8], start[9], start[10], start[11],
 			start[12], start[13], start[14], start[15]);
 		b.posematrix = glm::inverse(glm::mat4(b.invposematrix));
-
+		b.localtransform = get_node_transform(node);
 		b.name = node->name;
 
 		// needed when animations dont have any keyframes, cause gltf exports nothing when its euler angles ???
-		b.rot = glm::quat_cast(glm::mat4(b.posematrix));
+		//b.rot = glm::quat_cast(glm::mat4(b.posematrix));
+		b.rot = glm::quat_cast(glm::mat4(b.localtransform));
 		bone_to_index.insert({ std::string(node->name), model->bones.size() });
 		model->bones.push_back(b);
 	}

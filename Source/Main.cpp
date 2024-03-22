@@ -520,8 +520,10 @@ Model* Game_Media::get_game_model_from_index(int index)
 void Entity::set_model(const char* model_name)
 {
 	model = eng->media.get_game_model(model_name, &model_index);
-	if (model && model->bones.size() > 0)
+	if (model && model->bones.size() > 0) {
 		anim.set_model(model);
+		anim.owner = this;
+	}
 }
 
 
@@ -820,8 +822,24 @@ Game_Local::Game_Local() :
 	mouse_sensitivity("view.sens", 0.01f),
 	fake_movement_debug("game.fakemove",0, (int)CVar_Flags::INTEGER)
 {
-
+	Var_Manager::get()->create_var("stopai", "", Generic_Value(int(0)), 0);
 }
+
+DECLARE_ENGINE_CMD(spawn_npc)
+{
+	if (eng->get_state() != ENGINE_GAME) return;
+	
+	vec3 front = AnglesToVector(eng->local.view_angles.x, eng->local.view_angles.y);
+	vec3 pos = eng->local_player().position + vec3(0.f, STANDING_EYE_OFFSET, 0.f);
+
+	RayHit rh = eng->phys.trace_ray(Ray(pos, front), -1, PF_WORLD);
+	if (rh.dist > 0) {
+
+		auto npc = eng->create_entity(entityclass::NPC);
+		npc->position = rh.pos;
+	}
+}
+
 
 void Game_Local::init()
 {
@@ -1066,6 +1084,7 @@ void draw_wind_menu()
 	//ImGui::DragFloat("angle bias", &draw.ssao.bias, 0.02);
 	
 	ImGui::DragFloat("g_time_speedup", &g_time_speedup, 0.01);
+	if (g_time_speedup <= 0.0001) g_time_speedup = 0.0001;
 
 	ImGui::DragFloat("roughness", &draw.rough, 0.02);
 	ImGui::DragFloat("metalness", &draw.metal, 0.02);

@@ -80,6 +80,7 @@
     <ClInclude Include="Source\LispInterpreter.h" />
     <ClInclude Include="Source\Meshlet.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
+    <ClInclude Include="Source\EntityTypes.h" />
     <ClInclude Include="Source\Particles.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />

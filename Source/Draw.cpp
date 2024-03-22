@@ -1262,6 +1262,7 @@ void Renderer::render_bloom_chain()
 
 	glBindVertexArray(vao.default_);
 	// to prevent crashes??
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindVertexBuffer(0, buf.default_vb, 0, 0);
 	glBindVertexBuffer(1, buf.default_vb, 0, 0);
 	glBindVertexBuffer(2, buf.default_vb, 0, 0);

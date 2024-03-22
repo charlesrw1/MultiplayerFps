@@ -178,7 +178,7 @@ enum class animlayer
 	fullbody,
 	additive_misc
 };
-
+class Entity;
 class Animation_Tree;
 class Animator
 {
@@ -206,6 +206,7 @@ public:
 
 	const Model* model = nullptr;
 	const Animation_Set* set = nullptr;
+	Entity* owner = nullptr;
 	
 	Animation_Tree* tree;
 	vector<Anim_Play_Layer> play_layers;

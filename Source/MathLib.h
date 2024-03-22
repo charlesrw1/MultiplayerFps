@@ -2,9 +2,25 @@
 #define MATHLIB_H
 
 #include "glm/glm.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 inline glm::vec3 AnglesToVector(float pitch, float yaw) {
 	return glm::vec3(cos(yaw) * cos(pitch), sin(pitch), sin(yaw) * cos(pitch));
+}
+
+// smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing 
+template<typename T>
+static T damp_dt_independent(T a, T b, float smoothing, float dt)
+{
+	float alpha = pow(smoothing, dt);
+	return glm::mix(a, b, alpha);
+}
+
+template<>
+static glm::quat damp_dt_independent(glm::quat a, glm::quat b, float smoothing, float dt)
+{
+	float alpha = pow(smoothing, dt);
+	return glm::slerp(a, b, alpha);
 }
 
 struct Ray

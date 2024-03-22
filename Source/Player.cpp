@@ -16,14 +16,6 @@ static const Capsule crouch_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR
 static float fall_speed_threshold = -0.05f;
 static float grnd_speed_threshold = 0.6f;
 
-
-static float move_speed_player = 0.1f;
-static bool gravity = true;
-static bool col_response = true;
-static int col_iters = 2;
-static bool col_closest = true;
-static bool new_physics = true;
-
 static float ground_friction = 8.2;
 static float air_friction = 0.01;
 static float ground_accel = 6;
@@ -295,7 +287,6 @@ void player_physics_ground_move(Entity& player, Move_Command command, bool dont_
 		check_jump(player, command);
 		check_duck(player, command);
 	}
-
 
 	vec3 prevel = player.velocity;
 

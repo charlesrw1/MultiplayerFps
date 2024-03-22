@@ -18,20 +18,6 @@ using glm::dot;
 using glm::cross;
 using glm::normalize;
 
-// smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing 
-template<typename T>
-static T damp_dt_independent(T a, T b, float smoothing, float dt)
-{
-	float alpha = pow(smoothing, dt);
-	return glm::mix(a, b, alpha);
-}
-
-template<>
-static glm::quat damp_dt_independent(glm::quat a, glm::quat b, float smoothing, float dt)
-{
-	float alpha = pow(smoothing, dt);
-	return glm::slerp(a, b, alpha);
-}
 
 int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip) const
 {
@@ -214,6 +200,8 @@ static float MidLerp(float min, float max, float mid_val)
 
 void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float curframe)
 {
+	// ANIMATOR CLASS!
+
 	const Animation_Set* set = model->animations.get();
 	const Animation& clip = set->clips[clip_index];
 
@@ -223,7 +211,7 @@ void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float cu
 
 		vec3 interp_pos{};
 		if (pos_idx == -1)
-			interp_pos = model->bones.at(i).posematrix[3];
+			interp_pos = model->bones.at(i).localtransform[3];
 		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
 			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
 		else {
@@ -789,12 +777,14 @@ void util_calc_rotations(const Animation_Set* set,
 			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
 			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
 			float scale = MidLerp(t0,t1, curframe);
+			assert(scale >= 0 && scale <= 1.f);
 			interp_pos = glm::mix(set->GetPos(i, index0,clip_index).val, set->GetPos(i, index1,clip_index).val, scale);
 		}
 
 		glm::quat interp_rot{};
-		if (rot_idx == -1)
+		if (rot_idx == -1) {
 			interp_rot = model->bones.at(i).rot;
+		}
 		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
 			interp_rot = set->GetRot(i, rot_idx, clip_index).val;
 		else {
@@ -806,6 +796,7 @@ void util_calc_rotations(const Animation_Set* set,
 			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
 			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
 			float scale = MidLerp(t0,t1, curframe);
+			assert(scale >= 0 && scale <= 1.f);
 			interp_rot = glm::slerp(set->GetRot(i, index0, clip_index).val, set->GetRot(i, index1, clip_index).val, scale);
 		}
 		interp_rot = glm::normalize(interp_rot);
@@ -817,7 +808,7 @@ void util_calc_rotations(const Animation_Set* set,
 void util_set_to_bind_pose(Pose& pose, const Model* model)
 {
 	for (int i = 0; i < model->bones.size(); i++) {
-		pose.pos[i] = model->bones.at(i).posematrix[3];
+		pose.pos[i] = model->bones.at(i).localtransform[3];
 		pose.q[i] = model->bones.at(i).rot;
 	}
 }
@@ -1056,16 +1047,16 @@ struct Boolean_Blend_Node : public At_Node
 	float blendin = 0.2;
 };
 
-float ym0 = 0.1;
-float ym1 = 0.05;
-float xm0 = 0.1;
-float xm1 = 0.05;
-float lerp_rot = 0.5;
+float ym0 = 0.09;
+float ym1 = 0.3;
+float xm0 = 0.3;
+float xm1 = 0.3;
+float lerp_rot = 0.2;
 float g_fade_out = 0.2;
 float g_walk_fade_in = 2.0;
 float g_walk_fade_out = 3.0;
 float g_run_fade_in = 4.0;
-float g_dir_blend = 0.5;
+float g_dir_blend = 0.025;
 
 #include "imgui.h"
 void menu()
@@ -1252,6 +1243,8 @@ struct Directionalblend_node : public At_Node
 		walk_fade_out = g_walk_fade_out;
 		run_fade_in = g_run_fade_in;
 
+		float actual_character_move_speed = glm::length(glm::vec2(animator->in.relmovedir));
+
 		character_blend_weights = damp_dt_independent(glm::vec2(animator->in.relmovedir),
 			character_blend_weights, g_dir_blend, dt);
 
@@ -1275,6 +1268,7 @@ struct Directionalblend_node : public At_Node
 				break;
 			}
 		}
+		bool print = animator->owner->class_ == entityclass::NPC;
 		//printf("ANGLE: %f\n", character_angle);
 		// highest weighted pose controls syncing
 		Pose* scratchposes = Pose_Pool::get().alloc(3);
@@ -1282,11 +1276,11 @@ struct Directionalblend_node : public At_Node
 			idle->get_pose(scratchposes[0], dt);
 
 			if (anglelerp <= 0.5) {
-				advance_animation_sync_by(walk_directions[pose1], dt, character_ground_speed);
+				advance_animation_sync_by(walk_directions[pose1], dt, actual_character_move_speed);
 				walk_directions[pose2]->set_frame_by_interp(current_frame);
 			}
 			else {
-				advance_animation_sync_by(walk_directions[pose2], dt, character_ground_speed);
+				advance_animation_sync_by(walk_directions[pose2], dt, actual_character_move_speed);
 				walk_directions[pose1]->set_frame_by_interp(current_frame);
 			}
 
@@ -1295,20 +1289,28 @@ struct Directionalblend_node : public At_Node
 			util_blend(animator->model->bones.size(), scratchposes[1], pose, anglelerp);
 			float speed_lerp = MidLerp(0.0, walk_fade_in, character_ground_speed);
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, 1.0-speed_lerp);
+
+			if (print) {
+				printf("0 %f %f\n", anglelerp, speed_lerp);
+			}
 		}
 		else if(character_ground_speed <= walk_fade_out || !run_directions[0]) {
 			if (anglelerp <= 0.5) {
-				advance_animation_sync_by(walk_directions[pose1], dt, character_ground_speed);
+				advance_animation_sync_by(walk_directions[pose1], dt, actual_character_move_speed);
 				walk_directions[pose2]->set_frame_by_interp(current_frame);
 			}
 			else {
-				advance_animation_sync_by(walk_directions[pose2], dt, character_ground_speed);
+				advance_animation_sync_by(walk_directions[pose2], dt, actual_character_move_speed);
 				walk_directions[pose1]->set_frame_by_interp(current_frame);
 			}
 			walk_directions[pose1]->get_pose(pose, 0.f);
 			walk_directions[pose2]->get_pose(scratchposes[0], 0.f);
 
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
+
+			if (print) {
+				printf("1 %f\n", anglelerp);
+			}
 		}
 		else if (character_ground_speed <= run_fade_in) {
 			float speed_lerp = MidLerp(walk_fade_out, run_fade_in, character_ground_speed);
@@ -1320,7 +1322,7 @@ struct Directionalblend_node : public At_Node
 				if (anglelerp > 0.5)masterpose = run_directions[pose2];
 				else masterpose = run_directions[pose1];
 			}
-			advance_animation_sync_by(masterpose, dt, character_ground_speed);
+			advance_animation_sync_by(masterpose, dt, actual_character_move_speed);
 			walk_directions[pose1]->set_frame_by_interp(current_frame);
 			walk_directions[pose2]->set_frame_by_interp(current_frame);
 			run_directions[pose1]->set_frame_by_interp(current_frame);
@@ -1333,23 +1335,31 @@ struct Directionalblend_node : public At_Node
 		
 			util_bilinear_blend(animator->model->bones.size(), scratchposes[0], scratchposes[1], scratchposes[2], pose,
 				glm::vec2(1-anglelerp, 1- speed_lerp));
-			printf("%f\n", speed_lerp);
+			//printf("%f\n", speed_lerp);
+
+			if (print) {
+				printf("2 %f %f\n", anglelerp,speed_lerp);
+			}
 		}
 		else {
+			if (print) {
+				printf("abc\n");
+			}
+
 			if (anglelerp <= 0.5) {
-				advance_animation_sync_by(run_directions[pose1], dt, character_ground_speed);
+				advance_animation_sync_by(run_directions[pose1], dt, actual_character_move_speed);
 				run_directions[pose2]->set_frame_by_interp(current_frame);
 			}
 			else {
-				advance_animation_sync_by(run_directions[pose2], dt, character_ground_speed);
+				advance_animation_sync_by(run_directions[pose2], dt, actual_character_move_speed);
 				run_directions[pose1]->set_frame_by_interp(current_frame);
 			}
 			run_directions[pose1]->get_pose(pose, 0.f);
-			run_directions[pose2]->get_pose(scratchposes[0], 0.f);
+			//run_directions[pose2]->get_pose(scratchposes[0], 0.f);
 
-			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
+			//util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp)
 
-			printf("%d %d %f\n", pose1, pose2, anglelerp);
+		//	printf("%d %d %f\n", pose1, pose2, anglelerp);
 		}
 
 		//float frame_synced = 0.f;
@@ -1674,7 +1684,7 @@ void Animator::postprocess_animation(Pose& pose, float dt)
 	glm::vec3 rhand_target = cached_bonemats[rhand] * vec4(0.0, 0.0, 0.0, 1.0);
 	glm::vec3 lhand_target = cached_bonemats[lhand] * vec4(0.0, 0.0, 0.0, 1.0);
 	//hand_target += vec3(0.f, sin(GetTime()*0.2)*5.f, 20.0f * sin(GetTime()*0.5));
-	glm::mat4 ent_transform = eng->local_player().get_world_transform()*model->skeleton_root_transform;
+	glm::mat4 ent_transform = owner->get_world_transform()*model->skeleton_root_transform;
 	{
 		glm::vec3 world_hand = ent_transform * glm::vec4(rhand_target, 1.0);
 		Debug::add_sphere(world_hand, 0.01, COLOR_RED, 0.0, true);
@@ -1687,8 +1697,8 @@ void Animator::postprocess_animation(Pose& pose, float dt)
 		glm::vec3 rotation_dir = glm::normalize(vec3(atan(in.relaccel.y*ym0)*ym1, atan(in.relaccel.x*xm0)*xm1, 1.0f));
 		glm::vec3 worldspace = mat3(ent_transform) * vec3(rotation_dir);
 
-		Debug::add_line(eng->local_player().position, 
-			eng->local_player().position + vec3(worldspace.x,0.f,worldspace.z)*1000.f, 
+		Debug::add_line(owner->position, 
+			owner->position + vec3(worldspace.x,0.f,worldspace.z)*1000.f, 
 			COLOR_PINK, 0.f);
 
 		glm::quat q = glm::quat(rotation_dir, vec3(0,0,1));
@@ -1752,13 +1762,13 @@ void Animator::postprocess_animation(Pose& pose, float dt)
 		RayHit hit = eng->phys.trace_ray(r, -1, PF_WORLD);
 		Debug::add_box(hit.pos, vec3(0.2), COLOR_PINK, 0.f);
 
-		float rfootheight = hit.pos.y - eng->local_player().position.y;
+		float rfootheight = hit.pos.y - owner->position.y;
 		r.pos = worldspace_lfoot + vec3(0, 2, 0);
 		hit = eng->phys.trace_ray(r, -1, PF_WORLD);
 
 		Debug::add_box(hit.pos, vec3(0.2), COLOR_PINK, 0.f);
 
-		float lfootheight = hit.pos.y - eng->local_player().position.y;
+		float lfootheight = hit.pos.y - owner->position.y;
 		// now need to offset mesh so that both hiehgts are >= 0
 		float add = glm::min(lfootheight, rfootheight);
 
@@ -1782,7 +1792,9 @@ void Animator::postprocess_animation(Pose& pose, float dt)
 
 void Animator::evaluate_new(float dt)
 {
-	Entity& player = eng->local_player();
+	if (!owner) return;
+
+	Entity& player = *owner;
 	bool mirrored = player.state & PMS_CROUCHING;
 	Pose* poses = Pose_Pool::get().alloc(2);
 
@@ -1813,7 +1825,7 @@ void Animator::evaluate_new(float dt)
 
 	tree->root->get_pose(poses[0], dt);
 
-	postprocess_animation(poses[0], dt);
+	//postprocess_animation(poses[0], dt);
 
 	UpdateGlobalMatricies(poses[0].q, poses[0].pos, cached_bonemats);
 
@@ -1828,12 +1840,16 @@ void Animator::set_model_new(const Model* m)
 		tree =
 			load_animtion_tree(this,"./Data/Animations/testtree.txt");
 
+		for (int b = 0; b < m->bones.size(); b++) {
+			std::cout << m->bones.at(b).name << " " << m->bones.at(b).invposematrix[3] << '\n';
+		}
 
 		int i = m->animations->find("stand_rifle_walk_n");
+		int bone = m->bone_for_name("mixamorig:LeftEye");
 		auto& animation = m->animations->clips.at(i);
-		auto& channel = m->animations->GetChannel(i, 0);
+		auto& channel = m->animations->GetChannel(i, bone);
 		for (int j = 0; j < channel.num_rotations; j++) {
-			auto& rot = m->animations->GetRot(0, j, i);
+			auto& rot = m->animations->GetRot(bone, j, i);
 			printf("%d(%f) %f %f %f %f\n", j, rot.time, rot.val.w, rot.val.x, rot.val.y, rot.val.z);
 		}
 		printf("total: %f\n", animation.total_duration);

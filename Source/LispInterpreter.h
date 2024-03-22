@@ -10,6 +10,9 @@ using std::unique_ptr;
 using std::unordered_map;
 
 
+// Any sufficiently complicated C or Fortran program contains an ad hoc, 
+// informally-specified, bug-ridden, slow implementation of half of Common Lisp.
+
 struct Exp;
 struct At_Node;
 

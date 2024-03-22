@@ -144,6 +144,7 @@ void Game_Engine::make_client(int slot)
 
 	player_spawn(p);
 }
+#include "EntityTypes.h"
 
 Entity* Game_Engine::create_entity(entityclass classtype, int forceslot)
 {
@@ -167,12 +168,14 @@ Entity* Game_Engine::create_entity(entityclass classtype, int forceslot)
 	case entityclass::DOOR:
 		e = new Door;
 		break;
+	case entityclass::NPC:
+		e = new NPC;
+		break;
 
 	case entityclass::BOMBZONE:
 	case entityclass::SPAWNZONE:
 	case entityclass::SPAWNPOINT:
 	case entityclass::EMPTY:
-	case entityclass::NPC:
 		e = new Entity;
 		break;
 

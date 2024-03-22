@@ -9,6 +9,8 @@ bind 5 "reconnect"
 bind 6 "editdoc Map0"
 bind / reload_shaders
 
+bind P "spawn_npc"
+
 #net vars
 sv.tick_rate 66.0
 sv.snapshot_rate 30.0

@@ -251,5 +251,8 @@
     <ClInclude Include="Source\LispInterpreter.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
+    <ClInclude Include="Source\EntityTypes.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
