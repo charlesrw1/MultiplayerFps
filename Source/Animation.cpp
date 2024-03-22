@@ -1268,8 +1268,7 @@ struct Directionalblend_node : public At_Node
 				break;
 			}
 		}
-		bool print = animator->owner->class_ == entityclass::NPC;
-		//printf("ANGLE: %f\n", character_angle);
+
 		// highest weighted pose controls syncing
 		Pose* scratchposes = Pose_Pool::get().alloc(3);
 		if (character_ground_speed <= walk_fade_in) {
@@ -1289,10 +1288,6 @@ struct Directionalblend_node : public At_Node
 			util_blend(animator->model->bones.size(), scratchposes[1], pose, anglelerp);
 			float speed_lerp = MidLerp(0.0, walk_fade_in, character_ground_speed);
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, 1.0-speed_lerp);
-
-			if (print) {
-				printf("0 %f %f\n", anglelerp, speed_lerp);
-			}
 		}
 		else if(character_ground_speed <= walk_fade_out || !run_directions[0]) {
 			if (anglelerp <= 0.5) {
@@ -1307,10 +1302,6 @@ struct Directionalblend_node : public At_Node
 			walk_directions[pose2]->get_pose(scratchposes[0], 0.f);
 
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
-
-			if (print) {
-				printf("1 %f\n", anglelerp);
-			}
 		}
 		else if (character_ground_speed <= run_fade_in) {
 			float speed_lerp = MidLerp(walk_fade_out, run_fade_in, character_ground_speed);
@@ -1335,17 +1326,10 @@ struct Directionalblend_node : public At_Node
 		
 			util_bilinear_blend(animator->model->bones.size(), scratchposes[0], scratchposes[1], scratchposes[2], pose,
 				glm::vec2(1-anglelerp, 1- speed_lerp));
-			//printf("%f\n", speed_lerp);
 
-			if (print) {
-				printf("2 %f %f\n", anglelerp,speed_lerp);
-			}
 		}
 		else {
-			if (print) {
-				printf("abc\n");
-			}
-
+	
 			if (anglelerp <= 0.5) {
 				advance_animation_sync_by(run_directions[pose1], dt, actual_character_move_speed);
 				run_directions[pose2]->set_frame_by_interp(current_frame);
@@ -1355,19 +1339,11 @@ struct Directionalblend_node : public At_Node
 				run_directions[pose1]->set_frame_by_interp(current_frame);
 			}
 			run_directions[pose1]->get_pose(pose, 0.f);
-			//run_directions[pose2]->get_pose(scratchposes[0], 0.f);
+			run_directions[pose2]->get_pose(scratchposes[0], 0.f);
 
-			//util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp)
-
-		//	printf("%d %d %f\n", pose1, pose2, anglelerp);
+			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
 		}
 
-		//float frame_synced = 0.f;
-
-		//directions[pose1]->get_pose(pose, dt);
-		//directions[pose2]->get_pose(*scratchpose, dt);
-		//
-		//util_blend(animator->model->bones.size(), *scratchpose, pose, lerp);
 
 		Pose_Pool::get().free(3);
 
@@ -1825,7 +1801,7 @@ void Animator::evaluate_new(float dt)
 
 	tree->root->get_pose(poses[0], dt);
 
-	//postprocess_animation(poses[0], dt);
+	postprocess_animation(poses[0], dt);
 
 	UpdateGlobalMatricies(poses[0].q, poses[0].pos, cached_bonemats);
 
@@ -1835,24 +1811,13 @@ void Animator::evaluate_new(float dt)
 
 void Animator::set_model_new(const Model* m)
 {
+	static bool first = true;
+	if (first) {
+			Debug_Interface::get()->add_hook("animation stuff", menu);
+			first = false;
+	}
+
 	if (m->name == "player_FINAL.glb") {
-		Debug_Interface::get()->add_hook("animation stuff", menu);
-		tree =
-			load_animtion_tree(this,"./Data/Animations/testtree.txt");
-
-		for (int b = 0; b < m->bones.size(); b++) {
-			std::cout << m->bones.at(b).name << " " << m->bones.at(b).invposematrix[3] << '\n';
-		}
-
-		int i = m->animations->find("stand_rifle_walk_n");
-		int bone = m->bone_for_name("mixamorig:LeftEye");
-		auto& animation = m->animations->clips.at(i);
-		auto& channel = m->animations->GetChannel(i, bone);
-		for (int j = 0; j < channel.num_rotations; j++) {
-			auto& rot = m->animations->GetRot(bone, j, i);
-			printf("%d(%f) %f %f %f %f\n", j, rot.time, rot.val.w, rot.val.x, rot.val.y, rot.val.z);
-		}
-		printf("total: %f\n", animation.total_duration);
-
+		tree = load_animtion_tree(this,"./Data/Animations/testtree.txt");
 	}
 }
