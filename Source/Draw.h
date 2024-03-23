@@ -151,8 +151,8 @@ public:
 	}ubo;
 
 	struct params {
-		float radius = 2.0;
-		float intensity = 1.5;
+		float radius = 0.4;
+		float intensity = 2.5;
 		float bias = 0.1;
 		float blur_sharpness = 40.0;
 	}tweak;

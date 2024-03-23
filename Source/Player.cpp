@@ -632,10 +632,8 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 			p->anim.m.speed = 0.8f;
 
 			if (is_local) {
-				eng->local.viewmodel_animator.set_anim("act_reload", true);
-				eng->local.viewmodel_animator.m.loop = false;
-				eng->local.viewmodel_animator.m.speed = 2.5f;
-
+				Player* player = (Player*)p;
+				player->viewmodel->animator.set_anim("ak47_reload", true);
 			}
 		}
 		else {
@@ -709,6 +707,8 @@ void Player::move_update(Move_Command command)
 }
 ViewmodelComponent::ViewmodelComponent(Player* p) 
 {
+	this->player = p;
+
 	model = mods.find_or_load("arms.glb");
 	animator.set_model(model);
 
@@ -744,13 +744,18 @@ ViewmodelComponent::ViewmodelComponent(Player* p)
 	rh.use_two_bone_ik = true;
 	rh.use_bone_as_relative_transform = true;
 	rh.target_relative_bone_index = wp.bone_index;
+
+	lastoffset = vec3(0.f);
+	lastrot = glm::quat(1.f, 0, 0, 0);
 }
 
-float move_a = 1.f;
-float move_b = 1.f;
-float move_c = 1.f;
-float move_d = 1.f;
-
+float move_a = 8.f;
+float move_b = .1f;
+float move_c = 8.f;
+float move_d = .1f;
+float move_e = 1.f;
+float move_f = 0.05f;
+float move_g = 0.005f;
 
 void vm_menu()
 {
@@ -758,6 +763,18 @@ void vm_menu()
 	ImGui::DragFloat("b", &move_b, 0.01);
 	ImGui::DragFloat("c", &move_c, 0.01);
 	ImGui::DragFloat("d", &move_d, 0.01);
+	ImGui::DragFloat("e", &move_e, 0.01);
+	ImGui::DragFloat("f", &move_f, 0.01);
+	ImGui::DragFloat("g", &move_g, 0.01);
+}
+template<typename T>
+T neg_modulo(T x, T mod_)
+{
+	return glm::mod(glm::mod(x, mod_) + mod_, mod_);
+}
+float modulo_lerp(float start, float end, float mod, float t)
+{
+	return neg_modulo(t - start,mod) / neg_modulo(end - start, mod);
 }
 
 void ViewmodelComponent::update()
@@ -768,17 +785,56 @@ void ViewmodelComponent::update()
 		Debug_Interface::get()->add_hook("vm", vm_menu);
 	}
 
-	animator.set_anim("ak47_idle", false);
+	bool crouching = player->state & PMS_CROUCHING;
+	float speed = glm::length(glm::vec2(player->velocity.x,player->velocity.z));
+	float speed_mult = glm::smoothstep(0.f, 2.5f, speed);
+	float x = cos(GetTime()*move_a)*move_b*speed_mult;
+	float y = pow(cos(GetTime() * move_c ),4.f) * move_d*speed_mult;
+	glm::vec3 target_pos = vec3(x, y, 0.f);
+
+	glm::vec2 face_dir = glm::vec2(cos(HALFPI-player->rotation.y), sin(HALFPI-player->rotation.y));
+	glm::vec2 side = glm::vec2(-face_dir.y, face_dir.x);
+
+	vec2 grnd_accel = vec2(player->esimated_accel.x, player->esimated_accel.z);
+	vec2 grnd_vel = vec2(player->velocity.x, player->velocity.z);
+	vec2 rel_move_dir = glm::vec2(glm::dot(face_dir, grnd_accel), glm::dot(side, grnd_accel));
+	vec2 rel_vel_dir = vec2(dot(face_dir, grnd_vel), dot(side, grnd_vel));
+	float len = glm::length(rel_move_dir); 
+	if (len >= 0.0001f)
+	{
+		target_pos += vec3(rel_move_dir.y, 0.f, rel_move_dir.x) / len * glm::smoothstep(0.f, 2.5f, len) * move_f;
+	}
+	
+	//target_pos.y += glm::smoothstep(0.f,4.f, player->esimated_accel.y) * move_f*4.f;
+
+	glm::quat target_rot = glm::quat(1, 0, 0, 0);
+	len = glm::length(rel_vel_dir);
+//	if (len >= 0.0001f) {
+		float s = glm::smoothstep(-3.f, 3.f,rel_move_dir.y*0.1f) -0.5f;
+		target_rot *= glm::quat(vec3(s*0.7, 1.f, 0.f), vec3(0.f, 1.f, 0.f));
+//	}
+
+	vec3 view_dir = AnglesToVector(eng->local.view_angles.x, eng->local.view_angles.y);
+	vec3 sidedir = normalize(cross(view_dir,vec3(0,1,0)));
+	vec3 up = cross(view_dir, sidedir);
+	float deltax = dot(view_dir - last_view_dir, sidedir);
+	float deltay = dot(view_dir - last_view_dir, up);
+	last_view_dir = view_dir;
+
+	target_rot *= glm::quat(glm::vec3(deltax*move_e, deltay*move_e, 1.f), vec3(0, 0, 1));
+
+
+	lastoffset = damp_dt_independent(target_pos, lastoffset, move_g, eng->tick_interval);
+	lastrot = damp_dt_independent(target_rot, lastrot, move_g*0.1, eng->tick_interval);
+
+	if(animator.m.finished || animator.m.anim == -1)
+		animator.set_anim("ak47_idle", false);
 	
 	Bone_Controller& bc = animator.get_controller(bone_controller_type::misc1);
-
-	float x = cos(GetTime()*move_a)*move_b;
-	float y = pow(cos(GetTime() * move_c),4.f) * move_d;
-
-	bc.position = vec3(x,y,0.f);// vec3(0.f, sin(GetTime() + 0.5) * 0.8, 0.f);
+	bc.position = lastoffset;// vec3(0.f, sin(GetTime() + 0.5) * 0.8, 0.f);
 	//bc.rotation = glm::quat(1.f,0.f,0.f,0.f);
 
-	bc.rotation = glm::quat(1.f,0,0,0);// glm::quat(vec3(sin(GetTime() * 1.4) * 0.7, 0.f, 1.f), glm::vec3(0, 0.f, 1.f));
+	bc.rotation =lastrot;// glm::quat(vec3(sin(GetTime() * 1.4) * 0.7, 0.f, 1.f), glm::vec3(0, 0.f, 1.f));
 	
 	animator.AdvanceFrame(eng->tick_interval);
 	animator.SetupBones();

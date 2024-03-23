@@ -874,62 +874,6 @@ void Animator::set_leg_anim(const char* name, bool restart, float blend)
 	set_anim_from_index(legs, animation, restart, blend);
 }
 
-typedef uint32_t bonehandle;
-
-class IK_Controller
-{
-public:
-	virtual void update() = 0;
-	bonehandle bone1;
-	bonehandle bone2;
-	glm::vec3 targetpos;
-};
-
-class Single_Bone_Controller
-{
-public:
-
-	Model* mod;
-	bonehandle bone;
-};
-
-typedef uint32_t animhandle;
-
-
-class AnimSeqExt
-{
-public:
-	enum Type
-	{
-		STANDARD,
-		DIRECTIONAL_BLEND,
-		AIM_BLEND,
-		TURN_BLEND
-	}type;
-	enum Turn_Blend_Enums {
-		TURN_45,
-		TURN_NEG45,
-		TURN_90,
-		TURN_NEG90
-	};
-	enum Aim_Blend_Enums {
-		AIM_UP,
-		AIM_DOWN,
-		AIM_LEFT,
-		AIM_RIGHT,
-	};
-	enum Directional_Blend_Enums {
-		DIR_FORWARD,
-		DIR_BACKWARD,
-		DIR_LEFT,
-		DIR_RIGT,
-	}; 
-	int type_enum;
-	int num_clips = 0;
-	float clip_cdf[10];	// type == STANDARD && num_clips > 1
-	animhandle clips[10];
-};
-
 
 //#pragma optimize( "", on )
 

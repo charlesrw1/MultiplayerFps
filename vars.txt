@@ -23,7 +23,7 @@ gpu.draw_collision_tris 0
 gpu.draw_sv_colliders 0
 gpu.draw_viewmodel 1
 view.tp 0
-dbg.fly 1
+dbg.fly 0
 
 #game vars
 view.sens 0.005

@@ -1569,7 +1569,7 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 			skinned_matricies.push_back(mats[i]);
 		}
 
-		draw_skeleton(animator, 0.1f, transform);
+		//draw_skeleton(animator, 0.1f, transform);
 	}
 
 	obj.model = transform;
@@ -3276,7 +3276,7 @@ void Renderer::on_level_start()
 	draw.using_skybox_for_specular = true;
 	auto& helper = EnviornmentMapHelper::get();
 
-	scene.skybox = helper.create_from_file("hdr_sky3.hdr").original_cubemap;
+	scene.skybox = helper.create_from_file("hdr_sky2.hdr").original_cubemap;
 	// CUBEMAP_SIZE isnt the size of skybox, but its unused anyways
 	helper.convolute_irradiance_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, 0, 32);
 	helper.compute_specular_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapspecular_array, 0, CUBEMAP_SIZE);

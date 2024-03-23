@@ -6,7 +6,7 @@ class NPC : public Entity
 {
 public:
 	NPC() {
-		set_model("arms.glb");
+		set_model("player_FINAL.glb");
 		pathfind_state = going_towards_waypoint;
 		position = vec3(0.f);
 
@@ -85,7 +85,7 @@ public:
 	}
 
 	bool strafe_only = true;
-	float ground_accel = 4.f;
+	float ground_accel = 6.5f;
 	float ground_friction = 8.f;
 
 	int current_waypoint = 0;

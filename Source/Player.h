@@ -41,9 +41,13 @@ struct ViewmodelComponent
 
 	Model* model;
 	Animator animator;
+	Player* player;
 
 	void update();
 
+	glm::vec3 lastoffset;
+	glm::quat lastrot;
+	glm::vec3 last_view_dir;
 };
 
 class Player : public Entity
