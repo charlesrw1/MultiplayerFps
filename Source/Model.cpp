@@ -551,6 +551,7 @@ void load_model_materials2(std::vector<Game_Shader*>& materials, const std::stri
 				cgltf_pbr_metallic_roughness& base = mat.pbr_metallic_roughness;
 				if (base.base_color_texture.texture) {
 					gs = mats.create_temp_shader((fallbackname + mat_name).c_str());
+					assert(gs);
 					gs->images[Game_Shader::DIFFUSE] = LoadGltfImage2(base.base_color_texture.texture->image, data);
 					if (base.metallic_roughness_texture.texture) {
 						gs->images[Game_Shader::ROUGHNESS] = LoadGltfImage2(base.metallic_roughness_texture.texture->image, data);

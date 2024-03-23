@@ -142,6 +142,7 @@ void Game_Engine::make_client(int slot)
 		p->interp = unique_ptr<RenderInterpolationComponent>(new RenderInterpolationComponent(3));
 	}
 
+	p->init();
 	player_spawn(p);
 }
 #include "EntityTypes.h"
@@ -527,6 +528,10 @@ void Player::update()
 	if (position.y < -50 && !(flags & EF_DEAD)) {
 		flags |= EF_DEAD;
 		timer = 0.5f;
+	}
+
+	if (viewmodel) {
+		viewmodel->update();
 	}
 }
 

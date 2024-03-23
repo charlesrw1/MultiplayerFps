@@ -1,6 +1,7 @@
 #ifndef PLAYERMOVE_H
 #define PLAYERMOVE_H
 #include "Types.h"
+#include "Game_Engine.h"
 #include <memory>
 using std::unique_ptr;
 using std::vector;
@@ -31,18 +32,42 @@ struct LagCompensationComponent
 	int matrixhead;
 };
 
+
+
+class Player;
+struct ViewmodelComponent
+{
+	ViewmodelComponent(Player* player); 
+
+	Model* model;
+	Animator animator;
+
+	void update();
+
+};
+
 class Player : public Entity
 {
 public:
 	Player() :
 		buffered_cmds(8),
-		num_buffered_cmds(0) {}
+		num_buffered_cmds(0) {
+	}
+
+	void init() {
+		bool is_local_player = &eng->local_player() == this;
+
+		if (is_local_player) {
+			viewmodel.reset( new ViewmodelComponent(this) );
+		}
+	}
 
 	void update() override;
 
 	void move_update(Move_Command command);
 	void postc_move(Move_Command command);
 
+	unique_ptr<ViewmodelComponent> viewmodel;
 	unique_ptr<LagCompensationComponent> lagcomp;
 	vector<Move_Command> buffered_cmds;
 	int num_buffered_cmds = 0;

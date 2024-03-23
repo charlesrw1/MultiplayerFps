@@ -114,7 +114,7 @@ public:
 	uint64_t mask[4];	//256/64
 };
 
-// manages blends between 'layers', either state machine state or play layers
+// manages blends between layers
 class Anim_Sequencer
 {
 public:
@@ -178,6 +178,47 @@ enum class animlayer
 	fullbody,
 	additive_misc
 };
+// procedural bone controls
+// supports: direct bone transform manipulation	(ex: rotating/translating weapon bone)
+//			ik to meshspace transform	(ex: hand reaching to object)
+//			ik to transform relative to another bone	(ex: third person gun ik)
+//			ik to relative transform of bone relative to another bone (ex: first person gun ik)
+struct Bone_Controller
+{
+	bool enabled = false;
+	// if true, then transform is added to base, not replaced
+	bool add_transform_not_replace = false;
+	// if true, then uses 2 bone ik instead of direct transform
+	bool use_two_bone_ik = false;
+	bool evalutate_in_second_pass = false;
+	int bone_index = 0;
+	float weight = 1.f;
+	// target transform in meshspace!!!
+	// so you should multiply by inv-transform matrix if you have a worldspace transform
+	glm::quat rotation;
+	glm::vec3 position;
+
+	// if != -1, then position/rotation treated as a relative offset 
+	// to another bone pre-procedural bone adjustments and not worldspace
+	// useful for hand to gun ik
+	int target_relative_bone_index = -1;
+	bool use_bone_as_relative_transform = false;
+};
+
+// hardcoded bone controller types for programming convenience, doesnt affect any bone names/indicies
+enum class bone_controller_type
+{
+	rhand,
+	lhand,
+	rfoot,
+	lfoot,
+	misc1,
+	misc2,
+
+	max_count,
+};
+
+
 class Entity;
 class Animation_Tree;
 class Animator
@@ -191,8 +232,14 @@ public:
 	void set_leg_anim(const char* name, bool restart, float blend = 0.1f);
 	void SetupBones();
 	void ConcatWithInvPose();
-	const std::vector<glm::mat4x4> GetBones() const { 
-		return cached_bonemats; 
+
+	// what renderer consumes
+	const std::vector<glm::mat4x4> get_matrix_palette() const { 
+		return matrix_palette; 
+	}
+	// what game/physics stuff consumes
+	const std::vector<glm::mat4x4> get_global_bonemats() const {
+		return cached_bonemats;
 	}
 
 	void AdvanceFrame(float elapsed_time);
@@ -208,8 +255,15 @@ public:
 	const Animation_Set* set = nullptr;
 	Entity* owner = nullptr;
 	
-	Animation_Tree* tree;
+	Animation_Tree* tree = nullptr;
 	vector<Anim_Play_Layer> play_layers;
+
+
+	Bone_Controller& get_controller(bone_controller_type type_) {
+		return bone_controllers[(int)type_];
+	}
+	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
+	void update_procedural_bones(Pose& pose);
 
 	struct input {
 		glm::vec3 worldpos;
@@ -244,21 +298,20 @@ public:
 		glm::vec3 rootmotion_position_delta;
 	}out;
 
+	int num_bones() { return cached_bonemats.size(); }
 private:
 	void postprocess_animation(Pose& pose,float dt);
 
 	//void DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 	//void DoPlayerHandToGunIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats);
 
-	std::vector<glm::mat4x4> cached_bonemats;		// final transform matricies, meshspace->bonespace->meshspace
-	
-	vector<glm::mat4x4> cached_local;
-	vector<glm::mat4x4> cached_global;
+	vector<glm::mat4x4> cached_bonemats;	// global bonemats
+	vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
 
-	void CalcRotations(glm::quat q[], glm::vec3 pos[], int clip_index, float curframe);
+	//void CalcRotations(glm::quat q[], glm::vec3 pos[], int clip_index, float curframe);
 
 	// lerps 1->2 and outputs to 1
-	void LerpTransforms(glm::quat q1[], glm::vec3 p1[], glm::quat q2[], glm::vec3 p2[], float factor, int numbones);
+	//void LerpTransforms(glm::quat q1[], glm::vec3 p1[], glm::quat q2[], glm::vec3 p2[], float factor, int numbones);
 
 	void add_legs_layer(glm::quat q[], glm::vec3 pos[]);
 

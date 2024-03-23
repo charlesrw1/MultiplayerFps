@@ -707,6 +707,86 @@ void Player::move_update(Move_Command command)
 {
 	
 }
+ViewmodelComponent::ViewmodelComponent(Player* p) 
+{
+	model = mods.find_or_load("arms.glb");
+	animator.set_model(model);
+
+	Bone_Controller& wp = animator.get_controller(bone_controller_type::misc1);
+	wp.enabled = true;
+	wp.add_transform_not_replace = true;
+	wp.evalutate_in_second_pass = false;
+	wp.use_two_bone_ik = false;
+	wp.target_relative_bone_index = -1;
+	wp.bone_index = model->bone_for_name("WP_Weapon");
+
+	Bone_Controller& lh = animator.get_controller(bone_controller_type::lhand);
+	lh.bone_index = model->bone_for_name("hand_L.L");
+	lh.enabled = true;
+	lh.evalutate_in_second_pass = true;
+	lh.use_two_bone_ik = true;
+	lh.use_bone_as_relative_transform = true;
+	lh.target_relative_bone_index = wp.bone_index;
+
+	// since magazine isnt a child of weapon, maybe I shouldnt have done that
+	Bone_Controller& mag = animator.get_controller(bone_controller_type::misc2);
+	mag.bone_index = model->bone_for_name("WP_Magazine");
+	mag.enabled = true;
+	mag.evalutate_in_second_pass = true;
+	mag.use_two_bone_ik = false;
+	mag.use_bone_as_relative_transform = true;
+	mag.target_relative_bone_index = wp.bone_index;
+
+	Bone_Controller& rh = animator.get_controller(bone_controller_type::rhand);
+	rh.bone_index = model->bone_for_name("hand_L.R");
+	rh.enabled = true;
+	rh.evalutate_in_second_pass = true;
+	rh.use_two_bone_ik = true;
+	rh.use_bone_as_relative_transform = true;
+	rh.target_relative_bone_index = wp.bone_index;
+}
+
+float move_a = 1.f;
+float move_b = 1.f;
+float move_c = 1.f;
+float move_d = 1.f;
+
+
+void vm_menu()
+{
+	ImGui::DragFloat("a", &move_a, 0.01);
+	ImGui::DragFloat("b", &move_b, 0.01);
+	ImGui::DragFloat("c", &move_c, 0.01);
+	ImGui::DragFloat("d", &move_d, 0.01);
+}
+
+void ViewmodelComponent::update()
+ {
+	static bool first = true;
+	if (first) {
+		first = false;
+		Debug_Interface::get()->add_hook("vm", vm_menu);
+	}
+
+	animator.set_anim("ak47_idle", false);
+	
+	Bone_Controller& bc = animator.get_controller(bone_controller_type::misc1);
+
+	float x = cos(GetTime()*move_a)*move_b;
+	float y = pow(cos(GetTime() * move_c),4.f) * move_d;
+
+	bc.position = vec3(x,y,0.f);// vec3(0.f, sin(GetTime() + 0.5) * 0.8, 0.f);
+	//bc.rotation = glm::quat(1.f,0.f,0.f,0.f);
+
+	bc.rotation = glm::quat(1.f,0,0,0);// glm::quat(vec3(sin(GetTime() * 1.4) * 0.7, 0.f, 1.f), glm::vec3(0, 0.f, 1.f));
+	
+	animator.AdvanceFrame(eng->tick_interval);
+	animator.SetupBones();
+	animator.ConcatWithInvPose();
+	// find position/rotation of hands in current animation relative to the gun bone
+	// rotate/translate weapon bone of viewmodel according to procedural gen
+	// ik hands back to correct position relative to gun bone
+}
 
 // player update
 //		for all buffered commands

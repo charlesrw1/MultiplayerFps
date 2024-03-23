@@ -7,6 +7,12 @@
 #include <fstream>
 #include <sstream>
 
+using namespace glm;
+#include <iostream>
+#include <iomanip>
+
+#include "LispInterpreter.h"
+
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
 
@@ -17,6 +23,213 @@ using glm::length;
 using glm::dot;
 using glm::cross;
 using glm::normalize;
+
+static float LawOfCosines(float a, float b, float c)
+{
+	return (a * a - b * b - c * c) / (-2 * b * c);
+}
+
+static float MidLerp(float min, float max, float mid_val)
+{
+	return (mid_val - min) / (max - min);
+}
+
+
+static void util_subtract(int bonecount, const Pose& reference, Pose& source)
+{
+	for (int i = 0; i < bonecount; i++) {
+		source.pos[i] = source.pos[i] - reference.pos[i];
+		source.q[i] = source.q[i] - reference.q[i];
+	}
+
+}
+// b = lerp(a,b,f)
+static void util_blend(int bonecount, const Pose& a, Pose& b, float factor)
+{
+	for (int i = 0; i < bonecount; i++) {
+		b.q[i] = glm::slerp(b.q[i], a.q[i], factor);
+		b.q[i] = glm::normalize(b.q[i]);
+		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor);
+	}
+}
+// base = lerp(base,base+additive,f)
+static void util_add(int bonecount, const Pose& additive, Pose& base, float fac)
+{
+	for (int i = 0; i < bonecount; i++) {
+		base.pos[i] = glm::mix(base.pos[i], base.pos[i] + additive.pos[i], fac);
+		base.q[i] = glm::slerp(base.q[i], base.q[i] + additive.q[i], fac);
+		base.q[i] = glm::normalize(base.q[i]);
+	}
+}
+
+
+static void util_twobone_ik(
+	const vec3& a, const vec3& b, const vec3& c, 
+	const vec3& target, const vec3& pole_vector,
+	const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
+	glm::quat& a_local_rotation, glm::quat& b_local_rotation)
+{
+	float eps = 0.01;
+	float len_ab = length(b - a);
+	float len_cb = length(b - c);
+	float len_at = glm::clamp(length(target - a), eps, len_ab + len_cb - eps);
+
+	// Interior angles of a and b
+	float a_interior_angle = acos(dot(normalize(c - a), normalize(b - a)));
+	float b_interior_angle = acos(dot(normalize(a - b), normalize(c - b)));
+	vec3 c_a = c - a;
+	vec3 target_a = normalize(target - a);
+	float dot_c_a_t_a = dot(normalize(c_a), target_a);
+	float c_interior_angle = acos(glm::clamp(dot_c_a_t_a,-0.9999999f,0.9999999f));
+
+	// Law of cosines to get the desired angles of the triangle
+	float a_desired_angle = acos(LawOfCosines(len_cb, len_ab, len_at));
+	float b_desired_angle = acos(LawOfCosines(len_at, len_ab, len_cb));
+
+	// Axis to rotate around
+	vec3 d = b_global_rotation * pole_vector;
+	//vec3 axis0 =   normalize(cross(c - a, d));
+	vec3 axis0 = normalize(cross(c - a, b - a));
+	vec3 t_a = target - a;
+	vec3 cross_c_a_ta = cross(c_a, t_a);
+	vec3 axis1 = normalize(cross_c_a_ta);
+	glm::quat rot0 = glm::angleAxis(a_desired_angle - a_interior_angle, glm::inverse(a_global_rotation) * axis0);
+	glm::quat rot1 = glm::angleAxis(b_desired_angle - b_interior_angle, glm::inverse(b_global_rotation) * axis0);
+	glm::quat rot2 = glm::angleAxis(c_interior_angle, glm::inverse(a_global_rotation) * axis1);
+
+	a_local_rotation = a_local_rotation * (rot0 * rot2);
+	b_local_rotation = b_local_rotation * rot1;
+}
+
+
+// y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)
+void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1, Pose& y2, glm::vec2 fac)
+{
+	util_blend(bonecount, x1, x2, fac.x);
+	util_blend(bonecount, y1, y2, fac.x);
+	util_blend(bonecount, x2, y2, fac.y);
+}
+
+static float modulo_lerp(float start, float end, float mod, float alpha)
+{
+	float d1 = glm::abs(end - start);
+	float d2 = mod - d1;
+
+
+	if (d1 <= d2)
+		return glm::mix(start, end, alpha);
+	else {
+		if (start >= end)
+			return fmod(start + (alpha * d2), mod);
+		else
+			return fmod(end + ((1 - alpha) * d2), mod);
+	}
+}
+
+void util_calc_rotations(const Animation_Set* set, 
+	float curframe, int clip_index, const Model* model, Pose& pose)
+{
+	for (int i = 0; i < set->num_channels; i++) {
+		int pos_idx = set->FirstPositionKeyframe(curframe, i, clip_index);
+		int rot_idx = set->FirstRotationKeyframe(curframe, i, clip_index);
+
+		vec3 interp_pos{};
+		if (pos_idx == -1)
+			interp_pos = model->bones.at(i).posematrix[3];
+		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
+			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
+		else {
+			int index0 = pos_idx;
+			int index1 = pos_idx + 1;
+			float t0 = set->GetPos(i, index0, clip_index).time;
+			float t1 = set->GetPos(i, index1, clip_index).time;
+			if (index0 == 0)t0 = 0.f;
+			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
+			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
+			float scale = MidLerp(t0,t1, curframe);
+			assert(scale >= 0 && scale <= 1.f);
+			interp_pos = glm::mix(set->GetPos(i, index0,clip_index).val, set->GetPos(i, index1,clip_index).val, scale);
+		}
+
+		glm::quat interp_rot{};
+		if (rot_idx == -1) {
+			interp_rot = model->bones.at(i).rot;
+		}
+		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
+			interp_rot = set->GetRot(i, rot_idx, clip_index).val;
+		else {
+			int index0 = rot_idx;
+			int index1 = rot_idx + 1;
+			float t0 = set->GetRot(i, index0, clip_index).time;
+			float t1 = set->GetRot(i, index1, clip_index).time;
+			if (index0 == 0)t0 = 0.f;
+			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
+			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
+			float scale = MidLerp(t0,t1, curframe);
+			assert(scale >= 0 && scale <= 1.f);
+			interp_rot = glm::slerp(set->GetRot(i, index0, clip_index).val, set->GetRot(i, index1, clip_index).val, scale);
+		}
+		interp_rot = glm::normalize(interp_rot);
+
+		pose.q[i] = interp_rot;
+		pose.pos[i] = interp_pos;
+	}
+}
+void util_set_to_bind_pose(Pose& pose, const Model* model)
+{
+	for (int i = 0; i < model->bones.size(); i++) {
+		pose.pos[i] = model->bones.at(i).localtransform[3];
+		pose.q[i] = model->bones.at(i).rot;
+	}
+}
+
+class Pose_Pool
+{
+public:
+	Pose_Pool(int n) : poses(n) {}
+	static Pose_Pool& get() {
+		static Pose_Pool inst(64);
+		return inst;
+	}
+
+	vector<Pose> poses;
+	int head = 0;
+	Pose* alloc(int count) {
+		assert(count + head < 64);
+		head += count;
+		return &poses[head - count];
+	}
+	void free(int count) {
+		head -= count;
+		assert(head >= 0);
+	}
+};
+
+class Matrix_Pool
+{
+public:
+	Matrix_Pool(int n) : matricies(n) {}
+	static Matrix_Pool& get() {
+		static Matrix_Pool inst(256 * 2);
+		return inst;
+	}
+	vector<glm::mat4> matricies;
+	int head = 0;
+	glm::mat4* alloc(int count) {
+		assert(count + head < matricies.size() );
+		head += count;
+		return &matricies[head - count];
+	}
+	void free(int count) {
+		head -= count;
+		assert(head >= 0);
+	}
+};
+
+
+
+
+
 
 
 int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip) const
@@ -152,10 +365,7 @@ void Animator::AdvanceFrame(float elapsed)
 
 #if 1
 
-float LawOfCosines(float a, float b, float c)
-{
-	return (a * a - b * b - c * c) / (-2 * b * c);
-}
+
 
 //from https://theorangeduck.com/page/simple-two-joint
 // (A)
@@ -193,53 +403,7 @@ static void SolveTwoBoneIK(const vec3& a, const vec3& b, const vec3& c, const ve
 	b_local_rotation = b_local_rotation * rot1;
 }
 #endif
-static float MidLerp(float min, float max, float mid_val)
-{
-	return (mid_val - min) / (max - min);
-}
 
-void Animator::CalcRotations(glm::quat q[], vec3 pos[], int clip_index, float curframe)
-{
-	// ANIMATOR CLASS!
-
-	const Animation_Set* set = model->animations.get();
-	const Animation& clip = set->clips[clip_index];
-
-	for (int i = 0; i < set->num_channels; i++) {
-		int pos_idx = set->FirstPositionKeyframe(curframe, i, clip_index);
-		int rot_idx = set->FirstRotationKeyframe(curframe, i, clip_index);
-
-		vec3 interp_pos{};
-		if (pos_idx == -1)
-			interp_pos = model->bones.at(i).localtransform[3];
-		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
-			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
-		else {
-			int index0 = pos_idx;
-			int index1 = pos_idx + 1;
-			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
-			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
-			float scale = MidLerp(set->GetPos(i, index0,clip_index).time, set->GetPos(i, index1,clip_index).time, curframe);
-			interp_pos = glm::mix(set->GetPos(i, index0,clip_index).val, set->GetPos(i, index1,clip_index).val, scale);
-		}
-
-		glm::quat interp_rot{};
-		if (rot_idx == -1)
-			interp_rot = model->bones.at(i).rot;
-		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
-			interp_rot = set->GetRot(i, rot_idx, clip_index).val;
-		else {
-			int index0 = rot_idx;
-			int index1 = rot_idx + 1;
-			float scale = MidLerp(set->GetRot(i, index0, clip_index).time, set->GetRot(i, index1, clip_index).time, curframe);
-			interp_rot = glm::slerp(set->GetRot(i, index0, clip_index).val, set->GetRot(i, index1, clip_index).val, scale);
-		}
-		interp_rot = glm::normalize(interp_rot);
-
-		q[i] = interp_rot;
-		pos[i] = interp_pos;
-	}
-}
 #if 0
 void AnimationController::DoHandIK(glm::quat localq[], glm::vec3 localp[], std::vector<glm::mat4x4>& globalbonemats)
 {
@@ -348,6 +512,25 @@ void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& o
 		out_bone_matricies[i] =  out_bone_matricies[i];
 }
 
+void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const Model* model)
+{
+	for (int i = 0; i < model->bones.size(); i++)
+	{
+		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
+		matrix[3] = glm::vec4(local.pos[i], 1.0);
+
+		if (model->bones[i].parent == ROOT_BONE) {
+			out_bone_matricies[i] = matrix;
+		}
+		else {
+			assert(model->bones[i].parent < model->bones.size());
+			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+		}
+	}
+	for (int i = 0; i < model->bones.size(); i++)
+		out_bone_matricies[i] =  out_bone_matricies[i];
+}
+
 
 void Animator::SetupBones()
 {
@@ -359,8 +542,6 @@ void Animator::SetupBones()
 	ASSERT(model->animations && model);
 	ASSERT(cached_bonemats.size() == model->bones.size());
 
-	static glm::quat q[MAX_BONES];
-	static glm::vec3 pos[MAX_BONES];
 
 	if (m.anim < 0 || m.anim >= model->animations->clips.size())
 		m.anim = -1;
@@ -383,21 +564,201 @@ void Animator::SetupBones()
 		return;
 	}
 
+	Pose* pose = Pose_Pool::get().alloc(1);
+
+	util_calc_rotations(set, m.frame, m.anim ,model, *pose);
+
+	update_procedural_bones(*pose);
+
 	// Setup main layer
-	CalcRotations(q, pos, m.anim, m.frame);
-	if (m.blend_anim != -1)
-	{
-		static glm::quat q2[MAX_BONES];
-		static glm::vec3 pos2[MAX_BONES];
-		CalcRotations(q2, pos2, m.blend_anim, m.blend_frame);
-		float frac = m.blend_remaining / m.blend_time;
-		LerpTransforms(q, pos, q2, pos2, frac, model->bones.size());
+	//CalcRotations(q, pos, m.anim, m.frame);
+	//if (m.blend_anim != -1)
+	//{
+	//	static glm::quat q2[MAX_BONES];
+	//	static glm::vec3 pos2[MAX_BONES];
+	//	CalcRotations(q2, pos2, m.blend_anim, m.blend_frame);
+	//	float frac = m.blend_remaining / m.blend_time;
+	//	LerpTransforms(q, pos, q2, pos2, frac, model->bones.size());
+	//}
+
+	//if (legs.anim != -1)
+	//	add_legs_layer(q, pos);
+
+	Pose_Pool::get().free(1);
+
+}
+
+#include "imgui.h"
+
+glm::vec3 dbgoffset = vec3(0.f);
+void menu_2()
+{
+	ImGui::DragFloat3("dbg offs", &dbgoffset.x, 0.01);
+}
+
+
+void Animator::update_procedural_bones(Pose& pose)
+{
+	static bool first = true;
+	if (first) {
+		Debug_Interface::get()->add_hook("anim", menu_2);
+		first = false;
 	}
 
-	if (legs.anim != -1)
-		add_legs_layer(q, pos);
-	UpdateGlobalMatricies(q, pos, cached_bonemats);
+	// get global meshspace transforms
+	UpdateGlobalMatricies(pose.q, pose.pos, cached_bonemats);
+	{
+		int i = 0;
+		for (; i < (int)bone_controller_type::max_count; i++) {
+			if (bone_controllers[i].enabled) break;
+		}
+		if (i == (int)bone_controller_type::max_count) return;
+	}
+
+	Pose* preik = Pose_Pool::get().alloc(1);
+	*preik = pose;
+
+	glm::mat4* pre_ik_bonemats = Matrix_Pool::get().alloc(256);
+	memcpy(pre_ik_bonemats, cached_bonemats.data(), sizeof(glm::mat4) * cached_bonemats.size());
+
+	mat4 ent_transform = (owner) ? owner->get_world_transform() : mat4(1);
+	ent_transform = ent_transform * model->skeleton_root_transform;
+
+	struct global_transform_set {
+		int index;
+		glm::mat3 rot;
+	};
+	int global_sets_count = 0;
+	global_transform_set global_rot_sets[4];
+
+
+	auto ikfunctor = [&](int joint0, int joint1, int joint2, vec3 target, bool print = false) {
+
+		const float dist_eps = 0.0001f;
+		vec3 a = cached_bonemats[joint2] * vec4(0.0, 0.0, 0.0, 1.0);
+		vec3 b = cached_bonemats[joint1] * vec4(0.0, 0.0, 0.0, 1.0);
+		vec3 c = cached_bonemats[joint0] * vec4(0.0, 0.0, 0.0, 1.0);
+		float dist = length(c - target);
+		if (dist <= dist_eps) {
+			return;
+		}
+
+		Debug::add_sphere(ent_transform*vec4(a,1.0), 0.01, COLOR_GREEN, 0.0, true);
+		Debug::add_sphere(ent_transform*vec4(b,1.0), 0.01, COLOR_BLUE, 0.0, true);
+		Debug::add_sphere(ent_transform*vec4(c,1.0), 0.01, COLOR_CYAN, 0.0, true);
+		glm::quat a_global = glm::quat_cast(cached_bonemats[joint2]);
+		glm::quat b_global = glm::quat_cast(cached_bonemats[joint1]);
+		util_twobone_ik(a, b, c, target, vec3(0.0, 0.0, 1.0), a_global, b_global, pose.q[joint2], pose.q[joint1]);
+	};
+	auto ik_find_bones = [&](int joint0_bone, vec3 target, const Model* m) {
+		int joint1 = m->bones[joint0_bone].parent;
+		assert(joint1 != -1);
+		int joint2 = m->bones[joint1].parent;
+		assert(joint2 != -1);
+		ikfunctor(joint0_bone, joint1, joint2, target);
+	};
+
+	auto bone_update_functor = [&](Bone_Controller& bc) {
+		assert(bc.bone_index >= 0 && bc.bone_index < model->bones.size());
+
+		if (bc.use_two_bone_ik) {
+			if (bc.target_relative_bone_index != -1) {
+				assert(bc.target_relative_bone_index >= 0 && bc.target_relative_bone_index < model->bones.size());
+				// meshspace position of bone
+				glm::vec3 meshspace_pos = (bc.use_bone_as_relative_transform) ?
+					pre_ik_bonemats[bc.bone_index][3] : bc.position;
+				// use global matrix of pre-postprocess
+				glm::mat4 inv_relative_bone = glm::inverse(pre_ik_bonemats[bc.target_relative_bone_index]);
+				// position of bone relative to the target bone in meshspace
+				glm::mat4 rel_transform = inv_relative_bone * pre_ik_bonemats[bc.bone_index];
+				glm::mat4 global_transform = cached_bonemats[bc.target_relative_bone_index] * rel_transform;
+				// find final meshspace position
+				glm::vec3 final_meshspace_pos = global_transform[3];
+				
+				ik_find_bones(bc.bone_index, final_meshspace_pos, model);
+				//pose.q[bc.bone_index] *= glm::inverse(glm::quat_cast(cached_bonemats[bc.bone_index]))*glm::quat_cast(transform);
+				global_rot_sets[global_sets_count++] = { bc.bone_index, mat3(global_transform) };
+				// want to update local space rotation from global rotation
+			}
+			else {
+				ik_find_bones(bc.bone_index, bc.position, model);
+			}
+		}
+		else
+		{
+			if (bc.target_relative_bone_index != -1) {
+				glm::vec3 meshspace_pos = (bc.use_bone_as_relative_transform) ?
+					pre_ik_bonemats[bc.bone_index][3] : bc.position;
+				glm::mat4 inv_relative_bone = glm::inverse(pre_ik_bonemats[bc.target_relative_bone_index]);
+				glm::mat4 rel_transform = inv_relative_bone * pre_ik_bonemats[bc.bone_index];
+				glm::mat4 global_transform = cached_bonemats[bc.target_relative_bone_index] * rel_transform;
+				pose.pos[bc.bone_index] =  global_transform[3];
+				pose.q[bc.bone_index] = glm::quat_cast(global_transform);
+			}
+			else if (bc.add_transform_not_replace) {
+				pose.pos[bc.bone_index] += bc.position;
+				pose.q[bc.bone_index] *= bc.rotation;
+			}
+			else {
+				pose.pos[bc.bone_index] = bc.position;
+				pose.q[bc.bone_index] = bc.rotation;
+			}
+		}
+	};
+
+	// firstpass
+	for (int i = 0; i < (int)bone_controller_type::max_count; i++) {
+		Bone_Controller& bc = bone_controllers[i];
+		if (!bc.enabled || bc.evalutate_in_second_pass) continue;
+		bone_update_functor(bc);
+	}
+
+	util_localspace_to_meshspace(pose, cached_bonemats, model);
+
+	// second pass
+	for (int i = 0; i < (int)bone_controller_type::max_count; i++) {
+		Bone_Controller& bc = bone_controllers[i];
+		if (!bc.enabled || !bc.evalutate_in_second_pass) continue;
+		bone_update_functor(bc);
+	}
+
+
+	for (int i = 0; i < model->bones.size(); i++)
+	{
+		glm::mat4x4 matrix = glm::mat4_cast(pose.q[i]);
+		matrix[3] = glm::vec4(pose.pos[i], 1.0);
+
+		if (model->bones[i].parent == ROOT_BONE) {
+			cached_bonemats[i] = matrix;
+		}
+		else {
+			assert(model->bones[i].parent < model->bones.size());
+			cached_bonemats[i] = cached_bonemats[model->bones[i].parent] * matrix;
+			for (int j = 0; j < global_sets_count; j++) {
+				if (i == global_rot_sets[j].index) {
+					vec4 p = cached_bonemats[i][3];
+					global_rot_sets[j].rot = transpose(global_rot_sets[j].rot);
+					global_rot_sets[j].rot[0] = normalize(global_rot_sets[j].rot[0]);
+					global_rot_sets[j].rot[1] = normalize(global_rot_sets[j].rot[1]);
+					global_rot_sets[j].rot[2] = normalize(global_rot_sets[j].rot[2]);
+					global_rot_sets[j].rot = transpose(global_rot_sets[j].rot);
+
+					cached_bonemats[i] = global_rot_sets[j].rot;
+					cached_bonemats[i][3] = p;
+					break;
+				}
+			}
+		}
+	}
+
+
+	Pose_Pool::get().free(1);
+	Matrix_Pool::get().free(256);
 }
+
+
+
+#if 0
 void Animator::LerpTransforms(glm::quat q1[], vec3 p1[], glm::quat q2[], glm::vec3 p2[], float factor, int numbones)
 {
 	for (int i = 0; i < numbones; i++)
@@ -452,12 +813,13 @@ void Animator::add_legs_layer(glm::quat finalq[], glm::vec3 finalp[])
 			copybones = false;
 	}
 }
+#endif
 
 void Animator::ConcatWithInvPose()
 {
 	ASSERT(model);
 	for (int i = 0; i < model->bones.size(); i++) {
-		cached_bonemats[i] = cached_bonemats[i] * glm::mat4(model->bones[i].invposematrix);
+		matrix_palette[i] = cached_bonemats[i] * glm::mat4(model->bones[i].invposematrix);
 	}
 }
 
@@ -473,6 +835,7 @@ void Animator::set_model(const Model* mod)
 	if (model) {
 		set = model->animations.get();
 		cached_bonemats.resize(model->bones.size());
+		matrix_palette.resize(model->bones.size());
 	}
 
 	legs = Animator_Layer();
@@ -571,78 +934,7 @@ public:
 //#pragma optimize( "", on )
 
 // source = source-reference
-static void util_subtract(int bonecount, const Pose& reference, Pose& source)
-{
-	for (int i = 0; i < bonecount; i++) {
-		source.pos[i] = source.pos[i] - reference.pos[i];
-		source.q[i] = source.q[i] - reference.q[i];
-	}
 
-}
-// b = lerp(a,b,f)
-static void util_blend(int bonecount, const Pose& a, Pose& b, float factor)
-{
-	for (int i = 0; i < bonecount; i++) {
-		b.q[i] = glm::slerp(b.q[i], a.q[i], factor);
-		b.q[i] = glm::normalize(b.q[i]);
-		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor);
-	}
-}
-// base = lerp(base,base+additive,f)
-static void util_add(int bonecount, const Pose& additive, Pose& base, float fac)
-{
-	for (int i = 0; i < bonecount; i++) {
-		base.pos[i] = glm::mix(base.pos[i], base.pos[i] + additive.pos[i], fac);
-		base.q[i] = glm::slerp(base.q[i], base.q[i] + additive.q[i], fac);
-		base.q[i] = glm::normalize(base.q[i]);
-	}
-}
-
-static void util_blend_bilinear(const Pose& out, Pose* in, int incount, glm::vec2 interp)
-{
-
-
-}
-
-
-
-static void util_twobone_ik(
-	const vec3& a, const vec3& b, const vec3& c, 
-	const vec3& target, const vec3& pole_vector,
-	const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
-	glm::quat& a_local_rotation, glm::quat& b_local_rotation)
-{
-	float eps = 0.01;
-	float len_ab = length(b - a);
-	float len_cb = length(b - c);
-	float len_at = glm::clamp(length(target - a), eps, len_ab + len_cb - eps);
-
-	// Interior angles of a and b
-	float a_interior_angle = acos(dot(normalize(c - a), normalize(b - a)));
-	float b_interior_angle = acos(dot(normalize(a - b), normalize(c - b)));
-	vec3 c_a = c - a;
-	vec3 target_a = normalize(target - a);
-	float dot_c_a_t_a = dot(normalize(c_a), target_a);
-	float c_interior_angle = acos(glm::clamp(dot_c_a_t_a,-0.9999999f,0.9999999f));
-
-	// Law of cosines to get the desired angles of the triangle
-	float a_desired_angle = acos(LawOfCosines(len_cb, len_ab, len_at));
-	float b_desired_angle = acos(LawOfCosines(len_at, len_ab, len_cb));
-
-	// Axis to rotate around
-	vec3 d = b_global_rotation * pole_vector;
-	//vec3 axis0 =   normalize(cross(c - a, d));
-	vec3 axis0 = normalize(cross(c - a, b - a));
-	vec3 t_a = target - a;
-	vec3 cross_c_a_ta = cross(c_a, t_a);
-	vec3 axis1 = normalize(cross_c_a_ta);
-	glm::quat rot0 = glm::angleAxis(a_desired_angle - a_interior_angle, glm::inverse(a_global_rotation) * axis0);
-	glm::quat rot1 = glm::angleAxis(b_desired_angle - b_interior_angle, glm::inverse(b_global_rotation) * axis0);
-	glm::quat rot2 = glm::angleAxis(c_interior_angle, glm::inverse(a_global_rotation) * axis1);
-
-	a_local_rotation = a_local_rotation * (rot0 * rot2);
-	b_local_rotation = b_local_rotation * rot1;
-}
 
 PoseMask::PoseMask()
 {
@@ -662,7 +954,6 @@ static vector<int> get_indicies(const Animation_Set* set, const vector<const cha
 }
 
 
-#include "LispInterpreter.h"
 
 
 struct Ik_Foot_Lock
@@ -691,6 +982,9 @@ struct At_Node
 	virtual bool is_clip_node() {
 		return false;
 	}
+
+	virtual At_Node* copy(Animator* animator) { return nullptr;  }
+
 	Animator* animator;
 };
 
@@ -721,29 +1015,6 @@ struct Animation_Tree
 	Env script_vars;
 	Interpreter_Ctx ctx;
 };
-
-class Pose_Pool
-{
-public:
-	Pose_Pool(int n) : poses(n) {}
-	static Pose_Pool& get() {
-		static Pose_Pool inst(64);
-		return inst;
-	}
-
-	vector<Pose> poses;
-	int head = 0;
-	Pose* alloc(int count) {
-		assert(count + head < 64);
-		head += count;
-		return &poses[head - count];
-	}
-	void free(int count) {
-		head -= count;
-		assert(head >= 0);
-	}
-};
-
 State* State::get_next_state(Animator* animator)
 {
 	for (int i = 0; i < transitions.size(); i++) {
@@ -754,64 +1025,6 @@ State* State::get_next_state(Animator* animator)
 	return this;
 }
 
-
-
-void util_calc_rotations(const Animation_Set* set, 
-	float curframe, int clip_index, const Model* model, Pose& pose)
-{
-	for (int i = 0; i < set->num_channels; i++) {
-		int pos_idx = set->FirstPositionKeyframe(curframe, i, clip_index);
-		int rot_idx = set->FirstRotationKeyframe(curframe, i, clip_index);
-
-		vec3 interp_pos{};
-		if (pos_idx == -1)
-			interp_pos = model->bones.at(i).posematrix[3];
-		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
-			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
-		else {
-			int index0 = pos_idx;
-			int index1 = pos_idx + 1;
-			float t0 = set->GetPos(i, index0, clip_index).time;
-			float t1 = set->GetPos(i, index1, clip_index).time;
-			if (index0 == 0)t0 = 0.f;
-			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
-			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
-			float scale = MidLerp(t0,t1, curframe);
-			assert(scale >= 0 && scale <= 1.f);
-			interp_pos = glm::mix(set->GetPos(i, index0,clip_index).val, set->GetPos(i, index1,clip_index).val, scale);
-		}
-
-		glm::quat interp_rot{};
-		if (rot_idx == -1) {
-			interp_rot = model->bones.at(i).rot;
-		}
-		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
-			interp_rot = set->GetRot(i, rot_idx, clip_index).val;
-		else {
-			int index0 = rot_idx;
-			int index1 = rot_idx + 1;
-			float t0 = set->GetRot(i, index0, clip_index).time;
-			float t1 = set->GetRot(i, index1, clip_index).time;
-			if (index0 == 0)t0 = 0.f;
-			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
-			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
-			float scale = MidLerp(t0,t1, curframe);
-			assert(scale >= 0 && scale <= 1.f);
-			interp_rot = glm::slerp(set->GetRot(i, index0, clip_index).val, set->GetRot(i, index1, clip_index).val, scale);
-		}
-		interp_rot = glm::normalize(interp_rot);
-
-		pose.q[i] = interp_rot;
-		pose.pos[i] = interp_pos;
-	}
-}
-void util_set_to_bind_pose(Pose& pose, const Model* model)
-{
-	for (int i = 0; i < model->bones.size(); i++) {
-		pose.pos[i] = model->bones.at(i).localtransform[3];
-		pose.q[i] = model->bones.at(i).rot;
-	}
-}
 
 
 //#pragma optimize( "", off )
@@ -898,7 +1111,7 @@ struct Subtract_Node : public At_Node
 		Pose* reftemp = Pose_Pool::get().alloc(1);
 		ref->get_pose(*reftemp, dt);
 		source->get_pose(pose, dt);
-		util_subtract(animator->GetBones().size(), *reftemp, pose);
+		util_subtract(animator->num_bones(), *reftemp, pose);
 		Pose_Pool::get().free(1);
 		return true;
 	}
@@ -920,7 +1133,7 @@ struct Add_Node : public At_Node
 		Pose* addtemp = Pose_Pool::get().alloc(1);
 		base_pose->get_pose(pose, dt);
 		diff_pose->get_pose(*addtemp, dt);
-		util_add(animator->GetBones().size(), *addtemp, pose, lerp);
+		util_add(animator->num_bones(), *addtemp, pose, lerp);
 		Pose_Pool::get().free(1);
 		return true;
 	}
@@ -944,7 +1157,7 @@ struct Blend_Node : public At_Node
 		Pose* addtemp = Pose_Pool::get().alloc(1);
 		posea->get_pose(pose, dt);
 		poseb->get_pose(*addtemp, dt);
-		util_blend(animator->GetBones().size(), *addtemp, pose, lerp);
+		util_blend(animator->num_bones(), *addtemp, pose, lerp);
 		Pose_Pool::get().free(1);
 		return true;
 	}
@@ -1163,30 +1376,6 @@ struct Statemachine_Node : public At_Node
 	float fade_in_time = 0.f;
 	float active_weight = 0.f;
 };
-
-// y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)
-void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1, Pose& y2, glm::vec2 fac)
-{
-	util_blend(bonecount, x1, x2, fac.x);
-	util_blend(bonecount, y1, y2, fac.x);
-	util_blend(bonecount, x2, y2, fac.y);
-}
-
-static float modulo_lerp(float start, float end, float mod, float alpha)
-{
-	float d1 = glm::abs(end - start);
-	float d2 = mod - d1;
-
-
-	if (d1 <= d2)
-		return glm::mix(start, end, alpha);
-	else {
-		if (start >= end)
-			return fmod(start + (alpha * d2), mod);
-		else
-			return fmod(end + ((1 - alpha) * d2), mod);
-	}
-}
 
 
 
@@ -1629,9 +1818,6 @@ Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
 
 	return tree;
 }
-using namespace glm;
-#include <iostream>
-#include <iomanip>
 const int STREAM_WIDTH = 9;
 const int PRECISION_STREAM = 3;
 std::ostream& operator<<(std::ostream& out, glm::vec3 v){
@@ -1765,6 +1951,8 @@ void Animator::postprocess_animation(Pose& pose, float dt)
 	
 	Pose_Pool::get().free(1);
 }
+
+
 
 void Animator::evaluate_new(float dt)
 {

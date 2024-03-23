@@ -1533,6 +1533,25 @@ void Shared_Gpu_Driven_Resources::init()
 	glCreateBuffers(1, &scene_mats_ssbo);
 }
 
+void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
+{
+	auto& bones = a->get_global_bonemats();
+	for (int index = 0; index < a->model->bones.size(); index++) {
+		vec3 org = transform * bones[index][3];
+		Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
+		for (int i = 0; i < 3; i++) {
+			vec3 dir = mat3(transform) * bones[index][i];
+			dir = normalize(dir);
+			Debug::add_line(org, org + dir * line_len, colors[i],-1.f,false);
+		}
+
+		if (a->model->bones[index].parent != -1) {
+			vec3 parent_org = transform * bones[a->model->bones[index].parent][3];
+			Debug::add_line(org, parent_org, COLOR_PINK,-1.f,false);
+		}
+	}
+}
+
 void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 	const Mesh* mesh,
 	glm::mat4 transform,
@@ -1545,10 +1564,12 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 	
 	if (animator) {
 		obj.anim_matrix_offset = skinned_matricies.size();
-		auto& mats = animator->GetBones();
+		auto& mats = animator->get_matrix_palette();
 		for (int i = 0; i < animator->model->bones.size(); i++) {
 			skinned_matricies.push_back(mats[i]);
 		}
+
+		draw_skeleton(animator, 0.1f, transform);
 	}
 
 	obj.model = transform;
@@ -1606,7 +1627,10 @@ glm::mat4 Entity::get_world_transform()
 	return model;
 }
 
+#include "Player.h"
 #include <algorithm>
+
+
 void Shared_Gpu_Driven_Resources::build_draw_calls()
 {
 	skinned_matricies.clear();
@@ -1676,7 +1700,7 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 				continue;
 			}
 			const Bone& b = ent.model->bones.at(index);
-			glm::mat4 transform = a->GetBones()[index];
+			glm::mat4 transform = a->get_matrix_palette()[index];
 			transform = model * transform * mat4(b.posematrix) * rotate;
 			make_draw_calls_from(&m->mesh, transform,m->mats, nullptr, true, glm::vec4(1.f));
 
@@ -1704,6 +1728,10 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 
 	if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
 	{
+		Player* localplayer = (Player*)&eng->local_player();
+		assert(localplayer->viewmodel);
+		ViewmodelComponent* vm = localplayer->viewmodel.get();
+
 		mat4 invview = glm::inverse(draw.vs.view);
 
 		Game_Local* gamel = &eng->local;
@@ -1714,8 +1742,8 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 		model2 = glm::translate(model2, gamel->vm_offset);
 		model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
 
-		make_draw_calls_from(&eng->local.viewmodel->mesh, model2,
-			eng->local.viewmodel->mats, &eng->local.viewmodel_animator, false, glm::vec4(1.f));
+		make_draw_calls_from(&vm->model->mesh,model2,
+			vm->model->mats, &vm->animator, false, glm::vec4(1.f));
 	}
 
 
@@ -2504,11 +2532,12 @@ void draw_debug_shapes()
 	builder.Draw(GL_LINES);
 	glEnable(GL_DEPTH_TEST);
 	glCheckError();
-	vector<Debug_Shape>& shapes = *shapearrays[1];
+	vector<Debug_Shape>& shapes = debug_shapes.shapes;
 	for (int i = 0; i < shapes.size(); i++) {
 		shapes[i].lifetime -= eng->frame_time;
 		if (shapes[i].lifetime <= 0.f) {
 			shapes.erase(shapes.begin() + i);
+			i--;
 		}
 	}
 	builder.Free();
@@ -3247,7 +3276,7 @@ void Renderer::on_level_start()
 	draw.using_skybox_for_specular = true;
 	auto& helper = EnviornmentMapHelper::get();
 
-	scene.skybox = helper.create_from_file("hdr_sky.hdr").original_cubemap;
+	scene.skybox = helper.create_from_file("hdr_sky3.hdr").original_cubemap;
 	// CUBEMAP_SIZE isnt the size of skybox, but its unused anyways
 	helper.convolute_irradiance_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, 0, 32);
 	helper.compute_specular_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapspecular_array, 0, CUBEMAP_SIZE);
