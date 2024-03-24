@@ -1,8 +1,5 @@
 #include <SDL2/SDL.h>
 
-#include "SDL2/SDL_mixer.h"
-#include "phonon.h"
-
 #include "glad/glad.h"
 #include "stb_image.h"
 #include <cstdio>
@@ -735,65 +732,13 @@ public:
 
 };
 
-Mix_Chunk* gun_sound;
-
-void steam_audio_log_callback(IPLLogLevel level, const char* msg)
-{
-	sys_print("%s\n", msg);
-}
-
-const int AUDIO_SAMPLE_RATE = 44100;
-const int AUDIO_FRAME = 1024;
-
 void Audio_System::init()
 {
-	bool stereo = true;
 
-	int fail = Mix_OpenAudio(44'100, AUDIO_S16SYS, (stereo) ? 2 : 1, 2048);
-	if (fail) {
-		printf("init audio failed\n");
-		return;
-	}
 }
 
 void init_audio()
 {
-	int fail = Mix_OpenAudio(44'100, AUDIO_S16SYS, 1, 2048);
-	if (fail) {
-		printf("init audio failed\n");
-		return;
-	}
-
-	gun_sound = Mix_LoadWAV("Data\\Sounds\\q009\\explosion.ogg");
-
-	IPLContext context = nullptr;
-	IPLContextSettings contextsettings = {};
-	contextsettings.logCallback = steam_audio_log_callback;
-	contextsettings.version = STEAMAUDIO_VERSION;
-	iplContextCreate(&contextsettings, &context);
-
-	IPLHRTFSettings hrtfSettings{};
-	hrtfSettings.type = IPL_HRTFTYPE_DEFAULT;
-
-	IPLAudioSettings audio_settings{};
-	audio_settings.frameSize = AUDIO_FRAME;
-	audio_settings.samplingRate = AUDIO_SAMPLE_RATE;
-
-	IPLHRTF hrtf = nullptr;
-	iplHRTFCreate(context, &audio_settings, &hrtfSettings, &hrtf);
-
-	IPLBinauralEffectSettings effectSettings{};
-	effectSettings.hrtf = hrtf;
-	
-	IPLBinauralEffect effect = nullptr;
-	iplBinauralEffectCreate(context, &audio_settings, &effectSettings, &effect);
-
-
-	if (!gun_sound) {
-		printf("couldn't load sound\n");
-	}
-
-	//Mix_PlayChannel(0, gun_sound, 2);
 }
 
 extern void benchmark_run();
@@ -1096,6 +1041,7 @@ void draw_wind_menu()
 	ImGui::DragFloat("slice", &draw.slice_3d, 0.04, 0, 4);
 	
 
+	ImGui::Image(ImTextureID(EnviornmentMapHelper::get().integrator.lut_id), ImVec2(128, 128));
 
 	ImGui::Image(ImTextureID(draw.ssao.texture.viewnormal), ImVec2(512, 512));
 

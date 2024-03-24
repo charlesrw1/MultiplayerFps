@@ -19,9 +19,9 @@ static bool read_and_add_recursive(std::string filepath, std::string& text)
 		return false;
 	}
 
-	text += "#line 0 \"";
-	text += filepath;
-	text += "\"\n";
+	//text += "#line 0 \"";
+	//text += filepath;
+	//text += "\"\n";
 
 	std::string line;
 	int linenum = 1;
@@ -43,11 +43,11 @@ static bool read_and_add_recursive(std::string filepath, std::string& text)
 			}
 			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text);
 
-			text += "#line ";
-			text += std::to_string(linenum);
-			text += " \"";
-			text += filepath;
-			text += "\"\n";
+			//text += "#line ";
+			//text += std::to_string(linenum);
+			//text += " \"";
+			//text += filepath;
+			//text += "\"\n";
 		}
 
 

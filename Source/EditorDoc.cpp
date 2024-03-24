@@ -843,8 +843,8 @@ void EditorDoc::imgui_draw()
 
 				ImGui::PopID();
             }
+			ImGui::EndTable();
         }
-        ImGui::EndTable();
 
 		if (selected_node != nullptr) {
 
@@ -885,8 +885,8 @@ void EditorDoc::imgui_draw()
 					cell++;
 				}
 				ImGui::PopStyleColor();
+				ImGui::EndTable();
 			}
-			ImGui::EndTable();
 
 
 
