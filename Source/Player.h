@@ -38,12 +38,16 @@ class Player;
 struct ViewmodelComponent
 {
 	ViewmodelComponent(Player* player); 
+	~ViewmodelComponent();
 
 	Model* model;
 	Animator animator;
 	Player* player;
 
 	void update();
+	void update_visuals();
+
+	renderobj_handle viewmodel_handle;
 
 	glm::vec3 lastoffset;
 	glm::quat lastrot;
@@ -70,6 +74,8 @@ public:
 
 	void move_update(Move_Command command);
 	void postc_move(Move_Command command);
+
+	virtual void update_visuals() override;
 
 	unique_ptr<ViewmodelComponent> viewmodel;
 	unique_ptr<LagCompensationComponent> lagcomp;

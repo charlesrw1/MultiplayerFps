@@ -582,3 +582,29 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 	e->velocity = direction * grenade_vel.real();
 	return e;
 }
+#include "Draw.h"
+Entity::~Entity()
+{
+	draw.scene.remove(render_handle);
+}
+
+void Entity::update_visuals()
+{
+	if (render_handle == -1 && model)
+		render_handle = draw.scene.register_renderable();
+	else if (render_handle != -1 && !model)
+		draw.scene.remove(render_handle);
+
+	if (render_handle != -1 && model) {
+		Render_Object_Proxy proxy;
+
+		proxy.visible = !(flags & EF_HIDDEN);
+		if(model->bones.size()>0)
+			proxy.animator = &anim;
+		proxy.mesh = &model->mesh;
+		proxy.mats = &model->mats;
+		proxy.transform = get_world_transform();
+		
+		draw.scene.update(render_handle, proxy);
+	}
+}

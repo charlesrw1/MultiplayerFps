@@ -228,15 +228,43 @@ private:
 	std::vector<InterpolationData> interpdata;
 	int interpdata_head;
 };
+#include <vector>
+class Mesh;
+class Game_Shader;
+class Animator;
+struct Render_Object_Proxy
+{
+	Render_Object_Proxy() {
+		visible = true;
+		shadow_caster = true;
+		viewmodel_layer = false;
+	}
 
+	Mesh* mesh = nullptr;
+	Animator* animator = nullptr;
+	vector<Game_Shader*>* mats = nullptr;
+	uint32_t param1 = 0;
+	uint32_t param2 = 0;
+
+	bool visible : 1;
+	bool shadow_caster : 1;
+	bool viewmodel_layer : 1;
+
+#ifdef DEBUG_
+	Entity* owner = nullptr;
+#endif
+
+	glm::mat4 transform = glm::mat4(1.f);
+};
+
+typedef int renderobj_handle;
 
 typedef uint32_t entityhandle;
 class GeomContact;
 class Entity
 {
 public:
-	virtual ~Entity() {
-	}
+	virtual ~Entity();
 
 	entityhandle selfid = 0;	// eng->ents[]
 	entityclass class_ = entityclass::EMPTY;
@@ -277,8 +305,10 @@ public:
 	int force_angles = 0;	// 1=force, 2=add
 	glm::vec3 diff_angles = glm::vec3(0.f);
 
-	Animator anim;
+	renderobj_handle render_handle = -1;
 	Model* model = nullptr;
+
+	Animator anim;
 
 	unique_ptr<RenderInterpolationComponent> interp;
 
@@ -295,6 +325,8 @@ public:
 
 	virtual void update() { }
 	virtual void collide(Entity* other, const GeomContact& gc) {}
+
+	virtual void update_visuals();
 };
 
 class Door : public Entity

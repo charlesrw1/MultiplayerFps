@@ -1498,17 +1498,16 @@ void Game_Engine::loop()
 
 			for (int i = 0; i < num_ticks && state == ENGINE_GAME; i++) {
 				game_update_tick();
-				{
-				CPUSCOPESTART("animation update");
-			for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-				Entity& e = ei.get();
-				if (!e.model || !e.model->animations)
-					continue;
 
-				e.anim.SetupBones();
-				e.anim.ConcatWithInvPose();
-			}
-			}
+				CPUSCOPESTART("animation update");
+				for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+					Entity& e = ei.get();
+					if (!e.model || !e.model->animations)
+						continue;
+
+					e.anim.SetupBones();
+					e.anim.ConcatWithInvPose();
+				}
 			}
 
 			if(state == ENGINE_GAME)
@@ -1591,6 +1590,10 @@ void Game_Engine::pre_render_update()
 	local.update_viewmodel();
 
 	local.update_view();
+
+	for (auto ei = Ent_Iterator(0); !ei.finished(); ei = ei.next()) {
+		ei.get().update_visuals();
+	}
 }
 
 void draw_console_hook() {

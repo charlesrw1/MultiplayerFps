@@ -183,18 +183,52 @@ struct Render_Level_Params {
 	uint32_t provied_constant_buffer = 0;
 };
 
+template<typename T>
+class Free_List
+{
+public:
+	using handle_type = int;
+
+	T& get(handle_type handle) {
+		assert(handle_to_obj[handle] != -1);
+		return objects[handle_to_obj[handle]].type_;
+	}
+	handle_type make_new() {
+		handle_type h = 0;
+		if (free_handles.empty()) {
+			h =  first_free++;
+			handle_to_obj.resize(handle_to_obj.size() + 1);
+		}
+		else {
+			h = free_handles.back();
+			free_handles.pop_back();
+		}
+		handle_to_obj[h] = objects.size();
+		objects.resize(objects.size() + 1);
+
+		return h;
+	}
+	void free(handle_type handle) {
+		int obj_index = handle_to_obj[handle];
+		handle_to_obj[obj_index] = -1;
+		objects[obj_index] = objects.back();
+		handle_to_obj[objects[obj_index].handle] = obj_index;
+		objects.resize(objects.size() - 1);
+		free_handles.push_back(handle);
+	}
+
+	handle_type first_free = 0;
+	vector<handle_type> free_handles;
+	vector<int> handle_to_obj;
+	struct pair {
+		handle_type handle;
+		T type_;
+	};
+	vector<pair> objects;
+};
+
 
 typedef int Light_Handle;
-
-struct Render_Item
-{
-	Model* model;
-	uint32_t part_index;
-	Game_Shader* material;
-	glm::mat4 transform;
-	Entity* ent = nullptr;
-	Animator* animator = nullptr;
-};
 
 class Object_Cull_Job
 {
@@ -227,6 +261,21 @@ struct Render_Box_Cubemap
 class Render_Scene
 {
 public:
+	renderobj_handle register_renderable() {
+		return proxy_list.make_new();
+	}
+	void update(renderobj_handle handle, const Render_Object_Proxy& proxy) {
+		proxy_list.get(handle) = proxy;
+	}
+	void remove(renderobj_handle handle) {
+		if (handle != -1) {
+			proxy_list.free(handle);
+		}
+	}
+
+	Free_List<Render_Object_Proxy> proxy_list;
+
+
 	uint32_t skybox = 0;
 	std::vector<Render_Box_Cubemap> cubemaps;
 	uint32_t cubemap_ssbo;

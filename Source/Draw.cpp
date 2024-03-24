@@ -599,406 +599,6 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	glNamedBufferData(ubo, sizeof gpu::Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
 }
 
-const static int csm_resolutions[] = { 0, 256, 512, 1024 };
-
-void shadow_map_tweaks()
-{
-	auto& tweak = draw.shadowmap.tweak;
-	ImGui::DragFloat("log lin", &tweak.log_lin_lerp_factor,0.02);
-	if (ImGui::SliderInt("quality", &tweak.quality, 0, 4))
-		draw.shadowmap.targets_dirty = true;
-	ImGui::DragFloat("epsilon", &tweak.epsilon, 0.01);
-	ImGui::DragFloat("pfac", &tweak.poly_factor, 0.01);
-	ImGui::DragFloat("punit", &tweak.poly_units, 0.01);
-	ImGui::DragFloat("zscale", &tweak.z_dist_scaling, 0.01);
-
-}
-
-
-void Shadow_Map_System::init()
-{
-	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);
-
-	make_csm_rendertargets();
-	glCreateBuffers(1, &ubo.info);
-	glCreateBuffers(4, ubo.frame_view);
-}
-void Shadow_Map_System::make_csm_rendertargets()
-{
-	if (tweak.quality == 0)
-		return;
-	csm_resolution = csm_resolutions[(int)tweak.quality];
-
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
-	glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	float bordercolor[] = { 1.0,1.0,1.0,1.0 };
-	glTextureParameterfv(texture.shadow_array, GL_TEXTURE_BORDER_COLOR, bordercolor);
-
-	glCreateFramebuffers(1, &fbo.shadow);
-}
-
-
-static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
-{
-	float zratio = far / near;
-	float zrange = far - near;
-
-	const float bias = 0.0001f;
-
-	glm::vec4 planedistances;
-	for (int i = 0; i < 4; i++)
-	{
-		float x = (i + 1) / 4.f;
-		float log = near * pow(zratio, x);
-		float linear = near + zrange * x;
-		planedistances[i] = log_lin_lerp * (log - linear) + linear + bias;
-	}
-
-	return planedistances;
-}
-
-void Shadow_Map_System::update()
-{
-	//int setting = draw.shadow_quality_setting.integer();
-	//if (setting < 0) setting = 0;
-	//else if (setting > 3) setting = 3;
-	//draw.shadow_quality_setting.integer() = setting;
-
-	//if (tweak.quality != setting) {
-	//	tweak.quality = setting;
-	//	targets_dirty = true;
-	//}
-
-	if (targets_dirty) {
-		glDeleteTextures(1, &texture.shadow_array);
-		glDeleteFramebuffers(1, &fbo.shadow);
-		make_csm_rendertargets();
-		targets_dirty = false;
-	}
-	if (tweak.quality == 0)
-		return;
-	if (draw.scene.directional_index == -1)
-		return;
-
-	{
-		GPUSCOPESTART("Csm setup");
-
-		glm::vec3 directional_dir = draw.scene.lights[draw.scene.directional_index].normal;
-
-		const View_Setup& view = draw.vs;
-
-		float near = view.near;
-		float far = glm::min(view.far, tweak.max_shadow_dist);
-
-		split_distances = CalcPlaneSplits(near, far, tweak.log_lin_lerp_factor);
-		for (int i = 0; i < MAXCASCADES; i++)
-			update_cascade(i, view, directional_dir);
-
-		struct Shadowmap_Csm_Ubo_Struct
-		{
-			mat4 data[4];
-			vec4 near_planes;
-			vec4 far_planes;
-		}upload_data;
-
-		for (int i = 0; i < 4; i++) {
-			upload_data.data[i] = matricies[i];
-			upload_data.near_planes[i] = nearplanes[i];
-			upload_data.far_planes[i] = farplanes[i];
-		}
-
-		glNamedBufferData(ubo.info, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
-	}
-	// now setup scene for rendering
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
-	{
-		GPUSCOPESTART("Render csm layer");
-		for (int i = 0; i < 4; i++) {
-
-			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array, 0, i);
-
-			Render_Level_Params params;
-			params.output_framebuffer = fbo.shadow;
-			params.pass = Render_Level_Params::SHADOWMAP;
-			View_Setup setup;
-			setup.width = csm_resolution;
-			setup.height = csm_resolution;
-			setup.near = nearplanes[i];
-			setup.far = farplanes[i];
-			setup.viewproj = matricies[i];
-			setup.view = setup.proj = mat4(1);
-			params.view = setup;
-			params.provied_constant_buffer = ubo.frame_view[i];
-			params.upload_constants = true;
-
-			draw.render_level_to_target(params);
-		}
-	}
-}
-
-
-
-static glm::vec3* GetFrustumCorners(const mat4& view, const mat4& projection)
-{
-	mat4 inv_viewproj = glm::inverse(projection * view);
-	static glm::vec3 corners[8];
-	int i = 0;
-	for (int x = 0; x < 2; x++) {
-		for (int y = 0; y < 2; y++) {
-			for (int z = 0; z < 2; z++) {
-				vec4 ndc_coords = vec4(2 * x - 1, 2 * y - 1, 2 * z - 1, 1);
-				vec4 world_space = inv_viewproj * ndc_coords;
-				world_space /= world_space.w;
-				corners[i++] = world_space;
-			}
-		}
-	}
-
-	return corners;
-}
-
-
-void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, vec3 directionalDir)
-{
-	float far = split_distances[cascade_idx];
-	float near = (cascade_idx == 0) ? view.near : split_distances[cascade_idx - 1];
-	if (tweak.fit_to_scene)
-		near = view.near;
-
-	mat4 camera_cascaded_proj = glm::perspective(
-		glm::radians(view.near),
-		(float)view.width / view.height,
-		near, far);
-	// World space corners
-	glm::vec3* corners = GetFrustumCorners(view.view, camera_cascaded_proj);
-	vec3 frustum_center = vec3(0);
-	for (int i = 0; i < 8; i++)
-		frustum_center += corners[i];
-	frustum_center /= 8.f;
-
-	mat4 light_cascade_view = glm::lookAt(frustum_center - directionalDir, frustum_center, vec3(0, 1, 0));
-	vec3 viewspace_min = vec3(INFINITY);
-	vec3 viewspace_max = vec3(-INFINITY);
-	if (tweak.reduce_shimmering)
-	{
-		float sphere_radius = 0.f;
-		for (int i = 0; i < 8; i++) {
-			float dist = glm::length(corners[i] - frustum_center);
-			sphere_radius = glm::max(sphere_radius, dist);
-		}
-		sphere_radius = ceil(sphere_radius);
-		vec3 world_max = frustum_center + vec3(sphere_radius);
-		vec3 world_min = frustum_center - vec3(sphere_radius);
-
-		vec3 v_max = light_cascade_view * vec4(world_max, 1.0);
-		vec3 v_min = light_cascade_view * vec4(world_min, 1.0);
-		viewspace_max = glm::max(v_max, v_min);
-		viewspace_min = glm::min(v_max, v_min);
-		viewspace_max = vec3(sphere_radius);
-		viewspace_min = -viewspace_max;
-	}
-	else {
-		for (int i = 0; i < 8; i++) {
-			vec3 viewspace_corner = light_cascade_view * vec4(corners[i], 1.0);
-			viewspace_min = glm::min(viewspace_min, viewspace_corner);
-			viewspace_max = glm::max(viewspace_max, viewspace_corner);
-		}
-
-		// insert scaling for pcf filtering here
-
-	}
-	if (viewspace_min.z < 0)
-		viewspace_min.z *= tweak.z_dist_scaling;
-	else
-		viewspace_min.z /= tweak.z_dist_scaling;
-
-	if (viewspace_max.z < 0)
-		viewspace_max.z /= tweak.z_dist_scaling;
-	else
-		viewspace_max.z *= tweak.z_dist_scaling;
-
-	vec3 cascade_extent = viewspace_max - viewspace_min;
-
-	mat4 light_cascade_proj = glm::ortho(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y, viewspace_min.z, viewspace_max.z);
-	mat4 shadow_matrix = light_cascade_proj * light_cascade_view;
-	if (tweak.reduce_shimmering)
-	{
-		vec4 shadow_origin = vec4(0, 0, 0, 1);
-		shadow_origin = shadow_matrix * shadow_origin;
-		float w = shadow_origin.w;
-		shadow_origin *= csm_resolution / 2.0f;
-
-		vec4 rounded_origin = glm::round(shadow_origin);
-		vec4 rounded_offset = rounded_origin - shadow_origin;
-		rounded_offset *= 2.0f / csm_resolution;
-		rounded_offset.z = 0;
-		rounded_offset.w = 0;
-
-		mat4 shadow_cascade_proj = light_cascade_proj;
-		shadow_cascade_proj[3] += rounded_offset;
-
-		shadow_matrix = shadow_cascade_proj * light_cascade_view;
-	}
-
-
-	matricies[cascade_idx] = shadow_matrix;// light_cascade_proj* light_cascade_view;
-	nearplanes[cascade_idx] = viewspace_min.z;
-	farplanes[cascade_idx] = viewspace_max.z;
-}
-
-
-static const ivec3 volfog_sizes[] = { {0,0,0},{160,90,128},{80,45,64} };
-
-struct Vfog_Light
-{
-	glm::vec4 position_type;
-	glm::vec4 color;
-	glm::vec4 direction_coneangle;
-};
-struct Vfog_Params
-{
-	glm::ivec4 volumesize;
-	glm::vec4 volspread_frustumend;
-	glm::vec4 reprojection;
-	glm::mat4 last_frame_viewproj;
-};
-
-void Volumetric_Fog_System::init()
-{
-	if (quality == 0)
-		return;
-
-	voltexturesize = volfog_sizes[1];
-
-	glGenTextures(1, &texture.volume);
-	glBindTexture(GL_TEXTURE_3D, texture.volume);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-
-	glGenTextures(1, &texture.last_volume);
-	glBindTexture(GL_TEXTURE_3D, texture.last_volume);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, voltexturesize.x, voltexturesize.y, voltexturesize.z, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);	// REEE!!!!!!!!!!!!!
-
-
-	glCreateBuffers(1, &buffer.light);
-	glCreateBuffers(1, &buffer.param);
-
-	glCheckError();
-}
-
-void Volumetric_Fog_System::compute()
-{
-	if (!draw.enable_volumetric_fog.integer())
-		return;
-
-	GPUFUNCTIONSTART;
-
-	static Vfog_Light light_buffer[64];
-	int num_lights = 0;
-	{
-		Level_Light& l = draw.dyn_light;
-		Vfog_Light& vfl = light_buffer[num_lights++];
-		float type = (l.type == LIGHT_POINT) ? 0.0 : 1.0;
-		vfl.position_type = vec4(l.position, type);
-		vfl.color = vec4(l.color, 0.0);
-		vfl.direction_coneangle = vec4(l.direction, l.spot_angle);
-	}
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.light);
-	if (num_lights > 0)
-		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vfog_Light) * num_lights, light_buffer, GL_DYNAMIC_DRAW);
-
-	Vfog_Params params;
-	params.volumesize = glm::ivec4(voltexturesize, 0);
-	params.volspread_frustumend = vec4(spread, frustum_end, 0, 0);
-	params.last_frame_viewproj = draw.lastframe_vs.viewproj;
-	params.reprojection = vec4(temporal_sequence, 0.1, 0, 0);
-	glBindBuffer(GL_UNIFORM_BUFFER, buffer.param);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof Vfog_Params, &params, GL_DYNAMIC_DRAW);
-
-
-	glBindBufferBase(GL_UNIFORM_BUFFER, 4, buffer.param);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, buffer.light);
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.active_constants_ubo);
-	glCheckError();
-	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
-	{
-		prog.lightcalc.use();
-
-		prog.lightcalc.set_mat4("InvViewProj", glm::inverse(draw.vs.viewproj));
-		prog.lightcalc.set_vec3("ViewPos", draw.vs.origin);
-		glUniform3i(glGetUniformLocation(prog.lightcalc.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
-
-		prog.lightcalc.set_float("znear", draw.vs.near);
-		prog.lightcalc.set_float("zfar", draw.vs.far);
-		prog.lightcalc.set_mat4("InvView", glm::inverse(draw.vs.view));
-		prog.lightcalc.set_mat4("InvProjection", glm::inverse(draw.vs.proj));
-
-		prog.lightcalc.set_float("density", draw.vfog.x);
-		prog.lightcalc.set_float("anisotropy", draw.vfog.y);
-		prog.lightcalc.set_vec3("ambient", draw.ambientvfog);
-
-		prog.lightcalc.set_vec3("spotlightpos", vec3(0, 2, 0));
-		prog.lightcalc.set_vec3("spotlightnormal", vec3(0, -1, 0));
-		prog.lightcalc.set_float("spotlightangle", 0.5);
-		prog.lightcalc.set_vec3("spotlightcolor", vec3(10.f));
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_3D, texture.last_volume);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
-		prog.lightcalc.set_vec3("perlin_offset", glm::vec3(eng->time * 0.2, 0, eng->time));
-
-
-		prog.lightcalc.set_int("num_lights", 0);
-		glCheckError();
-
-		glBindImageTexture(2, texture.volume, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-
-		glDispatchCompute(groups.x, groups.y, groups.z);
-
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		glCheckError();
-
-	}
-	//static Config_Var* fog_raymarch = cfg.get_var("dbg/raymarch", "1");
-	if (1) {
-		prog.raymarch.use();
-		prog.raymarch.set_float("znear", draw.vs.near);
-		prog.raymarch.set_float("zfar", draw.vs.far);
-		glUniform3i(glGetUniformLocation(prog.raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
-
-		glBindImageTexture(5, texture.last_volume, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glBindImageTexture(2, texture.volume, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA16F);
-
-		glDispatchCompute(groups.x, groups.y, 1);
-
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		glCheckError();
-
-		// swap, rendering with voltexture
-		std::swap(texture.volume, texture.last_volume);
-	}
-
-
-	temporal_sequence = (temporal_sequence + 1) % 16;
-}
-
 Renderer::Renderer()
 	: draw_collision_tris("gpu.draw_collision_tris", 0),
 	draw_sv_colliders("gpu.draw_colliders",0),
@@ -1624,6 +1224,7 @@ glm::mat4 Entity::get_world_transform()
 	model = glm::translate(mat4(1), position + anim.out.meshoffset);
 	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
 	model = glm::scale(model, vec3(1.f));
+
 	return model;
 }
 
@@ -1669,82 +1270,91 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 		);
 	}
 
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-		auto& ent = ei.get();
-		//auto& ent = cgame->entities[i];
-		if (!ent.model)
-			continue;
-
-		if (ei.get_index() == eng->player_num() && !eng->local.thirdperson_camera.integer())
-			continue;
-
-		mat4 model = ent.get_world_transform()*ent.model->skeleton_root_transform;
-
-		Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
-
-		make_draw_calls_from(&ent.model->mesh, model, ent.model->mats, a, true, glm::vec4(1.f));
-
-		if (ent.class_ == entityclass::PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
-
-			Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
-
-
-			Model* m = FindOrLoadModel(stat.world_model);
-			if (!m) continue;
-
-			int index = ent.model->bone_for_name("weapon");
-			int index2 = ent.model->bone_for_name("magazine");
-			glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
-			if (index == -1 || index2 == -1) {
-				sys_print("no weapon bone\n");
-				continue;
-			}
-			const Bone& b = ent.model->bones.at(index);
-			glm::mat4 transform = a->get_matrix_palette()[index];
-			transform = model * transform * mat4(b.posematrix) * rotate;
-			make_draw_calls_from(&m->mesh, transform,m->mats, nullptr, true, glm::vec4(1.f));
-
-			//if (stat.category == ITEM_CAT_RIFLE) {
-			//	std::string mod = stat.world_model;
-			//	mod = mod.substr(0, mod.rfind('.'));
-			//	mod += "_mag.glb";
-			//	Model* mag_mod = FindOrLoadModel(mod.c_str());
-			//	if (mag_mod) {
-			//		const Bone& mag_bone = ent.model->bones.at(index2);
-			//		transform = a->GetBones()[index2];
-			//		transform = model * transform * mat4(mag_bone.posematrix) * rotate;
-			//		//DrawModel(pass, mag_mod, transform);
-			//
-			//		draw_model_real(mag_mod->mesh, mag_mod->mats, transform, nullptr, nullptr, state);
-			//	}
-			//}
+	for (auto& proxy : draw.scene.proxy_list.objects) {
+		if (!proxy.type_.visible) continue;
+		mat4 transform = proxy.type_.transform;
+		if (proxy.type_.viewmodel_layer) {
+			transform =  glm::inverse(draw.vs.view) * transform;
 		}
+		make_draw_calls_from(proxy.type_.mesh, transform, *proxy.type_.mats, proxy.type_.animator, proxy.type_.shadow_caster, glm::vec4(1.f));
 	}
+
+	//for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+	//	auto& ent = ei.get();
+	//	//auto& ent = cgame->entities[i];
+	//	if (!ent.model)
+	//		continue;
+	//
+	//	if (ei.get_index() == eng->player_num() && !eng->local.thirdperson_camera.integer())
+	//		continue;
+	//
+	//	mat4 model = ent.get_world_transform()*ent.model->skeleton_root_transform;
+	//
+	//	Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
+	//
+	//	make_draw_calls_from(&ent.model->mesh, model, ent.model->mats, a, true, glm::vec4(1.f));
+	//
+	//	if (ent.class_ == entityclass::PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
+	//
+	//		Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
+	//
+	//
+	//		Model* m = FindOrLoadModel(stat.world_model);
+	//		if (!m) continue;
+	//
+	//		int index = ent.model->bone_for_name("weapon");
+	//		int index2 = ent.model->bone_for_name("magazine");
+	//		glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
+	//		if (index == -1 || index2 == -1) {
+	//			sys_print("no weapon bone\n");
+	//			continue;
+	//		}
+	//		const Bone& b = ent.model->bones.at(index);
+	//		glm::mat4 transform = a->get_matrix_palette()[index];
+	//		transform = model * transform * mat4(b.posematrix) * rotate;
+	//		make_draw_calls_from(&m->mesh, transform,m->mats, nullptr, true, glm::vec4(1.f));
+	//
+	//		//if (stat.category == ITEM_CAT_RIFLE) {
+	//		//	std::string mod = stat.world_model;
+	//		//	mod = mod.substr(0, mod.rfind('.'));
+	//		//	mod += "_mag.glb";
+	//		//	Model* mag_mod = FindOrLoadModel(mod.c_str());
+	//		//	if (mag_mod) {
+	//		//		const Bone& mag_bone = ent.model->bones.at(index2);
+	//		//		transform = a->GetBones()[index2];
+	//		//		transform = model * transform * mat4(mag_bone.posematrix) * rotate;
+	//		//		//DrawModel(pass, mag_mod, transform);
+	//		//
+	//		//		draw_model_real(mag_mod->mesh, mag_mod->mats, transform, nullptr, nullptr, state);
+	//		//	}
+	//		//}
+	//	}
+	//}
 	for (int i = 0; i < draw.immediate_draw_calls.size(); i++) {
 		auto& call = draw.immediate_draw_calls[i];
 		make_draw_calls_from(&call.model->mesh,call.transform,call.model->mats, nullptr,true, glm::vec4(1.f));
 	}
 	draw.immediate_draw_calls.clear();
 
-	if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
-	{
-		Player* localplayer = (Player*)&eng->local_player();
-		assert(localplayer->viewmodel);
-		ViewmodelComponent* vm = localplayer->viewmodel.get();
-
-		mat4 invview = glm::inverse(draw.vs.view);
-
-		Game_Local* gamel = &eng->local;
-		mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
-		model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
-
-
-		model2 = glm::translate(model2, gamel->vm_offset);
-		model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
-
-		make_draw_calls_from(&vm->model->mesh,model2,
-			vm->model->mats, &vm->animator, false, glm::vec4(1.f));
-	}
+	//if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
+	//{
+	//	Player* localplayer = (Player*)&eng->local_player();
+	//	assert(localplayer->viewmodel);
+	//	ViewmodelComponent* vm = localplayer->viewmodel.get();
+	//
+	//	mat4 invview = glm::inverse(draw.vs.view);
+	//
+	//	Game_Local* gamel = &eng->local;
+	//	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
+	//	model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
+	//
+	//
+	//	model2 = glm::translate(model2, gamel->vm_offset);
+	//	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
+	//
+	//	make_draw_calls_from(&vm->model->mesh,model2,
+	//		vm->model->mats, &vm->animator, false, glm::vec4(1.f));
+	//}
 
 
 	glNamedBufferData(scene_mats_ssbo, sizeof Gpu_Material * scene_mats.size(), scene_mats.data(), GL_STATIC_DRAW);
@@ -3314,364 +2924,4 @@ void Renderer::on_level_start()
 
 	glCreateBuffers(1, &scene.cubemap_ssbo);
 	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
-}
-
-#include "glm/gtc/random.hpp"
-
-float ourLerp(float a, float b, float f)
-{
-	return a + f * (b - a);
-}
-
-
-void draw_hbao_menu()
-{
-	ImGui::DragFloat("radius", &draw.ssao.tweak.radius, 0.05, 0.f);
-	ImGui::DragFloat("sharpness", &draw.ssao.tweak.blur_sharpness, 0.05, 0);
-	ImGui::DragFloat("bias", &draw.ssao.tweak.bias, 0.05, 0);
-	ImGui::DragFloat("intensity", &draw.ssao.tweak.intensity, 0.05, 0);
-}
-
-static const int NOISE_RES = 4;
-static const int NUM_MRT = 8;
-
-#include <random>
-void SSAO_System::init()
-{
-	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
-
-	make_render_targets(true);
-	reload_shaders();
-
-	glCreateBuffers(1, &ubo.data);
-	glNamedBufferStorage(ubo.data, sizeof(gpu::HBAOData), nullptr, GL_DYNAMIC_STORAGE_BIT);
-
-	 std::mt19937 rmt;
-
-  float numDir = 8;  // keep in sync to glsl
-
-  signed short hbaoRandomShort[RANDOM_ELEMENTS * 4];
-
-  for(int i = 0; i < RANDOM_ELEMENTS; i++)
-  {
-    float Rand1 = static_cast<float>(rmt()) / 4294967296.0f;
-    float Rand2 = static_cast<float>(rmt()) / 4294967296.0f;
-
-    // Use random rotation angles in [0,2PI/NUM_DIRECTIONS)
-    float Angle       = glm::two_pi<float>() * Rand1 / numDir;
-    random_elements[i].x = cosf(Angle);
-    random_elements[i].y = sinf(Angle);
-    random_elements[i].z = Rand2;
-    random_elements[i].w = 0;
-#define SCALE ((1 << 15))
-    hbaoRandomShort[i * 4 + 0] = (signed short)(SCALE * random_elements[i].x);
-    hbaoRandomShort[i * 4 + 1] = (signed short)(SCALE * random_elements[i].y);
-    hbaoRandomShort[i * 4 + 2] = (signed short)(SCALE * random_elements[i].z);
-    hbaoRandomShort[i * 4 + 3] = (signed short)(SCALE * random_elements[i].w);
-#undef SCALE
-  }
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.random);
-	glTextureStorage2D(texture.random, 1, GL_RGBA16_SNORM, 4, 4);
-	glTextureSubImage2D(texture.random, 0, 0, 0, 4, 4, GL_RGBA, GL_SHORT, hbaoRandomShort);
-	glTextureParameteri(texture.random, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.random, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-}
-
-Shader make_program(const char* vert, const char* frag, const std::string& defines = "")
-{
-	Shader ret{};
-	Shader::compile(&ret, vert, frag, defines);
-	return ret;
-}
-
-
-void SSAO_System::reload_shaders()
-{
-	Shader::compile(prog.hbao_calc, "fullscreenquad.txt", "hbao/hbao.txt", "hbao/hbaoG.txt", {});
-	prog.hbao_blur = make_program("fullscreenquad.txt", "hbao/hbaoblur.txt");
-	prog.hbao_deinterleave = make_program("fullscreenquad.txt", "hbao/hbaodeinterleave.txt");
-	prog.hbao_reinterleave = make_program("fullscreenquad.txt", "hbao/hbaoreinterleave.txt");
-	prog.linearize_depth = make_program("fullscreenquad.txt", "hbao/linearizedepth.txt");
-	prog.make_viewspace_normals = make_program("fullscreenquad.txt", "hbao/viewnormal.txt");
-}
-
-
-void SSAO_System::make_render_targets(bool initial)
-{
-	width = eng->window_w.integer();
-	height = eng->window_h.integer();
-
-	if (!initial) {
-		glDeleteTextures(1, &texture.depthlinear);
-		glDeleteTextures(1, &texture.viewnormal);
-		glDeleteFramebuffers(1, &fbo.viewnormal);
-		glDeleteFramebuffers(1, &fbo.depthlinear);
-	}
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.depthlinear);
-	glTextureStorage2D(texture.depthlinear, 1, GL_RG32F, width, height);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glCreateFramebuffers(1, &fbo.depthlinear);
-	glNamedFramebufferTexture(fbo.depthlinear, GL_COLOR_ATTACHMENT0, texture.depthlinear, 0);
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
-	glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glCreateFramebuffers(1, &fbo.viewnormal);
-	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal, 0);
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
-	glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
-	glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
-	glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
-	glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glCreateFramebuffers(1, &fbo.finalresolve);
-	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT0, texture.result, 0);
-	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT1, texture.blur, 0);
-
-	GLenum drawbuffers[NUM_MRT];
-	for(int layer = 0; layer < NUM_MRT; layer++)
-		drawbuffers[layer] = GL_COLOR_ATTACHMENT0 + layer;
-	glCreateFramebuffers(1, &fbo.hbao2_deinterleave);
-	glNamedFramebufferDrawBuffers(fbo.hbao2_deinterleave, NUM_MRT, drawbuffers);
-
-	int quarterWidth  = ((width + 3) / 4);
-	int quarterHeight = ((height + 3) / 4);
-
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.deptharray);
-	glTextureStorage3D(texture.deptharray, 1, GL_R32F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	for(int i = 0; i < RANDOM_ELEMENTS; i++) {
-		if (texture.depthview[i] != 0)
-			glDeleteTextures(1, &texture.depthview[i]);
-		glGenTextures(1, &texture.depthview[i]);
-		glTextureView(texture.depthview[i], GL_TEXTURE_2D, texture.deptharray, GL_R32F, 0, 1, i, 1);
-		glBindTexture(GL_TEXTURE_2D, texture.depthview[i]);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	}
-
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.resultarray);
-	glTextureStorage3D(texture.resultarray, 1, GL_RG16F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glCreateFramebuffers(1, &fbo.hbao2_calc);
-	glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
-
-	// render viewspace normals and linear depth
-	// deinterleave
-	// render hbao for each layer
-	// reinterleave
-	// blur
-
-}
-
-#define USE_AO_LAYERED_SINGLEPASS 2
-const int HBAO_RANDOM_ELEMENTS = 4 * 4;
-
-void SSAO_System::update_ubo()
-{
-	// projection
-	mat4 proj_matrix = draw.vs.proj;
-	float proj_fov = draw.vs.fov;
-
-	const float* P = glm::value_ptr(proj_matrix);
-
-  float projInfoPerspective[] = {
-      2.0f / (P[4 * 0 + 0]),                  // (x) * (R - L)/N
-      2.0f / (P[4 * 1 + 1]),                  // (y) * (T - B)/N
-      -(1.0f - P[4 * 2 + 0]) / P[4 * 0 + 0],  // L/N
-      -(1.0f + P[4 * 2 + 1]) / P[4 * 1 + 1],  // B/N
-  };
-
-  float projInfoOrtho[] = {
-      2.0f / (P[4 * 0 + 0]),                  // ((x) * R - L)
-      2.0f / (P[4 * 1 + 1]),                  // ((y) * T - B)
-      -(1.0f + P[4 * 3 + 0]) / P[4 * 0 + 0],  // L
-      -(1.0f - P[4 * 3 + 1]) / P[4 * 1 + 1],  // B
-  };
-
-  int useOrtho = false;
-  data.projOrtho = useOrtho;
-  data.projInfo  = useOrtho ? glm::make_vec4(projInfoOrtho) : glm::make_vec4(projInfoPerspective);
-
-  float projScale;
-  if(useOrtho)
-  {
-    projScale = float(height) / (projInfoOrtho[1]);
-  }
-  else
-  {
-    projScale = float(height) / (tanf(proj_fov * 0.5f) * 2.0f);
-  }
-
-  // radius
-  float meters2viewspace   = 1.0f;
-  float R                  = tweak.radius * meters2viewspace;
-  data.R2             = R * R;
-  data.NegInvR2       = -1.0f / data.R2;
-  data.RadiusToScreen = R * 0.5f * projScale;
-
-  // ao
-  data.PowExponent  = std::max(tweak.intensity, 0.0f);
-  data.NDotVBias    = std::min(std::max(0.0f, tweak.bias), 1.0f);
-  data.AOMultiplier = 1.0f / (1.0f - data.NDotVBias);
-
-  // resolution
-  int quarterWidth  = ((width + 3) / 4);
-  int quarterHeight = ((height + 3) / 4);
-
-  data.InvQuarterResolution = vec2(1.0f / float(quarterWidth), 1.0f / float(quarterHeight));
-  data.InvFullResolution    = vec2(1.0f / float(width), 1.0f / float(height));
-
-#if USE_AO_LAYERED_SINGLEPASS
-  for(int i = 0; i < HBAO_RANDOM_ELEMENTS; i++)
-  {
-    data.float2Offsets[i] = vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, 0.0f, 0.0f);
-    data.jitters[i]       = random_elements[i];
-  }
-#endif
-
-  glNamedBufferSubData(ubo.data, 0, sizeof(gpu::HBAOData), &data);
-}
-
-void SSAO_System::render()
-{
-	GPUFUNCTIONSTART;
-
-	if (width != eng->window_w.integer() || height != eng->window_h.integer())
-		make_render_targets(false);
-
-	update_ubo();
-
-	const int quarterWidth  = ((width + 3) / 4);
-	const int quarterHeight = ((height + 3) / 4);
-	
-	glViewport(0, 0, width, height);
-
-	// linearize depth, writes to texture.depthlinear
-	{
-		float near = draw.vs.near;
-		float far = draw.vs.far;
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthlinear);
-		prog.linearize_depth.use();
-		prog.linearize_depth.set_vec4("clipInfo", glm::vec4(
-			near*far,
-			near-far,
-			far,
-			1.0
-		));
-		glBindTextureUnit(0, draw.tex.scene_depthstencil);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-		glCheckError();
-	}
-
-	// create viewspace normals, writes to texture.viewnormal
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.viewnormal);
-		prog.make_viewspace_normals.use();
-		prog.make_viewspace_normals.set_int("projOrtho", 0);
-		prog.make_viewspace_normals.set_vec4("projInfo", data.projInfo);
-		prog.make_viewspace_normals.set_vec2("InvFullResolution", data.InvFullResolution);
-		glBindTextureUnit(0, texture.depthlinear);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-	}
-
-	// deinterleave, writes to texture.deptharray
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_deinterleave);
-		glViewport(0, 0, quarterWidth, quarterHeight);
-		glBindTextureUnit(0, texture.depthlinear);
-		prog.hbao_deinterleave.use();
-		// two passes
-		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
-			prog.hbao_deinterleave.set_vec4("info", glm::vec4(
-				float(i % 4) + 0.5f, 
-				float(i / 4) + 0.5f, 
-				data.InvFullResolution.x,
-                data.InvFullResolution.y
-			));
-
-			for(int layer = 0; layer < NUM_MRT; layer++)
-				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
-		}
-	}
-
-	// calculate hbao, writes to texture.resultarray
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
-		glViewport(0, 0, quarterWidth, quarterHeight);
-		glBindTextureUnit(0, texture.deptharray);
-		glBindTextureUnit(1, texture.viewnormal);
-
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
-
-		prog.hbao_calc.use();
-
-		glDrawArrays(GL_TRIANGLES, 0, 3 * RANDOM_ELEMENTS);
-	}
-
-	// reinterleave, writes to texture.result
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.finalresolve);
-		glViewport(0, 0, width, height);
-		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		prog.hbao_reinterleave.use();
-
-		glBindTextureUnit(0, texture.resultarray);
-
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-	}
-
-	// depth aware blur, writes to texture.result
-	{
-		prog.hbao_blur.use();
-		// framebuffer = fbo.finalresolve
-		glDrawBuffer(GL_COLOR_ATTACHMENT1);
-		glBindTextureUnit(0, texture.result);
-		prog.hbao_blur.set_float("g_Sharpness",
-			tweak.blur_sharpness);
-		prog.hbao_blur.set_vec2("g_InvResolutionDirection", glm::vec2(
-			1.0f / float(width), 
-			0
-		));
-		glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .result and write to .blur
-
-		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		glBindTextureUnit(0, texture.blur);
-		prog.hbao_blur.set_vec2("g_InvResolutionDirection", glm::vec2(
-			0, 
-			1.0f / float(height)
-		));
-		glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .blur and write to .result
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glEnable(GL_DEPTH_TEST);
-	glUseProgram(0);
 }

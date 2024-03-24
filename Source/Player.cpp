@@ -705,12 +705,20 @@ void Player::move_update(Move_Command command)
 {
 	
 }
+#include "Draw.h"
+ViewmodelComponent::~ViewmodelComponent()
+{
+	draw.scene.remove(viewmodel_handle);
+}
+
 ViewmodelComponent::ViewmodelComponent(Player* p) 
 {
 	this->player = p;
 
 	model = mods.find_or_load("arms.glb");
 	animator.set_model(model);
+
+	viewmodel_handle = draw.scene.register_renderable();
 
 	Bone_Controller& wp = animator.get_controller(bone_controller_type::misc1);
 	wp.enabled = true;
@@ -775,6 +783,70 @@ T neg_modulo(T x, T mod_)
 float modulo_lerp(float start, float end, float mod, float t)
 {
 	return neg_modulo(t - start,mod) / neg_modulo(end - start, mod);
+}
+
+
+#include "glm/gtx/euler_angles.hpp"
+
+void ViewmodelComponent::update_visuals()
+{
+	Render_Object_Proxy proxy;
+
+	if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
+	{
+		proxy.viewmodel_layer = true;
+		proxy.visible = true;
+		proxy.animator = &animator;
+		proxy.mesh = &model->mesh;
+		proxy.mats = &model->mats;
+
+
+
+			//mat4 invview = glm::inverse(draw.vs.view);
+
+		Game_Local* gamel = &eng->local;
+		glm::mat4 model2 = glm::translate(mat4(1), vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
+		model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
+
+
+		model2 = glm::translate(model2, gamel->vm_offset);
+		model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
+
+		proxy.transform = model2;
+
+	}
+	else {
+		proxy.visible = false;
+	}
+	draw.scene.update(viewmodel_handle, proxy);
+}
+
+void Player::update_visuals()
+{
+	if (viewmodel) viewmodel->update_visuals();
+
+	if (render_handle == -1 && model)
+		render_handle = draw.scene.register_renderable();
+	else if (render_handle != -1 && !model)
+		draw.scene.remove(render_handle);
+
+	if (render_handle != -1 && model) {
+		Render_Object_Proxy proxy;
+
+		bool visible = !(flags & EF_HIDDEN);
+		if (this == &eng->local_player() && !eng->local.thirdperson_camera.integer()) 
+			visible = false;
+
+		proxy.visible = visible;
+		if (model->bones.size() > 0)
+			proxy.animator = &anim;
+		proxy.mesh = &model->mesh;
+		proxy.mats = &model->mats;
+		proxy.transform = get_world_transform()*model->skeleton_root_transform;
+
+		draw.scene.update(render_handle, proxy);
+	}
+
 }
 
 void ViewmodelComponent::update()

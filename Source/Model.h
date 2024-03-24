@@ -163,7 +163,6 @@ public:
 
 
 
-
 	struct Gpu_Buffer {
 		bufferhandle handle = 0;
 		uint32_t allocated = 0;
