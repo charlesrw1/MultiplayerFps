@@ -2588,8 +2588,10 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 			else bind_texture(ROUGH2_LOC, white_texture.gl_id);
 
 			if (dc.mesh->has_tangents()) {
-				if (blend1->images[Game_Shader::NORMAL]) bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id);
-				else bind_texture(NORMAL1_LOC, flat_normal_texture.gl_id);
+				if (blend1->images[Game_Shader::NORMAL])
+					bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id);
+				else 
+					bind_texture(NORMAL1_LOC, flat_normal_texture.gl_id);
 				if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id);
 				else bind_texture(NORMAL2_LOC, flat_normal_texture.gl_id);
 			}
@@ -2601,10 +2603,7 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 			SET_OR_USE_FALLBACK(Game_Shader::ROUGHNESS, ROUGH1_LOC, white_texture);
 			SET_OR_USE_FALLBACK(Game_Shader::AO, AO1_LOC, white_texture);
 			SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
-
-			if (dc.mesh->has_tangents()) {
-				SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, flat_normal_texture);
-			}
+			SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, flat_normal_texture);
 		}
 	}
 
