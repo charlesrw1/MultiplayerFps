@@ -24,7 +24,7 @@ void IPAndPort::set(string net)
 	size_t colon = net.rfind(':');
 	if (colon != string::npos) {
 		port = std::atoi(net.substr(colon).c_str());
-		net.substr(0, colon);
+		net = net.substr(0, colon);
 	}
 	if (net == "localhost") {
 		ip = 127 << 24 | 1;

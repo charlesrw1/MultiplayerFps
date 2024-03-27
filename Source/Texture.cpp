@@ -45,6 +45,7 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 		if (!gs) {
 			gs = new Game_Shader;
 			gs->name = matname;
+			gs->material_id = cur_mat_id++;
 			shaders.push_back(gs);
 		}
 
@@ -159,6 +160,7 @@ Game_Shader* Game_Material_Manager::create_temp_shader(const char* name)
 	else
 		*gs = Game_Shader();
 	gs->name = name;
+	gs->material_id = cur_mat_id++;
 	return gs;
 }
 Game_Shader* Game_Material_Manager::find_for_name(const char* name)

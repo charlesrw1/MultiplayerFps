@@ -9,6 +9,8 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#pragma optimize("", off)
+
 Renderer draw;
 
 static const int ALBEDO1_LOC = 0;
@@ -1232,6 +1234,261 @@ glm::mat4 Entity::get_world_transform()
 #include <algorithm>
 
 
+#if 0
+void Render_Pass::remove_from_batch(passobj_handle handle)
+{
+	Pass_Object& obj = pass_objects.get(handle);
+	int batch_idx = obj.batch_index;
+	Batch& batch = batches.at(batch_idx);
+
+	assert(obj.index_in_batch <= batch.pass_obj_count);
+	batch_draw_list.at(batch.pass_obj_start + obj.index_in_batch) = batch_draw_list.at(batch.pass_obj_start + batch.pass_obj_count - 1);
+	batch_draw_list.at(batch.pass_obj_start + batch.pass_obj_count - 1) = -1;
+
+	batch.pass_obj_count -= 1;
+}
+
+void Render_Pass::update_batches()
+{
+	// if any new/removed/refreshed objects
+	if (refresh_queue.empty() && creation_queue.empty() && deletion_queue.empty())
+		return;
+
+	// for removed objects
+	// find batch and decrment object count
+	for (auto& objhandle : deletion_queue) {
+		remove_from_batch(objhandle);
+		pass_objects.free(objhandle);
+	}
+
+	// for new and refreshed objects
+	// compute hash for state
+	// try to find existing batch with binary search
+	// if it exists and has space, then add to it
+
+	for (auto& objhandle : refresh_queue) {
+
+	}
+
+	for (auto& objhandle : creation_queue) {
+
+	}
+
+	// for new/refreshed objects that are left
+	// create new batches and add objects to end of obj list
+	
+	// sort new batches
+	// merge new batches into main batches (now all sorted)
+
+	// compute merged_batches
+
+	// recompute draw call buffer, one draw call per geometry, and add submesh instances with dc index and instance index
+
+	// now: have merged batch list with a start and end count draw calls
+	// have a list of submesh instances which index into draw calls and instance list for transform
+}
+#endif
+
+
+Render_Pass::Render_Pass(pass_type type) : type(type) {}
+
+
+draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& proxy, uint32_t submesh)
+{
+	draw_call_key key;
+
+	ASSERT(proxy.mats);
+	Game_Shader* material = (*proxy.mats)[proxy.mesh->parts[submesh].material_idx];
+	key.shader = draw.get_shader_index(*proxy.mesh, *material, (type == pass_type::DEPTH));
+	key.blending = material->alpha_type;
+	key.backface = material->backface;
+	key.texture = material->material_id;
+	key.vao = proxy.mesh->format;
+	key.mesh = proxy.mesh->id;
+
+	return key;
+}
+
+void Render_Pass::delete_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh) {
+	
+	Pass_Object obj;
+	obj.sort_key = create_sort_key_from_obj(proxy, submesh);
+	obj.render_obj = handle;
+	obj.submesh_index = submesh;
+	deletions.push_back(obj);
+}
+void Render_Pass::add_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh) {
+	Pass_Object obj;
+	obj.sort_key = create_sort_key_from_obj(proxy, submesh);
+	obj.render_obj = handle;
+	obj.submesh_index = submesh;
+	creations.push_back(obj);
+}
+#include <iterator>
+void Render_Pass::make_batches(Render_Scene& scene)
+{
+	if (creations.empty() && deletions.empty())
+		return;
+
+	draw_call_key key;
+	key.shader = 63;
+	auto abc = key.as_uint64();
+
+	const auto& sort_functor = [](const Pass_Object& a, const Pass_Object& b)
+	{ 
+		auto a64 = a.sort_key.as_uint64();
+		auto b64 = b.sort_key.as_uint64();
+		return a64 < b64;
+	};
+	const auto& merge_functor = [](const Pass_Object& a, const Pass_Object& b)
+	{
+		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
+		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64()) 
+			return  a.submesh_index < b.submesh_index;
+		else return false;
+	};
+	const auto& del_functor = [](const Pass_Object& a, const Pass_Object& b)
+	{
+		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
+		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
+			return  a.render_obj < b.render_obj && a.submesh_index < b.submesh_index;
+		else return false;
+	};
+	if (!deletions.empty()) {
+
+		std::sort(deletions.begin(), deletions.end(), sort_functor);
+
+		std::vector<Pass_Object> dest;
+		dest.reserve(sorted_list.size());
+
+		std::set_difference(sorted_list.begin(), sorted_list.end(), deletions.begin(), deletions.end(), std::back_inserter(dest), del_functor);
+
+		sorted_list = std::move(dest);
+		deletions.clear();
+	}
+
+	if (!creations.empty()) {
+		std::sort(creations.begin(), creations.end(), sort_functor);
+		size_t start_index = sorted_list.size();
+		sorted_list.reserve(sorted_list.size() + creations.size());
+		for (auto p : creations)
+			sorted_list.push_back(p);
+		Pass_Object* start = sorted_list.data();
+		Pass_Object* mid = sorted_list.data() + start_index;
+		Pass_Object* end = sorted_list.data() + sorted_list.size();
+
+		std::inplace_merge(start, mid, end, merge_functor);
+
+		creations.clear();
+	}
+
+	batches.clear();
+	mesh_batches.clear();
+
+	if (sorted_list.empty()) return;
+
+	{
+		const auto& functor = [](int first, Pass_Object* po, const Render_Object_Proxy* rop) -> Mesh_Batch
+		{
+			Mesh_Batch batch;
+			batch.first = first;
+			batch.count = 1;
+			auto& mats = rop->mats;
+			int index = rop->mesh->parts.at(po->submesh_index).material_idx;
+			batch.material = (*mats)[index];
+			batch.shader_index = po->sort_key.shader;
+			return batch;
+		};
+
+		// build mesh batches first
+		Pass_Object* batch_obj = &sorted_list[0];
+		const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
+		Mesh_Batch batch = functor(0, batch_obj, batch_proxy);
+
+		for (int i = 1; i < sorted_list.size(); i++) {
+			Pass_Object* this_obj = &sorted_list[i];
+			const Render_Object_Proxy* this_proxy = &scene.get(this_obj->render_obj);
+			bool same_mesh = this_proxy->mesh == batch_proxy->mesh && this_obj->submesh_index == batch_obj->submesh_index;
+			if (same_mesh)
+				batch.count++;
+			else {
+				mesh_batches.push_back(batch);
+				batch = functor(i, this_obj, this_proxy);
+				batch_obj = this_obj;
+				batch_proxy = this_proxy;
+			}
+		}
+		mesh_batches.push_back(batch);
+	}
+
+	Multidraw_Batch batch;
+	batch.first = 0;
+	batch.count = 1;
+	
+	Mesh_Batch* mesh_batch = &mesh_batches[0];
+	Pass_Object* batch_obj = &sorted_list[mesh_batch->first];
+	const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
+	bool is_at = mesh_batch->material->alpha_type == Game_Shader::A_TEST;
+	for (int i = 1; i < mesh_batches.size(); i++)
+	{
+		Mesh_Batch* this_batch = &mesh_batches[i];
+		Pass_Object* this_obj = &sorted_list[this_batch->first];
+		const Render_Object_Proxy* this_proxy = &scene.get(this_obj->render_obj);
+
+		bool batch_this = false;
+
+		bool same_vao = batch_obj->sort_key.vao == this_obj->sort_key.vao;
+		bool same_material = batch_obj->sort_key.texture == this_obj->sort_key.texture;
+		bool same_shader = batch_obj->sort_key.shader == this_obj->sort_key.shader;
+		bool same_other_state = batch_obj->sort_key.blending == this_obj->sort_key.blending 
+			&& batch_obj->sort_key.backface == this_obj->sort_key.blending;
+
+		if (type == pass_type::OPAQUE) {
+			if (same_vao && same_material && same_other_state && same_shader)
+				batch_this = true;
+			else
+				batch_this = false;
+
+		}
+		else if (type == pass_type::DEPTH){
+			// can batch across texture changes as long as its not alpha tested
+			if (same_shader && same_vao && same_other_state && this_batch->material->alpha_type != Game_Shader::A_TEST)
+				batch_this = true;
+			else
+				batch_this = false;
+		}
+
+		if (batch_this) {
+			batch.count += 1;
+		}
+		else {
+			batches.push_back(batch);
+			batch.count = 1;
+			batch.first = i;
+
+			mesh_batch = this_batch;
+			batch_obj = this_obj;
+			batch_proxy = this_proxy;
+		}
+	}
+
+	batches.push_back(batch);
+}
+
+
+
+Render_Scene::Render_Scene() 
+	: opaque(pass_type::OPAQUE)
+{
+
+}
+
+// culling step:
+// cpu: loop through submesh instance buffer, get the instance sphere bounds cull and output to draw call index
+//		compact
+
+
+
 void Shared_Gpu_Driven_Resources::build_draw_calls()
 {
 	skinned_matricies.clear();
@@ -1245,38 +1502,40 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 
 	Level* level = eng->level;
 
-	for (int m = 0; m < level->static_mesh_objs.size(); m++) {
-		Static_Mesh_Object& smo = level->static_mesh_objs[m];
-		ASSERT(smo.model);
-		make_draw_calls_from(
-			&smo.model->mesh,
-			smo.transform,
-			smo.model->mats,
-			nullptr,
-			true,
-			glm::vec4(1.f)
-		);
-	}
-	for (int m = 0; m < level->level_prefab->nodes.size(); m++) {
-		auto& node = level->level_prefab->nodes[m];
-		auto& mesh = level->level_prefab->meshes[node.mesh_idx];
-		make_draw_calls_from(
-			&mesh,
-			node.transform,
-			level->level_prefab->mats,
-			nullptr,
-			true,
-			glm::vec4(1.f)
-		);
-	}
+	//for (int m = 0; m < level->static_mesh_objs.size(); m++) {
+	//	Static_Mesh_Object& smo = level->static_mesh_objs[m];
+	//	ASSERT(smo.model);
+	//	make_draw_calls_from(
+	//		&smo.model->mesh,
+	//		smo.transform,
+	//		smo.model->mats,
+	//		nullptr,
+	//		true,
+	//		glm::vec4(1.f)
+	//	);
+	//}
+	//for (int m = 0; m < level->level_prefab->nodes.size(); m++) {
+	//	auto& node = level->level_prefab->nodes[m];
+	//	auto& mesh = level->level_prefab->meshes[node.mesh_idx];
+	//	make_draw_calls_from(
+	//		&mesh,
+	//		node.transform,
+	//		level->level_prefab->mats,
+	//		nullptr,
+	//		true,
+	//		glm::vec4(1.f)
+	//	);
+	//}
 
-	for (auto& proxy : draw.scene.proxy_list.objects) {
-		if (!proxy.type_.visible) continue;
-		mat4 transform = proxy.type_.transform;
-		if (proxy.type_.viewmodel_layer) {
+	for (auto& proxy_internal : draw.scene.proxy_list.objects) {
+		auto& proxy = proxy_internal.type_.proxy;
+
+		if (!proxy.visible) continue;
+		mat4 transform = proxy.transform;
+		if (proxy.viewmodel_layer) {
 			transform =  glm::inverse(draw.vs.view) * transform;
 		}
-		make_draw_calls_from(proxy.type_.mesh, transform, *proxy.type_.mats, proxy.type_.animator, proxy.type_.shadow_caster, glm::vec4(1.f));
+		make_draw_calls_from(proxy.mesh, transform, *proxy.mats, proxy.animator, proxy.shadow_caster, glm::vec4(1.f));
 	}
 
 	//for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
@@ -1759,7 +2018,7 @@ void multidraw_testing()
 	static Chunked_Model* meshlet_model;
 
 	if (!has_initialized) {
-		meshlet_model = get_chunked_mod("monkey.glb");
+		meshlet_model = get_chunked_mod("sphere.glb");
 
 		create_full_mdi_buffers(meshlet_model,
 			chunk_buffer,
@@ -1873,11 +2132,11 @@ void multidraw_testing()
 
 		glBindVertexArray(sphere->mesh.vao);
 		
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, mdi_command_buf_pm.get_handle());
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 		glMultiDrawElementsIndirect(GL_TRIANGLES, 
 			index_type, 
-			(void*)mdi_command_buf_pm.get_offset(), 
+			(void*)cmds,
 			num_commands, 
 			sizeof(gpu::DrawElementsIndirectCommand));
 	}
@@ -2189,6 +2448,9 @@ void Renderer::scene_draw(bool editor_mode)
 		eng->eddoc->scene_draw_callback();
 
 	if (!editor_mode) {
+
+		scene.opaque.make_batches(scene);
+
 		extract_objects();
 
 		shadowmap.update();
@@ -2923,4 +3185,28 @@ void Renderer::on_level_start()
 
 	glCreateBuffers(1, &scene.cubemap_ssbo);
 	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
+}
+
+renderobj_handle Render_Scene::register_renderable() {
+	renderobj_handle handle =  proxy_list.make_new();
+	return handle;
+}
+
+void Render_Scene::update(renderobj_handle handle, const Render_Object_Proxy& proxy) 
+{
+	ROP_Internal& in = proxy_list.get(handle);
+
+	if (!in.proxy.mesh && proxy.mesh) {
+		for (int i = 0; i < proxy.mesh->parts.size(); i++)
+			opaque.add_object(proxy, handle, i);
+	}
+
+	in.proxy = proxy;
+
+}
+
+void Render_Scene::remove(renderobj_handle handle) {
+	if (handle != -1) {
+		proxy_list.free(handle);
+	}
 }

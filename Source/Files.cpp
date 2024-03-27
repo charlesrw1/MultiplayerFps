@@ -68,7 +68,7 @@ void Archive::create(const char* archive_path)
 	entries.resize(num_entries);
 	std::fread(entries.data(), 1, num_entries * sizeof(Archive_Entry), file_handle);
 
-	for (int i = 0; i < num_entries; i++) {
+	for (unsigned int i = 0; i < num_entries; i++) {
 		Archive_Entry& e = entries[i];
 		StringUtils::StringHash hash(&string_table.at(e.string_offset));
 		if (hash_to_index.find(hash.computedHash) != hash_to_index.end()) {

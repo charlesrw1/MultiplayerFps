@@ -1,9 +1,10 @@
 .vs/
 Debug/
 Release/
+Data/
 imgui.ini
 *.dll
-
+*.bin
 
 *.obj
 *.pdb

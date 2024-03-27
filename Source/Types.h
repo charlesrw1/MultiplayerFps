@@ -250,9 +250,9 @@ struct Render_Object_Proxy
 	bool shadow_caster : 1;
 	bool viewmodel_layer : 1;
 
-#ifdef DEBUG_
+	// for debugging only
 	Entity* owner = nullptr;
-#endif
+
 
 	glm::mat4 transform = glm::mat4(1.f);
 };

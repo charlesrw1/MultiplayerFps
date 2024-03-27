@@ -9,7 +9,7 @@
 #include "Shader.h"
 #include "EnvProbe.h"
 #include "Texture.h"
-#include "../Shaders/SharedGpuTypes.txt";
+#include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
 
 class MeshPart;
@@ -161,6 +161,30 @@ public:
 	glm::vec4 random_elements[RANDOM_ELEMENTS];
 };
 
+
+
+struct Render_Light
+{
+	vec3 position;
+	vec3 normal;
+	vec3 color;
+	float conemin;
+	float conemax;
+	bool casts_shadow = false;
+	int shadow_array_index = 0;
+	int type = 0;
+};
+
+struct Render_Box_Cubemap
+{
+	vec3 boxmin;
+	vec3 boxmax;
+	vec3 probe_pos = vec3(0.f);
+	int priority = 0;
+	bool found_probe_flag = false;
+	int id = -1;
+};
+
 // more horribleness
 struct Render_Level_Params {
 	View_Setup view;
@@ -221,60 +245,143 @@ public:
 	vector<handle_type> free_handles;
 	vector<int> handle_to_obj;
 	struct pair {
-		handle_type handle;
+		handle_type handle = -1;
 		T type_;
 	};
 	vector<pair> objects;
 };
 
-
-typedef int Light_Handle;
-
-class Object_Cull_Job
+struct Batched_Draw_Call
 {
+	Batched_Draw_Call() {
+		mat_index = 0;
+		use_custom_sphere = 0;
+	}
+	Game_Shader* shader;
+	uint32_t element_count;
+	uint32_t element_start;
+	uint32_t base_vertex;
+	uint32_t mat_index : 31;
+	uint32_t use_custom_sphere : 1;
+	glm::vec4 custom_bounding_sphere = glm::vec4(0,0,0,1.f);
+};
 
+enum class blend_state : uint8_t
+{
+	NONE,
+	BLEND,
+	ADD,
+	MULTIPLY
+};
+
+enum class depth_test : uint8_t
+{
+	ON,
+	OFF
+};
+
+enum class backface_cull : uint8_t
+{
+	ON,
+	OFF
+};
+
+// represents a singular call to glDrawElements() with same state and mesh, batchable
+struct Mesh_Batch
+{
+	uint32_t first = 0;	// indexes into pass.sorted_list
+	uint32_t count = 0;
+
+	uint32_t shader_index = 0;	// indexes into shader_list[]
+	const Game_Shader* material = nullptr;
+};
+
+// represents multiple mesh_batch calls packaged into one glMultidrawIndirect()
+struct Multidraw_Batch
+{
+	uint32_t first = 0;
+	uint32_t count = 0;
+};
+
+struct draw_call_key  {
+	draw_call_key() {
+		shader = blending = backface = texture = vao = mesh = 0;
+	}
+	uint64_t mesh : 20;
+	uint64_t vao : 5;
+	uint64_t texture : 20;
+	uint64_t backface : 1;
+	uint64_t blending : 3;
+	uint64_t shader : 15;
+	
+	uint64_t as_uint64() const{
+		return *(reinterpret_cast<const uint64_t*>(this));
+	}
+};
+static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
+
+
+struct Pass_Object
+{
+	draw_call_key sort_key;
+	renderobj_handle render_obj = -1;	// entity instance
+	uint32_t submesh_index = 0;			// what submesh am i
 };
 
 
-struct Render_Light
+// in the end: want a flat list of batches that are merged with neighbors
+enum class pass_type
 {
-	vec3 position;
-	vec3 normal;
-	vec3 color;
-	float conemin;
-	float conemax;
-	bool casts_shadow = false;
-	int shadow_array_index = 0;
-	int type = 0;
+	OPAQUE,
+	TRANSPARENT,
+	DEPTH
 };
 
-struct Render_Box_Cubemap
+ 
+typedef int passobj_handle;
+
+class Render_Scene;
+class Render_Pass
 {
-	vec3 boxmin;
-	vec3 boxmax;
-	vec3 probe_pos = vec3(0.f);
-	int priority = 0;
-	bool found_probe_flag = false;
-	int id = -1;
+public:
+	Render_Pass(pass_type type);
+
+	void make_batches(Render_Scene& scene);
+
+	pass_type type;
+
+	void delete_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh);
+	void add_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh);
+
+	draw_call_key create_sort_key_from_obj(const Render_Object_Proxy& proxy, uint32_t submesh);
+
+	std::vector<Pass_Object> deletions;
+	std::vector<Pass_Object> creations;
+	std::vector<Pass_Object> sorted_list;
+	std::vector<Mesh_Batch> mesh_batches;
+	std::vector<Multidraw_Batch> batches;
+	std::vector<gpu::DrawElementsIndirectCommand> commands;
+};
+
+
+struct ROP_Internal
+{
+	Render_Object_Proxy proxy;
 };
 
 class Render_Scene
 {
 public:
-	renderobj_handle register_renderable() {
-		return proxy_list.make_new();
-	}
-	void update(renderobj_handle handle, const Render_Object_Proxy& proxy) {
-		proxy_list.get(handle) = proxy;
-	}
-	void remove(renderobj_handle handle) {
-		if (handle != -1) {
-			proxy_list.free(handle);
-		}
+	Render_Scene();
+	renderobj_handle register_renderable();
+	void update(renderobj_handle handle, const Render_Object_Proxy& proxy);
+	void remove(renderobj_handle handle);
+	const Render_Object_Proxy& get(renderobj_handle handle) {
+		return proxy_list.get(handle).proxy;
 	}
 
-	Free_List<Render_Object_Proxy> proxy_list;
-
+	Render_Pass opaque;
+	Free_List<ROP_Internal> proxy_list;
 
 	uint32_t skybox = 0;
 	std::vector<Render_Box_Cubemap> cubemaps;
@@ -286,6 +393,7 @@ public:
 	int directional_index = -1;
 	std::vector<Render_Light> lights;
 	uint32_t light_ssbo;
+
 };
 
 struct Draw_Model_Frontend_Params

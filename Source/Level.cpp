@@ -172,7 +172,8 @@ void on_node_callback(void* user, cgltf_data* data, cgltf_node* node, glm::mat4 
 		create_light_obj_from_gltf((Level*)user, node, global_transform);
 	}
 }
-
+#include "Types.h"
+#include "Draw.h"
 Level* LoadLevelFile(const char* level_name)
 {
 	std::string map_dir;
@@ -209,6 +210,19 @@ Level* LoadLevelFile(const char* level_name)
 
 	level->collision = std::move(level->level_prefab->physics);
 	level->collision->build();
+
+
+	for (int i = 0; i < prefab->nodes.size(); i++) {
+		auto& node = prefab->nodes[i];
+		renderobj_handle handle = draw.scene.register_renderable();
+		Render_Object_Proxy obj;
+		obj.mesh = &prefab->meshes[node.mesh_idx];
+		obj.transform = node.transform;
+		obj.animator = nullptr;
+		obj.visible = true;
+		obj.mats = &prefab->mats;
+		draw.scene.update(handle, obj);
+	}
 
 	return level;
 }

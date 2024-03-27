@@ -64,7 +64,9 @@ class Game_Shader
 public:
 	Game_Shader() {
 		memset(images, 0, sizeof images);
+		memset(references, 0, sizeof references);
 	}
+	uint32_t material_id = 0;
 	std::string name;
 	enum { DIFFUSE, NORMAL, ROUGHNESS, METAL, AO, SPECIAL, MAX_IMAGES };
 	Texture* images[MAX_IMAGES];	
@@ -116,6 +118,8 @@ public:
 	std::vector<Texture*> textures;
 	void free_all();
 private:
+	uint32_t cur_mat_id = 1;
+
 	Texture* create_but_dont_load(const char* filename);
 	bool load_texture(const std::string& path, Texture* t);
 };

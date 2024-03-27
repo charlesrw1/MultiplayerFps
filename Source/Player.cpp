@@ -792,16 +792,13 @@ void ViewmodelComponent::update_visuals()
 {
 	Render_Object_Proxy proxy;
 
+	proxy.viewmodel_layer = true;
+	proxy.visible = true;
+	proxy.animator = &animator;
+	proxy.mesh = &model->mesh;
+	proxy.mats = &model->mats;
 	if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
 	{
-		proxy.viewmodel_layer = true;
-		proxy.visible = true;
-		proxy.animator = &animator;
-		proxy.mesh = &model->mesh;
-		proxy.mats = &model->mats;
-
-
-
 			//mat4 invview = glm::inverse(draw.vs.view);
 
 		Game_Local* gamel = &eng->local;

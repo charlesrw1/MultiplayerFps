@@ -9,7 +9,6 @@
 #include "Animation.h"
 #include "Texture.h"
 
-#define _CRT_SECURE_NO_WARNINGS
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 
@@ -1175,6 +1174,8 @@ void Game_Mod_Manager::init()
 // does the actual uploading to the gpu
 bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 {
+	mesh->id = cur_mesh_id++;
+
 	// determine what buffer to go to
 	ASSERT(mesh->parts.size() > 0);
 	int attributes = mesh->attributes;

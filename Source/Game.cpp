@@ -603,7 +603,7 @@ void Entity::update_visuals()
 			proxy.animator = &anim;
 		proxy.mesh = &model->mesh;
 		proxy.mats = &model->mats;
-		proxy.transform = get_world_transform();
+		proxy.transform = get_world_transform()*model->skeleton_root_transform;
 		
 		draw.scene.update(render_handle, proxy);
 	}

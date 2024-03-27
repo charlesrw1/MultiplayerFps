@@ -71,6 +71,7 @@ public:
 class Mesh
 {
 public:
+	uint32_t id = 0;
 	vector<Submesh> parts;
 	Raw_Mesh_Data data;
 	Bounds aabb;
@@ -191,6 +192,8 @@ public:
 	Shared_Vertex_Buffer global_vertex_buffers[NUM_FMT];
 
 private:
+	uint32_t cur_mesh_id = 0;
+
 	bool upload_mesh(Mesh* mesh);
 	bool append_to_buffer(Gpu_Buffer& buf, char* input_data, uint32_t input_length);
 };
