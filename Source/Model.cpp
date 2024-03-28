@@ -519,7 +519,7 @@ bool add_node_mesh_to_new_mesh(
 
 	return true;
 }
-
+extern Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name, bool flipy);
 static Texture* LoadGltfImage2(cgltf_image* i, cgltf_data* data)
 {
 	cgltf_buffer_view& bv = *i->buffer_view;
@@ -530,6 +530,7 @@ static Texture* LoadGltfImage2(cgltf_image* i, cgltf_data* data)
 
 	const char* name = i->name;
 	if (!name) name = "";
+
 
 	return CreateTextureFromImgFormat(buffer_bytes + bv.offset, bv.size,name, false);
 }
@@ -562,7 +563,7 @@ void load_model_materials2(std::vector<Material*>& materials, const std::string&
 			}
 
 			if (!gs) {
-				gs = &mats.fallback;
+				gs = mats.fallback;
 			}
 		}
 		materials.push_back(gs);
@@ -886,7 +887,7 @@ static bool load_gltf_model3(const std::string& filepath, Model* model)
 	for(int i=0;i<model->mesh.parts.size(); i++) {
 		if (model->mesh.parts[i].material_idx == -1) {
 			if (!appended_null_material) {
-				model->mats.push_back(&mats.fallback);
+				model->mats.push_back(mats.fallback);
 				appended_null_material = true;
 			}
 			model->mesh.parts[i].material_idx = model->mats.size() - 1;
@@ -937,7 +938,7 @@ static bool load_gltf_prefab(const std::string& filepath, Prefab_Model* model,
 		for (int j = 0; j < model->meshes[i].parts.size(); j++) {
 			if (model->meshes[i].parts[j].material_idx == -1) {
 				if (!appended_null_material) {
-					model->mats.push_back(&mats.fallback);
+					model->mats.push_back(mats.fallback);
 					appended_null_material = true;
 				}
 				model->meshes[i].parts[j].material_idx = model->mats.size() - 1;

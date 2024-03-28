@@ -11,7 +11,7 @@
 
 #include "Entity.h"
 
-#pragma optimize("", off)
+//#pragma optimize("", off)
 
 Renderer draw;
 
@@ -800,6 +800,7 @@ void Renderer::Init()
 	InitGlState();
 
 	shared.init();
+	scene.init();
 
 	float start = GetTime();
 	reload_shaders();
@@ -1040,6 +1041,19 @@ void Renderer::DrawSkybox()
 	mb.Draw(GL_TRIANGLES);
 	glEnable(GL_CULL_FACE);
 	mb.Free();
+}
+
+void draw_batch(const Render_Pass& pass, const Multidraw_Batch& batch)
+{
+	
+
+}
+
+void draw_render_pass(const Render_Pass& pass)
+{
+	for (int i = 0; i < pass.batches.size(); i++) {
+		draw_batch(pass, pass.batches[i]);
+	}
 }
 
 void Renderer::render_level_to_target(Render_Level_Params params)
@@ -1379,50 +1393,61 @@ void Render_Pass::update_batches()
 }
 #endif
 
-
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
-
-draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& proxy, uint32_t submesh)
+draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& proxy, Material* material, uint32_t submesh, uint32_t layer)
 {
 	draw_call_key key;
 
 	ASSERT(proxy.mats);
-	Material* material = (*proxy.mats)[proxy.mesh->parts[submesh].material_idx];
 	key.shader = draw.get_mat_shader(*proxy.mesh, *material, (type == pass_type::DEPTH));
 	key.blending = (int)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
 	key.vao = proxy.mesh->format;
 	key.mesh = proxy.mesh->id;
+	key.layer = layer;
 
 	return key;
 }
 
-void Render_Pass::delete_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh) {
-	
+//void Render_Pass::delete_object(
+//	const Render_Object_Proxy& proxy, 
+//	renderobj_handle handle, 
+//	Material* material,
+//	uint32_t submesh,
+//	uint32_t layer) {
+//	
+//	Pass_Object obj;
+//	obj.sort_key = create_sort_key_from_obj(proxy, material, submesh, layer);
+//	obj.render_obj = handle;
+//	obj.submesh_index = submesh;
+//	deletions.push_back(obj);
+//}
+void Render_Pass::add_object(
+	const Render_Object_Proxy& proxy, 
+	renderobj_handle handle, 
+	Material* material,
+	uint32_t submesh,
+	uint32_t layer) {
+	ASSERT(handle != -1 && "null handle");
+	ASSERT(material && "null material");
 	Pass_Object obj;
-	obj.sort_key = create_sort_key_from_obj(proxy, submesh);
+	obj.sort_key = create_sort_key_from_obj(proxy, material, submesh, layer);
 	obj.render_obj = handle;
 	obj.submesh_index = submesh;
-	deletions.push_back(obj);
-}
-void Render_Pass::add_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh) {
-	Pass_Object obj;
-	obj.sort_key = create_sort_key_from_obj(proxy, submesh);
-	obj.render_obj = handle;
-	obj.submesh_index = submesh;
-	creations.push_back(obj);
+	obj.material = material;
+	ASSERT(material->gpu_material_mapping != Material::INVALID_MAPPING);
+	objects.push_back(obj);
 }
 #include <iterator>
 void Render_Pass::make_batches(Render_Scene& scene)
 {
-	if (creations.empty() && deletions.empty())
-		return;
+	CPUFUNCTIONSTART;
 
-	draw_call_key key;
-	key.shader = 63;
-	auto abc = key.as_uint64();
+	//if (creations.empty() && deletions.empty())
+	//	return;
+
 
 	const auto& sort_functor = [](const Pass_Object& a, const Pass_Object& b)
 	{ 
@@ -1437,6 +1462,13 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			return  a.submesh_index < b.submesh_index;
 		else return false;
 	};
+
+	// objects were added correctly in back to front order, just sort by layer
+	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
+	{
+		if (a.sort_key.layer < a.sort_key.layer) return true;
+		else return false;
+	};
 	const auto& del_functor = [](const Pass_Object& a, const Pass_Object& b)
 	{
 		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
@@ -1444,38 +1476,43 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			return  a.render_obj < b.render_obj && a.submesh_index < b.submesh_index;
 		else return false;
 	};
-	if (!deletions.empty()) {
+	//if (!deletions.empty()) {
+	//
+	//	std::sort(deletions.begin(), deletions.end(), sort_functor);
+	//
+	//	std::vector<Pass_Object> dest;
+	//	dest.reserve(sorted_list.size());
+	//
+	//	std::set_difference(sorted_list.begin(), sorted_list.end(), deletions.begin(), deletions.end(), std::back_inserter(dest), del_functor);
+	//
+	//	sorted_list = std::move(dest);
+	//	deletions.clear();
+	//}
 
-		std::sort(deletions.begin(), deletions.end(), sort_functor);
+	//if (!creations.empty()) {
+	//	std::sort(creations.begin(), creations.end(), merge_functor);
+	//	size_t start_index = sorted_list.size();
+	//	sorted_list.reserve(sorted_list.size() + creations.size());
+	//	for (auto p : creations)
+	//		sorted_list.push_back(p);
+	//	Pass_Object* start = sorted_list.data();
+	//	Pass_Object* mid = sorted_list.data() + start_index;
+	//	Pass_Object* end = sorted_list.data() + sorted_list.size();
+	//
+	//	std::inplace_merge(start, mid, end, merge_functor);
+	//
+	//	creations.clear();
+	//}
 
-		std::vector<Pass_Object> dest;
-		dest.reserve(sorted_list.size());
-
-		std::set_difference(sorted_list.begin(), sorted_list.end(), deletions.begin(), deletions.end(), std::back_inserter(dest), del_functor);
-
-		sorted_list = std::move(dest);
-		deletions.clear();
-	}
-
-	if (!creations.empty()) {
-		std::sort(creations.begin(), creations.end(), merge_functor);
-		size_t start_index = sorted_list.size();
-		sorted_list.reserve(sorted_list.size() + creations.size());
-		for (auto p : creations)
-			sorted_list.push_back(p);
-		Pass_Object* start = sorted_list.data();
-		Pass_Object* mid = sorted_list.data() + start_index;
-		Pass_Object* end = sorted_list.data() + sorted_list.size();
-
-		std::inplace_merge(start, mid, end, merge_functor);
-
-		creations.clear();
-	}
+	if (type == pass_type::TRANSPARENT)
+		std::sort(objects.begin(), objects.end(), sort_functor_transparent);
+	else
+		std::sort(objects.begin(), objects.end(), merge_functor);
 
 	batches.clear();
 	mesh_batches.clear();
 
-	if (sorted_list.empty()) return;
+	if (objects.empty()) return;
 
 	{
 		const auto& functor = [](int first, Pass_Object* po, const Render_Object_Proxy* rop) -> Mesh_Batch
@@ -1491,15 +1528,18 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		};
 
 		// build mesh batches first
-		Pass_Object* batch_obj = &sorted_list[0];
+		Pass_Object* batch_obj = &objects[0];
 		const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
 		Mesh_Batch batch = functor(0, batch_obj, batch_proxy);
 
-		for (int i = 1; i < sorted_list.size(); i++) {
-			Pass_Object* this_obj = &sorted_list[i];
+		for (int i = 1; i < objects.size(); i++) {
+			Pass_Object* this_obj = &objects[i];
 			const Render_Object_Proxy* this_proxy = &scene.get(this_obj->render_obj);
-			bool same_mesh = this_proxy->mesh == batch_proxy->mesh && this_obj->submesh_index == batch_obj->submesh_index;
-			if (same_mesh)
+			bool can_be_merged
+				= this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64()
+				&& this_obj->submesh_index == batch_obj->submesh_index && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
+			
+			if (can_be_merged)
 				batch.count++;
 			else {
 				mesh_batches.push_back(batch);
@@ -1516,26 +1556,27 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	batch.count = 1;
 	
 	Mesh_Batch* mesh_batch = &mesh_batches[0];
-	Pass_Object* batch_obj = &sorted_list[mesh_batch->first];
+	Pass_Object* batch_obj = &objects[mesh_batch->first];
 	const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
 	bool is_at = mesh_batch->material->alpha_tested;
 	for (int i = 1; i < mesh_batches.size(); i++)
 	{
 		Mesh_Batch* this_batch = &mesh_batches[i];
-		Pass_Object* this_obj = &sorted_list[this_batch->first];
+		Pass_Object* this_obj = &objects[this_batch->first];
 		const Render_Object_Proxy* this_proxy = &scene.get(this_obj->render_obj);
 
 		bool batch_this = false;
 
+		bool same_layer = batch_obj->sort_key.layer == this_obj->sort_key.layer;
 		bool same_vao = batch_obj->sort_key.vao == this_obj->sort_key.vao;
 		bool same_material = batch_obj->sort_key.texture == this_obj->sort_key.texture;
 		bool same_shader = batch_obj->sort_key.shader == this_obj->sort_key.shader;
 		bool same_other_state = batch_obj->sort_key.blending == this_obj->sort_key.blending 
 			&& batch_obj->sort_key.backface == this_obj->sort_key.blending;
 
-		if (type == pass_type::OPAQUE) {
-			if (same_vao && same_material && same_other_state && same_shader)
-				batch_this = true;
+		if (type == pass_type::OPAQUE || type == pass_type::TRANSPARENT) {
+			if (same_vao && same_material && same_other_state && same_shader && same_layer)
+				batch_this = true;	// can batch with different meshes
 			else
 				batch_this = false;
 
@@ -1568,9 +1609,182 @@ void Render_Pass::make_batches(Render_Scene& scene)
 
 
 Render_Scene::Render_Scene() 
-	: opaque(pass_type::OPAQUE)
+	: opaque(pass_type::OPAQUE),
+	transparents(pass_type::TRANSPARENT),
+	depth(pass_type::DEPTH)
 {
 
+}
+
+void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz)
+{
+	indirect_drawid_buf_size = drawbufsz;
+	indirect_instance_buf_size = instbufsz;
+
+	glCreateBuffers(1, &gldrawid_to_submesh_material);
+	glCreateBuffers(1, &glinstance_to_instance);
+}
+
+extern bool use_32_bit_indicies;
+void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
+{
+	list.commands.clear();
+	list.command_count.clear();
+
+	std::vector<uint32_t>& instance_to_instance = list.instance_to_instance;
+	std::vector<uint32_t>& draw_to_material = list.draw_to_material;
+	draw_to_material.clear();
+	instance_to_instance.clear();
+
+	int base_instance = 0;
+
+	for (int i = 0; i < src.batches.size(); i++) {
+		Multidraw_Batch& mdb = src.batches[i];
+
+
+		for (int j = 0; j < mdb.count; j++) {
+			Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
+			auto& obj = src.objects[meshb.first];
+			Render_Object_Proxy& proxy = proxy_list.get(obj.render_obj).proxy;
+			Mesh& mesh = *proxy.mesh;
+			auto& part = mesh.parts[obj.submesh_index];
+			gpu::DrawElementsIndirectCommand cmd;
+			cmd.baseInstance = base_instance;
+			cmd.primCount = meshb.count;
+			cmd.baseVertex = part.base_vertex;
+			cmd.firstIndex = part.element_offset / ((use_32_bit_indicies) ? 4 : 2);
+			cmd.count = part.element_count;
+
+			list.commands.push_back(cmd);
+
+			for (int k = 0; k < meshb.count; k++) {
+				instance_to_instance.push_back(src.objects[meshb.first + k].render_obj);
+			}
+
+			base_instance += cmd.primCount;
+		}
+
+		auto batch_material = src.mesh_batches[mdb.first].material;
+
+		draw_to_material.push_back(batch_material->gpu_material_mapping);
+
+		list.command_count.push_back(mdb.count);
+	}
+
+	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * list.indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
+	glNamedBufferSubData(list.glinstance_to_instance, 0, sizeof(uint32_t) * instance_to_instance.size(), instance_to_instance.data());
+
+	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * list.indirect_drawid_buf_size, nullptr, GL_DYNAMIC_DRAW);
+	glNamedBufferSubData(list.gldrawid_to_submesh_material, 0, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data());
+}
+
+
+void Render_Scene::init()
+{
+	int obj_count = 5'000;
+	int mat_count = 500;
+
+	vis_list.init(mat_count,obj_count);
+	opaque_list.init(mat_count,obj_count);
+	transparents_list.init(mat_count,obj_count);
+	shadow_lists.init(mat_count,obj_count);
+
+	glCreateBuffers(1, &gpu_render_material_buffer);
+	glCreateBuffers(1, &gpu_render_instance_buffer);
+	glCreateBuffers(1, &gpu_skinned_mats_buffer);
+}
+
+void Render_Scene::upload_scene_materials()
+{
+	scene_mats_vec.clear();
+	for (auto& mat : mats.materials) {
+		//if (mat.second.texture_are_loading_in_memory) {	// this material is being used
+			Material& m = mat.second;
+			Gpu_Material gpumat;
+			gpumat.diffuse_tint = m.diffuse_tint;
+			gpumat.rough_mult = m.roughness_mult;
+			gpumat.metal_mult = m.metalness_mult;
+			gpumat.rough_remap_x = m.roughness_remap_range.x;
+			gpumat.rough_remap_y = m.roughness_remap_range.y;
+
+			m.gpu_material_mapping = scene_mats_vec.size();
+
+			scene_mats_vec.push_back(gpumat);
+		//}
+		//else {
+		//	mat.second.gpu_material_mapping = -1;
+		//}
+	}
+
+	glNamedBufferData(gpu_skinned_mats_buffer, sizeof(Gpu_Material) * scene_mats_vec.size(), scene_mats_vec.data(), GL_DYNAMIC_DRAW);
+}
+
+glm::vec4 to_vec4(Color32 color) {
+	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
+}
+
+void Render_Scene::build_scene_data()
+{
+	CPUFUNCTIONSTART;
+
+	// upload materials, FIXME: cache this
+	upload_scene_materials();
+
+	transparents.clear();
+	depth.clear();
+	opaque.clear();
+
+	// add draw calls and sort them
+	gpu_objects.resize(proxy_list.objects.size());
+	skinned_matricies_vec.clear();
+
+	for (int i = 0; i < proxy_list.objects.size(); i++) {
+		auto& obj = proxy_list.objects[i];
+		auto& proxy = obj.type_.proxy;
+		if (proxy.visible) {
+			auto& mesh = *proxy.mesh;
+			for (int j = 0; j < mesh.parts.size(); j++) {
+				auto& part = mesh.parts[j];
+				Material* mat = (*proxy.mats)[part.material_idx];
+				if (mat->is_translucent())
+					transparents.add_object(proxy, obj.handle, mat, j, 0);
+				else {
+					depth.add_object(proxy, obj.handle, mat, j, 0);
+					opaque.add_object(proxy, obj.handle, mat, j, 0);
+				}
+				if (proxy.color_overlay) {
+					transparents.add_object(proxy, obj.handle, mats.unlit, j, 1);
+				}
+			}
+
+			if (proxy.animator) {
+				gpu_objects[i].anim_matrix_offset = skinned_matricies_vec.size();
+				auto& mats = proxy.animator->get_matrix_palette();
+				for (int i = 0; i < proxy.animator->model->bones.size(); i++) {
+					skinned_matricies_vec.push_back(mats[i]);
+				}
+			} 
+			else
+				gpu_objects[i].anim_matrix_offset = 0;
+
+			gpu_objects[i].model = proxy.transform;
+			gpu_objects[i].invmodel = glm::inverse(proxy.transform);
+			gpu_objects[i].color_val = to_vec4(proxy.param1);
+		}
+	}
+
+	glNamedBufferData(gpu_render_instance_buffer, sizeof(Gpu_Object) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
+	glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * skinned_matricies_vec.size(), skinned_matricies_vec.data(), GL_DYNAMIC_DRAW);
+
+	transparents.make_batches(*this);
+	opaque.make_batches(*this);
+	depth.make_batches(*this);
+
+	// build draw calls
+	build_render_list(vis_list, depth);
+	build_render_list(shadow_lists, depth);
+	build_render_list(opaque_list, opaque);
+	build_render_list(transparents_list, transparents);
 }
 
 // culling step:
@@ -2015,8 +2229,6 @@ void mdi_test_imgui()
 		num_prims_per_batch = MAX_OBJECTS /num_batches_to_render;
 	}
 }
-
-extern bool use_32_bit_indicies;
 #include "Meshlet.h"
 
 
@@ -2539,7 +2751,7 @@ void Renderer::scene_draw(bool editor_mode)
 
 	if (!editor_mode) {
 
-		scene.opaque.make_batches(scene);
+		scene.build_scene_data();
 
 		extract_objects();
 
@@ -3218,14 +3430,7 @@ renderobj_handle Render_Scene::register_renderable() {
 void Render_Scene::update(renderobj_handle handle, const Render_Object_Proxy& proxy) 
 {
 	ROP_Internal& in = proxy_list.get(handle);
-
-	if (!in.proxy.mesh && proxy.mesh) {
-		for (int i = 0; i < proxy.mesh->parts.size(); i++)
-			opaque.add_object(proxy, handle, i);
-	}
-
 	in.proxy = proxy;
-
 }
 
 void Render_Scene::remove(renderobj_handle handle) {

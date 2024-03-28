@@ -1285,6 +1285,11 @@ void Game_Engine::init()
 
 	draw.Init();
 	TIMESTAMP("draw init");
+
+	mats.init();
+	mats.load_material_file_directory("./Data/Materials/");
+	TIMESTAMP("mats init");
+
 	mods.init();
 	TIMESTAMP("mods init");
 
@@ -1300,9 +1305,6 @@ void Game_Engine::init()
 	local.init();
 	TIMESTAMP("local init");
 
-	mats.init();
-	mats.load_material_file_directory("./Data/Materials/");
-	TIMESTAMP("mats init");
 
 	// debug interface
 	imgui_context = ImGui::CreateContext();

@@ -13,6 +13,7 @@
 #undef min
 #undef max
 
+#undef OPAQUE
 
 static const char* const texture_folder_path = "./Data/Textures/";
 
@@ -193,8 +194,19 @@ void Game_Material_Manager::init()
 {
 	sys_print("Material Manager initialized\n");
 
+	fallback = create_temp_shader("_fallback");
+	fallback->texture_are_loading_in_memory = true;
 
-	
+	unlit = create_temp_shader("_unlit");
+	unlit->blend = blend_state::BLEND;
+	unlit->type = material_type::UNLIT;
+	unlit->texture_are_loading_in_memory = true;
+
+	outline_hull = create_temp_shader("_outlinehull");
+	outline_hull->blend = blend_state::OPAQUE;
+	outline_hull->type = material_type::OUTLINE_HULL;
+	outline_hull->backface = true;
+	outline_hull->texture_are_loading_in_memory = true;
 }
 
 

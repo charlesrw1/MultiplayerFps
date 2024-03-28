@@ -232,6 +232,7 @@ public:
 		}
 		handle_to_obj[h] = objects.size();
 		objects.resize(objects.size() + 1);
+		objects.back().handle = h;
 
 		return h;
 	}
@@ -254,19 +255,24 @@ public:
 	vector<pair> objects;
 };
 
-struct Batched_Draw_Call
+struct Gpu_Material
 {
-	Batched_Draw_Call() {
-		mat_index = 0;
-		use_custom_sphere = 0;
-	}
-	Material* shader;
-	uint32_t element_count;
-	uint32_t element_start;
-	uint32_t base_vertex;
-	uint32_t mat_index : 31;
-	uint32_t use_custom_sphere : 1;
-	glm::vec4 custom_bounding_sphere = glm::vec4(0,0,0,1.f);
+	glm::vec4 diffuse_tint;
+	float rough_mult;
+	float metal_mult;
+	float rough_remap_x;
+	float rough_remap_y;
+};
+
+struct Gpu_Object
+{
+	glm::mat4x4 model;
+	glm::mat4x4 invmodel;
+	glm::vec4 color_val;
+	int anim_matrix_offset = 0;
+	float obj_param1;
+	float obj_param2;
+	float padding;
 };
 
 
@@ -290,13 +296,18 @@ struct Multidraw_Batch
 struct draw_call_key  {
 	draw_call_key() {
 		shader = blending = backface = texture = vao = mesh = 0;
+		layer = 0;
 	}
-	uint64_t mesh : 20;
+
+	// lowest
+	uint64_t mesh : 19;
 	uint64_t vao : 5;
-	uint64_t texture : 20;
+	uint64_t texture : 19;
 	uint64_t backface : 1;
 	uint64_t blending : 3;
-	uint64_t shader : 15;
+	uint64_t shader : 14;
+	uint64_t layer : 3;		
+	// highest
 	
 	uint64_t as_uint64() const{
 		return *(reinterpret_cast<const uint64_t*>(this));
@@ -307,11 +318,15 @@ static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
 
 struct Pass_Object
 {
-	draw_call_key sort_key;
-	renderobj_handle render_obj = -1;	// entity instance
-	uint32_t submesh_index = 0;			// what submesh am i
-};
+	Pass_Object() {
+		submesh_index = 0;
+	}
 
+	draw_call_key sort_key;
+	const Material* material = nullptr;
+	renderobj_handle render_obj = -1;	// entity instance
+	uint32_t submesh_index;		// what submesh am i
+};
 
 // in the end: want a flat list of batches that are merged with neighbors
 enum class pass_type
@@ -330,33 +345,94 @@ class Render_Pass
 public:
 	Render_Pass(pass_type type);
 
-	void make_batches(Render_Scene& scene);
 
 	pass_type type;
 
-	void delete_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh);
-	void add_object(const Render_Object_Proxy& proxy, renderobj_handle handle, uint32_t submesh);
+	//void delete_object(
+	//	const Render_Object_Proxy& proxy, 
+	//	renderobj_handle handle,
+	//	Material* material,
+	//	uint32_t submesh,
+	//	uint32_t layer);
 
-	draw_call_key create_sort_key_from_obj(const Render_Object_Proxy& proxy, uint32_t submesh);
+	void make_batches(Render_Scene& scene);
+	
+	void add_object(
+		const Render_Object_Proxy& proxy, 
+		renderobj_handle handle,
+		Material* material,
+		uint32_t submesh, 
+		uint32_t layer);
 
-	std::vector<Pass_Object> deletions;
-	std::vector<Pass_Object> creations;
-	std::vector<Pass_Object> sorted_list;
+	draw_call_key create_sort_key_from_obj(
+		const Render_Object_Proxy& proxy, 
+		Material* material, 
+		uint32_t submesh, 
+		uint32_t layer);
+
+	void clear() {
+		objects.clear();
+	}
+
+	//std::vector<Pass_Object> deletions;
+	//std::vector<Pass_Object> creations;
+
+
+	std::vector<Pass_Object> objects;
 	std::vector<Mesh_Batch> mesh_batches;
 	std::vector<Multidraw_Batch> batches;
-	std::vector<gpu::DrawElementsIndirectCommand> commands;
 };
 
+class Culling_Pass
+{
+public:
+	bufferhandle visibility;
+};
 
 struct ROP_Internal
 {
 	Render_Object_Proxy proxy;
 };
 
+// cull main view
+// first pass does objects visible last frame
+// render visible ones last frame
+// second pass works on objects not visible, check if they are this frame
+
+// use the culling result to create draw calls for opaque, transparent
+
+// shadow view culling
+// only does frustum, cull objects for each cascade
+// create draw calls for each cascade
+
+struct Render_Lists
+{
+	void init(uint32_t drawidsz, uint32_t instbufsz);
+	uint32_t indirect_drawid_buf_size=0;
+	uint32_t indirect_instance_buf_size=0;
+
+
+	std::vector<gpu::DrawElementsIndirectCommand> commands;
+	bufferhandle gpu_command_list = 0;
+	std::vector<int> command_count;
+	bufferhandle gpu_command_count = 0;
+
+	std::vector<uint32_t> instance_to_instance;
+	std::vector<uint32_t> draw_to_material;
+
+	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
+	bufferhandle gldrawid_to_submesh_material;
+	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
+	bufferhandle glinstance_to_instance;
+};
+
 class Render_Scene
 {
 public:
 	Render_Scene();
+
+	void init();
+
 	renderobj_handle register_renderable();
 	void update(renderobj_handle handle, const Render_Object_Proxy& proxy);
 	void remove(renderobj_handle handle);
@@ -364,7 +440,28 @@ public:
 		return proxy_list.get(handle).proxy;
 	}
 
-	Render_Pass opaque;
+	void build_scene_data();
+	void build_render_list(Render_Lists& list, Render_Pass& src);
+	void upload_scene_materials();
+
+	Render_Pass depth;			// vis/shadow objects, same as opaque but grouped with minimal draw clls
+	Render_Pass opaque;			// opaque objects that have full sorting
+	Render_Pass transparents;	// transparent objects added in back to front order
+
+	Render_Lists vis_list;
+	Render_Lists opaque_list;
+	Render_Lists transparents_list;
+	Render_Lists shadow_lists;	// one for each cascade
+
+	std::vector<glm::mat4x4> skinned_matricies_vec;
+	std::vector<Gpu_Object> gpu_objects;
+	std::vector<Gpu_Material> scene_mats_vec;
+	bufferhandle gpu_skinned_mats_buffer = 0;
+	bufferhandle gpu_render_instance_buffer = 0;
+	bufferhandle gpu_render_material_buffer = 0;
+
+	Culling_Pass main_view;
+
 	Free_List<ROP_Internal> proxy_list;
 
 	uint32_t skybox = 0;
@@ -389,61 +486,6 @@ struct Draw_Model_Frontend_Params
 	bool render_additive;
 	glm::vec4 colorparam;
 };
-
-struct Draw_Call_Object
-{
-	int transform_idx = 0;
-	int mesh_idx = 0;
-	int owner_handle_idx = 0;
-};
-
-struct Multidraw_Indirect_Command
-{
-	unsigned int  count;
-	unsigned int  primCount;
-	unsigned int  firstIndex;
-	int   baseVertex;
-	unsigned int  baseInstance;
-};
-
-struct Gpu_Material
-{
-	glm::vec4 diffuse_tint;
-	float rough_mult;
-	float metal_mult;
-	float rough_remap_x;
-	float rough_remap_y;
-};
-
-struct Gpu_Object
-{
-	glm::mat4x4 model;
-	glm::mat4x4 invmodel;
-	glm::vec4 color_val;
-	int anim_matrix_offset = 0;
-	float obj_param1;
-	float obj_param2;
-	float padding;
-};
-
-
-struct Gpu_Batch
-{
-
-};
-
-
-typedef int Renering_Pass_Handle;
-
-// defines the resources needed for each pass (forward, shadow, reflection)
-struct Gpu_Mesh_Pass
-{
-	// these is written to by the gpu for culling and drawn
-	uint32_t indirect_draw_buffer;
-	uint32_t visibility_buffer;
-};
-
-typedef int Render_Scene_Handle;
 
 struct Draw_Call
 {
