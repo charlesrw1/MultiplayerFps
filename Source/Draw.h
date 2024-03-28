@@ -255,27 +255,6 @@ public:
 	vector<pair> objects;
 };
 
-struct Gpu_Material
-{
-	glm::vec4 diffuse_tint;
-	float rough_mult;
-	float metal_mult;
-	float rough_remap_x;
-	float rough_remap_y;
-};
-
-struct Gpu_Object
-{
-	glm::mat4x4 model;
-	glm::mat4x4 invmodel;
-	glm::vec4 color_val;
-	int anim_matrix_offset = 0;
-	float obj_param1;
-	float obj_param2;
-	float padding;
-};
-
-
 // represents a singular call to glDrawElements() with same state and mesh, batchable
 struct Mesh_Batch
 {
@@ -454,8 +433,8 @@ public:
 	Render_Lists shadow_lists;	// one for each cascade
 
 	std::vector<glm::mat4x4> skinned_matricies_vec;
-	std::vector<Gpu_Object> gpu_objects;
-	std::vector<Gpu_Material> scene_mats_vec;
+	std::vector<gpu::Object_Instance> gpu_objects;
+	std::vector<gpu::Material_Data> scene_mats_vec;
 	bufferhandle gpu_skinned_mats_buffer = 0;
 	bufferhandle gpu_render_instance_buffer = 0;
 	bufferhandle gpu_render_material_buffer = 0;
@@ -518,8 +497,8 @@ public:
 	vector<Draw_Call> shadows;
 
 	vector<glm::mat4x4> skinned_matricies;
-	vector<Gpu_Object> gpu_objects;
-	vector<Gpu_Material> scene_mats;
+	vector<gpu::Object_Instance> gpu_objects;
+	vector<gpu::Material_Data> scene_mats;
 
 	uint32_t scene_mats_ssbo;
 	uint32_t gpu_objs_ssbo;

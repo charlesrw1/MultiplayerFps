@@ -574,6 +574,9 @@ program_handle compile_mat_shader(shader_key key)
 		vert_shader = "AnimBasicV.txt";
 		frag_shader = "WaterF.txt";
 		break;
+	default:
+		ASSERT(!"material type not defined\n");
+		break;
 	}
 
 	if (key.alpha_tested) params += "ALPHATEST,";
@@ -858,14 +861,14 @@ void Renderer::Init()
 
 	glCreateTextures(GL_TEXTURE_2D, 1, &black_texture.gl_id);
 	glTextureStorage2D(black_texture.gl_id, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(black_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
+	glTextureSubImage2D(black_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, bdata);
 	glTextureParameteri(black_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTextureParameteri(black_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glGenerateTextureMipmap(black_texture.gl_id);
 
 	glCreateTextures(GL_TEXTURE_2D, 1, &flat_normal_texture.gl_id);
 	glTextureStorage2D(flat_normal_texture.gl_id, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(flat_normal_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
+	glTextureSubImage2D(flat_normal_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, normaldata);
 	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glGenerateTextureMipmap(flat_normal_texture.gl_id);
@@ -1130,6 +1133,11 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 
 		set_shader(program);
 
+		if (mat->type == material_type::WINDSWAY)
+			set_wind_constants();
+		else if (mat->type == material_type::WATER)
+			set_water_constants();
+
 		glBindVertexArray(mods.global_vertex_buffers[(int)format].main_vao);
 		
 		if (backface)
@@ -1165,6 +1173,11 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 				SET_OR_USE_FALLBACK(material_texture::METAL, METAL1_LOC, white_texture);
 				SET_OR_USE_FALLBACK(material_texture::NORMAL, NORMAL1_LOC, flat_normal_texture);
 			}
+		}
+
+		// alpha tested materials are a special case
+		if (pass.type == pass_type::DEPTH && mat->is_alphatested()) {
+			SET_OR_USE_FALLBACK(material_texture::DIFFUSE, ALBEDO1_LOC, white_texture);
 		}
 
 		shader().set_int("indirect_material_offset", offset);
@@ -1403,10 +1416,10 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 	bool casts_shadows,
 	glm::vec4 colorparam)
 {
-	Gpu_Object obj;
+	gpu::Object_Instance obj;
 	
 	if (animator) {
-		obj.anim_matrix_offset = skinned_matricies.size();
+		obj.anim_mat_offset = skinned_matricies.size();
 		auto& mats = animator->get_matrix_palette();
 		for (int i = 0; i < animator->model->bones.size(); i++) {
 			skinned_matricies.push_back(mats[i]);
@@ -1417,7 +1430,7 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 
 	obj.model = transform;
 	obj.invmodel = glm::inverse(transform);
-	obj.color_val = colorparam;
+	obj.colorval = colorparam;
 
 	int obj_idx = gpu_objects.size();
 	gpu_objects.push_back(obj);
@@ -1427,12 +1440,12 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 		dc.mat = mat_list[mesh->parts[s].material_idx];
 		if (1) {
 			// map it to a buffer
-			Gpu_Material gpumat;
-			gpumat.diffuse_tint = dc.mat->diffuse_tint;
+			gpu::Material_Data gpumat;
+			gpumat.diffuse_tint = glm::vec4(1.f);// dc.mat->diffuse_tint;
 			gpumat.rough_mult = dc.mat->roughness_mult;
 			gpumat.metal_mult = dc.mat->metalness_mult;
-			gpumat.rough_remap_x = dc.mat->roughness_remap_range.x;
-			gpumat.rough_remap_y = dc.mat->roughness_remap_range.y;
+			//gpumat.rough_remap_x = dc.mat->roughness_remap_range.x;
+			//gpumat.rough_remap_y = dc.mat->roughness_remap_range.y;
 
 			dc.mat_index = scene_mats.size();
 			scene_mats.push_back(gpumat);
@@ -1839,12 +1852,12 @@ void Render_Scene::upload_scene_materials()
 	for (auto& mat : mats.materials) {
 		//if (mat.second.texture_are_loading_in_memory) {	// this material is being used
 			Material& m = mat.second;
-			Gpu_Material gpumat;
-			gpumat.diffuse_tint = m.diffuse_tint;
+			gpu::Material_Data gpumat;
+			gpumat.diffuse_tint = glm::vec4(1.f);// m.diffuse_tint;
 			gpumat.rough_mult = m.roughness_mult;
 			gpumat.metal_mult = m.metalness_mult;
-			gpumat.rough_remap_x = m.roughness_remap_range.x;
-			gpumat.rough_remap_y = m.roughness_remap_range.y;
+		//	gpumat.rough_remap_x = m.roughness_remap_range.x;
+			//gpumat.rough_remap_y = m.roughness_remap_range.y;
 
 			m.gpu_material_mapping = scene_mats_vec.size();
 
@@ -1855,7 +1868,7 @@ void Render_Scene::upload_scene_materials()
 		//}
 	}
 
-	glNamedBufferData(gpu_skinned_mats_buffer, sizeof(Gpu_Material) * scene_mats_vec.size(), scene_mats_vec.data(), GL_DYNAMIC_DRAW);
+	glNamedBufferData(gpu_render_material_buffer, sizeof(gpu::Material_Data) * scene_mats_vec.size(), scene_mats_vec.data(), GL_DYNAMIC_DRAW);
 }
 
 glm::vec4 to_vec4(Color32 color) {
@@ -1897,22 +1910,25 @@ void Render_Scene::build_scene_data()
 			}
 
 			if (proxy.animator) {
-				gpu_objects[i].anim_matrix_offset = skinned_matricies_vec.size();
+				gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
 				auto& mats = proxy.animator->get_matrix_palette();
 				for (int i = 0; i < proxy.animator->model->bones.size(); i++) {
 					skinned_matricies_vec.push_back(mats[i]);
 				}
 			} 
 			else
-				gpu_objects[i].anim_matrix_offset = 0;
+				gpu_objects[i].anim_mat_offset = 0;
 
-			gpu_objects[i].model = proxy.transform;
-			gpu_objects[i].invmodel = glm::inverse(proxy.transform);
-			gpu_objects[i].color_val = to_vec4(proxy.param1);
+			if (proxy.viewmodel_layer)
+				gpu_objects[i].model = glm::inverse(draw.vs.view) * proxy.transform;
+			else
+				gpu_objects[i].model = proxy.transform;
+			gpu_objects[i].invmodel = glm::inverse(gpu_objects[i].model);
+			gpu_objects[i].colorval = to_vec4(proxy.param1);
 		}
 	}
 
-	glNamedBufferData(gpu_render_instance_buffer, sizeof(Gpu_Object) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
+	glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
 	glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * skinned_matricies_vec.size(), skinned_matricies_vec.data(), GL_DYNAMIC_DRAW);
 
 	transparents.make_batches(*this);
@@ -2059,9 +2075,9 @@ void Shared_Gpu_Driven_Resources::build_draw_calls()
 	//}
 
 
-	glNamedBufferData(scene_mats_ssbo, sizeof Gpu_Material * scene_mats.size(), scene_mats.data(), GL_STATIC_DRAW);
+	glNamedBufferData(scene_mats_ssbo, sizeof gpu::Material_Data * scene_mats.size(), scene_mats.data(), GL_STATIC_DRAW);
 	glNamedBufferData(anim_matrix_ssbo, sizeof glm::mat4 * skinned_matricies.size(), skinned_matricies.data(), GL_DYNAMIC_DRAW);
-	glNamedBufferData(gpu_objs_ssbo, sizeof Gpu_Object * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
+	glNamedBufferData(gpu_objs_ssbo, sizeof gpu::Object_Instance * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
 
 	auto compare = [](const Draw_Call& a, const Draw_Call& b) {
 		return a.sort < b.sort;
@@ -2224,106 +2240,6 @@ public:
 	uint32_t buffer = 0;
 };
 
-// Initialization: 
-// 
-// final_draw_calls is initialized to all the possible meshes of the objects
-//	on cpu: set element offset, element count, vertex base
-// 
-// obj_data is initialized and updated to the objects in the scene
-// 
-// draw_calls are created once when the ObjLevelData is created and aren't 
-// changed unless a material change happens or the obj is deleted
-// 
-// draw_call_indirection is set to the size of draw_calls
-//
-// Per frame:
-// gpu culling executes for each draw call, performs frustum/hi-z (with two pass system later)
-// then, it runs a compaction parallel prefix whatever sum on the final_draw_calls, which should compact them and remove 0 draw call meshes
-// next, it fills the draw_call_indirection buffer
-// the draw_call_indirection buffer is used when drawing an object by indexing it with baseinstance_id + instance_id
-// this then gives you an integer indexinto the draw_calls structure
-//
-// so to fill out this draw_call_indirection buffer, the gpu needs to set the baseinstance_id + instance_offset location of 
-// the indirection buffer to the index of the draw_call
-// since the parallel prefix sum was done, each DrawElementsIndirectCommand now has the correct baseinstance_id
-
-struct Mesh_Pass_Mdi
-{
-	vector<High_Level_Render_Object> high_level_objs;
-	vector<ObjLevelData> obj_data;		// 1 obj data creates n draw calls per material
-	vector<DrawCallObject> draw_calls;
-	vector<Gpu_Material> materials;
-	vector<Mesh_Pass_Mdi_Batch> batches;
-
-	Gpu_Buf<ObjLevelData> gpu_objs;
-	Gpu_Buf<DrawCallObject> gpu_draws;
-	Gpu_Buf<Gpu_Material> gpu_materials;
-	Gpu_Buf<uint32_t> draw_call_indirection;
-	Gpu_Buf<gpu::DrawElementsIndirectCommand> final_draw_calls;
-
-	// draw element indirect commands
-	Persistently_Mapped_Buffer dei_cmds;
-	// draw call objects
-	Persistently_Mapped_Buffer drawcalls;
-	uint32_t drawid_to_obj;
-
-
-
-	uint32_t culling_data_ubo;
-
-
-	int add_object(Mesh* mesh, Material* mat, glm::mat4 transform) {
-		
-		ObjLevelData obj;
-		obj.animation_start = 0;
-		obj.transform = transform;
-		obj.origin_and_radius = glm::vec4(mesh->aabb.get_center(), mesh->aabb.longest_axis() * 0.5f);
-		int obj_index = obj_data.size();
-		obj_data.push_back(obj);
-
-
-		int draw_call_start = draw_calls.size();
-		for (int i = 0; i < mesh->parts.size(); i++) {
-			DrawCallObject call;
-			call.index_to_mesh_draw_call = obj_index;
-			call.index_to_obj_data = obj_index;
-			call.index_to_mat_data = 0;
-			draw_calls.push_back(call);
-		}
-
-		High_Level_Render_Object high_level_obj = {};
-		high_level_obj.draw_calls_count = mesh->parts.size();
-		high_level_obj.draw_calls_start = draw_call_start;
-		high_level_obj.material = mat;
-		high_level_obj.mesh = mesh;
-		high_level_obj.obj_data_index = obj_index;
-
-		high_level_objs.push_back(high_level_obj);
-		return high_level_objs.size() - 1;
-	}
-
-	void init() {
-		glCreateBuffers(1, &culling_data_ubo);
-		glCreateBuffers(1, &gpu_objs.handle);
-		glCreateBuffers(1, &gpu_materials.handle);
-		glCreateBuffers(1, &gpu_draws.handle);
-		glCreateBuffers(1, &draw_call_indirection.handle);
-		glCreateBuffers(1, &final_draw_calls.handle);
-		GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-		
-	}
-	void update_and_cull() {
-		Culling_Data_Ubo ubo;
-		ubo.enable_culling = true;
-		ubo.znear = draw.vs.near;
-		ubo.zfar = draw.vs.far;
-		ubo.view = draw.vs.view;
-		ubo.proj = draw.vs.proj;
-		ubo.num_calls = draw_calls.size();
-
-
-	}
-};
 
 enum mdimodes
 {

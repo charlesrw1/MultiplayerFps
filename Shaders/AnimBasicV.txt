@@ -43,19 +43,9 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
-struct Gpu_Object_Data
-{
-	mat4 model;
-	mat4 invmodel;
-	vec4 colorval;
-	int anim_mat_offset;
-	float obj1;
-	float obj2;
-	float obj3;
-};
 
 layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
-	Gpu_Object_Data g_objects[];
+	Object_Instance g_objects[];
 };
 layout (binding = 3, std140) readonly buffer Object_Skin_Matricies {
 	mat4 g_skin_matricies[];
@@ -110,7 +100,7 @@ void main()
 	vec3 local_tangent = vec3(0.0);
 #endif // NORMALMAPPED
 
-	int obj_skin_offset = g_objects[obj_index].anim_mat_offset;
+	uint obj_skin_offset = g_objects[obj_index].anim_mat_offset;
 
 	for(int i=0;i<4;i++) {
 		if(VS_IN_BoneIndicies[i]==-1)

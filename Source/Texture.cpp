@@ -120,10 +120,15 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 			}
 			else sys_print("unknown shader type %s\n", str_get);
 		}
+
+		gs->blend = blend_state::OPAQUE;
 		if (*(str_get = dict.get_string("alpha")) != 0) {
-			if (strcmp(str_get, "add") == 0)gs->blend = blend_state::ADD;
-			else if (strcmp(str_get, "blend") == 0) gs->blend = blend_state::BLEND;
-			else if (strcmp(str_get, "test") == 0) gs->alpha_tested = true;;
+			if (strcmp(str_get, "add") == 0)
+				gs->blend = blend_state::ADD;
+			else if (strcmp(str_get, "blend") == 0) 
+				gs->blend = blend_state::BLEND;
+			else if (strcmp(str_get, "test") == 0) 
+				gs->alpha_tested = true;
 		}
 
 		if (*(str_get = dict.get_string("showbackface", "no")) == 0) {

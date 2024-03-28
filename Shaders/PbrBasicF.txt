@@ -94,17 +94,8 @@ layout (std140, binding = 8) uniform LightSpaceMatrices
 	vec4 FarPlanes;
 }CascadeMats;
 
-struct Gpu_Material
-{
-	vec4 diffuse_tint;
-	float rough_mult;
-	float metal_mult;
-	float padding1;
-	float padding2;
-};
-
-layout(binding = 4,std140) readonly buffer Material_Buffer {
-	Gpu_Material g_materials[];
+layout(binding = 4,std430) readonly buffer Material_Buffer {
+	Material_Data g_materials[];
 };
 
 
@@ -478,7 +469,10 @@ vec3 randColor(uint number){
 
 void main()
 {
+
 	uint obj_mat_index = FS_IN_Matid;
+	//FS_OUT_Color = vec4(vec3(get_ao())*randColor(FS_IN_Matid),1.0);
+	//return;
 
 	vec4 tex = texture(basecolor, vec2(FS_IN_Texcoord.x,FS_IN_Texcoord.y));
 	
@@ -554,8 +548,7 @@ vec3 normal_tex_rgb = N;
 
 	FS_OUT_Color = pbr_calculate(tex.rgb, roughness_metal.r , roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//FS_OUT_Color = vec4(roughness_metal.r, roughness_metal.g,0.0,0.0);
-	FS_OUT_Color = vec4(randColor(FS_IN_Matid)*max(dot(N,V),0.0),1.0);
-	//FS_OUT_Color = vec4(vec3(roughness_metal.g), 1.0);
+	//FS_OUT_Color = vec4(vec3(N), 1.0);
 
 #endif
 //#endif

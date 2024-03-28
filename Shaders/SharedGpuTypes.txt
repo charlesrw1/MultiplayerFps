@@ -7,6 +7,27 @@ typedef uint32_t uint;
 namespace gpu {
 #endif
 
+struct Object_Instance
+{
+	mat4 model;
+	mat4 invmodel;
+	vec4 colorval;
+	uint anim_mat_offset;
+	float obj1;
+	float obj2;
+	float obj3;
+};
+
+struct Material_Data
+{
+	vec4 diffuse_tint;
+	float rough_mult;
+	float metal_mult;
+	float padding1;
+	float padding2;
+};
+
+
 struct Ubo_View_Constants_Struct
 {
 	mat4 view;
