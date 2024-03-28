@@ -81,6 +81,7 @@ void main()
 	
 	prefix_sum_inclusive_append(id, meshlets_in_mesh);
 }
+
 #endif // INSTANCE_CULLING
 
 #ifdef MESHLET_CULLING

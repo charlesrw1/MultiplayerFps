@@ -597,6 +597,26 @@ public:
 	std::vector<material_shader_internal> shader_hash_map;
 };
 
+struct Opengl_State_Machine
+{
+	program_handle active_program;
+	texhandle textures_bound[16];
+	blend_state blending = blend_state::OPAQUE;
+	bool backface_state = false;
+	uint32_t current_vao = 0;
+
+	enum invalid_bits {
+		PROGRAM_BIT,
+		BLENDING_BIT,
+		BACKFACE_BIT,
+		VAO_BIT,
+		TEXTURE0_BIT,
+	};
+	uint32_t invalid_bits = UINT32_MAX;
+
+	void reset_state_machine();
+};
+
 class Renderer
 {
 public:
@@ -616,6 +636,9 @@ public:
 	void draw_model_immediate(Draw_Model_Frontend_Params params);
 
 	void reload_shaders();
+
+	void create_shaders();
+
 	void ui_render();
 
 	void on_level_start();
@@ -623,6 +646,7 @@ public:
 
 	void cubemap_positions_debug();
 
+	void execute_render_lists(Render_Lists& lists, Render_Pass& pass);
 
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
@@ -704,14 +728,7 @@ public:
 
 	void bind_texture(int bind, int id);
 	
-	void set_shader(program_handle handle) {
-		ASSERT(handle != -1);
-		if (handle != current_program) {
-			current_program = handle;
-			prog_man.get_obj(handle).use();
-			stats.shaders_bound++;
-		}
-	}
+	void set_shader(program_handle handle);
 
 	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
 		bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face);

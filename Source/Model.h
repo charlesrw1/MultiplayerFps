@@ -69,6 +69,14 @@ public:
 	int material_idx = 0;
 };
 
+enum class mesh_format
+{
+	SKINNED,
+	STATIC,
+	STATIC_PLUS,
+	COUNT
+};
+
 class Mesh
 {
 public:
@@ -80,13 +88,16 @@ public:
 	uint32_t merged_index_pointer = 0;	// in bytes
 	uint32_t merged_vert_offset = 0;
 	bool is_merged = false;
-	int format = 0;
+	mesh_format format = mesh_format::STATIC;
 	vertexarrayhandle vao = 0;
 
 	bool has_lightmap_coords() const;
 	bool has_colors() const;
 	bool has_bones() const;
 	bool has_tangents() const;
+	int format_as_int() {
+		return (int)format;
+	}
 };
 
 struct Model_Tag
@@ -176,20 +187,13 @@ public:
 		uint32_t main_vao = 0;
 	};
 
-	enum Formats {
-		FMT_SKINNED,	
-		FMT_STATIC,
-		FMT_STATIC_PLUS,
-		NUM_FMT
-	};
-
 	std::unordered_map<string, Prefab_Model*> prefabs;
 	std::unordered_map<string, Model*> models;
 
 	vertexarrayhandle depth_animated_vao = 0;
 	vertexarrayhandle depth_static_vao = 0;
 	Gpu_Buffer global_index_buffer;
-	Shared_Vertex_Buffer global_vertex_buffers[NUM_FMT];
+	Shared_Vertex_Buffer global_vertex_buffers[(int)mesh_format::COUNT];
 
 private:
 	uint32_t cur_mesh_id = 0;

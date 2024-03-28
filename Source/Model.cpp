@@ -252,7 +252,7 @@ public:
 };
 
 #define TO_MASK(x) (1<<x)
-Vertex_Descriptor vertex_buffer_formats[Game_Mod_Manager::NUM_FMT] =
+Vertex_Descriptor vertex_buffer_formats[(int)mesh_format::COUNT] =
 {
 	// skinned format
 	Vertex_Descriptor(
@@ -989,12 +989,12 @@ void Game_Mod_Manager::compact_memory()
 	vector<uint32_t> fixups[3];
 	for (auto& model : models) {
 		indexlist.push_back({ &model.second->mesh });
-		vertexlist[model.second->mesh.format].push_back(&model.second->mesh);
+		vertexlist[(int)model.second->mesh.format].push_back(&model.second->mesh);
 	}
 	for (auto& prefab : prefabs)
 		for (int i = 0; i < prefab.second->meshes.size(); i++) {
 			indexlist.push_back({ &prefab.second->meshes[i] });
-			vertexlist[prefab.second->meshes[i].format].push_back(&prefab.second->meshes[i]);
+			vertexlist[prefab.second->meshes[i].format_as_int()].push_back(&prefab.second->meshes[i]);
 		}
 	for (int i = 0; i < 3; i++)fixups[i].resize(vertexlist[i].size());
 
@@ -1055,7 +1055,7 @@ void Game_Mod_Manager::print_usage()
 {
 	int total_memory_usage = global_index_buffer.allocated;
 	sys_print("Index buffer: %d/%d", global_index_buffer.used, global_index_buffer.allocated);
-	for (int i = 0; i < NUM_FMT; i++) {
+	for (int i = 0; i < (int)mesh_format::COUNT; i++) {
 		sys_print("Vertex buffer %i\n", i);
 		int vertex_count = global_vertex_buffers[i].attributes[0].used / 12;
 		int vertex_allocated = global_vertex_buffers[i].attributes[0].allocated / 12;
@@ -1157,12 +1157,12 @@ void Game_Mod_Manager::init()
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, default_index_buffer_size * index_attribute_format.get_size(), NULL, GL_STATIC_DRAW);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-	for (int i = 0; i < NUM_FMT; i++) {
+	for (int i = 0; i < (int)mesh_format::COUNT; i++) {
 		vertex_buffer_formats[i].generate_buffers(global_vertex_buffers[i].attributes);
 	}
 
 	// create vaos
-	for (int i = 0; i < NUM_FMT; i++) {
+	for (int i = 0; i < (int)mesh_format::COUNT; i++) {
 		glGenVertexArrays(1, &global_vertex_buffers[i].main_vao);
 		glBindVertexArray(global_vertex_buffers[i].main_vao);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, global_index_buffer.handle);
@@ -1180,11 +1180,11 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 	// determine what buffer to go to
 	ASSERT(mesh->parts.size() > 0);
 	int attributes = mesh->attributes;
-	Formats format = FMT_STATIC;
+	mesh_format format = mesh_format::STATIC;
 	if (attributes & TO_MASK(ATTRIBUTE_JOINT))
-		format = FMT_SKINNED;
+		format = mesh_format::SKINNED;
 	else if ((attributes & TO_MASK(ATTRIBUTE_UV2)) || (attributes & TO_MASK(ATTRIBUTE_COLOR)))
-		format = FMT_STATIC_PLUS;
+		format = mesh_format::STATIC_PLUS;
 	mesh->format = format;
 	mesh->merged_index_pointer = global_index_buffer.used;
 	append_to_buffer(
@@ -1194,17 +1194,19 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 	);
 	glCheckError();
 
-	mesh->vao = global_vertex_buffers[format].main_vao;
+	const int format_int = mesh->format_as_int();
 
-	mesh->merged_vert_offset = global_vertex_buffers[format].attributes[0].used / vertex_attribute_formats[0].get_size();
+	mesh->vao = global_vertex_buffers[format_int].main_vao;
+
+	mesh->merged_vert_offset = global_vertex_buffers[format_int].attributes[0].used / vertex_attribute_formats[0].get_size();
 	int num_verticies = mesh->data.buffers[0].size() / vertex_attribute_formats[0].get_size();
 	for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-		if (vertex_buffer_formats[format].mask & (1 << i)) {
+		if (vertex_buffer_formats[format_int].mask & (1 << i)) {
 			// sanity check
 			int this_attribute_verticies = mesh->data.buffers[i].size() / vertex_attribute_formats[i].get_size();
 			// this can happen and is allowed, like a lightmap mesh not using vertex colors
 			if (this_attribute_verticies == 0) {
-				global_vertex_buffers[format].attributes[i].used += num_verticies * vertex_attribute_formats[i].get_size();
+				global_vertex_buffers[format_int].attributes[i].used += num_verticies * vertex_attribute_formats[i].get_size();
 			}
 			else if (this_attribute_verticies != num_verticies){
 				//assert(0 && "vertex count mismatch");
@@ -1213,7 +1215,7 @@ bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
 			}
 			else {
 				bool good = append_to_buffer(
-					global_vertex_buffers[format].attributes[i],
+					global_vertex_buffers[format_int].attributes[i],
 					mesh->data.buffers[i].data(),
 					mesh->data.buffers[i].size()
 				);

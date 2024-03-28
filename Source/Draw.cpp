@@ -540,6 +540,19 @@ shader_key get_real_shader_key_from_shader_type(shader_key key)
 	return key;
 }
 
+void Renderer::set_shader(program_handle handle)
+{
+	if (handle == -1) {
+		current_program = -1;
+		glUseProgram(0);
+	}
+	if (handle != current_program) {
+		current_program = handle;
+		prog_man.get_obj(handle).use();
+		stats.shaders_bound++;
+	}
+}
+
 program_handle compile_mat_shader(shader_key key)
 {
 	std::string params;
@@ -574,6 +587,7 @@ program_handle compile_mat_shader(shader_key key)
 	ASSERT(handle != -1);
 	draw.set_shader(handle);
 	draw.set_shader_sampler_locations();
+	draw.set_shader(-1);
 
 	draw.mat_table.insert(key, handle);
 	return handle;
@@ -591,14 +605,13 @@ static Shader naiveshader2;
 static Shader mdi_meshlet_cull_shader;
 static Shader mdi_meshlet_zero_bufs;
 
-
-void Renderer::reload_shaders()
+void Renderer::create_shaders()
 {
 	ssao.reload_shaders();
 	Shader::compile(&naiveshader, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE");
-		Shader::compile(&naiveshader2, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE2");
+	Shader::compile(&naiveshader2, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE2");
 
-		Shader::compile(&mdi_meshlet_cull_shader, "SimpleMeshV.txt", "UnlitF.txt", "MDICULL");
+	Shader::compile(&mdi_meshlet_cull_shader, "SimpleMeshV.txt", "UnlitF.txt", "MDICULL");
 
 
 	Shader::compute_compile(&meshlet_inst_cull, "Meshlets/meshlets.txt", "INSTANCE_CULLING");
@@ -609,17 +622,17 @@ void Renderer::reload_shaders()
 	Shader::compute_compile(&meshlet_compact, "Meshlets/compact.txt");
 
 
-	prog.simple				= prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt");
-	prog.textured			= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt");
-	prog.textured3d			= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
-	prog.texturedarray		= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
-	prog.skybox				= prog_man.create_raster("MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
-	prog.particle_basic		= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	prog.simple = prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt");
+	prog.textured = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt");
+	prog.textured3d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
+	prog.texturedarray = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
+	prog.skybox = prog_man.create_raster("MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
+	prog.particle_basic = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
 	// Bloom shaders
-	prog.bloom_downsample	= prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
-	prog.bloom_upsample		= prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
-	prog.combine			= prog_man.create_raster("fullscreenquad.txt", "CombineF.txt");
+	prog.bloom_downsample = prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
+	prog.bloom_upsample = prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
+	prog.combine = prog_man.create_raster("fullscreenquad.txt", "CombineF.txt");
 	prog.hbao = prog_man.create_raster("MbTexturedV.txt", "HbaoF.txt");
 	prog.xblur = prog_man.create_raster("MbTexturedV.txt", "BilateralBlurF.txt");
 	prog.yblur = prog_man.create_raster("MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
@@ -646,9 +659,35 @@ void Renderer::reload_shaders()
 	volfog.prog.lightcalc.set_int("previous_volume", 0);
 	volfog.prog.lightcalc.set_int("perlin_noise", 1);
 
-	
+
 	glCheckError();
 	glUseProgram(0);
+
+
+
+}
+
+void Renderer::reload_shaders()
+{
+	ssao.reload_shaders();
+	prog_man.recompile_all();
+
+	set_shader(prog.xblur);
+	shader().set_int("input_img", 0);
+	shader().set_int("scene_depth", 1);
+	set_shader(prog.yblur);
+	shader().set_int("input_img", 0);
+	shader().set_int("scene_depth", 1);
+	set_shader(prog.hbao);
+	shader().set_int("scene_depth", 0);
+	shader().set_int("noise_texture", 1);
+
+	for (int i = 0; i < mat_table.shader_hash_map.size(); i++) {
+		if (mat_table.shader_hash_map[i].handle != -1) {
+			set_shader(mat_table.shader_hash_map[i].handle);
+			set_shader_sampler_locations();
+		}
+	}
 }
 
 
@@ -803,7 +842,7 @@ void Renderer::Init()
 	scene.init();
 
 	float start = GetTime();
-	reload_shaders();
+	create_shaders();
 	printf("compiled shaders in %f\n", (float)GetTime() - start);
 
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
@@ -1056,6 +1095,92 @@ void draw_render_pass(const Render_Pass& pass)
 	}
 }
 
+void setup_material_state()
+{
+
+}
+#define SET_OR_USE_FALLBACK(texture, where, fallback) \
+if(mat->images[(int)texture]) bind_texture(where, mat->images[(int)texture]->gl_id); \
+else bind_texture(where, fallback.gl_id);
+
+void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
+{
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, scene.gpu_render_material_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+	int offset = 0;
+	for (int i = 0; i < pass.batches.size(); i++) {
+		int count = list.command_count[i];
+
+		const Material* mat = pass.mesh_batches[pass.batches[i].first].material;
+		draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
+
+		program_handle program = (program_handle)batch_key.shader;
+		blend_state blend = (blend_state)batch_key.blending;
+		bool backface = batch_key.backface;
+		uint32_t layer = batch_key.layer;
+		mesh_format format = (mesh_format)batch_key.vao;
+
+		assert(program >= 0 && program < prog_man.programs.size());
+
+		set_shader(program);
+
+		glBindVertexArray(mods.global_vertex_buffers[(int)format].main_vao);
+		
+		if (backface)
+			glDisable(GL_CULL_FACE);
+		else
+			glEnable(GL_CULL_FACE);
+
+		switch (blend) {
+		case blend_state::OPAQUE:
+			glDisable(GL_BLEND);
+			break;
+		case blend_state::ADD:
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
+			break;
+		case blend_state::BLEND:
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			break;
+		}
+
+		bool shader_doesnt_need_the_textures = mat->type == material_type::WATER || pass.type == pass_type::DEPTH;
+
+		if (!shader_doesnt_need_the_textures) {
+
+			if (mat->type == material_type::TWOWAYBLEND) {
+				ASSERT(0);
+			}
+			else {
+				SET_OR_USE_FALLBACK(material_texture::DIFFUSE, ALBEDO1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(material_texture::ROUGHNESS, ROUGH1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(material_texture::AO, AO1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(material_texture::METAL, METAL1_LOC, white_texture);
+				SET_OR_USE_FALLBACK(material_texture::NORMAL, NORMAL1_LOC, flat_normal_texture);
+			}
+		}
+
+		shader().set_int("indirect_material_offset", offset);
+
+		glMultiDrawElementsIndirect(
+			GL_TRIANGLES,
+			GL_UNSIGNED_INT,
+			(void*)(list.commands.data() + offset),
+			count,
+			sizeof(gpu::DrawElementsIndirectCommand)
+		);
+
+		offset += count;
+	}
+}
+
 void Renderer::render_level_to_target(Render_Level_Params params)
 {
 	vs = params.view;
@@ -1110,11 +1235,23 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	else  list = &shared.opaques;
 
 	{
-		Model_Drawing_State state;
-		for (int d = 0; d < list->size(); d++) {
-			Draw_Call& dc = (*list)[d];
-			draw_model_real(dc, state);
+		//Model_Drawing_State state;
+		//for (int d = 0; d < list->size(); d++) {
+		//	Draw_Call& dc = (*list)[d];
+		//	draw_model_real(dc, state);
+		//}
+		Render_Lists* lists = &scene.opaque_list;
+		Render_Pass* pass = &scene.opaque;
+		if (params.pass == params.SHADOWMAP || params.pass == params.DEPTH) {
+			lists = &scene.vis_list;	// FIXME
+			pass = &scene.depth;
 		}
+		else if (params.pass == params.TRANSLUCENT) {
+			lists = &scene.transparents_list;
+			pass = &scene.transparents;
+		}
+
+		execute_render_lists(*lists, *pass);
 	}
 
 	glCheckError();
@@ -1307,7 +1444,7 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 		uint64_t shade_index = draw.get_mat_shader(*mesh, *dc.mat, false);
 		uint64_t tex_index = (dc.mat->images[0]) ? dc.mat->images[0]->gl_id : 0;
 		uint64_t alpha_and_other = dc.mat->backface | (int)dc.mat->blend;
-		uint64_t vertfmt = mesh->format;
+		uint64_t vertfmt = (uint64_t)mesh->format;
 		dc.sort = (shade_index << 38) | (alpha_and_other<<36) | (tex_index<<4) | vertfmt;
 
 		if (dc.mat->is_translucent()) {
@@ -1401,10 +1538,10 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& p
 
 	ASSERT(proxy.mats);
 	key.shader = draw.get_mat_shader(*proxy.mesh, *material, (type == pass_type::DEPTH));
-	key.blending = (int)material->blend;
+	key.blending = (uint64_t)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
-	key.vao = proxy.mesh->format;
+	key.vao = (uint64_t)proxy.mesh->format;
 	key.mesh = proxy.mesh->id;
 	key.layer = layer;
 
@@ -1649,11 +1786,14 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			Mesh& mesh = *proxy.mesh;
 			auto& part = mesh.parts[obj.submesh_index];
 			gpu::DrawElementsIndirectCommand cmd;
-			cmd.baseInstance = base_instance;
-			cmd.primCount = meshb.count;
-			cmd.baseVertex = part.base_vertex;
-			cmd.firstIndex = part.element_offset / ((use_32_bit_indicies) ? 4 : 2);
+
+			cmd.baseVertex = part.base_vertex + mesh.merged_vert_offset;
 			cmd.count = part.element_count;
+			cmd.firstIndex = part.element_offset + mesh.merged_index_pointer;
+			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
+			cmd.primCount = meshb.count;
+			cmd.baseInstance = base_instance;
+
 
 			list.commands.push_back(cmd);
 
@@ -1662,11 +1802,10 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			}
 
 			base_instance += cmd.primCount;
+
+			auto batch_material = meshb.material;
+			draw_to_material.push_back(batch_material->gpu_material_mapping);
 		}
-
-		auto batch_material = src.mesh_batches[mdb.first].material;
-
-		draw_to_material.push_back(batch_material->gpu_material_mapping);
 
 		list.command_count.push_back(mdb.count);
 	}
@@ -2823,7 +2962,7 @@ void Renderer::scene_draw(bool editor_mode)
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	multidraw_testing();
+	//multidraw_testing();
 
 	DrawEntBlobShadows();
 	eng->local.pm.draw_particles();
@@ -3026,7 +3165,7 @@ program_handle Renderer::get_mat_shader(const Mesh& mesh, const Material& mat, b
 	if (handle != -1) return handle;
 	return compile_mat_shader(key);	// dynamic compilation ...
 }
-
+#undef SET_OR_USE_FALLBACK
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
 if(gs->images[(int)texture]) bind_texture(where, gs->images[(int)texture]->gl_id); \
 else bind_texture(where, fallback.gl_id);

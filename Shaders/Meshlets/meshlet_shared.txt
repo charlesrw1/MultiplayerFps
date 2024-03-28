@@ -20,40 +20,75 @@ struct Instance
 	mat4 transform;
 };
 
+// list of instances, with an index into a mesh and optional bounding box for animated stuff
+
 layout(binding = 1, std430) buffer PrefixSumBuffer {
 	int64_t counter;
 	uint padding2;
 	uint padding3;
     PrefixSumValue values[];
 }buf;
-
-layout(binding = 11, std430) buffer PrefixSumBuffer_ForFinalTris {
-	int64_t counter;
-	uint padding2;
-	uint padding3;
-    PrefixSumValue values[];
-}buf_2;
-
-layout(binding = 8, std430) buffer Indirect_Dispatch_Buffer {
-	DispatchIndirectCommand dispatch_indirect;
-};
-
 layout(binding = 2, std430) buffer DrawElementsIndirectCommand_Buffer {
 	uvec4 num_indirect_calls;
 	DrawElementsIndirectCommand indirect_calls[];
 };
 
-layout(binding = 9, std430) readonly buffer Instances_Buffer {
-	Instance instances[];
-};
-
 layout(binding = 3, std430) readonly buffer Meshlet_BUffer {
 	Chunk chunks[];
+};
+
+layout(binding = 4, std430) buffer OutputIndexBuffer_ {
+	uint data[];
+}output_indicies;
+
+layout(binding = 5, std430) buffer index_to_inst_buffer {
+	uint index_to_inst[];
+};
+
+// array of 32 bit indicies
+layout(binding = 6, std430) readonly buffer InputIndexBuffer_ {
+	uint data[];
+}global_indicies;
+
+// array of vec3
+layout(binding = 7, std430) readonly buffer PositionBuffer_ {
+	float /data[];	
+}mesh_positions;
+
+layout(binding = 8, std430) buffer Indirect_Dispatch_Buffer {
+	DispatchIndirectCommand dispatch_indirect;
+};
+layout(binding = 9, std430) readonly buffer Instances_Buffer {
+	Instance instances[];
 };
 layout(binding = 10, std430) buffer draw_count_buffer {
 	uvec4 total_compacted_draws;
 };
 
-layout(binding = 5, std430) buffer index_to_inst_buffer {
-	uint index_to_inst[];
+struct MeshletWorkitem
+{
+	uint meshlet_index;
+	uint instance_index;
 };
+
+layout(binding = 12, std430) buffer VisibleMeshletBuffer {
+	uvec4 total_meshlets;	// use as indirect buffer
+	MeshletWorkitem items[];
+}vis_meshlets;
+
+
+
+
+// instance.batch_index
+// batch_counts[]
+// batch_offsets[]
+// batch_draw_calls[]
+
+// vertex buffer positions[]
+// index buffer
+
+// expand mesh instances to meshlets
+// index into meshlets, cull meshlets, write to buffer by balloting 64 thread group
+// index into surviving meshlets, cull triangles, write out indiciesby 
+
+
