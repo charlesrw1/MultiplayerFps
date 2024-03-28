@@ -29,7 +29,7 @@
 #include "Player.h"
 #include "Config.h"
 #include "Draw.h"
-
+#include "Entity.h"
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
@@ -1565,7 +1565,7 @@ Entity* Game_Engine::get_ent(int index)
 	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
 	return ents[index];
 }
-Entity* Game_Engine::get_ent_from_handle(entityguid index)
+Entity* Game_Engine::get_ent_from_handle(entityhandle index)
 {
 	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
 	return ents[index];

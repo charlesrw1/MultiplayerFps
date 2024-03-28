@@ -4,6 +4,7 @@
 #include "Player.h"
 #include "Game_Engine.h"
 #include "Net.h"
+#include "EntityTypes.h"
 
 void player_update(Entity* ent);
 void player_spawn(Entity* ent);

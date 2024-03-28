@@ -290,8 +290,9 @@ static const float quad_verts[] =
 
 void BRDFIntegration::drawdebug()
 {
-    return;
 
+    return;
+#if 0
     MeshBuilder mb;
     mb.Begin();
     mb.Push2dQuad(vec2(0, 0), vec2(1, 1));
@@ -324,6 +325,7 @@ void BRDFIntegration::drawdebug()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     mb.Free();
     glCheckError();
+#endif
 
 }
 void BRDFIntegration::run()

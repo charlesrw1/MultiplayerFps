@@ -13,6 +13,9 @@
 #include "BVH.h"
 #include "DrawTypedefs.h"
 
+class Material;
+
+
 using std::string;
 using std::vector;
 using std::unique_ptr;
@@ -48,8 +51,6 @@ struct Physics_Mesh
 };
 
 struct Texture;
-class Game_Shader;
-
 
 #define MAX_MESH_ATTRIBUTES 8
 
@@ -107,7 +108,6 @@ class Mesh_Lod
 	Mesh* mesh;
 	float end_dist;
 };
-
 class Model
 {
 public:
@@ -121,7 +121,7 @@ public:
 	unique_ptr<Animation_Set> animations;
 	// tags for attachments etc.
 	vector<Model_Tag> tags;
-	vector<Game_Shader*> mats;
+	vector<Material*> mats;
 
 	unique_ptr<Physics_Mesh> collision;
 	vector<Collision_Box> boxes;
@@ -141,7 +141,7 @@ public:
 	string name;
 	vector<Mesh> meshes;
 	vector<Node> nodes;
-	vector<Game_Shader*> mats;
+	vector<Material*> mats;
 	unique_ptr<Physics_Mesh> physics;
 };
 

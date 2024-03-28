@@ -1,6 +1,9 @@
 #pragma once
 #include "Types.h"
 #include "Game_Engine.h"
+
+#include "Entity.h"
+
 using namespace glm;
 class NPC : public Entity
 {
@@ -89,4 +92,24 @@ public:
 	float ground_friction = 8.f;
 
 	int current_waypoint = 0;
+};
+
+class Door : public Entity
+{
+public:
+	enum {
+		OPEN,
+		CLOSED
+	}doorstate;
+
+	void update() override;
+};
+
+class Grenade : public Entity
+{
+public:
+	Grenade();
+	float timer = 0.f;
+	entityhandle thrower = -1;
+	void update() override;
 };

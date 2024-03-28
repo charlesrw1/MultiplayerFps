@@ -11,28 +11,6 @@ class MeshBuilder;
 class Animation_Set;
 
 
-struct LagCompState
-{
-	int startmatrix = 0;
-	int matrixcount = 0;
-	glm::vec3 pos = glm::vec3(0.0);
-	glm::vec3 rot = glm::vec3(0.0);
-	int tick = 0;
-};
-
-// uses 10*60*48 + 36*60 + 4 = ~31kb per lag compped
-struct LagCompensationComponent
-{
-	LagCompensationComponent() : 
-		hitbox_matricies(10 * 60, glm::mat4x3(1)), 
-		state_hist(60), 
-		matrixhead(0) {}
-	vector<glm::mat4x3> hitbox_matricies;
-	vector<LagCompState> state_hist;
-	int matrixhead;
-};
-
-
 
 class Player;
 struct ViewmodelComponent

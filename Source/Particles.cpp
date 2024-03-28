@@ -56,7 +56,7 @@ void Particle_Manager::draw_particles()
 	int sprite = -2;
 	bool additive = false;
 
-	draw.set_shader(draw.shader_list[draw.S_PARTICLE_BASIC]);
+	draw.set_shader(draw.prog.particle_basic);
 	draw.shader().set_mat4("ViewProj", draw.vs.viewproj);
 	draw.shader().set_mat4("Model", glm::mat4(1));
 	draw.shader().set_vec4("tint", glm::vec4(1.f));

@@ -18,6 +18,15 @@ static const char* const texture_folder_path = "./Data/Textures/";
 
 Game_Material_Manager mats;
 
+Material* Game_Material_Manager::find_and_make_if_dne(const char* name)
+{
+	Material* m = find_for_name(name);
+	if (m) return m;
+	m = &materials[name];
+	m->name = name;
+	return m;
+}
+
 #define ENSURE(num) if(line.size() < num) { sys_print("bad material definition %s @ %d\n", matname.c_str(), mat.second.linenum); continue;}
 void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 {
@@ -36,17 +45,18 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 		const std::string& matname = mat.first;
 
 		// first check if it exists
-		Game_Shader* gs = find_for_name(matname.c_str());
+		Material* gs = find_for_name(matname.c_str());
 		if (gs && !overwrite) continue;
 		else if (gs && overwrite) {
-			*gs = Game_Shader();
+			uint32_t id = gs->material_id;
+			*gs = Material();
 			gs->name = (matname);
+			gs->material_id = id;
 		}
 		if (!gs) {
-			gs = new Game_Shader;
+			gs = &materials[matname];
 			gs->name = matname;
 			gs->material_id = cur_mat_id++;
-			shaders.push_back(gs);
 		}
 
 		auto& dict = mat.second.dict;
@@ -54,77 +64,65 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 
 		if (*(str_get = dict.get_string("pbr_full")) != 0) {
 			const char* path = string_format("%s_albedo.png", str_get);
-			gs->images[Game_Shader::DIFFUSE] = create_but_dont_load(path);
+			gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(path);
 			path = string_format("%s_normal-ogl.png", str_get);
-			gs->images[Game_Shader::NORMAL] = create_but_dont_load(path);
+			gs->get_image(material_texture::NORMAL) = create_but_dont_load(path);
 			path = string_format("%s_ao.png", str_get);
-			gs->images[Game_Shader::AO] = create_but_dont_load(path);
+			gs->get_image(material_texture::AO) = create_but_dont_load(path);
 			path = string_format("%s_roughness.png", str_get);
-			gs->images[Game_Shader::ROUGHNESS] = create_but_dont_load(path);
+			gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(path);
 			path = string_format("%s_metallic.png", str_get);
-			gs->images[Game_Shader::METAL] = create_but_dont_load(path);
+			gs->get_image(material_texture::METAL) = create_but_dont_load(path);
 		}
 
 		// assume that ref_shaderX will be defined in the future, so create them if they haven't been
 		if (*(str_get = dict.get_string("ref_shader1")) != 0) {
-			gs->references[0] = find_for_name(str_get);
-			if (!gs->references[0]) {
-				Game_Shader* ref = new Game_Shader;
-				ref->name = str_get;
-				shaders.push_back(ref);
-				gs->references[0] = ref;
-			}
+			gs->references[0] = find_and_make_if_dne(str_get);
 		}
 		if (*(str_get = dict.get_string("ref_shader2")) != 0) {
-			gs->references[1] = find_for_name(str_get);
-			if (!gs->references[1]) {
-				Game_Shader* ref = new Game_Shader;
-				ref->name = str_get;
-				shaders.push_back(ref);
-				gs->references[1] = ref;
-			}
+			gs->references[1] = find_and_make_if_dne(str_get);
 		}
 
 		if (*(str_get = dict.get_string("albedo")) != 0) {
-			gs->images[Game_Shader::DIFFUSE] = create_but_dont_load(str_get);
+			gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(str_get);
 		}
 		if (*(str_get = dict.get_string("normal")) != 0) {
-			gs->images[Game_Shader::NORMAL] = create_but_dont_load(str_get);
+			gs->get_image(material_texture::NORMAL) = create_but_dont_load(str_get);
 		}
 		if (*(str_get = dict.get_string("ao")) != 0) {
-			gs->images[Game_Shader::AO] = create_but_dont_load(str_get);
+			gs->get_image(material_texture::AO) = create_but_dont_load(str_get);
 		}
 		if (*(str_get = dict.get_string("rough")) != 0) {
-			gs->images[Game_Shader::ROUGHNESS] = create_but_dont_load(str_get);
+			gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(str_get);
 		}
 		if (*(str_get = dict.get_string("metal")) != 0) {
-			gs->images[Game_Shader::METAL] = create_but_dont_load(str_get);
+			gs->get_image(material_texture::METAL) = create_but_dont_load(str_get);
 		}
 		if (*(str_get = dict.get_string("special")) != 0) {
-			gs->images[Game_Shader::SPECIAL] = create_but_dont_load(str_get);
+			gs->get_image(material_texture::SPECIAL) = create_but_dont_load(str_get);
 		}
 
 		gs->diffuse_tint = glm::vec4(dict.get_vec3("tint", glm::vec3(1.f)),1.f);
 
 		float default_metal = 0.f;
-		if (gs->images[Game_Shader::METAL]) default_metal = 1.f;
+		if (gs->get_image(material_texture::METAL)) default_metal = 1.f;
 		gs->metalness_mult = dict.get_float("metal_val", default_metal);
 		gs->roughness_mult = dict.get_float("rough_val", 1.f);
 		gs->roughness_remap_range = dict.get_vec2("rough_remap", glm::vec2(0, 1));
 
 		if (*(str_get = dict.get_string("shader")) != 0) {
-			if (strcmp(str_get,"blend2") == 0) gs->shader_type = Game_Shader::S_2WAYBLEND;
-			else if (strcmp(str_get, "wind")==0) gs->shader_type = Game_Shader::S_WINDSWAY;
+			if (strcmp(str_get,"blend2") == 0) gs->type = material_type::TWOWAYBLEND;
+			else if (strcmp(str_get, "wind")==0) gs->type = material_type::WINDSWAY;
 			else if (strcmp(str_get, "water")==0) {
-				gs->alpha_type = Game_Shader::A_BLEND;
-				gs->shader_type = Game_Shader::S_WATER;
+				gs->blend = blend_state::BLEND;
+				gs->type = material_type::WATER;
 			}
 			else sys_print("unknown shader type %s\n", str_get);
 		}
 		if (*(str_get = dict.get_string("alpha")) != 0) {
-			if (strcmp(str_get, "add") == 0) gs->alpha_type = Game_Shader::A_ADD;
-			else if (strcmp(str_get, "blend") == 0) gs->alpha_type = Game_Shader::A_BLEND;
-			else if (strcmp(str_get, "test") == 0) gs->alpha_type = Game_Shader::A_TEST;
+			if (strcmp(str_get, "add") == 0)gs->blend = blend_state::ADD;
+			else if (strcmp(str_get, "blend") == 0) gs->blend = blend_state::BLEND;
+			else if (strcmp(str_get, "test") == 0) gs->alpha_tested = true;;
 		}
 
 		if (*(str_get = dict.get_string("showbackface", "no")) == 0) {
@@ -150,37 +148,44 @@ void Game_Material_Manager::load_material_file_directory(const char* directory)
 	sys_print("Loaded material directory %s\n", directory);
 }
 
-Game_Shader* Game_Material_Manager::create_temp_shader(const char* name)
+Material* Game_Material_Manager::create_temp_shader(const char* name)
 {
-	Game_Shader* gs = find_for_name(name);
-	if (!gs) {
-		gs = new Game_Shader;
-		shaders.push_back(gs);
-	}
-	else
-		*gs = Game_Shader();
+	Material* gs = find_for_name(name);
+	if (gs) return gs;
+	gs = &materials[name];
 	gs->name = name;
 	gs->material_id = cur_mat_id++;
+
 	return gs;
 }
-Game_Shader* Game_Material_Manager::find_for_name(const char* name)
+
+
+void Game_Material_Manager::ensure_data_is_loaded(Material* mat)
 {
-	for (auto s : shaders)
-		if (s->name == name) {
-			if (!s->texture_are_loading_in_memory) {
-				for (int i = 0; i < Game_Shader::MAX_IMAGES; i++) {
-					if (s->images[i] && !s->images[i]->is_loaded_in_memory) {
-						bool good = load_texture(s->images[i]->name, s->images[i]);
-						if (!good) {
-							// memory leak here pretty much FIXME
-							s->images[i] = nullptr;
-						}
-					}
-				}
-				s->texture_are_loading_in_memory = true;
+	if (!mat->texture_are_loading_in_memory) {
+		for (int i = 0; i < (int)material_texture::COUNT; i++) {
+			if (mat->images[i] && !mat->images[i]->is_loaded_in_memory) {
+				bool good = load_texture(mat->images[i]->name, mat->images[i]);
+				if (!good) mat->images[i] = nullptr;
 			}
-			return s;
 		}
+
+		for (int i = 0; i < Material::MAX_REFERENCES; i++) {
+			if (mat->references[i] && !mat->references[i]->texture_are_loading_in_memory)
+				ensure_data_is_loaded(mat);
+		}
+
+		mat->texture_are_loading_in_memory = true;
+	}
+}
+
+Material* Game_Material_Manager::find_for_name(const char* name)
+{
+	const auto& find = materials.find(name);
+	if (find != materials.end()) {
+		ensure_data_is_loaded(&find->second);
+		return &find->second;
+	}
 	return nullptr;
 }
 
@@ -445,8 +450,8 @@ using std::vector;
 
 void FreeTexture(Texture* t)
 {
-	sys_print("Freeing texture: %s\n", t->name.c_str());
 	glDeleteTextures(1, &t->gl_id);
+	t->is_loaded_in_memory = false;
 }
 
 void FreeLoadedTextures()
@@ -455,11 +460,9 @@ void FreeLoadedTextures()
 }
 void Game_Material_Manager::free_all()
 {
-	for (int i = 0; i < textures.size(); i++) {
-		FreeTexture(textures[i]);
-		delete textures[i];
-	}
-	textures.clear();
+	printf("freeing textures\n");
+	for (auto& texture : textures)
+		FreeTexture(&texture.second);
 }
 
 Texture_Format to_format(int n, bool isfloat)
@@ -580,19 +583,20 @@ Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_d
 		path += texture_folder_path;
 	path += file;
 
+	Texture* t = nullptr;
 	if (!owner) {
-		for (int i = 0; i < textures.size(); i++) {
-			if (textures[i]->name == path) {
-				return textures[i];
-			}
-		}
+		auto find = textures.find(file);
+		if (find != textures.end())
+			return &find->second;
+		t = &textures[file];
+		t->name = path;
 	}
-	Texture* t = new Texture;
-	t->name = path;
+	else {
+		t = new Texture;
+		t->name = path;
+	}
 
 	bool good = load_texture(path, t);
-	if (!owner && good)
-		textures.push_back(t);
 	return t;
 }
 
@@ -608,25 +612,23 @@ Texture* Game_Material_Manager::create_but_dont_load(const char* file)
 	path += texture_folder_path;
 	path += file;
 
-	for (int i = 0; i < textures.size(); i++) {
-		if (textures[i]->name == path) {
-			return textures[i];
-		}
-	}
-	Texture* t = new Texture;
+	auto find = textures.find(file);
+	if (find != textures.end())
+		return &find->second;
+
+	Texture* t = &textures[file];
 	t->name = path;
 	t->is_loaded_in_memory = false;
-	textures.push_back(t);
 	return t;
 }
 
 Texture* Game_Material_Manager::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
 {
-	for (int i = 0; i < textures.size(); i++) {
-		if (textures[i]->name == name) {
-			return textures[i];
-		}
-	}
+	auto find = textures.find(name);
+	if (find != textures.end())
+		return &find->second;
+	Texture* t = &textures[name];
+	t->name = name;
 
 	int width, height, channels;
 	stbi_set_flip_vertically_on_load(flipy);
@@ -636,12 +638,9 @@ Texture* Game_Material_Manager::create_texture_from_memory(const char* name, con
 		return nullptr;
 	}
 
-	Texture* t = new Texture;
 	bool good = make_from_data(t, width, height, (void*)imgdat, to_format(channels, false));
 	stbi_image_free((void*)imgdat);
-	t->name = name;
 
-	textures.push_back(t);
 	return t;
 }
 Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name, bool flipy)

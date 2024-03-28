@@ -5,6 +5,7 @@
 #include "Config.h"
 #include "Particles.h"
 #include "Physics.h"
+#include "Entity.h"
 
 class Player;
 class Model;

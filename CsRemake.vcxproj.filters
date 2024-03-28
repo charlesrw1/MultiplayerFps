@@ -263,5 +263,17 @@
     <ClInclude Include="Source\EntityTypes.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\RenderObj.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\BaseComponents.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Entity.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Renderer_Types.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

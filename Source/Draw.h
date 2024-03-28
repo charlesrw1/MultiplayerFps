@@ -11,15 +11,18 @@
 #include "Texture.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
+#include "RenderObj.h"
 
 class MeshPart;
 class Model;
 class Animator;
 class Texture;
 class Entity;
-class Game_Shader;
+class Material;
 
 const int BLOOM_MIPS = 6;
+
+typedef int program_handle;
 
 struct Texture3d
 {
@@ -257,7 +260,7 @@ struct Batched_Draw_Call
 		mat_index = 0;
 		use_custom_sphere = 0;
 	}
-	Game_Shader* shader;
+	Material* shader;
 	uint32_t element_count;
 	uint32_t element_start;
 	uint32_t base_vertex;
@@ -266,25 +269,6 @@ struct Batched_Draw_Call
 	glm::vec4 custom_bounding_sphere = glm::vec4(0,0,0,1.f);
 };
 
-enum class blend_state : uint8_t
-{
-	NONE,
-	BLEND,
-	ADD,
-	MULTIPLY
-};
-
-enum class depth_test : uint8_t
-{
-	ON,
-	OFF
-};
-
-enum class backface_cull : uint8_t
-{
-	ON,
-	OFF
-};
 
 // represents a singular call to glDrawElements() with same state and mesh, batchable
 struct Mesh_Batch
@@ -293,7 +277,7 @@ struct Mesh_Batch
 	uint32_t count = 0;
 
 	uint32_t shader_index = 0;	// indexes into shader_list[]
-	const Game_Shader* material = nullptr;
+	const Material* material = nullptr;
 };
 
 // represents multiple mesh_batch calls packaged into one glMultidrawIndirect()
@@ -464,7 +448,7 @@ typedef int Render_Scene_Handle;
 struct Draw_Call
 {
 	const Mesh* mesh;
-	Game_Shader* mat;
+	Material* mat;
 	int submesh;
 	int mat_index;
 	int object_index;
@@ -482,7 +466,7 @@ public:
 	void make_draw_calls_from(
 		const Mesh* mesh,
 		glm::mat4 transform,
-		vector<Game_Shader*>& mat_list,
+		const vector<Material*>& mat_list,
 		const Animator* animator,
 		bool casts_shadows,
 		glm::vec4 colorparam);
@@ -506,6 +490,69 @@ struct Render_Stats
 	int shaders_bound = 0;
 	int tris_drawn = 0;
 	int draw_calls = 0;
+};
+
+class Program_Manager
+{
+public:
+	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
+	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
+	program_handle create_compute(const char* compute, const std::string& defines = {});
+	Shader get_obj(program_handle handle) {
+		return programs[handle].shader_obj;
+	}
+	void recompile_all();
+
+	struct program_def {
+		std::string defines;
+		const char* frag = nullptr;
+		const char* vert = nullptr;
+		const char* geo = nullptr;
+		bool is_compute = false;
+		bool compile_failed = false;
+		Shader shader_obj;
+	};
+	vector<program_def> programs;
+private:
+	void recompile(program_def& def);
+};
+
+struct shader_key
+{
+	shader_key() {
+		shader_type = 0;
+		depth_only = 0;
+		alpha_tested = 0;
+		normal_mapped = 0;
+		animated = 0;
+		vertex_colors = 0;
+	}
+	uint32_t shader_type : 27;
+	uint32_t animated : 1;
+	uint32_t alpha_tested : 1;
+	uint32_t normal_mapped : 1;
+	uint32_t vertex_colors : 1;
+	uint32_t depth_only : 1;
+
+	uint32_t as_uint32() const {
+		return *((uint32_t*)this);
+	}
+};
+static_assert(sizeof(shader_key) == 4, "shader key needs 4 bytes");
+
+class Material_Shader_Table
+{
+public:
+	Material_Shader_Table();
+	struct material_shader_internal {
+		shader_key key;
+		program_handle handle = -1;
+	};
+
+	program_handle lookup(shader_key key); 
+	void insert(shader_key key, program_handle handle);
+
+	std::vector<material_shader_internal> shader_hash_map;
 };
 
 class Renderer
@@ -548,46 +595,25 @@ public:
 
 	static const int MAX_SAMPLER_BINDINGS = 16;
 
-	// shaders
-	enum Shader_List { 
-		// meshbuilder's
-		S_SIMPLE, S_TEXTURED, S_TEXTURED3D, S_TEXTUREDARRAY, S_SKYBOXCUBE,
-		
-		// z-prepass'
-		S_DEPTH, S_AT_DEPTH, S_ANIMATED_DEPTH, S_WIND_DEPTH, S_WIND_AT_DEPTH,
-		
-		S_WATER,
-		S_PARTICLE_BASIC,
-
-		// other
-		S_BLOOM_DOWNSAMPLE, S_BLOOM_UPSAMPLE, S_COMBINE,
-		S_HBAO, S_XBLUR, S_YBLUR,	// hbao shaders
-		S_SSAO,
-
-		S_MDI_TESTING,
-
-
-		NUM_NON_MODEL_SHADERS,
-	};
-
-	enum Shader_Define_Param_Enum
+	Program_Manager prog_man;
+	Material_Shader_Table mat_table;
+	struct programs
 	{
-		SDP_ALPHATESTED,
-		SDP_NORMALMAPPED,
-		SDP_LIGHTMAPPED,
-		SDP_ANIMATED,
-		SDP_VERTEXCOLORS,
-		NUM_SDP
-	};
-	enum Model_Shader_Types
-	{
-		MST_STANDARD,
-		MST_MULTIBLEND,
-		MST_WINDSWAY,
-		NUM_MST
-	};
+		program_handle simple;
+		program_handle textured;
+		program_handle textured3d;
+		program_handle texturedarray;
+		program_handle skybox;
 
-	Shader shader_list[NUM_NON_MODEL_SHADERS + NUM_MST * (1 << NUM_SDP)];
+		program_handle particle_basic;
+		program_handle bloom_downsample;
+		program_handle bloom_upsample;
+		program_handle combine;
+		program_handle hbao;
+		program_handle xblur;
+		program_handle yblur;
+		program_handle mdi_testing;
+	}prog;
 
 	struct framebuffers {
 		fbohandle scene;
@@ -635,20 +661,12 @@ public:
 	Auto_Config_Var use_halfres_reflections;
 
 	void bind_texture(int bind, int id);
-	void set_shader(Shader& s) { 
-		if (s.ID != cur_shader) {
-			s.use();
-			cur_shader = s.ID; 
-
-			stats.shaders_bound++;
-		}
-	}
-	void set_shader(int index_into_shader_list) {
-		ASSERT(index_into_shader_list >= 0 && index_into_shader_list < (sizeof shader_list) / (sizeof Shader));
-		Shader& s = shader_list[index_into_shader_list];
-		if (s.ID != cur_shader) {
-			s.use();
-			cur_shader = s.ID;
+	
+	void set_shader(program_handle handle) {
+		ASSERT(handle != -1);
+		if (handle != current_program) {
+			current_program = handle;
+			prog_man.get_obj(handle).use();
 			stats.shaders_bound++;
 		}
 	}
@@ -656,7 +674,7 @@ public:
 	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
 		bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face);
 
-	Shader& shader();
+	Shader shader();
 	void set_shader_constants();
 	void set_depth_shader_constants();
 
@@ -683,8 +701,12 @@ public:
 	Render_Scene scene;
 	Shared_Gpu_Driven_Resources shared;
 	std::vector<Draw_Model_Frontend_Params> immediate_draw_calls;
-	int get_shader_index(const Mesh& part, const Game_Shader& gs, bool depth_pass);
+	
+	program_handle get_mat_shader(const Mesh& part, const Material& gs, bool depth_pass);
+	
 	Render_Stats stats;
+
+	void set_shader_sampler_locations();
 private:
 
 	struct Sprite_Drawing_State {
@@ -698,10 +720,10 @@ private:
 	struct Model_Drawing_State {
 		bool initial_set = true;
 		uint32_t current_vao = -1;
-		int current_shader = 0;	// S_ANIMATED, S_STATIC, ...
 		bool initial_model = true;
-		int current_alpha_state = 0;
-		int current_backface_state = 0;
+		program_handle current_progam = -1;
+		blend_state blend = blend_state::OPAQUE;
+		bool backface = false;
 		bool is_water_reflection_pass = false;
 		Render_Level_Params::Pass_Type pass = Render_Level_Params::OPAQUE;
 	};
@@ -724,7 +746,6 @@ private:
 	void DrawEntBlobShadows();
 	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
 
-	void set_shader_sampler_locations();
 	void set_wind_constants();
 	void set_water_constants();
 
@@ -732,7 +753,7 @@ private:
 
 	int cur_w = 0;
 	int cur_h = 0;
-	proghandle cur_shader = 0;
+	program_handle current_program = -1;
 	texhandle cur_tex[MAX_SAMPLER_BINDINGS];
 
 	MeshBuilder ui_builder;

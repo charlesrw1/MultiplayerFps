@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
 
@@ -34,91 +35,118 @@ struct Texture
 	int channels = 0;
 	Texture_Type type;
 	Texture_Format format;
+	bool couldnt_load = false;
 	bool no_filtering = false;
 	bool has_mips = false;
 	bool is_loaded_in_memory = false;
 	bool is_float = false;
+
 	texhandle gl_id = 0;
 
 	bool is_resident = false;
 	bindlesstexhandle bindless_handle = 0;
 };
 
-enum Material_Alpha_Mode
+enum class material_texture : uint8_t
 {
-	MALPHA_OPAQUE,
-	MALPHA_ADDITIVE,
-	MALPHA_BLEND,
-	MALPHA_MASKED,
-};
-enum Material_Shader_Category
-{
-	MSHADER_STANDARD,
-	MSHADER_WIND,
-	MSHADER_MULTIBLEND,
-	MSHADER_WATER,
+	DIFFUSE,
+	NORMAL,
+	ROUGHNESS,
+	METAL,
+	AO,
+	SPECIAL,
+
+	COUNT
 };
 
-class Game_Shader
+enum class blend_state : uint8_t
+{
+	OPAQUE,
+	BLEND,
+	ADD
+};
+
+enum class material_type : uint8_t
+{
+	DEFAULT,
+	TWOWAYBLEND,
+	WINDSWAY,
+	WATER
+};
+
+class Material
 {
 public:
-	Game_Shader() {
+	static const int MAX_REFERENCES = 2;
+
+	Material() {
 		memset(images, 0, sizeof images);
 		memset(references, 0, sizeof references);
 	}
 	uint32_t material_id = 0;
 	std::string name;
-	enum { DIFFUSE, NORMAL, ROUGHNESS, METAL, AO, SPECIAL, MAX_IMAGES };
-	Texture* images[MAX_IMAGES];	
-	enum { MAX_REFERENCES = 2};
-	Game_Shader* references[MAX_REFERENCES];
+
+	Texture* images[(int)material_texture::COUNT];
+
+	Texture*& get_image(material_texture texture) {
+		return images[(int)texture];
+	}
+
+	Material* references[MAX_REFERENCES];
 
 	// pbr parameters
 	glm::vec4 diffuse_tint = glm::vec4(1.f);
 	float roughness_mult = 1.f;
 	float metalness_mult = 0.f;
 	glm::vec2 roughness_remap_range = glm::vec2(0.f, 1.f);
-	bool backface = false;
 
-	enum { A_NONE, A_ADD, A_BLEND, A_TEST };
-	int alpha_type = A_NONE;
 	bool emmisive = false;	// dont recieve lighting
-	enum {S_DEFAULT, S_2WAYBLEND, S_WINDSWAY, S_WATER };
-	int shader_type = S_DEFAULT;
+	
+	material_type type = material_type::DEFAULT;
+	blend_state blend = blend_state::OPAQUE;
+	bool alpha_tested = false;
+	bool backface = false;
 
 	int physics = 0;	// physics of surface
 
 	bool texture_are_loading_in_memory = false;
+	
 	bool is_translucent() const {
-		return alpha_type == A_ADD || alpha_type == A_BLEND;
+		return blend == blend_state::ADD || blend == blend_state::BLEND || type == material_type::WATER;
+	}
+	bool is_alphatested() const {
+		return alpha_tested;
 	}
 
-	int current_gpu_mapping = -1;
-	int shader_hash = -1;
-	int params_hash = -1;
+	uint32_t gpu_material_mapping = 0;
 };
 
 class Game_Material_Manager
 {
 public:
 	void init();
+
 	void load_material_file_directory(const char* directory);
 	void load_material_file(const char* path, bool overwrite);
-	Game_Shader* find_for_name(const char* name);
-	Game_Shader* create_temp_shader(const char* name);
 
-	// @owner, caller manages lifetime if true
-	// @search_img_directory, prefixes the default image directory to file
+	Material* find_for_name(const char* name);
+	Material* create_temp_shader(const char* name);
+
+	// owner: caller manages lifetime if true
+	// search_img_directory: prefixes the default image directory to file
 	Texture* find_texture(const char* file, bool search_img_directory=true, bool owner=false);
 	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy);
 
-
-	Game_Shader fallback;
-	std::vector<Game_Shader*> shaders;
-	std::vector<Texture*> textures;
+	Material fallback;
+	Texture error_grid;
+	std::unordered_map<std::string, Material> materials;
+	std::unordered_map<std::string, Texture> textures;
 	void free_all();
 private:
 	uint32_t cur_mat_id = 1;
+	Material* find_and_make_if_dne(const char* name);
+
+	void ensure_data_is_loaded(Material* mat);
 
 	Texture* create_but_dont_load(const char* filename);
 	bool load_texture(const std::string& path, Texture* t);

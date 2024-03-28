@@ -9,6 +9,8 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include "Entity.h"
+
 #pragma optimize("", off)
 
 Renderer draw;
@@ -424,25 +426,157 @@ static const char* sdp_strs[] = {
 	"VERTEX_COLOR,",
 };
 
-void compile_game_shaders(Shader* shader_start, int toggle_params, int mandatory_params, const char* other_defines, const char* vert, const char* frag)
+program_handle Program_Manager::create_raster(const char* vert, const char* frag, const std::string& defines)
 {
-	std::string shader_defines;
-	int num = 1 << Renderer::NUM_SDP;
-	int not_toggle = ~(toggle_params|mandatory_params);
-	for (int i = 0; i < num; i++) {
-		if ((i & not_toggle)!=0) continue;
-		if (mandatory_params!=0 && (i & mandatory_params) == 0) continue;
-		for (int j = 0; j < Renderer::NUM_SDP; j++) {
-			if (i & (1 << j)) {
-				shader_defines += sdp_strs[j];
-			}
-		}
-		shader_defines += other_defines;
-		if (!shader_defines.empty()) shader_defines.pop_back();	// remove comma
+	program_def def;
+	def.vert = vert;
+	def.frag = frag;
+	def.defines = defines;
+	def.is_compute = false;
+	programs.push_back(def);
+	recompile(programs.back());
+	return programs.size() - 1;
+}
+program_handle Program_Manager::create_raster_geo(const char* vert, const char* frag, const char* geo, const std::string& defines)
+{
+	program_def def;
+	def.vert = vert;
+	def.frag = frag;
+	def.geo = geo;
+	def.defines = defines;
+	def.is_compute = false;
+	programs.push_back(def);
+	recompile(programs.back());
+	return programs.size() - 1;
+}
+program_handle Program_Manager::create_compute(const char* compute, const std::string& defines)
+{
+	program_def def;
+	def.vert = compute;
+	def.defines = defines;
+	def.is_compute = true;
+	programs.push_back(def);
+	recompile(programs.back());
+	return programs.size() - 1;
+}
+void Program_Manager::recompile_all()
+{
+	for (int i = 0; i < programs.size(); i++)
+		recompile(programs[i]);
+}
 
-		Shader::compile(&shader_start[i], vert, frag, shader_defines);
-		shader_defines.clear();
+void Program_Manager::recompile(program_def& def)
+{
+	if (def.is_compute) {
+		def.compile_failed = Shader::compute_compile(&def.shader_obj, def.vert, def.defines) 
+			!= ShaderResult::SHADER_SUCCESS;
 	}
+	else {
+		if (def.geo)
+			def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
+		else
+			def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
+	}
+}
+
+Material_Shader_Table::Material_Shader_Table() : shader_hash_map(128)
+{
+	ASSERT(((shader_hash_map.size() & (shader_hash_map.size() - 1)) == 0) && "must be power of 2");
+}
+
+program_handle Material_Shader_Table::lookup(shader_key key)
+{
+	uint32_t key32 = key.as_uint32();
+	uint32_t hash = std::hash<uint32_t>()(key32);
+	uint32_t size = shader_hash_map.size();
+	for (uint32_t i = 0; i < size; i++) {
+		uint32_t index = (hash + i) & (size - 1);
+		if (shader_hash_map[index].handle == -1) return -1;
+		if (shader_hash_map[index].key.as_uint32() == key32)
+			return shader_hash_map[index].handle;
+		printf("material table collision\n");
+	}
+	return -1;
+}
+void Material_Shader_Table::insert(shader_key key, program_handle handle)
+{
+	uint32_t key32 = key.as_uint32();
+	uint32_t hash = std::hash<uint32_t>()(key32);
+	uint32_t size = shader_hash_map.size();
+	hash %= size;
+	for (uint32_t i = 0; i < size; i++) {
+		uint32_t index = (hash + i) % size;
+		if (shader_hash_map[index].handle == -1) {
+			shader_hash_map[index].key = key;
+			shader_hash_map[index].handle = handle;
+			return;
+		}
+	}
+	ASSERT(!"material table overflow\n");
+}
+
+
+shader_key get_real_shader_key_from_shader_type(shader_key key)
+{
+	material_type type = (material_type)key.shader_type;
+	if (key.depth_only) {
+		key.normal_mapped = 0;
+		key.vertex_colors = 0;
+
+		// windsway has vertex shader modifications
+		if(type !=material_type::WINDSWAY)
+			key.shader_type = (int)material_type::DEFAULT;
+	}
+	else {
+		if (type == material_type::WINDSWAY) {
+			key.animated = 0;
+			key.vertex_colors = 0;
+		}
+		else if (type == material_type::TWOWAYBLEND)
+			key.vertex_colors = 1;
+		else if (type == material_type::WATER)
+			key.normal_mapped = 1;
+	}
+	return key;
+}
+
+program_handle compile_mat_shader(shader_key key)
+{
+	std::string params;
+	const char* vert_shader = "";
+	const char* frag_shader = "";
+
+	material_type type = (material_type)key.shader_type;
+	switch (type) {
+	case material_type::DEFAULT:
+	case material_type::WINDSWAY:
+	case material_type::TWOWAYBLEND:
+		vert_shader = "AnimBasicV.txt";
+		if (key.depth_only) 
+			frag_shader = "DepthF.txt";
+		else 
+			frag_shader = "PbrBasicF.txt";
+		break;
+	case material_type::WATER:
+		vert_shader = "AnimBasicV.txt";
+		frag_shader = "WaterF.txt";
+		break;
+	}
+
+	if (key.alpha_tested) params += "ALPHATEST,";
+	if (key.animated) params += "ANIMATED,";
+	if (key.normal_mapped) params += "NORMALMAPPED,";
+	if (key.vertex_colors) params += "VERTEX_COLOR,";
+	if (type == material_type::WINDSWAY) params += "WIND,";
+	if (!params.empty())params.pop_back();
+
+	program_handle handle = draw.prog_man.create_raster(vert_shader, frag_shader, params);
+	ASSERT(handle != -1);
+	draw.set_shader(handle);
+	draw.set_shader_sampler_locations();
+
+	draw.mat_table.insert(key, handle);
+	return handle;
 }
 
 static Shader meshlet_reset_pre_inst;
@@ -475,61 +609,33 @@ void Renderer::reload_shaders()
 	Shader::compute_compile(&meshlet_compact, "Meshlets/compact.txt");
 
 
-	// meshbuilder shaders
-	Shader::compile(&shader_list[S_SIMPLE], "MbSimpleV.txt", "MbSimpleF.txt");
-	Shader::compile(&shader_list[S_TEXTURED], "MbTexturedV.txt", "MbTexturedF.txt");
-	Shader::compile(&shader_list[S_TEXTURED3D], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
-	Shader::compile(&shader_list[S_TEXTUREDARRAY], "MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
-	Shader::compile(&shader_list[S_SKYBOXCUBE], "MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
-	Shader::compile(&shader_list[S_PARTICLE_BASIC], "MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
-
-	// model shaders
-	int num_per_shader = (1 << NUM_SDP);
-	int standard_toggle_mask = (1 << SDP_ANIMATED) | (1 << SDP_ALPHATESTED) | (1 << SDP_LIGHTMAPPED) | (1<<SDP_NORMALMAPPED);
-	int wind_mask = (1 << SDP_ALPHATESTED) | (1 << SDP_ALPHATESTED) | (1<<SDP_NORMALMAPPED);
-	int blend_toggle_mask = (1 << SDP_LIGHTMAPPED) | (1<<SDP_NORMALMAPPED);
-
-	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_STANDARD * num_per_shader], standard_toggle_mask, 0, "", "AnimBasicV.txt", "PbrBasicF.txt");
-	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_MULTIBLEND * num_per_shader], blend_toggle_mask, (1<<SDP_VERTEXCOLORS), "BLEND2,", "AnimBasicV.txt", "PbrBasicF.txt");
-	compile_game_shaders(&shader_list[NUM_NON_MODEL_SHADERS + MSHADER_WIND * num_per_shader], wind_mask, 0, "WIND,", "AnimBasicV.txt", "PbrBasicF.txt");
-
-
-	// depth shaders for models
-	const char* frag = "DepthF.txt";
-	Shader::compile(&shader_list[S_ANIMATED_DEPTH], "AnimBasicV.txt", frag, "ANIMATED");
-	Shader::compile(&shader_list[S_DEPTH], "AnimBasicV.txt", frag);
-	Shader::compile(&shader_list[S_AT_DEPTH], "AnimBasicV.txt", frag, "ALPHATEST");
-	Shader::compile(&shader_list[S_WIND_DEPTH], "AnimBasicV.txt", frag, "WIND");
-	Shader::compile(&shader_list[S_WIND_AT_DEPTH], "AnimBasicV.txt", frag, "WIND, ALPHATEST");
-
+	prog.simple				= prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt");
+	prog.textured			= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt");
+	prog.textured3d			= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
+	prog.texturedarray		= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
+	prog.skybox				= prog_man.create_raster("MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
+	prog.particle_basic		= prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 
 	// Bloom shaders
-	Shader::compile(&shader_list[S_BLOOM_DOWNSAMPLE], "fullscreenquad.txt", "BloomDownsampleF.txt");
-	Shader::compile(&shader_list[S_BLOOM_UPSAMPLE], "fullscreenquad.txt", "BloomUpsampleF.txt");
-	Shader::compile(&shader_list[S_COMBINE], "fullscreenquad.txt", "CombineF.txt");
+	prog.bloom_downsample	= prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
+	prog.bloom_upsample		= prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
+	prog.combine			= prog_man.create_raster("fullscreenquad.txt", "CombineF.txt");
+	prog.hbao = prog_man.create_raster("MbTexturedV.txt", "HbaoF.txt");
+	prog.xblur = prog_man.create_raster("MbTexturedV.txt", "BilateralBlurF.txt");
+	prog.yblur = prog_man.create_raster("MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
 
-
-	// Ssao shaders
-	Shader::compile(&shader_list[S_SSAO], "MbTexturedV.txt", "SsaoLOGF.txt");
-	Shader::compile(&shader_list[S_HBAO], "MbTexturedV.txt", "HbaoF.txt");
-	Shader::compile(&shader_list[S_XBLUR], "MbTexturedV.txt", "BilateralBlurF.txt");
-	Shader::compile(&shader_list[S_YBLUR], "MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
-	set_shader(S_SSAO);
-	shader().set_int("scene_depth", 0);
-	shader().set_int("noise_texture", 1);
-	set_shader(S_XBLUR);
+	set_shader(prog.xblur);
 	shader().set_int("input_img", 0);
 	shader().set_int("scene_depth", 1);
-	set_shader(S_YBLUR);
+	set_shader(prog.yblur);
 	shader().set_int("input_img", 0);
 	shader().set_int("scene_depth", 1);
-	set_shader(S_HBAO);
+	set_shader(prog.hbao);
 	shader().set_int("scene_depth", 0);
 	shader().set_int("noise_texture", 1);
 
 
-
-	Shader::compile(&shader_list[S_MDI_TESTING], "SimpleMeshV.txt", "UnlitF.txt", "MDI");
+	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
 
 	// volumetric fog shaders
@@ -540,22 +646,6 @@ void Renderer::reload_shaders()
 	volfog.prog.lightcalc.set_int("previous_volume", 0);
 	volfog.prog.lightcalc.set_int("perlin_noise", 1);
 
-
-	// water shader
-	Shader::compile(&shader_list[S_WATER], "AnimBasicV.txt", "WaterF.txt", "VERTEX_COLOR, NORMALMAPPED");
-	set_shader(S_WATER);
-	set_shader_sampler_locations();
-
-
-	// set sampler locations for all model shaders
-	int start = NUM_NON_MODEL_SHADERS;
-	int end = start + NUM_MST * num_per_shader;
-	for (int i = start; i < end; i++) {
-		if (shader_list[i].ID != 0) {
-			set_shader(shader_list[i]);
-			set_shader_sampler_locations();
-		}
-	}
 	
 	glCheckError();
 	glUseProgram(0);
@@ -874,7 +964,7 @@ void Renderer::render_bloom_chain()
 		return;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
-	set_shader(S_BLOOM_DOWNSAMPLE);
+	set_shader(prog.bloom_downsample);
 	float src_x = cur_w;
 	float src_y = cur_h;
 
@@ -905,7 +995,7 @@ void Renderer::render_bloom_chain()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	set_shader(S_BLOOM_UPSAMPLE);
+	set_shader(prog.bloom_upsample);
 	for (int i = BLOOM_MIPS - 1; i > 0; i--)
 	{
 		glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i - 1], 0);
@@ -931,7 +1021,7 @@ void Renderer::DrawSkybox()
 	mb.PushSolidBox(-vec3(1), vec3(1), COLOR_WHITE);
 	mb.End();
 
-	set_shader(S_SKYBOXCUBE);
+	set_shader(prog.skybox);
 	glm::mat4 view = vs.view;
 	view[3] = vec4(0, 0, 0, 1);	// remove translation
 	shader().set_mat4("ViewProj", vs.proj * view);
@@ -1042,7 +1132,7 @@ void Renderer::ui_render()
 	GPUFUNCTIONSTART;
 
 
-	set_shader(S_TEXTURED);
+	set_shader(prog.textured3d);
 	shader().set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
 	shader().set_mat4("ViewProj", proj);
@@ -1079,7 +1169,7 @@ void Renderer::ui_render()
 
 	glDisable(GL_BLEND);
 	if (0) {
-		set_shader(S_TEXTURED);
+		set_shader(prog.textured3d);
 		glCheckError();
 
 		shader().set_mat4("Model", mat4(1));
@@ -1157,7 +1247,7 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 	const Mesh* mesh,
 	glm::mat4 transform,
-	vector<Game_Shader*>& mat_list,
+	const vector<Material*>& mat_list,
 	const Animator* animator,
 	bool casts_shadows,
 	glm::vec4 colorparam)
@@ -1200,9 +1290,9 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 		dc.submesh = s;
 		dc.mesh = mesh;
 
-		uint64_t shade_index = draw.get_shader_index(*mesh, *dc.mat, false);
+		uint64_t shade_index = draw.get_mat_shader(*mesh, *dc.mat, false);
 		uint64_t tex_index = (dc.mat->images[0]) ? dc.mat->images[0]->gl_id : 0;
-		uint64_t alpha_and_other = dc.mat->backface | dc.mat->alpha_type;
+		uint64_t alpha_and_other = dc.mat->backface | (int)dc.mat->blend;
 		uint64_t vertfmt = mesh->format;
 		dc.sort = (shade_index << 38) | (alpha_and_other<<36) | (tex_index<<4) | vertfmt;
 
@@ -1212,7 +1302,7 @@ void Shared_Gpu_Driven_Resources::make_draw_calls_from(
 		else {
 			opaques.push_back(dc);
 			if (casts_shadows) {
-				shade_index = draw.get_shader_index(*mesh, *dc.mat, true);
+				shade_index = draw.get_mat_shader(*mesh, *dc.mat, true);
 				dc.sort = (shade_index << 38) | (alpha_and_other << 36) | (tex_index << 4) | vertfmt;
 				shadows.push_back(dc);
 			}
@@ -1298,9 +1388,9 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& p
 	draw_call_key key;
 
 	ASSERT(proxy.mats);
-	Game_Shader* material = (*proxy.mats)[proxy.mesh->parts[submesh].material_idx];
-	key.shader = draw.get_shader_index(*proxy.mesh, *material, (type == pass_type::DEPTH));
-	key.blending = material->alpha_type;
+	Material* material = (*proxy.mats)[proxy.mesh->parts[submesh].material_idx];
+	key.shader = draw.get_mat_shader(*proxy.mesh, *material, (type == pass_type::DEPTH));
+	key.blending = (int)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
 	key.vao = proxy.mesh->format;
@@ -1368,7 +1458,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	}
 
 	if (!creations.empty()) {
-		std::sort(creations.begin(), creations.end(), sort_functor);
+		std::sort(creations.begin(), creations.end(), merge_functor);
 		size_t start_index = sorted_list.size();
 		sorted_list.reserve(sorted_list.size() + creations.size());
 		for (auto p : creations)
@@ -1428,7 +1518,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	Mesh_Batch* mesh_batch = &mesh_batches[0];
 	Pass_Object* batch_obj = &sorted_list[mesh_batch->first];
 	const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
-	bool is_at = mesh_batch->material->alpha_type == Game_Shader::A_TEST;
+	bool is_at = mesh_batch->material->alpha_tested;
 	for (int i = 1; i < mesh_batches.size(); i++)
 	{
 		Mesh_Batch* this_batch = &mesh_batches[i];
@@ -1452,7 +1542,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		}
 		else if (type == pass_type::DEPTH){
 			// can batch across texture changes as long as its not alpha tested
-			if (same_shader && same_vao && same_other_state && this_batch->material->alpha_type != Game_Shader::A_TEST)
+			if (same_shader && same_vao && same_other_state && !this_batch->material->alpha_tested)
 				batch_this = true;
 			else
 				batch_this = false;
@@ -1672,7 +1762,7 @@ struct Gpu_Buf
 
 struct Mesh_Pass_Mdi_Batch
 {
-	Game_Shader* material;
+	Material* material;
 	int vert_fmt;
 	int start;
 	int end;
@@ -1681,7 +1771,7 @@ struct Mesh_Pass_Mdi_Batch
 struct High_Level_Render_Object
 {
 	Mesh* mesh;
-	Game_Shader* material;
+	Material* material;
 	int obj_data_index = 0;
 	int draw_calls_start = 0;
 	int draw_calls_count = 0;
@@ -1829,7 +1919,7 @@ struct Mesh_Pass_Mdi
 	uint32_t culling_data_ubo;
 
 
-	int add_object(Mesh* mesh, Game_Shader* mat, glm::mat4 transform) {
+	int add_object(Mesh* mesh, Material* mat, glm::mat4 transform) {
 		
 		ObjLevelData obj;
 		obj.animation_start = 0;
@@ -2128,7 +2218,7 @@ void multidraw_testing()
 
 		mdi_buffer2_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 2);
 		mdi_buffer_pm.bind_buffer(GL_SHADER_STORAGE_BUFFER, 3);
-		draw.set_shader(draw.S_MDI_TESTING);
+		draw.set_shader(draw.prog.mdi_testing);
 
 		glBindVertexArray(sphere->mesh.vao);
 		
@@ -2422,7 +2512,7 @@ void Renderer::scene_draw(bool editor_mode)
 
 	stats = {};
 
-	cur_shader = 0;
+	current_program = -1;
 	for (int i = 0; i < MAX_SAMPLER_BINDINGS; i++)
 		cur_tex[i] = 0;
 	if (cur_w != eng->window_w.integer() || cur_h != eng->window_h.integer())
@@ -2528,7 +2618,7 @@ void Renderer::scene_draw(bool editor_mode)
 
 
 
-	set_shader(S_SIMPLE);
+	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
@@ -2549,7 +2639,7 @@ void Renderer::scene_draw(bool editor_mode)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, cur_w, cur_h);
 
-	set_shader(S_COMBINE);
+	set_shader(prog.combine);
 	uint32_t bloom_tex = tex.bloom_chain[0];
 	if (!enable_bloom.integer()) bloom_tex = black_texture.gl_id;
 	bind_texture(0, tex.scene_color);
@@ -2568,7 +2658,7 @@ void Renderer::scene_draw(bool editor_mode)
 	}
 
 	mb.End();
-	set_shader(S_SIMPLE);
+	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
@@ -2599,7 +2689,7 @@ void Renderer::scene_draw(bool editor_mode)
 
 void Renderer::cubemap_positions_debug()
 {
-	set_shader(S_SIMPLE);
+	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
@@ -2616,11 +2706,10 @@ void Renderer::cubemap_positions_debug()
 	mb.Free();
 }
 
-Shader& Renderer::shader()
+Shader Renderer::shader()
 {
-	static Shader stemp;
-	stemp.ID = cur_shader;
-	return stemp;	// Shader is just a wrapper around an id anyways
+	if (current_program == -1) return Shader();
+	return prog_man.get_obj(current_program);
 }
 
 void Renderer::DrawEntBlobShadows()
@@ -2646,7 +2735,7 @@ void Renderer::DrawEntBlobShadows()
 	shadowverts.End();
 	glCheckError();
 
-	set_shader(S_PARTICLE_BASIC);
+	set_shader(prog.particle_basic);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.0));
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
@@ -2664,7 +2753,7 @@ void Renderer::DrawEntBlobShadows()
 	glEnable(GL_CULL_FACE);
 	glDepthMask(GL_TRUE);
 
-	cur_shader = -1;
+	current_program = -1;
 	glCheckError();
 
 }
@@ -2703,77 +2792,31 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, tex.reflected_depth);
 }
 
-int Renderer::get_shader_index(const Mesh& mesh, const Game_Shader& gs, bool depth_pass)
+program_handle Renderer::get_mat_shader(const Mesh& mesh, const Material& mat, bool depth_pass)
 {
-	bool is_alpha_test = gs.alpha_type == gs.A_TEST;
+	bool is_alpha_test = mat.alpha_tested;
 	bool is_lightmapped = mesh.has_lightmap_coords();
 	bool has_colors = mesh.has_colors();
-	int shader_type = gs.shader_type;
+	material_type shader_type = mat.type;
 	bool is_normal_mapped = mesh.has_tangents();
 	bool is_animated = mesh.has_bones();
 
-	int shader_index = -1;
-
-	using sl = Renderer::Shader_List;
-	if (depth_pass) {
-		if (shader_type == gs.S_WINDSWAY) {
-			shader_index = sl::S_WIND_DEPTH;
-			if (is_alpha_test)
-				shader_index = sl::S_WIND_AT_DEPTH;
-		}
-		else {
-			if (is_animated) {
-				shader_index = sl::S_ANIMATED_DEPTH;
-			}
-			else {
-				if (is_alpha_test)
-					shader_index = sl::S_AT_DEPTH;
-				else
-					shader_index = sl::S_DEPTH;
-			}
-		}
-	}
-	else {
-		int param_bitmask = 0;
-		if (is_animated) param_bitmask |= (1 << SDP_ANIMATED);
-		if (is_alpha_test) param_bitmask |= (1 << SDP_ALPHATESTED);
-		if (is_normal_mapped) param_bitmask |= (1 << SDP_NORMALMAPPED);
-		if (is_lightmapped) param_bitmask |= (1 << SDP_LIGHTMAPPED);
-		if (has_colors) param_bitmask |= (1 << SDP_VERTEXCOLORS);
-
-		int shader_type = gs.shader_type;
-
-		if (shader_type == Game_Shader::S_DEFAULT) {
-			shader_type = MSHADER_STANDARD;
-			param_bitmask &= ~(1 << SDP_VERTEXCOLORS);
-		}
-		else if (shader_type == Game_Shader::S_2WAYBLEND) {
-			shader_type = MSHADER_MULTIBLEND;
-
-			if (!gs.references[0] || !gs.references[1])
-				return -1;
-		}
-		else if (shader_type == Game_Shader::S_WINDSWAY) {
-			shader_type = MSHADER_WIND;
-			param_bitmask &= ~(1 << SDP_VERTEXCOLORS);
-		}
-
-		if (shader_type == Game_Shader::S_WATER) {
-			shader_index = S_WATER;
-		}
-		else {
-			shader_index = NUM_NON_MODEL_SHADERS + (shader_type) * (1 << NUM_SDP) + param_bitmask;
-		}
-	}
-
-	if (shader_list[shader_index].ID == 0)
-		shader_index = -1;
-
-	return shader_index;
+	shader_key key;
+	key.alpha_tested = is_alpha_test;
+	key.vertex_colors = has_colors;
+	key.shader_type = (uint32_t)shader_type;
+	key.normal_mapped = is_normal_mapped;
+	key.animated = is_animated;
+	key.depth_only = depth_pass;
+	
+	key = get_real_shader_key_from_shader_type(key);
+	program_handle handle = mat_table.lookup(key);
+	if (handle != -1) return handle;
+	return compile_mat_shader(key);	// dynamic compilation ...
 }
 
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
-if(gs->images[texture]) bind_texture(where, gs->images[texture]->gl_id); \
+if(gs->images[(int)texture]) bind_texture(where, gs->images[(int)texture]->gl_id); \
 else bind_texture(where, fallback.gl_id);
 
 
@@ -2782,12 +2825,12 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 	Model_Drawing_State& state)
 {
 	const Submesh& mp = dc.mesh->parts[dc.submesh];
-	Game_Shader* gs = dc.mat;
+	Material* gs = dc.mat;
 	bool is_animated = dc.mesh->has_bones();
 	bool is_depth = state.pass == Render_Level_Params::SHADOWMAP || state.pass == Render_Level_Params::DEPTH;
-	int next_shader = get_shader_index(*dc.mesh, *gs, is_depth);
+	int next_shader = get_mat_shader(*dc.mesh, *gs, is_depth);
 
-	bool is_water = gs->shader_type == Game_Shader::S_WATER;
+	bool is_water = gs->type == material_type::WATER;
 
 	if (next_shader == -1) return;
 
@@ -2795,12 +2838,12 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 	if (state.is_water_reflection_pass && is_water)
 		return;
 
-	if (state.initial_set || next_shader != state.current_shader) {
-		state.current_shader = next_shader;
+	if (state.initial_set || next_shader != state.current_progam) {
+		state.current_progam = next_shader;
 
 		set_shader(next_shader);
 
-		if (gs->shader_type == Game_Shader::S_WINDSWAY) {
+		if (gs->type == material_type::WINDSWAY) {
 			set_wind_constants();
 		}
 		else if (is_water) {
@@ -2809,63 +2852,43 @@ void Renderer::draw_model_real(const Draw_Call& dc,
 		set_shader_constants();
 	}
 
-	if (state.initial_set || state.current_alpha_state != gs->alpha_type) {
-		state.current_alpha_state = gs->alpha_type;
-		if (state.current_alpha_state == Game_Shader::A_NONE || state.current_alpha_state == Game_Shader::A_TEST) {
+	if (state.initial_set || state.blend != gs->blend) {
+		state.blend = gs->blend;
+		if (state.blend == blend_state::OPAQUE) {
 			glDisable(GL_BLEND);
 		}
-		else if (state.current_alpha_state == Game_Shader::A_BLEND) {
+		else if (state.blend == blend_state::BLEND) {
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
-		else if (state.current_alpha_state == Game_Shader::A_ADD) {
+		else if (state.blend == blend_state::ADD) {
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE);
 		}
 	}
-	if (state.initial_set || state.current_backface_state != (int)gs->backface) {
-		state.current_backface_state = gs->backface;
-		if (state.current_backface_state)
+
+	if (state.initial_set || state.backface != gs->backface) {
+		state.backface = gs->backface;
+		if (state.backface)
 			glDisable(GL_CULL_FACE);
 		else
 			glEnable(GL_CULL_FACE);
 	}
-
 
 	// ill find a better way maybe
 	bool shader_doesnt_need_the_textures = is_water || is_depth;
 
 	if (!shader_doesnt_need_the_textures) {
 
-		if (gs->shader_type == Game_Shader::S_2WAYBLEND) {
-			Game_Shader* blend1 = gs->references[0];
-			Game_Shader* blend2 = gs->references[1];
-			if (blend1->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO1_LOC, blend1->images[Game_Shader::DIFFUSE]->gl_id);
-			else bind_texture(ALBEDO1_LOC, white_texture.gl_id);
-			if (blend2->images[Game_Shader::DIFFUSE]) bind_texture(ALBEDO2_LOC, blend2->images[Game_Shader::DIFFUSE]->gl_id);
-			else bind_texture(ALBEDO2_LOC, white_texture.gl_id);
-			if (blend1->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH1_LOC, blend1->images[Game_Shader::ROUGHNESS]->gl_id);
-			else bind_texture(ROUGH1_LOC, white_texture.gl_id);
-			if (blend2->images[Game_Shader::ROUGHNESS]) bind_texture(ROUGH2_LOC, blend2->images[Game_Shader::ROUGHNESS]->gl_id);
-			else bind_texture(ROUGH2_LOC, white_texture.gl_id);
-
-			if (dc.mesh->has_tangents()) {
-				if (blend1->images[Game_Shader::NORMAL])
-					bind_texture(NORMAL1_LOC, blend1->images[Game_Shader::NORMAL]->gl_id);
-				else 
-					bind_texture(NORMAL1_LOC, flat_normal_texture.gl_id);
-				if (blend2->images[Game_Shader::NORMAL]) bind_texture(NORMAL2_LOC, blend2->images[Game_Shader::NORMAL]->gl_id);
-				else bind_texture(NORMAL2_LOC, flat_normal_texture.gl_id);
-			}
-
-			SET_OR_USE_FALLBACK(Game_Shader::SPECIAL, SPECIAL_LOC, white_texture);
+		if (gs->type == material_type::TWOWAYBLEND) {
+			ASSERT(0);
 		}
 		else {
-			SET_OR_USE_FALLBACK(Game_Shader::DIFFUSE, ALBEDO1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(Game_Shader::ROUGHNESS, ROUGH1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(Game_Shader::AO, AO1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(Game_Shader::METAL, METAL1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(Game_Shader::NORMAL, NORMAL1_LOC, flat_normal_texture);
+			SET_OR_USE_FALLBACK(material_texture::DIFFUSE, ALBEDO1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(material_texture::ROUGHNESS, ROUGH1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(material_texture::AO, AO1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(material_texture::METAL, METAL1_LOC, white_texture);
+			SET_OR_USE_FALLBACK(material_texture::NORMAL, NORMAL1_LOC, flat_normal_texture);
 		}
 	}
 
