@@ -6,6 +6,8 @@
 #include "Net.h"
 #include "EntityTypes.h"
 
+#include "DrawPublic.h"
+
 void player_update(Entity* ent);
 void player_spawn(Entity* ent);
 
@@ -583,18 +585,17 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 	e->velocity = direction * grenade_vel.real();
 	return e;
 }
-#include "Draw.h"
 Entity::~Entity()
 {
-	draw.scene.remove(render_handle);
+	idraw->remove_obj(render_handle);
 }
 
 void Entity::update_visuals()
 {
 	if (render_handle == -1 && model)
-		render_handle = draw.scene.register_renderable();
+		render_handle = idraw->register_obj();
 	else if (render_handle != -1 && !model)
-		draw.scene.remove(render_handle);
+		idraw->remove_obj(render_handle);
 
 	if (render_handle != -1 && model) {
 		Render_Object_Proxy proxy;
@@ -606,6 +607,6 @@ void Entity::update_visuals()
 		proxy.mats = &model->mats;
 		proxy.transform = get_world_transform()*model->skeleton_root_transform;
 		
-		draw.scene.update(render_handle, proxy);
+		idraw->update_obj(render_handle, proxy);
 	}
 }

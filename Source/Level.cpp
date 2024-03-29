@@ -146,6 +146,16 @@ void create_statics_from_dicts(Level* level)
 			Static_Mesh_Object smo = make_static_mesh_from_dict(obj);
 			if (smo.model) {
 				level->static_mesh_objs.push_back(smo);
+
+				smo.handle = idraw->register_obj();
+				Render_Object_Proxy rop;
+				rop.mesh = &smo.model->mesh;
+				rop.transform = smo.transform;
+				rop.animator = nullptr;
+				rop.visible = true;
+				rop.mats = &smo.model->mats;
+				idraw->update_obj(smo.handle, rop);
+
 				obj->_ed_varying_index_for_statics = level->static_mesh_objs.size() - 1;
 			}
 		}
@@ -173,7 +183,7 @@ void on_node_callback(void* user, cgltf_data* data, cgltf_node* node, glm::mat4 
 	}
 }
 #include "Types.h"
-#include "Draw.h"
+
 Level* LoadLevelFile(const char* level_name)
 {
 	std::string map_dir;
@@ -214,22 +224,30 @@ Level* LoadLevelFile(const char* level_name)
 
 	for (int i = 0; i < prefab->nodes.size(); i++) {
 		auto& node = prefab->nodes[i];
-		renderobj_handle handle = draw.scene.register_renderable();
+		renderobj_handle handle = idraw->register_obj();
 		Render_Object_Proxy obj;
 		obj.mesh = &prefab->meshes[node.mesh_idx];
 		obj.transform = node.transform;
 		obj.animator = nullptr;
 		obj.visible = true;
 		obj.mats = &prefab->mats;
-		draw.scene.update(handle, obj);
+		
+		idraw->update_obj(handle, obj);
+		level->prefab_handles.push_back(handle);
 	}
 
 	return level;
 }
 
-void FreeLevel(const Level* level)
+void FreeLevel(Level* level)
 {
 	if (level) {
+		for (int i = 0; i < level->prefab_handles.size(); i++)
+			idraw->remove_obj(level->prefab_handles[i]);
+
+		for (int i = 0; i < level->static_mesh_objs.size(); i++)
+			idraw->remove_obj(level->static_mesh_objs[i].handle);
+
 		mods.free_prefab(level->level_prefab);
 		delete level;
 		mods.compact_memory();

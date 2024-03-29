@@ -3,8 +3,9 @@
 #include "glad/glad.h"
 #include "Game_Engine.h"
 #include <algorithm>
-#include "Draw.h"
+#include "DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
+
 
 class TransformCommand : public Command
 {
@@ -186,6 +187,7 @@ void AssetBrowser::handle_input(const SDL_Event& inp)
 		doc->command_mgr.add_command(com);
 
 		if (!spawn_another) {
+			close();
 			doc->selected_node = node;
 			doc->mode = EditorDoc::TOOL_NONE;
 		}
@@ -212,7 +214,7 @@ RayHit EditorDoc::cast_ray_into_world(Ray* out_ray)
 	ndc.y *= -1;
 
 	glm::mat4 invviewproj = glm::inverse(vs_setup.viewproj);
-	glm::vec4 point = invviewproj * vec4(ndc, 1.0);
+	glm::vec4 point = invviewproj * glm::vec4(ndc, 1.0);
 	point /= point.w;
 
 	glm::vec3 dir = glm::normalize(glm::vec3(point) - r.pos);
@@ -238,7 +240,7 @@ void AssetBrowser::update()
 {
 	if (get_model()) {
 		if (!drawing_model) {
-			temp_place_model = draw.scene.register_renderable();
+			temp_place_model = idraw->register_obj();
 		}
 
 		drawing_model = true;
@@ -259,11 +261,11 @@ void AssetBrowser::update()
 		obj.visible = true;
 		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, (sin(GetTime()*4.0) * 0.5 + 0.5)*0.4  ));
 		obj.color_overlay = true;
-		draw.scene.update(temp_place_model, obj);
+		idraw->update_obj(temp_place_model, obj);
 	}
 	else {
 		if (drawing_model) {
-			draw.scene.remove(temp_place_model);
+			idraw->remove_obj(temp_place_model);
 			temp_place_model = -1;
 		}
 
@@ -271,7 +273,14 @@ void AssetBrowser::update()
 	}
 }
 
-void AssetBrowser::close() {}
+void AssetBrowser::close()
+{
+	drawing_model = false;
+	if (temp_place_model != -1) {
+		idraw->remove_obj(temp_place_model);
+		temp_place_model = -1;
+	}
+}
 
 void EditorDoc::on_add_or_remove_node(int ent_dict_index, EdObjType type, int index, bool is_removal)
 {
@@ -511,8 +520,10 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 	case TOOL_SPAWN_MODEL:
 		assets.handle_input(event);
 		if (event.type == SDL_KEYDOWN) {
-			if (event.key.keysym.scancode == SDL_SCANCODE_M)
+			if (event.key.keysym.scancode == SDL_SCANCODE_M) {
+				assets.close();
 				mode = TOOL_NONE;
+			}
 		}
 		break;
 

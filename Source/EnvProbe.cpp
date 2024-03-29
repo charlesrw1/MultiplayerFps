@@ -3,7 +3,7 @@
 #include <glm/ext.hpp>
 #include "Texture.h"
 #include "MeshBuilder.h"
-#include "Draw.h"
+#include "DrawLocal.h"
 
 using glm::vec3;
 using glm::mat4;

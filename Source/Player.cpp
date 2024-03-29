@@ -6,6 +6,8 @@
 #include "Game_Engine.h"
 #include "imgui.h"
 
+#include "DrawPublic.h"
+
 //
 //	PLAYER MOVEMENT CODE
 //
@@ -705,10 +707,11 @@ void Player::move_update(Move_Command command)
 {
 	
 }
-#include "Draw.h"
 ViewmodelComponent::~ViewmodelComponent()
 {
-	draw.scene.remove(viewmodel_handle);
+	idraw->remove_obj(viewmodel_handle);
+
+	printf("deleted viewmodel\n");
 }
 
 ViewmodelComponent::ViewmodelComponent(Player* p) 
@@ -718,7 +721,9 @@ ViewmodelComponent::ViewmodelComponent(Player* p)
 	model = mods.find_or_load("arms.glb");
 	animator.set_model(model);
 
-	viewmodel_handle = draw.scene.register_renderable();
+	viewmodel_handle = idraw->register_obj();
+
+	printf("created viewmodel %d\n", viewmodel_handle);
 
 	Bone_Controller& wp = animator.get_controller(bone_controller_type::misc1);
 	wp.enabled = true;
@@ -797,12 +802,12 @@ void ViewmodelComponent::update_visuals()
 	proxy.animator = &animator;
 	proxy.mesh = &model->mesh;
 	proxy.mats = &model->mats;
-	if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
+	if (eng->local.thirdperson_camera.integer() == 0)
 	{
 			//mat4 invview = glm::inverse(draw.vs.view);
 
 		Game_Local* gamel = &eng->local;
-		glm::mat4 model2 = glm::translate(mat4(1), vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
+		glm::mat4 model2 = glm::translate(glm::mat4(1), vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
 		model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
 
 
@@ -815,7 +820,7 @@ void ViewmodelComponent::update_visuals()
 	else {
 		proxy.visible = false;
 	}
-	draw.scene.update(viewmodel_handle, proxy);
+	idraw->update_obj(viewmodel_handle, proxy);
 }
 
 void Player::update_visuals()
@@ -823,9 +828,9 @@ void Player::update_visuals()
 	if (viewmodel) viewmodel->update_visuals();
 
 	if (render_handle == -1 && model)
-		render_handle = draw.scene.register_renderable();
+		render_handle = idraw->register_obj();
 	else if (render_handle != -1 && !model)
-		draw.scene.remove(render_handle);
+		idraw->remove_obj(render_handle);
 
 	if (render_handle != -1 && model) {
 		Render_Object_Proxy proxy;
@@ -841,7 +846,7 @@ void Player::update_visuals()
 		proxy.mats = &model->mats;
 		proxy.transform = get_world_transform()*model->skeleton_root_transform;
 
-		draw.scene.update(render_handle, proxy);
+		idraw->update_obj(render_handle, proxy);
 	}
 
 }

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include "glm/glm.hpp"
+#include "Util.h"
 
 class Mesh;
 class Animator;

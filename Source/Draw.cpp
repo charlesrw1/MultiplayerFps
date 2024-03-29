@@ -1,4 +1,5 @@
-#include "Draw.h"
+#include "DrawLocal.h"
+
 #include "Util.h"
 #include "glad/glad.h"
 #include "Texture.h"
@@ -14,6 +15,7 @@
 //#pragma optimize("", off)
 
 Renderer draw;
+RendererPublic* idraw = &draw;
 
 static const int ALBEDO1_LOC = 0;
 static const int NORMAL1_LOC = 1;
@@ -847,7 +849,7 @@ void imgui_stat_hook()
 
 }
 
-void Renderer::Init()
+void Renderer::init()
 {
 	bool supports_compression = false;
 	bool supports_sprase_tex = false;
@@ -948,6 +950,7 @@ void Renderer::Init()
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
 }
+
 
 void Renderer::InitFramebuffers()
 {
@@ -1772,7 +1775,7 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			list.commands.push_back(cmd);
 
 			for (int k = 0; k < meshb.count; k++) {
-				instance_to_instance.push_back(src.objects[meshb.first + k].render_obj);
+				instance_to_instance.push_back(proxy_list.handle_to_obj[src.objects[meshb.first + k].render_obj]);
 			}
 
 			base_instance += cmd.primCount;
@@ -1836,6 +1839,7 @@ glm::vec4 to_vec4(Color32 color) {
 	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
 }
 
+
 void Render_Scene::build_scene_data()
 {
 	CPUFUNCTIONSTART;
@@ -1882,11 +1886,14 @@ void Render_Scene::build_scene_data()
 				else
 					gpu_objects[i].anim_mat_offset = 0;
 
-				if (proxy.viewmodel_layer)
+				if (proxy.viewmodel_layer) {
 					gpu_objects[i].model = glm::inverse(draw.vs.view) * proxy.transform;
-				else
+					gpu_objects[i].invmodel = glm::inverse(gpu_objects[i].model);
+				}
+				else {
 					gpu_objects[i].model = proxy.transform;
-				gpu_objects[i].invmodel = glm::inverse(gpu_objects[i].model);
+					gpu_objects[i].invmodel = obj.type_.inv_transform;
+				}
 				gpu_objects[i].colorval = to_vec4(proxy.param1);
 			}
 		}
@@ -3013,6 +3020,27 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 	}
 }
 
+renderobj_handle Renderer::register_obj()
+{
+	return scene.register_renderable();
+}
+
+void Renderer::update_obj(renderobj_handle handle, const Render_Object_Proxy& proxy)
+{
+	scene.update(handle, proxy);
+}
+
+void Renderer::remove_obj(renderobj_handle handle)
+{
+	scene.remove(handle);
+}
+
+void Renderer::on_level_end()
+{
+
+
+}
+
 void Renderer::on_level_start()
 {
 	scene.cubemaps.clear();
@@ -3200,6 +3228,8 @@ void Render_Scene::update(renderobj_handle handle, const Render_Object_Proxy& pr
 {
 	ROP_Internal& in = proxy_list.get(handle);
 	in.proxy = proxy;
+	if (!proxy.viewmodel_layer) 
+		in.inv_transform = glm::inverse(proxy.transform);
 }
 
 void Render_Scene::remove(renderobj_handle handle) {

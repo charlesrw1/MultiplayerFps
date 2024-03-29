@@ -28,7 +28,7 @@
 #include "Server.h"
 #include "Player.h"
 #include "Config.h"
-#include "Draw.h"
+#include "DrawPublic.h"
 #include "Entity.h"
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -589,7 +589,7 @@ void Game_Engine::start_editor(const char* map)
 
 	mapname = map;
 	level = LoadLevelFile(map);
-	draw.on_level_start();
+	idraw->on_level_start();
 
 	eddoc->open_doc(map);
 
@@ -708,7 +708,7 @@ DECLARE_ENGINE_CMD(print_vars)
 
 DECLARE_ENGINE_CMD(reload_shaders)
 {
-	draw.reload_shaders();
+	idraw->reload_shaders();
 }
 
 
@@ -827,7 +827,7 @@ bool Game_Engine::start_map(string map, bool is_client)
 		sv->connect_local_client();
 	}
 
-	draw.on_level_start();
+	idraw->on_level_start();
 
 	return true;
 }
@@ -1031,27 +1031,27 @@ void draw_wind_menu()
 	ImGui::DragFloat("g_time_speedup", &g_time_speedup, 0.01);
 	if (g_time_speedup <= 0.0001) g_time_speedup = 0.0001;
 
-	ImGui::DragFloat("roughness", &draw.rough, 0.02);
-	ImGui::DragFloat("metalness", &draw.metal, 0.02);
-	ImGui::DragFloat3("aosphere", &draw.aosphere.x, 0.02);
-	ImGui::DragFloat2("vfog", &draw.vfog.x, 0.02);
-	ImGui::DragFloat3("ambient", &draw.ambientvfog.x, 0.02);
-	ImGui::DragFloat("spread", &draw.volfog.spread, 0.02);
-	ImGui::DragFloat("frustum", &draw.volfog.frustum_end, 0.02);
-	ImGui::DragFloat("slice", &draw.slice_3d, 0.04, 0, 4);
+	//ImGui::DragFloat("roughness", &draw.rough, 0.02);
+	//ImGui::DragFloat("metalness", &draw.metal, 0.02);
+	//ImGui::DragFloat3("aosphere", &draw.aosphere.x, 0.02);
+	//ImGui::DragFloat2("vfog", &draw.vfog.x, 0.02);
+	//ImGui::DragFloat3("ambient", &draw.ambientvfog.x, 0.02);
+	//ImGui::DragFloat("spread", &draw.volfog.spread, 0.02);
+	//ImGui::DragFloat("frustum", &draw.volfog.frustum_end, 0.02);
+	//ImGui::DragFloat("slice", &draw.slice_3d, 0.04, 0, 4);
 	
 
-	ImGui::Image(ImTextureID(EnviornmentMapHelper::get().integrator.lut_id), ImVec2(128, 128));
+	//ImGui::Image(ImTextureID(EnviornmentMapHelper::get().integrator.lut_id), ImVec2(128, 128));
 
-	ImGui::Image(ImTextureID(draw.ssao.texture.viewnormal), ImVec2(512, 512));
+	//ImGui::Image(ImTextureID(draw.ssao.texture.viewnormal), ImVec2(512, 512));
 
 
 
-	ImGui::Image(ImTextureID(draw.tex.reflected_color), ImVec2(512, 512));
-	ImGui::Image(ImTextureID(draw.tex.scene_color), ImVec2(512, 512));
-	ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
-	ImGui::Checkbox("upscale", &bloom_stop);
-	ImGui::Image(ImTextureID(draw.tex.bloom_chain[bloom_layer]), ImVec2(256, 256));
+	//ImGui::Image(ImTextureID(draw.tex.reflected_color), ImVec2(512, 512));
+	//ImGui::Image(ImTextureID(draw.tex.scene_color), ImVec2(512, 512));
+	//ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
+	//ImGui::Checkbox("upscale", &bloom_stop);
+	//ImGui::Image(ImTextureID(draw.tex.bloom_chain[bloom_layer]), ImVec2(256, 256));
 
 
 	ImGui::DragFloat3("wind dir", &wswind_dir.x, 0.04);
@@ -1110,9 +1110,9 @@ void Game_Engine::draw_screen()
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	if (state == ENGINE_GAME && local.has_run_tick)
-		draw.scene_draw(false);
+		idraw->scene_draw(false);
 	else if (state == ENGINE_EDITOR)
-		draw.scene_draw(true);
+		idraw->scene_draw(true);
 
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
@@ -1283,7 +1283,7 @@ void Game_Engine::init()
 	network_init();
 	TIMESTAMP("net init");
 
-	draw.Init();
+	idraw->init();
 	TIMESTAMP("draw init");
 
 	mats.init();

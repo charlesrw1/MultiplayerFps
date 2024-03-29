@@ -1,4 +1,5 @@
 #pragma once
+#include "DrawPublic.h"
 #include "Config.h"
 #include "glm/glm.hpp"
 #include "Util.h"
@@ -12,6 +13,8 @@
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
 #include "RenderObj.h"
+
+#pragma optimize("", on);
 
 class MeshPart;
 class Model;
@@ -371,6 +374,7 @@ public:
 struct ROP_Internal
 {
 	Render_Object_Proxy proxy;
+	glm::mat4 inv_transform;
 };
 
 // cull main view
@@ -529,16 +533,20 @@ public:
 	std::vector<material_shader_internal> shader_hash_map;
 };
 
-
-class Renderer
+class Renderer : public RendererPublic
 {
 public:
 	Renderer();
 
-	void Init();
-
-	// editor mode doesn't draw UI and it calls the eddoc hook to draw custom stuff
-	void scene_draw(bool editor_mode);
+	// public interface
+	virtual void init() override;
+	virtual void scene_draw(bool editor_mode) override;
+	virtual void on_level_start() override;
+	virtual void on_level_end() override;
+	virtual void reload_shaders() override;
+	virtual renderobj_handle register_obj() override;
+	virtual void update_obj(renderobj_handle handle, const Render_Object_Proxy& proxy) override;
+	virtual void remove_obj(renderobj_handle handle) override;
 
 	void render_level_to_target(Render_Level_Params params);
 
@@ -546,13 +554,10 @@ public:
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
 		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
 
-	void reload_shaders();
-
 	void create_shaders();
 
 	void ui_render();
 
-	void on_level_start();
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
 
 	void cubemap_positions_debug();
