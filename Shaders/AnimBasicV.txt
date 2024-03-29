@@ -16,6 +16,7 @@ layout (location = 6) in vec2 VS_IN_TexCoord2;
 layout (location = 7) in vec3 VS_IN_Tangent;
 #endif
 
+flat out uint FS_IN_Objid;
 flat out uint FS_IN_Matid;
 out vec3 FS_IN_FragPos;
 out vec3 FS_IN_Normal;
@@ -87,8 +88,8 @@ vec3 do_wind_sway(vec3 pos, mat4 Model)
 void main()
 {
 	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
-
 	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
+	FS_IN_Objid = obj_index;
 
 	mat4 Model = g_objects[obj_index].model;
 	mat4 InverseModel = g_objects[obj_index].invmodel;

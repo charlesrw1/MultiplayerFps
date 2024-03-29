@@ -225,9 +225,22 @@ RayHit EditorDoc::cast_ray_into_world(Ray* out_ray)
 	return eng->phys.trace_ray(r, -1, PF_ALL);
 }
 
+Color32 to_color32(glm::vec4 v) {
+	Color32 c;
+	c.r = glm::clamp(v.r * 255.f,0.f,255.f);
+	c.g = glm::clamp(v.g * 255.f, 0.f, 255.f);
+	c.b = glm::clamp(v.b * 255.f, 0.f, 255.f);
+	c.a = glm::clamp(v.a * 255.f, 0.f, 255.f);
+	return c;
+}
+
 void AssetBrowser::update()
 {
 	if (get_model()) {
+		if (!drawing_model) {
+			temp_place_model = draw.scene.register_renderable();
+		}
+
 		drawing_model = true;
 
 		Ray r;
@@ -238,8 +251,22 @@ void AssetBrowser::update()
 		else {
 			model_position = r.pos + r.dir * 10.f;
 		}
+
+		Render_Object_Proxy obj;
+		obj.mesh = &get_model()->mesh;
+		obj.mats = &get_model()->mats;
+		obj.transform = glm::translate(glm::mat4(1),model_position);
+		obj.visible = true;
+		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, (sin(GetTime()*4.0) * 0.5 + 0.5)*0.4  ));
+		obj.color_overlay = true;
+		draw.scene.update(temp_place_model, obj);
 	}
 	else {
+		if (drawing_model) {
+			draw.scene.remove(temp_place_model);
+			temp_place_model = -1;
+		}
+
 		drawing_model = false;
 	}
 }
@@ -722,16 +749,6 @@ void EditorDoc::scene_draw_callback()
 	switch (mode)
 	{
 	case TOOL_SPAWN_MODEL:
-		if (assets.drawing_model) {
-			Draw_Model_Frontend_Params p;
-			p.model = assets.get_model();
-			p.transform = glm::translate(glm::mat4(1), assets.model_position);
-			p.wireframe_render = false;
-			p.solidcolor_render = true;
-			p.render_additive = true;
-			p.colorparam = glm::vec4(1.0, 0.5, 0, (sin(GetTime()) * 0.5 + 0.5));
-			draw.draw_model_immediate(p);
-		}
 		break;
 
 	case TOOL_TRANSFORM:

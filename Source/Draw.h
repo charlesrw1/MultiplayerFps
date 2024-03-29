@@ -456,61 +456,14 @@ public:
 
 };
 
-struct Draw_Model_Frontend_Params
-{
-	Model* model = nullptr;
-	glm::mat4 transform;
-	bool wireframe_render;
-	bool solidcolor_render;
-	bool render_additive;
-	glm::vec4 colorparam;
-};
-
-struct Draw_Call
-{
-	const Mesh* mesh;
-	Material* mat;
-	int submesh;
-	int mat_index;
-	int object_index;
-	uint64_t sort;
-};
-
-// defines shared resources used for gpu driven rendering
-struct Shared_Gpu_Driven_Resources
-{
-public:
-	void init();
-
-	void build_draw_calls();
-
-	void make_draw_calls_from(
-		const Mesh* mesh,
-		glm::mat4 transform,
-		const vector<Material*>& mat_list,
-		const Animator* animator,
-		bool casts_shadows,
-		glm::vec4 colorparam);
-
-	vector<Draw_Call> opaques;
-	vector<Draw_Call> transparents;
-	vector<Draw_Call> shadows;
-
-	vector<glm::mat4x4> skinned_matricies;
-	vector<gpu::Object_Instance> gpu_objects;
-	vector<gpu::Material_Data> scene_mats;
-
-	uint32_t scene_mats_ssbo;
-	uint32_t gpu_objs_ssbo;
-	uint32_t anim_matrix_ssbo;
-};
-
 struct Render_Stats
 {
 	int textures_bound = 0;
 	int shaders_bound = 0;
 	int tris_drawn = 0;
 	int draw_calls = 0;
+	int vaos_bound = 0;
+	int blend_changes = 0;
 };
 
 class Program_Manager
@@ -576,25 +529,6 @@ public:
 	std::vector<material_shader_internal> shader_hash_map;
 };
 
-struct Opengl_State_Machine
-{
-	program_handle active_program;
-	texhandle textures_bound[16];
-	blend_state blending = blend_state::OPAQUE;
-	bool backface_state = false;
-	uint32_t current_vao = 0;
-
-	enum invalid_bits {
-		PROGRAM_BIT,
-		BLENDING_BIT,
-		BACKFACE_BIT,
-		VAO_BIT,
-		TEXTURE0_BIT,
-	};
-	uint32_t invalid_bits = UINT32_MAX;
-
-	void reset_state_machine();
-};
 
 class Renderer
 {
@@ -605,14 +539,12 @@ public:
 
 	// editor mode doesn't draw UI and it calls the eddoc hook to draw custom stuff
 	void scene_draw(bool editor_mode);
-	void extract_objects();
 
 	void render_level_to_target(Render_Level_Params params);
 
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
 		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
-	void draw_model_immediate(Draw_Model_Frontend_Params params);
 
 	void reload_shaders();
 
@@ -705,14 +637,17 @@ public:
 	Auto_Config_Var enable_ssao;
 	Auto_Config_Var use_halfres_reflections;
 
+	void bind_vao(uint32_t vao);
 	void bind_texture(int bind, int id);
-	
 	void set_shader(program_handle handle);
+	void set_blend_state(blend_state blend);
+	void set_show_backfaces(bool show_backfaces);
+
+	Shader shader();
 
 	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
 		bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face);
 
-	Shader shader();
 	void set_shader_constants();
 	void set_depth_shader_constants();
 
@@ -737,10 +672,8 @@ public:
 	Level_Light dyn_light;
 
 	Render_Scene scene;
-	Shared_Gpu_Driven_Resources shared;
-	std::vector<Draw_Model_Frontend_Params> immediate_draw_calls;
-	
-	program_handle get_mat_shader(const Mesh& part, const Material& gs, bool depth_pass);
+
+	program_handle get_mat_shader(bool is_animated, const Mesh& part, const Material& gs, bool depth_pass);
 	
 	Render_Stats stats;
 
@@ -754,20 +687,6 @@ private:
 		uint32_t current_t = 0;
 	}sprite_state;
 	void draw_sprite_buffer();
-
-	struct Model_Drawing_State {
-		bool initial_set = true;
-		uint32_t current_vao = -1;
-		bool initial_model = true;
-		program_handle current_progam = -1;
-		blend_state blend = blend_state::OPAQUE;
-		bool backface = false;
-		bool is_water_reflection_pass = false;
-		Render_Level_Params::Pass_Type pass = Render_Level_Params::OPAQUE;
-	};
-
-	void draw_model_real(const Draw_Call& dc,
-		Model_Drawing_State& state);
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
 
@@ -791,8 +710,32 @@ private:
 
 	int cur_w = 0;
 	int cur_h = 0;
-	program_handle current_program = -1;
-	texhandle cur_tex[MAX_SAMPLER_BINDINGS];
+
+
+	struct Opengl_State_Machine
+	{
+		program_handle active_program = -1;
+		texhandle textures_bound[16];
+		blend_state blending = blend_state::OPAQUE;
+		bool backface_state = false;
+		uint32_t current_vao = 0;
+
+		enum invalid_bits {
+			PROGRAM_BIT,
+			BLENDING_BIT,
+			BACKFACE_BIT,
+			VAO_BIT,
+			TEXTURE0_BIT,
+		};
+		uint32_t invalid_bits = UINT32_MAX;
+
+		bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1 << bit); }
+		void set_bit_valid(uint32_t bit) { invalid_bits &= ~(1 << bit); }
+		void set_bit_invalid(uint32_t bit) { invalid_bits |= (1 << bit); }
+		void invalidate_all() { invalid_bits = UINT32_MAX; }
+	};
+
+	Opengl_State_Machine state_machine;
 
 	MeshBuilder ui_builder;
 	texhandle building_ui_texture;

@@ -1,1 +1,1 @@
-map Map0
+editdoc Map0

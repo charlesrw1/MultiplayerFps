@@ -9,7 +9,7 @@ class NPC : public Entity
 {
 public:
 	NPC() {
-		set_model("player_FINAL.glb");
+		set_model("sphere.glb");
 		pathfind_state = going_towards_waypoint;
 		position = vec3(0.f);
 

@@ -310,12 +310,11 @@ void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
 void Renderer::bind_texture(int bind, int id)
 {
 	ASSERT(bind >= 0 && bind < MAX_SAMPLER_BINDINGS);
-	if (cur_tex[bind] != id) {
-		//glActiveTexture(GL_TEXTURE0 + bind);
-		//glBindTexture(target, id);
+	bool invalid = state_machine.is_bit_invalid(Opengl_State_Machine::TEXTURE0_BIT + bind);
+	if (invalid || state_machine.textures_bound[bind] != id) {
+		state_machine.set_bit_valid(Opengl_State_Machine::TEXTURE0_BIT + bind);
 		glBindTextureUnit(bind, id);
-		cur_tex[bind] = id;
-
+		state_machine.textures_bound[bind] = id;
 		stats.textures_bound++;
 	}
 }
@@ -401,9 +400,6 @@ void set_standard_draw_data(const Render_Level_Params& params)
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, draw.scene.cubemap_ssbo);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, draw.shared.scene_mats_ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, draw.shared.gpu_objs_ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, draw.shared.anim_matrix_ssbo);
 
 	glCheckError();
 }
@@ -494,7 +490,7 @@ program_handle Material_Shader_Table::lookup(shader_key key)
 		if (shader_hash_map[index].handle == -1) return -1;
 		if (shader_hash_map[index].key.as_uint32() == key32)
 			return shader_hash_map[index].handle;
-		printf("material table collision\n");
+		//printf("material table collision\n");
 	}
 	return -1;
 }
@@ -536,18 +532,69 @@ shader_key get_real_shader_key_from_shader_type(shader_key key)
 			key.vertex_colors = 1;
 		else if (type == material_type::WATER)
 			key.normal_mapped = 1;
+		else if (type == material_type::UNLIT) {
+			key.normal_mapped = 0;
+			key.alpha_tested = 0;
+		}
 	}
 	return key;
+}
+
+void Renderer::bind_vao(uint32_t vao)
+{
+	bool invalid = state_machine.is_bit_invalid(Opengl_State_Machine::VAO_BIT);
+	if (invalid || vao != state_machine.current_vao) {
+		state_machine.set_bit_valid(Opengl_State_Machine::VAO_BIT);
+		state_machine.current_vao = vao;
+		glBindVertexArray(vao);
+		stats.vaos_bound++;
+	}
+}
+
+void Renderer::set_blend_state(blend_state blend)
+{
+	bool invalid = state_machine.is_bit_invalid(Opengl_State_Machine::BLENDING_BIT);
+	if (invalid || blend != state_machine.blending) {
+		if (blend == blend_state::OPAQUE) 
+			glDisable(GL_BLEND);
+		else if (blend == blend_state::ADD) {
+			if (invalid || state_machine.blending == blend_state::OPAQUE)
+				glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE);
+		}
+		else if (blend == blend_state::BLEND) {
+			if (invalid || state_machine.blending == blend_state::OPAQUE)
+				glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+		state_machine.blending = blend;
+		state_machine.set_bit_valid(Opengl_State_Machine::BLENDING_BIT);
+		stats.blend_changes++;
+	}
+}
+void Renderer::set_show_backfaces(bool show_backfaces)
+{
+	bool invalid = state_machine.is_bit_invalid(Opengl_State_Machine::BACKFACE_BIT);
+	if (invalid || show_backfaces != state_machine.backface_state) {
+		if (show_backfaces)
+			glDisable(GL_CULL_FACE);
+		else
+			glEnable(GL_CULL_FACE);
+		state_machine.set_bit_valid(Opengl_State_Machine::BACKFACE_BIT);
+		state_machine.backface_state = show_backfaces;
+	}
 }
 
 void Renderer::set_shader(program_handle handle)
 {
 	if (handle == -1) {
-		current_program = -1;
+		state_machine.active_program = handle;
 		glUseProgram(0);
 	}
-	if (handle != current_program) {
-		current_program = handle;
+	bool invalid = state_machine.is_bit_invalid(Opengl_State_Machine::PROGRAM_BIT);
+	if (invalid || handle != state_machine.active_program) {
+		state_machine.set_bit_valid(Opengl_State_Machine::PROGRAM_BIT);
+		state_machine.active_program = handle;
 		prog_man.get_obj(handle).use();
 		stats.shaders_bound++;
 	}
@@ -564,6 +611,7 @@ program_handle compile_mat_shader(shader_key key)
 	case material_type::DEFAULT:
 	case material_type::WINDSWAY:
 	case material_type::TWOWAYBLEND:
+	case material_type::UNLIT:
 		vert_shader = "AnimBasicV.txt";
 		if (key.depth_only) 
 			frag_shader = "DepthF.txt";
@@ -584,6 +632,7 @@ program_handle compile_mat_shader(shader_key key)
 	if (key.normal_mapped) params += "NORMALMAPPED,";
 	if (key.vertex_colors) params += "VERTEX_COLOR,";
 	if (type == material_type::WINDSWAY) params += "WIND,";
+	if (type == material_type::UNLIT) params += "UNLIT,";
 	if (!params.empty())params.pop_back();
 
 	program_handle handle = draw.prog_man.create_raster(vert_shader, frag_shader, params);
@@ -793,6 +842,8 @@ void imgui_stat_hook()
 	ImGui::Text("Total tris: %d", draw.stats.tris_drawn);
 	ImGui::Text("Texture binds: %d", draw.stats.textures_bound);
 	ImGui::Text("Shader binds: %d", draw.stats.shaders_bound);
+	ImGui::Text("Vao binds: %d", draw.stats.vaos_bound);
+	ImGui::Text("Blend changes: %d", draw.stats.blend_changes);
 
 }
 
@@ -841,7 +892,6 @@ void Renderer::Init()
 	
 	InitGlState();
 
-	shared.init();
 	scene.init();
 
 	float start = GetTime();
@@ -1138,26 +1188,9 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 		else if (mat->type == material_type::WATER)
 			set_water_constants();
 
-		glBindVertexArray(mods.global_vertex_buffers[(int)format].main_vao);
-		
-		if (backface)
-			glDisable(GL_CULL_FACE);
-		else
-			glEnable(GL_CULL_FACE);
-
-		switch (blend) {
-		case blend_state::OPAQUE:
-			glDisable(GL_BLEND);
-			break;
-		case blend_state::ADD:
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_ONE, GL_ONE);
-			break;
-		case blend_state::BLEND:
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			break;
-		}
+		bind_vao(mods.global_vertex_buffers[(int)format].main_vao);
+		set_show_backfaces(backface);
+		set_blend_state(blend);
 
 		bool shader_doesnt_need_the_textures = mat->type == material_type::WATER || pass.type == pass_type::DEPTH;
 
@@ -1172,6 +1205,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 				SET_OR_USE_FALLBACK(material_texture::AO, AO1_LOC, white_texture);
 				SET_OR_USE_FALLBACK(material_texture::METAL, METAL1_LOC, white_texture);
 				SET_OR_USE_FALLBACK(material_texture::NORMAL, NORMAL1_LOC, flat_normal_texture);
+
 			}
 		}
 
@@ -1191,12 +1225,16 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 		);
 
 		offset += count;
+
+		stats.draw_calls++;
 	}
 }
 
 void Renderer::render_level_to_target(Render_Level_Params params)
 {
 	vs = params.view;
+
+	state_machine.invalidate_all();
 
 	if (params.is_probe_render)
 		using_skybox_for_specular = true;
@@ -1241,12 +1279,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		glEnable(GL_CLIP_DISTANCE0);
 	}
 	
-	std::vector<Draw_Call>* list;
-	if (params.is_water_reflection_pass) list = &shared.opaques;
-	else if (params.pass == params.SHADOWMAP) list = &shared.shadows;
-	else if (params.pass == params.TRANSLUCENT) list = &shared.transparents;
-	else  list = &shared.opaques;
-
+	
 	{
 		//Model_Drawing_State state;
 		//for (int d = 0; d < list->size(); d++) {
@@ -1382,12 +1415,6 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 		glm::vec2(srcw / tw, srch / th), color);
 }
 
-void Shared_Gpu_Driven_Resources::init()
-{
-	glCreateBuffers(1, &anim_matrix_ssbo);
-	glCreateBuffers(1, &gpu_objs_ssbo);
-	glCreateBuffers(1, &scene_mats_ssbo);
-}
 
 void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 {
@@ -1404,72 +1431,6 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 		if (a->model->bones[index].parent != -1) {
 			vec3 parent_org = transform * bones[a->model->bones[index].parent][3];
 			Debug::add_line(org, parent_org, COLOR_PINK,-1.f,false);
-		}
-	}
-}
-
-void Shared_Gpu_Driven_Resources::make_draw_calls_from(
-	const Mesh* mesh,
-	glm::mat4 transform,
-	const vector<Material*>& mat_list,
-	const Animator* animator,
-	bool casts_shadows,
-	glm::vec4 colorparam)
-{
-	gpu::Object_Instance obj;
-	
-	if (animator) {
-		obj.anim_mat_offset = skinned_matricies.size();
-		auto& mats = animator->get_matrix_palette();
-		for (int i = 0; i < animator->model->bones.size(); i++) {
-			skinned_matricies.push_back(mats[i]);
-		}
-
-		//draw_skeleton(animator, 0.1f, transform);
-	}
-
-	obj.model = transform;
-	obj.invmodel = glm::inverse(transform);
-	obj.colorval = colorparam;
-
-	int obj_idx = gpu_objects.size();
-	gpu_objects.push_back(obj);
-
-	for (int s = 0; s < mesh->parts.size(); s++) {
-		Draw_Call dc;
-		dc.mat = mat_list[mesh->parts[s].material_idx];
-		if (1) {
-			// map it to a buffer
-			gpu::Material_Data gpumat;
-			gpumat.diffuse_tint = glm::vec4(1.f);// dc.mat->diffuse_tint;
-			gpumat.rough_mult = dc.mat->roughness_mult;
-			gpumat.metal_mult = dc.mat->metalness_mult;
-			//gpumat.rough_remap_x = dc.mat->roughness_remap_range.x;
-			//gpumat.rough_remap_y = dc.mat->roughness_remap_range.y;
-
-			dc.mat_index = scene_mats.size();
-			scene_mats.push_back(gpumat);
-		}
-		dc.object_index = obj_idx;
-		dc.submesh = s;
-		dc.mesh = mesh;
-
-		uint64_t shade_index = draw.get_mat_shader(*mesh, *dc.mat, false);
-		uint64_t tex_index = (dc.mat->images[0]) ? dc.mat->images[0]->gl_id : 0;
-		uint64_t alpha_and_other = dc.mat->backface | (int)dc.mat->blend;
-		uint64_t vertfmt = (uint64_t)mesh->format;
-		dc.sort = (shade_index << 38) | (alpha_and_other<<36) | (tex_index<<4) | vertfmt;
-
-		if (dc.mat->is_translucent()) {
-			transparents.push_back(dc);
-		}
-		else {
-			opaques.push_back(dc);
-			if (casts_shadows) {
-				shade_index = draw.get_mat_shader(*mesh, *dc.mat, true);
-				dc.sort = (shade_index << 38) | (alpha_and_other << 36) | (tex_index << 4) | vertfmt;
-				shadows.push_back(dc);
-			}
 		}
 	}
 }
@@ -1550,7 +1511,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& p
 	draw_call_key key;
 
 	ASSERT(proxy.mats);
-	key.shader = draw.get_mat_shader(*proxy.mesh, *material, (type == pass_type::DEPTH));
+	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, *proxy.mesh, *material, (type == pass_type::DEPTH));
 	key.blending = (uint64_t)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
@@ -1672,7 +1633,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			batch.count = 1;
 			auto& mats = rop->mats;
 			int index = rop->mesh->parts.at(po->submesh_index).material_idx;
-			batch.material = (*mats)[index];
+			batch.material = po->material;
 			batch.shader_index = po->sort_key.shader;
 			return batch;
 		};
@@ -1889,212 +1850,70 @@ void Render_Scene::build_scene_data()
 	// add draw calls and sort them
 	gpu_objects.resize(proxy_list.objects.size());
 	skinned_matricies_vec.clear();
+	{
+		CPUSCOPESTART("traversal");
 
-	for (int i = 0; i < proxy_list.objects.size(); i++) {
-		auto& obj = proxy_list.objects[i];
-		auto& proxy = obj.type_.proxy;
-		if (proxy.visible) {
-			auto& mesh = *proxy.mesh;
-			for (int j = 0; j < mesh.parts.size(); j++) {
-				auto& part = mesh.parts[j];
-				Material* mat = (*proxy.mats)[part.material_idx];
-				if (mat->is_translucent())
-					transparents.add_object(proxy, obj.handle, mat, j, 0);
-				else {
-					depth.add_object(proxy, obj.handle, mat, j, 0);
-					opaque.add_object(proxy, obj.handle, mat, j, 0);
+		for (int i = 0; i < proxy_list.objects.size(); i++) {
+			auto& obj = proxy_list.objects[i];
+			auto& proxy = obj.type_.proxy;
+			if (proxy.visible) {
+				auto& mesh = *proxy.mesh;
+				for (int j = 0; j < mesh.parts.size(); j++) {
+					auto& part = mesh.parts[j];
+					Material* mat = (*proxy.mats)[part.material_idx];
+					if (mat->is_translucent())
+						transparents.add_object(proxy, obj.handle, mat, j, 0);
+					else {
+						depth.add_object(proxy, obj.handle, mat, j, 0);
+						opaque.add_object(proxy, obj.handle, mat, j, 0);
+					}
+					if (proxy.color_overlay) {
+						transparents.add_object(proxy, obj.handle, mats.unlit, j, 1);
+					}
 				}
-				if (proxy.color_overlay) {
-					transparents.add_object(proxy, obj.handle, mats.unlit, j, 1);
+
+				if (proxy.animator) {
+					gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
+					auto& mats = proxy.animator->get_matrix_palette();
+					for (int i = 0; i < proxy.animator->model->bones.size(); i++) {
+						skinned_matricies_vec.push_back(mats[i]);
+					}
 				}
+				else
+					gpu_objects[i].anim_mat_offset = 0;
+
+				if (proxy.viewmodel_layer)
+					gpu_objects[i].model = glm::inverse(draw.vs.view) * proxy.transform;
+				else
+					gpu_objects[i].model = proxy.transform;
+				gpu_objects[i].invmodel = glm::inverse(gpu_objects[i].model);
+				gpu_objects[i].colorval = to_vec4(proxy.param1);
 			}
-
-			if (proxy.animator) {
-				gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
-				auto& mats = proxy.animator->get_matrix_palette();
-				for (int i = 0; i < proxy.animator->model->bones.size(); i++) {
-					skinned_matricies_vec.push_back(mats[i]);
-				}
-			} 
-			else
-				gpu_objects[i].anim_mat_offset = 0;
-
-			if (proxy.viewmodel_layer)
-				gpu_objects[i].model = glm::inverse(draw.vs.view) * proxy.transform;
-			else
-				gpu_objects[i].model = proxy.transform;
-			gpu_objects[i].invmodel = glm::inverse(gpu_objects[i].model);
-			gpu_objects[i].colorval = to_vec4(proxy.param1);
 		}
+		glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
+		glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * skinned_matricies_vec.size(), skinned_matricies_vec.data(), GL_DYNAMIC_DRAW);
 	}
 
-	glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
-	glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * skinned_matricies_vec.size(), skinned_matricies_vec.data(), GL_DYNAMIC_DRAW);
+	{
+		CPUSCOPESTART("make batches");
 
-	transparents.make_batches(*this);
-	opaque.make_batches(*this);
-	depth.make_batches(*this);
-
-	// build draw calls
-	build_render_list(vis_list, depth);
-	build_render_list(shadow_lists, depth);
-	build_render_list(opaque_list, opaque);
-	build_render_list(transparents_list, transparents);
+		transparents.make_batches(*this);
+		opaque.make_batches(*this);
+		depth.make_batches(*this);
+	}
+	{
+		CPUSCOPESTART("make render lists");
+		// build draw calls
+		build_render_list(vis_list, depth);
+		build_render_list(shadow_lists, depth);
+		build_render_list(opaque_list, opaque);
+		build_render_list(transparents_list, transparents);
+	}
 }
 
 // culling step:
 // cpu: loop through submesh instance buffer, get the instance sphere bounds cull and output to draw call index
 //		compact
-
-
-
-void Shared_Gpu_Driven_Resources::build_draw_calls()
-{
-	skinned_matricies.clear();
-	gpu_objects.clear();
-	opaques.clear();
-	transparents.clear();
-	shadows.clear();
-	scene_mats.clear();
-
-	//int scene_pre_size = scene_mats.size();
-
-	Level* level = eng->level;
-
-	//for (int m = 0; m < level->static_mesh_objs.size(); m++) {
-	//	Static_Mesh_Object& smo = level->static_mesh_objs[m];
-	//	ASSERT(smo.model);
-	//	make_draw_calls_from(
-	//		&smo.model->mesh,
-	//		smo.transform,
-	//		smo.model->mats,
-	//		nullptr,
-	//		true,
-	//		glm::vec4(1.f)
-	//	);
-	//}
-	//for (int m = 0; m < level->level_prefab->nodes.size(); m++) {
-	//	auto& node = level->level_prefab->nodes[m];
-	//	auto& mesh = level->level_prefab->meshes[node.mesh_idx];
-	//	make_draw_calls_from(
-	//		&mesh,
-	//		node.transform,
-	//		level->level_prefab->mats,
-	//		nullptr,
-	//		true,
-	//		glm::vec4(1.f)
-	//	);
-	//}
-
-	for (auto& proxy_internal : draw.scene.proxy_list.objects) {
-		auto& proxy = proxy_internal.type_.proxy;
-
-		if (!proxy.visible) continue;
-		mat4 transform = proxy.transform;
-		if (proxy.viewmodel_layer) {
-			transform =  glm::inverse(draw.vs.view) * transform;
-		}
-		make_draw_calls_from(proxy.mesh, transform, *proxy.mats, proxy.animator, proxy.shadow_caster, glm::vec4(1.f));
-	}
-
-	//for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-	//	auto& ent = ei.get();
-	//	//auto& ent = cgame->entities[i];
-	//	if (!ent.model)
-	//		continue;
-	//
-	//	if (ei.get_index() == eng->player_num() && !eng->local.thirdperson_camera.integer())
-	//		continue;
-	//
-	//	mat4 model = ent.get_world_transform()*ent.model->skeleton_root_transform;
-	//
-	//	Animator* a = (ent.model->animations) ? &ent.anim : nullptr;
-	//
-	//	make_draw_calls_from(&ent.model->mesh, model, ent.model->mats, a, true, glm::vec4(1.f));
-	//
-	//	if (ent.class_ == entityclass::PLAYER && a && ent.inv.active_item != Game_Inventory::UNEQUIP) {
-	//
-	//		Game_Item_Stats& stat = get_item_stats()[ent.inv.active_item];
-	//
-	//
-	//		Model* m = FindOrLoadModel(stat.world_model);
-	//		if (!m) continue;
-	//
-	//		int index = ent.model->bone_for_name("weapon");
-	//		int index2 = ent.model->bone_for_name("magazine");
-	//		glm::mat4 rotate = glm::rotate(mat4(1), HALFPI, vec3(1, 0, 0));
-	//		if (index == -1 || index2 == -1) {
-	//			sys_print("no weapon bone\n");
-	//			continue;
-	//		}
-	//		const Bone& b = ent.model->bones.at(index);
-	//		glm::mat4 transform = a->get_matrix_palette()[index];
-	//		transform = model * transform * mat4(b.posematrix) * rotate;
-	//		make_draw_calls_from(&m->mesh, transform,m->mats, nullptr, true, glm::vec4(1.f));
-	//
-	//		//if (stat.category == ITEM_CAT_RIFLE) {
-	//		//	std::string mod = stat.world_model;
-	//		//	mod = mod.substr(0, mod.rfind('.'));
-	//		//	mod += "_mag.glb";
-	//		//	Model* mag_mod = FindOrLoadModel(mod.c_str());
-	//		//	if (mag_mod) {
-	//		//		const Bone& mag_bone = ent.model->bones.at(index2);
-	//		//		transform = a->GetBones()[index2];
-	//		//		transform = model * transform * mat4(mag_bone.posematrix) * rotate;
-	//		//		//DrawModel(pass, mag_mod, transform);
-	//		//
-	//		//		draw_model_real(mag_mod->mesh, mag_mod->mats, transform, nullptr, nullptr, state);
-	//		//	}
-	//		//}
-	//	}
-	//}
-	for (int i = 0; i < draw.immediate_draw_calls.size(); i++) {
-		auto& call = draw.immediate_draw_calls[i];
-		make_draw_calls_from(&call.model->mesh,call.transform,call.model->mats, nullptr,true, glm::vec4(1.f));
-	}
-	draw.immediate_draw_calls.clear();
-
-	//if (eng->local.thirdperson_camera.integer() == 0 && draw.draw_viewmodel.integer() == 1)
-	//{
-	//	Player* localplayer = (Player*)&eng->local_player();
-	//	assert(localplayer->viewmodel);
-	//	ViewmodelComponent* vm = localplayer->viewmodel.get();
-	//
-	//	mat4 invview = glm::inverse(draw.vs.view);
-	//
-	//	Game_Local* gamel = &eng->local;
-	//	mat4 model2 = glm::translate(invview, vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
-	//	model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
-	//
-	//
-	//	model2 = glm::translate(model2, gamel->vm_offset);
-	//	model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
-	//
-	//	make_draw_calls_from(&vm->model->mesh,model2,
-	//		vm->model->mats, &vm->animator, false, glm::vec4(1.f));
-	//}
-
-
-	glNamedBufferData(scene_mats_ssbo, sizeof gpu::Material_Data * scene_mats.size(), scene_mats.data(), GL_STATIC_DRAW);
-	glNamedBufferData(anim_matrix_ssbo, sizeof glm::mat4 * skinned_matricies.size(), skinned_matricies.data(), GL_DYNAMIC_DRAW);
-	glNamedBufferData(gpu_objs_ssbo, sizeof gpu::Object_Instance * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
-
-	auto compare = [](const Draw_Call& a, const Draw_Call& b) {
-		return a.sort < b.sort;
-	};
-
-	std::sort(shadows.begin(), shadows.end(), compare);
-	std::sort(opaques.begin(), opaques.end(), compare);
-	std::sort(transparents.begin(), transparents.end(), compare);
-}
-
-
-
-void Renderer::extract_objects()
-{
-	GPUFUNCTIONSTART;
-	shared.build_draw_calls();
-}
 
 
 // drawing structure
@@ -2349,9 +2168,6 @@ void multidraw_testing()
 {
 	GPUFUNCTIONSTART;
 
-	glEnable(GL_CULL_FACE);
-	glDepthMask(GL_TRUE);
-
 	static bool has_initialized = false;
 
 	static Model* spherelod0;
@@ -2377,18 +2193,28 @@ void multidraw_testing()
 	if (!has_initialized) {
 		meshlet_model = get_chunked_mod("sphere.glb");
 
-		create_full_mdi_buffers(meshlet_model,
-			chunk_buffer,
-			drawid_to_instance_buffer,
-			compute_indirect_buffer,
-			draw_elements_indirect_buffer,
-			prefix_sum_buffer,
-			draw_count_buffer);
+		//create_full_mdi_buffers(meshlet_model,
+		//	chunk_buffer,
+		//	drawid_to_instance_buffer,
+		//	compute_indirect_buffer,
+		//	draw_elements_indirect_buffer,
+		//	prefix_sum_buffer,
+		//	draw_count_buffer);
 
 		for (int y = 0; y < 10; y++) {
 			for (int z = 0; z < 10; z++) {
 				for (int x = 0; x < 10; x++) {
 					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.2)));
+
+
+					auto handle = draw.scene.register_renderable();
+					Render_Object_Proxy rop;
+					rop.mesh = &meshlet_model->model->mesh;
+					rop.mats = &meshlet_model->model->mats;
+					rop.transform = matricies.back();
+					rop.visible = true;
+
+					draw.scene.update(handle, rop);
 				}
 			}
 		}
@@ -2428,6 +2254,7 @@ void multidraw_testing()
 		has_initialized = true;
 	}
 
+	return;
 
 
 	Model* sphere = meshlet_model->model;;// (use_simple_sphere) ? spherelod1 : spherelod0;
@@ -2777,11 +2604,10 @@ void Renderer::scene_draw(bool editor_mode)
 {
 	GPUFUNCTIONSTART;
 
-	stats = {};
+	stats = Render_Stats();
 
-	current_program = -1;
-	for (int i = 0; i < MAX_SAMPLER_BINDINGS; i++)
-		cur_tex[i] = 0;
+	state_machine.invalidate_all();
+
 	if (cur_w != eng->window_w.integer() || cur_h != eng->window_h.integer())
 		InitFramebuffers();
 	lastframe_vs = current_frame_main_view;
@@ -2800,85 +2626,74 @@ void Renderer::scene_draw(bool editor_mode)
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
 
-	immediate_draw_calls.clear();
-	if (editor_mode)
-		eng->eddoc->scene_draw_callback();
+	//if (editor_mode)
+	//	eng->eddoc->scene_draw_callback();
 
-	if (!editor_mode) {
+	scene.build_scene_data();
 
-		scene.build_scene_data();
+	shadowmap.update();
 
-		extract_objects();
+	//volfog.compute();
 
-		shadowmap.update();
-
-		//volfog.compute();
-
-		// depth prepass
-		{
-			GPUSCOPESTART("Depth prepass");
-			Render_Level_Params params;
-			params.output_framebuffer = fbo.scene;
-			params.view = current_frame_main_view;
-			params.pass = Render_Level_Params::DEPTH;
-			params.upload_constants = false;
-			params.provied_constant_buffer = ubo.current_frame;
-			params.draw_viewmodel = true;
-			render_level_to_target(params);
-		}
-
-		// render ssao using prepass buffer
-		if (enable_ssao.integer())
-			ssao.render();
-
-		// planar reflection render
-		{
-			GPUSCOPESTART("Planar reflection");
-			planar_reflection_pass();
-		}
-
-		// main level render
-		{
-			GPUSCOPESTART("Main level render opaques");
-			Render_Level_Params params;
-			params.output_framebuffer = fbo.scene;
-			params.view = current_frame_main_view;
-			params.pass = Render_Level_Params::OPAQUE;
-			params.clear_framebuffer = false;
-			params.upload_constants = true;
-			params.provied_constant_buffer = ubo.current_frame;
-			params.draw_viewmodel = true;
-
-			glDepthMask(GL_FALSE);
-			glDepthFunc(GL_EQUAL);
-			render_level_to_target(params);
-			glDepthFunc(GL_LESS);
-			glDepthMask(GL_TRUE);
-		}
-		{
-			GPUSCOPESTART("Main level translucents");
-			Render_Level_Params params;
-			params.output_framebuffer = fbo.scene;
-			params.view = current_frame_main_view;
-			params.pass = Render_Level_Params::TRANSLUCENT;
-			params.clear_framebuffer = false;
-			params.upload_constants = true;
-			params.provied_constant_buffer = ubo.current_frame;
-			params.draw_viewmodel = true;
-			glDepthMask(GL_FALSE);
-			render_level_to_target(params);
-			glDepthMask(GL_TRUE);
-		}
-	}
-	else {
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-		glDisable(GL_BLEND);
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+	// depth prepass
+	{
+		GPUSCOPESTART("Depth prepass");
+		Render_Level_Params params;
+		params.output_framebuffer = fbo.scene;
+		params.view = current_frame_main_view;
+		params.pass = Render_Level_Params::DEPTH;
+		params.upload_constants = false;
+		params.provied_constant_buffer = ubo.current_frame;
+		params.draw_viewmodel = true;
+		render_level_to_target(params);
 	}
 
+	// render ssao using prepass buffer
+	if (enable_ssao.integer())
+		ssao.render();
+
+	// planar reflection render
+	{
+		GPUSCOPESTART("Planar reflection");
+		planar_reflection_pass();
+	}
+
+	// main level render
+	{
+		GPUSCOPESTART("Main level render opaques");
+		Render_Level_Params params;
+		params.output_framebuffer = fbo.scene;
+		params.view = current_frame_main_view;
+		params.pass = Render_Level_Params::OPAQUE;
+		params.clear_framebuffer = false;
+		params.upload_constants = true;
+		params.provied_constant_buffer = ubo.current_frame;
+		params.draw_viewmodel = true;
+
+		glDepthMask(GL_FALSE);
+		glDepthFunc(GL_EQUAL);
+		render_level_to_target(params);
+		glDepthFunc(GL_LESS);
+		glDepthMask(GL_TRUE);
+	}
+	{
+		GPUSCOPESTART("Main level translucents");
+		Render_Level_Params params;
+		params.output_framebuffer = fbo.scene;
+		params.view = current_frame_main_view;
+		params.pass = Render_Level_Params::TRANSLUCENT;
+		params.clear_framebuffer = false;
+		params.upload_constants = true;
+		params.provied_constant_buffer = ubo.current_frame;
+		params.draw_viewmodel = true;
+		glDepthMask(GL_FALSE);
+		glDepthFunc(GL_LEQUAL);
+		render_level_to_target(params);
+		glDepthMask(GL_TRUE);
+	}
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	//multidraw_testing();
+	multidraw_testing();
 
 	DrawEntBlobShadows();
 	eng->local.pm.draw_particles();
@@ -2891,8 +2706,8 @@ void Renderer::scene_draw(bool editor_mode)
 
 	draw_debug_shapes();
 
-	if (editor_mode)
-		eng->eddoc->overlays_draw();
+	//if (editor_mode)
+	//	eng->eddoc->overlays_draw();
 
 	glCheckError();
 	
@@ -2975,8 +2790,8 @@ void Renderer::cubemap_positions_debug()
 
 Shader Renderer::shader()
 {
-	if (current_program == -1) return Shader();
-	return prog_man.get_obj(current_program);
+	if (state_machine.active_program == -1) return Shader();
+	return prog_man.get_obj(state_machine.active_program);
 }
 
 void Renderer::DrawEntBlobShadows()
@@ -3020,14 +2835,8 @@ void Renderer::DrawEntBlobShadows()
 	glEnable(GL_CULL_FACE);
 	glDepthMask(GL_TRUE);
 
-	current_program = -1;
 	glCheckError();
 
-}
-
-void Renderer::draw_model_immediate(Draw_Model_Frontend_Params params)
-{
-	immediate_draw_calls.push_back(params);
 }
 
 
@@ -3059,14 +2868,14 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, tex.reflected_depth);
 }
 
-program_handle Renderer::get_mat_shader(const Mesh& mesh, const Material& mat, bool depth_pass)
+program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Mesh& mesh, const Material& mat, bool depth_pass)
 {
 	bool is_alpha_test = mat.alpha_tested;
 	bool is_lightmapped = mesh.has_lightmap_coords();
 	bool has_colors = mesh.has_colors();
 	material_type shader_type = mat.type;
 	bool is_normal_mapped = mesh.has_tangents();
-	bool is_animated = mesh.has_bones();
+	bool is_animated = mesh.has_bones() && has_animated_matricies;
 
 	shader_key key;
 	key.alpha_tested = is_alpha_test;
@@ -3085,101 +2894,6 @@ program_handle Renderer::get_mat_shader(const Mesh& mesh, const Material& mat, b
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
 if(gs->images[(int)texture]) bind_texture(where, gs->images[(int)texture]->gl_id); \
 else bind_texture(where, fallback.gl_id);
-
-
-// this function sucks so bad
-void Renderer::draw_model_real(const Draw_Call& dc,
-	Model_Drawing_State& state)
-{
-	const Submesh& mp = dc.mesh->parts[dc.submesh];
-	Material* gs = dc.mat;
-	bool is_animated = dc.mesh->has_bones();
-	bool is_depth = state.pass == Render_Level_Params::SHADOWMAP || state.pass == Render_Level_Params::DEPTH;
-	int next_shader = get_mat_shader(*dc.mesh, *gs, is_depth);
-
-	bool is_water = gs->type == material_type::WATER;
-
-	if (next_shader == -1) return;
-
-	// water only renders in the real geometry pass
-	if (state.is_water_reflection_pass && is_water)
-		return;
-
-	if (state.initial_set || next_shader != state.current_progam) {
-		state.current_progam = next_shader;
-
-		set_shader(next_shader);
-
-		if (gs->type == material_type::WINDSWAY) {
-			set_wind_constants();
-		}
-		else if (is_water) {
-			set_water_constants();
-		}
-		set_shader_constants();
-	}
-
-	if (state.initial_set || state.blend != gs->blend) {
-		state.blend = gs->blend;
-		if (state.blend == blend_state::OPAQUE) {
-			glDisable(GL_BLEND);
-		}
-		else if (state.blend == blend_state::BLEND) {
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		}
-		else if (state.blend == blend_state::ADD) {
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_ONE, GL_ONE);
-		}
-	}
-
-	if (state.initial_set || state.backface != gs->backface) {
-		state.backface = gs->backface;
-		if (state.backface)
-			glDisable(GL_CULL_FACE);
-		else
-			glEnable(GL_CULL_FACE);
-	}
-
-	// ill find a better way maybe
-	bool shader_doesnt_need_the_textures = is_water || is_depth;
-
-	if (!shader_doesnt_need_the_textures) {
-
-		if (gs->type == material_type::TWOWAYBLEND) {
-			ASSERT(0);
-		}
-		else {
-			SET_OR_USE_FALLBACK(material_texture::DIFFUSE, ALBEDO1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(material_texture::ROUGHNESS, ROUGH1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(material_texture::AO, AO1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(material_texture::METAL, METAL1_LOC, white_texture);
-			SET_OR_USE_FALLBACK(material_texture::NORMAL, NORMAL1_LOC, flat_normal_texture);
-		}
-	}
-
-	shader().set_int("obj_index", dc.object_index);
-	shader().set_int("obj_mat_index", dc.mat_index);
-	
-	if (state.current_vao != dc.mesh->vao) {
-		glBindVertexArray(dc.mesh->vao);
-		state.current_vao = dc.mesh->vao;
-	}
-	GLenum index_type = (use_32_bit_indicies) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-
-	glDrawElementsBaseVertex(
-		GL_TRIANGLES,
-		mp.element_count,
-		index_type,
-		(void*)(dc.mesh->merged_index_pointer + mp.element_offset),
-		dc.mesh->merged_vert_offset + mp.base_vertex
-	);
-	stats.draw_calls++;
-	stats.tris_drawn += mp.element_count / 3;
-
-	state.initial_set = false;
-}
 
 void Renderer::planar_reflection_pass()
 {

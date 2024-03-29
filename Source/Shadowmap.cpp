@@ -31,6 +31,7 @@ void Shadow_Map_System::make_csm_rendertargets()
 {
 	if (tweak.quality == 0)
 		return;
+	tweak.quality = 3;
 	csm_resolution = csm_resolutions[(int)tweak.quality];
 
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);

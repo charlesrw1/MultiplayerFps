@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 #include <memory>
 #include "Physics.h"
+#include "RenderObj.h"
 
 enum EdObjType
 {
@@ -153,6 +154,8 @@ public:
 	glm::vec3 model_position = glm::vec3(0.f);
 	std::vector<EdModel> edmodels;
 	std::vector<int> remap;
+
+	renderobj_handle temp_place_model = -1;
 
 	EditorDoc* doc;
 };

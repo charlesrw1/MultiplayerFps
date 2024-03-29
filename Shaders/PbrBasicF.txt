@@ -1,6 +1,7 @@
 
 layout (location = 0) out vec4 FS_OUT_Color;
 
+flat in uint FS_IN_Objid;
 flat in uint FS_IN_Matid;
 in vec3 FS_IN_FragPos;
 in vec3 FS_IN_Normal;
@@ -55,6 +56,7 @@ uniform sampler3D volumetric_fog;
 uniform sampler2D caustictex;
 
 
+#include "SharedGpuTypes.txt"
 
 struct Cubemap_Box
 {
@@ -66,6 +68,10 @@ struct Cubemap_Box
 layout (binding = 9, std140) readonly buffer Cubemap_Box_Buffer
 {
 	Cubemap_Box cubemaps[];
+};
+
+layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
+	Object_Instance g_objects[];
 };
 
 struct World_Light
@@ -80,8 +86,6 @@ layout (binding = 10, std140) readonly buffer World_Light_Buffer
 {
 	World_Light lights[];
 };
-
-#include "SharedGpuTypes.txt"
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
@@ -469,8 +473,13 @@ vec3 randColor(uint number){
 
 void main()
 {
-
 	uint obj_mat_index = FS_IN_Matid;
+	
+#ifdef UNLIT
+	FS_OUT_Color = g_objects[FS_IN_Objid].colorval * g_materials[obj_mat_index].diffuse_tint;
+	return;
+#endif
+	
 	//FS_OUT_Color = vec4(vec3(get_ao())*randColor(FS_IN_Matid),1.0);
 	//return;
 
@@ -548,7 +557,7 @@ vec3 normal_tex_rgb = N;
 
 	FS_OUT_Color = pbr_calculate(tex.rgb, roughness_metal.r , roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//FS_OUT_Color = vec4(roughness_metal.r, roughness_metal.g,0.0,0.0);
-	//FS_OUT_Color = vec4(vec3(N), 1.0);
+	//FS_OUT_Color = vec4(vec3(tex.rgb), 1.0);
 
 #endif
 //#endif
