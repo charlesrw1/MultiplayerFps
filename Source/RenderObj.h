@@ -19,6 +19,7 @@ struct Render_Object_Proxy
 		outline = false;
 		color_overlay = false;
 		dither = false;
+		opposite_dither = false;
 	}
 
 	Mesh* mesh = nullptr;
@@ -33,6 +34,7 @@ struct Render_Object_Proxy
 	bool outline : 1;
 	bool color_overlay : 1;
 	bool dither : 1;
+	bool opposite_dither : 1;
 
 	// for debugging only
 	Entity* owner = nullptr;

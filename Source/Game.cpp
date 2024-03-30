@@ -588,6 +588,8 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 Entity::~Entity()
 {
 	idraw->remove_obj(render_handle);
+
+	printf("removed handle %d\n",render_handle);
 }
 
 void Entity::update_visuals()

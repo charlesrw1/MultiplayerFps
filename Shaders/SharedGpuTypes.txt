@@ -13,7 +13,7 @@ struct Object_Instance
 	mat4 invmodel;
 	vec4 colorval;
 	uint anim_mat_offset;
-	float obj1;
+	uint opposite_dither;
 	float obj2;
 	float obj3;
 };
@@ -124,6 +124,12 @@ struct HBAOData {
   
   vec4    float2Offsets[AO_RANDOMTEX_SIZE*AO_RANDOMTEX_SIZE];
   vec4    jitters[AO_RANDOMTEX_SIZE*AO_RANDOMTEX_SIZE];
+};
+
+struct Post_Process_Settings
+{
+	float exposure;
+	float contrast;
 };
 
 #ifdef __cplusplus

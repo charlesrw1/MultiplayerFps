@@ -152,9 +152,16 @@ public:
 	Dict obj_dict;
 };
 
+static float alphadither = 0.0;
+void menu_temp()
+{
+	ImGui::SliderFloat("alpha", &alphadither, 0.0, 1.0);
+}
 
 void AssetBrowser::init()
 {
+	Debug_Interface::get()->add_hook("dither", menu_temp);
+
 	edmodels.clear();
 	char buffer[256];
 	while (Files::iterate_files_in_dir("./Data/Models/*", buffer, 256)) {
@@ -236,6 +243,7 @@ Color32 to_color32(glm::vec4 v) {
 	return c;
 }
 
+
 void AssetBrowser::update()
 {
 	if (get_model()) {
@@ -260,7 +268,7 @@ void AssetBrowser::update()
 		obj.mats = &get_model()->mats;
 		obj.transform = glm::translate(glm::mat4(1),model_position);
 		obj.visible = true;
-		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, (sin(GetTime()*4.0) * 0.5 + 0.5)));
+		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, alphadither));
 		obj.dither = true;
 		//obj.color_overlay = true;
 		idraw->update_obj(temp_place_model, obj);
@@ -268,7 +276,8 @@ void AssetBrowser::update()
 		auto mod = mods.find_or_load("sphere.glb");
 		obj.mesh = &mod->mesh;
 		obj.mats = &mod->mats;
-		obj.param1.a = 255 - obj.param1.a;
+		obj.opposite_dither = true;
+		//obj.visible = false;
 		idraw->update_obj(temp_place_model2, obj);
 
 	}
@@ -799,8 +808,6 @@ void EditorDoc::overlays_draw()
 			auto transform = selected_node->get_transform();
 			Bounds b = transform_bounds(transform, m->mesh.aabb);
 			mb.PushLineBox(b.bmin, b.bmax, COLOR_RED);
-
-
 
 		}
 	}

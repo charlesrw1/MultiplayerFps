@@ -843,11 +843,18 @@ void Game_Engine::set_tick_rate(float tick_rate)
 
 void Game_Engine::unload_current_level()
 {
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+		free_entity(ei.get_index());
+		ei.decrement_count();
+	}
+
 	FreeLevel(level);
 	level = nullptr;
 	phys.ClearObjs();
 	num_entities = 0;
 	tick = 0;
+
+	Debug::on_fixed_update_start();
 }
 
 void Game_Engine::client_goto_loading()

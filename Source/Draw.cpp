@@ -852,6 +852,12 @@ void imgui_stat_hook()
 	ImGui::Text("Vao binds: %d", draw.stats.vaos_bound);
 	ImGui::Text("Blend changes: %d", draw.stats.blend_changes);
 
+	ImGui::Text("opaque batches: %d", (int)draw.scene.opaque.batches.size());
+	ImGui::Text("depth batches: %d", (int)draw.scene.depth.batches.size());
+	ImGui::Text("transparent batches: %d", (int)draw.scene.transparents.batches.size());
+
+	ImGui::Text("total objects: %d", (int)draw.scene.proxy_list.objects.size());
+	ImGui::Text("opaque mesh batches: %d", (int)draw.scene.opaque.mesh_batches.size());
 }
 
 void Renderer::init()
@@ -1148,23 +1154,6 @@ void Renderer::DrawSkybox()
 	mb.Free();
 }
 
-void draw_batch(const Render_Pass& pass, const Multidraw_Batch& batch)
-{
-	
-
-}
-
-void draw_render_pass(const Render_Pass& pass)
-{
-	for (int i = 0; i < pass.batches.size(); i++) {
-		draw_batch(pass, pass.batches[i]);
-	}
-}
-
-void setup_material_state()
-{
-
-}
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
 if(mat->images[(int)texture]) bind_texture(where, mat->images[(int)texture]->gl_id); \
 else bind_texture(where, fallback.gl_id);
@@ -1660,7 +1649,6 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			bool can_be_merged
 				= this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64()
 				&& this_obj->submesh_index == batch_obj->submesh_index && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
-			
 			if (can_be_merged)
 				batch.count++;
 			else {
@@ -1790,6 +1778,8 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 
 			auto batch_material = meshb.material;
 			draw_to_material.push_back(batch_material->gpu_material_mapping);
+
+			draw.stats.tris_drawn += cmd.primCount * cmd.count / 3;
 		}
 
 		list.command_count.push_back(mdb.count);
@@ -1805,7 +1795,7 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 
 void Render_Scene::init()
 {
-	int obj_count = 5'000;
+	int obj_count = 20'000;
 	int mat_count = 500;
 
 	vis_list.init(mat_count,obj_count);
@@ -1848,6 +1838,8 @@ glm::vec4 to_vec4(Color32 color) {
 }
 
 #include <future>
+#include <thread>
+
 void Render_Scene::build_scene_data()
 {
 	CPUFUNCTIONSTART;
@@ -1903,6 +1895,7 @@ void Render_Scene::build_scene_data()
 					gpu_objects[i].invmodel = obj.type_.inv_transform;
 				}
 				gpu_objects[i].colorval = to_vec4(proxy.param1);
+				gpu_objects[i].opposite_dither = (uint32_t)proxy.opposite_dither;
 			}
 		}
 		glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
@@ -1912,19 +1905,22 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART("make batches");
 
-		//auto transtask = std::async(std::launch::async, [&]() {
-		//	});
-		//auto opaquetask = std::async(std::launch::async, [&]() {
-		//	});
-		//auto depthtask = std::async(std::launch::async, [&]() {
-		//	});
-
+		auto transtask = std::async(std::launch::async, [&]() {
 			transparents.make_batches(*this);
+			});
+		auto opaquetask = std::async(std::launch::async, [&]() {
 			opaque.make_batches(*this);
+			});
+		auto depthtask = std::async(std::launch::async, [&]() {
 			depth.make_batches(*this);
-		//transtask.wait();
-		//opaquetask.wait();
-		//depthtask.wait();
+			});
+
+			//transparents.make_batches(*this);
+			//opaque.make_batches(*this);
+			//depth.make_batches(*this);
+		transtask.wait();
+		opaquetask.wait();
+		depthtask.wait();
 	}
 	{
 		CPUSCOPESTART("make render lists");
@@ -2214,9 +2210,8 @@ void multidraw_testing()
 	static vector<glm::mat4> matricies;
 
 	static Chunked_Model* meshlet_model;
-	return;
 	if (!has_initialized) {
-		meshlet_model = get_chunked_mod("player_FINAL.glb");
+		meshlet_model = get_chunked_mod("sphere_lod1.glb");
 
 		//create_full_mdi_buffers(meshlet_model,
 		//	chunk_buffer,
@@ -2229,20 +2224,22 @@ void multidraw_testing()
 		for (int y = 0; y < 5; y++) {
 			for (int z = 0; z < 5; z++) {
 				for (int x = 0; x < 5; x++) {
-					//matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.2)));
-					//
-					//
-					//auto handle = draw.scene.register_renderable();
-					//Render_Object_Proxy rop;
-					//rop.mesh = &meshlet_model->model->mesh;
-					//rop.mats = &meshlet_model->model->mats;
-					//rop.transform = matricies.back();
-					//rop.visible = true;
-					//
-					//draw.scene.update(handle, rop);
+					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.2)));
+					
+					
+					auto handle = draw.scene.register_renderable();
+					Render_Object_Proxy rop;
+					rop.mesh = &meshlet_model->model->mesh;
+					rop.mats = &meshlet_model->model->mats;
+					rop.transform = matricies.back();
+					rop.visible = true;
+					
+					draw.scene.update(handle, rop);
 				}
 			}
 		}
+		has_initialized = true;
+		return;
 
 
 		Texture* textures[4];
@@ -2690,7 +2687,7 @@ void Renderer::scene_draw(bool editor_mode)
 		params.output_framebuffer = fbo.scene;
 		params.view = current_frame_main_view;
 		params.pass = Render_Level_Params::OPAQUE;
-		params.clear_framebuffer = false;
+		params.clear_framebuffer = true;
 		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
@@ -3198,7 +3195,7 @@ void Renderer::on_level_start()
 	draw.using_skybox_for_specular = true;
 	auto& helper = EnviornmentMapHelper::get();
 
-	scene.skybox = helper.create_from_file("hdr_sky2.hdr").original_cubemap;
+	scene.skybox = helper.create_from_file("hdr_sky1.hdr").original_cubemap;
 	// CUBEMAP_SIZE isnt the size of skybox, but its unused anyways
 	helper.convolute_irradiance_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, 0, 32);
 	helper.compute_specular_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapspecular_array, 0, CUBEMAP_SIZE);

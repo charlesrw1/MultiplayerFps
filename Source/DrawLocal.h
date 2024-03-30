@@ -458,6 +458,8 @@ public:
 	std::vector<Render_Light> lights;
 	uint32_t light_ssbo;
 
+
+
 };
 
 struct Render_Stats

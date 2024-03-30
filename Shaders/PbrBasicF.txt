@@ -344,9 +344,9 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	//F0 = vec3(0.95, 0.64, 0.54);
 // punctual lights
 	vec3 Lo = vec3(0.0);
-	vec3 L = -g.directional_light_dir_and_used.xyz;
+	vec3 L = -normalize(vec3(0.1,-1,0.0));
     vec3 H = normalize(V + L);
-    vec3 radiance = g.directional_light_color.rgb*0.002;
+    vec3 radiance = g.directional_light_color.rgb*0.0025;
 //#ifndef LIGHTMAPPED
 	{
 		vec3 surface_N = N;
@@ -425,7 +425,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 #endif
 
 	//float sun_shadow = sample_sun_shadow(FS_IN_FragPos)*max(dot(N, L),0.0);
-	//ambient += emissive + Lo*sun_shadow;
+	//ambient += emissive + Lo;
 
 	return vec4(ambient, opacity);
 }
@@ -479,10 +479,10 @@ vec3 randColor(uint number){
 
 
 float dither_pattern[16] = {
-	0.000001, 0.5, 0.125, 0.625,
-	0.75, 0.25, 0.875, 0.375,
-	0.1875, 0.6875, 0.0625, 0.5625,
-	0.9375, 0.4375, 0.8125, 0.3125
+	1.0 / 17.0,  9.0 / 17.0,  3.0 / 17.0, 11.0 / 17.0,
+13.0 / 17.0,  5.0 / 17.0, 15.0 / 17.0,  7.0 / 17.0,
+4.0 / 17.0, 12.0 / 17.0,  2.0 / 17.0, 10.0 / 17.0,
+16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
 };
 
 void main()
@@ -509,7 +509,7 @@ void main()
 	vec4 obj_color = g_objects[FS_IN_Objid].colorval;
 	uvec2 dither_coord = uvec2(uint(mod(gl_FragCoord.x, 4.0)), uint(mod(gl_FragCoord.y, 4.0)));
 	float dither_alpha = dither_pattern[dither_coord.x+dither_coord.y*4];
-	if(obj_color.a<=dither_alpha)
+	if(!(obj_color.a<=dither_alpha) != bool(g_objects[FS_IN_Objid].opposite_dither))
 		discard;
 #endif
 	
@@ -576,9 +576,15 @@ vec3 normal_tex_rgb = N;
 		roughness_metal *= 0.3;
 	
 	}
+	roughness_metal = vec2(0.5,0.0);
+	#ifndef ANIMATED
+	#endif
+	#ifdef ANIMATED
+	//emissive = vec3(5.0,1.0,1.0);
+	#endif
 
 
-	FS_OUT_Color = pbr_calculate(tex.rgb, roughness_metal.r , roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
+	FS_OUT_Color = pbr_calculate(tex.rgb,roughness_metal.r, roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//FS_OUT_Color = vec4(roughness_metal.r, roughness_metal.g,0.0,0.0);
 	//FS_OUT_Color = vec4(vec3(N), 1.0);
 

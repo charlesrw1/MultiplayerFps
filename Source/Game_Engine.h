@@ -91,6 +91,7 @@ struct Ent_Iterator
 	bool finished() const;
 	Entity& get();
 	int get_index() const { return index; }
+	void decrement_count() { summed_count--; }
 private:
 	int summed_count = 0;
 	int index = 0;
