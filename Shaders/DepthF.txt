@@ -1,8 +1,24 @@
 
+#include "SharedGpuTypes.txt"
+
 #ifdef ALPHATEST
 in vec2 FS_IN_Texcoord;
 uniform sampler2D basecolor;
 #endif
+
+
+float dither_pattern[16] = {
+	0.00001, 0.5, 0.125, 0.625,
+	0.75, 0.25, 0.875, 0.375,
+	0.1875, 0.6875, 0.0625, 0.5625,
+	0.9375, 0.4375, 0.8125, 0.3125
+};
+flat in uint FS_IN_Objid;
+
+layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
+	Object_Instance g_objects[];
+};
+
 
 void main()
 {
@@ -11,5 +27,15 @@ void main()
 	if(tex.a < 0.5)
 		discard;
 #endif
+
+#ifdef DITHER
+	vec4 obj_color = g_objects[FS_IN_Objid].colorval;
+	
+	uvec2 dither_coord = uvec2(uint(mod(gl_FragCoord.x, 4.0)), uint(mod(gl_FragCoord.y, 4.0)));
+	float dither_alpha = dither_pattern[dither_coord.x+dither_coord.y*4];
+	if(obj_color.a<=dither_alpha)
+		discard;
+#endif
+
 }
 	

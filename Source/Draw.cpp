@@ -520,6 +520,8 @@ shader_key get_real_shader_key_from_shader_type(shader_key key)
 	if (key.depth_only) {
 		key.normal_mapped = 0;
 		key.vertex_colors = 0;
+	
+		// FIXME dithering
 
 		// windsway has vertex shader modifications
 		if(type !=material_type::WINDSWAY)
@@ -633,9 +635,12 @@ program_handle compile_mat_shader(shader_key key)
 	if (key.animated) params += "ANIMATED,";
 	if (key.normal_mapped) params += "NORMALMAPPED,";
 	if (key.vertex_colors) params += "VERTEX_COLOR,";
+	if (key.dither) params += "DITHER,";
 	if (type == material_type::WINDSWAY) params += "WIND,";
 	if (type == material_type::UNLIT) params += "UNLIT,";
 	if (!params.empty())params.pop_back();
+
+	printf("INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
 
 	program_handle handle = draw.prog_man.create_raster(vert_shader, frag_shader, params);
 	ASSERT(handle != -1);
@@ -859,6 +864,7 @@ void Renderer::init()
 	bool supports_int64 = false;
 
 
+
 #ifdef _DEBUG
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(debug_message_callback, nullptr);
@@ -892,6 +898,10 @@ void Renderer::init()
 		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
 	}
 	
+	int max_buffer_bindings = 0;
+	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
+	printf("-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
+
 	InitGlState();
 
 	scene.init();
@@ -1514,7 +1524,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& p
 	draw_call_key key;
 
 	ASSERT(proxy.mats);
-	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, *proxy.mesh, *material, (type == pass_type::DEPTH));
+	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, *proxy.mesh, *material, (type == pass_type::DEPTH), proxy.dither);
 	key.blending = (uint64_t)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
@@ -1557,8 +1567,6 @@ void Render_Pass::add_object(
 #include <iterator>
 void Render_Pass::make_batches(Render_Scene& scene)
 {
-	CPUFUNCTIONSTART;
-
 	//if (creations.empty() && deletions.empty())
 	//	return;
 
@@ -1839,7 +1847,7 @@ glm::vec4 to_vec4(Color32 color) {
 	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
 }
 
-
+#include <future>
 void Render_Scene::build_scene_data()
 {
 	CPUFUNCTIONSTART;
@@ -1904,9 +1912,19 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART("make batches");
 
-		transparents.make_batches(*this);
-		opaque.make_batches(*this);
-		depth.make_batches(*this);
+		//auto transtask = std::async(std::launch::async, [&]() {
+		//	});
+		//auto opaquetask = std::async(std::launch::async, [&]() {
+		//	});
+		//auto depthtask = std::async(std::launch::async, [&]() {
+		//	});
+
+			transparents.make_batches(*this);
+			opaque.make_batches(*this);
+			depth.make_batches(*this);
+		//transtask.wait();
+		//opaquetask.wait();
+		//depthtask.wait();
 	}
 	{
 		CPUSCOPESTART("make render lists");
@@ -2196,9 +2214,9 @@ void multidraw_testing()
 	static vector<glm::mat4> matricies;
 
 	static Chunked_Model* meshlet_model;
-
+	return;
 	if (!has_initialized) {
-		meshlet_model = get_chunked_mod("sphere.glb");
+		meshlet_model = get_chunked_mod("player_FINAL.glb");
 
 		//create_full_mdi_buffers(meshlet_model,
 		//	chunk_buffer,
@@ -2208,20 +2226,20 @@ void multidraw_testing()
 		//	prefix_sum_buffer,
 		//	draw_count_buffer);
 
-		for (int y = 0; y < 10; y++) {
-			for (int z = 0; z < 10; z++) {
-				for (int x = 0; x < 10; x++) {
-					matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.2)));
-
-
-					auto handle = draw.scene.register_renderable();
-					Render_Object_Proxy rop;
-					rop.mesh = &meshlet_model->model->mesh;
-					rop.mats = &meshlet_model->model->mats;
-					rop.transform = matricies.back();
-					rop.visible = true;
-
-					draw.scene.update(handle, rop);
+		for (int y = 0; y < 5; y++) {
+			for (int z = 0; z < 5; z++) {
+				for (int x = 0; x < 5; x++) {
+					//matricies.push_back(glm::scale(glm::translate(glm::mat4(1), glm::vec3(x, y, z)*0.9f),glm::vec3(0.2)));
+					//
+					//
+					//auto handle = draw.scene.register_renderable();
+					//Render_Object_Proxy rop;
+					//rop.mesh = &meshlet_model->model->mesh;
+					//rop.mats = &meshlet_model->model->mats;
+					//rop.transform = matricies.back();
+					//rop.visible = true;
+					//
+					//draw.scene.update(handle, rop);
 				}
 			}
 		}
@@ -2875,7 +2893,7 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, tex.reflected_depth);
 }
 
-program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Mesh& mesh, const Material& mat, bool depth_pass)
+program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Mesh& mesh, const Material& mat, bool depth_pass, bool dither)
 {
 	bool is_alpha_test = mat.alpha_tested;
 	bool is_lightmapped = mesh.has_lightmap_coords();
@@ -2891,6 +2909,7 @@ program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Mesh&
 	key.normal_mapped = is_normal_mapped;
 	key.animated = is_animated;
 	key.depth_only = depth_pass;
+	key.dither = dither;
 	
 	key = get_real_shader_key_from_shader_type(key);
 	program_handle handle = mat_table.lookup(key);

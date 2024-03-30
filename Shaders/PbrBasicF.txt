@@ -319,7 +319,13 @@ float fresnel_term(vec3 N, vec3 V, float power)
 }
 
 
-vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float opacity, vec3 emissive, float ambient_occlusion)
+float specular_occlusion(float ndotv, float roughness, float ao_term)
+{
+	return clamp(pow(ndotv+ao_term, exp2(-2.0*roughness-1.0)) - 1.0 + ao_term, 0.0, 1.0);
+}
+
+
+vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float opacity, vec3 emissive, float micro_ao)
 {
 	vec3 view_pos = g.viewpos_time.xyz;
 	vec3 view_front = g.viewfront.xyz;
@@ -399,7 +405,7 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	vec3 F = FresnelSchlickRougness(max(dot(N,V),0.0),F0,Roughness);
 	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(N,V),0.0),Roughness)).rg;
 	vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
-	float ao = min(get_ao(),ambient_occlusion);
+	float ao = get_ao();
 	
 	vec3 irradiance = texture(pbr_irradiance_cubemaps,vec4(N, cm_index)).rgb;
 
@@ -411,7 +417,8 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 	vec3 kS = F;
 	vec3 kD = (1.0-kS)*(1.0-Metalness);
 	
-	vec3 ambient =(kD*diffuse_light+ specular)*ao;
+	
+	vec3 ambient =(kD*diffuse_light+ specular)*micro_ao*ao;
 	
 #ifdef LIGHTMAPPED
 	//ambient = mix(ambient*0.2, ambient, sun);
@@ -471,6 +478,13 @@ vec3 randColor(uint number){
 
 
 
+float dither_pattern[16] = {
+	0.000001, 0.5, 0.125, 0.625,
+	0.75, 0.25, 0.875, 0.375,
+	0.1875, 0.6875, 0.0625, 0.5625,
+	0.9375, 0.4375, 0.8125, 0.3125
+};
+
 void main()
 {
 	uint obj_mat_index = FS_IN_Matid;
@@ -491,6 +505,14 @@ void main()
 #endif
 	
 	
+#ifdef DITHER
+	vec4 obj_color = g_objects[FS_IN_Objid].colorval;
+	uvec2 dither_coord = uvec2(uint(mod(gl_FragCoord.x, 4.0)), uint(mod(gl_FragCoord.y, 4.0)));
+	float dither_alpha = dither_pattern[dither_coord.x+dither_coord.y*4];
+	if(obj_color.a<=dither_alpha)
+		discard;
+#endif
+	
 	tex.rgb = pow(tex.rgb,vec3(2.2));
 	
 	vec4 color_tint = g_materials[obj_mat_index].diffuse_tint;
@@ -498,6 +520,7 @@ void main()
 	tex *= color_tint;
 	
 #ifdef ALPHATEST
+
 	if(tex.a < 0.5)
 		discard;
 #endif
@@ -557,7 +580,7 @@ vec3 normal_tex_rgb = N;
 
 	FS_OUT_Color = pbr_calculate(tex.rgb, roughness_metal.r , roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
 	//FS_OUT_Color = vec4(roughness_metal.r, roughness_metal.g,0.0,0.0);
-	//FS_OUT_Color = vec4(vec3(tex.rgb), 1.0);
+	//FS_OUT_Color = vec4(vec3(N), 1.0);
 
 #endif
 //#endif

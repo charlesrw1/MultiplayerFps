@@ -241,7 +241,7 @@ public:
 	}
 	void free(handle_type handle) {
 		int obj_index = handle_to_obj[handle];
-		handle_to_obj[obj_index] = -1;
+		handle_to_obj[handle] = -1;
 		objects[obj_index] = objects.back();
 		handle_to_obj[objects[obj_index].handle] = obj_index;
 		objects.resize(objects.size() - 1);
@@ -504,13 +504,15 @@ struct shader_key
 		normal_mapped = 0;
 		animated = 0;
 		vertex_colors = 0;
+		dither = 0;
 	}
-	uint32_t shader_type : 27;
+	uint32_t shader_type : 26;
 	uint32_t animated : 1;
 	uint32_t alpha_tested : 1;
 	uint32_t normal_mapped : 1;
 	uint32_t vertex_colors : 1;
 	uint32_t depth_only : 1;
+	uint32_t dither : 1;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -678,7 +680,7 @@ public:
 
 	Render_Scene scene;
 
-	program_handle get_mat_shader(bool is_animated, const Mesh& part, const Material& gs, bool depth_pass);
+	program_handle get_mat_shader(bool is_animated, const Mesh& part, const Material& gs, bool depth_pass, bool dither);
 	
 	Render_Stats stats;
 

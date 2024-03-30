@@ -24,16 +24,6 @@
 			(move-directional-blend				
 				:idle (clip stand_rifle_aim_idle)
 				:walk (list
-					(clip stand_rifle_walk_s  :rootx del :rooty del )
-					(clip stand_rifle_walk_sw :rootx del :rooty del )
-					(clip stand_rifle_walk_w  :rootx del :rooty del )
-					(clip stand_rifle_walk_nw :rootx del :rooty del )
-					(clip stand_rifle_walk_n  :rootx del :rooty del )
-					(clip stand_rifle_walk_ne :rootx del :rooty del )
-					(clip stand_rifle_walk_e  :rootx del :rooty del )
-					(clip stand_rifle_walk_se :rootx del :rooty del )
-				)
-				:run (list
 					(clip stand_rifle_run_s  :rootx del :rooty del )
 					(clip stand_rifle_run_sw :rootx del :rooty del )
 					(clip stand_rifle_run_w  :rootx del :rooty del )

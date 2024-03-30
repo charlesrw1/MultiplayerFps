@@ -241,6 +241,7 @@ void AssetBrowser::update()
 	if (get_model()) {
 		if (!drawing_model) {
 			temp_place_model = idraw->register_obj();
+			temp_place_model2 = idraw->register_obj();
 		}
 
 		drawing_model = true;
@@ -259,13 +260,22 @@ void AssetBrowser::update()
 		obj.mats = &get_model()->mats;
 		obj.transform = glm::translate(glm::mat4(1),model_position);
 		obj.visible = true;
-		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, (sin(GetTime()*4.0) * 0.5 + 0.5)*0.4  ));
-		obj.color_overlay = true;
+		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, (sin(GetTime()*4.0) * 0.5 + 0.5)));
+		obj.dither = true;
+		//obj.color_overlay = true;
 		idraw->update_obj(temp_place_model, obj);
+
+		auto mod = mods.find_or_load("sphere.glb");
+		obj.mesh = &mod->mesh;
+		obj.mats = &mod->mats;
+		obj.param1.a = 255 - obj.param1.a;
+		idraw->update_obj(temp_place_model2, obj);
+
 	}
 	else {
 		if (drawing_model) {
 			idraw->remove_obj(temp_place_model);
+			idraw->remove_obj(temp_place_model2);
 			temp_place_model = -1;
 		}
 
@@ -278,6 +288,7 @@ void AssetBrowser::close()
 	drawing_model = false;
 	if (temp_place_model != -1) {
 		idraw->remove_obj(temp_place_model);
+		idraw->remove_obj(temp_place_model2);
 		temp_place_model = -1;
 	}
 }
@@ -362,6 +373,10 @@ void EditorNode::on_remove()
 		level->lights.erase(level->lights.begin() + _varying_obj_index);
 	}
 	else if (obj == EDOBJ_MODEL) {
+		auto& obj = level->static_mesh_objs.at(_varying_obj_index);
+		idraw->remove_obj(obj.handle);
+		obj.handle = -1;
+
 		level->static_mesh_objs.erase(level->static_mesh_objs.begin() + _varying_obj_index);
 	}
 }
@@ -383,6 +398,10 @@ void EditorNode::save_out_to_level()
 
 	if (obj == EDOBJ_MODEL) {
 		Static_Mesh_Object* obj = &doc->leveldoc->static_mesh_objs.at(_varying_obj_index);
+
+		if (obj->handle != -1)
+			idraw->remove_obj(obj->handle);
+
 		*obj = make_static_mesh_from_dict(espawn);
 	}
 	else if (obj == EDOBJ_LIGHT) {

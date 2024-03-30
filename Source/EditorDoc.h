@@ -139,6 +139,7 @@ public:
 	Model* get_model();
 	void clear_index() { selected_real_index = -1; }
 
+	int last_index = -1;
 	int selected_real_index = -1;
 	bool set_keyboard_focus = false;	
 	struct EdModel {
@@ -156,6 +157,8 @@ public:
 	std::vector<int> remap;
 
 	renderobj_handle temp_place_model = -1;
+	renderobj_handle temp_place_model2 = -1;
+
 
 	EditorDoc* doc;
 };

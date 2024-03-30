@@ -18,6 +18,7 @@ struct Render_Object_Proxy
 		viewmodel_layer = false;
 		outline = false;
 		color_overlay = false;
+		dither = false;
 	}
 
 	Mesh* mesh = nullptr;
@@ -31,6 +32,7 @@ struct Render_Object_Proxy
 	bool viewmodel_layer : 1;
 	bool outline : 1;
 	bool color_overlay : 1;
+	bool dither : 1;
 
 	// for debugging only
 	Entity* owner = nullptr;

@@ -102,6 +102,15 @@ Static_Mesh_Object make_static_mesh_from_dict(Level::Entity_Spawn* obj)
 
 			smo.transform = transform;
 
+			smo.handle = idraw->register_obj();
+			Render_Object_Proxy rop;
+			rop.mesh = &smo.model->mesh;
+			rop.transform = smo.transform;
+			rop.animator = nullptr;
+			rop.visible = true;
+			rop.mats = &smo.model->mats;
+			idraw->update_obj(smo.handle, rop);
+
 			smo.casts_shadows = dict->get_int("casts_shadows", 1);
 
 			return smo;
@@ -146,15 +155,6 @@ void create_statics_from_dicts(Level* level)
 			Static_Mesh_Object smo = make_static_mesh_from_dict(obj);
 			if (smo.model) {
 				level->static_mesh_objs.push_back(smo);
-
-				smo.handle = idraw->register_obj();
-				Render_Object_Proxy rop;
-				rop.mesh = &smo.model->mesh;
-				rop.transform = smo.transform;
-				rop.animator = nullptr;
-				rop.visible = true;
-				rop.mats = &smo.model->mats;
-				idraw->update_obj(smo.handle, rop);
 
 				obj->_ed_varying_index_for_statics = level->static_mesh_objs.size() - 1;
 			}
