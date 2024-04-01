@@ -5,7 +5,7 @@
 #include <algorithm>
 #include "DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
-
+#include "MeshBuilder.h"
 
 class TransformCommand : public Command
 {
@@ -263,7 +263,7 @@ void AssetBrowser::update()
 			model_position = r.pos + r.dir * 10.f;
 		}
 
-		Render_Object_Proxy obj;
+		Render_Object obj;
 		obj.mesh = &get_model()->mesh;
 		obj.mats = &get_model()->mats;
 		obj.transform = glm::translate(glm::mat4(1),model_position);
@@ -285,7 +285,6 @@ void AssetBrowser::update()
 		if (drawing_model) {
 			idraw->remove_obj(temp_place_model);
 			idraw->remove_obj(temp_place_model2);
-			temp_place_model = -1;
 		}
 
 		drawing_model = false;
@@ -295,10 +294,9 @@ void AssetBrowser::update()
 void AssetBrowser::close()
 {
 	drawing_model = false;
-	if (temp_place_model != -1) {
+	if (temp_place_model.is_valid()) {
 		idraw->remove_obj(temp_place_model);
 		idraw->remove_obj(temp_place_model2);
-		temp_place_model = -1;
 	}
 }
 
@@ -384,7 +382,6 @@ void EditorNode::on_remove()
 	else if (obj == EDOBJ_MODEL) {
 		auto& obj = level->static_mesh_objs.at(_varying_obj_index);
 		idraw->remove_obj(obj.handle);
-		obj.handle = -1;
 
 		level->static_mesh_objs.erase(level->static_mesh_objs.begin() + _varying_obj_index);
 	}
@@ -408,7 +405,7 @@ void EditorNode::save_out_to_level()
 	if (obj == EDOBJ_MODEL) {
 		Static_Mesh_Object* obj = &doc->leveldoc->static_mesh_objs.at(_varying_obj_index);
 
-		if (obj->handle != -1)
+		if (obj->handle.is_valid())
 			idraw->remove_obj(obj->handle);
 
 		*obj = make_static_mesh_from_dict(espawn);
@@ -639,25 +636,15 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 
 void EditorDoc::update()
 {
-	View_Setup setup;
-	setup.fov = glm::radians(70.f);
-	setup.near = 0.01;
-	setup.far = 100.0;
-	setup.height = eng->window_h.integer();
-	setup.width = eng->window_w.integer();
-	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, setup.near, setup.far);
+
 	{
 		int x=0, y=0;
 		if(eng->game_focused)
 			SDL_GetRelativeMouseState(&x, &y);
-		camera.update_from_input(eng->keys, x, y, glm::inverse(setup.proj));
+		camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 	}
 
-	setup.origin = camera.position;
-	setup.front = camera.front;
-	setup.view = camera.get_view_matrix();
-	setup.viewproj = setup.proj * setup.view;
-	vs_setup = setup;
+	vs_setup = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, eng->window_w.integer(), eng->window_h.integer());
 
 	// build physics world
 

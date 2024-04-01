@@ -42,9 +42,9 @@ public:
 	void on_transform_change() {}
 	void on_dict_value_change() {}
 
-	glm::vec3 position;
-	glm::vec3 rotation;
-	glm::vec3 scale;
+	glm::vec3 position{};
+	glm::vec3 rotation{};
+	glm::vec3 scale=glm::vec3(1.f);
 	glm::mat4 get_transform();
 	void set_transform(glm::mat4 newtransform);
 	
@@ -156,8 +156,8 @@ public:
 	std::vector<EdModel> edmodels;
 	std::vector<int> remap;
 
-	renderobj_handle temp_place_model = -1;
-	renderobj_handle temp_place_model2 = -1;
+	handle<Render_Object> temp_place_model;
+	handle<Render_Object> temp_place_model2;
 
 
 	EditorDoc* doc;

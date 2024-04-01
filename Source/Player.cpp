@@ -795,7 +795,7 @@ float modulo_lerp(float start, float end, float mod, float t)
 
 void ViewmodelComponent::update_visuals()
 {
-	Render_Object_Proxy proxy;
+	Render_Object proxy;
 
 	proxy.viewmodel_layer = true;
 	proxy.visible = true;
@@ -827,13 +827,13 @@ void Player::update_visuals()
 {
 	if (viewmodel) viewmodel->update_visuals();
 
-	if (render_handle == -1 && model)
+	if (!render_handle.is_valid() && model)
 		render_handle = idraw->register_obj();
-	else if (render_handle != -1 && !model)
+	else if (render_handle.is_valid() && !model)
 		idraw->remove_obj(render_handle);
 
-	if (render_handle != -1 && model) {
-		Render_Object_Proxy proxy;
+	if (render_handle.is_valid() && model) {
+		Render_Object proxy;
 
 		bool visible = !(flags & EF_HIDDEN);
 		if (this == &eng->local_player() && !eng->local.thirdperson_camera.integer()) 

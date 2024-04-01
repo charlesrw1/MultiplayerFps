@@ -18,14 +18,14 @@ struct ViewmodelComponent
 	ViewmodelComponent(Player* player); 
 	~ViewmodelComponent();
 
-	Model* model;
+	Model* model = nullptr;
 	Animator animator;
-	Player* player;
+	Player* player = nullptr;
 
 	void update();
 	void update_visuals();
 
-	renderobj_handle viewmodel_handle;
+	handle<Render_Object> viewmodel_handle;
 
 	glm::vec3 lastoffset;
 	glm::quat lastrot;

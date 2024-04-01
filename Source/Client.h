@@ -6,7 +6,6 @@
 #include "EmulatedSocket.h"
 #include "Physics.h"
 #include "Client.h"
-#include "Particles.h"
 #include <array>
 #include "Config.h"
 #include "Types.h"

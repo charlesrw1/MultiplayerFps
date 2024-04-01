@@ -10,9 +10,9 @@ class Animator;
 class Material;
 class Entity;
 class Model;
-struct Render_Object_Proxy
+struct Render_Object
 {
-	Render_Object_Proxy() {
+	Render_Object() {
 		visible = true;
 		shadow_caster = true;
 		viewmodel_layer = false;
@@ -42,5 +42,3 @@ struct Render_Object_Proxy
 
 	glm::mat4 transform = glm::mat4(1.f);
 };
-
-typedef int renderobj_handle;

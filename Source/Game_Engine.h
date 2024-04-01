@@ -3,9 +3,11 @@
 #include <string>
 #include "Types.h"
 #include "Config.h"
-#include "Particles.h"
+#include "ParticlesPublic.h"
 #include "Physics.h"
 #include "Entity.h"
+
+using glm::vec3;
 
 class Player;
 class Model;
@@ -48,8 +50,7 @@ public:
 	Auto_Config_Var mouse_sensitivity;
 	Auto_Config_Var fake_movement_debug;
 
-	Particle_Manager pm;
-	vec3 view_angles;
+	glm::vec3 view_angles;
 	Move_Command last_command;
 	View_Setup last_view;
 	bool has_run_tick = false;
@@ -155,18 +156,18 @@ public:
 	Ent_Iterator get_ent_start();
 	Player* get_client_player(int slot);
 public:
-	Client* cl;
-	Server* sv;
+	Client* cl=nullptr;
+	Server* sv=nullptr;
 
 #ifdef EDITDOC
 	EditorDoc* eddoc = nullptr;
 #endif
 	string mapname;
-	Level* level;
+	Level* level= nullptr;
 	PhysicsWorld phys;
 
 
-	bool is_host;
+	bool is_host=false;
 	Game_Local local;
 	Game_Media media;
 
@@ -176,9 +177,9 @@ public:
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 0.0;	// 1/tick_rate
 
-	ImGuiContext* imgui_context;
-	SDL_Window* window;
-	SDL_GLContext gl_context;
+	ImGuiContext* imgui_context = nullptr;
+	SDL_Window* window = nullptr;
+	SDL_GLContext gl_context = nullptr;
 	Auto_Config_Var window_w;
 	Auto_Config_Var window_h;
 	Auto_Config_Var window_fullscreen;
@@ -190,13 +191,13 @@ public:
 	bool dedicated_server = false;
 	bool keys[SDL_NUM_SCANCODES];
 	bool keychanges[SDL_NUM_SCANCODES];
-	int mousekeys;
+	int mousekeys = 0;
 	bool game_focused = false;
 
 	string* binds[SDL_NUM_SCANCODES];
 
-	int argc;
-	char** argv;
+	int argc = 0;
+	char** argv = nullptr;
 
 
 private:

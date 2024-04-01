@@ -228,13 +228,13 @@ void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
 		//local.pm.add_dust_hit(hit.pos-direction*0.1f);
 		// add particles + decals here
 
-		local.pm.add_blood_effect(hit.pos, -direction);
+		//local.pm.add_blood_effect(hit.pos, -direction);
 	}
 	else if(hit.ent_id!=-1){
 		Entity* hit_entitiy = eng->get_ent_from_handle(hit.ent_id);
 		hit_entitiy->damage(from, direction, 100);
 
-		local.pm.add_blood_effect(hit.pos, -direction);
+		//local.pm.add_blood_effect(hit.pos, -direction);
 	}
 
 	create_grenade(from, origin + direction * 0.5f, direction);
@@ -544,7 +544,7 @@ void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 {
 	if (glm::length(ent->velocity)>1.f) {
 		ent->rotation = vec3(fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI));
-		eng->local.pm.add_dust_hit(ent->position + normal * 0.1f);
+		//eng->local.pm.add_dust_hit(ent->position + normal * 0.1f);
 	}
 }
 
@@ -594,13 +594,13 @@ Entity::~Entity()
 
 void Entity::update_visuals()
 {
-	if (render_handle == -1 && model)
+	if (!render_handle.is_valid() && model)
 		render_handle = idraw->register_obj();
-	else if (render_handle != -1 && !model)
+	else if (render_handle.is_valid() && !model)
 		idraw->remove_obj(render_handle);
 
-	if (render_handle != -1 && model) {
-		Render_Object_Proxy proxy;
+	if (render_handle.is_valid() && model) {
+		Render_Object proxy;
 
 		proxy.visible = !(flags & EF_HIDDEN);
 		if(model->bones.size()>0)

@@ -98,6 +98,21 @@ vec3 ACESFitted(vec3 color)
     return color;
 }
 
+vec3 saturation_color_grade(vec3 color, float saturate_amt) {
+	float luminance = luminance(color);
+	return (color - luminance) * saturate_amt + luminance;
+}
+
+vec3 color_filter(vec3 color, vec3 filter_color) {
+	return color * filter_color;
+}
+
+vec3 color_contrast (vec3 color, float amt) {
+	const float ACEScc_MIDGRAY =   0.4135884;
+	return (color - ACEScc_MIDGRAY) * amt + ACEScc_MIDGRAY;
+}
+
+
 void main()
 {
 	vec3 scene = texture(scene_lit, texCoord).rgb;
@@ -110,6 +125,10 @@ void main()
 	both = aces_approx(both*0.7);
 	
 	vec3 srgb = pow(both,vec3(1/2.2));
+	//srgb = color_contrast(srgb, 0.95);
+	//srgb = color_filter(srgb, vec3(1.0,0.92,0.8));
+	srgb = saturation_color_grade(srgb, 1.1);
+	
 	
 	//srgb = contrast(srgb, vec3(1.1));
 	

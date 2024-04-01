@@ -30,7 +30,7 @@ struct Static_Mesh_Object
 	bool is_embedded_mesh = false;
 	bool casts_shadows = true;
 	Model* model = nullptr;
-	renderobj_handle handle = -1;	// handle to render system
+	handle<Render_Object> handle;	// handle to render system
 };
 
 struct Object_Dict
@@ -65,7 +65,7 @@ public:
 	vector<Level_Light> lights;
 	vector<Static_Mesh_Object> static_mesh_objs;
 	Prefab_Model* level_prefab;
-	vector<renderobj_handle> prefab_handles;
+	vector<handle<Render_Object>> prefab_handles;
 	vector<Entity_Spawn> espawns;
 	vector<Object_Dict> objs;
 

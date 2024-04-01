@@ -96,9 +96,6 @@
     <ClCompile Include="Source\ClientMgr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Particles.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Connection.cpp">
       <Filter>Source Files\Shared</Filter>
     </ClCompile>
@@ -142,6 +139,9 @@
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Source\Ssao.cpp">
+      <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Particles.cpp">
       <Filter>Source Files\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
@@ -215,9 +215,6 @@
     <ClInclude Include="source\Client.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Particles.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Bytepacker.h">
       <Filter>Source Files\Shared</Filter>
     </ClInclude>
@@ -276,6 +273,18 @@
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Source\DrawPublic.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\FreeList.h">
+      <Filter>Source Files\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DecalsPublic.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ParticlesLocal.h">
+      <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ParticlesPublic.h">
       <Filter>Source Files\Graphics</Filter>
     </ClInclude>
   </ItemGroup>

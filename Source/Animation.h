@@ -317,4 +317,6 @@ private:
 
 	void UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies);
 };
+
+
 #endif

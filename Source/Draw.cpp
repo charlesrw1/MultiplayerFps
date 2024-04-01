@@ -1508,7 +1508,7 @@ void Render_Pass::update_batches()
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
-draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& proxy, Material* material, uint32_t submesh, uint32_t layer)
+draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, Material* material, uint32_t submesh, uint32_t layer)
 {
 	draw_call_key key;
 
@@ -1525,7 +1525,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& p
 }
 
 //void Render_Pass::delete_object(
-//	const Render_Object_Proxy& proxy, 
+//	const Render_Object& proxy, 
 //	renderobj_handle handle, 
 //	Material* material,
 //	uint32_t submesh,
@@ -1538,12 +1538,12 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object_Proxy& p
 //	deletions.push_back(obj);
 //}
 void Render_Pass::add_object(
-	const Render_Object_Proxy& proxy, 
-	renderobj_handle handle, 
+	const Render_Object& proxy, 
+	handle<Render_Object> handle,
 	Material* material,
 	uint32_t submesh,
 	uint32_t layer) {
-	ASSERT(handle != -1 && "null handle");
+	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
 	Pass_Object obj;
 	obj.sort_key = create_sort_key_from_obj(proxy, material, submesh, layer);
@@ -1584,7 +1584,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	{
 		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
 		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
-			return  a.render_obj < b.render_obj && a.submesh_index < b.submesh_index;
+			return  a.render_obj.id < b.render_obj.id && a.submesh_index < b.submesh_index;
 		else return false;
 	};
 	//if (!deletions.empty()) {
@@ -1626,7 +1626,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	if (objects.empty()) return;
 
 	{
-		const auto& functor = [](int first, Pass_Object* po, const Render_Object_Proxy* rop) -> Mesh_Batch
+		const auto& functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch
 		{
 			Mesh_Batch batch;
 			batch.first = first;
@@ -1640,12 +1640,12 @@ void Render_Pass::make_batches(Render_Scene& scene)
 
 		// build mesh batches first
 		Pass_Object* batch_obj = &objects[0];
-		const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
+		const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
 		Mesh_Batch batch = functor(0, batch_obj, batch_proxy);
 
 		for (int i = 1; i < objects.size(); i++) {
 			Pass_Object* this_obj = &objects[i];
-			const Render_Object_Proxy* this_proxy = &scene.get(this_obj->render_obj);
+			const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
 			bool can_be_merged
 				= this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64()
 				&& this_obj->submesh_index == batch_obj->submesh_index && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
@@ -1667,13 +1667,13 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	
 	Mesh_Batch* mesh_batch = &mesh_batches[0];
 	Pass_Object* batch_obj = &objects[mesh_batch->first];
-	const Render_Object_Proxy* batch_proxy = &scene.get(batch_obj->render_obj);
+	const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
 	bool is_at = mesh_batch->material->alpha_tested;
 	for (int i = 1; i < mesh_batches.size(); i++)
 	{
 		Mesh_Batch* this_batch = &mesh_batches[i];
 		Pass_Object* this_obj = &objects[this_batch->first];
-		const Render_Object_Proxy* this_proxy = &scene.get(this_obj->render_obj);
+		const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
 
 		bool batch_this = false;
 
@@ -1755,7 +1755,7 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 		for (int j = 0; j < mdb.count; j++) {
 			Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
 			auto& obj = src.objects[meshb.first];
-			Render_Object_Proxy& proxy = proxy_list.get(obj.render_obj).proxy;
+			Render_Object& proxy = proxy_list.get(obj.render_obj.id).proxy;
 			Mesh& mesh = *proxy.mesh;
 			auto& part = mesh.parts[obj.submesh_index];
 			gpu::DrawElementsIndirectCommand cmd;
@@ -1771,7 +1771,7 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			list.commands.push_back(cmd);
 
 			for (int k = 0; k < meshb.count; k++) {
-				instance_to_instance.push_back(proxy_list.handle_to_obj[src.objects[meshb.first + k].render_obj]);
+				instance_to_instance.push_back(proxy_list.handle_to_obj[src.objects[meshb.first + k].render_obj.id]);
 			}
 
 			base_instance += cmd.primCount;
@@ -1859,6 +1859,7 @@ void Render_Scene::build_scene_data()
 
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
+			handle<Render_Object> objhandle{obj.handle};
 			auto& proxy = obj.type_.proxy;
 			if (proxy.visible) {
 				auto& mesh = *proxy.mesh;
@@ -1866,13 +1867,13 @@ void Render_Scene::build_scene_data()
 					auto& part = mesh.parts[j];
 					Material* mat = (*proxy.mats)[part.material_idx];
 					if (mat->is_translucent())
-						transparents.add_object(proxy, obj.handle, mat, j, 0);
+						transparents.add_object(proxy, objhandle, mat, j, 0);
 					else {
-						depth.add_object(proxy, obj.handle, mat, j, 0);
-						opaque.add_object(proxy, obj.handle, mat, j, 0);
+						depth.add_object(proxy, objhandle, mat, j, 0);
+						opaque.add_object(proxy, objhandle, mat, j, 0);
 					}
 					if (proxy.color_overlay) {
-						transparents.add_object(proxy, obj.handle, mats.unlit, j, 1);
+						transparents.add_object(proxy, objhandle, mats.unlit, j, 1);
 					}
 				}
 
@@ -2228,7 +2229,7 @@ void multidraw_testing()
 					
 					
 					auto handle = draw.scene.register_renderable();
-					Render_Object_Proxy rop;
+					Render_Object rop;
 					rop.mesh = &meshlet_model->model->mesh;
 					rop.mats = &meshlet_model->model->mats;
 					rop.transform = matricies.back();
@@ -2718,7 +2719,6 @@ void Renderer::scene_draw(bool editor_mode)
 	multidraw_testing();
 
 	DrawEntBlobShadows();
-	eng->local.pm.draw_particles();
 
 
 
@@ -2728,8 +2728,8 @@ void Renderer::scene_draw(bool editor_mode)
 
 	draw_debug_shapes();
 
-	//if (editor_mode)
-	//	eng->eddoc->overlays_draw();
+	if (editor_mode)
+		eng->eddoc->overlays_draw();
 
 	glCheckError();
 	
@@ -3036,19 +3036,20 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 	}
 }
 
-renderobj_handle Renderer::register_obj()
+handle<Render_Object> Renderer::register_obj()
 {
 	return scene.register_renderable();
 }
 
-void Renderer::update_obj(renderobj_handle handle, const Render_Object_Proxy& proxy)
+void Renderer::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
 {
 	scene.update(handle, proxy);
 }
 
-void Renderer::remove_obj(renderobj_handle handle)
+void Renderer::remove_obj(handle<Render_Object>& handle)
 {
 	scene.remove(handle);
+	handle.id = -1;
 }
 
 void Renderer::on_level_end()
@@ -3195,7 +3196,7 @@ void Renderer::on_level_start()
 	draw.using_skybox_for_specular = true;
 	auto& helper = EnviornmentMapHelper::get();
 
-	scene.skybox = helper.create_from_file("hdr_sky1.hdr").original_cubemap;
+	scene.skybox = helper.create_from_file("hdr_sky3.hdr").original_cubemap;
 	// CUBEMAP_SIZE isnt the size of skybox, but its unused anyways
 	helper.convolute_irradiance_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, 0, 32);
 	helper.compute_specular_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapspecular_array, 0, CUBEMAP_SIZE);
@@ -3235,21 +3236,21 @@ void Renderer::on_level_start()
 	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
 }
 
-renderobj_handle Render_Scene::register_renderable() {
-	renderobj_handle handle =  proxy_list.make_new();
+handle<Render_Object> Render_Scene::register_renderable() {
+	handle<Render_Object> handle{ proxy_list.make_new() };
 	return handle;
 }
 
-void Render_Scene::update(renderobj_handle handle, const Render_Object_Proxy& proxy) 
+void Render_Scene::update(handle<Render_Object> handle, const Render_Object& proxy)
 {
-	ROP_Internal& in = proxy_list.get(handle);
+	ROP_Internal& in = proxy_list.get(handle.id);
 	in.proxy = proxy;
 	if (!proxy.viewmodel_layer) 
 		in.inv_transform = glm::inverse(proxy.transform);
 }
 
-void Render_Scene::remove(renderobj_handle handle) {
-	if (handle != -1) {
-		proxy_list.free(handle);
+void Render_Scene::remove(handle<Render_Object> handle) {
+	if (handle.id != -1) {
+		proxy_list.free(handle.id);
 	}
 }

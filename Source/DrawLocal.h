@@ -13,6 +13,7 @@
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
 #include "RenderObj.h"
+#include "FreeList.h"
 
 #pragma optimize("", on);
 
@@ -213,50 +214,6 @@ struct Render_Level_Params {
 	uint32_t provied_constant_buffer = 0;
 };
 
-template<typename T>
-class Free_List
-{
-public:
-	using handle_type = int;
-
-	T& get(handle_type handle) {
-		assert(handle_to_obj[handle] != -1);
-		return objects[handle_to_obj[handle]].type_;
-	}
-	handle_type make_new() {
-		handle_type h = 0;
-		if (free_handles.empty()) {
-			h =  first_free++;
-			handle_to_obj.resize(handle_to_obj.size() + 1);
-		}
-		else {
-			h = free_handles.back();
-			free_handles.pop_back();
-		}
-		handle_to_obj[h] = objects.size();
-		objects.resize(objects.size() + 1);
-		objects.back().handle = h;
-
-		return h;
-	}
-	void free(handle_type handle) {
-		int obj_index = handle_to_obj[handle];
-		handle_to_obj[handle] = -1;
-		objects[obj_index] = objects.back();
-		handle_to_obj[objects[obj_index].handle] = obj_index;
-		objects.resize(objects.size() - 1);
-		free_handles.push_back(handle);
-	}
-
-	handle_type first_free = 0;
-	vector<handle_type> free_handles;
-	vector<int> handle_to_obj;
-	struct pair {
-		handle_type handle = -1;
-		T type_;
-	};
-	vector<pair> objects;
-};
 
 // represents a singular call to glDrawElements() with same state and mesh, batchable
 struct Mesh_Batch
@@ -306,7 +263,7 @@ struct Pass_Object
 
 	draw_call_key sort_key;
 	const Material* material = nullptr;
-	renderobj_handle render_obj = -1;	// entity instance
+	handle<Render_Object> render_obj{};	// entity instance
 	uint32_t submesh_index;		// what submesh am i
 };
 
@@ -331,7 +288,7 @@ public:
 	pass_type type;
 
 	//void delete_object(
-	//	const Render_Object_Proxy& proxy, 
+	//	const Render_Object& proxy, 
 	//	renderobj_handle handle,
 	//	Material* material,
 	//	uint32_t submesh,
@@ -340,14 +297,14 @@ public:
 	void make_batches(Render_Scene& scene);
 	
 	void add_object(
-		const Render_Object_Proxy& proxy, 
-		renderobj_handle handle,
+		const Render_Object& proxy, 
+		handle<Render_Object> handle,
 		Material* material,
 		uint32_t submesh, 
 		uint32_t layer);
 
 	draw_call_key create_sort_key_from_obj(
-		const Render_Object_Proxy& proxy, 
+		const Render_Object& proxy, 
 		Material* material, 
 		uint32_t submesh, 
 		uint32_t layer);
@@ -373,7 +330,7 @@ public:
 
 struct ROP_Internal
 {
-	Render_Object_Proxy proxy;
+	Render_Object proxy;
 	glm::mat4 inv_transform;
 };
 
@@ -416,11 +373,11 @@ public:
 
 	void init();
 
-	renderobj_handle register_renderable();
-	void update(renderobj_handle handle, const Render_Object_Proxy& proxy);
-	void remove(renderobj_handle handle);
-	const Render_Object_Proxy& get(renderobj_handle handle) {
-		return proxy_list.get(handle).proxy;
+	handle<Render_Object> register_renderable();
+	void update(handle<Render_Object> handle, const Render_Object& proxy);
+	void remove(handle<Render_Object> handle);
+	const Render_Object& get(handle<Render_Object> handle) {
+		return proxy_list.get(handle.id).proxy;
 	}
 
 	void build_scene_data();
@@ -548,9 +505,9 @@ public:
 	virtual void on_level_start() override;
 	virtual void on_level_end() override;
 	virtual void reload_shaders() override;
-	virtual renderobj_handle register_obj() override;
-	virtual void update_obj(renderobj_handle handle, const Render_Object_Proxy& proxy) override;
-	virtual void remove_obj(renderobj_handle handle) override;
+	virtual handle<Render_Object> register_obj() override;
+	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
+	virtual void remove_obj(handle<Render_Object>& handle) override;
 
 	void render_level_to_target(Render_Level_Params params);
 

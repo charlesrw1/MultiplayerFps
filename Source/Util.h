@@ -31,6 +31,13 @@ struct Color32
 #define COLOR_PINK Color32{0xff,0,0xff,0xff}
 #define COLOR_CYAN Color32{0,0xff,0xff,0xff}
 
+template<typename T>
+struct handle
+{
+	int id = -1;
+	bool is_valid() const { return id != -1; }
+};
+
 struct Buffer
 {
 	char* buffer;

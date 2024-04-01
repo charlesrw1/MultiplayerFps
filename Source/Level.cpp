@@ -103,7 +103,7 @@ Static_Mesh_Object make_static_mesh_from_dict(Level::Entity_Spawn* obj)
 			smo.transform = transform;
 
 			smo.handle = idraw->register_obj();
-			Render_Object_Proxy rop;
+			Render_Object rop;
 			rop.mesh = &smo.model->mesh;
 			rop.transform = smo.transform;
 			rop.animator = nullptr;
@@ -224,8 +224,8 @@ Level* LoadLevelFile(const char* level_name)
 
 	for (int i = 0; i < prefab->nodes.size(); i++) {
 		auto& node = prefab->nodes[i];
-		renderobj_handle handle = idraw->register_obj();
-		Render_Object_Proxy obj;
+		handle<Render_Object> handle = idraw->register_obj();
+		Render_Object obj;
 		obj.mesh = &prefab->meshes[node.mesh_idx];
 		obj.transform = node.transform;
 		obj.animator = nullptr;

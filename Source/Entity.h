@@ -86,19 +86,13 @@ public:
 	float col_height = 0;
 	int ground_index = 0;
 
-	// for interpolating entities
-	glm::vec3 interp_pos;
-	glm::vec3 interp_rot;
-	float interp_remaining;
-	float interp_time;
-
 	int target_ent = -1;
 	float in_air_time = 0.f;
 
 	int force_angles = 0;	// 1=force, 2=add
 	glm::vec3 diff_angles = glm::vec3(0.f);
 
-	renderobj_handle render_handle = -1;
+	handle<Render_Object> render_handle;
 	Model* model = nullptr;
 
 	Animator anim;

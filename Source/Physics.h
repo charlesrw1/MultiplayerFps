@@ -52,11 +52,11 @@ struct MeshShape
 struct PhysicsObject
 {
 	bool is_mesh = false;
-	glm::mat4 inverse_transform;
-	glm::mat4 transform;
+	glm::mat4 inverse_transform=glm::mat4(1.f);
+	glm::mat4 transform=glm::mat4(1.f);
 	MeshShape mesh;
-	glm::vec3 max;
-	glm::vec3 min_or_origin;
+	glm::vec3 max{};
+	glm::vec3 min_or_origin{};
 	const Animator* a = nullptr;
 	const Model* m = nullptr;
 
@@ -76,10 +76,10 @@ struct Trace_Shape
 
 	Bounds to_bounds();
 
-	glm::vec3 pos;
-	float radius;
-	float height;
-	bool sphere;
+	glm::vec3 pos{};
+	float radius=1.f;
+	float height=1.f;
+	bool sphere=false;
 };
 
 enum Physics_Property

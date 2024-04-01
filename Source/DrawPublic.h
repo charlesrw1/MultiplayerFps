@@ -13,9 +13,9 @@ public:
 	
 	virtual void reload_shaders() = 0;
 	
-	virtual renderobj_handle register_obj() = 0;
-	virtual void update_obj(renderobj_handle handle, const Render_Object_Proxy& proxy) = 0;
-	virtual void remove_obj(renderobj_handle handle) = 0;
+	virtual handle<Render_Object> register_obj() = 0;
+	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) = 0;
+	virtual void remove_obj(handle<Render_Object>& handle) = 0;
 };
 
 extern RendererPublic* idraw;

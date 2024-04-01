@@ -76,6 +76,9 @@ bool CheckGlErrorInternal_(const char* file, int line)
 class Debug_Console
 {
 public:
+	Debug_Console() {
+		memset(input_buffer, 0, sizeof input_buffer);
+	}
 	void init();
 	void draw();
 	void print(const char* fmt, ...);
@@ -789,8 +792,6 @@ DECLARE_ENGINE_CMD(spawn_npc)
 void Game_Local::init()
 {
 	view_angles = glm::vec3(0.f);
-	
-	pm.init();
 
 	viewmodel = FindOrLoadModel("arms.glb");
 	viewmodel_animator.set_model(viewmodel);
@@ -1237,6 +1238,14 @@ DECLARE_ENGINE_CMD(reload_mats)
 		mats.load_material_file_directory(args.at(1));
 }
 
+View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height)
+	: origin(origin),front(front),fov(fov),near(near),far(far),width(width),height(height)
+{
+	view = glm::lookAt(origin, origin + front, glm::vec3(0, 1.f, 0));
+	proj = glm::perspective(fov, width / (float)height, near, far);
+	viewproj = proj * view;
+}
+
 #define TIMESTAMP(x) printf("%s in %f\n",x,(float)GetTime()-start); start = GetTime();
 
 Game_Engine::Game_Engine() :
@@ -1247,7 +1256,9 @@ Game_Engine::Game_Engine() :
 	ents(NUM_GAME_ENTS, nullptr),
 	spawnids(NUM_GAME_ENTS,0)
 {
-
+	memset(binds, 0, sizeof binds);
+	memset(keychanges, 0, sizeof keychanges);
+	memset(keys, 0, sizeof keys);
 }
 
 extern Game_Mod_Manager mods;
@@ -1302,6 +1313,8 @@ void Game_Engine::init()
 
 	media.load();
 	TIMESTAMP("media init");
+
+	iparticle->init();
 
 	cl->init();
 	TIMESTAMP("cl init");
@@ -1593,8 +1606,6 @@ void Game_Engine::pre_render_update()
 			
 		}
 	}
-
-	local.pm.tick(eng->frame_time);
 
 	local.update_viewmodel();
 
