@@ -227,25 +227,20 @@ enum opcode : uint16_t
 
 
 
-	LispBytecode::type LispBytecode::compile(LispExp& exp, Env* env) {
+stack_val_type BytecodeExpression::compile(LispExp& exp, const ByteCodeExternalVars_CFG& external_vars) {
 		if (exp.type != LispExp::list_type) {
 			if (exp.type == LispExp::symbol_type) {
-				const auto& find = env->symbols.find(exp.as_sym());
-				if (find != env->symbols.end()) {
-					auto& findexp = find->second;
-					if (findexp.type == LispExp::int_type) {
+				const auto& find = external_vars.find(exp.as_sym());
+				if (find.is_valid()) {
+					if (external_vars.get_type(find) == stack_val_type::int_t) {
 						push_inst(PUSH_I);
-						uintptr_t ptr = (uintptr_t)&findexp.u.i;
-						push_4bytes(ptr);
-						push_4bytes(ptr >> 32);
-						return type::int_type;
+						push_4bytes(find.id);
+						return stack_val_type::int_t;
 					}
-					else if (find->second.type == LispExp::float_type) {
+					else if (external_vars.get_type(find) == stack_val_type::float_t) {
 						push_inst(PUSH_F);
-						uintptr_t ptr = (uintptr_t)&findexp.u.f;
-						push_4bytes(ptr);
-						push_4bytes(ptr >> 32);
-						return type::float_type;
+						push_4bytes(find.id);
+						return stack_val_type::float_t;
 					}
 					else
 						throw LispError("can only compile int/floats", &exp);
@@ -256,13 +251,13 @@ enum opcode : uint16_t
 			else if (exp.type == LispExp::int_type) {
 				push_inst(PUSH_CONST_I);
 				push_4bytes(exp.u.i);
-				return type::int_type;
+				return stack_val_type::int_t;
 			}
 			else if (exp.type == LispExp::float_type) {
 				push_inst(PUSH_CONST_F);
 				float f = exp.u.f;
 				push_4bytes(*(unsigned int*)&f);
-				return type::float_type;
+				return stack_val_type::float_t;
 			}
 			else {
 				throw LispError("unknown type for compiling", &exp);
@@ -271,33 +266,33 @@ enum opcode : uint16_t
 		else {
 			string op = exp.as_list().at(0).as_sym();
 			if (op == "not") {
-				auto type1 = compile( exp.as_list().at(1) , env);
-				if (type1 == type::float_type) {
+				auto type1 = compile( exp.as_list().at(1) , external_vars);
+				if (type1 == stack_val_type::float_t) {
 					push_inst(CAST_0_I);
 				}
 				push_inst(NOT);
-				return type::int_type;
+				return stack_val_type::int_t;
 			}
 			else if (op == "and" || op == "or") {
-				auto type1 = compile(exp.as_list().at(1), env);
-				auto type2 = compile(exp.as_list().at(2), env);
-				if (type1 != int_type)
+				auto type1 = compile(exp.as_list().at(1), external_vars);
+				auto type2 = compile(exp.as_list().at(2), external_vars);
+				if (type1 != stack_val_type::int_t)
 					push_inst(CAST_1_I);
-				if (type2 != int_type)
+				if (type2 != stack_val_type::int_t)
 					push_inst(CAST_0_I);
 				if (op == "and")
 					push_inst(AND);
 				else
 					push_inst(OR);
-				return type::int_type;
+				return stack_val_type::int_t;
 			}
 			else {
-				auto type1 = compile(exp.as_list().at(1), env);
-				auto type2 = compile(exp.as_list().at(2), env);
-				bool isfloat = (type1 == float_type || type2 == float_type);
-				if (isfloat && type1 != float_type)
+				auto type1 = compile(exp.as_list().at(1), external_vars);
+				auto type2 = compile(exp.as_list().at(2), external_vars);
+				bool isfloat = (type1 == stack_val_type::float_t || type2 == stack_val_type::float_t);
+				if (isfloat && type1 != stack_val_type::float_t)
 					push_inst(CAST_1_F);
-				if (isfloat && type2 != float_type)
+				if (isfloat && type2 != stack_val_type::float_t)
 					push_inst(CAST_0_F);
 				struct pairs {
 					const char* name;
@@ -325,7 +320,7 @@ enum opcode : uint16_t
 				}
 				if (i == 10) throw LispError("couldn't find op", nullptr);
 
-				return (isfloat) ? float_type : int_type;
+				return (isfloat) ? stack_val_type::float_t : stack_val_type::int_t;
 			}
 		}
 	}
@@ -335,7 +330,7 @@ enum opcode : uint16_t
 case (opcode_+1): OPONSTACK(op,i,i);
 #define FLOAT_AND_INT_OP_OUTPUT_INT(opcode_, op) case opcode_: OPONSTACK(op,f, i); \
 case (opcode_+1): OPONSTACK(op,i, i);
-	LispBytecode::stack_val LispBytecode::execute()
+	stack_val BytecodeExpression::execute(const ByteCodeExternalVars_RT& external_vars) const
 	{
 		stack_val stack[64];
 		int sp = 0;
@@ -395,14 +390,14 @@ case (opcode_+1): OPONSTACK(op,i, i);
 				pc += 4;
 			}break;
 			case PUSH_F: {
-				unsigned long long ptr = read_8bytes(pc + 1);
-				stack[sp++].f = *((double*)ptr);
-				pc += 8;
+				int index = read_4bytes(pc + 1);
+				stack[sp++].f = external_vars.get(handle<stack_val>{index}).f;
+				pc += 4;
 			}break;
 			case PUSH_I: {
-				unsigned long long ptr = read_8bytes(pc + 1);
-				stack[sp++].i = *((int*)ptr);
-				pc += 8;
+				int index = read_4bytes(pc + 1);
+				stack[sp++].i = external_vars.get(handle<stack_val>{index}).i;
+				pc += 4;
 			}break;
 			}
 		}

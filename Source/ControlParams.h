@@ -1,0 +1,8 @@
+ENUM_BEGIN()
+	ENUM(kPosition)
+	ENUM(flSpeed)
+	ENUM(bCrouching)
+	ENUM(bFalling)
+	ENUM(bJumpstart)
+	ENUM(kItemType)
+ENUM_END()

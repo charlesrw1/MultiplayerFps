@@ -61,9 +61,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
+    <ClInclude Include="Source\Animation_Tree.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
+    <ClInclude Include="Source\ControlParams.h" />
     <ClInclude Include="Source\DecalsPublic.h" />
     <ClInclude Include="Source\Dict.h" />
     <ClInclude Include="Source\DrawLocal.h" />
@@ -78,6 +80,7 @@
     <ClInclude Include="Source\FreeList.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\LispInterpreter.h" />
+    <ClInclude Include="Source\MemArena.h" />
     <ClInclude Include="Source\Meshlet.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
     <ClInclude Include="Source\EntityTypes.h" />
