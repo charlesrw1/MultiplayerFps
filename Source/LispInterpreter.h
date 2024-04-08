@@ -244,23 +244,57 @@ public:
 	static const Env& get_global_env();
 };
 
-class LispBytecode
+#include "Util.h" // handle
+enum class stack_val_type
+{
+	int_t,
+	float_t
+};
+struct stack_val
+{
+	union {
+		int i = 0;
+		float f;
+	};
+};
+
+struct ByteCodeExternalVars_CFG
+{
+	handle<stack_val> find(const std::string& str)const  {
+		for (int i = 0; i < vals.size(); i++) {
+			if (vals[i].str == str) return { i };
+		}
+		return handle<stack_val>();
+	}
+	stack_val_type get_type(handle<stack_val> handle) const { return vals.at(handle.id).type; }
+
+	handle<stack_val> set(const char* str, stack_val_type type) {
+		vals.push_back({ str, type });
+	}
+
+	struct stack_val_lookup {
+		std::string str;
+		stack_val_type type;
+	};
+	std::vector<stack_val_lookup> vals;
+};
+
+struct ByteCodeExternalVars_RT
+{
+	ByteCodeExternalVars_CFG* cfg = nullptr;
+	stack_val& get(handle<stack_val> handle) {
+		return vars.at(handle.id);
+	}
+	std::vector<stack_val> vars;
+};
+
+class BytecodeExpression
 {
 public:
 	vector<uint8_t> instructions;
-	struct stack_val
-	{
-		union {
-			int i;
-			float f;
-		};
-	};
-	stack_val execute();
-	enum type {
-		int_type,
-		float_type
-	};
-	type compile(LispExp& exp, Env* env);
+
+	stack_val execute(const ByteCodeExternalVars_RT& external_vars) const;
+	stack_val_type compile(LispExp& exp, const ByteCodeExternalVars_CFG& external_vars);
 private:
 	void push_inst(uint8_t c) {
 		instructions.push_back(c);
@@ -271,14 +305,14 @@ private:
 		instructions.push_back((x >> 16) & 0xff);
 		instructions.push_back((x >> 24) & 0xff);
 	}
-	uint32_t read_4bytes(int offset) {
+	uint32_t read_4bytes(int offset) const {
 		uint32_t res = (instructions[offset]);
 		res |= ((uint32_t)instructions[offset + 1] << 8);
 		res |= ((uint32_t)instructions[offset + 2] << 16);
 		res |= ((uint32_t)instructions[offset + 3] << 24);
 		return res;
 	}
-	uintptr_t read_8bytes(int offset) {
+	uintptr_t read_8bytes(int offset) const {
 		uintptr_t low = read_4bytes(offset);
 		uintptr_t high = read_4bytes(offset + 4);
 		return low | (high << 32);

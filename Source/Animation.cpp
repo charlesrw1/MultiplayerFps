@@ -13,6 +13,8 @@ using namespace glm;
 
 #include "LispInterpreter.h"
 
+#include "MemArena.h"
+
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
 
@@ -897,254 +899,382 @@ static vector<int> get_indicies(const Animation_Set* set, const vector<const cha
 	return out;
 }
 
-
-
-
-struct Ik_Foot_Lock
-{
-	glm::vec3 locked_rfoot_worldspace;
-	glm::vec3 locked_lfoot_worldspace;
-	bool rfootlocked = false;
-	bool lfootlocked = false;
+#define ENUM_BEGIN
+#define ENUM_END
+#define ENUM(x) x,
+enum class control_params {
+#include "ControlParams.h"
 };
+#define ENUM(x) #x
+const char* control_param_strs[] = {
+#include "ControlParams.h"
+};
+
+void f()
+{
+	
+}
 
 struct State;
 struct State_Transition
 {
 	State* transition_state;
-	LispBytecode compilied;
+	BytecodeExpression compilied;
 };
 
-struct At_Node
+
+struct Animation_Tree_RT;
+struct Animation_Tree_CFG;
+struct Node_CFG;
+struct Control_Params;
+struct NodeRt_Ctx
 {
-	At_Node(Animator* a) : animator(a) {}
+	Model* model = nullptr;
+	Animation_Set* set = nullptr;
+	Animation_Tree_RT* tree = nullptr;
+	ByteCodeExternalVars_RT* vars = nullptr;
+	Control_Params* param = nullptr;
 
-	virtual ~At_Node() = default;
+	stack_val get_param(handle<stack_val> handle) const { return vars->vars.at(handle.id); }
+	uint32_t num_bones() const { return model->bones.size(); }
+};
 
-	virtual bool get_pose(Pose& pose, float dt) = 0;
-	virtual void reset() = 0;
-	virtual bool is_clip_node() {
-		return false;
+struct GetPose_Ctx
+{
+	GetPose_Ctx() {}
+
+	GetPose_Ctx(const GetPose_Ctx& other, Pose* newpose) {
+		*this = other;
+		pose = newpose;
 	}
 
-	virtual At_Node* copy(Animator* animator) { return nullptr;  }
-
-	Animator* animator;
+	Pose* pose = nullptr;
+	float dt = 0.0;
 };
 
+struct Control_Params
+{
+	handle<stack_val> crouching;
+	handle<stack_val> standing;
+	handle<stack_val> relmovedir_x;
+	handle<stack_val> relmovedir_y;
+};
+
+struct Animation_Tree_CFG
+{
+	Node_CFG* root = nullptr;
+	Memory_Arena arena;
+	uint32_t data_used = 0;
+	std::vector<Node_CFG*> all_nodes;	// for initialization
+	ByteCodeExternalVars_CFG* control_param_vars;
+	Control_Params param;
+};
+
+
+struct Node_CFG
+{
+	Node_CFG(Animation_Tree_CFG* cfg, uint32_t rt_size) {
+		rt_offset = cfg->data_used;
+		cfg->data_used += rt_size;
+	}
+
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const = 0;
+	virtual void construct(NodeRt_Ctx& ctx) const {
+		assert(rt_offset == 0);
+	}
+	virtual void reset(NodeRt_Ctx& ctx) const = 0;
+	virtual bool is_clip_node() const { return false; }
+
+
+	template<typename T>
+	T* get_rt(NodeRt_Ctx& ctx) const {
+		return ctx.tree->get<T>(rt_offset);
+	}
+protected:
+	template<typename T>
+	T* construct_this(NodeRt_Ctx& ctx) const {
+		return ctx.tree->construct_rt<T>(rt_offset);
+	}
+private:
+	uint32_t rt_offset = 0;
+};
 
 struct State
 {
 	string name;
-	At_Node* tree = nullptr;
+	Node_CFG* tree = nullptr;
 	vector<State_Transition> transitions;
 	State* next_state = nullptr;
 
 	float state_duration = -1.0;
 	float time_left = 0.0;
 
-	State* get_next_state(Animator* animator);
+	State* get_next_state(NodeRt_Ctx& ctx);
 };
 
-struct Animation_Tree
+struct Animation_Tree_RT
 {
-	Animation_Tree() : ctx(100,&script_vars){}
-	~Animation_Tree() {
-		printf("at destructor\n");
+	void init_from_cfg(const Animation_Tree_CFG* cfg, Model* model, Animation_Set* set) {
+		this->cfg = cfg;
+		data.resize(cfg->data_used);
+		NodeRt_Ctx ctx;
+		ctx.model = model;
+		ctx.set = set;
+		ctx.tree = this;
+		cfg->root->construct(ctx);
+	}
+	const Animation_Tree_CFG* cfg = nullptr;
+	std::vector<uint8_t> data;	// runtime data
+	ByteCodeExternalVars_RT runtime_vars;
+
+	template<typename T>
+	T* get(uint32_t offset) {
+		assert(size == sizeof(T));
+		ASSERT(offset + sizeof(T) <= data.size());
+		return (T*)(data.data() + offset);
 	}
 
-	At_Node* root = nullptr;
-	unordered_map<string, State> states;
-	vector<unique_ptr<At_Node>> all_node_list;
-	Env script_vars;
-	Interpreter_Ctx ctx;
+	template<typename T>
+	T* construct_rt(uint32_t ofs) {
+		assert(size == sizeof(T));
+		T* ptr = get(ofs);
+		ptr = new(ptr)(T);
+		return ptr;
+	}
 };
-State* State::get_next_state(Animator* animator)
+
+
+State* State::get_next_state(NodeRt_Ctx& ctx)
 {
 	for (int i = 0; i < transitions.size(); i++) {
 		// evaluate condition
-		if (transitions[i].compilied.execute().i)
+		if (transitions[i].compilied.execute(*ctx.vars).i)
 			return transitions[i].transition_state;
 	}
 	return this;
 }
 
 
-
-//#pragma optimize( "", off )
-
-struct Clip_Node : public At_Node
+struct Clip_Node_RT
 {
-	Clip_Node(const char* clipname, Animator* animator) : At_Node(animator) {
-		clip_index = animator->set->find(clipname);
+	glm::vec3 root_pos_first_frame = glm::vec3(0.f);
+	float frame = 0.0;
+	uint32_t clip_index = 0;
+	float frame = 0.f;
+	bool stopped_flag = false;
+};
 
-		int root_index = animator->model->root_bone_index;
-		int first_pos = animator->set->FirstPositionKeyframe(0.0, root_index, clip_index);
-		root_pos_first_frame = first_pos != -1 ? 
-			animator->set->GetPos(root_index, first_pos, clip_index).val 
-			: animator->model->bones[root_index].posematrix[3];
+struct Clip_Node_CFG : public Node_CFG
+{
+	Clip_Node_CFG(const char* clip_name, Animation_Tree_CFG* cfg) 
+		: Node_CFG(cfg, sizeof(Clip_Node_RT)) {
+		this->clip_name = clip_name;
 	}
 
+	virtual void construct(NodeRt_Ctx& ctx) const {
+		Clip_Node_RT* rt = construct_this<Clip_Node_RT>(ctx);
+
+		rt->clip_index = ctx.set->find(clip_name);
+		int root_index = ctx.model->root_bone_index;
+		int first_pos = ctx.set->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
+		rt->root_pos_first_frame = first_pos != -1 ?
+			ctx.set->GetPos(root_index, first_pos, rt->clip_index).val
+			:ctx.model->bones[root_index].posematrix[3];
+	}
+
+
 	// Inherited via At_Node
-	virtual bool get_pose(Pose& pose, float dt)
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
-		if (clip_index == -1) {
-			util_set_to_bind_pose(pose, animator->model);
+		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+
+
+		if (rt->clip_index == -1) {
+			util_set_to_bind_pose(*pose.pose, ctx.model);
 			return true;
 		}
 
-		const Animation& clip = animator->set->clips[clip_index];
-		frame += clip.fps * dt * speed;
+		const Animation& clip = ctx.set->clips[rt->clip_index];
+		rt->frame += clip.fps * pose.dt * speed;
 
-		if (frame > clip.total_duration || frame < 0.f) {
+		if (rt->frame > clip.total_duration || rt->frame < 0.f) {
 			if (loop)
-				frame = fmod(fmod(frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+				rt->frame = fmod(fmod(rt->frame, clip.total_duration) + clip.total_duration, clip.total_duration);
 			else {
-				frame = clip.total_duration - 0.001f;
-				stopped_flag = true;
+				rt->frame = clip.total_duration - 0.001f;
+				rt->stopped_flag = true;
 			}
 		}
-		util_calc_rotations(animator->set, frame, clip_index,animator->model, pose);
+		util_calc_rotations(ctx.set, rt->frame, rt->clip_index,ctx.model, *pose.pose);
 
 
-		int root_index = animator->model->root_bone_index;
+		int root_index = ctx.model->root_bone_index;
 		for (int i = 0; i < 3; i++) {
 			if (rootmotion[i] == Remove) {
-				pose.pos[root_index][i] = root_pos_first_frame[i];
+				pose.pose->pos[root_index][i] = rt->root_pos_first_frame[i];
 			}
 		}
 
-		return !stopped_flag;
+		return !rt->stopped_flag;
 	}
 
-	virtual void reset() override {
-		frame = 0.f;
-		stopped_flag = false;
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+		rt->frame = 0.0;
+		rt->stopped_flag = false;
 	}
 	
+	virtual bool is_clip_node() const override {
+		return true;
+	}
+	const Animation* get_clip(NodeRt_Ctx& ctx) const {
+		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+		const Animation* clip = (rt->clip_index == -1) ? nullptr : &ctx.set->clips.at(rt->clip_index);
+		return clip;
+	}
+	void set_frame_by_interp(NodeRt_Ctx& ctx, float frac) const {
+		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+
+		rt->frame = get_clip(ctx)->total_duration * frac;
+	}
+
 	enum rootmotion_type {
 		None,
 		Remove
 	}rootmotion[3] = { None,None,None };
-
-	virtual bool is_clip_node() override {
-		return true;
-	}
-	const Animation* get_clip() {
-		const Animation* clip = (clip_index == -1) ? nullptr : &animator->set->clips.at(clip_index);
-		return clip;
-	}
-	void set_frame_by_interp(float frac) {
-		frame = get_clip()->total_duration * frac;
-	}
-
-	glm::vec3 root_pos_first_frame;
-	int clip_index = 0;
-	float frame = 0.f;
+	const char* clip_name = "";
 	bool loop = true;
 	float speed = 1.0;
-	bool stopped_flag = false;
 };
 
-struct Subtract_Node : public At_Node
+struct Subtract_Node_CFG : public Node_CFG
 {
-	using At_Node::At_Node;
+	Subtract_Node_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, 0) {}
 	// Inherited via At_Node
-	virtual bool get_pose(Pose& pose, float dt) override
-	{
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override {
+
 		Pose* reftemp = Pose_Pool::get().alloc(1);
-		ref->get_pose(*reftemp, dt);
-		source->get_pose(pose, dt);
-		util_subtract(animator->num_bones(), *reftemp, pose);
+		ref->get_pose(ctx, pose);
+		GetPose_Ctx pose2 = pose;
+		pose2.pose = reftemp;
+		source->get_pose(ctx, pose2);
+		util_subtract(ctx.model->bones.size(), *reftemp, *pose.pose);
 		Pose_Pool::get().free(1);
 		return true;
 	}
-	virtual void reset() override {
-		ref->reset();
-		source->reset();
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		ref->reset(ctx);
+		source->reset(ctx);
 	}
-	At_Node* ref;
-	At_Node* source;
+	Node_CFG* ref = nullptr;
+	Node_CFG* source = nullptr;
 };
 
-struct Add_Node : public At_Node
+struct Add_Node_CFG : public Node_CFG
 {
-	using At_Node::At_Node;
+	Add_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, 0) {}
 
-	virtual bool get_pose(Pose& pose, float dt) override
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
-		float lerp = compilied.execute().f;
+		float lerp = compilied.execute(*ctx.vars).f;
+
 		Pose* addtemp = Pose_Pool::get().alloc(1);
-		base_pose->get_pose(pose, dt);
-		diff_pose->get_pose(*addtemp, dt);
-		util_add(animator->num_bones(), *addtemp, pose, lerp);
+		base_pose->get_pose(ctx,pose);
+
+		GetPose_Ctx pose2 = pose;
+		pose2.pose = addtemp;
+
+		diff_pose->get_pose(ctx,pose2);
+		util_add(ctx.model->bones.size(), *addtemp, *pose.pose, lerp);
 		Pose_Pool::get().free(1);
 		return true;
 	}
-	virtual void reset() override {
-		diff_pose->reset();
-		base_pose->reset();
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		diff_pose->reset(ctx);
+		base_pose->reset(ctx);
 	}
 
-	LispBytecode compilied;
-	At_Node* diff_pose;
-	At_Node* base_pose;
+	BytecodeExpression compilied;
+	Node_CFG* diff_pose=nullptr;
+	Node_CFG* base_pose=nullptr;
 };
 
-struct Blend_Node : public At_Node
+struct Blend_Node_RT
 {
-	using At_Node::At_Node;
+	float lerp_amt = 0.0;
+};
 
-	virtual bool get_pose(Pose& pose, float dt) override
+struct Blend_Node_CFG : public Node_CFG
+{
+	Blend_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Blend_Node_RT)) {}
+
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
-		float lerp = compilied.execute().f;
+		float dest = compilied.execute(*ctx.vars).f;
+
+		Blend_Node_RT* rt = get_rt<Blend_Node_RT>(ctx);
+
+		rt->lerp_amt = damp_dt_independent(dest, rt->lerp_amt, damp_factor, pose.dt);
+
+
 		Pose* addtemp = Pose_Pool::get().alloc(1);
-		posea->get_pose(pose, dt);
-		poseb->get_pose(*addtemp, dt);
-		util_blend(animator->num_bones(), *addtemp, pose, lerp);
+		posea->get_pose(ctx, pose);
+		poseb->get_pose(ctx, GetPose_Ctx(pose, addtemp));
+		util_blend(ctx.num_bones(), *addtemp, *pose.pose, rt->lerp_amt);
 		Pose_Pool::get().free(1);
 		return true;
 	}
-	virtual void reset() override {
-		posea->reset();
-		poseb->reset();
+
+	virtual void construct(NodeRt_Ctx& ctx) const override {
+		construct_this<Blend_Node_RT>(ctx);
 	}
 
-	LispBytecode compilied;
-	At_Node* posea;
-	At_Node* poseb;
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		*get_rt<Blend_Node_RT>(ctx) = Blend_Node_RT();
+
+		posea->reset(ctx);
+		poseb->reset(ctx);
+	}
+
+	BytecodeExpression compilied;
+	Node_CFG* posea=nullptr;
+	Node_CFG* poseb=nullptr;
+	float damp_factor = 0.1;
 };
 
-struct Mirror_Node : public At_Node
+struct Mirror_Node_RT
 {
-	using At_Node::At_Node;
+	float lerp_amt = 0.0;
+};
+
+struct Mirror_Node_CFG : public Node_CFG
+{
+	Mirror_Node_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, sizeof Mirror_Node_RT) {}
 
 	// Inherited via At_Node
-	virtual bool get_pose(Pose& pose, float dt) override
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
-		bool good = exp.execute().i;
-		if (good) 
-			lerp_amt += dt / mirror_lerp_time;
-		else 
-			lerp_amt -= dt / mirror_lerp_time;
-		lerp_amt = glm::clamp(lerp_amt, 0.f, 1.f);
+		float amt  = float(expression.execute(*ctx.vars).i);
 
-		bool ret = input->get_pose(pose, dt);
+		auto rt = get_rt<Mirror_Node_RT>(ctx);
+		rt->lerp_amt = damp_dt_independent(amt, rt->lerp_amt, damp_time, pose.dt);
+
+		bool ret = input->get_pose(ctx,pose);
 
 
-		if (lerp_amt >= 0.000001) {
-			const Model* m = animator->model;
+		if (rt->lerp_amt >= 0.000001) {
+			const Model* m = ctx.model;
 			Pose* posemirrored = Pose_Pool::get().alloc(1);
 			// mirror the bones
 			for (int i = 0; i < m->bones.size(); i++) {
 				int from = m->bones[i].remap_index;
-				glm::vec3 frompos = pose.pos[from];
+				glm::vec3 frompos = pose.pose->pos[from];
 				posemirrored->pos[i] = glm::vec3(-frompos.x, frompos.y, frompos.z);
-				glm::quat fromquat = pose.q[from];
+				glm::quat fromquat = pose.pose->q[from];
 				posemirrored->q[i] = glm::quat(fromquat.w, fromquat.x, -fromquat.y, -fromquat.z);
 			}
 
-			util_blend(m->bones.size(), *posemirrored, pose, lerp_amt);
+			util_blend(m->bones.size(), *posemirrored, *pose.pose, rt->lerp_amt);
 
 			Pose_Pool::get().free(1);
 			
@@ -1152,16 +1282,22 @@ struct Mirror_Node : public At_Node
 		return ret;
 	}
 
-	virtual void reset() override
+	virtual void reset(NodeRt_Ctx& ctx) const override
 	{
-		lerp_amt = 0.0;
+		*get_rt< Mirror_Node_RT>(ctx) = Mirror_Node_RT();
+		input->reset(ctx);
 	}
-	At_Node* input = nullptr;
-	float mirror_lerp_time = 0.2f;
-	float lerp_amt = 0.f;
-	LispBytecode exp;
+
+	virtual void construct(NodeRt_Ctx& ctx) const override {
+		construct_this<Mirror_Node_RT>(ctx);
+	}
+
+	float damp_time = 0.1;
+	Node_CFG* input = nullptr;
+	BytecodeExpression expression;
 };
 
+#if 0
 struct Boolean_Blend_Node : public At_Node
 {
 	using At_Node::At_Node;
@@ -1203,6 +1339,7 @@ struct Boolean_Blend_Node : public At_Node
 	float value = 0.f;
 	float blendin = 0.2;
 };
+#endif
 
 float ym0 = 0.09;
 float ym1 = 0.3;
@@ -1233,68 +1370,84 @@ void menu()
 //	ImGui::DragFloat("g_frame_force", &g_frame_force, 0.0005);
 }
 
-struct Statemachine_Node : public At_Node
+struct Statemachine_Node_RT
 {
-	Statemachine_Node(Animator* a) : At_Node(a) {}
+	State* active_state = nullptr;
+	State* fading_out_state = nullptr;
+	float active_weight = 0.0;
+	bool change_to_next = false;
+};
+
+struct Statemachine_Node_CFG : public Node_CFG
+{
+	Statemachine_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Statemachine_Node_RT)) {}
 	
-	virtual bool get_pose(Pose& pose, float dt) override {
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override {
+
+		auto rt = get_rt<Statemachine_Node_RT>(ctx);
+
 
 		// evaluate state machine
-		if (active_state == nullptr) {
-			active_state = start_state;
-			active_weight = 0.0;
+		if (rt->active_state == nullptr) {
+			rt->active_state = start_state;
+			rt->active_weight = 0.0;
 		}
 		State* next_state;// = (change_to_next_state) ? active_state->next_state : active_state->get_next_state(animator);
-		if (change_to_next_state) next_state = active_state->next_state;
+		if (rt->change_to_next) next_state = rt->active_state->next_state;
 		else {
-			next_state = active_state->get_next_state(animator);
-			State* next_state2 = next_state->get_next_state(animator);
+			next_state = rt->active_state->get_next_state(ctx);
+			State* next_state2 = next_state->get_next_state(ctx);
 			int infinite_loop_check = 0;
 			while (next_state2 != next_state) {
 				next_state = next_state2;
-				next_state2 = next_state->get_next_state(animator);
+				next_state2 = next_state->get_next_state(ctx);
 				infinite_loop_check++;
 
 				ASSERT(infinite_loop_check < 100);
 			}
 		}
 
-		change_to_next_state = false;
-		if (active_state != next_state) {
-			if (next_state == fading_out_state) {
-				std::swap(active_state, fading_out_state);
-				active_weight = 1.0 - active_weight;
+		rt->change_to_next = false;
+		if (rt->active_state != next_state) {
+			if (next_state == rt->fading_out_state) {
+				std::swap(rt->active_state, rt->fading_out_state);
+				rt->active_weight = 1.0 - rt->active_weight;
 			}
 			else {
-				fading_out_state = active_state;
-				active_state = next_state;
-				active_state->tree->reset();
-				fade_in_time = g_fade_out;
-				active_weight = 0.f;
+				rt->fading_out_state = rt->active_state;
+				rt->active_state = next_state;
+				rt->active_state->tree->reset(ctx);
+				//fade_in_time = g_fade_out;
+				rt->active_weight = 0.f;
 			}
-			printf("changed to state %s\n", active_state->name.c_str());
+			printf("changed to state %s\n", rt->active_state->name.c_str());
 		}
 
-		active_weight += dt / fade_in_time;
-		if (active_weight > 1.f) {
-			active_weight = 1.f;
-			fading_out_state = nullptr;
+		rt->active_weight += pose.dt / fade_in_time;
+		if (rt->active_weight > 1.f) {
+			rt->active_weight = 1.f;
+			rt->fading_out_state = nullptr;
 		}
 
-		bool notdone = active_state->tree->get_pose(pose, dt);
+		bool notdone = rt->active_state->tree->get_pose(ctx,pose);
 
-		if (fading_out_state) {
+		if (rt->fading_out_state) {
 			Pose* fading_out_pose = Pose_Pool::get().alloc(1);
-			fading_out_state->tree->get_pose(*fading_out_pose, 0.f);	// dt == 0
+
+			GetPose_Ctx pose2;
+			pose2.dt = 0.f;
+			pose2.pose = fading_out_pose;
+
+			rt->fading_out_state->tree->get_pose(ctx,pose2);	// dt == 0
 			//printf("%f\n", active_weight);
-			assert(fading_out_state != active_state);
-			util_blend(animator->model->bones.size(), *fading_out_pose, pose, 1.0-active_weight);
+			assert(rt->fading_out_state != rt->active_state);
+			util_blend(ctx.num_bones(), *fading_out_pose, *pose.pose, 1.0-rt->active_weight);
 			Pose_Pool::get().free(1);
 		}
 
 		if (!notdone) {	// if done
-			if (active_state->next_state) {
-				change_to_next_state = true;
+			if (rt->active_state->next_state) {
+				rt->change_to_next = true;
 				return true;
 			}
 			else {
@@ -1303,89 +1456,87 @@ struct Statemachine_Node : public At_Node
 		}
 		return true;
 	}
-	bool change_to_next_state = false;
 
 	State* start_state = nullptr;
 
 	// Inherited via At_Node
-	virtual void reset() override
+	virtual void reset(NodeRt_Ctx& ctx) const override
 	{
-		active_state = nullptr;
-		fading_out_state = nullptr;
-		active_weight = 0.0;
+		*get_rt<Statemachine_Node_RT>(ctx) = Statemachine_Node_RT();
 	}
 
-	State* active_state = nullptr;
-	State* fading_out_state = nullptr;
+	virtual void construct(NodeRt_Ctx& ctx) const override
+	{
+		construct_this<Statemachine_Node_RT>(ctx);
+	}
+
 	float fade_in_time = 0.f;
-	float active_weight = 0.f;
 };
 
-
-
-struct Directionalblend_node : public At_Node
+struct Directionalblend_Node_RT
 {
-	Directionalblend_node(Animator* a) : At_Node(a) {
+	glm::vec2 character_blend_weights = glm::vec2(0.f);
+	float current_frame = 0.f;	// what [0,1] frame we are on, change this for footstep "syncing" layer
+};
+
+struct Directionalblend_node_CFG : public Node_CFG
+{
+	Directionalblend_node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Directionalblend_Node_RT)) {
 		memset(walk_directions, 0, sizeof(walk_directions));
-		memset(run_directions, 0, sizeof(run_directions));
 	}
 
-	Clip_Node* idle = nullptr;
-	Clip_Node* walk_directions[8];
-	Clip_Node* run_directions[8];
+	Clip_Node_CFG* idle = nullptr;
+	Clip_Node_CFG* walk_directions[8];
+
 	float walk_fade_in = 5.0;
 	float walk_fade_out = 2.0;
 	float run_fade_in = 5.0;
 
-	glm::vec2 character_blend_weights = glm::vec2(0.f);
-
-	float current_frame = 0.f;	// what [0,1] "frame" we are on, change this to footstep syncing layer
-
-	bool blend_between_idle_and_walk(float speed)
+	float get_rootmotion_of_clip(NodeRt_Ctx& ctx, Clip_Node_CFG* node)
 	{
-		if (!run_directions[0]) return true;
-		ASSERT(walk_directions[0]);
-		
-		int clip = walk_directions[0]->clip_index;
-		if (clip == -1) return 0;
-		return speed < glm::length(animator->set->clips.at(clip).root_motion_translation);
-	}
-	float get_rootmotion_of_clip(Clip_Node* node)
-	{
-		return glm::length(animator->set->clips.at(node->clip_index).root_motion_translation);
+		return glm::length(node->get_clip(ctx)->root_motion_translation);
 	}
 
-	void advance_animation_sync_by(Clip_Node* node, float dt, float character_speed)
+	void advance_animation_sync_by(NodeRt_Ctx& ctx, Clip_Node_CFG* node, float dt, float character_speed, Directionalblend_Node_RT* rt) const
 	{
-		const Animation* anim = node->get_clip();
-		node->frame = current_frame * anim->total_duration;
+		const Animation* anim = node->get_clip(ctx);
+		auto nodert = node->get_rt<Clip_Node_RT>(ctx);
+
+		nodert->frame = rt->current_frame * anim->total_duration;
 
 		float speed_of_anim = glm::length(anim->root_motion_translation)/(anim->total_duration/anim->fps);
 
 		// want to match character_speed and speed_of_anim
 		float speedup = character_speed / speed_of_anim;
-		node->frame += speedup * dt * anim->fps;
+		nodert->frame += speedup * dt * anim->fps;
 
-		current_frame = node->frame / anim->total_duration;
+		rt->current_frame = nodert->frame / anim->total_duration;
 	}
 
 	// Inherited via At_Node
-	virtual bool get_pose(Pose& pose, float dt) override
+	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
-		walk_fade_in = g_walk_fade_in;
-		walk_fade_out = g_walk_fade_out;
-		run_fade_in = g_run_fade_in;
+		//walk_fade_in = g_walk_fade_in;
+		//walk_fade_out = g_walk_fade_out;
+		//run_fade_in = g_run_fade_in;
 
-		float actual_character_move_speed = glm::length(glm::vec2(animator->in.relmovedir));
+		auto rt = get_rt<Directionalblend_Node_RT>(ctx);
 
-		character_blend_weights = damp_dt_independent(glm::vec2(animator->in.relmovedir),
-			character_blend_weights, g_dir_blend, dt);
+		glm::vec2 relmovedir = glm::vec2(
+			ctx.get_param(ctx.param->relmovedir_x),
+			ctx.get_param(ctx.param->relmovedir_y)
+		);
 
-		float character_ground_speed = glm::length(character_blend_weights);
+		float actual_character_move_speed = glm::length(relmovedir);
+
+		rt->character_blend_weights = damp_dt_independent(relmovedir,
+			rt->character_blend_weights, g_dir_blend, pose.dt);
+
+		float character_ground_speed = glm::length(rt->character_blend_weights);
 		float character_angle = PI;
 		// blend between angles
 		if (character_ground_speed >= 0.0000001f) {
-			glm::vec2 direction = character_blend_weights / character_ground_speed;;
+			glm::vec2 direction = rt->character_blend_weights / character_ground_speed;;
 			//character_angle = modulo_lerp(atan2f(direction.y, direction.x) + PI, character_angle, TWOPI, 0.94f);
 			character_angle = atan2f(direction.y, direction.x) + PI;
 		}
@@ -1405,15 +1556,15 @@ struct Directionalblend_node : public At_Node
 		// highest weighted pose controls syncing
 		Pose* scratchposes = Pose_Pool::get().alloc(3);
 		if (character_ground_speed <= walk_fade_in) {
-			idle->get_pose(scratchposes[0], dt);
+			idle->get_pose(ctx, GetPose_Ctx(pose, &scratchposes[0]));
 
 			if (anglelerp <= 0.5) {
-				advance_animation_sync_by(walk_directions[pose1], dt, actual_character_move_speed);
-				walk_directions[pose2]->set_frame_by_interp(current_frame);
+				advance_animation_sync_by(ctx,walk_directions[pose1], pose.dt, actual_character_move_speed, rt);
+				walk_directions[pose2]->set_frame_by_interp(ctx, rt->current_frame);
 			}
 			else {
-				advance_animation_sync_by(walk_directions[pose2], dt, actual_character_move_speed);
-				walk_directions[pose1]->set_frame_by_interp(current_frame);
+				advance_animation_sync_by(ctx, walk_directions[pose2], pose.dt, actual_character_move_speed);
+				walk_directions[pose1]->set_frame_by_interp(ctx, rt->current_frame);
 			}
 
 			walk_directions[pose2]->get_pose(scratchposes[1], 0.f);
@@ -1422,7 +1573,7 @@ struct Directionalblend_node : public At_Node
 			float speed_lerp = MidLerp(0.0, walk_fade_in, character_ground_speed);
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, 1.0-speed_lerp);
 		}
-		else if(character_ground_speed <= walk_fade_out || !run_directions[0]) {
+		else (character_ground_speed <= walk_fade_out || !run_directions[0]) {
 			if (anglelerp <= 0.5) {
 				advance_animation_sync_by(walk_directions[pose1], dt, actual_character_move_speed);
 				walk_directions[pose2]->set_frame_by_interp(current_frame);
@@ -1436,72 +1587,50 @@ struct Directionalblend_node : public At_Node
 
 			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
 		}
-		else if (character_ground_speed <= run_fade_in) {
-			float speed_lerp = MidLerp(walk_fade_out, run_fade_in, character_ground_speed);
-			Clip_Node* masterpose = walk_directions[pose1];
-			if (speed_lerp <= 0.5) {
-				if (anglelerp > 0.5) masterpose = walk_directions[pose2];
-			}
-			else {
-				if (anglelerp > 0.5)masterpose = run_directions[pose2];
-				else masterpose = run_directions[pose1];
-			}
-			advance_animation_sync_by(masterpose, dt, actual_character_move_speed);
-			walk_directions[pose1]->set_frame_by_interp(current_frame);
-			walk_directions[pose2]->set_frame_by_interp(current_frame);
-			run_directions[pose1]->set_frame_by_interp(current_frame);
-			run_directions[pose2]->set_frame_by_interp(current_frame);
-		
-			walk_directions[pose1]->get_pose(scratchposes[0], 0.f);
-			walk_directions[pose2]->get_pose(scratchposes[1], 0.f);
-			run_directions[pose1]->get_pose(scratchposes[2], 0.f);
-			run_directions[pose2]->get_pose(pose, 0.f);
-		
-			util_bilinear_blend(animator->model->bones.size(), scratchposes[0], scratchposes[1], scratchposes[2], pose,
-				glm::vec2(1-anglelerp, 1- speed_lerp));
-
-		}
-		else {
-	
-			if (anglelerp <= 0.5) {
-				advance_animation_sync_by(run_directions[pose1], dt, actual_character_move_speed);
-				run_directions[pose2]->set_frame_by_interp(current_frame);
-			}
-			else {
-				advance_animation_sync_by(run_directions[pose2], dt, actual_character_move_speed);
-				run_directions[pose1]->set_frame_by_interp(current_frame);
-			}
-			run_directions[pose1]->get_pose(pose, 0.f);
-			run_directions[pose2]->get_pose(scratchposes[0], 0.f);
-
-			util_blend(animator->model->bones.size(), scratchposes[0], pose, anglelerp);
-		}
 
 
 		Pose_Pool::get().free(3);
 
 		return true;
 	}
-	virtual void reset() override {
-		//current_frame = 0.0;
-		 //character_blend_weights = animator->in.relmovedir;
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		*get_rt<Directionalblend_Node_RT>(ctx) = Directionalblend_Node_RT();
+	}
+
+	virtual void construct(NodeRt_Ctx& ctx) const override {
+		construct_this<Directionalblend_Node_RT>(ctx);
 	}
 };
 
-struct Context
+struct AnimationTreeLoadContext
 {
-	Animation_Tree* tree;
-	Animator* animator;
-	At_Node* add_node(At_Node* node) {
-		tree->all_node_list.push_back(unique_ptr<At_Node>(node));
-		return tree->all_node_list.back().get();
+	Animation_Tree_CFG* tree = nullptr;
+
+	template<typename T>
+	T* allocate() {
+		return (T*)tree->arena.alloc_bottom(sizeof(T));
+	}
+
+
+	Node_CFG* add_node(Node_CFG* node) {
+		tree->all_nodes.push_back(node);
+		return node;
 	}
 	State* find_state(const string& name) {
-		return &tree->states[name];
+		if (states.find(name) == states.end()) {
+			auto s = allocate<State>();
+			s = new(s)State;
+			states[name] = s;
+			return s;
+		}
+
+		return states[name];
 	}
+
+	std::unordered_map<std::string, State*> states;
 };
 
-static Context at_ctx;
+static AnimationTreeLoadContext at_ctx;
 
 LispExp root_func(LispArgs args)
 {
@@ -1517,23 +1646,24 @@ LispExp root_func(LispArgs args)
 
 LispExp clip_func(LispArgs args)
 {
+	auto clip = at_ctx.allocate<Clip_Node_CFG>();
+	clip = new(clip)Clip_Node_CFG(args.at(0).as_sym().c_str(), at_ctx.tree);
 
-	Clip_Node* clip = new Clip_Node(args.at(0).as_sym().c_str(), at_ctx.animator);
 	for (int i = 1; i < args.count(); i++) {
 		auto& cmd = args.at(i).as_sym();
 		if (cmd == ":rootx") {
 			auto& x = args.at(i + 1).as_sym();
-			if (x == "del") clip->rootmotion[0] = Clip_Node::Remove;
+			if (x == "del") clip->rootmotion[0] = Clip_Node_CFG::Remove;
 			i += 1;
 		}
 		else if (cmd == ":rooty") {
 			auto& x = args.at(i + 1).as_sym();
-			if (x == "del") clip->rootmotion[1] = Clip_Node::Remove;
+			if (x == "del") clip->rootmotion[1] = Clip_Node_CFG::Remove;
 			i += 1;
 		}
 		else if (cmd == ":rootz") {
 			auto& x = args.at(i + 1).as_sym();
-			if (x == "del") clip->rootmotion[2] = Clip_Node::Remove;
+			if (x == "del") clip->rootmotion[2] = Clip_Node_CFG::Remove;
 			i += 1;
 		}
 		else if (cmd == ":loop") {
@@ -1546,7 +1676,8 @@ LispExp clip_func(LispArgs args)
 			i += 1;
 		}
 	}
-	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(clip));
+	at_ctx.add_node(clip);
+	return LispExp(LispExp::animation_tree_node_type, clip);
 }
 
 LispExp defstate_func(LispArgs args)
@@ -1558,7 +1689,7 @@ LispExp defstate_func(LispArgs args)
 	for (int i = 1; i < args.count(); i++) {
 		const string& sym = args.at(i).as_sym();
 		if (sym == ":tree") {
-			s->tree = (At_Node*)args.at(i + 1).as_custom_type(LispExp::animation_tree_node_type);
+			s->tree = (Node_CFG*)args.at(i + 1).as_custom_type(LispExp::animation_tree_node_type);
 			i += 1;
 		}
 		else if (sym == ":duration") {
@@ -1589,36 +1720,36 @@ LispExp transition_state(LispArgs args)
 {
 	State_Transition* st = new State_Transition;
 	st->transition_state = at_ctx.find_state(args.at(0).as_sym());
-	st->compilied.compile(args.at(1), &at_ctx.tree->script_vars);	// evaluate quoted
+	st->compilied.compile(args.at(1), *at_ctx.tree->control_param_vars);	// evaluate quoted
 	return LispExp(LispExp::animation_transition_type, st);
 }
 
 LispExp move_directional_blend_func(LispArgs args)
 {
-	Directionalblend_node* db = new Directionalblend_node(at_ctx.animator);
+	auto db = new(at_ctx.allocate<Directionalblend_node_CFG>())Directionalblend_node_CFG(at_ctx.tree);
 
 	for (int i = 0; i < args.count(); i++) {
 		auto& sym = args.args[i].as_sym();
 		if (sym == ":walk") {
 			auto& list = args.at(++i).as_list();
 			for (int j = 0; j < 8; j++) {
-				At_Node* node = (At_Node*)list.at(j).as_custom_type(LispExp::animation_tree_node_type);
+				Node_CFG* node = (Node_CFG*)list.at(j).as_custom_type(LispExp::animation_tree_node_type);
 				if (!node->is_clip_node()) throw "needs clip node type for db walk";
-				db->walk_directions[j] = (Clip_Node*)node;
+				db->walk_directions[j] = (Clip_Node_CFG*)node;
 			}
 		}
-		else if (sym == ":run") {
-			auto& list = args.at(++i).as_list();
-			for (int j = 0; j < 8; j++) {
-				At_Node* node = (At_Node*)list.at(j).as_custom_type(LispExp::animation_tree_node_type);
-				if (!node->is_clip_node()) throw "needs clip node type for db run";
-				db->run_directions[j] = (Clip_Node*)node;
-			}
-		}
+		//else if (sym == ":run") {
+		//	auto& list = args.at(++i).as_list();
+		//	for (int j = 0; j < 8; j++) {
+		//		Node_CFG* node = (Node_CFG*)list.at(j).as_custom_type(LispExp::animation_tree_node_type);
+		//		if (!node->is_clip_node()) throw "needs clip node type for db run";
+		//		db->run_directions[j] = (Clip_Node_CFG*)node;
+		//	}
+		//}
 		else if (sym == ":idle") {
-			At_Node* node = (At_Node*)args.at(++i).as_custom_type(LispExp::animation_tree_node_type);
+			Node_CFG* node = (Node_CFG*)args.at(++i).as_custom_type(LispExp::animation_tree_node_type);
 			if (!node->is_clip_node()) throw "needs clip node type for db idle";
-			db->idle = (Clip_Node*)node;
+			db->idle = (Clip_Node_CFG*)node;
 		}
 	}
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(db));
@@ -1626,47 +1757,47 @@ LispExp move_directional_blend_func(LispArgs args)
 
 LispExp statemachine_node(LispArgs args)
 {
-	Statemachine_Node* sm = new Statemachine_Node(at_ctx.animator);
+	auto sm = new(at_ctx.allocate<Statemachine_Node_CFG>())Statemachine_Node_CFG(at_ctx.tree);
+
+
 	sm->start_state = at_ctx.find_state(args.at(0).as_sym());
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(sm));
 }
 
 LispExp additive_node(LispArgs args)
 {
-	Add_Node* addnode = new Add_Node(at_ctx.animator);
-	addnode->base_pose = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
-	addnode->diff_pose = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
-	addnode->compilied.compile( args.at(2) , &at_ctx.tree->script_vars);
+	auto addnode = new(at_ctx.allocate<Add_Node_CFG>())Add_Node_CFG(at_ctx.tree);
+
+	addnode->base_pose = (Node_CFG*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	addnode->diff_pose = (Node_CFG*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+
+	addnode->compilied.compile( args.at(2) , *at_ctx.tree->control_param_vars);
+	
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(addnode));
 }
 
 LispExp sub_node_create(LispArgs args)
 {
-	Subtract_Node* subnode = new Subtract_Node(at_ctx.animator);
-	subnode->source = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
-	subnode->ref = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+	auto subnode = new(at_ctx.allocate<Subtract_Node_CFG>())Subtract_Node_CFG(at_ctx.tree);
+
+	subnode->source = (Node_CFG*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	subnode->ref = (Node_CFG*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(subnode));
 }
 LispExp blend_node_create(LispArgs args)
 {
-	Blend_Node* node = new Blend_Node(at_ctx.animator);
-	node->posea = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
-	node->poseb = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
-	node->compilied.compile( args.at(2) , &at_ctx.tree->script_vars);
-	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(node));
-}
-LispExp boolean_blend_create(LispArgs args)
-{
-	Boolean_Blend_Node* node = new Boolean_Blend_Node(at_ctx.animator);
-	node->nodes[0] = (At_Node*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
-	node->nodes[1] = (At_Node*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
-	node->exp.compile( args.at(2) , &at_ctx.tree->script_vars);
+	auto node = new(at_ctx.allocate<Blend_Node_CFG>())Blend_Node_CFG(at_ctx.tree);
+
+	node->posea = (Node_CFG*)args.at(0).as_custom_type(LispExp::animation_tree_node_type);
+	node->poseb = (Node_CFG*)args.at(1).as_custom_type(LispExp::animation_tree_node_type);
+	node->compilied.compile( args.at(2) , *at_ctx.tree->control_param_vars);
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(node));
 }
 
 LispExp mirror_node_create(LispArgs args)
 {
-	Mirror_Node* node = new Mirror_Node(at_ctx.animator);
+	auto node = new(at_ctx.allocate<Mirror_Node_CFG>())Mirror_Node_CFG(at_ctx.tree);
+
 
 	for (int i = 0; i < args.argc - 1; i++) {
 		string& sym = args.args[i].as_sym();
@@ -1676,7 +1807,7 @@ LispExp mirror_node_create(LispArgs args)
 			node->exp.compile( args.at(++i), &at_ctx.tree->script_vars);
 	}
 
-	node->input = (At_Node*)args.at(args.argc - 1).as_custom_type(LispExp::animation_tree_node_type);
+	node->input = (Node_CFG*)args.at(args.argc - 1).as_custom_type(LispExp::animation_tree_node_type);
 	return LispExp(LispExp::animation_tree_node_type, at_ctx.add_node(node));
 }
 
@@ -1689,6 +1820,8 @@ char get_first_token(string& s, char default_='\0')
 	}
 	return default_;
 }
+
+
 
 // LispInterpreter.cpp
 extern vector<string> to_tokens(string& input);
@@ -1707,61 +1840,98 @@ void load_mirror_remap(Model* model, const char* path)
 	}
 }
 
+class Animation_Data_Manager
+{
+public:
+	Animation_Data_Manager() {
+		def_params = set_params(&def_ext_vars);
+	}
+	Control_Params set_params(ByteCodeExternalVars_CFG* vars)
+	{
+		Control_Params param;
+		param.crouching		= vars->set("$crouching",	stack_val_type::int_t);
+		param.standing		= vars->set("$standing",	stack_val_type::int_t);
+		param.relmovedir_x	= vars->set("$relmovex",	stack_val_type::float_t);
+		param.relmovedir_y	= vars->set("$relmovey",	stack_val_type::float_t);
 
-Animation_Tree* load_animtion_tree(Animator* anim,const char* path) {
+		return param;
+	}
 
-	load_mirror_remap(const_cast<Model*>(anim->model), "./Data/Animations/remap.txt");	// FIXME
+	Animation_Tree_CFG* load_animation_tree(const char* path) {
+		auto find = trees.find(path);
+		if (find != trees.end()) return &find->second;
+		Animation_Tree_CFG* tree = &trees[path];
 
-	std::ifstream infile(path);
-	std::string line;
-	string fullcode;
-	while (std::getline(infile, line)) {
-		if (get_first_token(line) != ';') {
-			fullcode += line;
-			fullcode += ' ';
+		tree->param = def_params;
+		tree->control_param_vars = &def_ext_vars;
+	
+		std::ifstream infile(path);
+		std::string line;
+		string fullcode;
+		while (std::getline(infile, line)) {
+			if (get_first_token(line) != ';') {
+				fullcode += line;
+				fullcode += ' ';
+			}
 		}
+
+		auto env = LispLikeInterpreter::get_global_env();
+		env.symbols["root"].assign(root_func);
+		env.symbols["clip"].assign(clip_func);
+		env.symbols["move-directional-blend"].assign(move_directional_blend_func);
+		env.symbols["def-state"].assign(defstate_func);
+		env.symbols["transition"].assign(transition_state);
+		env.symbols["statemachine"].assign(statemachine_node);
+		env.symbols["additive"].assign(additive_node);
+		env.symbols["subtract"].assign(sub_node_create);
+		env.symbols["blend"].assign(blend_node_create);
+		env.symbols["mirror"].assign(mirror_node_create);
+
+		at_ctx.tree = tree;
+		at_ctx.states.clear();
+
+		Interpreter_Ctx ctx = Interpreter_Ctx(64, &env);
+
+		try {
+			LispExp root = LispLikeInterpreter::parse(fullcode);
+			LispExp val = LispLikeInterpreter::eval(root, &ctx);
+		}
+		catch (LispError e) {
+			printf("error occured %s\n", e.msg);
+
+			return nullptr;
+		}
+
+		return tree;
+	}
+	Animation_Tree_RT* get_runtime_tree(const char* path, Model* model, Animation_Set* set) {
+		load_mirror_remap(const_cast<Model*>(model), "./Data/Animations/remap.txt");	// FIXME
+
+		Animation_Tree_CFG* cfg_tree = load_animation_tree(path);
+
+		Animation_Tree_RT* runtime = new Animation_Tree_RT;
+		runtime->cfg = cfg_tree;
+		runtime->data.resize(cfg_tree->data_used);
+		runtime->runtime_vars.vars.resize(cfg_tree->control_param_vars->vals.size());
+		NodeRt_Ctx ctx;
+		ctx.model = model;
+		ctx.set = set;
+		ctx.tree = runtime;
+		ctx.param = &cfg_tree->param;
+		ctx.vars = &runtime->runtime_vars;
+		for (int i = 0; i < cfg_tree->all_nodes.size(); i++) {
+			cfg_tree->all_nodes[i]->construct(ctx);
+		}
+		return runtime;
 	}
 
-	auto env = LispLikeInterpreter::get_global_env();
-	env.symbols["root"].assign(			root_func);
-	env.symbols["clip"].assign(			clip_func);
-	env.symbols["move-directional-blend"].assign( move_directional_blend_func);
-	env.symbols["def-state"].assign( defstate_func);
-	env.symbols["transition"].assign( transition_state);
-	env.symbols["statemachine"].assign( statemachine_node);
-	env.symbols["additive"].assign( additive_node );
-	env.symbols["subtract"].assign( sub_node_create);
-	env.symbols["blend"].assign(blend_node_create);
-	env.symbols["mirror"].assign(mirror_node_create);
-	env.symbols["boolean-blend"].assign(boolean_blend_create);
+	Control_Params def_params;
+	ByteCodeExternalVars_CFG def_ext_vars;
+	std::unordered_map<std::string, Animation_Tree_CFG> trees;
+};
 
+static Animation_Data_Manager anim_man;
 
-	Animation_Tree* tree = new Animation_Tree;
-	at_ctx.tree = tree;
-	at_ctx.animator = anim;
-	tree->ctx.arg_head = 0;
-	tree->ctx.env = &env;
-	tree->script_vars = LispLikeInterpreter::get_global_env();
-
-	tree->script_vars.symbols["$moving"].assign( LispExp(0) );
-	tree->script_vars.symbols["$alpha"].assign( LispExp(0.0) );
-	tree->script_vars.symbols["$jumping"].assign( LispExp(0) );
-	tree->script_vars.symbols["$mirrored"].assign(LispExp(0));
-	tree->script_vars.symbols["$flCrouchLerp"].assign(LispExp(0.f));
-	try {
-		LispExp root = LispLikeInterpreter::parse(fullcode);
-		LispExp val = LispLikeInterpreter::eval(root, &tree->ctx);
-	}
-	catch (LispError e) {
-		printf("error occured %s\n", e.msg);
-
-		return nullptr;
-	}
-
-	tree->ctx.env = &tree->script_vars;
-
-	return tree;
-}
 const int STREAM_WIDTH = 9;
 const int PRECISION_STREAM = 3;
 std::ostream& operator<<(std::ostream& out, glm::vec3 v){
@@ -1925,6 +2095,11 @@ void Animator::evaluate_new(float dt)
 
 		in.ismoving = glm::length(player.velocity) > 0.1;
 		in.injump = player.state & PMS_JUMPING;
+
+		auto& vars = tree->runtime_vars;
+		auto& params = tree->cfg->param;
+		vars.get(params.crouching).i = in.ismoving;
+
 	tree->script_vars.symbols["$moving"].assign(	LispExp(int(in.ismoving) ) );
 	tree->script_vars.symbols["$alpha"].assign(		LispExp(float( sin(GetTime())*0.5 + 0.5  )));
 	tree->script_vars.symbols["$jumping"].assign(	LispExp(int(in.injump)));
@@ -1941,6 +2116,8 @@ void Animator::evaluate_new(float dt)
 }
 
 
+
+
 void Animator::set_model_new(const Model* m)
 {
 	static bool first = true;
@@ -1950,6 +2127,6 @@ void Animator::set_model_new(const Model* m)
 	}
 
 	if (m->name == "player_FINAL.glb") {
-		tree = load_animtion_tree(this,"./Data/Animations/testtree.txt");
+		tree = anim_man.get_runtime_tree("./Data/Animations/testtree.txt", const_cast<Model*>(m), const_cast<Animation_Set*>(set));
 	}
 }

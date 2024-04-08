@@ -36,6 +36,19 @@ namespace StringUtils {
 		StringHash(const StringHash& other) = default;
 	};
 
+	struct StringHash2
+	{
+		uint32_t computedHash=0;
+		const char* str = "";
+		constexpr StringHash2(const char* s) noexcept : computedHash(0)
+		{
+			computedHash = fnv1a_32(s, const_strlen(s));
+			str = s;
+		}
+	
+		StringHash2(const StringHash2& other) = default;
+	};
+
 }
 
 template<int BUFSIZE>
