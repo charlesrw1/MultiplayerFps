@@ -7,6 +7,34 @@
 
 #include "AnimationTreePublic.h"
 
+enum class animnode_type
+{
+	source,
+	statemachine,
+	selector,
+
+	mask,
+
+	blend,
+	blend2d,
+	add,
+	subtract,
+	aimoffset,
+
+	mirror,
+	play_speed,
+	rootmotion_speed,
+	sync,
+
+	state,
+
+	// used in editor
+	root,
+	start_statemachine,
+
+	COUNT
+};
+
 struct NodeRt_Ctx;
 struct ScriptExpression
 {

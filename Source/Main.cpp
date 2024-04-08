@@ -900,8 +900,11 @@ void Game_Engine::key_event(SDL_Event event)
 		//console.set_keyboard_focus = show_console;
 	}
 
-	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
+	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse) {
+		SDL_SetRelativeMouseMode(SDL_FALSE);
+		eng->game_focused = false;
 		return;
+	}
 	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
 		return;
 

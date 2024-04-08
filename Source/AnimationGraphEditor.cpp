@@ -15,7 +15,10 @@ void AnimationGraphEditor::init()
 	editing_tree = new Animation_Tree_CFG;
 	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
 
+	add_root_node_to_layer(0, false);
 	tabs.push_back(tab());
+	default_editor = ImNodes::EditorContextCreate();
+	ImNodes::EditorContextSet(default_editor);
 }
 
 void AnimationGraphEditor::close()
@@ -64,6 +67,35 @@ void AnimationGraphEditor::begin_draw()
 {
 	is_modifier_pressed = ImGui::GetIO().KeyAlt;
 
+
+	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
+
+		if (ImNodes::NumSelectedNodes() == 1) {
+			int node = 0;
+			ImNodes::GetSelectedNodes(&node);
+
+			Editor_Graph_Node* mynode = find_node_from_id(node);
+			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
+				auto findtab = find_tab(mynode);
+				if (findtab) {
+					findtab->mark_for_selection = true;
+				}
+				else {
+
+					tab t;
+					t.layer = &mynode->sublayer;
+					t.owner_node = mynode;
+					t.open = true;
+					t.pan = glm::vec2(0.f);
+					tabs.push_back(t);
+				}
+			}
+			ImNodes::ClearNodeSelection();
+
+		}
+	}
+
+
 	if (ImGui::Begin("animation graph property editor"))
 	{
 
@@ -76,40 +108,39 @@ void AnimationGraphEditor::begin_draw()
 	static bool open[3] = { true,true,true };
 
 	int rendered = 0;
+
+	update_tab_names();
+
 	if (ImGui::BeginTabBar("tabs")) {
+
 		for (int n = 0; n < tabs.size(); n++) {
-			if (ImGui::BeginTabItem(tabs[n].get_tab_name().c_str(), nullptr, 0))
+			auto flags = (tabs[n].mark_for_selection) ? ImGuiTabItemFlags_SetSelected : 0;
+			bool* open_bool = (tabs[n].owner_node) ? &tabs[n].open : nullptr;
+			if (ImGui::BeginTabItem(tabs[n].tabname.c_str(), open_bool, flags))
 			{
-				draw_graph_layer(tabs[n].layer);
+				uint32_t layer = (tabs[n].layer) ? tabs[n].layer->id : 0;
+				auto context = (tabs[n].layer) ? tabs[n].layer->context : default_editor;
+				ImNodes::EditorContextSet(context);
+				if (active_tab_index != n) {
+					ImNodes::ClearNodeSelection();
+				}
+				draw_graph_layer(layer);
 				rendered++;
+				active_tab_index = n;
 				ImGui::EndTabItem();
+				tabs[n].mark_for_selection = false;
 			}
-			// cant close the root node
-			if (!tabs[n].open && !tabs[n].owner_node)
-				tabs[n].open = true;
 		}
 		ImGui::EndTabBar();
 	}
 	ASSERT(rendered == 1);
 
-	if (ImGui::GetIO().MouseClickedCount[0]==2) {
-
-		if (ImNodes::NumSelectedNodes() == 1) {
-			int node = 0;
-			ImNodes::GetSelectedNodes(&node);
-
-			Editor_Graph_Node* mynode = find_node_from_id(node);
-			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
-				tab t;
-				t.layer = mynode->child_layer_index;
-				t.owner_node = mynode;
-				t.open = true;
-				t.pan = glm::vec2(0.f);
-				tabs.push_back(t);
-			}
+	for (int i = 0; i < tabs.size(); i++) {
+		if (!tabs[i].open) {
+			tabs.erase(tabs.begin() + i);
+			i--;
 		}
 	}
-
 
 
 	int start_atr = 0;
@@ -164,7 +195,9 @@ void AnimationGraphEditor::begin_draw()
 
 	if (ImGui::BeginPopup("my_select_popup"))
 	{
-		draw_node_creation_menu(false);
+		bool is_sm = tabs[active_tab_index].is_statemachine_tab();
+
+		draw_node_creation_menu(is_sm);
 		ImGui::EndPopup();
 	}
 	else {
@@ -177,9 +210,10 @@ void AnimationGraphEditor::begin_draw()
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
 	ImNodes::BeginNodeEditor();
-
 	for (auto node : nodes) {
+
 		if (node->graph_layer != layer) continue;
+
 
 		ImNodes::PushColorStyle(ImNodesCol_TitleBar, color32_to_int(node->node_color));
 		Color32 select_color = add_brightness(node->node_color, 30);
@@ -198,9 +232,12 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 			ImGui::TextUnformatted("input");
 			ImNodes::EndInputAttribute();
 		}
-		ImNodes::BeginOutputAttribute(node->getoutput_id(0));
-		ImGui::TextUnformatted("output");
-		ImNodes::EndOutputAttribute();
+
+		if (node->has_output_pins()) {
+			ImNodes::BeginOutputAttribute(node->getoutput_id(0));
+			ImGui::TextUnformatted("output");
+			ImNodes::EndOutputAttribute();
+		}
 
 		ImNodes::EndNode();
 
@@ -281,8 +318,25 @@ void AnimationGraphEditor::remove_node_from_index(int index)
 {
 	auto node = nodes.at(index);
 
+	if (!node->can_user_delete())
+		return;
+
 	for (int i = 0; i < nodes.size(); i++)
 		if (i != index) nodes[i]->remove_reference(node);
+
+	// node has a sublayer, remove child nodes
+	if (node->sublayer.context) {
+		for (int i = 0; i < nodes.size(); i++) {
+			if (nodes[i]->graph_layer == node->sublayer.id && i != index)
+				remove_node_from_index(i);
+		}
+	}
+
+	// remove tab reference
+	int tab = find_tab_index(node);
+	if (tab != -1) {
+		tabs.erase(tabs.begin() + tab);
+	}
 
 	delete node;
 	nodes.erase(nodes.begin() + index);
@@ -296,13 +350,18 @@ int AnimationGraphEditor::find_for_id(uint32_t id)
 	return -1;
 }
 
+void AnimationGraphEditor::save_graph(const std::string& name)
+{
+
+}
+
 
 
 static const char* get_animnode_name(animnode_type type)
 {
 	switch (type)
 	{
-	case animnode_type::root: return "Root";
+	case animnode_type::root: return "OUTPUT";
 	case animnode_type::statemachine: return "State machine";
 	case animnode_type::state: return "State";
 	case animnode_type::source: return "Source";
@@ -317,6 +376,7 @@ static const char* get_animnode_name(animnode_type type)
 	case animnode_type::play_speed: return "Speed";
 	case animnode_type::rootmotion_speed: return "Rootmotion Speed";
 	case animnode_type::sync: return "Sync";
+	case animnode_type::start_statemachine: return "START";
 	default: ASSERT(!"no name defined for state");
 	}
 }
@@ -343,8 +403,8 @@ static Color32 get_animnode_color(animnode_type type)
 	case animnode_type::play_speed:
 	case animnode_type::rootmotion_speed:
 	case animnode_type::sync:
+	default:
 		return { 13, 82, 44 };
-	default: ASSERT(!"no name defined for state");
 	}
 }
 
@@ -365,8 +425,8 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 			const char* name = get_animnode_name(type);
 			if (ImGui::Selectable(name)) {
 				auto a = create_graph_node_from_type(type);
-				a->title = name;
-				a->node_color = get_animnode_color(type);
+				a->graph_layer = get_current_layer_from_tab();
+
 				ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
 
 				if (drop_state.from) {
@@ -393,15 +453,23 @@ static T* create_node_type(Animation_Tree_CFG& cfg)
 Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_type type)
 {
 	auto node = add_node();
+
+	node->title = get_animnode_name(type);
+	node->node_color = get_animnode_color(type);
+
 	node->type = type;
 	switch (type)
 	{
 	case animnode_type::source:
 		node->node = create_node_type<Clip_Node_CFG>(*editing_tree);
+
+		node->num_inputs = 0;
 		break;
 	case animnode_type::statemachine:
 		node->node = create_node_type<Statemachine_Node_CFG>(*editing_tree);
-		node->child_layer_index = current_layer++;
+		node->sublayer = create_new_layer(true);
+
+		node->num_inputs = 0;
 		break;
 	case animnode_type::selector:
 		//node->node = create_node_type<Statemachine_Node_CFG>(*editing_tree);
@@ -412,34 +480,57 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 		break;
 	case animnode_type::blend:
 		node->node = create_node_type<Blend_Node_CFG>(*editing_tree);
+
+		node->num_inputs = 2;
 		break;
 	case animnode_type::blend2d:
 		node->node = create_node_type<Blend2d_CFG>(*editing_tree);
+
+		node->num_inputs = 9;
 		break;
 	case animnode_type::add:
 		node->node = create_node_type<Add_Node_CFG>(*editing_tree);
+
+		node->num_inputs = 2;
 		break;
 	case animnode_type::subtract:
 		node->node = create_node_type<Subtract_Node_CFG>(*editing_tree);
+
+		node->num_inputs = 2;
 		break;
 	case animnode_type::aimoffset:
+		node->num_inputs = 9;
 		break;
 	case animnode_type::mirror:
 		node->node = create_node_type<Mirror_Node_CFG>(*editing_tree);
+		node->num_inputs = 1;
 		break;
 	case animnode_type::play_speed:
 		break;
 	case animnode_type::rootmotion_speed:
 		node->node = create_node_type<Scale_By_Rootmotion_CFG>(*editing_tree);
-
+		node->num_inputs = 1;
 		break;
 	case animnode_type::sync:
 		node->node = create_node_type<Sync_Node_CFG>(*editing_tree);
+
+		node->num_inputs = 1;
 		break;
 	case animnode_type::state:
-		node->child_layer_index = current_layer++;
+		node->sublayer = create_new_layer(false);
+
+		node->num_inputs = 1;
+
+		node->state.state_ptr = (State*)editing_tree->arena.alloc_bottom(sizeof(State));
+		node->state.state_ptr = new(node->state.state_ptr)State;
+
+		node->state.state_ptr->tree = nullptr;
+		break;
+	case animnode_type::start_statemachine:
+		node->num_inputs = 0;
 		break;
 	case animnode_type::root:
+		node->num_inputs = 1;
 		break;
 	default:
 		ASSERT(0);
@@ -454,11 +545,19 @@ void Editor_Graph_Node::remove_reference(Editor_Graph_Node* node)
 		if (inputs[i] == node) inputs[i] = nullptr;
 	}
 	
-	// FIXME remove references inside internal nodes
+	for (int i = 0; i < sm.states.size(); i++) {
+		if (sm.states[i] == node) {
+			sm.states.erase(sm.states.begin() + i);
+			i--;
+		}
+	}
+	if (state.parent_statemachine == node)
+		state.parent_statemachine = nullptr;
 
+	// FIXME remove references inside internal nodes
 }
 
-bool Editor_Graph_Node::on_state_change()
+void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 {
 	switch (type)	
 	{
@@ -469,8 +568,20 @@ bool Editor_Graph_Node::on_state_change()
 		else set_node_title("Source");
 		num_inputs = 0;
 	}break;
-	case animnode_type::statemachine:
-		break;
+	case animnode_type::statemachine: {
+		auto source = (Statemachine_Node_CFG*)node;
+
+		auto rootnode = ed->find_first_node_in_layer(sublayer.id, animnode_type::root);
+		if (rootnode) {
+			auto startnode = rootnode->inputs[0];
+			if (startnode && startnode->type == animnode_type::state) {
+				source->start_state = startnode->state.state_ptr;
+				ASSERT(source->start_state);
+			}
+		}
+
+		num_inputs = 0;
+	}break;
 	case animnode_type::selector:
 		break;
 	case animnode_type::mask:
@@ -494,6 +605,8 @@ bool Editor_Graph_Node::on_state_change()
 	case animnode_type::sync:
 		break;
 	case animnode_type::state:
+
+
 		break;
 	case animnode_type::root:
 		break;
@@ -502,6 +615,4 @@ bool Editor_Graph_Node::on_state_change()
 	default:
 		break;
 	}
-
-	return false;
 }
