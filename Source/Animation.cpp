@@ -1320,6 +1320,8 @@ void Animator::set_model_new(const Model* m)
 	}
 
 	if (m->name == "player_FINAL.glb") {
+		return;
+
 		auto cfg_tree =  anim_tree_man->find_animation_tree("./Data/Animations/testtree.txt");
 		tree = new Animation_Tree_RT;
 		tree->init_from_cfg(cfg_tree, m, m->animations.get());

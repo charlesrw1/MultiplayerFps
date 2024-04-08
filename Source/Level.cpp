@@ -184,6 +184,14 @@ void on_node_callback(void* user, cgltf_data* data, cgltf_node* node, glm::mat4 
 }
 #include "Types.h"
 
+Level* open_empty_level()
+{
+	Level* level = new Level;
+	level->name = "_Empty";
+
+	return level;
+}
+
 Level* LoadLevelFile(const char* level_name)
 {
 	std::string map_dir;

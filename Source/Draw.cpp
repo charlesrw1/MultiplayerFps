@@ -2623,7 +2623,7 @@ void draw_debug_shapes()
 
 
 #include "EditorDoc.h"
-void Renderer::scene_draw(bool editor_mode)
+void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 {
 	GPUFUNCTIONSTART;
 
@@ -2635,11 +2635,8 @@ void Renderer::scene_draw(bool editor_mode)
 		InitFramebuffers();
 	lastframe_vs = current_frame_main_view;
 
-	if (editor_mode)
-		current_frame_main_view = eng->eddoc->get_vs();
-	else
-		current_frame_main_view = eng->local.last_view;
-
+	current_frame_main_view = view;
+	
 	if (enable_vsync.integer())
 		SDL_GL_SetSwapInterval(1);
 	else
@@ -2720,15 +2717,13 @@ void Renderer::scene_draw(bool editor_mode)
 
 	DrawEntBlobShadows();
 
-
-
 	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
 	draw_debug_shapes();
 
-	if (editor_mode)
+	if (mode == special_render_mode::lvl_editor)
 		eng->eddoc->overlays_draw();
 
 	glCheckError();
@@ -2738,7 +2733,6 @@ void Renderer::scene_draw(bool editor_mode)
 
 	int x = vs.width;
 	int y = vs.height;
-
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, cur_w, cur_h);
@@ -2751,17 +2745,6 @@ void Renderer::scene_draw(bool editor_mode)
 	bind_texture(2, lens_dirt->gl_id);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
-	MeshBuilder mb;
-	mb.Begin();
-	if (draw_sv_colliders.integer()) {
-		//for (int i = 0; i < MAX_CLIENTS; i++) {
-		//	if (eng->ents[i].type == ET_PLAYER) {
-		//		AddPlayerDebugCapsule(eng->ents[i], &mb, COLOR_CYAN);
-		//	}
-		//}
-	}
-
-	mb.End();
 	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
@@ -2769,19 +2752,9 @@ void Renderer::scene_draw(bool editor_mode)
 	if (draw_collision_tris.integer())
 		DrawCollisionWorld(eng->level);
 
-	mb.Draw(GL_LINES);
-
-	//game.rays.End();
-	//game.rays.Draw(GL_LINES);
-	if (eng->is_host) {
-		//phys_debug.End();
-		//phys_debug.Draw(GL_LINES);
-	}
-	
-	if(!editor_mode)
+	if(mode == special_render_mode::none)
 		ui_render();
 
-	mb.Free();
 
 	//cubemap_positions_debug();
 

@@ -64,18 +64,19 @@ public:
 	unique_ptr<Physics_Mesh> collision;	// merged collision of all level_meshes
 	vector<Level_Light> lights;
 	vector<Static_Mesh_Object> static_mesh_objs;
-	Prefab_Model* level_prefab;
+	Prefab_Model* level_prefab=nullptr;
 	vector<handle<Render_Object>> prefab_handles;
 	vector<Entity_Spawn> espawns;
 	vector<Object_Dict> objs;
 
-	Texture* lightmap;
+	Texture* lightmap = nullptr;
 
 	
 	std::string name;
-	uint32_t skybox_cubemap;
+	uint32_t skybox_cubemap=0;
 };
 
+Level* open_empty_level();
 Level* LoadLevelFile(const char* level);
 void FreeLevel(Level* level);
 

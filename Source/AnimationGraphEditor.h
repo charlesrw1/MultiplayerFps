@@ -1,9 +1,12 @@
 #pragma once
-
+#include "Types.h"
+#include "DrawPublic.h"
 #include "Util.h"
 #include <vector>
 #include <array>
 #include <string>
+
+#include "AnimationGraphEditorPublic.h"
 
 #include "RenderObj.h"
 #include "Animation.h"
@@ -145,23 +148,28 @@ public:
 		State* state_ptr = nullptr;
 	}state;
 };
-class AnimationGraphEditor
+class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
 public:
-
-	void init();
-	void close();
-
-	void tick(float dt);
+	virtual void init() override;
+	virtual void open(const char* name) override;
+	virtual void close() override;
+	virtual void tick(float dt) override;
+	virtual void handle_event(const SDL_Event& event) override;
+	virtual void overlay_draw() override;
+	virtual const View_Setup& get_vs() override{
+		return out.vs;
+	}
+	virtual const char* get_name() override {
+		return name.c_str();
+	}
 
 	void begin_draw();
 
 	void draw_graph_layer(uint32_t layer);
 
-	void handle_event(const SDL_Event& event);
-
 	void delete_selected();
-	bool has_selected() { return selected.size() > 0; }
+
 	Editor_Graph_Node* add_node();
 	void remove_node_from_index(int index);
 	void remove_node_from_id(uint32_t index);
@@ -170,7 +178,6 @@ public:
 		return nodes.at(find_for_id(id));
 	}
 	void save_graph(const std::string& name);
-	void open_graph(const std::string& name);
 
 	Editor_Graph_Node* find_first_node_in_layer(uint32_t layer, animnode_type type) {
 		for (int i = 0; i < nodes.size(); i++) {
@@ -181,20 +188,17 @@ public:
 		return nullptr;
 	}
 
+	std::string name = "";
 	void* imgui_node_context = nullptr;
-
 	ImNodesEditorContext* default_editor = nullptr;
 
-	std::vector<Editor_Graph_Node*> selected;
 	std::vector<Editor_Graph_Node*> nodes;
+	Animation_Tree_CFG* editing_tree = nullptr;
 
 	void draw_node_creation_menu(bool is_state_mode);
 	Editor_Graph_Node* create_graph_node_from_type(animnode_type type);
 
 
-	std::string name = "";
-
-	Animation_Tree_CFG* editing_tree = nullptr;
 
 	struct create_from_drop_state {
 		Editor_Graph_Node* from = nullptr;
@@ -205,8 +209,13 @@ public:
 	struct output_data {
 		Animator anim;
 		handle<Render_Object> obj;
-	}out;
+		User_Camera camera;
+		View_Setup vs;
 
+		Model* model = nullptr;
+		Animation_Set* set = nullptr;
+
+	}out;
 	struct tab {
 		editor_layer* layer = nullptr;
 		Editor_Graph_Node* owner_node = nullptr;
@@ -291,5 +300,3 @@ public:
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
 };
-
-extern AnimationGraphEditor* g_agraph;

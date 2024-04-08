@@ -39,17 +39,6 @@ public:
 	glm::mat4 get_view_matrix() const;
 };
 
-struct View_Setup
-{
-	View_Setup() {}
-	View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height);
-
-	glm::vec3 origin;
-	glm::vec3 front;
-	glm::mat4 view, proj, viewproj;
-	float fov, near, far;
-	int width, height;
-};
 
 enum Game_Command_Buttons
 {

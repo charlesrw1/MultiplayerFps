@@ -66,6 +66,7 @@
   <ItemGroup>
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\AnimationGraphEditor.h" />
+    <ClInclude Include="Source\AnimationGraphEditorPublic.h" />
     <ClInclude Include="Source\AnimationTreeLocal.h" />
     <ClInclude Include="Source\AnimationTreePublic.h" />
     <ClInclude Include="Source\AnimationUtil.h" />

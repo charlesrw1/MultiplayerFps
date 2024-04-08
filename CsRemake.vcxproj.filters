@@ -301,6 +301,9 @@
     <ClInclude Include="Source\Handle.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
+    <ClInclude Include="Source\AnimationGraphEditorPublic.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source">

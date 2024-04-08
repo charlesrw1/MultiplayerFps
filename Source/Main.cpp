@@ -39,7 +39,7 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
 
-#include "AnimationGraphEditor.h"
+#include "AnimationGraphEditorPublic.h"
 
 MeshBuilder phys_debug;
 Game_Engine* eng;
@@ -577,6 +577,41 @@ DECLARE_ENGINE_CMD(editdoc)
 	eng->start_editor(args.at(1));
 }
 
+DECLARE_ENGINE_CMD(animedit)
+{
+	if (args.size() != 2) {
+		sys_print("Usage: animedit character\n");
+		return;
+	}
+	eng->start_anim_editor(args.at(1));
+}
+
+
+void Game_Engine::start_anim_editor(const char* name)
+{
+	if (state == ENGINE_ANIMATION_EDITOR && strcmp( name, g_anim_ed_graph->get_name()) == 0) {
+		sys_print("already editing that anim graph");
+		return;
+	}
+	sys_print("starting anim editor %s\n", name);
+	if (state == ENGINE_GAME) {
+		exit_to_menu("starting anim editor\n");
+	}
+	else if (state == ENGINE_EDITOR) {
+		eddoc->close_doc();
+		unload_current_level();
+	}
+	else if (state == ENGINE_ANIMATION_EDITOR) {
+		g_anim_ed_graph->close();
+		unload_current_level();
+	}
+
+	eng->level = open_empty_level();
+	idraw->on_level_start();
+	g_anim_ed_graph->open(name);
+	set_state(ENGINE_ANIMATION_EDITOR);
+}
+
 void Game_Engine::start_editor(const char* map)
 {
 	if (state == ENGINE_EDITOR && map == mapname) {
@@ -592,6 +627,10 @@ void Game_Engine::start_editor(const char* map)
 		eddoc->close_doc();	// calls save on current document
 		unload_current_level();
 	}
+	else if (state == ENGINE_ANIMATION_EDITOR) {
+		g_anim_ed_graph->close();
+		unload_current_level();
+	}
 
 	if (!eddoc) {
 		eddoc = new EditorDoc;
@@ -599,6 +638,12 @@ void Game_Engine::start_editor(const char* map)
 
 	mapname = map;
 	level = LoadLevelFile(map);
+	if (!level) {
+		sys_print("level not found, creating new level\n");
+		level = open_empty_level();
+		level->name = mapname;
+	}
+
 	idraw->on_level_start();
 
 	eddoc->open_doc(map);
@@ -1109,7 +1154,7 @@ void Game_Engine::draw_debug_interface()
 	if (state == ENGINE_EDITOR)
 		eddoc->imgui_draw();
 
-	g_agraph->begin_draw();
+	g_anim_ed_graph->begin_draw();
 }
 
 void Game_Engine::draw_screen()
@@ -1129,15 +1174,24 @@ void Game_Engine::draw_screen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glClear(GL_COLOR_BUFFER_BIT);
-	if (state == ENGINE_GAME && local.has_run_tick)
-		idraw->scene_draw(false);
-	else if (state == ENGINE_EDITOR)
-		idraw->scene_draw(true);
+
+	View_Setup view;
+	if (state == ENGINE_GAME && local.has_run_tick) {
+		view = local.last_view;
+		idraw->scene_draw(view);
+	}
+	else if (state == ENGINE_EDITOR) {
+		view = eddoc->get_vs();
+		idraw->scene_draw(view, special_render_mode::lvl_editor);
+	}
+	else if (state == ENGINE_ANIMATION_EDITOR) {
+		view = g_anim_ed_graph->get_vs();
+		idraw->scene_draw(view, special_render_mode::anim_editor);
+	}
 
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui::NewFrame();
-
 	draw_debug_interface();
 	ImGui::ShowDemoWindow();
 
@@ -1154,7 +1208,7 @@ void Game_Engine::draw_screen()
 
 void Game_Engine::set_state(Engine_State state)
 {
-	const char* engine_strs[] = { "menu", "loading", "game", "editor"};
+	const char* engine_strs[] = { "menu", "loading", "game", "editor", "anim editor"};
 
 	if (this->state != state)
 		sys_print("Engine going to %s state\n", engine_strs[(int)state]);
@@ -1346,7 +1400,7 @@ void Game_Engine::init()
 	// debug interface
 	imgui_context = ImGui::CreateContext();
 	
-	g_agraph->init();
+	g_anim_ed_graph->init();
 
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -1499,8 +1553,10 @@ void Game_Engine::loop()
 
 			#ifdef EDITDOC
 			if (state == ENGINE_EDITOR) {
-				g_agraph->handle_event(event);
 				eddoc->handle_event(event);
+			}
+			else if (state == ENGINE_ANIMATION_EDITOR) {
+				g_anim_ed_graph->handle_event(event);
 			}
 			#endif
 		}
@@ -1516,6 +1572,10 @@ void Game_Engine::loop()
 		#ifdef EDITDOC
 		case ENGINE_EDITOR:
 			eng->eddoc->update();
+			break;
+
+		case ENGINE_ANIMATION_EDITOR:
+			g_anim_ed_graph->tick(frame_time);
 			break;
 		#endif
 		case ENGINE_LOADING:

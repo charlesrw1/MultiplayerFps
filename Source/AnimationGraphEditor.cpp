@@ -3,8 +3,10 @@
 #include "imnodes.h"
 #include "glm/glm.hpp"
 
+#include "Game_Engine.h"
+
 AnimationGraphEditor ed;
-AnimationGraphEditor* g_agraph = &ed;
+AnimationGraphEditorPublic* g_anim_ed_graph = &ed;
 
 void AnimationGraphEditor::init()
 {
@@ -23,6 +25,8 @@ void AnimationGraphEditor::init()
 
 void AnimationGraphEditor::close()
 {
+	idraw->remove_obj(out.obj);
+
 	ImNodes::DestroyContext(imgui_node_context);
 }
 
@@ -133,7 +137,7 @@ void AnimationGraphEditor::begin_draw()
 		}
 		ImGui::EndTabBar();
 	}
-	ASSERT(rendered == 1);
+	ASSERT(rendered <=1);
 
 	for (int i = 0; i < tabs.size(); i++) {
 		if (!tabs[i].open) {
@@ -273,6 +277,12 @@ void AnimationGraphEditor::handle_event(const SDL_Event& event)
 			break;
 		}
 		break;
+	}
+
+	if (eng->game_focused) {
+		if (event.type == SDL_MOUSEWHEEL) {
+			out.camera.scroll_callback(event.wheel.y);
+		}
 	}
 }
 
@@ -615,4 +625,38 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	default:
 		break;
 	}
+}
+
+void AnimationGraphEditor::tick(float dt)
+{
+	{
+		int x = 0, y = 0;
+		if (eng->game_focused)
+			SDL_GetRelativeMouseState(&x, &y);
+		out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+	}
+
+	out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, eng->window_w.integer(), eng->window_h.integer());
+}
+
+void AnimationGraphEditor::overlay_draw()
+{
+
+}
+
+void AnimationGraphEditor::open(const char* name)
+{
+	this->name = name;
+
+	out.model = mods.find_or_load("player_FINAL.glb");
+	out.set = out.model->animations.get();
+	out.anim.set_model(out.model);
+	out.obj = idraw->register_obj();
+
+	Render_Object ro;
+	ro.mesh = &out.model->mesh;
+	ro.mats = &out.model->mats;
+	//ro.transform = out.model->skeleton_root_transform;
+
+	idraw->update_obj(out.obj, ro);
 }

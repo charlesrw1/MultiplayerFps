@@ -79,7 +79,10 @@ enum Engine_State
 	ENGINE_MENU,
 	ENGINE_LOADING,
 	ENGINE_GAME,
+
 	ENGINE_EDITOR,
+
+	ENGINE_ANIMATION_EDITOR,
 };
 
 using std::string;
@@ -135,6 +138,7 @@ public:
 
 #ifdef EDITDOC
 	void start_editor(const char* map);
+	void start_anim_editor(const char* name);
 	void close_editor();
 #endif
 
