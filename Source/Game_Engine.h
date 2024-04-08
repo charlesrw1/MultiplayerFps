@@ -105,6 +105,7 @@ class Client;
 class Server;
 class Level;
 class EditorDoc;
+class ImNodesContext;
 class Game_Engine
 {
 public:
@@ -177,6 +178,7 @@ public:
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 0.0;	// 1/tick_rate
 
+	ImNodesContext* imgui_node_context = nullptr;
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_GLContext gl_context = nullptr;

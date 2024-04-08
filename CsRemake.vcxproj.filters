@@ -25,6 +25,9 @@
     <Filter Include="Source Files\Graphics">
       <UniqueIdentifier>{e67e9474-a8da-42c3-aeb7-de5775b5f95f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Editor">
+      <UniqueIdentifier>{05a87be2-6e73-4fd8-803b-19212f7bb942}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Texture.cpp">
@@ -143,6 +146,12 @@
     </ClCompile>
     <ClCompile Include="Source\Particles.cpp">
       <Filter>Source Files\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imnodes.cpp">
+      <Filter>Source Files\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AnimationGraphEditor.cpp">
+      <Filter>Source Files\Editor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -286,6 +295,15 @@
     </ClInclude>
     <ClInclude Include="Source\ParticlesPublic.h">
       <Filter>Source Files\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imnodes.h">
+      <Filter>Source Files\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imnodes_internal.h">
+      <Filter>Source Files\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AnimationGraphEditor.h">
+      <Filter>Source Files\Editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

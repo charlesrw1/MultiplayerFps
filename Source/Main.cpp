@@ -2,19 +2,22 @@
 
 #include "glad/glad.h"
 #include "stb_image.h"
+
 #include <cstdio>
 #include <vector>
 #include <string>
 #include <fstream>
 #include <sstream>
-#include "Shader.h"
-#include "Texture.h"
-#include "MathLib.h"
+
 #include "GlmInclude.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
+
+#include "Shader.h"
+#include "Texture.h"
+#include "MathLib.h"
 #include "Model.h"
 #include "MeshBuilder.h"
 #include "Util.h"
@@ -30,9 +33,13 @@
 #include "Config.h"
 #include "DrawPublic.h"
 #include "Entity.h"
+
+
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
+
+#include "AnimationGraphEditor.h"
 
 MeshBuilder phys_debug;
 Game_Engine* eng;
@@ -1098,6 +1105,8 @@ void Game_Engine::draw_debug_interface()
 
 	if (state == ENGINE_EDITOR)
 		eddoc->imgui_draw();
+
+	g_agraph->begin_draw();
 }
 
 void Game_Engine::draw_screen()
@@ -1263,6 +1272,11 @@ Game_Engine::Game_Engine() :
 
 extern Game_Mod_Manager mods;
 
+ImNodesContext* ImNodesCreateContext()
+{
+	return nullptr;
+}
+
 void Game_Engine::init()
 {
 	program_time_start = GetTime();
@@ -1328,6 +1342,9 @@ void Game_Engine::init()
 
 	// debug interface
 	imgui_context = ImGui::CreateContext();
+	
+	g_agraph->init();
+
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
@@ -1478,8 +1495,10 @@ void Game_Engine::loop()
 			}
 
 			#ifdef EDITDOC
-			if (state == ENGINE_EDITOR)
+			if (state == ENGINE_EDITOR) {
+				g_agraph->handle_event(event);
 				eddoc->handle_event(event);
+			}
 			#endif
 		}
 
