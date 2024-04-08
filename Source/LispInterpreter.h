@@ -4,6 +4,8 @@
 #include <memory>
 #include <unordered_map>
 #include <cassert>
+#include "ScriptVars.h"
+
 using std::string;
 using std::vector;
 using std::unique_ptr;
@@ -244,57 +246,15 @@ public:
 	static const Env& get_global_env();
 };
 
-#include "Util.h" // handle
-enum class stack_val_type
-{
-	int_t,
-	float_t
-};
-struct stack_val
-{
-	union {
-		int i = 0;
-		float f;
-	};
-};
-
-struct ByteCodeExternalVars_CFG
-{
-	handle<stack_val> find(const std::string& str)const  {
-		for (int i = 0; i < vals.size(); i++) {
-			if (vals[i].str == str) return { i };
-		}
-		return handle<stack_val>();
-	}
-	stack_val_type get_type(handle<stack_val> handle) const { return vals.at(handle.id).type; }
-
-	handle<stack_val> set(const char* str, stack_val_type type) {
-		vals.push_back({ str, type });
-	}
-
-	struct stack_val_lookup {
-		std::string str;
-		stack_val_type type;
-	};
-	std::vector<stack_val_lookup> vals;
-};
-
-struct ByteCodeExternalVars_RT
-{
-	ByteCodeExternalVars_CFG* cfg = nullptr;
-	stack_val& get(handle<stack_val> handle) {
-		return vars.at(handle.id);
-	}
-	std::vector<stack_val> vars;
-};
-
 class BytecodeExpression
 {
 public:
 	vector<uint8_t> instructions;
+	bool fast_path = false;
+	handle<Parameter> param;
 
-	stack_val execute(const ByteCodeExternalVars_RT& external_vars) const;
-	stack_val_type compile(LispExp& exp, const ByteCodeExternalVars_CFG& external_vars);
+	Parameter execute(const ScriptVars_RT& vars) const;
+	script_parameter_type compile(LispExp& exp, ScriptVars_CFG& vars);
 private:
 	void push_inst(uint8_t c) {
 		instructions.push_back(c);

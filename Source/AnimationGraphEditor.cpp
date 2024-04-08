@@ -11,6 +11,11 @@ void AnimationGraphEditor::init()
 	imgui_node_context = ImNodes::CreateContext();
 
 	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
+
+	editing_tree = new Animation_Tree_CFG;
+	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
+
+	tabs.push_back(tab());
 }
 
 void AnimationGraphEditor::close()
@@ -54,59 +59,58 @@ unsigned int color32_to_int(Color32 color) {
 	return *(unsigned int*)&color;
 }
 
+
 void AnimationGraphEditor::begin_draw()
 {
 	is_modifier_pressed = ImGui::GetIO().KeyAlt;
 
+	if (ImGui::Begin("animation graph property editor"))
+	{
+
+	}
+	ImGui::End();
 
 	ImGui::Begin("animation graph editor");
 
-	ImNodes::BeginNodeEditor();
+	const char* names[] = { "a","b","c" };
+	static bool open[3] = { true,true,true };
 
-	for (auto node : nodes) {
-
-		ImNodes::PushColorStyle(ImNodesCol_TitleBar, color32_to_int(node->node_color));
-		Color32 select_color = add_brightness(node->node_color, 30);
-		Color32 hover_color = add_brightness(mix_with(node->node_color, { 5, 225, 250 }, 0.6),5);
-		ImNodes::PushColorStyle(ImNodesCol_TitleBarHovered, color32_to_int(hover_color));
-		ImNodes::PushColorStyle(ImNodesCol_TitleBarSelected, color32_to_int(select_color));
-
-		ImNodes::BeginNode(node->id);
-
-		ImNodes::BeginNodeTitleBar();
-		ImGui::Text("%s\n", node->title.c_str());
-		ImNodes::EndNodeTitleBar();
-
-		for (int j = 0; j < node->num_inputs; j++) {
-			ImNodes::BeginInputAttribute(node->getinput_id(j), ImNodesPinShape_Triangle);
-			ImGui::TextUnformatted("input");
-			ImNodes::EndInputAttribute();
+	int rendered = 0;
+	if (ImGui::BeginTabBar("tabs")) {
+		for (int n = 0; n < tabs.size(); n++) {
+			if (ImGui::BeginTabItem(tabs[n].get_tab_name().c_str(), nullptr, 0))
+			{
+				draw_graph_layer(tabs[n].layer);
+				rendered++;
+				ImGui::EndTabItem();
+			}
+			// cant close the root node
+			if (!tabs[n].open && !tabs[n].owner_node)
+				tabs[n].open = true;
 		}
-		ImNodes::BeginOutputAttribute(node->getoutput_id(0));
-		ImGui::TextUnformatted("output");
-		ImNodes::EndOutputAttribute();
+		ImGui::EndTabBar();
+	}
+	ASSERT(rendered == 1);
 
-		ImGui::Dummy(ImVec2(80.0f, 45.0f));
+	if (ImGui::GetIO().MouseClickedCount[0]==2) {
 
-		ImNodes::EndNode();
-		
-		ImNodes::PopColorStyle();
-		ImNodes::PopColorStyle();
-		ImNodes::PopColorStyle();
+		if (ImNodes::NumSelectedNodes() == 1) {
+			int node = 0;
+			ImNodes::GetSelectedNodes(&node);
 
-
-		for (int j = 0; j < node->num_inputs; j++) {
-			if (node->inputs[j]) {
-
-				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j));
-
+			Editor_Graph_Node* mynode = find_node_from_id(node);
+			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
+				tab t;
+				t.layer = mynode->child_layer_index;
+				t.owner_node = mynode;
+				t.open = true;
+				t.pan = glm::vec2(0.f);
+				tabs.push_back(t);
 			}
 		}
 	}
 
 
-	ImNodes::MiniMap();
-	ImNodes::EndNodeEditor();
 
 	int start_atr = 0;
 	int end_atr = 0;
@@ -170,6 +174,54 @@ void AnimationGraphEditor::begin_draw()
 	ImGui::End();
 }
 
+void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
+{
+	ImNodes::BeginNodeEditor();
+
+	for (auto node : nodes) {
+		if (node->graph_layer != layer) continue;
+
+		ImNodes::PushColorStyle(ImNodesCol_TitleBar, color32_to_int(node->node_color));
+		Color32 select_color = add_brightness(node->node_color, 30);
+		Color32 hover_color = add_brightness(mix_with(node->node_color, { 5, 225, 250 }, 0.6), 5);
+		ImNodes::PushColorStyle(ImNodesCol_TitleBarHovered, color32_to_int(hover_color));
+		ImNodes::PushColorStyle(ImNodesCol_TitleBarSelected, color32_to_int(select_color));
+
+		ImNodes::BeginNode(node->id);
+
+		ImNodes::BeginNodeTitleBar();
+		ImGui::Text("%s\n", node->title.c_str());
+		ImNodes::EndNodeTitleBar();
+
+		for (int j = 0; j < node->num_inputs; j++) {
+			ImNodes::BeginInputAttribute(node->getinput_id(j), ImNodesPinShape_Triangle);
+			ImGui::TextUnformatted("input");
+			ImNodes::EndInputAttribute();
+		}
+		ImNodes::BeginOutputAttribute(node->getoutput_id(0));
+		ImGui::TextUnformatted("output");
+		ImNodes::EndOutputAttribute();
+
+		ImNodes::EndNode();
+
+		ImNodes::PopColorStyle();
+		ImNodes::PopColorStyle();
+		ImNodes::PopColorStyle();
+
+		for (int j = 0; j < node->num_inputs; j++) {
+			if (node->inputs[j]) {
+
+				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j), node->draw_flat_links());
+
+			}
+		}
+	}
+
+
+	ImNodes::MiniMap();
+	ImNodes::EndNodeEditor();
+}
+
 void AnimationGraphEditor::handle_event(const SDL_Event& event)
 {
 	switch (event.type)
@@ -209,6 +261,8 @@ void AnimationGraphEditor::delete_selected()
 		}
 	}
 
+	ImNodes::ClearNodeSelection();
+	ImNodes::ClearLinkSelection();
 }
 
 Editor_Graph_Node* AnimationGraphEditor::add_node()
@@ -260,7 +314,9 @@ static const char* get_animnode_name(animnode_type type)
 	case animnode_type::selector: return "Selector";
 	case animnode_type::mask: return "Mask";
 	case animnode_type::mirror: return "Mirror";
-	case animnode_type::speed: return "Speed";
+	case animnode_type::play_speed: return "Speed";
+	case animnode_type::rootmotion_speed: return "Rootmotion Speed";
+	case animnode_type::sync: return "Sync";
 	default: ASSERT(!"no name defined for state");
 	}
 }
@@ -284,7 +340,9 @@ static Color32 get_animnode_color(animnode_type type)
 	case animnode_type::selector:
 	case animnode_type::mask:
 	case animnode_type::mirror:
-	case animnode_type::speed:
+	case animnode_type::play_speed:
+	case animnode_type::rootmotion_speed:
+	case animnode_type::sync:
 		return { 13, 82, 44 };
 	default: ASSERT(!"no name defined for state");
 	}
@@ -306,7 +364,7 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 		{
 			const char* name = get_animnode_name(type);
 			if (ImGui::Selectable(name)) {
-				auto a = add_node();
+				auto a = create_graph_node_from_type(type);
 				a->title = name;
 				a->node_color = get_animnode_color(type);
 				ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
@@ -324,6 +382,72 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 
 }
 
+template<typename T>
+static T* create_node_type(Animation_Tree_CFG& cfg)
+{
+	auto c = cfg.arena.alloc_bottom(sizeof(T));
+	c = new(c)T(&cfg);
+	return (T*)c;
+}
+
+Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_type type)
+{
+	auto node = add_node();
+	node->type = type;
+	switch (type)
+	{
+	case animnode_type::source:
+		node->node = create_node_type<Clip_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::statemachine:
+		node->node = create_node_type<Statemachine_Node_CFG>(*editing_tree);
+		node->child_layer_index = current_layer++;
+		break;
+	case animnode_type::selector:
+		//node->node = create_node_type<Statemachine_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::mask:
+		//node->node = create_node_type<CFG>(*editing_tree);
+
+		break;
+	case animnode_type::blend:
+		node->node = create_node_type<Blend_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::blend2d:
+		node->node = create_node_type<Blend2d_CFG>(*editing_tree);
+		break;
+	case animnode_type::add:
+		node->node = create_node_type<Add_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::subtract:
+		node->node = create_node_type<Subtract_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::aimoffset:
+		break;
+	case animnode_type::mirror:
+		node->node = create_node_type<Mirror_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::play_speed:
+		break;
+	case animnode_type::rootmotion_speed:
+		node->node = create_node_type<Scale_By_Rootmotion_CFG>(*editing_tree);
+
+		break;
+	case animnode_type::sync:
+		node->node = create_node_type<Sync_Node_CFG>(*editing_tree);
+		break;
+	case animnode_type::state:
+		node->child_layer_index = current_layer++;
+		break;
+	case animnode_type::root:
+		break;
+	default:
+		ASSERT(0);
+		break;
+	}
+	return node;
+}
+
 void Editor_Graph_Node::remove_reference(Editor_Graph_Node* node)
 {
 	for (int i = 0; i < num_inputs; i++) {
@@ -332,4 +456,52 @@ void Editor_Graph_Node::remove_reference(Editor_Graph_Node* node)
 	
 	// FIXME remove references inside internal nodes
 
+}
+
+bool Editor_Graph_Node::on_state_change()
+{
+	switch (type)	
+	{
+	case animnode_type::source: {
+		auto source = (Clip_Node_CFG*)node;
+		int i = strlen(source->clip_name);
+		if (i != 0) set_node_title(source->clip_name);
+		else set_node_title("Source");
+		num_inputs = 0;
+	}break;
+	case animnode_type::statemachine:
+		break;
+	case animnode_type::selector:
+		break;
+	case animnode_type::mask:
+		break;
+	case animnode_type::blend:
+		break;
+	case animnode_type::blend2d:
+		break;
+	case animnode_type::add:
+		break;
+	case animnode_type::subtract:
+		break;
+	case animnode_type::aimoffset:
+		break;
+	case animnode_type::mirror:
+		break;
+	case animnode_type::play_speed:
+		break;
+	case animnode_type::rootmotion_speed:
+		break;
+	case animnode_type::sync:
+		break;
+	case animnode_type::state:
+		break;
+	case animnode_type::root:
+		break;
+	case animnode_type::COUNT:
+		break;
+	default:
+		break;
+	}
+
+	return false;
 }

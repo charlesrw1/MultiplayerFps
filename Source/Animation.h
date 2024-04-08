@@ -1,11 +1,16 @@
 #ifndef ANIMATION_H
 #define ANIMATION_H
+
+#include "Parameter.h"
+#include "Handle.h"
+
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include <vector>
 #include <string>
 #include <memory>
-#include <functional>
+
+
 class Model;
 using std::vector;
 using std::unique_ptr;
@@ -114,41 +119,6 @@ public:
 	uint64_t mask[4];	//256/64
 };
 
-// manages blends between layers
-class Anim_Sequencer
-{
-public:
-	Anim_Sequencer(int maxlayers) :
-		blendlayers(maxlayers) {}
-	struct Sublayer {
-		bool active = false;
-		int user_index = 0;
-		float fade_time = 0.f;
-		float weight = 0.f;	//weight +=/-= dt/fade_time
-	};
-	float global_fade_time = 0.f;
-	float global_weight = 1.f;
-
-	void push_layer(int user_index, float fade_in_time) {
-		for (int i = 1; i < blendlayers.size(); i++) blendlayers[i] = blendlayers[i - 1];
-
-		blendlayers[0].active = true;
-		blendlayers[0].user_index = user_index;
-		blendlayers[0].fade_time = fade_in_time;
-		blendlayers[0].weight = 0.0;
-	}
-	void push_layer_to_top(int index) {
-		Sublayer layer = blendlayers[index];
-		for (int i = 1; i < blendlayers.size(); i++) blendlayers[i] = blendlayers[i - 1];
-		blendlayers[0] = layer;
-	}
-	void clear() {
-		for (int i = 0; i < blendlayers.size(); i++)blendlayers[i].active = false;
-	}
-
-	vector<Sublayer> blendlayers;	// treated as a queue of layers that get blended
-};
-
 struct playing_clip
 {
 	int index;
@@ -156,15 +126,7 @@ struct playing_clip
 	bool looping = false;
 };
 
-class Anim_Play_Layer
-{
-public:
-	Anim_Play_Layer(int blendlayers) : sequencer(blendlayers) {}
 
-	Anim_Sequencer sequencer;
-	vector<playing_clip> playing_anims;
-	PoseMask mask;
-};
 
 // hardcoded layers with masks
 enum class animlayer
@@ -257,7 +219,14 @@ public:
 	Entity* owner = nullptr;
 	
 	Animation_Tree_RT* tree = nullptr;
-	vector<Anim_Play_Layer> play_layers;
+
+	handle<Parameter> p_flMovex;
+	handle<Parameter> p_flMovey;
+	handle<Parameter> p_flSpeed;
+	handle<Parameter> p_bCrouch;
+	handle<Parameter> p_bJumping;
+	handle<Parameter> p_bFalling;
+	handle<Parameter> p_bMoving;
 
 
 	Bone_Controller& get_controller(bone_controller_type type_) {

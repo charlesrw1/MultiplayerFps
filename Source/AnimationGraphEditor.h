@@ -5,7 +5,39 @@
 #include <array>
 #include <string>
 
+#include "RenderObj.h"
+#include "Animation.h"
+
 #include <SDL2/SDL.h>
+
+#include "AnimationTreeLocal.h"
+
+enum class animnode_type
+{
+	source,
+	statemachine,
+	selector,
+
+	mask,
+
+	blend,
+	blend2d,
+	add,
+	subtract,
+	aimoffset,
+
+	mirror,
+	play_speed,
+	rootmotion_speed,
+	sync,
+
+	state,
+
+	root,
+
+	COUNT
+};
+
 
 const uint32_t MAX_INPUTS = 16;
 const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
@@ -27,7 +59,7 @@ public:
 	Color32 node_color = { 23, 82, 12 };
 	bool persistent = false;	// dont delete from graph
 
-	uint32_t num_inputs = 4;
+	uint32_t num_inputs = 2;
 
 	uint32_t graph_layer = 0;
 
@@ -78,40 +110,42 @@ public:
 	static uint32_t get_nodeid_from_static_atr_id(uint32_t staticid) {
 		return (staticid - STATIC_ATR_START) / MAX_STATIC_ATRS;
 	}
-};
 
-enum class animnode_type
-{
-	source,
-	statemachine,
-	selector,
+	void set_node_title(const std::string& name) {
+		title = name;
+	}
 
-	mask,
-	
-	blend,
-	blend2d,
-	add,
-	subtract,
-	aimoffset,
+	// animation graph specific stuff
+	bool on_state_change();
+	bool is_node_valid();
 
-	mirror,
-	speed,
+	bool draw_flat_links() {
+		return type == animnode_type::state;
+	}
 
-	state,
-
-	root,
-
-	COUNT
-};
-
-// animation editor node specific stuff
-class Animation_Ed_Graph_Node : public Editor_Graph_Node
-{
-public:
+	bool node_data_is_invalid = true;
 	animnode_type type = animnode_type::source;
-	void on_state_change();
-};
+	Node_CFG* node = nullptr;
 
+	// used by statemachine and state nodes
+	uint32_t child_layer_index = 0;
+
+	// state machine node stuff
+	struct statemachine_data {
+		std::vector<Editor_Graph_Node*> states;
+	}sm;
+
+	// state node data
+	struct state_data {
+		Editor_Graph_Node* parent_statemachine = nullptr;
+		
+		struct transition {
+			std::string code = "";	// lisp expression
+			Editor_Graph_Node* transition_node = nullptr;
+		};
+
+	}state;
+};
 class AnimationGraphEditor
 {
 public:
@@ -119,7 +153,11 @@ public:
 	void init();
 	void close();
 
+	void tick(float dt);
+
 	void begin_draw();
+
+	void draw_graph_layer(uint32_t layer);
 
 	void handle_event(const SDL_Event& event);
 
@@ -132,13 +170,20 @@ public:
 	Editor_Graph_Node* find_node_from_id(uint32_t id) {
 		return nodes.at(find_for_id(id));
 	}
+	void save_graph(const std::string& name);
+	void open_graph(const std::string& name);
 
 	void* imgui_node_context = nullptr;
 	std::vector<Editor_Graph_Node*> selected;
 	std::vector<Editor_Graph_Node*> nodes;
 
 	void draw_node_creation_menu(bool is_state_mode);
-	Animation_Ed_Graph_Node* create_graph_node_from_type(animnode_type type);
+	Editor_Graph_Node* create_graph_node_from_type(animnode_type type);
+
+
+	std::string name = "";
+
+	Animation_Tree_CFG* editing_tree = nullptr;
 
 	struct create_from_drop_state {
 		Editor_Graph_Node* from = nullptr;
@@ -146,10 +191,34 @@ public:
 		uint32_t slot = 0;
 	}drop_state;
 
+	struct output_data {
+		Animator anim;
+		handle<Render_Object> obj;
+	}out;
+
+	struct tab {
+		uint32_t layer = 0;
+		Editor_Graph_Node* owner_node = nullptr;
+		bool open = true;
+		glm::vec2 pan = glm::vec2(0.f,0.f);
+
+		std::string get_tab_name() {
+			if (!owner_node) return "ROOT";
+			else if (owner_node->type == animnode_type::statemachine) return "statemachine: " + owner_node->title;
+			else if (owner_node->type == animnode_type::state) return "state: " + owner_node->title;
+			else ASSERT(!"tab with bad type");
+		}
+	};
+
+	std::vector<tab> tabs;
+
+
+
 	bool is_modifier_pressed = false;
 	bool is_focused = false;
 
 	uint32_t current_id = 0;
+	uint32_t current_layer = 1;	// layer 0 is root
 };
 
 extern AnimationGraphEditor* g_agraph;

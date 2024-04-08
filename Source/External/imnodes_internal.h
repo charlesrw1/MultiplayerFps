@@ -194,6 +194,8 @@ struct ImLinkData
         ImU32 Base, Hovered, Selected;
     } ColorStyle;
 
+    bool no_curved_bezier = false;
+
     ImLinkData(const int link_id) : Id(link_id), StartPinIdx(), EndPinIdx(), ColorStyle() {}
 };
 

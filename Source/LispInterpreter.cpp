@@ -227,20 +227,20 @@ enum opcode : uint16_t
 
 
 
-stack_val_type BytecodeExpression::compile(LispExp& exp, const ByteCodeExternalVars_CFG& external_vars) {
+script_parameter_type BytecodeExpression::compile(LispExp& exp, ScriptVars_CFG& external_vars) {
 		if (exp.type != LispExp::list_type) {
 			if (exp.type == LispExp::symbol_type) {
 				const auto& find = external_vars.find(exp.as_sym());
 				if (find.is_valid()) {
-					if (external_vars.get_type(find) == stack_val_type::int_t) {
+					if (external_vars.get_type(find) == script_parameter_type::animint) {
 						push_inst(PUSH_I);
 						push_4bytes(find.id);
-						return stack_val_type::int_t;
+						return script_parameter_type::animint;
 					}
-					else if (external_vars.get_type(find) == stack_val_type::float_t) {
+					else if (external_vars.get_type(find) == script_parameter_type::animfloat) {
 						push_inst(PUSH_F);
 						push_4bytes(find.id);
-						return stack_val_type::float_t;
+						return script_parameter_type::animfloat;
 					}
 					else
 						throw LispError("can only compile int/floats", &exp);
@@ -251,13 +251,14 @@ stack_val_type BytecodeExpression::compile(LispExp& exp, const ByteCodeExternalV
 			else if (exp.type == LispExp::int_type) {
 				push_inst(PUSH_CONST_I);
 				push_4bytes(exp.u.i);
-				return stack_val_type::int_t;
+				return script_parameter_type::animint;
+
 			}
 			else if (exp.type == LispExp::float_type) {
 				push_inst(PUSH_CONST_F);
 				float f = exp.u.f;
 				push_4bytes(*(unsigned int*)&f);
-				return stack_val_type::float_t;
+				return script_parameter_type::animfloat;
 			}
 			else {
 				throw LispError("unknown type for compiling", &exp);
@@ -267,32 +268,32 @@ stack_val_type BytecodeExpression::compile(LispExp& exp, const ByteCodeExternalV
 			string op = exp.as_list().at(0).as_sym();
 			if (op == "not") {
 				auto type1 = compile( exp.as_list().at(1) , external_vars);
-				if (type1 == stack_val_type::float_t) {
+				if (type1 == script_parameter_type::animfloat) {
 					push_inst(CAST_0_I);
 				}
 				push_inst(NOT);
-				return stack_val_type::int_t;
+				return script_parameter_type::animint;
 			}
 			else if (op == "and" || op == "or") {
 				auto type1 = compile(exp.as_list().at(1), external_vars);
 				auto type2 = compile(exp.as_list().at(2), external_vars);
-				if (type1 != stack_val_type::int_t)
+				if (type1 != script_parameter_type::animint)
 					push_inst(CAST_1_I);
-				if (type2 != stack_val_type::int_t)
+				if (type2 != script_parameter_type::animint)
 					push_inst(CAST_0_I);
 				if (op == "and")
 					push_inst(AND);
 				else
 					push_inst(OR);
-				return stack_val_type::int_t;
+				return script_parameter_type::animint;
 			}
 			else {
 				auto type1 = compile(exp.as_list().at(1), external_vars);
 				auto type2 = compile(exp.as_list().at(2), external_vars);
-				bool isfloat = (type1 == stack_val_type::float_t || type2 == stack_val_type::float_t);
-				if (isfloat && type1 != stack_val_type::float_t)
+				bool isfloat = (type1 == script_parameter_type::animfloat || type2 == script_parameter_type::animfloat);
+				if (isfloat && type1 != script_parameter_type::animfloat)
 					push_inst(CAST_1_F);
-				if (isfloat && type2 != stack_val_type::float_t)
+				if (isfloat && type2 != script_parameter_type::animfloat)
 					push_inst(CAST_0_F);
 				struct pairs {
 					const char* name;
@@ -320,19 +321,19 @@ stack_val_type BytecodeExpression::compile(LispExp& exp, const ByteCodeExternalV
 				}
 				if (i == 10) throw LispError("couldn't find op", nullptr);
 
-				return (isfloat) ? stack_val_type::float_t : stack_val_type::int_t;
+				return (isfloat) ? script_parameter_type::animfloat : script_parameter_type::animint;
 			}
 		}
 	}
 
 #define OPONSTACK(op, typein, typeout) stack[sp-2].typeout = stack[sp-2].typein op stack[sp-1].typein; sp-=1; break;
-#define FLOAT_AND_INT_OP(opcode_, op) case opcode_: OPONSTACK(op, f, f); \
-case (opcode_+1): OPONSTACK(op,i,i);
-#define FLOAT_AND_INT_OP_OUTPUT_INT(opcode_, op) case opcode_: OPONSTACK(op,f, i); \
-case (opcode_+1): OPONSTACK(op,i, i);
-	stack_val BytecodeExpression::execute(const ByteCodeExternalVars_RT& external_vars) const
+#define FLOAT_AND_INT_OP(opcode_, op) case opcode_: OPONSTACK(op, fval, fval); \
+case (opcode_+1): OPONSTACK(op,ival,ival);
+#define FLOAT_AND_INT_OP_OUTPUT_INT(opcode_, op) case opcode_: OPONSTACK(op,fval, ival); \
+case (opcode_+1): OPONSTACK(op,ival, ival);
+	Parameter BytecodeExpression::execute(const ScriptVars_RT& vars) const
 	{
-		stack_val stack[64];
+		Parameter stack[64];
 		int sp = 0;
 
 		for (int pc = 0; pc < instructions.size(); pc++) {
@@ -351,28 +352,28 @@ case (opcode_+1): OPONSTACK(op,i, i);
 				FLOAT_AND_INT_OP_OUTPUT_INT(NOTEQ_F, != );
 
 			case NOT:
-				stack[sp-1].i = !stack[sp-1].i;
+				stack[sp-1].ival = !stack[sp-1].ival;
 				break;
 			case AND:
-				stack[sp - 2].i = stack[sp - 2].i && stack[sp - 1].i;
+				stack[sp - 2].ival = stack[sp - 2].ival && stack[sp - 1].ival;
 				sp -= 1;
 				break;
 			case OR:
-				stack[sp - 2].i = stack[sp - 2].i || stack[sp - 1].i;
+				stack[sp - 2].ival = stack[sp - 2].ival || stack[sp - 1].ival;
 				sp -= 1;
 				break;
 
 			case CAST_0_F:
-				stack[sp-1].f = stack[sp-1].i;
+				stack[sp-1].fval = stack[sp-1].ival;
 				break;
 			case CAST_0_I:
-				stack[sp-1].i = stack[sp-1].f;
+				stack[sp-1].ival = stack[sp-1].fval;
 				break;
 			case CAST_1_F:
-				stack[sp - 2].f = stack[sp - 2].i;
+				stack[sp - 2].fval = stack[sp - 2].ival;
 				break;
 			case CAST_1_I:
-				stack[sp - 2].i = stack[sp - 2].f;
+				stack[sp - 2].ival = stack[sp - 2].fval;
 				break;
 
 			case PUSH_CONST_F: {
@@ -381,22 +382,22 @@ case (opcode_+1): OPONSTACK(op,i, i);
 					float f;
 				};
 				i = read_4bytes(pc + 1);
-				stack[sp++].f = f;
+				stack[sp++].fval = f;
 				pc += 4;
 			} break;
 			case PUSH_CONST_I: {
 				int i = read_4bytes(pc + 1);
-				stack[sp++].i = i;
+				stack[sp++].ival = i;
 				pc += 4;
 			}break;
 			case PUSH_F: {
 				int index = read_4bytes(pc + 1);
-				stack[sp++].f = external_vars.get(handle<stack_val>{index}).f;
+				stack[sp++].fval = vars.get(handle<Parameter>{index}).fval;
 				pc += 4;
 			}break;
 			case PUSH_I: {
 				int index = read_4bytes(pc + 1);
-				stack[sp++].i = external_vars.get(handle<stack_val>{index}).i;
+				stack[sp++].ival = vars.get(handle<Parameter>{index}).ival;
 				pc += 4;
 			}break;
 			}

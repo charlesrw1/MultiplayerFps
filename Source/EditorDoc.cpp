@@ -920,7 +920,6 @@ void EditorDoc::imgui_draw()
 					if (ImGui::InputText("##cell", buffer, 256)) {
 						kv.second = buffer;
 					}
-
 					ImGui::PopID();
 
 					cell++;
