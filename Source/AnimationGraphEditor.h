@@ -39,6 +39,10 @@ class Editor_Graph_Node
 public:
 	Editor_Graph_Node() {
 		memset(inputs.data(), 0, sizeof(Editor_Graph_Node*) * inputs.size());
+		memset(text_buffer0, 0, sizeof text_buffer0);
+		memset(text_buffer1, 0, sizeof text_buffer1);
+		memset(text_buffer2, 0, sizeof text_buffer2);
+
 	}
 
 	~Editor_Graph_Node() {
@@ -46,7 +50,6 @@ public:
 			ImNodes::EditorContextFree(sublayer.context);
 		}
 	}
-
 
 	std::string title = "Empty";
 	uint32_t id = 0;
@@ -57,6 +60,11 @@ public:
 
 	std::array<std::string, MAX_INPUTS> input_pin_names;
 	std::array<Editor_Graph_Node*, MAX_INPUTS> inputs;
+	
+	// since its logically more sense for transitions to be thought of as ouputs and not inputs
+	bool treat_inputs_as_outputs() {
+		return type == animnode_type::state;
+	}
 
 	uint32_t num_params = 1;
 	struct static_atr {
@@ -73,6 +81,11 @@ public:
 
 	void add_input(Editor_Graph_Node* input, uint32_t slot) {
 		inputs[slot] = input;
+
+		if (grow_pin_count_on_new_pin()) {
+			if (num_inputs > 0 && inputs[num_inputs - 1])
+				num_inputs++;
+		}
 	}
 
 	void remove_reference(Editor_Graph_Node* node);
@@ -108,6 +121,8 @@ public:
 		title = name;
 	}
 
+	void draw_property_editor(AnimationGraphEditor* ed);
+
 	// animation graph specific stuff
 	void on_state_change(AnimationGraphEditor* ed);
 	bool is_node_valid();
@@ -124,6 +139,13 @@ public:
 	bool is_statemachine() {
 		return type == animnode_type::statemachine;
 	}
+	bool is_state_node() {
+		return type == animnode_type::state;
+	}
+
+	bool grow_pin_count_on_new_pin() {
+		return type == animnode_type::state || type == animnode_type::selector;
+	}
 
 	animnode_type type = animnode_type::source;
 	Node_CFG* node = nullptr;
@@ -139,15 +161,33 @@ public:
 	// state node data
 	struct state_data {
 		Editor_Graph_Node* parent_statemachine = nullptr;
-		
 		struct transition {
 			std::string code = "";	// lisp expression
-			Editor_Graph_Node* transition_node = nullptr;
+			float blend_time = 0.1;
 		};
-
+		std::array<transition, MAX_INPUTS> transitions;
 		State* state_ptr = nullptr;
+		int selected_transition_for_prop_ed = 0;
 	}state;
+
+	char text_buffer0[256];
+	char text_buffer1[256];
+	char text_buffer2[256];
 };
+
+struct Editor_Parameter_list
+{
+	struct ed_param {
+		bool fake_entry = false;
+		std::string s;
+		script_parameter_type type = script_parameter_type::animfloat;
+		uint32_t id = 0;
+	};
+	std::vector<ed_param> param;
+
+	void update_real_param_list(ScriptVars_CFG* cfg);
+};
+
 class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
 public:
@@ -195,6 +235,8 @@ public:
 	std::vector<Editor_Graph_Node*> nodes;
 	Animation_Tree_CFG* editing_tree = nullptr;
 
+	Editor_Parameter_list ed_params;
+
 	void draw_node_creation_menu(bool is_state_mode);
 	Editor_Graph_Node* create_graph_node_from_type(animnode_type type);
 
@@ -215,7 +257,9 @@ public:
 		Model* model = nullptr;
 		Animation_Set* set = nullptr;
 
+		Animation_Tree_RT tree_rt;
 	}out;
+
 	struct tab {
 		editor_layer* layer = nullptr;
 		Editor_Graph_Node* owner_node = nullptr;
@@ -235,6 +279,12 @@ public:
 			else ASSERT(!"tab with bad type");
 		}
 	};
+
+	void update_every_node() {
+		for (int i = 0; i < nodes.size(); i++) {
+			nodes[i]->on_state_change(this);
+		}
+	}
 
 	editor_layer create_new_layer(bool is_statemachine) {
 		editor_layer layer;

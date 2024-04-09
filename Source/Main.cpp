@@ -171,8 +171,9 @@ void Game_Local::update_view()
 	vec3 true_front = AnglesToVector(true_viewangles.x, true_viewangles.y);
 
 	View_Setup setup;
-	setup.height = eng->window_h.integer();
-	setup.width = eng->window_w.integer();
+	auto viewport_sz = eng->get_game_viewport_dimensions();
+	setup.height = viewport_sz.y;
+	setup.width = viewport_sz.x;
 	setup.fov = glm::radians(fov.real());
 	setup.proj = glm::perspective(setup.fov, (float)setup.width / setup.height, 0.01f, 100.0f);
 	setup.near = 0.01f;
@@ -965,8 +966,9 @@ void Game_Engine::key_event(SDL_Event event)
 	else if (event.type == SDL_KEYUP) {
 		keys[event.key.keysym.scancode] = false;
 	}
+	// when drawing to windowed viewport, handle game_focused during drawing
 	else if (event.type == SDL_MOUSEBUTTONDOWN) {
-		if (event.button.button == 3) {
+		if (event.button.button == 3 && !eng->is_drawing_to_window_viewport()) {
 			SDL_SetRelativeMouseMode(SDL_TRUE);
 			int x, y;
 			SDL_GetRelativeMouseState(&x, &y);
@@ -975,7 +977,7 @@ void Game_Engine::key_event(SDL_Event event)
 		mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
-		if (event.button.button == 3) {
+		if (event.button.button == 3 && !eng->is_drawing_to_window_viewport()) {
 			SDL_SetRelativeMouseMode(SDL_FALSE);
 			eng->game_focused = false;
 		}
@@ -1147,6 +1149,19 @@ void menu_playervars()
 	}
 }
 
+bool Game_Engine::is_drawing_to_window_viewport()
+{
+	return state == ENGINE_ANIMATION_EDITOR;
+}
+
+glm::ivec2 Game_Engine::get_game_viewport_dimensions()
+{
+	if (is_drawing_to_window_viewport())
+		return window_viewport_size;
+	else
+		return { window_w.integer(), window_h.integer() };
+}
+
 void Game_Engine::draw_debug_interface()
 {
 	Debug_Interface::get()->draw();
@@ -1154,7 +1169,28 @@ void Game_Engine::draw_debug_interface()
 	if (state == ENGINE_EDITOR)
 		eddoc->imgui_draw();
 
-	g_anim_ed_graph->begin_draw();
+	if(state == ENGINE_ANIMATION_EDITOR)
+		g_anim_ed_graph->begin_draw();
+
+	if (is_drawing_to_window_viewport()) {
+		eng->game_focused = false;
+		if (ImGui::Begin("Scene viewport",nullptr,  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+
+			auto size = ImGui::GetWindowSize();
+			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), ImVec2(size.x, size.y), ImVec2(0,1),ImVec2(1,0));
+			window_viewport_size = { size.x,size.y };
+
+			bool focused_window = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+			eng->game_focused = focused_window && ImGui::GetIO().MouseDown[1];
+
+		}
+		if (eng->game_focused)
+			SDL_SetRelativeMouseMode(SDL_TRUE);
+		else
+			SDL_SetRelativeMouseMode(SDL_FALSE);
+		ImGui::End();
+	}
 }
 
 void Game_Engine::draw_screen()
@@ -1173,7 +1209,7 @@ void Game_Engine::draw_screen()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	View_Setup view;
 	if (state == ENGINE_GAME && local.has_run_tick) {
@@ -1188,6 +1224,8 @@ void Game_Engine::draw_screen()
 		view = g_anim_ed_graph->get_vs();
 		idraw->scene_draw(view, special_render_mode::anim_editor);
 	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();

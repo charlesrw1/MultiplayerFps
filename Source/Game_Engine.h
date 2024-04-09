@@ -114,6 +114,8 @@ class Game_Engine
 public:
 	Game_Engine();
 
+	glm::ivec2 get_game_viewport_dimensions();	// either full window or sub window
+
 	void init();
 	void cleanup();
 
@@ -198,7 +200,10 @@ public:
 	bool keys[SDL_NUM_SCANCODES];
 	bool keychanges[SDL_NUM_SCANCODES];
 	int mousekeys = 0;
+
 	bool game_focused = false;
+	bool is_drawing_to_window_viewport();
+	glm::ivec2 window_viewport_size = glm::ivec2(DEFAULT_WIDTH,DEFAULT_HEIGHT);
 
 	string* binds[SDL_NUM_SCANCODES];
 

@@ -949,7 +949,7 @@ void Renderer::init()
 	fbo.reflected_scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
 	tex.reflected_color = tex.reflected_depth = 0;
-	InitFramebuffers();
+	InitFramebuffers(true,eng->window_w.integer(), eng->window_h.integer());
 
 	EnviornmentMapHelper::get().init();
 	volfog.init();
@@ -968,11 +968,8 @@ void Renderer::init()
 }
 
 
-void Renderer::InitFramebuffers()
+void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 {
-	const int s_w = eng->window_w.integer();
-	const int s_h = eng->window_h.integer();
-
 	glDeleteTextures(1, &tex.scene_color);
 
 	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_color);
@@ -1022,6 +1019,20 @@ void Renderer::InitFramebuffers()
 	glCreateFramebuffers(1, &fbo.reflected_scene);
 	glNamedFramebufferTexture(fbo.reflected_scene, GL_COLOR_ATTACHMENT0, tex.reflected_color, 0);
 	glNamedFramebufferTexture(fbo.reflected_scene, GL_DEPTH_ATTACHMENT, tex.reflected_depth, 0);
+
+	glDeleteFramebuffers(1, &fbo.composite);
+	glDeleteTextures(1, &tex.output_composite);
+	if (create_composite_texture) {
+		glCreateTextures(GL_TEXTURE_2D, 1, &tex.output_composite);
+		glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
+		glTextureParameteri(tex.output_composite, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteri(tex.output_composite, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteri(tex.output_composite, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(tex.output_composite, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glCreateFramebuffers(1, &fbo.composite);
+		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
+	}
 
 	cur_w = s_w;
 	cur_h = s_h;
@@ -2631,8 +2642,10 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 
 	state_machine.invalidate_all();
 
-	if (cur_w != eng->window_w.integer() || cur_h != eng->window_h.integer())
-		InitFramebuffers();
+	const bool needs_composite = eng->is_drawing_to_window_viewport();
+
+	if (cur_w != view.width || cur_h != view.height)
+		InitFramebuffers(needs_composite, view.width, view.height);
 	lastframe_vs = current_frame_main_view;
 
 	current_frame_main_view = view;
@@ -2734,7 +2747,9 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 	int x = vs.width;
 	int y = vs.height;
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	uint32_t framebuffer_to_output = (needs_composite) ? fbo.composite : 0;
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_output);
 	glViewport(0, 0, cur_w, cur_h);
 
 	set_shader(prog.combine);

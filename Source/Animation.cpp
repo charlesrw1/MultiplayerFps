@@ -1308,7 +1308,8 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 	ctx.model = model;
 	ctx.set = set;
 	ctx.tree = this;
-	cfg->root->construct(ctx);
+	if(cfg->root)
+		cfg->root->construct(ctx);
 }
 
 void Animator::set_model_new(const Model* m)

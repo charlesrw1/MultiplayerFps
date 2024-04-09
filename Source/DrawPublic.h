@@ -36,9 +36,8 @@ public:
 	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) = 0;
 	virtual void remove_obj(handle<Render_Object>& handle) = 0;
 
-
-
-	//virtual uint32_t get_output_texture_handle() = 0;
+	// only used by animation editor to draw to an imgui window
+	virtual uint32_t get_composite_output_texture_handle() = 0;
 };
 
 extern RendererPublic* idraw;

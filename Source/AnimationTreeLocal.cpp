@@ -244,7 +244,7 @@ State* State::get_next_state(NodeRt_Ctx& ctx)
 	float actual_character_move_speed = glm::length(relmovedir);
 
 	rt->character_blend_weights = damp_dt_independent(relmovedir,
-		rt->character_blend_weights, 0.01, pose.dt);
+		rt->character_blend_weights, weight_damp, pose.dt);
 
 	float character_ground_speed = glm::length(rt->character_blend_weights);
 	float character_angle = PI;

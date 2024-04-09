@@ -66,8 +66,14 @@ vector<string> to_tokens(string& input)
 		tokens.pop_back();
 		if (token == "(") {
 			vector<LispExp> list;
-			while (tokens.back() != ")")
+			
+			while (!tokens.empty() && tokens.back() != ")")
 				list.push_back(read_from_tokens(tokens));
+
+			if (tokens.empty()) {
+				throw "unexpected eof";
+			}
+
 			tokens.pop_back();
 			return LispExp(std::move(list));
 		}

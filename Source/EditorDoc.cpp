@@ -644,7 +644,8 @@ void EditorDoc::update()
 		camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 	}
 
-	vs_setup = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, eng->window_w.integer(), eng->window_h.integer());
+	auto window_sz = eng->get_game_viewport_dimensions();
+	vs_setup = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 
 	// build physics world
 

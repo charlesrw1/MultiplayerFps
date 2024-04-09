@@ -22,7 +22,7 @@ void SSAO_System::init()
 {
 	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
 
-	make_render_targets(true);
+	make_render_targets(true, eng->window_w.integer(), eng->window_h.integer());
 	reload_shaders();
 
 	glCreateBuffers(1, &ubo.data);
@@ -79,11 +79,8 @@ void SSAO_System::reload_shaders()
 }
 
 
-void SSAO_System::make_render_targets(bool initial)
+void SSAO_System::make_render_targets(bool initial, int width, int height)
 {
-	width = eng->window_w.integer();
-	height = eng->window_h.integer();
-
 	if (!initial) {
 		glDeleteTextures(1, &texture.depthlinear);
 		glDeleteTextures(1, &texture.viewnormal);
@@ -169,6 +166,8 @@ void SSAO_System::make_render_targets(bool initial)
 	// reinterleave
 	// blur
 
+	this->width = width;
+	this->height = height;
 }
 
 #define USE_AO_LAYERED_SINGLEPASS 2
@@ -243,9 +242,12 @@ void SSAO_System::update_ubo()
 void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;
+	int v_w = draw.current_frame_main_view.width;
+	int v_h = draw.current_frame_main_view.height;
 
-	if (width != eng->window_w.integer() || height != eng->window_h.integer())
-		make_render_targets(false);
+
+	if (width != v_w || height != v_h)
+		make_render_targets(false, v_w,v_h);
 
 	update_ubo();
 

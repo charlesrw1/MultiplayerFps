@@ -118,7 +118,7 @@ class SSAO_System
 public:
 	void init();
 	void reload_shaders();
-	void make_render_targets(bool initial);
+	void make_render_targets(bool initial, int w, int h);
 	void render();
 	void update_ubo();
 
@@ -508,6 +508,10 @@ public:
 	virtual handle<Render_Object> register_obj() override;
 	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
 	virtual void remove_obj(handle<Render_Object>& handle) override;
+	virtual uint32_t get_composite_output_texture_handle() override {
+		ASSERT(tex.output_composite!=0);
+		return tex.output_composite;
+	}
 
 	void render_level_to_target(Render_Level_Params params);
 
@@ -530,12 +534,9 @@ public:
 	Texture white_texture;
 	Texture black_texture;
 	Texture flat_normal_texture;
-
-
 	Texture3d perlin3d;
 	
 	int cubemap_index = 0;
-
 	static const int MAX_SAMPLER_BINDINGS = 16;
 
 	Program_Manager prog_man;
@@ -562,6 +563,7 @@ public:
 		fbohandle scene;
 		fbohandle reflected_scene;
 		fbohandle bloom;
+		fbohandle composite = 0;
 	}fbo;
 
 	struct textures {
@@ -569,6 +571,7 @@ public:
 		texhandle scene_depthstencil;
 		texhandle reflected_color;
 		texhandle reflected_depth;
+		texhandle output_composite = 0;
 
 		texhandle bloom_chain[BLOOM_MIPS];
 		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
@@ -644,6 +647,7 @@ public:
 	Render_Stats stats;
 
 	void set_shader_sampler_locations();
+	View_Setup current_frame_main_view;
 private:
 
 	struct Sprite_Drawing_State {
@@ -662,7 +666,7 @@ private:
 	void planar_reflection_pass();
 
 	void InitGlState();
-	void InitFramebuffers();
+	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
 
 	void DrawSkybox();
 
@@ -672,7 +676,6 @@ private:
 	void set_wind_constants();
 	void set_water_constants();
 
-	View_Setup current_frame_main_view;
 
 	int cur_w = 0;
 	int cur_h = 0;

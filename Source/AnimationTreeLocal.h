@@ -213,7 +213,7 @@ struct Clip_Node_CFG : public Node_CFG
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		Clip_Node_RT* rt = construct_this<Clip_Node_RT>(ctx);
 
-		rt->clip_index = ctx.set->find(clip_name);
+		rt->clip_index = ctx.set->find(clip_name.c_str());
 		int root_index = ctx.model->root_bone_index;
 		int first_pos = ctx.set->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
 		rt->root_pos_first_frame = first_pos != -1 ?
@@ -252,7 +252,7 @@ struct Clip_Node_CFG : public Node_CFG
 		None,
 		Remove
 	}rootmotion[3] = { None,None,None };
-	const char* clip_name = "";
+	std::string clip_name;
 	bool loop = true;
 	float speed = 1.0;
 
@@ -386,11 +386,12 @@ struct Blend2d_CFG : public Node_CFG
 		memset(directions, 0, sizeof(directions));
 	}
 
-	Clip_Node_CFG* idle = nullptr;
-	Clip_Node_CFG* directions[8];
+	Node_CFG* idle = nullptr;
+	Node_CFG* directions[8];
 	handle<Parameter> xparam;
 	handle<Parameter> yparam;
-	float fade_in = 5.0;
+	float fade_in = 1.0;
+	float weight_damp = 0.01;
 
 	// Inherited via At_Node
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
