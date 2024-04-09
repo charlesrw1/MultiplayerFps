@@ -5,6 +5,17 @@
 
 #include "Game_Engine.h"
 
+std::string remove_whitespace(const char* str)
+{
+	std::string s = str;
+	while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\n'))
+		s.pop_back();
+	while (!s.empty() && (s[0] == ' ' || s[0] == '\t' || s[0] == '\n'))
+		s.erase(s.begin() + 0);
+	return s;
+}
+
+
 AnimationGraphEditor ed;
 AnimationGraphEditorPublic* g_anim_ed_graph = &ed;
 
@@ -125,6 +136,7 @@ void AnimationGraphEditor::begin_draw()
 				ed_params.param.back().id = uid++;
 
 				ed_params.param.back().fake_entry = true;
+
 			}
 
 			uint32_t prop_editor_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
@@ -164,11 +176,17 @@ void AnimationGraphEditor::begin_draw()
 
 					ImGui::TableSetColumnIndex(1);
 
+					ImGui::SetNextItemWidth(150.f);
 					static const char* type_strs[] = { "vec2","float","int" };
 					if (ImGui::Combo("##label", (int*)&param.type, type_strs, 3)) {
 						if (!param.fake_entry)
 							need_parameter_list_update = true;
 					}
+
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(150.f);
+					if (!param.fake_entry && cell < out.tree_rt.parameters.parameters.size())
+						ImGui::DragFloat("##label223123", &out.tree_rt.parameters.parameters.at(cell).fval, 0.05, 0.0);
 				
 
 					ImGui::PopID();
@@ -264,12 +282,9 @@ void AnimationGraphEditor::begin_draw()
 		Editor_Graph_Node* node_s = find_node_from_id(start_node_id);
 		Editor_Graph_Node* node_e = find_node_from_id(end_node_id);
 
-		node_e->inputs[end_idx] = node_s;
+		node_e->add_input(this, node_s, end_idx);
 
-		if (node_e->grow_pin_count_on_new_pin() && node_e->num_inputs < MAX_INPUTS) {
-			if (node_e->inputs[node_e->num_inputs-1])
-				node_e->num_inputs++;
-		}
+		update_every_node();
 	}
 	if (ImNodes::IsLinkDropped(&start_atr)) {
 		open_popup_menu_from_drop = true;
@@ -290,6 +305,8 @@ void AnimationGraphEditor::begin_draw()
 		uint32_t slot = Editor_Graph_Node::get_slot_from_id(link_id);
 		Editor_Graph_Node* node_s = find_node_from_id(node_id);
 		node_s->inputs[slot] = nullptr;
+
+		update_every_node();
 	}
 
 
@@ -447,7 +464,7 @@ void AnimationGraphEditor::remove_node_from_index(int index)
 		return;
 
 	for (int i = 0; i < nodes.size(); i++)
-		if (i != index) nodes[i]->remove_reference(node);
+		if (i != index) nodes[i]->remove_reference(this, node);
 
 	// node has a sublayer, remove child nodes
 	if (node->sublayer.context) {
@@ -465,6 +482,8 @@ void AnimationGraphEditor::remove_node_from_index(int index)
 
 	delete node;
 	nodes.erase(nodes.begin() + index);
+
+	update_every_node();
 }
 
 int AnimationGraphEditor::find_for_id(uint32_t id)
@@ -556,10 +575,10 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 
 				if (drop_state.from) {
 					if (drop_state.from_is_input) {
-						drop_state.from->add_input(a, drop_state.slot);
+						drop_state.from->add_input(this, a, drop_state.slot);
 					}
 					else
-						a->add_input(drop_state.from, 0);
+						a->add_input(this, drop_state.from, 0);
 				}
 			}
 		}
@@ -682,7 +701,7 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 	return node;
 }
 
-void Editor_Graph_Node::remove_reference(Editor_Graph_Node* node)
+void Editor_Graph_Node::remove_reference(AnimationGraphEditor* ed, Editor_Graph_Node* node)
 {
 	for (int i = 0; i < num_inputs; i++) {
 		if (inputs[i] == node) inputs[i] = nullptr;
@@ -696,8 +715,6 @@ void Editor_Graph_Node::remove_reference(Editor_Graph_Node* node)
 	}
 	if (state.parent_statemachine == node)
 		state.parent_statemachine = nullptr;
-
-	// FIXME remove references inside internal nodes
 }
 
 struct completion_callback_data
@@ -801,7 +818,7 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 		auto flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion;
 		completion_callback_data ccd = { ed,completion_callback_data::CLIPS };
 		if (ImGui::InputText("Clipname", text_buffer1, sizeof text_buffer1, flags, node_completion_callback, &ccd)) {
-			source->clip_name = text_buffer1;
+			source->clip_name = remove_whitespace(text_buffer1);
 			update_me = true;
 		}
 
@@ -856,6 +873,13 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 	case animnode_type::aimoffset:
 		break;
 	case animnode_type::mirror:
+	{
+		auto source = (Mirror_Node_CFG*)node;
+		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
+		if (ImGui::InputText("Param", text_buffer1, sizeof text_buffer1, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
+			update_me = true;
+		}
+	}
 		break;
 	case animnode_type::play_speed:
 		break;
@@ -907,7 +931,7 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 	}
 
 	if (update_me)
-		on_state_change(ed);
+		ed->update_every_node();
 }
 
 void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
@@ -923,10 +947,11 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	case animnode_type::statemachine: {
 		auto source = (Statemachine_Node_CFG*)node;
 
+		source->start_state = nullptr;
 		auto rootnode = ed->find_first_node_in_layer(sublayer.id, animnode_type::root);
 		if (rootnode) {
 			auto startnode = rootnode->inputs[0];
-			if (startnode && startnode->type == animnode_type::state) {
+			if (startnode && startnode->type == animnode_type::state && startnode->is_node_valid()) {
 				source->start_state = startnode->state.state_ptr;
 				ASSERT(source->start_state);
 			}
@@ -940,38 +965,35 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 		break;
 	case animnode_type::blend: {
 		auto source = (Blend_Node_CFG*)node;
-		handle<Parameter> param = ed->editing_tree->find_param(text_buffer1);
+
+
+		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
 		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
 			printf("Param, %s, not valid\n", text_buffer1);
 		}
 		source->param = param;
 
-		if (inputs[0])
-			source->posea = inputs[0]->node;
-		if (inputs[1])
-			source->poseb = inputs[1]->node;
+		source->posea = get_nodecfg_for_slot(0);
+		source->poseb = get_nodecfg_for_slot(1);
 	}
 		break;
 	case animnode_type::blend2d: {
 		auto source = (Blend2d_CFG*)node;
-		handle<Parameter> param = ed->editing_tree->find_param(text_buffer1);
+		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
 		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
 			printf("Param, %s, not valid\n", text_buffer1);
 		}
 		source->xparam = param;
 
-		param = ed->editing_tree->find_param(text_buffer2);
+		param = ed->editing_tree->find_param(remove_whitespace(text_buffer2).c_str());
 		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
 			printf("Param, %s, not valid\n", text_buffer2);
 		}
 		source->yparam = param;
 
-
-		if (inputs[0])
-			source->idle = inputs[0]->node;
+		source->idle = get_nodecfg_for_slot(0);
 		for (int i = 0; i < 8; i++) {
-			if (inputs[1 + i])
-				source->directions[i] = inputs[1 + i]->node;
+			source->directions[i] = get_nodecfg_for_slot(1 + i);
 		}
 	}
 		break;
@@ -979,19 +1001,15 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	{
 		auto source = (Add_Node_CFG*)node;
 
-		if (inputs[0])
-			source->diff_pose = inputs[0]->node;
-		if (inputs[1])
-			source->base_pose = inputs[1]->node;
+		source->diff_pose = get_nodecfg_for_slot(0);
+		source->base_pose = get_nodecfg_for_slot(1);
 	}	break;
 	case animnode_type::subtract:
 	{
 		auto source = (Subtract_Node_CFG*)node;
 
-		if (inputs[0])
-			source->ref = inputs[0]->node;
-		if (inputs[1])
-			source->source = inputs[1]->node;
+		source->ref = get_nodecfg_for_slot(0);
+		source->source = get_nodecfg_for_slot(1);
 	}
 		break;
 	case animnode_type::aimoffset:
@@ -999,9 +1017,12 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	case animnode_type::mirror:
 	{
 		auto source = (Mirror_Node_CFG*)node;
-
-		if (inputs[0])
-			source->input = inputs[0]->node;
+		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
+		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
+			printf("Param, %s, not valid\n", text_buffer1);
+		}
+		source->param = param;
+		source->input = get_nodecfg_for_slot(0);
 	}
 		break;
 	case animnode_type::play_speed:
@@ -1010,22 +1031,21 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	{
 		auto source = (Scale_By_Rootmotion_CFG*)node;
 
-		handle<Parameter> param = ed->editing_tree->find_param(text_buffer1);
+		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
 		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
 			printf("Param, %s, not valid\n", text_buffer1);
 		}
 		source->param = param;
 
-		if (inputs[0])
-			source->child = inputs[0]->node;
+		source->child = get_nodecfg_for_slot(0);
+
 	}
 		break;
 	case animnode_type::sync:
 	{
 		auto source = (Sync_Node_CFG*)node;
 
-		if(inputs[0])
-			source->child = inputs[0]->node;
+		source->child = get_nodecfg_for_slot(0);
 	}
 		break;
 	case animnode_type::state: {
@@ -1069,6 +1089,15 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	}
 		break;
 	case animnode_type::root:
+
+		// this is always the ROOT layer
+		if (graph_layer == 0) {
+
+			ed->editing_tree->root = get_nodecfg_for_slot(0);
+
+		}
+
+
 		break;
 	case animnode_type::COUNT:
 		break;
@@ -1088,6 +1117,90 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	}
 }
 
+bool Editor_Graph_Node::is_node_valid()
+{
+	switch (type)
+	{
+	case animnode_type::source:
+	{
+		return true;
+	}
+		break;
+	case animnode_type::statemachine:
+	{
+		auto source = (Statemachine_Node_CFG*)node;
+		return source->start_state != nullptr;
+	}
+		break;
+	case animnode_type::selector:
+		break;
+	case animnode_type::mask:
+		break;
+	case animnode_type::blend:
+	{
+		auto source = (Blend_Node_CFG*)node;
+		return source->param.is_valid() && source->posea&&source->poseb;
+	}
+		break;
+	case animnode_type::blend2d:
+	{
+		auto source = (Blend2d_CFG*)node;
+		bool posesvalid = source->idle;
+		for (int i = 0; i < 8; i++)
+			posesvalid &= bool(source->directions[i]);
+		return posesvalid && source->xparam.is_valid() && source->yparam.is_valid();
+	}
+		break;
+	case animnode_type::add:
+	{
+		auto source = (Add_Node_CFG*)node;
+		return source->base_pose && source->diff_pose && source->param.is_valid();
+	}
+		break;
+	case animnode_type::subtract:
+	{
+		auto source = (Subtract_Node_CFG*)node;
+		return source->ref && source->source;
+	}
+		break;
+	case animnode_type::aimoffset:
+		break;
+	case animnode_type::mirror:
+	{
+		auto source = (Mirror_Node_CFG*)node;
+		return source->input && source->param.is_valid();
+	}
+		break;
+	case animnode_type::play_speed:
+		break;
+	case animnode_type::rootmotion_speed:
+	{
+		auto source = (Scale_By_Rootmotion_CFG*)node;
+		return source->child && source->param.is_valid();
+	}
+		break;
+	case animnode_type::sync:
+	{
+		auto source = (Sync_Node_CFG*)node;
+		return source->child;
+	}
+		break;
+	case animnode_type::state:
+	{
+		return state.state_ptr->tree;
+	}
+		break;
+	case animnode_type::root:
+		break;
+	case animnode_type::start_statemachine:
+		break;
+	case animnode_type::COUNT:
+		break;
+	default:
+		break;
+	}
+}
+
 void AnimationGraphEditor::tick(float dt)
 {
 	{
@@ -1097,6 +1210,17 @@ void AnimationGraphEditor::tick(float dt)
 		out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 	}
 
+	out.anim.tick_tree_new(dt);
+	out.anim.ConcatWithInvPose();
+
+	Render_Object ro;
+	ro.mesh = &out.model->mesh;
+	ro.mats = &out.model->mats;
+	ro.transform = out.model->skeleton_root_transform;
+	ro.animator = &out.anim;
+
+	idraw->update_obj(out.obj, ro);
+
 	auto window_sz = eng->get_game_viewport_dimensions();
 	out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 }
@@ -1105,15 +1229,19 @@ void AnimationGraphEditor::overlay_draw()
 {
 
 }
-
+extern void load_mirror_remap(Model* model, const char* path);
 void AnimationGraphEditor::open(const char* name)
 {
 	this->name = name;
 
 	out.model = mods.find_or_load("player_FINAL.glb");
+	load_mirror_remap(out.model, "./Data/Animations/remap.txt");
+
 	out.set = out.model->animations.get();
 	out.anim.set_model(out.model);
 	out.obj = idraw->register_obj();
+
+	out.anim.tree = &out.tree_rt;
 
 	Render_Object ro;
 	ro.mesh = &out.model->mesh;

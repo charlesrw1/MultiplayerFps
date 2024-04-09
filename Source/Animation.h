@@ -196,6 +196,8 @@ public:
 	void SetupBones();
 	void ConcatWithInvPose();
 
+	void tick_tree_new(float dt);
+
 	// what renderer consumes
 	const std::vector<glm::mat4x4> get_matrix_palette() const { 
 		return matrix_palette; 

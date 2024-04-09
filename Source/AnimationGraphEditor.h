@@ -79,16 +79,18 @@ public:
 	};
 	std::array<static_atr, MAX_STATIC_ATRS> attributes;
 
-	void add_input(Editor_Graph_Node* input, uint32_t slot) {
+	void add_input(AnimationGraphEditor* ed, Editor_Graph_Node* input, uint32_t slot) {
 		inputs[slot] = input;
 
 		if (grow_pin_count_on_new_pin()) {
 			if (num_inputs > 0 && inputs[num_inputs - 1])
 				num_inputs++;
 		}
+
+		on_state_change(ed);
 	}
 
-	void remove_reference(Editor_Graph_Node* node);
+	void remove_reference(AnimationGraphEditor* ed, Editor_Graph_Node* node);
 
 	uint32_t getinput_id(uint32_t inputslot) {
 		return inputslot + id * MAX_INPUTS + INPUT_START;
@@ -145,6 +147,12 @@ public:
 
 	bool grow_pin_count_on_new_pin() {
 		return type == animnode_type::state || type == animnode_type::selector;
+	}
+
+	Node_CFG* get_nodecfg_for_slot(uint32_t slot) {
+		if (inputs[slot] && inputs[slot]->is_node_valid())
+			return inputs[slot]->node;
+		return nullptr;
 	}
 
 	animnode_type type = animnode_type::source;
@@ -281,6 +289,10 @@ public:
 	};
 
 	void update_every_node() {
+		for (int i = 0; i < nodes.size(); i++) {
+			nodes[i]->on_state_change(this);
+		}
+		// do it twice because... reasons...
 		for (int i = 0; i < nodes.size(); i++) {
 			nodes[i]->on_state_change(this);
 		}

@@ -1239,7 +1239,30 @@ void Animator::postprocess_animation(Pose& pose, float dt)
 	Pose_Pool::get().free(1);
 }
 
+void Animator::tick_tree_new(float dt)
+{
+	Pose* poses = Pose_Pool::get().alloc(2);
 
+	NodeRt_Ctx ctx;
+	ctx.tree = tree;
+	ctx.model = model;
+	ctx.set = set;
+	ctx.vars = &tree->parameters;
+	GetPose_Ctx gp_ctx;
+	gp_ctx.dt = dt;
+	gp_ctx.pose = &poses[0];
+
+	if (tree->cfg->root)
+		tree->cfg->root->get_pose(ctx, gp_ctx);
+	else
+		util_set_to_bind_pose(poses[0], model);
+
+	//postprocess_animation(poses[0], dt);
+
+	UpdateGlobalMatricies(poses[0].q, poses[0].pos, cached_bonemats);
+
+	Pose_Pool::get().free(2);
+}
 
 void Animator::evaluate_new(float dt)
 {

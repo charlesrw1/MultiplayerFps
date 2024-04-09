@@ -114,7 +114,7 @@ State* State::get_next_state(NodeRt_Ctx& ctx)
 	Pose* addtemp = Pose_Pool::get().alloc(1);
 	posea->get_pose(ctx, pose);
 	poseb->get_pose(ctx, pose.set_pose(addtemp));
-	util_blend(ctx.num_bones(), *addtemp, *pose.pose, rt->lerp_amt);
+	util_blend(ctx.num_bones(), *addtemp, *pose.pose,dest);
 	Pose_Pool::get().free(1);
 	return true;
 }
@@ -154,7 +154,6 @@ State* State::get_next_state(NodeRt_Ctx& ctx)
  bool Statemachine_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 
 	auto rt = get_rt<Statemachine_Node_RT>(ctx);
-
 
 	// evaluate state machine
 	if (rt->active_state == nullptr) {

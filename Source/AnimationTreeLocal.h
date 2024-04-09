@@ -35,6 +35,7 @@ enum class animnode_type
 	COUNT
 };
 
+
 struct NodeRt_Ctx;
 struct ScriptExpression
 {
@@ -68,12 +69,14 @@ struct NodeRt_Ctx
 struct GetPose_Ctx
 {
 	GetPose_Ctx set_pose(Pose* newpose) {
-		pose = newpose;
-		return *this;
+		GetPose_Ctx gp = *this;
+		gp.pose = newpose;
+		return gp;
 	}
 	GetPose_Ctx set_dt(float newdt) {
-		dt = newdt;
-		return *this;
+		GetPose_Ctx gp = *this;
+		gp.dt = newdt;
+		return gp;
 	}
 	// used for syncronizing animations
 	struct syncval {
@@ -81,12 +84,14 @@ struct GetPose_Ctx
 		bool first_seen = false;
 	};
 	GetPose_Ctx set_sync(syncval* s) {
-		sync = s;
-		return *this;
+		GetPose_Ctx gp = *this;
+		gp.sync = s;
+		return gp;
 	}
 	GetPose_Ctx set_rootmotion(float rm) {
-		rootmotion_scale = rm;
-		return *this;
+		GetPose_Ctx gp = *this;
+		gp.rootmotion_scale = rm;
+		return gp;
 	}
 
 	Pose* pose = nullptr;
@@ -106,7 +111,7 @@ struct Node_CFG
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const = 0;
 	virtual void construct(NodeRt_Ctx& ctx) const {
-		assert(rt_offset == 0);
+		//assert(rt_offset == 0);
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const = 0;
 	virtual bool is_clip_node() const { return false; }
@@ -214,14 +219,17 @@ struct Clip_Node_CFG : public Node_CFG
 		Clip_Node_RT* rt = construct_this<Clip_Node_RT>(ctx);
 
 		rt->clip_index = ctx.set->find(clip_name.c_str());
-		int root_index = ctx.model->root_bone_index;
-		int first_pos = ctx.set->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
-		rt->root_pos_first_frame = first_pos != -1 ?
-			ctx.set->GetPos(root_index, first_pos, rt->clip_index).val
-			: ctx.model->bones[root_index].posematrix[3];
 
-		const Animation& clip = ctx.set->clips[rt->clip_index];
-		rt->inv_speed_of_anim_root = 1.0 / glm::length(clip.root_motion_translation) / (clip.total_duration / clip.fps);
+		if (rt->clip_index != -1) {
+			int root_index = ctx.model->root_bone_index;
+			int first_pos = ctx.set->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
+			rt->root_pos_first_frame = first_pos != -1 ?
+				ctx.set->GetPos(root_index, first_pos, rt->clip_index).val
+				: ctx.model->bones[root_index].posematrix[3];
+
+			const Animation& clip = ctx.set->clips[rt->clip_index];
+			rt->inv_speed_of_anim_root = 1.0 / glm::length(clip.root_motion_translation) / (clip.total_duration / clip.fps);
+		}
 	}
 
 
