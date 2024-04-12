@@ -53,8 +53,6 @@ void Client::connect(string address)
 	for (int i = 0; i < NUM_GAME_ENTS; i++)
 		interpolation_data[i] = Entity_Interp();
 
-	eng->client_goto_loading();
-
 	TrySendingConnect();
 }
 

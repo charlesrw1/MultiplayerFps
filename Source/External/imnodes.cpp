@@ -29,6 +29,62 @@
 
 ImNodesContext* GImNodes = NULL;
 
+
+static float my_min(float x, float y) {
+    return (x < y) ? x : y;
+}
+static float my_max(float x, float y) {
+    return (x > y) ? x : y;
+}
+
+// a----|---b
+//   c--|--d
+// a---------|(b)
+//              (c)|--d
+
+
+static void find_overlap_point1d(float a_start, float a_end, float b_start, float b_end, float& out1, float& out2)
+{
+    float overlapStart = my_max(a_start, b_start);
+    float overlapEnd = my_min(a_end, b_end);
+
+    if (overlapEnd-0.00001 > overlapStart) {
+        // overlap exists
+        float overlap = overlapEnd - overlapStart;
+        out1 = out2 = overlapStart + overlap * 0.5f;
+    }
+    else {
+        out1 = (b_start+0.00001 > a_end) ? a_end : a_start;
+        out2 = (b_start+0.00001 > a_end) ? b_start : b_end;
+    }
+}
+
+
+static void closest_ray_between_rects(ImVec2 min1, ImVec2 max1, ImVec2 min2, ImVec2 max2, ImVec2& outpoint1, ImVec2& outpoint2)
+{
+    find_overlap_point1d(min1.x, max1.x, min2.x, max2.x, outpoint1.x, outpoint2.x);
+    find_overlap_point1d(min1.y, max1.y, min2.y, max2.y, outpoint1.y, outpoint2.y);
+
+
+    ImVec2 rayvec = outpoint2 - outpoint1;
+    if (ImDot(rayvec,ImVec2(0.1,1)) < 0.0 && ImLengthSqr(rayvec) > 0.0001) {
+        rayvec /= sqrt(ImLengthSqr(rayvec));
+        ImVec2 sidevec = ImVec2(rayvec.y, -rayvec.x);
+        // offset ray if it faces downwards so paralell rays are possible
+        outpoint1 += sidevec*10.f;
+        outpoint2 += sidevec*10.f;
+    }
+}
+
+
+static void GetClosestPointsOnRectDirectLine(ImRect startrect, ImRect endrect, ImVec2& ray_start, ImVec2& ray_end)
+{
+    const ImNodesEditorContext& editor = ImNodes::EditorContextGet();
+
+    closest_ray_between_rects(startrect.Min, startrect.Max, endrect.Min, endrect.Max, ray_start, ray_end);
+}
+
+
 namespace IMNODES_NAMESPACE
 {
 namespace
@@ -40,7 +96,6 @@ struct CubicBezier
     ImVec2 P0, P1, P2, P3;
     int    NumSegments;
 };
-
 inline ImVec2 EvalCubicBezier(
     const float   t,
     const ImVec2& P0,
@@ -133,6 +188,21 @@ inline CubicBezier GetCubicBezier(
     cubic_bezier.NumSegments = ImMax(static_cast<int>(link_length * line_segments_per_length), 1);
     return cubic_bezier;
 }
+
+static ImNodes::CubicBezier GetCubicBezier_Replacement(const ImPinData& start, const ImPinData& end, const ImLinkData& link)
+{
+    const ImNodesEditorContext& editor = ImNodes::EditorContextGet();
+
+    const ImNodeData& parent_start = editor.Nodes.Pool[start.ParentNodeIdx];
+    const ImNodeData& parent_end = editor.Nodes.Pool[end.ParentNodeIdx];
+    ImVec2 ray_start, ray_end;
+    closest_ray_between_rects(parent_start.Rect.Min, parent_start.Rect.Max, parent_end.Rect.Min, parent_end.Rect.Max, ray_start, ray_end);
+
+    printf("%f %f\n", ray_end.x, ray_end.y);
+
+    return GetCubicBezier(ray_start, ray_end, start.Type, GImNodes->Style.LinkLineSegmentsPerLength, false);
+}
+
 
 inline float EvalImplicitLineEq(const ImVec2& p1, const ImVec2& p2, const ImVec2& p)
 {
@@ -555,6 +625,7 @@ ImVec2 GetScreenSpacePinCoordinates(
     return ImVec2(x, 0.5f * (attribute_rect.Min.y + attribute_rect.Max.y));
 }
 
+
 ImVec2 GetScreenSpacePinCoordinates(const ImNodesEditorContext& editor, const ImPinData& pin)
 {
     const ImRect& parent_node_rect = editor.Nodes.Pool[pin.ParentNodeIdx].Rect;
@@ -789,15 +860,29 @@ void BoxSelectorUpdateSelection(ImNodesEditorContext& editor, ImRect box_rect)
             const ImRect&    node_start_rect = editor.Nodes.Pool[pin_start.ParentNodeIdx].Rect;
             const ImRect&    node_end_rect = editor.Nodes.Pool[pin_end.ParentNodeIdx].Rect;
 
-            const ImVec2 start = GetScreenSpacePinCoordinates(
+            ImVec2 start = GetScreenSpacePinCoordinates(
                 node_start_rect, pin_start.AttributeRect, pin_start.Type);
-            const ImVec2 end =
+            ImVec2 end =
                 GetScreenSpacePinCoordinates(node_end_rect, pin_end.AttributeRect, pin_end.Type);
 
-            // Test
-            if (RectangleOverlapsLink(box_rect, start, end, pin_start.Type, link.no_curved_bezier))
+            if (link.use_direct_line) {
+
+                GetClosestPointsOnRectDirectLine(node_start_rect, node_end_rect, start, end);
+
+                if (RectangleOverlapsLink(box_rect, start, end, pin_start.Type, true)) {
+                    editor.SelectedLinkIndices.push_back(link_idx);
+
+                }
+
+            }
+            else
             {
-                editor.SelectedLinkIndices.push_back(link_idx);
+                // Test
+                if (RectangleOverlapsLink(box_rect, start, end, pin_start.Type, false))
+                {
+                    editor.SelectedLinkIndices.push_back(link_idx);
+                }
+
             }
         }
     }
@@ -1266,8 +1351,12 @@ ImOptionalIndex ResolveHoveredLink(
         // TODO: the calculated CubicBeziers could be cached since we generate them again when
         // rendering the links
 
-        const CubicBezier cubic_bezier = GetCubicBezier(
-            start_pin.Pos, end_pin.Pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength, !link.no_curved_bezier);
+        CubicBezier cubic_bezier;
+        if (link.use_direct_line)
+            cubic_bezier = GetCubicBezier_Replacement(start_pin, end_pin, link);
+        else
+            cubic_bezier = GetCubicBezier(
+            start_pin.Pos, end_pin.Pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength, true);
 
         // The distance test
         {
@@ -1576,15 +1665,19 @@ void DrawNode(ImNodesEditorContext& editor, const int node_idx)
     }
 }
 
+
 void DrawLink(ImNodesEditorContext& editor, const int link_idx)
 {
     const ImLinkData& link = editor.Links.Pool[link_idx];
     const ImPinData&  start_pin = editor.Pins.Pool[link.StartPinIdx];
     const ImPinData&  end_pin = editor.Pins.Pool[link.EndPinIdx];
 
-    const CubicBezier cubic_bezier = GetCubicBezier(
-        start_pin.Pos, end_pin.Pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength, !link.no_curved_bezier);
-
+    CubicBezier cubic_bezier;
+    if (link.use_direct_line)
+        cubic_bezier = GetCubicBezier_Replacement(start_pin, end_pin, link);
+    else
+        cubic_bezier = GetCubicBezier(
+            start_pin.Pos, end_pin.Pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength, true);
     const bool link_hovered =
         GImNodes->HoveredLinkIdx == link_idx &&
         editor.ClickInteraction.Type != ImNodesClickInteractionType_BoxSelection;
@@ -1613,6 +1706,25 @@ void DrawLink(ImNodesEditorContext& editor, const int link_idx)
     {
         link_color = link.ColorStyle.Hovered;
     }
+
+    if (link.use_direct_line) {
+        ImVec2 rayvec = cubic_bezier.P3 - cubic_bezier.P0;
+        if (ImLengthSqr(rayvec) > 0.00001) {
+            float len = sqrt(ImLengthSqr(rayvec));
+            rayvec /= len;
+            ImVec2 sidevec = ImVec2(rayvec.y, -rayvec.x);
+
+            ImVec2 arrowvec = rayvec*-1.8f + sidevec;
+
+            GImNodes->CanvasDrawList->AddTriangleFilled(
+                cubic_bezier.P3,
+                cubic_bezier.P3 + (rayvec * -1.8f - sidevec)*10.0,
+                cubic_bezier.P3 + (rayvec * -1.8f + sidevec)*10.0,
+                link_color
+            );
+        }
+}
+
 
 #if IMGUI_VERSION_NUM < 18000
     GImNodes->CanvasDrawList->AddBezierCurve(
@@ -2598,7 +2710,7 @@ void PopAttributeFlag()
     GImNodes->CurrentAttributeFlags = GImNodes->AttributeFlagStack.back();
 }
 
-void Link(const int id, const int start_attr_id, const int end_attr_id, bool no_curve)
+void Link(const int id, const int start_attr_id, const int end_attr_id, bool use_direct_line)
 {
     IM_ASSERT(GImNodes->CurrentScope == ImNodesScope_Editor);
 
@@ -2610,7 +2722,7 @@ void Link(const int id, const int start_attr_id, const int end_attr_id, bool no_
     link.ColorStyle.Base = GImNodes->Style.Colors[ImNodesCol_Link];
     link.ColorStyle.Hovered = GImNodes->Style.Colors[ImNodesCol_LinkHovered];
     link.ColorStyle.Selected = GImNodes->Style.Colors[ImNodesCol_LinkSelected];
-    link.no_curved_bezier = no_curve;
+    link.use_direct_line = use_direct_line;
 
     // Check if this link was created by the current link event
     if ((editor.ClickInteraction.Type == ImNodesClickInteractionType_LinkCreation &&

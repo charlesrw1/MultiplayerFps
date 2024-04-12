@@ -21,17 +21,7 @@ AnimationGraphEditorPublic* g_anim_ed_graph = &ed;
 
 void AnimationGraphEditor::init()
 {
-	imgui_node_context = ImNodes::CreateContext();
-
-	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
-
-	editing_tree = new Animation_Tree_CFG;
-	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
-
-	add_root_node_to_layer(0, false);
-	tabs.push_back(tab());
-	default_editor = ImNodes::EditorContextCreate();
-	ImNodes::EditorContextSet(default_editor);
+	
 }
 
 void AnimationGraphEditor::close()
@@ -39,6 +29,16 @@ void AnimationGraphEditor::close()
 	idraw->remove_obj(out.obj);
 
 	ImNodes::DestroyContext(imgui_node_context);
+
+	for (int i = 0; i < nodes.size(); i++) {
+		delete nodes[i];
+	}
+	nodes.clear();
+
+	assert(editing_tree);
+	editing_tree->arena.shutdown();
+	delete editing_tree;
+	editing_tree = nullptr;
 }
 
 
@@ -81,36 +81,6 @@ unsigned int color32_to_int(Color32 color) {
 void AnimationGraphEditor::begin_draw()
 {
 	is_modifier_pressed = ImGui::GetIO().KeyAlt;
-
-
-	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
-
-		if (ImNodes::NumSelectedNodes() == 1) {
-			int node = 0;
-			ImNodes::GetSelectedNodes(&node);
-
-			Editor_Graph_Node* mynode = find_node_from_id(node);
-			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
-				auto findtab = find_tab(mynode);
-				if (findtab) {
-					findtab->mark_for_selection = true;
-				}
-				else {
-
-					tab t;
-					t.layer = &mynode->sublayer;
-					t.owner_node = mynode;
-					t.open = true;
-					t.pan = glm::vec2(0.f);
-					t.mark_for_selection = true;
-					tabs.push_back(t);
-				}
-			}
-			ImNodes::ClearNodeSelection();
-
-		}
-	}
-
 
 	if (ImGui::Begin("animation graph property editor"))
 	{
@@ -224,6 +194,35 @@ void AnimationGraphEditor::begin_draw()
 	ImGui::End();
 
 	ImGui::Begin("animation graph editor");
+	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
+
+		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_RootWindow) && ImNodes::NumSelectedNodes() == 1) {
+			int node = 0;
+			ImNodes::GetSelectedNodes(&node);
+
+			Editor_Graph_Node* mynode = find_node_from_id(node);
+			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
+				auto findtab = find_tab(mynode);
+				if (findtab) {
+					findtab->mark_for_selection = true;
+				}
+				else {
+
+					tab t;
+					t.layer = &mynode->sublayer;
+					t.owner_node = mynode;
+					t.open = true;
+					t.pan = glm::vec2(0.f);
+					t.mark_for_selection = true;
+					tabs.push_back(t);
+				}
+			}
+			ImNodes::ClearNodeSelection();
+
+		}
+	}
+
+
 
 
 	int rendered = 0;
@@ -374,8 +373,20 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		for (int j = 0; j < node->num_inputs; j++) {
 			if (node->inputs[j]) {
 
+				if (node->draw_flat_links()) {
+					ImNodes::PushColorStyle(ImNodesCol_Link, color32_to_int({ 0,0xff,0 }));
+					ImNodes::PushColorStyle(ImNodesCol_LinkHovered, color32_to_int({ 0xff,0xff,0xff }));
+					ImNodes::PushColorStyle(ImNodesCol_LinkSelected, color32_to_int({ 0xff,0xff,0xff }));
+
+				}
 				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j), node->draw_flat_links());
 
+				if (node->draw_flat_links()) {
+					ImNodes::PopColorStyle();
+					ImNodes::PopColorStyle();
+					ImNodes::PopColorStyle();
+
+				}
 			}
 		}
 	}
@@ -571,7 +582,9 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 				auto a = create_graph_node_from_type(type);
 				a->graph_layer = get_current_layer_from_tab();
 
+				ImNodes::ClearNodeSelection();
 				ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
+				ImNodes::SelectNode(a->id);
 
 				if (drop_state.from) {
 					if (drop_state.from_is_input) {
@@ -866,7 +879,13 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 		ImGui::DragFloat("Damp", &source->weight_damp, 0.025, 0.0);
 	}
 		break;
-	case animnode_type::add:
+	case animnode_type::add: {
+		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
+
+		if (ImGui::InputText("Param", text_buffer1, sizeof text_buffer1, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
+			update_me = true;
+		}
+	}
 		break;
 	case animnode_type::subtract:
 		break;
@@ -975,6 +994,8 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 
 		source->posea = get_nodecfg_for_slot(0);
 		source->poseb = get_nodecfg_for_slot(1);
+
+		assert(param.id >= -1);
 	}
 		break;
 	case animnode_type::blend2d: {
@@ -984,12 +1005,16 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 			printf("Param, %s, not valid\n", text_buffer1);
 		}
 		source->xparam = param;
+		assert(param.id >= -1);
+
 
 		param = ed->editing_tree->find_param(remove_whitespace(text_buffer2).c_str());
 		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
 			printf("Param, %s, not valid\n", text_buffer2);
 		}
 		source->yparam = param;
+		assert(param.id >= -1);
+
 
 		source->idle = get_nodecfg_for_slot(0);
 		for (int i = 0; i < 8; i++) {
@@ -1000,7 +1025,11 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	case animnode_type::add:
 	{
 		auto source = (Add_Node_CFG*)node;
-
+		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
+		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
+			printf("Param, %s, not valid\n", text_buffer1);
+		}
+		source->param = param;
 		source->diff_pose = get_nodecfg_for_slot(0);
 		source->base_pose = get_nodecfg_for_slot(1);
 	}	break;
@@ -1110,7 +1139,7 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 		ctx.model = ed->out.model;
 		ctx.set = ed->out.set;
 		ctx.tree = &ed->out.tree_rt;
-		ASSERT(ctx.tree->data.size() > 0);
+		//ASSERT(ctx.tree->data.size() > 0);
 		ASSERT(ctx.tree->cfg != nullptr);
 
 		node->construct(ctx);
@@ -1233,6 +1262,19 @@ extern void load_mirror_remap(Model* model, const char* path);
 void AnimationGraphEditor::open(const char* name)
 {
 	this->name = name;
+
+	imgui_node_context = ImNodes::CreateContext();
+
+	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
+
+	editing_tree = new Animation_Tree_CFG;
+	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
+
+	add_root_node_to_layer(0, false);
+	tabs.push_back(tab());
+	default_editor = ImNodes::EditorContextCreate();
+	ImNodes::EditorContextSet(default_editor);
+
 
 	out.model = mods.find_or_load("player_FINAL.glb");
 	load_mirror_remap(out.model, "./Data/Animations/remap.txt");

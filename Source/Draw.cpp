@@ -12,6 +12,10 @@
 
 #include "Entity.h"
 
+#ifdef EDITDOC
+#include "EditorDocPublic.h"
+#endif
+
 //#pragma optimize("", off)
 
 Renderer draw;
@@ -2631,9 +2635,6 @@ void draw_debug_shapes()
 }
 
 
-
-
-#include "EditorDoc.h"
 void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 {
 	GPUFUNCTIONSTART;
@@ -2645,7 +2646,7 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 	const bool needs_composite = eng->is_drawing_to_window_viewport();
 
 	if (cur_w != view.width || cur_h != view.height)
-		InitFramebuffers(needs_composite, view.width, view.height);
+		InitFramebuffers(true, view.width, view.height);
 	lastframe_vs = current_frame_main_view;
 
 	current_frame_main_view = view;
@@ -2660,7 +2661,7 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 	active_constants_ubo = ubo.current_frame;
 
 	//if (editor_mode)
-	//	eng->eddoc->scene_draw_callback();
+	//	g_editor_doc->scene_draw_callback();
 
 	scene.build_scene_data();
 
@@ -2737,7 +2738,7 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 	draw_debug_shapes();
 
 	if (mode == special_render_mode::lvl_editor)
-		eng->eddoc->overlays_draw();
+		g_editor_doc->overlays_draw();
 
 	glCheckError();
 	

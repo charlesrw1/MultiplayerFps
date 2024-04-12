@@ -128,6 +128,7 @@
     <ClCompile Include="Source\AnimationTreeLocal.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Source\External\imnodes_internal.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationGraphEditor.h">
@@ -172,7 +173,7 @@
     <ClInclude Include="Source\DrawTypedefs.h">
       <Filter>Source\Draw</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EditorDoc.h">
+    <ClInclude Include="Source\EditorDocLocal.h">
       <Filter>Source\Editor</Filter>
     </ClInclude>
     <ClInclude Include="Source\EmulatedSocket.h">
@@ -303,6 +304,9 @@
     </ClInclude>
     <ClInclude Include="Source\AnimationGraphEditorPublic.h">
       <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EditorDocPublic.h">
+      <Filter>Source\Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

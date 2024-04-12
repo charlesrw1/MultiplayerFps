@@ -558,16 +558,14 @@ Entity& Game_Engine::local_player()
 
 void Game_Engine::connect_to(string address)
 {
-	if (get_state() != ENGINE_MENU) {
-		// goto menu state first
-		exit_to_menu("connecting to another server");
-	}
+	travel_to_engine_state(ENGINE_LOADING, "connecting to another server");
+
 	sys_print("Connecting to server %s\n", address.c_str());
 	cl->connect(address);
 }
 
 #ifdef EDITDOC
-#include "EditorDoc.h"
+#include "EditorDocPublic.h"
 
 DECLARE_ENGINE_CMD(editdoc)
 {
@@ -587,55 +585,65 @@ DECLARE_ENGINE_CMD(animedit)
 	eng->start_anim_editor(args.at(1));
 }
 
+/* particleedit */
 
-void Game_Engine::start_anim_editor(const char* name)
+void Game_Engine::enable_imgui_docking()
 {
-	if (state == ENGINE_ANIMATION_EDITOR && strcmp( name, g_anim_ed_graph->get_name()) == 0) {
-		sys_print("already editing that anim graph");
-		return;
-	}
-	sys_print("starting anim editor %s\n", name);
-	if (state == ENGINE_GAME) {
-		exit_to_menu("starting anim editor\n");
-	}
-	else if (state == ENGINE_EDITOR) {
-		eddoc->close_doc();
-		unload_current_level();
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+}
+void Game_Engine::disable_imgui_docking()
+{
+	ImGui::GetIO().ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable);
+}
+
+void Game_Engine::travel_to_engine_state(Engine_State next_state, const char* exit_reason)
+{
+	const bool going_to_same_state = next_state == state;
+
+	static const char* last_settings = nullptr;
+	static size_t last_settings_size = 0;
+
+	if (state == ENGINE_LVL_EDITOR) {
+		g_editor_doc->close_doc();	// calls save on current document
 	}
 	else if (state == ENGINE_ANIMATION_EDITOR) {
 		g_anim_ed_graph->close();
-		unload_current_level();
+		last_settings = ImGui::SaveIniSettingsToMemory(&last_settings_size);
+		disable_imgui_docking();
 	}
+
+	if (next_state == ENGINE_ANIMATION_EDITOR) {
+		enable_imgui_docking();
+		if (last_settings)
+			ImGui::LoadIniSettingsFromMemory(last_settings, last_settings_size);
+	}
+
+
+
+	// if the client is transitioning from loading to game, don't unload
+	if(!(next_state == ENGINE_GAME && state == ENGINE_LOADING))
+		exit_to_menu(exit_reason);
+
+	set_state(next_state);
+}
+
+
+void Game_Engine::start_anim_editor(const char* name)
+{
+	sys_print("starting anim editor %s\n", name);
+
+	travel_to_engine_state(ENGINE_ANIMATION_EDITOR, "exiting because starting animation editor");
 
 	eng->level = open_empty_level();
 	idraw->on_level_start();
 	g_anim_ed_graph->open(name);
-	set_state(ENGINE_ANIMATION_EDITOR);
 }
 
 void Game_Engine::start_editor(const char* map)
 {
-	if (state == ENGINE_EDITOR && map == mapname) {
-		sys_print("already editing that map");
-		return;
-	}
-
 	sys_print("starting editor on map %s\n", map);
-	if (state == ENGINE_GAME) {
-		exit_to_menu("starting editor");
-	}
-	else if (state == ENGINE_EDITOR) {
-		eddoc->close_doc();	// calls save on current document
-		unload_current_level();
-	}
-	else if (state == ENGINE_ANIMATION_EDITOR) {
-		g_anim_ed_graph->close();
-		unload_current_level();
-	}
 
-	if (!eddoc) {
-		eddoc = new EditorDoc;
-	}
+	travel_to_engine_state(ENGINE_LVL_EDITOR, "exiting because starting level editor");
 
 	mapname = map;
 	level = LoadLevelFile(map);
@@ -647,9 +655,7 @@ void Game_Engine::start_editor(const char* map)
 
 	idraw->on_level_start();
 
-	eddoc->open_doc(map);
-
-	set_state(ENGINE_EDITOR);
+	g_editor_doc->open_doc(map);
 }
 
 void Game_Engine::close_editor()
@@ -677,7 +683,7 @@ DECLARE_ENGINE_CMD(bind)
 
 DECLARE_ENGINE_CMD_CAT("sv.",end)
 {
-	eng->exit_to_menu("server is ending");
+	eng->travel_to_engine_state(ENGINE_MENU, "server is ending");
 }
 
 DECLARE_ENGINE_CMD_CAT("cl.",force_update)
@@ -695,7 +701,7 @@ DECLARE_ENGINE_CMD(connect)
 }
 DECLARE_ENGINE_CMD(disconnect)
 {
-	eng->exit_to_menu("disconnecting");
+	eng->travel_to_engine_state(ENGINE_MENU, "disconnecting from server");
 }
 DECLARE_ENGINE_CMD(reconnect)
 {
@@ -852,9 +858,7 @@ void Game_Local::init()
 
 bool Game_Engine::start_map(string map, bool is_client)
 {
-	if (!is_client && get_state() != ENGINE_MENU) {
-		exit_to_menu("starting a new server");
-	}
+	travel_to_engine_state(is_client ? ENGINE_LOADING : ENGINE_GAME, is_client ? "exiting to start client" : "exiting to start server");
 
 	sys_print("Starting map %s\n", map.c_str());
 	mapname = map;
@@ -876,7 +880,6 @@ bool Game_Engine::start_map(string map, bool is_client)
 	if (!is_client) {
 		sv->start();
 		eng->is_host = true;
-		eng->set_state(ENGINE_GAME);
 		on_game_start();
 		sv->connect_local_client();
 	}
@@ -911,14 +914,10 @@ void Game_Engine::unload_current_level()
 	Debug::on_fixed_update_start();
 }
 
-void Game_Engine::client_goto_loading()
-{
-	set_state(ENGINE_LOADING);
-}
-
 void Game_Engine::client_enter_into_game()
 {
-	set_state(ENGINE_GAME);
+	sys_print("Local client entering into game state\n");
+	travel_to_engine_state(ENGINE_GAME, "going from loading to game state");
 }
 
 // my design sucks, client calls exit_to_menu() so only server needs to be ended here
@@ -936,7 +935,6 @@ void Game_Engine::exit_to_menu(const char* reason)
 
 	unload_current_level();
 	is_host = false;
-	set_state(ENGINE_MENU);
 }
 
 void Game_Engine::key_event(SDL_Event event)
@@ -1166,14 +1164,18 @@ void Game_Engine::draw_debug_interface()
 {
 	Debug_Interface::get()->draw();
 
-	if (state == ENGINE_EDITOR)
-		eddoc->imgui_draw();
+	if (state == ENGINE_LVL_EDITOR)
+		g_editor_doc->imgui_draw();
 
-	if(state == ENGINE_ANIMATION_EDITOR)
+	if (state == ENGINE_ANIMATION_EDITOR) {
+		ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
 		g_anim_ed_graph->begin_draw();
+	}
 
 	if (is_drawing_to_window_viewport()) {
 		eng->game_focused = false;
+
 		if (ImGui::Begin("Scene viewport",nullptr,  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
 
 			auto size = ImGui::GetWindowSize();
@@ -1216,8 +1218,8 @@ void Game_Engine::draw_screen()
 		view = local.last_view;
 		idraw->scene_draw(view);
 	}
-	else if (state == ENGINE_EDITOR) {
-		view = eddoc->get_vs();
+	else if (state == ENGINE_LVL_EDITOR) {
+		view = g_editor_doc->get_vs();
 		idraw->scene_draw(view, special_render_mode::lvl_editor);
 	}
 	else if (state == ENGINE_ANIMATION_EDITOR) {
@@ -1246,7 +1248,8 @@ void Game_Engine::draw_screen()
 
 void Game_Engine::set_state(Engine_State state)
 {
-	const char* engine_strs[] = { "menu", "loading", "game", "editor", "anim editor"};
+	static const char* engine_strs[] = { "menu", "loading", "game", "lvl editor", "anim editor"};
+	static_assert((sizeof(engine_strs) / sizeof(char*)) == ENGINE_STATE_COUNT, "forgot to add engine state str");
 
 	if (this->state != state)
 		sys_print("Engine going to %s state\n", engine_strs[(int)state]);
@@ -1590,8 +1593,8 @@ void Game_Engine::loop()
 			}
 
 			#ifdef EDITDOC
-			if (state == ENGINE_EDITOR) {
-				eddoc->handle_event(event);
+			if (state == ENGINE_LVL_EDITOR) {
+				g_editor_doc->handle_event(event);
 			}
 			else if (state == ENGINE_ANIMATION_EDITOR) {
 				g_anim_ed_graph->handle_event(event);
@@ -1608,8 +1611,8 @@ void Game_Engine::loop()
 			break;
 
 		#ifdef EDITDOC
-		case ENGINE_EDITOR:
-			eng->eddoc->update();
+		case ENGINE_LVL_EDITOR:
+			g_editor_doc->update();
 			break;
 
 		case ENGINE_ANIMATION_EDITOR:

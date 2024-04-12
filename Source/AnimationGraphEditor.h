@@ -26,6 +26,65 @@ struct editor_layer {
 	uint32_t id = 1;
 };
 
+class binary_file_writer
+{
+public:
+	uint8_t read_byte();
+	uint16_t read_word();
+	uint32_t read_int();
+
+
+	const char* read_string(int offset);
+	uint8_t* read_bytes(int offset);
+};
+
+struct animation_graph_game_header
+{
+	int version = 1;
+
+	int node_offset = 0;
+	int node_count = 0;
+	int state_offset = 0;
+	int state_count = 0;
+
+	int control_param_offset = 0;
+	int control_param_count = 0;
+
+	int string_table_offset = 0;
+	int string_table_size = 0;
+	int binary_table_offset = 0;
+	int binary_table_size = 0;
+
+	int root_node_index = 0;
+};
+
+struct animation_graph_editor_header
+{
+	int version = 1;
+
+	int node_offset = 0;
+	int node_count = 0;
+};
+
+// serialize a format just for runtime
+// and a format for editor use
+
+// editor use wraps around the runtime version
+
+// runtime:
+// list of nodes in a flat array
+// use index for pointers to other nodes
+// list of states in a flat array
+// use index for pointers to next states
+// list of control parameters
+// handle to root node
+// meta data about creation date etc
+// string table and binary table for data
+
+// editor format:
+// list of nodes which have handles into runtime nodes and runtime states
+// store imnodes id
+
 const uint32_t MAX_INPUTS = 16;
 const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
 const uint32_t INPUT_START = MAX_NODES_IN_GRAPH;

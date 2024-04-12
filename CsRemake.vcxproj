@@ -26,6 +26,7 @@
     <ClCompile Include="Source\Animation_Tree.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\External\imnodes.cpp" />
+    <ClCompile Include="Source\External\imnodes_internal.cpp" />
     <ClCompile Include="Source\Files.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
@@ -78,7 +79,8 @@
     <ClInclude Include="Source\DrawLocal.h" />
     <ClInclude Include="Source\DrawPublic.h" />
     <ClInclude Include="Source\DrawTypedefs.h" />
-    <ClInclude Include="Source\EditorDoc.h" />
+    <ClInclude Include="Source\EditorDocLocal.h" />
+    <ClInclude Include="Source\EditorDocPublic.h" />
     <ClInclude Include="Source\Entity.h" />
     <ClInclude Include="Source\Entityclasses.h" />
     <ClInclude Include="Source\EnvProbe.h" />

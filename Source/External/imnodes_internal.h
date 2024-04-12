@@ -161,6 +161,7 @@ struct ImNodeData
     ~ImNodeData() { Id = INT_MIN; }
 };
 
+struct ImLinkData;
 struct ImPinData
 {
     int                  Id;
@@ -170,6 +171,8 @@ struct ImPinData
     ImNodesPinShape      Shape;
     ImVec2               Pos; // screen-space coordinates
     int                  Flags;
+
+    ImVec2 get_actual_link_pos(const ImLinkData& link) const;
 
     struct
     {
@@ -183,7 +186,6 @@ struct ImPinData
     {
     }
 };
-
 struct ImLinkData
 {
     int Id;
@@ -194,7 +196,7 @@ struct ImLinkData
         ImU32 Base, Hovered, Selected;
     } ColorStyle;
 
-    bool no_curved_bezier = false;
+    bool use_direct_line = false;
 
     ImLinkData(const int link_id) : Id(link_id), StartPinIdx(), EndPinIdx(), ColorStyle() {}
 };

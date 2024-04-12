@@ -1,4 +1,4 @@
-#include "EditorDoc.h"
+#include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
 #include "Game_Engine.h"
@@ -6,6 +6,9 @@
 #include "DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
 #include "MeshBuilder.h"
+
+EditorDoc ed_doc;
+EditorDocPublic* g_editor_doc = &ed_doc;
 
 class TransformCommand : public Command
 {

@@ -118,7 +118,7 @@ static void util_calc_rotations(const Animation_Set* set,
 
 		vec3 interp_pos{};
 		if (pos_idx == -1)
-			interp_pos = model->bones.at(i).posematrix[3];
+			interp_pos = model->bones.at(i).localtransform[3];
 		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
 			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
 		else {

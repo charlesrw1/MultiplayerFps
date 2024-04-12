@@ -1,6 +1,8 @@
 #pragma once
-#include <SDL2/SDL.h>
-#include "DrawPublic.h"
+
+union SDL_Event;
+struct View_Setup;
+
 class AnimationGraphEditorPublic
 {
 public:

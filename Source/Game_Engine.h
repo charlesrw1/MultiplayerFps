@@ -80,9 +80,11 @@ enum Engine_State
 	ENGINE_LOADING,
 	ENGINE_GAME,
 
-	ENGINE_EDITOR,
+	ENGINE_LVL_EDITOR,
 
 	ENGINE_ANIMATION_EDITOR,
+
+	ENGINE_STATE_COUNT
 };
 
 using std::string;
@@ -107,7 +109,6 @@ struct ImGuiContext;
 class Client;
 class Server;
 class Level;
-class EditorDoc;
 class ImNodesContext;
 class Game_Engine
 {
@@ -134,7 +135,6 @@ public:
 	void set_tick_rate(float tick_rate);
 	bool start_map(string map, bool is_client = false);
 	void client_enter_into_game();
-	void client_goto_loading();
 	void exit_to_menu(const char* log_reason);
 	Engine_State get_state() { return state; }
 
@@ -142,7 +142,12 @@ public:
 	void start_editor(const char* map);
 	void start_anim_editor(const char* name);
 	void close_editor();
+
+	void enable_imgui_docking();
+	void disable_imgui_docking();
 #endif
+
+	void travel_to_engine_state(Engine_State state, const char* exit_reason);
 
 	// Host functions
 	Entity* create_entity(entityclass classtype, int forceslot = -1);
@@ -165,10 +170,6 @@ public:
 public:
 	Client* cl=nullptr;
 	Server* sv=nullptr;
-
-#ifdef EDITDOC
-	EditorDoc* eddoc = nullptr;
-#endif
 	string mapname;
 	Level* level= nullptr;
 	PhysicsWorld phys;
@@ -212,10 +213,12 @@ public:
 
 
 private:
+
 	int num_entities;
 	vector<Entity*> ents;
 	vector<char> spawnids;
 	Engine_State state;
+
 	void set_state(Engine_State state);
 	void unload_current_level();
 

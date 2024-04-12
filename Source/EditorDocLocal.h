@@ -1,4 +1,6 @@
 #pragma once
+#include "EditorDocPublic.h"
+
 #include "glm/glm.hpp"
 #include "Model.h"
 #include "Types.h"
@@ -164,21 +166,19 @@ public:
 };
 
 class Model;
-class EditorDoc
+class EditorDoc : public EditorDocPublic
 {
 public:
 	EditorDoc() : assets(this) {}
-	void open_doc(const char* levelname);
-	void save_doc();
-	void close_doc();
-
-	bool handle_event(const SDL_Event& event);
-	void update();
-
-	void scene_draw_callback();
-	void overlays_draw();
-	void imgui_draw();
-	const View_Setup& get_vs();
+	virtual void open_doc(const char* levelname) override;
+	virtual void save_doc() override;
+	virtual void close_doc() override;
+	virtual bool handle_event(const SDL_Event& event) override;
+	virtual void update() override;
+	virtual void scene_draw_callback() override;
+	virtual void overlays_draw() override;
+	virtual void imgui_draw() override;
+	virtual const View_Setup& get_vs() override;
 
 	void on_add_or_remove_node(int ent_dict_index, EdObjType type, int varying_index, bool is_removal);
 	RayHit cast_ray_into_world(Ray* out_ray);
