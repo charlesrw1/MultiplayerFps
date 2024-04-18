@@ -102,7 +102,16 @@ public:
 	};
 	std::array<static_atr, MAX_STATIC_ATRS> attributes;
 
-	void add_input(AnimationGraphEditor* ed, Editor_Graph_Node* input, uint32_t slot) {
+	bool add_input(AnimationGraphEditor* ed, Editor_Graph_Node* input, uint32_t slot) {
+
+		if (type == animnode_type::state) {
+			for (int i = 0; i < inputs.size(); i++) {
+				if (inputs[i] == input) {
+					return true;
+				}
+			}
+		}
+
 		inputs[slot] = input;
 
 		if (grow_pin_count_on_new_pin()) {
@@ -110,6 +119,7 @@ public:
 				num_inputs++;
 		}
 
+		return false;
 		//on_state_change(ed);
 	}
 
@@ -147,6 +157,7 @@ public:
 	}
 
 	void draw_property_editor(AnimationGraphEditor* ed);
+	void draw_link_property_editor(AnimationGraphEditor* ed, uint32_t slot_thats_selected);
 
 	// animation graph specific stuff
 	void on_state_change(AnimationGraphEditor* ed);
@@ -197,11 +208,12 @@ public:
 
 		Statemachine_Node_CFG* sm_node_parent = nullptr;
 		struct transition {
-			std::string code = "";	// lisp expression
-			float blend_time = 0.1;
+			More_Node_Property code_prop;
+			More_Node_Property time_prop;
 
-
-			More_Node_Property property;
+			std::string& get_code() {
+				return code_prop.str_type;
+			}
 		};
 		std::array<transition, MAX_INPUTS> transitions;
 		handle<State> state_handle;

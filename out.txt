@@ -1,27 +1,84 @@
 {
 	name ""
-	data_used "4"
+	data_used "44"
+	root_node "-1"
 	params [
-		{
-			name "a"
-			type "float"
-		}
 	]
 	nodes [
 		{
-			type "blend"
-			default_param "0"
+			type "statemachine"
+			default_param "-1"
 			inputs [
-				{
-					 -1
-				}
-				{
-					 -1
-				}
 			]
 			props [
 				{
-					value "0.100000"
+					value "-1"
+				}
+				{
+					value "0.000000"
+				}
+			]
+			states [
+				{
+					name "State"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+					]
+				}
+				{
+					name "State"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+					]
+				}
+				{
+					name "State"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+					]
+				}
+				{
+					name "State"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+					]
+				}
+			]
+		}
+		{
+			type "source"
+			default_param "-1"
+			inputs [
+			]
+			props [
+				{
+					value "0"
+				}
+				{
+					value "0"
+				}
+				{
+					value "0"
+				}
+				{
+					value ""
+				}
+				{
+					value "1"
+				}
+				{
+					value "1.000000"
+				}
+				{
+					value "1"
 				}
 			]
 		}

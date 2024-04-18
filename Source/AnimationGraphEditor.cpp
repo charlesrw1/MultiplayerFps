@@ -106,6 +106,18 @@ void AnimationGraphEditor::begin_draw()
 				Editor_Graph_Node* mynode = find_node_from_id(node);
 				mynode->draw_property_editor(this);
 			}
+			else if (ImNodes::NumSelectedLinks() == 1) {
+				int link = 0;
+				ImNodes::GetSelectedLinks(&link);
+
+				uint32_t node_id = Editor_Graph_Node::get_nodeid_from_link_id(link);
+				uint32_t slot = Editor_Graph_Node::get_slot_from_id(link);
+				Editor_Graph_Node* node_s = find_node_from_id(node_id);
+
+				node_s->draw_link_property_editor(this, slot);
+			}
+
+
 			ImGui::TreePop();
 		}
 
@@ -292,7 +304,7 @@ void AnimationGraphEditor::begin_draw()
 		Editor_Graph_Node* node_s = find_node_from_id(start_node_id);
 		Editor_Graph_Node* node_e = find_node_from_id(end_node_id);
 
-		node_e->add_input(this, node_s, end_idx);
+		bool destroy = node_e->add_input(this, node_s, end_idx);
 	}
 	if (ImNodes::IsLinkDropped(&start_atr)) {
 		open_popup_menu_from_drop = true;
@@ -357,7 +369,12 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		ImNodes::EndNodeTitleBar();
 
 		for (int j = 0; j < node->num_inputs; j++) {
-			ImNodes::BeginInputAttribute(node->getinput_id(j), ImNodesPinShape_Triangle);
+
+			ImNodesPinShape pin = ImNodesPinShape_Quad;
+
+			if (node->inputs[j]) pin = ImNodesPinShape_TriangleFilled;
+
+			ImNodes::BeginInputAttribute(node->getinput_id(j), pin);
 			if (!node->input_pin_names[j].empty())
 				ImGui::TextUnformatted(node->input_pin_names[j].c_str());
 			else
@@ -661,6 +678,14 @@ static More_Node_Property make_int_prop(const char* name)
 	return prop;
 }
 
+static More_Node_Property make_float_prop(const char* name)
+{
+	More_Node_Property prop;
+	prop.name = name;
+	prop.type = Property_Type::float_prop;
+	return prop;
+}
+
 static void make_param_prop(Editor_Graph_Node* node, const char* name = "param")
 {
 	std::function<void(More_Node_Property&)> param_callback = [node](More_Node_Property& prop) {
@@ -772,10 +797,15 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 		node->state->state_handle = { size };
 		node->state->sm_node_parent->states.resize(size + 1);
 
+		for (int i = 0; i < node->state->transitions.size(); i++) {
+			node->state->transitions[i].code_prop = make_string_prop("condition", {}, anim_completion_callback_function, &param_completion, false);
+			node->state->transitions[i].time_prop = make_float_prop("transition time");
+		}
+
 		node->state->get_state()->tree = nullptr;
 	}break;
 	case animnode_type::start_statemachine:
-		node->num_inputs = 1;
+		node->num_inputs = 0;
 		break;
 	case animnode_type::root:
 		node->num_inputs = 1;
@@ -932,6 +962,7 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 	bool update_me = false;
 	bool update_everything = false;
 
+	ImGui::Text("NODE \"%s\" ( %s )", get_title().c_str(), get_animnode_name(type));
 
 	if (node) {
 		update_me |= draw_properties_node(*node->get_property_list(), node);
@@ -952,28 +983,6 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 				transition_names.push_back(inputs[i]->get_title().c_str());
 			}
 		}
-		//completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
-		/*
-		if (transition_names.size() > 0) {
-			ImGui::Combo("Transition", &state.selected_transition_for_prop_ed, transition_names.data(), transition_names.size());
-
-			int idx = indirect[state.selected_transition_for_prop_ed];
-
-			static char buffer[256];
-			memcpy(buffer, state.transitions.at(idx).code.data(), state.transitions.at(idx).code.size());
-			buffer[state.transitions.at(idx).code.size()] = 0;
-			ImGui::PushID(idx);
-			if (ImGui::InputText("Transition condition", buffer, sizeof buffer, ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
-				update_me = true;
-			}
-			ImGui::PopID();
-			state.transitions.at(idx).code = buffer;
-			
-			update_me |= ImGui::DragFloat("Blend in", &state.transitions.at(idx).blend_time, 0.02, 0.0);
-		}
-		ImGui::Separator();
-		ImGui::DragFloat("State time", &state.state_ptr->state_duration, 0.05, 0.0);
-		*/
 	}
 		break;
 	case animnode_type::root:
@@ -985,6 +994,21 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 	default:
 		break;
 	}
+}
+
+void Editor_Graph_Node::draw_link_property_editor(AnimationGraphEditor* ed, uint32_t slot_thats_selected)
+{
+	if (type != animnode_type::state)
+		return;
+
+	ASSERT(inputs[slot_thats_selected]);
+
+	auto& transition = state->transitions[slot_thats_selected];
+
+	ImGui::Text("TRANSITION ( %s ) -> ( %s )", get_title().c_str(), inputs[slot_thats_selected]->get_title().c_str());
+	ImGui::Separator();
+	draw_node_property(transition.code_prop);
+	draw_node_property(transition.time_prop);
 }
 
 void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
@@ -1003,6 +1027,8 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	case animnode_type::statemachine: {
 		auto source = (Statemachine_Node_CFG*)node;
 
+		ASSERT(source);
+
 		source->start_state = { -1 };
 
 		auto rootnode = ed->find_first_node_in_layer(sublayer.id, animnode_type::root);
@@ -1013,7 +1039,6 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 			}
 		}
 
-		num_inputs = 0;
 	}break;
 	case animnode_type::selector:
 		break;
@@ -1072,11 +1097,11 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 
 		s->transitions.clear();
 		for (int i = 0; i < num_inputs; i++) {
-			if (inputs[i] && !state->transitions[i].code.empty()) {
+			if (inputs[i] && !state->transitions[i].get_code().empty()) {
 				ASSERT(inputs[i]->is_state_node());
 				State_Transition st;
 				st.transition_state = inputs[i]->state->state_handle;;
-				std::string code = state->transitions[i].code;
+				std::string code = state->transitions[i].get_code();
 				try {
 					auto exp = LispLikeInterpreter::parse(code);
 					st.script.compilied.compile(exp, ed->editing_tree->parameters);

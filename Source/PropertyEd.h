@@ -84,6 +84,7 @@ static int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
 		assert(user->string);
 		user->string->resize(data->BufSize);
+		data->Buf = (char*)user->string->data();
 	}
 	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
 		imgui_input_text_callback_completion(data, user);

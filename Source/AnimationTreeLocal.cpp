@@ -398,6 +398,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
 	 out.write_key_value("name", this->name.c_str());	
 	 out.write_key_value("data_used", string_format("%d", (int)data_used));
+	 out.write_key_value("root_node", string_format("%d", get_index_of_node(root)));
 
 	 out.write_key_list_start("params");
 	 for (auto& param : parameters.name_to_index) {
@@ -421,9 +422,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
 		 out.write_key_list_start("inputs");
 		 for (int i = 0; i < node->input.count; i++) {
-			 out.write_item_start();
 			 out.write_value( string_format("%d", get_index_of_node(node->input[i]) ) );
-			 out.write_item_end();
 		 }
 		 out.write_list_end();
 
