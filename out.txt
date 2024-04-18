@@ -1,0 +1,28 @@
+{
+	name ""
+	data_used "4"
+	params [
+		{
+			name "a"
+			type "float"
+		}
+	]
+	nodes [
+		{
+			type "blend"
+			default_param "0"
+			inputs [
+				{
+					 -1
+				}
+				{
+					 -1
+				}
+			]
+			props [
+				{
+					value "0.100000"
+				}
+			]
+		}
+	]

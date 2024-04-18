@@ -2,14 +2,19 @@
 #include <cassert>
 #include "ScriptVars.h"
 #include "MemArena.h"
-
+#include "StringUtil.h"
 // this is the thing loaded from disk once
+
+class DictParser;
+class DictWriter;
 
 class Model;
 class Animation_Set;
 class Node_CFG;
-struct Animation_Tree_CFG
+class Animation_Tree_CFG
 {
+public:
+	Stack_String<128> name;
 	Node_CFG* root = nullptr;
 	Memory_Arena arena;
 	uint32_t data_used = 0;
@@ -21,6 +26,11 @@ struct Animation_Tree_CFG
 			return { parameters.name_to_index[param] };
 		return { -1 };
 	}
+	int get_index_of_node(Node_CFG* ptr);
+
+	void write_to_dict(DictWriter& out);
+	void read_from_dict(DictParser& in);
+
 };
 
 class Model;

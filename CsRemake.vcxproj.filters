@@ -129,6 +129,10 @@
       <Filter>Source\Animation</Filter>
     </ClCompile>
     <ClCompile Include="Source\External\imnodes_internal.cpp" />
+    <ClCompile Include="Source\DictParser.cpp">
+      <Filter>Source\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AnimationTreePublic.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationGraphEditor.h">
@@ -307,6 +311,15 @@
     </ClInclude>
     <ClInclude Include="Source\EditorDocPublic.h">
       <Filter>Source\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DictParser.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DictWriter.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\PropertyEd.h">
+      <Filter>Source\Animation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

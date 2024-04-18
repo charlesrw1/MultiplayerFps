@@ -23,7 +23,9 @@
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\AnimationGraphEditor.cpp" />
     <ClCompile Include="Source\AnimationTreeLocal.cpp" />
+    <ClCompile Include="Source\AnimationTreePublic.cpp" />
     <ClCompile Include="Source\Animation_Tree.cpp" />
+    <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\External\imnodes.cpp" />
     <ClCompile Include="Source\External\imnodes_internal.cpp" />
@@ -76,6 +78,8 @@
     <ClInclude Include="source\Client.h" />
     <ClInclude Include="Source\DecalsPublic.h" />
     <ClInclude Include="Source\Dict.h" />
+    <ClInclude Include="Source\DictParser.h" />
+    <ClInclude Include="Source\DictWriter.h" />
     <ClInclude Include="Source\DrawLocal.h" />
     <ClInclude Include="Source\DrawPublic.h" />
     <ClInclude Include="Source\DrawTypedefs.h" />
@@ -103,6 +107,7 @@
     <ClInclude Include="Source\ParticlesPublic.h" />
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
+    <ClInclude Include="Source\PropertyEd.h" />
     <ClInclude Include="Source\Renderer_Types.h" />
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\ScriptVars.h" />

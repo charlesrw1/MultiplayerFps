@@ -415,3 +415,26 @@ case (opcode_+1): OPONSTACK(op,ival, ival);
 #undef FLOAT_AND_INT_OP
 #undef FLOAT_AND_INT_OP_OUTPUT_INT
 #undef OPONSTACK
+
+	
+
+	struct ScriptFuncDef
+	{
+		const char* arg_sig = nullptr;
+		int arg_count = 0;
+	};
+
+	class ScriptFuncHooks
+	{
+	public:
+
+
+	};
+
+
+	class ScriptThread
+	{
+		uint32_t pc = 0;
+		uint32_t sp = 0;
+		std::vector<char> stack;
+	};

@@ -35,11 +35,85 @@ enum class animnode_type
 	COUNT
 };
 
+enum class Property_Type
+{
+	int_prop,
+	bool_prop,
+	float_prop,
+	vec2_prop,
+	std_string_prop,
+};
+
+struct Node_Property
+{
+	const char* name = "";
+	Property_Type type = {};
+	size_t offset = 0;
+	bool serialize = true;
+	bool editable = true;
+};
+
+struct Node_Property_List
+{
+	Node_Property* list = nullptr;
+	int count = 0;
+};
+
+template<typename T, int INLINE_COUNT>
+class InlineVec
+{
+public:
+	InlineVec() {
+	}
+	~InlineVec() {
+		if (count <= INLINE_COUNT)
+			delete_inline();
+	}
+
+	const T& operator[](int index) const {
+		if (count > INLINE_COUNT) {
+			assert(index < count);
+			return heap[index];
+		}
+		else
+			return inline_[index];
+	}
+	T& operator[](int index)  {
+		if (count > INLINE_COUNT) {
+			assert(index < count);
+			return heap[index];
+		}
+		else
+			return inline_[index];
+	}
+	void assign_memory(T* t, int count) {
+		ASSERT(count > INLINE_COUNT);
+		ASSERT(this->count <= INLINE_COUNT);
+		delete_inline();
+		heap = t;
+		this->count = count;
+	}
+	int size() const {
+		return count;
+	}
+	void delete_inline() {
+		for (int i = 0; i < INLINE_COUNT; i++)
+			inline_[i].~T();
+	}
+
+	union {
+		T inline_[INLINE_COUNT];
+		T* heap;
+	};
+	int count = 0;
+};
+
 
 struct NodeRt_Ctx;
 struct ScriptExpression
 {
 	BytecodeExpression compilied;
+	std::string script_str;
 
 	bool evaluate(NodeRt_Ctx& rt) const;
 };
@@ -47,7 +121,7 @@ struct ScriptExpression
 struct State;
 struct State_Transition
 {
-	State* transition_state;
+	handle<State> transition_state;
 	ScriptExpression script;
 };
 
@@ -107,6 +181,8 @@ struct Node_CFG
 	Node_CFG(Animation_Tree_CFG* cfg, uint32_t rt_size) {
 		rt_offset = cfg->data_used;
 		cfg->data_used += rt_size;
+
+		memset(input.inline_, 0, sizeof(Node_CFG*) * 2);
 	}
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const = 0;
@@ -116,10 +192,19 @@ struct Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const = 0;
 	virtual bool is_clip_node() const { return false; }
 
+	// serialization helpers
+	virtual void write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {}
+	virtual void read_from_dict(Animation_Tree_CFG* tree, DictParser& in) {}
+	virtual Node_Property_List* get_property_list() = 0;
+	virtual animnode_type get_type() = 0;
+
 	template<typename T>
 	T* get_rt(NodeRt_Ctx& ctx) const {
 		return ctx.tree->get<T>(rt_offset);
 	}
+
+	InlineVec<Node_CFG*, 2> input;
+	handle<Parameter> param;	// all nodes have a default parameter for convenience
 protected:
 	template<typename T>
 	T* construct_this(NodeRt_Ctx& ctx) const {
@@ -134,31 +219,37 @@ struct State
 	string name;
 	Node_CFG* tree = nullptr;
 	vector<State_Transition> transitions;
-	State* next_state = nullptr;
-
+	handle<State> next_state;
 	float state_duration = -1.0;
 	float time_left = 0.0;
 
-	State* get_next_state(NodeRt_Ctx& ctx);
+	handle<State> get_next_state(NodeRt_Ctx& ctx) const;
 };
+
+#define DECLARE_ANIMNODE_CREATOR(TYPE_NAME, ENUM_TYPE) static Node_CFG* create(Animation_Tree_CFG* cfg) { \
+TYPE_NAME* clip = (TYPE_NAME*)cfg->arena.alloc_bottom(sizeof(TYPE_NAME)); \
+clip = new(clip)TYPE_NAME(cfg); \
+return clip; \
+} static Node_Property_List properties; static void register_props();  \
+virtual Node_Property_List* get_property_list() override { return &properties;}  \
+virtual animnode_type get_type() override { return ENUM_TYPE; }
 
 // playback speed *= param / (speed of clip's root motion)
 struct Scale_By_Rootmotion_CFG : public Node_CFG
 {
-	Scale_By_Rootmotion_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, 0) {}
+	DECLARE_ANIMNODE_CREATOR(Scale_By_Rootmotion_CFG, animnode_type::rootmotion_speed);
+
+	Scale_By_Rootmotion_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, 0) { input.count = 1; }
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
 		float rm = ctx.vars->get(param).fval;
-		bool ret = child->get_pose(ctx, pose.set_rootmotion(rm));
+		bool ret = input[0]->get_pose(ctx, pose.set_rootmotion(rm));
 		return ret;
 	}
 
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 	}
-
-	Node_CFG* child = nullptr;
-	handle<Parameter> param;
 };
 
 struct Sync_Node_RT
@@ -170,12 +261,12 @@ struct Sync_Node_CFG : public Node_CFG
 {
 	Sync_Node_CFG(Animation_Tree_CFG* cfg)
 		: Node_CFG(cfg, sizeof(Sync_Node_RT)) {
+		input.count = 1;
 	}
 
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		construct_this<Sync_Node_RT>(ctx);
 	}
-
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
@@ -185,7 +276,7 @@ struct Sync_Node_CFG : public Node_CFG
 		sv.first_seen = true;
 		sv.normalized_frame = rt->normalized_frame;
 
-		bool ret = child->get_pose(ctx, pose.set_sync(&sv));
+		bool ret = input[0]->get_pose(ctx, pose.set_sync(&sv));
 
 		rt->normalized_frame = sv.normalized_frame;
 
@@ -197,7 +288,7 @@ struct Sync_Node_CFG : public Node_CFG
 		rt->normalized_frame = 0.0;
 	}
 
-	Node_CFG* child = nullptr;
+	DECLARE_ANIMNODE_CREATOR(Sync_Node_CFG, animnode_type::sync)
 };
 
 struct Clip_Node_RT
@@ -213,7 +304,11 @@ struct Clip_Node_CFG : public Node_CFG
 {
 	Clip_Node_CFG(Animation_Tree_CFG* cfg)
 		: Node_CFG(cfg, sizeof(Clip_Node_RT)) {
+		input.count = 0;
 	}
+
+
+	DECLARE_ANIMNODE_CREATOR(Clip_Node_CFG, animnode_type::source)
 
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		Clip_Node_RT* rt = construct_this<Clip_Node_RT>(ctx);
@@ -270,31 +365,43 @@ struct Clip_Node_CFG : public Node_CFG
 
 struct Subtract_Node_CFG : public Node_CFG
 {
-	Subtract_Node_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, 0) {}
+	DECLARE_ANIMNODE_CREATOR(Subtract_Node_CFG, animnode_type::subtract)
+
+
+	Subtract_Node_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, 0) {
+		input.count = 2;
+	}
 	// Inherited via At_Node
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		ref->reset(ctx);
-		source->reset(ctx);
+		input[REF]->reset(ctx);
+		input[SOURCE]->reset(ctx);
 	}
-	Node_CFG* ref = nullptr;
-	Node_CFG* source = nullptr;
+	enum {
+		REF,
+		SOURCE
+	};
 };
 
 struct Add_Node_CFG : public Node_CFG
 {
-	Add_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, 0) {}
+	Add_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, 0) {
+		input.count = 2;
+	}
+
+	DECLARE_ANIMNODE_CREATOR(Add_Node_CFG,animnode_type::add)
+
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		diff_pose->reset(ctx);
-		base_pose->reset(ctx);
+		input[DIFF]->reset(ctx);
+		input[BASE]->reset(ctx);
 	}
 
-	handle<Parameter> param;
-
-	Node_CFG* diff_pose = nullptr;
-	Node_CFG* base_pose = nullptr;
+	enum {
+		DIFF,
+		BASE
+	};
 };
 
 struct Blend_Node_RT
@@ -304,7 +411,12 @@ struct Blend_Node_RT
 
 struct Blend_Node_CFG : public Node_CFG
 {
-	Blend_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Blend_Node_RT)) {}
+	DECLARE_ANIMNODE_CREATOR(Blend_Node_CFG, animnode_type::blend)
+
+
+	Blend_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Blend_Node_RT)) {
+		input.count = 2;
+	}
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
@@ -315,13 +427,11 @@ struct Blend_Node_CFG : public Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		*get_rt<Blend_Node_RT>(ctx) = Blend_Node_RT();
 
-		posea->reset(ctx);
-		poseb->reset(ctx);
+		input[0]->reset(ctx);
+		input[1]->reset(ctx);
+
 	}
 
-	handle<Parameter> param;
-	Node_CFG* posea = nullptr;
-	Node_CFG* poseb = nullptr;
 	float damp_factor = 0.1;
 };
 
@@ -332,7 +442,12 @@ struct Mirror_Node_RT
 
 struct Mirror_Node_CFG : public Node_CFG
 {
-	Mirror_Node_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, sizeof Mirror_Node_RT) {}
+	DECLARE_ANIMNODE_CREATOR(Mirror_Node_CFG, animnode_type::mirror)
+
+
+	Mirror_Node_CFG(Animation_Tree_CFG* cfg) : Node_CFG(cfg, sizeof Mirror_Node_RT) {
+		input.count = 1;
+	}
 
 	// Inherited via At_Node
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
@@ -340,7 +455,7 @@ struct Mirror_Node_CFG : public Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const override
 	{
 		*get_rt< Mirror_Node_RT>(ctx) = Mirror_Node_RT();
-		input->reset(ctx);
+		input[0]->reset(ctx);
 	}
 
 	virtual void construct(NodeRt_Ctx& ctx) const override {
@@ -348,26 +463,28 @@ struct Mirror_Node_CFG : public Node_CFG
 	}
 
 	float damp_time = 0.1;
-	Node_CFG* input = nullptr;
-	handle<Parameter> param;
 };
 
 
 struct Statemachine_Node_RT
 {
-	State* active_state = nullptr;
-	State* fading_out_state = nullptr;
+	handle<State> active_state;
+	handle<State> fading_out_state;
 	float active_weight = 0.0;
 	bool change_to_next = false;
 };
 
 struct Statemachine_Node_CFG : public Node_CFG
 {
-	Statemachine_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Statemachine_Node_RT)) {}
+	DECLARE_ANIMNODE_CREATOR(Statemachine_Node_CFG, animnode_type::statemachine)
+
+
+	Statemachine_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Statemachine_Node_RT))
+	{
+		input.count = 0;
+	}
 
 	virtual bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
-
-	State* start_state = nullptr;
 
 	// Inherited via At_Node
 	virtual void reset(NodeRt_Ctx& ctx) const override
@@ -380,7 +497,20 @@ struct Statemachine_Node_CFG : public Node_CFG
 		construct_this<Statemachine_Node_RT>(ctx);
 	}
 
+	virtual void write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) override;
+	virtual void read_from_dict(Animation_Tree_CFG* tree, DictParser& in) override;
+
+	const State* get_state(handle<State> handle) const {
+		if (handle.id == -1) return nullptr;
+		return &states.at(handle.id);
+	}
+	handle<State> get_state_handle(const State* state) const {
+		return { int((state - states.data()) / sizeof(State)) };
+	}
+
+	handle<State> start_state;
 	float fade_in_time = 0.f;
+	std::vector<State> states;
 };
 
 struct Directionalblend_Node_RT
@@ -390,12 +520,21 @@ struct Directionalblend_Node_RT
 
 struct Blend2d_CFG : public Node_CFG
 {
+	DECLARE_ANIMNODE_CREATOR(Blend2d_CFG, animnode_type::blend2d)
+
+
 	Blend2d_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Directionalblend_Node_RT)) {
-		memset(directions, 0, sizeof(directions));
+		// allocate memory for extra nodes
+		Node_CFG** nodes = (Node_CFG**)tree->arena.alloc_bottom(sizeof(Node_CFG**) * 9);
+		memset(nodes, 0, sizeof(Node_CFG*)*9);
+		input.assign_memory(nodes, 9);
 	}
 
-	Node_CFG* idle = nullptr;
-	Node_CFG* directions[8];
+	enum {
+		IDLE = 0,
+		DIRECTION = 1
+	};
+
 	handle<Parameter> xparam;
 	handle<Parameter> yparam;
 	float fade_in = 1.0;
@@ -411,3 +550,17 @@ struct Blend2d_CFG : public Node_CFG
 		construct_this<Directionalblend_Node_RT>(ctx);
 	}
 };
+
+
+typedef Node_CFG* (*create_func)(Animation_Tree_CFG* tree);
+typedef void (*register_func)();
+
+
+struct animnode_name_type
+{
+	const char* name = "";
+	create_func create = nullptr;
+	register_func reg = nullptr;
+};
+
+extern animnode_name_type& get_animnode_typedef(animnode_type type);

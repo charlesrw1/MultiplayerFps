@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
+#ifdef _DEBUG
+#include <cassert>
+#endif
 
 // from vkguide
 namespace StringUtils {
@@ -81,4 +84,45 @@ public:
 private:
 	int data_len = 0;
 	char data[BUFSIZE];
+};
+
+class StringView
+{
+public:
+	StringView() {}
+	StringView(const char* str) {
+		str_start = str;
+		str_len = strlen(str);
+	}
+	StringView(const char* str, int len) {
+		str_start = str;
+		str_len = len;
+
+#ifdef _DEBUG
+		for (int i = 0; i < len; i++) {
+			assert(str_start[i] != '\0');
+		}
+#endif // _DEBUG
+
+	}
+
+	bool cmp(const char* other) const {
+		const char* p1 = str_start;
+		int count = 0;
+		while (*other) {
+			if (count > str_len) return false;
+			if (*p1 != *other) return false;
+			p1++;
+			other++;
+			count++;
+		}
+		return true;
+	}
+
+	Stack_String<256> to_stack_string() {
+		return Stack_String<256>(str_start, str_len);
+	}
+
+	const char* str_start = nullptr;
+	int str_len = 0;
 };

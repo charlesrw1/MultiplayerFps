@@ -19,6 +19,20 @@ std::string remove_whitespace(const char* str)
 AnimationGraphEditor ed;
 AnimationGraphEditorPublic* g_anim_ed_graph = &ed;
 
+struct AnimCompletionCallbackUserData
+{
+	AnimationGraphEditor* ed = nullptr;
+	enum {
+		PARAMS,
+		CLIPS
+	}type;
+};
+std::vector<const char*>* anim_completion_callback_function(void* user, const char* word_start, int len);
+
+AnimCompletionCallbackUserData param_completion = { &ed, AnimCompletionCallbackUserData::PARAMS };
+AnimCompletionCallbackUserData clip_completion = { &ed, AnimCompletionCallbackUserData::CLIPS };
+
+
 void AnimationGraphEditor::init()
 {
 	
@@ -182,10 +196,7 @@ void AnimationGraphEditor::begin_draw()
 
 		if (need_parameter_list_update) {
 			ed_params.update_real_param_list(&editing_tree->parameters);
-
 			out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
-
-			update_every_node();
 		}
 
 
@@ -282,8 +293,6 @@ void AnimationGraphEditor::begin_draw()
 		Editor_Graph_Node* node_e = find_node_from_id(end_node_id);
 
 		node_e->add_input(this, node_s, end_idx);
-
-		update_every_node();
 	}
 	if (ImNodes::IsLinkDropped(&start_atr)) {
 		open_popup_menu_from_drop = true;
@@ -304,8 +313,6 @@ void AnimationGraphEditor::begin_draw()
 		uint32_t slot = Editor_Graph_Node::get_slot_from_id(link_id);
 		Editor_Graph_Node* node_s = find_node_from_id(node_id);
 		node_s->inputs[slot] = nullptr;
-
-		update_every_node();
 	}
 
 
@@ -346,7 +353,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		ImNodes::BeginNode(node->id);
 
 		ImNodes::BeginNodeTitleBar();
-		ImGui::Text("%s\n", node->title.c_str());
+		ImGui::Text("%s\n", node->get_title().c_str());
 		ImNodes::EndNodeTitleBar();
 
 		for (int j = 0; j < node->num_inputs; j++) {
@@ -395,7 +402,8 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 	ImNodes::MiniMap();
 	ImNodes::EndNodeEditor();
 }
-
+#include "DictWriter.h"
+#include <fstream>
 void AnimationGraphEditor::handle_event(const SDL_Event& event)
 {
 	switch (event.type)
@@ -408,6 +416,17 @@ void AnimationGraphEditor::handle_event(const SDL_Event& event)
 				delete_selected();
 			}
 			break;
+
+		case SDL_SCANCODE_SPACE:
+			compile_graph_for_playing();
+			{
+				DictWriter write;
+				editing_tree->write_to_dict(write);
+
+				std::ofstream outfile("out.txt");
+				outfile.write(write.get_output().c_str(), write.get_output().size());
+				outfile.close();
+			}break;
 		}
 		break;
 	case SDL_MOUSEBUTTONDOWN:
@@ -493,8 +512,6 @@ void AnimationGraphEditor::remove_node_from_index(int index)
 
 	delete node;
 	nodes.erase(nodes.begin() + index);
-
-	update_every_node();
 }
 
 int AnimationGraphEditor::find_for_id(uint32_t id)
@@ -607,41 +624,108 @@ static T* create_node_type(Animation_Tree_CFG& cfg)
 	return (T*)c;
 }
 
+
+static More_Node_Property make_string_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc = nullptr,
+void* fcsc_user_data = nullptr, bool treat_completion_as_combo = false)
+{
+	More_Node_Property prop;
+	prop.name = name;
+	prop.fcsc = fcsc;
+	prop.fcsc_user_data = fcsc_user_data;
+	prop.treat_completion_as_combo = treat_completion_as_combo;
+	prop.type = Property_Type::std_string_prop;
+	prop.on_edit_callback = callback;
+
+	return prop;
+}
+
+static More_Node_Property make_enum_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc = nullptr,
+	void* fcsc_user_data = nullptr, bool treat_completion_as_combo = false)
+{
+	More_Node_Property prop;
+	prop.name = name;
+	prop.fcsc = fcsc;
+	prop.on_edit_callback = callback;
+	prop.fcsc_user_data = fcsc_user_data;
+	prop.treat_completion_as_combo = treat_completion_as_combo;
+	prop.type = Property_Type::int_prop;
+
+	return prop;
+}
+
+static More_Node_Property make_int_prop(const char* name)
+{
+	More_Node_Property prop;
+	prop.name = name;
+	prop.type = Property_Type::int_prop;
+	return prop;
+}
+
+static void make_param_prop(Editor_Graph_Node* node, const char* name = "param")
+{
+	std::function<void(More_Node_Property&)> param_callback = [node](More_Node_Property& prop) {
+		Node_CFG* clip = (Node_CFG*)node->node;
+
+		handle<Parameter> p{ prop.i_type };
+
+		if (p.id >= ed.editing_tree->parameters.types.size())
+			p.id = -1;
+
+		//ASSERT(p.id < ed.editing_tree->parameters.types.size());
+		//ASSERT(p.id >= 0);
+
+		clip->param = p;
+	};
+	More_Node_Property props[] = {
+		make_enum_prop(name, param_callback, anim_completion_callback_function, &param_completion, true),
+	};
+	node->properties.push_back(props[0]);
+}
+
 Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_type type)
 {
 	auto node = add_node();
+	More_Node_Property name_prop = make_string_prop("name", {});
+	node->properties.push_back(name_prop);
 
-	node->title = get_animnode_name(type);
+	node->get_title() = get_animnode_name(type);
 	node->node_color = get_animnode_color(type);
 
 	node->type = type;
+
+	if (get_animnode_typedef(type).create)
+		node->node = get_animnode_typedef(type).create(editing_tree);
+
 	switch (type)
 	{
 	case animnode_type::source:
-		node->node = create_node_type<Clip_Node_CFG>(*editing_tree);
 
-		node->num_inputs = 0;
+		{
+			std::function<void(More_Node_Property&)> clipname_callback = [node](More_Node_Property& prop) {
+				Clip_Node_CFG* clip = (Clip_Node_CFG*)node->node;
+				clip->clip_name = remove_whitespace(prop.str_type.c_str());
+
+				if (!prop.str_type.empty()) node->set_node_title(prop.str_type);
+				else node->set_node_title("Source");
+			};
+			More_Node_Property props[] = {
+				make_enum_prop("clipname", clipname_callback, anim_completion_callback_function, &clip_completion, true),
+			};
+			node->properties.push_back(props[0]);
+		}
 		break;
 	case animnode_type::statemachine:
-		node->node = create_node_type<Statemachine_Node_CFG>(*editing_tree);
 		node->sublayer = create_new_layer(true);
-
-		node->num_inputs = 0;
+		node->sm = std::make_unique< Editor_Graph_Node::statemachine_data>();
 		break;
 	case animnode_type::selector:
-		//node->node = create_node_type<Statemachine_Node_CFG>(*editing_tree);
 		break;
 	case animnode_type::mask:
-		//node->node = create_node_type<CFG>(*editing_tree);
-		node->num_inputs = 2;
 		break;
 	case animnode_type::blend:
-		node->node = create_node_type<Blend_Node_CFG>(*editing_tree);
-
-		node->num_inputs = 2;
+		make_param_prop(node);
 		break;
 	case animnode_type::blend2d:
-		node->node = create_node_type<Blend2d_CFG>(*editing_tree);
 
 		node->input_pin_names[0] = "idle";
 		node->input_pin_names[1] = "s";
@@ -652,54 +736,46 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 		node->input_pin_names[6] = "ne";
 		node->input_pin_names[7] = "e";
 		node->input_pin_names[8] = "se";
-
-		node->num_inputs = 9;
 		break;
 	case animnode_type::add:
-		node->node = create_node_type<Add_Node_CFG>(*editing_tree);
+		make_param_prop(node);
+		node->input_pin_names[Add_Node_CFG::DIFF] = "diff";
+		node->input_pin_names[Add_Node_CFG::BASE] = "base";
 
-		node->input_pin_names[0] = "diff";
-		node->input_pin_names[1] = "base";
-
-
-		node->num_inputs = 2;
 		break;
 	case animnode_type::subtract:
-		node->node = create_node_type<Subtract_Node_CFG>(*editing_tree);
-		node->input_pin_names[0] = "ref";
-		node->input_pin_names[1] = "source";
-		node->num_inputs = 2;
+		node->input_pin_names[Subtract_Node_CFG::REF] = "ref";
+		node->input_pin_names[Subtract_Node_CFG::SOURCE] = "source";
 		break;
 	case animnode_type::aimoffset:
-		node->num_inputs = 9;
 		break;
 	case animnode_type::mirror:
-		node->node = create_node_type<Mirror_Node_CFG>(*editing_tree);
-		node->num_inputs = 1;
+		make_param_prop(node);
+
 		break;
 	case animnode_type::play_speed:
 		break;
 	case animnode_type::rootmotion_speed:
-		node->node = create_node_type<Scale_By_Rootmotion_CFG>(*editing_tree);
-		node->num_inputs = 1;
 		break;
 	case animnode_type::sync:
 		node->node = create_node_type<Sync_Node_CFG>(*editing_tree);
 
-		node->num_inputs = 1;
 		break;
-	case animnode_type::state:
+	case animnode_type::state: {
 		node->sublayer = create_new_layer(false);
+		node->state = std::make_unique<Editor_Graph_Node::state_data>();
+		node->state->parent_statemachine = get_owning_node_for_layer(get_current_layer_from_tab());
+		ASSERT(node->state->parent_statemachine->type == animnode_type::statemachine);
+		node->state->sm_node_parent = (Statemachine_Node_CFG*)node->state->parent_statemachine->node;
 
-		node->num_inputs = 1;
+		int size = (int)node->state->sm_node_parent->states.size();
+		node->state->state_handle = { size };
+		node->state->sm_node_parent->states.resize(size + 1);
 
-		node->state.state_ptr = (State*)editing_tree->arena.alloc_bottom(sizeof(State));
-		node->state.state_ptr = new(node->state.state_ptr)State;
-
-		node->state.state_ptr->tree = nullptr;
-		break;
+		node->state->get_state()->tree = nullptr;
+	}break;
 	case animnode_type::start_statemachine:
-		node->num_inputs = 0;
+		node->num_inputs = 1;
 		break;
 	case animnode_type::root:
 		node->num_inputs = 1;
@@ -708,10 +784,24 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 		ASSERT(0);
 		break;
 	}
-
-	out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
+	if(node->node)
+		node->num_inputs = node->node->input.count;
 
 	return node;
+}
+
+void AnimationGraphEditor::compile_graph_for_playing()
+{
+	editing_tree->all_nodes.clear();
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i]->node)
+			editing_tree->all_nodes.push_back(nodes[i]->node);
+	}
+
+	out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
+	for (int i = 0; i < nodes.size(); i++) {
+		nodes[i]->on_state_change(this);
+	}
 }
 
 void Editor_Graph_Node::remove_reference(AnimationGraphEditor* ed, Editor_Graph_Node* node)
@@ -720,192 +810,138 @@ void Editor_Graph_Node::remove_reference(AnimationGraphEditor* ed, Editor_Graph_
 		if (inputs[i] == node) inputs[i] = nullptr;
 	}
 	
-	for (int i = 0; i < sm.states.size(); i++) {
-		if (sm.states[i] == node) {
-			sm.states.erase(sm.states.begin() + i);
-			i--;
+	if (sm) {
+		for (int i = 0; i < sm->states.size(); i++) {
+			if (sm->states[i] == node) {
+				sm->states[i] = nullptr;	// do this because it will be fixed up on save/load time
+			}
 		}
 	}
-	if (state.parent_statemachine == node)
-		state.parent_statemachine = nullptr;
+	if (state) {
+		if (state->parent_statemachine == node) {
+			state->parent_statemachine = nullptr;
+			state->sm_node_parent = nullptr;
+		}
+	}
 }
 
-struct completion_callback_data
+
+
+std::vector<const char*>* anim_completion_callback_function(void* user, const char* word_start, int len)
 {
-	AnimationGraphEditor* ed;
-	enum search_list {
-		PARAMS,
-		CLIPS
-	}type;
-};
+	AnimCompletionCallbackUserData* auser = (AnimCompletionCallbackUserData*)user;
 
-int node_completion_callback(ImGuiInputTextCallbackData* data)
-{
-	completion_callback_data* ccd = (completion_callback_data*)data->UserData;
-	auto ed = ccd->ed;
+	static std::vector<const char*> vec;
+	vec.clear();
 
-	if (data->EventFlag != ImGuiInputTextFlags_CallbackCompletion) return 0;
+	auto ed = auser->ed;
 
-	const char* word_end = data->Buf + data->CursorPos;
-	const char* word_start = word_end;
-	while (word_start > data->Buf)
-	{
-		const char c = word_start[-1];
-		if (c == ' ' || c == '\t' || c == ',' || c == ';')
-			break;
-		word_start--;
-	}
-
-	// Build a list of candidates
-	ImVector<const char*> candidates;
-	if (ccd->type == completion_callback_data::CLIPS) {
+	if (auser->type == AnimCompletionCallbackUserData::CLIPS) {
 		for (int i = 0; i < ed->out.set->clips.size(); i++)
-			if (_strnicmp(ed->out.set->clips[i].name.c_str(), word_start, (int)(word_end - word_start)) == 0)
-				candidates.push_back((ed->out.set->clips[i].name.c_str()));
+			if (_strnicmp(ed->out.set->clips[i].name.c_str(), word_start,len) == 0)
+				vec.push_back((ed->out.set->clips[i].name.c_str()));
 	}
-	else if (ccd->type == completion_callback_data::PARAMS) {
+	else if (auser->type == AnimCompletionCallbackUserData::PARAMS) {
 		for (int i = 0; i < ed->ed_params.param.size(); i++)
-			if (_strnicmp(ed->ed_params.param.at(i).s.c_str(), word_start, (int)(word_end - word_start)) == 0)
-				candidates.push_back((ed->ed_params.param.at(i).s.c_str()));
+			if (_strnicmp(ed->ed_params.param.at(i).s.c_str(), word_start,len) == 0)
+				vec.push_back((ed->ed_params.param.at(i).s.c_str()));
 	}
-
-	if (candidates.Size == 0)
-	{
-		// No match
-		sys_print("No match for \"%.*s\"!\n", (int)(word_end - word_start), word_start);
-	}
-	else if (candidates.Size == 1)
-	{
-		// Single match. Delete the beginning of the word and replace it entirely so we've got nice casing.
-		data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
-		data->InsertChars(data->CursorPos, candidates[0]);
-		data->InsertChars(data->CursorPos, " ");
-	}
-	else
-	{
-		// Multiple matches. Complete as much as we can..
-		// So inputing "C"+Tab will complete to "CL" then display "CLEAR" and "CLASSIFY" as matches.
-		int match_len = (int)(word_end - word_start);
-		for (;;)
-		{
-			int c = 0;
-			bool all_candidates_matches = true;
-			for (int i = 0; i < candidates.Size && all_candidates_matches; i++)
-				if (i == 0)
-					c = toupper(candidates[i][match_len]);
-				else if (c == 0 || c != toupper(candidates[i][match_len]))
-					all_candidates_matches = false;
-			if (!all_candidates_matches)
-				break;
-			match_len++;
-		}
-
-		if (match_len > 0)
-		{
-			data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
-			data->InsertChars(data->CursorPos, candidates[0], candidates[0] + match_len);
-		}
-
-		// List matches
-		sys_print("Possible matches:\n");
-		for (int i = 0; i < candidates.Size; i++)
-			sys_print("- %s\n", candidates[i]);
-	}
-	return 0;
-
+	return &vec;
 }
+
+
+bool draw_properties_node(Node_Property_List& list, void* ptr)
+{
+	bool ret = false;
+
+	for (int i = 0; i < list.count; i++)
+	{
+		auto& prop = list.list[i];
+		switch (prop.type)
+		{
+		case Property_Type::bool_prop:
+			ret |= ImGui::Checkbox(prop.name, (bool*)((char*)ptr + prop.offset));
+			break;
+		case Property_Type::float_prop:
+			ret |= ImGui::DragFloat(prop.name, (float*)((char*)ptr + prop.offset), 0.05);
+			break;
+		case Property_Type::int_prop:
+			ret |= ImGui::DragInt(prop.name, (int*)((char*)ptr + prop.offset),0.5);
+			break;
+		case Property_Type::vec2_prop: {
+			glm::vec2* v = (glm::vec2*)((char*)ptr + prop.offset);
+			ret |= ImGui::DragFloat2(prop.name, &v->x, 0.05);
+		} break;
+
+		default:
+			break;
+		}
+	}
+
+	return ret;
+}
+
+bool draw_node_property(More_Node_Property& prop)
+{
+	bool changes = false;
+	switch (prop.type)
+	{
+	case Property_Type::std_string_prop:
+	{
+		ImguiInputTextCallbackUserStruct abcdef;
+		abcdef.fcsc = prop.fcsc;
+		abcdef.fcsc_user_data = prop.fcsc_user_data;
+		abcdef.string = &prop.str_type;
+		
+		uint32_t flags = ImGuiInputTextFlags_CallbackResize;
+		if (abcdef.fcsc)
+			flags |= ImGuiInputTextFlags_CallbackCompletion;
+
+		changes |= ImGui::InputText(prop.name, (char*)prop.str_type.data(), prop.str_type.size(), flags, imgui_input_text_callback_function, &abcdef);
+
+	}break;
+	case Property_Type::int_prop:
+	{
+		if (prop.treat_completion_as_combo) {
+			ASSERT(prop.fcsc);
+		
+			auto candidates = prop.fcsc(prop.fcsc_user_data, "", 0);
+			changes |= ImGui::Combo(prop.name, &prop.i_type, candidates->data(), candidates->size());
+			if (!candidates->empty())
+				prop.str_type = candidates->at(prop.i_type);
+			else {
+				prop.str_type = "";
+			}
+		}
+
+	}break;
+	default:
+
+		break;
+	}
+
+	if (changes && prop.on_edit_callback)
+		prop.on_edit_callback(prop);
+
+	return changes;
+}
+
 
 void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 {
 	bool update_me = false;
 	bool update_everything = false;
 
-	if (ImGui::InputText("Name", text_buffer0, sizeof text_buffer0)) {
-		title = text_buffer0;
+
+	if (node) {
+		update_me |= draw_properties_node(*node->get_property_list(), node);
 	}
+
+	for (auto& prop : properties)
+		update_me |= draw_node_property(prop);
 
 	switch (type)
 	{
-	case animnode_type::source: {
-		auto source = (Clip_Node_CFG*)node;
-		auto flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion;
-		completion_callback_data ccd = { ed,completion_callback_data::CLIPS };
-		if (ImGui::InputText("Clipname", text_buffer1, sizeof text_buffer1, flags, node_completion_callback, &ccd)) {
-			source->clip_name = remove_whitespace(text_buffer1);
-			update_me = true;
-		}
-
-		ImGui::Checkbox("Loop", &source->loop);
-		ImGui::Checkbox("Can be sync leader", &source->can_be_leader);
-		ImGui::DragFloat("Speed", &source->speed, 0.05);
-		static const char* rootmotion_options[] = { "default", "remove" };
-		update_me |= ImGui::ListBox("xroot", (int*)&source->rootmotion[0], rootmotion_options, 2);
-		update_me |= ImGui::ListBox("yroot", (int*)&source->rootmotion[1], rootmotion_options, 2);
-		update_me |= ImGui::ListBox("zroot", (int*)&source->rootmotion[2], rootmotion_options, 2);
-	}
-		break;
-	case animnode_type::statemachine:
-		break;
-	case animnode_type::selector:
-	{
-
-	}
-
-		break;
-	case animnode_type::mask:
-		break;
-	case animnode_type::blend:
-	{
-		auto source = (Blend_Node_CFG*)node;
-		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
-		if (ImGui::InputText("Param", text_buffer1, sizeof text_buffer1, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback , &ccd)) {
-			update_me = true;
-		}
-		ImGui::DragFloat("Damp", &source->damp_factor, 0.01, 0.0, 1.0);
-	}
-		break;
-	case animnode_type::blend2d:
-	{
-		auto source = (Blend2d_CFG*)node;
-		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
-
-		if (ImGui::InputText("ParamX", text_buffer1, sizeof text_buffer1, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
-			update_me = true;
-		}
-		if (ImGui::InputText("ParamY", text_buffer2, sizeof text_buffer2, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
-			update_me = true;
-		}
-		ImGui::DragFloat("Fade from idle", &source->fade_in, 0.05,0.0);
-		ImGui::DragFloat("Damp", &source->weight_damp, 0.025, 0.0);
-	}
-		break;
-	case animnode_type::add: {
-		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
-
-		if (ImGui::InputText("Param", text_buffer1, sizeof text_buffer1, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
-			update_me = true;
-		}
-	}
-		break;
-	case animnode_type::subtract:
-		break;
-	case animnode_type::aimoffset:
-		break;
-	case animnode_type::mirror:
-	{
-		auto source = (Mirror_Node_CFG*)node;
-		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
-		if (ImGui::InputText("Param", text_buffer1, sizeof text_buffer1, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion, node_completion_callback, &ccd)) {
-			update_me = true;
-		}
-	}
-		break;
-	case animnode_type::play_speed:
-		break;
-	case animnode_type::rootmotion_speed:
-		break;
-	case animnode_type::sync:
-		break;
 	case animnode_type::state:
 	{
 		std::vector<const char*> transition_names;
@@ -913,11 +949,11 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 		for (int i = 0; i < num_inputs; i++) {
 			if (inputs[i]) {
 				indirect.push_back(i);
-				transition_names.push_back(inputs[i]->title.c_str());
+				transition_names.push_back(inputs[i]->get_title().c_str());
 			}
 		}
-		completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
-
+		//completion_callback_data ccd = { ed,completion_callback_data::PARAMS };
+		/*
 		if (transition_names.size() > 0) {
 			ImGui::Combo("Transition", &state.selected_transition_for_prop_ed, transition_names.data(), transition_names.size());
 
@@ -937,6 +973,7 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 		}
 		ImGui::Separator();
 		ImGui::DragFloat("State time", &state.state_ptr->state_duration, 0.05, 0.0);
+		*/
 	}
 		break;
 	case animnode_type::root:
@@ -948,31 +985,31 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 	default:
 		break;
 	}
-
-	if (update_me)
-		ed->update_every_node();
 }
 
 void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 {
+
+	if (node) {
+		for (int i = 0; i < node->input.count; i++) {
+			node->input[i] = get_nodecfg_for_slot(i);
+		}
+	}
+
 	switch (type)	
 	{
 	case animnode_type::source: {
-		auto source = (Clip_Node_CFG*)node;
-		if (!source->clip_name.empty()) set_node_title(source->clip_name);
-		else set_node_title("Source");
-		num_inputs = 0;
 	}break;
 	case animnode_type::statemachine: {
 		auto source = (Statemachine_Node_CFG*)node;
 
-		source->start_state = nullptr;
+		source->start_state = { -1 };
+
 		auto rootnode = ed->find_first_node_in_layer(sublayer.id, animnode_type::root);
 		if (rootnode) {
 			auto startnode = rootnode->inputs[0];
-			if (startnode && startnode->type == animnode_type::state && startnode->is_node_valid()) {
-				source->start_state = startnode->state.state_ptr;
-				ASSERT(source->start_state);
+			if (startnode && startnode->type == animnode_type::state) {
+				source->start_state = startnode->state->state_handle;
 			}
 		}
 
@@ -984,103 +1021,46 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 		break;
 	case animnode_type::blend: {
 		auto source = (Blend_Node_CFG*)node;
-
-
-		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
-		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
-			printf("Param, %s, not valid\n", text_buffer1);
-		}
-		source->param = param;
-
-		source->posea = get_nodecfg_for_slot(0);
-		source->poseb = get_nodecfg_for_slot(1);
-
-		assert(param.id >= -1);
 	}
 		break;
 	case animnode_type::blend2d: {
-		auto source = (Blend2d_CFG*)node;
-		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
-		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
-			printf("Param, %s, not valid\n", text_buffer1);
-		}
-		source->xparam = param;
-		assert(param.id >= -1);
+		
 
-
-		param = ed->editing_tree->find_param(remove_whitespace(text_buffer2).c_str());
-		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
-			printf("Param, %s, not valid\n", text_buffer2);
-		}
-		source->yparam = param;
-		assert(param.id >= -1);
-
-
-		source->idle = get_nodecfg_for_slot(0);
-		for (int i = 0; i < 8; i++) {
-			source->directions[i] = get_nodecfg_for_slot(1 + i);
-		}
 	}
 		break;
 	case animnode_type::add:
 	{
-		auto source = (Add_Node_CFG*)node;
-		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
-		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
-			printf("Param, %s, not valid\n", text_buffer1);
-		}
-		source->param = param;
-		source->diff_pose = get_nodecfg_for_slot(0);
-		source->base_pose = get_nodecfg_for_slot(1);
+		
+	
 	}	break;
 	case animnode_type::subtract:
 	{
-		auto source = (Subtract_Node_CFG*)node;
-
-		source->ref = get_nodecfg_for_slot(0);
-		source->source = get_nodecfg_for_slot(1);
+		
 	}
 		break;
 	case animnode_type::aimoffset:
 		break;
 	case animnode_type::mirror:
 	{
-		auto source = (Mirror_Node_CFG*)node;
-		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
-		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
-			printf("Param, %s, not valid\n", text_buffer1);
-		}
-		source->param = param;
-		source->input = get_nodecfg_for_slot(0);
+	
 	}
 		break;
 	case animnode_type::play_speed:
 		break;
 	case animnode_type::rootmotion_speed:
 	{
-		auto source = (Scale_By_Rootmotion_CFG*)node;
-
-		handle<Parameter> param = ed->editing_tree->find_param(remove_whitespace(text_buffer1).c_str());
-		if (!param.is_valid() || ed->editing_tree->parameters.get_type(param) != script_parameter_type::animfloat) {
-			printf("Param, %s, not valid\n", text_buffer1);
-		}
-		source->param = param;
-
-		source->child = get_nodecfg_for_slot(0);
-
+	
 	}
 		break;
 	case animnode_type::sync:
 	{
-		auto source = (Sync_Node_CFG*)node;
-
-		source->child = get_nodecfg_for_slot(0);
+	
 	}
 		break;
 	case animnode_type::state: {
 
-		State* s = state.state_ptr;
-		s->name = title;
+		State* s = state->get_state();
+		s->name = get_title();
 
 		auto startnode = ed->find_first_node_in_layer(sublayer.id, animnode_type::start_statemachine);
 		if (!startnode)
@@ -1092,24 +1072,24 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 
 		s->transitions.clear();
 		for (int i = 0; i < num_inputs; i++) {
-			if (inputs[i] && !state.transitions[i].code.empty()) {
+			if (inputs[i] && !state->transitions[i].code.empty()) {
 				ASSERT(inputs[i]->is_state_node());
 				State_Transition st;
-				st.transition_state = inputs[i]->state.state_ptr;
-				std::string code = state.transitions[i].code;
+				st.transition_state = inputs[i]->state->state_handle;;
+				std::string code = state->transitions[i].code;
 				try {
 					auto exp = LispLikeInterpreter::parse(code);
 					st.script.compilied.compile(exp, ed->editing_tree->parameters);
 				}
 				catch (LispError err) {
 					printf("Err: %s\n", err.msg);
-					printf("Failed to compilie script transition for \"%s\" (%s)\n", title.c_str(), code.c_str());
+					printf("Failed to compilie script transition for \"%s\" (%s)\n", get_title().c_str(), code.c_str());
 
 					continue;
 				}
 				catch (...) {
 					printf("Unknown err\n");
-					printf("Failed to compilie script transition for \"%s\" (%s)\n", title.c_str(), code.c_str());
+					printf("Failed to compilie script transition for \"%s\" (%s)\n", get_title().c_str(), code.c_str());
 					continue;
 				}
 				s->transitions.push_back(st);
@@ -1118,13 +1098,6 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	}
 		break;
 	case animnode_type::root:
-
-		// this is always the ROOT layer
-		if (graph_layer == 0) {
-
-			ed->editing_tree->root = get_nodecfg_for_slot(0);
-
-		}
 
 
 		break;
@@ -1148,6 +1121,11 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 
 bool Editor_Graph_Node::is_node_valid()
 {
+	bool inputs_valid = true;
+	for (int i = 0; i < node->input.count; i++) {
+		if (!node->input[i]) return false;
+	}
+
 	switch (type)
 	{
 	case animnode_type::source:
@@ -1158,7 +1136,7 @@ bool Editor_Graph_Node::is_node_valid()
 	case animnode_type::statemachine:
 	{
 		auto source = (Statemachine_Node_CFG*)node;
-		return source->start_state != nullptr;
+		return source->start_state.is_valid();
 	}
 		break;
 	case animnode_type::selector:
@@ -1168,36 +1146,31 @@ bool Editor_Graph_Node::is_node_valid()
 	case animnode_type::blend:
 	{
 		auto source = (Blend_Node_CFG*)node;
-		return source->param.is_valid() && source->posea&&source->poseb;
+		return source->param.is_valid();
 	}
 		break;
 	case animnode_type::blend2d:
 	{
 		auto source = (Blend2d_CFG*)node;
-		bool posesvalid = source->idle;
-		for (int i = 0; i < 8; i++)
-			posesvalid &= bool(source->directions[i]);
-		return posesvalid && source->xparam.is_valid() && source->yparam.is_valid();
+
+		return source->xparam.is_valid() && source->yparam.is_valid();
 	}
 		break;
 	case animnode_type::add:
 	{
 		auto source = (Add_Node_CFG*)node;
-		return source->base_pose && source->diff_pose && source->param.is_valid();
+		return  source->param.is_valid();
 	}
 		break;
 	case animnode_type::subtract:
-	{
-		auto source = (Subtract_Node_CFG*)node;
-		return source->ref && source->source;
-	}
+
 		break;
 	case animnode_type::aimoffset:
 		break;
 	case animnode_type::mirror:
 	{
 		auto source = (Mirror_Node_CFG*)node;
-		return source->input && source->param.is_valid();
+		return source->param.is_valid();
 	}
 		break;
 	case animnode_type::play_speed:
@@ -1205,18 +1178,15 @@ bool Editor_Graph_Node::is_node_valid()
 	case animnode_type::rootmotion_speed:
 	{
 		auto source = (Scale_By_Rootmotion_CFG*)node;
-		return source->child && source->param.is_valid();
+		return source->param.is_valid();
 	}
 		break;
 	case animnode_type::sync:
-	{
-		auto source = (Sync_Node_CFG*)node;
-		return source->child;
-	}
+	
 		break;
 	case animnode_type::state:
 	{
-		return state.state_ptr->tree;
+		return state->get_state()->tree;
 	}
 		break;
 	case animnode_type::root:
@@ -1291,6 +1261,8 @@ void AnimationGraphEditor::open(const char* name)
 	//ro.transform = out.model->skeleton_root_transform;
 
 	idraw->update_obj(out.obj, ro);
+
+	out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
 }
 
 void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)

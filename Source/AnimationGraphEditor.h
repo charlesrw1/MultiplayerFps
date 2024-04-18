@@ -18,6 +18,9 @@
 #include "imnodes.h"
 
 #include <memory>
+#include <functional>
+
+#include "PropertyEd.h"
 
 class Editor_Graph_Node;
 
@@ -26,64 +29,21 @@ struct editor_layer {
 	uint32_t id = 1;
 };
 
-class binary_file_writer
+struct More_Node_Property
 {
-public:
-	uint8_t read_byte();
-	uint16_t read_word();
-	uint32_t read_int();
+	const char* name = "";
+	Property_Type type{};
 
-
-	const char* read_string(int offset);
-	uint8_t* read_bytes(int offset);
+	std::string str_type;
+	int i_type = 0;
+	int f_type = 0.f;
+	// string completion
+	find_completion_strs_callback fcsc = nullptr;
+	void* fcsc_user_data = nullptr;
+	bool treat_completion_as_combo = false;
+	std::function<void(More_Node_Property&)> on_edit_callback;
 };
 
-struct animation_graph_game_header
-{
-	int version = 1;
-
-	int node_offset = 0;
-	int node_count = 0;
-	int state_offset = 0;
-	int state_count = 0;
-
-	int control_param_offset = 0;
-	int control_param_count = 0;
-
-	int string_table_offset = 0;
-	int string_table_size = 0;
-	int binary_table_offset = 0;
-	int binary_table_size = 0;
-
-	int root_node_index = 0;
-};
-
-struct animation_graph_editor_header
-{
-	int version = 1;
-
-	int node_offset = 0;
-	int node_count = 0;
-};
-
-// serialize a format just for runtime
-// and a format for editor use
-
-// editor use wraps around the runtime version
-
-// runtime:
-// list of nodes in a flat array
-// use index for pointers to other nodes
-// list of states in a flat array
-// use index for pointers to next states
-// list of control parameters
-// handle to root node
-// meta data about creation date etc
-// string table and binary table for data
-
-// editor format:
-// list of nodes which have handles into runtime nodes and runtime states
-// store imnodes id
 
 const uint32_t MAX_INPUTS = 16;
 const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
@@ -98,10 +58,6 @@ class Editor_Graph_Node
 public:
 	Editor_Graph_Node() {
 		memset(inputs.data(), 0, sizeof(Editor_Graph_Node*) * inputs.size());
-		memset(text_buffer0, 0, sizeof text_buffer0);
-		memset(text_buffer1, 0, sizeof text_buffer1);
-		memset(text_buffer2, 0, sizeof text_buffer2);
-
 	}
 
 	~Editor_Graph_Node() {
@@ -110,7 +66,15 @@ public:
 		}
 	}
 
-	std::string title = "Empty";
+	enum class Hardcoded_Props {
+		name = 0,
+	};
+
+	std::string& get_title() {
+		ASSERT(properties.size() > (int)Hardcoded_Props::name);
+		return properties.at((int)Hardcoded_Props::name).str_type;
+	}
+
 	uint32_t id = 0;
 	Color32 node_color = { 23, 82, 12 };
 
@@ -146,7 +110,7 @@ public:
 				num_inputs++;
 		}
 
-		on_state_change(ed);
+		//on_state_change(ed);
 	}
 
 	void remove_reference(AnimationGraphEditor* ed, Editor_Graph_Node* node);
@@ -179,7 +143,7 @@ public:
 	}
 
 	void set_node_title(const std::string& name) {
-		title = name;
+		get_title() = name;
 	}
 
 	void draw_property_editor(AnimationGraphEditor* ed);
@@ -223,23 +187,36 @@ public:
 	// state machine node stuff
 	struct statemachine_data {
 		std::vector<Editor_Graph_Node*> states;
-	}sm;
+	};
+
+	std::unique_ptr<statemachine_data> sm;
 
 	// state node data
 	struct state_data {
 		Editor_Graph_Node* parent_statemachine = nullptr;
+
+		Statemachine_Node_CFG* sm_node_parent = nullptr;
 		struct transition {
 			std::string code = "";	// lisp expression
 			float blend_time = 0.1;
+
+
+			More_Node_Property property;
 		};
 		std::array<transition, MAX_INPUTS> transitions;
-		State* state_ptr = nullptr;
+		handle<State> state_handle;
 		int selected_transition_for_prop_ed = 0;
-	}state;
 
-	char text_buffer0[256];
-	char text_buffer1[256];
-	char text_buffer2[256];
+		State* get_state() {
+			ASSERT(sm_node_parent);
+			ASSERT(state_handle.id != -1);
+			return &sm_node_parent->states.at(state_handle.id);
+		}
+	};
+
+	std::unique_ptr<state_data> state;
+
+	std::vector<More_Node_Property> properties;
 };
 
 struct Editor_Parameter_list
@@ -294,6 +271,12 @@ public:
 		}
 		return nullptr;
 	}
+	Editor_Graph_Node* get_owning_node_for_layer(uint32_t layer) {
+		for (int i = 0; i < nodes.size(); i++) {
+			if (nodes[i]->sublayer.id == layer && nodes[i]->sublayer.context) return nodes[i];
+		}
+		return nullptr;
+	}
 
 	std::string name = "";
 	void* imgui_node_context = nullptr;
@@ -341,21 +324,13 @@ public:
 
 		void update_tab_name() {
 			if (!owner_node) tabname =  "ROOT";
-			else if (owner_node->type == animnode_type::statemachine) tabname =  "statemachine: " + owner_node->title;
-			else if (owner_node->type == animnode_type::state) tabname = "state: " + owner_node->title;
+			else if (owner_node->type == animnode_type::statemachine) tabname =  "statemachine: " + owner_node->get_title();
+			else if (owner_node->type == animnode_type::state) tabname = "state: " + owner_node->get_title();
 			else ASSERT(!"tab with bad type");
 		}
 	};
 
-	void update_every_node() {
-		for (int i = 0; i < nodes.size(); i++) {
-			nodes[i]->on_state_change(this);
-		}
-		// do it twice because... reasons...
-		for (int i = 0; i < nodes.size(); i++) {
-			nodes[i]->on_state_change(this);
-		}
-	}
+	void compile_graph_for_playing();
 
 	editor_layer create_new_layer(bool is_statemachine) {
 		editor_layer layer;
