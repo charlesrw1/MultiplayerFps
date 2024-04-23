@@ -24,11 +24,13 @@
     <ClCompile Include="Source\AnimationGraphEditor.cpp" />
     <ClCompile Include="Source\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\AnimationTreePublic.cpp" />
+    <ClCompile Include="Source\Animation_Man.cpp" />
     <ClCompile Include="Source\Animation_Tree.cpp" />
     <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\External\imnodes.cpp" />
     <ClCompile Include="Source\External\imnodes_internal.cpp" />
+    <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Files.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
@@ -91,6 +93,7 @@
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\imnodes.h" />
     <ClInclude Include="Source\External\imnodes_internal.h" />
+    <ClInclude Include="Source\External\ImSequencer.h" />
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\FreeList.h" />
     <ClInclude Include="Source\Game_Engine.h" />

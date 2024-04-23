@@ -6,7 +6,7 @@
 class DictParser
 {
 public:
-    void load_from_file(const char* filename);
+    bool load_from_file(const char* filename);
     void load_from_memory(const uint8_t* ptr, int length, const char* name);
     ~DictParser() {
         if (allocated) {

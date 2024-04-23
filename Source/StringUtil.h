@@ -81,6 +81,8 @@ public:
 	}
 	int size() { return data_len; }
 	const char* c_str() { return data; }
+
+	char* get_data() { return data; }
 private:
 	int data_len = 0;
 	char data[BUFSIZE];
@@ -116,7 +118,7 @@ public:
 			other++;
 			count++;
 		}
-		return true;
+		return count == str_len;
 	}
 
 	Stack_String<256> to_stack_string() {

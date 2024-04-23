@@ -24,18 +24,51 @@ struct AnimCompletionCallbackUserData
 	AnimationGraphEditor* ed = nullptr;
 	enum {
 		PARAMS,
-		CLIPS
+		CLIPS,
+		BONES,
+		PROP_TYPE,
 	}type;
 };
 std::vector<const char*>* anim_completion_callback_function(void* user, const char* word_start, int len);
 
 AnimCompletionCallbackUserData param_completion = { &ed, AnimCompletionCallbackUserData::PARAMS };
 AnimCompletionCallbackUserData clip_completion = { &ed, AnimCompletionCallbackUserData::CLIPS };
+AnimCompletionCallbackUserData bone_completion = { &ed, AnimCompletionCallbackUserData::BONES };
+AnimCompletionCallbackUserData prop_type_completion = { &ed, AnimCompletionCallbackUserData::PROP_TYPE };
 
 
+
+More_Node_Property make_string_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc = nullptr,
+	void* fcsc_user_data = nullptr, bool treat_completion_as_combo = false);
+More_Node_Property make_float_prop(const char* name);
 void AnimationGraphEditor::init()
 {
+	Table_Row template_row;
+	template_row.push_prop(make_string_prop("##name", {}));
 	
+	More_Node_Property prop2;
+	prop2.name = "##type";
+	prop2.i_type = 2;
+	prop2.fcsc = anim_completion_callback_function;
+	prop2.fcsc_user_data = &prop_type_completion;
+	prop2.type = Property_Type::int_prop;
+	prop2.treat_completion_as_combo = true;
+	prop2.on_edit_callback = [&](More_Node_Property& prop) {
+		auto table = ed.ed_params.get();
+		auto& row = table->find_row(prop.loc1);
+
+		script_parameter_type spt = (script_parameter_type)prop.i_type;
+		auto next_type = (spt == script_parameter_type::animfloat) ? Property_Type::float_prop : Property_Type::int_prop;
+
+		if (row.props[2].type != next_type) {
+			row.props[2].type = next_type;
+			row.props[2].i_type = 0;
+			row.props[2].f_type = 0.0;
+		}
+	};
+	template_row.push_prop(prop2);
+	template_row.push_prop(make_float_prop("##value"));
+	ed_params = std::make_unique<Table>(Table("Parameters", { {"Name",true,80.f}, {"Type"}, {"RT Value"} }, template_row));
 }
 
 void AnimationGraphEditor::close()
@@ -90,15 +123,212 @@ Color32 add_brightness(Color32 c, int brightness) {
 unsigned int color32_to_int(Color32 color) {
 	return *(unsigned int*)&color;
 }
+#include <unordered_set>
+#include "ImSequencer.h"
+enum class sequence_type
+{
+	clip,
+	transition,
+	state
+};
+struct MySequence : public ImSequencer::SequenceInterface
+{
+	// interface with sequencer
 
+	virtual int GetFrameMin() const {
+		return mFrameMin;
+	}
+	virtual int GetFrameMax() const {
+		return mFrameMax;
+	}
+	virtual int GetItemCount() const { return (int)items.size(); }
 
+	virtual void Add(int type) {  };
+	virtual void Del(int index) { }
+	virtual void Duplicate(int index) { }
+
+	virtual size_t GetCustomHeight(int index) { return 0; }
+
+	void add_manual_track(std::string str, int start, int end) {
+
+		uint32_t mask = 0;
+
+		for (int i = 0; i < items.size(); i++) {
+			const auto& item = items[i].back();
+			if (item.start < end && item.end > start) {
+				mask |= (1ull << i);
+			}
+		}
+
+		auto save = current_item_bitmask;
+		current_item_bitmask = mask;
+
+		int index = start_track(str, sequence_type::clip);
+		items[index].back().start = start;
+		items[index].back().end = end;
+		end_track(index);
+
+		current_item_bitmask = save;
+	}
+
+	int start_track(const std::string& str, sequence_type type) {
+		for (int i = 0; i < 64; i++) {
+			bool active = current_item_bitmask & (1ull << (uint64_t)i);
+			if (active)
+				continue;
+
+			ImSequencer::Item item;
+			item.start = active_frame;
+			item.end = active_frame + 1;
+			item.text = get_cstr(str);
+
+			if (i >= items.size()) {
+				items.push_back({});
+				ASSERT(i < items.size());
+			}
+			items[i].push_back(item);
+			current_item_bitmask |= (1ull << (uint64_t)i);
+
+			return i;
+		}
+		printf("Start_track full!\n");
+		ASSERT(0);
+		return 0;
+	}
+	void end_track(int index) {
+		current_item_bitmask = current_item_bitmask & ~(1ull << index);
+	}
+
+	void continue_tracks() {
+		for (int i = 0; i < 64; i++) {
+			if (current_item_bitmask & (1ull << i)) {
+				ASSERT(items.size() >= i);
+				ASSERT(!items[i].empty());
+				items[i].back().end = active_frame;
+			}
+		}
+	}
+
+	const char* get_cstr(std::string s) {
+		if (interned_strings.find(s) != interned_strings.end())
+			return interned_strings.find(s)->c_str();
+		interned_strings.insert(s);
+		return interned_strings.find(s)->c_str();
+	}
+
+	std::unordered_set<std::string> interned_strings;
+	uint64_t current_item_bitmask = 0;
+	std::vector<std::vector<ImSequencer::Item>> items;
+
+	// my datas
+	MySequence() : mFrameMin(0), mFrameMax(0) {}
+	int mFrameMin, mFrameMax;
+	int active_frame = 0;
+	
+	virtual void DoubleClick(int index) {
+		
+	}
+	// Inherited via SequenceInterface
+	virtual int GetItems(int index, ImSequencer::Item* item, int start = 0) override
+	{
+		if (start >= items[index].size()) return -1;
+		
+		*item = items[index][start];
+		return ++start;
+	}
+};
+
+#include "Texture.h"
 void AnimationGraphEditor::begin_draw()
 {
+
+	bool open = ImGui::TreeNodeEx("##tree", ImGuiTreeNodeFlags_FramePadding);
+	auto mesh = mats.find_texture("icon/mesh.png");
+	auto particle = mats.find_texture("icon/particle.png");
+	auto decal = mats.find_texture("icon/decal.png");
+	auto entity = mats.find_texture("icon/entity.png");
+	auto light = mats.find_texture("icon/light.png");
+
+	auto play = mats.find_texture("icon/play.png");
+	auto stop = mats.find_texture("icon/stop.png");
+	auto pause = mats.find_texture("icon/pause.png");
+	auto save = mats.find_texture("icon/Save.png");
+
+
+
+
+	ImGui::SameLine();
+	ImGui::Image((ImTextureID)decal->gl_id, ImVec2(24, 24));
+	ImGui::Image((ImTextureID)particle->gl_id, ImVec2(24, 24));
+	ImGui::Image((ImTextureID)mesh->gl_id, ImVec2(24, 24));
+	ImGui::Image((ImTextureID)entity->gl_id, ImVec2(24, 24));
+
+	ImGui::Image((ImTextureID)light->gl_id, ImVec2(24, 24));
+
+
+
+	ImGui::SameLine();
+	ImGui::TextUnformatted("EXTENDED");
+
+
+	if (ImGui::CollapsingHeader("Sequencer"))
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 1.0));
+		ImGui::ImageButton((ImTextureID)play->gl_id, ImVec2(32, 32));
+		ImGui::SameLine();
+		ImGui::ImageButton((ImTextureID)stop->gl_id, ImVec2(32, 32));
+		ImGui::SameLine();
+		ImGui::ImageButton((ImTextureID)pause->gl_id, ImVec2(32, 32), ImVec2(0,0),ImVec2(1,1),-1,ImVec4(0,0,0,0), ImVec4(1,1,1,0.3));
+		ImGui::SameLine();
+		ImGui::ImageButton((ImTextureID)save->gl_id, ImVec2(32, 32));
+		ImGui::PopStyleColor();
+
+
+		static bool init = false;
+		static MySequence mySequence;
+		if (!init) {
+			mySequence.mFrameMin = 0;
+			mySequence.mFrameMax = 100;
+
+			mySequence.add_manual_track("FIRST", 10, 30);
+			mySequence.add_manual_track("SECOND", 12, 60);
+			mySequence.add_manual_track("THIRD", 61, 90);
+			mySequence.add_manual_track("FOURTH", 92, 99);
+
+
+			init = true;
+		}
+		// let's create the sequencer
+		static int selectedEntry = -1;
+		static int firstFrame = 0;
+		static bool expanded = true;
+		static int currentFrame = 100;
+
+		ImGui::PushItemWidth(130);
+		ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
+		ImGui::SameLine();
+		ImGui::InputInt("Frame ", &currentFrame);
+		ImGui::SameLine();
+		ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
+		ImGui::PopItemWidth();
+		Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry, &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
+	}
+
+
+	if (open) {
+		static bool selectable = false;
+
+		ImGui::ImageButton((ImTextureID)light->gl_id, ImVec2(24,24));
+
+		ImGui::TreePop();
+	}
+
+
 	is_modifier_pressed = ImGui::GetIO().KeyAlt;
 
 	if (ImGui::Begin("animation graph property editor"))
 	{
-		if (ImGui::TreeNode("Node property editor")) {
+		if (ImGui::TreeNodeEx("Node property editor", ImGuiTreeNodeFlags_DefaultOpen)) {
 			if (ImNodes::NumSelectedNodes() == 1) {
 				int node = 0;
 				ImNodes::GetSelectedNodes(&node);
@@ -123,98 +353,12 @@ void AnimationGraphEditor::begin_draw()
 
 		bool need_parameter_list_update = false;
 
-		if (ImGui::TreeNode("Parameter list")) {
-			
-			if (ed_params.param.empty() || !ed_params.param.back().fake_entry) {
-				ed_params.param.push_back({});
-				
-				static uint32_t uid = 0;
-				ed_params.param.back().id = uid++;
-
-				ed_params.param.back().fake_entry = true;
-
-			}
-
-			uint32_t prop_editor_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
-
-			if (ImGui::BeginTable("Parameters", 2, prop_editor_flags))
-			{
-				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 80.f, 0);
-				ImGui::TableSetupColumn("Type", 0, 0.0f, 1);
-				ImGui::TableHeadersRow();
-
-				ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-
-				int cell = 0;
-
-				int delete_this_index = -1;
-				for (auto& param : ed_params.param)
-				{
-
-					ImGui::TableNextRow();
-
-					ImGui::TableSetColumnIndex(0);
-					ImGui::SetNextItemWidth(-FLT_MIN);
-					ImGui::PushID(param.id);
-
-					static char buffer[256];
-					memcpy(buffer, param.s.c_str(), param.s.size());
-					buffer[param.s.size()] = 0;
-					if (ImGui::InputText("##cell", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue)) {
-						if (param.fake_entry) param.fake_entry = false;
-						need_parameter_list_update = true;
-					}
-					param.s = buffer;
-
-					if (ImGui::IsItemFocused() && ImGui::IsKeyDown(ImGuiKey_Delete))
-						delete_this_index = cell;
-
-
-					ImGui::TableSetColumnIndex(1);
-
-					ImGui::SetNextItemWidth(150.f);
-					static const char* type_strs[] = { "vec2","float","int" };
-					if (ImGui::Combo("##label", (int*)&param.type, type_strs, 3)) {
-						if (!param.fake_entry)
-							need_parameter_list_update = true;
-					}
-
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(150.f);
-					if (!param.fake_entry && cell < out.tree_rt.parameters.parameters.size())
-						ImGui::DragFloat("##label223123", &out.tree_rt.parameters.parameters.at(cell).fval, 0.05, 0.0);
-				
-
-					ImGui::PopID();
-
-					cell++;
-				}
-
-				if (delete_this_index != -1) {
-
-					ed_params.param.erase(ed_params.param.begin() + delete_this_index);
-					need_parameter_list_update = true;
-
-				}
-
-
-				ImGui::PopStyleColor();
-				ImGui::EndTable();
-			}
-
-			ImGui::TreePop();
-
-		}
-
-		if (need_parameter_list_update) {
-			ed_params.update_real_param_list(&editing_tree->parameters);
-			out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
-		}
-
-
+		ed_params->imgui_draw();
 
 	}
 	ImGui::End();
+
+
 
 	ImGui::Begin("animation graph editor");
 	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
@@ -237,6 +381,7 @@ void AnimationGraphEditor::begin_draw()
 					t.open = true;
 					t.pan = glm::vec2(0.f);
 					t.mark_for_selection = true;
+					t.reset_pan_to_middle_next_draw = true;
 					tabs.push_back(t);
 				}
 			}
@@ -265,6 +410,14 @@ void AnimationGraphEditor::begin_draw()
 				if (active_tab_index != n) {
 					ImNodes::ClearNodeSelection();
 				}
+
+					auto winsize = ImGui::GetWindowSize();
+
+				if (tabs[n].reset_pan_to_middle_next_draw) {
+					ImNodes::EditorContextResetPanning(ImVec2(winsize.x/4, winsize.y/2.4));
+					tabs[n].reset_pan_to_middle_next_draw = false;
+				}
+
 				draw_graph_layer(layer);
 				rendered++;
 				active_tab_index = n;
@@ -642,8 +795,8 @@ static T* create_node_type(Animation_Tree_CFG& cfg)
 }
 
 
-static More_Node_Property make_string_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc = nullptr,
-void* fcsc_user_data = nullptr, bool treat_completion_as_combo = false)
+static More_Node_Property make_string_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc,
+void* fcsc_user_data, bool treat_completion_as_combo)
 {
 	More_Node_Property prop;
 	prop.name = name;
@@ -871,11 +1024,27 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 			if (_strnicmp(ed->out.set->clips[i].name.c_str(), word_start,len) == 0)
 				vec.push_back((ed->out.set->clips[i].name.c_str()));
 	}
-	else if (auser->type == AnimCompletionCallbackUserData::PARAMS) {
-		for (int i = 0; i < ed->ed_params.param.size(); i++)
-			if (_strnicmp(ed->ed_params.param.at(i).s.c_str(), word_start,len) == 0)
-				vec.push_back((ed->ed_params.param.at(i).s.c_str()));
+	else if (auser->type == AnimCompletionCallbackUserData::BONES) {
+		
+		auto bones  = ed->out.model->bones;
+		for (int i = 0; i < bones.size(); i++)
+			if (_strnicmp(bones[i].name.c_str(), word_start, len) == 0)
+				vec.push_back(bones[i].name.c_str());
+
 	}
+
+	else if (auser->type == AnimCompletionCallbackUserData::PROP_TYPE) {
+		vec.push_back("vec2");
+		vec.push_back("float");
+		vec.push_back("int");
+	}
+
+
+	//else if (auser->type == AnimCompletionCallbackUserData::PARAMS) {
+	//	for (int i = 0; i < ed->ed_params.param.size(); i++)
+	//		if (_strnicmp(ed->ed_params.param.at(i).s.c_str(), word_start,len) == 0)
+	//			vec.push_back((ed->ed_params.param.at(i).s.c_str()));
+	//}
 	return &vec;
 }
 
@@ -930,12 +1099,18 @@ bool draw_node_property(More_Node_Property& prop)
 		changes |= ImGui::InputText(prop.name, (char*)prop.str_type.data(), prop.str_type.size(), flags, imgui_input_text_callback_function, &abcdef);
 
 	}break;
+	case Property_Type::float_prop:
+
+		changes |= ImGui::DragFloat("##obj", &prop.f_type, 0.05);
+		break;
+
 	case Property_Type::int_prop:
 	{
 		if (prop.treat_completion_as_combo) {
 			ASSERT(prop.fcsc);
 		
 			auto candidates = prop.fcsc(prop.fcsc_user_data, "", 0);
+
 			changes |= ImGui::Combo(prop.name, &prop.i_type, candidates->data(), candidates->size());
 			if (!candidates->empty())
 				prop.str_type = candidates->at(prop.i_type);
@@ -953,6 +1128,10 @@ bool draw_node_property(More_Node_Property& prop)
 	if (changes && prop.on_edit_callback)
 		prop.on_edit_callback(prop);
 
+
+	int abc = ImGui::IsItemDeactivatedAfterEdit();
+	if(abc)
+		printf("ImGui::IsItemDeactivatedAfterEdit()\n");
 	return changes;
 }
 
@@ -1265,8 +1444,14 @@ void AnimationGraphEditor::open(const char* name)
 	editing_tree = new Animation_Tree_CFG;
 	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
 
+
+	auto set= anim_tree_man->find_set("default.txt");
+	auto skel = anim_tree_man->find_skeleton("default.txt");
+
+
 	add_root_node_to_layer(0, false);
 	tabs.push_back(tab());
+	tabs.back().reset_pan_to_middle_next_draw = true;
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
 
@@ -1300,5 +1485,79 @@ void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)
 
 		cfg->name_to_index[param.at(i).s] = cfg->types.size();
 		cfg->types.push_back(param.at(i).type);
+	}
+}
+
+void Table::imgui_draw()
+{
+
+	uint32_t prop_editor_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
+
+	int num_cols = col_names.size();
+
+	if (ImGui::Button("add row")) {
+
+		Table_Row row = template_row;
+		row.row_id = row_id_start++;
+		for (int i = 0; i < row.props.size(); i++) {
+			row.props[i].loc1 = row.row_id;
+			row.props[i].loc2 = i;
+		}
+		rows.push_back(row);
+	}
+
+	if (ImGui::BeginTable(table_name.c_str(), num_cols+allow_selecting, prop_editor_flags))
+	{
+
+		if(allow_selecting)
+			ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 0.f,0);
+
+
+		for (int i = 0; i < col_names.size(); i++) {
+			uint32_t flags = 0;
+			float w = 0.0;
+			if (col_names[i].fixed_width) {
+				flags = ImGuiTableColumnFlags_WidthFixed;
+				w = col_names[i].start_width;
+			}
+			ImGui::TableSetupColumn(col_names[i].name.c_str(), flags, w, i+allow_selecting);
+
+		}
+
+		ImGui::TableHeadersRow();
+
+		ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
+
+		int row_idx = 0;
+		int delete_this_index = -1;
+		for (auto& row : rows)
+		{
+			ImGui::TableNextRow();
+
+
+			if (allow_selecting) {
+				ImGui::TableSetColumnIndex(0);
+				ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+				if (ImGui::Selectable(string_format("%d",row_idx), selected_row == row.row_id, selectable_flags, ImVec2(0, 20.f)))
+				{
+					selected_row = row.row_id;
+				}
+			}
+
+
+			int col_idx = allow_selecting;
+			for (auto& col : row.props) {
+				ImGui::PushID(row.row_id*num_cols + col_idx);
+				ImGui::TableSetColumnIndex(col_idx);
+				draw_node_property(col);
+				col_idx++;
+				ImGui::PopID();
+			}
+			row_idx++;
+		}
+
+		ImGui::PopStyleColor();
+		ImGui::EndTable();
+
 	}
 }

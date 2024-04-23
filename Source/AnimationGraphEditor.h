@@ -27,6 +27,7 @@ class Editor_Graph_Node;
 struct editor_layer {
 	ImNodesEditorContext* context = nullptr;
 	uint32_t id = 1;
+
 };
 
 struct More_Node_Property
@@ -36,14 +37,68 @@ struct More_Node_Property
 
 	std::string str_type;
 	int i_type = 0;
-	int f_type = 0.f;
-	// string completion
+	float f_type = 0.f;
+	// string completion/combo box selection
 	find_completion_strs_callback fcsc = nullptr;
 	void* fcsc_user_data = nullptr;
 	bool treat_completion_as_combo = false;
 	std::function<void(More_Node_Property&)> on_edit_callback;
+
+	uint32_t loc1 = 0;
+	uint32_t loc2 = 0;
 };
 
+struct Table_Row
+{
+	Table_Row() {}
+
+	Table_Row& push_prop(More_Node_Property prop) {
+		props.push_back(prop);
+		return *this;
+	}
+
+	std::vector<More_Node_Property> props;
+	uint32_t row_id = 0;
+};
+
+struct Table_Col_Def
+{
+	std::string name;
+	bool fixed_width = false;
+	float start_width = 0.0;
+};
+
+class Table
+{
+public:
+	Table(std::string name, std::vector<Table_Col_Def> col_names, Table_Row te) : table_name(name), col_names(col_names){
+		template_row = te;
+	}
+
+	void imgui_draw();
+
+	Table& push_row(Table_Row row) {
+		ASSERT(row.props.size() == col_names.size() && "mismatched column sizes");
+		row.row_id = row_id_start++;
+		rows.push_back(row);
+		return *this;
+	}
+	Table_Row& find_row(uint32_t id) {
+		for (int i = 0; i < rows.size(); i++) {
+			if (rows[i].row_id == id) return rows[i];
+		}
+		ASSERT(0);
+	}
+
+	uint32_t selected_row = -1;
+	bool allow_selecting = true;
+	std::string table_name;
+	int num_cols = 0;
+	std::vector<Table_Col_Def> col_names;
+	std::vector<Table_Row> rows;
+	Table_Row template_row;
+	uint32_t row_id_start = 0;
+};
 
 const uint32_t MAX_INPUTS = 16;
 const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
@@ -241,6 +296,7 @@ struct Editor_Parameter_list
 	};
 	std::vector<ed_param> param;
 
+
 	void update_real_param_list(ScriptVars_CFG* cfg);
 };
 
@@ -297,7 +353,8 @@ public:
 	std::vector<Editor_Graph_Node*> nodes;
 	Animation_Tree_CFG* editing_tree = nullptr;
 
-	Editor_Parameter_list ed_params;
+
+	std::unique_ptr<Table> ed_params;
 
 	void draw_node_creation_menu(bool is_state_mode);
 	Editor_Graph_Node* create_graph_node_from_type(animnode_type type);
@@ -329,6 +386,7 @@ public:
 		glm::vec2 pan = glm::vec2(0.f, 0.f);
 		bool mark_for_selection = false;
 		std::string tabname;
+		bool reset_pan_to_middle_next_draw = false;
 
 		bool is_statemachine_tab() {
 			return owner_node && owner_node->is_statemachine();

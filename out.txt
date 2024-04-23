@@ -1,85 +1,8 @@
 {
 	name ""
-	data_used "44"
+	data_used "0"
 	root_node "-1"
 	params [
 	]
 	nodes [
-		{
-			type "statemachine"
-			default_param "-1"
-			inputs [
-			]
-			props [
-				{
-					value "-1"
-				}
-				{
-					value "0.000000"
-				}
-			]
-			states [
-				{
-					name "State"
-					next_state "-1"
-					duration "-1.000000"
-					node_index "-1"
-					transitions [
-					]
-				}
-				{
-					name "State"
-					next_state "-1"
-					duration "-1.000000"
-					node_index "-1"
-					transitions [
-					]
-				}
-				{
-					name "State"
-					next_state "-1"
-					duration "-1.000000"
-					node_index "-1"
-					transitions [
-					]
-				}
-				{
-					name "State"
-					next_state "-1"
-					duration "-1.000000"
-					node_index "-1"
-					transitions [
-					]
-				}
-			]
-		}
-		{
-			type "source"
-			default_param "-1"
-			inputs [
-			]
-			props [
-				{
-					value "0"
-				}
-				{
-					value "0"
-				}
-				{
-					value "0"
-				}
-				{
-					value ""
-				}
-				{
-					value "1"
-				}
-				{
-					value "1.000000"
-				}
-				{
-					value "1"
-				}
-			]
-		}
 	]

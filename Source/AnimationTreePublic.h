@@ -33,6 +33,36 @@ public:
 
 };
 
+class Model_Skeleton
+{
+public:
+	const Model* source = nullptr;
+	std::vector<int> bone_mirror_map;
+	
+	struct Remap {
+		Model_Skeleton* source = nullptr;
+		std::vector<int> source_to_skel;
+	};
+	std::vector<Remap> remaps;
+};
+
+class Animation_Set_New
+{
+public:
+	const Animation_Set_New* parent = nullptr;
+	const Model_Skeleton* src_skeleton = nullptr;
+	
+	struct Import {
+		const Model_Skeleton* import_skeleton = nullptr;
+		const Animation_Set* set = nullptr;
+	};
+
+	std::vector<Import> imports;
+	std::unordered_map<std::string, std::string> table;	// fixme: do better
+
+	void find_animation(const char* name, Animation_Set** out_set, int* out_index, int* skel_to_src_index);
+};
+
 class Model;
 struct Animation_Tree_RT
 {
@@ -60,6 +90,13 @@ class Animation_Tree_Manager
 public:
 	Animation_Tree_CFG* find_animation_tree(const char* filename);
 
+	const Animation_Set_New* find_set(const char* name);
+	const Model_Skeleton* find_skeleton(const char* name) const;
+	Model_Skeleton* find_skeleton(const char* name);
+private:
+
+	std::unordered_map<std::string, Model_Skeleton> skeletons;
+	std::unordered_map<std::string, Animation_Set_New> sets;
 	std::unordered_map<std::string, Animation_Tree_CFG> trees;
 };
 

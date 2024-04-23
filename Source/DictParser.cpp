@@ -2,10 +2,14 @@
 
 #include <fstream>
 
-void DictParser::load_from_file(const char* filename) {
+bool DictParser::load_from_file(const char* filename) {
     assert(buffer == nullptr);
-    std::ifstream infile(filename);
-    infile.seekg(std::ios::end);
+    std::ifstream infile(filename, std::ios::ate);
+
+    if (!infile)
+        return false;
+
+
     auto size = infile.tellg();
 
     buffer = new uint8_t[size];
@@ -19,6 +23,8 @@ void DictParser::load_from_file(const char* filename) {
     line = 1;
 
     this->filename = filename;
+
+    return true;
 }
 
 void DictParser::load_from_memory(const uint8_t* ptr, int length, const char* name) {

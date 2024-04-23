@@ -133,6 +133,12 @@
       <Filter>Source\Shared</Filter>
     </ClCompile>
     <ClCompile Include="Source\AnimationTreePublic.cpp" />
+    <ClCompile Include="Source\External\ImSequencer.cpp">
+      <Filter>Source\External\Imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation_Man.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationGraphEditor.h">
@@ -321,6 +327,9 @@
     <ClInclude Include="Source\PropertyEd.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="Source\External\ImSequencer.h">
+      <Filter>Source\External\Imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source">
@@ -349,6 +358,9 @@
     </Filter>
     <Filter Include="Source\Network">
       <UniqueIdentifier>{6db34f15-69d6-44f6-858d-e8a1f1a4a78c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Shared\Imgui">
+      <UniqueIdentifier>{81888e78-7b92-47a8-91c2-b98b6e6a6f93}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
