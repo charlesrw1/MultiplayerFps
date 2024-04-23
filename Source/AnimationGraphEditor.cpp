@@ -1020,9 +1020,14 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	auto ed = auser->ed;
 
 	if (auser->type == AnimCompletionCallbackUserData::CLIPS) {
-		for (int i = 0; i < ed->out.set->clips.size(); i++)
-			if (_strnicmp(ed->out.set->clips[i].name.c_str(), word_start,len) == 0)
-				vec.push_back((ed->out.set->clips[i].name.c_str()));
+		auto set = ed->out.set;
+		for (int i = 0; i < set->imports.size(); i++) {
+			auto subset = set->imports[i].set;
+			for (int j = 0; j < subset->clips.size(); j++) {
+				if (_strnicmp(subset->clips[j].name.c_str(), word_start, len) == 0)
+					vec.push_back(subset->clips[j].name.c_str());
+			}
+		}
 	}
 	else if (auser->type == AnimCompletionCallbackUserData::BONES) {
 		
@@ -1432,7 +1437,6 @@ void AnimationGraphEditor::overlay_draw()
 {
 
 }
-extern void load_mirror_remap(Model* model, const char* path);
 void AnimationGraphEditor::open(const char* name)
 {
 	this->name = name;
@@ -1445,8 +1449,6 @@ void AnimationGraphEditor::open(const char* name)
 	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
 
 
-	auto set= anim_tree_man->find_set("default.txt");
-	auto skel = anim_tree_man->find_skeleton("default.txt");
 
 
 	add_root_node_to_layer(0, false);
@@ -1455,11 +1457,9 @@ void AnimationGraphEditor::open(const char* name)
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
 
-
 	out.model = mods.find_or_load("player_FINAL.glb");
-	load_mirror_remap(out.model, "./Data/Animations/remap.txt");
+	out.set = anim_tree_man->find_set("default.txt");
 
-	out.set = out.model->animations.get();
 	out.anim.set_model(out.model);
 	out.obj = idraw->register_obj();
 

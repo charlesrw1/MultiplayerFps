@@ -42,15 +42,14 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 	Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
 
 
-	if (rt->clip_index == -1) {
+	const Animation* clip = get_clip(ctx);
+	if (!clip) {
 		util_set_to_bind_pose(*pose.pose, ctx.model);
 		return true;
 	}
 
-	const Animation& clip = ctx.set->clips[rt->clip_index];
-
 	if (pose.sync)
-		rt->frame = clip.total_duration * pose.sync->normalized_frame;
+		rt->frame = clip->total_duration * pose.sync->normalized_frame;
 
 
 	if (!pose.sync || pose.sync->first_seen) {
@@ -60,24 +59,29 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 			pose.dt *= speedup;
 		}
 
-		rt->frame += clip.fps * pose.dt * speed;
+		rt->frame += clip->fps * pose.dt * speed;
 
-		if (rt->frame > clip.total_duration || rt->frame < 0.f) {
+		if (rt->frame > clip->total_duration || rt->frame < 0.f) {
 			if (loop)
-				rt->frame = fmod(fmod(rt->frame, clip.total_duration) + clip.total_duration, clip.total_duration);
+				rt->frame = fmod(fmod(rt->frame, clip->total_duration) + clip->total_duration, clip->total_duration);
 			else {
-				rt->frame = clip.total_duration - 0.001f;
+				rt->frame = clip->total_duration - 0.001f;
 				rt->stopped_flag = true;
 			}
 		}
 
 		if (pose.sync) {
 			pose.sync->first_seen = false;
-			pose.sync->normalized_frame = rt->frame / clip.total_duration;
+			pose.sync->normalized_frame = rt->frame / clip->total_duration;
 		}
 
 	}
-	util_calc_rotations(ctx.set, rt->frame, rt->clip_index, ctx.model, *pose.pose);
+
+	const std::vector<int>* indicies = nullptr;
+	if (rt->skel_idx != -1)
+		indicies = &ctx.set->get_remap(rt->skel_idx);
+
+	util_calc_rotations(ctx.set->get_subset(rt->set_idx), rt->frame, rt->clip_index, ctx.model, indicies , *pose.pose);
 
 
 	int root_index = ctx.model->root_bone_index;
@@ -148,13 +152,18 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 
 	bool ret = input[0]->get_pose(ctx, pose);
 
+	bool has_mirror_map = ctx.set->src_skeleton->bone_mirror_map.size() == ctx.model->bones.size();
 
-	if (rt->lerp_amt >= 0.000001) {
+	if (has_mirror_map && rt->lerp_amt >= 0.000001) {
 		const Model* m = ctx.model;
 		Pose* posemirrored = Pose_Pool::get().alloc(1);
 		// mirror the bones
 		for (int i = 0; i < m->bones.size(); i++) {
-			int from = m->bones[i].remap_index;
+
+
+			int from = ctx.set->src_skeleton->bone_mirror_map.at(i);
+			if (from == -1)from = i;
+
 			glm::vec3 frompos = pose.pose->pos[from];
 			posemirrored->pos[i] = glm::vec3(-frompos.x, frompos.y, frompos.z);
 			glm::quat fromquat = pose.pose->q[from];

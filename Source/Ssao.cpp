@@ -83,9 +83,28 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 {
 	if (!initial) {
 		glDeleteTextures(1, &texture.depthlinear);
+		glDeleteFramebuffers(1, &fbo.depthlinear);
 		glDeleteTextures(1, &texture.viewnormal);
 		glDeleteFramebuffers(1, &fbo.viewnormal);
-		glDeleteFramebuffers(1, &fbo.depthlinear);
+
+		glDeleteTextures(1, &texture.result);
+		glDeleteTextures(1, &texture.blur);
+
+		glDeleteFramebuffers(1, &fbo.finalresolve);
+
+		glDeleteFramebuffers(1, &fbo.hbao2_deinterleave);
+
+		glDeleteTextures(1, &texture.deptharray);
+
+
+		for (int i = 0; i < RANDOM_ELEMENTS; i++) {
+			glDeleteTextures(1, &texture.depthview[i]);
+		}
+
+		glDeleteTextures(1, &texture.resultarray);
+
+
+		glDeleteFramebuffers(1, &fbo.hbao2_calc);
 	}
 
 	glCreateTextures(GL_TEXTURE_2D, 1, &texture.depthlinear);
@@ -131,6 +150,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	int quarterWidth = ((width + 3) / 4);
 	int quarterHeight = ((height + 3) / 4);
 
+
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.deptharray);
 	glTextureStorage3D(texture.deptharray, 1, GL_R32F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -139,8 +159,6 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	for (int i = 0; i < RANDOM_ELEMENTS; i++) {
-		if (texture.depthview[i] != 0)
-			glDeleteTextures(1, &texture.depthview[i]);
 		glGenTextures(1, &texture.depthview[i]);
 		glTextureView(texture.depthview[i], GL_TEXTURE_2D, texture.deptharray, GL_R32F, 0, 1, i, 1);
 		glBindTexture(GL_TEXTURE_2D, texture.depthview[i]);
@@ -149,6 +167,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	}
+
 
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.resultarray);
 	glTextureStorage3D(texture.resultarray, 1, GL_RG16F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);

@@ -133,7 +133,7 @@ struct Control_Params;
 struct NodeRt_Ctx
 {
 	const Model* model = nullptr;
-	const Animation_Set* set = nullptr;
+	const Animation_Set_New* set = nullptr;
 	Animation_Tree_RT* tree = nullptr;
 	ScriptVars_RT* vars = nullptr;
 
@@ -297,6 +297,8 @@ struct Clip_Node_RT
 	float inv_speed_of_anim_root = 1.0;
 	float frame = 0.0;
 	uint32_t clip_index = 0;
+	uint32_t set_idx = 0;
+	uint32_t skel_idx = 0;
 	bool stopped_flag = false;
 };
 
@@ -313,16 +315,24 @@ struct Clip_Node_CFG : public Node_CFG
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		Clip_Node_RT* rt = construct_this<Clip_Node_RT>(ctx);
 
-		rt->clip_index = ctx.set->find(clip_name.c_str());
+		ctx.set->find_animation(clip_name.c_str(), &rt->set_idx,&rt->clip_index,&rt->skel_idx);
 
 		if (rt->clip_index != -1) {
 			int root_index = ctx.model->root_bone_index;
-			int first_pos = ctx.set->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
-			rt->root_pos_first_frame = first_pos != -1 ?
-				ctx.set->GetPos(root_index, first_pos, rt->clip_index).val
-				: ctx.model->bones[root_index].posematrix[3];
 
-			const Animation& clip = ctx.set->clips[rt->clip_index];
+			if (rt->skel_idx != -1) {
+				root_index = ctx.set->get_remap(rt->skel_idx)[root_index];
+			}
+
+			auto subset = ctx.set->get_subset(rt->set_idx);
+			if (root_index != -1) {
+				int first_pos = subset->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
+				rt->root_pos_first_frame = first_pos != -1 ?
+					subset->GetPos(root_index, first_pos, rt->clip_index).val
+					: ctx.model->bones[root_index].posematrix[3];
+			}
+
+			const Animation& clip = subset->clips[rt->clip_index];
 			rt->inv_speed_of_anim_root = 1.0 / glm::length(clip.root_motion_translation) / (clip.total_duration / clip.fps);
 		}
 	}
@@ -342,8 +352,13 @@ struct Clip_Node_CFG : public Node_CFG
 	}
 	const Animation* get_clip(NodeRt_Ctx& ctx) const {
 		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
-		const Animation* clip = (rt->clip_index == -1) ? nullptr : &ctx.set->clips.at(rt->clip_index);
-		return clip;
+		if (rt->clip_index == -1) {
+			return nullptr;
+		}
+		auto subset = ctx.set->get_subset(rt->set_idx);
+		const Animation& clip = subset->clips[rt->clip_index];
+
+		return &clip;
 	}
 	void set_frame_by_interp(NodeRt_Ctx& ctx, float frac) const {
 		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);

@@ -362,9 +362,11 @@ void Animator::SetupBones()
 		return;
 	}
 
+	return;
+
 	Pose* pose = Pose_Pool::get().alloc(1);
 
-	util_calc_rotations(set, m.frame, m.anim ,model, *pose);
+	//util_calc_rotations(set, m.frame, m.anim ,model, *pose);
 
 	update_procedural_bones(*pose);
 
@@ -997,6 +999,8 @@ char get_first_token(string& s, char default_='\0')
 
 // LispInterpreter.cpp
 extern vector<string> to_tokens(string& input);
+
+#if 0
 void load_mirror_remap(Model* model, const char* path)
 {
 	std::ifstream infile(path);
@@ -1011,6 +1015,7 @@ void load_mirror_remap(Model* model, const char* path)
 		model->bones[left].remap_index = right;
 	}
 }
+#endif
 
 #if 0
 class Animation_Data_Manager
@@ -1246,7 +1251,7 @@ void Animator::tick_tree_new(float dt)
 	NodeRt_Ctx ctx;
 	ctx.tree = tree;
 	ctx.model = model;
-	ctx.set = set;
+	ctx.set = set_n;
 	ctx.vars = &tree->parameters;
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
@@ -1305,7 +1310,7 @@ void Animator::evaluate_new(float dt)
 	NodeRt_Ctx ctx;
 	ctx.tree = tree;
 	ctx.model = model;
-	ctx.set = set;
+	ctx.set = set_n;
 	ctx.vars = &tree->parameters;
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
@@ -1322,9 +1327,11 @@ void Animator::evaluate_new(float dt)
 #include "AnimationTreeLocal.h"
 #include "AnimationTreePublic.h"
 
-void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model* model, const Animation_Set* set)
+void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model* model, const Animation_Set_New* set)
 {
 	this->cfg = cfg;
+	this->model = model;
+	this->set = set;
 	parameters.parameters.resize(cfg->parameters.types.size());
 	data.resize(cfg->data_used);
 	NodeRt_Ctx ctx;
@@ -1347,8 +1354,11 @@ void Animator::set_model_new(const Model* m)
 		return;
 
 		auto cfg_tree =  anim_tree_man->find_animation_tree("./Data/Animations/testtree.txt");
+
+		set_n = anim_tree_man->find_set("default.txt");
+
 		tree = new Animation_Tree_RT;
-		tree->init_from_cfg(cfg_tree, m, m->animations.get());
+		tree->init_from_cfg(cfg_tree, m, set_n);
 
 		p_flMovex = cfg_tree->find_param("$movex");
 		p_flMovey = cfg_tree->find_param("$movey");
@@ -1363,6 +1373,30 @@ void Animator::set_model_new(const Model* m)
 
 Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {
 	return nullptr;
+}
+
+void Animation_Set_New::find_animation(const char* name, uint32_t* out_set, uint32_t* out_index, uint32_t* skel_idx) const
+{
+	const auto& find = table.find(name);
+	if (find != table.end()) {
+		name = find->second.c_str();
+	}
+
+	for (int i = imports.size() - 1; i >= 0; i--) {
+		int index = imports[i].set->find(name);
+		if (index != -1) {
+			*out_set = i;
+			*out_index = index;
+
+			if (imports[i].import_skeleton)
+				*skel_idx = imports[i].import_skeleton->find_remap(src_skeleton);
+
+			return;
+		}
+	}
+	*out_set = -1;
+	*out_index = -1;
+	*skel_idx = -1;
 }
 
 static Animation_Tree_Manager anim_tree_man__;

@@ -374,7 +374,7 @@ public:
 		View_Setup vs;
 
 		Model* model = nullptr;
-		Animation_Set* set = nullptr;
+		const Animation_Set_New* set = nullptr;
 
 		Animation_Tree_RT tree_rt;
 	}out;

@@ -110,52 +110,62 @@ static float modulo_lerp(float start, float end, float mod, float alpha)
 }
 
 static void util_calc_rotations(const Animation_Set* set,
-	float curframe, int clip_index, const Model* model, Pose& pose)
+	float curframe, int clip_index, const Model* model, const std::vector<int>* remap_indicies, Pose& pose)
 {
-	for (int i = 0; i < set->num_channels; i++) {
-		int pos_idx = set->FirstPositionKeyframe(curframe, i, clip_index);
-		int rot_idx = set->FirstRotationKeyframe(curframe, i, clip_index);
+	for (int dest_idx = 0; dest_idx < set->num_channels; dest_idx++) {
+		int src_idx = (remap_indicies) ? (*remap_indicies)[dest_idx] : dest_idx;
+
+		if (src_idx == -1) {
+			pose.pos[dest_idx] = model->bones.at(dest_idx).localtransform[3];
+			pose.q[dest_idx] = model->bones.at(dest_idx).rot;
+			pose.q[dest_idx] = glm::normalize(pose.q[dest_idx]);
+			continue;
+		}
+
+
+		int pos_idx = set->FirstPositionKeyframe(curframe, src_idx, clip_index);
+		int rot_idx = set->FirstRotationKeyframe(curframe, src_idx, clip_index);
 
 		vec3 interp_pos{};
 		if (pos_idx == -1)
-			interp_pos = model->bones.at(i).localtransform[3];
-		else if (pos_idx == set->GetChannel(clip_index, i).num_positions - 1)
-			interp_pos = set->GetPos(i, pos_idx, clip_index).val;
+			interp_pos = model->bones.at(src_idx).localtransform[3];
+		else if (pos_idx == set->GetChannel(clip_index, src_idx).num_positions - 1)
+			interp_pos = set->GetPos(src_idx, pos_idx, clip_index).val;
 		else {
 			int index0 = pos_idx;
 			int index1 = pos_idx + 1;
-			float t0 = set->GetPos(i, index0, clip_index).time;
-			float t1 = set->GetPos(i, index1, clip_index).time;
+			float t0 = set->GetPos(src_idx, index0, clip_index).time;
+			float t1 = set->GetPos(src_idx, index1, clip_index).time;
 			if (index0 == 0)t0 = 0.f;
 			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
 			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
 			float scale = MidLerp(t0, t1, curframe);
 			assert(scale >= 0 && scale <= 1.f);
-			interp_pos = glm::mix(set->GetPos(i, index0, clip_index).val, set->GetPos(i, index1, clip_index).val, scale);
+			interp_pos = glm::mix(set->GetPos(src_idx, index0, clip_index).val, set->GetPos(src_idx, index1, clip_index).val, scale);
 		}
 
 		glm::quat interp_rot{};
 		if (rot_idx == -1) {
-			interp_rot = model->bones.at(i).rot;
+			interp_rot = model->bones.at(src_idx).rot;
 		}
-		else if (rot_idx == set->GetChannel(clip_index, i).num_rotations - 1)
-			interp_rot = set->GetRot(i, rot_idx, clip_index).val;
+		else if (rot_idx == set->GetChannel(clip_index, src_idx).num_rotations - 1)
+			interp_rot = set->GetRot(src_idx, rot_idx, clip_index).val;
 		else {
 			int index0 = rot_idx;
 			int index1 = rot_idx + 1;
-			float t0 = set->GetRot(i, index0, clip_index).time;
-			float t1 = set->GetRot(i, index1, clip_index).time;
+			float t0 = set->GetRot(src_idx, index0, clip_index).time;
+			float t1 = set->GetRot(src_idx, index1, clip_index).time;
 			if (index0 == 0)t0 = 0.f;
 			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
 			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
 			float scale = MidLerp(t0, t1, curframe);
 			assert(scale >= 0 && scale <= 1.f);
-			interp_rot = glm::slerp(set->GetRot(i, index0, clip_index).val, set->GetRot(i, index1, clip_index).val, scale);
+			interp_rot = glm::slerp(set->GetRot(src_idx, index0, clip_index).val, set->GetRot(src_idx, index1, clip_index).val, scale);
 		}
 		interp_rot = glm::normalize(interp_rot);
 
-		pose.q[i] = interp_rot;
-		pose.pos[i] = interp_pos;
+		pose.q[dest_idx] = interp_rot;
+		pose.pos[dest_idx] = interp_pos;
 	}
 }
 static void util_set_to_bind_pose(Pose& pose, const Model* model)

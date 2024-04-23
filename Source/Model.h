@@ -26,7 +26,6 @@ struct Bone
 {
 	string name;
 	int parent;
-	int remap_index;
 	glm::mat4x3 posematrix;	// bone space -> mesh space
 	glm::mat4x3 invposematrix; // mesh space -> bone space
 	glm::mat4x3 localtransform;

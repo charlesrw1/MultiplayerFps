@@ -209,10 +209,10 @@ static bool read_mirror_skeleton_table(DictParser& parser, StringView& str, Mode
 
 	Model_Skeleton::Remap remap_inverse;
 	remap_inverse.source = skel;
-	remap_inverse.source_to_skel.resize(skel->source->bones.size(), -1);
+	remap_inverse.skel_to_source.resize(remap.source->source->bones.size(), -1);
 
 	// look up index of the source bone index to the destination index
-	remap.source_to_skel.resize(remap.source->source->bones.size(),-1);
+	remap.skel_to_source.resize(skel->source->bones.size(),-1);
 
 	if (!parser.expect_list_start())
 		return false;
@@ -236,8 +236,8 @@ static bool read_mirror_skeleton_table(DictParser& parser, StringView& str, Mode
 			return false;
 		}
 
-		remap.source_to_skel.at(src_idx) = dest_idx;
-		remap_inverse.source_to_skel.at(dest_idx) = src_idx;
+		remap.skel_to_source.at(dest_idx) = src_idx;
+		remap_inverse.skel_to_source.at(src_idx) = dest_idx;
 
 
 		parser.read_string(str);

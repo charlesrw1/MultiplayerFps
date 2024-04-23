@@ -184,6 +184,7 @@ enum class bone_controller_type
 class Entity;
 class Animation_Tree_CFG;
 class Animation_Tree_RT;
+class Animation_Set_New;
 class Animator
 {
 public:
@@ -218,6 +219,8 @@ public:
 
 	const Model* model = nullptr;
 	const Animation_Set* set = nullptr;
+	const Animation_Set_New* set_n = nullptr;
+
 	Entity* owner = nullptr;
 	
 	Animation_Tree_RT* tree = nullptr;

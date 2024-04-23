@@ -41,9 +41,17 @@ public:
 	
 	struct Remap {
 		Model_Skeleton* source = nullptr;
-		std::vector<int> source_to_skel;
+		std::vector<int> skel_to_source;
 	};
 	std::vector<Remap> remaps;
+
+	int find_remap(const Model_Skeleton* skel) const {
+		for (int i = 0; i < remaps.size(); i++) {
+			if (remaps[i].source == skel)
+				return i;
+		}
+		return -1;
+	}
 };
 
 class Animation_Set_New
@@ -60,14 +68,23 @@ public:
 	std::vector<Import> imports;
 	std::unordered_map<std::string, std::string> table;	// fixme: do better
 
-	void find_animation(const char* name, Animation_Set** out_set, int* out_index, int* skel_to_src_index);
+	void find_animation(const char* name, uint32_t* out_set, uint32_t* out_index, uint32_t* out_skel) const;
+	const Animation_Set* get_subset(uint32_t index) const {
+		return imports[index].set;
+	}
+	const std::vector<int>& get_remap(uint32_t skel_index) const {
+		return src_skeleton->remaps.at(skel_index).skel_to_source;
+	}
 };
 
 class Model;
 struct Animation_Tree_RT
 {
-	void init_from_cfg(const Animation_Tree_CFG* cfg,const Model* model, const Animation_Set* set);
+	void init_from_cfg(const Animation_Tree_CFG* cfg,const Model* model, const Animation_Set_New* set);
 	const Animation_Tree_CFG* cfg = nullptr;
+	const Model* model = nullptr;
+	const Animation_Set_New* set = nullptr;
+
 	std::vector<uint8_t> data;	// runtime data
 	ScriptVars_RT parameters;
 
