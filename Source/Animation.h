@@ -7,12 +7,9 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include <vector>
-#include <string>
-#include <memory>
 
 #include "AnimationTypes.h"
-#include "IGraphDriver.h"
-
+#include "AnimationTreePublic.h"
 
 
 // procedural bone controls
@@ -58,8 +55,8 @@ enum class bone_controller_type
 
 class Entity;
 class Animation_Tree_CFG;
-class Animation_Tree_RT;
 class Animation_Set_New;
+class IAnimationGraphDriver;
 class Animator
 {
 public:
@@ -103,7 +100,7 @@ public:
 	}
 
 	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
-	vector<Animation_Slot> slots;
+	std::vector<Animation_Slot> slots;
 
 	void play_anim_in_slot(StringView name, float start, float speed, bool loop);
 	bool is_slot_finished() { return slots[0].finished; }
@@ -113,8 +110,8 @@ public:
 	int num_bones() { return cached_bonemats.size(); }
 private:
 
-	vector<glm::mat4x4> cached_bonemats;	// global bonemats
-	vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
+	std::vector<glm::mat4x4> cached_bonemats;	// global bonemats
+	std::vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
 
 	void ConcatWithInvPose();
 

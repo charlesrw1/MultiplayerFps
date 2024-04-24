@@ -12,10 +12,9 @@ using namespace glm;
 #include <iomanip>
 
 #include "LispInterpreter.h"
-
 #include "MemArena.h"
-
 #include "AnimationUtil.h"
+#include "IGraphDriver.h"
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -579,6 +578,7 @@ void Animation_Set_New::find_animation(const char* name, uint32_t* out_set, uint
 		name = find->second.c_str();
 	}
 
+	// read backwards to allow overloading inherited
 	for (int i = imports.size() - 1; i >= 0; i--) {
 		int index = imports[i].mod->animations->find(name);
 		if (index != -1) {

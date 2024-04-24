@@ -1040,8 +1040,8 @@ public:
 		ImGui::SetNextWindowPos(ImVec2(winsize.x - width - 10, 50));
 		ImGui::SetNextWindowSize(ImVec2(width, 700));
 		ImGui::SetNextWindowBgAlpha(0.3);
-		ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar |
-			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+		ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar
+			| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
 		if (ImGui::Begin("Debug",nullptr, flags)) {
 			ImGui::PushItemWidth(140.f);
 			for (int i = 0; i < hooks.size(); i++) {

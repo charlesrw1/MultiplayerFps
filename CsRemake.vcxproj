@@ -23,6 +23,7 @@
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\AnimationGraphEditor.cpp" />
     <ClCompile Include="Source\AnimationTreeLocal.cpp" />
+    <ClCompile Include="Source\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation_Man.cpp" />
     <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />

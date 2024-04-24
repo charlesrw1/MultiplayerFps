@@ -270,7 +270,21 @@ static float mid_lerp(float min, float max, float mid_val)
 {
 	return (mid_val - min) / (max - min);
 }
-extern float modulo_lerp(float start, float end, float mod, float alpha);
+float modulo_lerp(float start, float end, float mod, float alpha)
+{
+	float d1 = glm::abs(end - start);
+	float d2 = mod - d1;
+
+
+	if (d1 <= d2)
+		return glm::mix(start, end, alpha);
+	else {
+		if (start >= end)
+			return fmod(start + (alpha * d2), mod);
+		else
+			return fmod(end + ((1 - alpha) * d2), mod);
+	}
+}
 
 void RenderInterpolationComponent::evaluate(float time)
 {

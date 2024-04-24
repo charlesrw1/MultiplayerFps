@@ -109,7 +109,9 @@ enum class AnimationNotifyType
 	FOOTSTEP_LEFT,
 	FOOTSTEP_RIGHT,
 	SOUND,
-	EFFECT
+	EFFECT,
+	LOCK_IK,
+	RELEASE_IK,
 };
 
 struct Animation_Notify_Def {

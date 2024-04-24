@@ -1,6 +1,8 @@
 #include "PlayerAnimDriver.h"
 #include "Entity.h"
 #include "Game_Engine.h" // Debug::
+#include "ScriptVars.h"
+
 void CharacterGraphDriver::on_init() {
 	const ScriptVars_CFG& vars = owner->runtime_dat.cfg->parameters;
 	flMovex = vars.find("flMovex");
@@ -38,17 +40,17 @@ void CharacterGraphDriver::on_update(float dt) {
 
 	glm::vec2 next_vel = glm::vec2(player.velocity.x, player.velocity.z);
 
-	groundvelocity = next_vel;
+	glm::vec2 groundvelocity = next_vel;
 
 	bool moving = glm::length(player.velocity) > 0.001;
 	glm::vec2 face_dir = glm::vec2(cos(HALFPI - player.rotation.y), sin(HALFPI - player.rotation.y));
 	glm::vec2 side = glm::vec2(-face_dir.y, face_dir.x);
-	relmovedir = glm::vec2(glm::dot(face_dir, groundvelocity), glm::dot(side, groundvelocity));
+	glm::vec2 relmovedir = glm::vec2(glm::dot(face_dir, groundvelocity), glm::dot(side, groundvelocity));
 
 	if (mirrored) relmovedir.y *= -1;
 
 	glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
-	relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
+	glm::vec2 relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
 
 	ismoving = glm::length(player.velocity) > 0.1;
 	injump = player.state & PMS_JUMPING;

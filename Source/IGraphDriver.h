@@ -1,8 +1,6 @@
 #pragma once
 
-#include "AnimationTreePublic.h"
-#include "AnimationTypes.h"
-
+class Pose;
 class Animator;
 class IAnimationGraphDriver
 {

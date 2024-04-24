@@ -139,6 +139,9 @@
     <ClCompile Include="Source\PlayerAnimDriver.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Source\AnimationUtil.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationTreeLocal.h">
