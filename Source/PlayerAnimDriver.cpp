@@ -148,8 +148,6 @@ void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
 
 
 	Pose_Pool::get().free(1);
-
-
 }
 
 void CharacterGraphDriver::post_ik_update() {

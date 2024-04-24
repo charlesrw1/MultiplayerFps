@@ -198,8 +198,6 @@ static ImNodes::CubicBezier GetCubicBezier_Replacement(const ImPinData& start, c
     ImVec2 ray_start, ray_end;
     closest_ray_between_rects(parent_start.Rect.Min, parent_start.Rect.Max, parent_end.Rect.Min, parent_end.Rect.Max, ray_start, ray_end);
 
-    printf("%f %f\n", ray_end.x, ray_end.y);
-
     return GetCubicBezier(ray_start, ray_end, start.Type, GImNodes->Style.LinkLineSegmentsPerLength, false);
 }
 
@@ -1716,10 +1714,11 @@ void DrawLink(ImNodesEditorContext& editor, const int link_idx)
 
             ImVec2 arrowvec = rayvec*-1.8f + sidevec;
 
+            ImVec2 tip = cubic_bezier.P3 + rayvec * 4.0;
             GImNodes->CanvasDrawList->AddTriangleFilled(
-                cubic_bezier.P3,
-                cubic_bezier.P3 + (rayvec * -1.8f - sidevec)*10.0,
-                cubic_bezier.P3 + (rayvec * -1.8f + sidevec)*10.0,
+                tip,
+                tip + (rayvec * -1.8f - sidevec)*10.0,
+                tip + (rayvec * -1.8f + sidevec)*10.0,
                 link_color
             );
         }

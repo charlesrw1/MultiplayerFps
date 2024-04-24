@@ -3,6 +3,7 @@
 #include "imnodes.h"
 #include "glm/glm.hpp"
 
+#include "Texture.h"
 #include "Game_Engine.h"
 
 std::string remove_whitespace(const char* str)
@@ -123,209 +124,109 @@ Color32 add_brightness(Color32 c, int brightness) {
 unsigned int color32_to_int(Color32 color) {
 	return *(unsigned int*)&color;
 }
-#include <unordered_set>
-#include "ImSequencer.h"
-enum class sequence_type
+
+void TabState::imgui_draw() {
+
+	update_tab_names();
+
+	int rendered = 0;
+
+	if (ImGui::BeginTabBar("tabs")) {
+
+		for (int n = 0; n < tabs.size(); n++) {
+			auto flags = (tabs[n].mark_for_selection) ? ImGuiTabItemFlags_SetSelected : 0;
+			bool* open_bool = (tabs[n].owner_node) ? &tabs[n].open : nullptr;
+			if (ImGui::BeginTabItem(tabs[n].tabname.c_str(), open_bool, flags))
+			{
+				uint32_t layer = (tabs[n].layer) ? tabs[n].layer->id : 0;
+				auto context = (tabs[n].layer) ? tabs[n].layer->context : parent->get_default_node_context();
+				ImNodes::EditorContextSet(context);
+				if (active_tab != n) {
+					ImNodes::ClearNodeSelection();
+				}
+
+				auto winsize = ImGui::GetWindowSize();
+
+				if (tabs[n].reset_pan_to_middle_next_draw) {
+					ImNodes::EditorContextResetPanning(ImVec2(winsize.x / 4, winsize.y / 2.4));
+					tabs[n].reset_pan_to_middle_next_draw = false;
+				}
+
+				parent->draw_graph_layer(layer);
+
+				rendered++;
+				active_tab = n;
+				ImGui::EndTabItem();
+				tabs[n].mark_for_selection = false;
+			}
+		}
+		ImGui::EndTabBar();
+	}
+	if (rendered > 1) {
+		printf("MORE THAN 1 TAB RENDERED\n");
+	}
+
+	for (int i = 0; i < tabs.size(); i++) {
+		if (!tabs[i].open) {
+			tabs.erase(tabs.begin() + i);
+			i--;
+		}
+	}
+
+
+}
+
+void AnimationGraphEditor::save_document()
 {
-	clip,
-	transition,
-	state
-};
-struct MySequence : public ImSequencer::SequenceInterface
+}
+
+void AnimationGraphEditor::create_new_document()
 {
-	// interface with sequencer
+}
 
-	virtual int GetFrameMin() const {
-		return mFrameMin;
-	}
-	virtual int GetFrameMax() const {
-		return mFrameMax;
-	}
-	virtual int GetItemCount() const { return (int)items.size(); }
-
-	virtual void Add(int type) {  };
-	virtual void Del(int index) { }
-	virtual void Duplicate(int index) { }
-
-	virtual size_t GetCustomHeight(int index) { return 0; }
-
-	void add_manual_track(std::string str, int start, int end) {
-
-		uint32_t mask = 0;
-
-		for (int i = 0; i < items.size(); i++) {
-			const auto& item = items[i].back();
-			if (item.start < end && item.end > start) {
-				mask |= (1ull << i);
-			}
-		}
-
-		auto save = current_item_bitmask;
-		current_item_bitmask = mask;
-
-		int index = start_track(str, sequence_type::clip);
-		items[index].back().start = start;
-		items[index].back().end = end;
-		end_track(index);
-
-		current_item_bitmask = save;
-	}
-
-	int start_track(const std::string& str, sequence_type type) {
-		for (int i = 0; i < 64; i++) {
-			bool active = current_item_bitmask & (1ull << (uint64_t)i);
-			if (active)
-				continue;
-
-			ImSequencer::Item item;
-			item.start = active_frame;
-			item.end = active_frame + 1;
-			item.text = get_cstr(str);
-
-			if (i >= items.size()) {
-				items.push_back({});
-				ASSERT(i < items.size());
-			}
-			items[i].push_back(item);
-			current_item_bitmask |= (1ull << (uint64_t)i);
-
-			return i;
-		}
-		printf("Start_track full!\n");
-		ASSERT(0);
-		return 0;
-	}
-	void end_track(int index) {
-		current_item_bitmask = current_item_bitmask & ~(1ull << index);
-	}
-
-	void continue_tracks() {
-		for (int i = 0; i < 64; i++) {
-			if (current_item_bitmask & (1ull << i)) {
-				ASSERT(items.size() >= i);
-				ASSERT(!items[i].empty());
-				items[i].back().end = active_frame;
-			}
-		}
-	}
-
-	const char* get_cstr(std::string s) {
-		if (interned_strings.find(s) != interned_strings.end())
-			return interned_strings.find(s)->c_str();
-		interned_strings.insert(s);
-		return interned_strings.find(s)->c_str();
-	}
-
-	std::unordered_set<std::string> interned_strings;
-	uint64_t current_item_bitmask = 0;
-	std::vector<std::vector<ImSequencer::Item>> items;
-
-	// my datas
-	MySequence() : mFrameMin(0), mFrameMax(0) {}
-	int mFrameMin, mFrameMax;
-	int active_frame = 0;
-	
-	virtual void DoubleClick(int index) {
-		
-	}
-	// Inherited via SequenceInterface
-	virtual int GetItems(int index, ImSequencer::Item* item, int start = 0) override
+void AnimationGraphEditor::draw_menu_bar()
+{
+	if (ImGui::BeginMenuBar())
 	{
-		if (start >= items[index].size()) return -1;
-		
-		*item = items[index][start];
-		return ++start;
-	}
-};
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("New")) {
+				create_new_document();
+			}
+			if (ImGui::MenuItem("Open", "Ctrl+O")) {
+				open_open_dialouge = true;
+			}
+			if (ImGui::MenuItem("Save", "Ctrl+S")) {
+				save_document();
+			}
 
-#include "Texture.h"
-void AnimationGraphEditor::begin_draw()
-{
-
-	bool open = ImGui::TreeNodeEx("##tree", ImGuiTreeNodeFlags_FramePadding);
-	auto mesh = mats.find_texture("icon/mesh.png");
-	auto particle = mats.find_texture("icon/particle.png");
-	auto decal = mats.find_texture("icon/decal.png");
-	auto entity = mats.find_texture("icon/entity.png");
-	auto light = mats.find_texture("icon/light.png");
-
-	auto play = mats.find_texture("icon/play.png");
-	auto stop = mats.find_texture("icon/stop.png");
-	auto pause = mats.find_texture("icon/pause.png");
-	auto save = mats.find_texture("icon/Save.png");
-
-
-
-
-	ImGui::SameLine();
-	ImGui::Image((ImTextureID)decal->gl_id, ImVec2(24, 24));
-	ImGui::Image((ImTextureID)particle->gl_id, ImVec2(24, 24));
-	ImGui::Image((ImTextureID)mesh->gl_id, ImVec2(24, 24));
-	ImGui::Image((ImTextureID)entity->gl_id, ImVec2(24, 24));
-
-	ImGui::Image((ImTextureID)light->gl_id, ImVec2(24, 24));
-
-
-
-	ImGui::SameLine();
-	ImGui::TextUnformatted("EXTENDED");
-
-
-	if (ImGui::CollapsingHeader("Sequencer"))
-	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 1.0));
-		ImGui::ImageButton((ImTextureID)play->gl_id, ImVec2(32, 32));
-		ImGui::SameLine();
-		ImGui::ImageButton((ImTextureID)stop->gl_id, ImVec2(32, 32));
-		ImGui::SameLine();
-		ImGui::ImageButton((ImTextureID)pause->gl_id, ImVec2(32, 32), ImVec2(0,0),ImVec2(1,1),-1,ImVec4(0,0,0,0), ImVec4(1,1,1,0.3));
-		ImGui::SameLine();
-		ImGui::ImageButton((ImTextureID)save->gl_id, ImVec2(32, 32));
-		ImGui::PopStyleColor();
-
-
-		static bool init = false;
-		static MySequence mySequence;
-		if (!init) {
-			mySequence.mFrameMin = 0;
-			mySequence.mFrameMax = 100;
-
-			mySequence.add_manual_track("FIRST", 10, 30);
-			mySequence.add_manual_track("SECOND", 12, 60);
-			mySequence.add_manual_track("THIRD", 61, 90);
-			mySequence.add_manual_track("FOURTH", 92, 99);
-
-
-			init = true;
+			ImGui::EndMenu();
 		}
-		// let's create the sequencer
-		static int selectedEntry = -1;
-		static int firstFrame = 0;
-		static bool expanded = true;
-		static int currentFrame = 100;
+		if (ImGui::BeginMenu("View")) {
+			ImGui::Checkbox("Timeline", &open_timeline);
+			ImGui::Checkbox("Viewport", &open_viewport);
+			ImGui::Checkbox("Property Ed", &open_prop_editor);
+			ImGui::EndMenu();
 
-		ImGui::PushItemWidth(130);
-		ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
-		ImGui::SameLine();
-		ImGui::InputInt("Frame ", &currentFrame);
-		ImGui::SameLine();
-		ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
-		ImGui::PopItemWidth();
-		Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry, &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
+		}
+
+		if (ImGui::BeginMenu("Settings")) {
+			ImGui::Checkbox("Statemachine passthrough", &statemachine_passthrough);
+			if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+				ImGui::Text("Enable passing through the blend tree\n"
+					"when selecting a state node if the\n" 
+					"blend tree is just a nested statemachine");
+				ImGui::EndTooltip();
+			}
+			ImGui::EndMenu();
+
+
+		}
+		ImGui::EndMenuBar();
 	}
-
-
-	if (open) {
-		static bool selectable = false;
-
-		ImGui::ImageButton((ImTextureID)light->gl_id, ImVec2(24,24));
-
-		ImGui::TreePop();
-	}
-
-
-	is_modifier_pressed = ImGui::GetIO().KeyAlt;
-
+}
+void AnimationGraphEditor::draw_prop_editor()
+{
 	if (ImGui::Begin("animation graph property editor"))
 	{
 		if (ImGui::TreeNodeEx("Node property editor", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -351,96 +252,134 @@ void AnimationGraphEditor::begin_draw()
 			ImGui::TreePop();
 		}
 
-		bool need_parameter_list_update = false;
-
-		ed_params->imgui_draw();
+		if (ImGui::TreeNodeEx("Control params", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ed_params->imgui_draw();
+			ImGui::TreePop();
+		}
 
 	}
 	ImGui::End();
+}
 
+void AnimationGraphEditor::draw_popups()
+{
 
+}
 
-	ImGui::Begin("animation graph editor");
-	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
+static ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, const ImGuiWindowClass* window_class = nullptr)
+{
+	using namespace ImGui;
 
-		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_RootWindow) && ImNodes::NumSelectedNodes() == 1) {
-			int node = 0;
-			ImNodes::GetSelectedNodes(&node);
+	if (viewport == NULL)
+		viewport = GetMainViewport();
 
-			Editor_Graph_Node* mynode = find_node_from_id(node);
-			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
-				auto findtab = find_tab(mynode);
-				if (findtab) {
-					findtab->mark_for_selection = true;
-				}
-				else {
+	SetNextWindowPos(viewport->WorkPos);
+	SetNextWindowSize(viewport->WorkSize);
+	SetNextWindowViewport(viewport->ID);
 
-					tab t;
-					t.layer = &mynode->sublayer;
-					t.owner_node = mynode;
-					t.open = true;
-					t.pan = glm::vec2(0.f);
-					t.mark_for_selection = true;
-					t.reset_pan_to_middle_next_draw = true;
-					tabs.push_back(t);
-				}
-			}
-			ImNodes::ClearNodeSelection();
+	ImGuiWindowFlags host_window_flags = 0;
+	host_window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking;
+	host_window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+	if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+		host_window_flags |= ImGuiWindowFlags_NoBackground;
 
-		}
-	}
+	PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	Begin("MAIN DOCKWIN", NULL, host_window_flags);
+	PopStyleVar(3);
 
+	ImGuiID dockspace_id = GetID("DockSpace");
+	DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags, window_class);
 
+	ed.draw_menu_bar();
 
+	End();
 
-	int rendered = 0;
+	return dockspace_id;
+}
 
-	update_tab_names();
+void Timeline::draw_imgui()
+{
+	auto playimg = mats.find_texture("icon/play.png");
+	auto stopimg = mats.find_texture("icon/stop.png");
+	auto pauseimg = mats.find_texture("icon/pause.png");
+	auto saveimg = mats.find_texture("icon/Save.png");
 
-	if (ImGui::BeginTabBar("tabs")) {
+	if(ImGui::Begin("Timeline")) {
 
-		for (int n = 0; n < tabs.size(); n++) {
-			auto flags = (tabs[n].mark_for_selection) ? ImGuiTabItemFlags_SetSelected : 0;
-			bool* open_bool = (tabs[n].owner_node) ? &tabs[n].open : nullptr;
-			if (ImGui::BeginTabItem(tabs[n].tabname.c_str(), open_bool, flags))
-			{
-				uint32_t layer = (tabs[n].layer) ? tabs[n].layer->id : 0;
-				auto context = (tabs[n].layer) ? tabs[n].layer->context : default_editor;
-				ImNodes::EditorContextSet(context);
-				if (active_tab_index != n) {
-					ImNodes::ClearNodeSelection();
-				}
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 1.0));
 
-					auto winsize = ImGui::GetWindowSize();
-
-				if (tabs[n].reset_pan_to_middle_next_draw) {
-					ImNodes::EditorContextResetPanning(ImVec2(winsize.x/4, winsize.y/2.4));
-					tabs[n].reset_pan_to_middle_next_draw = false;
-				}
-
-				draw_graph_layer(layer);
-				rendered++;
-				active_tab_index = n;
-				ImGui::EndTabItem();
-				tabs[n].mark_for_selection = false;
+		if (is_playing) {
+			if (ImGui::ImageButton((ImTextureID)pauseimg->gl_id, ImVec2(32, 32))) {
+				pause();
 			}
 		}
-		ImGui::EndTabBar();
-	}
-	ASSERT(rendered <=1);
-
-	for (int i = 0; i < tabs.size(); i++) {
-		if (!tabs[i].open) {
-			tabs.erase(tabs.begin() + i);
-			i--;
+		else {
+			if (ImGui::ImageButton((ImTextureID)playimg->gl_id, ImVec2(32, 32))) {
+				play();
+			}
 		}
-	}
+		ImGui::SameLine();
 
+		auto greyed_out = ImVec4(1, 1, 1, 0.3);
+
+		if (ImGui::ImageButton((ImTextureID)stopimg->gl_id, 
+			ImVec2(32, 32), 
+			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0), 
+			is_reset? ImVec4(1, 1, 1, 0.3) : ImVec4(1,1,1,1) ))
+		{
+			if(is_reset)
+				stop();
+		}
+		ImGui::SameLine();
+		if (ImGui::ImageButton((ImTextureID)saveimg->gl_id,
+			ImVec2(32, 32),
+			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
+			(!needs_compile) ? ImVec4(1, 1, 1, 0.3) : ImVec4(1, 1, 1, 1)))
+		{
+			if(needs_compile)
+				save();
+		}
+		ImGui::PopStyleColor();
+
+
+		static bool init = false;
+		if (!init) {
+			seq.mFrameMin = 0;
+			seq.mFrameMax = 100;
+
+			seq.add_manual_track("FIRST", 10, 30);
+			seq.add_manual_track("SECOND", 12, 60);
+			seq.add_manual_track("THIRD", 61, 90);
+			seq.add_manual_track("FOURTH", 92, 99);
+
+
+			init = true;
+		}
+
+		ImGui::PushItemWidth(100);
+		ImGui::InputInt("Frame Min", &seq.mFrameMin);
+		ImGui::SameLine();
+		ImGui::InputInt("Frame ", &current_tick);
+		ImGui::SameLine();
+		ImGui::InputInt("Frame Max", &seq.mFrameMax);
+		ImGui::PopItemWidth();
+		int selected = -1;
+		Sequencer(&seq, &current_tick, &expaned, &selected, &first_frame, ImSequencer::SEQUENCER_CHANGE_FRAME);
+
+
+	}
+	ImGui::End();
+}
+
+void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_drop)
+{
 
 	int start_atr = 0;
 	int end_atr = 0;
 	int link_id = 0;
-	bool open_popup_menu_from_drop = false;
+
 
 	if (ImNodes::IsLinkCreated(&start_atr, &end_atr))
 	{
@@ -453,14 +392,14 @@ void AnimationGraphEditor::begin_draw()
 		uint32_t end_idx = Editor_Graph_Node::get_slot_from_id(end_atr);
 
 		ASSERT(start_idx == 0);
-		
+
 		Editor_Graph_Node* node_s = find_node_from_id(start_node_id);
 		Editor_Graph_Node* node_e = find_node_from_id(end_node_id);
 
 		bool destroy = node_e->add_input(this, node_s, end_idx);
 	}
 	if (ImNodes::IsLinkDropped(&start_atr)) {
-		open_popup_menu_from_drop = true;
+		*open_popup_menu_from_drop = true;
 
 		bool is_input = start_atr >= INPUT_START && start_atr < OUTPUT_START;
 		uint32_t id = 0;
@@ -481,6 +420,54 @@ void AnimationGraphEditor::begin_draw()
 	}
 
 
+}
+
+void AnimationGraphEditor::begin_draw()
+{
+
+	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
+
+	draw_popups();
+
+
+	if (open_timeline)
+		timeline.draw_imgui();
+
+	if (open_prop_editor)
+		draw_prop_editor();
+
+	is_modifier_pressed = ImGui::GetIO().KeyAlt;
+
+
+	ImGui::Begin("animation graph editor");
+	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
+
+		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_RootWindow) && ImNodes::NumSelectedNodes() == 1) {
+			int node = 0;
+			ImNodes::GetSelectedNodes(&node);
+
+			Editor_Graph_Node* mynode = find_node_from_id(node);
+			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
+				auto findtab = graph_tabs.find_tab_index(mynode);
+				if (findtab!=-1) {
+					graph_tabs.mark_tab_for_selection(findtab);
+				}
+				else {
+					graph_tabs.add_tab(&mynode->sublayer, mynode, glm::vec2(0.f), true);
+				}
+			}
+			ImNodes::ClearNodeSelection();
+
+		}
+	}
+
+	graph_tabs.imgui_draw();
+
+	bool open_popup_menu_from_drop = false;
+	handle_imnode_creations(&open_popup_menu_from_drop);
+
+
 	is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_RootWindow);
 
 	if (open_popup_menu_from_drop || 
@@ -489,7 +476,7 @@ void AnimationGraphEditor::begin_draw()
 
 	if (ImGui::BeginPopup("my_select_popup"))
 	{
-		bool is_sm = tabs[active_tab_index].is_statemachine_tab();
+		bool is_sm = graph_tabs.get_active_tab()->is_statemachine_tab();
 
 		draw_node_creation_menu(is_sm);
 		ImGui::EndPopup();
@@ -675,10 +662,7 @@ void AnimationGraphEditor::remove_node_from_index(int index)
 	}
 
 	// remove tab reference
-	int tab = find_tab_index(node);
-	if (tab != -1) {
-		tabs.erase(tabs.begin() + tab);
-	}
+	graph_tabs.remove_nodes_tab(node);
 
 	delete node;
 	nodes.erase(nodes.begin() + index);
@@ -766,8 +750,7 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 		{
 			const char* name = get_animnode_name(type);
 			if (ImGui::Selectable(name)) {
-				auto a = create_graph_node_from_type(type);
-				a->graph_layer = get_current_layer_from_tab();
+				auto a = create_graph_node_from_type(type, graph_tabs.get_current_layer_from_tab());
 
 				ImNodes::ClearNodeSelection();
 				ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
@@ -860,9 +843,10 @@ static void make_param_prop(Editor_Graph_Node* node, const char* name = "param")
 	node->properties.push_back(props[0]);
 }
 
-Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_type type)
+Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_type type, uint32_t layer)
 {
 	auto node = add_node();
+	node->graph_layer = layer;
 	More_Node_Property name_prop = make_string_prop("name", {});
 	node->properties.push_back(name_prop);
 
@@ -942,7 +926,7 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 	case animnode_type::state: {
 		node->sublayer = create_new_layer(false);
 		node->state = std::make_unique<Editor_Graph_Node::state_data>();
-		node->state->parent_statemachine = get_owning_node_for_layer(get_current_layer_from_tab());
+		node->state->parent_statemachine = get_owning_node_for_layer(graph_tabs.get_current_layer_from_tab());
 		ASSERT(node->state->parent_statemachine->type == animnode_type::statemachine);
 		node->state->sm_node_parent = (Statemachine_Node_CFG*)node->state->parent_statemachine->node;
 
@@ -975,6 +959,8 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 
 void AnimationGraphEditor::compile_graph_for_playing()
 {
+	return;
+
 	editing_tree->all_nodes.clear();
 	for (int i = 0; i < nodes.size(); i++) {
 		if (nodes[i]->node)
@@ -1101,7 +1087,7 @@ bool draw_node_property(More_Node_Property& prop)
 		if (abcdef.fcsc)
 			flags |= ImGuiInputTextFlags_CallbackCompletion;
 
-		changes |= ImGui::InputText(prop.name, (char*)prop.str_type.data(), prop.str_type.size(), flags, imgui_input_text_callback_function, &abcdef);
+		changes |= ImGui::InputText(prop.name, (char*)prop.str_type.data(), prop.str_type.size() + 1, flags, imgui_input_text_callback_function, &abcdef);
 
 	}break;
 	case Property_Type::float_prop:
@@ -1319,6 +1305,8 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 
 bool Editor_Graph_Node::is_node_valid()
 {
+	if (!node) return false;
+
 	bool inputs_valid = true;
 	for (int i = 0; i < node->input.count; i++) {
 		if (!node->input[i]) return false;
@@ -1436,12 +1424,9 @@ void AnimationGraphEditor::open(const char* name)
 	editing_tree = new Animation_Tree_CFG;
 	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
 
-
-
-
+	graph_tabs.add_tab(nullptr, nullptr, glm::vec2(0.f), true);
 	add_root_node_to_layer(0, false);
-	tabs.push_back(tab());
-	tabs.back().reset_pan_to_middle_next_draw = true;
+
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
 

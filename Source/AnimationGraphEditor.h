@@ -300,9 +300,269 @@ struct Editor_Parameter_list
 	void update_real_param_list(ScriptVars_CFG* cfg);
 };
 
+
+struct GraphTab {
+	editor_layer* layer = nullptr;
+	Editor_Graph_Node* owner_node = nullptr;
+	bool open = true;
+	glm::vec2 pan = glm::vec2(0.f, 0.f);
+	bool mark_for_selection = false;
+	std::string tabname;
+	bool reset_pan_to_middle_next_draw = false;
+
+	bool is_statemachine_tab() {
+		return owner_node && owner_node->is_statemachine();
+	}
+
+	void update_tab_name() {
+		if (!owner_node) tabname = "ROOT";
+		else if (owner_node->type == animnode_type::statemachine) tabname = "statemachine: " + owner_node->get_title();
+		else if (owner_node->type == animnode_type::state) tabname = "state: " + owner_node->get_title();
+		else ASSERT(!"tab with bad type");
+	}
+};
+
+class AnimationGraphEditor;
+class TabState
+{
+public:
+	AnimationGraphEditor* parent;
+	TabState(AnimationGraphEditor* parent) : parent(parent) {}
+
+	void add_tab(editor_layer* layer, Editor_Graph_Node* node, glm::vec2 pan, bool mark_for_selection) {
+		GraphTab tab;
+		tab.layer = layer;
+		tab.owner_node = node;
+		tab.pan = pan;
+		tab.reset_pan_to_middle_next_draw = true;
+		tab.mark_for_selection = mark_for_selection;
+		tab.open = true;
+		tabs.push_back(tab);
+	}
+
+	void imgui_draw();
+
+	void mark_tab_for_selection(int index) {
+		tabs[index].mark_for_selection = true;
+	}
+
+	GraphTab* get_active_tab() {
+		if (tabs.empty()) return nullptr;
+		return &tabs[active_tab];
+	}
+
+	void remove_nodes_tab(Editor_Graph_Node* node) {
+		int tab = find_tab_index(node);
+		if (tab != -1) {
+			tabs.erase(tabs.begin() + tab);
+		}
+
+	}
+
+	GraphTab* find_tab(Editor_Graph_Node* owner_node) {
+		for (int i = 0; i < tabs.size(); i++) {
+			if (tabs[i].owner_node == owner_node)
+				return &tabs[i];
+		}
+		return nullptr;
+	}
+	int find_tab_index(Editor_Graph_Node* owner_node) {
+		for (int i = 0; i < tabs.size(); i++) {
+			if (tabs[i].owner_node == owner_node)
+				return i;
+		}
+		return -1;
+	}
+
+	uint32_t get_current_layer_from_tab() {
+		// 0 = root layer
+		return tabs[active_tab].layer ? tabs[active_tab].layer->id : 0;
+	}
+
+	void update_tab_names() {
+		std::unordered_map<std::string, int> name_to_count;
+
+		for (int i = 0; i < tabs.size(); i++) {
+			tabs[i].update_tab_name();
+
+			auto find = name_to_count.find(tabs[i].tabname);
+			if (find == name_to_count.end()) name_to_count[tabs[i].tabname] = 1;
+			else name_to_count[tabs[i].tabname]++;
+		}
+		for (int i = tabs.size() - 1; i >= 0; i--) {
+			auto find = name_to_count.find(tabs[i].tabname);
+			if (find->second > 1) {
+				tabs[i].tabname += "_";
+				tabs[i].tabname += std::to_string(find->second - 1);
+				name_to_count[find->first]--;
+			}
+		}
+	}
+
+private:
+	int active_tab = -1;
+	std::vector<GraphTab> tabs;
+};
+
+
+#include <unordered_set>
+#include "ImSequencer.h"
+enum class sequence_type
+{
+	clip,
+	transition,
+	state
+};
+struct MySequence : public ImSequencer::SequenceInterface
+{
+	// interface with sequencer
+
+	virtual int GetFrameMin() const {
+		return mFrameMin;
+	}
+	virtual int GetFrameMax() const {
+		return mFrameMax;
+	}
+	virtual int GetItemCount() const { return (int)items.size(); }
+
+	virtual void Add(int type) {  };
+	virtual void Del(int index) { }
+	virtual void Duplicate(int index) { }
+
+	virtual size_t GetCustomHeight(int index) { return 0; }
+
+	void add_manual_track(std::string str, int start, int end) {
+
+		uint32_t mask = 0;
+
+		for (int i = 0; i < items.size(); i++) {
+			const auto& item = items[i].back();
+			if (item.start < end && item.end > start) {
+				mask |= (1ull << i);
+			}
+		}
+
+		auto save = current_item_bitmask;
+		current_item_bitmask = mask;
+
+		int index = start_track(str, sequence_type::clip);
+		items[index].back().start = start;
+		items[index].back().end = end;
+		end_track(index);
+
+		current_item_bitmask = save;
+	}
+
+	int start_track(const std::string& str, sequence_type type) {
+		for (int i = 0; i < 64; i++) {
+			bool active = current_item_bitmask & (1ull << (uint64_t)i);
+			if (active)
+				continue;
+
+			ImSequencer::Item item;
+			item.start = active_frame;
+			item.end = active_frame + 1;
+			item.text = get_cstr(str);
+
+			if (i >= items.size()) {
+				items.push_back({});
+				ASSERT(i < items.size());
+			}
+			items[i].push_back(item);
+			current_item_bitmask |= (1ull << (uint64_t)i);
+
+			return i;
+		}
+		printf("Start_track full!\n");
+		ASSERT(0);
+		return 0;
+	}
+	void end_track(int index) {
+		current_item_bitmask = current_item_bitmask & ~(1ull << index);
+	}
+
+	void continue_tracks() {
+		for (int i = 0; i < 64; i++) {
+			if (current_item_bitmask & (1ull << i)) {
+				ASSERT(items.size() >= i);
+				ASSERT(!items[i].empty());
+				items[i].back().end = active_frame;
+			}
+		}
+	}
+
+	const char* get_cstr(std::string s) {
+		if (interned_strings.find(s) != interned_strings.end())
+			return interned_strings.find(s)->c_str();
+		interned_strings.insert(s);
+		return interned_strings.find(s)->c_str();
+	}
+
+	std::unordered_set<std::string> interned_strings;
+	uint64_t current_item_bitmask = 0;
+	std::vector<std::vector<ImSequencer::Item>> items;
+
+	// my datas
+	MySequence() : mFrameMin(0), mFrameMax(0) {}
+	int mFrameMin, mFrameMax;
+	int active_frame = 0;
+
+	virtual void DoubleClick(int index) {
+
+	}
+	// Inherited via SequenceInterface
+	virtual int GetItems(int index, ImSequencer::Item* item, int start = 0) override
+	{
+		if (start >= items[index].size()) return -1;
+
+		*item = items[index][start];
+		return ++start;
+	}
+};
+
+class Timeline
+{
+public:
+	AnimationGraphEditor* owner;
+	Timeline(AnimationGraphEditor* o) : owner(o) {}
+	void draw_imgui();
+
+	void play() {}
+	void pause() {}
+	void stop() {}
+	void save() {}
+
+	bool needs_compile = false;
+	bool is_reset = true;
+	bool is_playing = false;
+	float play_speed = 1.f;
+
+	bool expaned = true;
+	int first_frame = 0;
+
+	int current_tick = 0;
+
+	MySequence seq;
+};
+
+class GraphOutput
+{
+public:
+	Animator anim;
+	handle<Render_Object> obj;
+	User_Camera camera;
+	View_Setup vs;
+
+	Model* model = nullptr;
+	const Animation_Set_New* set = nullptr;
+};
+
+
 class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
 public:
+	AnimationGraphEditor() : graph_tabs(this), timeline(this) {
+	}
 	virtual void init() override;
 	virtual void open(const char* name) override;
 	virtual void close() override;
@@ -315,6 +575,9 @@ public:
 	virtual const char* get_name() override {
 		return name.c_str();
 	}
+
+	void create_new_document();
+	void save_document();
 
 	void begin_draw();
 
@@ -346,6 +609,13 @@ public:
 		return nullptr;
 	}
 
+	ImNodesEditorContext* get_default_node_context() {
+		return default_editor;
+	}
+
+	TabState graph_tabs;
+	Timeline timeline;
+
 	std::string name = "";
 	void* imgui_node_context = nullptr;
 	ImNodesEditorContext* default_editor = nullptr;
@@ -357,9 +627,10 @@ public:
 	std::unique_ptr<Table> ed_params;
 
 	void draw_node_creation_menu(bool is_state_mode);
-	Editor_Graph_Node* create_graph_node_from_type(animnode_type type);
+	Editor_Graph_Node* create_graph_node_from_type(animnode_type type, uint32_t layer);
 
 
+	GraphOutput out;
 
 	struct create_from_drop_state {
 		Editor_Graph_Node* from = nullptr;
@@ -367,36 +638,6 @@ public:
 		uint32_t slot = 0;
 	}drop_state;
 
-	struct output_data {
-		Animator anim;
-		handle<Render_Object> obj;
-		User_Camera camera;
-		View_Setup vs;
-
-		Model* model = nullptr;
-		const Animation_Set_New* set = nullptr;
-	}out;
-
-	struct tab {
-		editor_layer* layer = nullptr;
-		Editor_Graph_Node* owner_node = nullptr;
-		bool open = true;
-		glm::vec2 pan = glm::vec2(0.f, 0.f);
-		bool mark_for_selection = false;
-		std::string tabname;
-		bool reset_pan_to_middle_next_draw = false;
-
-		bool is_statemachine_tab() {
-			return owner_node && owner_node->is_statemachine();
-		}
-
-		void update_tab_name() {
-			if (!owner_node) tabname =  "ROOT";
-			else if (owner_node->type == animnode_type::statemachine) tabname =  "statemachine: " + owner_node->get_title();
-			else if (owner_node->type == animnode_type::state) tabname = "state: " + owner_node->get_title();
-			else ASSERT(!"tab with bad type");
-		}
-	};
 
 	void compile_graph_for_playing();
 
@@ -410,56 +651,24 @@ public:
 		return layer;
 	}
 
-	uint32_t get_current_layer_from_tab() {
-		return tabs[active_tab_index].layer ? tabs[active_tab_index].layer->id : 0;
-	}
-
-	tab* find_tab(Editor_Graph_Node* owner_node) {
-		for (int i = 0; i < tabs.size(); i++) {
-			if (tabs[i].owner_node == owner_node)
-				return &tabs[i];
-		}
-		return nullptr;
-	}
-	int find_tab_index(Editor_Graph_Node* owner_node) {
-		for (int i = 0; i < tabs.size(); i++) {
-			if (tabs[i].owner_node == owner_node)
-				return i;
-		}
-		return -1;
-	}
-
 	void add_root_node_to_layer(uint32_t layer, bool is_statemachine) {
-		auto a = create_graph_node_from_type(is_statemachine?animnode_type::start_statemachine : animnode_type::root);
-		a->graph_layer = layer;
+		auto a = create_graph_node_from_type(is_statemachine?animnode_type::start_statemachine : animnode_type::root, layer);
 	}
 
-
-	void update_tab_names() {
-		std::unordered_map<std::string, int> name_to_count;
-
-		for (int i = 0; i < tabs.size(); i++) {
-			tabs[i].update_tab_name();
-
-			auto find = name_to_count.find(tabs[i].tabname);
-			if (find == name_to_count.end()) name_to_count[tabs[i].tabname] = 1;
-			else name_to_count[tabs[i].tabname]++;
-		}
-		for (int i = tabs.size()-1; i>=0; i--) {
-			auto find = name_to_count.find(tabs[i].tabname);
-			if (find->second > 1) {
-				tabs[i].tabname += "_";
-				tabs[i].tabname += std::to_string(find->second-1);
-				name_to_count[find->first]--;
-			}
-		}
-	}
-
-	std::vector<tab> tabs;
-	uint32_t active_tab_index = 0;
+	void draw_menu_bar();
+	void draw_popups();
+	void draw_prop_editor();
+	void handle_imnode_creations(bool* open_popup_menu_from_drop);
 
 	bool is_modifier_pressed = false;
 	bool is_focused = false;
+
+	bool open_open_dialouge = false;
+	bool open_timeline = true;
+	bool open_viewport = true;
+	bool open_prop_editor = true;
+
+	bool statemachine_passthrough = false;
 
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root

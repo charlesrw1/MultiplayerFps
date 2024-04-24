@@ -1163,8 +1163,6 @@ void Game_Engine::draw_debug_interface()
 		g_editor_doc->imgui_draw();
 
 	if (state == ENGINE_ANIMATION_EDITOR) {
-		ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-
 		g_anim_ed_graph->begin_draw();
 	}
 
