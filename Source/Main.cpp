@@ -33,7 +33,7 @@
 #include "Config.h"
 #include "DrawPublic.h"
 #include "Entity.h"
-
+#include "AnimationTreePublic.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -528,10 +528,6 @@ Model* Game_Media::get_game_model_from_index(int index)
 void Entity::set_model(const char* model_name)
 {
 	model = eng->media.get_game_model(model_name, &model_index);
-	if (model && model->bones.size() > 0) {
-		anim.set_model(model);
-		anim.owner = this;
-	}
 }
 
 
@@ -853,7 +849,6 @@ void Game_Local::init()
 	view_angles = glm::vec3(0.f);
 
 	viewmodel = FindOrLoadModel("arms.glb");
-	viewmodel_animator.set_model(viewmodel);
 }
 
 bool Game_Engine::start_map(string map, bool is_client)
@@ -1323,8 +1318,6 @@ void Game_Engine::update_game_tick()
 
 		e.physics_update();
 		e.update();
-		if(e.model && e.model->animations)
-			e.anim.AdvanceFrame(tick_interval);
 	}
 
 	if (is_host) {
@@ -1418,6 +1411,7 @@ void Game_Engine::init()
 
 	mats.init();
 	mats.load_material_file_directory("./Data/Materials/");
+	anim_tree_man->init();
 	TIMESTAMP("mats init");
 
 	mods.init();
@@ -1647,11 +1641,9 @@ void Game_Engine::loop()
 				CPUSCOPESTART("animation update");
 				for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 					Entity& e = ei.get();
-					if (!e.model || !e.model->animations)
+					if (!e.animator)
 						continue;
-
-					e.anim.SetupBones();
-					e.anim.ConcatWithInvPose();
+					e.animator->tick_tree_new(eng->tick_interval);
 				}
 			}
 

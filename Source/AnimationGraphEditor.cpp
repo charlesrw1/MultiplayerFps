@@ -981,7 +981,7 @@ void AnimationGraphEditor::compile_graph_for_playing()
 			editing_tree->all_nodes.push_back(nodes[i]->node);
 	}
 
-	out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
+	//out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
 	for (int i = 0; i < nodes.size(); i++) {
 		nodes[i]->on_state_change(this);
 	}
@@ -1022,7 +1022,7 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	if (auser->type == AnimCompletionCallbackUserData::CLIPS) {
 		auto set = ed->out.set;
 		for (int i = 0; i < set->imports.size(); i++) {
-			auto subset = set->imports[i].set;
+			auto subset = set->imports[i].mod->animations.get();
 			for (int j = 0; j < subset->clips.size(); j++) {
 				if (_strnicmp(subset->clips[j].name.c_str(), word_start, len) == 0)
 					vec.push_back(subset->clips[j].name.c_str());
@@ -1315,17 +1315,6 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 	default:
 		break;
 	}
-
-	if (node) {
-		NodeRt_Ctx ctx;
-		ctx.model = ed->out.model;
-		ctx.set = ed->out.set;
-		ctx.tree = &ed->out.tree_rt;
-		//ASSERT(ctx.tree->data.size() > 0);
-		ASSERT(ctx.tree->cfg != nullptr);
-
-		node->construct(ctx);
-	}
 }
 
 bool Editor_Graph_Node::is_node_valid()
@@ -1419,7 +1408,6 @@ void AnimationGraphEditor::tick(float dt)
 	}
 
 	out.anim.tick_tree_new(dt);
-	out.anim.ConcatWithInvPose();
 
 	Render_Object ro;
 	ro.mesh = &out.model->mesh;
@@ -1460,10 +1448,9 @@ void AnimationGraphEditor::open(const char* name)
 	out.model = mods.find_or_load("player_FINAL.glb");
 	out.set = anim_tree_man->find_set("default.txt");
 
-	out.anim.set_model(out.model);
-	out.obj = idraw->register_obj();
+	out.anim.initialize_animator(out.model, out.set, editing_tree, nullptr, nullptr);
 
-	out.anim.tree = &out.tree_rt;
+	out.obj = idraw->register_obj();
 
 	Render_Object ro;
 	ro.mesh = &out.model->mesh;
@@ -1471,8 +1458,6 @@ void AnimationGraphEditor::open(const char* name)
 	//ro.transform = out.model->skeleton_root_transform;
 
 	idraw->update_obj(out.obj, ro);
-
-	out.tree_rt.init_from_cfg(editing_tree, out.model, out.set);
 }
 
 void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)

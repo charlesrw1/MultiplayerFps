@@ -2,6 +2,7 @@
 #include <cassert>
 #include "ScriptVars.h"
 #include "MemArena.h"
+#include "InlineVec.h"
 #include "StringUtil.h"
 // this is the thing loaded from disk once
 
@@ -36,6 +37,8 @@ public:
 class Model_Skeleton
 {
 public:
+	bool data_is_valid = false;
+
 	const Model* source = nullptr;
 	std::vector<int> bone_mirror_map;
 	
@@ -57,21 +60,20 @@ public:
 class Animation_Set_New
 {
 public:
-	const Animation_Set_New* parent = nullptr;
+	bool data_is_valid = false;
+
 	const Model_Skeleton* src_skeleton = nullptr;
 	
 	struct Import {
-		const Model_Skeleton* import_skeleton = nullptr;
-		const Animation_Set* set = nullptr;
+		Model_Skeleton* import_skeleton = nullptr;
+		const Model* mod = nullptr;
 	};
 
 	std::vector<Import> imports;
 	std::unordered_map<std::string, std::string> table;	// fixme: do better
 
 	void find_animation(const char* name, uint32_t* out_set, uint32_t* out_index, uint32_t* out_skel) const;
-	const Animation_Set* get_subset(uint32_t index) const {
-		return imports[index].set;
-	}
+	const Animation_Set* get_subset(uint32_t index) const;
 	const std::vector<int>& get_remap(uint32_t skel_index) const {
 		return src_skeleton->remaps.at(skel_index).skel_to_source;
 	}
@@ -102,16 +104,62 @@ struct Animation_Tree_RT
 	}
 };
 
+enum class AnimationNotifyType
+{
+	FOOTSTEP_LEFT,
+	FOOTSTEP_RIGHT,
+	SOUND,
+	EFFECT
+};
+
+struct Animation_Notify_Def {
+	AnimationNotifyType type = AnimationNotifyType::FOOTSTEP_LEFT;
+	int param_count = 0;
+	const char* params[4];
+	float start = 0.0;
+	float end = -1.0;
+
+	bool is_oneshot_event() const {
+		return end < 0.0;
+	}
+	bool is_duration_event()  const {
+		return !is_oneshot_event();
+	}
+};
+
+struct Animation_Notify_List
+{
+
+	int count = 0;
+	Animation_Notify_Def* defs = nullptr;
+};
+
+class DictParser;
 class Animation_Tree_Manager
 {
 public:
+	void init();
 	Animation_Tree_CFG* find_animation_tree(const char* filename);
 
 	const Animation_Set_New* find_set(const char* name);
 	const Model_Skeleton* find_skeleton(const char* name) const;
 	Model_Skeleton* find_skeleton(const char* name);
+
+	void on_new_animation(Model* m, int index);
 private:
 
+	void load_notifies();
+	void parse_notify_file(DictParser& parser);
+
+
+	struct Animation_Link {
+		const Model* model = nullptr;
+		int index = 0;
+		Animation_Notify_List list;
+	};
+
+	Memory_Arena event_arena;
+	std::unordered_map<std::string, Animation_Link> notifies;
 	std::unordered_map<std::string, Model_Skeleton> skeletons;
 	std::unordered_map<std::string, Animation_Set_New> sets;
 	std::unordered_map<std::string, Animation_Tree_CFG> trees;

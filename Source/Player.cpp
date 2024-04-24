@@ -154,8 +154,8 @@ void check_ground_state(Entity& player, Move_Command command, bool& dont_add_gra
 		player.state &= ~PMS_GROUND;
 	else {
 		if (command.first_sim && !(player.state & PMS_GROUND) && player.velocity.y < -2.f) {
-			player.anim.set_leg_anim("act_land", false);
- 			player.anim.legs.loop = false;
+			//player.anim.set_leg_anim("act_land", false);
+ 			//player.anim.legs.loop = false;
 		}
 		player.state |= PMS_GROUND;	
 	}
@@ -180,8 +180,8 @@ void check_jump(Entity& player, Move_Command command)
 		player.state &= ~PMS_GROUND;
 
 		if (command.first_sim) {
-			player.anim.set_leg_anim("act_jump_start", true);
-			player.anim.legs.loop = false;
+			//player.anim.set_leg_anim("act_jump_start", true);
+			//player.anim.legs.loop = false;
 		}
 	}
 }
@@ -428,11 +428,11 @@ void player_animation_update(Entity* ent)
 	bool set_legs = true;
 
 	const char* next_leg_anim = "null";
-	if (ent->anim.legs.anim == -1)
-		ent->anim.legs.finished = true;
+	//if (ent->anim.legs.anim == -1)
+	//	ent->anim.legs.finished = true;
 
-	if (!ent->anim.legs.loop && !ent->anim.legs.finished)
-		set_legs = false;
+	//if (!ent->anim.legs.loop && !ent->anim.legs.finished)
+	//	set_legs = false;
 
 	if (ent->state & PMS_JUMPING || (!(ent->state & PMS_GROUND) && ent->in_air_time > 0.3f)) {
 		next_leg_anim = "act_falling";
@@ -471,9 +471,9 @@ void player_animation_update(Entity* ent)
 	// shooting, reloading, etc.
 	if (set_legs) {
 
-		ent->anim.set_leg_anim(next_leg_anim, false, 0.15);
-		ent->anim.legs.loop = loop_legs;
-		ent->anim.legs.speed = leg_speed;
+		//ent->anim.set_leg_anim(next_leg_anim, false, 0.15);
+		//ent->anim.legs.loop = loop_legs;
+		//ent->anim.legs.speed = leg_speed;
 	}
 }
 
@@ -573,7 +573,7 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 	if (is_local) {
 		if (eng->local.viewmodel == nullptr) {
 			eng->local.viewmodel = FindOrLoadModel("m16_fp.glb");
-			eng->local.viewmodel_animator.set_model(eng->local.viewmodel);
+			//eng->local.viewmodel_animator.set_model(eng->local.viewmodel);
 		}
 	}
 
@@ -601,22 +601,22 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 				inv.state = ITEM_IN_FIRE;
 
 				if (item_stats.category == ITEM_CAT_RIFLE) {
-					p->anim.set_anim("act_shoot", true);
+					//p->anim.set_anim("act_shoot", true);
 					eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 				}
 				else if (item_stats.category == ITEM_CAT_BOLT_ACTION) {
-					p->anim.set_anim("act_shoot_sniper", true);
+					//p->anim.set_anim("act_shoot_sniper", true);
 					eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 				}
 				else if (item_stats.category == ITEM_CAT_MELEE) {
-					p->anim.set_anim("act_knife_attack", true);
+					//p->anim.set_anim("act_knife_attack", true);
 				}
-				p->anim.m.loop = false;
+				//p->anim.m.loop = false;
 
 
 				if (is_local) {
-					eng->local.viewmodel_animator.set_anim("act_shoot", true);
-					eng->local.viewmodel_animator.m.loop = false;
+					//eng->local.viewmodel_animator.set_anim("act_shoot", true);
+					//eng->local.viewmodel_animator.m.loop = false;
 				}
 
 				break;
@@ -629,29 +629,29 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 			inv.timer = item_stats.reload_time;
 			inv.state = ITEM_RELOAD;
 
-			p->anim.set_anim("act_reload", true);
-			p->anim.m.loop = false;
-			p->anim.m.speed = 0.8f;
+			//p->anim.set_anim("act_reload", true);
+			//p->anim.m.loop = false;
+			//p->anim.m.speed = 0.8f;
 
 			if (is_local) {
 				Player* player = (Player*)p;
-				player->viewmodel->animator.set_anim("ak47_reload", true);
+				//player->viewmodel->animator.set_anim("ak47_reload", true);
 			}
 		}
 		else {
 			if (cat == ITEM_CAT_RIFLE) {
-				p->anim.set_anim("act_idle", false);
+				//p->anim.set_anim("act_idle", false);
 			}
 			else if (cat == ITEM_CAT_BOLT_ACTION) {
-				p->anim.set_anim("act_idle_sniper", false);
+				//p->anim.set_anim("act_idle_sniper", false);
 			}
 			else if (cat == ITEM_CAT_MELEE) {
-				p->anim.set_anim("act_idle_knife", true);
+				//p->anim.set_anim("act_idle_knife", true);
 			}
 			else if (cat == ITEM_CAT_BOMB || cat == ITEM_CAT_THROWABLE) {
-				p->anim.set_anim("act_idle_item", true);
+				//p->anim.set_anim("act_idle_item", true);
 			}
-			p->anim.m.loop = true;
+			//p->anim.m.loop = true;
 
 		}
 			break;
@@ -719,7 +719,7 @@ ViewmodelComponent::ViewmodelComponent(Player* p)
 	this->player = p;
 
 	model = mods.find_or_load("arms.glb");
-	animator.set_model(model);
+	//animator.set_model(model);
 
 	viewmodel_handle = idraw->register_obj();
 
@@ -785,7 +785,7 @@ T neg_modulo(T x, T mod_)
 {
 	return glm::mod(glm::mod(x, mod_) + mod_, mod_);
 }
-float modulo_lerp(float start, float end, float mod, float t)
+static float modulo_lerp_(float start, float end, float mod, float t)
 {
 	return neg_modulo(t - start,mod) / neg_modulo(end - start, mod);
 }
@@ -799,7 +799,7 @@ void ViewmodelComponent::update_visuals()
 
 	proxy.viewmodel_layer = true;
 	proxy.visible = true;
-	proxy.animator = &animator;
+	//proxy.animator = &animator;
 	proxy.mesh = &model->mesh;
 	proxy.mats = &model->mats;
 	if (eng->local.thirdperson_camera.integer() == 0)
@@ -840,8 +840,8 @@ void Player::update_visuals()
 			visible = false;
 
 		proxy.visible = visible;
-		if (model->bones.size() > 0)
-			proxy.animator = &anim;
+		//if (model->bones.size() > 0)
+		//	proxy.animator = &anim;
 		proxy.mesh = &model->mesh;
 		proxy.mats = &model->mats;
 		proxy.transform = get_world_transform()*model->skeleton_root_transform;
@@ -901,8 +901,8 @@ void ViewmodelComponent::update()
 	lastoffset = damp_dt_independent(target_pos, lastoffset, move_g, eng->tick_interval);
 	lastrot = damp_dt_independent(target_rot, lastrot, move_g*0.1, eng->tick_interval);
 
-	if(animator.m.finished || animator.m.anim == -1)
-		animator.set_anim("ak47_idle", false);
+	//if(animator.m.finished || animator.m.anim == -1)
+	//	animator.set_anim("ak47_idle", false);
 	
 	Bone_Controller& bc = animator.get_controller(bone_controller_type::misc1);
 	bc.position = lastoffset;// vec3(0.f, sin(GetTime() + 0.5) * 0.8, 0.f);
@@ -910,9 +910,12 @@ void ViewmodelComponent::update()
 
 	bc.rotation =lastrot;// glm::quat(vec3(sin(GetTime() * 1.4) * 0.7, 0.f, 1.f), glm::vec3(0, 0.f, 1.f));
 	
-	animator.AdvanceFrame(eng->tick_interval);
-	animator.SetupBones();
-	animator.ConcatWithInvPose();
+
+	//animator.tick_tree_new(eng->tick_interval);
+
+	//animator.AdvanceFrame(eng->tick_interval);
+	//animator.SetupBones();
+	//animator.ConcatWithInvPose();
 	// find position/rotation of hands in current animation relative to the gun bone
 	// rotate/translate weapon bone of viewmodel according to procedural gen
 	// ik hands back to correct position relative to gun bone

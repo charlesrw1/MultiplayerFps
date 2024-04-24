@@ -10,10 +10,11 @@
 
 struct ScriptVars_CFG
 {
-	handle<Parameter> find(const std::string& str) {
-		if (name_to_index.find(str) != name_to_index.end()) {
+	handle<Parameter> find(const std::string& str) const {
+		const auto& find = name_to_index.find(str);
+		if (find != name_to_index.end()) {
 			handle<Parameter> h;
-			h.id = name_to_index[str];
+			h.id = find->second;
 			return h;
 		}
 		return { -1 };
@@ -36,6 +37,10 @@ struct ScriptVars_RT
 		return parameters[handle.id];
 	}
 	Parameter& get(handle<Parameter> handle) {
+		static Parameter invalid;
+		if (!handle.is_valid())
+			return invalid;
+
 		return parameters[handle.id];
 	}
 	std::vector<Parameter> parameters;

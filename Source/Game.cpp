@@ -135,6 +135,16 @@ void Game_Engine::client_leave(int slot)
 	free_entity(handle);
 }
 
+void Entity::initialize_animator(const Animation_Set_New* set, const Animation_Tree_CFG* graph, IAnimationGraphDriver* driver) {
+
+	ASSERT(model);
+
+	if (!animator)
+		animator.reset(new Animator());
+	animator->initialize_animator(model, set, graph, driver, this);
+}
+
+
 void Game_Engine::make_client(int slot)
 {
 	sys_print("making client %d\n", slot);
@@ -260,21 +270,7 @@ static float mid_lerp(float min, float max, float mid_val)
 {
 	return (mid_val - min) / (max - min);
 }
-static float modulo_lerp(float start, float end, float mod, float alpha)
-{
-	float d1 = glm::abs(end - start);
-	float d2 = mod - d1;
-
-
-	if (d1 <= d2)
-		return glm::mix(start, end, alpha);
-	else {
-		if (start >= end)
-			return fmod(start + (alpha * d2), mod);
-		else
-			return fmod(end + ((1 - alpha) * d2), mod);
-	}
-}
+extern float modulo_lerp(float start, float end, float mod, float alpha);
 
 void RenderInterpolationComponent::evaluate(float time)
 {
@@ -441,9 +437,9 @@ void Entity::damage(Entity* attacker, glm::vec3 dir, int damage)
 		flags |= EF_DEAD;
 		timer = 5.f;
 
-		anim.set_anim("act_die_1", true);
-		anim.m.loop = false;
-		anim.legs.anim = -1;
+		//anim.set_anim("act_die_1", true);
+		//anim.m.loop = false;
+		//anim.legs.anim = -1;
 		flags &= ~EF_SOLID;
 
 		flags |= EF_FORCED_ANIMATION;
@@ -455,25 +451,6 @@ void Entity::damage(Entity* attacker, glm::vec3 dir, int damage)
 void player_spawn(Entity* ent)
 {
 
-	ent->set_model("player_FINAL.glb");
-
-	if (ent->model) {
-		ent->anim.set_anim("act_idle", false);
-	}
-	//server.sv_game.GetPlayerSpawnPoisiton(ent);
-	ent->state = PMS_GROUND;
-	ent->flags = 0;
-	
-	ent->flags |= EF_SOLID;
-
-	ent->health = 100;
-	find_spawn_position(ent);
-
-	for (int i = 0; i < Game_Inventory::NUM_GAME_ITEMS; i++)
-		ent->inv.ammo[i] = 200;
-
-	ent->force_angles = 1;
-	ent->diff_angles = glm::vec3(0.f, ent->rotation.y, 0.f);
 }
 
 Entity* dummy_spawn()
@@ -484,8 +461,8 @@ Entity* dummy_spawn()
 	ent->flags = 0;
 	ent->health = 100;
 	ent->set_model("player_character.glb");
-	if (ent->model)
-		ent->anim.set_anim("act_run", true);
+	//if (ent->model)
+	//	ent->anim.set_anim("act_run", true);
 
 	return ent;
 }
@@ -499,8 +476,8 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 		ent->flags |= EF_DEAD;
 		ent->timer = 3.0;
 
-		ent->anim.set_anim("act_die", false);
-		ent->anim.m.loop = false;
+		//ent->anim.set_anim("act_die", false);
+		//ent->anim.m.loop = false;
 
 		printf("died!\n");
 	}
@@ -603,8 +580,8 @@ void Entity::update_visuals()
 		Render_Object proxy;
 
 		proxy.visible = !(flags & EF_HIDDEN);
-		if(model->bones.size()>0)
-			proxy.animator = &anim;
+		if (animator)
+			proxy.animator = animator.get();
 		proxy.mesh = &model->mesh;
 		proxy.mats = &model->mats;
 		proxy.transform = get_world_transform()*model->skeleton_root_transform;

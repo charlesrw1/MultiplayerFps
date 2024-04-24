@@ -83,8 +83,7 @@ public:
 	}pathfind_state;
 
 	void update_animation_inputs() {
-		anim.in.velocity = velocity;
-		anim.in.worldpos = position;
+		
 	}
 
 	bool strafe_only = true;

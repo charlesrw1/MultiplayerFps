@@ -1,14 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Source\AnimationGraphEditor.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Animation.cpp">
       <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="BVHBuild.cpp">
-      <Filter>Source\Shared</Filter>
     </ClCompile>
     <ClCompile Include="Source\Client.cpp">
       <Filter>Source\Network</Filter>
@@ -88,9 +82,6 @@
     <ClCompile Include="Source\LispInterpreter.cpp">
       <Filter>Source\Shared</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Files.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Net.cpp">
       <Filter>Source\Network</Filter>
     </ClCompile>
@@ -124,26 +115,32 @@
     <ClCompile Include="Source\Main.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Animation_Tree.cpp" />
     <ClCompile Include="Source\AnimationTreeLocal.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="Source\External\imnodes_internal.cpp" />
-    <ClCompile Include="Source\DictParser.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AnimationTreePublic.cpp" />
     <ClCompile Include="Source\External\ImSequencer.cpp">
       <Filter>Source\External\Imgui</Filter>
     </ClCompile>
     <ClCompile Include="Source\Animation_Man.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Source\AnimationGraphEditor.cpp">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="BVHBuild.cpp">
+      <Filter>Source\Shared\Containers</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DictParser.cpp">
+      <Filter>Source\Shared\Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Files.cpp">
+      <Filter>Source\Shared\Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\PlayerAnimDriver.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\AnimationGraphEditor.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\AnimationTreeLocal.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
@@ -152,9 +149,6 @@
     </ClInclude>
     <ClInclude Include="Source\BaseComponents.h">
       <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\BVH.h">
-      <Filter>Source\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\Bytepacker.h">
       <Filter>Source\Shared</Filter>
@@ -170,9 +164,6 @@
     </ClInclude>
     <ClInclude Include="Source\DecalsPublic.h">
       <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Dict.h">
-      <Filter>Source\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\DrawLocal.h">
       <Filter>Source\Draw</Filter>
@@ -243,22 +234,13 @@
     <ClInclude Include="Source\StringUtil.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\MemArena.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
     <ClInclude Include="Source\MathLib.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\LispInterpreter.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Key_Value_File.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
     <ClInclude Include="Source\GlmInclude.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\FreeList.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\Socket.h">
@@ -312,23 +294,53 @@
     <ClInclude Include="Source\Handle.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AnimationGraphEditorPublic.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\EditorDocPublic.h">
       <Filter>Source\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DictParser.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DictWriter.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\PropertyEd.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\External\ImSequencer.h">
       <Filter>Source\External\Imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\IGraphDriver.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AnimationTypes.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\PlayerAnimDriver.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AnimationGraphEditor.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AnimationGraphEditorPublic.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\PropertyEd.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\BVH.h">
+      <Filter>Source\Shared\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MemArena.h">
+      <Filter>Source\Shared\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\InlineVec.h">
+      <Filter>Source\Shared\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\FreeList.h">
+      <Filter>Source\Shared\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Dict.h">
+      <Filter>Source\Shared\Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DictWriter.h">
+      <Filter>Source\Shared\Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DictParser.h">
+      <Filter>Source\Shared\Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Key_Value_File.h">
+      <Filter>Source\Shared\Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -359,8 +371,17 @@
     <Filter Include="Source\Network">
       <UniqueIdentifier>{6db34f15-69d6-44f6-858d-e8a1f1a4a78c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\Shared\Imgui">
-      <UniqueIdentifier>{81888e78-7b92-47a8-91c2-b98b6e6a6f93}</UniqueIdentifier>
+    <Filter Include="Source\Animation\Editor">
+      <UniqueIdentifier>{f9c9c29a-fcbb-4712-aa4f-8633cfb1eace}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Shared\Memory">
+      <UniqueIdentifier>{d62fcd5e-9094-4e8c-94cd-54e5b6e16bd8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Shared\Containers">
+      <UniqueIdentifier>{6f63a5d3-f478-480c-8e68-a603a598cfe4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Shared\Files">
+      <UniqueIdentifier>{66fc2d20-e4f4-40cc-9f70-485ef630ae96}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

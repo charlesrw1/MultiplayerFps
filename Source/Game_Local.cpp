@@ -77,8 +77,8 @@ void Game_Local::update_viewmodel()
 	}break;
 	}
 
-	viewmodel_animator.AdvanceFrame(eng->frame_time);
-	viewmodel_animator.SetupBones();
-	viewmodel_animator.ConcatWithInvPose();
+	//viewmodel_animator.AdvanceFrame(eng->frame_time);
+	//viewmodel_animator.SetupBones();
+	//viewmodel_animator.ConcatWithInvPose();
 
 }

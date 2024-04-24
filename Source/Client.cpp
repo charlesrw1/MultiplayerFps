@@ -187,10 +187,7 @@ static int NegModulo(int a, int b)
 {
 	return (b + (a % b)) % b;
 }
-static float MidLerp(float min, float max, float mid_val)
-{
-	return (mid_val - min) / (max - min);
-}
+extern float MidLerp(float min, float max, float mid_val);
 
 Interp_Entry* Entity_Interp::GetLastState()
 {
@@ -233,31 +230,6 @@ float InterpolateAnimation(Animation* a, float start, float end, float alpha)
 }
 
 
-// this isnt perfect, whatev
-void interp_animator_layer(Animator_Layer& l1, Animator_Layer& l2, const Model* model, float midlerp, Animator_Layer& interp)
-{
-	if (l1.anim == l2.anim) {
-		int anim = l1.anim;
-		interp.anim = l1.anim;
-		if (anim >= 0 && anim < model->animations->clips.size()) {
-			
-			interp.frame = InterpolateAnimation(&model->animations->clips[anim],
-				l1.frame, l2.frame, midlerp);
-		}
-
-		interp.blend_anim = l2.blend_anim;
-		interp.blend_frame = l2.blend_frame;
-		interp.blend_time = l2.blend_time;
-		if (l1.blend_anim == l2.blend_anim)
-			interp.blend_remaining = glm::mix(l1.blend_remaining, l2.blend_remaining, midlerp);
-		else
-			interp.blend_remaining = l2.blend_remaining;
-	}
-	else
-	{
-		interp = l2;
-	}
-}
 
 
 void set_entity_interp_vars(Entity& e, Interp_Entry& ie)

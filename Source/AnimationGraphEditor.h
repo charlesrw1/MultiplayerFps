@@ -375,8 +375,6 @@ public:
 
 		Model* model = nullptr;
 		const Animation_Set_New* set = nullptr;
-
-		Animation_Tree_RT tree_rt;
 	}out;
 
 	struct tab {

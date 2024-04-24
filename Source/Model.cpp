@@ -1069,6 +1069,7 @@ void Game_Mod_Manager::print_usage()
 	sys_print("Total memory for ib+vbs: %d\n", total_memory_usage);
 }
 
+#include "AnimationTreePublic.h"
 
 Model* Game_Mod_Manager::find_or_load(const char* filename)
 {
@@ -1094,6 +1095,13 @@ Model* Game_Mod_Manager::find_or_load(const char* filename)
 	}
 
 	models[filename] = model;
+
+
+	if (model->animations) {
+		for (int i = 0; i < model->animations->clips.size(); i++)
+			anim_tree_man->on_new_animation(model, i);
+	}
+
 	return model;
 }
 

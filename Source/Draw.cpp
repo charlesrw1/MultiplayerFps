@@ -1436,7 +1436,8 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 {
 	auto& bones = a->get_global_bonemats();
-	for (int index = 0; index < a->model->bones.size(); index++) {
+	auto model = a->get_model();
+	for (int index = 0; index < model->bones.size(); index++) {
 		vec3 org = transform * bones[index][3];
 		Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
 		for (int i = 0; i < 3; i++) {
@@ -1445,8 +1446,8 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 			Debug::add_line(org, org + dir * line_len, colors[i],-1.f,false);
 		}
 
-		if (a->model->bones[index].parent != -1) {
-			vec3 parent_org = transform * bones[a->model->bones[index].parent][3];
+		if (model->bones[index].parent != -1) {
+			vec3 parent_org = transform * bones[model->bones[index].parent][3];
 			Debug::add_line(org, parent_org, COLOR_PINK,-1.f,false);
 		}
 	}
@@ -1455,7 +1456,7 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 glm::mat4 Entity::get_world_transform()
 {
 	mat4 model;
-	model = glm::translate(mat4(1), position + anim.out.meshoffset);
+	model = glm::translate(mat4(1), position);
 	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
 	model = glm::scale(model, vec3(1.f));
 
@@ -1895,7 +1896,10 @@ void Render_Scene::build_scene_data()
 				if (proxy.animator) {
 					gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
 					auto& mats = proxy.animator->get_matrix_palette();
-					for (int i = 0; i < proxy.animator->model->bones.size(); i++) {
+
+					auto model = proxy.animator->get_model();
+
+					for (int i = 0; i < model->bones.size(); i++) {
 						skinned_matricies_vec.push_back(mats[i]);
 					}
 				}

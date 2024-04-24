@@ -95,11 +95,14 @@ public:
 	handle<Render_Object> render_handle;
 	Model* model = nullptr;
 
-	Animator anim;
-
+	unique_ptr<Animator> animator;
 	unique_ptr<RenderInterpolationComponent> interp;
 
 	void set_model(const char* model);
+	void initialize_animator(
+		const Animation_Set_New* set, 
+		const Animation_Tree_CFG* graph, 
+		IAnimationGraphDriver* driver = nullptr);
 
 	void physics_update();
 	void projectile_physics();

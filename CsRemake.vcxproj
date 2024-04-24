@@ -23,13 +23,10 @@
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\AnimationGraphEditor.cpp" />
     <ClCompile Include="Source\AnimationTreeLocal.cpp" />
-    <ClCompile Include="Source\AnimationTreePublic.cpp" />
     <ClCompile Include="Source\Animation_Man.cpp" />
-    <ClCompile Include="Source\Animation_Tree.cpp" />
     <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\External\imnodes.cpp" />
-    <ClCompile Include="Source\External\imnodes_internal.cpp" />
     <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Files.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
@@ -50,6 +47,7 @@
     <ClCompile Include="Source\Meshlet.cpp" />
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
+    <ClCompile Include="Source\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Profilier.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
@@ -74,6 +72,7 @@
     <ClInclude Include="Source\AnimationGraphEditorPublic.h" />
     <ClInclude Include="Source\AnimationTreeLocal.h" />
     <ClInclude Include="Source\AnimationTreePublic.h" />
+    <ClInclude Include="Source\AnimationTypes.h" />
     <ClInclude Include="Source\AnimationUtil.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\BVH.h" />
@@ -97,7 +96,9 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\FreeList.h" />
     <ClInclude Include="Source\Game_Engine.h" />
+    <ClInclude Include="Source\IGraphDriver.h" />
     <ClInclude Include="Source\Handle.h" />
+    <ClInclude Include="Source\InlineVec.h" />
     <ClInclude Include="Source\LispInterpreter.h" />
     <ClInclude Include="Source\MemArena.h" />
     <ClInclude Include="Source\Meshlet.h" />
@@ -110,6 +111,7 @@
     <ClInclude Include="Source\ParticlesPublic.h" />
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\Net.h" />
+    <ClInclude Include="Source\PlayerAnimDriver.h" />
     <ClInclude Include="Source\PropertyEd.h" />
     <ClInclude Include="Source\Renderer_Types.h" />
     <ClInclude Include="Source\RenderObj.h" />

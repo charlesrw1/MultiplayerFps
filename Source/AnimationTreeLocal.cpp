@@ -37,7 +37,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 
 // Inherited via At_Node
 
- bool Clip_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
 
@@ -96,7 +96,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 
 // Inherited via At_Node
 
- bool Subtract_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+ bool Subtract_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 
 	Pose* reftemp = Pose_Pool::get().alloc(1);
 	input[REF]->get_pose(ctx, pose);
@@ -108,7 +108,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 	return true;
 }
 
- bool Add_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ bool Add_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	float lerp = ctx.vars->get(param).fval;
 
@@ -124,7 +124,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 	return true;
 }
 
- bool Blend_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ bool Blend_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	float dest = ctx.vars->get(param).fval;
 
@@ -143,7 +143,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 
 // Inherited via At_Node
 
- bool Mirror_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ bool Mirror_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	float amt = ctx.vars->get(param).fval;
 
@@ -178,7 +178,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 	return ret;
 }
 
- bool Statemachine_Node_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+ bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 
 	auto rt = get_rt<Statemachine_Node_RT>(ctx);
 
@@ -263,7 +263,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 
 // Inherited via At_Node
 
- bool Blend2d_CFG::get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ bool Blend2d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	//walk_fade_in = g_walk_fade_in;
 	//walk_fade_out = g_walk_fade_out;
