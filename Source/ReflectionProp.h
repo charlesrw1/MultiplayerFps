@@ -51,6 +51,7 @@ struct PropertyInfo {
 		const char* range_hint = "";
 		PropertyInfoList* nested_struct;	// use nested_struct for StdVector types
 	};
+	const char* custom_type_str = "";
 
 	uint8_t* get_ptr(void* inst) {
 		return (uint8_t*)inst + offset;
@@ -90,17 +91,17 @@ struct PropertyInfoList
 };
 
 
-
 class DictWriter;
 class DictParser;
 void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out);
 bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in);
 
-struct ListCallbacks
+class IListCallback
 {
-	PropertyInfoList* props = nullptr;
-	uint8_t* (*get_element)(void* inst, int arrayid, int index) = nullptr;
-	void (*resize)(void* inst, int arrayid, int newsize) = nullptr;
-	int (*get_size)(void* inst, int arrayid) = nullptr;
-	void (*swap_elements)(void* inst, int arrayid, int elm0, int elm1)=nullptr;
+public:
+	PropertyInfoList* props_in_list = nullptr;
+	virtual uint8_t* get_index(void* inst, int index) = 0;
+	virtual uint32_t get_size(void* inst) = 0;
+	virtual void resize(void* inst, uint32_t new_size) = 0;
+	virtual void swap_elements(void* inst, int item0, int item1) = 0;
 };

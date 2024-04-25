@@ -161,23 +161,73 @@ void TabState::imgui_draw() {
 
 	int rendered = 0;
 
-	if (ImGui::BeginTabBar("tabs")) {
+	if (tabs.empty()) return;
 
+	auto forward_img = mats.find_texture("icon/forward.png");
+	auto back_img = mats.find_texture("icon/back.png");
+
+
+	bool wants_back = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_LeftArrow));
+	bool wants_forward = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_RightArrow));
+
+
+	ImGui::BeginDisabled(active_tab_hist.empty());
+	if (ImGui::ImageButton(ImTextureID(back_img->gl_id), ImVec2(16, 16)) || (wants_back && !active_tab_hist.empty()) ) {
+
+		forward_tab_stack.push_back(active_tab);
+		active_tab = active_tab_hist.back();
+		active_tab_hist.pop_back();
+		active_tab_dirty = true;
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(forward_tab_stack.empty());
+	if (ImGui::ImageButton(ImTextureID(forward_img->gl_id), ImVec2(16, 16)) || (wants_forward && !forward_tab_stack.empty()) ) {
+		active_tab_hist.push_back(active_tab);
+		active_tab = forward_tab_stack.back();
+		forward_tab_stack.pop_back();
+		active_tab_dirty = true;
+	}
+	ImGui::EndDisabled();
+
+	// keeps a history of what that last tab actually rendered was
+	static int actual_last_tab_rendered = -1;
+
+	bool any_deleted = false;
+
+	if (ImGui::BeginTabBar("tabs")) {
 		for (int n = 0; n < tabs.size(); n++) {
-			auto flags = (tabs[n].mark_for_selection) ? ImGuiTabItemFlags_SetSelected : 0;
+
+			bool needs_select = n == active_tab && active_tab_dirty;
+
+			auto flags = (needs_select) ? ImGuiTabItemFlags_SetSelected : 0;
+			bool prev_open = tabs[n].open;
 			bool* open_bool = (tabs[n].owner_node) ? &tabs[n].open : nullptr;
 			if (ImGui::BeginTabItem(tabs[n].tabname.c_str(), open_bool, flags))
 			{
+				bool this_is_an_old_active_tab_or_just_skip = n != active_tab && active_tab_dirty;
+
+				if (this_is_an_old_active_tab_or_just_skip) {
+					ImGui::EndTabItem();
+					continue;
+				}
+
+				bool this_tab_needs_a_reset = n != active_tab;
+
 				uint32_t layer = (tabs[n].layer) ? tabs[n].layer->id : 0;
 				auto context = (tabs[n].layer) ? tabs[n].layer->context : parent->get_default_node_context();
+				if (this_tab_needs_a_reset) {
+					ImNodes::ClearNodeSelection();
+				}
 				ImNodes::EditorContextSet(context);
-				if (active_tab != n) {
+				if (this_tab_needs_a_reset) {
 					ImNodes::ClearNodeSelection();
 				}
 
 				auto winsize = ImGui::GetWindowSize();
 
 				if (tabs[n].reset_pan_to_middle_next_draw) {
+					ImNodes::EditorContextResetPanning(ImVec2(0,0));
 					ImNodes::EditorContextResetPanning(ImVec2(winsize.x / 4, winsize.y / 2.4));
 					tabs[n].reset_pan_to_middle_next_draw = false;
 				}
@@ -185,25 +235,34 @@ void TabState::imgui_draw() {
 				parent->draw_graph_layer(layer);
 
 				rendered++;
-				active_tab = n;
 				ImGui::EndTabItem();
-				tabs[n].mark_for_selection = false;
+
+				if (active_tab != n) {
+					ASSERT(!active_tab_dirty);
+					active_tab = n;
+				}
 			}
+			any_deleted |= !tabs[n].open;
 		}
 		ImGui::EndTabBar();
 	}
-	if (rendered > 1) {
-		printf("MORE THAN 1 TAB RENDERED\n");
-	}
 
-	for (int i = 0; i < tabs.size(); i++) {
-		if (!tabs[i].open) {
-			tabs.erase(tabs.begin() + i);
-			i--;
+	active_tab_dirty = false;
+
+	if (any_deleted) {
+		int sum = 0;
+		for (int i = 0; i < tabs.size(); i++) {
+			if (tabs[i].open) {
+				tabs[sum++] = tabs[i];
+			}
 		}
+
+		forward_tab_stack.clear();
+		active_tab_hist.clear();
+
+
+		tabs.resize(sum);
 	}
-
-
 }
 
 void AnimationGraphEditor::save_document()
@@ -483,6 +542,7 @@ void AnimationGraphEditor::begin_draw()
 
 
 	ImGui::Begin("animation graph editor");
+
 	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 
 		if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_RootWindow) && ImNodes::NumSelectedNodes() == 1) {
@@ -493,7 +553,7 @@ void AnimationGraphEditor::begin_draw()
 			if (mynode->type == animnode_type::state || mynode->type == animnode_type::statemachine) {
 				auto findtab = graph_tabs.find_tab_index(mynode);
 				if (findtab!=-1) {
-					graph_tabs.mark_tab_for_selection(findtab);
+					graph_tabs.push_tab_to_view(findtab);
 				}
 				else {
 					graph_tabs.add_tab(&mynode->sublayer, mynode, glm::vec2(0.f), true);
@@ -548,6 +608,12 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 		ImNodes::BeginNodeTitleBar();
 		ImGui::Text("%s\n", node->get_title().c_str());
+
+
+		auto er = mats.find_texture("icon/error.png");
+		ImGui::SameLine();
+		ImGui::Image((ImTextureID)er->gl_id, ImVec2(16, 16));
+
 		ImNodes::EndNodeTitleBar();
 
 		for (int j = 0; j < node->num_inputs; j++) {
@@ -569,6 +635,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 			ImGui::TextUnformatted("output");
 			ImNodes::EndOutputAttribute();
 		}
+
 
 		ImNodes::EndNode();
 

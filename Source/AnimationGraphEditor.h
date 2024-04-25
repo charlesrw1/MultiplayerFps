@@ -243,7 +243,6 @@ struct GraphTab {
 	Editor_Graph_Node* owner_node = nullptr;
 	bool open = true;
 	glm::vec2 pan = glm::vec2(0.f, 0.f);
-	bool mark_for_selection = false;
 	std::string tabname;
 	bool reset_pan_to_middle_next_draw = false;
 
@@ -266,25 +265,24 @@ public:
 	AnimationGraphEditor* parent;
 	TabState(AnimationGraphEditor* parent) : parent(parent) {}
 
+
 	void add_tab(editor_layer* layer, Editor_Graph_Node* node, glm::vec2 pan, bool mark_for_selection) {
 		GraphTab tab;
 		tab.layer = layer;
 		tab.owner_node = node;
 		tab.pan = pan;
 		tab.reset_pan_to_middle_next_draw = true;
-		tab.mark_for_selection = mark_for_selection;
 		tab.open = true;
 		tabs.push_back(tab);
+
+		push_tab_to_view(tabs.size() - 1);
 	}
 
 	void imgui_draw();
 
-	void mark_tab_for_selection(int index) {
-		tabs[index].mark_for_selection = true;
-	}
-
 	GraphTab* get_active_tab() {
 		if (tabs.empty()) return nullptr;
+
 		return &tabs[active_tab];
 	}
 
@@ -294,6 +292,18 @@ public:
 			tabs.erase(tabs.begin() + tab);
 		}
 
+	}
+
+
+	void push_tab_to_view(int index) {
+		if (index == active_tab)
+			return;
+
+		forward_tab_stack.clear();
+		if(active_tab!=-1)
+			active_tab_hist.push_back(active_tab);
+		active_tab = index;
+		active_tab_dirty = true;
 	}
 
 	GraphTab* find_tab(Editor_Graph_Node* owner_node) {
@@ -313,7 +323,10 @@ public:
 
 	uint32_t get_current_layer_from_tab() {
 		// 0 = root layer
-		return tabs[active_tab].layer ? tabs[active_tab].layer->id : 0;
+
+		int active = active_tab;
+
+		return tabs[active].layer ? tabs[active].layer->id : 0;
 	}
 
 	void update_tab_names() {
@@ -338,6 +351,10 @@ public:
 
 private:
 	int active_tab = -1;
+	bool active_tab_dirty = false;
+
+	std::vector<int> forward_tab_stack;
+	std::vector<int> active_tab_hist;
 	std::vector<GraphTab> tabs;
 };
 
@@ -494,7 +511,7 @@ public:
 	const Animation_Set_New* set = nullptr;
 };
 
-
+class Texture;
 class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
 public:
@@ -604,6 +621,13 @@ public:
 	bool open_prop_editor = true;
 
 	bool statemachine_passthrough = false;
+
+	struct icons {
+		Texture* error;
+		Texture* back;
+		Texture* forward;
+		Texture* undo;
+	}icon;
 
 	uint32_t node_last_frame = -1;
 	uint32_t link_last_frame = -1;
