@@ -26,6 +26,16 @@ enum SerializedPropFlags
 	PROP_DEFAULT = PROP_EDITABLE | PROP_SERIALIZE
 };
 
+struct ParsedHintStr
+{
+	float default_ = 0.0;
+	float min_val = -9999.f;
+	float max_val = 9999.f;
+	float step = 1.0;
+	bool less = false;
+	bool greater = false;
+};
+
 struct PropertyInfoList;
 struct PropertyInfo {
 	PropertyInfo() {}

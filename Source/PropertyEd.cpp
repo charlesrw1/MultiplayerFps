@@ -32,6 +32,9 @@ void PropertyGrid::update()
 		ImGui::Text("nothing to edit");
 		return;
 	}
+
+	ImGui::BeginDisabled(read_only);
+
 	ImGuiTableFlags const flags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
 		if(ImGui::BeginTable("Table", 2, flags) ){
@@ -45,10 +48,12 @@ void PropertyGrid::update()
 
 			ImGui::EndTable();
 		}
+
+		ImGui::EndDisabled();
 //	}
 	//ImGui::End();
 }
-
+#include "Texture.h"
 void IGridRow::update()
 {
 	ImGui::PushID(this);
@@ -62,15 +67,15 @@ void IGridRow::update()
 
 	ImGui::TableNextColumn();
 	ImGuiTableFlags const flags = ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_SizingFixedFit;
-	//if (ImGui::BeginTable("GridTable", 2, flags))
-	//{
-		//ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
-		//ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 100.0);
+	if (ImGui::BeginTable("GridTable", 2, flags))
+	{
+		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 100.0);
 
-		//ImGui::TableNextRow();
+		ImGui::TableNextRow();
 
-		//ImGui::TableNextColumn();
-		//ImGui::AlignTextToFramePadding();
+		ImGui::TableNextColumn();
+		ImGui::AlignTextToFramePadding();
 		
 		internal_update();
 
@@ -82,12 +87,16 @@ void IGridRow::update()
 
 		ImGui::TableNextColumn();
 		//if (HasResetSection())
-		//{
-		//	DrawResetSection();
-		//}
+		{
+			//DrawResetSection();
 
-		//ImGui::EndTable();
-	//}
+			auto reset_img = mats.find_texture("icon/undo.png");
+
+			ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(16, 16));
+		}
+
+		ImGui::EndTable();
+	}
 
 	ImGui::PopID();
 }

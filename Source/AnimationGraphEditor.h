@@ -201,8 +201,6 @@ public:
 		Statemachine_Node_CFG* sm_node_parent = nullptr;
 		struct transition {
 
-			std::string
-
 			//Editable_Property code_prop;
 			//Editable_Property time_prop;
 

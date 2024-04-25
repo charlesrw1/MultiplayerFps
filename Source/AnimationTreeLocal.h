@@ -54,6 +54,7 @@ struct State_Transition
 {
 	handle<State> transition_state;
 	ScriptExpression script;
+	float transition_time = 0.1f;
 };
 
 struct Rt_Vars_Base
@@ -168,9 +169,11 @@ struct State
 	string name;
 	Node_CFG* tree = nullptr;
 	vector<State_Transition> transitions;
-	handle<State> next_state;
-	float state_duration = -1.0;
 	float time_left = 0.0;
+
+	float state_duration = -1.0;				// when > 0, specifies how long state should be active, then signals a transition end
+	bool transition_wait_on_end = false;		// when the state finishes, wait until a valid transition instead of continuing/ending
+	handle<State> next_state;					// continue state
 
 	handle<State> get_next_state(NodeRt_Ctx& ctx) const;
 };

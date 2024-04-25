@@ -29,7 +29,7 @@ public:
 	virtual void internal_update() = 0;
 	virtual int extra_row_count() { return 0; }
 
-	bool editable = true;
+
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
 };
@@ -93,8 +93,12 @@ public:
 	}
 
 	void add_property_list_to_grid(PropertyInfoList* list, void* inst);
-
 	void update();
+
+	void set_read_only(bool read_only) {
+		this->read_only = read_only;
+	}
+
 	bool read_only = false;
 	std::vector<std::unique_ptr<IGridRow>> rows;
 };
