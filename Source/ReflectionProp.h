@@ -2,6 +2,7 @@
 #include <cstdint>
 #include "EnumDefReflection.h"
 
+// If you modify this, change the autoenumdef!!
 extern AutoEnumDef core_type_id_def;
 enum class core_type_id : uint8_t
 {
@@ -15,7 +16,7 @@ enum class core_type_id : uint8_t
 	Float,
 	Struct,
 	StdString,
-	StdVector,
+	List,
 };
 
 enum SerializedPropFlags
@@ -36,6 +37,7 @@ struct ParsedHintStr
 	bool greater = false;
 };
 
+class IListCallback;
 struct PropertyInfoList;
 struct PropertyInfo {
 	PropertyInfo() {}
@@ -49,7 +51,7 @@ struct PropertyInfo {
 	uint8_t flags = PROP_DEFAULT;
 	union {
 		const char* range_hint = "";
-		PropertyInfoList* nested_struct;	// use nested_struct for StdVector types
+		IListCallback* list_ptr;
 	};
 	const char* custom_type_str = "";
 
@@ -81,6 +83,8 @@ PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t fl
 PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
 PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id);
 PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags);
+PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr);
+
 
 struct PropertyInfoList
 {
@@ -99,6 +103,9 @@ bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in);
 class IListCallback
 {
 public:
+	IListCallback(PropertyInfoList* struct_) 
+		: props_in_list(struct_) {}
+
 	PropertyInfoList* props_in_list = nullptr;
 	virtual uint8_t* get_index(void* inst, int index) = 0;
 	virtual uint32_t get_size(void* inst) = 0;

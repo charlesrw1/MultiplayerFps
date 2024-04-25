@@ -1371,6 +1371,9 @@ void Editor_Graph_Node::add_node_props(PropertyGrid* grid)
 		grid->add_property_list_to_grid(&list, node);
 
 	}
+	else if (type == animnode_type::state) {
+		grid->add_property_list_to_grid(State::get_props(), state->get_state());	// FIXME: SO DANGEROUS!
+	}
 }
 
 void AnimationGraphEditor::tick(float dt)

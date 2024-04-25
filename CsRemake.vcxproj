@@ -125,6 +125,7 @@
     <ClInclude Include="Source\Renderer_Types.h" />
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\ScriptVars.h" />
+    <ClInclude Include="Source\StdVectorReflection.h" />
     <ClInclude Include="Source\StringUtil.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\Bytepacker.h" />

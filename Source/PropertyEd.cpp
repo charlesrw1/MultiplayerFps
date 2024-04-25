@@ -2,6 +2,21 @@
 #include "imgui.h"
 #include "GlobalEnumMgr.h"
 
+static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst)
+{
+	if (prop->type == core_type_id::List) {
+		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop);
+		return array_;
+	}
+	else {
+		PropertyRow* prop_ = new PropertyRow(nullptr, inst, prop);
+
+		if (prop_->prop_editor)
+			return prop_;
+		delete prop_;
+		return nullptr;
+	}
+}
 
 void PropertyGrid::add_property_list_to_grid(PropertyInfoList* list, void* inst)
 {
@@ -11,16 +26,9 @@ void PropertyGrid::add_property_list_to_grid(PropertyInfoList* list, void* inst)
 		if (!prop.can_edit())
 			continue;
 
-		if (prop.type == core_type_id::StdVector) {
-			ArrayRow* array_ = new ArrayRow(nullptr, inst, &prop);
-			rows.push_back(std::unique_ptr<IGridRow>(array_));
-		}
-		else {
-			PropertyRow* prop_ = new PropertyRow(nullptr, inst, &prop);
-
-			if(prop_->prop_editor)
-				rows.push_back(std::unique_ptr<IGridRow>(prop_));
-		}
+		auto row = create_row(nullptr, &prop, inst);
+		if (row)
+			rows.push_back(std::unique_ptr<IGridRow>(row));
 	}
 
 
@@ -54,6 +62,10 @@ void PropertyGrid::update()
 	//ImGui::End();
 }
 #include "Texture.h"
+void IGridRow::clear_children()
+{
+	child_rows.clear();	// unique_ptr handles destruction
+}
 void IGridRow::update()
 {
 	ImGui::PushID(this);
@@ -99,6 +111,9 @@ void IGridRow::update()
 	}
 
 	ImGui::PopID();
+
+	for (int i = 0; i < child_rows.size(); i++)
+		child_rows[i]->update();
 }
 
 void IPropertyEditor::update()
@@ -287,7 +302,7 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 
 ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop) : IGridRow(parent), instance(instance), prop(prop)
 {
-	ASSERT(0);
+	rebuild_child_rows();
 }
 
 PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop) : IGridRow(parent), instance(instance), prop(prop)
@@ -297,12 +312,54 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop) :
 
  void ArrayRow::internal_update() 
 {
+	 auto trashimg = mats.find_texture("icon/trash.png");
+	 auto addimg = mats.find_texture("icon/plus.png");
 
+	 if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
+
+		 clear_children();
+		 prop->list_ptr->resize(instance, prop->list_ptr->get_size(instance) + 1);
+		 rebuild_child_rows();
+	 }
+
+	 ImGui::SameLine();
+
+	 if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
+
+		 clear_children();
+		 prop->list_ptr->resize(instance, 0);
+	 }
 }
 
  void ArrayRow::draw_header()
  {
-	 ImGui::CollapsingHeader(prop->name);
+	 ImGui::PushStyleColor(ImGuiCol_Header, 0);
+	 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+	 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+	 if(ImGui::TreeNode(prop->name))
+		 ImGui::TreePop();
+	 ImGui::PopStyleColor(3);
+ }
+
+ void ArrayRow::rebuild_child_rows()
+ {
+	 clear_children();
+
+	 ASSERT(prop->type == core_type_id::List);
+
+	 IListCallback* list = prop->list_ptr;
+	 int count = list->get_size(instance);
+	 PropertyInfoList* struct_ = list->props_in_list;
+	 for (int i = 0; i < count; i++) {
+
+		 ASSERT(struct_->count >= 1);
+		 // FIXME:
+		 IGridRow* child = create_row(this, &struct_->list[0], list->get_index(instance, i));
+
+		 ASSERT(child);
+
+		 child_rows.push_back(std::unique_ptr<IGridRow>(child));
+	 }
  }
 
  void PropertyRow::draw_header()

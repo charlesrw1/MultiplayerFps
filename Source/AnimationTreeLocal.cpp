@@ -7,6 +7,9 @@
 
 #include "GlobalEnumMgr.h"
 
+#include "ReflectionRegisterDefines.h"
+#include "StdVectorReflection.h"
+
 #define DECLARE_PROPERTIES(type) PropertyInfoList type::properties;
 
 DECLARE_PROPERTIES(Clip_Node_CFG);
@@ -46,6 +49,17 @@ AutoEnumDef animnode_type_def = AutoEnumDef("",sizeof(animnode_strs)/sizeof(char
 bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
 {
 	return compilied.execute(*ctx.vars).ival;
+}
+
+PropertyInfoList* State::get_props()
+{
+	MAKE_VECTORCALLBACK(State_Transition, transitions);
+	static PropertyInfo props[] = {
+		REG_STDVECTOR( State, transitions, PROP_DEFAULT ),
+	};
+
+	static PropertyInfoList list = MAKEPROPLIST(props);
+	return &list;
 }
 
 handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
@@ -485,9 +499,6 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 out.write_list_end();
  }
 
-
-#include "ReflectionRegisterDefines.h"
-
  void Blend2d_CFG::register_props()
  {
 	 START_PROPS
@@ -722,4 +733,15 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 else {
 		 ASSERT(0);
 	 }
+ }
+
+ PropertyInfoList* State_Transition::get_props()
+ {
+	 static PropertyInfo props[] = {
+		 REG_INT(State_Transition, transition_state, PROP_SERIALIZE, ""),
+		 REG_FLOAT(State_Transition, transition_time, PROP_DEFAULT, ""),
+		 REG_STDSTRING(State_Transition, script.script_str, PROP_SERIALIZE, "")
+	 };
+	 static PropertyInfoList list = { props, sizeof(props) / sizeof(PropertyInfo) };
+	 return &list;
  }

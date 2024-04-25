@@ -52,6 +52,8 @@ struct ScriptExpression
 struct State;
 struct State_Transition
 {
+	static PropertyInfoList* get_props();
+
 	handle<State> transition_state;
 	ScriptExpression script;
 	float transition_time = 0.1f;
@@ -166,6 +168,8 @@ private:
 
 struct State
 {
+	static PropertyInfoList* get_props();
+
 	string name;
 	Node_CFG* tree = nullptr;
 	vector<State_Transition> transitions;

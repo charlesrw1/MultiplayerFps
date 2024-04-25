@@ -142,9 +142,6 @@
     <ClCompile Include="Source\AnimationUtil.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="Source\EnumDefReflection.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Parameter.cpp">
       <Filter>Source\Shared</Filter>
     </ClCompile>
@@ -153,6 +150,9 @@
     </ClCompile>
     <ClCompile Include="Source\PropertyEd.cpp">
       <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EnumDefReflection.cpp">
+      <Filter>Source\Animation\Reflection</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -357,16 +357,19 @@
     <ClInclude Include="Source\Key_Value_File.h">
       <Filter>Source\Shared\Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\GlobalEnumMgr.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EnumDefReflection.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\ReflectionProp.h">
       <Filter>Source\Animation\Reflection</Filter>
     </ClInclude>
     <ClInclude Include="Source\ReflectionRegisterDefines.h">
+      <Filter>Source\Animation\Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\StdVectorReflection.h">
+      <Filter>Source\Animation\Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GlobalEnumMgr.h">
+      <Filter>Source\Animation\Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EnumDefReflection.h">
       <Filter>Source\Animation\Reflection</Filter>
     </ClInclude>
   </ItemGroup>

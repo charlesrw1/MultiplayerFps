@@ -52,10 +52,12 @@ class IGridRow
 {
 public:
 	IGridRow(IGridRow* parent) : parent(parent) {}
-
+	virtual ~IGridRow() {}
 	virtual void update();
 	virtual void internal_update() = 0;
 	virtual void draw_header() = 0;
+
+	void clear_children();
 
 	IGridRow* parent = nullptr;
 	std::vector<std::unique_ptr<IGridRow>> child_rows;
@@ -68,6 +70,8 @@ public:
 
 	virtual void internal_update() override;
 	virtual void draw_header() override;
+
+	void rebuild_child_rows();
 
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;

@@ -16,10 +16,10 @@ static const char* core_type_id_strs[] = {
 	"Float",
 	"Struct",
 	"StdString",
-	"StdVector"
+	"List"
 };
 
-static_assert((sizeof(core_type_id_strs) / sizeof(char*)) == ((int)core_type_id::StdVector + 1), "out of sync");
+static_assert((sizeof(core_type_id_strs) / sizeof(char*)) == ((int)core_type_id::List + 1), "out of sync");
 AutoEnumDef core_type_id_def = AutoEnumDef("", sizeof(core_type_id_strs) / sizeof(char*), core_type_id_strs);
 
 
@@ -76,6 +76,14 @@ PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t fla
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::StdString;
+	return prop;
+}
+
+PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr)
+{
+	PropertyInfo prop(name,offset,flags);
+	prop.type = core_type_id::List;
+	prop.list_ptr = ptr;
 	return prop;
 }
 
@@ -233,28 +241,3 @@ PropertyInfo* PropertyInfoList::find(const char* name) const
 	return nullptr;
 }
 
-template<typename T>
-class StdVectorCallback : public IListCallback
-{
-	// Inherited via IListCallback
-	virtual uint8_t* get_index(void* inst, int index) override
-	{
-		std::vector<T>* list = (std::vector<T>*)inst;
-		return (uint8_t*)&list->at(index);
-	}
-	virtual uint32_t get_size(void* inst) override
-	{
-		std::vector<T>* list = (std::vector<T>*)inst;
-		return list->size();
-	}
-	virtual void resize(void* inst, uint32_t new_size) override
-	{
-		std::vector<T>* list = (std::vector<T>*)inst;
-		list->resize(new_size);
-	}
-	virtual void swap_elements(void* inst, int item0, int item1) override
-	{
-		std::vector<T>* list = (std::vector<T>*)inst;
-		std::swap(list->at(item0), list->at(item1));
-	}
-};

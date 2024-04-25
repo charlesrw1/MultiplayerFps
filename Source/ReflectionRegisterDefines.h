@@ -9,3 +9,5 @@
 #define START_PROPS  static PropertyInfo props[] = {
 #define END_PROPS  }; \
  properties = { props, sizeof(props) / sizeof(PropertyInfo) };
+
+#define MAKEPROPLIST(name) { name, sizeof(name) / sizeof(PropertyInfo) }
