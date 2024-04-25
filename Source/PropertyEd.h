@@ -29,7 +29,6 @@ public:
 	virtual void internal_update() = 0;
 	virtual int extra_row_count() { return 0; }
 
-
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
 };
@@ -59,6 +58,7 @@ public:
 	virtual bool draw_children() {
 		return true;
 	}
+	virtual float get_indent_width() { return 18.0; }
 
 	void clear_children();
 
@@ -75,6 +75,10 @@ public:
 	virtual void internal_update() override;
 	virtual void draw_header(float header_ofs) override;
 	virtual bool draw_children() override;
+
+	virtual float get_indent_width() { return 30.0; }
+
+
 	bool passthrough_to_child() {
 		return row_index != -1 && child_rows.size() == 1;
 	}
@@ -91,6 +95,8 @@ public:
 
 	virtual void internal_update() override;
 	virtual void draw_header(float header_ofs) override;
+
+	virtual float get_indent_width() { return 30.0; }
 
 	void rebuild_child_rows();
 

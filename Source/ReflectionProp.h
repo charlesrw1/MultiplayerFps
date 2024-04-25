@@ -84,6 +84,7 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flag
 PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id);
 PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr);
+PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 
 
 struct PropertyInfoList

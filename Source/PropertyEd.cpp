@@ -103,7 +103,7 @@ void IGridRow::update(float header_ofs)
 
 	if (draw_children()) {
 		for (int i = 0; i < child_rows.size(); i++)
-			child_rows[i]->update(header_ofs + 18.f);
+			child_rows[i]->update(header_ofs + get_indent_width());
 	}
 }
 
@@ -312,9 +312,8 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 auto addimg = mats.find_texture("icon/plus.png");
 
 	 if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
-
 		 clear_children();
-		 prop->list_ptr->resize(instance, prop->list_ptr->get_size(instance) + 1);
+		 prop->list_ptr->resize(instance, prop->list_ptr->get_size(instance) + 1);	// might invalidate childrens ptrs, so refresh
 		 rebuild_child_rows();
 	 }
 
@@ -330,6 +329,10 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 for (int i = 0; i < commands.size(); i++) {
 		 switch (commands[i].command) {
 		 case Delete: {
+
+			 // do this here so destructors dont access stale pointers
+			 child_rows.erase(child_rows.begin() + i);
+
 			 int index_to_delete = commands[i].index;
 			 int size = get_size();
 			 for (int i = index_to_delete; i < size - 1; i++) {
@@ -363,6 +366,7 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 }
 
 	 if (!commands.empty()) {
+		 clear_children();
 		 rebuild_child_rows();
 		 commands.clear();
 	 }
@@ -383,8 +387,8 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 
  void ArrayRow::rebuild_child_rows()
  {
-	 clear_children();
-
+	
+	 ASSERT(child_rows.size() == 0);	// clearing done before
 	 ASSERT(prop->type == core_type_id::List);
 
 	 IListCallback* list = prop->list_ptr;
@@ -402,6 +406,7 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 ImGui::SameLine();
 
 	 ImGui::Text(prop->name);
+
  }
 
  void PropertyRow::internal_update()
@@ -422,7 +427,7 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
 	 }
 
-	 name = "Unknown";
+	 name = list->type_name;
 
 	 if (row_idx != -1) {
 		 name = string_format("[ %d ]", row_idx);

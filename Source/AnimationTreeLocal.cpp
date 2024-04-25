@@ -56,6 +56,10 @@ PropertyInfoList* State::get_props()
 	MAKE_VECTORCALLBACK(State_Transition, transitions);
 	static PropertyInfo props[] = {
 		REG_STDVECTOR( State, transitions, PROP_DEFAULT ),
+		REG_FLOAT(State, state_duration, PROP_DEFAULT, ""),
+		REG_BOOL(State, transition_wait_on_end, PROP_DEFAULT, ""),
+		REG_INT(State, next_state.id, PROP_SERIALIZE, ""),
+		REG_STDSTRING(State, name, PROP_SERIALIZE, "")
 	};
 
 	static PropertyInfoList list = MAKEPROPLIST(State, props);
@@ -740,7 +744,10 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 static PropertyInfo props[] = {
 		 REG_INT(State_Transition, transition_state, PROP_SERIALIZE, ""),
 		 REG_FLOAT(State_Transition, transition_time, PROP_DEFAULT, ""),
-		 REG_STDSTRING(State_Transition, script.script_str, PROP_SERIALIZE, "")
+		 REG_STDSTRING(State_Transition, script.script_str, PROP_SERIALIZE, ""),
+
+
+		 REG_STRUCT_CUSTOM_TYPE(State_Transition, script, PROP_EDITABLE, "AG_LISP_CODE")
 	 };
 	 static PropertyInfoList list = { props, sizeof(props) / sizeof(PropertyInfo) };
 	 return &list;

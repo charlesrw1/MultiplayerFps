@@ -88,6 +88,14 @@ PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
+PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype)
+{
+	PropertyInfo prop(name, offset, flags);
+	prop.type = core_type_id::Struct;
+	prop.custom_type_str = customtype;
+	return prop;
+}
+
 
 
 void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out)

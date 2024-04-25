@@ -6,6 +6,8 @@
 #define REG_BOOL(type, name, flags, hint) make_bool_property(#name,offsetof(type, name), flags, hint)
 #define REG_STDSTRING(type, name, flags) make_string_property(#name,offsetof(type, name), flags)
 
+
+#define REG_STRUCT_CUSTOM_TYPE(type, name, flags, customtype) make_struct_property(#name,offsetof(type, name), flags, customtype)
 #define REG_STDSTRING_CUSTOM_TYPE(type, name, flags, customtype) make_string_property(#name,offsetof(type, name), flags, customtype)
 
 

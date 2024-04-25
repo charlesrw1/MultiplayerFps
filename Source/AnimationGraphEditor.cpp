@@ -72,6 +72,29 @@ public:
 
 	bool initial = true;
 	int index = 0;
+};
+
+
+
+class AgLispCodeEditorProperty : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+		ASSERT(prop->type == core_type_id::Struct);
+
+		auto script = (ScriptExpression*)prop->get_ptr(instance);
+
+		ImguiInputTextCallbackUserStruct user;
+		user.string = &script->script_str;
+		ImGui::InputTextMultiline("##source", (char*)script->script_str.data(), script->script_str.size()+1, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user);
+	}
+
+	bool initial = true;
+	int index = 0;
 
 };
 
@@ -85,6 +108,9 @@ public:
 	{
 		if (strcmp(prop->custom_type_str, "AG_CLIP_TYPE") == 0) {
 			return new FindAnimationClipPropertyEditor(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_LISP_CODE") == 0) {
+			return new AgLispCodeEditorProperty(instance, prop);
 		}
 
 		return nullptr;

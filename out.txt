@@ -1,6 +1,6 @@
 {
 	name ""
-	data_used "48"
+	data_used "20"
 	root_node "-1"
 	params [
 	]
