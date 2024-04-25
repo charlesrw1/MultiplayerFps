@@ -22,6 +22,8 @@
 
 #include "PropertyEd.h"
 
+#include "ReflectionProp.h"
+
 class Editor_Graph_Node;
 
 struct editor_layer {
@@ -30,75 +32,7 @@ struct editor_layer {
 
 };
 
-struct More_Node_Property
-{
-	const char* name = "";
-	Property_Type type{};
 
-	std::string str_type;
-	int i_type = 0;
-	float f_type = 0.f;
-	// string completion/combo box selection
-	find_completion_strs_callback fcsc = nullptr;
-	void* fcsc_user_data = nullptr;
-	bool treat_completion_as_combo = false;
-	std::function<void(More_Node_Property&)> on_edit_callback;
-
-	uint32_t loc1 = 0;
-	uint32_t loc2 = 0;
-};
-
-struct Table_Row
-{
-	Table_Row() {}
-
-	Table_Row& push_prop(More_Node_Property prop) {
-		props.push_back(prop);
-		return *this;
-	}
-
-	std::vector<More_Node_Property> props;
-	uint32_t row_id = 0;
-};
-
-struct Table_Col_Def
-{
-	std::string name;
-	bool fixed_width = false;
-	float start_width = 0.0;
-};
-
-class Table
-{
-public:
-	Table(std::string name, std::vector<Table_Col_Def> col_names, Table_Row te) : table_name(name), col_names(col_names){
-		template_row = te;
-	}
-
-	void imgui_draw();
-
-	Table& push_row(Table_Row row) {
-		ASSERT(row.props.size() == col_names.size() && "mismatched column sizes");
-		row.row_id = row_id_start++;
-		rows.push_back(row);
-		return *this;
-	}
-	Table_Row& find_row(uint32_t id) {
-		for (int i = 0; i < rows.size(); i++) {
-			if (rows[i].row_id == id) return rows[i];
-		}
-		ASSERT(0);
-	}
-
-	uint32_t selected_row = -1;
-	bool allow_selecting = true;
-	std::string table_name;
-	int num_cols = 0;
-	std::vector<Table_Col_Def> col_names;
-	std::vector<Table_Row> rows;
-	Table_Row template_row;
-	uint32_t row_id_start = 0;
-};
 
 const uint32_t MAX_INPUTS = 16;
 const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
@@ -121,15 +55,16 @@ public:
 		}
 	}
 
-	enum class Hardcoded_Props {
-		name = 0,
-	};
+
+	static PropertyInfoList properties;
+	static void register_props();
 
 	std::string& get_title() {
-		ASSERT(properties.size() > (int)Hardcoded_Props::name);
-		return properties.at((int)Hardcoded_Props::name).str_type;
+		return title;
+	
 	}
 
+	std::string title;
 	uint32_t id = 0;
 	Color32 node_color = { 23, 82, 12 };
 
@@ -244,6 +179,8 @@ public:
 		return nullptr;
 	}
 
+	void add_node_props(PropertyGrid* grid);
+
 	animnode_type type = animnode_type::source;
 	Node_CFG* node = nullptr;
 
@@ -263,12 +200,15 @@ public:
 
 		Statemachine_Node_CFG* sm_node_parent = nullptr;
 		struct transition {
-			More_Node_Property code_prop;
-			More_Node_Property time_prop;
 
-			std::string& get_code() {
-				return code_prop.str_type;
-			}
+			std::string
+
+			//Editable_Property code_prop;
+			//Editable_Property time_prop;
+
+			//std::string& get_code() {
+			//	return code_prop.str_type;
+			//}
 		};
 		std::array<transition, MAX_INPUTS> transitions;
 		handle<State> state_handle;
@@ -283,7 +223,6 @@ public:
 
 	std::unique_ptr<state_data> state;
 
-	std::vector<More_Node_Property> properties;
 };
 
 struct Editor_Parameter_list
@@ -291,7 +230,7 @@ struct Editor_Parameter_list
 	struct ed_param {
 		bool fake_entry = false;
 		std::string s;
-		script_parameter_type type = script_parameter_type::animfloat;
+		script_parameter_type type = script_parameter_type::int_t;
 		uint32_t id = 0;
 	};
 	std::vector<ed_param> param;
@@ -613,6 +552,7 @@ public:
 		return default_editor;
 	}
 
+	PropertyGrid node_props;
 	TabState graph_tabs;
 	Timeline timeline;
 
@@ -622,9 +562,6 @@ public:
 
 	std::vector<Editor_Graph_Node*> nodes;
 	Animation_Tree_CFG* editing_tree = nullptr;
-
-
-	std::unique_ptr<Table> ed_params;
 
 	void draw_node_creation_menu(bool is_state_mode);
 	Editor_Graph_Node* create_graph_node_from_type(animnode_type type, uint32_t layer);
@@ -669,6 +606,9 @@ public:
 	bool open_prop_editor = true;
 
 	bool statemachine_passthrough = false;
+
+	uint32_t node_last_frame = -1;
+	uint32_t link_last_frame = -1;
 
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root

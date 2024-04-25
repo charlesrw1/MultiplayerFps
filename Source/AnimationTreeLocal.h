@@ -7,6 +7,12 @@
 
 #include "AnimationTreePublic.h"
 #include "InlineVec.h"
+
+#include "EnumDefReflection.h"
+#include "ReflectionProp.h"
+
+// Modify AutoEnumDef when changing enum!
+extern AutoEnumDef animnode_type_def;
 enum class animnode_type
 {
 	source,
@@ -34,32 +40,6 @@ enum class animnode_type
 
 	COUNT
 };
-
-enum class Property_Type
-{
-	int_prop,
-	bool_prop,
-	float_prop,
-	vec2_prop,
-	std_string_prop,
-};
-
-struct Node_Property
-{
-	const char* name = "";
-	Property_Type type = {};
-	size_t offset = 0;
-	bool serialize = true;
-	bool editable = true;
-};
-
-struct Node_Property_List
-{
-	Node_Property* list = nullptr;
-	int count = 0;
-};
-
-
 struct NodeRt_Ctx;
 struct ScriptExpression
 {
@@ -157,7 +137,7 @@ struct Node_CFG
 	// serialization helpers
 	virtual void write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {}
 	virtual void read_from_dict(Animation_Tree_CFG* tree, DictParser& in) {}
-	virtual Node_Property_List* get_property_list() = 0;
+	virtual PropertyInfoList* get_property_list() = 0;
 	virtual animnode_type get_type() = 0;
 
 	void set_active(NodeRt_Ctx& ctx, Rt_Vars_Base* base) const {
@@ -199,8 +179,8 @@ struct State
 TYPE_NAME* clip = (TYPE_NAME*)cfg->arena.alloc_bottom(sizeof(TYPE_NAME)); \
 clip = new(clip)TYPE_NAME(cfg); \
 return clip; \
-} static Node_Property_List properties; static void register_props();  \
-virtual Node_Property_List* get_property_list() override { return &properties;}  \
+} static PropertyInfoList properties; static void register_props();  \
+virtual PropertyInfoList* get_property_list() override { return &properties;}  \
 virtual animnode_type get_type() override { return ENUM_TYPE; }
 
 // playback speed *= param / (speed of clip's root motion)
@@ -271,6 +251,14 @@ struct Clip_Node_RT : Rt_Vars_Base
 	bool stopped_flag = false;
 };
 
+
+extern AutoEnumDef rootmotion_setting_def;
+enum class rootmotion_setting : uint8_t {
+	keep,
+	remove,
+	add_velocity
+};
+
 struct Clip_Node_CFG : public Node_CFG
 {
 	Clip_Node_CFG(Animation_Tree_CFG* cfg)
@@ -335,16 +323,13 @@ struct Clip_Node_CFG : public Node_CFG
 		rt->frame = get_clip(ctx)->total_duration * frac;
 	}
 
-	enum rootmotion_type {
-		None,
-		Remove
-	}rootmotion[3] = { None,None,None };
+	rootmotion_setting rm[3] = { rootmotion_setting::keep ,rootmotion_setting::keep, rootmotion_setting::keep };
 	std::string clip_name;
 	bool loop = true;
+	bool allow_sync = false;
+	bool can_be_leader = false;
 	float speed = 1.0;
-
-	int sync_track_idx = 0;
-	bool can_be_leader = true;
+	uint16_t start_frame = 0;
 };
 
 struct Subtract_Node_CFG : public Node_CFG
@@ -542,7 +527,6 @@ typedef void (*register_func)();
 
 struct animnode_name_type
 {
-	const char* name = "";
 	create_func create = nullptr;
 	register_func reg = nullptr;
 };

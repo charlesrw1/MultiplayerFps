@@ -5,7 +5,9 @@
 #include "DictWriter.h"
 #include "DictParser.h"
 
-#define DECLARE_PROPERTIES(type) Node_Property_List type::properties;
+#include "GlobalEnumMgr.h"
+
+#define DECLARE_PROPERTIES(type) PropertyInfoList type::properties;
 
 DECLARE_PROPERTIES(Clip_Node_CFG);
 DECLARE_PROPERTIES(Sync_Node_CFG);
@@ -17,7 +19,28 @@ DECLARE_PROPERTIES(Blend_Node_CFG);
 DECLARE_PROPERTIES(Blend2d_CFG);
 DECLARE_PROPERTIES(Scale_By_Rootmotion_CFG);
 
+static const char* animnode_strs[] = {
+	"source",
+	"statemachine",
+	"selector",
+	"mask",
+	"blend",
+	"blend2d",
+	"add",
+	"subtract",
+	"aimoffset",
+	"mirror",
+	"play_speed",
+	"rootmotion_speed",
+	"sync",
+	"state",
+	"root",
+	"start_statemachine",
+	"COUNT",
+};
 
+static_assert((sizeof(animnode_strs) / sizeof(char*)) ==  ((int)animnode_type::COUNT + 1), "string reflection out of sync");
+AutoEnumDef animnode_type_def = AutoEnumDef("",sizeof(animnode_strs)/sizeof(char*), animnode_strs);
 
 
 bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
@@ -35,7 +58,13 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 	return { -1 };
 }
 
-// Inherited via At_Node
+
+static const char* rm_setting_strs[] = {
+	"keep",
+	"remove",
+	"add_velocity"
+};
+AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
@@ -86,7 +115,7 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
 
 	int root_index = ctx.model->root_bone_index;
 	for (int i = 0; i < 3; i++) {
-		if (rootmotion[i] == Remove) {
+		if (rm[i] == rootmotion_setting::remove) {
 			pose.pose->pos[root_index][i] = rt->root_pos_first_frame[i];
 		}
 	}
@@ -343,23 +372,22 @@ handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
  {
 	 switch (type)
 	 {
-	 case script_parameter_type::animvec2:
-		 return "vec2";
-		 break;
-	 case script_parameter_type::animfloat:
-		 return "float";
-		 break;
-	 case script_parameter_type::animint:
-		 return "int";
-		 break;
+	 case script_parameter_type::float_t:
+		 return "float_t";
+	 case script_parameter_type::int_t:
+		 return "int_t";
+	 case script_parameter_type::bool_t:
+		 return "bool_t";
+	 case script_parameter_type::enum_t:
+		 return "enum_t";
 	 default:
 		 ASSERT(!"no type defined");
 		 break;
 	 }
 }
 
-#define DEFINE_ANIMNODE_DEF(name, class_) nodes[(int)animnode_type::name] = {#name, class_::create, class_::register_props}
-#define DEFINE_ANIMNODE_DEF_NO_PROP(name, class_) nodes[(int)animnode_type::name] = {#name, class_::create, nullptr}
+#define DEFINE_ANIMNODE_DEF(name, class_) nodes[(int)animnode_type::name] = {class_::create, class_::register_props}
+#define DEFINE_ANIMNODE_DEF_NO_PROP(name, class_) nodes[(int)animnode_type::name] = {class_::create, nullptr}
 
  static animnode_name_type* get_anim_node_map()
  {
@@ -399,7 +427,9 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 return -1;
  }
 
- static void write_properties(Node_Property_List& list, void* ptr, DictWriter& out);
+
+
+
 
  void Animation_Tree_CFG::write_to_dict(DictWriter& out)
  {
@@ -410,11 +440,17 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 out.write_key_value("root_node", string_format("%d", get_index_of_node(root)));
 
 	 out.write_key_list_start("params");
-	 for (auto& param : parameters.name_to_index) {
+	 for (auto& param_int : parameters.name_to_index) {
+
+		 auto& param = parameters.types.at(param_int.second);
 
 		 out.write_item_start();
-		 out.write_key_value("name", param.first.c_str());
-		 out.write_key_value("type", parameter_type_to_string(parameters.types.at(param.second)));
+		 out.write_key_value("name", param_int.first.c_str());
+		 out.write_key_value("type", parameter_type_to_string(param.default_.type));
+
+		 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
+
+
 		 out.write_item_end();
 	 }
 	 out.write_list_end();
@@ -425,7 +461,11 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 auto& node = all_nodes[i];
 		 out.write_item_start();
 
-		 out.write_key_value("type", get_animnode_typedef(node->get_type()).name);
+		 const char* type_name = GlobalEnumDefMgr::get().get_enum_type_name(animnode_type_def.id);
+		 const char* enum_str = GlobalEnumDefMgr::get().get_enum_name(animnode_type_def.id, (int)node->get_type());
+		 char* out_str = string_format("%s::%s", type_name, enum_str);
+
+		 out.write_key_value("type", out_str);
 
 		 out.write_key_value("default_param", string_format("%d", node->param.id));
 
@@ -445,161 +485,57 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 out.write_list_end();
  }
 
- static void write_properties(Node_Property_List& list, void* ptr, DictWriter& out)
- {
-	 out.write_key_list_start("props");
-	 for (int i = 0; i < list.count; i++)
-	 {
-		 out.write_item_start();
-		 auto& prop = list.list[i];
-		 if (!prop.serialize) continue;
-		 switch (prop.type)
-		 {
-		 case Property_Type::bool_prop: {
-			 bool* b = (bool*)((char*)ptr + prop.offset);
-			 out.write_key_value("value", string_format("%d", (int) *b));
-		 }break;
-		 case Property_Type::int_prop: {
-			 int* i = (int*)((char*)ptr + prop.offset);
-			 out.write_key_value("value", string_format("%d", *i));
-		 }break;
 
-		 case Property_Type::float_prop: {
-			 float* i = (float*)((char*)ptr + prop.offset);
-			 out.write_key_value("value", string_format("%f", *i));
-		 }break;
-
-		 case Property_Type::std_string_prop: {
-			 std::string* i = (std::string*)((char*)ptr + prop.offset);
-			 out.write_key_value("value", i->c_str());
-		 }break;
-
-		 case Property_Type::vec2_prop: {
-			 glm::vec2* i = (glm::vec2*)((char*)ptr + prop.offset);
-			 out.write_key_value("value", string_format("%f %f", i->x,i->y));
-		 }break;
-
-		 default:
-			 ASSERT(0);
-			 break;
-		 }
-		 out.write_item_end();
-	 }
-	 out.write_list_end();
- }
-
-
-
- static bool read_properties(Node_Property_List& list, void* ptr, DictParser& in)
- {
-	 StringView tok;
-
-	 in.expect_list_start();
-
-	 for (int i = 0; i < list.count; i++)
-	 {
-		 bool good = in.check_item_start(tok);
-		 if (!good) {
-			 printf("read properties mismatch (old format??)\n");
-			 return in.check_list_end(tok);
-		 }
-
-		 auto& prop = list.list[i];
-		 if (!prop.serialize) continue;
-
-		 in.read_string(tok);
-		 if (!tok.cmp("value")) return false;
-
-		 switch (prop.type)
-		 {
-		 case Property_Type::bool_prop: {
-			 bool* b = (bool*)((char*)ptr + prop.offset);
-			 int i = 0;
-			 *b = in.read_int(i);
-		 }break;
-		 case Property_Type::int_prop: {
-			 int* i = (int*)((char*)ptr + prop.offset);
-			 in.read_int(*i);
-		 }break;
-
-		 case Property_Type::float_prop: {
-			 float* i = (float*)((char*)ptr + prop.offset);
-			 in.read_float(*i);
-		 }break;
-
-		 case Property_Type::std_string_prop: {
-			 std::string* i = (std::string*)((char*)ptr + prop.offset);
-
-			 in.read_string(tok);
-			 *i = tok.to_stack_string().c_str();
-		 }break;
-
-		 case Property_Type::vec2_prop: {
-			 glm::vec2* i = (glm::vec2*)((char*)ptr + prop.offset);
-			 in.read_float2(i->x, i->y);
-		 }break;
-
-		 default:
-			 ASSERT(0);
-			 break;
-		 }
-
-		 in.read_string(tok);
-		 if (!in.check_item_end(tok))
-			 return false;
-	 }
-	 in.read_string(tok);
-	 return in.check_list_end(tok);
- }
+#include "ReflectionRegisterDefines.h"
 
  void Blend2d_CFG::register_props()
  {
-	 static Node_Property props[] = {
-		 {"xparam", Property_Type::int_prop, offsetof(Blend2d_CFG,xparam.id)},
-		 {"yparam", Property_Type::int_prop, offsetof(Blend2d_CFG,yparam.id)},
-		 {"fade_in", Property_Type::float_prop, offsetof(Blend2d_CFG,fade_in)},
-		 {"weight_damp", Property_Type::float_prop, offsetof(Blend2d_CFG,weight_damp)},
-	 };
-	 properties = { props, sizeof(props) / sizeof(Node_Property) };
+	 START_PROPS
+		 REG_INT(Blend2d_CFG, xparam, PROP_SERIALIZE, ""),
+		 REG_INT(Blend2d_CFG, yparam, PROP_SERIALIZE, ""),
+		 REG_FLOAT(Blend2d_CFG, fade_in, PROP_DEFAULT, ""),
+		 REG_FLOAT(Blend2d_CFG, weight_damp, PROP_DEFAULT, "")
+	 END_PROPS
  }
 
  void Mirror_Node_CFG::register_props()
  {
-	 static Node_Property props[] = {
-		 {"damp_time", Property_Type::float_prop, offsetof(Mirror_Node_CFG,damp_time)},
-	 };
-	 properties = { props, sizeof(props) / sizeof(Node_Property) };
+	 START_PROPS
+		 REG_FLOAT(Mirror_Node_CFG, damp_time, PROP_DEFAULT, "")
+	 END_PROPS
  }
 
  void Blend_Node_CFG::register_props()
  {
-	 static Node_Property props[] = {
-		 {"damp_time", Property_Type::float_prop, offsetof(Blend_Node_CFG,damp_factor)},
-	 };
-	 properties = { props, sizeof(props) / sizeof(Node_Property) };
+	 START_PROPS
+		 REG_FLOAT(Blend_Node_CFG, damp_factor, PROP_DEFAULT, "")
+	END_PROPS
  }
 
  void Clip_Node_CFG::register_props()
  {
-	 static Node_Property props[] = {
-		 {"rootmotion_x", Property_Type::int_prop, offsetof(Clip_Node_CFG,rootmotion[0])},
-		 {"rootmotion_y", Property_Type::int_prop, offsetof(Clip_Node_CFG,rootmotion[1])},
-		 {"rootmotion_z", Property_Type::int_prop, offsetof(Clip_Node_CFG,rootmotion[2])},
-		 {"clipname", Property_Type::std_string_prop, offsetof(Clip_Node_CFG,clip_name)},
-		 {"loop", Property_Type::bool_prop, offsetof(Clip_Node_CFG,loop)},
-		 {"speed", Property_Type::float_prop, offsetof(Clip_Node_CFG,speed)},
-		 {"can_be_leader", Property_Type::bool_prop, offsetof(Clip_Node_CFG,can_be_leader)},
-	 };
-	 properties = { props, sizeof(props) / sizeof(Node_Property) };
+	 START_PROPS
+
+		 REG_ENUM(Clip_Node_CFG, rm[0], PROP_DEFAULT, "", rootmotion_setting_def.id),
+		 REG_ENUM(Clip_Node_CFG, rm[1], PROP_DEFAULT, "", rootmotion_setting_def.id),
+		 REG_ENUM(Clip_Node_CFG, rm[2], PROP_DEFAULT, "", rootmotion_setting_def.id),
+
+		 REG_BOOL(Clip_Node_CFG, loop, PROP_DEFAULT, ""),
+		 REG_FLOAT(Clip_Node_CFG, speed, PROP_DEFAULT, "0,-5,5"),
+		 REG_INT(Clip_Node_CFG, start_frame, PROP_DEFAULT, ""),
+		 REG_BOOL(Clip_Node_CFG, allow_sync, PROP_DEFAULT, ""),
+		 REG_BOOL(Clip_Node_CFG, can_be_leader, PROP_DEFAULT, ""),
+
+		 REG_STDSTRING(Clip_Node_CFG, clip_name, PROP_SERIALIZE)
+
+	END_PROPS
  }
 
  void Statemachine_Node_CFG::register_props()
  {
-	 static Node_Property props[] = {
-		 {"start_state", Property_Type::int_prop, offsetof(Statemachine_Node_CFG,start_state.id)},
-		 {"fade_in_time", Property_Type::float_prop, offsetof(Statemachine_Node_CFG,fade_in_time)},
-	 };
-	 properties = { props, sizeof(props) / sizeof(Node_Property) };
+	 START_PROPS
+		 REG_INT(Statemachine_Node_CFG, start_state, PROP_SERIALIZE, "")
+	END_PROPS
  }
 
  // base64 encoding
@@ -736,5 +672,54 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
 			 }
 		 }
+	 }
+ }
+
+ float PropertyInfo::get_float(void* ptr)
+ {
+	 ASSERT(type == core_type_id::Float);
+
+	 return *(float*)((char*)ptr + offset);
+ }
+
+ void PropertyInfo::set_float(void* ptr, float f)
+ {
+	 ASSERT(type == core_type_id::Float);
+
+	 *(float*)((char*)ptr + offset) = f;
+ }
+
+ int PropertyInfo::get_int(void* ptr)
+ {
+	 ASSERT(is_integral_type());
+	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
+		 return *(uint8_t*)((char*)ptr + offset);
+	 }
+	 else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
+		 return *(uint16_t*)((char*)ptr + offset);
+	 }
+	 else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
+		 return *(uint32_t*)((char*)ptr + offset);
+	 }
+	 else {
+		 ASSERT(0);
+		 return 0;
+	 }
+ }
+
+ void PropertyInfo::set_int(void* ptr, int i)
+ {
+	 ASSERT(is_integral_type());
+	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
+		 *(uint8_t*)((char*)ptr + offset) = i;
+	 }
+	 else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
+		 *(uint16_t*)((char*)ptr + offset) = i;
+	 }
+	 else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
+		 *(uint32_t*)((char*)ptr + offset) = i;
+	 }
+	 else {
+		 ASSERT(0);
 	 }
  }

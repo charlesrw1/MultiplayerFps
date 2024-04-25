@@ -6,6 +6,7 @@
 #include "Texture.h"
 #include "Game_Engine.h"
 
+
 std::string remove_whitespace(const char* str)
 {
 	std::string s = str;
@@ -38,38 +39,67 @@ AnimCompletionCallbackUserData bone_completion = { &ed, AnimCompletionCallbackUs
 AnimCompletionCallbackUserData prop_type_completion = { &ed, AnimCompletionCallbackUserData::PROP_TYPE };
 
 
+class FindAnimationClipPropertyEditor : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
 
-More_Node_Property make_string_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc = nullptr,
-	void* fcsc_user_data = nullptr, bool treat_completion_as_combo = false);
-More_Node_Property make_float_prop(const char* name);
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+		ASSERT(prop->type == core_type_id::StdString);
+
+		auto str = (std::string*)prop->get_ptr(instance);
+		auto options = anim_completion_callback_function(&clip_completion, "", 0);
+
+		if (initial) {
+			index = 0;
+			for (int i = 0; i < options->size(); i++) {
+				if (*str == options->at(i)) {
+					index = i;
+					break;
+				}
+			}
+			initial = false;
+		}
+
+		ImGui::Combo("##combo", &index, options->data(), options->size());
+
+		if(index < options->size())
+			*str = (*options)[index];
+	}
+
+	bool initial = true;
+	int index = 0;
+
+};
+
+
+class AnimationGraphEditorPropertyFactory : public IPropertyEditorFactory
+{
+public:
+
+	// Inherited via IPropertyEditorFactory
+	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) override
+	{
+		if (prop->name == "AG_CLIP_TYPE") {
+			return new FindAnimationClipPropertyEditor(instance, prop);
+		}
+
+		return nullptr;
+	}
+
+};
+static AnimationGraphEditorPropertyFactory g_AnimationGraphEditorPropertyFactory;
+
+
+
 void AnimationGraphEditor::init()
 {
-	Table_Row template_row;
-	template_row.push_prop(make_string_prop("##name", {}));
+
+
 	
-	More_Node_Property prop2;
-	prop2.name = "##type";
-	prop2.i_type = 2;
-	prop2.fcsc = anim_completion_callback_function;
-	prop2.fcsc_user_data = &prop_type_completion;
-	prop2.type = Property_Type::int_prop;
-	prop2.treat_completion_as_combo = true;
-	prop2.on_edit_callback = [&](More_Node_Property& prop) {
-		auto table = ed.ed_params.get();
-		auto& row = table->find_row(prop.loc1);
-
-		script_parameter_type spt = (script_parameter_type)prop.i_type;
-		auto next_type = (spt == script_parameter_type::animfloat) ? Property_Type::float_prop : Property_Type::int_prop;
-
-		if (row.props[2].type != next_type) {
-			row.props[2].type = next_type;
-			row.props[2].i_type = 0;
-			row.props[2].f_type = 0.0;
-		}
-	};
-	template_row.push_prop(prop2);
-	template_row.push_prop(make_float_prop("##value"));
-	ed_params = std::make_unique<Table>(Table("Parameters", { {"Name",true,80.f}, {"Type"}, {"RT Value"} }, template_row));
 }
 
 void AnimationGraphEditor::close()
@@ -235,7 +265,16 @@ void AnimationGraphEditor::draw_prop_editor()
 				ImNodes::GetSelectedNodes(&node);
 
 				Editor_Graph_Node* mynode = find_node_from_id(node);
-				mynode->draw_property_editor(this);
+
+				if (node != node_last_frame) {
+					node_props.clear_all();
+					mynode->add_node_props(&node_props);
+					node_last_frame = node;
+				}
+
+				//mynode->draw_property_editor(this);
+
+				node_props.update();
 			}
 			else if (ImNodes::NumSelectedLinks() == 1) {
 				int link = 0;
@@ -247,15 +286,18 @@ void AnimationGraphEditor::draw_prop_editor()
 
 				node_s->draw_link_property_editor(this, slot);
 			}
+			else {
+				node_last_frame = link_last_frame = -1;
+			}
 
 
 			ImGui::TreePop();
 		}
 
-		if (ImGui::TreeNodeEx("Control params", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ed_params->imgui_draw();
-			ImGui::TreePop();
-		}
+		//if (ImGui::TreeNodeEx("Control params", ImGuiTreeNodeFlags_DefaultOpen)) {
+		//	//ed_params->imgui_draw();
+		//	ImGui::TreePop();
+		//}
 
 	}
 	ImGui::End();
@@ -769,6 +811,10 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 
 }
 
+// nodes/particles/entities/everything has data that HAS to be serialized to disk and read back
+// some of this has custom editing functions
+
+
 template<typename T>
 static T* create_node_type(Animation_Tree_CFG& cfg)
 {
@@ -777,104 +823,24 @@ static T* create_node_type(Animation_Tree_CFG& cfg)
 	return (T*)c;
 }
 
-
-static More_Node_Property make_string_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc,
-void* fcsc_user_data, bool treat_completion_as_combo)
-{
-	More_Node_Property prop;
-	prop.name = name;
-	prop.fcsc = fcsc;
-	prop.fcsc_user_data = fcsc_user_data;
-	prop.treat_completion_as_combo = treat_completion_as_combo;
-	prop.type = Property_Type::std_string_prop;
-	prop.on_edit_callback = callback;
-
-	return prop;
-}
-
-static More_Node_Property make_enum_prop(const char* name, const std::function<void(More_Node_Property&)>& callback, find_completion_strs_callback fcsc = nullptr,
-	void* fcsc_user_data = nullptr, bool treat_completion_as_combo = false)
-{
-	More_Node_Property prop;
-	prop.name = name;
-	prop.fcsc = fcsc;
-	prop.on_edit_callback = callback;
-	prop.fcsc_user_data = fcsc_user_data;
-	prop.treat_completion_as_combo = treat_completion_as_combo;
-	prop.type = Property_Type::int_prop;
-
-	return prop;
-}
-
-static More_Node_Property make_int_prop(const char* name)
-{
-	More_Node_Property prop;
-	prop.name = name;
-	prop.type = Property_Type::int_prop;
-	return prop;
-}
-
-static More_Node_Property make_float_prop(const char* name)
-{
-	More_Node_Property prop;
-	prop.name = name;
-	prop.type = Property_Type::float_prop;
-	return prop;
-}
-
-static void make_param_prop(Editor_Graph_Node* node, const char* name = "param")
-{
-	std::function<void(More_Node_Property&)> param_callback = [node](More_Node_Property& prop) {
-		Node_CFG* clip = (Node_CFG*)node->node;
-
-		handle<Parameter> p{ prop.i_type };
-
-		if (p.id >= ed.editing_tree->parameters.types.size())
-			p.id = -1;
-
-		//ASSERT(p.id < ed.editing_tree->parameters.types.size());
-		//ASSERT(p.id >= 0);
-
-		clip->param = p;
-	};
-	More_Node_Property props[] = {
-		make_enum_prop(name, param_callback, anim_completion_callback_function, &param_completion, true),
-	};
-	node->properties.push_back(props[0]);
-}
-
 Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_type type, uint32_t layer)
 {
 	auto node = add_node();
 	node->graph_layer = layer;
-	More_Node_Property name_prop = make_string_prop("name", {});
-	node->properties.push_back(name_prop);
 
 	node->get_title() = get_animnode_name(type);
 	node->node_color = get_animnode_color(type);
 
 	node->type = type;
 
-	if (get_animnode_typedef(type).create)
+	if (get_animnode_typedef(type).create) {
 		node->node = get_animnode_typedef(type).create(editing_tree);
+	}
 
 	switch (type)
 	{
 	case animnode_type::source:
 
-		{
-			std::function<void(More_Node_Property&)> clipname_callback = [node](More_Node_Property& prop) {
-				Clip_Node_CFG* clip = (Clip_Node_CFG*)node->node;
-				clip->clip_name = remove_whitespace(prop.str_type.c_str());
-
-				if (!prop.str_type.empty()) node->set_node_title(prop.str_type);
-				else node->set_node_title("Source");
-			};
-			More_Node_Property props[] = {
-				make_enum_prop("clipname", clipname_callback, anim_completion_callback_function, &clip_completion, true),
-			};
-			node->properties.push_back(props[0]);
-		}
 		break;
 	case animnode_type::statemachine:
 		node->sublayer = create_new_layer(true);
@@ -885,7 +851,7 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 	case animnode_type::mask:
 		break;
 	case animnode_type::blend:
-		make_param_prop(node);
+
 		break;
 	case animnode_type::blend2d:
 
@@ -900,7 +866,7 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 		node->input_pin_names[8] = "se";
 		break;
 	case animnode_type::add:
-		make_param_prop(node);
+
 		node->input_pin_names[Add_Node_CFG::DIFF] = "diff";
 		node->input_pin_names[Add_Node_CFG::BASE] = "base";
 
@@ -912,7 +878,7 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 	case animnode_type::aimoffset:
 		break;
 	case animnode_type::mirror:
-		make_param_prop(node);
+
 
 		break;
 	case animnode_type::play_speed:
@@ -935,8 +901,10 @@ Editor_Graph_Node* AnimationGraphEditor::create_graph_node_from_type(animnode_ty
 		node->state->sm_node_parent->states.resize(size + 1);
 
 		for (int i = 0; i < node->state->transitions.size(); i++) {
+#if 0
 			node->state->transitions[i].code_prop = make_string_prop("condition", {}, anim_completion_callback_function, &param_completion, false);
 			node->state->transitions[i].time_prop = make_float_prop("transition time");
+#endif
 		}
 
 		node->state->get_state()->tree = nullptr;
@@ -971,6 +939,19 @@ void AnimationGraphEditor::compile_graph_for_playing()
 	for (int i = 0; i < nodes.size(); i++) {
 		nodes[i]->on_state_change(this);
 	}
+}
+
+#include "ReflectionRegisterDefines.h"
+
+PropertyInfoList Editor_Graph_Node::properties;
+
+void Editor_Graph_Node::register_props()
+{
+	START_PROPS
+		REG_STDSTRING(Editor_Graph_Node, title, PROP_DEFAULT),
+		REG_INT(Editor_Graph_Node, id, PROP_SERIALIZE, ""),
+		REG_ENUM(Editor_Graph_Node, type, PROP_SERIALIZE, "", animnode_type_def.id)
+	END_PROPS;
 }
 
 void Editor_Graph_Node::remove_reference(AnimationGraphEditor* ed, Editor_Graph_Node* node)
@@ -1040,92 +1021,6 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 }
 
 
-bool draw_properties_node(Node_Property_List& list, void* ptr)
-{
-	bool ret = false;
-
-	for (int i = 0; i < list.count; i++)
-	{
-		auto& prop = list.list[i];
-		switch (prop.type)
-		{
-		case Property_Type::bool_prop:
-			ret |= ImGui::Checkbox(prop.name, (bool*)((char*)ptr + prop.offset));
-			break;
-		case Property_Type::float_prop:
-			ret |= ImGui::DragFloat(prop.name, (float*)((char*)ptr + prop.offset), 0.05);
-			break;
-		case Property_Type::int_prop:
-			ret |= ImGui::DragInt(prop.name, (int*)((char*)ptr + prop.offset),0.5);
-			break;
-		case Property_Type::vec2_prop: {
-			glm::vec2* v = (glm::vec2*)((char*)ptr + prop.offset);
-			ret |= ImGui::DragFloat2(prop.name, &v->x, 0.05);
-		} break;
-
-		default:
-			break;
-		}
-	}
-
-	return ret;
-}
-
-bool draw_node_property(More_Node_Property& prop)
-{
-	bool changes = false;
-	switch (prop.type)
-	{
-	case Property_Type::std_string_prop:
-	{
-		ImguiInputTextCallbackUserStruct abcdef;
-		abcdef.fcsc = prop.fcsc;
-		abcdef.fcsc_user_data = prop.fcsc_user_data;
-		abcdef.string = &prop.str_type;
-		
-		uint32_t flags = ImGuiInputTextFlags_CallbackResize;
-		if (abcdef.fcsc)
-			flags |= ImGuiInputTextFlags_CallbackCompletion;
-
-		changes |= ImGui::InputText(prop.name, (char*)prop.str_type.data(), prop.str_type.size() + 1, flags, imgui_input_text_callback_function, &abcdef);
-
-	}break;
-	case Property_Type::float_prop:
-
-		changes |= ImGui::DragFloat("##obj", &prop.f_type, 0.05);
-		break;
-
-	case Property_Type::int_prop:
-	{
-		if (prop.treat_completion_as_combo) {
-			ASSERT(prop.fcsc);
-		
-			auto candidates = prop.fcsc(prop.fcsc_user_data, "", 0);
-
-			changes |= ImGui::Combo(prop.name, &prop.i_type, candidates->data(), candidates->size());
-			if (!candidates->empty())
-				prop.str_type = candidates->at(prop.i_type);
-			else {
-				prop.str_type = "";
-			}
-		}
-
-	}break;
-	default:
-
-		break;
-	}
-
-	if (changes && prop.on_edit_callback)
-		prop.on_edit_callback(prop);
-
-
-	int abc = ImGui::IsItemDeactivatedAfterEdit();
-	if(abc)
-		printf("ImGui::IsItemDeactivatedAfterEdit()\n");
-	return changes;
-}
-
 
 void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 {
@@ -1134,12 +1029,9 @@ void Editor_Graph_Node::draw_property_editor(AnimationGraphEditor* ed)
 
 	ImGui::Text("NODE \"%s\" ( %s )", get_title().c_str(), get_animnode_name(type));
 
-	if (node) {
-		update_me |= draw_properties_node(*node->get_property_list(), node);
-	}
 
-	for (auto& prop : properties)
-		update_me |= draw_node_property(prop);
+	//for (auto& prop : properties)
+	//	update_me |= draw_node_property(prop);
 
 	switch (type)
 	{
@@ -1177,8 +1069,6 @@ void Editor_Graph_Node::draw_link_property_editor(AnimationGraphEditor* ed, uint
 
 	ImGui::Text("TRANSITION ( %s ) -> ( %s )", get_title().c_str(), inputs[slot_thats_selected]->get_title().c_str());
 	ImGui::Separator();
-	draw_node_property(transition.code_prop);
-	draw_node_property(transition.time_prop);
 }
 
 void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
@@ -1267,6 +1157,8 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 
 		s->transitions.clear();
 		for (int i = 0; i < num_inputs; i++) {
+
+#if 0 
 			if (inputs[i] && !state->transitions[i].get_code().empty()) {
 				ASSERT(inputs[i]->is_state_node());
 				State_Transition st;
@@ -1289,6 +1181,7 @@ void Editor_Graph_Node::on_state_change(AnimationGraphEditor* ed)
 				}
 				s->transitions.push_back(st);
 			}
+#endif
 		}
 	}
 		break;
@@ -1386,6 +1279,33 @@ bool Editor_Graph_Node::is_node_valid()
 	}
 }
 
+void Editor_Graph_Node::add_node_props(PropertyGrid* grid)
+{
+	if (node)
+		grid->add_property_list_to_grid(node->get_property_list(), node);
+
+	if (type == animnode_type::source) {
+
+		static bool initial = true;
+		static PropertyInfo source_prop;
+		static PropertyInfoList list;
+		if (initial) {
+			auto prop_list = node->get_property_list();
+			auto clip_prop = prop_list->find("clip_name");
+			ASSERT(clip_prop);
+			source_prop.flags = PROP_EDITABLE;	// dont serialize
+			source_prop.name = "AG_CLIP_TYPE";	// special clip name
+			source_prop.type = core_type_id::StdString;
+			source_prop.offset = clip_prop->offset;
+			list = { &source_prop, 1 };
+			initial = false;
+		}
+
+		grid->add_property_list_to_grid(&list, node);
+
+	}
+}
+
 void AnimationGraphEditor::tick(float dt)
 {
 	{
@@ -1454,10 +1374,10 @@ void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)
 		if (param.at(i).fake_entry) continue;
 
 		cfg->name_to_index[param.at(i).s] = cfg->types.size();
-		cfg->types.push_back(param.at(i).type);
+		//cfg->types.push_back(param.at(i).type);
 	}
 }
-
+#if 0
 void Table::imgui_draw()
 {
 
@@ -1519,7 +1439,7 @@ void Table::imgui_draw()
 			for (auto& col : row.props) {
 				ImGui::PushID(row.row_id*num_cols + col_idx);
 				ImGui::TableSetColumnIndex(col_idx);
-				draw_node_property(col);
+				//draw_node_property(col);
 				col_idx++;
 				ImGui::PopID();
 			}
@@ -1531,3 +1451,4 @@ void Table::imgui_draw()
 
 	}
 }
+#endif

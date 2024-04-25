@@ -3,8 +3,9 @@
 #include "imgui.h"
 #include <string>
 #include <vector>
-
+#include <memory>
 #include "Util.h"
+#include "ReflectionProp.h"
 
 typedef std::vector<const char*>* (*find_completion_strs_callback)(void* user, const char* str, int len);
 
@@ -16,80 +17,129 @@ struct ImguiInputTextCallbackUserStruct
 	void* fcsc_user_data = nullptr;
 };
 
-static int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, ImguiInputTextCallbackUserStruct* user)
+int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data);
+
+
+class IPropertyEditor
 {
-	const char* word_end = data->Buf + data->CursorPos;
-	const char* word_start = word_end;
-	while (word_start > data->Buf)
-	{
-		const char c = word_start[-1];
-		if (c == ' ' || c == '\t' || c == ',' || c == ';')
-			break;
-		word_start--;
-	}
+public:
+	IPropertyEditor(void* instance, PropertyInfo* prop) : instance(instance), prop(prop) {}
 
-	auto candidates = *user->fcsc(user->fcsc_user_data, word_start, (int)(word_end - word_start));
+	void update();
+	virtual void internal_update() = 0;
+	virtual int extra_row_count() { return 0; }
 
-	if (candidates.empty())
-	{
-		// No match
-		sys_print("No match for \"%.*s\"!\n", (int)(word_end - word_start), word_start);
-	}
-	else if (candidates.size()==1)
-	{
-		// Single match. Delete the beginning of the word and replace it entirely so we've got nice casing.
-		data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
-		data->InsertChars(data->CursorPos, candidates[0]);
-		data->InsertChars(data->CursorPos, " ");
-	}
-	else
-	{
-		// Multiple matches. Complete as much as we can..
-		// So inputing "C"+Tab will complete to "CL" then display "CLEAR" and "CLASSIFY" as matches.
-		int match_len = (int)(word_end - word_start);
-		for (;;)
-		{
-			int c = 0;
-			bool all_candidates_matches = true;
-			for (int i = 0; i < candidates.size() && all_candidates_matches; i++)
-				if (i == 0)
-					c = toupper(candidates[i][match_len]);
-				else if (c == 0 || c != toupper(candidates[i][match_len]))
-					all_candidates_matches = false;
-			if (!all_candidates_matches)
-				break;
-			match_len++;
-		}
+	bool editable = true;
+	void* instance = nullptr;
+	PropertyInfo* prop = nullptr;
+};
 
-		if (match_len > 0)
-		{
-			data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
-			data->InsertChars(data->CursorPos, candidates[0], candidates[0] + match_len);
-		}
-
-		// List matches
-		sys_print("Possible matches:\n");
-		for (int i = 0; i < candidates.size(); i++)
-			sys_print("- %s\n", candidates[i]);
-	}
-	return 0;
-}
-
-
-static int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
+class IPropertyEditorFactory
 {
-	ImguiInputTextCallbackUserStruct* user = (ImguiInputTextCallbackUserStruct*)data->UserData;
-	assert(user);
+public:
+	IPropertyEditorFactory();
 
-	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-		assert(user->string);
-		user->string->resize(data->BufSize);
-		data->Buf = (char*)user->string->data();
+	static IPropertyEditor* create(PropertyInfo* prop, void* instance);
+
+	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) = 0;
+private:
+	IPropertyEditorFactory* next = nullptr;
+	static IPropertyEditorFactory* first;
+};
+
+
+class IGridRow
+{
+public:
+	IGridRow(IGridRow* parent) : parent(parent) {}
+
+	virtual void update();
+	virtual void internal_update() = 0;
+	virtual void draw_header() = 0;
+
+	IGridRow* parent = nullptr;
+	std::vector<std::unique_ptr<IGridRow>> child_rows;
+};
+
+class ArrayRow : public IGridRow
+{
+public:
+	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop);
+
+	virtual void internal_update() override;
+	virtual void draw_header() override;
+
+	void* instance = nullptr;
+	PropertyInfo* prop = nullptr;
+};
+class PropertyRow : public IGridRow
+{
+public:
+	PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop);
+
+	virtual void internal_update() override;
+	virtual void draw_header() override;
+
+	void* instance = nullptr;
+	PropertyInfo* prop = nullptr;
+	std::unique_ptr<IPropertyEditor> prop_editor = nullptr;
+};
+
+class PropertyGrid
+{
+public:
+	void clear_all() {
+		rows.clear();
 	}
-	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
-		imgui_input_text_callback_completion(data, user);
-	}
 
+	void add_property_list_to_grid(PropertyInfoList* list, void* inst);
 
-	return 0;
-}
+	void update();
+	bool read_only = false;
+	std::vector<std::unique_ptr<IGridRow>> rows;
+};
+
+class StringEditor : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override;
+};
+
+class FloatEditor : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override;
+};
+
+class IntegerEditor : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override;
+};
+
+class EnumEditor : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override;
+};
+
+class BooleanEditor : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override;
+};

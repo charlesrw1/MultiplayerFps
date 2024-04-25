@@ -58,13 +58,13 @@ void CharacterGraphDriver::on_update(float dt) {
 
 	auto& params = owner->runtime_dat.parameters;
 
-	params.get(bMoving).ival = ismoving;
-	params.get(bCrouch).ival = int(player.state & PMS_CROUCHING);
-	params.get(bJumping).ival = int(player.state & PMS_JUMPING);
-	params.get(bFalling).ival = !bool(player.state & PMS_GROUND);
-	params.get(flSpeed).fval = glm::length(relmovedir);
-	params.get(flMovex).fval = relmovedir.x;
-	params.get(flMovey).fval = relmovedir.y;
+	params.set_bool(bMoving, ismoving);
+	params.set_bool(bCrouch, (player.state & PMS_CROUCHING));
+	params.set_bool(bJumping, player.state & PMS_JUMPING);
+	params.set_bool(bFalling, !bool(player.state & PMS_GROUND));
+	params.set_float(flSpeed,glm::length(relmovedir));
+	params.set_float(flMovex ,relmovedir.x);
+	params.set_float(flMovey, relmovedir.y);
 
 }
 

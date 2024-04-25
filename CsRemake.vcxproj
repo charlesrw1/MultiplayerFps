@@ -27,6 +27,7 @@
     <ClCompile Include="Source\Animation_Man.cpp" />
     <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
+    <ClCompile Include="Source\EnumDefReflection.cpp" />
     <ClCompile Include="Source\External\imnodes.cpp" />
     <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Files.cpp" />
@@ -47,9 +48,12 @@
     <ClCompile Include="Source\LispInterpreter.cpp" />
     <ClCompile Include="Source\Meshlet.cpp" />
     <ClCompile Include="Source\Net.cpp" />
+    <ClCompile Include="Source\Parameter.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
     <ClCompile Include="Source\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Profilier.cpp" />
+    <ClCompile Include="Source\PropertyEd.cpp" />
+    <ClCompile Include="Source\ReflectionProp.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\Level.cpp" />
@@ -75,6 +79,7 @@
     <ClInclude Include="Source\AnimationTreePublic.h" />
     <ClInclude Include="Source\AnimationTypes.h" />
     <ClInclude Include="Source\AnimationUtil.h" />
+    <ClInclude Include="Source\EnumDefReflection.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\BVH.h" />
     <ClInclude Include="source\Client.h" />
@@ -97,6 +102,7 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\FreeList.h" />
     <ClInclude Include="Source\Game_Engine.h" />
+    <ClInclude Include="Source\GlobalEnumMgr.h" />
     <ClInclude Include="Source\IGraphDriver.h" />
     <ClInclude Include="Source\Handle.h" />
     <ClInclude Include="Source\InlineVec.h" />
@@ -114,6 +120,8 @@
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\PlayerAnimDriver.h" />
     <ClInclude Include="Source\PropertyEd.h" />
+    <ClInclude Include="Source\ReflectionProp.h" />
+    <ClInclude Include="Source\ReflectionRegisterDefines.h" />
     <ClInclude Include="Source\Renderer_Types.h" />
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\ScriptVars.h" />

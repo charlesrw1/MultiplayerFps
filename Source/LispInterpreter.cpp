@@ -231,25 +231,27 @@ enum opcode : uint16_t
 	CAST_1_I,
 };
 
-
+static bool is_integral_type(script_parameter_type type_) {
+	return type_ != script_parameter_type::float_t;
+}
 
 script_parameter_type BytecodeExpression::compile(LispExp& exp, ScriptVars_CFG& external_vars) {
 		if (exp.type != LispExp::list_type) {
 			if (exp.type == LispExp::symbol_type) {
 				const auto& find = external_vars.find(exp.as_sym());
 				if (find.is_valid()) {
-					if (external_vars.get_type(find) == script_parameter_type::animint) {
+					auto type = external_vars.get_type(find);
+
+					if (is_integral_type(type)) {
 						push_inst(PUSH_I);
 						push_4bytes(find.id);
-						return script_parameter_type::animint;
+						return type;
 					}
-					else if (external_vars.get_type(find) == script_parameter_type::animfloat) {
+					else {
 						push_inst(PUSH_F);
 						push_4bytes(find.id);
-						return script_parameter_type::animfloat;
 					}
-					else
-						throw LispError("can only compile int/floats", &exp);
+					return type;
 				}
 				else
 					throw LispError("undefined symbol", &exp);
@@ -257,14 +259,14 @@ script_parameter_type BytecodeExpression::compile(LispExp& exp, ScriptVars_CFG& 
 			else if (exp.type == LispExp::int_type) {
 				push_inst(PUSH_CONST_I);
 				push_4bytes(exp.u.i);
-				return script_parameter_type::animint;
+				return script_parameter_type::int_t;
 
 			}
 			else if (exp.type == LispExp::float_type) {
 				push_inst(PUSH_CONST_F);
 				float f = exp.u.f;
 				push_4bytes(*(unsigned int*)&f);
-				return script_parameter_type::animfloat;
+				return script_parameter_type::float_t;
 			}
 			else {
 				throw LispError("unknown type for compiling", &exp);
@@ -274,32 +276,32 @@ script_parameter_type BytecodeExpression::compile(LispExp& exp, ScriptVars_CFG& 
 			string op = exp.as_list().at(0).as_sym();
 			if (op == "not") {
 				auto type1 = compile( exp.as_list().at(1) , external_vars);
-				if (type1 == script_parameter_type::animfloat) {
+				if (!is_integral_type(type1)) {
 					push_inst(CAST_0_I);
 				}
 				push_inst(NOT);
-				return script_parameter_type::animint;
+				return script_parameter_type::int_t;
 			}
 			else if (op == "and" || op == "or") {
 				auto type1 = compile(exp.as_list().at(1), external_vars);
 				auto type2 = compile(exp.as_list().at(2), external_vars);
-				if (type1 != script_parameter_type::animint)
+				if (!is_integral_type(type1))
 					push_inst(CAST_1_I);
-				if (type2 != script_parameter_type::animint)
+				if (!is_integral_type(type2))
 					push_inst(CAST_0_I);
 				if (op == "and")
 					push_inst(AND);
 				else
 					push_inst(OR);
-				return script_parameter_type::animint;
+				return script_parameter_type::int_t;
 			}
 			else {
 				auto type1 = compile(exp.as_list().at(1), external_vars);
 				auto type2 = compile(exp.as_list().at(2), external_vars);
-				bool isfloat = (type1 == script_parameter_type::animfloat || type2 == script_parameter_type::animfloat);
-				if (isfloat && type1 != script_parameter_type::animfloat)
+				bool isfloat = (!is_integral_type(type1) || !is_integral_type(type2));
+				if (isfloat && is_integral_type(type1))
 					push_inst(CAST_1_F);
-				if (isfloat && type2 != script_parameter_type::animfloat)
+				if (isfloat && is_integral_type(type2))
 					push_inst(CAST_0_F);
 				struct pairs {
 					const char* name;
@@ -327,7 +329,7 @@ script_parameter_type BytecodeExpression::compile(LispExp& exp, ScriptVars_CFG& 
 				}
 				if (i == 10) throw LispError("couldn't find op", nullptr);
 
-				return (isfloat) ? script_parameter_type::animfloat : script_parameter_type::animint;
+				return (isfloat) ? script_parameter_type::float_t : script_parameter_type::int_t;
 			}
 		}
 	}
