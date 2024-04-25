@@ -2,14 +2,14 @@
 #include "imgui.h"
 #include "GlobalEnumMgr.h"
 
-static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst)
+static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx)
 {
 	if (prop->type == core_type_id::List) {
-		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop);
+		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop, row_idx);
 		return array_;
 	}
 	else {
-		PropertyRow* prop_ = new PropertyRow(nullptr, inst, prop);
+		PropertyRow* prop_ = new PropertyRow(nullptr, inst, prop, row_idx);
 
 		if (prop_->prop_editor)
 			return prop_;
@@ -20,18 +20,7 @@ static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst)
 
 void PropertyGrid::add_property_list_to_grid(PropertyInfoList* list, void* inst)
 {
-
-	for (int i = 0; i < list->count; i++) {
-		auto& prop = list->list[i];
-		if (!prop.can_edit())
-			continue;
-
-		auto row = create_row(nullptr, &prop, inst);
-		if (row)
-			rows.push_back(std::unique_ptr<IGridRow>(row));
-	}
-
-
+	rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(nullptr, inst, list, -1)));
 }
 
 void PropertyGrid::update()
@@ -43,7 +32,7 @@ void PropertyGrid::update()
 
 	ImGui::BeginDisabled(read_only);
 
-	ImGuiTableFlags const flags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_NoBordersInBodyUntilResize | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
+	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
 		if(ImGui::BeginTable("Table", 2, flags) ){
 
@@ -51,7 +40,7 @@ void PropertyGrid::update()
 			ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
 
 			for (int i = 0; i < rows.size(); i++) {
-				rows[i]->update();
+				rows[i]->update(0.0);
 			}
 
 			ImGui::EndTable();
@@ -66,7 +55,7 @@ void IGridRow::clear_children()
 {
 	child_rows.clear();	// unique_ptr handles destruction
 }
-void IGridRow::update()
+void IGridRow::update(float header_ofs)
 {
 	ImGui::PushID(this);
 
@@ -75,10 +64,10 @@ void IGridRow::update()
 	ImGui::AlignTextToFramePadding();
 
 
-	draw_header();
+	draw_header(header_ofs);
 
 	ImGui::TableNextColumn();
-	ImGuiTableFlags const flags = ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_SizingFixedFit;
+	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit;
 	if (ImGui::BeginTable("GridTable", 2, flags))
 	{
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
@@ -104,7 +93,7 @@ void IGridRow::update()
 
 			auto reset_img = mats.find_texture("icon/undo.png");
 
-			ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(16, 16));
+			ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14));
 		}
 
 		ImGui::EndTable();
@@ -112,8 +101,10 @@ void IGridRow::update()
 
 	ImGui::PopID();
 
-	for (int i = 0; i < child_rows.size(); i++)
-		child_rows[i]->update();
+	if (draw_children()) {
+		for (int i = 0; i < child_rows.size(); i++)
+			child_rows[i]->update(header_ofs + 18.f);
+	}
 }
 
 void IPropertyEditor::update()
@@ -300,12 +291,17 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop) : IGridRow(parent), instance(instance), prop(prop)
+ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
 	rebuild_child_rows();
 }
 
-PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop) : IGridRow(parent), instance(instance), prop(prop)
+int ArrayRow::get_size()
+{
+	return prop->list_ptr->get_size(instance);
+}
+
+PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
 	prop_editor = std::unique_ptr<IPropertyEditor>(IPropertyEditorFactory::create(prop, instance));
 }
@@ -329,10 +325,54 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop) :
 		 clear_children();
 		 prop->list_ptr->resize(instance, 0);
 	 }
+
+
+	 for (int i = 0; i < commands.size(); i++) {
+		 switch (commands[i].command) {
+		 case Delete: {
+			 int index_to_delete = commands[i].index;
+			 int size = get_size();
+			 for (int i = index_to_delete; i < size - 1; i++) {
+
+				 prop->list_ptr->swap_elements(instance, i, i + 1);
+
+			 }
+			 prop->list_ptr->resize(instance, size - 1); 
+
+		 }break;
+
+		 case Movedown: {
+			 int size = get_size();
+
+			 int index = commands[i].index;
+			 if (index < size - 1) {
+				 prop->list_ptr->swap_elements(instance, index, index + 1);
+			 }
+
+		 }break;
+
+		 case Moveup: {
+			 int index = commands[i].index;
+			 if (index > 0) {
+				 prop->list_ptr->swap_elements(instance, index - 1, index);
+			 }
+
+		 }break;
+
+		 }
+	 }
+
+	 if (!commands.empty()) {
+		 rebuild_child_rows();
+		 commands.clear();
+	 }
 }
 
- void ArrayRow::draw_header()
+ void ArrayRow::draw_header(float header_ofs)
  {
+	 ImGui::Dummy(ImVec2(header_ofs, 0));
+	 ImGui::SameLine();
+
 	 ImGui::PushStyleColor(ImGuiCol_Header, 0);
 	 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
 	 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
@@ -352,22 +392,101 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop) :
 	 PropertyInfoList* struct_ = list->props_in_list;
 	 for (int i = 0; i < count; i++) {
 
-		 ASSERT(struct_->count >= 1);
-		 // FIXME:
-		 IGridRow* child = create_row(this, &struct_->list[0], list->get_index(instance, i));
-
-		 ASSERT(child);
-
-		 child_rows.push_back(std::unique_ptr<IGridRow>(child));
+		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(instance, i), struct_, i)));
 	 }
  }
 
- void PropertyRow::draw_header()
+ void PropertyRow::draw_header(float ofs)
  {
+	 ImGui::Dummy(ImVec2(ofs, 0));
+	 ImGui::SameLine();
+
 	 ImGui::Text(prop->name);
  }
 
  void PropertyRow::internal_update()
  {
 	 prop_editor->update();
+ }
+
+
+ GroupRow::GroupRow(IGridRow* parent, void* instance, PropertyInfoList* list, int row_idx) : IGridRow(parent, row_idx), proplist(list), inst(instance)
+ {
+	 for (int i = 0; i < list->count; i++) {
+		 auto& prop = list->list[i];
+		 if (!prop.can_edit())
+			 continue;
+
+		 auto row = create_row(this, &prop, inst, -1);
+		 if (row)
+			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
+	 }
+
+	 name = "Unknown";
+
+	 if (row_idx != -1) {
+		 name = string_format("[ %d ]", row_idx);
+	 }
+ }
+
+ bool GroupRow::draw_children()
+ {
+	 return !passthrough_to_child();
+ }
+
+ void GroupRow::draw_header(float ofs)
+ {
+	 ImGui::Dummy(ImVec2(ofs, 0));
+
+		ImGui::SameLine();
+	 if (passthrough_to_child())
+		 ImGui::Text(name.c_str());
+	 else {
+		 ImGui::PushStyleColor(ImGuiCol_Header, 0);
+		 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+		 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+		 if (ImGui::TreeNode(name.c_str()))
+			 ImGui::TreePop();
+		 ImGui::PopStyleColor(3);
+	 }
+	 if (row_index == -1)
+		 return;
+
+	 ArrayRow* array_ = (ArrayRow*)parent;
+
+	 bool canmoveup = row_index > 0;
+	 bool canmovedown = (row_index != array_->get_size() - 1);
+
+	 auto moveup = mats.find_texture("icon/moveup.png");
+	 auto movedown = mats.find_texture("icon/movedown.png");
+	 auto trash1 = mats.find_texture("icon/trash1.png");
+
+	 ImGui::SameLine();
+	 ImGui::BeginDisabled(!canmoveup);
+	 if (ImGui::ImageButton((ImTextureID)moveup->gl_id, ImVec2(16, 16))) {
+		 array_->moveup_index(row_index);
+	 }
+	 ImGui::EndDisabled();
+	 ImGui::SameLine();
+	 ImGui::BeginDisabled(!canmovedown);
+	 if (ImGui::ImageButton((ImTextureID)movedown->gl_id, ImVec2(16, 16))) {
+		 array_->movedown_index(row_index);
+	 }
+	 ImGui::EndDisabled();
+	 ImGui::SameLine();
+	 if (ImGui::ImageButton((ImTextureID)trash1->gl_id, ImVec2(16, 16))) {
+		 array_->delete_index(row_index);
+	 }
+ }
+
+ void GroupRow::internal_update() {
+
+	 if (passthrough_to_child())
+	 {
+		 auto row = (IGridRow*)child_rows[0].get();
+
+		 row->internal_update();
+
+	 }
+
  }

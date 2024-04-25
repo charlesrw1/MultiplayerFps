@@ -72,9 +72,10 @@ PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
-PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags)
+PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype)
 {
 	PropertyInfo prop(name, offset, flags);
+	prop.custom_type_str = customtype;
 	prop.type = core_type_id::StdString;
 	return prop;
 }

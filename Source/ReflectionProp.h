@@ -82,7 +82,7 @@ PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags
 PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint = "");
 PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
 PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id);
-PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags);
+PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr);
 
 
@@ -90,6 +90,7 @@ struct PropertyInfoList
 {
 	PropertyInfo* list = nullptr;
 	int count = 0;
+	const char* type_name = "Unknown";
 
 	PropertyInfo* find(const char* name) const;
 };

@@ -51,27 +51,73 @@ private:
 class IGridRow
 {
 public:
-	IGridRow(IGridRow* parent) : parent(parent) {}
+	IGridRow(IGridRow* parent, int row_index = -1) : parent(parent), row_index(row_index) {}
 	virtual ~IGridRow() {}
-	virtual void update();
+	virtual void update(float header_ofs);
 	virtual void internal_update() = 0;
-	virtual void draw_header() = 0;
+	virtual void draw_header(float header_ofs) = 0;
+	virtual bool draw_children() {
+		return true;
+	}
 
 	void clear_children();
 
+	int row_index = -1;	// if > 0, then row is part of an array
 	IGridRow* parent = nullptr;
 	std::vector<std::unique_ptr<IGridRow>> child_rows;
+};
+
+class GroupRow : public IGridRow
+{
+public:
+	GroupRow(IGridRow* parent, void* instance, PropertyInfoList* info, int row_idx);
+
+	virtual void internal_update() override;
+	virtual void draw_header(float header_ofs) override;
+	virtual bool draw_children() override;
+	bool passthrough_to_child() {
+		return row_index != -1 && child_rows.size() == 1;
+	}
+
+	void* inst = nullptr;
+	PropertyInfoList* proplist = nullptr;
+	std::string name;
 };
 
 class ArrayRow : public IGridRow
 {
 public:
-	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop);
+	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
 
 	virtual void internal_update() override;
-	virtual void draw_header() override;
+	virtual void draw_header(float header_ofs) override;
 
 	void rebuild_child_rows();
+
+	int get_size();
+
+	void delete_index(int index) {
+		commands.push_back({ Delete, index });
+	}
+	void moveup_index(int index) {
+		commands.push_back({ Moveup, index });
+	}
+	void movedown_index(int index) {
+		commands.push_back({ Movedown, index });
+	}
+private:
+
+	enum CommandEnum {
+		Moveup,
+		Movedown,
+		Delete,
+	};
+	struct CommandData {
+		CommandEnum command;
+		int index = 0;
+	};
+
+	std::vector<CommandData> commands;
 
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
@@ -79,10 +125,10 @@ public:
 class PropertyRow : public IGridRow
 {
 public:
-	PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop);
+	PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
 
 	virtual void internal_update() override;
-	virtual void draw_header() override;
+	virtual void draw_header(float header_ofs) override;
 
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;

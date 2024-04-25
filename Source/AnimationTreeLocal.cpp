@@ -58,7 +58,7 @@ PropertyInfoList* State::get_props()
 		REG_STDVECTOR( State, transitions, PROP_DEFAULT ),
 	};
 
-	static PropertyInfoList list = MAKEPROPLIST(props);
+	static PropertyInfoList list = MAKEPROPLIST(State, props);
 	return &list;
 }
 
@@ -537,7 +537,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 REG_BOOL(Clip_Node_CFG, allow_sync, PROP_DEFAULT, ""),
 		 REG_BOOL(Clip_Node_CFG, can_be_leader, PROP_DEFAULT, ""),
 
-		 REG_STDSTRING(Clip_Node_CFG, clip_name, PROP_SERIALIZE)
+		 REG_STDSTRING_CUSTOM_TYPE(Clip_Node_CFG, clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
 
 	END_PROPS
  }

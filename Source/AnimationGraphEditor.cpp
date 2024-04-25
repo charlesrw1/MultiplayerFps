@@ -83,7 +83,7 @@ public:
 	// Inherited via IPropertyEditorFactory
 	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) override
 	{
-		if (prop->name == "AG_CLIP_TYPE") {
+		if (strcmp(prop->custom_type_str, "AG_CLIP_TYPE") == 0) {
 			return new FindAnimationClipPropertyEditor(instance, prop);
 		}
 
@@ -1351,28 +1351,8 @@ void Editor_Graph_Node::add_node_props(PropertyGrid* grid)
 	if (node)
 		grid->add_property_list_to_grid(node->get_property_list(), node);
 
-	if (type == animnode_type::source) {
-
-		static bool initial = true;
-		static PropertyInfo source_prop;
-		static PropertyInfoList list;
-		if (initial) {
-			auto prop_list = node->get_property_list();
-			auto clip_prop = prop_list->find("clip_name");
-			ASSERT(clip_prop);
-			source_prop.flags = PROP_EDITABLE;	// dont serialize
-			source_prop.name = "AG_CLIP_TYPE";	// special clip name
-			source_prop.type = core_type_id::StdString;
-			source_prop.offset = clip_prop->offset;
-			list = { &source_prop, 1 };
-			initial = false;
-		}
-
-		grid->add_property_list_to_grid(&list, node);
-
-	}
 	else if (type == animnode_type::state) {
-		grid->add_property_list_to_grid(State::get_props(), state->get_state());	// FIXME: SO DANGEROUS!
+		grid->add_property_list_to_grid(State::get_props(), state->get_state());	// FIXME: SO DANGEROUS! PTR
 	}
 }
 

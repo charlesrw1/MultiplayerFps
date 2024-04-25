@@ -6,8 +6,13 @@
 #define REG_BOOL(type, name, flags, hint) make_bool_property(#name,offsetof(type, name), flags, hint)
 #define REG_STDSTRING(type, name, flags) make_string_property(#name,offsetof(type, name), flags)
 
+#define REG_STDSTRING_CUSTOM_TYPE(type, name, flags, customtype) make_string_property(#name,offsetof(type, name), flags, customtype)
+
+
+
+#define MAKEPROPLIST(typename_, name) { name, sizeof(name) / sizeof(PropertyInfo), #typename_ }
+
 #define START_PROPS  static PropertyInfo props[] = {
 #define END_PROPS  }; \
  properties = { props, sizeof(props) / sizeof(PropertyInfo) };
 
-#define MAKEPROPLIST(name) { name, sizeof(name) / sizeof(PropertyInfo) }
