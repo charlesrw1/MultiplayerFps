@@ -219,7 +219,8 @@ public:
 
 	bool is_statemachine() override { return true; }
 	virtual Node_CFG* get_graph_node() override { return node; }
-	virtual editor_layer* get_layer() { return &sublayer; }
+	virtual editor_layer* get_layer() { return (sublayer.context )
+		?  &sublayer : nullptr; }
 	handle<State> add_new_state(AgEditor_StateNode* node_);
 
 	State* get_state(handle<State> state);
@@ -252,7 +253,10 @@ public:
 	virtual bool compile_my_data() override;
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
 	virtual bool draw_flat_links() override { return true; }
-	virtual editor_layer* get_layer() { return &sublayer; }
+	virtual editor_layer* get_layer() {
+		return (sublayer.context)
+			? &sublayer : nullptr;
+	}
 	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) override;
 
 	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) override;
@@ -272,16 +276,8 @@ public:
 	editor_layer sublayer;
 	AgEditor_StateMachineNode* parent_statemachine = nullptr;
 
-	Statemachine_Node_CFG* sm_node_parent = nullptr;
-
 	handle<State> state_handle;
 	int selected_transition_for_prop_ed = 0;
-
-	State* get_state() {
-		ASSERT(sm_node_parent);
-		ASSERT(state_handle.id != -1);
-		return &sm_node_parent->states.at(state_handle.id);
-	}
 };
 
 struct Editor_Parameter_list
@@ -602,7 +598,8 @@ public:
 
 	void delete_selected();
 
-	void remove_node_from_index(int index);
+	void nuke_layer(uint32_t layer_id);
+	void remove_node_from_index(int index, bool force);
 	void remove_node_from_id(uint32_t index);
 	int find_for_id(uint32_t id);
 	IAgEditorNode* find_node_from_id(uint32_t id) {
@@ -663,8 +660,6 @@ public:
 		editor_layer layer;
 		layer.id = current_layer++;
 		layer.context = ImNodes::EditorContextCreate();
-
-		add_root_node_to_layer(layer.id, is_statemachine);
 
 		return layer;
 	}

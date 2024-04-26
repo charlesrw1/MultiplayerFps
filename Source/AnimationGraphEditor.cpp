@@ -803,33 +803,61 @@ void AnimationGraphEditor::delete_selected()
 
 void AnimationGraphEditor::remove_node_from_id(uint32_t id)
 {
-	return remove_node_from_index(find_for_id(id));
+	return remove_node_from_index(find_for_id(id), false);
 }
-void AnimationGraphEditor::remove_node_from_index(int index)
+
+void AnimationGraphEditor::nuke_layer(uint32_t id)
+{
+	for (int i = 0; i < nodes.size(); i++) {
+		if (!nodes[i]) continue;
+
+		if (nodes[i]->graph_layer != id)
+			continue;
+
+		auto sublayer = nodes[i]->get_layer();
+		if (sublayer) {
+			graph_tabs.remove_nodes_tab(nodes[i]);
+			nuke_layer(sublayer->id);
+		}
+
+		delete nodes[i];
+		nodes[i] = nullptr;
+	}
+}
+
+void AnimationGraphEditor::remove_node_from_index(int index, bool force)
 {
 	auto node = nodes.at(index);
 
-	if (!node->can_user_delete())
+	if (!node->can_user_delete() && !force)
 		return;
 
-	for (int i = 0; i < nodes.size(); i++)
-		if (i != index) nodes[i]->remove_reference(node);
+	for (int i = 0; i < nodes.size(); i++) {
+		if (i != index) {
+			nodes[i]->remove_reference(node);
+		}
+	}
 
 	// node has a sublayer, remove child nodes
 
 	auto sublayer = node->get_layer();
 	if (sublayer) {
-		for (int i = 0; i < nodes.size(); i++) {
-			if (nodes[i]->graph_layer == sublayer->id && i != index)
-				remove_node_from_index(i);
-		}
+		// remove tab reference
+		graph_tabs.remove_nodes_tab(node);
+		nuke_layer(sublayer->id);
 	}
 
-	// remove tab reference
-	graph_tabs.remove_nodes_tab(node);
 
 	delete node;
-	nodes.erase(nodes.begin() + index);
+	nodes[index] = nullptr;
+
+	int sum = 0;
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i]) {
+			nodes[sum++] = nodes[i];
+		}
+	}
+	nodes.resize(sum);
 }
 
 int AnimationGraphEditor::find_for_id(uint32_t id)
@@ -1026,6 +1054,8 @@ bool AgEditor_BaseNode::compile_my_data()
 		&& type != animnode_type::blend2d
 		&& type != animnode_type::aimoffset
 		&& type != animnode_type::subtract
+		&& type != animnode_type::source
+
 		) {
 
 		if (!node->param.is_valid())
@@ -1043,7 +1073,7 @@ bool AgEditor_BaseNode::compile_my_data()
 
 		Clip_Node_CFG* clip = (Clip_Node_CFG*)node;
 		if (clip->clip_name.empty())
-			append_info_msg("[INFO] animation string is empty\n");
+			append_info_msg("[ERROR] animation string is empty\n");
 	}
 
 	return compile_error_string.empty();
@@ -1057,12 +1087,14 @@ void AgEditor_BaseNode::get_props(std::vector<PropertyListInstancePair>& props)
 bool AgEditor_StateNode::traverse_and_find_errors()
 {
 	children_have_errors = false;
-	auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
 
-	if (startnode->inputs[0].other_node)
-		children_have_errors |= !startnode->inputs[0].other_node->traverse_and_find_errors();
-	// else is an error too, but its already built into compile_error_string
+	if (type != animnode_type::start_statemachine) {
+		auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
 
+		if (startnode->inputs[0].other_node)
+			children_have_errors |= !startnode->inputs[0].other_node->traverse_and_find_errors();
+		// else is an error too, but its already built into compile_error_string
+	}
 	return !children_have_errors && compile_error_string.empty();
 }
 
@@ -1115,18 +1147,20 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 
 	// append tree
 
-	auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
-	ASSERT(startnode);
+	if (type != animnode_type::start_statemachine) {
+		auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
+		ASSERT(startnode);
 
-	if (!startnode->inputs[0].other_node) {
-		append_fail_msg(string_format("[ERROR] missing start state in blend tree \n"));
-	}
-	else {
+		if (!startnode->inputs[0].other_node) {
+			append_fail_msg(string_format("[ERROR] missing start state in blend tree \n"));
+		}
+		else {
 
-		IAgEditorNode* rootnode = startnode->inputs[0].other_node;
-		ASSERT(rootnode->get_graph_node());
+			IAgEditorNode* rootnode = startnode->inputs[0].other_node;
+			ASSERT(rootnode->get_graph_node());
 
-		s->tree = rootnode->get_graph_node();
+			s->tree = rootnode->get_graph_node();
+		}
 	}
 
 	return compile_error_string.empty();	// empty == no errors generated
@@ -1137,8 +1171,11 @@ void AgEditor_StateNode::on_remove_pin(int slot, bool force)
 {
 	ASSERT(inputs[slot].other_node);
 	
-	if (inputs[slot].other_node->is_state_node())
+	if (inputs[slot].other_node->is_state_node()) {
 		((AgEditor_StateNode*)inputs[slot].other_node)->remove_output_to(this);
+		inputs[slot].other_node = nullptr;
+		inputs[slot].pin_name = "Unknown";
+	}
 }
 
 void AgEditor_StateNode::get_props(std::vector<PropertyListInstancePair>& props)
@@ -1176,7 +1213,6 @@ void AgEditor_StateNode::get_link_props(std::vector<PropertyListInstancePair>& p
 	ASSERT(inputs[slot].other_node);
 	ASSERT(state_handle.is_valid());
 	ASSERT(inputs[slot].other_node->is_state_node());
-	ASSERT(sm_node_parent);
 
 	((AgEditor_StateNode*)inputs[slot].other_node)->get_transition_props(this, props);
 }
@@ -1231,7 +1267,8 @@ void AgEditor_StateMachineNode::get_props(std::vector<PropertyListInstancePair>&
 
 void AgEditor_StateNode::init()
 {
-	sublayer  = ed.create_new_layer(false);
+	if(type != animnode_type::start_statemachine)
+		sublayer  = ed.create_new_layer(false);
 
 	auto parent= ed.get_owning_node_for_layer(graph_layer);
 	ASSERT(parent->is_statemachine());
@@ -1240,6 +1277,9 @@ void AgEditor_StateNode::init()
 	state_handle = parent_statemachine->add_new_state(this);
 
 	num_inputs = 1;
+
+	if (type != animnode_type::start_statemachine)
+		ed.add_root_node_to_layer(sublayer.id, false);
 }
 
 void AgEditor_StateMachineNode::init()
@@ -1249,6 +1289,9 @@ void AgEditor_StateMachineNode::init()
 
 	sublayer = ed.create_new_layer(true);
 	num_inputs = 0;
+
+
+	ed.add_root_node_to_layer(sublayer.id, true);
 }
 
 bool AgEditor_StateMachineNode::traverse_and_find_errors()
@@ -1263,19 +1306,17 @@ bool AgEditor_StateMachineNode::traverse_and_find_errors()
 }
 
 void AgEditor_StateNode::remove_reference(IAgEditorNode* node)
-{
-
-	ASSERT(output.size() == parent_statemachine->get_state(state_handle)->transitions.size());
-	
-	if(node->is_state_node())
+{	
+	if (node->is_state_node()) {
 		remove_output_to((AgEditor_StateNode*)node);
+	}
 
 	// node gets deleted since its in the layer
-	if (parent_statemachine == node) {
-		parent_statemachine = nullptr;
-		sm_node_parent = nullptr;
-	}
 	IAgEditorNode::remove_reference(node);
+	
+	if (node == parent_statemachine) {
+		parent_statemachine = nullptr;
+	}
 }
 
 bool AgEditor_StateNode::compile_my_data()
@@ -1322,20 +1363,19 @@ bool AgEditor_StateMachineNode::compile_my_data()
 
 	node->start_state = { -1 };
 
-	auto state_enter = ed.find_first_node_in_layer(sublayer.id, animnode_type::start_statemachine);
+	auto state_enter = (AgEditor_StateNode*)ed.find_first_node_in_layer(sublayer.id, animnode_type::start_statemachine);
 	ASSERT(state_enter);	// should never be deleted
 
-	auto startnode = state_enter->inputs[0];
 
-	if (!startnode.other_node) {
-		append_fail_msg("[ERROR] state machine has no start state\n");
-	}
-	else {
-		ASSERT(startnode.other_node->is_state_node());
-		auto handle = ((AgEditor_StateNode*)startnode.other_node)->state_handle;
+	//if (!startnode.other_node) {
+	//	append_fail_msg("[ERROR] state machine has no start state\n");
+	//}
+	//else {
+		//ASSERT(startnode.other_node->is_state_node());
+		auto handle = state_enter->state_handle;
 		ASSERT(handle.is_valid());
 		node->start_state = handle;
-	}
+	//}
 }
 
 handle<State> AgEditor_StateMachineNode::add_new_state(AgEditor_StateNode* node_) {
@@ -1362,10 +1402,10 @@ IAgEditorNode* AnimationGraphEditor::create_graph_node_from_type(animnode_type t
 	if (type == animnode_type::statemachine) {
 		node = new AgEditor_StateMachineNode;
 	}
-	else if (type == animnode_type::state) {
+	else if (type == animnode_type::state || type == animnode_type::start_statemachine) {
 		node = new AgEditor_StateNode;
 	}
-	else if (type == animnode_type::root || type == animnode_type::start_statemachine) {
+	else if (type == animnode_type::root) {
 		node = new IAgEditorNode;
 	}
 	else {
