@@ -114,3 +114,9 @@ public:
 	virtual void resize(void* inst, uint32_t new_size) = 0;
 	virtual void swap_elements(void* inst, int item0, int item1) = 0;
 };
+
+struct PropertyListInstancePair
+{
+	PropertyInfoList* list = nullptr;
+	void* instance = nullptr;
+};
