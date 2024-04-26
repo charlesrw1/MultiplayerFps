@@ -630,7 +630,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
 	auto strong_error = mats.find_texture("icon/fatalerr.png");
 	auto weak_error = mats.find_texture("icon/error.png");
-	auto info_str = mats.find_texture("icon/question.png");
+	auto info_img = mats.find_texture("icon/question.png");
 
 	ImNodes::BeginNodeEditor();
 	for (auto node : nodes) {
@@ -647,7 +647,12 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		ImNodes::BeginNode(node->id);
 
 		ImNodes::BeginNodeTitleBar();
-		ImGui::Text("%s\n", node->get_title().c_str());
+
+		if(node->name_is_default())
+			ImGui::Text("%s\n", node->get_default_name().c_str());
+		else
+			ImGui::Text("%s\n", node->get_title().c_str());
+
 
 		if (!node->compile_error_string.empty()) {
 			ImGui::SameLine();
@@ -666,6 +671,16 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 			if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
 				ImGui::Text("children have errors");
+				ImGui::EndTooltip();
+			}
+		}
+
+		if (!node->compile_info_string.empty()) {
+			ImGui::SameLine();
+			ImGui::Image((ImTextureID)info_img->gl_id, ImVec2(16, 16));
+
+			if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+				ImGui::Text(node->compile_info_string.c_str());
 				ImGui::EndTooltip();
 			}
 		}
@@ -742,7 +757,7 @@ void AnimationGraphEditor::handle_event(const SDL_Event& event)
 			break;
 
 		case SDL_SCANCODE_SPACE:
-			compile_graph_for_playing();
+			compile_and_run();
 			{
 				DictWriter write;
 				editing_tree->write_to_dict(write);
@@ -1036,9 +1051,6 @@ bool AgEditor_BaseNode::compile_my_data()
 		}
 	}
 	
-	compile_error_string.clear();
-	compile_info_string.clear();
-
 	// selector nodes can have empty inputs
 	if (type != animnode_type::selector) {
 		if (has_null_input) {
@@ -1081,6 +1093,8 @@ bool AgEditor_BaseNode::compile_my_data()
 
 void AgEditor_BaseNode::get_props(std::vector<PropertyListInstancePair>& props)
 {
+	IAgEditorNode::get_props(props);
+
 	props.push_back({ node->get_property_list(),node });
 }
 
@@ -1101,6 +1115,7 @@ bool AgEditor_StateNode::traverse_and_find_errors()
 bool AgEditor_StateNode::compile_data_for_statemachine()
 {
 	compile_error_string.clear();
+	compile_info_string.clear();
 
 	State* s = parent_statemachine->get_state(state_handle);
 	s->name = get_title();
@@ -1115,7 +1130,7 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 		// compile script
 
 		if (st->script.script_str.empty()) {
-			append_fail_msg(string_format("[ERROR] script (-> %s) is empty\n", out_state->get_title().c_str()));
+			append_info_msg(string_format("[ERROR] script (-> %s) is empty\n", out_state->get_title().c_str()));
 		}
 		else {
 
@@ -1180,6 +1195,8 @@ void AgEditor_StateNode::on_remove_pin(int slot, bool force)
 
 void AgEditor_StateNode::get_props(std::vector<PropertyListInstancePair>& props)
 {
+	IAgEditorNode::get_props(props);
+
 	props.push_back({ State::get_props(),parent_statemachine->get_state(state_handle) });
 }
 
@@ -1262,11 +1279,18 @@ void AgEditor_StateNode::get_transition_props(AgEditor_StateNode* to, std::vecto
 
 void AgEditor_StateMachineNode::get_props(std::vector<PropertyListInstancePair>& props)
 {
+	IAgEditorNode::get_props(props);
+
 	props.push_back({ node->get_property_list(),node });
 }
 
 void AgEditor_StateNode::init()
 {
+	if (type == animnode_type::start_statemachine)
+		num_inputs = 0;
+	else
+		num_inputs = 1;
+
 	if(type != animnode_type::start_statemachine)
 		sublayer  = ed.create_new_layer(false);
 
@@ -1276,7 +1300,6 @@ void AgEditor_StateNode::init()
 
 	state_handle = parent_statemachine->add_new_state(this);
 
-	num_inputs = 1;
 
 	if (type != animnode_type::start_statemachine)
 		ed.add_root_node_to_layer(sublayer.id, false);
@@ -1338,6 +1361,50 @@ void AgEditor_StateMachineNode::remove_reference(IAgEditorNode* node)
 	}
 }
 
+std::string AgEditor_StateNode::get_default_name()
+{
+	bool any_non_defaults = false;
+
+	if (type == animnode_type::start_statemachine)
+		return get_animnode_name(type);
+
+	auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
+
+	if (!startnode->inputs[0].other_node || startnode->inputs[0].other_node->type != animnode_type::source)
+		return get_animnode_name(type);
+
+	// get clip name to use as default state name
+	return startnode->inputs[0].other_node->get_default_name();
+}
+
+std::string AgEditor_StateMachineNode::get_default_name()
+{
+	bool any_non_defaults = false;
+	std::string name;
+	for (int i = 0; i < states.size(); i++) {
+
+		// states can be null...
+		if (!states[i]) continue;
+
+		if (states[i]->type == animnode_type::start_statemachine)
+			continue;
+		if (states[i]->name_is_default())
+			continue;
+		name += states[i]->title;
+		name += '/';
+
+		if (name.size() > 22) {
+			name += "...";
+			return name;
+		}
+	}
+	if (name.empty())
+		return get_animnode_name(type);
+
+	name.pop_back();
+	return name;
+}
+
 bool AgEditor_StateMachineNode::compile_my_data()
 {
 
@@ -1346,6 +1413,7 @@ bool AgEditor_StateMachineNode::compile_my_data()
 		if (states[i]) {
 			states[sum] = states[i];
 			node->states[sum] = node->states[i];
+			states[sum]->state_handle = { sum };
 			sum++;
 		}
 	}
@@ -1359,7 +1427,7 @@ bool AgEditor_StateMachineNode::compile_my_data()
 	}
 
 	if (has_errors)
-		append_fail_msg("[ERROR] state machine states contain errors\m");
+		append_fail_msg("[ERROR] state machine states contain errors\n");
 
 	node->start_state = { -1 };
 
@@ -1432,7 +1500,11 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	}
 
 	for (int i = 0; i < nodes.size(); i++) {
-		nodes[i]->compile_my_data();
+		if (!nodes[i]->dont_call_compile()) {
+			nodes[i]->compile_error_string.clear();
+			nodes[i]->compile_info_string.clear();
+			nodes[i]->compile_my_data();
+		}
 	}
 
 	IAgEditorNode* output_pose = find_first_node_in_layer(0, animnode_type::root);
@@ -1452,8 +1524,6 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 #include "ReflectionRegisterDefines.h"
 
-PropertyInfoList IAgEditorNode::properties;
-
 void IAgEditorNode::init()
 {
 	ASSERT(type == animnode_type::root || type == animnode_type::start_statemachine);
@@ -1465,13 +1535,30 @@ void IAgEditorNode::init()
 
 }
 
-void IAgEditorNode::register_props()
+PropertyInfoList* IAgEditorNode::get_prop_list()
 {
-	START_PROPS
+
+	static PropertyInfo props[] = {
 		REG_STDSTRING(IAgEditorNode, title, PROP_DEFAULT),
 		REG_INT(IAgEditorNode, id, PROP_SERIALIZE, ""),
-		REG_ENUM(IAgEditorNode, type, PROP_SERIALIZE, "", animnode_type_def.id)
-	END_PROPS;
+		REG_ENUM(IAgEditorNode, type, PROP_SERIALIZE, "", animnode_type_def.id),
+		REG_INT(IAgEditorNode, graph_layer, PROP_SERIALIZE, "")
+	};
+
+	static PropertyInfoList list = MAKEPROPLIST(IAgEditorNode, props);
+	return &list;
+}
+
+std::string IAgEditorNode::get_default_name()
+{
+	if (type == animnode_type::source) {
+
+		Clip_Node_CFG* node = (Clip_Node_CFG*)((AgEditor_BaseNode*)this)->node;
+
+		return node->clip_name;
+	}
+
+	return get_animnode_name(type);
 }
 
 
@@ -1578,7 +1665,9 @@ void AnimationGraphEditor::tick(float dt)
 void AnimationGraphEditor::compile_and_run()
 {
 	bool good_to_run = compile_graph_for_playing();
-
+	if (good_to_run)
+		out.anim.initialize_animator(out.model, out.set, editing_tree, nullptr, nullptr);
+	running = good_to_run;
 }
 
 void AnimationGraphEditor::overlay_draw()
@@ -1629,78 +1718,3 @@ void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)
 		//cfg->types.push_back(param.at(i).type);
 	}
 }
-#if 0
-void Table::imgui_draw()
-{
-
-	uint32_t prop_editor_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
-
-	int num_cols = col_names.size();
-
-	if (ImGui::Button("add row")) {
-
-		Table_Row row = template_row;
-		row.row_id = row_id_start++;
-		for (int i = 0; i < row.props.size(); i++) {
-			row.props[i].loc1 = row.row_id;
-			row.props[i].loc2 = i;
-		}
-		rows.push_back(row);
-	}
-
-	if (ImGui::BeginTable(table_name.c_str(), num_cols+allow_selecting, prop_editor_flags))
-	{
-
-		if(allow_selecting)
-			ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 0.f,0);
-
-
-		for (int i = 0; i < col_names.size(); i++) {
-			uint32_t flags = 0;
-			float w = 0.0;
-			if (col_names[i].fixed_width) {
-				flags = ImGuiTableColumnFlags_WidthFixed;
-				w = col_names[i].start_width;
-			}
-			ImGui::TableSetupColumn(col_names[i].name.c_str(), flags, w, i+allow_selecting);
-
-		}
-
-		ImGui::TableHeadersRow();
-
-		ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-
-		int row_idx = 0;
-		int delete_this_index = -1;
-		for (auto& row : rows)
-		{
-			ImGui::TableNextRow();
-
-
-			if (allow_selecting) {
-				ImGui::TableSetColumnIndex(0);
-				ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-				if (ImGui::Selectable(string_format("%d",row_idx), selected_row == row.row_id, selectable_flags, ImVec2(0, 20.f)))
-				{
-					selected_row = row.row_id;
-				}
-			}
-
-
-			int col_idx = allow_selecting;
-			for (auto& col : row.props) {
-				ImGui::PushID(row.row_id*num_cols + col_idx);
-				ImGui::TableSetColumnIndex(col_idx);
-				//draw_node_property(col);
-				col_idx++;
-				ImGui::PopID();
-			}
-			row_idx++;
-		}
-
-		ImGui::PopStyleColor();
-		ImGui::EndTable();
-
-	}
-}
-#endif

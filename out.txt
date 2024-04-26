@@ -1,6 +1,6 @@
 {
 	name ""
-	data_used "180"
+	data_used "60"
 	root_node "0"
 	params [
 	]
@@ -25,16 +25,69 @@
 					node_index "-1"
 					transitions [
 						transition_state "1"
-						script ""
+						script "1"
 					]
 				}
 				{
 					name "Unnamed"
 					next_state "-1"
 					duration "-1.000000"
-					node_index "-1"
+					node_index "1"
 					transitions [
 					]
+				}
+			]
+		}
+		{
+			type "::source"
+			default_param "-1"
+			inputs [
+			]
+			props [
+				{
+					name "rm[0]"
+					type "Enum8"
+					value "rm::keep"
+				}
+				{
+					name "rm[1]"
+					type "Enum8"
+					value "rm::keep"
+				}
+				{
+					name "rm[2]"
+					type "Enum8"
+					value "rm::keep"
+				}
+				{
+					name "loop"
+					type "Bool"
+					value "1"
+				}
+				{
+					name "speed"
+					type "Float"
+					value "1.000000"
+				}
+				{
+					name "start_frame"
+					type "Int16"
+					value "0"
+				}
+				{
+					name "allow_sync"
+					type "Bool"
+					value "0"
+				}
+				{
+					name "can_be_leader"
+					type "Bool"
+					value "0"
+				}
+				{
+					name "clip_name"
+					type "StdString"
+					value "Armature|mixamo.com|Layer0"
 				}
 			]
 		}

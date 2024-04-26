@@ -63,9 +63,9 @@ public:
 
 	}
 
+	static PropertyInfoList* get_prop_list();
 
-	static PropertyInfoList properties;
-	static void register_props();
+	virtual std::string get_default_name();
 
 	std::string& get_title() {
 		return title;
@@ -80,6 +80,7 @@ public:
 
 	std::array<InputPinNode, MAX_INPUTS> inputs;
 	
+	bool name_is_default() { return title == "Unnamed"; }
 
 	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) {
 		inputs[slot].other_node = input;
@@ -164,10 +165,14 @@ public:
 
 	virtual Node_CFG* get_graph_node() { return nullptr; }
 
-	virtual void get_props(std::vector<PropertyListInstancePair>& props) {}
+	virtual void get_props(std::vector<PropertyListInstancePair>& props) {
+	
+		props.push_back({ get_prop_list(), this });
+	}
 
 	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) {}
 
+	virtual bool dont_call_compile() { return false; }
 
 	animnode_type type = animnode_type::source;
 
@@ -187,7 +192,7 @@ public:
 
 class AgEditor_BaseNode : public IAgEditorNode
 {
-
+public:
 	virtual void init();
 
 	virtual bool compile_my_data() override;
@@ -202,6 +207,8 @@ class AgEditor_StateMachineNode : public IAgEditorNode
 {
 public:
 	virtual void init();
+
+	virtual std::string get_default_name() override;
 
 	virtual bool traverse_and_find_errors();
 
@@ -243,8 +250,11 @@ public:
 		}
 	}
 
+	virtual bool dont_call_compile() { return true; }
+
 	virtual bool traverse_and_find_errors();
 
+	virtual std::string get_default_name() override;
 
 	bool compile_data_for_statemachine();
 	virtual void on_remove_pin(int slot, bool force) override;

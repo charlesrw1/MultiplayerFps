@@ -119,11 +119,13 @@ void StringEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::StdString);
 
-	auto str = *(std::string*)((char*)instance + prop->offset);
+	auto str = (std::string*)((char*)instance + prop->offset);
 
 	ImguiInputTextCallbackUserStruct user;
-	user.string = &str;
-	ImGui::InputText("##input_text", (char*)str.data(), str.size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user);
+	user.string = str;
+	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user))
+		str->resize(strlen(str->c_str()));
+
 }
 
 void FloatEditor::internal_update()
@@ -298,7 +300,7 @@ ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row
 
 int ArrayRow::get_size()
 {
-	return prop->list_ptr->get_size(instance);
+	return prop->list_ptr->get_size(prop->get_ptr(instance));
 }
 
 PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
@@ -311,9 +313,11 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 auto trashimg = mats.find_texture("icon/trash.png");
 	 auto addimg = mats.find_texture("icon/plus.png");
 
+	 uint8_t* list_instance_ptr = prop->get_ptr(instance);
+
 	 if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
 		 clear_children();
-		 prop->list_ptr->resize(instance, prop->list_ptr->get_size(instance) + 1);	// might invalidate childrens ptrs, so refresh
+		 prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) + 1);	// might invalidate childrens ptrs, so refresh
 		 rebuild_child_rows();
 	 }
 
@@ -322,7 +326,7 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
 
 		 clear_children();
-		 prop->list_ptr->resize(instance, 0);
+		 prop->list_ptr->resize(list_instance_ptr, 0);
 	 }
 
 
@@ -337,10 +341,10 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 			 int size = get_size();
 			 for (int i = index_to_delete; i < size - 1; i++) {
 
-				 prop->list_ptr->swap_elements(instance, i, i + 1);
+				 prop->list_ptr->swap_elements(list_instance_ptr, i, i + 1);
 
 			 }
-			 prop->list_ptr->resize(instance, size - 1); 
+			 prop->list_ptr->resize(list_instance_ptr, size - 1);
 
 		 }break;
 
@@ -349,7 +353,7 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 
 			 int index = commands[i].index;
 			 if (index < size - 1) {
-				 prop->list_ptr->swap_elements(instance, index, index + 1);
+				 prop->list_ptr->swap_elements(list_instance_ptr, index, index + 1);
 			 }
 
 		 }break;
@@ -357,7 +361,7 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 		 case Moveup: {
 			 int index = commands[i].index;
 			 if (index > 0) {
-				 prop->list_ptr->swap_elements(instance, index - 1, index);
+				 prop->list_ptr->swap_elements(list_instance_ptr, index - 1, index);
 			 }
 
 		 }break;
@@ -392,11 +396,11 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 ASSERT(prop->type == core_type_id::List);
 
 	 IListCallback* list = prop->list_ptr;
-	 int count = list->get_size(instance);
+	 int count = list->get_size(prop->get_ptr(instance));
 	 PropertyInfoList* struct_ = list->props_in_list;
 	 for (int i = 0; i < count; i++) {
 
-		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(instance, i), struct_, i)));
+		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(prop->get_ptr(instance), i), struct_, i)));
 	 }
  }
 
