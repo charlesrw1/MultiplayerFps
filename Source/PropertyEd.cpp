@@ -123,8 +123,8 @@ void StringEditor::internal_update()
 
 	ImguiInputTextCallbackUserStruct user;
 	user.string = str;
-	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user))
-		str->resize(strlen(str->c_str()));
+	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1/* null terminator byte */, ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user))
+		str->resize(strlen(str->c_str()));	// imgui messes with buffer size
 
 }
 

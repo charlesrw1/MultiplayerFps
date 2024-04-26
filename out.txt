@@ -1,43 +1,10 @@
 {
 	name ""
-	data_used "60"
-	root_node "0"
+	data_used "72"
+	root_node "2"
 	params [
 	]
 	nodes [
-		{
-			type "::statemachine"
-			default_param "-1"
-			inputs [
-			]
-			props [
-				{
-					name "start_state"
-					type "Int32"
-					value "0"
-				}
-			]
-			states [
-				{
-					name "Unnamed"
-					next_state "-1"
-					duration "-1.000000"
-					node_index "-1"
-					transitions [
-						transition_state "1"
-						script "1"
-					]
-				}
-				{
-					name "Unnamed"
-					next_state "-1"
-					duration "-1.000000"
-					node_index "1"
-					transitions [
-					]
-				}
-			]
-		}
 		{
 			type "::source"
 			default_param "-1"
@@ -88,6 +55,61 @@
 					name "clip_name"
 					type "StdString"
 					value "Armature|mixamo.com|Layer0"
+				}
+			]
+		}
+		{
+			type "::statemachine"
+			default_param "-1"
+			inputs [
+			]
+			props [
+				{
+					name "start_state"
+					type "Int32"
+					value "0"
+				}
+			]
+			states [
+				{
+					name "Unnamed"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+						transition_state "1"
+						script ""
+					]
+				}
+				{
+					name "Unnamed"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+					]
+				}
+				{
+					name "Unnamed"
+					next_state "-1"
+					duration "-1.000000"
+					node_index "-1"
+					transitions [
+					]
+				}
+			]
+		}
+		{
+			type "::mirror"
+			default_param "-1"
+			inputs [
+				 0
+			]
+			props [
+				{
+					name "damp_time"
+					type "Float"
+					value "0.100000"
 				}
 			]
 		}

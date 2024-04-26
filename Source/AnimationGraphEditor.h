@@ -154,7 +154,7 @@ public:
 	}
 
 	bool grow_pin_count_on_new_pin() {
-		return type == animnode_type::state || type == animnode_type::selector;
+		return type == animnode_type::state;
 	}
 
 	Node_CFG* get_nodecfg_for_slot(uint32_t slot) {
@@ -166,7 +166,6 @@ public:
 	virtual Node_CFG* get_graph_node() { return nullptr; }
 
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) {
-	
 		props.push_back({ get_prop_list(), this });
 	}
 

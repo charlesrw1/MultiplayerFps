@@ -11,17 +11,25 @@
 #include "EnumDefReflection.h"
 #include "ReflectionProp.h"
 
+#include <cassert>
+
+// to add new node:
+// add enum value and edit autoenumdef
+// make class with overloaded functions ( incl. get_props() which can be null )
+//		remember that Node_CFG constructor has to take in Rt_Vars_Base at minimum, runtime vars inherit from that
+// add in impl macro at top of animationtreelocal.cpp to define some metadata
+
 // Modify AutoEnumDef when changing enum!
 extern AutoEnumDef animnode_type_def;
 enum class animnode_type
 {
 	source,
 	statemachine,
-	selector,
 
 	mask,
 
 	blend,
+	blend_by_int,
 	blend2d,
 	add,
 	subtract,
@@ -40,6 +48,7 @@ enum class animnode_type
 
 	COUNT
 };
+
 struct NodeRt_Ctx;
 struct ScriptExpression
 {
@@ -137,10 +146,10 @@ struct Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const = 0;
 	virtual bool is_clip_node() const { return false; }
 
-	// serialization helpers
+	// serialization helpers, optional
 	virtual void write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {}
 	virtual void read_from_dict(Animation_Tree_CFG* tree, DictParser& in) {}
-	virtual PropertyInfoList* get_property_list() = 0;
+	virtual PropertyInfoList* get_props() = 0;
 	virtual animnode_type get_type() = 0;
 
 	void set_active(NodeRt_Ctx& ctx, Rt_Vars_Base* base) const {
@@ -186,8 +195,9 @@ struct State
 TYPE_NAME* clip = (TYPE_NAME*)cfg->arena.alloc_bottom(sizeof(TYPE_NAME)); \
 clip = new(clip)TYPE_NAME(cfg); \
 return clip; \
-} static PropertyInfoList properties; static void register_props();  \
-virtual PropertyInfoList* get_property_list() override { return &properties;}  \
+}  \
+static const animnode_type CONST_TYPE_ENUM = ENUM_TYPE; \
+virtual PropertyInfoList* get_props() override;  \
 virtual animnode_type get_type() override { return ENUM_TYPE; }
 
 // playback speed *= param / (speed of clip's root motion)
@@ -268,8 +278,11 @@ enum class rootmotion_setting : uint8_t {
 
 struct Clip_Node_CFG : public Node_CFG
 {
+	using RT_TYPE = Clip_Node_RT;
+
+
 	Clip_Node_CFG(Animation_Tree_CFG* cfg)
-		: Node_CFG(cfg, sizeof(Clip_Node_RT)) {
+		: Node_CFG(cfg, sizeof(RT_TYPE)) {
 		input.count = 0;
 	}
 
@@ -277,7 +290,7 @@ struct Clip_Node_CFG : public Node_CFG
 	DECLARE_ANIMNODE_CREATOR(Clip_Node_CFG, animnode_type::source)
 
 	virtual void construct(NodeRt_Ctx& ctx) const {
-		Clip_Node_RT* rt = construct_this<Clip_Node_RT>(ctx);
+		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
 
 		ctx.set->find_animation(clip_name.c_str(), &rt->set_idx,&rt->clip_index,&rt->skel_idx);
 
@@ -306,7 +319,7 @@ struct Clip_Node_CFG : public Node_CFG
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 		rt->frame = 0.0;
 		rt->stopped_flag = false;
 	}
@@ -315,7 +328,7 @@ struct Clip_Node_CFG : public Node_CFG
 		return true;
 	}
 	const Animation* get_clip(NodeRt_Ctx& ctx) const {
-		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 		if (rt->clip_index == -1) {
 			return nullptr;
 		}
@@ -325,7 +338,7 @@ struct Clip_Node_CFG : public Node_CFG
 		return &clip;
 	}
 	void set_frame_by_interp(NodeRt_Ctx& ctx, float frac) const {
-		Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
 		rt->frame = get_clip(ctx)->total_duration * frac;
 	}
@@ -383,25 +396,42 @@ struct Add_Node_CFG : public Node_CFG
 struct Blend_Node_RT : Rt_Vars_Base
 {
 	float lerp_amt = 0.0;
+	float saved_f = 0.0;
 };
 
+// generic blend by bool or blend by float
 struct Blend_Node_CFG : public Node_CFG
 {
+	using RT_TYPE = Blend_Node_RT;
+
 	DECLARE_ANIMNODE_CREATOR(Blend_Node_CFG, animnode_type::blend)
 
 
-	Blend_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Blend_Node_RT)) {
+	Blend_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(RT_TYPE)) {
 		input.count = 2;
 	}
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
 	virtual void construct(NodeRt_Ctx& ctx) const override {
-		construct_this<Blend_Node_RT>(ctx);
+		construct_this<RT_TYPE>(ctx);
 	}
 
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		*get_rt<Blend_Node_RT>(ctx) = Blend_Node_RT();
+		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+
+		float cur_val = 0.0;
+		if (param.is_valid()) {
+			if (parameter_type == 0)	// float
+				cur_val = ctx.vars->get(param).fval;
+			else
+				cur_val =  (float)ctx.vars->get(param).ival;
+		}
+		rt->lerp_amt = cur_val;
+		if (store_value_on_reset)
+			rt->saved_f = cur_val;
+
+
 
 		input[0]->reset(ctx);
 		input[1]->reset(ctx);
@@ -409,11 +439,76 @@ struct Blend_Node_CFG : public Node_CFG
 	}
 
 	float damp_factor = 0.1;
+	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
+	// below are computed on init
+	uint8_t parameter_type = 0;// 0 = float, 1 = bool
+};
+
+struct Blend_Int_Node_RT : public Rt_Vars_Base
+{
+	int fade_out_i = -1;
+	float lerp_amt = 0.0;
+	int active_i = 0;
+};
+
+// blend by int or enum, can handle 1 crossfade (TODO: arbritary n-blends)
+class Blend_Int_Node_CFG : public Node_CFG
+{
+public:
+	using RT_TYPE = Blend_Int_Node_RT;
+
+	DECLARE_ANIMNODE_CREATOR(Blend_Int_Node_CFG, animnode_type::blend_by_int)
+
+	Blend_Int_Node_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(RT_TYPE)) {
+		input.count = 1;
+	}
+
+	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+
+	virtual void construct(NodeRt_Ctx& ctx) const override {
+		construct_this<RT_TYPE>(ctx);
+	}
+
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+		
+		if (!param.is_valid()) return;
+
+		int val = ctx.vars->get(param).ival;
+
+		rt->active_i = get_actual_index(val);
+		rt->lerp_amt = 1.0;
+		rt->fade_out_i = -1;
+
+		for (int i = 0; i < input.count; i++)
+			input[i]->reset(ctx);
+	}
+
+	int get_actual_index(int val_from_param) const {
+		if (!uses_jump_table) {
+			assert(val_from_param >= 0 && val_from_param < input.count);
+			return val_from_param;
+		}
+		assert(val_from_param >= 0 && val_from_param < jump_table.count);
+		int real_idx = jump_table[val_from_param];
+		assert(real_idx >= 0 && real_idx < input.count);
+		return real_idx;
+	}
+
+	float damp_factor = 0.1;
+	bool store_value_on_reset = false;
+
+	bool uses_jump_table = false;	// for enums
+	InlineVec<int, 2> jump_table;
 };
 
 struct Mirror_Node_RT : Rt_Vars_Base
 {
 	float lerp_amt = 0.0;
+	union {
+		int saved_boolean = 0;
+		float saved_f;
+	};
 };
 
 struct Mirror_Node_CFG : public Node_CFG
@@ -439,6 +534,10 @@ struct Mirror_Node_CFG : public Node_CFG
 	}
 
 	float damp_time = 0.1;
+
+	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
+	// below are computed on init
+	uint8_t parameter_type = 1;// 0 = float, 1 = bool
 };
 
 
@@ -536,6 +635,9 @@ struct animnode_name_type
 {
 	create_func create = nullptr;
 	register_func reg = nullptr;
+	Color32 editor_color = { 0,0,0,0xff };
+	const char* editor_name = "Unnamed";
+	const char* editor_tooltip = "No tooltip";
 };
 
 extern animnode_name_type& get_animnode_typedef(animnode_type type);

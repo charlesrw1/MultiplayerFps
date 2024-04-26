@@ -49,10 +49,8 @@ struct PropertyInfo {
 	uint16_t enum_type_id = 0;
 	core_type_id type = core_type_id::Int32;
 	uint8_t flags = PROP_DEFAULT;
-	union {
-		const char* range_hint = "";
-		IListCallback* list_ptr;
-	};
+	const char* range_hint = "";
+	IListCallback* list_ptr = nullptr;
 	const char* custom_type_str = "";
 
 	uint8_t* get_ptr(void* inst) {

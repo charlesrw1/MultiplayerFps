@@ -10,24 +10,51 @@
 #include "ReflectionRegisterDefines.h"
 #include "StdVectorReflection.h"
 
-#define DECLARE_PROPERTIES(type) PropertyInfoList type::properties;
 
-DECLARE_PROPERTIES(Clip_Node_CFG);
-DECLARE_PROPERTIES(Sync_Node_CFG);
-DECLARE_PROPERTIES(Mirror_Node_CFG);
-DECLARE_PROPERTIES(Statemachine_Node_CFG);
-DECLARE_PROPERTIES(Add_Node_CFG);
-DECLARE_PROPERTIES(Subtract_Node_CFG);
-DECLARE_PROPERTIES(Blend_Node_CFG);
-DECLARE_PROPERTIES(Blend2d_CFG);
-DECLARE_PROPERTIES(Scale_By_Rootmotion_CFG);
+struct AutoAnimNodeDef
+{
+	AutoAnimNodeDef(animnode_type type, create_func create, const char* ed_name, const char* ed_tooltip, Color32 color) {
+		get_animnode_typedef(type).create = create;
+		get_animnode_typedef(type).editor_name = ed_name;
+		get_animnode_typedef(type).editor_tooltip = ed_tooltip;
+		get_animnode_typedef(type).editor_color = color;
+	}
+};
+#define IMPL_TOOL_NODE(type, name /* editor name */, tooltip /* editor tooltip */, color /* editor node color*/)   static AutoAnimNodeDef autoanimnode_##type(animnode_type::type,nullptr, name, tooltip, color)
+#define IMPL_ANIMNODE(type, name, tooltip, color) static AutoAnimNodeDef autoanimnode_##type(type::CONST_TYPE_ENUM, type::create, name, tooltip, color)
+
+
+// colors for editor nodes
+static const Color32 ROOT_COLOR = { 94, 2, 2 };
+static const Color32 SM_COLOR = { 82, 2, 94 };
+static const Color32 STATE_COLOR = { 15, 61, 16 };
+static const Color32 SOURCE_COLOR = { 1, 0, 74 };
+static const Color32 BLEND_COLOR = { 26, 75, 79 };
+static const Color32 ADD_COLOR = { 44, 57, 71 };
+static const Color32 MISC_COLOR = { 13, 82, 44 };
+
+IMPL_TOOL_NODE(start_statemachine, "START", "State machine enter", ROOT_COLOR);
+IMPL_TOOL_NODE(root, "OUTPUT", "Output pose for the blend tree", ROOT_COLOR);
+IMPL_TOOL_NODE(state, "State", "A state in a FSM. Use output pin to create transitions to other states\n", STATE_COLOR);
+
+IMPL_ANIMNODE(Clip_Node_CFG, "Clip", "Animation input data", SOURCE_COLOR);
+IMPL_ANIMNODE(Sync_Node_CFG, "Sync", "Syncs animations below this node", MISC_COLOR);
+IMPL_ANIMNODE(Mirror_Node_CFG, "Mirror", "Mirrors animation across axis", MISC_COLOR);
+IMPL_ANIMNODE(Statemachine_Node_CFG, "Statemachine", "Contains a statemachine with transitions\n(double click to open)", SM_COLOR);
+IMPL_ANIMNODE(Add_Node_CFG, "Apply Additive", "Apply additive(delta'd) animation to a base pose", ADD_COLOR);
+IMPL_ANIMNODE(Subtract_Node_CFG, "Subtract", "Subtract a source pose from a ref pose, use with \'Apply Additive\'", ADD_COLOR);
+IMPL_ANIMNODE(Blend_Node_CFG, "Blend", "Blend 2 poses by a boolean or float [0,1]", BLEND_COLOR);
+IMPL_ANIMNODE(Blend_Int_Node_CFG, "Blend by int/enum", "Blend n poses by an int or enum\n", BLEND_COLOR);
+IMPL_ANIMNODE(Blend2d_CFG, "Blend 2D", "Blend 8 directional poses and an idle pose\nUse for directional locomotion", BLEND_COLOR);
+IMPL_ANIMNODE(Scale_By_Rootmotion_CFG, "Rootmotion Scale", "Scale any clip sampling by the velocity parameter. \n(ex: a running clip is at 2 m/s, entity is moving at 4 m/s, so clip is played at 2x speed", MISC_COLOR);
+
 
 static const char* animnode_strs[] = {
 	"source",
 	"statemachine",
-	"selector",
 	"mask",
 	"blend",
+	"blend_by_int",
 	"blend2d",
 	"add",
 	"subtract",
@@ -51,19 +78,18 @@ bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
 	return compilied.execute(*ctx.vars).ival;
 }
 
+
+
 PropertyInfoList* State::get_props()
 {
 	MAKE_VECTORCALLBACK(State_Transition, transitions);
-	static PropertyInfo props[] = {
-		REG_STDVECTOR( State, transitions, PROP_DEFAULT ),
-		REG_FLOAT(State, state_duration, PROP_DEFAULT, ""),
-		REG_BOOL(State, transition_wait_on_end, PROP_DEFAULT, ""),
-		REG_INT(State, next_state.id, PROP_SERIALIZE, ""),
-		REG_STDSTRING(State, name, PROP_SERIALIZE, "")
-	};
-
-	static PropertyInfoList list = MAKEPROPLIST(State, props);
-	return &list;
+	START_PROPS(State)
+		REG_STDVECTOR(transitions, PROP_DEFAULT),
+		REG_FLOAT(state_duration, PROP_DEFAULT, ""),
+		REG_BOOL(transition_wait_on_end, PROP_DEFAULT, ""),
+		REG_INT(next_state.id, PROP_SERIALIZE, ""),
+		REG_STDSTRING(name, PROP_SERIALIZE, "")
+	END_PROPS(State)
 }
 
 handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
@@ -86,7 +112,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	Clip_Node_RT* rt = get_rt<Clip_Node_RT>(ctx);
+	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
 
 	const Animation* clip = get_clip(ctx);
@@ -173,20 +199,89 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
  bool Blend_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	float dest = ctx.vars->get(param).fval;
+	 if (!param.is_valid()) {
+		 util_set_to_bind_pose(*pose.pose, ctx.model);
+		 return true;
+	 }
+	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
-	Blend_Node_RT* rt = get_rt<Blend_Node_RT>(ctx);
+	 float value = 0.0;
+	 if (store_value_on_reset) {
+		 value = rt->saved_f;
+	 }
+	 else {
+		 if (parameter_type == 0)
+			 value = ctx.vars->get(param).fval;
+		 else if (parameter_type == 1) // bool
+			 value = (float)ctx.vars->get(param).ival;
+		rt->lerp_amt = damp_dt_independent(value, rt->lerp_amt, damp_factor, pose.dt);
+	 }
 
-	rt->lerp_amt = damp_dt_independent(dest, rt->lerp_amt, damp_factor, pose.dt);
 
+	 bool keep_going = true;
 
 	Pose* addtemp = Pose_Pool::get().alloc(1);
-	input[0]->get_pose(ctx, pose);
-	input[1]->get_pose(ctx, pose.set_pose(addtemp));
-	util_blend(ctx.num_bones(), *addtemp, *pose.pose,dest);
+	keep_going &= input[0]->get_pose(ctx, pose);
+	keep_going &= input[1]->get_pose(ctx, pose.set_pose(addtemp));
+	util_blend(ctx.num_bones(), *addtemp, *pose.pose, rt->lerp_amt);
 	Pose_Pool::get().free(1);
-	return true;
+	return keep_going;
 }
+
+
+ bool Blend_Int_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ {
+	 if (!param.is_valid()) {
+		 util_set_to_bind_pose(*pose.pose, ctx.model);
+		 return true;
+	 }
+	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+
+	 // param never changes
+	 if (!store_value_on_reset) {
+		 int val = ctx.vars->get(param).ival;
+		 int real_idx = get_actual_index(val);
+
+		 if (real_idx != rt->active_i) {
+
+			 if (rt->fade_out_i == real_idx) { /* already transitioning from that, swap with active */
+				 rt->lerp_amt = 1.0 - rt->lerp_amt;
+				 std::swap(rt->fade_out_i, rt->active_i);
+			 }
+			 else if (rt->fade_out_i != -1) {/* alread transitioning, abrupt stop */
+				 rt->lerp_amt = 1.0;
+				 rt->fade_out_i = -1;
+				 rt->active_i = real_idx;
+			 }
+			 else {/* normal fade out */
+				 rt->fade_out_i = rt->active_i;
+				 rt->active_i = real_idx;
+				 rt->lerp_amt = 0.0;
+			 }
+		 }
+
+		 rt->lerp_amt = damp_dt_independent(1.0f, rt->lerp_amt, damp_factor, pose.dt);
+
+		 if (rt->lerp_amt >= 0.99999)
+			 rt->fade_out_i = -1;
+	 }
+	 /* else, value never changes, so use saved one from reset */
+
+	 bool keep_going = true;
+
+	 if (store_value_on_reset || !rt->fade_out_i) {
+		 keep_going &= input[rt->active_i]->get_pose(ctx, pose);
+	 }
+	 else {
+		 Pose* addtemp = Pose_Pool::get().alloc(1);
+		 keep_going &= input[rt->active_i]->get_pose(ctx, pose);
+		 keep_going &= input[rt->fade_out_i]->get_pose(ctx, pose.set_pose(addtemp));
+		 util_blend(ctx.num_bones(), *addtemp, *pose.pose, rt->lerp_amt);
+		 Pose_Pool::get().free(1);
+	 }
+	 return keep_going;
+ }
+
 
 // Inherited via At_Node
 
@@ -404,37 +499,10 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	 }
 }
 
-#define DEFINE_ANIMNODE_DEF(name, class_) nodes[(int)animnode_type::name] = {class_::create, class_::register_props}
-#define DEFINE_ANIMNODE_DEF_NO_PROP(name, class_) nodes[(int)animnode_type::name] = {class_::create, nullptr}
-
- static animnode_name_type* get_anim_node_map()
- {
-	 static animnode_name_type nodes[(int)animnode_type::COUNT];
-	 static bool initialized = false;
-	 if (!initialized) {
-		 DEFINE_ANIMNODE_DEF(source, Clip_Node_CFG);
-		 DEFINE_ANIMNODE_DEF(statemachine, Statemachine_Node_CFG);
-		 DEFINE_ANIMNODE_DEF(blend, Blend_Node_CFG);
-		 DEFINE_ANIMNODE_DEF(blend2d, Blend2d_CFG);
-		 DEFINE_ANIMNODE_DEF_NO_PROP(add, Add_Node_CFG);
-		 DEFINE_ANIMNODE_DEF_NO_PROP(subtract, Subtract_Node_CFG);
-		 DEFINE_ANIMNODE_DEF_NO_PROP(sync, Sync_Node_CFG);
-		 DEFINE_ANIMNODE_DEF_NO_PROP(rootmotion_speed, Scale_By_Rootmotion_CFG);
-		 DEFINE_ANIMNODE_DEF(mirror, Mirror_Node_CFG);
-
-		 for (int i = 0; i < (int)animnode_type::COUNT; i++) {
-			 if (nodes[i].reg)
-				 nodes[i].reg();
-		 }
-
-		 initialized = true;
-	 }
-	 return nodes;
- }
-#undef DEFINE_ANIMNODE_DEF
-
 animnode_name_type& get_animnode_typedef(animnode_type type) {
-	 return get_anim_node_map()[(int)type];
+	static animnode_name_type types[(int)animnode_type::COUNT];
+
+	return types[(int)type];
  }
 
  int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
@@ -444,9 +512,6 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 }
 	 return -1;
  }
-
-
-
 
 
  void Animation_Tree_CFG::write_to_dict(DictWriter& out)
@@ -493,7 +558,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 }
 		 out.write_list_end();
 
-		 write_properties(*node->get_property_list(), node, out);
+		 write_properties(*node->get_props(), node, out);
 
 		 node->write_to_dict(this, out);
 
@@ -503,54 +568,82 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 out.write_list_end();
  }
 
- void Blend2d_CFG::register_props()
+ PropertyInfoList* Scale_By_Rootmotion_CFG::get_props()
  {
-	 START_PROPS
-		 REG_INT(Blend2d_CFG, xparam, PROP_SERIALIZE, ""),
-		 REG_INT(Blend2d_CFG, yparam, PROP_SERIALIZE, ""),
-		 REG_FLOAT(Blend2d_CFG, fade_in, PROP_DEFAULT, ""),
-		 REG_FLOAT(Blend2d_CFG, weight_damp, PROP_DEFAULT, "")
-	 END_PROPS
+	 return nullptr;
  }
 
- void Mirror_Node_CFG::register_props()
+ PropertyInfoList* Sync_Node_CFG::get_props()
  {
-	 START_PROPS
-		 REG_FLOAT(Mirror_Node_CFG, damp_time, PROP_DEFAULT, "")
-	 END_PROPS
+	 return nullptr;
  }
 
- void Blend_Node_CFG::register_props()
+ PropertyInfoList* Subtract_Node_CFG::get_props()
  {
-	 START_PROPS
-		 REG_FLOAT(Blend_Node_CFG, damp_factor, PROP_DEFAULT, "")
-	END_PROPS
+	 return nullptr;
  }
 
- void Clip_Node_CFG::register_props()
+ PropertyInfoList* Add_Node_CFG::get_props()
  {
-	 START_PROPS
-
-		 REG_ENUM(Clip_Node_CFG, rm[0], PROP_DEFAULT, "", rootmotion_setting_def.id),
-		 REG_ENUM(Clip_Node_CFG, rm[1], PROP_DEFAULT, "", rootmotion_setting_def.id),
-		 REG_ENUM(Clip_Node_CFG, rm[2], PROP_DEFAULT, "", rootmotion_setting_def.id),
-
-		 REG_BOOL(Clip_Node_CFG, loop, PROP_DEFAULT, ""),
-		 REG_FLOAT(Clip_Node_CFG, speed, PROP_DEFAULT, "0,-5,5"),
-		 REG_INT(Clip_Node_CFG, start_frame, PROP_DEFAULT, ""),
-		 REG_BOOL(Clip_Node_CFG, allow_sync, PROP_DEFAULT, ""),
-		 REG_BOOL(Clip_Node_CFG, can_be_leader, PROP_DEFAULT, ""),
-
-		 REG_STDSTRING_CUSTOM_TYPE(Clip_Node_CFG, clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
-
-	END_PROPS
+	 return nullptr;
  }
 
- void Statemachine_Node_CFG::register_props()
+ PropertyInfoList* Blend_Int_Node_CFG::get_props()
  {
-	 START_PROPS
-		 REG_INT(Statemachine_Node_CFG, start_state, PROP_SERIALIZE, "")
-	END_PROPS
+	 START_PROPS(Blend_Int_Node_CFG)
+		 REG_INT(param,0,"")
+	END_PROPS(Blend_Int_Node_CFG)
+ }
+
+ PropertyInfoList* Blend2d_CFG::get_props()
+ {
+	 START_PROPS(Blend2d_CFG)
+		 REG_INT(xparam, PROP_SERIALIZE, ""),
+		 REG_INT(yparam, PROP_SERIALIZE, ""),
+		 REG_FLOAT(fade_in, PROP_DEFAULT, ""),
+		 REG_FLOAT(weight_damp, PROP_DEFAULT, "")
+	 END_PROPS(Blend2d_CFG)
+ }
+
+ PropertyInfoList* Mirror_Node_CFG::get_props()
+ {
+	 START_PROPS(Mirror_Node_CFG)
+		 REG_FLOAT(damp_time, PROP_DEFAULT, "")
+	 END_PROPS(Mirror_Node_CFG)
+ }
+
+ PropertyInfoList* Blend_Node_CFG::get_props()
+ {
+	 START_PROPS(Blend_Node_CFG)
+		 REG_INT(param.id, PROP_SERIALIZE, ""),
+		 REG_FLOAT(damp_factor, PROP_DEFAULT, ""),
+		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, ""),
+	END_PROPS(Blend_Node_CFG)
+ }
+
+ PropertyInfoList* Clip_Node_CFG::get_props()
+ {
+	 START_PROPS(Clip_Node_CFG)
+		 REG_ENUM( rm[0], PROP_DEFAULT, "", rootmotion_setting_def.id),
+		 REG_ENUM( rm[1], PROP_DEFAULT, "", rootmotion_setting_def.id),
+		 REG_ENUM( rm[2], PROP_DEFAULT, "", rootmotion_setting_def.id),
+
+		 REG_BOOL( loop, PROP_DEFAULT, ""),
+		 REG_FLOAT( speed, PROP_DEFAULT, "0,-5,5"),
+		 REG_INT( start_frame, PROP_DEFAULT, ""),
+		 REG_BOOL( allow_sync, PROP_DEFAULT, ""),
+		 REG_BOOL( can_be_leader, PROP_DEFAULT, ""),
+
+		 REG_STDSTRING_CUSTOM_TYPE( clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
+
+	END_PROPS(Clip_Node_CFG)
+ }
+
+ PropertyInfoList* Statemachine_Node_CFG::get_props()
+ {
+	 START_PROPS(Statemachine_Node_CFG)
+		 REG_INT( start_state, PROP_SERIALIZE, "")
+	END_PROPS(Statemachine_Node_CFG)
  }
 
  // base64 encoding
@@ -741,14 +834,10 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
  PropertyInfoList* State_Transition::get_props()
  {
-	 static PropertyInfo props[] = {
-		 REG_INT(State_Transition, transition_state, PROP_SERIALIZE, ""),
-		 REG_FLOAT(State_Transition, transition_time, PROP_DEFAULT, ""),
-		 REG_STDSTRING(State_Transition, script.script_str, PROP_SERIALIZE, ""),
-
-
-		 REG_STRUCT_CUSTOM_TYPE(State_Transition, script, PROP_EDITABLE, "AG_LISP_CODE")
-	 };
-	 static PropertyInfoList list = { props, sizeof(props) / sizeof(PropertyInfo) };
-	 return &list;
+	 START_PROPS(State_Transition)
+		 REG_INT( transition_state, PROP_SERIALIZE, ""),
+		 REG_FLOAT( transition_time, PROP_DEFAULT, ""),
+		 REG_STDSTRING( script.script_str, PROP_SERIALIZE, ""),
+		 REG_STRUCT_CUSTOM_TYPE( script, PROP_EDITABLE, "AG_LISP_CODE")
+	END_PROPS(State_Transition)
  }
