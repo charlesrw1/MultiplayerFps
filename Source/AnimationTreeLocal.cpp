@@ -446,7 +446,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
 	// highest weighted pose controls syncing
 	Pose* scratchposes = Pose_Pool::get().alloc(3);
-	if (character_ground_speed <= fade_in) {
+	if (character_ground_speed < 0.9999) {
 
 		if (anglelerp <= 0.5) {
 			input[DIRECTION + pose1]->get_pose(ctx, pose.set_pose(&scratchposes[1]));
@@ -459,8 +459,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		input[IDLE]->get_pose(ctx, pose.set_pose(&scratchposes[0]));
 
 		util_blend(ctx.num_bones(), scratchposes[1], *pose.pose, anglelerp);
-		float speed_lerp = MidLerp(0.0, fade_in, character_ground_speed);
-		util_blend(ctx.num_bones(), scratchposes[0], *pose.pose, 1.0 - speed_lerp);
+		util_blend(ctx.num_bones(), scratchposes[0], *pose.pose, 1.0 - character_ground_speed);
 	}
 	else {
 		if (anglelerp <= 0.5) {
@@ -585,22 +584,23 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
  PropertyInfoList* Add_Node_CFG::get_props()
  {
-	 return nullptr;
+	 START_PROPS(Add_Node_CFG)
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER")
+	 END_PROPS(Add_Node_CFG)
  }
 
  PropertyInfoList* Blend_Int_Node_CFG::get_props()
  {
 	 START_PROPS(Blend_Int_Node_CFG)
-		 REG_INT(param,0,"")
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT,"", "AG_PARAM_FINDER")
 	END_PROPS(Blend_Int_Node_CFG)
  }
 
  PropertyInfoList* Blend2d_CFG::get_props()
  {
 	 START_PROPS(Blend2d_CFG)
-		 REG_INT(xparam, PROP_SERIALIZE, ""),
-		 REG_INT(yparam, PROP_SERIALIZE, ""),
-		 REG_FLOAT(fade_in, PROP_DEFAULT, ""),
+		 REG_INT_W_CUSTOM(xparam, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
+		 REG_INT_W_CUSTOM(yparam, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
 		 REG_FLOAT(weight_damp, PROP_DEFAULT, "")
 	 END_PROPS(Blend2d_CFG)
  }
@@ -608,14 +608,15 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
  PropertyInfoList* Mirror_Node_CFG::get_props()
  {
 	 START_PROPS(Mirror_Node_CFG)
-		 REG_FLOAT(damp_time, PROP_DEFAULT, "")
+		 REG_FLOAT(damp_time, PROP_DEFAULT, ""),
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER")
 	 END_PROPS(Mirror_Node_CFG)
  }
 
  PropertyInfoList* Blend_Node_CFG::get_props()
  {
 	 START_PROPS(Blend_Node_CFG)
-		 REG_INT(param.id, PROP_SERIALIZE, ""),
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
 		 REG_FLOAT(damp_factor, PROP_DEFAULT, ""),
 		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, ""),
 	END_PROPS(Blend_Node_CFG)

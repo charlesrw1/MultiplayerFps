@@ -612,7 +612,6 @@ struct Blend2d_CFG : public Node_CFG
 
 	handle<Parameter> xparam;
 	handle<Parameter> yparam;
-	float fade_in = 1.0;
 	float weight_damp = 0.01;
 
 	// Inherited via At_Node

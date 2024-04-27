@@ -32,7 +32,7 @@ PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
-PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint)
+PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint, const char* customtype)
 {
 	PropertyInfo prop(name, offset, flags);
 
@@ -46,6 +46,7 @@ PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t fl
 		assert(0);
 
 	prop.range_hint = hint;
+	prop.custom_type_str = customtype;
 	return prop;
 }
 
@@ -80,11 +81,12 @@ PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t fla
 	return prop;
 }
 
-PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr)
+PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype)
 {
 	PropertyInfo prop(name,offset,flags);
 	prop.type = core_type_id::List;
 	prop.list_ptr = ptr;
+	prop.custom_type_str = customtype;
 	return prop;
 }
 

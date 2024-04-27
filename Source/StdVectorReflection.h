@@ -31,3 +31,4 @@ class StdVectorCallback : public IListCallback
 
 #define MAKE_VECTORCALLBACK( type, name ) static StdVectorCallback<type> vecdef_##name( type::get_props() );
 #define REG_STDVECTOR(name, flags ) make_list_property(#name, offsetof(TYPE_FROM_START, name), flags, &vecdef_##name)
+#define REG_STDVECTOR_W_CUSTOM(name, flags, custom ) make_list_property(#name, offsetof(TYPE_FROM_START, name), flags, &vecdef_##name, custom)

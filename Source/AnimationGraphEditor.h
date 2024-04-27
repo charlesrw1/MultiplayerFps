@@ -577,6 +577,52 @@ public:
 	const Animation_Set_New* set = nullptr;
 };
 
+class ControlParamArrayHeader;
+class ControlParamsWindow
+{
+public:
+	void imgui_draw();
+	void refresh_props() {
+		control_params.clear_all();
+		control_params.add_property_list_to_grid(get_props(), this, PG_LIST_PASSTHROUGH);
+	}
+
+	struct tuple {
+		const char* str = "";
+		int index = 0;
+		script_parameter_type type{};
+	};
+
+	std::vector<tuple> get_param_names_for_lookup() {
+		std::vector<tuple> out;
+		for (int i = 0; i < props.size(); i++) {
+			// c_str shouldnt become invalid
+			out.push_back({ props[i].name.c_str(), props[i].imgui_id, props[i].type });
+		}
+		return out;
+	}
+
+private:
+	static PropertyInfoList* get_props();
+
+	struct ControlParamProp {
+		ControlParamProp() {
+			static int unique_id = 0;
+			imgui_id = unique_id++;
+		}
+		int indirect_index = 0;
+		std::string name = "Unnamed";
+		script_parameter_type type = script_parameter_type::int_t;
+		int enum_type = 0;
+		int imgui_id = 0;
+		static PropertyInfoList* get_props();
+	};
+	friend class ControlParamArrayHeader;
+
+	std::vector<ControlParamProp> props;
+	PropertyGrid control_params;
+};
+
 class Texture;
 class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
@@ -639,7 +685,9 @@ public:
 		return default_editor;
 	}
 
+	ControlParamsWindow control_params;
 	PropertyGrid node_props;
+
 	TabState graph_tabs;
 	Timeline timeline;
 

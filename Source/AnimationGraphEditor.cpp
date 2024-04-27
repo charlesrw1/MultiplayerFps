@@ -5,7 +5,7 @@
 
 #include "Texture.h"
 #include "Game_Engine.h"
-
+#include "GlobalEnumMgr.h"
 
 std::string remove_whitespace(const char* str)
 {
@@ -99,6 +99,104 @@ public:
 };
 
 
+class AgEnumFinder : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+		ASSERT(prop->type == core_type_id::Int32);
+
+		ImGui::Text("Hello world\n");
+	}
+
+};
+
+
+ImVec4 color32_to_imvec4(Color32 color) {
+	return ImVec4(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
+}
+
+ImVec4 scriptparamtype_to_color(script_parameter_type type)
+{
+	ASSERT((int)type < 4);
+
+	static ImVec4 color[] = {
+		color32_to_imvec4({120, 237, 100}),
+		color32_to_imvec4({245, 27, 223}),
+		color32_to_imvec4({10, 175, 240}),
+		color32_to_imvec4({240, 198, 12}),
+	};
+	return color[(int)type];
+}
+
+class AgParamFinder : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+		ASSERT(prop->type == core_type_id::Int32);
+
+		int selected_id = prop->get_int(instance);
+
+		auto options = ed.control_params.get_param_names_for_lookup();
+		int array_idx = -1;
+		for (int i = 0; i < options.size(); i++) {
+			if (options[i].index == selected_id) {
+				array_idx = i;
+				break;
+			}
+		}
+		if (array_idx == -1) selected_id = -1;
+
+		if (array_idx != -1)
+			ImGui::PushStyleColor(ImGuiCol_Text, scriptparamtype_to_color(options[array_idx].type));
+
+		if (!ImGui::BeginCombo("##paramfinder", (array_idx == -1) ? nullptr : options[array_idx].str, ImGuiComboFlags_None)) {
+			if (array_idx != -1)
+				ImGui::PopStyleColor();
+			return;
+		}
+
+		if (array_idx != -1)
+			ImGui::PopStyleColor();
+
+		bool value_changed = false;
+		bool does_id_map_to_anything = false;
+		for (int i = 0; i < options.size(); i++)
+		{
+			ImGui::PushID(i);
+			const bool item_selected = options[i].index == selected_id;
+			does_id_map_to_anything |= item_selected;
+			const char* item_text = options[i].str;
+		
+			ImGui::PushStyleColor(ImGuiCol_Text, scriptparamtype_to_color(options[i].type));
+
+			if (ImGui::Selectable(item_text, item_selected))
+			{
+				value_changed = true;
+				selected_id = options[i].index;
+			}
+			if (item_selected)
+				ImGui::SetItemDefaultFocus();
+			ImGui::PopID();
+
+			ImGui::PopStyleColor();
+		}
+
+		ImGui::EndCombo();
+		prop->set_int(instance, selected_id);
+	}
+
+};
+
+
+
 class AnimationGraphEditorPropertyFactory : public IPropertyEditorFactory
 {
 public:
@@ -112,12 +210,75 @@ public:
 		else if (strcmp(prop->custom_type_str, "AG_LISP_CODE") == 0) {
 			return new AgLispCodeEditorProperty(instance, prop);
 		}
+		else if (strcmp(prop->custom_type_str, "AG_ENUM_TYPE_FINDER") == 0) {
+			return new AgEnumFinder(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_PARAM_FINDER") == 0) {
+			return new AgParamFinder(instance, prop);
+		}
 
 		return nullptr;
 	}
 
 };
 static AnimationGraphEditorPropertyFactory g_AnimationGraphEditorPropertyFactory;
+
+
+class ControlParamArrayHeader : public IArrayHeader
+{
+	using IArrayHeader::IArrayHeader;
+
+	// Inherited via IArrayHeader
+	virtual bool imgui_draw_header(int index) {
+		using proptype = ControlParamsWindow::ControlParamProp;
+		std::vector<proptype>* array_ = (std::vector<proptype>*)prop->get_ptr(instance);
+		ASSERT(index >= 0 && index < array_->size());
+		proptype& prop_ = array_->at(index);
+
+		bool open = ImGui::TreeNode("##header");
+		if (open) 
+			ImGui::TreePop();
+		ImGui::SameLine(0);
+		ImGui::PushStyleColor(ImGuiCol_Text, scriptparamtype_to_color(prop_.type));
+		ImGui::Text(prop_.name.c_str());
+		ImGui::PopStyleColor();
+
+
+		return open;
+	}
+	virtual void imgui_draw_closed_body(int index)
+	{
+		using proptype = ControlParamsWindow::ControlParamProp;
+		std::vector<proptype>* array_ = (std::vector<proptype>*)prop->get_ptr(instance);
+		ASSERT(index >= 0 && index < array_->size());
+		proptype& prop_ = array_->at(index);
+
+		ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 153, 152, 156 }));
+		const char* name = GlobalEnumDefMgr::get().get_enum_name(script_parameter_type_def.id, (int)prop_.type);
+		ImGui::Text("%s", name);
+		ImGui::PopStyleColor();
+	}
+	friend class ControlParamsWindow;
+};
+
+class AnimationGraphEditorArrayHeaderFactory : public IArrayHeaderFactory
+{
+public:
+
+	// Inherited via IPropertyEditorFactory
+	virtual IArrayHeader* try_create(PropertyInfo* prop, void* instance) override
+	{
+		if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_ARRAY") == 0) {
+			return new ControlParamArrayHeader(instance, prop);
+		}
+
+
+		return nullptr;
+	}
+
+};
+static AnimationGraphEditorArrayHeaderFactory g_AnimationGraphEditorArrayHeaderFactory;
+
 
 
 
@@ -344,52 +505,46 @@ void AnimationGraphEditor::draw_prop_editor()
 {
 	if (ImGui::Begin("animation graph property editor"))
 	{
-		if (ImGui::TreeNodeEx("Node property editor", ImGuiTreeNodeFlags_DefaultOpen)) {
-			if (ImNodes::NumSelectedNodes() == 1) {
-				int node = 0;
-				ImNodes::GetSelectedNodes(&node);
+		
+		if (ImNodes::NumSelectedNodes() == 1) {
+			int node = 0;
+			ImNodes::GetSelectedNodes(&node);
 
-				IAgEditorNode* mynode = find_node_from_id(node);
+			IAgEditorNode* mynode = find_node_from_id(node);
 
-				if (node != node_last_frame) {
-					node_props.clear_all();
+			if (node != node_last_frame) {
+				node_props.clear_all();
 
-					std::vector<PropertyListInstancePair> info;
-					mynode->get_props(info);
+				std::vector<PropertyListInstancePair> info;
+				mynode->get_props(info);
 
-					for (int i = 0; i < info.size(); i++) {
-						if(info[i].list) /* some nodes have null props */
-							node_props.add_property_list_to_grid(info[i].list, info[i].instance);
-					}
-					node_last_frame = node;
+				for (int i = 0; i < info.size(); i++) {
+					if(info[i].list) /* some nodes have null props */
+						node_props.add_property_list_to_grid(info[i].list, info[i].instance);
 				}
-
-				//mynode->draw_property_editor(this);
-
-				node_props.update();
-			}
-			else if (ImNodes::NumSelectedLinks() == 1) {
-				int link = 0;
-				ImNodes::GetSelectedLinks(&link);
-
-				uint32_t node_id = IAgEditorNode::get_nodeid_from_link_id(link);
-				uint32_t slot = IAgEditorNode::get_slot_from_id(link);
-				IAgEditorNode* node_s = find_node_from_id(node_id);
-
-				//node_s->get_props()
-			}
-			else {
-				node_last_frame = link_last_frame = -1;
+				node_last_frame = node;
 			}
 
+			//mynode->draw_property_editor(this);
 
-			ImGui::TreePop();
+			node_props.update();
 		}
+		else if (ImNodes::NumSelectedLinks() == 1) {
+			int link = 0;
+			ImNodes::GetSelectedLinks(&link);
 
-		//if (ImGui::TreeNodeEx("Control params", ImGuiTreeNodeFlags_DefaultOpen)) {
-		//	//ed_params->imgui_draw();
-		//	ImGui::TreePop();
-		//}
+			uint32_t node_id = IAgEditorNode::get_nodeid_from_link_id(link);
+			uint32_t slot = IAgEditorNode::get_slot_from_id(link);
+			IAgEditorNode* node_s = find_node_from_id(node_id);
+
+			//node_s->get_props()
+		}
+		else {
+			node_last_frame = link_last_frame = -1;
+
+
+			ImGui::Text("No node selected\n");
+		}
 
 	}
 	ImGui::End();
@@ -571,6 +726,8 @@ void AnimationGraphEditor::begin_draw()
 
 	if (open_prop_editor)
 		draw_prop_editor();
+
+	control_params.imgui_draw();
 
 	is_modifier_pressed = ImGui::GetIO().KeyAlt;
 
@@ -1605,6 +1762,32 @@ void AnimationGraphEditor::tick(float dt)
 	out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 }
 
+#include "StdVectorReflection.h"
+PropertyInfoList* ControlParamsWindow::ControlParamProp::get_props()
+{
+	START_PROPS(ControlParamsWindow::ControlParamProp)
+		REG_STDSTRING(name, PROP_EDITABLE),
+		REG_ENUM(type, PROP_EDITABLE, "", script_parameter_type_def.id),
+		REG_INT_W_CUSTOM(enum_type, PROP_EDITABLE, "", "AG_ENUM_TYPE_FINDER")
+	END_PROPS(CPW:ControlParamProp)
+}
+
+PropertyInfoList* ControlParamsWindow::get_props()
+{
+	MAKE_VECTORCALLBACK(ControlParamsWindow::ControlParamProp, props)
+	START_PROPS(ControlParamsWindow)
+		REG_STDVECTOR_W_CUSTOM(props, PROP_EDITABLE, "AG_CONTROL_PARAM_ARRAY")
+	END_PROPS(ControlParams)
+}
+
+void ControlParamsWindow::imgui_draw()
+{
+	if (ImGui::Begin("Control Parameters")) {
+		control_params.update();
+	}
+	ImGui::End();
+}
+
 
 void AnimationGraphEditor::compile_and_run()
 {
@@ -1648,6 +1831,8 @@ void AnimationGraphEditor::open(const char* name)
 	ro.transform = out.model->skeleton_root_transform;
 
 	idraw->update_obj(out.obj, ro);
+
+	control_params.refresh_props();
 }
 
 void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)

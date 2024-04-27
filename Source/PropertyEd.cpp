@@ -2,6 +2,11 @@
 #include "imgui.h"
 #include "GlobalEnumMgr.h"
 
+static uint32_t color32_to_uint(Color32 color) {
+	return *(uint32_t*)&color;
+}
+
+
 static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx)
 {
 	if (prop->type == core_type_id::List) {
@@ -18,9 +23,21 @@ static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, in
 	}
 }
 
-void PropertyGrid::add_property_list_to_grid(PropertyInfoList* list, void* inst)
+void PropertyGrid::add_property_list_to_grid(PropertyInfoList* list, void* inst, uint32_t flags)
 {
-	rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(nullptr, inst, list, -1)));
+	IGridRow* row = nullptr;
+
+	if (flags & PG_LIST_PASSTHROUGH && list->count == 1 && list->list[0].type == core_type_id::List) {
+		row = create_row(nullptr, list->list, inst, -1);
+		row->set_name_override(list->type_name);
+		ASSERT(row);
+	}
+	else {
+		row = new GroupRow(nullptr, inst, list, -1);
+	}
+
+	rows.push_back(std::unique_ptr<IGridRow>(row));
+
 }
 
 void PropertyGrid::update()
@@ -68,10 +85,14 @@ void IGridRow::update(float header_ofs)
 
 	ImGui::TableNextColumn();
 	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit;
-	if (ImGui::BeginTable("GridTable", 2, flags))
+	int num_cols = (has_row_controls()) ? 3 : 2;
+	if (ImGui::BeginTable("GridTable", num_cols, flags))
 	{
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
-		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 100.0);
+		if(num_cols == 3)
+			ImGui::TableSetupColumn("##Controls", ImGuiTableColumnFlags_WidthFixed, 100.0);
+		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 50.0);
+
 
 		ImGui::TableNextRow();
 
@@ -80,20 +101,18 @@ void IGridRow::update(float header_ofs)
 		
 		internal_update();
 
-		//if (HasExtraControls())
-		//{
-		//	ImGui::TableNextColumn();
-		//	DrawExtraControlsSection();
-		//}
+		if (has_row_controls())
+		{
+			ImGui::TableNextColumn();
+			draw_row_controls();
+		}
 
 		ImGui::TableNextColumn();
-		//if (HasResetSection())
+		if (has_reset_button())
 		{
-			//DrawResetSection();
-
 			auto reset_img = mats.find_texture("icon/undo.png");
-
-			ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14));
+			if (ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14)))
+				on_reset();
 		}
 
 		ImGui::EndTable();
@@ -101,7 +120,7 @@ void IGridRow::update(float header_ofs)
 
 	ImGui::PopID();
 
-	if (draw_children()) {
+	if (draw_children() && expanded) {
 		for (int i = 0; i < child_rows.size(); i++)
 			child_rows[i]->update(header_ofs + get_indent_width());
 	}
@@ -171,6 +190,28 @@ void IntegerEditor::internal_update()
 
 	prop->set_int(instance, val);
 }
+
+IArrayHeaderFactory* IArrayHeaderFactory::first = nullptr;
+
+IArrayHeaderFactory::IArrayHeaderFactory()
+{
+	next = first;
+	first = this;
+}
+
+IArrayHeader* IArrayHeaderFactory::create(PropertyInfo* prop, void* instance)
+{
+	IArrayHeaderFactory* factory = first;
+	while (factory) {
+
+		IArrayHeader* out = factory->try_create(prop, instance);
+		if (out)
+			return out;
+		factory = factory->next;
+	}
+	return nullptr;
+}
+
 
 IPropertyEditorFactory* IPropertyEditorFactory::first = nullptr;
 
@@ -295,6 +336,9 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 
 ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
+	header = std::unique_ptr<IArrayHeader>( IArrayHeaderFactory::create(prop, instance) );
+
+
 	rebuild_child_rows();
 }
 
@@ -305,28 +349,46 @@ int ArrayRow::get_size()
 
 PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
+
 	prop_editor = std::unique_ptr<IPropertyEditor>(IPropertyEditorFactory::create(prop, instance));
+}
+
+void ArrayRow::draw_row_controls()
+{
+	auto trashimg = mats.find_texture("icon/trash.png");
+	auto addimg = mats.find_texture("icon/plus.png");
+	uint8_t* list_instance_ptr = prop->get_ptr(instance);
+
+	ImGui::PushStyleColor(ImGuiCol_Button, 0);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+
+	if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
+		clear_children();
+		prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) + 1);	// might invalidate childrens ptrs, so refresh
+		rebuild_child_rows();
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
+
+		clear_children();
+		prop->list_ptr->resize(list_instance_ptr, 0);
+	}
+
+	ImGui::PopStyleColor(3);
 }
 
  void ArrayRow::internal_update() 
 {
-	 auto trashimg = mats.find_texture("icon/trash.png");
-	 auto addimg = mats.find_texture("icon/plus.png");
 
 	 uint8_t* list_instance_ptr = prop->get_ptr(instance);
+	 {
+		 int count = get_size();
 
-	 if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
-		 clear_children();
-		 prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) + 1);	// might invalidate childrens ptrs, so refresh
-		 rebuild_child_rows();
-	 }
+		 ImGui::TextColored(ImVec4(0.5,0.5,0.5,1.0),"elements: %d", count);
 
-	 ImGui::SameLine();
-
-	 if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
-
-		 clear_children();
-		 prop->list_ptr->resize(list_instance_ptr, 0);
 	 }
 
 
@@ -384,7 +446,12 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 ImGui::PushStyleColor(ImGuiCol_Header, 0);
 	 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
 	 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
-	 if(ImGui::TreeNode(prop->name))
+
+	 const char* name = prop->name;
+	 if (!name_override.empty()) name = name_override.c_str();
+
+	 expanded = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_DefaultOpen);
+	 if(expanded)
 		 ImGui::TreePop();
 	 ImGui::PopStyleColor(3);
  }
@@ -398,8 +465,10 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 IListCallback* list = prop->list_ptr;
 	 int count = list->get_size(prop->get_ptr(instance));
 	 PropertyInfoList* struct_ = list->props_in_list;
-	 for (int i = 0; i < count; i++) {
 
+
+
+	 for (int i = 0; i < count; i++) {
 		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(prop->get_ptr(instance), i), struct_, i)));
 	 }
  }
@@ -419,8 +488,12 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
  }
 
 
- GroupRow::GroupRow(IGridRow* parent, void* instance, PropertyInfoList* list, int row_idx) : IGridRow(parent, row_idx), proplist(list), inst(instance)
+ GroupRow::GroupRow(IGridRow* parent, void* instance, PropertyInfoList* list, 
+	 int row_idx) 
+	 : IGridRow(parent, row_idx), proplist(list), 
+	 inst(instance)
  {
+	
 	 for (int i = 0; i < list->count; i++) {
 		 auto& prop = list->list[i];
 		 if (!prop.can_edit())
@@ -443,23 +516,10 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 return !passthrough_to_child();
  }
 
- void GroupRow::draw_header(float ofs)
+ void GroupRow::draw_row_controls()
  {
-	 ImGui::Dummy(ImVec2(ofs, 0));
-
-		ImGui::SameLine();
-	 if (passthrough_to_child())
-		 ImGui::Text(name.c_str());
-	 else {
-		 ImGui::PushStyleColor(ImGuiCol_Header, 0);
-		 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-		 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
-		 if (ImGui::TreeNode(name.c_str()))
-			 ImGui::TreePop();
-		 ImGui::PopStyleColor(3);
-	 }
-	 if (row_index == -1)
-		 return;
+	 ASSERT(parent);
+	 ASSERT(row_index != -1);
 
 	 ArrayRow* array_ = (ArrayRow*)parent;
 
@@ -470,7 +530,10 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 auto movedown = mats.find_texture("icon/movedown.png");
 	 auto trash1 = mats.find_texture("icon/trash1.png");
 
-	 ImGui::SameLine();
+	 ImGui::PushStyleColor(ImGuiCol_Button, 0);
+	 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
+	 ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+
 	 ImGui::BeginDisabled(!canmoveup);
 	 if (ImGui::ImageButton((ImTextureID)moveup->gl_id, ImVec2(16, 16))) {
 		 array_->moveup_index(row_index);
@@ -486,6 +549,37 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	 if (ImGui::ImageButton((ImTextureID)trash1->gl_id, ImVec2(16, 16))) {
 		 array_->delete_index(row_index);
 	 }
+
+	 ImGui::PopStyleColor(3);
+ }
+
+ void GroupRow::draw_header(float ofs)
+ {
+	 ImGui::Dummy(ImVec2(ofs, 0));
+	 ImGui::SameLine();
+
+	 ImGui::PushStyleColor(ImGuiCol_Header, 0);
+	 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+	 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+
+	 bool is_array = row_index != -1;
+	 bool has_drawn = false;
+	 if (is_array) {
+		 ArrayRow* array_ = (ArrayRow*)parent;
+		 if (array_->header) {
+			 expanded = array_->header->imgui_draw_header(row_index);
+			 has_drawn = true;
+		 }
+	 }
+	 if(!has_drawn) {
+
+		 uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+		 expanded = ImGui::TreeNodeEx(name.c_str(), flags);
+		if(expanded)
+			 ImGui::TreePop();
+
+	 }
+	ImGui::PopStyleColor(3);
  }
 
  void GroupRow::internal_update() {
@@ -496,6 +590,14 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 
 		 row->internal_update();
 
+	 }
+
+	 bool is_array = row_index != -1;
+	 if (!expanded && is_array) {
+		 ArrayRow* array_ = (ArrayRow*)parent;
+		 if (array_->header) {
+			 array_->header->imgui_draw_closed_body(row_index);
+		 }
 	 }
 
  }
