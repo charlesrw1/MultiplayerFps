@@ -35,7 +35,11 @@ static const Color32 MISC_COLOR = { 13, 82, 44 };
 
 IMPL_TOOL_NODE(start_statemachine, "START", "State machine enter", ROOT_COLOR);
 IMPL_TOOL_NODE(root, "OUTPUT", "Output pose for the blend tree", ROOT_COLOR);
-IMPL_TOOL_NODE(state, "State", "A state in a FSM. Use output pin to create transitions to other states\n", STATE_COLOR);
+IMPL_TOOL_NODE(state, "State", 
+	"A state in a FSM\n"
+	"Use output pin to create transitions to other states\n"
+	"(click on transition arrows to change condition)\n"
+	"(double click to open blend tree)\n", STATE_COLOR);
 
 IMPL_ANIMNODE(Clip_Node_CFG, "Clip", "Animation input data", SOURCE_COLOR);
 IMPL_ANIMNODE(Sync_Node_CFG, "Sync", "Syncs animations below this node", MISC_COLOR);
@@ -45,7 +49,14 @@ IMPL_ANIMNODE(Add_Node_CFG, "Apply Additive", "Apply additive(delta'd) animation
 IMPL_ANIMNODE(Subtract_Node_CFG, "Subtract", "Subtract a source pose from a ref pose, use with \'Apply Additive\'", ADD_COLOR);
 IMPL_ANIMNODE(Blend_Node_CFG, "Blend", "Blend 2 poses by a boolean or float [0,1]", BLEND_COLOR);
 IMPL_ANIMNODE(Blend_Int_Node_CFG, "Blend by int/enum", "Blend n poses by an int or enum\n", BLEND_COLOR);
-IMPL_ANIMNODE(Blend2d_CFG, "Blend 2D", "Blend 8 directional poses and an idle pose\nUse for directional locomotion", BLEND_COLOR);
+IMPL_ANIMNODE(BlendSpace2d_CFG, "Blend 2D", 
+	"Blends clips driven by 2d parameterization\n"
+	"Can use 5,9,11,or 15 vertex topology\n"
+	"Can use with both normal and additive poses\n"
+	"Ex: directional movement or aim offsets\n", BLEND_COLOR);
+IMPL_ANIMNODE(BlendSpace1d_CFG, "Blend 1D", 
+	"Blends clips driven by 1d parameterization\n"
+	"Can use with normal and additive poses\n", BLEND_COLOR);
 IMPL_ANIMNODE(Scale_By_Rootmotion_CFG, "Rootmotion Scale", "Scale any clip sampling by the velocity parameter. \n(ex: a running clip is at 2 m/s, entity is moving at 4 m/s, so clip is played at 2x speed", MISC_COLOR);
 
 
@@ -56,6 +67,7 @@ static const char* animnode_strs[] = {
 	"blend",
 	"blend_by_int",
 	"blend2d",
+	"blend1d",
 	"add",
 	"subtract",
 	"aimoffset",
@@ -72,10 +84,12 @@ static const char* animnode_strs[] = {
 static_assert((sizeof(animnode_strs) / sizeof(char*)) ==  ((int)animnode_type::COUNT + 1), "string reflection out of sync");
 AutoEnumDef animnode_type_def = AutoEnumDef("",sizeof(animnode_strs)/sizeof(char*), animnode_strs);
 
+static BytecodeContext g_animbytecodectx;
+BytecodeContext& get_global_anim_bytecode_ctx() { return g_animbytecodectx; }
 
 bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
 {
-	return compilied.execute(*ctx.vars).ival;
+	return compilied.execute(&get_global_anim_bytecode_ctx(), *ctx.vars).ival;
 }
 
 
@@ -405,13 +419,18 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
 // Inherited via At_Node
 
- bool Blend2d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ bool BlendSpace1d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ {
+	 return false;
+ }
+
+ bool BlendSpace2d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	//walk_fade_in = g_walk_fade_in;
 	//walk_fade_out = g_walk_fade_out;
 	//run_fade_in = g_run_fade_in;
 
-	auto rt = get_rt<Directionalblend_Node_RT>(ctx);
+	auto rt = get_rt<RT_TYPE>(ctx);
 
 	glm::vec2 relmovedir = glm::vec2(
 		ctx.vars->get(xparam).fval,
@@ -444,40 +463,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		}
 	}
 
-	// highest weighted pose controls syncing
-	Pose* scratchposes = Pose_Pool::get().alloc(3);
-	if (character_ground_speed < 0.9999) {
-
-		if (anglelerp <= 0.5) {
-			input[DIRECTION + pose1]->get_pose(ctx, pose.set_pose(&scratchposes[1]));
-			input[DIRECTION + pose2]->get_pose(ctx, pose);
-		}
-		else {
-			input[DIRECTION + pose2]->get_pose(ctx, pose);
-			input[DIRECTION + pose1]->get_pose(ctx, pose.set_pose(&scratchposes[1]));
-		}
-		input[IDLE]->get_pose(ctx, pose.set_pose(&scratchposes[0]));
-
-		util_blend(ctx.num_bones(), scratchposes[1], *pose.pose, anglelerp);
-		util_blend(ctx.num_bones(), scratchposes[0], *pose.pose, 1.0 - character_ground_speed);
-	}
-	else {
-		if (anglelerp <= 0.5) {
-			input[DIRECTION + pose1]->get_pose(ctx, pose.set_pose(&scratchposes[1]));
-			input[DIRECTION + pose2]->get_pose(ctx, pose);
-		}
-		else {
-			input[DIRECTION + pose2]->get_pose(ctx, pose);
-			input[DIRECTION + pose1]->get_pose(ctx, pose.set_pose(&scratchposes[1]));
-		}
-
-		util_blend(ctx.num_bones(), scratchposes[0], *pose.pose, anglelerp);
-	}
-
-
-	Pose_Pool::get().free(3);
-
-	return true;
+	return false;
 }
 
  static const char* parameter_type_to_string(script_parameter_type type)
@@ -582,6 +568,14 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 return nullptr;
  }
 
+ PropertyInfoList* BlendSpace1d_CFG::get_props()
+ {
+	 START_PROPS(BlendSpace1d_CFG)
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
+		 REG_BOOL(is_additive_blend_space, PROP_DEFAULT, ""),
+	END_PROPS(BlendSpace1d_CFG)
+ }
+
  PropertyInfoList* Add_Node_CFG::get_props()
  {
 	 START_PROPS(Add_Node_CFG)
@@ -596,20 +590,21 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	END_PROPS(Blend_Int_Node_CFG)
  }
 
- PropertyInfoList* Blend2d_CFG::get_props()
+ PropertyInfoList* BlendSpace2d_CFG::get_props()
  {
-	 START_PROPS(Blend2d_CFG)
+	 START_PROPS(BlendSpace2d_CFG)
 		 REG_INT_W_CUSTOM(xparam, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
 		 REG_INT_W_CUSTOM(yparam, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
 		 REG_FLOAT(weight_damp, PROP_DEFAULT, "")
-	 END_PROPS(Blend2d_CFG)
+	 END_PROPS(BlendSpace2d_CFG)
  }
 
  PropertyInfoList* Mirror_Node_CFG::get_props()
  {
 	 START_PROPS(Mirror_Node_CFG)
 		 REG_FLOAT(damp_time, PROP_DEFAULT, ""),
-		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER")
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
+		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, ""),
 	 END_PROPS(Mirror_Node_CFG)
  }
 

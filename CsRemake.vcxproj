@@ -45,7 +45,7 @@
     <ClCompile Include="Source\External\imgui_widgets.cpp" />
     <ClCompile Include="source\Game.cpp" />
     <ClCompile Include="Source\glad.c" />
-    <ClCompile Include="Source\LispInterpreter.cpp" />
+    <ClCompile Include="Source\ExpressionLang.cpp" />
     <ClCompile Include="Source\Meshlet.cpp" />
     <ClCompile Include="Source\MyImguiLib.cpp" />
     <ClCompile Include="Source\Net.cpp" />
@@ -107,7 +107,7 @@
     <ClInclude Include="Source\IGraphDriver.h" />
     <ClInclude Include="Source\Handle.h" />
     <ClInclude Include="Source\InlineVec.h" />
-    <ClInclude Include="Source\LispInterpreter.h" />
+    <ClInclude Include="Source\ExpressionLang.h" />
     <ClInclude Include="Source\MemArena.h" />
     <ClInclude Include="Source\Meshlet.h" />
     <ClInclude Include="Source\Key_Value_File.h" />

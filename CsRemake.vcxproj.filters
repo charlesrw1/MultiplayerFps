@@ -79,7 +79,7 @@
     <ClCompile Include="Source\Profilier.cpp">
       <Filter>Source\Shared</Filter>
     </ClCompile>
-    <ClCompile Include="Source\LispInterpreter.cpp">
+    <ClCompile Include="Source\ExpressionLang.cpp">
       <Filter>Source\Shared</Filter>
     </ClCompile>
     <ClCompile Include="Source\Net.cpp">
@@ -255,7 +255,7 @@
     <ClInclude Include="Source\MathLib.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\LispInterpreter.h">
+    <ClInclude Include="Source\ExpressionLang.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\GlmInclude.h">

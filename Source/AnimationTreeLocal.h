@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Model.h"
-#include "LispInterpreter.h"
+#include "ExpressionLang.h"
 #include "glm/glm.hpp"
 #include "MemArena.h"
 
@@ -31,6 +31,7 @@ enum class animnode_type
 	blend,
 	blend_by_int,
 	blend2d,
+	blend1d,
 	add,
 	subtract,
 	aimoffset,
@@ -588,40 +589,76 @@ struct Statemachine_Node_CFG : public Node_CFG
 	std::vector<State> states;
 };
 
-struct Directionalblend_Node_RT : Rt_Vars_Base
+struct BlendSpace2d_RT : Rt_Vars_Base
 {
 	glm::vec2 character_blend_weights = glm::vec2(0.f);
 };
 
-struct Blend2d_CFG : public Node_CFG
+struct BlendSpace2d_CFG : public Node_CFG
 {
-	DECLARE_ANIMNODE_CREATOR(Blend2d_CFG, animnode_type::blend2d)
+	DECLARE_ANIMNODE_CREATOR(BlendSpace2d_CFG, animnode_type::blend2d)
+	using RT_TYPE = BlendSpace2d_RT;
 
-
-	Blend2d_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(Directionalblend_Node_RT)) {
+	BlendSpace2d_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(RT_TYPE)) {
 		// allocate memory for extra nodes
 		Node_CFG** nodes = (Node_CFG**)tree->arena.alloc_bottom(sizeof(Node_CFG**) * 9);
 		memset(nodes, 0, sizeof(Node_CFG*)*9);
 		input.assign_memory(nodes, 9);
 	}
 
-	enum {
-		IDLE = 0,
-		DIRECTION = 1
-	};
-
 	handle<Parameter> xparam;
 	handle<Parameter> yparam;
 	float weight_damp = 0.01;
 
+	struct GridPoint {
+		float x = 0.0;
+		float y = 0.0;
+		// grid point corresponds to input source node
+	};
+
+	// either 5,9,11, or 15 vertex topology
+	InlineVec<GridPoint, 5> blend2d_verts;
+	bool is_additive_blend_space = false;
+
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		*get_rt<Directionalblend_Node_RT>(ctx) = Directionalblend_Node_RT();
+		*get_rt<RT_TYPE>(ctx) = RT_TYPE();
 	}
 
 	virtual void construct(NodeRt_Ctx& ctx) const override {
-		construct_this<Directionalblend_Node_RT>(ctx);
+		construct_this<RT_TYPE>(ctx);
+	}
+};
+
+struct BlendSpace1d_RT : public Rt_Vars_Base
+{
+	float weight = 0.0;
+};
+
+class BlendSpace1d_CFG : public Node_CFG
+{
+public:
+	DECLARE_ANIMNODE_CREATOR(BlendSpace1d_CFG, animnode_type::blend1d)
+	using RT_TYPE = BlendSpace1d_RT;
+
+	BlendSpace1d_CFG(Animation_Tree_CFG* tree) : Node_CFG(tree, sizeof(RT_TYPE)) {
+		// allocate memory for extra nodes
+		Node_CFG** nodes = (Node_CFG**)tree->arena.alloc_bottom(sizeof(Node_CFG**) * 9);
+		memset(nodes, 0, sizeof(Node_CFG*) * 9);
+		input.assign_memory(nodes, 9);
+	}
+
+	InlineVec<float, 3> blend1d_verts;
+	bool is_additive_blend_space = false;
+
+	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		*get_rt<RT_TYPE>(ctx) = RT_TYPE();
+	}
+
+	virtual void construct(NodeRt_Ctx& ctx) const override {
+		construct_this<RT_TYPE>(ctx);
 	}
 };
 
@@ -640,3 +677,4 @@ struct animnode_name_type
 };
 
 extern animnode_name_type& get_animnode_typedef(animnode_type type);
+BytecodeContext& get_global_anim_bytecode_ctx();

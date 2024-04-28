@@ -159,7 +159,6 @@ private:
 		int index = 0;
 		Animation_Notify_List list;
 	};
-
 	Memory_Arena event_arena;
 	std::unordered_map<std::string, Animation_Link> notifies;
 	std::unordered_map<std::string, Model_Skeleton> skeletons;

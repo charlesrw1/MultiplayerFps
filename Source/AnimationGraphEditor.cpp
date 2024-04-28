@@ -93,7 +93,16 @@ public:
 
 		ImguiInputTextCallbackUserStruct user;
 		user.string = &script->script_str;
-		ImGui::InputTextMultiline("##source", (char*)script->script_str.data(), script->script_str.size()+1, ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 4), ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user);
+		if (ImGui::InputTextMultiline("##source",
+			(char*)script->script_str.data(),
+			script->script_str.size() + 1,
+			ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 4),
+			ImGuiInputTextFlags_CallbackResize,
+			imgui_input_text_callback_function,
+			&user)) {
+			script->script_str.resize(strlen(script->script_str.data()));
+		}
+
 	}
 
 	bool initial = true;
@@ -1222,7 +1231,7 @@ bool AgEditor_BaseNode::compile_my_data()
 
 	if (type == animnode_type::blend2d) {
 
-		Blend2d_CFG* blend2d = (Blend2d_CFG*)node;
+		BlendSpace2d_CFG* blend2d = (BlendSpace2d_CFG*)node;
 		if (!blend2d->xparam.is_valid() || !blend2d->yparam.is_valid())
 			append_fail_msg("[ERROR] missing parameter(s)\n");
 	}
@@ -1317,17 +1326,14 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 		}
 		else {
 
-			std::string code = st->script.script_str;
+			const std::string& code = st->script.script_str;
 			const char* err_str = nullptr;
 			try {
-				auto exp = LispLikeInterpreter::parse(code);
 
-				if (exp.type != LispExp::int_type) {
-					err_str = "wrong output type, expected boolean";
-				}
-				else {
-					st->script.compilied.compile(exp, ed.editing_tree->parameters);
-				}
+				auto ret = st->script.compilied.compile_new(&get_global_anim_bytecode_ctx(), &ed.editing_tree->parameters, code);
+				if (strlen(ret) != 1 || ret[0] != 'i')
+					err_str = "must return only 1 integer/boolean";
+
 			}
 			catch (LispError err) {
 				err_str = err.msg;
@@ -1338,7 +1344,8 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 			}
 
 			if (err_str) {
-				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", err_str));
+				const char* to_state = out_state->get_title().c_str();
+				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", to_state, err_str));
 			}
 		}
 	}
