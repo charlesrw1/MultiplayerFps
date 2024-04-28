@@ -32,8 +32,6 @@ struct editor_layer {
 
 };
 
-
-
 const uint32_t MAX_INPUTS = 16;
 const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
 const uint32_t INPUT_START = MAX_NODES_IN_GRAPH;
@@ -53,7 +51,6 @@ class IAgEditorNode
 {
 public:
 
-	virtual void init();
 
 	IAgEditorNode() {
 		
@@ -62,44 +59,61 @@ public:
 	virtual ~IAgEditorNode() {
 
 	}
-
 	static PropertyInfoList* get_prop_list();
 
+	virtual void init();
 	virtual std::string get_default_name();
-
-	std::string& get_title() {
-		return title;
-	
+	virtual Node_CFG* get_graph_node() { return nullptr; }
+	virtual void get_props(std::vector<PropertyListInstancePair>& props) {
+		props.push_back({ get_prop_list(), this });
 	}
+	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) {}
+	virtual bool dont_call_compile() { return false; }
+	virtual bool traverse_and_find_errors();
+	virtual void on_remove_pin(int slot, bool force = false) {
+		inputs[slot].other_node = nullptr;
+	}
+	virtual void remove_reference(IAgEditorNode* node);
+	virtual editor_layer* get_layer() { return nullptr;  }
+	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) {
+		inputs[slot].other_node = input;
+		if (grow_pin_count_on_new_pin()) {
+			if (num_inputs > 0 && inputs[num_inputs - 1].other_node)
+				num_inputs++;
+		}
+		return false;
+	}
+	// animation graph specific stuff
+	virtual bool compile_my_data();
+	virtual bool draw_flat_links() { return false; }
+	virtual bool is_statemachine() {
+		return false;
+	}
+	virtual bool is_state_node() {
+		return false;
+	}
+
+
+	virtual void draw_node_top_bar() {}
+	virtual void post_prop_edit_update() {}
+	virtual void draw_node_bottom_bar() {}
+
+	const std::string& get_title() {
+		return title;
+	}
+	void set_node_title(const std::string& name) {
+		title = name;
+	}
+	bool name_is_default() { return title == "Unnamed"; }
 
 	std::string title = "Unnamed";
 	uint32_t id = 0;
 	Color32 node_color = { 23, 82, 12 };
 	uint32_t num_inputs = 1;
 	uint32_t graph_layer = 0;
-
+	animnode_type type = animnode_type::source;
 	std::array<InputPinNode, MAX_INPUTS> inputs;
 	
-	bool name_is_default() { return title == "Unnamed"; }
-
-	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) {
-		inputs[slot].other_node = input;
-
-		if (grow_pin_count_on_new_pin()) {
-			if (num_inputs > 0 && inputs[num_inputs - 1].other_node)
-				num_inputs++;
-		}
-
-		return false;
-	}
-
-	virtual void on_remove_pin(int slot, bool force = false) {
-		inputs[slot].other_node = nullptr;
-	}
-
-	virtual void remove_reference(IAgEditorNode* node);
-
-	virtual editor_layer* get_layer() { return nullptr;  }
 
 	uint32_t getinput_id(uint32_t inputslot) {
 		return inputslot + id * MAX_INPUTS + INPUT_START;
@@ -128,29 +142,11 @@ public:
 		return (staticid - STATIC_ATR_START) / MAX_STATIC_ATRS;
 	}
 
-	void set_node_title(const std::string& name) {
-		get_title() = name;
-	}
-
-	// animation graph specific stuff
-	virtual bool compile_my_data();
-
-
-	virtual bool draw_flat_links() { return false; }
-
-
 	bool can_user_delete() {
 		return type != animnode_type::root;
 	}
 	bool has_output_pins() {
 		return type != animnode_type::root;
-	}
-
-	virtual bool is_statemachine() {
-		return false;
-	}
-	virtual bool is_state_node() {
-		return false;
 	}
 
 	bool grow_pin_count_on_new_pin() {
@@ -163,26 +159,12 @@ public:
 		return nullptr;
 	}
 
-	virtual Node_CFG* get_graph_node() { return nullptr; }
-
-	virtual void get_props(std::vector<PropertyListInstancePair>& props) {
-		props.push_back({ get_prop_list(), this });
-	}
-
-	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) {}
-
-	virtual bool dont_call_compile() { return false; }
-
-	animnode_type type = animnode_type::source;
-
 	void append_fail_msg(const char* msg) {
 		compile_error_string += msg;
 	}
 	void append_info_msg(const char* msg) {
 		compile_info_string += msg;
 	}
-
-	virtual bool traverse_and_find_errors();
 
 	bool children_have_errors = false;
 	std::string compile_error_string;
@@ -197,6 +179,7 @@ public:
 	virtual bool compile_my_data() override;
 	virtual Node_CFG* get_graph_node() override { return node; }
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
+	virtual void draw_node_top_bar() override;
 
 	Node_CFG* node = nullptr;
 };
@@ -206,14 +189,15 @@ class AgEditor_StateMachineNode : public IAgEditorNode
 {
 public:
 	virtual void init();
-
 	virtual std::string get_default_name() override;
-
 	virtual bool traverse_and_find_errors();
-
 	virtual void remove_reference(IAgEditorNode* node) override;
-
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
+	virtual bool compile_my_data() override;
+	virtual bool is_statemachine() override { return true; }
+	virtual Node_CFG* get_graph_node() override { return node; }
+	virtual editor_layer* get_layer() { return (sublayer.context )
+		?  &sublayer : nullptr; }
 
 	~AgEditor_StateMachineNode() {
 		if (sublayer.context) {
@@ -221,12 +205,6 @@ public:
 		}
 	}
 
-	virtual bool compile_my_data() override;
-
-	bool is_statemachine() override { return true; }
-	virtual Node_CFG* get_graph_node() override { return node; }
-	virtual editor_layer* get_layer() { return (sublayer.context )
-		?  &sublayer : nullptr; }
 	handle<State> add_new_state(AgEditor_StateNode* node_);
 
 	State* get_state(handle<State> state);
@@ -250,14 +228,10 @@ public:
 	}
 
 	virtual bool dont_call_compile() { return true; }
-
 	virtual bool traverse_and_find_errors();
-
 	virtual std::string get_default_name() override;
-
-	bool compile_data_for_statemachine();
 	virtual void on_remove_pin(int slot, bool force) override;
-	bool is_state_node() override { return true; }
+	virtual bool is_state_node() override { return true; }
 	virtual void remove_reference(IAgEditorNode* node) override;
 	virtual bool compile_my_data() override;
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
@@ -267,13 +241,13 @@ public:
 			? &sublayer : nullptr;
 	}
 	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) override;
-
 	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) override;
 
 	void on_output_create(AgEditor_StateNode* node_to_output);
 	void remove_output_to(AgEditor_StateNode* node);
 
 	void get_transition_props(AgEditor_StateNode* to, std::vector<PropertyListInstancePair>& props);
+	bool compile_data_for_statemachine();
 
 	struct output_transition_info {
 		AgEditor_StateNode* output_to = nullptr;
@@ -287,20 +261,6 @@ public:
 
 	handle<State> state_handle;
 	int selected_transition_for_prop_ed = 0;
-};
-
-struct Editor_Parameter_list
-{
-	struct ed_param {
-		bool fake_entry = false;
-		std::string s;
-		script_parameter_type type = script_parameter_type::int_t;
-		uint32_t id = 0;
-	};
-	std::vector<ed_param> param;
-
-
-	void update_real_param_list(ScriptVars_CFG* cfg);
 };
 
 
@@ -586,7 +546,7 @@ public:
 		control_params.clear_all();
 		control_params.add_property_list_to_grid(get_props(), this, PG_LIST_PASSTHROUGH);
 	}
-
+	void set_read_only(bool readonly) { control_params.set_read_only(readonly); }
 	struct tuple {
 		const char* str = "";
 		int index = 0;
@@ -602,9 +562,7 @@ public:
 		return out;
 	}
 
-private:
-	static PropertyInfoList* get_props();
-
+	
 	struct ControlParamProp {
 		ControlParamProp() {
 			static int unique_id = 0;
@@ -615,12 +573,48 @@ private:
 		script_parameter_type type = script_parameter_type::int_t;
 		int enum_type = 0;
 		int imgui_id = 0;
+
+		bool is_virtual_param = false;
+		ScriptExpression script;
+
 		static PropertyInfoList* get_props();
 	};
+
+	const ControlParamProp* get_parameter(int id) {
+		for (int i = 0; i < props.size(); i++)
+			if (props[i].imgui_id == id) 
+				return &props[i];
+
+		return nullptr;
+	}
+private:
+	static PropertyInfoList* get_props();
+
 	friend class ControlParamArrayHeader;
 
 	std::vector<ControlParamProp> props;
 	PropertyGrid control_params;
+};
+
+class BoneWeightListWindow
+{
+	struct BoneWeightListProp {
+		BoneWeightListProp() {
+			static int unique_id = 0;
+			imgui_id = unique_id++;
+		}
+		std::string name = "Unnamed";
+
+		struct BoneWeightProp {
+			float weight = 0.0;
+			int bone_index = 0;
+		};
+
+		std::vector<BoneWeightProp> weights;
+
+		int imgui_id = 0;
+		static PropertyInfoList* get_props();
+	};
 };
 
 class Texture;
@@ -642,8 +636,21 @@ public:
 		return name.c_str();
 	}
 
-	void create_new_document();
+	enum class graph_playback_state {
+		stopped,
+		running,
+		paused,
+	}playback = graph_playback_state::stopped;
+
+
+	graph_playback_state get_playback_state() { return playback; }
+	bool graph_is_read_only() { return playback != graph_playback_state::stopped(); }
+	void pause_playback();
+	void start_or_resume_playback();
+	void stop_playback();
 	void save_document();
+
+	void create_new_document();
 
 	void compile_and_run();
 
@@ -701,7 +708,7 @@ public:
 	void draw_node_creation_menu(bool is_state_mode);
 	IAgEditorNode* create_graph_node_from_type(animnode_type type, uint32_t layer);
 
-	bool running = false;
+
 	GraphOutput out;
 
 	struct create_from_drop_state {

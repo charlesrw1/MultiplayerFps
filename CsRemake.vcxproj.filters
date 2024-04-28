@@ -154,6 +154,9 @@
     <ClCompile Include="Source\EnumDefReflection.cpp">
       <Filter>Source\Animation\Reflection</Filter>
     </ClCompile>
+    <ClCompile Include="Source\MyImguiLib.cpp">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationTreeLocal.h">
@@ -371,6 +374,9 @@
     </ClInclude>
     <ClInclude Include="Source\EnumDefReflection.h">
       <Filter>Source\Animation\Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MyImguiLib.h">
+      <Filter>Source\Animation\Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

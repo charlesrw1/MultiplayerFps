@@ -353,10 +353,33 @@ PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, i
 	prop_editor = std::unique_ptr<IPropertyEditor>(IPropertyEditorFactory::create(prop, instance));
 }
 
+void ArrayRow::hook_update_pre_tree_node()
+{
+	if (set_next_state == next_state::hidden)
+		ImGui::SetNextItemOpen(false);
+	else if (set_next_state == next_state::visible)
+		ImGui::SetNextItemOpen(true);
+}
+
+bool ArrayRow::are_any_nodes_open()
+{
+	for (int i = 0; i < child_rows.size(); i++) {
+		if (child_rows[i]->expanded)
+			return true;
+	}
+	return false;
+}
+
 void ArrayRow::draw_row_controls()
 {
 	auto trashimg = mats.find_texture("icon/trash.png");
 	auto addimg = mats.find_texture("icon/plus.png");
+
+	auto visible_icon = mats.find_texture("icon/visible.png");
+	auto hidden_icon = mats.find_texture("icon/hidden.png");
+
+	bool are_any_open = are_any_nodes_open();
+
 	uint8_t* list_instance_ptr = prop->get_ptr(instance);
 
 	ImGui::PushStyleColor(ImGuiCol_Button, 0);
@@ -371,10 +394,28 @@ void ArrayRow::draw_row_controls()
 
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
+	if (!header || header->has_delete_all()) {
+		ImGui::BeginDisabled(child_rows.empty());
+		if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
 
-		clear_children();
-		prop->list_ptr->resize(list_instance_ptr, 0);
+			clear_children();
+			prop->list_ptr->resize(list_instance_ptr, 0);
+		}
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+	}
+
+	set_next_state = next_state::keep;
+
+	if (are_any_open) {
+		if (ImGui::ImageButton(ImTextureID(visible_icon->gl_id), ImVec2(16, 16))) {
+			set_next_state = next_state::hidden;
+		}
+	}
+	else {
+		if (ImGui::ImageButton(ImTextureID(hidden_icon->gl_id), ImVec2(16, 16))) {
+			set_next_state = next_state::visible;
+		}
 	}
 
 	ImGui::PopStyleColor(3);
@@ -530,6 +571,7 @@ void ArrayRow::draw_row_controls()
 	 auto movedown = mats.find_texture("icon/movedown.png");
 	 auto trash1 = mats.find_texture("icon/trash1.png");
 
+
 	 ImGui::PushStyleColor(ImGuiCol_Button, 0);
 	 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
 	 ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
@@ -553,6 +595,7 @@ void ArrayRow::draw_row_controls()
 	 ImGui::PopStyleColor(3);
  }
 
+
  void GroupRow::draw_header(float ofs)
  {
 	 ImGui::Dummy(ImVec2(ofs, 0));
@@ -566,6 +609,9 @@ void ArrayRow::draw_row_controls()
 	 bool has_drawn = false;
 	 if (is_array) {
 		 ArrayRow* array_ = (ArrayRow*)parent;
+
+		 array_->hook_update_pre_tree_node();
+
 		 if (array_->header) {
 			 expanded = array_->header->imgui_draw_header(row_index);
 			 has_drawn = true;

@@ -56,6 +56,7 @@ public:
 	}
 	virtual bool imgui_draw_header(int index) = 0;
 	virtual void imgui_draw_closed_body(int index) = 0;
+	virtual bool has_delete_all() { return true; }
 	
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
@@ -147,7 +148,6 @@ public:
 		return passthrough_to_list_if_possible;
 	}
 
-
 	void* inst = nullptr;
 	PropertyInfoList* proplist = nullptr;
 	std::string name;
@@ -166,9 +166,10 @@ public:
 	virtual float get_indent_width() { return 30.0; }
 
 	void rebuild_child_rows();
-
+	void hook_update_pre_tree_node();
 	int get_size();
 
+	bool are_any_nodes_open();
 
 	void delete_index(int index) {
 		commands.push_back({ Delete, index });
@@ -188,6 +189,13 @@ private:
 		Movedown,
 		Delete,
 	};
+
+	enum class next_state {
+		keep,
+		hidden,
+		visible
+	}set_next_state = next_state::keep;
+
 	struct CommandData {
 		CommandEnum command;
 		int index = 0;

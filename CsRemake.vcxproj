@@ -47,6 +47,7 @@
     <ClCompile Include="Source\glad.c" />
     <ClCompile Include="Source\LispInterpreter.cpp" />
     <ClCompile Include="Source\Meshlet.cpp" />
+    <ClCompile Include="Source\MyImguiLib.cpp" />
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Parameter.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
@@ -111,6 +112,7 @@
     <ClInclude Include="Source\Meshlet.h" />
     <ClInclude Include="Source\Key_Value_File.h" />
     <ClInclude Include="Source\EntityTypes.h" />
+    <ClInclude Include="Source\MyImguiLib.h" />
     <ClInclude Include="Source\Parameter.h" />
     <ClInclude Include="Source\ParticlesLocal.h" />
     <ClInclude Include="Source\Config.h" />

@@ -7,6 +7,9 @@
 #include "Game_Engine.h"
 #include "GlobalEnumMgr.h"
 
+#include "DictWriter.h"
+#include <fstream>
+
 std::string remove_whitespace(const char* str)
 {
 	std::string s = str;
@@ -229,16 +232,17 @@ class ControlParamArrayHeader : public IArrayHeader
 	using IArrayHeader::IArrayHeader;
 
 	// Inherited via IArrayHeader
+	virtual bool has_delete_all() override { return false; }
 	virtual bool imgui_draw_header(int index) {
 		using proptype = ControlParamsWindow::ControlParamProp;
 		std::vector<proptype>* array_ = (std::vector<proptype>*)prop->get_ptr(instance);
 		ASSERT(index >= 0 && index < array_->size());
 		proptype& prop_ = array_->at(index);
-
 		bool open = ImGui::TreeNode("##header");
 		if (open) 
 			ImGui::TreePop();
 		ImGui::SameLine(0);
+
 		ImGui::PushStyleColor(ImGuiCol_Text, scriptparamtype_to_color(prop_.type));
 		ImGui::Text(prop_.name.c_str());
 		ImGui::PopStyleColor();
@@ -454,10 +458,26 @@ void TabState::imgui_draw() {
 
 void AnimationGraphEditor::save_document()
 {
+
+	{
+		DictWriter write;
+		editing_tree->write_to_dict(write);
+
+		std::ofstream outfile("out.txt");
+		outfile.write(write.get_output().c_str(), write.get_output().size());
+		outfile.close();
+	}
+
 }
 
 void AnimationGraphEditor::create_new_document()
 {
+}
+
+void AnimationGraphEditor::pause_playback()
+{
+	ASSERT(playback != graph_playback_state::stopped);
+	playback = graph_playback_state::paused;
 }
 
 void AnimationGraphEditor::draw_menu_bar()
@@ -500,6 +520,13 @@ void AnimationGraphEditor::draw_menu_bar()
 		}
 		ImGui::EndMenuBar();
 	}
+}
+void AnimationGraphEditor::start_or_resume_playback()
+{
+	if (playback == graph_playback_state::stopped)
+		compile_and_run();
+	else
+		playback = graph_playback_state::running;
 }
 void AnimationGraphEditor::draw_prop_editor()
 {
@@ -550,6 +577,11 @@ void AnimationGraphEditor::draw_prop_editor()
 	ImGui::End();
 }
 
+void AnimationGraphEditor::stop_playback()
+{
+	playback = graph_playback_state::stopped;
+}
+
 void AnimationGraphEditor::draw_popups()
 {
 
@@ -590,47 +622,8 @@ static ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFl
 
 void Timeline::draw_imgui()
 {
-	auto playimg = mats.find_texture("icon/play.png");
-	auto stopimg = mats.find_texture("icon/stop.png");
-	auto pauseimg = mats.find_texture("icon/pause.png");
-	auto saveimg = mats.find_texture("icon/Save.png");
 
 	if(ImGui::Begin("Timeline")) {
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 1.0));
-
-		if (is_playing) {
-			if (ImGui::ImageButton((ImTextureID)pauseimg->gl_id, ImVec2(32, 32))) {
-				pause();
-			}
-		}
-		else {
-			if (ImGui::ImageButton((ImTextureID)playimg->gl_id, ImVec2(32, 32))) {
-				play();
-			}
-		}
-		ImGui::SameLine();
-
-		auto greyed_out = ImVec4(1, 1, 1, 0.3);
-
-		if (ImGui::ImageButton((ImTextureID)stopimg->gl_id, 
-			ImVec2(32, 32), 
-			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0), 
-			is_reset? ImVec4(1, 1, 1, 0.3) : ImVec4(1,1,1,1) ))
-		{
-			if(is_reset)
-				stop();
-		}
-		ImGui::SameLine();
-		if (ImGui::ImageButton((ImTextureID)saveimg->gl_id,
-			ImVec2(32, 32),
-			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
-			(!needs_compile) ? ImVec4(1, 1, 1, 0.3) : ImVec4(1, 1, 1, 1)))
-		{
-			if(needs_compile)
-				save();
-		}
-		ImGui::PopStyleColor();
 
 
 		static bool init = false;
@@ -664,11 +657,9 @@ void Timeline::draw_imgui()
 
 void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_drop)
 {
-
 	int start_atr = 0;
 	int end_atr = 0;
 	int link_id = 0;
-
 
 	if (ImNodes::IsLinkCreated(&start_atr, &end_atr))
 	{
@@ -717,12 +708,8 @@ void AnimationGraphEditor::begin_draw()
 
 	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
-
-	draw_popups();
-
-
-	if (open_timeline)
-		timeline.draw_imgui();
+	node_props.set_read_only(graph_is_read_only());
+	control_params.set_read_only(graph_is_read_only());
 
 	if (open_prop_editor)
 		draw_prop_editor();
@@ -758,32 +745,79 @@ void AnimationGraphEditor::begin_draw()
 		}
 	}
 
+	{
+		auto playimg = mats.find_texture("icon/play.png");
+		auto stopimg = mats.find_texture("icon/stop.png");
+		auto pauseimg = mats.find_texture("icon/pause.png");
+		auto saveimg = mats.find_texture("icon/save.png");
+
+		ImGui::PushStyleColor(ImGuiCol_Button,0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.5));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive,0);
+
+
+		if (get_playback_state() == graph_playback_state::running) {
+			if (ImGui::ImageButton((ImTextureID)pauseimg->gl_id, ImVec2(32, 32)))
+				pause_playback();
+		}
+		else {
+			if (ImGui::ImageButton((ImTextureID)playimg->gl_id, ImVec2(32, 32)))
+				start_or_resume_playback();
+		}
+		ImGui::SameLine();
+		bool is_stopped = get_playback_state() == graph_playback_state::stopped;
+		auto greyed_out = ImVec4(1, 1, 1, 0.3);
+
+		ImGui::BeginDisabled(is_stopped);
+		if (ImGui::ImageButton((ImTextureID)stopimg->gl_id,
+			ImVec2(32, 32),
+			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
+			ImVec4(1, 1, 1, 1)))
+		{
+			if (!is_stopped)
+				stop_playback();
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+		if (ImGui::ImageButton((ImTextureID)saveimg->gl_id,
+			ImVec2(32, 32),
+			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
+			ImVec4(1, 1, 1, 1)))
+		{
+			save_document();
+		}
+		ImGui::PopStyleColor(3);
+	}
+
+
 	graph_tabs.imgui_draw();
 
-	bool open_popup_menu_from_drop = false;
-	handle_imnode_creations(&open_popup_menu_from_drop);
+	if (!graph_is_read_only()) {
+		bool open_popup_menu_from_drop = false;
 
+		handle_imnode_creations(&open_popup_menu_from_drop);
 
-	is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_RootWindow);
+		is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_RootWindow);
 
-	if (open_popup_menu_from_drop || 
-		(is_focused && ImGui::GetIO().MouseClicked[1]))
-		ImGui::OpenPopup("my_select_popup");
+		if (open_popup_menu_from_drop ||
+			(is_focused && ImGui::GetIO().MouseClicked[1]))
+			ImGui::OpenPopup("my_select_popup");
 
-	if (ImGui::BeginPopup("my_select_popup"))
-	{
-		bool is_sm = graph_tabs.get_active_tab()->is_statemachine_tab();
-
-		draw_node_creation_menu(is_sm);
-		ImGui::EndPopup();
-	}
-	else {
-		drop_state.from = nullptr;
+		if (ImGui::BeginPopup("my_select_popup"))
+		{
+			bool is_sm = graph_tabs.get_active_tab()->is_statemachine_tab();
+			draw_node_creation_menu(is_sm);
+			ImGui::EndPopup();
+		}
+		else {
+			drop_state.from = nullptr;
+		}
 	}
 
 	ImGui::End();
 }
-
+#include "MyImguiLib.h"
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
 	auto strong_error = mats.find_texture("icon/fatalerr.png");
@@ -858,6 +892,16 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 		ImNodes::EndNodeTitleBar();
 
+		float x1 = ImGui::GetItemRectMin().x;
+		float x2 = ImGui::GetItemRectMax().x;
+
+
+		ImGui::BeginDisabled(graph_is_read_only());
+		node->draw_node_top_bar();
+		ImGui::EndDisabled();
+		
+		MyImSeperator(x1,x2,1.0);
+
 		for (int j = 0; j < node->num_inputs; j++) {
 
 			ImNodesPinShape pin = ImNodesPinShape_Quad;
@@ -913,8 +957,6 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 	ImNodes::MiniMap();
 	ImNodes::EndNodeEditor();
 }
-#include "DictWriter.h"
-#include <fstream>
 void AnimationGraphEditor::handle_event(const SDL_Event& event)
 {
 	switch (event.type)
@@ -929,15 +971,14 @@ void AnimationGraphEditor::handle_event(const SDL_Event& event)
 			break;
 
 		case SDL_SCANCODE_SPACE:
-			compile_and_run();
-			{
-				DictWriter write;
-				editing_tree->write_to_dict(write);
+			if (event.key.keysym.mod & KMOD_LCTRL && !ImGui::GetIO().WantCaptureKeyboard) {
+				if (get_playback_state() == graph_playback_state::running)
+					pause_playback();
+				else
+					start_or_resume_playback();
+			}
 
-				std::ofstream outfile("out.txt");
-				outfile.write(write.get_output().c_str(), write.get_output().size());
-				outfile.close();
-			}break;
+			break;
 		}
 		break;
 	case SDL_MOUSEBUTTONDOWN:
@@ -1194,6 +1235,43 @@ bool AgEditor_BaseNode::compile_my_data()
 	}
 
 	return compile_error_string.empty();
+}
+
+void AgEditor_BaseNode::draw_node_top_bar()
+{
+	bool uses_default_param = node->get_props()->find("param") != nullptr;
+	if (uses_default_param) {
+		auto param = ed.control_params.get_parameter(node->param.id);
+		if (param) {
+			ImGui::TextColored(scriptparamtype_to_color(param->type), string_format(":= %s",param->name.c_str()));
+		}
+	}
+
+	if (type == animnode_type::blend_by_int) {
+
+		auto node_ = (Blend_Int_Node_CFG*)node;
+		auto param = ed.control_params.get_parameter(node->param.id);
+		if (param && param->type == script_parameter_type::int_t) {
+
+			ImGui::PushStyleColor(ImGuiCol_Button, color32_to_int({ 0xff,0xff,0xff,50 }));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_int({ 0xff,0xff,0xff,128 }));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, color32_to_int({ 0xff,0xff,0xff,50 }));
+
+
+			if (ImGui::SmallButton("Add") && num_inputs < MAX_INPUTS) {
+				num_inputs += 1;
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Remove") && num_inputs > 0) {
+				on_remove_pin(num_inputs, true);
+				num_inputs -= 1;
+			}
+
+			ImGui::PopStyleColor(3);
+		}
+
+	}
+
 }
 
 void AgEditor_BaseNode::get_props(std::vector<PropertyListInstancePair>& props)
@@ -1750,8 +1828,10 @@ void AnimationGraphEditor::tick(float dt)
 	ro.mesh = &out.model->mesh;
 	ro.mats = &out.model->mats;
 	
-	if (running) {
+	if (get_playback_state() == graph_playback_state::running) {
 		out.anim.tick_tree_new(dt);
+	}
+	if (get_playback_state() != graph_playback_state::stopped) {
 		ro.transform = out.model->skeleton_root_transform;
 		ro.animator = &out.anim;
 	}
@@ -1768,7 +1848,11 @@ PropertyInfoList* ControlParamsWindow::ControlParamProp::get_props()
 	START_PROPS(ControlParamsWindow::ControlParamProp)
 		REG_STDSTRING(name, PROP_EDITABLE),
 		REG_ENUM(type, PROP_EDITABLE, "", script_parameter_type_def.id),
-		REG_INT_W_CUSTOM(enum_type, PROP_EDITABLE, "", "AG_ENUM_TYPE_FINDER")
+		REG_INT_W_CUSTOM(enum_type, PROP_EDITABLE, "", "AG_ENUM_TYPE_FINDER"),
+
+		REG_BOOL(is_virtual_param, PROP_EDITABLE, ""),
+		REG_STRUCT_CUSTOM_TYPE(script, PROP_EDITABLE, "AG_LISP_CODE")
+
 	END_PROPS(CPW:ControlParamProp)
 }
 
@@ -1792,9 +1876,10 @@ void ControlParamsWindow::imgui_draw()
 void AnimationGraphEditor::compile_and_run()
 {
 	bool good_to_run = compile_graph_for_playing();
-	if (good_to_run)
+	if (good_to_run) {
 		out.anim.initialize_animator(out.model, out.set, editing_tree, nullptr, nullptr);
-	running = good_to_run;
+		playback = graph_playback_state::running;
+	}
 }
 
 void AnimationGraphEditor::overlay_draw()
@@ -1833,17 +1918,4 @@ void AnimationGraphEditor::open(const char* name)
 	idraw->update_obj(out.obj, ro);
 
 	control_params.refresh_props();
-}
-
-void Editor_Parameter_list::update_real_param_list(ScriptVars_CFG* cfg)
-{
-	cfg->name_to_index.clear();
-	cfg->types.clear();
-
-	for (int i = 0; i < param.size(); i++) {
-		if (param.at(i).fake_entry) continue;
-
-		cfg->name_to_index[param.at(i).s] = cfg->types.size();
-		//cfg->types.push_back(param.at(i).type);
-	}
 }
