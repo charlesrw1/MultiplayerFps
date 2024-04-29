@@ -63,6 +63,7 @@ public:
 	static void close(File_Buffer*& file);
 	static void init();
 	static bool iterate_files_in_dir(const char* path, char* buffer, int buffer_size);
+	static bool does_file_exist(const char* path);
 };
 
 class Profiler

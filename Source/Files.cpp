@@ -175,6 +175,14 @@ void Files::init()
 	archives = a;
 }
 
+bool Files::does_file_exist(const char* path)
+{
+	if (INVALID_FILE_ATTRIBUTES == GetFileAttributesA(path) && GetLastError() == ERROR_FILE_NOT_FOUND) {
+		return false;
+	}
+	return true;
+}
+
 bool Files::iterate_files_in_dir(const char* dir, char* buffer, int buffer_len)
 {
 	static bool in_middle_of_search = false;

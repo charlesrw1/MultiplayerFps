@@ -1,27 +1,22 @@
 #pragma once
-#include "Types.h"
-#include "DrawPublic.h"
-#include "Util.h"
 #include <vector>
 #include <array>
 #include <string>
-
-#include "AnimationGraphEditorPublic.h"
-
-#include "RenderObj.h"
-#include "Animation.h"
-
+#include <memory>
 #include <SDL2/SDL.h>
-
-#include "AnimationTreeLocal.h"
-
+#include <functional>
+#include <unordered_set>
+#include "ImSequencer.h"
 #include "imnodes.h"
 
-#include <memory>
-#include <functional>
-
+#include "Types.h"
+#include "DrawPublic.h"
+#include "Util.h"
+#include "AnimationGraphEditorPublic.h"
+#include "RenderObj.h"
+#include "Animation.h"
+#include "AnimationTreeLocal.h"
 #include "PropertyEd.h"
-
 #include "ReflectionProp.h"
 
 class IAgEditorNode;
@@ -50,18 +45,15 @@ class AnimationGraphEditor;
 class IAgEditorNode
 {
 public:
-
-
-	IAgEditorNode() {
-		
+	IAgEditorNode() {	
 	}
-
 	virtual ~IAgEditorNode() {
-
 	}
 	static PropertyInfoList* get_prop_list();
 
+	// called after either creation or load from file
 	virtual void init();
+
 	virtual std::string get_default_name();
 	virtual Node_CFG* get_graph_node() { return nullptr; }
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) {
@@ -93,7 +85,8 @@ public:
 		return false;
 	}
 
-
+	virtual void on_post_edit() {
+	}
 	virtual void draw_node_top_bar() {}
 	virtual void post_prop_edit_update() {}
 	virtual void draw_node_bottom_bar() {}
@@ -174,20 +167,54 @@ public:
 class AgEditor_BaseNode : public IAgEditorNode
 {
 public:
-	virtual void init();
+	AgEditor_BaseNode(Node_CFG* node) : node(node) {}
 
+	virtual void init();
 	virtual bool compile_my_data() override;
 	virtual Node_CFG* get_graph_node() override { return node; }
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
 	virtual void draw_node_top_bar() override;
+	virtual void on_post_edit() override {}
 
 	Node_CFG* node = nullptr;
+};
+
+extern AutoEnumDef BlendSpace2dTopology_def;
+enum class BlendSpace2dTopology
+{
+	FiveVert,
+	NineVert,
+	FifteenVert,
+};
+
+class AgEditor_BlendspaceNode : public AgEditor_BaseNode
+{
+public:
+	using AgEditor_BaseNode::AgEditor_BaseNode;
+
+	virtual void init();
+	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
+	virtual bool compile_my_data() override;
+	static PropertyInfoList* get_props_list();
+
+	struct Blendspace_Input {
+		static PropertyInfoList* get_props();
+		float x=0.0;
+		float y=0.0;
+		std::string clip_name;
+		Clip_Node_CFG* clip_node = nullptr;
+	};
+	char parameterization = 0;	// empty value
+	BlendSpace2dTopology topology_2d = BlendSpace2dTopology::FiveVert;
+	std::vector<Blendspace_Input> blend_space_inputs;
 };
 
 class AgEditor_StateNode;
 class AgEditor_StateMachineNode : public IAgEditorNode
 {
 public:
+	AgEditor_StateMachineNode(Statemachine_Node_CFG* node) : node(node) {}
+
 	virtual void init();
 	virtual std::string get_default_name() override;
 	virtual bool traverse_and_find_errors();
@@ -205,7 +232,16 @@ public:
 		}
 	}
 
-	handle<State> add_new_state(AgEditor_StateNode* node_);
+	handle<State> add_new_state();
+	bool set_editor_node_for_handle(handle<State> handle, AgEditor_StateNode* node) {
+		ASSERT(handle.is_valid());
+		if (handle.id >= 0 && handle.id < states.size() && states[handle.id] == nullptr) {
+			states[handle.id] = node;
+			return true;
+		}
+		printf("!!! set_editor_node_for_handle failed !!! (something was read from disk wrong or out of date)\n ");
+		return false;
+	}
 
 	State* get_state(handle<State> state);
 
@@ -219,6 +255,9 @@ public:
 class AgEditor_StateNode : public IAgEditorNode
 {
 public:
+	AgEditor_StateNode(AgEditor_StateMachineNode* parent, handle<State> state_handle) 
+		: parent_statemachine(parent), state_handle(state_handle) {}
+
 	virtual void init();
 
 	~AgEditor_StateNode() {
@@ -262,7 +301,6 @@ public:
 	handle<State> state_handle;
 	int selected_transition_for_prop_ed = 0;
 };
-
 
 struct GraphTab {
 	editor_layer* layer = nullptr;
@@ -319,7 +357,6 @@ public:
 		}
 
 	}
-
 
 	void push_tab_to_view(int index) {
 		if (index == active_tab)
@@ -385,8 +422,6 @@ private:
 };
 
 
-#include <unordered_set>
-#include "ImSequencer.h"
 enum class sequence_type
 {
 	clip,
@@ -617,6 +652,18 @@ class BoneWeightListWindow
 	};
 };
 
+class IPopup
+{
+public:
+	virtual bool draw() = 0;
+};
+
+class AreYouSurePopup : public IPopup
+{
+	virtual bool draw() override;
+	std::function<void(int)> command;
+};
+
 class Texture;
 class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
@@ -635,6 +682,7 @@ public:
 	virtual const char* get_name() override {
 		return name.c_str();
 	}
+	virtual void begin_draw() override;
 
 	enum class graph_playback_state {
 		stopped,
@@ -642,24 +690,32 @@ public:
 		paused,
 	}playback = graph_playback_state::stopped;
 
-
 	graph_playback_state get_playback_state() { return playback; }
 	bool graph_is_read_only() { return playback != graph_playback_state::stopped(); }
 	void pause_playback();
 	void start_or_resume_playback();
 	void stop_playback();
+
+	void save_command();
 	void save_document();
-
+	void remove_unused_nodes() {}
+	void save_editor_nodes(DictWriter& writer) {}
 	void create_new_document();
-
 	void compile_and_run();
+	bool compile_graph_for_playing();
 
-	void begin_draw();
 
-	void draw_graph_layer(uint32_t layer);
+
+	IAgEditorNode* editor_node_for_cfg_node(Node_CFG* node) {
+		for (int i = 0; i < nodes.size(); i++) {
+			ASSERT(nodes[i]);
+			if (nodes[i]->get_graph_node() == node)
+				return nodes[i];
+		}
+		return nullptr;
+	}
 
 	void delete_selected();
-
 	void nuke_layer(uint32_t layer_id);
 	void remove_node_from_index(int index, bool force);
 	void remove_node_from_id(uint32_t index);
@@ -667,7 +723,6 @@ public:
 	IAgEditorNode* find_node_from_id(uint32_t id) {
 		return nodes.at(find_for_id(id));
 	}
-	void save_graph(const std::string& name);
 
 	IAgEditorNode* find_first_node_in_layer(uint32_t layer, animnode_type type) {
 		for (int i = 0; i < nodes.size(); i++) {
@@ -705,9 +760,7 @@ public:
 	std::vector<IAgEditorNode*> nodes;
 	Animation_Tree_CFG* editing_tree = nullptr;
 
-	void draw_node_creation_menu(bool is_state_mode);
-	IAgEditorNode* create_graph_node_from_type(animnode_type type, uint32_t layer);
-
+	IAgEditorNode* create_graph_node_from_type(IAgEditorNode* parent, animnode_type type, uint32_t layer);
 
 	GraphOutput out;
 
@@ -718,7 +771,6 @@ public:
 	}drop_state;
 
 
-	bool compile_graph_for_playing();
 
 	editor_layer create_new_layer(bool is_statemachine) {
 		editor_layer layer;
@@ -728,14 +780,16 @@ public:
 		return layer;
 	}
 
-	void add_root_node_to_layer(uint32_t layer, bool is_statemachine) {
-		auto a = create_graph_node_from_type(is_statemachine?animnode_type::start_statemachine : animnode_type::root, layer);
+	void add_root_node_to_layer(IAgEditorNode* parent, uint32_t layer, bool is_statemachine) {
+		auto a = create_graph_node_from_type(parent, is_statemachine?animnode_type::start_statemachine : animnode_type::root, layer);
 	}
 
+	void draw_node_creation_menu(bool is_state_mode);
 	void draw_menu_bar();
 	void draw_popups();
 	void draw_prop_editor();
 	void handle_imnode_creations(bool* open_popup_menu_from_drop);
+	void draw_graph_layer(uint32_t layer);
 
 	bool is_modifier_pressed = false;
 	bool is_focused = false;

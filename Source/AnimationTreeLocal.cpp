@@ -13,15 +13,17 @@
 
 struct AutoAnimNodeDef
 {
-	AutoAnimNodeDef(animnode_type type, create_func create, const char* ed_name, const char* ed_tooltip, Color32 color) {
+	AutoAnimNodeDef(animnode_type type, create_func create, int allowed_inputs, const char* ed_name, const char* ed_tooltip, Color32 color) {
 		get_animnode_typedef(type).create = create;
 		get_animnode_typedef(type).editor_name = ed_name;
 		get_animnode_typedef(type).editor_tooltip = ed_tooltip;
 		get_animnode_typedef(type).editor_color = color;
+		get_animnode_typedef(type).allowed_inputs = allowed_inputs;
+
 	}
 };
-#define IMPL_TOOL_NODE(type, name /* editor name */, tooltip /* editor tooltip */, color /* editor node color*/)   static AutoAnimNodeDef autoanimnode_##type(animnode_type::type,nullptr, name, tooltip, color)
-#define IMPL_ANIMNODE(type, name, tooltip, color) static AutoAnimNodeDef autoanimnode_##type(type::CONST_TYPE_ENUM, type::create, name, tooltip, color)
+#define IMPL_TOOL_NODE(type, num_inputs/* num inputs allowed, -1 for any/specific */, name /* editor name */, tooltip /* editor tooltip */, color /* editor node color*/)   static AutoAnimNodeDef autoanimnode_##type(animnode_type::type,nullptr,num_inputs, name, tooltip, color)
+#define IMPL_ANIMNODE(type, num_inputs, name, tooltip, color) static AutoAnimNodeDef autoanimnode_##type(type::CONST_TYPE_ENUM, type::create, num_inputs, name, tooltip, color)
 
 
 // colors for editor nodes
@@ -33,31 +35,31 @@ static const Color32 BLEND_COLOR = { 26, 75, 79 };
 static const Color32 ADD_COLOR = { 44, 57, 71 };
 static const Color32 MISC_COLOR = { 13, 82, 44 };
 
-IMPL_TOOL_NODE(start_statemachine, "START", "State machine enter", ROOT_COLOR);
-IMPL_TOOL_NODE(root, "OUTPUT", "Output pose for the blend tree", ROOT_COLOR);
-IMPL_TOOL_NODE(state, "State", 
+IMPL_TOOL_NODE(start_statemachine, 0, "START", "State machine enter", ROOT_COLOR);
+IMPL_TOOL_NODE(root, 1, "OUTPUT", "Output pose for the blend tree", ROOT_COLOR);
+IMPL_TOOL_NODE(state, -1, "State", 
 	"A state in a FSM\n"
 	"Use output pin to create transitions to other states\n"
 	"(click on transition arrows to change condition)\n"
 	"(double click to open blend tree)\n", STATE_COLOR);
 
-IMPL_ANIMNODE(Clip_Node_CFG, "Clip", "Animation input data", SOURCE_COLOR);
-IMPL_ANIMNODE(Sync_Node_CFG, "Sync", "Syncs animations below this node", MISC_COLOR);
-IMPL_ANIMNODE(Mirror_Node_CFG, "Mirror", "Mirrors animation across axis", MISC_COLOR);
-IMPL_ANIMNODE(Statemachine_Node_CFG, "Statemachine", "Contains a statemachine with transitions\n(double click to open)", SM_COLOR);
-IMPL_ANIMNODE(Add_Node_CFG, "Apply Additive", "Apply additive(delta'd) animation to a base pose", ADD_COLOR);
-IMPL_ANIMNODE(Subtract_Node_CFG, "Subtract", "Subtract a source pose from a ref pose, use with \'Apply Additive\'", ADD_COLOR);
-IMPL_ANIMNODE(Blend_Node_CFG, "Blend", "Blend 2 poses by a boolean or float [0,1]", BLEND_COLOR);
-IMPL_ANIMNODE(Blend_Int_Node_CFG, "Blend by int/enum", "Blend n poses by an int or enum\n", BLEND_COLOR);
-IMPL_ANIMNODE(BlendSpace2d_CFG, "Blend 2D", 
+IMPL_ANIMNODE(Clip_Node_CFG, 0,"Clip", "Animation input data", SOURCE_COLOR);
+IMPL_ANIMNODE(Sync_Node_CFG, 1,"Sync", "Syncs animations below this node", MISC_COLOR);
+IMPL_ANIMNODE(Mirror_Node_CFG, 1,"Mirror", "Mirrors animation across axis", MISC_COLOR);
+IMPL_ANIMNODE(Statemachine_Node_CFG,0, "Statemachine", "Contains a statemachine with transitions\n(double click to open)", SM_COLOR);
+IMPL_ANIMNODE(Add_Node_CFG,2, "Apply Additive", "Apply additive(delta'd) animation to a base pose", ADD_COLOR);
+IMPL_ANIMNODE(Subtract_Node_CFG,2, "Subtract", "Subtract a source pose from a ref pose, use with \'Apply Additive\'", ADD_COLOR);
+IMPL_ANIMNODE(Blend_Node_CFG, 2,"Blend", "Blend 2 poses by a boolean or float [0,1]", BLEND_COLOR);
+IMPL_ANIMNODE(Blend_Int_Node_CFG,-1, "Blend by int/enum", "Blend n poses by an int or enum\n", BLEND_COLOR);
+IMPL_ANIMNODE(BlendSpace2d_CFG, -1,"Blend 2D", 
 	"Blends clips driven by 2d parameterization\n"
 	"Can use 5,9,11,or 15 vertex topology\n"
 	"Can use with both normal and additive poses\n"
 	"Ex: directional movement or aim offsets\n", BLEND_COLOR);
-IMPL_ANIMNODE(BlendSpace1d_CFG, "Blend 1D", 
+IMPL_ANIMNODE(BlendSpace1d_CFG,-1, "Blend 1D", 
 	"Blends clips driven by 1d parameterization\n"
 	"Can use with normal and additive poses\n", BLEND_COLOR);
-IMPL_ANIMNODE(Scale_By_Rootmotion_CFG, "Rootmotion Scale", "Scale any clip sampling by the velocity parameter. \n(ex: a running clip is at 2 m/s, entity is moving at 4 m/s, so clip is played at 2x speed", MISC_COLOR);
+IMPL_ANIMNODE(Scale_By_Rootmotion_CFG,1, "Rootmotion Scale", "Scale any clip sampling by the velocity parameter. \n(ex: a running clip is at 2 m/s, entity is moving at 4 m/s, so clip is played at 2x speed", MISC_COLOR);
 
 
 static const char* animnode_strs[] = {

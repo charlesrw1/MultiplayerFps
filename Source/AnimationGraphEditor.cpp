@@ -10,6 +10,8 @@
 #include "DictWriter.h"
 #include <fstream>
 
+#include "MyImguiLib.h"
+
 std::string remove_whitespace(const char* str)
 {
 	std::string s = str;
@@ -127,10 +129,6 @@ public:
 };
 
 
-ImVec4 color32_to_imvec4(Color32 color) {
-	return ImVec4(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
-}
-
 ImVec4 scriptparamtype_to_color(script_parameter_type type)
 {
 	ASSERT((int)type < 4);
@@ -209,33 +207,6 @@ public:
 
 
 
-class AnimationGraphEditorPropertyFactory : public IPropertyEditorFactory
-{
-public:
-
-	// Inherited via IPropertyEditorFactory
-	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) override
-	{
-		if (strcmp(prop->custom_type_str, "AG_CLIP_TYPE") == 0) {
-			return new FindAnimationClipPropertyEditor(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_LISP_CODE") == 0) {
-			return new AgLispCodeEditorProperty(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_ENUM_TYPE_FINDER") == 0) {
-			return new AgEnumFinder(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_PARAM_FINDER") == 0) {
-			return new AgParamFinder(instance, prop);
-		}
-
-		return nullptr;
-	}
-
-};
-static AnimationGraphEditorPropertyFactory g_AnimationGraphEditorPropertyFactory;
-
-
 class ControlParamArrayHeader : public IArrayHeader
 {
 	using IArrayHeader::IArrayHeader;
@@ -273,25 +244,6 @@ class ControlParamArrayHeader : public IArrayHeader
 	}
 	friend class ControlParamsWindow;
 };
-
-class AnimationGraphEditorArrayHeaderFactory : public IArrayHeaderFactory
-{
-public:
-
-	// Inherited via IPropertyEditorFactory
-	virtual IArrayHeader* try_create(PropertyInfo* prop, void* instance) override
-	{
-		if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_ARRAY") == 0) {
-			return new ControlParamArrayHeader(instance, prop);
-		}
-
-
-		return nullptr;
-	}
-
-};
-static AnimationGraphEditorArrayHeaderFactory g_AnimationGraphEditorArrayHeaderFactory;
-
 
 
 
@@ -350,9 +302,6 @@ Color32 add_brightness(Color32 c, int brightness) {
 	c.g = g;
 	c.b = b;
 	return c;
-}
-unsigned int color32_to_int(Color32 color) {
-	return *(unsigned int*)&color;
 }
 
 void TabState::imgui_draw() {
@@ -467,16 +416,28 @@ void TabState::imgui_draw() {
 
 void AnimationGraphEditor::save_document()
 {
-
-	{
-		DictWriter write;
-		editing_tree->write_to_dict(write);
-
-		std::ofstream outfile("out.txt");
-		outfile.write(write.get_output().c_str(), write.get_output().size());
-		outfile.close();
+	if (name.empty()) {
+		ImGui::PushID(0);
+		ImGui::OpenPopup("Save file dialog");
+		ImGui::PopID();
+		return;
 	}
 
+
+	remove_unused_nodes();
+
+	DictWriter write;
+	editing_tree->write_to_dict(write);
+	save_editor_nodes(write);
+
+	std::ofstream outfile(name);
+	outfile.write(write.get_output().c_str(), write.get_output().size());
+	outfile.close();
+
+	size_t len = 0;
+	const char* str = ImNodes::SaveEditorStateToIniString(default_editor, &len);
+
+	printf("%s\n", str);
 }
 
 void AnimationGraphEditor::create_new_document()
@@ -594,6 +555,77 @@ void AnimationGraphEditor::stop_playback()
 void AnimationGraphEditor::draw_popups()
 {
 
+	ImGui::PushID(0);
+	if (ImGui::BeginPopupModal("Save file dialog")) {
+
+		static bool alread_exists_err = false;
+		static bool cant_open_path_err = false;
+		static char buffer[256];
+		static bool init = true;
+		if (init) {
+			buffer[0] = 0;
+			alread_exists_err = false;
+			cant_open_path_err = false;
+			init = false;
+		}
+		bool write_out = false;
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are saved under /Data/Animations/Graphs/");
+
+		bool returned_true = false;
+		if (!alread_exists_err) {
+			ImGui::Text("Enter path: ");
+			ImGui::SameLine();
+			returned_true = ImGui::InputText("##pathinput", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
+		}
+
+		if (returned_true) {
+			const char* full_path = string_format("./Data/Animations/Graphs/%s", buffer);
+			bool already_exists = Files::does_file_exist(full_path);
+			cant_open_path_err = false;
+			alread_exists_err = false;
+			if (already_exists)
+				alread_exists_err = true;
+			else {
+				std::ofstream test_open(full_path);
+				if (!test_open)
+					cant_open_path_err = true;
+			}
+			if (!alread_exists_err && !cant_open_path_err) {
+				write_out = true;
+			}
+		}
+		if (alread_exists_err) {
+			ImGui::Text("File already exists. Overwrite?");
+			if (ImGui::Button("Yes")) {
+				write_out = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("No")) {
+				alread_exists_err = false;
+			}
+		}
+		else if (cant_open_path_err) {
+			ImGui::Text("Cant open path\n");
+		}
+
+		if (write_out) {
+			name = buffer;
+			init = true;
+			ImGui::CloseCurrentPopup();
+			save_document();
+		}
+
+		ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopupModal("Open file dialog"), nullptr) {
+
+		ImGui::Text("Animations are saved to $WorkingDir/Data/Animations/Graphs");
+		const char* path = "Data/Animations/Graphs";
+		char buffer[256];
+		int selected = -1;
+	}
+	ImGui::PopID();
 }
 
 static ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, const ImGuiWindowClass* window_class = nullptr)
@@ -714,7 +746,6 @@ void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_dr
 
 void AnimationGraphEditor::begin_draw()
 {
-
 	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	node_props.set_read_only(graph_is_read_only());
@@ -824,7 +855,11 @@ void AnimationGraphEditor::begin_draw()
 		}
 	}
 
+	draw_popups();
+
+
 	ImGui::End();
+
 }
 #include "MyImguiLib.h"
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
@@ -1105,12 +1140,6 @@ int AnimationGraphEditor::find_for_id(uint32_t id)
 	return -1;
 }
 
-void AnimationGraphEditor::save_graph(const std::string& name)
-{
-
-}
-
-
 
 static bool animnode_allow_creation_from_menu(bool in_state_mode, animnode_type type) {
 	if (in_state_mode) return type == animnode_type::state;
@@ -1128,7 +1157,10 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 		{
 			const char* name = get_animnode_typedef(type).editor_name;
 			if (ImGui::Selectable(name)) {
-				auto a = create_graph_node_from_type(type, graph_tabs.get_current_layer_from_tab());
+
+				int cur_layer = graph_tabs.get_current_layer_from_tab();
+				auto parent = ed.get_owning_node_for_layer(cur_layer);
+				auto a = create_graph_node_from_type(parent, type, cur_layer);
 
 				ImNodes::ClearNodeSelection();
 				ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
@@ -1159,26 +1191,40 @@ static T* create_node_type(Animation_Tree_CFG& cfg)
 	return (T*)c;
 }
 
+// two paths: create new node
+//			  load an existing node from a file
+
 void AgEditor_BaseNode::init()
 {
-	node = get_animnode_typedef(type).create(ed.editing_tree);
 	ASSERT(node);
+	node_color = get_animnode_typedef(type).editor_color;
 
-	num_inputs = 2;
+	// find editor input nodes
+	ASSERT(node->input.num_used()<=MAX_INPUTS);
+
+	int init_input_count = 0;
+	int max_input_slot = node->input.num_used();
+	for (int i = 0; i < max_input_slot; i++) {
+
+		Node_CFG* node_cfg = node->input[i];
+		if (!node_cfg)
+			continue;
+		init_input_count++;
+		IAgEditorNode* ed_node = ed.editor_node_for_cfg_node(node_cfg);
+
+		if (!ed_node) {
+			printf("!!! couldn't find editor node for cfg !!! (data read wrong from disk or out of date?)\n");
+
+			ASSERT(0);
+			// TODO: create the new editor node
+		}
+
+		add_input(&ed, ed_node, i);
+	}
+
+	int allowed_inputs = get_animnode_typedef(type).allowed_inputs;
 
 	switch (type) {
-	case animnode_type::blend2d: {
-		inputs[0].pin_name = "idle";
-		inputs[1].pin_name = "s";
-		inputs[2].pin_name = "sw";
-		inputs[3].pin_name = "w";
-		inputs[4].pin_name = "nw";
-		inputs[5].pin_name = "n";
-		inputs[6].pin_name = "ne";
-		inputs[7].pin_name = "e";
-		inputs[8].pin_name = "se";
-		num_inputs = 9;
-	}break;
 	case animnode_type::add:
 		inputs[Add_Node_CFG::DIFF].pin_name = "diff";
 		inputs[Add_Node_CFG::BASE].pin_name = "base";
@@ -1187,19 +1233,27 @@ void AgEditor_BaseNode::init()
 		inputs[Subtract_Node_CFG::REF].pin_name = "ref";
 		inputs[Subtract_Node_CFG::SOURCE].pin_name = "source";
 		break;
-
-	case animnode_type::mirror:
-	case animnode_type::play_speed:
-	case animnode_type::rootmotion_speed:
-	case animnode_type::sync:
-		num_inputs = 1; 
-		break;
-	case animnode_type::source: 
-		num_inputs = 0; 
-		break;
-
 	}
+
+	if (allowed_inputs != -1) {
+		if (max_input_slot > allowed_inputs) {
+			printf("!!! too many inputs for node !!! (out of date or corrupted?)\n");
+
+			for (int j = allowed_inputs; j < max_input_slot; j++) {
+				
+				if (node->input[j]) {
+					on_remove_pin(j, true);
+				}
+				node->input[j] = nullptr;
+			}
+			ASSERT(allowed_inputs <= node->input.allocated);
+			node->input.count = allowed_inputs;
+		}
+	}
+
 }
+
+
 
 bool AgEditor_BaseNode::compile_my_data()
 {
@@ -1476,35 +1530,26 @@ void AgEditor_StateMachineNode::get_props(std::vector<PropertyListInstancePair>&
 
 void AgEditor_StateNode::init()
 {
+	node_color = get_animnode_typedef(type).editor_color;
+
 	if (type == animnode_type::start_statemachine)
 		num_inputs = 0;
 	else
 		num_inputs = 1;
 
-	if(type != animnode_type::start_statemachine)
-		sublayer  = ed.create_new_layer(false);
+	bool good = parent_statemachine->set_editor_node_for_handle(state_handle, this);
+	ASSERT(good);
 
-	auto parent= ed.get_owning_node_for_layer(graph_layer);
-	ASSERT(parent->is_statemachine());
-	parent_statemachine = (AgEditor_StateMachineNode*)parent;
-
-	state_handle = parent_statemachine->add_new_state(this);
-
-
-	if (type != animnode_type::start_statemachine)
-		ed.add_root_node_to_layer(sublayer.id, false);
+	// read data from statenode to init stuff
 }
 
 void AgEditor_StateMachineNode::init()
 {
-	node = (Statemachine_Node_CFG*)get_animnode_typedef(type).create(ed.editing_tree);
 	ASSERT(node);
-
-	sublayer = ed.create_new_layer(true);
+	node_color = get_animnode_typedef(type).editor_color;
 	num_inputs = 0;
 
-
-	ed.add_root_node_to_layer(sublayer.id, true);
+	states.resize(node->states.size());
 }
 
 bool AgEditor_StateMachineNode::traverse_and_find_errors()
@@ -1636,11 +1681,11 @@ bool AgEditor_StateMachineNode::compile_my_data()
 	//}
 }
 
-handle<State> AgEditor_StateMachineNode::add_new_state(AgEditor_StateNode* node_) {
+handle<State> AgEditor_StateMachineNode::add_new_state() {
 	ASSERT(states.size() == node->states.size());
 	int idx = states.size();
 	states.resize(idx + 1);
-	states[idx] = node_;
+	states[idx] = nullptr;// this is fixed up later
 
 	node->states.resize(idx + 1);
 
@@ -1652,29 +1697,69 @@ State* AgEditor_StateMachineNode::get_state(handle<State> state) {
 	return &node->states.at(state.id);
 }
 
-IAgEditorNode* AnimationGraphEditor::create_graph_node_from_type(animnode_type type, uint32_t layer)
+AgEditor_StateMachineNode* create_statemachine_node()
+{
+	auto cfg = (Statemachine_Node_CFG*)get_animnode_typedef(animnode_type::statemachine).create(ed.editing_tree);
+	AgEditor_StateMachineNode* node = new AgEditor_StateMachineNode(cfg);
+	node->sublayer = ed.create_new_layer(true);
+	ed.add_root_node_to_layer(node, node->sublayer.id, true);
+
+	return node;
+}
+
+AgEditor_StateNode* create_state_node(IAgEditorNode* parent, uint32_t layer, bool create_layer)
+{
+	ASSERT(parent);
+	ASSERT(parent->is_statemachine());
+	auto parent_sm = (AgEditor_StateMachineNode*)parent;
+	auto state_handle = parent_sm->add_new_state();
+
+	AgEditor_StateNode* state = new AgEditor_StateNode(parent_sm, state_handle);
+
+	if (create_layer) {
+		state->sublayer = ed.create_new_layer(false);
+		ed.add_root_node_to_layer(state, state->sublayer.id, false);
+	}
+
+	return state;
+}
+
+AgEditor_BaseNode* create_generic_node(animnode_type type)
+{
+	auto cfg = get_animnode_typedef(type).create(ed.editing_tree);
+
+	if (type == animnode_type::blend1d || type == animnode_type::blend2d)
+		return new AgEditor_BlendspaceNode(cfg);
+	else
+		return new AgEditor_BaseNode(cfg);
+}
+
+
+IAgEditorNode* AnimationGraphEditor::create_graph_node_from_type(IAgEditorNode* parent, animnode_type type, uint32_t layer)
 {
 
 	IAgEditorNode* node = nullptr;
 
 	if (type == animnode_type::statemachine) {
-		node = new AgEditor_StateMachineNode;
+		node = create_statemachine_node();
 	}
 	else if (type == animnode_type::state || type == animnode_type::start_statemachine) {
-		node = new AgEditor_StateNode;
+		node = create_state_node(parent, layer, type == animnode_type::state);
+	}
+	else if (type == animnode_type::blend1d || type == animnode_type::blend2d) {
+		node = create_generic_node(type);
 	}
 	else if (type == animnode_type::root) {
 		node = new IAgEditorNode;
 	}
 	else {
-		node = new AgEditor_BaseNode;
+		node = create_generic_node(type);
 	}
 
 	node->type = type;
 	node->id = current_id++;
 	nodes.push_back(node);
 	node->graph_layer = layer;
-	node->node_color = get_animnode_typedef(type).editor_color;
 
 	node->init();
 
@@ -1716,6 +1801,8 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 void IAgEditorNode::init()
 {
+	node_color = get_animnode_typedef(type).editor_color;
+
 	ASSERT(type == animnode_type::root || type == animnode_type::start_statemachine);
 
 	if (type == animnode_type::root)
@@ -1895,7 +1982,7 @@ void AnimationGraphEditor::overlay_draw()
 }
 void AnimationGraphEditor::open(const char* name)
 {
-	this->name = name;
+	//this->name = name;
 
 	imgui_node_context = ImNodes::CreateContext();
 
@@ -1905,7 +1992,7 @@ void AnimationGraphEditor::open(const char* name)
 	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
 
 	graph_tabs.add_tab(nullptr, nullptr, glm::vec2(0.f), true);
-	add_root_node_to_layer(0, false);
+	add_root_node_to_layer(nullptr, 0, false);
 
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
@@ -1926,3 +2013,179 @@ void AnimationGraphEditor::open(const char* name)
 
 	control_params.refresh_props();
 }
+
+class AgEditor_BlendSpaceArrayHead : public IArrayHeader
+{
+	using IArrayHeader::IArrayHeader;
+	// Inherited via IArrayHeader
+	virtual bool imgui_draw_header(int index)
+	{
+		return false;
+	}
+	virtual void imgui_draw_closed_body(int index)
+	{
+	}
+};
+
+class AgEdtior_BlendSpaceParameteriation : public IPropertyEditor
+{
+	using IPropertyEditor::IPropertyEditor;
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+
+		std::vector<ImVec2> verts;
+		std::vector<const char*> names;
+
+		std::vector<int> indicies;
+
+		verts.push_back(ImVec2(0.5, 0.5));
+		names.push_back("[0]");
+
+		verts.push_back(ImVec2(0, 0));
+		names.push_back("[1]");
+
+		verts.push_back(ImVec2(0, 1));
+		names.push_back("[2]");
+
+		verts.push_back(ImVec2(1,1));
+		names.push_back("[3]");
+
+		verts.push_back(ImVec2(1, 0));
+		names.push_back("[4]");
+
+		indicies.push_back(0);
+		indicies.push_back(1);
+		indicies.push_back(2);
+
+		indicies.push_back(0);
+		indicies.push_back(1);
+		indicies.push_back(4);
+
+
+
+		MyImDrawBlendSpace("##label", verts, indicies, names, ImVec2(0, 0), ImVec2(1, 1), nullptr);
+
+	}
+};
+
+void AgEditor_BlendspaceNode::get_props(std::vector<PropertyListInstancePair>& props)
+{
+	AgEditor_BaseNode::get_props(props);
+	props.push_back({ AgEditor_BlendspaceNode::get_props_list(), this });
+}
+
+void AgEditor_BlendspaceNode::init()
+{
+	AgEditor_BaseNode::init();
+	num_inputs = 0;	// these are EDITOR inputs, not CFG inputs
+	if (type == animnode_type::blend2d) {
+		BlendSpace2d_CFG* node = (BlendSpace2d_CFG*)this->node;
+		if (node->is_additive_blend_space)
+			num_inputs = 1;
+
+		int number_of_inputs_on_input = node->input.num_used();
+
+		// default on creation to 9 vert blend space because its useful
+		if (number_of_inputs_on_input == 0 || number_of_inputs_on_input == 9)
+			topology_2d = BlendSpace2dTopology::NineVert;
+		else if(number_of_inputs_on_input == 5)
+			topology_2d = BlendSpace2dTopology::FiveVert;
+		else if (number_of_inputs_on_input == 15)
+			topology_2d = BlendSpace2dTopology::FifteenVert;
+		else {
+			printf("!!! AgEditor_BlendspaceNode got bad input count !!! (%d)", number_of_inputs_on_input);
+			node->input.count = 0;
+			topology_2d = BlendSpace2dTopology::NineVert;
+		}
+	}
+	else {
+		BlendSpace1d_CFG* node = (BlendSpace1d_CFG*)this->node;
+		if (node->is_additive_blend_space)
+			num_inputs = 1;
+	}
+}
+
+bool AgEditor_BlendspaceNode::compile_my_data()
+{
+	return AgEditor_BaseNode::compile_my_data();
+}
+
+PropertyInfoList* AgEditor_BlendspaceNode::get_props_list()
+{
+	MAKE_VECTORCALLBACK(Blendspace_Input, blend_space_inputs)
+	START_PROPS(AgEditor_BlendspaceNode)
+		REG_ENUM(topology_2d,PROP_EDITABLE,"", BlendSpace2dTopology_def.id),
+		REG_STDVECTOR_W_CUSTOM(blend_space_inputs, PROP_EDITABLE, ""),
+		REG_INT_W_CUSTOM(parameterization, PROP_EDITABLE, "", "AG_EDITOR_BLEND_SPACE_PARAMETERIZATION"),
+	END_PROPS(AgEditor_BlendspaceNode)
+}
+
+PropertyInfoList* AgEditor_BlendspaceNode::Blendspace_Input::get_props()
+{
+	START_PROPS(AgEditor_BlendspaceNode::Blendspace_Input)
+		REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_EDITABLE, "AG_CLIP_TYPE"),
+		REG_FLOAT(x,PROP_EDITABLE,""),
+		REG_FLOAT(y,PROP_EDITABLE, ""),
+	END_PROPS(AgEditor_BlendspaceNode::Blendspace_Input)
+}
+
+// Property Editor Factorys
+
+class AnimationGraphEditorPropertyFactory : public IPropertyEditorFactory
+{
+public:
+
+	// Inherited via IPropertyEditorFactory
+	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) override
+	{
+		if (strcmp(prop->custom_type_str, "AG_CLIP_TYPE") == 0) {
+			return new FindAnimationClipPropertyEditor(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_LISP_CODE") == 0) {
+			return new AgLispCodeEditorProperty(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_ENUM_TYPE_FINDER") == 0) {
+			return new AgEnumFinder(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_PARAM_FINDER") == 0) {
+			return new AgParamFinder(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_EDITOR_BLEND_SPACE_PARAMETERIZATION") == 0) {
+			return new AgEdtior_BlendSpaceParameteriation(instance, prop);
+		}
+
+		return nullptr;
+	}
+
+};
+static AnimationGraphEditorPropertyFactory g_AnimationGraphEditorPropertyFactory;
+
+
+class AnimationGraphEditorArrayHeaderFactory : public IArrayHeaderFactory
+{
+public:
+
+	// Inherited via IPropertyEditorFactory
+	virtual IArrayHeader* try_create(PropertyInfo* prop, void* instance) override
+	{
+		if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_ARRAY") == 0) {
+			return new ControlParamArrayHeader(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_EDITOR_BLEND_SPACE") == 0) {
+			return new AgEditor_BlendSpaceArrayHead(instance, prop);
+		}
+
+
+		return nullptr;
+	}
+
+};
+static AnimationGraphEditorArrayHeaderFactory g_AnimationGraphEditorArrayHeaderFactory;
+
+static const char* strs[] = {
+	"FiveVert",
+	"NineVert",
+	"FifteenVert",
+};
+AutoEnumDef BlendSpace2dTopology_def = AutoEnumDef("blend2d", 3, strs);

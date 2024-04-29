@@ -1,5 +1,7 @@
-#include "MyImguiLib.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
+#include "imgui.h"
+#include "MyImguiLib.h"
 
 void MyImSeperator(float x1, float x2, float width)
 {
@@ -32,4 +34,98 @@ void MyImSeperator(float x1, float x2, float width)
         }
 
     }
+}
+
+ImVec2 get_screen_pos(ImRect frame, ImVec2 param, ImVec2 min, ImVec2 max)
+{
+    ImVec2 width = max - min;
+    ImVec2 normalized = (param - min) / width;
+    ImVec2 screen = (frame.Max - frame.Min) * normalized + frame.Min;
+    return screen;
+}
+
+bool MyImDrawBlendSpace(
+    const char* label,
+    const std::vector<ImVec2>& verts,
+    const std::vector<int>& indicies,
+    const std::vector<const char*>& vert_names,
+    ImVec2 minbound,
+    ImVec2 maxbound, ImVec2* hover_pos)
+{
+    assert(indicies.size() % 3 == 0);
+
+    using namespace ImGui;
+
+    ImVec2 size = ImVec2(maxbound.x - minbound.x, maxbound.y - minbound.y);
+    float height_scale = size.y / size.x;
+
+    ImGui::Text("placeholder");
+
+    ImGuiWindow* window = GetCurrentWindow();
+    auto& style = GetStyle();
+    auto id = window->GetID(label);
+
+    PushItemWidth(-FLT_MIN);
+
+    float width = CalcItemWidth();
+    float height = width * height_scale;
+    const ImVec2 frame_size = ImVec2(width, height); // Arbitrary default of 8 lines high for multi-line
+
+    const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + frame_size);
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, color32_to_imvec4({ 128,128,128 }));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, style.FrameRounding);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, style.FrameBorderSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); // Ensure no clip rect so mouse hover can reach FramePadding edges
+    bool child_visible = ImGui::BeginChildEx(label, id, frame_bb.GetSize(), true, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoMouseInputs);
+  
+    window = GetCurrentWindow();
+
+    float border_width = 5.0;
+
+    const ImRect sub_bb(window->Pos + ImVec2(border_width,border_width), window->Pos + window->Size - ImVec2(border_width,border_width));
+
+    PopStyleVar(3);
+    PopStyleColor();
+    if (!child_visible)
+    {
+        EndChild();
+        return false;
+     }
+    ImGui::EndChild();
+
+    for (int i = 0; i < indicies.size(); i+=3) {
+        ImVec2 p1 = get_screen_pos(sub_bb, verts[indicies[i]] , minbound,maxbound);
+        ImVec2 p2 = get_screen_pos(sub_bb,verts[indicies[i+1]], minbound,maxbound);
+        ImVec2 p3 = get_screen_pos(sub_bb,verts[indicies[i+2]], minbound,maxbound);
+
+        window->DrawList->AddLine(p1, p2, color32_to_int({ 200,200,200 }));
+        window->DrawList->AddLine(p2, p3, color32_to_int({ 200,200,200 }));
+        window->DrawList->AddLine(p3, p1, color32_to_int({ 200,200,200 }));
+    }
+
+    auto restore_pos = GetCursorScreenPos();
+    for (int i = 0; i < verts.size(); i++) {
+
+        const char* name = vert_names[i];
+        ImVec2 p = get_screen_pos(sub_bb, verts[i], minbound, maxbound);
+
+        window->DrawList->AddCircleFilled(p,10, color32_to_int({ 5, 226, 255,160 }), 8);
+
+        SetCursorScreenPos(p- ImVec2(10,10));
+        ImGui::PushID(i);
+        InvisibleButton("##blendbutton", ImVec2(20,20));
+        if (IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped))
+        {
+            if (ImGui::BeginTooltip()) {
+                ImGui::Text("%s\n( %.3f, %.3f )\n", name, verts[i].x, verts[i].y);
+                EndTooltip();
+            }
+        }
+        ImGui::PopID();
+
+    }
+    SetCursorScreenPos(restore_pos);
+
+    return false;
 }
