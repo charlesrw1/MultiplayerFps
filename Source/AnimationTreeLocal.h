@@ -125,7 +125,7 @@ struct GetPose_Ctx
 
 struct Node_CFG
 {
-	virtual void init_memory_offsets(Animation_Tree_CFG* cfg) = 0;
+	virtual void init_memory_offsets(Animation_Tree_CFG* cfg, int inputs_to_alloc) = 0;
 
 	bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 		set_active(ctx, get_rt<Rt_Vars_Base>(ctx));
@@ -169,17 +169,7 @@ protected:
 		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
 		cfg->data_used += rt_size;
 
-		memset(input.inline_, 0, sizeof(Node_CFG*) * 2);
-		if (init_input_count <= -1)
-			input.count = 0;
-		else if (init_input_count <= 2)
-			input.count = init_input_count;
-		else {
-			ASSERT(init_input_count <= 16);
-			Node_CFG** nodes = (Node_CFG**)cfg->arena.alloc_bottom(sizeof(Node_CFG**) * init_input_count);
-			memset(nodes, 0, sizeof(Node_CFG*) * init_input_count);
-			input.assign_memory(nodes, init_input_count);
-		}
+		input.resize(init_input_count, nullptr);
 	}
 
 private:
@@ -197,9 +187,10 @@ virtual PropertyInfoList* get_props() override;  \
 virtual animnode_type get_type() override { return ENUM_TYPE; } 
 
 #define DEFAULT_CTOR(TYPE_NAME) \
-virtual void init_memory_offsets(Animation_Tree_CFG* tree) override { \
-	init_memory_internal(tree, sizeof(RT_TYPE), get_animnode_typedef(CONST_TYPE_ENUM).allowed_inputs); \
-}
+virtual void init_memory_offsets(Animation_Tree_CFG* tree, int init_count) override { \
+	init_memory_internal(tree, sizeof(RT_TYPE),init_count); \
+} \
+TYPE_NAME() {}
 
 // playback speed *= param / (speed of clip's root motion)
 struct Scale_By_Rootmotion_CFG : public Node_CFG
@@ -460,18 +451,18 @@ public:
 		rt->lerp_amt = 1.0;
 		rt->fade_out_i = -1;
 
-		for (int i = 0; i < input.count; i++)
+		for (int i = 0; i < input.size(); i++)
 			input[i]->reset(ctx);
 	}
 
 	int get_actual_index(int val_from_param) const {
 		if (!uses_jump_table) {
-			assert(val_from_param >= 0 && val_from_param < input.count);
+			assert(val_from_param >= 0 && val_from_param <input.size());
 			return val_from_param;
 		}
-		assert(val_from_param >= 0 && val_from_param < jump_table.count);
+		assert(val_from_param >= 0 && val_from_param < jump_table.size());
 		int real_idx = jump_table[val_from_param];
-		assert(real_idx >= 0 && real_idx < input.count);
+		assert(real_idx >= 0 && real_idx < input.size());
 		return real_idx;
 	}
 
@@ -479,7 +470,7 @@ public:
 	bool store_value_on_reset = false;
 
 	bool uses_jump_table = false;	// for enums
-	InlineVec<int, 2> jump_table;
+	InlineVec<unsigned char, 10> jump_table;
 };
 
 struct Mirror_Node_RT : Rt_Vars_Base
@@ -546,7 +537,7 @@ struct State
 	bool is_end_state = false;
 	bool wait_until_finish = false;
 	float state_duration = -1.0;				// when > 0, specifies how long state should be active, then signals a transition end
-	std::vector<uint16_t> transition_idxs;
+	InlineVec<uint16_t, 6> transition_idxs;
 };
 
 struct Statemachine_Node_RT : Rt_Vars_Base
@@ -593,7 +584,7 @@ struct Statemachine_Node_CFG : public Node_CFG
 	}
 
 	std::vector<State> states;
-	std::vector<uint16_t> entry_transitions;
+	InlineVec<uint16_t, 6> entry_transitions;
 	std::vector<State_Transition> transitions;
 };
 

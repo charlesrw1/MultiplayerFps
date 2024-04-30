@@ -25,6 +25,7 @@ std::string remove_whitespace(const char* str)
 
 AnimationGraphEditor ed;
 AnimationGraphEditorPublic* g_anim_ed_graph = &ed;
+int EditorControlParamProp::unique_id_generator = 0;
 
 struct AnimCompletionCallbackUserData
 {
@@ -154,10 +155,10 @@ public:
 
 		int selected_id = prop->get_int(instance);
 
-		auto options = ed.control_params.get_param_names_for_lookup();
+		const auto& options = ed.control_params.get_control_params();
 		int array_idx = -1;
 		for (int i = 0; i < options.size(); i++) {
-			if (options[i].index == selected_id) {
+			if (options[i].current_id == selected_id) {
 				array_idx = i;
 				break;
 			}
@@ -167,7 +168,7 @@ public:
 		if (array_idx != -1)
 			ImGui::PushStyleColor(ImGuiCol_Text, scriptparamtype_to_color(options[array_idx].type));
 
-		if (!ImGui::BeginCombo("##paramfinder", (array_idx == -1) ? nullptr : options[array_idx].str, ImGuiComboFlags_None)) {
+		if (!ImGui::BeginCombo("##paramfinder", (array_idx == -1) ? nullptr : options[array_idx].name.c_str(), ImGuiComboFlags_None)) {
 			if (array_idx != -1)
 				ImGui::PopStyleColor();
 			return;
@@ -181,16 +182,16 @@ public:
 		for (int i = 0; i < options.size(); i++)
 		{
 			ImGui::PushID(i);
-			const bool item_selected = options[i].index == selected_id;
+			const bool item_selected = options[i].current_id == selected_id;
 			does_id_map_to_anything |= item_selected;
-			const char* item_text = options[i].str;
+			const char* item_text = options[i].name.c_str();
 		
 			ImGui::PushStyleColor(ImGuiCol_Text, scriptparamtype_to_color(options[i].type));
 
 			if (ImGui::Selectable(item_text, item_selected))
 			{
 				value_changed = true;
-				selected_id = options[i].index;
+				selected_id = options[i].current_id;
 			}
 			if (item_selected)
 				ImGui::SetItemDefaultFocus();
@@ -214,7 +215,7 @@ class ControlParamArrayHeader : public IArrayHeader
 	// Inherited via IArrayHeader
 	virtual bool has_delete_all() override { return false; }
 	virtual bool imgui_draw_header(int index) {
-		using proptype = ControlParamsWindow::ControlParamProp;
+		using proptype = EditorControlParamProp;
 		std::vector<proptype>* array_ = (std::vector<proptype>*)prop->get_ptr(instance);
 		ASSERT(index >= 0 && index < array_->size());
 		proptype& prop_ = array_->at(index);
@@ -232,7 +233,7 @@ class ControlParamArrayHeader : public IArrayHeader
 	}
 	virtual void imgui_draw_closed_body(int index)
 	{
-		using proptype = ControlParamsWindow::ControlParamProp;
+		using proptype = EditorControlParamProp;
 		std::vector<proptype>* array_ = (std::vector<proptype>*)prop->get_ptr(instance);
 		ASSERT(index >= 0 && index < array_->size());
 		proptype& prop_ = array_->at(index);
@@ -1348,7 +1349,7 @@ std::string AgEditor_BaseNode::get_input_pin_name(int index)
 	case animnode_type::blend_by_int:
 	{
 		auto param = node->param;
-		if (!param.is_valid() || ed.control_params.get_parameter(param.id)->type != script_parameter_type::enum_t)
+		if (!param.is_valid() || ed.control_params.get_parameter_for_ed_id(param.id)->type != script_parameter_type::enum_t)
 			return string_format("%d", index);
 		return "enum placeholder";
 	};
@@ -1377,10 +1378,10 @@ void AgEditor_BaseNode::init()
 	node_color = get_animnode_typedef(type).editor_color;
 
 	// find editor input nodes
-	ASSERT(node->input.num_used()<=MAX_INPUTS);
+	ASSERT(node->input.size()<=MAX_INPUTS);
 
 	int init_input_count = 0;
-	int max_input_slot = node->input.num_used();
+	int max_input_slot = node->input.size();
 	for (int i = 0; i < max_input_slot; i++) {
 
 		Node_CFG* node_cfg = node->input[i];
@@ -1411,10 +1412,8 @@ void AgEditor_BaseNode::init()
 					on_remove_pin(j, true);
 					on_post_remove_pins();
 				}
-				node->input[j] = nullptr;
 			}
-			ASSERT(allowed_inputs <= node->input.allocated);
-			node->input.count = allowed_inputs;
+			node->input.resize(allowed_inputs);
 		}
 		num_inputs = allowed_inputs;
 	}
@@ -1426,29 +1425,30 @@ void AgEditor_BaseNode::init()
 bool AgEditor_BaseNode::compile_my_data()
 {
 	ASSERT(node);
-	ASSERT(node->input.count >= num_inputs);	// FIXME
-
-
+	
 	// update inputs
 	int actual_input_count = get_animnode_typedef(type).allowed_inputs;
 	ASSERT(actual_input_count == -1 || actual_input_count == num_inputs);
 
-	bool has_null_input = false;
-	if (actual_input_count == -1) {
-		int num_alloced = node->input.allocated;
-		if (num_alloced < num_inputs) {
-
-			auto& arena = ed.editing_tree->arena;
-			auto ptr = (Node_CFG**)arena.alloc_bottom( sizeof(Node_CFG*) * num_inputs );
-			node->input.assign_memory(ptr, num_inputs);
+	// read prop list to find parameter usage, pretty cursed
+	auto prop_list = node->get_props();
+	for (int j = 0; j < prop_list->count; j++) {
+		if (strcmp(prop_list->list[j].custom_type_str, "AG_PARAM_FINDER") == 0) {
+			ASSERT(prop_list->list[j].type == core_type_id::Int32);
+			int ed_id = prop_list->list[j].get_int(node);
+			int paramid = ed.control_params.get_index_of_prop_for_compiling(ed_id).id;
+			prop_list->list[j].set_int(node, paramid);
 		}
 	}
-	else {
-		for (int i = 0; i < num_inputs; i++) {
-			has_null_input |= !bool(inputs[i].other_node);
-			if (inputs[i].other_node && inputs[i].other_node->get_graph_node()) {
-				node->input[i] = inputs[i].other_node->get_graph_node();
-			}
+
+	node->init_memory_offsets(ed.editing_tree, num_inputs);
+
+	bool has_null_input = false;
+	node->input.resize(num_inputs);
+	for (int i = 0; i < num_inputs; i++) {
+		has_null_input |= !bool(inputs[i].other_node);
+		if (inputs[i].other_node && inputs[i].other_node->get_graph_node()) {
+			node->input[i] = inputs[i].other_node->get_graph_node();
 		}
 	}
 	
@@ -1490,7 +1490,7 @@ void AgEditor_BaseNode::draw_node_top_bar()
 {
 	bool uses_default_param = node->get_props()->find("param") != nullptr;
 	if (uses_default_param) {
-		auto param = ed.control_params.get_parameter(node->param.id);
+		auto param = ed.control_params.get_parameter_for_ed_id(node->param.id);
 		if (param) {
 			ImGui::TextColored(scriptparamtype_to_color(param->type), string_format(":= %s",param->name.c_str()));
 		}
@@ -1499,7 +1499,7 @@ void AgEditor_BaseNode::draw_node_top_bar()
 	if (type == animnode_type::blend_by_int) {
 
 		auto node_ = (Blend_Int_Node_CFG*)node;
-		auto param = ed.control_params.get_parameter(node->param.id);
+		auto param = ed.control_params.get_parameter_for_ed_id(node->param.id);
 		if (!node->param.is_valid() || (param && param->type == script_parameter_type::int_t)) {
 
 			ImGui::PushStyleColor(ImGuiCol_Button, color32_to_int({ 0xff,0xff,0xff,50 }));
@@ -1553,7 +1553,7 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 	Statemachine_Node_CFG* sm_cfg = parent_statemachine->node;
 	if (type == animnode_type::state) {
 
-		self_state.transition_idxs.clear();
+		self_state.transition_idxs.resize(0);
 	}
 	for (int i = 0; i < output.size(); i++) {
 		AgEditor_StateNode* out_state = output[i].output_to;
@@ -1874,7 +1874,7 @@ bool AgEditor_StateMachineNode::compile_my_data()
 			states[i]->state_handle_internal = { i };
 		}
 	}
-	node->entry_transitions.clear();
+	node->entry_transitions.resize(0);
 	node->transitions.clear();
 
 	bool has_errors = false;
@@ -2001,6 +2001,11 @@ IAgEditorNode* AnimationGraphEditor::create_graph_node_from_type(IAgEditorNode* 
 
 bool AnimationGraphEditor::compile_graph_for_playing()
 {
+	control_params.add_parameters_to_tree(&editing_tree->parameters);
+
+	// initialize memory offets for runtime
+	editing_tree->data_used = 0;
+
 	for (int i = 0; i < nodes.size(); i++) {
 		if (!nodes[i]->dont_call_compile()) {
 			nodes[i]->compile_error_string.clear();
@@ -2021,10 +2026,7 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 	bool tree_is_good_to_run = output_pose->traverse_and_find_errors();
 
-	// initialize memory offets for runtime
-	editing_tree->data_used = 0;
-	for (int i = 0; i < editing_tree->all_nodes.size(); i++)
-		editing_tree->all_nodes[i]->init_memory_offsets(editing_tree);
+	control_params.recalculate_control_prop_ids();
 
 	return tree_is_good_to_run;
 }
@@ -2172,22 +2174,18 @@ void AnimationGraphEditor::tick(float dt)
 }
 
 #include "StdVectorReflection.h"
-PropertyInfoList* ControlParamsWindow::ControlParamProp::get_props()
+PropertyInfoList* EditorControlParamProp::get_props()
 {
-	START_PROPS(ControlParamsWindow::ControlParamProp)
+	START_PROPS(EditorControlParamProp)
 		REG_STDSTRING(name, PROP_EDITABLE),
 		REG_ENUM(type, PROP_EDITABLE, "", script_parameter_type_def.id),
 		REG_INT_W_CUSTOM(enum_type, PROP_EDITABLE, "", "AG_ENUM_TYPE_FINDER"),
-
-		REG_BOOL(is_virtual_param, PROP_EDITABLE, ""),
-		REG_STRUCT_CUSTOM_TYPE(script, PROP_EDITABLE, "AG_LISP_CODE")
-
-	END_PROPS(CPW:ControlParamProp)
+	END_PROPS(EditorControlParamProp)
 }
 
 PropertyInfoList* ControlParamsWindow::get_props()
 {
-	MAKE_VECTORCALLBACK(ControlParamsWindow::ControlParamProp, props)
+	MAKE_VECTORCALLBACK(EditorControlParamProp, props)
 	START_PROPS(ControlParamsWindow)
 		REG_STDVECTOR_W_CUSTOM(props, PROP_EDITABLE, "AG_CONTROL_PARAM_ARRAY")
 	END_PROPS(ControlParams)
@@ -2319,7 +2317,7 @@ void AgEditor_BlendspaceNode::init()
 		if (node->is_additive_blend_space)
 			num_inputs = 1;
 
-		int number_of_inputs_on_input = node->input.num_used();
+		int number_of_inputs_on_input = node->input.size();
 
 		// default on creation to 9 vert blend space because its useful
 		if (number_of_inputs_on_input == 0 || number_of_inputs_on_input == 9)
@@ -2330,7 +2328,7 @@ void AgEditor_BlendspaceNode::init()
 			topology_2d = BlendSpace2dTopology::FifteenVert;
 		else {
 			printf("!!! AgEditor_BlendspaceNode got bad input count !!! (%d)", number_of_inputs_on_input);
-			node->input.count = 0;
+			node->input.resize(0);
 			topology_2d = BlendSpace2dTopology::NineVert;
 		}
 	}

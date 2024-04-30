@@ -34,6 +34,8 @@ struct ScriptVars_CFG
 
 		types.push_back(param);
 		name_to_index[str] = types.size() - 1;
+
+		return { (int)types.size() - 1};
 	}
 
 	std::vector<Parameter_CFG> types;

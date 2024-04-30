@@ -592,6 +592,24 @@ public:
 	const Animation_Set_New* set = nullptr;
 };
 
+struct EditorControlParamProp {
+	EditorControlParamProp() {
+		current_id = unique_id_generator++;
+	}
+	std::string name = "Unnamed";
+	script_parameter_type type = script_parameter_type::int_t;
+	int enum_type = 0;
+	int current_id = 0;
+
+	static PropertyInfoList* get_props();
+
+	static void reset_id_generator(int to) {
+		unique_id_generator = to;
+	}
+private:
+	static int unique_id_generator;
+};
+
 class ControlParamArrayHeader;
 class ControlParamsWindow
 {
@@ -602,42 +620,35 @@ public:
 		control_params.add_property_list_to_grid(get_props(), this, PG_LIST_PASSTHROUGH);
 	}
 	void set_read_only(bool readonly) { control_params.set_read_only(readonly); }
-	struct tuple {
-		const char* str = "";
-		int index = 0;
-		script_parameter_type type{};
-	};
 
-	std::vector<tuple> get_param_names_for_lookup() {
-		std::vector<tuple> out;
+	const std::vector<EditorControlParamProp>& get_control_params() { return props; }
+
+	void add_parameters_to_tree(ScriptVars_CFG* cfg) {
+		cfg->name_to_index.clear();
+		cfg->types.clear();
 		for (int i = 0; i < props.size(); i++) {
-			// c_str shouldnt become invalid
-			out.push_back({ props[i].name.c_str(), props[i].imgui_id, props[i].type });
+			auto index = cfg->set(props[i].name.c_str(), props[i].type);
+			ASSERT(index.id == i);
 		}
-		return out;
+	}
+	void recalculate_control_prop_ids() {
+		// all parameters are now referencing the 'index' of the property as its id,
+		// so set it for future ones
+		for (int i = 0; i < props.size(); i++)
+			props[i].current_id = i;
+		EditorControlParamProp::reset_id_generator( props.size() );	// reset to size() so new props get added correctly
+	}
+	
+	handle<Parameter_CFG> get_index_of_prop_for_compiling(int id) {
+		for (int i = 0; i < props.size(); i++)
+			if (props[i].current_id == id)
+				return { i };
+		return { -1 };
 	}
 
-	
-	struct ControlParamProp {
-		ControlParamProp() {
-			static int unique_id = 0;
-			imgui_id = unique_id++;
-		}
-		int indirect_index = 0;
-		std::string name = "Unnamed";
-		script_parameter_type type = script_parameter_type::int_t;
-		int enum_type = 0;
-		int imgui_id = 0;
-
-		bool is_virtual_param = false;
-		ScriptExpression script;
-
-		static PropertyInfoList* get_props();
-	};
-
-	const ControlParamProp* get_parameter(int id) {
+	const EditorControlParamProp* get_parameter_for_ed_id(int id) {
 		for (int i = 0; i < props.size(); i++)
-			if (props[i].imgui_id == id) 
+			if (props[i].current_id == id) 
 				return &props[i];
 
 		return nullptr;
@@ -647,7 +658,7 @@ private:
 
 	friend class ControlParamArrayHeader;
 
-	std::vector<ControlParamProp> props;
+	std::vector<EditorControlParamProp> props;
 	PropertyGrid control_params;
 };
 

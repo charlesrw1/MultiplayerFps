@@ -101,8 +101,7 @@ PropertyInfoList* State::get_props()
 		make_integer_property(".",0,PROP_SERIALIZE,sizeof(uint16_t),"","")
 	};
 	static PropertyInfoList transiton_list_list = { transition_list_props,1 };
-	static StdVectorCallback<uint16_t> vecdef_transition_idxs(&transiton_list_list);
-
+	static auto vecdef_transition_idxs = get_inlinevec_callback(&((State*)0)->transition_idxs, &transiton_list_list);
 	START_PROPS(State)
 		REG_STDVECTOR(transition_idxs,PROP_SERIALIZE),
 		REG_FLOAT(state_duration, PROP_DEFAULT, ""),
@@ -534,7 +533,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 out.write_key_value("default_param", string_format("%d", node->param.id));
 
 		 out.write_key_list_start("inputs");
-		 for (int i = 0; i < node->input.count; i++) {
+		 for (int i = 0; i < node->input.size(); i++) {
 			 out.write_value( string_format("%d", get_index_of_node(node->input[i]) ) );
 		 }
 		 out.write_list_end();
