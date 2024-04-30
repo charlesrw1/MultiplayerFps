@@ -95,29 +95,22 @@ bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
 }
 
 
-
 PropertyInfoList* State::get_props()
 {
-	MAKE_VECTORCALLBACK(State_Transition, transitions);
+	static PropertyInfo transition_list_props[] = {
+		make_integer_property(".",0,PROP_SERIALIZE,sizeof(uint16_t),"","")
+	};
+	static PropertyInfoList transiton_list_list = { transition_list_props,1 };
+	static StdVectorCallback<uint16_t> vecdef_transition_idxs(&transiton_list_list);
+
 	START_PROPS(State)
-		REG_STDVECTOR(transitions, PROP_DEFAULT),
+		REG_STDVECTOR(transition_idxs,PROP_SERIALIZE),
 		REG_FLOAT(state_duration, PROP_DEFAULT, ""),
-		REG_BOOL(transition_wait_on_end, PROP_DEFAULT, ""),
-		REG_INT(next_state.id, PROP_SERIALIZE, ""),
-		REG_STDSTRING(name, PROP_SERIALIZE, "")
+		REG_BOOL(wait_until_finish, PROP_DEFAULT, ""),
+		REG_BOOL(is_end_state, PROP_DEFAULT, ""),
+		REG_INT(tree_index, PROP_SERIALIZE, ""),
 	END_PROPS(State)
 }
-
-handle<State> State::get_next_state(NodeRt_Ctx& ctx) const
-{
-	for (int i = 0; i < transitions.size(); i++) {
-		// evaluate condition
-		if (transitions[i].script.evaluate(ctx))
-			return  transitions[i].transition_state;
-	}
-	return { -1 };
-}
-
 
 static const char* rm_setting_strs[] = {
 	"keep",
@@ -339,7 +332,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
  bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 
 	auto rt = get_rt<Statemachine_Node_RT>(ctx);
-
+#if 0
 	// evaluate state machine
 	if (!rt->active_state.is_valid()) {
 		rt->active_state = start_state;
@@ -416,6 +409,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 			return false;	// bubble up the finished event
 		}
 	}
+#endif
 	return true;
 }
 
@@ -639,8 +633,11 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
  PropertyInfoList* Statemachine_Node_CFG::get_props()
  {
+	 MAKE_VECTORCALLBACK(State, states);
+	 MAKE_VECTORCALLBACK(State_Transition, transitions);
 	 START_PROPS(Statemachine_Node_CFG)
-		 REG_INT( start_state, PROP_SERIALIZE, "")
+		 REG_STDVECTOR(states,PROP_SERIALIZE),
+		 REG_STDVECTOR(transitions, PROP_SERIALIZE)
 	END_PROPS(Statemachine_Node_CFG)
  }
 
@@ -680,6 +677,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
 
  void Statemachine_Node_CFG::write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {
+#if 0
 	 out.write_key_list_start("states");
 
 	 std::string buf;
@@ -704,12 +702,14 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 out.write_item_end();
 	 }
 	 out.write_list_end();
+#endif
  }
 
 
  // FIXME BROKEN AS FUCK
  void Statemachine_Node_CFG::read_from_dict(Animation_Tree_CFG* tree, DictParser& in) 
  {
+#if 0
 	 ASSERT(0);
 	 StringView tok;
 	 in.read_string(tok);
@@ -779,6 +779,7 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 			 }
 		 }
 	 }
+#endif
  }
 
  float PropertyInfo::get_float(void* ptr)
@@ -834,8 +835,9 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
  {
 	 START_PROPS(State_Transition)
 		 REG_INT( transition_state, PROP_SERIALIZE, ""),
+		 REG_BOOL(automatic_transition_rule, PROP_DEFAULT, ""),
 		 REG_FLOAT( transition_time, PROP_DEFAULT, ""),
-		 REG_STDSTRING( script.script_str, PROP_SERIALIZE, ""),
-		 REG_STRUCT_CUSTOM_TYPE( script, PROP_EDITABLE, "AG_LISP_CODE")
+		 REG_STDSTRING_CUSTOM_TYPE( script_uncompilied, PROP_DEFAULT, "AG_LISP_CODE"),
+		 REG_BOOL(is_continue_transition, PROP_DEFAULT, "")
 	END_PROPS(State_Transition)
  }

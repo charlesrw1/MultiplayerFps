@@ -53,7 +53,7 @@ public:
 
 private:
     void add_indents() {
-        for (int i = 0; i < tabs; i++)this->str += '\t';
+       // for (int i = 0; i < tabs; i++)this->str += '\t';
     }
     int tabs = 0;
     std::string str;

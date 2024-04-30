@@ -27,8 +27,8 @@ struct editor_layer {
 
 };
 
-const uint32_t MAX_INPUTS = 16;
-const uint32_t MAX_NODES_IN_GRAPH = (1 << 12);
+const uint32_t MAX_INPUTS = 32;
+const uint32_t MAX_NODES_IN_GRAPH = (1 << 14);
 const uint32_t INPUT_START = MAX_NODES_IN_GRAPH;
 const uint32_t OUTPUT_START = INPUT_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
 const uint32_t LINK_START = OUTPUT_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
@@ -37,7 +37,6 @@ const uint32_t STATIC_ATR_START = LINK_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
 
 struct InputPinNode
 {
-	std::string pin_name;
 	IAgEditorNode* other_node = nullptr;
 };
 
@@ -45,7 +44,7 @@ class AnimationGraphEditor;
 class IAgEditorNode
 {
 public:
-	IAgEditorNode() {	
+	IAgEditorNode(uint32_t id, uint32_t layer, animnode_type type) : id(id), graph_layer(layer),type(type){
 	}
 	virtual ~IAgEditorNode() {
 	}
@@ -53,6 +52,9 @@ public:
 
 	// called after either creation or load from file
 	virtual void init();
+
+	virtual bool has_pin_colors()  { return false; }
+	virtual ImVec4 get_pin_colors()  { return ImVec4(1,1,1,1); }
 
 	virtual std::string get_default_name();
 	virtual Node_CFG* get_graph_node() { return nullptr; }
@@ -65,8 +67,9 @@ public:
 	virtual void on_remove_pin(int slot, bool force = false) {
 		inputs[slot].other_node = nullptr;
 	}
+	virtual void on_post_remove_pins() {}
 	virtual void remove_reference(IAgEditorNode* node);
-	virtual editor_layer* get_layer() { return nullptr;  }
+	virtual const editor_layer* get_layer() { return nullptr;  }
 	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) {
 		inputs[slot].other_node = input;
 		if (grow_pin_count_on_new_pin()) {
@@ -78,6 +81,8 @@ public:
 	// animation graph specific stuff
 	virtual bool compile_my_data();
 	virtual bool draw_flat_links() { return false; }
+	virtual bool push_imnode_link_colors(int index) { return false; }
+
 	virtual bool is_statemachine() {
 		return false;
 	}
@@ -99,14 +104,22 @@ public:
 	}
 	bool name_is_default() { return title == "Unnamed"; }
 
+	const uint32_t id = 0;
+	const uint32_t graph_layer = 0;
+	const animnode_type type = animnode_type::source;
+
 	std::string title = "Unnamed";
-	uint32_t id = 0;
 	Color32 node_color = { 23, 82, 12 };
 	uint32_t num_inputs = 1;
-	uint32_t graph_layer = 0;
-	animnode_type type = animnode_type::source;
 	std::array<InputPinNode, MAX_INPUTS> inputs;
 	
+
+	virtual std::string get_input_pin_name(int index) {
+		return std::string("in");
+	}
+	virtual std::string get_output_pin_name() {
+		return std::string("out");
+	}
 
 	uint32_t getinput_id(uint32_t inputslot) {
 		return inputslot + id * MAX_INPUTS + INPUT_START;
@@ -167,7 +180,8 @@ public:
 class AgEditor_BaseNode : public IAgEditorNode
 {
 public:
-	AgEditor_BaseNode(Node_CFG* node) : node(node) {}
+	AgEditor_BaseNode(Node_CFG* node, uint32_t id, uint32_t layer, animnode_type type) 
+		: node(node), IAgEditorNode(id,layer,type) {}
 
 	virtual void init();
 	virtual bool compile_my_data() override;
@@ -175,8 +189,8 @@ public:
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
 	virtual void draw_node_top_bar() override;
 	virtual void on_post_edit() override {}
-
-	Node_CFG* node = nullptr;
+	virtual  std::string get_input_pin_name(int index) override;
+	Node_CFG* const node = nullptr;
 };
 
 extern AutoEnumDef BlendSpace2dTopology_def;
@@ -213,7 +227,8 @@ class AgEditor_StateNode;
 class AgEditor_StateMachineNode : public IAgEditorNode
 {
 public:
-	AgEditor_StateMachineNode(Statemachine_Node_CFG* node) : node(node) {}
+	AgEditor_StateMachineNode(Statemachine_Node_CFG* node, uint32_t id, uint32_t layer, animnode_type type, editor_layer own_layer) 
+		: node(node), IAgEditorNode(id,layer,type) , sublayer(own_layer){}
 
 	virtual void init();
 	virtual std::string get_default_name() override;
@@ -223,7 +238,7 @@ public:
 	virtual bool compile_my_data() override;
 	virtual bool is_statemachine() override { return true; }
 	virtual Node_CFG* get_graph_node() override { return node; }
-	virtual editor_layer* get_layer() { return (sublayer.context )
+	virtual const editor_layer* get_layer() override { return (sublayer.context )
 		?  &sublayer : nullptr; }
 
 	~AgEditor_StateMachineNode() {
@@ -232,31 +247,25 @@ public:
 		}
 	}
 
-	handle<State> add_new_state();
-	bool set_editor_node_for_handle(handle<State> handle, AgEditor_StateNode* node) {
-		ASSERT(handle.is_valid());
-		if (handle.id >= 0 && handle.id < states.size() && states[handle.id] == nullptr) {
-			states[handle.id] = node;
-			return true;
-		}
-		printf("!!! set_editor_node_for_handle failed !!! (something was read from disk wrong or out of date)\n ");
-		return false;
+	bool add_node_to_statemachine(AgEditor_StateNode* node) {
+	
+		states.push_back(node);
+		return true;
 	}
 
 	State* get_state(handle<State> state);
 
 	std::vector<AgEditor_StateNode*> states;
-	editor_layer sublayer;
 
-	Statemachine_Node_CFG* node = nullptr;
+	const editor_layer sublayer;
+	Statemachine_Node_CFG* const node = nullptr;
 };
-
 
 class AgEditor_StateNode : public IAgEditorNode
 {
 public:
-	AgEditor_StateNode(AgEditor_StateMachineNode* parent, handle<State> state_handle) 
-		: parent_statemachine(parent), state_handle(state_handle) {}
+	AgEditor_StateNode(AgEditor_StateMachineNode* parent, uint32_t id, uint32_t layer, animnode_type type, editor_layer sublayer)
+		: parent_statemachine(parent), sublayer(sublayer), IAgEditorNode(id,layer,type) {}
 
 	virtual void init();
 
@@ -265,7 +274,12 @@ public:
 			ImNodes::EditorContextFree(sublayer.context);
 		}
 	}
+	virtual void on_post_remove_pins() override;
+	virtual  std::string get_output_pin_name() override { return ""; }
+	virtual bool has_pin_colors() override { return true; }
+	virtual ImVec4 get_pin_colors() override { return ImVec4(0.5, 0.5, 0.5, 1.0); }
 
+	virtual  std::string get_input_pin_name(int index) override;
 	virtual bool dont_call_compile() { return true; }
 	virtual bool traverse_and_find_errors();
 	virtual std::string get_default_name() override;
@@ -275,12 +289,14 @@ public:
 	virtual bool compile_my_data() override;
 	virtual void get_props(std::vector<PropertyListInstancePair>& props) override;
 	virtual bool draw_flat_links() override { return true; }
-	virtual editor_layer* get_layer() {
+	virtual const editor_layer* get_layer() {
 		return (sublayer.context)
 			? &sublayer : nullptr;
 	}
 	virtual bool add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) override;
 	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) override;
+
+	virtual bool push_imnode_link_colors(int index) override;
 
 	void on_output_create(AgEditor_StateNode* node_to_output);
 	void remove_output_to(AgEditor_StateNode* node);
@@ -288,22 +304,26 @@ public:
 	void get_transition_props(AgEditor_StateNode* to, std::vector<PropertyListInstancePair>& props);
 	bool compile_data_for_statemachine();
 
+	State_Transition* get_state_transition_to(AgEditor_StateNode* to) {
+		for (int i = 0; i < output.size(); i++) if (output[i].output_to == to)return &output[i].st;
+		return nullptr;
+	}
+
 	struct output_transition_info {
 		AgEditor_StateNode* output_to = nullptr;
+		State_Transition st;
 	};
-
-	// maps 1-to-1 with state transitions
 	std::vector<output_transition_info> output;
-
-	editor_layer sublayer;
-	AgEditor_StateMachineNode* parent_statemachine = nullptr;
-
-	handle<State> state_handle;
+	State self_state;
+	handle<State> state_handle_internal;
 	int selected_transition_for_prop_ed = 0;
+
+	const editor_layer sublayer;
+	AgEditor_StateMachineNode* const parent_statemachine = nullptr;
 };
 
 struct GraphTab {
-	editor_layer* layer = nullptr;
+	const editor_layer* layer = nullptr;
 	IAgEditorNode* owner_node = nullptr;
 	bool open = true;
 	glm::vec2 pan = glm::vec2(0.f, 0.f);
@@ -330,7 +350,7 @@ public:
 	TabState(AnimationGraphEditor* parent) : parent(parent) {}
 
 
-	void add_tab(editor_layer* layer, IAgEditorNode* node, glm::vec2 pan, bool mark_for_selection) {
+	void add_tab(const editor_layer* layer, IAgEditorNode* node, glm::vec2 pan, bool mark_for_selection) {
 		GraphTab tab;
 		tab.layer = layer;
 		tab.owner_node = node;
@@ -698,8 +718,7 @@ public:
 
 	void save_command();
 	void save_document();
-	void remove_unused_nodes() {}
-	void save_editor_nodes(DictWriter& writer) {}
+	void save_editor_nodes(DictWriter& writer);
 	void create_new_document();
 	void compile_and_run();
 	bool compile_graph_for_playing();
@@ -801,15 +820,11 @@ public:
 
 	bool statemachine_passthrough = false;
 
-	struct icons {
-		Texture* error;
-		Texture* back;
-		Texture* forward;
-		Texture* undo;
-	}icon;
-
-	uint32_t node_last_frame = -1;
-	uint32_t link_last_frame = -1;
+	struct selection_state
+	{
+		uint32_t node_last_frame = -1;
+		uint32_t link_last_frame = -1;
+	}sel;
 
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root

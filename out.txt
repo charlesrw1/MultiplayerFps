@@ -1,8 +1,102 @@
 {
-	name ""
-	data_used "0"
-	root_node "-1"
-	params [
-	]
-	nodes [
-	]
+name ""
+data_used "52"
+root_node "-1"
+params [
+]
+nodes [
+{
+type "::source"
+default_param "-1"
+inputs [
+]
+props [
+{
+name "rm[0]"
+type "Enum8"
+value "rm::keep"
+}
+{
+name "rm[1]"
+type "Enum8"
+value "rm::keep"
+}
+{
+name "rm[2]"
+type "Enum8"
+value "rm::keep"
+}
+{
+name "loop"
+type "Bool"
+value "1"
+}
+{
+name "speed"
+type "Float"
+value "1.000000"
+}
+{
+name "start_frame"
+type "Int16"
+value "0"
+}
+{
+name "allow_sync"
+type "Bool"
+value "0"
+}
+{
+name "can_be_leader"
+type "Bool"
+value "0"
+}
+{
+name "clip_name"
+type "StdString"
+value "Armature|mixamo.com|Layer0"
+}
+]
+}
+{
+type "::blend2d"
+default_param "-1"
+inputs [
+]
+props [
+{
+name "xparam"
+type "Int32"
+value "-1"
+}
+{
+name "yparam"
+type "Int32"
+value "-1"
+}
+{
+name "weight_damp"
+type "Float"
+value "0.010000"
+}
+]
+}
+]
+ editor
+{
+nodes [
+{
+name "Unnamed"
+graph_layer "0"
+id "0"
+type "root"
+}
+{
+name "Unnamed"
+node_idx "1"
+graph_layer "0"
+id "2"
+type "blend2d"
+}
+]
+}

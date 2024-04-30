@@ -97,6 +97,6 @@ inline void* Memory_Arena::alloc_bottom(uint32_t size)
 		std::abort();
 		return nullptr;
 	}
-	bottom_pointer += size;
+	bottom_pointer = ret + size;
 	return (void*)ret;
 }

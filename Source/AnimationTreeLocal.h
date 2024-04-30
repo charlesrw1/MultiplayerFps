@@ -66,25 +66,6 @@ struct animnode_name_type
 
 extern animnode_name_type& get_animnode_typedef(animnode_type type);
 
-struct NodeRt_Ctx;
-struct ScriptExpression
-{
-	BytecodeExpression compilied;
-	std::string script_str;
-
-	bool evaluate(NodeRt_Ctx& rt) const;
-};
-
-struct State;
-struct State_Transition
-{
-	static PropertyInfoList* get_props();
-
-	handle<State> transition_state;
-	ScriptExpression script;
-	float transition_time = 0.1f;
-};
-
 struct Rt_Vars_Base
 {
 	uint16_t last_update_tick = 0;
@@ -144,23 +125,7 @@ struct GetPose_Ctx
 
 struct Node_CFG
 {
-	Node_CFG(Animation_Tree_CFG* cfg, uint32_t rt_size, int init_input_count) {
-		rt_offset = cfg->data_used;
-		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
-		cfg->data_used += rt_size;
-
-		memset(input.inline_, 0, sizeof(Node_CFG*) * 2);
-		if (init_input_count <= -1)
-			input.count = 0;
-		else if (init_input_count <= 2)
-			input.count = init_input_count;
-		else {
-			ASSERT(init_input_count <= 16);
-			Node_CFG** nodes = (Node_CFG**)cfg->arena.alloc_bottom(sizeof(Node_CFG**) * init_input_count);
-			memset(nodes, 0, sizeof(Node_CFG*) * init_input_count);
-			input.assign_memory(nodes, init_input_count);
-		}
-	}
+	virtual void init_memory_offsets(Animation_Tree_CFG* cfg) = 0;
 
 	bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 		set_active(ctx, get_rt<Rt_Vars_Base>(ctx));
@@ -198,37 +163,43 @@ protected:
 	T* construct_this(NodeRt_Ctx& ctx) const {
 		return ctx.tree->construct_rt<T>(rt_offset);
 	}
+
+	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size, int init_input_count) {
+		rt_offset = cfg->data_used;
+		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
+		cfg->data_used += rt_size;
+
+		memset(input.inline_, 0, sizeof(Node_CFG*) * 2);
+		if (init_input_count <= -1)
+			input.count = 0;
+		else if (init_input_count <= 2)
+			input.count = init_input_count;
+		else {
+			ASSERT(init_input_count <= 16);
+			Node_CFG** nodes = (Node_CFG**)cfg->arena.alloc_bottom(sizeof(Node_CFG**) * init_input_count);
+			memset(nodes, 0, sizeof(Node_CFG*) * init_input_count);
+			input.assign_memory(nodes, init_input_count);
+		}
+	}
+
 private:
 	uint32_t rt_offset = 0;
 };
 
-struct State
-{
-	static PropertyInfoList* get_props();
-
-	string name;
-	Node_CFG* tree = nullptr;
-	vector<State_Transition> transitions;
-	float time_left = 0.0;
-
-	float state_duration = -1.0;				// when > 0, specifies how long state should be active, then signals a transition end
-	bool transition_wait_on_end = false;		// when the state finishes, wait until a valid transition instead of continuing/ending
-	handle<State> next_state;					// continue state
-
-	handle<State> get_next_state(NodeRt_Ctx& ctx) const;
-};
-
-#define DECLARE_ANIMNODE_CREATOR(TYPE_NAME, ENUM_TYPE) static Node_CFG* create(Animation_Tree_CFG* cfg) { \
+#define DECLARE_ANIMNODE_CREATOR(TYPE_NAME, ENUM_TYPE) \
+static Node_CFG* create(Animation_Tree_CFG* cfg) { \
 TYPE_NAME* clip = (TYPE_NAME*)cfg->arena.alloc_bottom(sizeof(TYPE_NAME)); \
-clip = new(clip)TYPE_NAME(cfg); \
+clip = new(clip)TYPE_NAME(); \
 return clip; \
 }  \
 static const animnode_type CONST_TYPE_ENUM = ENUM_TYPE; \
 virtual PropertyInfoList* get_props() override;  \
-virtual animnode_type get_type() override { return ENUM_TYPE; }
+virtual animnode_type get_type() override { return ENUM_TYPE; } 
 
-#define DEFAULT_CTOR(TYPE_NAME) TYPE_NAME(Animation_Tree_CFG* cfg) \
-: Node_CFG(cfg, sizeof(RT_TYPE), get_animnode_typedef(CONST_TYPE_ENUM).allowed_inputs) { }
+#define DEFAULT_CTOR(TYPE_NAME) \
+virtual void init_memory_offsets(Animation_Tree_CFG* tree) override { \
+	init_memory_internal(tree, sizeof(RT_TYPE), get_animnode_typedef(CONST_TYPE_ENUM).allowed_inputs); \
+}
 
 // playback speed *= param / (speed of clip's root motion)
 struct Scale_By_Rootmotion_CFG : public Node_CFG
@@ -544,13 +515,49 @@ struct Mirror_Node_CFG : public Node_CFG
 	uint8_t parameter_type = 1;// 0 = float, 1 = bool
 };
 
+struct NodeRt_Ctx;
+struct ScriptExpression
+{
+	BytecodeExpression compilied;
+
+	bool evaluate(NodeRt_Ctx& rt) const;
+};
+
+struct State;
+struct State_Transition
+{
+	static PropertyInfoList* get_props();
+	bool is_a_continue_transition() const { return is_continue_transition; }
+	handle<State> transition_state;
+	BytecodeExpression script_condition;
+	std::string script_uncompilied;		// TODO: save to disk precompilied, compiling is fast though so not a huge deal
+	bool is_continue_transition = false;
+	float transition_time = 0.2f;
+	bool automatic_transition_rule = true;
+};
+
+
+struct State
+{
+	static PropertyInfoList* get_props();
+
+	Node_CFG* tree = nullptr;	// fixed up at initialization
+	uint16_t tree_index = 0;
+	bool is_end_state = false;
+	bool wait_until_finish = false;
+	float state_duration = -1.0;				// when > 0, specifies how long state should be active, then signals a transition end
+	std::vector<uint16_t> transition_idxs;
+};
 
 struct Statemachine_Node_RT : Rt_Vars_Base
 {
 	handle<State> active_state;
 	handle<State> fading_out_state;
-	float active_weight = 0.0;
-	bool change_to_next = false;
+	State_Transition* active_transition = nullptr;
+	Pose* cached_pose_from_transition  = nullptr;
+
+	float blend_duration = 0.0;
+	float blend_percentage = 0.0;
 };
 
 struct Statemachine_Node_CFG : public Node_CFG
@@ -560,6 +567,8 @@ struct Statemachine_Node_CFG : public Node_CFG
 	DEFAULT_CTOR(Statemachine_Node_CFG)
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+
+	handle<State> find_start_state(Statemachine_Node_RT* rt) { return {}; }
 
 	// Inherited via At_Node
 	virtual void reset(NodeRt_Ctx& ctx) const override
@@ -583,9 +592,9 @@ struct Statemachine_Node_CFG : public Node_CFG
 		return { int((state - states.data()) / sizeof(State)) };
 	}
 
-	handle<State> start_state;
-	float fade_in_time = 0.f;
 	std::vector<State> states;
+	std::vector<uint16_t> entry_transitions;
+	std::vector<State_Transition> transitions;
 };
 
 struct BlendSpace2d_RT : Rt_Vars_Base
