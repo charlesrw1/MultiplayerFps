@@ -208,6 +208,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		 return true;
 	 }
 	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+	 ASSERT(!(rt->lerp_amt != rt->lerp_amt));
 
 	 float value = 0.0;
 	 if (store_value_on_reset) {
@@ -218,7 +219,8 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 			 value = ctx.vars->get(param).fval;
 		 else if (parameter_type == 1) // bool
 			 value = (float)ctx.vars->get(param).ival;
-		rt->lerp_amt = damp_dt_independent(value, rt->lerp_amt, damp_factor, pose.dt);
+		//rt->lerp_amt = damp_dt_independent(value, rt->lerp_amt, damp_factor, pose.dt);
+		ASSERT(!(rt->lerp_amt != rt->lerp_amt));
 	 }
 
 
@@ -227,7 +229,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	Pose* addtemp = Pose_Pool::get().alloc(1);
 	keep_going &= input[0]->get_pose(ctx, pose);
 	keep_going &= input[1]->get_pose(ctx, pose.set_pose(addtemp));
-	util_blend(ctx.num_bones(), *addtemp, *pose.pose, rt->lerp_amt);
+	util_blend(ctx.num_bones(), *addtemp, *pose.pose, value);
 	Pose_Pool::get().free(1);
 	return keep_going;
 }
@@ -621,12 +623,12 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
  PropertyInfoList* Clip_Node_CFG::get_props()
  {
 	 START_PROPS(Clip_Node_CFG)
-		 REG_ENUM( rm[0], PROP_DEFAULT, "0", rootmotion_setting_def.id),
-		 REG_ENUM( rm[1], PROP_DEFAULT, "0", rootmotion_setting_def.id),
-		 REG_ENUM( rm[2], PROP_DEFAULT, "0", rootmotion_setting_def.id),
+		 REG_ENUM( rm[0], PROP_DEFAULT, "rm::keep", rootmotion_setting_def.id),
+		 REG_ENUM( rm[1], PROP_DEFAULT, "rm::keep", rootmotion_setting_def.id),
+		 REG_ENUM( rm[2], PROP_DEFAULT, "rm::keep", rootmotion_setting_def.id),
 
 		 REG_BOOL( loop, PROP_DEFAULT, "1"),
-		 REG_FLOAT( speed, PROP_DEFAULT, "0,-5,5"),
+		 REG_FLOAT( speed, PROP_DEFAULT, "1.0,0.1,10"),
 		 REG_INT( start_frame, PROP_DEFAULT, "0"),
 		 REG_BOOL( allow_sync, PROP_DEFAULT, "0"),
 		 REG_BOOL( can_be_leader, PROP_DEFAULT, "1"),

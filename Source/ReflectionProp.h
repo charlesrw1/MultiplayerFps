@@ -30,12 +30,17 @@ enum SerializedPropFlags
 
 struct ParsedHintStr
 {
-	float default_ = 0.0;
-	float min_val = -9999.f;
-	float max_val = 9999.f;
-	float step = 1.0;
-	bool less = false;
-	bool greater = false;
+	bool has_default = false;
+	bool has_min = false;
+	bool has_max = false;
+	float default_f = 0.0;
+	int default_i = 0;
+	float min_f = -9999.f;
+	float max_f = 9999.f;
+	int min_i = INT32_MIN;
+	int max_i = INT32_MAX;
+	float step_f = 0.1;
+	int step_i = 1;
 };
 
 class IListCallback;
@@ -76,10 +81,13 @@ struct PropertyInfo {
 			|| type == core_type_id::Enum8 || type == core_type_id::Enum16 || type == core_type_id::Enum32;
 	}
 };
+
+ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop);
+
 PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
 PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint = "", const char* customtype = "");
 PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id);
+PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id, const char* hint= "");
 PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype = "");
 PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");

@@ -331,7 +331,7 @@ struct Clip_Node_CFG : public Node_CFG
 	std::string clip_name;
 	bool loop = true;
 	bool allow_sync = false;
-	bool can_be_leader = false;
+	bool can_be_leader = true;
 	float speed = 1.0;
 	uint16_t start_frame = 0;
 };

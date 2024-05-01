@@ -1508,6 +1508,7 @@ bool AgEditor_BaseNode::compile_my_data()
 	bool has_null_input = false;
 	node->input.resize(num_inputs);
 	for (int i = 0; i < num_inputs; i++) {
+		node->input[i] = nullptr;
 		has_null_input |= !bool(inputs[i].other_node);
 		if (inputs[i].other_node && inputs[i].other_node->get_graph_node()) {
 			node->input[i] = inputs[i].other_node->get_graph_node();
@@ -1517,7 +1518,7 @@ bool AgEditor_BaseNode::compile_my_data()
 	// selector nodes can have empty inputs
 
 	if (has_null_input)
-		append_info_msg("[INFO] missing inputs\n");
+		append_fail_msg("[ERROR] missing inputs\n");
 
 	if (type != animnode_type::rootmotion_speed
 		&& type != animnode_type::blend2d
@@ -1938,6 +1939,8 @@ bool AgEditor_StateMachineNode::compile_my_data()
 	}
 	node->entry_transitions.resize(0);
 	node->transitions.clear();
+
+	node->init_memory_offsets(ed.editing_tree, 0);
 
 	bool has_errors = false;
 

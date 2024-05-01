@@ -29,6 +29,92 @@ static_assert((sizeof(core_type_id_strs) / sizeof(char*)) == ((int)core_type_id:
 AutoEnumDef core_type_id_def = AutoEnumDef("", sizeof(core_type_id_strs) / sizeof(char*), core_type_id_strs);
 
 
+static StringView delimit(const char* start, const char character = ',')
+{
+	StringView s;
+	s.str_start = start;
+	s.str_len = 0;
+	while (*start != 0 && *start != character) {
+		s.str_len++;
+		start++;
+	}
+	return s;
+}
+
+static void parse_str(StringView str, float& f, int& i, core_type_id type, bool is_min_max_or_inc) {
+	if (str.cmp("true") || str.cmp("True")) {
+		ASSERT(type == core_type_id::Bool);
+		ASSERT(!is_min_max_or_inc);
+		i = 1;
+	}
+	else if (str.cmp("false") || str.cmp("False")) {
+		i = 0;
+		ASSERT(!is_min_max_or_inc);
+		ASSERT(type == core_type_id::Bool);
+	}
+	else {
+		if (type == core_type_id::Enum8 || type == core_type_id::Enum16 || type == core_type_id::Enum32) {
+			auto idx = GlobalEnumDefMgr::get().get_for_name(str.to_stack_string().c_str());
+			ASSERT(idx.enum_idx != -1 && idx.val_idx != -1);
+			i = idx.val_idx;
+			ASSERT(!is_min_max_or_inc);
+		}
+		else if (type == core_type_id::Int8 || type == core_type_id::Int16 || type == core_type_id::Int32 || type == core_type_id::Bool) {
+			i = atoi(str.to_stack_string().c_str());
+		}
+		else if (type == core_type_id::Float) {
+			f = atof(str.to_stack_string().c_str());
+		}
+		else
+			ASSERT(!"no parse hint str allowed for non-numbers/enums");	// no hint strs
+	}
+}
+
+ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop)
+{
+	ParsedHintStr parsed;
+	const char* start = prop->range_hint;
+	StringView sv = delimit(start);
+	if (sv.str_len > 0) {
+		parse_str(sv, parsed.default_f, parsed.default_i, prop->type, false);
+		parsed.has_default = true;
+	}
+	const char* next = sv.str_start + sv.str_len;
+	if (*next == 0)
+		return parsed;
+	ASSERT(*next == ',');
+	next++;
+	sv = delimit(next);
+	if (sv.str_len > 0) {
+		parse_str(sv, parsed.min_f, parsed.min_i, prop->type, true);
+		parsed.has_min = true;
+
+	}
+
+	next = sv.str_start + sv.str_len;
+	if (*next == 0)
+		return parsed;
+	ASSERT(*next == ',');
+	next++;
+	sv = delimit(next);
+	if (sv.str_len > 0) {
+		parse_str(sv, parsed.max_f, parsed.max_i, prop->type, true);
+		parsed.has_max = true;
+
+	}
+
+	next = sv.str_start + sv.str_len;
+	if (*next == 0)
+		return parsed;
+	ASSERT(*next == ',');
+	next++;
+	sv = delimit(next);
+	if (sv.str_len > 0) {
+		parse_str(sv, parsed.step_f, parsed.step_i, prop->type, true);
+	}
+
+	return parsed;
+}
 
 PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags, const char* hint)
 {
@@ -64,9 +150,10 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flag
 	return prop;
 }
 
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id)
+PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
+	prop.range_hint = hint;
 	if (bytes == 1)
 		prop.type = core_type_id::Enum8;
 	else if (bytes == 2)

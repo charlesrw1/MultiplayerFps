@@ -557,14 +557,19 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 	this->model = model;
 	this->set = set;
 	parameters.parameters.resize(cfg->parameters.types.size());
-	data.resize(cfg->data_used);
+	data.clear();
+	data.resize(cfg->data_used, 0);
 	NodeRt_Ctx ctx;
 	ctx.model = model;
 	ctx.set = set;
 	ctx.tree = this;
-
+	ctx.vars = &parameters;
+	ctx.tick = 0;
 	for (int i = 0; i < cfg->all_nodes.size(); i++)
 		cfg->all_nodes[i]->construct(ctx);
+
+	if(cfg->root)
+		cfg->root->reset(ctx);
 }
 
 
