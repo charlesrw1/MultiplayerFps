@@ -25,6 +25,12 @@ public:
         this->str += "[\n";
         tabs++;
     }
+    void write_list_start() {
+        add_indents();
+        this->str += ' ';
+        this->str += "[\n";
+        tabs++;
+    }
     void write_list_end() {
         tabs--;
         add_indents();
@@ -50,11 +56,14 @@ public:
     std::string& get_output() {
         return str;
     }
-
+    void set_should_add_indents(bool b) { should_add_indents = b; }
 private:
     void add_indents() {
-       // for (int i = 0; i < tabs; i++)this->str += '\t';
+        if(should_add_indents)
+            for (int i = 0; i < tabs; i++)
+                this->str += '\t';
     }
+    bool should_add_indents = false;
     int tabs = 0;
     std::string str;
 };

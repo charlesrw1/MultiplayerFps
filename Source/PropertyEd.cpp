@@ -372,6 +372,9 @@ bool ArrayRow::are_any_nodes_open()
 
 void ArrayRow::draw_row_controls()
 {
+	if (header && !header->can_edit_array())
+		return;
+
 	auto trashimg = mats.find_texture("icon/trash.png");
 	auto addimg = mats.find_texture("icon/plus.png");
 
@@ -432,6 +435,8 @@ void ArrayRow::draw_row_controls()
 
 	 }
 
+	 if (header && !header->can_edit_array())
+		 commands.clear();
 
 	 for (int i = 0; i < commands.size(); i++) {
 		 switch (commands[i].command) {
@@ -563,6 +568,9 @@ void ArrayRow::draw_row_controls()
 	 ASSERT(row_index != -1);
 
 	 ArrayRow* array_ = (ArrayRow*)parent;
+
+	 if (array_->header && !array_->header->can_edit_array())
+		 return;
 
 	 bool canmoveup = row_index > 0;
 	 bool canmovedown = (row_index != array_->get_size() - 1);

@@ -562,8 +562,9 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 	ctx.model = model;
 	ctx.set = set;
 	ctx.tree = this;
-	if(cfg->root)
-		cfg->root->construct(ctx);
+
+	for (int i = 0; i < cfg->all_nodes.size(); i++)
+		cfg->all_nodes[i]->construct(ctx);
 }
 
 
@@ -571,7 +572,7 @@ Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {
 	return nullptr;
 }
 
-void Animation_Set_New::find_animation(const char* name, uint32_t* out_set, uint32_t* out_index, uint32_t* skel_idx) const
+void Animation_Set_New::find_animation(const char* name, int16_t* out_set, int16_t* out_index, int16_t* skel_idx) const
 {
 	const auto& find = table.find(name);
 	if (find != table.end()) {

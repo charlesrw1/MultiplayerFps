@@ -15,7 +15,7 @@ class Node_CFG;
 class Animation_Tree_CFG
 {
 public:
-	Stack_String<128> name;
+	std::string name;
 	Node_CFG* root = nullptr;
 	Memory_Arena arena;
 	uint32_t data_used = 0;
@@ -72,7 +72,7 @@ public:
 	std::vector<Import> imports;
 	std::unordered_map<std::string, std::string> table;	// fixme: do better
 
-	void find_animation(const char* name, uint32_t* out_set, uint32_t* out_index, uint32_t* out_skel) const;
+	void find_animation(const char* name, int16_t* out_set, int16_t* out_index, int16_t* out_skel) const;
 	const Animation_Set* get_subset(uint32_t index) const;
 	const std::vector<int>& get_remap(uint32_t skel_index) const {
 		return src_skeleton->remaps.at(skel_index).skel_to_source;

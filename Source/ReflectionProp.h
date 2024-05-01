@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "EnumDefReflection.h"
+#include "StringUtil.h"
 
 // If you modify this, change the autoenumdef!!
 extern AutoEnumDef core_type_id_def;
@@ -97,7 +98,7 @@ struct PropertyInfoList
 class DictWriter;
 class DictParser;
 void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out);
-bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in);
+bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token);
 
 class IListCallback
 {

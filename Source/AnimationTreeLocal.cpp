@@ -97,16 +97,12 @@ bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
 
 PropertyInfoList* State::get_props()
 {
-	static PropertyInfo transition_list_props[] = {
-		make_integer_property(".",0,PROP_SERIALIZE,sizeof(uint16_t),"","")
-	};
-	static PropertyInfoList transiton_list_list = { transition_list_props,1 };
-	static auto vecdef_transition_idxs = get_inlinevec_callback(&((State*)0)->transition_idxs, &transiton_list_list);
+	MAKE_INLVECTORCALLBACK_ATOM(uint16_t, transition_idxs, State);
 	START_PROPS(State)
 		REG_STDVECTOR(transition_idxs,PROP_SERIALIZE),
-		REG_FLOAT(state_duration, PROP_DEFAULT, ""),
-		REG_BOOL(wait_until_finish, PROP_DEFAULT, ""),
-		REG_BOOL(is_end_state, PROP_DEFAULT, ""),
+		REG_FLOAT(state_duration, PROP_DEFAULT, "-1.0"),
+		REG_BOOL(wait_until_finish, PROP_DEFAULT, "0"),
+		REG_BOOL(is_end_state, PROP_DEFAULT, "0"),
 		REG_INT(tree_index, PROP_SERIALIZE, ""),
 	END_PROPS(State)
 }
@@ -493,14 +489,25 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 return -1;
  }
 
+ void Animation_Tree_CFG::read_from_dict(DictParser& in)
+ {
+
+ }
 
  void Animation_Tree_CFG::write_to_dict(DictWriter& out)
  {
+	 out.set_should_add_indents(true);
 	 out.write_item_start();
 
 	 out.write_key_value("name", this->name.c_str());	
-	 out.write_key_value("data_used", string_format("%d", (int)data_used));
 	 out.write_key_value("root_node", string_format("%d", get_index_of_node(root)));
+
+	 std::unordered_map<Node_CFG*, int> node_ptr_to_index;
+	 for (int i = 0; i < all_nodes.size(); i++) {
+		 // sanity check
+		 ASSERT(node_ptr_to_index.find(all_nodes[i]) == node_ptr_to_index.end());
+		 node_ptr_to_index[all_nodes[i]] = i;
+	 }
 
 	 out.write_key_list_start("params");
 	 for (auto& param_int : parameters.name_to_index) {
@@ -512,7 +519,6 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 out.write_key_value("type", parameter_type_to_string(param.default_.type));
 
 		 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
-
 
 		 out.write_item_end();
 	 }
@@ -566,64 +572,64 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
  PropertyInfoList* BlendSpace1d_CFG::get_props()
  {
 	 START_PROPS(BlendSpace1d_CFG)
-		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
-		 REG_BOOL(is_additive_blend_space, PROP_DEFAULT, ""),
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "-1", "AG_PARAM_FINDER"),
+		 REG_BOOL(is_additive_blend_space, PROP_DEFAULT, "0"),
 	END_PROPS(BlendSpace1d_CFG)
  }
 
  PropertyInfoList* Add_Node_CFG::get_props()
  {
 	 START_PROPS(Add_Node_CFG)
-		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER")
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "-1", "AG_PARAM_FINDER")
 	 END_PROPS(Add_Node_CFG)
  }
 
  PropertyInfoList* Blend_Int_Node_CFG::get_props()
  {
 	 START_PROPS(Blend_Int_Node_CFG)
-		 REG_INT_W_CUSTOM(param, PROP_DEFAULT,"", "AG_PARAM_FINDER")
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT,"-1", "AG_PARAM_FINDER")
 	END_PROPS(Blend_Int_Node_CFG)
  }
 
  PropertyInfoList* BlendSpace2d_CFG::get_props()
  {
 	 START_PROPS(BlendSpace2d_CFG)
-		 REG_INT_W_CUSTOM(xparam, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
-		 REG_INT_W_CUSTOM(yparam, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
-		 REG_FLOAT(weight_damp, PROP_DEFAULT, "")
+		 REG_INT_W_CUSTOM(xparam, PROP_DEFAULT, "-1", "AG_PARAM_FINDER"),
+		 REG_INT_W_CUSTOM(yparam, PROP_DEFAULT, "-1", "AG_PARAM_FINDER"),
+		 REG_FLOAT(weight_damp, PROP_DEFAULT, "0.01")
 	 END_PROPS(BlendSpace2d_CFG)
  }
 
  PropertyInfoList* Mirror_Node_CFG::get_props()
  {
 	 START_PROPS(Mirror_Node_CFG)
-		 REG_FLOAT(damp_time, PROP_DEFAULT, ""),
-		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
-		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, ""),
+		 REG_FLOAT(damp_time, PROP_DEFAULT, "0.1"),
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "-1", "AG_PARAM_FINDER"),
+		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, "0"),
 	 END_PROPS(Mirror_Node_CFG)
  }
 
  PropertyInfoList* Blend_Node_CFG::get_props()
  {
 	 START_PROPS(Blend_Node_CFG)
-		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "", "AG_PARAM_FINDER"),
-		 REG_FLOAT(damp_factor, PROP_DEFAULT, ""),
-		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, ""),
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "-1", "AG_PARAM_FINDER"),
+		 REG_FLOAT(damp_factor, PROP_DEFAULT, "0.1"),
+		 REG_BOOL(store_value_on_reset, PROP_DEFAULT, "0"),
 	END_PROPS(Blend_Node_CFG)
  }
 
  PropertyInfoList* Clip_Node_CFG::get_props()
  {
 	 START_PROPS(Clip_Node_CFG)
-		 REG_ENUM( rm[0], PROP_DEFAULT, "", rootmotion_setting_def.id),
-		 REG_ENUM( rm[1], PROP_DEFAULT, "", rootmotion_setting_def.id),
-		 REG_ENUM( rm[2], PROP_DEFAULT, "", rootmotion_setting_def.id),
+		 REG_ENUM( rm[0], PROP_DEFAULT, "0", rootmotion_setting_def.id),
+		 REG_ENUM( rm[1], PROP_DEFAULT, "0", rootmotion_setting_def.id),
+		 REG_ENUM( rm[2], PROP_DEFAULT, "0", rootmotion_setting_def.id),
 
-		 REG_BOOL( loop, PROP_DEFAULT, ""),
+		 REG_BOOL( loop, PROP_DEFAULT, "1"),
 		 REG_FLOAT( speed, PROP_DEFAULT, "0,-5,5"),
-		 REG_INT( start_frame, PROP_DEFAULT, ""),
-		 REG_BOOL( allow_sync, PROP_DEFAULT, ""),
-		 REG_BOOL( can_be_leader, PROP_DEFAULT, ""),
+		 REG_INT( start_frame, PROP_DEFAULT, "0"),
+		 REG_BOOL( allow_sync, PROP_DEFAULT, "0"),
+		 REG_BOOL( can_be_leader, PROP_DEFAULT, "1"),
 
 		 REG_STDSTRING_CUSTOM_TYPE( clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
 
@@ -632,11 +638,13 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
  PropertyInfoList* Statemachine_Node_CFG::get_props()
  {
+	 MAKE_INLVECTORCALLBACK_ATOM(uint16_t, entry_transitions, Statemachine_Node_CFG);
 	 MAKE_VECTORCALLBACK(State, states);
 	 MAKE_VECTORCALLBACK(State_Transition, transitions);
 	 START_PROPS(Statemachine_Node_CFG)
 		 REG_STDVECTOR(states,PROP_SERIALIZE),
-		 REG_STDVECTOR(transitions, PROP_SERIALIZE)
+		 REG_STDVECTOR(transitions, PROP_SERIALIZE),
+		 REG_STDVECTOR(entry_transitions, PROP_SERIALIZE)
 	END_PROPS(Statemachine_Node_CFG)
  }
 
@@ -676,109 +684,14 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
 
  void Statemachine_Node_CFG::write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {
-#if 0
-	 out.write_key_list_start("states");
 
-	 std::string buf;
-
-	 for (int i = 0; i < states.size(); i++) {
-		 auto& state = states[i];
-		 out.write_item_start();
-
-		 out.write_key_value("name", state.name.c_str());
-		 out.write_key_value("next_state", string_format("%d", state.next_state.id));
-		 out.write_key_value("duration", string_format("%f", state.state_duration));
-		 out.write_key_value("node_index", string_format("%d", tree->get_index_of_node(state.tree)));
-
-		 out.write_key_list_start("transitions");
-		 for (int j = 0; j < state.transitions.size(); j++) {
-			 auto& tr = state.transitions[j];
-			 out.write_key_value("transition_state", string_format("%d", tr.transition_state.id));
-			 out.write_key_value("script", tr.script.script_str.c_str());
-		 }
-		 out.write_list_end();
-
-		 out.write_item_end();
-	 }
-	 out.write_list_end();
-#endif
  }
 
 
  // FIXME BROKEN AS FUCK
  void Statemachine_Node_CFG::read_from_dict(Animation_Tree_CFG* tree, DictParser& in) 
  {
-#if 0
-	 ASSERT(0);
-	 StringView tok;
-	 in.read_string(tok);
-	 if (!tok.cmp("states")) {
-		 printf("couldnt find states\n");
-		 return;
-	 }
 
-	 if (!in.expect_list_start()) {
-		 printf("nop list start\n");
-		 return;
-	 }
-
-	 while (1)
-	 {
-		 if (!in.read_string(tok))
-			 break;
-		 if (!in.check_item_start(tok))
-			 break;
-
-		 State state;
-
-		 in.read_string(tok);
-		 while (!in.check_item_end(tok) && !in.is_eof()) {
-			 if (tok.cmp("name")) {
-				 in.read_string(tok);
-				 state.name = tok.to_stack_string().c_str();
-			 }
-			 else if (tok.cmp("next_state")) {
-				 in.read_int(state.next_state.id);
-			 }
-			 else if (tok.cmp("duration")) {
-				 in.read_float(state.state_duration);
-			 }
-			 else if (tok.cmp("node_index")) {
-				 int index;
-				 in.read_int(index);
-				 state.tree = (Node_CFG*)index;	// fixup later
-			 }
-			 else if (tok.cmp("transitions")) {
-				 if (!in.expect_list_start())
-					 return;
-
-				 in.read_string(tok);
-				 while (!in.check_list_end(tok) && !in.is_eof())
-				 {
-					 State_Transition transition;
-
-					 in.read_string(tok);
-					 while (!in.check_item_end(tok) && !in.is_eof()) {
-
-						 if (tok.cmp("transition_state")) {
-							 in.read_int(transition.transition_state.id);
-						 }
-						 else if (tok.cmp("script")) {
-							 in.read_string(tok);
-							 // run lisp interpreter to compile later
-							 transition.script.script_str = tok.to_stack_string().c_str();
-						 }
-
-						 in.read_string(tok);
-					 }
-
-					 in.read_string(tok);
-				 }
-
-			 }
-		 }
-	 }
-#endif
  }
 
  float PropertyInfo::get_float(void* ptr)
@@ -833,10 +746,10 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
  PropertyInfoList* State_Transition::get_props()
  {
 	 START_PROPS(State_Transition)
-		 REG_INT( transition_state, PROP_SERIALIZE, ""),
-		 REG_BOOL(automatic_transition_rule, PROP_DEFAULT, ""),
-		 REG_FLOAT( transition_time, PROP_DEFAULT, ""),
+		 REG_INT( transition_state, PROP_SERIALIZE, "-1"),
+		 REG_BOOL(automatic_transition_rule, PROP_DEFAULT, "1"),
+		 REG_FLOAT( transition_time, PROP_DEFAULT, "0.2"),
 		 REG_STDSTRING_CUSTOM_TYPE( script_uncompilied, PROP_DEFAULT, "AG_LISP_CODE"),
-		 REG_BOOL(is_continue_transition, PROP_DEFAULT, "")
+		 REG_BOOL(is_continue_transition, PROP_DEFAULT, "0")
 	END_PROPS(State_Transition)
  }

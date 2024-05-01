@@ -243,10 +243,22 @@ class ControlParamArrayHeader : public IArrayHeader
 		ImGui::Text("%s", name);
 		ImGui::PopStyleColor();
 	}
+
+	virtual bool can_edit_array() override {
+		return !ed.graph_is_read_only();
+	}
+
 	friend class ControlParamsWindow;
 };
 
 
+void ControlParamsWindow::refresh_props() {
+	control_params.clear_all();
+	if (ed.get_playback_state() == AnimationGraphEditor::graph_playback_state::stopped)
+		control_params.add_property_list_to_grid(get_props(), this, PG_LIST_PASSTHROUGH);
+	else
+		control_params.add_property_list_to_grid(get_edit_value_props(), this, PG_LIST_PASSTHROUGH);
+}
 
 void AnimationGraphEditor::init()
 {
@@ -466,6 +478,7 @@ void AnimationGraphEditor::save_document()
 
 
 	DictWriter write;
+	write.set_should_add_indents(true);
 	editing_tree->write_to_dict(write);
 	save_editor_nodes(write);
 
@@ -579,6 +592,8 @@ void AnimationGraphEditor::start_or_resume_playback()
 		compile_and_run();
 	else
 		playback = graph_playback_state::running;
+
+	control_params.refresh_props();
 }
 void AnimationGraphEditor::draw_prop_editor()
 {
@@ -657,6 +672,74 @@ void AnimationGraphEditor::draw_prop_editor()
 void AnimationGraphEditor::stop_playback()
 {
 	playback = graph_playback_state::stopped;
+
+	control_params.refresh_props();
+}
+
+template<typename FUNCTOR>
+static void open_or_save_file_dialog(FUNCTOR&& callback)
+{
+	static bool alread_exists_err = false;
+	static bool cant_open_path_err = false;
+	static char buffer[256];
+	static bool init = true;
+	if (init) {
+		buffer[0] = 0;
+		alread_exists_err = false;
+		cant_open_path_err = false;
+		init = false;
+	}
+	bool write_out = false;
+
+	bool returned_true = false;
+	if (!alread_exists_err) {
+		ImGui::Text("Enter path: ");
+		ImGui::SameLine();
+		returned_true = ImGui::InputText("##pathinput", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
+	}
+
+	if (returned_true) {
+		const char* full_path = string_format("./Data/Animations/Graphs/%s", buffer);
+		bool already_exists = Files::does_file_exist(full_path);
+		cant_open_path_err = false;
+		alread_exists_err = false;
+		if (already_exists)
+			alread_exists_err = true;
+		else {
+			std::ofstream test_open(full_path);
+			if (!test_open)
+				cant_open_path_err = true;
+		}
+		if (!alread_exists_err && !cant_open_path_err) {
+			write_out = true;
+		}
+	}
+	if (alread_exists_err) {
+		ImGui::Text("File already exists. Overwrite?");
+		if (ImGui::Button("Yes")) {
+			write_out = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("No")) {
+			alread_exists_err = false;
+		}
+	}
+	else if (cant_open_path_err) {
+		ImGui::Text("Cant open path\n");
+	}
+	ImGui::Separator();
+	if (ImGui::Button("Cancel")) {
+		init = true;
+		ImGui::CloseCurrentPopup();
+	}
+
+	if (write_out) {
+		init = true;
+		ImGui::CloseCurrentPopup();
+		callback(buffer);
+	}
+
+	ImGui::EndPopup();
 }
 
 void AnimationGraphEditor::draw_popups()
@@ -664,73 +747,19 @@ void AnimationGraphEditor::draw_popups()
 
 	ImGui::PushID(0);
 	if (ImGui::BeginPopupModal("Save file dialog")) {
-
-		static bool alread_exists_err = false;
-		static bool cant_open_path_err = false;
-		static char buffer[256];
-		static bool init = true;
-		if (init) {
-			buffer[0] = 0;
-			alread_exists_err = false;
-			cant_open_path_err = false;
-			init = false;
-		}
-		bool write_out = false;
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are saved under /Data/Animations/Graphs/");
-
-		bool returned_true = false;
-		if (!alread_exists_err) {
-			ImGui::Text("Enter path: ");
-			ImGui::SameLine();
-			returned_true = ImGui::InputText("##pathinput", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
-		}
-
-		if (returned_true) {
-			const char* full_path = string_format("./Data/Animations/Graphs/%s", buffer);
-			bool already_exists = Files::does_file_exist(full_path);
-			cant_open_path_err = false;
-			alread_exists_err = false;
-			if (already_exists)
-				alread_exists_err = true;
-			else {
-				std::ofstream test_open(full_path);
-				if (!test_open)
-					cant_open_path_err = true;
-			}
-			if (!alread_exists_err && !cant_open_path_err) {
-				write_out = true;
-			}
-		}
-		if (alread_exists_err) {
-			ImGui::Text("File already exists. Overwrite?");
-			if (ImGui::Button("Yes")) {
-				write_out = true;
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("No")) {
-				alread_exists_err = false;
-			}
-		}
-		else if (cant_open_path_err) {
-			ImGui::Text("Cant open path\n");
-		}
-
-		if (write_out) {
-			name = buffer;
-			init = true;
-			ImGui::CloseCurrentPopup();
+		open_or_save_file_dialog([&](const char* buf) {
+			name = buf;
 			save_document();
-		}
-
-		ImGui::EndPopup();
+		});
 	}
 
 	if (ImGui::BeginPopupModal("Open file dialog"), nullptr) {
 
-		ImGui::Text("Animations are saved to $WorkingDir/Data/Animations/Graphs");
-		const char* path = "Data/Animations/Graphs";
-		char buffer[256];
-		int selected = -1;
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are searched in $WorkingDir/Data/Animations/Graphs");
+		open_or_save_file_dialog([&](const char* buf) {
+			open(buf);
+		});
 	}
 	ImGui::PopID();
 }
@@ -858,7 +887,6 @@ void AnimationGraphEditor::begin_draw()
 	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	node_props.set_read_only(graph_is_read_only());
-	control_params.set_read_only(graph_is_read_only());
 
 	if (open_prop_editor)
 		draw_prop_editor();
@@ -1178,6 +1206,9 @@ void AnimationGraphEditor::handle_event(const SDL_Event& event)
 
 void AnimationGraphEditor::delete_selected()
 {
+	if (graph_is_read_only())
+		return;
+
 	std::vector<int> ids;
 	ids.resize(ImNodes::NumSelectedLinks());
 	if (ids.size() > 0) {
@@ -1370,6 +1401,37 @@ std::string AgEditor_StateNode::get_input_pin_name(int index)
 		name.append("...");
 	}
 	return name;
+}
+
+
+static void delete_cfg_node(Node_CFG* node)
+{
+	ASSERT(!ed.graph_is_read_only());
+
+	// erase node from tree
+	int index = 0;
+	auto& all_nodes = ed.editing_tree->all_nodes;
+	for (int; index < all_nodes.size(); index++) {
+		if (all_nodes[index] == node)
+			break;
+	}
+	ASSERT(index != all_nodes.size());
+	all_nodes.erase(all_nodes.begin() + index);
+
+	// call destructor on node, since its allocated in an arena, ie no deletes
+	node->~Node_CFG();
+}
+
+AgEditor_BaseNode::~AgEditor_BaseNode()
+{
+	delete_cfg_node(node);
+}
+
+AgEditor_StateMachineNode::~AgEditor_StateMachineNode() {
+	if (sublayer.context) {
+		ImNodes::EditorContextFree(sublayer.context);
+	}
+	delete_cfg_node(node);
 }
 
 void AgEditor_BaseNode::init()
@@ -2179,8 +2241,23 @@ PropertyInfoList* EditorControlParamProp::get_props()
 	START_PROPS(EditorControlParamProp)
 		REG_STDSTRING(name, PROP_EDITABLE),
 		REG_ENUM(type, PROP_EDITABLE, "", script_parameter_type_def.id),
-		REG_INT_W_CUSTOM(enum_type, PROP_EDITABLE, "", "AG_ENUM_TYPE_FINDER"),
+		REG_INT_W_CUSTOM(enum_type, PROP_SERIALIZE, "-1", "AG_ENUM_TYPE_FINDER"),
 	END_PROPS(EditorControlParamProp)
+}
+
+PropertyInfoList* EditorControlParamProp::get_ed_control_null_prop()
+{
+	START_PROPS(EditorControlParamProp)
+		REG_STRUCT_CUSTOM_TYPE(name, PROP_EDITABLE, "AG_CONTROL_PARAM_RUN_EDIT")	// custom struct type for editing
+	END_PROPS(EditorControlParamProp)
+}
+
+PropertyInfoList* ControlParamsWindow::get_edit_value_props()
+{
+	static StdVectorCallback<EditorControlParamProp> vecdef_props(EditorControlParamProp::get_ed_control_null_prop());
+	START_PROPS(ControlParamsWindow)
+		REG_STDVECTOR_W_CUSTOM(props, PROP_EDITABLE, "AG_CONTROL_PARAM_ARRAY_RUN_EDIT")
+	END_PROPS(ControlParams-Editing)
 }
 
 PropertyInfoList* ControlParamsWindow::get_props()
@@ -2363,6 +2440,43 @@ PropertyInfoList* AgEditor_BlendspaceNode::Blendspace_Input::get_props()
 	END_PROPS(AgEditor_BlendspaceNode::Blendspace_Input)
 }
 
+
+class CotrolParamEditorRunTime : public IPropertyEditor
+{
+public:
+	using IPropertyEditor::IPropertyEditor;
+
+	virtual void internal_update() override {
+
+		assert(prop->type == core_type_id::Struct);
+		EditorControlParamProp* prop = (EditorControlParamProp*)instance;
+		// prop.id is the index into runtime/cfg vars
+		Animation_Tree_RT* rt = ed.get_runtime_tree();
+		Parameter& p = rt->parameters.get({ prop->current_id });
+
+		if (prop->type == script_parameter_type::bool_t) {
+			bool b = p.ival;
+			ImGui::Checkbox("##checkbox", &b);
+			p.ival = b;
+		}
+		else if (prop->type == script_parameter_type::int_t) {
+			int i = p.ival;
+			ImGui::InputInt("##inputint", &i);
+			p.ival = i;
+		}
+		else if (prop->type == script_parameter_type::float_t) {
+			float f = p.fval;
+			ImGui::SliderFloat("##slidefloat", &f, 0.0, 1.0);
+			p.fval = f;
+		}
+		else if (prop->type == script_parameter_type::enum_t) {
+			ImGui::Text("ENUM PLACEHOLDER");
+		}
+		ImGui::SameLine();
+	}
+
+};
+
 // Property Editor Factorys
 
 class AnimationGraphEditorPropertyFactory : public IPropertyEditorFactory
@@ -2387,6 +2501,9 @@ public:
 		else if (strcmp(prop->custom_type_str, "AG_EDITOR_BLEND_SPACE_PARAMETERIZATION") == 0) {
 			return new AgEdtior_BlendSpaceParameteriation(instance, prop);
 		}
+		else if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_RUN_EDIT") == 0) {
+			return new CotrolParamEditorRunTime(instance, prop);
+		}
 
 		return nullptr;
 	}
@@ -2407,6 +2524,9 @@ public:
 		}
 		else if (strcmp(prop->custom_type_str, "AG_EDITOR_BLEND_SPACE") == 0) {
 			return new AgEditor_BlendSpaceArrayHead(instance, prop);
+		}
+		else if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_ARRAY_RUN_EDIT") == 0) {
+			return new ControlParamArrayHeader(instance, prop);	// fixme
 		}
 
 

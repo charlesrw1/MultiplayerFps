@@ -1,0 +1,78 @@
+{
+	name ""
+	root_node "-1"
+	params [
+	]
+	nodes [
+		{
+			type "::source"
+			default_param "-1"
+			inputs [
+			]
+			{
+				{
+					name "rm[0]"
+					type "Enum8"
+					value "rm::keep"
+				}
+				{
+					name "rm[1]"
+					type "Enum8"
+					value "rm::keep"
+				}
+				{
+					name "rm[2]"
+					type "Enum8"
+					value "rm::keep"
+				}
+				{
+					name "loop"
+					type "Bool"
+					value "1"
+				}
+				{
+					name "speed"
+					type "Float"
+					value "1.000000"
+				}
+				{
+					name "start_frame"
+					type "Int16"
+					value "0"
+				}
+				{
+					name "allow_sync"
+					type "Bool"
+					value "0"
+				}
+				{
+					name "can_be_leader"
+					type "Bool"
+					value "0"
+				}
+				{
+					name "clip_name"
+					type "StdString"
+					value "Armature|mixamo.com|Layer0"
+				}
+			}
+		}
+	]
+	 editor
+	{
+		nodes [
+			{
+				name "Unnamed"
+				graph_layer "0"
+				id "0"
+				type "root"
+			}
+			{
+				name "Unnamed"
+				node_idx "0"
+				graph_layer "0"
+				id "1"
+				type "source"
+			}
+		]
+	}

@@ -22,6 +22,9 @@ public:
     bool check_item_end(const StringView& tok) {
         return tok.cmp("}");
     }
+    bool check_list_start(const StringView& tok) {
+        return tok.cmp("[");
+    }
     bool expect_list_start() {
         StringView tok;
         bool ret = read_next_token(tok);

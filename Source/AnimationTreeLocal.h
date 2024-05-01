@@ -252,9 +252,9 @@ struct Clip_Node_RT : Rt_Vars_Base
 	glm::vec3 root_pos_first_frame = glm::vec3(0.f);
 	float inv_speed_of_anim_root = 1.0;
 	float frame = 0.0;
-	uint32_t clip_index = 0;
-	uint32_t set_idx = 0;
-	uint32_t skel_idx = 0;
+	int16_t clip_index = -1;
+	int16_t set_idx = -1;
+	int16_t skel_idx = -1;
 	bool stopped_flag = false;
 };
 
@@ -383,7 +383,12 @@ struct Blend_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Blend_Node_RT;
 	DECLARE_ANIMNODE_CREATOR(Blend_Node_CFG, animnode_type::blend)
-	DEFAULT_CTOR(Blend_Node_CFG)
+
+	virtual void init_memory_offsets(Animation_Tree_CFG* tree, int init_count) override {
+		init_memory_internal(tree, sizeof(RT_TYPE), init_count); 
+		if (param.is_valid())
+			parameter_type = (tree->parameters.get_type(param) == script_parameter_type::float_t) ? 0 : 1;
+	} 
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 

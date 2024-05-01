@@ -1,0 +1,19 @@
+{
+name ""
+data_used "0"
+root_node "-1"
+params [
+]
+nodes [
+]
+ editor
+{
+nodes [
+{
+name "Unnamed"
+graph_layer "0"
+id "0"
+type "root"
+}
+]
+}

@@ -183,6 +183,8 @@ public:
 	AgEditor_BaseNode(Node_CFG* node, uint32_t id, uint32_t layer, animnode_type type) 
 		: node(node), IAgEditorNode(id,layer,type) {}
 
+	virtual ~AgEditor_BaseNode();
+
 	virtual void init();
 	virtual bool compile_my_data() override;
 	virtual Node_CFG* get_graph_node() override { return node; }
@@ -241,11 +243,7 @@ public:
 	virtual const editor_layer* get_layer() override { return (sublayer.context )
 		?  &sublayer : nullptr; }
 
-	~AgEditor_StateMachineNode() {
-		if (sublayer.context) {
-			ImNodes::EditorContextFree(sublayer.context);
-		}
-	}
+	virtual ~AgEditor_StateMachineNode();
 
 	bool add_node_to_statemachine(AgEditor_StateNode* node) {
 	
@@ -598,11 +596,12 @@ struct EditorControlParamProp {
 	}
 	std::string name = "Unnamed";
 	script_parameter_type type = script_parameter_type::int_t;
-	int enum_type = 0;
+	int16_t enum_type = -1;
+
 	int current_id = 0;
 
 	static PropertyInfoList* get_props();
-
+	static PropertyInfoList* get_ed_control_null_prop();
 	static void reset_id_generator(int to) {
 		unique_id_generator = to;
 	}
@@ -615,11 +614,7 @@ class ControlParamsWindow
 {
 public:
 	void imgui_draw();
-	void refresh_props() {
-		control_params.clear_all();
-		control_params.add_property_list_to_grid(get_props(), this, PG_LIST_PASSTHROUGH);
-	}
-	void set_read_only(bool readonly) { control_params.set_read_only(readonly); }
+	void refresh_props();
 
 	const std::vector<EditorControlParamProp>& get_control_params() { return props; }
 
@@ -627,6 +622,9 @@ public:
 		cfg->name_to_index.clear();
 		cfg->types.clear();
 		for (int i = 0; i < props.size(); i++) {
+			if (props[i].type != script_parameter_type::enum_t)
+				props[i].enum_type = -1;
+
 			auto index = cfg->set(props[i].name.c_str(), props[i].type);
 			ASSERT(index.id == i);
 		}
@@ -655,6 +653,7 @@ public:
 	}
 private:
 	static PropertyInfoList* get_props();
+	static PropertyInfoList* get_edit_value_props();
 
 	friend class ControlParamArrayHeader;
 
@@ -791,6 +790,10 @@ public:
 	Animation_Tree_CFG* editing_tree = nullptr;
 
 	IAgEditorNode* create_graph_node_from_type(IAgEditorNode* parent, animnode_type type, uint32_t layer);
+
+	Animation_Tree_RT* get_runtime_tree() {
+		return &out.anim.runtime_dat;
+	}
 
 	GraphOutput out;
 

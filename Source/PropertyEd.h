@@ -57,6 +57,7 @@ public:
 	virtual bool imgui_draw_header(int index) = 0;
 	virtual void imgui_draw_closed_body(int index) = 0;
 	virtual bool has_delete_all() { return true; }
+	virtual bool can_edit_array() { return true; }
 	
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
@@ -95,6 +96,7 @@ public:
 	virtual bool has_row_controls() { return false; }
 	virtual void draw_row_controls() {}
 	virtual bool passthrough_to_child() { return false; }
+	virtual bool is_array() { return false; }
 
 	void set_name_override(const std::string& str) { name_override = str; }
 
@@ -145,7 +147,7 @@ public:
 	virtual bool has_row_controls() { return row_index != -1; }
 
 	virtual bool passthrough_to_child() override {
-		return passthrough_to_list_if_possible;
+		return parent && parent->is_array() && proplist->count == 1;
 	}
 
 	void* inst = nullptr;
@@ -164,7 +166,7 @@ public:
 	virtual bool has_row_controls() override { return true; }
 	virtual void draw_row_controls();
 	virtual float get_indent_width() { return 30.0; }
-
+	virtual bool is_array() override { return true; }
 	void rebuild_child_rows();
 	void hook_update_pre_tree_node();
 	int get_size();
