@@ -519,7 +519,7 @@ void Animator::tick_tree_new(float dt)
 	ctx.tree = &runtime_dat;
 	ctx.model = get_model();
 	ctx.set = get_set();
-	ctx.vars = &runtime_dat.parameters;
+	ctx.param_cfg = runtime_dat.cfg->params.get();
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
 	gp_ctx.pose = &poses[0];
@@ -556,14 +556,16 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 	this->cfg = cfg;
 	this->model = model;
 	this->set = set;
-	parameters.parameters.resize(cfg->parameters.types.size());
+
+	vars.resize(cfg->graph_program ? cfg->graph_program->num_vars() : 0);
+
 	data.clear();
 	data.resize(cfg->data_used, 0);
 	NodeRt_Ctx ctx;
 	ctx.model = model;
 	ctx.set = set;
 	ctx.tree = this;
-	ctx.vars = &parameters;
+	ctx.param_cfg = cfg->params.get();
 	ctx.tick = 0;
 	for (int i = 0; i < cfg->all_nodes.size(); i++)
 		cfg->all_nodes[i]->construct(ctx);

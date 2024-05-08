@@ -19,7 +19,7 @@ public:
     }
 
     // fixme
-    InlineVec& operator=(const InlineVec& other)  {
+    InlineVec& operator=(const InlineVec& other) {
         destroy_(data(), data() + size());
         reserve(other.size());
         const T* ptr = other.data();
@@ -27,6 +27,7 @@ public:
         T* my_start = data();
         for (; ptr != end; ptr++, my_start++)
             new(my_start)T(*ptr);
+        set_size_(other.size());
         return *this;
     }
     InlineVec(const InlineVec& other) {
@@ -37,6 +38,7 @@ public:
         T* my_start = data();
         for (; ptr != end; ptr++, my_start++)
             new(my_start)T(*ptr);
+        set_size_(other.size());
     }
     InlineVec& operator=(InlineVec&& other) = delete;
     InlineVec(InlineVec&& other) = delete;
@@ -71,6 +73,16 @@ public:
         if (curcount + 1 > cap)
             expand_capacity_((curcount + 1 > cap * 2) ? curcount + 1 : cap * 2);
         new(data() + curcount)T(std::move(val));
+
+        set_size_(curcount + 1);
+    }
+
+    void push_back(const T& val) {
+        SIZE_TYPE cap = capacity_();
+        SIZE_TYPE curcount = size();
+        if (curcount + 1 > cap)
+            expand_capacity_((curcount + 1 > cap * 2) ? curcount + 1 : cap * 2);
+        new(data() + curcount)T(val);
 
         set_size_(curcount + 1);
     }

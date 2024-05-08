@@ -1,6 +1,5 @@
 #include "PropertyEd.h"
 #include "imgui.h"
-#include "GlobalEnumMgr.h"
 
 static uint32_t color32_to_uint(Color32 color) {
 	return *(uint32_t*)&color;
@@ -177,7 +176,7 @@ void EnumEditor::internal_update()
 	ASSERT(prop->type == core_type_id::Enum8 || prop->type == core_type_id::Enum16 || prop->type == core_type_id::Enum32);
 
 	int enum_val = prop->get_int(instance);
-	auto& enum_def = GlobalEnumDefMgr::get().get_enum_def(prop->enum_type_id);
+	auto& enum_def = Enum::get_enum_def(prop->enum_type_id);
 	ASSERT(enum_val >= 0 && enum_val < enum_def.count);
 
 	ImGui::Combo("##combo", &enum_val, enum_def.strs, enum_def.count);

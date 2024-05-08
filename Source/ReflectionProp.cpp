@@ -2,7 +2,6 @@
 #include "DictParser.h"
 #include "DictWriter.h"
 #include "Util.h"
-#include "GlobalEnumMgr.h"
 #include <cassert>
 #include "StdVectorReflection.h"
 
@@ -54,7 +53,7 @@ static void parse_str(StringView str, float& f, int& i, core_type_id type, bool 
 	}
 	else {
 		if (type == core_type_id::Enum8 || type == core_type_id::Enum16 || type == core_type_id::Enum32) {
-			auto idx = GlobalEnumDefMgr::get().get_for_name(str.to_stack_string().c_str());
+			auto idx = Enum::find_for_full_name(str.to_stack_string().c_str());
 			ASSERT(idx.enum_idx != -1 && idx.val_idx != -1);
 			i = idx.val_idx;
 			ASSERT(!is_min_max_or_inc);
@@ -211,8 +210,8 @@ std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, D
 	case core_type_id::Enum8:
 	case core_type_id::Enum16:
 	case core_type_id::Enum32: {
-		const char* type_name = GlobalEnumDefMgr::get().get_enum_type_name(prop.enum_type_id);
-		const char* enum_str = GlobalEnumDefMgr::get().get_enum_name(prop.enum_type_id, prop.get_int(ptr));
+		const char* type_name = Enum::get_type_name(prop.enum_type_id);
+		const char* enum_str = Enum::get_enum_name(prop.enum_type_id, prop.get_int(ptr));
 		value_str = string_format("%s::%s", type_name, enum_str);
 	}break;
 
@@ -290,7 +289,7 @@ void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, Prop_F
 		out.write_item_start();
 		{
 			out.write_key_value("name", prop.name);
-			out.write_key_value("type", GlobalEnumDefMgr::get().get_enum_name(core_type_id_def.id, (int)prop.type));
+			out.write_key_value("type", Enum::get_enum_name(core_type_id_def.id, (int)prop.type));
 			out.write_value("value ");
 			std::string value_str = write_field_type(prop.type, ptr, prop, out);
 			if (!value_str.empty())
@@ -372,7 +371,7 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	case core_type_id::Enum16:
 	case core_type_id::Enum32: {
 		Stack_String<256> str = tok.to_stack_string();
-		auto enum_idx = GlobalEnumDefMgr::get().get_for_name(str.c_str());
+		auto enum_idx = Enum::find_for_full_name(str.c_str());
 
 		if (enum_idx.enum_idx < 0) {
 			printf("\n\n!!! CANT FIND ENUM %s !!!\n\n", str.c_str());

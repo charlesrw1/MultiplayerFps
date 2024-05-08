@@ -11,6 +11,8 @@
 #include "EnumDefReflection.h"
 #include "ReflectionProp.h"
 
+#include "ScriptVars.h"
+
 #include <cassert>
 
 // to add new node:
@@ -71,18 +73,30 @@ struct Rt_Vars_Base
 	uint16_t last_update_tick = 0;
 };
 
-
+class Program;
 struct Animation_Tree_RT;
 struct Animation_Tree_CFG;
 struct Node_CFG;
 struct Control_Params;
+class Language;
 struct NodeRt_Ctx
 {
 	const Model* model = nullptr;
 	const Animation_Set_New* set = nullptr;
 	Animation_Tree_RT* tree = nullptr;
-	ScriptVars_RT* vars = nullptr;
+	const ControlParam_CFG* param_cfg = nullptr;
+	const Program* script_prog = nullptr;
 	uint16_t tick = 0;
+
+	float get_float(ControlParamHandle handle) const {
+		return param_cfg->get_float(&tree->vars, handle);
+	}
+	int get_int(ControlParamHandle handle) const {
+		return param_cfg->get_int(&tree->vars, handle);
+	}
+	bool get_bool(ControlParamHandle handle) const {
+		return param_cfg->get_bool(&tree->vars, handle);
+	}
 
 	uint32_t num_bones() const { return model->bones.size(); }
 };
@@ -157,7 +171,7 @@ struct Node_CFG
 	}
 
 	InlineVec<Node_CFG*, 2> input;
-	handle<Parameter> param;	// all nodes have a default parameter for convenience
+	ControlParamHandle param;	// all nodes have a default parameter for convenience
 protected:
 	template<typename T>
 	T* construct_this(NodeRt_Ctx& ctx) const {
@@ -201,7 +215,7 @@ struct Scale_By_Rootmotion_CFG : public Node_CFG
 	
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
-		float rm = ctx.vars->get(param).fval;
+		float rm = ctx.get_float(param);
 		bool ret = input[0]->get_pose(ctx, pose.set_rootmotion(rm));
 		return ret;
 	}
@@ -386,8 +400,10 @@ struct Blend_Node_CFG : public Node_CFG
 
 	virtual void init_memory_offsets(Animation_Tree_CFG* tree, int init_count) override {
 		init_memory_internal(tree, sizeof(RT_TYPE), init_count); 
-		if (param.is_valid())
-			parameter_type = (tree->parameters.get_type(param) == script_parameter_type::float_t) ? 0 : 1;
+
+		if (param.is_valid()) {
+			parameter_type = (tree->params->get_type(param) == control_param_type::float_t) ? 0 : 1;
+		}
 	} 
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
@@ -402,9 +418,9 @@ struct Blend_Node_CFG : public Node_CFG
 		float cur_val = 0.0;
 		if (param.is_valid()) {
 			if (parameter_type == 0)	// float
-				cur_val = ctx.vars->get(param).fval;
-			else
-				cur_val =  (float)ctx.vars->get(param).ival;
+				cur_val = ctx.get_float(param);
+			else // boolean
+				cur_val = (float)ctx.get_bool(param);
 		}
 		rt->lerp_amt = cur_val;
 		if (store_value_on_reset)
@@ -450,7 +466,7 @@ public:
 		
 		if (!param.is_valid()) return;
 
-		int val = ctx.vars->get(param).ival;
+		int val = ctx.get_int(param);
 
 		rt->active_i = get_actual_index(val);
 		rt->lerp_amt = 1.0;
@@ -512,12 +528,6 @@ struct Mirror_Node_CFG : public Node_CFG
 };
 
 struct NodeRt_Ctx;
-struct ScriptExpression
-{
-	BytecodeExpression compilied;
-
-	bool evaluate(NodeRt_Ctx& rt) const;
-};
 
 struct State;
 struct State_Transition
@@ -604,8 +614,9 @@ struct BlendSpace2d_CFG : public Node_CFG
 	DECLARE_ANIMNODE_CREATOR(BlendSpace2d_CFG, animnode_type::blend2d)
 	DEFAULT_CTOR(BlendSpace2d_CFG)
 
-	handle<Parameter> xparam;
-	handle<Parameter> yparam;
+	ControlParamHandle xparam;
+	ControlParamHandle yparam;
+
 	float weight_damp = 0.01;
 
 	struct GridPoint {
@@ -653,5 +664,3 @@ public:
 		construct_this<RT_TYPE>(ctx);
 	}
 };
-
-BytecodeContext& get_global_anim_bytecode_ctx();

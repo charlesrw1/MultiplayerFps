@@ -18,6 +18,7 @@
 #include "AnimationTreeLocal.h"
 #include "PropertyEd.h"
 #include "ReflectionProp.h"
+#include "ScriptVars.h"
 
 class IAgEditorNode;
 
@@ -595,10 +596,19 @@ struct EditorControlParamProp {
 		current_id = unique_id_generator++;
 	}
 	std::string name = "Unnamed";
-	script_parameter_type type = script_parameter_type::int_t;
+	control_param_type type = control_param_type::int_t;
 	int16_t enum_type = -1;
 
 	int current_id = 0;
+
+	AG_ControlParam get_control_param() const {
+		AG_ControlParam p;
+		p.name = name;
+		p.type = type;
+		p.enum_idx = enum_type;
+		p.reset_after_tick = false;
+		return p;
+	}
 
 	static PropertyInfoList* get_props();
 	static PropertyInfoList* get_ed_control_null_prop();
@@ -618,15 +628,11 @@ public:
 
 	const std::vector<EditorControlParamProp>& get_control_params() { return props; }
 
-	void add_parameters_to_tree(ScriptVars_CFG* cfg) {
-		cfg->name_to_index.clear();
-		cfg->types.clear();
+	void add_parameters_to_tree(ControlParam_CFG* cfg) {
+		cfg->clear_variables();
 		for (int i = 0; i < props.size(); i++) {
-			if (props[i].type != script_parameter_type::enum_t)
-				props[i].enum_type = -1;
-
-			auto index = cfg->set(props[i].name.c_str(), props[i].type);
-			ASSERT(index.id == i);
+			ControlParamHandle h = cfg->push_variable(props[i].get_control_param());
+			ASSERT(h.id == i);
 		}
 	}
 	void recalculate_control_prop_ids() {
@@ -637,7 +643,7 @@ public:
 		EditorControlParamProp::reset_id_generator( props.size() );	// reset to size() so new props get added correctly
 	}
 	
-	handle<Parameter_CFG> get_index_of_prop_for_compiling(int id) {
+	ControlParamHandle get_index_of_prop_for_compiling(int id) {
 		for (int i = 0; i < props.size(); i++)
 			if (props[i].current_id == id)
 				return { i };

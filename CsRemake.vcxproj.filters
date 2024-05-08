@@ -79,9 +79,6 @@
     <ClCompile Include="Source\Profilier.cpp">
       <Filter>Source\Shared</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ExpressionLang.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Net.cpp">
       <Filter>Source\Network</Filter>
     </ClCompile>
@@ -142,9 +139,6 @@
     <ClCompile Include="Source\AnimationUtil.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Parameter.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
     <ClCompile Include="Source\ReflectionProp.cpp">
       <Filter>Source\Animation\Reflection</Filter>
     </ClCompile>
@@ -156,6 +150,12 @@
     </ClCompile>
     <ClCompile Include="Source\MyImguiLib.cpp">
       <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\StringName.cpp">
+      <Filter>Source\Shared</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ExpressionLang.cpp">
+      <Filter>Source\Shared\Script</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -255,9 +255,6 @@
     <ClInclude Include="Source\MathLib.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ExpressionLang.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
     <ClInclude Include="Source\GlmInclude.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
@@ -300,14 +297,8 @@
     <ClInclude Include="Source\AnimationTreePublic.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ScriptVars.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
     <ClInclude Include="Source\AnimationUtil.h">
       <Filter>Source\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Parameter.h">
-      <Filter>Source\Shared</Filter>
     </ClInclude>
     <ClInclude Include="Source\Handle.h">
       <Filter>Source\Shared</Filter>
@@ -369,9 +360,6 @@
     <ClInclude Include="Source\StdVectorReflection.h">
       <Filter>Source\Animation\Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="Source\GlobalEnumMgr.h">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="Source\EnumDefReflection.h">
       <Filter>Source\Animation\Reflection</Filter>
     </ClInclude>
@@ -380,6 +368,21 @@
     </ClInclude>
     <ClInclude Include="Source\beziercurveeditor.h">
       <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\StringName.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ScriptVars.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ExpressionLang.h">
+      <Filter>Source\Shared\Script</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ControlParamHandle.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\ScriptValue.h">
+      <Filter>Source\Shared\Script</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -424,6 +427,9 @@
     </Filter>
     <Filter Include="Source\Animation\Reflection">
       <UniqueIdentifier>{bf227bdf-ab78-4e5e-90f9-50c3aaf86b4e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Shared\Script">
+      <UniqueIdentifier>{c6a03c8a-f0c4-4a0f-9e1b-acfecab0d3ed}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

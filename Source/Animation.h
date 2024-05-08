@@ -1,7 +1,6 @@
 #ifndef ANIMATION_H
 #define ANIMATION_H
 
-#include "Parameter.h"
 #include "Handle.h"
 
 #include "glm/glm.hpp"

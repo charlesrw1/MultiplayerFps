@@ -5,7 +5,7 @@
 
 #include "Texture.h"
 #include "Game_Engine.h"
-#include "GlobalEnumMgr.h"
+#include "EnumDefReflection.h"
 
 #include "DictWriter.h"
 #include <fstream>
@@ -130,7 +130,7 @@ public:
 };
 
 
-ImVec4 scriptparamtype_to_color(script_parameter_type type)
+ImVec4 scriptparamtype_to_color(control_param_type type)
 {
 	ASSERT((int)type < 4);
 
@@ -239,7 +239,7 @@ class ControlParamArrayHeader : public IArrayHeader
 		proptype& prop_ = array_->at(index);
 
 		ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 153, 152, 156 }));
-		const char* name = GlobalEnumDefMgr::get().get_enum_name(script_parameter_type_def.id, (int)prop_.type);
+		const char* name = Enum::get_enum_name(control_param_type_def.id, (int)prop_.type);
 		ImGui::Text("%s", name);
 		ImGui::PopStyleColor();
 	}
@@ -1451,7 +1451,7 @@ std::string AgEditor_BaseNode::get_input_pin_name(int index)
 	case animnode_type::blend_by_int:
 	{
 		auto param = node->param;
-		if (!param.is_valid() || ed.control_params.get_parameter_for_ed_id(param.id)->type != script_parameter_type::enum_t)
+		if (!param.is_valid() || ed.control_params.get_parameter_for_ed_id(param.id)->type != control_param_type::enum_t)
 			return string_format("%d", index);
 		return "enum placeholder";
 	};
@@ -1634,7 +1634,7 @@ void AgEditor_BaseNode::draw_node_top_bar()
 
 		auto node_ = (Blend_Int_Node_CFG*)node;
 		auto param = ed.control_params.get_parameter_for_ed_id(node->param.id);
-		if (!node->param.is_valid() || (param && param->type == script_parameter_type::int_t)) {
+		if (!node->param.is_valid() || (param && param->type == control_param_type::int_t)) {
 
 			ImGui::PushStyleColor(ImGuiCol_Button, color32_to_int({ 0xff,0xff,0xff,50 }));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_int({ 0xff,0xff,0xff,128 }));
@@ -1695,33 +1695,37 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 
 		st->transition_state = output[i].output_to->state_handle_internal;
 
-		// compile script
-
+		// compile transition script
 		if (!st->script_uncompilied.empty() && st->is_a_continue_transition()) {
 			append_info_msg(string_format("[INFO] is_continue_transition == true, but script is not empty.\n"));
 		}
 		else if(!st->is_a_continue_transition()) {
 
 			const std::string& code = st->script_uncompilied;
-			const char* err_str = nullptr;
+			std::string err_str;
 			try {
 
-				auto ret = st->script_condition.compile_new(&get_global_anim_bytecode_ctx(), &ed.editing_tree->parameters, code);
-				if (strlen(ret) != 1 || ret[0] != 'i')
-					err_str = "must return only 1 integer/boolean";
+				auto ret = st->script_condition.compile(
+					ed.editing_tree->graph_program.get(),
+					code,
+					NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
+
+				// must return boolean
+				if (ret.out_types.size() != 1 || ret.out_types[0]!=script_types::bool_t)
+					err_str = "script must return boolean";
 
 			}
-			catch (LispError err) {
-				err_str = err.msg;
+			catch (CompileError err) {
+				err_str = std::move(err.str);
 			}
 			catch (...) {
 				err_str = "unknown error";
 
 			}
 
-			if (err_str) {
+			if (!err_str.empty()) {
 				const char* to_state = out_state->get_title().c_str();
-				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", to_state, err_str));
+				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", to_state, err_str.c_str()));
 			}
 		}
 
@@ -1736,7 +1740,6 @@ bool AgEditor_StateNode::compile_data_for_statemachine()
 	}
 
 	// append tree
-
 	if (type != animnode_type::start_statemachine) {
 		auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
 		ASSERT(startnode);
@@ -2137,11 +2140,17 @@ IAgEditorNode* AnimationGraphEditor::create_graph_node_from_type(IAgEditorNode* 
 
 bool AnimationGraphEditor::compile_graph_for_playing()
 {
-	control_params.add_parameters_to_tree(&editing_tree->parameters);
+	// add control parameters to cfg list
+	control_params.add_parameters_to_tree(editing_tree->params.get());
+
+	// add cfg vars to library
+	// link var lib and other libs to script program before compiling all the scripts
+	editing_tree->init_program_libs();
 
 	// initialize memory offets for runtime
 	editing_tree->data_used = 0;
 
+	// compile all nodes
 	for (int i = 0; i < nodes.size(); i++) {
 		if (!nodes[i]->dont_call_compile()) {
 			nodes[i]->compile_error_string.clear();
@@ -2162,6 +2171,7 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 	bool tree_is_good_to_run = output_pose->traverse_and_find_errors();
 
+	// after all updates have been run, fixup editor id/indexes for control props
 	control_params.recalculate_control_prop_ids();
 
 	return tree_is_good_to_run;
@@ -2314,7 +2324,7 @@ PropertyInfoList* EditorControlParamProp::get_props()
 {
 	START_PROPS(EditorControlParamProp)
 		REG_STDSTRING(name, PROP_EDITABLE),
-		REG_ENUM(type, PROP_EDITABLE, "", script_parameter_type_def.id),
+		REG_ENUM(type, PROP_EDITABLE, "", control_param_type_def.id),
 		REG_INT_W_CUSTOM(enum_type, PROP_SERIALIZE, "-1", "AG_ENUM_TYPE_FINDER"),
 	END_PROPS(EditorControlParamProp)
 }
@@ -2526,24 +2536,26 @@ public:
 		EditorControlParamProp* prop = (EditorControlParamProp*)instance;
 		// prop.id is the index into runtime/cfg vars
 		Animation_Tree_RT* rt = ed.get_runtime_tree();
-		Parameter& p = rt->parameters.get({ prop->current_id });
-
-		if (prop->type == script_parameter_type::bool_t) {
-			bool b = p.ival;
+		program_script_vars_instance* vars = &rt->vars;
+		ControlParam_CFG* params = ed.editing_tree->params.get();
+		AG_ControlParam* control = &params->types.at(prop->current_id);
+		ControlParamHandle handle = { prop->current_id };
+		if (control->type == control_param_type::bool_t) {
+			bool b = params->get_bool(vars, handle);
 			ImGui::Checkbox("##checkbox", &b);
-			p.ival = b;
+			params->set_bool(vars, handle, b);
 		}
-		else if (prop->type == script_parameter_type::int_t) {
-			int i = p.ival;
+		else if (control->type == control_param_type::int_t) {
+			int i = params->get_int(vars, handle);
 			ImGui::InputInt("##inputint", &i);
-			p.ival = i;
+			params->set_int(vars, handle, i);
 		}
-		else if (prop->type == script_parameter_type::float_t) {
-			float f = p.fval;
+		else if (control->type == control_param_type::float_t) {
+			float f = params->get_float(vars, handle);
 			ImGui::SliderFloat("##slidefloat", &f, 0.0, 1.0);
-			p.fval = f;
+			params->set_float(vars, handle, f);
 		}
-		else if (prop->type == script_parameter_type::enum_t) {
+		else if (control->type == control_param_type::enum_t) {
 			ImGui::Text("ENUM PLACEHOLDER");
 		}
 		ImGui::SameLine();

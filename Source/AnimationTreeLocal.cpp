@@ -5,10 +5,11 @@
 #include "DictWriter.h"
 #include "DictParser.h"
 
-#include "GlobalEnumMgr.h"
 
 #include "ReflectionRegisterDefines.h"
 #include "StdVectorReflection.h"
+
+#include "ScriptVars.h"
 
 
 struct AutoAnimNodeDef
@@ -85,14 +86,6 @@ static const char* animnode_strs[] = {
 
 static_assert((sizeof(animnode_strs) / sizeof(char*)) ==  ((int)animnode_type::COUNT + 1), "string reflection out of sync");
 AutoEnumDef animnode_type_def = AutoEnumDef("",sizeof(animnode_strs)/sizeof(char*), animnode_strs);
-
-static BytecodeContext g_animbytecodectx;
-BytecodeContext& get_global_anim_bytecode_ctx() { return g_animbytecodectx; }
-
-bool ScriptExpression::evaluate(NodeRt_Ctx& ctx) const
-{
-	return compilied.execute(&get_global_anim_bytecode_ctx(), *ctx.vars).ival;
-}
 
 
 PropertyInfoList* State::get_props()
@@ -187,7 +180,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
  bool Add_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	float lerp = ctx.vars->get(param).fval;
+	float lerp = ctx.get_float(param);
 
 	Pose* addtemp = Pose_Pool::get().alloc(1);
 	input[BASE]->get_pose(ctx, pose);
@@ -216,9 +209,9 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	 }
 	 else {
 		 if (parameter_type == 0)
-			 value = ctx.vars->get(param).fval;
+			 value = ctx.get_float(param);
 		 else if (parameter_type == 1) // bool
-			 value = (float)ctx.vars->get(param).ival;
+			 value = (float)ctx.get_bool(param);
 		//rt->lerp_amt = damp_dt_independent(value, rt->lerp_amt, damp_factor, pose.dt);
 		ASSERT(!(rt->lerp_amt != rt->lerp_amt));
 	 }
@@ -245,7 +238,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
 	 // param never changes
 	 if (!store_value_on_reset) {
-		 int val = ctx.vars->get(param).ival;
+		 int val = ctx.get_int(param);
 		 int real_idx = get_actual_index(val);
 
 		 if (real_idx != rt->active_i) {
@@ -293,7 +286,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
  bool Mirror_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	float amt = ctx.vars->get(param).fval;
+	float amt = ctx.get_float(param);
 
 	auto rt = get_rt<Mirror_Node_RT>(ctx);
 	rt->lerp_amt = damp_dt_independent(amt, rt->lerp_amt, damp_time, pose.dt);
@@ -426,8 +419,8 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	auto rt = get_rt<RT_TYPE>(ctx);
 
 	glm::vec2 relmovedir = glm::vec2(
-		ctx.vars->get(xparam).fval,
-		ctx.vars->get(yparam).fval
+		ctx.get_float(xparam),
+		ctx.get_float(yparam)
 	);
 
 	float actual_character_move_speed = glm::length(relmovedir);
@@ -459,31 +452,42 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	return false;
 }
 
- static const char* parameter_type_to_string(script_parameter_type type)
- {
-	 switch (type)
-	 {
-	 case script_parameter_type::float_t:
-		 return "float_t";
-	 case script_parameter_type::int_t:
-		 return "int_t";
-	 case script_parameter_type::bool_t:
-		 return "bool_t";
-	 case script_parameter_type::enum_t:
-		 return "enum_t";
-	 default:
-		 ASSERT(!"no type defined");
-		 break;
-	 }
-}
-
 animnode_name_type& get_animnode_typedef(animnode_type type) {
 	static animnode_name_type types[(int)animnode_type::COUNT];
 
 	return types[(int)type];
  }
 
- int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
+Animation_Tree_CFG::Animation_Tree_CFG()
+{
+	graph_var_lib = std::make_unique<Library>();
+	graph_program = std::make_unique<Program>();
+	params = std::make_unique<ControlParam_CFG>();
+}
+
+Animation_Tree_CFG::~Animation_Tree_CFG()
+{
+	// cleanup nodes, they were allocated in arena so dont free() them
+	for (int i = 0; i < all_nodes.size(); i++) {
+		all_nodes[i]->~Node_CFG();
+	}
+}
+
+void Animation_Tree_CFG::init_program_libs()
+{
+	graph_var_lib->clear();
+	params->set_library_vars(graph_var_lib.get());
+
+	graph_program->clear();
+	graph_program->push_library(anim_tree_man->get_std_animation_script_lib());
+	graph_program->push_library(graph_var_lib.get());
+}
+
+ ControlParamHandle Animation_Tree_CFG::find_param(StringName name) {
+	return params->find(name);
+}
+
+int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  {
 	 for (int i = 0; i < all_nodes.size(); i++) {
 		 if (ptr == all_nodes[i]) return i;
@@ -524,16 +528,13 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 dat.graph_is_valid = graph_is_valid;
 
 	 out.write_key_list_start("params");
-	 for (auto& param_int : parameters.name_to_index) {
-
-		 auto& param = parameters.types.at(param_int.second);
-
+	 for (auto& param : params->types) {
 		 out.write_item_start();
 		 {
-			 out.write_key_value("name", param_int.first.c_str());
-			 out.write_key_value("type", parameter_type_to_string(param.type));
-			 if (param.type == script_parameter_type::enum_t && param.enum_idx!=-1) {
-				 out.write_key_value("enum_type", GlobalEnumDefMgr::get().get_enum_type_name(param.enum_idx));
+			 out.write_key_value("name", param.name.c_str());
+			 out.write_key_value("type", Enum::get_enum_name(control_param_type_def.id, (int)param.type));
+			 if (param.type == control_param_type::enum_t && param.enum_idx!=-1) {
+				 out.write_key_value("enum_type", Enum::get_type_name(param.enum_idx));
 			 }
 			 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
 		 }
@@ -547,8 +548,8 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 auto& node = all_nodes[i];
 		 out.write_item_start();
 		 {
-			 const char* type_name = GlobalEnumDefMgr::get().get_enum_type_name(animnode_type_def.id);
-			 const char* enum_str = GlobalEnumDefMgr::get().get_enum_name(animnode_type_def.id, (int)node->get_type());
+			 const char* type_name = Enum::get_type_name(animnode_type_def.id);
+			 const char* enum_str = Enum::get_enum_name(animnode_type_def.id, (int)node->get_type());
 			 char* out_str = string_format("%s::%s", type_name, enum_str);
 			 out.write_key_value("type", out_str);
 
@@ -770,3 +771,62 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 REG_BOOL(is_continue_transition, PROP_DEFAULT, "0")
 	END_PROPS(State_Transition)
  }
+
+ void ControlParam_CFG::set_library_vars(Library* lib)
+ {
+	 for (int i = 0; i < types.size(); i++) {
+		 AG_ControlParam& param = types[i];
+		 lib->push_global_def(param.name.c_str(), get_script_type_for_control_param(param.type));
+	 }
+ }
+
+ namespace Script {
+	 static void time_remaining(script_state* state)
+	 {
+
+	 }
+
+	 static void is_tag_active(script_state* state)
+	 {
+
+	 }
+
+	 static void is_tag_entered(script_state* state)
+	 {
+
+	 }
+
+	 static void is_tag_exited(script_state* state)
+	 {
+
+	 }
+
+	 static void get_curve(script_state* state)
+	 {
+
+	 }
+ }
+
+
+ const Library* Animation_Tree_Manager::get_std_animation_script_lib()
+ {
+	 static bool init = true;
+	 static Library lib;
+	 if (init) {
+		 lib.push_function_def("time_remaining", "float", "transition_t", Script::time_remaining);
+		 lib.push_function_def("is_tag_active", "bool", "transition_t,int", Script::is_tag_active);
+		 lib.push_function_def("is_tag_entered", "bool", "transition_t,int", Script::is_tag_entered);
+		 lib.push_function_def("is_tag_exited", "bool", "transition_t,int", Script::is_tag_exited);
+		 lib.push_function_def("get_curve", "float", "transition_t,name", Script::get_curve);
+		 init = false;
+	 }
+	 return &lib;
+ }
+
+ const char* cpt_strs[] = {
+	"int_t",
+	"enum_t",
+	"bool_t",
+	"float_t",
+ };
+ AutoEnumDef control_param_type_def = AutoEnumDef("cpt", 4, cpt_strs);

@@ -4,7 +4,7 @@
 #include "ScriptVars.h"
 
 void CharacterGraphDriver::on_init() {
-	const ScriptVars_CFG& vars = owner->runtime_dat.cfg->parameters;
+	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->params.get();
 	flMovex = vars.find("flMovex");
 	flMovey = vars.find("flMovey");
 	flSpeed = vars.find("flSpeed");
@@ -56,15 +56,17 @@ void CharacterGraphDriver::on_update(float dt) {
 	injump = player.state & PMS_JUMPING;
 
 
-	auto& params = owner->runtime_dat.parameters;
+	auto& params = *owner->runtime_dat.cfg->params.get();
+	auto vars = &owner->runtime_dat.vars;
 
-	params.set_bool(bMoving, ismoving);
-	params.set_bool(bCrouch, (player.state & PMS_CROUCHING));
-	params.set_bool(bJumping, player.state & PMS_JUMPING);
-	params.set_bool(bFalling, !bool(player.state & PMS_GROUND));
-	params.set_float(flSpeed,glm::length(relmovedir));
-	params.set_float(flMovex ,relmovedir.x);
-	params.set_float(flMovey, relmovedir.y);
+
+	params.set_bool(vars, bMoving, ismoving);
+	params.set_bool(vars, bCrouch, (player.state & PMS_CROUCHING));
+	params.set_bool(vars, bJumping, player.state & PMS_JUMPING);
+	params.set_bool(vars, bFalling, !bool(player.state & PMS_GROUND));
+	params.set_float(vars, flSpeed,glm::length(relmovedir));
+	params.set_float(vars, flMovex ,relmovedir.x);
+	params.set_float(vars, flMovey, relmovedir.y);
 
 }
 

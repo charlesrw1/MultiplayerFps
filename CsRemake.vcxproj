@@ -49,7 +49,6 @@
     <ClCompile Include="Source\Meshlet.cpp" />
     <ClCompile Include="Source\MyImguiLib.cpp" />
     <ClCompile Include="Source\Net.cpp" />
-    <ClCompile Include="Source\Parameter.cpp" />
     <ClCompile Include="Source\Particles.cpp" />
     <ClCompile Include="Source\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Profilier.cpp" />
@@ -69,6 +68,7 @@
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Player.cpp" />
     <ClCompile Include="Source\Ssao.cpp" />
+    <ClCompile Include="Source\StringName.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
     <ClCompile Include="Source\Volumetricfog.cpp" />
   </ItemGroup>
@@ -81,6 +81,7 @@
     <ClInclude Include="Source\AnimationTypes.h" />
     <ClInclude Include="Source\AnimationUtil.h" />
     <ClInclude Include="Source\beziercurveeditor.h" />
+    <ClInclude Include="Source\ControlParamHandle.h" />
     <ClInclude Include="Source\EnumDefReflection.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\BVH.h" />
@@ -104,7 +105,6 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\FreeList.h" />
     <ClInclude Include="Source\Game_Engine.h" />
-    <ClInclude Include="Source\GlobalEnumMgr.h" />
     <ClInclude Include="Source\IGraphDriver.h" />
     <ClInclude Include="Source\Handle.h" />
     <ClInclude Include="Source\InlineVec.h" />
@@ -114,7 +114,6 @@
     <ClInclude Include="Source\Key_Value_File.h" />
     <ClInclude Include="Source\EntityTypes.h" />
     <ClInclude Include="Source\MyImguiLib.h" />
-    <ClInclude Include="Source\Parameter.h" />
     <ClInclude Include="Source\ParticlesLocal.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
@@ -127,8 +126,10 @@
     <ClInclude Include="Source\ReflectionRegisterDefines.h" />
     <ClInclude Include="Source\Renderer_Types.h" />
     <ClInclude Include="Source\RenderObj.h" />
+    <ClInclude Include="Source\ScriptValue.h" />
     <ClInclude Include="Source\ScriptVars.h" />
     <ClInclude Include="Source\StdVectorReflection.h" />
+    <ClInclude Include="Source\StringName.h" />
     <ClInclude Include="Source\StringUtil.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\Bytepacker.h" />

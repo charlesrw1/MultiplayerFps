@@ -14,7 +14,10 @@ namespace StringUtils {
 	{
 		return ((count ? fnv1a_32(s, count - 1) : 2166136261u) ^ s[count]) * 16777619u;
 	}
-
+	constexpr uint64_t fnv1a_64(const char const* s, std::size_t count)
+	{
+		return ((count ? fnv1a_64(s, count - 1) : 14695981039346656037ull /* offset */) ^ s[count]) * 1099511628211ull /* prime */;
+	}
 	constexpr size_t const_strlen(const char* s)
 	{
 		size_t size = 0;

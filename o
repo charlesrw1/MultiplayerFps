@@ -1,123 +1,137 @@
+ runtime
 {
-	name ""
-	root_node "-1"
-	params [
-	]
-	nodes [
-		{
-			type "::statemachine"
-			default_param "-1"
-			inputs [
-			]
-			{
-				{
-					states [
-					]
-				}
-				{
-					transitions [
-					]
-				}
-				{
-					entry_transitions [
-					]
-				}
-			}
-		}
-	]
-	 editor
-	{
-		nodes [
-			{
-				name "Unnamed"
-				graph_layer "0"
-				id "0"
-				type "root"
-			}
-			{
-				name "Unnamed"
-				graph_layer "1"
-				id "2"
-				type "start_statemachine"
-				state_handle "-1"
-				parent_state_machine "0"
-			}
-			{
-				name "Unnamed"
-				node_idx "0"
-				graph_layer "0"
-				id "1"
-				type "statemachine"
-				sublayer_id "1"
-				sublayer_state "[editor]
-panning=150,325
-
-[node.2]
-origin=0,0
-
-[node.3]
-origin=144,-155
-
-[node.5]
-origin=217,20
-
-[node.7]
-origin=-24,108
-"
-			}
-			{
-				name "Unnamed"
-				graph_layer "2"
-				id "4"
-				type "root"
-			}
-			{
-				name "Unnamed"
-				graph_layer "1"
-				id "3"
-				type "state"
-				sublayer_id "2"
-				sublayer_state "[editor]
-panning=0,0
-"
-				state_handle "-1"
-				parent_state_machine "0"
-			}
-			{
-				name "Unnamed"
-				graph_layer "3"
-				id "6"
-				type "root"
-			}
-			{
-				name "Unnamed"
-				graph_layer "1"
-				id "5"
-				type "state"
-				sublayer_id "3"
-				sublayer_state "[editor]
-panning=0,0
-"
-				state_handle "-1"
-				parent_state_machine "0"
-			}
-			{
-				name "Unnamed"
-				graph_layer "4"
-				id "8"
-				type "root"
-			}
-			{
-				name "Unnamed"
-				graph_layer "1"
-				id "7"
-				type "state"
-				sublayer_id "4"
-				sublayer_state "[editor]
-panning=0,0
-"
-				state_handle "-1"
-				parent_state_machine "0"
-			}
-		]
-	}
+params [
+]
+nodes [
+{
+type "::source"
+inputs [
+]
+{
+{
+name "rm[0]"
+type "Enum8"
+ value 
+ rm::keep
+}
+{
+name "rm[1]"
+type "Enum8"
+ value 
+ rm::keep
+}
+{
+name "rm[2]"
+type "Enum8"
+ value 
+ rm::keep
+}
+{
+name "loop"
+type "Bool"
+ value 
+ 1
+}
+{
+name "speed"
+type "Float"
+ value 
+ 1.000000
+}
+{
+name "start_frame"
+type "Int16"
+ value 
+ 0
+}
+{
+name "allow_sync"
+type "Bool"
+ value 
+ 0
+}
+{
+name "can_be_leader"
+type "Bool"
+ value 
+ 1
+}
+{
+name "clip_name"
+type "StdString"
+ value 
+ Armature|mixamo.com|Layer0
+}
+}
+}
+]
+}
+ editor
+{
+nodes [
+{
+{
+name "id"
+type "Int32"
+ value 
+ 0
+}
+{
+name "name"
+type "StdString"
+ value 
+ Unnamed
+}
+{
+name "graphlayer"
+type "Int32"
+ value 
+ 0
+}
+{
+name "is_state_node"
+type "Bool"
+ value 
+ 0
+}
+{
+name "handle"
+type "Int32"
+ value 
+ -1
+}
+}
+{
+{
+name "id"
+type "Int32"
+ value 
+ 1
+}
+{
+name "name"
+type "StdString"
+ value 
+ Unnamed
+}
+{
+name "graphlayer"
+type "Int32"
+ value 
+ 0
+}
+{
+name "is_state_node"
+type "Bool"
+ value 
+ 0
+}
+{
+name "handle"
+type "Int32"
+ value 
+ 0
+}
+}
+]
+}

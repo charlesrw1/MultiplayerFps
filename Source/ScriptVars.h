@@ -2,87 +2,110 @@
 
 
 #include "Util.h" // handle
+#include "ExpressionLang.h"
 #include "glm/glm.hpp"
 #include <string>
 #include <unordered_map>
+#include "EnumDefReflection.h"
+#include "StringName.h"
+#include "ControlParamHandle.h"
 
-#include "Parameter.h"
+// graph control parameter variables
+// script layer variables
 
-struct Parameter_CFG
+
+// if you modify this enum, change the AutoEnumDef!
+extern AutoEnumDef control_param_type_def;
+enum class control_param_type : uint8_t
+{
+	// integer types
+	int_t,
+	enum_t,
+	bool_t,
+	float_t,
+};
+
+struct AG_ControlParam
 {
 	std::string name;
 	int default_i = 0;
 	float default_f = 0.0;
-	script_parameter_type type = script_parameter_type::int_t;
+	control_param_type type = control_param_type::int_t;
 	int16_t enum_idx = 0;
 	bool reset_after_tick = false;
 };
 
-struct ScriptVars_CFG
+struct ControlParam_CFG
 {
-	handle<Parameter> find(const std::string& str) const {
-		const auto& find = name_to_index.find(str);
+	ControlParamHandle find(StringName name) const {
+		const auto& find = name_to_index.find(name.get_hash());
 		if (find != name_to_index.end()) {
-			handle<Parameter> h;
-			h.id = find->second;
-			return h;
+			return { find->second };
 		}
 		return { -1 };
 	}
-	script_parameter_type get_type(handle<Parameter> handle) const { 
-		return types.at(handle.id).type;
+
+	void set_float(program_script_vars_instance* rt, ControlParamHandle handle, float val) const {
+		if (!handle.is_valid()) return;
+		ASSERT(get_type(handle) == control_param_type::float_t);
+		rt->at(handle.id).f = val;
+	}
+	void set_int(program_script_vars_instance* rt, ControlParamHandle handle, int val) const {
+		if (!handle.is_valid()) return;
+		ASSERT(get_type(handle) == control_param_type::int_t);
+		rt->at(handle.id).ui32 = val;
+	}
+	void set_bool(program_script_vars_instance* rt, ControlParamHandle handle, bool val) const {
+		if (!handle.is_valid()) return;
+		ASSERT(get_type(handle) == control_param_type::bool_t);
+		rt->at(handle.id).ui32 = val;
 	}
 
-	handle<Parameter> set(const char* str, script_parameter_type type) {
-		Parameter_CFG param;
-		param.type = type;
-		param.reset_after_tick = false;
-		param.name = str;
-		param.enum_idx = -1;
+	float get_float(program_script_vars_instance* rt, ControlParamHandle handle) const {
+		if (!handle.is_valid()) return 0.f;
+		ASSERT(get_type(handle) == control_param_type::float_t);
+		return rt->at(handle.id).f;
+	}
+	int get_int(program_script_vars_instance* rt, ControlParamHandle handle) const {
+		if (!handle.is_valid()) return 0;
+		ASSERT(get_type(handle) == control_param_type::int_t);
+		return rt->at(handle.id).ui32;
+	}
+	bool get_bool(program_script_vars_instance* rt, ControlParamHandle handle) const {
+		if (!handle.is_valid()) return 0;
+		ASSERT(get_type(handle) == control_param_type::bool_t);
+		return rt->at(handle.id).ui32;
+	}
 
+
+	control_param_type get_type(ControlParamHandle handle) const {
+		ASSERT(handle.id >= 0 && handle.id < types.size());
+		return types[handle.id].type;
+	}
+
+	static script_types get_script_type_for_control_param(control_param_type param) {
+		switch (param)
+		{
+		case control_param_type::int_t:return script_types::int_t;
+		case control_param_type::enum_t:return script_types::int_t;
+		case control_param_type::bool_t:return script_types::bool_t;
+		case control_param_type::float_t:return script_types::float_t;
+		default:
+			ASSERT(0);
+		}
+	}
+
+	void clear_variables() {
+		name_to_index.clear();
+		types.clear();
+	}
+	ControlParamHandle push_variable(const AG_ControlParam& param) {
 		types.push_back(param);
-		name_to_index[str] = types.size() - 1;
-
-		return { (int)types.size() - 1};
+		name_to_index[StringName(param.name.c_str()).get_hash()] = (int)types.size() - 1;
+		return { (int)types.size() - 1 };
 	}
+	void set_library_vars(Library* lib);
 
-	std::vector<Parameter_CFG> types;
-	std::unordered_map<std::string, int> name_to_index;
+	std::vector<AG_ControlParam> types;
+	std::unordered_map<name_hash_t, int> name_to_index;
 };
-
-
-struct ScriptVars_RT
-{
-	const Parameter& get(handle<Parameter> handle)const {
-		return parameters[handle.id];
-	}
-	Parameter& get(handle<Parameter> handle) {
-		return parameters[handle.id];
-	}
-
-	void set_float(handle<Parameter> handle, float f) {
-		if (handle.is_valid()) {
-			auto p = get(handle);
-			ASSERT(p.type == script_parameter_type::float_t);
-			p.fval = f;
-		}
-	}
-	void set_int(handle<Parameter> handle, int i) {
-		if (handle.is_valid()) {
-			auto p = get(handle);
-			ASSERT(p.type == script_parameter_type::int_t);
-			p.ival = i;
-		}
-	}
-	void set_bool(handle<Parameter> handle, bool b) {
-		if (handle.is_valid()) {
-			auto p = get(handle);
-			ASSERT(p.type == script_parameter_type::bool_t);
-			p.ival = b;
-		}
-	}
-
-
-	std::vector<Parameter> parameters;
-};
-
