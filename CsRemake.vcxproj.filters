@@ -378,6 +378,9 @@
     <ClInclude Include="Source\MyImguiLib.h">
       <Filter>Source\Animation\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Source\beziercurveeditor.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source">

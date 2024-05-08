@@ -496,14 +496,16 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 
  }
 
+ struct AnimationTreeLoadStruct
+ {
+	 std::string name;
+	 bool graph_is_valid = false;
+	 int root_node_index = -1;
+ };
+
+
  void Animation_Tree_CFG::write_to_dict(DictWriter& out)
  {
-	 out.set_should_add_indents(true);
-	 out.write_item_start();
-
-	 out.write_key_value("name", this->name.c_str());	
-	 out.write_key_value("root_node", string_format("%d", get_index_of_node(root)));
-
 	 std::unordered_map<Node_CFG*, int> node_ptr_to_index;
 	 for (int i = 0; i < all_nodes.size(); i++) {
 		 // sanity check
@@ -511,17 +513,30 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 		 node_ptr_to_index[all_nodes[i]] = i;
 	 }
 
+	// out.set_should_add_indents(true);
+	 out.write_value("runtime");
+	 out.write_item_start();
+
+	 AnimationTreeLoadStruct dat;
+	 dat.name = this->name;
+	 if (node_ptr_to_index.find(root) != node_ptr_to_index.end())
+		 dat.root_node_index = node_ptr_to_index[root];
+	 dat.graph_is_valid = graph_is_valid;
+
 	 out.write_key_list_start("params");
 	 for (auto& param_int : parameters.name_to_index) {
 
 		 auto& param = parameters.types.at(param_int.second);
 
 		 out.write_item_start();
-		 out.write_key_value("name", param_int.first.c_str());
-		 out.write_key_value("type", parameter_type_to_string(param.default_.type));
-
-		 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
-
+		 {
+			 out.write_key_value("name", param_int.first.c_str());
+			 out.write_key_value("type", parameter_type_to_string(param.type));
+			 if (param.type == script_parameter_type::enum_t && param.enum_idx!=-1) {
+				 out.write_key_value("enum_type", GlobalEnumDefMgr::get().get_enum_type_name(param.enum_idx));
+			 }
+			 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
+		 }
 		 out.write_item_end();
 	 }
 	 out.write_list_end();
@@ -531,29 +546,29 @@ animnode_name_type& get_animnode_typedef(animnode_type type) {
 	 for (int i = 0; i < all_nodes.size(); i++) {
 		 auto& node = all_nodes[i];
 		 out.write_item_start();
+		 {
+			 const char* type_name = GlobalEnumDefMgr::get().get_enum_type_name(animnode_type_def.id);
+			 const char* enum_str = GlobalEnumDefMgr::get().get_enum_name(animnode_type_def.id, (int)node->get_type());
+			 char* out_str = string_format("%s::%s", type_name, enum_str);
+			 out.write_key_value("type", out_str);
 
-		 const char* type_name = GlobalEnumDefMgr::get().get_enum_type_name(animnode_type_def.id);
-		 const char* enum_str = GlobalEnumDefMgr::get().get_enum_name(animnode_type_def.id, (int)node->get_type());
-		 char* out_str = string_format("%s::%s", type_name, enum_str);
+			 out.write_key_list_start("inputs");
+			 for (int i = 0; i < node->input.size(); i++) {
 
-		 out.write_key_value("type", out_str);
+				 ASSERT(node_ptr_to_index.find(node->input[i]) != node_ptr_to_index.end());
+				 int index = node_ptr_to_index.find(node->input[i])->second;
+				 out.write_value(string_format("%d", index));
+			 }
+			 out.write_list_end();
 
-		 out.write_key_value("default_param", string_format("%d", node->param.id));
-
-		 out.write_key_list_start("inputs");
-		 for (int i = 0; i < node->input.size(); i++) {
-			 out.write_value( string_format("%d", get_index_of_node(node->input[i]) ) );
+			 write_properties(*node->get_props(), node, out);
 		 }
-		 out.write_list_end();
-
-		 write_properties(*node->get_props(), node, out);
-
-		 node->write_to_dict(this, out);
-
 		 out.write_item_end();
 	 }
 
 	 out.write_list_end();
+
+	 out.write_item_end();
  }
 
  PropertyInfoList* Scale_By_Rootmotion_CFG::get_props()

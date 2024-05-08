@@ -17,3 +17,11 @@ inline ImVec4 color32_to_imvec4(Color32 color) {
 inline unsigned int color32_to_int(Color32 color) {
 	return *(unsigned int*)&color;
 }
+namespace ImGui {
+	int Curve(const char* label, const ImVec2& size,
+		const int maxpoints,
+		ImVec2* points,
+		int* selection,
+		const ImVec2& rangeMin = ImVec2(0, 0),
+		const ImVec2& rangeMax = ImVec2(1, 1));
+};

@@ -80,6 +80,7 @@
     <ClInclude Include="Source\AnimationTreePublic.h" />
     <ClInclude Include="Source\AnimationTypes.h" />
     <ClInclude Include="Source\AnimationUtil.h" />
+    <ClInclude Include="Source\beziercurveeditor.h" />
     <ClInclude Include="Source\EnumDefReflection.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\BVH.h" />

@@ -105,7 +105,9 @@ struct PropertyInfoList
 
 class DictWriter;
 class DictParser;
-void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out);
+
+struct Prop_Flag_Overrides;
+void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, Prop_Flag_Overrides* overrides = nullptr);
 bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token);
 
 class IListCallback

@@ -4,7 +4,7 @@
 #include "Util.h"
 #include "GlobalEnumMgr.h"
 #include <cassert>
-
+#include "StdVectorReflection.h"
 
 inline std::string string_view_to_std_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
@@ -270,20 +270,31 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out)
 }
 
 
-void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out)
+void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, Prop_Flag_Overrides* overrides)
 {
 	out.write_item_start();
 	for (int i = 0; i < list.count; i++)
 	{
-		out.write_item_start();
 		auto& prop = list.list[i];
 
-		std::string value_str = write_field_type(prop.type, ptr, prop, out);
+		uint32_t flags = prop.flags;
+		if (overrides) {
+			auto find = overrides->map.find(prop.name);
+			if (find != overrides->map.end())
+				flags = find->second;
+		}
 
-		if (!value_str.empty()) {
+		if (!(flags & PROP_SERIALIZE))
+			continue;
+
+		out.write_item_start();
+		{
 			out.write_key_value("name", prop.name);
 			out.write_key_value("type", GlobalEnumDefMgr::get().get_enum_name(core_type_id_def.id, (int)prop.type));
-			out.write_key_value("value", value_str.c_str());
+			out.write_value("value ");
+			std::string value_str = write_field_type(prop.type, ptr, prop, out);
+			if (!value_str.empty())
+				out.write_value(value_str.c_str());
 		}
 
 		out.write_item_end();

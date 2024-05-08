@@ -827,10 +827,13 @@ public:
 	bool is_modifier_pressed = false;
 	bool is_focused = false;
 
-	bool open_open_dialouge = false;
-	bool open_timeline = true;
+	bool open_graph = true;
+	bool open_control_params = true;
 	bool open_viewport = true;
 	bool open_prop_editor = true;
+	bool open_open_popup = false;
+	bool open_save_popup = false;
+
 
 	bool statemachine_passthrough = false;
 

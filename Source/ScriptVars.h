@@ -10,7 +10,11 @@
 
 struct Parameter_CFG
 {
-	Parameter default_;
+	std::string name;
+	int default_i = 0;
+	float default_f = 0.0;
+	script_parameter_type type = script_parameter_type::int_t;
+	int16_t enum_idx = 0;
 	bool reset_after_tick = false;
 };
 
@@ -25,12 +29,16 @@ struct ScriptVars_CFG
 		}
 		return { -1 };
 	}
-	script_parameter_type get_type(handle<Parameter> handle) const { return types.at(handle.id).default_.type; }
+	script_parameter_type get_type(handle<Parameter> handle) const { 
+		return types.at(handle.id).type;
+	}
 
 	handle<Parameter> set(const char* str, script_parameter_type type) {
 		Parameter_CFG param;
-		param.default_.init_for_type(type);
+		param.type = type;
 		param.reset_after_tick = false;
+		param.name = str;
+		param.enum_idx = -1;
 
 		types.push_back(param);
 		name_to_index[str] = types.size() - 1;

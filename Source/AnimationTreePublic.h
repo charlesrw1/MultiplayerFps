@@ -21,6 +21,7 @@ public:
 	uint32_t data_used = 0;
 	std::vector<Node_CFG*> all_nodes;	// for initialization
 	ScriptVars_CFG parameters;
+	bool graph_is_valid = false;
 
 	handle<Parameter> find_param(const char* param)  {
 		if (parameters.name_to_index.find(param) != parameters.name_to_index.end())

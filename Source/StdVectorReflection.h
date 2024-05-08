@@ -1,6 +1,10 @@
 #pragma once
 #include "ReflectionProp.h"
 #include "InlineVec.h"
+
+#include <unordered_map>
+#include <string>
+
 template<typename T>
 class StdVectorCallback : public IListCallback
 {
@@ -76,6 +80,10 @@ PropertyInfoList* get_list_value<int32_t>();
 template<>
 PropertyInfoList* get_list_value<float>();
 
+struct Prop_Flag_Overrides
+{
+	std::unordered_map<std::string, uint32_t> map;
+};
 
 #define MAKE_VECTORCALLBACK( type, name ) static StdVectorCallback<type> vecdef_##name( type::get_props() );
 #define REG_STDVECTOR(name, flags ) make_list_property(#name, offsetof(TYPE_FROM_START, name), flags, &vecdef_##name)

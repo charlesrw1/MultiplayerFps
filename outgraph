@@ -1,0 +1,798 @@
+ runtime
+{
+	params [
+	]
+	nodes [
+		{
+			type "::source"
+			inputs [
+			]
+			{
+				{
+					name "rm[0]"
+					type "Enum8"
+					 value 
+					 rm::keep
+				}
+				{
+					name "rm[1]"
+					type "Enum8"
+					 value 
+					 rm::keep
+				}
+				{
+					name "rm[2]"
+					type "Enum8"
+					 value 
+					 rm::keep
+				}
+				{
+					name "loop"
+					type "Bool"
+					 value 
+					 1
+				}
+				{
+					name "speed"
+					type "Float"
+					 value 
+					 1.000000
+				}
+				{
+					name "start_frame"
+					type "Int16"
+					 value 
+					 0
+				}
+				{
+					name "allow_sync"
+					type "Bool"
+					 value 
+					 0
+				}
+				{
+					name "can_be_leader"
+					type "Bool"
+					 value 
+					 1
+				}
+				{
+					name "clip_name"
+					type "StdString"
+					 value 
+					 Armature|mixamo.com|Layer0
+				}
+			}
+		}
+		{
+			type "::statemachine"
+			inputs [
+			]
+			{
+				{
+					name "states"
+					type "List"
+					 value 
+					 [
+						{
+							{
+								name "transition_idxs"
+								type "List"
+								 value 
+								 [
+								]
+							}
+							{
+								name "state_duration"
+								type "Float"
+								 value 
+								 -1.000000
+							}
+							{
+								name "wait_until_finish"
+								type "Bool"
+								 value 
+								 0
+							}
+							{
+								name "is_end_state"
+								type "Bool"
+								 value 
+								 0
+							}
+							{
+								name "tree_index"
+								type "Int16"
+								 value 
+								 0
+							}
+						}
+					]
+				}
+				{
+					name "transitions"
+					type "List"
+					 value 
+					 [
+						{
+							{
+								name "transition_state"
+								type "Int32"
+								 value 
+								 1
+							}
+							{
+								name "automatic_transition_rule"
+								type "Bool"
+								 value 
+								 1
+							}
+							{
+								name "transition_time"
+								type "Float"
+								 value 
+								 0.200000
+							}
+							{
+								name "script_uncompilied"
+								type "StdString"
+								 value 
+							}
+							{
+								name "is_continue_transition"
+								type "Bool"
+								 value 
+								 0
+							}
+						}
+					]
+				}
+				{
+					name "entry_transitions"
+					type "List"
+					 value 
+					 [
+						 0 
+					]
+				}
+			}
+		}
+		{
+			type "::statemachine"
+			inputs [
+			]
+			{
+				{
+					name "states"
+					type "List"
+					 value 
+					 [
+						{
+							{
+								name "transition_idxs"
+								type "List"
+								 value 
+								 [
+								]
+							}
+							{
+								name "state_duration"
+								type "Float"
+								 value 
+								 -1.000000
+							}
+							{
+								name "wait_until_finish"
+								type "Bool"
+								 value 
+								 0
+							}
+							{
+								name "is_end_state"
+								type "Bool"
+								 value 
+								 0
+							}
+							{
+								name "tree_index"
+								type "Int16"
+								 value 
+								 0
+							}
+						}
+						{
+							{
+								name "transition_idxs"
+								type "List"
+								 value 
+								 [
+								]
+							}
+							{
+								name "state_duration"
+								type "Float"
+								 value 
+								 -1.000000
+							}
+							{
+								name "wait_until_finish"
+								type "Bool"
+								 value 
+								 0
+							}
+							{
+								name "is_end_state"
+								type "Bool"
+								 value 
+								 0
+							}
+							{
+								name "tree_index"
+								type "Int16"
+								 value 
+								 0
+							}
+						}
+					]
+				}
+				{
+					name "transitions"
+					type "List"
+					 value 
+					 [
+						{
+							{
+								name "transition_state"
+								type "Int32"
+								 value 
+								 1
+							}
+							{
+								name "automatic_transition_rule"
+								type "Bool"
+								 value 
+								 1
+							}
+							{
+								name "transition_time"
+								type "Float"
+								 value 
+								 0.200000
+							}
+							{
+								name "script_uncompilied"
+								type "StdString"
+								 value 
+							}
+							{
+								name "is_continue_transition"
+								type "Bool"
+								 value 
+								 0
+							}
+						}
+						{
+							{
+								name "transition_state"
+								type "Int32"
+								 value 
+								 2
+							}
+							{
+								name "automatic_transition_rule"
+								type "Bool"
+								 value 
+								 1
+							}
+							{
+								name "transition_time"
+								type "Float"
+								 value 
+								 0.200000
+							}
+							{
+								name "script_uncompilied"
+								type "StdString"
+								 value 
+							}
+							{
+								name "is_continue_transition"
+								type "Bool"
+								 value 
+								 0
+							}
+						}
+					]
+				}
+				{
+					name "entry_transitions"
+					type "List"
+					 value 
+					 [
+						 0 
+					]
+				}
+			}
+		}
+	]
+}
+ editor
+{
+	nodes [
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 0
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 0
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 -1
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 0
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 0
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 3
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 1
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 -1
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 2
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 0
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "sublayer_id"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "sublayer"
+				type "StdString"
+				 value 
+				 [editor]
+panning=109,325
+
+[node.3]
+origin=0,0
+
+[node.4]
+origin=101,-190
+
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 5
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 2
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 -1
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 4
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 1
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "sublayer_id"
+				type "Int32"
+				 value 
+				 2
+			}
+			{
+				name "sublayer"
+				type "StdString"
+				 value 
+				 [editor]
+panning=109,325
+
+[node.5]
+origin=144,-116
+
+[node.6]
+origin=7,-118
+
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 7
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 3
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 1
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 -1
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 6
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 2
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 2
+			}
+			{
+				name "sublayer_id"
+				type "Int32"
+				 value 
+				 3
+			}
+			{
+				name "sublayer"
+				type "StdString"
+				 value 
+				 [editor]
+panning=109,325
+
+[node.7]
+origin=0,0
+
+[node.8]
+origin=58,-175
+
+[node.10]
+origin=139,87
+
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 9
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 4
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 -1
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 8
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 3
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 1
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 1
+			}
+			{
+				name "sublayer_id"
+				type "Int32"
+				 value 
+				 4
+			}
+			{
+				name "sublayer"
+				type "StdString"
+				 value 
+				 [editor]
+panning=0,0
+
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 11
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 5
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 0
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 -1
+			}
+		}
+		{
+			{
+				name "id"
+				type "Int32"
+				 value 
+				 10
+			}
+			{
+				name "name"
+				type "StdString"
+				 value 
+				 Unnamed
+			}
+			{
+				name "graphlayer"
+				type "Int32"
+				 value 
+				 3
+			}
+			{
+				name "is_state_node"
+				type "Bool"
+				 value 
+				 1
+			}
+			{
+				name "handle"
+				type "Int32"
+				 value 
+				 2
+			}
+			{
+				name "sublayer_id"
+				type "Int32"
+				 value 
+				 5
+			}
+			{
+				name "sublayer"
+				type "StdString"
+				 value 
+				 [editor]
+panning=0,0
+
+			}
+		}
+	]
+}

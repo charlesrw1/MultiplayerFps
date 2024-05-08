@@ -470,15 +470,12 @@ void TabState::imgui_draw() {
 void AnimationGraphEditor::save_document()
 {
 	if (name.empty()) {
-		ImGui::PushID(0);
-		ImGui::OpenPopup("Save file dialog");
-		ImGui::PopID();
+		open_save_popup = true;
 		return;
 	}
 
-
 	DictWriter write;
-	write.set_should_add_indents(true);
+	write.set_should_add_indents(false);
 	editing_tree->write_to_dict(write);
 	save_editor_nodes(write);
 
@@ -486,6 +483,38 @@ void AnimationGraphEditor::save_document()
 	outfile.write(write.get_output().c_str(), write.get_output().size());
 	outfile.close();
 }
+#include "ReflectionRegisterDefines.h"
+#include "StdVectorReflection.h"
+
+struct EditorNodeSerializeData
+{
+	std::string name;
+	uint32_t id;
+	uint32_t graphlayer;
+
+	// graph nodes or state node depended
+	bool is_state_node;
+	int handle;
+
+	// statemachine + state
+	uint32_t sublayer_id;
+	std::string sublayer;
+
+	static PropertyInfoList* get_props() {
+		START_PROPS(EditorNodeSerializeData)
+			REG_INT(id,PROP_SERIALIZE,""),
+			REG_STDSTRING(name, PROP_SERIALIZE),
+			REG_INT(graphlayer, PROP_SERIALIZE,""),
+
+			REG_BOOL(is_state_node, PROP_SERIALIZE,""),
+			REG_INT(handle, PROP_SERIALIZE, ""),
+
+			REG_INT(sublayer_id, 0, ""),
+			REG_STDSTRING(sublayer, 0, ""),
+		END_PROPS(EditorNodeSerializeData)
+	}
+};
+#include "StdVectorReflection.h"
 
 void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 {
@@ -499,37 +528,36 @@ void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 	out.write_item_start();
 	out.write_key_list_start("nodes");
 	for (int i = 0; i < nodes.size(); i++) {
+
 		IAgEditorNode* node = nodes[i];
-		out.write_item_start();
-		out.write_key_value("name", node->get_title().c_str());
-		Node_CFG* node_cfg = node->get_graph_node();
-		if (node_cfg) {
-			ASSERT(node_ptr_to_output_index.find(node_cfg) != node_ptr_to_output_index.end());
-			out.write_key_value("node_idx", string_format("%d",node_ptr_to_output_index[node_cfg]));
-		}
 
-		out.write_key_value("graph_layer", string_format("%d",node->graph_layer));
-		out.write_key_value("id", string_format("%d", node->id));
-		
-		const char* enum_type = GlobalEnumDefMgr::get().get_enum_name(animnode_type_def.id, (int)node->type);
-		out.write_key_value("type", enum_type);
-		
+		Prop_Flag_Overrides overrides;
+		EditorNodeSerializeData out_dat;
+		out_dat.name = node->get_title();
+		out_dat.id = node->id;
+		out_dat.graphlayer = node->graph_layer;
+		out_dat.handle = -1;
+		out_dat.is_state_node = false;
 		if (node->get_layer()) {
-			auto sublayer = node->get_layer();
-			out.write_key_value("sublayer_id", string_format("%d", sublayer->id));
-			// serialize ImNodes context string
 
-			out.write_key_value("sublayer_state", ImNodes::SaveEditorStateToIniString(sublayer->context));
+			out_dat.sublayer = ImNodes::SaveEditorStateToIniString(node->get_layer()->context);
+			out_dat.sublayer_id = node->get_layer()->id;
+
+			overrides.map["sublayer"] = PROP_SERIALIZE;
+			overrides.map["sublayer_id"] = PROP_SERIALIZE;
 		}
-
-		if (node->is_state_node()) {
-
+		if (node->get_graph_node()) {
+			auto graph_node = node->get_graph_node();
+			ASSERT(node_ptr_to_output_index.find(graph_node) != node_ptr_to_output_index.end());
+			out_dat.handle = node_ptr_to_output_index[graph_node];
+		}
+		else if (node->is_state_node()) {
+			out_dat.is_state_node = true;
 			AgEditor_StateNode* statenode = (AgEditor_StateNode*)node;
-			out.write_key_value("state_handle", string_format("%d", statenode->state_handle_internal.id));
-			ASSERT(node_ptr_to_output_index.find(statenode->parent_statemachine->node) != node_ptr_to_output_index.end());
-			out.write_key_value("parent_state_machine", string_format("%d", node_ptr_to_output_index[statenode->parent_statemachine->node]));
+			out_dat.handle = statenode->state_handle_internal.id;
 		}
-		out.write_item_end();
+
+		write_properties(*EditorNodeSerializeData::get_props(), &out_dat, out, &overrides);
 	}
 	out.write_list_end();
 	out.write_item_end();
@@ -555,16 +583,18 @@ void AnimationGraphEditor::draw_menu_bar()
 				create_new_document();
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
-				open_open_dialouge = true;
+				open_open_popup = true;
+
 			}
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
-				save_document();
+				open_save_popup = true;
 			}
 
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("View")) {
-			ImGui::Checkbox("Timeline", &open_timeline);
+			ImGui::Checkbox("Graph", &open_graph);
+			ImGui::Checkbox("Control params", &open_control_params);
 			ImGui::Checkbox("Viewport", &open_viewport);
 			ImGui::Checkbox("Property Ed", &open_prop_editor);
 			ImGui::EndMenu();
@@ -677,22 +707,22 @@ void AnimationGraphEditor::stop_playback()
 }
 
 template<typename FUNCTOR>
-static void open_or_save_file_dialog(FUNCTOR&& callback)
+static void open_or_save_file_dialog(FUNCTOR&& callback, const bool is_save_dialog)
 {
-	static bool alread_exists_err = false;
-	static bool cant_open_path_err = false;
+	static bool alread_exists = false;
+	static bool cant_open_path = false;
 	static char buffer[256];
 	static bool init = true;
 	if (init) {
 		buffer[0] = 0;
-		alread_exists_err = false;
-		cant_open_path_err = false;
+		alread_exists= false;
+		cant_open_path = false;
 		init = false;
 	}
 	bool write_out = false;
 
 	bool returned_true = false;
-	if (!alread_exists_err) {
+	if (!alread_exists || !is_save_dialog) {
 		ImGui::Text("Enter path: ");
 		ImGui::SameLine();
 		returned_true = ImGui::InputText("##pathinput", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
@@ -700,31 +730,51 @@ static void open_or_save_file_dialog(FUNCTOR&& callback)
 
 	if (returned_true) {
 		const char* full_path = string_format("./Data/Animations/Graphs/%s", buffer);
-		bool already_exists = Files::does_file_exist(full_path);
-		cant_open_path_err = false;
-		alread_exists_err = false;
-		if (already_exists)
-			alread_exists_err = true;
+		bool file_already_exists = Files::does_file_exist(full_path);
+		cant_open_path = false;
+		alread_exists = false;
+
+		if (is_save_dialog) {
+
+			if (file_already_exists)
+				alread_exists = true;
+			else {
+				std::ofstream test_open(full_path);
+				if (!test_open)
+					cant_open_path = true;
+			}
+			if (!alread_exists && !cant_open_path) {
+				write_out = true;
+			}
+		}
 		else {
-			std::ofstream test_open(full_path);
-			if (!test_open)
-				cant_open_path_err = true;
+
+			if (file_already_exists)
+				write_out = true;
+			else
+				cant_open_path = true;
+
 		}
-		if (!alread_exists_err && !cant_open_path_err) {
+	}
+	if (alread_exists) {
+
+		if (is_save_dialog) {
+
+			ImGui::Text("File already exists. Overwrite?");
+			if (ImGui::Button("Yes")) {
+				write_out = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("No")) {
+				alread_exists = false;
+			}
+		}
+		else {
+			// open file dialog
 			write_out = true;
 		}
 	}
-	if (alread_exists_err) {
-		ImGui::Text("File already exists. Overwrite?");
-		if (ImGui::Button("Yes")) {
-			write_out = true;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("No")) {
-			alread_exists_err = false;
-		}
-	}
-	else if (cant_open_path_err) {
+	else if (cant_open_path) {
 		ImGui::Text("Cant open path\n");
 	}
 	ImGui::Separator();
@@ -744,24 +794,30 @@ static void open_or_save_file_dialog(FUNCTOR&& callback)
 
 void AnimationGraphEditor::draw_popups()
 {
+	if (open_open_popup) {
+		ImGui::OpenPopup("Open file dialog");
+		open_open_popup = false;
+	}
+	if (open_save_popup) {
+		ImGui::OpenPopup("Save file dialog");
+		open_save_popup = false;
+	}
 
-	ImGui::PushID(0);
 	if (ImGui::BeginPopupModal("Save file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are saved under /Data/Animations/Graphs/");
 		open_or_save_file_dialog([&](const char* buf) {
 			name = buf;
 			save_document();
-		});
+		}, true);
 	}
 
-	if (ImGui::BeginPopupModal("Open file dialog"), nullptr) {
+	if (ImGui::BeginPopupModal("Open file dialog")) {
 
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are searched in $WorkingDir/Data/Animations/Graphs");
 		open_or_save_file_dialog([&](const char* buf) {
 			open(buf);
-		});
+		},false);
 	}
-	ImGui::PopID();
 }
 
 static ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, const ImGuiWindowClass* window_class = nullptr)
@@ -882,6 +938,19 @@ void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_dr
 
 }
 
+void draw_curve_test()
+{
+	static ImVec2 points[20];
+	static int init = true;
+	static int selected = 0;
+	if (init) {
+		for (int i = 0; i < 20; i++)
+			points[i].x = 1000.0;
+		init = false;
+	}
+	ImGui::Curve("test", ImVec2(300, 200), 10, points, &selected);
+}
+
 void AnimationGraphEditor::begin_draw()
 {
 	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
@@ -893,10 +962,12 @@ void AnimationGraphEditor::begin_draw()
 
 	control_params.imgui_draw();
 
+
 	is_modifier_pressed = ImGui::GetIO().KeyAlt;
 
 
 	ImGui::Begin("animation graph editor");
+	draw_curve_test();
 
 	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 
