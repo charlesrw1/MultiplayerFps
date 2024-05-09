@@ -12,8 +12,19 @@ public:
         this->str += str2;
         this->str += "\"\n";
     }
-    void write_value(const char* str1) {
+
+    void write_key(const char* str1) {
         add_indents();
+        this->str += str1;
+        this->str += ' ';
+    }
+
+    void write_value_quoted(const char* str) {
+        this->str += " \"";
+        this->str += str;
+        this->str += "\"\n";
+    }
+    void write_value(const char* str1) {
         this->str += ' ';
         this->str += str1;
         this->str += '\n';

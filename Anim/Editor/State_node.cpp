@@ -45,7 +45,7 @@ bool State_EdNode::push_imnode_link_colors(int index) {
 	ASSERT(inputs[index]->is_state_node());
 	State_EdNode* other = (State_EdNode*)inputs[index];
 
-	auto st = other->get_state_transition_to(this);
+	auto st = other->get_state_transition_to(this, index);
 	ASSERT(st);
 
 	if (st->is_a_continue_transition()) {
@@ -79,7 +79,7 @@ void State_EdNode::on_remove_pin(int slot, bool force)
 	ASSERT(inputs[slot]);
 
 	if (inputs[slot]->is_state_node()) {
-		((State_EdNode*)inputs[slot])->remove_output_to(this);
+		((State_EdNode*)inputs[slot])->remove_output_to(this, slot);
 		inputs[slot] = nullptr;
 	}
 	else
@@ -89,7 +89,7 @@ void State_EdNode::on_remove_pin(int slot, bool force)
 void State_EdNode::remove_reference(Base_EdNode* node)
 {
 	if (node->is_state_node()) {
-		remove_output_to((State_EdNode*)node);
+		remove_output_to((State_EdNode*)node, -1);
 	}
 
 	// node gets deleted since its in the layer
@@ -102,18 +102,12 @@ void State_EdNode::remove_reference(Base_EdNode* node)
 
 bool State_EdNode::add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot)
 {
-	for (int i = 0; i < inputs.size(); i++) {
-		if (inputs[i] == input) {
-			return true;
-		}
-	}
-
 	ASSERT(input->is_state_node());
 
 	inputs[slot] = input;
 
 	State_EdNode* statenode = (State_EdNode*)input;
-	statenode->on_output_create(this);
+	statenode->on_output_create(this, slot);
 
 	if (num_inputs > 0 && inputs[num_inputs - 1] && num_inputs < inputs.size())
 		num_inputs++;
@@ -166,8 +160,7 @@ bool State_EdNode::compile_data_for_statemachine()
 			}
 
 			if (!err_str.empty()) {
-				const char* to_state = out_state->get_title().c_str();
-				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", to_state, err_str.c_str()));
+				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", out_state->get_title().c_str(), err_str.c_str()));
 			}
 		}
 
@@ -183,7 +176,7 @@ bool State_EdNode::compile_data_for_statemachine()
 
 	// append tree
 	if (is_regular_state_node()) {
-		Base_EdNode* startnode = ed.find_first_node_in_layer(sublayer.id, "StartState_EdNode");
+		Base_EdNode* startnode = ed.find_first_node_in_layer(sublayer.id, "Root_EdNode");
 		ASSERT(startnode);
 
 		if (!startnode->inputs[0]) {
@@ -203,28 +196,28 @@ bool State_EdNode::compile_data_for_statemachine()
 	return compile_error_string.empty();	// empty == no errors generated
 }
 
-void State_EdNode::remove_output_to(State_EdNode* node)
+void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 {
 	bool already_seen = false;
 	for (int i = 0; i < output.size(); i++) {
 
 		// WARNING transitions invalidation potentially!
-		if (output[i].output_to == node) {
-
-			ASSERT(!already_seen);
-
+		if (output[i].output_to == node && (slot == -1 || slot == output[i].output_to_index)) {
 			output.erase(output.begin() + i);
 			already_seen = true;
 			i--;
 		}
 	}
+	ASSERT(already_seen);
+	// output array might become invalidated
+	ed.signal_nessecary_prop_ed_reset();
 }
 
- void State_EdNode::get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props)
+ void State_EdNode::get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props, int slot)
 {
 	for (int i = 0; i < output.size(); i++) {
-		if (output[i].output_to == to) {
-			// WARNING: this pointer becomes invalid if output is resized, this shouldnt happen
+		if (output[i].output_to == to && output[i].output_to_index == slot) {
+			// WARNING: this pointer becomes invalid if output is resized
 			props.push_back({ State_Transition::get_props(), &output[i].st });
 			return;
 		}
@@ -253,6 +246,10 @@ void State_EdNode::remove_output_to(State_EdNode* node)
 	 for (int i = 0; i < num_inputs - 1; i++) {
 		 if (inputs[i]) {
 			 ASSERT(inputs[i]->is_state_node());
+
+			 State_EdNode* statenode = (State_EdNode*)inputs[i];
+			 statenode->reassign_output_slot(this, i, count);
+
 			 inputs[count++] = inputs[i];
 		 }
 	 }

@@ -5,6 +5,7 @@
 class Statemachine_EdNode : public Base_EdNode
 {
 	EDNODE_HEADER(Statemachine_EdNode);
+	MAKE_STANDARD_ADD_PROPS(Statemachine_EdNode);
 
 	~Statemachine_EdNode() override {
 		ASSERT(sublayer.context);

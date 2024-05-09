@@ -20,7 +20,8 @@ inline void write_object_properties(
 
 	out.write_key_value("type", obj->get_typeinfo().name);
 	for (auto& proplist : props) {
-		write_properties(*proplist.list, proplist.instance, out, userptr);
+		if(proplist.list)
+			write_properties(*proplist.list, proplist.instance, out, userptr);
 	}
 
 	out.write_item_end();

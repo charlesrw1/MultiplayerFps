@@ -461,7 +461,7 @@ void TabState::imgui_draw() {
 				ImGui::Text("%s ->\n%s", other_name.c_str(), my_name.c_str());
 				ImGui::Separator();
 
-				auto st = other_node->get_state_transition_to(state);
+				auto st = other_node->get_state_transition_to(state, slot);
 				ASSERT(st);
 
 				if (st->is_a_continue_transition())
@@ -506,6 +506,13 @@ struct getter_ednode
 	}
 };
 
+struct AgSerializeContext
+{
+	std::unordered_map<Node_CFG*, int> ptr_to_index;
+	Animation_Tree_CFG* tree = nullptr;
+};
+
+
 void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 {
 	std::unordered_map<Node_CFG*, int> node_ptr_to_output_index;
@@ -514,14 +521,27 @@ void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 		node_ptr_to_output_index[editing_tree->all_nodes[i]] = i;
 	}
 
+
+	AgSerializeContext context;
+	context.tree = ed.editing_tree;
+	context.ptr_to_index = std::move(node_ptr_to_output_index);
+	TypedVoidPtr userptr(NAME("AgSerializeContext"), &context);
+
 	out.write_value("editor");
 	out.write_item_start();
+
+	out.write_key("rootstate");
+	out.write_item_start();
+	write_properties(*get_props(), this, out, {});
+	out.write_item_end();
+
 	out.write_key_list_start("nodes");
 	for (int i = 0; i < nodes.size(); i++) {
 		Base_EdNode* node = nodes[i];
-		write_object_properties<Base_EdNode, getter_ednode>(node, {}, out);
+		write_object_properties<Base_EdNode, getter_ednode>(node, userptr, out);
 	}
 	out.write_list_end();
+
 	out.write_item_end();
 }
 
@@ -598,13 +618,14 @@ void AnimationGraphEditor::draw_prop_editor()
 
 			Base_EdNode* mynode = find_node_from_id(node);
 
-			if (node != sel.node_last_frame) {
+			if (node != sel.node_last_frame || reset_prop_editor_next_tick) {
 				sel.link_last_frame = -1;
 
 				node_props.clear_all();
 
 				std::vector<PropertyListInstancePair> info;
 				mynode->add_props(info);
+				mynode->add_props_for_editable_element(info);
 
 				for (int i = 0; i < info.size(); i++) {
 					if(info[i].list) /* some nodes have null props */
@@ -629,7 +650,7 @@ void AnimationGraphEditor::draw_prop_editor()
 				sel.node_last_frame = -1;
 			}
 			else {
-				if (link != sel.link_last_frame) {
+				if (link != sel.link_last_frame || reset_prop_editor_next_tick) {
 					sel.node_last_frame = -1;
 
 					node_props.clear_all();
@@ -655,6 +676,7 @@ void AnimationGraphEditor::draw_prop_editor()
 
 			ImGui::Text("No node selected\n");
 		}
+		reset_prop_editor_next_tick = false;
 
 	}
 	ImGui::End();
@@ -1151,9 +1173,18 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		for (int j = 0; j < num_inputs; j++) {
 			if (node->inputs[j]) {
 
+				int offset = 0;
+				if (draw_flat_links) {
+					for (int k = 0; k < j; k++) {
+						if (node->inputs[k] == node->inputs[j])
+							offset++;
+					}
+				}
+
+
 				bool pushed_colors = node->push_imnode_link_colors(j);
 	
-				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j), draw_flat_links);
+				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j), draw_flat_links, offset);
 
 				if (pushed_colors) {
 					ImNodes::PopColorStyle();
@@ -1654,6 +1685,11 @@ void AnimationGraphEditor::compile_and_run()
 {
 	bool good_to_run = compile_graph_for_playing();
 	if (good_to_run) {
+
+		for (int i = 0; i < editing_tree->all_nodes.size(); i++) {
+			editing_tree->all_nodes[i]->initialize(ed.editing_tree);
+		}
+
 		out.anim.initialize_animator(out.model, out.set, editing_tree, nullptr, nullptr);
 		playback = graph_playback_state::running;
 	}
@@ -1854,6 +1890,8 @@ struct AutoStruct_asdf {
 		auto& sfac = get_property_serializer_factory();
 
 		sfac.registerClass<SerializeImNodeState>("SerializeImNodeState");
+		sfac.registerClass<SerializeNodeCFGRef>("SerializeNodeCFGRef");
+
 	}
 };
 
@@ -1879,12 +1917,6 @@ void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info,
 	*context = ImNodes::EditorContextCreate();
 	ImNodes::LoadEditorStateFromIniString(*context, inistring.c_str(), inistring.size());
 }
-
-struct AgSerializeContext
-{
-	std::unordered_map<Node_CFG*, int> ptr_to_index;
-	Animation_Tree_CFG* tree = nullptr;
-};
 
 std::string SerializeNodeCFGRef::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)
 {

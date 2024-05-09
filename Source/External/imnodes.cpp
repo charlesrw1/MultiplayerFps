@@ -60,28 +60,35 @@ static void find_overlap_point1d(float a_start, float a_end, float b_start, floa
 }
 
 
-static void closest_ray_between_rects(ImVec2 min1, ImVec2 max1, ImVec2 min2, ImVec2 max2, ImVec2& outpoint1, ImVec2& outpoint2)
+static void closest_ray_between_rects(ImVec2 min1, ImVec2 max1, ImVec2 min2, ImVec2 max2, ImVec2& outpoint1, ImVec2& outpoint2, int offset_lateral)
 {
     find_overlap_point1d(min1.x, max1.x, min2.x, max2.x, outpoint1.x, outpoint2.x);
     find_overlap_point1d(min1.y, max1.y, min2.y, max2.y, outpoint1.y, outpoint2.y);
 
 
     ImVec2 rayvec = outpoint2 - outpoint1;
+     ImVec2 rayvecnormal = rayvec/ sqrt(ImLengthSqr(rayvec));
+        ImVec2 sidevec = ImVec2(rayvecnormal.y, -rayvecnormal.x);
+        float ofs = (7.5f + offset_lateral * 15.f);
     if (ImDot(rayvec,ImVec2(0.1,1)) < 0.0 && ImLengthSqr(rayvec) > 0.0001) {
-        rayvec /= sqrt(ImLengthSqr(rayvec));
-        ImVec2 sidevec = ImVec2(rayvec.y, -rayvec.x);
         // offset ray if it faces downwards so paralell rays are possible
-        outpoint1 += sidevec*10.f;
-        outpoint2 += sidevec*10.f;
+        outpoint1 += sidevec*ofs;
+        outpoint2 += sidevec*ofs;
     }
+    else {
+        outpoint1 += sidevec * ofs;
+        outpoint2 += sidevec * ofs;
+    }
+    outpoint2 -= rayvecnormal * 4.0;
+
 }
 
 
-static void GetClosestPointsOnRectDirectLine(ImRect startrect, ImRect endrect, ImVec2& ray_start, ImVec2& ray_end)
+static void GetClosestPointsOnRectDirectLine(ImRect startrect, ImRect endrect, ImVec2& ray_start, ImVec2& ray_end, int ray_lateral_offset)
 {
     const ImNodesEditorContext& editor = ImNodes::EditorContextGet();
 
-    closest_ray_between_rects(startrect.Min, startrect.Max, endrect.Min, endrect.Max, ray_start, ray_end);
+    closest_ray_between_rects(startrect.Min, startrect.Max, endrect.Min, endrect.Max, ray_start, ray_end, ray_lateral_offset);
 }
 
 
@@ -196,7 +203,7 @@ static ImNodes::CubicBezier GetCubicBezier_Replacement(const ImPinData& start, c
     const ImNodeData& parent_start = editor.Nodes.Pool[start.ParentNodeIdx];
     const ImNodeData& parent_end = editor.Nodes.Pool[end.ParentNodeIdx];
     ImVec2 ray_start, ray_end;
-    closest_ray_between_rects(parent_start.Rect.Min, parent_start.Rect.Max, parent_end.Rect.Min, parent_end.Rect.Max, ray_start, ray_end);
+    closest_ray_between_rects(parent_start.Rect.Min, parent_start.Rect.Max, parent_end.Rect.Min, parent_end.Rect.Max, ray_start, ray_end, link.direct_line_offset);
 
     return GetCubicBezier(ray_start, ray_end, start.Type, GImNodes->Style.LinkLineSegmentsPerLength, false);
 }
@@ -865,7 +872,7 @@ void BoxSelectorUpdateSelection(ImNodesEditorContext& editor, ImRect box_rect)
 
             if (link.use_direct_line) {
 
-                GetClosestPointsOnRectDirectLine(node_start_rect, node_end_rect, start, end);
+                GetClosestPointsOnRectDirectLine(node_start_rect, node_end_rect, start, end, link.direct_line_offset);
 
                 if (RectangleOverlapsLink(box_rect, start, end, pin_start.Type, true)) {
                     editor.SelectedLinkIndices.push_back(link_idx);
@@ -2709,7 +2716,7 @@ void PopAttributeFlag()
     GImNodes->CurrentAttributeFlags = GImNodes->AttributeFlagStack.back();
 }
 
-void Link(const int id, const int start_attr_id, const int end_attr_id, bool use_direct_line)
+void Link(const int id, const int start_attr_id, const int end_attr_id, bool use_direct_line, int direct_line_ofs)
 {
     IM_ASSERT(GImNodes->CurrentScope == ImNodesScope_Editor);
 
@@ -2722,6 +2729,7 @@ void Link(const int id, const int start_attr_id, const int end_attr_id, bool use
     link.ColorStyle.Hovered = GImNodes->Style.Colors[ImNodesCol_LinkHovered];
     link.ColorStyle.Selected = GImNodes->Style.Colors[ImNodesCol_LinkSelected];
     link.use_direct_line = use_direct_line;
+    link.direct_line_offset = direct_line_ofs;
 
     // Check if this link was created by the current link event
     if ((editor.ClickInteraction.Type == ImNodesClickInteractionType_LinkCreation &&

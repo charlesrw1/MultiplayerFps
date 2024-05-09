@@ -128,6 +128,14 @@ inline bool util_compile_default(ControlParamHandle* param, bool param_is_boolfl
 		clear_newly_created(); \
 	}
 
+#define MAKE_STANDARD_ADD_PROPS(type_name) \
+	void add_props(std::vector<PropertyListInstancePair>& props) override { \
+		Base_EdNode::add_props(props); \
+		props.push_back({ type_name::get_props(), this }); \
+	} \
+	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override { \
+		props.push_back({node->get_props(), node } );\
+	} 
 
 class Clip_EdNode : public Base_EdNode
 {
@@ -141,6 +149,7 @@ public:
 		0
 	);
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Clip_EdNode);
 	
 	std::string get_title() const override {
 		if (node->clip_name.empty()) return get_name();
@@ -169,6 +178,7 @@ class Blend_EdNode : public Base_EdNode
 	);
 
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Blend_EdNode);
 
 	void draw_node_topbar() override {
 		util_draw_param_for_topbar(node->param);
@@ -186,6 +196,7 @@ class Blend_int_EdNode : public Base_EdNode
 	EDNODE_HEADER(Blend_int_EdNode);
 	MAKE_STANARD_SERIALIZE(Blend_int_EdNode);
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Blend_int_EdNode);
 
 	Node_CFG* get_graph_node() override { return node; }
 	std::string get_name() const override { return "Blend by int"; }
@@ -240,6 +251,7 @@ class Additive_EdNode : public Base_EdNode
 		2
 	);
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Additive_EdNode);
 
 	std::string get_input_pin_name(int index) const override {
 		if (index == 0) return "Delta";
@@ -268,6 +280,7 @@ class Subtract_EdNode : public Base_EdNode
 	);
 
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Subtract_EdNode);
 
 
 	std::string get_input_pin_name(int index) const override {
@@ -294,6 +307,7 @@ class Mirror_EdNode : public Base_EdNode
 		1
 	);
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Mirror_EdNode);
 
 
 	void draw_node_topbar() override {
@@ -318,6 +332,7 @@ class Sync_EdNode : public Base_EdNode
 		1
 	);
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Sync_EdNode);
 
 	bool compile_my_data() override {
 		return util_compile_default(nullptr, true, 1, this);

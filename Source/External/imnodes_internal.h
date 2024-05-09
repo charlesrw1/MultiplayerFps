@@ -196,7 +196,9 @@ struct ImLinkData
         ImU32 Base, Hovered, Selected;
     } ColorStyle;
 
+    // ADDED FIELDS:
     bool use_direct_line = false;
+    int direct_line_offset = 0;
 
     ImLinkData(const int link_id) : Id(link_id), StartPinIdx(), EndPinIdx(), ColorStyle() {}
 };

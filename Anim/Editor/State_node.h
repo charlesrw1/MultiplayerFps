@@ -1,12 +1,12 @@
 #pragma once
 #include "Base_node.h"
 #include "imnodes.h"
+#include "AnimationGraphEditor.h"
 class Statemachine_EdNode;
 class State_EdNode : public Base_EdNode
 {
 public:
 	~State_EdNode() override {
-		ASSERT(!is_regular_state_node() && sublayer.context);
 		if (sublayer.context)
 			ImNodes::EditorContextFree(sublayer.context);
 	}
@@ -46,7 +46,16 @@ public:
 	void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) override {
 		ASSERT(inputs[slot]);
 		ASSERT(inputs[slot]->is_state_node());
-		((State_EdNode*)inputs[slot])->get_transition_props(this, props);
+		((State_EdNode*)inputs[slot])->get_transition_props(this, props, slot);
+	}
+
+	void add_props(std::vector<PropertyListInstancePair>& props) override {
+		Base_EdNode::add_props(props);
+		props.push_back({ State_EdNode::get_props(), this });
+	}
+
+	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override {
+		props.push_back({State::get_props(), &self_state });
 	}
 
 public:
@@ -54,20 +63,33 @@ public:
 	bool is_regular_state_node() const { return !is_start_node() && !is_alias_node(); }
 
 	bool compile_data_for_statemachine();
-	void remove_output_to(State_EdNode* node);
-	void get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props);
+	void get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props, int slot);
 	
 	virtual bool is_alias_node() const { return false; }
 	virtual bool is_start_node() const { return false; }
 
-	void on_output_create(State_EdNode* other) {
-		output.push_back({ other });
+	void reassign_output_slot(State_EdNode* node, int prev, int next) {
+		// Warning: N^2 
+		for (int i = 0; i < output.size(); i++) {
+			if (output[i].output_to == node && output[i].output_to_index == prev) {
+				output[i].output_to_index = next;
+				return;
+			}
+		}
+		ASSERT(!"missing node");
+	}
+	void remove_output_to(State_EdNode* node, int slot);
+	void on_output_create(State_EdNode* other, int index) {
+		output.push_back({ other, index });
+		// output vector might become invalidated
+		ed.signal_nessecary_prop_ed_reset();
 	}
 
-	State_Transition* get_state_transition_to(State_EdNode* to) {
+	State_Transition* get_state_transition_to(State_EdNode* to, int index) {
 		for (int i = 0; i < output.size(); i++) 
-			if (output[i].output_to == to)
+			if (output[i].output_to == to && output[i].output_to_index == index)
 				return &output[i].st;
+		ASSERT(!"no transition");
 		return nullptr;
 	}
 
@@ -82,6 +104,7 @@ public:
 
 	struct output_transition_info {
 		State_EdNode* output_to = nullptr;
+		int output_to_index = 0;
 		State_Transition st;
 	};
 
@@ -111,6 +134,8 @@ public:
 		// skip State_EdNode
 		props.push_back({ StateAlias_EdNode::get_props(), this });
 	}
+	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override {
+	}
 
 	// Inherited from State_EdNode
 	bool is_alias_node() const override { return true; }
@@ -134,6 +159,8 @@ public:
 		Base_EdNode::add_props(props);
 		// skip State_EdNode
 		props.push_back({ StateStart_EdNode::get_props(), this });
+	}
+	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override {
 	}
 
 	// Inherited from State_EdNode

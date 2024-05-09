@@ -29,6 +29,7 @@ class Blendspace2d_EdNode : public Base_EdNode
 		1
 	);
 	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Blendspace2d_EdNode);
 
 	bool compile_my_data()
 	{

@@ -33,11 +33,8 @@ const Color32 MISC_COLOR = { 13, 82, 44 };
 
 extern ImVec4 scriptparamtype_to_color(control_param_type type);
 
-#define EDNODE_HEADER(type_name)  virtual const TypeInfo& get_typeinfo() const override; \
-	void add_props(std::vector<PropertyListInstancePair>& props) override { \
-Base_EdNode::add_props(props); \
-props.push_back({ type_name::get_props(), this }); \
-}
+#define EDNODE_HEADER(type_name)  virtual const TypeInfo& get_typeinfo() const override; 
+
 
 class AnimationGraphEditor;
 class Base_EdNode
@@ -77,9 +74,16 @@ public:
 	virtual bool has_pin_colors() const { return false; }
 	virtual ImVec4 get_pin_colors() const { return ImVec4(1, 1, 1, 1); }
 	virtual Node_CFG* get_graph_node() { return nullptr; }
+	
+	// this call adds only elements native to the EdNode object
 	virtual void add_props(std::vector<PropertyListInstancePair>& props) {
 		props.push_back({ get_props(), this });
 	}
+	// this call adds elements that are being edited like Node_CFG, State
+	virtual void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) {
+	}
+
+
 	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) {}
 	virtual bool dont_call_compile() const { return false; }
 	virtual bool traverse_and_find_errors();

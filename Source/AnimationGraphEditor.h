@@ -542,6 +542,10 @@ public:
 	void handle_imnode_creations(bool* open_popup_menu_from_drop);
 	void draw_graph_layer(uint32_t layer);
 
+	void signal_nessecary_prop_ed_reset() {
+		reset_prop_editor_next_tick = true;
+	}
+
 	bool is_modifier_pressed = false;
 	bool is_focused = false;
 
@@ -551,15 +555,29 @@ public:
 	bool open_prop_editor = true;
 	bool open_open_popup = false;
 	bool open_save_popup = false;
-
-
 	bool statemachine_passthrough = false;
+
+	bool reset_prop_editor_next_tick = false;
 
 	struct selection_state
 	{
 		uint32_t node_last_frame = -1;
 		uint32_t link_last_frame = -1;
 	}sel;
+
+
+	static PropertyInfoList* get_props() {
+		START_PROPS(AnimationGraphEditor)
+			REG_INT(current_id, PROP_SERIALIZE, ""),
+			REG_INT(current_layer, PROP_SERIALIZE, ""),
+			REG_STRUCT_CUSTOM_TYPE(default_editor, PROP_SERIALIZE, "SerializeImNodeState"),
+			// settings
+			REG_BOOL(open_graph, PROP_SERIALIZE, ""),
+			REG_BOOL(open_control_params, PROP_SERIALIZE, ""),
+			REG_BOOL(open_prop_editor, PROP_SERIALIZE, ""),
+			REG_BOOL(statemachine_passthrough, PROP_SERIALIZE, ""),
+		END_PROPS(AnimationGraphEditor)
+	}
 
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root

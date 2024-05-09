@@ -1,0 +1,19 @@
+ runtime
+{
+params [
+]
+nodes [
+]
+}
+ editor
+{
+nodes [
+{
+type "Root_EdNode"
+ id 
+ 0
+ graph_layer 
+ 0
+}
+]
+}

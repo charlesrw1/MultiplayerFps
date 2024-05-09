@@ -299,10 +299,10 @@ void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedV
 		if (!(flags & PROP_SERIALIZE))
 			continue;
 		
-		out.write_value(string_format("%s ", prop.name));
+		out.write_key(string_format("%s ", prop.name));
 		std::string value_str = write_field_type(prop.type, ptr, prop, out, userptr);
 		if (!value_str.empty())
-			out.write_value(value_str.c_str());
+			out.write_value_quoted(value_str.c_str());
 	}
 }
 bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr);
@@ -427,6 +427,9 @@ struct FindInst
 FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePair>& proplists)
 {
 	for (auto& prop : proplists) {
+		if (!prop.list)
+			continue;
+
 		auto val = prop.list->find(name);
 		if (val)
 			return { val,prop.instance };
