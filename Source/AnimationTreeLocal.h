@@ -11,62 +11,17 @@
 #include "EnumDefReflection.h"
 #include "ReflectionProp.h"
 
-#include "ScriptVars.h"
+#include "ControlParams.h"
+#include "TypeInfo.h"
+
+#include "Factory.h"
 
 #include <cassert>
-
-// to add new node:
-// add enum value and edit autoenumdef
-// make class with overloaded functions ( incl. get_props() which can be null )
-//		use macros as shown below, set RT_TYPE to set the runtime struct
-// add in impl macro at top of animationtreelocal.cpp to define some metadata like number of allowed inputs
-
-// Modify AutoEnumDef when changing enum!
-extern AutoEnumDef animnode_type_def;
-enum class animnode_type
-{
-	source,
-	statemachine,
-
-	mask,
-
-	blend,
-	blend_by_int,
-	blend2d,
-	blend1d,
-	add,
-	subtract,
-	aimoffset,
-
-	mirror,
-	play_speed,
-	rootmotion_speed,
-	sync,
-
-	state,
-
-	// used in editor
-	root,
-	start_statemachine,
-
-	COUNT
-};
 
 
 class Node_CFG;
 class Animation_Tree_CFG;
-typedef Node_CFG* (*create_func)(Animation_Tree_CFG* tree);
 
-struct animnode_name_type
-{
-	create_func create = nullptr;
-	int allowed_inputs = 0; /* -1 means it can be dynamic, ie set to 0 */
-	Color32 editor_color = { 0,0,0,0xff };
-	const char* editor_name = "Unnamed";
-	const char* editor_tooltip = "No tooltip";
-};
-
-extern animnode_name_type& get_animnode_typedef(animnode_type type);
 
 struct Rt_Vars_Base
 {
@@ -139,7 +94,7 @@ struct GetPose_Ctx
 
 struct Node_CFG
 {
-	virtual void init_memory_offsets(Animation_Tree_CFG* cfg, int inputs_to_alloc) = 0;
+	virtual void initialize(Animation_Tree_CFG* cfg) = 0;
 
 	bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 		set_active(ctx, get_rt<Rt_Vars_Base>(ctx));
@@ -153,10 +108,8 @@ struct Node_CFG
 	virtual bool is_clip_node() const { return false; }
 
 	// serialization helpers, optional
-	virtual void write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {}
-	virtual void read_from_dict(Animation_Tree_CFG* tree, DictParser& in) {}
 	virtual PropertyInfoList* get_props() = 0;
-	virtual animnode_type get_type() = 0;
+	virtual const TypeInfo& get_typeinfo() const = 0;
 
 	void set_active(NodeRt_Ctx& ctx, Rt_Vars_Base* base) const {
 		base->last_update_tick = ctx.tick;
@@ -171,47 +124,39 @@ struct Node_CFG
 	}
 
 	InlineVec<Node_CFG*, 2> input;
-	ControlParamHandle param;	// all nodes have a default parameter for convenience
 protected:
 	template<typename T>
 	T* construct_this(NodeRt_Ctx& ctx) const {
 		return ctx.tree->construct_rt<T>(rt_offset);
 	}
 
-	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size, int init_input_count) {
+	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size) {
 		rt_offset = cfg->data_used;
 		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
 		cfg->data_used += rt_size;
-
-		input.resize(init_input_count, nullptr);
 	}
 
 private:
 	uint32_t rt_offset = 0;
 };
 
-#define DECLARE_ANIMNODE_CREATOR(TYPE_NAME, ENUM_TYPE) \
-static Node_CFG* create(Animation_Tree_CFG* cfg) { \
-TYPE_NAME* clip = (TYPE_NAME*)cfg->arena.alloc_bottom(sizeof(TYPE_NAME)); \
-clip = new(clip)TYPE_NAME(); \
-return clip; \
-}  \
-static const animnode_type CONST_TYPE_ENUM = ENUM_TYPE; \
-virtual PropertyInfoList* get_props() override;  \
-virtual animnode_type get_type() override { return ENUM_TYPE; } 
-
-#define DEFAULT_CTOR(TYPE_NAME) \
-virtual void init_memory_offsets(Animation_Tree_CFG* tree, int init_count) override { \
-	init_memory_internal(tree, sizeof(RT_TYPE),init_count); \
+#define DECLARE_NODE_CFG(TYPE_NAME) \
+virtual PropertyInfoList* get_props() override; \
+virtual const TypeInfo& get_typeinfo() const override; \
+virtual void initialize(Animation_Tree_CFG* tree) override { \
+	init_memory_internal(tree, sizeof(RT_TYPE)); \
 } \
 TYPE_NAME() {}
+
+#define DECLARE_NO_DEFAULT(TYPE_NAME) \
+virtual PropertyInfoList* get_props() override; \
+virtual const TypeInfo& get_typeinfo() const override; 
 
 // playback speed *= param / (speed of clip's root motion)
 struct Scale_By_Rootmotion_CFG : public Node_CFG
 {
 	using RT_TYPE = Rt_Vars_Base;
-	DECLARE_ANIMNODE_CREATOR(Scale_By_Rootmotion_CFG, animnode_type::rootmotion_speed);
-	DEFAULT_CTOR(Scale_By_Rootmotion_CFG)
+	DECLARE_NODE_CFG(Scale_By_Rootmotion_CFG);
 	
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
 	{
@@ -222,6 +167,8 @@ struct Scale_By_Rootmotion_CFG : public Node_CFG
 
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 	}
+
+	ControlParamHandle param;
 };
 
 struct Sync_Node_RT : Rt_Vars_Base
@@ -232,8 +179,7 @@ struct Sync_Node_RT : Rt_Vars_Base
 struct Sync_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Sync_Node_RT;
-	DECLARE_ANIMNODE_CREATOR(Sync_Node_CFG, animnode_type::sync)
-	DEFAULT_CTOR(Sync_Node_CFG)
+	DECLARE_NODE_CFG(Sync_Node_CFG);
 
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		construct_this<Sync_Node_RT>(ctx);
@@ -259,6 +205,7 @@ struct Sync_Node_CFG : public Node_CFG
 		rt->normalized_frame = 0.0;
 	}
 
+	ControlParamHandle param;
 };
 
 struct Clip_Node_RT : Rt_Vars_Base
@@ -284,8 +231,7 @@ struct Clip_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Clip_Node_RT;
 
-	DECLARE_ANIMNODE_CREATOR(Clip_Node_CFG, animnode_type::source)
-	DEFAULT_CTOR(Clip_Node_CFG)
+	DECLARE_NODE_CFG(Clip_Node_CFG);
 
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
@@ -353,8 +299,7 @@ struct Clip_Node_CFG : public Node_CFG
 struct Subtract_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Rt_Vars_Base;
-	DECLARE_ANIMNODE_CREATOR(Subtract_Node_CFG, animnode_type::subtract)
-	DEFAULT_CTOR(Subtract_Node_CFG)
+	DECLARE_NODE_CFG(Subtract_Node_CFG);
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
@@ -371,8 +316,7 @@ struct Subtract_Node_CFG : public Node_CFG
 struct Add_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Rt_Vars_Base;
-	DECLARE_ANIMNODE_CREATOR(Add_Node_CFG,animnode_type::add)
-	DEFAULT_CTOR(Add_Node_CFG)
+	DECLARE_NODE_CFG(Add_Node_CFG);
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 	virtual void reset(NodeRt_Ctx& ctx) const override {
@@ -384,6 +328,7 @@ struct Add_Node_CFG : public Node_CFG
 		DIFF,
 		BASE
 	};
+	ControlParamHandle param;
 };
 
 struct Blend_Node_RT : Rt_Vars_Base
@@ -396,11 +341,10 @@ struct Blend_Node_RT : Rt_Vars_Base
 struct Blend_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Blend_Node_RT;
-	DECLARE_ANIMNODE_CREATOR(Blend_Node_CFG, animnode_type::blend)
+	DECLARE_NO_DEFAULT(Blend_Node_CFG);
 
-	virtual void init_memory_offsets(Animation_Tree_CFG* tree, int init_count) override {
-		init_memory_internal(tree, sizeof(RT_TYPE), init_count); 
-
+	virtual void initialize(Animation_Tree_CFG* tree) override {
+		init_memory_internal(tree, sizeof(RT_TYPE)); 
 		if (param.is_valid()) {
 			parameter_type = (tree->params->get_type(param) == control_param_type::float_t) ? 0 : 1;
 		}
@@ -433,6 +377,7 @@ struct Blend_Node_CFG : public Node_CFG
 
 	}
 
+	ControlParamHandle param;
 	float damp_factor = 0.1;
 	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
 	// below are computed on init
@@ -452,8 +397,7 @@ class Blend_Int_Node_CFG : public Node_CFG
 public:
 	using RT_TYPE = Blend_Int_Node_RT;
 
-	DECLARE_ANIMNODE_CREATOR(Blend_Int_Node_CFG, animnode_type::blend_by_int)
-	DEFAULT_CTOR(Blend_Int_Node_CFG)
+	DECLARE_NODE_CFG(Blend_Int_Node_CFG);
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
@@ -489,7 +433,7 @@ public:
 
 	float damp_factor = 0.1;
 	bool store_value_on_reset = false;
-
+	ControlParamHandle param;
 	bool uses_jump_table = false;	// for enums
 	InlineVec<unsigned char, 10> jump_table;
 };
@@ -504,8 +448,7 @@ struct Mirror_Node_RT : Rt_Vars_Base
 struct Mirror_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Mirror_Node_RT;
-	DECLARE_ANIMNODE_CREATOR(Mirror_Node_CFG, animnode_type::mirror)
-	DEFAULT_CTOR(Mirror_Node_CFG)
+	DECLARE_NODE_CFG(Mirror_Node_CFG);
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
@@ -521,7 +464,7 @@ struct Mirror_Node_CFG : public Node_CFG
 	}
 
 	float damp_time = 0.1;
-
+	ControlParamHandle param;
 	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
 	// below are computed on init
 	uint8_t parameter_type = 1;// 0 = float, 1 = bool
@@ -569,8 +512,7 @@ struct Statemachine_Node_RT : Rt_Vars_Base
 struct Statemachine_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Statemachine_Node_RT;
-	DECLARE_ANIMNODE_CREATOR(Statemachine_Node_CFG, animnode_type::statemachine)
-	DEFAULT_CTOR(Statemachine_Node_CFG)
+	DECLARE_NODE_CFG(Statemachine_Node_CFG);
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
@@ -586,9 +528,6 @@ struct Statemachine_Node_CFG : public Node_CFG
 	{
 		construct_this<Statemachine_Node_RT>(ctx);
 	}
-
-	virtual void write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) override;
-	virtual void read_from_dict(Animation_Tree_CFG* tree, DictParser& in) override;
 
 	const State* get_state(handle<State> handle) const {
 		if (handle.id == -1) return nullptr;
@@ -611,8 +550,7 @@ struct BlendSpace2d_RT : Rt_Vars_Base
 struct BlendSpace2d_CFG : public Node_CFG
 {
 	using RT_TYPE = BlendSpace2d_RT;
-	DECLARE_ANIMNODE_CREATOR(BlendSpace2d_CFG, animnode_type::blend2d)
-	DEFAULT_CTOR(BlendSpace2d_CFG)
+	DECLARE_NODE_CFG(BlendSpace2d_CFG);
 
 	ControlParamHandle xparam;
 	ControlParamHandle yparam;
@@ -649,8 +587,7 @@ class BlendSpace1d_CFG : public Node_CFG
 {
 public:
 	using RT_TYPE = BlendSpace1d_RT;
-	DECLARE_ANIMNODE_CREATOR(BlendSpace1d_CFG, animnode_type::blend1d)
-	DEFAULT_CTOR(BlendSpace1d_CFG)
+	DECLARE_NODE_CFG(BlendSpace1d_CFG);
 
 	InlineVec<float, 3> blend1d_verts;
 	bool is_additive_blend_space = false;
@@ -663,4 +600,7 @@ public:
 	virtual void construct(NodeRt_Ctx& ctx) const override {
 		construct_this<RT_TYPE>(ctx);
 	}
+	ControlParamHandle param;
 };
+
+extern Factory<std::string, Node_CFG>& get_runtime_node_factory();

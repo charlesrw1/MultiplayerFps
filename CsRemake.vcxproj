@@ -19,6 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Anim\Editor\Root_node.cpp" />
+    <ClCompile Include="Anim\Editor\Statemachine_node.cpp" />
+    <ClCompile Include="Anim\Editor\State_node.cpp" />
     <ClCompile Include="BVHBuild.cpp" />
     <ClCompile Include="Source\Animation.cpp" />
     <ClCompile Include="Source\AnimationGraphEditor.cpp" />
@@ -27,6 +30,7 @@
     <ClCompile Include="Source\Animation_Man.cpp" />
     <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
+    <ClCompile Include="Source\EdNode.cpp" />
     <ClCompile Include="Source\EnumDefReflection.cpp" />
     <ClCompile Include="Source\External\imnodes.cpp" />
     <ClCompile Include="Source\External\ImSequencer.cpp" />
@@ -73,6 +77,12 @@
     <ClCompile Include="Source\Volumetricfog.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Anim\Editor\Blendspace_nodes.h" />
+    <ClInclude Include="Anim\Editor\Basic_nodes.h" />
+    <ClInclude Include="Anim\Editor\Root_node.h" />
+    <ClInclude Include="Anim\Editor\Statemachine_node.h" />
+    <ClInclude Include="Anim\Editor\State_node.h" />
+    <ClInclude Include="Source\AddClassToFactory.h" />
     <ClInclude Include="Source\Animation.h" />
     <ClInclude Include="Source\AnimationGraphEditor.h" />
     <ClInclude Include="Source\AnimationGraphEditorPublic.h" />
@@ -103,8 +113,10 @@
     <ClInclude Include="Source\External\imnodes_internal.h" />
     <ClInclude Include="Source\External\ImSequencer.h" />
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
+    <ClInclude Include="Source\Factory.h" />
     <ClInclude Include="Source\FreeList.h" />
     <ClInclude Include="Source\Game_Engine.h" />
+    <ClInclude Include="Source\Base_node.h" />
     <ClInclude Include="Source\IGraphDriver.h" />
     <ClInclude Include="Source\Handle.h" />
     <ClInclude Include="Source\InlineVec.h" />
@@ -127,10 +139,12 @@
     <ClInclude Include="Source\Renderer_Types.h" />
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\ScriptValue.h" />
-    <ClInclude Include="Source\ScriptVars.h" />
+    <ClInclude Include="Source\ControlParams.h" />
     <ClInclude Include="Source\StdVectorReflection.h" />
     <ClInclude Include="Source\StringName.h" />
     <ClInclude Include="Source\StringUtil.h" />
+    <ClInclude Include="Source\TypedVoidPtr.h" />
+    <ClInclude Include="Source\TypeInfo.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\Bytepacker.h" />
     <ClInclude Include="Source\Connection.h" />
@@ -148,6 +162,7 @@
     <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon.h" />
     <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_interfaces.h" />
     <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_version.h" />
+    <ClInclude Include="WriteObject.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

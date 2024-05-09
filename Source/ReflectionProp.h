@@ -2,6 +2,8 @@
 #include <cstdint>
 #include "EnumDefReflection.h"
 #include "StringUtil.h"
+#include "Factory.h"
+#include "TypedVoidPtr.h"
 
 // If you modify this, change the autoenumdef!!
 extern AutoEnumDef core_type_id_def;
@@ -59,14 +61,14 @@ struct PropertyInfo {
 	IListCallback* list_ptr = nullptr;
 	const char* custom_type_str = "";
 
-	uint8_t* get_ptr(void* inst) {
+	uint8_t* get_ptr(void* inst) const {
 		return (uint8_t*)inst + offset;
 	}
 	
-	float get_float(void* ptr);
+	float get_float(void* ptr) const;
 	void set_float(void* ptr, float f);
 
-	int get_int(void* ptr);
+	int get_int(void* ptr) const;
 	void set_int(void* ptr, int i);
 
 	bool can_edit() const {
@@ -106,9 +108,17 @@ struct PropertyInfoList
 class DictWriter;
 class DictParser;
 
+struct PropertyListInstancePair
+{
+	PropertyInfoList* list = nullptr;
+	void* instance = nullptr;
+};
+
 struct Prop_Flag_Overrides;
-void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, Prop_Flag_Overrides* overrides = nullptr);
-bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token);
+void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr);
+std::pair<StringView, bool> read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, TypedVoidPtr userptr);
+std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, TypedVoidPtr userptr);
+
 
 class IListCallback
 {
@@ -123,8 +133,13 @@ public:
 	virtual void swap_elements(void* inst, int item0, int item1) = 0;
 };
 
-struct PropertyListInstancePair
+
+
+class IPropertySerializer
 {
-	PropertyInfoList* list = nullptr;
-	void* instance = nullptr;
+public:
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) = 0;
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) = 0;
 };
+
+extern Factory<std::string, IPropertySerializer>& get_property_serializer_factory();

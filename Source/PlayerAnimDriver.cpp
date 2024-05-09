@@ -1,7 +1,7 @@
 #include "PlayerAnimDriver.h"
 #include "Entity.h"
 #include "Game_Engine.h" // Debug::
-#include "ScriptVars.h"
+#include "ControlParams.h"
 
 void CharacterGraphDriver::on_init() {
 	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->params.get();

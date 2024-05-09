@@ -190,8 +190,8 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t fla
 	return prop;
 }
 
-void write_list(PropertyInfo* prop, void* ptr, DictWriter& out);
-std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, DictWriter& out) {
+void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, TypedVoidPtr userptr);
+std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, DictWriter& out, TypedVoidPtr userptr) {
 	std::string value_str;
 
 	switch (prop.type)
@@ -222,14 +222,30 @@ std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, D
 
 	case core_type_id::List: {
 
-		write_list(&prop, prop.get_ptr(ptr), out);
+		write_list(&prop, prop.get_ptr(ptr), out, userptr);
+
+	}break;
+
+	case core_type_id::Struct: {
+
+		auto& fac = get_property_serializer_factory();
+		auto serializer = fac.createObject(prop.custom_type_str);
+		if (serializer) {
+			auto str = serializer->serialize(out, prop, ptr, userptr);
+			delete serializer;	// fixme: inplace new/free instead?
+			return str;
+		}
+		else {
+			printf("!!!!!! NO SERIALIZER FOR STRUCT %s !!!!!!!!", prop.custom_type_str);
+			return "";
+		}
 
 	}break;
 	}
 	return value_str;
 }
 
-void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out)
+void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr userptr)
 {
 	out.write_list_start();
 
@@ -248,7 +264,7 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out)
 
 			uint8_t* member_dat = list_ptr->get_index(ptr, i);
 
-			buf += write_field_type(prop.type, member_dat, prop, out);
+			buf += write_field_type(prop.type, member_dat, prop, out, userptr);
 			buf += ' ';
 			out.write_value(buf.c_str());
 			buf.clear();
@@ -262,46 +278,35 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out)
 
 			uint8_t* member_dat = list_ptr->get_index(ptr, i);
 
-			write_properties(*list_ptr->props_in_list, list_ptr->get_index(ptr, i), out);
+			out.write_item_start();
+			write_properties(*list_ptr->props_in_list, list_ptr->get_index(ptr, i), out, userptr);
+			out.write_item_end();
 		}
 		out.write_list_end();
 	}
 }
 
 
-void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, Prop_Flag_Overrides* overrides)
+void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr)
 {
-	out.write_item_start();
 	for (int i = 0; i < list.count; i++)
 	{
 		auto& prop = list.list[i];
 
 		uint32_t flags = prop.flags;
-		if (overrides) {
-			auto find = overrides->map.find(prop.name);
-			if (find != overrides->map.end())
-				flags = find->second;
-		}
+		
 
 		if (!(flags & PROP_SERIALIZE))
 			continue;
-
-		out.write_item_start();
-		{
-			out.write_key_value("name", prop.name);
-			out.write_key_value("type", Enum::get_enum_name(core_type_id_def.id, (int)prop.type));
-			out.write_value("value ");
-			std::string value_str = write_field_type(prop.type, ptr, prop, out);
-			if (!value_str.empty())
-				out.write_value(value_str.c_str());
-		}
-
-		out.write_item_end();
+		
+		out.write_value(string_format("%s ", prop.name));
+		std::string value_str = write_field_type(prop.type, ptr, prop, out, userptr);
+		if (!value_str.empty())
+			out.write_value(value_str.c_str());
 	}
-	out.write_item_end();
 }
-bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok);
-bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok)
+bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr);
+bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
 {
 	if (!in.check_list_start(tok))
 		return false;
@@ -317,7 +322,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 
 			listcallback->resize(listptr, count + 1);
 
-			if (!read_propety_field(prop, listcallback->get_index(listptr, count), in, tok))
+			if (!read_propety_field(prop, listcallback->get_index(listptr, count), in, tok, userptr))
 				return false;
 
 			count++;
@@ -332,7 +337,10 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 
 			listcallback->resize(listptr, count + 1);
 
-			if (!read_properties(*listcallback->props_in_list, listcallback->get_index(listptr, count), in, tok))
+			in.read_string(tok);
+
+
+			if (!read_properties(*listcallback->props_in_list, listcallback->get_index(listptr, count), in, tok, userptr).second)
 				return false;
 
 			count++;
@@ -342,7 +350,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 	}
 	return true;
 }
-bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok)
+bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
 {
 
 	switch (prop->type)
@@ -383,7 +391,23 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	}break;
 
 	case core_type_id::List:
-		return read_list_field(prop, prop->get_ptr(ptr), in, tok);
+		return read_list_field(prop, prop->get_ptr(ptr), in, tok, userptr);
+
+	case core_type_id::Struct: {
+
+		auto& fac = get_property_serializer_factory();
+		auto serializer = fac.createObject(prop->custom_type_str);
+		if (serializer) {
+			serializer->unserialize(in, *prop, ptr, tok, userptr);
+			delete serializer;	// fixme: inplace new/free instead?
+			return true;
+		}
+		else {
+			printf("!!!!!! NO SERIALIZER FOR STRUCT %s !!!!!!!!", prop->custom_type_str);
+			return "";
+		}
+
+	}break;
 
 	default:
 		ASSERT(0);
@@ -394,28 +418,43 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 }
 
 
-bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView tok)
+struct FindInst
 {
+	PropertyInfo* prop = nullptr;
+	void* instptr = nullptr;
+};
 
+FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePair>& proplists)
+{
+	for (auto& prop : proplists) {
+		auto val = prop.list->find(name);
+		if (val)
+			return { val,prop.instance };
+	}
+	return { nullptr,nullptr };
+}
+
+std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, TypedVoidPtr userptr)
+{
 	// expect { (start field list)
 	if (!in.check_item_start(tok))
-		return false;
+		return { tok, false };
 
 	in.read_string(tok);
 	while (!in.is_eof() && !in.check_item_end(tok))	// exit out if } (end field list)
 	{
 		// expect { (start property field)
 		if (!in.check_item_start(tok))
-			return false;
+			return { tok, false };
 
 		in.read_string(tok);
 		if (!tok.cmp("name"))
-			return false;
+			return { tok, false };
 		in.read_string(tok);
 		auto name = tok.to_stack_string();
-		auto prop = list.find(name.c_str());
+		auto find = find_in_proplists(name.c_str(), proplists);
 
-		if (!prop) {
+		if (!find.prop) {
 			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
 
 			// skip property field
@@ -425,24 +464,31 @@ bool read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringVi
 			in.read_string(tok);
 			continue;
 		}
-		
-		in.read_string(tok);
-		if (!tok.cmp("value"))
-			return false;
 
 		in.read_string(tok);
-		if (!read_propety_field(prop, ptr, in, tok))
-			return false;
+		if (!tok.cmp("value"))
+			return { tok, false };
+
+		in.read_string(tok);
+		if (!read_propety_field(find.prop, find.instptr, in, tok, userptr))
+			return { tok, false };
 
 
 		in.read_string(tok);
 		if (!in.check_item_end(tok))
-			return false;
+			return { tok, false };
 
 		in.read_string(tok);
 	}
 
-	return true;
+	return { tok, true };
+}
+
+std::pair<StringView, bool> read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
+{
+	std::vector<PropertyListInstancePair> props(1);
+	props[0] = { &list,ptr };
+	return read_multi_properties(props, in, tok, userptr);
 }
 
 PropertyInfo* PropertyInfoList::find(const char* name) const
@@ -491,4 +537,10 @@ PropertyInfoList* get_list_value<float>() {
 	};
 	static PropertyInfoList list = { info,1,"_float" };
 	return &list;
+}
+
+Factory<std::string, IPropertySerializer>& get_property_serializer_factory()
+{
+	static Factory<std::string, IPropertySerializer> inst;
+	return inst;
 }

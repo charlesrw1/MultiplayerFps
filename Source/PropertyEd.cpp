@@ -206,45 +206,14 @@ void IntegerEditor::internal_update()
 	prop->set_int(instance, val);
 }
 
-IArrayHeaderFactory* IArrayHeaderFactory::first = nullptr;
 
-IArrayHeaderFactory::IArrayHeaderFactory()
-{
-	next = first;
-	first = this;
-}
+static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
 
-IArrayHeader* IArrayHeaderFactory::create(PropertyInfo* prop, void* instance)
-{
-	IArrayHeaderFactory* factory = first;
-	while (factory) {
-
-		IArrayHeader* out = factory->try_create(prop, instance);
-		if (out)
-			return out;
-		factory = factory->next;
-	}
-	return nullptr;
-}
-
-
-IPropertyEditorFactory* IPropertyEditorFactory::first = nullptr;
-
-IPropertyEditorFactory::IPropertyEditorFactory()
-{
-	next = first;
-	first = this;
-}
-
-IPropertyEditor* IPropertyEditorFactory::create(PropertyInfo* prop, void* instance)
-{
-	IPropertyEditorFactory* factory = first;
-	while (factory) {
-		
-		IPropertyEditor* out = factory->try_create(prop, instance);
-		if (out)
-			return out;
-		factory = factory->next;
+	IPropertyEditor* out = nullptr;
+	out = get_property_editor_factory().createObject(prop->custom_type_str);
+	if (out) {
+		out->post_construct_for_custom_type(instance, prop);
+		return out;
 	}
 
 	switch (prop->type)
@@ -268,7 +237,6 @@ IPropertyEditor* IPropertyEditorFactory::create(PropertyInfo* prop, void* instan
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;
 	}
-
 
 }
 
@@ -349,10 +317,23 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
+Factory<std::string, IPropertyEditor>& get_property_editor_factory()
+{
+	static Factory<std::string, IPropertyEditor> inst;
+	return inst;
+}
+
+Factory<std::string, IArrayHeader>& get_array_header_factory()
+{
+	static Factory<std::string, IArrayHeader> inst;
+	return inst;
+}
+
 ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
-	header = std::unique_ptr<IArrayHeader>( IArrayHeaderFactory::create(prop, instance) );
-
+	header = std::unique_ptr<IArrayHeader>(get_array_header_factory().createObject(prop->custom_type_str));
+	if(header)
+		header->post_construct(instance, prop);
 
 	rebuild_child_rows();
 }
@@ -364,8 +345,7 @@ int ArrayRow::get_size()
 
 PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
-
-	prop_editor = std::unique_ptr<IPropertyEditor>(IPropertyEditorFactory::create(prop, instance));
+	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(prop,instance));
 }
 
 void ArrayRow::hook_update_pre_tree_node()

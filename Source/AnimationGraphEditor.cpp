@@ -10,6 +10,10 @@
 #include "DictWriter.h"
 #include <fstream>
 
+#include "../Anim/Editor/State_node.h"
+#include "../Anim/Editor/Statemachine_node.h"
+
+
 #include "MyImguiLib.h"
 
 std::string remove_whitespace(const char* str)
@@ -282,6 +286,10 @@ void AnimationGraphEditor::close()
 	editing_tree->arena.shutdown();
 	delete editing_tree;
 	editing_tree = nullptr;
+
+	for (auto& obj : template_creation_nodes)
+		delete obj;
+	template_creation_nodes.resize(0);
 }
 
 
@@ -433,20 +441,22 @@ void TabState::imgui_draw() {
 	if (ImNodes::IsLinkHovered(&link)) {
 
 
-		uint32_t node_id = IAgEditorNode::get_nodeid_from_link_id(link);
-		uint32_t slot = IAgEditorNode::get_slot_from_id(link);
-		IAgEditorNode* node_s = ed.find_node_from_id(node_id);
+		uint32_t node_id = Base_EdNode::get_nodeid_from_link_id(link);
+		uint32_t slot = Base_EdNode::get_slot_from_id(link);
+		Base_EdNode* node_s = ed.find_node_from_id(node_id);
 		if (node_s->is_state_node()) {
 
-			AgEditor_StateNode* state = (AgEditor_StateNode*)node_s;
-			if (state->inputs[slot].other_node) {
-				ImGui::BeginTooltip();
-				ASSERT(state->inputs[slot].other_node->is_state_node());
-				auto other_node = (AgEditor_StateNode*)state->inputs[slot].other_node;
-				// should always be true
-				auto other_name = !other_node->name_is_default() ? other_node->title : other_node->get_default_name();
+			auto state = dynamic_cast<State_EdNode*>(node_s);
+			ASSERT(state);
 
-				auto my_name = !state->name_is_default() ? state->title : state->get_default_name();
+			if (state->inputs[slot]) {
+				ImGui::BeginTooltip();
+				ASSERT(state->inputs[slot]->is_state_node());
+				auto other_node = dynamic_cast<State_EdNode*>(state->inputs[slot]);
+				ASSERT(other_node);
+				// should always be true
+				auto other_name = other_node->get_title();
+				auto my_name = state->get_title();
 
 				ImGui::Text("%s ->\n%s", other_name.c_str(), my_name.c_str());
 				ImGui::Separator();
@@ -486,35 +496,15 @@ void AnimationGraphEditor::save_document()
 #include "ReflectionRegisterDefines.h"
 #include "StdVectorReflection.h"
 
-struct EditorNodeSerializeData
+#include "StdVectorReflection.h"
+#include "../WriteObject.h"
+
+struct getter_ednode
 {
-	std::string name;
-	uint32_t id;
-	uint32_t graphlayer;
-
-	// graph nodes or state node depended
-	bool is_state_node;
-	int handle;
-
-	// statemachine + state
-	uint32_t sublayer_id;
-	std::string sublayer;
-
-	static PropertyInfoList* get_props() {
-		START_PROPS(EditorNodeSerializeData)
-			REG_INT(id,PROP_SERIALIZE,""),
-			REG_STDSTRING(name, PROP_SERIALIZE),
-			REG_INT(graphlayer, PROP_SERIALIZE,""),
-
-			REG_BOOL(is_state_node, PROP_SERIALIZE,""),
-			REG_INT(handle, PROP_SERIALIZE, ""),
-
-			REG_INT(sublayer_id, 0, ""),
-			REG_STDSTRING(sublayer, 0, ""),
-		END_PROPS(EditorNodeSerializeData)
+	static void get(std::vector<PropertyListInstancePair>& props, Base_EdNode* node) {
+		node->add_props(props);
 	}
 };
-#include "StdVectorReflection.h"
 
 void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 {
@@ -528,36 +518,8 @@ void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 	out.write_item_start();
 	out.write_key_list_start("nodes");
 	for (int i = 0; i < nodes.size(); i++) {
-
-		IAgEditorNode* node = nodes[i];
-
-		Prop_Flag_Overrides overrides;
-		EditorNodeSerializeData out_dat;
-		out_dat.name = node->get_title();
-		out_dat.id = node->id;
-		out_dat.graphlayer = node->graph_layer;
-		out_dat.handle = -1;
-		out_dat.is_state_node = false;
-		if (node->get_layer()) {
-
-			out_dat.sublayer = ImNodes::SaveEditorStateToIniString(node->get_layer()->context);
-			out_dat.sublayer_id = node->get_layer()->id;
-
-			overrides.map["sublayer"] = PROP_SERIALIZE;
-			overrides.map["sublayer_id"] = PROP_SERIALIZE;
-		}
-		if (node->get_graph_node()) {
-			auto graph_node = node->get_graph_node();
-			ASSERT(node_ptr_to_output_index.find(graph_node) != node_ptr_to_output_index.end());
-			out_dat.handle = node_ptr_to_output_index[graph_node];
-		}
-		else if (node->is_state_node()) {
-			out_dat.is_state_node = true;
-			AgEditor_StateNode* statenode = (AgEditor_StateNode*)node;
-			out_dat.handle = statenode->state_handle_internal.id;
-		}
-
-		write_properties(*EditorNodeSerializeData::get_props(), &out_dat, out, &overrides);
+		Base_EdNode* node = nodes[i];
+		write_object_properties<Base_EdNode, getter_ednode>(node, {}, out);
 	}
 	out.write_list_end();
 	out.write_item_end();
@@ -634,7 +596,7 @@ void AnimationGraphEditor::draw_prop_editor()
 			int node = 0;
 			ImNodes::GetSelectedNodes(&node);
 
-			IAgEditorNode* mynode = find_node_from_id(node);
+			Base_EdNode* mynode = find_node_from_id(node);
 
 			if (node != sel.node_last_frame) {
 				sel.link_last_frame = -1;
@@ -642,7 +604,7 @@ void AnimationGraphEditor::draw_prop_editor()
 				node_props.clear_all();
 
 				std::vector<PropertyListInstancePair> info;
-				mynode->get_props(info);
+				mynode->add_props(info);
 
 				for (int i = 0; i < info.size(); i++) {
 					if(info[i].list) /* some nodes have null props */
@@ -658,23 +620,22 @@ void AnimationGraphEditor::draw_prop_editor()
 			int link = 0;
 			ImNodes::GetSelectedLinks(&link);
 
-			uint32_t node_id = IAgEditorNode::get_nodeid_from_link_id(link);
-			uint32_t slot = IAgEditorNode::get_slot_from_id(link);
-			IAgEditorNode* node_s = find_node_from_id(node_id);
+			uint32_t node_id = Base_EdNode::get_nodeid_from_link_id(link);
+			uint32_t slot = Base_EdNode::get_slot_from_id(link);
+			Base_EdNode* node_s = find_node_from_id(node_id);
 
 			if (!node_s->is_state_node()) {
 				sel.link_last_frame = -1;
 				sel.node_last_frame = -1;
 			}
 			else {
-				AgEditor_StateNode* state = (AgEditor_StateNode*)node_s;
 				if (link != sel.link_last_frame) {
 					sel.node_last_frame = -1;
 
 					node_props.clear_all();
 
 					std::vector<PropertyListInstancePair> info;
-					state->get_link_props(info, slot);
+					node_s->get_link_props(info, slot);
 
 					for (int i = 0; i < info.size(); i++) {
 						if (info[i].list) /* some nodes have null props */
@@ -899,15 +860,15 @@ void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_dr
 		if (start_atr >= INPUT_START && start_atr < OUTPUT_START)
 			std::swap(start_atr, end_atr);
 
-		uint32_t start_node_id = IAgEditorNode::get_nodeid_from_output_id(start_atr);
-		uint32_t end_node_id = IAgEditorNode::get_nodeid_from_input_id(end_atr);
-		uint32_t start_idx = IAgEditorNode::get_slot_from_id(start_atr);
-		uint32_t end_idx = IAgEditorNode::get_slot_from_id(end_atr);
+		uint32_t start_node_id = Base_EdNode::get_nodeid_from_output_id(start_atr);
+		uint32_t end_node_id = Base_EdNode::get_nodeid_from_input_id(end_atr);
+		uint32_t start_idx = Base_EdNode::get_slot_from_id(start_atr);
+		uint32_t end_idx = Base_EdNode::get_slot_from_id(end_atr);
 
 		ASSERT(start_idx == 0);
 
-		IAgEditorNode* node_s = find_node_from_id(start_node_id);
-		IAgEditorNode* node_e = find_node_from_id(end_node_id);
+		Base_EdNode* node_s = find_node_from_id(start_node_id);
+		Base_EdNode* node_e = find_node_from_id(end_node_id);
 
 		bool destroy = node_e->add_input(this, node_s, end_idx);
 	}
@@ -917,18 +878,18 @@ void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_dr
 		bool is_input = start_atr >= INPUT_START && start_atr < OUTPUT_START;
 		uint32_t id = 0;
 		if (is_input)
-			id = IAgEditorNode::get_nodeid_from_input_id(start_atr);
+			id = Base_EdNode::get_nodeid_from_input_id(start_atr);
 		else
-			id = IAgEditorNode::get_nodeid_from_output_id(start_atr);
+			id = Base_EdNode::get_nodeid_from_output_id(start_atr);
 		drop_state.from = find_node_from_id(id);
 		drop_state.from_is_input = is_input;
-		drop_state.slot = IAgEditorNode::get_slot_from_id(start_atr);
+		drop_state.slot = Base_EdNode::get_slot_from_id(start_atr);
 	}
 	if (ImNodes::IsLinkDestroyed(&link_id)) {
 
-		uint32_t node_id = IAgEditorNode::get_nodeid_from_link_id(link_id);
-		uint32_t slot = IAgEditorNode::get_slot_from_id(link_id);
-		IAgEditorNode* node_s = find_node_from_id(node_id);
+		uint32_t node_id = Base_EdNode::get_nodeid_from_link_id(link_id);
+		uint32_t slot = Base_EdNode::get_slot_from_id(link_id);
+		Base_EdNode* node_s = find_node_from_id(node_id);
 
 		node_s->on_remove_pin(slot);
 
@@ -975,7 +936,7 @@ void AnimationGraphEditor::begin_draw()
 			int node = 0;
 			ImNodes::GetSelectedNodes(&node);
 
-			IAgEditorNode* mynode = find_node_from_id(node);
+			Base_EdNode* mynode = find_node_from_id(node);
 			
 			const editor_layer* layer = mynode->get_layer();
 
@@ -1082,11 +1043,13 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		if (node->graph_layer != layer) continue;
 
 
-		ImNodes::PushColorStyle(ImNodesCol_TitleBar, color32_to_int(node->node_color));
-		Color32 select_color = add_brightness(node->node_color, 30);
-		Color32 hover_color = add_brightness(mix_with(node->node_color, { 5, 225, 250 }, 0.6), 5);
-		ImNodes::PushColorStyle(ImNodesCol_TitleBarHovered, color32_to_int(hover_color));
-		ImNodes::PushColorStyle(ImNodesCol_TitleBarSelected, color32_to_int(select_color));
+		Color32 nodecolor = node->get_node_color();
+
+		ImNodes::PushColorStyle(ImNodesCol_TitleBar,nodecolor.to_uint());
+		Color32 select_color = add_brightness(nodecolor, 30);
+		Color32 hover_color = add_brightness(mix_with(nodecolor, { 5, 225, 250 }, 0.6), 5);
+		ImNodes::PushColorStyle(ImNodesCol_TitleBarHovered, hover_color.to_uint());
+		ImNodes::PushColorStyle(ImNodesCol_TitleBarSelected, select_color.to_uint());
 
 		// node is selected
 		if (node->id == sel.node_last_frame) {
@@ -1098,13 +1061,10 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 		ImNodes::BeginNodeTitleBar();
 
-		if(node->name_is_default())
-			ImGui::Text("%s\n", node->get_default_name().c_str());
-		else
-			ImGui::Text("%s\n", node->get_title().c_str());
+		ImGui::Text("%s\n", node->get_title().c_str());
 
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && ImGui::BeginTooltip()) {
-			ImGui::TextUnformatted(get_animnode_typedef(node->type).editor_tooltip);
+			ImGui::TextUnformatted(node->get_tooltip().c_str());
 			ImGui::EndTooltip();
 		}
 
@@ -1158,18 +1118,19 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		if (node->has_pin_colors())
 			pin_color = node->get_pin_colors();
 
-		for (int j = 0; j < node->num_inputs; j++) {
+		int num_inputs = node->get_num_inputs();
+		for (int j = 0; j < num_inputs; j++) {
 
 			ImNodesPinShape pin = ImNodesPinShape_Quad;
 
-			if (node->inputs[j].other_node) pin = ImNodesPinShape_TriangleFilled;
+			if (node->inputs[j]) pin = ImNodesPinShape_TriangleFilled;
 			ImNodes::BeginInputAttribute(node->getinput_id(j), pin);
 			auto str = node->get_input_pin_name(j);
 
 			ImGui::TextColored(pin_color, str.c_str());
 			ImNodes::EndInputAttribute();
 		}
-		if (node->has_output_pins()) {
+		if (node->has_output_pin()) {
 			ImNodes::BeginOutputAttribute(node->getoutput_id(0));
 			ImGui::TextColored(pin_color, node->get_output_pin_name().c_str());
 			ImNodes::EndOutputAttribute();
@@ -1187,12 +1148,12 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		}
 
 		bool draw_flat_links = node->draw_flat_links();
-		for (int j = 0; j < node->num_inputs; j++) {
-			if (node->inputs[j].other_node) {
+		for (int j = 0; j < num_inputs; j++) {
+			if (node->inputs[j]) {
 
 				bool pushed_colors = node->push_imnode_link_colors(j);
 	
-				ImNodes::Link(node->getlink_id(j), node->inputs[j].other_node->getoutput_id(0), node->getinput_id(j), draw_flat_links);
+				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j), draw_flat_links);
 
 				if (pushed_colors) {
 					ImNodes::PopColorStyle();
@@ -1209,28 +1170,6 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 	ImNodes::EndNodeEditor();
 }
 
-bool AgEditor_StateNode::push_imnode_link_colors(int index)
-{
-	ASSERT(inputs[index].other_node);
-	ASSERT(inputs[index].other_node->is_state_node());
-	AgEditor_StateNode* other = (AgEditor_StateNode*)inputs[index].other_node;
-
-	auto st = other->get_state_transition_to(this);
-	ASSERT(st);
-
-	if (st->is_a_continue_transition()) {
-		ImNodes::PushColorStyle(ImNodesCol_Link, color32_to_int({ 242, 41, 41 }));
-		ImNodes::PushColorStyle(ImNodesCol_LinkSelected, color32_to_int({ 245, 211, 211 }));
-	}
-	else {
-		ImNodes::PushColorStyle(ImNodesCol_Link, color32_to_int({ 0,0xff,0 }));
-		ImNodes::PushColorStyle(ImNodesCol_LinkSelected, color32_to_int({ 193, 247, 186 }));
-	}
-
-	ImNodes::PushColorStyle(ImNodesCol_LinkHovered, color32_to_int({ 0xff,0xff,0xff }));
-
-	return true;
-}
 
 void AnimationGraphEditor::handle_event(const SDL_Event& event)
 {
@@ -1285,12 +1224,12 @@ void AnimationGraphEditor::delete_selected()
 	if (ids.size() > 0) {
 		ImNodes::GetSelectedLinks(ids.data());
 
-		std::vector<IAgEditorNode*> stuff;
+		std::vector<Base_EdNode*> stuff;
 
 		for (int i = 0; i < ids.size(); i++) {
-			uint32_t nodeid = IAgEditorNode::get_nodeid_from_link_id(ids[i]);
-			uint32_t slot = IAgEditorNode::get_slot_from_id(ids[i]);
-			IAgEditorNode* node = find_node_from_id(nodeid);
+			uint32_t nodeid = Base_EdNode::get_nodeid_from_link_id(ids[i]);
+			uint32_t slot = Base_EdNode::get_slot_from_id(ids[i]);
+			Base_EdNode* node = find_node_from_id(nodeid);
 			node->on_remove_pin(slot);
 			stuff.push_back(node);
 		}
@@ -1340,7 +1279,7 @@ void AnimationGraphEditor::remove_node_from_index(int index, bool force)
 {
 	auto node = nodes.at(index);
 
-	if (!node->can_user_delete() && !force)
+	if (!node->can_delete() && !force)
 		return;
 
 	for (int i = 0; i < nodes.size(); i++) {
@@ -1380,38 +1319,54 @@ int AnimationGraphEditor::find_for_id(uint32_t id)
 }
 
 
-static bool animnode_allow_creation_from_menu(bool in_state_mode, animnode_type type) {
-	if (in_state_mode) return type == animnode_type::state;
-	else {
-		return type != animnode_type::root && type != animnode_type::state;
+
+
+Base_EdNode* AnimationGraphEditor::user_create_new_graphnode(const char* typename_, uint32_t layer)
+{
+	auto& factory = get_tool_node_factory();
+	if (!factory.hasClass(typename_)) {
+		printf("factory doesnt have node for typename %s\n", typename_);
+		return nullptr;
 	}
+	Base_EdNode* node = factory.createObject(typename_);
+
+	node->post_construct(current_id++, layer);
+	nodes.push_back(node);
+	node->init();
+
+	return node;
 }
 
 void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 {
-	int count = (int)animnode_type::COUNT;
+	int count = template_creation_nodes.size();
 	for (int i = 0; i < count; i++) {
-		animnode_type type = animnode_type(i);
-		if (animnode_allow_creation_from_menu(is_state_mode,type))
-		{
-			const char* name = get_animnode_typedef(type).editor_name;
-			if (ImGui::Selectable(name)) {
+		const Base_EdNode* node = template_creation_nodes[i];
 
-				int cur_layer = graph_tabs.get_current_layer_from_tab();
-				auto parent = ed.get_owning_node_for_layer(cur_layer);
-				auto a = create_graph_node_from_type(parent, type, cur_layer);
+		if (node->is_state_node() != is_state_mode)
+			continue;
 
-				ImNodes::ClearNodeSelection();
-				ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
-				ImNodes::SelectNode(a->id);
+		if (!node->allow_creation_from_menu())
+			continue;
 
-				if (drop_state.from) {
-					if (drop_state.from_is_input) {
-						drop_state.from->add_input(this, a, drop_state.slot);
-					}
-					else
-						a->add_input(this, drop_state.from, 0);
+		const std::string& name = node->get_name();
+
+		if (ImGui::Selectable(name.c_str())) {
+
+			int cur_layer = graph_tabs.get_current_layer_from_tab();
+
+			Base_EdNode* a  = user_create_new_graphnode(node->get_typeinfo().name, cur_layer);
+
+			ImNodes::ClearNodeSelection();
+			ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
+			ImNodes::SelectNode(a->id);
+
+			if (drop_state.from) {
+				if (drop_state.from_is_input) {
+					drop_state.from->add_input(this, a, drop_state.slot);
 				}
+				else
+					a->add_input(this, drop_state.from, 0);
 			}
 		}
 	}
@@ -1433,46 +1388,6 @@ static T* create_node_type(Animation_Tree_CFG& cfg)
 // two paths: create new node
 //			  load an existing node from a file
 
-std::string AgEditor_BaseNode::get_input_pin_name(int index)
-{
-	switch (type)
-	{
-	case animnode_type::add:
-		if (index == Add_Node_CFG::DIFF) return "diff";
-		if (index == Add_Node_CFG::BASE) return "base";
-		ASSERT(0);
-	case animnode_type::subtract:
-		if(index  == Subtract_Node_CFG::REF) return "ref";
-		if (index == Subtract_Node_CFG::SOURCE) return "source";
-		ASSERT(0);
-	case animnode_type::root:
-		if (index == 0) return "OUTPUT";
-		ASSERT(0);
-	case animnode_type::blend_by_int:
-	{
-		auto param = node->param;
-		if (!param.is_valid() || ed.control_params.get_parameter_for_ed_id(param.id)->type != control_param_type::enum_t)
-			return string_format("%d", index);
-		return "enum placeholder";
-	};
-
-
-	default:
-		return "in";
-	}
-}
-
-std::string AgEditor_StateNode::get_input_pin_name(int index)
-{
-	if (!inputs[index].other_node) return {};
-
-	std::string name = inputs[index].other_node->name_is_default() ? inputs[index].other_node->get_default_name() : inputs[index].other_node->title;
-	if (name.size() > 16) {
-		name.resize(13);
-		name.append("...");
-	}
-	return name;
-}
 
 
 static void delete_cfg_node(Node_CFG* node)
@@ -1493,68 +1408,7 @@ static void delete_cfg_node(Node_CFG* node)
 	node->~Node_CFG();
 }
 
-AgEditor_BaseNode::~AgEditor_BaseNode()
-{
-	delete_cfg_node(node);
-}
-
-AgEditor_StateMachineNode::~AgEditor_StateMachineNode() {
-	if (sublayer.context) {
-		ImNodes::EditorContextFree(sublayer.context);
-	}
-	delete_cfg_node(node);
-}
-
-void AgEditor_BaseNode::init()
-{
-	ASSERT(node);
-	node_color = get_animnode_typedef(type).editor_color;
-
-	// find editor input nodes
-	ASSERT(node->input.size()<=MAX_INPUTS);
-
-	int init_input_count = 0;
-	int max_input_slot = node->input.size();
-	for (int i = 0; i < max_input_slot; i++) {
-
-		Node_CFG* node_cfg = node->input[i];
-		if (!node_cfg)
-			continue;
-		init_input_count++;
-		IAgEditorNode* ed_node = ed.editor_node_for_cfg_node(node_cfg);
-
-		if (!ed_node) {
-			printf("!!! couldn't find editor node for cfg !!! (data read wrong from disk or out of date?)\n");
-
-			ASSERT(0);
-			// TODO: create the new editor node
-		}
-
-		add_input(&ed, ed_node, i);
-	}
-
-	int allowed_inputs = get_animnode_typedef(type).allowed_inputs;
-
-	if (allowed_inputs != -1) {
-		if (max_input_slot > allowed_inputs) {
-			printf("!!! too many inputs for node !!! (out of date or corrupted?)\n");
-
-			for (int j = allowed_inputs; j < max_input_slot; j++) {
-				
-				if (node->input[j]) {
-					on_remove_pin(j, true);
-					on_post_remove_pins();
-				}
-			}
-			node->input.resize(allowed_inputs);
-		}
-		num_inputs = allowed_inputs;
-	}
-
-}
-
-
-
+#if 0
 bool AgEditor_BaseNode::compile_my_data()
 {
 	ASSERT(node);
@@ -1620,523 +1474,26 @@ bool AgEditor_BaseNode::compile_my_data()
 	return compile_error_string.empty();
 }
 
-void AgEditor_BaseNode::draw_node_top_bar()
-{
-	bool uses_default_param = node->get_props()->find("param") != nullptr;
-	if (uses_default_param) {
-		auto param = ed.control_params.get_parameter_for_ed_id(node->param.id);
-		if (param) {
-			ImGui::TextColored(scriptparamtype_to_color(param->type), string_format(":= %s",param->name.c_str()));
-		}
-	}
+#endif
 
-	if (type == animnode_type::blend_by_int) {
-
-		auto node_ = (Blend_Int_Node_CFG*)node;
-		auto param = ed.control_params.get_parameter_for_ed_id(node->param.id);
-		if (!node->param.is_valid() || (param && param->type == control_param_type::int_t)) {
-
-			ImGui::PushStyleColor(ImGuiCol_Button, color32_to_int({ 0xff,0xff,0xff,50 }));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_int({ 0xff,0xff,0xff,128 }));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, color32_to_int({ 0xff,0xff,0xff,50 }));
-
-
-			if (ImGui::SmallButton("Add") && num_inputs < MAX_INPUTS) {
-				num_inputs += 1;
-			}
-			ImGui::SameLine();
-			if (ImGui::SmallButton("Remove") && num_inputs > 0) {
-				on_remove_pin(num_inputs-1, true);
-				on_post_remove_pins();
-				num_inputs -= 1;
-			}
-
-			ImGui::PopStyleColor(3);
-		}
-
-	}
-
-}
-
+#if 0
 void AgEditor_BaseNode::get_props(std::vector<PropertyListInstancePair>& props)
 {
-	IAgEditorNode::get_props(props);
+	Base_EdNode::get_props(props);
 
 	props.push_back({ node->get_props(),node });
-}
-
-bool AgEditor_StateNode::traverse_and_find_errors()
-{
-	children_have_errors = false;
-
-	if (type != animnode_type::start_statemachine) {
-		auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
-
-		if (startnode->inputs[0].other_node)
-			children_have_errors |= !startnode->inputs[0].other_node->traverse_and_find_errors();
-		// else is an error too, but its already built into compile_error_string
-	}
-	return !children_have_errors && compile_error_string.empty();
-}
-
-bool AgEditor_StateNode::compile_data_for_statemachine()
-{
-	compile_error_string.clear();
-	compile_info_string.clear();
-
-	Statemachine_Node_CFG* sm_cfg = parent_statemachine->node;
-	if (type == animnode_type::state) {
-
-		self_state.transition_idxs.resize(0);
-	}
-	for (int i = 0; i < output.size(); i++) {
-		AgEditor_StateNode* out_state = output[i].output_to;
-		State_Transition* st = &output[i].st;
-
-		st->transition_state = output[i].output_to->state_handle_internal;
-
-		// compile transition script
-		if (!st->script_uncompilied.empty() && st->is_a_continue_transition()) {
-			append_info_msg(string_format("[INFO] is_continue_transition == true, but script is not empty.\n"));
-		}
-		else if(!st->is_a_continue_transition()) {
-
-			const std::string& code = st->script_uncompilied;
-			std::string err_str;
-			try {
-
-				auto ret = st->script_condition.compile(
-					ed.editing_tree->graph_program.get(),
-					code,
-					NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
-
-				// must return boolean
-				if (ret.out_types.size() != 1 || ret.out_types[0]!=script_types::bool_t)
-					err_str = "script must return boolean";
-
-			}
-			catch (CompileError err) {
-				err_str = std::move(err.str);
-			}
-			catch (...) {
-				err_str = "unknown error";
-
-			}
-
-			if (!err_str.empty()) {
-				const char* to_state = out_state->get_title().c_str();
-				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", to_state, err_str.c_str()));
-			}
-		}
-
-		sm_cfg->transitions.push_back(*st);
-		int idx = sm_cfg->transitions.size() - 1;
-		if (type == animnode_type::state) {
-			self_state.transition_idxs.push_back(idx);
-		}
-		else {// entry state
-			sm_cfg->entry_transitions.push_back(idx);
-		}
-	}
-
-	// append tree
-	if (type != animnode_type::start_statemachine) {
-		auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
-		ASSERT(startnode);
-
-		if (!startnode->inputs[0].other_node) {
-			append_fail_msg(string_format("[ERROR] missing start state in blend tree \n"));
-		}
-		else {
-
-			IAgEditorNode* rootnode = startnode->inputs[0].other_node;
-			ASSERT(rootnode->get_graph_node());
-
-			self_state.tree = rootnode->get_graph_node();
-		}
-
-		sm_cfg->states.push_back(self_state);
-	}
-
-	return compile_error_string.empty();	// empty == no errors generated
-	
-}
-
-void AgEditor_StateNode::on_remove_pin(int slot, bool force)
-{
-	ASSERT(inputs[slot].other_node);
-
-	if (inputs[slot].other_node->is_state_node()) {
-		((AgEditor_StateNode*)inputs[slot].other_node)->remove_output_to(this);
-		inputs[slot].other_node = nullptr;
-	}
-	else
-		ASSERT(!"not state node in state graph");
-}
-
-void AgEditor_StateNode::on_post_remove_pins()
-{
-	ASSERT(num_inputs >= 1);
-	ASSERT(inputs[num_inputs-1].other_node == nullptr);
-	
-	int count = 0;
-	for (int i = 0; i < num_inputs - 1; i++) {
-		if (inputs[i].other_node) {
-			ASSERT(inputs[i].other_node->is_state_node());
-			inputs[count++] = inputs[i];
-		}
-	}
-	num_inputs = count + 1;
-	ASSERT(num_inputs >= 1 && num_inputs < MAX_INPUTS);
-	inputs[num_inputs - 1].other_node = nullptr;
-
-
-
-#ifdef _DEBUG
-		ASSERT(num_inputs >= 1);
-		ASSERT(inputs[num_inputs - 1].other_node == nullptr);
-		if (num_inputs > 1) {
-			for (int i = 0; i < num_inputs - 1; i++) {
-				ASSERT(inputs[i].other_node != nullptr);
-			}
-		}
-#endif // _DEBUG
-
 }
 
 void AgEditor_StateNode::get_props(std::vector<PropertyListInstancePair>& props)
 {
-	IAgEditorNode::get_props(props);
+	Base_EdNode::get_props(props);
 
 	props.push_back({ State::get_props(),&self_state });
 }
+#endif
 
- bool AgEditor_StateNode::add_input(AnimationGraphEditor* ed, IAgEditorNode* input, uint32_t slot) {
 
-	for (int i = 0; i < inputs.size(); i++) {
-		if (inputs[i].other_node == input) {
-			return true;
-		}
-	}
 
-	ASSERT(input->is_state_node());
-
-	inputs[slot].other_node = input;
-
-	AgEditor_StateNode* statenode = (AgEditor_StateNode*)input;
-	statenode->on_output_create(this);
-
-
-	if (grow_pin_count_on_new_pin()) {
-		if (num_inputs > 0 && inputs[num_inputs - 1].other_node)
-			num_inputs++;
-	}
-
-	return false;
-}
-
-void AgEditor_StateNode::get_link_props(std::vector<PropertyListInstancePair>& props, int slot)
-{
-	ASSERT(inputs[slot].other_node);
-	ASSERT(inputs[slot].other_node->is_state_node());
-
-	((AgEditor_StateNode*)inputs[slot].other_node)->get_transition_props(this, props);
-}
-
-void AgEditor_StateNode::on_output_create(AgEditor_StateNode* node_to_output)
-{
-	output.push_back({ node_to_output });
-}
-
-void AgEditor_StateNode::remove_output_to(AgEditor_StateNode* node)
-{
-
-	bool already_seen = false;
-	for (int i = 0; i < output.size(); i++) {
-
-		// WARNING transitions invalidation potentially!
-		if (output[i].output_to == node) {
-
-			ASSERT(!already_seen);
-
-			output.erase(output.begin() + i);
-			already_seen = true;
-			i--;
-		}
-	}
-
-}
-
-void AgEditor_StateNode::get_transition_props(AgEditor_StateNode* to, std::vector<PropertyListInstancePair>& props)
-{
-	for (int i = 0; i < output.size(); i++) {
-		if (output[i].output_to == to) {
-			
-			// WARNING: this pointer becomes invalid if output is resized, this shouldnt happen
-			props.push_back({ State_Transition::get_props(), &output[i].st });
-			return;
-		}
-	}
-	ASSERT(0);
-}
-
-void AgEditor_StateMachineNode::get_props(std::vector<PropertyListInstancePair>& props)
-{
-	IAgEditorNode::get_props(props);
-
-	props.push_back({ node->get_props(),node });
-}
-
-void AgEditor_StateNode::init()
-{
-	node_color = get_animnode_typedef(type).editor_color;
-
-	if (type == animnode_type::start_statemachine)
-		num_inputs = 0;
-	else
-		num_inputs = 1;
-
-	bool good = parent_statemachine->add_node_to_statemachine(this);
-	ASSERT(good);
-
-	// read data from statenode to init stuff using the state_handle_internal which gives index into parent statemachine
-}
-
-void AgEditor_StateMachineNode::init()
-{
-	ASSERT(node);
-	node_color = get_animnode_typedef(type).editor_color;
-	num_inputs = 0;
-}
-
-bool AgEditor_StateMachineNode::traverse_and_find_errors()
-{
-	children_have_errors = false;
-
-	for (int i = 0; i < states.size(); i++) {
-		children_have_errors |= !states[i]->traverse_and_find_errors();
-	}
-
-	return !children_have_errors && compile_error_string.empty();
-}
-
-void AgEditor_StateNode::remove_reference(IAgEditorNode* node)
-{	
-	if (node->is_state_node()) {
-		remove_output_to((AgEditor_StateNode*)node);
-	}
-
-	// node gets deleted since its in the layer
-	IAgEditorNode::remove_reference(node);
-	
-	if (node == parent_statemachine) {
-		//parent_statemachine = nullptr;
-	}
-}
-
-bool AgEditor_StateNode::compile_my_data()
-{
-	// empty, compiling done through statemachine node
-	return true;
-}
-
-
-void AgEditor_StateMachineNode::remove_reference(IAgEditorNode* node)
-{
-
-	IAgEditorNode::remove_reference(node);
-
-	bool already_erased = false;
-	for (int i = 0; i < states.size(); i++) {
-		if (states[i] == node) {
-			ASSERT(!already_erased);	// just a check
-			states.erase(states.begin() + i);
-			i--;
-			already_erased = true;
-		}
-	}
-}
-
-std::string AgEditor_StateNode::get_default_name()
-{
-	bool any_non_defaults = false;
-
-	if (type == animnode_type::start_statemachine)
-		return get_animnode_typedef(type).editor_name;
-
-	auto startnode = ed.find_first_node_in_layer(sublayer.id, animnode_type::root);
-
-	if (!startnode->inputs[0].other_node || startnode->inputs[0].other_node->type != animnode_type::source)
-		return get_animnode_typedef(type).editor_name;
-
-	// get clip name to use as default state name
-	return startnode->inputs[0].other_node->get_default_name();
-}
-
-std::string AgEditor_StateMachineNode::get_default_name()
-{
-	bool any_non_defaults = false;
-	std::string name;
-	for (int i = 0; i < states.size(); i++) {
-
-		// states can be null...
-		if (!states[i]) continue;
-
-		if (states[i]->type == animnode_type::start_statemachine)
-			continue;
-		if (states[i]->name_is_default())
-			continue;
-		name += states[i]->title;
-		name += '/';
-
-		if (name.size() > 22) {
-			name += "...";
-			return name;
-		}
-	}
-	if (name.empty())
-		return get_animnode_typedef(type).editor_name;
-
-	name.pop_back();
-	return name;
-}
-
-bool AgEditor_StateMachineNode::compile_my_data()
-{
-
-	node->states.clear();
-	for (int i = 0; i < states.size(); i++) {
-		ASSERT(states[i]);
-		if (states[i]->type == animnode_type::state) {
-			states[i]->state_handle_internal = { i };
-		}
-	}
-	node->entry_transitions.resize(0);
-	node->transitions.clear();
-
-	node->init_memory_offsets(ed.editing_tree, 0);
-
-	bool has_errors = false;
-
-	for (int i = 0; i < states.size(); i++) {
-		has_errors |= !states[i]->compile_data_for_statemachine();
-	}
-
-	if (has_errors)
-		append_fail_msg("[ERROR] state machine states contain errors\n");
-
-
-	auto state_enter = (AgEditor_StateNode*)ed.find_first_node_in_layer(sublayer.id, animnode_type::start_statemachine);
-	ASSERT(state_enter);	// should never be deleted
-
-	bool found_default_entry = false;
-	for (int i = 0; i < node->entry_transitions.size(); i++) {
-
-		auto st = node->transitions[node->entry_transitions[i]];
-		if (st.is_a_continue_transition()) {
-			if (found_default_entry) {
-				append_fail_msg("[ERROR] state machine contains more than one default entry condition");
-				break;
-			}
-			found_default_entry = true;
-
-		}
-
-	}
-	if (!found_default_entry) {
-		append_fail_msg("[ERROR] state machine does not have a default entry transition");
-	}
-
-	return true;
-
-}
-
-
-State* AgEditor_StateMachineNode::get_state(handle<State> state) {
-	ASSERT(state.is_valid() && state.id < node->states.size());
-	return &node->states.at(state.id);
-}
-
-
-AgEditor_StateMachineNode* create_statemachine_node(uint32_t id, uint32_t layer)
-{
-	auto cfg = (Statemachine_Node_CFG*)get_animnode_typedef(animnode_type::statemachine).create(ed.editing_tree);
-
-	AgEditor_StateMachineNode* node = new AgEditor_StateMachineNode(
-		cfg, 
-		id, 
-		layer, 
-		animnode_type::statemachine, 
-		ed.create_new_layer(true));
-
-	ed.add_root_node_to_layer(node, node->sublayer.id, true);
-
-	return node;
-}
-
-AgEditor_StateNode* create_state_node(IAgEditorNode* parent, uint32_t layer, animnode_type type, uint32_t id)
-{
-	ASSERT(parent);
-	ASSERT(parent->is_statemachine());
-	ASSERT(parent->get_layer()->id == layer);
-	auto parent_sm = (AgEditor_StateMachineNode*)parent;
-
-	editor_layer sublayer{};
-	if (type == animnode_type::state)
-		sublayer = ed.create_new_layer(false);
-
-	AgEditor_StateNode* state = new AgEditor_StateNode(parent_sm, id, layer, type, sublayer);
-
-	if (type == animnode_type::state)
-		ed.add_root_node_to_layer(state, state->sublayer.id, false);
-
-	return state;
-}
-
-AgEditor_BaseNode* create_generic_node(animnode_type type, uint32_t id, uint32_t layer)
-{
-	auto cfg = get_animnode_typedef(type).create(ed.editing_tree);
-
-	if (type == animnode_type::blend1d || type == animnode_type::blend2d)
-		return new AgEditor_BlendspaceNode(cfg, id,layer,type);
-	else
-		return new AgEditor_BaseNode(cfg,id,layer,type);
-}
-
-
-IAgEditorNode* AnimationGraphEditor::create_graph_node_from_type(IAgEditorNode* parent_, animnode_type type, uint32_t layer)
-{
-
-	IAgEditorNode* node = nullptr;
-
-	uint32_t id = current_id++;
-
-	if (type == animnode_type::statemachine) {
-		node = create_statemachine_node(id,layer);
-	}
-	else if (type == animnode_type::state || type == animnode_type::start_statemachine) {
-		ASSERT(parent_);
-		node = create_state_node(parent_, layer, type, id);
-	}
-	else if (type == animnode_type::blend1d || type == animnode_type::blend2d) {
-		node = create_generic_node(type, id, layer);
-	}
-	else if (type == animnode_type::root) {
-		node = new IAgEditorNode(id,layer,type);
-	}
-	else {
-		node = create_generic_node(type, id,layer);
-	}
-
-	nodes.push_back(node);
-
-	if (node->get_graph_node())
-		editing_tree->all_nodes.push_back(node->get_graph_node());
-
-	node->init();
-
-	return node;
-}
 
 bool AnimationGraphEditor::compile_graph_for_playing()
 {
@@ -2159,11 +1516,11 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 		}
 	}
 
-	IAgEditorNode* output_pose = find_first_node_in_layer(0, animnode_type::root);
+	Base_EdNode* output_pose = find_first_node_in_layer(0, "Root_EdNode");
 	ASSERT(output_pose);
 	output_pose->compile_error_string.clear();
-	if (output_pose->inputs[0].other_node) {
-		editing_tree->root = output_pose->inputs[0].other_node->get_graph_node();
+	if (output_pose->inputs[0]) {
+		editing_tree->root = output_pose->inputs[0]->get_graph_node();
 		ASSERT(editing_tree->root);
 	}
 	else
@@ -2177,55 +1534,6 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	return tree_is_good_to_run;
 }
 
-#include "ReflectionRegisterDefines.h"
-
-void IAgEditorNode::init()
-{
-	node_color = get_animnode_typedef(type).editor_color;
-
-	ASSERT(type == animnode_type::root || type == animnode_type::start_statemachine);
-
-	if (type == animnode_type::root)
-		num_inputs = 1;
-	if (type == animnode_type::start_statemachine)
-		num_inputs = 0;
-
-}
-
-PropertyInfoList* IAgEditorNode::get_prop_list()
-{
-	START_PROPS(IAgEditorNode)
-		REG_STDSTRING( title, PROP_DEFAULT),
-		REG_INT( id, PROP_SERIALIZE, ""),
-		REG_ENUM( type, PROP_SERIALIZE, "", animnode_type_def.id),
-		REG_INT( graph_layer, PROP_SERIALIZE, "")
-	END_PROPS(IAgEditorNode)
-}
-
-std::string IAgEditorNode::get_default_name()
-{
-	if (type == animnode_type::source) {
-
-		Clip_Node_CFG* node = (Clip_Node_CFG*)((AgEditor_BaseNode*)this)->node;
-
-		return node->clip_name;
-	}
-
-	return get_animnode_typedef(type).editor_name;
-}
-
-
-
-void IAgEditorNode::remove_reference(IAgEditorNode* node)
-{
-	for (int i = 0; i < num_inputs; i++) {
-		if (inputs[i].other_node == node) {
-			on_remove_pin(i, true);
-
-			on_post_remove_pins();
-		}
-	}
-}
 
 
 
@@ -2271,25 +1579,6 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	//}
 	return &vec;
 }
-
-
-
-bool IAgEditorNode::compile_my_data()
-{
-	return true;
-}
-
-bool IAgEditorNode::traverse_and_find_errors()
-{
-	children_have_errors = false;
-	for (int i = 0; i < num_inputs; i++) {
-		if (inputs[i].other_node)
-			children_have_errors |= !inputs[i].other_node->traverse_and_find_errors();
-	}
-
-	return !children_have_errors && compile_error_string.empty();
-}
-
 
 void AnimationGraphEditor::tick(float dt)
 {
@@ -2406,6 +1695,13 @@ void AnimationGraphEditor::open(const char* name)
 	idraw->update_obj(out.obj, ro);
 
 	control_params.refresh_props();
+
+	// init template nodes for creation menu
+	template_creation_nodes.clear();
+	auto& ed_factory = get_tool_node_factory();
+	for (auto& obj : ed_factory.get_object_creator()) {
+		template_creation_nodes.push_back(obj.second());
+	}
 }
 
 class AgEditor_BlendSpaceArrayHead : public IArrayHeader
@@ -2463,12 +1759,9 @@ class AgEdtior_BlendSpaceParameteriation : public IPropertyEditor
 	}
 };
 
-void AgEditor_BlendspaceNode::get_props(std::vector<PropertyListInstancePair>& props)
-{
-	AgEditor_BaseNode::get_props(props);
-	props.push_back({ AgEditor_BlendspaceNode::get_props_list(), this });
-}
 
+
+#if 0
 void AgEditor_BlendspaceNode::init()
 {
 	AgEditor_BaseNode::init();
@@ -2499,31 +1792,7 @@ void AgEditor_BlendspaceNode::init()
 			num_inputs = 1;
 	}
 }
-
-bool AgEditor_BlendspaceNode::compile_my_data()
-{
-	return AgEditor_BaseNode::compile_my_data();
-}
-
-PropertyInfoList* AgEditor_BlendspaceNode::get_props_list()
-{
-	MAKE_VECTORCALLBACK(Blendspace_Input, blend_space_inputs)
-	START_PROPS(AgEditor_BlendspaceNode)
-		REG_ENUM(topology_2d,PROP_EDITABLE,"", BlendSpace2dTopology_def.id),
-		REG_STDVECTOR_W_CUSTOM(blend_space_inputs, PROP_EDITABLE, ""),
-		REG_INT_W_CUSTOM(parameterization, PROP_EDITABLE, "", "AG_EDITOR_BLEND_SPACE_PARAMETERIZATION"),
-	END_PROPS(AgEditor_BlendspaceNode)
-}
-
-PropertyInfoList* AgEditor_BlendspaceNode::Blendspace_Input::get_props()
-{
-	START_PROPS(AgEditor_BlendspaceNode::Blendspace_Input)
-		REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_EDITABLE, "AG_CLIP_TYPE"),
-		REG_FLOAT(x,PROP_EDITABLE,""),
-		REG_FLOAT(y,PROP_EDITABLE, ""),
-	END_PROPS(AgEditor_BlendspaceNode::Blendspace_Input)
-}
-
+#endif
 
 class CotrolParamEditorRunTime : public IPropertyEditor
 {
@@ -2563,64 +1832,32 @@ public:
 
 };
 
-// Property Editor Factorys
+#include "AddClassToFactory.h"
 
-class AnimationGraphEditorPropertyFactory : public IPropertyEditorFactory
-{
-public:
+struct AutoStruct_asdf {
+	AutoStruct_asdf() {
+		auto& pfac = get_property_editor_factory();
 
-	// Inherited via IPropertyEditorFactory
-	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) override
-	{
-		if (strcmp(prop->custom_type_str, "AG_CLIP_TYPE") == 0) {
-			return new FindAnimationClipPropertyEditor(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_LISP_CODE") == 0) {
-			return new AgLispCodeEditorProperty(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_ENUM_TYPE_FINDER") == 0) {
-			return new AgEnumFinder(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_PARAM_FINDER") == 0) {
-			return new AgParamFinder(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_EDITOR_BLEND_SPACE_PARAMETERIZATION") == 0) {
-			return new AgEdtior_BlendSpaceParameteriation(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_RUN_EDIT") == 0) {
-			return new CotrolParamEditorRunTime(instance, prop);
-		}
+		pfac.registerClass<FindAnimationClipPropertyEditor>("AG_CLIP_TYPE");
+		pfac.registerClass<AgLispCodeEditorProperty>("AG_LISP_CODE");
+		pfac.registerClass<AgEnumFinder>("AG_ENUM_TYPE_FINDER");
+		pfac.registerClass<AgParamFinder>("AG_PARAM_FINDER");
+		pfac.registerClass<AgEdtior_BlendSpaceParameteriation>("AG_EDITOR_BLEND_SPACE_PARAMETERIZATION");
+		pfac.registerClass<CotrolParamEditorRunTime>("AG_CONTROL_PARAM_RUN_EDIT");
 
-		return nullptr;
+		auto& afac = get_array_header_factory();
+
+		afac.registerClass<ControlParamArrayHeader>("AG_CONTROL_PARAM_ARRAY");
+		afac.registerClass<AgEditor_BlendSpaceArrayHead>("AG_EDITOR_BLEND_SPACE");
+		afac.registerClass<ControlParamArrayHeader>("AG_CONTROL_PARAM_ARRAY_RUN_EDIT");
+
+		auto& sfac = get_property_serializer_factory();
+
+		sfac.registerClass<SerializeImNodeState>("SerializeImNodeState");
 	}
-
 };
-static AnimationGraphEditorPropertyFactory g_AnimationGraphEditorPropertyFactory;
 
-
-class AnimationGraphEditorArrayHeaderFactory : public IArrayHeaderFactory
-{
-public:
-
-	// Inherited via IPropertyEditorFactory
-	virtual IArrayHeader* try_create(PropertyInfo* prop, void* instance) override
-	{
-		if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_ARRAY") == 0) {
-			return new ControlParamArrayHeader(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_EDITOR_BLEND_SPACE") == 0) {
-			return new AgEditor_BlendSpaceArrayHead(instance, prop);
-		}
-		else if (strcmp(prop->custom_type_str, "AG_CONTROL_PARAM_ARRAY_RUN_EDIT") == 0) {
-			return new ControlParamArrayHeader(instance, prop);	// fixme
-		}
-
-
-		return nullptr;
-	}
-
-};
-static AnimationGraphEditorArrayHeaderFactory g_AnimationGraphEditorArrayHeaderFactory;
+static AutoStruct_asdf add_to_factories_asdf;
 
 static const char* strs[] = {
 	"FiveVert",
@@ -2628,3 +1865,43 @@ static const char* strs[] = {
 	"FifteenVert",
 };
 AutoEnumDef BlendSpace2dTopology_def = AutoEnumDef("blend2d", 3, strs);
+
+std::string SerializeImNodeState::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)
+{
+	auto context = *(ImNodesEditorContext**)info.get_ptr(inst);
+	return ImNodes::SaveEditorStateToIniString(context);
+}
+
+void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr)
+{
+	std::string inistring(token.str_start, token.str_len);
+	auto context = (ImNodesEditorContext**)info.get_ptr(inst);
+	*context = ImNodes::EditorContextCreate();
+	ImNodes::LoadEditorStateFromIniString(*context, inistring.c_str(), inistring.size());
+}
+
+struct AgSerializeContext
+{
+	std::unordered_map<Node_CFG*, int> ptr_to_index;
+	Animation_Tree_CFG* tree = nullptr;
+};
+
+std::string SerializeNodeCFGRef::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)
+{
+	ASSERT(userptr.name == NAME("AgSerializeContext"));
+	AgSerializeContext* context = (AgSerializeContext*)userptr.ptr;
+	auto node = *(Node_CFG**)info.get_ptr(inst);
+	ASSERT(context->ptr_to_index.find(node) != context->ptr_to_index.end());
+
+	return std::to_string(context->ptr_to_index.find(node)->second);
+}
+
+void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr)
+{
+	ASSERT(userptr.name == NAME("AgSerializeContext"));
+	AgSerializeContext* context = (AgSerializeContext*)userptr.ptr;
+	auto node_ptr = (Node_CFG**)info.get_ptr(inst);
+	int index = atoi(token.to_stack_string().c_str());
+	ASSERT(index >= 0 && index < context->tree->all_nodes.size());
+	*node_ptr = context->tree->all_nodes.at(index);
+}

@@ -157,6 +157,16 @@
     <ClCompile Include="Source\ExpressionLang.cpp">
       <Filter>Source\Shared\Script</Filter>
     </ClCompile>
+    <ClCompile Include="Anim\Editor\Root_node.cpp" />
+    <ClCompile Include="Anim\Editor\State_node.cpp">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EdNode.cpp">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClCompile>
+    <ClCompile Include="Anim\Editor\Statemachine_node.cpp">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationTreeLocal.h">
@@ -372,7 +382,7 @@
     <ClInclude Include="Source\StringName.h">
       <Filter>Source\Shared</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ScriptVars.h">
+    <ClInclude Include="Source\ControlParams.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
     <ClInclude Include="Source\ExpressionLang.h">
@@ -383,6 +393,39 @@
     </ClInclude>
     <ClInclude Include="Source\ScriptValue.h">
       <Filter>Source\Shared\Script</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Base_node.h">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Anim\Editor\Basic_nodes.h">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Anim\Editor\State_node.h">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Factory.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Anim\Editor\Statemachine_node.h">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Anim\Editor\Root_node.h">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Anim\Editor\Blendspace_nodes.h">
+      <Filter>Source\Animation\Editor\Nodes</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\TypeInfo.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AddClassToFactory.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\TypedVoidPtr.h">
+      <Filter>Source\Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="WriteObject.h">
+      <Filter>Source\Animation\Reflection</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -430,6 +473,15 @@
     </Filter>
     <Filter Include="Source\Shared\Script">
       <UniqueIdentifier>{c6a03c8a-f0c4-4a0f-9e1b-acfecab0d3ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Animation\Editor\Nodes">
+      <UniqueIdentifier>{0a794bc5-6d32-43ce-a56f-b3846e2cf753}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Animation\Runtime">
+      <UniqueIdentifier>{9c05b69c-23cb-472c-96ba-75b0d5df44ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Animation\Runtime\Nodes">
+      <UniqueIdentifier>{000376a4-56d3-4283-a0a5-bf5b9931a84e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

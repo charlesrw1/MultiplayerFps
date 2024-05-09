@@ -25,7 +25,12 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data);
 class IPropertyEditor
 {
 public:
-	IPropertyEditor(void* instance, PropertyInfo* prop) : instance(instance), prop(prop) {}
+	IPropertyEditor()  {}
+
+	void post_construct_for_custom_type(void* instance, PropertyInfo* prop) {
+		this->instance = instance;
+		this->prop = prop;
+	}
 
 	void update();
 	virtual void internal_update() = 0;
@@ -37,25 +42,21 @@ public:
 	PropertyInfo* prop = nullptr;
 };
 
-// creates a custom IPropertyEditor based on the custom_type_str in PropertyInfo
-class IPropertyEditorFactory
-{
-public:
-	IPropertyEditorFactory();
-	static IPropertyEditor* create(PropertyInfo* prop, void* instance);
-	virtual IPropertyEditor* try_create(PropertyInfo* prop, void* instance) = 0;
-private:
-	IPropertyEditorFactory* next = nullptr;
-	static IPropertyEditorFactory* first;
-};
+extern Factory<std::string, IPropertyEditor>& get_property_editor_factory();
 
 // optional: gets the string to use for an array header for a given index and what to draw when the item is closed
 class IArrayHeader
 {
 public:
-	IArrayHeader(void* instance, PropertyInfo* prop) : instance(instance), prop(prop)  {
-		ASSERT(prop->type == core_type_id::List && prop->list_ptr);
+	IArrayHeader() {
+	
 	}
+	void post_construct(void* instance, PropertyInfo* prop) {
+		ASSERT(prop->type == core_type_id::List && prop->list_ptr);
+		this->instance = instance;
+		this->prop = prop;
+	}
+
 	virtual bool imgui_draw_header(int index) = 0;
 	virtual void imgui_draw_closed_body(int index) = 0;
 	virtual bool has_delete_all() { return true; }
@@ -64,18 +65,7 @@ public:
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
 };
-
-// creates a custom IArrayHeader based on the custom_type_str in PropertyInfo, only for core_type_id::List types
-class IArrayHeaderFactory
-{
-public:
-	IArrayHeaderFactory();
-	static IArrayHeader* create(PropertyInfo* prop, void* instance);
-	virtual IArrayHeader* try_create(PropertyInfo* prop, void* instance) = 0;
-private:
-	IArrayHeaderFactory* next = nullptr;
-	static IArrayHeaderFactory* first;
-};
+extern Factory<std::string, IArrayHeader>& get_array_header_factory();
 
 class IGridRow
 {
@@ -229,8 +219,10 @@ public:
 class StringEditor : public IPropertyEditor
 {
 public:
-	using IPropertyEditor::IPropertyEditor;
-
+	StringEditor(void* inst, PropertyInfo* prop) {
+		this->instance = inst;
+		this->prop = prop;
+	}
 	// Inherited via IPropertyEditor
 	virtual void internal_update() override;
 
@@ -241,8 +233,11 @@ public:
 class FloatEditor : public IPropertyEditor
 {
 public:
-	FloatEditor(void* inst, PropertyInfo* prop) 
-		: IPropertyEditor(inst, prop) { hint_str = parse_hint_str_for_property(prop); }
+	FloatEditor(void* inst, PropertyInfo* prop) { 
+		this->instance = inst;
+		this->prop = prop;
+		hint_str = parse_hint_str_for_property(prop); 
+	}
 
 	// Inherited via IPropertyEditor
 	virtual void internal_update() override;
@@ -260,8 +255,11 @@ public:
 class IntegerEditor : public IPropertyEditor
 {
 public:
-	IntegerEditor(void* inst, PropertyInfo* prop) 
-		: IPropertyEditor(inst, prop) { hint_str = parse_hint_str_for_property(prop); }
+	IntegerEditor(void* inst, PropertyInfo* prop)  { 
+		this->instance = inst;
+		this->prop = prop;
+		hint_str = parse_hint_str_for_property(prop);
+	}
 
 
 	// Inherited via IPropertyEditor
@@ -278,8 +276,11 @@ public:
 class EnumEditor : public IPropertyEditor
 {
 public:
-	EnumEditor(void* inst, PropertyInfo* prop) 
-		: IPropertyEditor(inst, prop) { hint_str = parse_hint_str_for_property(prop); }
+	EnumEditor(void* inst, PropertyInfo* prop) { 
+		this->instance = inst;
+		this->prop = prop;
+		hint_str = parse_hint_str_for_property(prop); 
+	}
 
 	// Inherited via IPropertyEditor
 	virtual void internal_update() override;
@@ -295,8 +296,11 @@ public:
 class BooleanEditor : public IPropertyEditor
 {
 public:
-	BooleanEditor(void* inst, PropertyInfo* prop) 
-		: IPropertyEditor(inst,prop) { hint_str = parse_hint_str_for_property(prop); }
+	BooleanEditor(void* inst, PropertyInfo* prop) { 
+		this->instance = inst;
+		this->prop = prop;
+		hint_str = parse_hint_str_for_property(prop);
+	}
 
 	// Inherited via IPropertyEditor
 	virtual void internal_update() override;

@@ -1,40 +1,44 @@
 #include "AnimationTreeLocal.h"
-
 #include "AnimationUtil.h"
-
 #include "DictWriter.h"
 #include "DictParser.h"
-
-
 #include "ReflectionRegisterDefines.h"
 #include "StdVectorReflection.h"
+#include "ControlParams.h"
+#include "AddClassToFactory.h"
 
-#include "ScriptVars.h"
 
+#define IMPL_NODE_CFG(type_name) \
+const TypeInfo& type_name::get_typeinfo() const { \
+	static TypeInfo ti = { #type_name, sizeof(type_name) };\
+	return ti;\
+}\
+AddClassToFactory<type_name, Node_CFG> nodecreator##type_name(get_runtime_node_factory(),#type_name);
 
-struct AutoAnimNodeDef
+IMPL_NODE_CFG(Clip_Node_CFG);
+IMPL_NODE_CFG(Sync_Node_CFG);
+IMPL_NODE_CFG(Mirror_Node_CFG);
+IMPL_NODE_CFG(Statemachine_Node_CFG);
+IMPL_NODE_CFG(Add_Node_CFG);
+IMPL_NODE_CFG(Subtract_Node_CFG);
+IMPL_NODE_CFG(Blend_Node_CFG);
+IMPL_NODE_CFG(Blend_Int_Node_CFG);
+IMPL_NODE_CFG(BlendSpace2d_CFG);
+IMPL_NODE_CFG(BlendSpace1d_CFG);
+IMPL_NODE_CFG(Scale_By_Rootmotion_CFG);
+
+PropertyInfoList* get_nodecfg_ptr_type()
 {
-	AutoAnimNodeDef(animnode_type type, create_func create, int allowed_inputs, const char* ed_name, const char* ed_tooltip, Color32 color) {
-		get_animnode_typedef(type).create = create;
-		get_animnode_typedef(type).editor_name = ed_name;
-		get_animnode_typedef(type).editor_tooltip = ed_tooltip;
-		get_animnode_typedef(type).editor_color = color;
-		get_animnode_typedef(type).allowed_inputs = allowed_inputs;
-
-	}
-};
-#define IMPL_TOOL_NODE(type, num_inputs/* num inputs allowed, -1 for any/specific */, name /* editor name */, tooltip /* editor tooltip */, color /* editor node color*/)   static AutoAnimNodeDef autoanimnode_##type(animnode_type::type,nullptr,num_inputs, name, tooltip, color)
-#define IMPL_ANIMNODE(type, num_inputs, name, tooltip, color) static AutoAnimNodeDef autoanimnode_##type(type::CONST_TYPE_ENUM, type::create, num_inputs, name, tooltip, color)
+	static PropertyInfo props[] = {
+		make_struct_property("__value",0,PROP_SERIALIZE,"SerializeNodeCFGRef")
+	};
+	static PropertyInfoList list = { props,1,"nodecfg_ptr" };
+	return &list;
+}
 
 
-// colors for editor nodes
-static const Color32 ROOT_COLOR = { 94, 2, 2 };
-static const Color32 SM_COLOR = { 82, 2, 94 };
-static const Color32 STATE_COLOR = { 15, 61, 16 };
-static const Color32 SOURCE_COLOR = { 1, 0, 74 };
-static const Color32 BLEND_COLOR = { 26, 75, 79 };
-static const Color32 ADD_COLOR = { 44, 57, 71 };
-static const Color32 MISC_COLOR = { 13, 82, 44 };
+#if 0
+
 
 IMPL_TOOL_NODE(start_statemachine, 0, "START", "State machine enter", ROOT_COLOR);
 IMPL_TOOL_NODE(root, 1, "OUTPUT", "Output pose for the blend tree", ROOT_COLOR);
@@ -63,30 +67,7 @@ IMPL_ANIMNODE(BlendSpace1d_CFG,-1, "Blend 1D",
 IMPL_ANIMNODE(Scale_By_Rootmotion_CFG,1, "Rootmotion Scale", "Scale any clip sampling by the velocity parameter. \n(ex: a running clip is at 2 m/s, entity is moving at 4 m/s, so clip is played at 2x speed", MISC_COLOR);
 
 
-static const char* animnode_strs[] = {
-	"source",
-	"statemachine",
-	"mask",
-	"blend",
-	"blend_by_int",
-	"blend2d",
-	"blend1d",
-	"add",
-	"subtract",
-	"aimoffset",
-	"mirror",
-	"play_speed",
-	"rootmotion_speed",
-	"sync",
-	"state",
-	"root",
-	"start_statemachine",
-	"COUNT",
-};
-
-static_assert((sizeof(animnode_strs) / sizeof(char*)) ==  ((int)animnode_type::COUNT + 1), "string reflection out of sync");
-AutoEnumDef animnode_type_def = AutoEnumDef("",sizeof(animnode_strs)/sizeof(char*), animnode_strs);
-
+#endif
 
 PropertyInfoList* State::get_props()
 {
@@ -452,12 +433,6 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	return false;
 }
 
-animnode_name_type& get_animnode_typedef(animnode_type type) {
-	static animnode_name_type types[(int)animnode_type::COUNT];
-
-	return types[(int)type];
- }
-
 Animation_Tree_CFG::Animation_Tree_CFG()
 {
 	graph_var_lib = std::make_unique<Library>();
@@ -507,6 +482,14 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 int root_node_index = -1;
  };
 
+#include "../WriteObject.h"
+
+ struct getter_nodecfg
+ {
+	 static void get(std::vector<PropertyListInstancePair>& props, Node_CFG* node) {
+		 props.push_back({ node->get_props(), node });
+	 }
+ };
 
  void Animation_Tree_CFG::write_to_dict(DictWriter& out)
  {
@@ -548,10 +531,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 auto& node = all_nodes[i];
 		 out.write_item_start();
 		 {
-			 const char* type_name = Enum::get_type_name(animnode_type_def.id);
-			 const char* enum_str = Enum::get_enum_name(animnode_type_def.id, (int)node->get_type());
-			 char* out_str = string_format("%s::%s", type_name, enum_str);
-			 out.write_key_value("type", out_str);
+			 write_object_properties<Node_CFG, getter_nodecfg>(node, {}, out);
 
 			 out.write_key_list_start("inputs");
 			 for (int i = 0; i < node->input.size(); i++) {
@@ -561,8 +541,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 				 out.write_value(string_format("%d", index));
 			 }
 			 out.write_list_end();
-
-			 write_properties(*node->get_props(), node, out);
 		 }
 		 out.write_item_end();
 	 }
@@ -701,18 +679,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  }
 
 
- void Statemachine_Node_CFG::write_to_dict(Animation_Tree_CFG* tree, DictWriter& out) {
-
- }
-
-
- // FIXME BROKEN AS FUCK
- void Statemachine_Node_CFG::read_from_dict(Animation_Tree_CFG* tree, DictParser& in) 
- {
-
- }
-
- float PropertyInfo::get_float(void* ptr)
+ float PropertyInfo::get_float(void* ptr) const
  {
 	 ASSERT(type == core_type_id::Float);
 
@@ -726,7 +693,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 *(float*)((char*)ptr + offset) = f;
  }
 
- int PropertyInfo::get_int(void* ptr)
+ int PropertyInfo::get_int(void* ptr) const
  {
 	 ASSERT(is_integral_type());
 	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
@@ -830,3 +797,9 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	"float_t",
  };
  AutoEnumDef control_param_type_def = AutoEnumDef("cpt", 4, cpt_strs);
+
+ Factory<std::string, Node_CFG>& get_runtime_node_factory()
+ {
+	static Factory<std::string, Node_CFG> factory;
+	return factory;
+ }
