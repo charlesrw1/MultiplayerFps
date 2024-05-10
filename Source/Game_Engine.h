@@ -2,7 +2,7 @@
 #include <SDL2/SDL.h>
 #include <string>
 #include "Types.h"
-#include "Config.h"
+#include "Framework/Config.h"
 #include "ParticlesPublic.h"
 #include "Physics.h"
 #include "Entity.h"

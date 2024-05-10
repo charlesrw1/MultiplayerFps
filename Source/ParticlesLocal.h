@@ -2,13 +2,13 @@
 #include "Texture.h"
 #include "glm/glm.hpp"
 #include <vector>
-#include "Util.h"
+#include "Framework/Util.h"
 #include "Shader.h"
-#include "MeshBuilder.h"
+#include "Framework/MeshBuilder.h"
 
-#include "MathLib.h"
+#include "Framework/MathLib.h"
 
-#include "FreeList.h"
+#include "Framework/FreeList.h"
 #include "ParticlesPublic.h"
 
 #include <unordered_map>

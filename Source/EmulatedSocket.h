@@ -3,8 +3,8 @@
 #include <queue>
 #include <ctime>
 #include "Net.h"
-#include "MathLib.h"
-#include "Util.h"
+#include "Framework/MathLib.h"
+#include "Framework/Util.h"
 
 class EmulatedSocket : public Socket
 {

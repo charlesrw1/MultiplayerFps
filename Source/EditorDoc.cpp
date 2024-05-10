@@ -5,8 +5,8 @@
 #include <algorithm>
 #include "DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
-#include "MeshBuilder.h"
-
+#include "Framework/MeshBuilder.h"
+#include "Framework/Dict.h"
 EditorDoc ed_doc;
 EditorDocPublic* g_editor_doc = &ed_doc;
 

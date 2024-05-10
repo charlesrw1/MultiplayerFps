@@ -1,9 +1,8 @@
 #ifndef NET_H
 #define NET_H
-#include "Util.h"
-#include "Bytepacker.h"
+#include "Framework/Util.h"
 #include "Connection.h"
-#include "Animation.h"
+#include "Animation/Runtime/Animation.h"
 
 const int CLIENT_SNAPSHOT_HISTORY = 16;	// buffer last 16 snapshots
 
@@ -141,6 +140,9 @@ void new_entity_fields_test();
 // Network serialization functions
 
 class Entity;
+
+class ByteWriter;
+class ByteReader;
 
 void write_full_entity(Entity* e, ByteWriter& msg);
 void read_entity(Entity* e, ByteReader& msg, int condition, bool is_delta);

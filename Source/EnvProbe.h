@@ -2,7 +2,7 @@
 #define ENVPROBE_H
 
 #include "Shader.h"
-#include "Util.h"
+#include "Framework/Util.h"
 #include <string>
 
 const int CUBEMAP_SIZE = 128;

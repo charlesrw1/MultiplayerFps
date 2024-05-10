@@ -2,11 +2,10 @@
 #define LEVEL_H
 #include <vector>
 #include <string>
-#include "BVH.h"
 #include "Model.h"
-#include "Config.h"
-#include "Dict.h"
-
+#include "Framework/BVH.h"
+#include "Framework/Config.h"
+#include "Framework/Dict.h"
 #include "DrawPublic.h"
 
 enum {

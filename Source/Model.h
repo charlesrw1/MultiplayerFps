@@ -6,11 +6,11 @@
 #include <memory>
 #include <map>
 #include <unordered_map>
-#include "MathLib.h"
+#include "Framework/MathLib.h"
 #include "glm/gtc/quaternion.hpp"
-#include "Util.h"
-#include "Animation.h"
-#include "BVH.h"
+#include "Framework/Util.h"
+#include "Animation/Runtime/Animation.h"
+#include "Framework/BVH.h"
 #include "DrawTypedefs.h"
 
 class Material;

@@ -5,8 +5,9 @@
 #include "glad/glad.h"
 #include "glm/gtc/type_ptr.hpp"
 
-#include "Util.h"
-#include "Animation.h"
+#include "Framework/Util.h"
+#include "Animation/Runtime/Animation.h"
+#include "Animation/AnimationTreePublic.h"
 #include "Texture.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -971,7 +972,7 @@ Model* FindOrLoadModel(const char* filename)
 }
 
 
-#include "Config.h"
+#include "Framework/Config.h"
 DECLARE_ENGINE_CMD_CAT("gpu.", print_vertex_usage)
 {
 	mods.print_usage();
@@ -1068,8 +1069,6 @@ void Game_Mod_Manager::print_usage()
 	}
 	sys_print("Total memory for ib+vbs: %d\n", total_memory_usage);
 }
-
-#include "AnimationTreePublic.h"
 
 Model* Game_Mod_Manager::find_or_load(const char* filename)
 {

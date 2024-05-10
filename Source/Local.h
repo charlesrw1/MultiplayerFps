@@ -3,9 +3,9 @@
 #include "Shader.h"
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
-#include "Util.h"
-#include "MeshBuilder.h"
-#include "Vs.h"
+#include "Framework/Util.h"
+#include "Framework/MeshBuilder.h"
+#include "Framework/Vs.h"
 
 
 struct RenderAttachments

@@ -1,6 +1,7 @@
 #include "Client.h"
 #include "Game_Engine.h"
 
+#include "Framework/Bytepacker.h"
 //#define DebugOut(fmt, ...)
 
 

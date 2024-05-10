@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "Game_Engine.h"
+#include "Framework/Bytepacker.h"
 
 RemoteClient::RemoteClient(Server* sv, int slot)
 {

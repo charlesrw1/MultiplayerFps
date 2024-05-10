@@ -1,13 +1,13 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 #include "Net.h"
-#include "Animation.h"
+#include "Animation/Runtime/Animation.h"
 #include "Level.h"
 #include "EmulatedSocket.h"
 #include "Physics.h"
 #include "Client.h"
 #include <array>
-#include "Config.h"
+#include "Framework/Config.h"
 #include "Types.h"
 
 

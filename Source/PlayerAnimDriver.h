@@ -1,12 +1,11 @@
 #pragma once
 
-#include "IGraphDriver.h"
+#include "Animation/IGraphDriver.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
-#include "Animation.h"
-#include "AnimationUtil.h"
+#include "Animation/Runtime/Animation.h"
 
 class CharacterGraphDriver : public IAnimationGraphDriver
 {

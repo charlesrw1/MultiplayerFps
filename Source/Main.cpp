@@ -17,11 +17,9 @@
 
 #include "Shader.h"
 #include "Texture.h"
-#include "MathLib.h"
+#include "Framework/MathLib.h"
 #include "Model.h"
-#include "MeshBuilder.h"
-#include "Util.h"
-#include "Animation.h"
+#include "Animation/Runtime/Animation.h"
 #include "Level.h"
 #include "Physics.h"
 #include "Net.h"
@@ -30,16 +28,17 @@
 #include "Client.h"
 #include "Server.h"
 #include "Player.h"
-#include "Config.h"
+#include "Framework/Config.h"
 #include "DrawPublic.h"
 #include "Entity.h"
-#include "AnimationTreePublic.h"
+
+#include "Animation/AnimationTreePublic.h"
+#include "Animation/Editor/AnimationGraphEditorPublic.h"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
 
-#include "AnimationGraphEditorPublic.h"
 
 MeshBuilder phys_debug;
 Game_Engine* eng;
@@ -802,7 +801,7 @@ void init_audio()
 extern void benchmark_run();
 extern void benchmark_gltf();
 extern void at_test();
-#include "ExpressionLang.h"
+#include "Framework/ExpressionLang.h"
 int main(int argc, char** argv)
 {
 

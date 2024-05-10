@@ -1,19 +1,19 @@
 #pragma once
 #include "DrawPublic.h"
-#include "Config.h"
+#include "Framework/Config.h"
 #include "glm/glm.hpp"
-#include "Util.h"
+#include "Framework/Util.h"
 #include "Types.h"
 #include "Level.h"
 #include "GlmInclude.h"
-#include "MeshBuilder.h"
+#include "Framework/MeshBuilder.h"
 #include "Shader.h"
 #include "EnvProbe.h"
 #include "Texture.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
 #include "RenderObj.h"
-#include "FreeList.h"
+#include "Framework/FreeList.h"
 
 #pragma optimize("", on);
 

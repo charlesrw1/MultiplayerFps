@@ -1,11 +1,11 @@
 #ifndef SERVER_H
 #define SERVER_H
 #include "Net.h"
-#include "Animation.h"
+#include "Animation/Runtime/Animation.h"
 #include "Physics.h"
-#include "Config.h"
+#include "Framework/Config.h"
 #include "Types.h"
-#include "MeshBuilder.h"
+#include "Framework/MeshBuilder.h"
 
 // what i want:
 // game_event: make particle, make sound, etc. events

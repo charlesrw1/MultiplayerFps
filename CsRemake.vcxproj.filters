@@ -1,288 +1,280 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Source\Animation.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Client.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ClientMgr.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Config.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Connection.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Draw.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EditorDoc.cpp">
-      <Filter>Source\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EnvProbe.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_demo.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_draw.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_impl_opengl3.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_impl_sdl2.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_tables.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_widgets.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imnodes.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Volumetricfog.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Texture.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Ssao.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Shadowmap.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Shader.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Particles.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Meshlet.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Model.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\MeshBuilder.cpp">
-      <Filter>Source\Draw</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Profilier.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Net.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Socket.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ServerClMgr.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Server.cpp">
-      <Filter>Source\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Player.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Physics.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="source\Game.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="source\Game_Local.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\glad.c">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Level.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Main.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AnimationTreeLocal.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\ImSequencer.cpp">
-      <Filter>Source\External\Imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation_Man.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AnimationGraphEditor.cpp">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="BVHBuild.cpp">
-      <Filter>Source\Shared\Containers</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\DictParser.cpp">
-      <Filter>Source\Shared\Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Files.cpp">
-      <Filter>Source\Shared\Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\PlayerAnimDriver.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AnimationUtil.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ReflectionProp.cpp">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\PropertyEd.cpp">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EnumDefReflection.cpp">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\MyImguiLib.cpp">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\StringName.cpp">
-      <Filter>Source\Shared</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ExpressionLang.cpp">
-      <Filter>Source\Shared\Script</Filter>
-    </ClCompile>
-    <ClCompile Include="Anim\Editor\Root_node.cpp" />
-    <ClCompile Include="Anim\Editor\State_node.cpp">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EdNode.cpp">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClCompile>
-    <ClCompile Include="Anim\Editor\Statemachine_node.cpp">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\ControlParams.cpp" />
+    <Filter Include="Source">
+      <UniqueIdentifier>{32c30d61-581a-47a3-8c34-ff1de5128ecb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Framework">
+      <UniqueIdentifier>{ef5cbbb3-c285-4e2b-a220-4dda0c2ad580}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Animation">
+      <UniqueIdentifier>{3d732538-cb95-4dad-9ffc-135991d6c214}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Animation\Editor">
+      <UniqueIdentifier>{d8fa6c03-cbff-4480-a6f0-9c75feb9afbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Animation\Runtime">
+      <UniqueIdentifier>{433d724c-7600-47d9-9b29-01e60befd274}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\External">
+      <UniqueIdentifier>{5a5346fb-bd44-4cb3-9177-8d10a346476a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Render">
+      <UniqueIdentifier>{be5d62a0-07f0-4721-9751-dbc16c6355bc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\AnimationTreeLocal.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\BaseComponents.h">
-      <Filter>Source\Game</Filter>
+      <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Bytepacker.h">
-      <Filter>Source\Shared</Filter>
+    <ClInclude Include="Source\CamData.h">
+      <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="source\Client.h">
-      <Filter>Source\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Config.h">
-      <Filter>Source\Shared</Filter>
+    <ClInclude Include="Source\Client.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Connection.h">
-      <Filter>Source\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DecalsPublic.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DrawLocal.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DrawPublic.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DrawTypedefs.h">
-      <Filter>Source\Draw</Filter>
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\EditorDocLocal.h">
-      <Filter>Source\Editor</Filter>
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EditorDocPublic.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\EmulatedSocket.h">
-      <Filter>Source\Network</Filter>
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Entity.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Entityclasses.h">
-      <Filter>Source\Game</Filter>
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\EntityTypes.h">
-      <Filter>Source\Game</Filter>
+      <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EnvProbe.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\External\imnodes.h">
-      <Filter>Source\External\Imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\External\imnodes_internal.h">
-      <Filter>Source\External\Imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Texture.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Shader.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\RenderObj.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Renderer_Types.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ParticlesLocal.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ParticlesPublic.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Meshlet.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Model.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MeshBuilder.h">
-      <Filter>Source\Draw</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Util.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Types.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\StringUtil.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MathLib.h">
-      <Filter>Source\Shared</Filter>
+    <ClInclude Include="Source\Game_Engine.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\GlmInclude.h">
-      <Filter>Source\Shared</Filter>
+      <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Socket.h">
-      <Filter>Source\Network</Filter>
+    <ClInclude Include="Source\Level.h">
+      <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="source\Server.h">
-      <Filter>Source\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Player.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Physics.h">
-      <Filter>Source\Game</Filter>
+    <ClInclude Include="Source\Local.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Net.h">
-      <Filter>Source\Network</Filter>
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Physics.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Player.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\PlayerAnimDriver.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Server.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Socket.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Types.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\AddClassToFactory.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\beziercurveeditor.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\BVH.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Bytepacker.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Config.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Dict.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\DictParser.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\DictWriter.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\EnumDefReflection.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ExpressionLang.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Factory.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\FreeList.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Handle.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\InlineVec.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Key_Value_File.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MathLib.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MemArena.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MeshBuilder.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MyImguiLib.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\PropertyEd.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ReflectionProp.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ReflectionRegisterDefines.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ScriptValue.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\StdVectorReflection.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\StringName.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\StringUtil.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\TypedVoidPtr.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\TypeInfo.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Vs.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\WriteObject.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\AnimationTreePublic.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\AnimationTypes.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\AnimationUtil.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\IGraphDriver.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditorPublic.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\Base_node.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\Basic_nodes.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\Blendspace_nodes.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\Root_node.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\Sequencetemp.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\State_node.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Editor\Statemachine_node.h">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\Animation.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\ControlParamHandle.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\ControlParams.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\cgltf.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imconfig.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imgui.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imgui_impl_opengl3.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imgui_impl_opengl3_loader.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imgui_impl_sdl2.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imgui_internal.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imnodes.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imnodes_internal.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\ImSequencer.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imstb_rectpack.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imstb_textedit.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\imstb_truetype.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\json.hpp">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\stb_image.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\stb_image_write.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\tiny_gltf.h">
+      <Filter>Source\External</Filter>
     </ClInclude>
     <ClInclude Include="Source\External\glad\glad.h">
       <Filter>Source\External</Filter>
@@ -290,202 +282,217 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon.h">
-      <Filter>Source\External</Filter>
+    <ClInclude Include="Source\DecalsPublic.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_interfaces.h">
-      <Filter>Source\External</Filter>
+    <ClInclude Include="Source\DrawLocal.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="steamaudio_4.5.2\steamaudio\include\phonon_version.h">
-      <Filter>Source\External</Filter>
+    <ClInclude Include="Source\DrawPublic.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game_Engine.h">
-      <Filter>Source</Filter>
+    <ClInclude Include="Source\DrawTypedefs.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Level.h">
-      <Filter>Source</Filter>
+    <ClInclude Include="Source\EnvProbe.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AnimationTreePublic.h">
-      <Filter>Source\Animation</Filter>
+    <ClInclude Include="Source\Texture.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AnimationUtil.h">
-      <Filter>Source\Animation</Filter>
+    <ClInclude Include="Source\Shader.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Handle.h">
-      <Filter>Source\Shared</Filter>
+    <ClInclude Include="Source\RenderObj.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EditorDocPublic.h">
-      <Filter>Source\Editor</Filter>
+    <ClInclude Include="Source\ProgramCaching.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\External\ImSequencer.h">
-      <Filter>Source\External\Imgui</Filter>
+    <ClInclude Include="Source\Meshlet.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\IGraphDriver.h">
-      <Filter>Source\Animation</Filter>
+    <ClInclude Include="Source\ParticlesPublic.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AnimationTypes.h">
-      <Filter>Source\Animation</Filter>
+    <ClInclude Include="Source\ParticlesLocal.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\PlayerAnimDriver.h">
-      <Filter>Source\Animation</Filter>
+    <ClInclude Include="Source\Model.h">
+      <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AnimationGraphEditor.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\AnimationGraphEditorPublic.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\PropertyEd.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\BVH.h">
-      <Filter>Source\Shared\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MemArena.h">
-      <Filter>Source\Shared\Memory</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\InlineVec.h">
-      <Filter>Source\Shared\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\FreeList.h">
-      <Filter>Source\Shared\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Dict.h">
-      <Filter>Source\Shared\Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DictWriter.h">
-      <Filter>Source\Shared\Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DictParser.h">
-      <Filter>Source\Shared\Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Key_Value_File.h">
-      <Filter>Source\Shared\Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ReflectionProp.h">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ReflectionRegisterDefines.h">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\StdVectorReflection.h">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EnumDefReflection.h">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\MyImguiLib.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\beziercurveeditor.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\StringName.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ControlParams.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ExpressionLang.h">
-      <Filter>Source\Shared\Script</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ControlParamHandle.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ScriptValue.h">
-      <Filter>Source\Shared\Script</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Base_node.h">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Anim\Editor\Basic_nodes.h">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Anim\Editor\State_node.h">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Factory.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Anim\Editor\Statemachine_node.h">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Anim\Editor\Root_node.h">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Anim\Editor\Blendspace_nodes.h">
-      <Filter>Source\Animation\Editor\Nodes</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\TypeInfo.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\AddClassToFactory.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\TypedVoidPtr.h">
-      <Filter>Source\Shared</Filter>
-    </ClInclude>
-    <ClInclude Include="WriteObject.h">
-      <Filter>Source\Animation\Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Sequencetemp.h">
-      <Filter>Source\Animation\Editor</Filter>
+    <ClInclude Include="Source\Framework\Util.h">
+      <Filter>Source\Framework</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Source">
-      <UniqueIdentifier>{32c30d61-581a-47a3-8c34-ff1de5128ecb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\External">
-      <UniqueIdentifier>{05320582-9386-486b-ac4a-c925a55cb080}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\External\Imgui">
-      <UniqueIdentifier>{012ddd1c-aa58-48da-8f72-afaf30b761a0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation">
-      <UniqueIdentifier>{da9ef0dd-e216-44ba-9c06-a11386d8fce8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Editor">
-      <UniqueIdentifier>{e7bba277-c68e-4be3-8490-949a4151f7cc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Draw">
-      <UniqueIdentifier>{d0112166-dc4a-4106-8118-7354a736fd55}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game">
-      <UniqueIdentifier>{9ca067c3-af1e-4c9c-aadb-24d740464781}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Shared">
-      <UniqueIdentifier>{c5101b0f-c43f-42c2-8170-f57b763f636d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Network">
-      <UniqueIdentifier>{6db34f15-69d6-44f6-858d-e8a1f1a4a78c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation\Editor">
-      <UniqueIdentifier>{f9c9c29a-fcbb-4712-aa4f-8633cfb1eace}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Shared\Memory">
-      <UniqueIdentifier>{d62fcd5e-9094-4e8c-94cd-54e5b6e16bd8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Shared\Containers">
-      <UniqueIdentifier>{6f63a5d3-f478-480c-8e68-a603a598cfe4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Shared\Files">
-      <UniqueIdentifier>{66fc2d20-e4f4-40cc-9f70-485ef630ae96}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation\Reflection">
-      <UniqueIdentifier>{bf227bdf-ab78-4e5e-90f9-50c3aaf86b4e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Shared\Script">
-      <UniqueIdentifier>{c6a03c8a-f0c4-4a0f-9e1b-acfecab0d3ed}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation\Editor\Nodes">
-      <UniqueIdentifier>{0a794bc5-6d32-43ce-a56f-b3846e2cf753}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation\Runtime">
-      <UniqueIdentifier>{9c05b69c-23cb-472c-96ba-75b0d5df44ed}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation\Runtime\Nodes">
-      <UniqueIdentifier>{000376a4-56d3-4283-a0a5-bf5b9931a84e}</UniqueIdentifier>
-    </Filter>
+    <ClCompile Include="Source\Client.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ClientMgr.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Connection.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EditorDoc.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Files.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game_Local.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\glad.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Level.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Main.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Net.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Physics.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Player.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\PlayerAnimDriver.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Server.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\ServerClMgr.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Socket.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\BVHBuild.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Config.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\DictParser.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\ExpressionLang.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\MeshBuilder.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\MyImguiLib.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\PropertyEd.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\ReflectionProp.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\StringName.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Animation_Man.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\AnimationUtil.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor.cpp">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Editor\State_node.cpp">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Editor\Statemachine_node.cpp">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Runtime\Animation.cpp">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\glad.c">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui_demo.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui_draw.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui_impl_opengl3.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui_impl_sdl2.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui_tables.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imgui_widgets.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\imnodes.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\ImSequencer.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Draw.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EnvProbe.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Volumetricfog.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Texture.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Ssao.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Shadowmap.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Shader.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Meshlet.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Particles.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Model.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Profilier.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Editor\EdNode.cpp">
+      <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

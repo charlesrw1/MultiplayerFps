@@ -1,11 +1,11 @@
 #include "Physics.h"
 #include <vector>
 #include "GlmInclude.h"
-#include "MathLib.h"
+#include "Framework/MathLib.h"
 #include "Level.h"
-#include "MeshBuilder.h"
+#include "Framework/MeshBuilder.h"
 #include "glad/glad.h"
-#include "BVH.h"
+#include "Framework/BVH.h"
 #include "Types.h"
 #include "Model.h"
 

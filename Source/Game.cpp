@@ -497,8 +497,8 @@ void EntTakeDamage(Entity* ent, Entity* from, int amt)
 	}
 }
 
-#include "MeshBuilder.h"
-#include "Config.h"
+#include "Framework/MeshBuilder.h"
+#include "Framework/Config.h"
 void Game_Engine::execute_player_move(int num, Move_Command cmd)
 {
 	double oldtime = eng->time;

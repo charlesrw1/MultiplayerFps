@@ -2,7 +2,7 @@
 #include "glad/glad.h"
 #include <glm/ext.hpp>
 #include "Texture.h"
-#include "MeshBuilder.h"
+#include "Framework/MeshBuilder.h"
 #include "DrawLocal.h"
 
 using glm::vec3;

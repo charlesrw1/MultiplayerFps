@@ -6,6 +6,7 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "Physics.h"
 #include "Texture.h"
+#include "Framework/Key_Value_File.h"
 #include <array>
 
 static const char* const maps_directory = "./Data/Maps/";
@@ -61,7 +62,6 @@ void Physics_Mesh::build()
 	printf("Built bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
-#include "Key_Value_File.h"
 void load_ents(Level* l, const std::string& mapdir)
 {
 	std::string ent_file_name = mapdir + "ents.txt";

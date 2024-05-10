@@ -1,11 +1,11 @@
 #include "Game_Engine.h"
 #include "Client.h"
-#include "Util.h"
+#include "Framework/Util.h"
 #include "Game_Engine.h"
 #include "GlmInclude.h"
 #include "Player.h"
-#include "MeshBuilder.h"
-#include "Config.h"
+#include "Framework/MeshBuilder.h"
+#include "Framework/Config.h"
 
 
 glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
