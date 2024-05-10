@@ -1,3 +1,4 @@
+#if 0
 #include <meshoptimizer.h>
 #include <vector>
 #include "Model.h"
@@ -164,3 +165,4 @@ Chunked_Model* get_chunked_mod(const char* filename)
 
 	return chunked_mesh;
 }
+#endif

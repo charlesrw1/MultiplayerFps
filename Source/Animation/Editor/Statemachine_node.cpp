@@ -1,4 +1,4 @@
-#include "../Anim/Editor/Statemachine_node.h"
+#include "Statemachine_node.h"
 
  void Statemachine_EdNode::init() {
 	bool is_create = util_create_or_ensure(node);

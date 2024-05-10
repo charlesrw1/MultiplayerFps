@@ -32,5 +32,4 @@ struct Chunked_Model
 	Model* model;
 };
 
-
-Chunked_Model* get_chunked_mod(const char* filename);
+//Chunked_Model* get_chunked_mod(const char* filename);

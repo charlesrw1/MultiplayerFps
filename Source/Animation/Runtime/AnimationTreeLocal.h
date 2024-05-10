@@ -544,13 +544,7 @@ struct Statemachine_Node_CFG : public Node_CFG
 	using RT_TYPE = Statemachine_Node_RT;
 	DECLARE_NO_DEFAULT(Statemachine_Node_CFG);
 
-	virtual void initialize(Animation_Tree_CFG* tree) override {
-		init_memory_internal(tree, sizeof(RT_TYPE));
-		
-		for (int i = 0; i < states.size(); i++) {
-			states[i].tree = serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
-		}
-	}
+	virtual void initialize(Animation_Tree_CFG* tree) override;
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 

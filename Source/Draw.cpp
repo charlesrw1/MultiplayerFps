@@ -2204,7 +2204,7 @@ glm::vec4 bounds_to_sphere(Bounds b)
 	if (diff.z > radius)radius = diff.z;
 	return glm::vec4(center, radius);
 }
-
+#if 0
 void multidraw_testing()
 {
 	GPUFUNCTIONSTART;
@@ -2535,7 +2535,7 @@ void multidraw_testing()
 
 	draw.stats.tris_drawn = sphere->mesh.parts[0].element_count * num_batches_to_render * num_prims_per_batch / 3;
 }
-
+#endif
 struct Debug_Shape
 {
 	enum type {
@@ -2731,7 +2731,7 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 	}
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	multidraw_testing();
+	//multidraw_testing();
 
 	DrawEntBlobShadows();
 

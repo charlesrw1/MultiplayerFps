@@ -1,6 +1,6 @@
 "runtime" {
 "rootdata" {
-"root"  "0"
+"root"  "-1"
 "data_used"  "40"
 "graph_is_valid"  "0"
 }
@@ -12,15 +12,7 @@ type "Statemachine_Node_CFG"
 "states"  [
 {
 "transition_idxs"  [
- 1  ]
-"state_duration"  "-1.000000"
-"wait_until_finish"  "0"
-"is_end_state"  "0"
-"tree"  "-1"
-}
-{
-"transition_idxs"  [
- 2  ]
+]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
@@ -28,20 +20,6 @@ type "Statemachine_Node_CFG"
 }
 ]
 "transitions"  [
-{
-"transition_state"  "0"
-"automatic_transition_rule"  "1"
-"transition_time"  "0.200000"
-"script_uncompilied"  ""
-"is_continue_transition"  "1"
-}
-{
-"transition_state"  "1"
-"automatic_transition_rule"  "1"
-"transition_time"  "0.200000"
-"script_uncompilied"  ""
-"is_continue_transition"  "0"
-}
 {
 "transition_state"  "0"
 "automatic_transition_rule"  "1"
@@ -62,16 +40,16 @@ type "Statemachine_Node_CFG"
  editor
 {
 "rootstate" {
-"current_id"  "9"
-"current_layer"  "5"
+"current_id"  "5"
+"current_layer"  "3"
 "default_editor"  "[editor]
-panning=447,329
+panning=315,352
 
 [node.0]
-origin=0,0
+origin=-124,-128
 
 [node.1]
-origin=-245,-28
+origin=-229,-7
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
@@ -91,16 +69,13 @@ type "Statemachine_EdNode"
 "name"  ""
 "sublayer.id"  "1"
 "sublayer.context"  "[editor]
-panning=159,325
+panning=113,325
 
 [node.2]
-origin=-45,15
+origin=0,0
 
 [node.3]
-origin=140,-174
-
-[node.7]
-origin=177,104
+origin=156,-194
 "
 "node"  "0"
 }
@@ -113,7 +88,7 @@ type "StateStart_EdNode"
 type "State_EdNode"
 "id"  "3"
 "graph_layer"  "1"
-"name"  "IDLE"
+"name"  ""
 "state_handle_internal.id"  "0"
 "sublayer.id"  "2"
 "sublayer.context"  "[editor]
@@ -124,22 +99,6 @@ panning=0,0
 type "Root_EdNode"
 "id"  "4"
 "graph_layer"  "2"
-}
-{
-type "State_EdNode"
-"id"  "7"
-"graph_layer"  "1"
-"name"  ""
-"state_handle_internal.id"  "1"
-"sublayer.id"  "4"
-"sublayer.context"  "[editor]
-panning=0,0
-"
-}
-{
-type "Root_EdNode"
-"id"  "8"
-"graph_layer"  "4"
 }
 ]
 }

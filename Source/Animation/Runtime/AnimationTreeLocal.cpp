@@ -260,6 +260,47 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	return ret;
 }
 
+ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
+	 init_memory_internal(tree, sizeof(RT_TYPE));
+
+	 for (int i = 0; i < states.size(); i++) {
+		 states[i].tree = serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
+	 }
+
+	 if (tree->graph_is_valid) {
+		 // this can be serialized to a bytestream but for now just compile it on load
+		 // since the graph is valid, there shoudnt be and runtime errors
+		 // however, graph_is_valid can be true and the script is bad ONLY IF
+		 // this statemachine isnt referenced in the final tree, thus a bad script
+		 // has no effect on the final graph
+		 // theres an assert checking that the script is valid when its checked in the 
+		 // graphs real path
+
+		 for (int i = 0; i < transitions.size(); i++) {
+			 if (transitions[i].is_a_continue_transition()) 
+				 continue;
+
+			 bool bad = false;
+			const std::string& code = transitions[i].script_uncompilied;
+			try {
+				 auto ret = transitions[i].script_condition.compile(
+					 tree->graph_program.get(),
+					 code,
+					 NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
+			
+				 // must return boolean
+				 if (ret.out_types.size() != 1 || ret.out_types[0] != script_types::bool_t)
+					 bad = true;
+			}
+			catch (...) {
+				bad = true;
+			}
+			if (bad)
+				transitions[i].script_condition.instructions.clear();
+		 }
+	 }
+ }
+
  bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 
 	auto rt = get_rt<Statemachine_Node_RT>(ctx);
@@ -451,13 +492,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		REG_BOOL(graph_is_valid, PROP_SERIALIZE, "")
 	END_PROPS()
  }
-
- struct AnimationTreeLoadStruct
- {
-	 std::string name;
-	 bool graph_is_valid = false;
-	 int root_node_index = -1;
- };
 
 
  struct getter_nodecfg
