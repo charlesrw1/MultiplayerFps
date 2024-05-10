@@ -194,7 +194,7 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t fla
 }
 
 void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, TypedVoidPtr userptr);
-std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, DictWriter& out, TypedVoidPtr userptr) {
+std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, DictWriter& out, TypedVoidPtr userptr) {
 	std::string value_str;
 
 	switch (prop.type)
@@ -228,6 +228,7 @@ std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, D
 
 		write_list(&prop, prop.get_ptr(ptr), out, userptr);
 
+		return std::pair<std::string,bool>{ {},false };
 	}break;
 
 	case core_type_id::Struct: {
@@ -237,16 +238,16 @@ std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, D
 		if (serializer) {
 			auto str = serializer->serialize(out, prop, ptr, userptr);
 			delete serializer;	// fixme: inplace new/free instead?
-			return str;
+			value_str = std::move(str);
 		}
 		else {
 			printf("!!!!!! NO SERIALIZER FOR STRUCT %s !!!!!!!!", prop.custom_type_str);
-			return "";
+			ASSERT(0);
 		}
 
 	}break;
 	}
-	return value_str;
+	return { value_str,true };
 }
 
 void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr userptr)
@@ -268,7 +269,9 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr
 
 			uint8_t* member_dat = list_ptr->get_index(ptr, i);
 
-			buf += write_field_type(prop.type, member_dat, prop, out, userptr);
+			auto str = write_field_type(prop.type, member_dat, prop, out, userptr);
+			ASSERT(str.second);
+			buf += str.first;
 			buf += ' ';
 			out.write_value_no_ln(buf.c_str());
 			buf.clear();
@@ -303,10 +306,10 @@ void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedV
 		if (!(flags & PROP_SERIALIZE))
 			continue;
 		
-		out.write_key(string_format("%s ", prop.name));
-		std::string value_str = write_field_type(prop.type, ptr, prop, out, userptr);
-		if (!value_str.empty())
-			out.write_value_quoted(value_str.c_str());
+		out.write_key(prop.name);
+		auto write_val = write_field_type(prop.type, ptr, prop, out, userptr);
+		if (write_val.second)
+			out.write_value_quoted(write_val.first.c_str());
 	}
 }
 bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr);
@@ -326,7 +329,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 
 			listcallback->resize(listptr, count + 1);
 
-			if (!read_propety_field(prop, listcallback->get_index(listptr, count), in, tok, userptr))
+			if (!read_propety_field(&listcallback->props_in_list->list[0], listcallback->get_index(listptr, count), in, tok, userptr))
 				return false;
 
 			count++;
@@ -340,8 +343,6 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 		while (!in.is_eof() && !in.check_list_end(tok)) {
 
 			listcallback->resize(listptr, count + 1);
-
-			in.read_string(tok);
 
 
 			if (!read_properties(*listcallback->props_in_list, listcallback->get_index(listptr, count), in, tok, userptr).second)
@@ -444,47 +445,28 @@ FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePai
 
 std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, TypedVoidPtr userptr)
 {
-	// expect { (start field list)
-	if (!in.check_item_start(tok))
+	// expect { (start field list) if not a null token
+	if (tok.str_len > 0 && !in.check_item_start(tok))
 		return { tok, false };
 
 	in.read_string(tok);
 	while (!in.is_eof() && !in.check_item_end(tok))	// exit out if } (end field list)
 	{
-		// expect { (start property field)
-		if (!in.check_item_start(tok))
-			return { tok, false };
-
-		in.read_string(tok);
-		if (!tok.cmp("name"))
-			return { tok, false };
-		in.read_string(tok);
 		auto name = tok.to_stack_string();
 		auto find = find_in_proplists(name.c_str(), proplists);
 
 		if (!find.prop) {
 			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
-
-			// skip property field
-			while (!in.is_eof() && !in.check_item_end(tok)) {
-				in.read_string(tok);
-			}
-			in.read_string(tok);
+			
+			in.read_string(tok);	// ERROR
+			ASSERT(0);
 			continue;
 		}
-
-		in.read_string(tok);
-		if (!tok.cmp("value"))
-			return { tok, false };
 
 		in.read_string(tok);
 		if (!read_propety_field(find.prop, find.instptr, in, tok, userptr))
 			return { tok, false };
 
-
-		in.read_string(tok);
-		if (!in.check_item_end(tok))
-			return { tok, false };
 
 		in.read_string(tok);
 	}

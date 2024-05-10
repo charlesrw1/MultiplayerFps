@@ -283,9 +283,14 @@ void AnimationGraphEditor::init()
 
 void AnimationGraphEditor::close()
 {
-	idraw->remove_obj(out.obj);
+	if (!has_document_open())
+		return;
+	
 	// fixme:
 	save_document();
+
+	if(out.obj.is_valid())
+		idraw->remove_obj(out.obj);
 
 	for (int i = 0; i < nodes.size(); i++) {
 		delete nodes[i];
@@ -295,9 +300,29 @@ void AnimationGraphEditor::close()
 	if (is_owning_editing_tree) {
 		delete editing_tree;
 	}
+	out.anim = Animator();
 	editing_tree = nullptr;
+	name = "";
+	out.model = nullptr;
+	out.set = nullptr;
+	open_open_popup = false;
+	open_save_popup = false;
+	reset_prop_editor_next_tick = false;
+	playback = graph_playback_state::stopped;
+
+	sel = selection_state();
+	drop_state = create_from_drop_state();
+	current_id = 0;
+	current_layer = 1;
+
+	opt = settings();
+	graph_tabs = TabState(this);
+	node_props.clear_all();
+	control_params.clear_all();
 
 	ImNodes::EditorContextFree(default_editor);
+
+	ASSERT(!has_document_open());
 }
 
 
@@ -485,11 +510,11 @@ void TabState::imgui_draw() {
 	}
 }
 
-void AnimationGraphEditor::save_document()
+bool AnimationGraphEditor::save_document()
 {
-	if (name.empty()) {
+	if (!current_document_has_path()) {
 		open_save_popup = true;
-		return;
+		return false;
 	}
 
 	// first compile, compiling writes editor node data out to the CFG node
@@ -504,6 +529,8 @@ void AnimationGraphEditor::save_document()
 	std::ofstream outfile(name);
 	outfile.write(write.get_output().c_str(), write.get_output().size());
 	outfile.close();
+
+	return true;
 }
 #include "ReflectionRegisterDefines.h"
 #include "StdVectorReflection.h"
@@ -529,9 +556,7 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 	{
 		if (!in.expect_string("rootstate") || !in.expect_item_start())
 			return false;
-		StringView tok;
-		in.read_string(tok);
-		auto out = read_properties(*get_props(), this, in, tok, userptr);
+		auto out = read_properties(*get_props(), this, in, {}, userptr);
 		if (!out.second || !in.check_item_end(out.first))
 			return false;
 	}
@@ -593,7 +618,7 @@ void AnimationGraphEditor::draw_menu_bar()
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem("New")) {
-				create_new_document();
+				open("");
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
 				open_open_popup = true;
@@ -866,7 +891,7 @@ static ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFl
 
 	return dockspace_id;
 }
-
+#if 0
 void Timeline::draw_imgui()
 {
 
@@ -901,7 +926,7 @@ void Timeline::draw_imgui()
 	}
 	ImGui::End();
 }
-
+#endif
 void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_drop)
 {
 	int start_atr = 0;
@@ -954,6 +979,8 @@ void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_dr
 
 void draw_curve_test()
 {
+	return;
+
 	static ImVec2 points[20];
 	static int init = true;
 	static int selected = 0;
@@ -1543,42 +1570,82 @@ void AgEditor_StateNode::get_props(std::vector<PropertyListInstancePair>& props)
 
 bool AnimationGraphEditor::compile_graph_for_playing()
 {
+	// removed unreferenced graph nodes
+	{
+		auto tree = get_tree();
+
+		std::unordered_set<Node_CFG*> refed_nodes;
+
+		std::vector<Node_CFG*> extra_nodes;
+		for (int i = 0; i < nodes.size(); i++) {
+			refed_nodes.insert(nodes[i]->get_graph_node());
+			nodes[i]->get_any_extra_refed_graph_nodes(extra_nodes);
+		}
+		for (auto node : extra_nodes)
+			refed_nodes.insert(node);
+
+		int num_deleted = 0;
+		int count = 0;
+		std::unordered_set<Node_CFG*> removed_nodes;
+		for (int i = 0; i < tree->all_nodes.size(); i++) {
+			auto cfg_node = tree->all_nodes[i];
+			if (refed_nodes.find(cfg_node)==refed_nodes.end()) {
+				// guard against double deletes
+				ASSERT(removed_nodes.find(cfg_node) == removed_nodes.end());
+				removed_nodes.insert(cfg_node);
+				num_deleted++;
+				delete cfg_node;
+			}
+			else {
+				tree->all_nodes[count++] = cfg_node;
+			}
+		}
+		tree->all_nodes.resize(count);
+		printf("Deleted %d unreferenced nodes\n", num_deleted);
+	}
+
 	// add control parameters to cfg list
 	control_params.add_parameters_to_tree(editing_tree->params.get());
 
 	// add cfg vars to library
 	// link var lib and other libs to script program before compiling all the scripts
+	// called again when calling post_init_load()
 	editing_tree->init_program_libs();
 
 	// initialize memory offets for runtime
 	editing_tree->data_used = 0;
+
+	// to get access to ptr->index hashmap
+	AgSerializeContext ctx(get_tree());
 
 	// compile all nodes
 	for (int i = 0; i < nodes.size(); i++) {
 		if (!nodes[i]->dont_call_compile()) {
 			nodes[i]->compile_error_string.clear();
 			nodes[i]->compile_info_string.clear();
-			nodes[i]->compile_my_data();
+			nodes[i]->compile_my_data(&ctx);
 		}
 	}
 
 	Base_EdNode* output_pose = find_first_node_in_layer(0, "Root_EdNode");
 	ASSERT(output_pose);
-	output_pose->compile_error_string.clear();
+	output_pose->compile_error_string.clear();	//???
+	Node_CFG* root_node = nullptr;
 	if (output_pose->inputs[0]) {
-		editing_tree->root = output_pose->inputs[0]->get_graph_node();
-		ASSERT(editing_tree->root);
+		root_node = output_pose->inputs[0]->get_graph_node();
+		ASSERT(root_node);
 	}
-	else
+	else {
+		root_node = nullptr;
 		output_pose->append_fail_msg("[ERROR] no output pose\n");
+	}
+	editing_tree->root = ptr_to_serialized_nodecfg_ptr(root_node, &ctx);
+
 
 	bool tree_is_good_to_run = output_pose->traverse_and_find_errors();
 
 	// after all updates have been run, fixup editor id/indexes for control props
 	control_params.recalculate_control_prop_ids();
-
-	// init memory
-	editing_tree->post_load_init();
 
 	editing_tree->graph_is_valid = tree_is_good_to_run;
 
@@ -1705,6 +1772,7 @@ void ControlParamsWindow::imgui_draw()
 void AnimationGraphEditor::compile_and_run()
 {
 	bool good_to_run = compile_graph_for_playing();
+	get_tree()->post_load_init();
 	if (good_to_run) {
 		out.anim.initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
 		playback = graph_playback_state::running;
@@ -1743,15 +1811,19 @@ void AnimationGraphEditor::open(const char* name)
 	if (!is_initialized)
 		init();
 
-	std::string graphname = name;
-	// reset settings, default if new doc or gets loaded by graphname
-	opt = settings();
+	// close currently open document
+	close();
+
+	ASSERT(!has_document_open());
 
 	bool needs_new_doc = true;
-	if (!graphname.empty()) {
+	if (strlen(name)!=0) {
 		// try loading graphname, create new document on fail
 		DictParser parser;
+
+		double start = GetTime();
 		editing_tree = anim_tree_man->load_animation_tree_file(name, parser);
+		printf("loaded in %f\n", GetTime() - start);
 		if (editing_tree) {
 
 			bool good = load_editor_nodes(parser);
@@ -1762,13 +1834,30 @@ void AnimationGraphEditor::open(const char* name)
 			else {
 				needs_new_doc = false;
 				is_owning_editing_tree = false;
+				this->name = name;
+
+				for (int i = 0; i < nodes.size(); i++) {
+					nodes[i]->init();
+				}
+
 			}
 		}
+		if(needs_new_doc)
+			printf("Couldn't open animation tree file %s, creating new document instead\n", name);
 	}
 
 	if (needs_new_doc) {
-		printf("Couldn't open animation tree file %s, creating new document instead\n", name);
+		this->name = "";	// empty name
 		create_new_document();
+		ASSERT(!current_document_has_path());
+	}
+
+
+	{
+		const char* window_name = "unnamed";
+		if (!needs_new_doc)
+			window_name = this->name.c_str();
+		SDL_SetWindowTitle(eng->window, string_format("AnimationEditor: %s", window_name));
 	}
 
 	ASSERT(editing_tree);
@@ -1783,7 +1872,7 @@ void AnimationGraphEditor::open(const char* name)
 	out.obj = idraw->register_obj();
 
 	// refresh control_param editor
-	control_params.refresh_props();
+	control_params.init_from_tree(get_tree()->params.get());
 }
 
 class AgEditor_BlendSpaceArrayHead : public IArrayHeader
@@ -1961,6 +2050,7 @@ void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info,
 	std::string inistring(token.str_start, token.str_len);
 	auto context = (ImNodesEditorContext**)info.get_ptr(inst);
 	*context = ImNodes::EditorContextCreate();
+	ImNodes::EditorContextSet(*context);
 	ImNodes::LoadEditorStateFromIniString(*context, inistring.c_str(), inistring.size());
 }
 

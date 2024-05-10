@@ -1336,6 +1336,8 @@ DECLARE_ENGINE_CMD(reload_mats)
 		mats.load_material_file_directory(args.at(1));
 }
 
+
+
 View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height)
 	: origin(origin),front(front),fov(fov),near(near),far(far),width(width),height(height)
 {

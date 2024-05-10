@@ -28,6 +28,7 @@
     <ClCompile Include="Source\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation_Man.cpp" />
+    <ClCompile Include="Source\ControlParams.cpp" />
     <ClCompile Include="Source\DictParser.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\EdNode.cpp" />
@@ -140,6 +141,7 @@
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\ScriptValue.h" />
     <ClInclude Include="Source\ControlParams.h" />
+    <ClInclude Include="Source\Sequencetemp.h" />
     <ClInclude Include="Source\StdVectorReflection.h" />
     <ClInclude Include="Source\StringName.h" />
     <ClInclude Include="Source\StringUtil.h" />

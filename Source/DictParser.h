@@ -89,7 +89,7 @@ public:
         read_string(start);
         while (!check_list_end(start) && !is_eof()) {
             bool out = f(start);
-            if (out) 
+            if (!out) 
                 return false;
             read_string(start);
         }

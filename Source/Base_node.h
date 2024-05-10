@@ -59,7 +59,7 @@ public:
 	// called after either creation or load from file
 	virtual void init() = 0;
 	virtual std::string get_name() const = 0;
-	virtual bool compile_my_data() = 0;
+	virtual bool compile_my_data(const AgSerializeContext* ctx) = 0;
 	virtual const TypeInfo& get_typeinfo() const = 0;
 
 	// used to specify menu to draw the creation for this in
@@ -74,6 +74,8 @@ public:
 	virtual bool has_pin_colors() const { return false; }
 	virtual ImVec4 get_pin_colors() const { return ImVec4(1, 1, 1, 1); }
 	virtual Node_CFG* get_graph_node() { return nullptr; }
+	// used for blendspace nodes to add ref'd clip nodes
+	virtual void get_any_extra_refed_graph_nodes(std::vector<Node_CFG*>& refed_nodes) {}
 	
 	// this call adds only elements native to the EdNode object
 	virtual void add_props(std::vector<PropertyListInstancePair>& props) {

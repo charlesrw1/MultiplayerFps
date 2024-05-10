@@ -8,13 +8,14 @@
 	}
 }
 
-bool Statemachine_EdNode::compile_my_data()
+bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 {
 	node->states.clear();
+	int node_state_count = 0;
 	for (int i = 0; i < states.size(); i++) {
 		ASSERT(states[i]);
 		if (states[i]->is_regular_state_node()) {
-			states[i]->state_handle_internal = { i };
+			states[i]->state_handle_internal = { node_state_count++ };
 		}
 	}
 	node->entry_transitions.resize(0);
@@ -25,8 +26,10 @@ bool Statemachine_EdNode::compile_my_data()
 	bool has_errors = false;
 
 	for (int i = 0; i < states.size(); i++) {
-		has_errors |= !states[i]->compile_data_for_statemachine();
+		has_errors |= !states[i]->compile_data_for_statemachine(ctx);
 	}
+
+	ASSERT(node_state_count == node->states.size());
 
 	if (has_errors)
 		append_fail_msg("[ERROR] state machine states contain errors\n");

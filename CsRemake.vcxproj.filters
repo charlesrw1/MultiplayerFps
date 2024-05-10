@@ -167,6 +167,7 @@
     <ClCompile Include="Anim\Editor\Statemachine_node.cpp">
       <Filter>Source\Animation\Editor\Nodes</Filter>
     </ClCompile>
+    <ClCompile Include="Source\ControlParams.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\AnimationTreeLocal.h">
@@ -426,6 +427,9 @@
     </ClInclude>
     <ClInclude Include="WriteObject.h">
       <Filter>Source\Animation\Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Sequencetemp.h">
+      <Filter>Source\Animation\Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

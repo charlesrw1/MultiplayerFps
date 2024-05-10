@@ -31,9 +31,9 @@ public:
 	}
 	std::string get_name() const override { return "State"; }
 	// compiling done by statemachine owner
-	bool compile_my_data() override { return true; }
+	bool compile_my_data(const AgSerializeContext* ctx) override { return true; }
 	Color32 get_node_color() const override { return STATE_COLOR; }
-	const editor_layer* get_layer() {
+	const editor_layer* get_layer() const override {
 		if (is_regular_state_node())
 			return &sublayer;
 		return nullptr;
@@ -62,7 +62,7 @@ public:
 
 	bool is_regular_state_node() const { return !is_start_node() && !is_alias_node(); }
 
-	bool compile_data_for_statemachine();
+	bool compile_data_for_statemachine(const AgSerializeContext* ctx);
 	void get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props, int slot);
 	
 	virtual bool is_alias_node() const { return false; }

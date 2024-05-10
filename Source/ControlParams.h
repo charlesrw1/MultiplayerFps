@@ -33,6 +33,8 @@ struct AG_ControlParam
 	control_param_type type = control_param_type::int_t;
 	int16_t enum_idx = 0;
 	bool reset_after_tick = false;
+
+	static PropertyInfoList* get_props();
 };
 
 struct ControlParam_CFG
@@ -105,6 +107,8 @@ struct ControlParam_CFG
 		return { (int)types.size() - 1 };
 	}
 	void set_library_vars(Library* lib);
+
+	static PropertyInfoList* get_props();
 
 	std::vector<AG_ControlParam> types;
 	std::unordered_map<name_hash_t, int> name_to_index;

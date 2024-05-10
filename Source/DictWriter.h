@@ -15,7 +15,9 @@ public:
 
     void write_key(const char* str1) {
         add_indents();
+        this->str += '\"';
         this->str += str1;
+        this->str += '\"';
         this->str += ' ';
     }
 

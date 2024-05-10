@@ -68,7 +68,7 @@ PropertyInfoList* State::get_props()
 		REG_FLOAT(state_duration, PROP_DEFAULT, "-1.0"),
 		REG_BOOL(wait_until_finish, PROP_DEFAULT, "0"),
 		REG_BOOL(is_end_state, PROP_DEFAULT, "0"),
-		REG_INT(tree_index, PROP_SERIALIZE, ""),
+		REG_STRUCT_CUSTOM_TYPE(tree, PROP_SERIALIZE, "AgSerializeNodeCfg"),
 	END_PROPS(State)
 }
 
@@ -450,9 +450,16 @@ void Animation_Tree_CFG::init_program_libs()
 
 void Animation_Tree_CFG::post_load_init()
 {
+	init_program_libs();
+
 	for (int i = 0; i < all_nodes.size(); i++) {
 		all_nodes[i]->initialize(this);
 	}
+	root = serialized_nodecfg_ptr_to_ptr(root, this);
+
+	params->name_to_index.clear();
+	for (int i = 0; i < params->types.size(); i++)
+		params->name_to_index[StringName(params->types[i].name.c_str()).get_hash()] = i;
 }
 
  ControlParamHandle Animation_Tree_CFG::find_param(StringName name) {
@@ -471,7 +478,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  {
 	 START_PROPS(Animation_Tree_CFG)
 		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
-		 REG_INT(data_used, PROP_SERIALIZE, ""),
+		REG_INT(data_used, PROP_SERIALIZE, ""),
 		REG_BOOL(graph_is_valid, PROP_SERIALIZE, "")
 	END_PROPS()
  }
@@ -494,23 +501,15 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
  bool Animation_Tree_CFG::read_from_dict(DictParser& in)
  {
-	 StringView tok;
-	 if (!in.expect_string("runtime"))
+	 if (!in.expect_string("runtime") || !in.expect_item_start())
 		 return false;
-	 if (!in.expect_item_start())
-		 return false;
+
 	 {
-		 if (!in.expect_string("rootdata"))
+		 if (!in.expect_string("rootdata") || !in.expect_item_start())
 			 return false;
-		 if (!in.expect_item_start())
-			 return false;
-		 StringView tok;
-		 in.read_string(tok);
-		 auto res = read_properties(*get_props(), this, in, tok, {});
-		 if (!res.second)
-			 return false;
-		 tok = res.first;
-		 if (!in.check_item_end(tok))
+		 auto res = read_properties(*get_props(), this, in, {}, {});
+
+		 if (!res.second || !in.check_item_end(res.first))
 			 return false;
 	 }
 
@@ -518,7 +517,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 if (!in.expect_string("nodes") || !in.expect_list_start())
 			 return false;
 
-		 in.read_list_and_apply_functor([&](StringView view) -> bool
+		bool good =  in.read_list_and_apply_functor([&](StringView view) -> bool
 			 {
 				 Node_CFG* node = read_object_properties<Node_CFG, getter_nodecfg>(get_runtime_node_factory(), {}, in, view);
 				 if (node) {
@@ -528,7 +527,21 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 				 return false;
 			 }
 		 );
+		if (!good)
+			return false;
 	 }
+
+	 {
+		 if (!in.expect_string("params") || !in.expect_item_start())
+			 return false;
+		 auto res = read_properties(*ControlParam_CFG::get_props(), params.get(), in, {}, {});
+
+		 if (!res.second || !in.check_item_end(res.first))
+			 return false;
+	 }
+
+
+	 return in.expect_item_end();
  }
 
 
@@ -557,21 +570,11 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 }
 		 out.write_list_end();
 	 }
-	 {
-		 out.write_key_list_start("params");
-		 for (auto& param : params->types) {
-			 out.write_item_start();
-			 {
-				 out.write_key_value("name", param.name.c_str());
-				 out.write_key_value("type", Enum::get_enum_name(control_param_type_def.id, (int)param.type));
-				 if (param.type == control_param_type::enum_t && param.enum_idx != -1) {
-					 out.write_key_value("enum_type", Enum::get_type_name(param.enum_idx));
-				 }
-				 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
-			 }
-			 out.write_item_end();
-		 }
-		 out.write_list_end();
+	 { 
+		 out.write_key("params");
+		 out.write_item_start();
+		 write_properties(*ControlParam_CFG::get_props(), params.get(), out, ctxptr);
+		 out.write_item_end();
 	 }
 	 out.write_item_end();
  }
@@ -779,6 +782,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 }
  }
 
+
  namespace Script {
 	 static void time_remaining(script_state* state)
 	 {
@@ -850,17 +854,14 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) override
 	 {
 		 ASSERT(user.name == NAME("AgSerializeContext"));
-		 auto context = (AgSerializeContext*)user.ptr;
 		 Node_CFG* ptr = *(Node_CFG**)info.get_ptr(inst);
-		 if (ptr == nullptr)
-			 return "-1";
-		 ASSERT(context->ptr_to_index.find(ptr) != context->ptr_to_index.end());
-		 return std::to_string(context->ptr_to_index[ptr]);
+
+		 int64_t num = (int64_t)ptr;
+
+		 return std::to_string(num);
 	 }
 	 virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) override
 	 {
-		 ASSERT(user.name == NAME("AgSerializeContext"));
-
 		 uintptr_t index = atoi(token.to_stack_string().c_str());
 
 		 Node_CFG** ptr_to_ptr = (Node_CFG**)info.get_ptr(inst);
@@ -886,4 +887,24 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 START_PROPS(Node_CFG)
 		 REG_STDVECTOR(input, PROP_SERIALIZE)
 	END_PROPS(Node_CFG);
+ }
+
+ PropertyInfoList* AG_ControlParam::get_props()
+ {
+	 START_PROPS(AG_ControlParam)
+		 REG_BOOL(reset_after_tick, PROP_SERIALIZE, ""),
+		 REG_ENUM(type, PROP_SERIALIZE, "", control_param_type_def.id),
+		 REG_STDSTRING(name, PROP_SERIALIZE),
+		 REG_INT(default_i, PROP_SERIALIZE,""),
+		 REG_FLOAT(default_f, PROP_SERIALIZE, ""),
+		 REG_INT(enum_idx, PROP_SERIALIZE,"")
+	END_PROPS(AG_ControlParam)
+ }
+
+ PropertyInfoList* ControlParam_CFG::get_props()
+ {
+	 MAKE_VECTORCALLBACK(AG_ControlParam, types);
+	 START_PROPS(ControlParam_CFG)
+		 REG_STDVECTOR(types, PROP_SERIALIZE)
+	 END_PROPS(ControlParam_CFG)
  }

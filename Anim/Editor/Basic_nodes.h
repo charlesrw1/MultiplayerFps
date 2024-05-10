@@ -69,7 +69,7 @@ inline control_param_type util_get_param_type(ControlParamHandle handle) {
 	return ed.editing_tree->params->get_type(handle);
 }
 
-inline bool util_compile_default(ControlParamHandle* param, bool param_is_boolfloat, int num_inputs, Base_EdNode* node)
+inline bool util_compile_default(ControlParamHandle* param, bool param_is_boolfloat, int num_inputs, Base_EdNode* node, const AgSerializeContext* ctx)
 {
 	auto cfg = node->get_graph_node();
 
@@ -97,7 +97,9 @@ inline bool util_compile_default(ControlParamHandle* param, bool param_is_boolfl
 
 	bool missing_inputs = false;
 	for (int i = 0; i < num_inputs; i++) {
-		cfg->input[i] = (node->inputs[i]) ? node->inputs[i]->get_graph_node() : nullptr;
+		Node_CFG* other_ptr = (node->inputs[i]) ? node->inputs[i]->get_graph_node() : nullptr;
+
+		cfg->input[i] = ptr_to_serialized_nodecfg_ptr(other_ptr, ctx);
 		missing_inputs |= node->inputs[i] == nullptr;
 	}
 	if (missing_inputs)
@@ -156,7 +158,7 @@ public:
 		return node->clip_name;
 	}
 	
-	bool compile_my_data() override {
+	bool compile_my_data(const AgSerializeContext* ctx) override {
 		if (node->clip_name.empty())
 			append_fail_msg("[ERROR] clip name is empty\n");
 
@@ -184,8 +186,8 @@ class Blend_EdNode : public Base_EdNode
 		util_draw_param_for_topbar(node->param);
 	}
 
-	bool compile_my_data() override {
-		return util_compile_default(&node->param, true, 2, this);
+	bool compile_my_data(const AgSerializeContext* ctx) override {
+		return util_compile_default(&node->param, true, 2, this, ctx);
 	}
 
 	Blend_Node_CFG* node = nullptr;
@@ -231,9 +233,9 @@ class Blend_int_EdNode : public Base_EdNode
 		}
 	}
 
-	bool compile_my_data() override {
+	bool compile_my_data(const AgSerializeContext* ctx) override {
 		// FIXME:
-		return util_compile_default(&node->param, false, num_int_inputs, this);
+		return util_compile_default(&node->param, false, num_int_inputs, this, ctx);
 	}
 
 	int num_int_inputs = 0;
@@ -261,8 +263,8 @@ class Additive_EdNode : public Base_EdNode
 	void draw_node_topbar() override {
 		util_draw_param_for_topbar(node->param);
 	}
-	bool compile_my_data() override {
-		return util_compile_default(&node->param, true, 2, this);
+	bool compile_my_data(const AgSerializeContext* ctx) override {
+		return util_compile_default(&node->param, true, 2, this, ctx);
 	}
 
 	Add_Node_CFG* node = nullptr;
@@ -289,8 +291,8 @@ class Subtract_EdNode : public Base_EdNode
 		ASSERT(0);
 	}
 
-	bool compile_my_data() override {
-		return util_compile_default(nullptr, true, 2, this);
+	bool compile_my_data(const AgSerializeContext* ctx) override {
+		return util_compile_default(nullptr, true, 2, this, ctx);
 	}
 
 	Subtract_Node_CFG* node = nullptr;
@@ -314,8 +316,8 @@ class Mirror_EdNode : public Base_EdNode
 		util_draw_param_for_topbar(node->param);
 	}
 
-	bool compile_my_data() override {
-		return util_compile_default(&node->param, true, 1, this);
+	bool compile_my_data(const AgSerializeContext* ctx) override {
+		return util_compile_default(&node->param, true, 1, this, ctx);
 	}
 
 	Mirror_Node_CFG* node = nullptr;
@@ -334,8 +336,8 @@ class Sync_EdNode : public Base_EdNode
 	MAKE_STANDARD_INIT();
 	MAKE_STANDARD_ADD_PROPS(Sync_EdNode);
 
-	bool compile_my_data() override {
-		return util_compile_default(nullptr, true, 1, this);
+	bool compile_my_data(const AgSerializeContext* ctx) override {
+		return util_compile_default(nullptr, true, 1, this, ctx);
 	}
 	
 	Sync_Node_CFG* node = nullptr;

@@ -36,6 +36,18 @@ struct Rt_Vars_Base
 	uint16_t last_update_tick = 0;
 };
 
+inline Node_CFG* serialized_nodecfg_ptr_to_ptr(Node_CFG* ptr, Animation_Tree_CFG* cfg) {
+	uintptr_t index = (uintptr_t)ptr;	// serialized as indicies
+	ASSERT(index < 0xffff || index == -1);	// assume anything larger is a bad pointer error
+	return (index == -1) ? nullptr : cfg->all_nodes.at(index);
+}
+
+inline Node_CFG* ptr_to_serialized_nodecfg_ptr(Node_CFG* ptr, const AgSerializeContext* ctx) {
+	ASSERT(ptr == nullptr || ctx->ptr_to_index.find(ptr) != ctx->ptr_to_index.end());
+	uintptr_t index = (ptr) ? ctx->ptr_to_index.find(ptr)->second : -1;
+	return (Node_CFG*)index;
+}
+
 class Program;
 struct Animation_Tree_RT;
 struct Animation_Tree_CFG;
@@ -148,6 +160,10 @@ protected:
 		rt_offset = cfg->data_used;
 		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
 		cfg->data_used += rt_size;
+
+		for (int i = 0; i < input.size(); i++) {
+			input[i] = serialized_nodecfg_ptr_to_ptr(input[i], cfg);
+		} 
 	}
 
 private:
@@ -505,7 +521,6 @@ struct State
 	static PropertyInfoList* get_props();
 
 	Node_CFG* tree = nullptr;	// fixed up at initialization
-	uint16_t tree_index = 0;
 	bool is_end_state = false;
 	bool wait_until_finish = false;
 	float state_duration = -1.0;				// when > 0, specifies how long state should be active, then signals a transition end
@@ -526,7 +541,15 @@ struct Statemachine_Node_RT : Rt_Vars_Base
 struct Statemachine_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Statemachine_Node_RT;
-	DECLARE_NODE_CFG(Statemachine_Node_CFG);
+	DECLARE_NO_DEFAULT(Statemachine_Node_CFG);
+
+	virtual void initialize(Animation_Tree_CFG* tree) override {
+		init_memory_internal(tree, sizeof(RT_TYPE));
+		
+		for (int i = 0; i < states.size(); i++) {
+			states[i].tree = serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
+		}
+	}
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 

@@ -9,6 +9,8 @@ bind 5 "reconnect"
 bind 6 "editdoc Map0"
 bind / reload_shaders
 
+bind , "animedit out.txt"
+
 bind P "spawn_npc"
 
 #net vars

@@ -47,10 +47,10 @@ inline BASE* read_object_properties(
 	std::vector<PropertyListInstancePair> props;
 	PROPGETTER::get(props, obj);
 
-	auto ret =  read_multi_properties(props, in, tok, userptr);
+	auto ret = read_multi_properties(props, in, {}, userptr);
 	tok = ret.first;
 
-	if (ret.second || !in.check_item_end(tok)) {
+	if (!ret.second || !in.check_item_end(tok)) {
 		delete obj;
 		return nullptr;
 	}

@@ -1,102 +1,191 @@
-{
-name ""
-data_used "52"
-root_node "-1"
-params [
-]
+"runtime" {
+"rootdata" {
+"root"  "0"
+"data_used"  "40"
+"graph_is_valid"  "0"
+}
 nodes [
 {
-type "::source"
-default_param "-1"
-inputs [
+type "Statemachine_Node_CFG"
+"input"  [
 ]
-props [
+"states"  [
 {
-name "rm[0]"
-type "Enum8"
-value "rm::keep"
+"transition_idxs"  [
+]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "1"
+"is_end_state"  "1"
+"tree"  "-1"
 }
 {
-name "rm[1]"
-type "Enum8"
-value "rm::keep"
+"transition_idxs"  [
+]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "-1"
 }
 {
-name "rm[2]"
-type "Enum8"
-value "rm::keep"
+"transition_idxs"  [
+]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "-1"
 }
-{
-name "loop"
-type "Bool"
-value "1"
-}
-{
-name "speed"
-type "Float"
-value "1.000000"
-}
-{
-name "start_frame"
-type "Int16"
-value "0"
-}
-{
-name "allow_sync"
-type "Bool"
-value "0"
-}
-{
-name "can_be_leader"
-type "Bool"
-value "0"
-}
-{
-name "clip_name"
-type "StdString"
-value "Armature|mixamo.com|Layer0"
-}
+]
+"transitions"  [
+]
+"entry_transitions"  [
 ]
 }
 {
-type "::blend2d"
-default_param "-1"
-inputs [
+type "Clip_Node_CFG"
+"input"  [
 ]
-props [
-{
-name "xparam"
-type "Int32"
-value "-1"
-}
-{
-name "yparam"
-type "Int32"
-value "-1"
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "Armature|mixamo.com|Layer0"
 }
 {
-name "weight_damp"
-type "Float"
-value "0.010000"
+type "Blend_Node_CFG"
+"input"  [
+ 1   -1  ]
+"param"  "-1"
+"damp_factor"  "0.100000"
+"store_value_on_reset"  "0"
 }
 ]
-}
+"params" {
+"types"  [
 ]
+}
+}
  editor
 {
+"rootstate" {
+"current_id"  "11"
+"current_layer"  "5"
+"default_editor"  "[editor]
+panning=388,452
+
+[node.0]
+origin=14,-71
+
+[node.1]
+origin=-208,-131
+
+[node.9]
+origin=-211,-250
+
+[node.10]
+origin=49,-230
+"
+"opt.open_graph"  "1"
+"opt.open_control_params"  "1"
+"opt.open_prop_editor"  "1"
+"opt.statemachine_passthrough"  "0"
+}
 nodes [
 {
-name "Unnamed"
-graph_layer "0"
-id "0"
-type "root"
+type "Root_EdNode"
+"id"  "0"
+"graph_layer"  "0"
 }
 {
-name "Unnamed"
-node_idx "1"
-graph_layer "0"
-id "2"
-type "blend2d"
+type "Statemachine_EdNode"
+"id"  "1"
+"graph_layer"  "0"
+"name"  ""
+"sublayer.id"  "1"
+"sublayer.context"  "[editor]
+panning=315,470
+
+[node.2]
+origin=0,0
+
+[node.3]
+origin=112,-250
+
+[node.5]
+origin=197,-48
+
+[node.7]
+origin=318,-268
+"
+"node"  "0"
+}
+{
+type "StateStart_EdNode"
+"id"  "2"
+"graph_layer"  "1"
+}
+{
+type "State_EdNode"
+"id"  "3"
+"graph_layer"  "1"
+"name"  "Unnamed"
+"state_handle_internal.id"  "0"
+"sublayer.id"  "2"
+"sublayer.context"  "[editor]
+panning=0,0
+"
+}
+{
+type "Root_EdNode"
+"id"  "4"
+"graph_layer"  "2"
+}
+{
+type "State_EdNode"
+"id"  "5"
+"graph_layer"  "1"
+"name"  "Unnamed"
+"state_handle_internal.id"  "1"
+"sublayer.id"  "3"
+"sublayer.context"  "[editor]
+panning=0,0
+"
+}
+{
+type "Root_EdNode"
+"id"  "6"
+"graph_layer"  "3"
+}
+{
+type "State_EdNode"
+"id"  "7"
+"graph_layer"  "1"
+"name"  "Unnamed"
+"state_handle_internal.id"  "2"
+"sublayer.id"  "4"
+"sublayer.context"  "[editor]
+panning=0,0
+"
+}
+{
+type "Root_EdNode"
+"id"  "8"
+"graph_layer"  "4"
+}
+{
+type "Clip_EdNode"
+"id"  "9"
+"graph_layer"  "0"
+"node"  "1"
+}
+{
+type "Blend_EdNode"
+"id"  "10"
+"graph_layer"  "0"
+"node"  "2"
 }
 ]
 }

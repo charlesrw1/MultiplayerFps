@@ -24,6 +24,15 @@ void State_EdNode::init()
 			
 		}
 	}
+	else if (is_start_node()) {
+		// num_inputs implicitly 0
+
+		if (!is_this_node_created()) {
+			
+
+
+		}
+	}
 }
 std::string State_EdNode::get_title() const
 {
@@ -115,7 +124,7 @@ bool State_EdNode::add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint3
 	return false;
 }
 
-bool State_EdNode::compile_data_for_statemachine()
+bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 {
 	compile_error_string.clear();
 	compile_info_string.clear();
@@ -179,6 +188,7 @@ bool State_EdNode::compile_data_for_statemachine()
 		Base_EdNode* startnode = ed.find_first_node_in_layer(sublayer.id, "Root_EdNode");
 		ASSERT(startnode);
 
+		Node_CFG* tree = nullptr;
 		if (!startnode->inputs[0]) {
 			append_fail_msg(string_format("[ERROR] missing start state in blend tree \n"));
 		}
@@ -187,8 +197,10 @@ bool State_EdNode::compile_data_for_statemachine()
 			Base_EdNode* rootnode = startnode->inputs[0];
 			ASSERT(rootnode->get_graph_node());
 
-			self_state.tree = rootnode->get_graph_node();
+			tree = rootnode->get_graph_node();
 		}
+
+		self_state.tree = ptr_to_serialized_nodecfg_ptr(tree, ctx);	
 
 		sm_cfg->states.push_back(self_state);
 	}
@@ -208,7 +220,7 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 			i--;
 		}
 	}
-	ASSERT(already_seen);
+	ASSERT(slot == -1 || already_seen);
 	// output array might become invalidated
 	ed.signal_nessecary_prop_ed_reset();
 }

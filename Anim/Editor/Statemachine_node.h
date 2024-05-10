@@ -16,7 +16,7 @@ public:
 	// overrides
 	void init() override;
 	std::string get_title() const override;
-	bool compile_my_data() override;
+	bool compile_my_data(const AgSerializeContext* ctx) override;
 	bool traverse_and_find_errors() override;
 	void remove_reference(Base_EdNode* node) override;
 
@@ -44,7 +44,7 @@ public:
 		START_PROPS(Statemachine_EdNode)
 			REG_STDSTRING(name,PROP_DEFAULT),
 			REG_INT(sublayer.id, PROP_SERIALIZE, ""),
-			REG_STRUCT_CUSTOM_TYPE(sublayer.context,PROP_SERIALIZE, "ImNode_PropSerialize"),
+			REG_STRUCT_CUSTOM_TYPE(sublayer.context,PROP_SERIALIZE, "SerializeImNodeState"),
 			REG_STRUCT_CUSTOM_TYPE(node, PROP_SERIALIZE, "SerializeNodeCFGRef")
 		END_PROPS(Statemachine_EdNode)
 	}

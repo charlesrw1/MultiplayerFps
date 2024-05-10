@@ -152,144 +152,6 @@ private:
 };
 
 
-enum class sequence_type
-{
-	clip,
-	transition,
-	state
-};
-struct MySequence : public ImSequencer::SequenceInterface
-{
-	// interface with sequencer
-
-	virtual int GetFrameMin() const {
-		return mFrameMin;
-	}
-	virtual int GetFrameMax() const {
-		return mFrameMax;
-	}
-	virtual int GetItemCount() const { return (int)items.size(); }
-
-	virtual void Add(int type) {  };
-	virtual void Del(int index) { }
-	virtual void Duplicate(int index) { }
-
-	virtual size_t GetCustomHeight(int index) { return 0; }
-
-	void add_manual_track(std::string str, int start, int end) {
-
-		uint32_t mask = 0;
-
-		for (int i = 0; i < items.size(); i++) {
-			const auto& item = items[i].back();
-			if (item.start < end && item.end > start) {
-				mask |= (1ull << i);
-			}
-		}
-
-		auto save = current_item_bitmask;
-		current_item_bitmask = mask;
-
-		int index = start_track(str, sequence_type::clip);
-		items[index].back().start = start;
-		items[index].back().end = end;
-		end_track(index);
-
-		current_item_bitmask = save;
-	}
-
-	int start_track(const std::string& str, sequence_type type) {
-		for (int i = 0; i < 64; i++) {
-			bool active = current_item_bitmask & (1ull << (uint64_t)i);
-			if (active)
-				continue;
-
-			ImSequencer::Item item;
-			item.start = active_frame;
-			item.end = active_frame + 1;
-			item.text = get_cstr(str);
-
-			if (i >= items.size()) {
-				items.push_back({});
-				ASSERT(i < items.size());
-			}
-			items[i].push_back(item);
-			current_item_bitmask |= (1ull << (uint64_t)i);
-
-			return i;
-		}
-		printf("Start_track full!\n");
-		ASSERT(0);
-		return 0;
-	}
-	void end_track(int index) {
-		current_item_bitmask = current_item_bitmask & ~(1ull << index);
-	}
-
-	void continue_tracks() {
-		for (int i = 0; i < 64; i++) {
-			if (current_item_bitmask & (1ull << i)) {
-				ASSERT(items.size() >= i);
-				ASSERT(!items[i].empty());
-				items[i].back().end = active_frame;
-			}
-		}
-	}
-
-	const char* get_cstr(std::string s) {
-		if (interned_strings.find(s) != interned_strings.end())
-			return interned_strings.find(s)->c_str();
-		interned_strings.insert(s);
-		return interned_strings.find(s)->c_str();
-	}
-
-	std::unordered_set<std::string> interned_strings;
-	uint64_t current_item_bitmask = 0;
-	std::vector<std::vector<ImSequencer::Item>> items;
-
-	// my datas
-	MySequence() : mFrameMin(0), mFrameMax(0) {}
-	int mFrameMin, mFrameMax;
-	int active_frame = 0;
-
-	virtual void DoubleClick(int index) {
-
-	}
-	// Inherited via SequenceInterface
-	virtual int GetItems(int index, ImSequencer::Item* item, int start = 0) override
-	{
-		if (start >= items[index].size()) return -1;
-
-		*item = items[index][start];
-		return ++start;
-	}
-};
-
-class Timeline
-{
-public:
-	AnimationGraphEditor* owner;
-	Timeline(AnimationGraphEditor* o) : owner(o) {}
-	void draw_imgui();
-
-	void play() {}
-	void pause() {}
-	void stop() {}
-	void save() {}
-
-	bool needs_compile = false;
-	bool is_reset = true;
-	bool is_playing = false;
-	float play_speed = 1.f;
-
-	bool expaned = true;
-	int first_frame = 0;
-
-	int current_tick = 0;
-
-	MySequence seq;
-};
-
 class GraphOutput
 {
 public:
@@ -321,6 +183,12 @@ struct EditorControlParamProp {
 		p.enum_idx = enum_type;
 		p.reset_after_tick = false;
 		return p;
+	}
+	EditorControlParamProp(const AG_ControlParam& param) {
+		name = param.name;
+		type = param.type;
+		enum_type = param.enum_idx;
+		current_id = unique_id_generator++;
 	}
 
 	static PropertyInfoList* get_props();
@@ -370,6 +238,21 @@ public:
 
 		return nullptr;
 	}
+
+	void init_from_tree(ControlParam_CFG* cfg) {
+		clear_all();
+		for (int i = 0; i < cfg->types.size(); i++) {
+			props.push_back(cfg->types[i]);
+		}
+		refresh_props();
+	}
+
+	void clear_all() {
+		props.clear();
+		EditorControlParamProp::reset_id_generator(0);
+		control_params.clear_all();
+	}
+
 private:
 	static PropertyInfoList* get_props();
 	static PropertyInfoList* get_edit_value_props();
@@ -413,11 +296,13 @@ class AreYouSurePopup : public IPopup
 	std::function<void(int)> command;
 };
 
+
+
 class Texture;
 class AnimationGraphEditor : public AnimationGraphEditorPublic
 {
 public:
-	AnimationGraphEditor() : graph_tabs(this), timeline(this) {
+	AnimationGraphEditor() : graph_tabs(this) {
 	}
 	virtual void init() override;
 	virtual void open(const char* name) override;
@@ -437,7 +322,7 @@ public:
 		stopped,
 		running,
 		paused,
-	}playback = graph_playback_state::stopped;
+	};
 
 	graph_playback_state get_playback_state() { return playback; }
 	bool graph_is_read_only() { return playback != graph_playback_state::stopped(); }
@@ -446,14 +331,17 @@ public:
 	void stop_playback();
 
 	void save_command();
-	void save_document();
+	bool save_document();
 	void save_editor_nodes(DictWriter& writer);
 	void create_new_document();
 	void compile_and_run();
 	bool compile_graph_for_playing();
 	bool load_editor_nodes(DictParser& parser);
+	bool current_document_has_path() { return !name.empty(); }
 
 	Base_EdNode* editor_node_for_cfg_node(Node_CFG* node) {
+		if (node == nullptr)
+			return nullptr;
 		for (int i = 0; i < nodes.size(); i++) {
 			ASSERT(nodes[i]);
 			if (nodes[i]->get_graph_node() == node)
@@ -496,21 +384,7 @@ public:
 
 	ControlParamsWindow control_params;
 	PropertyGrid node_props;
-
 	TabState graph_tabs;
-	Timeline timeline;
-
-	// name of loaded graph, empty if newly created and unsaved
-	std::string name = "";
-	ImNodesEditorContext* default_editor = nullptr;
-	std::vector<Base_EdNode*> nodes;
-
-	// if true, then deletes editing_tree on graph close
-	// otherwise, the pointer is a reference to a loaded graph stored in anim_graph_man
-	bool is_owning_editing_tree = false;
-	Animation_Tree_CFG* editing_tree = nullptr;
-
-	std::vector<const Base_EdNode*> template_creation_nodes;
 
 	Animation_Tree_CFG* get_tree() {
 		return editing_tree;
@@ -519,14 +393,6 @@ public:
 	Animation_Tree_RT* get_runtime_tree() {
 		return &out.anim.runtime_dat;
 	}
-
-	GraphOutput out;
-
-	struct create_from_drop_state {
-		Base_EdNode* from = nullptr;
-		bool from_is_input = false;
-		uint32_t slot = 0;
-	}drop_state;
 
 	editor_layer create_new_layer(bool is_statemachine) {
 		editor_layer layer;
@@ -553,11 +419,34 @@ public:
 		reset_prop_editor_next_tick = true;
 	}
 
-	bool is_modifier_pressed = false;
-	bool is_focused = false;
-
+	bool has_document_open() const {
+		return editing_tree != nullptr;
+	}
 
 	void try_load_preview_models();
+
+	static PropertyInfoList* get_props() {
+		START_PROPS(AnimationGraphEditor)
+			REG_INT(current_id, PROP_SERIALIZE, ""),
+			REG_INT(current_layer, PROP_SERIALIZE, ""),
+			REG_STRUCT_CUSTOM_TYPE(default_editor, PROP_SERIALIZE, "SerializeImNodeState"),
+			// settings
+			REG_BOOL(opt.open_graph, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.open_control_params, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
+			REG_STDSTRING(opt.preview_model,PROP_EDITABLE),
+			REG_STDSTRING(opt.preview_set, PROP_EDITABLE)
+		END_PROPS(AnimationGraphEditor)
+	}
+
+	bool is_modifier_pressed = false;
+	bool is_focused = false;
+	bool is_initialized = false;
+	void* imgui_node_context = nullptr;
+	std::vector<const Base_EdNode*> template_creation_nodes;
+
+	graph_playback_state playback = graph_playback_state::stopped;
 
 	struct settings {
 		bool open_graph = true;
@@ -579,24 +468,20 @@ public:
 		uint32_t link_last_frame = -1;
 	}sel;
 
-	static PropertyInfoList* get_props() {
-		START_PROPS(AnimationGraphEditor)
-			REG_INT(current_id, PROP_SERIALIZE, ""),
-			REG_INT(current_layer, PROP_SERIALIZE, ""),
-			REG_STRUCT_CUSTOM_TYPE(default_editor, PROP_SERIALIZE, "SerializeImNodeState"),
-			// settings
-			REG_BOOL(opt.open_graph, PROP_SERIALIZE, ""),
-			REG_BOOL(opt.open_control_params, PROP_SERIALIZE, ""),
-			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
-			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
-			REG_STDSTRING(opt.preview_model,PROP_EDITABLE),
-			REG_STDSTRING(opt.preview_set, PROP_EDITABLE)
-		END_PROPS(AnimationGraphEditor)
-	}
+	struct create_from_drop_state {
+		Base_EdNode* from = nullptr;
+		bool from_is_input = false;
+		uint32_t slot = 0;
+	}drop_state;
 
-	bool is_initialized = false;
-	void* imgui_node_context = nullptr;
-
+	std::string name = "";
+	ImNodesEditorContext* default_editor = nullptr;
+	std::vector<Base_EdNode*> nodes;
+	// if true, then deletes editing_tree on graph close
+	// otherwise, the pointer is a reference to a loaded graph stored in anim_graph_man
+	bool is_owning_editing_tree = false;
+	Animation_Tree_CFG* editing_tree = nullptr;
+	GraphOutput out;
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
 };
