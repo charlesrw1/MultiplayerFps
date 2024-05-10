@@ -197,7 +197,7 @@ void BooleanEditor::internal_update()
 
 void IntegerEditor::internal_update()
 {
-	ASSERT(prop->type == core_type_id::Int8 || prop->type == core_type_id::Int16 || prop->type == core_type_id::Int32);
+	ASSERT(prop->type == core_type_id::Int8 || prop->type == core_type_id::Int16 || prop->type == core_type_id::Int32 || prop->type == core_type_id::Int64);
 
 	int val = prop->get_int(instance);
 
@@ -231,6 +231,7 @@ static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
 	case core_type_id::Int8:
 	case core_type_id::Int16:
 	case core_type_id::Int32:
+	case core_type_id::Int64:
 		return new IntegerEditor(instance, prop);
 
 	default:

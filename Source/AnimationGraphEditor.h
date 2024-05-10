@@ -293,6 +293,8 @@ public:
 class GraphOutput
 {
 public:
+	bool is_valid_for_preview() { return model && set; }
+
 	Animator anim;
 	handle<Render_Object> obj;
 	User_Camera camera;
@@ -449,8 +451,7 @@ public:
 	void create_new_document();
 	void compile_and_run();
 	bool compile_graph_for_playing();
-
-
+	bool load_editor_nodes(DictParser& parser);
 
 	Base_EdNode* editor_node_for_cfg_node(Node_CFG* node) {
 		for (int i = 0; i < nodes.size(); i++) {
@@ -499,13 +500,21 @@ public:
 	TabState graph_tabs;
 	Timeline timeline;
 
+	// name of loaded graph, empty if newly created and unsaved
 	std::string name = "";
-	void* imgui_node_context = nullptr;
 	ImNodesEditorContext* default_editor = nullptr;
+	std::vector<Base_EdNode*> nodes;
+
+	// if true, then deletes editing_tree on graph close
+	// otherwise, the pointer is a reference to a loaded graph stored in anim_graph_man
+	bool is_owning_editing_tree = false;
+	Animation_Tree_CFG* editing_tree = nullptr;
+
 	std::vector<const Base_EdNode*> template_creation_nodes;
 
-	std::vector<Base_EdNode*> nodes;
-	Animation_Tree_CFG* editing_tree = nullptr;
+	Animation_Tree_CFG* get_tree() {
+		return editing_tree;
+	}
 
 	Animation_Tree_RT* get_runtime_tree() {
 		return &out.anim.runtime_dat;
@@ -518,8 +527,6 @@ public:
 		bool from_is_input = false;
 		uint32_t slot = 0;
 	}drop_state;
-
-
 
 	editor_layer create_new_layer(bool is_statemachine) {
 		editor_layer layer;
@@ -549,14 +556,21 @@ public:
 	bool is_modifier_pressed = false;
 	bool is_focused = false;
 
-	bool open_graph = true;
-	bool open_control_params = true;
-	bool open_viewport = true;
-	bool open_prop_editor = true;
+
+	void try_load_preview_models();
+
+	struct settings {
+		bool open_graph = true;
+		bool open_control_params = true;
+		bool open_viewport = true;
+		bool open_prop_editor = true;
+		bool statemachine_passthrough = false;
+		std::string preview_model = "player_FINAL.glb";
+		std::string preview_set = "default.txt";
+	}opt;
+
 	bool open_open_popup = false;
 	bool open_save_popup = false;
-	bool statemachine_passthrough = false;
-
 	bool reset_prop_editor_next_tick = false;
 
 	struct selection_state
@@ -565,19 +579,23 @@ public:
 		uint32_t link_last_frame = -1;
 	}sel;
 
-
 	static PropertyInfoList* get_props() {
 		START_PROPS(AnimationGraphEditor)
 			REG_INT(current_id, PROP_SERIALIZE, ""),
 			REG_INT(current_layer, PROP_SERIALIZE, ""),
 			REG_STRUCT_CUSTOM_TYPE(default_editor, PROP_SERIALIZE, "SerializeImNodeState"),
 			// settings
-			REG_BOOL(open_graph, PROP_SERIALIZE, ""),
-			REG_BOOL(open_control_params, PROP_SERIALIZE, ""),
-			REG_BOOL(open_prop_editor, PROP_SERIALIZE, ""),
-			REG_BOOL(statemachine_passthrough, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.open_graph, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.open_control_params, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
+			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
+			REG_STDSTRING(opt.preview_model,PROP_EDITABLE),
+			REG_STDSTRING(opt.preview_set, PROP_EDITABLE)
 		END_PROPS(AnimationGraphEditor)
 	}
+
+	bool is_initialized = false;
+	void* imgui_node_context = nullptr;
 
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root

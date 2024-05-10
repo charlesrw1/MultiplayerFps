@@ -27,15 +27,6 @@ IMPL_NODE_CFG(BlendSpace2d_CFG);
 IMPL_NODE_CFG(BlendSpace1d_CFG);
 IMPL_NODE_CFG(Scale_By_Rootmotion_CFG);
 
-PropertyInfoList* get_nodecfg_ptr_type()
-{
-	static PropertyInfo props[] = {
-		make_struct_property("__value",0,PROP_SERIALIZE,"SerializeNodeCFGRef")
-	};
-	static PropertyInfoList list = { props,1,"nodecfg_ptr" };
-	return &list;
-}
-
 
 #if 0
 
@@ -442,9 +433,8 @@ Animation_Tree_CFG::Animation_Tree_CFG()
 
 Animation_Tree_CFG::~Animation_Tree_CFG()
 {
-	// cleanup nodes, they were allocated in arena so dont free() them
 	for (int i = 0; i < all_nodes.size(); i++) {
-		all_nodes[i]->~Node_CFG();
+		delete all_nodes[i];
 	}
 }
 
@@ -456,6 +446,13 @@ void Animation_Tree_CFG::init_program_libs()
 	graph_program->clear();
 	graph_program->push_library(anim_tree_man->get_std_animation_script_lib());
 	graph_program->push_library(graph_var_lib.get());
+}
+
+void Animation_Tree_CFG::post_load_init()
+{
+	for (int i = 0; i < all_nodes.size(); i++) {
+		all_nodes[i]->initialize(this);
+	}
 }
 
  ControlParamHandle Animation_Tree_CFG::find_param(StringName name) {
@@ -470,9 +467,13 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 return -1;
  }
 
- void Animation_Tree_CFG::read_from_dict(DictParser& in)
+ PropertyInfoList* Animation_Tree_CFG::get_props()
  {
-
+	 START_PROPS(Animation_Tree_CFG)
+		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
+		 REG_INT(data_used, PROP_SERIALIZE, ""),
+		REG_BOOL(graph_is_valid, PROP_SERIALIZE, "")
+	END_PROPS()
  }
 
  struct AnimationTreeLoadStruct
@@ -487,66 +488,91 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  struct getter_nodecfg
  {
 	 static void get(std::vector<PropertyListInstancePair>& props, Node_CFG* node) {
-		 props.push_back({ node->get_props(), node });
+		 node->add_props(props);
 	 }
  };
 
+ bool Animation_Tree_CFG::read_from_dict(DictParser& in)
+ {
+	 StringView tok;
+	 if (!in.expect_string("runtime"))
+		 return false;
+	 if (!in.expect_item_start())
+		 return false;
+	 {
+		 if (!in.expect_string("rootdata"))
+			 return false;
+		 if (!in.expect_item_start())
+			 return false;
+		 StringView tok;
+		 in.read_string(tok);
+		 auto res = read_properties(*get_props(), this, in, tok, {});
+		 if (!res.second)
+			 return false;
+		 tok = res.first;
+		 if (!in.check_item_end(tok))
+			 return false;
+	 }
+
+	 {
+		 if (!in.expect_string("nodes") || !in.expect_list_start())
+			 return false;
+
+		 in.read_list_and_apply_functor([&](StringView view) -> bool
+			 {
+				 Node_CFG* node = read_object_properties<Node_CFG, getter_nodecfg>(get_runtime_node_factory(), {}, in, view);
+				 if (node) {
+					 all_nodes.push_back(node);
+					 return true;
+				 }
+				 return false;
+			 }
+		 );
+	 }
+ }
+
+
  void Animation_Tree_CFG::write_to_dict(DictWriter& out)
  {
-	 std::unordered_map<Node_CFG*, int> node_ptr_to_index;
-	 for (int i = 0; i < all_nodes.size(); i++) {
-		 // sanity check
-		 ASSERT(node_ptr_to_index.find(all_nodes[i]) == node_ptr_to_index.end());
-		 node_ptr_to_index[all_nodes[i]] = i;
-	 }
 
-	// out.set_should_add_indents(true);
-	 out.write_value("runtime");
+	 // out.set_should_add_indents(true);
+	 out.write_key("runtime");
 	 out.write_item_start();
 
-	 AnimationTreeLoadStruct dat;
-	 dat.name = this->name;
-	 if (node_ptr_to_index.find(root) != node_ptr_to_index.end())
-		 dat.root_node_index = node_ptr_to_index[root];
-	 dat.graph_is_valid = graph_is_valid;
+	 AgSerializeContext ctx(this);
+	 TypedVoidPtr ctxptr(NAME("AgSerializeContext"), &ctx);
 
-	 out.write_key_list_start("params");
-	 for (auto& param : params->types) {
+	 {
+		 out.write_key("rootdata");
 		 out.write_item_start();
-		 {
-			 out.write_key_value("name", param.name.c_str());
-			 out.write_key_value("type", Enum::get_enum_name(control_param_type_def.id, (int)param.type));
-			 if (param.type == control_param_type::enum_t && param.enum_idx!=-1) {
-				 out.write_key_value("enum_type", Enum::get_type_name(param.enum_idx));
-			 }
-			 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
-		 }
-		 out.write_item_end();
-	 }
-	 out.write_list_end();
-
-	 out.write_key_list_start("nodes");
-
-	 for (int i = 0; i < all_nodes.size(); i++) {
-		 auto& node = all_nodes[i];
-		 out.write_item_start();
-		 {
-			 write_object_properties<Node_CFG, getter_nodecfg>(node, {}, out);
-
-			 out.write_key_list_start("inputs");
-			 for (int i = 0; i < node->input.size(); i++) {
-
-				 ASSERT(node_ptr_to_index.find(node->input[i]) != node_ptr_to_index.end());
-				 int index = node_ptr_to_index.find(node->input[i])->second;
-				 out.write_value(string_format("%d", index));
-			 }
-			 out.write_list_end();
-		 }
+		 write_properties(*get_props(), this, out, ctxptr);
 		 out.write_item_end();
 	 }
 
-	 out.write_list_end();
-
+	 {
+		 out.write_key_list_start("nodes");
+		 for (int i = 0; i < all_nodes.size(); i++) {
+			 auto& node = all_nodes[i];
+			 write_object_properties<Node_CFG, getter_nodecfg>(node, ctxptr, out);
+		 }
+		 out.write_list_end();
+	 }
+	 {
+		 out.write_key_list_start("params");
+		 for (auto& param : params->types) {
+			 out.write_item_start();
+			 {
+				 out.write_key_value("name", param.name.c_str());
+				 out.write_key_value("type", Enum::get_enum_name(control_param_type_def.id, (int)param.type));
+				 if (param.type == control_param_type::enum_t && param.enum_idx != -1) {
+					 out.write_key_value("enum_type", Enum::get_type_name(param.enum_idx));
+				 }
+				 out.write_key_value("reset_on_tick", string_format("%d", (int)param.reset_after_tick));
+			 }
+			 out.write_item_end();
+		 }
+		 out.write_list_end();
+	 }
 	 out.write_item_end();
  }
 
@@ -705,6 +731,9 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
 		 return *(uint32_t*)((char*)ptr + offset);
 	 }
+	 else if (type == core_type_id::Int64) {
+		 return *(uint64_t*)((char*)ptr + offset);
+	 }
 	 else {
 		 ASSERT(0);
 		 return 0;
@@ -722,6 +751,9 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 }
 	 else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
 		 *(uint32_t*)((char*)ptr + offset) = i;
+	 }
+	 else if (type == core_type_id::Int64) {
+		 *(uint64_t*)((char*)ptr + offset) = i;	// ERROR NARROWING
 	 }
 	 else {
 		 ASSERT(0);
@@ -802,4 +834,56 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  {
 	static Factory<std::string, Node_CFG> factory;
 	return factory;
+ }
+
+ AgSerializeContext::AgSerializeContext(Animation_Tree_CFG* tree)
+ {
+	 this->tree = tree;
+	 for (int i = 0; i < tree->all_nodes.size(); i++) {
+		 ptr_to_index[tree->all_nodes[i]] = i;
+	 }
+ }
+
+ class AgSerializeNodeCfg : public IPropertySerializer
+ {
+	 // Inherited via IPropertySerializer
+	 virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) override
+	 {
+		 ASSERT(user.name == NAME("AgSerializeContext"));
+		 auto context = (AgSerializeContext*)user.ptr;
+		 Node_CFG* ptr = *(Node_CFG**)info.get_ptr(inst);
+		 if (ptr == nullptr)
+			 return "-1";
+		 ASSERT(context->ptr_to_index.find(ptr) != context->ptr_to_index.end());
+		 return std::to_string(context->ptr_to_index[ptr]);
+	 }
+	 virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) override
+	 {
+		 ASSERT(user.name == NAME("AgSerializeContext"));
+
+		 uintptr_t index = atoi(token.to_stack_string().c_str());
+
+		 Node_CFG** ptr_to_ptr = (Node_CFG**)info.get_ptr(inst);
+		 *ptr_to_ptr = (Node_CFG*)(index);	// This gets fixed up in a post process step
+	 }
+ };
+
+ static AddClassToFactory<AgSerializeNodeCfg, IPropertySerializer> abc(get_property_serializer_factory(), "AgSerializeNodeCfg");
+
+ PropertyInfoList* get_nodecfg_ptr_type()
+ {
+	 static PropertyInfo props[] = {
+		 make_struct_property("_value",0,PROP_SERIALIZE,"AgSerializeNodeCfg")
+	 };
+	 static PropertyInfoList list = { props,1,"nodecfg_ptr" };
+	 return &list;
+ }
+
+
+ PropertyInfoList* Node_CFG::get_props_static()
+ {
+	 MAKE_INLVECTORCALLBACK_TYPE(get_nodecfg_ptr_type(), input, Node_CFG);
+	 START_PROPS(Node_CFG)
+		 REG_STDVECTOR(input, PROP_SERIALIZE)
+	END_PROPS(Node_CFG);
  }

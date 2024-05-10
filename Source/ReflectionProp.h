@@ -13,6 +13,7 @@ enum class core_type_id : uint8_t
 	Int8,
 	Int16,
 	Int32,
+	Int64,
 	Enum8,
 	Enum16,
 	Enum32,
@@ -79,7 +80,7 @@ struct PropertyInfo {
 	}
 	bool is_integral_type() const {
 		return type == core_type_id::Bool || type == core_type_id::Int8 
-			|| type == core_type_id::Int16 || type == core_type_id::Int32
+			|| type == core_type_id::Int16 || type == core_type_id::Int32 || type == core_type_id::Int64
 			|| type == core_type_id::Enum8 || type == core_type_id::Enum16 || type == core_type_id::Enum32;
 	}
 };

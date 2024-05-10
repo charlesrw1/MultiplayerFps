@@ -43,7 +43,7 @@ public:
 	virtual uint8_t* get_index(void* inst, int index) override
 	{
 		InlineVec<T,SIZE>* list = (InlineVec<T, SIZE>*)inst;
-		return (uint8_t*)&list[index];
+		return (uint8_t*)&(*list)[index];
 	}
 	virtual uint32_t get_size(void* inst) override
 	{

@@ -16,26 +16,44 @@ public:
 
     // high level dict functions
 
+    bool expect_string(const char* str) {
+        StringView tok;
+        read_string(tok);
+        return tok.cmp(str);
+    }
+
+    bool expect_item_start() {
+        StringView tok;
+        read_string(tok);
+        return check_item_start(tok);
+    }
+    bool expect_item_end() {
+        StringView tok;
+        read_string(tok);
+        return check_item_end(tok);
+    }
     bool check_item_start(const StringView& tok) {
         return tok.cmp("{");
     }
     bool check_item_end(const StringView& tok) {
         return tok.cmp("}");
     }
+
     bool check_list_start(const StringView& tok) {
         return tok.cmp("[");
     }
     bool expect_list_start() {
         StringView tok;
-        bool ret = read_next_token(tok);
-        bool cmp = tok.cmp("[");
-        if (!cmp) {
-            raise_error("expected list start '['");
-        }
-        return cmp && ret;
+        read_string(tok);
+        return check_list_start(tok);
     }
     bool check_list_end(const StringView& tok) {
         return tok.cmp("]");
+    }
+    bool expect_list_end() {
+        StringView tok;
+        read_string(tok);
+        return check_list_end(tok);
     }
 
     bool read_string(StringView& str) {
@@ -63,6 +81,22 @@ public:
     }
 
     bool expect_no_more_tokens();
+
+    template<typename FUNCTOR>
+    bool read_list_and_apply_functor(FUNCTOR&& f) {
+
+        StringView start;
+        read_string(start);
+        while (!check_list_end(start) && !is_eof()) {
+            bool out = f(start);
+            if (out) 
+                return false;
+            read_string(start);
+        }
+
+        return check_list_end(start);
+
+    }
 
 private:
     void raise_error(const char* msg) {

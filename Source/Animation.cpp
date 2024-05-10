@@ -574,9 +574,13 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 		cfg->root->reset(ctx);
 }
 
-
+#include "DictParser.h"
 Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {
-	return nullptr;
+	if (trees.find(n) != trees.end())
+		return &trees[n];
+	
+	DictParser parser;
+	return load_animation_tree_file(n, parser);
 }
 
 void Animation_Set_New::find_animation(const char* name, int16_t* out_set, int16_t* out_index, int16_t* skel_idx) const

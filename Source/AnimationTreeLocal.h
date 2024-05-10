@@ -22,6 +22,14 @@
 class Node_CFG;
 class Animation_Tree_CFG;
 
+struct AgSerializeContext
+{
+	AgSerializeContext(Animation_Tree_CFG* tree);
+
+	std::unordered_map<Node_CFG*, int> ptr_to_index;
+	Animation_Tree_CFG* tree = nullptr;
+};
+
 
 struct Rt_Vars_Base
 {
@@ -107,7 +115,11 @@ struct Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const = 0;
 	virtual bool is_clip_node() const { return false; }
 
-	// serialization helpers, optional
+	// serialization helpers
+	void add_props(std::vector<PropertyListInstancePair>& props) {
+		props.push_back({ Node_CFG::get_props_static(), this });
+		props.push_back({ get_props(), this });
+	}
 	virtual PropertyInfoList* get_props() = 0;
 	virtual const TypeInfo& get_typeinfo() const = 0;
 
@@ -122,6 +134,8 @@ struct Node_CFG
 	T* get_rt(NodeRt_Ctx& ctx) const {
 		return ctx.tree->get<T>(rt_offset);
 	}
+
+	static PropertyInfoList* get_props_static();
 
 	InlineVec<Node_CFG*, 2> input;
 protected:

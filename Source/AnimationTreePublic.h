@@ -20,20 +20,21 @@ class Library;
 class ControlParam_CFG;
 
 // this is the thing loaded from disk once
+class Animation_Tree_Manager;
+struct PropertyInfoList;
 class Animation_Tree_CFG
 {
 public:
 	Animation_Tree_CFG();
 	~Animation_Tree_CFG();
-	void init_memory_arena(size_t memsize) {
-		arena.init("AGTREE", memsize);
-	}
+
 	void init_program_libs();
+	void post_load_init();
 
 	bool graph_is_valid = false;
 	std::string name;
 	Node_CFG* root = nullptr;
-	Memory_Arena arena;
+	// data in bytes for runtime nodes
 	uint32_t data_used = 0;
 	std::vector<Node_CFG*> all_nodes;	// for initialization
 	std::unique_ptr<Library> graph_var_lib;
@@ -43,7 +44,14 @@ public:
 	ControlParamHandle find_param(StringName name);
 	int get_index_of_node(Node_CFG* ptr);
 	void write_to_dict(DictWriter& out);
-	void read_from_dict(DictParser& in);
+	bool read_from_dict(DictParser& in);
+
+
+	static PropertyInfoList* get_props();
+
+private:
+	friend class Animation_Tree_Manager;
+	bool is_initialized() { return !name.empty(); }
 };
 
 class Model_Skeleton
@@ -144,6 +152,8 @@ struct Animation_Notify_List
 };
 
 class DictParser;
+
+class AnimationGraphEditor;
 class Animation_Tree_Manager
 {
 public:
@@ -158,6 +168,8 @@ private:
 	void load_notifies();
 	void parse_notify_file(DictParser& parser);
 
+	Animation_Tree_CFG* load_animation_tree_file(const char* filename, DictParser& parser);
+
 	struct Animation_Link {
 		const Model* model = nullptr;
 		int index = 0;
@@ -168,6 +180,8 @@ private:
 	std::unordered_map<std::string, Model_Skeleton> skeletons;
 	std::unordered_map<std::string, Animation_Set_New> sets;
 	std::unordered_map<std::string, Animation_Tree_CFG> trees;
+
+	friend class AnimationGraphEditor;
 };
 
 extern Animation_Tree_Manager* anim_tree_man;

@@ -266,30 +266,38 @@ void ControlParamsWindow::refresh_props() {
 
 void AnimationGraphEditor::init()
 {
+	ASSERT(!is_initialized);
 
+	imgui_node_context = ImNodes::CreateContext();
+	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
 
-	
+	// init template nodes for creation menu
+	template_creation_nodes.clear();
+	auto& ed_factory = get_tool_node_factory();
+	for (auto& obj : ed_factory.get_object_creator()) {
+		template_creation_nodes.push_back(obj.second());
+	}
+
+	is_initialized = true;
 }
 
 void AnimationGraphEditor::close()
 {
 	idraw->remove_obj(out.obj);
-
-	ImNodes::DestroyContext(imgui_node_context);
+	// fixme:
+	save_document();
 
 	for (int i = 0; i < nodes.size(); i++) {
 		delete nodes[i];
 	}
 	nodes.clear();
 
-	assert(editing_tree);
-	editing_tree->arena.shutdown();
-	delete editing_tree;
+	if (is_owning_editing_tree) {
+		delete editing_tree;
+	}
 	editing_tree = nullptr;
 
-	for (auto& obj : template_creation_nodes)
-		delete obj;
-	template_creation_nodes.resize(0);
+	ImNodes::EditorContextFree(default_editor);
 }
 
 
@@ -484,8 +492,12 @@ void AnimationGraphEditor::save_document()
 		return;
 	}
 
+	// first compile, compiling writes editor node data out to the CFG node
+	bool good = compile_graph_for_playing();
+
 	DictWriter write;
 	write.set_should_add_indents(false);
+
 	editing_tree->write_to_dict(write);
 	save_editor_nodes(write);
 
@@ -506,25 +518,48 @@ struct getter_ednode
 	}
 };
 
-struct AgSerializeContext
-{
-	std::unordered_map<Node_CFG*, int> ptr_to_index;
-	Animation_Tree_CFG* tree = nullptr;
-};
 
+bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
+{
+	AgSerializeContext context(get_tree());
+	TypedVoidPtr userptr(NAME("AgSerializeContext"), &context);
+
+	if (!in.expect_string("editor") || !in.expect_item_start())
+		return false;
+	{
+		if (!in.expect_string("rootstate") || !in.expect_item_start())
+			return false;
+		StringView tok;
+		in.read_string(tok);
+		auto out = read_properties(*get_props(), this, in, tok, userptr);
+		if (!out.second || !in.check_item_end(out.first))
+			return false;
+	}
+
+	{
+		if (!in.expect_string("nodes") || !in.expect_list_start())
+			return false;
+		bool good = in.read_list_and_apply_functor([&](StringView view) -> bool {
+			Base_EdNode* node = read_object_properties<Base_EdNode, getter_ednode>(get_tool_node_factory(), userptr, in, view);
+			if (node) {
+				nodes.push_back(node);
+				return true;
+			}
+			return false;
+			});
+		if (!good)
+			return false;
+	}
+
+	if (!in.expect_item_end())
+		return false;
+
+	return true;
+}
 
 void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 {
-	std::unordered_map<Node_CFG*, int> node_ptr_to_output_index;
-	// use these to fixup editor nodes on reload
-	for (int i = 0; i < editing_tree->all_nodes.size(); i++) {
-		node_ptr_to_output_index[editing_tree->all_nodes[i]] = i;
-	}
-
-
-	AgSerializeContext context;
-	context.tree = ed.editing_tree;
-	context.ptr_to_index = std::move(node_ptr_to_output_index);
+	AgSerializeContext context(get_tree());
 	TypedVoidPtr userptr(NAME("AgSerializeContext"), &context);
 
 	out.write_value("editor");
@@ -543,10 +578,6 @@ void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 	out.write_list_end();
 
 	out.write_item_end();
-}
-
-void AnimationGraphEditor::create_new_document()
-{
 }
 
 void AnimationGraphEditor::pause_playback()
@@ -575,16 +606,16 @@ void AnimationGraphEditor::draw_menu_bar()
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("View")) {
-			ImGui::Checkbox("Graph", &open_graph);
-			ImGui::Checkbox("Control params", &open_control_params);
-			ImGui::Checkbox("Viewport", &open_viewport);
-			ImGui::Checkbox("Property Ed", &open_prop_editor);
+			ImGui::Checkbox("Graph", &opt.open_graph);
+			ImGui::Checkbox("Control params", &opt.open_control_params);
+			ImGui::Checkbox("Viewport", &opt.open_viewport);
+			ImGui::Checkbox("Property Ed", &opt.open_prop_editor);
 			ImGui::EndMenu();
 
 		}
 
 		if (ImGui::BeginMenu("Settings")) {
-			ImGui::Checkbox("Statemachine passthrough", &statemachine_passthrough);
+			ImGui::Checkbox("Statemachine passthrough", &opt.statemachine_passthrough);
 			if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
 				ImGui::Text("Enable passing through the blend tree\n"
 					"when selecting a state node if the\n" 
@@ -940,7 +971,7 @@ void AnimationGraphEditor::begin_draw()
 
 	node_props.set_read_only(graph_is_read_only());
 
-	if (open_prop_editor)
+	if (opt.open_prop_editor)
 		draw_prop_editor();
 
 	control_params.imgui_draw();
@@ -1404,22 +1435,6 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 
 }
 
-// nodes/particles/entities/everything has data that HAS to be serialized to disk and read back
-// some of this has custom editing functions
-
-
-template<typename T>
-static T* create_node_type(Animation_Tree_CFG& cfg)
-{
-	auto c = cfg.arena.alloc_bottom(sizeof(T));
-	c = new(c)T(&cfg);
-	return (T*)c;
-}
-
-// two paths: create new node
-//			  load an existing node from a file
-
-
 
 static void delete_cfg_node(Node_CFG* node)
 {
@@ -1562,8 +1577,14 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	// after all updates have been run, fixup editor id/indexes for control props
 	control_params.recalculate_control_prop_ids();
 
+	// init memory
+	editing_tree->post_load_init();
+
+	editing_tree->graph_is_valid = tree_is_good_to_run;
+
 	return tree_is_good_to_run;
 }
+
 
 
 
@@ -1685,12 +1706,7 @@ void AnimationGraphEditor::compile_and_run()
 {
 	bool good_to_run = compile_graph_for_playing();
 	if (good_to_run) {
-
-		for (int i = 0; i < editing_tree->all_nodes.size(); i++) {
-			editing_tree->all_nodes[i]->initialize(ed.editing_tree);
-		}
-
-		out.anim.initialize_animator(out.model, out.set, editing_tree, nullptr, nullptr);
+		out.anim.initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
 		playback = graph_playback_state::running;
 	}
 }
@@ -1699,45 +1715,75 @@ void AnimationGraphEditor::overlay_draw()
 {
 
 }
-void AnimationGraphEditor::open(const char* name)
+
+
+void AnimationGraphEditor::create_new_document()
 {
-	//this->name = name;
-
-	imgui_node_context = ImNodes::CreateContext();
-
-	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
-
+	printf("creating new document");
+	this->name = "";	// when saving, user is prompted
 	editing_tree = new Animation_Tree_CFG;
-	editing_tree->arena.init("ATREE ARENA", 1'000'000);	// spam the memory for the editor
-
-	graph_tabs.add_tab(nullptr, nullptr, glm::vec2(0.f), true);
+	is_owning_editing_tree = true;
+	// add the output pose node to the root layer
 	add_root_node_to_layer(nullptr, 0, false);
-
+	// create context for root layer
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
+}
 
-	out.model = mods.find_or_load("player_FINAL.glb");
-	out.set = anim_tree_man->find_set("default.txt");
+void AnimationGraphEditor::try_load_preview_models()
+{
+	out.model = mods.find_or_load(opt.preview_model.c_str());
+	out.set = anim_tree_man->find_set(opt.preview_set.c_str());
+	if(out.model && out.set)
+		out.anim.initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
+}
 
-	out.anim.initialize_animator(out.model, out.set, editing_tree, nullptr, nullptr);
+void AnimationGraphEditor::open(const char* name)
+{
+	if (!is_initialized)
+		init();
 
+	std::string graphname = name;
+	// reset settings, default if new doc or gets loaded by graphname
+	opt = settings();
+
+	bool needs_new_doc = true;
+	if (!graphname.empty()) {
+		// try loading graphname, create new document on fail
+		DictParser parser;
+		editing_tree = anim_tree_man->load_animation_tree_file(name, parser);
+		if (editing_tree) {
+
+			bool good = load_editor_nodes(parser);
+			if (!good) {
+				editing_tree = nullptr;
+				printf("couldn't load editor nodes for tree %s\n", name);
+			}
+			else {
+				needs_new_doc = false;
+				is_owning_editing_tree = false;
+			}
+		}
+	}
+
+	if (needs_new_doc) {
+		printf("Couldn't open animation tree file %s, creating new document instead\n", name);
+		create_new_document();
+	}
+
+	ASSERT(editing_tree);
+
+	// initialize other state
+	graph_tabs = TabState(this);
+	// push root tab, always visible
+	graph_tabs.add_tab(nullptr, nullptr, glm::vec2(0.f), true);
+
+	// load preview model and set and register renderable
+	try_load_preview_models();
 	out.obj = idraw->register_obj();
 
-	Render_Object ro;
-	ro.mesh = &out.model->mesh;
-	ro.mats = &out.model->mats;
-	ro.transform = out.model->skeleton_root_transform;
-
-	idraw->update_obj(out.obj, ro);
-
+	// refresh control_param editor
 	control_params.refresh_props();
-
-	// init template nodes for creation menu
-	template_creation_nodes.clear();
-	auto& ed_factory = get_tool_node_factory();
-	for (auto& obj : ed_factory.get_object_creator()) {
-		template_creation_nodes.push_back(obj.second());
-	}
 }
 
 class AgEditor_BlendSpaceArrayHead : public IArrayHeader

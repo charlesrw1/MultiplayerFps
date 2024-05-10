@@ -15,6 +15,7 @@ static const char* core_type_id_strs[] = {
 	"Int8",
 	"Int16",
 	"Int32",
+	"Int64",
 	"Enum8",
 	"Enum16",
 	"Enum32",
@@ -58,7 +59,7 @@ static void parse_str(StringView str, float& f, int& i, core_type_id type, bool 
 			i = idx.val_idx;
 			ASSERT(!is_min_max_or_inc);
 		}
-		else if (type == core_type_id::Int8 || type == core_type_id::Int16 || type == core_type_id::Int32 || type == core_type_id::Bool) {
+		else if (type == core_type_id::Int8 || type == core_type_id::Int16 || type == core_type_id::Int32 || type == core_type_id::Int64|| type == core_type_id::Bool) {
 			i = atoi(str.to_stack_string().c_str());
 		}
 		else if (type == core_type_id::Float) {
@@ -133,6 +134,8 @@ PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t fl
 		prop.type = core_type_id::Int16;
 	else if (bytes == 4)
 		prop.type = core_type_id::Int32;
+	else if (bytes == 8)
+		prop.type == core_type_id::Int64;
 	else
 		assert(0);
 
@@ -200,6 +203,7 @@ std::string write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, D
 	case core_type_id::Int8:
 	case core_type_id::Int16:
 	case core_type_id::Int32:
+	case core_type_id::Int64:
 		value_str = string_format("%d", prop.get_int(ptr));
 		break;
 
@@ -266,7 +270,7 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr
 
 			buf += write_field_type(prop.type, member_dat, prop, out, userptr);
 			buf += ' ';
-			out.write_value(buf.c_str());
+			out.write_value_no_ln(buf.c_str());
 			buf.clear();
 		}
 		out.write_list_end();
@@ -359,7 +363,8 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	case core_type_id::Bool:
 	case core_type_id::Int8:
 	case core_type_id::Int16:
-	case core_type_id::Int32: {
+	case core_type_id::Int32:
+	case core_type_id::Int64:{
 		int i = atoi(tok.to_stack_string().c_str());
 		prop->set_int(ptr, i);
 	}break;

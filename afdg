@@ -1,6 +1,6 @@
 runtime {
 rootdata {
-root   "0"
+root   "1"
 data_used   "0"
 graph_is_valid   "0"
 }
@@ -19,6 +19,19 @@ allow_sync   "0"
 can_be_leader   "1"
 clip_name   "Armature|mixamo.com|Layer0"
 }
+{
+type "Blend_Node_CFG"
+input   [
+ 0   2  ]
+param   "-1"
+damp_factor   "0.100000"
+store_value_on_reset   "0"
+}
+{
+type "Sync_Node_CFG"
+input   [
+ -1  ]
+}
 ]
 params [
 ]
@@ -26,7 +39,7 @@ params [
  editor
 {
 rootstate {
-current_id   "2"
+current_id   "4"
 current_layer   "1"
 default_editor   "[editor]
 panning=300,325
@@ -35,7 +48,13 @@ panning=300,325
 origin=0,0
 
 [node.1]
-origin=-285,-171
+origin=-293,-198
+
+[node.2]
+origin=-120,-91
+
+[node.3]
+origin=-261,-22
 "
 opt.open_graph   "1"
 opt.open_control_params   "1"
@@ -53,6 +72,18 @@ type "Clip_EdNode"
 id   "1"
 graph_layer   "0"
 node   "0"
+}
+{
+type "Blend_EdNode"
+id   "2"
+graph_layer   "0"
+node   "1"
+}
+{
+type "Sync_EdNode"
+id   "3"
+graph_layer   "0"
+node   "2"
 }
 ]
 }

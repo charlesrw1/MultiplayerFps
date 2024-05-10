@@ -24,6 +24,13 @@ public:
         this->str += str;
         this->str += "\"\n";
     }
+
+    void write_value_no_ln(const char* str) {
+        this->str += ' ';
+        this->str += str;
+        this->str += ' ';
+    }
+
     void write_value(const char* str1) {
         this->str += ' ';
         this->str += str1;
