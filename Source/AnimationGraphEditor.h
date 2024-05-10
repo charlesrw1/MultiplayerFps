@@ -47,8 +47,10 @@ struct GraphTab {
 	}
 
 	void update_tab_name() {
-		if (!owner_node) tabname = "ROOT";
-		else owner_node->get_layer_tab_title();
+		if (!owner_node) 
+			tabname = "ROOT";
+		else 
+			tabname = owner_node->get_layer_tab_title();
 	}
 };
 

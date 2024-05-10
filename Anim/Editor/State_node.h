@@ -24,6 +24,10 @@ public:
 	bool traverse_and_find_errors() override;
 	void on_post_remove_pins() override;
 
+	std::string get_layer_tab_title() const override {
+		return "State: " + get_title();
+	}
+
 	int get_num_inputs() const override { 
 		if (is_alias_node() || is_start_node()) 
 			return 0;
@@ -38,7 +42,7 @@ public:
 			return &sublayer;
 		return nullptr;
 	}
-
+	bool dont_call_compile() const override { return true; }
 	bool draw_flat_links() const override { return true; }
 	bool is_state_node() const override { return true; }
 	ImVec4 get_pin_colors() const override { return ImVec4(0.5, 0.5, 0.5, 1.0); }
@@ -60,8 +64,11 @@ public:
 
 public:
 
+
 	bool is_regular_state_node() const { return !is_start_node() && !is_alias_node(); }
 
+	void init_for_statemachine(Statemachine_EdNode* parent, std::vector<bool>& transition_taken_bitmask, 
+		const std::vector<State_EdNode*>& handle_to_ednode);
 	bool compile_data_for_statemachine(const AgSerializeContext* ctx);
 	void get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props, int slot);
 	
@@ -95,7 +102,7 @@ public:
 
 	static PropertyInfoList* get_props() {
 		START_PROPS(State_EdNode)
-			REG_STDSTRING(name, PROP_SERIALIZE),
+			REG_STDSTRING(name, PROP_DEFAULT),
 			REG_INT(state_handle_internal.id,PROP_SERIALIZE,""),
 			REG_INT(sublayer.id, PROP_SERIALIZE, ""),
 			REG_STRUCT_CUSTOM_TYPE(sublayer.context, PROP_SERIALIZE, "SerializeImNodeState")
@@ -108,7 +115,7 @@ public:
 		State_Transition st;
 	};
 
-	int num_inputs = 0;
+	int num_inputs = 1;
 
 	std::vector<output_transition_info> output;
 	State self_state;
@@ -118,7 +125,7 @@ public:
 	editor_layer sublayer;
 	Statemachine_EdNode* parent_statemachine = nullptr;
 
-	std::string name = "Unnamed";
+	std::string name = "";
 
 };
 

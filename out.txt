@@ -12,15 +12,7 @@ type "Statemachine_Node_CFG"
 "states"  [
 {
 "transition_idxs"  [
-]
-"state_duration"  "-1.000000"
-"wait_until_finish"  "1"
-"is_end_state"  "1"
-"tree"  "-1"
-}
-{
-"transition_idxs"  [
-]
+ 1  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
@@ -28,7 +20,7 @@ type "Statemachine_Node_CFG"
 }
 {
 "transition_idxs"  [
-]
+ 2  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
@@ -36,31 +28,30 @@ type "Statemachine_Node_CFG"
 }
 ]
 "transitions"  [
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+}
+{
+"transition_state"  "1"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "0"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "0"
+}
 ]
 "entry_transitions"  [
-]
-}
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
-"rm[2]"  "rm::keep"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "Armature|mixamo.com|Layer0"
-}
-{
-type "Blend_Node_CFG"
-"input"  [
- 1   -1  ]
-"param"  "-1"
-"damp_factor"  "0.100000"
-"store_value_on_reset"  "0"
+ 0  ]
 }
 ]
 "params" {
@@ -71,22 +62,16 @@ type "Blend_Node_CFG"
  editor
 {
 "rootstate" {
-"current_id"  "11"
+"current_id"  "9"
 "current_layer"  "5"
 "default_editor"  "[editor]
-panning=388,452
+panning=447,329
 
 [node.0]
-origin=14,-71
+origin=0,0
 
 [node.1]
-origin=-208,-131
-
-[node.9]
-origin=-211,-250
-
-[node.10]
-origin=49,-230
+origin=-245,-28
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
@@ -106,19 +91,16 @@ type "Statemachine_EdNode"
 "name"  ""
 "sublayer.id"  "1"
 "sublayer.context"  "[editor]
-panning=315,470
+panning=159,325
 
 [node.2]
-origin=0,0
+origin=-45,15
 
 [node.3]
-origin=112,-250
-
-[node.5]
-origin=197,-48
+origin=140,-174
 
 [node.7]
-origin=318,-268
+origin=177,104
 "
 "node"  "0"
 }
@@ -131,7 +113,7 @@ type "StateStart_EdNode"
 type "State_EdNode"
 "id"  "3"
 "graph_layer"  "1"
-"name"  "Unnamed"
+"name"  "IDLE"
 "state_handle_internal.id"  "0"
 "sublayer.id"  "2"
 "sublayer.context"  "[editor]
@@ -145,26 +127,10 @@ type "Root_EdNode"
 }
 {
 type "State_EdNode"
-"id"  "5"
-"graph_layer"  "1"
-"name"  "Unnamed"
-"state_handle_internal.id"  "1"
-"sublayer.id"  "3"
-"sublayer.context"  "[editor]
-panning=0,0
-"
-}
-{
-type "Root_EdNode"
-"id"  "6"
-"graph_layer"  "3"
-}
-{
-type "State_EdNode"
 "id"  "7"
 "graph_layer"  "1"
-"name"  "Unnamed"
-"state_handle_internal.id"  "2"
+"name"  ""
+"state_handle_internal.id"  "1"
 "sublayer.id"  "4"
 "sublayer.context"  "[editor]
 panning=0,0
@@ -174,18 +140,6 @@ panning=0,0
 type "Root_EdNode"
 "id"  "8"
 "graph_layer"  "4"
-}
-{
-type "Clip_EdNode"
-"id"  "9"
-"graph_layer"  "0"
-"node"  "1"
-}
-{
-type "Blend_EdNode"
-"id"  "10"
-"graph_layer"  "0"
-"node"  "2"
 }
 ]
 }

@@ -6,6 +6,35 @@
 		sublayer = ed.create_new_layer(true);
 		ed.add_root_node_to_layer(this, sublayer.id, true);
 	}
+	else {
+
+		for (int i = 0; i < ed.nodes.size(); i++) {
+			if (ed.nodes[i]->graph_layer == sublayer.id) {
+				ASSERT(ed.nodes[i]->is_state_node());
+				add_node_to_statemachine((State_EdNode*)ed.nodes[i]);
+			}
+		}
+		// now have a list of all ed state nodes
+		std::vector<bool> taken_transitions(node->transitions.size(),false);
+		std::vector<State_EdNode*> handle_to_ednode;
+		handle_to_ednode.resize(node->states.size(),nullptr);
+		for (int i = 0; i < states.size(); i++) {
+			if (states[i]->state_handle_internal.is_valid()) {
+				handle_to_ednode[states[i]->state_handle_internal.id] = states[i];
+			}
+		}
+#ifdef _DEBUG
+		for (auto p : handle_to_ednode)
+			ASSERT(p);
+#endif _DEBUG
+
+		// TODO:
+		// evaluate alias transitions first
+
+		for (int i = 0; i < states.size(); i++) {
+			states[i]->init_for_statemachine(this, taken_transitions, handle_to_ednode);
+		}
+	}
 }
 
 bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)

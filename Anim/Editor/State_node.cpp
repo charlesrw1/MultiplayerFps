@@ -3,6 +3,10 @@
 #include "AnimationGraphEditor.h"
 void State_EdNode::init()
 {
+	if (!is_this_node_created())
+		return;
+	// loaded nodes get a different path
+
 	Base_EdNode* parent = ed.get_owning_node_for_layer(graph_layer);
 	ASSERT(parent);
 	ASSERT(strcmp(parent->get_typeinfo().name, "Statemachine_EdNode") == 0);
@@ -10,33 +14,70 @@ void State_EdNode::init()
 	parent_statemachine->add_node_to_statemachine(this);
 
 	if (is_regular_state_node()) {
-		num_inputs = 1;
-
-
-		if (is_this_node_created()) {
-			ASSERT(!sublayer.context);
-			sublayer = ed.create_new_layer(false);
-			ed.add_root_node_to_layer(this, sublayer.id, false);
-		}
-		else {
-			ASSERT(state_handle_internal.is_valid());
-			self_state = *parent_statemachine->get_state(state_handle_internal);
-			
-		}
+		ASSERT(!sublayer.context);
+		sublayer = ed.create_new_layer(false);
+		ed.add_root_node_to_layer(this, sublayer.id, false);
 	}
 	else if (is_start_node()) {
 		// num_inputs implicitly 0
-
-		if (!is_this_node_created()) {
-			
-
-
-		}
 	}
 }
+void State_EdNode::init_for_statemachine(Statemachine_EdNode* parent, std::vector<bool>& transition_taken_bitmask,
+	const std::vector<State_EdNode*>& handle_to_ednode)
+{
+	ASSERT(!is_this_node_created());
+	parent_statemachine = parent;
+
+	if (is_regular_state_node()) {
+		ASSERT(state_handle_internal.is_valid());
+		self_state = *parent_statemachine->get_state(state_handle_internal);
+		
+		for (int i = 0; i < self_state.transition_idxs.size(); i++) {
+			int index = self_state.transition_idxs[i];
+			if (transition_taken_bitmask[index])
+				continue;
+			State_Transition& t = parent_statemachine->node->transitions.at(index);
+			State_EdNode* to = handle_to_ednode[t.transition_state.id];
+			ASSERT(to->is_regular_state_node());
+			to->add_input(&ed, this, to->num_inputs++ - 1 /* num_inputs initialized to 1 */);
+			// this is horrible, add_input calls on_output on this
+			ASSERT(output.back().output_to == to);
+			output.back().st = t;
+
+			transition_taken_bitmask[index] = true;
+		}
+	}
+	else if (is_start_node()) {
+		Statemachine_Node_CFG* sm = parent_statemachine->node;
+
+		for (int i = 0; i < sm->entry_transitions.size(); i++) {
+			int index = sm->entry_transitions[i];
+			if (transition_taken_bitmask[index])
+				continue;
+			State_Transition& t = parent_statemachine->node->transitions.at(index);
+			State_EdNode* to = handle_to_ednode[t.transition_state.id];
+			ASSERT(to->is_regular_state_node());
+			to->add_input(&ed, this, to->num_inputs++ - 1 /* num_inputs initialized to 1 */);
+			// this is horrible, add_input calls on_output on this
+			ASSERT(output.back().output_to == to);
+			output.back().st = t;
+
+			transition_taken_bitmask[index] = true;
+		}
+	}
+	else if (is_alias_node()) {
+		// FIXME
+		ASSERT(0);
+	}
+	else
+		ASSERT(0);
+}
+
 std::string State_EdNode::get_title() const
 {
-	if (name != "Unnamed" || !is_regular_state_node())
+	if (!name.empty())
+		return name;
+	else if (!is_regular_state_node())
 		return get_name();
 
 	bool any_non_defaults = false;
@@ -123,6 +164,7 @@ bool State_EdNode::add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint3
 
 	return false;
 }
+
 
 bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 {

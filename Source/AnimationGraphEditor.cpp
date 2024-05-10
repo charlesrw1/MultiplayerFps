@@ -406,12 +406,14 @@ void TabState::imgui_draw() {
 			auto flags = (needs_select) ? ImGuiTabItemFlags_SetSelected : 0;
 			bool prev_open = tabs[n].open;
 			bool* open_bool = (tabs[n].owner_node) ? &tabs[n].open : nullptr;
-			if (ImGui::BeginTabItem(tabs[n].tabname.c_str(), open_bool, flags))
+			ImGui::PushID(tabs[n].owner_node);
+			if (ImGui::BeginTabItem(string_format("%s###",tabs[n].tabname.c_str()), open_bool, flags))
 			{
 				bool this_is_an_old_active_tab_or_just_skip = n != active_tab && active_tab_dirty;
 
 				if (this_is_an_old_active_tab_or_just_skip) {
 					ImGui::EndTabItem();
+					ImGui::PopID();
 					continue;
 				}
 
@@ -445,6 +447,7 @@ void TabState::imgui_draw() {
 					active_tab = n;
 				}
 			}
+			ImGui::PopID();
 			any_deleted |= !tabs[n].open;
 		}
 		ImGui::EndTabBar();

@@ -34,6 +34,11 @@ public:
 		return &sublayer;
 	}
 
+	std::string get_layer_tab_title() const override {
+		return "Sm: " + get_title();
+	}
+
+
 public:
 	void add_node_to_statemachine(State_EdNode* node) {
 		states.push_back(node);
