@@ -3,11 +3,16 @@
 #include "Game_Engine.h"
 
 #include "Entity.h"
+#include "Interaction.h"
+
+
 
 using namespace glm;
 class NPC : public Entity
 {
 public:
+	ENTITY_HEADER();
+
 	NPC() {
 		set_model("player_FINAL.glb");
 		pathfind_state = going_towards_waypoint;
@@ -15,6 +20,8 @@ public:
 
 		rotation.y = HALFPI;
 	}
+
+	virtual void spawn() override;
 	virtual void update() override {
 
 		glm::vec3 waypoints[3] = {
@@ -96,19 +103,31 @@ public:
 class Door : public Entity
 {
 public:
+	ENTITY_HEADER();
+
 	enum {
 		OPEN,
 		CLOSED
 	}doorstate;
 
+	void spawn() override;
 	void update() override;
 };
 
 class Grenade : public Entity
 {
 public:
+	ENTITY_HEADER();
 	Grenade();
-	float timer = 0.f;
-	entityhandle thrower = -1;
+
+	void set_thrower(entityhandle handle) {
+		thrower = handle;
+	}
+
+	void spawn() override;
 	void update() override;
+
+	float throw_time = 0.0;
+
+	entityhandle thrower = -1;
 };

@@ -32,7 +32,7 @@ std::string remove_whitespace(const char* str)
 
 
 AnimationGraphEditor ed;
-AnimationGraphEditorPublic* g_anim_ed_graph = &ed;
+IEditorTool* g_anim_ed_graph = &ed;
 int EditorControlParamProp::unique_id_generator = 0;
 
 struct AnimCompletionCallbackUserData
@@ -325,10 +325,22 @@ void AnimationGraphEditor::close()
 	control_params.clear_all();
 
 	ImNodes::EditorContextFree(default_editor);
-
+	
 	ASSERT(!has_document_open());
 }
 
+static std::string saved_settings = "";
+
+DECLARE_ENGINE_CMD(dumpdockini)
+{
+	saved_settings = ImGui::SaveIniSettingsToMemory();
+	sys_print("--------- Dump Ini Settings ---------\n");
+	sys_print(saved_settings.c_str());
+}
+DECLARE_ENGINE_CMD(loaddockini)
+{
+	ImGui::LoadIniSettingsFromMemory(saved_settings.c_str(), saved_settings.size());
+}
 
 static Color32 to_color32(glm::vec4 v) {
 	Color32 c;
@@ -995,7 +1007,14 @@ void draw_curve_test()
 	ImGui::Curve("test", ImVec2(300, 200), 10, points, &selected);
 }
 
-void AnimationGraphEditor::begin_draw()
+void AnimationGraphEditor::draw_frame()
+{
+	// draws into a viewport image that is later sampled when drawing gui
+	auto vs = get_vs();
+	idraw->scene_draw(vs, this);
+}
+
+void AnimationGraphEditor::imgui_draw()
 {
 	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
@@ -1263,7 +1282,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 }
 
 
-void AnimationGraphEditor::handle_event(const SDL_Event& event)
+bool AnimationGraphEditor::handle_event(const SDL_Event& event)
 {
 	switch (event.type)
 	{
@@ -1304,6 +1323,7 @@ void AnimationGraphEditor::handle_event(const SDL_Event& event)
 			out.camera.scroll_callback(event.wheel.y);
 		}
 	}
+	return false;
 }
 
 void AnimationGraphEditor::delete_selected()
@@ -1706,9 +1726,10 @@ void AnimationGraphEditor::tick(float dt)
 {
 	{
 		int x = 0, y = 0;
-		if (eng->game_focused)
+		if (eng->game_focused && eng->get_state() != Engine_State::Game) {
 			SDL_GetRelativeMouseState(&x, &y);
-		out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+			out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+		}
 	}
 
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderObj.h"
+#include "IEditorTool.h"
 
 struct View_Setup
 {
@@ -14,17 +15,10 @@ struct View_Setup
 	int width, height;
 };
 
-enum class special_render_mode
-{
-	none,
-	lvl_editor,
-	anim_editor
-};
-
 class RendererPublic
 {
 public:
-	virtual void scene_draw(View_Setup view, special_render_mode mode = special_render_mode::none) = 0;
+	virtual void scene_draw(View_Setup view, IEditorTool* tool = nullptr) = 0;
 	virtual void init() = 0;
 
 	virtual void on_level_start() = 0;

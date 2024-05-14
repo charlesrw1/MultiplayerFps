@@ -166,22 +166,27 @@ public:
 };
 
 class Model;
-class EditorDoc : public EditorDocPublic
+class EditorDoc : public IEditorTool
 {
 public:
 	EditorDoc() : assets(this) {}
-	virtual void open_doc(const char* levelname) override;
-	virtual void save_doc() override;
-	virtual void close_doc() override;
+	virtual void init() {}
+	virtual void open(const char* levelname) override;
+	virtual void close() override;
 	virtual bool handle_event(const SDL_Event& event) override;
-	virtual void update() override;
-	virtual void scene_draw_callback() override;
-	virtual void overlays_draw() override;
+	virtual void tick(float dt) override;
+	virtual void overlay_draw() override;
 	virtual void imgui_draw() override;
+	virtual void draw_frame() override;
 	virtual const View_Setup& get_vs() override;
+	virtual const char* get_name() override {
+		return "";
+	}
 
 	void on_add_or_remove_node(int ent_dict_index, EdObjType type, int varying_index, bool is_removal);
 	RayHit cast_ray_into_world(Ray* out_ray);
+
+	void save_doc();
 	
 	enum ToolMode {
 		TOOL_NONE,	// can select objects in viewport

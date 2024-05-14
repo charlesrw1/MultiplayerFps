@@ -43,14 +43,14 @@ void Client::ReadPackets()
 				// We now have a valid connection with the server
 				server.Init(&sock, server.remote_addr);
 				state = CS_CONNECTED;
-				if (eng->start_map(mapname, true)) {
-					eng->set_tick_rate(tickrate);
-					eng->tick = tick;
-					client_num = client_num_;
-				}
-				else {
-					disconnect_to_menu("couldn't start map");
-				}
+				//if (eng->start_map(mapname, true)) {
+				//	eng->set_tick_rate(tickrate);
+				//	eng->tick = tick;
+				//	client_num = client_num_;
+				//}
+				//else {
+				//	disconnect_to_menu("couldn't start map");
+				//}
 			}
 			else if (msg == "reject" && state == CS_TRYINGCONNECT) {
 				disconnect_to_menu("rejected by server");
@@ -105,7 +105,8 @@ void Client::HandleServerPacket(ByteReader& buf)
 				state = CS_SPAWNED;
 
 				// start game state after recieving first snapshot
-				eng->client_enter_into_game();
+				ASSERT(0);
+				//eng->client_enter_into_game();
 			}
 			bool ignore_packet = OnEntSnapshot(buf);
 			if (ignore_packet)
@@ -115,8 +116,9 @@ void Client::HandleServerPacket(ByteReader& buf)
 			disconnect_to_menu("server closed connection");
 			break;
 		case SV_UPDATE_VIEW:
-			glm::vec3 new_angles = buf.ReadVec3();
-			eng->local.view_angles = new_angles;
+			ASSERT(0);
+		//	glm::vec3 new_angles = buf.ReadVec3();
+			//eng->local.view_angles = new_angles;
 			break;
 		case SV_TEXT:
 			break;
@@ -225,7 +227,6 @@ void Client::SendMovesAndMessages()
 	server.Send(buffer, writer.BytesWritten());
 }
 
-static Entity null_ent;
 
 void Client::read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, bool is_delta, ByteReader* from_ent, int tick)
 {

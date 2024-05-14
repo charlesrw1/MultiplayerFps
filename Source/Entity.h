@@ -5,6 +5,12 @@
 #include "RenderObj.h"
 #include "Animation/Runtime/Animation.h"
 #include "BaseComponents.h"
+#include "Interaction.h"
+
+#include "Framework/TypeInfo.h"
+#include "Framework/AddClassToFactory.h"
+#include "Framework/StringName.h"
+
 
 class Model;
 class GeomContact;
@@ -12,91 +18,97 @@ class GeomContact;
 enum Entity_Flags
 {
 	EF_DEAD = 1,
-	EF_FORCED_ANIMATION = 2,
-	EF_HIDDEN = 4,
-	EF_HIDE_ITEM = 8,
-	EF_BOUNCE = 16,
-	EF_SLIDE = 32,
-	EF_SOLID = 64,
-	EF_FROZEN_VIEW = 128,
-	EF_TELEPORTED = 256,
+	EF_HIDDEN = 2,
+	EF_HIDE_ITEM = 4,
+	EF_DISABLE_PHYSICS = 8,
+	EF_FROZEN_VIEW = 16,
 };
 
-enum Player_Movement_State
+enum class Ent_PhysicsType : uint8_t
 {
-	PMS_GROUND = 1,		// on ground, else in air
-	PMS_CROUCHING = 2,	// crouching in air or on ground
-	PMS_JUMPING = 4,	// first part of jump
+	None,				// dont do any physics calculations
+	Solid,				// None, but pushes away other physics objects
+	Passthrough,		// None, but checks overlaps, for triggers etc.
+	Simple,				// position+velocity integration with gravity
+	SimpleNoGravity,	// Simple but no gravity
+	Complex,			// Simple but with collision
+	PlayerMove,			// Only for players
+
+	RigidBody,			// use rigid body sim TODO :)
 };
 
-enum Entity_Physics
+enum class Ent_PhysicsShape : uint8_t
 {
-	EPHYS_NONE,
-	EPHYS_PLAYER,
-	EPHYS_GRAVITY,
-	EPHYS_PROJECTILE,
-	EPHYS_MOVER,		// platforms, doors
+	AABB,
+	Sphere,
 };
 
-enum class entityclass
+struct Ent_PhysicsSettings
 {
-	EMPTY,	// no/defaut logic
-	PLAYER,
-	THROWABLE,
-	DOOR,
-	NPC,
+	Ent_PhysicsType type = Ent_PhysicsType::None;
+	Ent_PhysicsShape shape = Ent_PhysicsShape::AABB;
+	float friction = 0.0;
+	float grav_scale = 1.0;
+	float elasticity = 0.0;
+	glm::vec3 size = glm::vec3(0.f);
 
-	BOMBZONE,
-	SPAWNZONE,
-
-	SPAWNPOINT,
+	float get_radius() const { return size.x; }
+	bool is_solid() const {
+		return type == Ent_PhysicsType::Solid;
+	}
 };
 
 typedef uint32_t entityhandle;
 
+#define ENTITY_HEADER()\
+	const TypeInfo& get_typeinfo() const override;
+
+#define ENTITY_IMPL(classname) \
+	const TypeInfo& classname::get_typeinfo() const { \
+			return {#classname, sizeof(classname) };\
+	}\
+	static AddClassToFactory<classname,Entity> facimpl##classname(get_entityfactory(), #classname);
+
+
 class Entity
 {
 public:
+	Entity();
 	virtual ~Entity();
+	virtual const TypeInfo& get_typeinfo() const = 0;
+	StringName get_classname() const {
+		// FIXME: this
+		return StringName(get_typeinfo().name);
+	}
+
+	virtual void spawn();
+	virtual void update();
+	virtual void present();
+
+	virtual InlineVec<Interaction*, 2> get_interactions() const { return {}; };
+	virtual void damage(Entity* other) {}
+	virtual void collide(Entity* other, const GeomContact& gc) {}
+	virtual void killed() {}
 
 	entityhandle selfid = 0;	// eng->ents[]
-	entityclass class_ = entityclass::EMPTY;
+	StringName self_name;		// name of entity to identify them
 
 	glm::vec3 position = glm::vec3(0);
 	glm::vec3 rotation = glm::vec3(0);
-	int model_index = 0;	// media.gamemodels[]
-
 	glm::vec3 velocity = glm::vec3(0);
-	glm::vec3 view_angles = glm::vec3(0.f);
-
 	glm::vec3 esimated_accel = glm::vec3(0.f);
+	Ent_PhysicsSettings phys_opt;
 
-	short state = 0;	// For players: Player_Movement_State
-	short flags = 0;	// Entity_Flags
-
-	float timer = 0.f;	// multipurpose timer
-
-	int owner_index = 0;
+	uint32_t state_flags = 0;	// Entity flags
 	int health = 100;
+	
+	// fix this garbo
 	Game_Inventory inv;
-
-	int physics = EPHYS_NONE;
-	glm::vec3 col_size;	// for characters, .x=radius,.y=height; for zones, it is an aabb
-	float col_radius = 0.f;
-	float col_height = 0;
-	int ground_index = 0;
-
-	int target_ent = -1;
-	float in_air_time = 0.f;
-
-	int force_angles = 0;	// 1=force, 2=add
-	glm::vec3 diff_angles = glm::vec3(0.f);
 
 	handle<Render_Object> render_handle;
 	Model* model = nullptr;
 
 	unique_ptr<Animator> animator;
-	unique_ptr<RenderInterpolationComponent> interp;
 
 	void set_model(const char* model);
 	void initialize_animator(
@@ -104,17 +116,17 @@ public:
 		const Animation_Tree_CFG* graph, 
 		IAnimationGraphDriver* driver = nullptr);
 
-	void physics_update();
+	void move();
 	void projectile_physics();
 	void gravity_physics();
 	void mover_physics();
 
-	void damage(Entity* inflictor, glm::vec3 from, int amount);
-
 	glm::mat4 get_world_transform();
 
-	virtual void update() { }
-	virtual void collide(Entity* other, const GeomContact& gc) {}
+	bool is_solid() const { return phys_opt.is_solid(); }
 
-	virtual void update_visuals();
 };
+
+template<typename K, typename T>
+class Factory;
+extern Factory<std::string, Entity>& get_entityfactory();

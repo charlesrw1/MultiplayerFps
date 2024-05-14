@@ -6,7 +6,11 @@ bind 2 "connect localhost"
 bind 3 "disconnect"
 bind 4 "sv.end"
 bind 5 "reconnect"
-bind 6 "editdoc Map0"
+
+bind 6 "start_ed map Map0"
+bind 7 "close_ed"
+bind 8 "start_ed anim out.txt"
+
 bind / reload_shaders
 
 bind , "animedit out.txt"

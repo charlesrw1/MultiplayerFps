@@ -62,7 +62,7 @@ void Client::connect(string address)
 
 void Client::TrySendingConnect()
 {
-	ASSERT(eng->get_state() == ENGINE_LOADING);
+	//ASSERT(eng->get_state() == ENGINE_LOADING);
 
 	const int MAX_CONNECT_ATTEMPTS = 10;
 	const float CONNECT_RETRY = 1.f;
@@ -71,7 +71,8 @@ void Client::TrySendingConnect()
 		return;
 	if (connect_attempts >= MAX_CONNECT_ATTEMPTS) {
 		state = CS_DISCONNECTED;
-		eng->exit_to_menu("Couldn't connect to server\n");
+		ASSERT(0);
+		//eng->exit_to_menu("Couldn't connect to server\n");
 		return;
 	}
 	double delta = GetTime() - attempt_time;
@@ -111,8 +112,9 @@ void Client::disconnect_from_server(const char* reason)
 
 void Client::disconnect_to_menu(const char* debug_reason)
 {
+	ASSERT(0);
 	disconnect_from_server(debug_reason);
-	eng->exit_to_menu("client disconnected");
+	//eng->exit_to_menu("client disconnected");
 }
 
 

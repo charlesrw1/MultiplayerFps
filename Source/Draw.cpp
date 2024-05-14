@@ -2639,7 +2639,7 @@ void draw_debug_shapes()
 }
 
 
-void Renderer::scene_draw(View_Setup view, special_render_mode mode)
+void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 {
 	GPUFUNCTIONSTART;
 
@@ -2741,8 +2741,8 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 
 	draw_debug_shapes();
 
-	if (mode == special_render_mode::lvl_editor)
-		g_editor_doc->overlays_draw();
+	if (tool)
+		tool->overlay_draw();
 
 	glCheckError();
 	
@@ -2772,7 +2772,7 @@ void Renderer::scene_draw(View_Setup view, special_render_mode mode)
 	if (draw_collision_tris.integer())
 		DrawCollisionWorld(eng->level);
 
-	if(mode == special_render_mode::none)
+	if(!tool)
 		ui_render();
 
 
@@ -2838,7 +2838,7 @@ void Renderer::DrawEntBlobShadows()
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
 	glCheckError();
 
-	bind_texture(0, eng->media.blob_shadow->gl_id);
+	//bind_texture(0, eng->media.blob_shadow->gl_id);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);

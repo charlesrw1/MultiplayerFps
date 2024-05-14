@@ -7,6 +7,10 @@
 #include "Physics.h"
 #include "Entity.h"
 
+#include "IEditorTool.h"
+
+#include "Debug.h"
+
 using glm::vec3;
 
 class Player;
@@ -21,71 +25,34 @@ public:
 	std::vector<std::string> model_manifest;
 	std::vector<Model*> model_cache;
 	std::vector<std::string> sound_manifest;
-	Texture* blob_shadow;
 };
 
-class Debug
+extern Auto_Config_Var g_thirdperson;
+extern Auto_Config_Var g_fov;
+extern Auto_Config_Var g_mousesens;
+extern Auto_Config_Var g_fakemovedebug;
+extern Auto_Config_Var g_drawdebugmenu;
+extern Auto_Config_Var g_drawimguidemo;
+
+
+
+enum class Engine_State
 {
-public:
-	static void add_line(glm::vec3 from, glm::vec3 to, Color32 color, float lifetime, bool fixedupdate = true);
-	static void add_sphere(glm::vec3 center, float rad, Color32 color, float lifetime, bool fixedupdate = true);
-	static void add_box(glm::vec3 center, glm::vec3 size, Color32 color, float lifetime, bool fixedupdate = true);
-	static void on_fixed_update_start();
-	static void on_frame_begin();
+	Idle,		// main menu or in tool state
+	Loading,	// loading next level
+	Game,		// in game state
 };
 
-
-
-class Game_Local
+// what tool is active
+enum class Eng_Tool_state
 {
-public:
-	Game_Local();
-
-	void init();
-	void update_view();
-	void update_viewmodel();
-
-	Auto_Config_Var thirdperson_camera;
-	Auto_Config_Var fov;
-	Auto_Config_Var mouse_sensitivity;
-	Auto_Config_Var fake_movement_debug;
-
-	glm::vec3 view_angles;
-	Move_Command last_command;
-	View_Setup last_view;
-	bool has_run_tick = false;
-	bool using_debug_cam = false;
-	User_Camera fly_cam;
-
-	int prev_item_state = ITEM_IDLE;
-	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
-	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
-
-	Animator viewmodel_animator;
-	Model* viewmodel=nullptr;
-
-	glm::vec3 vm_offset = glm::vec3(0.f,-2.9f,0.f);
-	glm::vec3 vm_scale = glm::vec3(1.f);
-	float vm_reload_start = 0.f;
-	float vm_reload_end = 0.f;
-	float vm_recoil_start_time = 0.f;
-	float vm_recoil_end_time = 0.f;
-	glm::vec3 viewmodel_recoil_ofs = glm::vec3(0.f);
-	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
+	None,
+	Level,
+	Animgraph,
+	// Particle
+	// Material
 };
 
-enum Engine_State
-{
-	ENGINE_MENU,
-	ENGINE_LOADING,
-	ENGINE_GAME,
-
-	ENGINE_LVL_EDITOR,
-
-	ENGINE_ANIMATION_EDITOR,
-
-	ENGINE_STATE_COUNT
-};
 
 using std::string;
 
@@ -95,9 +62,12 @@ struct Ent_Iterator
 	Ent_Iterator(int start = 0, int count = 0);
 	Ent_Iterator& next();
 	bool finished() const;
-	Entity& get();
+	Entity& get() const;
 	int get_index() const { return index; }
 	void decrement_count() { summed_count--; }
+	bool finish_at(const Ent_Iterator& other) const {
+		return index != -1 && other.index <= index;
+	}
 private:
 	int summed_count = 0;
 	int index = 0;
@@ -133,50 +103,54 @@ public:
 	// state relevant functions
 	void connect_to(string address);
 	void set_tick_rate(float tick_rate);
-	bool start_map(string map, bool is_client = false);
-	void client_enter_into_game();
-	void exit_to_menu(const char* log_reason);
-	Engine_State get_state() { return state; }
 
-#ifdef EDITDOC
-	void start_editor(const char* map);
-	void start_anim_editor(const char* name);
-	void close_editor();
+	bool is_in_game() const {
+		return state == Engine_State::Game;
+	}
+	Engine_State get_state() const { return state; }
+	Eng_Tool_state get_tool_state() const { return tool_state; }
+	bool is_in_an_editor_state() { return get_tool_state() != Eng_Tool_state::None; }
+	IEditorTool* get_current_tool();
 
-	void enable_imgui_docking();
-	void disable_imgui_docking();
-#endif
+	void change_editor_state(Eng_Tool_state tool, const char* file = "");
 
-	void travel_to_engine_state(Engine_State state, const char* exit_reason);
+	void queue_load_map(string nextmap);
+
+	void execute_map_change();
+	void stop_game();
+	void spawn_starting_players(bool initial);
+	void populate_map();
+	void leave_current_game();
+
+	bool game_draw_screen();
+
 
 	// Host functions
-	Entity* create_entity(entityclass classtype, int forceslot = -1);
-	void free_entity(entityhandle handle);
 
+	Entity* create_entity(const char* classname, int forceslot = -1);
+	void free_entity(entityhandle handle);
 	void make_client(int num);
 	void client_leave(int num);
 	void update_game_tick();
-	void execute_player_move(int player, Move_Command command);
-	void damage(Entity* inflictor, Entity* target, int amount, int flags);
+	// returns if there was anything to draw
 
 	// entity accessor functions
 	Entity& local_player();
 	int player_num();
+	Player* get_local_player();
 	Entity* get_ent(int index);
 	Entity* get_ent_from_handle(entityhandle id);
-	int find_by_classtype(int start, entityclass classtype);
-	Ent_Iterator get_ent_start();
+	int find_by_classtype(int start, StringName classtype);
 	Player* get_client_player(int slot);
 public:
+	bool map_spawned() { return level != nullptr; }
+
 	Client* cl=nullptr;
 	Server* sv=nullptr;
 	string mapname;
 	Level* level= nullptr;
 	PhysicsWorld phys;
 
-
-	bool is_host=false;
-	Game_Local local;
 	Game_Media media;
 
 	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
@@ -185,7 +159,6 @@ public:
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 0.0;	// 1/tick_rate
 
-	ImNodesContext* imgui_node_context = nullptr;
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_GLContext gl_context = nullptr;
@@ -211,27 +184,28 @@ public:
 	int argc = 0;
 	char** argv = nullptr;
 
+	bool is_host() const { return true; }
 
 private:
 
 	int num_entities;
 	vector<Entity*> ents;
 	vector<char> spawnids;
-	Engine_State state;
 
-	void set_state(Engine_State state);
-	void unload_current_level();
+	Engine_State state = Engine_State::Idle;
+	Eng_Tool_state tool_state = Eng_Tool_state::None;
 
-	void view_angle_update();
+	bool is_hosting_game = false;
+
 	void make_move();
 	void init_sdl_window();
 	void key_event(SDL_Event event);
 
-	void draw_debug_interface();
+	void draw_any_imgui_interfaces();
 
 	void game_update_tick();
-
-	void on_game_start();
+	
+	void spawn_player(int slot);
 
 	friend class Ent_Iterator;
 };

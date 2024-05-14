@@ -501,7 +501,7 @@ public:
 
 	// public interface
 	virtual void init() override;
-	virtual void scene_draw(View_Setup view, special_render_mode mode) override;
+	virtual void scene_draw(View_Setup view, IEditorTool* tool) override;
 	virtual void on_level_start() override;
 	virtual void on_level_end() override;
 	virtual void reload_shaders() override;

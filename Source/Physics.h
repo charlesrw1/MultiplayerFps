@@ -57,11 +57,8 @@ struct PhysicsObject
 	MeshShape mesh;
 	glm::vec3 max{};
 	glm::vec3 min_or_origin{};
-	const Animator* a = nullptr;
-	const Model* m = nullptr;
 
 	int userindex = -1;
-	bool player = false;
 	bool solid = true;
 	bool is_level = false;
 

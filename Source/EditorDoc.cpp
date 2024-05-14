@@ -8,7 +8,7 @@
 #include "Framework/MeshBuilder.h"
 #include "Framework/Dict.h"
 EditorDoc ed_doc;
-EditorDocPublic* g_editor_doc = &ed_doc;
+IEditorTool* g_editor_doc = &ed_doc;
 
 class TransformCommand : public Command
 {
@@ -464,7 +464,7 @@ void EditorNode::make_from_existing(int existing_index)
 	init_on_new_espawn();
 }
 
-void EditorDoc::open_doc(const char* levelname)
+void EditorDoc::open(const char* levelname)
 {
 	nodes.clear();
 	leveldoc = eng->level;
@@ -483,7 +483,7 @@ void EditorDoc::save_doc()
 {
 }
 
-void EditorDoc::close_doc()
+void EditorDoc::close()
 {
 	nodes.clear();
 }
@@ -637,7 +637,7 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 	return out;
 }
 
-void EditorDoc::update()
+void EditorDoc::tick(float dt)
 {
 
 	{
@@ -774,21 +774,8 @@ void EditorDoc::transform_tool_update()
 
 }
 
-void EditorDoc::scene_draw_callback()
-{
-	switch (mode)
-	{
-	case TOOL_SPAWN_MODEL:
-		break;
 
-	case TOOL_TRANSFORM:
-		break;
-	}
-
-}
-
-
-void EditorDoc::overlays_draw()
+void EditorDoc::overlay_draw()
 {
 	static MeshBuilder mb;
 	mb.Begin();
@@ -824,6 +811,12 @@ uint32_t get_bg_color_for_ent(Level* l, EditorNode* node)
 		return color_to_uint({ 77, 239, 247, 50 });
 	}
 	return color_to_uint({ 50,50,50,50 });
+}
+
+void EditorDoc::draw_frame()
+{
+	auto vs = get_vs();
+	idraw->scene_draw(vs, this);
 }
 
 void EditorDoc::imgui_draw()

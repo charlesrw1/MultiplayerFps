@@ -22,6 +22,9 @@
     <Filter Include="Source\Render">
       <UniqueIdentifier>{be5d62a0-07f0-4721-9751-dbc16c6355bc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Game">
+      <UniqueIdentifier>{452eb327-c33b-4d63-ab04-3c80f2a32508}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -45,12 +48,6 @@
     <ClInclude Include="Source\EmulatedSocket.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Entity.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EntityTypes.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Game_Engine.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -67,9 +64,6 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Physics.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Player.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\PlayerAnimDriver.h">
@@ -324,6 +318,24 @@
     <ClInclude Include="Source\Framework\Util.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\IEditorTool.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Debug.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EntityTypes.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Entity.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Player.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Interaction.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -344,9 +356,6 @@
     <ClCompile Include="Source\Game.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game_Local.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\glad.c">
       <Filter>Source</Filter>
     </ClCompile>
@@ -360,9 +369,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Physics.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Player.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\PlayerAnimDriver.cpp">
@@ -493,6 +499,12 @@
     </ClCompile>
     <ClCompile Include="Source\Animation\Editor\EdNode.cpp">
       <Filter>Source\Animation\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Player.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EntityTypes.cpp">
+      <Filter>Source\Game</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

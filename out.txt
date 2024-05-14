@@ -1,6 +1,6 @@
 "runtime" {
 "rootdata" {
-"root"  "-1"
+"root"  "0"
 "data_used"  "40"
 "graph_is_valid"  "0"
 }
@@ -43,13 +43,13 @@ type "Statemachine_Node_CFG"
 "current_id"  "5"
 "current_layer"  "3"
 "default_editor"  "[editor]
-panning=315,352
+panning=201,432
 
 [node.0]
-origin=-124,-128
+origin=-123,20
 
 [node.1]
-origin=-229,-7
+origin=-301,-127
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
@@ -69,7 +69,7 @@ type "Statemachine_EdNode"
 "name"  ""
 "sublayer.id"  "1"
 "sublayer.context"  "[editor]
-panning=113,325
+panning=201,432
 
 [node.2]
 origin=0,0
@@ -88,7 +88,7 @@ type "StateStart_EdNode"
 type "State_EdNode"
 "id"  "3"
 "graph_layer"  "1"
-"name"  ""
+"name"  "Idle"
 "state_handle_internal.id"  "0"
 "sublayer.id"  "2"
 "sublayer.context"  "[editor]

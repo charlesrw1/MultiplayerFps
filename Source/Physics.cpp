@@ -9,6 +9,27 @@
 #include "Types.h"
 #include "Model.h"
 
+#include <physx/foundation/PxFoundation.h>
+#include <PxPhysicsAPI.h>
+#include <PxActor.h>
+#include <PxScene.h>
+#include <PxPhysics.h>
+#include <physx/characterkinematic/PxController.h>
+#include <physx/foundation/PxPhysicsVersion.h>
+#include <physx/common/PxTolerancesScale.h>
+class PhysicsSystem
+{
+public:
+	
+
+
+private:
+	physx::PxDefaultErrorCallback err;
+	physx::PxDefaultAllocator alloc;
+	physx::PxScene* scene = nullptr;
+	physx::PxPhysics* physics_factory = nullptr;
+	physx::PxFoundation* foundation = nullptr;
+};
 void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out);
 
 static MeshBuilder world_collision;
@@ -538,7 +559,7 @@ void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out)
 void ray_vs_shape(Ray r, PhysicsObject& obj, RayHit* rh)
 {
 	// trace against hitboxes
-	if (obj.a) {
+	if (0) {
 		sys_print("hitbox trace");
 	}
 	else {
@@ -640,11 +661,9 @@ bool PhysicsWorld::FilterObj(PhysicsObject* o, int ig_ent, int filter_flags)
 {
 	if (!o->is_level && o->userindex == ig_ent)
 		return true;
-	if (o->player && !(filter_flags & PF_PLAYERS))
-		return true;
+	
 	if (o->is_level && !(filter_flags & PF_WORLD))
 		return true;
-	if (!(o->player || o->is_level) && !(filter_flags & PF_NONPLAYERS))
-		return true;
+
 	return false;
 }

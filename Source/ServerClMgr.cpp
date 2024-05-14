@@ -82,10 +82,11 @@ bool RemoteClient::OnMoveCmd(ByteReader& msg)
 	}
 
 	Entity& e = *eng->get_ent(client_num);
+	ASSERT(0);
 	// FIXME: exploit to send inputs at increased rate
 	for (int i = commands_to_run - 1; i >= 0; i--) {
 		Move_Command c = commands[i];
-		eng->execute_player_move(client_num, c);
+	//	eng->execute_player_move(client_num, c);
 
 		//e.add_to_last();
 	}
@@ -133,12 +134,13 @@ void RemoteClient::Update()
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
 	Entity& e = *eng->get_ent(client_num);
-	if (e.force_angles == 1) {
-		writer.WriteByte(SV_UPDATE_VIEW);
-		writer.WriteVec3(e.diff_angles);
-
-		e.force_angles = 0;
-	}
+	ASSERT(0);
+	//if (e.force_angles == 1) {
+	//	writer.WriteByte(SV_UPDATE_VIEW);
+	//	writer.WriteVec3(e.diff_angles);
+	//
+	//	e.force_angles = 0;
+	//}
 
 
 	//myserver->WriteDeltaSnapshot(writer, baseline, client_num);

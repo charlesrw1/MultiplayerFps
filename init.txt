@@ -1,1 +1,3 @@
-animedit character_graph
+start_ed anim "out.txt"
+
+map "Map0"

@@ -304,7 +304,7 @@ class AreYouSurePopup : public IPopup
 
 
 class Texture;
-class AnimationGraphEditor : public AnimationGraphEditorPublic
+class AnimationGraphEditor : public IEditorTool
 {
 public:
 	AnimationGraphEditor() : graph_tabs(this) {
@@ -313,7 +313,7 @@ public:
 	virtual void open(const char* name) override;
 	virtual void close() override;
 	virtual void tick(float dt) override;
-	virtual void handle_event(const SDL_Event& event) override;
+	virtual bool handle_event(const SDL_Event& event) override;
 	virtual void overlay_draw() override;
 	virtual const View_Setup& get_vs() override{
 		return out.vs;
@@ -321,7 +321,8 @@ public:
 	virtual const char* get_name() override {
 		return name.c_str();
 	}
-	virtual void begin_draw() override;
+	virtual void imgui_draw() override;
+	virtual void draw_frame() override;
 
 	enum class graph_playback_state {
 		stopped,

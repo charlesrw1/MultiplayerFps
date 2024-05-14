@@ -8,6 +8,9 @@
 
 #include "DrawPublic.h"
 
+
+ENTITY_IMPL(Player);
+
 //
 //	PLAYER MOVEMENT CODE
 //
@@ -101,127 +104,126 @@ static Auto_Config_Var phys_gravity("phys.gravity", 16.f);
 static Auto_Config_Var debug_fly("dbg.fly", 0, 0,"Let player fly around");
 
 // hacky way to move up stairs
-void check_perch(Entity& player, bool& dont_add_grav)
+bool Player::check_perch()
 {
-	dont_add_grav = false;
 
 	glm::vec2 dirs[8] = { vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1),
 		vec2(SQRT2,SQRT2),vec2(SQRT2,-SQRT2), vec2(-SQRT2,-SQRT2), vec2(-SQRT2,SQRT2) };
 	for (int i = 0; i < 8; i++) {
 		float height = CHAR_HITBOX_RADIUS;
 		Ray ray;
-		ray.pos = player.position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad.real()) + vec3(0, height, 0);
+		ray.pos = position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad.real()) + vec3(0, height, 0);
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
-		rh = eng->phys.trace_ray(ray, player.selfid, PF_WORLD);
+		rh = eng->phys.trace_ray(ray, selfid, PF_WORLD);
 
 		// perched on ledge
 		if (rh.hit_world) {
 			if (((height - rh.dist) >= min_stair.real()) && (height - rh.dist) <= max_stair.real() && rh.normal.y > 0.98) {
-				player.position.y = player.position.y + (height - rh.dist);
-				player.state |= PMS_GROUND;
-				player.state &= ~PMS_JUMPING;
-				player.velocity.y = 0;
-				sys_print("perched\n");
-				dont_add_grav = true;
-				return;
+				position.y = position.y + (height - rh.dist);
+				velocity.y = 0;
+				return true;
 			}
 			else if (abs(height - rh.dist) < 0.005) {
 				// stay in perched state
-				player.state |= PMS_GROUND;
-				dont_add_grav = true;
+				return true;
 			}
 		}
 	}
+	return false;
 }
 
+Action_State Player::get_ground_state_based_on_speed(float s) const
+{
+	if (s > 0.1)
+		return Action_State::Moving;
+	else
+		return Action_State::Idle;
+}
 
-
-void check_ground_state(Entity& player, Move_Command command, bool& dont_add_grav)
+Action_State Player::update_state(const float grnd_speed, bool& dont_add_grav)
 {
 
-	if (player.velocity.y > 2.f) {
-		player.state &= ~PMS_GROUND;
-		return;
+	Action_State next_action = action;
+	get_crouch_state(is_crouching);
+
+	if (velocity.y > 2.f) {
+		if (!is_on_ground())
+			return Action_State::Falling;
+		else
+			return action;
 	}
 
 	GeomContact result;
-	vec3 where = player.position - vec3(0, 0.005 - standing_capsule.radius, 0);
-	result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), player.selfid, PF_ALL);
+	vec3 where = position - vec3(0, 0.005 - standing_capsule.radius, 0);
+	result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), selfid, PF_ALL);
 
-	if (!result.found || result.surf_normal.y < 0.3)
-		player.state &= ~PMS_GROUND;
+	bool should_be_airbourne = (!result.found || result.surf_normal.y < 0.3);
+
+	bool perched = check_perch();
+	should_be_airbourne = should_be_airbourne && !perched;
+	dont_add_grav = perched;
+
+	if (should_be_airbourne) {
+		if(is_on_ground())
+			next_action = Action_State::Falling;
+	}
 	else {
-		if (command.first_sim && !(player.state & PMS_GROUND) && player.velocity.y < -2.f) {
-			//player.anim.set_leg_anim("act_land", false);
- 			//player.anim.legs.loop = false;
+
+		if (cmd.button_mask & BUTTON_JUMP) {
+			printf("jump\n");
+			velocity.y = jumpimpulse;
+			next_action = Action_State::Jumped;
 		}
-		player.state |= PMS_GROUND;	
-	}
-
-	if(!(player.state & PMS_JUMPING))
-		check_perch(player, dont_add_grav);
-
-	if (player.state & PMS_GROUND) {
-		player.state &= ~PMS_JUMPING;
-		player.in_air_time = 0.f;
-	}
-	else if (command.first_sim)
-		player.in_air_time += eng->tick_interval;
-}
-
-void check_jump(Entity& player, Move_Command command)
-{
-	if ((player.state & PMS_GROUND) && command.button_mask & BUTTON_JUMP) {
-		printf("jump\n");
-		player.velocity.y = jumpimpulse;
-		player.state |= PMS_JUMPING;
-		player.state &= ~PMS_GROUND;
-
-		if (command.first_sim) {
-			//player.anim.set_leg_anim("act_jump_start", true);
-			//player.anim.legs.loop = false;
+		else {
+			next_action = get_ground_state_based_on_speed(grnd_speed);
 		}
 	}
+	
+	return next_action;
 }
+
+
 
 GeomContact player_physics_trace_character(int index, bool crouching, vec3 end);
-void check_duck(Entity& player, Move_Command cmd)
+void Player::get_crouch_state(bool& out_is_crouching)
 {
 	const float diff = CHAR_STANDING_HB_HEIGHT - CHAR_CROUCING_HB_HEIGHT;
 
-	if (cmd.button_mask & BUTTON_DUCK) {
-		if (!(player.state & PMS_GROUND) && !(player.state & PMS_CROUCHING)) {
-			// Move legs of player up
-			player.position.y += diff;		}
+	out_is_crouching = is_crouching;
 
-		player.state |= PMS_CROUCHING;
+	if (cmd.button_mask & BUTTON_DUCK) {
+		if (!is_on_ground() && !is_crouching) {
+			// Move legs of player up
+			position.y += diff;		
+		}
+		out_is_crouching = true;
 	}
 	else {
-		if (player.state & PMS_CROUCHING) {
+		if (!is_crouching) {
 			// uncrouch
 
-			if (player.state & PMS_GROUND) {
-				auto gc = player_physics_trace_character(player.selfid, false, player.position+vec3(0,0.001,0));
+			if (is_on_ground()) {
+				auto gc = player_physics_trace_character(selfid, false, position+vec3(0,0.001,0));
 
 				if (!gc.found) {
-					player.state &= ~PMS_CROUCHING;
+					out_is_crouching = false;
 				}
 			}
 			else {
-				vec3 end = player.position - vec3(0, diff, 0) + vec3(0,0.001,0);
-				auto gc = player_physics_trace_character(player.selfid, false, end);
+				vec3 end = position - vec3(0, diff, 0) + vec3(0,0.001,0);
+				auto gc = player_physics_trace_character(selfid, false, end);
 
 				if (!gc.found) {
 					// one more check
 					Ray r;
-					r.pos = player.position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
+					r.pos = position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
 					r.dir = vec3(0, -1, 0);
-					auto tc = eng->phys.trace_ray(r, player.selfid, PF_ALL);
+					auto tc = eng->phys.trace_ray(r, selfid, PF_ALL);
 					if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
-						player.state &= ~PMS_CROUCHING;
-						player.position.y -= diff;
+						out_is_crouching = false;
+						position.y -= diff;
 						sys_print("passed");
 					}
 				}
@@ -236,10 +238,10 @@ GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
 	return eng->phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
 }
 
-void player_physics_move(Entity& player)
+void Player::slide_move()
 {
-	vec3 orig_velocity = player.velocity;
-	vec3 orig_position = player.position;
+	vec3 orig_velocity = velocity;
+	vec3 orig_position = position;
 
 	int num_bumps = 4;
 
@@ -247,15 +249,15 @@ void player_physics_move(Entity& player)
 
 	for (int i = 0; i < num_bumps; i++)
 	{
-		vec3 end = player.position + player.velocity * (move_time/num_bumps);
+		vec3 end = position + velocity * (move_time/num_bumps);
 
-		GeomContact trace = player_physics_trace_character(player.selfid, player.state & PMS_CROUCHING, end);
+		GeomContact trace = player_physics_trace_character(selfid,is_crouching, end);
 
 		if (trace.found) {
-			vec3 penetration_velocity = dot(player.velocity, trace.penetration_normal) * trace.penetration_normal;
-			vec3 slide_velocity = player.velocity - penetration_velocity;
+			vec3 penetration_velocity = dot(velocity, trace.penetration_normal) * trace.penetration_normal;
+			vec3 slide_velocity = velocity - penetration_velocity;
 			
-			vec3 neg_vunit = -glm::normalize(player.velocity);
+			vec3 neg_vunit = -glm::normalize(velocity);
 			float d = dot(trace.penetration_normal, neg_vunit);
 			
 			//if (abs(d) > 0.001f) {
@@ -263,17 +265,17 @@ void player_physics_move(Entity& player)
 			//	player.position = end + push_out_depth * neg_vunit;
 			//}
 			//else {
-				player.position = end + trace.penetration_normal * trace.penetration_depth;
+				position = end + trace.penetration_normal * trace.penetration_depth;
 			//}
-			player.velocity = slide_velocity;
-			if (dot(player.velocity, orig_velocity) < 0) {
+			velocity = slide_velocity;
+			if (dot(velocity, orig_velocity) < 0) {
 				sys_print("opposite velocity\n");
-				player.velocity = vec3(0.f);
+				velocity = vec3(0.f);
 				break;
 			}
 		}
 		else {
-			player.position = end;
+			position = end;
 		}
 	}
 }
@@ -283,34 +285,40 @@ float lensquared_noy(vec3 v)
 	return v.x * v.x + v.z * v.z;
 }
 
-void player_physics_ground_move(Entity& player, Move_Command command, bool dont_add_grav)
+void Player::ground_move()
 {
-	if (!(player.flags & EF_DEAD)) {
-		check_jump(player, command);
-		check_duck(player, command);
+	state_time += eng->tick_interval;
+
+	bool dont_add_grav = false;
+	Action_State last = action;
+	action = update_state(glm::length(velocity), dont_add_grav);
+
+	if (last != action) {
+		state_time = 0.0;
 	}
 
-	vec3 prevel = player.velocity;
+	vec3 prevel = velocity;
 
-	vec2 inputvec = vec2(command.forward_move, command.lateral_move);
+	vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
 	float inputlen = length(inputvec);
 	if (inputlen > 0.00001)
 		inputvec = inputvec / inputlen;
 	if (inputlen > 1)
 		inputlen = 1;
 
-	vec3 look_front = AnglesToVector(command.view_angles.x, command.view_angles.y);
+	vec3 look_front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
 	look_front.y = 0;
 	look_front = normalize(look_front);
 	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
-	float acceleation_val = (player.state & PMS_GROUND) ? ground_accel : air_accel;
-	acceleation_val = (player.state & PMS_CROUCHING) ? ground_accel_crouch : acceleation_val;
-	float maxspeed_val = (player.state & PMS_GROUND) ? max_ground_speed : max_air_speed;
+	const bool player_on_ground = is_on_ground();
+	float acceleation_val = (player_on_ground) ? ground_accel : air_accel;
+	acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
+	float maxspeed_val = (player_on_ground) ? max_ground_speed : max_air_speed;
 
 	vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
-	vec3 xz_velocity = vec3(player.velocity.x, 0, player.velocity.z);
+	vec3 xz_velocity = vec3(velocity.x, 0, velocity.z);
 
 	float wishspeed = inputlen * maxspeed_val;
 	float addspeed = wishspeed - dot(xz_velocity, wishdir);
@@ -324,19 +332,13 @@ void player_physics_ground_move(Entity& player, Move_Command command, bool dont_
 	//	xz_velocity = xz_velocity * (maxspeed / len);
 	if (len < 0.3 && accelspeed < 0.0001)
 		xz_velocity = vec3(0);
-	player.velocity = vec3(xz_velocity.x, player.velocity.y, xz_velocity.z);
+	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
 
 	if (!dont_add_grav) {
-		player.velocity.y -= phys_gravity.real() * eng->tick_interval;
+		velocity.y -= phys_gravity.real() * eng->tick_interval;
 	}
 	
-
-	player_physics_move(player);
-
-	if (!(player.flags & EF_DEAD)) {
-		player.rotation = vec3(0.f);
-		player.rotation .y = HALFPI - command.view_angles.y;
-	}
+	slide_move();
 }
 
 
@@ -356,125 +358,54 @@ void player_physics_check_nans(Entity& player)
 	}
 }
 
-void player_physics_update(Entity* p, Move_Command command)
+void Player::move()
 {
-	glm::vec3 last_velocity = p->velocity;
+	glm::vec3 last_velocity = velocity;
 
-	if (p->flags & EF_DEAD) {
-		command.forward_move = 0;
-		command.lateral_move = 0;
-		command.up_move = 0;
+	// fixme:
+	view_angles = cmd.view_angles;
 
-		command.button_mask = 0;
-	}
-	p->view_angles = command.view_angles;
-
-	vec3 pre_update_velocity = p->velocity;
 	
 	// Friction
-	float friction_value = (p->state & PMS_GROUND) ? ground_friction : air_friction;
-	float speed = length(p->velocity);
+	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
+	float speed = glm::length(velocity);
+
 	if (speed >= 0.0001) {
 		float dropamt = friction_value * speed * eng->tick_interval;
 		float newspd = speed - dropamt;
 		if (newspd < 0)
 			newspd = 0;
 		float factor = newspd / speed;
-		p->velocity.x *= factor;
-		p->velocity.z *= factor;
+		velocity.x *= factor;
+		velocity.z *= factor;
 	}
 
-	bool dont_add_grav = false;
-	check_ground_state(*p, command,dont_add_grav);
-	if (eng->is_host && debug_fly.integer()) {
-		p->state = PMS_JUMPING;
+	if (eng->is_host() && debug_fly.integer()) {
+		action = Action_State::Falling;
 
-		vec2 inputvec = vec2(command.forward_move, command.lateral_move);
+		vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
 		float inputlen = length(inputvec);
 		if (inputlen > 0.00001)
 			inputvec = inputvec / inputlen;
 		if (inputlen > 1)
 			inputlen = 1;
 
-		vec3 look_front = AnglesToVector(command.view_angles.x, command.view_angles.y);
+		vec3 look_front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
 		look_front = normalize(look_front);
 		vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
 		vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 
-		p->position += wishdir * 12.0f*(float)eng->tick_interval;
+		position += wishdir * 12.0f*(float)eng->tick_interval;
 
 	}
 	else
-		player_physics_ground_move(*p, command, dont_add_grav);
-	player_physics_check_nans(*p);
-
-
-	p->esimated_accel = (p->velocity - last_velocity) / (float)eng->tick_interval;
-}
-
-
-// if in the middle of an animation, dont interrupt it
-void player_animation_update(Entity* ent)
-{
-	// lower body
-	glm::vec3 ent_face_dir = AnglesToVector(ent->view_angles.x, ent->view_angles.y);
-	float groundspeed = glm::length(glm::vec2(ent->velocity.x, ent->velocity.z));
-	bool falling = ent->velocity.y < fall_speed_threshold;
+		ground_move();
 	
-	int leg_anim = 0;
-	float leg_speed = 1.f;
-	bool loop_legs = true;
-	bool set_legs = true;
-
-	const char* next_leg_anim = "null";
-	//if (ent->anim.legs.anim == -1)
-	//	ent->anim.legs.finished = true;
-
-	//if (!ent->anim.legs.loop && !ent->anim.legs.finished)
-	//	set_legs = false;
-
-	if (ent->state & PMS_JUMPING || (!(ent->state & PMS_GROUND) && ent->in_air_time > 0.3f)) {
-		next_leg_anim = "act_falling";
-	}
-	else if (groundspeed > grnd_speed_threshold) {
-		if (ent->state & PMS_CROUCHING)
-			next_leg_anim = "act_crouch_walk";
-		else {
-			vec3 facing_dir = vec3(cos(ent->view_angles.y), 0, sin(ent->view_angles.y));	// which direction are we facing towards
-			vec3 grnd_velocity = glm::normalize(vec3(ent->velocity.x, 0, ent->velocity.z));
-			float d = dot(facing_dir, grnd_velocity);
-			bool left = cross(facing_dir, grnd_velocity).y < 0;
-			bool backwards = dot(ent_face_dir, ent->velocity) < -0.25;
-			if (abs(d) >= 0.5) { // 60 degrees from look
-				if (backwards) next_leg_anim = "act_run_back";
-				else next_leg_anim = "act_run";
-			}
-			else {
-				if (left) next_leg_anim = "act_strafe_left";
-				else next_leg_anim = "act_strafe";
-			}
-
-			leg_speed = ((groundspeed - grnd_speed_threshold) / 6.f) + 1.f;
-
-		}
-	}
-	else {
-		if (ent->state & PMS_CROUCHING)
-			next_leg_anim = "act_crouch_idle";
-		else
-			next_leg_anim = "stand_unqeuip_idle";
-	}
+	player_physics_check_nans(*this);
 
 
-	// pick out upper body animations here
-	// shooting, reloading, etc.
-	if (set_legs) {
-
-		//ent->anim.set_leg_anim(next_leg_anim, false, 0.15);
-		//ent->anim.legs.loop = loop_legs;
-		//ent->anim.legs.speed = leg_speed;
-	}
+	esimated_accel = (velocity - last_velocity) / (float)eng->tick_interval;
 }
 
 void player_fire_weapon()
@@ -507,42 +438,42 @@ static float fire_time = 0.15f;
 static float reload_time = 1.9f;
 
 
-void change_to_item(Entity& p, int next_item)
+void Player::change_to_item(int next_item)
 {
 	ASSERT(next_item >= 0 && next_item < Game_Inventory::NUM_GAME_ITEMS);
-	ASSERT(p.inv.active_item >= 0 && p.inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
+	ASSERT(inv.active_item >= 0 && inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
 
-	if (next_item == p.inv.active_item)
+	if (next_item == inv.active_item)
 		return;
-	if (next_item == p.inv.pending_item)
+	if (next_item == inv.pending_item)
 		return;
-	if (p.inv.state == ITEM_RAISING) {
+	if (inv.state == ITEM_RAISING) {
 		Game_Item_Stats& next = get_item_stats()[next_item];
-		p.inv.active_item = next_item;
-		p.inv.state = ITEM_RAISING;
-		p.inv.timer = next.draw_time;
-		p.inv.pending_item = -1;
+		inv.active_item = next_item;
+		inv.state = ITEM_RAISING;
+		inv.timer = next.draw_time;
+		inv.pending_item = -1;
 		return;
 	}
 
-	Game_Item_Stats& cur = get_item_stats()[p.inv.active_item];
-	p.inv.pending_item = next_item;
-	p.inv.state = ITEM_LOWERING;
-	p.inv.timer = cur.holster_time;
+	Game_Item_Stats& cur = get_item_stats()[inv.active_item];
+	inv.pending_item = next_item;
+	inv.state = ITEM_LOWERING;
+	inv.timer = cur.holster_time;
 }
 
-void player_item_update(Entity* p, Move_Command command, bool is_local)
+void Player::item_update()
 {
-	Game_Inventory& inv = p->inv;
-	bool is_simulated_client = !eng->is_host;
+	Game_Inventory& inv = this->inv;
+	bool is_simulated_client = !eng->is_host();
 
-	if (is_simulated_client && p->inv.tick_for_staging != -1) {
-		int delta = eng->tick - p->inv.tick_for_staging;
+	if (is_simulated_client && inv.tick_for_staging != -1) {
+		int delta = eng->tick - inv.tick_for_staging;
 		if (delta > 30) { // 30 ticks since the inventory synced up, assume there was packet loss or something
-			p->inv.active_item = p->inv.staging_item;
-			ASSERT(p->inv.active_item >= 0 && p->inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
-			p->inv.ammo[p->inv.active_item] = p->inv.staging_ammo;
-			p->inv.clip[p->inv.active_item] = p->inv.staging_clip;
+			inv.active_item =inv.staging_item;
+			ASSERT(inv.active_item >= 0 && inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
+			inv.ammo[inv.active_item] = inv.staging_ammo;
+			inv.clip[inv.active_item] = inv.staging_clip;
 		}
 	}
 
@@ -560,30 +491,24 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 	}
 
 	// check swaps
-	if (command.button_mask & BUTTON_ITEM_PREV) {
+	if (cmd.button_mask & BUTTON_ITEM_PREV) {
 		int next_item = inv.active_item - 1;
 		if (next_item < 0) next_item = Game_Inventory::NUM_GAME_ITEMS - 1;
-		change_to_item(*p, next_item);
+		change_to_item(next_item);
 	}
-	else if (command.button_mask & BUTTON_ITEM_NEXT) {
+	else if (cmd.button_mask & BUTTON_ITEM_NEXT) {
 		int next_item = (inv.active_item + 1) % Game_Inventory::NUM_GAME_ITEMS;
-		change_to_item(*p, next_item);
+		change_to_item(next_item);
 	}
 
-	if (is_local) {
-		if (eng->local.viewmodel == nullptr) {
-			eng->local.viewmodel = FindOrLoadModel("m16_fp.glb");
-			//eng->local.viewmodel_animator.set_model(eng->local.viewmodel);
-		}
-	}
 
 	// tick timer
 	if (inv.timer > 0)
 		inv.timer -= eng->tick_interval;
 
-	vec3 look_vec = AnglesToVector(command.view_angles.x, command.view_angles.y);
-	bool wants_shoot = command.button_mask & BUTTON_FIRE1;
-	bool wants_reload = command.button_mask & BUTTON_RELOAD;
+	vec3 look_vec = get_look_vec();
+	bool wants_shoot = cmd.button_mask & BUTTON_FIRE1;
+	bool wants_reload = cmd.button_mask & BUTTON_RELOAD;
 	Game_Item_Stats& item_stats = get_item_stats()[inv.active_item];
 	int cat = item_stats.category;
 
@@ -602,11 +527,11 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 
 				if (item_stats.category == ITEM_CAT_RIFLE) {
 					//p->anim.set_anim("act_shoot", true);
-					eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+					//eng->fire_bullet(this, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 				}
 				else if (item_stats.category == ITEM_CAT_BOLT_ACTION) {
 					//p->anim.set_anim("act_shoot_sniper", true);
-					eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
+					//eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
 				}
 				else if (item_stats.category == ITEM_CAT_MELEE) {
 					//p->anim.set_anim("act_knife_attack", true);
@@ -614,10 +539,10 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 				//p->anim.m.loop = false;
 
 
-				if (is_local) {
-					//eng->local.viewmodel_animator.set_anim("act_shoot", true);
+				//if (is_local) {
+				//	//eng->local.viewmodel_animator.set_anim("act_shoot", true);
 					//eng->local.viewmodel_animator.m.loop = false;
-				}
+				//}
 
 				break;
 			}
@@ -633,10 +558,10 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 			//p->anim.m.loop = false;
 			//p->anim.m.speed = 0.8f;
 
-			if (is_local) {
-				Player* player = (Player*)p;
+			//if (is_local) {
+			//	Player* player = (Player*)p;
 				//player->viewmodel->animator.set_anim("ak47_reload", true);
-			}
+			///}
 		}
 		else {
 			if (cat == ITEM_CAT_RIFLE) {
@@ -693,20 +618,7 @@ void player_item_update(Entity* p, Move_Command command, bool is_local)
 	}
 }
 
-// item code and animation updates
-void player_post_physics(Entity* p, Move_Command command, bool is_local)
-{
-	// animation is being controlled server side
-	if (!(p->flags & EF_FORCED_ANIMATION)) {
-		player_item_update(p, command, is_local);
-		player_animation_update(p);
-	}
-}
 
-void Player::move_update(Move_Command command)
-{
-	
-}
 ViewmodelComponent::~ViewmodelComponent()
 {
 	idraw->remove_obj(viewmodel_handle);
@@ -802,16 +714,13 @@ void ViewmodelComponent::update_visuals()
 	//proxy.animator = &animator;
 	proxy.mesh = &model->mesh;
 	proxy.mats = &model->mats;
-	if (eng->local.thirdperson_camera.integer() == 0)
+	if (!g_thirdperson.integer())
 	{
-			//mat4 invview = glm::inverse(draw.vs.view);
-
-		Game_Local* gamel = &eng->local;
-		glm::mat4 model2 = glm::translate(glm::mat4(1), vec3(0.18, -0.18, -0.25) + gamel->viewmodel_offsets + gamel->viewmodel_recoil_ofs);
-		model2 = glm::scale(model2, glm::vec3(gamel->vm_scale.x));
+		glm::mat4 model2 = glm::translate(glm::mat4(1), vec3(0.18, -0.18, -0.25) + viewmodel_offsets + viewmodel_recoil_ofs);
+		model2 = glm::scale(model2, glm::vec3(vm_scale.x));
 
 
-		model2 = glm::translate(model2, gamel->vm_offset);
+		model2 = glm::translate(model2, vm_offset);
 		model2 = model2 * glm::eulerAngleY(PI + PI / 128.f);
 
 		proxy.transform = model2;
@@ -823,31 +732,131 @@ void ViewmodelComponent::update_visuals()
 	idraw->update_obj(viewmodel_handle, proxy);
 }
 
-void Player::update_visuals()
+void Player::present()
 {
-	if (viewmodel) viewmodel->update_visuals();
+	Entity::present();
 
-	if (!render_handle.is_valid() && model)
-		render_handle = idraw->register_obj();
-	else if (render_handle.is_valid() && !model)
-		idraw->remove_obj(render_handle);
+	if (viewmodel) 
+		viewmodel->update_visuals();
+}
 
-	if (render_handle.is_valid() && model) {
-		Render_Object proxy;
 
-		bool visible = !(flags & EF_HIDDEN);
-		if (this == &eng->local_player() && !eng->local.thirdperson_camera.integer()) 
-			visible = false;
+Player::Player() 
+{
 
-		proxy.visible = visible;
-		//if (model->bones.size() > 0)
-		//	proxy.animator = &anim;
-		proxy.mesh = &model->mesh;
-		proxy.mats = &model->mats;
-		proxy.transform = get_world_transform()*model->skeleton_root_transform;
+}
 
-		idraw->update_obj(render_handle, proxy);
+void Player::set_input_command(Move_Command newcmd) {
+	this->cmd = newcmd;
+}
+
+void Player::spawn() {
+
+	set_model("player_FINAL.glb");
+
+	bool is_local_player = &eng->local_player() == this;
+	
+	if (is_local_player && !viewmodel) {
+		viewmodel.reset(new ViewmodelComponent(this));
 	}
+
+	auto set = anim_tree_man->find_set("default.txt");
+	auto graph = anim_tree_man->find_animation_tree("default.txt");
+
+	if(set && graph)
+		initialize_animator(set, graph, &graph_driver);
+
+	phys_opt.shape = Ent_PhysicsShape::AABB;
+	phys_opt.type = Ent_PhysicsType::PlayerMove;
+
+	health = 100;
+
+	find_spawn_position(this);
+
+	for (int i = 0; i < Game_Inventory::NUM_GAME_ITEMS; i++)
+		inv.ammo[i] = 200;
+}
+
+
+void Player::update()
+{
+	if (state_flags & EF_DEAD) {
+		cmd.forward_move = 0;
+		cmd.lateral_move = 0;
+		cmd.up_move = 0;
+		cmd.button_mask = 0;
+	}
+
+	move();
+	item_update();
+
+	if (viewmodel) {
+		viewmodel->update();
+	}
+}
+
+glm::vec3 Player::calc_eye_position()
+{
+	float view_height = (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
+	return position + vec3(0, view_height, 0);
+}
+
+void Player::get_view(glm::vec3& org, glm::vec3& ang, float& fov)
+{
+	if (g_thirdperson.integer()) {
+
+		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
+		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
+		vec3 camera_pos = position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
+
+		org = camera_pos;
+		ang = view_angles;
+		fov = g_fov.real();
+	}
+	else
+	{
+		vec3 cam_position = calc_eye_position();
+
+		org = cam_position;
+		ang = view_angles;
+		fov = g_fov.real();
+	}
+}
+
+
+glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
+{
+	float p = (1 / (peakt - 1));
+
+	if (t < peakt)
+		return maxrecoil * (1 / peakt) * t;
+	else
+		return maxrecoil * (p * t - p);
+
+}
+
+
+static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& viewmodel_offsets)
+{
+	Entity& e = eng->local_player();
+	glm::vec3 view_front = AnglesToVector(view_angles.x, view_angles.y);
+	view_front.y = 0;
+	glm::vec3 side_grnd = glm::normalize(glm::cross(view_front, vec3(0, 1, 0)));
+	float spd_side = dot(side_grnd, e.velocity);
+	float side_ofs_ideal = -spd_side / 200.f;
+	glm::clamp(side_ofs_ideal, -0.007f, 0.007f);
+	float spd_front = dot(view_front, e.velocity);
+	float front_ofs_ideal = spd_front / 200.f;
+	glm::clamp(front_ofs_ideal, -0.007f, 0.007f);
+	float up_spd = e.velocity.y;
+	float up_ofs_ideal = -up_spd / 200.f;
+	glm::clamp(up_ofs_ideal, -0.007f, 0.007f);
+
+	if (crouching)
+		up_ofs_ideal += 0.04;
+
+	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, eng->frame_time * 100.f);
+
 
 }
 
@@ -859,7 +868,9 @@ void ViewmodelComponent::update()
 		Debug_Interface::get()->add_hook("vm", vm_menu);
 	}
 
-	bool crouching = player->state & PMS_CROUCHING;
+	update_viewmodel(player->view_angles, player->is_crouching, viewmodel_offsets);
+
+	bool crouching = player->is_crouching;
 	float speed = glm::length(glm::vec2(player->velocity.x,player->velocity.z));
 	float speed_mult = glm::smoothstep(0.f, 2.5f, speed);
 	float x = cos(GetTime()*move_a)*move_b*speed_mult;
@@ -888,7 +899,7 @@ void ViewmodelComponent::update()
 		target_rot *= glm::quat(vec3(s*0.7, 1.f, 0.f), vec3(0.f, 1.f, 0.f));
 //	}
 
-	vec3 view_dir = AnglesToVector(eng->local.view_angles.x, eng->local.view_angles.y);
+	vec3 view_dir = AnglesToVector(player->view_angles.x,player->view_angles.y);
 	vec3 sidedir = normalize(cross(view_dir,vec3(0,1,0)));
 	vec3 up = cross(view_dir, sidedir);
 	float deltax = dot(view_dir - last_view_dir, sidedir);
