@@ -555,11 +555,6 @@ void Game_Engine::change_editor_state(Eng_Tool_state next_tool, const char* file
 		get_current_tool()->close();
 	tool_state = next_tool;
 	if (tool_state != Eng_Tool_state::None) {
-
-		if (!level) {
-			level = open_empty_level();
-			idraw->on_level_start();
-		}
 		get_current_tool()->open(file);
 		enable_imgui_docking();
 	}
@@ -740,7 +735,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-#define DECLVAR(name,varname, value) Auto_Config_Var varname(#name, value);
+#define DECLVAR(name,varname, value) Auto_Config_Var varname(name, value);
 DECLVAR("mousesens", g_mousesens, 0.005f);
 DECLVAR("fov", g_fov, 70.f);
 DECLVAR("thirdperson", g_thirdperson, 0);
@@ -987,45 +982,7 @@ Debug_Interface* Debug_Interface::get()
 	return &inst;
 }
 
-float g_time_speedup = 1.f;
-void draw_wind_menu()
-{
-	//ImGui::DragFloat("radius", &draw.ssao.radius, 0.02);
-	//ImGui::DragFloat("angle bias", &draw.ssao.bias, 0.02);
-	
-	ImGui::DragFloat("g_time_speedup", &g_time_speedup, 0.01);
-	if (g_time_speedup <= 0.0001) g_time_speedup = 0.0001;
-
-	//ImGui::DragFloat("roughness", &draw.rough, 0.02);
-	//ImGui::DragFloat("metalness", &draw.metal, 0.02);
-	//ImGui::DragFloat3("aosphere", &draw.aosphere.x, 0.02);
-	//ImGui::DragFloat2("vfog", &draw.vfog.x, 0.02);
-	//ImGui::DragFloat3("ambient", &draw.ambientvfog.x, 0.02);
-	//ImGui::DragFloat("spread", &draw.volfog.spread, 0.02);
-	//ImGui::DragFloat("frustum", &draw.volfog.frustum_end, 0.02);
-	//ImGui::DragFloat("slice", &draw.slice_3d, 0.04, 0, 4);
-	
-
-	//ImGui::Image(ImTextureID(EnviornmentMapHelper::get().integrator.lut_id), ImVec2(128, 128));
-
-	//ImGui::Image(ImTextureID(draw.ssao.texture.viewnormal), ImVec2(512, 512));
-
-
-
-	//ImGui::Image(ImTextureID(draw.tex.reflected_color), ImVec2(512, 512));
-	//ImGui::Image(ImTextureID(draw.tex.scene_color), ImVec2(512, 512));
-	//ImGui::SliderInt("layer", &bloom_layer, 0, BLOOM_MIPS - 1);
-	//ImGui::Checkbox("upscale", &bloom_stop);
-	//ImGui::Image(ImTextureID(draw.tex.bloom_chain[bloom_layer]), ImVec2(256, 256));
-
-
-	ImGui::DragFloat3("wind dir", &wswind_dir.x, 0.04);
-	ImGui::DragFloat("speed", &speed, 0.04);
-	ImGui::DragFloat("height", &wsheight, 0.04);
-	ImGui::DragFloat("radius", &wsradius, 0.04);
-	ImGui::DragFloat("startheight", &wsstartheight, 0.04, 0.f, 1.f);
-	ImGui::DragFloat("startradius", &wsstartradius, 0.04, 0.f, 1.f);
-}
+DECLVAR("slomo", g_slomo, 1.f);
 
 
 bool Game_Engine::is_drawing_to_window_viewport()
@@ -1279,9 +1236,6 @@ void Game_Engine::init()
 	
 	dbg_console.init();
 
-	// hook debug menus
-	Debug_Interface::get()->add_hook("Wind Vars", draw_wind_menu);
-
 	// engine initilization
 	float first_start = GetTime();
 	float start = GetTime();
@@ -1463,6 +1417,7 @@ void Game_Engine::stop_game()
 		delete &ei.get();
 	}
 	ents.clear();
+	num_entities = 0;
 
 	idraw->on_level_end();
 	
@@ -1470,6 +1425,9 @@ void Game_Engine::stop_game()
 	level = nullptr;
 
 	phys.ClearObjs();
+
+	// clear any debug shapes
+	Debug::on_fixed_update_start();
 }
 
 void Game_Engine::loop()
@@ -1516,12 +1474,17 @@ void Game_Engine::loop()
 			// later, will add menu controls, now all you can do is use the console to change state
 			SDL_Delay(5);
 
-			if (map_spawned() && get_tool_state() == Eng_Tool_state::None) {
+			if (map_spawned()) {
 				stop_game();
 				continue;	// goto next frame
 			}
 			break;
 		case Engine_State::Loading:
+
+			// for compiling data etc.
+			if (get_tool_state() != Eng_Tool_state::None)
+				get_current_tool()->signal_going_to_game();
+
 			execute_map_change();
 			continue; // goto next frame
 			break;
@@ -1539,8 +1502,11 @@ void Game_Engine::loop()
 			}
 			float orig_ft = frame_time;
 			float orig_ti = tick_interval;
-			frame_time *= g_time_speedup;
-			tick_interval *= g_time_speedup;
+
+			g_slomo.real() = glm::clamp(g_slomo.real(), 0.00001f, 2.0f);
+
+			frame_time *= g_slomo.real();
+			tick_interval *= g_slomo.real();
 
 			for (int i = 0; i < num_ticks; i++) {
 
@@ -1609,6 +1575,9 @@ Entity& Ent_Iterator::get() const
 
 Entity* Game_Engine::get_ent(int index)
 {
+	if (index < 0 || index >= ents.size())
+		return nullptr;
+
 	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
 	return ents[index];
 }
@@ -1622,12 +1591,6 @@ void Game_Engine::pre_render_update()
 {
 	ASSERT(state == Engine_State::Game);
 
-		// interpolate entities for rendering
-// fixme
-
-	for (auto ei = Ent_Iterator(0); !ei.finished(); ei = ei.next()) {
-		ei.get().present();
-	}
 }
 
 void draw_console_hook() {

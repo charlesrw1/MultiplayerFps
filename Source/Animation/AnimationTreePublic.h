@@ -19,6 +19,7 @@ class Program;
 class Library;
 class ControlParam_CFG;
 
+
 // this is the thing loaded from disk once
 class Animation_Tree_Manager;
 struct PropertyInfoList;
@@ -54,6 +55,13 @@ private:
 	bool is_initialized() { return !name.empty(); }
 };
 
+
+struct BonePoseMask
+{
+	StringName name;
+	std::vector<float> weight;
+};
+
 class Model_Skeleton
 {
 public:
@@ -65,12 +73,19 @@ public:
 		std::vector<int> skel_to_source;
 	};
 	std::vector<Remap> remaps;
+	std::vector<BonePoseMask> masks;
 
 	int find_remap(const Model_Skeleton* skel) const {
 		for (int i = 0; i < remaps.size(); i++) {
 			if (remaps[i].source == skel)
 				return i;
 		}
+		return -1;
+	}
+	int find_mask(StringName name) const {
+		for (int i = 0; i < masks.size(); i++)
+			if (masks[i].name == name)
+				return i;
 		return -1;
 	}
 };
@@ -93,6 +108,8 @@ public:
 		return src_skeleton->remaps.at(skel_index).skel_to_source;
 	}
 };
+
+
 
 class Model;
 struct Animation_Tree_RT

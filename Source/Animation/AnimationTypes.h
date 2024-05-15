@@ -114,5 +114,5 @@ public:
 	void clear_all();
 	bool is_masked(int index);
 	void set(int index, bool masked);
-	uint64_t mask[4];	//256/64
+	uint64_t mask[4];	//256/
 };

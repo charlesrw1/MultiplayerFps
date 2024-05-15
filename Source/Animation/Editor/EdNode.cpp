@@ -30,6 +30,8 @@ EDIMPL(Sync_EdNode);
 EDIMPL(Mirror_EdNode);
 EDIMPL(StateStart_EdNode);
 EDIMPL(Blendspace2d_EdNode);
+EDIMPL(Blend_Layered_EdNode);
+
 void f()
 {
 	Clip_EdNode e;

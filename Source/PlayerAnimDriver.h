@@ -22,7 +22,7 @@ public:
 	handle<AG_ControlParam> bCrouch;
 	handle<AG_ControlParam> bJumping;
 	handle<AG_ControlParam> bFalling;
-	handle<AG_ControlParam> bMoving;
+	handle<AG_ControlParam> bRunning;
 	handle<AG_ControlParam> flAimx;
 	handle<AG_ControlParam> flAimy;
 

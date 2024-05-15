@@ -387,7 +387,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glCheckError();
 
 
-	if (eng->level->lightmap)
+	if (eng->level && eng->level->lightmap)
 		draw.bind_texture(LIGHTMAP_LOC, eng->level->lightmap->gl_id);
 	else
 		draw.bind_texture(LIGHTMAP_LOC, draw.white_texture.gl_id);
@@ -2811,6 +2811,8 @@ Shader Renderer::shader()
 
 void Renderer::DrawEntBlobShadows()
 {
+	return;
+
 	shadowverts.Begin();
 
 	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next())
@@ -3226,7 +3228,8 @@ void Renderer::on_level_start()
 	}
 
 	glCreateBuffers(1, &scene.cubemap_ssbo);
-	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* scene.cubemaps.size(), probes, GL_STATIC_DRAW);
+	size_t size = glm::min((int)scene.cubemaps.size(), 128);
+	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* size, probes, GL_STATIC_DRAW);
 }
 
 handle<Render_Object> Render_Scene::register_renderable() {

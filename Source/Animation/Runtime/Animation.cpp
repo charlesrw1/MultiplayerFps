@@ -315,6 +315,9 @@ void Animator::update_procedural_bones(Pose& pose)
 	auto model = get_model();
 
 	auto bone_update_functor = [&](Bone_Controller& bc) {
+		if (bc.bone_index == -1)
+			return;
+
 		assert(bc.bone_index >= 0 && bc.bone_index < get_model()->bones.size());
 
 		if (bc.use_two_bone_ik) {
@@ -517,7 +520,11 @@ void Animator::tick_tree_new(float dt)
 {
 	Pose* poses = Pose_Pool::get().alloc(2);
 
+	script_value_t stack[64];
+
 	NodeRt_Ctx ctx;
+	ctx.stack = stack;
+	ctx.stack_size = 64;
 	ctx.tree = &runtime_dat;
 	ctx.model = get_model();
 	ctx.set = get_set();
@@ -571,6 +578,8 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 
 	if(cfg->root)
 		cfg->root->reset(ctx);
+
+
 }
 
 #include "Framework/DictParser.h"

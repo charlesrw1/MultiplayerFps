@@ -33,7 +33,7 @@ extern Auto_Config_Var g_mousesens;
 extern Auto_Config_Var g_fakemovedebug;
 extern Auto_Config_Var g_drawdebugmenu;
 extern Auto_Config_Var g_drawimguidemo;
-
+extern Auto_Config_Var g_slomo;
 
 
 enum class Engine_State
@@ -71,6 +71,13 @@ struct Ent_Iterator
 private:
 	int summed_count = 0;
 	int index = 0;
+};
+
+struct AddToDebugMenu
+{
+	AddToDebugMenu(const char* name, void(*func)()) {
+		Debug_Interface::get()->add_hook(name, func);
+	}
 };
 
 

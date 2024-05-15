@@ -170,7 +170,7 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 {
 	compile_error_string.clear();
 	compile_info_string.clear();
-
+	std::vector<int> sort_priority;
 	Statemachine_Node_CFG* sm_cfg = parent_statemachine->node;
 	if (is_regular_state_node()) {
 
@@ -179,6 +179,9 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 	for (int i = 0; i < output.size(); i++) {
 		State_EdNode* out_state = output[i].output_to;
 		State_Transition* st = &output[i].st;
+
+		if (!st->is_continue_transition)
+			st->automatic_transition_rule = false;
 
 		st->transition_state = output[i].output_to->state_handle_internal;
 

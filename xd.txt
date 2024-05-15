@@ -1,0 +1,109 @@
+"runtime" {
+"rootdata" {
+"root"  "0"
+"data_used"  "0"
+"graph_is_valid"  "1"
+}
+nodes [
+{
+type "Blend_Masked_CFG"
+"input"  [
+ 1   2  ]
+"meshspace_rotation_blend"  "0"
+"param"  "0"
+"maskname"  "-2046707745"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "Armature|mixamo.com|Layer0"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "Armature|mixamo.com|Layer0"
+}
+]
+"params" {
+"types"  [
+{
+"reset_after_tick"  "0"
+"type"  "cpt::float_t"
+"name"  "Unnamed"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+]
+}
+}
+ editor
+{
+"rootstate" {
+"current_id"  "4"
+"current_layer"  "1"
+"default_editor"  "[editor]
+panning=212,312
+
+[node.0]
+origin=194,-37
+
+[node.1]
+origin=148,-154
+
+[node.2]
+origin=-116,-88
+
+[node.3]
+origin=-124,18
+"
+"opt.open_graph"  "1"
+"opt.open_control_params"  "1"
+"opt.open_prop_editor"  "1"
+"opt.statemachine_passthrough"  "0"
+}
+nodes [
+{
+type "Root_EdNode"
+"id"  "0"
+"graph_layer"  "0"
+}
+{
+type "Blend_Layered_EdNode"
+"id"  "1"
+"graph_layer"  "0"
+"maskname"  ""
+"node"  "0"
+}
+{
+type "Clip_EdNode"
+"id"  "2"
+"graph_layer"  "0"
+"node"  "1"
+}
+{
+type "Clip_EdNode"
+"id"  "3"
+"graph_layer"  "0"
+"node"  "2"
+}
+]
+}

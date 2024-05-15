@@ -25,6 +25,12 @@
     <Filter Include="Source\Game">
       <UniqueIdentifier>{452eb327-c33b-4d63-ab04-3c80f2a32508}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Physics">
+      <UniqueIdentifier>{9b65b38e-a7e6-4190-b11f-ea2271b81792}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Physics\Editor">
+      <UniqueIdentifier>{119307ff-0cdd-49ad-8a28-3855ef65629d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -336,6 +342,21 @@
     <ClInclude Include="Source\Interaction.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Physics\Editor\PublicPhysicsEditor.h">
+      <Filter>Source\Physics\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\PoolAllocator.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\Percentage.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\SyncTime.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -354,9 +375,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\glad.c">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Level.cpp">
@@ -505,6 +523,12 @@
     </ClCompile>
     <ClCompile Include="Source\EntityTypes.cpp">
       <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Physics\Editor\PhysicsEditorLocal.cpp">
+      <Filter>Source\Physics\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
+      <Filter>Source\Animation\Runtime</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

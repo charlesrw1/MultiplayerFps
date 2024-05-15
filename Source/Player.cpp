@@ -201,7 +201,7 @@ void Player::get_crouch_state(bool& out_is_crouching)
 		out_is_crouching = true;
 	}
 	else {
-		if (!is_crouching) {
+		if (is_crouching) {
 			// uncrouch
 
 			if (is_on_ground()) {
@@ -358,6 +358,66 @@ void player_physics_check_nans(Entity& player)
 	}
 }
 
+void draw_entity_info()
+{
+	static int current_index = 0;
+	ImGui::Text("entity index: %d", current_index);
+	if (ImGui::SmallButton("next")) {
+
+		Ent_Iterator ei(current_index);
+		ei = ei.next();
+		if (ei.finished())
+			current_index = 0;
+		else
+			current_index = ei.get_index();
+	}
+
+	Entity* e = eng->get_ent(current_index);
+	if (!e)
+		return;
+
+	ImGui::InputFloat3("position", &e->position.x);
+	ImGui::InputFloat3("velocity", &e->velocity.x);
+	ImGui::InputFloat3("acceleration", &e->esimated_accel.x);
+
+	static bool predict_brake = true;
+	ImGui::Checkbox("Predict stop pos", &predict_brake);
+	if (predict_brake && e->get_classname() == NAME("Player")) {
+		Player* p = (Player*)e;
+
+		if (glm::abs(p->cmd.forward_move) < 0.000001 && glm::abs(p->cmd.lateral_move) < 0.000001) {
+			glm::vec3 pos = e->position;
+			glm::vec3 v = e->velocity;
+			v.y = 0.0;
+			// assume accel = 0
+			int iter = 0;
+			float dt = 0.025;	// use a big dt
+			while (dot(v, v) > 0.0001*0.0001 && iter < 100) {
+				float speed = glm::length(v);
+
+				if (speed < 0.3)
+					break;
+
+				float dropamt = ground_friction * speed * dt;
+				float newspd = speed - dropamt;
+				if (newspd < 0)
+					newspd = 0;
+				float factor = newspd / speed;
+				v *= factor;
+				pos += v * (float)dt;
+				iter++;
+			}
+			ImGui::Text("%d", iter);
+			ImGui::Text("%f %f %f", pos.x, pos.y, pos.z);
+			Debug::add_sphere(pos, 0.5, COLOR_BLUE, -1.0, false);
+		}
+	}
+
+}
+
+static AddToDebugMenu addmovevars("move vars", move_variables_menu);
+static AddToDebugMenu adddrawentinfo("entity physics info", draw_entity_info);
+
 void Player::move()
 {
 	glm::vec3 last_velocity = velocity;
@@ -379,6 +439,7 @@ void Player::move()
 		velocity.x *= factor;
 		velocity.z *= factor;
 	}
+
 
 	if (eng->is_host() && debug_fly.integer()) {
 		action = Action_State::Falling;
@@ -403,6 +464,13 @@ void Player::move()
 		ground_move();
 	
 	player_physics_check_nans(*this);
+
+
+	auto pos = position;
+	auto height = CHAR_STANDING_HB_HEIGHT;
+	auto width = CHAR_HITBOX_RADIUS;
+	Debug::add_sphere(pos + vec3(0, width, 0), width, COLOR_PINK, -1.f);
+	Debug::add_sphere(pos + vec3(0, height- width, 0), width, COLOR_PINK,-1.f);
 
 
 	esimated_accel = (velocity - last_velocity) / (float)eng->tick_interval;
@@ -761,9 +829,9 @@ void Player::spawn() {
 	}
 
 	auto set = anim_tree_man->find_set("default.txt");
-	auto graph = anim_tree_man->find_animation_tree("default.txt");
+	auto graph = anim_tree_man->find_animation_tree("out.txt");
 
-	if(set && graph)
+	if(set && graph && graph->graph_is_valid)
 		initialize_animator(set, graph, &graph_driver);
 
 	phys_opt.shape = Ent_PhysicsShape::AABB;

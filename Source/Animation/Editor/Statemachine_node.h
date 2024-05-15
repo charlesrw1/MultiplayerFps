@@ -2,6 +2,7 @@
 #include "Base_node.h"
 #include "State_node.h"
 #include "Basic_nodes.h"
+#include "../Runtime/Statemachine_cfg.h"
 class Statemachine_EdNode : public Base_EdNode
 {
 	EDNODE_HEADER(Statemachine_EdNode);

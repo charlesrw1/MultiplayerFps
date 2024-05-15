@@ -162,13 +162,23 @@ class GraphOutput
 public:
 	bool is_valid_for_preview() { return model && set; }
 
-	Animator anim;
-	handle<Render_Object> obj;
-	User_Camera camera;
+	void reset_animator();
 	View_Setup vs;
+	User_Camera camera;
+	handle<Render_Object> obj;
+	Animator* get_animator();
+
+	Animator& get_local_animator() {
+		return anim;
+	}
 
 	Model* model = nullptr;
 	const Animation_Set_New* set = nullptr;
+private:
+
+
+	Animator anim;
+
 };
 
 struct EditorControlParamProp {
@@ -323,6 +333,7 @@ public:
 	}
 	virtual void imgui_draw() override;
 	virtual void draw_frame() override;
+	void signal_going_to_game() override;
 
 	enum class graph_playback_state {
 		stopped,
@@ -397,7 +408,9 @@ public:
 	}
 
 	Animation_Tree_RT* get_runtime_tree() {
-		return &out.anim.runtime_dat;
+		Animator* a = out.get_animator();
+
+		return a ? &a->runtime_dat : nullptr;
 	}
 
 	editor_layer create_new_layer(bool is_statemachine) {
@@ -490,6 +503,8 @@ public:
 	GraphOutput out;
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
+
+	bool last_tick_had_game_running = false;
 };
 
 extern AnimationGraphEditor ed;

@@ -2,6 +2,7 @@
 #include "Base_node.h"
 #include "imnodes.h"
 #include "AnimationGraphEditor.h"
+#include "../Runtime/Statemachine_cfg.h"
 class Statemachine_EdNode;
 class State_EdNode : public Base_EdNode
 {
@@ -116,6 +117,7 @@ public:
 	};
 
 	int num_inputs = 1;
+
 
 	std::vector<output_transition_info> output;
 	State self_state;

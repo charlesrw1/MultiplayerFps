@@ -1,6 +1,6 @@
 "runtime" {
 "rootdata" {
-"root"  "7"
+"root"  "0"
 "data_used"  "40"
 "graph_is_valid"  "1"
 }
@@ -20,7 +20,7 @@ type "Statemachine_Node_CFG"
 }
 {
 "transition_idxs"  [
- 6   5   4  ]
+ 4   5  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
@@ -28,7 +28,7 @@ type "Statemachine_Node_CFG"
 }
 {
 "transition_idxs"  [
- 7  ]
+ 6  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
@@ -36,19 +36,27 @@ type "Statemachine_Node_CFG"
 }
 {
 "transition_idxs"  [
- 8   9  ]
+ 7  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
-"tree"  "6"
+"tree"  "7"
 }
 {
 "transition_idxs"  [
- 10  ]
+ 8  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
 "tree"  "5"
+}
+{
+"transition_idxs"  [
+ 9  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "6"
 }
 ]
 "transitions"  [
@@ -59,7 +67,6 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  ""
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
-"priority"  "0"
 }
 {
 "transition_state"  "1"
@@ -68,7 +75,6 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  "bRunning"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "1"
-"priority"  "0"
 }
 {
 "transition_state"  "3"
@@ -76,8 +82,7 @@ type "Statemachine_Node_CFG"
 "transition_time"  "0.300000"
 "script_uncompilied"  "bFalling"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "0"
-"priority"  "0"
+"can_be_interrupted"  "1"
 }
 {
 "transition_state"  "4"
@@ -86,7 +91,6 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  "bJumping"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
-"priority"  "0"
 }
 {
 "transition_state"  "0"
@@ -95,7 +99,6 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  "( not bRunning )"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "1"
-"priority"  "1"
 }
 {
 "transition_state"  "2"
@@ -104,16 +107,6 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  "bTurn180"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "1"
-"priority"  "0"
-}
-{
-"transition_state"  "4"
-"automatic_transition_rule"  "0"
-"transition_time"  "0.200000"
-"script_uncompilied"  "bJumping"
-"is_continue_transition"  "0"
-"can_be_interrupted"  "0"
-"priority"  "255"
 }
 {
 "transition_state"  "1"
@@ -122,25 +115,14 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  ""
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
-"priority"  "0"
 }
 {
-"transition_state"  "1"
-"automatic_transition_rule"  "0"
-"transition_time"  "0.200000"
-"script_uncompilied"  "( and bRunning ( and ( not bFalling ) ( not bJumping ) ) )"
-"is_continue_transition"  "0"
-"can_be_interrupted"  "1"
-"priority"  "0"
-}
-{
-"transition_state"  "0"
+"transition_state"  "5"
 "automatic_transition_rule"  "0"
 "transition_time"  "0.200000"
 "script_uncompilied"  "( and ( not bFalling ) ( not bJumping ) )"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "1"
-"priority"  "0"
+"can_be_interrupted"  "0"
 }
 {
 "transition_state"  "3"
@@ -149,7 +131,14 @@ type "Statemachine_Node_CFG"
 "script_uncompilied"  ""
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
-"priority"  "0"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.300000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+"can_be_interrupted"  "0"
 }
 ]
 "entry_transitions"  [
@@ -226,20 +215,12 @@ type "Clip_Node_CFG"
 "rm[0]"  "rm::keep"
 "rm[1]"  "rm::keep"
 "rm[2]"  "rm::keep"
-"loop"  "1"
+"loop"  "0"
 "speed"  "1.000000"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "midair_fall"
-}
-{
-type "Blend_Masked_CFG"
-"input"  [
- 0   8  ]
-"meshspace_rotation_blend"  "0"
-"param"  "3"
-"maskname"  "1185796983"
+"clip_name"  "land_to_stand"
 }
 {
 type "Clip_Node_CFG"
@@ -253,7 +234,7 @@ type "Clip_Node_CFG"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "stand_unqeuip_idle"
+"clip_name"  "midair_fall"
 }
 ]
 "params" {
@@ -304,22 +285,16 @@ type "Clip_Node_CFG"
  editor
 {
 "rootstate" {
-"current_id"  "45"
+"current_id"  "39"
 "current_layer"  "15"
 "default_editor"  "[editor]
-panning=8,15
+panning=632,320
 
 [node.0]
-origin=21,-80
+origin=13,-117
 
 [node.8]
-origin=-418,-105
-
-[node.43]
-origin=-212,-37
-
-[node.44]
-origin=-455,39
+origin=-377,-106
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
@@ -339,7 +314,7 @@ type "Statemachine_EdNode"
 "name"  "Locomtion Layer"
 "sublayer.id"  "3"
 "sublayer.context"  "[editor]
-panning=208,76
+panning=303,134
 
 [node.9]
 origin=-122,51
@@ -358,6 +333,9 @@ origin=-51,383
 
 [node.32]
 origin=-118,216
+
+[node.35]
+origin=176,338
 "
 "node"  "0"
 }
@@ -396,7 +374,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "1"
 "sublayer.id"  "9"
 "sublayer.context"  "[editor]
-panning=212,312
+panning=193,312
 
 [node.21]
 origin=201,-21
@@ -510,23 +488,38 @@ type "Clip_EdNode"
 "node"  "5"
 }
 {
+type "State_EdNode"
+"id"  "35"
+"graph_layer"  "3"
+"name"  ""
+"state_handle_internal.id"  "5"
+"sublayer.id"  "14"
+"sublayer.context"  "[editor]
+panning=193,312
+
+[node.36]
+origin=128,6
+
+[node.37]
+origin=-16,16
+"
+}
+{
+type "Root_EdNode"
+"id"  "36"
+"graph_layer"  "14"
+}
+{
 type "Clip_EdNode"
-"id"  "38"
-"graph_layer"  "12"
+"id"  "37"
+"graph_layer"  "14"
 "node"  "6"
 }
 {
-type "Blend_Layered_EdNode"
-"id"  "43"
-"graph_layer"  "0"
-"maskname"  "upper_mask_soft"
-"node"  "7"
-}
-{
 type "Clip_EdNode"
-"id"  "44"
-"graph_layer"  "0"
-"node"  "8"
+"id"  "38"
+"graph_layer"  "12"
+"node"  "7"
 }
 ]
 }

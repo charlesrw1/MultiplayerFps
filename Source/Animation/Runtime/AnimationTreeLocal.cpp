@@ -8,6 +8,9 @@
 #include "Framework/AddClassToFactory.h"
 #include "Framework/WriteObject.h"
 
+#include "Statemachine_cfg.h"
+
+Pool_Allocator g_pose_pool = Pool_Allocator(sizeof(Pose), 8);
 
 #define IMPL_NODE_CFG(type_name) \
 const TypeInfo& type_name::get_typeinfo() const { \
@@ -27,19 +30,8 @@ IMPL_NODE_CFG(Blend_Int_Node_CFG);
 IMPL_NODE_CFG(BlendSpace2d_CFG);
 IMPL_NODE_CFG(BlendSpace1d_CFG);
 IMPL_NODE_CFG(Scale_By_Rootmotion_CFG);
+IMPL_NODE_CFG(Blend_Masked_CFG);
 
-
-PropertyInfoList* State::get_props()
-{
-	MAKE_INLVECTORCALLBACK_ATOM(uint16_t, transition_idxs, State);
-	START_PROPS(State)
-		REG_STDVECTOR(transition_idxs,PROP_SERIALIZE),
-		REG_FLOAT(state_duration, PROP_DEFAULT, "-1.0"),
-		REG_BOOL(wait_until_finish, PROP_DEFAULT, "0"),
-		REG_BOOL(is_end_state, PROP_DEFAULT, "0"),
-		REG_STRUCT_CUSTOM_TYPE(tree, PROP_SERIALIZE, "AgSerializeNodeCfg"),
-	END_PROPS(State)
-}
 
 static const char* rm_setting_strs[] = {
 	"keep",
@@ -102,7 +94,12 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		}
 	}
 
-	return !rt->stopped_flag;
+	bool outres = !rt->stopped_flag;
+	float cur_t = clip->fps * rt->frame;
+	float clip_t = clip->fps * clip->total_duration;
+	outres &= !pose.has_auto_transition || (pose.automatic_transition_time + cur_t < clip_t);
+
+	return outres;
 }
 
 // Inherited via At_Node
@@ -227,16 +224,25 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
  bool Mirror_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	float amt = ctx.get_float(param);
 
 	auto rt = get_rt<Mirror_Node_RT>(ctx);
-	rt->lerp_amt = damp_dt_independent(amt, rt->lerp_amt, damp_time, pose.dt);
+	 if (!store_value_on_reset) {
 
+		 float amt{};
+		 if (parameter_type == 0) {
+			 amt = ctx.get_float(param);
+		 }
+		 else {
+			 amt = (float)ctx.get_bool(param);
+		 }
+
+		 rt->saved_f = damp_dt_independent(amt, rt->saved_f, damp_time, pose.dt);
+	 }
 	bool ret = input[0]->get_pose(ctx, pose);
 
 	bool has_mirror_map = ctx.set->src_skeleton->bone_mirror_map.size() == ctx.model->bones.size();
 
-	if (has_mirror_map && rt->lerp_amt >= 0.000001) {
+	if (has_mirror_map && rt->saved_f >= 0.000001) {
 		const Model* m = ctx.model;
 		Pose* posemirrored = Pose_Pool::get().alloc(1);
 		// mirror the bones
@@ -252,7 +258,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 			posemirrored->q[i] = glm::quat(fromquat.w, fromquat.x, -fromquat.y, -fromquat.z);
 		}
 
-		util_blend(m->bones.size(), *posemirrored, *pose.pose, rt->lerp_amt);
+		util_blend(m->bones.size(), *posemirrored, *pose.pose, rt->saved_f);
 
 		Pose_Pool::get().free(1);
 
@@ -260,130 +266,6 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	return ret;
 }
 
- void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
-	 init_memory_internal(tree, sizeof(RT_TYPE));
-
-	 for (int i = 0; i < states.size(); i++) {
-		 states[i].tree = serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
-	 }
-
-	 if (tree->graph_is_valid) {
-		 // this can be serialized to a bytestream but for now just compile it on load
-		 // since the graph is valid, there shoudnt be and runtime errors
-		 // however, graph_is_valid can be true and the script is bad ONLY IF
-		 // this statemachine isnt referenced in the final tree, thus a bad script
-		 // has no effect on the final graph
-		 // theres an assert checking that the script is valid when its checked in the 
-		 // graphs real path
-
-		 for (int i = 0; i < transitions.size(); i++) {
-			 if (transitions[i].is_a_continue_transition()) 
-				 continue;
-
-			 bool bad = false;
-			const std::string& code = transitions[i].script_uncompilied;
-			try {
-				 auto ret = transitions[i].script_condition.compile(
-					 tree->graph_program.get(),
-					 code,
-					 NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
-			
-				 // must return boolean
-				 if (ret.out_types.size() != 1 || ret.out_types[0] != script_types::bool_t)
-					 bad = true;
-			}
-			catch (...) {
-				bad = true;
-			}
-			if (bad)
-				transitions[i].script_condition.instructions.clear();
-		 }
-	 }
- }
-
- bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
-
-	auto rt = get_rt<Statemachine_Node_RT>(ctx);
-#if 0
-	// evaluate state machine
-	if (!rt->active_state.is_valid()) {
-		rt->active_state = start_state;
-		rt->active_weight = 0.0;
-	}
-	const State* next_state = nullptr;;// = (change_to_next_state) ? active_state->next_state : active_state->get_next_state(animator);
-	if (rt->change_to_next) next_state = get_state(get_state(rt->active_state)->next_state);
-	else {
-		const State* active_state = get_state(rt->active_state);
-		next_state = get_state(active_state->get_next_state(ctx));
-		const State* next_state2 = get_state(next_state->get_next_state(ctx));
-		int infinite_loop_check = 0;
-		while (next_state2 != next_state) {
-			next_state = next_state2;
-			next_state2 = get_state(next_state->get_next_state(ctx));
-			infinite_loop_check++;
-
-			ASSERT(infinite_loop_check < 100);
-		}
-	}
-
-	rt->change_to_next = false;
-
-
-	auto next_state_handle = get_state_handle(next_state);
-	if (rt->active_state.id != next_state_handle.id) {
-		if (next_state_handle.id == rt->fading_out_state.id) {
-			std::swap(rt->active_state, rt->fading_out_state);
-			rt->active_weight = 1.0 - rt->active_weight;
-		}
-		else {
-			rt->fading_out_state = rt->active_state;
-			rt->active_state = next_state_handle;
-
-			get_state(rt->active_state)->tree->reset(ctx);
-			//fade_in_time = g_fade_out;
-			rt->active_weight = 0.f;
-		}
-		printf("changed to state %s\n", get_state(rt->active_state)->name.c_str());
-	}
-
-	rt->active_weight += pose.dt / fade_in_time;
-	if (rt->active_weight > 1.f) {
-		rt->active_weight = 1.f;
-		rt->fading_out_state = { -1 };
-	}
-
-	auto active_state_ptr = get_state(rt->active_state);
-	auto fading_state_ptr = get_state(rt->fading_out_state);
-
-
-	bool notdone = active_state_ptr->tree->get_pose(ctx, pose);
-
-	if (fading_state_ptr) {
-		Pose* fading_out_pose = Pose_Pool::get().alloc(1);
-
-
-		fading_state_ptr->tree->get_pose(ctx,
-			pose.set_dt(0.f)
-			.set_pose(fading_out_pose)
-		);
-		//printf("%f\n", active_weight);
-		assert(rt->fading_out_state.id != rt->active_state.id);
-		util_blend(ctx.num_bones(), *fading_out_pose, *pose.pose, 1.0 - rt->active_weight);
-		Pose_Pool::get().free(1);
-	}
-
-	if (!notdone) {	// if done
-		if (active_state_ptr->next_state.is_valid()) {
-			rt->change_to_next = true;
-			return true;
-		}
-		else {
-			return false;	// bubble up the finished event
-		}
-	}
-#endif
-	return true;
-}
 
 // Inherited via At_Node
 
@@ -581,6 +463,15 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 out.write_item_end();
  }
 
+ PropertyInfoList* Blend_Masked_CFG::get_props()
+ {
+	 START_PROPS(Blend_Masked_CFG)
+		 REG_BOOL(meshspace_rotation_blend,PROP_DEFAULT,"0"),
+		 REG_INT_W_CUSTOM(param,PROP_DEFAULT,"-1","AG_PARAM_FINDER"),
+		 REG_INT(maskname,PROP_SERIALIZE,"0")
+	END_PROPS(Blend_Masked_CFG)
+ }
+
  PropertyInfoList* Scale_By_Rootmotion_CFG::get_props()
  {
 	 return nullptr;
@@ -661,18 +552,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 REG_STDSTRING_CUSTOM_TYPE( clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
 
 	END_PROPS(Clip_Node_CFG)
- }
-
- PropertyInfoList* Statemachine_Node_CFG::get_props()
- {
-	 MAKE_INLVECTORCALLBACK_ATOM(uint16_t, entry_transitions, Statemachine_Node_CFG);
-	 MAKE_VECTORCALLBACK(State, states);
-	 MAKE_VECTORCALLBACK(State_Transition, transitions);
-	 START_PROPS(Statemachine_Node_CFG)
-		 REG_STDVECTOR(states,PROP_SERIALIZE),
-		 REG_STDVECTOR(transitions, PROP_SERIALIZE),
-		 REG_STDVECTOR(entry_transitions, PROP_SERIALIZE)
-	END_PROPS(Statemachine_Node_CFG)
  }
 
  // base64 encoding
@@ -763,17 +642,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 else {
 		 ASSERT(0);
 	 }
- }
-
- PropertyInfoList* State_Transition::get_props()
- {
-	 START_PROPS(State_Transition)
-		 REG_INT( transition_state, PROP_SERIALIZE, "-1"),
-		 REG_BOOL(automatic_transition_rule, PROP_DEFAULT, "1"),
-		 REG_FLOAT( transition_time, PROP_DEFAULT, "0.2"),
-		 REG_STDSTRING_CUSTOM_TYPE( script_uncompilied, PROP_DEFAULT, "AG_LISP_CODE"),
-		 REG_BOOL(is_continue_transition, PROP_DEFAULT, "0")
-	END_PROPS(State_Transition)
  }
 
  void ControlParam_CFG::set_library_vars(Library* lib)
@@ -909,4 +777,23 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 START_PROPS(ControlParam_CFG)
 		 REG_STDVECTOR(types, PROP_SERIALIZE)
 	 END_PROPS(ControlParam_CFG)
+ }
+
+ bool Blend_Masked_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ {
+	 auto rt = get_rt<RT_TYPE>(ctx);
+	 if(rt->mask_index==-1)
+		 return input[0]->get_pose(ctx, pose);
+	 auto& mask = ctx.set->src_skeleton->masks[rt->mask_index];
+	
+	 Pose* pose_layer = Pose_Pool::get().alloc(1);
+	 bool ret = input[0]->get_pose(ctx, pose);
+	 ret &= input[1]->get_pose(ctx, pose.set_pose(pose_layer));
+
+	 util_blend_with_mask(ctx.num_bones(), *pose_layer, *pose.pose, 1.0, mask.weight);
+
+	 Pose_Pool::get().free(1);
+
+	 return ret;
+
  }

@@ -18,6 +18,15 @@ void util_blend(int bonecount, const Pose& a, Pose& b, float factor)
 		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor);
 	}
 }
+void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, const std::vector<float>& mask)
+{
+	ASSERT(mask.size() >= bonecount);
+	for (int i = 0; i < bonecount; i++) {
+		b.q[i] = glm::slerp(b.q[i], a.q[i], factor*mask[i]);
+		b.q[i] = glm::normalize(b.q[i]);
+		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor*mask[i]);
+	}
+}
 
 // base = lerp(base,base+additive,f)
 void util_add(int bonecount, const Pose& additive, Pose& base, float fac)

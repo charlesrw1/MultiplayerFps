@@ -576,8 +576,8 @@ vec3 normal_tex_rgb = N;
 		roughness_metal *= 0.3;
 	
 	}
-	#ifndef ANIMATED
 	roughness_metal = vec2(0.5,0.0);
+	#ifndef ANIMATED
 	#endif
 	#ifdef ANIMATED
 	//emissive = vec3(5.0,1.0,1.0);
@@ -585,6 +585,7 @@ vec3 normal_tex_rgb = N;
 
 
 	FS_OUT_Color = pbr_calculate(tex.rgb,roughness_metal.r, roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
+	//FS_OUT_Color = vec4(N,1.0);
 	//FS_OUT_Color = vec4(roughness_metal.r, roughness_metal.g,0.0,0.0);
 	//FS_OUT_Color = vec4(vec3(N), 1.0);
 

@@ -1,27 +1,29 @@
 #pragma once
 
 #include "Model.h"
-#include "Framework/ExpressionLang.h"
 #include "glm/glm.hpp"
-#include "Framework/MemArena.h"
 
 #include "Animation/AnimationTreePublic.h"
-#include "Framework/InlineVec.h"
 
+#include "Framework/ExpressionLang.h"
+#include "Framework/MemArena.h"
+#include "Framework/InlineVec.h"
 #include "Framework/EnumDefReflection.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/Factory.h"
+#include "Framework/PoolAllocator.h"
+#include "Framework/TypeInfo.h"
 
 #include "ControlParams.h"
 #include "ControlParamHandle.h"
-#include "Framework/TypeInfo.h"
 
-#include "Framework/Factory.h"
 
 #include <cassert>
 
-
 class Node_CFG;
 class Animation_Tree_CFG;
+
+extern Pool_Allocator g_pose_pool;
 
 struct AgSerializeContext
 {
@@ -64,6 +66,9 @@ struct NodeRt_Ctx
 	const Program* script_prog = nullptr;
 	uint16_t tick = 0;
 
+	int stack_size = 0;
+	script_value_t* stack = nullptr;
+
 	float get_float(ControlParamHandle handle) const {
 		return param_cfg->get_float(&tree->vars, handle);
 	}
@@ -104,12 +109,22 @@ struct GetPose_Ctx
 		gp.rootmotion_scale = rm;
 		return gp;
 	}
+	GetPose_Ctx set_automatic_transition(float time) {
+		GetPose_Ctx gp = *this;
+		gp.automatic_transition_time = time;
+		gp.has_auto_transition = true;
+		return gp;
+	}
 
 	Pose* pose = nullptr;
 	float dt = 0.0;
 	syncval* sync = nullptr;
 	// if > 0, then scale clip by rootmotion
 	float rootmotion_scale = -1.0;
+
+	// if true, then clip will return that it is finished when current_time + auto_transition_time >= clip_time
+	bool has_auto_transition = false;
+	float automatic_transition_time = 0.0;
 };
 
 
@@ -471,22 +486,32 @@ public:
 
 struct Mirror_Node_RT : Rt_Vars_Base
 {
-	float lerp_amt = 0.0;
-	float saved_f;
-	bool saved_boolean = 0;
+	float saved_f = 0.0;
 };
 
 struct Mirror_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Mirror_Node_RT;
-	DECLARE_NODE_CFG(Mirror_Node_CFG);
+	DECLARE_NO_DEFAULT(Mirror_Node_CFG);
+	virtual void initialize(Animation_Tree_CFG* cfg) {
+		init_memory_internal(cfg, sizeof(RT_TYPE));
+		parameter_type = cfg->params->get_type(param) == control_param_type::float_t ? 0 : 1;
+	}
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
 	virtual void reset(NodeRt_Ctx& ctx) const override
 	{
-		*get_rt< Mirror_Node_RT>(ctx) = Mirror_Node_RT();
+		auto rt = get_rt< Mirror_Node_RT>(ctx);
+
+		if (parameter_type == 0) {
+			rt->saved_f = ctx.get_float(param);
+		}
+		else {
+			rt->saved_f = (float)ctx.get_bool(param);
+		}
+
 		input[0]->reset(ctx);
 	}
 
@@ -502,77 +527,6 @@ struct Mirror_Node_CFG : public Node_CFG
 };
 
 struct NodeRt_Ctx;
-
-struct State;
-struct State_Transition
-{
-	static PropertyInfoList* get_props();
-	bool is_a_continue_transition() const { return is_continue_transition; }
-	handle<State> transition_state;
-	BytecodeExpression script_condition;
-	std::string script_uncompilied;		// TODO: save to disk precompilied, compiling is fast though so not a huge deal
-	bool is_continue_transition = false;
-	float transition_time = 0.2f;
-	bool automatic_transition_rule = true;
-};
-
-
-struct State
-{
-	static PropertyInfoList* get_props();
-
-	Node_CFG* tree = nullptr;	// fixed up at initialization
-	bool is_end_state = false;
-	bool wait_until_finish = false;
-	float state_duration = -1.0;				// when > 0, specifies how long state should be active, then signals a transition end
-	InlineVec<uint16_t, 6> transition_idxs;
-};
-
-struct Statemachine_Node_RT : Rt_Vars_Base
-{
-	handle<State> active_state;
-	handle<State> fading_out_state;
-	State_Transition* active_transition = nullptr;
-	Pose* cached_pose_from_transition  = nullptr;
-
-	float blend_duration = 0.0;
-	float blend_percentage = 0.0;
-};
-
-struct Statemachine_Node_CFG : public Node_CFG
-{
-	using RT_TYPE = Statemachine_Node_RT;
-	DECLARE_NO_DEFAULT(Statemachine_Node_CFG);
-
-	virtual void initialize(Animation_Tree_CFG* tree) override;
-
-	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
-
-	handle<State> find_start_state(Statemachine_Node_RT* rt) { return {}; }
-
-	// Inherited via At_Node
-	virtual void reset(NodeRt_Ctx& ctx) const override
-	{
-		*get_rt<Statemachine_Node_RT>(ctx) = Statemachine_Node_RT();
-	}
-
-	virtual void construct(NodeRt_Ctx& ctx) const override
-	{
-		construct_this<Statemachine_Node_RT>(ctx);
-	}
-
-	const State* get_state(handle<State> handle) const {
-		if (handle.id == -1) return nullptr;
-		return &states.at(handle.id);
-	}
-	handle<State> get_state_handle(const State* state) const {
-		return { int((state - states.data()) / sizeof(State)) };
-	}
-
-	std::vector<State> states;
-	InlineVec<uint16_t, 6> entry_transitions;
-	std::vector<State_Transition> transitions;
-};
 
 struct BlendSpace2d_RT : Rt_Vars_Base
 {
@@ -634,5 +588,71 @@ public:
 	}
 	ControlParamHandle param;
 };
+
+
+struct Blend_Masked_RT : public Rt_Vars_Base
+{
+	int16_t mask_index = -1;
+};
+
+class Blend_Masked_CFG : public Node_CFG
+{
+public:
+	using RT_TYPE = Blend_Masked_RT;
+	DECLARE_NODE_CFG(Blend_Masked_CFG);
+	virtual void construct(NodeRt_Ctx& ctx) const override {
+		construct_this<RT_TYPE>(ctx);
+		auto rt = get_rt<RT_TYPE>(ctx);
+		rt->mask_index = (int16_t)ctx.set->src_skeleton->find_mask(maskname);
+	}
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+		input[0]->reset(ctx);
+		input[1]->reset(ctx);
+	}
+
+	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+
+	bool meshspace_rotation_blend = false;
+	int8_t param_type = 0;	// 0 = float,1=bool
+	ControlParamHandle param;
+	StringName maskname;
+};
+
+
+class LocalToComponent_CFG
+{
+
+};
+
+class ComponentToLocal_CFG
+{
+
+};
+
+class SolveIkConstraints_CFG
+{
+
+};
+
+class PushIKConstraints_CFG
+{
+
+};
+
+class PushBoneMask_CFG
+{
+
+};
+
+class MotionWarp_CFG
+{
+
+};
+
+class BoneModifier_CFG
+{
+
+};
+
 
 extern Factory<std::string, Node_CFG>& get_runtime_node_factory();

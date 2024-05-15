@@ -24,6 +24,9 @@ void util_blend(int bonecount, const Pose& a, Pose& b, float factor);
 // base = lerp(base,base+additive,f)
 void util_add(int bonecount, const Pose& additive, Pose& base, float fac);
 
+// b = lerp(a,b,f)
+void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, const std::vector<float>& mask);
+
 
 void util_twobone_ik(
 	const vec3& a, const vec3& b, const vec3& c,

@@ -419,7 +419,7 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 			if (not_integer_or_bool_type(res))
 				throw CompileError("or requires bool/int type (arg1)", line_num);
 
-			push_inst(POP_OR_JUMP_EQ);
+			push_inst(POP_OR_JUMP_NEQ);
 			int first_ofs = instructions.size();
 			push_4bytes(0);
 
@@ -437,7 +437,7 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 			if (not_integer_or_bool_type(res))
 				throw CompileError("and requires bool/int type (arg1)", line_num);
 
-			push_inst(POP_OR_JUMP_NEQ);
+			push_inst(POP_OR_JUMP_EQ);
 			int first_ofs = instructions.size();
 			push_4bytes(0);
 
@@ -908,8 +908,8 @@ void BytecodeExpression::execute(script_state* state, const Program* prog, progr
 
 		case POP_OR_JUMP_EQ: {
 			int where_ = read_4bytes(pc + 1);
-			int top = stack[sp].ui32;
-			if (top != 0) {
+			int top = stack[sp - 1].ui32;
+			if (top == 0) {
 				pc = where_ - 1;
 			}
 			else {
@@ -920,8 +920,8 @@ void BytecodeExpression::execute(script_state* state, const Program* prog, progr
 
 		case POP_OR_JUMP_NEQ: {
 			int where_ = read_4bytes(pc + 1);
-			int top = stack[sp].ui32;
-			if (top == 0) {
+			int top = stack[sp-1].ui32;
+			if (top != 0) {
 				pc = where_ - 1;
 			}
 			else {

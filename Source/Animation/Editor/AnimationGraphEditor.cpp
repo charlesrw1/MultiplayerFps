@@ -304,7 +304,7 @@ void AnimationGraphEditor::close()
 	if (is_owning_editing_tree) {
 		delete editing_tree;
 	}
-	out.anim = Animator();
+	out.reset_animator();
 	editing_tree = nullptr;
 	name = "";
 	out.model = nullptr;
@@ -313,7 +313,7 @@ void AnimationGraphEditor::close()
 	open_save_popup = false;
 	reset_prop_editor_next_tick = false;
 	playback = graph_playback_state::stopped;
-
+	last_tick_had_game_running = false;
 	sel = selection_state();
 	drop_state = create_from_drop_state();
 	current_id = 0;
@@ -331,15 +331,21 @@ void AnimationGraphEditor::close()
 
 static std::string saved_settings = "";
 
-DECLARE_ENGINE_CMD(dumpdockini)
+DECLARE_ENGINE_CMD(dump_imgui_ini)
 {
-	saved_settings = ImGui::SaveIniSettingsToMemory();
-	sys_print("--------- Dump Ini Settings ---------\n");
-	sys_print(saved_settings.c_str());
+	if (args.size() != 2) {
+		sys_print("usage: dump_imgui_ini <file>");
+		return;
+	}
+	ImGui::SaveIniSettingsToDisk(args.at(1));
 }
-DECLARE_ENGINE_CMD(loaddockini)
+DECLARE_ENGINE_CMD(load_imgui_ini)
 {
-	ImGui::LoadIniSettingsFromMemory(saved_settings.c_str(), saved_settings.size());
+	if (args.size() != 2) {
+		sys_print("usage: load_imgui_ini <file>");
+		return;
+	}
+	ImGui::LoadIniSettingsFromDisk(args.at(1));
 }
 
 static Color32 to_color32(glm::vec4 v) {
@@ -1722,33 +1728,64 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	return &vec;
 }
 
+void AnimationGraphEditor::signal_going_to_game()
+{
+	compile_and_run();
+	if (out.obj.is_valid())
+		idraw->remove_obj(out.obj);
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+}
+
 void AnimationGraphEditor::tick(float dt)
 {
+
+	if(eng->get_state() == Engine_State::Idle)
 	{
+		if (last_tick_had_game_running) {
+			playback = graph_playback_state::stopped;
+			last_tick_had_game_running = false;
+			control_params.refresh_props();
+
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
+		}
+		
+
 		int x = 0, y = 0;
-		if (eng->game_focused && eng->get_state() != Engine_State::Game) {
+		if (eng->game_focused) {
 			SDL_GetRelativeMouseState(&x, &y);
 			out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 		}
+
+		if (!out.obj.is_valid())
+			out.obj = idraw->register_obj();
+
+		Render_Object ro;
+		ro.mesh = &out.model->mesh;
+		ro.mats = &out.model->mats;
+
+		if (get_playback_state() == graph_playback_state::running) {
+			out.get_local_animator().tick_tree_new(dt * g_slomo.real());
+		}
+		if (get_playback_state() != graph_playback_state::stopped) {
+			ro.transform = out.model->skeleton_root_transform;
+			ro.animator = &out.get_local_animator();
+		}
+
+		idraw->update_obj(out.obj, ro);
+
+		auto window_sz = eng->get_game_viewport_dimensions();
+		out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+	}
+	else if(eng->get_state() == Engine_State::Game) {
+		
+		if (!last_tick_had_game_running) {
+			playback = graph_playback_state::running;
+			last_tick_had_game_running = true;
+			control_params.refresh_props();
+		}
+		
 	}
 
-
-	Render_Object ro;
-	ro.mesh = &out.model->mesh;
-	ro.mats = &out.model->mats;
-	
-	if (get_playback_state() == graph_playback_state::running) {
-		out.anim.tick_tree_new(dt);
-	}
-	if (get_playback_state() != graph_playback_state::stopped) {
-		ro.transform = out.model->skeleton_root_transform;
-		ro.animator = &out.anim;
-	}
-
-	idraw->update_obj(out.obj, ro);
-
-	auto window_sz = eng->get_game_viewport_dimensions();
-	out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 }
 
 #include "Framework/StdVectorReflection.h"
@@ -1798,7 +1835,7 @@ void AnimationGraphEditor::compile_and_run()
 	bool good_to_run = compile_graph_for_playing();
 	get_tree()->post_load_init();
 	if (good_to_run) {
-		out.anim.initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
+		out.get_local_animator().initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
 		playback = graph_playback_state::running;
 	}
 }
@@ -1827,13 +1864,15 @@ void AnimationGraphEditor::try_load_preview_models()
 	out.model = mods.find_or_load(opt.preview_model.c_str());
 	out.set = anim_tree_man->find_set(opt.preview_set.c_str());
 	if(out.model && out.set)
-		out.anim.initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
+		out.get_local_animator().initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
 }
 
 void AnimationGraphEditor::open(const char* name)
 {
 	if (!is_initialized)
 		init();
+
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 
 	// close currently open document
 	close();
@@ -1893,7 +1932,6 @@ void AnimationGraphEditor::open(const char* name)
 
 	// load preview model and set and register renderable
 	try_load_preview_models();
-	out.obj = idraw->register_obj();
 
 	// refresh control_param editor
 	control_params.init_from_tree(get_tree()->params.get());
@@ -2096,4 +2134,22 @@ void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, 
 	int index = atoi(token.to_stack_string().c_str());
 	ASSERT(index >= 0 && index < context->tree->all_nodes.size());
 	*node_ptr = context->tree->all_nodes.at(index);
+}
+
+void GraphOutput::reset_animator()
+{
+	anim = Animator();
+}
+
+#include "Player.h"
+
+Animator* GraphOutput::get_animator()
+{
+	if (eng->get_state() == Engine_State::Game) {
+		Player* p = eng->get_local_player();
+		if (p && p->animator.get() && p->animator.get()->runtime_dat.cfg == ed.editing_tree) {
+			return p->animator.get();
+		}
+	}
+	return &anim;
 }

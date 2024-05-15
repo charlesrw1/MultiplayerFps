@@ -3,18 +3,22 @@
 #include "Game_Engine.h" // Debug::
 #include "Animation/Runtime/ControlParams.h"
 #include "Animation/AnimationUtil.h"
+#include "Player.h"
+
+#define FIND_VAR(x) x = vars.find(#x)
 
 void CharacterGraphDriver::on_init() {
 	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->params.get();
-	flMovex = vars.find("flMovex");
-	flMovey = vars.find("flMovey");
-	flSpeed = vars.find("flSpeed");
-	bCrouch = vars.find("bCrouch");
-	bJumping = vars.find("bJumping");
-	bFalling = vars.find("bFalling");
-	bMoving = vars.find("bMoving");
-	flAimx = vars.find("flAimx");
-	flAimy = vars.find("flAimy");
+
+	FIND_VAR(flAimx);
+	FIND_VAR(flAimy);
+	FIND_VAR(bRunning);
+	FIND_VAR(bFalling);
+	FIND_VAR(bJumping);
+	FIND_VAR(bCrouch);
+	FIND_VAR(flSpeed);
+
+
 
 	auto model = owner->get_model();
 	owner->get_controller(bone_controller_type::lhand).bone_index = model->bone_for_name("mixamorig:LeftHand");
@@ -34,8 +38,7 @@ void CharacterGraphDriver::on_update(float dt) {
 
 	if (!owner->owner) return;
 
-	Entity& player = *owner->owner;
-	bool mirrored = player.state & PMS_CROUCHING;
+	Player& player = *(Player*)owner->owner;
 
 	meshoffset = glm::vec3(0.f);
 
@@ -48,23 +51,22 @@ void CharacterGraphDriver::on_update(float dt) {
 	glm::vec2 side = glm::vec2(-face_dir.y, face_dir.x);
 	glm::vec2 relmovedir = glm::vec2(glm::dot(face_dir, groundvelocity), glm::dot(side, groundvelocity));
 
-	if (mirrored) relmovedir.y *= -1;
 
 	glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
 	glm::vec2 relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
 
-	ismoving = glm::length(player.velocity) > 0.1;
-	injump = player.state & PMS_JUMPING;
+	ismoving = glm::length(player.velocity) > 0.1 || glm::length(grndaccel) > 0.1;
+	injump = !player.is_on_ground();
 
 
 	auto& params = *owner->runtime_dat.cfg->params.get();
 	auto vars = &owner->runtime_dat.vars;
 
 
-	params.set_bool(vars, bMoving, ismoving);
-	params.set_bool(vars, bCrouch, (player.state & PMS_CROUCHING));
-	params.set_bool(vars, bJumping, player.state & PMS_JUMPING);
-	params.set_bool(vars, bFalling, !bool(player.state & PMS_GROUND));
+	params.set_bool(vars, bRunning, ismoving && player.is_on_ground());
+	params.set_bool(vars, bCrouch, player.is_crouching);
+	params.set_bool(vars, bJumping, player.action == Action_State::Jumped);
+	params.set_bool(vars, bFalling, player.action == Action_State::Falling);
 	params.set_float(vars, flSpeed,glm::length(relmovedir));
 	params.set_float(vars, flMovex ,relmovedir.x);
 	params.set_float(vars, flMovey, relmovedir.y);
@@ -73,6 +75,7 @@ void CharacterGraphDriver::on_update(float dt) {
 
 void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
 
+	return;
 	Pose* source = Pose_Pool::get().alloc(1);
 	*source = pose;
 	auto model = owner->get_model();

@@ -277,6 +277,7 @@ static bool read_remap_skeleton_table(DictParser& parser, StringView& str, Model
 		}
 
 		skeleton->bone_mirror_map.at(r) = l;
+		skeleton->bone_mirror_map.at(l) = r;
 
 		parser.read_string(str);
 
@@ -339,7 +340,81 @@ static bool read_mirror_skeleton_table(DictParser& parser, StringView& str, Mode
 	return true;
 }
 
+struct BoneWeightMask
+{
+	std::string name;
+	float weight=1.0;
+};
+
+static bool read_mask_table(DictParser& parser, StringView& str, Model_Skeleton* skel)
+{
+	if (!skel->source) return false;
+
+		auto mod = skel->source;
+	std::vector<int> num_children_per_bone;
+	num_children_per_bone.resize(mod->bones.size());
+	for (int i = 0; i < mod->bones.size(); i++) {
+		int count = 1;
+		for (int j = i+1; j < mod->bones.size(); j++) {
+
+			int parent = mod->bones[j].parent;
+			if (parent < i)
+				break;
+			count++;
+		}
+		num_children_per_bone[i] = count;
+	}
+
+
+	if (!parser.expect_list_start())
+		return false;
+	parser.read_string(str);
+	while (!parser.check_list_end(str) && !parser.is_eof())
+	{
+		std::string maskname = str.to_stack_string().c_str();
+		if (!parser.expect_item_start())
+			return false;
+
+		std::vector<BoneWeightMask> bonefilters;
+
+		parser.read_string(str);
+		while (!parser.check_item_end(str) && !parser.is_eof()) {
+			BoneWeightMask bwm;
+			bwm.name = std::string(str.str_start, str.str_len);
+			parser.read_float(bwm.weight);
+			bonefilters.push_back(bwm);
+			parser.read_string(str);
+		}
+
+		BonePoseMask mask_out;
+		mask_out.name = StringName(maskname.c_str());
+		mask_out.weight.resize(mod->bones.size(),0.f);
+		for (int i = 0; i < bonefilters.size(); i++) {
+
+			int bone_index = mod->bone_for_name(bonefilters[i].name.c_str());
+			if (bone_index == -1) {
+				printf("!!!no bone!!!\n");
+				continue;
+			}
+
+			int count = num_children_per_bone[bone_index];
+			for (int j = 0; j < count; j++) {
+				mask_out.weight[bone_index+j] = bonefilters[i].weight;
+			}
+		}
+
+		skel->masks.push_back(std::move(mask_out));
+
+
+
+		parser.read_string(str);
+	}
+
+	return parser.check_list_end(str);
+}
+
 // '{' already read
+
 static bool read_remap_skeleton(DictParser& parser, StringView& str, Model_Skeleton* skel)
 {
 	Model_Skeleton::Remap remap;
@@ -409,6 +484,10 @@ Model_Skeleton* Animation_Tree_Manager::find_skeleton(const char* name)
 				parser.read_string(str);
 			}
 
+		}
+		else if (str.cmp("masks")) {
+			if (!read_mask_table(parser, str, skeleton))
+				goto had_err;
 		}
 
 		parser.read_string(str);

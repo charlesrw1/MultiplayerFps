@@ -324,6 +324,40 @@ class Mirror_EdNode : public Base_EdNode
 	Mirror_Node_CFG* node = nullptr;
 };
 
+class Blend_Layered_EdNode : public Base_EdNode
+{
+	EDNODE_HEADER(Blend_Layered_EdNode);
+	MAKE_STANDARD_FUNCTIONS(
+		"Blend Layered",
+		BLEND_COLOR,
+		"placeholder",
+		2
+	);
+	MAKE_STANDARD_INIT();
+	MAKE_STANDARD_ADD_PROPS(Blend_Layered_EdNode);
+
+
+	void draw_node_topbar() override {
+		ImGui::TextColored(ImVec4(0.7, 0.7, 0.7, 1.0), maskname.c_str());
+		util_draw_param_for_topbar(node->param);
+	}
+
+	bool compile_my_data(const AgSerializeContext* ctx) override {
+		node->maskname = StringName(maskname.c_str());
+		return util_compile_default(&node->param, true, 2, this, ctx);
+	}
+
+	static PropertyInfoList* get_props() {
+		START_PROPS(Blend_Layered_EdNode)
+			REG_STDSTRING(maskname,PROP_DEFAULT),
+			REG_STRUCT_CUSTOM_TYPE(node, PROP_SERIALIZE, "SerializeNodeCFGRef"),
+		END_PROPS(Blend_Layered_EdNode)
+	}
+
+	std::string maskname = "";
+	Blend_Masked_CFG* node = nullptr;
+};
+
 class Sync_EdNode : public Base_EdNode
 {
 	EDNODE_HEADER(Sync_EdNode);

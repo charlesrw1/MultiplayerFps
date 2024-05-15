@@ -37,6 +37,21 @@
 	}
 }
 
+#include <algorithm>
+
+ template<uint32_t COUNT>
+ void sort_indicies(InlineVec<uint16_t, COUNT>& transition_idxs, const std::vector<State_Transition>& transitions)
+ {
+	 // fuck it
+	 std::vector<uint16_t> transition_idxs_vec(transition_idxs.size());
+	 memcpy(transition_idxs_vec.data(), transition_idxs.data(), transition_idxs.size() * sizeof(uint16_t));
+	 std::sort(transition_idxs_vec.begin(), transition_idxs_vec.end(), [&](const uint16_t a, const uint16_t b)->bool {
+		 return transitions[a].priority < transitions[b].priority && !transitions[a].is_continue_transition;
+	});
+	 memcpy((void*)transition_idxs.data(), transition_idxs_vec.data(), transition_idxs.size() * sizeof(uint16_t));
+
+ }
+
 bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 {
 	node->states.clear();
@@ -56,7 +71,13 @@ bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 
 	for (int i = 0; i < states.size(); i++) {
 		has_errors |= !states[i]->compile_data_for_statemachine(ctx);
+
 	}
+
+	for (int j = 0; j < node->states.size(); j++)
+		sort_indicies(node->states[j].transition_idxs, node->transitions);
+	sort_indicies(node->entry_transitions, node->transitions);
+
 
 	ASSERT(node_state_count == node->states.size());
 

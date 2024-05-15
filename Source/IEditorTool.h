@@ -19,4 +19,6 @@ public:
 
 	virtual void open(const char* name) = 0;
 	virtual void close() = 0;
+
+	virtual void signal_going_to_game() { }
 };
