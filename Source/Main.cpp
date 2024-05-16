@@ -742,6 +742,8 @@ DECLVAR("thirdperson", g_thirdperson, 0);
 DECLVAR("fakemovedebug", g_fakemovedebug, 0);
 DECLVAR("drawdebugmenu", g_drawdebugmenu, 1);
 DECLVAR("drawimguidemo", g_drawimguidemo, 1);
+DECLVAR("debug_skeletons", g_debug_skeletons, 1);
+DECLVAR("debug_grid", g_draw_grid, 1);
 
 
 DECLARE_ENGINE_CMD(spawn_npc)
@@ -1220,6 +1222,8 @@ ImNodesContext* ImNodesCreateContext()
 
 void Game_Engine::init()
 {
+	sys_print("--------- Initializing Engine ---------\n");
+
 	program_time_start = GetTime();
 
 	memset(keys, 0, sizeof(keys));

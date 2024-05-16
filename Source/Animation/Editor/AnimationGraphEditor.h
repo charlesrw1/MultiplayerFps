@@ -455,7 +455,13 @@ public:
 			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
 			REG_STDSTRING(opt.preview_model,PROP_EDITABLE),
-			REG_STDSTRING(opt.preview_set, PROP_EDITABLE)
+			REG_STDSTRING(opt.preview_set, PROP_EDITABLE),
+			REG_FLOAT(out.camera.position.x,PROP_SERIALIZE,""),
+			REG_FLOAT(out.camera.position.y, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.position.z, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.front.x, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.front.y, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.front.z, PROP_SERIALIZE, ""),
 		END_PROPS(AnimationGraphEditor)
 	}
 

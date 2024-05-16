@@ -135,7 +135,7 @@ PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t fl
 	else if (bytes == 4)
 		prop.type = core_type_id::Int32;
 	else if (bytes == 8)
-		prop.type == core_type_id::Int64;
+		prop.type = core_type_id::Int64;
 	else
 		assert(0);
 
@@ -204,7 +204,7 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 	case core_type_id::Int16:
 	case core_type_id::Int32:
 	case core_type_id::Int64:
-		value_str = string_format("%d", prop.get_int(ptr));
+		value_str = string_format("%lld", prop.get_int(ptr));
 		break;
 
 	case core_type_id::Float:
@@ -366,7 +366,7 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	case core_type_id::Int16:
 	case core_type_id::Int32:
 	case core_type_id::Int64:{
-		int i = atoi(tok.to_stack_string().c_str());
+		uint64_t i = _atoi64(tok.to_stack_string().c_str());
 		prop->set_int(ptr, i);
 	}break;
 

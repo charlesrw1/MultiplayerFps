@@ -20,7 +20,7 @@ type "Statemachine_Node_CFG"
 }
 {
 "transition_idxs"  [
- 6   5   4  ]
+ 4   5   6  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
@@ -89,13 +89,13 @@ type "Statemachine_Node_CFG"
 "priority"  "0"
 }
 {
-"transition_state"  "0"
+"transition_state"  "4"
 "automatic_transition_rule"  "0"
 "transition_time"  "0.200000"
-"script_uncompilied"  "( not bRunning )"
+"script_uncompilied"  "bJumping"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "1"
-"priority"  "1"
+"can_be_interrupted"  "0"
+"priority"  "-1"
 }
 {
 "transition_state"  "2"
@@ -107,13 +107,13 @@ type "Statemachine_Node_CFG"
 "priority"  "0"
 }
 {
-"transition_state"  "4"
+"transition_state"  "0"
 "automatic_transition_rule"  "0"
 "transition_time"  "0.200000"
-"script_uncompilied"  "bJumping"
+"script_uncompilied"  "( not bRunning )"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "0"
-"priority"  "255"
+"can_be_interrupted"  "1"
+"priority"  "1"
 }
 {
 "transition_state"  "1"
@@ -236,10 +236,24 @@ type "Clip_Node_CFG"
 {
 type "Blend_Masked_CFG"
 "input"  [
- 0   8  ]
-"meshspace_rotation_blend"  "0"
+ 9   8  ]
+"meshspace_rotation_blend"  "1"
 "param"  "3"
-"maskname"  "1185796983"
+"maskname"  "-2358917160150117513"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::remove"
+"rm[1]"  "rm::remove"
+"rm[2]"  "rm::remove"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "stand_unqeuip_idle"
 }
 {
 type "Clip_Node_CFG"
@@ -248,6 +262,20 @@ type "Clip_Node_CFG"
 "rm[0]"  "rm::keep"
 "rm[1]"  "rm::keep"
 "rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "stand_rifle_aim_c"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::remove"
+"rm[1]"  "rm::remove"
+"rm[2]"  "rm::remove"
 "loop"  "1"
 "speed"  "1.000000"
 "start_frame"  "0"
@@ -298,33 +326,53 @@ type "Clip_Node_CFG"
 "default_f"  "0.000000"
 "enum_idx"  "65535"
 }
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bMirrorUpper"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
 ]
 }
 }
  editor
 {
 "rootstate" {
-"current_id"  "45"
+"current_id"  "50"
 "current_layer"  "15"
 "default_editor"  "[editor]
-panning=8,15
+panning=262,24
 
 [node.0]
-origin=21,-80
+origin=280,137
 
 [node.8]
-origin=-418,-105
+origin=-443,-118
 
 [node.43]
-origin=-212,-37
+origin=-114,154
 
-[node.44]
-origin=-455,39
+[node.46]
+origin=-336,337
+
+[node.47]
+origin=-347,77
+
+[node.49]
+origin=-362,229
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
+"out.camera.position.x"  "-0.042893"
+"out.camera.position.y"  "1.595445"
+"out.camera.position.z"  "1.269367"
+"out.camera.front.x"  "0.146600"
+"out.camera.front.y"  "-0.218230"
+"out.camera.front.z"  "-0.964823"
 }
 nodes [
 {
@@ -524,9 +572,21 @@ type "Blend_Layered_EdNode"
 }
 {
 type "Clip_EdNode"
-"id"  "44"
+"id"  "46"
 "graph_layer"  "0"
 "node"  "8"
+}
+{
+type "Clip_EdNode"
+"id"  "47"
+"graph_layer"  "0"
+"node"  "9"
+}
+{
+type "Clip_EdNode"
+"id"  "49"
+"graph_layer"  "0"
+"node"  "10"
 }
 ]
 }

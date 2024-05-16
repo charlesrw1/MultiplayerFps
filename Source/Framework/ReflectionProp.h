@@ -69,8 +69,8 @@ struct PropertyInfo {
 	float get_float(void* ptr) const;
 	void set_float(void* ptr, float f);
 
-	int get_int(void* ptr) const;
-	void set_int(void* ptr, int i);
+	uint64_t get_int(void* ptr) const;
+	void set_int(void* ptr, uint64_t i);
 
 	bool can_edit() const {
 		return flags & PROP_EDITABLE;

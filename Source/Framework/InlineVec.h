@@ -130,7 +130,8 @@ private:
         else {
             T* ptr = cur_p;
             T* new_ptr = new_p;
-            for (; ptr != end_cur_p; ptr++, new_ptr++) {
+            T* end_new_p = new_p + capacity;
+            for (; ptr != end_cur_p && new_ptr != end_new_p; ptr++, new_ptr++) {
                 new(new_ptr)T(std::move(*ptr));
             }
         }

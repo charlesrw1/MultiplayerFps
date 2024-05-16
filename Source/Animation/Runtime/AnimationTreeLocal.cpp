@@ -466,10 +466,10 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  PropertyInfoList* Blend_Masked_CFG::get_props()
  {
 	 START_PROPS(Blend_Masked_CFG)
-		 REG_BOOL(meshspace_rotation_blend,PROP_DEFAULT,"0"),
-		 REG_INT_W_CUSTOM(param,PROP_DEFAULT,"-1","AG_PARAM_FINDER"),
-		 REG_INT(maskname,PROP_SERIALIZE,"0")
-	END_PROPS(Blend_Masked_CFG)
+		 REG_BOOL(meshspace_rotation_blend, PROP_DEFAULT, "0"),
+		 REG_INT_W_CUSTOM(param, PROP_DEFAULT, "-1", "AG_PARAM_FINDER"),
+		 REG_INT(maskname, PROP_SERIALIZE, "0")
+	 END_PROPS(Blend_Masked_CFG)
  }
 
  PropertyInfoList* Scale_By_Rootmotion_CFG::get_props()
@@ -603,11 +603,11 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 *(float*)((char*)ptr + offset) = f;
  }
 
- int PropertyInfo::get_int(void* ptr) const
+ uint64_t PropertyInfo::get_int(void* ptr) const
  {
 	 ASSERT(is_integral_type());
 	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		 return *(uint8_t*)((char*)ptr + offset);
+		 return *(int8_t*)((char*)ptr + offset);
 	 }
 	 else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
 		 return *(uint16_t*)((char*)ptr + offset);
@@ -624,11 +624,11 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 }
  }
 
- void PropertyInfo::set_int(void* ptr, int i)
+ void PropertyInfo::set_int(void* ptr, uint64_t i)
  {
 	 ASSERT(is_integral_type());
 	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		 *(uint8_t*)((char*)ptr + offset) = i;
+		 *(int8_t*)((char*)ptr + offset) = i;
 	 }
 	 else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
 		 *(uint16_t*)((char*)ptr + offset) = i;
@@ -779,6 +779,15 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 END_PROPS(ControlParam_CFG)
  }
 
+#include "Game_Engine.h"
+#include "imgui.h"
+ static float mask_weight = 0.0;
+ void somemenulol()
+ {
+	 ImGui::SliderFloat("w", &mask_weight, 0.0, 1.0);
+ }
+ static AddToDebugMenu men("daf", somemenulol);
+
  bool Blend_Masked_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
 	 auto rt = get_rt<RT_TYPE>(ctx);
@@ -786,14 +795,26 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 return input[0]->get_pose(ctx, pose);
 	 auto& mask = ctx.set->src_skeleton->masks[rt->mask_index];
 	
-	 Pose* pose_layer = Pose_Pool::get().alloc(1);
-	 bool ret = input[0]->get_pose(ctx, pose);
-	 ret &= input[1]->get_pose(ctx, pose.set_pose(pose_layer));
+	 if (meshspace_rotation_blend) {
+		 Pose* base_layer = Pose_Pool::get().alloc(1);
+		 bool ret = input[1]->get_pose(ctx, pose);
+		 ret &= input[0]->get_pose(ctx, pose.set_pose(base_layer));
+		 util_global_blend(ctx.set->src_skeleton,base_layer, pose.pose, mask_weight, mask.weight);
+		 Pose_Pool::get().free(1);
+		 return ret;
+	 }
 
-	 util_blend_with_mask(ctx.num_bones(), *pose_layer, *pose.pose, 1.0, mask.weight);
 
-	 Pose_Pool::get().free(1);
+	 // nase
 
-	 return ret;
+	 else {
+		 Pose* layer = Pose_Pool::get().alloc(1);
+		 bool ret = input[0]->get_pose(ctx, pose);
+		 ret &= input[1]->get_pose(ctx, pose.set_pose(layer));
+		 util_blend_with_mask(ctx.num_bones(), *layer, *pose.pose, 1.0, mask.weight);
+		 Pose_Pool::get().free(1);
+		 return ret;
+	 }
+
 
  }

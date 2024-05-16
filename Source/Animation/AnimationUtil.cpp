@@ -1,5 +1,35 @@
 #include "AnimationUtil.h"
 
+#include "Debug.h"
+
+static glm::mat4 debug_animation_transform = glm::mat4(1);
+
+void Animation_Debug::set_local_to_world(glm::mat4 transform) {
+	debug_animation_transform = transform;
+}
+void Animation_Debug::push_line(const glm::mat4& transform_me, const glm::mat4& transform_parent, bool has_parent) {
+
+	const auto& transform = debug_animation_transform;
+	vec3 org = transform * transform_me[3];
+	Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
+	for (int i = 0; i < 3; i++) {
+		vec3 dir = glm::mat3(transform) * transform_me[i];
+		dir = normalize(dir);
+		Debug::add_line(org, org + dir * 0.1f, colors[i], -1.f, false);
+	}
+
+	if (has_parent) {
+		vec3 parent_org = transform * transform_parent[3];
+		Debug::add_line(org, parent_org, COLOR_PINK, -1.f, false);
+	}
+
+}
+void Animation_Debug::push_sphere(const glm::vec3& p, float radius) {
+	glm::vec3 org = debug_animation_transform * glm::vec4(p, 1.0);
+	Debug::add_sphere(org, radius, COLOR_GREEN,-1.f,false);
+}
+
+
 void util_subtract(int bonecount, const Pose& reference, Pose& source)
 {
 	for (int i = 0; i < bonecount; i++) {
@@ -26,6 +56,238 @@ void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, c
 		b.q[i] = glm::normalize(b.q[i]);
 		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor*mask[i]);
 	}
+}
+
+static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
+{
+	return to * glm::inverse(from);
+}
+static glm::quat quat_blend_additive(const glm::quat& a, const glm::quat& b, float t)
+{
+	glm::quat target = b * a;
+	return glm::slerp(a, target, t);
+}
+
+
+void util_global_bl34234end(const Model_Skeleton* skel, const Pose* a, Pose* b, float factor, const std::vector<float>& mask)
+{
+	const auto& bone_vec = skel->source->bones;
+	const int bonecount = bone_vec.size();
+
+	glm::mat4* matricies1 = new glm::mat4[256];
+	glm::mat4* matricies2 = new glm::mat4[256];
+
+
+	util_localspace_to_meshspace_ptr(*a, matricies1, skel->source);
+	util_localspace_to_meshspace_ptr(*b, matricies2, skel->source);
+
+
+
+
+
+
+
+	delete[] matricies1;
+	delete[] matricies2;
+
+	// now do a blend between base and global blened result
+	//util_blend(bonecount, *a, *b, 1.0 -factor);
+}
+
+#include "Framework/Config.h"
+
+static glm::quat forward_dir = glm::quat(0.0,0,0,1);
+static bool face_foward = true;
+static bool apply_to_local = false;
+static bool apply_to_all = false;
+#include "imgui.h"
+#include "Game_Engine.h"
+void menu1235()
+{
+	if(ImGui::Begin("abc")) {
+		ImGui::SliderFloat4("dir", &forward_dir.x,-1,1);
+		ImGui::Checkbox("ff", &face_foward);
+		ImGui::Checkbox("apply_to_local", &apply_to_local);
+		ImGui::Checkbox("apply_to_all", &apply_to_all);
+
+		forward_dir = glm::normalize(forward_dir);
+	} ImGui::End();
+
+	glm::mat4 transform = glm::mat4_cast(forward_dir);
+	Debug::add_line(vec3(0.f), transform[0], COLOR_RED, -1.f, false);
+	Debug::add_line(vec3(0.f), transform[1], COLOR_GREEN, -1.f, false);
+	Debug::add_line(vec3(0.f), transform[2], COLOR_BLUE, -1.f, false);
+
+
+}
+
+static AddToDebugMenu aeasdf("meun", menu1235);
+
+
+static void draw_skeleton_util_debug(const glm::mat4* bones,const Model* model, int count, float line_len, const glm::mat4& transform)
+{
+
+	for (int index = 0; index < count; index++) {
+		vec3 org = transform * bones[index][3];
+		Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
+		for (int i = 0; i < 3; i++) {
+			vec3 dir = glm::mat3(transform) * bones[index][i];
+			dir = normalize(dir);
+			Debug::add_line(org, org + dir * line_len, colors[i], -1.f, false);
+		}
+
+		if (model->bones[index].parent != -1) {
+			vec3 parent_org = transform * bones[model->bones[index].parent][3];
+			Debug::add_line(org, parent_org, COLOR_PINK, -1.f, false);
+		}
+	}
+}
+
+void util_meshspace_to_localspace(const glm::mat4* mesh, const Model* mod, Pose* out)
+{
+	const int count = mod->bones.size();
+	for (int i = 0; i < count; i++) {
+		auto& bone = mod->bones[i];
+		int parent = bone.parent;
+
+		glm::mat4 matrix = mesh[i];
+		if (parent != -1) {
+			matrix =  glm::inverse(mesh[parent])*matrix;
+		}
+
+		out->pos[i] = matrix[3];
+		out->q[i] = glm::quat_cast(matrix);
+	}
+}
+
+void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, float factor, const std::vector<float>& mask)
+{
+	const auto& bone_vec = skel->source->bones;
+	const int bonecount = bone_vec.size();
+
+	std::vector<glm::mat4> globalspace_base(bonecount);
+	util_localspace_to_meshspace_ptr(*a, globalspace_base.data(), skel->source);
+
+
+	std::vector<glm::mat4> globalspace_layer(bonecount);
+	util_localspace_to_meshspace_ptr(*b, globalspace_layer.data(), skel->source);
+
+	for (int j = 0; j < bonecount; j++) {
+		if (mask[j] > 0.5) {
+			//glm::vec3 translation = globalspace_base[j][3];
+			globalspace_base[j] = globalspace_layer[j];
+			//globalspace_base[j][3] = glm::vec4(translation, 1.0);
+		}
+	}
+
+
+	util_meshspace_to_localspace(globalspace_base.data(), skel->source, b);
+	return;
+
+
+	InlineVec<glm::quat, 128> baserotations;
+	InlineVec<glm::quat, 128> layerrotations;
+	InlineVec<glm::quat, 128> output_rots;
+	InlineVec<bool, 128> booleans;
+	baserotations.resize(bonecount);
+	layerrotations.resize(bonecount);
+	output_rots.resize(bonecount);
+	booleans.resize(bonecount, false);
+
+	Pose* out = Pose_Pool::get().alloc(1);
+
+
+	for (int i = 0; i < bonecount; i++) {
+		const int parent = bone_vec[i].parent;
+		if (parent == -1) {
+			baserotations[i] = a->q[i];
+
+			layerrotations[i] = b->q[i];
+		}
+		else {
+			baserotations[i] = a->q[i] * baserotations[parent];
+
+			layerrotations[i] = b->q[i] * layerrotations[parent];
+			
+		}
+
+	}
+
+	for (int i = 0; i < bonecount; i++) {
+		const int parent = bone_vec[i].parent;
+		const float weight = mask[i];
+
+		out->pos[i] = glm::mix(a->pos[i], b->pos[i], weight);
+		
+		output_rots[i] = glm::slerp(baserotations[i], layerrotations[i], weight);
+
+		//if((weight > 0.5||apply_to_all) && face_foward)
+		//	output_rots[i] = forward_dir;
+
+		booleans[i] = true;
+		if (parent != -1) {
+			ASSERT(booleans[parent]);
+
+			//glm::mat4 transform = glm::mat4_cast(output_rots[parent]);
+			//transform[3] = glm::vec4(b->pos[parent],1.f);
+			//auto inv = glm::inverse(transform);
+			//
+			//glm::mat4 transform2 = glm::mat4_cast(output_rots[i]);
+			//transform2[3] = glm::vec4(b->pos[i], 1.f);
+			//
+			//glm::quat localrot = glm::quat_cast(transform2 * inv);
+
+			glm::quat localrot = quat_delta(output_rots[parent], output_rots[i]);
+			
+			//if ((weight > 0.5 || apply_to_all)&& apply_to_local)
+			//	localrot = forward_dir;
+			
+			out->q[i] = localrot;
+		}
+		else {
+			out->q[i] = output_rots[i];
+		}
+
+	}
+
+
+#if 0
+	glm::mat4* bone_to_world = new glm::mat4[256];
+
+	for (int i = 0; i < bonecount; i++) {
+		const int parent = bone_vec[i].parent;
+		const float weight = mask[i];
+
+
+		b->pos[i] = glm::mix(a->pos[i], b->pos[i], weight);
+		output_rots[i] = glm::slerp(baserotations[i], layerrotations[i], weight);
+
+		bone_to_world[i] =  glm::mat4_cast(output_rots[i]);
+		bone_to_world[i][3] = glm::vec4(b->pos[i], 1.0);
+
+		if (parent != -1) {
+
+			auto inv = glm::inverse(bone_to_world[parent]);
+
+			auto local = bone_to_world[i]*inv;
+
+			b->q[i] = glm::quat_cast(local);
+		}
+		else {
+			b->q[i] = glm::quat_cast(bone_to_world[i]);
+		}
+
+	}
+	delete[] bone_to_world;
+#endif
+
+
+	* b = *out;
+
+	Pose_Pool::get().free(1);
+
+	// now do a blend between base and global blened result
+	//util_blend(bonecount, *a, *b, 1.0 -factor);
 }
 
 // base = lerp(base,base+additive,f)

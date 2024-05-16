@@ -239,8 +239,8 @@ void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_mat
 			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
 		}
 	}
-	for (int i = 0; i < model->bones.size(); i++)
-		out_bone_matricies[i] =  out_bone_matricies[i];
+	//for (int i = 0; i < model->bones.size(); i++)
+	//	out_bone_matricies[i] =  out_bone_matricies[i];
 }
 
 #include "imgui.h"

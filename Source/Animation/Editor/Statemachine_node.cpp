@@ -1,4 +1,5 @@
 #include "Statemachine_node.h"
+#include <algorithm>
 
  void Statemachine_EdNode::init() {
 	bool is_create = util_create_or_ensure(node);
@@ -37,7 +38,6 @@
 	}
 }
 
-#include <algorithm>
 
  template<uint32_t COUNT>
  void sort_indicies(InlineVec<uint16_t, COUNT>& transition_idxs, const std::vector<State_Transition>& transitions)

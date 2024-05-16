@@ -39,6 +39,7 @@ static const int SHADOWMAP_LOC = 11;
 static const int CAUSTICS_LOC = 12;
 static const int SSAO_TEX_LOC = 8;
 
+extern Auto_Config_Var g_debug_skeletons;
 
 
 // Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
@@ -866,6 +867,9 @@ void imgui_stat_hook()
 
 void Renderer::init()
 {
+	sys_print("--------- Initializing Renderer ---------\n");
+
+
 	bool supports_compression = false;
 	bool supports_sprase_tex = false;
 	bool supports_bindless = false;
@@ -1894,6 +1898,12 @@ void Render_Scene::build_scene_data()
 				}
 
 				if (proxy.animator) {
+
+					if (g_debug_skeletons.integer()) {
+						draw_skeleton(proxy.animator, 0.05, proxy.transform);
+					}
+
+
 					gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
 					auto& mats = proxy.animator->get_matrix_palette();
 
@@ -2638,6 +2648,24 @@ void draw_debug_shapes()
 	builder.Free();
 }
 
+extern Auto_Config_Var g_draw_grid;
+
+void draw_debug_grid()
+{
+	static MeshBuilder mb;
+	static bool init = true;
+	if (init) {
+		mb.Begin();
+		for (int x = 0; x < 11; x++) {
+			mb.PushLine(glm::vec3(-5, 0, x - 5), glm::vec3(5, 0, x - 5), COLOR_WHITE);
+			mb.PushLine(glm::vec3(x - 5, 0, -5), glm::vec3(x - 5, 0, 5), COLOR_WHITE);
+		}
+		mb.End();
+		init = false;
+	}
+	glEnable(GL_DEPTH_TEST);
+	mb.Draw(GL_LINES);
+}
 
 void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 {
@@ -2743,6 +2771,9 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 
 	if (tool)
 		tool->overlay_draw();
+
+	if (g_draw_grid.integer())
+		draw_debug_grid();
 
 	glCheckError();
 	

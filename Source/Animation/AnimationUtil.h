@@ -6,6 +6,14 @@ using glm::vec3;
 using std::vector;
 using glm::quat;
 
+class Animation_Debug
+{
+public:
+	static void set_local_to_world(glm::mat4 transform);
+	static void push_line(const glm::mat4& transform_me, const glm::mat4& transform_parent, bool has_parent);
+	static void push_sphere(const glm::vec3& p, float radius);
+};
+
 
 inline float LawOfCosines(float a, float b, float c)
 {
@@ -17,7 +25,7 @@ inline float MidLerp(float min, float max, float mid_val)
 	return (mid_val - min) / (max - min);
 }
 
-
+void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const Model* model);
 void util_subtract(int bonecount, const Pose& reference, Pose& source);
 // b = lerp(a,b,f)
 void util_blend(int bonecount, const Pose& a, Pose& b, float factor);
@@ -27,6 +35,10 @@ void util_add(int bonecount, const Pose& additive, Pose& base, float fac);
 // b = lerp(a,b,f)
 void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, const std::vector<float>& mask);
 
+// a = base pose
+// b = layered pose
+// returns output in b
+void util_global_blend(const Model_Skeleton* skel,const Pose* a,  Pose* b, float factor,const std::vector<float>& mask);
 
 void util_twobone_ik(
 	const vec3& a, const vec3& b, const vec3& c,
