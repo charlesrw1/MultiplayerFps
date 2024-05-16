@@ -459,7 +459,8 @@ std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstan
 			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
 			
 			in.read_string(tok);	// ERROR
-			ASSERT(0);
+			in.read_string(tok);
+			//ASSERT(0);
 			continue;
 		}
 

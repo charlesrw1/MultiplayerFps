@@ -793,6 +793,14 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 auto rt = get_rt<RT_TYPE>(ctx);
 	 if(rt->mask_index==-1)
 		 return input[0]->get_pose(ctx, pose);
+
+
+	 bool b = ctx.get_bool(param);
+
+	 if (!b) {
+		 return input[0]->get_pose(ctx, pose);
+	 }
+
 	 auto& mask = ctx.set->src_skeleton->masks[rt->mask_index];
 	
 	 if (meshspace_rotation_blend) {

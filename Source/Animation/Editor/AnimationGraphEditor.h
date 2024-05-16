@@ -459,9 +459,9 @@ public:
 			REG_FLOAT(out.camera.position.x,PROP_SERIALIZE,""),
 			REG_FLOAT(out.camera.position.y, PROP_SERIALIZE, ""),
 			REG_FLOAT(out.camera.position.z, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.front.x, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.front.y, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.front.z, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.yaw, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.pitch, PROP_SERIALIZE, ""),
+			REG_FLOAT(out.camera.move_speed, PROP_SERIALIZE, ""),
 		END_PROPS(AnimationGraphEditor)
 	}
 

@@ -1,7 +1,7 @@
 "runtime" {
 "rootdata" {
-"root"  "7"
-"data_used"  "40"
+"root"  "10"
+"data_used"  "120"
 "graph_is_valid"  "1"
 }
 nodes [
@@ -16,7 +16,7 @@ type "Statemachine_Node_CFG"
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
-"tree"  "1"
+"tree"  "22"
 }
 {
 "transition_idxs"  [
@@ -24,7 +24,7 @@ type "Statemachine_Node_CFG"
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
-"tree"  "2"
+"tree"  "12"
 }
 {
 "transition_idxs"  [
@@ -32,23 +32,47 @@ type "Statemachine_Node_CFG"
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
-"tree"  "4"
+"tree"  "3"
 }
 {
 "transition_idxs"  [
- 8   9  ]
-"state_duration"  "-1.000000"
-"wait_until_finish"  "0"
-"is_end_state"  "0"
-"tree"  "6"
-}
-{
-"transition_idxs"  [
- 10  ]
+ 8   9   10  ]
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
 "tree"  "5"
+}
+{
+"transition_idxs"  [
+ 11  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "4"
+}
+{
+"transition_idxs"  [
+ 12   13  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "13"
+}
+{
+"transition_idxs"  [
+ 14  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "14"
+}
+{
+"transition_idxs"  [
+ 15  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "21"
 }
 ]
 "transitions"  [
@@ -64,35 +88,44 @@ type "Statemachine_Node_CFG"
 {
 "transition_state"  "1"
 "automatic_transition_rule"  "0"
-"transition_time"  "0.200000"
+"transition_time"  "0.300000"
 "script_uncompilied"  "bRunning"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "1"
+"can_be_interrupted"  "0"
 "priority"  "0"
 }
 {
 "transition_state"  "3"
 "automatic_transition_rule"  "0"
 "transition_time"  "0.300000"
-"script_uncompilied"  "bFalling"
+"script_uncompilied"  "( or bFalling bJumping )"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
 }
 {
-"transition_state"  "4"
+"transition_state"  "6"
 "automatic_transition_rule"  "0"
 "transition_time"  "0.200000"
-"script_uncompilied"  "bJumping"
+"script_uncompilied"  "bInCover"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
 }
 {
-"transition_state"  "4"
+"transition_state"  "3"
 "automatic_transition_rule"  "0"
-"transition_time"  "0.200000"
-"script_uncompilied"  "bJumping"
+"transition_time"  "0.200001"
+"script_uncompilied"  "( or bJumping bFalling )"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "-2"
+}
+{
+"transition_state"  "5"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.100000"
+"script_uncompilied"  "( not bRunning )"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "-1"
@@ -107,15 +140,6 @@ type "Statemachine_Node_CFG"
 "priority"  "0"
 }
 {
-"transition_state"  "0"
-"automatic_transition_rule"  "0"
-"transition_time"  "0.200000"
-"script_uncompilied"  "( not bRunning )"
-"is_continue_transition"  "0"
-"can_be_interrupted"  "1"
-"priority"  "1"
-}
-{
 "transition_state"  "1"
 "automatic_transition_rule"  "1"
 "transition_time"  "0.200000"
@@ -123,6 +147,15 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+}
+{
+"transition_state"  "7"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  "( and bBigFall ( and ( not bFalling ) ( not bJumping ) ) )"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "-1"
 }
 {
 "transition_state"  "1"
@@ -139,7 +172,7 @@ type "Statemachine_Node_CFG"
 "transition_time"  "0.200000"
 "script_uncompilied"  "( and ( not bFalling ) ( not bJumping ) )"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "1"
+"can_be_interrupted"  "0"
 "priority"  "0"
 }
 {
@@ -151,23 +184,45 @@ type "Statemachine_Node_CFG"
 "can_be_interrupted"  "1"
 "priority"  "0"
 }
+{
+"transition_state"  "1"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.300000"
+"script_uncompilied"  "bRunning"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "-1"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+"can_be_interrupted"  "1"
+"priority"  "0"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  "( not bInCover )"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "0"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+"can_be_interrupted"  "0"
+"priority"  "0"
+}
 ]
 "entry_transitions"  [
  0  ]
-}
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
-"rm[2]"  "rm::keep"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "stand_rifle_aim_idle"
 }
 {
 type "Clip_Node_CFG"
@@ -181,7 +236,7 @@ type "Clip_Node_CFG"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "stand_rifle_walk_n"
+"clip_name"  "run_forward_unequip"
 }
 {
 type "Clip_Node_CFG"
@@ -200,7 +255,7 @@ type "Clip_Node_CFG"
 {
 type "Mirror_Node_CFG"
 "input"  [
- 3  ]
+ 2  ]
 "damp_time"  "0.100000"
 "param"  "2"
 "store_value_on_reset"  "1"
@@ -231,29 +286,7 @@ type "Clip_Node_CFG"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "midair_fall"
-}
-{
-type "Blend_Masked_CFG"
-"input"  [
- 9   8  ]
-"meshspace_rotation_blend"  "1"
-"param"  "3"
-"maskname"  "-2358917160150117513"
-}
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::remove"
-"rm[1]"  "rm::remove"
-"rm[2]"  "rm::remove"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "stand_unqeuip_idle"
+"clip_name"  "falling"
 }
 {
 type "Clip_Node_CFG"
@@ -267,7 +300,7 @@ type "Clip_Node_CFG"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "stand_rifle_aim_c"
+"clip_name"  "stand_rifle_aim_l"
 }
 {
 type "Clip_Node_CFG"
@@ -281,7 +314,319 @@ type "Clip_Node_CFG"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "stand_unqeuip_idle"
+"clip_name"  "Armature|mixamo.com|Layer0"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::remove"
+"rm[1]"  "rm::remove"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "run_forward_unequip"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::remove"
+"rm[1]"  "rm::remove"
+"rm[2]"  "rm::keep"
+"loop"  "0"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "run_to_stop_unequip"
+}
+{
+type "Blend_Masked_CFG"
+"input"  [
+ 0   11  ]
+"meshspace_rotation_blend"  "0"
+"param"  "5"
+"maskname"  "-3228084067690520019"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "0.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "stand_rifle_run_n"
+}
+{
+type "Mirror_Node_CFG"
+"input"  [
+ 1  ]
+"damp_time"  "0.100000"
+"param"  "2"
+"store_value_on_reset"  "0"
+}
+{
+type "Mirror_Node_CFG"
+"input"  [
+ 9  ]
+"damp_time"  "0.100000"
+"param"  "6"
+"store_value_on_reset"  "1"
+}
+{
+type "Statemachine_Node_CFG"
+"input"  [
+]
+"states"  [
+{
+"transition_idxs"  [
+ 1  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "15"
+}
+{
+"transition_idxs"  [
+ 2  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "20"
+}
+]
+"transitions"  [
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+"can_be_interrupted"  "1"
+"priority"  "0"
+}
+{
+"transition_state"  "1"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  "bRunning"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "0"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  "( not bRunning )"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "0"
+}
+]
+"entry_transitions"  [
+ 0  ]
+}
+{
+type "Mirror_Node_CFG"
+"input"  [
+ 17  ]
+"damp_time"  "0.000000"
+"param"  "8"
+"store_value_on_reset"  "0"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "cover_idle"
+}
+{
+type "Blend_Node_CFG"
+"input"  [
+ 16   18  ]
+"param"  "9"
+"damp_factor"  "0.250000"
+"store_value_on_reset"  "0"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "cover_idle_low"
+}
+{
+type "Mirror_Node_CFG"
+"input"  [
+ 20  ]
+"damp_time"  "0.100000"
+"param"  "8"
+"store_value_on_reset"  "0"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::remove"
+"rm[1]"  "rm::remove"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "cover_move_left"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "0"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "big_fall"
+}
+{
+type "Statemachine_Node_CFG"
+"input"  [
+]
+"states"  [
+{
+"transition_idxs"  [
+ 1  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "26"
+}
+{
+"transition_idxs"  [
+ 2  ]
+"state_duration"  "-1.000000"
+"wait_until_finish"  "0"
+"is_end_state"  "0"
+"tree"  "23"
+}
+]
+"transitions"  [
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+"can_be_interrupted"  "1"
+"priority"  "0"
+}
+{
+"transition_state"  "1"
+"automatic_transition_rule"  "0"
+"transition_time"  "0.200000"
+"script_uncompilied"  "( or bTurnInPlaceRight bTurnInPlaceLeft )"
+"is_continue_transition"  "0"
+"can_be_interrupted"  "0"
+"priority"  "0"
+}
+{
+"transition_state"  "0"
+"automatic_transition_rule"  "1"
+"transition_time"  "0.200000"
+"script_uncompilied"  ""
+"is_continue_transition"  "1"
+"can_be_interrupted"  "0"
+"priority"  "0"
+}
+]
+"entry_transitions"  [
+ 0  ]
+}
+{
+type "Blend_Node_CFG"
+"input"  [
+ 24   25  ]
+"param"  "11"
+"damp_factor"  "0.100000"
+"store_value_on_reset"  "1"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "0"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "turn_left"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "0"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "turn_right"
+}
+{
+type "Mirror_Node_CFG"
+"input"  [
+ 27  ]
+"damp_time"  "0.100000"
+"param"  "6"
+"store_value_on_reset"  "1"
+}
+{
+type "Clip_Node_CFG"
+"input"  [
+]
+"rm[0]"  "rm::keep"
+"rm[1]"  "rm::keep"
+"rm[2]"  "rm::keep"
+"loop"  "1"
+"speed"  "1.000000"
+"start_frame"  "0"
+"allow_sync"  "0"
+"can_be_leader"  "1"
+"clip_name"  "stand_idle_2"
 }
 ]
 "params" {
@@ -334,45 +679,104 @@ type "Clip_Node_CFG"
 "default_f"  "0.000000"
 "enum_idx"  "65535"
 }
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bRightFootForwards"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bInCover"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bCoverLeft"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bCoverLow"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bBigFall"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bTurnInPlaceLeft"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
+{
+"reset_after_tick"  "0"
+"type"  "cpt::bool_t"
+"name"  "bTurnInPlaceRight"
+"default_i"  "0"
+"default_f"  "0.000000"
+"enum_idx"  "65535"
+}
 ]
 }
 }
  editor
 {
 "rootstate" {
-"current_id"  "50"
-"current_layer"  "15"
+"current_id"  "100"
+"current_layer"  "28"
 "default_editor"  "[editor]
-panning=262,24
+panning=219,325
 
 [node.0]
-origin=280,137
+origin=329,139
 
 [node.8]
-origin=-443,-118
-
-[node.43]
-origin=-114,154
-
-[node.46]
-origin=-336,337
+origin=-173,69
 
 [node.47]
-origin=-347,77
+origin=-342,-47
 
 [node.49]
-origin=-362,229
+origin=-464,220
+
+[node.51]
+origin=-482,100
+
+[node.55]
+origin=80,138
+
+[node.56]
+origin=-184,253
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "-0.042893"
-"out.camera.position.y"  "1.595445"
-"out.camera.position.z"  "1.269367"
-"out.camera.front.x"  "0.146600"
-"out.camera.front.y"  "-0.218230"
-"out.camera.front.z"  "-0.964823"
+"out.camera.position.x"  "0.030094"
+"out.camera.position.y"  "1.724915"
+"out.camera.position.z"  "2.356766"
+"out.camera.yaw"  "4.709993"
+"out.camera.pitch"  "-0.280797"
+"out.camera.move_speed"  "0.025686"
 }
 nodes [
 {
@@ -387,7 +791,7 @@ type "Statemachine_EdNode"
 "name"  "Locomtion Layer"
 "sublayer.id"  "3"
 "sublayer.context"  "[editor]
-panning=208,76
+panning=298,155
 
 [node.9]
 origin=-122,51
@@ -396,7 +800,7 @@ origin=-122,51
 origin=361,249
 
 [node.18]
-origin=122,-76
+origin=123,-59
 
 [node.24]
 origin=400,-58
@@ -405,7 +809,16 @@ origin=400,-58
 origin=-51,383
 
 [node.32]
-origin=-118,216
+origin=-261,277
+
+[node.52]
+origin=141,165
+
+[node.61]
+origin=-104,-191
+
+[node.82]
+origin=-104,187
 "
 "node"  "0"
 }
@@ -422,13 +835,13 @@ type "State_EdNode"
 "state_handle_internal.id"  "0"
 "sublayer.id"  "8"
 "sublayer.context"  "[editor]
-panning=193,312
+panning=192,248
 
 [node.19]
 origin=233,-21
 
-[node.22]
-origin=10,-18
+[node.87]
+origin=-47,17
 "
 }
 {
@@ -444,13 +857,16 @@ type "State_EdNode"
 "state_handle_internal.id"  "1"
 "sublayer.id"  "9"
 "sublayer.context"  "[editor]
-panning=212,312
+panning=295,283
 
 [node.21]
 origin=201,-21
 
 [node.23]
 origin=-116,-15
+
+[node.58]
+origin=92,-22
 "
 }
 {
@@ -460,15 +876,9 @@ type "Root_EdNode"
 }
 {
 type "Clip_EdNode"
-"id"  "22"
-"graph_layer"  "8"
-"node"  "1"
-}
-{
-type "Clip_EdNode"
 "id"  "23"
 "graph_layer"  "9"
-"node"  "2"
+"node"  "1"
 }
 {
 type "State_EdNode"
@@ -499,13 +909,13 @@ type "Root_EdNode"
 type "Clip_EdNode"
 "id"  "26"
 "graph_layer"  "10"
-"node"  "3"
+"node"  "2"
 }
 {
 type "Mirror_EdNode"
 "id"  "27"
 "graph_layer"  "10"
-"node"  "4"
+"node"  "3"
 }
 {
 type "State_EdNode"
@@ -515,7 +925,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "3"
 "sublayer.id"  "12"
 "sublayer.context"  "[editor]
-panning=193,312
+panning=219,246
 
 [node.31]
 origin=118,0
@@ -537,13 +947,13 @@ type "State_EdNode"
 "state_handle_internal.id"  "4"
 "sublayer.id"  "13"
 "sublayer.context"  "[editor]
-panning=193,312
+panning=219,246
 
 [node.33]
 origin=235,-16
 
 [node.34]
-origin=-90,-11
+origin=-90,-10
 "
 }
 {
@@ -555,38 +965,362 @@ type "Root_EdNode"
 type "Clip_EdNode"
 "id"  "34"
 "graph_layer"  "13"
-"node"  "5"
+"node"  "4"
 }
 {
 type "Clip_EdNode"
 "id"  "38"
 "graph_layer"  "12"
-"node"  "6"
-}
-{
-type "Blend_Layered_EdNode"
-"id"  "43"
-"graph_layer"  "0"
-"maskname"  "upper_mask_soft"
-"node"  "7"
-}
-{
-type "Clip_EdNode"
-"id"  "46"
-"graph_layer"  "0"
-"node"  "8"
+"node"  "5"
 }
 {
 type "Clip_EdNode"
 "id"  "47"
 "graph_layer"  "0"
-"node"  "9"
+"node"  "6"
 }
 {
 type "Clip_EdNode"
 "id"  "49"
 "graph_layer"  "0"
+"node"  "7"
+}
+{
+type "Clip_EdNode"
+"id"  "51"
+"graph_layer"  "0"
+"node"  "8"
+}
+{
+type "State_EdNode"
+"id"  "52"
+"graph_layer"  "3"
+"name"  "stop running"
+"state_handle_internal.id"  "5"
+"sublayer.id"  "15"
+"sublayer.context"  "[editor]
+panning=219,246
+
+[node.53]
+origin=221,8
+
+[node.54]
+origin=-89,31
+
+[node.59]
+origin=111,30
+"
+}
+{
+type "Root_EdNode"
+"id"  "53"
+"graph_layer"  "15"
+}
+{
+type "Clip_EdNode"
+"id"  "54"
+"graph_layer"  "15"
+"node"  "9"
+}
+{
+type "Blend_Layered_EdNode"
+"id"  "55"
+"graph_layer"  "0"
+"maskname"  "upper_mask_final"
 "node"  "10"
+}
+{
+type "Clip_EdNode"
+"id"  "56"
+"graph_layer"  "0"
+"node"  "11"
+}
+{
+type "Mirror_EdNode"
+"id"  "58"
+"graph_layer"  "9"
+"node"  "12"
+}
+{
+type "Mirror_EdNode"
+"id"  "59"
+"graph_layer"  "15"
+"node"  "13"
+}
+{
+type "State_EdNode"
+"id"  "61"
+"graph_layer"  "3"
+"name"  "Cover"
+"state_handle_internal.id"  "6"
+"sublayer.id"  "16"
+"sublayer.context"  "[editor]
+panning=219,255
+
+[node.62]
+origin=322,-29
+
+[node.67]
+origin=46,-34
+"
+}
+{
+type "Root_EdNode"
+"id"  "62"
+"graph_layer"  "16"
+}
+{
+type "Statemachine_EdNode"
+"id"  "67"
+"graph_layer"  "16"
+"name"  "Cover statemachine"
+"sublayer.id"  "19"
+"sublayer.context"  "[editor]
+panning=159,200
+
+[node.68]
+origin=0,0
+
+[node.69]
+origin=239,-99
+
+[node.71]
+origin=253,121
+"
+"node"  "14"
+}
+{
+type "StateStart_EdNode"
+"id"  "68"
+"graph_layer"  "19"
+}
+{
+type "State_EdNode"
+"id"  "69"
+"graph_layer"  "19"
+"name"  "Idle"
+"state_handle_internal.id"  "0"
+"sublayer.id"  "20"
+"sublayer.context"  "[editor]
+panning=219,255
+
+[node.70]
+origin=299,-14
+
+[node.76]
+origin=194,7
+
+[node.77]
+origin=-91,-42
+
+[node.78]
+origin=100,-4
+
+[node.79]
+origin=-112,75
+"
+}
+{
+type "Root_EdNode"
+"id"  "70"
+"graph_layer"  "20"
+}
+{
+type "State_EdNode"
+"id"  "71"
+"graph_layer"  "19"
+"name"  "move l"
+"state_handle_internal.id"  "1"
+"sublayer.id"  "21"
+"sublayer.context"  "[editor]
+panning=219,255
+
+[node.72]
+origin=216,0
+
+[node.80]
+origin=114,68
+
+[node.81]
+origin=-113,10
+"
+}
+{
+type "Root_EdNode"
+"id"  "72"
+"graph_layer"  "21"
+}
+{
+type "Mirror_EdNode"
+"id"  "76"
+"graph_layer"  "20"
+"node"  "15"
+}
+{
+type "Clip_EdNode"
+"id"  "77"
+"graph_layer"  "20"
+"node"  "16"
+}
+{
+type "Blend_EdNode"
+"id"  "78"
+"graph_layer"  "20"
+"node"  "17"
+}
+{
+type "Clip_EdNode"
+"id"  "79"
+"graph_layer"  "20"
+"node"  "18"
+}
+{
+type "Mirror_EdNode"
+"id"  "80"
+"graph_layer"  "21"
+"node"  "19"
+}
+{
+type "Clip_EdNode"
+"id"  "81"
+"graph_layer"  "21"
+"node"  "20"
+}
+{
+type "State_EdNode"
+"id"  "82"
+"graph_layer"  "3"
+"name"  "BIG FALL"
+"state_handle_internal.id"  "7"
+"sublayer.id"  "23"
+"sublayer.context"  "[editor]
+panning=219,246
+
+[node.83]
+origin=224,-6
+
+[node.84]
+origin=-74,8
+"
+}
+{
+type "Root_EdNode"
+"id"  "83"
+"graph_layer"  "23"
+}
+{
+type "Clip_EdNode"
+"id"  "84"
+"graph_layer"  "23"
+"node"  "21"
+}
+{
+type "Statemachine_EdNode"
+"id"  "87"
+"graph_layer"  "8"
+"name"  "Idle/Turn in place"
+"sublayer.id"  "25"
+"sublayer.context"  "[editor]
+panning=231,161
+
+[node.88]
+origin=9,0
+
+[node.89]
+origin=200,-85
+
+[node.91]
+origin=198,137
+"
+"node"  "22"
+}
+{
+type "StateStart_EdNode"
+"id"  "88"
+"graph_layer"  "25"
+}
+{
+type "State_EdNode"
+"id"  "89"
+"graph_layer"  "25"
+"name"  "Actual idle"
+"state_handle_internal.id"  "0"
+"sublayer.id"  "26"
+"sublayer.context"  "[editor]
+panning=219,246
+
+[node.90]
+origin=306,-64
+
+[node.98]
+origin=138,-54
+
+[node.99]
+origin=-139,-36
+"
+}
+{
+type "Root_EdNode"
+"id"  "90"
+"graph_layer"  "26"
+}
+{
+type "State_EdNode"
+"id"  "91"
+"graph_layer"  "25"
+"name"  "Turn In place"
+"state_handle_internal.id"  "1"
+"sublayer.id"  "27"
+"sublayer.context"  "[editor]
+panning=394,257
+
+[node.92]
+origin=144,-42
+
+[node.94]
+origin=12,-72
+
+[node.95]
+origin=-254,-49
+
+[node.96]
+origin=-291,23
+"
+}
+{
+type "Root_EdNode"
+"id"  "92"
+"graph_layer"  "27"
+}
+{
+type "Blend_EdNode"
+"id"  "94"
+"graph_layer"  "27"
+"node"  "23"
+}
+{
+type "Clip_EdNode"
+"id"  "95"
+"graph_layer"  "27"
+"node"  "24"
+}
+{
+type "Clip_EdNode"
+"id"  "96"
+"graph_layer"  "27"
+"node"  "25"
+}
+{
+type "Mirror_EdNode"
+"id"  "98"
+"graph_layer"  "26"
+"node"  "26"
+}
+{
+type "Clip_EdNode"
+"id"  "99"
+"graph_layer"  "26"
+"node"  "27"
 }
 ]
 }

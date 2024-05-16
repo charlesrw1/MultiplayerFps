@@ -55,18 +55,26 @@ void CharacterGraphDriver::on_update(float dt) {
 	glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
 	glm::vec2 relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
 
-	ismoving = glm::length(player.velocity) > 0.1 || glm::length(grndaccel) > 0.1;
+
+	bool has_input = abs( player.cmd.forward_move ) > 0.01 || abs( player.cmd.lateral_move ) > 0.01;
+
+	ismoving = has_input;
 	injump = !player.is_on_ground();
 
 
 	auto& params = *owner->runtime_dat.cfg->params.get();
 	auto vars = &owner->runtime_dat.vars;
 
+	auto ray = eng->phys.trace_ray(Ray(player.position, glm::vec3(0, -1, 0)), player.selfid, PF_WORLD);
+	float dist_to_ground = ray.dist < 0.0 ? 100000.0 : ray.dist;
+
+	bool should_transition_out_of_jump_or_fall = !player.is_on_ground() && player.velocity.y < 0 && ray.dist < 0.6;
+
 
 	params.set_bool(vars, bRunning, ismoving && player.is_on_ground());
 	params.set_bool(vars, bCrouch, player.is_crouching);
-	params.set_bool(vars, bJumping, player.action == Action_State::Jumped);
-	params.set_bool(vars, bFalling, player.action == Action_State::Falling);
+	params.set_bool(vars, bJumping, player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
+	params.set_bool(vars, bFalling, player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
 	params.set_float(vars, flSpeed,glm::length(relmovedir));
 	params.set_float(vars, flMovex ,relmovedir.x);
 	params.set_float(vars, flMovey, relmovedir.y);

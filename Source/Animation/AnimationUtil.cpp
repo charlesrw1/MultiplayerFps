@@ -160,28 +160,88 @@ void util_meshspace_to_localspace(const glm::mat4* mesh, const Model* mod, Pose*
 	}
 }
 
+void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_matricies, const Model* model)
+{
+	for (int i = 0; i < model->bones.size(); i++)
+	{
+		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
+		matrix[3] = glm::vec4(local.pos[i], 1.0);
+
+		if (model->bones[i].parent == -1) {
+			out_bone_matricies[i] = matrix;
+		}
+		else {
+			assert(model->bones[i].parent < model->bones.size());
+			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+		}
+	}
+	//for (int i = 0; i < model->bones.size(); i++)
+	//	out_bone_matricies[i] =  out_bone_matricies[i];
+}
+
 void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, float factor, const std::vector<float>& mask)
 {
 	const auto& bone_vec = skel->source->bones;
 	const int bonecount = bone_vec.size();
 
 	std::vector<glm::mat4> globalspace_base(bonecount);
-	util_localspace_to_meshspace_ptr(*a, globalspace_base.data(), skel->source);
+
+	//for (int i = 0; i < bonecount; i++)
+	//{
+	//	glm::mat4x4 matrix = glm::mat4_cast(glm::slerp(a->q[i],b->q[i],mask[i]));
+	//	matrix[3] = glm::vec4(glm::mix(a->pos[i],b->pos[i],mask[i]),1.f);
+	//
+	//	if (bone_vec[i].parent == -1) {
+	//		globalspace_base[i] = matrix;
+	//	}
+	//	else {
+	//		//assert(model->bones[i].parent < model->bones.size());
+	//		globalspace_base[i] = globalspace_base[bone_vec[i].parent] * matrix;
+	//	}
+	//}
+
+	util_localspace_to_meshspace_ptr_2(*a, globalspace_base.data(), skel->source);
 
 
 	std::vector<glm::mat4> globalspace_layer(bonecount);
-	util_localspace_to_meshspace_ptr(*b, globalspace_layer.data(), skel->source);
+	util_localspace_to_meshspace_ptr_2(*b, globalspace_layer.data(), skel->source);
+
+	std::vector<glm::quat> globalspace_rotations(bonecount);
 
 	for (int j = 0; j < bonecount; j++) {
-		if (mask[j] > 0.5) {
-			//glm::vec3 translation = globalspace_base[j][3];
-			globalspace_base[j] = globalspace_layer[j];
-			//globalspace_base[j][3] = glm::vec4(translation, 1.0);
+		glm::quat base = glm::quat_cast(globalspace_base[j]);
+		glm::quat layer = glm::quat_cast(globalspace_layer[j]);
+		glm::quat global = glm::slerp(base, layer, mask[j]);	// meshspace 
+		globalspace_rotations[j] = global;
+		//glm::vec4 t = globalspace_layer[j][3];
+		//globalspace_base[j] = glm::mat4_cast(layer);
+		//globalspace_base[j][3] = t;
+#if 1
+		int parent = bone_vec[j].parent;
+		if (parent == -1) {
+			b->q[j]=global;
 		}
+		else {
+			glm::mat3 matrix = glm::mat3_cast(global);
+			glm::mat3 parent_mat = glm::mat3_cast(globalspace_rotations[parent]);
+			matrix = glm::inverse(parent_mat) * matrix;
+			b->q[j] = glm::quat_cast(matrix);
+		}
+
+		b->pos[j] = a->pos[j];
+#endif
 	}
 
 
-	util_meshspace_to_localspace(globalspace_base.data(), skel->source, b);
+
+
+
+	//util_meshspace_to_localspace(globalspace_base.data(), skel->source, b);
+	return;
+
+
+
+
 	return;
 
 
