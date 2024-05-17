@@ -188,6 +188,8 @@ struct EditorControlParamProp {
 	std::string name = "Unnamed";
 	control_param_type type = control_param_type::int_t;
 	int16_t enum_type = -1;
+	bool is_virtual_param = false;
+	std::string virtual_param_code;
 
 	int current_id = 0;
 
@@ -197,12 +199,15 @@ struct EditorControlParamProp {
 		p.type = type;
 		p.enum_idx = enum_type;
 		p.reset_after_tick = false;
+		//p.script_uncompilied = virtual_param_code;
 		return p;
 	}
 	EditorControlParamProp(const AG_ControlParam& param) {
 		name = param.name;
 		type = param.type;
 		enum_type = param.enum_idx;
+		//virtual_param_code = param.script_uncompilied;
+		is_virtual_param = !virtual_param_code.empty();
 		current_id = unique_id_generator++;
 	}
 

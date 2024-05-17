@@ -236,6 +236,13 @@ class ControlParamArrayHeader : public IArrayHeader
 		ImGui::Text(prop_.name.c_str());
 		ImGui::PopStyleColor();
 
+		if (prop_.is_virtual_param) {
+			ImGui::SameLine();
+			ImGui::TextColored(color32_to_imvec4({ 146, 71, 237 }), "Virtual");
+		}
+		else
+			prop_.virtual_param_code.clear();
+
 
 		return open;
 	}
@@ -1795,6 +1802,8 @@ PropertyInfoList* EditorControlParamProp::get_props()
 		REG_STDSTRING(name, PROP_EDITABLE),
 		REG_ENUM(type, PROP_EDITABLE, "", control_param_type_def.id),
 		REG_INT_W_CUSTOM(enum_type, PROP_SERIALIZE, "-1", "AG_ENUM_TYPE_FINDER"),
+		REG_BOOL(is_virtual_param, PROP_EDITABLE, "0"),
+		REG_STDSTRING_CUSTOM_TYPE(virtual_param_code, PROP_EDITABLE, "AG_LISP_CODE"),
 	END_PROPS(EditorControlParamProp)
 }
 

@@ -1,6 +1,6 @@
 "runtime" {
 "rootdata" {
-"root"  "28"
+"root"  "10"
 "data_used"  "120"
 "graph_is_valid"  "1"
 }
@@ -89,12 +89,12 @@ type "Statemachine_Node_CFG"
 {
 "transition_state"  "1"
 "automatic_transition_rule"  "0"
-"transition_time"  "0.250000"
+"transition_time"  "0.300000"
 "script_uncompilied"  "bRunning"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
-"easing_type"  "easing::CubicEaseInOut"
+"easing_type"  "easing::CubicEaseIn"
 }
 {
 "transition_state"  "3"
@@ -134,7 +134,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "-1"
-"easing_type"  "easing::Linear"
+"easing_type"  "easing::CubicEaseIn"
 }
 {
 "transition_state"  "2"
@@ -364,7 +364,7 @@ type "Clip_Node_CFG"
 type "Blend_Masked_CFG"
 "input"  [
  0   11  ]
-"meshspace_rotation_blend"  "1"
+"meshspace_rotation_blend"  "0"
 "param"  "5"
 "maskname"  "-3228084067690520019"
 }
@@ -387,15 +387,15 @@ type "Mirror_Node_CFG"
 "input"  [
  1  ]
 "damp_time"  "0.100000"
-"param"  "6"
-"store_value_on_reset"  "1"
+"param"  "2"
+"store_value_on_reset"  "0"
 }
 {
 type "Mirror_Node_CFG"
 "input"  [
- 32  ]
+ 9  ]
 "damp_time"  "0.100000"
-"param"  "2"
+"param"  "6"
 "store_value_on_reset"  "1"
 }
 {
@@ -650,67 +650,6 @@ type "Clip_Node_CFG"
 "can_be_leader"  "1"
 "clip_name"  "stand_idle_2"
 }
-{
-type "Add_Node_CFG"
-"input"  [
- 29   10  ]
-"param"  "14"
-}
-{
-type "Subtract_Node_CFG"
-"input"  [
- 30   31  ]
-}
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
-"rm[2]"  "rm::keep"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "stand_rifle_aim_l"
-}
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
-"rm[2]"  "rm::keep"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "stand_rifle_aim_c"
-}
-{
-type "Blend_Node_CFG"
-"input"  [
- 9   33  ]
-"param"  "15"
-"damp_factor"  "0.100000"
-"store_value_on_reset"  "1"
-}
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
-"rm[2]"  "rm::keep"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "stand_idle_3"
-}
 ]
 "params" {
 "types"  [
@@ -818,46 +757,22 @@ type "Clip_Node_CFG"
 "default_f"  "0.000000"
 "enum_idx"  "65535"
 }
-{
-"reset_after_tick"  "0"
-"type"  "cpt::bool_t"
-"name"  "bHitGround"
-"default_i"  "0"
-"default_f"  "0.000000"
-"enum_idx"  "65535"
-}
-{
-"reset_after_tick"  "0"
-"type"  "cpt::float_t"
-"name"  "flSomething"
-"default_i"  "0"
-"default_f"  "0.000000"
-"enum_idx"  "65535"
-}
-{
-"reset_after_tick"  "0"
-"type"  "cpt::float_t"
-"name"  "flStopPercentage"
-"default_i"  "0"
-"default_f"  "0.000000"
-"enum_idx"  "65535"
-}
 ]
 }
 }
  editor
 {
 "rootstate" {
-"current_id"  "130"
-"current_layer"  "32"
+"current_id"  "100"
+"current_layer"  "28"
 "default_editor"  "[editor]
-panning=414,225
+panning=345,199
 
 [node.0]
-origin=395,132
+origin=329,139
 
 [node.8]
-origin=-162,74
+origin=-173,69
 
 [node.47]
 origin=-342,-47
@@ -869,32 +784,20 @@ origin=-464,220
 origin=-482,100
 
 [node.55]
-origin=8,101
+origin=80,138
 
 [node.56]
-origin=-166,149
-
-[node.105]
-origin=217,107
-
-[node.123]
-origin=-94,-29
-
-[node.118]
-origin=91,-52
-
-[node.122]
-origin=-98,-105
+origin=-184,253
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "-0.076549"
-"out.camera.position.y"  "2.071714"
-"out.camera.position.z"  "-1.650039"
-"out.camera.yaw"  "1.630001"
-"out.camera.pitch"  "-0.550797"
+"out.camera.position.x"  "1.873549"
+"out.camera.position.y"  "2.215855"
+"out.camera.position.z"  "1.689913"
+"out.camera.yaw"  "4.079992"
+"out.camera.pitch"  "-0.310797"
 "out.camera.move_speed"  "0.025686"
 }
 nodes [
@@ -910,13 +813,13 @@ type "Statemachine_EdNode"
 "name"  "Locomtion Layer"
 "sublayer.id"  "3"
 "sublayer.context"  "[editor]
-panning=49,139
+panning=393,281
 
 [node.9]
 origin=-210,27
 
 [node.20]
-origin=404,350
+origin=404,351
 
 [node.18]
 origin=123,-59
@@ -954,7 +857,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "0"
 "sublayer.id"  "8"
 "sublayer.context"  "[editor]
-panning=243,262
+panning=219,337
 
 [node.19]
 origin=233,-21
@@ -976,7 +879,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "1"
 "sublayer.id"  "9"
 "sublayer.context"  "[editor]
-panning=311,269
+panning=295,283
 
 [node.21]
 origin=201,-21
@@ -1118,22 +1021,16 @@ type "State_EdNode"
 "state_handle_internal.id"  "5"
 "sublayer.id"  "15"
 "sublayer.context"  "[editor]
-panning=243,262
+panning=219,337
 
 [node.53]
-origin=408,12
+origin=221,8
 
 [node.54]
-origin=-115,7
+origin=-89,31
 
 [node.59]
-origin=297,12
-
-[node.128]
-origin=186,-4
-
-[node.129]
-origin=-90,91
+origin=111,30
 "
 }
 {
@@ -1346,7 +1243,7 @@ type "Statemachine_EdNode"
 "name"  "Idle/Turn in place"
 "sublayer.id"  "25"
 "sublayer.context"  "[editor]
-panning=243,262
+panning=231,161
 
 [node.88]
 origin=9,0
@@ -1372,13 +1269,13 @@ type "State_EdNode"
 "state_handle_internal.id"  "0"
 "sublayer.id"  "26"
 "sublayer.context"  "[editor]
-panning=243,262
+panning=219,246
 
 [node.90]
 origin=306,-64
 
 [node.98]
-origin=138,-52
+origin=138,-54
 
 [node.99]
 origin=-139,-36
@@ -1446,42 +1343,6 @@ type "Clip_EdNode"
 "id"  "99"
 "graph_layer"  "26"
 "node"  "27"
-}
-{
-type "Additive_EdNode"
-"id"  "105"
-"graph_layer"  "0"
-"node"  "28"
-}
-{
-type "Subtract_EdNode"
-"id"  "118"
-"graph_layer"  "0"
-"node"  "29"
-}
-{
-type "Clip_EdNode"
-"id"  "122"
-"graph_layer"  "0"
-"node"  "30"
-}
-{
-type "Clip_EdNode"
-"id"  "123"
-"graph_layer"  "0"
-"node"  "31"
-}
-{
-type "Blend_EdNode"
-"id"  "128"
-"graph_layer"  "15"
-"node"  "32"
-}
-{
-type "Clip_EdNode"
-"id"  "129"
-"graph_layer"  "15"
-"node"  "33"
 }
 ]
 }

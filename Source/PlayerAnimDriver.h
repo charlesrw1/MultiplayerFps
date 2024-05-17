@@ -16,15 +16,22 @@ public:
 	virtual void pre_ik_update(Pose& pose, float dt) override;
 	virtual void post_ik_update() override;
 
-	handle<AG_ControlParam> flMovex;
-	handle<AG_ControlParam> flMovey;
-	handle<AG_ControlParam> flSpeed;
-	handle<AG_ControlParam> bCrouch;
-	handle<AG_ControlParam> bJumping;
-	handle<AG_ControlParam> bFalling;
-	handle<AG_ControlParam> bRunning;
-	handle<AG_ControlParam> flAimx;
-	handle<AG_ControlParam> flAimy;
+	int8_t flMovex=-1;
+	int8_t flMovey=-1;
+	int8_t flSpeed=-1;
+	int8_t bCrouch=-1;
+	int8_t bJumping=-1;
+	int8_t bFalling=-1;
+	int8_t bRunning=-1;
+	int8_t flAimx=-1;
+	int8_t flAimy=-1;
+	int8_t flStopPercentage=-1;
+	int8_t bTurnInPlaceLeft=-1;
+	int8_t bTurnInPlaceRight=-1;
+	int8_t bLeftFootForwards=-1;
+	int8_t bRightFootForwards=-1;
+
+	bool left_foot_is_forward = false;
 
 	bool crouched = false;
 	bool falling=false;

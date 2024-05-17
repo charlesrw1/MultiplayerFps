@@ -33,12 +33,16 @@ struct AG_ControlParam
 	int16_t enum_idx = 0;
 	bool reset_after_tick = false;
 
+
 	static PropertyInfoList* get_props();
 };
 
 struct ControlParam_CFG
 {
 	ControlParamHandle find(StringName name) const {
+		return { find_no_handle(name) };
+	}
+	int find_no_handle(StringName name) const {
 		const auto& find = name_to_index.find(name.get_hash());
 		if (find != name_to_index.end()) {
 			return { find->second };
@@ -60,6 +64,16 @@ struct ControlParam_CFG
 		if (!handle.is_valid()) return;
 		ASSERT(get_type(handle) == control_param_type::bool_t);
 		rt->at(handle.id).ui32 = val;
+	}
+
+	void set_float_nh(program_script_vars_instance* rt, int handle, float val) const {
+		set_float(rt, { handle }, val);
+	}
+	void set_int_nh(program_script_vars_instance* rt, int handle, int val) const {
+		set_int(rt, { handle }, val);
+	}
+	void set_bool_nh(program_script_vars_instance* rt, int handle, bool val) const {
+		set_bool(rt, { handle }, val);
 	}
 
 	float get_float(program_script_vars_instance* rt, ControlParamHandle handle) const {

@@ -767,7 +767,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 REG_STDSTRING(name, PROP_SERIALIZE),
 		 REG_INT(default_i, PROP_SERIALIZE,""),
 		 REG_FLOAT(default_f, PROP_SERIALIZE, ""),
-		 REG_INT(enum_idx, PROP_SERIALIZE,"")
+		 REG_INT(enum_idx, PROP_SERIALIZE,""),
 	END_PROPS(AG_ControlParam)
  }
 

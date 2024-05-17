@@ -5,7 +5,7 @@
 #include "Animation/AnimationUtil.h"
 #include "Player.h"
 
-#define FIND_VAR(x) x = vars.find(#x)
+#define FIND_VAR(x) x = vars.find_no_handle(NAME(#x))
 
 void CharacterGraphDriver::on_init() {
 	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->params.get();
@@ -17,7 +17,11 @@ void CharacterGraphDriver::on_init() {
 	FIND_VAR(bJumping);
 	FIND_VAR(bCrouch);
 	FIND_VAR(flSpeed);
-
+	FIND_VAR(flStopPercentage);
+	FIND_VAR(bTurnInPlaceLeft);
+	FIND_VAR(bTurnInPlaceRight);
+	FIND_VAR(bLeftFootForwards);
+	FIND_VAR(bRightFootForwards);
 
 
 	auto model = owner->get_model();
@@ -71,28 +75,38 @@ void CharacterGraphDriver::on_update(float dt) {
 	bool should_transition_out_of_jump_or_fall = !player.is_on_ground() && player.velocity.y < 0 && ray.dist < 0.6;
 
 
-	params.set_bool(vars, bRunning, ismoving && player.is_on_ground());
-	params.set_bool(vars, bCrouch, player.is_crouching);
-	params.set_bool(vars, bJumping, player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
-	params.set_bool(vars, bFalling, player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
-	params.set_float(vars, flSpeed,glm::length(relmovedir));
-	params.set_float(vars, flMovex ,relmovedir.x);
-	params.set_float(vars, flMovey, relmovedir.y);
+	params.set_bool_nh(vars, bRunning, ismoving && player.is_on_ground());
+	params.set_bool_nh(vars, bCrouch, player.is_crouching);
+	params.set_bool_nh(vars, bJumping, player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
+	params.set_bool_nh(vars, bFalling, player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
+	params.set_float_nh(vars, flSpeed,glm::length(relmovedir));
+	params.set_float_nh(vars, flMovex ,relmovedir.x);
+	params.set_float_nh(vars, flMovey, relmovedir.y);
+
+	params.set_bool_nh(vars, bLeftFootForwards, left_foot_is_forward);
+	params.set_bool_nh(vars, bRightFootForwards, !left_foot_is_forward);
 
 }
 
 void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
 
+	auto& cached_bonemats = owner->get_global_bonemats();
+	auto model = owner->get_model();
+
+	const int lfoot = model->bone_for_name("mixamorig:LeftFoot");
+	const int rfoot = model->bone_for_name("mixamorig:RightFoot");
+
+	glm::vec3 lfoot_pos = cached_bonemats[lfoot][3];
+	glm::vec3 rfoot_pos = cached_bonemats[rfoot][3];
+
+	left_foot_is_forward = glm::dot(glm::vec3(0, 0, 1), lfoot_pos) < glm::dot(glm::vec3(0, 0, 1), rfoot_pos);
 	return;
+#if 0
 	Pose* source = Pose_Pool::get().alloc(1);
 	*source = pose;
-	auto model = owner->get_model();
 	auto ent = owner->owner;
 
-	auto& cached_bonemats = owner->get_global_bonemats();
 
-	const int rhand = model->bone_for_name("mixamorig:RightHand");
-	const int lhand = model->bone_for_name("mixamorig:LeftHand");
 
 	glm::vec3 rhand_target = cached_bonemats[rhand] * glm::vec4(0.0, 0.0, 0.0, 1.0);
 	glm::vec3 lhand_target = cached_bonemats[lhand] * glm::vec4(0.0, 0.0, 0.0, 1.0);
@@ -162,6 +176,7 @@ void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
 
 
 	Pose_Pool::get().free(1);
+#endif
 }
 
 void CharacterGraphDriver::post_ik_update() {
