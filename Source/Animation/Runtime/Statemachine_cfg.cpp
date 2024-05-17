@@ -5,6 +5,14 @@
 
 #include "Animation/AnimationUtil.h"
 
+static const char* easing_strs[] = {
+	"Linear",
+	"CubicEaseIn",
+	"CubicEaseOut",
+	"CubicEaseInOut",
+};
+static AutoEnumDef Easing_def = AutoEnumDef("easing", 4, easing_strs);
+
 PropertyInfoList* State_Transition::get_props()
 {
 	START_PROPS(State_Transition)
@@ -14,7 +22,8 @@ PropertyInfoList* State_Transition::get_props()
 		REG_STDSTRING_CUSTOM_TYPE(script_uncompilied, PROP_DEFAULT, "AG_LISP_CODE"),
 		REG_BOOL(is_continue_transition, PROP_DEFAULT, "0"),
 		REG_BOOL(can_be_interrupted, PROP_DEFAULT, "1"),
-		REG_INT(priority,PROP_DEFAULT, "0"),
+		REG_INT(priority, PROP_DEFAULT, "0"),
+		REG_ENUM(easing_type, PROP_DEFAULT, "easing::Linear", Easing_def.id)
 	END_PROPS(State_Transition)
 }
 
@@ -283,7 +292,10 @@ bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose)
 		ASSERT(rt->cached_pose_from_transition);
 
 		// blend the cached pose with current pose
-		util_blend(ctx.num_bones(), *rt->cached_pose_from_transition, *pose.pose, 1.0-rt->blend_percentage);
+
+		float blend = evaluate_easing(active_transition->easing_type, 1.0 - rt->blend_percentage);
+
+		util_blend(ctx.num_bones(), *rt->cached_pose_from_transition, *pose.pose, blend);
 
 		if (rt->blend_duration >= 0.001) {
 			rt->blend_percentage += pose.dt / rt->blend_duration;

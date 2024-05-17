@@ -61,10 +61,10 @@ struct Ent_PhysicsSettings
 typedef uint32_t entityhandle;
 
 #define ENTITY_HEADER()\
-	const TypeInfo& get_typeinfo() const override;
+	const TypeInfo get_typeinfo() const override;
 
 #define ENTITY_IMPL(classname) \
-	const TypeInfo& classname::get_typeinfo() const { \
+	const TypeInfo classname::get_typeinfo() const { \
 			return {#classname, sizeof(classname) };\
 	}\
 	static AddClassToFactory<classname,Entity> facimpl##classname(get_entityfactory(), #classname);
@@ -75,7 +75,7 @@ class Entity
 public:
 	Entity();
 	virtual ~Entity();
-	virtual const TypeInfo& get_typeinfo() const = 0;
+	virtual const TypeInfo get_typeinfo() const = 0;
 	StringName get_classname() const {
 		// FIXME: this
 		return StringName(get_typeinfo().name);

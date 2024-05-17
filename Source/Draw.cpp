@@ -1875,7 +1875,7 @@ void Render_Scene::build_scene_data()
 	gpu_objects.resize(proxy_list.objects.size());
 	skinned_matricies_vec.clear();
 	{
-		CPUSCOPESTART("traversal");
+		CPUSCOPESTART(traversal);
 
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
@@ -1933,7 +1933,7 @@ void Render_Scene::build_scene_data()
 	}
 
 	{
-		CPUSCOPESTART("make batches");
+		CPUSCOPESTART(make_batches);
 
 		auto transtask = std::async(std::launch::async, [&]() {
 			transparents.make_batches(*this);
@@ -1953,7 +1953,7 @@ void Render_Scene::build_scene_data()
 		depthtask.wait();
 	}
 	{
-		CPUSCOPESTART("make render lists");
+		CPUSCOPESTART(make_render_lists);
 		// build draw calls
 		build_render_list(vis_list, depth);
 		build_render_list(shadow_lists, depth);

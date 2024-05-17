@@ -1380,12 +1380,14 @@ void Game_Engine::game_update_tick()
 	//	tick += 1;
 	//}
 
-	//CPUSCOPESTART("animation update");
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-		Entity& e = ei.get();
-		if (!e.animator)
-			continue;
-		e.animator->tick_tree_new(eng->tick_interval);
+	CPUSCOPESTART(animation_update); 
+	{
+		for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
+			Entity& e = ei.get();
+			if (!e.animator)
+				continue;
+			e.animator->tick_tree_new(eng->tick_interval);
+		}
 	}
 }
 

@@ -84,6 +84,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "1"
@@ -93,6 +94,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::CubicEaseIn"
 }
 {
 "transition_state"  "3"
@@ -102,6 +104,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::CubicEaseIn"
 }
 {
 "transition_state"  "6"
@@ -111,6 +114,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "3"
@@ -120,6 +124,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "-2"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "5"
@@ -129,6 +134,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "-1"
+"easing_type"  "easing::CubicEaseIn"
 }
 {
 "transition_state"  "2"
@@ -138,6 +144,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "1"
@@ -147,6 +154,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "7"
@@ -156,6 +164,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "-1"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "1"
@@ -165,6 +174,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "0"
@@ -174,6 +184,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "3"
@@ -183,6 +194,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "1"
@@ -192,6 +204,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "-1"
+"easing_type"  "easing::CubicEaseIn"
 }
 {
 "transition_state"  "0"
@@ -201,6 +214,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "0"
@@ -210,6 +224,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "0"
@@ -219,6 +234,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 ]
 "entry_transitions"  [
@@ -338,7 +354,7 @@ type "Clip_Node_CFG"
 "rm[1]"  "rm::remove"
 "rm[2]"  "rm::keep"
 "loop"  "0"
-"speed"  "1.000000"
+"speed"  "1.350000"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
@@ -413,6 +429,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "1"
@@ -422,6 +439,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "0"
@@ -431,6 +449,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 ]
 "entry_transitions"  [
@@ -506,8 +525,8 @@ type "Clip_Node_CFG"
 type "Clip_Node_CFG"
 "input"  [
 ]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
+"rm[0]"  "rm::remove"
+"rm[1]"  "rm::remove"
 "rm[2]"  "rm::keep"
 "loop"  "0"
 "speed"  "1.000000"
@@ -547,6 +566,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "1"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "1"
@@ -556,6 +576,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "0"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "0"
@@ -565,6 +586,7 @@ type "Statemachine_Node_CFG"
 "is_continue_transition"  "1"
 "can_be_interrupted"  "0"
 "priority"  "0"
+"easing_type"  "easing::Linear"
 }
 ]
 "entry_transitions"  [
@@ -744,7 +766,7 @@ type "Clip_Node_CFG"
 "current_id"  "100"
 "current_layer"  "28"
 "default_editor"  "[editor]
-panning=219,325
+panning=345,199
 
 [node.0]
 origin=329,139
@@ -771,11 +793,11 @@ origin=-184,253
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "0.030094"
-"out.camera.position.y"  "1.724915"
-"out.camera.position.z"  "2.356766"
-"out.camera.yaw"  "4.709993"
-"out.camera.pitch"  "-0.280797"
+"out.camera.position.x"  "1.873549"
+"out.camera.position.y"  "2.215855"
+"out.camera.position.z"  "1.689913"
+"out.camera.yaw"  "4.079992"
+"out.camera.pitch"  "-0.310797"
 "out.camera.move_speed"  "0.025686"
 }
 nodes [
@@ -791,13 +813,13 @@ type "Statemachine_EdNode"
 "name"  "Locomtion Layer"
 "sublayer.id"  "3"
 "sublayer.context"  "[editor]
-panning=298,155
+panning=393,281
 
 [node.9]
-origin=-122,51
+origin=-210,27
 
 [node.20]
-origin=361,249
+origin=404,351
 
 [node.18]
 origin=123,-59
@@ -809,16 +831,16 @@ origin=400,-58
 origin=-51,383
 
 [node.32]
-origin=-261,277
+origin=-328,393
 
 [node.52]
-origin=141,165
+origin=153,184
 
 [node.61]
-origin=-104,-191
+origin=46,-271
 
 [node.82]
-origin=-104,187
+origin=-132,193
 "
 "node"  "0"
 }
@@ -835,7 +857,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "0"
 "sublayer.id"  "8"
 "sublayer.context"  "[editor]
-panning=192,248
+panning=219,337
 
 [node.19]
 origin=233,-21
@@ -999,7 +1021,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "5"
 "sublayer.id"  "15"
 "sublayer.context"  "[editor]
-panning=219,246
+panning=219,337
 
 [node.53]
 origin=221,8
@@ -1194,7 +1216,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "7"
 "sublayer.id"  "23"
 "sublayer.context"  "[editor]
-panning=219,246
+panning=219,337
 
 [node.83]
 origin=224,-6

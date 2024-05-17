@@ -357,6 +357,9 @@
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\Easing.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

@@ -36,6 +36,7 @@
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h" />
     <ClInclude Include="Source\Animation\Runtime\ControlParamHandle.h" />
     <ClInclude Include="Source\Animation\Runtime\ControlParams.h" />
+    <ClInclude Include="Source\Animation\Runtime\Easing.h" />
     <ClInclude Include="Source\Animation\Runtime\Percentage.h" />
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />

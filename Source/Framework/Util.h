@@ -97,7 +97,7 @@ struct Profile_Scope_Wrapper
 #define CPUFUNCTIONSTART MAKEPROF_(__FUNCTION__, false)
 #define GPUFUNCTIONSTART MAKEPROF_(__FUNCTION__, true)
 #define GPUSCOPESTART(name) MAKEPROF_(name, true)
-#define CPUSCOPESTART(name) MAKEPROF_(name, false)
+#define CPUSCOPESTART(name) Profile_Scope_Wrapper profileevent##name(#name, false)
 
 
 #else

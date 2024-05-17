@@ -1,6 +1,37 @@
 #pragma once
 #include "AnimationTreeLocal.h"
 
+enum class Easing : uint8_t
+{
+	Linear,
+	CubicEaseIn,
+	CubicEaseOut,
+	CubicEaseInOut,
+};
+
+inline float evaluate_easing(Easing type, float t)
+{
+	switch (type)
+	{
+	case Easing::Linear:
+		return t;
+		break;
+	case Easing::CubicEaseIn:
+		return t * t * t;
+		break;
+	case Easing::CubicEaseOut: {
+		float oneminus = 1 - t;
+		return 1.0 - oneminus * oneminus * oneminus;
+	} break;
+	case Easing::CubicEaseInOut: {
+		float othert = -2 * t + 2;
+		return (t < 0.5) ? 4 * t * t * t : 1.0 - othert * othert * othert * 0.5;
+	}break;
+	default:
+		break;
+	}
+}
+
 struct State;
 struct State_Transition
 {
@@ -15,6 +46,7 @@ struct State_Transition
 	bool automatic_transition_rule = false;
 	bool can_be_interrupted = true;
 	int8_t priority = 0;
+	Easing easing_type = Easing::Linear;
 };
 
 
