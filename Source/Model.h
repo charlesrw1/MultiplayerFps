@@ -13,7 +13,42 @@
 #include "Framework/BVH.h"
 #include "DrawTypedefs.h"
 
+// Hardcoded attribute locations for shaders
+const int POSITION_LOC = 0;
+const int UV_LOC = 1;
+const int NORMAL_LOC = 2;
+const int JOINT_LOC = 3;
+const int WEIGHT_LOC = 4;
+const int COLOR_LOC = 5;
+const int UV2_LOC = 6;
+const int TANGENT_LOC = 7;
+
+
+enum Vertex_Attributes
+{
+	ATTRIBUTE_POS = 0,
+	ATTRIBUTE_UV = 1,
+	ATTRIBUTE_NORMAL = 2,
+	ATTRIBUTE_TANGENT = 3,
+	ATTRIBUTE_JOINT_OR_COLOR = 4,
+	ATTRIBUTE_WEIGHT_OR_COLOR2 = 5,
+	MAX_ATTRIBUTES,
+};
+
+struct ModelVertex
+{
+	glm::vec3 pos;
+	glm::vec2 uv;
+	int16_t normal[3];
+	int16_t tangent[3];
+	uint8_t color[4];	// or bone index
+	uint8_t color2[4];	// or bone weight
+};
+static_assert(sizeof(ModelVertex) == 40, "vertex size wrong");
+
+
 class Material;
+
 
 
 using std::string;
@@ -31,6 +66,17 @@ struct Bone
 	glm::mat4x3 localtransform;
 	glm::quat rot;
 };
+
+class Skeleton2
+{
+public:
+
+private:
+	std::vector<Bone> bones;
+	std::vector<uint8_t> mirror_map;
+};
+
+
 
 struct Physics_Triangle
 {
@@ -51,12 +97,19 @@ struct Physics_Mesh
 
 struct Texture;
 
-#define MAX_MESH_ATTRIBUTES 8
 
 struct Raw_Mesh_Data
 {
-	vector<char> buffers[MAX_MESH_ATTRIBUTES];
+	Raw_Mesh_Data() {
+		memset(attribute_offsets, 0, sizeof(attribute_offsets));
+	}
+
+	vector<char> buffers[MAX_ATTRIBUTES];
 	vector<char> indicies;
+
+	int attribute_offsets[MAX_ATTRIBUTES];
+	int index_offset = 0;
+	vector<uint8_t> data;
 };
 
 class Submesh
@@ -67,6 +120,8 @@ public:
 	int element_count = 0;
 	int material_idx = 0;
 };
+
+
 
 enum class mesh_format
 {
@@ -135,72 +190,60 @@ public:
 
 	unique_ptr<Physics_Mesh> collision;
 	vector<Collision_Box> boxes;
+	bool loaded_in_memory = false;
 
 	int bone_for_name(const char* name) const;
 };
 
-// not sure why i seperated this but :/
-class Prefab_Model
+#include <array>
+class MainVbIbAllocator
 {
 public:
-	struct Node {
-		string name;
-		glm::mat4 transform;
-		int mesh_idx = -1;
-	};
-	string name;
-	vector<Mesh> meshes;
-	vector<Node> nodes;
-	vector<Material*> mats;
-	unique_ptr<Physics_Mesh> physics;
-};
+	
+	void init(uint32_t num_indicies, uint32_t num_verts);
 
-class cgltf_data;
-class cgltf_node;
-class Game_Mod_Manager
-{
-public:
-
-	typedef void(*prefab_callback)(void* user, cgltf_data* data, cgltf_node* node, glm::mat4 globaltransform);
-
-	void init();
-	Model* find_or_load(const char* filename);
-	Prefab_Model* find_or_load_prefab(const char* filename, bool dont_append_path,
-		prefab_callback callback, void* userdata);
-	void free_prefab(Prefab_Model* prefab);
-	void free_model(Model* m);
-	void compact_memory();
-	void print_usage();
-
-
-
-	struct Gpu_Buffer {
+	struct buffer {
 		bufferhandle handle = 0;
 		uint32_t allocated = 0;
-		uint32_t target = 0;
 		uint32_t used = 0;
 	};
 
-	struct Shared_Vertex_Buffer {
-		Gpu_Buffer attributes[MAX_MESH_ATTRIBUTES];
-		uint32_t main_vao = 0;
-	};
+	buffer vbuffer;
+	buffer ibuffer;
+};
 
-	std::unordered_map<string, Prefab_Model*> prefabs;
-	std::unordered_map<string, Model*> models;
+class ModelMan
+{
+public:
+	void init();
+	Model* find_or_load(const char* filename);
+	void free_model(Model* m);
 
-	vertexarrayhandle depth_animated_vao = 0;
-	vertexarrayhandle depth_static_vao = 0;
-	Gpu_Buffer global_index_buffer;
-	Shared_Vertex_Buffer global_vertex_buffers[(int)mesh_format::COUNT];
+	void compact_memory();
+	void print_usage();
+
+	vertexarrayhandle get_vao(bool animated) {
+		if (animated)
+			return animated_vao;
+		else
+			return static_vao;
+	}
+
+	Model* error_model = nullptr;
 
 private:
-	uint32_t cur_mesh_id = 0;
 
-	bool upload_mesh(Mesh* mesh);
-	bool append_to_buffer(Gpu_Buffer& buf, char* input_data, uint32_t input_length);
+	bool parse_model_into_memory(Model* m, std::string path);
+	bool upload_model(Mesh* m);
+
+	vertexarrayhandle static_vao;
+	vertexarrayhandle animated_vao;
+	MainVbIbAllocator allocator;
+
+	uint32_t cur_mesh_id = 0;
+	std::unordered_map<string, Model*> models;
 };
-extern Game_Mod_Manager mods;
+extern ModelMan mods;
 
 void FreeLoadedModels();
 Model* FindOrLoadModel(const char* filename);

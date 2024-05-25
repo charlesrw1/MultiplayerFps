@@ -140,4 +140,6 @@ public:
 #define DECLARE_ENGINE_CMD(func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
 #define DECLARE_ENGINE_CMD_CAT(category, func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(category#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
 
+#define DECLVAR(name,varname, value) Auto_Config_Var varname(name, value);
+
 #endif // !CONFIG_H

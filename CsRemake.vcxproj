@@ -40,6 +40,7 @@
     <ClInclude Include="Source\Animation\Runtime\Percentage.h" />
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
+    <ClInclude Include="Source\AssetCompile\ModelCompile.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\CamData.h" />
     <ClInclude Include="Source\Client.h" />
@@ -76,6 +77,7 @@
     <ClInclude Include="Source\External\tiny_gltf.h" />
     <ClInclude Include="Source\Framework\AddClassToFactory.h" />
     <ClInclude Include="Source\Framework\beziercurveeditor.h" />
+    <ClInclude Include="Source\Framework\BinaryReadWrite.h" />
     <ClInclude Include="Source\Framework\BVH.h" />
     <ClInclude Include="Source\Framework\Bytepacker.h" />
     <ClInclude Include="Source\Framework\Config.h" />
@@ -139,6 +141,7 @@
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
+    <ClCompile Include="Source\AssetCompile\ModelCompile.cpp" />
     <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
@@ -248,9 +251,11 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <VcpkgTriplet>x64-windows</VcpkgTriplet>

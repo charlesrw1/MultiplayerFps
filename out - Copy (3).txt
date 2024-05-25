@@ -16,7 +16,7 @@ type "Statemachine_Node_CFG"
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
-"tree"  "34"
+"tree"  "22"
 }
 {
 "transition_idxs"  [
@@ -89,12 +89,12 @@ type "Statemachine_Node_CFG"
 {
 "transition_state"  "1"
 "automatic_transition_rule"  "0"
-"transition_time"  "0.250000"
+"transition_time"  "0.150000"
 "script_uncompilied"  "bRunning"
 "is_continue_transition"  "0"
-"can_be_interrupted"  "1"
+"can_be_interrupted"  "0"
 "priority"  "0"
-"easing_type"  "easing::CubicEaseInOut"
+"easing_type"  "easing::Linear"
 }
 {
 "transition_state"  "3"
@@ -387,7 +387,7 @@ type "Mirror_Node_CFG"
 "input"  [
  1  ]
 "damp_time"  "0.100000"
-"param"  "6"
+"param"  "2"
 "store_value_on_reset"  "1"
 }
 {
@@ -711,14 +711,6 @@ type "Clip_Node_CFG"
 "can_be_leader"  "1"
 "clip_name"  "stand_idle_3"
 }
-{
-type "Mirror_Node_CFG"
-"input"  [
- 22  ]
-"damp_time"  "0.100000"
-"param"  "6"
-"store_value_on_reset"  "1"
-}
 ]
 "params" {
 "types"  [
@@ -856,10 +848,10 @@ type "Mirror_Node_CFG"
  editor
 {
 "rootstate" {
-"current_id"  "132"
+"current_id"  "130"
 "current_layer"  "32"
 "default_editor"  "[editor]
-panning=243,325
+panning=107,153
 
 [node.0]
 origin=395,132
@@ -898,12 +890,12 @@ origin=-98,-105
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "0.430223"
-"out.camera.position.y"  "2.071714"
-"out.camera.position.z"  "-1.295479"
-"out.camera.yaw"  "2.070002"
-"out.camera.pitch"  "-0.360797"
-"out.camera.move_speed"  "0.025686"
+"out.camera.position.x"  "-0.345821"
+"out.camera.position.y"  "1.854405"
+"out.camera.position.z"  "-2.714340"
+"out.camera.yaw"  "2.310001"
+"out.camera.pitch"  "-0.270796"
+"out.camera.move_speed"  "0.195055"
 }
 nodes [
 {
@@ -918,7 +910,7 @@ type "Statemachine_EdNode"
 "name"  "Locomtion Layer"
 "sublayer.id"  "3"
 "sublayer.context"  "[editor]
-panning=243,262
+panning=63,110
 
 [node.9]
 origin=-210,27
@@ -939,7 +931,7 @@ origin=-51,383
 origin=-328,393
 
 [node.52]
-origin=134,229
+origin=144,237
 
 [node.61]
 origin=46,-271
@@ -968,10 +960,7 @@ panning=243,262
 origin=233,-21
 
 [node.87]
-origin=-108,-10
-
-[node.131]
-origin=96,-56
+origin=-47,17
 "
 }
 {
@@ -987,7 +976,7 @@ type "State_EdNode"
 "state_handle_internal.id"  "1"
 "sublayer.id"  "9"
 "sublayer.context"  "[editor]
-panning=311,269
+panning=243,205
 
 [node.21]
 origin=201,-21
@@ -1129,16 +1118,16 @@ type "State_EdNode"
 "state_handle_internal.id"  "5"
 "sublayer.id"  "15"
 "sublayer.context"  "[editor]
-panning=243,262
+panning=42,159
 
 [node.53]
 origin=408,12
 
 [node.54]
-origin=-115,7
+origin=-115,6
 
 [node.59]
-origin=297,12
+origin=297,11
 
 [node.128]
 origin=186,-4
@@ -1493,12 +1482,6 @@ type "Clip_EdNode"
 "id"  "129"
 "graph_layer"  "15"
 "node"  "33"
-}
-{
-type "Mirror_EdNode"
-"id"  "131"
-"graph_layer"  "8"
-"node"  "34"
 }
 ]
 }

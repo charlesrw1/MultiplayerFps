@@ -50,25 +50,6 @@ const float INV_PI = 1.f / PI;
 const float SQRT2 = 1.41421362;
 const float INV_SQRT2 = 1 / SQRT2;
 
-typedef Buffer File_Buffer;
-
-// useful helper for txt data files
-bool file_getline(const File_Buffer* file, Buffer* str_buffer, int* index, char delimiter = '\n');
-
-class Files
-{
-public:
-	enum {
-		LOOK_IN_ARCHIVE = 1,
-		TEXT = 2,
-	};
-
-	static File_Buffer* open(const char* path, int flags = LOOK_IN_ARCHIVE);
-	static void close(File_Buffer*& file);
-	static void init();
-	static bool iterate_files_in_dir(const char* path, char* buffer, int buffer_size);
-	static bool does_file_exist(const char* path);
-};
 
 class Profiler
 {

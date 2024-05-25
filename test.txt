@@ -1,0 +1,43 @@
+"runtime" {
+"rootdata" {
+"root"  "-1"
+"data_used"  "0"
+"graph_is_valid"  "0"
+}
+nodes [
+]
+"params" {
+"types"  [
+]
+}
+}
+ editor
+{
+"rootstate" {
+"current_id"  "1"
+"current_layer"  "1"
+"default_editor"  "[editor]
+panning=193,300
+
+[node.0]
+origin=209,6
+"
+"opt.open_graph"  "1"
+"opt.open_control_params"  "1"
+"opt.open_prop_editor"  "1"
+"opt.statemachine_passthrough"  "0"
+"out.camera.position.x"  "-0.345821"
+"out.camera.position.y"  "1.854405"
+"out.camera.position.z"  "-2.714340"
+"out.camera.yaw"  "2.310001"
+"out.camera.pitch"  "-0.270796"
+"out.camera.move_speed"  "0.195055"
+}
+nodes [
+{
+type "Root_EdNode"
+"id"  "0"
+"graph_layer"  "0"
+}
+]
+}

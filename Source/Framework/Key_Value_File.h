@@ -74,5 +74,7 @@ inline bool Key_Value_File::open(const char* filename)
 		name_to_entry[curname] = std::move(cur);
 	}
 
+	Files::close(infile);
+
 	return true;
 }

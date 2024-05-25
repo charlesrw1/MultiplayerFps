@@ -31,6 +31,9 @@
     <Filter Include="Source\Physics\Editor">
       <UniqueIdentifier>{119307ff-0cdd-49ad-8a28-3855ef65629d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\AssetCompile">
+      <UniqueIdentifier>{1568a8a7-6fa8-4782-a7f4-7723b9e79593}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -360,6 +363,12 @@
     <ClInclude Include="Source\Animation\Runtime\Easing.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="Source\AssetCompile\ModelCompile.h">
+      <Filter>Source\AssetCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\BinaryReadWrite.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -532,6 +541,9 @@
     </ClCompile>
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
       <Filter>Source\Animation\Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile.cpp">
+      <Filter>Source\AssetCompile</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

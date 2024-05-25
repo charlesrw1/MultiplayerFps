@@ -3,7 +3,7 @@
 #include <string>
 #include "Framework/StringUtil.h"
 #include <Windows.h>
-
+#include "Framework/Files.h"
 struct File_Internal
 {
 	File_Buffer external_buffer;
@@ -182,7 +182,34 @@ bool Files::does_file_exist(const char* path)
 	}
 	return true;
 }
+struct FileListIteratorImp : public FileListIterator {
 
+	FileListIteratorImp() {
+
+	}
+	~FileListIteratorImp() override {
+
+	}
+
+	// Inherited via FileListIterator
+	virtual bool next() override
+	{
+		return false;
+	}
+	virtual std::string&& get_path() override
+	{
+		return std::string && ();
+	}
+	virtual uint64_t get_timestamp() override
+	{
+		return uint64_t();
+	}
+
+	bool descend_subdirectories = false;
+	HANDLE hFind = nullptr;
+	WIN32_FIND_DATAA findData;
+	std::string path;
+};
 bool Files::iterate_files_in_dir(const char* dir, char* buffer, int buffer_len)
 {
 	static bool in_middle_of_search = false;
