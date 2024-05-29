@@ -262,7 +262,7 @@ struct Clip_Node_RT : Rt_Vars_Base
 {
 	glm::vec3 root_pos_first_frame = glm::vec3(0.f);
 	float inv_speed_of_anim_root = 1.0;
-	float frame = 0.0;
+	float anim_time = 0.0;
 	bool stopped_flag = false;
 	const AnimationSeq* clip = nullptr;
 	int remap_index = -1;
@@ -302,7 +302,7 @@ struct Clip_Node_CFG : public Node_CFG
 
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
-		rt->frame = 0.0;
+		rt->anim_time = 0.0;
 		rt->stopped_flag = false;
 	}
 
@@ -316,7 +316,7 @@ struct Clip_Node_CFG : public Node_CFG
 	void set_frame_by_interp(NodeRt_Ctx& ctx, float frac) const {
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
-		rt->frame = get_clip(ctx)->duration * frac;
+		rt->anim_time = get_clip(ctx)->duration * frac;
 	}
 
 	rootmotion_setting rm[3] = { rootmotion_setting::keep ,rootmotion_setting::keep, rootmotion_setting::keep };

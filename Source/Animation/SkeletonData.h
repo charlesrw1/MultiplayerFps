@@ -22,9 +22,9 @@ struct EventIndex {
 
 struct ChannelOffset
 {
-	uint16_t pos = 0;	// float[3]
-	uint16_t rot = 0;	// float[4]
-	uint16_t scale = 0;	// float[1]
+	uint32_t pos = 0;	// float[3]
+	uint32_t rot = 0;	// float[4]
+	uint32_t scale = 0;	// float[1]
 };
 
 struct ScalePositionRot
@@ -42,7 +42,7 @@ public:
 	std::vector<float> pose_data;
 	bool is_additive_clip = false;
 	float duration = 0.0;
-	float fps = 24.0;
+	float fps = 30.0;
 	float average_linear_velocity = 0.0;
 
 

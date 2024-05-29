@@ -666,6 +666,7 @@ private:
 	void draw_sprite_buffer();
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
+	void render_lists_old_way(Render_Lists& list, Render_Pass& pass);
 
 	void init_bloom_buffers();
 	void render_bloom_chain();

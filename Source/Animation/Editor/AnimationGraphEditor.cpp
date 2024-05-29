@@ -1775,6 +1775,7 @@ void AnimationGraphEditor::tick(float dt)
 			ro.transform = out.model->get_root_transform();
 			ro.animator = &out.get_local_animator();
 		}
+		//ro.animator = nullptr;
 
 		idraw->update_obj(out.obj, ro);
 

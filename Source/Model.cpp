@@ -570,7 +570,7 @@ void ModelMan::init()
 	glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
 	glEnableVertexAttribArray(TANGENT_LOC);
 	// Bone index
-	glVertexAttribPointer(JOINT_LOC, 4, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
+	glVertexAttribIPointer(JOINT_LOC, 4, GL_UNSIGNED_BYTE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
 	glEnableVertexAttribArray(JOINT_LOC);
 	// Bone weight
 	glVertexAttribPointer(WEIGHT_LOC, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color2[0]));

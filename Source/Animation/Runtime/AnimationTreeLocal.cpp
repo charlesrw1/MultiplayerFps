@@ -43,7 +43,8 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
-
+	 //util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
+	 //return true;
 
 	const AnimationSeq* clip = get_clip(ctx);
 	if (!clip) {
@@ -52,7 +53,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	}
 
 	if (pose.sync)
-		rt->frame = clip->duration * pose.sync->normalized_frame;
+		rt->anim_time = clip->duration * pose.sync->normalized_frame;
 
 
 	if (!pose.sync || pose.sync->first_seen) {
@@ -62,20 +63,20 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 			pose.dt *= speedup;
 		}
 
-		rt->frame += clip->fps * pose.dt * speed;
+		rt->anim_time += pose.dt * speed;
 
-		if (rt->frame > clip->duration || rt->frame < 0.f) {
+		if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
 			if (loop)
-				rt->frame = fmod(fmod(rt->frame, clip->duration) + clip->duration, clip->duration);
+				rt->anim_time = fmod(fmod(rt->anim_time, clip->duration) + clip->duration, clip->duration);
 			else {
-				rt->frame = clip->duration - 0.001f;
+				rt->anim_time = clip->duration - 0.001f;
 				rt->stopped_flag = true;
 			}
 		}
 
 		if (pose.sync) {
 			pose.sync->first_seen = false;
-			pose.sync->normalized_frame = rt->frame / clip->duration;
+			pose.sync->normalized_frame = rt->anim_time / clip->duration;
 		}
 
 	}
@@ -84,7 +85,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	if (rt->remap_index != -1)
 		indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
 
-	util_calc_rotations(ctx.get_skeleton(), clip, rt->frame, indicies, *pose.pose);
+	util_calc_rotations(ctx.get_skeleton(), clip, rt->anim_time, indicies, *pose.pose);
 
 	const int root_index = 0;
 	for (int i = 0; i < 3; i++) {
@@ -94,8 +95,8 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	}
 
 	bool outres = !rt->stopped_flag;
-	float cur_t = clip->fps * rt->frame;
-	float clip_t = clip->fps * clip->duration;
+	float cur_t = rt->anim_time;
+	float clip_t = clip->duration;
 	outres &= !pose.has_auto_transition || (pose.automatic_transition_time + cur_t < clip_t);
 
 	return outres;

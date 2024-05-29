@@ -161,7 +161,7 @@ void tokenize_string(std::string& input, Cmd_Args& output)
 	std::string token;
 	bool in_quotes = false;
 	for (char c : input) {
-		if ((c == ' ' || c == '\t') && !in_quotes) {
+		if ((c == ' ' || c == '\t' || c=='\r') && !in_quotes) {
 			if (!token.empty()) {
 				output.add_arg(token.c_str(), token.size());
 				token.clear();
@@ -236,7 +236,7 @@ public:
 		hash_to_index[hash.computedHash] = num_cmds - 1;
 	}
 	void execute(Cmd_Execute_Mode mode, const char* command_string) {
-
+		sys_print("#%s\n", command_string);
 		Cmd_Args args;
 		std::string command = command_string;
 		tokenize_string(command, args);

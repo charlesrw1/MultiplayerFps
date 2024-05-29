@@ -1750,7 +1750,7 @@ bool are_all_poskeyframes_equal(float epsilon, const Animation_Set* set, const A
 	for (int i = 1; i < count; i++) {
 		int index = pos_start + i;
 		glm::vec3 first = set->positions[pos_start].val;
-		glm::vec3 this_ = set->positions[pos_start].val;
+		glm::vec3 this_ = set->positions[index].val;
 		float sq_dist = glm::dot(first-this_, first-this_);
 		if (sq_dist > epsilon)
 			return false;
@@ -1768,7 +1768,7 @@ bool are_all_rotframes_equal(float epsilon, const Animation_Set* set, const Anim
 	for (int i = 1; i < count; i++) {
 		int index = rot_start + i;
 		glm::quat first = set->rotations[rot_start].val;
-		glm::quat this_ = set->rotations[rot_start].val;
+		glm::quat this_ = set->rotations[index].val;
 		float sq_dist = glm::dot(first - this_, first - this_);
 		if (sq_dist > epsilon)
 			return false;
@@ -1786,7 +1786,7 @@ bool are_all_scaleframes_equal(float epsilon, const Animation_Set* set, const An
 	for (int i = 1; i < count; i++) {
 		int index = scale_start + i;
 		glm::vec3 first = set->scales[scale_start].val;
-		glm::vec3 this_ = set->scales[scale_start].val;
+		glm::vec3 this_ = set->scales[index].val;
 		float sq_dist = glm::dot(first - this_, first - this_);
 		if (sq_dist > epsilon)
 			return false;
@@ -1844,11 +1844,11 @@ void append_animation_seq_to_list(
 		const int LOAD_idx = FINAL_bone_to_LOAD_bone[FINAL_idx];
 		assert(LOAD_idx != -1);
 
-		ChannelOffset offsets{};
+		ChannelOffset& offsets = out_seq.channel_offsets[FINAL_idx];
 
 		const int SRC_idx = (source.remap) ? (*source.remap)[LOAD_idx] : LOAD_idx;
 
-#define SET_HIGH_BIT(x) x |= (1<<31)
+#define SET_HIGH_BIT(x) x |= (1u<<31u)
 
 		// All keyframes set to target bind pose
 		if (SRC_idx == -1) {
@@ -1911,7 +1911,7 @@ void append_animation_seq_to_list(
 				glm::vec3 pos = get_pos_for_time(t);
 				write_out_to_outseq(&pos.x, 3, &out_seq);
 			}
-			assert((offsets.rot - out_seq.pose_data.size()) / 3 == (out_seq.get_num_keyframes_inclusive()));
+			assert((out_seq.pose_data.size() - offsets.pos) / 3 == (out_seq.get_num_keyframes_inclusive()));
 		}
 
 		// ROTATION
@@ -1948,7 +1948,7 @@ void append_animation_seq_to_list(
 				glm::quat rot = get_rot_for_time(t);
 				write_out_to_outseq(&rot.x, 4, &out_seq);
 			}
-			assert((offsets.rot - out_seq.pose_data.size())/4 == out_seq.get_num_keyframes_inclusive());
+			assert(( out_seq.pose_data.size() - offsets.rot)/4 == out_seq.get_num_keyframes_inclusive());
 		}
 
 		// SCALE
@@ -1984,14 +1984,17 @@ void append_animation_seq_to_list(
 				float uniform_scale = get_scale_for_time(t);
 				write_out_to_outseq(&uniform_scale, 1, &out_seq);
 			}
-			assert((offsets.scale - out_seq.pose_data.size()) == out_seq.get_num_keyframes_inclusive());
+			assert(( out_seq.pose_data.size()-offsets.scale) == out_seq.get_num_keyframes_inclusive());
 		}
+
+
+
 #undef CALC_TIME_INTERP
 #undef SET_HIGH_BIT
 	}
 
-#define IS_HIGH_BIT_SET(x) (x & (1<<31))
-#define CLEAR_HIGH_BIT(x) ( x & ~(1<<31) )
+#define IS_HIGH_BIT_SET(x) (x & (1u<<31u))
+#define CLEAR_HIGH_BIT(x) ( x & ~(1u<<31u) )
 	
 	
 	assert(myskel->get_bone_parent(FINAL_bone_to_LOAD_bone[0]) == -1);	// ROOT
@@ -2097,7 +2100,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 	
 	FinalSkeletonOutput* final_out = new FinalSkeletonOutput;
 
-
+	final_out->armature_root_transform = compile_data->armature_root;
 
 	for (int i = 0; i < imports.size(); i++) {
 
@@ -2492,8 +2495,8 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 	out.write_int32(MODEL_VERSION);
 
 	glm::mat4 roottransform = glm::mat4(1.0);
-	//if (skel)
-	//	roottransform = skel->armature_root_transform;
+	if (skel)
+		roottransform = skel->armature_root_transform;
 	out.write_struct(&roottransform);
 	
 	out.write_struct(&model->AABB);

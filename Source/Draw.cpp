@@ -1187,11 +1187,14 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, scene.gpu_render_material_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
-
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
+
+		auto& batch = pass.batches[i];
+
+
 		int count = list.command_count[i];
 
 		const Material* mat = pass.mesh_batches[pass.batches[i].first].material;
@@ -1242,7 +1245,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 		shader().set_int("indirect_material_offset", offset);
 
 
-		const GLenum index_type = (mods.get_index_type_size()==4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+		const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
 
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
@@ -1255,6 +1258,91 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 		offset += count;
 
 		stats.draw_calls++;
+	}
+}
+
+void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass)
+{
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, scene.gpu_render_material_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+	int offset = 0;
+	for (int i = 0; i < pass.batches.size(); i++) {
+		
+		auto& batch = pass.batches[i];
+		int count = list.command_count[i];
+
+		for (int dc = 0; dc < batch.count; dc++) {
+			auto& cmd = list.commands[offset + dc];
+
+			const Material* mat = pass.mesh_batches[pass.batches[i].first].material;
+			draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
+
+			program_handle program = (program_handle)batch_key.shader;
+			blend_state blend = (blend_state)batch_key.blending;
+			bool backface = batch_key.backface;
+			uint32_t layer = batch_key.layer;
+			int format = batch_key.vao;
+
+			assert(program >= 0 && program < prog_man.programs.size());
+
+			set_shader(program);
+
+			if (mat->type == material_type::WINDSWAY)
+				set_wind_constants();
+			else if (mat->type == material_type::WATER)
+				set_water_constants();
+
+			bind_vao(mods.get_vao(true/* animated */));
+
+			set_show_backfaces(backface);
+			set_blend_state(blend);
+
+			bool shader_doesnt_need_the_textures = mat->type == material_type::WATER || pass.type == pass_type::DEPTH;
+
+			if (!shader_doesnt_need_the_textures) {
+
+				if (mat->type == material_type::TWOWAYBLEND) {
+					ASSERT(0);
+				}
+				else {
+					SET_OR_USE_FALLBACK(material_texture::DIFFUSE, ALBEDO1_LOC, white_texture);
+					SET_OR_USE_FALLBACK(material_texture::ROUGHNESS, ROUGH1_LOC, white_texture);
+					SET_OR_USE_FALLBACK(material_texture::AO, AO1_LOC, white_texture);
+					SET_OR_USE_FALLBACK(material_texture::METAL, METAL1_LOC, white_texture);
+					SET_OR_USE_FALLBACK(material_texture::NORMAL, NORMAL1_LOC, flat_normal_texture);
+
+				}
+			}
+
+			// alpha tested materials are a special case
+			if (pass.type == pass_type::DEPTH && mat->is_alphatested()) {
+				SET_OR_USE_FALLBACK(material_texture::DIFFUSE, ALBEDO1_LOC, white_texture);
+			}
+
+			shader().set_int("indirect_material_offset", offset);
+
+
+			const GLenum index_type = (mods.get_index_type_size()==4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+
+			glDrawElementsBaseVertex(
+				GL_TRIANGLES,
+				cmd.count,
+				index_type,
+				(void*)(cmd.firstIndex * mods.get_index_type_size()),
+				cmd.baseVertex
+			);
+
+			stats.draw_calls++;
+		}
+
+		offset += count;
+
 	}
 }
 
@@ -1325,7 +1413,9 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 			pass = &scene.transparents;
 		}
 
-		execute_render_lists(*lists, *pass);
+		//execute_render_lists(*lists, *pass);
+
+		render_lists_old_way(*lists, *pass);
 	}
 
 	glCheckError();

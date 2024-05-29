@@ -460,8 +460,8 @@ void util_calc_rotations(const Animation_Set* set,const Model* source_model, flo
 }
 #endif
 
-#define IS_HIGH_BIT_SET(x) (x&(1<<31))
-#define UNSET_HIGH_BIT(x) (x & ~(1<<31))
+#define IS_HIGH_BIT_SET(x) (x&(1u<<31u))
+#define UNSET_HIGH_BIT(x) (x & ~(1u<<31u))
 
 glm::vec3* AnimationSeq::get_pos_write_ptr(int channel, int keyframe) {
 
@@ -493,7 +493,7 @@ ScalePositionRot AnimationSeq::get_keyframe(int bone, int keyframe, float lerpam
 {
 	// TODO: insert return statement here
 	ChannelOffset offset = channel_offsets[bone];
-
+	
 	ScalePositionRot output;
 
 	if (IS_HIGH_BIT_SET(offset.pos)) {

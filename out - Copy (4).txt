@@ -1,6 +1,6 @@
 "runtime" {
 "rootdata" {
-"root"  "35"
+"root"  "28"
 "data_used"  "120"
 "graph_is_valid"  "1"
 }
@@ -719,20 +719,6 @@ type "Mirror_Node_CFG"
 "param"  "6"
 "store_value_on_reset"  "1"
 }
-{
-type "Clip_Node_CFG"
-"input"  [
-]
-"rm[0]"  "rm::keep"
-"rm[1]"  "rm::keep"
-"rm[2]"  "rm::keep"
-"loop"  "1"
-"speed"  "1.000000"
-"start_frame"  "0"
-"allow_sync"  "0"
-"can_be_leader"  "1"
-"clip_name"  "stand_rifle_aim_d"
-}
 ]
 "params" {
 "types"  [
@@ -870,10 +856,10 @@ type "Clip_Node_CFG"
  editor
 {
 "rootstate" {
-"current_id"  "133"
+"current_id"  "132"
 "current_layer"  "32"
 "default_editor"  "[editor]
-panning=167,65
+panning=243,325
 
 [node.0]
 origin=395,132
@@ -907,9 +893,6 @@ origin=91,-52
 
 [node.122]
 origin=-98,-105
-
-[node.132]
-origin=22,278
 "
 "opt.open_graph"  "1"
 "opt.open_control_params"  "1"
@@ -1516,12 +1499,6 @@ type "Mirror_EdNode"
 "id"  "131"
 "graph_layer"  "8"
 "node"  "34"
-}
-{
-type "Clip_EdNode"
-"id"  "132"
-"graph_layer"  "0"
-"node"  "35"
 }
 ]
 }
