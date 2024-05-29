@@ -253,6 +253,7 @@ struct Sync_Node_CFG : public Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		Sync_Node_RT* rt = get_rt<Sync_Node_RT>(ctx);
 		rt->normalized_frame = 0.0;
+		input[0]->reset(ctx);
 	}
 
 	ControlParamHandle param;
@@ -323,7 +324,7 @@ struct Clip_Node_CFG : public Node_CFG
 	std::string clip_name;
 	bool loop = true;
 	bool allow_sync = false;
-	bool can_be_leader = true;
+	bool can_be_leader = false;
 	float speed = 1.0;
 	uint16_t start_frame = 0;
 };

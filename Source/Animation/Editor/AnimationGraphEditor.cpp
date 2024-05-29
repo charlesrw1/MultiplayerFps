@@ -1689,7 +1689,7 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	return tree_is_good_to_run;
 }
 
-
+#include <algorithm>
 
 
 
@@ -1707,6 +1707,9 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 		for (const auto& c : clips)
 			if (_strnicmp(c.first.c_str(), word_start, len) == 0)
 				vec.push_back(c.first.c_str());
+		std::sort(vec.begin(), vec.end(), [](const char* a, const char* b) -> bool {
+			return strcmp(a, b) < 0;
+			});
 		
 	}
 	else if (auser->type == AnimCompletionCallbackUserData::BONES) {

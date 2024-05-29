@@ -52,11 +52,15 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		return true;
 	}
 
-	if (pose.sync)
+	const bool has_a_sync_already = pose.sync != nullptr && allow_sync;
+
+	if (has_a_sync_already)
 		rt->anim_time = clip->duration * pose.sync->normalized_frame;
 
+	const bool can_update_sync = pose.sync && pose.sync->first_seen && can_be_leader && allow_sync;
+	const bool update_self_time = !allow_sync || !pose.sync;
 
-	if (!pose.sync || pose.sync->first_seen) {
+	if (can_update_sync || update_self_time) {
 		if (pose.rootmotion_scale >= 0) {
 			// want to match character_speed and speed_of_anim
 			float speedup = pose.rootmotion_scale * rt->inv_speed_of_anim_root;
@@ -74,7 +78,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 			}
 		}
 
-		if (pose.sync) {
+		if (pose.sync && can_be_leader && allow_sync) {
 			pose.sync->first_seen = false;
 			pose.sync->normalized_frame = rt->anim_time / clip->duration;
 		}
@@ -548,7 +552,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 REG_FLOAT( speed, PROP_DEFAULT, "1.0,0.1,10"),
 		 REG_INT( start_frame, PROP_DEFAULT, "0"),
 		 REG_BOOL( allow_sync, PROP_DEFAULT, "0"),
-		 REG_BOOL( can_be_leader, PROP_DEFAULT, "1"),
+		 REG_BOOL( can_be_leader, PROP_DEFAULT, "0"),
 
 		 REG_STDSTRING_CUSTOM_TYPE( clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
 
@@ -806,8 +810,8 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	
 	 if (meshspace_rotation_blend) {
 		 Pose* base_layer = Pose_Pool::get().alloc(1);
-		 bool ret = input[1]->get_pose(ctx, pose);
-		 ret &= input[0]->get_pose(ctx, pose.set_pose(base_layer));
+		 bool ret = input[0]->get_pose(ctx, pose.set_pose(base_layer));
+		 ret &= input[1]->get_pose(ctx, pose);
 		 util_global_blend(ctx.get_skeleton(),base_layer, pose.pose, mask_weight, rt->mask->weight);
 		 Pose_Pool::get().free(1);
 		 return ret;

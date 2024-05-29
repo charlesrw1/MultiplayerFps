@@ -115,7 +115,8 @@ struct BoneData
 
 struct BonePoseMask
 {
-	StringName name;
+	std::string strname;
+	StringName idname;
 	std::vector<float> weight;
 };
 
@@ -164,7 +165,7 @@ public:
 	}
 	const BonePoseMask* find_mask(StringName name) const {
 		for (int i = 0; i < masks.size(); i++) {
-			if (masks[i].name == name)
+			if (masks[i].idname == name)
 				return &masks[i];
 		}
 		return nullptr;

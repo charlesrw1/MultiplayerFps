@@ -19,7 +19,7 @@
 #include <stdexcept>
 // MODEL FORMAT:
 
-static const int MODEL_VERSION = 2;
+static const int MODEL_VERSION = 3;
 
 
 
@@ -63,6 +63,12 @@ static const int MODEL_VERSION = 2;
 // int b_has_mirror_map
 // int16_t mirror_map[ (b_has_mirror_map) ? num_bones : 0 ]
 //
+// int num_masks
+// MASK masks[num_mask]
+
+// MASK
+// string name
+// float mask_data[num_bones]
 
 // MESH
 // int base_vertex
@@ -525,113 +531,6 @@ public:
 };
 #undef CAST_TO_AND_INDEX
 
-
-#if 0
-bool write_out2(vector<char>& out, const cgltf_accessor* in, Format_Descriptor outfmt)
-{
-	Format_Descriptor infmt(in->component_type, in->type, in->normalized);
-	int new_bytes = outfmt.get_size() * in->count;
-	int start = out.size();
-	char* in_buffer_start = (char*)in->buffer_view->buffer->data + in->buffer_view->offset + in->offset;
-	out.resize(start + new_bytes);
-	if (infmt == outfmt && in->stride == infmt.get_size()) {
-		memcpy(out.data() + start, in_buffer_start, new_bytes);
-		return true;
-	}
-
-	int out_stride = outfmt.get_size();
-	int in_stride = in->stride;
-	for (int i = 0; i < in->count; i++) {
-		outfmt.convert_this_from_that(in_buffer_start + i * in_stride, infmt, out.data() + start + out_stride * i);
-	}
-	return true;
-}
-
-
-void append_collision_data3(unique_ptr<Physics_Mesh>& phys, cgltf_data* data, cgltf_mesh* mesh, std::vector<Material*>& materials,
-	const glm::mat4& transform)
-{
-	if (!phys)
-		phys = std::make_unique<Physics_Mesh>();
-
-	Physics_Mesh* pm = phys.get();
-
-	for (int part = 0; part < mesh->primitives_count; part++)
-	{
-		const int vertex_offset = pm->verticies.size();
-		cgltf_primitive& primitive = mesh->primitives[part];
-
-		cgltf_attribute* position_at = nullptr;
-		for (int j = 0; j < primitive.attributes_count; j++) {
-			if (strcmp("POSITION", primitive.attributes[j].name) == 0) {
-				position_at = primitive.attributes + j;
-				break;
-			}
-		}
-		ASSERT(position_at);
-		cgltf_accessor* position_ac = position_at->data;
-		cgltf_buffer_view* position_bv = position_ac->buffer_view;
-		cgltf_buffer* pos_buffer = position_bv->buffer;
-		uint8_t* byte_buffer = (uint8_t*)pos_buffer->data;
-
-		//int pos_stride = position_ac.ByteStride(position_bv);
-		int pos_stride = position_ac->stride;
-
-		ASSERT(position_ac->type == cgltf_type_vec3 && position_ac->component_type == cgltf_component_type_r_32f);
-		ASSERT(position_ac->offset == 0 && position_bv->stride == 0);
-		unsigned char* pos_start = &byte_buffer[position_bv->offset];
-		for (int v = 0; v < position_ac->count; v++) {
-			glm::vec3 data = *(glm::vec3*)(pos_start + v * pos_stride);
-			pm->verticies.push_back(data);
-		}
-
-		// Transform verts
-		if (transform != glm::mat4(1)) {
-			for (int v = 0; v < position_ac->count; v++) {
-				pm->verticies[vertex_offset + v] = transform * glm::vec4(pm->verticies[vertex_offset + v], 1.0);
-			}
-		}
-
-		cgltf_accessor* index_ac = primitive.indices;
-		cgltf_buffer_view* index_bv = index_ac->buffer_view;
-		cgltf_buffer* index_buffer = index_bv->buffer;
-		int index_stride = index_ac->stride;
-		byte_buffer = (uint8_t*)index_buffer->data;
-
-		ASSERT(index_ac->offset == 0 && index_bv->stride == 0);
-		unsigned char* index_start = &byte_buffer[index_bv->offset];
-		for (int i = 0; i < index_ac->count; i += 3) {
-			Physics_Triangle ct;
-			if (index_ac->component_type == cgltf_component_type_r_32u) {
-				ct.indicies[0] = *(unsigned int*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned int*)(index_start + index_stride * (i + 1));
-				ct.indicies[2] = *(unsigned int*)(index_start + index_stride * (i + 2));
-			}
-			else if (index_ac->component_type == cgltf_component_type_r_16u) {
-				ct.indicies[0] = *(unsigned short*)(index_start + index_stride * i);
-				ct.indicies[1] = *(unsigned short*)(index_start + index_stride * (i + 1));
-				ct.indicies[2] = *(unsigned short*)(index_start + index_stride * (i + 2));
-			}
-			ct.indicies[0] += vertex_offset;
-			ct.indicies[1] += vertex_offset;
-			ct.indicies[2] += vertex_offset;
-
-			glm::vec3 verts[3];
-			for (int j = 0; j < 3; j++)
-				verts[j] = pm->verticies.at(ct.indicies[j]);
-			glm::vec3 face_normal = glm::normalize(glm::cross(verts[1] - verts[0], verts[2] - verts[0]));
-			ct.face_normal = face_normal;
-			ct.plane_offset = -glm::dot(face_normal, verts[0]);
-			if (primitive.material) {
-				int mat_index = cgltf_material_index(data, primitive.material);
-
-				ct.surf_type = materials.at(mat_index)->physics;
-			}
-			pm->tris.push_back(ct);
-		}
-	}
-}
-#endif
 
 template<typename FUNCTOR, typename T>
 void convert_format_verts(FUNCTOR&& f, size_t start, std::vector<T>& verts, cgltf_accessor* ac)
@@ -1215,34 +1114,6 @@ glm::mat4 compute_world_space(glm::mat4 localtransform, int bone, MSkeleton* ske
 	return localtransform;
 }
 
-/*
-
-
-			if (retarget) {
-				//glm::mat4 m = glm::mat4_cast(interp_rot);
-				//m[3] = glm::vec4(interp_pos,1.0);
-				//// m = local transform from source skeleton
-				//
-				//glm::mat4 worldspace = compute_world_space(m, src_idx, from_skel);
-				//// m = world space transform in source ekeleton
-				//
-				//int parent_of_target = smd->skeleton.get_bone_parent(dest_idx);
-				//glm::mat4 parent_inv = glm::mat4(1.f);
-				//if (parent_of_target != -1)
-				//	parent_inv = smd->skeleton.get_inv_posematrix(parent_of_target);
-				//
-				//glm::mat4 local = smd->skeleton.pose_matrix[dest_idx] * from_skel->inv_pose_matrix[src_idx] * worldspace * parent_inv;
-				//// basically finds different of target bind pose and multiplies by local
-				//
-				//interp_rot = glm::quat_cast(local);
-				//interp_pos = local[3];
-
-				if (src_idx != 0) {
-					//interp_rot = smd->skeleton.get_l
-					interp_pos = output_skel->get_bone_local_transform(dest_idx)[3];
-				}
-*/
-
 
 MSkeleton::~MSkeleton() {
 	for (auto clip : clips) {
@@ -1398,7 +1269,7 @@ static void traverse_model_nodes(
 void mark_used_bones_R(int this_index, const SkeletonCompileData* scd, std::vector<bool>& bone_refed)
 {
 	int parent = scd->get_bone_parent(this_index);
-	if (parent != -1) {
+	if (bone_refed[this_index] && parent != -1) {
 		bone_refed[parent] = true;
 		mark_used_bones_R(parent, scd, bone_refed);
 	}
@@ -1433,8 +1304,9 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				 mesh.mark_for_delete = true;
 				 continue;
 			 }
-			 if (!mesh.has_normals() || !mesh.has_tangents()) {
-				 sys_print("??? mesh was exported without normals and/or tangents, skipping it...\n");
+
+			 if (!mesh.has_normals()) {
+				 sys_print("??? mesh was exported without normals, skipping it...\n");
 				 mesh.mark_for_delete = true;
 				 continue;
 			 }
@@ -1455,8 +1327,11 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 
 					 for (int x = 0; x < 4; x++) {
 						 assert(fv.bone_index[x] >= -1 && fv.bone_index[x] < num_bones);
-						 if (fv.bone_index[x] != -1)
+						 if (fv.bone_index[x] != -1) {
+
 							 bone_is_referenced.at(fv.bone_index[x]) = true;
+						 
+						 }
 					 }
 				 }
 			 }
@@ -1478,8 +1353,6 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 		 for (int i = 0; i < num_bones; i++) {
 			 if (bone_is_referenced[i]) {
 				 LOAD_to_FINAL_bones[i] = count++;
-				 sys_print("*** bone will be kept %s\n", scd->bones[i].strname.c_str());
-
 			 }
 			 else {
 				 sys_print("*** bone will be pruned %s\n", scd->bones[i].strname.c_str());
@@ -1491,7 +1364,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				FINAL_to_LOAD_bones.at(LOAD_to_FINAL_bones[i]) = i;
 
 		 FINAL_bone_count = count;
-
+		 sys_print("*** final bone count %d\n", FINAL_bone_count);
 
 		 for (int i = 0; i < mcd.lod_where.size(); i++) {
 			 for (int j = 0; j < mcd.lod_where[i].mesh_nodes.size(); j++) {
@@ -1750,7 +1623,7 @@ std::vector<BonePoseMask> get_bone_masks(
 	for (int i = 0; i < def.weightlists.size(); i++) {
 		BonePoseMask bpm;
 		auto& weightlist_def = def.weightlists[i];
-		bpm.name = weightlist_def.name.c_str();
+		bpm.strname = weightlist_def.name;
 		bpm.weight.resize(FINAL_bones_count);
 		for (int j = 0; j < weightlist_def.defs.size(); j++) {
 
@@ -1880,7 +1753,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 	if (definition && definition->crop.has_crop) {
 		if(definition->crop.start >= 0 && definition->crop.start < END_keyframe)
 			START_keyframe = definition->crop.start;
-		if (definition->crop.end >= 9999.0 && definition->crop.end < END_keyframe && END_keyframe > START_keyframe)
+		if (definition->crop.end < END_keyframe && END_keyframe > START_keyframe)
 			END_keyframe = definition->crop.end;
 		NUM_keyframes = END_keyframe - START_keyframe;
 	}
@@ -2070,7 +1943,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 
 			if (myskel->get_bone_parent(LOAD_idx) == -1) {
 				glm::mat4 local_other = source.skel->bones[SRC_idx].localtransform;
-				transform_matrix = glm::inverse(myskel->armature_root) * glm::inverse(source.skel->armature_root);
+				transform_matrix = glm::inverse(myskel->armature_root)*source.skel->armature_root;
 			}
 			if (myskel->bones[LOAD_idx].retarget_type == RetargetBoneType::FromAnimationScaled) {
 				scale = glm::length(myskel->get_local_position(LOAD_idx));
@@ -2080,14 +1953,12 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			for (int keyframe = 0; keyframe < out_seq.get_num_keyframes_inclusive(); keyframe++) {
 				glm::vec3* pos = out_seq.get_pos_write_ptr(FINAL_idx, keyframe);
 				glm::quat* rot = out_seq.get_quat_write_ptr(FINAL_idx, keyframe);
-				if (!pos || !rot)	//indicate a "single" pose frame
+				if (!pos && !rot)
 					break;
-
 				if (myskel->get_bone_parent(LOAD_idx) == -1) {
-					glm::mat4 matrix = glm::mat4_cast(*rot);
-					matrix[3] = glm::vec4(*pos, 1.0);
-					
-					*pos = transform_matrix * glm::vec4(*pos, 1.0);
+
+					if(pos)
+						*pos =  transform_matrix* glm::vec4(*pos, 1.0);
 
 					glm::mat3 justrot2 = transform_matrix;
 					justrot2[0] = glm::normalize(justrot2[0]);
@@ -2095,14 +1966,16 @@ void ModelCompileHelper::append_animation_seq_to_list(
 					justrot2[2] = glm::normalize(justrot2[2]);
 
 					auto try2 = glm::quat_cast(justrot2);
-
-					*rot = try2 * (*rot);
+					if(rot)
+						*rot = try2 * (*rot);
 				}
 				else if (myskel->bones[LOAD_idx].retarget_type == RetargetBoneType::FromAnimationScaled) {
-					*pos *= scale;
+					if(pos)
+						*pos *= scale;
 				}
 				else if (myskel->bones[LOAD_idx].retarget_type == RetargetBoneType::FromTargetBindPose) {
-					*pos = myskel->get_local_position(LOAD_idx);
+					if(pos)
+						*pos = myskel->get_local_position(LOAD_idx);
 				}
 			}
 		}
@@ -2134,10 +2007,12 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			const glm::quat* rot0 = out_seq.get_quat_write_ptr(FINAL_idx, 0);
 			glm::vec3* pos1 = out_seq.get_pos_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive()-1);
 			glm::quat* rot1 = out_seq.get_quat_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive() - 1);
-			if (!pos1 || !rot1)	//indicate a "single" pose frame
+			if (!pos1 && !rot1)	//indicate a "single" pose frame
 				continue;
-			*pos1 = *pos0;
-			*rot1 = *rot0;
+			if(pos1)
+				*pos1 = *pos0;
+			if(rot1)
+				*rot1 = *rot0;
 		}
 	}
 
@@ -2205,10 +2080,12 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			
 			 glm::vec3* pos = target->get_pos_write_ptr(i, j);
 			 glm::quat* rot = target->get_quat_write_ptr(i, j);
-			 if (!pos || !rot)	//indicate a "single" pose frame
+			 if (!pos && !rot)	//indicate a "single" pose frame
 				 break;
-			 *pos = *pos - ref_pose.pos[i];
-			 *rot = *rot - ref_pose.q[i];
+			 if(pos)
+				 *pos = *pos - ref_pose.pos[i];
+			 if (rot)
+				 *rot = quat_delta(ref_pose.q[i], *rot);
 		 }
 	 }
 }
@@ -2250,8 +2127,6 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 
 		append_animation_seq_to_list(astc, final_out, FINAL_bone_to_LOAD_bone, LOAD_bone_to_FINAL_bone, compile_data, data);
 	}
-
-
 
 	for (const auto& clip : data.str_to_clip_def) {
 
@@ -2569,7 +2444,7 @@ FinalModelData create_final_model_data(
 	std::vector<int> lods_to_def(num_actual_lods,-1);
 	for (int i = 0; i < def.loddefs.size(); i++) {
 		assert(def.loddefs[i].lod_num >= 0);
-		if (def.loddefs[i].lod_num > num_actual_lods) continue;
+		if (def.loddefs[i].lod_num >= num_actual_lods) continue;
 		lods_to_def[def.loddefs[i].lod_num] = i;
 	}
 
@@ -2737,6 +2612,13 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 			);
 		}
 
+		out.write_int32(skel->masks.size());
+		for (int i = 0; i < skel->masks.size(); i++) {
+			out.write_string(skel->masks[i].strname);
+			assert(skel->masks[i].weight.size() == skel->bones.size());
+			out.write_bytes_ptr((uint8_t*)skel->masks[i].weight.data(), skel->bones.size() * sizeof(float));
+		}
+
 		out.write_int32('E');
 	}
 
@@ -2747,7 +2629,7 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 		sys_print("!!! Couldn't open file to write out model %s\n", path.c_str());
 		return false;
 	}
-	sys_print("*** Writing out model (%s) (size: %d)", path.c_str(), (int)out.get_size());
+	sys_print("*** Writing out model (%s) (size: %d)\n", path.c_str(), (int)out.get_size());
 	sys_print("***     -vert bytes: %d\n", (int)vert_size);
 	sys_print("***     -index bytes: %d\n", (int)index_size);
 	sys_print("***     -bone bytes: %d\n", (int)skel_size);
@@ -2781,7 +2663,8 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 		return false;
 
 	unique_ptr<SkeletonCompileData> skeleton_data = get_skin_from_file(out.data, defname.c_str(), def.armature_name);
-	add_bone_def_data_to_skeleton(def, skeleton_data.get());
+	if(skeleton_data)
+		add_bone_def_data_to_skeleton(def, skeleton_data.get());
 
 	const ProcessNodesAndMeshOutput post_traverse = process_nodes_and_mesh(
 		out.data,
@@ -2818,7 +2701,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 	return res;
 }
 
-static bool compile_everything = true;
+static bool compile_everything = false;
 
 bool ModelCompilier::compile(const char* name)
 {

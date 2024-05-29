@@ -349,8 +349,11 @@ void util_add(int bonecount, const Pose& additive, Pose& base, float fac)
 {
 	for (int i = 0; i < bonecount; i++) {
 		base.pos[i] = glm::mix(base.pos[i], base.pos[i] + additive.pos[i], fac);
-		base.q[i] = glm::slerp(base.q[i], base.q[i] + additive.q[i], fac);
-		base.q[i] = glm::normalize(base.q[i]);
+
+		glm::quat target = additive.q[i] * base.q[i];
+
+		base.q[i] = glm::slerp(base.q[i], target, fac);
+		//base.q[i] = glm::normalize(base.q[i]);
 	}
 }
 

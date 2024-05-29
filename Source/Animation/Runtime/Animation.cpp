@@ -446,9 +446,9 @@ Animator::Animator() : slots(1)
 
 }
 
-static vector<int> get_indicies(const Animation_Set* set, const vector<const char*>& strings)
+static std::vector<int> get_indicies(const Animation_Set* set, const std::vector<const char*>& strings)
 {
-	vector<int> out;
+	std::vector<int> out;
 	for (auto s : strings) out.push_back(set->find(s));
 	return out;
 }
@@ -498,7 +498,7 @@ char get_first_token(string& s, char default_='\0')
 
 
 // LispInterpreter.cpp
-extern vector<string> to_tokens(string& input);
+extern std::vector<string> to_tokens(string& input);
 
 const int STREAM_WIDTH = 9;
 const int PRECISION_STREAM = 3;

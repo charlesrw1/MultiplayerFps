@@ -27,7 +27,7 @@ ModelMan mods;
 static const char* const model_folder_path = "./Data/Models/";
 
 
-static const int MODEL_FORMAT_VERSION = 2;
+static const int MODEL_FORMAT_VERSION = 3;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
@@ -465,6 +465,15 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 		if (has_mirror_map) {
 			m->skel->mirroring_table.resize(num_bones);
 			read.read_bytes_ptr(m->skel->mirroring_table.data(), num_bones * sizeof(int16_t));
+		}
+
+		uint32_t num_masks = read.read_int32();
+		m->skel->masks.resize(num_masks);
+		for (int i = 0; i < num_masks; i++) {
+			read.read_string(m->skel->masks[i].strname);
+			m->skel->masks[i].idname = m->skel->masks[i].strname.c_str();
+			m->skel->masks[i].weight.resize(num_bones);
+			read.read_bytes_ptr(m->skel->masks[i].weight.data(), num_bones * sizeof(float));
 		}
 
 		 DEBUG_MARKER = read.read_int32();
