@@ -731,7 +731,7 @@ type "Clip_Node_CFG"
 "start_frame"  "0"
 "allow_sync"  "0"
 "can_be_leader"  "1"
-"clip_name"  "stand_rifle_aim_d"
+"clip_name"  "STRAFE_TO_STOP_FF"
 }
 ]
 "params" {
@@ -873,7 +873,7 @@ type "Clip_Node_CFG"
 "current_id"  "133"
 "current_layer"  "32"
 "default_editor"  "[editor]
-panning=167,65
+panning=272,89
 
 [node.0]
 origin=395,132
@@ -915,12 +915,12 @@ origin=22,278
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "0.430223"
-"out.camera.position.y"  "2.071714"
-"out.camera.position.z"  "-1.295479"
-"out.camera.yaw"  "2.250002"
-"out.camera.pitch"  "-0.700797"
-"out.camera.move_speed"  "0.025686"
+"out.camera.position.x"  "-0.717096"
+"out.camera.position.y"  "1.318927"
+"out.camera.position.z"  "-1.879029"
+"out.camera.yaw"  "1.410008"
+"out.camera.pitch"  "-0.310797"
+"out.camera.move_speed"  "0.028897"
 }
 nodes [
 {

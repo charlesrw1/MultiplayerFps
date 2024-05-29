@@ -27,7 +27,7 @@ ModelMan mods;
 static const char* const model_folder_path = "./Data/Models/";
 
 
-static const int MODEL_FORMAT_VERSION = 1;
+static const int MODEL_FORMAT_VERSION = 2;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
@@ -366,6 +366,11 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 	for (int i = 0; i < num_materials; i++) {
 		read.read_string(buffer);
 		m->materials.push_back(mats.find_for_name(buffer.c_str()));
+
+		if (!m->materials.back()) {
+			sys_print("!!! model doesn't have material %s\n", buffer.c_str());
+			m->materials.back() = mats.fallback;
+		}
 	}
 
 
@@ -467,7 +472,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 	}
 
 	// collision data goes here
-
+	return true;
 }
 
 DECLVAR("developer_mode", developer_mode, 1);

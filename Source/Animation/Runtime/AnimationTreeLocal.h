@@ -578,7 +578,7 @@ public:
 
 struct Blend_Masked_RT : public Rt_Vars_Base
 {
-	int16_t mask_index = -1;
+	const BonePoseMask* mask = nullptr;
 };
 
 class Blend_Masked_CFG : public Node_CFG
@@ -590,7 +590,7 @@ public:
 		construct_this<RT_TYPE>(ctx);
 		auto rt = get_rt<RT_TYPE>(ctx);
 		//FIXME
-		rt->mask_index = -1;// (int16_t)ctx.set->src_skeleton->find_mask(maskname);
+		rt->mask = ctx.get_skeleton()->find_mask(maskname);
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		input[0]->reset(ctx);

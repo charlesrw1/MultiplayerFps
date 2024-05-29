@@ -425,7 +425,7 @@ void Animator::ConcatWithInvPose()
 
 	for (int i = 0; i < skel->get_num_bones(); i++) {
 
-		matrix_palette[i] = cached_bonemats[i] * skel->get_inv_posematrix(i);
+		matrix_palette[i] = cached_bonemats[i] * (glm::mat4)skel->get_inv_posematrix(i);
 
 	}
 }
@@ -516,7 +516,40 @@ std::ostream& operator<<(std::ostream& out, glm::quat v){
 	return out;
 }
 
+glm::vec3 vector = glm::vec3(0, 0, 0);
+float angle = 0.0;
+bool add_angles = true;
+bool normalize_ = true;
+bool mult_first = true;
+bool enable = false;
+void menu_pose()
+{
+	ImGui::SliderAngle("pitch", &vector.x);
+	ImGui::SliderAngle("yaw", &vector.y);
+	ImGui::SliderAngle("roll", &vector.z);
+	ImGui::Checkbox("add", &add_angles);
+	ImGui::Checkbox("mult_first", &mult_first);
+	ImGui::Checkbox("normalize_", &normalize_);
+	ImGui::Checkbox("enable", &enable);
 
+
+}
+AddToDebugMenu asdfa("mod pose", menu_pose);
+
+void modify_pose_debug(Pose& pose)
+{
+	if (!enable) return;
+	if(add_angles)
+		pose.q[0] = pose.q[0] + glm::quat(vector);
+	else {
+		if(mult_first)
+			pose.q[0] = glm::quat(vector) * pose.q[0];
+		else
+			pose.q[0] = pose.q[0] * glm::quat(vector);
+	}
+	if(normalize_)
+		pose.q[0] = glm::normalize(pose.q[0]);
+}
 
 void Animator::tick_tree_new(float dt)
 {
@@ -544,7 +577,6 @@ void Animator::tick_tree_new(float dt)
 		util_set_to_bind_pose(poses[0], get_skel());
 
 	util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
-
 	if(driver)
 		driver->pre_ik_update(poses[0], dt);
 

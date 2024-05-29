@@ -170,9 +170,6 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				 	gs->alpha_tested = true;
 
 			}
-			else if (tok.cmp("showbackface")) {
-				gs->backface = true;
-			}
 
 		}
 	}

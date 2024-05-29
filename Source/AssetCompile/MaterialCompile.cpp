@@ -6,6 +6,8 @@ static const char* MATERIAL_DIRECTORY = "./Data/Materials/";
 
 bool MaterialCompilier::compile(const char* name)
 {
+	sys_print("------ Compiling Material %s ------\n",name);
+
 	std::string path = MATERIAL_DIRECTORY;
 	path += name;
 	path += ".txt";

@@ -6,6 +6,8 @@
 #include "Framework/Files.h"
 #include "Framework/StringUtil.h"
 
+#include <cassert>
+
 class BinaryReader
 {
 public:

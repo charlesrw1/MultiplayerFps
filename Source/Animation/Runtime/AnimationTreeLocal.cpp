@@ -792,24 +792,23 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  bool Blend_Masked_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
 	 auto rt = get_rt<RT_TYPE>(ctx);
-	 if(rt->mask_index==-1)
+	 if(!rt->mask)
 		 return input[0]->get_pose(ctx, pose);
 
 
 	 bool b = ctx.get_bool(param);
 
-	// if (!b) {
+	 if (!b) {
 		 return input[0]->get_pose(ctx, pose);
-	// }
+	 }
 
-#if 0
-	 auto& mask = ctx.set->src_skeleton->masks[rt->mask_index];
+#if 1
 	
 	 if (meshspace_rotation_blend) {
 		 Pose* base_layer = Pose_Pool::get().alloc(1);
 		 bool ret = input[1]->get_pose(ctx, pose);
 		 ret &= input[0]->get_pose(ctx, pose.set_pose(base_layer));
-		 util_global_blend(ctx.set->src_skeleton,base_layer, pose.pose, mask_weight, mask.weight);
+		 util_global_blend(ctx.get_skeleton(),base_layer, pose.pose, mask_weight, rt->mask->weight);
 		 Pose_Pool::get().free(1);
 		 return ret;
 	 }
@@ -821,7 +820,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 Pose* layer = Pose_Pool::get().alloc(1);
 		 bool ret = input[0]->get_pose(ctx, pose);
 		 ret &= input[1]->get_pose(ctx, pose.set_pose(layer));
-		 util_blend_with_mask(ctx.num_bones(), *layer, *pose.pose, 1.0, mask.weight);
+		 util_blend_with_mask(ctx.num_bones(), *layer, *pose.pose, 1.0, rt->mask->weight);
 		 Pose_Pool::get().free(1);
 		 return ret;
 	 }

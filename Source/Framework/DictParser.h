@@ -7,7 +7,6 @@ class IFile;
 class DictParser
 {
 public:
-    bool load_from_file(const char* filename);
     void load_from_memory(const uint8_t* ptr, int length, const char* name);
     void load_from_file(IFile* file);
     ~DictParser() {
@@ -125,7 +124,7 @@ private:
     void skip_to_next_line();
     void skip_whitespace();
     bool break_a_token(char c) {
-        return (c == ' ' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\t' || c == '\n');
+        return (c == ' ' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\t' || c == '\n' || c=='\r');
     }
     const char* get_c_str(int ofs) {
         assert(ofs < buffer_size);

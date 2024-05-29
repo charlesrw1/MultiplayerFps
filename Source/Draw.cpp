@@ -883,7 +883,7 @@ void Renderer::init()
 #ifdef _DEBUG
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(debug_message_callback, nullptr);
-	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE); 
+	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 #endif
 
@@ -901,7 +901,7 @@ void Renderer::init()
 	}
 
 	printf("Extension support:\n");
-	printf("-GL_ARB_bindless_texture: %s\n", (supports_bindless)?"yes":"no");
+	printf("-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
 	printf("-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
 	printf("-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
 	printf("-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
@@ -912,7 +912,7 @@ void Renderer::init()
 	if (!supports_compression) {
 		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
 	}
-	
+
 	int max_buffer_bindings = 0;
 	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
 	printf("-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
@@ -928,7 +928,7 @@ void Renderer::init()
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
 	const uint8_t normaldata[] = { 128,128,255 };
-	
+
 	glCreateTextures(GL_TEXTURE_2D, 1, &white_texture.gl_id);
 	glTextureStorage2D(white_texture.gl_id, 1, GL_RGB8, 1, 1);
 	glTextureSubImage2D(white_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
@@ -958,13 +958,13 @@ void Renderer::init()
 	fbo.reflected_scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
 	tex.reflected_color = tex.reflected_depth = 0;
-	InitFramebuffers(true,eng->window_w.integer(), eng->window_h.integer());
+	InitFramebuffers(true, eng->window_w.integer(), eng->window_h.integer());
 
 	EnviornmentMapHelper::get().init();
 	volfog.init();
 	shadowmap.init();
 	ssao.init();
-	
+
 	lens_dirt = mats.find_texture("lens_dirt.jpg");
 	casutics = mats.find_texture("caustics.png");
 	waternormal = mats.find_texture("waternormal.png");
@@ -976,6 +976,7 @@ void Renderer::init()
 	on_level_start();
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
+
 }
 
 
@@ -1413,9 +1414,9 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 			pass = &scene.transparents;
 		}
 
-		//execute_render_lists(*lists, *pass);
+		execute_render_lists(*lists, *pass);
 
-		render_lists_old_way(*lists, *pass);
+		//render_lists_old_way(*lists, *pass);
 	}
 
 	glCheckError();
@@ -1958,6 +1959,26 @@ glm::vec4 to_vec4(Color32 color) {
 #include <future>
 #include <thread>
 
+
+
+const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_times_tanfov)
+{
+	const auto& vs = draw.get_current_frame_vs();
+
+	glm::vec3 to_origin = glm::vec3(object.transform[3]) - vs.origin;
+	float distance_to_point = glm::dot(to_origin, vs.front);
+
+	float percentage = inv_two_times_tanfov / distance_to_point;
+	percentage *= object.model->get_bounding_sphere().w;
+
+	for (int i = object.model->get_num_lods() - 1; i > 0; i--) {
+		if (percentage <= object.model->get_lod(i).end_percentage)
+			return object.model->get_lod(i);
+	}
+	return object.model->get_lod(0);
+}
+
+
 void Render_Scene::build_scene_data()
 {
 	CPUFUNCTIONSTART;
@@ -1975,14 +1996,21 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART(traversal);
 
+		const float inv_two_times_tanfov = 1.0 / ( 2.0 * tan(draw.get_current_frame_vs().fov*0.5));
+
 
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{obj.handle};
 			auto& proxy = obj.type_.proxy;
-			if (proxy.visible) {
+			if (proxy.visible && proxy.model) {
 				// When CPU culling do that here
-				const auto& lod = proxy.model->get_lod(0);
+				
+				// determine LOD:
+				
+				const auto& lod = get_lod_to_render(proxy, inv_two_times_tanfov);
+			
+
 
 				const int pstart = lod.part_ofs;
 				const int pend = pstart + lod.part_count;

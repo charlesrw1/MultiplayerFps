@@ -106,12 +106,13 @@ bool MapLoadFile::parse(const std::string name)
 	mappath += name;
 	mappath += "/entities.txt";
 
-	DictParser parser;
-	bool good = parser.load_from_file(name.c_str());
-	if (!good) {
+	auto file = FileSys::open_read(name.c_str());
+	if (!file) {
 		sys_print("!!! couldn't find ent file %s\n", mappath.c_str());
 		return false;
 	}
+	DictParser parser;
+	parser.load_from_file(file.get());
 
 	while (!parser.is_eof()) {
 

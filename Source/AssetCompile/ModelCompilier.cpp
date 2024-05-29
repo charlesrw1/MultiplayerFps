@@ -19,7 +19,7 @@
 #include <stdexcept>
 // MODEL FORMAT:
 
-static const int MODEL_VERSION = 1;
+static const int MODEL_VERSION = 2;
 
 
 
@@ -146,6 +146,7 @@ struct AnimImportedSet_Load
 	std::string armature_name;
 	bool include_mirror = true;
 	bool include_weightlist = true;
+	bool retarget = false;
 };
 enum class SubtractType_Load {
 	None,
@@ -385,6 +386,27 @@ struct ProcessMeshOutput
 	std::vector<int> FINAL_bone_to_LOAD_bone;
 	int get_final_count() const { return FINAL_bone_to_LOAD_bone.size(); }
 };
+struct AnimationSourceToCompile
+{
+	std::vector<int>* remap = nullptr;
+	const SkeletonCompileData* skel = nullptr;
+	int animation_souce_index = 0;
+	bool should_retarget_this = false;
+
+	const Animation_Set* get_set() const {
+		return skel->setself.get();
+	}
+
+	const Animation* get_animation() const {
+		return &skel->setself->clips.at(animation_souce_index);
+	}
+	const std::string& get_animation_name() const {
+		return get_animation()->name;
+	}
+	bool is_self() const {
+		return remap == nullptr;
+	}
+};
 
 struct FinalSkeletonOutput;
 class ModelCompileHelper
@@ -418,6 +440,14 @@ public:
 	static void process_physics(const ModelCompileData& comp, const ModelDefData& data);
 	static void subtract_clips(const int num_bones, AnimationSeq* target, const AnimationSeq* source);
 	static std::vector<std::string> create_final_material_names(const std::string& modelname, const ModelCompileData& comp, const ModelDefData& data, const std::vector<bool>& mats_refed);
+	static void append_animation_seq_to_list(
+		AnimationSourceToCompile source,
+		FinalSkeletonOutput* final_,
+		const std::vector<int>& FINAL_bone_to_LOAD_bone,
+		const std::vector<int>& LOAD_bone_to_FINAL_bone,
+		const SkeletonCompileData* myskel,
+		const ModelDefData& data);
+
 };
 
 
@@ -616,7 +646,7 @@ void convert_format_verts(FUNCTOR&& f, size_t start, std::vector<T>& verts, cglt
 }
 
 
-bool append_a_found_mesh_node(
+void append_a_found_mesh_node(
 	const ModelDefData& def,
 	ModelCompileData& mcd,
 	cgltf_node* node,
@@ -995,10 +1025,11 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 
 
 ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) {
-	DictParser in;
-	bool good = in.load_from_file(name.c_str());
-	if (!good)
+	auto file = FileSys::open_read_os(name.c_str());
+	if (!file)
 		throw std::runtime_error("couldn't open dict");
+	DictParser in;
+	in.load_from_file(file.get());
 
 	ModelDefData out;
 
@@ -1040,13 +1071,22 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) 
 
 				}
 				else if (tok.cmp("crop")) {
-
+					float start = 0.0;
+					in.read_float(start);
+					in.read_string(tok);
+					float end = 10000.0;
+					if (!tok.cmp("END")) {
+						end = atof(tok.to_stack_string().c_str());
+					}
+					acl.crop.has_crop = true;
+					acl.crop.start = start;
+					acl.crop.end = end;
 				}
 				else if (tok.cmp("start")) {
 
 				}
-				else if (tok.cmp("loop_fix")) {
-
+				else if (tok.cmp("fixloop")) {
+					acl.fixloop = true;
 				}
 			}
 
@@ -1128,7 +1168,8 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) 
 			auto str2 = to_std_string_sv(tok);
 			out.material_rename[str1] = str2;
 		}
-		else if (tok.cmp("include")) {
+		else if (tok.cmp("include") || tok.cmp("include_ex")) {
+			bool extended = tok.cmp("include_ex");
 			in.read_string(tok);
 			AnimImportType_Load type{};
 			if (tok.cmp("file")) type = AnimImportType_Load::File;
@@ -1140,7 +1181,20 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) 
 			AnimImportedSet_Load ais;
 			ais.name = name;
 			ais.type = type;
+
+			if (extended) {
+				if (!in.expect_item_start()) throw std::runtime_error("expected { for include_ex");
+
+				while (in.read_string(tok) && !in.is_eof() && !in.check_item_end(tok)) {
+					if (tok.cmp("retarget")) {
+						ais.retarget = true;
+					}
+				}
+			}
+
+
 			out.imports.push_back(ais);
+
 		}
 		else {
 			throw std::runtime_error("unknown key" + to_std_string_sv(tok));
@@ -1334,7 +1388,7 @@ static void traverse_model_nodes(
 	}
 
 	if (has_mesh) {
-		bool good = append_a_found_mesh_node(def, mcd, node, this_transform, col_index!=-1);
+		 append_a_found_mesh_node(def, mcd, node, this_transform, col_index!=-1);
 	}
 
 	for (int i = 0; i < node->children_count; i++)
@@ -1424,9 +1478,11 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 		 for (int i = 0; i < num_bones; i++) {
 			 if (bone_is_referenced[i]) {
 				 LOAD_to_FINAL_bones[i] = count++;
+				 sys_print("*** bone will be kept %s\n", scd->bones[i].strname.c_str());
+
 			 }
 			 else {
-				 printf("bone will be pruned %s\n", scd->bones[i].strname.c_str());
+				 sys_print("*** bone will be pruned %s\n", scd->bones[i].strname.c_str());
 			 }
 		 }
 		 FINAL_to_LOAD_bones.resize(count);
@@ -1482,6 +1538,7 @@ struct ImportedSkeleton
 {
 	unique_ptr<SkeletonCompileData> skeleton = nullptr;
 	std::vector<int> remap_from_LOAD_to_THIS;
+	bool retarget_this = false;
 };
 
 unique_ptr<SkeletonCompileData> open_file_and_read_skeleton(const std::string& path)
@@ -1524,6 +1581,7 @@ std::vector<ImportedSkeleton> read_animation_imports(
 			continue;
 		else if (data.imports[i].type == AnimImportType_Load::File) {
 			ImportedSkeleton is;
+			is.retarget_this = data.imports[i].retarget;
 
 			std::string full_path = modelpath_to_fullpath(data.imports[i].name);
 
@@ -1548,6 +1606,7 @@ std::vector<ImportedSkeleton> read_animation_imports(
 				if (get_extension(full_path) != ".glb")
 					continue;
 				ImportedSkeleton is;
+				is.retarget_this = data.imports[i].retarget;
 				is.skeleton = open_file_and_read_skeleton(full_path);
 
 				if (!is.skeleton) {
@@ -1718,26 +1777,6 @@ std::vector<BonePoseMask> get_bone_masks(
 	return masks;
 }
 
-struct AnimationSourceToCompile
-{
-	std::vector<int>* remap = nullptr;
-	const SkeletonCompileData* skel = nullptr;
-	int animation_souce_index = 0;
-
-	const Animation_Set* get_set() const {
-		return skel->setself.get();
-	}
-
-	const Animation* get_animation() const {
-		return &skel->setself->clips.at(animation_souce_index);
-	}
-	const std::string& get_animation_name() const {
-		return get_animation()->name;
-	}
-	bool is_self() const {
-		return remap == nullptr;
-	}
-};
 
 
 bool are_all_poskeyframes_equal(float epsilon, const Animation_Set* set, const Animation* a, int LOAD_channel)
@@ -1807,8 +1846,12 @@ inline float lerp_between(float min, float max, float mid_val)
 	return (mid_val - min) / (max - min);
 }
 
+static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
+{
+	return to * glm::inverse(from);
+}
 
-void append_animation_seq_to_list(
+void ModelCompileHelper::append_animation_seq_to_list(
 	AnimationSourceToCompile source,
 	FinalSkeletonOutput* final_,
 	const std::vector<int>& FINAL_bone_to_LOAD_bone,
@@ -1831,9 +1874,19 @@ void append_animation_seq_to_list(
 	const float fps = 30.0;
 	out_seq.fps = fps;
 
-	const int num_keyframes_wo_last = source_a->total_duration * fps;
+	int START_keyframe = 0;
+	int NUM_keyframes = source_a->total_duration * fps;
+	int END_keyframe = NUM_keyframes;
+	if (definition && definition->crop.has_crop) {
+		if(definition->crop.start >= 0 && definition->crop.start < END_keyframe)
+			START_keyframe = definition->crop.start;
+		if (definition->crop.end >= 9999.0 && definition->crop.end < END_keyframe && END_keyframe > START_keyframe)
+			END_keyframe = definition->crop.end;
+		NUM_keyframes = END_keyframe - START_keyframe;
+	}
+
 	out_seq.duration = source_a->total_duration;
-	out_seq.num_frames = num_keyframes_wo_last;
+	out_seq.num_frames = NUM_keyframes;
 
 	out_seq.channel_offsets.resize(target_count);
 
@@ -1875,9 +1928,9 @@ void append_animation_seq_to_list(
 		int index1 = VarName + 1; \
 		float t0 = source_set->FuncName(SRC_idx, index0, clip_index).time; \
 		float t1 = source_set->FuncName(SRC_idx, index1, clip_index).time; \
-		if (index0 == 0)t0 = 0.f; \
 		float scale = lerp_between(t0, t1, TIME); \
-		assert(scale >= 0 && scale <= 1.f);
+		//assert(scale >= 0 && scale <= 1.f);
+		//if (index0 == 0)t0 = 0.f;
 
 		// POSITION
 		offsets.pos = out_seq.pose_data.size();
@@ -1906,7 +1959,8 @@ void append_animation_seq_to_list(
 		}
 		else {
 			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
-				const float t = frame / fps;
+				const int frame_w_crop = frame + START_keyframe;
+				const float t = frame_w_crop / fps;
 				ASSERT(t <= out_seq.duration);
 				glm::vec3 pos = get_pos_for_time(t);
 				write_out_to_outseq(&pos.x, 3, &out_seq);
@@ -1943,7 +1997,8 @@ void append_animation_seq_to_list(
 		}
 		else {
 			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
-				const float t = frame / fps;
+				const int frame_w_crop = frame + START_keyframe;
+				const float t = frame_w_crop / fps;
 				ASSERT(t <= out_seq.duration);
 				glm::quat rot = get_rot_for_time(t);
 				write_out_to_outseq(&rot.x, 4, &out_seq);
@@ -1979,7 +2034,8 @@ void append_animation_seq_to_list(
 		}
 		else {
 			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
-				const float t = frame / fps;
+				const int frame_w_crop = frame + START_keyframe;
+				const float t = frame_w_crop / fps;
 				ASSERT(t <= out_seq.duration);
 				float uniform_scale = get_scale_for_time(t);
 				write_out_to_outseq(&uniform_scale, 1, &out_seq);
@@ -1996,6 +2052,63 @@ void append_animation_seq_to_list(
 #define IS_HIGH_BIT_SET(x) (x & (1u<<31u))
 #define CLEAR_HIGH_BIT(x) ( x & ~(1u<<31u) )
 	
+	// Set actual duration here
+	out_seq.duration = (float)NUM_keyframes / fps;
+
+	// Apply any retargeting
+	if (source.should_retarget_this) {
+		for (int FINAL_idx = 0; FINAL_idx < target_count; FINAL_idx++) {
+			const int LOAD_idx = FINAL_bone_to_LOAD_bone[FINAL_idx];
+			assert(LOAD_idx != -1);
+			float scale = 1.0;
+
+			const int SRC_idx = (source.remap) ? (*source.remap)[LOAD_idx] : LOAD_idx;
+			if (SRC_idx == -1)	// already added local pose
+				continue;
+
+			glm::mat4 transform_matrix = glm::mat4(1.0);
+
+			if (myskel->get_bone_parent(LOAD_idx) == -1) {
+				glm::mat4 local_other = source.skel->bones[SRC_idx].localtransform;
+				transform_matrix = glm::inverse(myskel->armature_root) * glm::inverse(source.skel->armature_root);
+			}
+			if (myskel->bones[LOAD_idx].retarget_type == RetargetBoneType::FromAnimationScaled) {
+				scale = glm::length(myskel->get_local_position(LOAD_idx));
+				scale /= glm::length(source.skel->get_local_position(SRC_idx));
+			}
+
+			for (int keyframe = 0; keyframe < out_seq.get_num_keyframes_inclusive(); keyframe++) {
+				glm::vec3* pos = out_seq.get_pos_write_ptr(FINAL_idx, keyframe);
+				glm::quat* rot = out_seq.get_quat_write_ptr(FINAL_idx, keyframe);
+				if (!pos || !rot)	//indicate a "single" pose frame
+					break;
+
+				if (myskel->get_bone_parent(LOAD_idx) == -1) {
+					glm::mat4 matrix = glm::mat4_cast(*rot);
+					matrix[3] = glm::vec4(*pos, 1.0);
+					
+					*pos = transform_matrix * glm::vec4(*pos, 1.0);
+
+					glm::mat3 justrot2 = transform_matrix;
+					justrot2[0] = glm::normalize(justrot2[0]);
+					justrot2[1] = glm::normalize(justrot2[1]);
+					justrot2[2] = glm::normalize(justrot2[2]);
+
+					auto try2 = glm::quat_cast(justrot2);
+
+					*rot = try2 * (*rot);
+				}
+				else if (myskel->bones[LOAD_idx].retarget_type == RetargetBoneType::FromAnimationScaled) {
+					*pos *= scale;
+				}
+				else if (myskel->bones[LOAD_idx].retarget_type == RetargetBoneType::FromTargetBindPose) {
+					*pos = myskel->get_local_position(LOAD_idx);
+				}
+			}
+		}
+	}
+
+
 	
 	assert(myskel->get_bone_parent(FINAL_bone_to_LOAD_bone[0]) == -1);	// ROOT
 	// Calculate average linear velocity
@@ -2012,6 +2125,19 @@ void append_animation_seq_to_list(
 			glm::vec3 dif = last - first;
 
 			out_seq.average_linear_velocity = glm::length(dif) / out_seq.get_duration();
+		}
+	}
+
+	if (definition && definition->fixloop) {
+		for (int FINAL_idx = 0; FINAL_idx < target_count; FINAL_idx++) {
+			const glm::vec3* pos0 = out_seq.get_pos_write_ptr(FINAL_idx, 0);
+			const glm::quat* rot0 = out_seq.get_quat_write_ptr(FINAL_idx, 0);
+			glm::vec3* pos1 = out_seq.get_pos_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive()-1);
+			glm::quat* rot1 = out_seq.get_quat_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive() - 1);
+			if (!pos1 || !rot1)	//indicate a "single" pose frame
+				continue;
+			*pos1 = *pos0;
+			*rot1 = *rot0;
 		}
 	}
 
@@ -2110,6 +2236,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 			astc.animation_souce_index = j;
 			astc.remap = &imp.remap_from_LOAD_to_THIS;
 			astc.skel = imp.skeleton.get();
+			astc.should_retarget_this = imp.retarget_this;
 
 			append_animation_seq_to_list(astc, final_out, FINAL_bone_to_LOAD_bone, LOAD_bone_to_FINAL_bone, compile_data, data);
 		}
@@ -2177,7 +2304,7 @@ static void output_embedded_texture(const std::string& outputname, const cgltf_i
 	sys_print("*** writing out embedded texture %s\n", outputname.c_str());
 
 	std::string image_path = "./Data/Textures/" + outputname;
-	std::ofstream outfile(image_path.c_str());
+	std::ofstream outfile(image_path.c_str(), std::ios::binary);
 	if (!outfile) {
 		sys_print("!!! couldn't open file to output embedded texture %s\n", image_path.c_str());
 		return;
@@ -2231,14 +2358,14 @@ static std::string create_material_and_export(const std::string& generated_name,
 		);
 
 		if (base.base_color_texture.texture) {
-			std::string output_name = generated_name + base.base_color_texture.texture->image->name;
+			std::string output_name =  base.base_color_texture.texture->image->name;
 			output_name += ".png";
 			output_embedded_texture(output_name, base.base_color_texture.texture->image, data);
 			
 			out.write_key_value("albedo", output_name.c_str());
 		}
 		if (base.metallic_roughness_texture.texture) {
-			std::string output_name = generated_name + base.metallic_roughness_texture.texture->image->name;
+			std::string output_name =  base.metallic_roughness_texture.texture->image->name;
 			output_name += ".png";
 			output_embedded_texture(output_name, base.metallic_roughness_texture.texture->image, data);
 
@@ -2247,7 +2374,7 @@ static std::string create_material_and_export(const std::string& generated_name,
 
 	}
 	if (mat->normal_texture.texture) {
-		std::string output_name = generated_name + mat->normal_texture.texture->image->name;
+		std::string output_name =  mat->normal_texture.texture->image->name;
 		output_name += ".png";
 		output_embedded_texture(output_name, mat->normal_texture.texture->image, data);
 
@@ -2312,8 +2439,10 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 			continue;
 
 		// not good, this means the material does not exist, thus we should create one
+		std::string justname = strip_extension(modelname);
+		get_filename(justname);
 
-		std::string generated_mat_name = modelname + cgltf_mat.name + std::to_string(i);
+		std::string generated_mat_name = justname + cgltf_mat.name;
 		generated_mat_name = make_non_proplematic_name(generated_mat_name);
 
 		final_mats[i] = create_material_and_export(generated_mat_name, d, &cgltf_mat);
@@ -2482,6 +2611,15 @@ FinalModelData create_final_model_data(
 		final_mod.lods.push_back(out_lod);
 	}
 
+	if (final_mod.lods.size() == 0) {
+		sys_print("??? model has no lods to output, creating an empty default one\n");
+		MeshLod loddefault;
+		loddefault.part_count = 0;
+		loddefault.part_ofs = 0;
+		final_mod.lods.push_back(loddefault);
+		total_bounds = Bounds(glm::vec3(-0.5), glm::vec3(0.5));
+	}
+
 	final_mod.AABB = total_bounds;
 
 	return final_mod;
@@ -2624,6 +2762,17 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 	return true;
 }
 
+void add_bone_def_data_to_skeleton(const ModelDefData& def, SkeletonCompileData* skel)
+{
+	for (int i = 0; i < skel->get_num_bones(); i++) {
+		auto name = skel->bones[i].strname;
+		if (def.bone_retarget_type.find(name) != def.bone_retarget_type.end())
+			skel->bones[i].retarget_type = def.bone_retarget_type.find(name)->second;
+		else
+			skel->bones[i].retarget_type = RetargetBoneType::FromTargetBindPose;
+	}
+}
+
 bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDefData& def)
 {
 	cgltf_and_binary out = load_cgltf_data(modelpath_to_fullpath(def.model_source));
@@ -2632,7 +2781,8 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 		return false;
 
 	unique_ptr<SkeletonCompileData> skeleton_data = get_skin_from_file(out.data, defname.c_str(), def.armature_name);
-	
+	add_bone_def_data_to_skeleton(def, skeleton_data.get());
+
 	const ProcessNodesAndMeshOutput post_traverse = process_nodes_and_mesh(
 		out.data,
 		skeleton_data.get(),
@@ -2646,7 +2796,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 		post_traverse.meshout.material_is_used
 	);
 
-	unique_ptr<FinalSkeletonOutput> final_skeleton = create_final_skeleton(
+	unique_ptr<FinalSkeletonOutput> final_skeleton = ModelCompileHelper::create_final_skeleton(
 		post_traverse.meshout.LOAD_bone_to_FINAL_bone, 
 		post_traverse.meshout.FINAL_bone_to_LOAD_bone,
 		skeleton_data.get(), 
@@ -2668,6 +2818,8 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 	return res;
 }
 
+static bool compile_everything = true;
+
 bool ModelCompilier::compile(const char* name)
 {
 	sys_print("----- Compiling Model %s -----\n", name);
@@ -2684,14 +2836,31 @@ bool ModelCompilier::compile(const char* name)
 
 	std::string compilied = strip_extension(name) + ".cmdl";
 	file = FileSys::open_read_os(compilied.c_str());
+
+
+	bool needs_compile = compile_everything;
 	if (file) {
 		timestamp_of_cmdl = file->get_timestamp();
+		if (file->size() <= 8)
+			needs_compile = true;
+		else {
+			uint32_t magic = 0;
+			uint32_t version = 0;
+			file->read(&magic, 4);
+			file->read(&version, 4);
+			if (magic != 'CMDL') {
+				needs_compile = true;
+			}
+			else if (version != MODEL_VERSION) {
+				sys_print("*** .cmdl version out of data (found %d, current %d), recompiling\n", version, MODEL_VERSION);
+				needs_compile = true;
+			}
+		}
 	}
 	file.reset();
 
-	bool needs_compile = false;
-	if (timestamp_of_cmdl <= timestamp_of_def) {
-		sys_print("*** .def newer than .cmdl, needs recompile\n");
+	if (!needs_compile && timestamp_of_cmdl <= timestamp_of_def) {
+		sys_print("*** .def newer than .cmdl, recompiling\n");
 		needs_compile = true;
 	}
 
@@ -2729,6 +2898,9 @@ bool ModelCompilier::compile(const char* name)
 		}
 		return false;
 	};
+
+	bool needs_compile_before_src = needs_compile;
+
 	if (!needs_compile)
 		needs_compile |= check_timestamp_file(timestamp_of_cmdl, modelpath_to_fullpath(def_data.model_source));
 	for (int i = 0; i < def_data.imports.size() && !needs_compile; i++) {
@@ -2737,6 +2909,8 @@ bool ModelCompilier::compile(const char* name)
 		else if (def_data.imports[i].type == AnimImportType_Load::Folder)
 			needs_compile |= check_timestamp_folder(timestamp_of_cmdl, modelpath_to_fullpath(def_data.imports[i].name));
 	}
+	if (!needs_compile_before_src && needs_compile)
+		sys_print("*** source files out of data, recompiling\n");
 
 	if (!needs_compile) {
 		sys_print("*** skipping compile\n");

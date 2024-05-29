@@ -1869,7 +1869,7 @@ void AnimationGraphEditor::create_new_document()
 
 void AnimationGraphEditor::try_load_preview_models()
 {
-	out.model = mods.find_or_load(opt.preview_model.c_str());
+	out.model = mods.find_or_load("player_FINAL.cmdl");
 	if(out.is_valid_for_preview())
 		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);
 }

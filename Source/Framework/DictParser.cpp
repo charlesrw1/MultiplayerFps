@@ -2,34 +2,6 @@
 #include "Framework/Files.h"
 #include <fstream>
 
-bool DictParser::load_from_file(const char* filename) {
-
-    assert(!buffer);
-    
-    std::ifstream infile(filename, std::ios::ate);
-
-
-    if (!infile)
-        return false;
-
-
-    auto size = infile.tellg();
-
-    buffer = new uint8_t[size];
-    buffer_size = (int)size;
-    allocated = true;
-
-    infile.seekg(0);
-    infile.read((char*)buffer, buffer_size);
-
-    read_ptr = 0;
-    line = 1;
-
-    this->filename = filename;
-
-    return true;
-}
-
 void DictParser::load_from_memory(const uint8_t* ptr, int length, const char* name) {
     
     assert(!buffer);

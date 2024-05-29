@@ -15,7 +15,7 @@
 #include "RenderObj.h"
 #include "Framework/FreeList.h"
 
-#pragma optimize("", on);
+#pragma optimize("", on)
 
 class MeshPart;
 class Model;
@@ -652,6 +652,8 @@ public:
 	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither);
 	
 	Render_Stats stats;
+
+	const View_Setup& get_current_frame_vs()const { return current_frame_main_view; }
 
 	void set_shader_sampler_locations();
 	View_Setup current_frame_main_view;

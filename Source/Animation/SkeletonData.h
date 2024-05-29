@@ -153,16 +153,22 @@ public:
 		return mirroring_table[index];
 	}
 
-	const glm::mat4x4& get_bone_local_transform(int index) const { return bone_dat[index].localtransform; }
+	const glm::mat4x3& get_bone_local_transform(int index) const { return bone_dat[index].localtransform; }
 	const glm::quat& get_bone_local_rotation(int index) const { return bone_dat[index].rot; }
-	const glm::mat4& get_inv_posematrix(int index) const { return bone_dat[index].invposematrix; }
+	const glm::mat4x3& get_inv_posematrix(int index) const { return bone_dat[index].invposematrix; }
 
 	const AnimationSeq* find_clip(const std::string& name, int& remap_index) const;
 
 	const Bone_Index_Remap* get_remap(int index) const {
 		return &remaps[index];
 	}
-
+	const BonePoseMask* find_mask(StringName name) const {
+		for (int i = 0; i < masks.size(); i++) {
+			if (masks[i].name == name)
+				return &masks[i];
+		}
+		return nullptr;
+	}
 
 private:
 
