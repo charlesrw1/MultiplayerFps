@@ -160,7 +160,7 @@ private:
 class GraphOutput
 {
 public:
-	bool is_valid_for_preview() { return model && set; }
+	bool is_valid_for_preview() { return model && model->get_skel(); }
 
 	void reset_animator();
 	View_Setup vs;
@@ -173,7 +173,6 @@ public:
 	}
 
 	Model* model = nullptr;
-	const Animation_Set_New* set = nullptr;
 private:
 
 
@@ -484,7 +483,7 @@ public:
 		bool open_viewport = true;
 		bool open_prop_editor = true;
 		bool statemachine_passthrough = false;
-		std::string preview_model = "player_FINAL.glb";
+		std::string preview_model = "player_FINAL.cmdl";
 		std::string preview_set = "default.txt";
 	}opt;
 

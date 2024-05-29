@@ -125,9 +125,28 @@ void sys_print(const char* fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
+	
+	int len = strlen(fmt);
+	bool print_end = false;
+	if (len >= 3 && fmt[0] == '!' && fmt[1] == '!' && fmt[2] == '!') {
+		printf("\033[91m");
+		print_end = true;
+	}
+	else if (len >= 3 && fmt[0] == '?' && fmt[1] == '?' && fmt[2] == '?') {
+		printf("\033[33m");
+		print_end = true;
+	}
+	else if (len >= 3 && fmt[0] == '*' && fmt[1] == '*' && fmt[2] == '*') {
+		printf("\033[94m");
+		print_end = true;
+	}
+
 	vprintf(fmt, args);
 	dbg_console.print_args(fmt, args);
 	va_end(args);
+
+	if (print_end)
+		printf("\033[0m");
 }
 
 void sys_vprint(const char* fmt, va_list args)
@@ -406,31 +425,12 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 		position += delta;
 	}
 }
-
+#include "Framework/Files.h"
 void Game_Media::load()
 {
 	model_manifest.clear();
 
-	File_Buffer* manifest_f = Files::open("./Data/Models/manifest.txt", Files::TEXT | Files::LOOK_IN_ARCHIVE);
-
-
-	//std::ifstream manifest_f("./Data/Models/manifest.txt");
-	if (!manifest_f) {
-		sys_print("Couldn't open model manifest\n");
-		return;
-	}
-	char buffer[256];
-	Buffer str;
-	str.buffer = buffer;
-	str.length = 256;
-	int index = 0;
-	while (file_getline(manifest_f, &str, &index, '\n')) {
-		std::string s = str.buffer;
-		model_manifest.push_back(s);
-	}
-
-	Files::close(manifest_f);
-
+	
 	model_cache.resize(model_manifest.size());
 
 }
@@ -450,14 +450,14 @@ Model* Game_Media::get_game_model(const char* model, int* out_index)
 
 	if(out_index) *out_index = i;
 	if (model_cache[i]) return model_cache[i];
-	model_cache[i] = FindOrLoadModel(model);
+	model_cache[i] = mods.find_or_load(model);
 	return model_cache[i];
 }
 Model* Game_Media::get_game_model_from_index(int index)
 {
 	if (index < 0 || index >= model_manifest.size()) return nullptr;
 	if (model_cache[index]) return model_cache[index];
-	model_cache[index] = FindOrLoadModel(model_manifest[index].c_str());
+	model_cache[index] = mods.find_or_load(model_manifest[index].c_str());
 	return model_cache[index];
 }
 
@@ -793,8 +793,11 @@ void Game_Engine::execute_map_change()
 	stop_game();
 
 	// try loading map
-	level = LoadLevelFile(mapname.c_str());
-	if (!level) {
+	level = new Level;
+
+	if (!level->open_from_file(mapname)) {
+		delete level;
+		level = nullptr;
 		sys_print("!!! couldn't load map !!!\n");
 		state = Engine_State::Idle;
 		return;
@@ -892,7 +895,7 @@ void Game_Engine::bind_key(int key, string command)
 
 void Game_Engine::cleanup()
 {
-	FreeLoadedTextures();
+
 	NetworkQuit();
 	SDL_GL_DeleteContext(gl_context);
 	SDL_DestroyWindow(window);
@@ -1136,9 +1139,9 @@ void Game_Engine::build_physics_world(float time)
 		obj.is_level = true;
 		obj.solid = true;
 		obj.is_mesh = true;
-		obj.mesh.structure = &level->collision->bvh;
-		obj.mesh.verticies = &level->collision->verticies;
-		obj.mesh.tris = &level->collision->tris;
+		obj.mesh.structure = &level->scollision->bvh;
+		obj.mesh.verticies = &level->scollision->verticies;
+		obj.mesh.tris = &level->scollision->tris;
 
 		phys.AddObj(obj);
 	}
@@ -1213,7 +1216,7 @@ Game_Engine::Game_Engine() :
 	memset(keys, 0, sizeof keys);
 }
 
-extern Game_Mod_Manager mods;
+extern ModelMan mods;
 
 ImNodesContext* ImNodesCreateContext()
 {
@@ -1247,7 +1250,7 @@ void Game_Engine::init()
 	TIMESTAMP("init sdl window");
 
 	Profiler::init();
-	Files::init();
+	FileSys::init();
 
 	init_audio();
 	TIMESTAMP("init audio");
@@ -1259,7 +1262,7 @@ void Game_Engine::init()
 	TIMESTAMP("draw init");
 
 	mats.init();
-	mats.load_material_file_directory("./Data/Materials/");
+	mats.load_material_file_directory("./Data/Materials");
 	anim_tree_man->init();
 	TIMESTAMP("mats init");
 
@@ -1427,7 +1430,7 @@ void Game_Engine::stop_game()
 
 	idraw->on_level_end();
 	
-	FreeLevel(level);
+	delete level;
 	level = nullptr;
 
 	phys.ClearObjs();

@@ -25,6 +25,10 @@ inline float MidLerp(float min, float max, float mid_val)
 	return (mid_val - min) / (max - min);
 }
 
+class AnimationSeq;
+class MSkeleton;
+void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const std::vector<int16_t>* remap_indicies, Pose& outpose);
+void util_localspace_to_meshspace(Pose& local, const glm::mat4* meshspace /* size = num bones*/, const MSkeleton* skel);
 void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const Model* model);
 void util_subtract(int bonecount, const Pose& reference, Pose& source);
 // b = lerp(a,b,f)
@@ -38,7 +42,7 @@ void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, c
 // a = base pose
 // b = layered pose
 // returns output in b
-void util_global_blend(const Model_Skeleton* skel,const Pose* a,  Pose* b, float factor,const std::vector<float>& mask);
+void util_global_blend(const MSkeleton* skel,const Pose* a,  Pose* b, float factor,const std::vector<float>& mask);
 
 void util_twobone_ik(
 	const vec3& a, const vec3& b, const vec3& c,
@@ -50,9 +54,7 @@ void util_twobone_ik(
 // y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)
 void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1, Pose& y2, glm::vec2 fac);
 
-void util_calc_rotations(const Animation_Set* set,
-	float curframe, int clip_index, const Model* model, const std::vector<int>* remap_indicies, Pose& pose);
-void util_set_to_bind_pose(Pose& pose, const Model* model);
+void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel);
 
 class Pose_Pool
 {

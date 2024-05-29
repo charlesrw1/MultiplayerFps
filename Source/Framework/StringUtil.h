@@ -127,6 +127,7 @@ public:
 	Stack_String<256> to_stack_string() {
 		return Stack_String<256>(str_start, str_len);
 	}
+	bool is_empty() const { return str_len == 0; }
 
 	const char* str_start = nullptr;
 	int str_len = 0;

@@ -7,91 +7,66 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "Framework/MeshBuilder.h"
 #include "Framework/Dict.h"
+#include "Framework/Files.h"
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
 class TransformCommand : public Command
 {
 public:
-	TransformCommand(EditorDoc* doc, int node_idx, TransformType type, glm::vec3 delta) 
-		: doc(doc),node_idx(node_idx), type(type),delta(delta) {}
+	TransformCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n, TransformType type, glm::vec3 delta)
+		: doc(doc), node(n), type(type),delta(delta) {}
+
+	TransformCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n, glm::quat delta_q)
+		: doc(doc), node(n), type(ROTATION), delta_q(delta_q) {}
+
 	~TransformCommand() {}
 	void execute() {
-		EditorNode* node = doc->nodes[node_idx].get();
 		if (type == TRANSLATION)
 			node->position += delta;
 		else if (type == ROTATION)
-			node->rotation += delta;
+			node->rotation += delta_q;
 		else if (type == SCALE)
 			node->scale += delta;
-
-		node->save_out_to_level();
 	}
 	void undo() {
-		EditorNode* node = doc->nodes[node_idx].get();
 		if (type == TRANSLATION)
 			node->position -= delta;
 		else if (type == ROTATION)
-			node->rotation -= delta;
+			node->rotation -= delta_q;
 		else if (type == SCALE)
 			node->scale -= delta;
-
-		node->save_out_to_level();
 	}
 
-	int node_idx;
+	std::shared_ptr<EditorNode> node;
 	glm::vec3 delta;
+	glm::quat delta_q;
 	TransformType type;
-	EditorDoc* doc;
+	EditorDoc* doc{};
 };
 
 class EditPropertyCommand : public Command
 {
 public:
-	enum Type {
-		ADD_PROPERTY,
-		REMOVE_PROPERTY,
-		CHANGE_PROPERTY,
-	};
 
-	EditPropertyCommand(EditorDoc* doc, int node_idx, std::string key, Type type, std::string changeval)
-		: doc(doc), node_idx(node_idx), type(type), newval(changeval) {}
+	EditPropertyCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n, std::string key, std::string changeval)
+		: doc(doc), node(n), newval(changeval),key(key) {}
 	~EditPropertyCommand() {}
 	void execute() {
-		EditorNode* node = doc->nodes[node_idx].get();
-		Dict* d = &node->get_dict();
-		if (type == ADD_PROPERTY) {
-			d->set_string(key.c_str(), newval.c_str());
-		}
-		else if (type == REMOVE_PROPERTY) {
-			oldval = d->get_string(key.c_str());
-			d->remove_key(key.c_str());
-		}
-		else {
-			oldval = d->get_string(key.c_str());
-			d->set_string(key.c_str(), newval.c_str());
-		}
 
-		node->save_out_to_level();
+		Dict* d = &node->get_dict();
+
+		oldval = d->get_string(key.c_str());
+		d->set_string(key.c_str(), newval.c_str());
 	}
 	void undo() {
-		EditorNode* node = doc->nodes[node_idx].get();
-		Dict* d = &node->get_dict();
-		if (type == ADD_PROPERTY) {
-			d->remove_key(key.c_str());
-		}
-		else if (type == REMOVE_PROPERTY) {
-			d->set_string(key.c_str(), oldval.c_str());
-		}
-		else {
-			d->set_string(key.c_str(), oldval.c_str());
-		}
 
-		node->save_out_to_level();
+		Dict* d = &node->get_dict();
+
+		d->set_string(key.c_str(), oldval.c_str());
 	}
 
-	int node_idx;
-	Type type;
+	std::shared_ptr<EditorNode> node;
 	std::string oldval;
 	std::string key;
 	std::string newval;
@@ -101,17 +76,18 @@ public:
 class CreateNodeCommand : public Command
 {
 public:
-	CreateNodeCommand(EditorDoc* doc, EditorNode* node, Dict spawn_dict) : doc(doc), node(node), spawn_dict(spawn_dict) {}
+	CreateNodeCommand(const std::shared_ptr<EditorNode>& node, EditorDoc* doc) 
+		: doc(doc), node(node) {}
 	~CreateNodeCommand() {
 	}
 
 	void execute() {
 		doc->nodes.push_back(node);
-		Dict copy = spawn_dict;	// because on create is destructive...
-		node->on_create_from_dict(-1,-1, &copy);
+		node->show();
 	}
 	void undo() {
-		node->on_remove();
+		assert(doc->nodes.back().get() == node.get());
+		node->hide();
 		doc->nodes.pop_back();
 	}
 
@@ -123,36 +99,26 @@ public:
 class RemoveNodeCommand : public Command
 {
 public:
-	RemoveNodeCommand(EditorDoc* doc, int nodeidx) : doc(doc), nodeidx(nodeidx) {}
+	RemoveNodeCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n) 
+		: doc(doc), node(n) {
+		index = doc->get_node_index(n.get());
+		assert(index != -1);
+	}
 	~RemoveNodeCommand() {
 	}
 
 	void execute() {
-		node = doc->nodes[nodeidx];
-		Level::Entity_Spawn& espawn = doc->leveldoc->espawns[node->dict_index];
-		// make a copy of the underlying data, dont want to lose it
-		obj_dict = std::move(espawn.spawnargs);
-		obj_dict_index = node->dict_index;
-		varying_index = node->_varying_obj_index;
-
-		node->on_remove();	// removes the node from engine lists
-		// decrements other node indicies to patch up removal
-		doc->on_add_or_remove_node(node->dict_index, node->obj, node->_varying_obj_index, true);
-		// removes node from editor list
-		doc->nodes.erase(doc->nodes.begin() + nodeidx);
+		node->hide();
+		doc->nodes.erase(doc->nodes.begin() + index);
 	}
 	void undo() {
-		doc->nodes.insert(doc->nodes.begin() + nodeidx,node);
-		doc->on_add_or_remove_node(node->dict_index, node->obj, node->_varying_obj_index, false);
-		node->on_create_from_dict(obj_dict_index, varying_index, &obj_dict);
+		doc->nodes.insert(doc->nodes.begin() + index,node);
+		node->show();
 	}
-	int nodeidx;
+
 	std::shared_ptr<EditorNode> node;
 	EditorDoc* doc;
-
-	int obj_dict_index = 0;
-	int varying_index = 0;
-	Dict obj_dict;
+	int index = 0;
 };
 
 static float alphadither = 0.0;
@@ -161,18 +127,33 @@ void menu_temp()
 	ImGui::SliderFloat("alpha", &alphadither, 0.0, 1.0);
 }
 
+
+static bool has_extension(const std::string& path, const std::string& ext)
+{
+	auto find = path.rfind('.');
+	if (find == std::string::npos)
+		return false;
+	return path.substr(find + 1) == ext;
+}
+
+
 void AssetBrowser::init()
 {
 	Debug_Interface::get()->add_hook("dither", menu_temp);
 
 	edmodels.clear();
-	char buffer[256];
-	while (Files::iterate_files_in_dir("./Data/Models/*", buffer, 256)) {
-		EdModel em;
-		em.name = buffer; // load the models once you need them
-		em.m = nullptr;
-		edmodels.push_back(em);
+
+	const char*const  model_root = "./Data/Models";
+	const int mr_len = strlen(model_root);
+	FileTree tree = FileSys::find_files(model_root);
+	for (const auto& file : tree) {
+		if(has_extension(file, ".c_mdl")) {
+			EdModel em{};
+			em.name = file.substr(mr_len + 1);
+			edmodels.push_back(em);
+		}
 	}
+
 	update_remap();
 
 	asset_name_filter[0] = 0;
@@ -192,15 +173,21 @@ void AssetBrowser::handle_input(const SDL_Event& inp)
 		d.set_string("classname", "static_mesh");
 		d.set_string("model", edmodels[selected_real_index].name.c_str());
 
-		EditorNode* node = new EditorNode(doc);
-		CreateNodeCommand* com = new CreateNodeCommand(doc, node, std::move(d));
-		doc->command_mgr.add_command(com);
-
-		if (!spawn_another) {
-			close();
-			doc->selected_node = node;
-			doc->mode = EditorDoc::TOOL_NONE;
-		}
+		//EditorNode* node = doc->create_node_from_type("static_mesh");
+		//node->get_dict().set_vec3("position", model_position);
+		//node->get_dict().set_string("model", edmodels[selected_real_index].name.c_str());
+		//node->update_from_dict();
+		//
+		//std::shared_ptr<EditorNode> shared_ptr_node(node);
+		//
+		//CreateNodeCommand* com = new CreateNodeCommand(shared_ptr_node,doc);
+		//doc->command_mgr.add_command(com);
+		//
+		//if (!spawn_another) {
+		//	close();
+		//	doc->selected_node = shared_ptr_node;
+		//	doc->mode = EditorDoc::TOOL_NONE;
+		//}
 
 	}
 
@@ -267,8 +254,8 @@ void AssetBrowser::update()
 		}
 
 		Render_Object obj;
-		obj.mesh = &get_model()->mesh;
-		obj.mats = &get_model()->mats;
+		obj.model = get_model();
+
 		obj.transform = glm::translate(glm::mat4(1),model_position);
 		obj.visible = true;
 		obj.param1 = to_color32(glm::vec4(1.0, 0.5, 0, alphadither));
@@ -277,8 +264,7 @@ void AssetBrowser::update()
 		idraw->update_obj(temp_place_model, obj);
 
 		auto mod = mods.find_or_load("sphere.glb");
-		obj.mesh = &mod->mesh;
-		obj.mats = &mod->mats;
+		obj.model = mod;
 		obj.opposite_dither = true;
 		//obj.visible = false;
 		idraw->update_obj(temp_place_model2, obj);
@@ -303,178 +289,66 @@ void AssetBrowser::close()
 	}
 }
 
-void EditorDoc::on_add_or_remove_node(int ent_dict_index, EdObjType type, int index, bool is_removal)
-{
-	for (int i = 0; i < nodes.size(); i++) {
-		if (is_removal && nodes[i]->dict_index > ent_dict_index)
-			nodes[i]->dict_index -= 1;
-		if (!is_removal && nodes[i]->dict_index > ent_dict_index)
-			nodes[i]->dict_index += 1;
-
-		if (nodes[i]->obj == type) {
-
-			if (is_removal && nodes[i]->_varying_obj_index > index)
-				nodes[i]->_varying_obj_index -= 1;
-			else if (!is_removal && nodes[i]->_varying_obj_index > index)
-				nodes[i]->_varying_obj_index += 1;
-		}
-	}
-
-
-}
-
-extern Static_Mesh_Object make_static_mesh_from_dict(Level::Entity_Spawn* obj);
-extern Level_Light make_light_from_dict(Level::Entity_Spawn* obj);
 
 
 Dict& EditorNode::get_dict()
 {
-	return doc->leveldoc->espawns[dict_index].spawnargs;
+	return edit_ent;
 }
 
-void EditorNode::on_create_from_dict(int ent_spawn_index, int varying_index, Dict* d)
+
+EditorNode::~EditorNode()
 {
-	Level* level = doc->leveldoc;
-	if (ent_spawn_index == -1) {
-		ent_spawn_index = level->espawns.size();
-	}
-	level->espawns.insert(level->espawns.begin() + ent_spawn_index, Level::Entity_Spawn());
-	doc->on_add_or_remove_node(ent_spawn_index, obj, varying_index, false);
-	Level::Entity_Spawn& es = level->espawns.at(ent_spawn_index);
-	dict_index = ent_spawn_index;
-
-	es.spawnargs = std::move(*d);
-	es.position = es.spawnargs.get_vec3("position");
-	es.rotation = es.spawnargs.get_vec3("rotation");
-	es.scale = es.spawnargs.get_vec3("scale", vec3(1.f));
-	es.classname = es.spawnargs.get_string("classname");
-	es.name = es.spawnargs.get_string("name", "emptyname");
-
-	init_on_new_espawn();
-
-	if (obj == EDOBJ_LIGHT) {
-		if (varying_index == -1) {
-			varying_index = level->lights.size();
-		}
-		level->lights.insert(level->lights.begin() + varying_index, make_light_from_dict(&es));
-	}
-	else if (obj == EDOBJ_MODEL) {
-		if (varying_index == -1) {
-			varying_index = level->static_mesh_objs.size();
-		}
-		level->static_mesh_objs.insert(level->static_mesh_objs.begin() + varying_index, make_static_mesh_from_dict(&es));
-	}
-	_varying_obj_index = varying_index;
-	es._ed_varying_index_for_statics = _varying_obj_index;
+	if (render_handle.is_valid())
+		idraw->remove_obj(render_handle);
+	if (render_light.is_valid())
+		idraw->remove_light(render_light);
 }
 
-void EditorNode::on_remove()
+void EditorNode::show()
 {
-	// make sure any editor references are gone
-	if (doc->selected_node == this)
-		doc->selected_node = nullptr;
-
-	// edit the actual engine stuff
-	Level* level = doc->leveldoc;
-	doc->leveldoc->espawns.erase(doc->leveldoc->espawns.begin() + dict_index);	// remove the entityspawn
-
-	// remove specific stuff
-	if (obj == EDOBJ_LIGHT) {
-		level->lights.erase(level->lights.begin() + _varying_obj_index);
-	}
-	else if (obj == EDOBJ_MODEL) {
-		auto& obj = level->static_mesh_objs.at(_varying_obj_index);
-		idraw->remove_obj(obj.handle);
-
-		level->static_mesh_objs.erase(level->static_mesh_objs.begin() + _varying_obj_index);
+	idraw->remove_obj(render_handle);
+	idraw->remove_light(render_light);
+	if (model) {
+		render_handle = idraw->register_obj();
 	}
 }
-
-
-void EditorNode::save_out_to_level()
+void EditorNode::hide()
 {
-	Level::Entity_Spawn* espawn = &doc->leveldoc->espawns[dict_index];
-
-	// save out
-	get_dict().set_vec3("position", position);
-	get_dict().set_vec3("rotation", rotation);
-	get_dict().set_vec3("scale", scale);
-	espawn->name = get_dict().get_string("name");
-	espawn->classname = get_dict().get_string("classname");
-	espawn->position = position;
-	espawn->rotation = rotation;
-	espawn->scale = scale;
-
-	if (obj == EDOBJ_MODEL) {
-		Static_Mesh_Object* obj = &doc->leveldoc->static_mesh_objs.at(_varying_obj_index);
-
-		if (obj->handle.is_valid())
-			idraw->remove_obj(obj->handle);
-
-		*obj = make_static_mesh_from_dict(espawn);
-	}
-	else if (obj == EDOBJ_LIGHT) {
-		Level_Light* obj = &doc->leveldoc->lights.at(_varying_obj_index);
-		*obj = make_light_from_dict(espawn);
-	}
+	idraw->remove_obj(render_handle);
+	idraw->remove_light(render_light);
 }
+
+
+
 glm::mat4 EditorNode::get_transform()
 {
 	glm::mat4 transform;
 	transform = glm::translate(glm::mat4(1), position);
-	transform = transform * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
+	transform = transform * glm::mat4_cast(rotation);
 	transform = glm::scale(transform, scale);
 	return transform;
 }
 void EditorNode::init_on_new_espawn()
 {
-	const char* classname = get_dict().get_string("classname");
-	if (strcmp(classname, "light")==0)
-		obj = EDOBJ_LIGHT;
-	else if (strcmp("cubemap", classname) == 0 || strcmp("cubemap_box", classname) == 0) {
-		obj = EDOBJ_CUBEMAPS;
-	}
-	else if (strcmp("static_mesh", classname) == 0)
-		obj = EDOBJ_MODEL;
-	else
-		obj = EDOBJ_GAMEOBJ;
-
-	position = get_dict().get_vec3("position");
-	rotation = get_dict().get_vec3("rotation");
-	scale = get_dict().get_vec3("scale", vec3(1.f));
-
-	const char* mod_name = get_dict().get_string("model");
-	if (*mod_name) {
-		model = FindOrLoadModel(mod_name);
-	}
+	
 }
 
-void EditorNode::make_from_existing(int existing_index)
+EditorNode* EditorDoc::create_node_from_dict(const Dict& d)
 {
-	dict_index = existing_index;
-	Level::Entity_Spawn* espawn = &doc->leveldoc->espawns[dict_index];
-	_varying_obj_index = espawn->_ed_varying_index_for_statics;
-	// in case these weren't set already
-	get_dict().set_string("name", espawn->name.c_str());
-	get_dict().set_string("classname", espawn->classname.c_str());
-	get_dict().set_vec3("position", espawn->position);
-	get_dict().set_vec3("rotation", espawn->rotation);
-	get_dict().set_vec3("scale", espawn->scale);
-	
-	init_on_new_espawn();
+	return nullptr;
 }
 
 void EditorDoc::open(const char* levelname)
 {
 	nodes.clear();
-	leveldoc = eng->level;
+	
+	bool good = editing_map.parse(levelname);
 
-	for (int i = 0; i < leveldoc->espawns.size(); i++) {
-		Level::Entity_Spawn* espawn = &leveldoc->espawns[i];
-		EditorNode* node = new EditorNode(this);
-		node->make_from_existing(i);
-
-		nodes.push_back(std::shared_ptr<EditorNode>(node));
+	for (int i = 0; i < editing_map.spawners.size(); i++) {
+		EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
+		if(node)
+			nodes.push_back(std::shared_ptr<EditorNode>(node));
 	}
 	assets.init();
 }
@@ -528,7 +402,7 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			}
 			else if (scancode == SDL_SCANCODE_BACKSPACE) {
 				if (selected_node != nullptr) {
-					RemoveNodeCommand* com = new RemoveNodeCommand(this, get_node_index(selected_node));
+					RemoveNodeCommand* com = new RemoveNodeCommand(this, selected_node);
 					command_mgr.add_command(com);
 				}
 			}
@@ -537,7 +411,7 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			if (event.button.button == 1) {
 				RayHit rh = cast_ray_into_world(nullptr);
 				if (rh.dist > 0 && rh.ent_id > 0) {
-					selected_node = nodes[rh.ent_id].get();
+					selected_node = nodes[rh.ent_id];
 				}
 				else {
 					selected_node = nullptr;
@@ -653,18 +527,18 @@ void EditorDoc::tick(float dt)
 	// build physics world
 
 	eng->phys.ClearObjs();
-	{
-		PhysicsObject obj;
-		obj.is_level = true;
-		obj.solid = true;
-		obj.is_mesh = true;
-		obj.mesh.structure = &eng->level->collision->bvh;
-		obj.mesh.verticies = &eng->level->collision->verticies;
-		obj.mesh.tris = &eng->level->collision->tris;
-		obj.userindex = -1;
-
-		eng->phys.AddObj(obj);
-	}
+	//{
+	//	PhysicsObject obj;
+	//	obj.is_level = true;
+	//	obj.solid = true;
+	//	obj.is_mesh = true;
+	//	obj.mesh.structure = &eng->level->collision->bvh;
+	//	obj.mesh.verticies = &eng->level->collision->verticies;
+	//	obj.mesh.tris = &eng->level->collision->tris;
+	//	obj.userindex = -1;
+	//
+	//	eng->phys.AddObj(obj);
+	//}
 
 	for (int i = 0; i < nodes.size(); i++) {
 		if (nodes[i]->model) {
@@ -673,7 +547,7 @@ void EditorDoc::tick(float dt)
 			obj.solid = false;
 			obj.is_mesh = false;
 
-			Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->mesh.aabb);
+			Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->get_bounds());
 			obj.min_or_origin = b.bmin;
 			obj.max = b.bmax;
 			obj.userindex = i;
@@ -770,7 +644,6 @@ void EditorDoc::transform_tool_update()
 
 	if(good2)
 		selected_node->position = intersect_point;
-	selected_node->save_out_to_level();
 
 }
 
@@ -784,7 +657,7 @@ void EditorDoc::overlay_draw()
 		if (selected_node->model) {
 			Model* m = selected_node->model;
 			auto transform = selected_node->get_transform();
-			Bounds b = transform_bounds(transform, m->mesh.aabb);
+			Bounds b = transform_bounds(transform,m->get_bounds());
 			mb.PushLineBox(b.bmin, b.bmax, COLOR_RED);
 
 		}
@@ -797,21 +670,6 @@ uint32_t color_to_uint(Color32 c) {
 	return c.r | c.g << 8 | c.b << 16 | c.a << 24;
 }
 
-uint32_t get_bg_color_for_ent(Level* l, EditorNode* node)
-{
-	const char* classname = node->get_dict().get_string("classname");
-
-	if (node->obj == EDOBJ_MODEL) {
-		return color_to_uint({ 0, 140, 255 , 50 });
-	}
-	if (node->obj == EDOBJ_LIGHT) {
-		return color_to_uint({ 255, 242, 0, 50 });
-	}
-	if (node->obj == EDOBJ_CUBEMAPS) {
-		return color_to_uint({ 77, 239, 247, 50 });
-	}
-	return color_to_uint({ 50,50,50,50 });
-}
 
 void EditorDoc::draw_frame()
 {
@@ -863,7 +721,7 @@ void EditorDoc::imgui_draw()
                 ImGui::PushID(row_n);
                 ImGui::TableNextRow(ImGuiTableRowFlags_None, 0.f);
 
-				ImU32 row_bg_color = get_bg_color_for_ent(leveldoc, n);
+				ImU32 row_bg_color = color_to_uint(n->get_object_color());
 				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
 
                 // For the demo purpose we can select among different type of items submitted in the first column
@@ -875,7 +733,7 @@ void EditorDoc::imgui_draw()
                     if (ImGui::Selectable(name, item_is_selected, selectable_flags, ImVec2(0, 0.f)))
                     {
 						item_selected = row_n;
-						selected_node = n;
+						selected_node = nodes[row_n];
                     }
                 }
 
@@ -943,7 +801,7 @@ Model* AssetBrowser::get_model()
 	if (selected_real_index == -1) return nullptr;
 	EdModel* em = &edmodels[selected_real_index];
 	if (em->havent_loaded) {
-		em->m = FindOrLoadModel(em->name.c_str());
+		em->m = mods.find_or_load(em->name.c_str());
 		em->havent_loaded = false;
 	}
 	return em->m;

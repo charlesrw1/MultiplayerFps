@@ -129,9 +129,6 @@
     <ClInclude Include="Source\Framework\InlineVec.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\Key_Value_File.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\MathLib.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
@@ -363,11 +360,26 @@
     <ClInclude Include="Source\Animation\Runtime\Easing.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AssetCompile\ModelCompile.h">
-      <Filter>Source\AssetCompile</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\BinaryReadWrite.h">
       <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Event.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\SkeletonData.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AssetCompile\Compiliers.h">
+      <Filter>Source\AssetCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Files.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Physics\Physics2.h">
+      <Filter>Source\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AssetCompile\Someutils.h">
+      <Filter>Source\AssetCompile</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -381,9 +393,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\EditorDoc.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Files.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game.cpp">
@@ -542,7 +551,17 @@
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
       <Filter>Source\Animation\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelCompile.cpp">
+    <ClCompile Include="Source\AssetCompile\ImageCompile.cpp">
+      <Filter>Source\AssetCompile</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
+      <Filter>Source\AssetCompile</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DrawLocal.cpp" />
+    <ClCompile Include="Source\Files.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\MaterialCompile.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
   </ItemGroup>

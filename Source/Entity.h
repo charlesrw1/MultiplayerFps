@@ -60,6 +60,21 @@ struct Ent_PhysicsSettings
 
 typedef uint32_t entityhandle;
 
+class Entity;
+class EntityRef
+{
+public:
+	EntityRef() : index(0), guid(0) {}
+	explicit EntityRef(const Entity* e) {}
+	EntityRef(uint32_t index, uint32_t guid) : index(index), guid(guid) {}
+
+	Entity* get() const;
+	void print() const;
+private:
+	uint32_t index : 20;
+	uint32_t guid : 12;
+};
+
 #define ENTITY_HEADER()\
 	const TypeInfo get_typeinfo() const override;
 
@@ -112,7 +127,6 @@ public:
 
 	void set_model(const char* model);
 	void initialize_animator(
-		const Animation_Set_New* set, 
 		const Animation_Tree_CFG* graph, 
 		IAnimationGraphDriver* driver = nullptr);
 

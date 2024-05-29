@@ -8,54 +8,67 @@
 #include "Framework/Util.h"
 #include "Animation/Runtime/Animation.h"
 #include "Animation/AnimationTreePublic.h"
+#include "Framework/DictParser.h"
 #include "Texture.h"
 
+#include "AssetCompile/Compiliers.h"
+#include "Framework/Files.h"
+#include "Framework/BinaryReadWrite.h"
 
 #include "Memory.h"
 
+#include "Framework/Config.h"
+#include <algorithm>
 
+#include "Animation/SkeletonData.h"
 
+ModelMan mods;
 
 static const char* const model_folder_path = "./Data/Models/";
 
 
+static const int MODEL_FORMAT_VERSION = 1;
+
+static const int STATIC_VERTEX_SIZE = 1'000'000;
+static const int STATIC_INDEX_SIZE = 3'000'000;
+
+// FIXME:
+bool use_32_bit_indicies = false;
+
+static const int INDEX_TYPE_SIZE = sizeof(uint16_t);
 
 
-Format_Descriptor vertex_attribute_formats[MAX_ATTRIBUTES] =
+int ModelMan::get_index_type_size() const
 {
-	Format_Descriptor(CT_FLOAT, 3, false),	// position
-	Format_Descriptor(CT_FLOAT, 2, false),	// uv
-	Format_Descriptor(CT_S16, 3, true),	// normal
-	Format_Descriptor(CT_U8, 4, false),		// joint
-	Format_Descriptor(CT_U8, 4, true),	// weight
-	Format_Descriptor(CT_U8, 3, true),		// color
-	Format_Descriptor(CT_FLOAT, 2, false),		// uv2
-	Format_Descriptor(CT_S16, 3, true) // tangent
-};
+	return INDEX_TYPE_SIZE;
+}
 
-// not exactly small...
-struct SmallVertex
+void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 {
-	float pos[3];	// 12 bytes
-	float uv[2];	// 20 bytes
-	int16_t normal[3];	// 26 bytes
-	int16_t tangent[3];	// 32 bytes
-};
-struct BigVertex
-{
-	float pos[3];
-	float uv[2];
-	int16_t normal[3];
-	int16_t tangent[3];
-	// bone index or color
-	uint8_t color[4];	// 36 bytes
-	// bone weight or 2 uint16 lightmap uv
-	uint8_t color2[4];	// 40 bytes
-};
+	assert(ibuffer.handle == 0 && vbuffer.handle == 0);
 
-Format_Descriptor index_attribute_format = Format_Descriptor(CT_U32, 1, false);
-bool use_32_bit_indicies = true;
+	glGenBuffers(1, &vbuffer.handle);
+	glBindBuffer(GL_ARRAY_BUFFER, vbuffer.handle);
+	glBufferData(GL_ARRAY_BUFFER,
+		sizeof(ModelVertex) * STATIC_VERTEX_SIZE /* size */,
+		nullptr, GL_STATIC_DRAW);
+	vbuffer.allocated = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
+	vbuffer.used = 0;
 
+	const int index_size = INDEX_TYPE_SIZE;
+	glGenBuffers(1, &ibuffer.handle);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibuffer.handle);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+		index_size * STATIC_INDEX_SIZE /* size */,
+		nullptr, GL_STATIC_DRAW);
+	ibuffer.allocated = index_size * STATIC_INDEX_SIZE;
+	ibuffer.used = 0;
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+#if 0
 class Vertex_Descriptor
 {
 public:
@@ -122,55 +135,42 @@ Vertex_Descriptor vertex_buffer_formats[(int)mesh_format::COUNT] =
 		TO_MASK(ATTRIBUTE_UV2)),
 };
 static const int default_index_buffer_size = 3'000'000;
-
-bool Mesh::has_lightmap_coords() const
+#endif
+bool Model::has_lightmap_coords() const
 {
-	return attributes & (1 << UV2_LOC);
+	return false;
 }
 
-bool Mesh::has_bones() const
+bool Model::has_bones() const
 {
-	return attributes & (1 << JOINT_LOC);
+	return skel!=nullptr;
 }
 
-bool Mesh::has_colors() const
+bool Model::has_colors() const
 {
-	return attributes & (1 << COLOR_LOC);
+	return false;
 }
 
-bool Mesh::has_tangents() const
+bool Model::has_tangents() const
 {
-	return attributes & (1 << TANGENT_LOC);
+	return true;
 }
 
 
 
-int Model::bone_for_name(const char* name) const
+int Model::bone_for_name(StringName name) const
 {
-	for (int i = 0; i < bones.size(); i++) {
-		if (bones[i].name == name)
-			return i;
-	}
+	// FIXME
 	return -1;
 }
-
-Game_Mod_Manager mods;
-
-Model* FindOrLoadModel(const char* filename)
-{
-	return mods.find_or_load(filename);
-}
-
-
-#include "Framework/Config.h"
-DECLARE_ENGINE_CMD_CAT("gpu.", print_vertex_usage)
+DECLARE_ENGINE_CMD_CAT("gpu.", printusage)
 {
 	mods.print_usage();
 }
 
-#include <algorithm>
 
-void Game_Mod_Manager::compact_memory()
+#if 0
+void ModelMan::compact_memory()
 {
 	return;
 	float start = GetTime();
@@ -241,23 +241,49 @@ void Game_Mod_Manager::compact_memory()
 
 	printf("compact geometry time: %f\n", end - start);
 }
+#endif
 
-void Game_Mod_Manager::print_usage()
+void MainVbIbAllocator::print_usage() const
 {
-	int total_memory_usage = global_index_buffer.allocated;
-	sys_print("Index buffer: %d/%d", global_index_buffer.used, global_index_buffer.allocated);
-	for (int i = 0; i < (int)mesh_format::COUNT; i++) {
-		sys_print("Vertex buffer %i\n", i);
-		int vertex_count = global_vertex_buffers[i].attributes[0].used / 12;
-		int vertex_allocated = global_vertex_buffers[i].attributes[0].allocated / 12;
+	auto print_facts = [](const char* name, const buffer& b, int element_size) {
+		float used_percentage = 1.0;
+		if (b.allocated > 0)
+			used_percentage = (double)b.used / (double)b.allocated;
+		used_percentage *= 100.0;
 
-		sys_print("-Vertex count %d/%d\n", vertex_count, vertex_allocated);
+		int used_elements = b.used / element_size;
+		int allocated_elements = b.allocated / element_size;
+		sys_print("%s: %d/%d (%.1f%%) (bytes:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used);
+	};
+	sys_print("---- MainVbIbAllocator::print_usage ----\n");
 
-		for (int j = 0; j < MAX_ATTRIBUTES; j++) {
-			total_memory_usage += global_vertex_buffers[i].attributes[j].allocated;
-		}
+	print_facts("Index buffer", ibuffer, INDEX_TYPE_SIZE);
+	print_facts("Vertex buffer", vbuffer, sizeof(ModelVertex));
+}
+
+void MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
+	append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
+}
+void MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
+	append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
+}
+
+void MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
+{
+	if (size + buf.used > buf.allocated) {
+		sys_print("!!! %s buffer overflow %d/%d !!!\n",name, int(size + vbuffer.used), int(vbuffer.allocated));
+		std::fflush(stdout);
+		std::abort();
 	}
-	sys_print("Total memory for ib+vbs: %d\n", total_memory_usage);
+	glBindBuffer(target, buf.handle);
+	glBufferSubData(target, buf.used, size, data);
+	buf.used += size;
+}
+
+
+void ModelMan::print_usage() const
+{
+	allocator.print_usage();
 }
 
 
@@ -276,25 +302,181 @@ static std::string strip_extension(const std::string& name)
 		return {};
 	return name.substr(0,find);
 }
-
-
-#include "Framework/DictParser.h"
-bool ModelMan::parse_model_into_memory(Model* m, std::string path)
+static glm::vec4 bounds_to_sphere(Bounds b)
 {
-	std::string binpath = path + ".c_msh";
+	glm::vec3 center = b.get_center();
+	glm::vec3 mindiff = center - b.bmin;
+	glm::vec3 maxdiff = b.bmax - center;
+	glm::vec3 diff = glm::max(mindiff, maxdiff);
+	float radius = diff.x;
+	if (diff.y > radius)radius = diff.y;
+	if (diff.z > radius)radius = diff.z;
+	return glm::vec4(center, radius);
+}
 
-	DictParser in;
-	bool good = in.load_from_file(binpath.c_str());
-	if (!good) {
+// Format definied in ModelCompilier.cpp
+bool ModelMan::read_model_into_memory(Model* m, std::string path)
+{
+	std::string binpath = path;
 
+	auto file = FileSys::open_read(binpath.c_str());
+	if (!file) {
+		sys_print("!!! model %s does not exist\n", binpath.c_str());
+		return false;
 	}
+
+	BinaryReader read(file.get());
+
+	uint32_t magic = read.read_int32();
+	if (magic != 'CMDL') {
+		sys_print("bad model format\n");
+		return false;
+	}
+	uint32_t version = read.read_int32();
+	if (version != MODEL_FORMAT_VERSION) {
+		sys_print("out of date format\n");
+		return false;
+	}
+	read.read_struct(&m->skeleton_root_transform);
+
+	read.read_struct(&m->aabb);
+	m->bounding_sphere = bounds_to_sphere(m->aabb);
+
+	uint32_t num_lods = read.read_int32();
+	m->lods.reserve(num_lods);
+	for (int i = 0; i < num_lods; i++) {
+		MeshLod mlod;
+		read.read_struct(&mlod);
+		m->lods.push_back(mlod);
+	}
+	uint32_t num_parts = read.read_int32();
+	m->parts.reserve(num_parts);
+	for (int i = 0; i < num_parts; i++) {
+		Submesh submesh;
+		read.read_struct(&submesh);
+		m->parts.push_back(submesh);
+	}
+
+	uint32_t DEBUG_MARKER = read.read_int32();
+	assert(DEBUG_MARKER == 'HELP');
+
+	uint32_t num_materials = read.read_int32();
+	m->materials.reserve(num_materials);
+	std::string buffer;
+	for (int i = 0; i < num_materials; i++) {
+		read.read_string(buffer);
+		m->materials.push_back(mats.find_for_name(buffer.c_str()));
+	}
+
+
+	uint32_t num_locators = read.read_int32();
+	m->tags.reserve(num_locators);
+	for (int i = 0; i < num_locators; i++) {
+		ModelTag tag;
+		read.read_string(tag.name);
+		read.read_struct(&tag.transform);
+		tag.bone_index = read.read_int32();
+		m->tags.push_back(tag);
+	}
+
+
+	uint32_t num_indicies = read.read_int32();
+	m->data.indicies.resize(num_indicies);
+	read.read_bytes_ptr(
+		m->data.indicies.data(), 
+		num_indicies * sizeof(uint16_t)
+	);
+
+	uint32_t num_verticies = read.read_int32();
+	m->data.verts.resize(num_verticies);
+	read.read_bytes_ptr(
+		m->data.verts.data(), 
+		num_verticies * sizeof(ModelVertex)
+	);
+
+	DEBUG_MARKER = read.read_int32();
+	assert(DEBUG_MARKER == 'HELP');
+
+	uint32_t num_bones = read.read_int32();
+	if (num_bones > 0) {
+
+		m->skel = std::make_unique<MSkeleton>();
+		m->skel->bone_dat.reserve(num_bones);
+		for (int i = 0; i < num_bones; i++) {
+			BoneData bd;
+			read.read_string(bd.strname);
+			bd.name = StringName(bd.strname.c_str());
+			bd.parent = read.read_int32();
+			bd.retarget_type = (RetargetBoneType)read.read_int32();
+			read.read_struct(&bd.posematrix);
+			read.read_struct(&bd.invposematrix);
+			read.read_struct(&bd.localtransform);
+			read.read_struct(&bd.rot);
+			m->skel->bone_dat.push_back(bd);
+		}
+
+		uint32_t num_anims = read.read_int32();
+		for (int i = 0; i < num_anims; i++) {
+
+			uint32_t DEBUG_MARKER = read.read_int32();
+			assert(DEBUG_MARKER == 'HELP');
+
+			AnimationSeq* aseq = new AnimationSeq;
+			std::string name;
+			read.read_string(name);
+			aseq->duration = read.read_float();
+			aseq->average_linear_velocity = read.read_float();
+			aseq->num_frames = read.read_int32();
+			aseq->is_additive_clip = read.read_byte();
+			
+			aseq->channel_offsets.resize(num_bones);
+			read.read_bytes_ptr(aseq->channel_offsets.data(), num_bones * sizeof(ChannelOffset));
+			uint32_t packed_size = read.read_int32();
+			aseq->pose_data.resize(packed_size);
+			read.read_bytes_ptr(aseq->pose_data.data(), packed_size * sizeof(float));
+
+			aseq->event_keyframes.resize(aseq->num_frames+1);
+			read.read_bytes_ptr(aseq->event_keyframes.data(), aseq->event_keyframes.size() * sizeof(EventIndex));
+			uint32_t num_events = read.read_int32();
+			for (int j = 0; j < num_events; j++) {
+				AnimEvent ae;
+				read.read_string(ae.str);
+				aseq->events.push_back(ae);
+			}
+			MSkeleton::refed_clip rc;
+			rc.ptr = aseq;
+			rc.remap_idx = -1;
+			rc.skeleton_owns_clip = true;
+			m->skel->clips.insert({ std::move(name),rc });
+		}
+
+		uint32_t num_includes = read.read_int32();
+		for (int i = 0; i < num_includes; i++) {
+			std::string str;
+			read.read_string(str);
+		}
+
+		bool has_mirror_map = read.read_byte();
+		if (has_mirror_map) {
+			m->skel->mirroring_table.resize(num_bones);
+			read.read_bytes_ptr(m->skel->mirroring_table.data(), num_bones * sizeof(int16_t));
+		}
+
+		 DEBUG_MARKER = read.read_int32();
+		assert(DEBUG_MARKER == 'E');
+	}
+
+	// collision data goes here
+
 }
 
 DECLVAR("developer_mode", developer_mode, 1);
-#include "AssetCompile/ModelCompile.h"
+
 Model* ModelMan::find_or_load(const char* filename)
 {
-	auto find = models.find(filename);
+	std::string filenamestr = filename;
+
+	auto find = models.find(filenamestr);
 	if (find != models.end()) {
 		if (!find->second)
 			return error_model;
@@ -303,28 +485,30 @@ Model* ModelMan::find_or_load(const char* filename)
 
 
 	if (developer_mode.integer()) {
+		std::string model_def = model_folder_path + strip_extension(filename);
+		model_def += ".def";
 
-		bool good = ModelCompilier::compile(filename);
+		bool good = ModelCompilier::compile(model_def.c_str());
 		if (!good) {
-			sys_print("compilier failed on model %s\n", filename);
+			sys_print("compilier failed on model %s\n", model_def.c_str());
 			return error_model;
 		}
 	}
 
 	Model* model = new Model;
-	model->name = filename;
+	model->name = filenamestr;
 	model->loaded_in_memory = false;
 
 	string path(model_folder_path);
-	path += filename;
-	bool good = parse_model_into_memory(model,std::move(path));
+	path += filenamestr;
+	bool good = read_model_into_memory(model,std::move(path));
 
 	if (!good) {
 		delete model;
 		return error_model;
 	}
 
-	good = upload_model(&model->mesh);
+	good = upload_model(model);
 
 	if (!good) {
 		delete model;
@@ -332,50 +516,13 @@ Model* ModelMan::find_or_load(const char* filename)
 	}
 
 	model->loaded_in_memory = true;
-	models[filename] = model;
+	models.insert({ std::move(filenamestr), model });
 
 	return model;
 }
 
-void Game_Mod_Manager::free_prefab(Prefab_Model* deleteprefab)
-{
-	for (auto& prefab : prefabs) {
-		if (deleteprefab == prefab.second) {
-			std::string val = prefab.first;
-			prefabs.erase(val);
-			return;
-			// todo: free the buffer memory
-		}
-	}
-}
-
-Prefab_Model* Game_Mod_Manager::find_or_load_prefab(const char* file, bool dont_append_path,prefab_callback callback, void* callback_data)
-{
-	auto find = prefabs.find(file);
-	if (find != prefabs.end()) {
-		return find->second;
-	}
-	string path;
-	if (!dont_append_path)
-		path += model_folder_path;
-	path += file;
-
-	Prefab_Model* model = new Prefab_Model;
-	model->name = file;
-
-	bool good = load_gltf_prefab(path, model, callback, callback_data);
-	if (!good) {
-		delete model;
-		return nullptr;
-	}
-	for (int i = 0; i < model->meshes.size(); i++)
-		upload_mesh(&model->meshes[i]);
-
-	prefabs[file] = model;
-	return model;
-}
-
-bool Game_Mod_Manager::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t input_length)
+#if 0
+bool ModelMan::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t input_length)
 {
 	if (input_length + buf.used > buf.allocated) {
 		printf("Index buffer overflow\n");
@@ -387,82 +534,73 @@ bool Game_Mod_Manager::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint
 	buf.used += input_length;
 	return true;
 }
+#endif
 
-void Game_Mod_Manager::init()
+void ModelMan::set_v_attributes()
 {
-	global_index_buffer.allocated = default_index_buffer_size * index_attribute_format.get_size();
-	global_index_buffer.target = GL_ELEMENT_ARRAY_BUFFER;
-	glGenBuffers(1, &global_index_buffer.handle);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, global_index_buffer.handle);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, default_index_buffer_size * index_attribute_format.get_size(), NULL, GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	assert(allocator.vbuffer.handle != 0);
 
-	for (int i = 0; i < (int)mesh_format::COUNT; i++) {
-		vertex_buffer_formats[i].generate_buffers(global_vertex_buffers[i].attributes);
-	}
+	glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
 
-	// create vaos
-	for (int i = 0; i < (int)mesh_format::COUNT; i++) {
-		glGenVertexArrays(1, &global_vertex_buffers[i].main_vao);
-		glBindVertexArray(global_vertex_buffers[i].main_vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, global_index_buffer.handle);
-		vertex_buffer_formats[i].set_all_contained_attributes(global_vertex_buffers[i].attributes);
-		glBindVertexArray(0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	}
+
+
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-// does the actual uploading to the gpu
-bool Game_Mod_Manager::upload_mesh(Mesh* mesh)
+void ModelMan::init()
 {
-	mesh->id = cur_mesh_id++;
+	allocator.init(STATIC_INDEX_SIZE, STATIC_VERTEX_SIZE);
 
-	// determine what buffer to go to
-	ASSERT(mesh->parts.size() > 0);
-	int attributes = mesh->attributes;
-	mesh_format format = mesh_format::STATIC;
-	if (attributes & TO_MASK(ATTRIBUTE_JOINT))
-		format = mesh_format::SKINNED;
-	else if ((attributes & TO_MASK(ATTRIBUTE_UV2)) || (attributes & TO_MASK(ATTRIBUTE_COLOR)))
-		format = mesh_format::STATIC_PLUS;
-	mesh->format = format;
-	mesh->merged_index_pointer = global_index_buffer.used;
-	append_to_buffer(
-		global_index_buffer, 
-		mesh->data.indicies.data(), 
-		mesh->data.indicies.size()
-	);
-	glCheckError();
+	glGenVertexArrays(1, &animated_vao);
+	glBindVertexArray(animated_vao);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
+	glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
 
-	const int format_int = mesh->format_as_int();
+	// POSITION
+	glVertexAttribPointer(POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, pos));
+	glEnableVertexAttribArray(POSITION_LOC);
+	// UV
+	glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, uv));
+	glEnableVertexAttribArray(UV_LOC);
+	// NORMAL
+	glVertexAttribPointer(NORMAL_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, normal[0]));
+	glEnableVertexAttribArray(NORMAL_LOC);
+	// Tangent
+	glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
+	glEnableVertexAttribArray(TANGENT_LOC);
+	// Bone index
+	glVertexAttribPointer(JOINT_LOC, 4, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
+	glEnableVertexAttribArray(JOINT_LOC);
+	// Bone weight
+	glVertexAttribPointer(WEIGHT_LOC, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color2[0]));
+	glEnableVertexAttribArray(WEIGHT_LOC);
 
-	mesh->vao = global_vertex_buffers[format_int].main_vao;
+	glBindVertexArray(0);
+}
 
-	mesh->merged_vert_offset = global_vertex_buffers[format_int].attributes[0].used / vertex_attribute_formats[0].get_size();
-	int num_verticies = mesh->data.buffers[0].size() / vertex_attribute_formats[0].get_size();
-	for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-		if (vertex_buffer_formats[format_int].mask & (1 << i)) {
-			// sanity check
-			int this_attribute_verticies = mesh->data.buffers[i].size() / vertex_attribute_formats[i].get_size();
-			// this can happen and is allowed, like a lightmap mesh not using vertex colors
-			if (this_attribute_verticies == 0) {
-				global_vertex_buffers[format_int].attributes[i].used += num_verticies * vertex_attribute_formats[i].get_size();
-			}
-			else if (this_attribute_verticies != num_verticies){
-				//assert(0 && "vertex count mismatch");
-				printf("vertex count mismatch\n");
-				return false;
-			}
-			else {
-				bool good = append_to_buffer(
-					global_vertex_buffers[format_int].attributes[i],
-					mesh->data.buffers[i].data(),
-					mesh->data.buffers[i].size()
-				);
-			}
-		}
-	}
-	glCheckError();
+// Uploads the models vertex and index data to the gpu
+// and sets the models ptrs/offsets into the global vertex buffer
+bool ModelMan::upload_model(Model* mesh)
+{
+	mesh->uid = cur_mesh_id++;
+
+	if (mesh->parts.size() == 0)
+		return false;
+
+	mesh->merged_index_pointer = allocator.ibuffer.used;
+
+	size_t indiciesbufsize{};
+	const uint8_t* const ibufferdata = mesh->data.get_index_data(&indiciesbufsize);
+	allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);
+
+	// vertex start offset
+	mesh->merged_vert_offset = allocator.vbuffer.used / sizeof(ModelVertex);
+
+	size_t vertbufsize{};
+	const uint8_t* const v_bufferdata = mesh->data.get_vertex_data(&vertbufsize);
+	allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
+
 	return true;
 }
 

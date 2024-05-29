@@ -10,6 +10,7 @@
 #include "../AnimationTypes.h"
 #include "../AnimationTreePublic.h"
 
+#include "Model.h"
 
 // procedural bone controls
 // supports: direct bone transform manipulation	(ex: rotating/translating weapon bone)
@@ -51,10 +52,9 @@ enum class bone_controller_type
 	max_count,
 };
 
-
+class MSkeleton;
 class Entity;
 class Animation_Tree_CFG;
-class Animation_Set_New;
 class IAnimationGraphDriver;
 class Animator
 {
@@ -63,7 +63,6 @@ public:
 
 	void initialize_animator(
 		const Model* model,
-		const Animation_Set_New* set,
 		const Animation_Tree_CFG* graph,
 		IAnimationGraphDriver* driver,
 		Entity* ent = nullptr);
@@ -82,8 +81,8 @@ public:
 	const Model* get_model() const {
 		return runtime_dat.model;
 	}
-	const Animation_Set_New* get_set() const {
-		return runtime_dat.set;
+	const MSkeleton* get_skel() const {
+		return runtime_dat.model->get_skel();
 	}
 	const Animation_Tree_CFG* get_tree() const {
 		return runtime_dat.cfg;

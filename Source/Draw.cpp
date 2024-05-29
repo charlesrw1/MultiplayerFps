@@ -12,6 +12,8 @@
 
 #include "Entity.h"
 
+#include "Animation/SkeletonData.h"
+
 #ifdef EDITDOC
 #include "EditorDocPublic.h"
 #endif
@@ -388,9 +390,9 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	glCheckError();
 
 
-	if (eng->level && eng->level->lightmap)
-		draw.bind_texture(LIGHTMAP_LOC, eng->level->lightmap->gl_id);
-	else
+	//if (eng->level && eng->level->lightmap)
+	//	draw.bind_texture(LIGHTMAP_LOC, eng->level->lightmap->gl_id);
+	//else
 		draw.bind_texture(LIGHTMAP_LOC, draw.white_texture.gl_id);
 
 	//glActiveTexture(GL_TEXTURE0 + start + 4);
@@ -773,17 +775,16 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
 
-	if (scene.directional_index != -1) {
-		auto& light = scene.lights[scene.directional_index];
-		constants.directional_light_dir_and_used = vec4(light.normal, 0.0);
-		constants.directional_light_dir_and_used.w = 1.0;
-		constants.directional_light_color = vec4(light.color, 0.0);
+	auto light = scene.get_main_directional_light();
+	if (light) {
+		constants.directional_light_dir_and_used = vec4(light->light.normal, 1.0);
+		constants.directional_light_color = vec4(light->light.color, 0.0);
 	}
 	else
 		constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
 
 	constants.numcubemaps = scene.cubemaps.size();
-	constants.numlights = scene.lights.size();
+
 	if (using_skybox_for_specular)
 		constants.forcecubemap = 0.0;
 	else
@@ -971,6 +972,8 @@ void Renderer::init()
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
 	glNamedBufferStorage(buf.default_vb, 12 * 3, nullptr, 0);
+
+	on_level_start();
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
 }
@@ -1198,7 +1201,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 		blend_state blend = (blend_state)batch_key.blending;
 		bool backface = batch_key.backface;
 		uint32_t layer = batch_key.layer;
-		mesh_format format = (mesh_format)batch_key.vao;
+		int format = batch_key.vao;
 
 		assert(program >= 0 && program < prog_man.programs.size());
 
@@ -1209,7 +1212,8 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 		else if (mat->type == material_type::WATER)
 			set_water_constants();
 
-		bind_vao(mods.global_vertex_buffers[(int)format].main_vao);
+		bind_vao(mods.get_vao(true/* animated */));
+
 		set_show_backfaces(backface);
 		set_blend_state(blend);
 
@@ -1237,9 +1241,12 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 
 		shader().set_int("indirect_material_offset", offset);
 
+
+		const GLenum index_type = (mods.get_index_type_size()==4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
-			GL_UNSIGNED_INT,
+			index_type,
 			(void*)(list.commands.data() + offset),
 			count,
 			sizeof(gpu::DrawElementsIndirectCommand)
@@ -1441,7 +1448,8 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 {
 	auto& bones = a->get_global_bonemats();
 	auto model = a->get_model();
-	for (int index = 0; index < model->bones.size(); index++) {
+	auto skel = model->get_skel();
+	for (int index = 0; index < skel->get_num_bones(); index++) {
 		vec3 org = transform * bones[index][3];
 		Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
 		for (int i = 0; i < 3; i++) {
@@ -1449,9 +1457,9 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 			dir = normalize(dir);
 			Debug::add_line(org, org + dir * line_len, colors[i],-1.f,false);
 		}
-
-		if (model->bones[index].parent != -1) {
-			vec3 parent_org = transform * bones[model->bones[index].parent][3];
+		const int parent = skel->get_bone_parent(index);
+		if (parent != -1) {
+			vec3 parent_org = transform * bones[parent][3];
 			Debug::add_line(org, parent_org, COLOR_PINK,-1.f,false);
 		}
 	}
@@ -1532,13 +1540,12 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, 
 {
 	draw_call_key key;
 
-	ASSERT(proxy.mats);
-	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, *proxy.mesh, *material, (type == pass_type::DEPTH), proxy.dither);
+	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, proxy.model, material, (type == pass_type::DEPTH), proxy.dither);
 	key.blending = (uint64_t)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
-	key.vao = (uint64_t)proxy.mesh->format;
-	key.mesh = proxy.mesh->id;
+	key.vao = 0;// (uint64_t)proxy.mesh->format;
+	key.mesh = proxy.model->get_uid();
 	key.layer = layer;
 
 	return key;
@@ -1651,8 +1658,8 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			Mesh_Batch batch;
 			batch.first = first;
 			batch.count = 1;
-			auto& mats = rop->mats;
-			int index = rop->mesh->parts.at(po->submesh_index).material_idx;
+			//auto& mats = rop->mats;
+			int index = rop->model->get_part(po->submesh_index).material_idx;// rop->mesh->parts.at(po->submesh_index).material_idx;
 			batch.material = po->material;
 			batch.shader_index = po->sort_key.shader;
 			return batch;
@@ -1776,13 +1783,14 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
 			auto& obj = src.objects[meshb.first];
 			Render_Object& proxy = proxy_list.get(obj.render_obj.id).proxy;
-			Mesh& mesh = *proxy.mesh;
-			auto& part = mesh.parts[obj.submesh_index];
+		
+
+			auto& part = proxy.model->get_part(obj.submesh_index);// mesh.parts[obj.submesh_index];
 			gpu::DrawElementsIndirectCommand cmd;
 
-			cmd.baseVertex = part.base_vertex + mesh.merged_vert_offset;
+			cmd.baseVertex = part.base_vertex + proxy.model->get_merged_vertex_ofs();
 			cmd.count = part.element_count;
-			cmd.firstIndex = part.element_offset + mesh.merged_index_pointer;
+			cmd.firstIndex = part.element_offset + proxy.model->get_merged_index_ptr();
 			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
 			cmd.primCount = meshb.count;
 			cmd.baseInstance = base_instance;
@@ -1877,15 +1885,24 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART(traversal);
 
+
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{obj.handle};
 			auto& proxy = obj.type_.proxy;
 			if (proxy.visible) {
-				auto& mesh = *proxy.mesh;
-				for (int j = 0; j < mesh.parts.size(); j++) {
-					auto& part = mesh.parts[j];
-					Material* mat = (*proxy.mats)[part.material_idx];
+				// When CPU culling do that here
+				const auto& lod = proxy.model->get_lod(0);
+
+				const int pstart = lod.part_ofs;
+				const int pend = pstart + lod.part_count;
+
+				// Both GPU/CPU culling: select LOD based on camera dist
+
+				for (int j = pstart; j < pend; j++) {
+					auto& part = proxy.model->get_part(j);
+
+					Material* mat = proxy.model->get_material(part.material_idx);
 					if (mat->is_translucent())
 						transparents.add_object(proxy, objhandle, mat, j, 0);
 					else {
@@ -1907,11 +1924,10 @@ void Render_Scene::build_scene_data()
 					gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
 					auto& mats = proxy.animator->get_matrix_palette();
 
-					auto model = proxy.animator->get_model();
-
-					for (int i = 0; i < model->bones.size(); i++) {
+					for (int i = 0; i < proxy.animator->num_bones(); i++) {
 						skinned_matricies_vec.push_back(mats[i]);
 					}
+
 				}
 				else
 					gpu_objects[i].anim_mat_offset = 0;
@@ -2009,7 +2025,7 @@ struct Mesh_Pass_Mdi_Batch
 
 struct High_Level_Render_Object
 {
-	Mesh* mesh;
+	// Model* m
 	Material* material;
 	int obj_data_index = 0;
 	int draw_calls_start = 0;
@@ -2203,7 +2219,7 @@ glm::vec4 normalize_plane(glm::vec4 p)
 	return p / glm::length(glm::vec3(p));
 }
 
-glm::vec4 bounds_to_sphere(Bounds b)
+static glm::vec4 bounds_to_sphere(Bounds b)
 {
 	glm::vec3 center = b.get_center();
 	glm::vec3 mindiff = center - b.bmin;
@@ -2916,14 +2932,14 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, tex.reflected_depth);
 }
 
-program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Mesh& mesh, const Material& mat, bool depth_pass, bool dither)
+program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model* mod, const Material* mat, bool depth_pass, bool dither)
 {
-	bool is_alpha_test = mat.alpha_tested;
-	bool is_lightmapped = mesh.has_lightmap_coords();
-	bool has_colors = mesh.has_colors();
-	material_type shader_type = mat.type;
-	bool is_normal_mapped = mesh.has_tangents();
-	bool is_animated = mesh.has_bones() && has_animated_matricies;
+	bool is_alpha_test = mat->alpha_tested;
+	bool is_lightmapped = mod->has_lightmap_coords();
+	bool has_colors = mod->has_colors();
+	material_type shader_type = mat->type;
+	bool is_normal_mapped = mod->has_tangents();
+	bool is_animated = mod->has_bones() && has_animated_matricies;
 
 	shader_key key;
 	key.alpha_tested = is_alpha_test;
@@ -3078,6 +3094,32 @@ void Renderer::remove_obj(handle<Render_Object>& handle)
 	handle.id = -1;
 }
 
+handle<Render_Light> Renderer::register_light(const Render_Light& proxy)
+{
+	auto handle = scene.register_light();
+	scene.update_light(handle, proxy);
+	return handle;
+}
+
+void Renderer::update_light(handle<Render_Light> handle, const Render_Light& proxy)
+{
+	scene.update_light(handle, proxy);
+}
+
+void Renderer::remove_light(handle<Render_Light>& handle)
+{
+	scene.remove_light(handle);
+	handle.id = -1;
+}
+RL_Internal* Render_Scene::get_main_directional_light()
+{
+	for (int i = 0; i < light_list.objects.size(); i++) {
+		auto& light = light_list.objects[i].type_.light;
+		if (light.type == LIGHT_DIRECTIONAL)
+			return &light_list.objects[i].type_;
+	}
+	return nullptr;
+}
 void Renderer::on_level_end()
 {
 
@@ -3087,7 +3129,7 @@ void Renderer::on_level_end()
 void Renderer::on_level_start()
 {
 	scene.cubemaps.clear();
-	scene.lights.clear();
+
 	glDeleteBuffers(1, &scene.cubemap_ssbo);
 	glDeleteBuffers(1, &scene.light_ssbo);
 	glDeleteTextures(1, &scene.levelcubemapirradiance_array);
@@ -3095,31 +3137,12 @@ void Renderer::on_level_start()
 	glDeleteTextures(1, &scene.skybox);
 	scene.cubemap_ssbo = 0;
 	scene.levelcubemapirradiance_array = scene.levelcubemapspecular_array = 0;
-	scene.directional_index = -1;
-
-	// add the lights
-	auto& llights = eng->level->lights;
-	for (int i = 0; i < llights.size(); i++) {
-		Level_Light& ll = llights[i];
-		if (ll.type == LIGHT_DIRECTIONAL && scene.directional_index == -1) {
-			scene.directional_index = i;
-		}
-		Render_Light rl;
-		rl.type = ll.type;
-		rl.position = ll.position;
-		rl.color = ll.color;
-		rl.normal = ll.direction;
-		rl.conemin = rl.conemax = ll.spot_angle;
-		rl.casts_shadow = false;
-
-		scene.lights.push_back(rl);
-	}
 
 
 	// Render cubemaps
 	scene.cubemaps.push_back({});		// skybox probe
 	scene.cubemaps[0].found_probe_flag = true;
-
+#if 0
 	auto& espawns = eng->level->espawns;
 	for (int i = 0; i < espawns.size(); i++) {
 		if (espawns[i].classname == "cubemap_box") {
@@ -3172,6 +3195,7 @@ void Renderer::on_level_start()
 			}
 		}
 	}
+#endif
 	for (int i = 0; i < scene.cubemaps.size(); i++) {
 		if (!scene.cubemaps[i].found_probe_flag) {
 			scene.cubemaps.erase(scene.cubemaps.begin() + i);

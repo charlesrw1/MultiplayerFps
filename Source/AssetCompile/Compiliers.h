@@ -8,9 +8,7 @@ class ModelCompilier
 {
 public:
 	static bool compile(const char* name);
-	static void compile_all();
 
-	static bool load_gltf_model3(const std::string& filepath, Model* model);
 };
 
 class ImageCompilier
@@ -20,14 +18,13 @@ public:
 
 	static bool compile_from_text(const std::string& file, bool text_was_changed = false);
 
-	static void compile_all();
 };
 
 class MaterialCompilier
 {
 public:
 	static bool compile(const char* name);
-	static void compile_all();
+
 };
 
 /*

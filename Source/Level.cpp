@@ -6,40 +6,10 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "Physics.h"
 #include "Texture.h"
-#include "Framework/Key_Value_File.h"
 #include <array>
 
 static const char* const maps_directory = "./Data/Maps/";
 
-// to not go insane, this creates an object dictionary which is then loaded later
-void create_light_obj_from_gltf(Level* level, cgltf_node* node, glm::mat4 transform)
-{
-	cgltf_light* light = node->light;
-
-	Level::Entity_Spawn espawn;
-	espawn.classname = "light";
-	espawn.name = node->name;
-	espawn.position = transform[3];
-	espawn.rotation = -transform[2];	// FIXME
-	
-	const char* types[] = {
-		"invalid","directional","point","spot"
-	};
-
-	Level_Light ll;
-	espawn.spawnargs.set_string("type", types[light->type]);
-	glm::vec3 color = glm::vec3(light->color[0], light->color[1], light->color[2]) * (float)light->intensity;
-	espawn.spawnargs.set_vec3("color", color);
-	
-	if (light->type == cgltf_light_type_spot) {
-		espawn.spawnargs.set_float("outer_cone", light->spot_inner_cone_angle);
-		espawn.spawnargs.set_float("inner_cone", light->spot_outer_cone_angle);
-	}
-
-	espawn.spawnargs.set_int("?embedded", 1);
-
-	level->espawns.push_back(espawn);
-}
 void Physics_Mesh::build()
 {
 	std::vector<Bounds> bound_vec;
@@ -62,202 +32,156 @@ void Physics_Mesh::build()
 	printf("Built bvh in %.2f seconds\n", (float)GetTime() - time_start);
 }
 
-void load_ents(Level* l, const std::string& mapdir)
-{
-	std::string ent_file_name = mapdir + "ents.txt";
-	Key_Value_File ent_file;
-	bool good = ent_file.open(ent_file_name.c_str());
-	if (!good) return;
-	{
-		for (auto& ent : ent_file.name_to_entry) {
-			Level::Entity_Spawn espawn;
-			espawn.spawnargs = std::move(ent.second.dict);
-			espawn.classname = espawn.spawnargs.get_string("classname", "");
-			if (espawn.classname.empty()) {
-				sys_print("Entity without classname, skipping...\n");
-				continue;
-			}
-			espawn.name = ent.first;
-			espawn.position = espawn.spawnargs.get_vec3("position");
-			espawn.rotation = espawn.spawnargs.get_vec3("rotation");
-			espawn.scale = espawn.spawnargs.get_vec3("scale",glm::vec3(1.f));
 
-			l->espawns.push_back(espawn);
-		}
-	}
-}
 
-Static_Mesh_Object make_static_mesh_from_dict(Level::Entity_Spawn* obj)
+handle<Render_Object> make_static_mesh_from_dict(const Dict& dict)
 {
-	Dict* dict = &obj->spawnargs;
+
 	const char* get_str = "";
 
-	if (*(get_str = dict->get_string("model", "")) != 0) {
-		Static_Mesh_Object smo;
-		smo.model = FindOrLoadModel(get_str);
-		if (smo.model) {
-			glm::mat4 transform = glm::translate(glm::mat4(1), obj->position);
-			transform = transform * glm::eulerAngleXYZ(obj->rotation.x, obj->rotation.y, obj->rotation.z);
-			transform = glm::scale(transform, obj->scale);
+	if (*(get_str = dict.get_string("model", "")) != 0) {
+		
+		Model* m = mods.find_or_load(get_str);
+		if (m) {
+			glm::mat4 transform = glm::translate(glm::mat4(1), dict.get_vec3("position"));
+			glm::vec3 angles = dict.get_vec3("rotation");
+			transform = transform * glm::eulerAngleXYZ(angles.x,angles.y,angles.z);
+			transform = glm::scale(transform, dict.get_vec3("scale",glm::vec3(1.f)));
 
-			smo.transform = transform;
 
-			smo.handle = idraw->register_obj();
+			auto handle = idraw->register_obj();
 			Render_Object rop;
-			rop.mesh = &smo.model->mesh;
-			rop.transform = smo.transform;
+			rop.model = m;
+			rop.transform = transform;
 			rop.animator = nullptr;
 			rop.visible = true;
-			rop.mats = &smo.model->mats;
-			idraw->update_obj(smo.handle, rop);
+			rop.shadow_caster = dict.get_int("casts_shadows", 1);
+			idraw->update_obj(handle, rop);
 
-			smo.casts_shadows = dict->get_int("casts_shadows", 1);
-
-			return smo;
+			return handle;
 		}
 	}
 
 	return {};
 }
 
-Level_Light make_light_from_dict(Level::Entity_Spawn* obj)
+handle<Render_Light> make_light_from_dict(const Dict& dict)
 {
-	Dict* dict = &obj->spawnargs;
 
-	const char* type = dict->get_string("type", "point");
-	glm::vec3 color = dict->get_vec3("color", glm::vec3(1.f));
-	Level_Light light;
+
+	const char* type = dict.get_string("type", "point");
+	glm::vec3 color = dict.get_vec3("color", glm::vec3(1.f));
+	Render_Light light;
 	light.color = color;
-	light.position = obj->position;
-	light.direction = obj->rotation;
+	light.position = dict.get_vec3("position");
+	glm::vec3 angles = dict.get_vec3("angles");
+	light.normal = AnglesToVector(angles.x, angles.y);
 	if (strcmp(type, "directional") == 0) {
 		light.type = LIGHT_DIRECTIONAL;
+		light.main_light_override = true;
 	}
 	else if (strcmp(type, "point") == 0) {
 		light.type = LIGHT_POINT;
 	}
 	else {
 		light.type = LIGHT_SPOT;
-		light.spot_angle = dict->get_float("outer_cone", 0.7f);
+		light.conemin = dict.get_float("outer_cone", 0.7f);
 	}
 
-	return light;
-}
-
-void create_statics_from_dicts(Level* level)
-{
-	const char* get_str = "";
-	for (int i = 0; i < level->espawns.size(); i++)
-	{
-		Level::Entity_Spawn* obj = &level->espawns[i];
-		Dict* dict = &obj->spawnargs;
-		if (obj->classname == "static_mesh") {
-			Static_Mesh_Object smo = make_static_mesh_from_dict(obj);
-			if (smo.model) {
-				level->static_mesh_objs.push_back(smo);
-
-				obj->_ed_varying_index_for_statics = level->static_mesh_objs.size() - 1;
-			}
-		}
-		else if (obj->classname == "light") {
-			level->lights.push_back(make_light_from_dict(obj));
-			obj->_ed_varying_index_for_statics = level->lights.size() - 1;
-		}
-		else if (obj->classname == "decal") {
-
-		}
-		else if (obj->classname == "static_sound") {
-
-		}
-		else if (obj->classname == "static_particle") {
-
-		}
-	}
+	auto handle = idraw->register_light(light);
+	return handle;
 }
 
 
-void on_node_callback(void* user, cgltf_data* data, cgltf_node* node, glm::mat4 global_transform)
+
+#include "Framework/Files.h"
+
+
+bool MapLoadFile::parse(const std::string name)
 {
-	if (node->light) {
-		create_light_obj_from_gltf((Level*)user, node, global_transform);
+	spawners.clear();
+	mapname = "";
+
+	std::string mappath =  maps_directory;
+	mappath += name;
+	mappath += "/entities.txt";
+
+	DictParser parser;
+	bool good = parser.load_from_file(name.c_str());
+	if (!good) {
+		sys_print("!!! couldn't find ent file %s\n", mappath.c_str());
+		return false;
 	}
+
+	while (!parser.is_eof()) {
+
+		Dict d;
+		parser.expect_item_start();
+		StringView tok;
+		while (parser.read_string(tok) && !parser.check_item_end(tok) && !parser.is_eof()) {
+			std::string key = std::string(tok.str_start, tok.str_len);
+			parser.read_string(tok);
+			std::string val = std::string(tok.str_start, tok.str_len);
+			d.keyvalues.insert({ std::move(key),std::move(val) });
+		}
+
+		spawners.push_back(std::move(d));
+	}
+
+	mapname = name;
+	return parser.is_eof();
 }
-#include "Types.h"
-
-Level* open_empty_level()
+#include "Framework/DictWriter.h"
+#include <fstream>
+void MapLoadFile::write_to_disk(const std::string name)
 {
-	Level* level = new Level;
-	level->name = "_Empty";
+	sys_print("*** Writing map %s to disk\n", name.c_str());
+	sys_print("   -> num ents: %s\n", (int) spawners.size());
 
-	return level;
-}
+	std::string mappath = maps_directory;
+	mappath += name;
+	mappath += "/entities.txt";
 
-Level* LoadLevelFile(const char* level_name)
-{
-	std::string map_dir;
-	map_dir.reserve(256);
+	DictWriter out;
 
-	map_dir += maps_directory;
-	map_dir += level_name;
-	map_dir += "/";
-	std::string levelmesh_path = map_dir + "levelmesh.glb";
+	for (auto& s : spawners) {
 
-	File_Buffer* infile = Files::open(levelmesh_path.c_str());
-	if (!infile) {
-		printf("no level with such name\n");
-		return nullptr;
-	}
-	Files::close(infile);
+		out.write_item_start();
+		for (auto& kv : s.dict.keyvalues) {
 
-	Level* level = new Level;
-	level->name = level_name;
-
-	Prefab_Model* prefab = mods.find_or_load_prefab(levelmesh_path.c_str(), true, on_node_callback, level);
-	if (!prefab) {
-		delete level;
-		return nullptr;
-	}
-	level->level_prefab = prefab;
-	
-	load_ents(level, map_dir);
-	create_statics_from_dicts(level);
-
-	std::string lightmap_path = map_dir + "lightmap.hdr";
-	level->lightmap = mats.find_texture(lightmap_path.c_str(), false, true);
-
-
-	level->collision = std::move(level->level_prefab->physics);
-	level->collision->build();
-
-
-	for (int i = 0; i < prefab->nodes.size(); i++) {
-		auto& node = prefab->nodes[i];
-		handle<Render_Object> handle = idraw->register_obj();
-		Render_Object obj;
-		obj.mesh = &prefab->meshes[node.mesh_idx];
-		obj.transform = node.transform;
-		obj.animator = nullptr;
-		obj.visible = true;
-		obj.mats = &prefab->mats;
-		
-		idraw->update_obj(handle, obj);
-		level->prefab_handles.push_back(handle);
+			out.write_key(kv.first.c_str());
+			out.write_value(kv.second.c_str());
+		}
+		out.write_item_end();
 	}
 
-	return level;
+	std::ofstream outfile(mappath);
+	size_t count = out.get_output().size();
+	outfile.write(out.get_output().c_str(), count);
+	outfile.close();
 }
 
-void FreeLevel(Level* level)
+bool Level::open_from_file(const std::string& path)
 {
-	if (level) {
-		for (int i = 0; i < level->prefab_handles.size(); i++)
-			idraw->remove_obj(level->prefab_handles[i]);
+	bool b = loadfile.parse(path);
+	if (!b)
+		return false;
 
-		for (int i = 0; i < level->static_mesh_objs.size(); i++)
-			idraw->remove_obj(level->static_mesh_objs[i].handle);
+	for (int i = 0; i < loadfile.spawners.size(); i++) {
+		auto& spawner = loadfile.spawners[i];
+		if (spawner.type == NAME("static_mesh"))
+			smeshes.push_back(make_static_mesh_from_dict(spawner.dict));
+		else if (spawner.type == NAME("static_light"))
+			slights.push_back(make_light_from_dict(spawner.dict));
 
-		mods.free_prefab(level->level_prefab);
-		delete level;
-		mods.compact_memory();
 	}
+}
+
+void Level::free_level()
+{
+	for (int i = 0; i < smeshes.size(); i++)
+		idraw->remove_obj(smeshes[i]);
+
+	for (int i = 0; i < slights.size(); i++)
+		idraw->remove_light(slights[i]);
 }

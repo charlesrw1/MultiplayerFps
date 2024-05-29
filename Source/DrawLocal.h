@@ -109,7 +109,7 @@ public:
 	float farplanes[MAXCASCADES];
 	int csm_resolution = 0;
 	bool enabled = false;
-	Level_Light current_sun;
+
 	bool targets_dirty = false;
 };
 
@@ -169,18 +169,6 @@ public:
 };
 
 
-
-struct Render_Light
-{
-	vec3 position;
-	vec3 normal;
-	vec3 color;
-	float conemin;
-	float conemax;
-	bool casts_shadow = false;
-	int shadow_array_index = 0;
-	int type = 0;
-};
 
 struct Render_Box_Cubemap
 {
@@ -334,6 +322,13 @@ struct ROP_Internal
 	glm::mat4 inv_transform;
 };
 
+struct RL_Internal
+{
+	Render_Light light;
+	// stuff like shadowmap indicies etc.
+	int shadow_array_index = -1;
+};
+
 // cull main view
 // first pass does objects visible last frame
 // render visible ones last frame
@@ -380,9 +375,19 @@ public:
 		return proxy_list.get(handle.id).proxy;
 	}
 
+	handle<Render_Light> register_light() { return { 0 }; }
+	void update_light(handle<Render_Light> handle, const Render_Light& proxy) {}
+	void remove_light(handle<Render_Light> handle) {}
+	const Render_Light& get_light(handle<Render_Light> handle) {
+		return light_list.get(handle.id).light;
+	}
+
 	void build_scene_data();
 	void build_render_list(Render_Lists& list, Render_Pass& src);
 	void upload_scene_materials();
+
+	RL_Internal* get_main_directional_light();
+
 
 	Render_Pass depth;			// vis/shadow objects, same as opaque but grouped with minimal draw clls
 	Render_Pass opaque;			// opaque objects that have full sorting
@@ -403,6 +408,7 @@ public:
 	Culling_Pass main_view;
 
 	Free_List<ROP_Internal> proxy_list;
+	Free_List<RL_Internal> light_list;
 
 	uint32_t skybox = 0;
 	std::vector<Render_Box_Cubemap> cubemaps;
@@ -411,8 +417,6 @@ public:
 	uint32_t levelcubemapspecular_array = 0;
 	int levelcubemap_num = 0;
 
-	int directional_index = -1;
-	std::vector<Render_Light> lights;
 	uint32_t light_ssbo;
 
 
@@ -512,6 +516,9 @@ public:
 		ASSERT(tex.output_composite!=0);
 		return tex.output_composite;
 	}
+	virtual handle<Render_Light> register_light(const Render_Light& l) override;
+	virtual void update_light(handle<Render_Light> handle, const Render_Light& l) override;
+	virtual void remove_light(handle<Render_Light>& handle) override;
 
 	void render_level_to_target(Render_Level_Params params);
 
@@ -638,11 +645,11 @@ public:
 	Shadow_Map_System shadowmap;
 	Volumetric_Fog_System volfog;
 	float slice_3d=0.0;
-	Level_Light dyn_light;
+
 
 	Render_Scene scene;
 
-	program_handle get_mat_shader(bool is_animated, const Mesh& part, const Material& gs, bool depth_pass, bool dither);
+	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither);
 	
 	Render_Stats stats;
 

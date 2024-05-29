@@ -3,9 +3,11 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
-#include "Game_Engine.h"
-#include "imgui.h"
 
+#include "imgui.h"
+#include "Framework/Files.h"
+#include "Framework/BinaryReadWrite.h"
+#include "Framework/DictParser.h"
 class Var_Manager_Impl : public Var_Manager
 {
 public:
@@ -154,9 +156,9 @@ Var_Manager_Impl::Var_Manager_Impl()
 }
 
 
-void tokenize_string(string& input, Cmd_Args& output)
+void tokenize_string(std::string& input, Cmd_Args& output)
 {
-	string token;
+	std::string token;
 	bool in_quotes = false;
 	for (char c : input) {
 		if ((c == ' ' || c == '\t') && !in_quotes) {
@@ -213,6 +215,7 @@ Generic_Value to_gv(const char* s)
 
 
 
+
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
@@ -235,7 +238,7 @@ public:
 	void execute(Cmd_Execute_Mode mode, const char* command_string) {
 
 		Cmd_Args args;
-		string command = command_string;
+		std::string command = command_string;
 		tokenize_string(command, args);
 		if (args.size() == 0) return;
 		Engine_Cmd* ec = find_cmd(args.at(0));
@@ -257,21 +260,25 @@ public:
 		}
 	}
 	void execute_file(Cmd_Execute_Mode mode, const char* path) {
-		File_Buffer* infile = Files::open(path, Files::TEXT);
-		//std::ifstream infile(path);
-		if (!infile) {
-			printf(__FUNCTION__": couldn't open file\n");
+
+		auto file = FileSys::open_read_os(path);
+		if(!file) {
+			sys_print("!!! couldn't open config file to execute: %s\n", path);
 			return;
 		}
-		char buffer[256];
-		Buffer str_buf = { buffer,256 };
-		int index = 0;
-		while (file_getline(infile,&str_buf,&index,'\n')) {
-			if (buffer[0]==0)
+		
+		DictParser parser;
+		parser.load_from_file(file.get());
+
+		StringView view;
+		while (parser.read_line(view)) {
+			if (view.is_empty())
 				continue;
-			if (buffer[0]=='#')
+			if (view.str_start[0] == '#')
 				continue;
-			execute(Cmd_Execute_Mode::NOW, buffer);
+
+			std::string str = std::string(view.str_start, view.str_len);
+			execute(Cmd_Execute_Mode::NOW, str.c_str());
 		}
 	}
 	void execute_buffer() {

@@ -10,45 +10,78 @@
 #include "Physics.h"
 #include "RenderObj.h"
 
-enum EdObjType
+#include "Framework/Factory.h"
+#include "Framework/PropertyEd.h"
+enum class SchemaPropType
 {
-	EDOBJ_EMPTY,
-	EDOBJ_MODEL,
-	EDOBJ_DECAL,
-	EDOBJ_LIGHT,
-	EDOBJ_SOUND,
-	EDOBJ_GAMEOBJ,
-	EDOBJ_PARTICLE,
-	EDOBJ_CUBEMAPS,
+	Bool,
+	Int,
+	Float,
+	Coordinates,
+	Angles,
+	Enum,
+
+	Color,
+	String,
+
+	Model,
+	Material,
+	Animgraph,
+	Script,
+	EntRef,
 };
+
+class SchemaProperty
+{
+	std::string typestr;
+	std::string name;
+	std::string hint;
+	std::string tooltip;
+};
+
+class ObjectSchema
+{
+public:
+
+private:
+	std::string name;
+	std::vector<SchemaProperty> properties;
+	std::vector<PropertyInfo> properties_for_grid;
+	PropertyInfoList prop_info_list;
+};
+
+class SchemaManager
+{
+public:
+
+
+	std::vector<ObjectSchema*> schema;
+};
+
 class EditorDoc;
 class EditorNode
 {
 public:
 	EditorNode(EditorDoc* doc) : doc(doc) {}
+	~EditorNode();
 
+	void hide();
+	void show();
 
 	virtual void scene_draw() {}
 	virtual void imgui_tick() {}
 	
-	void on_remove();
-
 	void init_on_new_espawn();
 
-
-	void make_from_existing(int index);
 	void on_create_from_dict(int index, int varying_index, Dict* d);
-	void save_out_to_level();
-
 
 	void on_transform_change() {}
 	void on_dict_value_change() {}
 
 	glm::vec3 position{};
-	glm::vec3 rotation{};
+	glm::quat rotation;
 	glm::vec3 scale=glm::vec3(1.f);
 	glm::mat4 get_transform();
-	void set_transform(glm::mat4 newtransform);
 	
 	bool use_sphere_collision = true;
 	glm::vec3 collision_bounds = glm::vec3(0.5f);
@@ -57,15 +90,27 @@ public:
 
 	EditorDoc* doc;
 
-	EdObjType obj = EDOBJ_EMPTY;
-	int dict_index = -1;
-	int _varying_obj_index = -1;
+	handle<Render_Object> render_handle;
+	handle<Render_Light> render_light;
+	handle<Render_Decal> render_decal;
 	
 	Dict& get_dict();
 
+	Color32 get_object_color() { return COLOR_WHITE; }
 	const char* get_name() {
 		return get_dict().get_string("name", "no_name");
 	}
+	void save_transform_to_dict() {
+		edit_ent.set_vec3("position", position);
+		glm::vec3 a = glm::eulerAngles(rotation);
+		edit_ent.set_vec3("rotation", a);
+		edit_ent.set_vec3("scale", scale);
+	}
+	void update_from_dict();
+private:
+	bool node_is_hidden = false;
+	Dict edit_ent;
+	const ObjectSchema* template_class = nullptr;
 };
 
 // some considerations:
@@ -183,7 +228,6 @@ public:
 		return "";
 	}
 
-	void on_add_or_remove_node(int ent_dict_index, EdObjType type, int varying_index, bool is_removal);
 	RayHit cast_ray_into_world(Ray* out_ray);
 
 	void save_doc();
@@ -203,8 +247,8 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
-	EditorNode* selected_node;
-	
+	std::shared_ptr<EditorNode> selected_node;
+
 	// dont want to deal with patching up another index
 	int get_node_index(EditorNode* node) {
 		for (int i = 0; i < nodes.size(); i++) {
@@ -212,11 +256,17 @@ public:
 		}
 		ASSERT(0);
 	}
-	
+
+	EditorNode* create_node_from_dict(const Dict& d);
+
 	UndoRedoSystem command_mgr;
 	AssetBrowser assets;
 	View_Setup vs_setup;
-	Level* leveldoc = nullptr;
+
+	PropertyGrid prop_editor;
+
+	MapLoadFile editing_map;
+
 	User_Camera camera;
 	std::vector<std::shared_ptr<EditorNode>> nodes;
 	std::vector<std::string> ent_files;

@@ -6,12 +6,11 @@
 #include "stb_image.h"
 #include "glad/glad.h"
 #include "Framework/Util.h"
-#include "Framework/Key_Value_File.h"
 
 #include "Game_Engine.h"
-#include <Windows.h>
-#undef min
-#undef max
+
+#include "Framework/Files.h"
+#include "Framework/DictParser.h"
 
 #undef OPAQUE
 
@@ -31,19 +30,28 @@ Material* Game_Material_Manager::find_and_make_if_dne(const char* name)
 #define ENSURE(num) if(line.size() < num) { sys_print("bad material definition %s @ %d\n", matname.c_str(), mat.second.linenum); continue;}
 void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 {
-	Key_Value_File file;
-	bool good = file.open(path);
-	if (!good) {
-		sys_print("Couldn't open material file %s\n", path);
-		return;
+	auto fileos = FileSys::open_read_os(path);
+	if (!fileos) {
+		sys_print("!!! Couldn't open material file %s\n", path);
 	}
+
+
+	DictParser file;
+	file.load_from_file(fileos.get());
+
 
 
 	string key;
 	string temp2;
-	for (auto& mat : file.name_to_entry)
-	{
-		const std::string& matname = mat.first;
+
+	while (!file.is_eof()) {
+		StringView name;
+		if (!file.read_string(name) || !file.expect_item_start()) {
+			sys_print("bad material def %s\n", path);
+			return;
+		}
+
+		std::string matname = std::string(name.str_start, name.str_len);
 
 		// first check if it exists
 		Material* gs = find_for_name(matname.c_str());
@@ -60,79 +68,112 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 			gs->material_id = cur_mat_id++;
 		}
 
-		auto& dict = mat.second.dict;
-		const char* str_get = "";
+		StringView tok;
+		while (file.read_string(tok) && !file.is_eof() && !file.check_item_end(tok) ) {
 
-		if (*(str_get = dict.get_string("pbr_full")) != 0) {
-			const char* path = string_format("%s_albedo.png", str_get);
-			gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(path);
-			path = string_format("%s_normal-ogl.png", str_get);
-			gs->get_image(material_texture::NORMAL) = create_but_dont_load(path);
-			path = string_format("%s_ao.png", str_get);
-			gs->get_image(material_texture::AO) = create_but_dont_load(path);
-			path = string_format("%s_roughness.png", str_get);
-			gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(path);
-			path = string_format("%s_metallic.png", str_get);
-			gs->get_image(material_texture::METAL) = create_but_dont_load(path);
-		}
 
-		// assume that ref_shaderX will be defined in the future, so create them if they haven't been
-		if (*(str_get = dict.get_string("ref_shader1")) != 0) {
-			gs->references[0] = find_and_make_if_dne(str_get);
-		}
-		if (*(str_get = dict.get_string("ref_shader2")) != 0) {
-			gs->references[1] = find_and_make_if_dne(str_get);
-		}
-
-		if (*(str_get = dict.get_string("albedo")) != 0) {
-			gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(str_get);
-		}
-		if (*(str_get = dict.get_string("normal")) != 0) {
-			gs->get_image(material_texture::NORMAL) = create_but_dont_load(str_get);
-		}
-		if (*(str_get = dict.get_string("ao")) != 0) {
-			gs->get_image(material_texture::AO) = create_but_dont_load(str_get);
-		}
-		if (*(str_get = dict.get_string("rough")) != 0) {
-			gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(str_get);
-		}
-		if (*(str_get = dict.get_string("metal")) != 0) {
-			gs->get_image(material_texture::METAL) = create_but_dont_load(str_get);
-		}
-		if (*(str_get = dict.get_string("special")) != 0) {
-			gs->get_image(material_texture::SPECIAL) = create_but_dont_load(str_get);
-		}
-
-		gs->diffuse_tint = glm::vec4(dict.get_vec3("tint", glm::vec3(1.f)),1.f);
-
-		float default_metal = 0.f;
-		if (gs->get_image(material_texture::METAL)) default_metal = 1.f;
-		gs->metalness_mult = dict.get_float("metal_val", default_metal);
-		gs->roughness_mult = dict.get_float("rough_val", 1.f);
-		gs->roughness_remap_range = dict.get_vec2("rough_remap", glm::vec2(0, 1));
-
-		if (*(str_get = dict.get_string("shader")) != 0) {
-			if (strcmp(str_get,"blend2") == 0) gs->type = material_type::TWOWAYBLEND;
-			else if (strcmp(str_get, "wind")==0) gs->type = material_type::WINDSWAY;
-			else if (strcmp(str_get, "water")==0) {
-				gs->blend = blend_state::BLEND;
-				gs->type = material_type::WATER;
+			if (tok.cmp("pbr_full")) {
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				const char* path = string_format("%s_albedo.png", str_get);
+				gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(path);
+				path = string_format("%s_normal-ogl.png", str_get);
+				gs->get_image(material_texture::NORMAL) = create_but_dont_load(path);
+				path = string_format("%s_ao.png", str_get);
+				gs->get_image(material_texture::AO) = create_but_dont_load(path);
+				path = string_format("%s_roughness.png", str_get);
+				gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(path);
+				path = string_format("%s_metallic.png", str_get);
+				gs->get_image(material_texture::METAL) = create_but_dont_load(path);
 			}
-			else sys_print("unknown shader type %s\n", str_get);
-		}
 
-		gs->blend = blend_state::OPAQUE;
-		if (*(str_get = dict.get_string("alpha")) != 0) {
-			if (strcmp(str_get, "add") == 0)
-				gs->blend = blend_state::ADD;
-			else if (strcmp(str_get, "blend") == 0) 
-				gs->blend = blend_state::BLEND;
-			else if (strcmp(str_get, "test") == 0) 
-				gs->alpha_tested = true;
-		}
+			// assume that ref_shaderX will be defined in the future, so create them if they haven't been
+			else if (tok.cmp("ref_shader1")) {
+				file.read_string(tok);
+				gs->references[0] = find_and_make_if_dne(tok.to_stack_string().c_str());
+			}
+			else if (tok.cmp("ref_shader2")) {
+				file.read_string(tok);
+				gs->references[1] = find_and_make_if_dne(tok.to_stack_string().c_str());
+			}
 
-		if (*(str_get = dict.get_string("showbackface", "no")) == 0) {
-			gs->backface = true;
+			else if (tok.cmp("albedo")) {
+				file.read_string(tok);
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(str_get);
+			}
+			else if (tok.cmp("normal")) {
+				file.read_string(tok);
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				gs->get_image(material_texture::NORMAL) = create_but_dont_load(str_get);
+			}
+			else if (tok.cmp("ao")) {
+				file.read_string(tok);
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				gs->get_image(material_texture::AO) = create_but_dont_load(str_get);
+			}
+			else if (tok.cmp("rough")) {
+				file.read_string(tok);
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(str_get);
+			}
+			else if (tok.cmp("metal")) {
+				file.read_string(tok);
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				gs->get_image(material_texture::METAL) = create_but_dont_load(str_get);
+				gs->metalness_mult = 1.0;
+			}
+			else if (tok.cmp("special")) {
+				file.read_string(tok);
+				auto ss = tok.to_stack_string();
+				const char* str_get = ss.c_str();
+				gs->get_image(material_texture::SPECIAL) = create_but_dont_load(str_get);
+			}
+			else if (tok.cmp("tint")) {
+				glm::vec3 t;
+				file.read_float3(t.x, t.y, t.z);
+				gs->diffuse_tint = glm::vec4(t, gs->diffuse_tint.w);
+			}
+			else if (tok.cmp("metal_val")) {
+				file.read_float(gs->metalness_mult);
+			}
+			else if (tok.cmp("rough_val")) {
+				file.read_float(gs->roughness_mult);
+			}
+			else if (tok.cmp("rough_remap")) {
+				glm::vec2 v;
+				file.read_float2(v.x, v.y);
+				gs->roughness_remap_range = v;
+			}
+			else if (tok.cmp("shader")) {
+				file.read_string(tok);
+				if (tok.cmp("blend2")) gs->type = material_type::TWOWAYBLEND;
+				else if (tok.cmp("wind")) gs->type = material_type::WINDSWAY;
+				else if (tok.cmp("water")) {
+					gs->blend = blend_state::BLEND;
+					gs->type = material_type::WATER;
+				}
+				else sys_print("unknown shader type %s\n", tok.to_stack_string().c_str());
+			}
+			else if (tok.cmp("alpha")) {
+				file.read_string(tok);
+				if(tok.cmp("add"))
+					gs->blend = blend_state::ADD;
+				else if (tok.cmp("blend"))
+					gs->blend = blend_state::BLEND;
+				else if(tok.cmp("test"))
+				 	gs->alpha_tested = true;
+
+			}
+			else if (tok.cmp("showbackface")) {
+				gs->backface = true;
+			}
+
 		}
 	}
 }
@@ -141,17 +182,13 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 
 void Game_Material_Manager::load_material_file_directory(const char* directory)
 {
-	std::string path = std::string(directory) + '*';
+	sys_print("------ Load Materials ------\n");
 
-	char buffer[260];
-
-	while (Files::iterate_files_in_dir(path.c_str(), buffer, 260)) {
-		std::string path = directory;
-		path += buffer;
-		load_material_file(path.c_str(), true);
+	FileTree tree = FileSys::find_files(directory);
+	for (const auto& file : tree) {
+		load_material_file(file.c_str(), true);
 	}
 
-	sys_print("Loaded material directory %s\n", directory);
 }
 
 Material* Game_Material_Manager::create_temp_shader(const char* name)
@@ -471,10 +508,6 @@ void FreeTexture(Texture* t)
 	t->is_loaded_in_memory = false;
 }
 
-void FreeLoadedTextures()
-{
-	mats.free_all();
-}
 void Game_Material_Manager::free_all()
 {
 	printf("freeing textures\n");
@@ -505,33 +538,41 @@ bool Game_Material_Manager::load_texture(const std::string& path, Texture* t)
 
 	std::string path_to_use = path.substr(0, path.rfind('.')) + ".dds";
 
-	if (INVALID_FILE_ATTRIBUTES == GetFileAttributesA(path_to_use.c_str()) && GetLastError() == ERROR_FILE_NOT_FOUND) {
+	auto file = FileSys::open_read(path_to_use.c_str());
+
+	if (!file) {
 		path_to_use = path;
+		file = FileSys::open_read(path_to_use.c_str());
 	}
 
 	// check archive
-	File_Buffer* f = Files::open(path_to_use.c_str());
-	if (!f) {
-		sys_print("Couldn't load texture: %s", path.c_str());
+
+
+	if (!file) {
+		sys_print("!!! Couldn't load texture: %s", path.c_str());
 		return false;
 	}
 
+	std::vector<uint8_t> filedata;
+	filedata.resize(file->size());
+	file->read(filedata.data(), filedata.size());
+
 	if (path_to_use.find(".dds")!=std::string::npos) {
-		load_dds_file(t, (uint8_t*)f->buffer, f->length);
+		load_dds_file(t, filedata.data(), filedata.size());
 		return true;
 	}
 	else if (path_to_use.find(".hdr") != std::string::npos) {
 		stbi_set_flip_vertically_on_load(true);
-		data = stbi_loadf_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
+		data = stbi_loadf_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
 		is_float = true;
 	}
 	else {
 		stbi_set_flip_vertically_on_load(false);
-		data = stbi_load_from_memory((uint8_t*)f->buffer, f->length, &x, &y, &channels, 0);
+		data = stbi_load_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
 		printf("%d %d\n", x, y);
 		is_float = false;
 	}
-	Files::close(f);
+	file->close();
 
 
 	if (data == nullptr) {
@@ -617,10 +658,6 @@ Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_d
 	return t;
 }
 
-Texture* FindOrLoadTexture(const char* filename)
-{
-	return mats.find_texture(filename, true, false);
-}
 
 Texture* Game_Material_Manager::create_but_dont_load(const char* file)
 {

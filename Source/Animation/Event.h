@@ -26,7 +26,22 @@ struct AnimEvent
 
 	StringName name;
 	std::string str;
+
 };
+
+class AE_Footstep : public AnimEvent
+{
+public:
+};
+
+class AE_PlaySound : public AnimEvent
+{
+public:
+
+
+};
+
+
 
 // state events
 enum class SEvent_e : uint8_t

@@ -58,9 +58,13 @@ void NPC::spawn()
 void Game_Engine::populate_map()
 {
 	// call spawn functions
-	for (int i = 0; i < level->espawns.size(); i++) {
-		Level::Entity_Spawn& es = level->espawns.at(i);
-		Entity* e = create_entity(es.classname.c_str(), -1);
+	auto& spawners = level->loadfile.spawners;
+	for (int i = 0; i < spawners.size(); i++) {
+		if (spawners[i].type != NAME("entity") && spawners[i].type != NAME(""))
+			continue;
+		const char* classname = spawners[i].dict.get_string("classname");
+
+		Entity* e = create_entity(classname, -1);
 		if (!e)
 			continue;
 		e->spawn();
@@ -74,13 +78,13 @@ void Game_Engine::client_leave(int slot)
 	free_entity(handle);
 }
 
-void Entity::initialize_animator(const Animation_Set_New* set, const Animation_Tree_CFG* graph, IAnimationGraphDriver* driver) {
+void Entity::initialize_animator(const Animation_Tree_CFG* graph, IAnimationGraphDriver* driver) {
 
 	ASSERT(model);
 
 	if (!animator)
 		animator.reset(new Animator());
-	animator->initialize_animator(model, set, graph, driver, this);
+	animator->initialize_animator(model,graph, driver, this);
 }
 
 
@@ -425,9 +429,10 @@ void Entity::present()
 		proxy.visible = !(state_flags & EF_HIDDEN);
 		if (animator)
 			proxy.animator = animator.get();
-		proxy.mesh = &model->mesh;
-		proxy.mats = &model->mats;
-		proxy.transform = get_world_transform()*model->skeleton_root_transform;
+		proxy.model = model;
+
+		// FIXME:
+		proxy.transform = get_world_transform();// * model->skeleton_root_transform;
 		
 		idraw->update_obj(render_handle, proxy);
 	}

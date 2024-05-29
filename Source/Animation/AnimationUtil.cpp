@@ -1,6 +1,7 @@
 #include "AnimationUtil.h"
 
 #include "Debug.h"
+#include "Animation/SkeletonData.h"
 
 static glm::mat4 debug_animation_transform = glm::mat4(1);
 
@@ -69,31 +70,6 @@ static glm::quat quat_blend_additive(const glm::quat& a, const glm::quat& b, flo
 }
 
 
-void util_global_bl34234end(const Model_Skeleton* skel, const Pose* a, Pose* b, float factor, const std::vector<float>& mask)
-{
-	const auto& bone_vec = skel->source->bones;
-	const int bonecount = bone_vec.size();
-
-	glm::mat4* matricies1 = new glm::mat4[256];
-	glm::mat4* matricies2 = new glm::mat4[256];
-
-
-	util_localspace_to_meshspace_ptr(*a, matricies1, skel->source);
-	util_localspace_to_meshspace_ptr(*b, matricies2, skel->source);
-
-
-
-
-
-
-
-	delete[] matricies1;
-	delete[] matricies2;
-
-	// now do a blend between base and global blened result
-	//util_blend(bonecount, *a, *b, 1.0 -factor);
-}
-
 #include "Framework/Config.h"
 
 static glm::quat forward_dir = glm::quat(0.0,0,0,1);
@@ -124,7 +100,7 @@ void menu1235()
 static AddToDebugMenu aeasdf("meun", menu1235);
 
 
-static void draw_skeleton_util_debug(const glm::mat4* bones,const Model* model, int count, float line_len, const glm::mat4& transform)
+static void draw_skeleton_util_debug(const glm::mat4* bones,const MSkeleton* model, int count, float line_len, const glm::mat4& transform)
 {
 
 	for (int index = 0; index < count; index++) {
@@ -136,19 +112,19 @@ static void draw_skeleton_util_debug(const glm::mat4* bones,const Model* model, 
 			Debug::add_line(org, org + dir * line_len, colors[i], -1.f, false);
 		}
 
-		if (model->bones[index].parent != -1) {
-			vec3 parent_org = transform * bones[model->bones[index].parent][3];
+		if (model->get_bone_parent(index) != -1) {
+			vec3 parent_org = transform * bones[model->get_bone_parent(index)][3];
 			Debug::add_line(org, parent_org, COLOR_PINK, -1.f, false);
 		}
 	}
 }
 
-void util_meshspace_to_localspace(const glm::mat4* mesh, const Model* mod, Pose* out)
+void util_meshspace_to_localspace(const glm::mat4* mesh, const MSkeleton* mod, Pose* out)
 {
-	const int count = mod->bones.size();
+	const int count = mod->get_num_bones();
 	for (int i = 0; i < count; i++) {
-		auto& bone = mod->bones[i];
-		int parent = bone.parent;
+
+		int parent = mod->get_bone_parent(i);
 
 		glm::mat4 matrix = mesh[i];
 		if (parent != -1) {
@@ -160,29 +136,47 @@ void util_meshspace_to_localspace(const glm::mat4* mesh, const Model* mod, Pose*
 	}
 }
 
-void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_matricies, const Model* model)
+void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_matricies, const MSkeleton* skel)
 {
-	for (int i = 0; i < model->bones.size(); i++)
+	for (int i = 0; i < skel->get_num_bones(); i++)
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
 
-		if (model->bones[i].parent == -1) {
+		if (skel->get_bone_parent(i) == -1) {
 			out_bone_matricies[i] = matrix;
 		}
 		else {
-			assert(model->bones[i].parent < model->bones.size());
-			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+			assert(skel->get_bone_parent(i) < skel->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[skel->get_bone_parent(i)] * matrix;
 		}
 	}
 	//for (int i = 0; i < model->bones.size(); i++)
 	//	out_bone_matricies[i] =  out_bone_matricies[i];
 }
 
-void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, float factor, const std::vector<float>& mask)
+
+
+void util_localspace_to_meshspace(Pose& local, const glm::mat4* meshspace /* size = num bones*/, const MSkeleton* skel)
 {
-	const auto& bone_vec = skel->source->bones;
-	const int bonecount = bone_vec.size();
+	const int count = skel->get_num_bones();
+	for (int i = 0; i < count; i++) {
+		const int parent = skel->get_bone_parent(i);
+
+		glm::mat4 matrix = meshspace[i];
+		if (parent != -1) {
+			matrix = glm::inverse(meshspace[parent]) * matrix;
+		}
+
+		local.pos[i] = matrix[3];
+		local.q[i] = glm::quat_cast(matrix);
+	}
+}
+
+void util_global_blend(const MSkeleton* skel, const Pose* a,  Pose* b, float factor, const std::vector<float>& mask)
+{
+
+	const int bonecount = skel->get_num_bones();
 
 	std::vector<glm::mat4> globalspace_base(bonecount);
 
@@ -200,11 +194,11 @@ void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, floa
 	//	}
 	//}
 
-	util_localspace_to_meshspace_ptr_2(*a, globalspace_base.data(), skel->source);
+	util_localspace_to_meshspace_ptr_2(*a, globalspace_base.data(), skel);
 
 
 	std::vector<glm::mat4> globalspace_layer(bonecount);
-	util_localspace_to_meshspace_ptr_2(*b, globalspace_layer.data(), skel->source);
+	util_localspace_to_meshspace_ptr_2(*b, globalspace_layer.data(), skel);
 
 	std::vector<glm::quat> globalspace_rotations(bonecount);
 
@@ -217,7 +211,7 @@ void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, floa
 		//globalspace_base[j] = glm::mat4_cast(layer);
 		//globalspace_base[j][3] = t;
 #if 1
-		int parent = bone_vec[j].parent;
+		int parent = skel->get_bone_parent(j);
 		if (parent == -1) {
 			b->q[j]=global;
 		}
@@ -258,7 +252,7 @@ void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, floa
 
 
 	for (int i = 0; i < bonecount; i++) {
-		const int parent = bone_vec[i].parent;
+		const int parent = skel->get_bone_parent(i);
 		if (parent == -1) {
 			baserotations[i] = a->q[i];
 
@@ -274,7 +268,7 @@ void util_global_blend(const Model_Skeleton* skel, const Pose* a,  Pose* b, floa
 	}
 
 	for (int i = 0; i < bonecount; i++) {
-		const int parent = bone_vec[i].parent;
+		const int parent = skel->get_bone_parent(i);
 		const float weight = mask[i];
 
 		out->pos[i] = glm::mix(a->pos[i], b->pos[i], weight);
@@ -402,9 +396,13 @@ void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1
 	util_blend(bonecount, x2, y2, fac.y);
 }
 
-void util_calc_rotations(const Animation_Set* set, float curframe, int clip_index, const Model* model, const std::vector<int>* remap_indicies, Pose& pose)
+#if 0
+void util_calc_rotations(const Animation_Set* set,const Model* source_model, float curframe, int clip_index, const Model* model, const std::vector<int>* remap_indicies, Pose& pose)
 {
-	for (int dest_idx = 0; dest_idx < set->num_channels; dest_idx++) {
+
+	const int count = model->bones.size();
+
+	for (int dest_idx = 0; dest_idx < count; dest_idx++) {
 		int src_idx = (remap_indicies) ? (*remap_indicies)[dest_idx] : dest_idx;
 
 		if (src_idx == -1) {
@@ -420,7 +418,7 @@ void util_calc_rotations(const Animation_Set* set, float curframe, int clip_inde
 
 		vec3 interp_pos{};
 		if (pos_idx == -1)
-			interp_pos = model->bones.at(src_idx).localtransform[3];
+			interp_pos = source_model->bones.at(src_idx).localtransform[3];
 		else if (pos_idx == set->GetChannel(clip_index, src_idx).num_positions - 1)
 			interp_pos = set->GetPos(src_idx, pos_idx, clip_index).val;
 		else {
@@ -438,7 +436,7 @@ void util_calc_rotations(const Animation_Set* set, float curframe, int clip_inde
 
 		glm::quat interp_rot{};
 		if (rot_idx == -1) {
-			interp_rot = model->bones.at(src_idx).rot;
+			interp_rot = source_model->bones.at(src_idx).rot;
 		}
 		else if (rot_idx == set->GetChannel(clip_index, src_idx).num_rotations - 1)
 			interp_rot = set->GetRot(src_idx, rot_idx, clip_index).val;
@@ -460,11 +458,127 @@ void util_calc_rotations(const Animation_Set* set, float curframe, int clip_inde
 		pose.pos[dest_idx] = interp_pos;
 	}
 }
+#endif
 
-void util_set_to_bind_pose(Pose& pose, const Model* model)
+#define IS_HIGH_BIT_SET(x) (x&(1<<31))
+#define UNSET_HIGH_BIT(x) (x & ~(1<<31))
+
+glm::vec3* AnimationSeq::get_pos_write_ptr(int channel, int keyframe) {
+
+	ChannelOffset offset = channel_offsets[channel];
+	uint32_t actual_ofs = UNSET_HIGH_BIT(offset.pos);
+	if (IS_HIGH_BIT_SET(offset.pos)) {
+		if (keyframe > 0) return nullptr;
+		return (glm::vec3*)(pose_data.data() + actual_ofs);
+	}
+	else {
+		return ((glm::vec3*)(pose_data.data() + actual_ofs)) + keyframe;
+	}
+}
+glm::quat* AnimationSeq::get_quat_write_ptr(int channel, int keyframe) {
+
+	ChannelOffset offset = channel_offsets[channel];
+	uint32_t actual_ofs = UNSET_HIGH_BIT(offset.rot);
+	if (IS_HIGH_BIT_SET(offset.rot)) {
+		if (keyframe > 0) return nullptr;
+		return (glm::quat*)(pose_data.data() + actual_ofs);
+	}
+	else {
+		return ((glm::quat*)(pose_data.data() + actual_ofs)) + keyframe;
+	}
+}
+
+
+ScalePositionRot AnimationSeq::get_keyframe(int bone, int keyframe, float lerpamt) const
 {
-	for (int i = 0; i < model->bones.size(); i++) {
-		pose.pos[i] = model->bones.at(i).localtransform[3];
-		pose.q[i] = model->bones.at(i).rot;
+	// TODO: insert return statement here
+	ChannelOffset offset = channel_offsets[bone];
+
+	ScalePositionRot output;
+
+	if (IS_HIGH_BIT_SET(offset.pos)) {
+		uint32_t actual_ofs = UNSET_HIGH_BIT(offset.pos);
+		output.pos = *(glm::vec3*)(pose_data.data() + actual_ofs);
+	}
+	else {
+		uint32_t actual_ofs = UNSET_HIGH_BIT(offset.pos);
+
+		glm::vec3* ptr = (glm::vec3*)(pose_data.data() + actual_ofs);
+
+		glm::vec3 p0 = ptr[keyframe];
+		glm::vec3 p1 = ptr[keyframe+1];
+
+		output.pos = glm::mix(p0, p1, lerpamt);
+	}
+
+	if (IS_HIGH_BIT_SET(offset.rot)) {
+		uint32_t actual_ofs = UNSET_HIGH_BIT(offset.rot);
+		output.rot = *(glm::quat*)(pose_data.data() + actual_ofs);
+	}
+	else {
+		uint32_t actual_ofs = UNSET_HIGH_BIT(offset.rot);
+		glm::quat* ptr = (glm::quat*)(pose_data.data() + actual_ofs);
+
+		glm::quat r0 = ptr[keyframe];
+		glm::quat r1 = ptr[keyframe + 1];
+
+		output.rot = glm::slerp(r0, r1, lerpamt);
+	}
+
+	if (IS_HIGH_BIT_SET(offset.scale)) {
+		uint32_t actual_ofs = UNSET_HIGH_BIT(offset.scale);
+		output.scale = *(float*)(pose_data.data() + actual_ofs);
+	}
+	else {
+		uint32_t actual_ofs = UNSET_HIGH_BIT(offset.scale);
+		float* ptr = (float*)(pose_data.data() + actual_ofs);
+
+		float s0 = ptr[keyframe];
+		float s1 = ptr[keyframe + 1];
+
+		output.scale = glm::mix(s0, s1, lerpamt);
+	}
+
+	return output;
+}
+
+const AnimEvent* AnimationSeq::get_events_for_keyframe(int keyframe, int* count) const
+{
+	int ev_count = event_keyframes[keyframe].count;
+	*count = ev_count;
+	if (ev_count == 0) 
+		return nullptr;
+	return &events.at(event_keyframes[keyframe].offset);
+}
+
+#include "Animation/SkeletonData.h"
+void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const std::vector<int16_t>* remap_indicies, Pose& outpose)
+{
+	const int count = skeleton->get_num_bones();
+	int keyframe = clip->get_frame_for_time(time);
+	float lerp_amt = MidLerp(clip->get_time_of_keyframe(keyframe), clip->get_time_of_keyframe(keyframe + 1), time);
+
+	for (int dest_idx = 0; dest_idx < count; dest_idx++) {
+		int src_idx = (remap_indicies) ? (*remap_indicies)[dest_idx] : dest_idx;
+
+		if (src_idx == -1) {
+			outpose.pos[dest_idx] = skeleton->get_bone_local_transform(dest_idx)[3];
+			outpose.q[dest_idx] = skeleton->get_bone_local_rotation(dest_idx);
+			outpose.q[dest_idx] = glm::normalize(outpose.q[dest_idx]);
+			continue;
+		}
+
+		ScalePositionRot transform = clip->get_keyframe(src_idx, keyframe, lerp_amt);
+		outpose.pos[dest_idx] = transform.pos;
+		outpose.q[dest_idx] = transform.rot;
+	}
+}
+
+
+void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel)
+{
+	for (int i = 0; i < skel->get_num_bones(); i++) {
+		pose.pos[i] = skel->get_bone_local_transform(i)[3];
+		pose.q[i] = skel->get_bone_local_rotation(i);
 	}
 }

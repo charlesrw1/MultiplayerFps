@@ -3,11 +3,13 @@
 #include "Framework/StringUtil.h"
 #include <cassert>
 
+class IFile;
 class DictParser
 {
 public:
     bool load_from_file(const char* filename);
     void load_from_memory(const uint8_t* ptr, int length, const char* name);
+    void load_from_file(IFile* file);
     ~DictParser() {
         if (allocated) {
             delete buffer;
@@ -98,6 +100,7 @@ public:
 
     }
 
+    bool read_line(StringView& line, char delimiter = '\n');
 private:
     void raise_error(const char* msg) {
         had_error = true;

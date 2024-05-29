@@ -17,6 +17,8 @@
 #include "ControlParams.h"
 #include "ControlParamHandle.h"
 
+#include "Animation/SkeletonData.h"
+
 
 #include <cassert>
 
@@ -60,7 +62,7 @@ class Language;
 struct NodeRt_Ctx
 {
 	const Model* model = nullptr;
-	const Animation_Set_New* set = nullptr;
+
 	Animation_Tree_RT* tree = nullptr;
 	const ControlParam_CFG* param_cfg = nullptr;
 	const Program* script_prog = nullptr;
@@ -78,8 +80,10 @@ struct NodeRt_Ctx
 	bool get_bool(ControlParamHandle handle) const {
 		return param_cfg->get_bool(&tree->vars, handle);
 	}
-
-	uint32_t num_bones() const { return model->bones.size(); }
+	const MSkeleton* get_skeleton() const {
+		return model->get_skel();
+	}
+	uint32_t num_bones() const { return model->get_skel()->get_num_bones(); }
 };
 
 struct GetPose_Ctx
@@ -259,10 +263,9 @@ struct Clip_Node_RT : Rt_Vars_Base
 	glm::vec3 root_pos_first_frame = glm::vec3(0.f);
 	float inv_speed_of_anim_root = 1.0;
 	float frame = 0.0;
-	int16_t clip_index = -1;
-	int16_t set_idx = -1;
-	int16_t skel_idx = -1;
 	bool stopped_flag = false;
+	const AnimationSeq* clip = nullptr;
+	int remap_index = -1;
 };
 
 
@@ -282,25 +285,14 @@ struct Clip_Node_CFG : public Node_CFG
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
 
-		ctx.set->find_animation(clip_name.c_str(), &rt->set_idx,&rt->clip_index,&rt->skel_idx);
+	
+		rt->clip = ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
 
-		if (rt->clip_index != -1) {
-			int root_index = ctx.model->root_bone_index;
-
-			if (rt->skel_idx != -1) {
-				root_index = ctx.set->get_remap(rt->skel_idx)[root_index];
-			}
-
-			auto subset = ctx.set->get_subset(rt->set_idx);
-			if (root_index != -1) {
-				int first_pos = subset->FirstPositionKeyframe(0.0, root_index, rt->clip_index);
-				rt->root_pos_first_frame = first_pos != -1 ?
-					subset->GetPos(root_index, first_pos, rt->clip_index).val
-					: ctx.model->bones[root_index].posematrix[3];
-			}
-
-			const Animation& clip = subset->clips[rt->clip_index];
-			rt->inv_speed_of_anim_root = 1.0 / glm::length(clip.root_motion_translation) / (clip.total_duration / clip.fps);
+		if (rt->clip) {
+			const int root_index = 0;
+			rt->root_pos_first_frame = rt->clip->get_keyframe(0, 0, 0.0).pos;
+			
+			rt->inv_speed_of_anim_root = 1.0 / rt->clip->average_linear_velocity;
 		}
 	}
 
@@ -317,20 +309,14 @@ struct Clip_Node_CFG : public Node_CFG
 	virtual bool is_clip_node() const override {
 		return true;
 	}
-	const Animation* get_clip(NodeRt_Ctx& ctx) const {
+	const AnimationSeq* get_clip(NodeRt_Ctx& ctx) const {
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
-		if (rt->clip_index == -1) {
-			return nullptr;
-		}
-		auto subset = ctx.set->get_subset(rt->set_idx);
-		const Animation& clip = subset->clips[rt->clip_index];
-
-		return &clip;
+		return rt->clip;
 	}
 	void set_frame_by_interp(NodeRt_Ctx& ctx, float frac) const {
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
-		rt->frame = get_clip(ctx)->total_duration * frac;
+		rt->frame = get_clip(ctx)->duration * frac;
 	}
 
 	rootmotion_setting rm[3] = { rootmotion_setting::keep ,rootmotion_setting::keep, rootmotion_setting::keep };
@@ -603,7 +589,8 @@ public:
 	virtual void construct(NodeRt_Ctx& ctx) const override {
 		construct_this<RT_TYPE>(ctx);
 		auto rt = get_rt<RT_TYPE>(ctx);
-		rt->mask_index = (int16_t)ctx.set->src_skeleton->find_mask(maskname);
+		//FIXME
+		rt->mask_index = -1;// (int16_t)ctx.set->src_skeleton->find_mask(maskname);
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		input[0]->reset(ctx);

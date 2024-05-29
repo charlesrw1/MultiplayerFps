@@ -6,6 +6,7 @@
 #include "Framework/BVH.h"
 #include "Framework/Config.h"
 #include "Framework/Dict.h"
+#include "Framework/DictParser.h"
 #include "DrawPublic.h"
 
 enum {
@@ -14,7 +15,7 @@ enum {
 	LIGHT_SPOT,
 };
 
-struct Level_Light
+struct StaticLight
 {
 	int type = 0;
 	glm::vec3 position;
@@ -23,60 +24,72 @@ struct Level_Light
 	float spot_angle;
 };
 
-struct Static_Mesh_Object
+struct Texture;
+struct StaticEnv
 {
-	glm::mat4x3 transform;
-	bool is_embedded_mesh = false;
-	bool casts_shadows = true;
-	Model* model = nullptr;
-	handle<Render_Object> handle;	// handle to render system
+	std::string skyname;
+	const Texture* sky_texture = nullptr;
 };
 
-struct Object_Dict
+class MapEntity
 {
+public:
+	MapEntity() = default;
+	MapEntity(const Dict& d) {
+		dict = d;
+		type = dict.get_string("type");
+	}
+	MapEntity(Dict&& d) {
+		dict = std::move(d);
+		type = dict.get_string("type");
+	}
+	StringName type;
 	Dict dict;
-	glm::vec3 position;
-	glm::vec3 rotation;
-	glm::vec3 scale;
-	const char* name = "";	// referenced from dict
 };
 
-using std::vector;
+class MapLoadFile
+{
+public:
+	const std::string& get_name() const { return mapname; }
+	
+	bool parse(const std::string name);
 
-class Model;
-class Texture;
+	// for map editing
+	void write_to_disk(const std::string name);
+	void clear_all() { spawners.clear(); }
+	void add_spawner(const Dict& d) { 
+		spawners.push_back(d); 
+	}
+
+	string mapname;
+	std::vector<MapEntity> spawners;
+};
+
 class Level
 {
 public:
-	struct Entity_Spawn
-	{
-		std::string name;
-		std::string classname;
-		glm::vec3 position;
-		glm::vec3 rotation;
-		glm::vec3 scale;
-		Dict spawnargs;
+	Level() = default;
+	Level(const Level& o) = delete;
+	~Level() {
+		free_level();
+	}
 
-		int _ed_varying_index_for_statics = -1;
-	};
+	bool open_from_file(const std::string& path);
 
-	unique_ptr<Physics_Mesh> collision;	// merged collision of all level_meshes
-	vector<Level_Light> lights;
-	vector<Static_Mesh_Object> static_mesh_objs;
-	Prefab_Model* level_prefab=nullptr;
-	vector<handle<Render_Object>> prefab_handles;
-	vector<Entity_Spawn> espawns;
-	vector<Object_Dict> objs;
-
-	Texture* lightmap = nullptr;
-
-	
 	std::string name;
-	uint32_t skybox_cubemap=0;
+	unique_ptr<Physics_Mesh> scollision;	// merged collision of all level_meshes
+	
+	vector<handle<Render_Light>> slights;
+	vector<handle<Render_Object>> smeshes;
+
+
+	StaticEnv senv;
+	int main_sun = -1;
+
+	bool has_main_sun() const { return main_sun != -1; }
+
+	MapLoadFile loadfile;
+private:
+	void free_level();
 };
-
-Level* open_empty_level();
-Level* LoadLevelFile(const char* level);
-void FreeLevel(Level* level);
-
 #endif // !LEVEL_H

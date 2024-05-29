@@ -780,8 +780,7 @@ void ViewmodelComponent::update_visuals()
 	proxy.viewmodel_layer = true;
 	proxy.visible = true;
 	//proxy.animator = &animator;
-	proxy.mesh = &model->mesh;
-	proxy.mats = &model->mats;
+	proxy.model = model;
 	if (!g_thirdperson.integer())
 	{
 		glm::mat4 model2 = glm::translate(glm::mat4(1), vec3(0.18, -0.18, -0.25) + viewmodel_offsets + viewmodel_recoil_ofs);
@@ -828,11 +827,11 @@ void Player::spawn() {
 		viewmodel.reset(new ViewmodelComponent(this));
 	}
 
-	auto set = anim_tree_man->find_set("default.txt");
+
 	auto graph = anim_tree_man->find_animation_tree("out.txt");
 
-	if(set && graph && graph->graph_is_valid)
-		initialize_animator(set, graph, &graph_driver);
+	if(graph && graph->graph_is_valid)
+		initialize_animator(graph, &graph_driver);
 
 	phys_opt.shape = Ent_PhysicsShape::AABB;
 	phys_opt.type = Ent_PhysicsType::PlayerMove;

@@ -6,9 +6,6 @@
 bool ImageCompilier::compile(const char* name)
 {
 
-
-
-
 	int output = std::system(".\\x64\\Debug\\texconv.exe");
 	return false;
 }

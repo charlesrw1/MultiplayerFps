@@ -45,14 +45,14 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
 
-	const Animation* clip = get_clip(ctx);
+	const AnimationSeq* clip = get_clip(ctx);
 	if (!clip) {
-		util_set_to_bind_pose(*pose.pose, ctx.model);
+		util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
 		return true;
 	}
 
 	if (pose.sync)
-		rt->frame = clip->total_duration * pose.sync->normalized_frame;
+		rt->frame = clip->duration * pose.sync->normalized_frame;
 
 
 	if (!pose.sync || pose.sync->first_seen) {
@@ -64,30 +64,29 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
 		rt->frame += clip->fps * pose.dt * speed;
 
-		if (rt->frame > clip->total_duration || rt->frame < 0.f) {
+		if (rt->frame > clip->duration || rt->frame < 0.f) {
 			if (loop)
-				rt->frame = fmod(fmod(rt->frame, clip->total_duration) + clip->total_duration, clip->total_duration);
+				rt->frame = fmod(fmod(rt->frame, clip->duration) + clip->duration, clip->duration);
 			else {
-				rt->frame = clip->total_duration - 0.001f;
+				rt->frame = clip->duration - 0.001f;
 				rt->stopped_flag = true;
 			}
 		}
 
 		if (pose.sync) {
 			pose.sync->first_seen = false;
-			pose.sync->normalized_frame = rt->frame / clip->total_duration;
+			pose.sync->normalized_frame = rt->frame / clip->duration;
 		}
 
 	}
 
-	const std::vector<int>* indicies = nullptr;
-	if (rt->skel_idx != -1)
-		indicies = &ctx.set->get_remap(rt->skel_idx);
+	const std::vector<int16_t>* indicies = nullptr;
+	if (rt->remap_index != -1)
+		indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
 
-	util_calc_rotations(ctx.set->get_subset(rt->set_idx), rt->frame, rt->clip_index, ctx.model, indicies , *pose.pose);
+	util_calc_rotations(ctx.get_skeleton(), clip, rt->frame, indicies, *pose.pose);
 
-
-	int root_index = ctx.model->root_bone_index;
+	const int root_index = 0;
 	for (int i = 0; i < 3; i++) {
 		if (rm[i] == rootmotion_setting::remove) {
 			pose.pose->pos[root_index][i] = rt->root_pos_first_frame[i];
@@ -96,7 +95,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 
 	bool outres = !rt->stopped_flag;
 	float cur_t = clip->fps * rt->frame;
-	float clip_t = clip->fps * clip->total_duration;
+	float clip_t = clip->fps * clip->duration;
 	outres &= !pose.has_auto_transition || (pose.automatic_transition_time + cur_t < clip_t);
 
 	return outres;
@@ -111,7 +110,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	GetPose_Ctx pose2 = pose;
 	pose2.pose = reftemp;
 	input[SOURCE]->get_pose(ctx, pose2);
-	util_subtract(ctx.model->bones.size(), *reftemp, *pose.pose);
+	util_subtract(ctx.num_bones(), *reftemp, *pose.pose);
 	Pose_Pool::get().free(1);
 	return true;
 }
@@ -127,7 +126,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	pose2.pose = addtemp;
 
 	input[DIFF]->get_pose(ctx, pose2);
-	util_add(ctx.model->bones.size(), *addtemp, *pose.pose, lerp);
+	util_add(ctx.num_bones(), *addtemp, *pose.pose, lerp);
 	Pose_Pool::get().free(1);
 	return true;
 }
@@ -135,7 +134,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
  bool Blend_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	 if (!param.is_valid()) {
-		 util_set_to_bind_pose(*pose.pose, ctx.model);
+		 util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
 		 return true;
 	 }
 	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
@@ -169,7 +168,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
  bool Blend_Int_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
 	 if (!param.is_valid()) {
-		 util_set_to_bind_pose(*pose.pose, ctx.model);
+		 util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
 		 return true;
 	 }
 	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
@@ -240,17 +239,18 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	 }
 	bool ret = input[0]->get_pose(ctx, pose);
 
-	bool has_mirror_map = ctx.set->src_skeleton->bone_mirror_map.size() == ctx.model->bones.size();
+	bool has_mirror_map = ctx.get_skeleton()->has_mirroring_table();
 
 	if (has_mirror_map && rt->saved_f >= 0.000001) {
 		const Model* m = ctx.model;
 		Pose* posemirrored = Pose_Pool::get().alloc(1);
 		// mirror the bones
-		for (int i = 0; i < m->bones.size(); i++) {
+		for (int i = 0; i <ctx.num_bones(); i++) {
 
 
-			int from = ctx.set->src_skeleton->bone_mirror_map.at(i);
-			if (from == -1)from = i;
+			int from = ctx.get_skeleton()->get_mirrored_bone(i);
+			if (from == -1) 
+				from = i;	// set to self
 
 			glm::vec3 frompos = pose.pose->pos[from];
 			posemirrored->pos[i] = glm::vec3(-frompos.x, frompos.y, frompos.z);
@@ -258,7 +258,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 			posemirrored->q[i] = glm::quat(fromquat.w, fromquat.x, -fromquat.y, -fromquat.z);
 		}
 
-		util_blend(m->bones.size(), *posemirrored, *pose.pose, rt->saved_f);
+		util_blend(ctx.num_bones(), *posemirrored, *pose.pose, rt->saved_f);
 
 		Pose_Pool::get().free(1);
 
@@ -797,10 +797,11 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 	 bool b = ctx.get_bool(param);
 
-	 if (!b) {
+	// if (!b) {
 		 return input[0]->get_pose(ctx, pose);
-	 }
+	// }
 
+#if 0
 	 auto& mask = ctx.set->src_skeleton->masks[rt->mask_index];
 	
 	 if (meshspace_rotation_blend) {
@@ -824,5 +825,5 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 return ret;
 	 }
 
-
+#endif
  }

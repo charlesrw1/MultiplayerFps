@@ -161,7 +161,5 @@ private:
 
 extern Game_Material_Manager mats;
 
-void FreeLoadedTextures();
-Texture* FindOrLoadTexture(const char* filename);
 
 #endif // !TEXTURE_H

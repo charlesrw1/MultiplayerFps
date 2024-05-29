@@ -88,13 +88,15 @@ void Shadow_Map_System::update()
 	}
 	if (tweak.quality == 0)
 		return;
-	if (draw.scene.directional_index == -1)
+
+	auto directional_light = draw.scene.get_main_directional_light();
+	if (!directional_light)
 		return;
 
 	{
 		GPUSCOPESTART("Csm setup");
 
-		glm::vec3 directional_dir = draw.scene.lights[draw.scene.directional_index].normal;
+		glm::vec3 directional_dir = directional_light->light.normal;
 
 		const View_Setup& view = draw.vs;
 

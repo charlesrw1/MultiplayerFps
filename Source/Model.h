@@ -9,31 +9,21 @@
 #include "Framework/MathLib.h"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/Util.h"
-#include "Animation/Runtime/Animation.h"
 #include "Framework/BVH.h"
 #include "DrawTypedefs.h"
+#include "Framework/StringName.h"
+#include "Framework/InlineVec.h"
 
 // Hardcoded attribute locations for shaders
-const int POSITION_LOC = 0;
-const int UV_LOC = 1;
-const int NORMAL_LOC = 2;
-const int JOINT_LOC = 3;
-const int WEIGHT_LOC = 4;
-const int COLOR_LOC = 5;
-const int UV2_LOC = 6;
-const int TANGENT_LOC = 7;
+const int POSITION_LOC  = 0;
+const int UV_LOC		= 1;
+const int NORMAL_LOC    = 2;
+const int TANGENT_LOC   = 3;
+const int JOINT_LOC		= 4;
+const int WEIGHT_LOC	= 5;
 
-
-enum Vertex_Attributes
-{
-	ATTRIBUTE_POS = 0,
-	ATTRIBUTE_UV = 1,
-	ATTRIBUTE_NORMAL = 2,
-	ATTRIBUTE_TANGENT = 3,
-	ATTRIBUTE_JOINT_OR_COLOR = 4,
-	ATTRIBUTE_WEIGHT_OR_COLOR2 = 5,
-	MAX_ATTRIBUTES,
-};
+//const int COLOR_LOC = 5;
+//const int UV2_LOC = 6;
 
 struct ModelVertex
 {
@@ -67,15 +57,6 @@ struct Bone
 	glm::quat rot;
 };
 
-class Skeleton2
-{
-public:
-
-private:
-	std::vector<Bone> bones;
-	std::vector<uint8_t> mirror_map;
-};
-
 
 
 struct Physics_Triangle
@@ -95,104 +76,125 @@ struct Physics_Mesh
 	void build();
 };
 
-struct Texture;
-
-
-struct Raw_Mesh_Data
+class RawMeshData
 {
-	Raw_Mesh_Data() {
-		memset(attribute_offsets, 0, sizeof(attribute_offsets));
+public:
+	int get_num_indicies(int index_size) const {
+		return indicies.size();
 	}
+	int get_num_verticies(int vertex_size) const {
+		return verts.size();
+	}
+	int get_num_vertex_bytes() const {
+		return verts.size()*sizeof(ModelVertex);
+	}
+	int get_num_index_bytes() const {
+		return indicies.size()*sizeof(uint16_t);
+	}
+	const uint8_t* get_index_data(size_t* size) const {
+		*size = indicies.size() * sizeof(uint16_t);
+		return (uint8_t*)indicies.data();
+	}
+	const uint8_t* get_vertex_data(size_t* size) const {
+		*size = verts.size() * sizeof(ModelVertex);
+		return (uint8_t*)verts.data();
+	}
+private:
+	// index offset always = 0
+	std::vector<ModelVertex> verts;
+	std::vector<uint16_t> indicies;
 
-	vector<char> buffers[MAX_ATTRIBUTES];
-	vector<char> indicies;
 
-	int attribute_offsets[MAX_ATTRIBUTES];
-	int index_offset = 0;
-	vector<uint8_t> data;
+	friend class Model;
+	friend class ModelMan;
 };
 
 class Submesh
 {
 public:
-	int base_vertex = 0;
-	int element_offset = 0;
-	int element_count = 0;
+	int base_vertex = 0;	// index
+	int element_offset = 0;	// in bytes
+	int element_count = 0;	// in element size
 	int material_idx = 0;
+	int vertex_count = 0;	// in element size
 };
 
-
-
-enum class mesh_format
-{
-	SKINNED,
-	STATIC,
-	STATIC_PLUS,
-	COUNT
-};
-
-class Mesh
-{
-public:
-	uint32_t id = 0;
-	vector<Submesh> parts;
-	Raw_Mesh_Data data;
-	Bounds aabb;
-	int attributes = 0;	// bitmask of vertex attributes
-	uint32_t merged_index_pointer = 0;	// in bytes
-	uint32_t merged_vert_offset = 0;
-	bool is_merged = false;
-	mesh_format format = mesh_format::STATIC;
-	vertexarrayhandle vao = 0;
-
-	bool has_lightmap_coords() const;
-	bool has_colors() const;
-	bool has_bones() const;
-	bool has_tangents() const;
-	int format_as_int() {
-		return (int)format;
-	}
-};
-
-struct Model_Tag
+struct ModelTag
 {
 	string name;
 	int bone_index = -1;
 	glm::mat4 transform;
 };
 
-struct Collision_Box
+
+struct MeshLod
 {
-	string name;
-	int bone_idx = -1;
-	Bounds aabb;
+	float end_percentage = -1.0;
+	int part_ofs = 0;
+	int part_count = 0;
 };
 
-class Mesh_Lod
-{
-	Mesh* mesh;
-	float end_dist;
-};
+class MSkeleton;
 class Model
 {
 public:
-	string name;
-	Mesh mesh;
-	// skeleton heirarchy
-	vector<Bone> bones;
-	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
-	int root_bone_index;
-	// embedded ainmations
-	unique_ptr<Animation_Set> animations;
-	// tags for attachments etc.
-	vector<Model_Tag> tags;
-	vector<Material*> mats;
+	uint32_t get_uid() const { return uid; }
+	const string& get_name() const { return name; }
+	int bone_for_name(StringName name) const;
+	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
+	Bounds get_aabb_from_sphere() const { 
+		return Bounds(glm::vec3(bounding_sphere) - glm::vec3(bounding_sphere.w),
+			glm::vec3(bounding_sphere) + glm::vec3(bounding_sphere.w));
+	}
 
+	const MSkeleton* get_skel() const { return skel.get(); }
+
+	const Submesh& get_part(int index) const { return parts[index]; }
+	int get_num_lods() const { return lods.size(); }
+	const MeshLod& get_lod(int index) const { return lods[index]; }
+
+	Material* get_material(int index) const { return materials[index]; }
+
+	bool has_lightmap_coords() const;
+	bool has_colors() const;
+	bool has_bones() const;
+	bool has_tangents() const;
+
+	uint32_t get_merged_index_ptr() const { return merged_index_pointer; }
+	uint32_t get_merged_vertex_ofs() const { return merged_vert_offset; }
+
+	bool is_loaded_in_memory() const { return loaded_in_memory; }
+
+	const glm::mat4& get_root_transform() const { return skeleton_root_transform; }
+
+	const Bounds& get_bounds() const { return aabb; }
+
+private:
+	uint32_t uid = 0;
+	string name;
+	InlineVec<MeshLod, 2> lods;
+	vector<Submesh> parts;
+
+	Bounds aabb;
+	glm::vec4 bounding_sphere;
+
+	uint32_t merged_index_pointer = 0;	// in bytes
+	uint32_t merged_vert_offset = 0;
+	RawMeshData data;
+
+	unique_ptr<MSkeleton> skel;
+
+	vector<ModelTag> tags;
+
+	vector<Material*> materials;
+	
 	unique_ptr<Physics_Mesh> collision;
-	vector<Collision_Box> boxes;
+
+	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
 	bool loaded_in_memory = false;
 
-	int bone_for_name(const char* name) const;
+	friend class ModelMan;
+	friend class ModelCompileHelper;
 };
 
 #include <array>
@@ -201,6 +203,11 @@ class MainVbIbAllocator
 public:
 	
 	void init(uint32_t num_indicies, uint32_t num_verts);
+	void print_usage() const;
+
+	void append_to_v_buffer(const uint8_t* data, size_t size);
+	void append_to_i_buffer(const uint8_t* data, size_t size);
+
 
 	struct buffer {
 		bufferhandle handle = 0;
@@ -210,6 +217,9 @@ public:
 
 	buffer vbuffer;
 	buffer ibuffer;
+
+private:
+	void append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 
 class ModelMan
@@ -217,36 +227,33 @@ class ModelMan
 public:
 	void init();
 	Model* find_or_load(const char* filename);
-	void free_model(Model* m);
 
 	void compact_memory();
-	void print_usage();
+	void print_usage() const;
 
 	vertexarrayhandle get_vao(bool animated) {
-		if (animated)
-			return animated_vao;
-		else
-			return static_vao;
+		return animated_vao;
 	}
 
-	Model* error_model = nullptr;
+	int get_index_type_size() const;
 
+	Model* get_error_model() { return error_model; }
+	Model* get_sprite_model() { return _sprite; }
 private:
+	Model* error_model = nullptr;
+	Model* _sprite = nullptr;
 
-	bool parse_model_into_memory(Model* m, std::string path);
-	bool upload_model(Mesh* m);
+	void set_v_attributes();
+	bool read_model_into_memory(Model* m, std::string path);
+	bool upload_model(Model* m);
 
-	vertexarrayhandle static_vao;
 	vertexarrayhandle animated_vao;
+	//vertexarrayhandle static_vao;
 	MainVbIbAllocator allocator;
 
 	uint32_t cur_mesh_id = 0;
 	std::unordered_map<string, Model*> models;
 };
 extern ModelMan mods;
-
-void FreeLoadedModels();
-Model* FindOrLoadModel(const char* filename);
-void ReloadModel(Model* m);
 
 #endif // !MODEL_H

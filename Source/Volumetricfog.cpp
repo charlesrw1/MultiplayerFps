@@ -62,12 +62,12 @@ void Volumetric_Fog_System::compute()
 	static Vfog_Light light_buffer[64];
 	int num_lights = 0;
 	{
-		Level_Light& l = draw.dyn_light;
-		Vfog_Light& vfl = light_buffer[num_lights++];
-		float type = (l.type == LIGHT_POINT) ? 0.0 : 1.0;
-		vfl.position_type = vec4(l.position, type);
-		vfl.color = vec4(l.color, 0.0);
-		vfl.direction_coneangle = vec4(l.direction, l.spot_angle);
+		//Level_Light& l = draw.dyn_light;
+		//Vfog_Light& vfl = light_buffer[num_lights++];
+		//float type = (l.type == LIGHT_POINT) ? 0.0 : 1.0;
+		//vfl.position_type = vec4(l.position, type);
+		//vfl.color = vec4(l.color, 0.0);
+		//vfl.direction_coneangle = vec4(l.direction, l.spot_angle);
 	}
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.light);

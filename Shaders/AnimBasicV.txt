@@ -4,16 +4,16 @@ layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
 #ifdef ANIMATED
 layout (location = 3) in ivec4 VS_IN_BoneIndicies;
-layout (location = 4) in vec4 VS_IN_BoneWeights;
+layout (location = 5) in vec4 VS_IN_BoneWeights;
 #endif
 #ifdef VERTEX_COLOR
-layout (location = 5) in vec4 VS_IN_Color;
+layout (location = 6) in vec4 VS_IN_Color;
 #endif
 #ifdef LIGHTMAPPED
-layout (location = 6) in vec2 VS_IN_TexCoord2;
+layout (location = 7) in vec2 VS_IN_TexCoord2;
 #endif
 #ifdef NORMALMAPPED
-layout (location = 7) in vec3 VS_IN_Tangent;
+layout (location = 3) in vec3 VS_IN_Tangent;
 #endif
 
 flat out uint FS_IN_Objid;

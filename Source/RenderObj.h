@@ -5,7 +5,7 @@
 #include "glm/glm.hpp"
 #include "Framework/Util.h"
 
-class Mesh;
+
 class Animator;
 class Material;
 class Entity;
@@ -22,9 +22,9 @@ struct Render_Object
 		opposite_dither = false;
 	}
 
-	Mesh* mesh = nullptr;
+	Model* model = nullptr;
 	Animator* animator = nullptr;
-	std::vector<Material*>* mats = nullptr;
+
 	Color32 param1 = COLOR_WHITE;
 	Color32 param2 = COLOR_WHITE;
 
@@ -41,4 +41,26 @@ struct Render_Object
 
 
 	glm::mat4 transform = glm::mat4(1.f);
+};
+
+struct Render_Decal
+{
+	glm::mat4 transform = glm::mat4(1.0);
+	glm::vec3 dimensions = glm::vec3(1.0);
+	Material* material=nullptr;
+};
+
+struct Render_Light
+{
+	glm::vec3 position;
+	glm::vec3 normal;
+	glm::vec3 color;
+	float conemin;
+	float conemax;
+	bool casts_shadow = false;
+
+	int type = 0;
+
+	// use for the main sun
+	bool main_light_override = false;
 };

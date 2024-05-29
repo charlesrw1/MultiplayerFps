@@ -12,6 +12,7 @@
 #include "Framework/StdVectorReflection.h"
 #include "Framework/WriteObject.h"
 #include "Framework/MyImguiLib.h"
+#include "Framework/Files.h"
 
 #include <fstream>
 
@@ -315,7 +316,7 @@ void AnimationGraphEditor::close()
 	editing_tree = nullptr;
 	name = "";
 	out.model = nullptr;
-	out.set = nullptr;
+
 	open_open_popup = false;
 	open_save_popup = false;
 	reset_prop_editor_next_tick = false;
@@ -797,7 +798,7 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const bool is_save_dial
 
 	if (returned_true) {
 		const char* full_path = string_format("./Data/Animations/Graphs/%s", buffer);
-		bool file_already_exists = Files::does_file_exist(full_path);
+		bool file_already_exists = FileSys::does_os_file_exist(full_path);
 		cant_open_path = false;
 		alread_exists = false;
 
@@ -1702,21 +1703,18 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	auto ed = auser->ed;
 
 	if (auser->type == AnimCompletionCallbackUserData::CLIPS) {
-		auto set = ed->out.set;
-		for (int i = 0; i < set->imports.size(); i++) {
-			auto subset = set->imports[i].mod->animations.get();
-			for (int j = 0; j < subset->clips.size(); j++) {
-				if (_strnicmp(subset->clips[j].name.c_str(), word_start, len) == 0)
-					vec.push_back(subset->clips[j].name.c_str());
-			}
-		}
+		auto& clips = ed->out.model->get_skel()->get_clips_hashmap();
+		for (const auto& c : clips)
+			if (_strnicmp(c.first.c_str(), word_start, len) == 0)
+				vec.push_back(c.first.c_str());
+		
 	}
 	else if (auser->type == AnimCompletionCallbackUserData::BONES) {
-
-		auto bones = ed->out.model->bones;
-		for (int i = 0; i < bones.size(); i++)
-			if (_strnicmp(bones[i].name.c_str(), word_start, len) == 0)
-				vec.push_back(bones[i].name.c_str());
+		assert(0);
+		//auto& bones = ed->out.
+		//for (int i = 0; i < bones.size(); i++)
+		//	if (_strnicmp(bones[i].name.c_str(), word_start, len) == 0)
+		//		vec.push_back(bones[i].name.c_str());
 
 	}
 
@@ -1767,14 +1765,14 @@ void AnimationGraphEditor::tick(float dt)
 			out.obj = idraw->register_obj();
 
 		Render_Object ro;
-		ro.mesh = &out.model->mesh;
-		ro.mats = &out.model->mats;
+
+		ro.model = out.model;
 
 		if (get_playback_state() == graph_playback_state::running) {
 			out.get_local_animator().tick_tree_new(dt * g_slomo.real());
 		}
-		if (get_playback_state() != graph_playback_state::stopped) {
-			ro.transform = out.model->skeleton_root_transform;
+		if (get_playback_state() != graph_playback_state::stopped && ro.model->get_skel()) {
+			ro.transform = out.model->get_root_transform();
 			ro.animator = &out.get_local_animator();
 		}
 
@@ -1844,7 +1842,7 @@ void AnimationGraphEditor::compile_and_run()
 	bool good_to_run = compile_graph_for_playing();
 	get_tree()->post_load_init();
 	if (good_to_run) {
-		out.get_local_animator().initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
+		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);
 		playback = graph_playback_state::running;
 	}
 }
@@ -1871,9 +1869,8 @@ void AnimationGraphEditor::create_new_document()
 void AnimationGraphEditor::try_load_preview_models()
 {
 	out.model = mods.find_or_load(opt.preview_model.c_str());
-	out.set = anim_tree_man->find_set(opt.preview_set.c_str());
-	if(out.model && out.set)
-		out.get_local_animator().initialize_animator(out.model, out.set, get_tree(), nullptr, nullptr);
+	if(out.is_valid_for_preview())
+		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);
 }
 
 void AnimationGraphEditor::open(const char* name)

@@ -31,7 +31,9 @@
     <ClInclude Include="Source\Animation\Editor\Sequencetemp.h" />
     <ClInclude Include="Source\Animation\Editor\Statemachine_node.h" />
     <ClInclude Include="Source\Animation\Editor\State_node.h" />
+    <ClInclude Include="Source\Animation\Event.h" />
     <ClInclude Include="Source\Animation\IGraphDriver.h" />
+    <ClInclude Include="Source\Animation\SkeletonData.h" />
     <ClInclude Include="Source\Animation\Runtime\Animation.h" />
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h" />
     <ClInclude Include="Source\Animation\Runtime\ControlParamHandle.h" />
@@ -40,7 +42,8 @@
     <ClInclude Include="Source\Animation\Runtime\Percentage.h" />
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
-    <ClInclude Include="Source\AssetCompile\ModelCompile.h" />
+    <ClInclude Include="Source\AssetCompile\Compiliers.h" />
+    <ClInclude Include="Source\AssetCompile\Someutils.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\CamData.h" />
     <ClInclude Include="Source\Client.h" />
@@ -87,10 +90,10 @@
     <ClInclude Include="Source\Framework\EnumDefReflection.h" />
     <ClInclude Include="Source\Framework\ExpressionLang.h" />
     <ClInclude Include="Source\Framework\Factory.h" />
+    <ClInclude Include="Source\Framework\Files.h" />
     <ClInclude Include="Source\Framework\FreeList.h" />
     <ClInclude Include="Source\Framework\Handle.h" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
-    <ClInclude Include="Source\Framework\Key_Value_File.h" />
     <ClInclude Include="Source\Framework\MathLib.h" />
     <ClInclude Include="Source\Framework\MemArena.h" />
     <ClInclude Include="Source\Framework\MeshBuilder.h" />
@@ -121,6 +124,7 @@
     <ClInclude Include="Source\ParticlesPublic.h" />
     <ClInclude Include="Source\Physics.h" />
     <ClInclude Include="Source\Physics\Editor\PublicPhysicsEditor.h" />
+    <ClInclude Include="Source\Physics\Physics2.h" />
     <ClInclude Include="Source\Player.h" />
     <ClInclude Include="Source\PlayerAnimDriver.h" />
     <ClInclude Include="Source\ProgramCaching.h" />
@@ -141,11 +145,14 @@
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
-    <ClCompile Include="Source\AssetCompile\ModelCompile.cpp" />
+    <ClCompile Include="Source\AssetCompile\MaterialCompile.cpp" />
+    <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />
+    <ClCompile Include="Source\AssetCompile\ImageCompile.cpp" />
     <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\Draw.cpp" />
+    <ClCompile Include="Source\DrawLocal.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\EntityTypes.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />

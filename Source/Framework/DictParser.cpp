@@ -1,10 +1,13 @@
 #include "Framework/DictParser.h"
-
+#include "Framework/Files.h"
 #include <fstream>
 
 bool DictParser::load_from_file(const char* filename) {
-    assert(buffer == nullptr);
+
+    assert(!buffer);
+    
     std::ifstream infile(filename, std::ios::ate);
+
 
     if (!infile)
         return false;
@@ -28,6 +31,9 @@ bool DictParser::load_from_file(const char* filename) {
 }
 
 void DictParser::load_from_memory(const uint8_t* ptr, int length, const char* name) {
+    
+    assert(!buffer);
+
     buffer = ptr;
     buffer_size = length;
     read_ptr = 0;
@@ -35,6 +41,23 @@ void DictParser::load_from_memory(const uint8_t* ptr, int length, const char* na
     allocated = false;
 
     this->filename = name;
+}
+
+void DictParser::load_from_file(IFile* file)
+{
+    assert(!buffer);
+
+
+    buffer = new uint8_t[file->size()];
+    buffer_size = file->size();
+    allocated = true;
+
+    file->read((uint8_t*)buffer, buffer_size);
+
+    read_ptr = 0;
+    line = 1;
+
+    this->filename = filename;
 }
 
 // convenience functions
@@ -136,6 +159,7 @@ bool DictParser::read_next_token(StringView& token) {
     }
     else if (break_a_token(c)) {
         token = StringView(get_c_str(read_ptr - 1), 1);
+        skip_whitespace();
         return true;
     }
 
@@ -156,6 +180,9 @@ bool DictParser::read_next_token(StringView& token) {
         count++;
     }
     token = StringView(get_c_str(start), count);
+
+    skip_whitespace();
+
     return true;
 }
 
@@ -165,6 +192,27 @@ char DictParser::get_next_character_but_dont_fail(char default_) {
     }
     else
         return default_;
+}
+
+bool DictParser::read_line(StringView& line, char delimiter)
+{
+    if (is_eof()) {
+        return false;
+    }
+    int start = read_ptr;
+    while (read_ptr < size()) {
+        if (get_character(read_ptr) == delimiter) {
+            line.str_start = (char*)&buffer[start];
+            line.str_len = read_ptr - start;
+            read_ptr++;
+            return true;
+        }
+        read_ptr++;
+    }
+
+    line.str_start = (char*)&buffer[start];
+    line.str_len = read_ptr - start;
+    return true;
 }
 
 void DictParser::skip_to_next_line() {
@@ -180,7 +228,7 @@ void DictParser::skip_to_next_line() {
 void DictParser::skip_whitespace() {
     while (read_ptr < size()) {
         char c = get_character(read_ptr++);
-        if (c == ' ' || c == '\t') continue;
+        if (c == ' ' || c == '\t' || c== '\r') continue;
         else if (c == '\n') {
             line++;
             continue;

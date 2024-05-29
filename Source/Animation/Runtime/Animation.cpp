@@ -119,18 +119,20 @@ int Animation_Set::find(const char* name) const
 
 void Animator::initialize_animator(
 	const Model* model, 
-	const Animation_Set_New* set, 
+
 	const Animation_Tree_CFG* graph, 
 	IAnimationGraphDriver* driver, 
 	Entity* ent)
 {
 	ASSERT(model);
-	ASSERT(set);
+
+	if (!model->get_skel())
+		return;
 
 	if (!graph)
 		return;
 
-	runtime_dat.init_from_cfg(graph, model, set);
+	runtime_dat.init_from_cfg(graph, model);
 	this->driver = driver;
 	this->owner = ent;
 
@@ -138,9 +140,9 @@ void Animator::initialize_animator(
 		driver->owner = this;
 		driver->on_init();
 	}
-
-	cached_bonemats.resize(model->bones.size());
-	matrix_palette.resize(model->bones.size());
+	const int bones = model->get_skel()->get_num_bones();
+	cached_bonemats.resize(bones);
+	matrix_palette.resize(bones);
 }
 
 #if 1
@@ -186,57 +188,55 @@ static void SolveTwoBoneIK(const vec3& a, const vec3& b, const vec3& c, const ve
 
 void Animator::UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies)
 {
-	auto model = get_model();
+	auto skeleton = get_skel();
 
-	for (int i = 0; i < model->bones.size(); i++)
+	for (int i = 0; i < skeleton->get_num_bones(); i++)
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(localq[i]);
 		matrix[3] = glm::vec4(localp[i], 1.0);
 
-		if (model->bones[i].parent == ROOT_BONE) {
+		if (skeleton->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;
 		}
 		else {
-			assert(model->bones[i].parent < model->bones.size());
-			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+			assert(skeleton->get_bone_parent(i) < skeleton->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[skeleton->get_bone_parent(i)] * matrix;
 		}
 	}
-	for (int i = 0; i < model->bones.size(); i++)
-		out_bone_matricies[i] = out_bone_matricies[i];
+
 }
 
-void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const Model* model)
+void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const MSkeleton* model)
 {
-	for (int i = 0; i < model->bones.size(); i++)
+	for (int i = 0; i < model->get_num_bones(); i++)
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
 
-		if (model->bones[i].parent == ROOT_BONE) {
+		if (model->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;
 		}
 		else {
-			assert(model->bones[i].parent < model->bones.size());
-			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+			assert(model->get_bone_parent(i) < model->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[model->get_bone_parent(i)] * matrix;
 		}
 	}
-	for (int i = 0; i < model->bones.size(); i++)
-		out_bone_matricies[i] =  out_bone_matricies[i];
+
 }
 
-void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const Model* model)
+void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const MSkeleton* model)
 {
-	for (int i = 0; i < model->bones.size(); i++)
+	for (int i = 0; i < model->get_num_bones(); i++)
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
 
-		if (model->bones[i].parent == ROOT_BONE) {
+		if (model->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;
 		}
 		else {
-			assert(model->bones[i].parent < model->bones.size());
-			out_bone_matricies[i] = out_bone_matricies[model->bones[i].parent] * matrix;
+			assert(model->get_bone_parent(i) < model->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[model->get_bone_parent(i)] * matrix;
 		}
 	}
 	//for (int i = 0; i < model->bones.size(); i++)
@@ -276,7 +276,7 @@ void Animator::update_procedural_bones(Pose& pose)
 	memcpy(pre_ik_bonemats, cached_bonemats.data(), sizeof(glm::mat4) * cached_bonemats.size());
 
 	mat4 ent_transform = (owner) ? owner->get_world_transform() : mat4(1);
-	ent_transform = ent_transform * get_model()->skeleton_root_transform;
+	ent_transform = ent_transform * get_model()->get_root_transform();
 
 	struct global_transform_set {
 		int index;
@@ -304,25 +304,25 @@ void Animator::update_procedural_bones(Pose& pose)
 		glm::quat b_global = glm::quat_cast(cached_bonemats[joint1]);
 		util_twobone_ik(a, b, c, target, vec3(0.0, 0.0, 1.0), a_global, b_global, pose.q[joint2], pose.q[joint1]);
 	};
-	auto ik_find_bones = [&](int joint0_bone, vec3 target, const Model* m) {
-		int joint1 = m->bones[joint0_bone].parent;
+	auto ik_find_bones = [&](int joint0_bone, vec3 target, const MSkeleton* m) {
+		int joint1 = m->get_bone_parent(joint0_bone);
 		assert(joint1 != -1);
-		int joint2 = m->bones[joint1].parent;
+		int joint2 =  m->get_bone_parent(joint1);
 		assert(joint2 != -1);
 		ikfunctor(joint0_bone, joint1, joint2, target);
 	};
 
-	auto model = get_model();
+	auto skel = get_skel();
 
 	auto bone_update_functor = [&](Bone_Controller& bc) {
 		if (bc.bone_index == -1)
 			return;
 
-		assert(bc.bone_index >= 0 && bc.bone_index < get_model()->bones.size());
+		assert(bc.bone_index >= 0 && bc.bone_index < get_skel()->get_num_bones());
 
 		if (bc.use_two_bone_ik) {
 			if (bc.target_relative_bone_index != -1) {
-				assert(bc.target_relative_bone_index >= 0 && bc.target_relative_bone_index < get_model()->bones.size());
+				assert(bc.target_relative_bone_index >= 0 && bc.target_relative_bone_index < get_skel()->get_num_bones());
 				// meshspace position of bone
 				glm::vec3 meshspace_pos = (bc.use_bone_as_relative_transform) ?
 					pre_ik_bonemats[bc.bone_index][3] : bc.position;
@@ -334,13 +334,13 @@ void Animator::update_procedural_bones(Pose& pose)
 				// find final meshspace position
 				glm::vec3 final_meshspace_pos = global_transform[3];
 				
-				ik_find_bones(bc.bone_index, final_meshspace_pos, model);
+				ik_find_bones(bc.bone_index, final_meshspace_pos, skel);
 				//pose.q[bc.bone_index] *= glm::inverse(glm::quat_cast(cached_bonemats[bc.bone_index]))*glm::quat_cast(transform);
 				global_rot_sets[global_sets_count++] = { bc.bone_index, mat3(global_transform) };
 				// want to update local space rotation from global rotation
 			}
 			else {
-				ik_find_bones(bc.bone_index, bc.position, model);
+				ik_find_bones(bc.bone_index, bc.position, skel);
 			}
 		}
 		else
@@ -372,7 +372,7 @@ void Animator::update_procedural_bones(Pose& pose)
 		bone_update_functor(bc);
 	}
 
-	util_localspace_to_meshspace(pose, cached_bonemats, model);
+	util_localspace_to_meshspace(pose, cached_bonemats, skel);
 
 	// second pass
 	for (int i = 0; i < (int)bone_controller_type::max_count; i++) {
@@ -382,17 +382,17 @@ void Animator::update_procedural_bones(Pose& pose)
 	}
 
 
-	for (int i = 0; i < model->bones.size(); i++)
+	for (int i = 0; i < skel->get_num_bones(); i++)
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(pose.q[i]);
 		matrix[3] = glm::vec4(pose.pos[i], 1.0);
 
-		if (model->bones[i].parent == ROOT_BONE) {
+		if (skel->get_bone_parent(i) == ROOT_BONE) {
 			cached_bonemats[i] = matrix;
 		}
 		else {
-			assert(model->bones[i].parent < model->bones.size());
-			cached_bonemats[i] = cached_bonemats[model->bones[i].parent] * matrix;
+			assert(skel->get_bone_parent(i) < skel->get_num_bones());
+			cached_bonemats[i] = cached_bonemats[skel->get_bone_parent(i)] * matrix;
 			for (int j = 0; j < global_sets_count; j++) {
 				if (i == global_rot_sets[j].index) {
 					vec4 p = cached_bonemats[i][3];
@@ -419,12 +419,14 @@ void Animator::update_procedural_bones(Pose& pose)
 
 void Animator::ConcatWithInvPose()
 {
-	ASSERT(get_model());
+	ASSERT(get_skel());
 
-	auto model = get_model();
+	auto skel = get_skel();
 
-	for (int i = 0; i < model->bones.size(); i++) {
-		matrix_palette[i] = cached_bonemats[i] * glm::mat4(model->bones[i].invposematrix);
+	for (int i = 0; i < skel->get_num_bones(); i++) {
+
+		matrix_palette[i] = cached_bonemats[i] * skel->get_inv_posematrix(i);
+
 	}
 }
 
@@ -527,7 +529,7 @@ void Animator::tick_tree_new(float dt)
 	ctx.stack_size = 64;
 	ctx.tree = &runtime_dat;
 	ctx.model = get_model();
-	ctx.set = get_set();
+
 	ctx.param_cfg = runtime_dat.cfg->params.get();
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
@@ -539,9 +541,9 @@ void Animator::tick_tree_new(float dt)
 	if (get_tree()&& get_tree()->root)
 		get_tree()->root->get_pose(ctx, gp_ctx);
 	else
-		util_set_to_bind_pose(poses[0], get_model());
+		util_set_to_bind_pose(poses[0], get_skel());
 
-	util_localspace_to_meshspace(poses[0], cached_bonemats, get_model());
+	util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
 
 	if(driver)
 		driver->pre_ik_update(poses[0], dt);
@@ -557,11 +559,11 @@ void Animator::tick_tree_new(float dt)
 }
 
 
-void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model* model, const Animation_Set_New* set)
+void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model* model)
 {
 	this->cfg = cfg;
 	this->model = model;
-	this->set = set;
+
 
 	vars.resize(cfg->graph_program ? cfg->graph_program->num_vars() : 0);
 
@@ -569,7 +571,7 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 	data.resize(cfg->data_used, 0);
 	NodeRt_Ctx ctx;
 	ctx.model = model;
-	ctx.set = set;
+
 	ctx.tree = this;
 	ctx.param_cfg = cfg->params.get();
 	ctx.tick = 0;
@@ -589,35 +591,6 @@ Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {
 	
 	DictParser parser;
 	return load_animation_tree_file(n, parser);
-}
-
-void Animation_Set_New::find_animation(const char* name, int16_t* out_set, int16_t* out_index, int16_t* skel_idx) const
-{
-	const auto& find = table.find(name);
-	if (find != table.end()) {
-		name = find->second.c_str();
-	}
-
-	// read backwards to allow overloading inherited
-	for (int i = imports.size() - 1; i >= 0; i--) {
-		int index = imports[i].mod->animations->find(name);
-		if (index != -1) {
-			*out_set = i;
-			*out_index = index;
-
-			if (imports[i].import_skeleton)
-				*skel_idx = imports[i].import_skeleton->find_remap(src_skeleton);
-
-			return;
-		}
-	}
-	*out_set = -1;
-	*out_index = -1;
-	*skel_idx = -1;
-}
-
-const Animation_Set* Animation_Set_New::get_subset(uint32_t index) const {
-	return imports[index].mod->animations.get();
 }
 
 static Animation_Tree_Manager anim_tree_man__;
