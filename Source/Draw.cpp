@@ -645,6 +645,7 @@ program_handle compile_mat_shader(shader_key key)
 	if (key.dither) params += "DITHER,";
 	if (type == material_type::WINDSWAY) params += "WIND,";
 	if (type == material_type::UNLIT) params += "UNLIT,";
+	if (key.billboard) params += "BILLBOARD,";
 	if (!params.empty())params.pop_back();
 
 	printf("INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
@@ -1627,7 +1628,7 @@ void Render_Pass::update_batches()
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
-draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, Material* material, uint32_t submesh, uint32_t layer)
+draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, Material* material,uint32_t camera_dist, uint32_t submesh, uint32_t layer)
 {
 	draw_call_key key;
 
@@ -1638,6 +1639,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, 
 	key.vao = 0;// (uint64_t)proxy.mesh->format;
 	key.mesh = proxy.model->get_uid();
 	key.layer = layer;
+	key.distance = camera_dist;
 
 	return key;
 }
@@ -1659,12 +1661,13 @@ void Render_Pass::add_object(
 	const Render_Object& proxy, 
 	handle<Render_Object> handle,
 	Material* material,
+	uint32_t camera_dist,
 	uint32_t submesh,
 	uint32_t layer) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
 	Pass_Object obj;
-	obj.sort_key = create_sort_key_from_obj(proxy, material, submesh, layer);
+	obj.sort_key = create_sort_key_from_obj(proxy, material,camera_dist, submesh, layer);
 	obj.render_obj = handle;
 	obj.submesh_index = submesh;
 	obj.material = material;
@@ -1695,7 +1698,9 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	// objects were added correctly in back to front order, just sort by layer
 	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
 	{
-		if (a.sort_key.layer < a.sort_key.layer) return true;
+		if (a.sort_key.distance > b.sort_key.distance) return true;
+		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
+			return a.submesh_index < b.submesh_index;
 		else return false;
 	};
 	const auto& del_functor = [](const Pass_Object& a, const Pass_Object& b)
@@ -1934,9 +1939,14 @@ void Render_Scene::upload_scene_materials()
 		//if (mat.second.texture_are_loading_in_memory) {	// this material is being used
 			Material& m = mat.second;
 			gpu::Material_Data gpumat;
-			gpumat.diffuse_tint = glm::vec4(1.f);// m.diffuse_tint;
+			gpumat.diffuse_tint = m.diffuse_tint;
 			gpumat.rough_mult = m.roughness_mult;
 			gpumat.metal_mult = m.metalness_mult;
+			gpumat.bitmask_flags = 0;
+			if(m.billboard==billboard_setting::ROTATE_AXIS)
+				gpumat.bitmask_flags |= gpu::MATFLAG_BILLBOARD_ROTATE_AXIS;
+
+
 		//	gpumat.rough_remap_x = m.roughness_remap_range.x;
 			//gpumat.rough_remap_y = m.roughness_remap_range.y;
 
@@ -1961,13 +1971,13 @@ glm::vec4 to_vec4(Color32 color) {
 
 
 
-const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_times_tanfov)
+const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_times_tanfov, float& out_camera_dist)
 {
 	const auto& vs = draw.get_current_frame_vs();
 
 	glm::vec3 to_origin = glm::vec3(object.transform[3]) - vs.origin;
 	float distance_to_point = glm::dot(to_origin, vs.front);
-
+	out_camera_dist = distance_to_point;
 	float percentage = inv_two_times_tanfov / distance_to_point;
 	percentage *= object.model->get_bounding_sphere().w;
 
@@ -1977,7 +1987,6 @@ const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_time
 	}
 	return object.model->get_lod(0);
 }
-
 
 void Render_Scene::build_scene_data()
 {
@@ -2007,10 +2016,8 @@ void Render_Scene::build_scene_data()
 				// When CPU culling do that here
 				
 				// determine LOD:
-				
-				const auto& lod = get_lod_to_render(proxy, inv_two_times_tanfov);
-			
-
+				float cam_dist = 0.0;
+				const auto& lod = get_lod_to_render(proxy, inv_two_times_tanfov, cam_dist);
 
 				const int pstart = lod.part_ofs;
 				const int pend = pstart + lod.part_count;
@@ -2021,14 +2028,22 @@ void Render_Scene::build_scene_data()
 					auto& part = proxy.model->get_part(j);
 
 					Material* mat = proxy.model->get_material(part.material_idx);
-					if (mat->is_translucent())
-						transparents.add_object(proxy, objhandle, mat, j, 0);
+					if (obj.type_.proxy.mat_override)
+						mat = obj.type_.proxy.mat_override;
+					if (mat->is_translucent()) {
+						float far = draw.get_current_frame_vs().far;
+						cam_dist = 2.0 * (cam_dist / (far + cam_dist));
+						cam_dist = glm::max(cam_dist, 0.f);
+						uint32_t quantized = cam_dist * (1 << 15);
+						if (quantized >= (1 << 15)) quantized = (1 << 15) - 1;
+						transparents.add_object(proxy, objhandle, mat, quantized, j, 0);
+					}
 					else {
-						depth.add_object(proxy, objhandle, mat, j, 0);
-						opaque.add_object(proxy, objhandle, mat, j, 0);
+						depth.add_object(proxy, objhandle, mat, 0, j, 0);
+						opaque.add_object(proxy, objhandle, mat, 0,j, 0);
 					}
 					if (proxy.color_overlay) {
-						transparents.add_object(proxy, objhandle, mats.unlit, j, 1);
+						transparents.add_object(proxy, objhandle, mats.unlit, 0, j, 1);
 					}
 				}
 
@@ -3067,6 +3082,7 @@ program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model
 	key.animated = is_animated;
 	key.depth_only = depth_pass;
 	key.dither = dither;
+	key.billboard = mat->billboard != billboard_setting::NONE;
 	
 	key = get_real_shader_key_from_shader_type(key);
 	program_handle handle = mat_table.lookup(key);

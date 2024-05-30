@@ -1872,6 +1872,36 @@ void AnimationGraphEditor::create_new_document()
 
 void AnimationGraphEditor::try_load_preview_models()
 {
+	{
+		Material* mymat = mats.create_temp_shader("sprite_texture");
+		mymat->billboard = billboard_setting::ROTATE_AXIS;
+		mymat->images[0] = mats.find_texture("frog.jpg");
+		mymat->blend = blend_state::BLEND;
+		mymat->type = material_type::UNLIT;
+		mymat->diffuse_tint = glm::vec4(1, 1, 0, 0.8);
+	
+		auto handle= idraw->register_obj();
+		Render_Object obj;
+		obj.model = mods.get_sprite_model();
+		obj.transform = glm::translate(glm::mat4(1.0),glm::vec3(0, 2.0, 0.0));
+		obj.mat_override = mymat;
+		obj.visible = true;
+
+
+		idraw->update_obj(handle, obj);
+
+		handle = idraw->register_obj();
+		obj=Render_Object();
+		obj.model = mods.get_sprite_model();
+		obj.transform = glm::translate(glm::mat4(1.0), glm::vec3(1.0, 2.0, 0.0));
+		obj.mat_override = mymat;
+		obj.param1 = COLOR_PINK;
+		obj.visible = true;
+
+
+		idraw->update_obj(handle, obj);
+	}
+
 	out.model = mods.find_or_load("player_FINAL.cmdl");
 	if(out.is_valid_for_preview())
 		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);

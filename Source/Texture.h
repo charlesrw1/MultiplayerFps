@@ -74,6 +74,15 @@ enum class material_type : uint8_t
 	WATER,
 	UNLIT,
 	OUTLINE_HULL,
+
+	CUSTOM,	// custom vertex+fragment shader
+};
+
+enum class billboard_setting : uint8_t
+{
+	NONE,
+	FACE_CAMERA,	// standard billboard
+	ROTATE_AXIS,	// rotate around the provided axis in model transform
 };
 
 class Material
@@ -109,6 +118,11 @@ public:
 	blend_state blend = blend_state::OPAQUE;
 	bool alpha_tested = false;
 	bool backface = false;
+	billboard_setting billboard = billboard_setting::NONE;
+
+	// for custom shaders
+	std::string custom_vertex_shader;
+	std::string custom_fragment_shader;
 
 	int physics = 0;	// physics of surface
 

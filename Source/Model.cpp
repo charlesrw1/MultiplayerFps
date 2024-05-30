@@ -591,6 +591,74 @@ void ModelMan::init()
 	glEnableVertexAttribArray(WEIGHT_LOC);
 
 	glBindVertexArray(0);
+
+
+	create_default_models();
+}
+
+void ModelMan::create_default_models()
+{
+	_sprite = new Model;
+	_sprite->aabb = Bounds(glm::vec3(-0.5), glm::vec3(0.5));
+	_sprite->bounding_sphere = bounds_to_sphere(_sprite->aabb);
+	_sprite->materials.push_back(mats.fallback);
+	{
+		ModelVertex corners[4];
+		corners[0].pos = glm::vec3(0.5, 0.5, 0.0);
+		corners[0].uv = glm::vec2(1.0, 1.0);
+		corners[0].normal[0] = 0;
+		corners[0].normal[1] = 0;
+		corners[0].normal[2] = INT16_MAX;
+
+		corners[1].pos = glm::vec3(-0.5, 0.5, 0.0);
+		corners[1].uv = glm::vec2(0.0, 1.0);
+		corners[1].normal[0] = 0;
+		corners[1].normal[1] = 0;
+		corners[1].normal[2] = INT16_MAX;
+
+		corners[2].pos = glm::vec3(-0.5, -0.5, 0.0);
+		corners[2].uv = glm::vec2(0.0, 0.0);
+		corners[2].normal[0] = 0;
+		corners[2].normal[1] = 0;
+		corners[2].normal[2] = INT16_MAX;
+
+		corners[3].pos = glm::vec3(0.5, -0.5, 0.0);
+		corners[3].uv = glm::vec2(1.0, 0.0);
+		corners[3].normal[0] = 0;
+		corners[3].normal[1] = 0;
+		corners[3].normal[2] = INT16_MAX;
+
+		_sprite->data.verts.push_back(corners[0]);
+		_sprite->data.verts.push_back(corners[1]);
+		_sprite->data.verts.push_back(corners[2]);
+		_sprite->data.verts.push_back(corners[3]);
+		_sprite->data.indicies.push_back(0);
+		_sprite->data.indicies.push_back(1);
+		_sprite->data.indicies.push_back(2);
+		_sprite->data.indicies.push_back(0);
+		_sprite->data.indicies.push_back(2);
+		_sprite->data.indicies.push_back(3);
+
+		Submesh sm;
+		sm.base_vertex = 0;
+		sm.element_count = 6;
+		sm.element_offset = 0;
+		sm.material_idx = 0;
+		sm.vertex_count = 4;
+		MeshLod lod;
+		lod.end_percentage = 1.0;
+		lod.part_count = 1;
+		lod.part_ofs = 0;
+
+		_sprite->parts.push_back(sm);
+		_sprite->lods.push_back(lod);
+		_sprite->loaded_in_memory = true;
+
+		_sprite->name = "_SPRITE";
+		models["_SPRITE.cmdl"] = _sprite;
+
+		upload_model(_sprite);
+	}
 }
 
 // Uploads the models vertex and index data to the gpu

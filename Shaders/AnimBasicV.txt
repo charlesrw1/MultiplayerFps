@@ -57,6 +57,9 @@ layout (binding = 5, std430) readonly buffer Indirect_Instance_Buf {
 layout(binding = 6, std430) readonly buffer Indirect_Mat_Buf {
 	uint indirect_materials[];
 };
+layout(binding = 4,std430) readonly buffer Material_Buffer {
+	Material_Data g_materials[];
+};
 
 uniform int indirect_material_offset = 0;
 
@@ -79,10 +82,7 @@ vec3 do_wind_sway(vec3 pos, mat4 Model)
 	
 	return pos +  pos_offset*0.05;
 }
-
-#endif
-
-
+#endif // WIND
 
 
 void main()
@@ -94,12 +94,22 @@ void main()
 	mat4 Model = g_objects[obj_index].model;
 	mat4 InverseModel = g_objects[obj_index].invmodel;
 
+#ifdef BILLBOARD
+	mat4 wo_translation = g.invview;
+	wo_translation[3] = vec4(0.0,0.0,0.0,1.0);
+	if(bool(g_materials[FS_IN_Matid].bitmask_flags & MATFLAG_BILLBOARD_ROTATE_AXIS) )
+		wo_translation[1] = vec4(0,1,0,0);
+
+	Model = Model * wo_translation;
+#endif
+
+
 #ifdef ANIMATED
 	vec3 local_pos = vec3(0.0);
 	vec3 local_normal = vec3(0.0);
-#ifdef NORMALMAPPED
+	#ifdef NORMALMAPPED
 	vec3 local_tangent = vec3(0.0);
-#endif // NORMALMAPPED
+	#endif // NORMALMAPPED
 
 	uint obj_skin_offset = g_objects[obj_index].anim_mat_offset;
 
@@ -118,19 +128,19 @@ void main()
 	#endif // NORMALMAPPED
 	}
 	
-#else
+#else	// (NOT ANIMATED)
 	vec3 local_pos = VS_IN_Postion;
 	vec3 local_normal = VS_IN_Normal;
 
-#ifdef NORMALMAPPED
+	#ifdef NORMALMAPPED
 	vec3 local_tangent = VS_IN_Tangent;
-#endif // NORMALMAPPED
+	#endif // NORMALMAPPED
 
 #endif // ANIMATED
 
 #ifdef WIND
 	local_pos = do_wind_sway(local_pos, Model);
-#endif
+#endif // WIND
 
 
 //	vec3 local_pos = vec3(BoneTransform[VS_IN_Bone]*vec4(VS_IN_Postion,1.0));
@@ -139,8 +149,8 @@ void main()
 		randColor(VS_IN_BoneIndicies.y)*VS_IN_BoneWeights.y+
 		randColor(VS_IN_BoneIndicies.z)*VS_IN_BoneWeights.z+
 		randColor(VS_IN_BoneIndicies.w)*VS_IN_BoneWeights.w;
-		
-#endif
+#endif // ANIMATED
+
 	FS_IN_FragPos = vec3(Model * vec4(local_pos,1.0));
     FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
 	
@@ -151,16 +161,16 @@ void main()
 	normalize(local_tangent  ), 
 	normalize(world_bitangent), 
 	normalize(FS_IN_Normal   ));
-#endif
+#endif // NORMALMAPPED
     
 	
 #ifdef VERTEX_COLOR
 	FS_IN_Color = VS_IN_Color;
-#endif
+#endif // VERTEX_COLOR
 
 #ifdef LIGHTMAPPED
 	FS_IN_TexCoord2 = VS_IN_TexCoord2;
-#endif
+#endif // LIGHTMAPPED
 	
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	gl_Position = FS_IN_NDC;

@@ -1,0 +1,44 @@
+
+layout (location = 0) out vec4 FS_OUT_Color;
+
+flat in uint FS_IN_Objid;
+flat in uint FS_IN_Matid;
+in vec3 FS_IN_FragPos;
+in vec3 FS_IN_Normal;
+in vec2 FS_IN_Texcoord;
+in vec3 FS_IN_BoneColor;
+in vec4 FS_IN_NDC;
+
+
+#ifdef NORMALMAPPED
+in mat3 FS_IN_TBN;
+#endif
+
+#include "SharedGpuTypes.txt"
+
+struct Cubemap_Box
+{
+	vec4 boxmin;
+	vec4 boxmax;
+	vec4 probepos_priority;
+};
+
+layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
+	Object_Instance g_objects[];
+};
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout(binding = 4,std430) readonly buffer Material_Buffer {
+	Material_Data g_materials[];
+};
+
+
+void main()
+{
+	uint obj_mat_index = FS_IN_Matid;
+	
+	FS_OUT_Color = vec4(2,0,0,1);
+}

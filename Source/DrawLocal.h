@@ -223,25 +223,27 @@ struct Multidraw_Batch
 struct draw_call_key  {
 	draw_call_key() {
 		shader = blending = backface = texture = vao = mesh = 0;
+		distance = 0;
 		layer = 0;
 	}
 
 	// lowest
-	uint64_t mesh : 19;
-	uint64_t vao : 5;
-	uint64_t texture : 19;
+	uint64_t distance : 14;
+	uint64_t mesh : 14;
+	uint64_t vao : 3;
+	uint64_t texture : 14;
 	uint64_t backface : 1;
 	uint64_t blending : 3;
-	uint64_t shader : 14;
-	uint64_t layer : 3;		
+	uint64_t shader : 12;
+	uint64_t layer : 3;
 	// highest
 	
+	// :)
 	uint64_t as_uint64() const{
 		return *(reinterpret_cast<const uint64_t*>(this));
 	}
 };
 static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
-
 
 struct Pass_Object
 {
@@ -288,12 +290,14 @@ public:
 		const Render_Object& proxy, 
 		handle<Render_Object> handle,
 		Material* material,
+		uint32_t camera_dist,
 		uint32_t submesh, 
 		uint32_t layer);
 
 	draw_call_key create_sort_key_from_obj(
 		const Render_Object& proxy, 
 		Material* material, 
+		uint32_t camera_dist,
 		uint32_t submesh, 
 		uint32_t layer);
 
@@ -468,14 +472,16 @@ struct shader_key
 		animated = 0;
 		vertex_colors = 0;
 		dither = 0;
+		billboard = 0;
 	}
-	uint32_t shader_type : 26;
+	uint32_t shader_type : 25;
 	uint32_t animated : 1;
 	uint32_t alpha_tested : 1;
 	uint32_t normal_mapped : 1;
 	uint32_t vertex_colors : 1;
 	uint32_t depth_only : 1;
 	uint32_t dither : 1;
+	uint32_t billboard : 1;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);

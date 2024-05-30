@@ -243,6 +243,8 @@ private:
 	Model* error_model = nullptr;
 	Model* _sprite = nullptr;
 
+	void create_default_models();
+
 	void set_v_attributes();
 	bool read_model_into_memory(Model* m, std::string path);
 	bool upload_model(Model* m);

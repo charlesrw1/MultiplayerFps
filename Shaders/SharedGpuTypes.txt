@@ -18,13 +18,16 @@ struct Object_Instance
 	float obj3;
 };
 
+// flags for 'bitmask_flags'
+const uint MATFLAG_BILLBOARD_ROTATE_AXIS  = 1;
+
 struct Material_Data
 {
 	vec4 diffuse_tint;
 	float rough_mult;
 	float metal_mult;
-	float padding1;
-	float padding2;
+	float padding;
+	uint bitmask_flags;
 };
 
 

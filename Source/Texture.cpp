@@ -158,6 +158,7 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 					gs->blend = blend_state::BLEND;
 					gs->type = material_type::WATER;
 				}
+
 				else sys_print("unknown shader type %s\n", tok.to_stack_string().c_str());
 			}
 			else if (tok.cmp("alpha")) {
@@ -170,6 +171,10 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 				 	gs->alpha_tested = true;
 
 			}
+			else if(tok.cmp("billboard"))
+				gs->billboard = billboard_setting::FACE_CAMERA;
+			else if (tok.cmp("billboard_axis"))
+				gs->billboard = billboard_setting::ROTATE_AXIS;
 
 		}
 	}

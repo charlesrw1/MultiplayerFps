@@ -9,6 +9,8 @@
 #include <physx/geometry/PxBoxGeometry.h>
 #include <physx/geometry/PxSphereGeometry.h>
 #include <physx/geometry/PxCapsuleGeometry.h>
+#include <physx/PxScene.h>
+
 #include "Framework/InlineVec.h"
 
 #include "Framework/StringName.h"
@@ -41,22 +43,25 @@ enum class PhysicsConstraintType_e : uint8_t
 	D6Joint,
 };
 
-class PhysicsShapeDef
-{
-public:
-	ShapeType_e shape  = ShapeType_e::None;
 
+struct sphere_def_t {
+	float radius;
+};
+struct box_def_t {
+	glm::vec3 halfsize;
+};
+struct vertical_capsule_def_t {
+	float radius;
+	float half_height;
+};
+
+struct physics_shape_def
+{
+	ShapeType_e shape  = ShapeType_e::None;
 	union {
-		struct sphere_t {
-			glm::vec3 pos;
-		}sph;
-		struct box_t {
-			glm::vec3 halfsize;
-		}box;
-		struct capsule_t {
-			float radius;
-			float half_height;
-		}cap;
+		sphere_def_t sph;
+		box_def_t box;
+		vertical_capsule_def_t cap;
 		// cooked physx data
 		physx::PxConvexMesh* convex_mesh;
 	};
@@ -88,7 +93,7 @@ class PhysicsBody
 public:
 	physx::PxTriangleMesh* trimesh_shape = nullptr;
 	bool is_skeleton = false;
-	std::vector<PhysicsShapeDef> shapes;
+	std::vector<physics_shape_def> shapes;
 	std::vector<PSubBodyDef> subbodies;
 	std::vector<PhysicsBodyConstraintDef> constraints;
 };
@@ -124,10 +129,11 @@ public:
 	}
 	PhysicsActor(const PhysicsActor& other) = delete;
 	PhysicsActor& operator=(PhysicsActor& other) = delete;
+	PhysicsActor(PhysicsActor&& other);
 
 	void create_actor_from_def(const PhysicsBody& def, const PSubBodyDef& subbody);
 	void create_trimesh_actor(physx::PxTriangleMesh* mesh);
-	void create_actor_from_shape(const PhysicsShapeDef& shape);
+	void create_actor_from_shape(const physics_shape_def& shape);
 
 	void free();
 
@@ -203,14 +209,14 @@ class PhysicsManLocal
 public:
 	// Shape traces
 	void trace_ray();
-	void trace_shape();
-
+	void box_cast();
+	void sphere_cast();
+	void capsule_cast();
 	void simulate();
 
 	physx::PxScene* get_global_scene() {
 		return scene;
 	}
-
 private:
 	physx::PxScene* scene = nullptr;
 };

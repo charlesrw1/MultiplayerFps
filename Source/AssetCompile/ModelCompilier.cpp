@@ -205,7 +205,7 @@ struct PhysicsCollisionShapeDefLoad
 	bool is_mesh = false;		// exports tri mesh
 
 	std::string material_name;
-	PhysicsShapeDef def;
+	physics_shape_def def;
 	PhysicsBodyConstraintDef constraint_def;
 };
 
