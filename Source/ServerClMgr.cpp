@@ -105,6 +105,8 @@ void RemoteClient::OnTextCommand(ByteReader& msg)
 		Disconnect("text command failed");
 }
 
+extern ConfigVar snapshot_rate;
+
 void RemoteClient::Update()
 {
 	if (!IsConnected() || local_client)
@@ -119,7 +121,7 @@ void RemoteClient::Update()
 	if (next_snapshot_time > 0.f)
 		return;
 
-	next_snapshot_time += (1.0 / myserver->snapshot_rate.real());
+	next_snapshot_time += (1.0 / snapshot_rate.get_float());
 
 	uint8_t buffer[MAX_PAYLOAD_SIZE];
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
@@ -128,9 +130,9 @@ void RemoteClient::Update()
 	writer.WriteLong(eng->tick);
 
 	writer.WriteByte(SV_SNAPSHOT);
-	static Auto_Config_Var never_delta("sv.never_delta", 0);
+	static ConfigVar never_delta("sv.never_delta", "0",CVAR_BOOL|CVAR_DEV);
 
-	int delta_frame = (never_delta.integer()) ? -1 : baseline;
+	int delta_frame = (never_delta.get_bool()) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
 	Entity& e = *eng->get_ent(client_num);

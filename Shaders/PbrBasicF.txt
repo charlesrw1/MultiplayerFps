@@ -489,15 +489,15 @@ void main()
 {
 	uint obj_mat_index = FS_IN_Matid;
 	
-#ifdef UNLIT
-	FS_OUT_Color = g_objects[FS_IN_Objid].colorval * g_materials[obj_mat_index].diffuse_tint;
-	return;
-#endif
 	
 	//FS_OUT_Color = vec4(vec3(get_ao())*randColor(FS_IN_Matid),1.0);
 	//return;
 
 	vec4 tex = texture(basecolor, vec2(FS_IN_Texcoord.x,FS_IN_Texcoord.y));
+#ifdef UNLIT
+	FS_OUT_Color = tex * g_objects[FS_IN_Objid].colorval * g_materials[obj_mat_index].diffuse_tint;
+	return;
+#endif
 	
 #ifdef BLEND2
 	float blend2_lerp = get_blend2_lerp();

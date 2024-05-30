@@ -3,77 +3,67 @@
 #include "Framework/Util.h"
 #include "Framework/StringUtil.h"
 
-struct Generic_Value
+enum CVarFlags
 {
-	enum Type { STRING, INT, FLOAT } type;
-	union {
-		char string_val[64];
-		int integer;
-		float real;
-	};
-	Generic_Value() {
-		integer = 0;
-		type = INT;
-	}
-	Generic_Value(const char* str) { 
-		int len = strlen(str);
-		if (len < 63) {
-			type = STRING;
-			memcpy_s(string_val, 63, str,len);
-			string_val[len] = 0;
-		}
-	}
-	Generic_Value(int i) { type = INT; integer = i; }
-	Generic_Value(float f) { type = FLOAT; real = f; }
-};
-
-struct Config_Var : Generic_Value
-{
-	Stack_String<64> name;
-	Stack_String<64> description;
-
-	int flags = 0;
-	bool persist = true;
+	CVAR_READONLY	= 1,
+	CVAR_SAVETODISK	= (1 << 1),
+	CVAR_INTEGER	= (1 << 3),
+	CVAR_BOOL		= (1 << 4),
+	CVAR_FLOAT		= (1 << 5),
+	CVAR_REGISTERED	= (1 << 6),
+	CVAR_DEV		= (1 << 7),
 };
 
 
-enum class CVar_Flags
-{
-	READONLY = 1,
-	SAVETODISK = (1<<1),
-
-	// used for imgui displaying
-	INTEGER = (1<<2),	// otherwise treat as boolean if integer type
-
-	// internal flag
-	SETFROMDISK = (1<<3)
-};
-
-
-class Var_Manager
+class ConfigVarDataPublic
 {
 public:
-	static Var_Manager* get();
-	virtual Config_Var* create_var(const char* name, const char* description, Generic_Value value, int flags) = 0;
-	virtual Config_Var* get_var(StringUtils::StringHash hash) = 0;
-	virtual Config_Var* set_var(StringUtils::StringHash hash, Generic_Value value) = 0;
-	virtual void set_var(Config_Var* var, Generic_Value value) = 0;
-	virtual void print_vars(const char* match) = 0;
-	virtual Config_Var* get_all_var_list(int* length) = 0;
+	const char* name = "";
+	const char* value = "";
+	int flags = 0;	// CVarFlags
+	float minVal = 0.f;
+	float maxVal = 1.f;
+	int integerVal = 0;
+	float floatVal = 0.0;
 };
 
-class Auto_Config_Var
+class ConfigVarDataInternal;
+class ConfigVar
 {
 public:
-	Auto_Config_Var(const char* name, Generic_Value value, int flags = 0, const char* desc = "") {
-		var = Var_Manager::get()->create_var(name, desc, value, flags);
-	}
+	ConfigVar(const char* name, const char* value, int flags, float min = -1.f, float max = 1.f);
 
-	int& integer() { return var->integer; }
-	float& real() { return var->real; }
-	const char* cstring() { return var->string_val; }
+	int get_integer() const { return ptr->integerVal; }
+	float get_float() const { return ptr->floatVal; }
+	bool get_bool() const { return ptr->integerVal; }
+	const char* get_string() const { return ptr->value; }
+	int get_var_flags() const { return ptr->flags; }
+	const char* get_name() const { return ptr->name; }
 
-	Config_Var* var = nullptr;
+
+	void set_bool(bool setI);
+	void set_integer(int setI);
+	void set_float(float setF);
+	void set_string(const char* str);
+private:
+	ConfigVar(ConfigVarDataInternal* ptr);
+	ConfigVarDataPublic* ptr = nullptr;
+
+	friend class ConfigVarDataInternal;
+	friend class VarManImpl;
+};
+
+
+class VarMan
+{
+public:
+	static VarMan* get();
+	virtual void register_var(ConfigVar* var, ConfigVarDataPublic initializer) = 0;
+	virtual ConfigVar* find(const char* name) = 0;
+	virtual void set_var_string(const char* name, const char* value) =0 ;
+	virtual void set_var_int(const char* name,int iVAl) = 0;
+	virtual void set_var_bool(const char* name, bool bVal) = 0;
+	virtual void set_var_float(const char* name, float fVal) = 0;
 };
 
 class Cmd_Manager_Impl;
@@ -139,7 +129,5 @@ public:
 
 #define DECLARE_ENGINE_CMD(func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
 #define DECLARE_ENGINE_CMD_CAT(category, func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(category#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
-
-#define DECLVAR(name,varname, value) Auto_Config_Var varname(name, value);
 
 #endif // !CONFIG_H

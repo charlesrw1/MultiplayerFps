@@ -54,7 +54,7 @@ void Volumetric_Fog_System::init()
 
 void Volumetric_Fog_System::compute()
 {
-	if (!draw.enable_volumetric_fog.integer())
+	if (!enable_volumetric_fog.get_bool())
 		return;
 
 	GPUFUNCTIONSTART;

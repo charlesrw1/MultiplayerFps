@@ -74,18 +74,6 @@ public:
 	void read_entity_from_snapshot(Entity* ent, int index, ByteReader& msg, bool is_delta, 
 		ByteReader* from_ent, int tick);
 
-	Auto_Config_Var interp_time;
-	Auto_Config_Var fake_lag;
-	Auto_Config_Var fake_loss;
-	Auto_Config_Var time_out;
-	Auto_Config_Var interpolate;
-	Auto_Config_Var predict;
-	Auto_Config_Var smooth_error_time;
-	Auto_Config_Var dont_replicate_player;
-	Auto_Config_Var time_reset_threshold;
-	Auto_Config_Var do_adjust_time;
-	Auto_Config_Var max_adjust_time;
-
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
 

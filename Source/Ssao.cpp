@@ -22,7 +22,7 @@ void SSAO_System::init()
 {
 	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
 
-	make_render_targets(true, eng->window_w.integer(), eng->window_h.integer());
+	make_render_targets(true, g_window_w.get_integer(), g_window_h.get_integer());
 	reload_shaders();
 
 	glCreateBuffers(1, &ubo.data);

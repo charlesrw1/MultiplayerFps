@@ -97,11 +97,11 @@ bool item_state_changed = false;
 bool finished = false;
 bool force_animation = false;
 
-static Auto_Config_Var min_stair("phys.min_stair", 0.25f);
-static Auto_Config_Var max_stair("phys.max_stair", 0.5f);
-static Auto_Config_Var stair_rad("phys.stair_radius", 0.01f);
-static Auto_Config_Var phys_gravity("phys.gravity", 16.f);
-static Auto_Config_Var debug_fly("dbg.fly", 0, 0,"Let player fly around");
+static ConfigVar min_stair("phys.min_stair", "0.25",CVAR_FLOAT);
+static ConfigVar max_stair("phys.max_stair", "0.5",CVAR_FLOAT);
+static ConfigVar stair_rad("phys.stair_radius", "0.01",CVAR_FLOAT);
+static ConfigVar phys_gravity("phys.gravity", "16.0",CVAR_FLOAT,-20,20);
+static ConfigVar debug_fly("dbg.fly", "0", CVAR_BOOL);
 
 // hacky way to move up stairs
 bool Player::check_perch()
@@ -112,7 +112,7 @@ bool Player::check_perch()
 	for (int i = 0; i < 8; i++) {
 		float height = CHAR_HITBOX_RADIUS;
 		Ray ray;
-		ray.pos = position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad.real()) + vec3(0, height, 0);
+		ray.pos = position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad.get_float()) + vec3(0, height, 0);
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
@@ -120,7 +120,7 @@ bool Player::check_perch()
 
 		// perched on ledge
 		if (rh.hit_world) {
-			if (((height - rh.dist) >= min_stair.real()) && (height - rh.dist) <= max_stair.real() && rh.normal.y > 0.98) {
+			if (((height - rh.dist) >= min_stair.get_float()) && (height - rh.dist) <= max_stair.get_float() && rh.normal.y > 0.98) {
 				position.y = position.y + (height - rh.dist);
 				velocity.y = 0;
 				return true;
@@ -335,7 +335,7 @@ void Player::ground_move()
 	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
 
 	if (!dont_add_grav) {
-		velocity.y -= phys_gravity.real() * eng->tick_interval;
+		velocity.y -= phys_gravity.get_float() * eng->tick_interval;
 	}
 	
 	slide_move();
@@ -441,7 +441,7 @@ void Player::move()
 	}
 
 
-	if (eng->is_host() && debug_fly.integer()) {
+	if (eng->is_host() && debug_fly.get_bool()) {
 		action = Action_State::Falling;
 
 		vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
@@ -781,7 +781,7 @@ void ViewmodelComponent::update_visuals()
 	proxy.visible = true;
 	//proxy.animator = &animator;
 	proxy.model = model;
-	if (!g_thirdperson.integer())
+	if (!g_thirdperson.get_bool())
 	{
 		glm::mat4 model2 = glm::translate(glm::mat4(1), vec3(0.18, -0.18, -0.25) + viewmodel_offsets + viewmodel_recoil_ofs);
 		model2 = glm::scale(model2, glm::vec3(vm_scale.x));
@@ -870,7 +870,7 @@ glm::vec3 Player::calc_eye_position()
 
 void Player::get_view(glm::vec3& org, glm::vec3& ang, float& fov)
 {
-	if (g_thirdperson.integer()) {
+	if (g_thirdperson.get_bool()) {
 
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
@@ -878,7 +878,7 @@ void Player::get_view(glm::vec3& org, glm::vec3& ang, float& fov)
 
 		org = camera_pos;
 		ang = view_angles;
-		fov = g_fov.real();
+		fov = g_fov.get_float();
 	}
 	else
 	{
@@ -886,7 +886,7 @@ void Player::get_view(glm::vec3& org, glm::vec3& ang, float& fov)
 
 		org = cam_position;
 		ang = view_angles;
-		fov = g_fov.real();
+		fov = g_fov.get_float();
 	}
 }
 

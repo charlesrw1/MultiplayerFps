@@ -321,7 +321,6 @@ void AnimationGraphEditor::close()
 	open_save_popup = false;
 	reset_prop_editor_next_tick = false;
 	playback = graph_playback_state::stopped;
-	last_tick_had_game_running = false;
 	sel = selection_state();
 	drop_state = create_from_drop_state();
 	current_id = 0;
@@ -545,6 +544,10 @@ void TabState::imgui_draw() {
 
 bool AnimationGraphEditor::save_document()
 {
+	if (playback == graph_playback_state::running) {
+		sys_print("!!! cant save graph while playing\n");
+		return false;
+	}
 	if (!current_document_has_path()) {
 		open_save_popup = true;
 		return false;
@@ -1104,6 +1107,7 @@ void AnimationGraphEditor::imgui_draw()
 		}
 		ImGui::EndDisabled();
 
+		ImGui::BeginDisabled(!is_stopped);
 		ImGui::SameLine();
 		if (ImGui::ImageButton((ImTextureID)saveimg->gl_id,
 			ImVec2(32, 32),
@@ -1113,6 +1117,7 @@ void AnimationGraphEditor::imgui_draw()
 			save_document();
 		}
 		ImGui::PopStyleColor(3);
+		ImGui::EndDisabled();
 	}
 
 
@@ -1736,27 +1741,38 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	return &vec;
 }
 
-void AnimationGraphEditor::signal_going_to_game()
+void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
 {
-	compile_and_run();
-	if (out.obj.is_valid())
-		idraw->remove_obj(out.obj);
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+	if (newstate == editor_focus_state::Background) {
+		stop_playback();
+		compile_and_run();
+		control_params.refresh_props();
+		if (out.obj.is_valid())
+			idraw->remove_obj(out.obj);
+		playback = graph_playback_state::running;
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+	}
+	else if(newstate == editor_focus_state::Closed){
+		close();
+		if (out.obj.is_valid())
+			idraw->remove_obj(out.obj);
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+	}
+	else {
+		// focused, stuff can start being rendered
+		playback = graph_playback_state::stopped;
+		control_params.refresh_props();
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
+	}
 }
 
 void AnimationGraphEditor::tick(float dt)
 {
+	assert(get_focus_state() != editor_focus_state::Closed);
 
-	if(eng->get_state() == Engine_State::Idle)
+	if(get_focus_state()==editor_focus_state::Focused)
 	{
-		if (last_tick_had_game_running) {
-			playback = graph_playback_state::stopped;
-			last_tick_had_game_running = false;
-			control_params.refresh_props();
-
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
-		}
-		
+		assert(eng->get_state() != Engine_State::Game);
 
 		int x = 0, y = 0;
 		if (eng->game_focused) {
@@ -1772,7 +1788,7 @@ void AnimationGraphEditor::tick(float dt)
 		ro.model = out.model;
 
 		if (get_playback_state() == graph_playback_state::running) {
-			out.get_local_animator().tick_tree_new(dt * g_slomo.real());
+			out.get_local_animator().tick_tree_new(dt * g_slomo.get_float());
 		}
 		if (get_playback_state() != graph_playback_state::stopped && ro.model->get_skel()) {
 			ro.transform = out.model->get_root_transform();
@@ -1785,14 +1801,8 @@ void AnimationGraphEditor::tick(float dt)
 		auto window_sz = eng->get_game_viewport_dimensions();
 		out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 	}
-	else if(eng->get_state() == Engine_State::Game) {
-		
-		if (!last_tick_had_game_running) {
-			playback = graph_playback_state::running;
-			last_tick_had_game_running = true;
-			control_params.refresh_props();
-		}
-		
+	else {	// not focused, game running likely
+		playback = graph_playback_state::running;
 	}
 
 }
@@ -1874,16 +1884,16 @@ void AnimationGraphEditor::try_load_preview_models()
 {
 	{
 		Material* mymat = mats.create_temp_shader("sprite_texture");
-		mymat->billboard = billboard_setting::ROTATE_AXIS;
-		mymat->images[0] = mats.find_texture("frog.jpg");
+		mymat->billboard = billboard_setting::SCREENSPACE;
+		mymat->images[0] = mats.find_texture("icon/light.png");
 		mymat->blend = blend_state::BLEND;
 		mymat->type = material_type::UNLIT;
-		mymat->diffuse_tint = glm::vec4(1, 1, 0, 0.8);
+		mymat->diffuse_tint = glm::vec4(1.0);
 	
 		auto handle= idraw->register_obj();
 		Render_Object obj;
 		obj.model = mods.get_sprite_model();
-		obj.transform = glm::translate(glm::mat4(1.0),glm::vec3(0, 2.0, 0.0));
+		obj.transform = glm::scale(glm::translate(glm::mat4(1.0),glm::vec3(0, 2.0, 0.0)),glm::vec3(0.08,0.08,1.0));
 		obj.mat_override = mymat;
 		obj.visible = true;
 
@@ -1893,9 +1903,8 @@ void AnimationGraphEditor::try_load_preview_models()
 		handle = idraw->register_obj();
 		obj=Render_Object();
 		obj.model = mods.get_sprite_model();
-		obj.transform = glm::translate(glm::mat4(1.0), glm::vec3(1.0, 2.0, 0.0));
+		obj.transform = glm::scale(glm::translate(glm::mat4(1.0), glm::vec3(1.0, 2.0, 0.0)), glm::vec3(0.08, 0.08, 1.0));
 		obj.mat_override = mymat;
-		obj.param1 = COLOR_PINK;
 		obj.visible = true;
 
 
@@ -1909,10 +1918,15 @@ void AnimationGraphEditor::try_load_preview_models()
 
 void AnimationGraphEditor::open(const char* name)
 {
+	assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
+
 	if (!is_initialized)
 		init();
 
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
+	if (get_focus_state() == editor_focus_state::Background) {
+		sys_print("!!! cant open Animation Editor while game is running. Close the level then try again.\n");
+		return;
+	}
 
 	// close currently open document
 	close();
@@ -1932,7 +1946,7 @@ void AnimationGraphEditor::open(const char* name)
 			bool good = load_editor_nodes(parser);
 			if (!good) {
 				editing_tree = nullptr;
-				printf("couldn't load editor nodes for tree %s\n", name);
+				sys_print("!!! couldn't load editor nodes for tree %s\n", name);
 			}
 			else {
 				needs_new_doc = false;
@@ -1946,7 +1960,7 @@ void AnimationGraphEditor::open(const char* name)
 			}
 		}
 		if(needs_new_doc)
-			printf("Couldn't open animation tree file %s, creating new document instead\n", name);
+			sys_print("!!! Couldn't open animation tree file %s, creating new document instead\n", name);
 	}
 
 	if (needs_new_doc) {

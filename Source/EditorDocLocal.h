@@ -270,4 +270,7 @@ public:
 	User_Camera camera;
 	std::vector<std::shared_ptr<EditorNode>> nodes;
 	std::vector<std::string> ent_files;
+
+	// Inherited via IEditorTool
+	virtual void on_change_focus(editor_focus_state newstate) override;
 };

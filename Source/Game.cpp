@@ -360,11 +360,6 @@ void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 	}
 }
 
-static Auto_Config_Var grenade_radius("game.gren_rad", 0.25f);
-static Auto_Config_Var grenade_slide("game.gren_slide", 0);
-static Auto_Config_Var grenade_vel("game.gren_vel", 18.f);
-
-
 
 
 Grenade::Grenade()
@@ -375,7 +370,7 @@ void Grenade::spawn()
 {
 	set_model("grenade_he.glb");
 	phys_opt.type = Ent_PhysicsType::Complex;
-	phys_opt.size.x = grenade_radius.real();
+	//phys_opt.size.x = grenade_radius.real();
 	phys_opt.shape = Ent_PhysicsShape::Sphere;
 	throw_time = eng->time;
 }
@@ -397,7 +392,7 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 	Grenade* e = (Grenade*)eng->create_entity("Grenade");
 	e->thrower = thrower->selfid;
 	e->position = org;
-	e->velocity = direction * grenade_vel.real();
+	//e->velocity = direction * grenade_vel.real();
 	return e;
 }
 Entity::~Entity()

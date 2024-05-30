@@ -98,9 +98,6 @@ public:
 	Socket socket;
 
 	// CONFIG VARS
-	Auto_Config_Var snapshot_rate;
-	Auto_Config_Var tick_rate;
-	Auto_Config_Var max_time_out;
 
 private:
 	int FindClient(IPAndPort addr) const;

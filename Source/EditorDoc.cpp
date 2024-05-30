@@ -339,6 +339,10 @@ EditorNode* EditorDoc::create_node_from_dict(const Dict& d)
 	return nullptr;
 }
 
+void EditorDoc::on_change_focus(editor_focus_state newstate)
+{
+}
+
 void EditorDoc::open(const char* levelname)
 {
 	nodes.clear();

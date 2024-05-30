@@ -27,7 +27,7 @@ Material* Game_Material_Manager::find_and_make_if_dne(const char* name)
 	return m;
 }
 
-#define ENSURE(num) if(line.size() < num) { sys_print("bad material definition %s @ %d\n", matname.c_str(), mat.second.linenum); continue;}
+#define ENSURE(num) if(line.size() < num) { sys_print("!!! bad material definition %s @ %d\n", matname.c_str(), mat.second.linenum); continue;}
 void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 {
 	auto fileos = FileSys::open_read_os(path);
@@ -47,7 +47,7 @@ void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
 	while (!file.is_eof()) {
 		StringView name;
 		if (!file.read_string(name) || !file.expect_item_start()) {
-			sys_print("bad material def %s\n", path);
+			sys_print("!!! bad material def %s\n", path);
 			return;
 		}
 

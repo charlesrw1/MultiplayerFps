@@ -83,6 +83,7 @@ enum class billboard_setting : uint8_t
 	NONE,
 	FACE_CAMERA,	// standard billboard
 	ROTATE_AXIS,	// rotate around the provided axis in model transform
+	SCREENSPACE,	// faces camera and keeps constant screen space size
 };
 
 class Material

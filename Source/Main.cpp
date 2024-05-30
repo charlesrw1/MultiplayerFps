@@ -127,19 +127,24 @@ void sys_print(const char* fmt, ...)
 	va_start(args, fmt);
 	
 	int len = strlen(fmt);
-	bool print_end = false;
+	bool print_end = true;
 	if (len >= 3 && fmt[0] == '!' && fmt[1] == '!' && fmt[2] == '!') {
 		printf("\033[91m");
-		print_end = true;
 	}
 	else if (len >= 3 && fmt[0] == '?' && fmt[1] == '?' && fmt[2] == '?') {
 		printf("\033[33m");
-		print_end = true;
 	}
 	else if (len >= 3 && fmt[0] == '*' && fmt[1] == '*' && fmt[2] == '*') {
 		printf("\033[94m");
-		print_end = true;
 	}
+	else if (len >= 3 && fmt[0] == '`' && fmt[1] == '`' && fmt[2] == '`') {
+		printf("\033[32m");
+	}
+	else if (len >= 1 && fmt[0] == '>') {
+		printf("\033[35m");
+	}
+	else
+		print_end = false;
 
 	vprintf(fmt, args);
 	dbg_console.print_args(fmt, args);
@@ -186,8 +191,8 @@ static void view_angle_update(glm::vec3& view_angles)
 {
 	int x, y;
 	SDL_GetRelativeMouseState(&x, &y);
-	float x_off = g_mousesens.real() * x;
-	float y_off = g_mousesens.real() * y;
+	float x_off = g_mousesens.get_float() * x;
+	float y_off = g_mousesens.get_float() * y;
 
 	view_angles.x -= y_off;	// pitch
 	view_angles.y += x_off;	// yaw
@@ -208,9 +213,9 @@ void Game_Engine::make_move()
 	command.view_angles = p->view_angles;
 	command.tick = tick;
 
-	if (g_fakemovedebug.integer() != 0)
+	if (g_fakemovedebug.get_integer() != 0)
 		command.lateral_move = std::fmod(GetTime(), 2.f) > 1.f ? -1.f : 1.f;
-	if (g_fakemovedebug.integer() == 2)
+	if (g_fakemovedebug.get_integer() == 2)
 		command.button_mask |= BUTTON_JUMP;
 
 	if (!game_focused) {
@@ -267,7 +272,7 @@ void Game_Engine::init_sdl_window()
 	ASSERT(!window);
 
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
-		printf(__FUNCTION__": %s\n", SDL_GetError());
+		sys_print("!!! init sdl failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
 
@@ -278,18 +283,18 @@ void Game_Engine::init_sdl_window()
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
 	window = SDL_CreateWindow("CsRemake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		window_w.integer(), window_h.integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
-		printf(__FUNCTION__": %s\n", SDL_GetError());
+		sys_print("!!! create sdl window failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
 
 	gl_context = SDL_GL_CreateContext(window);
 	sys_print("OpenGL loaded\n");
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
-	sys_print("Vendor: %s\n", glGetString(GL_VENDOR));
-	sys_print("Renderer: %s\n", glGetString(GL_RENDERER));
-	sys_print("Version: %s\n\n", glGetString(GL_VERSION));
+	sys_print("``` Vendor: %s\n", glGetString(GL_VENDOR));
+	sys_print("``` Renderer: %s\n", glGetString(GL_RENDERER));
+	sys_print("``` Version: %s\n\n", glGetString(GL_VERSION));
 
 	SDL_GL_SetSwapInterval(0);
 }
@@ -551,10 +556,13 @@ static void disable_imgui_docking()
 void Game_Engine::change_editor_state(Eng_Tool_state next_tool, const char* file)
 {
 	sys_print("--------- Change Editor State ---------\n");
-	if (tool_state != next_tool && tool_state != Eng_Tool_state::None)
+	if (tool_state != next_tool && tool_state != Eng_Tool_state::None) {
 		get_current_tool()->close();
+		get_current_tool()->set_focus_state(editor_focus_state::Closed);
+	}
 	tool_state = next_tool;
 	if (tool_state != Eng_Tool_state::None) {
+		get_current_tool()->set_focus_state((get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
 		get_current_tool()->open(file);
 		enable_imgui_docking();
 	}
@@ -671,10 +679,10 @@ DECLARE_ENGINE_CMD(print_ents)
 
 DECLARE_ENGINE_CMD(print_vars)
 {
-	if (args.size() == 1)
-		Var_Manager::get()->print_vars(nullptr);
-	else
-		Var_Manager::get()->print_vars(args.at(1));
+	//if (args.size() == 1)
+	//	Var_Manager::get()->print_vars(nullptr);
+	//else
+	//	Var_Manager::get()->print_vars(args.at(1));
 }
 
 DECLARE_ENGINE_CMD(reload_shaders)
@@ -735,16 +743,19 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-#define DECLVAR(name,varname, value) Auto_Config_Var varname(name, value);
-DECLVAR("mousesens", g_mousesens, 0.005f);
-DECLVAR("fov", g_fov, 70.f);
-DECLVAR("thirdperson", g_thirdperson, 0);
-DECLVAR("fakemovedebug", g_fakemovedebug, 0);
-DECLVAR("drawdebugmenu", g_drawdebugmenu, 1);
-DECLVAR("drawimguidemo", g_drawimguidemo, 1);
-DECLVAR("debug_skeletons", g_debug_skeletons, 1);
-DECLVAR("debug_grid", g_draw_grid, 1);
+ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
+ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
+ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL);
+ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, 0,2);
+ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL);
+ConfigVar g_debug_skeletons("g_debug_skeletons", "1", CVAR_BOOL);
+ConfigVar g_draw_grid("g_draw_grid", "1", CVAR_BOOL);
+ConfigVar g_drawdebugmenu("g_drawdebugmenu","1",CVAR_BOOL);
 
+ConfigVar g_window_w("vid.width","1200",CVAR_INTEGER,1,4000);
+ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, 1, 4000);
+ConfigVar g_window_fullscreen("vid.fullscreen", "0",CVAR_BOOL);
+ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,0,UINT16_MAX);
 
 DECLARE_ENGINE_CMD(spawn_npc)
 {
@@ -987,7 +998,7 @@ Debug_Interface* Debug_Interface::get()
 	return &inst;
 }
 
-DECLVAR("slomo", g_slomo, 1.f);
+ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, 0.0001, 5.0);
 
 
 bool Game_Engine::is_drawing_to_window_viewport()
@@ -1000,12 +1011,12 @@ glm::ivec2 Game_Engine::get_game_viewport_dimensions()
 	if (is_drawing_to_window_viewport())
 		return window_viewport_size;
 	else
-		return { window_w.integer(), window_h.integer() };
+		return { g_window_w.get_integer(), g_window_w.get_integer() };
 }
 
 void Game_Engine::draw_any_imgui_interfaces()
 {
-	if(g_drawdebugmenu.integer())
+	if(g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
 
 	// draw tool editor
@@ -1033,7 +1044,7 @@ void Game_Engine::draw_any_imgui_interfaces()
 		ImGui::End();
 	}
 
-	if(g_drawimguidemo.integer())
+	if(g_drawimguidemo.get_bool())
 		ImGui::ShowDemoWindow();
 }
 
@@ -1046,7 +1057,7 @@ bool Game_Engine::game_draw_screen()
 	
 	glm::vec3 position(0,0,0);
 	glm::vec3 angles(0, 0, 0);
-	float fov = g_fov.real();
+	float fov = g_fov.get_float();
 	p->get_view(position, angles, fov);
 	glm::vec3 front = AnglesToVector(angles.x, angles.y);
 
@@ -1063,14 +1074,7 @@ void Game_Engine::draw_screen()
 {
 	GPUFUNCTIONSTART;
 
-	int x, y;
-	SDL_GetWindowSize(window, &x, &y);
-	if (x % 2 == 1) x -= 1;
-	if (y % 2 == 1) y -= 1;
-	SDL_SetWindowSize(window, x, y);
-
-	window_w.integer() = x;
-	window_h.integer() = y;
+	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1131,7 +1135,7 @@ IEditorTool* Game_Engine::get_current_tool()
 
 void Game_Engine::build_physics_world(float time)
 {
-	static Auto_Config_Var only_world("dbg.onlyworld",0);
+	static ConfigVar only_world("dbg.onlyworld","0",CVAR_BOOL);
 
 	phys.ClearObjs();
 	{
@@ -1145,7 +1149,7 @@ void Game_Engine::build_physics_world(float time)
 
 		phys.AddObj(obj);
 	}
-	if (only_world.integer()) return;
+	if (only_world.get_bool()) return;
 
 	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 		Entity& ce = ei.get();
@@ -1204,10 +1208,6 @@ View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near,
 #define TIMESTAMP(x) printf("%s in %f\n",x,(float)GetTime()-start); start = GetTime();
 
 Game_Engine::Game_Engine() :
-	window_w("vid.width", 1200),
-	window_h("vid.height", 800),
-	window_fullscreen("vid.fullscreen", 0),
-	host_port("net.hostport", DEFAULT_SERVER_PORT),
 	ents(NUM_GAME_ENTS, nullptr),
 	spawnids(NUM_GAME_ENTS,0)
 {
@@ -1307,10 +1307,10 @@ void Game_Engine::init()
 			starty = atoi(argv[++i]);
 		}
 		else if (strcmp(argv[i], "-w") == 0) {
-			window_w.integer() = atoi(argv[++i]);
+			g_window_w.set_integer(atoi(argv[++i]));
 		}
 		else if (strcmp(argv[i], "-h") == 0) {
-			window_h.integer() = atoi(argv[++i]);
+			g_window_h.set_integer(atoi(argv[++i]));
 		}
 		else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			SDL_SetWindowTitle(window, "CsRemake - VISUAL STUDIO\n");
@@ -1331,7 +1331,7 @@ void Game_Engine::init()
 
 
 	SDL_SetWindowPosition(window, startx, starty);
-	SDL_SetWindowSize(window, window_w.integer(), window_h.integer());
+	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 	TIMESTAMP("cfg exectute");
 
 
@@ -1464,6 +1464,19 @@ void Game_Engine::loop()
 			case SDL_QUIT:
 				::Quit();
 				break;
+			case SDL_WINDOWEVENT:
+				if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+					int x, y;
+					SDL_GetWindowSize(window, &x, &y);
+					if (x % 2 == 1) x -= 1;
+					if (y % 2 == 1) y -= 1;
+
+					if (x != g_window_w.get_integer())
+						g_window_w.set_integer(x);
+					if (y != g_window_h.get_integer())
+						g_window_h.set_integer(y);
+				}
+				break;
 			case SDL_KEYUP:
 			case SDL_KEYDOWN:
 			case SDL_MOUSEBUTTONDOWN:
@@ -1483,16 +1496,20 @@ void Game_Engine::loop()
 			// later, will add menu controls, now all you can do is use the console to change state
 			SDL_Delay(5);
 
+
 			if (map_spawned()) {
 				stop_game();
 				continue;	// goto next frame
+			}
+			else if(get_tool_state() != Eng_Tool_state::None){
+				get_current_tool()->set_focus_state(editor_focus_state::Focused);
 			}
 			break;
 		case Engine_State::Loading:
 
 			// for compiling data etc.
 			if (get_tool_state() != Eng_Tool_state::None)
-				get_current_tool()->signal_going_to_game();
+				get_current_tool()->set_focus_state(editor_focus_state::Background);
 
 			execute_map_change();
 			continue; // goto next frame
@@ -1512,10 +1529,8 @@ void Game_Engine::loop()
 			float orig_ft = frame_time;
 			float orig_ti = tick_interval;
 
-			g_slomo.real() = glm::clamp(g_slomo.real(), 0.00001f, 2.0f);
-
-			frame_time *= g_slomo.real();
-			tick_interval *= g_slomo.real();
+			frame_time *= g_slomo.get_float();
+			tick_interval *= g_slomo.get_float();
 
 			for (int i = 0; i < num_ticks; i++) {
 
@@ -1543,12 +1558,12 @@ void Game_Engine::loop()
 		draw_screen();
 
 		static float next_print = 0;
-		static Auto_Config_Var print_fps("dbg.print_fps", 0);
-		if (next_print <= 0 && print_fps.integer()) {
+		static ConfigVar print_fps("dbg.print_fps", "0",CVAR_BOOL);
+		if (next_print <= 0 && print_fps.get_bool()) {
 			next_print += 2.0;
 			sys_print("fps %f", 1.0 / eng->frame_time);
 		}
-		else if (print_fps.integer())
+		else if (print_fps.get_bool())
 			next_print -= eng->frame_time;
 
 		Profiler::end_frame_tick();
@@ -1653,11 +1668,11 @@ void Debug_Console::draw()
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
 		for (int i = 0; i < lines.size(); i++)
 		{
-			ImVec4 color;
+			Color32 color;
 			bool has_color = false;
-			if (!lines[i].empty() && lines[i][0]=='#') { color = ImVec4(1.0f, 0.8f, 0.6f, 1.0f); has_color = true; }
+			if (!lines[i].empty() && lines[i][0] == '>') { color = { 136,23,152 }; has_color = true; }
 			if (has_color)
-				ImGui::PushStyleColor(ImGuiCol_Text, color);
+				ImGui::PushStyleColor(ImGuiCol_Text, color.to_uint());
 			ImGui::TextUnformatted(lines[i].c_str());
 			if (has_color)
 				ImGui::PopStyleColor();
@@ -1683,7 +1698,7 @@ void Debug_Console::draw()
 	{
 		char* s = input_buffer;
 		if (s[0]) {
-			print("#%s", input_buffer);
+			print("> %s", input_buffer);
 
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, input_buffer);
 

@@ -24,6 +24,16 @@ class Texture;
 class Entity;
 class Material;
 
+extern ConfigVar draw_collision_tris;
+extern ConfigVar draw_sv_colliders;
+extern ConfigVar draw_viewmodel;
+extern ConfigVar enable_vsync;
+extern ConfigVar shadow_quality_setting;
+extern ConfigVar enable_bloom;
+extern ConfigVar enable_volumetric_fog;
+extern ConfigVar enable_ssao;
+extern ConfigVar use_halfres_reflections;
+
 const int BLOOM_MIPS = 6;
 
 typedef int program_handle;
@@ -472,16 +482,16 @@ struct shader_key
 		animated = 0;
 		vertex_colors = 0;
 		dither = 0;
-		billboard = 0;
+		billboard_type = 0;
 	}
-	uint32_t shader_type : 25;
+	uint32_t shader_type : 24;
 	uint32_t animated : 1;
 	uint32_t alpha_tested : 1;
 	uint32_t normal_mapped : 1;
 	uint32_t vertex_colors : 1;
 	uint32_t depth_only : 1;
 	uint32_t dither : 1;
-	uint32_t billboard : 1;
+	uint32_t billboard_type : 2;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -609,15 +619,6 @@ public:
 	View_Setup lastframe_vs;
 
 	// graphics_settings
-	Auto_Config_Var draw_collision_tris;
-	Auto_Config_Var draw_sv_colliders;
-	Auto_Config_Var draw_viewmodel;
-	Auto_Config_Var enable_vsync;
-	Auto_Config_Var shadow_quality_setting;
-	Auto_Config_Var enable_bloom;
-	Auto_Config_Var enable_volumetric_fog;
-	Auto_Config_Var enable_ssao;
-	Auto_Config_Var use_halfres_reflections;
 
 	void bind_vao(uint32_t vao);
 	void bind_texture(int bind, int id);

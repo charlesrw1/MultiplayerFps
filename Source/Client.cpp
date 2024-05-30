@@ -11,18 +11,22 @@
 
 //#define DebugOut(fmt, ...)
 
+ConfigVar interp_time("cl.interp", "0.1", CVAR_FLOAT, 0.0, 0.3);
+ConfigVar fake_lag("cl.fake_lag", "0", CVAR_INTEGER, 0,1000);
+ConfigVar fake_loss("cl.fake_loss", "0", CVAR_INTEGER, 0.0, 100.0);
+ConfigVar time_out("cl.timeout", "5.0", CVAR_FLOAT | CVAR_READONLY, 0.0, 10.0);
+ConfigVar interpolate("cl.do_interp", "1", CVAR_BOOL);
+ConfigVar smooth_error_time("cl.smooth_error", "1.0", CVAR_FLOAT, 0.5, 2.0);
+ConfigVar predict("cl.predict", "1", CVAR_BOOL);
+ConfigVar dont_replicate_player("cl.dont_rep_player", "0", CVAR_BOOL);
+ConfigVar time_reset_threshold("cl.time_reset", "0.1", CVAR_FLOAT, 0.0, 0.3);
+ConfigVar do_adjust_time("cl.do_adjust_time", "1", CVAR_BOOL);
+ConfigVar max_adjust_time("cl.max_adjust", "1.0", CVAR_FLOAT, 0.0, 2.0);
+
+
+
 Client::Client() :
-	interp_time("cl.interp", 0.1f, 0, "Interpolation time"),
-	fake_lag("cl.fake_lag", 0, (int)CVar_Flags::INTEGER, "Amount of fake lag in ms(int)"),
-	fake_loss("cl.fake_loss", 0, (int)CVar_Flags::INTEGER, "Amount of fake loss % (int"),
-	time_out("cl.timeout", 5.f),
-	interpolate("cl.do_interp", 1),
-	smooth_error_time("cl.smooth_error", 1.f),
-	predict("cl.predict", 1),
-	dont_replicate_player("cl.dont_rep_player", 0),
-	time_reset_threshold("cl.time_reset", 0.1f),
-	do_adjust_time("cl.do_adjust_time", 1),
-	max_adjust_time("cl.max_adjust", 1.f),
+
 	frame_storage(CLIENT_SNAPSHOT_HISTORY*256,CLIENT_SNAPSHOT_HISTORY)
 {
 
@@ -369,11 +373,11 @@ Frame* Client::FindSnapshotForTick(int tick)
 // will add/subtract a small value to adjust the number of ticks running
 float Client::adjust_time_step(int ticks_runnning)
 {
-	if (!do_adjust_time.integer())
+	if (!do_adjust_time.get_bool())
 		return 0.f;
 
 	float adjust_total = 0.f;
-	float max_time_adjust = max_adjust_time.real() / 1000.f;
+	float max_time_adjust = max_adjust_time.get_float() / 1000.f;
 	
 	for (int i = 0; i < ticks_runnning; i++) {
 		if (abs(time_delta) < 0.0001)

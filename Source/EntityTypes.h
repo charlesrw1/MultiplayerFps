@@ -52,7 +52,7 @@ public:
 			float speed = 5.5f;
 			vec3 idealvelocity = normalize(towaypoint)*speed;
 			vec3 add_vel_dir = idealvelocity - velocity;
-			if (!Var_Manager::get()->get_var("stopai")->integer) {
+			if (!VarMan::get()->find("stopai")->get_float()) {
 				float lenavd = length(add_vel_dir);
 				if (lenavd >= 0.000001)
 					velocity += add_vel_dir / lenavd * ground_accel * speed * (dt);

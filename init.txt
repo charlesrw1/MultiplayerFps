@@ -1,5 +1,5 @@
 map "Map0"
 thirdperson 1
-disconnect
+
 
 start_ed anim "out.txt"

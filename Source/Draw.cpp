@@ -41,8 +41,17 @@ static const int SHADOWMAP_LOC = 11;
 static const int CAUSTICS_LOC = 12;
 static const int SSAO_TEX_LOC = 8;
 
-extern Auto_Config_Var g_debug_skeletons;
+extern ConfigVar g_debug_skeletons;
 
+ConfigVar draw_collision_tris("r.draw_collision_tris","0",CVAR_BOOL);
+ConfigVar draw_sv_colliders("r.draw_sv_col","0",CVAR_BOOL);
+ConfigVar draw_viewmodel("r.draw_viewmodel","1",CVAR_BOOL);
+ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL);
+ConfigVar shadow_quality_setting("r.shadow_setting","0",CVAR_INTEGER,0,3);
+ConfigVar enable_bloom("r.bloom","1",CVAR_BOOL);
+ConfigVar enable_volumetric_fog("r.vol_fog","0",CVAR_BOOL);
+ConfigVar enable_ssao("r.ssao","1",CVAR_BOOL);
+ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL);
 
 // Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
 uint32_t hash(uint32_t x, uint32_t seed) {
@@ -645,7 +654,8 @@ program_handle compile_mat_shader(shader_key key)
 	if (key.dither) params += "DITHER,";
 	if (type == material_type::WINDSWAY) params += "WIND,";
 	if (type == material_type::UNLIT) params += "UNLIT,";
-	if (key.billboard) params += "BILLBOARD,";
+	if (key.billboard_type == (int)billboard_setting::ROTATE_AXIS || key.billboard_type == (int)billboard_setting::FACE_CAMERA) params += "BILLBOARD,";
+	else if (key.billboard_type == (int)billboard_setting::SCREENSPACE) params += "BILLBOARD_SCREENSPACE,";
 	if (!params.empty())params.pop_back();
 
 	printf("INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
@@ -772,6 +782,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.near = vs.near;
 	constants.far = vs.far;
 	constants.shadowmap_epsilon = shadowmap.tweak.epsilon;
+	constants.inv_scale_by_proj_distance = 1.0 / (2.0 * tan(vs.fov * 0.5));
 
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
@@ -797,15 +808,6 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 }
 
 Renderer::Renderer()
-	: draw_collision_tris("gpu.draw_collision_tris", 0),
-	draw_sv_colliders("gpu.draw_colliders",0),
-	draw_viewmodel("gpu.draw_viewmodel", 0),
-	enable_vsync("gpu.vsync",0),
-	enable_bloom("gpu.bloom",1),
-	shadow_quality_setting("gpu.shadow_quality",1, (int)CVar_Flags::INTEGER),
-	enable_volumetric_fog("gpu.volfog",1),
-	enable_ssao("gpu.ssao",1),
-	use_halfres_reflections("gpu.halfreswater",1)
 {
 
 }
@@ -959,7 +961,7 @@ void Renderer::init()
 	fbo.reflected_scene = 0;
 	tex.scene_color = tex.scene_depthstencil = 0;
 	tex.reflected_color = tex.reflected_depth = 0;
-	InitFramebuffers(true, eng->window_w.integer(), eng->window_h.integer());
+	InitFramebuffers(true, g_window_w.get_integer(), g_window_h.get_integer());
 
 	EnviornmentMapHelper::get().init();
 	volfog.init();
@@ -1013,7 +1015,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glDeleteTextures(1, &tex.reflected_color);
 	glCreateTextures(GL_TEXTURE_2D, 1, &tex.reflected_color);
 	ivec2 reflect_size = ivec2(s_w, s_h);
-	if (use_halfres_reflections.integer()) reflect_size /= 2;
+	if (use_halfres_reflections.get_bool()) reflect_size /= 2;
 	glTextureStorage2D(tex.reflected_color, 1, GL_RGBA16F, reflect_size.x, reflect_size.y);
 	glTextureParameteri(tex.reflected_color, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTextureParameteri(tex.reflected_color, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -1096,7 +1098,7 @@ void Renderer::render_bloom_chain()
 	glBindVertexBuffer(2, buf.default_vb, 0, 0);
 
 
-	if (!enable_bloom.integer())
+	if (!enable_bloom.get_bool())
 		return;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.bloom);
@@ -2005,7 +2007,7 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART(traversal);
 
-		const float inv_two_times_tanfov = 1.0 / ( 2.0 * tan(draw.get_current_frame_vs().fov*0.5));
+		const float inv_two_times_tanfov = 1.0 / ( tan(draw.get_current_frame_vs().fov*0.5));
 
 
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
@@ -2049,7 +2051,7 @@ void Render_Scene::build_scene_data()
 
 				if (proxy.animator) {
 
-					if (g_debug_skeletons.integer()) {
+					if (g_debug_skeletons.get_bool()) {
 						draw_skeleton(proxy.animator, 0.05, proxy.transform);
 					}
 
@@ -2797,7 +2799,7 @@ void draw_debug_shapes()
 	builder.Free();
 }
 
-extern Auto_Config_Var g_draw_grid;
+extern ConfigVar g_draw_grid;
 
 void draw_debug_grid()
 {
@@ -2832,7 +2834,7 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 
 	current_frame_main_view = view;
 	
-	if (enable_vsync.integer())
+	if (enable_vsync.get_bool())
 		SDL_GL_SetSwapInterval(1);
 	else
 		SDL_GL_SetSwapInterval(0);
@@ -2864,7 +2866,7 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 	}
 
 	// render ssao using prepass buffer
-	if (enable_ssao.integer())
+	if (enable_ssao.get_bool())
 		ssao.render();
 
 	// planar reflection render
@@ -2921,7 +2923,7 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 	if (tool)
 		tool->overlay_draw();
 
-	if (g_draw_grid.integer())
+	if (g_draw_grid.get_bool())
 		draw_debug_grid();
 
 	glCheckError();
@@ -2939,7 +2941,7 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 
 	set_shader(prog.combine);
 	uint32_t bloom_tex = tex.bloom_chain[0];
-	if (!enable_bloom.integer()) bloom_tex = black_texture.gl_id;
+	if (!enable_bloom.get_bool()) bloom_tex = black_texture.gl_id;
 	bind_texture(0, tex.scene_color);
 	bind_texture(1, bloom_tex);
 	bind_texture(2, lens_dirt->gl_id);
@@ -2949,7 +2951,7 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
-	if (draw_collision_tris.integer())
+	if (draw_collision_tris.get_bool())
 		DrawCollisionWorld(eng->level);
 
 	if(!tool)
@@ -3082,7 +3084,7 @@ program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model
 	key.animated = is_animated;
 	key.depth_only = depth_pass;
 	key.dither = dither;
-	key.billboard = mat->billboard != billboard_setting::NONE;
+	key.billboard_type = (int)mat->billboard;
 	
 	key = get_real_shader_key_from_shader_type(key);
 	program_handle handle = mat_table.lookup(key);
@@ -3111,7 +3113,7 @@ void Renderer::planar_reflection_pass()
 	setup.origin.y -= dist_to_plane * 2.0f;
 	setup.view = glm::lookAt(setup.origin, setup.origin + setup.front, glm::vec3(0, 1, 0));
 	setup.viewproj = setup.proj * setup.view;
-	if (use_halfres_reflections.integer()) {
+	if (use_halfres_reflections.get_bool()) {
 		setup.width /= 2;
 		setup.height /= 2;
 	}

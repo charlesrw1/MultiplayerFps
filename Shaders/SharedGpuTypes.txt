@@ -44,7 +44,7 @@ struct Ubo_View_Constants_Struct
 	float near;
 	float far;
 	float shadowmap_epsilon;
-	float padding1;
+	float inv_scale_by_proj_distance;
 	
 	vec4 fogcolor;
 	vec4 fogparams;

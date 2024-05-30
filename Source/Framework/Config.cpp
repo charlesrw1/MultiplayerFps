@@ -8,75 +8,162 @@
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
 #include "Framework/DictParser.h"
-class Var_Manager_Impl : public Var_Manager
+
+class ConfigVarDataInternal : public ConfigVarDataPublic
 {
 public:
-	Var_Manager_Impl();
+	ConfigVarDataInternal(const ConfigVarDataPublic& data) : selfptr(this) {
+		nameStr = data.name;
+		valueStr = data.value;
 
-	Config_Var* create_var(const char* name, const char* description, Generic_Value default_val, int flags) {
-		Config_Var* var = get_var(name);
-		if (var) {
-			if (var->flags & (int)CVar_Flags::SETFROMDISK) {
-				var->description = description;
-				var->flags |= flags;
+		name = nameStr.c_str();
+		value = valueStr.c_str();
 
-				var->flags &= ~(int)CVar_Flags::SETFROMDISK;
-			}
-			else {
-				sys_print("Duplicate call to create var for %s\n", name);
-			}
-			return var;
-		}
-		ASSERT(num_vars < 512);
-		var = &all_vars[num_vars++];
-		var->name = name;
-		var->description = description;
-		var->flags = flags;
-		should_sort_vars = true;
-		var_remap[num_vars - 1] = num_vars - 1;
-		hash_to_index[StringUtils::StringHash(name).computedHash] = num_vars - 1;
+		minVal = data.minVal;
+		maxVal = data.maxVal;
+		flags |= data.flags;
 
-		set_var(var, default_val);
-		return var;
-	}
-	Config_Var* set_var(StringUtils::StringHash hash, Generic_Value value) {
-		Config_Var* var = get_var(hash);
-		if (!var)
-			return nullptr;
-		set_var(var, value);
-		return var;
+		update();
 	}
 
-	Config_Var* get_all_var_list(int* length) {
-		*length = num_vars;
-		return all_vars;
+	void init_from_register(const ConfigVarDataPublic& data) {
+		valueStr = data.value;
+		value = valueStr.c_str();
+		minVal = data.minVal;
+		maxVal = data.maxVal;
+		flags |= data.flags;
+		update();
 	}
-	void set_var(Config_Var* var, Generic_Value value) {
-		if (var->flags & (int)CVar_Flags::READONLY) {
-			sys_print("Attempt to write to readonly var %s\n", var->name.c_str());
+
+	void set_string(const char* value) {
+		if (flags & CVAR_READONLY) {
+			sys_print("!!! cant set readonly var %s\n", value);
 			return;
 		}
-		var->type = value.type;
-		switch (var->type) {
-		case Generic_Value::STRING:
-			strcpy(var->string_val, value.string_val);
-			break;
-		case Generic_Value::INT:
-			var->integer = value.integer;
-			break;
-		case Generic_Value::FLOAT:
-			var->real = value.real;
-			break;
+
+		valueStr = value;
+		this->value = valueStr.c_str();
+		update();
+	}
+	void update() {
+		if (flags & CVAR_BOOL) {
+			integerVal = atoi(value)!=0;
+			valueStr = std::to_string(integerVal);
+			value = valueStr.c_str();
+		}
+		else if (flags & CVAR_INTEGER) {
+			integerVal = atoi(value);
+			if (integerVal < minVal)integerVal = minVal;
+			else if (integerVal > maxVal) integerVal = maxVal;
+			valueStr = std::to_string(integerVal);
+			value = valueStr.c_str();
+		}
+		else if (flags & CVAR_FLOAT) {
+			floatVal = atof(value);
+			if (floatVal < minVal)floatVal = minVal;
+			else if (floatVal > maxVal) floatVal = maxVal;
+			valueStr = std::to_string(floatVal);
+			value = valueStr.c_str();
 		}
 	}
 
-	Config_Var* get_var(StringUtils::StringHash hash) {
-		auto f = hash_to_index.find(hash.computedHash);
-		if (f != hash_to_index.end()) {
-			return &all_vars[f->second];
-		}
+	std::string nameStr;
+	std::string valueStr;
+
+	ConfigVar selfptr;
+
+};
+
+
+ConfigVar::ConfigVar(ConfigVarDataInternal* ptr)
+{
+	this->ptr = ptr;
+}
+
+ConfigVar::ConfigVar(const char* name, const char* value, int flags, float min , float max )
+{
+	ConfigVarDataPublic init;
+	init.name = name;
+	init.value = value;
+	init.flags = flags;
+	init.minVal = min;
+	init.maxVal = max;
+	VarMan::get()->register_var(this, init);
+}
+
+void ConfigVar::set_string(const char* s)
+{
+	((ConfigVarDataInternal*)ptr)->set_string(s);
+}
+void ConfigVar::set_bool(bool b)
+{
+	set_string(std::to_string((int)b).c_str());
+}
+
+void ConfigVar::set_float(float f)
+{
+	set_string(std::to_string(f).c_str());
+}
+void ConfigVar::set_integer(int i)
+{
+	set_string(std::to_string(i).c_str());
+}
+
+
+
+
+class VarManImpl : public VarMan
+{
+public:
+	VarManImpl();
+
+	ConfigVar* find(const char* name) {
+		auto find = vars.find(name);
+		if (find != vars.end()) 
+			return &find->second->selfptr;
 		return nullptr;
 	}
+
+	void register_var(ConfigVar* var, ConfigVarDataPublic initializer) override {
+
+		ConfigVarDataInternal* internal_ = find_internal_var(initializer.name);
+		if (internal_) {
+			// already have a internal var, update it unless we tried registering a var twice
+			if (internal_->flags & CVAR_REGISTERED)
+				Fatalf("config var was allocated twice %s\n", internal_->name);
+			internal_->init_from_register(initializer);
+		}
+		else {
+			auto pair = vars.insert({ std::string(initializer.name),new ConfigVarDataInternal(initializer) });
+			internal_ = pair.first->second;
+		}
+		internal_->flags |= CVAR_REGISTERED;
+		var->ptr = internal_;
+	}
+
+	void set_var_string(const char* name, const char* value) {
+		auto internal_ = find_internal_var(name);
+		if (internal_) {
+			internal_->set_string(value);
+		}
+		else {
+			ConfigVarDataPublic initializer;
+			initializer.name = name;
+			initializer.value = value;
+			vars.insert({ std::string(name), new ConfigVarDataInternal(initializer) });
+		}
+	}
+	void set_var_int(const char* name,int iVal) {
+		set_var_string(name, std::to_string(iVal).c_str());
+	}
+	void set_var_bool(const char* name, bool bVal) {
+		set_var_string(name, std::to_string((int)bVal).c_str());
+	}
+	void set_var_float(const char* name, float fVal) {
+		set_var_string(name, std::to_string(fVal).c_str());
+	}
+
+	
 	void print_vars(const char* match) {
 		sys_print("%--36s %s", "name", "value");
 		//for (int i = 0; i < num_vars; i++)
@@ -85,72 +172,60 @@ public:
 	}
 
 	void imgui_draw() {
-		if (should_sort_vars) {
-			sort_vars();
-			should_sort_vars = false;
-		}
+	
 
-		for (int i = 0; i < num_vars; i++) {
-			Config_Var* var = all_vars + (var_remap[i]);
-			bool readonly = var->flags & (int)CVar_Flags::READONLY;
+		for (auto var_pair : vars) {
+			auto var = var_pair.second;
 
-			if (var->type == Generic_Value::INT) {
-				if (var->flags & (int)CVar_Flags::INTEGER) {
-					ImGui::SliderInt(var->name.c_str(), &var->integer, 0, 5);
-				}
-				else {
-					bool b = var->integer;
-					if (ImGui::Checkbox(var->name.c_str(), &b)) {
-						var->integer = b;
-					}
-				}
+			bool readonly = var->flags & CVAR_READONLY;
+
+			if (readonly) {
+				ImGui::Text(var->value);
 			}
-			else if (var->type == Generic_Value::STRING) {
-				ImGui::InputText(var->name.c_str(), var->string_val, 64);
+			else if (var->flags & CVAR_INTEGER) {
+
 			}
-			else if (var->type == Generic_Value::FLOAT) {
-				ImGui::DragFloat(var->name.c_str(), &var->real, 0.01);
+			else if (var->flags & CVAR_FLOAT) {
+
+			}
+			else if (var->flags & CVAR_BOOL) {
+
+			}
+			else {
+
 			}
 		}
 	}
 
-	int var_type(Config_Var* var) {
-		if (var->type == Generic_Value::INT) {
-			if (var->flags & (int)CVar_Flags::INTEGER)
-				return 0;
-			else
-				return 1;
-		}
-		else if (var->type == Generic_Value::STRING)
-			return 2;
-		else if (var->type == Generic_Value::FLOAT)
-			return 3;
-	}
 
 	void sort_vars() {
 	
 	}
 
+	ConfigVarDataInternal* find_internal_var(const std::string& name) {
+		auto find = vars.find(name);
+		if (find != vars.end()) 
+			return find->second;
+		return nullptr;
+	}
+
 	bool should_sort_vars = false;
 	bool create_var_on_unknown = false;
-	int num_vars = 0;
-	Config_Var all_vars[512];
-	int var_remap[512];
-	std::unordered_map<uint32_t, int> hash_to_index;
+	std::unordered_map<std::string, ConfigVarDataInternal*> vars;
 };
 
-Var_Manager* Var_Manager::get()
+VarMan* VarMan::get()
 {
-	static Var_Manager_Impl inst;
+	static VarManImpl inst;
 	return &inst;
 }
 
 void imgui_vars_hook()
 {
-	((Var_Manager_Impl*)Var_Manager::get())->imgui_draw();
+	((VarManImpl*)VarMan::get())->imgui_draw();
 }
 
-Var_Manager_Impl::Var_Manager_Impl()
+VarManImpl::VarManImpl()
 {
 	Debug_Interface::get()->add_hook("Cvars", imgui_vars_hook);
 }
@@ -204,14 +279,6 @@ static int classify_string(const char* s)
 	return (floating_point) ? 2 : 1;
 }
 
-Generic_Value to_gv(const char* s)
-{
-	int c = classify_string(s);
-	if (c == 0) return Generic_Value(s);
-	if (c == 1) return Generic_Value(atoi(s));
-	if (c == 2) return Generic_Value((float)atof(s));
-}
-
 
 
 
@@ -236,7 +303,7 @@ public:
 		hash_to_index[hash.computedHash] = num_cmds - 1;
 	}
 	void execute(Cmd_Execute_Mode mode, const char* command_string) {
-		sys_print("#%s\n", command_string);
+		sys_print("> %s\n", command_string);
 		Cmd_Args args;
 		std::string command = command_string;
 		tokenize_string(command, args);
@@ -246,15 +313,15 @@ public:
 			ec->func(args);
 		}
 		else {
-			Config_Var* var = Var_Manager::get()->get_var(args.at(0));
+			ConfigVar* var = VarMan::get()->find(args.at(0));
 			if (var && args.size() == 1) {
-				sys_print("%s %s\n", var->name.c_str(), "XYZ");
+				sys_print("%s %s\n", var->get_name(), var->get_string());
 			}
 
 			else if (!var && set_unknown_variables && args.size() == 2)
-				Var_Manager::get()->create_var(args.at(0), "", to_gv(args.at(1)), (int)CVar_Flags::SETFROMDISK);
+				VarMan::get()->set_var_string(args.at(0), args.at(1));
 			else if (var && args.size() == 2)
-				Var_Manager::get()->set_var(args.at(0), to_gv(args.at(1)));
+				var->set_string(args.at(1));
 			else
 				sys_print("unknown command: %s\n",args.at(0));
 		}
@@ -274,7 +341,7 @@ public:
 		while (parser.read_line(view)) {
 			if (view.is_empty())
 				continue;
-			if (view.str_start[0] == '#')
+			if (view.str_start[0] == '#' || (view.str_len==1&&view.str_start[0]=='\r'))
 				continue;
 
 			std::string str = std::string(view.str_start, view.str_len);

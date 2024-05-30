@@ -5,11 +5,17 @@
 //#define DebugOut(fmt, ...)
 
 
+extern ConfigVar fake_loss;
+extern ConfigVar fake_lag;
+extern ConfigVar time_out;
+extern ConfigVar time_reset_threshold;
+
+
 void Client::ReadPackets()
 {
 	// check cfg var updates
-	sock.loss = fake_loss.integer();
-	sock.lag = fake_lag.integer();
+	sock.loss = fake_loss.get_integer();
+	sock.lag = fake_lag.get_integer();
 	sock.jitter = 0;
 	sock.enabled = !(sock.loss == 0 && sock.lag == 0 && sock.jitter == 0);
 
@@ -73,7 +79,7 @@ void Client::ReadPackets()
 	}
 
 	if (state >= CS_CONNECTED) {
-		if (GetTime() - server.last_recieved > time_out.real()) {
+		if (GetTime() - server.last_recieved > time_out.get_float()) {
 			disconnect_to_menu("server timed out");
 		}
 	}
@@ -129,7 +135,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 			time_delta = eng->time - server_time;
 
 			// hard reset the time values
-			if (abs(time_delta) > time_reset_threshold.real()) {
+			if (abs(time_delta) > time_reset_threshold.get_float()) {
 				sys_print("reset time %f\n", time_delta);
 				eng->tick = server_tick;
 				eng->time = server_time;

@@ -27,13 +27,18 @@ public:
 	std::vector<std::string> sound_manifest;
 };
 
-extern Auto_Config_Var g_thirdperson;
-extern Auto_Config_Var g_fov;
-extern Auto_Config_Var g_mousesens;
-extern Auto_Config_Var g_fakemovedebug;
-extern Auto_Config_Var g_drawdebugmenu;
-extern Auto_Config_Var g_drawimguidemo;
-extern Auto_Config_Var g_slomo;
+extern ConfigVar g_thirdperson;
+extern ConfigVar g_fov;
+extern ConfigVar g_mousesens;
+extern ConfigVar g_fakemovedebug;
+extern ConfigVar g_drawdebugmenu;
+extern ConfigVar g_drawimguidemo;
+extern ConfigVar g_slomo;
+
+extern ConfigVar g_window_w;
+extern ConfigVar g_window_h;
+extern ConfigVar g_window_fullscreen;
+extern ConfigVar g_host_port;
 
 
 enum class Engine_State
@@ -169,10 +174,7 @@ public:
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_GLContext gl_context = nullptr;
-	Auto_Config_Var window_w;
-	Auto_Config_Var window_h;
-	Auto_Config_Var window_fullscreen;
-	Auto_Config_Var host_port;
+
 	bool show_console = false;
 
 	Archive* data_archive = nullptr;

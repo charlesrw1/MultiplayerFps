@@ -337,7 +337,7 @@ public:
 	}
 	virtual void imgui_draw() override;
 	virtual void draw_frame() override;
-	void signal_going_to_game() override;
+	virtual void on_change_focus(editor_focus_state newstate) override;
 
 	enum class graph_playback_state {
 		stopped,
@@ -513,8 +513,6 @@ public:
 	GraphOutput out;
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
-
-	bool last_tick_had_game_running = false;
 };
 
 extern AnimationGraphEditor ed;
