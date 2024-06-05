@@ -1,6 +1,6 @@
 "runtime" {
 "rootdata" {
-"root"  "42"
+"root"  "31"
 "data_used"  "200"
 "graph_is_valid"  "1"
 }
@@ -597,7 +597,7 @@ type "Clip_Node_CFG"
 {
 type "Add_Node_CFG"
 "input"  [
- 25   38  ]
+ 25   7  ]
 "param"  "14"
 }
 {
@@ -784,7 +784,7 @@ type "Statemachine_Node_CFG"
 "state_duration"  "-1.000000"
 "wait_until_finish"  "0"
 "is_end_state"  "0"
-"tree"  "39"
+"tree"  "38"
 }
 ]
 "transitions"  [
@@ -801,12 +801,6 @@ type "Statemachine_Node_CFG"
 ]
 "entry_transitions"  [
  0  ]
-}
-{
-type "Add_Node_CFG"
-"input"  [
- -1   7  ]
-"param"  "15"
 }
 {
 type "Clip_Node_CFG"
@@ -853,7 +847,7 @@ type "Clip_Node_CFG"
 {
 type "Add_Node_CFG"
 "input"  [
- 40   41  ]
+ 39   40  ]
 "param"  "15"
 }
 ]
@@ -1004,7 +998,7 @@ type "Add_Node_CFG"
 "current_id"  "160"
 "current_layer"  "38"
 "default_editor"  "[editor]
-panning=232,135
+panning=228,325
 
 [node.0]
 origin=599,105
@@ -1042,9 +1036,6 @@ origin=-219,157
 [node.151]
 origin=-95,309
 
-[node.153]
-origin=117,250
-
 [node.157]
 origin=374,282
 
@@ -1058,11 +1049,11 @@ origin=558,292
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "1.315433"
-"out.camera.position.y"  "1.402410"
-"out.camera.position.z"  "0.821273"
-"out.camera.yaw"  "3.754112"
-"out.camera.pitch"  "-0.300797"
+"out.camera.position.x"  "3.641177"
+"out.camera.position.y"  "2.735660"
+"out.camera.position.z"  "3.899194"
+"out.camera.yaw"  "3.954112"
+"out.camera.pitch"  "-0.370797"
 "out.camera.move_speed"  "0.074151"
 }
 nodes [
@@ -1758,12 +1749,6 @@ type "StateStart_EdNode"
 "graph_layer"  "36"
 }
 {
-type "Additive_EdNode"
-"id"  "153"
-"graph_layer"  "0"
-"node"  "38"
-}
-{
 type "State_EdNode"
 "id"  "154"
 "graph_layer"  "36"
@@ -1789,25 +1774,25 @@ type "Root_EdNode"
 type "Clip_EdNode"
 "id"  "156"
 "graph_layer"  "37"
-"node"  "39"
+"node"  "38"
 }
 {
 type "Clip_EdNode"
 "id"  "157"
 "graph_layer"  "0"
-"node"  "40"
+"node"  "39"
 }
 {
 type "Clip_EdNode"
 "id"  "158"
 "graph_layer"  "0"
-"node"  "41"
+"node"  "40"
 }
 {
 type "Additive_EdNode"
 "id"  "159"
 "graph_layer"  "0"
-"node"  "42"
+"node"  "41"
 }
 ]
 }

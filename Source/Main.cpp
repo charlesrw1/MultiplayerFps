@@ -747,7 +747,7 @@ ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL);
 ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, 0,2);
-ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL);
+ConfigVar g_drawimguidemo("g_drawimguidemo", "1", CVAR_BOOL);
 ConfigVar g_debug_skeletons("g_debug_skeletons", "1", CVAR_BOOL);
 ConfigVar g_draw_grid("g_draw_grid", "1", CVAR_BOOL);
 ConfigVar g_drawdebugmenu("g_drawdebugmenu","1",CVAR_BOOL);
@@ -916,7 +916,6 @@ void Game_Engine::cleanup()
 	}
 }
 
-bool bloom_stop = false;
 static int bloom_layer = 0;
 extern float wsheight;
 extern float wsradius;
@@ -1205,7 +1204,7 @@ View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near,
 	viewproj = proj * view;
 }
 
-#define TIMESTAMP(x) printf("%s in %f\n",x,(float)GetTime()-start); start = GetTime();
+#define TIMESTAMP(x) sys_print("```%s in %f\n",x,(float)GetTime()-start); start = GetTime();
 
 Game_Engine::Game_Engine() :
 	ents(NUM_GAME_ENTS, nullptr),
@@ -1227,6 +1226,9 @@ void Game_Engine::init()
 {
 	sys_print("--------- Initializing Engine ---------\n");
 
+	float first_start = GetTime();
+	float start = GetTime();
+
 	program_time_start = GetTime();
 
 	memset(keys, 0, sizeof(keys));
@@ -1244,48 +1246,23 @@ void Game_Engine::init()
 	dbg_console.init();
 
 	// engine initilization
-	float first_start = GetTime();
-	float start = GetTime();
 	init_sdl_window();
-	TIMESTAMP("init sdl window");
 
 	Profiler::init();
 	FileSys::init();
 
 	init_audio();
-	TIMESTAMP("init audio");
-
 	network_init();
-	TIMESTAMP("net init");
-
 	idraw->init();
-	TIMESTAMP("draw init");
-
 	mats.init();
-	mats.load_material_file_directory("./Data/Materials");
 	anim_tree_man->init();
-	TIMESTAMP("mats init");
-
 	mods.init();
-	TIMESTAMP("mods init");
-
-	media.load();
-	TIMESTAMP("media init");
-
 	iparticle->init();
-
 	cl->init();
-	TIMESTAMP("cl init");
-
 	sv->init();
-	TIMESTAMP("sv init");
-
-
-
-	// debug interface
 	imgui_context = ImGui::CreateContext();
-	
 	g_anim_ed_graph->init();
+	TIMESTAMP("init everything");
 
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -1332,12 +1309,11 @@ void Game_Engine::init()
 
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
-	TIMESTAMP("cfg exectute");
 
 
 	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
 
-	printf("Total execute time: %f\n", GetTime() - first_start);
+	TIMESTAMP("execute startup");
 }
 
 

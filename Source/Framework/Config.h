@@ -12,6 +12,7 @@ enum CVarFlags
 	CVAR_FLOAT		= (1 << 5),
 	CVAR_REGISTERED	= (1 << 6),
 	CVAR_DEV		= (1 << 7),
+	CVAR_UNBOUNDED	= (1 << 8),
 };
 
 

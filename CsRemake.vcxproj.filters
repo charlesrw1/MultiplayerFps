@@ -34,6 +34,9 @@
     <Filter Include="Source\AssetCompile">
       <UniqueIdentifier>{1568a8a7-6fa8-4782-a7f4-7723b9e79593}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Particles">
+      <UniqueIdentifier>{2b346765-d73a-4880-bb21-c71a7101ecbc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -381,6 +384,15 @@
     <ClInclude Include="Source\AssetCompile\Someutils.h">
       <Filter>Source\AssetCompile</Filter>
     </ClInclude>
+    <ClInclude Include="Source\ScehmaMan.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Particles\ParticlesPublic.h">
+      <Filter>Source\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Particles\ParticlesLocal.h">
+      <Filter>Source\Particles</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -564,5 +576,6 @@
     <ClCompile Include="Source\AssetCompile\MaterialCompile.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
+    <ClCompile Include="Source\EditorDocLocal.cpp" />
   </ItemGroup>
 </Project>

@@ -236,7 +236,7 @@ Material* Game_Material_Manager::find_for_name(const char* name)
 
 void Game_Material_Manager::init()
 {
-	sys_print("Material Manager initialized\n");
+	sys_print("--------- Materials Init ---------\n");
 
 	fallback = create_temp_shader("_fallback");
 	fallback->texture_are_loading_in_memory = true;
@@ -251,6 +251,8 @@ void Game_Material_Manager::init()
 	outline_hull->type = material_type::OUTLINE_HULL;
 	outline_hull->backface = true;
 	outline_hull->texture_are_loading_in_memory = true;
+
+	load_material_file_directory("./Data/Materials");
 }
 
 

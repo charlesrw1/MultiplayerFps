@@ -84,6 +84,81 @@ private:
 	}\
 	static AddClassToFactory<classname,Entity> facimpl##classname(get_entityfactory(), #classname);
 
+enum class GenericAttachment_e : uint8_t
+{
+	Mesh,
+	Fx,
+	Light,
+	Decal,
+};
+
+class GenericAttachment_t
+{
+public:
+	bool is_attached_to_bone() const { return bone != 0xff; }
+	int get_bone() const { return bone; }
+	GenericAttachment_e get_type() const { return type; }
+	// returns false if should be removed
+	bool update();
+
+	void create_render();
+	void create_fx();
+	void create_light();
+	void create_decal();
+
+	union {
+		int render_handle = -1;
+		int fx_handle;
+		int light_handle;
+		int decal_handle;
+	};
+	uint16_t custom = 0;
+	GenericAttachment_e type = GenericAttachment_e::Mesh;
+	uint8_t bone = 0xff;
+	glm::mat4x3 transform = glm::mat4(1.0);
+};
+
+
+enum class call_type_e : uint8_t
+{
+	event_on_handle,
+	event_on_self,
+	event_on_activator,
+};
+
+struct RegisteredEvent
+{
+	StringName ev_name;
+	call_type_e call_type = call_type_e::event_on_handle;
+	entityhandle call_this_on;
+	float delay = 0.0;
+	RegisteredEvent* next = nullptr;
+};
+
+
+// list of observers that are connected to signals, such as OnTrigger, OnTouch, OnPlayerKilled etc.
+// these then either send an event to an entity or broadcast it globally
+class SignalObservers
+{
+public:
+	void post_signal(StringName name, entityhandle handle);
+	std::vector<RegisteredEvent> signal_map;
+};
+
+struct EntInputEvent
+{
+	// args
+	// entityhandle to call on
+	// entityhandle that kicked off the chain
+};
+
+
+// specific input commands like Damage, Kill, Open, Close, Play, Pause, etc. that can be queued up, or called immeadeatley
+class EntityEventBus
+{
+public:
+};
+
 
 class Entity
 {
@@ -101,9 +176,6 @@ public:
 	virtual void present();
 
 	virtual InlineVec<Interaction*, 2> get_interactions() const { return {}; };
-	virtual void damage(Entity* other) {}
-	virtual void collide(Entity* other, const GeomContact& gc) {}
-	virtual void killed() {}
 
 	entityhandle selfid = 0;	// eng->ents[]
 	StringName self_name;		// name of entity to identify them
@@ -139,6 +211,10 @@ public:
 
 	bool is_solid() const { return phys_opt.is_solid(); }
 
+	// transform heirarchy
+	entityhandle parent = -1;
+	entityhandle group_next = -1;	// next link in current master parent tree
+	vector<GenericAttachment_t> attachments;	// cheap way to add lights/decals/etc. to an entities transform heirarchy
 };
 
 template<typename K, typename T>

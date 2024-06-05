@@ -6,6 +6,7 @@
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
 #include <fstream>
+#include <direct.h>
 
 class OSFile : public IFile
 {
@@ -146,10 +147,29 @@ IFilePtr FileSys::open_read(const char* p, int flags)
 }
 
 
-
 void FileSys::init()
 {
-	
+	sys_print("------ FileSys init ------\n");
+
+	char own_path[256];
+	HMODULE hModule = GetModuleHandleA(NULL);
+	if (hModule != NULL)
+	{
+		GetModuleFileNameA(hModule, own_path, (sizeof(own_path)));
+		std::string path = own_path;
+		auto find = path.rfind('\\');
+		if (find == std::string::npos)
+			Fatalf("!!! bad getmodulefilename\n");
+		path = path.substr(0,find);
+		path += "\\..\\..\\";
+		int ret = _chdir(path.c_str());
+		if (ret != 0)
+			Fatalf("!!! failed to change working directory %d %s\n", ret, path.c_str());
+	}
+	else {
+		Fatalf("!!! GetModuleHandle returned null\n");
+	}
+
 }
 
 class FileTreeIterator {

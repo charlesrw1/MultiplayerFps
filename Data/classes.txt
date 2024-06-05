@@ -1,0 +1,28 @@
+
+"BaseEntity" abstract {
+	vec3 position "0 0 0"
+	quat rotation ""
+	model model ""
+
+}
+
+"NPC" : "a default NPC" {
+	inherits BaseEntity
+	_edimage "myimage.png"
+	
+	; dont expose this to editor
+	cppclass _classname "Player"
+	
+	bool can_use_item "false" : "can player use item"
+	int attribute_something "0,0,5" : "something"
+	
+	SET model "mod.cmdl"
+	
+	SIGNAL Fire : "(void) Callled when NPC fires weapon"
+	SIGNAL Killed : "(void) Called when NPC was killed"
+	SIGNAL FindTarget : "(entityhandle) Called when NPC finds target"
+	
+	EVENT SetIdle : "Sets NPC to idle"
+	EVENT Out : "Sets NPC output"
+}
+

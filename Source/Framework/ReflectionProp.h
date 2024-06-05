@@ -61,6 +61,7 @@ struct PropertyInfo {
 	const char* range_hint = "";
 	IListCallback* list_ptr = nullptr;
 	const char* custom_type_str = "";
+	const char* tooltip = "";
 
 	uint8_t* get_ptr(void* inst) const {
 		return (uint8_t*)inst + offset;

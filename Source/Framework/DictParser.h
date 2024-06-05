@@ -60,6 +60,16 @@ public:
     bool read_string(StringView& str) {
         return read_next_token(str);
     }
+    void return_string(StringView view) {
+        int index = (uint8_t*)view.str_start - buffer;
+        assert(index >= 0 && index < buffer_size);
+        if (index > 0 && index + 1 < buffer_size) {
+            if (view.str_start[-1] == '\"' && view.str_start[view.str_len] == '\"') {
+                index -= 1;
+            }
+        }
+        read_ptr = index;
+    }
 
     // convenience functions
     bool read_int(int& i);

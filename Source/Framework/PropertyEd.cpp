@@ -48,7 +48,7 @@ void PropertyGrid::update()
 
 	ImGui::BeginDisabled(read_only);
 
-	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
+	ImGuiTableFlags const flags =  ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit;
 	//if (ImGui::Begin("PropEdit")) {
 		if(ImGui::BeginTable("Table", 2, flags) ){
 

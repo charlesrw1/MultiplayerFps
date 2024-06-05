@@ -179,7 +179,7 @@ protected:
 	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size) {
 		rt_offset = cfg->data_used;
 		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
-		cfg->data_used += rt_size;
+		cfg->data_used += rt_size;	// FIXME alignment
 
 		for (int i = 0; i < input.size(); i++) {
 			input[i] = serialized_nodecfg_ptr_to_ptr(input[i], cfg);

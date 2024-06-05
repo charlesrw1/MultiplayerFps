@@ -53,17 +53,21 @@ public:
 		}
 		else if (flags & CVAR_INTEGER) {
 			integerVal = atoi(value);
-			if (integerVal < minVal)integerVal = minVal;
-			else if (integerVal > maxVal) integerVal = maxVal;
-			valueStr = std::to_string(integerVal);
-			value = valueStr.c_str();
+			if (!(flags & CVAR_UNBOUNDED)) {
+				if (integerVal < minVal)integerVal = minVal;
+				else if (integerVal > maxVal) integerVal = maxVal;
+				valueStr = std::to_string(integerVal);
+				value = valueStr.c_str();
+			}
 		}
 		else if (flags & CVAR_FLOAT) {
 			floatVal = atof(value);
-			if (floatVal < minVal)floatVal = minVal;
-			else if (floatVal > maxVal) floatVal = maxVal;
-			valueStr = std::to_string(floatVal);
-			value = valueStr.c_str();
+			if (!(flags & CVAR_UNBOUNDED)) {
+				if (floatVal < minVal)floatVal = minVal;
+				else if (floatVal > maxVal) floatVal = maxVal;
+				valueStr = std::to_string(floatVal);
+				value = valueStr.c_str();
+			}
 		}
 	}
 

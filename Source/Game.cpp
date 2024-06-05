@@ -330,7 +330,7 @@ void Entity::gravity_physics()
 		else position = end;
 	}
 	if (hit_a_wall) {
-		collide(nullptr, contact);
+		//collide(nullptr, contact);
 		if (bounce) {
 			velocity = glm::reflect(pre_velocity, first_n);
 			velocity *= 0.6f;

@@ -122,6 +122,8 @@
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\ParticlesLocal.h" />
     <ClInclude Include="Source\ParticlesPublic.h" />
+    <ClInclude Include="Source\Particles\ParticlesLocal.h" />
+    <ClInclude Include="Source\Particles\ParticlesPublic.h" />
     <ClInclude Include="Source\Physics.h" />
     <ClInclude Include="Source\Physics\Editor\PublicPhysicsEditor.h" />
     <ClInclude Include="Source\Physics\Physics2.h" />
@@ -129,6 +131,7 @@
     <ClInclude Include="Source\PlayerAnimDriver.h" />
     <ClInclude Include="Source\ProgramCaching.h" />
     <ClInclude Include="Source\RenderObj.h" />
+    <ClInclude Include="Source\ScehmaMan.h" />
     <ClInclude Include="Source\Server.h" />
     <ClInclude Include="Source\Shader.h" />
     <ClInclude Include="Source\Socket.h" />
@@ -154,6 +157,7 @@
     <ClCompile Include="Source\Draw.cpp" />
     <ClCompile Include="Source\DrawLocal.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
+    <ClCompile Include="Source\EditorDocLocal.cpp" />
     <ClCompile Include="Source\EntityTypes.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
     <ClCompile Include="Source\External\glad.c" />

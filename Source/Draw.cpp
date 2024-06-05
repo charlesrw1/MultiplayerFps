@@ -1083,9 +1083,6 @@ void Renderer::init_bloom_buffers()
 	}
 }
 
-
-extern bool bloom_stop;
-
 void Renderer::render_bloom_chain()
 {
 	GPUFUNCTIONSTART;
@@ -1123,11 +1120,6 @@ void Renderer::render_bloom_chain()
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glBindTextureUnit(0, tex.bloom_chain[i]);
-	}
-
-	if (bloom_stop) {
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		return;
 	}
 
 	glEnable(GL_BLEND);
@@ -2908,6 +2900,7 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 		render_level_to_target(params);
 		glDepthMask(GL_TRUE);
 	}
+	set_blend_state(blend_state::OPAQUE);
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	//multidraw_testing();
@@ -2941,7 +2934,8 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 
 	set_shader(prog.combine);
 	uint32_t bloom_tex = tex.bloom_chain[0];
-	if (!enable_bloom.get_bool()) bloom_tex = black_texture.gl_id;
+	if (!enable_bloom.get_bool()) 
+		bloom_tex = black_texture.gl_id;
 	bind_texture(0, tex.scene_color);
 	bind_texture(1, bloom_tex);
 	bind_texture(2, lens_dirt->gl_id);
