@@ -521,7 +521,7 @@ public:
 
 	// public interface
 	virtual void init() override;
-	virtual void scene_draw(View_Setup view, IEditorTool* tool) override;
+	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool) override;
 	virtual void on_level_start() override;
 	virtual void on_level_end() override;
 	virtual void reload_shaders() override;

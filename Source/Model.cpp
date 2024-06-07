@@ -22,6 +22,8 @@
 
 #include "Animation/SkeletonData.h"
 
+#include "Physics/Physics2.h"
+
 ModelMan mods;
 
 static const char* const model_folder_path = "./Data/Models/";

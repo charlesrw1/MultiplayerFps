@@ -1,19 +1,23 @@
 
 "BaseEntity" abstract {
 	vec3 position "0 0 0"
-	quat rotation ""
+	vec3 scale "1 1 1"
+	vec3 rotation "0 0 0"
+	color32 color "255 255 255 255"
 	model model ""
 
+	SIGNAL OnKill : "(void) called when entity is removed"
+	EVENT Activate : "(void) activate an entity from dormancy"
 }
 
 "NPC" : "a default NPC" {
 	inherits BaseEntity
-	_edimage "myimage.png"
+	_edimage "icon/smile.png"
 	
 	; dont expose this to editor
-	cppclass _classname "Player"
+	cppclass _classname "NPC"
 	
-	bool can_use_item "false" : "can player use item"
+	bool can_use_item "0" : "can player use item"
 	int attribute_something "0,0,5" : "something"
 	
 	SET model "mod.cmdl"
@@ -26,3 +30,30 @@
 	EVENT Out : "Sets NPC output"
 }
 
+"PlayerSpawn" {
+	inherits BaseEntity
+	_edmodel player_FINAL.cmdl
+	cppclass _classname "Player"
+}
+
+"WedgeBrush" {
+	inherits BaseEntity
+	SET model "wedge.cmdl"
+}
+"CubeBrush" {
+	inherits BaseEntity
+	SET model "cube.cmdl"
+}
+"CylinderBrush" {
+	inherits BaseEntity
+	SET model "cylinder.cmdl"
+}
+
+"Trigger" {
+	inherits BaseEntity
+	_edmodel spheres.cmdl
+	cppclass _classname "Trigger"
+	
+	SIGNAL OnEnter : "(void) called when something enters trigger (!activator)"
+	SIGNAL OnExit : "(void) called when something leaves trigger (!activator)"
+}

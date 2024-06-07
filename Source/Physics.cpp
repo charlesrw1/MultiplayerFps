@@ -9,27 +9,7 @@
 #include "Types.h"
 #include "Model.h"
 
-#include <physx/foundation/PxFoundation.h>
-#include <PxPhysicsAPI.h>
-#include <PxActor.h>
-#include <PxScene.h>
-#include <PxPhysics.h>
-#include <physx/characterkinematic/PxController.h>
-#include <physx/foundation/PxPhysicsVersion.h>
-#include <physx/common/PxTolerancesScale.h>
-class PhysicsSystem
-{
-public:
-	
 
-
-private:
-	physx::PxDefaultErrorCallback err;
-	physx::PxDefaultAllocator alloc;
-	physx::PxScene* scene = nullptr;
-	physx::PxPhysics* physics_factory = nullptr;
-	physx::PxFoundation* foundation = nullptr;
-};
 void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out);
 
 static MeshBuilder world_collision;

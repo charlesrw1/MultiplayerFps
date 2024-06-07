@@ -25,3 +25,6 @@ namespace ImGui {
 		const ImVec2& rangeMin = ImVec2(0, 0),
 		const ImVec2& rangeMax = ImVec2(1, 1));
 };
+
+class IEditorTool;
+ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, IEditorTool* tool, const ImGuiWindowClass* window_class = nullptr);

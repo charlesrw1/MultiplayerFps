@@ -891,38 +891,6 @@ void AnimationGraphEditor::draw_popups()
 	}
 }
 
-static ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, const ImGuiWindowClass* window_class = nullptr)
-{
-	using namespace ImGui;
-
-	if (viewport == NULL)
-		viewport = GetMainViewport();
-
-	SetNextWindowPos(viewport->WorkPos);
-	SetNextWindowSize(viewport->WorkSize);
-	SetNextWindowViewport(viewport->ID);
-
-	ImGuiWindowFlags host_window_flags = 0;
-	host_window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking;
-	host_window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
-	if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
-		host_window_flags |= ImGuiWindowFlags_NoBackground;
-
-	PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	Begin("MAIN DOCKWIN", NULL, host_window_flags);
-	PopStyleVar(3);
-
-	ImGuiID dockspace_id = GetID("DockSpace");
-	DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags, window_class);
-
-	ed.draw_menu_bar();
-
-	End();
-
-	return dockspace_id;
-}
 #if 0
 void Timeline::draw_imgui()
 {
@@ -1024,17 +992,8 @@ void draw_curve_test()
 	ImGui::Curve("test", ImVec2(300, 200), 10, points, &selected);
 }
 
-void AnimationGraphEditor::draw_frame()
-{
-	// draws into a viewport image that is later sampled when drawing gui
-	auto vs = get_vs();
-	idraw->scene_draw(vs, this);
-}
-
 void AnimationGraphEditor::imgui_draw()
 {
-	dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-
 	node_props.set_read_only(graph_is_read_only());
 
 	if (opt.open_prop_editor)
@@ -1325,19 +1284,10 @@ bool AnimationGraphEditor::handle_event(const SDL_Event& event)
 			break;
 		}
 		break;
-	case SDL_MOUSEBUTTONDOWN:
-		if (event.button.button == 3) {
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-			int x, y;
-			SDL_GetRelativeMouseState(&x, &y);
-			eng->game_focused = true;
-		}
-		break;
-
-
+	
 	}
 
-	if (eng->game_focused) {
+	if (eng->get_game_focused()) {
 		if (event.type == SDL_MOUSEWHEEL) {
 			out.camera.scroll_callback(event.wheel.y);
 		}
@@ -1775,7 +1725,7 @@ void AnimationGraphEditor::tick(float dt)
 		assert(eng->get_state() != Engine_State::Game);
 
 		int x = 0, y = 0;
-		if (eng->game_focused) {
+		if (eng->get_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
 			out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 		}

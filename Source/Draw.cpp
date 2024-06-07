@@ -14,6 +14,8 @@
 
 #include "Animation/SkeletonData.h"
 
+#include "Physics/Physics2.h"
+
 #ifdef EDITDOC
 #include "EditorDocPublic.h"
 #endif
@@ -2792,11 +2794,13 @@ void draw_debug_shapes()
 }
 
 extern ConfigVar g_draw_grid;
+extern ConfigVar g_grid_size;
 
 void draw_debug_grid()
 {
 	static MeshBuilder mb;
 	static bool init = true;
+
 	if (init) {
 		mb.Begin();
 		for (int x = 0; x < 11; x++) {
@@ -2810,7 +2814,7 @@ void draw_debug_grid()
 	mb.Draw(GL_LINES);
 }
 
-void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
+void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool)
 {
 	GPUFUNCTIONSTART;
 
@@ -2830,6 +2834,14 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 		SDL_GL_SetSwapInterval(1);
 	else
 		SDL_GL_SetSwapInterval(0);
+
+	if (!params.draw_world && (!params.draw_ui || !gui))
+		return;
+	else if (gui && !params.draw_world && params.draw_ui) {
+		// just paint ui and then return
+		gui->ui_paint();
+		return;
+	}
 
 	vs = current_frame_main_view;
 	upload_ubo_view_constants(ubo.current_frame);
@@ -2913,6 +2925,9 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 
 	draw_debug_shapes();
 
+	// hook in physics debugging, function determines if its drawing or not
+	g_physics->debug_draw_shapes();
+
 	if (tool)
 		tool->overlay_draw();
 
@@ -2945,12 +2960,8 @@ void Renderer::scene_draw(View_Setup view, IEditorTool* tool)
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
-	if (draw_collision_tris.get_bool())
-		DrawCollisionWorld(eng->level);
-
-	if(!tool)
-		ui_render();
-
+	if (gui && params.draw_ui)
+		gui->ui_paint();
 
 	//cubemap_positions_debug();
 

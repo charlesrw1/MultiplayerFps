@@ -17,6 +17,7 @@ void sys_print(const char* fmt, ...);
 
 char* string_format(const char* fmt, ...);
 
+
 struct Color32
 {
 	uint8_t r = 0;

@@ -132,3 +132,39 @@ bool MyImDrawBlendSpace(
 
     return false;
 }
+
+#include "IEditorTool.h"
+
+ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags,IEditorTool* tool, const ImGuiWindowClass* window_class)
+{
+    using namespace ImGui;
+
+    if (viewport == NULL)
+        viewport = GetMainViewport();
+
+    SetNextWindowPos(viewport->WorkPos);
+    SetNextWindowSize(viewport->WorkSize);
+    SetNextWindowViewport(viewport->ID);
+
+    ImGuiWindowFlags host_window_flags = 0;
+    host_window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking;
+    host_window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+    if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+        host_window_flags |= ImGuiWindowFlags_NoBackground;
+
+    PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    Begin("MAIN DOCKWIN", NULL, host_window_flags);
+    PopStyleVar(3);
+
+    ImGuiID dockspace_id = GetID("DockSpace");
+    DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags, window_class);
+
+    if (tool)
+        tool->draw_menu_bar();
+
+    End();
+
+    return dockspace_id;
+}

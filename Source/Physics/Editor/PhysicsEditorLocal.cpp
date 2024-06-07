@@ -24,9 +24,7 @@ class PhysicsEditorLocal : public IEditorTool
 	{
 		return nullptr;
 	}
-	virtual void draw_frame() override
-	{
-	}
+
 	virtual void imgui_draw() override
 	{
 	}

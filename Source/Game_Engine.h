@@ -92,6 +92,8 @@ class Client;
 class Server;
 class Level;
 class ImNodesContext;
+class GUI_RootControl;
+class UIControl;
 class Game_Engine
 {
 public:
@@ -136,7 +138,6 @@ public:
 
 	bool game_draw_screen();
 
-
 	// Host functions
 
 	Entity* create_entity(const char* classname, int forceslot = -1);
@@ -154,11 +155,15 @@ public:
 	Entity* get_ent_from_handle(entityhandle id);
 	int find_by_classtype(int start, StringName classtype);
 	Player* get_client_player(int slot);
+
+	UIControl* get_gui() { return (UIControl*)gui_root.get(); }
 public:
 	bool map_spawned() { return level != nullptr; }
 
-	Client* cl=nullptr;
-	Server* sv=nullptr;
+	unique_ptr<GUI_RootControl> gui_root;
+	unique_ptr<Client> cl;
+	unique_ptr<Server> sv;
+
 	string mapname;
 	Level* level= nullptr;
 	PhysicsWorld phys;
@@ -177,14 +182,14 @@ public:
 
 	bool show_console = false;
 
-	Archive* data_archive = nullptr;
-
 	bool dedicated_server = false;
 	bool keys[SDL_NUM_SCANCODES];
 	bool keychanges[SDL_NUM_SCANCODES];
 	int mousekeys = 0;
 
-	bool game_focused = false;
+	bool get_game_focused() const { return game_focused; }
+	void set_game_focused(bool focus);
+
 	bool is_drawing_to_window_viewport();
 	glm::ivec2 window_viewport_size = glm::ivec2(DEFAULT_WIDTH,DEFAULT_HEIGHT);
 
@@ -196,6 +201,10 @@ public:
 	bool is_host() const { return true; }
 
 private:
+	// when game goes into focus mode, the mouse position is saved so it can be reset when exiting focus mode
+	int saved_mouse_x=0, saved_mouse_y=0;
+	// focused= mouse is captured, assumes relative inputs are being taken, otherwise cursor is shown
+	bool game_focused = false;
 
 	int num_entities;
 	vector<Entity*> ents;

@@ -2,6 +2,11 @@
 #include "glad/glad.h"
 
 static const int MIN_VERTEX_ARRAY_SIZE = 16;
+
+const uint32_t MeshBuilder::TRIANGLES = GL_TRIANGLES;
+const uint32_t MeshBuilder::LINES = GL_LINES;
+
+
 void MeshBuilder::Free()
 {
 	glDeleteVertexArrays(1, &VAO);

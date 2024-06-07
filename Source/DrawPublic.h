@@ -1,7 +1,6 @@
 #pragma once
 
 #include "RenderObj.h"
-#include "IEditorTool.h"
 
 struct View_Setup
 {
@@ -15,6 +14,15 @@ struct View_Setup
 	int width, height;
 };
 
+struct SceneDrawParamsEx {
+	bool draw_ui = true;
+	bool output_to_screen = true;	// else output to a framebuffer texture, later sampled by ie ImGui ui
+	bool draw_world = true;
+};
+
+class MeshBuilder;
+class IEditorTool;
+class UIControl;
 class RendererPublic
 {
 public:
@@ -22,7 +30,11 @@ public:
 
 	// Game call api
 
-	virtual void scene_draw(View_Setup view, IEditorTool* tool = nullptr) = 0;
+	virtual void scene_draw(
+		SceneDrawParamsEx params,
+		View_Setup view,	/* camera */
+		UIControl* ui_root = nullptr /* ui_paint callback */, 
+		IEditorTool* tool = nullptr /* overlay_draw callback (might remove this)*/) = 0;
 	virtual void on_level_start() = 0;
 	virtual void on_level_end() = 0;
 	

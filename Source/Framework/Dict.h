@@ -29,6 +29,19 @@ public:
 			return defaultval;
 		return find->second.c_str();
 	}
+
+	Color32 get_color(const char* key, Color32 defaultval = COLOR_WHITE) const {
+		const auto& find = keyvalues.find(key);
+		if (find == keyvalues.end())
+			return defaultval;
+		Color32 o;
+		int fields = sscanf(find->second.c_str(), "%hhu %hhu %hhu %hhu", &o.r, &o.g, &o.b,&o.a);
+		return o;
+	}
+	void set_color(const char* key, Color32 c) {
+		keyvalues[key] = string_format("%hhu %hhu %hhu %hhu", c.r, c.g, c.b, c.a);
+	}
+
 	glm::vec3 get_vec3(const char* key, glm::vec3 defaultval = glm::vec3(0.f))const {
 		const auto& find = keyvalues.find(key);
 		if (find == keyvalues.end())
@@ -66,6 +79,10 @@ public:
 	}
 	void remove_key(const char* key) {
 		keyvalues.erase(key);
+	}
+	bool has_key(const char* key) {
+		const auto& find = keyvalues.find(key);
+		return !(find == keyvalues.end());
 	}
 
 	std::unordered_map <std::string, std::string> keyvalues;

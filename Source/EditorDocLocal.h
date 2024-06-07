@@ -14,6 +14,7 @@
 #include "Framework/Factory.h"
 #include "Framework/PropertyEd.h"
 #include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/StdVectorReflection.h"
 
 class ConnectionList : public IArrayHeader
 {
@@ -120,73 +121,89 @@ public:
 	std::unordered_map<std::string,ObjectSchema> all_schema_list;
 };
 
+class PhysicsActor;
 class EditorDoc;
 class EditorNode
 {
 public:
-	EditorNode(EditorDoc* doc) : doc(doc) {}
+	EditorNode()  {}
 	~EditorNode();
 
-	void hide();
-	void show();
+	virtual void hide();
+	virtual void show();
 
-	virtual void scene_draw() {}
-	virtual void imgui_tick() {}
-	
+	virtual void per_frame_tick() {}
+
 	void init_on_new_espawn();
-
-	void on_create_from_dict(int index, int varying_index, Dict* d);
-
-	void on_transform_change() {}
-	void on_dict_value_change() {}
 
 	const char* get_schema_name() const {
 		return template_class ? template_class->name.c_str() : "unknown schema";
 	}
-
-	uint64_t uid = 0;
-
-	glm::vec3 position{};
-	glm::quat rotation;
-	glm::vec3 scale=glm::vec3(1.f);
 	glm::mat4 get_transform();
-	
-	bool use_sphere_collision = true;
-	glm::vec3 collision_bounds = glm::vec3(0.5f);
-	Material* sprite_texture = nullptr;
-	Model* model = nullptr;
-
-	EditorDoc* doc;
 
 	handle<Render_Object> render_handle;
-	handle<Render_Light> render_light;
-	handle<Render_Decal> render_decal;
+	PhysicsActor* physics = nullptr;
 	
 	Dict& get_dict();
+
+	glm::vec3 get_position() {
+		return get_dict().get_vec3("position");
+	}
 
 	Color32 get_object_color() { return COLOR_WHITE; }
 	const char* get_name() {
 		return get_dict().get_string("name", "no_name");
 	}
-	void save_transform_to_dict() {
-		get_dict().set_vec3("position", position);
-		glm::vec3 a = glm::eulerAngles(rotation);
+	void save_transform_to_dict(glm::vec3 v, glm::quat r, glm::vec3 s) {
+		get_dict().set_vec3("position", v);
+		glm::vec3 a = glm::eulerAngles(r);
 		get_dict().set_vec3("rotation", a);
-		get_dict().set_vec3("scale", scale);
+		get_dict().set_vec3("scale", s);
 	}
-	void update_from_dict();
-
-
-	void init_from_schema(const ObjectSchema* t) {
-		template_class = t;
-		dictionary = {};	// empty dict means deafult values
+	void read_transform_from_dict(glm::vec3& v, glm::quat& r, glm::vec3& s) {
+		v = get_dict().get_vec3("position");
+		r = glm::quat(get_dict().get_vec3("rotation"));
+		s = get_dict().get_vec3("scale",glm::vec3(1));
 	}
+
+	Model* get_rendering_model() {
+		if (!model_is_dirty)
+			return current_model;
+		model_is_dirty = false;
+		std::string s = get_dict().get_string("model");
+		if (!s.empty()) {
+			return mods.find_or_load(s.c_str());
+		}
+		if (!template_class)
+			return nullptr;
+		if (!template_class->edmodel.empty())
+			return mods.find_or_load(template_class->edmodel.c_str());
+		return nullptr;
+	}
+	uint32_t get_uid() {
+		return get_dict().get_int("_editor_uid", 0);
+	}
+	void set_uid(uint32_t uid) {
+		get_dict().set_int("_editor_uid", (int)uid);	// fixme
+	}
+	Color32 get_rendering_color() {
+		return get_dict().get_color("color");
+	}
+	Material* get_sprite_material();
+
+	// only write these when initially spawning like position/model, dont get queued in command system
+	void write_dict_value_spawn();
+	void write_dict_value(std::string key, std::string value);
+
+	void init_from_schema(const ObjectSchema* t);
 private:
-	bool node_is_hidden = false;
 	Dict dictionary;
 	std::vector<SignalProperty> signals;
 	const ObjectSchema* template_class = nullptr;
 	friend class EdPropertyGrid;
+
+	bool model_is_dirty = true;
+	 Model* current_model = nullptr;
 };
 
 class DecalNode
@@ -205,7 +222,6 @@ class RegionShape
 };
 
 // for triggers, defining regions, or editor geometry
-
 class LightNode
 {
 
@@ -225,6 +241,7 @@ public:
 	virtual ~Command() {}
 	virtual void execute() = 0;
 	virtual void undo() = 0;
+	virtual std::string to_string() = 0;
 };
 
 class UndoRedoSystem
@@ -241,18 +258,24 @@ public:
 		index += 1;
 		index %= HIST_SIZE;
 
+		sys_print("``` Executing: %s\n", c->to_string().c_str());
+
 		c->execute();
 	}
 	void undo() {
 		index -= 1;
 		if (index < 0) index = HIST_SIZE - 1;
 		if (hist[index]) {
+
+			sys_print("``` Undoing: %s\n", hist[index]->to_string().c_str());
+
+
 			hist[index]->undo();
 			delete hist[index];
 			hist[index] = nullptr;
 		}
 		else {
-			sys_print("nothing to undo\n");
+			sys_print("*** nothing to undo\n");
 		}
 	}
 
@@ -405,7 +428,7 @@ class DragAndDropAsset
 {
 public:
 };
-#include "Framework/StdVectorReflection.h"
+
 class EdPropertyGrid
 {
 public:
@@ -420,6 +443,10 @@ public:
 		set(n);
 	}
 	void draw();
+
+	EditorNode* get_node() {
+		return node;
+	}
 private:
 	// currently editing this
 	EditorNode* node = nullptr;
@@ -442,14 +469,14 @@ class EditorDoc : public IEditorTool
 {
 public:
 	EditorDoc() {}
-	virtual void init() {}
+	virtual void init();
 	virtual void open(const char* levelname) override;
 	virtual void close() override;
 	virtual bool handle_event(const SDL_Event& event) override;
+	virtual void ui_paint() override;
 	virtual void tick(float dt) override;
 	virtual void overlay_draw() override;
 	virtual void imgui_draw() override;
-	virtual void draw_frame() override;
 	virtual const View_Setup& get_vs() override;
 	virtual const char* get_name() override {
 		return "";
@@ -459,7 +486,11 @@ public:
 		return "temp/path/to/map";
 	}
 
-	RayHit cast_ray_into_world(Ray* out_ray);
+	void remove_any_references(EditorNode* node);
+
+	void hook_scene_viewport_draw();
+
+	RayHit cast_ray_into_world(Ray* out_ray, int mx, int my);
 
 	void save_doc();
 	

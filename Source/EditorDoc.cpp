@@ -10,6 +10,7 @@
 #include "Framework/Files.h"
 #include "Framework/MyImguiLib.h"
 #include "AssetCompile/Someutils.h"
+#include "Physics/Physics2.h"
 #include <stdexcept>
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
@@ -25,16 +26,17 @@ static std::string to_string(StringView view) {
 // or: "<default>
 // or: "<default>,<option1>,<option2>,.."
 
-std::vector<StringView> parse_hint_string(const std::string& hint)
+std::vector<StringView> parse_hint_string(const char* cstr)
 {
 	std::vector<StringView> out;
 	int start = 0;
 	size_t find = 0;
+	std::string hint = cstr;
 	while ((find = hint.find(',',start))!=std::string::npos) {
-		out.push_back(StringView(hint.data()+start, (find-start)));
+		out.push_back(StringView(cstr +start, (find-start)));
 		start = find + 1;
 	}
-	out.push_back(StringView(hint.data() + start, (find - start)));
+	out.push_back(StringView(cstr + start, (hint.size() - start)));
 	return out;
 }
 
@@ -129,7 +131,7 @@ bool EditorSchemaManager::load(const char* path)
 				std::string default_new = to_string(tok);
 
 				// overwrite default
-				auto vec = parse_hint_string(find->hint);
+				auto vec = parse_hint_string(find->hint.c_str());
 				for (int i = 1; i < vec.size(); i++) {
 					default_new += ',';
 					default_new += to_string(vec.at(i));
@@ -155,6 +157,8 @@ bool EditorSchemaManager::load(const char* path)
 				continue;
 			}
 
+			prop.type = "Leveled_" + prop.type;
+
 			in.read_string(tok);
 			prop.hint = to_string(tok);
 
@@ -174,40 +178,6 @@ bool EditorSchemaManager::load(const char* path)
 
 	return true;
 }
-
-class TransformCommand : public Command
-{
-public:
-	TransformCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n, TransformType type, glm::vec3 delta)
-		: doc(doc), node(n), type(type),delta(delta) {}
-
-	TransformCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n, glm::quat delta_q)
-		: doc(doc), node(n), type(ROTATION), delta_q(delta_q) {}
-
-	~TransformCommand() {}
-	void execute() {
-		if (type == TRANSLATION)
-			node->position += delta;
-		else if (type == ROTATION)
-			node->rotation += delta_q;
-		else if (type == SCALE)
-			node->scale += delta;
-	}
-	void undo() {
-		if (type == TRANSLATION)
-			node->position -= delta;
-		else if (type == ROTATION)
-			node->rotation -= delta_q;
-		else if (type == SCALE)
-			node->scale -= delta;
-	}
-
-	std::shared_ptr<EditorNode> node;
-	glm::vec3 delta;
-	glm::quat delta_q;
-	TransformType type;
-	EditorDoc* doc{};
-};
 
 class EditPropertyCommand : public Command
 {
@@ -229,6 +199,9 @@ public:
 
 		d->set_string(key.c_str(), oldval.c_str());
 	}
+	std::string to_string() override {
+		return "EditProperty: " + std::string(node->get_schema_name()) + key;
+	}
 
 	std::shared_ptr<EditorNode> node;
 	std::string oldval;
@@ -240,32 +213,37 @@ public:
 class CreateNodeCommand : public Command
 {
 public:
-	CreateNodeCommand(const std::shared_ptr<EditorNode>& node, EditorDoc* doc) 
-		: doc(doc), node(node) {}
+	CreateNodeCommand(const std::shared_ptr<EditorNode>& node) :
+		 node(node) {}
 	~CreateNodeCommand() {
 	}
 
 	void execute() {
-		doc->nodes.push_back(node);
+		ed_doc.nodes.push_back(node);
 		node->show();
 	}
 	void undo() {
-		assert(doc->nodes.back().get() == node.get());
+		assert(ed_doc.nodes.back().get() == node.get());
 		node->hide();
-		doc->nodes.pop_back();
+		ed_doc.nodes.pop_back();
+
+		ed_doc.remove_any_references(node.get());
+	}
+	std::string to_string() override {
+		return "CreateNode: " + std::string(node->get_schema_name());
 	}
 
-	Dict spawn_dict;
 	std::shared_ptr<EditorNode> node;
-	EditorDoc * doc;
 };
+
+
 
 class RemoveNodeCommand : public Command
 {
 public:
-	RemoveNodeCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n) 
-		: doc(doc), node(n) {
-		index = doc->get_node_index(n.get());
+	RemoveNodeCommand(const std::shared_ptr<EditorNode>& n) 
+		:  node(n) {
+		index = ed_doc.get_node_index(n.get());
 		assert(index != -1);
 	}
 	~RemoveNodeCommand() {
@@ -273,15 +251,18 @@ public:
 
 	void execute() {
 		node->hide();
-		doc->nodes.erase(doc->nodes.begin() + index);
+		ed_doc.nodes.erase(ed_doc.nodes.begin() + index);
+		ed_doc.remove_any_references(node.get());
 	}
 	void undo() {
-		doc->nodes.insert(doc->nodes.begin() + index,node);
+		ed_doc.nodes.insert(ed_doc.nodes.begin() + index,node);
 		node->show();
 	}
-
+	std::string to_string() override {
+		return "RemoveNode: " + std::string(node->get_schema_name());
+	}
+	
 	std::shared_ptr<EditorNode> node;
-	EditorDoc* doc;
 	int index = 0;
 };
 
@@ -396,17 +377,17 @@ void AssetBrowser::init()
 }
 
 
-
-RayHit EditorDoc::cast_ray_into_world(Ray* out_ray)
+// Unproject mouse coords into a vector, cast that into the world via physics
+RayHit EditorDoc::cast_ray_into_world(Ray* out_ray, const int mx, const int my)
 {
 	Ray r;
 	r.pos = camera.position;
 
-	int x, y;
-	SDL_GetMouseState(&x, &y);
-	int wx, wy;
-	SDL_GetWindowSize(eng->window, &wx, &wy);
-	glm::vec3 ndc = glm::vec3(float(x) / wx, float(y) / wy, 0);
+	// get ui size
+	const Rect2d size = get_size();
+	const int wx = size.w;
+	const int wy = size.h;
+	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
 	ndc = ndc * 2.f - 1.f;
 	ndc.y *= -1;
 
@@ -420,6 +401,11 @@ RayHit EditorDoc::cast_ray_into_world(Ray* out_ray)
 
 	if (out_ray)
 		*out_ray = r;
+
+	world_query_result res;
+	g_physics->trace_ray(res, r.pos, r.dir, 100.0, {});
+
+	Debug::add_line(r.pos, r.dir * 50.0f, COLOR_PINK, 10.0);
 
 	return eng->phys.trace_ray(r, -1, PF_ALL);
 }
@@ -448,30 +434,98 @@ Dict& EditorNode::get_dict()
 
 EditorNode::~EditorNode()
 {
-	if (render_handle.is_valid())
-		idraw->remove_obj(render_handle);
-	if (render_light.is_valid())
-		idraw->remove_light(render_light);
+	hide();	// remove any handles
 }
 
+static Material* generate_spritemat_from_texture(Texture* t)
+{
+	// generate hash based on name, yes this is hacked
+	StringName name_(t->name.c_str());
+	Material* mat = mats.find_for_name(std::to_string(name_.get_hash()).c_str());
+	if (mat)
+		return mat;
+
+	mat = mats.create_temp_shader(std::to_string(name_.get_hash()).c_str());
+	mat->billboard = billboard_setting::FACE_CAMERA;
+	mat->images[0] = t;
+	mat->type = material_type::UNLIT;
+	mat->alpha_tested = true;
+
+	mat->diffuse_tint = glm::vec4(1.0);
+
+	return mat;
+}
+
+Material* EditorNode::get_sprite_material()
+{
+	if (template_class && !template_class->edimage.empty()) {
+		Texture* t = mats.find_texture(template_class->edimage.c_str());
+		if (t) {
+			return generate_spritemat_from_texture(t);
+		}
+	}
+	Texture* t = mats.find_texture("icon/mesh.png");
+	assert(t);
+	return generate_spritemat_from_texture(t);
+
+}
+ void EditorNode::init_from_schema(const ObjectSchema* t) {
+	template_class = t;
+	dictionary = {};	// empty dict means deafult values
+
+	for (int i = 0; i < template_class->properties.size(); i++) {
+		auto& prop = template_class->properties[i];
+		auto parsevec = parse_hint_string(prop.hint.c_str());
+		if (parsevec.empty()) continue;
+		dictionary.set_string(prop.name.c_str(), to_std_string_sv(parsevec[0]).c_str());
+	}
+}
 void EditorNode::show()
 {
-	idraw->remove_obj(render_handle);
-	idraw->remove_light(render_light);
-	if (model) {
-		render_handle = idraw->register_obj();
+	hide();
+
+	Model* m = get_rendering_model();
+	render_handle = idraw->register_obj();
+
+	if (m) {
+		Render_Object ro;
+		ro.model = m;
+		ro.transform = get_transform();
+		ro.visible = true;
+		ro.param1 = get_rendering_color();
+		idraw->update_obj(render_handle, ro);
+	}
+	else {
+		Material* mat = get_sprite_material();
+		Render_Object ro;
+		ro.model = mods.get_sprite_model();
+
+		glm::vec3 position = get_dict().get_vec3("position");
+		ro.param1 = get_rendering_color();
+		ro.transform = glm::scale(glm::translate(glm::mat4(1), position),glm::vec3(0.5));
+		ro.mat_override = mat;
+		ro.visible = true;
+		idraw->update_obj(render_handle, ro);
+
+		physics = g_physics->allocate_physics_actor();
+		sphere_def_t def;
+		def.radius = 0.25;
+		physics->create_static_sphere_actor( def, position);
 	}
 }
 void EditorNode::hide()
 {
 	idraw->remove_obj(render_handle);
-	idraw->remove_light(render_light);
+	g_physics->free_physics_actor(physics);
 }
-
 
 
 glm::mat4 EditorNode::get_transform()
 {
+	glm::vec3 position, scale;
+	glm::quat rotation;
+	read_transform_from_dict(position, rotation, scale);
+
 	glm::mat4 transform;
 	transform = glm::translate(glm::mat4(1), position);
 	transform = transform * glm::mat4_cast(rotation);
@@ -491,20 +545,45 @@ EditorNode* EditorDoc::create_node_from_dict(const Dict& d)
 EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 {
 	auto template_obj = ed_schema.find_schema(schema_type);
-	EditorNode* node = new EditorNode(this);
-	node->uid = id_start++;
+	EditorNode* node = new EditorNode();
+	node->set_uid(id_start);
 	node->init_from_schema(template_obj);
-	nodes.push_back(std::shared_ptr<EditorNode>(node));
+	
+	std::shared_ptr<EditorNode> shared(node);
+
+	command_mgr.add_command(new CreateNodeCommand(shared) );	// add command
+
 	return node;
 }
 
 void EditorDoc::on_change_focus(editor_focus_state newstate)
 {
+	if (newstate == editor_focus_state::Background) {
 
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
+	}
+	else if (newstate == editor_focus_state::Closed) {
+		close();
+
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
+	}
+	else {
+		// focused, stuff can start being rendered
+
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
+	}
+}
+
+void EditorDoc::init()
+{
+	// set my parent
+	set_parent(eng->get_gui());
 }
 
 void EditorDoc::open(const char* levelname)
 {
+	init();
+
 	ed_schema.load("./Data/classes.txt");
 	nodes.clear();
 	
@@ -537,23 +616,24 @@ void EditorDoc::enter_transform_tool(TransformType type)
 	if (selected_node == nullptr) return;
 	transform_tool_type = type;
 	axis_bit_mask = 7;
-	transform_tool_origin = selected_node->position;
+	transform_tool_origin = selected_node->get_dict().get_vec3("position");
 	mode = TOOL_TRANSFORM;
+}
+
+void EditorDoc::ui_paint() 
+{
+	size = parent->get_size();	// update my size
 }
 
 bool EditorDoc::handle_event(const SDL_Event& event)
 {
-	if (ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantCaptureMouse)
-		return false;
-
-
 	switch (mode)
 	{
 	case TOOL_NONE:
 		if (event.type == SDL_KEYDOWN) {
 			uint32_t scancode = event.key.keysym.scancode;
 			if (scancode == SDL_SCANCODE_M) {
-				mode = TOOL_SPAWN_MODEL;
+				//mode = TOOL_SPAWN_MODEL;
 				//assets.open(true);
 			}
 			else if (scancode == SDL_SCANCODE_G) {
@@ -567,7 +647,7 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			}
 			else if (scancode == SDL_SCANCODE_BACKSPACE) {
 				if (selected_node != nullptr) {
-					RemoveNodeCommand* com = new RemoveNodeCommand(this, selected_node);
+					RemoveNodeCommand* com = new RemoveNodeCommand(selected_node);
 					command_mgr.add_command(com);
 				}
 			}
@@ -576,8 +656,11 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			}
 		}
 		if (event.type == SDL_MOUSEBUTTONDOWN) {
+			if (!get_size().is_point_inside(event.button.x, event.button.y))
+				return false;
+
 			if (event.button.button == 1) {
-				RayHit rh = cast_ray_into_world(nullptr);
+				RayHit rh = cast_ray_into_world(nullptr, event.button.x, event.button.y);
 				if (rh.dist > 0 && rh.ent_id > 0) {
 					selected_node = nodes[rh.ent_id];
 				}
@@ -640,7 +723,7 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 				command_mgr.undo();
 		}
 	}
-	if (eng->game_focused) {
+	if (eng->get_game_focused()) {
 		if (event.type == SDL_MOUSEWHEEL) {
 			camera.scroll_callback(event.wheel.y);
 		}
@@ -684,9 +767,10 @@ void EditorDoc::tick(float dt)
 
 	{
 		int x=0, y=0;
-		if(eng->game_focused)
+		if (eng->get_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
-		camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+			camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+		}
 	}
 
 	auto window_sz = eng->get_game_viewport_dimensions();
@@ -708,21 +792,21 @@ void EditorDoc::tick(float dt)
 	//	eng->phys.AddObj(obj);
 	//}
 
-	for (int i = 0; i < nodes.size(); i++) {
-		if (nodes[i]->model) {
-			PhysicsObject obj;
-			obj.is_level = false;
-			obj.solid = false;
-			obj.is_mesh = false;
-
-			Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->get_bounds());
-			obj.min_or_origin = b.bmin;
-			obj.max = b.bmax;
-			obj.userindex = i;
-
-			eng->phys.AddObj(obj);
-		}
-	}
+	//for (int i = 0; i < nodes.size(); i++) {
+	//	if (nodes[i]->model) {
+	//		PhysicsObject obj;
+	//		obj.is_level = false;
+	//		obj.solid = false;
+	//		obj.is_mesh = false;
+	//
+	//		Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->get_bounds());
+	//		obj.min_or_origin = b.bmin;
+	//		obj.max = b.bmax;
+	//		obj.userindex = i;
+	//
+	//		eng->phys.AddObj(obj);
+	//	}
+	//}
 
 
 	switch (mode)
@@ -781,6 +865,7 @@ void EditorDoc::transform_tool_update()
 	bool yandz = yaxis && zaxis;
 	bool zandx = zaxis && xaxis;
 
+	#if  0
 	Ray r;
 	cast_ray_into_world(&r);	// just using this to get the unprojected ray :/
 	bool good2 = true;
@@ -809,9 +894,10 @@ void EditorDoc::transform_tool_update()
 	else if (zaxis) {
 		good2 = line_plane_intersect(r, planes[2], planed[2], intersect_point);
 	}
+#endif
 
-	if(good2)
-		selected_node->position = intersect_point;
+	//if(good2)
+	//	selected_node->position = intersect_point;
 
 }
 
@@ -822,8 +908,8 @@ void EditorDoc::overlay_draw()
 	mb.Begin();
 	mb.PushLineBox(glm::vec3(-1), glm::vec3(1), COLOR_BLUE);
 	if (selected_node) {
-		if (selected_node->model) {
-			Model* m = selected_node->model;
+		Model* m = selected_node->get_rendering_model();
+		if (m) {
 			auto transform = selected_node->get_transform();
 			Bounds b = transform_bounds(transform,m->get_bounds());
 			mb.PushLineBox(b.bmin, b.bmax, COLOR_RED);
@@ -838,11 +924,12 @@ uint32_t color_to_uint(Color32 c) {
 	return c.r | c.g << 8 | c.b << 16 | c.a << 24;
 }
 
-
-void EditorDoc::draw_frame()
+void EditorDoc::remove_any_references(EditorNode* node)
 {
-	auto vs = get_vs();
-	idraw->scene_draw(vs, this);
+	if (outliner.get_selected() == node)
+		outliner.set_selected(nullptr);
+	if (prop_editor.get_node() == node)
+		prop_editor.set(nullptr);
 }
 
 void EditorDoc::imgui_draw()
@@ -853,6 +940,10 @@ void EditorDoc::imgui_draw()
 	outliner.draw();
 	prop_editor.set(outliner.get_selected());
 	prop_editor.draw();
+
+	if (outliner.get_selected() != nullptr)
+		outliner.get_selected()->show();	// update it
+
 	return;
 #if 0
 	ImGui::SetNextWindowPos(ImVec2(10, 10));
@@ -967,6 +1058,28 @@ void EditorDoc::imgui_draw()
 	}
 	ImGui::End();
 #endif
+}
+
+void EditorDoc::hook_scene_viewport_draw()
+{
+	if (ImGui::BeginDragDropTarget())
+	{
+		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+		//if (payload->IsDataType("AssetBrowserDragDrop"))
+		//	sys_print("``` accepting\n");
+
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
+		{
+			EdResourceBase* resource = *(EdResourceBase**)payload->Data;
+	
+			EdResourceSchema* schema = dynamic_cast<EdResourceSchema*>(resource);
+			if (schema) {
+				spawn_from_schema_type(schema->get_asset_name().c_str());
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
 }
 
 void AssetBrowser::imgui_draw()
@@ -1126,19 +1239,148 @@ bool ConnectionList::imgui_draw_header(int index)
 
 class IDictEditor : public IPropertyEditor
 {
+public:
+	using IPropertyEditor::IPropertyEditor;
 
+	EditorNode* get_node() {
+		return (EditorNode*)instance;
+	}
+
+	virtual bool can_reset() override  { 
+		auto node = get_node();
+
+		auto vec = parse_hint_string(prop->range_hint);
+		if (vec.empty() || vec[0].is_empty())
+			return false;
+		return (!vec[0].cmp(node->get_dict().get_string(prop->name)));
+	}
+	virtual void reset_value() override final {
+		auto node = get_node();
+		auto vec = parse_hint_string(prop->range_hint);
+		assert(!vec.empty()&&!vec[0].is_empty());
+		node->get_dict().set_string(prop->name, to_std_string_sv(vec[0]).c_str());
+	}
+	virtual void internal_update() override {
+		auto node = get_node();
+		if (!node->get_dict().has_key(prop->name)) {
+			if (can_reset())
+				reset_value();
+		}
+	}
 };
 
-class Int_t_editor : public IDictEditor
+class int_t_editor : public IDictEditor
 {
+	using IDictEditor::IDictEditor;
 
+	// Inherited via IDictEditor
+	virtual void internal_update() override {
+		IDictEditor::internal_update();
+		auto node = get_node();
+		int i = node->get_dict().get_int(prop->name);
+		auto vec = parse_hint_string(prop->range_hint);
+		if (vec.size() == 3) {
+			int min = atoi(vec[1].to_stack_string().c_str());
+			int max = atoi(vec[2].to_stack_string().c_str());
+			ImGui::SliderInt("##inputint", &i, min, max);
+		}
+		else
+			ImGui::InputInt("##inputint", &i);
+		node->get_dict().set_int(prop->name, i);
+	}
 };
+
+class float_t_editor : public IDictEditor
+{
+	using IDictEditor::IDictEditor;
+
+	// Inherited via IDictEditor
+	virtual void internal_update() override {
+		IDictEditor::internal_update();
+		auto node = get_node();
+		float f = node->get_dict().get_float(prop->name);
+		auto vec = parse_hint_string(prop->range_hint);
+		if (vec.size() == 3) {
+			float min = atof(vec[1].to_stack_string().c_str());
+			float max = atof(vec[2].to_stack_string().c_str());
+			ImGui::SliderFloat("##inputfl", &f, min, max);
+		}
+		else
+			ImGui::InputFloat("##inputfl", &f);
+		node->get_dict().set_float(prop->name, f);
+	}
+};
+
+class bool_t_editor : public IDictEditor
+{
+	using IDictEditor::IDictEditor;
+
+	// Inherited via IDictEditor
+	virtual void internal_update() override {
+		IDictEditor::internal_update();
+		auto node = get_node();
+		bool b = node->get_dict().get_int(prop->name);
+		auto vec = parse_hint_string(prop->range_hint);
+		ImGui::Checkbox("##inputbool", &b);
+		node->get_dict().set_int(prop->name, b);
+	}
+};
+
+class vec3_t_editor : public IDictEditor
+{
+	using IDictEditor::IDictEditor;
+
+	// Inherited via IDictEditor
+	virtual void internal_update() override {
+		IDictEditor::internal_update();
+		auto node = get_node();
+		glm::vec3 v = node->get_dict().get_vec3(prop->name);
+		ImGui::DragFloat3("##vec3", &v.x,0.2);
+		node->get_dict().set_vec3(prop->name, v);
+	}
+
+	virtual bool can_reset() override {
+		auto node = get_node();
+		auto vec = parse_hint_string(prop->range_hint);
+		if (vec.empty() || vec[0].is_empty())
+			return false;
+		glm::vec3 v;
+		int fields = sscanf(vec[0].to_stack_string().c_str(), "%f %f %f", &v.x, &v.y, &v.z);
+		glm::vec3 dv = node->get_dict().get_vec3(prop->name);
+
+		return glm::dot(v - dv, v - dv) > 0.00001;
+	}
+};
+
+class color32_t_editor : public IDictEditor
+{
+	using IDictEditor::IDictEditor;
+
+	// Inherited via IDictEditor
+	virtual void internal_update() override {
+		IDictEditor::internal_update();
+		auto node = get_node();
+		Color32 color = node->get_dict().get_color(prop->name);
+		ImVec4 colorvec4 = ImGui::ColorConvertU32ToFloat4(color.to_uint());
+		ImGui::ColorEdit4("##colorpicker", &colorvec4.x);
+		uint32_t res = ImGui::ColorConvertFloat4ToU32(colorvec4);
+		// im lazy
+		color = *(Color32*)(&res);
+		node->get_dict().set_color(prop->name, color);
+	}
+};
+
 
 struct AutoStruct_asdf134 {
  AutoStruct_asdf134() {
 	 auto& pfac = get_property_editor_factory();
 
-	
+	 pfac.registerClass<float_t_editor>("Leveled_float");
+	 pfac.registerClass<int_t_editor>("Leveled_int");
+	 pfac.registerClass<bool_t_editor>("Leveled_bool");
+	 pfac.registerClass<color32_t_editor>("Leveled_color32");
+	 pfac.registerClass<vec3_t_editor>("Leveled_vec3");
+
 	 auto& afac = get_array_header_factory();
 
 	 afac.registerClass<ConnectionList>("LevelEd_ConnectionList");
@@ -1230,11 +1472,12 @@ void EdPropertyGrid::set(EditorNode* node_new)
 	connection_props_from_node = display_grid();
 	props_from_node = display_grid();
 
-	if (!node->template_class) {
-		node = nullptr;
-	}
 	if (!node)
 		return;
+	if (!node->template_class) {
+		node = nullptr;
+		return;
+	}
 
 	for (const auto& prop : node->template_class->properties) {
 		if (prop.dont_expose)

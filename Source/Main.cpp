@@ -31,6 +31,7 @@
 #include "Framework/Config.h"
 #include "DrawPublic.h"
 #include "Entity.h"
+#include "Physics/Physics2.h"
 
 #include "Animation/AnimationTreePublic.h"
 #include "Animation/Editor/AnimationGraphEditorPublic.h"
@@ -154,6 +155,34 @@ void sys_print(const char* fmt, ...)
 		printf("\033[0m");
 }
 
+class GUI_RootControl : public UIControl
+{
+public:
+	// Inherited from UIControl
+	void ui_paint() override {
+		if (eng->get_current_tool() != nullptr)
+			eng->get_current_tool()->ui_paint();
+	}
+	bool handle_event(const SDL_Event& event) override {
+		if (eng->get_current_tool() != nullptr)
+			return eng->get_current_tool()->handle_event(event);
+
+		return false;
+	}
+
+public:
+	void init();
+	void set_ui_rect();
+
+	void set_screen_rect_base(Rect2d rect) {
+		this->size = rect;
+	}
+
+	// game panel
+	// tool panel
+	// log panel
+};
+
 void sys_vprint(const char* fmt, va_list args)
 {
 	vprintf(fmt, args);
@@ -218,7 +247,7 @@ void Game_Engine::make_move()
 	if (g_fakemovedebug.get_integer() == 2)
 		command.button_mask |= BUTTON_JUMP;
 
-	if (!game_focused) {
+	if (!get_game_focused()) {
 		p->set_input_command(command);
 		if(cl->get_state()>=CS_CONNECTED) 
 			cl->get_command(cl->OutSequence()) = command;
@@ -562,9 +591,9 @@ void Game_Engine::change_editor_state(Eng_Tool_state next_tool, const char* file
 	}
 	tool_state = next_tool;
 	if (tool_state != Eng_Tool_state::None) {
+		enable_imgui_docking();
 		get_current_tool()->set_focus_state((get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
 		get_current_tool()->open(file);
-		enable_imgui_docking();
 	}
 	else
 		disable_imgui_docking();
@@ -750,12 +779,16 @@ ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, 0,2);
 ConfigVar g_drawimguidemo("g_drawimguidemo", "1", CVAR_BOOL);
 ConfigVar g_debug_skeletons("g_debug_skeletons", "1", CVAR_BOOL);
 ConfigVar g_draw_grid("g_draw_grid", "1", CVAR_BOOL);
+ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, 0.01,10);
+
 ConfigVar g_drawdebugmenu("g_drawdebugmenu","1",CVAR_BOOL);
 
 ConfigVar g_window_w("vid.width","1200",CVAR_INTEGER,1,4000);
 ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, 1, 4000);
 ConfigVar g_window_fullscreen("vid.fullscreen", "0",CVAR_BOOL);
 ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,0,UINT16_MAX);
+ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV);
+
 
 DECLARE_ENGINE_CMD(spawn_npc)
 {
@@ -849,6 +882,22 @@ void Game_Engine::set_tick_rate(float tick_rate)
 	tick_interval = 1.0 / tick_rate;
 }
 
+void Game_Engine::set_game_focused(bool focused)
+{
+	if (focused == game_focused)
+		return;
+
+	if (focused) {
+		// reset deltas
+		SDL_GetRelativeMouseState(nullptr, nullptr);
+		SDL_GetMouseState(&saved_mouse_x, &saved_mouse_y);
+		SDL_SetRelativeMouseMode(SDL_TRUE);
+	}
+	else {
+		SDL_SetRelativeMouseMode(SDL_FALSE);
+	}
+	game_focused = focused;
+}
 
 void Game_Engine::key_event(SDL_Event event)
 {
@@ -858,8 +907,7 @@ void Game_Engine::key_event(SDL_Event event)
 	}
 
 	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse) {
-		SDL_SetRelativeMouseMode(SDL_FALSE);
-		eng->game_focused = false;
+		set_game_focused(false);
 		return;
 	}
 	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
@@ -880,17 +928,13 @@ void Game_Engine::key_event(SDL_Event event)
 	// when drawing to windowed viewport, handle game_focused during drawing
 	else if (event.type == SDL_MOUSEBUTTONDOWN) {
 		if (event.button.button == 3 && !eng->is_drawing_to_window_viewport()) {
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-			int x, y;
-			SDL_GetRelativeMouseState(&x, &y);
-			eng->game_focused = true;
+			set_game_focused(true);
 		}
 		mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
 		if (event.button.button == 3 && !eng->is_drawing_to_window_viewport()) {
-			SDL_SetRelativeMouseMode(SDL_FALSE);
-			eng->game_focused = false;
+			set_game_focused(false);
 		}
 		mousekeys &= ~(1 << event.button.button);
 	}
@@ -906,10 +950,12 @@ void Game_Engine::bind_key(int key, string command)
 
 void Game_Engine::cleanup()
 {
-
-	NetworkQuit();
-	SDL_GL_DeleteContext(gl_context);
-	SDL_DestroyWindow(window);
+	// could get fatal error before initializing this stuff
+	if (gl_context && window) {
+		NetworkQuit();
+		SDL_GL_DeleteContext(gl_context);
+		SDL_DestroyWindow(window);
+	}
 
 	for (int i = 0; i < SDL_NUM_SCANCODES; i++) {
 		delete binds[i];
@@ -1013,34 +1059,82 @@ glm::ivec2 Game_Engine::get_game_viewport_dimensions()
 		return { g_window_w.get_integer(), g_window_w.get_integer() };
 }
 
+static bool window_hovered = true;
+static bool window_focused = true;
+static bool scene_hovered = false;
+static bool scene_focused = false;
+
+
+void f345()
+{
+	ImGui::Text("window_hovered: %d",int(window_hovered));
+	ImGui::Text("window_focused: %d", int(window_focused));
+	ImGui::Text("scene_hovered: %d", int(scene_hovered));
+	ImGui::Text("scene_focused: %d", int(scene_focused));
+	ImGui::Text("eng->game_focused: %d", int(eng->get_game_focused()));
+}
+AddToDebugMenu asdf45("func", f345);
+#include "Framework/MyImguiLib.h"
 void Game_Engine::draw_any_imgui_interfaces()
 {
-	if(g_drawdebugmenu.get_bool())
+	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
 
-	// draw tool editor
-	if (is_in_an_editor_state())
+	// draw tool interface if its active
+	if (is_in_an_editor_state()) {
+		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, get_current_tool());
 		get_current_tool()->imgui_draw();
+	}
 
+	// will only be true if in a tool state
 	if (is_drawing_to_window_viewport()) {
-		eng->game_focused = false;
 
-		if (ImGui::Begin("Scene viewport",nullptr,  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+		if (scene_hovered)
+			flags |=  ImGuiWindowFlags_NoMove;
+		bool next_focus = false;
+		if (ImGui::Begin("Scene viewport",nullptr, flags)) {
 
 			auto size = ImGui::GetWindowSize();
-			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), ImVec2(size.x, size.y), ImVec2(0,1),ImVec2(1,0));
+			auto pos = ImGui::GetCursorPos();
+			auto winpos = ImGui::GetWindowPos();
+			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), ImVec2(size.x, size.y), ImVec2(0,1),ImVec2(1,0));	// this is the scene draw texture
+			scene_hovered = ImGui::IsItemHovered();
 			window_viewport_size = { size.x,size.y };
+			window_hovered = ImGui::IsWindowHovered();
+			window_focused = ImGui::IsWindowFocused();
+			scene_focused = ImGui::IsItemFocused();
 
-			bool focused_window = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+			// save off where the viewport is the GUI for mouse events
+			Rect2d rect;
+			rect.x = pos.x+winpos.x;
+			rect.y = pos.y+winpos.y;
+			rect.w = size.x;
+			rect.h = size.y;
+			gui_root->set_screen_rect_base(rect);
 
-			eng->game_focused = focused_window && ImGui::GetIO().MouseDown[1];
+			bool focused_window = scene_hovered;
+			next_focus = focused_window && ImGui::GetIO().MouseDown[1];
 
+			// hook tool for drag and drop stuff
+			if (is_in_an_editor_state())
+				get_current_tool()->hook_scene_viewport_draw();
 		}
-		if (eng->game_focused)
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-		else
-			SDL_SetRelativeMouseMode(SDL_FALSE);
+
+		set_game_focused(next_focus);
+
 		ImGui::End();
+	}
+	else {
+		// normal game path, scene view was already drawn the the window framebuffer
+
+		Rect2d rect;
+		rect.x = 0;
+		rect.y = 0;
+		rect.w = g_window_w.get_integer();
+		rect.h = g_window_h.get_integer();
+
+		gui_root->set_screen_rect_base(rect);
 	}
 
 	if(g_drawimguidemo.get_bool())
@@ -1049,8 +1143,13 @@ void Game_Engine::draw_any_imgui_interfaces()
 
 bool Game_Engine::game_draw_screen()
 {
-	if (get_local_player() == nullptr)
-		return false;
+	if (get_local_player() == nullptr) {
+		SceneDrawParamsEx params;
+		params.draw_world = false;
+		params.draw_ui = true;
+		idraw->scene_draw(params, {}, get_gui(), nullptr);	// not spawned, so just update the UI
+		return true;
+	}
 
 	Player* p = get_local_player();
 	
@@ -1064,7 +1163,8 @@ bool Game_Engine::game_draw_screen()
 
 	View_Setup vs = View_Setup(position, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
-	idraw->scene_draw(vs, nullptr);
+	SceneDrawParamsEx params;
+	idraw->scene_draw(params,vs, get_gui(), nullptr);
 
 	return true;
 }
@@ -1078,22 +1178,23 @@ void Game_Engine::draw_screen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// in main menu, draw the shell screen
-	// in game, draw game and or shell screen
-	// in loading, draw loading
-	// in tool != none, draw tool gui
-
 	if (state == Engine_State::Idle) {
 		// draw general ui
-
-		if (get_current_tool() != nullptr)
-			get_current_tool()->draw_frame();
-
+		if (get_current_tool() != nullptr) {
+			SceneDrawParamsEx params;
+			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui(), get_current_tool());
+		}
+		else {
+			SceneDrawParamsEx params;
+			params.draw_world = false;	// no world to draw
+			idraw->scene_draw(params, {}, get_gui(), nullptr);
+		}
 	}
 	else if (state == Engine_State::Loading) {
-
 		// draw loading ui etc.
-
+		SceneDrawParamsEx params;
+		params.draw_world = false;
+		idraw->scene_draw(params, {}, get_gui(), nullptr);
 	}
 	else if (state == Engine_State::Game) {
 		bool good = game_draw_screen();
@@ -1106,11 +1207,13 @@ void Game_Engine::draw_screen()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// draw imgui interfaces
-	// if a tool is active, this is where drawing of the ui part happens
+	// if a tool is active, game screen gets drawn to an imgui viewport
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui::NewFrame();
+
 	draw_any_imgui_interfaces();
+
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -1240,8 +1343,8 @@ void Game_Engine::init()
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 	state = Engine_State::Idle;
 	is_hosting_game = false;
-	sv = new Server;
-	cl = new Client;
+	sv.reset( new Server );
+	cl.reset( new Client );
 	
 	dbg_console.init();
 
@@ -1251,10 +1354,14 @@ void Game_Engine::init()
 	Profiler::init();
 	FileSys::init();
 
+	g_physics->init();
 	init_audio();
 	network_init();
 	idraw->init();
 	mats.init();
+
+	gui_root.reset(new GUI_RootControl );
+
 	anim_tree_man->init();
 	mods.init();
 	iparticle->init();
@@ -1336,13 +1443,22 @@ void Game_Engine::game_update_tick()
 
 	Debug::on_fixed_update_start();
 
+	// create input
 	make_move();
 	//if (!is_host())
 	//	cl->SendMovesAndMessages();
 
 	time = tick * tick_interval;
 	build_physics_world(0.f);
+	
+	// update entities
 	update_game_tick();
+
+	// update the physics
+	g_physics->simulate_and_fetch(tick_interval);
+
+	// call present() on any entities that need it (get physics results)
+
 	tick += 1;
 
 	//if (is_host()) {
@@ -1359,6 +1475,7 @@ void Game_Engine::game_update_tick()
 	//	tick += 1;
 	//}
 
+	// fixme:
 	CPUSCOPESTART(animation_update); 
 	{
 		for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
@@ -1429,6 +1546,11 @@ void Game_Engine::loop()
 			dt = 0.1;
 		frame_time = dt;
 
+		// reset cursor if in relative mode
+		if (get_game_focused()) {
+			SDL_WarpMouseInWindow(window, saved_mouse_x, saved_mouse_y);
+		}
+
 		// update input
 		memset(keychanges, 0, sizeof keychanges);
 		SDL_Event event;
@@ -1461,17 +1583,21 @@ void Game_Engine::loop()
 				key_event(event);
 				break;
 			}
-			if (get_tool_state() != Eng_Tool_state::None)
-				get_current_tool()->handle_event(event);
+			if (!get_game_focused()) {
+				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
+					continue;
+				if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
+					continue;
+			}
+
+			get_gui()->handle_event(event);
 		}
 
 		// update state
 		switch (state)
 		{
 		case Engine_State::Idle:
-			// later, will add menu controls, now all you can do is use the console to change state
-			SDL_Delay(5);
-
+			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
 
 			if (map_spawned()) {
 				stop_game();
@@ -1490,7 +1616,6 @@ void Game_Engine::loop()
 			execute_map_change();
 			continue; // goto next frame
 			break;
-
 		case Engine_State::Game: {
 			//ASSERT(cl->get_state() == CS_SPAWNED || is_host);
 
@@ -1526,21 +1651,19 @@ void Game_Engine::loop()
 			tick_interval = orig_ti;
 		}break;
 		
-		}	// switch(Engine_State::?)
+		}
 
-		if (tool_state != Eng_Tool_state::None)
+		// can tick() tool when in a game state
+		if (tool_state != Eng_Tool_state::None) {
 			get_current_tool()->tick(frame_time);
+			// hack: when in editor state, still want physics simulation
+			if (state != Engine_State::Game) {
+				float dt = frame_time * g_slomo.get_float();
+				g_physics->simulate_and_fetch(dt);
+			}
+		}
 
 		draw_screen();
-
-		static float next_print = 0;
-		static ConfigVar print_fps("dbg.print_fps", "0",CVAR_BOOL);
-		if (next_print <= 0 && print_fps.get_bool()) {
-			next_print += 2.0;
-			sys_print("fps %f", 1.0 / eng->frame_time);
-		}
-		else if (print_fps.get_bool())
-			next_print -= eng->frame_time;
 
 		Profiler::end_frame_tick();
 	}

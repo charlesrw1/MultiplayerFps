@@ -493,9 +493,9 @@ void main()
 	//FS_OUT_Color = vec4(vec3(get_ao())*randColor(FS_IN_Matid),1.0);
 	//return;
 
-	vec4 tex = texture(basecolor, vec2(FS_IN_Texcoord.x,FS_IN_Texcoord.y));
+	vec4 tex = texture(basecolor, vec2(FS_IN_Texcoord.x,FS_IN_Texcoord.y)) * g_objects[FS_IN_Objid].colorval;
 #ifdef UNLIT
-	FS_OUT_Color = pow(tex,vec4(2.2)) * g_objects[FS_IN_Objid].colorval * g_materials[obj_mat_index].diffuse_tint;
+	FS_OUT_Color = pow(tex,vec4(2.2)) * g_materials[obj_mat_index].diffuse_tint;
 	return;
 #endif
 	

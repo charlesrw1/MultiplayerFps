@@ -159,6 +159,15 @@ class EntityEventBus
 public:
 };
 
+struct UpdateFlags
+{
+	enum Enum : uint8_t
+	{
+		UPDATE = 1,	// pre physics
+		PRESENT = 2,	// post physics
+	};
+};
+
 
 class Entity
 {

@@ -135,6 +135,7 @@ struct MeshLod
 };
 
 class MSkeleton;
+class PhysicsBody;
 class Model
 {
 public:
@@ -169,6 +170,9 @@ public:
 
 	const Bounds& get_bounds() const { return aabb; }
 
+	const PhysicsBody* get_physics_body() const {
+		return collision.get();
+	}
 private:
 	uint32_t uid = 0;
 	string name;
@@ -182,13 +186,14 @@ private:
 	uint32_t merged_vert_offset = 0;
 	RawMeshData data;
 
+	// skeleton + animation data
 	unique_ptr<MSkeleton> skel;
 
-	vector<ModelTag> tags;
+	// collision geometry, if null, then the aabb of the model will be used if the object is used as collision
+	unique_ptr<PhysicsBody> collision;
 
+	vector<ModelTag> tags;
 	vector<Material*> materials;
-	
-	unique_ptr<Physics_Mesh> collision;
 
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
 	bool loaded_in_memory = false;

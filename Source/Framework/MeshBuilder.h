@@ -47,12 +47,18 @@ public:
 	void Push2dQuad(vec2 upper_left, vec2 size);
 	void PushSolidBox(vec3 box_min, vec3 box_max, Color32 color);
 	void PushLineBox(vec3 box_min, vec3 box_max, Color32 color);
+
+
 	void PushOrientedLineBox(vec3 box_min, vec3 box_max, glm::mat4 transform, Color32 color);
 	// line sphere
 	void AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color);
 
 	// GL_TRIANGLES,etc.
 	void Draw(uint32_t gl_type);
+	// can also use these instead
+	static const uint32_t TRIANGLES;
+	static const uint32_t LINES;
+
 
 	const std::vector<MbVertex>& get_v() { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }

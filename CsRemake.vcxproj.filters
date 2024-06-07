@@ -37,6 +37,12 @@
     <Filter Include="Source\Particles">
       <UniqueIdentifier>{2b346765-d73a-4880-bb21-c71a7101ecbc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Render\Editor">
+      <UniqueIdentifier>{cf8e1b25-fcf4-4fec-a387-c9537dd0ce18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\LevelEditor">
+      <UniqueIdentifier>{39dc0eba-3592-4a90-85c5-7d4758977354}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -49,12 +55,6 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Connection.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EditorDocLocal.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EditorDocPublic.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\EmulatedSocket.h">
@@ -393,6 +393,21 @@
     <ClInclude Include="Source\Particles\ParticlesLocal.h">
       <Filter>Source\Particles</Filter>
     </ClInclude>
+    <ClInclude Include="Source\UI.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\UIEditorLocal.h">
+      <Filter>Source\Render\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Rect2d.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EditorDocLocal.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EditorDocPublic.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -402,9 +417,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Connection.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EditorDoc.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game.cpp">
@@ -577,5 +589,14 @@
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
     <ClCompile Include="Source\EditorDocLocal.cpp" />
+    <ClCompile Include="Source\UIEditorLocal.cpp">
+      <Filter>Source\Render\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Physics\Physics2.cpp">
+      <Filter>Source\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EditorDoc.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

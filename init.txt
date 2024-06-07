@@ -3,3 +3,7 @@ thirdperson 1
 
 
 start_ed map Map0
+
+g_draw_physx_scene 31
+g_drawdebugmenu 0
+g_drawimguidemo 0

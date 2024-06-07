@@ -328,6 +328,7 @@ public:
 	virtual void close() override;
 	virtual void tick(float dt) override;
 	virtual bool handle_event(const SDL_Event& event) override;
+	virtual void ui_paint() override {}
 	virtual void overlay_draw() override;
 	virtual const View_Setup& get_vs() override{
 		return out.vs;
@@ -336,7 +337,6 @@ public:
 		return name.c_str();
 	}
 	virtual void imgui_draw() override;
-	virtual void draw_frame() override;
 	virtual void on_change_focus(editor_focus_state newstate) override;
 
 	enum class graph_playback_state {
@@ -432,7 +432,7 @@ public:
 	}
 
 	void draw_node_creation_menu(bool is_state_mode);
-	void draw_menu_bar();
+	void draw_menu_bar() override;
 	void draw_popups();
 	void draw_prop_editor();
 	void handle_imnode_creations(bool* open_popup_menu_from_drop);
