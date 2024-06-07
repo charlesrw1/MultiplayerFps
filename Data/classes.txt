@@ -20,7 +20,7 @@
 	bool can_use_item "0" : "can player use item"
 	int attribute_something "0,0,5" : "something"
 	
-	SET model "mod.cmdl"
+	SET model "boat.cmdl"
 	
 	SIGNAL Fire : "(void) Callled when NPC fires weapon"
 	SIGNAL Killed : "(void) Called when NPC was killed"

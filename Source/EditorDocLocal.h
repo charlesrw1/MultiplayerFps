@@ -172,13 +172,15 @@ public:
 		model_is_dirty = false;
 		std::string s = get_dict().get_string("model");
 		if (!s.empty()) {
-			return mods.find_or_load(s.c_str());
+			current_model = mods.find_or_load(s.c_str());
 		}
-		if (!template_class)
-			return nullptr;
-		if (!template_class->edmodel.empty())
-			return mods.find_or_load(template_class->edmodel.c_str());
-		return nullptr;
+		else if (!template_class)
+			current_model = nullptr;
+		else if (!template_class->edmodel.empty())
+			current_model = mods.find_or_load(template_class->edmodel.c_str());
+		else
+			current_model = nullptr;
+		return current_model;
 	}
 	uint32_t get_uid() {
 		return get_dict().get_int("_editor_uid", 0);

@@ -7,6 +7,8 @@
 #include <physx/geometry/PxCapsuleGeometry.h>
 #include <physx/PxScene.h>
 
+#include "Framework/BinaryReadWrite.h"
+
 #include <physx/foundation/PxFoundation.h>
 #include <physx/PxPhysicsAPI.h>
 #include <physx/PxActor.h>
@@ -16,6 +18,8 @@
 #include <physx/foundation/PxPhysicsVersion.h>
 #include <physx/common/PxTolerancesScale.h>
 
+#include "physx/extensions/PxDefaultStreams.h"
+
 #define COOKING
 
 #include "physx/cooking/PxCooking.h"
@@ -23,6 +27,8 @@
 
 // for debug drawing
 #include "Framework/MeshBuilder.h"
+
+#include "Model.h"
 
 #define WARN_ONCE(a,...) { \
 	static bool has_warned = false; \
@@ -65,7 +71,14 @@ inline glm::quat physx_to_glm(const physx::PxQuat& v) {
 inline physx::PxVec3 glm_to_physx(const glm::vec3& v) {
 	return physx::PxVec3(v.x, v.y, v.z);
 }
+inline physx::PxQuat glm_to_physx(const glm::quat& v) {
+	return physx::PxQuat(v.x, v.y, v.z,v.w);
+}
 
+physx::PxTransform PhysTransform::get_physx() const
+{
+	return physx::PxTransform(glm_to_physx(position), glm_to_physx(rotation));
+}
 class PhysicsManLocal : public PhysicsManPublic
 {
 public:
@@ -130,6 +143,20 @@ public:
 
 	void debug_draw_shapes() override;
 
+	// used only by model loader
+	bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
+		if (def.shape == ShapeType_e::ConvexShape) {
+			uint32_t count = reader.read_int32();
+			uint8_t* data = new uint8_t[count];
+			reader.read_bytes_ptr(data, count);
+			physx::PxDefaultMemoryInputData inp(data, count);
+
+			def.convex_mesh = physics_factory->createConvexMesh(inp);
+		}
+
+		return true;
+	}
+
 	physx::PxMaterial* default_material = nullptr;
 	physx::PxDefaultCpuDispatcher* dispatcher = nullptr;
 	physx::PxDefaultErrorCallback err;
@@ -181,18 +208,42 @@ void PhysicsActor::free()
 		actor = nullptr;
 	}
 }
-
-void PhysicsActor::create_static_sphere_actor(sphere_def_t sphere, const glm::vec3& pos)
+void PhysicsActor::create_static_actor_from_shape(const physics_shape_def& shape, PhysicsShapeType type)
 {
 	if (is_allocated()) {
 		sys_print("??? physics actor wasn't freed before call to create()\n");
 		free();
 	}
-	physx::PxTransform t(glm_to_physx(pos));
-
+	physx::PxTransform t(glm_to_physx(shape.local_p),glm_to_physx(shape.local_q));
 	physx::PxRigidStatic* static_actor = physics_local.physics_factory->createRigidStatic(t);
-	physx::PxShape* sphere_shape = physx::PxRigidActorExt::createExclusiveShape(*static_actor,
-		physx::PxSphereGeometry(sphere.radius),*physics_local.default_material);
+	switch (shape.shape)
+	{
+	case ShapeType_e::Box:
+		physx::PxRigidActorExt::createExclusiveShape(*static_actor,
+			physx::PxBoxGeometry(glm_to_physx(shape.box.halfsize)), *physics_local.default_material);
+		break;
+	case ShapeType_e::Sphere:
+		physx::PxRigidActorExt::createExclusiveShape(*static_actor,
+			physx::PxSphereGeometry(shape.sph.radius), *physics_local.default_material);
+		break;
+	}
+	physics_local.scene->addActor(*static_actor);
+	actor = static_actor;
+}
+void PhysicsActor::create_static_actor_from_model(const Model* model, PhysTransform transform, PhysicsShapeType type)
+{
+	if (!model->get_physics_body())
+		return;
+	auto body = model->get_physics_body();
+	physx::PxRigidStatic* static_actor = physics_local.physics_factory->createRigidStatic(transform.get_physx());
+	for (int i = 0; i < body->num_shapes_of_main; i++) {
+		auto& shape = body->shapes[i];
+		if (shape.shape != ShapeType_e::ConvexShape)
+			continue;
+
+		physx::PxShape* aConvexShape = physx::PxRigidActorExt::createExclusiveShape(*static_actor,
+			physx::PxConvexMeshGeometry(shape.convex_mesh), *physics_local.default_material);
+	}
 	physics_local.scene->addActor(*static_actor);
 	actor = static_actor;
 }
@@ -308,11 +359,8 @@ void PhysicsManLocal::debug_draw_shapes()
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 10.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_AABBS, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
-
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_STATIC, 1.0);
 		init = true;
 	}
 	debug_mesh.Begin();

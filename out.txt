@@ -998,7 +998,7 @@ type "Add_Node_CFG"
 "current_id"  "160"
 "current_layer"  "38"
 "default_editor"  "[editor]
-panning=228,432
+panning=228,325
 
 [node.0]
 origin=599,105
@@ -1049,11 +1049,11 @@ origin=558,292
 "opt.open_control_params"  "1"
 "opt.open_prop_editor"  "1"
 "opt.statemachine_passthrough"  "0"
-"out.camera.position.x"  "1.834414"
-"out.camera.position.y"  "3.221970"
-"out.camera.position.z"  "4.414047"
-"out.camera.yaw"  "4.394117"
-"out.camera.pitch"  "-0.510797"
+"out.camera.position.x"  "0.244833"
+"out.camera.position.y"  "2.932645"
+"out.camera.position.z"  "1.813799"
+"out.camera.yaw"  "4.464118"
+"out.camera.pitch"  "-0.740797"
 "out.camera.move_speed"  "0.093847"
 }
 nodes [

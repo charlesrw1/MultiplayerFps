@@ -17,15 +17,19 @@
 #include "Physics/Physics2.h"
 #include "AssetCompile/Someutils.h"
 #include <stdexcept>
+
+// Physx needed for cooking meshes:
+#include <physx/cooking/PxCooking.h>
+
 // MODEL FORMAT:
 
-static const int MODEL_VERSION = 3;
+static const int MODEL_VERSION = 5;
 
 
 
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-// int version 1
+// int version 5
 // 
 // mat4 root_transform
 // 
@@ -45,6 +49,17 @@ static const int MODEL_VERSION = 3;
 // 
 // VBIB vbib
 // 
+// **PHYSICS DATA:
+// bool has_physics (if false, skip this section)
+// bool can_be_dynamic
+// int num_bodies
+// PSubBodyDef bodies[num_bodies]
+// int num_shapes
+// physics_shape_def shapes[num_shapes] (pointers are serialized as an offset to { int size, data[] })
+// int num_constraints
+// PhysicsBodyConstraintDef constrains[num_contraints]
+// 
+// **ANIMATION DATA:
 // int num_bones
 // mat4 bindpose[num_bones]
 // mat4 invbindpose[num_bones]
@@ -314,6 +329,8 @@ struct LODMesh
 	bool has_normals() const {
 		return (attribute_mask & (1 << CMA_NORMAL));
 	}
+
+	ShapeType_e shape_type = ShapeType_e::None;
 };
 
 struct CompileModLOD
@@ -549,7 +566,7 @@ void append_a_found_mesh_node(
 	const ModelDefData& def,
 	ModelCompileData& mcd,
 	cgltf_node* node,
-	const glm::mat4& transform, bool is_collision_node)
+	const glm::mat4& transform, bool is_collision_node, ShapeType_e shape)
 {
 	ASSERT(node->mesh);
 
@@ -691,6 +708,7 @@ void append_a_found_mesh_node(
 		m.ref.index = cgltf_node_index(mcd.gltf_file, node);
 		m.attribute_mask = attrib_mask;
 		m.mark_for_delete = false;
+		m.shape_type = shape;
 
 		if (is_collision_node)
 			mcd.physics_nodes.push_back(m);
@@ -1234,20 +1252,20 @@ static void traverse_model_nodes(
 	// TRI_
 
 	std::string node_name = node->name;
-	int col_index = -1;
-	if (node_name.find("BOX_")== 0)
-		col_index = 0;
+	ShapeType_e shape = ShapeType_e::None;
+	if (node_name.find("BOX_") == 0)
+		shape = ShapeType_e::Box;
 	else if (node_name.find("CAP_") == 0)
-		col_index = 1;
+		shape = ShapeType_e::Capsule;
 	else if (node_name.find("SPH_") == 0)
-		col_index = 2;
+		shape = ShapeType_e::Sphere;
 	else if (node_name.find("CVX_") == 0)
-		col_index = 3;
+		shape = ShapeType_e::ConvexShape;
 	else if (node_name.find("TRI_") == 0)
-		col_index = 4;
+		shape = ShapeType_e::MeshShape;
 
 	bool has_mesh = node->mesh;
-	if (col_index != -1) {
+	if (shape != ShapeType_e::None) {
 		if (has_mesh)
 			sys_print("*** found collision item %s\n", node_name.c_str());
 		else
@@ -1259,7 +1277,7 @@ static void traverse_model_nodes(
 	}
 
 	if (has_mesh) {
-		 append_a_found_mesh_node(def, mcd, node, this_transform, col_index!=-1);
+		 append_a_found_mesh_node(def, mcd, node, this_transform, shape!= ShapeType_e::None,shape);
 	}
 
 	for (int i = 0; i < node->children_count; i++)
@@ -2349,10 +2367,16 @@ ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const Skeleto
 	output.meshout = std::move(post_mesh_process);
 	return output;
 }
-
+#include "physx/extensions/PxDefaultStreams.h"
 // Last stop for stuff thats getting written out
+struct FinalPhysicsData
+{
+	PhysicsBody body;
+	std::vector<std::unique_ptr<physx::PxDefaultMemoryOutputStream>> output_streams;
+};
 struct FinalModelData
 {
+	FinalPhysicsData final_physics;
 	std::vector<ModelVertex> verticies;
 	std::vector<uint16_t> indicies;
 	std::vector<MeshLod> lods;
@@ -2362,18 +2386,21 @@ struct FinalModelData
 	std::vector<ModelTag> tags;
 };
 
-ModelVertex fatvert_to_mv_skinned(const FATVertex& v)
+ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
 {
 	ModelVertex mv;
 	mv.pos = v.position;
+	mv.pos = transform * glm::vec4(v.position, 1.0);
 	mv.uv = v.uv;
 
 	// quantize
+	glm::vec3 normal = normal_tr * v.normal;
 	for (int i = 0; i < 3; i++) {
-		mv.normal[i] = v.normal[i] * INT16_MAX;
+		mv.normal[i] = normal[i] * INT16_MAX;
 	}
+	glm::vec3 tangent = normal_tr * v.tangent;
 	for (int i = 0; i < 3; i++) {
-		mv.tangent[i] = v.tangent[i] * INT16_MAX;
+		mv.tangent[i] = tangent[i] * INT16_MAX;
 	}
 
 	for (int i = 0; i < 4; i++) {
@@ -2389,18 +2416,82 @@ ModelVertex fatvert_to_mv_skinned(const FATVertex& v)
 
 	return mv;
 }
+#include "physx/cooking/PxCooking.h"
+FinalPhysicsData create_final_physics_data(
+	const std::vector<std::string>& final_mat_names,
+	const std::vector<bool>& mat_is_used,
+	const ModelCompileData& compile,
+	const std::vector<int>& LOAD_to_FINAL_bones,
+	const ModelDefData& def
+)
+{
+	FinalPhysicsData out;
+
+	for (auto& p : compile.physics_nodes) {
+		switch (p.shape_type) {
+		case ShapeType_e::ConvexShape:
+		{
+
+			physx::PxConvexMeshDesc desc;
+			auto buf = std::make_unique<physx::PxDefaultMemoryOutputStream>();
+			physx::PxCookingParams params = physx::PxCookingParams(physx::PxTolerancesScale());
+
+			desc.flags |= physx::PxConvexFlag::eCOMPUTE_CONVEX;
+			desc.flags |= physx::PxConvexFlag::eCHECK_ZERO_AREA_TRIANGLES;
+
+			const int index_start = p.submesh.element_offset / sizeof(uint32_t);	
+			const int vertex_start = p.submesh.base_vertex;
+
+			glm::mat4 transform = p.ref.globaltransform;
+			std::vector<glm::vec3> positions;
+			for (int i = 0; i < p.submesh.vertex_count; i++) {
+				positions.push_back(glm::vec3(transform * glm::vec4(compile.verticies[vertex_start + i].position, 1.0f)));
+			}
+
+			desc.points.count = p.submesh.vertex_count;
+			desc.points.data = positions.data();
+			desc.points.stride = sizeof(glm::vec3);
+
+
+			desc.indices.count = p.submesh.element_count;
+			desc.indices.data = ((uint8_t*)(compile.indicies.data() + index_start));
+			desc.indices.stride = sizeof(uint32_t);
+
+
+			bool good = PxCookConvexMesh(params, desc, *buf.get());
+			
+			if (good) {
+
+				out.body.num_shapes_of_main++;
+				physics_shape_def def;
+				// treating convex_mesh like a void* for serialzing
+				def.convex_mesh = (physx::PxConvexMesh*)buf.get();
+				def.shape = ShapeType_e::ConvexShape;
+				out.output_streams.push_back(std::move(buf));
+				out.body.shapes.push_back(def);
+			}
+		}break;
+
+		}
+	}
+	return out;
+}
 
 
 Submesh make_final_submesh_from_existing(
 	const Submesh& in,
 	FinalModelData& finalmod, 
 	const ModelCompileData& compile, 
-	const std::vector<int>& indirect_mats_out)
+	const std::vector<int>& indirect_mats_out,
+	glm::mat4 transform)
 {
 	Submesh out;
 	out.material_idx = (in.material_idx == -1) ? indirect_mats_out[indirect_mats_out.size() - 1] : indirect_mats_out[in.material_idx];
 	out.element_count = in.element_count;
 	out.vertex_count = in.vertex_count;
+
+	glm::mat4 invtransform = glm::inverse(transform);
+	glm::mat3 normal_tr = glm::mat3(glm::transpose(invtransform));
 
 	const int index_start = in.element_offset / sizeof(uint32_t);
 	const int new_index_start = finalmod.indicies.size();
@@ -2410,7 +2501,7 @@ Submesh make_final_submesh_from_existing(
 	const int vertex_start = in.base_vertex;
 	const int new_vertex_start = finalmod.verticies.size();
 	for (int i = 0; i < in.vertex_count; i++) {
-		finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i]));
+		finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
 	}
 
 	out.base_vertex = new_vertex_start;
@@ -2428,6 +2519,7 @@ FinalModelData create_final_model_data(
 	const ModelDefData& def)
 {
 	FinalModelData final_mod;
+	final_mod.final_physics = create_final_physics_data(final_mat_names, mat_is_used, compile, LOAD_to_FINAL_bones, def);
 
 	std::vector<int> indirect_mats_out(final_mat_names.size(),-1);
 	int count = 0;
@@ -2472,12 +2564,17 @@ FinalModelData create_final_model_data(
 			const LODMesh& lm = lod.mesh_nodes[j];
 			total_bounds = bounds_union(total_bounds, lm.bounds);
 
+			glm::mat4 transform = lm.ref.globaltransform;
+			if (lm.has_bones())
+				transform = glm::mat4(1.0);
+
 			final_mod.submeshes.push_back(
 				make_final_submesh_from_existing(
 					lm.submesh,
 					final_mod,
 					compile,
-					indirect_mats_out
+					indirect_mats_out,
+					transform
 				)
 			);
 		}
@@ -2543,6 +2640,46 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 	out.write_int32(model->verticies.size());
 	out.write_bytes_ptr((uint8_t*)model->verticies.data(), model->verticies.size() * sizeof(ModelVertex));
 	size_t vert_size = out.tell()- marker;
+
+	out.write_int32('HELP');
+
+
+	// **PHYSICS DATA:
+// bool has_physics (if false, skip this section)
+// bool can_be_dynamic
+// 	int num_shapes_main
+// int num_bodies
+// PSubBodyDef bodies[num_bodies]
+// int num_shapes
+// physics_shape_def shapes[num_shapes] (pointers are serialized as an offset to { int size, data[] })
+// int num_constraints
+// PhysicsBodyConstraintDef constrains[num_contraints]
+
+	if (model->final_physics.body.shapes.size() > 0) {
+		auto& body = model->final_physics.body;
+		out.write_byte(1);
+		out.write_byte(body.can_be_dynamic);
+		out.write_int32(body.num_shapes_of_main);
+		out.write_int32(body.subbodies.size());
+		out.write_bytes_ptr((uint8_t*)body.subbodies.data(), body.subbodies.size() * sizeof(PSubBodyDef));
+		out.write_int32(body.shapes.size());
+		for (int i = 0; i < body.shapes.size(); i++) {
+			out.write_bytes_ptr((uint8_t*)&body.shapes[i], sizeof(physics_shape_def));
+			if (body.shapes[i].shape == ShapeType_e::ConvexShape) {
+				physx::PxDefaultMemoryOutputStream* output = (physx::PxDefaultMemoryOutputStream*)body.shapes[i].convex_mesh;
+				out.write_int32(output->getSize());
+				out.write_bytes_ptr(output->getData(), output->getSize());
+
+			}
+			out.write_int32('HELP');
+		}
+		out.write_int32(body.constraints.size());
+		out.write_bytes_ptr((uint8_t*)body.constraints.data(), body.constraints.size() * sizeof(PhysicsBodyConstraintDef));
+	}
+	else {
+		out.write_byte(0);
+	}
+
 
 	out.write_int32('HELP');
 

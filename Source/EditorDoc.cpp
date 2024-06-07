@@ -486,7 +486,7 @@ void EditorNode::show()
 
 	Model* m = get_rendering_model();
 	render_handle = idraw->register_obj();
-
+	physics = g_physics->allocate_physics_actor();
 	if (m) {
 		Render_Object ro;
 		ro.model = m;
@@ -494,6 +494,20 @@ void EditorNode::show()
 		ro.visible = true;
 		ro.param1 = get_rendering_color();
 		idraw->update_obj(render_handle, ro);
+
+		glm::quat q;
+		glm::vec3 p, s;
+		read_transform_from_dict(p, q, s);
+		glm::vec3 halfsize = (m->get_bounds().bmax - m->get_bounds().bmin)*0.5f*glm::abs(s);
+		glm::vec3 center = m->get_bounds().get_center()*s;
+		center = glm::mat4_cast(q) * glm::vec4(center, 1.0);
+		PhysTransform tr;
+		tr.position = p;
+		tr.rotation = q;
+		if (m->get_physics_body())
+			physics->create_static_actor_from_model(m, tr);
+		else
+			physics->create_static_actor_from_shape(physics_shape_def::create_box(halfsize,p+ center,q));
 	}
 	else {
 		Material* mat = get_sprite_material();
@@ -507,10 +521,8 @@ void EditorNode::show()
 		ro.visible = true;
 		idraw->update_obj(render_handle, ro);
 
-		physics = g_physics->allocate_physics_actor();
-		sphere_def_t def;
-		def.radius = 0.25;
-		physics->create_static_sphere_actor( def, position);
+
+		physics->create_static_actor_from_shape(physics_shape_def::create_sphere(position, 0.25));
 	}
 }
 void EditorNode::hide()

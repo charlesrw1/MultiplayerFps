@@ -84,6 +84,23 @@ struct physics_shape_def
 	};
 	glm::vec3 local_p = glm::vec3(0.0);
 	glm::quat local_q = glm::quat(1, 0, 0, 0);
+
+	static physics_shape_def create_sphere(glm::vec3 center, float radius) {
+		physics_shape_def shape;
+		shape.shape = ShapeType_e::Sphere;
+		shape.sph.radius = radius;
+		shape.local_p = center;
+		return shape;
+	}
+	static physics_shape_def create_box(glm::vec3 halfsize, glm::vec3 pos, glm::quat rot = glm::quat(1, 0, 0, 0)) {
+		physics_shape_def shape;
+		shape.shape = ShapeType_e::Box;
+		shape.box.halfsize = halfsize;
+		shape.local_p = pos;
+		shape.local_q = rot;
+		return shape;
+	}
+
 };
 
 class PhysicsBodyConstraintDef
@@ -119,17 +136,21 @@ public:
 
 	bool can_be_dynamic = false;	// set to true if triangle mesh shape not used
 	std::vector<physics_shape_def> shapes;
-	std::vector<PSubBodyDef> subbodies;
-	// contraints used by skeletal meshes
+	uint32_t num_shapes_of_main = 0;	// these are the main collider shapes
+
+	// subbodies that are used by skeletons for ragdolls/hitboxes
 	bool is_skeleton = false;
+	std::vector<PSubBodyDef> subbodies;
 	std::vector<PhysicsBodyConstraintDef> constraints;
 };
 
 struct PhysTransform
 {
 	PhysTransform(const physx::PxTransform& t);
-	glm::vec3 position;
-	glm::quat rotation;
+	PhysTransform() = default;
+	physx::PxTransform get_physx() const;
+	glm::vec3 position=glm::vec3(0.0);
+	glm::quat rotation=glm::quat(0,0,0,0);
 };
 
 enum class PhysicsShapeType
@@ -166,13 +187,11 @@ public:
 
 	// creation functions, if an actor already exists, will warn and delete it, you should explicitly call free()
 	// creates physics from the models collision bodies, falls back to an AABB
-	void create_static_actor_from_model(const Model* model);
+	void create_static_actor_from_model(const Model* model, PhysTransform transform, PhysicsShapeType type = PhysicsShapeType::SimulateAndQuery);
 	void create_dynamic_actor_from_model(const Model* model);
 	// create from primitives
-	void create_static_actor_from_shape(const physics_shape_def& shape);
-	void create_static_box_actor(box_def_t box, const glm::vec3& pos, const glm::quat& rot);
-	void create_static_sphere_actor(sphere_def_t sphere, const glm::vec3& pos);
-	void create_dynamic_sphere_actor(sphere_def_t sphere, const glm::vec3& pos);
+	void create_static_actor_from_shape(const physics_shape_def& shape, PhysicsShapeType type = PhysicsShapeType::SimulateAndQuery);
+	void create_dynamic_actor_from_shape(const physics_shape_def& shape, PhysicsShapeType type = PhysicsShapeType::SimulateAndQuery);
 
 	// set how the actor's shape should simulate, all shapes are the same type
 	// ex: trigger only, query only, query and simulate...
@@ -283,7 +302,7 @@ struct world_query_result
 	uint16_t contents=0;
 	int16_t bone_hit = -1;
 };
-
+class BinaryReader;
 class PhysicsManPublic
 {
 public:
@@ -306,6 +325,9 @@ public:
 
 	// called by renderer only, matrix/shader/etc. already set
 	virtual void debug_draw_shapes() = 0;
+
+	// used only by model loader
+	virtual bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) = 0;
 };
 
 extern PhysicsManPublic* g_physics;
