@@ -29,7 +29,7 @@ ModelMan mods;
 static const char* const model_folder_path = "./Data/Models/";
 
 
-static const int MODEL_FORMAT_VERSION = 5;
+static const int MODEL_FORMAT_VERSION = 6;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;

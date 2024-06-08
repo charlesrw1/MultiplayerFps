@@ -998,7 +998,7 @@ type "Add_Node_CFG"
 "current_id"  "160"
 "current_layer"  "38"
 "default_editor"  "[editor]
-panning=228,325
+panning=228,432
 
 [node.0]
 origin=599,105
@@ -1052,8 +1052,8 @@ origin=558,292
 "out.camera.position.x"  "0.257732"
 "out.camera.position.y"  "4.097573"
 "out.camera.position.z"  "3.516088"
-"out.camera.yaw"  "4.724121"
-"out.camera.pitch"  "-0.620797"
+"out.camera.yaw"  "4.674120"
+"out.camera.pitch"  "-0.530797"
 "out.camera.move_speed"  "0.093847"
 }
 nodes [

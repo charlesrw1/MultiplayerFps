@@ -23,13 +23,13 @@
 
 // MODEL FORMAT:
 
-static const int MODEL_VERSION = 5;
 
 
 
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-// int version 5
+static const int MODEL_VERSION = 6;
+// int version XXX
 // 
 // mat4 root_transform
 // 
@@ -2395,10 +2395,12 @@ ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform
 
 	// quantize
 	glm::vec3 normal = normal_tr * v.normal;
+	normal = glm::normalize(normal);
 	for (int i = 0; i < 3; i++) {
 		mv.normal[i] = normal[i] * INT16_MAX;
 	}
 	glm::vec3 tangent = normal_tr * v.tangent;
+	tangent = glm::normalize(tangent);
 	for (int i = 0; i < 3; i++) {
 		mv.tangent[i] = tangent[i] * INT16_MAX;
 	}

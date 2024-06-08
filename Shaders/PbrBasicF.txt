@@ -423,6 +423,13 @@ vec4 pbr_calculate(vec3 diffuse, float roughness, float metalness, vec3 N, float
 #ifdef LIGHTMAPPED
 	//ambient = mix(ambient*0.2, ambient, sun);
 #endif
+#ifdef DEBUG_SHADER
+	if(g.debug_options == DEBUG_LIGHTING_ONLY)
+		return vec4(kD*irradiance+specular*micro_ao*ao,1.0);
+	else if(g.debug_options == DEBUG_AO)
+		return vec4(ao,ao,ao,1.0);
+
+#endif
 
 	//float sun_shadow = sample_sun_shadow(FS_IN_FragPos)*max(dot(N, L),0.0);
 	//ambient += emissive + Lo;
@@ -529,10 +536,10 @@ void main()
 	if(tex.a < 0.5)
 		discard;
 #endif
-#if 1
 
 	vec3 V = normalize(g.viewpos_time.xyz-FS_IN_FragPos);
-	vec3 N = normalize(FS_IN_Normal);
+	vec3 Normalized_IN_N = normalize(FS_IN_Normal);
+	vec3 N = Normalized_IN_N;
 	vec3 R = reflect(-V,N);
 	vec3 IN_N = N;
 	
@@ -582,25 +589,29 @@ vec3 normal_tex_rgb = N;
 	
 	}
 	roughness_metal = vec2(0.5,0.0);
-	#ifndef ANIMATED
-	#endif
-	#ifdef ANIMATED
-	//emissive = vec3(5.0,1.0,1.0);
-	#endif
 
 
 	FS_OUT_Color = pbr_calculate(tex.rgb,roughness_metal.r, roughness_metal.g, N, 1.0,emissive, ambient_occlusion).rgbb;
 	
+
+#ifdef DEBUG_SHADER
+	if(g.debug_options == DEBUG_OBJID)
+		FS_OUT_Color.rgb = randColor(FS_IN_Objid);
+	else if(g.debug_options == DEBUG_MATID)
+		FS_OUT_Color.rgb = randColor(FS_IN_Matid);
+	else if(g.debug_options == DEBUG_NORMAL)
+		FS_OUT_Color.rgb = (N*0.5+vec3(0.5));
+	else if(g.debug_options == DEBUG_ALBEDO)
+		FS_OUT_Color.rgb = tex.rgb;
+	else if(g.debug_options == DEBUG_WIREFRAME)
+		FS_OUT_Color = vec4(0.0,0.5,0.5,1.0);
+#endif // DEBUG_SHADER
+
+// for overlaying on the editor mainly
 #ifdef COLOR_OVERLAY
 	vec4 co = unpackUnorm4x8(g_objects[FS_IN_Objid].colorval2);
 	FS_OUT_Color.rgb = FS_OUT_Color.rgb + co.rgb * co.a;//mix(FS_OUT_Color.rgb, co.rgb, co.a);
-#endif
-	
-	//FS_OUT_Color = vec4(N,1.0);
-	//FS_OUT_Color = vec4(roughness_metal.r, roughness_metal.g,0.0,0.0);
-	//FS_OUT_Color = vec4(FS_IN_Normal, 1.0);
+#endif // COLOR_OVERLAY
 
-#endif
-//#endif
 
 }	

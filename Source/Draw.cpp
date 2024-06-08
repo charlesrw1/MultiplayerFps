@@ -49,8 +49,7 @@ static const int SSAO_TEX_LOC = 8;
 
 extern ConfigVar g_debug_skeletons;
 
-ConfigVar draw_collision_tris("r.draw_collision_tris","0",CVAR_BOOL);
-ConfigVar draw_sv_colliders("r.draw_sv_col","0",CVAR_BOOL);
+
 ConfigVar draw_viewmodel("r.draw_viewmodel","1",CVAR_BOOL);
 ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL);
 ConfigVar shadow_quality_setting("r.shadow_setting","0",CVAR_INTEGER,0,3);
@@ -58,6 +57,24 @@ ConfigVar enable_bloom("r.bloom","1",CVAR_BOOL);
 ConfigVar enable_volumetric_fog("r.vol_fog","0",CVAR_BOOL);
 ConfigVar enable_ssao("r.ssao","1",CVAR_BOOL);
 ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL);
+ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV);
+
+/*
+Defined in Shaders/SharedGpuTypes.txt
+
+const uint DEBUG_NONE = 0;
+const uint DEBUG_NORMAL = 1;
+const uint DEBUG_MATID = 2;
+const uint DEBUG_SHADERID = 3;
+const uint DEBUG_WIREFRAME = 4;
+const uint DEBUG_ALBEDO = 5;
+const uint DEBUG_DIFFUSE = 6;
+const uint DEBUG_SPECULAR = 7;
+const uint DEBUG_OBJID = 8;
+const uint DEBUG_LIGHTING_ONLY = 9;
+
+*/
+ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, 0, 9);
 
 // Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
 uint32_t hash(uint32_t x, uint32_t seed) {
@@ -663,6 +680,7 @@ program_handle compile_mat_shader(shader_key key)
 	if (key.billboard_type == (int)billboard_setting::ROTATE_AXIS || key.billboard_type == (int)billboard_setting::FACE_CAMERA) params += "BILLBOARD,";
 	else if (key.billboard_type == (int)billboard_setting::SCREENSPACE) params += "BILLBOARD_SCREENSPACE,";
 	if (key.color_overlay) params += "COLOR_OVERLAY,";
+	if (key.debug) params += "DEBUG_SHADER,";
 	if (!params.empty())params.pop_back();
 
 	printf("INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
@@ -810,6 +828,8 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 		constants.forcecubemap = -1.0;
 
 	constants.custom_clip_plane = custom_clip_plane;
+
+	constants.debug_options = r_debug_mode.get_integer();
 
 	glNamedBufferData(ubo, sizeof gpu::Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
 }
@@ -1416,9 +1436,11 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 			pass = &scene.transparents;
 		}
 
-		execute_render_lists(*lists, *pass);
-
-		//render_lists_old_way(*lists, *pass);
+		// renderdoc seems to hate mdi for some reason, so heres an option to disable it
+		if(dont_use_mdi.get_bool())
+			render_lists_old_way(*lists, *pass);
+		else
+			execute_render_lists(*lists, *pass);
 	}
 
 	glCheckError();
@@ -2766,8 +2788,12 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	shadowmap.update();
 
 	//volfog.compute();
+	const bool is_wireframe_mode = r_debug_mode.get_integer() == gpu::DEBUG_WIREFRAME;
+	if(is_wireframe_mode)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	// depth prepass
+	if (!is_wireframe_mode)
 	{
 		GPUSCOPESTART("Depth prepass");
 		Render_Level_Params params;
@@ -2802,8 +2828,10 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
 
-		glDepthMask(GL_FALSE);
-		glDepthFunc(GL_EQUAL);
+		if (!is_wireframe_mode) {
+			glDepthMask(GL_FALSE);
+			glDepthFunc(GL_EQUAL);
+		}
 		render_level_to_target(params);
 		glDepthFunc(GL_LESS);
 		glDepthMask(GL_TRUE);
@@ -2818,12 +2846,17 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
-		glDepthMask(GL_FALSE);
-		glDepthFunc(GL_LEQUAL);
+		if (!is_wireframe_mode) {
+			glDepthMask(GL_FALSE);
+			glDepthFunc(GL_LEQUAL);
+		}
 		render_level_to_target(params);
 		glDepthMask(GL_TRUE);
 	}
 	set_blend_state(blend_state::OPAQUE);
+
+	if (is_wireframe_mode)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	//multidraw_testing();
@@ -2989,7 +3022,12 @@ program_handle Renderer::get_mat_shader(bool has_animated_matricies, bool color_
 	key.dither = dither;
 	key.billboard_type = (int)mat->billboard;
 	key.color_overlay = color_overlay;
-	
+#ifdef _DEBUG
+	key.debug = (r_debug_mode.get_integer()!=0);
+#else 
+	key.debug = false;
+#endif
+
 	key = get_real_shader_key_from_shader_type(key);
 	program_handle handle = mat_table.lookup(key);
 	if (handle != -1) return handle;

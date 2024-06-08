@@ -483,7 +483,7 @@ struct shader_key
 		dither = 0;
 		billboard_type = 0;
 	}
-	uint32_t shader_type : 23;
+	uint32_t shader_type : 22;
 	uint32_t animated : 1;
 	uint32_t alpha_tested : 1;
 	uint32_t normal_mapped : 1;
@@ -492,6 +492,7 @@ struct shader_key
 	uint32_t dither : 1;
 	uint32_t billboard_type : 2;
 	uint32_t color_overlay : 1;
+	uint32_t debug : 1;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
