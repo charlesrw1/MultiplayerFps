@@ -74,6 +74,7 @@ enum class material_type : uint8_t
 	WATER,
 	UNLIT,
 	OUTLINE_HULL,
+	SELECTION_PULSE,
 
 	CUSTOM,	// custom vertex+fragment shader
 };
@@ -120,10 +121,6 @@ public:
 	bool alpha_tested = false;
 	bool backface = false;
 	billboard_setting billboard = billboard_setting::NONE;
-
-	// for custom shaders
-	std::string custom_vertex_shader;
-	std::string custom_fragment_shader;
 
 	int physics = 0;	// physics of surface
 

@@ -16,6 +16,11 @@
 #include "Framework/ReflectionRegisterDefines.h"
 #include "Framework/StdVectorReflection.h"
 
+#include "Physics/Physics2.h"
+#include "External/ImGuizmo.h"
+
+extern ConfigVar g_mousesens;
+
 class ConnectionList : public IArrayHeader
 {
 	using IArrayHeader::IArrayHeader;
@@ -81,6 +86,7 @@ public:
 	ObjectConnections connections;
 
 	std::string edimage;
+	std::string edtype;
 	std::string edmodel;
 	Color32 edcolor;
 
@@ -132,6 +138,8 @@ public:
 	virtual void hide();
 	virtual void show();
 
+	virtual EditorNode* duplicate();
+
 	virtual void per_frame_tick() {}
 
 	void init_on_new_espawn();
@@ -165,7 +173,10 @@ public:
 		r = glm::quat(get_dict().get_vec3("rotation"));
 		s = get_dict().get_vec3("scale",glm::vec3(1));
 	}
-
+	void set_model(const std::string& name) {
+		get_dict().set_string("model", name.c_str());
+		model_is_dirty = true;
+	}
 	Model* get_rendering_model() {
 		if (!model_is_dirty)
 			return current_model;
@@ -198,12 +209,16 @@ public:
 	void write_dict_value(std::string key, std::string value);
 
 	void init_from_schema(const ObjectSchema* t);
+
+	void set_selected(bool selected) {
+		is_selected = selected;
+	}
 private:
 	Dict dictionary;
 	std::vector<SignalProperty> signals;
 	const ObjectSchema* template_class = nullptr;
 	friend class EdPropertyGrid;
-
+	bool is_selected = false;
 	bool model_is_dirty = true;
 	 Model* current_model = nullptr;
 };
@@ -250,7 +265,13 @@ class UndoRedoSystem
 {
 public:
 	UndoRedoSystem() {
-		hist.resize(HIST_SIZE);
+		hist.resize(HIST_SIZE,nullptr);
+	}
+	void clear_all() {
+		for (int i = 0; i < hist.size(); i++) {
+			delete hist[i];
+			hist[i] = nullptr;
+		}
 	}
 	void add_command(Command* c) {
 		if (hist[index]) {
@@ -280,6 +301,7 @@ public:
 			sys_print("*** nothing to undo\n");
 		}
 	}
+
 
 	const int HIST_SIZE = 128;
 	int index = 0;
@@ -333,7 +355,6 @@ class AssetBrowser
 public:
 	// indexes filesystem for resources
 	void init();
-	void update();
 	void imgui_draw();
 
 	//void increment_index(int amt);
@@ -403,21 +424,8 @@ class ObjectOutliner
 {
 public:
 	void draw();
-	void free_reference(const EditorNode* node) {
-		if (selected == node) {
-			selected = nullptr;
-		}
-	}
-	void set_selected(EditorNode* node) {
-		selected = node;
-	}
-	EditorNode* get_selected() {
-		return selected;
-	}
 private:
 	void draw_table_R( EditorNode* node, int depth);
-
-	EditorNode* selected = nullptr;
 };
 
 class ObjectPlacerTool
@@ -466,6 +474,136 @@ private:
 
 };
 
+class OrthoCamera
+{
+public:
+	glm::vec3 position = glm::vec3(0.0);
+	float width = 10.0;
+	glm::vec3 front = glm::vec3(1, 0, 0);
+	glm::vec3 up = glm::vec3(0, 1, 0);
+	glm::vec3 side = glm::vec3(0, 0, 1);
+
+	float far = 200.0;
+	void set_position_and_front(glm::vec3 position, glm::vec3 front) {
+		this->position = position;
+		this->front = front;
+		if (abs(dot(front, glm::vec3(0, 1, 0))) > 0.999) {
+			up = glm::vec3(1, 0, 0);
+		}
+		else
+			up = glm::vec3(0, 1, 0);
+		side = cross(up, front);
+	}
+
+	void scroll_callback(int amt) {
+		width += (width * 0.5) * amt;
+		if (abs(width) < 0.000001)
+			width = 0.0001;
+	}
+	void update_from_input(const bool keys[], int mouse_dx, int mouse_dy, float aspectratio) {
+		position += side * (g_mousesens.get_float() * mouse_dx) * width;
+		position += up * (g_mousesens.get_float() * mouse_dy) * width * aspectratio;
+	}
+	glm::mat4 get_view_matrix() const {
+		return glm::lookAt(position, position+front, up);
+	}
+	glm::mat4 get_proj_matrix(float aspect_ratio) const {
+		return glm::ortho(-width, width, -width*aspect_ratio, width * aspect_ratio,0.001f, 100.0f);
+	}
+};
+using SharedNodeList = std::vector<std::shared_ptr<EditorNode>>;
+class SelectionState
+{
+public:
+	bool has_any_selected() const { return num_selected() > 0; }
+	int num_selected() const { return selected_nodes.size(); }
+	const SharedNodeList& get_selection() const { return selected_nodes; }
+	void add_to_selection(const std::shared_ptr<EditorNode>& node) {
+		if (get_index(node.get())==-1) {
+			selected_nodes.push_back(node);
+			selection_dirty = true;
+		}
+		node->set_selected(true);
+	}
+	void remove_from_selection(EditorNode* node) {
+		int index = get_index(node);
+		if (index != -1) {
+			selected_nodes.erase(selected_nodes.begin() + index);
+			selection_dirty = true;
+		}
+		node->set_selected(false);
+	}
+	void clear_all_selected() {
+		for (int i = 0; i < selected_nodes.size(); i++) {
+			selected_nodes[i]->set_selected(false);
+			selected_nodes[i]->show();	// update the model
+		}
+		selected_nodes.clear();
+		selection_dirty = true;
+	}
+	void set_select_only_this(const std::shared_ptr<EditorNode>& node) {
+		clear_all_selected();
+		add_to_selection(node);
+	}
+	bool is_selection_dirty() const { return selection_dirty; }
+	void clear_selection_dirty() { selection_dirty = false; }
+	bool is_node_selected(EditorNode* node) const {
+		return get_index(node) != -1;
+	}
+private:
+	int get_index(EditorNode* node) const {
+		for (int i = 0; i < selected_nodes.size(); i++) {
+			if (selected_nodes[i].get() == node)
+				return i;
+		}
+		return -1;
+	}
+
+	bool selection_dirty = false;
+	SharedNodeList selected_nodes;
+};
+
+class ManipulateTransformTool
+{
+public:
+	void update();
+	void handle_event(const SDL_Event& event);
+	bool is_hovered();
+	bool is_using();
+
+	void free_refs() {
+		saved_of_set.clear();
+	}
+private:
+	void swap_mode() {
+		if (mode == ImGuizmo::LOCAL)
+			mode = ImGuizmo::WORLD;
+		else
+			mode = ImGuizmo::LOCAL;
+	}
+	enum StateEnum {
+		IDLE,
+		MANIPULATING_OBJS,
+	}state = IDLE;
+
+	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
+	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
+	glm::mat4 current_transform_of_group = glm::mat4(1.0);
+	
+	bool has_translation_snap = true;
+	float translation_snap = 1.0;
+	bool has_scale_snap = true;
+	float scale_snap = 1.0;
+	bool has_rotation_snap = true;
+	float rotation_snap = 45.0;
+
+	struct SavedTransform {
+		glm::mat4 pretransform;
+		std::shared_ptr<EditorNode> node;
+	};
+	std::vector<SavedTransform> saved_of_set;
+};
+
 class Model;
 class EditorDoc : public IEditorTool
 {
@@ -488,20 +626,23 @@ public:
 		return "temp/path/to/map";
 	}
 
+
+	void duplicate_selected_and_select_them();
+
 	void remove_any_references(EditorNode* node);
 
-	void hook_scene_viewport_draw();
+	void hook_imgui_newframe() override {
+		ImGuizmo::BeginFrame();
+	}
+	void hook_scene_viewport_draw() override;
 
-	RayHit cast_ray_into_world(Ray* out_ray, int mx, int my);
+	world_query_result cast_ray_into_world(Ray* out_ray, int mx, int my);
 
 	void save_doc();
 	
 	enum ToolMode {
-		TOOL_NONE,	// can select objects in viewport
-		TOOL_SPAWN_MODEL,	// clicking spawns selected model
-		TOOL_SPAWN_OBJ,
 		TOOL_TRANSFORM,	// translation/rotation/scale tool
-	}mode = TOOL_NONE;
+	}mode = TOOL_TRANSFORM;
 
 	bool local_transform = false;
 	TransformType transform_tool_type;
@@ -511,7 +652,7 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
-	std::shared_ptr<EditorNode> selected_node;
+	SelectionState selection_state;
 
 	// dont want to deal with patching up another index
 	int get_node_index(EditorNode* node) {
@@ -531,8 +672,13 @@ public:
 	MapLoadFile editing_map;
 	EditorSchemaManager ed_schema;
 	ObjectOutliner outliner;
+	ManipulateTransformTool manipulate;
 
+	bool using_ortho = false;
 	User_Camera camera;
+	OrthoCamera ortho_camera;
+
+
 	std::vector<std::shared_ptr<EditorNode>> nodes;
 	std::vector<std::string> ent_files;
 

@@ -4,7 +4,6 @@
 #include "glm/glm.hpp"
 #include "Framework/Util.h"
 #include "Types.h"
-#include "Level.h"
 #include "GlmInclude.h"
 #include "Framework/MeshBuilder.h"
 #include "Shader.h"
@@ -484,7 +483,7 @@ struct shader_key
 		dither = 0;
 		billboard_type = 0;
 	}
-	uint32_t shader_type : 24;
+	uint32_t shader_type : 23;
 	uint32_t animated : 1;
 	uint32_t alpha_tested : 1;
 	uint32_t normal_mapped : 1;
@@ -492,6 +491,7 @@ struct shader_key
 	uint32_t depth_only : 1;
 	uint32_t dither : 1;
 	uint32_t billboard_type : 2;
+	uint32_t color_overlay : 1;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -656,7 +656,7 @@ public:
 
 	Render_Scene scene;
 
-	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither);
+	program_handle get_mat_shader(bool is_animated, bool color_overlay, const Model* mod, const Material* gs, bool depth_pass, bool dither);
 	
 	Render_Stats stats;
 
@@ -728,6 +728,7 @@ private:
 
 	MeshBuilder shadowverts;
 
+	float current_time = 0.0;
 };
 
 extern Renderer draw;

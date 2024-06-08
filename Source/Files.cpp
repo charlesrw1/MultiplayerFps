@@ -151,6 +151,7 @@ void FileSys::init()
 {
 	sys_print("------ FileSys init ------\n");
 
+	// updates working directory to ./CsRemake/*
 	char own_path[256];
 	HMODULE hModule = GetModuleHandleA(NULL);
 	if (hModule != NULL)

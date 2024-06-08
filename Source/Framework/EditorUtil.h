@@ -1,0 +1,120 @@
+#pragma once
+#include <string>
+#include "imgui.h"
+#include "Framework/Files.h"
+#include "Framework/Util.h"
+/* "./Data/Animations/Graphs/%s" */
+template<typename FUNCTOR>
+static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog)
+{
+	static bool alread_exists = false;
+	static bool cant_open_path = false;
+	static char buffer[256];
+	static bool init = true;
+	if (init) {
+		buffer[0] = 0;
+		alread_exists = false;
+		cant_open_path = false;
+		init = false;
+	}
+	bool write_out = false;
+
+	bool returned_true = false;
+	if (!alread_exists || !is_save_dialog) {
+		ImGui::Text("Enter path: ");
+		ImGui::SameLine();
+		returned_true = ImGui::InputText("##pathinput", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
+	}
+
+	if (returned_true) {
+		const char* full_path = string_format("%s%s",path_prefix.c_str(), buffer);
+		bool file_already_exists = FileSys::does_os_file_exist(full_path);
+		cant_open_path = false;
+		alread_exists = false;
+
+		if (is_save_dialog) {
+
+			if (file_already_exists)
+				alread_exists = true;
+			else {
+				std::ofstream test_open(full_path);
+				if (!test_open)
+					cant_open_path = true;
+			}
+			if (!alread_exists && !cant_open_path) {
+				write_out = true;
+			}
+		}
+		else {
+
+			if (file_already_exists)
+				write_out = true;
+			else
+				cant_open_path = true;
+
+		}
+	}
+	if (alread_exists) {
+
+		if (is_save_dialog) {
+
+			ImGui::Text("File already exists. Overwrite?");
+			if (ImGui::Button("Yes")) {
+				write_out = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("No")) {
+				alread_exists = false;
+			}
+		}
+		else {
+			// open file dialog
+			write_out = true;
+		}
+	}
+	else if (cant_open_path) {
+		ImGui::Text("Cant open path\n");
+	}
+	ImGui::Separator();
+	if (ImGui::Button("Cancel")) {
+		init = true;
+		ImGui::CloseCurrentPopup();
+	}
+
+	if (write_out) {
+		init = true;
+		ImGui::CloseCurrentPopup();
+		callback(buffer);
+	}
+
+	ImGui::EndPopup();
+}
+
+static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup, std::string& name, IEditorTool* tool, const std::string& prefix)
+{
+	if (open_open_popup) {
+		ImGui::OpenPopup("Open file dialog");
+		open_open_popup = false;
+	}
+	if (open_save_popup) {
+		ImGui::OpenPopup("Save file dialog");
+		open_save_popup = false;
+	}
+
+	if (ImGui::BeginPopupModal("Save file dialog")) {
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are saved under %s",prefix.c_str());
+		open_or_save_file_dialog([&](const char* buf) {
+			name = buf;
+			tool->save_document();
+			}, prefix.c_str(), true);
+	}
+
+	if (ImGui::BeginPopupModal("Open file dialog")) {
+
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are searched in $WorkingDir/Data/Animations/Graphs");
+		open_or_save_file_dialog([&](const char* buf) {
+			tool->open(buf);
+			}, prefix.c_str(), false);
+	}
+}
+/* "./Data/Animations/Graphs/"*/

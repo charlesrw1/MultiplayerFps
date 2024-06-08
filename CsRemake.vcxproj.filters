@@ -43,6 +43,15 @@
     <Filter Include="Source\LevelEditor">
       <UniqueIdentifier>{39dc0eba-3592-4a90-85c5-7d4758977354}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Framework\Render">
+      <UniqueIdentifier>{e4a8ee42-4202-461c-b21c-125dd955e5e6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Framework\Containers">
+      <UniqueIdentifier>{a306bb3e-66bd-4c4c-954d-35499d528260}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Framework\Editor">
+      <UniqueIdentifier>{16da7ef5-e3c3-4541-9e27-fcc1fa42cc72}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -96,22 +105,10 @@
     <ClInclude Include="Source\Framework\beziercurveeditor.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\BVH.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\Bytepacker.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Config.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Dict.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\DictParser.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\DictWriter.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\EnumDefReflection.h">
@@ -123,22 +120,10 @@
     <ClInclude Include="Source\Framework\Factory.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\FreeList.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\Handle.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\InlineVec.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\MathLib.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\MemArena.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\MeshBuilder.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\MyImguiLib.h">
@@ -169,9 +154,6 @@
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\TypeInfo.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Vs.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\WriteObject.h">
@@ -408,6 +390,43 @@
     <ClInclude Include="Source\EditorDocPublic.h">
       <Filter>Source\LevelEditor</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\MemArena.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h">
+      <Filter>Source\Framework\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Vs.h">
+      <Filter>Source\Framework\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MeshBuilder.h">
+      <Filter>Source\Framework\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\BVH.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\DictWriter.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\DictParser.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Dict.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\FreeList.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\InlineVec.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DynamicMesh.h" />
+    <ClInclude Include="Source\External\ImGuizmo.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\EditorUtil.h">
+      <Filter>Source\Framework\Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -446,22 +465,13 @@
     <ClCompile Include="Source\Socket.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\BVHBuild.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\Config.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\DictParser.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\ExpressionLang.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\MeshBuilder.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\MyImguiLib.cpp">
@@ -597,6 +607,24 @@
     </ClCompile>
     <ClCompile Include="Source\EditorDoc.cpp">
       <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp">
+      <Filter>Source\Framework\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\MeshBuilder.cpp">
+      <Filter>Source\Framework\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\BVHBuild.cpp">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\DictParser.cpp">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\External\ImGuizmo.cpp">
+      <Filter>Source\External</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\EditorUtil.cpp">
+      <Filter>Source\Framework\Editor</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

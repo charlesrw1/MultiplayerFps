@@ -14,7 +14,7 @@ struct Object_Instance
 	vec4 colorval;
 	uint anim_mat_offset;
 	uint opposite_dither;
-	float obj2;
+	uint colorval2;
 	float obj3;
 };
 

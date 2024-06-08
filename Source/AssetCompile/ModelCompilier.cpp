@@ -2562,11 +2562,17 @@ FinalModelData create_final_model_data(
 				continue;
 
 			const LODMesh& lm = lod.mesh_nodes[j];
-			total_bounds = bounds_union(total_bounds, lm.bounds);
 
 			glm::mat4 transform = lm.ref.globaltransform;
 			if (lm.has_bones())
 				transform = glm::mat4(1.0);
+
+			glm::vec3 a = transform * glm::vec4(lm.bounds.bmin,1.0);
+			glm::vec3 b = transform * glm::vec4(lm.bounds.bmax, 1.0);
+			Bounds bounds = Bounds(a);
+			bounds = bounds_union(bounds, b);
+
+			total_bounds = bounds_union(total_bounds, bounds);
 
 			final_mod.submeshes.push_back(
 				make_final_submesh_from_existing(

@@ -246,6 +246,7 @@ void Game_Material_Manager::init()
 	unlit->type = material_type::UNLIT;
 	unlit->texture_are_loading_in_memory = true;
 
+
 	outline_hull = create_temp_shader("_outlinehull");
 	outline_hull->blend = blend_state::OPAQUE;
 	outline_hull->type = material_type::OUTLINE_HULL;

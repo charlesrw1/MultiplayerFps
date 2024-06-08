@@ -10,6 +10,16 @@
 	EVENT Activate : "(void) activate an entity from dormancy"
 }
 
+"StaticMesh" {
+	inherits BaseEntity
+	bool cast_shadow "1"
+	bool has_collisions "1"
+}
+
+"PhysicsProp" {
+	inherits BaseEntity
+}
+
 "NPC" : "a default NPC" {
 	inherits BaseEntity
 	_edimage "icon/smile.png"
@@ -36,18 +46,7 @@
 	cppclass _classname "Player"
 }
 
-"WedgeBrush" {
-	inherits BaseEntity
-	SET model "wedge.cmdl"
-}
-"CubeBrush" {
-	inherits BaseEntity
-	SET model "cube.cmdl"
-}
-"CylinderBrush" {
-	inherits BaseEntity
-	SET model "cylinder.cmdl"
-}
+
 
 "Trigger" {
 	inherits BaseEntity

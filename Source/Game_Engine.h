@@ -7,12 +7,11 @@
 #include "Physics.h"
 #include "Entity.h"
 
-#include "IEditorTool.h"
-
 #include "Debug.h"
 
 using glm::vec3;
 
+class IEditorTool;
 class Player;
 class Model;
 class Game_Media

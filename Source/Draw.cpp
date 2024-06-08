@@ -3,24 +3,28 @@
 #include "Framework/Util.h"
 #include "glad/glad.h"
 #include "Texture.h"
-#include "Game_Engine.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
-
-#include "Entity.h"
-
 #include "Animation/SkeletonData.h"
 
-#include "Physics/Physics2.h"
+#include "Physics/Physics2.h"	// for g_physics->debug_draw()
+#include "UI.h"					// for gui->ui_paint()
+#include "IEditorTool.h"		// for overlay_draw()
 
-#ifdef EDITDOC
-#include "EditorDocPublic.h"
-#endif
+#include "Debug.h"
+
+#include <SDL2/SDL.h>
+
+#include "Level.h"
 
 //#pragma optimize("", off)
+
+extern ConfigVar g_window_w;
+extern ConfigVar g_window_h;
+extern ConfigVar g_window_fullscreen;
 
 Renderer draw;
 RendererPublic* idraw = &draw;
@@ -658,6 +662,7 @@ program_handle compile_mat_shader(shader_key key)
 	if (type == material_type::UNLIT) params += "UNLIT,";
 	if (key.billboard_type == (int)billboard_setting::ROTATE_AXIS || key.billboard_type == (int)billboard_setting::FACE_CAMERA) params += "BILLBOARD,";
 	else if (key.billboard_type == (int)billboard_setting::SCREENSPACE) params += "BILLBOARD_SCREENSPACE,";
+	if (key.color_overlay) params += "COLOR_OVERLAY,";
 	if (!params.empty())params.pop_back();
 
 	printf("INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
@@ -777,7 +782,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.viewproj = vs.viewproj;
 	constants.invview = glm::inverse(vs.view);
 	constants.invproj = glm::inverse(vs.proj);
-	constants.viewpos_time = glm::vec4(vs.origin, eng->time);
+	constants.viewpos_time = glm::vec4(vs.origin, this->current_time);
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
 
@@ -1553,17 +1558,7 @@ void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
 	}
 }
 
-glm::mat4 Entity::get_world_transform()
-{
-	mat4 model;
-	model = glm::translate(mat4(1), position);
-	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
-	model = glm::scale(model, vec3(1.f));
 
-	return model;
-}
-
-#include "Player.h"
 #include <algorithm>
 
 
@@ -1628,7 +1623,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, 
 {
 	draw_call_key key;
 
-	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, proxy.model, material, (type == pass_type::DEPTH), proxy.dither);
+	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, proxy.color_overlay, proxy.model, material, (type == pass_type::DEPTH), proxy.dither);
 	key.blending = (uint64_t)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
@@ -2038,9 +2033,6 @@ void Render_Scene::build_scene_data()
 						depth.add_object(proxy, objhandle, mat, 0, j, 0);
 						opaque.add_object(proxy, objhandle, mat, 0,j, 0);
 					}
-					if (proxy.color_overlay) {
-						transparents.add_object(proxy, objhandle, mats.unlit, 0, j, 1);
-					}
 				}
 
 				if (proxy.animator) {
@@ -2071,6 +2063,7 @@ void Render_Scene::build_scene_data()
 				}
 				gpu_objects[i].colorval = to_vec4(proxy.param1);
 				gpu_objects[i].opposite_dither = (uint32_t)proxy.opposite_dither;
+				gpu_objects[i].colorval2 = proxy.param2.to_uint();
 			}
 		}
 		glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
@@ -2172,88 +2165,6 @@ struct Culling_Data_Ubo
 	int enable_culling;
 };
 
-
-class Persistently_Mapped_Buffer
-{
-public:
-	// initializes with a tripple buffered buffer of size size_per_buffer
-	// call this again if you need to resize the buffer
-	void init(uint32_t size_per_buffer) {
-		if (buffer != 0) {
-			glUnmapNamedBuffer(buffer);
-			glDeleteBuffers(1, &buffer);
-		}
-		glCreateBuffers(1, &buffer);
-
-		this->size_per_buffer = size_per_buffer;
-		total_size = size_per_buffer * 3;
-		
-		uint32_t mapflags = GL_MAP_COHERENT_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT;
-		glNamedBufferStorage(buffer, total_size, nullptr, mapflags);
-		ptr = glMapNamedBufferRange(buffer, 0, total_size, mapflags);
-		
-		syncobjs[0] = syncobjs[1] = syncobjs[2] = 0;
-		index = 0;
-	}
-
-	// waits for fence and returns the pointer to the area good for writing
-	// only call this once per frame to get pointer as it increments what sub-buffer it uses
-	void* wait_and_get_write_ptr() {
-		index = (index + 1) % 3;
-
-		if (syncobjs[index] != 0) {
-			GLbitfield waitFlags = 0;
-			GLuint64 waitDuration = 0;
-			while (1) {
-				GLenum waitRet = glClientWaitSync(syncobjs[index], waitFlags, waitDuration);
-				if (waitRet == GL_ALREADY_SIGNALED || waitRet == GL_CONDITION_SATISFIED) {
-					return (char*)ptr + size_per_buffer * index;
-				}
-
-				if (waitRet == GL_WAIT_FAILED) {
-					assert(!"Not sure what to do here. Probably raise an exception or something.");
-					return nullptr;
-				}
-
-				// After the first time, need to start flushing, and wait for a looong time.
-				waitFlags = GL_SYNC_FLUSH_COMMANDS_BIT;
-				waitDuration = 100'000'000;
-			}
-		}
-		return (char*)ptr + size_per_buffer * index;
-	}
-
-	// call this after you are done writing
-	void lock_current_range() {
-		syncobjs[index] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-	}
-
-	// binds the currently used range to binding point
-	void bind_buffer(GLenum target, int binding) {
-		uintptr_t offset = get_offset();
-		uintptr_t size = size_per_buffer;
-		glBindBufferRange(target, binding, buffer, offset, size);
-	}
-
-	uintptr_t get_offset() {
-		return  (index * size_per_buffer);
-	}
-
-	uint32_t get_handle() {
-		return buffer;
-	}
-
-	uint32_t get_buffer_size() {
-		return size_per_buffer;
-	}
-
-	GLsync syncobjs[3];
-	void* ptr;
-	int index;
-	uint32_t size_per_buffer = 0;
-	uint32_t total_size;
-	uint32_t buffer = 0;
-};
 
 
 enum mdimodes
@@ -2754,7 +2665,7 @@ void Debug::on_fixed_update_start()
 	debug_shapes.one_frame_fixedupdate.clear();
 }
 
-void draw_debug_shapes()
+void draw_debug_shapes(float dt)
 {
 	MeshBuilder builder;
 	builder.Begin();
@@ -2784,7 +2695,7 @@ void draw_debug_shapes()
 	glCheckError();
 	vector<Debug_Shape>& shapes = debug_shapes.shapes;
 	for (int i = 0; i < shapes.size(); i++) {
-		shapes[i].lifetime -= eng->frame_time;
+		shapes[i].lifetime -= dt;
 		if (shapes[i].lifetime <= 0.f) {
 			shapes.erase(shapes.begin() + i);
 			i--;
@@ -2822,7 +2733,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 	state_machine.invalidate_all();
 
-	const bool needs_composite = eng->is_drawing_to_window_viewport();
+	const bool needs_composite = !params.output_to_screen;
 
 	if (cur_w != view.width || cur_h != view.height)
 		InitFramebuffers(true, view.width, view.height);
@@ -2923,7 +2834,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
-	draw_debug_shapes();
+	draw_debug_shapes(params.dt);
 
 	// hook in physics debugging, function determines if its drawing or not
 	g_physics->debug_draw_shapes();
@@ -3002,20 +2913,7 @@ void Renderer::DrawEntBlobShadows()
 
 	shadowverts.Begin();
 
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next())
-	{
-
-		RayHit rh;
-		Ray r;
-		r.pos = ei.get().position + glm::vec3(0, 0.1f, 0);
-		r.dir = glm::vec3(0, -1, 0);
-		rh = eng->phys.trace_ray(r, ei.get_index(), PF_WORLD);
-
-		if (rh.dist < 0)
-			continue;
-
-		AddBlobShadow(rh.pos + vec3(0, 0.05, 0), rh.normal, CHAR_HITBOX_RADIUS * 4.5f);
-	}
+	
 	glCheckError();
 
 	shadowverts.End();
@@ -3054,7 +2952,7 @@ float speed = 1.0;
 
 void Renderer::set_wind_constants()
 {
-	shader().set_float("time", eng->time);
+	shader().set_float("time", this->current_time);
 	shader().set_float("height", wsheight);
 	shader().set_float("radius", wsradius);
 	shader().set_float("startheight", wsstartheight);
@@ -3072,7 +2970,7 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, tex.reflected_depth);
 }
 
-program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model* mod, const Material* mat, bool depth_pass, bool dither)
+program_handle Renderer::get_mat_shader(bool has_animated_matricies, bool color_overlay, const Model* mod, const Material* mat, bool depth_pass, bool dither)
 {
 	bool is_alpha_test = mat->alpha_tested;
 	bool is_lightmapped = mod->has_lightmap_coords();
@@ -3090,6 +2988,7 @@ program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model
 	key.depth_only = depth_pass;
 	key.dither = dither;
 	key.billboard_type = (int)mat->billboard;
+	key.color_overlay = color_overlay;
 	
 	key = get_real_shader_key_from_shader_type(key);
 	program_handle handle = mat_table.lookup(key);
@@ -3137,7 +3036,7 @@ void Renderer::planar_reflection_pass()
 	render_level_to_target(params);
 }
 
-
+#if 0
 void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 {
 	vec3 origin = e.position;
@@ -3152,6 +3051,7 @@ void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
 	mb->AddSphere(b, radius, 10, 7, color);
 	mb->AddSphere((a + b) / 2.f, (c.tip.y - c.base.y) / 2.f, 10, 7, COLOR_RED);
 }
+#endif
 void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front)
 {
 	vec3 up = vec3(0, -1, 0);

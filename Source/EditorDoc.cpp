@@ -11,9 +11,18 @@
 #include "Framework/MyImguiLib.h"
 #include "AssetCompile/Someutils.h"
 #include "Physics/Physics2.h"
+
+#include "External/ImGuizmo.h"
+
 #include <stdexcept>
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
+
+Factory<std::string, EditorNode>& get_editor_node_factory()
+{
+	static Factory<std::string, EditorNode> inst;
+	return inst;
+};
 
 
 
@@ -108,6 +117,11 @@ bool EditorSchemaManager::load(const char* path)
 				os.edimage = to_string(tok);
 				continue;
 			}
+			else if (tok.cmp("_edtype")) {
+				in.read_string(tok);
+				os.edtype = to_string(tok);
+				continue;
+			}
 			else if (tok.cmp("_edmodel")) {
 				in.read_string(tok);
 				os.edmodel = to_string(tok);
@@ -182,58 +196,109 @@ bool EditorSchemaManager::load(const char* path)
 class EditPropertyCommand : public Command
 {
 public:
+	struct Group {
+		Group(const std::shared_ptr<EditorNode>& n, Dict changes) :
+			n(n), changes(changes) {}
+		std::shared_ptr<EditorNode> n;
+		Dict changes;
+	};
 
-	EditPropertyCommand(EditorDoc* doc, const std::shared_ptr<EditorNode>& n, std::string key, std::string changeval)
-		: doc(doc), node(n), newval(changeval),key(key) {}
+	EditPropertyCommand(const std::vector<Group>& change_vec) {
+		this->change_vec = change_vec;
+		for (auto& n : this->change_vec) {
+			Dict oldval;
+			for (auto& key : n.changes.keyvalues) {
+				if (n.n->get_dict().has_key(key.first.c_str()))
+					oldval.set_string(key.first.c_str(), n.n->get_dict().get_string(key.first.c_str()));
+			}
+			oldvals.push_back(oldval);
+		}
+	}
 	~EditPropertyCommand() {}
 	void execute() {
-
-		Dict* d = &node->get_dict();
-
-		oldval = d->get_string(key.c_str());
-		d->set_string(key.c_str(), newval.c_str());
+		for (auto& g : change_vec) {
+			for (auto& k : g.changes.keyvalues) {
+				g.n->get_dict().set_string(k.first.c_str(), k.second.c_str());
+			}
+			g.n->show();
+		}
 	}
 	void undo() {
+		int i = 0;
+		for (auto& g : change_vec) {
+			Dict& olddict = oldvals[i];
+			for (auto& k : g.changes.keyvalues) {
+				if (olddict.has_key(k.first.c_str())) {
+					g.n->get_dict().set_string(k.first.c_str(), olddict.get_string(k.first.c_str()));
+				}
+				else
+					g.n->get_dict().remove_key(k.first.c_str());
+			}
+			g.n->show();
 
-		Dict* d = &node->get_dict();
-
-		d->set_string(key.c_str(), oldval.c_str());
+			i++;
+		}
 	}
 	std::string to_string() override {
-		return "EditProperty: " + std::string(node->get_schema_name()) + key;
+		std::string str =  "EditProperties:";
+		for (auto& g : change_vec) {
+			str += " ";
+			str += g.n->get_schema_name();
+			str += "{";
+			for (auto& k : g.changes.keyvalues) {
+				str += k.first;
+				str += ":";
+				str += k.second;
+				str += ",";
+			}
+			str += "},";
+		}
+		return str;
 	}
 
-	std::shared_ptr<EditorNode> node;
-	std::string oldval;
-	std::string key;
-	std::string newval;
-	EditorDoc* doc;
+	std::vector<Group> change_vec;
+	std::vector<Dict> oldvals;
 };
 
 class CreateNodeCommand : public Command
 {
 public:
-	CreateNodeCommand(const std::shared_ptr<EditorNode>& node) :
-		 node(node) {}
+	CreateNodeCommand(const std::shared_ptr<EditorNode>& node) {
+		nodes.push_back(node);
+	}
+
+	CreateNodeCommand(const SharedNodeList& list) :
+		nodes(list) {}
+
 	~CreateNodeCommand() {
 	}
 
 	void execute() {
-		ed_doc.nodes.push_back(node);
-		node->show();
+		for (auto& n : nodes) {
+			ed_doc.nodes.push_back(n);
+			n->show();
+		}
 	}
 	void undo() {
-		assert(ed_doc.nodes.back().get() == node.get());
-		node->hide();
-		ed_doc.nodes.pop_back();
-
-		ed_doc.remove_any_references(node.get());
+		for (auto& n : nodes) {
+			assert(ed_doc.nodes.back().get() == n.get());
+			n->hide();
+			ed_doc.nodes.pop_back();
+			ed_doc.remove_any_references(n.get());
+		}
 	}
 	std::string to_string() override {
-		return "CreateNode: " + std::string(node->get_schema_name());
+		std::string str = "CreateNodes:";
+		for (int i = 0; i < nodes.size(); i++) {
+			str += ' ';
+			str += nodes[i]->get_schema_name();
+			str += ",";
+		}
+		str.pop_back();
+		return str;
 	}
 
-	std::shared_ptr<EditorNode> node;
+	SharedNodeList nodes;
 };
 
 
@@ -241,29 +306,47 @@ public:
 class RemoveNodeCommand : public Command
 {
 public:
-	RemoveNodeCommand(const std::shared_ptr<EditorNode>& n) 
-		:  node(n) {
-		index = ed_doc.get_node_index(n.get());
-		assert(index != -1);
+	RemoveNodeCommand(const SharedNodeList& list)
+		 {
+		assert(!list.empty());
+		nodes = list;
+
 	}
+	RemoveNodeCommand(const std::shared_ptr<EditorNode>& n)
+	{
+		nodes.push_back(n);
+	}
+
 	~RemoveNodeCommand() {
 	}
 
 	void execute() {
-		node->hide();
-		ed_doc.nodes.erase(ed_doc.nodes.begin() + index);
-		ed_doc.remove_any_references(node.get());
+		for (int i = 0; i < nodes.size();i++) {
+			auto& node = nodes[i];
+			node->hide();
+			ed_doc.nodes.erase(ed_doc.nodes.begin() + ed_doc.get_node_index(node.get()));
+			ed_doc.remove_any_references(node.get());
+		}
 	}
 	void undo() {
-		ed_doc.nodes.insert(ed_doc.nodes.begin() + index,node);
-		node->show();
+		for (int i = 0; i < nodes.size(); i++) {
+			auto& node = nodes[i];
+			ed_doc.nodes.push_back(node);
+			node->show();
+		}
 	}
 	std::string to_string() override {
-		return "RemoveNode: " + std::string(node->get_schema_name());
+		std::string str = "RemoveNodes:";
+		for (int i = 0; i < nodes.size(); i++) {
+			str += ' ';
+			str += nodes[i]->get_schema_name();
+			str += ",";
+		}
+		str.pop_back();
+		return str;
 	}
 	
-	std::shared_ptr<EditorNode> node;
-	int index = 0;
+	SharedNodeList nodes;
 };
 
 static float alphadither = 0.0;
@@ -305,7 +388,13 @@ class EdResourceModel : public EdResourceBase
 {
 public:
 	EdResourceModel(const std::string& path) {
-		name = path;
+		full_path = path;
+		auto pos = path.rfind("Models/");
+		if (pos != std::string::npos) {
+			name = path.substr(pos + 7);
+		}
+		else
+			name = path;
 	}
 	const char* get_type_name() const override {
 		return "Model";
@@ -313,7 +402,11 @@ public:
 	EdResType get_type() const override {
 		return EdResType::Model;
 	}
+	std::string get_full_path() const override {
+		return full_path;
+	}
 	Color32 get_asset_color() const override { return { 5, 168, 255 }; }
+	std::string full_path;
 };
 
 class EdResourceMaterial : public EdResourceBase
@@ -378,36 +471,44 @@ void AssetBrowser::init()
 
 
 // Unproject mouse coords into a vector, cast that into the world via physics
-RayHit EditorDoc::cast_ray_into_world(Ray* out_ray, const int mx, const int my)
+world_query_result EditorDoc::cast_ray_into_world(Ray* out_ray, const int mx, const int my)
 {
 	Ray r;
-	r.pos = camera.position;
-
 	// get ui size
 	const Rect2d size = get_size();
 	const int wx = size.w;
 	const int wy = size.h;
+	const float aratio = float(wy) / wx;
 	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
-	ndc = ndc * 2.f - 1.f;
-	ndc.y *= -1;
+		ndc = ndc * 2.f - 1.f;
+		ndc.y *= -1;
+	
+	if (using_ortho) {
+		glm::vec3 pos = ortho_camera.position - ortho_camera.side * ndc.x * ortho_camera.width + ortho_camera.up * ndc.y * ortho_camera.width * aratio;
+		glm::vec3 front = ortho_camera.front;
+		r.pos = pos;
+		r.dir = front;
+	}
+	else {
+		r.pos = vs_setup.origin;
 
-	glm::mat4 invviewproj = glm::inverse(vs_setup.viewproj);
-	glm::vec4 point = invviewproj * glm::vec4(ndc, 1.0);
-	point /= point.w;
 
-	glm::vec3 dir = glm::normalize(glm::vec3(point) - r.pos);
+		glm::mat4 invviewproj = glm::inverse(vs_setup.viewproj);
+		glm::vec4 point = invviewproj * glm::vec4(ndc, 1.0);
+		point /= point.w;
 
-	r.dir = dir;
+		glm::vec3 dir = glm::normalize(glm::vec3(point) - r.pos);
+
+		r.dir = dir;
+	}
 
 	if (out_ray)
 		*out_ray = r;
 
 	world_query_result res;
 	g_physics->trace_ray(res, r.pos, r.dir, 100.0, {});
-
-	Debug::add_line(r.pos, r.dir * 50.0f, COLOR_PINK, 10.0);
-
-	return eng->phys.trace_ray(r, -1, PF_ALL);
+	Debug::add_line(r.pos,r.pos+ r.dir * 50.0f, COLOR_PINK, 0.66);
+	return res;
 }
 
 Color32 to_color32(glm::vec4 v) {
@@ -420,12 +521,6 @@ Color32 to_color32(glm::vec4 v) {
 }
 
 
-void AssetBrowser::update()
-{
-	
-}
-
-
 Dict& EditorNode::get_dict()
 {
 	return dictionary;
@@ -435,6 +530,34 @@ Dict& EditorNode::get_dict()
 EditorNode::~EditorNode()
 {
 	hide();	// remove any handles
+}
+
+EditorNode* EditorNode::duplicate()
+{
+	EditorNode* other = new EditorNode;
+	other->dictionary = this->dictionary;
+	other->model_is_dirty = true;
+	other->template_class = this->template_class;
+	
+	return other;
+}
+
+void EditorDoc::duplicate_selected_and_select_them()
+{
+	if (selection_state.num_selected() == 0) {
+		sys_print("??? duplicate_selected_and_select_them but nothing selected\n");
+		return;
+	}
+	std::vector<std::shared_ptr<EditorNode>> nodes;
+	for (int i = 0; i < selection_state.get_selection().size(); i++) {
+		nodes.push_back(std::shared_ptr<EditorNode>(selection_state.get_selection().at(i)->duplicate()));
+	}
+	for (int i = 0; i < nodes.size(); i++)
+		nodes[i]->set_uid(id_start++);
+	selection_state.clear_all_selected();
+	command_mgr.add_command(new CreateNodeCommand(nodes));
+	for (int i = 0; i < nodes.size(); i++)
+		selection_state.add_to_selection(nodes[i]);
 }
 
 static Material* generate_spritemat_from_texture(Texture* t)
@@ -492,7 +615,15 @@ void EditorNode::show()
 		ro.model = m;
 		ro.transform = get_transform();
 		ro.visible = true;
+		ro.color_overlay = is_selected;
 		ro.param1 = get_rendering_color();
+		if (is_selected) {
+			float alpha = sin(GetTime()*2.5);
+			alpha *= alpha;
+			uint8_t alphau = alpha * 80 + 10;
+
+			ro.param2 = { 0xff, 128, 0, alphau };
+		}
 		idraw->update_obj(render_handle, ro);
 
 		glm::quat q;
@@ -519,11 +650,23 @@ void EditorNode::show()
 		ro.transform = glm::scale(glm::translate(glm::mat4(1), position),glm::vec3(0.5));
 		ro.mat_override = mat;
 		ro.visible = true;
+		
+		ro.color_overlay = is_selected;
+		if (is_selected) {
+			float alpha = sin(GetTime() * 2.5);
+			alpha *= alpha;
+			uint8_t alphau = alpha * 80 + 10;
+
+			ro.param2 = { 0xff, 128, 0, alphau };
+		}
+
 		idraw->update_obj(render_handle, ro);
 
 
 		physics->create_static_actor_from_shape(physics_shape_def::create_sphere(position, 0.25));
 	}
+
+	physics->set_editornode(this);
 }
 void EditorNode::hide()
 {
@@ -557,7 +700,11 @@ EditorNode* EditorDoc::create_node_from_dict(const Dict& d)
 EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 {
 	auto template_obj = ed_schema.find_schema(schema_type);
-	EditorNode* node = new EditorNode();
+	EditorNode* node = nullptr;
+	if (!template_obj->edtype.empty())
+		node = get_editor_node_factory().createObject(template_obj->edtype);
+	if(!node)
+		node = new EditorNode();
 	node->set_uid(id_start);
 	node->init_from_schema(template_obj);
 	
@@ -595,7 +742,9 @@ void EditorDoc::init()
 void EditorDoc::open(const char* levelname)
 {
 	init();
-
+	command_mgr.clear_all();
+	manipulate.free_refs();
+	selection_state.clear_all_selected();
 	ed_schema.load("./Data/classes.txt");
 	nodes.clear();
 	
@@ -620,16 +769,17 @@ void EditorDoc::close()
 
 void EditorDoc::leave_transform_tool(bool apply_delta)
 {
-	mode = TOOL_NONE;
+
 }
 
 void EditorDoc::enter_transform_tool(TransformType type)
 {
-	if (selected_node == nullptr) return;
-	transform_tool_type = type;
-	axis_bit_mask = 7;
-	transform_tool_origin = selected_node->get_dict().get_vec3("position");
-	mode = TOOL_TRANSFORM;
+	return;
+	if (!selection_state.has_any_selected()) return;
+	//transform_tool_type = type;
+	//axis_bit_mask = 7;
+	//transform_tool_origin = selected_node->get_dict().get_vec3("position");
+	//mode = TOOL_TRANSFORM;
 }
 
 void EditorDoc::ui_paint() 
@@ -637,112 +787,133 @@ void EditorDoc::ui_paint()
 	size = parent->get_size();	// update my size
 }
 
+void ManipulateTransformTool::handle_event(const SDL_Event& event)
+{
+	if (event.type == SDL_KEYDOWN && !eng->get_game_focused() && ed_doc.selection_state.has_any_selected()) {
+		uint32_t scancode = event.key.keysym.scancode;
+		bool has_shift = event.key.keysym.mod & KMOD_SHIFT;
+		if (scancode == SDL_SCANCODE_R) {
+			if (operation_mask == ImGuizmo::ROTATE)
+				swap_mode();
+			else
+				operation_mask = ImGuizmo::ROTATE;
+		}
+		else if (scancode == SDL_SCANCODE_G) {
+			if (operation_mask == ImGuizmo::TRANSLATE)
+				swap_mode();
+			else
+				operation_mask = ImGuizmo::TRANSLATE;
+		}
+		else if (scancode == SDL_SCANCODE_S) {
+			operation_mask = ImGuizmo::SCALE;
+			mode = ImGuizmo::LOCAL;	// local scaling only
+		}
+
+
+		else if (scancode == SDL_SCANCODE_LEFTBRACKET) {
+			if (operation_mask == ImGuizmo::TRANSLATE) {
+				translation_snap = translation_snap * 2.0;
+			}
+			else if (operation_mask == ImGuizmo::SCALE) {
+				translation_snap = translation_snap * 2.0;
+			}
+		}
+		else if (scancode == SDL_SCANCODE_RIGHTBRACKET) {
+			if (operation_mask == ImGuizmo::TRANSLATE) {
+				translation_snap = translation_snap * 0.5;
+			}
+			else if (operation_mask == ImGuizmo::SCALE) {
+				translation_snap = translation_snap * 9.5;
+			}
+		}
+	}
+}
+
 bool EditorDoc::handle_event(const SDL_Event& event)
 {
 	switch (mode)
 	{
-	case TOOL_NONE:
+	case TOOL_TRANSFORM: {
+
+		manipulate.handle_event(event);
+
 		if (event.type == SDL_KEYDOWN) {
 			uint32_t scancode = event.key.keysym.scancode;
-			if (scancode == SDL_SCANCODE_M) {
-				//mode = TOOL_SPAWN_MODEL;
-				//assets.open(true);
-			}
-			else if (scancode == SDL_SCANCODE_G) {
-				enter_transform_tool(TRANSLATION);
-			}
-			else if (scancode == SDL_SCANCODE_R) {
-				enter_transform_tool(ROTATION);
-			}
-			else if (scancode == SDL_SCANCODE_S) {
-				enter_transform_tool(SCALE);
-			}
-			else if (scancode == SDL_SCANCODE_BACKSPACE) {
-				if (selected_node != nullptr) {
-					RemoveNodeCommand* com = new RemoveNodeCommand(selected_node);
+			const float ORTHO_DIST = 20.0;
+			if (scancode == SDL_SCANCODE_DELETE) {
+				if (selection_state.has_any_selected()) {
+					RemoveNodeCommand* com = new RemoveNodeCommand(selection_state.get_selection());
 					command_mgr.add_command(com);
+					selection_state.clear_all_selected();	// should already be cleared but just checking
 				}
 			}
-			else if (scancode == SDL_SCANCODE_N) {
-				spawn_from_schema_type("NPC");
+			else if (scancode == SDL_SCANCODE_KP_5) {
+				using_ortho = false;
 			}
+			else if (scancode == SDL_SCANCODE_KP_7 && event.key.keysym.mod & KMOD_CTRL) {
+				using_ortho = true;
+				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, ORTHO_DIST, 0), glm::vec3(0, -1, 0));
+			}
+			else if (scancode == SDL_SCANCODE_KP_7) {
+				using_ortho = true;
+				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, -ORTHO_DIST, 0), glm::vec3(0, 1, 0));
+			}
+			else if (scancode == SDL_SCANCODE_KP_3 && event.key.keysym.mod & KMOD_CTRL) {
+				using_ortho = true;
+				ortho_camera.set_position_and_front(camera.position + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
+			}
+			else if (scancode == SDL_SCANCODE_KP_3) {
+				using_ortho = true;
+				ortho_camera.set_position_and_front(camera.position + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
+			}
+			else if (scancode == SDL_SCANCODE_KP_1 && event.key.keysym.mod & KMOD_CTRL) {
+				using_ortho = true;
+				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
+			}
+			else if (scancode == SDL_SCANCODE_KP_1) {
+				using_ortho = true;
+				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
+			}
+
 		}
-		if (event.type == SDL_MOUSEBUTTONDOWN) {
+		else if (event.type == SDL_MOUSEBUTTONDOWN) {
 			if (!get_size().is_point_inside(event.button.x, event.button.y))
 				return false;
 
+			if (manipulate.is_hovered() || manipulate.is_using())
+				return false;
+
 			if (event.button.button == 1) {
-				RayHit rh = cast_ray_into_world(nullptr, event.button.x, event.button.y);
-				if (rh.dist > 0 && rh.ent_id > 0) {
-					selected_node = nodes[rh.ent_id];
+				world_query_result rh = cast_ray_into_world(nullptr, event.button.x, event.button.y);
+
+				if (rh.fraction == 1.0) {
+					// no hit
+					selection_state.clear_all_selected();
 				}
 				else {
-					selected_node = nullptr;
+					int index = ed_doc.get_node_index(rh.actor->get_editor_node_owner());
+					if (eng->keys[SDL_SCANCODE_LSHIFT]) {
+						selection_state.add_to_selection(nodes[index]);
+					}
+					else
+						selection_state.set_select_only_this(nodes[index]);
 				}
 			}
 		}
-		break;
-	case TOOL_SPAWN_MODEL:
-		//assets.handle_input(event);
-		//if (event.type == SDL_KEYDOWN) {
-		//	if (event.key.keysym.scancode == SDL_SCANCODE_M) {
-		//		assets.close();
-		//		mode = TOOL_NONE;
-		//	}
-		//}
-		break;
 
-	case TOOL_TRANSFORM:
-		if (event.type == SDL_MOUSEBUTTONDOWN) {
-			if (event.button.button == 1)
-				leave_transform_tool(true);
-			if (event.button.button == 3)
-				leave_transform_tool(false);
-		}
-
-		else if (event.type == SDL_KEYDOWN) {
-			uint32_t scancode = event.key.keysym.scancode;
-			bool has_shift = event.key.keysym.mod & KMOD_SHIFT;
-			if (scancode == SDL_SCANCODE_X) {
-				if (!has_shift)
-					axis_bit_mask = (1 << 1) | (1 << 2);
-				else
-					axis_bit_mask = 1;
-			}
-			else if (scancode == SDL_SCANCODE_Y) {
-				if (!has_shift)
-					axis_bit_mask = (1) | (1 << 2);
-				else
-					axis_bit_mask = (1<<1);
-			}
-			else if (scancode == SDL_SCANCODE_Z) {
-				if (!has_shift)
-					axis_bit_mask = 1 | (1 << 1);
-				else
-					axis_bit_mask = (1<<2);
-			}
-			else if (scancode == SDL_SCANCODE_L) {
-				local_transform = !local_transform;
-			}
-		}
-		break;
+	}break;
 	}
 
-	// dont undo in middle of transforms
-	if (mode != TOOL_TRANSFORM) {
-		if (event.type == SDL_KEYDOWN) {
-			if (event.key.keysym.scancode == SDL_SCANCODE_Z && event.key.keysym.mod & KMOD_CTRL)
-				command_mgr.undo();
-		}
-	}
-	if (eng->get_game_focused()) {
-		if (event.type == SDL_MOUSEWHEEL) {
-			camera.scroll_callback(event.wheel.y);
-		}
-	}
 	if (event.type == SDL_KEYDOWN) {
-		if (event.key.keysym.scancode == SDL_SCANCODE_O)
-			camera.orbit_mode = !camera.orbit_mode;
+		if (event.key.keysym.scancode == SDL_SCANCODE_Z && event.key.keysym.mod & KMOD_CTRL)
+			command_mgr.undo();
+	}
+
+	if (eng->get_game_focused() && event.type == SDL_MOUSEWHEEL) {
+		if (using_ortho)
+			ortho_camera.scroll_callback(event.wheel.y);
+		else
+			camera.scroll_callback(event.wheel.y);
 	}
 
 	return true;
@@ -774,67 +945,39 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 	return out;
 }
 
+
 void EditorDoc::tick(float dt)
 {
 
+	auto window_sz = eng->get_game_viewport_dimensions();
+	float aratio = (float)window_sz.y / window_sz.x;
 	{
 		int x=0, y=0;
 		if (eng->get_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
-			camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+			if (using_ortho)
+				ortho_camera.update_from_input(eng->keys, x, y, aratio);
+			else
+				camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 		}
 	}
 
-	auto window_sz = eng->get_game_viewport_dimensions();
-	vs_setup = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
-
-	// build physics world
-
-	eng->phys.ClearObjs();
-	//{
-	//	PhysicsObject obj;
-	//	obj.is_level = true;
-	//	obj.solid = true;
-	//	obj.is_mesh = true;
-	//	obj.mesh.structure = &eng->level->collision->bvh;
-	//	obj.mesh.verticies = &eng->level->collision->verticies;
-	//	obj.mesh.tris = &eng->level->collision->tris;
-	//	obj.userindex = -1;
-	//
-	//	eng->phys.AddObj(obj);
-	//}
-
-	//for (int i = 0; i < nodes.size(); i++) {
-	//	if (nodes[i]->model) {
-	//		PhysicsObject obj;
-	//		obj.is_level = false;
-	//		obj.solid = false;
-	//		obj.is_mesh = false;
-	//
-	//		Bounds b = transform_bounds(nodes[i]->get_transform(), nodes[i]->model->get_bounds());
-	//		obj.min_or_origin = b.bmin;
-	//		obj.max = b.bmax;
-	//		obj.userindex = i;
-	//
-	//		eng->phys.AddObj(obj);
-	//	}
-	//}
-
-
-	switch (mode)
-	{
-	case TOOL_SPAWN_MODEL:
-		assets.update();
-		break;
-
-	case TOOL_TRANSFORM:
-		transform_tool_update();
-
-
-		break;
+	if(!using_ortho)
+		vs_setup = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+	else {
+		View_Setup vs;
+		vs.far = 100.0;
+		vs.front = ortho_camera.front;
+		vs.origin = ortho_camera.position;
+		vs.height = window_sz.y;
+		vs.width = window_sz.x;
+		vs.proj = ortho_camera.get_proj_matrix(aratio);
+		vs.view = ortho_camera.get_view_matrix();
+		vs.viewproj = vs.proj * vs.view;
+		vs.near = 0.001;
+		vs.fov = glm::radians(90.f);
+		vs_setup = vs;
 	}
-
-	
 }
 
 bool line_plane_intersect(Ray r, glm::vec3 plane, float planed, glm::vec3& intersect)
@@ -919,14 +1062,17 @@ void EditorDoc::overlay_draw()
 	static MeshBuilder mb;
 	mb.Begin();
 	mb.PushLineBox(glm::vec3(-1), glm::vec3(1), COLOR_BLUE);
-	if (selected_node) {
-		Model* m = selected_node->get_rendering_model();
-		if (m) {
-			auto transform = selected_node->get_transform();
-			Bounds b = transform_bounds(transform,m->get_bounds());
-			mb.PushLineBox(b.bmin, b.bmax, COLOR_RED);
-
+	if (selection_state.has_any_selected()) {
+		Bounds total_bounds;
+		auto& selected = selection_state.get_selection();
+		for (auto& s : selected) {
+			Model* m = s->get_rendering_model();
+			if (m) {
+				auto transform = s->get_transform();
+				total_bounds = bounds_union(total_bounds,transform_bounds(transform,m->get_bounds()));
+			}
 		}
+		mb.PushLineBox(total_bounds.bmin, total_bounds.bmax, COLOR_RED);
 	}
 	mb.End();
 	mb.Draw(GL_LINES);
@@ -938,10 +1084,128 @@ uint32_t color_to_uint(Color32 c) {
 
 void EditorDoc::remove_any_references(EditorNode* node)
 {
-	if (outliner.get_selected() == node)
-		outliner.set_selected(nullptr);
+	selection_state.remove_from_selection(node);
 	if (prop_editor.get_node() == node)
 		prop_editor.set(nullptr);
+}
+#include <glm/gtc/type_ptr.hpp>
+bool ManipulateTransformTool::is_hovered()
+{
+	return ImGuizmo::IsOver();
+}
+bool ManipulateTransformTool::is_using()
+{
+	return ImGuizmo::IsUsing();
+}
+
+void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
+{
+	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
+	q = glm::quat_cast(transform);
+	p = transform[3];
+}
+
+void ManipulateTransformTool::update()
+{
+	if (ed_doc.selection_state.num_selected() == 0) {
+		if (state == MANIPULATING_OBJS)
+			state = IDLE;
+		saved_of_set.clear();
+		return;
+	}
+
+	if (state == IDLE) {
+		saved_of_set.clear();
+		// calculate transform
+		if (ed_doc.selection_state.num_selected() == 1) {
+			current_transform_of_group = ed_doc.selection_state.get_selection()[0]->get_transform();
+		}
+		else {
+			glm::vec3 center = glm::vec3(0.0);
+			for (auto& n : ed_doc.selection_state.get_selection())
+				center += n->get_position();
+			center /= (float)ed_doc.selection_state.num_selected();
+			current_transform_of_group = glm::translate(glm::mat4(1.0), center);
+		}
+	}
+
+	//auto selected = ed_doc.selection_state.sel
+
+	const float* view = glm::value_ptr(ed_doc.vs_setup.view);
+	const float* proj = glm::value_ptr(ed_doc.vs_setup.proj);
+
+	float* model = glm::value_ptr(current_transform_of_group);
+
+	ImGuizmo::SetImGuiContext(eng->imgui_context);
+	ImGuizmo::SetDrawlist();
+	Rect2d rect = ed_doc.get_size();
+	ImGuizmo::SetRect(rect.x, rect.y, rect.w, rect.h);
+	ImGuizmo::Enable(true);
+	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
+
+	glm::vec3 snap;
+	if (operation_mask == ImGuizmo::TRANSLATE)
+		snap = glm::vec3(translation_snap);
+	else if (operation_mask == ImGuizmo::SCALE)
+		snap = glm::vec3(scale_snap);
+	else if (operation_mask == ImGuizmo::ROTATE)
+		snap = glm::vec3(rotation_snap);
+
+	bool good = ImGuizmo::Manipulate(view, proj, operation_mask, mode, model,nullptr,&snap.x);
+	bool create_command = false;
+	if (ImGuizmo::IsUsingAny()) {
+		if (state == IDLE) {
+			if (eng->keys[SDL_SCANCODE_LCTRL])
+				ed_doc.duplicate_selected_and_select_them();
+
+			for (auto& s : ed_doc.selection_state.get_selection()) {
+				SavedTransform st;
+				st.node = s;
+				st.pretransform = s->get_transform();
+				saved_of_set.push_back(st);
+			}
+		}
+		state = MANIPULATING_OBJS;
+	}
+	else {
+		if (state == MANIPULATING_OBJS) {
+			create_command = true;
+		}
+		state = IDLE;
+	}
+
+	if (state == MANIPULATING_OBJS || create_command) {
+		// calculate transform
+		if (ed_doc.selection_state.num_selected() == 1) {
+			auto& n = ed_doc.selection_state.get_selection()[0];
+			glm::vec3 scale, p;
+			glm::quat r;
+			decompose_transform(current_transform_of_group, p, r, scale);
+
+			if (create_command) {
+				auto& prev = saved_of_set[0];
+				glm::vec3 p_scale, p_p;
+				glm::quat p_r;
+				decompose_transform(prev.pretransform, p_p, p_r, p_scale);
+				n->save_transform_to_dict(p_p, p_r, p_scale);
+
+				Dict changes;
+				changes.set_vec3("position", p);
+				changes.set_vec3("rotation", glm::eulerAngles(r));
+				changes.set_vec3("scale", scale);
+				std::vector<EditPropertyCommand::Group> groups;
+				groups.push_back({ n,changes });
+				ed_doc.command_mgr.add_command(new EditPropertyCommand(groups));
+			}
+			else {
+				n->save_transform_to_dict(p, r, scale);
+
+			}
+		}
+		else {
+		
+		}
+	}
 }
 
 void EditorDoc::imgui_draw()
@@ -950,12 +1214,15 @@ void EditorDoc::imgui_draw()
 		assets.imgui_draw();
 
 	outliner.draw();
-	prop_editor.set(outliner.get_selected());
+	if (selection_state.num_selected() == 1)
+		prop_editor.set(selection_state.get_selection()[0].get());
+	else
+		prop_editor.set(nullptr);
 	prop_editor.draw();
 
-	if (outliner.get_selected() != nullptr)
-		outliner.get_selected()->show();	// update it
-
+	for (int i = 0; i < selection_state.num_selected(); i++) {
+		selection_state.get_selection()[i]->show();
+	}
 	return;
 #if 0
 	ImGui::SetNextWindowPos(ImVec2(10, 10));
@@ -1084,14 +1351,34 @@ void EditorDoc::hook_scene_viewport_draw()
 		{
 			EdResourceBase* resource = *(EdResourceBase**)payload->Data;
 	
-			EdResourceSchema* schema = dynamic_cast<EdResourceSchema*>(resource);
-			if (schema) {
+			switch (resource->get_type()) {
+			case EdResType::Schema: {
+				EdResourceSchema* schema = dynamic_cast<EdResourceSchema*>(resource);
 				spawn_from_schema_type(schema->get_asset_name().c_str());
+
+			}break;
+			case EdResType::Model: {
+				EdResourceModel* mod = dynamic_cast<EdResourceModel*>(resource);
+				auto node = spawn_from_schema_type("StaticMesh");
+				node->set_model(mod->get_asset_name().c_str());
+				node->show();
+			}break;
 			}
 		}
 		ImGui::EndDragDropTarget();
 	}
 
+	manipulate.update();
+
+
+}
+
+std::string to_lower(const std::string& s) {
+	std::string out;
+	out.reserve(s.size());
+	for (auto c : s)
+		out.push_back(tolower(c));
+	return out;
 }
 
 void AssetBrowser::imgui_draw()
@@ -1149,16 +1436,24 @@ void AssetBrowser::imgui_draw()
 		if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs())
 			if (sorts_specs->SpecsDirty)
 			{
+				bool a = std::string("boatMaterial001") < std::string("CubeBrush");
+
+				std::vector<std::string> strs;
+				for (int i = 0; i < all_resources.size(); i++) {
+					strs.push_back(all_resources[i]->get_asset_name());
+				}
+				std::sort(strs.begin(), strs.end());
+
 				std::sort(all_resources.begin(), all_resources.end(),
 					[&](const unique_ptr<EdResourceBase>& a, const unique_ptr<EdResourceBase>& b) -> bool {
-						if(sorts_specs->Specs[0].ColumnIndex==1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
-							return a->get_asset_name() > b->get_asset_name();
-						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
-							return a->get_asset_name() < b->get_asset_name();
-						else if (sorts_specs->Specs[0].ColumnIndex == 0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
-							return a->get_type_name() > b->get_type_name();
+						if(sorts_specs->Specs[0].ColumnIndex==0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
+							return to_lower(a->get_asset_name()) > to_lower(b->get_asset_name());
 						else if (sorts_specs->Specs[0].ColumnIndex == 0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
-							return a->get_type_name() < b->get_type_name();
+							return to_lower(a->get_asset_name()) < to_lower(b->get_asset_name());
+						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
+							return to_lower(a->get_type_name()) > to_lower(b->get_type_name());
+						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
+							return to_lower(a->get_type_name()) < to_lower(b->get_type_name());
 						return true;
 					}
 				);
@@ -1180,7 +1475,7 @@ void AssetBrowser::imgui_draw()
 					continue;
 			}
 			else if(name_filter_len>0){
-				if (res->get_full_path().find(asset_name_filter) == std::string::npos)
+				if (res->get_asset_name().find(asset_name_filter) == std::string::npos)
 					continue;
 			}
 			ImGui::PushID(res);
@@ -1205,7 +1500,7 @@ void AssetBrowser::imgui_draw()
 			}
 
 			ImGui::SameLine();
-			ImGui::Text(res->get_full_path().c_str());
+			ImGui::Text(res->get_asset_name().c_str());
 			ImGui::TableNextColumn();
 			ImGui::TextColored(color32_to_imvec4(res->get_asset_color()),  res->get_type_name());
 	
@@ -1412,10 +1707,13 @@ void ObjectOutliner::draw_table_R(EditorNode* node, int depth)
 
 	ImGui::PushID(node);
 	{
-		const bool item_is_selected = node == selected && node != nullptr;
+		const bool item_is_selected = node != nullptr && ed_doc.selection_state.is_node_selected(node);
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-			selected = node;
+			if (node == nullptr)
+				ed_doc.selection_state.clear_all_selected();
+			else
+				ed_doc.selection_state.set_select_only_this(ed_doc.nodes[ed_doc.get_node_index(node)]);// cursed
 		}
 	}
 	

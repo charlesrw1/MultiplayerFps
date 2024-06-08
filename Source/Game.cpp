@@ -432,3 +432,14 @@ void Entity::present()
 		idraw->update_obj(render_handle, proxy);
 	}
 }
+
+#include "glm/gtx/euler_angles.hpp"
+glm::mat4 Entity::get_world_transform()
+{
+	mat4 model;
+	model = glm::translate(mat4(1), position);
+	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
+	model = glm::scale(model, vec3(1.f));
+
+	return model;
+}

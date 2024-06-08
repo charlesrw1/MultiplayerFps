@@ -15,9 +15,13 @@ struct View_Setup
 };
 
 struct SceneDrawParamsEx {
+	SceneDrawParamsEx(float time, float dt) 
+		: time(time), dt(dt) {}
 	bool draw_ui = true;
 	bool output_to_screen = true;	// else output to a framebuffer texture, later sampled by ie ImGui ui
 	bool draw_world = true;
+	float time;
+	float dt;
 };
 
 class MeshBuilder;

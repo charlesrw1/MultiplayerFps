@@ -1143,8 +1143,10 @@ void Game_Engine::draw_any_imgui_interfaces()
 
 bool Game_Engine::game_draw_screen()
 {
+	SceneDrawParamsEx params(eng->time,eng->frame_time);
+	params.output_to_screen = !eng->is_drawing_to_window_viewport();
+	
 	if (get_local_player() == nullptr) {
-		SceneDrawParamsEx params;
 		params.draw_world = false;
 		params.draw_ui = true;
 		idraw->scene_draw(params, {}, get_gui(), nullptr);	// not spawned, so just update the UI
@@ -1163,7 +1165,6 @@ bool Game_Engine::game_draw_screen()
 
 	View_Setup vs = View_Setup(position, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
-	SceneDrawParamsEx params;
 	idraw->scene_draw(params,vs, get_gui(), nullptr);
 
 	return true;
@@ -1178,21 +1179,20 @@ void Game_Engine::draw_screen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	SceneDrawParamsEx params(eng->time, eng->frame_time);
+	params.output_to_screen = !eng->is_drawing_to_window_viewport();
 	if (state == Engine_State::Idle) {
 		// draw general ui
 		if (get_current_tool() != nullptr) {
-			SceneDrawParamsEx params;
 			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui(), get_current_tool());
 		}
 		else {
-			SceneDrawParamsEx params;
 			params.draw_world = false;	// no world to draw
 			idraw->scene_draw(params, {}, get_gui(), nullptr);
 		}
 	}
 	else if (state == Engine_State::Loading) {
 		// draw loading ui etc.
-		SceneDrawParamsEx params;
 		params.draw_world = false;
 		idraw->scene_draw(params, {}, get_gui(), nullptr);
 	}
@@ -1211,6 +1211,8 @@ void Game_Engine::draw_screen()
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui::NewFrame();
+	if (get_current_tool())
+		get_current_tool()->hook_imgui_newframe();
 
 	draw_any_imgui_interfaces();
 

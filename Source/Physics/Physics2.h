@@ -298,7 +298,7 @@ struct world_query_result
 	glm::vec3 hit_pos;
 	glm::vec3 hit_normal;
 	glm::vec3 trace_dir;
-	physx::PxActor* actor = nullptr;
+	PhysicsActor* actor = nullptr;
 	uint16_t contents=0;
 	int16_t bone_hit = -1;
 };

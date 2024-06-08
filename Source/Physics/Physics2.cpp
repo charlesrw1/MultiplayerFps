@@ -92,7 +92,15 @@ public:
 		bool status = scene->raycast(
 			glm_to_physx(start), glm_to_physx(dir), length, hit);
 		sys_print("ray: %d\n", (int)status);
-		out.fraction = 1.0;
+		if (!status) {
+			out.fraction = 1.0;
+			return;
+		}
+		out.fraction = hit.block.distance / length;
+		out.actor = (PhysicsActor*)hit.block.actor->userData;
+		out.hit_pos = physx_to_glm(hit.block.position);
+		out.hit_normal = physx_to_glm(hit.block.normal);
+		out.trace_dir = dir;
 	}
 	
 	PhysicsConstraint* allocate_constraint() override {
@@ -229,6 +237,8 @@ void PhysicsActor::create_static_actor_from_shape(const physics_shape_def& shape
 	}
 	physics_local.scene->addActor(*static_actor);
 	actor = static_actor;
+
+	actor->userData = this;
 }
 void PhysicsActor::create_static_actor_from_model(const Model* model, PhysTransform transform, PhysicsShapeType type)
 {
@@ -246,6 +256,8 @@ void PhysicsActor::create_static_actor_from_model(const Model* model, PhysTransf
 	}
 	physics_local.scene->addActor(*static_actor);
 	actor = static_actor;
+
+	actor->userData = this;
 }
 
 static vec3 randColor(uint32_t number) {

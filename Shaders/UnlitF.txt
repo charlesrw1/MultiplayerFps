@@ -37,4 +37,6 @@ void main()
 
 	//FS_OUT_Color = vec4(FS_IN_ColorHash.rgbb);
 	FS_OUT_Color = vec4(FS_IN_ColorHash*ndotv,1);
+
+	
 }

@@ -26,9 +26,11 @@ public:
 
 	virtual void open(const char* name) = 0;
 	virtual void close() = 0;
+	virtual bool save_document() { return false; }
 
 	virtual void on_change_focus(editor_focus_state newstate) = 0;
 
+	virtual void hook_imgui_newframe() {}
 	virtual void hook_scene_viewport_draw() {}
 	virtual void draw_menu_bar() {}	// imgui hook
 
