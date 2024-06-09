@@ -424,9 +424,6 @@
     <ClInclude Include="Source\External\ImGuizmo.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\EditorUtil.h">
-      <Filter>Source\Framework\Editor</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -623,8 +620,8 @@
     <ClCompile Include="Source\External\ImGuizmo.cpp">
       <Filter>Source\External</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\EditorUtil.cpp">
-      <Filter>Source\Framework\Editor</Filter>
+    <ClCompile Include="Source\IEditorTool.cpp">
+      <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

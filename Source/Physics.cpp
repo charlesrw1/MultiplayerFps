@@ -573,6 +573,8 @@ GeomContact PhysicsWorld::trace_shape(Trace_Shape shape, int ig, int filt)
 	gc.found = false;
 	gc.intersect_len = INFINITY;
 
+	return gc;
+
 	for (int i = 0; i < objs.size(); i++)
 	{
 		if (FilterObj(&objs[i], ig, filt))
@@ -606,6 +608,8 @@ RayHit PhysicsWorld::trace_ray(Ray r, int ignore_index, int filter_flags)
 {
 	RayHit final;
 	final.dist = -1;
+
+	return final;
 
 	for (int i = 0; i < objs.size(); i++)
 	{

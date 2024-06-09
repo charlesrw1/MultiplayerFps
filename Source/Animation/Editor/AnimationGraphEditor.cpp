@@ -278,8 +278,6 @@ void ControlParamsWindow::refresh_props() {
 
 void AnimationGraphEditor::init()
 {
-	ASSERT(!is_initialized);
-
 	imgui_node_context = ImNodes::CreateContext();
 	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
 
@@ -289,18 +287,10 @@ void AnimationGraphEditor::init()
 	for (auto& obj : ed_factory.get_object_creator()) {
 		template_creation_nodes.push_back(obj.second());
 	}
-
-	is_initialized = true;
 }
 
-void AnimationGraphEditor::close()
+void AnimationGraphEditor::close_internal()
 {
-	if (!has_document_open())
-		return;
-	
-	// fixme:
-	save_document();
-
 	if(out.obj.is_valid())
 		idraw->remove_obj(out.obj);
 
@@ -314,11 +304,8 @@ void AnimationGraphEditor::close()
 	}
 	out.reset_animator();
 	editing_tree = nullptr;
-	name = "";
 	out.model = nullptr;
 
-	open_open_popup = false;
-	open_save_popup = false;
 	reset_prop_editor_next_tick = false;
 	playback = graph_playback_state::stopped;
 	sel = selection_state();
@@ -332,8 +319,6 @@ void AnimationGraphEditor::close()
 	control_params.clear_all();
 
 	ImNodes::EditorContextFree(default_editor);
-	
-	ASSERT(!has_document_open());
 }
 
 static std::string saved_settings = "";
@@ -541,20 +526,14 @@ void TabState::imgui_draw() {
 
 	}
 }
-
-bool AnimationGraphEditor::save_document()
+bool AnimationGraphEditor::can_save_document() {
+	return playback != graph_playback_state::running;
+}
+bool AnimationGraphEditor::save_document_internal()
 {
-	if (playback == graph_playback_state::running) {
-		sys_print("!!! cant save graph while playing\n");
-		return false;
-	}
-	if (!current_document_has_path()) {
-		open_save_popup = true;
-		return false;
-	}
-
 	// first compile, compiling writes editor node data out to the CFG node
 	bool good = compile_graph_for_playing();
+	get_tree()->post_load_init();	// initialize the memory offsets
 
 	DictWriter write;
 	write.set_should_add_indents(false);
@@ -562,7 +541,7 @@ bool AnimationGraphEditor::save_document()
 	editing_tree->write_to_dict(write);
 	save_editor_nodes(write);
 
-	std::ofstream outfile(name);
+	std::ofstream outfile(get_save_root_dir() + get_doc_name());
 	outfile.write(write.get_output().c_str(), write.get_output().size());
 	outfile.close();
 
@@ -653,11 +632,11 @@ void AnimationGraphEditor::draw_menu_bar()
 				open("");
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
-				open_open_popup = true;
+				open_the_open_popup();
 
 			}
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
-				open_save_popup = true;
+				save();
 			}
 
 			ImGui::EndMenu();
@@ -777,12 +756,6 @@ void AnimationGraphEditor::stop_playback()
 	control_params.refresh_props();
 }
 
-#include "Framework/EditorUtil.h"
-
-void AnimationGraphEditor::draw_popups()
-{
-	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, "./Data/Animations/Graphs/");
-}
 
 #if 0
 void Timeline::draw_imgui()
@@ -966,7 +939,7 @@ void AnimationGraphEditor::imgui_draw()
 			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
 			ImVec4(1, 1, 1, 1)))
 		{
-			save_document();
+			save();
 		}
 		ImGui::PopStyleColor(3);
 		ImGui::EndDisabled();
@@ -997,11 +970,11 @@ void AnimationGraphEditor::imgui_draw()
 		}
 	}
 
-	draw_popups();
 
 
 	ImGui::End();
 
+	IEditorTool::imgui_draw();
 }
 
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
@@ -1587,19 +1560,22 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
 {
 	if (newstate == editor_focus_state::Background) {
-		stop_playback();
-		compile_and_run();
+
+		if (eng->get_state() != Engine_State::Game) {
+			stop_playback();
+			compile_and_run();
+		}
 		control_params.refresh_props();
 		if (out.obj.is_valid())
 			idraw->remove_obj(out.obj);
 		playback = graph_playback_state::running;
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else if(newstate == editor_focus_state::Closed){
 		close();
 		if (out.obj.is_valid())
 			idraw->remove_obj(out.obj);
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else {
 		// focused, stuff can start being rendered
@@ -1713,7 +1689,7 @@ void AnimationGraphEditor::overlay_draw()
 void AnimationGraphEditor::create_new_document()
 {
 	printf("creating new document");
-	this->name = "";	// when saving, user is prompted
+	set_empty_name();	// when saving, user is prompted
 	editing_tree = new Animation_Tree_CFG;
 	is_owning_editing_tree = true;
 	// add the output pose node to the root layer
@@ -1759,23 +1735,8 @@ void AnimationGraphEditor::try_load_preview_models()
 		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);
 }
 
-void AnimationGraphEditor::open(const char* name)
+void AnimationGraphEditor::open_document_internal(const char* name)
 {
-	assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
-
-	if (!is_initialized)
-		init();
-
-	if (get_focus_state() == editor_focus_state::Background) {
-		sys_print("!!! cant open Animation Editor while game is running. Close the level then try again.\n");
-		return;
-	}
-
-	// close currently open document
-	close();
-
-	ASSERT(!has_document_open());
-
 	bool needs_new_doc = true;
 	if (strlen(name)!=0) {
 		// try loading graphname, create new document on fail
@@ -1794,7 +1755,7 @@ void AnimationGraphEditor::open(const char* name)
 			else {
 				needs_new_doc = false;
 				is_owning_editing_tree = false;
-				this->name = name;
+				set_doc_name(name);
 
 				for (int i = 0; i < nodes.size(); i++) {
 					nodes[i]->init();
@@ -1807,17 +1768,9 @@ void AnimationGraphEditor::open(const char* name)
 	}
 
 	if (needs_new_doc) {
-		this->name = "";	// empty name
+		set_empty_name();
 		create_new_document();
 		ASSERT(!current_document_has_path());
-	}
-
-
-	{
-		const char* window_name = "unnamed";
-		if (!needs_new_doc)
-			window_name = this->name.c_str();
-		SDL_SetWindowTitle(eng->window, string_format("AnimationEditor: %s", window_name));
 	}
 
 	ASSERT(editing_tree);

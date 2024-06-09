@@ -324,8 +324,8 @@ public:
 	AnimationGraphEditor() : graph_tabs(this) {
 	}
 	virtual void init() override;
-	virtual void open(const char* name) override;
-	virtual void close() override;
+	virtual void open_document_internal(const char* name) override;
+	virtual void close_internal() override;
 	virtual void tick(float dt) override;
 	virtual bool handle_event(const SDL_Event& event) override;
 	virtual void ui_paint() override {}
@@ -333,9 +333,7 @@ public:
 	virtual const View_Setup& get_vs() override{
 		return out.vs;
 	}
-	virtual const char* get_name() override {
-		return name.c_str();
-	}
+	bool can_save_document() override;
 	virtual void imgui_draw() override;
 	virtual void on_change_focus(editor_focus_state newstate) override;
 
@@ -352,13 +350,12 @@ public:
 	void stop_playback();
 
 	void save_command();
-	bool save_document();
+	bool save_document_internal() override;
 	void save_editor_nodes(DictWriter& writer);
 	void create_new_document();
 	void compile_and_run();
 	bool compile_graph_for_playing();
 	bool load_editor_nodes(DictParser& parser);
-	bool current_document_has_path() { return !name.empty(); }
 
 	Base_EdNode* editor_node_for_cfg_node(Node_CFG* node) {
 		if (node == nullptr)
@@ -442,7 +439,7 @@ public:
 		reset_prop_editor_next_tick = true;
 	}
 
-	bool has_document_open() const {
+	bool has_document_open() const override {
 		return editing_tree != nullptr;
 	}
 
@@ -471,7 +468,6 @@ public:
 
 	bool is_modifier_pressed = false;
 	bool is_focused = false;
-	bool is_initialized = false;
 	void* imgui_node_context = nullptr;
 	std::vector<const Base_EdNode*> template_creation_nodes;
 
@@ -487,8 +483,6 @@ public:
 		std::string preview_set = "default.txt";
 	}opt;
 
-	bool open_open_popup = false;
-	bool open_save_popup = false;
 	bool reset_prop_editor_next_tick = false;
 
 	struct selection_state
@@ -503,7 +497,6 @@ public:
 		uint32_t slot = 0;
 	}drop_state;
 
-	std::string name = "";
 	ImNodesEditorContext* default_editor = nullptr;
 	std::vector<Base_EdNode*> nodes;
 	// if true, then deletes editing_tree on graph close
@@ -513,6 +506,8 @@ public:
 	GraphOutput out;
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
+
+	const char* get_editor_name()override { return "Animation Editor"; }
 };
 
 extern AnimationGraphEditor ed;

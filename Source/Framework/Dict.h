@@ -16,6 +16,9 @@ public:
 	void set_vec3(const char* key, glm::vec3 val) {
 		keyvalues[key] = string_format("%f %f %f", val.x, val.y, val.z);
 	}
+	void set_vec4(const char* key, glm::vec4 val) {
+		keyvalues[key] = string_format("%f %f %f %f", val.x, val.y, val.z,val.w);
+	}
 	void set_float(const char* key, float val) {
 		keyvalues[key] = string_format("%f", val);
 	}
@@ -48,6 +51,14 @@ public:
 			return defaultval;
 		glm::vec3 o = glm::vec3(0.f);
 		int fields = sscanf(find->second.c_str(), "%f %f %f", &o.x, &o.y, &o.z);
+		return o;
+	}
+	glm::vec4 get_vec4(const char* key, glm::vec4 defaultval = glm::vec4(0.f))const {
+		const auto& find = keyvalues.find(key);
+		if (find == keyvalues.end())
+			return defaultval;
+		glm::vec4 o = glm::vec4(0.f);
+		int fields = sscanf(find->second.c_str(), "%f %f %f %f", &o.x, &o.y, &o.z,&o.w);
 		return o;
 	}
 	glm::vec2 get_vec2(const char* key, glm::vec2 defaultval = glm::vec2(0.f)) const {

@@ -553,6 +553,9 @@ void modify_pose_debug(Pose& pose)
 
 void Animator::tick_tree_new(float dt)
 {
+	if (!runtime_dat.cfg)
+		return;
+
 	Pose* poses = Pose_Pool::get().alloc(2);
 
 	script_value_t stack[64];

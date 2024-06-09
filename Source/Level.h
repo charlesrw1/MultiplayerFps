@@ -65,6 +65,7 @@ public:
 	std::vector<MapEntity> spawners;
 };
 
+class PhysicsActor;
 class Level
 {
 public:
@@ -79,8 +80,10 @@ public:
 	std::string name;
 	unique_ptr<Physics_Mesh> scollision;	// merged collision of all level_meshes
 	
+	// static lights/meshes/physics
 	vector<handle<Render_Light>> slights;
 	vector<handle<Render_Object>> smeshes;
+	vector<PhysicsActor*> sphysics;
 
 
 	StaticEnv senv;

@@ -9,6 +9,8 @@
 #include "DrawPublic.h"
 
 
+
+
 ENTITY_IMPL(Player);
 
 //
@@ -425,7 +427,6 @@ void Player::move()
 	// fixme:
 	view_angles = cmd.view_angles;
 
-	
 	// Friction
 	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
 	float speed = glm::length(velocity);
@@ -439,7 +440,6 @@ void Player::move()
 		velocity.x *= factor;
 		velocity.z *= factor;
 	}
-
 
 	if (eng->is_host() && debug_fly.get_bool()) {
 		action = Action_State::Falling;
@@ -460,7 +460,7 @@ void Player::move()
 		position += wishdir * 12.0f*(float)eng->tick_interval;
 
 	}
-	else
+	else if(0)
 		ground_move();
 	
 	player_physics_check_nans(*this);
@@ -819,7 +819,7 @@ void Player::set_input_command(Move_Command newcmd) {
 
 void Player::spawn() {
 
-	set_model("player_FINAL.glb");
+	set_model("player_FINAL.cmdl");
 
 	bool is_local_player = &eng->local_player() == this;
 	
@@ -830,7 +830,7 @@ void Player::spawn() {
 
 	auto graph = anim_tree_man->find_animation_tree("out.txt");
 
-	if(graph && graph->graph_is_valid)
+	if(graph && graph->graph_is_valid && model && model->get_skel())
 		initialize_animator(graph, &graph_driver);
 
 	phys_opt.shape = Ent_PhysicsShape::AABB;

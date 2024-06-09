@@ -89,7 +89,6 @@
     <ClInclude Include="Source\Framework\Dict.h" />
     <ClInclude Include="Source\Framework\DictParser.h" />
     <ClInclude Include="Source\Framework\DictWriter.h" />
-    <ClInclude Include="Source\Framework\EditorUtil.h" />
     <ClInclude Include="Source\Framework\EnumDefReflection.h" />
     <ClInclude Include="Source\Framework\ExpressionLang.h" />
     <ClInclude Include="Source\Framework\Factory.h" />
@@ -182,7 +181,6 @@
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
     <ClCompile Include="Source\Framework\DictParser.cpp" />
-    <ClCompile Include="Source\Framework\EditorUtil.cpp" />
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp" />
     <ClCompile Include="Source\Framework\ExpressionLang.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
@@ -193,6 +191,7 @@
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game.cpp" />
+    <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\Meshlet.cpp" />

@@ -553,7 +553,7 @@ void EditorDoc::duplicate_selected_and_select_them()
 		nodes.push_back(std::shared_ptr<EditorNode>(selection_state.get_selection().at(i)->duplicate()));
 	}
 	for (int i = 0; i < nodes.size(); i++)
-		nodes[i]->set_uid(id_start++);
+		nodes[i]->set_uid(get_next_id());
 	selection_state.clear_all_selected();
 	command_mgr.add_command(new CreateNodeCommand(nodes));
 	for (int i = 0; i < nodes.size(); i++)
@@ -605,6 +605,8 @@ Material* EditorNode::get_sprite_material()
 }
 void EditorNode::show()
 {
+	assert(ed_doc.get_focus_state() == editor_focus_state::Focused);
+
 	hide();
 
 	Model* m = get_rendering_model();
@@ -620,6 +622,7 @@ void EditorNode::show()
 		if (is_selected) {
 			float alpha = sin(GetTime()*2.5);
 			alpha *= alpha;
+
 			uint8_t alphau = alpha * 80 + 10;
 
 			ro.param2 = { 0xff, 128, 0, alphau };
@@ -694,7 +697,18 @@ void EditorNode::init_on_new_espawn()
 
 EditorNode* EditorDoc::create_node_from_dict(const Dict& d)
 {
-	return nullptr;
+	const char* template_class = d.get_string("_schema_name");
+	EditorNode* node = new EditorNode;
+	auto template_obj = ed_schema.find_schema(template_class);
+	if (!template_obj) {
+		sys_print("node schema type doesnt exist %s\n", template_class);
+	}
+	else
+		node->init_from_schema(template_obj);
+	for (auto& kv : d.keyvalues) {
+		node->get_dict().set_string(kv.first.c_str(), kv.second.c_str());
+	}
+	return node;
 }
 
 EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
@@ -705,8 +719,8 @@ EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 		node = get_editor_node_factory().createObject(template_obj->edtype);
 	if(!node)
 		node = new EditorNode();
-	node->set_uid(id_start);
 	node->init_from_schema(template_obj);
+	node->set_uid(get_next_id());
 	
 	std::shared_ptr<EditorNode> shared(node);
 
@@ -715,56 +729,125 @@ EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 	return node;
 }
 
+void EditorDoc::draw_menu_bar()
+{
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("New")) {
+				open("");
+			}
+			if (ImGui::MenuItem("Open", "Ctrl+O")) {
+				open_the_open_popup();
+
+			}
+			if (ImGui::MenuItem("Save", "Ctrl+S")) {
+				save();
+			}
+
+			ImGui::EndMenu();
+		}
+		
+		ImGui::EndMenuBar();
+	}
+
+}
+
 void EditorDoc::on_change_focus(editor_focus_state newstate)
 {
 	if (newstate == editor_focus_state::Background) {
 
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
+		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
+		hide_everything();
 	}
 	else if (newstate == editor_focus_state::Closed) {
 		close();
-
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
+		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
 	}
 	else {
 		// focused, stuff can start being rendered
-
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
+		show_everything();
 	}
+}
+
+void EditorDoc::hide_everything()
+{
+	for (int i = 0; i < nodes.size(); i++)
+		nodes[i]->hide();
+}
+void EditorDoc::show_everything()
+{
+	for (int i = 0; i < nodes.size(); i++)
+		nodes[i]->show();
 }
 
 void EditorDoc::init()
 {
 	// set my parent
 	set_parent(eng->get_gui());
+	ed_schema.load("./Data/classes.txt");
+	assets.init();
+}
+#include "Framework/DictWriter.h"
+#include <fstream>
+bool EditorDoc::save_document_internal()
+{
+	MapLoadFile mlf;
+
+	for (int i = 0; i < nodes.size(); i++) {
+
+		auto& node = nodes[i];
+		Dict dict = node->get_dict(); /* copy */
+		const char* template_name = node->get_schema_name();
+		dict.set_string("_schema_name", template_name);
+		mlf.add_spawner(dict);
+	}
+
+	// do any compile steps like nav mesh generation, light computation, etc here
+	mlf.write_to_disk(get_save_root_dir() + get_doc_name());
+
+	return true;
 }
 
-void EditorDoc::open(const char* levelname)
+void EditorDoc::open_document_internal(const char* levelname)
 {
-	init();
+	id_start = 0;
+	bool needs_new_doc = true;
+	if (strlen(levelname) != 0) {
+		std::string path = get_save_root_dir() + levelname;
+		bool good = editing_map.parse(path);
+		if (good) {
+			for (int i = 0; i < editing_map.spawners.size(); i++) {
+				EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
+				if (node) {
+					nodes.push_back(std::shared_ptr<EditorNode>(node));
+					if (get_focus_state() == editor_focus_state::Focused)
+						node->show();
+					id_start = glm::max(id_start, node->get_uid()+1);
+				}
+			}
+			needs_new_doc = false;
+			set_doc_name(levelname);
+		}
+	}
+
+	if(needs_new_doc) {
+		sys_print("creating new document\n");
+		set_empty_name();
+	}
+
+	is_open = true;
+}
+
+void EditorDoc::close_internal()
+{
+	nodes.clear();
 	command_mgr.clear_all();
 	manipulate.free_refs();
 	selection_state.clear_all_selected();
-	ed_schema.load("./Data/classes.txt");
-	nodes.clear();
-	
-	bool good = editing_map.parse(levelname);
-
-	for (int i = 0; i < editing_map.spawners.size(); i++) {
-		EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
-		if(node)
-			nodes.push_back(std::shared_ptr<EditorNode>(node));
-	}
-	assets.init();
-}
-
-void EditorDoc::save_doc()
-{
-}
-
-void EditorDoc::close()
-{
-	nodes.clear();
+	is_open = false;
 }
 
 void EditorDoc::leave_transform_tool(bool apply_delta)
@@ -789,6 +872,7 @@ void EditorDoc::ui_paint()
 
 void ManipulateTransformTool::handle_event(const SDL_Event& event)
 {
+
 	if (event.type == SDL_KEYDOWN && !eng->get_game_focused() && ed_doc.selection_state.has_any_selected()) {
 		uint32_t scancode = event.key.keysym.scancode;
 		bool has_shift = event.key.keysym.mod & KMOD_SHIFT;
@@ -831,6 +915,10 @@ void ManipulateTransformTool::handle_event(const SDL_Event& event)
 
 bool EditorDoc::handle_event(const SDL_Event& event)
 {
+	if (get_focus_state() != editor_focus_state::Focused)
+		return false;
+
+
 	switch (mode)
 	{
 	case TOOL_TRANSFORM: {
@@ -1101,7 +1189,7 @@ bool ManipulateTransformTool::is_using()
 void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
 {
 	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-	q = glm::quat_cast(transform);
+	q = glm::normalize(glm::quat_cast(transform));
 	p = transform[3];
 }
 
@@ -1155,7 +1243,7 @@ void ManipulateTransformTool::update()
 	bool create_command = false;
 	if (ImGuizmo::IsUsingAny()) {
 		if (state == IDLE) {
-			if (eng->keys[SDL_SCANCODE_LCTRL])
+			if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl))
 				ed_doc.duplicate_selected_and_select_them();
 
 			for (auto& s : ed_doc.selection_state.get_selection()) {
@@ -1191,7 +1279,7 @@ void ManipulateTransformTool::update()
 
 				Dict changes;
 				changes.set_vec3("position", p);
-				changes.set_vec3("rotation", glm::eulerAngles(r));
+				changes.set_vec4("rotation", glm::vec4(r.w,r.x,r.y,r.z));
 				changes.set_vec3("scale", scale);
 				std::vector<EditPropertyCommand::Group> groups;
 				groups.push_back({ n,changes });
@@ -1220,9 +1308,14 @@ void EditorDoc::imgui_draw()
 		prop_editor.set(nullptr);
 	prop_editor.draw();
 
-	for (int i = 0; i < selection_state.num_selected(); i++) {
-		selection_state.get_selection()[i]->show();
+	if (get_focus_state() == editor_focus_state::Focused) {
+		for (int i = 0; i < selection_state.num_selected(); i++) {
+			selection_state.get_selection()[i]->show();
+		}
 	}
+
+	IEditorTool::imgui_draw();
+
 	return;
 #if 0
 	ImGui::SetNextWindowPos(ImVec2(10, 10));
@@ -1677,6 +1770,38 @@ class color32_t_editor : public IDictEditor
 	}
 };
 
+class quat_t_editor : public IDictEditor
+{
+	using IDictEditor::IDictEditor;
+
+	// Inherited via IDictEditor
+	virtual void internal_update() override {
+		IDictEditor::internal_update();
+		auto node = get_node();
+		glm::vec4 v = node->get_dict().get_vec4(prop->name);
+		glm::vec3 eul = glm::eulerAngles(glm::quat(v.x, v.y, v.z, v.w));
+		eul *= 180.f / PI;
+		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
+			eul *= PI / 180.f;
+			glm::quat q = glm::quat(eul);
+			node->get_dict().set_vec4("rotation",glm::vec4(q.w, q.x, q.y, q.z));
+		}
+	}
+
+	virtual bool can_reset() override {
+		auto node = get_node();
+		auto vec = parse_hint_string(prop->range_hint);
+		if (vec.empty() || vec[0].is_empty())
+			return false;
+		glm::vec4 v;
+		int fields = sscanf(vec[0].to_stack_string().c_str(), "%f %f %f %f", &v.x, &v.y, &v.z,&v.w);
+		glm::vec4 dv = node->get_dict().get_vec4(prop->name);
+
+		return glm::dot(v - dv, v - dv) > 0.00001;
+	}
+};
+
+
 
 struct AutoStruct_asdf134 {
  AutoStruct_asdf134() {
@@ -1687,6 +1812,8 @@ struct AutoStruct_asdf134 {
 	 pfac.registerClass<bool_t_editor>("Leveled_bool");
 	 pfac.registerClass<color32_t_editor>("Leveled_color32");
 	 pfac.registerClass<vec3_t_editor>("Leveled_vec3");
+	 pfac.registerClass<quat_t_editor>("Leveled_quat");
+
 
 	 auto& afac = get_array_header_factory();
 
@@ -1720,7 +1847,7 @@ void ObjectOutliner::draw_table_R(EditorNode* node, int depth)
 	ImGui::SameLine();
 
 	if (node == nullptr) {
-		ImGui::Text(ed_doc.get_full_output_path());
+		ImGui::Text(ed_doc.get_full_output_path().c_str());
 	}
 	else {
 		ImGui::Text(node->get_schema_name());

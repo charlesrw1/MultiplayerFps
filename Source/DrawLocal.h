@@ -729,6 +729,7 @@ private:
 
 	MeshBuilder shadowverts;
 
+	// current world time for shaders/fx fed in by SceneParamsEx on draw_scene()
 	float current_time = 0.0;
 };
 

@@ -162,8 +162,9 @@ bool Model::has_tangents() const
 
 int Model::bone_for_name(StringName name) const
 {
-	// FIXME
-	return -1;
+	if (!get_skel())
+		return -1;
+	return get_skel()->get_bone_index(name);
 }
 DECLARE_ENGINE_CMD_CAT("gpu.", printusage)
 {
@@ -634,6 +635,8 @@ void ModelMan::init()
 
 void ModelMan::create_default_models()
 {
+	error_model = find_or_load("question.cmdl");
+
 	_sprite = new Model;
 	_sprite->aabb = Bounds(glm::vec3(-0.5), glm::vec3(0.5));
 	_sprite->bounding_sphere = bounds_to_sphere(_sprite->aabb);

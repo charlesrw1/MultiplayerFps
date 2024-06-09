@@ -497,8 +497,7 @@ Model* Game_Media::get_game_model_from_index(int index)
 
 void Entity::set_model(const char* model_name)
 {
-	int model_index = 0;
-	model = eng->media.get_game_model(model_name, &model_index);
+	model = mods.find_or_load(model_name);
 }
 
 
@@ -548,7 +547,7 @@ DECLARE_ENGINE_CMD(close_ed)
 DECLARE_ENGINE_CMD(start_ed)
 {
 	static const char* usage_str = "Usage: starteditor [map,anim] <file>\n";
-	if (args.size() != 3) {
+	if (args.size() != 2 && args.size()!=3) {
 		sys_print(usage_str);
 		return;
 	}
@@ -566,8 +565,10 @@ DECLARE_ENGINE_CMD(start_ed)
 		sys_print(usage_str);
 		return;
 	}
-
-	eng->change_editor_state(e, args.at(2));
+	const char* file_to_open = "";	// make a new map
+	if (args.size() == 3)
+		file_to_open = args.at(2);
+	eng->change_editor_state(e, file_to_open);
 }
 
 
@@ -586,16 +587,19 @@ void Game_Engine::change_editor_state(Eng_Tool_state next_tool, const char* file
 {
 	sys_print("--------- Change Editor State ---------\n");
 	if (tool_state != next_tool && tool_state != Eng_Tool_state::None) {
-		get_current_tool()->close();
+		// this should call close internally
 		get_current_tool()->set_focus_state(editor_focus_state::Closed);
 	}
 	tool_state = next_tool;
 	if (tool_state != Eng_Tool_state::None) {
 		enable_imgui_docking();
-		get_current_tool()->set_focus_state((get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
-		get_current_tool()->open(file);
+		bool could_open = get_current_tool()->open_and_set_focus(file, (get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
+		if (!could_open) {
+			tool_state = Eng_Tool_state::None;
+		}
 	}
-	else
+
+	if (tool_state == Eng_Tool_state::None)
 		disable_imgui_docking();
 }
 
@@ -950,6 +954,9 @@ void Game_Engine::bind_key(int key, string command)
 
 void Game_Engine::cleanup()
 {
+	if (get_current_tool())
+		get_current_tool()->set_focus_state(editor_focus_state::Closed);
+
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
 		NetworkQuit();
@@ -1056,7 +1063,7 @@ glm::ivec2 Game_Engine::get_game_viewport_dimensions()
 	if (is_drawing_to_window_viewport())
 		return window_viewport_size;
 	else
-		return { g_window_w.get_integer(), g_window_w.get_integer() };
+		return { g_window_w.get_integer(), g_window_h.get_integer() };
 }
 
 static bool window_hovered = true;
@@ -1145,11 +1152,16 @@ bool Game_Engine::game_draw_screen()
 {
 	SceneDrawParamsEx params(eng->time,eng->frame_time);
 	params.output_to_screen = !eng->is_drawing_to_window_viewport();
+	View_Setup vs_for_gui;
+	auto viewport = get_game_viewport_dimensions();
+	vs_for_gui.width = viewport.x;
+	vs_for_gui.height = viewport.y;
+
 	
 	if (get_local_player() == nullptr) {
 		params.draw_world = false;
 		params.draw_ui = true;
-		idraw->scene_draw(params, {}, get_gui(), nullptr);	// not spawned, so just update the UI
+		idraw->scene_draw(params, vs_for_gui, get_gui(), nullptr);	// not spawned, so just update the UI
 		return true;
 	}
 
@@ -1160,8 +1172,6 @@ bool Game_Engine::game_draw_screen()
 	float fov = g_fov.get_float();
 	p->get_view(position, angles, fov);
 	glm::vec3 front = AnglesToVector(angles.x, angles.y);
-
-	auto viewport = get_game_viewport_dimensions();
 
 	View_Setup vs = View_Setup(position, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
@@ -1181,6 +1191,12 @@ void Game_Engine::draw_screen()
 
 	SceneDrawParamsEx params(eng->time, eng->frame_time);
 	params.output_to_screen = !eng->is_drawing_to_window_viewport();
+	// so the width/height parameters are valid
+	View_Setup vs_for_gui;
+	auto viewport = get_game_viewport_dimensions();
+	vs_for_gui.width = viewport.x;
+	vs_for_gui.height = viewport.y;
+
 	if (state == Engine_State::Idle) {
 		// draw general ui
 		if (get_current_tool() != nullptr) {
@@ -1188,13 +1204,13 @@ void Game_Engine::draw_screen()
 		}
 		else {
 			params.draw_world = false;	// no world to draw
-			idraw->scene_draw(params, {}, get_gui(), nullptr);
+			idraw->scene_draw(params, vs_for_gui, get_gui(), nullptr);
 		}
 	}
 	else if (state == Engine_State::Loading) {
 		// draw loading ui etc.
 		params.draw_world = false;
-		idraw->scene_draw(params, {}, get_gui(), nullptr);
+		idraw->scene_draw(params, vs_for_gui, get_gui(), nullptr);
 	}
 	else if (state == Engine_State::Game) {
 		bool good = game_draw_screen();
@@ -1370,7 +1386,6 @@ void Game_Engine::init()
 	cl->init();
 	sv->init();
 	imgui_context = ImGui::CreateContext();
-	g_anim_ed_graph->init();
 	TIMESTAMP("init everything");
 
 	ImGui::SetCurrentContext(imgui_context);
@@ -1799,8 +1814,7 @@ void Debug_Console::draw()
 	{
 		char* s = input_buffer;
 		if (s[0]) {
-			print("> %s", input_buffer);
-
+			// this will print it to the console
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, input_buffer);
 
 			history.push_back(input_buffer);

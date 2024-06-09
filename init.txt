@@ -2,10 +2,17 @@
 thirdperson 1
 
 
-start_ed map Map0
+start_ed map
 
 g_draw_physx_scene 31
- #g_drawdebugmenu 0
+g_drawdebugmenu 1
 g_drawimguidemo 0
 
-r.debug_mode 9
+bind 1 "map m"
+bind 6 "start_ed map m.txt"
+
+bind F1 "r.debug_mode 0"
+bind F2 "r.debug_mode 4"
+bind F3 "r.debug_mode 5"
+bind F4 "r.debug_mode 8"
+bind F5 "r.debug_mode 2"

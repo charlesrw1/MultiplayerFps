@@ -5,7 +5,8 @@ out vec4 FS_OUT_FragColor;
 
 uniform sampler2D equirectangular_img;
 
-const vec2 inv_atan = vec2(0.1591, 0.3183);
+//const vec2 inv_atan = vec2(0.1591, 0.3183);
+const vec2 inv_atan = vec2(0.1591, 0.315);
 vec2 sample_spherical(vec3 V)
 {
 	vec2 uv = vec2(atan(V.z,V.x),asin(V.y));

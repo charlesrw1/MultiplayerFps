@@ -1,9 +1,5 @@
 #pragma once
-#include <vector>
-#include <memory>
-#include "Framework/Util.h"
-#include "Framework/PropertyEd.h"
-#include "glm/glm.hpp"
+
 #include "Framework/Rect2d.h"
 class UIFont;
 class Material;

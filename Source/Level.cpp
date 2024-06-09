@@ -8,6 +8,8 @@
 #include "Texture.h"
 #include <array>
 
+#include "Physics/Physics2.h"
+
 static const char* const maps_directory = "./Data/Maps/";
 
 void Physics_Mesh::build()
@@ -34,35 +36,64 @@ void Physics_Mesh::build()
 
 
 
-handle<Render_Object> make_static_mesh_from_dict(const Dict& dict)
+void make_static_mesh_from_dict(vector<handle<Render_Object>>& objs, vector<PhysicsActor*>& phys, const Dict& dict)
 {
-
 	const char* get_str = "";
 
-	if (*(get_str = dict.get_string("model", "")) != 0) {
-		
-		Model* m = mods.find_or_load(get_str);
-		if (m) {
-			glm::mat4 transform = glm::translate(glm::mat4(1), dict.get_vec3("position"));
-			glm::vec3 angles = dict.get_vec3("rotation");
-			transform = transform * glm::eulerAngleXYZ(angles.x,angles.y,angles.z);
-			transform = glm::scale(transform, dict.get_vec3("scale",glm::vec3(1.f)));
-
-
-			auto handle = idraw->register_obj();
-			Render_Object rop;
-			rop.model = m;
-			rop.transform = transform;
-			rop.animator = nullptr;
-			rop.visible = true;
-			rop.shadow_caster = dict.get_int("casts_shadows", 1);
-			idraw->update_obj(handle, rop);
-
-			return handle;
-		}
+	const char* modelname = dict.get_string("model");
+	if (*modelname == 0) {
+		return;
 	}
+	Model* model = mods.find_or_load(modelname);
+	if (!model)
+		return;
 
-	return {};
+	glm::vec3 p = dict.get_vec3("position");
+	glm::vec3 s = dict.get_vec3("scale",glm::vec3(1.f));
+	glm::vec4 qvec = dict.get_vec4("rotation");
+	glm::quat q = glm::quat(qvec.x, qvec.y, qvec.z, qvec.w);
+	glm::mat4 transform = glm::translate(glm::mat4(1), p);
+	transform *= glm::mat4_cast(q);
+	transform = glm::scale(transform, s);
+
+	Color32 color = dict.get_color("color");
+
+	auto handle = idraw->register_obj();
+	Render_Object rop;
+	rop.param1 = color;
+	rop.model = model;
+	rop.transform = transform;
+	rop.animator = nullptr;
+	rop.visible = true;
+	rop.shadow_caster = dict.get_int("casts_shadows", 1);
+
+	bool has_collisions = dict.get_int("has_collisions", 1);
+	idraw->update_obj(handle, rop);
+	objs.push_back(handle);
+
+	if (has_collisions) {
+		// create physics
+		PhysicsActor* actor = g_physics->allocate_physics_actor();
+		assert(actor);
+		actor->set_entity(nullptr);
+
+		PhysTransform pt;
+		pt.position = p;
+		pt.rotation = q;
+
+		glm::vec3 halfsize = (model->get_bounds().bmax - model->get_bounds().bmin) * 0.5f * glm::abs(s);
+		glm::vec3 center = model->get_bounds().get_center() * s;
+		center = glm::mat4_cast(q) * glm::vec4(center, 1.0);
+		PhysTransform tr;
+		tr.position = p;	// fixme: scaling for models
+		tr.rotation = q;
+		if (model->get_physics_body())
+			actor->create_static_actor_from_model(model, tr);
+		else
+			actor->create_static_actor_from_shape(physics_shape_def::create_box(halfsize, p + center, q));
+	
+		phys.push_back(actor);
+	}
 }
 
 handle<Render_Light> make_light_from_dict(const Dict& dict)
@@ -102,13 +133,10 @@ bool MapLoadFile::parse(const std::string name)
 	spawners.clear();
 	mapname = "";
 
-	std::string mappath =  maps_directory;
-	mappath += name;
-	mappath += "/entities.txt";
 
 	auto file = FileSys::open_read(name.c_str());
 	if (!file) {
-		sys_print("!!! couldn't find ent file %s\n", mappath.c_str());
+		sys_print("!!! couldn't find map file %s\n", name.c_str());
 		return false;
 	}
 	DictParser parser;
@@ -137,11 +165,7 @@ bool MapLoadFile::parse(const std::string name)
 void MapLoadFile::write_to_disk(const std::string name)
 {
 	sys_print("*** Writing map %s to disk\n", name.c_str());
-	sys_print("   -> num ents: %s\n", (int) spawners.size());
-
-	std::string mappath = maps_directory;
-	mappath += name;
-	mappath += "/entities.txt";
+	sys_print("   num ents: %d\n", (int) spawners.size());
 
 	DictWriter out;
 
@@ -151,12 +175,12 @@ void MapLoadFile::write_to_disk(const std::string name)
 		for (auto& kv : s.dict.keyvalues) {
 
 			out.write_key(kv.first.c_str());
-			out.write_value(kv.second.c_str());
+			out.write_value_quoted(kv.second.c_str());
 		}
 		out.write_item_end();
 	}
 
-	std::ofstream outfile(mappath);
+	std::ofstream outfile(name);
 	size_t count = out.get_output().size();
 	outfile.write(out.get_output().c_str(), count);
 	outfile.close();
@@ -164,18 +188,18 @@ void MapLoadFile::write_to_disk(const std::string name)
 
 bool Level::open_from_file(const std::string& path)
 {
-	bool b = loadfile.parse(path);
+	std::string fullpath = maps_directory + path + ".txt";
+	bool b = loadfile.parse(fullpath);
 	if (!b)
 		return false;
 
 	for (int i = 0; i < loadfile.spawners.size(); i++) {
 		auto& spawner = loadfile.spawners[i];
-		if (spawner.type == NAME("static_mesh"))
-			smeshes.push_back(make_static_mesh_from_dict(spawner.dict));
-		else if (spawner.type == NAME("static_light"))
-			slights.push_back(make_light_from_dict(spawner.dict));
+		if (strcmp(spawner.dict.get_string("_schema_name"), "StaticMesh") == 0)
+			make_static_mesh_from_dict(smeshes, sphysics, spawner.dict);
 
 	}
+	return true;
 }
 
 void Level::free_level()
@@ -185,4 +209,11 @@ void Level::free_level()
 
 	for (int i = 0; i < slights.size(); i++)
 		idraw->remove_light(slights[i]);
+
+	for (int i = 0; i < sphysics.size(); i++)
+		g_physics->free_physics_actor(sphysics[i]);
+
+	smeshes.clear();
+	slights.clear();
+	sphysics.clear();
 }

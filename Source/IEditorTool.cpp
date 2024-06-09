@@ -1,8 +1,71 @@
-#pragma once
+#include "IEditorTool.h"
+#include "Framework/Util.h"
 #include <string>
+#include <fstream>
 #include "imgui.h"
 #include "Framework/Files.h"
 #include "Framework/Util.h"
+#include "Game_Engine.h"
+#include <cassert>
+#include <SDL2/SDL.h>
+bool IEditorTool::open(const char* name) {
+	assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
+
+	if (get_focus_state() == editor_focus_state::Background) {
+		sys_print("!!! cant open %s while game is running. Close the level then try again.\n", get_editor_name());
+		return false;
+	}
+	// close currently open document
+	close();
+	assert(!has_document_open());
+
+	open_document_internal(name);
+
+	{
+		const char* window_name = "unnamed";
+		if (current_document_has_path())
+			window_name = this->name.c_str();
+		SDL_SetWindowTitle(eng->window, string_format("%s: %s",get_editor_name(), window_name));
+	}
+
+	return true;
+}
+
+void IEditorTool::close()
+{
+	if (!has_document_open())
+		return;
+	// fixme: prompt to save?
+	save();
+	open_open_popup = open_save_popup = false;
+	close_internal();
+	name = "";
+
+	SDL_SetWindowTitle(eng->window,"CsRemake");
+
+	ASSERT(!has_document_open());
+}
+bool IEditorTool::save()
+{
+	if (!can_save_document()) {
+		sys_print("!!! cant save graph while playing\n");
+		return false;
+	}
+	if (!current_document_has_path()) {
+		open_save_popup = true;
+		return false;
+	}
+
+	{
+		const char* window_name = "unnamed";
+		if (current_document_has_path())
+			window_name = this->name.c_str();
+		SDL_SetWindowTitle(eng->window, string_format("%s: %s", get_editor_name(), window_name));
+	}
+
+	return save_document_internal();
+}
+
 /* "./Data/Animations/Graphs/%s" */
 template<typename FUNCTOR>
 static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog)
@@ -27,7 +90,7 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 	}
 
 	if (returned_true) {
-		const char* full_path = string_format("%s%s",path_prefix.c_str(), buffer);
+		const char* full_path = string_format("%s%s", path_prefix.c_str(), buffer);
 		bool file_already_exists = FileSys::does_os_file_exist(full_path);
 		cant_open_path = false;
 		alread_exists = false;
@@ -102,19 +165,23 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 	}
 
 	if (ImGui::BeginPopupModal("Save file dialog")) {
-		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are saved under %s",prefix.c_str());
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Will be saved under %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
 			name = buf;
-			tool->save_document();
+			tool->save();
 			}, prefix.c_str(), true);
 	}
 
 	if (ImGui::BeginPopupModal("Open file dialog")) {
-
-		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Graphs are searched in $WorkingDir/Data/Animations/Graphs");
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
-			tool->open(buf);
+			tool->open_and_set_focus(buf, tool->get_focus_state());
 			}, prefix.c_str(), false);
 	}
 }
 /* "./Data/Animations/Graphs/"*/
+
+void IEditorTool::imgui_draw()
+{
+	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, get_save_root_dir());
+}

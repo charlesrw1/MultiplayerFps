@@ -710,18 +710,18 @@ static Shader mdi_meshlet_zero_bufs;
 void Renderer::create_shaders()
 {
 	ssao.reload_shaders();
-	Shader::compile(&naiveshader, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE");
-	Shader::compile(&naiveshader2, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE2");
+	//Shader::compile(&naiveshader, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE");
+	//Shader::compile(&naiveshader2, "SimpleMeshV.txt", "UnlitF.txt", "NAIVE2");
 
-	Shader::compile(&mdi_meshlet_cull_shader, "SimpleMeshV.txt", "UnlitF.txt", "MDICULL");
+	//Shader::compile(&mdi_meshlet_cull_shader, "SimpleMeshV.txt", "UnlitF.txt", "MDICULL");
 
 
-	Shader::compute_compile(&meshlet_inst_cull, "Meshlets/meshlets.txt", "INSTANCE_CULLING");
-	Shader::compute_compile(&meshlet_meshlet_cull, "Meshlets/meshlets.txt", "MESHLET_CULLING");
-	Shader::compute_compile(&meshlet_reset_pre_inst, "Meshlets/reset.txt", "RESET_PRE_INSTANCES");
-	Shader::compute_compile(&meshlet_reset_post_inst, "Meshlets/reset.txt", "RESET_POST_INSTANCES");
-	Shader::compute_compile(&mdi_meshlet_zero_bufs, "Meshlets/zerobuf.txt");
-	Shader::compute_compile(&meshlet_compact, "Meshlets/compact.txt");
+	//Shader::compute_compile(&meshlet_inst_cull, "Meshlets/meshlets.txt", "INSTANCE_CULLING");
+	//Shader::compute_compile(&meshlet_meshlet_cull, "Meshlets/meshlets.txt", "MESHLET_CULLING");
+	//Shader::compute_compile(&meshlet_reset_pre_inst, "Meshlets/reset.txt", "RESET_PRE_INSTANCES");
+	//Shader::compute_compile(&meshlet_reset_post_inst, "Meshlets/reset.txt", "RESET_POST_INSTANCES");
+	//Shader::compute_compile(&mdi_meshlet_zero_bufs, "Meshlets/zerobuf.txt");
+	//Shader::compute_compile(&meshlet_compact, "Meshlets/compact.txt");
 
 
 	prog.simple = prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt");

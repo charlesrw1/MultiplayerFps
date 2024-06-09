@@ -164,13 +164,13 @@ public:
 	}
 	void save_transform_to_dict(glm::vec3 v, glm::quat r, glm::vec3 s) {
 		get_dict().set_vec3("position", v);
-		glm::vec3 a = glm::eulerAngles(r);
-		get_dict().set_vec3("rotation", a);
+		get_dict().set_vec4("rotation", glm::vec4(r.w,r.x,r.y,r.z));
 		get_dict().set_vec3("scale", s);
 	}
 	void read_transform_from_dict(glm::vec3& v, glm::quat& r, glm::vec3& s) {
 		v = get_dict().get_vec3("position");
-		r = glm::quat(get_dict().get_vec3("rotation"));
+		glm::vec4 r_v = get_dict().get_vec4("rotation");
+		r = glm::quat(r_v.x, r_v.y, r_v.z, r_v.w);
 		s = get_dict().get_vec3("scale",glm::vec3(1));
 	}
 	void set_model(const std::string& name) {
@@ -604,26 +604,40 @@ private:
 	std::vector<SavedTransform> saved_of_set;
 };
 
+
+// maps/
+//	both prefabs and maps
+//	build_<map_name>/
+//		cubemaps,...
+
 class Model;
 class EditorDoc : public IEditorTool
 {
 public:
 	EditorDoc() {}
 	virtual void init();
-	virtual void open(const char* levelname) override;
-	virtual void close() override;
+	virtual bool can_save_document() override { return true; }
+	virtual void open_document_internal(const char* levelname) override;
+	virtual void close_internal() override;
+	virtual bool save_document_internal() override;
+	virtual bool has_document_open() const override {
+		return is_open;
+	}
+	virtual const char* get_editor_name()  override {
+		return "Level Editor";
+	}
+	virtual void draw_menu_bar() override;
+
 	virtual bool handle_event(const SDL_Event& event) override;
 	virtual void ui_paint() override;
 	virtual void tick(float dt) override;
 	virtual void overlay_draw() override;
 	virtual void imgui_draw() override;
 	virtual const View_Setup& get_vs() override;
-	virtual const char* get_name() override {
-		return "";
-	}
+	virtual std::string get_save_root_dir() override { return "./Data/Maps/"; }
 
-	const char* get_full_output_path() {
-		return "temp/path/to/map";
+	std::string get_full_output_path() {
+		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
 	}
 
 
@@ -638,7 +652,6 @@ public:
 
 	world_query_result cast_ray_into_world(Ray* out_ray, int mx, int my);
 
-	void save_doc();
 	
 	enum ToolMode {
 		TOOL_TRANSFORM,	// translation/rotation/scale tool
@@ -665,6 +678,7 @@ public:
 	EditorNode* create_node_from_dict(const Dict& d);
 	EditorNode* spawn_from_schema_type(const char* schema_name);
 
+	bool is_open = false;
 	UndoRedoSystem command_mgr;
 	AssetBrowser assets;
 	View_Setup vs_setup;
@@ -685,5 +699,13 @@ public:
 	// Inherited via IEditorTool
 	virtual void on_change_focus(editor_focus_state newstate) override;
 private:
-	uint64_t id_start = 0;
+
+	void hide_everything();
+	void show_everything();
+
+	uint32_t get_next_id() {
+		return id_start++;
+	}
+
+	uint32_t id_start = 0;
 };
