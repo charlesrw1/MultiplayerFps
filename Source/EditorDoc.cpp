@@ -846,7 +846,7 @@ void EditorDoc::close_internal()
 	nodes.clear();
 	command_mgr.clear_all();
 	manipulate.free_refs();
-	selection_state.clear_all_selected();
+	selection_state.clear_all_selected(false);
 	is_open = false;
 }
 
@@ -1434,6 +1434,9 @@ void EditorDoc::imgui_draw()
 
 void EditorDoc::hook_scene_viewport_draw()
 {
+	if (get_focus_state() != editor_focus_state::Focused)
+		return;
+
 	if (ImGui::BeginDragDropTarget())
 	{
 		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();

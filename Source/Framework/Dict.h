@@ -61,6 +61,14 @@ public:
 		int fields = sscanf(find->second.c_str(), "%f %f %f %f", &o.x, &o.y, &o.z,&o.w);
 		return o;
 	}
+	glm::quat get_quat(const char* key, glm::quat defaultval = glm::quat(1, 0, 0, 0)) const {
+		const auto& find = keyvalues.find(key);
+		if (find == keyvalues.end())
+			return defaultval;
+		glm::quat q;
+		int fields = sscanf(find->second.c_str(), "%f %f %f %f", &q.w, &q.x, &q.y, &q.z);
+		return q;
+	}
 	glm::vec2 get_vec2(const char* key, glm::vec2 defaultval = glm::vec2(0.f)) const {
 		const auto& find = keyvalues.find(key);
 		if (find == keyvalues.end())

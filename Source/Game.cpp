@@ -7,7 +7,7 @@
 #include "EntityTypes.h"
 
 #include "DrawPublic.h"
-
+#include "Physics/Physics2.h"
 
 void find_spawn_position(Entity* ent)
 {
@@ -45,12 +45,12 @@ void Door::update()
 {
 	rotation.y = eng->time;
 }
-void Door::spawn()
+void Door::spawn(const Dict& args)
 {
 
 }
 
-void NPC::spawn()
+void NPC::spawn(const Dict& args)
 {
 
 }
@@ -67,7 +67,7 @@ void Game_Engine::populate_map()
 		Entity* e = create_entity(classname, -1);
 		if (!e)
 			continue;
-		e->spawn();
+		e->spawn(spawners[i].dict);
 	}
 }
 
@@ -79,20 +79,23 @@ void Game_Engine::client_leave(int slot)
 }
 
 void Entity::initialize_animator(const Animation_Tree_CFG* graph, IAnimationGraphDriver* driver) {
-
-	ASSERT(model);
-
+	assert(get_model());
 	if (!animator)
 		animator.reset(new Animator());
-	animator->initialize_animator(model,graph, driver, this);
+	animator->initialize_animator(get_model(),graph, driver, this);
 }
-
+void Entity::remove_animator()
+{
+	animator.reset();
+	renderable.animator = nullptr;
+	idraw->remove_obj(render_handle);	// just to be sure there isnt a dangling reference
+}
 
 void Game_Engine::make_client(int slot)
 {
 	sys_print("making client %d\n", slot);
 	Player* p = (Player*)create_entity("Player", slot);
-	p->spawn();
+	p->spawn({});
 }
 #include "EntityTypes.h"
 
@@ -298,6 +301,7 @@ void Entity::projectile_physics()
 }
 void Entity::gravity_physics()
 {
+#if 0
 	bool bounce = true;
 	bool slide = true;
 
@@ -336,6 +340,7 @@ void Entity::gravity_physics()
 			velocity *= 0.6f;
 		}
 	}
+#endif
 }
 #include <PxPhysics.h>
 
@@ -350,14 +355,9 @@ void Entity::update()
 #include "Framework/Config.h"
 
 
-static Random fxrand = Random(1452345);
-
 void grenade_hit_wall(Entity* ent, glm::vec3 normal)
 {
-	if (glm::length(ent->velocity)>1.f) {
-		ent->rotation = vec3(fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI), fxrand.RandF(0, TWOPI));
-		//eng->local.pm.add_dust_hit(ent->position + normal * 0.1f);
-	}
+	
 }
 
 
@@ -366,12 +366,11 @@ Grenade::Grenade()
 {
 }
 
-void Grenade::spawn()
+void Grenade::spawn(const Dict& args)
 {
-	set_model("grenade_he.glb");
-	phys_opt.type = Ent_PhysicsType::Complex;
-	//phys_opt.size.x = grenade_radius.real();
-	phys_opt.shape = Ent_PhysicsShape::Sphere;
+	Entity::spawn(args);
+	set_model("grenade_he.cmdl");
+	
 	throw_time = eng->time;
 }
 
@@ -399,6 +398,8 @@ Entity::~Entity()
 {
 	printf("removed handle %d\n",render_handle.id);
 	idraw->remove_obj(render_handle);
+	if (physics_actor)
+		g_physics->free_physics_actor(physics_actor);
 
 }
 Entity::Entity()
@@ -406,30 +407,35 @@ Entity::Entity()
 
 }
 
-void Entity::spawn()
+void Entity::spawn(const Dict& args)
 {
-
+	name_id = args.get_string("name", "");
+	position = args.get_vec3("position");
+	rotation = args.get_quat("rotation");
+	scale = args.get_vec3("scale", glm::vec3(1.f));
+	const char* modelname = args.get_string("model", "");
+	if (*modelname)
+		set_model(modelname);
+	renderable.param1 = args.get_color("color", COLOR_WHITE);
+	if ((bool)args.get_int("start_hidden", 0))
+		flags = EntityFlags::Enum(flags | EntityFlags::Hidden);
 }
 
 void Entity::present()
 {
-	if (!render_handle.is_valid() && model)
+	if (!render_handle.is_valid() && can_render_this_object())
 		render_handle = idraw->register_obj();
-	else if (render_handle.is_valid() && !model)
+	else if (render_handle.is_valid() && !can_render_this_object())
 		idraw->remove_obj(render_handle);
 
-	if (render_handle.is_valid() && model) {
-		Render_Object proxy;
+	if (render_handle.is_valid() && can_render_this_object()) {
+		assert(renderable.model);
 
-		proxy.visible = !(state_flags & EF_HIDDEN);
+		renderable.visible = !is_object_hidden();
 		if (animator)
-			proxy.animator = animator.get();
-		proxy.model = model;
-
-		// FIXME:
-		proxy.transform = get_world_transform();// * model->skeleton_root_transform;
-		
-		idraw->update_obj(render_handle, proxy);
+			renderable.animator = animator.get();
+		renderable.transform = get_world_transform();// * model->skeleton_root_transform;
+		idraw->update_obj(render_handle, renderable);
 	}
 }
 

@@ -254,7 +254,7 @@ void Game_Engine::make_move()
 		return;
 	}
 
-	if (!(p->state_flags & EF_FROZEN_VIEW))
+	if (!p->has_flag(PlayerFlags::FrozenView))
 		view_angle_update(command.view_angles);
 
 
@@ -497,7 +497,7 @@ Model* Game_Media::get_game_model_from_index(int index)
 
 void Entity::set_model(const char* model_name)
 {
-	model = mods.find_or_load(model_name);
+	renderable.model = mods.find_or_load(model_name);
 }
 
 
@@ -705,7 +705,7 @@ DECLARE_ENGINE_CMD(print_ents)
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
 	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 		Entity& e = ei.get();
-		sys_print("%-15d %-15s %-15f %-15f %-15d\n", ei.get_index(), ei.get().get_classname().get_c_str(), e.position.x, e.position.z, (int)e.model);
+		sys_print("%-15d %-15s %-15f %-15f\n", ei.get_index(), ei.get().get_classname().get_c_str(), e.position.x, e.position.z);
 	}
 }
 #endif
@@ -814,7 +814,7 @@ DECLARE_ENGINE_CMD(spawn_npc)
 		auto npc = eng->create_entity("NPC");
 		if (npc) {
 			npc->position = rh.pos;
-			npc->spawn();
+			npc->spawn({});
 		}
 	}
 }
@@ -1255,34 +1255,7 @@ IEditorTool* Game_Engine::get_current_tool()
 
 void Game_Engine::build_physics_world(float time)
 {
-	static ConfigVar only_world("dbg.onlyworld","0",CVAR_BOOL);
 
-	phys.ClearObjs();
-	{
-		PhysicsObject obj;
-		obj.is_level = true;
-		obj.solid = true;
-		obj.is_mesh = true;
-		obj.mesh.structure = &level->scollision->bvh;
-		obj.mesh.verticies = &level->scollision->verticies;
-		obj.mesh.tris = &level->scollision->tris;
-
-		phys.AddObj(obj);
-	}
-	if (only_world.get_bool()) return;
-
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-		Entity& ce = ei.get();
-
-		//if (!(ce.flags & EF_SOLID)) continue;
-
-		PhysicsObject po;
-		po.userindex = ce.selfid;
-		po.max = ce.phys_opt.size * 0.5f + ce.position;
-		continue;
-
-		phys.AddObj(po);
-	}
 }
 
 void Game_Engine::update_game_tick()

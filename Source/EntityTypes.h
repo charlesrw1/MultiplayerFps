@@ -4,6 +4,7 @@
 
 #include "Entity.h"
 #include "Interaction.h"
+#include "Framework/Dict.h"
 
 
 
@@ -20,8 +21,9 @@ public:
 
 		rotation.y = HALFPI;
 	}
+	glm::vec3 velocity = glm::vec3(0.f);
 
-	virtual void spawn() override;
+	virtual void spawn(const Dict& spawnargs) override;
 	virtual void update() override {
 
 		glm::vec3 waypoints[3] = {
@@ -110,7 +112,7 @@ public:
 		CLOSED
 	}doorstate;
 
-	void spawn() override;
+	void spawn(const Dict& spawnargs) override;
 	void update() override;
 };
 
@@ -124,7 +126,7 @@ public:
 		thrower = handle;
 	}
 
-	void spawn() override;
+	void spawn(const Dict& spawnargs) override;
 	void update() override;
 
 	float throw_time = 0.0;

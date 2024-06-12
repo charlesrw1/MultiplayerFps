@@ -37,27 +37,8 @@
 		has_warned = true;\
 	} }
 
-// Int is a bitflags:
-//	1 = draw dynamic shapes (rigid body physics driven stuff)
-//	2 = draw trigger volumes
-//	4 = draw static shapes	 (world)
-//	8 = draw kinematic shapes (players, doors, etc.)
-//  16 = draw contraints	(bones, etc.)
-// set to 31 for everything
 
-struct DebugPhysxSceneFlags
-{
-	enum Enum
-	{
-		Dynamic = 1,
-		Trigger = 2,
-		Static = 4,
-		Kinematic = 8,
-		Contraints = 16,
-	};
-};
-
-ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_INTEGER, 0, 31);
+ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_BOOL);
 ConfigVar g_draw_every_physx_ray_hit("g_draw_every_physx_ray_hit", "0", CVAR_DEV | CVAR_BOOL);
 ConfigVar g_draw_every_physx_contact("g_draw_every_physx_contact", "0", CVAR_DEV | CVAR_BOOL);
 
@@ -82,26 +63,99 @@ physx::PxTransform PhysTransform::get_physx() const
 class PhysicsManLocal : public PhysicsManPublic
 {
 public:
-	void trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, PhysContents::Enum mask) override {
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, PhysContents::Enum mask) override {
 		float length = glm::length(end - start);
 		glm::vec3 dir = (end - start) / length;
-		trace_ray(out, start, dir, length, mask);
+		return trace_ray(out, start, dir, length, mask);
 	}
-	void trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, PhysContents::Enum mask) override {
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, PhysContents::Enum mask) override {
 		physx::PxRaycastBuffer hit;
 		bool status = scene->raycast(
 			glm_to_physx(start), glm_to_physx(dir), length, hit);
 		sys_print("ray: %d\n", (int)status);
 		if (!status) {
 			out.fraction = 1.0;
-			return;
+			return status;
 		}
 		out.fraction = hit.block.distance / length;
 		out.actor = (PhysicsActor*)hit.block.actor->userData;
 		out.hit_pos = physx_to_glm(hit.block.position);
 		out.hit_normal = physx_to_glm(hit.block.normal);
 		out.trace_dir = dir;
+		out.distance = hit.block.distance;
+		return status;
 	}
+	bool sweep_shared(world_query_result& out,
+		physx::PxGeometry& geom,
+		const glm::vec3& start,
+		const glm::vec3& dir,
+		float length,
+		PhysContents::Enum mask)
+	{
+		physx::PxSweepBuffer sweep;
+		physx::PxTransform local(glm_to_physx(start));
+		bool status = scene->sweep(geom, local, glm_to_physx(dir), length, sweep);
+		if (!status) {
+			out.fraction = 1.0;
+			return status;
+		}
+		out.had_initial_overlap = sweep.block.hadInitialOverlap();
+		out.distance = sweep.block.distance;
+		out.fraction = sweep.block.distance / length;
+		out.actor = (PhysicsActor*)sweep.block.actor->userData;
+		out.hit_pos = physx_to_glm(sweep.block.position);
+		out.hit_normal = physx_to_glm(sweep.block.normal);
+		out.trace_dir = dir;
+		return status;
+	}
+	bool overlap_shared(
+		physx::PxGeometry& geom,
+		const glm::vec3& start,
+		PhysContents::Enum mask)
+	{
+		physx::PxOverlapBuffer overlap;
+		physx::PxTransform local(glm_to_physx(start));
+		bool status = scene->overlap(geom, local, overlap);
+		return status;
+	}
+	virtual bool sweep_capsule(
+		world_query_result& out,
+		const vertical_capsule_def_t& capsule,
+		const glm::vec3& start,
+		const glm::vec3& dir,
+		float length,
+		PhysContents::Enum mask) 
+	{
+		auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
+		return sweep_shared(out, geom, start, dir, length, mask);
+	}
+	virtual bool sweep_sphere(
+		world_query_result& out,
+		float radius,
+		const glm::vec3& start,
+		const glm::vec3& dir,
+		float length,
+		PhysContents::Enum mask) {
+		auto geom = physx::PxSphereGeometry(radius);
+		return sweep_shared(out, geom, start, dir, length, mask);
+	}
+	virtual bool capsule_is_overlapped(
+		const vertical_capsule_def_t& capsule,
+		const glm::vec3& start,
+		PhysContents::Enum mask) {
+		auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
+		return overlap_shared(geom, start, mask);
+
+	}
+	virtual bool sphere_is_overlapped(
+		world_query_result& out,
+		float radius,
+		const glm::vec3& start,
+		PhysContents::Enum mask) {
+		auto geom = physx::PxSphereGeometry(radius);
+		return overlap_shared(geom, start, mask);
+	}
+
 	
 	PhysicsConstraint* allocate_constraint() override {
 		return new PhysicsConstraint;

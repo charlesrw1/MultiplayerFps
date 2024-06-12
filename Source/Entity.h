@@ -15,48 +15,16 @@
 class Model;
 class GeomContact;
 
-enum Entity_Flags
+
+struct EntityFlags
 {
-	EF_DEAD = 1,
-	EF_HIDDEN = 2,
-	EF_HIDE_ITEM = 4,
-	EF_DISABLE_PHYSICS = 8,
-	EF_FROZEN_VIEW = 16,
+	enum Enum
+	{
+		Dead = 1,
+		Hidden = 2,
+	};
 };
 
-enum class Ent_PhysicsType : uint8_t
-{
-	None,				// dont do any physics calculations
-	Solid,				// None, but pushes away other physics objects
-	Passthrough,		// None, but checks overlaps, for triggers etc.
-	Simple,				// position+velocity integration with gravity
-	SimpleNoGravity,	// Simple but no gravity
-	Complex,			// Simple but with collision
-	PlayerMove,			// Only for players
-
-	RigidBody,			// use rigid body sim TODO :)
-};
-
-enum class Ent_PhysicsShape : uint8_t
-{
-	AABB,
-	Sphere,
-};
-
-struct Ent_PhysicsSettings
-{
-	Ent_PhysicsType type = Ent_PhysicsType::None;
-	Ent_PhysicsShape shape = Ent_PhysicsShape::AABB;
-	float friction = 0.0;
-	float grav_scale = 1.0;
-	float elasticity = 0.0;
-	glm::vec3 size = glm::vec3(0.f);
-
-	float get_radius() const { return size.x; }
-	bool is_solid() const {
-		return type == Ent_PhysicsType::Solid;
-	}
-};
 
 typedef uint32_t entityhandle;
 
@@ -168,7 +136,8 @@ struct UpdateFlags
 	};
 };
 
-
+class PhysicsActor;
+class Dict;
 class Entity
 {
 public:
@@ -180,50 +149,67 @@ public:
 		return StringName(get_typeinfo().name);
 	}
 
-	virtual void spawn();
+	// initialize values
+	virtual void spawn(const Dict& spawn_args);
+	// initialize anything that depends on references to other entities
+	virtual void post_spawn(const Dict& spawn_args) {}
 	virtual void update();
 	virtual void present();
 
-	virtual InlineVec<Interaction*, 2> get_interactions() const { return {}; };
+	bool has_physics_actor() const { return physics_actor; }
 
 	entityhandle selfid = 0;	// eng->ents[]
-	StringName self_name;		// name of entity to identify them
+	std::string name_id;		// name of entity frome editor
 
-	glm::vec3 position = glm::vec3(0);
-	glm::vec3 rotation = glm::vec3(0);
-	glm::vec3 velocity = glm::vec3(0);
+	PhysicsActor* physics_actor = nullptr;
+	glm::vec3 scale = glm::vec3(1.f);
+	glm::vec3 position = glm::vec3(0.0);
+	glm::quat rotation = glm::quat();
 	glm::vec3 esimated_accel = glm::vec3(0.f);
-	Ent_PhysicsSettings phys_opt;
 
-	uint32_t state_flags = 0;	// Entity flags
+	EntityFlags::Enum flags = EntityFlags::Enum(0);
 	int health = 100;
 	
 	// fix this garbo
 	Game_Inventory inv;
 
 	handle<Render_Object> render_handle;
-	Model* model = nullptr;
-
+	Render_Object renderable;
 	unique_ptr<Animator> animator;
 
 	void set_model(const char* model);
 	void initialize_animator(
 		const Animation_Tree_CFG* graph, 
 		IAnimationGraphDriver* driver = nullptr);
+	void remove_animator();
+
+	virtual glm::vec3 get_velocity() const {
+		return glm::vec3(0.f);
+	}
 
 	void move();
 	void projectile_physics();
 	void gravity_physics();
 	void mover_physics();
 
+
+	bool has_flag(EntityFlags::Enum flag) const {
+		return flags & flag;
+	}
+	void set_flag(EntityFlags::Enum flag, bool val) {
+		if (val)
+			flags = EntityFlags::Enum(flags | flag);
+		else
+			flags = EntityFlags::Enum(flags & (~flag));
+	}
 	glm::mat4 get_world_transform();
-
-	bool is_solid() const { return phys_opt.is_solid(); }
-
-	// transform heirarchy
-	entityhandle parent = -1;
-	entityhandle group_next = -1;	// next link in current master parent tree
-	vector<GenericAttachment_t> attachments;	// cheap way to add lights/decals/etc. to an entities transform heirarchy
+	bool can_render_this_object() const {
+		return renderable.model && !is_object_hidden();
+	}
+	bool is_object_hidden() const {
+		return flags & EntityFlags::Hidden;
+	}
+	Model* get_model() const { return renderable.model; }
 };
 
 template<typename K, typename T>

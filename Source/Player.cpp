@@ -8,9 +8,10 @@
 
 #include "DrawPublic.h"
 
+#include "Physics/Physics2.h"
 
 
-
+#include "Framework/Dict.h"
 ENTITY_IMPL(Player);
 
 //
@@ -240,6 +241,28 @@ GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
 	return eng->phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
 }
 
+
+void sweep_move(glm::vec3& velocity, glm::vec3& position)
+{
+	world_query_result res;
+	float move_time = eng->tick_interval;
+	float length = glm::length(velocity) * move_time;
+
+	if (length < 0.00001)
+		return;
+
+	glm::vec3 dir = glm::normalize(velocity);
+	bool found = g_physics->sweep_sphere(res, 1.0, position, dir, length, {});
+	if (found) {
+		position = position + dir * length * res.fraction+res.hit_normal*0.01f;
+		velocity = glm::vec3(0.0);
+	}
+	else {
+		position = position + dir * length;
+	}
+
+}
+
 void Player::slide_move()
 {
 	vec3 orig_velocity = velocity;
@@ -249,30 +272,60 @@ void Player::slide_move()
 
 	float move_time = eng->tick_interval;
 
+	// lateral
+	glm::vec3 lateral_velocity = glm::vec3(velocity.x, 0, velocity.z);
+	sweep_move(lateral_velocity, position);
+
+	// down
+	glm::vec3 down_velocity = glm::vec3(0, velocity.y, 0);
+	sweep_move(down_velocity, position);
+
+	velocity = glm::vec3(lateral_velocity.x, down_velocity.y, lateral_velocity.z);
+	return;
+
+	world_query_result res;
+	glm::vec3 dir = glm::normalize(velocity);
+	float length = glm::length(velocity) * move_time;
+	bool found = g_physics->sweep_sphere(res, 1.0, position, dir, length,{});
+	if (found) {
+		position = position + dir * length * res.fraction;
+		velocity = glm::vec3(0.0);
+	}
+	else {
+		position = position + dir * length;
+	}
+	return;
+
 	for (int i = 0; i < num_bumps; i++)
 	{
+		if (glm::length(velocity) < 0.0001)
+			return;
+
 		vec3 end = position + velocity * (move_time/num_bumps);
 
-		GeomContact trace = player_physics_trace_character(selfid,is_crouching, end);
 
-		if (trace.found) {
-			vec3 penetration_velocity = dot(velocity, trace.penetration_normal) * trace.penetration_normal;
+
+		world_query_result res;
+		bool found = g_physics->sweep_sphere(res, 5.0, position, glm::normalize(velocity), glm::length(velocity) * (move_time / num_bumps), {});
+
+		if (found) {
+			vec3 penetration_velocity = dot(velocity, res.hit_normal) * res.hit_normal;
 			vec3 slide_velocity = velocity - penetration_velocity;
 			
 			vec3 neg_vunit = -glm::normalize(velocity);
-			float d = dot(trace.penetration_normal, neg_vunit);
+			float d = dot(res.hit_normal, neg_vunit);
 			
 			//if (abs(d) > 0.001f) {
 			//	float push_out_depth = trace.penetration_depth / d;
 			//	player.position = end + push_out_depth * neg_vunit;
 			//}
 			//else {
-				position = end + trace.penetration_normal * trace.penetration_depth;
+			position = res.hit_pos;
 			//}
 			velocity = slide_velocity;
 			if (dot(velocity, orig_velocity) < 0) {
 				sys_print("opposite velocity\n");
-				velocity = vec3(0.f);
+			//	velocity = vec3(0.f);
 				break;
 			}
 		}
@@ -293,7 +346,7 @@ void Player::ground_move()
 
 	bool dont_add_grav = false;
 	Action_State last = action;
-	action = update_state(glm::length(velocity), dont_add_grav);
+	action = Action_State::Moving;// update_state(glm::length(velocity), dont_add_grav);
 
 	if (last != action) {
 		state_time = 0.0;
@@ -344,7 +397,7 @@ void Player::ground_move()
 }
 
 
-void player_physics_check_nans(Entity& player)
+void player_physics_check_nans(Player& player)
 {
 	if (player.position.x != player.position.x || player.position.y != player.position.y ||
 		player.position.z != player.position.z)
@@ -377,9 +430,9 @@ void draw_entity_info()
 	Entity* e = eng->get_ent(current_index);
 	if (!e)
 		return;
-
+	glm::vec3 vel = e->get_velocity();
 	ImGui::InputFloat3("position", &e->position.x);
-	ImGui::InputFloat3("velocity", &e->velocity.x);
+	ImGui::InputFloat3("velocity", &vel.x);
 	ImGui::InputFloat3("acceleration", &e->esimated_accel.x);
 
 	static bool predict_brake = true;
@@ -389,7 +442,7 @@ void draw_entity_info()
 
 		if (glm::abs(p->cmd.forward_move) < 0.000001 && glm::abs(p->cmd.lateral_move) < 0.000001) {
 			glm::vec3 pos = e->position;
-			glm::vec3 v = e->velocity;
+			glm::vec3 v = vel;
 			v.y = 0.0;
 			// assume accel = 0
 			int iter = 0;
@@ -457,10 +510,11 @@ void Player::move()
 
 		vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 
-		position += wishdir * 12.0f*(float)eng->tick_interval;
-
+		//position += wishdir * 12.0f*(float)eng->tick_interval;
+		velocity = wishdir * 12.0f;
+		slide_move();
 	}
-	else if(0)
+	else
 		ground_move();
 	
 	player_physics_check_nans(*this);
@@ -469,8 +523,8 @@ void Player::move()
 	auto pos = position;
 	auto height = CHAR_STANDING_HB_HEIGHT;
 	auto width = CHAR_HITBOX_RADIUS;
-	Debug::add_sphere(pos + vec3(0, width, 0), width, COLOR_PINK, -1.f);
-	Debug::add_sphere(pos + vec3(0, height- width, 0), width, COLOR_PINK,-1.f);
+	//Debug::add_sphere(pos + vec3(0, width, 0), width, COLOR_PINK, -1.f);
+	//Debug::add_sphere(pos + vec3(0, height- width, 0), width, COLOR_PINK,-1.f);
 
 
 	esimated_accel = (velocity - last_velocity) / (float)eng->tick_interval;
@@ -813,13 +867,30 @@ Player::Player()
 
 }
 
+void Player::find_a_spawn_point()
+{
+	MapEntity* spawnpoint = eng->level->find_by_schema_name(NAME("PlayerSpawn"));
+	if (!spawnpoint) {
+		sys_print("!!! player has no spawn point\n");
+	}
+	else {
+		glm::vec3 eul = glm::eulerAngles(spawnpoint->dict.get_quat("rotation"));
+		view_angles.y = eul.y;
+		rotation = glm::quat(eul);
+		position = spawnpoint->dict.get_vec3("position");
+	}
+}
+
 void Player::set_input_command(Move_Command newcmd) {
 	this->cmd = newcmd;
 }
 
-void Player::spawn() {
+void Player::spawn(const Dict& spawnargs) {
+	Entity::spawn(spawnargs);
 
 	set_model("player_FINAL.cmdl");
+
+	//kinematic_actor = g_physics->allocate_physics_actor();
 
 	bool is_local_player = &eng->local_player() == this;
 	
@@ -827,18 +898,13 @@ void Player::spawn() {
 		viewmodel.reset(new ViewmodelComponent(this));
 	}
 
-
 	auto graph = anim_tree_man->find_animation_tree("out.txt");
-
-	if(graph && graph->graph_is_valid && model && model->get_skel())
+	if(graph && graph->graph_is_valid && get_model() && get_model()->get_skel())
 		initialize_animator(graph, &graph_driver);
-
-	phys_opt.shape = Ent_PhysicsShape::AABB;
-	phys_opt.type = Ent_PhysicsType::PlayerMove;
 
 	health = 100;
 
-	find_spawn_position(this);
+	find_a_spawn_point();
 
 	for (int i = 0; i < Game_Inventory::NUM_GAME_ITEMS; i++)
 		inv.ammo[i] = 200;
@@ -847,7 +913,7 @@ void Player::spawn() {
 
 void Player::update()
 {
-	if (state_flags & EF_DEAD) {
+	if (Entity::has_flag(EntityFlags::Dead)) {
 		cmd.forward_move = 0;
 		cmd.lateral_move = 0;
 		cmd.up_move = 0;
@@ -906,16 +972,17 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& viewmodel_offsets)
 {
 	Entity& e = eng->local_player();
+	glm::vec3 velocity = e.get_velocity();
 	glm::vec3 view_front = AnglesToVector(view_angles.x, view_angles.y);
 	view_front.y = 0;
 	glm::vec3 side_grnd = glm::normalize(glm::cross(view_front, vec3(0, 1, 0)));
-	float spd_side = dot(side_grnd, e.velocity);
+	float spd_side = dot(side_grnd, velocity);
 	float side_ofs_ideal = -spd_side / 200.f;
 	glm::clamp(side_ofs_ideal, -0.007f, 0.007f);
-	float spd_front = dot(view_front, e.velocity);
+	float spd_front = dot(view_front, velocity);
 	float front_ofs_ideal = spd_front / 200.f;
 	glm::clamp(front_ofs_ideal, -0.007f, 0.007f);
-	float up_spd = e.velocity.y;
+	float up_spd = velocity.y;
 	float up_ofs_ideal = -up_spd / 200.f;
 	glm::clamp(up_ofs_ideal, -0.007f, 0.007f);
 
@@ -936,9 +1003,9 @@ void ViewmodelComponent::update()
 	}
 
 	update_viewmodel(player->view_angles, player->is_crouching, viewmodel_offsets);
-
+	glm::vec3 velocty = player->get_velocity();
 	bool crouching = player->is_crouching;
-	float speed = glm::length(glm::vec2(player->velocity.x,player->velocity.z));
+	float speed = glm::length(glm::vec2(velocty.x, velocty.z));
 	float speed_mult = glm::smoothstep(0.f, 2.5f, speed);
 	float x = cos(GetTime()*move_a)*move_b*speed_mult;
 	float y = pow(cos(GetTime() * move_c ),4.f) * move_d*speed_mult;
@@ -948,7 +1015,7 @@ void ViewmodelComponent::update()
 	glm::vec2 side = glm::vec2(-face_dir.y, face_dir.x);
 
 	vec2 grnd_accel = vec2(player->esimated_accel.x, player->esimated_accel.z);
-	vec2 grnd_vel = vec2(player->velocity.x, player->velocity.z);
+	vec2 grnd_vel = vec2(velocty.x, velocty.z);
 	vec2 rel_move_dir = glm::vec2(glm::dot(face_dir, grnd_accel), glm::dot(side, grnd_accel));
 	vec2 rel_vel_dir = vec2(dot(face_dir, grnd_vel), dot(side, grnd_vel));
 	float len = glm::length(rel_move_dir); 

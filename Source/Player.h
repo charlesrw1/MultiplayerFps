@@ -57,6 +57,14 @@ enum class Action_State
 	Falling,
 };
 
+struct PlayerFlags
+{
+	enum Enum
+	{
+		FrozenView = 1,
+	};
+};
+
 class Player : public Entity
 {
 public:
@@ -65,7 +73,7 @@ public:
 	Player();
 
 	// Entity overrides
-	void spawn() override;
+	void spawn(const Dict& spawnargs) override;
 	void update() override;
 	void present() override;
 
@@ -74,6 +82,8 @@ public:
 
 	glm::vec3 calc_eye_position();
 	void get_view(glm::vec3& origin, glm::vec3& angles, float& fov);
+
+	void find_a_spawn_point();
 
 	// current viewangles for player
 	glm::vec3 view_angles = glm::vec3(0.f);
@@ -88,11 +98,31 @@ public:
 
 	Move_Command cmd;
 
+	PhysicsActor* kinematic_actor = nullptr;
+
 	unique_ptr<ViewmodelComponent> viewmodel;
 	unique_ptr<LagCompensationComponent> lagcomp;
 
 	// animation system driver
 	CharacterGraphDriver graph_driver;
+
+	virtual glm::vec3 get_velocity() const  override {
+		return velocity;
+	}
+
+	glm::vec3 velocity = glm::vec3(0.f);
+
+	bool has_flag(PlayerFlags::Enum flag) const {
+		return flags & flag;
+	}
+	void set_flag(PlayerFlags::Enum flag, bool val) {
+		if (val)
+			flags = PlayerFlags::Enum(flags | flag);
+		else
+			flags = PlayerFlags::Enum(flags & (~flag));
+	}
+
+	PlayerFlags::Enum flags = {};
 private:
 
 	// physics stuff

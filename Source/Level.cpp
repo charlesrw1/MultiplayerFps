@@ -128,6 +128,8 @@ handle<Render_Light> make_light_from_dict(const Dict& dict)
 #include "Framework/Files.h"
 
 
+
+
 bool MapLoadFile::parse(const std::string name)
 {
 	spawners.clear();
@@ -184,6 +186,19 @@ void MapLoadFile::write_to_disk(const std::string name)
 	size_t count = out.get_output().size();
 	outfile.write(out.get_output().c_str(), count);
 	outfile.close();
+}
+
+MapEntity* Level::find_by_schema_name(StringName name, MapEntity* start)
+{
+	size_t start_i = (start==nullptr)?0:start - loadfile.spawners.data();
+	assert(start_i < loadfile.spawners.size());
+	while (start_i < loadfile.spawners.size())
+	{
+		if (loadfile.spawners[start_i].type == name)
+			return &loadfile.spawners[start_i];
+		start_i++;
+	}
+	return nullptr;
 }
 
 bool Level::open_from_file(const std::string& path)

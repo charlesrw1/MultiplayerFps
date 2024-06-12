@@ -300,7 +300,10 @@ struct world_query_result
 	glm::vec3 trace_dir;
 	PhysicsActor* actor = nullptr;
 	uint16_t contents=0;
+	uint32_t face_hit = 0;
 	int16_t bone_hit = -1;
+	bool had_initial_overlap = false;
+	float distance = 0.0;
 };
 class BinaryReader;
 class PhysicsManPublic
@@ -308,8 +311,33 @@ class PhysicsManPublic
 public:
 	virtual void init() = 0;
 
-	virtual void trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, PhysContents::Enum mask) = 0;
-	virtual void trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, PhysContents::Enum mask) = 0;
+	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, PhysContents::Enum mask) = 0;
+	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, PhysContents::Enum mask) = 0;
+	
+	virtual bool sweep_capsule(
+		world_query_result& out,
+		const vertical_capsule_def_t& capsule, 
+		const glm::vec3& start, 
+		const glm::vec3& dir, 
+		float length, 
+		PhysContents::Enum mask) = 0;
+	virtual bool sweep_sphere(
+		world_query_result& out,
+		float radius,
+		const glm::vec3& start,
+		const glm::vec3& dir,
+		float length,
+		PhysContents::Enum mask) = 0;
+	virtual bool capsule_is_overlapped(
+		const vertical_capsule_def_t& capsule,
+		const glm::vec3& start,
+		PhysContents::Enum mask) = 0;
+	virtual bool sphere_is_overlapped(
+		world_query_result& out,
+		float radius,
+		const glm::vec3& start,
+		PhysContents::Enum mask) = 0;
+	
 	virtual PhysicsActor* allocate_physics_actor() = 0;
 	virtual void free_physics_actor(PhysicsActor*& actor) = 0;
 	virtual PhysicsConstraint* allocate_constraint() = 0;

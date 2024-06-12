@@ -533,10 +533,11 @@ public:
 		}
 		node->set_selected(false);
 	}
-	void clear_all_selected() {
+	void clear_all_selected(bool show_this = true) {
 		for (int i = 0; i < selected_nodes.size(); i++) {
 			selected_nodes[i]->set_selected(false);
-			selected_nodes[i]->show();	// update the model
+			if(show_this)
+				selected_nodes[i]->show();	// update the model
 		}
 		selected_nodes.clear();
 		selection_dirty = true;

@@ -43,7 +43,6 @@
 "PlayerSpawn" {
 	inherits BaseEntity
 	_edmodel player_FINAL.cmdl
-	cppclass _classname "Player"
 }
 
 

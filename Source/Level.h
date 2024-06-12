@@ -37,11 +37,11 @@ public:
 	MapEntity() = default;
 	MapEntity(const Dict& d) {
 		dict = d;
-		type = dict.get_string("type");
+		type = dict.get_string("_schema_name");
 	}
 	MapEntity(Dict&& d) {
 		dict = std::move(d);
-		type = dict.get_string("type");
+		type = dict.get_string("_schema_name");
 	}
 	StringName type;
 	Dict dict;
@@ -65,6 +65,13 @@ public:
 	std::vector<MapEntity> spawners;
 };
 
+class WorldLocator
+{
+public:
+	StringName hashed_name;
+	const Dict* dict = nullptr;
+};
+
 class PhysicsActor;
 class Level
 {
@@ -85,6 +92,8 @@ public:
 	vector<handle<Render_Object>> smeshes;
 	vector<PhysicsActor*> sphysics;
 
+	// use for world locator points like player spawns
+	MapEntity* find_by_schema_name(StringName name, MapEntity* start = nullptr);
 
 	StaticEnv senv;
 	int main_sun = -1;
