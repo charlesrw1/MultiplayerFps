@@ -210,7 +210,7 @@ void IntegerEditor::internal_update()
 static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
 
 	IPropertyEditor* out = nullptr;
-	out = get_property_editor_factory().createObject(prop->custom_type_str);
+	out = IPropertyEditor::get_factory().createObject(prop->custom_type_str);
 	if (out) {
 		out->post_construct_for_custom_type(instance, prop);
 		return out;
@@ -318,13 +318,13 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-Factory<std::string, IPropertyEditor>& get_property_editor_factory()
+Factory<std::string, IPropertyEditor>& IPropertyEditor::get_factory()
 {
 	static Factory<std::string, IPropertyEditor> inst;
 	return inst;
 }
 
-Factory<std::string, IArrayHeader>& get_array_header_factory()
+Factory<std::string, IArrayHeader>& IArrayHeader::get_factory()
 {
 	static Factory<std::string, IArrayHeader> inst;
 	return inst;
@@ -332,7 +332,7 @@ Factory<std::string, IArrayHeader>& get_array_header_factory()
 
 ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
-	header = std::unique_ptr<IArrayHeader>(get_array_header_factory().createObject(prop->custom_type_str));
+	header = std::unique_ptr<IArrayHeader>(IArrayHeader::get_factory().createObject(prop->custom_type_str));
 	if(header)
 		header->post_construct(instance, prop);
 

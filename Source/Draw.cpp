@@ -948,7 +948,7 @@ void Renderer::init()
 	printf("-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
 
 	InitGlState();
-
+	mem_arena.init("Render Temp", 4'000'000);
 	scene.init();
 
 	float start = GetTime();
@@ -1006,7 +1006,6 @@ void Renderer::init()
 	on_level_start();
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
-
 }
 
 
@@ -1877,8 +1876,8 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 	list.commands.clear();
 	list.command_count.clear();
 
-	std::vector<uint32_t>& instance_to_instance = list.instance_to_instance;
-	std::vector<uint32_t>& draw_to_material = list.draw_to_material;
+	static std::vector<uint32_t> instance_to_instance;
+	static std::vector<uint32_t> draw_to_material;
 	draw_to_material.clear();
 	instance_to_instance.clear();
 
@@ -1947,7 +1946,9 @@ void Render_Scene::init()
 
 void Render_Scene::upload_scene_materials()
 {
-	scene_mats_vec.clear();
+	const size_t buf_size = sizeof(gpu::Material_Data) * mats.materials.size();
+	auto gpu_mats = (gpu::Material_Data*)draw.get_arena().alloc_bottom(buf_size);
+	int i = 0;
 	for (auto& mat : mats.materials) {
 		//if (mat.second.texture_are_loading_in_memory) {	// this material is being used
 			Material& m = mat.second;
@@ -1962,17 +1963,22 @@ void Render_Scene::upload_scene_materials()
 
 		//	gpumat.rough_remap_x = m.roughness_remap_range.x;
 			//gpumat.rough_remap_y = m.roughness_remap_range.y;
-
-			m.gpu_material_mapping = scene_mats_vec.size();
-
-			scene_mats_vec.push_back(gpumat);
+			m.gpu_material_mapping = i;
+			//m.gpu_material_mapping = scene_mats_vec.size();
+			gpu_mats[i] = gpumat;
+			//scene_mats_vec.push_back(gpumat);
 		//}
 		//else {
 		//	mat.second.gpu_material_mapping = -1;
 		//}
-	}
 
-	glNamedBufferData(gpu_render_material_buffer, sizeof(gpu::Material_Data) * scene_mats_vec.size(), scene_mats_vec.data(), GL_DYNAMIC_DRAW);
+			i++;
+	}
+	glNamedBufferData(gpu_render_material_buffer, buf_size, gpu_mats, GL_DYNAMIC_DRAW);
+
+	draw.get_arena().free_bottom();
+
+	//glNamedBufferData(gpu_render_material_buffer, sizeof(gpu::Material_Data) * scene_mats_vec.size(), scene_mats_vec.data(), GL_DYNAMIC_DRAW);
 }
 
 glm::vec4 to_vec4(Color32 color) {
@@ -2013,10 +2019,18 @@ void Render_Scene::build_scene_data()
 	opaque.clear();
 
 	// add draw calls and sort them
-	gpu_objects.resize(proxy_list.objects.size());
-	skinned_matricies_vec.clear();
+	//gpu_objects.resize(proxy_list.objects.size());
+
+	//skinned_matricies_vec.clear();
 	{
 		CPUSCOPESTART(traversal);
+
+		const size_t num_ren_objs = proxy_list.objects.size();
+		auto gpu_objects = (gpu::Object_Instance*)draw.get_arena().alloc_bottom(sizeof(gpu::Object_Instance) * num_ren_objs);
+		const size_t max_skinned_matricies = 256 * 100;// budget for ~100 characters
+		size_t current_skinned_matrix_index = 0;
+		auto skinned_matricies = (glm::mat4*)draw.get_arena().alloc_bottom(sizeof(glm::mat4) * max_skinned_matricies);
+		ASSERT(gpu_objects && skinned_matricies);
 
 		const float inv_two_times_tanfov = 1.0 / ( tan(draw.get_current_frame_vs().fov*0.5));
 
@@ -2064,12 +2078,16 @@ void Render_Scene::build_scene_data()
 					}
 
 
-					gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
+					//gpu_objects[i].anim_mat_offset = skinned_matricies_vec.size();
+					gpu_objects[i].anim_mat_offset = current_skinned_matrix_index;
 					auto& mats = proxy.animator->get_matrix_palette();
-
-					for (int i = 0; i < proxy.animator->num_bones(); i++) {
-						skinned_matricies_vec.push_back(mats[i]);
-					}
+					const uint32_t num_bones = proxy.animator->num_bones();
+					ASSERT(num_bones + current_skinned_matrix_index < max_skinned_matricies);
+					std::memcpy(skinned_matricies + current_skinned_matrix_index, mats.data(), sizeof(glm::mat4) * num_bones);
+					current_skinned_matrix_index += num_bones;
+					//for (int i = 0; i < proxy.animator->num_bones(); i++) {
+					//	skinned_matricies_vec.push_back(mats[i]);
+					//}
 
 				}
 				else
@@ -2088,8 +2106,11 @@ void Render_Scene::build_scene_data()
 				gpu_objects[i].colorval2 = proxy.param2.to_uint();
 			}
 		}
-		glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * gpu_objects.size(), gpu_objects.data(), GL_DYNAMIC_DRAW);
-		glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * skinned_matricies_vec.size(), skinned_matricies_vec.data(), GL_DYNAMIC_DRAW);
+		glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
+		glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * current_skinned_matrix_index,skinned_matricies, GL_DYNAMIC_DRAW);
+		
+
+		draw.get_arena().free_bottom();
 	}
 
 	{
@@ -2751,6 +2772,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 {
 	GPUFUNCTIONSTART;
 
+	mem_arena.free_bottom();
 	stats = Render_Stats();
 
 	state_machine.invalidate_all();

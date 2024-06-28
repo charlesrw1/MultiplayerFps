@@ -1,3 +1,4 @@
+#include "ModelCompilierLocal.h"
 #include "Animation/SkeletonData.h"
 #include "Framework/DictParser.h"
 #include "Compiliers.h"
@@ -12,23 +13,20 @@
 
 #include "Animation/AnimationUtil.h"
 
-
+#include "Framework/WriteObject.h"
 #include "Framework/BinaryReadWrite.h"
 #include "Physics/Physics2.h"
 #include "AssetCompile/Someutils.h"
 #include <stdexcept>
 
+
 // Physx needed for cooking meshes:
 #include <physx/cooking/PxCooking.h>
 
 // MODEL FORMAT:
-
-
-
-
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 6;
+static const int MODEL_VERSION = 7;
 // int version XXX
 // 
 // mat4 root_transform
@@ -141,137 +139,11 @@ static const int MODEL_VERSION = 6;
 // int packed_size
 // float packed_data[packed_size]
 // 
-// KEYFRAME_EVENT events[num_keyframes]
-// 
 // int num_events
 // EVENT events[num_events]
+//		"{ type <event_type> <fields> }"
 // 
 
-
-
-struct AnimEvent_Load
-{
-	float time = 0.0;
-	std::string type;
-	std::string arg;
-};
-enum class AnimImportType_Load {
-	File,
-	Folder,
-	Model,
-};
-struct AnimImportedSet_Load
-{
-	AnimImportType_Load type = AnimImportType_Load::File;
-	std::string name;
-	std::string armature_name;
-	bool include_mirror = true;
-	bool include_weightlist = true;
-	bool retarget = false;
-};
-enum class SubtractType_Load {
-	None,
-	FromThis,
-	FromAnother,
-};
-
-struct ClipCrop
-{
-	float start = 0.0;
-	float end = 10000.0;
-	bool has_crop = false;
-};
-struct ClipStart
-{
-	float new_start = 0.0;
-	bool has_start = false;
-};
-
-struct AnimationClip_Load
-{
-	SubtractType_Load sub = SubtractType_Load::None;
-	std::string subtract_clipname;
-	float fps = 30.0;
-	ClipCrop crop;
-	ClipStart start;
-	bool fixloop = false;
-	std::vector<AnimEvent_Load> events;
-
-	// if non empty, then set origin of clip to this
-	std::string make_relative_to_locator;
-};
-
-struct LODDef
-{
-	int lod_num = 0;
-	float distance = 1.0;
-	bool use_skeleton_lod = false;
-};
-
-struct SkeletonLODDef
-{
-	bool was_defined = false;
-	std::vector<std::string> collapsed_bones;
-};
-
-struct PhysicsCollisionShapeDefLoad
-{
-	std::string node_name_target;
-	bool is_mesh = false;		// exports tri mesh
-
-	std::string material_name;
-	physics_shape_def def;
-	PhysicsBodyConstraintDef constraint_def;
-};
-
-struct WeightlistDef
-{
-	std::string name;
-	std::vector<std::pair<std::string, float>> defs;
-};
-
-
-
-struct ModelDefData
-{
-	std::string model_source;
-	uint64_t timestamp_of_def = 0;
-
-	// MATERIALS
-	std::string root_material_dir;
-	std::unordered_map<std::string, std::string> material_rename;
-
-	// LODS
-	std::vector<LODDef> loddefs;
-	const int num_lods() const { return loddefs.size(); }
-
-	// SKELETON
-	bool merge_meshes_into_skeleton = false;
-	SkeletonLODDef skellod;
-	std::string armature_name;
-	std::unordered_map<std::string, std::string> bone_rename;
-	std::vector<std::string> keepbones;
-	std::unordered_map<std::string, RetargetBoneType> bone_retarget_type;
-	struct mirror {
-		std::string bone1;
-		std::string bone2;
-	};
-	std::vector<mirror> mirrored_bones;
-	std::vector< WeightlistDef> weightlists;
-
-	// PHYSICS
-	std::vector<PhysicsCollisionShapeDefLoad> physicsshapes;
-
-	// ANIMATION
-	std::unordered_map<std::string, AnimationClip_Load> str_to_clip_def;
-	std::vector<AnimImportedSet_Load> imports;
-
-	const AnimationClip_Load* find(const std::string& animname) const {
-		if (str_to_clip_def.find(animname) != str_to_clip_def.end())
-			return &str_to_clip_def.find(animname)->second;
-		return nullptr;
-	}
-};
 
 struct NodeRef
 {
@@ -437,6 +309,7 @@ class ModelCompileHelper
 public:
 
 	static ModelDefData parse_definition_file(const std::string& deffile);
+	static std::string model_def_to_string(const ModelDefData& def);
 
 	static bool compile_model(const std::string& defname, const ModelDefData& data);
 
@@ -1007,7 +880,7 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) 
 				}
 			}
 
-			out.str_to_clip_def[name] = acl;
+			out.str_to_clip_def[name] = std::move(acl);
 		}
 		else if (tok.cmp("rename_bone")) {
 			in.read_string(tok);
@@ -2034,49 +1907,10 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		}
 	}
 
-	out_seq.event_keyframes.resize(out_seq.get_num_keyframes_inclusive());
-
 	// Output any events
 	if (definition) {
-		
-		std::vector<int> indicies;
-		for (int i = 0; i < definition->events.size(); i++)
-			indicies[i] = i;
-		// sort by time
-		std::sort(indicies.begin(), indicies.end(), [&](const int& a, const int& b) {
-			return definition->events[a].time < definition->events[b].time;
-		});
-
-		EventIndex cur;
-		int current_index = -1;
-		for (int i = 0; i < indicies.size(); i++) {
-			const auto& event = definition->events[indicies[i]];
-			int frame_of_event = event.time;	// already in keyframes
-			if (frame_of_event < 0)
-				frame_of_event += out_seq.get_num_keyframes_inclusive();
-			if (frame_of_event >= out_seq.get_num_keyframes_inclusive())
-				frame_of_event = out_seq.get_num_keyframes_inclusive() - 1;
-
-			AnimEvent ae;
-			ae.str = event.type;
-			out_seq.events.push_back(ae);
-			if (frame_of_event != current_index) {
-				if (current_index != -1 && cur.count > 0) {
-					out_seq.event_keyframes.at(current_index) = cur;
-					cur = EventIndex();
-
-					cur.offset = out_seq.events.size();
-					cur.count = 1;
-					current_index = frame_of_event;
-				}
-			}
-			else {
-				cur.count++;
-			}
-		}
-		if (current_index != -1 && cur.count > 0) {
-			out_seq.event_keyframes.at(current_index) = cur;
-		}
+		for (auto& ev : definition->events)
+			out_seq.events.push_back(std::unique_ptr<AnimationEvent>(ev.event->create_copy()));
 	}
 
 
@@ -2732,15 +2566,13 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 				(uint8_t*)seq.second.pose_data.data(), 
 				seq.second.pose_data.size() * sizeof(float));
 
-			assert(seq.second.event_keyframes.size() == seq.second.num_frames + 1);
-			out.write_bytes_ptr(
-				(uint8_t*)seq.second.event_keyframes.data(),
-				seq.second.event_keyframes.size() * sizeof(EventIndex)
-			);
-
 			out.write_int32(seq.second.events.size());
-			for (int i = 0; i < seq.second.events.size(); i++)
-				out.write_string(seq.second.events[i].str);
+			for (int i = 0; i < seq.second.events.size(); i++) {
+				auto ev = seq.second.events[i].get();
+				DictWriter writer;
+				write_object_properties<AnimationEvent, AnimationEventGetter>(ev, TypedVoidPtr(), writer);
+				out.write_string(writer.get_output());
+			}
 		}
 		animation_size = out.tell()-marker;
 

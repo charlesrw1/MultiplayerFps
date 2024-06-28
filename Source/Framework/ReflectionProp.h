@@ -140,8 +140,8 @@ public:
 class IPropertySerializer
 {
 public:
+	static Factory<std::string, IPropertySerializer>& get_factory();
+
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) = 0;
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) = 0;
 };
-
-extern Factory<std::string, IPropertySerializer>& get_property_serializer_factory();

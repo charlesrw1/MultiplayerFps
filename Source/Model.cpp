@@ -14,7 +14,7 @@
 #include "AssetCompile/Compiliers.h"
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
-
+#include "Framework/WriteObject.h"
 #include "Memory.h"
 
 #include "Framework/Config.h"
@@ -29,7 +29,7 @@ ModelMan mods;
 static const char* const model_folder_path = "./Data/Models/";
 
 
-static const int MODEL_FORMAT_VERSION = 6;
+static const int MODEL_FORMAT_VERSION = 7;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
@@ -477,13 +477,22 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 			aseq->pose_data.resize(packed_size);
 			read.read_bytes_ptr(aseq->pose_data.data(), packed_size * sizeof(float));
 
-			aseq->event_keyframes.resize(aseq->num_frames+1);
-			read.read_bytes_ptr(aseq->event_keyframes.data(), aseq->event_keyframes.size() * sizeof(EventIndex));
 			uint32_t num_events = read.read_int32();
+			std::string buffer;
 			for (int j = 0; j < num_events; j++) {
-				AnimEvent ae;
-				read.read_string(ae.str);
-				aseq->events.push_back(ae);
+				read.read_string(buffer);
+				DictParser parser;
+				StringView tok;
+				parser.read_string(tok);
+				parser.load_from_memory((uint8_t*)buffer.c_str(), buffer.size(), "abc");
+				AnimationEvent* event = read_object_properties<AnimationEvent, AnimationEventGetter>(
+					AnimationEvent::get_factory(), TypedVoidPtr(), parser, tok
+					);
+				if (!event) {
+					sys_print("??? couldn't load animation event '%s'\n", buffer.c_str());
+				}
+				else
+					aseq->events.push_back(std::unique_ptr<AnimationEvent>(event));
 			}
 			MSkeleton::refed_clip rc;
 			rc.ptr = aseq;

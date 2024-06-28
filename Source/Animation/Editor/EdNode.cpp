@@ -6,12 +6,12 @@
 #include "Statemachine_node.h"
 #include "Framework/AddClassToFactory.h"
 #include "Framework/ReflectionRegisterDefines.h"
-Factory<std::string, Base_EdNode>& get_tool_node_factory() {
+Factory<std::string, Base_EdNode>& Base_EdNode::get_factory() {
 	static Factory<std::string, Base_EdNode> inst;
 	return inst;
 }
 
-#define EDIMPL(type_name) static AddClassToFactory<type_name, Base_EdNode> impl##type_name(get_tool_node_factory(), #type_name); \
+#define EDIMPL(type_name) static AddClassToFactory<type_name, Base_EdNode> impl##type_name(Base_EdNode::get_factory(), #type_name); \
 	 const TypeInfo& type_name::get_typeinfo() const  { \
 		static TypeInfo ti = {#type_name, sizeof(type_name)}; \
 		return ti; \
@@ -32,11 +32,6 @@ EDIMPL(StateStart_EdNode);
 EDIMPL(Blendspace2d_EdNode);
 EDIMPL(Blend_Layered_EdNode);
 
-void f()
-{
-	Clip_EdNode e;
-
-}
 void Base_EdNode::remove_reference(Base_EdNode* node)
 {
 	for (int i = 0; i < inputs.size(); i++) {

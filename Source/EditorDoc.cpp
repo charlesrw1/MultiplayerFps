@@ -1532,8 +1532,6 @@ void AssetBrowser::imgui_draw()
 		if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs())
 			if (sorts_specs->SpecsDirty)
 			{
-				bool a = std::string("boatMaterial001") < std::string("CubeBrush");
-
 				std::vector<std::string> strs;
 				for (int i = 0; i < all_resources.size(); i++) {
 					strs.push_back(all_resources[i]->get_asset_name());
@@ -1808,7 +1806,7 @@ class quat_t_editor : public IDictEditor
 
 struct AutoStruct_asdf134 {
  AutoStruct_asdf134() {
-	 auto& pfac = get_property_editor_factory();
+	 auto& pfac = IPropertyEditor::get_factory();
 
 	 pfac.registerClass<float_t_editor>("Leveled_float");
 	 pfac.registerClass<int_t_editor>("Leveled_int");
@@ -1818,11 +1816,11 @@ struct AutoStruct_asdf134 {
 	 pfac.registerClass<quat_t_editor>("Leveled_quat");
 
 
-	 auto& afac = get_array_header_factory();
+	 auto& afac = IArrayHeader::get_factory();
 
 	 afac.registerClass<ConnectionList>("LevelEd_ConnectionList");
 
-	 auto& sfac = get_property_serializer_factory();
+	 auto& sfac = IPropertySerializer::get_factory();
  }
 };
 static AutoStruct_asdf134 AutoStruct_asdf134asdfa;

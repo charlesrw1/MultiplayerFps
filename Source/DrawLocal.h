@@ -13,6 +13,7 @@
 #include "DrawTypedefs.h"
 #include "RenderObj.h"
 #include "Framework/FreeList.h"
+#include "Render/RenderExtra.h"
 
 #pragma optimize("", on)
 
@@ -44,140 +45,6 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
-class Volumetric_Fog_System
-{
-public:
-	int quality = 2;
-
-	glm::ivec3 voltexturesize;
-	float density = 10.0;
-	float anisotropy = 0.7;
-	float spread = 1.0;
-	float frustum_end = 50.f;
-	int temporal_sequence = 0;
-
-	struct buffers {
-		bufferhandle light;
-		bufferhandle param;
-	}buffer;
-
-	struct programs {
-		Shader reproject;
-		Shader lightcalc;
-		Shader raymarch;
-	}prog;
-
-	struct textures {
-		texhandle volume;
-		texhandle last_volume;
-	}texture;
-
-	void init();
-	void shutdown();
-	void compute();
-};
-class Shadow_Map_System
-{
-public:
-	void init();
-	void update();
-	void make_csm_rendertargets();
-	void update_cascade(int idx, const View_Setup& vs, glm::vec3 directional_dir);
-
-	const static int MAXCASCADES = 4;
-
-	struct uniform_buffers {
-		bufferhandle frame_view[4];
-		bufferhandle info;
-	}ubo;
-
-	struct framebuffers {
-		fbohandle shadow;
-	}fbo;
-
-	struct textures {
-		texhandle shadow_array;
-	}texture;
-
-	struct params {
-		bool cull_front_faces = false;
-		bool fit_to_scene = true;
-		bool reduce_shimmering = true;
-		float log_lin_lerp_factor = 0.5;
-		float max_shadow_dist = 80.f;
-		float epsilon = 0.008f;
-		float poly_units = 4;
-		float poly_factor = 1.1;
-		float z_dist_scaling = 1.f;
-		int quality = 2;
-	}tweak;
-
-	glm::vec4 split_distances;
-	glm::mat4x4 matricies[MAXCASCADES];
-	float nearplanes[MAXCASCADES];
-	float farplanes[MAXCASCADES];
-	int csm_resolution = 0;
-	bool enabled = false;
-
-	bool targets_dirty = false;
-};
-
-class SSAO_System
-{
-public:
-	void init();
-	void reload_shaders();
-	void make_render_targets(bool initial, int w, int h);
-	void render();
-	void update_ubo();
-
-	int width=0, height=0;
-	const static int RANDOM_ELEMENTS = 16;
-
-	struct framebuffers {
-		fbohandle depthlinear        = 0;
-		fbohandle viewnormal         = 0;
-		fbohandle hbao2_deinterleave = 0;
-		fbohandle hbao2_calc         = 0;
-		fbohandle finalresolve = 0;
-	}fbo;
-
-	struct programs {
-		Shader hbao_calc;
-		Shader linearize_depth;
-		Shader make_viewspace_normals;
-		Shader hbao_blur;
-		Shader hbao_deinterleave;
-		Shader hbao_reinterleave;
-	}prog;
-
-	struct textures {
-		texhandle random	= 0;
-		texhandle result	= 0;
-		texhandle blur		= 0;
-		texhandle viewnormal = 0;
-		texhandle depthlinear = 0;
-		texhandle deptharray = 0;
-		texhandle resultarray = 0;
-		texhandle depthview[RANDOM_ELEMENTS];
-	}texture;
-
-	struct uniform_buffers {
-		bufferhandle data = 0;
-	}ubo;
-
-	struct params {
-		float radius = 0.4;
-		float intensity = 2.5;
-		float bias = 0.1;
-		float blur_sharpness = 40.0;
-	}tweak;
-
-	gpu::HBAOData data = {};
-	glm::vec4 random_elements[RANDOM_ELEMENTS];
-};
-
-
 
 struct Render_Box_Cubemap
 {
@@ -189,7 +56,6 @@ struct Render_Box_Cubemap
 	int id = -1;
 };
 
-// more horribleness
 struct Render_Level_Params {
 	View_Setup view;
 	uint32_t output_framebuffer;
@@ -222,13 +88,14 @@ struct Mesh_Batch
 	const Material* material = nullptr;
 };
 
-// represents multiple mesh_batch calls packaged into one glMultidrawIndirect()
+// represents multiple Mesh_Batch calls packaged into one glMultidrawIndirect()
 struct Multidraw_Batch
 {
 	uint32_t first = 0;
 	uint32_t count = 0;
 };
 
+// represents one draw call of a mesh with a material and various state, sorted and put into Mesh_Batch's
 struct draw_call_key  {
 	draw_call_key() {
 		shader = blending = backface = texture = vao = mesh = 0;
@@ -284,15 +151,6 @@ public:
 	Render_Pass(pass_type type);
 
 
-	pass_type type;
-
-	//void delete_object(
-	//	const Render_Object& proxy, 
-	//	renderobj_handle handle,
-	//	Material* material,
-	//	uint32_t submesh,
-	//	uint32_t layer);
-
 	void make_batches(Render_Scene& scene);
 	
 	void add_object(
@@ -314,27 +172,20 @@ public:
 		objects.clear();
 	}
 
-	//std::vector<Pass_Object> deletions;
-	//std::vector<Pass_Object> creations;
-
-
+	pass_type type;
 	std::vector<Pass_Object> objects;
 	std::vector<Mesh_Batch> mesh_batches;
 	std::vector<Multidraw_Batch> batches;
 };
 
-class Culling_Pass
-{
-public:
-	bufferhandle visibility;
-};
-
+// RenderObject internal data
 struct ROP_Internal
 {
 	Render_Object proxy;
 	glm::mat4 inv_transform;
 };
 
+// RenderLight internal data
 struct RL_Internal
 {
 	Render_Light light;
@@ -364,9 +215,6 @@ struct Render_Lists
 	bufferhandle gpu_command_list = 0;
 	std::vector<int> command_count;
 	bufferhandle gpu_command_count = 0;
-
-	std::vector<uint32_t> instance_to_instance;
-	std::vector<uint32_t> draw_to_material;
 
 	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
 	bufferhandle gldrawid_to_submesh_material;
@@ -401,7 +249,6 @@ public:
 
 	RL_Internal* get_main_directional_light();
 
-
 	Render_Pass depth;			// vis/shadow objects, same as opaque but grouped with minimal draw clls
 	Render_Pass opaque;			// opaque objects that have full sorting
 	Render_Pass transparents;	// transparent objects added in back to front order
@@ -409,19 +256,21 @@ public:
 	Render_Lists vis_list;
 	Render_Lists opaque_list;
 	Render_Lists transparents_list;
-	Render_Lists shadow_lists;	// one for each cascade
+	Render_Lists shadow_lists;
 
-	std::vector<glm::mat4x4> skinned_matricies_vec;
-	std::vector<gpu::Object_Instance> gpu_objects;
-	std::vector<gpu::Material_Data> scene_mats_vec;
 	bufferhandle gpu_skinned_mats_buffer = 0;
 	bufferhandle gpu_render_instance_buffer = 0;
 	bufferhandle gpu_render_material_buffer = 0;
 
-	Culling_Pass main_view;
-
 	Free_List<ROP_Internal> proxy_list;
 	Free_List<RL_Internal> light_list;
+
+	bufferhandle light_ssbo;
+	bufferhandle light_grid_ssbo;
+	bufferhandle indirect_to_light_ssbo;
+
+	// list of IBL cubemaps and boxes
+	// list of irradiance probe volumes and boxes
 
 	uint32_t skybox = 0;
 	std::vector<Render_Box_Cubemap> cubemaps;
@@ -429,10 +278,6 @@ public:
 	uint32_t levelcubemapirradiance_array = 0;
 	uint32_t levelcubemapspecular_array = 0;
 	int levelcubemap_num = 0;
-
-	uint32_t light_ssbo;
-
-
 
 };
 
@@ -554,6 +399,10 @@ public:
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass);
 
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
+
+	Memory_Arena mem_arena;
+
+	Memory_Arena& get_arena() { return mem_arena; }
 
 	Texture white_texture;
 	Texture black_texture;

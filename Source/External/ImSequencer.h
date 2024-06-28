@@ -27,6 +27,8 @@
 
 #include <cstddef>
 
+#include "imgui.h"
+
 struct ImDrawList;
 struct ImRect;
 namespace ImSequencer
@@ -43,6 +45,12 @@ namespace ImSequencer
     };
 
     struct Item {
+        // >>>
+        bool is_instant_item() const {
+            return end <= start;
+        }
+        // <<<
+
         int start=0;
         int end=0;
         unsigned int color = 0x808080ff;
@@ -63,11 +71,17 @@ namespace ImSequencer
       virtual const char* GetCollapseFmt() const { return "%d Frames / %d entries"; }
 
       virtual int GetItems(int index, Item* item, int start = 0) = 0;
+    
+      // >>>
+      virtual void set_item_start(int track, int index, int start) = 0;
+      virtual void set_item_end(int track, int index, int end) = 0;
+      virtual void track_context_menu() {}
+      virtual void delete_item(int track, int index) = 0;
+       // <<<
 
       virtual void Add(int /*type*/) {}
       virtual void Del(int /*index*/) {}
       virtual void Duplicate(int /*index*/) {}
-
       virtual void Copy() {}
       virtual void Paste() {}
 
@@ -78,9 +92,6 @@ namespace ImSequencer
 
        virtual ~SequenceInterface() = default;
    };
-
-
    // return true if selection is made
    bool Sequencer(SequenceInterface* sequence, int* currentFrame, bool* expanded, int* selectedEntry, int* firstFrame, int sequenceOptions);
-
 }

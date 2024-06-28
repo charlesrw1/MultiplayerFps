@@ -2,11 +2,11 @@
 thirdperson 1
 
 
-start_ed map
+start_ed anim
 
 g_draw_physx_scene 31
 g_drawdebugmenu 1
-g_drawimguidemo 0
+g_drawimguidemo 1
 
 bind 1 "map m"
 bind 6 "start_ed map m.txt"

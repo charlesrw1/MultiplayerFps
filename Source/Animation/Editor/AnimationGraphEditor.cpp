@@ -275,6 +275,25 @@ void ControlParamsWindow::refresh_props() {
 	else
 		control_params.add_property_list_to_grid(get_edit_value_props(), this, PG_LIST_PASSTHROUGH);
 }
+#include "Framework/CurveEditorImgui.h"
+static SequencerImgui seqimgui;
+
+
+class AnimationEventEditor : public SequencerEditorItem
+{
+public:
+	AnimationEventEditor(int start, int end, Color32 c) {
+		this->time_start = start;
+		this->time_end = end;
+		this->color = c;
+	}
+	AnimationEventEditor(int start, Color32 c) {
+		this->time_start = start;
+		this->instant_item = true;
+		this->color = c;
+	}
+	virtual std::string get_name() { return "name"; }
+};
 
 void AnimationGraphEditor::init()
 {
@@ -283,10 +302,15 @@ void AnimationGraphEditor::init()
 
 	// init template nodes for creation menu
 	template_creation_nodes.clear();
-	auto& ed_factory = get_tool_node_factory();
+	auto& ed_factory = Base_EdNode::get_factory();
 	for (auto& obj : ed_factory.get_object_creator()) {
 		template_creation_nodes.push_back(obj.second());
 	}
+
+	seqimgui.add_item(new AnimationEventEditor(0, 5, COLOR_BLUE));
+	seqimgui.add_item(new AnimationEventEditor(8, 10, COLOR_RED));
+	seqimgui.add_item(new AnimationEventEditor(6, COLOR_GREEN));
+
 }
 
 void AnimationGraphEditor::close_internal()
@@ -576,7 +600,7 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 		if (!in.expect_string("nodes") || !in.expect_list_start())
 			return false;
 		bool good = in.read_list_and_apply_functor([&](StringView view) -> bool {
-			Base_EdNode* node = read_object_properties<Base_EdNode, getter_ednode>(get_tool_node_factory(), userptr, in, view);
+			Base_EdNode* node = read_object_properties<Base_EdNode, getter_ednode>(Base_EdNode::get_factory(), userptr, in, view);
 			if (node) {
 				nodes.push_back(node);
 				return true;
@@ -757,42 +781,6 @@ void AnimationGraphEditor::stop_playback()
 }
 
 
-#if 0
-void Timeline::draw_imgui()
-{
-
-	if(ImGui::Begin("Timeline")) {
-
-
-		static bool init = false;
-		if (!init) {
-			seq.mFrameMin = 0;
-			seq.mFrameMax = 100;
-
-			seq.add_manual_track("FIRST", 10, 30);
-			seq.add_manual_track("SECOND", 12, 60);
-			seq.add_manual_track("THIRD", 61, 90);
-			seq.add_manual_track("FOURTH", 92, 99);
-
-
-			init = true;
-		}
-
-		ImGui::PushItemWidth(100);
-		ImGui::InputInt("Frame Min", &seq.mFrameMin);
-		ImGui::SameLine();
-		ImGui::InputInt("Frame ", &current_tick);
-		ImGui::SameLine();
-		ImGui::InputInt("Frame Max", &seq.mFrameMax);
-		ImGui::PopItemWidth();
-		int selected = -1;
-		Sequencer(&seq, &current_tick, &expaned, &selected, &first_frame, ImSequencer::SEQUENCER_CHANGE_FRAME);
-
-
-	}
-	ImGui::End();
-}
-#endif
 void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_drop)
 {
 	int start_atr = 0;
@@ -858,8 +846,14 @@ void draw_curve_test()
 	ImGui::Curve("test", ImVec2(300, 200), 10, points, &selected);
 }
 
+#include "Framework/CurveEditorImgui.h"
+
 void AnimationGraphEditor::imgui_draw()
 {
+	CurveEditorImgui cei;
+	//cei.draw();
+	seqimgui.draw();
+
 	node_props.set_read_only(graph_is_read_only());
 
 	if (opt.open_prop_editor)
@@ -1270,7 +1264,7 @@ int AnimationGraphEditor::find_for_id(uint32_t id)
 
 Base_EdNode* AnimationGraphEditor::user_create_new_graphnode(const char* typename_, uint32_t layer)
 {
-	auto& factory = get_tool_node_factory();
+	auto& factory = Base_EdNode::get_factory();
 	if (!factory.hasClass(typename_)) {
 		printf("factory doesnt have node for typename %s\n", typename_);
 		return nullptr;
@@ -1919,7 +1913,7 @@ public:
 
 struct AutoStruct_asdf {
 	AutoStruct_asdf() {
-		auto& pfac = get_property_editor_factory();
+		auto& pfac = IPropertyEditor::get_factory();
 
 		pfac.registerClass<FindAnimationClipPropertyEditor>("AG_CLIP_TYPE");
 		pfac.registerClass<AgLispCodeEditorProperty>("AG_LISP_CODE");
@@ -1928,13 +1922,13 @@ struct AutoStruct_asdf {
 		pfac.registerClass<AgEdtior_BlendSpaceParameteriation>("AG_EDITOR_BLEND_SPACE_PARAMETERIZATION");
 		pfac.registerClass<CotrolParamEditorRunTime>("AG_CONTROL_PARAM_RUN_EDIT");
 
-		auto& afac = get_array_header_factory();
+		auto& afac = IArrayHeader::get_factory();
 
 		afac.registerClass<ControlParamArrayHeader>("AG_CONTROL_PARAM_ARRAY");
 		afac.registerClass<AgEditor_BlendSpaceArrayHead>("AG_EDITOR_BLEND_SPACE");
 		afac.registerClass<ControlParamArrayHeader>("AG_CONTROL_PARAM_ARRAY_RUN_EDIT");
 
-		auto& sfac = get_property_serializer_factory();
+		auto& sfac = IPropertySerializer::get_factory();
 
 		sfac.registerClass<SerializeImNodeState>("SerializeImNodeState");
 		sfac.registerClass<SerializeNodeCFGRef>("SerializeNodeCFGRef");

@@ -23,10 +23,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-#include "ImSequencer.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "ImSequencer.h"
 #include <cstdlib>
+#include <cstdint>
+
+static void draw_rectangle_rotated(ImVec2 max, ImVec2 min, ImColor color)
+{
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    auto center = max + min;
+    center *= 0.5f;
+    draw_list->AddLine(ImVec2(max.x, center.y), ImVec2(center.x, max.y), color);
+    draw_list->AddLine(ImVec2(center.x, max.y), ImVec2(min.x, center.y), color);
+    draw_list->AddLine(ImVec2(min.x, center.y), ImVec2(center.x, min.y), color);
+    draw_list->AddLine(ImVec2(center.x, min.y), ImVec2(max.x, center.y), color);
+}
 
 namespace ImSequencer
 {
@@ -55,15 +69,16 @@ namespace ImSequencer
       return clickedBtn;
    }
 
+
    bool Sequencer(SequenceInterface* sequence, int* currentFrame, bool* expanded, int* selectedEntry, int* firstFrame, int sequenceOptions)
    {
       bool ret = false;
       ImGuiIO& io = ImGui::GetIO();
       int cx = (int)(io.MousePos.x);
       int cy = (int)(io.MousePos.y);
-      static float framePixelWidth = 10.f;
-      static float framePixelWidthTarget = 10.f;
-      int legendWidth = 30.f;
+      static float framePixelWidth = 15.f;
+      static float framePixelWidthTarget = 15.f;
+      int legendWidth = 80.f;
 
       static int movingEntry = -1;
       static int movingPos = -1;
@@ -360,11 +375,13 @@ namespace ImSequencer
                  {
                      draw_list->AddRectFilled(slotP1, slotP3, slotColorHalf, 2);
                      draw_list->AddRectFilled(slotP1, slotP2, slotColor, 2);
-
+                     const float width = 10.0;
+                     draw_rectangle_rotated(slotP2 + ImVec2(width, width), slotP2 - ImVec2(width, width), ImColor(255,0,255,255));
                  }
                  if (ImRect(slotP1, slotP2).Contains(io.MousePos) && io.MouseDoubleClicked[0])
                  {
                      sequence->DoubleClick(i);
+
                  }
                  // Ensure grabbable handles
                  const float max_handle_width = slotP2.x - slotP1.x / 3.0f;

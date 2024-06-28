@@ -233,7 +233,7 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 
 	case core_type_id::Struct: {
 
-		auto& fac = get_property_serializer_factory();
+		auto& fac = IPropertySerializer::get_factory();
 		auto serializer = fac.createObject(prop.custom_type_str);
 		if (serializer) {
 			auto str = serializer->serialize(out, prop, ptr, userptr);
@@ -401,7 +401,7 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 
 	case core_type_id::Struct: {
 
-		auto& fac = get_property_serializer_factory();
+		auto& fac = IPropertySerializer::get_factory();
 		auto serializer = fac.createObject(prop->custom_type_str);
 		if (serializer) {
 			serializer->unserialize(in, *prop, ptr, tok, userptr);
@@ -530,7 +530,7 @@ PropertyInfoList* get_list_value<float>() {
 	return &list;
 }
 
-Factory<std::string, IPropertySerializer>& get_property_serializer_factory()
+Factory<std::string, IPropertySerializer>& IPropertySerializer::get_factory()
 {
 	static Factory<std::string, IPropertySerializer> inst;
 	return inst;

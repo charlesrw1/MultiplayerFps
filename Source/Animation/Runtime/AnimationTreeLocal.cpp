@@ -17,7 +17,7 @@ const TypeInfo& type_name::get_typeinfo() const { \
 	static TypeInfo ti = { #type_name, sizeof(type_name) };\
 	return ti;\
 }\
-AddClassToFactory<type_name, Node_CFG> nodecreator##type_name(get_runtime_node_factory(),#type_name);
+AddClassToFactory<type_name, Node_CFG> nodecreator##type_name(Node_CFG::get_factory(),#type_name);
 
 IMPL_NODE_CFG(Clip_Node_CFG);
 IMPL_NODE_CFG(Sync_Node_CFG);
@@ -408,7 +408,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 		bool good =  in.read_list_and_apply_functor([&](StringView view) -> bool
 			 {
-				 Node_CFG* node = read_object_properties<Node_CFG, getter_nodecfg>(get_runtime_node_factory(), {}, in, view);
+				 Node_CFG* node = read_object_properties<Node_CFG, getter_nodecfg>(Node_CFG::get_factory(), {}, in, view);
 				 if (node) {
 					 all_nodes.push_back(node);
 					 return true;
@@ -709,7 +709,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  };
  AutoEnumDef control_param_type_def = AutoEnumDef("cpt", 4, cpt_strs);
 
- Factory<std::string, Node_CFG>& get_runtime_node_factory()
+ Factory<std::string, Node_CFG>& Node_CFG::get_factory()
  {
 	static Factory<std::string, Node_CFG> factory;
 	return factory;
@@ -744,7 +744,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 }
  };
 
- static AddClassToFactory<AgSerializeNodeCfg, IPropertySerializer> abc(get_property_serializer_factory(), "AgSerializeNodeCfg");
+ static AddClassToFactory<AgSerializeNodeCfg, IPropertySerializer> abc(IPropertySerializer::get_factory(), "AgSerializeNodeCfg");
 
  PropertyInfoList* get_nodecfg_ptr_type()
  {

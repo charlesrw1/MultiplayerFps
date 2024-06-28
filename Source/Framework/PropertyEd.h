@@ -25,6 +25,8 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data);
 class IPropertyEditor
 {
 public:
+	static Factory<std::string, IPropertyEditor>& get_factory();
+
 	IPropertyEditor()  {}
 
 	void post_construct_for_custom_type(void* instance, PropertyInfo* prop) {
@@ -42,12 +44,13 @@ public:
 	PropertyInfo* prop = nullptr;
 };
 
-extern Factory<std::string, IPropertyEditor>& get_property_editor_factory();
-
 // optional: gets the string to use for an array header for a given index and what to draw when the item is closed
 class IArrayHeader
 {
 public:
+	static Factory<std::string, IArrayHeader>& get_factory();
+
+
 	IArrayHeader() {
 	
 	}
@@ -65,7 +68,6 @@ public:
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
 };
-extern Factory<std::string, IArrayHeader>& get_array_header_factory();
 
 class IGridRow
 {

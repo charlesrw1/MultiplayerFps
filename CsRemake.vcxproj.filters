@@ -189,9 +189,6 @@
     <ClInclude Include="Source\Animation\Editor\Root_node.h">
       <Filter>Source\Animation\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Sequencetemp.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\Editor\State_node.h">
       <Filter>Source\Animation\Editor</Filter>
     </ClInclude>
@@ -424,6 +421,24 @@
     <ClInclude Include="Source\External\ImGuizmo.h">
       <Filter>Source\External</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\RenderExtra.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h">
+      <Filter>Source\AssetCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h">
+      <Filter>Source\AssetCompile</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Curve.h">
+      <Filter>Source\Framework\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\CurveEditorImgui.h">
+      <Filter>Source\Framework\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\GameAnimEvents.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -622,6 +637,19 @@
     </ClCompile>
     <ClCompile Include="Source\IEditorTool.cpp">
       <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp">
+      <Filter>Source\AssetCompile</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\CurveEditorImgui.cpp">
+      <Filter>Source\Framework\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Editor\Sequencetemp.cpp" />
+    <ClCompile Include="Source\Animation\Event.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\GameAnimEvents.cpp">
+      <Filter>Source\Game</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

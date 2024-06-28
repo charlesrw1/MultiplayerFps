@@ -134,6 +134,8 @@ struct GetPose_Ctx
 
 struct Node_CFG
 {
+	static Factory<std::string, Node_CFG>& get_factory();
+
 	virtual void initialize(Animation_Tree_CFG* cfg) = 0;
 
 	bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
@@ -641,6 +643,3 @@ class BoneModifier_CFG
 {
 
 };
-
-
-extern Factory<std::string, Node_CFG>& get_runtime_node_factory();

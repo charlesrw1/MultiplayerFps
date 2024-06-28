@@ -41,6 +41,7 @@ class AnimationGraphEditor;
 class Base_EdNode
 {
 public:
+	static Factory<std::string, Base_EdNode>& get_factory();
 
 	Base_EdNode() {
 		for (int i = 0; i < inputs.size(); i++) 
@@ -185,6 +186,3 @@ private:
 	bool is_newly_created = false;
 
 };
-
-
-extern Factory<std::string, Base_EdNode>& get_tool_node_factory();

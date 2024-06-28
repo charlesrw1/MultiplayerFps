@@ -28,7 +28,6 @@
     <ClInclude Include="Source\Animation\Editor\Basic_nodes.h" />
     <ClInclude Include="Source\Animation\Editor\Blendspace_nodes.h" />
     <ClInclude Include="Source\Animation\Editor\Root_node.h" />
-    <ClInclude Include="Source\Animation\Editor\Sequencetemp.h" />
     <ClInclude Include="Source\Animation\Editor\Statemachine_node.h" />
     <ClInclude Include="Source\Animation\Editor\State_node.h" />
     <ClInclude Include="Source\Animation\Event.h" />
@@ -43,6 +42,8 @@
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
     <ClInclude Include="Source\AssetCompile\Compiliers.h" />
+    <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
+    <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h" />
     <ClInclude Include="Source\AssetCompile\Someutils.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\CamData.h" />
@@ -86,6 +87,8 @@
     <ClInclude Include="Source\Framework\BVH.h" />
     <ClInclude Include="Source\Framework\Bytepacker.h" />
     <ClInclude Include="Source\Framework\Config.h" />
+    <ClInclude Include="Source\Framework\Curve.h" />
+    <ClInclude Include="Source\Framework\CurveEditorImgui.h" />
     <ClInclude Include="Source\Framework\Dict.h" />
     <ClInclude Include="Source\Framework\DictParser.h" />
     <ClInclude Include="Source\Framework\DictWriter.h" />
@@ -115,6 +118,7 @@
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\WriteObject.h" />
+    <ClInclude Include="Source\Game\GameAnimEvents.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IEditorTool.h" />
@@ -135,6 +139,7 @@
     <ClInclude Include="Source\PlayerAnimDriver.h" />
     <ClInclude Include="Source\ProgramCaching.h" />
     <ClInclude Include="Source\RenderObj.h" />
+    <ClInclude Include="Source\Render\RenderExtra.h" />
     <ClInclude Include="Source\ScehmaMan.h" />
     <ClInclude Include="Source\Server.h" />
     <ClInclude Include="Source\Shader.h" />
@@ -149,12 +154,15 @@
     <ClCompile Include="Source\Animation\Animation_Man.cpp" />
     <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor.cpp" />
     <ClCompile Include="Source\Animation\Editor\EdNode.cpp" />
+    <ClCompile Include="Source\Animation\Editor\Sequencetemp.cpp" />
     <ClCompile Include="Source\Animation\Editor\Statemachine_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\State_node.cpp" />
+    <ClCompile Include="Source\Animation\Event.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\AssetCompile\MaterialCompile.cpp" />
+    <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />
     <ClCompile Include="Source\AssetCompile\ImageCompile.cpp" />
     <ClCompile Include="Source\Client.cpp" />
@@ -180,6 +188,7 @@
     <ClCompile Include="Source\Files.cpp" />
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
     <ClCompile Include="Source\Framework\DictParser.cpp" />
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp" />
     <ClCompile Include="Source\Framework\ExpressionLang.cpp" />
@@ -191,6 +200,7 @@
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game.cpp" />
+    <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />

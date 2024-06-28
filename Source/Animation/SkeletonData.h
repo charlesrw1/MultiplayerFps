@@ -15,11 +15,6 @@ class Node_CFG;
 class Pose;
 
 
-struct EventIndex {
-	uint8_t offset = 0;
-	uint8_t count = 0;
-};
-
 struct ChannelOffset
 {
 	uint32_t pos = 0;	// float[3]
@@ -45,10 +40,8 @@ public:
 	float fps = 30.0;
 	float average_linear_velocity = 0.0;
 
-
 	// store any animation events or curves here
-	std::vector<EventIndex> event_keyframes;
-	std::vector<AnimEvent> events;
+	std::vector<std::unique_ptr<AnimationEvent>> events;
 
 	int get_num_keyframes_inclusive() const {
 		return num_frames + 1;
@@ -70,7 +63,7 @@ public:
 
 	ScalePositionRot get_keyframe(int bone, int keyframe, float lerp) const;
 
-	const AnimEvent* get_events_for_keyframe(int keyframe, int* out_count) const;
+	const AnimationEvent* get_events_for_keyframe(int keyframe, int* out_count) const;
 
 private:
 	glm::vec3* get_pos_write_ptr(int channel, int keyframe);
