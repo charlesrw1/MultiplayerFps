@@ -566,7 +566,7 @@ void Animator::tick_tree_new(float dt)
 	ctx.tree = &runtime_dat;
 	ctx.model = get_model();
 
-	ctx.param_cfg = runtime_dat.cfg->params.get();
+	ctx.param_cfg = runtime_dat.cfg->get_control_params();
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
 	gp_ctx.pose = &poses[0];
@@ -574,8 +574,8 @@ void Animator::tick_tree_new(float dt)
 	if(driver)
 		driver->on_update(dt);
 
-	if (get_tree()&& get_tree()->root)
-		get_tree()->root->get_pose(ctx, gp_ctx);
+	if (get_tree()&& get_tree()->get_root_node())
+		get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
 	else
 		util_set_to_bind_pose(poses[0], get_skel());
 
@@ -600,21 +600,20 @@ void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model
 	this->model = model;
 
 
-	vars.resize(cfg->graph_program ? cfg->graph_program->num_vars() : 0);
+	vars.resize(cfg->get_num_vars());
 
 	data.clear();
-	data.resize(cfg->data_used, 0);
+	data.resize(cfg->get_data_used(), 0);
 	NodeRt_Ctx ctx;
 	ctx.model = model;
 
 	ctx.tree = this;
-	ctx.param_cfg = cfg->params.get();
+	ctx.param_cfg = cfg->get_control_params();
 	ctx.tick = 0;
-	for (int i = 0; i < cfg->all_nodes.size(); i++)
-		cfg->all_nodes[i]->construct(ctx);
+	cfg->construct_all_nodes(ctx);
 
-	if(cfg->root)
-		cfg->root->reset(ctx);
+	if(cfg->get_root_node())
+		cfg->get_root_node()->reset(ctx);
 
 
 }

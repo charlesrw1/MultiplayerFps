@@ -899,7 +899,7 @@ void Player::spawn(const Dict& spawnargs) {
 	}
 
 	auto graph = anim_tree_man->find_animation_tree("out.txt");
-	if(graph && graph->graph_is_valid && get_model() && get_model()->get_skel())
+	if(graph && graph->get_graph_is_valid() && get_model() && get_model()->get_skel())
 		initialize_animator(graph, &graph_driver);
 
 	health = 100;

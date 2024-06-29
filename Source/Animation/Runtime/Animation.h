@@ -91,7 +91,6 @@ public:
 	Animation_Tree_RT runtime_dat;
 	Entity* owner = nullptr;
 	IAnimationGraphDriver* driver = nullptr;
-	std::vector<Animation_Notify_Def*> out_events;
 
 	Bone_Controller& get_controller(bone_controller_type type_) {
 		return bone_controllers[(int)type_];

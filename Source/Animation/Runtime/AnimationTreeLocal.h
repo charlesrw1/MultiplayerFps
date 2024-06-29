@@ -44,7 +44,7 @@ struct Rt_Vars_Base
 inline Node_CFG* serialized_nodecfg_ptr_to_ptr(Node_CFG* ptr, Animation_Tree_CFG* cfg) {
 	uintptr_t index = (uintptr_t)ptr;	// serialized as indicies
 	ASSERT(index < 0xffff || index == -1);	// assume anything larger is a bad pointer error
-	return (index == -1) ? nullptr : cfg->all_nodes.at(index);
+	return (index == -1) ? nullptr : cfg->get_node(index);
 }
 
 inline Node_CFG* ptr_to_serialized_nodecfg_ptr(Node_CFG* ptr, const AgSerializeContext* ctx) {
@@ -178,10 +178,12 @@ protected:
 		return ctx.tree->construct_rt<T>(rt_offset);
 	}
 
+
 	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size) {
-		rt_offset = cfg->data_used;
+		rt_offset = cfg->get_data_used();
 		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
-		cfg->data_used += rt_size;	// FIXME alignment
+
+		cfg->add_data_used(rt_size);
 
 		for (int i = 0; i < input.size(); i++) {
 			input[i] = serialized_nodecfg_ptr_to_ptr(input[i], cfg);
@@ -381,7 +383,7 @@ struct Blend_Node_CFG : public Node_CFG
 	virtual void initialize(Animation_Tree_CFG* tree) override {
 		init_memory_internal(tree, sizeof(RT_TYPE)); 
 		if (param.is_valid()) {
-			parameter_type = (tree->params->get_type(param) == control_param_type::float_t) ? 0 : 1;
+			parameter_type = (tree->get_control_params()->get_type(param) == control_param_type::float_t) ? 0 : 1;
 		}
 	} 
 
@@ -484,7 +486,7 @@ struct Mirror_Node_CFG : public Node_CFG
 	DECLARE_NO_DEFAULT(Mirror_Node_CFG);
 	virtual void initialize(Animation_Tree_CFG* cfg) {
 		init_memory_internal(cfg, sizeof(RT_TYPE));
-		parameter_type = cfg->params->get_type(param) == control_param_type::float_t ? 0 : 1;
+		parameter_type = cfg->get_control_params()->get_type(param) == control_param_type::float_t ? 0 : 1;
 	}
 
 	// Inherited via At_Node

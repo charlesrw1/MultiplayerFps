@@ -8,7 +8,7 @@
 #define FIND_VAR(x) x = vars.find_no_handle(NAME(#x))
 
 void CharacterGraphDriver::on_init() {
-	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->params.get();
+	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->get_control_params();
 
 	FIND_VAR(flAimx);
 	FIND_VAR(flAimy);
@@ -66,7 +66,7 @@ void CharacterGraphDriver::on_update(float dt) {
 	injump = !player.is_on_ground();
 
 
-	auto& params = *owner->runtime_dat.cfg->params.get();
+	auto& params = *owner->runtime_dat.cfg->get_control_params();
 	auto vars = &owner->runtime_dat.vars;
 
 	auto ray = eng->phys.trace_ray(Ray(player.position, glm::vec3(0, -1, 0)), player.selfid, PF_WORLD);

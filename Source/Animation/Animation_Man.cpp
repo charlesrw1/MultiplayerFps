@@ -35,7 +35,7 @@ Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char*
 		new(tree)Animation_Tree_CFG();
 	}
 
-	tree->name = filename;
+	tree->path = filename;
 	bool good = tree->read_from_dict(parser);
 	if (!good) {
 		printf("animation tree file parsing failed %s\n", filename);

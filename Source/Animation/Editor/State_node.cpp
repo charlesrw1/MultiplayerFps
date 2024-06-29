@@ -196,7 +196,7 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 			try {
 
 				auto ret = st->script_condition.compile(
-					ed.editing_tree->graph_program.get(),
+					ed.editing_tree->get_program(),
 					code,
 					NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
 

@@ -4,12 +4,7 @@
 
 #include "../Runtime/AnimationTreeLocal.h"
 
-template<typename T>
-inline void util_create_node(T*& node)
-{
-	node = new T();
-	ed.editing_tree->all_nodes.push_back(node);
-}
+
 
 template<typename T>
 inline void util_ensure_type(T* saved)
@@ -34,7 +29,7 @@ inline bool util_create_or_ensure(T*& node)
 		return false;
 	}
 	else {
-		util_create_node(node);
+		ed.util_create_node(node);
 		return true;
 	}
 }
@@ -67,7 +62,7 @@ inline ControlParamHandle util_get_real_param(ControlParamHandle oldhandle) {
 
 inline control_param_type util_get_param_type(ControlParamHandle handle) {
 	ASSERT(handle.is_valid());
-	return ed.editing_tree->params->get_type(handle);
+	return ed.editing_tree->get_control_params()->get_type(handle);
 }
 
 inline bool util_compile_default(ControlParamHandle* param, bool param_is_boolfloat, int num_inputs, Base_EdNode* node, const AgSerializeContext* ctx)

@@ -371,6 +371,13 @@ Animation_Tree_CFG::~Animation_Tree_CFG()
 	}
 }
 
+ uint32_t Animation_Tree_CFG::get_num_vars() const { return graph_program ? graph_program->num_vars() : 0; }
+
+void Animation_Tree_CFG::construct_all_nodes(NodeRt_Ctx& ctx) const {
+	for (int i = 0; i < all_nodes.size(); i++)
+		all_nodes[i]->construct(ctx);
+}
+
 void Animation_Tree_CFG::init_program_libs()
 {
 	graph_var_lib->clear();

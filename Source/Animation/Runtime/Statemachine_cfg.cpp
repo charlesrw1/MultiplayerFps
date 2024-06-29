@@ -61,7 +61,7 @@ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 		states[i].tree = serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
 	}
 
-	if (tree->graph_is_valid) {
+	if (tree->get_graph_is_valid()) {
 		// this can be serialized to a bytestream but for now just compile it on load
 		// since the graph is valid, there shoudnt be and runtime errors
 		// however, graph_is_valid can be true and the script is bad ONLY IF
@@ -78,7 +78,7 @@ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 			const std::string& code = transitions[i].script_uncompilied;
 			try {
 				auto ret = transitions[i].script_condition.compile(
-					tree->graph_program.get(),
+					tree->get_program(),
 					code,
 					NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
 

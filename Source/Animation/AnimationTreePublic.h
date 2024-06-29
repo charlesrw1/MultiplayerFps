@@ -10,6 +10,8 @@
 
 #include "Runtime/ControlParamHandle.h"
 
+#include "IAsset.h"
+
 class DictParser;
 class DictWriter;
 class Model;
@@ -23,17 +25,49 @@ class ControlParam_CFG;
 // this is the thing loaded from disk once
 class Animation_Tree_Manager;
 struct PropertyInfoList;
-class Animation_Tree_CFG
+class NodeRt_Ctx;
+class Animation_Tree_CFG : public IAsset
 {
 public:
 	Animation_Tree_CFG();
 	~Animation_Tree_CFG();
 
-	void init_program_libs();
+	const Node_CFG* get_root_node() const {
+		return root;
+	}
+	 Node_CFG* get_root_node()  {
+		return root;
+	}
+	const ControlParam_CFG* get_control_params() const {
+		return params.get();
+	}
 	void post_load_init();
+	ControlParamHandle find_param(StringName name);
+	int get_index_of_node(Node_CFG* ptr);
+	void write_to_dict(DictWriter& out);
+	bool read_from_dict(DictParser& in);
+
+	uint32_t get_data_used() const { return data_used; }
+	uint32_t get_num_vars() const;
+
+	void construct_all_nodes(NodeRt_Ctx& ctx) const;
+
+	void add_data_used(uint32_t amt) {
+		data_used += amt;
+		uintptr_t modulo = data_used % 16;
+		if (modulo != 0)
+			data_used =  data_used + 16 - modulo;
+	}
+
+	Node_CFG* get_node(uint32_t index) { return all_nodes.at(index); }
+
+	const Program* get_program() const { return graph_program.get(); }
+
+	bool get_graph_is_valid() const { return graph_is_valid; }
+private:
+	void init_program_libs();
 
 	bool graph_is_valid = false;
-	std::string name;
 	Node_CFG* root = nullptr;
 	// data in bytes for runtime nodes
 	uint32_t data_used = 0;
@@ -42,28 +76,26 @@ public:
 	std::unique_ptr<Program> graph_program;
 	std::unique_ptr<ControlParam_CFG> params;
 
-	ControlParamHandle find_param(StringName name);
-	int get_index_of_node(Node_CFG* ptr);
-	void write_to_dict(DictWriter& out);
-	bool read_from_dict(DictParser& in);
-
-
 	static PropertyInfoList* get_props();
 
-private:
+	// :(
 	friend class Animation_Tree_Manager;
-	bool is_initialized() { return !name.empty(); }
+	friend class AnimationGraphEditor;
+	friend class SerializeNodeCFGRef;
+	friend class AgSerializeContext;
+
+	bool is_initialized() { return !path.empty(); }
 };
 
 class Model;
-struct Animation_Tree_RT
+class Animation_Tree_RT
 {
+public:
+	void init_from_cfg(const Animation_Tree_CFG* cfg,const Model* model);
+
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
-	std::vector<uint8_t> data;	// runtime data
 	program_script_vars_instance vars;
-
-	void init_from_cfg(const Animation_Tree_CFG* cfg,const Model* model);
 
 	template<typename T>
 	T* get(uint32_t offset) {
@@ -77,39 +109,10 @@ struct Animation_Tree_RT
 		ptr = new(ptr)(T);
 		return ptr;
 	}
+private:
+	std::vector<uint8_t> data;	// runtime data
 };
 
-enum class AnimationNotifyType
-{
-	FOOTSTEP_LEFT,
-	FOOTSTEP_RIGHT,
-	SOUND,
-	EFFECT,
-	LOCK_IK,
-	RELEASE_IK,
-};
-
-struct Animation_Notify_Def {
-	AnimationNotifyType type = AnimationNotifyType::FOOTSTEP_LEFT;
-	int param_count = 0;
-	const char* params[4];
-	float start = 0.0;
-	float end = -1.0;
-
-	bool is_oneshot_event() const {
-		return end < 0.0;
-	}
-	bool is_duration_event()  const {
-		return !is_oneshot_event();
-	}
-};
-
-struct Animation_Notify_List
-{
-
-	int count = 0;
-	Animation_Notify_Def* defs = nullptr;
-};
 
 class DictParser;
 

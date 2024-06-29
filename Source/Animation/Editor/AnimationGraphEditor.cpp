@@ -1314,25 +1314,6 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 
 }
 
-
-static void delete_cfg_node(Node_CFG* node)
-{
-	ASSERT(!ed.graph_is_read_only());
-
-	// erase node from tree
-	int index = 0;
-	auto& all_nodes = ed.editing_tree->all_nodes;
-	for (int; index < all_nodes.size(); index++) {
-		if (all_nodes[index] == node)
-			break;
-	}
-	ASSERT(index != all_nodes.size());
-	all_nodes.erase(all_nodes.begin() + index);
-
-	// call destructor on node, since its allocated in an arena, ie no deletes
-	node->~Node_CFG();
-}
-
 #if 0
 bool AgEditor_BaseNode::compile_my_data()
 {
@@ -1883,8 +1864,8 @@ public:
 		// prop.id is the index into runtime/cfg vars
 		Animation_Tree_RT* rt = ed.get_runtime_tree();
 		program_script_vars_instance* vars = &rt->vars;
-		ControlParam_CFG* params = ed.editing_tree->params.get();
-		AG_ControlParam* control = &params->types.at(prop->current_id);
+		const ControlParam_CFG* params = ed.editing_tree->get_control_params();
+		const AG_ControlParam* control = &params->types.at(prop->current_id);
 		ControlParamHandle handle = { prop->current_id };
 		if (control->type == control_param_type::bool_t) {
 			bool b = params->get_bool(vars, handle);

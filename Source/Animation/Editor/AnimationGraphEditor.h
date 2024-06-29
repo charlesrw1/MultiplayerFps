@@ -409,6 +409,12 @@ public:
 	Animation_Tree_CFG* get_tree() {
 		return editing_tree;
 	}
+	template<typename T>
+	void util_create_node(T*& node)
+	{
+		node = new T();
+		editing_tree->all_nodes.push_back(node);
+	}
 
 	Animation_Tree_RT* get_runtime_tree() {
 		Animator* a = out.get_animator();

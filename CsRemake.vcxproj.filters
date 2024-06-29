@@ -52,7 +52,7 @@
     <Filter Include="Source\Framework\Editor">
       <UniqueIdentifier>{16da7ef5-e3c3-4541-9e27-fcc1fa42cc72}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\AssetTypes">
+    <Filter Include="Source\Asset">
       <UniqueIdentifier>{26fb727a-7dcf-45e8-9269-4b240ca067f4}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -309,9 +309,6 @@
     <ClInclude Include="Source\Framework\Util.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\IEditorTool.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Debug.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -442,17 +439,20 @@
     <ClInclude Include="Source\Game\GameAnimEvents.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\IAsset.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\Material.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\AssetRegistry.h">
-      <Filter>Source\AssetTypes</Filter>
+      <Filter>Source\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Assets\AssetBrowser.h">
-      <Filter>Source\AssetTypes</Filter>
+      <Filter>Source\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\IEditorTool.h">
+      <Filter>Source\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\IAsset.h">
+      <Filter>Source\Asset</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -650,9 +650,6 @@
     <ClCompile Include="Source\External\ImGuizmo.cpp">
       <Filter>Source\External</Filter>
     </ClCompile>
-    <ClCompile Include="Source\IEditorTool.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
@@ -671,10 +668,13 @@
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Assets\AssetRegistry.cpp">
-      <Filter>Source\AssetTypes</Filter>
+      <Filter>Source\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Source\Assets\AssetBrowser.cpp">
-      <Filter>Source\AssetTypes</Filter>
+      <Filter>Source\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\IEditorTool.cpp">
+      <Filter>Source\Asset</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

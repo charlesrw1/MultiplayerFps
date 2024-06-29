@@ -8,7 +8,7 @@ class Root_EdNode : public Base_EdNode
 	void init() override {
 		if (!is_this_node_created()) {
 			if (graph_layer == 0) {	// root layer
-				Base_EdNode* root = ed.editor_node_for_cfg_node(ed.get_tree()->root);
+				Base_EdNode* root = ed.editor_node_for_cfg_node(ed.get_tree()->get_root_node());
 				if (root)
 					add_input(&ed, root, 0);
 			}
