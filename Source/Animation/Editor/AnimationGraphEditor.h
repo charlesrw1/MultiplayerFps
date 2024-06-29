@@ -166,9 +166,9 @@ public:
 	View_Setup vs;
 	User_Camera camera;
 	handle<Render_Object> obj;
-	Animator* get_animator();
+	AnimatorInstance* get_animator();
 
-	Animator& get_local_animator() {
+	AnimatorInstance& get_local_animator() {
 		return anim;
 	}
 
@@ -176,7 +176,7 @@ public:
 private:
 
 
-	Animator anim;
+	AnimatorInstance anim;
 
 };
 
@@ -417,7 +417,7 @@ public:
 	}
 
 	Animation_Tree_RT* get_runtime_tree() {
-		Animator* a = out.get_animator();
+		AnimatorInstance* a = out.get_animator();
 
 		return a ? &a->runtime_dat : nullptr;
 	}

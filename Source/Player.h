@@ -22,7 +22,7 @@ struct ViewmodelComponent
 	~ViewmodelComponent();
 
 	Model* model = nullptr;
-	Animator animator;
+	AnimatorInstance animator;
 	Player* player = nullptr;
 
 	void update();
@@ -104,7 +104,8 @@ public:
 	unique_ptr<LagCompensationComponent> lagcomp;
 
 	// animation system driver
-	CharacterGraphDriver graph_driver;
+	CharacterGraphDriver animator;
+	AnimatorInstance* get_animator() override { return &animator; }
 
 	virtual glm::vec3 get_velocity() const  override {
 		return velocity;

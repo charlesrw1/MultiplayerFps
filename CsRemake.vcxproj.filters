@@ -171,9 +171,6 @@
     <ClInclude Include="Source\Animation\AnimationUtil.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\IGraphDriver.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor.h">
       <Filter>Source\Animation\Editor</Filter>
     </ClInclude>

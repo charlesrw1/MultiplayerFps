@@ -6,7 +6,7 @@
 #include "Framework/Util.h"
 
 
-class Animator;
+class AnimatorInstance;
 class Material;
 class Entity;
 class Model;
@@ -23,7 +23,7 @@ struct Render_Object
 	}
 
 	Model* model = nullptr;
-	Animator* animator = nullptr;
+	AnimatorInstance* animator = nullptr;
 	Material* mat_override = nullptr;
 	Color32 param1 = COLOR_WHITE;
 	Color32 param2 = COLOR_WHITE;

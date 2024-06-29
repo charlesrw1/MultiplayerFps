@@ -1558,7 +1558,7 @@ void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, 
 }
 
 
-void draw_skeleton(const Animator* a,float line_len,const mat4& transform)
+void draw_skeleton(const AnimatorInstance* a,float line_len,const mat4& transform)
 {
 	auto& bones = a->get_global_bonemats();
 	auto model = a->get_model();

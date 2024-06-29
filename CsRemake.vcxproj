@@ -31,7 +31,6 @@
     <ClInclude Include="Source\Animation\Editor\Statemachine_node.h" />
     <ClInclude Include="Source\Animation\Editor\State_node.h" />
     <ClInclude Include="Source\Animation\Event.h" />
-    <ClInclude Include="Source\Animation\IGraphDriver.h" />
     <ClInclude Include="Source\Animation\SkeletonData.h" />
     <ClInclude Include="Source\Animation\Runtime\Animation.h" />
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h" />

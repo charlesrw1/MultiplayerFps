@@ -52,19 +52,31 @@ enum class bone_controller_type
 	max_count,
 };
 
+#include <vector>
+#include "Framework/Factory.h"
+#include "Framework/ReflectionProp.h"
+
+class Pose;
+class Animator;
+
+
 class MSkeleton;
 class Entity;
 class Animation_Tree_CFG;
-class IAnimationGraphDriver;
-class Animator
+
+class AnimatorInstance
 {
 public:
-	Animator();
+	static Factory<std::string, AnimatorInstance>& get_factory();
+
+	AnimatorInstance();
+
+	// expose properties to animation graph
+	virtual void add_props(std::vector<PropertyListInstancePair>& props) {};
 
 	void initialize_animator(
 		const Model* model,
 		const Animation_Tree_CFG* graph,
-		IAnimationGraphDriver* driver,
 		Entity* ent = nullptr);
 
 	void tick_tree_new(float dt);
@@ -89,15 +101,10 @@ public:
 	}
 
 	Animation_Tree_RT runtime_dat;
-	Entity* owner = nullptr;
-	IAnimationGraphDriver* driver = nullptr;
 
 	Bone_Controller& get_controller(bone_controller_type type_) {
 		return bone_controllers[(int)type_];
 	}
-
-	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
-	std::vector<Animation_Slot> slots;
 
 	void play_anim_in_slot(StringView name, float start, float speed, bool loop);
 	bool is_slot_finished() { return slots[0].finished; }
@@ -105,16 +112,28 @@ public:
 	void update_procedural_bones(Pose& pose);
 
 	int num_bones() { return cached_bonemats.size(); }
+
+	Entity* get_owner() const { return owner; }
 private:
 
+	// hooks for derived classes
+	virtual void on_init() {};
+	virtual void on_update(float dt) {}
+	virtual void pre_ik_update(Pose& pose, float dt) {}
+	virtual void post_ik_update() {}
+
+	// owning entity, can be null for example in editor
+	Entity* owner = nullptr;
 	std::vector<glm::mat4x4> cached_bonemats;	// global bonemats
 	std::vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
 
 	void ConcatWithInvPose();
-
 	void add_legs_layer(glm::quat q[], glm::vec3 pos[]);
-
 	void UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies);
+	
+	// depreciated
+	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
+	std::vector<Animation_Slot> slots;
 };
 
 

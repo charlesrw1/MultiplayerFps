@@ -113,23 +113,17 @@ private:
 	std::vector<uint8_t> data;	// runtime data
 };
 
-
 class DictParser;
-
 class AnimationGraphEditor;
 class Animation_Tree_Manager
 {
 public:
 	void init();
 	Animation_Tree_CFG* find_animation_tree(const char* filename);
-
 	const Library* get_std_animation_script_lib();
 private:
-
 	Animation_Tree_CFG* load_animation_tree_file(const char* filename, DictParser& parser);
-
 	std::unordered_map<std::string, Animation_Tree_CFG> trees;
-
 	friend class AnimationGraphEditor;
 };
 

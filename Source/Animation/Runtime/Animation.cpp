@@ -14,9 +14,16 @@ using namespace glm;
 #include "Framework/ExpressionLang.h"
 #include "Framework/MemArena.h"
 #include "../AnimationUtil.h"
-#include "../IGraphDriver.h"
 #include "AnimationTreeLocal.h"
 #include "../AnimationTreePublic.h"
+
+
+Factory<std::string, AnimatorInstance>& AnimatorInstance::get_factory()
+{
+	static Factory<std::string, AnimatorInstance> inst;
+	return inst;
+}
+
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -117,11 +124,9 @@ int Animation_Set::find(const char* name) const
 	return -1;
 }
 
-void Animator::initialize_animator(
+void AnimatorInstance::initialize_animator(
 	const Model* model, 
-
 	const Animation_Tree_CFG* graph, 
-	IAnimationGraphDriver* driver, 
 	Entity* ent)
 {
 	ASSERT(model);
@@ -133,13 +138,10 @@ void Animator::initialize_animator(
 		return;
 
 	runtime_dat.init_from_cfg(graph, model);
-	this->driver = driver;
 	this->owner = ent;
 
-	if (driver) {
-		driver->owner = this;
-		driver->on_init();
-	}
+	on_init();
+
 	const int bones = model->get_skel()->get_num_bones();
 	cached_bonemats.resize(bones);
 	matrix_palette.resize(bones);
@@ -186,7 +188,7 @@ static void SolveTwoBoneIK(const vec3& a, const vec3& b, const vec3& c, const ve
 }
 #endif
 
-void Animator::UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies)
+void AnimatorInstance::UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies)
 {
 	auto skeleton = get_skel();
 
@@ -252,7 +254,7 @@ void menu_2()
 }
 
 
-void Animator::update_procedural_bones(Pose& pose)
+void AnimatorInstance::update_procedural_bones(Pose& pose)
 {
 	static bool first = true;
 	if (first) {
@@ -417,7 +419,7 @@ void Animator::update_procedural_bones(Pose& pose)
 
 
 
-void Animator::ConcatWithInvPose()
+void AnimatorInstance::ConcatWithInvPose()
 {
 	ASSERT(get_skel());
 
@@ -441,7 +443,7 @@ PoseMask::PoseMask()
 {
 
 }
-Animator::Animator() : slots(1)
+AnimatorInstance::AnimatorInstance() : slots(1)
 {
 
 }
@@ -551,7 +553,7 @@ void modify_pose_debug(Pose& pose)
 		pose.q[0] = glm::normalize(pose.q[0]);
 }
 
-void Animator::tick_tree_new(float dt)
+void AnimatorInstance::tick_tree_new(float dt)
 {
 	if (!runtime_dat.cfg)
 		return;
@@ -571,8 +573,7 @@ void Animator::tick_tree_new(float dt)
 	gp_ctx.dt = dt;
 	gp_ctx.pose = &poses[0];
 
-	if(driver)
-		driver->on_update(dt);
+	on_update(dt);
 
 	if (get_tree()&& get_tree()->get_root_node())
 		get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
@@ -580,13 +581,12 @@ void Animator::tick_tree_new(float dt)
 		util_set_to_bind_pose(poses[0], get_skel());
 
 	util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
-	if(driver)
-		driver->pre_ik_update(poses[0], dt);
+	
+	pre_ik_update(poses[0], dt);
 
 	update_procedural_bones(poses[0]);
 
-	if(driver)
-		driver->post_ik_update();
+	post_ik_update();
 
 	ConcatWithInvPose();
 

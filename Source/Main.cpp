@@ -1462,9 +1462,9 @@ void Game_Engine::game_update_tick()
 	{
 		for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 			Entity& e = ei.get();
-			if (!e.animator)
+			if (!e.get_animator())
 				continue;
-			e.animator->tick_tree_new(eng->tick_interval);
+			e.get_animator()->tick_tree_new(eng->tick_interval);
 		}
 	}
 }

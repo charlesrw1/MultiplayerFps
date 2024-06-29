@@ -78,19 +78,6 @@ void Game_Engine::client_leave(int slot)
 	free_entity(handle);
 }
 
-void Entity::initialize_animator(const Animation_Tree_CFG* graph, IAnimationGraphDriver* driver) {
-	assert(get_model());
-	if (!animator)
-		animator.reset(new Animator());
-	animator->initialize_animator(get_model(),graph, driver, this);
-}
-void Entity::remove_animator()
-{
-	animator.reset();
-	renderable.animator = nullptr;
-	idraw->remove_obj(render_handle);	// just to be sure there isnt a dangling reference
-}
-
 void Game_Engine::make_client(int slot)
 {
 	sys_print("making client %d\n", slot);
@@ -432,8 +419,7 @@ void Entity::present()
 		assert(renderable.model);
 
 		renderable.visible = !is_object_hidden();
-		if (animator)
-			renderable.animator = animator.get();
+		renderable.animator = get_animator();
 		renderable.transform = get_world_transform();// * model->skeleton_root_transform;
 		idraw->update_obj(render_handle, renderable);
 	}

@@ -33,6 +33,8 @@ struct AG_ControlParam
 	int16_t enum_idx = 0;
 	bool reset_after_tick = false;
 
+	// if >0, then control param exists in anim instance, else it doesnt and this is a dangling reference
+	int offset_in_anim_instance = -1;
 
 	static PropertyInfoList* get_props();
 };

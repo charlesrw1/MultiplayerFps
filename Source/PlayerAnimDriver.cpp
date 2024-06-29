@@ -5,44 +5,30 @@
 #include "Animation/AnimationUtil.h"
 #include "Player.h"
 
-#define FIND_VAR(x) x = vars.find_no_handle(NAME(#x))
+#include "Framework/AddClassToFactory.h"
+
+ADDTOFACTORYMACRO(CharacterGraphDriver, AnimatorInstance);
 
 void CharacterGraphDriver::on_init() {
-	const ControlParam_CFG& vars = *owner->runtime_dat.cfg->get_control_params();
+	auto model = get_model();
+	get_controller(bone_controller_type::lhand).bone_index = model->bone_for_name("mixamorig:LeftHand");
+	get_controller(bone_controller_type::lhand).use_two_bone_ik = true;
 
-	FIND_VAR(flAimx);
-	FIND_VAR(flAimy);
-	FIND_VAR(bRunning);
-	FIND_VAR(bFalling);
-	FIND_VAR(bJumping);
-	FIND_VAR(bCrouch);
-	FIND_VAR(flSpeed);
-	FIND_VAR(flStopPercentage);
-	FIND_VAR(bTurnInPlaceLeft);
-	FIND_VAR(bTurnInPlaceRight);
-	FIND_VAR(bLeftFootForwards);
-	FIND_VAR(bRightFootForwards);
+	get_controller(bone_controller_type::rhand).bone_index = model->bone_for_name("mixamorig:RightHand");
+	get_controller(bone_controller_type::rhand).use_two_bone_ik = true;
 
+	get_controller(bone_controller_type::rfoot).bone_index = model->bone_for_name("mixamorig:LeftFoot");
+	get_controller(bone_controller_type::rfoot).use_two_bone_ik = true;
 
-	auto model = owner->get_model();
-	owner->get_controller(bone_controller_type::lhand).bone_index = model->bone_for_name("mixamorig:LeftHand");
-	owner->get_controller(bone_controller_type::lhand).use_two_bone_ik = true;
-
-	owner->get_controller(bone_controller_type::rhand).bone_index = model->bone_for_name("mixamorig:RightHand");
-	owner->get_controller(bone_controller_type::rhand).use_two_bone_ik = true;
-
-	owner->get_controller(bone_controller_type::rfoot).bone_index = model->bone_for_name("mixamorig:LeftFoot");
-	owner->get_controller(bone_controller_type::rfoot).use_two_bone_ik = true;
-
-	owner->get_controller(bone_controller_type::lfoot).bone_index = model->bone_for_name("mixamorig:RightFot");
-	owner->get_controller(bone_controller_type::lfoot).use_two_bone_ik = true;
+	get_controller(bone_controller_type::lfoot).bone_index = model->bone_for_name("mixamorig:RightFot");
+	get_controller(bone_controller_type::lfoot).use_two_bone_ik = true;
 }
 
 void CharacterGraphDriver::on_update(float dt) {
 
-	if (!owner->owner) return;
-
-	Player& player = *(Player*)owner->owner;
+	if (!get_owner()) return;
+	ASSERT(get_owner()->get_classname() == NAME("Player"));
+	Player& player = *(Player*)get_owner();
 
 	meshoffset = glm::vec3(0.f);
 
@@ -66,8 +52,8 @@ void CharacterGraphDriver::on_update(float dt) {
 	injump = !player.is_on_ground();
 
 
-	auto& params = *owner->runtime_dat.cfg->get_control_params();
-	auto vars = &owner->runtime_dat.vars;
+	auto& params = *runtime_dat.cfg->get_control_params();
+	auto vars = &runtime_dat.vars;
 
 	auto ray = eng->phys.trace_ray(Ray(player.position, glm::vec3(0, -1, 0)), player.selfid, PF_WORLD);
 	float dist_to_ground = ray.dist < 0.0 ? 100000.0 : ray.dist;
@@ -90,8 +76,8 @@ void CharacterGraphDriver::on_update(float dt) {
 
 void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
 
-	auto& cached_bonemats = owner->get_global_bonemats();
-	auto model = owner->get_model();
+	auto& cached_bonemats = get_global_bonemats();
+	auto model = get_model();
 
 	const int lfoot = model->bone_for_name("mixamorig:LeftFoot");
 	const int rfoot = model->bone_for_name("mixamorig:RightFoot");

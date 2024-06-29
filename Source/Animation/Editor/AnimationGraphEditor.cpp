@@ -1650,7 +1650,7 @@ void AnimationGraphEditor::compile_and_run()
 	bool good_to_run = compile_graph_for_playing();
 	get_tree()->post_load_init();
 	if (good_to_run) {
-		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);
+		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr);
 		playback = graph_playback_state::running;
 	}
 }
@@ -1707,7 +1707,7 @@ void AnimationGraphEditor::try_load_preview_models()
 
 	out.model = mods.find_or_load("player_FINAL.cmdl");
 	if(out.is_valid_for_preview())
-		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr, nullptr);
+		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr);
 }
 
 void AnimationGraphEditor::open_document_internal(const char* name)
@@ -1963,17 +1963,17 @@ void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, 
 
 void GraphOutput::reset_animator()
 {
-	anim = Animator();
+	anim = AnimatorInstance();
 }
 
 #include "Player.h"
 
-Animator* GraphOutput::get_animator()
+AnimatorInstance* GraphOutput::get_animator()
 {
 	if (eng->get_state() == Engine_State::Game) {
 		Player* p = eng->get_local_player();
-		if (p && p->animator.get() && p->animator.get()->runtime_dat.cfg == ed.editing_tree) {
-			return p->animator.get();
+		if (p && p->get_animator() && p->get_animator()->runtime_dat.cfg == ed.editing_tree) {
+			return p->get_animator();
 		}
 	}
 	return &anim;

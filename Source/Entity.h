@@ -175,13 +175,10 @@ public:
 
 	handle<Render_Object> render_handle;
 	Render_Object renderable;
-	unique_ptr<Animator> animator;
+
+	virtual AnimatorInstance* get_animator() { return nullptr; }
 
 	void set_model(const char* model);
-	void initialize_animator(
-		const Animation_Tree_CFG* graph, 
-		IAnimationGraphDriver* driver = nullptr);
-	void remove_animator();
 
 	virtual glm::vec3 get_velocity() const {
 		return glm::vec3(0.f);

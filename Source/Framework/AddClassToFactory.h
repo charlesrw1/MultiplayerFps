@@ -10,3 +10,4 @@ struct AddClassToFactory
         factory.registerClass<T>(name);
     }
 };
+#define ADDTOFACTORYMACRO(Class,Base) static AddClassToFactory<Class,Base> Class##factory_12345(Base::get_factory(), #Class)

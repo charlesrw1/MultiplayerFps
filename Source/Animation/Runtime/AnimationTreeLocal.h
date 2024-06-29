@@ -132,8 +132,9 @@ struct GetPose_Ctx
 };
 
 
-struct Node_CFG
+class Node_CFG
 {
+public:
 	static Factory<std::string, Node_CFG>& get_factory();
 
 	virtual void initialize(Animation_Tree_CFG* cfg) = 0;
