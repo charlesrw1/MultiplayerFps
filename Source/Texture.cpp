@@ -16,246 +16,7 @@
 
 static const char* const texture_folder_path = "./Data/Textures/";
 
-Game_Material_Manager mats;
-
-Material* Game_Material_Manager::find_and_make_if_dne(const char* name)
-{
-	Material* m = find_for_name(name);
-	if (m) return m;
-	m = &materials[name];
-	m->name = name;
-	return m;
-}
-
-#define ENSURE(num) if(line.size() < num) { sys_print("!!! bad material definition %s @ %d\n", matname.c_str(), mat.second.linenum); continue;}
-void Game_Material_Manager::load_material_file(const char* path, bool overwrite)
-{
-	auto fileos = FileSys::open_read_os(path);
-	if (!fileos) {
-		sys_print("!!! Couldn't open material file %s\n", path);
-	}
-
-
-	DictParser file;
-	file.load_from_file(fileos.get());
-
-
-
-	string key;
-	string temp2;
-
-	while (!file.is_eof()) {
-		StringView name;
-		if (!file.read_string(name) || !file.expect_item_start()) {
-			sys_print("!!! bad material def %s\n", path);
-			return;
-		}
-
-		std::string matname = std::string(name.str_start, name.str_len);
-
-		// first check if it exists
-		Material* gs = find_for_name(matname.c_str());
-		if (gs && !overwrite) continue;
-		else if (gs && overwrite) {
-			uint32_t id = gs->material_id;
-			*gs = Material();
-			gs->name = (matname);
-			gs->material_id = id;
-		}
-		if (!gs) {
-			gs = &materials[matname];
-			gs->name = matname;
-			gs->material_id = cur_mat_id++;
-		}
-
-		StringView tok;
-		while (file.read_string(tok) && !file.is_eof() && !file.check_item_end(tok) ) {
-
-
-			if (tok.cmp("pbr_full")) {
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				const char* path = string_format("%s_albedo.png", str_get);
-				gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(path);
-				path = string_format("%s_normal-ogl.png", str_get);
-				gs->get_image(material_texture::NORMAL) = create_but_dont_load(path);
-				path = string_format("%s_ao.png", str_get);
-				gs->get_image(material_texture::AO) = create_but_dont_load(path);
-				path = string_format("%s_roughness.png", str_get);
-				gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(path);
-				path = string_format("%s_metallic.png", str_get);
-				gs->get_image(material_texture::METAL) = create_but_dont_load(path);
-			}
-
-			// assume that ref_shaderX will be defined in the future, so create them if they haven't been
-			else if (tok.cmp("ref_shader1")) {
-				file.read_string(tok);
-				gs->references[0] = find_and_make_if_dne(tok.to_stack_string().c_str());
-			}
-			else if (tok.cmp("ref_shader2")) {
-				file.read_string(tok);
-				gs->references[1] = find_and_make_if_dne(tok.to_stack_string().c_str());
-			}
-
-			else if (tok.cmp("albedo")) {
-				file.read_string(tok);
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				gs->get_image(material_texture::DIFFUSE) = create_but_dont_load(str_get);
-			}
-			else if (tok.cmp("normal")) {
-				file.read_string(tok);
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				gs->get_image(material_texture::NORMAL) = create_but_dont_load(str_get);
-			}
-			else if (tok.cmp("ao")) {
-				file.read_string(tok);
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				gs->get_image(material_texture::AO) = create_but_dont_load(str_get);
-			}
-			else if (tok.cmp("rough")) {
-				file.read_string(tok);
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				gs->get_image(material_texture::ROUGHNESS) = create_but_dont_load(str_get);
-			}
-			else if (tok.cmp("metal")) {
-				file.read_string(tok);
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				gs->get_image(material_texture::METAL) = create_but_dont_load(str_get);
-				gs->metalness_mult = 1.0;
-			}
-			else if (tok.cmp("special")) {
-				file.read_string(tok);
-				auto ss = tok.to_stack_string();
-				const char* str_get = ss.c_str();
-				gs->get_image(material_texture::SPECIAL) = create_but_dont_load(str_get);
-			}
-			else if (tok.cmp("tint")) {
-				glm::vec3 t;
-				file.read_float3(t.x, t.y, t.z);
-				gs->diffuse_tint = glm::vec4(t, gs->diffuse_tint.w);
-			}
-			else if (tok.cmp("metal_val")) {
-				file.read_float(gs->metalness_mult);
-			}
-			else if (tok.cmp("rough_val")) {
-				file.read_float(gs->roughness_mult);
-			}
-			else if (tok.cmp("rough_remap")) {
-				glm::vec2 v;
-				file.read_float2(v.x, v.y);
-				gs->roughness_remap_range = v;
-			}
-			else if (tok.cmp("shader")) {
-				file.read_string(tok);
-				if (tok.cmp("blend2")) gs->type = material_type::TWOWAYBLEND;
-				else if (tok.cmp("wind")) gs->type = material_type::WINDSWAY;
-				else if (tok.cmp("water")) {
-					gs->blend = blend_state::BLEND;
-					gs->type = material_type::WATER;
-				}
-
-				else sys_print("unknown shader type %s\n", tok.to_stack_string().c_str());
-			}
-			else if (tok.cmp("alpha")) {
-				file.read_string(tok);
-				if(tok.cmp("add"))
-					gs->blend = blend_state::ADD;
-				else if (tok.cmp("blend"))
-					gs->blend = blend_state::BLEND;
-				else if(tok.cmp("test"))
-				 	gs->alpha_tested = true;
-
-			}
-			else if(tok.cmp("billboard"))
-				gs->billboard = billboard_setting::FACE_CAMERA;
-			else if (tok.cmp("billboard_axis"))
-				gs->billboard = billboard_setting::ROTATE_AXIS;
-
-		}
-	}
-}
-#undef ENSURE;
-
-
-void Game_Material_Manager::load_material_file_directory(const char* directory)
-{
-	sys_print("------ Load Materials ------\n");
-
-	FileTree tree = FileSys::find_files(directory);
-	for (const auto& file : tree) {
-		load_material_file(file.c_str(), true);
-	}
-
-}
-
-Material* Game_Material_Manager::create_temp_shader(const char* name)
-{
-	Material* gs = find_for_name(name);
-	if (gs) return gs;
-	gs = &materials[name];
-	gs->name = name;
-	gs->material_id = cur_mat_id++;
-
-	return gs;
-}
-
-
-void Game_Material_Manager::ensure_data_is_loaded(Material* mat)
-{
-	if (!mat->texture_are_loading_in_memory) {
-		for (int i = 0; i < (int)material_texture::COUNT; i++) {
-			if (mat->images[i] && !mat->images[i]->is_loaded_in_memory) {
-				bool good = load_texture(mat->images[i]->name, mat->images[i]);
-				if (!good) mat->images[i] = nullptr;
-			}
-		}
-
-		for (int i = 0; i < Material::MAX_REFERENCES; i++) {
-			if (mat->references[i] && !mat->references[i]->texture_are_loading_in_memory)
-				ensure_data_is_loaded(mat);
-		}
-
-		mat->texture_are_loading_in_memory = true;
-	}
-}
-
-Material* Game_Material_Manager::find_for_name(const char* name)
-{
-	const auto& find = materials.find(name);
-	if (find != materials.end()) {
-		ensure_data_is_loaded(&find->second);
-		return &find->second;
-	}
-	return nullptr;
-}
-
-void Game_Material_Manager::init()
-{
-	sys_print("--------- Materials Init ---------\n");
-
-	fallback = create_temp_shader("_fallback");
-	fallback->texture_are_loading_in_memory = true;
-
-	unlit = create_temp_shader("_unlit");
-	unlit->blend = blend_state::BLEND;
-	unlit->type = material_type::UNLIT;
-	unlit->texture_are_loading_in_memory = true;
-
-
-	outline_hull = create_temp_shader("_outlinehull");
-	outline_hull->blend = blend_state::OPAQUE;
-	outline_hull->type = material_type::OUTLINE_HULL;
-	outline_hull->backface = true;
-	outline_hull->texture_are_loading_in_memory = true;
-
-	load_material_file_directory("./Data/Materials");
-}
-
+TextureMan g_imgs;
 
 void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
 {
@@ -507,18 +268,6 @@ static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 using std::string;
 using std::vector;
 
-void FreeTexture(Texture* t)
-{
-	glDeleteTextures(1, &t->gl_id);
-	t->is_loaded_in_memory = false;
-}
-
-void Game_Material_Manager::free_all()
-{
-	printf("freeing textures\n");
-	for (auto& texture : textures)
-		FreeTexture(&texture.second);
-}
 
 Texture_Format to_format(int n, bool isfloat)
 {
@@ -533,7 +282,7 @@ Texture_Format to_format(int n, bool isfloat)
 }
 
 
-bool Game_Material_Manager::load_texture(const std::string& path, Texture* t)
+bool TextureMan::load_texture(const std::string& path, Texture* t)
 {
 	int x, y, channels;
 	stbi_set_flip_vertically_on_load(false);
@@ -591,7 +340,7 @@ bool Game_Material_Manager::load_texture(const std::string& path, Texture* t)
 	if (!good) {
 		return false;
 	}
-	t->is_loaded_in_memory = true;
+	t->is_loaded = true;
 
 	//t->bindless_handle = glGetTextureHandleARB(t->gl_id);
 	//glMakeTextureHandleResidentARB(t->bindless_handle);
@@ -638,7 +387,7 @@ void benchmark_run()
 
 }
 
-Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_directory, bool owner)
+Texture* TextureMan::find_texture(const char* file, bool search_img_directory, bool owner)
 {
 	std::string path;
 	path.reserve(256);
@@ -650,13 +399,14 @@ Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_d
 	if (!owner) {
 		auto find = textures.find(file);
 		if (find != textures.end())
-			return &find->second;
-		t = &textures[file];
-		t->name = path;
+			return find->second;
+		t = new Texture;
+		textures[file] = t;
+		t->path = path;
 	}
 	else {
 		t = new Texture;
-		t->name = path;
+		t->path = path;
 	}
 
 	bool good = load_texture(path, t);
@@ -664,7 +414,7 @@ Texture* Game_Material_Manager::find_texture(const char* file, bool search_img_d
 }
 
 
-Texture* Game_Material_Manager::create_but_dont_load(const char* file)
+Texture* TextureMan::create_unloaded_ptr(const char* file)
 {
 	std::string path;
 	path.reserve(256);
@@ -673,21 +423,23 @@ Texture* Game_Material_Manager::create_but_dont_load(const char* file)
 
 	auto find = textures.find(file);
 	if (find != textures.end())
-		return &find->second;
+		return find->second;
 
-	Texture* t = &textures[file];
-	t->name = path;
-	t->is_loaded_in_memory = false;
+	Texture* t = new Texture;
+	textures[file] = t;
+	t->path = path;
+	t->is_loaded = false;
 	return t;
 }
 
-Texture* Game_Material_Manager::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
+Texture* TextureMan::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
 {
 	auto find = textures.find(name);
 	if (find != textures.end())
-		return &find->second;
-	Texture* t = &textures[name];
-	t->name = name;
+		return find->second;
+	Texture* t = new Texture;
+	textures[name] = t;
+	t->path = name;
 
 	int width, height, channels;
 	stbi_set_flip_vertically_on_load(flipy);
@@ -701,8 +453,4 @@ Texture* Game_Material_Manager::create_texture_from_memory(const char* name, con
 	stbi_image_free((void*)imgdat);
 
 	return t;
-}
-Texture* CreateTextureFromImgFormat(uint8_t* inpdata, int datalen, std::string name, bool flipy)
-{
-	return mats.create_texture_from_memory(name.c_str(), inpdata, datalen, flipy);
 }

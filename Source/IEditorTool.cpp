@@ -8,6 +8,10 @@
 #include "Game_Engine.h"
 #include <cassert>
 #include <SDL2/SDL.h>
+
+#include "Assets/AssetBrowser.h"
+
+
 bool IEditorTool::open(const char* name) {
 	assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
 

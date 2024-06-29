@@ -103,7 +103,7 @@ EnvCubemap EnviornmentMapHelper::create_from_file(std::string hdr_file)
 	}
 
 
-    Texture* hdr_image = mats.find_texture(hdr_file.c_str(), true, true);
+    Texture* hdr_image = g_imgs.find_texture(hdr_file.c_str(), true, true);
 	if (!hdr_image)
         return {};
 

@@ -14,7 +14,7 @@
 #include "RenderObj.h"
 #include "Framework/FreeList.h"
 #include "Render/RenderExtra.h"
-
+#include "Render/Material.h"
 #pragma optimize("", on)
 
 class MeshPart;

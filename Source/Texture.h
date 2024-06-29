@@ -2,10 +2,10 @@
 #define TEXTURE_H
 #include <string>
 #include <cstdint>
-#include <vector>
 #include <unordered_map>
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
+#include "IAsset.h"
 
 enum Texture_Format
 {
@@ -27,151 +27,43 @@ enum Texture_Type
 	TEXTYPE_CUBEMAP,
 };
 
-struct Texture
+class Texture : public IAsset
 {
-	std::string name;
+public:
 	int width = 0;
 	int height = 0;
 	int channels = 0;
 	Texture_Type type;
 	Texture_Format format;
-	bool couldnt_load = false;
 	bool no_filtering = false;
 	bool has_mips = false;
-	bool is_loaded_in_memory = false;
 	bool is_float = false;
 
 	texhandle gl_id = 0;
 
 	bool is_resident = false;
 	bindlesstexhandle bindless_handle = 0;
+
+	friend class TextureMan;
 };
 
-enum class material_texture : uint8_t
-{
-	DIFFUSE,
-	NORMAL,
-	ROUGHNESS,
-	METAL,
-	AO,
-	SPECIAL,
-
-	COUNT
-};
-
-enum class blend_state : uint8_t
-{
-	OPAQUE,
-	BLEND,
-	ADD
-};
-
-enum class material_type : uint8_t
-{
-	DEFAULT,
-	TWOWAYBLEND,
-	WINDSWAY,
-	WATER,
-	UNLIT,
-	OUTLINE_HULL,
-	SELECTION_PULSE,
-
-	CUSTOM,	// custom vertex+fragment shader
-};
-
-enum class billboard_setting : uint8_t
-{
-	NONE,
-	FACE_CAMERA,	// standard billboard
-	ROTATE_AXIS,	// rotate around the provided axis in model transform
-	SCREENSPACE,	// faces camera and keeps constant screen space size
-};
-
-class Material
+class TextureMan
 {
 public:
-	static const int MAX_REFERENCES = 2;
-	static const uint32_t INVALID_MAPPING = uint32_t(-1);
-
-	Material() {
-		memset(images, 0, sizeof images);
-		memset(references, 0, sizeof references);
-	}
-	uint32_t material_id = 0;
-	std::string name;
-
-	Texture* images[(int)material_texture::COUNT];
-
-	Texture*& get_image(material_texture texture) {
-		return images[(int)texture];
-	}
-
-	Material* references[MAX_REFERENCES];
-
-	// pbr parameters
-	glm::vec4 diffuse_tint = glm::vec4(1.f);
-	float roughness_mult = 1.f;
-	float metalness_mult = 0.f;
-	glm::vec2 roughness_remap_range = glm::vec2(0.f, 1.f);
-
-	bool emmisive = false;	// dont recieve lighting
-	
-	material_type type = material_type::DEFAULT;
-	blend_state blend = blend_state::OPAQUE;
-	bool alpha_tested = false;
-	bool backface = false;
-	billboard_setting billboard = billboard_setting::NONE;
-
-	int physics = 0;	// physics of surface
-
-	bool texture_are_loading_in_memory = false;
-	
-	bool is_translucent() const {
-		return blend == blend_state::ADD || blend == blend_state::BLEND || type == material_type::WATER;
-	}
-	bool is_alphatested() const {
-		return alpha_tested;
-	}
-
-	// where this material maps to in the gpu buffer
-	uint32_t gpu_material_mapping = INVALID_MAPPING;
-};
-
-class Game_Material_Manager
-{
-public:
-	void init();
-
-	void load_material_file_directory(const char* directory);
-	void load_material_file(const char* path, bool overwrite);
-
-	Material* find_for_name(const char* name);
-	Material* create_temp_shader(const char* name);
-
 	// owner: caller manages lifetime if true
 	// search_img_directory: prefixes the default image directory to file
-	Texture* find_texture(const char* file, bool search_img_directory=true, bool owner=false);
+	Texture* find_texture(const char* file, bool search_img_directory = true, bool owner = false);
 	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy);
-
-	Material* unlit;
-	Material* outline_hull;
-	Material* fallback = nullptr;
-
-	Texture error_grid;
-	std::unordered_map<std::string, Material> materials;
-	std::unordered_map<std::string, Texture> textures;
-	void free_all();
 private:
-	uint32_t cur_mat_id = 1;
-	Material* find_and_make_if_dne(const char* name);
 
-	void ensure_data_is_loaded(Material* mat);
-
-	Texture* create_but_dont_load(const char* filename);
+	Texture* create_unloaded_ptr(const char* filename);
 	bool load_texture(const std::string& path, Texture* t);
+
+	std::unordered_map<std::string, Texture*> textures;
+	friend class MaterialMan;
 };
 
-extern Game_Material_Manager mats;
+extern TextureMan g_imgs;
 
 
 #endif // !TEXTURE_H

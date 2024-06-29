@@ -45,6 +45,7 @@
     <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
     <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h" />
     <ClInclude Include="Source\AssetCompile\Someutils.h" />
+    <ClInclude Include="Source\Assets\AssetBrowser.h" />
     <ClInclude Include="Source\BaseComponents.h" />
     <ClInclude Include="Source\CamData.h" />
     <ClInclude Include="Source\Client.h" />
@@ -121,6 +122,7 @@
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\GlmInclude.h" />
+    <ClInclude Include="Source\IAsset.h" />
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Interaction.h" />
     <ClInclude Include="Source\Level.h" />
@@ -139,7 +141,9 @@
     <ClInclude Include="Source\PlayerAnimDriver.h" />
     <ClInclude Include="Source\ProgramCaching.h" />
     <ClInclude Include="Source\RenderObj.h" />
+    <ClInclude Include="Source\Render\Material.h" />
     <ClInclude Include="Source\Render\RenderExtra.h" />
+    <ClInclude Include="Source\AssetRegistry.h" />
     <ClInclude Include="Source\ScehmaMan.h" />
     <ClInclude Include="Source\Server.h" />
     <ClInclude Include="Source\Shader.h" />
@@ -165,6 +169,9 @@
     <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />
     <ClCompile Include="Source\AssetCompile\ImageCompile.cpp" />
+    <ClCompile Include="Source\Assets\AssetBrowser.cpp" />
+    <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
+    <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
@@ -213,6 +220,7 @@
     <ClCompile Include="Source\Physics\Physics2.cpp" />
     <ClCompile Include="Source\Player.cpp" />
     <ClCompile Include="Source\PlayerAnimDriver.cpp" />
+    <ClCompile Include="Source\Render\Material.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Shader.cpp" />

@@ -180,7 +180,7 @@ public:
 		WIN32_FIND_DATAA findData;
 	};
 
-	FileTreeIterator(const std::string& root) {
+	FileTreeIterator(const std::string& root, bool dont_descend) : dont_descend(dont_descend) {
 		pushDirectory(root);
 		++(*this);  // Move to the first valid file
 	}
@@ -202,7 +202,7 @@ public:
 				std::string filename = currentEntry.findData.cFileName;
 				if (filename != "." && filename != "..") {
 					currentEntry.path = directories.back().path + "/" + filename;
-					if (currentEntry.findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+					if (!dont_descend && (currentEntry.findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
 						pushDirectory(currentEntry.path);
 						continue;
 					}
@@ -231,6 +231,8 @@ private:
 
 	std::vector<DirectoryEntry> directories;
 	FileEntry currentEntry;
+
+	bool dont_descend = false;
 
 	void pushDirectory(const std::string& directory) {
 		std::string searchPath = directory + "/*";
@@ -262,8 +264,8 @@ FileTreeIter::FileTreeIter()
 	ptr = std::move(other.ptr);
 }
 
-FileTreeIter::FileTreeIter(const std::string& root) {
-	ptr = std::make_unique<FileTreeIterator>(root);
+FileTreeIter::FileTreeIter(const std::string& root, bool dont_descend) {
+	ptr = std::make_unique<FileTreeIterator>(root, dont_descend);
 }
 
 

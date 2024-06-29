@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 #include <memory>
-#include <map>
 #include <unordered_map>
 #include "Framework/MathLib.h"
 #include "glm/gtc/quaternion.hpp"
@@ -13,6 +12,7 @@
 #include "DrawTypedefs.h"
 #include "Framework/StringName.h"
 #include "Framework/InlineVec.h"
+#include "IAsset.h"
 
 // Hardcoded attribute locations for shaders
 const int POSITION_LOC  = 0;
@@ -44,19 +44,6 @@ class Material;
 using std::string;
 using std::vector;
 using std::unique_ptr;
-
-#define MAX_BONES 256
-
-struct Bone
-{
-	string name;
-	int parent;
-	glm::mat4x3 posematrix;	// bone space -> mesh space
-	glm::mat4x3 invposematrix; // mesh space -> bone space
-	glm::mat4x3 localtransform;
-	glm::quat rot;
-};
-
 
 
 struct Physics_Triangle
@@ -136,11 +123,10 @@ struct MeshLod
 
 class MSkeleton;
 class PhysicsBody;
-class Model
+class Model : public IAsset
 {
 public:
 	uint32_t get_uid() const { return uid; }
-	const string& get_name() const { return name; }
 	int bone_for_name(StringName name) const;
 	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
 	Bounds get_aabb_from_sphere() const { 
@@ -164,7 +150,6 @@ public:
 	uint32_t get_merged_index_ptr() const { return merged_index_pointer; }
 	uint32_t get_merged_vertex_ofs() const { return merged_vert_offset; }
 
-	bool is_loaded_in_memory() const { return loaded_in_memory; }
 
 	const glm::mat4& get_root_transform() const { return skeleton_root_transform; }
 
@@ -175,7 +160,6 @@ public:
 	}
 private:
 	uint32_t uid = 0;
-	string name;
 	InlineVec<MeshLod, 2> lods;
 	vector<Submesh> parts;
 
@@ -196,13 +180,12 @@ private:
 	vector<Material*> materials;
 
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
-	bool loaded_in_memory = false;
 
 	friend class ModelMan;
 	friend class ModelCompileHelper;
 };
 
-#include <array>
+
 class MainVbIbAllocator
 {
 public:
@@ -260,6 +243,8 @@ private:
 
 	uint32_t cur_mesh_id = 0;
 	std::unordered_map<string, Model*> models;
+
+	friend class Model;
 };
 extern ModelMan mods;
 

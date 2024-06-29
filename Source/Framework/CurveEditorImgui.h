@@ -54,7 +54,6 @@ private:
 	int GetFrameMax() const { return frameMax; }
 	int GetFrameMin() const { return frameMin; }
 
-	void rebuild_track_indicies();
 
 	int firstFrame = 0;
 	int frameMin = 0;
@@ -81,6 +80,13 @@ private:
 		int max = 0;
 		for (int i = 0; i < items.size(); i++)
 			if (items[i]->track_index > max)
+				max = items[i]->track_index;
+		return max + 1;
+	}
+	int number_of_event_rows_exclude(int ex) const {
+		int max = 0;
+		for (int i = 0; i < items.size(); i++)
+			if (items[i]->track_index > max && i != ex)
 				max = items[i]->track_index;
 		return max + 1;
 	}

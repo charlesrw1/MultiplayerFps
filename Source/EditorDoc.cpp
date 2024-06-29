@@ -13,7 +13,7 @@
 #include "Physics/Physics2.h"
 
 #include "External/ImGuizmo.h"
-
+#include "Render/Material.h"
 #include <stdexcept>
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
@@ -356,13 +356,7 @@ void menu_temp()
 }
 
 
-static bool has_extension(const std::string& path, const std::string& ext)
-{
-	auto find = path.rfind('.');
-	if (find == std::string::npos)
-		return false;
-	return path.substr(find + 1) == ext;
-}
+
 
 // check every 5 seconds
 ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR_FLOAT | CVAR_UNBOUNDED);
@@ -370,104 +364,39 @@ ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR
 #include "Texture.h"
 
 
-class EdResourceSchema : public EdResourceBase
+
+#include "AssetCompile/Someutils.h"// string stuff
+#include "AssetRegistry.h"
+class SchemaAssetMetadata : public AssetMetadata
 {
 public:
-	EdResourceSchema(const std::string& path) {
-		name = path;
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() override
+	{
+		return { 242, 68, 117 };
 	}
-	const char* get_type_name() const override {
+
+	virtual std::string get_type_name() override
+	{
 		return "Schema";
 	}
-	EdResType get_type() const override {
-		return EdResType::Schema;
-	}
-	Color32 get_asset_color() const override { return { 252, 104, 93 }; }
-};
-class EdResourceModel : public EdResourceBase
-{
-public:
-	EdResourceModel(const std::string& path) {
-		full_path = path;
-		auto pos = path.rfind("Models/");
-		if (pos != std::string::npos) {
-			name = path.substr(pos + 7);
-		}
-		else
-			name = path;
-	}
-	const char* get_type_name() const override {
-		return "Model";
-	}
-	EdResType get_type() const override {
-		return EdResType::Model;
-	}
-	std::string get_full_path() const override {
-		return full_path;
-	}
-	Color32 get_asset_color() const override { return { 5, 168, 255 }; }
-	std::string full_path;
-};
 
-class EdResourceMaterial : public EdResourceBase
-{
-public:
-	EdResourceMaterial(const std::string& path) {
-		name = path;
-	}
-	const char* get_type_name() const override {
-		return "Material";
-	}
-	EdResType get_type() const override {
-		return EdResType::Material;
-	}
-};
-
-EdResourceBase* AssetBrowser::search_for_file(const std::string& path)
-{
-	auto find = path_to_resource.find(path);
-	return find == path_to_resource.end() ? nullptr : find->second;
-}
-
-void AssetBrowser::init()
-{
-	all_resources.clear();
-	path_to_resource.clear();
-
-	// loop through various directories and find files in them
-
-	// MODELS
-	auto find_tree = FileSys::find_files("./Data/Models");
-	for (const auto file : find_tree) {
-		if (has_extension(file, "cmdl")) {
-			auto resource_exists = search_for_file(file);
-			if (!resource_exists) {
-				append_new_resource(new EdResourceModel(file));
-			}
-		}
-		// if a .cmdl hasn't been compilied yet, still include .defs as .cmdls as they will be autocompilied
-		else if (has_extension(file, "def")) {
-			std::string path = strip_extension(file) + ".cmdl";
-			auto resource_exists = search_for_file(path);
-			if (!resource_exists) {
-				append_new_resource(new EdResourceModel(path));
-			}
+	virtual void index_assets(std::vector<std::string>& filepaths) override
+	{
+		for (const auto& schema : ed_doc.ed_schema.all_schema_list) {
+			if (schema.second.display_in_editor)
+				filepaths.push_back(schema.first);
 		}
 	}
-	// MATERIALS
-	// should proablly handle differently, all materials  gets indexed by material system at init time
-	for (const auto& mat : mats.materials) {
-		append_new_resource(new EdResourceMaterial(mat.first));
-	}
-	// SCHEMAS
-	for (const auto& schema : ed_doc.ed_schema.all_schema_list) {
-		if(schema.second.display_in_editor)
-			append_new_resource(new EdResourceSchema(schema.first));
-	}
 
+	virtual std::string root_filepath() override
+	{
+		return "";
+	}
+	virtual bool assets_are_filepaths() { return false; }
+};
+static AutoRegisterAsset<SchemaAssetMetadata> schema_register_0983;
 
-	asset_name_filter[0] = 0;
-}
 
 
 // Unproject mouse coords into a vector, cast that into the world via physics
@@ -559,11 +488,10 @@ void EditorDoc::duplicate_selected_and_select_them()
 	for (int i = 0; i < nodes.size(); i++)
 		selection_state.add_to_selection(nodes[i]);
 }
-
 static Material* generate_spritemat_from_texture(Texture* t)
 {
 	// generate hash based on name, yes this is hacked
-	StringName name_(t->name.c_str());
+	StringName name_(t->get_name().c_str());
 	Material* mat = mats.find_for_name(std::to_string(name_.get_hash()).c_str());
 	if (mat)
 		return mat;
@@ -582,12 +510,12 @@ static Material* generate_spritemat_from_texture(Texture* t)
 Material* EditorNode::get_sprite_material()
 {
 	if (template_class && !template_class->edimage.empty()) {
-		Texture* t = mats.find_texture(template_class->edimage.c_str());
+		Texture* t = g_imgs.find_texture(template_class->edimage.c_str());
 		if (t) {
 			return generate_spritemat_from_texture(t);
 		}
 	}
-	Texture* t = mats.find_texture("icon/mesh.png");
+	Texture* t = g_imgs.find_texture("icon/mesh.png");
 	assert(t);
 	return generate_spritemat_from_texture(t);
 
@@ -788,7 +716,6 @@ void EditorDoc::init()
 	// set my parent
 	set_parent(eng->get_gui());
 	ed_schema.load("./Data/classes.txt");
-	assets.init();
 }
 #include "Framework/DictWriter.h"
 #include <fstream>
@@ -1298,9 +1225,6 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
-	//if (mode == TOOL_SPAWN_MODEL) 
-		assets.imgui_draw();
-
 	outliner.draw();
 	if (selection_state.num_selected() == 1)
 		prop_editor.set(selection_state.get_selection()[0].get());
@@ -1445,20 +1369,15 @@ void EditorDoc::hook_scene_viewport_draw()
 
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 		{
-			EdResourceBase* resource = *(EdResourceBase**)payload->Data;
-	
-			switch (resource->get_type()) {
-			case EdResType::Schema: {
-				EdResourceSchema* schema = dynamic_cast<EdResourceSchema*>(resource);
-				spawn_from_schema_type(schema->get_asset_name().c_str());
-
-			}break;
-			case EdResType::Model: {
-				EdResourceModel* mod = dynamic_cast<EdResourceModel*>(resource);
+			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+			auto type = resource->type->get_type_name();
+			if (type == "Model") {
 				auto node = spawn_from_schema_type("StaticMesh");
-				node->set_model(mod->get_asset_name().c_str());
+				node->set_model(resource->filename);
 				node->show();
-			}break;
+			}
+			else if (type == "Schema") {
+				spawn_from_schema_type(resource->filename.c_str());
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1467,142 +1386,6 @@ void EditorDoc::hook_scene_viewport_draw()
 	manipulate.update();
 
 
-}
-
-std::string to_lower(const std::string& s) {
-	std::string out;
-	out.reserve(s.size());
-	for (auto c : s)
-		out.push_back(tolower(c));
-	return out;
-}
-
-void AssetBrowser::imgui_draw()
-{
-	if (!ImGui::Begin("Asset Browser")) {
-		ImGui::End();
-		return;
-	}
-
-	uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders | 
-		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
-	
-	//if (set_keyboard_focus) {
-	//	ImGui::SetKeyboardFocusHere();
-	//	set_keyboard_focus = false;
-	//}
-	static bool match_case = false;
-	ImGui::SetNextItemWidth(200.0);
-	ImGui::InputTextWithHint("FILTER", "filter asset path", asset_name_filter, 256);
-	ImGui::SameLine();
-	ImGui::Checkbox("MATCH CASE", &match_case);
-	const int name_filter_len = strlen(asset_name_filter);
-	
-	if (ImGui::SmallButton("Type filters..."))
-		ImGui::OpenPopup("type_popup_assets");
-	if (ImGui::BeginPopup("type_popup_assets"))
-	{
-		bool is_hiding_all = filter_type_mask != 0;
-		if (ImGui::Checkbox("Show/Hide all", &is_hiding_all)) {
-			if (filter_type_mask != 0)
-				filter_type_mask = 0;
-			else
-				filter_type_mask = -1;
-		}
-
-		ImGui::CheckboxFlags("Materials", &filter_type_mask, (int)EdResType::Material);
-		ImGui::CheckboxFlags("Models", &filter_type_mask, (int)EdResType::Model);
-		ImGui::CheckboxFlags("Schemas", &filter_type_mask, (int)EdResType::Schema);
-		ImGui::EndPopup();
-	}
-
-	
-	std::string all_lower_cast_filter_name;
-	if (!match_case) {
-		all_lower_cast_filter_name = asset_name_filter;
-		for (int i = 0; i < name_filter_len; i++) 
-			all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
-	}
-	
-	if (ImGui::BeginTable("Browser", 2, ent_list_flags))
-	{
-		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
-		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
-
-		if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs())
-			if (sorts_specs->SpecsDirty)
-			{
-				std::vector<std::string> strs;
-				for (int i = 0; i < all_resources.size(); i++) {
-					strs.push_back(all_resources[i]->get_asset_name());
-				}
-				std::sort(strs.begin(), strs.end());
-
-				std::sort(all_resources.begin(), all_resources.end(),
-					[&](const unique_ptr<EdResourceBase>& a, const unique_ptr<EdResourceBase>& b) -> bool {
-						if(sorts_specs->Specs[0].ColumnIndex==0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
-							return to_lower(a->get_asset_name()) > to_lower(b->get_asset_name());
-						else if (sorts_specs->Specs[0].ColumnIndex == 0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
-							return to_lower(a->get_asset_name()) < to_lower(b->get_asset_name());
-						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
-							return to_lower(a->get_type_name()) > to_lower(b->get_type_name());
-						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
-							return to_lower(a->get_type_name()) < to_lower(b->get_type_name());
-						return true;
-					}
-				);
-				sorts_specs->SpecsDirty = false;
-			}
-
-
-		ImGui::TableHeadersRow();
-	
-		for (int row_n = 0; row_n < all_resources.size(); row_n++)
-		{
-			auto res = all_resources[row_n].get();
-			if (!should_type_show(res->get_type()))
-				continue;
-			if (!match_case && name_filter_len>0) {
-				std::string path = res->get_full_path();
-				for (int i = 0; i < path.size(); i++) path[i] = tolower(path[i]);
-				if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
-					continue;
-			}
-			else if(name_filter_len>0){
-				if (res->get_asset_name().find(asset_name_filter) == std::string::npos)
-					continue;
-			}
-			ImGui::PushID(res);
-			const bool item_is_selected = res == selected_resoruce;
-	
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-	
-			ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-			if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-				selected_resoruce = res;
-			}
-
-			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-			{
-				ImGui::SetDragDropPayload("AssetBrowserDragDrop",&res,sizeof(EdResourceBase*));
-				
-				ImGui::TextColored(color32_to_imvec4(res->get_asset_color()),"%s", res->get_type_name());
-				ImGui::Text("Asset: %s", res->get_asset_name().c_str());
-
-				ImGui::EndDragDropSource();
-			}
-
-			ImGui::SameLine();
-			ImGui::Text(res->get_asset_name().c_str());
-			ImGui::TableNextColumn();
-			ImGui::TextColored(color32_to_imvec4(res->get_asset_color()),  res->get_type_name());
-	
-			ImGui::PopID();
-		}
-		ImGui::EndTable();
-	}
-	ImGui::End();
 }
 
 const View_Setup& EditorDoc::get_vs()
@@ -1626,7 +1409,7 @@ bool ConnectionList::imgui_draw_header(int index)
 
 	return open;
 }
- void ConnectionList::imgui_draw_closed_body(int index)
+void ConnectionList::imgui_draw_closed_body(int index)
 {
 	std::vector<SignalProperty>* array_ = (std::vector<SignalProperty>*)prop->get_ptr(instance);
 	ASSERT(index >= 0 && index < array_->size());

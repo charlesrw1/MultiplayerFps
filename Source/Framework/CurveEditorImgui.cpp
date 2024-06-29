@@ -184,9 +184,9 @@ void SequencerImgui::draw_header( int first_frame, const float WIDTH, int* curre
     // cursor
     if (*current_frame >= first_frame && *current_frame <= GetFrameMax())
     {
-        static const float cursorWidth = 8.f;
+        static const float cursorWidth = 4.f;
         float cursorOffset = canvas_pos.x + (*current_frame - firstFrameUsed) * frame_pixel_width  - cursorWidth * 0.5f;
-        draw_list->AddLine(ImVec2(cursorOffset, canvas_pos.y), ImVec2(cursorOffset, canvas_pos.y + header_height), 0xA02A2AFF, cursorWidth);
+        draw_list->AddLine(ImVec2(cursorOffset, canvas_pos.y), ImVec2(cursorOffset, canvas_pos.y + 400.f), 0xA02A2AFF, cursorWidth);
         char tmps[512];
         ImFormatString(tmps, IM_ARRAYSIZE(tmps), "%d", *current_frame);
         draw_list->AddText(ImVec2(cursorOffset + 10, canvas_pos.y + 2), 0xFF2A2AFF, tmps);
@@ -235,62 +235,19 @@ bool track_overlaps(float start, float end, float s2, float end2)
   return start <= end2 && end >= s2;
 }
 
-void SequencerImgui::rebuild_track_indicies()
-{
-    int total_layers = 0;
-    for (int i = 0; i < items.size(); i++) {
-        auto item = items[i].get();
-        float slotP1= (item->time_start * frame_pixel_width);
-        float slotP2;
-        if (item->instant_item) {
-            auto size = ImGui::CalcTextSize(item->get_name().c_str());
-            slotP2 = slotP1 + size.x + 6.0;
-        }
-        else {
-            slotP2 = item->time_end * frame_pixel_width + frame_pixel_width;
-        }
-
-        bool found = false;
-        for (int layer = 0; layer < total_layers; layer++) {
-            bool no_overlaps = true;
-            for (int j = 0; j < i; j++) {
-
-                auto item2 = items[i].get();
-                float slotP1_ = (item2->time_start * frame_pixel_width);
-                float slotP2_;
-                if (item2->instant_item) {
-                    auto size = ImGui::CalcTextSize(item2->get_name().c_str());
-                    slotP2_ = slotP1_ + size.x + 6.0;
-                }
-                else {
-                    slotP2_ = item2->time_end * frame_pixel_width + frame_pixel_width;
-                }
-
-                if (track_overlaps(slotP1,slotP2,slotP1_,slotP2_)) {
-                    no_overlaps = false;
-                    break;
-                }
-
-
-            }
-        }
-
-        if (!found) {
-            total_layers++;
-            items[i]->track_index = total_layers - 1;
-        }
-    }
-}
-
 
 void SequencerImgui::draw_items(const float timeline_width)
 {
     auto canvas_pos = ImGui::GetCursorScreenPos();
+
+    const int num_rows = number_of_event_rows();
+
     const float item_height = 24.0;
+    const float total_item_height = item_height * num_rows;
     auto draw_list = ImGui::GetWindowDrawList();
 
-    ImGui::InvisibleButton("dummy234", ImVec2(timeline_width, item_height));
-    ImGui::PushClipRect(ImVec2(canvas_pos.x, canvas_pos.y), canvas_pos + ImVec2(timeline_width, item_height), true);
+    ImGui::InvisibleButton("dummy234", ImVec2(timeline_width, total_item_height));
+    ImGui::PushClipRect(ImVec2(canvas_pos.x, canvas_pos.y), canvas_pos + ImVec2(timeline_width, total_item_height), true);
 
 
     if (movingEntry != -1 && !ImGui::GetIO().MouseDown[0]) {
@@ -309,6 +266,15 @@ void SequencerImgui::draw_items(const float timeline_width)
             if (frame >= GetFrameMax())
                 frame = GetFrameMax();
 
+            int track = 0;
+            track = (int)((ImGui::GetIO().MousePos.y - canvas_pos.y) / item_height);
+            const int num_rows_ex = number_of_event_rows_exclude(movingEntry);
+            if (track < 0)
+                track = 0;
+            if (track > num_rows_ex)
+                track = num_rows_ex;
+            items[movingEntry]->track_index = track;
+
             if (moving_right_side) {
                 items[movingEntry]->time_end = frame-1;
             }
@@ -324,7 +290,7 @@ void SequencerImgui::draw_items(const float timeline_width)
 
         //size_t localCustomHeight = sequence->GetCustomHeight(i);
 
-        ImVec2 pos = ImVec2(canvas_pos.x - firstFrame * frame_pixel_width, canvas_pos.y);
+        ImVec2 pos = ImVec2(canvas_pos.x - firstFrame * frame_pixel_width, canvas_pos.y + item->track_index*item_height);
         
         ImVec2 slotP1(pos.x + item->time_start * frame_pixel_width, pos.y + 2);
         ImVec2 slotP2;

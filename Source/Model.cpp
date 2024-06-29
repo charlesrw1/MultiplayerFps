@@ -24,9 +24,60 @@
 
 #include "Physics/Physics2.h"
 
+#include "Render/Material.h"
+
 ModelMan mods;
 
 static const char* const model_folder_path = "./Data/Models/";
+
+#include <unordered_set>
+#include "AssetCompile/Someutils.h"// string stuff
+#include "AssetRegistry.h"
+class ModelAssetMetadata : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() override
+	{
+		return { 33, 107, 181 };
+	}
+
+	virtual std::string get_type_name() override
+	{
+		return "Model";
+	}
+
+	virtual void index_assets(std::vector<std::string>& filepaths) override
+	{
+		std::unordered_set<std::string> stuff;
+		auto find_tree = FileSys::find_files("./Data/Models");
+		for (const auto _file : find_tree) {
+			auto file = _file.substr(14);
+			if (has_extension(file, "cmdl")) {
+				auto resource_exists = stuff.find(file) != stuff.end();
+				if (!resource_exists) {
+					stuff.insert(file);
+					filepaths.push_back(file);
+				}
+			}
+			// if a .cmdl hasn't been compilied yet, still include .defs as .cmdls as they will be autocompilied
+			else if (has_extension(file, "def")) {
+				std::string path = strip_extension(file) + ".cmdl";
+				auto resource_exists = stuff.find(path) != stuff.end();
+				if (!resource_exists) {
+					stuff.insert(path);
+					filepaths.push_back(path);
+				}
+			}
+		}
+	}
+
+	virtual std::string root_filepath() override
+	{
+		return model_folder_path;
+	}
+};
+static AutoRegisterAsset<ModelAssetMetadata> model_register_0983;
 
 
 static const int MODEL_FORMAT_VERSION = 7;
@@ -290,21 +341,6 @@ void ModelMan::print_usage() const
 }
 
 
-static std::string get_extension(const std::string& name)
-{
-	auto find = name.rfind('.');
-	if (find == std::string::npos)
-		return {};
-	return name.substr(find);
-}
-
-static std::string strip_extension(const std::string& name)
-{
-	auto find = name.rfind('.');
-	if (find == std::string::npos)
-		return {};
-	return name.substr(0,find);
-}
 static glm::vec4 bounds_to_sphere(Bounds b)
 {
 	glm::vec3 center = b.get_center();
@@ -556,8 +592,8 @@ Model* ModelMan::find_or_load(const char* filename)
 	}
 
 	Model* model = new Model;
-	model->name = filenamestr;
-	model->loaded_in_memory = false;
+	model->path = filenamestr;
+	model->is_loaded = false;
 
 	string path(model_folder_path);
 	path += filenamestr;
@@ -575,7 +611,7 @@ Model* ModelMan::find_or_load(const char* filename)
 		return error_model;
 	}
 
-	model->loaded_in_memory = true;
+	model->is_loaded = true;
 	models.insert({ std::move(filenamestr), model });
 
 	return model;
@@ -700,9 +736,9 @@ void ModelMan::create_default_models()
 
 		_sprite->parts.push_back(sm);
 		_sprite->lods.push_back(lod);
-		_sprite->loaded_in_memory = true;
+		_sprite->is_loaded = true;
 
-		_sprite->name = "_SPRITE";
+		_sprite->path = "_SPRITE";
 		models["_SPRITE.cmdl"] = _sprite;
 
 		upload_model(_sprite);

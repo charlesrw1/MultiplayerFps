@@ -404,8 +404,8 @@ void TabState::imgui_draw() {
 
 	if (tabs.empty()) return;
 
-	auto forward_img = mats.find_texture("icon/forward.png");
-	auto back_img = mats.find_texture("icon/back.png");
+	auto forward_img = g_imgs.find_texture("icon/forward.png");
+	auto back_img = g_imgs.find_texture("icon/back.png");
 
 
 	bool wants_back = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_LeftArrow));
@@ -893,10 +893,10 @@ void AnimationGraphEditor::imgui_draw()
 	}
 
 	{
-		auto playimg = mats.find_texture("icon/play.png");
-		auto stopimg = mats.find_texture("icon/stop.png");
-		auto pauseimg = mats.find_texture("icon/pause.png");
-		auto saveimg = mats.find_texture("icon/save.png");
+		auto playimg = g_imgs.find_texture("icon/play.png");
+		auto stopimg = g_imgs.find_texture("icon/stop.png");
+		auto pauseimg = g_imgs.find_texture("icon/pause.png");
+		auto saveimg = g_imgs.find_texture("icon/save.png");
 
 		ImGui::PushStyleColor(ImGuiCol_Button,0);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.5));
@@ -973,9 +973,9 @@ void AnimationGraphEditor::imgui_draw()
 
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
-	auto strong_error = mats.find_texture("icon/fatalerr.png");
-	auto weak_error = mats.find_texture("icon/error.png");
-	auto info_img = mats.find_texture("icon/question.png");
+	auto strong_error = g_imgs.find_texture("icon/fatalerr.png");
+	auto weak_error = g_imgs.find_texture("icon/error.png");
+	auto info_img = g_imgs.find_texture("icon/question.png");
 
 	ImNodes::BeginNodeEditor();
 	for (auto node : nodes) {
@@ -1692,13 +1692,13 @@ void AnimationGraphEditor::create_new_document()
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
 }
-
+#include "Render/Material.h"
 void AnimationGraphEditor::try_load_preview_models()
 {
 	{
 		Material* mymat = mats.create_temp_shader("sprite_texture");
 		mymat->billboard = billboard_setting::SCREENSPACE;
-		mymat->images[0] = mats.find_texture("icon/light.png");
+		mymat->images[0] = g_imgs.find_texture("icon/light.png");
 		mymat->blend = blend_state::BLEND;
 		mymat->type = material_type::UNLIT;
 		mymat->diffuse_tint = glm::vec4(1.0);

@@ -52,6 +52,9 @@
     <Filter Include="Source\Framework\Editor">
       <UniqueIdentifier>{16da7ef5-e3c3-4541-9e27-fcc1fa42cc72}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\AssetTypes">
+      <UniqueIdentifier>{26fb727a-7dcf-45e8-9269-4b240ca067f4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -439,6 +442,18 @@
     <ClInclude Include="Source\Game\GameAnimEvents.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\IAsset.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\Material.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AssetRegistry.h">
+      <Filter>Source\AssetTypes</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Assets\AssetBrowser.h">
+      <Filter>Source\AssetTypes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -650,6 +665,16 @@
     </ClCompile>
     <ClCompile Include="Source\Game\GameAnimEvents.cpp">
       <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Assets\CurveAsset.cpp" />
+    <ClCompile Include="Source\Render\Material.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Assets\AssetRegistry.cpp">
+      <Filter>Source\AssetTypes</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Assets\AssetBrowser.cpp">
+      <Filter>Source\AssetTypes</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -32,7 +32,8 @@
 #include "DrawPublic.h"
 #include "Entity.h"
 #include "Physics/Physics2.h"
-
+#include "Render/Material.h"
+#include "Assets/AssetBrowser.h"
 #include "Animation/AnimationTreePublic.h"
 #include "Animation/Editor/AnimationGraphEditorPublic.h"
 
@@ -560,6 +561,9 @@ DECLARE_ENGINE_CMD(start_ed)
 	else if (edit_type == "anim") {
 		e = Eng_Tool_state::Animgraph;
 	}
+	else if (edit_type == "model") {
+		e = Eng_Tool_state::ModelEd;
+	}
 	else {
 		sys_print("unknown editor\n");
 		sys_print(usage_str);
@@ -593,6 +597,7 @@ void Game_Engine::change_editor_state(Eng_Tool_state next_tool, const char* file
 	tool_state = next_tool;
 	if (tool_state != Eng_Tool_state::None) {
 		enable_imgui_docking();
+		global_asset_browser.init();
 		bool could_open = get_current_tool()->open_and_set_focus(file, (get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
 		if (!could_open) {
 			tool_state = Eng_Tool_state::None;
@@ -1091,6 +1096,7 @@ void Game_Engine::draw_any_imgui_interfaces()
 	if (is_in_an_editor_state()) {
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, get_current_tool());
 		get_current_tool()->imgui_draw();
+		global_asset_browser.imgui_draw();
 	}
 
 	// will only be true if in a tool state
@@ -1241,6 +1247,9 @@ void Game_Engine::draw_screen()
 	}
 }
 
+
+extern IEditorTool* g_model_editor;
+
 IEditorTool* Game_Engine::get_current_tool()
 {
 	if (tool_state == Eng_Tool_state::None)
@@ -1249,6 +1258,8 @@ IEditorTool* Game_Engine::get_current_tool()
 		return  g_anim_ed_graph;
 	else if (tool_state == Eng_Tool_state::Level)
 		return g_editor_doc;
+	else if (tool_state == Eng_Tool_state::ModelEd)
+		return g_model_editor;
 	else
 		ASSERT(0);
 }
@@ -1281,11 +1292,7 @@ void Game_Engine::update_game_tick()
 
 DECLARE_ENGINE_CMD(reload_mats)
 {
-	sys_print("reloading materials\n");
-	if (args.size() == 1)
-		mats.load_material_file_directory("./Data/Materials/");
-	else
-		mats.load_material_file_directory(args.at(1));
+	ASSERT(0);
 }
 
 

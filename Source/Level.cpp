@@ -11,6 +11,40 @@
 #include "Physics/Physics2.h"
 
 static const char* const maps_directory = "./Data/Maps/";
+#include "Framework/Files.h"
+#include "AssetCompile/Someutils.h"
+#include "AssetRegistry.h"
+class MapAssetMetadata : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() override
+	{
+		return { 185, 235, 237 };
+	}
+
+	virtual std::string get_type_name() override
+	{
+		return "Map";
+	}
+
+	virtual void index_assets(std::vector<std::string>& filepaths) override
+	{
+		auto tree = FileSys::find_files("./Data/Maps",true);
+		for (auto file : tree) {
+			filepaths.push_back((file.substr(12)));
+		}
+	}
+	virtual bool assets_are_filepaths() { return true; }
+	virtual std::string root_filepath() override
+	{
+		return "./Data/Maps/";
+	}
+};
+static AutoRegisterAsset<MapAssetMetadata> map_register_0987;
+
+
+
 
 void Physics_Mesh::build()
 {

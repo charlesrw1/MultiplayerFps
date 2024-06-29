@@ -1,6 +1,7 @@
 #pragma once
 #include "IEditorTool.h"
 #include "DrawPublic.h"
+#include "Types.h"
 class ModelEditorTool : public IEditorTool
 {
 	// Inherited via IEditorTool
@@ -18,5 +19,7 @@ class ModelEditorTool : public IEditorTool
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
 
+	bool is_open = false;
 	View_Setup view;
+	User_Camera camera;
 };

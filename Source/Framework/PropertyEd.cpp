@@ -109,7 +109,7 @@ void IGridRow::update(float header_ofs)
 		ImGui::TableNextColumn();
 		if (has_reset_button())
 		{
-			auto reset_img = mats.find_texture("icon/undo.png");
+			auto reset_img = g_imgs.find_texture("icon/undo.png");
 			if (ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14)))
 				on_reset();
 		}
@@ -371,11 +371,11 @@ void ArrayRow::draw_row_controls()
 	if (header && !header->can_edit_array())
 		return;
 
-	auto trashimg = mats.find_texture("icon/trash.png");
-	auto addimg = mats.find_texture("icon/plus.png");
+	auto trashimg = g_imgs.find_texture("icon/trash.png");
+	auto addimg = g_imgs.find_texture("icon/plus.png");
 
-	auto visible_icon = mats.find_texture("icon/visible.png");
-	auto hidden_icon = mats.find_texture("icon/hidden.png");
+	auto visible_icon = g_imgs.find_texture("icon/visible.png");
+	auto hidden_icon = g_imgs.find_texture("icon/hidden.png");
 
 	bool are_any_open = are_any_nodes_open();
 
@@ -571,9 +571,9 @@ void ArrayRow::draw_row_controls()
 	 bool canmoveup = row_index > 0;
 	 bool canmovedown = (row_index != array_->get_size() - 1);
 
-	 auto moveup = mats.find_texture("icon/moveup.png");
-	 auto movedown = mats.find_texture("icon/movedown.png");
-	 auto trash1 = mats.find_texture("icon/trash1.png");
+	 auto moveup = g_imgs.find_texture("icon/moveup.png");
+	 auto movedown = g_imgs.find_texture("icon/movedown.png");
+	 auto trash1 = g_imgs.find_texture("icon/trash1.png");
 
 
 	 ImGui::PushStyleColor(ImGuiCol_Button, 0);

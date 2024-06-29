@@ -10,6 +10,7 @@
 
 #include "Framework/FreeList.h"
 #include "ParticlesPublic.h"
+#include "Render/Material.h"
 
 #include <unordered_map>
 

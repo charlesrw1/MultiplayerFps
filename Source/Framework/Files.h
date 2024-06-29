@@ -25,7 +25,7 @@ class FileTreeIterator;
 struct FileTreeIter
 {
     ~FileTreeIter();
-    FileTreeIter(const std::string& root);
+    FileTreeIter(const std::string& root, bool dont_descend);
     FileTreeIter();
     FileTreeIter(FileTreeIter&& other);
     const std::string& operator*() const;
@@ -38,9 +38,11 @@ struct FileTreeIter
 class FileTree {
 public:
     FileTree(const std::string& root) : rootPath(root) {}
+	FileTree(const std::string& root, bool dont_descend) : rootPath(root),dont_descend(dont_descend){}
+
 
     FileTreeIter begin() {
-        return FileTreeIter(rootPath);
+        return FileTreeIter(rootPath, dont_descend);
     }
 
     FileTreeIter end() {
@@ -48,6 +50,7 @@ public:
     }
 
 private:
+	bool dont_descend = false;
     std::string rootPath;
 };
 
@@ -73,5 +76,8 @@ public:
 
 	static FileTree find_files(const char* relative_path) {
 		return FileTree(relative_path);
+	}
+	static FileTree find_files(const char* relative_path, bool dont_descend) {
+		return FileTree(relative_path, dont_descend);
 	}
 };

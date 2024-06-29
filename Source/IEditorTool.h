@@ -80,6 +80,11 @@ public:
 	virtual void hook_scene_viewport_draw() {}
 	virtual void draw_menu_bar() {}	// imgui hook
 protected:
+
+	// New: MUST provide an AssetMetadata type name, such as Model, Map, ...
+	// this works with the asset browser for nice integration
+	//virtual const char* asset_type_name() = 0;
+
 	bool open(const char* name);
 	bool current_document_has_path() const { return !name.empty(); }
 	void open_the_open_popup() {

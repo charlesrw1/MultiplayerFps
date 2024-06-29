@@ -51,8 +51,9 @@ enum class Engine_State
 enum class Eng_Tool_state
 {
 	None,
-	Level,
-	Animgraph,
+	Level,	// level editor
+	Animgraph,	// animation graph editor
+	ModelEd,	// model editor
 	// Particle
 	// Material
 };

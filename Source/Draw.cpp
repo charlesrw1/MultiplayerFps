@@ -995,9 +995,9 @@ void Renderer::init()
 	shadowmap.init();
 	ssao.init();
 
-	lens_dirt = mats.find_texture("lens_dirt.jpg");
-	casutics = mats.find_texture("caustics.png");
-	waternormal = mats.find_texture("waternormal.png");
+	lens_dirt = g_imgs.find_texture("lens_dirt.jpg");
+	casutics = g_imgs.find_texture("caustics.png");
+	waternormal = g_imgs.find_texture("waternormal.png");
 
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
@@ -1482,7 +1482,7 @@ void Renderer::ui_render()
 	glDisable(GL_CULL_FACE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	Texture* t = mats.find_texture("crosshair007.png");
+	Texture* t = g_imgs.find_texture("crosshair007.png");
 	int centerx = cur_w / 2;
 	int centery = cur_h / 2;
 
@@ -1946,35 +1946,13 @@ void Render_Scene::init()
 
 void Render_Scene::upload_scene_materials()
 {
-	const size_t buf_size = sizeof(gpu::Material_Data) * mats.materials.size();
+	const size_t buf_size = sizeof(gpu::Material_Data) * 2'000;
 	auto gpu_mats = (gpu::Material_Data*)draw.get_arena().alloc_bottom(buf_size);
-	int i = 0;
-	for (auto& mat : mats.materials) {
-		//if (mat.second.texture_are_loading_in_memory) {	// this material is being used
-			Material& m = mat.second;
-			gpu::Material_Data gpumat;
-			gpumat.diffuse_tint = m.diffuse_tint;
-			gpumat.rough_mult = m.roughness_mult;
-			gpumat.metal_mult = m.metalness_mult;
-			gpumat.bitmask_flags = 0;
-			if(m.billboard==billboard_setting::ROTATE_AXIS)
-				gpumat.bitmask_flags |= gpu::MATFLAG_BILLBOARD_ROTATE_AXIS;
 
-
-		//	gpumat.rough_remap_x = m.roughness_remap_range.x;
-			//gpumat.rough_remap_y = m.roughness_remap_range.y;
-			m.gpu_material_mapping = i;
-			//m.gpu_material_mapping = scene_mats_vec.size();
-			gpu_mats[i] = gpumat;
-			//scene_mats_vec.push_back(gpumat);
-		//}
-		//else {
-		//	mat.second.gpu_material_mapping = -1;
-		//}
-
-			i++;
-	}
-	glNamedBufferData(gpu_render_material_buffer, buf_size, gpu_mats, GL_DYNAMIC_DRAW);
+	size_t out_count = 0;
+	bool needs_update = mats.update_gpu_material_buffer(gpu_mats, 2'000, &out_count);
+	if(needs_update)
+		glNamedBufferData(gpu_render_material_buffer, out_count*sizeof(gpu::Material_Data), gpu_mats, GL_DYNAMIC_DRAW);
 
 	draw.get_arena().free_bottom();
 

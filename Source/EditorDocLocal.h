@@ -18,6 +18,8 @@
 
 #include "Physics/Physics2.h"
 #include "External/ImGuizmo.h"
+#include "AssetRegistry.h"
+#include "Assets/AssetBrowser.h"
 
 extern ConfigVar g_mousesens;
 
@@ -317,109 +319,6 @@ enum TransformType
 
 class EditorDoc;
 
-enum class EdResType
-{
-	Model = 1,
-	Sound = 2,
-	Material = 4,
-	AnimationTree = 8,
-	Particle = 16,
-	Schema = 32,
-	Prefab = 64,
-};
-
-class EdResourceBase
-{
-public:
-	// Model
-	// Sound
-	// Material
-	// AnimationTree
-	// Particle
-	// Schema
-	// Prefab
-	virtual const char* get_type_name() const= 0;
-	virtual std::string get_full_path() const { return name; }
-	virtual std::string get_asset_name() const { return name; }
-	virtual void check_for_update() { }
-	virtual bool is_asset_out_of_date() const { return false; }
-	virtual Texture* get_thumbnail() const { return nullptr; }
-	virtual EdResType get_type() const = 0;
-	virtual Color32 get_asset_color() const { return COLOR_WHITE; }
-protected:
-	std::string name;
-};
-
-class AssetBrowser
-{
-public:
-	// indexes filesystem for resources
-	void init();
-	void imgui_draw();
-
-	//void increment_index(int amt);
-	//void update_remap();
-	//Model* get_model();
-	//void clear_index() { selected_real_index = -1; }
-
-	//int last_index = -1;
-	//int selected_real_index = -1;
-	//bool set_keyboard_focus = false;	
-	//struct EdModel {
-	//	std::string name = {};
-	//	Model* m = nullptr;
-	//	uint32_t thumbnail_tex = 0;
-	//	bool havent_loaded = true;
-	//};
-	//char asset_name_filter[256];
-	//bool filter_match_case = false;
-	//
-	//bool drawing_model = false;
-	//glm::vec3 model_position = glm::vec3(0.f);
-	//std::vector<EdModel> edmodels;
-	//std::vector<int> remap;
-
-	void clear_filter() {
-		filter_type_mask = -1;
-	}
-	void filter_all() {
-		filter_type_mask = 0;
-	}
-	void unset_filter(EdResType type) {
-		filter_type_mask |= (uint32_t)type;
-	}
-	void set_filter(EdResType type) {
-		filter_type_mask &= ~((uint32_t)type);
-	}
-	bool should_type_show(EdResType type) const {
-		return filter_type_mask & (uint32_t)type;
-	}
-
-	EdResourceBase* search_for_file(const std::string& filepath);
-
-	enum class Mode
-	{
-		Rows,
-		Grid,
-	};
-
-	Mode mode = Mode::Grid;
-	char asset_name_filter[256];
-	bool filter_match_case = false;
-	uint32_t filter_type_mask = -1;
-
-	EdResourceBase* selected_resoruce = nullptr;
-	// indexes everything
-
-	std::unordered_map<std::string, EdResourceBase*> path_to_resource;
-	std::vector<unique_ptr<EdResourceBase>> all_resources;
-
-	void append_new_resource(EdResourceBase* r) {
-		path_to_resource.insert({ r->get_full_path(),r });
-		all_resources.push_back(std::unique_ptr<EdResourceBase>(r));
-	}
-};
-
 class ObjectOutliner
 {
 public:
@@ -681,7 +580,6 @@ public:
 
 	bool is_open = false;
 	UndoRedoSystem command_mgr;
-	AssetBrowser assets;
 	View_Setup vs_setup;
 	EdPropertyGrid prop_editor;
 	MapLoadFile editing_map;
