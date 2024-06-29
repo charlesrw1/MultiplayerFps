@@ -10,6 +10,42 @@
 
 #include "Statemachine_cfg.h"
 
+#include "AssetCompile/Someutils.h"
+#include "AssetRegistry.h"
+#include "Framework/Files.h"
+#include "Animation/Editor/AnimationGraphEditorPublic.h"
+class AnimGraphAssetMeta : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() override
+	{
+		return { 152, 237, 149 };
+	}
+
+	virtual std::string get_type_name() override
+	{
+		return "AnimGraph";
+	}
+	virtual void index_assets(std::vector<std::string>& filepaths) override
+	{
+		auto tree = FileSys::find_files("./Data/Graphs");
+		for (auto file : tree) {
+			filepaths.push_back((file.substr(14)));
+		}
+	}
+	virtual bool assets_are_filepaths() { return true; }
+	virtual std::string root_filepath() override
+	{
+		return "./Data/Graphs/";
+	}
+	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
+};
+static AutoRegisterAsset<AnimGraphAssetMeta> animgraph_register_0987;
+
+
+
+
 Pool_Allocator g_pose_pool = Pool_Allocator(sizeof(Pose), 8);
 
 #define IMPL_NODE_CFG(type_name) \

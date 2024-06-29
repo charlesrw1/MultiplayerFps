@@ -37,7 +37,7 @@ public:
 	bool filter_match_case = false;
 	uint32_t filter_type_mask = -1;
 
-	std::string selected_resource;
+	AssetOnDisk selected_resource;
 	bool double_clicked_selected = false;
 
 	AssetOnDisk drag_drop;

@@ -336,7 +336,9 @@ public:
 	bool can_save_document() override;
 	virtual void imgui_draw() override;
 	virtual void on_change_focus(editor_focus_state newstate) override;
-
+	std::string get_save_root_dir()  override {
+		return "./Data/Graphs/";
+	}
 	enum class graph_playback_state {
 		stopped,
 		running,

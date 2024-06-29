@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include <algorithm>
 #include "Framework/MyImguiLib.h"
+#include "Framework/Config.h"
 AssetBrowser global_asset_browser;
 
 std::string to_lower(const std::string& s) {
@@ -116,16 +117,24 @@ void AssetBrowser::imgui_draw()
 					continue;
 			}
 			ImGui::PushID(res.filename.c_str());
-			const bool item_is_selected = res.filename == selected_resource;
+			const bool item_is_selected = res.filename == selected_resource.filename;
 
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 
-			ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+			ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 			if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-				selected_resource = res.filename;
-				if (ImGui::GetIO().MouseClickedCount[0] == 2)
+				selected_resource = res;
+				if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 					double_clicked_selected = true;
+					if (selected_resource.type->tool_to_edit_me()) {
+						std::string cmdstr = "start_ed ";
+						cmdstr += selected_resource.type->get_type_name();
+						cmdstr += " ";
+						cmdstr += selected_resource.filename;
+						Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmdstr.c_str());
+					}
+				}
 			}
 
 			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
@@ -152,4 +161,5 @@ void AssetBrowser::imgui_draw()
 		ImGui::EndTable();
 	}
 	ImGui::End();
+
 }

@@ -5,6 +5,7 @@
 
 // All assets that you want showing in the asset browser should be registered here
 
+class IEditorTool;
 class AssetMetadata
 {
 public:
@@ -19,6 +20,8 @@ public:
 	virtual std::string root_filepath() = 0;
 	// if false, then asset names wont be treated like filepaths
 	virtual bool assets_are_filepaths() { return true; }
+	// override this to add a new tool to the editor, used for maps, models, animations, everything
+	virtual IEditorTool* tool_to_edit_me() const { return nullptr; }
 
 	uint32_t self_index = 0;
 };

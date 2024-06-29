@@ -14,6 +14,7 @@ static const char* const maps_directory = "./Data/Maps/";
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
 #include "AssetRegistry.h"
+#include "EditorDocPublic.h"
 class MapAssetMetadata : public AssetMetadata
 {
 public:
@@ -40,6 +41,7 @@ public:
 	{
 		return "./Data/Maps/";
 	}
+	virtual IEditorTool* tool_to_edit_me() const { return g_editor_doc; }
 };
 static AutoRegisterAsset<MapAssetMetadata> map_register_0987;
 

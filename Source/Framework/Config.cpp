@@ -306,7 +306,8 @@ public:
 		command->name = name;
 		hash_to_index[hash.computedHash] = num_cmds - 1;
 	}
-	void execute(Cmd_Execute_Mode mode, const char* command_string) {
+	void execute_string(const char* command_string) {
+
 		sys_print("> %s\n", command_string);
 		Cmd_Args args;
 		std::string command = command_string;
@@ -327,7 +328,17 @@ public:
 			else if (var && args.size() == 2)
 				var->set_string(args.at(1));
 			else
-				sys_print("unknown command: %s\n",args.at(0));
+				sys_print("unknown command: %s\n", args.at(0));
+		}
+	}
+
+	void execute(Cmd_Execute_Mode mode, const char* command_string) {
+
+		if (mode == Cmd_Execute_Mode::NOW)
+			execute_string(command_string);
+		else {
+			command_buffer += command_string;
+			command_buffer += '\n';
 		}
 	}
 	void execute_file(Cmd_Execute_Mode mode, const char* path) {
@@ -353,7 +364,22 @@ public:
 		}
 	}
 	void execute_buffer() {
-
+		if (command_buffer.empty())
+			return;
+		std::string line;
+		for (char c : command_buffer) {
+			if (c == '\n') {
+				if (!line.empty())
+					execute_string(line.c_str());
+				line.clear();
+			}
+			else {
+				line += c;
+			}
+		}
+		if (!line.empty())
+			execute_string(line.c_str());
+		command_buffer.clear();
 	}
 
 	void set_set_unknown_variables(bool b) override {
@@ -374,6 +400,7 @@ public:
 		return nullptr;
 	}
 	
+	std::string command_buffer;
 	bool set_unknown_variables = false;
 	static const int MAX_CMDS = 64;
 	int num_cmds = 0;

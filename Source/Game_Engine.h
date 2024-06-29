@@ -47,18 +47,6 @@ enum class Engine_State
 	Game,		// in game state
 };
 
-// what tool is active
-enum class Eng_Tool_state
-{
-	None,
-	Level,	// level editor
-	Animgraph,	// animation graph editor
-	ModelEd,	// model editor
-	// Particle
-	// Material
-};
-
-
 using std::string;
 
 class Game_Engine;
@@ -122,11 +110,9 @@ public:
 		return state == Engine_State::Game;
 	}
 	Engine_State get_state() const { return state; }
-	Eng_Tool_state get_tool_state() const { return tool_state; }
-	bool is_in_an_editor_state() { return get_tool_state() != Eng_Tool_state::None; }
+	bool is_in_an_editor_state() { return get_current_tool() != nullptr; }
 	IEditorTool* get_current_tool();
-
-	void change_editor_state(Eng_Tool_state tool, const char* file = "");
+	void change_editor_state(IEditorTool* next_tool, const char* file = "");
 
 	void queue_load_map(string nextmap);
 
@@ -211,7 +197,7 @@ private:
 	vector<char> spawnids;
 
 	Engine_State state = Engine_State::Idle;
-	Eng_Tool_state tool_state = Eng_Tool_state::None;
+	IEditorTool* active_tool = nullptr;
 
 	bool is_hosting_game = false;
 

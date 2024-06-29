@@ -39,7 +39,7 @@ public:
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() override
 	{
-		return { 33, 107, 181 };
+		return { 20, 125, 245 };
 	}
 
 	virtual std::string get_type_name() override

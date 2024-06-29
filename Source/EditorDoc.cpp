@@ -716,6 +716,7 @@ void EditorDoc::init()
 	// set my parent
 	set_parent(eng->get_gui());
 	ed_schema.load("./Data/classes.txt");
+	global_asset_browser.init();
 }
 #include "Framework/DictWriter.h"
 #include <fstream>

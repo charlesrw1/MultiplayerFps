@@ -542,37 +542,29 @@ void Game_Engine::connect_to(string address)
 
 DECLARE_ENGINE_CMD(close_ed)
 {
-	eng->change_editor_state(Eng_Tool_state::None);
+	eng->change_editor_state(nullptr);
 }
 
 DECLARE_ENGINE_CMD(start_ed)
 {
-	static const char* usage_str = "Usage: starteditor [map,anim] <file>\n";
+	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset name>] <file>\n";
 	if (args.size() != 2 && args.size()!=3) {
 		sys_print(usage_str);
 		return;
 	}
 
 	std::string edit_type = args.at(1);
-	Eng_Tool_state e{};
-	if (edit_type == "map") {
-		e = Eng_Tool_state::Level;
-	}
-	else if (edit_type == "anim") {
-		e = Eng_Tool_state::Animgraph;
-	}
-	else if (edit_type == "model") {
-		e = Eng_Tool_state::ModelEd;
+	const AssetMetadata* metadata = AssetRegistrySystem::get().find_type(edit_type.c_str());
+	if (metadata && metadata->tool_to_edit_me()) {
+		const char* file_to_open = "";	// make a new map
+		if (args.size() == 3)
+			file_to_open = args.at(2);
+		eng->change_editor_state(metadata->tool_to_edit_me(), file_to_open);
 	}
 	else {
 		sys_print("unknown editor\n");
 		sys_print(usage_str);
-		return;
 	}
-	const char* file_to_open = "";	// make a new map
-	if (args.size() == 3)
-		file_to_open = args.at(2);
-	eng->change_editor_state(e, file_to_open);
 }
 
 
@@ -587,24 +579,24 @@ static void disable_imgui_docking()
 
 #define ASSERT_ENUM_STRING( enumstr, index )		( 1 / (int)!( (int)enumstr - index ) ) ? #enumstr : ""
 
-void Game_Engine::change_editor_state(Eng_Tool_state next_tool, const char* file)
+void Game_Engine::change_editor_state(IEditorTool* next_tool, const char* file)
 {
 	sys_print("--------- Change Editor State ---------\n");
-	if (tool_state != next_tool && tool_state != Eng_Tool_state::None) {
+	if (active_tool != next_tool && active_tool != nullptr) {
 		// this should call close internally
 		get_current_tool()->set_focus_state(editor_focus_state::Closed);
 	}
-	tool_state = next_tool;
-	if (tool_state != Eng_Tool_state::None) {
+	active_tool = next_tool;
+	if (active_tool != nullptr) {
 		enable_imgui_docking();
 		global_asset_browser.init();
 		bool could_open = get_current_tool()->open_and_set_focus(file, (get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
 		if (!could_open) {
-			tool_state = Eng_Tool_state::None;
+			active_tool = nullptr;
 		}
 	}
 
-	if (tool_state == Eng_Tool_state::None)
+	if (!active_tool )
 		disable_imgui_docking();
 }
 
@@ -1060,7 +1052,7 @@ ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, 0.0001, 5.0);
 
 bool Game_Engine::is_drawing_to_window_viewport()
 {
-	return tool_state != Eng_Tool_state::None;
+	return is_in_an_editor_state();
 }
 
 glm::ivec2 Game_Engine::get_game_viewport_dimensions()
@@ -1089,6 +1081,8 @@ AddToDebugMenu asdf45("func", f345);
 #include "Framework/MyImguiLib.h"
 void Game_Engine::draw_any_imgui_interfaces()
 {
+	CPUSCOPESTART(imgui_draw);
+
 	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
 
@@ -1252,16 +1246,7 @@ extern IEditorTool* g_model_editor;
 
 IEditorTool* Game_Engine::get_current_tool()
 {
-	if (tool_state == Eng_Tool_state::None)
-		return nullptr;
-	else if (tool_state == Eng_Tool_state::Animgraph)
-		return  g_anim_ed_graph;
-	else if (tool_state == Eng_Tool_state::Level)
-		return g_editor_doc;
-	else if (tool_state == Eng_Tool_state::ModelEd)
-		return g_model_editor;
-	else
-		ASSERT(0);
+	return active_tool;
 }
 
 void Game_Engine::build_physics_world(float time)
@@ -1590,6 +1575,8 @@ void Game_Engine::loop()
 			get_gui()->handle_event(event);
 		}
 
+		Cmd_Manager::get()->execute_buffer();
+
 		// update state
 		switch (state)
 		{
@@ -1600,14 +1587,14 @@ void Game_Engine::loop()
 				stop_game();
 				continue;	// goto next frame
 			}
-			else if(get_tool_state() != Eng_Tool_state::None){
+			else if(is_in_an_editor_state()){
 				get_current_tool()->set_focus_state(editor_focus_state::Focused);
 			}
 			break;
 		case Engine_State::Loading:
 
 			// for compiling data etc.
-			if (get_tool_state() != Eng_Tool_state::None)
+			if (is_in_an_editor_state())
 				get_current_tool()->set_focus_state(editor_focus_state::Background);
 
 			execute_map_change();
@@ -1651,7 +1638,7 @@ void Game_Engine::loop()
 		}
 
 		// can tick() tool when in a game state
-		if (tool_state != Eng_Tool_state::None) {
+		if (is_in_an_editor_state()) {
 			get_current_tool()->tick(frame_time);
 			// hack: when in editor state, still want physics simulation
 			if (state != Engine_State::Game) {
@@ -1795,7 +1782,7 @@ void Debug_Console::draw()
 		char* s = input_buffer;
 		if (s[0]) {
 			// this will print it to the console
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, input_buffer);
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, input_buffer);
 
 			history.push_back(input_buffer);
 			scroll_to_bottom = true;
