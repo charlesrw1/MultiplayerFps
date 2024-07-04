@@ -11,7 +11,7 @@
 #include "../AnimationTreePublic.h"
 
 #include "Model.h"
-
+#include "Framework/ExpressionLang.h"
 // procedural bone controls
 // supports: direct bone transform manipulation	(ex: rotating/translating weapon bone)
 //			ik to meshspace transform	(ex: hand reaching to object)
@@ -55,6 +55,9 @@ enum class bone_controller_type
 #include <vector>
 #include "Framework/Factory.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/TypeInfo.h"
+
+#include "Framework/ClassBase.h"
 
 class Pose;
 class Animator;
@@ -64,17 +67,17 @@ class MSkeleton;
 class Entity;
 class Animation_Tree_CFG;
 
-class AnimatorInstance
+class AnimatorInstance : public ClassBase
 {
 public:
-	static Factory<std::string, AnimatorInstance>& get_factory();
+	CLASS_HEADER();
 
 	AnimatorInstance();
 
-	// expose properties to animation graph
-	virtual void add_props(std::vector<PropertyListInstancePair>& props) {};
-
-	void initialize_animator(
+	// returns true on success
+	// fails if AnimatorInstance isnt compatible with AnimationGraph
+	// or if model doesnt have skeleton
+	bool initialize_animator(
 		const Model* model,
 		const Animation_Tree_CFG* graph,
 		Entity* ent = nullptr);
@@ -91,16 +94,14 @@ public:
 	}
 
 	const Model* get_model() const {
-		return runtime_dat.model;
+		return model;
 	}
 	const MSkeleton* get_skel() const {
-		return runtime_dat.model->get_skel();
+		return (model)?model->get_skel():nullptr;
 	}
 	const Animation_Tree_CFG* get_tree() const {
-		return runtime_dat.cfg;
+		return cfg;
 	}
-
-	Animation_Tree_RT runtime_dat;
 
 	Bone_Controller& get_controller(bone_controller_type type_) {
 		return bone_controllers[(int)type_];
@@ -114,6 +115,10 @@ public:
 	int num_bones() { return cached_bonemats.size(); }
 
 	Entity* get_owner() const { return owner; }
+
+	ScriptInstance& get_script_inst() { return script_inst; }
+
+	bool is_initialized() const { return model != nullptr; }
 private:
 
 	// hooks for derived classes
@@ -124,7 +129,7 @@ private:
 
 	// owning entity, can be null for example in editor
 	Entity* owner = nullptr;
-	std::vector<glm::mat4x4> cached_bonemats;	// global bonemats
+	std::vector<glm::mat4> cached_bonemats;	// global bonemats
 	std::vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
 
 	void ConcatWithInvPose();
@@ -134,6 +139,14 @@ private:
 	// depreciated
 	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
 	std::vector<Animation_Slot> slots;
+
+	const Animation_Tree_CFG* cfg = nullptr;
+	const Model* model = nullptr;
+
+	ScriptInstance script_inst;
+	std::vector<uint8_t> data;	// runtime data
+	
+	friend class NodeRt_Ctx;
 };
 
 

@@ -7,12 +7,8 @@
 #include "SkeletonData.h"
 #include <algorithm>
 #include "Framework/Files.h"
-static const char* GRAPH_DIRECTORY = "Data/Animations/Graphs/";
-static const char* SKEL_DIRECTORY = "Data/Animations/Skels/";
-static const char* MODEL_DIRECTORY = "Data/Models/";
-static const char* NOTIFY_DIRECTORY = "Data/Animations/Notify/";
-static const char* SET_DIRECTORY = "Data/Animations/Sets/";
 
+static const char* MODEL_DIRECTORY = "Data/Models/";
 
 Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char* filename, DictParser& parser)
 {
@@ -43,7 +39,7 @@ Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char*
 		return nullptr;
 	}
 
-	tree->post_load_init();
+	bool valid = tree->post_load_init();
 
 	return tree;
 }

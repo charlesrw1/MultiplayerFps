@@ -4,12 +4,12 @@
 class SoundAnimEvent : public AnimationEvent
 {
 public:
-	ANIMEVENT_HEADER(SoundAnimEvent);
+	CLASS_HEADER();
 
 	virtual void on_event(Animator* a) override {
 		sys_print("--- sound! %d\n", some_number);
 	}
-	virtual PropertyInfoList* get_props() override {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(SoundAnimEvent)
 			REG_INT(some_number, PROP_DEFAULT, "")
 		END_PROPS(SoundAnimEvent)
@@ -21,12 +21,12 @@ public:
 class FootstepAnimEvent : public AnimationEvent
 {
 public:
-	ANIMEVENT_HEADER(FootstepAnimEvent);
+	CLASS_HEADER();
 
 	virtual void on_event(Animator* a) override {
 		sys_print("--- footstep %d\n");
 	}
-	virtual PropertyInfoList* get_props() override {
+	static const PropertyInfoList* get_props() {
 		return nullptr;
 	}
 };

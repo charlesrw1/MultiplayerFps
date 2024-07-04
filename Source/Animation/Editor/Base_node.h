@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <array>
+#include <vector>
+#include <string>
 #include "imgui.h"
 
 #include "../Runtime/AnimationTreeLocal.h"
@@ -9,6 +11,8 @@
 #include "Framework/TypeInfo.h"
 #include "Framework/ReflectionRegisterDefines.h"
 #include "Framework/ReflectionProp.h"
+
+#include "Framework/ClassBase.h"
 
 struct ImNodesEditorContext;
 struct editor_layer {
@@ -32,20 +36,59 @@ const Color32 BLEND_COLOR = { 26, 75, 79 };
 const Color32 ADD_COLOR = { 44, 57, 71 };
 const Color32 MISC_COLOR = { 13, 82, 44 };
 
-extern ImVec4 scriptparamtype_to_color(control_param_type type);
 
-#define EDNODE_HEADER(type_name)  virtual const TypeInfo& get_typeinfo() const override; 
+#define EDNODE_HEADER(type_name) CLASS_HEADER()
 
+extern ImVec4 scriptparamtype_to_color(anim_graph_value type);
+
+struct GraphPinType
+{
+	GraphPinType() = default;
+
+	enum type_ {
+		value_t,
+		localspace_pose,
+		meshspace_pose,
+		state_t,
+	}type=localspace_pose;
+	anim_graph_value value_type = anim_graph_value::bool_t;
+	GraphPinType(anim_graph_value agv) : type(value_t), value_type(agv) {}
+	GraphPinType(type_ agv) : type(agv) {}
+
+	bool operator==(const GraphPinType& other) const { return other.type == type && value_type == other.value_type; }
+};
+
+inline GraphPinType hint_str_to_GraphPinType(const char* str)
+{
+	if (strcmp(str, "float") == 0) return GraphPinType(anim_graph_value::float_t);
+	if (strcmp(str, "int") == 0) return GraphPinType(anim_graph_value::int_t);
+	if (strcmp(str, "bool") == 0) return GraphPinType(anim_graph_value::bool_t);
+	if (strcmp(str, "local") == 0) return GraphPinType(GraphPinType::localspace_pose);
+	if (strcmp(str, "mesh") == 0) return GraphPinType(GraphPinType::meshspace_pose);
+	ASSERT(0);
+}
+
+
+struct PropertyInfo;
+struct Base_EdNode;
+struct GraphNodeInput
+{
+	std::string name;
+	GraphPinType type;
+	Base_EdNode* node = nullptr;
+	const PropertyInfo* prop_link = nullptr;
+	bool is_attached_to_node() const { return node; }
+};
 
 class AnimationGraphEditor;
-class Base_EdNode
+class Base_EdNode : public ClassBase
 {
 public:
-	static Factory<std::string, Base_EdNode>& get_factory();
+	CLASS_HEADER();
 
 	Base_EdNode() {
 		for (int i = 0; i < inputs.size(); i++) 
-			inputs[i] = nullptr;
+			inputs[i].node = nullptr;
 	}
 	virtual ~Base_EdNode() {}
 
@@ -62,7 +105,6 @@ public:
 	virtual void init() = 0;
 	virtual std::string get_name() const = 0;
 	virtual bool compile_my_data(const AgSerializeContext* ctx) = 0;
-	virtual const TypeInfo& get_typeinfo() const = 0;
 
 	// used to specify menu to draw the creation for this in
 	virtual std::string get_menu_category() const { return ""; }
@@ -75,36 +117,34 @@ public:
 
 	virtual bool has_pin_colors() const { return false; }
 	virtual ImVec4 get_pin_colors() const { return ImVec4(1, 1, 1, 1); }
-	virtual Node_CFG* get_graph_node() { return nullptr; }
+	virtual BaseAGNode* get_graph_node() { return nullptr; }
 	// used for blendspace nodes to add ref'd clip nodes
-	virtual void get_any_extra_refed_graph_nodes(std::vector<Node_CFG*>& refed_nodes) {}
-	
-	// this call adds only elements native to the EdNode object
-	virtual void add_props(std::vector<PropertyListInstancePair>& props) {
-		props.push_back({ get_props(), this });
-	}
-	// this call adds elements that are being edited like Node_CFG, State
-	virtual void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) {
-	}
+	virtual void get_any_extra_refed_graph_nodes(std::vector<BaseAGNode*>& refed_nodes) {}
 
+	// this call adds elements that are being edited like Node_CFG, State
+	virtual void add_props_for_extra_editable_element(std::vector<PropertyListInstancePair>& props) {
+	}
 
 	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) {}
+
 	virtual bool dont_call_compile() const { return false; }
 	virtual bool traverse_and_find_errors();
-	virtual void on_remove_pin(int slot, bool force = false) {
-		inputs[slot] = nullptr;
-	}
-	virtual void on_post_remove_pins() {}
 	virtual void remove_reference(Base_EdNode* node);
 	
 	// for statemachine and state nodes
 	virtual const editor_layer* get_layer() const { return nullptr; }
 	virtual std::string get_layer_tab_title() const { return ""; }
 
+	virtual void on_remove_pin(int slot, bool force = false) {
+		inputs[slot].node = nullptr;
+	}
+	virtual void on_post_remove_pins() {}
 	virtual bool add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot) {
-		inputs[slot] = input;
+		inputs[slot].node = input;
 		return false;
 	}
+
+
 	// animation graph specific stuff
 	virtual bool draw_flat_links() const { return false; }
 	virtual bool push_imnode_link_colors(int index) { return false; }
@@ -116,12 +156,14 @@ public:
 	virtual void post_prop_edit_update() {}
 	virtual void draw_node_bottom_bar() {}
 
-	virtual int get_num_inputs() const { return 0; }
 	virtual Color32 get_node_color() const { return { 23, 82, 12 }; }
 	virtual bool has_output_pin() const { return true; }
 	virtual bool can_delete() const { return true; }
-	virtual std::string get_input_pin_name(int index) const { return "in"; }
+
+	virtual std::string get_input_pin_name(int index) const { return inputs[index].name; }
 	virtual std::string get_output_pin_name() const { return  "out"; }
+	virtual GraphPinType get_output_pin_type() const { return GraphPinType(); }
+
 
 	uint32_t getinput_id(uint32_t inputslot) const {
 		return inputslot + id * MAX_INPUTS + INPUT_START;
@@ -159,8 +201,6 @@ public:
 
 	uint32_t id = 0;
 	uint32_t graph_layer = 0;
-	std::array<Base_EdNode*, MAX_INPUTS> inputs;
-
 
 	bool has_errors() const {
 		return !compile_error_string.empty();
@@ -182,7 +222,29 @@ public:
 		is_newly_created = false;
 	}
 
+	uint32_t get_input_size() const { return inputs.size(); }
+
+	std::vector<GraphNodeInput> inputs;
+
+	void init_graph_node_input(const char* name, GraphPinType type, const PropertyInfo* pi) {
+		GraphNodeInput i;
+		i.name = name;
+		i.type = type;
+		i.prop_link = pi;
+		inputs.push_back(i);
+	}
+	void init_graph_nodes_from_node() {
+		auto node = get_graph_node();
+		auto props = node->get_type().props;
+		for (int i = 0; i < props->count; i++) {
+			auto& prop = props->list[i];
+			// value/pose node type
+			if (strcmp(prop.custom_type_str, "AgSerializeNodeCfg") == 0) {
+				auto type = hint_str_to_GraphPinType(prop.range_hint);
+				init_graph_node_input(prop.name, type, &props->list[i]);
+			}
+		}
+	}
 private:
 	bool is_newly_created = false;
-
 };

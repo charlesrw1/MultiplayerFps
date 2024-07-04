@@ -6,36 +6,35 @@
 #include "Statemachine_node.h"
 #include "Framework/AddClassToFactory.h"
 #include "Framework/ReflectionRegisterDefines.h"
-Factory<std::string, Base_EdNode>& Base_EdNode::get_factory() {
-	static Factory<std::string, Base_EdNode> inst;
-	return inst;
-}
 
-#define EDIMPL(type_name) static AddClassToFactory<type_name, Base_EdNode> impl##type_name(Base_EdNode::get_factory(), #type_name); \
-	 const TypeInfo& type_name::get_typeinfo() const  { \
-		static TypeInfo ti = {#type_name, sizeof(type_name)}; \
-		return ti; \
-	}
+
+ABSTRACT_CLASS_IMPL_NO_PROPS(Base_EdNode, ClassBase);
+
+
+#define EDIMPL(type_name) \
+CLASS_IMPL(type_name, Base_EdNode)
 
 EDIMPL(Clip_EdNode);
 EDIMPL(Additive_EdNode);
 EDIMPL(Subtract_EdNode);
 EDIMPL(Root_EdNode);
-EDIMPL(State_EdNode);
-EDIMPL(StateAlias_EdNode);
 EDIMPL(Statemachine_EdNode);
 EDIMPL(Blend_EdNode);
 EDIMPL(Blend_int_EdNode);
 EDIMPL(Sync_EdNode);
 EDIMPL(Mirror_EdNode);
-EDIMPL(StateStart_EdNode);
 EDIMPL(Blendspace2d_EdNode);
 EDIMPL(Blend_Layered_EdNode);
+
+EDIMPL(State_EdNode);
+CLASS_IMPL(StateStart_EdNode, State_EdNode);
+CLASS_IMPL(StateAlias_EdNode, State_EdNode);
+
 
 void Base_EdNode::remove_reference(Base_EdNode* node)
 {
 	for (int i = 0; i < inputs.size(); i++) {
-		if (inputs[i] == node) {
+		if (inputs[i].node == node) {
 			on_remove_pin(i, true);
 
 			on_post_remove_pins();
@@ -53,9 +52,9 @@ void Base_EdNode::post_construct(uint32_t id, uint32_t graph_layer)
 bool Base_EdNode::traverse_and_find_errors()
 {
 	children_have_errors = false;
-	for (int i = 0; i < get_num_inputs(); i++) {
-		if (inputs[i])
-			children_have_errors |= !inputs[i]->traverse_and_find_errors();
+	for (int i = 0; i < inputs.size(); i++) {
+		if (inputs[i].node)
+			children_have_errors |= !inputs[i].node->traverse_and_find_errors();
 	}
 
 	return !children_have_errors && compile_error_string.empty();

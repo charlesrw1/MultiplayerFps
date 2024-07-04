@@ -11,7 +11,9 @@
 #include "Framework/StringName.h"
 #include "Framework/StringUtil.h"
 #include "Framework/InlineVec.h"
-
+#include "Framework/Handle.h"
+#include "Framework/ReflectionProp.h"
+#include "Framework/ClassBase.h"
 
 class CompileError
 {
@@ -28,6 +30,7 @@ struct script_state;
 typedef void(*bytecode_function)(script_state* stack);
 
 
+extern AutoEnumDef script_types_def;
 enum class script_types : uint8_t
 {
 	bool_t,		// 'b' 4 byte true/false
@@ -43,7 +46,6 @@ enum class script_types : uint8_t
 enum class script_def_type : uint8_t
 {
 	nativefunc_t,		// native function pointer
-	global_t,			// global input variable, provide index
 	constant_t,			// constant variable/enum
 	struct_t,			// structure def
 };
@@ -59,11 +61,6 @@ struct script_variable_def
 			const char* argout;
 			int index;
 		}func;
-		struct globalvar_def {
-			script_types type;
-			uint64_t name_hash;
-			int index;
-		}global;
 		struct constvar_def {
 			script_types type;
 			script_value_t value;
@@ -178,81 +175,122 @@ struct compile_data_referenced
 	//std::vector<fixup_func> fixups;
 };
 
-class Program;
-class BytecodeExpression
+
+
+struct PropertyInfoList;
+struct PropertyInfo;
+
+struct ScriptVariable
 {
-public:
-	std::vector<uint8_t> instructions;
+	std::string name;
+	script_types type = script_types::bool_t;
+	bool is_native = false;
+	int var_offset = 0;
+	
+	static PropertyInfoList* get_props();
 
-	compile_result compile(const Program* expr, const std::string& code, StringName self_type);
-	void execute(script_state* state, const Program* prog, program_script_vars_instance* input) const;
-	void print_instructions();
-private:
-	void compile_from_tokens(compile_result& result, compile_data_referenced& local, int current_base_ptr, const Program* ctx, std::vector<StringViewAndLine>& tokens, StringName self_type);
-
-	void write_4bytes_at_location(uint32_t bytes, int loc) {
-		instructions.at(loc) = (bytes & 0xff);
-		instructions.at(loc + 1) = (bytes >> 8) & 0xff;
-		instructions.at(loc + 2) = (bytes >> 16) & 0xff;
-		instructions.at(loc + 3) = (bytes >> 24) & 0xff;
-	}
-
-	void push_inst(uint8_t c) {
-		instructions.push_back(c);
-	}
-	void push_4bytes(unsigned int x) {
-		instructions.push_back(x & 0xff);
-		instructions.push_back((x >> 8) & 0xff);
-		instructions.push_back((x >> 16) & 0xff);
-		instructions.push_back((x >> 24) & 0xff);
-	}
-	uint32_t read_4bytes(int offset) const {
-		uint32_t res = (instructions[offset]);
-		res |= ((uint32_t)instructions[offset + 1] << 8);
-		res |= ((uint32_t)instructions[offset + 2] << 16);
-		res |= ((uint32_t)instructions[offset + 3] << 24);
-		return res;
-	}
-
-	friend class Program;
+	// set at runtime initialization
+	const PropertyInfo* native_pi_of_variable = nullptr;
 };
 
+class Script;
+typedef handle<Script> ScriptHandle;
+class ScriptInstance;
+class Script
+{
+public:
+	static const PropertyInfoList* get_props();
+
+	Script() = default;
+	Script(std::vector<ScriptVariable>& variables, std::string native_classname);
+
+	bool execute(ScriptHandle function_handle, script_state* state, ScriptInstance* input) const;
+	compile_result compile(ScriptHandle& handle, const std::string& code, const std::string& selftype);
+	void print_instructions(ScriptHandle handle) const;
+
+	void link_to_native_class();
+	bool check_is_valid();
+	const ClassTypeInfo* get_native_class() const {return native_classtypeinfo; }
+
+	uint32_t num_variables() const { return variables.size(); }
+	uint32_t get_num_values_for_variables() const { return num_values_for_variables; }
+
+	const std::vector<ScriptVariable>& get_variables() const { return variables; };
+private:
+	uint32_t read_4bytes(uint32_t offset) const {
+		uint32_t res = (instruction_data[offset]);
+		res |= ((uint32_t)instruction_data[offset + 1] << 8);
+		res |= ((uint32_t)instruction_data[offset + 2] << 16);
+		res |= ((uint32_t)instruction_data[offset + 3] << 24);
+		return res;
+	}
+	float read_variable_float(uint32_t variable, ScriptInstance* inst) const;
+	int32_t read_variable_int32(uint32_t variable, ScriptInstance* inst) const;
+	const ScriptVariable* find_variable(const std::string& name) const {
+		for (int i = 0; i < variables.size(); i++)
+			if (variables[i].name == name)
+				return &variables[i];
+		return nullptr;
+	}
+	uint32_t variable_index(const ScriptVariable* v) const { return v - variables.data(); }
+
+	struct ScriptFunction {
+		uint32_t bytecode_offset = 0;
+		uint32_t bytecode_length = 0;
+		uint8_t input_vars = 0;
+		uint8_t output_vars = 0;
+	};
+	std::vector<uint8_t> instruction_data;
+	std::vector<char> string_data;
+	std::vector<ScriptFunction> function_ptrs;
+
+	std::vector<ScriptVariable> variables;
+	uint32_t num_values_for_variables = 0;
+	std::string native_classname;
+	const ClassTypeInfo* native_classtypeinfo = nullptr;
+
+	friend class BytecodeCompileHelper;
+};
+class ScriptInstance
+{
+public:
+	bool init_from(const Script* script, ClassBase* base_class);
+	ClassBase* get_native_class_ptr() const { return native_class_ptr;  }
+	const Script* get_parent_script() const { return instance_of; }
+	std::vector<script_value_t>& get_values_array() { return values; }
+private:
+	// variable data
+	const Script* instance_of = nullptr;
+	ClassBase* native_class_ptr = nullptr;
+	std::vector<script_value_t> values;
+};
 
 class Library
 {
 public:
-	std::unordered_map<uint64_t, int> name_to_idx;
+	std::unordered_map<std::string, int> name_to_idx;
 	std::vector<script_variable_def> defs;
-	uint16_t num_vars = 0;
 	uint16_t num_funcs = 0;
 	uint16_t num_structs = 0;
 
-	void push_global_def(const char* name, script_types type);
 	void push_function_def(const char* name, const char* out /* comma seperated out type(s)*/, const char* in, bytecode_function func);
 	void push_constant_def(const char* name, script_types type, script_value_t value);
 	void push_struct_def(const char* name, const char* fields);
-	const script_variable_def* find_def(StringName name) const;
-	void clear() {
-		num_vars = num_funcs = num_structs = 0;
-		defs.clear();
-		name_to_idx.clear();
-	}
+	const script_variable_def* find_def(const std::string& s) const;
 };
-
-
 
 class Program
 {
 public:
-	void clear() {
-		imports.resize(0);
-		func_ptrs.resize(0);
+	static Program& get() {
+		static Program inst;
+		return inst;
 	}
-
+	void add_library(const Library* lib);
+private:
 	struct full_import {
 		const Library* lib = nullptr;
 		uint16_t func_start = 0;
-		uint16_t var_start = 0;
 		uint16_t struct_start = 0;
 	};
 
@@ -267,26 +305,18 @@ public:
 	};
 	std::vector<runtime_func_ptr> func_ptrs;
 
-	void push_library(const Library* lib);
 
 	struct find_tuple {
 		const script_variable_def* def = nullptr;
 		int full_index = 0;	// for variables and functions
 	};
 
-	find_tuple find_def(const char* name) const {
-		return find_def(StringName(name));
-	}
-	find_tuple find_def(StringName name) const;
-	int find_variable_index(StringName name) const {
-		return find_def(name).full_index;
-	}
-	int num_vars() const {
-		return imports.size() > 0 ?
-			imports[imports.size() - 1].var_start + imports[imports.size() - 1].lib->num_vars
-			: 0;
-	}
 
-	void print_globals() const;
-	void print_functions() const;
+	find_tuple find_def(const std::string& name) const;
+
+
+	friend class Script;
+	friend class BytecodeCompileHelper;
+private:
+	Program() {}
 };

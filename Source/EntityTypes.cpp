@@ -1,11 +1,8 @@
 #include "EntityTypes.h"
 #include "Framework/Factory.h"
 
-Factory<std::string, Entity>& get_entityfactory() {
-	static Factory<std::string, Entity> inst;
-	return inst;
-}
+ABSTRACT_CLASS_IMPL_NO_PROPS(Entity, ClassBase);
 
-ENTITY_IMPL(Door);
-ENTITY_IMPL(Grenade);
-ENTITY_IMPL(NPC);
+CLASS_IMPL_NO_PROPS(Door, Entity);
+CLASS_IMPL_NO_PROPS(Grenade, Entity);
+CLASS_IMPL_NO_PROPS(NPC, Entity);

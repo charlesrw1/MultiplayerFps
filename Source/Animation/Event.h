@@ -7,19 +7,15 @@
 #include "Framework/Factory.h"
 #include "Framework/Util.h"
 #include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/ClassBase.h"
 class Animator;
 
-#define ANIMEVENT_HEADER(type_name)  virtual const TypeInfo& get_typeinfo() const override; \
-	virtual AnimationEvent* create_copy() const;
-class AnimationEvent
+class AnimationEvent : public ClassBase
 {
 public:
-	static Factory<std::string, AnimationEvent>& get_factory();
+	CLASS_HEADER();
 
 	virtual Color32 get_editor_color() { return COLOR_BLUE; }
-	virtual const TypeInfo& get_typeinfo() const = 0;
-	// override to add any serialized properties
-	virtual PropertyInfoList* get_props() = 0;
 
 	// if true, then event has a duration from [frame,frame+frame_duration]
 	// on_event is called on enter and on_end is guaranteed to call on exit
@@ -30,10 +26,8 @@ public:
 	uint16_t get_frame() const { return frame; }
 	uint16_t get_duration() const { return frame_duration; }
 
-	virtual AnimationEvent* create_copy() const = 0;
-
 private:
-	static PropertyInfoList* get_event_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(AnimationEvent)
 			REG_INT(frame,PROP_SERIALIZE,""),
 			REG_INT(frame_duration, PROP_SERIALIZE,"")
@@ -43,12 +37,4 @@ private:
 
 	uint16_t frame = 0;
 	uint16_t frame_duration = 0;
-};
-
-struct AnimationEventGetter
-{
-	static void get(std::vector<PropertyListInstancePair>& props, AnimationEvent* node) {
-		props.push_back({ node->get_event_props(), node });
-		props.push_back({ node->get_props(), node });
-	}
 };

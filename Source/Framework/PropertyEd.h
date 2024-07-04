@@ -114,7 +114,7 @@ public:
 		rows.clear();
 	}
 
-	void add_property_list_to_grid(PropertyInfoList* list, void* inst, uint32_t flags = 0 /* PropertyGridFlags */);
+	void add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags = 0 /* PropertyGridFlags */);
 	void update();
 
 	void set_read_only(bool read_only) {
@@ -129,7 +129,7 @@ public:
 class GroupRow : public IGridRow
 {
 public:
-	GroupRow(IGridRow* parent, void* instance, PropertyInfoList* info, int row_idx);
+	GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx);
 
 	virtual void internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -145,7 +145,7 @@ public:
 	}
 
 	void* inst = nullptr;
-	PropertyInfoList* proplist = nullptr;
+	const PropertyInfoList* proplist = nullptr;
 	std::string name;
 	bool passthrough_to_list_if_possible = false;
 };

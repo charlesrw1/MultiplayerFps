@@ -19,17 +19,16 @@ struct Blendspace_Input {
 	Clip_Node_CFG* clip_node = nullptr;
 };
 
-class Blendspace2d_EdNode : public Base_EdNode
+class Blendspace2d_EdNode : public BaseNodeUtil_EdNode<BlendSpace2d_CFG>
 {
-	EDNODE_HEADER(Blendspace2d_EdNode);
+	CLASS_HEADER();
+	MAKE_STANARD_SERIALIZE(Blendspace2d_EdNode);
 	MAKE_STANDARD_FUNCTIONS(
 		"Blendspace 2D",
 		BLEND_COLOR,
 		"placeholder",
 		1
 	);
-	MAKE_STANDARD_INIT();
-	MAKE_STANDARD_ADD_PROPS(Blendspace2d_EdNode);
 
 	bool compile_my_data(const AgSerializeContext* ctx) override
 	{
@@ -42,5 +41,4 @@ class Blendspace2d_EdNode : public Base_EdNode
 	std::vector<Blendspace_Input> blend_space_inputs;
 
 	int serialized_index = -1;
-	BlendSpace2d_CFG* node = nullptr;
 };

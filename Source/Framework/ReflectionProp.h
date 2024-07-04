@@ -18,6 +18,11 @@ enum class core_type_id : uint8_t
 	Enum16,
 	Enum32,
 	Float,
+	
+	Vec2,
+	Vec3,
+	Quat,
+
 	Struct,
 	StdString,
 	List,
@@ -68,10 +73,10 @@ struct PropertyInfo {
 	}
 	
 	float get_float(void* ptr) const;
-	void set_float(void* ptr, float f);
+	void set_float(void* ptr, float f) const;
 
 	uint64_t get_int(void* ptr) const;
-	void set_int(void* ptr, uint64_t i);
+	void set_int(void* ptr, uint64_t i) const;
 
 	bool can_edit() const {
 		return flags & PROP_EDITABLE;
@@ -94,7 +99,7 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flag
 PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id, const char* hint= "");
 PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype = "");
-PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
+PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "", const char* hint = "");
 
 
 struct PropertyInfoList
@@ -112,15 +117,15 @@ class DictParser;
 
 struct PropertyListInstancePair
 {
-	PropertyInfoList* list = nullptr;
+	const PropertyInfoList* list = nullptr;
 	void* instance = nullptr;
 };
 
 struct Prop_Flag_Overrides;
-void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr);
-std::pair<StringView, bool> read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, TypedVoidPtr userptr);
+void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr);
+std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, TypedVoidPtr userptr);
 std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, TypedVoidPtr userptr);
-
+void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, TypedVoidPtr userptr);
 
 class IListCallback
 {

@@ -3,9 +3,12 @@
 #include "State_node.h"
 class Root_EdNode : public Base_EdNode
 {
-	EDNODE_HEADER(Root_EdNode);
+public:
+	CLASS_HEADER();
 
 	void init() override {
+		init_graph_node_input("input", GraphPinType(GraphPinType::localspace_pose), nullptr);
+
 		if (!is_this_node_created()) {
 			if (graph_layer == 0) {	// root layer
 				Base_EdNode* root = ed.editor_node_for_cfg_node(ed.get_tree()->get_root_node());
@@ -23,11 +26,15 @@ class Root_EdNode : public Base_EdNode
 		}
 		clear_newly_created();
 	}
+
+	Node_CFG* get_root_node() const {
+		return inputs[0].node ? inputs[0].node->get_graph_node()->cast_to<Node_CFG>() : nullptr;
+	}
+
 	std::string get_name() const override { return "Output pose"; }
 	bool compile_my_data(const AgSerializeContext* ctx) override { return true; }
 	Color32 get_node_color() const override { return ROOT_COLOR; }
 	bool has_output_pin() const override { return false; }
-	int get_num_inputs() const override { return 1; }
 	bool can_delete() const override { return false; }
 	bool allow_creation_from_menu() const override { return false; }
 

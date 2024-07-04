@@ -320,7 +320,7 @@ void SequencerImgui::draw_items(const float timeline_width)
             auto mousepos = ImGui::GetMousePos();
             ImRect rect(slotP1, slotP2);
             item_hovered = rect.Contains(mousepos);
-            printf("%d\n", (int)item_hovered);
+           // printf("%d\n", (int)item_hovered);
 
             const float width = 6.0;
 

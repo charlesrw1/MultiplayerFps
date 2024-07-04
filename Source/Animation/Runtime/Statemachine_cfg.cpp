@@ -41,7 +41,7 @@ PropertyInfoList* State::get_props()
 }
 
 
-PropertyInfoList* Statemachine_Node_CFG::get_props()
+const PropertyInfoList* Statemachine_Node_CFG::get_props()
 {
 	MAKE_INLVECTORCALLBACK_ATOM(uint16_t, entry_transitions, Statemachine_Node_CFG);
 	MAKE_VECTORCALLBACK(State, states);
@@ -58,7 +58,7 @@ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 	init_memory_internal(tree, sizeof(RT_TYPE));
 
 	for (int i = 0; i < states.size(); i++) {
-		states[i].tree = serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
+		states[i].tree = (Node_CFG*)serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);
 	}
 
 	if (tree->get_graph_is_valid()) {
@@ -77,10 +77,7 @@ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 			bool bad = false;
 			const std::string& code = transitions[i].script_uncompilied;
 			try {
-				auto ret = transitions[i].script_condition.compile(
-					tree->get_program(),
-					code,
-					NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
+				auto ret = tree->get_script()->compile(transitions[i].handle, code, "anim_inst");
 
 				// must return boolean
 				if (ret.out_types.size() != 1 || ret.out_types[0] != script_types::bool_t)
@@ -90,7 +87,7 @@ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 				bad = true;
 			}
 			if (bad)
-				transitions[i].script_condition.instructions.clear();
+				transitions[i].handle.id = -1;
 		}
 	}
 }
@@ -120,9 +117,9 @@ handle<State> Statemachine_Node_CFG::find_enter_state(Statemachine_Node_RT* rt, 
 		}
 
 		// some error, should assert
-		ASSERT(!st.script_condition.instructions.empty());
+		ASSERT(st.handle.is_valid());
 		script_state state(stack, 0, 32, nullptr);
-		st.script_condition.execute(&state, ctx.script_prog, &ctx.tree->vars);
+		ctx.script->execute(st.handle, &state, &ctx.get_script_inst());
 		bool yes = state.pop_int();
 
 		if (yes) {
@@ -151,12 +148,13 @@ const State_Transition* Statemachine_Node_CFG::find_state_transition(NodeRt_Ctx&
 		const State_Transition& st = transitions[s->transition_idxs[i]];
 		if (st.is_a_continue_transition())
 			return &st;
-		ASSERT(!st.script_condition.instructions.empty());
 
-		script_state state(ctx.stack, 0, ctx.stack_size, nullptr);
-		st.script_condition.execute(&state, ctx.script_prog, &ctx.tree->vars);
-		bool good = state.pop_int();
-		if (good) {
+		ASSERT(st.handle.is_valid());
+		script_state state(ctx.stack, 0, 32, nullptr);
+		ctx.script->execute(st.handle, &state, &ctx.get_script_inst());
+		bool yes = state.pop_int();
+
+		if (yes) {
 			return &st;
 		}
 	}

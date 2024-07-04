@@ -3,33 +3,52 @@
 #include "Framework/Factory.h"
 #include "Framework/DictWriter.h"
 #include "Framework/DictParser.h"
+#include "Framework/ClassBase.h"
 #include <string>
 
+inline void copy_object_properties( ClassBase* from, ClassBase* to, TypedVoidPtr userptr)
+{
+	ASSERT(from->get_type() == to->get_type());
 
-template<typename BASE, typename PROPGETTER>
+	std::vector<const PropertyInfoList*> props;
+	const ClassTypeInfo* typeinfo = &from->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back(typeinfo->props);
+		typeinfo = typeinfo->super_typeinfo;
+	}
+	copy_properties(props, from, to, userptr);
+}
+
 inline void write_object_properties(
-	BASE* obj,
+	ClassBase* obj,
 	TypedVoidPtr userptr,
 	DictWriter& out
 )
 {
 	std::vector<PropertyListInstancePair> props;
-	PROPGETTER::get(props, obj);
+	const ClassTypeInfo* typeinfo = &obj->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, obj });
+		typeinfo = typeinfo->super_typeinfo;
+	}
+
+	typeinfo = &obj->get_type();
 
 	out.write_item_start();
 
-	out.write_key_value("type", obj->get_typeinfo().name);
+	out.write_key_value("type", typeinfo->classname);
 	for (auto& proplist : props) {
 		if(proplist.list)
-			write_properties(*proplist.list, proplist.instance, out, userptr);
+			write_properties(*const_cast<PropertyInfoList*>(proplist.list), proplist.instance, out, userptr);
 	}
 
 	out.write_item_end();
 }
 
-template<typename BASE, typename PROPGETTER>
+template<typename BASE>
 inline BASE* read_object_properties(
-	Factory<std::string,BASE>& factory,
 	TypedVoidPtr userptr,
 	DictParser& in,
 	StringView tok
@@ -41,11 +60,17 @@ inline BASE* read_object_properties(
 	if (!tok.cmp("type"))
 		return nullptr;
 	in.read_string(tok);
-	BASE* obj = factory.createObject(tok.to_stack_string().c_str());
+	BASE* obj = ClassBase::create_class<BASE>(tok.to_stack_string().c_str());
 	if (!obj)
 		return nullptr;
+
 	std::vector<PropertyListInstancePair> props;
-	PROPGETTER::get(props, obj);
+	const ClassTypeInfo* typeinfo = &obj->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, obj });
+		typeinfo = typeinfo->super_typeinfo;
+	}
 
 	auto ret = read_multi_properties(props, in, {}, userptr);
 	tok = ret.first;

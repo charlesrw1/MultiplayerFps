@@ -20,6 +20,9 @@ static const char* core_type_id_strs[] = {
 	"Enum16",
 	"Enum32",
 	"Float",
+	"Vec2",
+	"Vec3",
+	"Quat",
 	"Struct",
 	"StdString",
 	"List"
@@ -185,11 +188,12 @@ PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
-PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype)
+PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Struct;
 	prop.custom_type_str = customtype;
+	prop.range_hint = hint;
 	return prop;
 }
 
@@ -294,7 +298,7 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr
 }
 
 
-void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr)
+void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr)
 {
 	for (int i = 0; i < list.count; i++)
 	{
@@ -312,6 +316,23 @@ void write_properties(PropertyInfoList& list, void* ptr, DictWriter& out, TypedV
 			out.write_value_quoted(write_val.first.c_str());
 	}
 }
+
+void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, void* to, TypedVoidPtr userptr)
+{
+	DictWriter out;
+	for(auto l : lists)
+		write_properties(*l, from, out, userptr);
+	DictParser parser;
+	auto str = std::move(out.get_output());
+	parser.load_from_memory((uint8_t*)str.c_str(), str.size(), "...");
+	std::vector<PropertyListInstancePair> pairs;
+	for (auto l : lists)
+		pairs.push_back({ l,to });
+	read_multi_properties(pairs, parser, {}, userptr);
+}
+
+
+
 bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr);
 bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
 {
@@ -475,7 +496,7 @@ std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstan
 	return { tok, true };
 }
 
-std::pair<StringView, bool> read_properties(PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
+std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
 {
 	std::vector<PropertyListInstancePair> props(1);
 	props[0] = { &list,ptr };

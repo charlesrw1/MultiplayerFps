@@ -1562,6 +1562,9 @@ void draw_skeleton(const AnimatorInstance* a,float line_len,const mat4& transfor
 {
 	auto& bones = a->get_global_bonemats();
 	auto model = a->get_model();
+	if (!model || !model->get_skel())
+		return;
+	
 	auto skel = model->get_skel();
 	for (int index = 0; index < skel->get_num_bones(); index++) {
 		vec3 org = transform * bones[index][3];

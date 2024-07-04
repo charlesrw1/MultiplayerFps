@@ -68,7 +68,7 @@ struct PlayerFlags
 class Player : public Entity
 {
 public:
-	ENTITY_HEADER();
+	CLASS_HEADER();
 
 	Player();
 

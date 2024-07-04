@@ -3,8 +3,8 @@
 #include "Model.h"
 #include "glm/glm.hpp"
 
+#include "Animation.h"
 #include "Animation/AnimationTreePublic.h"
-
 #include "Framework/ExpressionLang.h"
 #include "Framework/MemArena.h"
 #include "Framework/InlineVec.h"
@@ -13,10 +13,7 @@
 #include "Framework/Factory.h"
 #include "Framework/PoolAllocator.h"
 #include "Framework/TypeInfo.h"
-
-#include "ControlParams.h"
-#include "ControlParamHandle.h"
-
+#include "Framework/ClassBase.h"
 #include "Animation/SkeletonData.h"
 
 
@@ -31,7 +28,7 @@ struct AgSerializeContext
 {
 	AgSerializeContext(Animation_Tree_CFG* tree);
 
-	std::unordered_map<Node_CFG*, int> ptr_to_index;
+	std::unordered_map<BaseAGNode*, int> ptr_to_index;
 	Animation_Tree_CFG* tree = nullptr;
 };
 
@@ -41,49 +38,52 @@ struct Rt_Vars_Base
 	uint16_t last_update_tick = 0;
 };
 
-inline Node_CFG* serialized_nodecfg_ptr_to_ptr(Node_CFG* ptr, Animation_Tree_CFG* cfg) {
+class BaseAGNode;
+inline BaseAGNode* serialized_nodecfg_ptr_to_ptr(BaseAGNode* ptr, Animation_Tree_CFG* cfg) {
 	uintptr_t index = (uintptr_t)ptr;	// serialized as indicies
 	ASSERT(index < 0xffff || index == -1);	// assume anything larger is a bad pointer error
 	return (index == -1) ? nullptr : cfg->get_node(index);
 }
 
-inline Node_CFG* ptr_to_serialized_nodecfg_ptr(Node_CFG* ptr, const AgSerializeContext* ctx) {
+inline BaseAGNode* ptr_to_serialized_nodecfg_ptr(BaseAGNode* ptr, const AgSerializeContext* ctx) {
 	ASSERT(ptr == nullptr || ctx->ptr_to_index.find(ptr) != ctx->ptr_to_index.end());
 	uintptr_t index = (ptr) ? ctx->ptr_to_index.find(ptr)->second : -1;
-	return (Node_CFG*)index;
+	return (BaseAGNode*)index;
 }
 
-class Program;
-struct Animation_Tree_RT;
 struct Animation_Tree_CFG;
 struct Node_CFG;
-struct Control_Params;
-class Language;
-struct NodeRt_Ctx
+class NodeRt_Ctx
 {
-	const Model* model = nullptr;
+public:
+	NodeRt_Ctx(AnimatorInstance* inst, script_value_t* stack, int stack_size);
 
-	Animation_Tree_RT* tree = nullptr;
-	const ControlParam_CFG* param_cfg = nullptr;
-	const Program* script_prog = nullptr;
+	const Model* model = nullptr;
+	AnimatorInstance* anim = nullptr;
+	const Script* script = nullptr;
 	uint16_t tick = 0;
+
+	ScriptInstance& get_script_inst() { return anim->get_script_inst(); }
 
 	int stack_size = 0;
 	script_value_t* stack = nullptr;
 
-	float get_float(ControlParamHandle handle) const {
-		return param_cfg->get_float(&tree->vars, handle);
-	}
-	int get_int(ControlParamHandle handle) const {
-		return param_cfg->get_int(&tree->vars, handle);
-	}
-	bool get_bool(ControlParamHandle handle) const {
-		return param_cfg->get_bool(&tree->vars, handle);
-	}
 	const MSkeleton* get_skeleton() const {
 		return model->get_skel();
 	}
 	uint32_t num_bones() const { return model->get_skel()->get_num_bones(); }
+
+	template<typename T>
+	T* get(uint32_t offset) {
+		ASSERT(offset + sizeof(T) <= anim->data.size());
+		return (T*)(anim->data.data() + offset);
+	}
+	template<typename T>
+	T* construct_rt(uint32_t ofs) {
+		T* ptr = get<T>(ofs);
+		ptr = new(ptr)(T);
+		return ptr;
+	}
 };
 
 struct GetPose_Ctx
@@ -131,32 +131,80 @@ struct GetPose_Ctx
 	float automatic_transition_time = 0.0;
 };
 
-
-class Node_CFG
+class BaseAGNode : public ClassBase
 {
 public:
-	static Factory<std::string, Node_CFG>& get_factory();
+	CLASS_HEADER();
 
 	virtual void initialize(Animation_Tree_CFG* cfg) = 0;
+	virtual void construct(NodeRt_Ctx& ctx) const {
+	}
+protected:
+	void fixup_ptrs(Animation_Tree_CFG* cfg) {
+		const PropertyInfoList* l = get_type().props;
+		if (!l)
+			return;
+
+		// auto fixup
+		for (int i = 0; i < l->count; i++) {
+			if (strcmp(l->list[i].name, "AgSerializeNodeCfg") == 0) {
+				BaseAGNode** nodea = (BaseAGNode**)l->list[i].get_ptr(this);
+				*nodea = serialized_nodecfg_ptr_to_ptr(*nodea, cfg);
+			}
+		}
+
+	}
+	
+};
+
+using AnimGraphVariable = handle<ScriptVariable>;
+
+// only accepted graph values
+extern AutoEnumDef anim_graph_value_def;
+enum class anim_graph_value
+{
+	bool_t,
+	float_t,
+	int_t,
+	vec3_t,
+	quat_t,
+};
+
+class NodeRt_Ctx;
+class ValueNode : public BaseAGNode
+{
+public:
+	CLASS_HEADER();
+
+	template<typename T>
+	T get_value(NodeRt_Ctx& ctx) {
+		T val{};
+		get_value_internal(ctx, &val);
+		return val;
+	}
+	virtual anim_graph_value get_value_type() const = 0;
+private:
+	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) = 0;
+};
+
+
+
+class Node_CFG : public BaseAGNode
+{
+public:
+	CLASS_HEADER();
+
+
 
 	bool get_pose(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 		set_active(ctx, get_rt<Rt_Vars_Base>(ctx));
 		return get_pose_internal(ctx, pose);
 	}
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const = 0;
-	virtual void construct(NodeRt_Ctx& ctx) const {
-		//assert(rt_offset == 0);
-	}
+
 	virtual void reset(NodeRt_Ctx& ctx) const = 0;
 	virtual bool is_clip_node() const { return false; }
 
-	// serialization helpers
-	void add_props(std::vector<PropertyListInstancePair>& props) {
-		props.push_back({ Node_CFG::get_props_static(), this });
-		props.push_back({ get_props(), this });
-	}
-	virtual PropertyInfoList* get_props() = 0;
-	virtual const TypeInfo& get_typeinfo() const = 0;
 
 	void set_active(NodeRt_Ctx& ctx, Rt_Vars_Base* base) const {
 		base->last_update_tick = ctx.tick;
@@ -167,18 +215,13 @@ public:
 
 	template<typename T>
 	T* get_rt(NodeRt_Ctx& ctx) const {
-		return ctx.tree->get<T>(rt_offset);
+		return ctx.get<T>(rt_offset);
 	}
-
-	static PropertyInfoList* get_props_static();
-
-	InlineVec<Node_CFG*, 2> input;
 protected:
 	template<typename T>
 	T* construct_this(NodeRt_Ctx& ctx) const {
-		return ctx.tree->construct_rt<T>(rt_offset);
+		return ctx.construct_rt<T>(rt_offset);
 	}
-
 
 	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size) {
 		rt_offset = cfg->get_data_used();
@@ -186,9 +229,7 @@ protected:
 
 		cfg->add_data_used(rt_size);
 
-		for (int i = 0; i < input.size(); i++) {
-			input[i] = serialized_nodecfg_ptr_to_ptr(input[i], cfg);
-		} 
+		fixup_ptrs(cfg);
 	}
 
 private:
@@ -196,35 +237,12 @@ private:
 };
 
 #define DECLARE_NODE_CFG(TYPE_NAME) \
-virtual PropertyInfoList* get_props() override; \
-virtual const TypeInfo& get_typeinfo() const override; \
+CLASS_HEADER(); \
 virtual void initialize(Animation_Tree_CFG* tree) override { \
 	init_memory_internal(tree, sizeof(RT_TYPE)); \
 } \
 TYPE_NAME() {}
 
-#define DECLARE_NO_DEFAULT(TYPE_NAME) \
-virtual PropertyInfoList* get_props() override; \
-virtual const TypeInfo& get_typeinfo() const override; 
-
-// playback speed *= param / (speed of clip's root motion)
-struct Scale_By_Rootmotion_CFG : public Node_CFG
-{
-	using RT_TYPE = Rt_Vars_Base;
-	DECLARE_NODE_CFG(Scale_By_Rootmotion_CFG);
-	
-	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override
-	{
-		float rm = ctx.get_float(param);
-		bool ret = input[0]->get_pose(ctx, pose.set_rootmotion(rm));
-		return ret;
-	}
-
-	virtual void reset(NodeRt_Ctx& ctx) const override {
-	}
-
-	ControlParamHandle param;
-};
 
 struct Sync_Node_RT : Rt_Vars_Base
 {
@@ -248,7 +266,7 @@ struct Sync_Node_CFG : public Node_CFG
 		sv.first_seen = true;
 		sv.normalized_frame = rt->normalized_frame;
 
-		bool ret = input[0]->get_pose(ctx, pose.set_sync(&sv));
+		bool ret = input->get_pose(ctx, pose.set_sync(&sv));
 
 		rt->normalized_frame = sv.normalized_frame;
 
@@ -258,10 +276,16 @@ struct Sync_Node_CFG : public Node_CFG
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		Sync_Node_RT* rt = get_rt<Sync_Node_RT>(ctx);
 		rt->normalized_frame = 0.0;
-		input[0]->reset(ctx);
+		input->reset(ctx);
+	}
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Sync_Node_CFG)
+			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+		END_PROPS(Sync_Node_CFG)
 	}
 
-	ControlParamHandle param;
+	Node_CFG* input = nullptr;
 };
 
 struct Clip_Node_RT : Rt_Vars_Base
@@ -306,6 +330,24 @@ struct Clip_Node_CFG : public Node_CFG
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
+	static PropertyInfoList* get_props()
+	{
+		START_PROPS(Clip_Node_CFG)
+			REG_ENUM(rm[0], PROP_DEFAULT, "rm::keep", rootmotion_setting_def.id),
+			REG_ENUM(rm[1], PROP_DEFAULT, "rm::keep", rootmotion_setting_def.id),
+			REG_ENUM(rm[2], PROP_DEFAULT, "rm::keep", rootmotion_setting_def.id),
+
+			REG_BOOL(loop, PROP_DEFAULT, "1"),
+			REG_FLOAT(speed, PROP_DEFAULT, "1.0,0.1,10"),
+			REG_INT(start_frame, PROP_DEFAULT, "0"),
+			REG_BOOL(allow_sync, PROP_DEFAULT, "0"),
+			REG_BOOL(can_be_leader, PROP_DEFAULT, "0"),
+
+			REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
+
+		END_PROPS(Clip_Node_CFG)
+	}
+
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 		rt->anim_time = 0.0;
@@ -342,13 +384,14 @@ struct Subtract_Node_CFG : public Node_CFG
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		input[REF]->reset(ctx);
-		input[SOURCE]->reset(ctx);
+		ref->reset(ctx);
+		source->reset(ctx);
 	}
-	enum {
-		REF,
-		SOURCE
-	};
+	static PropertyInfoList* get_props() { return nullptr; }
+
+	Node_CFG* ref = nullptr;
+	Node_CFG* source = nullptr;
+
 };
 
 struct Add_Node_CFG : public Node_CFG
@@ -357,16 +400,22 @@ struct Add_Node_CFG : public Node_CFG
 	DECLARE_NODE_CFG(Add_Node_CFG);
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Add_Node_CFG)
+			REG_CUSTOM_TYPE_HINT(diff, PROP_SERIALIZE, "AgSerializeNodeCfg","local"),
+			REG_CUSTOM_TYPE_HINT(base, PROP_SERIALIZE, "AgSerializeNodeCfg","local"),
+			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg","float"),
+		END_PROPS(Add_Node_CFG)
+	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		input[DIFF]->reset(ctx);
-		input[BASE]->reset(ctx);
+		diff->reset(ctx);
+		base->reset(ctx);
 	}
 
-	enum {
-		DIFF,
-		BASE
-	};
-	ControlParamHandle param;
+	Node_CFG* diff = nullptr;
+	Node_CFG* base = nullptr;
+	ValueNode* param = nullptr;
 };
 
 struct Blend_Node_RT : Rt_Vars_Base
@@ -379,16 +428,27 @@ struct Blend_Node_RT : Rt_Vars_Base
 struct Blend_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Blend_Node_RT;
-	DECLARE_NO_DEFAULT(Blend_Node_CFG);
+	CLASS_HEADER();
 
 	virtual void initialize(Animation_Tree_CFG* tree) override {
 		init_memory_internal(tree, sizeof(RT_TYPE)); 
-		if (param.is_valid()) {
-			parameter_type = (tree->get_control_params()->get_type(param) == control_param_type::float_t) ? 0 : 1;
-		}
 	} 
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Blend_Node_CFG)
+			REG_FLOAT(damp_factor, PROP_DEFAULT, "0.1"),
+			REG_BOOL(store_value_on_reset, PROP_DEFAULT, "0"),
+
+
+			REG_CUSTOM_TYPE_HINT(inp0, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+			REG_CUSTOM_TYPE_HINT(inp1, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+
+		END_PROPS(Blend_Node_CFG)
+	}
 
 	virtual void construct(NodeRt_Ctx& ctx) const override {
 		construct_this<RT_TYPE>(ctx);
@@ -398,24 +458,22 @@ struct Blend_Node_CFG : public Node_CFG
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 
 		float cur_val = 0.0;
-		if (param.is_valid()) {
-			if (parameter_type == 0)	// float
-				cur_val = ctx.get_float(param);
-			else // boolean
-				cur_val = (float)ctx.get_bool(param);
-		}
+		cur_val = param->get_value<float>(ctx);
+
 		rt->lerp_amt = cur_val;
 		if (store_value_on_reset)
 			rt->saved_f = cur_val;
 
 
-
-		input[0]->reset(ctx);
-		input[1]->reset(ctx);
-
+		inp0->reset(ctx);
+		inp1->reset(ctx);
 	}
 
-	ControlParamHandle param;
+	Node_CFG* inp0 = nullptr;
+	Node_CFG* inp1 = nullptr;
+
+	ValueNode* param = nullptr;
+
 	float damp_factor = 0.1;
 	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
 	// below are computed on init
@@ -439,6 +497,15 @@ public:
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Blend_Int_Node_CFG)
+
+			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg", "int"),
+
+		END_PROPS(Blend_Int_Node_CFG)
+	}
+
 	virtual void construct(NodeRt_Ctx& ctx) const override {
 		construct_this<RT_TYPE>(ctx);
 	}
@@ -446,9 +513,7 @@ public:
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
 		
-		if (!param.is_valid()) return;
-
-		int val = ctx.get_int(param);
+		int val = param->get_value<int>(ctx);
 
 		rt->active_i = get_actual_index(val);
 		rt->lerp_amt = 1.0;
@@ -459,21 +524,14 @@ public:
 	}
 
 	int get_actual_index(int val_from_param) const {
-		if (!uses_jump_table) {
-			assert(val_from_param >= 0 && val_from_param <input.size());
-			return val_from_param;
-		}
-		assert(val_from_param >= 0 && val_from_param < jump_table.size());
-		int real_idx = jump_table[val_from_param];
-		assert(real_idx >= 0 && real_idx < input.size());
-		return real_idx;
+		if (val_from_param < 0 || val_from_param >= input.size()) val_from_param = 0;
+		return val_from_param;
 	}
 
+	InlineVec<Node_CFG*, 2> input;
 	float damp_factor = 0.1;
 	bool store_value_on_reset = false;
-	ControlParamHandle param;
-	bool uses_jump_table = false;	// for enums
-	InlineVec<unsigned char, 10> jump_table;
+	ValueNode* param = nullptr;
 };
 
 struct Mirror_Node_RT : Rt_Vars_Base
@@ -484,27 +542,32 @@ struct Mirror_Node_RT : Rt_Vars_Base
 struct Mirror_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Mirror_Node_RT;
-	DECLARE_NO_DEFAULT(Mirror_Node_CFG);
+	CLASS_HEADER();
 	virtual void initialize(Animation_Tree_CFG* cfg) {
 		init_memory_internal(cfg, sizeof(RT_TYPE));
-		parameter_type = cfg->get_control_params()->get_type(param) == control_param_type::float_t ? 0 : 1;
 	}
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Mirror_Node_CFG)
+			REG_FLOAT(damp_time, PROP_DEFAULT, "0.1"),
+
+			REG_BOOL(store_value_on_reset, PROP_DEFAULT, "0"),
+
+			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+
+		END_PROPS(Mirror_Node_CFG)
+	}
+
 	virtual void reset(NodeRt_Ctx& ctx) const override
 	{
 		auto rt = get_rt< Mirror_Node_RT>(ctx);
-
-		if (parameter_type == 0) {
-			rt->saved_f = ctx.get_float(param);
-		}
-		else {
-			rt->saved_f = (float)ctx.get_bool(param);
-		}
-
-		input[0]->reset(ctx);
+		rt->saved_f = param->get_value<float>(ctx);
+		input->reset(ctx);
 	}
 
 	virtual void construct(NodeRt_Ctx& ctx) const override {
@@ -512,7 +575,8 @@ struct Mirror_Node_CFG : public Node_CFG
 	}
 
 	float damp_time = 0.1;
-	ControlParamHandle param;
+	Node_CFG* input = nullptr;
+	ValueNode* param = nullptr;
 	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
 	// below are computed on init
 	uint8_t parameter_type = 1;// 0 = float, 1 = bool
@@ -530,8 +594,8 @@ struct BlendSpace2d_CFG : public Node_CFG
 	using RT_TYPE = BlendSpace2d_RT;
 	DECLARE_NODE_CFG(BlendSpace2d_CFG);
 
-	ControlParamHandle xparam;
-	ControlParamHandle yparam;
+	ValueNode* xparam = nullptr;
+	ValueNode* yparam = nullptr;
 
 	float weight_damp = 0.01;
 
@@ -547,6 +611,17 @@ struct BlendSpace2d_CFG : public Node_CFG
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(BlendSpace2d_CFG)
+
+			REG_FLOAT(weight_damp, PROP_DEFAULT, "0.01"),
+
+			REG_CUSTOM_TYPE_HINT(xparam, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+			REG_CUSTOM_TYPE_HINT(yparam, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+
+		END_PROPS(BlendSpace2d_CFG)
+	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		*get_rt<RT_TYPE>(ctx) = RT_TYPE();
 	}
@@ -571,6 +646,13 @@ public:
 	bool is_additive_blend_space = false;
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(BlendSpace1d_CFG)
+			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+			REG_BOOL(is_additive_blend_space, PROP_DEFAULT, "0"),
+			END_PROPS(BlendSpace1d_CFG)
+	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		*get_rt<RT_TYPE>(ctx) = RT_TYPE();
 	}
@@ -578,7 +660,7 @@ public:
 	virtual void construct(NodeRt_Ctx& ctx) const override {
 		construct_this<RT_TYPE>(ctx);
 	}
-	ControlParamHandle param;
+	ValueNode* param = nullptr;
 };
 
 
@@ -599,22 +681,39 @@ public:
 		rt->mask = ctx.get_skeleton()->find_mask(maskname);
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
-		input[0]->reset(ctx);
-		input[1]->reset(ctx);
+		base->reset(ctx);
+		layer->reset(ctx);
+	}
+
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Blend_Masked_CFG)
+			REG_BOOL(meshspace_rotation_blend, PROP_DEFAULT, "0"),
+			REG_INT(maskname, PROP_SERIALIZE, "0"),
+
+			REG_CUSTOM_TYPE_HINT(base, PROP_SERIALIZE, "AgSerializeNodeCfg","local"),
+			REG_CUSTOM_TYPE_HINT(layer, PROP_SERIALIZE, "AgSerializeNodeCfg","local"),
+			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg","float"),
+		END_PROPS(Blend_Masked_CFG)
 	}
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
 	bool meshspace_rotation_blend = false;
-	int8_t param_type = 0;	// 0 = float,1=bool
-	ControlParamHandle param;
+	ValueNode* param = nullptr;
+	Node_CFG* base = nullptr;
+	Node_CFG* layer = nullptr;
+
 	StringName maskname;
 };
 
+// local/meshspace conversion
+// 2 bone ik
+// modify transform
+// copy transform
 
 class LocalToComponent_CFG
 {
-
 };
 
 class ComponentToLocal_CFG
@@ -645,4 +744,74 @@ class MotionWarp_CFG
 class BoneModifier_CFG
 {
 
+};
+
+
+#define VALUENODE_HEADER(type) virtual anim_graph_value get_value_type() const override { return anim_graph_value::type; } \
+CLASS_HEADER();
+
+class CurveNode : public ValueNode
+{
+public:
+	VALUENODE_HEADER(float_t);
+	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+		*(float*)ptr = 0.f;
+	}
+	static const PropertyInfoList* get_props() {
+		START_PROPS(CurveNode) REG_STDSTRING(curve_name, PROP_DEFAULT) END_PROPS(CurveNode)
+	}
+	std::string curve_name;
+};
+class VectorConstant : public ValueNode
+{
+public:
+	VALUENODE_HEADER(vec3_t);
+	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+		*(glm::vec3*)ptr = v;
+	}
+	static const PropertyInfoList* get_props() {
+		return nullptr;
+	}
+	glm::vec3 v;
+};
+class VariableNode : public ValueNode
+{
+public:
+	CLASS_HEADER();
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(VariableNode) REG_INT(handle, PROP_DEFAULT, "") END_PROPS(VariableNode)
+	}
+	AnimGraphVariable handle;
+};
+
+class RotationConstant : public ValueNode
+{
+public:
+	VALUENODE_HEADER(quat_t);
+	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+		*(glm::quat*)ptr = rotation;
+	}
+	glm::quat rotation;
+};
+class FloatConstant : public ValueNode
+{
+public:
+	VALUENODE_HEADER(float_t);
+	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+		*(float*)ptr = f;
+	}
+	static const PropertyInfoList* get_props() {
+		START_PROPS(FloatConstant) REG_FLOAT(f, PROP_DEFAULT, "") END_PROPS(FloatConstant)
+	}
+	float f = 0.0;
+};
+class BoolAsFloatConstant : public ValueNode
+{
+public:
+	VALUENODE_HEADER(float_t);
+	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+
+	}
+	bool b = false;
 };

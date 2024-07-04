@@ -1,16 +1,30 @@
 #include "State_node.h"
 #include "Statemachine_node.h"
 #include "AnimationGraphEditor.h"
+#include "Root_node.h"
+
+bool State_EdNode::is_start_node() const
+{
+	return get_type() == StateStart_EdNode::StaticType;
+}
+bool State_EdNode::is_alias_node() const
+{
+	return get_type() == StateAlias_EdNode::StaticType;
+
+}
 void State_EdNode::init()
 {
+	if (is_regular_state_node())
+		push_empty_node();
+
 	if (!is_this_node_created())
 		return;
 	// loaded nodes get a different path
 
 	Base_EdNode* parent = ed.get_owning_node_for_layer(graph_layer);
 	ASSERT(parent);
-	ASSERT(strcmp(parent->get_typeinfo().name, "Statemachine_EdNode") == 0);
-	parent_statemachine = (Statemachine_EdNode*)parent;
+	ASSERT(parent->is_a<Statemachine_EdNode>());
+	parent_statemachine = parent->cast_to<Statemachine_EdNode>();
 	parent_statemachine->add_node_to_statemachine(this);
 
 	if (is_regular_state_node()) {
@@ -39,7 +53,7 @@ void State_EdNode::init_for_statemachine(Statemachine_EdNode* parent, std::vecto
 			State_Transition& t = parent_statemachine->node->transitions.at(index);
 			State_EdNode* to = handle_to_ednode[t.transition_state.id];
 			ASSERT(to->is_regular_state_node());
-			to->add_input(&ed, this, to->num_inputs++ - 1 /* num_inputs initialized to 1 */);
+			to->push_input(&ed, this);
 			// this is horrible, add_input calls on_output on this
 			ASSERT(output.back().output_to == to);
 			output.back().st = t;
@@ -57,7 +71,7 @@ void State_EdNode::init_for_statemachine(Statemachine_EdNode* parent, std::vecto
 			State_Transition& t = parent_statemachine->node->transitions.at(index);
 			State_EdNode* to = handle_to_ednode[t.transition_state.id];
 			ASSERT(to->is_regular_state_node());
-			to->add_input(&ed, this, to->num_inputs++ - 1 /* num_inputs initialized to 1 */);
+			to->push_input(&ed, this);
 			// this is horrible, add_input calls on_output on this
 			ASSERT(output.back().output_to == to);
 			output.back().st = t;
@@ -82,18 +96,18 @@ std::string State_EdNode::get_title() const
 
 	bool any_non_defaults = false;
 
-	auto startnode = ed.find_first_node_in_layer(sublayer.id,"Root_EdNode");
+	auto startnode = ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
 
-	if (!startnode->inputs[0] || strcmp(startnode->inputs[0]->get_typeinfo().name, "Clip_EdNode") != 0)
+	if (!startnode->inputs[0].node || !startnode->inputs[0].node->is_a<Clip_EdNode>())
 		return get_name();
 
 	// get clip name to use as default state name
-	return startnode->inputs[0]->get_title();
+	return startnode->inputs[0].node->get_title();
 }
 bool State_EdNode::push_imnode_link_colors(int index) {
-	ASSERT(inputs[index]);
-	ASSERT(inputs[index]->is_state_node());
-	State_EdNode* other = (State_EdNode*)inputs[index];
+	ASSERT(inputs[index].node);
+	State_EdNode* other =inputs[index].node->cast_to<State_EdNode>();
+	ASSERT(other);
 
 	auto st = other->get_state_transition_to(this, index);
 	ASSERT(st);
@@ -114,9 +128,9 @@ bool State_EdNode::push_imnode_link_colors(int index) {
 
 std::string State_EdNode::get_input_pin_name(int index) const
 {
-	if (!inputs[index]) return {};
+	if (!inputs[index].node) return {};
 
-	std::string name = inputs[index]->get_title();
+	std::string name = inputs[index].node->get_title();
 	if (name.size() > 16) {
 		name.resize(13);
 		name.append("...");
@@ -126,14 +140,9 @@ std::string State_EdNode::get_input_pin_name(int index) const
 
 void State_EdNode::on_remove_pin(int slot, bool force)
 {
-	ASSERT(inputs[slot]);
-
-	if (inputs[slot]->is_state_node()) {
-		((State_EdNode*)inputs[slot])->remove_output_to(this, slot);
-		inputs[slot] = nullptr;
-	}
-	else
-		ASSERT(!"not state node in state graph");
+	ASSERT(inputs[slot].node&&inputs[slot].node->is_a<State_EdNode>());
+	inputs[slot].node->cast_to<State_EdNode>()->remove_output_to(this, slot);
+	inputs[slot].node = nullptr;
 }
 
 void State_EdNode::remove_reference(Base_EdNode* node)
@@ -153,14 +162,12 @@ void State_EdNode::remove_reference(Base_EdNode* node)
 bool State_EdNode::add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot)
 {
 	ASSERT(input->is_state_node());
+	ASSERT(inputs[slot].type.type == GraphPinType::state_t);
 
-	inputs[slot] = input;
+	inputs[slot].node = input;
 
-	State_EdNode* statenode = (State_EdNode*)input;
+	State_EdNode* statenode = input->cast_to<State_EdNode>();
 	statenode->on_output_create(this, slot);
-
-	if (num_inputs > 0 && inputs[num_inputs - 1] && num_inputs < inputs.size())
-		num_inputs++;
 
 	return false;
 }
@@ -194,16 +201,16 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 			const std::string& code = st->script_uncompilied;
 			std::string err_str;
 			try {
+				ScriptHandle handle;
 
-				auto ret = st->script_condition.compile(
-					ed.editing_tree->get_program(),
-					code,
-					NAME("transition_t"));		// selfname = transition_t, for special transition functions like time_remaining() etc.
+				// discard the handle, actually compiling is done when the graph is loaded to run
+				// compiling here is just to check for errors, although there is a possibility for errors to creep in
+				// if the AnimatorInstance variables change types without compiling again
+				auto ret = ed.editing_tree->get_script()->compile(handle, code, "anim_inst");
 
 				// must return boolean
 				if (ret.out_types.size() != 1 || ret.out_types[0] != script_types::bool_t)
 					err_str = "script must return boolean";
-
 			}
 			catch (CompileError err) {
 				err_str = std::move(err.str);
@@ -230,22 +237,16 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 
 	// append tree
 	if (is_regular_state_node()) {
-		Base_EdNode* startnode = ed.find_first_node_in_layer(sublayer.id, "Root_EdNode");
+		Root_EdNode* startnode = ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
 		ASSERT(startnode);
 
-		Node_CFG* tree = nullptr;
-		if (!startnode->inputs[0]) {
+		Node_CFG* tree = startnode->get_root_node();
+
+		if (!tree) {
 			append_fail_msg(string_format("[ERROR] missing start state in blend tree \n"));
 		}
-		else {
 
-			Base_EdNode* rootnode = startnode->inputs[0];
-			ASSERT(rootnode->get_graph_node());
-
-			tree = rootnode->get_graph_node();
-		}
-
-		self_state.tree = ptr_to_serialized_nodecfg_ptr(tree, ctx);	
+		self_state.tree = (Node_CFG*)ptr_to_serialized_nodecfg_ptr(tree, ctx);	
 
 		sm_cfg->states.push_back(self_state);
 	}
@@ -285,10 +286,10 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
  bool State_EdNode::traverse_and_find_errors() {
 	children_have_errors = false;
 	if (is_regular_state_node()) {
-		auto startnode = ed.find_first_node_in_layer(sublayer.id, "Root_EdNode");
+		auto startnode = ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
 
-		if (startnode->inputs[0])
-			children_have_errors |= !startnode->inputs[0]->traverse_and_find_errors();
+		if (startnode->get_root_node())
+			children_have_errors |= !startnode->inputs[0].node->traverse_and_find_errors();
 		// else is an error too, but its already built into compile_error_string
 	}
 	return !children_have_errors && compile_error_string.empty();
@@ -296,31 +297,31 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 
  void State_EdNode::on_post_remove_pins()
  {
-	 ASSERT(num_inputs >= 1);
-	 ASSERT(inputs[num_inputs - 1] == nullptr);
+	 ASSERT(inputs.size() >= 1);
+	 ASSERT(inputs.back().node == nullptr);
 
 	 int count = 0;
-	 for (int i = 0; i < num_inputs - 1; i++) {
-		 if (inputs[i]) {
-			 ASSERT(inputs[i]->is_state_node());
+	 for (int i = 0; i < inputs.size() - 1; i++) {
+		 if (inputs[i].node) {
+			 State_EdNode* statenode = inputs[i].node->cast_to<State_EdNode>();
+			 ASSERT(statenode);
 
-			 State_EdNode* statenode = (State_EdNode*)inputs[i];
 			 statenode->reassign_output_slot(this, i, count);
 
 			 inputs[count++] = inputs[i];
 		 }
 	 }
-	 num_inputs = count + 1;
-	 ASSERT(num_inputs >= 1 && num_inputs < MAX_INPUTS);
-	 inputs[num_inputs - 1] = nullptr;
+	 inputs.resize(count);
+	 push_empty_node();
+
 
 
 #ifdef _DEBUG
-	 ASSERT(num_inputs >= 1);
-	 ASSERT(inputs[num_inputs - 1] == nullptr);
-	 if (num_inputs > 1) {
-		 for (int i = 0; i < num_inputs - 1; i++) {
-			 ASSERT(inputs[i] != nullptr);
+	 ASSERT(inputs.size() >= 1);
+	 ASSERT(inputs.back().node == nullptr);
+	 if (inputs.size() > 1) {
+		 for (int i = 0; i < inputs.size() - 1; i++) {
+			 ASSERT(inputs[i].node != nullptr);
 		 }
 	 }
 #endif // _DEBUG

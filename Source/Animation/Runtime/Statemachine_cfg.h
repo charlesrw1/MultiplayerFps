@@ -39,7 +39,7 @@ struct State_Transition
 	bool is_a_continue_transition() const { return is_continue_transition; }
 	bool is_an_auto() const { return automatic_transition_rule; }
 	handle<State> transition_state;
-	BytecodeExpression script_condition;
+	ScriptHandle handle;
 	std::string script_uncompilied;		// TODO: save to disk precompilied, compiling is fast though so not a huge deal
 	bool is_continue_transition = false;
 	float transition_time = 0.2f;
@@ -75,12 +75,13 @@ struct Statemachine_Node_RT : Rt_Vars_Base
 struct Statemachine_Node_CFG : public Node_CFG
 {
 	using RT_TYPE = Statemachine_Node_RT;
-	DECLARE_NO_DEFAULT(Statemachine_Node_CFG);
+	CLASS_HEADER();
 
 	virtual void initialize(Animation_Tree_CFG* tree) override;
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
-
+	
+	static const PropertyInfoList* get_props();
 
 	// Inherited via At_Node
 	virtual void reset(NodeRt_Ctx& ctx) const override;

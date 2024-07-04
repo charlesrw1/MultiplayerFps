@@ -106,13 +106,3 @@ public:
 	glm::quat q[256];
 	glm::vec3 pos[256];
 };
-
-class PoseMask
-{
-public:
-	PoseMask();
-	void clear_all();
-	bool is_masked(int index);
-	void set(int index, bool masked);
-	uint64_t mask[4];	//256/
-};

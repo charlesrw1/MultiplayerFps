@@ -22,7 +22,7 @@ static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, in
 	}
 }
 
-void PropertyGrid::add_property_list_to_grid(PropertyInfoList* list, void* inst, uint32_t flags)
+void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags)
 {
 	IGridRow* row = nullptr;
 
@@ -530,7 +530,7 @@ void ArrayRow::draw_row_controls()
  }
 
 
- GroupRow::GroupRow(IGridRow* parent, void* instance, PropertyInfoList* list, 
+ GroupRow::GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* list, 
 	 int row_idx) 
 	 : IGridRow(parent, row_idx), proplist(list), 
 	 inst(instance)

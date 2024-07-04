@@ -5,8 +5,6 @@
 #include "../Runtime/Statemachine_cfg.h"
 class Statemachine_EdNode : public Base_EdNode
 {
-	EDNODE_HEADER(Statemachine_EdNode);
-	MAKE_STANDARD_ADD_PROPS(Statemachine_EdNode);
 
 	~Statemachine_EdNode() override {
 		ASSERT(sublayer.context);
@@ -14,6 +12,9 @@ class Statemachine_EdNode : public Base_EdNode
 	}
 
 public:
+	CLASS_HEADER();
+	MAKE_OUTPUT_TYPE(localspace_pose);
+
 	// overrides
 	void init() override;
 	std::string get_title() const override;

@@ -85,7 +85,7 @@ bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 		append_fail_msg("[ERROR] state machine states contain errors\n");
 
 
-	auto state_enter = (StateStart_EdNode*)ed.find_first_node_in_layer(sublayer.id, "StateStart_EdNode");
+	auto state_enter = ed.find_first_node_in_layer<StateStart_EdNode>(sublayer.id);
 	ASSERT(state_enter);	// should never be deleted
 
 	bool found_default_entry = false;

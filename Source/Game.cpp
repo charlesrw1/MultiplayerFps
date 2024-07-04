@@ -11,7 +11,7 @@
 
 void find_spawn_position(Entity* ent)
 {
-	int index = eng->find_by_classtype(0, NAME("Spawnpoint") );
+	int index = eng->find_by_classtype(0, ("Spawnpoint") );
 	bool found = false;
 	while (index != -1) {
 		Entity& e = *eng->get_ent(index);
@@ -25,7 +25,7 @@ void find_spawn_position(Entity* ent)
 			return;
 		}
 		
-		index = eng->find_by_classtype(index + 1, NAME("Spawnpoint") );
+		index = eng->find_by_classtype(index + 1, ("Spawnpoint") );
 	}
 
 	sys_print("No valid spawn positions for entity\n");
@@ -98,7 +98,8 @@ Entity* Game_Engine::create_entity(const char* classname, int forceslot)
 	ASSERT(slot != NUM_GAME_ENTS && "create_entity overfow");
 	
 	Entity* e = nullptr;
-	e = get_entityfactory().createObject(classname);
+	e = ClassBase::create_class<Entity>(classname);
+
 	if (!e) {
 		printf("no class defined for name %s\n", classname);
 		return nullptr;
@@ -111,11 +112,15 @@ Entity* Game_Engine::create_entity(const char* classname, int forceslot)
 	return e;
 }
 
-int Game_Engine::find_by_classtype(int index, StringName classtype)
+int Game_Engine::find_by_classtype(int index, const char* classtype)
 {
+	const ClassTypeInfo* ci = ClassBase::find_class(classtype);
+	if (!ci)
+		return -1;
+
 	for (int i = index; i < NUM_GAME_ENTS; i++) {
 		if (!ents[i]) continue;
-		if (ents[i]->get_classname() == classtype)
+		if (ents[i]->get_type() == *ci)
 			return i;
 	}
 	return -1;
@@ -157,7 +162,7 @@ Player* Game_Engine::get_client_player(int slot)
 {
 	ASSERT(slot < MAX_CLIENTS);
 	if (!ents[slot]) return nullptr;
-	ASSERT(ents[slot]->get_classname() == "Player");
+	ASSERT(ents[slot]->is_a<Player>());
 	return (Player*)ents[slot];
 }
 

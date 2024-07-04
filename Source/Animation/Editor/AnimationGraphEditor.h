@@ -160,23 +160,34 @@ private:
 class GraphOutput
 {
 public:
-	bool is_valid_for_preview() { return model && model->get_skel(); }
-
-	void reset_animator();
+	bool is_valid_for_preview() { return model && anim && model->get_skel(); }
+	
+	void hide();
+	void show(bool is_playing);
+	
 	View_Setup vs;
 	User_Camera camera;
-	handle<Render_Object> obj;
+
 	AnimatorInstance* get_animator();
+	Model* get_model() { return model; }
 
-	AnimatorInstance& get_local_animator() {
-		return anim;
+
+	void set_model(Model* model) {
+		this->model = model;
+		idraw->remove_obj(obj);
 	}
+	// Graph output takes ownership of pointer
+	void set_animator_instance(AnimatorInstance* inst);
+	void clear();
 
-	Model* model = nullptr;
+	void initialize_animator(Animation_Tree_CFG* tree) {
+		if (anim && model)
+			anim->initialize_animator(model, tree, nullptr);
+	}
 private:
-
-
-	AnimatorInstance anim;
+	handle<Render_Object> obj;
+	 Model* model = nullptr;
+	unique_ptr<AnimatorInstance> anim = nullptr;
 
 };
 
@@ -185,29 +196,29 @@ struct EditorControlParamProp {
 		current_id = unique_id_generator++;
 	}
 	std::string name = "Unnamed";
-	control_param_type type = control_param_type::int_t;
-	int16_t enum_type = -1;
-	bool is_virtual_param = false;
-	std::string virtual_param_code;
+	anim_graph_value type= anim_graph_value::bool_t;
+	bool is_old_native_param = false;	// old native param means param doesnt exist but variables reference it
+	int reference_count = 0;
 
 	int current_id = 0;
 
-	AG_ControlParam get_control_param() const {
-		AG_ControlParam p;
-		p.name = name;
-		p.type = type;
-		p.enum_idx = enum_type;
-		p.reset_after_tick = false;
-		//p.script_uncompilied = virtual_param_code;
-		return p;
+	static script_types anim_graph_type_to_script_types(anim_graph_value agv) {
+		switch (agv)
+		{
+		case anim_graph_value::bool_t: return script_types::bool_t;
+		case anim_graph_value::float_t: return script_types::float_t;
+		case anim_graph_value::int_t: return script_types::int_t;
+		default:
+			return script_types::custom_t;
+		}
 	}
-	EditorControlParamProp(const AG_ControlParam& param) {
-		name = param.name;
-		type = param.type;
-		enum_type = param.enum_idx;
-		//virtual_param_code = param.script_uncompilied;
-		is_virtual_param = !virtual_param_code.empty();
-		current_id = unique_id_generator++;
+
+	ScriptVariable get_control_param() const {
+		ScriptVariable p;
+		p.name = name;
+		p.type = anim_graph_type_to_script_types(type);
+		p.is_native = true;
+		return p;
 	}
 
 	static PropertyInfoList* get_props();
@@ -228,13 +239,8 @@ public:
 
 	const std::vector<EditorControlParamProp>& get_control_params() { return props; }
 
-	void add_parameters_to_tree(ControlParam_CFG* cfg) {
-		cfg->clear_variables();
-		for (int i = 0; i < props.size(); i++) {
-			ControlParamHandle h = cfg->push_variable(props[i].get_control_param());
-			ASSERT(h.id == i);
-		}
-	}
+	unique_ptr<Script> add_parameters_to_tree();
+	
 	void recalculate_control_prop_ids() {
 		// all parameters are now referencing the 'index' of the property as its id,
 		// so set it for future ones
@@ -243,27 +249,19 @@ public:
 		EditorControlParamProp::reset_id_generator( props.size() );	// reset to size() so new props get added correctly
 	}
 	
-	ControlParamHandle get_index_of_prop_for_compiling(int id) {
+	AnimGraphVariable get_index_of_prop_for_compiling(AnimGraphVariable id) {
 		for (int i = 0; i < props.size(); i++)
-			if (props[i].current_id == id)
+			if (props[i].current_id == id.id)
 				return { i };
 		return { -1 };
 	}
 
-	const EditorControlParamProp* get_parameter_for_ed_id(int id) {
+	const EditorControlParamProp* get_parameter_for_ed_id(AnimGraphVariable id) {
 		for (int i = 0; i < props.size(); i++)
-			if (props[i].current_id == id) 
+			if (props[i].current_id == id.id) 
 				return &props[i];
 
 		return nullptr;
-	}
-
-	void init_from_tree(ControlParam_CFG* cfg) {
-		clear_all();
-		for (int i = 0; i < cfg->types.size(); i++) {
-			props.push_back(cfg->types[i]);
-		}
-		refresh_props();
 	}
 
 	void clear_all() {
@@ -282,45 +280,11 @@ private:
 	PropertyGrid control_params;
 };
 
-class BoneWeightListWindow
-{
-	struct BoneWeightListProp {
-		BoneWeightListProp() {
-			static int unique_id = 0;
-			imgui_id = unique_id++;
-		}
-		std::string name = "Unnamed";
-
-		struct BoneWeightProp {
-			float weight = 0.0;
-			int bone_index = 0;
-		};
-
-		std::vector<BoneWeightProp> weights;
-
-		int imgui_id = 0;
-		static PropertyInfoList* get_props();
-	};
-};
-
-class IPopup
-{
-public:
-	virtual bool draw() = 0;
-};
-
-class AreYouSurePopup : public IPopup
-{
-	virtual bool draw() override;
-	std::function<void(int)> command;
-};
-
-
-
 class Texture;
 class AnimationGraphEditor : public IEditorTool
 {
 public:
+
 	AnimationGraphEditor() : graph_tabs(this) {
 	}
 	virtual void init() override;
@@ -359,7 +323,7 @@ public:
 	bool compile_graph_for_playing();
 	bool load_editor_nodes(DictParser& parser);
 
-	Base_EdNode* editor_node_for_cfg_node(Node_CFG* node) {
+	Base_EdNode* editor_node_for_cfg_node(BaseAGNode* node) {
 		if (node == nullptr)
 			return nullptr;
 		for (int i = 0; i < nodes.size(); i++) {
@@ -379,10 +343,11 @@ public:
 		return nodes.at(find_for_id(id));
 	}
 
-	Base_EdNode* find_first_node_in_layer(uint32_t layer, const char* name) {
+	template<typename T>
+	T* find_first_node_in_layer(uint32_t layer) {
 		for (int i = 0; i < nodes.size(); i++) {
-			if (nodes[i]->graph_layer == layer && strcmp(nodes[i]->get_typeinfo().name, name) == 0 ){
-				return nodes[i];
+			if (nodes[i]->graph_layer == layer && nodes[i]->get_type() == T::StaticType){
+				return nodes[i]->cast_to<T>();
 			}
 		}
 		return nullptr;
@@ -406,6 +371,7 @@ public:
 	PropertyGrid node_props;
 	TabState graph_tabs;
 
+
 	Animation_Tree_CFG* get_tree() {
 		return editing_tree;
 	}
@@ -416,11 +382,6 @@ public:
 		editing_tree->all_nodes.push_back(node);
 	}
 
-	Animation_Tree_RT* get_runtime_tree() {
-		AnimatorInstance* a = out.get_animator();
-
-		return a ? &a->runtime_dat : nullptr;
-	}
 
 	editor_layer create_new_layer(bool is_statemachine) {
 		editor_layer layer;
@@ -463,14 +424,16 @@ public:
 			REG_BOOL(opt.open_control_params, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
-			REG_STDSTRING(opt.preview_model,PROP_EDITABLE),
-			REG_STDSTRING(opt.preview_set, PROP_EDITABLE),
 			REG_FLOAT(out.camera.position.x,PROP_SERIALIZE,""),
 			REG_FLOAT(out.camera.position.y, PROP_SERIALIZE, ""),
 			REG_FLOAT(out.camera.position.z, PROP_SERIALIZE, ""),
 			REG_FLOAT(out.camera.yaw, PROP_SERIALIZE, ""),
 			REG_FLOAT(out.camera.pitch, PROP_SERIALIZE, ""),
 			REG_FLOAT(out.camera.move_speed, PROP_SERIALIZE, ""),
+
+			// Editable options
+			REG_STDSTRING(opt.PreviewModel, PROP_DEFAULT),
+			REG_STDSTRING_CUSTOM_TYPE(opt.AnimatorClass, PROP_DEFAULT, "AnimatorInstanceParentEditor")
 		END_PROPS(AnimationGraphEditor)
 	}
 
@@ -487,8 +450,10 @@ public:
 		bool open_viewport = true;
 		bool open_prop_editor = true;
 		bool statemachine_passthrough = false;
-		std::string preview_model = "player_FINAL.cmdl";
-		std::string preview_set = "default.txt";
+
+		// defaults
+		std::string PreviewModel = "player_FINAL.cmdl";
+		std::string AnimatorClass = "AnimatorInstance";
 	}opt;
 
 	bool reset_prop_editor_next_tick = false;

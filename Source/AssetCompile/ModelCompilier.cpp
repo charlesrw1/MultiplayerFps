@@ -1909,8 +1909,11 @@ void ModelCompileHelper::append_animation_seq_to_list(
 
 	// Output any events
 	if (definition) {
-		for (auto& ev : definition->events)
-			out_seq.events.push_back(std::unique_ptr<AnimationEvent>(ev.event->create_copy()));
+		for (auto& ev : definition->events) {
+			auto copy = ev.event->create_copy();
+			ASSERT(copy->is_a<AnimationEvent>());
+			out_seq.events.push_back(std::unique_ptr<AnimationEvent>(copy->cast_to<AnimationEvent>()));
+		}
 	}
 
 
@@ -2570,7 +2573,7 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 			for (int i = 0; i < seq.second.events.size(); i++) {
 				auto ev = seq.second.events[i].get();
 				DictWriter writer;
-				write_object_properties<AnimationEvent, AnimationEventGetter>(ev, TypedVoidPtr(), writer);
+				write_object_properties(ev, TypedVoidPtr(), writer);
 				out.write_string(writer.get_output());
 			}
 		}

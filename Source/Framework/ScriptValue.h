@@ -15,7 +15,3 @@ struct script_value_t
 		uint64_t ui64;	// name_t, pointer_t, everything else
 	};
 };
-
-
-// instance input variables, size must be > max(global_var_index) or crash
-using program_script_vars_instance = std::vector<script_value_t>;

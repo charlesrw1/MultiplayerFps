@@ -42,6 +42,8 @@
 #include "imgui_impl_sdl2.h"
 
 
+#include "Framework/ClassBase.h"
+
 MeshBuilder phys_debug;
 Game_Engine* eng;
 
@@ -702,7 +704,7 @@ DECLARE_ENGINE_CMD(print_ents)
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
 	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 		Entity& e = ei.get();
-		sys_print("%-15d %-15s %-15f %-15f\n", ei.get_index(), ei.get().get_classname().get_c_str(), e.position.x, e.position.z);
+		sys_print("%-15d %-15s %-15f %-15f\n", ei.get_index(), ei.get().get_type().classname, e.position.x, e.position.z);
 	}
 }
 #endif
@@ -1259,8 +1261,9 @@ void Game_Engine::update_game_tick()
 
 	for (auto ei = Ent_Iterator(); ei.finish_at(Ent_Iterator(MAX_CLIENTS)); ei = ei.next()) {
 		Entity& e = ei.get();
-		ASSERT(e.get_classname() == NAME("Player"));
-		Player* p = (Player*)&e;
+
+		Player* p = e.cast_to<Player>();
+		assert(p);
 
 		// fixme
 		p->update();
@@ -1316,6 +1319,9 @@ void Game_Engine::init()
 	float start = GetTime();
 
 	program_time_start = GetTime();
+
+	// initialize class reflection/creation system
+	ClassBase::init();
 
 	memset(keys, 0, sizeof(keys));
 	memset(keychanges, 0, sizeof(keychanges));

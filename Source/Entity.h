@@ -10,7 +10,7 @@
 #include "Framework/TypeInfo.h"
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringName.h"
-
+#include "Framework/ClassBase.h"
 
 class Model;
 class GeomContact;
@@ -42,15 +42,6 @@ private:
 	uint32_t index : 20;
 	uint32_t guid : 12;
 };
-
-#define ENTITY_HEADER()\
-	const TypeInfo get_typeinfo() const override;
-
-#define ENTITY_IMPL(classname) \
-	const TypeInfo classname::get_typeinfo() const { \
-			return {#classname, sizeof(classname) };\
-	}\
-	static AddClassToFactory<classname,Entity> facimpl##classname(get_entityfactory(), #classname);
 
 enum class GenericAttachment_e : uint8_t
 {
@@ -138,16 +129,13 @@ struct UpdateFlags
 
 class PhysicsActor;
 class Dict;
-class Entity
+class Entity : public ClassBase
 {
 public:
+	CLASS_HEADER();
+
 	Entity();
 	virtual ~Entity();
-	virtual const TypeInfo get_typeinfo() const = 0;
-	StringName get_classname() const {
-		// FIXME: this
-		return StringName(get_typeinfo().name);
-	}
 
 	// initialize values
 	virtual void spawn(const Dict& spawn_args);
@@ -208,7 +196,3 @@ public:
 	}
 	Model* get_model() const { return renderable.model; }
 };
-
-template<typename K, typename T>
-class Factory;
-extern Factory<std::string, Entity>& get_entityfactory();

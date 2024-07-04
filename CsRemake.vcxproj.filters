@@ -55,6 +55,9 @@
     <Filter Include="Source\Asset">
       <UniqueIdentifier>{26fb727a-7dcf-45e8-9269-4b240ca067f4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Animation\Runtime\ValueNode">
+      <UniqueIdentifier>{8af99ab6-1a95-4d41-8116-cf4777c60443}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -199,12 +202,6 @@
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Runtime\ControlParamHandle.h">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Runtime\ControlParams.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="Source\External\cgltf.h">
@@ -451,6 +448,9 @@
     <ClInclude Include="Source\IAsset.h">
       <Filter>Source\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\ClassBase.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -672,6 +672,9 @@
     </ClCompile>
     <ClCompile Include="Source\IEditorTool.cpp">
       <Filter>Source\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\ClassBase.cpp">
+      <Filter>Source\Framework</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

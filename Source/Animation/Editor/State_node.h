@@ -1,5 +1,6 @@
 #pragma once
 #include "Base_node.h"
+#include "Basic_nodes.h"
 #include "imnodes.h"
 #include "AnimationGraphEditor.h"
 #include "../Runtime/Statemachine_cfg.h"
@@ -12,16 +13,30 @@ public:
 			ImNodes::EditorContextFree(sublayer.context);
 	}
 
-	EDNODE_HEADER(State_EdNode);
+	CLASS_HEADER();
+	MAKE_OUTPUT_TYPE(state_t);
 public:
 	// overrides
 	void init() override;
 	std::string get_title() const override;
 	bool push_imnode_link_colors(int index) override;
+	
 	std::string get_input_pin_name(int index) const override;
+
 	void on_remove_pin(int index, bool force) override;
 	void remove_reference(Base_EdNode* node) override;
+
 	bool add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot) override;
+	bool push_input(AnimationGraphEditor* ed, Base_EdNode* input)  {
+		ASSERT(inputs.size() >= 1);
+		uint32_t ofs = inputs.size() - 1;
+		if (inputs.size() < MAX_INPUTS)
+			push_empty_node();
+		return add_input(ed, input, ofs);
+	}
+	void push_empty_node() {
+		init_graph_node_input("<new state>", GraphPinType(GraphPinType::state_t), nullptr);
+	}
 	bool traverse_and_find_errors() override;
 	void on_post_remove_pins() override;
 
@@ -29,11 +44,6 @@ public:
 		return "State: " + get_title();
 	}
 
-	int get_num_inputs() const override { 
-		if (is_alias_node() || is_start_node()) 
-			return 0;
-		return num_inputs;
-	}
 	std::string get_name() const override { return "State"; }
 	// compiling done by statemachine owner
 	bool compile_my_data(const AgSerializeContext* ctx) override { return true; }
@@ -49,32 +59,27 @@ public:
 	ImVec4 get_pin_colors() const override { return ImVec4(0.5, 0.5, 0.5, 1.0); }
 	bool has_pin_colors() const override { return true; }
 	void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) override {
-		ASSERT(inputs[slot]);
-		ASSERT(inputs[slot]->is_state_node());
-		((State_EdNode*)inputs[slot])->get_transition_props(this, props, slot);
+		ASSERT(inputs[slot].node);
+		ASSERT(inputs[slot].node->is_a<State_EdNode>());
+		inputs[slot].node->cast_to<State_EdNode>()->get_transition_props(this, props, slot);
 	}
 
-	void add_props(std::vector<PropertyListInstancePair>& props) override {
-		Base_EdNode::add_props(props);
-		props.push_back({ State_EdNode::get_props(), this });
-	}
-
-	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override {
+	void add_props_for_extra_editable_element(std::vector<PropertyListInstancePair>& props) override {
 		props.push_back({State::get_props(), &self_state });
 	}
 
 public:
 
 
-	bool is_regular_state_node() const { return !is_start_node() && !is_alias_node(); }
+	bool is_regular_state_node() const { return get_type()==State_EdNode::StaticType; }
+	bool is_start_node() const;
+	bool is_alias_node() const;
+
 
 	void init_for_statemachine(Statemachine_EdNode* parent, std::vector<bool>& transition_taken_bitmask, 
 		const std::vector<State_EdNode*>& handle_to_ednode);
 	bool compile_data_for_statemachine(const AgSerializeContext* ctx);
 	void get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props, int slot);
-	
-	virtual bool is_alias_node() const { return false; }
-	virtual bool is_start_node() const { return false; }
 
 	void reassign_output_slot(State_EdNode* node, int prev, int next) {
 		// Warning: N^2 
@@ -116,9 +121,6 @@ public:
 		State_Transition st;
 	};
 
-	int num_inputs = 1;
-
-
 	std::vector<output_transition_info> output;
 	State self_state;
 	handle<State> state_handle_internal;
@@ -136,18 +138,11 @@ public:
 class StateAlias_EdNode : public State_EdNode
 {
 public:
-
-	const TypeInfo& get_typeinfo() const override;
-	void add_props(std::vector<PropertyListInstancePair>& props) override {
-		Base_EdNode::add_props(props);
-		// skip State_EdNode
-		props.push_back({ StateAlias_EdNode::get_props(), this });
+	CLASS_HEADER();
+	
+	
+	void add_props_for_extra_editable_element(std::vector<PropertyListInstancePair>& props) override {
 	}
-	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override {
-	}
-
-	// Inherited from State_EdNode
-	bool is_alias_node() const override { return true; }
 
 	// Inherited from Base_EdNode
 	bool allow_creation_from_menu() const { return false; }	// FIXME
@@ -162,23 +157,11 @@ public:
 class StateStart_EdNode : public State_EdNode
 {
 public:
-
-	const TypeInfo& get_typeinfo() const override;
-	void add_props(std::vector<PropertyListInstancePair>& props) override {
-		Base_EdNode::add_props(props);
-		// skip State_EdNode
-		props.push_back({ StateStart_EdNode::get_props(), this });
-	}
-	void add_props_for_editable_element(std::vector<PropertyListInstancePair>& props) override {
-	}
-
-	// Inherited from State_EdNode
-	bool is_start_node() const override { return true; }
+	CLASS_HEADER();
 
 	// Inherited from Base_EdNode
 	std::string get_name() const override { return "State Enter"; }
 	bool can_delete() const override { return false; }
-	int get_num_inputs() const override { return 0; }
 	Color32 get_node_color() const  override { return ROOT_COLOR; }
 	std::string get_output_pin_name() const { return "START"; }
 	bool allow_creation_from_menu() const { return false; }

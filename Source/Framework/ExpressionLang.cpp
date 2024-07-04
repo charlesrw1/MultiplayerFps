@@ -206,9 +206,91 @@ static int parse_param_str(const char* s, bool* is_param_float)
 	return count;
 }
 
+bool ScriptInstance::init_from(const Script* script, ClassBase* obj)
+{
+	this->native_class_ptr = nullptr;
+	this->instance_of = nullptr;
+	if (script->get_native_class() && !obj->get_type().is_a(*script->get_native_class()))
+		return false;
 
-static void parse_type_string(const char* s, int line, compile_result& res, const Program* prog);
-static void add_type(StringView str, int line, compile_result& res, const Program* prog)
+	this->native_class_ptr = obj;
+	this->instance_of = script;
+
+	values.resize(script->get_num_values_for_variables());
+
+	return true;
+}
+
+inline float Script::read_variable_float(uint32_t variable, ScriptInstance* inst) const {
+	auto& var = variables.at(variable);
+	if (var.is_native && var.native_pi_of_variable) {
+		assert(var.native_pi_of_variable->type == core_type_id::Float);
+		return (float)var.native_pi_of_variable->get_float(inst->get_native_class_ptr());
+	}
+	else if (var.is_native && !var.native_pi_of_variable) {
+		return 0.f;
+	}
+	else {
+		auto values = inst->get_values_array();
+		return values.at(var.var_offset).f;
+	}
+}
+inline int32_t Script::read_variable_int32(uint32_t variable, ScriptInstance* inst) const {
+
+	auto& var = variables.at(variable);
+	if (var.is_native && var.native_pi_of_variable) {
+		auto nt = (var.native_pi_of_variable->type);
+		assert(nt == core_type_id::Bool || nt == core_type_id::Int8||nt==core_type_id::Int16||nt==core_type_id::Int32);
+
+		return (int32_t)var.native_pi_of_variable->get_int(inst->get_native_class_ptr());
+	}
+	else if (var.is_native && !var.native_pi_of_variable) {
+		return 0;
+	}
+	else {
+		auto values = inst->get_values_array();
+		return values.at(var.var_offset).ui32;
+	}
+}
+
+
+class Program;
+class BytecodeCompileHelper
+{
+public:
+	BytecodeCompileHelper(std::vector<uint8_t>& inst) : instructions(inst) {}
+	std::vector<uint8_t>& instructions;
+	compile_result compile(const Script* expr, const std::string& code, const std::string& selftype);
+
+
+private:
+	static void parse_type_from_tokens(std::vector<StringViewAndLine>& toks, compile_result& res, const Script* prog);
+	static void parse_type_string(const char* str, int line, compile_result& res, const Script* prog, int string_len);
+	static void add_type(StringView str, int line, compile_result& res, const Script* prog);
+
+	void compile_from_tokens(compile_result& result, compile_data_referenced& local, int current_base_ptr, const Script* ctx, std::vector<StringViewAndLine>& tokens, const std::string& selftype);
+
+	void write_4bytes_at_location(uint32_t bytes, int loc) {
+		instructions.at(loc) = (bytes & 0xff);
+		instructions.at(loc + 1) = (bytes >> 8) & 0xff;
+		instructions.at(loc + 2) = (bytes >> 16) & 0xff;
+		instructions.at(loc + 3) = (bytes >> 24) & 0xff;
+	}
+
+	void push_inst(uint8_t c) {
+		instructions.push_back(c);
+	}
+	void push_4bytes(unsigned int x) {
+		instructions.push_back(x & 0xff);
+		instructions.push_back((x >> 8) & 0xff);
+		instructions.push_back((x >> 16) & 0xff);
+		instructions.push_back((x >> 24) & 0xff);
+	}
+
+	friend class Program;
+};
+
+void BytecodeCompileHelper::add_type(StringView str, int line, compile_result& res, const Script* prog)
 {
 	int start = res.out_types.size();
 	if (str.str_len == 0) {
@@ -241,8 +323,9 @@ static void add_type(StringView str, int line, compile_result& res, const Progra
 	if (res.out_types.size() > start)
 		return;
 
-	uint64_t hash = StringName(str.to_stack_string().c_str()).get_hash();
-	Program::find_tuple find = prog->find_def(hash);
+
+	auto prog2 = &Program::get();
+	Program::find_tuple find = prog2->find_def(str.to_stack_string().c_str());
 
 	if (!find.def)
 		throw CompileError("cant find type: " + stringview_to_string(str), line);
@@ -253,7 +336,7 @@ static void add_type(StringView str, int line, compile_result& res, const Progra
 	res.custom_types.push_back(find.full_index);
 }
 
-static void parse_type_string(const char* str, int line, compile_result& res, const Program* prog, int string_len = 5000)
+void BytecodeCompileHelper::parse_type_string(const char* str, int line, compile_result& res, const Script* prog, int string_len)
 {
 	res.out_types.resize(0);
 	res.custom_types.resize(0);
@@ -281,7 +364,7 @@ static void parse_type_string(const char* str, int line, compile_result& res, co
 	add_type(StringView(str + start, count), line, res, prog);
 }
 
-static void parse_type_from_tokens(std::vector<StringViewAndLine>& toks, compile_result& res, const Program* prog)
+ void BytecodeCompileHelper::parse_type_from_tokens(std::vector<StringViewAndLine>& toks, compile_result& res, const Script* prog)
 {
 	res.clear();
 	if (toks.empty()) throw CompileError("empty type string", -1);
@@ -308,7 +391,24 @@ static void parse_type_from_tokens(std::vector<StringViewAndLine>& toks, compile
 
 #include "Framework/StringUtil.h"
 
-compile_result BytecodeExpression::compile(const Program* global, const std::string& code, StringName selftype) {
+
+ compile_result Script::compile(ScriptHandle& handle, const std::string& code, const std::string& self_type)
+ {
+	 ScriptFunction sf;
+	 sf.bytecode_offset = instruction_data.size();
+	 sf.bytecode_length = 0;
+
+	 BytecodeCompileHelper help(instruction_data);
+	 auto res = help.compile(this, code, self_type);
+
+	 sf.bytecode_length = instruction_data.size() - sf.bytecode_offset;
+	 function_ptrs.push_back(sf);
+	 handle = { (int)function_ptrs.size() };
+
+	 return res;
+ }
+
+compile_result BytecodeCompileHelper::compile(const Script* global, const std::string& code, const std::string& selftype) {
 	instructions.clear();
 
 	std::string code_replaced = code;
@@ -381,8 +481,8 @@ static bool has_quotations(StringView view)
 }
 
 
-void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_referenced& local, int base_ptr, const  Program* global,
-	std::vector<StringViewAndLine>& tokens, StringName selftype)
+void BytecodeCompileHelper::compile_from_tokens(compile_result& res, compile_data_referenced& local, int base_ptr, const  Script* global,
+	std::vector<StringViewAndLine>& tokens, const std::string& selftype)
 {
 	res.custom_types.resize(0);
 	res.out_types.resize(0);
@@ -610,7 +710,9 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 			}
 			else {
 				std::string str = token.to_stack_string().c_str();
-				Program::find_tuple find = global->find_def(str.c_str());
+
+				auto prog = &Program::get();
+				Program::find_tuple find = prog->find_def(str.c_str());
 
 				if (!find.def || find.def->type != script_def_type::nativefunc_t)
 					throw CompileError("user function not defined: " + str, line_num);
@@ -742,7 +844,8 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 			std::string str = token.to_stack_string().c_str();
 			if (str == "self") {
 
-				Program::find_tuple find = global->find_def(selftype);
+				auto prog = &Program::get();
+				Program::find_tuple find = prog->find_def(selftype);
 				if (!find.def || find.def->type != script_def_type::struct_t)
 					throw CompileError("cant find selftype", line_num);
 				res.push_custom_type(find.full_index);
@@ -763,14 +866,35 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 				res = local_var->type;
 				return;
 			}
-			Program::find_tuple find = global->find_def(str.c_str());
 
-			if (!find.def || (find.def->type != script_def_type::constant_t && find.def->type != script_def_type::global_t))
+
+			auto var = global->find_variable(str);
+			if (var) {
+
+				if (!(var->type == script_types::bool_t || var->type == script_types::int_t || var->type == script_types::float_t))
+					throw CompileError("cant use non bool/int/float type global variable: " + var->name, line_num);
+
+				if (var->type != script_types::float_t) {
+					push_inst(PUSH_I);
+				}
+				else {
+					push_inst(PUSH_F);
+				}
+				push_4bytes(global->variable_index(var));
+				res.push_std_type(var->type);
+			}
+
+			auto prog = &Program::get();
+			Program::find_tuple find = prog->find_def(str.c_str());
+
+			if (!find.def || (find.def->type != script_def_type::constant_t))
 				throw CompileError("unknown global variable or constant: " + str, line_num);
 
 			if (find.def->type == script_def_type::constant_t) {
 				auto def = find.def;
-				assert(def->constant.type == script_types::bool_t || def->constant.type == script_types::int_t || def->constant.type == script_types::float_t);
+				if (!(def->constant.type == script_types::bool_t || def->constant.type == script_types::int_t || def->constant.type == script_types::float_t))
+					throw CompileError("cant use non bool/int/float type constant: " + def->name, line_num);
+				
 				if (def->constant.type != script_types::float_t) {
 					push_inst(PUSH_I);
 					push_4bytes(def->constant.value.ui64);
@@ -781,24 +905,56 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 				}
 				res.push_std_type(def->constant.type);
 			}
-			else if (find.def->type == script_def_type::global_t) {
-				auto def = find.def;
-				assert(def->type == script_def_type::global_t);
-				assert(def->global.type == script_types::bool_t || def->global.type == script_types::int_t || def->global.type == script_types::float_t);
-
-				if (def->global.type != script_types::float_t) {
-					push_inst(PUSH_I);
-				}
-				else {
-					push_inst(PUSH_F);
-				}
-				push_4bytes(find.full_index);
-				res.push_std_type(def->global.type);
-			}
 			else
 				assert(0);
 		}
 	}
+}
+#include "Framework/Util.h"
+void Script::link_to_native_class()
+{
+	auto typeinfo = ClassBase::find_class(native_classname.c_str());
+	this->native_classtypeinfo = typeinfo;
+	if (!typeinfo)
+		return;
+
+	std::vector<const PropertyInfoList*> props;
+	
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back(typeinfo->props);
+		typeinfo = typeinfo->super_typeinfo;
+	}
+
+
+	std::unordered_map<std::string, int> var_name_to_idx;
+	for (int i = 0; i < variables.size(); i++)
+		var_name_to_idx[variables[i].name] = i;
+
+	for (int i = 0; i < props.size(); i++) {
+		for (int j = 0; j < props[i]->count; j++) {
+			auto pi = &props[i]->list[j];
+			auto var = var_name_to_idx.find(pi->name);
+			if (var != var_name_to_idx.end()) {
+				ScriptVariable* sv = &variables.at(var->second);
+				if (sv->native_pi_of_variable != nullptr)
+					sys_print("??? variable defined more than once: %s\n", sv->name.c_str());
+				else if (sv->is_native)
+					sv->native_pi_of_variable = pi;
+			}
+		}
+	}
+}
+bool Script::check_is_valid()
+{
+	bool bad = false;
+	for (int i = 0; i < variables.size(); i++) {
+		if (variables[i].is_native && !variables[i].native_pi_of_variable) {
+			bad = true;
+			sys_print("!!! Script: variable %s is native but didnt get linked to any native variable\n", variables[i].name.c_str());
+		}
+	}
+	return !bad;
 }
 
 #define OPONSTACK(op, typein, typeout) stack[sp-2].typeout = stack[sp-2].typein op stack[sp-1].typein; sp-=1; break;
@@ -806,18 +962,25 @@ void BytecodeExpression::compile_from_tokens(compile_result& res, compile_data_r
 case (opcode_+1): OPONSTACK(op,ui32,ui32);
 #define FLOAT_AND_INT_OP_OUTPUT_INT(opcode_, op) case opcode_: OPONSTACK(op,f, ui32); \
 case (opcode_+1): OPONSTACK(op,ui32, ui32);
-
 #define CAST_OP(op, down, in, out) case op: stack[sp - down].out = stack[sp - down].in; break;
-
-void BytecodeExpression::execute(script_state* state, const Program* prog, program_script_vars_instance* input) const
+bool Script::execute(ScriptHandle function_handle, script_state* state, ScriptInstance* input) const
 {
+	assert(function_handle.is_valid());
+	assert(this == input->get_parent_script());
+
+	auto& func_ofs = function_ptrs.at(function_handle.id);
+	Program* global_program = &Program::get();
+
 	script_value_t* stack = state->stack;
-	int sp = state->stack_ptr;
+	uint32_t sp = state->stack_ptr;
 
-	int count = instructions.size();
+	const uint32_t count = func_ofs.bytecode_offset+func_ofs.bytecode_length;
+	uint32_t pc = func_ofs.bytecode_offset;
 
-	for (int pc = 0; pc < count; pc++) {
-		uint8_t op = instructions[pc];
+	for (; pc < count; pc++) {
+		assert(pc >= func_ofs.bytecode_offset && pc < count);
+
+		uint8_t op = instruction_data[pc];
 		switch (op)
 		{
 			FLOAT_AND_INT_OP(ADD_F, +);
@@ -879,15 +1042,15 @@ void BytecodeExpression::execute(script_state* state, const Program* prog, progr
 			pc += 8;
 		}break;
 		case PUSH_F: {
-			int index = read_4bytes(pc + 1);
-			assert(index >= 0 && index < input->size());
-			stack[sp++].f = input->at(index).f;
+			uint32_t index = read_4bytes(pc + 1);
+			assert(index >= 0 && index < num_variables());
+			stack[sp++].f = read_variable_float(index, input);
 			pc += 4;
 		}break;
 		case PUSH_I: {
-			int index = read_4bytes(pc + 1);
-			assert(index >= 0 && index < input->size());
-			stack[sp++].ui32 = input->at(index).ui32;
+			uint32_t index = read_4bytes(pc + 1);
+			assert(index >= 0 && index < num_variables());
+			stack[sp++].ui32 = read_variable_int32(index, input);
 			pc += 4;
 		}break;
 
@@ -932,9 +1095,9 @@ void BytecodeExpression::execute(script_state* state, const Program* prog, progr
 
 		case CALL_USER_FUNC: {
 			int func_ = read_4bytes(pc + 1);
-			assert(func_ >= 0 && func_ < prog->func_ptrs.size());
+			assert(func_ >= 0 && func_ < global_program->func_ptrs.size());
 			state->stack_ptr = sp;
-			auto& funcdef = prog->func_ptrs.at(func_);
+			auto& funcdef = global_program->func_ptrs.at(func_);
 			funcdef.function(state);
 			pc += 4;
 			sp = state->stack_ptr;
@@ -948,26 +1111,33 @@ void BytecodeExpression::execute(script_state* state, const Program* prog, progr
 	}
 
 	state->stack_ptr = sp;
+
+	return true;
 }
 
-const script_variable_def* Library::find_def(StringName name) const
+const script_variable_def* Library::find_def(const std::string& s) const
 {
-	auto find = name_to_idx.find(name.get_hash());
+	auto find = name_to_idx.find(s);
 	if (find == name_to_idx.end()) return nullptr;
 	return defs.data() + find->second;
 }
 
-void BytecodeExpression::print_instructions()
+void Script::print_instructions(ScriptHandle f) const
 {
+	assert(f.is_valid());
+
+	auto& func_ofs = function_ptrs.at(f.id);
+
 	int num_instructions = 0;
-	for (int i = 0; i < instructions.size(); i++) {
-		const opcode_info& inf = opcode_infos[instructions[i]];
+	const int end = func_ofs.bytecode_offset + func_ofs.bytecode_length;
+	for (int i = func_ofs.bytecode_offset; i < end; i++) {
+		const opcode_info& inf = opcode_infos[instruction_data[i]];
 		num_instructions++;
 		i += 4 * inf.args;
 	}
-	printf("Instructions %d (bytes %d)\n", num_instructions, (int)instructions.size());
-	for (int i = 0; i < instructions.size(); i++) {
-		const opcode_info& inf = opcode_infos[instructions[i]];
+	printf("Instructions %d (bytes %d)\n", num_instructions, (int)instruction_data.size());
+	for (int i = func_ofs.bytecode_offset; i < end; i++) {
+		const opcode_info& inf = opcode_infos[instruction_data[i]];
 		printf("0x%02x ", i);
 		printf("%-20s", inf.name);
 		for (int j = 0; j < inf.args; j++) {
@@ -981,17 +1151,6 @@ void BytecodeExpression::print_instructions()
 
 }
 
-void Library::push_global_def(const char* name, script_types type) {
-	script_variable_def def;
-	def.name = name;
-	def.type = script_def_type::global_t;
-	def.global.type = type;
-	def.global.index = num_vars++;
-	def.global.name_hash = StringName(name).get_hash();
-	name_to_idx[StringName(name).get_hash()] = defs.size();
-	defs.push_back(def);
-}
-
 void Library::push_function_def(const char* name, const char* out, const char* in, bytecode_function func)
 {
 	script_variable_def def;
@@ -1002,7 +1161,7 @@ void Library::push_function_def(const char* name, const char* out, const char* i
 	def.func.index = num_funcs++;
 	def.func.ptr = func;
 
-	name_to_idx[StringName(name).get_hash()] = defs.size();
+	name_to_idx[name] = defs.size();
 	defs.push_back(def);
 }
 
@@ -1014,7 +1173,7 @@ void Library::push_constant_def(const char* name, script_types type, script_valu
 	def.constant.type = type;
 	def.constant.value = value;
 
-	name_to_idx[StringName(name).get_hash()] = defs.size();
+	name_to_idx[name] = defs.size();
 	defs.push_back(def);
 }
 
@@ -1026,22 +1185,21 @@ void Library::push_struct_def(const char* name, const char* fields)
 	def.struct_.fields = fields;
 	def.struct_.index = num_structs++;
 
-	name_to_idx[StringName(name).get_hash()] = defs.size();
+	name_to_idx[name] = defs.size();
 	defs.push_back(def);
 }
 
-void Program::push_library(const Library* lib)
+void Program::add_library(const Library* lib)
 {
 	full_import import_;
 	import_.lib = lib;
 	if (imports.size() > 0) {
 		full_import* back = &imports[imports.size() - 1];
-		import_.var_start = back->lib->num_vars + back->var_start;
 		import_.func_start = back->lib->num_funcs + back->func_start;
 		import_.struct_start = back->lib->num_structs + back->struct_start;
 	}
 	else
-		import_.func_start = import_.var_start = 0;
+		import_.func_start = 0;
 
 	imports.push_back(import_);
 	int pre_size = func_ptrs.size();
@@ -1060,7 +1218,7 @@ void Program::push_library(const Library* lib)
 	assert(post_size - pre_size == lib->num_funcs);
 }
 
-Program::find_tuple Program::find_def(StringName name) const
+Program::find_tuple Program::find_def(const std::string& name) const
 {
 	int start = imports.size() - 1;
 	for (; start >= 0; start--) {	// search in reverse order
@@ -1071,8 +1229,6 @@ Program::find_tuple Program::find_def(StringName name) const
 			tup.def = def;
 			if (def->type == script_def_type::nativefunc_t)
 				tup.full_index = imp->func_start + def->func.index;
-			else if (def->type == script_def_type::global_t)
-				tup.full_index = imp->var_start + def->global.index;
 			else if (def->type == script_def_type::struct_t)
 				tup.full_index = imp->struct_start + def->struct_.index;
 
@@ -1081,4 +1237,41 @@ Program::find_tuple Program::find_def(StringName name) const
 	}
 
 	return find_tuple();
+}
+
+#include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/ReflectionProp.h"
+
+static const char* cpt_strs[] = {
+   "bool_t",
+	"int_t",		// 'i' 4 byte integer
+	"float_t",	// 'f' 4 byte float
+	"name_t",		// 'n' 8 byte hashed string
+	"pointer_t",	// 'p' 8 byte custom pointer with type name 'mypointer_t', 'p' for untyped void* (dont do this)
+	"custom_t",	// 's' custom type, arb size, only can be used by user functions
+	"empty_t",
+};
+AutoEnumDef script_types_def = AutoEnumDef("st", 7, cpt_strs);
+PropertyInfoList* ScriptVariable::get_props()
+{
+	START_PROPS(ScriptVariable)
+		REG_STDSTRING(name, PROP_DEFAULT),
+		REG_BOOL(is_native, PROP_DEFAULT,""),
+		REG_ENUM(type,PROP_DEFAULT, "", script_types_def.id)
+	END_PROPS(ScriptVariable)
+}
+#include "Framework/StdVectorReflection.h"
+const PropertyInfoList* Script::get_props()
+{
+	MAKE_VECTORCALLBACK(ScriptVariable, variables);
+	START_PROPS(Script)
+		REG_STDVECTOR(variables, PROP_SERIALIZE),
+		REG_STDSTRING(native_classname, PROP_SERIALIZE),
+		REG_INT(num_values_for_variables,PROP_SERIALIZE,"")
+	END_PROPS(Script)
+}
+Script::Script(std::vector<ScriptVariable>& variables, std::string native_classname)
+{
+	variables = std::move(variables);
+	this->native_classname = native_classname;
 }

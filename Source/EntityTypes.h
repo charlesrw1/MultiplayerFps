@@ -12,7 +12,7 @@ using namespace glm;
 class NPC : public Entity
 {
 public:
-	ENTITY_HEADER();
+	CLASS_HEADER();
 
 	NPC() {
 		set_model("player_FINAL.glb");
@@ -105,7 +105,7 @@ public:
 class Door : public Entity
 {
 public:
-	ENTITY_HEADER();
+	CLASS_HEADER();
 
 	enum {
 		OPEN,
@@ -119,7 +119,8 @@ public:
 class Grenade : public Entity
 {
 public:
-	ENTITY_HEADER();
+	CLASS_HEADER();
+
 	Grenade();
 
 	void set_thrower(entityhandle handle) {

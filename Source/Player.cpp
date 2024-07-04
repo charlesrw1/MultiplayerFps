@@ -12,7 +12,8 @@
 
 
 #include "Framework/Dict.h"
-ENTITY_IMPL(Player);
+
+CLASS_IMPL_NO_PROPS(Player, Entity);
 
 //
 //	PLAYER MOVEMENT CODE
@@ -437,8 +438,8 @@ void draw_entity_info()
 
 	static bool predict_brake = true;
 	ImGui::Checkbox("Predict stop pos", &predict_brake);
-	if (predict_brake && e->get_classname() == NAME("Player")) {
-		Player* p = (Player*)e;
+	Player* p = e->cast_to<Player>();
+	if (predict_brake && p) {
 
 		if (glm::abs(p->cmd.forward_move) < 0.000001 && glm::abs(p->cmd.lateral_move) < 0.000001) {
 			glm::vec3 pos = e->position;

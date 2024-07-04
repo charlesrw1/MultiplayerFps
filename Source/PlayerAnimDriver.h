@@ -6,14 +6,12 @@
 
 #include "Animation/Runtime/Animation.h"
 #include "Framework/ReflectionRegisterDefines.h"
+
 class CharacterGraphDriver : public AnimatorInstance
 {
 public:
+	CLASS_HEADER();
 
-	virtual void add_props(std::vector<PropertyListInstancePair>& props) override {
-		AnimatorInstance::add_props(props);
-		props.push_back({ get_props(),this });
-	}
 	virtual void on_init() override;
 	virtual void on_update(float dt) override;
 	virtual void pre_ik_update(Pose& pose, float dt) override;

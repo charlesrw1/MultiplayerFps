@@ -19,7 +19,7 @@
 #include "State_node.h"
 #include "Statemachine_node.h"
 
-
+#include "Root_node.h"
 
 std::string remove_whitespace(const char* str)
 {
@@ -53,6 +53,46 @@ AnimCompletionCallbackUserData clip_completion = { &ed, AnimCompletionCallbackUs
 AnimCompletionCallbackUserData bone_completion = { &ed, AnimCompletionCallbackUserData::BONES };
 AnimCompletionCallbackUserData prop_type_completion = { &ed, AnimCompletionCallbackUserData::PROP_TYPE };
 
+
+class AnimatorInstanceParentEditor : public IPropertyEditor
+{
+public:
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+		ASSERT(prop->type == core_type_id::StdString);
+
+		auto str = (std::string*)prop->get_ptr(instance);
+
+		if (initial) {
+			auto iter = ClassBase::get_subclasses<AnimatorInstance>();
+			for (; !iter.is_end(); iter.next()) {
+				if (iter.get_type()->allocate)
+					options.push_back(iter.get_type()->classname);
+			}
+
+			index = 0;
+			for (int i = 0; i < options.size(); i++) {
+				if (*str == options.at(i)) {
+					index = i;
+					break;
+				}
+			}
+			initial = false;
+		}
+		int prev_index = index;
+		if (ImGui::Combo("##combo", &index, options.data(), options.size())) {
+			if (index != prev_index && index > 0) {
+				*str = options[index];
+			}
+		}
+	}
+
+	std::vector<const char*> options;
+	bool initial = true;
+	int index = 0;
+};
 
 class FindAnimationClipPropertyEditor : public IPropertyEditor
 {
@@ -139,17 +179,18 @@ public:
 };
 
 
-ImVec4 scriptparamtype_to_color(control_param_type type)
+ImVec4 scriptparamtype_to_color(anim_graph_value type)
 {
-	ASSERT((int)type < 4);
+	ASSERT((uint32_t)type <= 4);
 
 	static ImVec4 color[] = {
-		color32_to_imvec4({120, 237, 100}),
-		color32_to_imvec4({245, 27, 223}),
-		color32_to_imvec4({10, 175, 240}),
-		color32_to_imvec4({240, 198, 12}),
+		color32_to_imvec4({120, 237, 100}),	// bool 
+		color32_to_imvec4({245, 27, 223}),	// float
+		color32_to_imvec4({10, 175, 240}),	// int
+		color32_to_imvec4({240, 198, 12}),	// vec3
+		color32_to_imvec4({0, 198, 12}),	// quat
 	};
-	return color[(int)type];
+	return color[(uint32_t)type];
 }
 
 class AgParamFinder : public IPropertyEditor
@@ -237,13 +278,6 @@ class ControlParamArrayHeader : public IArrayHeader
 		ImGui::Text(prop_.name.c_str());
 		ImGui::PopStyleColor();
 
-		if (prop_.is_virtual_param) {
-			ImGui::SameLine();
-			ImGui::TextColored(color32_to_imvec4({ 146, 71, 237 }), "Virtual");
-		}
-		else
-			prop_.virtual_param_code.clear();
-
 
 		return open;
 	}
@@ -255,13 +289,13 @@ class ControlParamArrayHeader : public IArrayHeader
 		proptype& prop_ = array_->at(index);
 
 		ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 153, 152, 156 }));
-		const char* name = Enum::get_enum_name(control_param_type_def.id, (int)prop_.type);
+		const char* name = Enum::get_enum_name(anim_graph_value_def.id, (int)prop_.type);
 		ImGui::Text("%s", name);
 		ImGui::PopStyleColor();
 	}
 
 	virtual bool can_edit_array() override {
-		return !ed.graph_is_read_only();
+		return false;// !ed.graph_is_read_only();
 	}
 
 	friend class ControlParamsWindow;
@@ -274,6 +308,17 @@ void ControlParamsWindow::refresh_props() {
 		control_params.add_property_list_to_grid(get_props(), this, PG_LIST_PASSTHROUGH);
 	else
 		control_params.add_property_list_to_grid(get_edit_value_props(), this, PG_LIST_PASSTHROUGH);
+}
+ unique_ptr<Script> ControlParamsWindow::add_parameters_to_tree() {
+	std::vector<ScriptVariable> vars;
+	for (int i = 0; i < props.size(); i++) {
+		vars.push_back(props[i].get_control_param());
+	}
+
+	// create script with variables and the AnimatorInstance classname
+	auto script = std::make_unique<Script>(vars, ed.opt.AnimatorClass);
+
+	return script;
 }
 #include "Framework/CurveEditorImgui.h"
 static SequencerImgui seqimgui;
@@ -301,10 +346,18 @@ void AnimationGraphEditor::init()
 	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
 
 	// init template nodes for creation menu
+	for (int i = 0; i < template_creation_nodes.size(); i++)
+		delete template_creation_nodes[i];
 	template_creation_nodes.clear();
-	auto& ed_factory = Base_EdNode::get_factory();
-	for (auto& obj : ed_factory.get_object_creator()) {
-		template_creation_nodes.push_back(obj.second());
+	
+	auto iter = ClassBase::get_subclasses<Base_EdNode>();
+	for (;!iter.is_end();iter.next()) {
+		auto classtype = iter.get_type();
+		if (classtype->allocate) {
+			ClassBase* node = classtype->allocate();
+			ASSERT(node->is_a<Base_EdNode>());
+			template_creation_nodes.push_back((Base_EdNode*)node);
+		}
 	}
 
 	seqimgui.add_item(new AnimationEventEditor(0, 5, COLOR_BLUE));
@@ -315,8 +368,7 @@ void AnimationGraphEditor::init()
 
 void AnimationGraphEditor::close_internal()
 {
-	if(out.obj.is_valid())
-		idraw->remove_obj(out.obj);
+	out.clear();
 
 	for (int i = 0; i < nodes.size(); i++) {
 		delete nodes[i];
@@ -326,9 +378,7 @@ void AnimationGraphEditor::close_internal()
 	if (is_owning_editing_tree) {
 		delete editing_tree;
 	}
-	out.reset_animator();
 	editing_tree = nullptr;
-	out.model = nullptr;
 
 	reset_prop_editor_next_tick = false;
 	playback = graph_playback_state::stopped;
@@ -523,10 +573,9 @@ void TabState::imgui_draw() {
 			auto state = dynamic_cast<State_EdNode*>(node_s);
 			ASSERT(state);
 
-			if (state->inputs[slot]) {
+			if (state->inputs[slot].node) {
 				ImGui::BeginTooltip();
-				ASSERT(state->inputs[slot]->is_state_node());
-				auto other_node = dynamic_cast<State_EdNode*>(state->inputs[slot]);
+				auto other_node = state->inputs[slot].node->cast_to<State_EdNode>();
 				ASSERT(other_node);
 				// should always be true
 				auto other_name = other_node->get_title();
@@ -573,13 +622,6 @@ bool AnimationGraphEditor::save_document_internal()
 }
 
 
-struct getter_ednode
-{
-	static void get(std::vector<PropertyListInstancePair>& props, Base_EdNode* node) {
-		node->add_props(props);
-	}
-};
-
 
 bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 {
@@ -600,7 +642,7 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 		if (!in.expect_string("nodes") || !in.expect_list_start())
 			return false;
 		bool good = in.read_list_and_apply_functor([&](StringView view) -> bool {
-			Base_EdNode* node = read_object_properties<Base_EdNode, getter_ednode>(Base_EdNode::get_factory(), userptr, in, view);
+			Base_EdNode* node = read_object_properties<Base_EdNode>(userptr, in, view);
 			if (node) {
 				nodes.push_back(node);
 				return true;
@@ -633,7 +675,7 @@ void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 	out.write_key_list_start("nodes");
 	for (int i = 0; i < nodes.size(); i++) {
 		Base_EdNode* node = nodes[i];
-		write_object_properties<Base_EdNode, getter_ednode>(node, userptr, out);
+		write_object_properties(node, userptr, out);
 	}
 	out.write_list_end();
 
@@ -698,6 +740,19 @@ void AnimationGraphEditor::start_or_resume_playback()
 
 	control_params.refresh_props();
 }
+
+inline void add_props_from_ClassBase(std::vector<PropertyListInstancePair>& info, ClassBase* base)
+{
+	if (!base)
+		return;
+	const ClassTypeInfo* ti = &base->get_type();
+	while (ti) {
+		if (ti->props)
+			info.push_back({ ti->props, base });
+		ti = ti->super_typeinfo;
+	}
+}
+
 void AnimationGraphEditor::draw_prop_editor()
 {
 	if (ImGui::Begin("animation graph property editor"))
@@ -715,8 +770,10 @@ void AnimationGraphEditor::draw_prop_editor()
 				node_props.clear_all();
 
 				std::vector<PropertyListInstancePair> info;
-				mynode->add_props(info);
-				mynode->add_props_for_editable_element(info);
+
+				add_props_from_ClassBase(info, mynode);
+				add_props_from_ClassBase(info, mynode->get_graph_node());
+				mynode->add_props_for_extra_editable_element(info);
 
 				for (int i = 0; i < info.size(); i++) {
 					if(info[i].list) /* some nodes have null props */
@@ -1058,12 +1115,13 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		if (node->has_pin_colors())
 			pin_color = node->get_pin_colors();
 
-		int num_inputs = node->get_num_inputs();
+		int num_inputs = node->get_input_size();
 		for (int j = 0; j < num_inputs; j++) {
 
 			ImNodesPinShape pin = ImNodesPinShape_Quad;
 
-			if (node->inputs[j]) pin = ImNodesPinShape_TriangleFilled;
+			if (node->inputs[j].is_attached_to_node()) 
+				pin = ImNodesPinShape_TriangleFilled;
 			ImNodes::BeginInputAttribute(node->getinput_id(j), pin);
 			auto str = node->get_input_pin_name(j);
 
@@ -1089,12 +1147,12 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 		bool draw_flat_links = node->draw_flat_links();
 		for (int j = 0; j < num_inputs; j++) {
-			if (node->inputs[j]) {
+			if (node->inputs[j].is_attached_to_node()) {
 
 				int offset = 0;
 				if (draw_flat_links) {
 					for (int k = 0; k < j; k++) {
-						if (node->inputs[k] == node->inputs[j])
+						if (node->inputs[k].node == node->inputs[j].node)
 							offset++;
 					}
 				}
@@ -1102,7 +1160,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 				bool pushed_colors = node->push_imnode_link_colors(j);
 	
-				ImNodes::Link(node->getlink_id(j), node->inputs[j]->getoutput_id(0), node->getinput_id(j), draw_flat_links, offset);
+				ImNodes::Link(node->getlink_id(j), node->inputs[j].node->getoutput_id(0), node->getinput_id(j), draw_flat_links, offset);
 
 				if (pushed_colors) {
 					ImNodes::PopColorStyle();
@@ -1264,12 +1322,13 @@ int AnimationGraphEditor::find_for_id(uint32_t id)
 
 Base_EdNode* AnimationGraphEditor::user_create_new_graphnode(const char* typename_, uint32_t layer)
 {
-	auto& factory = Base_EdNode::get_factory();
-	if (!factory.hasClass(typename_)) {
+
+	Base_EdNode* node = ClassBase::create_class<Base_EdNode>(typename_);//factory.createObject(typename_);
+
+	if (!node) {
 		printf("factory doesnt have node for typename %s\n", typename_);
 		return nullptr;
 	}
-	Base_EdNode* node = factory.createObject(typename_);
 
 	node->post_construct(current_id++, layer);
 	nodes.push_back(node);
@@ -1296,7 +1355,7 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 
 			int cur_layer = graph_tabs.get_current_layer_from_tab();
 
-			Base_EdNode* a  = user_create_new_graphnode(node->get_typeinfo().name, cur_layer);
+			Base_EdNode* a  = user_create_new_graphnode(node->get_type().classname, cur_layer);
 
 			ImNodes::ClearNodeSelection();
 			ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
@@ -1407,9 +1466,9 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	{
 		auto tree = get_tree();
 
-		std::unordered_set<Node_CFG*> refed_nodes;
+		std::unordered_set<BaseAGNode*> refed_nodes;
 
-		std::vector<Node_CFG*> extra_nodes;
+		std::vector<BaseAGNode*> extra_nodes;
 		for (int i = 0; i < nodes.size(); i++) {
 			refed_nodes.insert(nodes[i]->get_graph_node());
 			nodes[i]->get_any_extra_refed_graph_nodes(extra_nodes);
@@ -1419,7 +1478,7 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 		int num_deleted = 0;
 		int count = 0;
-		std::unordered_set<Node_CFG*> removed_nodes;
+		std::unordered_set<BaseAGNode*> removed_nodes;
 		for (int i = 0; i < tree->all_nodes.size(); i++) {
 			auto cfg_node = tree->all_nodes[i];
 			if (refed_nodes.find(cfg_node)==refed_nodes.end()) {
@@ -1438,12 +1497,8 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	}
 
 	// add control parameters to cfg list
-	control_params.add_parameters_to_tree(editing_tree->params.get());
-
-	// add cfg vars to library
-	// link var lib and other libs to script program before compiling all the scripts
-	// called again when calling post_init_load()
-	editing_tree->init_program_libs();
+	editing_tree->code.reset();										// delete script
+	editing_tree->code = control_params.add_parameters_to_tree();	// recreate script
 
 	// initialize memory offets for runtime
 	editing_tree->data_used = 0;
@@ -1460,19 +1515,14 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 		}
 	}
 
-	Base_EdNode* output_pose = find_first_node_in_layer(0, "Root_EdNode");
+	auto output_pose = find_first_node_in_layer<Root_EdNode>(0);
 	ASSERT(output_pose);
 	output_pose->compile_error_string.clear();	//???
-	Node_CFG* root_node = nullptr;
-	if (output_pose->inputs[0]) {
-		root_node = output_pose->inputs[0]->get_graph_node();
-		ASSERT(root_node);
-	}
-	else {
-		root_node = nullptr;
+	Node_CFG* root_node = output_pose->get_root_node();
+	if(!root_node) {
 		output_pose->append_fail_msg("[ERROR] no output pose\n");
 	}
-	editing_tree->root = ptr_to_serialized_nodecfg_ptr(root_node, &ctx);
+	editing_tree->root = (Node_CFG*)ptr_to_serialized_nodecfg_ptr(root_node, &ctx);
 
 
 	bool tree_is_good_to_run = output_pose->traverse_and_find_errors();
@@ -1481,6 +1531,11 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	control_params.recalculate_control_prop_ids();
 
 	editing_tree->graph_is_valid = tree_is_good_to_run;
+
+	// recreate script AGAIN because nodes compilied functions into the script
+	// but it gets compilied again after this
+	editing_tree->code.reset();										// delete script
+	editing_tree->code = control_params.add_parameters_to_tree();	// recreate script
 
 	return tree_is_good_to_run;
 }
@@ -1499,14 +1554,16 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	auto ed = auser->ed;
 
 	if (auser->type == AnimCompletionCallbackUserData::CLIPS) {
-		auto& clips = ed->out.model->get_skel()->get_clips_hashmap();
-		for (const auto& c : clips)
-			if (_strnicmp(c.first.c_str(), word_start, len) == 0)
-				vec.push_back(c.first.c_str());
-		std::sort(vec.begin(), vec.end(), [](const char* a, const char* b) -> bool {
-			return strcmp(a, b) < 0;
-			});
-		
+		if (ed->out.get_model() && ed->out.get_model()->get_skel()) {
+
+			auto& clips = ed->out.get_model()->get_skel()->get_clips_hashmap();
+			for (const auto& c : clips)
+				if (_strnicmp(c.first.c_str(), word_start, len) == 0)
+					vec.push_back(c.first.c_str());
+			std::sort(vec.begin(), vec.end(), [](const char* a, const char* b) -> bool {
+				return strcmp(a, b) < 0;
+				});
+		}
 	}
 	else if (auser->type == AnimCompletionCallbackUserData::BONES) {
 		assert(0);
@@ -1541,15 +1598,12 @@ void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
 			compile_and_run();
 		}
 		control_params.refresh_props();
-		if (out.obj.is_valid())
-			idraw->remove_obj(out.obj);
+		out.hide();
 		playback = graph_playback_state::running;
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else if(newstate == editor_focus_state::Closed){
 		close();
-		if (out.obj.is_valid())
-			idraw->remove_obj(out.obj);
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else {
@@ -1574,23 +1628,13 @@ void AnimationGraphEditor::tick(float dt)
 			out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
 		}
 
-		if (!out.obj.is_valid())
-			out.obj = idraw->register_obj();
-
-		Render_Object ro;
-
-		ro.model = out.model;
-
 		if (get_playback_state() == graph_playback_state::running) {
-			out.get_local_animator().tick_tree_new(dt * g_slomo.get_float());
+			auto animator = out.get_animator();
+			if(animator)
+				animator->tick_tree_new(dt * g_slomo.get_float());
 		}
-		if (get_playback_state() != graph_playback_state::stopped && ro.model->get_skel()) {
-			ro.transform = out.model->get_root_transform();
-			ro.animator = &out.get_local_animator();
-		}
-		//ro.animator = nullptr;
-
-		idraw->update_obj(out.obj, ro);
+		
+		out.show(get_playback_state() != graph_playback_state::stopped);
 
 		auto window_sz = eng->get_game_viewport_dimensions();
 		out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
@@ -1606,10 +1650,8 @@ PropertyInfoList* EditorControlParamProp::get_props()
 {
 	START_PROPS(EditorControlParamProp)
 		REG_STDSTRING(name, PROP_EDITABLE),
-		REG_ENUM(type, PROP_EDITABLE, "", control_param_type_def.id),
-		REG_INT_W_CUSTOM(enum_type, PROP_SERIALIZE, "-1", "AG_ENUM_TYPE_FINDER"),
-		REG_BOOL(is_virtual_param, PROP_EDITABLE, "0"),
-		REG_STDSTRING_CUSTOM_TYPE(virtual_param_code, PROP_EDITABLE, "AG_LISP_CODE"),
+		REG_ENUM(type, PROP_EDITABLE, "", anim_graph_value_def.id),
+		REG_BOOL(is_old_native_param, PROP_SERIALIZE, "0"),
 	END_PROPS(EditorControlParamProp)
 }
 
@@ -1650,7 +1692,7 @@ void AnimationGraphEditor::compile_and_run()
 	bool good_to_run = compile_graph_for_playing();
 	get_tree()->post_load_init();
 	if (good_to_run) {
-		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr);
+		out.initialize_animator(get_tree());
 		playback = graph_playback_state::running;
 	}
 }
@@ -1676,6 +1718,7 @@ void AnimationGraphEditor::create_new_document()
 #include "Render/Material.h"
 void AnimationGraphEditor::try_load_preview_models()
 {
+#if 0
 	{
 		Material* mymat = mats.create_temp_shader("sprite_texture");
 		mymat->billboard = billboard_setting::SCREENSPACE;
@@ -1704,10 +1747,10 @@ void AnimationGraphEditor::try_load_preview_models()
 
 		idraw->update_obj(handle, obj);
 	}
+#endif
 
-	out.model = mods.find_or_load("player_FINAL.cmdl");
-	if(out.is_valid_for_preview())
-		out.get_local_animator().initialize_animator(out.model, get_tree(), nullptr);
+	out.set_model(mods.find_or_load(opt.PreviewModel.c_str()));
+	out.set_animator_instance(ClassBase::create_class<AnimatorInstance>(opt.AnimatorClass.c_str()));
 }
 
 void AnimationGraphEditor::open_document_internal(const char* name)
@@ -1759,7 +1802,7 @@ void AnimationGraphEditor::open_document_internal(const char* name)
 	try_load_preview_models();
 
 	// refresh control_param editor
-	control_params.init_from_tree(get_tree()->params.get());
+	//control_params.init_from_tree(get_tree()->params.get());
 }
 
 class AgEditor_BlendSpaceArrayHead : public IArrayHeader
@@ -1862,29 +1905,43 @@ public:
 		assert(prop->type == core_type_id::Struct);
 		EditorControlParamProp* prop = (EditorControlParamProp*)instance;
 		// prop.id is the index into runtime/cfg vars
-		Animation_Tree_RT* rt = ed.get_runtime_tree();
-		program_script_vars_instance* vars = &rt->vars;
-		const ControlParam_CFG* params = ed.editing_tree->get_control_params();
-		const AG_ControlParam* control = &params->types.at(prop->current_id);
-		ControlParamHandle handle = { prop->current_id };
-		if (control->type == control_param_type::bool_t) {
-			bool b = params->get_bool(vars, handle);
-			ImGui::Checkbox("##checkbox", &b);
-			params->set_bool(vars, handle, b);
+
+		auto anim = ed.out.get_animator();
+		if (!anim)
+			return;
+
+		auto tree = ed.get_tree();
+		auto script = tree->get_script();
+		auto& vars = script->get_variables();
+		
+		const int index = prop->current_id;
+		auto& var = vars.at(index);
+		
+		if (var.is_native&&var.native_pi_of_variable) {
+			auto pi = var.native_pi_of_variable;
+			if (pi->type == core_type_id::Bool) {
+				bool b = pi->get_int(anim);
+				ImGui::Checkbox("##checkbox", &b);
+				pi->set_int(anim, b);
+			}
+			else if (pi->type == core_type_id::Int32) {
+				int i = pi->get_int(anim);
+				ImGui::InputInt("##inputint", &i);
+				pi->set_int(anim, i);
+			}
+			else if (pi->type == core_type_id::Float) {
+				float f = pi->get_float(anim);
+				ImGui::SliderFloat("##slidefloat", &f, 0.0, 1.0);
+				pi->set_float(anim, f);
+			}
+			else {
+				ImGui::TextColored(color32_to_imvec4({ 100,10,70 }), "variable type not implemented");
+			}
 		}
-		else if (control->type == control_param_type::int_t) {
-			int i = params->get_int(vars, handle);
-			ImGui::InputInt("##inputint", &i);
-			params->set_int(vars, handle, i);
+		else {
+			ImGui::TextColored(color32_to_imvec4({ 100,10,10 }), "variable not found");
 		}
-		else if (control->type == control_param_type::float_t) {
-			float f = params->get_float(vars, handle);
-			ImGui::SliderFloat("##slidefloat", &f, 0.0, 1.0);
-			params->set_float(vars, handle, f);
-		}
-		else if (control->type == control_param_type::enum_t) {
-			ImGui::Text("ENUM PLACEHOLDER");
-		}
+		
 		ImGui::SameLine();
 	}
 
@@ -1902,6 +1959,7 @@ struct AutoStruct_asdf {
 		pfac.registerClass<AgParamFinder>("AG_PARAM_FINDER");
 		pfac.registerClass<AgEdtior_BlendSpaceParameteriation>("AG_EDITOR_BLEND_SPACE_PARAMETERIZATION");
 		pfac.registerClass<CotrolParamEditorRunTime>("AG_CONTROL_PARAM_RUN_EDIT");
+		pfac.registerClass<AnimatorInstanceParentEditor>("AnimatorInstanceParentEditor");
 
 		auto& afac = IArrayHeader::get_factory();
 
@@ -1945,7 +2003,7 @@ std::string SerializeNodeCFGRef::serialize(DictWriter& out, const PropertyInfo& 
 {
 	ASSERT(userptr.name == NAME("AgSerializeContext"));
 	AgSerializeContext* context = (AgSerializeContext*)userptr.ptr;
-	auto node = *(Node_CFG**)info.get_ptr(inst);
+	auto node = *(BaseAGNode**)info.get_ptr(inst);
 	ASSERT(context->ptr_to_index.find(node) != context->ptr_to_index.end());
 
 	return std::to_string(context->ptr_to_index.find(node)->second);
@@ -1955,26 +2013,43 @@ void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, 
 {
 	ASSERT(userptr.name == NAME("AgSerializeContext"));
 	AgSerializeContext* context = (AgSerializeContext*)userptr.ptr;
-	auto node_ptr = (Node_CFG**)info.get_ptr(inst);
+	auto node_ptr = (BaseAGNode**)info.get_ptr(inst);
 	int index = atoi(token.to_stack_string().c_str());
 	ASSERT(index >= 0 && index < context->tree->all_nodes.size());
 	*node_ptr = context->tree->all_nodes.at(index);
 }
 
-void GraphOutput::reset_animator()
+void GraphOutput::show(bool is_playing)
 {
-	anim = AnimatorInstance();
+	if (!obj.is_valid())
+		obj = idraw->register_obj();
+	Render_Object obj_data;
+	obj_data.model = model;
+	if (is_playing && model->get_skel()) {
+		obj_data.animator = anim.get();
+		obj_data.transform = model->get_root_transform();
+	}
+	idraw->update_obj(obj,obj_data);
+}
+void GraphOutput::hide()
+{
+	idraw->remove_obj(obj);
+}
+void GraphOutput::clear()
+{
+	model = nullptr;
+	anim.reset();
+	idraw->remove_obj(obj);
+}
+void GraphOutput::set_animator_instance(AnimatorInstance* inst)
+{
+	anim.reset(inst);
+	idraw->remove_obj(obj);
 }
 
 #include "Player.h"
 
 AnimatorInstance* GraphOutput::get_animator()
 {
-	if (eng->get_state() == Engine_State::Game) {
-		Player* p = eng->get_local_player();
-		if (p && p->get_animator() && p->get_animator()->runtime_dat.cfg == ed.editing_tree) {
-			return p->get_animator();
-		}
-	}
-	return &anim;
+	return anim.get();
 }

@@ -18,12 +18,7 @@ using namespace glm;
 #include "../AnimationTreePublic.h"
 
 
-Factory<std::string, AnimatorInstance>& AnimatorInstance::get_factory()
-{
-	static Factory<std::string, AnimatorInstance> inst;
-	return inst;
-}
-
+CLASS_IMPL_NO_PROPS(AnimatorInstance, ClassBase);
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -124,27 +119,58 @@ int Animation_Set::find(const char* name) const
 	return -1;
 }
 
-void AnimatorInstance::initialize_animator(
+bool AnimatorInstance::initialize_animator(
 	const Model* model, 
 	const Animation_Tree_CFG* graph, 
 	Entity* ent)
 {
 	ASSERT(model);
 
-	if (!model->get_skel())
-		return;
+	if (!model->get_skel()) {
+		sys_print("!!! model doesnt have skeleton for AnimatorInstance\n");
+		return false;
+	}
 
-	if (!graph)
-		return;
+	if (!graph) {
+		sys_print("!!! graph not provided for animator instance\n");
+		return false;
+	}
 
-	runtime_dat.init_from_cfg(graph, model);
+	// Initialize script instance, sets pointer of AnimatorInstance for native variables
+	bool good = script_inst.init_from(cfg->get_script(), this);
+	
+	if (!good) {
+		sys_print("!!! script instance failed to init\n");
+		return false;
+	}
+
+	this->cfg = cfg;
+	this->model = model;
 	this->owner = ent;
 
+	// Initialize runtime data, runtime nodes get constructed in this array of bytes
+	data.clear();
+	data.resize(cfg->get_data_used(), 0);
+
+	// Construct nodes
+	NodeRt_Ctx ctx(this,nullptr,0);
+	cfg->construct_all_nodes(ctx);
+
+	// Reset root node here to kick things off
+	if (cfg->get_root_node())
+		cfg->get_root_node()->reset(ctx);
+
+	// Callback to inherited class
 	on_init();
 
+	// Init bone arrays
 	const int bones = model->get_skel()->get_num_bones();
 	cached_bonemats.resize(bones);
 	matrix_palette.resize(bones);
+
+	ASSERT(is_initialized());
+
+	return true;
 }
 
 #if 1
@@ -439,10 +465,6 @@ void AnimatorInstance::ConcatWithInvPose()
 // source = source-reference
 
 
-PoseMask::PoseMask()
-{
-
-}
 AnimatorInstance::AnimatorInstance() : slots(1)
 {
 
@@ -552,23 +574,26 @@ void modify_pose_debug(Pose& pose)
 	if(normalize_)
 		pose.q[0] = glm::normalize(pose.q[0]);
 }
+NodeRt_Ctx::NodeRt_Ctx(AnimatorInstance* inst, script_value_t* stack, int stack_size)
+{
+	this->stack = stack;
+	this->stack_size = stack_size;
+	this->anim = inst;
+	this->model = inst->get_model();
+	this->script = inst->get_tree()->get_script();
+}
 
 void AnimatorInstance::tick_tree_new(float dt)
 {
-	if (!runtime_dat.cfg)
+	if (!cfg)
 		return;
 
 	Pose* poses = Pose_Pool::get().alloc(2);
 
 	script_value_t stack[64];
 
-	NodeRt_Ctx ctx;
-	ctx.stack = stack;
-	ctx.stack_size = 64;
-	ctx.tree = &runtime_dat;
-	ctx.model = get_model();
+	NodeRt_Ctx ctx(this,stack,64);
 
-	ctx.param_cfg = runtime_dat.cfg->get_control_params();
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
 	gp_ctx.pose = &poses[0];
@@ -593,30 +618,6 @@ void AnimatorInstance::tick_tree_new(float dt)
 	Pose_Pool::get().free(2);
 }
 
-
-void Animation_Tree_RT::init_from_cfg(const Animation_Tree_CFG* cfg, const Model* model)
-{
-	this->cfg = cfg;
-	this->model = model;
-
-
-	vars.resize(cfg->get_num_vars());
-
-	data.clear();
-	data.resize(cfg->get_data_used(), 0);
-	NodeRt_Ctx ctx;
-	ctx.model = model;
-
-	ctx.tree = this;
-	ctx.param_cfg = cfg->get_control_params();
-	ctx.tick = 0;
-	cfg->construct_all_nodes(ctx);
-
-	if(cfg->get_root_node())
-		cfg->get_root_node()->reset(ctx);
-
-
-}
 
 #include "Framework/DictParser.h"
 Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {

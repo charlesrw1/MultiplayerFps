@@ -521,8 +521,8 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 				StringView tok;
 				parser.read_string(tok);
 				parser.load_from_memory((uint8_t*)buffer.c_str(), buffer.size(), "abc");
-				AnimationEvent* event = read_object_properties<AnimationEvent, AnimationEventGetter>(
-					AnimationEvent::get_factory(), TypedVoidPtr(), parser, tok
+				AnimationEvent* event = read_object_properties<AnimationEvent>(
+					TypedVoidPtr(), parser, tok
 					);
 				if (!event) {
 					sys_print("??? couldn't load animation event '%s'\n", buffer.c_str());

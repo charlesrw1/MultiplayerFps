@@ -1,13 +1,13 @@
 #include "PlayerAnimDriver.h"
 #include "Entity.h"
 #include "Game_Engine.h" // Debug::
-#include "Animation/Runtime/ControlParams.h"
+
 #include "Animation/AnimationUtil.h"
 #include "Player.h"
 
 #include "Framework/AddClassToFactory.h"
 
-ADDTOFACTORYMACRO(CharacterGraphDriver, AnimatorInstance);
+CLASS_IMPL(CharacterGraphDriver, AnimatorInstance);
 
 void CharacterGraphDriver::on_init() {
 	auto model = get_model();
@@ -27,8 +27,7 @@ void CharacterGraphDriver::on_init() {
 void CharacterGraphDriver::on_update(float dt) {
 
 	if (!get_owner()) return;
-	ASSERT(get_owner()->get_classname() == NAME("Player"));
-	Player& player = *(Player*)get_owner();
+	Player& player = *get_owner()->cast_to<Player>();
 
 	meshoffset = glm::vec3(0.f);
 
@@ -51,26 +50,22 @@ void CharacterGraphDriver::on_update(float dt) {
 	ismoving = has_input;
 	injump = !player.is_on_ground();
 
-
-	auto& params = *runtime_dat.cfg->get_control_params();
-	auto vars = &runtime_dat.vars;
-
 	auto ray = eng->phys.trace_ray(Ray(player.position, glm::vec3(0, -1, 0)), player.selfid, PF_WORLD);
 	float dist_to_ground = ray.dist < 0.0 ? 100000.0 : ray.dist;
 
 	bool should_transition_out_of_jump_or_fall = !player.is_on_ground() && player.velocity.y < 0 && ray.dist < 0.6;
 
 
-	params.set_bool_nh(vars, bRunning, ismoving && player.is_on_ground());
-	params.set_bool_nh(vars, bCrouch, player.is_crouching);
-	params.set_bool_nh(vars, bJumping, player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
-	params.set_bool_nh(vars, bFalling, player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
-	params.set_float_nh(vars, flSpeed,glm::length(relmovedir));
-	params.set_float_nh(vars, flMovex ,relmovedir.x);
-	params.set_float_nh(vars, flMovey, relmovedir.y);
+	bRunning =(  ismoving && player.is_on_ground());
+	bCrouch = (player.is_crouching);
+	bJumping =(  player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
+	bFalling =(  player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
+	flSpeed = glm::length(relmovedir);
+	flMovex = relmovedir.x;
+	flMovey = relmovedir.y;
 
-	params.set_bool_nh(vars, bLeftFootForwards, left_foot_is_forward);
-	params.set_bool_nh(vars, bRightFootForwards, !left_foot_is_forward);
+	bLeftFootForwards= left_foot_is_forward;
+	bRightFootForwards= !left_foot_is_forward;
 
 }
 

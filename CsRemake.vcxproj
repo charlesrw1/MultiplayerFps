@@ -34,8 +34,6 @@
     <ClInclude Include="Source\Animation\SkeletonData.h" />
     <ClInclude Include="Source\Animation\Runtime\Animation.h" />
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h" />
-    <ClInclude Include="Source\Animation\Runtime\ControlParamHandle.h" />
-    <ClInclude Include="Source\Animation\Runtime\ControlParams.h" />
     <ClInclude Include="Source\Animation\Runtime\Easing.h" />
     <ClInclude Include="Source\Animation\Runtime\Percentage.h" />
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
@@ -86,6 +84,7 @@
     <ClInclude Include="Source\Framework\BinaryReadWrite.h" />
     <ClInclude Include="Source\Framework\BVH.h" />
     <ClInclude Include="Source\Framework\Bytepacker.h" />
+    <ClInclude Include="Source\Framework\ClassBase.h" />
     <ClInclude Include="Source\Framework\Config.h" />
     <ClInclude Include="Source\Framework\Curve.h" />
     <ClInclude Include="Source\Framework\CurveEditorImgui.h" />
@@ -193,6 +192,7 @@
     <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Files.cpp" />
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
+    <ClCompile Include="Source\Framework\ClassBase.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
     <ClCompile Include="Source\Framework\DictParser.cpp" />

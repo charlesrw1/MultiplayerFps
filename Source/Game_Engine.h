@@ -139,7 +139,9 @@ public:
 	Player* get_local_player();
 	Entity* get_ent(int index);
 	Entity* get_ent_from_handle(entityhandle id);
-	int find_by_classtype(int start, StringName classtype);
+
+	int find_by_classtype(int start, const char* classname);
+	
 	Player* get_client_player(int slot);
 
 	UIControl* get_gui() { return (UIControl*)gui_root.get(); }
