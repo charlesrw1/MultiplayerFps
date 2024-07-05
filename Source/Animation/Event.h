@@ -10,10 +10,7 @@
 #include "Framework/ClassBase.h"
 class Animator;
 
-class AnimationEvent : public ClassBase
-{
-public:
-	CLASS_HEADER();
+CLASS_H(AnimationEvent, ClassBase)
 
 	virtual Color32 get_editor_color() { return COLOR_BLUE; }
 

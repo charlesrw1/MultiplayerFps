@@ -289,7 +289,7 @@ class ControlParamArrayHeader : public IArrayHeader
 		proptype& prop_ = array_->at(index);
 
 		ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 153, 152, 156 }));
-		const char* name = Enum::get_enum_name(anim_graph_value_def.id, (int)prop_.type);
+		const char* name = EnumTrait<anim_graph_value>::StaticType.get_enum_str((int)prop_.type);
 		ImGui::Text("%s", name);
 		ImGui::PopStyleColor();
 	}
@@ -344,6 +344,9 @@ void AnimationGraphEditor::init()
 {
 	imgui_node_context = ImNodes::CreateContext();
 	ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
+
+
+	ImNodes::GetStyle().Flags |= ImNodesStyleFlags_GridSnapping | ImNodesStyleFlags_GridLinesPrimary;
 
 	// init template nodes for creation menu
 	for (int i = 0; i < template_creation_nodes.size(); i++)
@@ -605,8 +608,8 @@ bool AnimationGraphEditor::can_save_document() {
 bool AnimationGraphEditor::save_document_internal()
 {
 	// first compile, compiling writes editor node data out to the CFG node
+	// this converts data to serialized form (ie Node* become indicies)
 	bool good = compile_graph_for_playing();
-	get_tree()->post_load_init();	// initialize the memory offsets
 
 	DictWriter write;
 	write.set_should_add_indents(false);
@@ -617,6 +620,10 @@ bool AnimationGraphEditor::save_document_internal()
 	std::ofstream outfile(get_save_root_dir() + get_doc_name());
 	outfile.write(write.get_output().c_str(), write.get_output().size());
 	outfile.close();
+
+	// now the graph is in a compilied state with serialized nodes, unserialize it so it works again
+	// with the engine
+	get_tree()->post_load_init();	// initialize the memory offsets
 
 	return true;
 }
@@ -999,6 +1006,7 @@ void AnimationGraphEditor::imgui_draw()
 
 	graph_tabs.imgui_draw();
 
+	static ImVec2 mouse_click_pos = ImVec2(0, 0);
 	if (!graph_is_read_only()) {
 		bool open_popup_menu_from_drop = false;
 
@@ -1007,13 +1015,14 @@ void AnimationGraphEditor::imgui_draw()
 		is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_RootWindow);
 
 		if (open_popup_menu_from_drop ||
-			(is_focused && ImGui::GetIO().MouseClicked[1]))
+			(is_focused && ImGui::GetIO().MouseClicked[1])) {
 			ImGui::OpenPopup("my_select_popup");
-
+			mouse_click_pos = ImGui::GetMousePos();
+		}
 		if (ImGui::BeginPopup("my_select_popup"))
 		{
 			bool is_sm = graph_tabs.get_active_tab()->is_statemachine_tab();
-			draw_node_creation_menu(is_sm);
+			draw_node_creation_menu(is_sm, mouse_click_pos);
 			ImGui::EndPopup();
 		}
 		else {
@@ -1058,7 +1067,13 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 		ImNodes::BeginNodeTitleBar();
 
-		ImGui::Text("%s\n", node->get_title().c_str());
+		{
+			auto cursorpos = ImGui::GetCursorPos();
+			ImGui::Dummy(ImVec2(100, 0.0));
+			ImGui::SameLine(0, 0);
+			ImGui::SetCursorPosX(cursorpos.x);
+			ImGui::Text("%s\n", node->get_title().c_str());
+		}
 
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && ImGui::BeginTooltip()) {
 			ImGui::TextUnformatted(node->get_tooltip().c_str());
@@ -1130,12 +1145,18 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		}
 		if (node->has_output_pin()) {
 			ImNodes::BeginOutputAttribute(node->getoutput_id(0));
-			ImGui::TextColored(pin_color, node->get_output_pin_name().c_str());
+			auto output_str = node->get_output_pin_name();
+
+			auto posX = (ImGui::GetCursorPosX() + (x2-x1) - ImGui::CalcTextSize(output_str.c_str()).x - 2 * ImGui::GetStyle().ItemSpacing.x)-5.0;
+			if (posX > ImGui::GetCursorPosX())
+				ImGui::SetCursorPosX(posX);
+
+			ImGui::TextColored(pin_color, output_str.c_str());
 			ImNodes::EndOutputAttribute();
 		}
 
 		ImNodes::EndNode();
-
+	
 		ImNodes::PopColorStyle();
 		ImNodes::PopColorStyle();
 		ImNodes::PopColorStyle();
@@ -1337,7 +1358,7 @@ Base_EdNode* AnimationGraphEditor::user_create_new_graphnode(const char* typenam
 	return node;
 }
 
-void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
+void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode, ImVec2 mouse_click_pos)
 {
 	int count = template_creation_nodes.size();
 	for (int i = 0; i < count; i++) {
@@ -1358,7 +1379,7 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode)
 			Base_EdNode* a  = user_create_new_graphnode(node->get_type().classname, cur_layer);
 
 			ImNodes::ClearNodeSelection();
-			ImNodes::SetNodeScreenSpacePos(a->id, ImGui::GetMousePos());
+			ImNodes::SetNodeScreenSpacePos(a->id, mouse_click_pos);
 			ImNodes::SelectNode(a->id);
 
 			if (drop_state.from) {
@@ -1646,11 +1667,11 @@ void AnimationGraphEditor::tick(float dt)
 }
 
 #include "Framework/StdVectorReflection.h"
-PropertyInfoList* EditorControlParamProp::get_props()
+const PropertyInfoList* EditorControlParamProp::get_props()
 {
 	START_PROPS(EditorControlParamProp)
 		REG_STDSTRING(name, PROP_EDITABLE),
-		REG_ENUM(type, PROP_EDITABLE, "", anim_graph_value_def.id),
+		REG_ENUM(type, PROP_EDITABLE, "", anim_graph_value),
 		REG_BOOL(is_old_native_param, PROP_SERIALIZE, "0"),
 	END_PROPS(EditorControlParamProp)
 }
@@ -1670,7 +1691,7 @@ PropertyInfoList* ControlParamsWindow::get_edit_value_props()
 	END_PROPS(ControlParams-Editing)
 }
 
-PropertyInfoList* ControlParamsWindow::get_props()
+const PropertyInfoList* ControlParamsWindow::get_props()
 {
 	MAKE_VECTORCALLBACK(EditorControlParamProp, props)
 	START_PROPS(ControlParamsWindow)
@@ -1977,16 +1998,14 @@ struct AutoStruct_asdf {
 
 static AutoStruct_asdf add_to_factories_asdf;
 
-static const char* strs[] = {
-	"FiveVert",
-	"NineVert",
-	"FifteenVert",
-};
-AutoEnumDef BlendSpace2dTopology_def = AutoEnumDef("blend2d", 3, strs);
+
 
 std::string SerializeImNodeState::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)
 {
 	auto context = *(ImNodesEditorContext**)info.get_ptr(inst);
+	if (!context)
+		return "";
+
 	return ImNodes::SaveEditorStateToIniString(context);
 }
 
@@ -1994,9 +2013,13 @@ void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info,
 {
 	std::string inistring(token.str_start, token.str_len);
 	auto context = (ImNodesEditorContext**)info.get_ptr(inst);
-	*context = ImNodes::EditorContextCreate();
-	ImNodes::EditorContextSet(*context);
-	ImNodes::LoadEditorStateFromIniString(*context, inistring.c_str(), inistring.size());
+	if (inistring.empty())
+		*context = nullptr;
+	else {
+		*context = ImNodes::EditorContextCreate();
+		ImNodes::EditorContextSet(*context);
+		ImNodes::LoadEditorStateFromIniString(*context, inistring.c_str(), inistring.size());
+	}
 }
 
 std::string SerializeNodeCFGRef::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)

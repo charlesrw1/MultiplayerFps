@@ -47,57 +47,50 @@ static AutoRegisterAsset<AnimGraphAssetMeta> animgraph_register_0987;
 
 Pool_Allocator g_pose_pool = Pool_Allocator(sizeof(Pose), 8);
 
-ABSTRACT_CLASS_IMPL_NO_PROPS(BaseAGNode, ClassBase);
+CLASS_IMPL(BaseAGNode);
 
 // Pose nodes
-ABSTRACT_CLASS_IMPL_NO_PROPS(Node_CFG, BaseAGNode);
-
-#define IMPL_NODE_CFG(type_name) \
-CLASS_IMPL(type_name, Node_CFG)
-
-IMPL_NODE_CFG(Clip_Node_CFG);
-IMPL_NODE_CFG(Sync_Node_CFG);
-IMPL_NODE_CFG(Mirror_Node_CFG);
-IMPL_NODE_CFG(Statemachine_Node_CFG);
-IMPL_NODE_CFG(Add_Node_CFG);
-IMPL_NODE_CFG(Subtract_Node_CFG);
-IMPL_NODE_CFG(Blend_Node_CFG);
-IMPL_NODE_CFG(Blend_Int_Node_CFG);
-IMPL_NODE_CFG(BlendSpace2d_CFG);
-IMPL_NODE_CFG(BlendSpace1d_CFG);
-IMPL_NODE_CFG(Blend_Masked_CFG);
+CLASS_IMPL(Node_CFG);
+CLASS_IMPL(Clip_Node_CFG);
+CLASS_IMPL(Sync_Node_CFG);
+CLASS_IMPL(Mirror_Node_CFG);
+CLASS_IMPL(Statemachine_Node_CFG);
+CLASS_IMPL(Add_Node_CFG);
+CLASS_IMPL(Subtract_Node_CFG);
+CLASS_IMPL(Blend_Node_CFG);
+CLASS_IMPL(Blend_Int_Node_CFG);
+CLASS_IMPL(BlendSpace2d_CFG);
+CLASS_IMPL(BlendSpace1d_CFG);
+CLASS_IMPL(Blend_Masked_CFG);
 
 // Value nodes
-ABSTRACT_CLASS_IMPL_NO_PROPS(ValueNode, BaseAGNode);
+CLASS_IMPL(ValueNode);
 
-#define IMPL_VALUE_NODE(type_name) \
-CLASS_IMPL(type_name, ValueNode)
-
-//IMPL_VALUE_NODE(CurveNode);
-//IMPL_VALUE_NODE(FloatConstant);
-//IMPL_VALUE_NODE(VectorConstant);
+CLASS_IMPL(FloatConstant);
+CLASS_IMPL(CurveNode);
+CLASS_IMPL(VectorConstant);
 //IMPL_VALUE_NODE(VariableNode);
 
-static const char* animgraphvalustrs[] = {
-	"bool_t",
-	"float_t",
-	"int_t",
-	"vec3_t",
-	"quat_t",
-};
-AutoEnumDef anim_graph_value_def=AutoEnumDef("agv",5, animgraphvalustrs);
+ENUM_START(anim_graph_value)
+	STRINGIFY_EUNM(anim_graph_value::bool_t,	0),
+	STRINGIFY_EUNM(anim_graph_value::float_t,	1),
+	STRINGIFY_EUNM(anim_graph_value::int_t,		2),
+	STRINGIFY_EUNM(anim_graph_value::vec3_t,	3),
+	STRINGIFY_EUNM(anim_graph_value::quat_t,	4)
+ENUM_IMPL(anim_graph_value);
 
 
-static const char* rm_setting_strs[] = {
-	"keep",
-	"remove",
-	"add_velocity"
-};
-AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
+
+ENUM_START(rootmotion_setting)
+	STRINGIFY_EUNM(rootmotion_setting::keep, 0),
+	STRINGIFY_EUNM(rootmotion_setting::remove, 1),
+	STRINGIFY_EUNM(rootmotion_setting::add_velocity, 2)
+ENUM_IMPL(rootmotion_setting);
+
 
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+	 RT_TYPE* rt = get_rt(ctx);
 	 //util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
 	 //return true;
 
@@ -197,7 +190,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		 util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
 		 return true;
 	 }
-	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+	 RT_TYPE* rt = get_rt(ctx);
 	 ASSERT(!(rt->lerp_amt != rt->lerp_amt));
 
 	 float value = 0.0;
@@ -227,7 +220,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 		 util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
 		 return true;
 	 }
-	 RT_TYPE* rt = get_rt<RT_TYPE>(ctx);
+	 RT_TYPE* rt = get_rt(ctx);
 
 	 // param never changes
 	 if (!store_value_on_reset) {
@@ -280,7 +273,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
  bool Mirror_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 
-	auto rt = get_rt<Mirror_Node_RT>(ctx);
+	auto rt = get_rt(ctx);
 	 if (!store_value_on_reset) {
 
 		 float amt = param->get_value<float>(ctx);
@@ -330,7 +323,7 @@ AutoEnumDef rootmotion_setting_def = AutoEnumDef("rm", 3, rm_setting_strs);
 	//walk_fade_out = g_walk_fade_out;
 	//run_fade_in = g_run_fade_in;
 
-	auto rt = get_rt<RT_TYPE>(ctx);
+	auto rt = get_rt(ctx);
 
 	glm::vec2 relmovedir = glm::vec2(
 		xparam->get_value<float>(ctx),
@@ -392,8 +385,8 @@ bool Animation_Tree_CFG::post_load_init()
 
 	code->link_to_native_class();
 	
-	bool error = code->check_is_valid();
-	if (error) {
+	bool good = code->check_is_valid();
+	if (!good) {
 		sys_print("!!! script failed 'check_is_valid' for AnimGraph %s\n", get_name().c_str());
 	}
 
@@ -408,10 +401,10 @@ bool Animation_Tree_CFG::post_load_init()
 	else
 		root = nullptr;
 
-	if (!root || error)
+	if (!root || !good)
 		graph_is_valid = false;
 
-	return !error;
+	return good;
 }
 
 int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
@@ -422,7 +415,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 return -1;
  }
 
- PropertyInfoList* Animation_Tree_CFG::get_props()
+ const PropertyInfoList* Animation_Tree_CFG::get_props()
  {
 	 START_PROPS(Animation_Tree_CFG)
 		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
@@ -610,15 +603,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 
 
- const char* cpt_strs[] = {
-	"int_t",
-	"enum_t",
-	"bool_t",
-	"float_t",
- };
- AutoEnumDef control_param_type_def = AutoEnumDef("cpt", 4, cpt_strs);
-
-
  AgSerializeContext::AgSerializeContext(Animation_Tree_CFG* tree)
  {
 	 this->tree = tree;
@@ -673,7 +657,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
  bool Blend_Masked_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
-	 auto rt = get_rt<RT_TYPE>(ctx);
+	 auto rt = get_rt(ctx);
 	 if(!rt->mask)
 		 return base->get_pose(ctx, pose);
 

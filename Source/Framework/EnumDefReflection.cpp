@@ -11,72 +11,40 @@ public:
 		return inst;
 	}
 
-	const char* get_enum_type_name(int16_t enum_type) {
-		return enum_defs.at(enum_type).name;
-	}
-	const char* get_enum_name(int16_t enum_type, int enum_idx) {
-		assert(enum_idx >= 0 && enum_idx < enum_defs.at(enum_type).count);
-		return enum_defs.at(enum_type).strs[enum_idx];
-	}
 
-	uint16_t add_enum(Enum_Def def) {
-		enum_defs.push_back(def);
-		int16_t id = enum_defs.size() - 1;
-
-		std::string buf;
-		for (int i = 0; i < def.count; i++) {
-			buf.clear();
-			buf += def.name;
-			buf += "::";
-			buf += def.strs[i];
-#ifdef _DEBUG
-			const auto& find = name_to_idx.find(buf);
-			assert(find == name_to_idx.end());
-#endif
-			name_to_idx[buf] = { id, int16_t(i) };
-		}
-
-		return id;
-	}
-
-	GlobalEnumDefIdx get_for_name(const char* str) {
-		const auto& find = name_to_idx.find(str);
-		if (find == name_to_idx.end())
-			return GlobalEnumDefIdx();
-		else
-			return find->second;
-	}
-
-	const Enum_Def& get_enum_def(uint16_t idx) {
-		return enum_defs[idx];
-	}
-
-	std::vector<Enum_Def> enum_defs;
-	std::unordered_map<std::string, GlobalEnumDefIdx> name_to_idx;
+	std::unordered_map<std::string, EnumFindResult> name_to_idx;
 };
 
-AutoEnumDef::AutoEnumDef(const char* name, int count, const char** strs)
+
+void EnumRegistry::register_enum(const EnumTypeInfo* eti) {
+	auto& name_to_idx = GlobalEnumDefMgr::get().name_to_idx;
+
+	for (int i = 0; i < eti->str_count; i++) {
+		EnumFindResult efr;
+		efr.enum_idx = i;
+		efr.typeinfo = eti;
+		name_to_idx[eti->strs[i]] = efr;
+	}
+}
+
+EnumFindResult EnumRegistry::find_enum_by_name(const char* enum_value_name) {
+	auto& name_to_idx = GlobalEnumDefMgr::get().name_to_idx;
+	auto find = name_to_idx.find(enum_value_name);
+	return find == name_to_idx.end() ? EnumFindResult() : find->second;
+}
+
+EnumTypeInfo::EnumTypeInfo(const char* name, const char** strs, size_t count) : name(name),strs(strs),str_count(count)
 {
-	id = GlobalEnumDefMgr::get().add_enum({ name,count,strs });
+	EnumRegistry::register_enum(this);
 }
-namespace Enum {
-	type_handle_t add_new_def(Enum_Def def)
-	{
-		return GlobalEnumDefMgr::get().add_enum(def);
-	}
 
-	const char* get_type_name(type_handle_t handle) {
-		return GlobalEnumDefMgr::get().get_enum_type_name(handle);
-	}
-	const char* get_enum_name(type_handle_t handle, int index) {
-		return GlobalEnumDefMgr::get().get_enum_name(handle, index);
+enum MyEnum
+{
+	aVal, bVal, cVal
+};
+ENUM_HEADER(MyEnum)
 
-	}
-	const Enum_Def& get_enum_def(type_handle_t handle) {
-		return GlobalEnumDefMgr::get().get_enum_def(handle);
-
-	}
-	GlobalEnumDefIdx find_for_full_name(const char* name) {
-		return GlobalEnumDefMgr::get().get_for_name(name);
-	}
-}
+ENUM_START(MyEnum)
+	STRINGIFY_EUNM(aVal, 0),
+	STRINGIFY_EUNM(bVal, 1)
+ENUM_IMPL(MyEnum)

@@ -13,7 +13,7 @@
 
 #include "Framework/Dict.h"
 
-CLASS_IMPL_NO_PROPS(Player, Entity);
+CLASS_IMPL(Player);
 
 //
 //	PLAYER MOVEMENT CODE

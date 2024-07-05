@@ -75,7 +75,7 @@ private:
 	// stores variables and functions for evaulating transitions
 	std::unique_ptr<Script> code;
 
-	static PropertyInfoList* get_props();
+	static const PropertyInfoList* get_props();
 
 	friend class Animation_Tree_Manager;
 	friend class AnimationGraphEditor;

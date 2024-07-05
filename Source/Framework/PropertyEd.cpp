@@ -176,10 +176,9 @@ void EnumEditor::internal_update()
 	ASSERT(prop->type == core_type_id::Enum8 || prop->type == core_type_id::Enum16 || prop->type == core_type_id::Enum32);
 
 	int enum_val = prop->get_int(instance);
-	auto& enum_def = Enum::get_enum_def(prop->enum_type_id);
-	ASSERT(enum_val >= 0 && enum_val < enum_def.count);
+	ASSERT(enum_val >= 0 && enum_val < prop->enum_type->str_count);
 
-	ImGui::Combo("##combo", &enum_val, enum_def.strs, enum_def.count);
+	ImGui::Combo("##combo", &enum_val, prop->enum_type->strs, prop->enum_type->str_count);
 
 	prop->set_int(instance, enum_val);
 }
@@ -506,7 +505,7 @@ void ArrayRow::draw_row_controls()
 
 	 IListCallback* list = prop->list_ptr;
 	 int count = list->get_size(prop->get_ptr(instance));
-	 PropertyInfoList* struct_ = list->props_in_list;
+	 const PropertyInfoList* struct_ = list->props_in_list;
 
 
 

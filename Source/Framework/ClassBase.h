@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <type_traits>
 #include "Framework/TypedVoidPtr.h"
 
 struct PropertyInfoList;
@@ -10,7 +11,7 @@ struct ClassTypeInfo
 public:
 	typedef ClassBase* (*CreateObjectFunc)();
 
-	ClassTypeInfo(const char* classname, const char* superclass, const PropertyInfoList* props, CreateObjectFunc alloc);
+	ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, const PropertyInfoList* props, CreateObjectFunc alloc);
 
 	uint16_t id = 0;
 	uint16_t last_child = 0;
@@ -36,24 +37,89 @@ private:
 
 };
 
-#define CLASS_HEADER() \
-static ClassTypeInfo StaticType; \
-const ClassTypeInfo& get_type() const override;
+template<typename, typename T>
+struct has_get_props {
+	static_assert(
+		std::integral_constant<T, false>::value,
+		"Second template parameter needs to be of function type.");
+};
 
-#define CLASS_IMPL(classname, supername) \
-ClassTypeInfo classname::StaticType = ClassTypeInfo(#classname, #supername, classname::get_props(),ClassTypeInfo::default_allocate<classname>); \
-const ClassTypeInfo& classname::get_type() const  { return classname::StaticType; }
-#define ABSTRACT_CLASS_IMPL(classname, supername) \
-ClassTypeInfo classname::StaticType = ClassTypeInfo(#classname, #supername, classname::get_props(), nullptr); \
-const ClassTypeInfo& classname::get_type() const  { return classname::StaticType; }
+// Specialization that does the checking
+template<typename C, typename Ret, typename... Args>
+struct has_get_props<C, Ret(Args...)> {
+private:
+	template<typename T>
+	static constexpr auto check(T*) -> typename
+		std::is_same<
+		decltype(std::declval<T>().get_props(std::declval<Args>()...)),
+		Ret    // Ensure the return type matches
+		>::type;
 
-#define CLASS_IMPL_NO_PROPS(classname, supername) \
-ClassTypeInfo classname::StaticType = ClassTypeInfo(#classname, #supername, nullptr,ClassTypeInfo::default_allocate<classname>); \
-const ClassTypeInfo& classname::get_type() const  { return classname::StaticType; }
+	template<typename>
+	static constexpr std::false_type check(...);
 
-#define ABSTRACT_CLASS_IMPL_NO_PROPS(classname, supername) \
-ClassTypeInfo classname::StaticType = ClassTypeInfo(#classname, #supername, nullptr, nullptr); \
-const ClassTypeInfo& classname::get_type() const  { return classname::StaticType; }
+	typedef decltype(check<C>(0)) type;
+
+public:
+	static constexpr bool value = type::value;
+};
+
+
+template<typename T>
+const PropertyInfoList* call_get_props_if_it_exists() {
+	if constexpr (has_get_props<T, const PropertyInfoList*()>::value) {
+		return T::get_props();
+	}
+	else {
+		return nullptr;
+	}
+}
+
+template<typename T>
+struct is_abstract {
+private:
+	template<typename U>
+	static constexpr auto test(U*) -> decltype(U(), std::false_type());
+
+	template<typename>
+	static constexpr std::true_type test(...);
+
+public:
+	static constexpr bool value = decltype(test<T>(nullptr))::value;
+};
+
+
+// Function template to create an instance of the class if it is not abstract
+template<typename T>
+typename std::enable_if<!is_abstract<T>::value, ClassTypeInfo::CreateObjectFunc>::type default_class_create() {
+	return ClassTypeInfo::default_allocate<T>;
+}
+
+// Overload for the case when the class is abstract
+template<typename T>
+typename std::enable_if<is_abstract<T>::value, ClassTypeInfo::CreateObjectFunc>::type default_class_create() {
+	return nullptr;
+}
+
+
+#define CLASS_IMPL(classname) \
+ClassTypeInfo classname::StaticType = ClassTypeInfo( \
+	#classname, \
+	&classname::SuperClassType::StaticType, \
+	call_get_props_if_it_exists<classname>(), \
+	default_class_create<classname>() \
+);
+
+#define CLASS_H_EXPLICIT_SUPER(classname, cpp_supername, reflected_super) \
+class classname : public cpp_supername { \
+public: \
+	using SuperClassType = reflected_super; \
+	static ClassTypeInfo StaticType; \
+	const ClassTypeInfo& get_type() const override { return classname::StaticType; }
+
+#define CLASS_H(classname, supername) \
+	CLASS_H_EXPLICIT_SUPER(classname, supername, supername)
+
 
 struct ClassTypeIterator
 {

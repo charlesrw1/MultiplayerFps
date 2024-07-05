@@ -8,27 +8,28 @@
 #include "Framework/ReflectionRegisterDefines.h"
 
 
-ABSTRACT_CLASS_IMPL_NO_PROPS(Base_EdNode, ClassBase);
+CLASS_IMPL(Base_EdNode);
 
+CLASS_IMPL(Clip_EdNode);
+CLASS_IMPL(Additive_EdNode);
+CLASS_IMPL(Subtract_EdNode);
+CLASS_IMPL(Root_EdNode);
+CLASS_IMPL(Statemachine_EdNode);
+CLASS_IMPL(Blend_EdNode);
+CLASS_IMPL(Blend_int_EdNode);
+CLASS_IMPL(Sync_EdNode);
+CLASS_IMPL(Mirror_EdNode);
+CLASS_IMPL(Blendspace2d_EdNode);
+CLASS_IMPL(Blend_Layered_EdNode);
 
-#define EDIMPL(type_name) \
-CLASS_IMPL(type_name, Base_EdNode)
+CLASS_IMPL(State_EdNode);
+CLASS_IMPL(StateStart_EdNode);
+CLASS_IMPL(StateAlias_EdNode);
 
-EDIMPL(Clip_EdNode);
-EDIMPL(Additive_EdNode);
-EDIMPL(Subtract_EdNode);
-EDIMPL(Root_EdNode);
-EDIMPL(Statemachine_EdNode);
-EDIMPL(Blend_EdNode);
-EDIMPL(Blend_int_EdNode);
-EDIMPL(Sync_EdNode);
-EDIMPL(Mirror_EdNode);
-EDIMPL(Blendspace2d_EdNode);
-EDIMPL(Blend_Layered_EdNode);
+CLASS_IMPL(FloatConstant_EdNode);
+CLASS_IMPL(Curve_EdNode);
+CLASS_IMPL(VectorConstant_EdNode);
 
-EDIMPL(State_EdNode);
-CLASS_IMPL(StateStart_EdNode, State_EdNode);
-CLASS_IMPL(StateAlias_EdNode, State_EdNode);
 
 
 void Base_EdNode::remove_reference(Base_EdNode* node)

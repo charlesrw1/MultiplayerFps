@@ -65,10 +65,7 @@ struct PlayerFlags
 	};
 };
 
-class Player : public Entity
-{
-public:
-	CLASS_HEADER();
+CLASS_H(Player, Entity)
 
 	Player();
 

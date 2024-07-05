@@ -221,7 +221,7 @@ struct EditorControlParamProp {
 		return p;
 	}
 
-	static PropertyInfoList* get_props();
+	static const PropertyInfoList* get_props();
 	static PropertyInfoList* get_ed_control_null_prop();
 	static void reset_id_generator(int to) {
 		unique_id_generator = to;
@@ -271,7 +271,7 @@ public:
 	}
 
 private:
-	static PropertyInfoList* get_props();
+	static const PropertyInfoList* get_props();
 	static PropertyInfoList* get_edit_value_props();
 
 	friend class ControlParamArrayHeader;
@@ -397,7 +397,7 @@ public:
 		user_create_new_graphnode((is_statemachine) ? "StateStart_EdNode" : "Root_EdNode", layer);
 	}
 
-	void draw_node_creation_menu(bool is_state_mode);
+	void draw_node_creation_menu(bool is_state_mode, ImVec2 mouse_click_pos);
 	void draw_menu_bar() override;
 	void draw_popups();
 	void draw_prop_editor();
@@ -414,7 +414,7 @@ public:
 
 	void try_load_preview_models();
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(AnimationGraphEditor)
 			REG_INT(current_id, PROP_SERIALIZE, ""),
 			REG_INT(current_layer, PROP_SERIALIZE, ""),

@@ -6,7 +6,6 @@
 #include "TypedVoidPtr.h"
 
 // If you modify this, change the autoenumdef!!
-extern AutoEnumDef core_type_id_def;
 enum class core_type_id : uint8_t
 {
 	Bool,
@@ -27,6 +26,7 @@ enum class core_type_id : uint8_t
 	StdString,
 	List,
 };
+
 
 enum SerializedPropFlags
 {
@@ -60,13 +60,13 @@ struct PropertyInfo {
 
 	const char* name = "";
 	uint16_t offset = 0;
-	uint16_t enum_type_id = 0;
 	core_type_id type = core_type_id::Int32;
 	uint8_t flags = PROP_DEFAULT;
 	const char* range_hint = "";
 	IListCallback* list_ptr = nullptr;
 	const char* custom_type_str = "";
 	const char* tooltip = "";
+	const EnumTypeInfo* enum_type = nullptr;
 
 	uint8_t* get_ptr(void* inst) const {
 		return (uint8_t*)inst + offset;
@@ -96,7 +96,7 @@ ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop);
 PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
 PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint = "", const char* customtype = "");
 PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id, const char* hint= "");
+PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const EnumTypeInfo* t, const char* hint= "");
 PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype = "");
 PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "", const char* hint = "");
@@ -130,10 +130,10 @@ void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, vo
 class IListCallback
 {
 public:
-	IListCallback(PropertyInfoList* struct_) 
+	IListCallback(const PropertyInfoList* struct_) 
 		: props_in_list(struct_) {}
 
-	PropertyInfoList* props_in_list = nullptr;
+	const PropertyInfoList* props_in_list = nullptr;
 	virtual uint8_t* get_index(void* inst, int index) = 0;
 	virtual uint32_t get_size(void* inst) = 0;
 	virtual void resize(void* inst, uint32_t new_size) = 0;

@@ -3,7 +3,7 @@
 #include "Base_node.h"
 
 #include "../Runtime/AnimationTreeLocal.h"
-
+#include "Animation/Editor/AnimationGraphEditor.h"
 
 
 
@@ -69,8 +69,13 @@ inline bool util_compile_default(Base_EdNode* node, const AgSerializeContext* ct
 
 		BaseAGNode** ptr_to_ptr = (BaseAGNode**)prop.get_ptr(cfg);
 		if (other_ed_node && !(other_ed_node->get_output_pin_type() == input.type)) {
-			node->append_fail_msg("[ERROR] node input is wrong type (this should have not errored)");
+			node->append_info_msg("[INFO] node input is wrong type, removing it (this should have not errored)\n");
 			*ptr_to_ptr = ptr_to_serialized_nodecfg_ptr(nullptr, ctx);
+			
+			node->on_remove_pin(i);
+			node->on_post_remove_pins();
+
+			other = nullptr;	// doesnt  have input anymore
 		}
 		else {
 			*ptr_to_ptr = ptr_to_serialized_nodecfg_ptr(other, ctx);
@@ -96,7 +101,7 @@ inline bool util_compile_default(Base_EdNode* node, const AgSerializeContext* ct
 	virtual GraphPinType get_output_pin_type() const override { return GraphPinType(GraphPinType::pin_type); }
 
 #define MAKE_STANARD_SERIALIZE(type_name) \
-	static PropertyInfoList* get_props() { \
+	static const PropertyInfoList* get_props() { \
 		START_PROPS(type_name) \
 			REG_STRUCT_CUSTOM_TYPE(node, PROP_SERIALIZE, "SerializeNodeCFGRef") \
 		END_PROPS(type_name) \
@@ -121,10 +126,36 @@ public:
 	T* node = nullptr;
 };
 
-class Clip_EdNode : public BaseNodeUtil_EdNode<Clip_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+
+CLASS_H_EXPLICIT_SUPER(FloatConstant_EdNode, BaseNodeUtil_EdNode<FloatConstant>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Float Constant",
+	SOURCE_COLOR,
+	"placeholder",
+	);
+MAKE_STANARD_SERIALIZE(FloatConstant_EdNode)
+};
+
+CLASS_H_EXPLICIT_SUPER(Curve_EdNode, BaseNodeUtil_EdNode<CurveNode>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Curve",
+	SOURCE_COLOR,
+	"placeholder",
+	);
+MAKE_STANARD_SERIALIZE(Curve_EdNode)
+};
+
+CLASS_H_EXPLICIT_SUPER(VectorConstant_EdNode, BaseNodeUtil_EdNode<VectorConstant>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Vector Constant",
+	SOURCE_COLOR,
+	"placeholder",
+	);
+MAKE_STANARD_SERIALIZE(VectorConstant_EdNode)
+};
+
+
+CLASS_H_EXPLICIT_SUPER(Clip_EdNode, BaseNodeUtil_EdNode<Clip_Node_CFG>, Base_EdNode)
 
 	MAKE_STANDARD_FUNCTIONS(
 		"Clip", 
@@ -146,10 +177,7 @@ public:
 	}
 };
 
-class Blend_EdNode : public BaseNodeUtil_EdNode<Blend_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Blend_EdNode, BaseNodeUtil_EdNode<Blend_Node_CFG>, Base_EdNode)
 
 	MAKE_STANDARD_FUNCTIONS(
 		"Blend",
@@ -159,10 +187,7 @@ public:
 	MAKE_STANARD_SERIALIZE(Blend_EdNode);
 };
 
-class Blend_int_EdNode : public BaseNodeUtil_EdNode<Blend_Int_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Blend_int_EdNode, BaseNodeUtil_EdNode<Blend_Int_Node_CFG>, Base_EdNode)
 
 	MAKE_STANDARD_FUNCTIONS(
 		"Blend By Int",
@@ -212,10 +237,7 @@ public:
 	int num_int_inputs = 0;
 };
 
-class Additive_EdNode : public BaseNodeUtil_EdNode<Add_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Additive_EdNode, BaseNodeUtil_EdNode<Add_Node_CFG>, Base_EdNode)
 
 	MAKE_STANARD_SERIALIZE(Additive_EdNode);
 	MAKE_STANDARD_FUNCTIONS(
@@ -225,10 +247,7 @@ public:
 	);
 };
 
-class Subtract_EdNode : public BaseNodeUtil_EdNode<Subtract_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Subtract_EdNode, BaseNodeUtil_EdNode<Subtract_Node_CFG>, Base_EdNode)
 
 	MAKE_STANARD_SERIALIZE(Subtract_EdNode);
 	MAKE_STANDARD_FUNCTIONS(
@@ -238,10 +257,7 @@ public:
 	);
 };
 
-class Mirror_EdNode : public BaseNodeUtil_EdNode<Mirror_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Mirror_EdNode, BaseNodeUtil_EdNode<Mirror_Node_CFG>, Base_EdNode)
 
 	MAKE_STANARD_SERIALIZE(Mirror_EdNode);
 	MAKE_STANDARD_FUNCTIONS(
@@ -252,11 +268,7 @@ public:
 
 
 };
-
-class Blend_Layered_EdNode : public BaseNodeUtil_EdNode<Blend_Masked_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Blend_Layered_EdNode, BaseNodeUtil_EdNode<Blend_Masked_CFG>, Base_EdNode)
 
 	MAKE_STANDARD_FUNCTIONS(
 		"Blend Layered",
@@ -285,10 +297,7 @@ public:
 	std::string maskname = "";
 };
 
-class Sync_EdNode : public BaseNodeUtil_EdNode<Sync_Node_CFG>
-{
-public:
-	CLASS_HEADER();
+CLASS_H_EXPLICIT_SUPER(Sync_EdNode, BaseNodeUtil_EdNode<Sync_Node_CFG>, Base_EdNode)
 	
 	MAKE_STANDARD_FUNCTIONS(
 		"Sync",

@@ -66,7 +66,7 @@ struct SignalProperty
 	float delay = 0.0;
 	bool fire_multiple_times = false;
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(SignalProperty)
 			REG_STDSTRING_CUSTOM_TYPE(signal_name,PROP_DEFAULT,"LevelEd_SignalName"),
 			REG_STDSTRING_CUSTOM_TYPE(target_name, PROP_DEFAULT, "LevelEd_TargetName"),

@@ -81,18 +81,14 @@ struct GraphNodeInput
 };
 
 class AnimationGraphEditor;
-class Base_EdNode : public ClassBase
-{
-public:
-	CLASS_HEADER();
-
+CLASS_H(Base_EdNode, ClassBase)
 	Base_EdNode() {
 		for (int i = 0; i < inputs.size(); i++) 
 			inputs[i].node = nullptr;
 	}
 	virtual ~Base_EdNode() {}
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(Base_EdNode)
 			REG_INT(id, PROP_SERIALIZE, ""),
 			REG_INT(graph_layer, PROP_SERIALIZE, ""),
@@ -235,6 +231,8 @@ public:
 	}
 	void init_graph_nodes_from_node() {
 		auto node = get_graph_node();
+		if (!node||!node->get_type().props)
+			return;
 		auto props = node->get_type().props;
 		for (int i = 0; i < props->count; i++) {
 			auto& prop = props->list[i];

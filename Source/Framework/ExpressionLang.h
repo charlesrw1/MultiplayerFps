@@ -30,7 +30,7 @@ struct script_state;
 typedef void(*bytecode_function)(script_state* stack);
 
 
-extern AutoEnumDef script_types_def;
+
 enum class script_types : uint8_t
 {
 	bool_t,		// 'b' 4 byte true/false
@@ -41,6 +41,7 @@ enum class script_types : uint8_t
 	custom_t,	// 's' custom type, arb size, only can be used by user functions
 	empty_t,	// 'e' 0 byte return
 };
+ENUM_HEADER(script_types);
 
 
 enum class script_def_type : uint8_t
@@ -187,7 +188,7 @@ struct ScriptVariable
 	bool is_native = false;
 	int var_offset = 0;
 	
-	static PropertyInfoList* get_props();
+	static const PropertyInfoList* get_props();
 
 	// set at runtime initialization
 	const PropertyInfo* native_pi_of_variable = nullptr;

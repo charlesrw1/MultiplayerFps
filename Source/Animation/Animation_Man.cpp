@@ -12,10 +12,17 @@ static const char* MODEL_DIRECTORY = "Data/Models/";
 
 Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char* filename, DictParser& parser)
 {
-	auto file = FileSys::open_read_os(filename);
+	std::string fullpath = "./Data/Graphs/";
+	fullpath += filename;
+
+	auto file = FileSys::open_read_os(fullpath.c_str());
 
 	if (!file) {
-		printf("couldn't load animation tree file %s\n", filename);
+		sys_print("!!! couldn't load animation tree file %s\n", filename);
+		return nullptr;
+	}
+	if (file->size() == 0) {
+		sys_print("!!! animation tree file empty %s\n", filename);
 		return nullptr;
 	}
 	parser.load_from_file(file.get());
@@ -25,7 +32,7 @@ Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char*
 	bool already_loaded = tree->is_initialized();
 
 	if (already_loaded) {
-		printf("tree already loaded, realoading\n");
+		sys_print("``` tree already loaded, realoading\n");
 		// whatev...
 		tree->~Animation_Tree_CFG();
 		new(tree)Animation_Tree_CFG();
@@ -34,7 +41,7 @@ Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char*
 	tree->path = filename;
 	bool good = tree->read_from_dict(parser);
 	if (!good) {
-		printf("animation tree file parsing failed %s\n", filename);
+		sys_print("!!! animation tree file parsing failed %s\n", filename);
 		tree->graph_is_valid = false;
 		return nullptr;
 	}

@@ -4,18 +4,21 @@
 #include "imnodes.h"
 #include "AnimationGraphEditor.h"
 #include "../Runtime/Statemachine_cfg.h"
+
 class Statemachine_EdNode;
-class State_EdNode : public Base_EdNode
-{
-public:
+
+CLASS_H(State_EdNode, Base_EdNode)
+
 	~State_EdNode() override {
 		if (sublayer.context)
 			ImNodes::EditorContextFree(sublayer.context);
 	}
 
-	CLASS_HEADER();
 	MAKE_OUTPUT_TYPE(state_t);
-public:
+
+
+	void ensure_that_inputs_are_exposed();
+
 	// overrides
 	void init() override;
 	std::string get_title() const override;
@@ -28,11 +31,19 @@ public:
 
 	bool add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot) override;
 	bool push_input(AnimationGraphEditor* ed, Base_EdNode* input)  {
-		ASSERT(inputs.size() >= 1);
-		uint32_t ofs = inputs.size() - 1;
-		if (inputs.size() < MAX_INPUTS)
-			push_empty_node();
-		return add_input(ed, input, ofs);
+		
+		if (inputs.size() >= MAX_INPUTS) {
+			sys_print("!!! state node inputs full\n");
+			return false;
+		}
+		
+		ensure_that_inputs_are_exposed();
+		ASSERT(!inputs.empty());
+		uint32_t slot = inputs.size() - 1;
+
+		bool res = add_input(ed, input, slot);
+
+		ensure_that_inputs_are_exposed();
 	}
 	void push_empty_node() {
 		init_graph_node_input("<new state>", GraphPinType(GraphPinType::state_t), nullptr);
@@ -106,7 +117,7 @@ public:
 		return nullptr;
 	}
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(State_EdNode)
 			REG_STDSTRING(name, PROP_DEFAULT),
 			REG_INT(state_handle_internal.id,PROP_SERIALIZE,""),
@@ -130,16 +141,12 @@ public:
 	Statemachine_EdNode* parent_statemachine = nullptr;
 
 	std::string name = "";
-
+	
 };
 
 
 
-class StateAlias_EdNode : public State_EdNode
-{
-public:
-	CLASS_HEADER();
-	
+CLASS_H(StateAlias_EdNode, State_EdNode)
 	
 	void add_props_for_extra_editable_element(std::vector<PropertyListInstancePair>& props) override {
 	}
@@ -147,17 +154,14 @@ public:
 	// Inherited from Base_EdNode
 	bool allow_creation_from_menu() const { return false; }	// FIXME
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(StateAlias_EdNode)
 			REG_STDSTRING(name, PROP_SERIALIZE)
 		END_PROPS(StateAlias_EdNode);
 	}
 };
+CLASS_H(StateStart_EdNode, State_EdNode)
 
-class StateStart_EdNode : public State_EdNode
-{
-public:
-	CLASS_HEADER();
 
 	// Inherited from Base_EdNode
 	std::string get_name() const override { return "State Enter"; }
@@ -165,8 +169,4 @@ public:
 	Color32 get_node_color() const  override { return ROOT_COLOR; }
 	std::string get_output_pin_name() const { return "START"; }
 	bool allow_creation_from_menu() const { return false; }
-
-	static PropertyInfoList* get_props() {
-		return nullptr;
-	}
 };

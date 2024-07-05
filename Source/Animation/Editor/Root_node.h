@@ -1,11 +1,8 @@
 #pragma once
 #include "Base_node.h"
 #include "State_node.h"
-class Root_EdNode : public Base_EdNode
-{
-public:
-	CLASS_HEADER();
 
+CLASS_H(Root_EdNode, Base_EdNode)
 	void init() override {
 		init_graph_node_input("input", GraphPinType(GraphPinType::localspace_pose), nullptr);
 
@@ -37,10 +34,5 @@ public:
 	bool has_output_pin() const override { return false; }
 	bool can_delete() const override { return false; }
 	bool allow_creation_from_menu() const override { return false; }
-
-	static PropertyInfoList* get_props() {
-		return nullptr;
-	}
-
 
 };

@@ -129,10 +129,8 @@ struct UpdateFlags
 
 class PhysicsActor;
 class Dict;
-class Entity : public ClassBase
-{
-public:
-	CLASS_HEADER();
+
+CLASS_H(Entity, ClassBase)
 
 	Entity();
 	virtual ~Entity();

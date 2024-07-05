@@ -7,17 +7,15 @@
 #include "Animation/Runtime/Animation.h"
 #include "Framework/ReflectionRegisterDefines.h"
 
-class CharacterGraphDriver : public AnimatorInstance
-{
-public:
-	CLASS_HEADER();
+CLASS_H(CharacterGraphDriver, AnimatorInstance)
+
 
 	virtual void on_init() override;
 	virtual void on_update(float dt) override;
 	virtual void pre_ik_update(Pose& pose, float dt) override;
 	virtual void post_ik_update() override;
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(CharacterGraphDriver)
 			REG_FLOAT(flMovex,PROP_DEFAULT,""),
 			REG_FLOAT(flMovey, PROP_DEFAULT, ""),

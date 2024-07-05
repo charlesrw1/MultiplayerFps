@@ -1241,23 +1241,23 @@ Program::find_tuple Program::find_def(const std::string& name) const
 
 #include "Framework/ReflectionRegisterDefines.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/EnumDefReflection.h"
+ENUM_START(script_types)
+	STRINGIFY_EUNM(script_types::bool_t, 0),
+	STRINGIFY_EUNM(script_types::int_t, 1),
+	STRINGIFY_EUNM(script_types::float_t, 2),
+	STRINGIFY_EUNM(script_types::name_t, 3),
+	STRINGIFY_EUNM(script_types::pointer_t, 4),
+	STRINGIFY_EUNM(script_types::custom_t, 5),
+	STRINGIFY_EUNM(script_types::empty_t, 6)
+ENUM_IMPL(script_types)
 
-static const char* cpt_strs[] = {
-   "bool_t",
-	"int_t",		// 'i' 4 byte integer
-	"float_t",	// 'f' 4 byte float
-	"name_t",		// 'n' 8 byte hashed string
-	"pointer_t",	// 'p' 8 byte custom pointer with type name 'mypointer_t', 'p' for untyped void* (dont do this)
-	"custom_t",	// 's' custom type, arb size, only can be used by user functions
-	"empty_t",
-};
-AutoEnumDef script_types_def = AutoEnumDef("st", 7, cpt_strs);
-PropertyInfoList* ScriptVariable::get_props()
+const PropertyInfoList* ScriptVariable::get_props()
 {
 	START_PROPS(ScriptVariable)
 		REG_STDSTRING(name, PROP_DEFAULT),
 		REG_BOOL(is_native, PROP_DEFAULT,""),
-		REG_ENUM(type,PROP_DEFAULT, "", script_types_def.id)
+		REG_ENUM(type,PROP_DEFAULT, "", script_types)
 	END_PROPS(ScriptVariable)
 }
 #include "Framework/StdVectorReflection.h"

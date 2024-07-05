@@ -7,7 +7,7 @@
 
 #include "Framework/WriteObject.h"
 
-ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", "", nullptr, nullptr);
+ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr);
 const ClassTypeInfo& ClassBase::get_type() const { return ClassBase::StaticType; }
 
 struct TypeInfoWithExtra
@@ -43,12 +43,13 @@ static ClassRegistryData& get_registry()
 }
 
 
-ClassTypeInfo::ClassTypeInfo(const char* classname, const char* superclass, const PropertyInfoList* props, CreateObjectFunc alloc)
+ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, const PropertyInfoList* props, CreateObjectFunc alloc)
 {
 	this->classname = classname;
-	this->superclassname = superclass;
+	this->superclassname = "";
 	this->props = props;
 	this->allocate = alloc;
+	this->super_typeinfo = super_typeinfo;
 
 	// register this
 	ClassBase::register_class(this);
@@ -63,7 +64,7 @@ void ClassBase::register_class(ClassTypeInfo* cti)
 {
 	if (get_registry().initialzed)
 		Fatalf("!!! RegisterClass called outside of static initialization\n");
-	if (*cti->superclassname == 0 /*strlen == 0*/ && cti != &ClassBase::StaticType)
+	if (!cti->super_typeinfo && cti != &ClassBase::StaticType)
 		Fatalf("!!! RegisterClass called without a super class, parent to ClassBase if its a root class");
 
 	auto& string_to_typeinfo = get_registry().string_to_typeinfo;
@@ -81,7 +82,9 @@ void TypeInfoWithExtra::init()
 
 	if (has_initialized)
 		return;
-	if (strlen(typeinfo->superclassname) > 0) {
+	if (typeinfo->super_typeinfo) {
+		typeinfo->superclassname = typeinfo->super_typeinfo->classname;
+
 		auto super = get_registry().string_to_typeinfo.find(typeinfo->superclassname);
 		if (super == get_registry().string_to_typeinfo.end())
 			Fatalf("!!! Couldnt find super class %s for class %s\n", typeinfo->superclassname, typeinfo->classname);
@@ -89,8 +92,6 @@ void TypeInfoWithExtra::init()
 		// initialize super class
 		if (!super->second.has_initialized)
 			super->second.init();
-
-		typeinfo->super_typeinfo = super->second.typeinfo;
 
 		set_parent(&super->second);
 	}

@@ -9,10 +9,7 @@
 
 
 using namespace glm;
-class NPC : public Entity
-{
-public:
-	CLASS_HEADER();
+CLASS_H(NPC, Entity)
 
 	NPC() {
 		set_model("player_FINAL.glb");
@@ -102,10 +99,7 @@ public:
 	int current_waypoint = 0;
 };
 
-class Door : public Entity
-{
-public:
-	CLASS_HEADER();
+CLASS_H(Door, Entity)
 
 	enum {
 		OPEN,
@@ -116,10 +110,7 @@ public:
 	void update() override;
 };
 
-class Grenade : public Entity
-{
-public:
-	CLASS_HEADER();
+CLASS_H(Grenade, Entity)
 
 	Grenade();
 

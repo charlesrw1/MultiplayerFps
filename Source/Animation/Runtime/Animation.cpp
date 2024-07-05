@@ -18,7 +18,7 @@ using namespace glm;
 #include "../AnimationTreePublic.h"
 
 
-CLASS_IMPL_NO_PROPS(AnimatorInstance, ClassBase);
+CLASS_IMPL(AnimatorInstance);
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -137,14 +137,14 @@ bool AnimatorInstance::initialize_animator(
 	}
 
 	// Initialize script instance, sets pointer of AnimatorInstance for native variables
-	bool good = script_inst.init_from(cfg->get_script(), this);
+	bool good = script_inst.init_from(graph->get_script(), this);
 	
 	if (!good) {
 		sys_print("!!! script instance failed to init\n");
 		return false;
 	}
 
-	this->cfg = cfg;
+	this->cfg = graph;
 	this->model = model;
 	this->owner = ent;
 

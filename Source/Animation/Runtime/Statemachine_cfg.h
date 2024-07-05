@@ -35,7 +35,7 @@ inline float evaluate_easing(Easing type, float t)
 struct State;
 struct State_Transition
 {
-	static PropertyInfoList* get_props();
+	static const PropertyInfoList* get_props();
 	bool is_a_continue_transition() const { return is_continue_transition; }
 	bool is_an_auto() const { return automatic_transition_rule; }
 	handle<State> transition_state;
@@ -52,7 +52,7 @@ struct State_Transition
 
 struct State
 {
-	static PropertyInfoList* get_props();
+	static const PropertyInfoList* get_props();
 
 	Node_CFG* tree = nullptr;	// fixed up at initialization
 	bool is_end_state = false;
@@ -72,10 +72,8 @@ struct Statemachine_Node_RT : Rt_Vars_Base
 	float blend_percentage = 0.0;
 };
 
-struct Statemachine_Node_CFG : public Node_CFG
-{
-	using RT_TYPE = Statemachine_Node_RT;
-	CLASS_HEADER();
+
+NODECFG_HEADER(Statemachine_Node_CFG, Statemachine_Node_RT)
 
 	virtual void initialize(Animation_Tree_CFG* tree) override;
 
@@ -85,10 +83,6 @@ struct Statemachine_Node_CFG : public Node_CFG
 
 	// Inherited via At_Node
 	virtual void reset(NodeRt_Ctx& ctx) const override;
-
-	virtual void construct(NodeRt_Ctx& ctx) const override {
-		construct_this<Statemachine_Node_RT>(ctx);
-	}
 
 	const State* get_state(handle<State> handle) const {
 		if (handle.id == -1) return nullptr;

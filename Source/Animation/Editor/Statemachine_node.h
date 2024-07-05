@@ -3,16 +3,15 @@
 #include "State_node.h"
 #include "Basic_nodes.h"
 #include "../Runtime/Statemachine_cfg.h"
-class Statemachine_EdNode : public Base_EdNode
-{
+
+
+CLASS_H(Statemachine_EdNode, Base_EdNode)
 
 	~Statemachine_EdNode() override {
 		ASSERT(sublayer.context);
 		ImNodes::EditorContextFree(sublayer.context);
 	}
 
-public:
-	CLASS_HEADER();
 	MAKE_OUTPUT_TYPE(localspace_pose);
 
 	// overrides
@@ -47,7 +46,7 @@ public:
 	}
 	State* get_state(handle<State> state);
 
-	static PropertyInfoList* get_props() {
+	static const PropertyInfoList* get_props() {
 		START_PROPS(Statemachine_EdNode)
 			REG_STDSTRING(name,PROP_DEFAULT),
 			REG_INT(sublayer.id, PROP_SERIALIZE, ""),

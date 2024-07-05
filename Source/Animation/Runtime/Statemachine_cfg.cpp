@@ -11,9 +11,17 @@ static const char* easing_strs[] = {
 	"CubicEaseOut",
 	"CubicEaseInOut",
 };
-static AutoEnumDef Easing_def = AutoEnumDef("easing", 4, easing_strs);
 
-PropertyInfoList* State_Transition::get_props()
+ENUM_HEADER(Easing);
+ENUM_START(Easing)
+	STRINGIFY_EUNM(Easing::Linear, 0),
+	STRINGIFY_EUNM(Easing::CubicEaseIn, 1),
+	STRINGIFY_EUNM(Easing::CubicEaseOut, 2),
+	STRINGIFY_EUNM(Easing::CubicEaseInOut, 3)
+ENUM_IMPL(Easing);
+
+
+const PropertyInfoList* State_Transition::get_props()
 {
 	START_PROPS(State_Transition)
 		REG_INT(transition_state, PROP_SERIALIZE, "-1"),
@@ -23,12 +31,12 @@ PropertyInfoList* State_Transition::get_props()
 		REG_BOOL(is_continue_transition, PROP_DEFAULT, "0"),
 		REG_BOOL(can_be_interrupted, PROP_DEFAULT, "1"),
 		REG_INT(priority, PROP_DEFAULT, "0"),
-		REG_ENUM(easing_type, PROP_DEFAULT, "easing::Linear", Easing_def.id)
+		REG_ENUM(easing_type, PROP_DEFAULT, "Easing::Linear", Easing)
 	END_PROPS(State_Transition)
 }
 
 
-PropertyInfoList* State::get_props()
+const PropertyInfoList* State::get_props()
 {
 	MAKE_INLVECTORCALLBACK_ATOM(uint16_t, transition_idxs, State);
 	START_PROPS(State)
@@ -165,7 +173,7 @@ const State_Transition* Statemachine_Node_CFG::find_state_transition(NodeRt_Ctx&
 
 bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 
-	auto rt = get_rt<Statemachine_Node_RT>(ctx);
+	auto rt = get_rt(ctx);
 
 	ASSERT(rt->active_state.is_valid());
 
@@ -321,7 +329,7 @@ bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose)
 
 void Statemachine_Node_CFG::reset(NodeRt_Ctx& ctx) const
 {
-	auto rt = get_rt<Statemachine_Node_RT>(ctx);
+	auto rt = get_rt(ctx);
 	// does the reset
 	find_enter_state(rt, ctx);
 

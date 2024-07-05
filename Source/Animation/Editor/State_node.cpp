@@ -158,7 +158,23 @@ void State_EdNode::remove_reference(Base_EdNode* node)
 		//parent_statemachine = nullptr;
 	}
 }
-
+void State_EdNode::ensure_that_inputs_are_exposed()
+{
+	if (inputs.size() == MAX_INPUTS)
+		return;
+	if (inputs.empty()) {
+		GraphNodeInput in;
+		in.node = nullptr;
+		in.type = GraphPinType(GraphPinType::state_t);
+		inputs.push_back(in);
+	}
+	else if (inputs.back().node != nullptr) {
+		GraphNodeInput in;
+		in.node = nullptr;
+		in.type = GraphPinType(GraphPinType::state_t);
+		inputs.push_back(in);
+	}
+}
 bool State_EdNode::add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot)
 {
 	ASSERT(input->is_state_node());
@@ -168,6 +184,8 @@ bool State_EdNode::add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint3
 
 	State_EdNode* statenode = input->cast_to<State_EdNode>();
 	statenode->on_output_create(this, slot);
+
+	ensure_that_inputs_are_exposed();
 
 	return false;
 }
@@ -312,9 +330,8 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 		 }
 	 }
 	 inputs.resize(count);
-	 push_empty_node();
-
-
+	 
+	 ensure_that_inputs_are_exposed();
 
 #ifdef _DEBUG
 	 ASSERT(inputs.size() >= 1);

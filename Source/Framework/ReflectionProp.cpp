@@ -10,27 +10,6 @@ inline std::string string_view_to_std_string(StringView view) {
 }
 
 
-static const char* core_type_id_strs[] = {
-	"Bool",
-	"Int8",
-	"Int16",
-	"Int32",
-	"Int64",
-	"Enum8",
-	"Enum16",
-	"Enum32",
-	"Float",
-	"Vec2",
-	"Vec3",
-	"Quat",
-	"Struct",
-	"StdString",
-	"List"
-};
-
-static_assert((sizeof(core_type_id_strs) / sizeof(char*)) == ((int)core_type_id::List + 1), "out of sync");
-AutoEnumDef core_type_id_def = AutoEnumDef("", sizeof(core_type_id_strs) / sizeof(char*), core_type_id_strs);
-
 
 static StringView delimit(const char* start, const char character = ',')
 {
@@ -57,9 +36,9 @@ static void parse_str(StringView str, float& f, int& i, core_type_id type, bool 
 	}
 	else {
 		if (type == core_type_id::Enum8 || type == core_type_id::Enum16 || type == core_type_id::Enum32) {
-			auto idx = Enum::find_for_full_name(str.to_stack_string().c_str());
-			ASSERT(idx.enum_idx != -1 && idx.val_idx != -1);
-			i = idx.val_idx;
+			auto idx = EnumRegistry::find_enum_by_name(str.to_stack_string().c_str()).enum_idx;
+			ASSERT(idx != -1);
+			i = idx;
 			ASSERT(!is_min_max_or_inc);
 		}
 		else if (type == core_type_id::Int8 || type == core_type_id::Int16 || type == core_type_id::Int32 || type == core_type_id::Int64|| type == core_type_id::Bool) {
@@ -155,7 +134,7 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flag
 	return prop;
 }
 
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, int enum_type_id, const char* hint)
+PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const EnumTypeInfo* enumtype, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.range_hint = hint;
@@ -167,7 +146,7 @@ PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags
 		prop.type = core_type_id::Enum32;
 	else
 		assert(0);
-	prop.enum_type_id = enum_type_id;
+	prop.enum_type = enumtype;
 	return prop;
 }
 
@@ -218,9 +197,9 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 	case core_type_id::Enum8:
 	case core_type_id::Enum16:
 	case core_type_id::Enum32: {
-		const char* type_name = Enum::get_type_name(prop.enum_type_id);
-		const char* enum_str = Enum::get_enum_name(prop.enum_type_id, prop.get_int(ptr));
-		value_str = string_format("%s::%s", type_name, enum_str);
+		const char* type_name = prop.enum_type->get_name();
+		const char* enum_str = prop.enum_type->get_enum_str(prop.get_int(ptr));
+		value_str = string_format("%s", enum_str);
 	}break;
 
 	case core_type_id::StdString: {
@@ -406,14 +385,15 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	case core_type_id::Enum16:
 	case core_type_id::Enum32: {
 		Stack_String<256> str = tok.to_stack_string();
-		auto enum_idx = Enum::find_for_full_name(str.c_str());
+		auto enum_idx = EnumRegistry::find_enum_by_name(str.c_str());
+		
 
 		if (enum_idx.enum_idx < 0) {
 			printf("\n\n!!! CANT FIND ENUM %s !!!\n\n", str.c_str());
 			prop->set_int(ptr, 0);
 		}
 		else
-			prop->set_int(ptr, enum_idx.val_idx);
+			prop->set_int(ptr, enum_idx.enum_idx);
 
 	}break;
 
@@ -480,6 +460,11 @@ std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstan
 			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
 			
 			in.read_string(tok);	// ERROR
+			if (tok.cmp("[")) {
+				while (in.read_string(tok) && !tok.cmp("]")) {}
+			}
+
+
 			in.read_string(tok);
 			//ASSERT(0);
 			continue;

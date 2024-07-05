@@ -1,33 +1,48 @@
 #pragma once
 #include <cstdint>
 
-struct GlobalEnumDefIdx {
-	int16_t enum_idx = -1;
-	int16_t val_idx = -1;
-};
+struct EnumTypeInfo {
 
-struct Enum_Def
-{
+	EnumTypeInfo(const char* name, const char** strs, size_t count);
+
+	const char* get_name() const { return name; }
+	const char* get_enum_str(int index) const {
+		return (index >= 0 && index < str_count) ? strs[index] : "";
+	}
+
 	const char* name = "";
-	int count = 0;
 	const char** strs = nullptr;
+	int str_count = 0;
+	int id = 0;
+};
+template<typename T>
+struct EnumTrait;
+
+#define ENUM_HEADER(Type) \
+template<> \
+struct EnumTrait<Type> {\
+	static EnumTypeInfo StaticType;\
 };
 
-struct AutoEnumDef
+#define ENUM_START(Type) \
+static const char* Type##strs[] = {
+
+#define STRINGIFY_EUNM(val, expected) ( 1 / (int)!( (int)val - expected ) ) ? #val : ""
+
+#define ENUM_IMPL(Type) \
+}; \
+EnumTypeInfo EnumTrait<Type>::StaticType = EnumTypeInfo(#Type, Type##strs, sizeof(Type##strs)/sizeof(const char*));
+
+struct EnumFindResult
 {
-	AutoEnumDef(const char* name, int count, const char** strs);
-	uint16_t id=0;
+	const EnumTypeInfo* typeinfo = nullptr;
+	int enum_idx = -1;
 };
 
-namespace Enum
+class EnumRegistry
 {
-	typedef int16_t type_handle_t;
-
-	type_handle_t add_new_def(Enum_Def def);
-	const char* get_type_name(type_handle_t handle);
-	const char* get_enum_name(type_handle_t handle, int index);
-	const Enum_Def& get_enum_def(type_handle_t handle);
-	GlobalEnumDefIdx find_for_full_name(const char* name);
-
-}
+public:
+	static void register_enum(const EnumTypeInfo* eti);
+	static EnumFindResult find_enum_by_name(const char* enum_value_name);
+};
 

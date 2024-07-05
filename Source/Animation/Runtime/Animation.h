@@ -67,11 +67,7 @@ class MSkeleton;
 class Entity;
 class Animation_Tree_CFG;
 
-class AnimatorInstance : public ClassBase
-{
-public:
-	CLASS_HEADER();
-
+CLASS_H(AnimatorInstance, ClassBase)
 	AnimatorInstance();
 
 	// returns true on success
