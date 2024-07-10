@@ -26,10 +26,18 @@ CLASS_IMPL(State_EdNode);
 CLASS_IMPL(StateStart_EdNode);
 CLASS_IMPL(StateAlias_EdNode);
 
+CLASS_IMPL(MeshToLocalspace_EdNode);
+CLASS_IMPL(LocalToMeshspace_EdNode);
+CLASS_IMPL(GetCachedPose_EdNode);
+CLASS_IMPL(SavePoseToCache_EdNode);
+
+
 CLASS_IMPL(FloatConstant_EdNode);
 CLASS_IMPL(Curve_EdNode);
 CLASS_IMPL(VectorConstant_EdNode);
-
+CLASS_IMPL(Variable_EdNode);
+CLASS_IMPL(RotationConstant_EdNode);
+CLASS_IMPL(ModifyBone_EdNode);
 
 
 void Base_EdNode::remove_reference(Base_EdNode* node)

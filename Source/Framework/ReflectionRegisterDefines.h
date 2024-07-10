@@ -5,6 +5,8 @@
 #define REG_ENUM(name, flags, hint, enum_id) make_enum_property(#name,offsetof(TYPE_FROM_START, name), flags,sizeof(TYPE_FROM_START::name), &EnumTrait<enum_id>::StaticType,hint)
 #define REG_BOOL(name, flags, hint) make_bool_property(#name,offsetof(TYPE_FROM_START, name), flags, hint)
 #define REG_STDSTRING(name, flags) make_string_property(#name,offsetof(TYPE_FROM_START, name), flags)
+#define REG_VEC3(name,flags) make_vec3_property(#name,offsetof(TYPE_FROM_START, name), flags)
+#define REG_QUAT(name,flags) make_quat_property(#name,offsetof(TYPE_FROM_START, name), flags)
 
 
 #define REG_STRUCT_CUSTOM_TYPE(name, flags, customtype) make_struct_property(#name,offsetof(TYPE_FROM_START, name), flags, customtype)

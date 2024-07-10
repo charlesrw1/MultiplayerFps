@@ -74,6 +74,9 @@ public:
 		}
 	}
 	Stack_String(const char* str, int len) {
+		data[0] = 0;
+		data_len = 0;
+
 		int s = strlen(str);
 		if (len < s) s = len;
 		if (s + 1 < BUFSIZE) {
@@ -83,7 +86,7 @@ public:
 		}
 	}
 	int size() { return data_len; }
-	const char* c_str() { return data; }
+	const char* c_str() const { return data; }
 
 	char* get_data() { return data; }
 private:

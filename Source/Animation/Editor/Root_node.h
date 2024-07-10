@@ -27,12 +27,20 @@ CLASS_H(Root_EdNode, Base_EdNode)
 	Node_CFG* get_root_node() const {
 		return inputs[0].node ? inputs[0].node->get_graph_node()->cast_to<Node_CFG>() : nullptr;
 	}
-
+	 std::string get_tooltip() const override { return "The final output pose of the graph"; }
 	std::string get_name() const override { return "Output pose"; }
 	bool compile_my_data(const AgSerializeContext* ctx) override { return true; }
 	Color32 get_node_color() const override { return ROOT_COLOR; }
 	bool has_output_pin() const override { return false; }
 	bool can_delete() const override { return false; }
 	bool allow_creation_from_menu() const override { return false; }
+
+	bool can_output_to_type(GraphPinType input_pin)const override {
+		return false;	// no oututs pins
+	}
+	GraphPinType get_output_type_general() const override {
+		return GraphPinType(GraphPinType::localspace_pose);
+	}
+
 
 };

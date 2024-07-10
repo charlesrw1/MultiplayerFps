@@ -35,7 +35,9 @@ const Color32 SOURCE_COLOR = { 1, 0, 74 };
 const Color32 BLEND_COLOR = { 26, 75, 79 };
 const Color32 ADD_COLOR = { 44, 57, 71 };
 const Color32 MISC_COLOR = { 13, 82, 44 };
-
+const Color32 VALUE_COLOR = { 93, 97, 15 };
+const Color32 IK_COLOR = MISC_COLOR;
+const Color32 CACHE_COLOR = { 5,5,5 };
 
 #define EDNODE_HEADER(type_name) CLASS_HEADER()
 
@@ -65,6 +67,10 @@ inline GraphPinType hint_str_to_GraphPinType(const char* str)
 	if (strcmp(str, "bool") == 0) return GraphPinType(anim_graph_value::bool_t);
 	if (strcmp(str, "local") == 0) return GraphPinType(GraphPinType::localspace_pose);
 	if (strcmp(str, "mesh") == 0) return GraphPinType(GraphPinType::meshspace_pose);
+	if (strcmp(str, "vec3") == 0) return GraphPinType(anim_graph_value::vec3_t);
+	if (strcmp(str, "quat") == 0) return GraphPinType(anim_graph_value::quat_t);
+
+
 	ASSERT(0);
 }
 
@@ -158,8 +164,11 @@ CLASS_H(Base_EdNode, ClassBase)
 
 	virtual std::string get_input_pin_name(int index) const { return inputs[index].name; }
 	virtual std::string get_output_pin_name() const { return  "out"; }
-	virtual GraphPinType get_output_pin_type() const { return GraphPinType(); }
 
+	virtual GraphPinType get_output_type_general() const = 0;
+	virtual bool can_output_to_type(GraphPinType input_pin) const {
+		return get_output_type_general() == input_pin;
+	}
 
 	uint32_t getinput_id(uint32_t inputslot) const {
 		return inputslot + id * MAX_INPUTS + INPUT_START;

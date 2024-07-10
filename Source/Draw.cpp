@@ -1906,7 +1906,6 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			cmd.primCount = meshb.count;
 			cmd.baseInstance = base_instance;
 
-
 			list.commands.push_back(cmd);
 
 			for (int k = 0; k < meshb.count; k++) {

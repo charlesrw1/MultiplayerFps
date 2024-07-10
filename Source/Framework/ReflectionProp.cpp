@@ -97,7 +97,20 @@ ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop)
 
 	return parsed;
 }
-
+PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint8_t flags, const char* hint )
+{
+	PropertyInfo prop(name, offset, flags);
+	prop.type = core_type_id::Vec3;
+	prop.range_hint = hint;
+	return prop;
+}
+PropertyInfo make_quat_property(const char* name, uint16_t offset, uint8_t flags, const char* hint)
+{
+	PropertyInfo prop(name, offset, flags);
+	prop.type = core_type_id::Quat;
+	prop.range_hint = hint;
+	return prop;
+}
 PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);

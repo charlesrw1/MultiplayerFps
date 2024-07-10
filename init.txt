@@ -2,7 +2,7 @@
 thirdperson 1
 
 
-start_ed Map
+start_ed AnimGraph savenamed.txt
 
 g_draw_physx_scene 31
 g_drawdebugmenu 1

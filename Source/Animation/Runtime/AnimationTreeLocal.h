@@ -24,9 +24,57 @@ class Animation_Tree_CFG;
 
 extern Pool_Allocator g_pose_pool;
 
+// only accepted graph values
+enum class anim_graph_value
+{
+	bool_t,
+	float_t,
+	int_t,
+	vec3_t,
+	quat_t,
+};
+ENUM_HEADER(anim_graph_value);
+
+
+inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_id type)
+{
+	*good = true;
+	switch (type)
+	{
+	case core_type_id::Bool: return anim_graph_value::bool_t;
+	case core_type_id::Int8: return anim_graph_value::int_t;
+	case core_type_id::Int16: return anim_graph_value::int_t;
+	case core_type_id::Int32: return anim_graph_value::int_t;
+	case core_type_id::Float: return anim_graph_value::float_t;
+	case core_type_id::Vec3: return anim_graph_value::vec3_t;
+	case core_type_id::Quat: return anim_graph_value::quat_t;
+	default:
+		*good = false;
+		return {};
+	}
+}
+
+
+using AnimGraphVariable = handle<ScriptVariable>;
 struct AgSerializeContext
 {
 	AgSerializeContext(Animation_Tree_CFG* tree);
+
+	AnimGraphVariable find_variable_index(std::string name, anim_graph_value& type) const {
+		auto& vars = tree->get_script()->get_variables();
+		for (int i = 0; i < vars.size(); i++) {
+			if (name == vars[i].name && vars[i].native_pi_of_variable) {
+				bool good = false;
+				type = core_type_id_to_anim_graph_value(&good, vars[i].native_pi_of_variable->type);
+				if (!good) {
+					sys_print("!!! bad type for variable %s\n", name.c_str());
+					return { -1 };
+				}
+				return { i };
+			}
+		}
+		return { -1 };
+	}
 
 	std::unordered_map<BaseAGNode*, int> ptr_to_index;
 	Animation_Tree_CFG* tree = nullptr;
@@ -54,6 +102,8 @@ inline BaseAGNode* ptr_to_serialized_nodecfg_ptr(BaseAGNode* ptr, const AgSerial
 	return (BaseAGNode*)index;
 }
 
+
+
 struct Animation_Tree_CFG;
 struct Node_CFG;
 class NodeRt_Ctx
@@ -65,6 +115,7 @@ public:
 	AnimatorInstance* anim = nullptr;
 	const Script* script = nullptr;
 	uint16_t tick = 0;
+
 
 	ScriptInstance& get_script_inst() { return anim->get_script_inst(); }
 
@@ -135,7 +186,9 @@ struct GetPose_Ctx
 };
 
 CLASS_H(BaseAGNode, ClassBase)
+	// called once per Graph asset
 	virtual void initialize(Animation_Tree_CFG* cfg) = 0;
+	// called once per instance of Graph
 	virtual void construct(NodeRt_Ctx& ctx) const {
 	}
 protected:
@@ -155,20 +208,6 @@ protected:
 	}
 };
 
-using AnimGraphVariable = handle<ScriptVariable>;
-
-// only accepted graph values
-
-enum class anim_graph_value
-{
-	bool_t,
-	float_t,
-	int_t,
-	vec3_t,
-	quat_t,
-};
-ENUM_HEADER(anim_graph_value);
-
 class NodeRt_Ctx;
 
 CLASS_H(ValueNode, BaseAGNode)
@@ -176,12 +215,35 @@ CLASS_H(ValueNode, BaseAGNode)
 	template<typename T>
 	T get_value(NodeRt_Ctx& ctx) {
 		T val{};
-		get_value_internal(ctx, &val);
+		get_value_internal(ctx, type_trait_animgraph<T>::val, &val);
 		return val;
 	}
-	virtual anim_graph_value get_value_type() const = 0;
 private:
-	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) = 0;
+	template<typename T>
+	struct type_trait_animgraph { };
+	template<>
+	struct type_trait_animgraph<int> {
+		static const anim_graph_value val = anim_graph_value::int_t;
+	};
+	template<>
+	struct type_trait_animgraph<bool> {
+		static const anim_graph_value val = anim_graph_value::bool_t;
+	};
+	template<>
+	struct type_trait_animgraph<float> {
+		static const anim_graph_value val = anim_graph_value::float_t;
+	};
+	template<>
+	struct type_trait_animgraph<glm::vec3> {
+		static const anim_graph_value val = anim_graph_value::vec3_t;
+	};
+	template<>
+	struct type_trait_animgraph<glm::quat> {
+		static const anim_graph_value val = anim_graph_value::quat_t;
+	};
+
+
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value expected_type, void* ptr) = 0;
 };
 
 
@@ -326,6 +388,8 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	static const PropertyInfoList* get_props()
 	{
 		START_PROPS(Clip_Node_CFG)
+			REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE"),
+
 			REG_ENUM(rm[0], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
 			REG_ENUM(rm[1], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
 			REG_ENUM(rm[2], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
@@ -334,9 +398,8 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 			REG_FLOAT(speed, PROP_DEFAULT, "1.0,0.1,10"),
 			REG_INT(start_frame, PROP_DEFAULT, "0"),
 			REG_BOOL(allow_sync, PROP_DEFAULT, "0"),
-			REG_BOOL(can_be_leader, PROP_DEFAULT, "0"),
+			REG_BOOL(can_be_leader, PROP_DEFAULT, "0")
 
-			REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE")
 
 		END_PROPS(Clip_Node_CFG)
 	}
@@ -660,48 +723,120 @@ NODECFG_HEADER(Blend_Masked_CFG, Blend_Masked_RT)
 // modify transform
 // copy transform
 
-class LocalToComponent_CFG
+NODECFG_HEADER(SavePoseToCache_CFG, Rt_Vars_Base)
+
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+static const PropertyInfoList* get_props()
 {
-};
+	START_PROPS(SavePoseToCache_CFG)
+		REG_STDSTRING(cache_name, PROP_DEFAULT),
+		REG_CUSTOM_TYPE_HINT(pose, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+	END_PROPS(SavePoseToCache_CFG)
+}
 
-class ComponentToLocal_CFG
-{
-
-};
-
-class SolveIkConstraints_CFG
-{
-
-};
-
-class PushIKConstraints_CFG
-{
-
-};
-
-class PushBoneMask_CFG
-{
-
-};
-
-class MotionWarp_CFG
-{
-
-};
-
-class BoneModifier_CFG
-{
-
+std::string cache_name;
+Node_CFG* pose = nullptr;
 };
 
 
-#define VALUENODE_HEADER(classname, type) \
-CLASS_H(classname, ValueNode) \
-virtual anim_graph_value get_value_type() const override { return anim_graph_value::type; }
+NODECFG_HEADER(GetCachedPose_CFG, Rt_Vars_Base)
 
-VALUENODE_HEADER(CurveNode, float_t)
-	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
-		*(float*)ptr = 0.f;
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+static const PropertyInfoList* get_props()
+{
+	START_PROPS(GetCachedPose_CFG)
+		REG_STDSTRING(cache_name, PROP_DEFAULT),
+	END_PROPS(GetCachedPose_CFG)
+}
+
+std::string cache_name;
+};
+
+NODECFG_HEADER(LocalToMeshspace_CFG, Rt_Vars_Base)
+
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+static const PropertyInfoList* get_props()
+{
+	START_PROPS(LocalToMeshspace_CFG)
+		REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+	END_PROPS(LocalToMeshspace_CFG)
+}
+
+Node_CFG* input = nullptr;
+};
+
+NODECFG_HEADER(MeshspaceToLocal_CFG, Rt_Vars_Base)
+
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+
+static const PropertyInfoList* get_props()
+{
+	START_PROPS(MeshspaceToLocal_CFG)
+		REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "mesh"),
+	END_PROPS(MeshspaceToLocal_CFG)
+}
+
+Node_CFG* input = nullptr;
+};
+
+
+NODECFG_HEADER(ModifyBone_CFG, Rt_Vars_Base)
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+static const PropertyInfoList* get_props()
+{
+	START_PROPS(ModifyBone_CFG)
+		REG_STDSTRING(bone_name, PROP_DEFAULT),
+		REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+		REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "mesh"),
+		REG_CUSTOM_TYPE_HINT(position, PROP_SERIALIZE, "AgSerializeNodeCfg", "vec3"),
+		REG_CUSTOM_TYPE_HINT(rotation, PROP_SERIALIZE, "AgSerializeNodeCfg", "quat"),
+	END_PROPS(ModifyBone_CFG)
+}
+
+
+Node_CFG* input = nullptr;
+ValueNode* alpha = nullptr;
+ValueNode* position = nullptr;
+ValueNode* rotation = nullptr;
+std::string bone_name;
+
+};
+
+
+CLASS_H(CurveNode, ValueNode)
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value type, void* ptr) override {
+		if(type == anim_graph_value::float_t)
+			*(float*)ptr = 0.f;
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(CurveNode) REG_STDSTRING(curve_name, PROP_DEFAULT) END_PROPS(CurveNode)
@@ -709,9 +844,10 @@ VALUENODE_HEADER(CurveNode, float_t)
 	std::string curve_name;
 };
 
-VALUENODE_HEADER(VectorConstant, vec3_t)
-	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
-		*(glm::vec3*)ptr = v;
+CLASS_H(VectorConstant, ValueNode)
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value type, void* ptr) override {
+		if(type == anim_graph_value::vec3_t)
+			*(glm::vec3*)ptr = v;
 	}
 	static const PropertyInfoList* get_props() {
 		return nullptr;
@@ -719,22 +855,86 @@ VALUENODE_HEADER(VectorConstant, vec3_t)
 	glm::vec3 v;
 };
 
+
 CLASS_H(VariableNode, ValueNode)
 	static const PropertyInfoList* get_props() {
-		START_PROPS(VariableNode) REG_INT(handle, PROP_DEFAULT, "") END_PROPS(VariableNode)
+		START_PROPS(VariableNode) 
+			REG_INT(handle, PROP_SERIALIZE, ""),
+			REG_FLOAT(scale, PROP_DEFAULT, "1"),
+			REG_FLOAT(bias, PROP_DEFAULT, "0"),
+			REG_BOOL(apply_clamp, PROP_DEFAULT, "0"),
+			REG_FLOAT(min_bounds, PROP_DEFAULT, "0"),
+			REG_FLOAT(max_bounds, PROP_DEFAULT, "1")
+
+		END_PROPS(VariableNode)
 	}
+	virtual void initialize(Animation_Tree_CFG* cfg) override {
+		if (!handle.is_valid())
+			sys_print("??? invalid handle for variable node on initialization\n");
+		else {
+			auto& vars = cfg->get_script()->get_variables();
+			if (handle.id >= 0 && handle.id < vars.size())
+				pi = vars.at(handle.id).native_pi_of_variable;
+
+			if (!pi)
+				sys_print("??? variable wasnt linked to native class\n");
+			else {
+				bool good = false;
+				var_type = core_type_id_to_anim_graph_value(&good, pi->type);
+				if (!good) {
+					pi = nullptr;
+					sys_print("??? variable type wasn't found right\n");
+				}
+			}
+		}
+	}
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value type, void* ptr) override {
+		if (!pi)
+			return;
+		if (type == anim_graph_value::float_t) {
+			float f = 0.0;
+			if (var_type == anim_graph_value::float_t)
+				f = pi->get_float(ctx.anim);
+			else if (var_type == anim_graph_value::bool_t)
+				f = (float)(bool)pi->get_int(ctx.anim);
+			f = f * scale + bias;
+			if (apply_clamp)
+				f = glm::min(glm::max(f, min_bounds), max_bounds);
+			*(float*)ptr = f;
+		}
+		else if (type == anim_graph_value::bool_t && var_type == anim_graph_value::bool_t) {
+			*(bool*)ptr = pi->get_int(ctx.anim);
+		}
+		else if(type == anim_graph_value::int_t && var_type == anim_graph_value::int_t)
+			*(int*)ptr = pi->get_int(ctx.anim);
+		else if (type == anim_graph_value::quat_t && var_type == anim_graph_value::quat_t)
+			*(glm::quat*)ptr = *(glm::quat*)pi->get_ptr(ctx.anim);
+		else if (type == anim_graph_value::vec3_t && var_type == anim_graph_value::vec3_t)
+			*(glm::vec3*)ptr = *(glm::vec3*)pi->get_ptr(ctx.anim);
+
+		// if it failed, ptr is set already to T{} by default, should have already caught the error before running
+	}
+
+	float scale = 1.0;
+	float bias = 0.0;
+	bool apply_clamp = false;
+	float min_bounds = 0.0;
+	float max_bounds = 1.0;
+
+	anim_graph_value var_type = {};
 	AnimGraphVariable handle;
+	const PropertyInfo* pi = nullptr;
 };
 
-VALUENODE_HEADER(RotationConstant, quat_t)
-	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+CLASS_H(RotationConstant, ValueNode)
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value type, void* ptr) override {
 		*(glm::quat*)ptr = rotation;
 	}
 	glm::quat rotation;
 };
-VALUENODE_HEADER(FloatConstant, float_t)
+CLASS_H(FloatConstant, ValueNode)
 
-	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value type, void* ptr) override {
 		*(float*)ptr = f;
 	}
 	static const PropertyInfoList* get_props() {
@@ -743,9 +943,12 @@ VALUENODE_HEADER(FloatConstant, float_t)
 	float f = 0.0;
 };
 
-VALUENODE_HEADER(BoolAsFloatConstant, float_t)
-	virtual void get_value_internal(NodeRt_Ctx& ctx, void* ptr) override {
-
+CLASS_H(BoolConstant, ValueNode)
+	virtual void get_value_internal(NodeRt_Ctx& ctx, anim_graph_value type, void* ptr) override {
+	if (type == anim_graph_value::bool_t)
+		*(bool*)ptr = (bool)b;
+	else if(type == anim_graph_value::float_t)
+		*(float*)ptr = (float)b;
 	}
 	bool b = false;
 };

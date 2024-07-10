@@ -14,8 +14,16 @@ CLASS_H(State_EdNode, Base_EdNode)
 			ImNodes::EditorContextFree(sublayer.context);
 	}
 
-	MAKE_OUTPUT_TYPE(state_t);
 
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::state_t);
+}
+
+std::string get_tooltip() const override {
+	return "A single state in a statemachine.\n"
+		"Double-click to open the state's subtree.\nCreate transitions between states using each states pins.\n"
+		"Setup transition conditions by clicking on the arrows.\n";
+	}
 
 	void ensure_that_inputs_are_exposed();
 
@@ -162,7 +170,12 @@ CLASS_H(StateAlias_EdNode, State_EdNode)
 };
 CLASS_H(StateStart_EdNode, State_EdNode)
 
-
+std::string get_tooltip() const override {
+	return "The entry state of the statemachine.\n"
+		"A stateachine needs at least one default transition out of the entry state.\n"
+		"Set this up by setting the transition arrow's 'is_a_continue_transition' to true.\n"
+		"The entry state can have multiple transitions, but fallsback to the default otherwise.\n";
+}
 	// Inherited from Base_EdNode
 	std::string get_name() const override { return "State Enter"; }
 	bool can_delete() const override { return false; }

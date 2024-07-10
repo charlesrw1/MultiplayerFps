@@ -451,6 +451,15 @@
     <ClInclude Include="Source\Framework\ClassBase.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\MaterialLocal.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h">
+      <Filter>Source\Render\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\MaterialPublic.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -675,6 +684,12 @@
     </ClCompile>
     <ClCompile Include="Source\Framework\ClassBase.cpp">
       <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\MaterialLocal.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp">
+      <Filter>Source\Animation\Editor</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

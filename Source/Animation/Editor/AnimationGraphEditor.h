@@ -24,18 +24,32 @@
 
 #include "Base_node.h"
 
-class SerializeImNodeState : public IPropertySerializer
+class IObserver
 {
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr) override;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr) override;
+public:
+	virtual void on_notify(const std::string& strname) = 0;
 };
-class SerializeNodeCFGRef : public IPropertySerializer
+class ISubject
 {
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr) override;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr) override;
+public:
+	void register_me(const std::string& callback, IObserver* obj) {
+		map[callback].insert(obj);
+	}
+	void unregister(IObserver* obj) {
+		for (auto& a : map)
+			a.second.erase(obj);
+	}
+protected:
+	void notify_observers(const std::string& str) {
+		auto set = map.find(str);
+		if (set != map.end())
+			for (auto& obs : set->second)
+				obs->on_notify(str);
+	}
+private:
+	std::unordered_map<std::string, std::unordered_set<IObserver*>> map;
 };
+
 
 struct GraphTab {
 	const editor_layer* layer = nullptr;
@@ -171,12 +185,11 @@ public:
 	AnimatorInstance* get_animator();
 	Model* get_model() { return model; }
 
-
 	void set_model(Model* model) {
 		this->model = model;
 		idraw->remove_obj(obj);
 	}
-	// Graph output takes ownership of pointer
+
 	void set_animator_instance(AnimatorInstance* inst);
 	void clear();
 
@@ -186,102 +199,84 @@ public:
 	}
 private:
 	handle<Render_Object> obj;
-	 Model* model = nullptr;
-	unique_ptr<AnimatorInstance> anim = nullptr;
+	Model* model = nullptr;
+	std::unique_ptr<AnimatorInstance> anim = nullptr;
 
 };
 
-struct EditorControlParamProp {
-	EditorControlParamProp() {
-		current_id = unique_id_generator++;
-	}
-	std::string name = "Unnamed";
-	anim_graph_value type= anim_graph_value::bool_t;
-	bool is_old_native_param = false;	// old native param means param doesnt exist but variables reference it
-	int reference_count = 0;
-
-	int current_id = 0;
-
-	static script_types anim_graph_type_to_script_types(anim_graph_value agv) {
-		switch (agv)
-		{
-		case anim_graph_value::bool_t: return script_types::bool_t;
-		case anim_graph_value::float_t: return script_types::float_t;
-		case anim_graph_value::int_t: return script_types::int_t;
-		default:
-			return script_types::custom_t;
-		}
-	}
-
-	ScriptVariable get_control_param() const {
-		ScriptVariable p;
-		p.name = name;
-		p.type = anim_graph_type_to_script_types(type);
-		p.is_native = true;
-		return p;
-	}
-
-	static const PropertyInfoList* get_props();
-	static PropertyInfoList* get_ed_control_null_prop();
-	static void reset_id_generator(int to) {
-		unique_id_generator = to;
-	}
-private:
-	static int unique_id_generator;
+struct VariableNameAndType
+{
+	std::string str;
+	anim_graph_value type = anim_graph_value::float_t;
 };
 
 class ControlParamArrayHeader;
-class ControlParamsWindow
+class ControlParamsWindow : public IObserver
 {
 public:
+	ControlParamsWindow();
+
 	void imgui_draw();
 	void refresh_props();
 
-	const std::vector<EditorControlParamProp>& get_control_params() { return props; }
-
 	unique_ptr<Script> add_parameters_to_tree();
 	
-	void recalculate_control_prop_ids() {
-		// all parameters are now referencing the 'index' of the property as its id,
-		// so set it for future ones
+	AnimGraphVariable get_index_of_prop_for_compiling(std::string str) {
 		for (int i = 0; i < props.size(); i++)
-			props[i].current_id = i;
-		EditorControlParamProp::reset_id_generator( props.size() );	// reset to size() so new props get added correctly
-	}
-	
-	AnimGraphVariable get_index_of_prop_for_compiling(AnimGraphVariable id) {
-		for (int i = 0; i < props.size(); i++)
-			if (props[i].current_id == id.id)
+			if (props[i].str == str)
 				return { i };
 		return { -1 };
 	}
-
-	const EditorControlParamProp* get_parameter_for_ed_id(AnimGraphVariable id) {
-		for (int i = 0; i < props.size(); i++)
-			if (props[i].current_id == id.id) 
-				return &props[i];
-
-		return nullptr;
+	anim_graph_value get_type(AnimGraphVariable var) {
+		assert(var.is_valid());
+		return props[var.id].type;
 	}
 
-	void clear_all() {
-		props.clear();
-		EditorControlParamProp::reset_id_generator(0);
-		control_params.clear_all();
-	}
-
+	void on_notify(const std::string& strname) override;
 private:
-	static const PropertyInfoList* get_props();
-	static PropertyInfoList* get_edit_value_props();
 
-	friend class ControlParamArrayHeader;
+	struct VariableParam
+	{
+		std::string str;
+		anim_graph_value type = anim_graph_value::float_t;
+		const PropertyInfo* nativepi = nullptr;
+	};
 
-	std::vector<EditorControlParamProp> props;
-	PropertyGrid control_params;
+	std::vector<VariableParam> props;
+	
+	VariableNameAndType dragdrop;
+	//PropertyGrid control_params;
+};
+
+class ListAnimationDataInModel : public IObserver
+{
+public:
+	ListAnimationDataInModel();
+	void imgui_draw();
+	void on_notify(const std::string& strname) override;
+private:
+	void set_model(const Model* model);
+	const Model* model = nullptr;
+	char name_filter[256];
+	std::vector<std::string> vec;
+	std::string drag_drop_name;
+	std::string selected_name;
+};
+
+class AnimGraphClipboard : public IObserver
+{
+public:
+	AnimGraphClipboard();
+	void handle_event(const SDL_Event& event);
+	void remove_references(Base_EdNode* node);
+	void on_notify(const std::string& strname) override;
+private:
+	void paste_selected();
+	std::vector<Base_EdNode*> clipboard;
 };
 
 class Texture;
-class AnimationGraphEditor : public IEditorTool
+class AnimationGraphEditor : public IEditorTool, public ISubject
 {
 public:
 
@@ -300,6 +295,7 @@ public:
 	bool can_save_document() override;
 	virtual void imgui_draw() override;
 	virtual void on_change_focus(editor_focus_state newstate) override;
+
 	std::string get_save_root_dir()  override {
 		return "./Data/Graphs/";
 	}
@@ -367,10 +363,11 @@ public:
 		return default_editor;
 	}
 
+	ListAnimationDataInModel animation_list;
 	ControlParamsWindow control_params;
 	PropertyGrid node_props;
 	TabState graph_tabs;
-
+	AnimGraphClipboard clipboard;
 
 	Animation_Tree_CFG* get_tree() {
 		return editing_tree;
@@ -432,7 +429,7 @@ public:
 			REG_FLOAT(out.camera.move_speed, PROP_SERIALIZE, ""),
 
 			// Editable options
-			REG_STDSTRING(opt.PreviewModel, PROP_DEFAULT),
+			REG_STDSTRING_CUSTOM_TYPE(opt.PreviewModel, PROP_DEFAULT,"FindModelForEdAnimG"),
 			REG_STDSTRING_CUSTOM_TYPE(opt.AnimatorClass, PROP_DEFAULT, "AnimatorInstanceParentEditor")
 		END_PROPS(AnimationGraphEditor)
 	}
@@ -443,6 +440,9 @@ public:
 	std::vector<const Base_EdNode*> template_creation_nodes;
 
 	graph_playback_state playback = graph_playback_state::stopped;
+
+	void set_animator_instance_from_string(std::string str);
+	void set_model_from_str(std::string str);
 
 	struct settings {
 		bool open_graph = true;
@@ -480,7 +480,13 @@ public:
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
 
-	const char* get_editor_name()override { return "Animation Editor"; }
+	PropertyGrid self_grid;
+
+	const char* get_editor_name() override { return "Animation Editor"; }
+
+	void add_node_to_tree_manual(BaseAGNode* n) {
+		editing_tree->all_nodes.push_back(n);
+	}
 };
 
 extern AnimationGraphEditor ed;

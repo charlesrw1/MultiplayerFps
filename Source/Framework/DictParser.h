@@ -110,6 +110,21 @@ public:
     }
 
     bool read_line(StringView& line, char delimiter = '\n');
+
+    const char* get_filename() const { return filename.c_str(); }
+
+    uint32_t get_marker() {
+        return read_ptr;
+    }
+    bool get_string_view_for_marker(StringView& sv, uint32_t start, uint32_t end) {
+        if (start < buffer_size && end <= buffer_size) {
+            sv = StringView((const char*)&buffer[start], end - start);
+            return true;
+        }
+        return false;
+    }
+    void skip_to_next_line();
+    void skip_whitespace();
 private:
     void raise_error(const char* msg) {
         had_error = true;
@@ -131,8 +146,6 @@ private:
         assert(where_ < buffer_size);
         return buffer[where_];
     }
-    void skip_to_next_line();
-    void skip_whitespace();
     bool break_a_token(char c) {
         return (c == ' ' || c == '[' || c == ']' || c == '{' || c == '}' || c == '\t' || c == '\n' || c=='\r');
     }

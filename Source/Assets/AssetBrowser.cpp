@@ -6,7 +6,7 @@
 #include "Framework/Config.h"
 AssetBrowser global_asset_browser;
 
-std::string to_lower(const std::string& s) {
+static std::string to_lower(const std::string& s) {
 	std::string out;
 	out.reserve(s.size());
 	for (auto c : s)

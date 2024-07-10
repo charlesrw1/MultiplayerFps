@@ -62,6 +62,13 @@ CLASS_IMPL(Blend_Int_Node_CFG);
 CLASS_IMPL(BlendSpace2d_CFG);
 CLASS_IMPL(BlendSpace1d_CFG);
 CLASS_IMPL(Blend_Masked_CFG);
+CLASS_IMPL(ModifyBone_CFG);
+CLASS_IMPL(LocalToMeshspace_CFG);
+CLASS_IMPL(MeshspaceToLocal_CFG);
+
+CLASS_IMPL(GetCachedPose_CFG);
+CLASS_IMPL(SavePoseToCache_CFG);
+
 
 // Value nodes
 CLASS_IMPL(ValueNode);
@@ -69,7 +76,10 @@ CLASS_IMPL(ValueNode);
 CLASS_IMPL(FloatConstant);
 CLASS_IMPL(CurveNode);
 CLASS_IMPL(VectorConstant);
-//IMPL_VALUE_NODE(VariableNode);
+CLASS_IMPL(VariableNode);
+CLASS_IMPL(RotationConstant);
+
+
 
 ENUM_START(anim_graph_value)
 	STRINGIFY_EUNM(anim_graph_value::bool_t,	0),

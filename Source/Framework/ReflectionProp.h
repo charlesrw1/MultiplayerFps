@@ -100,6 +100,8 @@ PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags
 PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
 PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype = "");
 PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "", const char* hint = "");
+PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
+PropertyInfo make_quat_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
 
 
 struct PropertyInfoList

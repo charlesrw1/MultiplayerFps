@@ -33,6 +33,11 @@ CLASS_H(CharacterGraphDriver, AnimatorInstance)
 			REG_BOOL(bTurnInPlaceRight, PROP_DEFAULT, ""),
 			REG_BOOL(bLeftFootForwards, PROP_DEFAULT, ""),
 			REG_BOOL(bRightFootForwards, PROP_DEFAULT, ""),
+
+			REG_VEC3(vLeftFootPosition,PROP_DEFAULT),
+			REG_QUAT(qLeftFootRotation, PROP_DEFAULT),
+			REG_INT(iSomeInteger, PROP_DEFAULT, "")
+
 		END_PROPS(CharacterGraphDriver)
 	}
 
@@ -50,6 +55,10 @@ CLASS_H(CharacterGraphDriver, AnimatorInstance)
 	bool bTurnInPlaceRight=false;
 	bool bLeftFootForwards=false;
 	bool bRightFootForwards=false;
+	int iSomeInteger = 0;
+
+	glm::vec3 vLeftFootPosition;
+	glm::quat qLeftFootRotation;
 
 	bool left_foot_is_forward = false;
 

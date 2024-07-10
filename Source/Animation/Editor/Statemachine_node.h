@@ -12,7 +12,11 @@ CLASS_H(Statemachine_EdNode, Base_EdNode)
 		ImNodes::EditorContextFree(sublayer.context);
 	}
 
-	MAKE_OUTPUT_TYPE(localspace_pose);
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::localspace_pose);
+}
+
+
 
 	// overrides
 	void init() override;

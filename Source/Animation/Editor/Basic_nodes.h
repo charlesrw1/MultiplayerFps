@@ -68,7 +68,7 @@ inline bool util_compile_default(Base_EdNode* node, const AgSerializeContext* ct
 		BaseAGNode* other = (other_ed_node) ? other_ed_node->get_graph_node() : nullptr;
 
 		BaseAGNode** ptr_to_ptr = (BaseAGNode**)prop.get_ptr(cfg);
-		if (other_ed_node && !(other_ed_node->get_output_pin_type() == input.type)) {
+		if (other_ed_node && !(other_ed_node->can_output_to_type(input.type))) {
 			node->append_info_msg("[INFO] node input is wrong type, removing it (this should have not errored)\n");
 			*ptr_to_ptr = ptr_to_serialized_nodecfg_ptr(nullptr, ctx);
 			
@@ -120,39 +120,116 @@ public:
 		util_default_init(this, node, is_this_node_created());
 		clear_newly_created();
 	}
-	GraphPinType get_output_pin_type() const override { return GraphPinType(GraphPinType::localspace_pose); }
 	BaseAGNode* get_graph_node() override { return node; }
+
+	GraphPinType get_output_type_general() const override {
+		return GraphPinType(GraphPinType::localspace_pose);
+	}
 
 	T* node = nullptr;
 };
 
 
+CLASS_H_EXPLICIT_SUPER(Variable_EdNode, BaseNodeUtil_EdNode<VariableNode>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Variable",
+	VALUE_COLOR,
+	"References a C++ variable"
+);
+
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(variable.type);
+}
+
+static const PropertyInfoList* get_props() {
+
+	START_PROPS(Variable_EdNode)
+		REG_STRUCT_CUSTOM_TYPE(node, PROP_SERIALIZE, "SerializeNodeCFGRef"),
+		// hack moment
+		REG_STRUCT_CUSTOM_TYPE(variable, PROP_EDITABLE, "FindAnimGraphVariableProp"),
+		REG_STDSTRING(variable.str, PROP_SERIALIZE, ""),
+		REG_ENUM(variable.type, PROP_SERIALIZE, "", anim_graph_value)
+	END_PROPS(Variable_EdNode)
+}
+std::string get_title() const override {
+	if (variable.str.empty()) return get_name();
+	return variable.str;
+}
+bool compile_my_data(const AgSerializeContext* ctx) override {
+
+	anim_graph_value found_type{};
+	node->handle = ctx->find_variable_index(variable.str, found_type);
+
+	if (!node->handle.is_valid())
+		append_fail_msg("[ERROR] node variable handle is invalid");
+	if (node->handle.is_valid() && found_type != variable.type) {
+		append_info_msg("[INFO] variable found type differs from current type, overriding it");
+		sys_print("??? After compiling, variable %s's type differs from previous type stored, overriding it...\n", variable.str.c_str());
+		variable.type = found_type;
+	}
+
+	return util_compile_default(this, ctx);
+}
+
+VariableNameAndType variable;
+
+};
+
 CLASS_H_EXPLICIT_SUPER(FloatConstant_EdNode, BaseNodeUtil_EdNode<FloatConstant>, Base_EdNode)
 MAKE_STANDARD_FUNCTIONS(
 	"Float Constant",
-	SOURCE_COLOR,
+	VALUE_COLOR,
 	"placeholder",
 	);
 MAKE_STANARD_SERIALIZE(FloatConstant_EdNode)
+
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(anim_graph_value::float_t);
+}
+
 };
 
 CLASS_H_EXPLICIT_SUPER(Curve_EdNode, BaseNodeUtil_EdNode<CurveNode>, Base_EdNode)
 MAKE_STANDARD_FUNCTIONS(
 	"Curve",
-	SOURCE_COLOR,
+	VALUE_COLOR,
 	"placeholder",
 	);
-MAKE_STANARD_SERIALIZE(Curve_EdNode)
+MAKE_STANARD_SERIALIZE(Curve_EdNode);
+
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(anim_graph_value::float_t);
+}
+
 };
 
 CLASS_H_EXPLICIT_SUPER(VectorConstant_EdNode, BaseNodeUtil_EdNode<VectorConstant>, Base_EdNode)
 MAKE_STANDARD_FUNCTIONS(
 	"Vector Constant",
-	SOURCE_COLOR,
+	VALUE_COLOR,
 	"placeholder",
 	);
 MAKE_STANARD_SERIALIZE(VectorConstant_EdNode)
+
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(anim_graph_value::vec3_t);
+}
+
 };
+CLASS_H_EXPLICIT_SUPER(RotationConstant_EdNode, BaseNodeUtil_EdNode<RotationConstant>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Rotation Constant",
+	VALUE_COLOR,
+	"placeholder",
+	);
+MAKE_STANARD_SERIALIZE(RotationConstant_EdNode);
+
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(anim_graph_value::quat_t);
+}
+
+};
+
 
 
 CLASS_H_EXPLICIT_SUPER(Clip_EdNode, BaseNodeUtil_EdNode<Clip_Node_CFG>, Base_EdNode)
@@ -160,7 +237,7 @@ CLASS_H_EXPLICIT_SUPER(Clip_EdNode, BaseNodeUtil_EdNode<Clip_Node_CFG>, Base_EdN
 	MAKE_STANDARD_FUNCTIONS(
 		"Clip", 
 		SOURCE_COLOR, 
-		"placeholder", 
+		"Plays an animation", 
 	);
 	MAKE_STANARD_SERIALIZE(Clip_EdNode);
 	
@@ -182,10 +259,74 @@ CLASS_H_EXPLICIT_SUPER(Blend_EdNode, BaseNodeUtil_EdNode<Blend_Node_CFG>, Base_E
 	MAKE_STANDARD_FUNCTIONS(
 		"Blend",
 		BLEND_COLOR,
-		"placeholder",
+		"Blends 2 clips according to a float value",
 	);
 	MAKE_STANARD_SERIALIZE(Blend_EdNode);
 };
+
+CLASS_H_EXPLICIT_SUPER(ModifyBone_EdNode, BaseNodeUtil_EdNode<ModifyBone_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Modify bone",
+	IK_COLOR,
+	"Sets the transform of a single bone manually",
+	);
+MAKE_STANARD_SERIALIZE(ModifyBone_EdNode);
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::meshspace_pose);
+}
+};
+
+CLASS_H_EXPLICIT_SUPER(LocalToMeshspace_EdNode, BaseNodeUtil_EdNode<LocalToMeshspace_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Local to Mesh space",
+	IK_COLOR,
+	"Converts current pose from local space to mesh space",
+	);
+MAKE_STANARD_SERIALIZE(LocalToMeshspace_EdNode);
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::meshspace_pose);
+}
+};
+
+CLASS_H_EXPLICIT_SUPER(MeshToLocalspace_EdNode, BaseNodeUtil_EdNode<MeshspaceToLocal_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Mesh to Local space",
+	IK_COLOR,
+	"Converts current pose from mesh space to local space",
+	);
+MAKE_STANARD_SERIALIZE(MeshToLocalspace_EdNode);
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::localspace_pose);
+}
+};
+
+CLASS_H_EXPLICIT_SUPER(SavePoseToCache_EdNode, BaseNodeUtil_EdNode<SavePoseToCache_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Save cached pose",
+	CACHE_COLOR,
+	"Saves a pose that can be used in another part of the graph",
+	);
+MAKE_STANARD_SERIALIZE(SavePoseToCache_EdNode);
+
+bool has_output_pin() const override { return false; }
+
+bool can_output_to_type(GraphPinType input_pin)const override {
+	return false;	// no oututs pins
+}
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::localspace_pose);
+}
+};
+
+CLASS_H_EXPLICIT_SUPER(GetCachedPose_EdNode, BaseNodeUtil_EdNode<GetCachedPose_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Get cached pose",
+	CACHE_COLOR,
+	"Get a pose that references another tree of nodes, see 'Save cached pose'",
+	);
+MAKE_STANARD_SERIALIZE(GetCachedPose_EdNode);
+};
+
 
 CLASS_H_EXPLICIT_SUPER(Blend_int_EdNode, BaseNodeUtil_EdNode<Blend_Int_Node_CFG>, Base_EdNode)
 
@@ -243,7 +384,7 @@ CLASS_H_EXPLICIT_SUPER(Additive_EdNode, BaseNodeUtil_EdNode<Add_Node_CFG>, Base_
 	MAKE_STANDARD_FUNCTIONS(
 		"Additive",
 		ADD_COLOR,
-		"placeholder",
+		"Apply an additive clip onto the base clip",
 	);
 };
 
@@ -263,7 +404,7 @@ CLASS_H_EXPLICIT_SUPER(Mirror_EdNode, BaseNodeUtil_EdNode<Mirror_Node_CFG>, Base
 	MAKE_STANDARD_FUNCTIONS(
 		"Mirror",
 		MISC_COLOR,
-		"placeholder",
+		"Mirror the bones across an axis, bone mirroing table must be set up in model asset",
 	);
 
 
@@ -273,7 +414,7 @@ CLASS_H_EXPLICIT_SUPER(Blend_Layered_EdNode, BaseNodeUtil_EdNode<Blend_Masked_CF
 	MAKE_STANDARD_FUNCTIONS(
 		"Blend Layered",
 		BLEND_COLOR,
-		"placeholder",
+		"Layer a pose on top of a base pose that can be masked",
 	);
 
 	void draw_node_topbar() override {

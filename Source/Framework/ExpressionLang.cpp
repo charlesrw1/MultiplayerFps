@@ -882,6 +882,8 @@ void BytecodeCompileHelper::compile_from_tokens(compile_result& res, compile_dat
 				}
 				push_4bytes(global->variable_index(var));
 				res.push_std_type(var->type);
+
+				return;
 			}
 
 			auto prog = &Program::get();
@@ -1272,6 +1274,6 @@ const PropertyInfoList* Script::get_props()
 }
 Script::Script(std::vector<ScriptVariable>& variables, std::string native_classname)
 {
-	variables = std::move(variables);
+	this->variables = std::move(variables);
 	this->native_classname = native_classname;
 }
