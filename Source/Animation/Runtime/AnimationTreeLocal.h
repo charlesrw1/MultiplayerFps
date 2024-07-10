@@ -766,12 +766,8 @@ std::string cache_name;
 
 NODECFG_HEADER(LocalToMeshspace_CFG, Rt_Vars_Base)
 
-virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
-	return false;
-}
-
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 virtual void reset(NodeRt_Ctx& ctx) const {
-
 }
 static const PropertyInfoList* get_props()
 {
@@ -785,9 +781,7 @@ Node_CFG* input = nullptr;
 
 NODECFG_HEADER(MeshspaceToLocal_CFG, Rt_Vars_Base)
 
-virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
-	return false;
-}
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 
 virtual void reset(NodeRt_Ctx& ctx) const {
 
@@ -803,6 +797,26 @@ static const PropertyInfoList* get_props()
 Node_CFG* input = nullptr;
 };
 
+NODECFG_HEADER(DirectPlaySlot_CFG, Rt_Vars_Base)
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+static const PropertyInfoList* get_props()
+{
+	START_PROPS(DirectPlaySlot_CFG)
+		REG_BOOL(update_children_when_playing,PROP_DEFAULT, "1"),
+		REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local")
+	END_PROPS(DirectPlaySlot_CFG)
+}
+
+bool update_children_when_playing = true;
+Node_CFG* input = nullptr;
+
+};
 
 NODECFG_HEADER(ModifyBone_CFG, Rt_Vars_Base)
 virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
@@ -830,6 +844,38 @@ ValueNode* position = nullptr;
 ValueNode* rotation = nullptr;
 std::string bone_name;
 
+};
+
+
+NODECFG_HEADER(TwoBoneIK_CFG, Rt_Vars_Base)
+
+virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	return false;
+}
+
+virtual void reset(NodeRt_Ctx& ctx) const {
+
+}
+static const PropertyInfoList* get_props()
+{
+	START_PROPS(TwoBoneIK_CFG)
+		REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "mesh"),
+		REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+		REG_CUSTOM_TYPE_HINT(position, PROP_SERIALIZE, "AgSerializeNodeCfg", "vec3"),
+		REG_STDSTRING(bone_name, PROP_DEFAULT),
+		REG_BOOL(ik_in_bone_space, PROP_DEFAULT, "1"),
+		REG_STDSTRING(other_bone, PROP_DEFAULT)
+	END_PROPS(TwoBoneIK_CFG)
+}
+
+
+Node_CFG* input = nullptr;
+ValueNode* alpha = nullptr;
+ValueNode* position = nullptr;
+std::string bone_name;
+
+bool ik_in_bone_space = true;
+std::string other_bone;
 };
 
 

@@ -1602,9 +1602,15 @@ void ControlParamsWindow::imgui_draw()
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 
 
-	if (ImGui::BeginTable("controlproplistabc", 2, ent_list_flags))
+	const bool is_graph_running = ed.playback != AnimationGraphEditor::graph_playback_state::stopped;
+
+	const int num_cols = (is_graph_running) ? 3 : 2;
+
+	if (ImGui::BeginTable("controlproplistabc", num_cols, ent_list_flags))
 	{
 		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
+		if (is_graph_running)
+			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
 		ImGui::TableHeadersRow();
 
@@ -1636,6 +1642,40 @@ void ControlParamsWindow::imgui_draw()
 
 			ImGui::SameLine();
 			ImGui::Text(res.str.c_str());
+
+			if (is_graph_running) {
+				ImGui::TableNextColumn();
+				switch (res.type)
+				{
+				case anim_graph_value::float_t: {
+					float f = res.nativepi->get_float(ed.out.get_animator());
+					ImGui::DragFloat("##inpf", &f, 0.05);
+					res.nativepi->set_float(ed.out.get_animator(), f);
+				}break;
+				case anim_graph_value::bool_t: {
+					bool b = res.nativepi->get_int(ed.out.get_animator());
+					ImGui::Checkbox("##inpf", &b);
+					res.nativepi->set_int(ed.out.get_animator(), b);
+				}break;
+				case anim_graph_value::vec3_t: {
+					glm::vec3* v = (glm::vec3*)res.nativepi->get_ptr(ed.out.get_animator());
+					ImGui::InputFloat3("##inpf", &v->x);
+				}break;
+				case anim_graph_value::quat_t: {
+					glm::quat* v = (glm::quat*)res.nativepi->get_ptr(ed.out.get_animator());
+					ImGui::InputFloat4("##inpf", &v->w);
+				}break;
+				case anim_graph_value::int_t:
+				{
+					int b = res.nativepi->get_int(ed.out.get_animator());
+					ImGui::InputInt("##inpf", &b);
+					res.nativepi->set_int(ed.out.get_animator(), b);
+				}break;
+				};
+			}
+
+
+
 			ImGui::TableNextColumn();
 			std::string s = EnumTrait<anim_graph_value>::StaticType.get_enum_str((int)res.type);
 			auto find = s.rfind("::");

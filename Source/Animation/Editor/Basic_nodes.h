@@ -276,6 +276,19 @@ GraphPinType get_output_type_general() const override {
 }
 };
 
+CLASS_H_EXPLICIT_SUPER(TwoBoneIK_EdNode, BaseNodeUtil_EdNode<TwoBoneIK_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"2 Bone IK",
+	IK_COLOR,
+	"Peforms a 2 bone ik.\nCan set target in meshspace or in bonespace relative to another bone",
+	);
+MAKE_STANARD_SERIALIZE(TwoBoneIK_EdNode);
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::meshspace_pose);
+}
+};
+
+
 CLASS_H_EXPLICIT_SUPER(LocalToMeshspace_EdNode, BaseNodeUtil_EdNode<LocalToMeshspace_CFG>, Base_EdNode)
 MAKE_STANDARD_FUNCTIONS(
 	"Local to Mesh space",
@@ -325,6 +338,15 @@ MAKE_STANDARD_FUNCTIONS(
 	"Get a pose that references another tree of nodes, see 'Save cached pose'",
 	);
 MAKE_STANARD_SERIALIZE(GetCachedPose_EdNode);
+};
+
+CLASS_H_EXPLICIT_SUPER(DirectPlaySlot_EdNode, BaseNodeUtil_EdNode<DirectPlaySlot_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Direct play slot",
+	DIRPLAY_COLOR,
+	"Named slot that animations can be manually played to from game code",
+	);
+MAKE_STANARD_SERIALIZE(DirectPlaySlot_EdNode);
 };
 
 

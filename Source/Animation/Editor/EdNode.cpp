@@ -30,7 +30,8 @@ CLASS_IMPL(MeshToLocalspace_EdNode);
 CLASS_IMPL(LocalToMeshspace_EdNode);
 CLASS_IMPL(GetCachedPose_EdNode);
 CLASS_IMPL(SavePoseToCache_EdNode);
-
+CLASS_IMPL(DirectPlaySlot_EdNode);
+CLASS_IMPL(TwoBoneIK_EdNode);
 
 CLASS_IMPL(FloatConstant_EdNode);
 CLASS_IMPL(Curve_EdNode);

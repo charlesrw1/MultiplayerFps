@@ -38,8 +38,7 @@ const Color32 MISC_COLOR = { 13, 82, 44 };
 const Color32 VALUE_COLOR = { 93, 97, 15 };
 const Color32 IK_COLOR = MISC_COLOR;
 const Color32 CACHE_COLOR = { 5,5,5 };
-
-#define EDNODE_HEADER(type_name) CLASS_HEADER()
+const Color32 DIRPLAY_COLOR = { 112, 112, 112 };
 
 extern ImVec4 scriptparamtype_to_color(anim_graph_value type);
 
@@ -69,8 +68,6 @@ inline GraphPinType hint_str_to_GraphPinType(const char* str)
 	if (strcmp(str, "mesh") == 0) return GraphPinType(GraphPinType::meshspace_pose);
 	if (strcmp(str, "vec3") == 0) return GraphPinType(anim_graph_value::vec3_t);
 	if (strcmp(str, "quat") == 0) return GraphPinType(anim_graph_value::quat_t);
-
-
 	ASSERT(0);
 }
 

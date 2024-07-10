@@ -65,10 +65,10 @@ CLASS_IMPL(Blend_Masked_CFG);
 CLASS_IMPL(ModifyBone_CFG);
 CLASS_IMPL(LocalToMeshspace_CFG);
 CLASS_IMPL(MeshspaceToLocal_CFG);
-
+CLASS_IMPL(TwoBoneIK_CFG);
 CLASS_IMPL(GetCachedPose_CFG);
 CLASS_IMPL(SavePoseToCache_CFG);
-
+CLASS_IMPL(DirectPlaySlot_CFG);
 
 // Value nodes
 CLASS_IMPL(ValueNode);
@@ -703,3 +703,18 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 #endif
  }
+
+bool LocalToMeshspace_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+{
+	bool res = input->get_pose(ctx, pose);
+	
+	return false;
+	
+}
+bool MeshspaceToLocal_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+{
+	bool res = input->get_pose(ctx, pose);
+
+	return false;
+
+}

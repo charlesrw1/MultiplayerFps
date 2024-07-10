@@ -219,7 +219,8 @@ void util_global_blend(const MSkeleton* skel, const Pose* a,  Pose* b, float fac
 			glm::mat3 matrix = glm::mat3_cast(global);
 			glm::mat3 parent_mat = glm::mat3_cast(globalspace_rotations[parent]);
 			matrix = glm::inverse(parent_mat) * matrix;
-			b->q[j] = glm::quat_cast(matrix);
+			//b->q[j] = glm::quat_cast(matrix);
+			b->q[j] = glm::inverse(globalspace_rotations[parent]) * global;
 		}
 
 		b->pos[j] = a->pos[j];
