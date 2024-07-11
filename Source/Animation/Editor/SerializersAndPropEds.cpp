@@ -1,3 +1,7 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+#include "imgui_internal.h"
+
 #include "Framework/ReflectionProp.h"
 #include "Framework/PropertyEd.h"
 #include "Animation/Editor/AnimationGraphEditor.h"
@@ -309,7 +313,125 @@ class AgEdtior_BlendSpaceParameteriation : public IPropertyEditor
 
 	}
 };
+#include "Blendspace_nodes.h"
+class BlendspaceGridEd : public IPropertyEditor
+{
+	virtual void internal_update() override
+	{
+		//auto str = (VariableNameAndType*)prop->get_ptr(instance);
+		//drag_drop_property_ed_func(&str->str, Color32{ 62, 27, 82 }, [&](void* payload) {
+		//
+		//	VariableNameAndType* resource = *(VariableNameAndType**)payload;
+		//	*str = *resource;
+		//
+		//	}, "AnimGraphVariableDrag", "variable");
+		Blendspace2d_EdNode* node = (Blendspace2d_EdNode*)instance;
+		if (node->cols == 0 || node->rows == 0)	// only happens on startup
+			node->resize_grid(1, 1);
+				
+		auto drawlist = ImGui::GetWindowDrawList();
+		auto& style = ImGui::GetStyle();
 
+
+		const Color32 unusedc = { 42, 48, 39 };
+		const Color32 usedc = { 124, 150, 111 };
+		const Color32 hoveredc = { 187, 196, 61 };
+		const float square_width = 48;
+
+		static int x_popup_idx = 0;
+		static int y_popup_idx = 0;
+
+
+		for (int y = 0; y < node->rows; y++) {
+			for (int x = 0; x < node->cols; x++) {
+
+				auto min = ImGui::GetCursorScreenPos();
+
+				const int index = y * node->cols + x;
+				auto& gridpoint = node->gridpoints[index];
+				const bool hovered = ImRect(min, min + ImVec2(square_width, square_width)).Contains(ImGui::GetMousePos());
+				Color32 color_to_use = unusedc;
+				if (hovered) color_to_use = hoveredc;
+				else if (!gridpoint.animation_name.empty()) color_to_use = usedc;
+
+				drawlist->AddRectFilled(ImVec2(min.x, min.y), ImVec2(min.x + square_width, min.y + square_width), color_to_use.to_uint());
+				
+				ImGui::PushClipRect(min, min + ImVec2(square_width, square_width),false);
+				if (!gridpoint.animation_name.empty())
+					drawlist->AddText(NULL, 0.0f, min, COLOR_WHITE.to_uint(), gridpoint.animation_name.c_str(), nullptr, square_width);
+				ImGui::PopClipRect();
+
+				ImGui::InvisibleButton("##adfad", ImVec2(square_width,square_width));
+				if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+					if (!gridpoint.animation_name.empty()) {
+						ImGui::BeginTooltip();
+							ImGui::Text(gridpoint.animation_name.c_str());
+						ImGui::EndTooltip();
+					}
+					if (ImGui::GetIO().MouseClicked[1]) {
+						ImGui::OpenPopup("blendspace_grid_popup");
+						x_popup_idx = x;
+						y_popup_idx = y;
+					}
+				}
+				if (ImGui::BeginDragDropTarget())
+				{
+					//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+					//if (payload->IsDataType("AssetBrowserDragDrop"))
+					//	sys_print("``` accepting\n");
+
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimationItemAnimGraphEd"))
+					{
+						std::string* p = *(std::string**)payload->Data;
+						gridpoint.animation_name = *p;
+
+					}
+					ImGui::EndDragDropTarget();
+				}
+
+				if (x != node->cols-1)
+					ImGui::SameLine();
+			}
+		}
+
+		if (ImGui::BeginPopup("blendspace_grid_popup")) {
+
+			bool close_popup = false;
+			auto& gridpoint = node->gridpoints[y_popup_idx * node->cols + x_popup_idx];
+			if (!gridpoint.animation_name.empty() && ImGui::SmallButton("remove animation")) {
+				gridpoint.animation_name = "";
+				close_popup = true;
+			}
+			ImGui::Separator();
+
+			int gridpoints_before = node->gridpoints.size();
+
+			if (ImGui::SmallButton("add row above"))
+				node->append_row_to_grid(y_popup_idx);
+			if (ImGui::SmallButton("add row below"))
+				node->append_row_to_grid(y_popup_idx+1);
+			if (node->rows > 1 && ImGui::SmallButton("remove this row"))
+				node->remove_row_from_grid(y_popup_idx);
+			
+			ImGui::Separator();
+
+			if (ImGui::SmallButton("add col left"))
+				node->append_col_to_grid(x_popup_idx);
+			if (ImGui::SmallButton("add col right"))
+				node->append_col_to_grid(x_popup_idx + 1);
+			if (node->cols > 1 && ImGui::SmallButton("remove this col"))
+				node->remove_col_from_grid(x_popup_idx);
+
+
+			int gridpoints_after = node->gridpoints.size();
+			if (gridpoints_after != gridpoints_before || close_popup)
+				ImGui::CloseCurrentPopup();
+
+			ImGui::EndPopup();
+		}
+
+	}
+};
 
 struct AutoStruct_asdf {
 	AutoStruct_asdf() {
@@ -319,7 +441,7 @@ struct AutoStruct_asdf {
 		pfac.registerClass<FindAnimGraphVariableProp>("FindAnimGraphVariableProp");
 
 		pfac.registerClass<FindModelForEdAnimG>("FindModelForEdAnimG");
-
+		pfac.registerClass<BlendspaceGridEd>("BlendspaceGridEd");
 
 		pfac.registerClass<AgLispCodeEditorProperty>("AG_LISP_CODE");
 		pfac.registerClass<AgEnumFinder>("AG_ENUM_TYPE_FINDER");

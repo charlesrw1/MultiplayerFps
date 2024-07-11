@@ -899,7 +899,7 @@ void Player::spawn(const Dict& spawnargs) {
 		viewmodel.reset(new ViewmodelComponent(this));
 	}
 
-	auto graph = anim_tree_man->find_animation_tree("out.txt");
+	auto graph = anim_tree_man->find_animation_tree("savenamed.txt");
 	if (graph && graph->get_graph_is_valid() && get_model() && get_model()->get_skel())
 		animator.initialize_animator(get_model(), graph, this);
 

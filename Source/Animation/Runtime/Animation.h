@@ -59,10 +59,10 @@ enum class bone_controller_type
 
 #include "Framework/ClassBase.h"
 
+#include "Animation/Runtime/SyncTime.h"
+
 class Pose;
 class Animator;
-
-
 class MSkeleton;
 class Entity;
 class Animation_Tree_CFG;
@@ -141,6 +141,10 @@ private:
 
 	ScriptInstance script_inst;
 	std::vector<uint8_t> data;	// runtime data
+
+	// active sync groups for graph
+	std::vector<SyncGroupData> active_sync_groups;
+	SyncGroupData& find_or_create_sync_group(StringName name);
 	
 	friend class NodeRt_Ctx;
 };

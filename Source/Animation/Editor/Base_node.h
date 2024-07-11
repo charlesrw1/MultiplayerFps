@@ -80,6 +80,9 @@ struct GraphNodeInput
 	GraphPinType type;
 	Base_EdNode* node = nullptr;
 	const PropertyInfo* prop_link = nullptr;
+
+	bool is_node_required = true;	// set to false to not emit errors when node is missing
+
 	bool is_attached_to_node() const { return node; }
 };
 

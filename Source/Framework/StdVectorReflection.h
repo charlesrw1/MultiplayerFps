@@ -66,6 +66,7 @@ template<typename T, uint32_t COUNT>
 inline InlineVectorCallback<T,COUNT> get_inlinevec_callback(InlineVec<T, COUNT>* abc, PropertyInfoList* struct_) {
 	return InlineVectorCallback<T, COUNT>(struct_);
 }
+
 template<typename T>
 inline PropertyInfoList* get_list_value() {
 	return nullptr;
@@ -86,6 +87,8 @@ struct Prop_Flag_Overrides
 };
 
 #define MAKE_VECTORCALLBACK( type, name ) static StdVectorCallback<type> vecdef_##name( type::get_props() );
+#define MAKE_VECTORCALLBACK_ATOM( type, name ) static StdVectorCallback<type> vecdef_##name( get_list_value<type>() );
+
 #define REG_STDVECTOR(name, flags ) make_list_property(#name, offsetof(TYPE_FROM_START, name), flags, &vecdef_##name)
 #define REG_STDVECTOR_W_CUSTOM(name, flags, custom ) make_list_property(#name, offsetof(TYPE_FROM_START, name), flags, &vecdef_##name, custom)
 #define MAKE_INLVECTORCALLBACK( type, name, owner_type ) static auto vecdef_##name = get_inlinevec_callback( &((owner_type*)0)->name, type::get_props() );

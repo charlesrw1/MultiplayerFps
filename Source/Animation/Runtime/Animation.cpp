@@ -600,10 +600,40 @@ void AnimatorInstance::tick_tree_new(float dt)
 
 	on_update(dt);
 
+	// call into tree
 	if (get_tree()&& get_tree()->get_root_node())
 		get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
 	else
 		util_set_to_bind_pose(poses[0], get_skel());
+
+	// update sync groups
+	for (int i = 0; i < active_sync_groups.size(); i++) {
+
+		// group did not update, remove it
+		if (!active_sync_groups[i].update_owner) {
+			ASSERT(!active_sync_groups[i].is_first_update);
+			active_sync_groups.erase(active_sync_groups.begin() + i);
+			i--;
+			continue;
+		}
+		SyncGroupData& data = active_sync_groups[i];
+		// clear first update flag
+		data.is_first_update = false;
+
+		// set updated data into data used for next tree tick
+		data.time = data.update_time;
+		data.has_sync_marker = data.update_has_sync_marker;
+		data.sync_marker_name = data.update_sync_marker_name;
+
+		// clear update data
+		data.update_time = Percentage();
+		data.update_weight = 0.0;
+		data.update_owner = nullptr;
+		data.update_owner_synctype = sync_opt::Default;
+		data.update_sync_marker_name = StringName();
+		data.update_has_sync_marker = false;
+	}
+
 
 	util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
 	
@@ -630,3 +660,19 @@ Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {
 
 static Animation_Tree_Manager anim_tree_man__;
 Animation_Tree_Manager* anim_tree_man = &anim_tree_man__;
+
+SyncGroupData& AnimatorInstance::find_or_create_sync_group(StringName name)
+{
+	for (int i = 0; i < active_sync_groups.size(); i++) {
+		if (active_sync_groups[i].name == name)
+			return active_sync_groups[i];
+	}
+
+	// no sync group active, create one
+	SyncGroupData sync;
+	sync.name = name;
+	sync.is_first_update = true;
+	
+	active_sync_groups.push_back(sync);
+	return active_sync_groups.back();
+}

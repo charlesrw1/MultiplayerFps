@@ -1590,7 +1590,7 @@ void ControlParamsWindow::on_notify(const std::string& str)
 		props.clear();
 	}
 }
-
+#include "glm/gtx/euler_angles.hpp"
 void ControlParamsWindow::imgui_draw()
 {
 	if (!ImGui::Begin("Control parameters")) {
@@ -1659,11 +1659,18 @@ void ControlParamsWindow::imgui_draw()
 				}break;
 				case anim_graph_value::vec3_t: {
 					glm::vec3* v = (glm::vec3*)res.nativepi->get_ptr(ed.out.get_animator());
-					ImGui::InputFloat3("##inpf", &v->x);
+					ImGui::DragFloat3("##inpf", &v->x,0.025);
 				}break;
 				case anim_graph_value::quat_t: {
 					glm::quat* v = (glm::quat*)res.nativepi->get_ptr(ed.out.get_animator());
-					ImGui::InputFloat4("##inpf", &v->w);
+					
+					glm::vec3 eul = glm::eulerAngles(*v);
+					eul *= 180.f / PI;
+					if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
+						eul *= PI / 180.f;
+						*v = glm::quat(eul);
+					}
+
 				}break;
 				case anim_graph_value::int_t:
 				{

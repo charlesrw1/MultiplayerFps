@@ -81,7 +81,7 @@ inline bool util_compile_default(Base_EdNode* node, const AgSerializeContext* ct
 			*ptr_to_ptr = ptr_to_serialized_nodecfg_ptr(other, ctx);
 		}
 
-		if (!other)
+		if (!other && input.is_node_required)
 			missing_inputs = true;
 
 		input_index++;
@@ -288,6 +288,19 @@ GraphPinType get_output_type_general() const override {
 }
 };
 
+CLASS_H_EXPLICIT_SUPER(CopyBone_EdNode, BaseNodeUtil_EdNode<CopyBone_CFG>, Base_EdNode)
+MAKE_STANDARD_FUNCTIONS(
+	"Copy Bone",
+	IK_COLOR,
+	"Copies the transform of one bone to another.\n",
+	);
+MAKE_STANARD_SERIALIZE(CopyBone_EdNode);
+GraphPinType get_output_type_general() const override {
+	return GraphPinType(GraphPinType::meshspace_pose);
+}
+};
+
+
 
 CLASS_H_EXPLICIT_SUPER(LocalToMeshspace_EdNode, BaseNodeUtil_EdNode<LocalToMeshspace_CFG>, Base_EdNode)
 MAKE_STANDARD_FUNCTIONS(
@@ -458,16 +471,4 @@ CLASS_H_EXPLICIT_SUPER(Blend_Layered_EdNode, BaseNodeUtil_EdNode<Blend_Masked_CF
 	}
 
 	std::string maskname = "";
-};
-
-CLASS_H_EXPLICIT_SUPER(Sync_EdNode, BaseNodeUtil_EdNode<Sync_Node_CFG>, Base_EdNode)
-	
-	MAKE_STANDARD_FUNCTIONS(
-		"Sync",
-		MISC_COLOR,
-		"placeholder",
-	);
-
-	// serialize
-	MAKE_STANARD_SERIALIZE(Sync_EdNode);
 };

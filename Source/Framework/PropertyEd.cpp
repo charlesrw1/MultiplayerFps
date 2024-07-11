@@ -205,6 +205,36 @@ void IntegerEditor::internal_update()
 	prop->set_int(instance, val);
 }
 
+class VectorEditor : public IPropertyEditor
+{
+public:
+	VectorEditor(void* ins, PropertyInfo* inf) {
+		prop = inf; instance = ins;
+	}
+	virtual void internal_update() {
+		glm::vec3* v = (glm::vec3*)prop->get_ptr(instance);
+		ImGui::DragFloat3("##vec", (float*)v, 0.05);
+	}
+};
+#include "glm/gtx/euler_angles.hpp"
+class RotationEditor : public IPropertyEditor
+{
+public:
+	RotationEditor(void* ins, PropertyInfo* inf)  {
+		prop = inf; instance = ins;
+	}
+
+	virtual void internal_update() {
+		glm::quat* v = (glm::quat*)prop->get_ptr(instance);
+
+		glm::vec3 eul = glm::eulerAngles(*v);
+		eul *= 180.f / PI;
+		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
+			eul *= PI / 180.f;
+			*v = glm::quat(eul);
+		}
+	}
+};
 
 static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
 
@@ -232,7 +262,10 @@ static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
 	case core_type_id::Int32:
 	case core_type_id::Int64:
 		return new IntegerEditor(instance, prop);
-
+	case core_type_id::Vec3:
+		return new VectorEditor(instance, prop);
+	case core_type_id::Quat:
+		return new VectorEditor(instance, prop);
 	default:
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;

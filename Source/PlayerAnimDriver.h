@@ -36,8 +36,8 @@ CLASS_H(CharacterGraphDriver, AnimatorInstance)
 
 			REG_VEC3(vLeftFootPosition,PROP_DEFAULT),
 			REG_QUAT(qLeftFootRotation, PROP_DEFAULT),
-			REG_INT(iSomeInteger, PROP_DEFAULT, "")
-
+			REG_INT(iSomeInteger, PROP_DEFAULT, ""),
+			REG_QUAT(qRightHandRotation, PROP_DEFAULT)
 		END_PROPS(CharacterGraphDriver)
 	}
 
@@ -59,6 +59,8 @@ CLASS_H(CharacterGraphDriver, AnimatorInstance)
 
 	glm::vec3 vLeftFootPosition;
 	glm::quat qLeftFootRotation;
+
+	glm::quat qRightHandRotation;
 
 	bool left_foot_is_forward = false;
 

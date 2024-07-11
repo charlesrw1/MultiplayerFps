@@ -4,7 +4,8 @@
 #include "Framework/Util.h"
 #include <cassert>
 #include "Framework/StdVectorReflection.h"
-
+#include <glm/glm.hpp>
+#include <glm/gtx/quaternion.hpp>
 inline std::string string_view_to_std_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
@@ -242,6 +243,18 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 		}
 
 	}break;
+
+	case core_type_id::Vec3:
+	{
+		glm::vec3* v = (glm::vec3*)prop.get_ptr(ptr);
+		value_str = string_format("%f %f %f", v->x, v->y, v->z);
+	}break;
+	case core_type_id::Quat:
+	{
+		glm::quat* v = (glm::quat*)prop.get_ptr(ptr);
+		value_str = string_format("%f %f %f %f", v->x, v->y, v->z, v->w);
+	}break;
+
 	}
 	return { value_str,true };
 }
@@ -428,6 +441,19 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 		}
 
 	}break;
+
+	case core_type_id::Vec3:
+	{
+		glm::vec3* v = (glm::vec3*)prop->get_ptr(ptr);
+		int field = sscanf(tok.to_stack_string().c_str(), "%f %f %f", &v->x, &v->y, &v->z);
+		return true;
+	}
+	case core_type_id::Quat:
+	{
+		glm::quat* v = (glm::quat*)prop->get_ptr(ptr);
+		int field = sscanf(tok.to_stack_string().c_str(), "%f %f %f %f", &v->x, &v->y, &v->z, &v->w);
+		return true;
+	}
 
 	default:
 		ASSERT(0);

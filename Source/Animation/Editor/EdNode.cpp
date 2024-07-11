@@ -17,7 +17,7 @@ CLASS_IMPL(Root_EdNode);
 CLASS_IMPL(Statemachine_EdNode);
 CLASS_IMPL(Blend_EdNode);
 CLASS_IMPL(Blend_int_EdNode);
-CLASS_IMPL(Sync_EdNode);
+
 CLASS_IMPL(Mirror_EdNode);
 CLASS_IMPL(Blendspace2d_EdNode);
 CLASS_IMPL(Blend_Layered_EdNode);
@@ -32,6 +32,7 @@ CLASS_IMPL(GetCachedPose_EdNode);
 CLASS_IMPL(SavePoseToCache_EdNode);
 CLASS_IMPL(DirectPlaySlot_EdNode);
 CLASS_IMPL(TwoBoneIK_EdNode);
+CLASS_IMPL(CopyBone_EdNode);
 
 CLASS_IMPL(FloatConstant_EdNode);
 CLASS_IMPL(Curve_EdNode);
@@ -39,6 +40,7 @@ CLASS_IMPL(VectorConstant_EdNode);
 CLASS_IMPL(Variable_EdNode);
 CLASS_IMPL(RotationConstant_EdNode);
 CLASS_IMPL(ModifyBone_EdNode);
+
 
 
 void Base_EdNode::remove_reference(Base_EdNode* node)

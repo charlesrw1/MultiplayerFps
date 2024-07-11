@@ -52,7 +52,7 @@ CLASS_IMPL(BaseAGNode);
 // Pose nodes
 CLASS_IMPL(Node_CFG);
 CLASS_IMPL(Clip_Node_CFG);
-CLASS_IMPL(Sync_Node_CFG);
+
 CLASS_IMPL(Mirror_Node_CFG);
 CLASS_IMPL(Statemachine_Node_CFG);
 CLASS_IMPL(Add_Node_CFG);
@@ -60,7 +60,7 @@ CLASS_IMPL(Subtract_Node_CFG);
 CLASS_IMPL(Blend_Node_CFG);
 CLASS_IMPL(Blend_Int_Node_CFG);
 CLASS_IMPL(BlendSpace2d_CFG);
-CLASS_IMPL(BlendSpace1d_CFG);
+
 CLASS_IMPL(Blend_Masked_CFG);
 CLASS_IMPL(ModifyBone_CFG);
 CLASS_IMPL(LocalToMeshspace_CFG);
@@ -69,7 +69,7 @@ CLASS_IMPL(TwoBoneIK_CFG);
 CLASS_IMPL(GetCachedPose_CFG);
 CLASS_IMPL(SavePoseToCache_CFG);
 CLASS_IMPL(DirectPlaySlot_CFG);
-
+CLASS_IMPL(CopyBone_CFG);
 // Value nodes
 CLASS_IMPL(ValueNode);
 
@@ -98,6 +98,12 @@ ENUM_START(rootmotion_setting)
 ENUM_IMPL(rootmotion_setting);
 
 
+ENUM_START(sync_opt)
+	STRINGIFY_EUNM(sync_opt::Default,0),
+	STRINGIFY_EUNM(sync_opt::AlwaysLeader, 1),
+	STRINGIFY_EUNM(sync_opt::AlwaysFollower, 2)
+ENUM_IMPL(sync_opt)
+
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	 RT_TYPE* rt = get_rt(ctx);
@@ -110,20 +116,59 @@ ENUM_IMPL(rootmotion_setting);
 		return true;
 	}
 
-	const bool has_a_sync_already = pose.sync != nullptr && allow_sync;
+	/*
+	if node is synced:
+		if sync is first frame:
+			util_calc_rotations(0)
+		else
+			time = sync.get_time()
+			util_calc_rotations(sync.get_time())
+		if sync.wants_update()
+			time += dt
+			sync.set_time(time_for_sync)
+	else:
+		util_calc_rotations(time)
+		time += dt
+	*/
 
-	if (has_a_sync_already)
-		rt->anim_time = clip->duration * pose.sync->normalized_frame;
+	// synced update
+	if (has_sync_group()) {
+		SyncGroupData& sync = ctx.find_sync_group_data(hashed_syncgroupname);
 
-	const bool can_update_sync = pose.sync && pose.sync->first_seen && can_be_leader && allow_sync;
-	const bool update_self_time = !allow_sync || !pose.sync;
-
-	if (can_update_sync || update_self_time) {
-		if (pose.rootmotion_scale >= 0) {
-			// want to match character_speed and speed_of_anim
-			float speedup = pose.rootmotion_scale * rt->inv_speed_of_anim_root;
-			pose.dt *= speedup;
+		if (sync.is_this_first_update()) {
+			// do nothing
 		}
+		else {
+			rt->anim_time = sync.time.get() * clip->duration;	// normalized time, TODO: sync markers
+		}
+		const float time_to_evaluate_sequence = rt->anim_time;
+
+		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
+
+			rt->anim_time += pose.dt * speed;
+
+			if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
+				if (loop)
+					rt->anim_time = fmod(fmod(rt->anim_time, clip->duration) + clip->duration, clip->duration);
+				else {
+					rt->anim_time = clip->duration - 0.001f;
+					rt->stopped_flag = true;
+				}
+			}
+
+			sync.write_to_update_time(SyncOption, 0.5/*TODO*/, this, Percentage(rt->anim_time, clip->duration));
+		}
+
+		const std::vector<int16_t>* indicies = nullptr;
+		if (rt->remap_index != -1)
+			indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
+
+		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
+
+	}
+	// unsynced update
+	else {
+		const float time_to_evaluate_sequence = rt->anim_time;
 
 		rt->anim_time += pose.dt * speed;
 
@@ -136,18 +181,12 @@ ENUM_IMPL(rootmotion_setting);
 			}
 		}
 
-		if (pose.sync && can_be_leader && allow_sync) {
-			pose.sync->first_seen = false;
-			pose.sync->normalized_frame = rt->anim_time / clip->duration;
-		}
+		const std::vector<int16_t>* indicies = nullptr;
+		if (rt->remap_index != -1)
+			indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
 
+		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
 	}
-
-	const std::vector<int16_t>* indicies = nullptr;
-	if (rt->remap_index != -1)
-		indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
-
-	util_calc_rotations(ctx.get_skeleton(), clip, rt->anim_time, indicies, *pose.pose);
 
 	const int root_index = 0;
 	for (int i = 0; i < 3; i++) {
@@ -163,6 +202,15 @@ ENUM_IMPL(rootmotion_setting);
 
 	return outres;
 }
+
+ bool BlendSpace2d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ {
+	 auto rt = get_rt(ctx);
+
+
+	 return false;
+ }
+
 
 // Inherited via At_Node
 
@@ -322,52 +370,7 @@ ENUM_IMPL(rootmotion_setting);
 
 // Inherited via At_Node
 
- bool BlendSpace1d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
- {
-	 return false;
- }
 
- bool BlendSpace2d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
-{
-	//walk_fade_in = g_walk_fade_in;
-	//walk_fade_out = g_walk_fade_out;
-	//run_fade_in = g_run_fade_in;
-
-	auto rt = get_rt(ctx);
-
-	glm::vec2 relmovedir = glm::vec2(
-		xparam->get_value<float>(ctx),
-		yparam->get_value<float>(ctx)
-	);
-
-	float actual_character_move_speed = glm::length(relmovedir);
-
-	rt->character_blend_weights = damp_dt_independent(relmovedir,
-		rt->character_blend_weights, weight_damp, pose.dt);
-
-	float character_ground_speed = glm::length(rt->character_blend_weights);
-	float character_angle = PI;
-	// blend between angles
-	if (character_ground_speed >= 0.0000001f) {
-		glm::vec2 direction = rt->character_blend_weights / character_ground_speed;;
-		//character_angle = modulo_lerp(atan2f(direction.y, direction.x) + PI, character_angle, TWOPI, 0.94f);
-		character_angle = atan2f(direction.y, direction.x) + PI;
-	}
-
-
-	float anglelerp = 0.0;
-	int pose1 = 0, pose2 = 1;
-	for (int i = 0; i < 8; i++) {
-		if (character_angle - PI <= -PI + PI / 4.0 * (i + 1)) {
-			pose1 = i;
-			pose2 = (i + 1) % 8;
-			anglelerp = MidLerp(-PI + PI / 4.0 * i, -PI + PI / 4.0 * (i + 1), character_angle - PI);
-			break;
-		}
-	}
-
-	return false;
-}
 
 Animation_Tree_CFG::Animation_Tree_CFG()
 {
@@ -706,15 +709,219 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 bool LocalToMeshspace_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
+	// this function does nothing mwhahah
 	bool res = input->get_pose(ctx, pose);
-	
-	return false;
+	return res;
 	
 }
 bool MeshspaceToLocal_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	bool res = input->get_pose(ctx, pose);
-
-	return false;
-
+	return res;
 }
+
+static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkeleton* skel, int index)
+{
+	glm::mat4* mats = Matrix_Pool::get().alloc(36);
+
+	int count = 0;
+	while (index != -1) {
+		assert(count < 36);
+		glm::mat4x4 matrix = glm::mat4_cast(pose->q[index]);
+		matrix[3] = glm::vec4(pose->pos[index], 1.0);
+		mats[count++] = matrix;
+		index = skel->get_bone_parent(index);
+	}
+	for (int i = count - 2; i >= 0; i--) {
+		mats[i] = mats[i + 1] * mats[i];
+	}
+	glm::mat4 final_ = mats[0];
+	Matrix_Pool::get().free(36);
+	return final_;
+}
+
+ bool TwoBoneIK_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	 bool res = input->get_pose(ctx, pose);
+	 auto rt = get_rt(ctx);
+	 if (rt->bone_index == -1)
+		 return res;
+
+	 // build up global matrix when needed instead of recreating it every step
+	// not sure if this is optimal, should profile different ways to pass around pose
+	 glm::mat4* mats = Matrix_Pool::get().alloc(36);
+	 int indicies[36];
+
+	 auto skel = ctx.get_skeleton();
+	 int index = rt->bone_index;
+	 int count = 0;
+	 while (index != -1) {
+		 assert(count < 36);
+		 glm::mat4x4 matrix = glm::mat4_cast(pose.pose->q[index]);
+		 matrix[3] = glm::vec4(pose.pose->pos[index], 1.0);
+		 mats[count++] = matrix;
+		 indicies[count - 1] = index;
+		 index = skel->get_bone_parent(index);
+	 }
+	 for (int i = count - 2; i >= 0; i--) {
+		 mats[i] = mats[i + 1] * mats[i];
+	 }
+
+	 if (count <= 2) {
+		 sys_print("??? ik attempted on some root bone %s\n", bone_name.c_str());
+		 return res;
+	 }
+
+	 auto ikfunctor = [&](glm::quat& outlocal1, glm::quat& outlocal2, vec3 target, bool print = false) {
+
+		 const float dist_eps = 0.0001f;
+		 // GLOBAL positions
+		 vec3 a = mats[2] * glm::vec4(0.0, 0.0, 0.0, 1.0);
+		 vec3 b = mats[1] * glm::vec4(0.0, 0.0, 0.0, 1.0);
+		 vec3 c = mats[0] * glm::vec4(0.0, 0.0, 0.0, 1.0);
+		 float dist = length(c - target);
+		 if (dist <= dist_eps) {
+			 return;
+		 }
+
+		 //Debug::add_sphere(ent_transform * vec4(a, 1.0), 0.01, COLOR_GREEN, 0.0, true);
+		 //Debug::add_sphere(ent_transform * vec4(b, 1.0), 0.01, COLOR_BLUE, 0.0, true);
+		 //Debug::add_sphere(ent_transform * vec4(c, 1.0), 0.01, COLOR_CYAN, 0.0, true);
+
+		 glm::quat a_global = glm::quat_cast(mats[2]);
+		 glm::quat b_global = glm::quat_cast(mats[1]);
+		 util_twobone_ik(a, b, c, target, vec3(0.0, 0.0, 1.0), a_global, b_global, outlocal2, outlocal1);
+	 };
+
+	 glm::vec3 target_vec = position->get_value<glm::vec3>(ctx);
+	 glm::quat target_rotation = {};
+
+	 if (ik_in_bone_space&&rt->target_bone_index!=-1) {
+		 glm::mat4 matrix = build_global_transform_for_bone_index(pose.pose, skel, rt->target_bone_index);
+		 target_vec = matrix * glm::vec4(target_vec, 1.0);
+		 if (take_rotation_of_other_bone)
+			 target_rotation = glm::quat_cast(matrix);
+	 }
+
+
+	 int index1 = indicies[1];
+	 int index2 = indicies[2];
+
+	 ikfunctor(pose.pose->q[index1], pose.pose->q[index2], target_vec, false);
+
+
+	 if (take_rotation_of_other_bone && rt->target_bone_index != -1) {
+		// compute the global rotation now
+		 glm::quat q = {};
+		 if (count >= 4)
+			 q = glm::quat_cast(mats[3]);
+		 q = q * pose.pose->q[index2];
+		 q = q * pose.pose->q[index1];
+
+		 pose.pose->q[rt->bone_index] = glm::inverse(q) * target_rotation;
+	 }
+
+	 Matrix_Pool::get().free(36);
+
+	 return res;
+}
+
+
+ bool ModifyBone_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	 bool res = input->get_pose(ctx, pose);
+	 auto rt = get_rt(ctx);
+	 if (rt->bone_index == -1)
+		 return res;
+
+	 // build up global matrix when needed instead of recreating it every step
+	 // not sure if this is optimal, should profile different ways to pass around pose
+	 glm::mat4* mats = Matrix_Pool::get().alloc(36);
+	 auto skel = ctx.get_skeleton();
+	 int index = rt->bone_index;
+	 int count = 0;
+	 while (index != -1) {
+		 assert(count < 36);
+		 glm::mat4x4 matrix = glm::mat4_cast(pose.pose->q[index]);
+		 matrix[3] = glm::vec4(pose.pose->pos[index], 1.0);
+		 mats[count++] = matrix;
+		 index = skel->get_bone_parent(index);
+	 }
+	 for (int i = count - 2; i >= 0; i--) {
+		 mats[i] = mats[i + 1] * mats[i];
+	 }
+
+	 glm::vec3 set_pos = position->get_value<glm::vec3>(ctx);
+	 glm::quat set_rot = rotation->get_value<glm::quat>(ctx);
+
+	 glm::vec3 global_pos = mats[0][3];
+	 glm::quat global_rot = glm::quat_cast(mats[0]);
+
+	 if (apply_position) {
+		 if (apply_position_meshspace) {
+			 if (apply_position_additive)
+				 mats[0][3] = glm::vec4(global_pos + set_pos, 1.0f);
+			 else
+				 mats[0][3] = glm::vec4(set_pos, 1.0f);
+		 }
+		 else {
+			 if (apply_position_additive)
+				 pose.pose->pos[rt->bone_index] += set_pos;
+			 else
+				 pose.pose->pos[rt->bone_index] = set_pos;
+		 }
+	 }
+	 if (apply_rotation) {
+		 if (apply_rotation_meshspace) {
+			 if (apply_rotation_additive) {
+				 glm::quat q = set_rot * global_rot;
+				 auto lastcol = mats[0][3];
+				 mats[0] = glm::mat4_cast(q);
+				 mats[0][3] = lastcol;
+			 }
+			 else {
+				 glm::quat q = set_rot;
+				 auto lastcol = mats[0][3];
+				 mats[0] = glm::mat4_cast(q);
+				 mats[0][3] = lastcol;
+			 }
+		 }
+		 else {
+			 if (apply_rotation_additive)
+				 pose.pose->q[rt->bone_index] = set_rot * pose.pose->q[rt->bone_index];
+			 else
+				 pose.pose->q[rt->bone_index] = set_rot;
+		 }
+	 }
+
+	 if (apply_position_meshspace || apply_rotation_meshspace) {
+		 // go from global to local again
+		 if (count > 1)
+			 mats[0] = glm::inverse(mats[1]) * mats[0];
+		 if (apply_rotation && apply_rotation_meshspace)
+			 pose.pose->q[rt->bone_index] = glm::quat_cast(mats[0]);
+		 if (apply_position && apply_position_meshspace)
+			 pose.pose->pos[rt->bone_index] = mats[0][3];
+	 }
+	Matrix_Pool::get().free(36);
+	 return res;
+ }
+
+ bool CopyBone_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
+	 bool res = input->get_pose(ctx, pose);
+	 auto rt = get_rt(ctx);
+	 if (rt->src_bone_index == -1 || rt->target_bone_index == -1)
+		 return res;
+	 auto skel = ctx.get_skeleton();
+
+	 if (copy_bonespace) {
+		 // simple, just copy over pos/quat
+		 pose.pose->q[rt->target_bone_index] = pose.pose->q[rt->src_bone_index];
+		 pose.pose->pos[rt->target_bone_index] = pose.pose->pos[rt->src_bone_index];
+		 return res;
+	 }
+	 glm::mat4 mat = build_global_transform_for_bone_index(pose.pose, skel, rt->src_bone_index);
+	 pose.pose->q[rt->target_bone_index] = glm::quat_cast(mat);
+	 pose.pose->pos[rt->target_bone_index] = mat[3];
+
+	 return res;
+
+ }

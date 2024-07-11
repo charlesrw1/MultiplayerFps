@@ -403,14 +403,13 @@ void BytecodeCompileHelper::parse_type_string(const char* str, int line, compile
 
 	 sf.bytecode_length = instruction_data.size() - sf.bytecode_offset;
 	 function_ptrs.push_back(sf);
-	 handle = { (int)function_ptrs.size() };
+	 handle = { (int)function_ptrs.size() - 1 };
 
 	 return res;
  }
 
 compile_result BytecodeCompileHelper::compile(const Script* global, const std::string& code, const std::string& selftype) {
-	instructions.clear();
-
+	
 	std::string code_replaced = code;
 	replace(code_replaced, "(", " ( ");
 	replace(code_replaced, ")", " ) ");
