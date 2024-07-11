@@ -11,6 +11,7 @@
 CLASS_IMPL(Base_EdNode);
 
 CLASS_IMPL(Clip_EdNode);
+CLASS_IMPL(Frame_Evaluate_EdNode);
 CLASS_IMPL(Additive_EdNode);
 CLASS_IMPL(Subtract_EdNode);
 CLASS_IMPL(Root_EdNode);

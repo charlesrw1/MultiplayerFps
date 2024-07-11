@@ -2,8 +2,9 @@
 #define NET_H
 #include "Framework/Util.h"
 #include "Connection.h"
-#include "Animation/Runtime/Animation.h"
 
+#include <glm/glm.hpp>
+#include <vector>
 const int CLIENT_SNAPSHOT_HISTORY = 16;	// buffer last 16 snapshots
 
 const int MAX_PAYLOAD_SIZE = 1400;

@@ -9,7 +9,7 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "Animation/SkeletonData.h"
-
+#include "Animation/Runtime/Animation.h"
 #include "Physics/Physics2.h"	// for g_physics->debug_draw()
 #include "UI.h"					// for gui->ui_paint()
 #include "IEditorTool.h"		// for overlay_draw()

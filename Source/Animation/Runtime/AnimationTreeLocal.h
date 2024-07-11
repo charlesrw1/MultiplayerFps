@@ -146,6 +146,10 @@ public:
 		return anim->find_or_create_sync_group(name);
 	}
 
+	AnimatorInstance::DirectAnimationSlot& get_slot_for_index(int index) {
+		return anim->slots.at(index);
+	}
+
 };
 
 struct GetPose_Ctx
@@ -407,6 +411,41 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	uint16_t start_frame = 0;
 };
 
+struct Frame_Evaluate_RT : public Rt_Vars_Base
+{
+	const AnimationSeq* clip = nullptr;
+	int remap_index = -1;
+};
+NODECFG_HEADER(Frame_Evaluate_CFG, Frame_Evaluate_RT)
+	virtual void construct(NodeRt_Ctx& ctx) const {
+		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
+	
+	
+		rt->clip = ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
+	}
+	
+	// Inherited via At_Node
+	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
+	
+	static const PropertyInfoList* get_props()
+	{
+		START_PROPS(Frame_Evaluate_CFG)
+			REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE"),
+			REG_CUSTOM_TYPE_HINT(explicit_time, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+			REG_BOOL(wrap_around_time, PROP_DEFAULT, "0"),
+			REG_BOOL(normalized_time, PROP_DEFAULT, "0")
+		END_PROPS(Frame_Evaluate_CFG)
+	}
+	virtual void reset(NodeRt_Ctx& ctx) const override {
+
+	}
+	
+	ValueNode* explicit_time = nullptr;
+	bool wrap_around_time = false;
+	bool normalized_time = false;
+	std::string clip_name;
+};
+
 NODECFG_HEADER(Subtract_Node_CFG, Rt_Vars_Base)
 
 	// Inherited via At_Node
@@ -450,14 +489,9 @@ NODECFG_HEADER(Add_Node_CFG, Rt_Vars_Base)
 	ValueNode* param = nullptr;
 };
 
-struct Blend_Node_RT : Rt_Vars_Base
-{
-	float lerp_amt = 0.0;
-	float saved_f = 0.0;
-};
 
 // generic blend by bool or blend by float
-NODECFG_HEADER(Blend_Node_CFG, Blend_Node_RT)
+NODECFG_HEADER(Blend_Node_CFG, Rt_Vars_Base)
 
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
@@ -465,13 +499,9 @@ NODECFG_HEADER(Blend_Node_CFG, Blend_Node_RT)
 	static const PropertyInfoList* get_props()
 	{
 		START_PROPS(Blend_Node_CFG)
-			REG_FLOAT(damp_factor, PROP_DEFAULT, "0.1"),
-			REG_BOOL(store_value_on_reset, PROP_DEFAULT, "0"),
-
-
 			REG_CUSTOM_TYPE_HINT(inp0, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
 			REG_CUSTOM_TYPE_HINT(inp1, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
-			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
+			REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
 
 		END_PROPS(Blend_Node_CFG)
 	}
@@ -479,13 +509,6 @@ NODECFG_HEADER(Blend_Node_CFG, Blend_Node_RT)
 
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		RT_TYPE* rt = get_rt(ctx);
-
-		float cur_val = 0.0;
-		cur_val = param->get_value<float>(ctx);
-
-		rt->lerp_amt = cur_val;
-		if (store_value_on_reset)
-			rt->saved_f = cur_val;
 
 
 		inp0->reset(ctx);
@@ -495,12 +518,7 @@ NODECFG_HEADER(Blend_Node_CFG, Blend_Node_RT)
 	Node_CFG* inp0 = nullptr;
 	Node_CFG* inp1 = nullptr;
 
-	ValueNode* param = nullptr;
-
-	float damp_factor = 0.1;
-	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
-	// below are computed on init
-	uint8_t parameter_type = 0;// 0 = float, 1 = bool
+	ValueNode* alpha = nullptr;
 };
 
 struct Blend_Int_Node_RT : public Rt_Vars_Base
@@ -544,7 +562,6 @@ NODECFG_HEADER(Blend_Int_Node_CFG, Blend_Int_Node_RT)
 	}
 
 	InlineVec<Node_CFG*, 2> input;
-	float damp_factor = 0.1;
 	bool store_value_on_reset = false;
 	ValueNode* param = nullptr;
 };
@@ -561,8 +578,7 @@ NODECFG_HEADER(Mirror_Node_CFG, Mirror_Node_RT)
 	static const PropertyInfoList* get_props()
 	{
 		START_PROPS(Mirror_Node_CFG)
-			REG_FLOAT(damp_time, PROP_DEFAULT, "0.1"),
-
+			
 			REG_BOOL(store_value_on_reset, PROP_DEFAULT, "0"),
 
 			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
@@ -574,17 +590,14 @@ NODECFG_HEADER(Mirror_Node_CFG, Mirror_Node_RT)
 	virtual void reset(NodeRt_Ctx& ctx) const override
 	{
 		auto rt = get_rt(ctx);
-		rt->saved_f = param->get_value<float>(ctx);
 		input->reset(ctx);
+		rt->saved_f = param->get_value<float>(ctx);
 	}
 
 
-	float damp_time = 0.1;
 	Node_CFG* input = nullptr;
 	ValueNode* param = nullptr;
 	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
-	// below are computed on init
-	uint8_t parameter_type = 1;// 0 = float, 1 = bool
 };
 
 struct NodeRt_Ctx;
@@ -662,6 +675,8 @@ NODECFG_HEADER(Blend_Masked_CFG, Blend_Masked_RT)
 		auto rt = get_rt(ctx);
 		//FIXME
 		rt->mask = ctx.get_skeleton()->find_mask(maskname);
+		if (!rt->mask)
+			sys_print("??? blend_masked_cfg has no valid mask\n");
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		base->reset(ctx);
@@ -676,14 +691,15 @@ NODECFG_HEADER(Blend_Masked_CFG, Blend_Masked_RT)
 
 			REG_CUSTOM_TYPE_HINT(base, PROP_SERIALIZE, "AgSerializeNodeCfg","local"),
 			REG_CUSTOM_TYPE_HINT(layer, PROP_SERIALIZE, "AgSerializeNodeCfg","local"),
-			REG_CUSTOM_TYPE_HINT(param, PROP_SERIALIZE, "AgSerializeNodeCfg","float"),
+			REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg","float"),
 		END_PROPS(Blend_Masked_CFG)
 	}
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
 
 	bool meshspace_rotation_blend = false;
-	ValueNode* param = nullptr;
+	ValueNode* alpha = nullptr;
+	
 	Node_CFG* base = nullptr;
 	Node_CFG* layer = nullptr;
 
@@ -702,7 +718,7 @@ virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 }
 
 virtual void reset(NodeRt_Ctx& ctx) const {
-
+	pose->reset(ctx);
 }
 static const PropertyInfoList* get_props()
 {
@@ -740,6 +756,7 @@ NODECFG_HEADER(LocalToMeshspace_CFG, Rt_Vars_Base)
 
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 	virtual void reset(NodeRt_Ctx& ctx) const {
+		input->reset(ctx);
 	}
 	static const PropertyInfoList* get_props()
 	{
@@ -756,7 +773,7 @@ NODECFG_HEADER(MeshspaceToLocal_CFG, Rt_Vars_Base)
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 	
 	virtual void reset(NodeRt_Ctx& ctx) const {
-	
+		input->reset(ctx);
 	}
 	
 	static const PropertyInfoList* get_props()
@@ -769,25 +786,29 @@ NODECFG_HEADER(MeshspaceToLocal_CFG, Rt_Vars_Base)
 	Node_CFG* input = nullptr;
 };
 
-NODECFG_HEADER(DirectPlaySlot_CFG, Rt_Vars_Base)
-	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
-		return false;
-	}
-	
+struct DirectPlaySlot_RT : public Rt_Vars_Base
+{
+	Pose* fading_out_pose = nullptr;
+};
+
+NODECFG_HEADER(DirectPlaySlot_CFG, DirectPlaySlot_RT)
+	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 	virtual void reset(NodeRt_Ctx& ctx) const {
-	
+		input->reset(ctx);
 	}
 	static const PropertyInfoList* get_props()
 	{
 		START_PROPS(DirectPlaySlot_CFG)
 			REG_BOOL(update_children_when_playing,PROP_DEFAULT, "1"),
-			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local")
+			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+			REG_INT(slot_index, PROP_SERIALIZE, "")
 		END_PROPS(DirectPlaySlot_CFG)
 	}
 	
 	bool update_children_when_playing = true;
-	Node_CFG* input = nullptr;
+	int slot_index = -1;
 
+	Node_CFG* input = nullptr;
 };
 
 struct ModifyBone_RT : public Rt_Vars_Base
@@ -804,12 +825,12 @@ NODECFG_HEADER(ModifyBone_CFG, ModifyBone_RT)
 	
 	bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override ;
 	void reset(NodeRt_Ctx& ctx) const override {
-	
+		input->reset(ctx);
 	}
 	static const PropertyInfoList* get_props()
 	{
 		START_PROPS(ModifyBone_CFG)
-			REG_STDSTRING(bone_name, PROP_DEFAULT),
+			REG_STDSTRING_CUSTOM_TYPE(bone_name, PROP_DEFAULT, "AgBoneFinder"),
 			REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
 			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "mesh"),
 			REG_CUSTOM_TYPE_HINT(position, PROP_SERIALIZE, "AgSerializeNodeCfg", "vec3"),
@@ -858,7 +879,7 @@ NODECFG_HEADER(TwoBoneIK_CFG, TwoBoneIK_RT)
 			sys_print("??? no target bone when its required for twoboneik\n");
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const {
-	
+		input->reset(ctx);
 	}
 	static const PropertyInfoList* get_props()
 	{
@@ -866,9 +887,9 @@ NODECFG_HEADER(TwoBoneIK_CFG, TwoBoneIK_RT)
 			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "mesh"),
 			REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
 			REG_CUSTOM_TYPE_HINT(position, PROP_SERIALIZE, "AgSerializeNodeCfg", "vec3"),
-			REG_STDSTRING(bone_name, PROP_DEFAULT),
+			REG_STDSTRING_CUSTOM_TYPE(bone_name, PROP_DEFAULT, "AgBoneFinder"),
 			REG_BOOL(ik_in_bone_space, PROP_DEFAULT, "0"),
-			REG_STDSTRING(other_bone, PROP_DEFAULT),
+			REG_STDSTRING_CUSTOM_TYPE(other_bone, PROP_DEFAULT, "AgBoneFinder"),
 			REG_BOOL(take_rotation_of_other_bone, PROP_DEFAULT, "0")
 		END_PROPS(TwoBoneIK_CFG)
 	}
@@ -903,7 +924,7 @@ NODECFG_HEADER(CopyBone_CFG, CopyBone_RT)
 			sys_print("??? no bone index for copybone node\n");
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const {
-	
+		input->reset(ctx);
 	}
 
 	
@@ -912,8 +933,8 @@ NODECFG_HEADER(CopyBone_CFG, CopyBone_RT)
 		START_PROPS(CopyBone_CFG)
 			REG_CUSTOM_TYPE_HINT(input, PROP_SERIALIZE, "AgSerializeNodeCfg", "mesh"),
 			REG_CUSTOM_TYPE_HINT(alpha, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
-			REG_STDSTRING(src_bone, PROP_DEFAULT),
-			REG_STDSTRING(dest_bone, PROP_DEFAULT),
+			REG_STDSTRING_CUSTOM_TYPE(src_bone, PROP_DEFAULT, "AgBoneFinder"),
+			REG_STDSTRING_CUSTOM_TYPE(dest_bone, PROP_DEFAULT, "AgBoneFinder"),
 			REG_BOOL(copy_position,PROP_DEFAULT, "0"),
 			REG_BOOL(copy_rotation, PROP_DEFAULT, "0"),
 			REG_BOOL(copy_bonespace, PROP_DEFAULT, "0"),

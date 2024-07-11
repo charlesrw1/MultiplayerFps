@@ -1430,6 +1430,9 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	// initialize memory offets for runtime
 	editing_tree->data_used = 0;
 
+	// clear slot_names, direct play nodes will append this
+	editing_tree->direct_slot_names.clear();
+
 	// to get access to ptr->index hashmap
 	AgSerializeContext ctx(get_tree());
 
@@ -2150,4 +2153,20 @@ void AnimGraphClipboard::remove_references(Base_EdNode* node)
 			i--;
 		}
 	}
+}
+
+DECLARE_ENGINE_CMD(animed_play_slot)
+{
+	if (args.size() != 3) {
+		sys_print("usage animed_play_slot <slot> <anim>");
+		return;
+	}
+	if (ed.playback != AnimationGraphEditor::graph_playback_state::running) {
+		sys_print("!!! can only play slots when graph is running\n");
+		return;
+	}
+	std::string slotname = args.at(1);
+	std::string anim = args.at(2);
+
+	ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
 }

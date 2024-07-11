@@ -1,7 +1,7 @@
 #ifndef GAMETYPE_H
 #define GAMETYPE_H
 #include "Framework/Util.h"
-#include "Animation/Runtime/Animation.h"
+#include <glm/glm.hpp>
 #include <memory>
 using std::unique_ptr;
 

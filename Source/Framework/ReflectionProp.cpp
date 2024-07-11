@@ -549,6 +549,14 @@ PropertyInfoList* get_list_value<uint32_t>() {
 
 }
 template<>
+PropertyInfoList* get_list_value<std::string>() {
+	static PropertyInfo info[] = {
+		make_string_property("_value",0/* 0 offset */,PROP_DEFAULT)
+	};
+	static PropertyInfoList list = { info,1,"_std::string" };
+	return &list;
+}
+template<>
 PropertyInfoList* get_list_value<uint16_t>() {
 	static PropertyInfo info[] = {
 		make_integer_property("_value",0/* 0 offset */,PROP_DEFAULT,sizeof(uint16_t))

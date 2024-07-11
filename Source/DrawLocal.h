@@ -15,6 +15,7 @@
 #include "Framework/FreeList.h"
 #include "Render/RenderExtra.h"
 #include "Render/Material.h"
+#include "Framework/MemArena.h"
 #pragma optimize("", on)
 
 class MeshPart;
@@ -311,7 +312,7 @@ public:
 		bool compile_failed = false;
 		Shader shader_obj;
 	};
-	vector<program_def> programs;
+	std::vector<program_def> programs;
 private:
 	void recompile(program_def& def);
 };

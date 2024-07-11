@@ -7,7 +7,6 @@
 #include "Framework/Bytepacker.h"
 
 #include "Game_Engine.h"
-#include "Player.h"
 
 //#define DebugOut(fmt, ...)
 
@@ -231,14 +230,6 @@ float interpolate_modulo(float start, float end, float mod, float alpha)
 	}
 }
 
-float InterpolateAnimation(Animation* a, float start, float end, float alpha)
-{
-	// check distances
-	float clip_len = a->total_duration;
-	return interpolate_modulo(start, end, clip_len, alpha);
-}
-
-
 
 
 void set_entity_interp_vars(Entity& e, Interp_Entry& ie)
@@ -355,20 +346,7 @@ void Client::interpolate_states()
 	}
 #endif
 }
-#if 0
-Frame* Client::GetCurrentSnapshot()
-{
-	return &snapshots.at(InSequence() % CLIENT_SNAPSHOT_HISTORY);
-}
-Frame* Client::FindSnapshotForTick(int tick)
-{
-	for (int i = 0; i < snapshots.size(); i++) {
-		if (snapshots[i].tick == tick)
-			return &snapshots[i];
-	}
-	return nullptr;
-}
-#endif
+
 
 // will add/subtract a small value to adjust the number of ticks running
 float Client::adjust_time_step(int ticks_runnning)

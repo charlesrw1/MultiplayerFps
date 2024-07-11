@@ -257,6 +257,50 @@ public:
 
 };
 
+class AgBoneFinder : public IPropertyEditor
+{
+public:
+	AgBoneFinder()
+	{
+		auto model = ed.out.get_model();
+		if (!model || !model->get_skel()) {
+			no_model = true; 
+			return; 
+		}
+		for (int i = 0; i < model->get_skel()->bone_dat.size(); i++)
+			bones.push_back(model->get_skel()->bone_dat[i].strname);
+
+	}
+
+	// Inherited via IPropertyEditor
+	virtual void internal_update() override
+	{
+		ASSERT(prop->type == core_type_id::StdString);
+		std::string* str = (std::string*)prop->get_ptr(instance);
+		if (no_model)
+			ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "no model set");
+		else if(bones.empty())
+			ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "model has no bones");
+		else {
+
+			if (ImGui::BeginCombo("##bones", str->c_str())) {
+				for (int i = 0; i < bones.size(); i++) {
+					bool is_selected = *str == bones[i];
+					if (ImGui::Selectable(bones[i].c_str(), &is_selected)) {
+						*str = bones[i];
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+		}
+	}
+	bool no_model = false;
+	// copy in as std strings, could be c_strs but that opens up more room for bugs
+	std::vector<std::string> bones;
+};
+
+
 
 
 class AgEditor_BlendSpaceArrayHead : public IArrayHeader
@@ -439,7 +483,7 @@ struct AutoStruct_asdf {
 
 		pfac.registerClass<FindAnimationClipPropertyEditor>("AG_CLIP_TYPE");
 		pfac.registerClass<FindAnimGraphVariableProp>("FindAnimGraphVariableProp");
-
+		pfac.registerClass<AgBoneFinder>("AgBoneFinder");
 		pfac.registerClass<FindModelForEdAnimG>("FindModelForEdAnimG");
 		pfac.registerClass<BlendspaceGridEd>("BlendspaceGridEd");
 

@@ -61,6 +61,8 @@ public:
 	BaseAGNode* get_node(uint32_t index) { return all_nodes.at(index); }
 
 	bool get_graph_is_valid() const { return graph_is_valid; }
+
+	const std::vector<std::string>& get_slot_names() const { return direct_slot_names; }
 private:
 	bool graph_is_valid = false;
 
@@ -75,12 +77,19 @@ private:
 	// stores variables and functions for evaulating transitions
 	std::unique_ptr<Script> code;
 
+	// provides names + indicies for playing animations directly
+	// these get provided by adding 'Direct play' nodes and setting their names
+	// if 2 nodes share a name, then they reference same index
+	// TODO: might want better way than this than tying it to a graph asset
+	std::vector<std::string> direct_slot_names;
+
 	static const PropertyInfoList* get_props();
 
 	friend class Animation_Tree_Manager;
 	friend class AnimationGraphEditor;
 	friend class SerializeNodeCFGRef;
 	friend class AgSerializeContext;
+	friend class DirectPlaySlot_EdNode;// hack for editor nodes to append direct_slot
 
 	bool is_initialized() { return !path.empty(); }
 };

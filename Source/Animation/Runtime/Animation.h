@@ -61,10 +61,12 @@ enum class bone_controller_type
 
 #include "Animation/Runtime/SyncTime.h"
 
+
 class Pose;
 class Animator;
 class MSkeleton;
 class Entity;
+class AnimationSeq;
 class Animation_Tree_CFG;
 
 CLASS_H(AnimatorInstance, ClassBase)
@@ -77,6 +79,8 @@ CLASS_H(AnimatorInstance, ClassBase)
 		const Model* model,
 		const Animation_Tree_CFG* graph,
 		Entity* ent = nullptr);
+
+	// Main update method
 
 	void tick_tree_new(float dt);
 
@@ -98,23 +102,29 @@ CLASS_H(AnimatorInstance, ClassBase)
 	const Animation_Tree_CFG* get_tree() const {
 		return cfg;
 	}
+	int num_bones() const { return cached_bonemats.size(); }
+	Entity* get_owner() const { return owner; }
+	ScriptInstance& get_script_inst() { return script_inst; }
+	bool is_initialized() const { return model != nullptr; }
 
 	Bone_Controller& get_controller(bone_controller_type type_) {
 		return bone_controllers[(int)type_];
 	}
 
-	void play_anim_in_slot(StringView name, float start, float speed, bool loop);
-	bool is_slot_finished() { return slots[0].finished; }
-
 	void update_procedural_bones(Pose& pose);
 
-	int num_bones() { return cached_bonemats.size(); }
 
-	Entity* get_owner() const { return owner; }
 
-	ScriptInstance& get_script_inst() { return script_inst; }
+	// Slot playing
 
-	bool is_initialized() const { return model != nullptr; }
+	// returns weather it was succesful
+	bool play_animation_in_slot(
+		std::string animation,
+		StringName slot,
+		float play_speed,
+		float start_pos
+	);
+
 private:
 
 	// hooks for derived classes
@@ -134,7 +144,6 @@ private:
 	
 	// depreciated
 	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
-	std::vector<Animation_Slot> slots;
 
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
@@ -146,6 +155,33 @@ private:
 	std::vector<SyncGroupData> active_sync_groups;
 	SyncGroupData& find_or_create_sync_group(StringName name);
 	
+	// direct play slots for manual animation playback
+	struct DirectAnimationSlot
+	{
+		enum State {
+			FadingIn,
+			Full,
+			FadingOut,
+		}state;
+
+		StringName name;
+
+		const AnimationSeq* active = nullptr;
+		float time = 0.0;
+		float playspeed = 0.0;
+		bool apply_rootmotion = false;
+
+		float fade_duration = 0.2;
+		float fade_percentage = 0.0;
+	};
+	std::vector<DirectAnimationSlot> slots;
+	DirectAnimationSlot* find_slot_with_name(StringName name) {
+		for (int i = 0; i < slots.size(); i++)
+			if (slots[i].name == name)
+				return &slots[i];
+		return nullptr;
+	}
+
 	friend class NodeRt_Ctx;
 };
 

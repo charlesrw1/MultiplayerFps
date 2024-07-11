@@ -188,6 +188,7 @@ private:
 	friend class Animation_Tree_Manager;
 	friend class ModelCompileHelper;
 	friend class ModelMan;
+	friend class AgBoneFinder;	// for accessing bones
 public:
 	// For use with editor
 	const std::unordered_map<std::string, refed_clip>& get_clips_hashmap() const { return clips; }

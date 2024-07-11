@@ -84,21 +84,6 @@ struct Animation_Index
 	int16_t skel = -1;
 };
 
-class Animation_Slot
-{
-public:
-	Animation_Index anim;
-	float frame = 0;
-	float speed = 1;
-	bool loop = false;
-	bool finished = false;
-
-	Animation_Index blend_out_anim;
-	float blend_out_frame = 0.0;
-
-	float blend_time = 0;
-	float blend_remaining = 0;
-};
 
 class Pose
 {

@@ -67,7 +67,7 @@ public:
 		return inst;
 	}
 
-	vector<Pose> poses;
+	std::vector<Pose> poses;
 	int head = 0;
 	Pose* alloc(int count) {
 		assert(count + head < 64);
@@ -88,7 +88,7 @@ public:
 		static Matrix_Pool inst(256 * 2);
 		return inst;
 	}
-	vector<glm::mat4> matricies;
+	std::vector<glm::mat4> matricies;
 	int head = 0;
 	glm::mat4* alloc(int count) {
 		assert(count + head < matricies.size());

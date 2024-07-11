@@ -80,6 +80,8 @@ template<>
 PropertyInfoList* get_list_value<int32_t>();
 template<>
 PropertyInfoList* get_list_value<float>();
+template<>
+PropertyInfoList* get_list_value<std::string>();
 
 struct Prop_Flag_Overrides
 {

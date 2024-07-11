@@ -1,7 +1,7 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 #include "Net.h"
-#include "Animation/Runtime/Animation.h"
+
 #include "Level.h"
 #include "EmulatedSocket.h"
 #include "Physics.h"

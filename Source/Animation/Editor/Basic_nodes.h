@@ -254,6 +254,30 @@ CLASS_H_EXPLICIT_SUPER(Clip_EdNode, BaseNodeUtil_EdNode<Clip_Node_CFG>, Base_EdN
 	}
 };
 
+CLASS_H_EXPLICIT_SUPER(Frame_Evaluate_EdNode, BaseNodeUtil_EdNode<Frame_Evaluate_CFG>, Base_EdNode)
+
+MAKE_STANDARD_FUNCTIONS(
+	"Frame evaluator",
+	CACHE_COLOR,
+	"Returns a single frame of an animation clip",
+	);
+MAKE_STANARD_SERIALIZE(Frame_Evaluate_EdNode);
+
+bool compile_my_data(const AgSerializeContext* ctx) override {
+	if (node->clip_name.empty())
+		append_fail_msg("[ERROR] clip name is empty\n");
+
+	return util_compile_default(this, ctx);
+}
+
+std::string get_title() const override {
+	if (node->clip_name.empty()) return get_name();
+	return "Evaluate: " + node->clip_name;
+}
+};
+
+
+
 CLASS_H_EXPLICIT_SUPER(Blend_EdNode, BaseNodeUtil_EdNode<Blend_Node_CFG>, Base_EdNode)
 
 	MAKE_STANDARD_FUNCTIONS(
@@ -359,7 +383,42 @@ MAKE_STANDARD_FUNCTIONS(
 	DIRPLAY_COLOR,
 	"Named slot that animations can be manually played to from game code",
 	);
-MAKE_STANARD_SERIALIZE(DirectPlaySlot_EdNode);
+static const PropertyInfoList* get_props() {
+
+	START_PROPS(DirectPlaySlot_EdNode)
+		REG_STRUCT_CUSTOM_TYPE(node, PROP_SERIALIZE, "SerializeNodeCFGRef"),
+		REG_STDSTRING(slot_name, PROP_DEFAULT)
+	END_PROPS(DirectPlaySlot_EdNode)
+}
+std::string get_title() const override {
+	if (slot_name.empty()) return get_name();
+	return "Slot: " + slot_name;
+}
+bool compile_my_data(const AgSerializeContext* ctx) override {
+
+	if (slot_name.empty())
+		append_fail_msg("[ERROR] slot_name is empty, set slot_name to the string that assets reference to play directly");
+	else {
+		bool found = false;
+		auto tree = ed.editing_tree;
+		for (int i = 0; i < tree->direct_slot_names.size(); i++) {
+			if (tree->direct_slot_names[i] == slot_name) {
+				node->slot_index = i;
+				found = true;
+			}
+		}
+		if (!found) {
+			tree->direct_slot_names.push_back(slot_name);
+			node->slot_index = tree->direct_slot_names.size() - 1;
+
+			sys_print("``` compilied slot name: %s\n", slot_name.c_str());
+		}
+	}
+	return util_compile_default(this, ctx);
+}
+
+std::string slot_name;
+
 };
 
 

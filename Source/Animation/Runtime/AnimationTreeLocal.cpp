@@ -52,6 +52,7 @@ CLASS_IMPL(BaseAGNode);
 // Pose nodes
 CLASS_IMPL(Node_CFG);
 CLASS_IMPL(Clip_Node_CFG);
+CLASS_IMPL(Frame_Evaluate_CFG);
 
 CLASS_IMPL(Mirror_Node_CFG);
 CLASS_IMPL(Statemachine_Node_CFG);
@@ -103,6 +104,34 @@ ENUM_START(sync_opt)
 	STRINGIFY_EUNM(sync_opt::AlwaysLeader, 1),
 	STRINGIFY_EUNM(sync_opt::AlwaysFollower, 2)
 ENUM_IMPL(sync_opt)
+
+bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+{
+	auto rt = get_rt(ctx);
+
+	const AnimationSeq* clip = rt->clip;
+	if (!clip) {
+		util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
+		return true;
+	}
+	float frame = explicit_time->get_value<float>(ctx);
+
+	if (normalized_time)
+		frame = frame * clip->duration;
+
+	if(wrap_around_time)
+		frame = fmod(fmod(frame, clip->duration) + clip->duration, clip->duration);
+	else {
+		if (frame < 0) frame = 0;
+		else if (frame >= clip->duration) frame = clip->duration - 0.000001;
+	}
+	const std::vector<int16_t>* indicies = nullptr;
+	if (rt->remap_index != -1)
+		indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
+	util_calc_rotations(ctx.get_skeleton(), clip, frame, indicies, *pose.pose);
+
+	return true;
+}
 
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
@@ -244,31 +273,20 @@ ENUM_IMPL(sync_opt)
 
  bool Blend_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
-	 if (!param) {
-		 util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
-		 return true;
-	 }
-	 RT_TYPE* rt = get_rt(ctx);
-	 ASSERT(!(rt->lerp_amt != rt->lerp_amt));
-
-	 float value = 0.0;
-	 if (store_value_on_reset) {
-		 value = rt->saved_f;
-	 }
-	 else {
-		 value = param->get_value<float>(ctx);
-		ASSERT(!(rt->lerp_amt != rt->lerp_amt));
-	 }
-
-
-	 bool keep_going = true;
-
+	if (!alpha) {
+		util_set_to_bind_pose(*pose.pose, ctx.get_skeleton());
+		return true;
+	}
+	RT_TYPE* rt = get_rt(ctx);
+	float value = alpha->get_value<float>(ctx);
+	if (value <= 0.00001)
+		return inp0->get_pose(ctx, pose);
+	bool ret = inp0->get_pose(ctx, pose);
 	Pose* addtemp = Pose_Pool::get().alloc(1);
-	keep_going &= inp0->get_pose(ctx, pose);
-	keep_going &= inp1->get_pose(ctx, pose.set_pose(addtemp));
+	inp1->get_pose(ctx, pose.set_pose(addtemp));
 	util_blend(ctx.num_bones(), *addtemp, *pose.pose, value);
 	Pose_Pool::get().free(1);
-	return keep_going;
+	return ret;
 }
 
 
@@ -303,7 +321,7 @@ ENUM_IMPL(sync_opt)
 			 }
 		 }
 
-		 rt->lerp_amt = damp_dt_independent(1.0f, rt->lerp_amt, damp_factor, pose.dt);
+		 //rt->lerp_amt = damp_dt_independent(1.0f, rt->lerp_amt, damp_factor, pose.dt);
 
 		 if (rt->lerp_amt >= 0.99999)
 			 rt->fade_out_i = -1;
@@ -336,7 +354,7 @@ ENUM_IMPL(sync_opt)
 
 		 float amt = param->get_value<float>(ctx);
 
-		 rt->saved_f = damp_dt_independent(amt, rt->saved_f, damp_time, pose.dt);
+		 //rt->saved_f = damp_dt_independent(amt, rt->saved_f, damp_time, pose.dt);
 	 }
 	bool ret = input->get_pose(ctx, pose);
 
@@ -430,14 +448,14 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
  const PropertyInfoList* Animation_Tree_CFG::get_props()
  {
+	 MAKE_VECTORCALLBACK_ATOM(std::string, direct_slot_names);
 	 START_PROPS(Animation_Tree_CFG)
 		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
 		REG_INT(data_used, PROP_SERIALIZE, ""),
-		REG_BOOL(graph_is_valid, PROP_SERIALIZE, "")
+		REG_BOOL(graph_is_valid, PROP_SERIALIZE, ""),
+		REG_STDVECTOR(direct_slot_names, PROP_SERIALIZE)
 	END_PROPS()
  }
-
-
 
 
  bool Animation_Tree_CFG::read_from_dict(DictParser& in)
@@ -518,6 +536,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 write_properties(*Script::get_props(), code.get(), out, ctxptr);
 		 out.write_item_end();
 	 }
+
 	 out.write_item_end();
  }
 
@@ -659,52 +678,36 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 
 
-#include "Game_Engine.h"
-#include "imgui.h"
- static float mask_weight = 0.0;
- void somemenulol()
- {
-	 ImGui::SliderFloat("w", &mask_weight, 0.0, 1.0);
- }
- static AddToDebugMenu men("daf", somemenulol);
-
  bool Blend_Masked_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
 	 auto rt = get_rt(ctx);
 	 if(!rt->mask)
 		 return base->get_pose(ctx, pose);
 
+	 float alpha_val = alpha->get_value<float>(ctx);
 
-	 float b = param->get_value<float>(ctx);
-
-	 if (b <= 0.000001) {
+	 // epsilon
+	 if (alpha_val <= 0.000001) {
 		 return base->get_pose(ctx, pose);
 	 }
 
-#if 1
-	
+	 // handle blending of curves, events, etc.
 	 if (meshspace_rotation_blend) {
 		 Pose* base_layer = Pose_Pool::get().alloc(1);
 		 bool ret = base->get_pose(ctx, pose.set_pose(base_layer));
-		 ret &= layer->get_pose(ctx, pose);
-		 util_global_blend(ctx.get_skeleton(),base_layer, pose.pose, mask_weight, rt->mask->weight);
+		 layer->get_pose(ctx, pose); // ignore return value, fixme?
+		 util_global_blend(ctx.get_skeleton(),base_layer, pose.pose, alpha_val, rt->mask->weight);
 		 Pose_Pool::get().free(1);
 		 return ret;
 	 }
-
-
-	 // nase
-
 	 else {
 		 Pose* layer = Pose_Pool::get().alloc(1);
 		 bool ret = base->get_pose(ctx, pose);
-		 ret &= this->layer->get_pose(ctx, pose.set_pose(layer));
-		 util_blend_with_mask(ctx.num_bones(), *layer, *pose.pose, 1.0, rt->mask->weight);
+		 this->layer->get_pose(ctx, pose.set_pose(layer));
+		 util_blend_with_mask(ctx.num_bones(), *layer, *pose.pose, alpha_val, rt->mask->weight);
 		 Pose_Pool::get().free(1);
 		 return ret;
 	 }
-
-#endif
  }
 
 bool LocalToMeshspace_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
@@ -924,4 +927,56 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 
 	 return res;
 
+ }
+
+ bool DirectPlaySlot_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+ {
+	 if (slot_index == -1)
+		 return input->get_pose(ctx, pose);
+	 auto& slot = ctx.get_slot_for_index(slot_index);
+	 auto rt = get_rt(ctx);
+	 if (!slot.active) {
+		 if (rt->fading_out_pose) {
+			 g_pose_pool.free(rt->fading_out_pose);
+			 rt->fading_out_pose = nullptr;
+		 }
+		 return input->get_pose(ctx, pose);
+	 }
+
+	 // slot is active, a few choices:
+	 // to blend smoothly, capture the last pose
+
+	 if (slot.state == slot.FadingIn) {
+		 if (!rt->fading_out_pose) {
+			 rt->fading_out_pose = (Pose*)g_pose_pool.allocate();
+			 input->get_pose(ctx, pose.set_pose(rt->fading_out_pose));
+		 }
+		 // now have a pose from fading out
+		util_calc_rotations(ctx.get_skeleton(), slot.active, slot.time, nullptr, *pose.pose);
+
+		// blend
+		util_blend(ctx.num_bones(), *rt->fading_out_pose, *pose.pose, 1.0 -evaluate_easing(Easing::CubicEaseInOut, slot.fade_percentage));
+	 }
+	 else if (slot.state == slot.Full) {
+		 if (rt->fading_out_pose) {
+			 g_pose_pool.free(rt->fading_out_pose);
+			 rt->fading_out_pose = nullptr;
+		 }
+		 util_calc_rotations(ctx.get_skeleton(), slot.active, slot.time, nullptr, *pose.pose);
+	 }
+	 else {// fadingOut
+
+		 if (!rt->fading_out_pose) {
+			 rt->fading_out_pose = (Pose*)g_pose_pool.allocate();
+			 util_calc_rotations(ctx.get_skeleton(), slot.active, slot.time, nullptr,*rt->fading_out_pose);
+		 }
+		 // now have a pose from fading out
+
+		input->get_pose(ctx, pose);
+		 // blend
+		 util_blend(ctx.num_bones(), *rt->fading_out_pose, *pose.pose, evaluate_easing(Easing::CubicEaseInOut, slot.fade_percentage));
+	 }
+
+	 // sample rootmotion,curves,events here
+	 return true;
  }

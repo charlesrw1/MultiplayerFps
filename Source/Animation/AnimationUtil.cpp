@@ -205,7 +205,7 @@ void util_global_blend(const MSkeleton* skel, const Pose* a,  Pose* b, float fac
 	for (int j = 0; j < bonecount; j++) {
 		glm::quat base = glm::quat_cast(globalspace_base[j]);
 		glm::quat layer = glm::quat_cast(globalspace_layer[j]);
-		glm::quat global = glm::slerp(base, layer, mask[j]);	// meshspace 
+		glm::quat global = glm::slerp(base, layer, mask[j] * factor);	// meshspace 
 		globalspace_rotations[j] = global;
 		//glm::vec4 t = globalspace_layer[j][3];
 		//globalspace_base[j] = glm::mat4_cast(layer);
@@ -226,123 +226,6 @@ void util_global_blend(const MSkeleton* skel, const Pose* a,  Pose* b, float fac
 		b->pos[j] = a->pos[j];
 #endif
 	}
-
-
-
-
-
-	//util_meshspace_to_localspace(globalspace_base.data(), skel->source, b);
-	return;
-
-
-
-
-	return;
-
-
-	InlineVec<glm::quat, 128> baserotations;
-	InlineVec<glm::quat, 128> layerrotations;
-	InlineVec<glm::quat, 128> output_rots;
-	InlineVec<bool, 128> booleans;
-	baserotations.resize(bonecount);
-	layerrotations.resize(bonecount);
-	output_rots.resize(bonecount);
-	booleans.resize(bonecount, false);
-
-	Pose* out = Pose_Pool::get().alloc(1);
-
-
-	for (int i = 0; i < bonecount; i++) {
-		const int parent = skel->get_bone_parent(i);
-		if (parent == -1) {
-			baserotations[i] = a->q[i];
-
-			layerrotations[i] = b->q[i];
-		}
-		else {
-			baserotations[i] = a->q[i] * baserotations[parent];
-
-			layerrotations[i] = b->q[i] * layerrotations[parent];
-			
-		}
-
-	}
-
-	for (int i = 0; i < bonecount; i++) {
-		const int parent = skel->get_bone_parent(i);
-		const float weight = mask[i];
-
-		out->pos[i] = glm::mix(a->pos[i], b->pos[i], weight);
-		
-		output_rots[i] = glm::slerp(baserotations[i], layerrotations[i], weight);
-
-		//if((weight > 0.5||apply_to_all) && face_foward)
-		//	output_rots[i] = forward_dir;
-
-		booleans[i] = true;
-		if (parent != -1) {
-			ASSERT(booleans[parent]);
-
-			//glm::mat4 transform = glm::mat4_cast(output_rots[parent]);
-			//transform[3] = glm::vec4(b->pos[parent],1.f);
-			//auto inv = glm::inverse(transform);
-			//
-			//glm::mat4 transform2 = glm::mat4_cast(output_rots[i]);
-			//transform2[3] = glm::vec4(b->pos[i], 1.f);
-			//
-			//glm::quat localrot = glm::quat_cast(transform2 * inv);
-
-			glm::quat localrot = quat_delta(output_rots[parent], output_rots[i]);
-			
-			//if ((weight > 0.5 || apply_to_all)&& apply_to_local)
-			//	localrot = forward_dir;
-			
-			out->q[i] = localrot;
-		}
-		else {
-			out->q[i] = output_rots[i];
-		}
-
-	}
-
-
-#if 0
-	glm::mat4* bone_to_world = new glm::mat4[256];
-
-	for (int i = 0; i < bonecount; i++) {
-		const int parent = bone_vec[i].parent;
-		const float weight = mask[i];
-
-
-		b->pos[i] = glm::mix(a->pos[i], b->pos[i], weight);
-		output_rots[i] = glm::slerp(baserotations[i], layerrotations[i], weight);
-
-		bone_to_world[i] =  glm::mat4_cast(output_rots[i]);
-		bone_to_world[i][3] = glm::vec4(b->pos[i], 1.0);
-
-		if (parent != -1) {
-
-			auto inv = glm::inverse(bone_to_world[parent]);
-
-			auto local = bone_to_world[i]*inv;
-
-			b->q[i] = glm::quat_cast(local);
-		}
-		else {
-			b->q[i] = glm::quat_cast(bone_to_world[i]);
-		}
-
-	}
-	delete[] bone_to_world;
-#endif
-
-
-	* b = *out;
-
-	Pose_Pool::get().free(1);
-
-	// now do a blend between base and global blened result
-	//util_blend(bonecount, *a, *b, 1.0 -factor);
 }
 
 // base = lerp(base,base+additive,f)

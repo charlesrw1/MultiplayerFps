@@ -136,6 +136,12 @@ bool AnimatorInstance::initialize_animator(
 		return false;
 	}
 
+	// initialize slots
+	slots.clear();
+	slots.resize(graph->get_slot_names().size());
+	for (int i = 0; i < slots.size(); i++)
+		slots[i].name = graph->get_slot_names()[i].c_str();	// set hashed name for gamecode to find
+
 	// Initialize script instance, sets pointer of AnimatorInstance for native variables
 	bool good = script_inst.init_from(graph->get_script(), this);
 	
@@ -634,6 +640,35 @@ void AnimatorInstance::tick_tree_new(float dt)
 		data.update_has_sync_marker = false;
 	}
 
+	// update animation slots
+	for (int i = 0; i < slots.size(); i++) {
+		if (!slots[i].active)
+			continue;
+		auto seq = slots[i].active;
+		auto& slot = slots[i];
+		if (slot.state == DirectAnimationSlot::FadingIn) {
+			slot.fade_percentage += dt / slot.fade_duration;
+			if (slot.fade_percentage > 1.0)
+				slot.state = DirectAnimationSlot::Full;
+			slot.time += dt;	// also update time
+			if (slot.time > seq->get_duration())	// just exit out
+				slot.active = nullptr;
+		}
+		else if (slot.state == DirectAnimationSlot::Full) {
+			slot.time += dt;
+			if (slot.time > seq->get_duration()) {
+				slot.time = seq->get_duration() - 0.0001;
+				slot.fade_percentage = 1.0;
+				slot.state = DirectAnimationSlot::FadingOut;
+			}
+		}
+		else if (slot.state == DirectAnimationSlot::FadingOut) {
+			slot.fade_percentage -= dt / slot.fade_duration;
+			if (slot.fade_percentage < 0)
+				slot.active = nullptr;
+		}
+	}
+
 
 	util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
 	
@@ -675,4 +710,32 @@ SyncGroupData& AnimatorInstance::find_or_create_sync_group(StringName name)
 	
 	active_sync_groups.push_back(sync);
 	return active_sync_groups.back();
+}
+
+bool AnimatorInstance::play_animation_in_slot(
+	std::string animation,
+	StringName slot,
+	float play_speed,
+	float start_pos
+)
+{
+	if (!model || !cfg)
+		return false;
+
+	auto slot_to_play_in = find_slot_with_name(slot);
+	if (!slot_to_play_in) {
+		sys_print("??? no slot with name\n");
+		return false;
+	}
+	int remap_idx = -1;
+	auto seq = model->get_skel()->find_clip(animation, remap_idx);
+	assert(remap_idx == -1);	// FIXME
+
+	slot_to_play_in->state = DirectAnimationSlot::FadingIn;
+	slot_to_play_in->fade_percentage = 0.0;
+	slot_to_play_in->active = seq;
+	slot_to_play_in->time = 0.0;
+	slot_to_play_in->playspeed = play_speed;
+
+	return true;
 }
