@@ -1,25 +1,32 @@
 #pragma once
 
 #include "Framework/InlineVec.h"
+#include "ReflectionProp.h"
+#include "EnumDefReflection.h"
 
+// A generic time based curve 
 
-enum class CurveInterpType : uint8_t
+// interpolation applies to entire graph
+enum class CrvIntrp : uint8_t	// curve interp
 {
 	Cubic,
 	Linear,
 	Constant,
 };
+ENUM_HEADER(CrvIntrp);
 
 class CurvePoint
 {
 public:
+
 	float value = 0.0;
-	uint16_t time = 0.0;
+	float time = 0.0;
 };
 
 class Curve
 {
 public:
-	CurveInterpType curve_interp = CurveInterpType::Linear;
-	InlineVec<CurvePoint, 2> points;
+	CrvIntrp curve_interp = CrvIntrp::Linear;
+	std::vector<CurvePoint> points;
+	float length = 0.0;
 };

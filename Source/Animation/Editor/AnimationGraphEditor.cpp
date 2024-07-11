@@ -155,7 +155,7 @@ public:
 	}
 	virtual std::string get_name() { return "name"; }
 };
-
+static CurveEditorImgui cei;
 void AnimationGraphEditor::init()
 {
 	imgui_node_context = ImNodes::CreateContext();
@@ -742,9 +742,9 @@ void draw_curve_test()
 
 void AnimationGraphEditor::imgui_draw()
 {
-	CurveEditorImgui cei;
 	//cei.draw();
 	seqimgui.draw();
+	cei.draw();
 
 	node_props.set_read_only(graph_is_read_only());
 

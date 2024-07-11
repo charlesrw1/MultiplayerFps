@@ -4,22 +4,17 @@
 #include "imgui_internal.h"
 #include "CurveEditorImgui.h"
 #include "MyImguiLib.h"
-void CurveEditorImgui::draw()
-{
-	static std::vector<ImVec2> points;
-	static bool init = false;
-	static int selection = 0;
-	if (!init) {
-		points.resize(10);
-		init = true;
-	}
-	if(ImGui::Begin("win"))
-		ImGui::Curve("mycurve", ImVec2(200, 200), 10, points.data(), &selection);
-	ImGui::End();
-}
-
+#include <algorithm>
 void CurveEditorImgui::update(float dt)
 {
+}
+
+inline ImVec2 CurveEditorImgui::grid_to_screenspace(ImVec2 grid) const {
+    return (grid - grid_offset) / base_scale*scale + BASE_SCREENPOS;
+}
+
+inline ImVec2 CurveEditorImgui::screenspace_to_grid(ImVec2 screen) const {
+    return (screen - BASE_SCREENPOS) * base_scale * (ImVec2(1.0/scale.x,1.0/scale.y)) + grid_offset;
 }
 
 
@@ -359,36 +354,6 @@ void SequencerImgui::draw_items(const float timeline_width)
             , ImRect(ImVec2(slotP2.x - handle_width, slotP1.y), slotP2)
             , ImRect(slotP1, slotP2) };
 
-       // const unsigned int quadColor[] = { 0xFFFFFFFF, 0xFFFFFFFF, slotColor + (selected ? 0 : 0x202020) };
-#if 0
-        if (movingEntry == -1 && (sequenceOptions & SEQUENCER_EDIT_STARTEND))// TODOFOCUS && backgroundRect.Contains(io.MousePos))
-        {
-            for (int j = 2; j >= 0; j--)
-            {
-                ImRect& rc = rects[j];
-                if (!rc.Contains(io.MousePos))
-                    continue;
-                draw_list->AddRectFilled(rc.Min, rc.Max, quadColor[j], 2);
-            }
-
-            for (int j = 0; j < 3; j++)
-            {
-                ImRect& rc = rects[j];
-                if (!rc.Contains(io.MousePos))
-                    continue;
-                if (!ImRect(childFramePos, childFramePos + childFrameSize).Contains(io.MousePos))
-                    continue;
-                if (ImGui::IsMouseClicked(0) && !MovingScrollBar && !MovingCurrentFrame)
-                {
-                    movingEntry = i;
-                    movingPos = cx;
-                    movingPart = j + 1;
-                    sequence->BeginEdit(movingEntry);
-                    break;
-                }
-            }
-        }
-#endif
         if (slotP1.x <= (canvas_pos.x + timeline_width) && slotP2.x >= (canvas_pos.x))
         {
             draw_list->AddText(ImVec2(slotP1.x+6.0, slotP1.y), 0xffffffff, item->get_name().c_str());
@@ -459,4 +424,228 @@ void SequencerImgui::draw()
     ImGui::EndGroup();
 
     ImGui::End();
+}
+void DrawGrid(ImDrawList* draw_list, const ImVec2& canvas_pos, const ImVec2& canvas_size, float zoom) {
+   
+    ImU32 col_grid = IM_COL32(255, 50, 50, 40);
+    ImU32 col_subdiv = IM_COL32(200, 200, 200, 20);
+
+    zoom = std::max(zoom, 0.001f);
+
+    float base_grid_size = 400;
+    float grid_size = base_grid_size * zoom;
+
+    // Calculate the number of subdivisions based on zoom level
+    const int subdivision = 5;
+    const float subdiv_size = (2);
+    const float inv_subdiv_size = 1.0 / subdiv_size;
+
+
+    // want to find right grid size
+
+    // optimal size: 
+    if (grid_size < base_grid_size) {
+        // too small
+        while (grid_size < base_grid_size* inv_subdiv_size)
+            grid_size *= subdiv_size;
+    }
+    else {
+        while (grid_size > base_grid_size)
+            grid_size /= subdiv_size;
+    }
+    float subgrid_size = grid_size / subdivision;
+
+
+    for (float x = canvas_pos.x; x < canvas_pos.x + canvas_size.x; x += grid_size) {
+        draw_list->AddLine(ImVec2(x, canvas_pos.y), ImVec2(x, canvas_pos.y + canvas_size.y), col_grid);
+        for (int i = 1; i < subdivision; i++) {
+            draw_list->AddLine(ImVec2(x + i * subgrid_size, canvas_pos.y), ImVec2(x + i * subgrid_size, canvas_pos.y + canvas_size.y), col_subdiv);
+        }
+    }
+
+    for (float y = canvas_pos.y; y < canvas_pos.y + canvas_size.y; y += grid_size) {
+        draw_list->AddLine(ImVec2(canvas_pos.x, y), ImVec2(canvas_pos.x + canvas_size.x, y), col_grid);
+        for (int i = 1; i < subdivision; i++) {
+            draw_list->AddLine(ImVec2(canvas_pos.x, y + i * subgrid_size), ImVec2(canvas_pos.x + canvas_size.x, y + i * subgrid_size), col_subdiv);
+        }
+    }
+}
+
+void CurveEditorImgui::draw()
+{
+
+   // static float offset_x = 0.0;
+   static float zoom = 1.0;
+    if (ImGui::Begin("var edit")) {
+        //ImGui::DragFloat("ofx", &offset_x, 0.1);
+        ImGui::DragFloat("zoom", &zoom, 0.01,0.0001);
+
+    }
+    if (zoom <= 0.000001) zoom = 0.000001;
+    ImGui::End();
+  //  grid_offset.x = offset_x;
+   // scale.x = zoom;
+
+    if (!ImGui::Begin("curve edit")) {
+        ImGui::End();
+        return;
+    }
+
+   BASE_SCREENPOS = ImGui::GetCursorScreenPos();
+   WINDOW_SIZE = ImGui::GetWindowSize();
+
+   //ImGui::InvisibleButton("dummy234_", ImVec2(WINDOW_SIZE.x, WINDOW_SIZE.y));
+
+   const float TIMELINE_BAR_HEIGHT = 100.0;
+   const Color32 background = { 36, 36, 36 };
+   const Color32 edges = { 0, 0, 0, 128 };
+
+   // draw background
+   auto drawlist = ImGui::GetWindowDrawList();
+   drawlist->AddRectFilled(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE, background.to_uint());
+
+   ImVec2 BASE_GRIDSPACE = screenspace_to_grid(BASE_SCREENPOS);
+   ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+   ImVec2 canvas_size = ImGui::GetContentRegionAvail();
+   //
+   
+   const float GRID_SPACING = 64.0;
+   float grid_size = GRID_SPACING * scale.x;
+   int subdivisions = 2;
+   const float base_grid_size = GRID_SPACING;
+   const float subdiv_size = (2);
+    const float inv_subdiv_size = 1.0 / subdiv_size;
+   if (grid_size < base_grid_size) {
+       // too small
+       while (grid_size < base_grid_size * inv_subdiv_size)
+           grid_size *= subdiv_size;
+   }
+   else {
+       while (grid_size > base_grid_size)
+           grid_size /= subdiv_size;
+   }
+   float subgrid_size = grid_size / subdivisions;
+   float dx_subgrid = screenspace_to_grid(ImVec2(subgrid_size, 0)).x - screenspace_to_grid(ImVec2(0, 0)).x;;
+   if (dx_subgrid < 1.0) {
+       grid_size = scale.x / base_scale.x * subdivisions;
+       subgrid_size = grid_size / subdivisions;
+   }
+
+   float dx_grid = screenspace_to_grid(ImVec2(grid_size, 0)).x - screenspace_to_grid(ImVec2(0, 0)).x;;
+
+
+
+
+
+   ImU32 col_grid = IM_COL32(255, 50, 50, 40);
+   ImU32 col_subdiv = IM_COL32(200, 200, 200, 20); 
+   float valx = canvas_pos.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size);
+   auto grid = screenspace_to_grid(ImVec2(valx, 0));
+   int i = 0;
+   for (float x = canvas_pos.x - fmod(grid_offset.x/base_scale.x*scale.x,grid_size); x < canvas_pos.x + canvas_size.x; x += grid_size) {
+       drawlist->AddLine(ImVec2(x, canvas_pos.y), ImVec2(x, canvas_pos.y + canvas_size.y), col_grid);
+       drawlist->AddText(ImVec2(x, canvas_pos.y), IM_COL32(0, 255, 0, 255), string_format("%.1f", grid.x+ dx_grid*i));
+       for (int i = 1; i < subdivisions; i++) {
+           drawlist->AddLine(ImVec2(x + i * subgrid_size, canvas_pos.y), ImVec2(x + i * subgrid_size, canvas_pos.y + canvas_size.y), col_subdiv);
+       }
+       i++;
+   }
+
+   // draw points
+
+   ImU32 curvecol = curve.color.to_uint();
+   auto& points = curve.thecurve.points;
+   for (int i = 1; i < curve.thecurve.points.size(); i++) {
+       auto ss_start = grid_to_screenspace(ImVec2(points[i-1].time, points[i-1].value));
+       auto ss_end = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
+
+       drawlist->AddLine(ss_start, ss_end, curvecol);
+   }
+   if (!points.empty()) {
+       auto pointfront = points.front();
+       auto ss_start = grid_to_screenspace(ImVec2(pointfront.time, pointfront.value));
+       auto ss_end = ImVec2(BASE_SCREENPOS.x, ss_start.y);
+       drawlist->AddLine(ss_start, ss_end, curvecol);
+       auto pointback = points.back();
+       ss_start = grid_to_screenspace(ImVec2(pointback.time, pointback.value));
+       ss_end = ImVec2(BASE_SCREENPOS.x+WINDOW_SIZE.x, ss_start.y);
+       drawlist->AddLine(ss_start, ss_end, curvecol);
+   }
+   for (int i = 0; i < points.size(); i++) {
+
+       auto ss_point = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
+       ImVec2 min = ss_point - ImVec2(4, 4);
+       ImVec2 max = ss_point + ImVec2(4, 4);
+
+       draw_rectangle_rotated(min, max, curvecol);
+
+   }
+
+   static ImVec2 clickpos;
+   if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
+       ImGui::OpenPopup("curve_edit_popup");
+       clickpos = screenspace_to_grid(ImGui::GetMousePos());
+   }
+   if (ImGui::BeginPopup("curve_edit_popup")) {
+       if (ImGui::Button("add point")) {
+           curve.thecurve.points.push_back({ clickpos.y,clickpos.x });
+           auto& points = curve.thecurve.points;
+
+           std::sort(points.begin(), points.end(), [](const auto& p, const auto& p2)->bool { return p.time < p2.time; });
+       }
+       ImGui::EndPopup();
+   }
+
+
+
+
+   auto origin_ss = grid_to_screenspace(ImVec2(0, 0));
+   if (origin_ss.x - BASE_SCREENPOS.x >= 0) {
+       drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(origin_ss.x,BASE_SCREENPOS.y + WINDOW_SIZE.y), edges.to_uint());
+   }
+
+   auto end_ss = grid_to_screenspace(ImVec2(MAX_TIME, 0));
+   if (end_ss.x - BASE_SCREENPOS.x <= WINDOW_SIZE.x) {
+       drawlist->AddRectFilled(ImVec2(end_ss.x,BASE_SCREENPOS.y), BASE_SCREENPOS+WINDOW_SIZE, edges.to_uint());
+   }
+
+   // middle mouse down
+   static bool started_pan = false;
+   static ImVec2 pan_start = {};
+   if (ImGui::GetIO().MouseDown[2] && ImGui::IsWindowFocused()) {
+       if (!started_pan)
+           pan_start = screenspace_to_grid(ImGui::GetMousePos());
+       started_pan = true;
+       auto mousepose = ImGui::GetMousePos();
+       auto in_gs = screenspace_to_grid(mousepose);
+       // set offset such that pan_start == in_gs
+
+       auto grid_wo_offset = screenspace_to_grid(mousepose) - grid_offset;
+
+       grid_offset = pan_start - grid_wo_offset;
+   }
+   else
+       started_pan = false;
+
+   if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001 && ImGui::IsWindowFocused()) {
+       auto mousepos = ImGui::GetMousePos();
+       auto start = screenspace_to_grid(mousepos);
+
+       float wh = ImGui::GetIO().MouseWheel;
+       if (wh > 0) {
+           scale.x += scale.x * 0.25;
+       }
+       else {
+           scale.x -= scale.x * 0.25;
+           if (scale.x < 0.01) scale.x = 0.01;
+       }
+       // set grid offsets to maintain positon
+       auto in_gs = screenspace_to_grid(mousepos);
+       auto grid_wo_offset = screenspace_to_grid(mousepos) - grid_offset;
+       grid_offset = start - grid_wo_offset;
+   }
+  // printf("%f\n",grid_offset)
+
+   ImGui::End();
+
 }

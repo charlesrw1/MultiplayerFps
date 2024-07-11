@@ -14,7 +14,7 @@ struct EditingCurve
 	Color32 color = COLOR_CYAN;
 	void* user = nullptr;
 };
-
+#include <glm/glm.hpp>
 class CurveEditorImgui
 {
 public:
@@ -24,6 +24,21 @@ private:
 	float max_time = 1.0;
 	float time = 0.0;
 	std::vector<EditingCurve> curves;
+
+	EditingCurve  curve;
+
+	float MAX_TIME = 35.0;
+
+	// grid space
+	ImVec2 scale = ImVec2(1, 1);
+	const ImVec2 base_scale =ImVec2(1.0/32,1.0/30);
+	ImVec2 grid_offset=ImVec2(0,0);
+
+	ImVec2 BASE_SCREENPOS;
+	ImVec2 WINDOW_SIZE;
+
+	ImVec2 grid_to_screenspace(ImVec2 grid) const;
+	ImVec2 screenspace_to_grid(ImVec2 screen) const;
 };
 
 class SequencerImgui;
@@ -40,6 +55,7 @@ private:
 
 	friend class SequencerImgui;
 };
+
 
 class SequencerImgui
 {
