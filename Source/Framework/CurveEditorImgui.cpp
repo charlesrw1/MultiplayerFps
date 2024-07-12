@@ -471,180 +471,536 @@ void DrawGrid(ImDrawList* draw_list, const ImVec2& canvas_pos, const ImVec2& can
     }
 }
 
-void CurveEditorImgui::draw()
-{
+// catlum rom spline evalutation https://iquilezles.org/articles/minispline/
 
-   // static float offset_x = 0.0;
-   static float zoom = 1.0;
-    if (ImGui::Begin("var edit")) {
-        //ImGui::DragFloat("ofx", &offset_x, 0.1);
-        ImGui::DragFloat("zoom", &zoom, 0.01,0.0001);
+static signed char coefs[16] = {
+    -1, 2,-1, 0,
+     3,-5, 0, 2,
+    -3, 4, 1, 0,
+     1,-1, 0, 0 };
+
+void spline(const float* key, int num, int dim, float t, float* v)
+{
+    const int size = dim + 1;
+
+    // find key
+    int k = 0; while (key[k * size] < t) k++;
+
+    // interpolant
+    const float h = (t - key[(k - 1) * size]) / (key[k * size] - key[(k - 1) * size]);
+
+    // init result
+    for (int i = 0; i < dim; i++) v[i] = 0.0f;
+
+    // add basis functions
+    for (int i = 0; i < 4; i++)
+    {
+        int kn = k + i - 2; if (kn < 0) kn = 0; else if (kn > (num - 1)) kn = num - 1;
+        const signed char* co = coefs + 4 * i;
+        const float b = 0.5f * (((co[0] * h + co[1]) * h + co[2]) * h + co[3]);
+        for (int j = 0; j < dim; j++) v[j] += b * key[kn * size + j + 1];
+    }
+}
+
+glm::vec2 bezier_evaluate(float t, const glm::vec2 p0, const glm::vec2& p1, const glm::vec2& p2, const glm::vec2& p3)
+{
+    auto a = (1 - t) * (1 - t) * (1 - t) * p0;
+    auto b = 3 * t * (1 - t) * (1 - t) * p1;
+    auto c = 3 * t * t * (1 - t) * p2;
+    auto d = t * t * t * p3;
+    return a + b + c + d;
+}
+
+ENUM_START(CurvePointType)
+    STRINGIFY_EUNM(CurvePointType::Linear,0),
+    STRINGIFY_EUNM(CurvePointType::Constant, 1),
+    STRINGIFY_EUNM(CurvePointType::Auto, 2),
+    STRINGIFY_EUNM(CurvePointType::SplitTangents, 3),
+    STRINGIFY_EUNM(CurvePointType::Aligned, 4)
+ENUM_IMPL(CurvePointType)
+
+void CurveEditorImgui::draw_editor_space()
+{
+    auto drawlist = ImGui::GetWindowDrawList();
+    const Color32 background = { 36, 36, 36 };
+    const Color32 edges = { 0, 0, 0, 128 };
+
+    // draw background
+
+    drawlist->AddRectFilled(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE, background.to_uint());
+
+    ImVec2 BASE_GRIDSPACE = screenspace_to_grid(BASE_SCREENPOS);
+    ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+    ImVec2 canvas_size = ImGui::GetContentRegionAvail();
+
+
+    // to prevent moving window
+    ImGui::InvisibleButton("dummy234_", ImVec2(WINDOW_SIZE.x,
+        std::max(WINDOW_SIZE.y - 36.0, 0.01) /* hacked value, not sure how to get the exact value, some padding variable likely*/));
+
+    {
+        auto min_ss = grid_to_screenspace(ImVec2(0, MIN_VALUE));
+        if (min_ss.y - BASE_SCREENPOS.y >= 0) {
+            drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, min_ss.y), edges.to_uint());
+        }
+        auto max_ss = grid_to_screenspace(ImVec2(0, MAX_VALUE));
+        if (max_ss.y - BASE_SCREENPOS.y <= WINDOW_SIZE.y) {
+            drawlist->AddRectFilled(ImVec2(BASE_SCREENPOS.x, max_ss.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
+        }
+    }
+
+    const ImVec2 GRID_SPACING = ImVec2(64.0, 30.0);
+    ImVec2 grid_size = GRID_SPACING * scale;
+
+    const ImVec2 subdivisions(2, 2);
+    const ImVec2 base_grid_size = GRID_SPACING;
+    const ImVec2 subdiv_size = ImVec2(2, 2);
+    const ImVec2 inv_subdiv_size = ImVec2(1.0 / subdiv_size.x, 1.0 / subdiv_size.y);
+    if (grid_size.x < base_grid_size.x) {
+        // too small
+        while (grid_size.x < base_grid_size.x * inv_subdiv_size.x)
+            grid_size.x *= subdiv_size.x;
+    }
+    else {
+        while (grid_size.x > base_grid_size.x)
+            grid_size.x /= subdiv_size.x;
+    }
+    if (grid_size.y < base_grid_size.y) {
+        // too small
+        while (grid_size.y < base_grid_size.y * inv_subdiv_size.y)
+            grid_size.y *= subdiv_size.y;
+    }
+    else {
+        while (grid_size.y > base_grid_size.y)
+            grid_size.y /= subdiv_size.y;
+    }
+
+
+    ImVec2 subgrid_size = grid_size * ImVec2(1.0 / subdivisions.x, 1.0 / subdivisions.y);
+    ImVec2 dxdy_subgrid = screenspace_to_grid(subgrid_size) - screenspace_to_grid(ImVec2(0, 0));
+    if (dxdy_subgrid.x < 1.0) {
+        grid_size.x = scale.x / base_scale.x * subdivisions.x;
+        subgrid_size.x = grid_size.x / subdivisions.x;
+    }
+
+    ImVec2 dxdy_grid = screenspace_to_grid(grid_size) - screenspace_to_grid(ImVec2(0, 0));
+
+
+
+
+
+    ImU32 col_grid = IM_COL32(255, 50, 50, 40);
+    ImU32 col_subdiv = IM_COL32(200, 200, 200, 20);
+    float valx = canvas_pos.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size.x);
+    float valy = canvas_pos.y - fmod(grid_offset.y / base_scale.y * scale.y, grid_size.y);
+
+    const ImVec2 grid = screenspace_to_grid(ImVec2(valx, valy));
+    int i = 0;
+    for (float x = canvas_pos.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size.x); x < canvas_pos.x + canvas_size.x; x += grid_size.x) {
+        drawlist->AddLine(ImVec2(x, canvas_pos.y), ImVec2(x, canvas_pos.y + canvas_size.y), col_grid);
+        drawlist->AddText(ImVec2(x, canvas_pos.y), IM_COL32(150, 150, 150, 255), string_format("%.1f", grid.x + dxdy_grid.x * i));
+        for (int i = 1; i < subdivisions.x; i++) {
+            drawlist->AddLine(ImVec2(x + i * subgrid_size.x, canvas_pos.y), ImVec2(x + i * subgrid_size.x, canvas_pos.y + canvas_size.y), col_subdiv);
+        }
+        i++;
+    }
+
+
+
+
+    // draw/update points
+
+    ImU32 curvecol = curve.color.to_uint();
+    auto& points = curve.thecurve.points;
+
+    // draw the points
+    for (int i = 0; i < (int)curve.thecurve.points.size() - 1; i++) {
+        auto& point = points[i];
+        if (point.type == CurvePointType::Constant) {
+            auto ss_start = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
+            auto ss_end = grid_to_screenspace(ImVec2(points[i + 1].time, points[i].value));
+            drawlist->AddLine(ss_start, ss_end, curvecol);
+        }
+        else if (point.type == CurvePointType::Linear) {
+            auto ss_start = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
+            auto ss_end = grid_to_screenspace(ImVec2(points[i + 1].time, points[i + 1].value));
+            drawlist->AddLine(ss_start, ss_end, curvecol);
+        }
+        else if (point.type == CurvePointType::Auto) {
+
+            float data[12] = {
+               -1.0,points[i - 1].time, points[i - 1].value,
+               0.0,points[i].time,points[i].value,
+               1.0,points[i + 1].time,points[i + 1].value,
+               2.0,points[i + 2].time,points[i + 2].value
+            };
+            const int subdivisions = 20;
+            glm::vec2 points[subdivisions];
+
+            for (int j = 0; j < subdivisions; j++) {
+                float t = j / (float(subdivisions) - 1.0);
+                spline(data, 12, 2, t, (float*)&points[j]);
+            }
+
+            for (int j = 0; j < subdivisions - 1; j++) {
+                drawlist->AddLine(
+                    grid_to_screenspace(ImVec2(points[j].x, points[j].y)),
+                    grid_to_screenspace(ImVec2(points[j + 1].x, points[j + 1].y)),
+                    IM_COL32(255, 0, 128, 255));
+            }
+        }
+        else if (point.type == CurvePointType::SplitTangents || point.type == CurvePointType::Aligned) {
+            const int subdivisions = 20;
+            glm::vec2 pointsout[subdivisions];
+            glm::vec2 p0 = { point.time,point.value };
+            glm::vec2 p1 = p0 + point.tangent1;
+            glm::vec2 p3 = { points[i + 1].time,points[i + 1].value };
+            glm::vec2 p2 = p3 + points[i + 1].tangent0;
+            for (int j = 0; j < subdivisions; j++) {
+                float t = j / (float(subdivisions) - 1.0);
+                pointsout[j] = bezier_evaluate(t, p0, p1, p2, p3);
+            }
+            for (int j = 0; j < subdivisions - 1; j++) {
+                drawlist->AddLine(
+                    grid_to_screenspace(ImVec2(pointsout[j].x, pointsout[j].y)),
+                    grid_to_screenspace(ImVec2(pointsout[j + 1].x, pointsout[j + 1].y)),
+                    curvecol);
+            }
+        }
+    }
+
+    if (!points.empty()) {
+        auto pointfront = points.front();
+        auto ss_start = grid_to_screenspace(ImVec2(pointfront.time, pointfront.value));
+        auto ss_end = ImVec2(BASE_SCREENPOS.x, ss_start.y);
+        drawlist->AddLine(ss_start, ss_end, curvecol);
+        auto& pointback = points.back();
+        ss_start = grid_to_screenspace(ImVec2(pointback.time, pointback.value));
+        ss_end = ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, ss_start.y);
+        drawlist->AddLine(ss_start, ss_end, curvecol);
+    }
+
+
+    static bool dragging_point = false;
+    static int dragged_point_index = -1;
+    static int dragged_point_type = 0;   // 0 = point, 1=tangent0,2=tangent1
+    if (dragging_point && !ImGui::GetIO().MouseDown[0]) {
+        dragged_point_index = -1;
+        dragged_point_type = 0;
+        dragging_point = false;
+    }
+
+    static int point_index_for_popup = -1;
+    const float POINT_RADIUS_SS = 4;
+    const float POINT_SELECTION_RADIUS = 10;
+    for (int i = 0; i < points.size(); i++) {
+
+        auto& point = points[i];
+
+        auto ss_point = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
+        ImVec2 min = ss_point - ImVec2(POINT_RADIUS_SS, POINT_RADIUS_SS);
+        ImVec2 max = ss_point + ImVec2(POINT_RADIUS_SS, POINT_RADIUS_SS);
+        ImVec2 min_sel = ss_point - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
+        ImVec2 max_sel = ss_point + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
+
+        bool draw_tooltip = false;
+        if (i == dragged_point_index)
+            draw_tooltip = true;
+        if (ImRect(min_sel, max_sel).Contains(ImGui::GetMousePos())) {
+            if (dragged_point_index == -1)
+                draw_tooltip = true;
+
+            if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
+                dragged_point_index = i;
+                dragged_point_type = 0;  // point type
+                dragging_point = true;
+            }
+
+            if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
+                ImGui::OpenPopup("point_popup");
+                point_index_for_popup = i;
+            }
+        }
+        const bool draw_tangents = point.type == CurvePointType::SplitTangents || point.type == CurvePointType::Aligned;
+        if (draw_tangents) {
+            auto tan_point_ss = grid_to_screenspace(ImVec2(points[i].time + points[i].tangent0.x, points[i].value + points[i].tangent0.y));
+            ImVec2 min_sel_tan = tan_point_ss - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
+            ImVec2 max_sel_tan = tan_point_ss + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
+
+            if (ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
+
+                if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
+                    dragged_point_index = i;
+                    dragged_point_type = 1;  // tangent0 type
+                    dragging_point = true;
+                }
+            }
+
+            tan_point_ss = grid_to_screenspace(ImVec2(points[i].time + points[i].tangent1.x, points[i].value + points[i].tangent1.y));
+            min_sel_tan = tan_point_ss - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
+            max_sel_tan = tan_point_ss + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
+
+            if (ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
+
+                if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
+                    dragged_point_index = i;
+                    dragged_point_type = 2;  // tangent1 type
+                    dragging_point = true;
+                }
+            }
+        }
+
+        if (draw_tooltip) {
+            if (ImGui::BeginTooltip()) {
+
+                ImGui::Text("%f %f", points[i].time, points[i].value);
+                ImGui::EndTooltip();
+            }
+        }
+
+
+        if (draw_tangents) {
+            auto tan_point_ss = grid_to_screenspace(ImVec2(points[i].time + points[i].tangent0.x, points[i].value + points[i].tangent0.y));
+            drawlist->AddLine(ss_point, tan_point_ss, IM_COL32(200, 200, 200, 180));
+            drawlist->AddCircleFilled(tan_point_ss, POINT_RADIUS_SS, IM_COL32(222, 222, 222, 255));
+            tan_point_ss = grid_to_screenspace(ImVec2(points[i].time + points[i].tangent1.x, points[i].value + points[i].tangent1.y));
+            drawlist->AddLine(ss_point, tan_point_ss, IM_COL32(200, 200, 200, 180));
+            drawlist->AddCircleFilled(tan_point_ss, POINT_RADIUS_SS, IM_COL32(222, 222, 222, 255));
+        }
+
+        draw_rectangle_rotated(min, max, curvecol);
 
     }
-    if (zoom <= 0.000001) zoom = 0.000001;
-    ImGui::End();
-  //  grid_offset.x = offset_x;
-   // scale.x = zoom;
+
+    if (ImGui::BeginPopup("point_popup")) {
+        if (point_index_for_popup < 0 || point_index_for_popup >= points.size()) {
+            sys_print("??? point_index_for_popup invalid\n");
+            point_index_for_popup = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        else {
+            std::string current_type = EnumTrait<CurvePointType>::StaticType.get_enum_str((int)points[point_index_for_popup].type);
+            current_type = current_type.substr(current_type.rfind("::") + 2);
+
+            bool close_the_popup = false;
+            if (ImGui::BeginCombo("##type", current_type.c_str())) {
+                for (int i = 0; i < EnumTrait<CurvePointType>::StaticType.str_count; i++) {
+                    std::string str = EnumTrait<CurvePointType>::StaticType.get_enum_str(i);
+                    str = str.substr(str.rfind("::") + 2);
+                    bool selected = i == (int)points[point_index_for_popup].type;
+                    if (ImGui::Selectable(str.c_str(), &selected)) {
+                        points[point_index_for_popup].type = CurvePointType(i);
+                        close_the_popup = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::Button("Delete point")) {
+                points.erase(points.begin() + point_index_for_popup);
+                close_the_popup = true;
+            }
+
+            if (close_the_popup) {
+                point_index_for_popup = -1;
+                ImGui::CloseCurrentPopup();
+            }
+
+        }
+        ImGui::EndPopup();
+    }
+
+    if (dragging_point) {
+        auto mousepos = ImGui::GetMousePos();
+        auto gridspace = screenspace_to_grid(mousepos);
+
+        if (dragged_point_index < 0 || dragged_point_index >= points.size()) {
+            sys_print("??? dragged_point_index invalid\n");
+            dragged_point_index = -1;
+            dragging_point = false;
+        }
+        else {
+            clamp_point_to_grid(gridspace);
+            auto& point = points[dragged_point_index];
+            if (dragged_point_type == 0) {
+                points[dragged_point_index].time = gridspace.x;
+                points[dragged_point_index].value = gridspace.y;
+            }
+            else if (dragged_point_type == 1) {
+                point.tangent0.x = gridspace.x - point.time; // because tangents are relative to point position
+                point.tangent0.y = gridspace.y - point.value;
+            }
+            else if (dragged_point_type == 2) {
+                point.tangent1.x = gridspace.x - point.time;
+                point.tangent1.y = gridspace.y - point.value;
+            }
+            if (point.type == CurvePointType::Aligned) {
+                if (dragged_point_type == 1) {
+                    point.tangent1 = -point.tangent0;
+                }
+                else if (dragged_point_type == 2) {
+                    point.tangent0 = -point.tangent1;
+                }
+            }
+        }
+    }
+
+
+    static ImVec2 clickpos;
+    if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
+        ImGui::OpenPopup("curve_edit_popup");
+        clickpos = screenspace_to_grid(ImGui::GetMousePos());
+    }
+    if (ImGui::BeginPopup("curve_edit_popup")) {
+        if (ImGui::Button("Add point")) {
+
+            clamp_point_to_grid(clickpos);
+
+            curve.thecurve.points.push_back({ clickpos.y,clickpos.x });
+            auto& points = curve.thecurve.points;
+
+            std::sort(points.begin(), points.end(), [](const auto& p, const auto& p2)->bool { return p.time < p2.time; });
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+
+    {
+
+        auto origin_ss = grid_to_screenspace(ImVec2(0, 0));
+        if (origin_ss.x - BASE_SCREENPOS.x >= 0) {
+            drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(origin_ss.x, BASE_SCREENPOS.y + WINDOW_SIZE.y), edges.to_uint());
+        }
+
+        auto end_ss = grid_to_screenspace(ImVec2(MAX_TIME, 0));
+        if (end_ss.x - BASE_SCREENPOS.x <= WINDOW_SIZE.x) {
+            drawlist->AddRectFilled(ImVec2(end_ss.x, BASE_SCREENPOS.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
+        }
+    }
+
+    // draw y after drawing mask boxes
+    i = 0;
+    for (float y = canvas_pos.y - fmod(grid_offset.y / base_scale.y * scale.y, grid_size.y); y < canvas_pos.y + canvas_size.y; y += grid_size.y) {
+        drawlist->AddLine(ImVec2(canvas_pos.x, y), ImVec2(canvas_pos.x + canvas_size.x, y), col_grid);
+        drawlist->AddText(ImVec2(canvas_pos.x, y), IM_COL32(200, 200, 200, 255), string_format("%.1f", grid.y + dxdy_grid.y * i));
+        for (int i = 1; i < subdivisions.y; i++) {
+            drawlist->AddLine(ImVec2(canvas_pos.x, y + i * subgrid_size.y), ImVec2(canvas_pos.x + canvas_size.x, y + i * subgrid_size.y), col_subdiv);
+        }
+        i++;
+    }
+
+
+
+    // middle mouse down
+    static bool started_pan = false;
+    static ImVec2 pan_start = {};
+    if (ImGui::GetIO().MouseDown[2] && ImGui::IsWindowFocused()) {
+        if (!started_pan)
+            pan_start = screenspace_to_grid(ImGui::GetMousePos());
+        started_pan = true;
+        auto mousepose = ImGui::GetMousePos();
+        auto in_gs = screenspace_to_grid(mousepose);
+        // set offset such that pan_start == in_gs
+
+        auto grid_wo_offset = screenspace_to_grid(mousepose) - grid_offset;
+
+        grid_offset = pan_start - grid_wo_offset;
+    }
+    else
+        started_pan = false;
+
+
+    const float MOUSE_SCALE_EXP = 0.25;
+    const float MIN_SCALE = 0.01;
+
+    if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001 && ImGui::IsWindowFocused()) {
+        auto mousepos = ImGui::GetMousePos();
+        auto start = screenspace_to_grid(mousepos);
+        bool ctrl_is_down = ImGui::GetIO().KeyCtrl;
+
+        float wh = ImGui::GetIO().MouseWheel;
+        if (wh > 0) {
+            if (ctrl_is_down)
+                scale.y += scale.y * MOUSE_SCALE_EXP;
+            else
+                scale.x += scale.x * MOUSE_SCALE_EXP;
+        }
+        else {
+            if (ctrl_is_down) {
+                scale.y -= scale.y * MOUSE_SCALE_EXP;
+                if (scale.y < MIN_SCALE) scale.y = MIN_SCALE;
+            }
+            else {
+                scale.x -= scale.x * MOUSE_SCALE_EXP;
+                if (scale.x < MIN_SCALE) scale.x = MIN_SCALE;
+            }
+        }
+        // set grid offsets to maintain positon
+        auto in_gs = screenspace_to_grid(mousepos);
+        auto grid_wo_offset = screenspace_to_grid(mousepos) - grid_offset;
+        grid_offset = start - grid_wo_offset;
+    }
+    // printf("%f\n",grid_offset)
+
+}
+
+void CurveEditorImgui::draw()
+{
 
     if (!ImGui::Begin("curve edit")) {
         ImGui::End();
         return;
     }
 
-   BASE_SCREENPOS = ImGui::GetCursorScreenPos();
-   WINDOW_SIZE = ImGui::GetWindowSize();
+   uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+       ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 
-   //ImGui::InvisibleButton("dummy234_", ImVec2(WINDOW_SIZE.x, WINDOW_SIZE.y));
+   const int num_cols = 2;
 
-   const float TIMELINE_BAR_HEIGHT = 100.0;
-   const Color32 background = { 36, 36, 36 };
-   const Color32 edges = { 0, 0, 0, 128 };
+   if (ImGui::BeginTable("curveedit", num_cols, ent_list_flags))
+   {
+       ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
+       ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 
-   // draw background
-   auto drawlist = ImGui::GetWindowDrawList();
-   drawlist->AddRectFilled(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE, background.to_uint());
+       ImGui::TableNextRow();
+       ImGui::TableNextColumn();
 
-   ImVec2 BASE_GRIDSPACE = screenspace_to_grid(BASE_SCREENPOS);
-   ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
-   ImVec2 canvas_size = ImGui::GetContentRegionAvail();
-   //
-   
-   const float GRID_SPACING = 64.0;
-   float grid_size = GRID_SPACING * scale.x;
-   int subdivisions = 2;
-   const float base_grid_size = GRID_SPACING;
-   const float subdiv_size = (2);
-    const float inv_subdiv_size = 1.0 / subdiv_size;
-   if (grid_size < base_grid_size) {
-       // too small
-       while (grid_size < base_grid_size * inv_subdiv_size)
-           grid_size *= subdiv_size;
-   }
-   else {
-       while (grid_size > base_grid_size)
-           grid_size /= subdiv_size;
-   }
-   float subgrid_size = grid_size / subdivisions;
-   float dx_subgrid = screenspace_to_grid(ImVec2(subgrid_size, 0)).x - screenspace_to_grid(ImVec2(0, 0)).x;;
-   if (dx_subgrid < 1.0) {
-       grid_size = scale.x / base_scale.x * subdivisions;
-       subgrid_size = grid_size / subdivisions;
-   }
+       // 
+       {
+           uint32_t inner_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+               ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
+           if (ImGui::BeginTable("flags", 1, inner_flags))
+           {
+               ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
+               ImGui::TableNextRow();
+               ImGui::TableNextColumn();
+               for (int row_n = 0; row_n < curves.size(); row_n++)
+               {
+                   auto& res = curves[row_n];
 
-   float dx_grid = screenspace_to_grid(ImVec2(grid_size, 0)).x - screenspace_to_grid(ImVec2(0, 0)).x;;
+                   ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+                   if (ImGui::Selectable("##selectednode", false, selectable_flags, ImVec2(0, 0))) {
 
+                   }
 
+                   ImGui::SameLine();
+                   ImGui::Text(res.name.c_str());
+               }
 
-
-
-   ImU32 col_grid = IM_COL32(255, 50, 50, 40);
-   ImU32 col_subdiv = IM_COL32(200, 200, 200, 20); 
-   float valx = canvas_pos.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size);
-   auto grid = screenspace_to_grid(ImVec2(valx, 0));
-   int i = 0;
-   for (float x = canvas_pos.x - fmod(grid_offset.x/base_scale.x*scale.x,grid_size); x < canvas_pos.x + canvas_size.x; x += grid_size) {
-       drawlist->AddLine(ImVec2(x, canvas_pos.y), ImVec2(x, canvas_pos.y + canvas_size.y), col_grid);
-       drawlist->AddText(ImVec2(x, canvas_pos.y), IM_COL32(0, 255, 0, 255), string_format("%.1f", grid.x+ dx_grid*i));
-       for (int i = 1; i < subdivisions; i++) {
-           drawlist->AddLine(ImVec2(x + i * subgrid_size, canvas_pos.y), ImVec2(x + i * subgrid_size, canvas_pos.y + canvas_size.y), col_subdiv);
+               ImGui::EndTable();
+           }
        }
-       i++;
+
+       ImGui::TableNextColumn();
+
+       // editor space
+       BASE_SCREENPOS = ImGui::GetCursorScreenPos();
+       WINDOW_SIZE = ImGui::GetContentRegionAvail();
+        draw_editor_space();
+
+       ImGui::EndTable();
    }
 
-   // draw points
-
-   ImU32 curvecol = curve.color.to_uint();
-   auto& points = curve.thecurve.points;
-   for (int i = 1; i < curve.thecurve.points.size(); i++) {
-       auto ss_start = grid_to_screenspace(ImVec2(points[i-1].time, points[i-1].value));
-       auto ss_end = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
-
-       drawlist->AddLine(ss_start, ss_end, curvecol);
-   }
-   if (!points.empty()) {
-       auto pointfront = points.front();
-       auto ss_start = grid_to_screenspace(ImVec2(pointfront.time, pointfront.value));
-       auto ss_end = ImVec2(BASE_SCREENPOS.x, ss_start.y);
-       drawlist->AddLine(ss_start, ss_end, curvecol);
-       auto pointback = points.back();
-       ss_start = grid_to_screenspace(ImVec2(pointback.time, pointback.value));
-       ss_end = ImVec2(BASE_SCREENPOS.x+WINDOW_SIZE.x, ss_start.y);
-       drawlist->AddLine(ss_start, ss_end, curvecol);
-   }
-   for (int i = 0; i < points.size(); i++) {
-
-       auto ss_point = grid_to_screenspace(ImVec2(points[i].time, points[i].value));
-       ImVec2 min = ss_point - ImVec2(4, 4);
-       ImVec2 max = ss_point + ImVec2(4, 4);
-
-       draw_rectangle_rotated(min, max, curvecol);
-
-   }
-
-   static ImVec2 clickpos;
-   if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
-       ImGui::OpenPopup("curve_edit_popup");
-       clickpos = screenspace_to_grid(ImGui::GetMousePos());
-   }
-   if (ImGui::BeginPopup("curve_edit_popup")) {
-       if (ImGui::Button("add point")) {
-           curve.thecurve.points.push_back({ clickpos.y,clickpos.x });
-           auto& points = curve.thecurve.points;
-
-           std::sort(points.begin(), points.end(), [](const auto& p, const auto& p2)->bool { return p.time < p2.time; });
-       }
-       ImGui::EndPopup();
-   }
-
-
-
-
-   auto origin_ss = grid_to_screenspace(ImVec2(0, 0));
-   if (origin_ss.x - BASE_SCREENPOS.x >= 0) {
-       drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(origin_ss.x,BASE_SCREENPOS.y + WINDOW_SIZE.y), edges.to_uint());
-   }
-
-   auto end_ss = grid_to_screenspace(ImVec2(MAX_TIME, 0));
-   if (end_ss.x - BASE_SCREENPOS.x <= WINDOW_SIZE.x) {
-       drawlist->AddRectFilled(ImVec2(end_ss.x,BASE_SCREENPOS.y), BASE_SCREENPOS+WINDOW_SIZE, edges.to_uint());
-   }
-
-   // middle mouse down
-   static bool started_pan = false;
-   static ImVec2 pan_start = {};
-   if (ImGui::GetIO().MouseDown[2] && ImGui::IsWindowFocused()) {
-       if (!started_pan)
-           pan_start = screenspace_to_grid(ImGui::GetMousePos());
-       started_pan = true;
-       auto mousepose = ImGui::GetMousePos();
-       auto in_gs = screenspace_to_grid(mousepose);
-       // set offset such that pan_start == in_gs
-
-       auto grid_wo_offset = screenspace_to_grid(mousepose) - grid_offset;
-
-       grid_offset = pan_start - grid_wo_offset;
-   }
-   else
-       started_pan = false;
-
-   if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001 && ImGui::IsWindowFocused()) {
-       auto mousepos = ImGui::GetMousePos();
-       auto start = screenspace_to_grid(mousepos);
-
-       float wh = ImGui::GetIO().MouseWheel;
-       if (wh > 0) {
-           scale.x += scale.x * 0.25;
-       }
-       else {
-           scale.x -= scale.x * 0.25;
-           if (scale.x < 0.01) scale.x = 0.01;
-       }
-       // set grid offsets to maintain positon
-       auto in_gs = screenspace_to_grid(mousepos);
-       auto grid_wo_offset = screenspace_to_grid(mousepos) - grid_offset;
-       grid_offset = start - grid_wo_offset;
-   }
-  // printf("%f\n",grid_offset)
 
    ImGui::End();
 

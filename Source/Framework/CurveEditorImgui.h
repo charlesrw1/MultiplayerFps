@@ -11,7 +11,7 @@ struct EditingCurve
 	Curve thecurve;
 	std::string name = "";
 	bool visible = true;
-	Color32 color = COLOR_CYAN;
+	Color32 color = COLOR_PINK;
 	void* user = nullptr;
 };
 #include <glm/glm.hpp>
@@ -21,24 +21,53 @@ public:
 	void draw();
 	void update(float dt);
 private:
+	void draw_editor_space();
+
 	float max_time = 1.0;
 	float time = 0.0;
 	std::vector<EditingCurve> curves;
 
 	EditingCurve  curve;
 
+	// Max value on the X axis (min X axis is always 0)
 	float MAX_TIME = 35.0;
 
-	// grid space
+	// Max/min values on the Y axis
+	float MIN_VALUE = 0.0;
+	float MAX_VALUE = 1.0;
+
+	bool enable_grid_snapping_x = true;
+	bool enable_grid_snapping_y = true;
+	ImVec2 grid_snap_size = ImVec2(1, 0.1);
+
+	// Scale is what gets changed with zooming, modifies base_scale
 	ImVec2 scale = ImVec2(1, 1);
+	// Base scale is constant, defines a screenspace -> grid unit factor
 	const ImVec2 base_scale =ImVec2(1.0/32,1.0/30);
+	// Offset, defined in grid space
 	ImVec2 grid_offset=ImVec2(0,0);
 
+	// used internally for convenience
 	ImVec2 BASE_SCREENPOS;
 	ImVec2 WINDOW_SIZE;
 
 	ImVec2 grid_to_screenspace(ImVec2 grid) const;
 	ImVec2 screenspace_to_grid(ImVec2 screen) const;
+
+	void clamp_point_to_grid(ImVec2& gridspace) {
+		if (enable_grid_snapping_x) {
+			gridspace.x = std::round(gridspace.x / grid_snap_size.x) * grid_snap_size.x;
+		}
+		if (enable_grid_snapping_y) {
+			gridspace.y = std::round(gridspace.y / grid_snap_size.y) * grid_snap_size.y;
+		}
+		if (gridspace.x < 0)
+			gridspace.x = 0;
+		if (gridspace.x > MAX_TIME)
+			gridspace.x = MAX_TIME;
+		if (gridspace.y < MIN_VALUE) gridspace.y = MIN_VALUE;
+		if (gridspace.y > MAX_VALUE) gridspace.y = MAX_VALUE;
+	}
 };
 
 class SequencerImgui;
