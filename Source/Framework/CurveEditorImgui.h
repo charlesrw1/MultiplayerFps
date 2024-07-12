@@ -5,6 +5,7 @@
 #include "Framework/Curve.h"
 #include <vector>
 #include <string>
+#include <glm/glm.hpp>
 
 struct EditingCurve
 {
@@ -12,22 +13,18 @@ struct EditingCurve
 	std::string name = "";
 	bool visible = true;
 	Color32 color = COLOR_PINK;
-	void* user = nullptr;
 };
-#include <glm/glm.hpp>
 class CurveEditorImgui
 {
 public:
+	CurveEditorImgui() {
+	}
 	void draw();
 	void update(float dt);
 private:
 	void draw_editor_space();
 
-	float max_time = 1.0;
-	float time = 0.0;
 	std::vector<EditingCurve> curves;
-
-	EditingCurve  curve;
 
 	// Max value on the X axis (min X axis is always 0)
 	float MAX_TIME = 35.0;
@@ -50,6 +47,26 @@ private:
 	// used internally for convenience
 	ImVec2 BASE_SCREENPOS;
 	ImVec2 WINDOW_SIZE;
+
+	// state stuff
+	int selected_curve = -1;
+	// these are all indexing into selected_curve
+	bool dragging_point = false;
+	int dragged_point_index = -1;
+	int dragged_point_type = 0;   // 0 = point, 1=tangent0,2=tangent1
+	int point_index_for_popup = -1;
+
+	void set_selected_curve(int index) {
+		if (selected_curve != index) {
+			// remove any state from setting points
+			dragging_point = false;
+			dragged_point_index = -1;
+			dragged_point_type = 0;
+			point_index_for_popup = -1;
+
+			selected_curve = index;
+		}
+	}
 
 	ImVec2 grid_to_screenspace(ImVec2 grid) const;
 	ImVec2 screenspace_to_grid(ImVec2 screen) const;

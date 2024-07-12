@@ -208,6 +208,7 @@
     <ClCompile Include="Source\Framework\Profilier.cpp" />
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
+    <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />

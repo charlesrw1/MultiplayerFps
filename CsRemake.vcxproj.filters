@@ -691,5 +691,8 @@
     <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp">
       <Filter>Source\Animation\Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\Sequencer.cpp">
+      <Filter>Source\Framework\Editor</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

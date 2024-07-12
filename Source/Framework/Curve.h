@@ -10,7 +10,6 @@ enum class CurvePointType : uint8_t
 {
 	Linear,	// linear interp
 	Constant,	// no interp
-	Auto,		// tangents determiend by adjacent points
 	SplitTangents,	// 2 handle free tangents
 	Aligned,		// free tangents but they are kept aligned
 };
