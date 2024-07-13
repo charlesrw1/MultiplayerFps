@@ -12,8 +12,8 @@ CLASS_H(CharacterGraphDriver, AnimatorInstance)
 
 	virtual void on_init() override;
 	virtual void on_update(float dt) override;
-	virtual void pre_ik_update(Pose& pose, float dt) override;
-	virtual void post_ik_update() override;
+	virtual void on_post_update() override;
+
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(CharacterGraphDriver)

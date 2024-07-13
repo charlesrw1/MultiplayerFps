@@ -155,7 +155,7 @@ public:
 	}
 	virtual std::string get_name() { return "name"; }
 };
-static CurveEditorImgui cei;
+//static CurveEditorImgui cei;
 void AnimationGraphEditor::init()
 {
 	imgui_node_context = ImNodes::CreateContext();
@@ -179,10 +179,7 @@ void AnimationGraphEditor::init()
 		}
 	}
 
-	seqimgui.add_item(new AnimationEventEditor(0, 5, COLOR_BLUE));
-	seqimgui.add_item(new AnimationEventEditor(8, 10, COLOR_RED));
-	seqimgui.add_item(new AnimationEventEditor(6, COLOR_GREEN));
-
+	
 }
 
 void AnimationGraphEditor::close_internal()
@@ -743,8 +740,8 @@ void draw_curve_test()
 void AnimationGraphEditor::imgui_draw()
 {
 	//cei.draw();
-	seqimgui.draw();
-	cei.draw();
+	//seqimgui.draw();
+	//cei.draw();
 
 	node_props.set_read_only(graph_is_read_only());
 

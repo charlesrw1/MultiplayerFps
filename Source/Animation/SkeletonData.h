@@ -56,7 +56,8 @@ public:
 	float get_duration() const { return duration; }
 	int get_frame_for_time(float time) const { 
 		int frame = time * fps;
-		assert(frame >= 0 && frame < num_frames);
+		if (frame < 0)return 0;
+		if (frame >= num_frames)return num_frames - 1;
 		return frame;
 	}
 	float get_time_of_keyframe(int keyframe) const { return (float)keyframe / fps; }

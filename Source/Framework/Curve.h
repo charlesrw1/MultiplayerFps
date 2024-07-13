@@ -1,34 +1,27 @@
 #pragma once
+#include <vector>
+#include "Framework/Handle.h"
+#include "Framework/CurveEditorImgui.h"
 
-#include "Framework/InlineVec.h"
-#include "ReflectionProp.h"
-#include "EnumDefReflection.h"
-#include <glm/glm.hpp>
-// A generic time based curve 
-
-enum class CurvePointType : uint8_t
-{
-	Linear,	// linear interp
-	Constant,	// no interp
-	SplitTangents,	// 2 handle free tangents
-	Aligned,		// free tangents but they are kept aligned
-};
-ENUM_HEADER(CurvePointType);
-
-class CurvePoint
+class FileWriter;
+class FileReader;
+class BakedCurve
 {
 public:
+	void bake_from(const std::vector<EditingCurve>& curves, float max_time, float min_y, float frames_per_second);
+	float evaluate_named(StringName name, float time);
+	float evaluate(float time);
+	void write_to(FileWriter& out);
+	void read_from(FileReader& in);
 
-	float value = 0.0;
-	float time = 0.0;
-	glm::vec2 tangent0=glm::vec2(-1,0);
-	glm::vec2 tangent1=glm::vec2(1,0);
-	CurvePointType type = CurvePointType::Linear;
-};
-
-class Curve
-{
-public:
-	std::vector<CurvePoint> points;
-	float length = 0.0;
+	struct track {
+		StringName name;
+		int keyframe_start = 0;
+		// if keyframe_start < 0, then track only has 1 keyframe
+		float min_val=0.0;
+	};
+	int total_keyframes = 0;
+	float total_length = 0.0;
+	std::vector<track> tracks;
+	std::vector<float> floats;
 };

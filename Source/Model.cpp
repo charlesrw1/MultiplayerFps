@@ -33,6 +33,8 @@ static const char* const model_folder_path = "./Data/Models/";
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
 #include "AssetRegistry.h"
+
+extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 class ModelAssetMetadata : public AssetMetadata
 {
 public:
@@ -71,7 +73,7 @@ public:
 			}
 		}
 	}
-
+	virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
 	virtual std::string root_filepath() override
 	{
 		return model_folder_path;

@@ -23,15 +23,19 @@ CLASS_H(AnimationEvent, ClassBase)
 	uint16_t get_frame() const { return frame; }
 	uint16_t get_duration() const { return frame_duration; }
 
-private:
 	static const PropertyInfoList* get_props() {
 		START_PROPS(AnimationEvent)
 			REG_INT(frame,PROP_SERIALIZE,""),
-			REG_INT(frame_duration, PROP_SERIALIZE,"")
+			REG_INT(frame_duration, PROP_SERIALIZE,""),
+			REG_INT(editor_layer, PROP_SERIALIZE, ""),
+
 		END_PROPS(AnimationEvent)
 	}
+private:
 	friend class AnimationEventGetter;
+	friend class EditModelAnimations;
 
 	uint16_t frame = 0;
 	uint16_t frame_duration = 0;
+	uint16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
 };

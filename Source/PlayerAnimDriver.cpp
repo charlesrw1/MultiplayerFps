@@ -11,17 +11,7 @@ CLASS_IMPL(CharacterGraphDriver, AnimatorInstance);
 
 void CharacterGraphDriver::on_init() {
 	auto model = get_model();
-	get_controller(bone_controller_type::lhand).bone_index = model->bone_for_name("mixamorig:LeftHand");
-	get_controller(bone_controller_type::lhand).use_two_bone_ik = true;
-
-	get_controller(bone_controller_type::rhand).bone_index = model->bone_for_name("mixamorig:RightHand");
-	get_controller(bone_controller_type::rhand).use_two_bone_ik = true;
-
-	get_controller(bone_controller_type::rfoot).bone_index = model->bone_for_name("mixamorig:LeftFoot");
-	get_controller(bone_controller_type::rfoot).use_two_bone_ik = true;
-
-	get_controller(bone_controller_type::lfoot).bone_index = model->bone_for_name("mixamorig:RightFot");
-	get_controller(bone_controller_type::lfoot).use_two_bone_ik = true;
+	
 }
 
 void CharacterGraphDriver::on_update(float dt) {
@@ -69,7 +59,7 @@ void CharacterGraphDriver::on_update(float dt) {
 
 }
 
-void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
+void CharacterGraphDriver::on_post_update() {
 
 	auto& cached_bonemats = get_global_bonemats();
 	auto model = get_model();
@@ -81,85 +71,4 @@ void CharacterGraphDriver::pre_ik_update(Pose& pose, float dt) {
 	glm::vec3 rfoot_pos = cached_bonemats[rfoot][3];
 
 	left_foot_is_forward = glm::dot(glm::vec3(0, 0, 1), lfoot_pos) < glm::dot(glm::vec3(0, 0, 1), rfoot_pos);
-	return;
-#if 0
-	Pose* source = Pose_Pool::get().alloc(1);
-	*source = pose;
-	auto ent = owner->owner;
-
-
-
-	glm::vec3 rhand_target = cached_bonemats[rhand] * glm::vec4(0.0, 0.0, 0.0, 1.0);
-	glm::vec3 lhand_target = cached_bonemats[lhand] * glm::vec4(0.0, 0.0, 0.0, 1.0);
-
-	glm::mat4 ent_transform = ent->get_world_transform() * model->skeleton_root_transform;
-	{
-		glm::vec3 world_hand = ent_transform * glm::vec4(rhand_target, 1.0);
-		Debug::add_sphere(world_hand, 0.01, COLOR_RED, 0.0, true);
-		world_hand = ent_transform * glm::vec4(lhand_target, 1.0);
-		Debug::add_sphere(world_hand, 0.01, COLOR_RED, 0.0, true);
-	}
-
-	owner->get_controller(bone_controller_type::rhand).enabled = true;
-	owner->get_controller(bone_controller_type::rhand).position = rhand_target;
-
-
-	owner->get_controller(bone_controller_type::lhand).enabled = true;
-	owner->get_controller(bone_controller_type::lhand).position = lhand_target;
-
-	owner->get_controller(bone_controller_type::rfoot).enabled = false;
-	owner->get_controller(bone_controller_type::lfoot).enabled = false;
-
-	// feet ik
-	if (!ismoving && !injump)
-	{
-		const int rightfoot = model->bone_for_name("mixamorig:RightFoot");
-		const int rightleg = model->bone_for_name("mixamorig:RightLeg");
-		const int rightlegupper = model->bone_for_name("mixamorig:RightUpLeg");
-		const int leftfoot = model->bone_for_name("mixamorig:LeftFoot");
-		const int leftleg = model->bone_for_name("mixamorig:LeftLeg");
-		const int leftlegupper = model->bone_for_name("mixamorig:LeftUpLeg");
-
-		glm::vec3 worldspace_rfoot = ent_transform * cached_bonemats[rightfoot] * glm::vec4(0.f, 0.f, 0.f, 1.f);
-		glm::vec3 worldspace_lfoot = ent_transform * cached_bonemats[leftfoot] * glm::vec4(0.f, 0.f, 0.f, 1.f);
-		Ray r;
-		r.pos = worldspace_rfoot + vec3(0, 2, 0);
-		r.dir = vec3(0, -1, 0);
-		RayHit hit = eng->phys.trace_ray(r, -1, PF_WORLD);
-		Debug::add_box(hit.pos, vec3(0.2), COLOR_PINK, 0.f);
-
-		float rfootheight = hit.pos.y - ent->position.y;
-		r.pos = worldspace_lfoot + vec3(0, 2, 0);
-		hit = eng->phys.trace_ray(r, -1, PF_WORLD);
-
-		Debug::add_box(hit.pos, vec3(0.2), COLOR_PINK, 0.f);
-
-		float lfootheight = hit.pos.y - ent->position.y;
-		// now need to offset mesh so that both hiehgts are >= 0
-		float add = glm::min(lfootheight, rfootheight);
-
-		//printf("add %f\n", add);
-
-		meshoffset = glm::vec3(0, add, 0);
-
-		glm::mat4 invent = glm::inverse(ent_transform);
-
-		// now do ik for left and right feet
-		glm::vec3 lfoottarget = invent * glm::vec4(worldspace_lfoot + vec3(0, lfootheight - add, 0), 1.f);
-		glm::vec3 rfoottarget = invent * glm::vec4(worldspace_rfoot + vec3(0, rfootheight - add, 0), 1.f);
-
-		owner->get_controller(bone_controller_type::rfoot).enabled = true;
-		owner->get_controller(bone_controller_type::rfoot).position = rfoottarget;
-
-		owner->get_controller(bone_controller_type::lfoot).enabled = true;
-		owner->get_controller(bone_controller_type::lfoot).position = lfoottarget;
-	}
-
-
-	Pose_Pool::get().free(1);
-#endif
-}
-
-void CharacterGraphDriver::post_ik_update() {
-
 }

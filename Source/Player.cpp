@@ -760,39 +760,6 @@ ViewmodelComponent::ViewmodelComponent(Player* p)
 
 	printf("created viewmodel %d\n", viewmodel_handle);
 
-	Bone_Controller& wp = animator.get_controller(bone_controller_type::misc1);
-	wp.enabled = true;
-	wp.add_transform_not_replace = true;
-	wp.evalutate_in_second_pass = false;
-	wp.use_two_bone_ik = false;
-	wp.target_relative_bone_index = -1;
-	wp.bone_index = model->bone_for_name("WP_Weapon");
-
-	Bone_Controller& lh = animator.get_controller(bone_controller_type::lhand);
-	lh.bone_index = model->bone_for_name("hand_L.L");
-	lh.enabled = true;
-	lh.evalutate_in_second_pass = true;
-	lh.use_two_bone_ik = true;
-	lh.use_bone_as_relative_transform = true;
-	lh.target_relative_bone_index = wp.bone_index;
-
-	// since magazine isnt a child of weapon, maybe I shouldnt have done that
-	Bone_Controller& mag = animator.get_controller(bone_controller_type::misc2);
-	mag.bone_index = model->bone_for_name("WP_Magazine");
-	mag.enabled = true;
-	mag.evalutate_in_second_pass = true;
-	mag.use_two_bone_ik = false;
-	mag.use_bone_as_relative_transform = true;
-	mag.target_relative_bone_index = wp.bone_index;
-
-	Bone_Controller& rh = animator.get_controller(bone_controller_type::rhand);
-	rh.bone_index = model->bone_for_name("hand_L.R");
-	rh.enabled = true;
-	rh.evalutate_in_second_pass = true;
-	rh.use_two_bone_ik = true;
-	rh.use_bone_as_relative_transform = true;
-	rh.target_relative_bone_index = wp.bone_index;
-
 	lastoffset = vec3(0.f);
 	lastrot = glm::quat(1.f, 0, 0, 0);
 }
@@ -1049,12 +1016,6 @@ void ViewmodelComponent::update()
 
 	//if(animator.m.finished || animator.m.anim == -1)
 	//	animator.set_anim("ak47_idle", false);
-	
-	Bone_Controller& bc = animator.get_controller(bone_controller_type::misc1);
-	bc.position = lastoffset;// vec3(0.f, sin(GetTime() + 0.5) * 0.8, 0.f);
-	//bc.rotation = glm::quat(1.f,0.f,0.f,0.f);
-
-	bc.rotation =lastrot;// glm::quat(vec3(sin(GetTime() * 1.4) * 0.7, 0.f, 1.f), glm::vec3(0, 0.f, 1.f));
 	
 
 	//animator.tick_tree_new(eng->tick_interval);

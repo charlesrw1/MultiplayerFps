@@ -5,11 +5,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "Framework/CurveEditorImgui.h"
 
-struct AnimEvent_Load
-{
-	std::unique_ptr<AnimationEvent> event;
-};
 enum class AnimImportType_Load {
 	File,
 	Folder,
@@ -42,6 +39,7 @@ struct ClipStart
 	bool has_start = false;
 };
 
+
 struct AnimationClip_Load
 {
 	SubtractType_Load sub = SubtractType_Load::None;
@@ -50,7 +48,8 @@ struct AnimationClip_Load
 	ClipCrop crop;
 	ClipStart start;
 	bool fixloop = false;
-	std::vector<AnimEvent_Load> events;
+	std::vector<std::unique_ptr<AnimationEvent>> events;
+	std::vector<EditingCurve> curves;
 
 	// if non empty, then set origin of clip to this
 	std::string make_relative_to_locator;
@@ -85,9 +84,14 @@ struct WeightlistDef
 	std::vector<std::pair<std::string, float>> defs;
 };
 
-
-struct ModelDefData
+// interchange format between editor and compilier essentially, serialized to disk
+class ModelDefData
 {
+public:
+	void read_from_dict(DictParser& in);
+	void write_to_dict(DictWriter& out);
+
+
 	std::string model_source;
 	uint64_t timestamp_of_def = 0;
 

@@ -12,45 +12,6 @@
 
 #include "Model.h"
 #include "Framework/ExpressionLang.h"
-// procedural bone controls
-// supports: direct bone transform manipulation	(ex: rotating/translating weapon bone)
-//			ik to meshspace transform	(ex: hand reaching to object)
-//			ik to transform relative to another bone	(ex: third person gun ik)
-//			ik to relative transform of bone relative to another bone (ex: first person gun ik)
-struct Bone_Controller
-{
-	bool enabled = false;
-	// if true, then transform is added to base, not replaced
-	bool add_transform_not_replace = false;
-	// if true, then uses 2 bone ik instead of direct transform
-	bool use_two_bone_ik = false;
-	bool evalutate_in_second_pass = false;
-	int bone_index = 0;
-	float weight = 1.f;
-	// target transform in meshspace!!!
-	// so you should multiply by inv-transform matrix if you have a worldspace transform
-	glm::quat rotation;
-	glm::vec3 position;
-
-	// if != -1, then position/rotation treated as a relative offset 
-	// to another bone pre-procedural bone adjustments and not worldspace
-	// useful for hand to gun ik
-	int target_relative_bone_index = -1;
-	bool use_bone_as_relative_transform = false;
-};
-
-// hardcoded bone controller types for programming convenience, doesnt affect any bone names/indicies
-enum class bone_controller_type
-{
-	rhand,
-	lhand,
-	rfoot,
-	lfoot,
-	misc1,
-	misc2,
-
-	max_count,
-};
 
 #include <vector>
 #include "Framework/Factory.h"
@@ -107,13 +68,6 @@ CLASS_H(AnimatorInstance, ClassBase)
 	ScriptInstance& get_script_inst() { return script_inst; }
 	bool is_initialized() const { return model != nullptr; }
 
-	Bone_Controller& get_controller(bone_controller_type type_) {
-		return bone_controllers[(int)type_];
-	}
-
-	void update_procedural_bones(Pose& pose);
-
-
 
 	// Slot playing
 
@@ -130,8 +84,7 @@ private:
 	// hooks for derived classes
 	virtual void on_init() {};
 	virtual void on_update(float dt) {}
-	virtual void pre_ik_update(Pose& pose, float dt) {}
-	virtual void post_ik_update() {}
+	virtual void on_post_update() {}
 
 	// owning entity, can be null for example in editor
 	Entity* owner = nullptr;
@@ -142,9 +95,6 @@ private:
 	void add_legs_layer(glm::quat q[], glm::vec3 pos[]);
 	void UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies);
 	
-	// depreciated
-	Bone_Controller bone_controllers[(int)bone_controller_type::max_count];
-
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
 
@@ -183,6 +133,7 @@ private:
 	}
 
 	friend class NodeRt_Ctx;
+	friend class EditModelAnimations;
 };
 
 

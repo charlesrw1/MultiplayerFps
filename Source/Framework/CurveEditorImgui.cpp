@@ -5,9 +5,7 @@
 #include "CurveEditorImgui.h"
 #include "MyImguiLib.h"
 #include <algorithm>
-void CurveEditorImgui::update(float dt)
-{
-}
+
 
 inline ImVec2 CurveEditorImgui::grid_to_screenspace(ImVec2 grid) const {
     return (grid - grid_offset) / base_scale*scale + BASE_SCREENPOS;
@@ -62,6 +60,7 @@ int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
 
 void CurveEditorImgui::draw_editor_space()
 {
+
     auto drawlist = ImGui::GetWindowDrawList();
     const Color32 background = { 36, 36, 36 };
     const Color32 edges = { 0, 0, 0, 128 };
@@ -71,10 +70,11 @@ void CurveEditorImgui::draw_editor_space()
     WINDOW_SIZE.y -= 20;
     WINDOW_SIZE.y = glm::max(WINDOW_SIZE.y, 0.1f);
 
+    // top black bar for timeline
+    const float TIMELINE_HEIGHT = 20.0;
 
     drawlist->AddRectFilled(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE, background.to_uint());
 
-    ImVec2 BASE_GRIDSPACE = screenspace_to_grid(BASE_SCREENPOS);
     ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     ImVec2 canvas_size = WINDOW_SIZE;
 
@@ -86,14 +86,20 @@ void CurveEditorImgui::draw_editor_space()
 
     const bool is_window_focused_and_mouse_in_region = ImGui::IsWindowFocused() && ImRect(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE).Contains(ImGui::GetMousePos());
     {
-        auto min_ss = grid_to_screenspace(ImVec2(0, MIN_VALUE));
-        if (min_ss.y - BASE_SCREENPOS.y >= 0) {
-            drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, min_ss.y), edges.to_uint());
+
+        auto min_ss = grid_to_screenspace(ImVec2(0, min_y_value));
+ 
+        if (min_ss.y - BASE_SCREENPOS.y <= WINDOW_SIZE.y) {
+            drawlist->AddRectFilled(ImVec2(BASE_SCREENPOS.x, min_ss.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
         }
-        auto max_ss = grid_to_screenspace(ImVec2(0, MAX_VALUE));
-        if (max_ss.y - BASE_SCREENPOS.y <= WINDOW_SIZE.y) {
-            drawlist->AddRectFilled(ImVec2(BASE_SCREENPOS.x, max_ss.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
+        auto max_ss = grid_to_screenspace(ImVec2(0, max_y_value));
+        if (max_ss.y - BASE_SCREENPOS.y >= 0) {
+            drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, max_ss.y), edges.to_uint());
         }
+
+
+        drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, BASE_SCREENPOS.y + TIMELINE_HEIGHT),
+            IM_COL32(0, 0, 0, 255));
     }
 
     const ImVec2 GRID_SPACING = ImVec2(64.0, 30.0);
@@ -132,10 +138,6 @@ void CurveEditorImgui::draw_editor_space()
 
     ImVec2 dxdy_grid = screenspace_to_grid(grid_size) - screenspace_to_grid(ImVec2(0, 0));
 
-
-
-
-
     ImU32 col_grid = IM_COL32(255, 50, 50, 40);
     ImU32 col_subdiv = IM_COL32(200, 200, 200, 20);
     float valx = canvas_pos.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size.x);
@@ -143,6 +145,7 @@ void CurveEditorImgui::draw_editor_space()
 
     const ImVec2 grid = screenspace_to_grid(ImVec2(valx, valy));
     {
+        // X axis markings
         int i = 0;
         for (float x = canvas_pos.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size.x); x < canvas_pos.x + canvas_size.x; x += grid_size.x) {
             drawlist->AddLine(ImVec2(x, canvas_pos.y), ImVec2(x, canvas_pos.y + canvas_size.y), col_grid);
@@ -169,7 +172,7 @@ void CurveEditorImgui::draw_editor_space()
         }
 
 
-        auto& points = curves[curve_index].thecurve.points;
+        auto& points = curves[curve_index].points;
 
         // draw the points
         for (int i = 0; i < (int)points.size() - 1; i++) {
@@ -185,17 +188,17 @@ void CurveEditorImgui::draw_editor_space()
                 drawlist->AddLine(ss_start, ss_end, curvecol);
             }
             else if (point.type == CurvePointType::SplitTangents || point.type == CurvePointType::Aligned) {
-                const int subdivisions = 20;
-                glm::vec2 pointsout[subdivisions];
+                const int BEZIER_CURVE_SUBDIV = 30;
+                glm::vec2 pointsout[BEZIER_CURVE_SUBDIV];
                 glm::vec2 p0 = { point.time,point.value };
                 glm::vec2 p1 = p0 + point.tangent1;
                 glm::vec2 p3 = { points[i + 1].time,points[i + 1].value };
                 glm::vec2 p2 = p3 + points[i + 1].tangent0;
-                for (int j = 0; j < subdivisions; j++) {
-                    float t = j / (float(subdivisions) - 1.0);
+                for (int j = 0; j < BEZIER_CURVE_SUBDIV; j++) {
+                    float t = j / (float(BEZIER_CURVE_SUBDIV) - 1.0);
                     pointsout[j] = bezier_evaluate(t, p0, p1, p2, p3);
                 }
-                for (int j = 0; j < subdivisions - 1; j++) {
+                for (int j = 0; j < BEZIER_CURVE_SUBDIV - 1; j++) {
                     drawlist->AddLine(
                         grid_to_screenspace(ImVec2(pointsout[j].x, pointsout[j].y)),
                         grid_to_screenspace(ImVec2(pointsout[j + 1].x, pointsout[j + 1].y)),
@@ -205,7 +208,7 @@ void CurveEditorImgui::draw_editor_space()
         }
 
         if (!points.empty()) {
-            auto pointfront = points.front();
+            auto& pointfront = points.front();
             auto ss_start = grid_to_screenspace(ImVec2(pointfront.time, pointfront.value));
             auto ss_end = ImVec2(BASE_SCREENPOS.x, ss_start.y);
             drawlist->AddLine(ss_start, ss_end, curvecol);
@@ -241,7 +244,7 @@ void CurveEditorImgui::draw_editor_space()
                 if (dragged_point_index == -1)
                     draw_tooltip = true;
 
-                if (!dragging_point&&ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
+                if (!dragging_point&&!dragging_scrubber&&ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
                     // set curve
                     set_selected_curve(curve_index);
 
@@ -264,7 +267,7 @@ void CurveEditorImgui::draw_editor_space()
                 ImVec2 min_sel_tan = tan_point_ss - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
                 ImVec2 max_sel_tan = tan_point_ss + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
 
-                if (!dragging_point && ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
+                if (!dragging_point&&!dragging_scrubber && ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
 
                     if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
                         set_selected_curve(curve_index);
@@ -278,7 +281,7 @@ void CurveEditorImgui::draw_editor_space()
                 min_sel_tan = tan_point_ss - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
                 max_sel_tan = tan_point_ss + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
 
-                if (!dragging_point && ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
+                if (!dragging_point && !dragging_scrubber&&ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
 
                     if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
                         set_selected_curve(curve_index);
@@ -317,13 +320,13 @@ void CurveEditorImgui::draw_editor_space()
             set_selected_curve(-1);
             ImGui::CloseCurrentPopup();
         }
-        else if (point_index_for_popup < 0 || point_index_for_popup >= curves[selected_curve].thecurve.points.size()) {
+        else if (point_index_for_popup < 0 || point_index_for_popup >= curves[selected_curve].points.size()) {
             sys_print("??? point_index_for_popup invalid\n");
             point_index_for_popup = -1;
             ImGui::CloseCurrentPopup();
         }
         else {
-            auto& points = curves[selected_curve].thecurve.points;
+            auto& points = curves[selected_curve].points;
             std::string current_type = EnumTrait<CurvePointType>::StaticType.get_enum_str((int)points[point_index_for_popup].type);
             current_type = current_type.substr(current_type.rfind("::") + 2);
 
@@ -365,14 +368,14 @@ void CurveEditorImgui::draw_editor_space()
             dragged_point_index = -1;
             dragging_point = false;
         }
-        else if (dragged_point_index < 0 || dragged_point_index >= curves[selected_curve].thecurve.points.size()) {
+        else if (dragged_point_index < 0 || dragged_point_index >= curves[selected_curve].points.size()) {
             sys_print("??? dragged_point_index invalid\n");
             dragged_point_index = -1;
             dragging_point = false;
         }
         else {
             clamp_point_to_grid(gridspace);
-            auto& points = curves[selected_curve].thecurve.points;
+            auto& points = curves[selected_curve].points;
             auto& point = points[dragged_point_index];
             if (dragged_point_type == 0) {
                 points[dragged_point_index].time = gridspace.x;
@@ -410,7 +413,6 @@ void CurveEditorImgui::draw_editor_space()
     }
 
 
-    static ImVec2 clickpos;
     if (ImGui::GetIO().MouseClicked[1] && is_window_focused_and_mouse_in_region && selected_curve != -1 && point_index_for_popup==-1/*hack*/) {
         ImGui::OpenPopup("curve_edit_popup");
         clickpos = screenspace_to_grid(ImGui::GetMousePos());
@@ -423,7 +425,7 @@ void CurveEditorImgui::draw_editor_space()
         }
         else {
             if (ImGui::Button("Add point")) {
-                auto& points = curves[selected_curve].thecurve.points;
+                auto& points = curves[selected_curve].points;
                 clamp_point_to_grid(clickpos);
 
                points.push_back({ clickpos.y,clickpos.x });
@@ -444,7 +446,7 @@ void CurveEditorImgui::draw_editor_space()
             drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(origin_ss.x, BASE_SCREENPOS.y + WINDOW_SIZE.y), edges.to_uint());
         }
 
-        auto end_ss = grid_to_screenspace(ImVec2(MAX_TIME, 0));
+        auto end_ss = grid_to_screenspace(ImVec2(max_x_value, 0));
         if (end_ss.x - BASE_SCREENPOS.x <= WINDOW_SIZE.x) {
             drawlist->AddRectFilled(ImVec2(end_ss.x, BASE_SCREENPOS.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
         }
@@ -466,8 +468,6 @@ void CurveEditorImgui::draw_editor_space()
 
 
     // middle mouse down
-    static bool started_pan = false;
-    static ImVec2 pan_start = {};
     if (ImGui::GetIO().MouseDown[2] && ImGui::IsWindowFocused()) {
         if (!started_pan)
             pan_start = screenspace_to_grid(ImGui::GetMousePos());
@@ -487,7 +487,7 @@ void CurveEditorImgui::draw_editor_space()
     const float MOUSE_SCALE_EXP = 0.25;
     const float MIN_SCALE = 0.01;
 
-    if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001 && ImGui::IsWindowFocused()) {
+    if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001 && ImGui::IsWindowFocused()&&ImGui::IsWindowHovered()) {
         auto mousepos = ImGui::GetMousePos();
         auto start = screenspace_to_grid(mousepos);
         bool ctrl_is_down = ImGui::GetIO().KeyCtrl;
@@ -514,13 +514,49 @@ void CurveEditorImgui::draw_editor_space()
         auto grid_wo_offset = screenspace_to_grid(mousepos) - grid_offset;
         grid_offset = start - grid_wo_offset;
     }
+
+    if (!ImGui::GetIO().MouseDown[0])
+        dragging_scrubber = false;
+
+    // draw and update timeline scrubber
+    if (ImRect(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, BASE_SCREENPOS.y + TIMELINE_HEIGHT)).Contains(ImGui::GetMousePos())
+        && ImGui::IsWindowFocused() && !dragging_point) {
+        if (ImGui::GetIO().MouseDown[0]) {
+            dragging_scrubber = true;
+        }
+    }
+    if (dragging_scrubber) {
+        auto gridspace = screenspace_to_grid(ImGui::GetMousePos());
+        current_time = gridspace.x;
+        if (snap_scrubber_to_grid) {
+            current_time = std::round(current_time / grid_snap_size.x) * grid_snap_size.x;
+        }
+
+        if (current_time < 0.0)
+            current_time = 0.0;
+        if (current_time > max_x_value)
+            current_time = max_x_value;
+
+        set_scrubber_this_frame = true;
+    }
+    {
+        auto pos_of_scrubber = grid_to_screenspace(ImVec2(current_time, 0));
+        const char* time_str = string_format("%.2f", current_time);
+        auto& style = ImGui::GetStyle();
+        float time_str_width = ImGui::CalcTextSize(time_str).x + style.FramePadding.x * 1.0f;
+        float off = time_str_width * 0.5;
+        drawlist->AddLine(ImVec2(pos_of_scrubber.x, BASE_SCREENPOS.y),ImVec2(pos_of_scrubber.x, BASE_SCREENPOS.y + WINDOW_SIZE.y), IM_COL32(27, 145, 247, 255),2.0);
+        drawlist->AddRectFilled(ImVec2(pos_of_scrubber.x - off, BASE_SCREENPOS.y), ImVec2(pos_of_scrubber.x+off, BASE_SCREENPOS.y + TIMELINE_HEIGHT), IM_COL32(27, 145, 247,255),6.0);
+        drawlist->AddText(ImVec2(pos_of_scrubber.x - off + 2.0, BASE_SCREENPOS.y), IM_COL32(255, 255, 255, 255), time_str);
+    }
+
     // printf("%f\n",grid_offset)
     ImGui::PopClipRect();
 }
 
 void CurveEditorImgui::draw()
 {
-
+    set_scrubber_this_frame = false;
     if (!ImGui::Begin("curve edit")) {
         ImGui::End();
         return;
@@ -569,11 +605,12 @@ void CurveEditorImgui::draw()
                        if (grid_snap_size.y < 0.001)
                            grid_snap_size.y = 0.001;
                    }
-                   ImGui::InputFloat("Max X", &MAX_TIME);
-                   if (MAX_TIME <= 0.001) MAX_TIME = 0.001;
-                   ImGui::InputFloat("Min Y", &MIN_VALUE);
-                   ImGui::InputFloat("Max Y", &MAX_VALUE);
-                   if (MAX_VALUE <= MIN_VALUE) MAX_VALUE = MIN_VALUE + 0.01;
+                   ImGui::InputFloat("Max X", &max_x_value);
+                   if (max_x_value <= 0.001) max_x_value = 0.001;
+                   ImGui::InputFloat("Min Y", &min_y_value);
+                   ImGui::InputFloat("Max Y", &max_y_value);
+                   if (max_y_value <= min_y_value) max_y_value = min_y_value + 0.01;
+                   ImGui::Checkbox("Snap Time to grid", &snap_scrubber_to_grid);
                    ImGui::EndPopup();
                }
                ImGui::Separator();
@@ -585,7 +622,7 @@ void CurveEditorImgui::draw()
                    ImGui::TableNextColumn();
                    auto& res = curves[row_n];
 
-                   ImGui::PushID(res.name.c_str());
+                   ImGui::PushID(res.curve_id);
                    ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
                    if (ImGui::Selectable("##selectednode", row_n == selected_curve, selectable_flags, ImVec2(0, 24))) {
                        set_selected_curve(row_n);
@@ -598,7 +635,7 @@ void CurveEditorImgui::draw()
                    ImGui::SameLine();
                    ImGui::Checkbox("##check", &res.visible);
                    ImGui::SameLine();
-                   ImGui::Text(res.name.c_str());
+                   ImGui::TextColored(color32_to_imvec4(res.color),res.name.c_str());
                    ImGui::PopID();
                }
                ImGui::TableNextRow();
@@ -614,7 +651,7 @@ void CurveEditorImgui::draw()
                    EditingCurve ed;
                    ed.name = "New row";
 
-                   curves.push_back(ed);
+                   add_curve(ed);
                }
 
                ImGui::EndTable();
@@ -663,4 +700,127 @@ void CurveEditorImgui::draw()
 
    ImGui::End();
 
+}
+
+class CurvePointSerialize : public IPropertySerializer
+{
+public:
+    virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) {
+        CurvePoint* point = (CurvePoint*)inst;
+        std::string outs = string_format("\"%i %f %f %f %f %f %f\"", point->type, point->time, point->value, point->tangent0.x, point->tangent0.y, point->tangent1.x, point->tangent1.y);
+        return outs;
+    }
+    virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) {
+        std::string str = std::string(token.str_start, token.str_len);
+        CurvePoint* point = (CurvePoint*)inst;
+        int param = 0;
+        int read = sscanf(str.c_str(), "%i %f %f %f %f %f %f", &param, &point->time, &point->value, &point->tangent0.x, &point->tangent0.y, &point->tangent1.x, &point->tangent1.y);
+        if (param < 0 || param >= 4)param = 0;
+        point->type = CurvePointType(param);
+    }
+};
+#include "AddClassToFactory.h"
+ADDTOFACTORYMACRO(CurvePointSerialize, IPropertySerializer);
+
+#include "Framework/Curve.h"
+#include "BinaryReadWrite.h"
+void BakedCurve::write_to(FileWriter& out)
+{
+    out.write_int32(total_keyframes);
+    out.write_float(total_length);
+
+}
+void BakedCurve::read_from(FileReader& in)
+{
+
+}
+void BakedCurve::bake_from(const std::vector<EditingCurve>& curves, float max_time, float min_y, float frames_per_second)
+{
+    this->total_length = max_time;
+    this->total_keyframes = max_time * frames_per_second;
+
+    const float step = 1.0/frames_per_second;
+    for (int curve_idx = 0; curve_idx < curves.size(); curve_idx++) {
+        auto& curve = curves[curve_idx];
+        auto& points = curve.points;
+        // now to evaluate: xdddd
+        struct outstruct {
+            float time=0;
+            float value=0;
+            bool constant = false;
+        };
+        std::vector< outstruct> outsorted;
+        for (int pointidx = 0; pointidx < points.size() - 1; pointidx++) {
+            auto& point = points[pointidx];
+
+            if (point.type == CurvePointType::Constant) {
+                const float interval = points[pointidx + 1].time - point.time;
+                for (float t = 0.0; t < interval; t += step) {
+                    outsorted.push_back({ point.time + t, point.value,true });
+                }
+            }
+            else if (point.type == CurvePointType::Linear) {
+                const float interval = points[pointidx + 1].time - point.time;
+                const float slope = (points[pointidx + 1].value - point.value) / interval;
+                for (float t = 0.0; t < interval; t += step) {
+                    outsorted.push_back({ point.time + t, point.value + slope * t });
+                }
+            }
+            else if (point.type == CurvePointType::SplitTangents || point.type == CurvePointType::Aligned) {
+                // now for the hacky part
+                const int BEZIER_CURVE_SUBDIV = 30;
+                glm::vec2 pointsout[BEZIER_CURVE_SUBDIV];
+                glm::vec2 p0 = { point.time,point.value };
+                glm::vec2 p1 = p0 + point.tangent1;
+                glm::vec2 p3 = { points[pointidx + 1].time,points[pointidx + 1].value };
+                glm::vec2 p2 = p3 + points[pointidx + 1].tangent0;
+                for (int j = 0; j < BEZIER_CURVE_SUBDIV - 1; j++) {
+                    float t = j / (float(BEZIER_CURVE_SUBDIV) - 1.0);
+                    pointsout[j] = bezier_evaluate(t, p0, p1, p2, p3);
+                    outsorted.push_back({ pointsout[j].x,pointsout[j].y });
+                }
+            }
+        }
+        if (!points.empty()) {
+            auto& pointfront = points.front();
+             float interval = pointfront.time - 0.0;
+            for (float t = 0.0; t < interval; t += step) {
+                outsorted.push_back({0.0f + t, pointfront.value });
+            }
+
+            auto& pointback = points.back();
+             interval = max_time - pointback.time;
+            for (float t = 0.0; t < interval; t += step) {
+                outsorted.push_back({ pointback.time + t, pointback.value });
+            }
+        }
+        std::vector<outstruct> outfinal;
+        outfinal.resize(total_keyframes);
+        std::sort(outsorted.begin(), outsorted.end(), [](const auto& p1, const auto& p2) -> bool { return p1.time < p2.time; });
+        for (int i = 0; i < total_keyframes; i++) {
+            const float time = i * frames_per_second;
+            auto find = std::lower_bound(outsorted.begin(), outsorted.end(), time, [](const outstruct& p1,float time) -> bool { return p1.time < time; });
+            if (find == outsorted.end()) {
+                // set to last point value
+                outfinal[i] = outsorted.front();
+            }
+            else {
+                const int index = std::distance(outsorted.begin(), find);
+                if (index > 0 && !find->constant) {
+                    // lerp
+                    float this_time = find->time;
+                    float prev_time = outsorted[index - 1].time;
+                    assert(prev_time < this_time);
+                    float INTERP = (time - prev_time) / (this_time - prev_time);
+                    float interped_val = glm::mix(outsorted[index - 1].value, find->value, INTERP);
+                    outfinal[i] = { time,interped_val,false };
+                }
+                else
+                    outfinal[i] = *find;
+            }
+        }
+
+
+
+    }
 }

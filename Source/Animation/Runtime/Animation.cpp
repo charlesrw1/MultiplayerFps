@@ -285,7 +285,7 @@ void menu_2()
 	ImGui::DragFloat3("dbg offs", &dbgoffset.x, 0.01);
 }
 
-
+#if 0
 void AnimatorInstance::update_procedural_bones(Pose& pose)
 {
 	static bool first = true;
@@ -448,7 +448,7 @@ void AnimatorInstance::update_procedural_bones(Pose& pose)
 	Pose_Pool::get().free(1);
 	Matrix_Pool::get().free(256);
 }
-
+#endif
 
 
 void AnimatorInstance::ConcatWithInvPose()
@@ -604,6 +604,7 @@ void AnimatorInstance::tick_tree_new(float dt)
 	gp_ctx.dt = dt;
 	gp_ctx.pose = &poses[0];
 
+	// callback
 	on_update(dt);
 
 	// call into tree
@@ -672,11 +673,8 @@ void AnimatorInstance::tick_tree_new(float dt)
 
 	util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
 	
-	pre_ik_update(poses[0], dt);
-
-	update_procedural_bones(poses[0]);
-
-	post_ik_update();
+	// Callback
+	on_post_update();
 
 	ConcatWithInvPose();
 

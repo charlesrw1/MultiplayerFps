@@ -2,195 +2,14 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "CurveEditorImgui.h"
-
-void SequencerImgui::draw_scrollbar(int* first_frame, float scrollbar_width, int current_frame)
-{
-    const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
-    const ImVec2 scrollBarSize(scrollbar_width, 20.f);
-    auto& io = ImGui::GetIO();
-    auto draw_list = ImGui::GetWindowDrawList();
-
-    ImGui::InvisibleButton("scrollBar", scrollBarSize);
-    ImVec2 scrollBarMin = ImGui::GetItemRectMin();
-    ImVec2 scrollBarMax = ImGui::GetItemRectMax();
-
-    // ratio = number of frames visible in control / number to total frames
-
-    const int frameCount = ImMax(GetFrameMax() - GetFrameMin(), 1);
-    float startFrameOffset = ((float)(*first_frame - GetFrameMin()) / (float)frameCount) * (scrollbar_width);
-    ImVec2 scrollBarA(scrollBarMin.x, scrollBarMin.y - 2);
-    ImVec2 scrollBarB(scrollBarMin.x + scrollbar_width, scrollBarMax.y - 1);
-    draw_list->AddRectFilled(scrollBarA, scrollBarB, 0xFF222222, 0);
-
-    ImRect scrollBarRect(scrollBarA, scrollBarB);
-    bool inScrollBar = scrollBarRect.Contains(io.MousePos);
-
-    draw_list->AddRectFilled(scrollBarA, scrollBarB, 0xFF101010, 8);
-
-    const int visibleFrameCount = (int)floorf((scrollbar_width) / frame_pixel_width);
-    const float barWidthRatio = ImMin(visibleFrameCount / (float)frameCount, 1.f);
-    const float barWidthInPixels = barWidthRatio * (scrollbar_width);
-    ImVec2 scrollBarC(scrollBarMin.x + startFrameOffset, scrollBarMin.y);
-    ImVec2 scrollBarD(scrollBarMin.x + barWidthInPixels + startFrameOffset, scrollBarMax.y - 2);
-    draw_list->AddRectFilled(scrollBarC, scrollBarD, (inScrollBar || MovingScrollBar) ? 0xFF606060 : 0xFF505050, 6);
-
-    ImRect barHandleLeft(scrollBarC, ImVec2(scrollBarC.x + 14, scrollBarD.y));
-    ImRect barHandleRight(ImVec2(scrollBarD.x - 14, scrollBarC.y), scrollBarD);
-
-    bool onLeft = barHandleLeft.Contains(io.MousePos);
-    bool onRight = barHandleRight.Contains(io.MousePos);
-
-    ImRect scrollBarThumb(scrollBarC, scrollBarD);
-    static const float MinBarWidth = 44.f;
-
-    {
-        if (MovingScrollBar)
-        {
-            if (!io.MouseDown[0])
-            {
-                MovingScrollBar = false;
-            }
-            else
-            {
-                float framesPerPixelInBar = barWidthInPixels / (float)visibleFrameCount;
-                *first_frame = int((io.MousePos.x - panningViewSource.x) / framesPerPixelInBar) - panningViewFrame;
-                *first_frame = ImClamp(*first_frame, GetFrameMin(), ImMax(GetFrameMax() - visibleFrameCount, GetFrameMin()));
-            }
-        }
-        else
-        {
-            if (scrollBarThumb.Contains(io.MousePos) && ImGui::IsMouseClicked(0) && !MovingCurrentFrame)
-            {
-                MovingScrollBar = true;
-                panningViewSource = io.MousePos;
-                panningViewFrame = -*first_frame;
-            }
-
-        }
-    }
-
-    if (ImGui::IsWindowHovered())
-    {
-        float  frameOverCursor = *first_frame + (int)(visibleFrameCount * ((io.MousePos.x - canvas_pos.x) / (scrollbar_width)));
-        //frameOverCursor = max(min(*firstFrame - visibleFrameCount / 2, frameCount - visibleFrameCount), 0);
-
-        /**firstFrame -= frameOverCursor;
-        *firstFrame *= framePixelWidthTarget / framePixelWidth;
-        *firstFrame += frameOverCursor;*/
-        if (io.MouseWheel < -FLT_EPSILON)
-        {
-            *first_frame -= frameOverCursor;
-            *first_frame = int(*first_frame * 1.1f);
-            frame_pixel_width_target *= 0.9f;
-            *first_frame += frameOverCursor;
-        }
-
-        if (io.MouseWheel > FLT_EPSILON)
-        {
-            *first_frame -= frameOverCursor;
-            *first_frame = int(*first_frame * 0.9f);
-            frame_pixel_width_target *= 1.1f;
-            *first_frame += frameOverCursor;
-        }
-        *first_frame = ImClamp(*first_frame, GetFrameMin(), ImMax(GetFrameMax() - visibleFrameCount, GetFrameMin()));
-
-    }
+inline ImVec2 SequencerImgui::grid_to_screenspace(ImVec2 grid) const {
+    return (grid - grid_offset) / base_scale * scale + BASE_SCREENPOS;
 }
-void SequencerImgui::draw_header(int first_frame, const float WIDTH, int* current_frame)
-{
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    const int ItemHeight = 20;
 
-    const float header_height = 20.f;
-
-    const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
-
-    ImGui::InvisibleButton("headerregion", ImVec2(WIDTH, header_height));
-
-    //header frame number and lines
-    int modFrameCount = 10;
-    int frameStep = 1;
-    while ((modFrameCount * frame_pixel_width) < 150)
-    {
-        modFrameCount *= 2;
-        frameStep *= 2;
-    };
-    int halfModFrameCount = modFrameCount / 2;
-
-    auto drawLine = [&](int i, int regionHeight) {
-        bool baseIndex = ((i % modFrameCount) == 0) || (i == GetFrameMax() || i == GetFrameMin());
-        bool halfIndex = (i % halfModFrameCount) == 0;
-        int px = (int)canvas_pos.x + int(i * frame_pixel_width) /* + legendWidth*/ - int(first_frame * frame_pixel_width);
-        int tiretStart = baseIndex ? 4 : (halfIndex ? 10 : 14);
-        int tiretEnd = baseIndex ? regionHeight : ItemHeight;
-
-        if (px <= (WIDTH + canvas_pos.x) && px >= (canvas_pos.x /* + legendWidth */))
-        {
-            draw_list->AddLine(ImVec2((float)px, canvas_pos.y + (float)tiretStart), ImVec2((float)px, canvas_pos.y + (float)tiretEnd - 1), 0xFF606060, 1);
-
-            draw_list->AddLine(ImVec2((float)px, canvas_pos.y + (float)ItemHeight), ImVec2((float)px, canvas_pos.y + (float)regionHeight - 1), 0x30606060, 1);
-        }
-
-        if (baseIndex && px > (canvas_pos.x /* + legendWidth*/))
-        {
-            char tmps[512];
-            ImFormatString(tmps, IM_ARRAYSIZE(tmps), "%d", i);
-            draw_list->AddText(ImVec2((float)px + 3.f, canvas_pos.y), 0xFFBBBBBB, tmps);
-        }
-
-    };
-
-    auto drawLineContent = [&](int i, int /*regionHeight*/) {
-        int px = (int)canvas_pos.x + int(i * frame_pixel_width) /* + legendWidth*/ - int(first_frame * frame_pixel_width);
-        int tiretStart = int(canvas_pos.y);
-        int tiretEnd = int(canvas_pos.y) + header_height;
-
-        if (px <= (WIDTH + canvas_pos.x) && px >= (canvas_pos.x/* + legendWidth*/))
-        {
-            //draw_list->AddLine(ImVec2((float)px, canvas_pos.y + (float)tiretStart), ImVec2((float)px, canvas_pos.y + (float)tiretEnd - 1), 0xFF606060, 1);
-
-            draw_list->AddLine(ImVec2(float(px), float(tiretStart)), ImVec2(float(px), float(tiretEnd)), 0x30606060, 1);
-        }
-    };
-    for (int i = GetFrameMin(); i <= GetFrameMax(); i += frameStep)
-    {
-        drawLine(i, ItemHeight);
-    }
-    drawLine(GetFrameMin(), ItemHeight);
-    drawLine(GetFrameMax(), ItemHeight);
-    const int firstFrameUsed = first_frame;
-    // cursor
-    if (*current_frame >= first_frame && *current_frame <= GetFrameMax())
-    {
-        static const float cursorWidth = 4.f;
-        float cursorOffset = canvas_pos.x + (*current_frame - firstFrameUsed) * frame_pixel_width - cursorWidth * 0.5f;
-        draw_list->AddLine(ImVec2(cursorOffset, canvas_pos.y), ImVec2(cursorOffset, canvas_pos.y + 400.f), 0xA02A2AFF, cursorWidth);
-        char tmps[512];
-        ImFormatString(tmps, IM_ARRAYSIZE(tmps), "%d", *current_frame);
-        draw_list->AddText(ImVec2(cursorOffset + 10, canvas_pos.y + 2), 0xFF2A2AFF, tmps);
-    }
-
-    ImRect topRect(ImVec2(canvas_pos.x, canvas_pos.y), ImVec2(canvas_pos.x + WIDTH, canvas_pos.y + header_height));
-    auto& io = ImGui::GetIO();
-    if (!MovingCurrentFrame && !MovingScrollBar && *current_frame >= 0 && topRect.Contains(ImGui::GetIO().MousePos) && ImGui::GetIO().MouseDown[0])
-    {
-        MovingCurrentFrame = true;
-    }
-    if (MovingCurrentFrame)
-    {
-        const  int frameCount = ImMax(GetFrameMax() - GetFrameMin(), 1);
-        if (frameCount)
-        {
-            *current_frame = (int)((io.MousePos.x - topRect.Min.x + frame_pixel_width * 0.5) / frame_pixel_width) + firstFrameUsed;
-            if (*current_frame < GetFrameMin())
-                *current_frame = GetFrameMin();
-            if (*current_frame >= GetFrameMax())
-                *current_frame = GetFrameMax();
-        }
-        if (!io.MouseDown[0])
-            MovingCurrentFrame = false;
-    }
+inline ImVec2 SequencerImgui::screenspace_to_grid(ImVec2 screen) const {
+    return (screen - BASE_SCREENPOS) * base_scale * (ImVec2(1.0 / scale.x, 1.0 / scale.y)) + grid_offset;
 }
+
 static void draw_rectangle_rotated(ImVec2 max, ImVec2 min, ImColor color)
 {
 
@@ -214,50 +33,51 @@ bool track_overlaps(float start, float end, float s2, float end2)
 }
 
 
-void SequencerImgui::draw_items(const float timeline_width)
+bool SequencerImgui::draw_items()
 {
     auto canvas_pos = ImGui::GetCursorScreenPos();
 
     const int num_rows = number_of_event_rows();
-
+    bool hovered_any_items = false;
     const float item_height = 24.0;
     const float total_item_height = item_height * num_rows;
     auto draw_list = ImGui::GetWindowDrawList();
-
-    ImGui::InvisibleButton("dummy234", ImVec2(timeline_width, total_item_height));
-    ImGui::PushClipRect(ImVec2(canvas_pos.x, canvas_pos.y), canvas_pos + ImVec2(timeline_width, total_item_height), true);
-
-
-    if (movingEntry != -1 && !ImGui::GetIO().MouseDown[0]) {
-        movingEntry = -1;
-        moving_right_side = false;
+    const float HEADER_HEIGHT = 20.0;
+    if (!ImGui::GetIO().MouseDown[0]) {
+        is_dragging_selected = false;
     }
-    else if (movingEntry != -1) {
-        const  int frameCount = ImMax(GetFrameMax() - GetFrameMin(), 1);
-        if (frameCount)
-        {
-            int frame = 0;
 
-            frame = (int)((ImGui::GetIO().MousePos.x - canvas_pos.x + frame_pixel_width * 0.5) / frame_pixel_width) + firstFrame;
-            if (frame < GetFrameMin())
-                frame = GetFrameMin();
-            if (frame >= GetFrameMax())
-                frame = GetFrameMax();
+    if (is_dragging_selected) {
+        if (selectedEntry == -1 || selectedEntry >= items.size()) {
+            sys_print("??? is_dragging_slected null entry\n");
+        }
+        else {
+            auto mousepos = ImGui::GetMousePos();
+            auto gridspace = screenspace_to_grid(mousepos);
 
-            int track = 0;
-            track = (int)((ImGui::GetIO().MousePos.y - canvas_pos.y) / item_height);
-            const int num_rows_ex = number_of_event_rows_exclude(movingEntry);
-            if (track < 0)
-                track = 0;
-            if (track > num_rows_ex)
-                track = num_rows_ex;
-            items[movingEntry]->track_index = track;
+            clamp_point_to_grid(gridspace);
 
+            auto& item = items[selectedEntry];
+            
             if (moving_right_side) {
-                items[movingEntry]->time_end = frame - 1;
+                item->time_end = gridspace.x;
             }
-            else
-                items[movingEntry]->time_start = frame;
+            else {
+                item->time_start = gridspace.x;
+            }
+            if (!item->instant_item) {
+                if (item->time_end <= item->time_start)
+                    item->time_end = item->time_start + 1.0;
+            }
+
+            // find track index
+            mousepos.y -= BASE_SCREENPOS.y;
+            mousepos.y -= HEADER_HEIGHT;
+            int track = std::floor(mousepos.y / item_height);
+            item->track_index = track;
+            if (item->track_index < 0)item->track_index = 0;
+            if (item->track_index > 4)item->track_index = 4;
+
         }
     }
 
@@ -265,146 +85,326 @@ void SequencerImgui::draw_items(const float timeline_width)
         auto item = items[i].get();
         Color32 color = item->color;
 
+        // x coord is in grid space, y is in screen space
 
-        //size_t localCustomHeight = sequence->GetCustomHeight(i);
+        float x_start_ss = grid_to_screenspace(ImVec2(item->time_start, 0)).x;
+        float x_end_ss = grid_to_screenspace(ImVec2(item->time_end, 0)).x;
 
-        ImVec2 pos = ImVec2(canvas_pos.x - firstFrame * frame_pixel_width, canvas_pos.y + item->track_index * item_height);
+        float y_start_ss = BASE_SCREENPOS.y + HEADER_HEIGHT + item->track_index * item_height;
+        float y_end_ss = y_start_ss + item_height;
 
-        ImVec2 slotP1(pos.x + item->time_start * frame_pixel_width, pos.y + 2);
-        ImVec2 slotP2;
         if (item->instant_item) {
             auto size = ImGui::CalcTextSize(item->get_name().c_str());
-            slotP2 = ImVec2(slotP1.x + size.x + 6.0, pos.y + item_height - 1);
-        }
-        else {
-            slotP2 = ImVec2(pos.x + item->time_end * frame_pixel_width + frame_pixel_width, pos.y + item_height - 1);
+            x_end_ss = x_start_ss + size.x + 8.0;
         }
 
-        bool left_hovered = false;
-        bool right_hovered = false;
-        bool item_hovered = false;
-        if (slotP1.x <= (canvas_pos.x + timeline_width) && slotP2.x >= (canvas_pos.x))
+        Color32 rect_color = color;
+        rect_color.a = 128;
+        if (selectedEntry == i)
+            rect_color = { 252, 186, 3, 200 };
+        
+        draw_list->AddRectFilled(ImVec2(x_start_ss, y_start_ss), ImVec2(x_end_ss, y_end_ss), rect_color.to_uint(),2.0);
+
         {
-            //draw_list->AddRectFilled(slotP1, slotP3, slotColorHalf, 2);
+            // check draggables
+            const float HANDLE_SELECT_RADIUS = 8;
+            const float HANDLE_RADIUS = 4;
+            const ImVec2 HANDLE_RADIUS_V = ImVec2(HANDLE_RADIUS, HANDLE_RADIUS);
 
+            const ImVec2 HANDLE_SELECT_RADIUS_V = ImVec2(HANDLE_SELECT_RADIUS, HANDLE_SELECT_RADIUS);
+            ImVec2 lefthandle_c = ImVec2(x_start_ss, y_start_ss + item_height * 0.5);
 
-            Color32 rect_color = color;
-            rect_color.a = 128;
-            if (selectedEntry == i)
-                rect_color = { 252, 186, 3, 128 };
-
-            draw_list->AddRectFilled(slotP1, slotP2, rect_color.to_uint(), 2);
-
-            auto mousepos = ImGui::GetMousePos();
-            ImRect rect(slotP1, slotP2);
-            item_hovered = rect.Contains(mousepos);
-            // printf("%d\n", (int)item_hovered);
-
-            const float width = 6.0;
-
-            ImVec2 handle_l_center = slotP1 + ImVec2(0, item_height * 0.5);
-            left_hovered = ImLengthSqr(handle_l_center - mousepos) < width * width;
-
-            bool is_color_white = left_hovered || (movingEntry == i && !moving_right_side);
-            draw_rectangle_rotated(handle_l_center + ImVec2(width, width), handle_l_center - ImVec2(width, width), is_color_white ? COLOR_WHITE.to_uint() : color.to_uint());
-
-            if (!item->instant_item) {
-                ImVec2 handle_r_center = ImVec2(slotP2.x, slotP1.y) + ImVec2(0, item_height * 0.5);
-                right_hovered = ImLengthSqr(handle_r_center - mousepos) < width * width;
-                is_color_white = right_hovered || (movingEntry == i && moving_right_side);
-                draw_rectangle_rotated(handle_r_center + ImVec2(width, width), handle_r_center - ImVec2(width, width), is_color_white ? COLOR_WHITE.to_uint() : color.to_uint());
+            if (!is_dragging_selected &&
+                ImRect(lefthandle_c - HANDLE_SELECT_RADIUS_V, lefthandle_c + HANDLE_SELECT_RADIUS_V).Contains(ImGui::GetMousePos())
+                )
+            {
+                if (ImGui::GetIO().MouseClicked[0]) {
+                    selectedEntry = i;
+                    moving_right_side = false;
+                    is_dragging_selected = true;
+                }
             }
+            {
+                const bool is_select = is_dragging_selected && i == selectedEntry && !moving_right_side;
+                draw_rectangle_rotated(lefthandle_c + HANDLE_RADIUS_V, lefthandle_c - HANDLE_RADIUS_V, is_select ? COLOR_WHITE.to_uint() : color.to_uint());
+            }
+            
+            if (!item->instant_item) {
+                ImVec2 righthandle_c = ImVec2(x_end_ss, y_start_ss + item_height * 0.5);
+                if (!is_dragging_selected &&
+                    ImRect(righthandle_c - HANDLE_SELECT_RADIUS_V, righthandle_c + HANDLE_SELECT_RADIUS_V).Contains(ImGui::GetMousePos())
+                    )
+                {
+                    if (ImGui::GetIO().MouseClicked[0]) {
+                        selectedEntry = i;
+                        moving_right_side = true;
+                        is_dragging_selected = true;
+                    }
+                }
+                const bool is_select = is_dragging_selected && i == selectedEntry && moving_right_side;
+                draw_rectangle_rotated(righthandle_c + HANDLE_RADIUS_V, righthandle_c - HANDLE_RADIUS_V, is_select ? COLOR_WHITE.to_uint() : color.to_uint());
+            }
+
+            if (!is_dragging_selected && ImRect(ImVec2(x_start_ss, y_start_ss), ImVec2(x_end_ss, y_end_ss)).Contains(ImGui::GetMousePos())) {
+                if (ImGui::GetIO().MouseClicked[0]) {
+                    selectedEntry = i;
+                    is_dragging_selected = false;   // FALSE
+                }
+                hovered_any_items = true;
+                if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
+                    // set curve
+                    selectedEntry = i;
+                    ImGui::OpenPopup("item_popup");
+                }
+            }
+
+            draw_list->AddText(ImVec2(x_start_ss+6.0, y_start_ss+1.0), COLOR_WHITE.to_uint(), item->get_name().c_str());
+
         }
 
-        if (ImGui::GetIO().MouseClicked[0] && item_hovered && !left_hovered && !right_hovered && movingEntry == -1) {
-            selectedEntry = i;
-        }
-        else if (movingEntry == -1 && left_hovered && ImGui::GetIO().MouseDown[0]) {
-            movingEntry = i;
-            moving_right_side = false;
-        }
-        else if (movingEntry == -1 && right_hovered && ImGui::GetIO().MouseDown[0]) {
-            movingEntry = i;
-            moving_right_side = true;
-        }
-
-
-        // Ensure grabbable handles
-        const float max_handle_width = slotP2.x - slotP1.x / 3.0f;
-        const float min_handle_width = ImMin(10.0f, max_handle_width);
-        const float handle_width = ImClamp(frame_pixel_width / 2.0f, min_handle_width, max_handle_width);
-        ImRect rects[3] = { ImRect(slotP1, ImVec2(slotP1.x + handle_width, slotP2.y))
-            , ImRect(ImVec2(slotP2.x - handle_width, slotP1.y), slotP2)
-            , ImRect(slotP1, slotP2) };
-
-        if (slotP1.x <= (canvas_pos.x + timeline_width) && slotP2.x >= (canvas_pos.x))
-        {
-            draw_list->AddText(ImVec2(slotP1.x + 6.0, slotP1.y), 0xffffffff, item->get_name().c_str());
-        }
 
     }
+    if (ImGui::BeginPopup("item_popup")) {
+        if (selectedEntry == -1 || selectedEntry >= items.size()) {
+            sys_print("??? item_popup invalid item\n");
+            selectedEntry = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        else {
+            if (ImGui::Button("Delete")) {
+                items.erase(items.begin() + selectedEntry); // calls destructor
+                selectedEntry = -1;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
 
-
-    ImGui::PopClipRect();
-
+    return hovered_any_items;
 }
 void SequencerImgui::draw()
 {
+    set_scrubber_this_frame = false;
 
     if (!ImGui::Begin("Timeline")) {
         ImGui::End();
         return;
     }
 
-    ImGui::PushItemWidth(100);
-    ImGui::InputInt("Frame Min", &frameMin);
-    ImGui::SameLine();
-    ImGui::InputInt("Frame ", &currentFrame);
-    ImGui::SameLine();
-    ImGui::InputInt("Frame Max", &frameMax);
+    // >>> COPIED FROM CURVE EDITOR
+    BASE_SCREENPOS = ImGui::GetCursorScreenPos();
+    WINDOW_SIZE = ImGui::GetContentRegionAvail();
+ 
+    auto drawlist = ImGui::GetWindowDrawList();
+    const Color32 background = { 36, 36, 36 };
+    const Color32 edges = { 0, 0, 0, 128 };
 
-    frame_pixel_width_target = ImClamp(frame_pixel_width_target, 0.1f, 50.f);
-    frame_pixel_width = ImLerp(frame_pixel_width, frame_pixel_width_target, 0.33f);
+    // draw background
+    const float temp_ = WINDOW_SIZE.y;
+    WINDOW_SIZE.y -= 20;
+    WINDOW_SIZE.y = glm::max(WINDOW_SIZE.y, 0.1f);
 
-    ImGui::BeginGroup();
-    const  uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
-        ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
-    float TIMELINEWIDTH = 0.0;
-    if (ImGui::BeginTable("SequencerTable", 2, ent_list_flags))
+    // top black bar for timeline
+    const float TIMELINE_HEIGHT = 20.0;
+
+    // Base background
+    drawlist->AddRectFilled(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE, background.to_uint());
+
+
+    // to prevent moving window
+    ImGui::InvisibleButton("dummy234_", ImVec2(WINDOW_SIZE.x,
+        std::max(temp_ - 5.0f, 0.01f) /* hacked value, not sure how to get the exact value, some padding variable likely*/));
+    ImGui::PushClipRect(ImVec2(BASE_SCREENPOS), BASE_SCREENPOS + WINDOW_SIZE, true);
+
+    const bool is_window_focused_and_mouse_in_region = ImGui::IsWindowFocused() && ImRect(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE).Contains(ImGui::GetMousePos());
+
     {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
 
-        TIMELINEWIDTH = ImGui::GetColumnWidth();
+        auto min_ss = grid_to_screenspace(ImVec2(0, min_y_value));
 
-        draw_header(firstFrame, TIMELINEWIDTH, &currentFrame);
+        //if (min_ss.y - BASE_SCREENPOS.y <= WINDOW_SIZE.y) {
+        //    drawlist->AddRectFilled(ImVec2(BASE_SCREENPOS.x, min_ss.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
+        //}
+        //auto max_ss = grid_to_screenspace(ImVec2(0, max_y_value));
+        //if (max_ss.y - BASE_SCREENPOS.y >= 0) {
+        //    drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, max_ss.y), edges.to_uint());
+        //}
 
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
 
-        ImGui::Text("Events");
-        ImGui::TableNextColumn();
-        draw_items(TIMELINEWIDTH);
-
-        ImGui::EndTable();
+        drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, BASE_SCREENPOS.y + TIMELINE_HEIGHT),
+            IM_COL32(0, 0, 0, 255));
     }
 
-    // synced table for scrollbar
-    if (ImGui::BeginTable("SequencerTable", 2, ent_list_flags)) {
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
 
-        draw_scrollbar(&firstFrame, TIMELINEWIDTH, currentFrame);
+    const ImVec2 GRID_SPACING = ImVec2(64.0, 30.0);
+    ImVec2 grid_size = GRID_SPACING * scale;
 
-        ImGui::EndTable();
+    const ImVec2 subdivisions(2, 2);
+    const ImVec2 base_grid_size = GRID_SPACING;
+    const ImVec2 subdiv_size = ImVec2(2, 2);
+    const ImVec2 inv_subdiv_size = ImVec2(1.0 / subdiv_size.x, 1.0 / subdiv_size.y);
+    if (grid_size.x < base_grid_size.x) {
+        // too small
+        while (grid_size.x < base_grid_size.x * inv_subdiv_size.x)
+            grid_size.x *= subdiv_size.x;
     }
-    ImGui::EndGroup();
+    else {
+        while (grid_size.x > base_grid_size.x)
+            grid_size.x /= subdiv_size.x;
+    }
+    if (grid_size.y < base_grid_size.y) {
+        // too small
+        while (grid_size.y < base_grid_size.y * inv_subdiv_size.y)
+            grid_size.y *= subdiv_size.y;
+    }
+    else {
+        while (grid_size.y > base_grid_size.y)
+            grid_size.y /= subdiv_size.y;
+    }
+
+
+    ImVec2 subgrid_size = grid_size * ImVec2(1.0 / subdivisions.x, 1.0 / subdivisions.y);
+    ImVec2 dxdy_subgrid = screenspace_to_grid(subgrid_size) - screenspace_to_grid(ImVec2(0, 0));
+    if (dxdy_subgrid.x < 1.0) {
+        grid_size.x = scale.x / base_scale.x * subdivisions.x;
+        subgrid_size.x = grid_size.x / subdivisions.x;
+    }
+
+    ImVec2 dxdy_grid = screenspace_to_grid(grid_size) - screenspace_to_grid(ImVec2(0, 0));
+
+    ImU32 col_grid = IM_COL32(255, 50, 50, 40);
+    ImU32 col_subdiv = IM_COL32(200, 200, 200, 20);
+    float valx = BASE_SCREENPOS.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size.x);
+    float valy = BASE_SCREENPOS.y - fmod(grid_offset.y / base_scale.y * scale.y, grid_size.y);
+
+    const ImVec2 grid = screenspace_to_grid(ImVec2(valx, valy));
+    {
+        // X axis markings
+        int i = 0;
+        for (float x = BASE_SCREENPOS.x - fmod(grid_offset.x / base_scale.x * scale.x, grid_size.x); x < BASE_SCREENPOS.x + WINDOW_SIZE.x; x += grid_size.x) {
+            drawlist->AddLine(ImVec2(x, BASE_SCREENPOS.y), ImVec2(x, BASE_SCREENPOS.y + WINDOW_SIZE.y), col_grid);
+            drawlist->AddText(ImVec2(x, BASE_SCREENPOS.y), IM_COL32(150, 150, 150, 255), string_format("%.1f", grid.x + dxdy_grid.x * i));
+            for (int i = 1; i < subdivisions.x; i++) {
+                drawlist->AddLine(ImVec2(x + i * subgrid_size.x, BASE_SCREENPOS.y), ImVec2(x + i * subgrid_size.x, BASE_SCREENPOS.y + WINDOW_SIZE.y), col_subdiv);
+            }
+            i++;
+        }
+    }
+
+
+    {
+
+        auto origin_ss = grid_to_screenspace(ImVec2(0, 0));
+        if (origin_ss.x - BASE_SCREENPOS.x >= 0) {
+            drawlist->AddRectFilled(BASE_SCREENPOS, ImVec2(origin_ss.x, BASE_SCREENPOS.y + WINDOW_SIZE.y), edges.to_uint());
+        }
+
+        auto end_ss = grid_to_screenspace(ImVec2(max_x_value, 0));
+        if (end_ss.x - BASE_SCREENPOS.x <= WINDOW_SIZE.x) {
+            drawlist->AddRectFilled(ImVec2(end_ss.x, BASE_SCREENPOS.y), BASE_SCREENPOS + WINDOW_SIZE, edges.to_uint());
+        }
+    }
+
+    // Dont draw horizontal markings for timeline!
+
+   const bool was_any_hovered =  draw_items();
+
+
+    // middle mouse down
+    if (ImGui::GetIO().MouseDown[2] && ImGui::IsWindowFocused()) {
+        if (!started_pan)
+            pan_start = screenspace_to_grid(ImGui::GetMousePos());
+        started_pan = true;
+        auto mousepose = ImGui::GetMousePos();
+        auto in_gs = screenspace_to_grid(mousepose);
+        // set offset such that pan_start == in_gs
+
+        auto grid_wo_offset = screenspace_to_grid(mousepose) - grid_offset;
+
+        grid_offset.x = pan_start.x - grid_wo_offset.x;
+    }
+    else
+        started_pan = false;
+
+    const float MOUSE_SCALE_EXP = 0.25;
+    const float MIN_SCALE = 0.01;
+
+    if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001 && ImGui::IsWindowFocused() && ImGui::IsWindowHovered()) {
+        auto mousepos = ImGui::GetMousePos();
+        auto start = screenspace_to_grid(mousepos);
+        bool ctrl_is_down = ImGui::GetIO().KeyCtrl;
+
+        float wh = ImGui::GetIO().MouseWheel;
+        if (wh > 0) {
+          //  if (ctrl_is_down)
+       //         scale.y += scale.y * MOUSE_SCALE_EXP;
+     //       else
+                scale.x += scale.x * MOUSE_SCALE_EXP;
+        }
+        /* Dont allow Y scaling */
+        else {
+           // if (ctrl_is_down) {
+           //     scale.y -= scale.y * MOUSE_SCALE_EXP;
+           //     if (scale.y < MIN_SCALE) scale.y = MIN_SCALE;
+           // }
+             {
+                scale.x -= scale.x * MOUSE_SCALE_EXP;
+                if (scale.x < MIN_SCALE) scale.x = MIN_SCALE;
+            }
+        }
+        // set grid offsets to maintain positon
+        auto in_gs = screenspace_to_grid(mousepos);
+        auto grid_wo_offset = screenspace_to_grid(mousepos) - grid_offset;
+        grid_offset = start - grid_wo_offset;
+    }
+
+    if (!ImGui::GetIO().MouseDown[0])
+        dragging_scrubber = false;
+
+
+
+    // draw and update timeline scrubber
+    if (ImRect(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, BASE_SCREENPOS.y + TIMELINE_HEIGHT)).Contains(ImGui::GetMousePos())
+        && ImGui::IsWindowFocused()  /* && not dragging point !!*/) {
+        if (ImGui::GetIO().MouseDown[0]) {
+            dragging_scrubber = true;
+        }
+    }
+    if (dragging_scrubber) {
+        auto gridspace = screenspace_to_grid(ImGui::GetMousePos());
+        current_time = gridspace.x;
+        if (snap_scrubber_to_grid) {
+            current_time = std::round(current_time / grid_snap_size.x) * grid_snap_size.x;
+        }
+
+        if (current_time < 0.0)
+            current_time = 0.0;
+        if (current_time > max_x_value)
+            current_time = max_x_value;
+
+        set_scrubber_this_frame = true;
+    }
+    {
+        auto pos_of_scrubber = grid_to_screenspace(ImVec2(current_time, 0));
+        const char* time_str = string_format("%.2f", current_time);
+        auto& style = ImGui::GetStyle();
+        float time_str_width = ImGui::CalcTextSize(time_str).x + style.FramePadding.x * 1.0f;
+        float off = time_str_width * 0.5;
+        drawlist->AddLine(ImVec2(pos_of_scrubber.x, BASE_SCREENPOS.y), ImVec2(pos_of_scrubber.x, BASE_SCREENPOS.y + WINDOW_SIZE.y), IM_COL32(27, 145, 247, 255), 2.0);
+        drawlist->AddRectFilled(ImVec2(pos_of_scrubber.x - off, BASE_SCREENPOS.y), ImVec2(pos_of_scrubber.x + off, BASE_SCREENPOS.y + TIMELINE_HEIGHT), IM_COL32(27, 145, 247, 255), 6.0);
+        drawlist->AddText(ImVec2(pos_of_scrubber.x - off + 2.0, BASE_SCREENPOS.y), IM_COL32(255, 255, 255, 255), time_str);
+    }
+
+    if (!dragging_scrubber && !is_dragging_selected && ImGui::IsWindowFocused() && !was_any_hovered && ImGui::GetIO().MouseClicked[1]) {
+        ImGui::OpenPopup("creation_ctx_menu");
+    }
+    if (ImGui::BeginPopup("creation_ctx_menu")) {
+        context_menu_callback();
+        ImGui::EndPopup();
+    }
+
+    // printf("%f\n",grid_offset)
+    ImGui::PopClipRect();
 
     ImGui::End();
 }

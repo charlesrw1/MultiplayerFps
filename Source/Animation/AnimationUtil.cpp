@@ -157,21 +157,6 @@ void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_m
 
 
 
-void util_localspace_to_meshspace(Pose& local, const glm::mat4* meshspace /* size = num bones*/, const MSkeleton* skel)
-{
-	const int count = skel->get_num_bones();
-	for (int i = 0; i < count; i++) {
-		const int parent = skel->get_bone_parent(i);
-
-		glm::mat4 matrix = meshspace[i];
-		if (parent != -1) {
-			matrix = glm::inverse(meshspace[parent]) * matrix;
-		}
-
-		local.pos[i] = matrix[3];
-		local.q[i] = glm::quat_cast(matrix);
-	}
-}
 
 void util_global_blend(const MSkeleton* skel, const Pose* a,  Pose* b, float factor, const std::vector<float>& mask)
 {
