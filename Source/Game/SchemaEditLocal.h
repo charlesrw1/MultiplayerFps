@@ -4,4 +4,6 @@
 class SchemaEditorLocal : public IEditorTool
 {
 public:
+
+
 };

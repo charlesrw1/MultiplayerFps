@@ -118,6 +118,7 @@
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\WriteObject.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
+    <ClInclude Include="Source\Game\SchemaEditLocal.h" />
     <ClInclude Include="Source\Game_Engine.h" />
     <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IAsset.h" />
@@ -181,7 +182,7 @@
     <ClCompile Include="Source\DrawLocal.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
     <ClCompile Include="Source\EditorDocLocal.cpp" />
-    <ClCompile Include="Source\EntityTypes.cpp" />
+    <ClCompile Include="Source\Entity.cpp" />
     <ClCompile Include="Source\EnvProbe.cpp" />
     <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\External\imgui.cpp" />
@@ -212,6 +213,7 @@
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
+    <ClCompile Include="Source\Game\SchemaEditLocal.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />

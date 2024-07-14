@@ -563,6 +563,7 @@ static float reload_time = 1.9f;
 
 void Player::change_to_item(int next_item)
 {
+#if 0
 	ASSERT(next_item >= 0 && next_item < Game_Inventory::NUM_GAME_ITEMS);
 	ASSERT(inv.active_item >= 0 && inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
 
@@ -583,10 +584,12 @@ void Player::change_to_item(int next_item)
 	inv.pending_item = next_item;
 	inv.state = ITEM_LOWERING;
 	inv.timer = cur.holster_time;
+#endif
 }
 
 void Player::item_update()
 {
+#if 0
 	Game_Inventory& inv = this->inv;
 	bool is_simulated_client = !eng->is_host();
 
@@ -739,9 +742,10 @@ void Player::item_update()
 	case ITEM_USING:
 		break;
 	}
+#endif
 }
 
-
+#if 0
 ViewmodelComponent::~ViewmodelComponent()
 {
 	idraw->remove_obj(viewmodel_handle);
@@ -820,14 +824,8 @@ void ViewmodelComponent::update_visuals()
 	}
 	idraw->update_obj(viewmodel_handle, proxy);
 }
+#endif
 
-void Player::present()
-{
-	Entity::present();
-
-	if (viewmodel) 
-		viewmodel->update_visuals();
-}
 
 
 Player::Player() 
@@ -853,31 +851,6 @@ void Player::set_input_command(Move_Command newcmd) {
 	this->cmd = newcmd;
 }
 
-void Player::spawn(const Dict& spawnargs) {
-	Entity::spawn(spawnargs);
-
-	set_model("player_FINAL.cmdl");
-
-	//kinematic_actor = g_physics->allocate_physics_actor();
-
-	bool is_local_player = &eng->local_player() == this;
-	
-	if (is_local_player && !viewmodel) {
-		viewmodel.reset(new ViewmodelComponent(this));
-	}
-
-	auto graph = anim_tree_man->find_animation_tree("savenamed.txt");
-	if (graph && graph->get_graph_is_valid() && get_model() && get_model()->get_skel())
-		animator.initialize_animator(get_model(), graph, this);
-
-	health = 100;
-
-	find_a_spawn_point();
-
-	for (int i = 0; i < Game_Inventory::NUM_GAME_ITEMS; i++)
-		inv.ammo[i] = 200;
-}
-
 
 void Player::update()
 {
@@ -890,10 +863,6 @@ void Player::update()
 
 	move();
 	item_update();
-
-	if (viewmodel) {
-		viewmodel->update();
-	}
 }
 
 glm::vec3 Player::calc_eye_position()
@@ -961,7 +930,7 @@ static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& v
 
 
 }
-
+#if 0
 void ViewmodelComponent::update()
  {
 	static bool first = true;
@@ -1063,3 +1032,4 @@ void ViewmodelComponent::update()
 // client side update game logic
 //		for all objects
 //			client update
+#endif

@@ -45,15 +45,7 @@ void Door::update()
 {
 	rotation.y = eng->time;
 }
-void Door::spawn(const Dict& args)
-{
 
-}
-
-void NPC::spawn(const Dict& args)
-{
-
-}
 
 void Game_Engine::populate_map()
 {
@@ -67,7 +59,7 @@ void Game_Engine::populate_map()
 		Entity* e = create_entity(classname, -1);
 		if (!e)
 			continue;
-		e->spawn(spawners[i].dict);
+		//e->spawn(spawners[i].dict);
 	}
 }
 
@@ -82,7 +74,7 @@ void Game_Engine::make_client(int slot)
 {
 	sys_print("making client %d\n", slot);
 	Player* p = (Player*)create_entity("Player", slot);
-	p->spawn({});
+	//p->spawn({});
 }
 #include "EntityTypes.h"
 
@@ -285,61 +277,7 @@ void RenderInterpolationComponent::clear()
 }
 
 
-void Entity::projectile_physics()
-{
-	for (int i = 0; i < 5; i++) {
-
-	}
-}
-void Entity::gravity_physics()
-{
-#if 0
-	bool bounce = true;
-	bool slide = true;
-
-	velocity.y -= (12.f * eng->tick_interval);
-	int bumps = 4;
-	bool hit_a_wall = false;
-	float time = eng->tick_interval;
-	vec3 pre_velocity = velocity;
-	glm::vec3 first_n;
-	GeomContact contact{};
-	for (int i = 0; i < bumps; i++) {
-		vec3 end = position + velocity * (time / bumps);
-		
-		contact = eng->phys.trace_shape(Trace_Shape(end, phys_opt.get_radius()), selfid, PF_WORLD);
-
-		if (contact.found) {
-			position = end + contact.penetration_normal * (contact.penetration_depth);
-
-			if (!hit_a_wall) {
-				hit_a_wall = true;
-			}
-			first_n = contact.surf_normal;
-
-			if (1) {
-				vec3 penetration_velocity = dot(velocity, contact.penetration_normal) * contact.penetration_normal;
-				vec3 slide_velocity = velocity - penetration_velocity;
-				velocity = slide_velocity;
-			}
-		}
-		else position = end;
-	}
-	if (hit_a_wall) {
-		//collide(nullptr, contact);
-		if (bounce) {
-			velocity = glm::reflect(pre_velocity, first_n);
-			velocity *= 0.6f;
-		}
-	}
-#endif
-}
 #include <PxPhysics.h>
-
-void Entity::update()
-{
-	gravity_physics();
-}
 
 
 
@@ -358,18 +296,9 @@ Grenade::Grenade()
 {
 }
 
-void Grenade::spawn(const Dict& args)
-{
-	Entity::spawn(args);
-	set_model("grenade_he.cmdl");
-	
-	throw_time = eng->time;
-}
-
 
 void Grenade::update()
 {
-	Entity::update();
 
 	if (eng->time - throw_time > 2.5) {
 		sys_print("BOOM\n");
@@ -388,47 +317,10 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 }
 Entity::~Entity()
 {
-	printf("removed handle %d\n",render_handle.id);
-	idraw->remove_obj(render_handle);
-	if (physics_actor)
-		g_physics->free_physics_actor(physics_actor);
-
-}
-Entity::Entity()
-{
+	
 
 }
 
-void Entity::spawn(const Dict& args)
-{
-	name_id = args.get_string("name", "");
-	position = args.get_vec3("position");
-	rotation = args.get_quat("rotation");
-	scale = args.get_vec3("scale", glm::vec3(1.f));
-	const char* modelname = args.get_string("model", "");
-	if (*modelname)
-		set_model(modelname);
-	renderable.param1 = args.get_color("color", COLOR_WHITE);
-	if ((bool)args.get_int("start_hidden", 0))
-		flags = EntityFlags::Enum(flags | EntityFlags::Hidden);
-}
-
-void Entity::present()
-{
-	if (!render_handle.is_valid() && can_render_this_object())
-		render_handle = idraw->register_obj();
-	else if (render_handle.is_valid() && !can_render_this_object())
-		idraw->remove_obj(render_handle);
-
-	if (render_handle.is_valid() && can_render_this_object()) {
-		assert(renderable.model);
-
-		renderable.visible = !is_object_hidden();
-		renderable.animator = get_animator();
-		renderable.transform = get_world_transform();// * model->skeleton_root_transform;
-		idraw->update_obj(render_handle, renderable);
-	}
-}
 
 #include "glm/gtx/euler_angles.hpp"
 glm::mat4 Entity::get_world_transform()

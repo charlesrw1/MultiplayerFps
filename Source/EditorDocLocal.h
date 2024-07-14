@@ -151,6 +151,8 @@ public:
 	}
 	glm::mat4 get_transform();
 
+	std::unique_ptr<Entity> editing_entity;
+
 	handle<Render_Object> render_handle;
 	PhysicsActor* physics = nullptr;
 	
@@ -224,35 +226,6 @@ private:
 	bool model_is_dirty = true;
 	 Model* current_model = nullptr;
 };
-
-class DecalNode
-{
-
-};
-
-class SplineNode
-{
-
-};
-
-class RegionShape
-{
-
-};
-
-// for triggers, defining regions, or editor geometry
-class LightNode
-{
-
-};
-
-// some considerations:
-// raycasting
-// can hook into physics world and add your own physics objects
-// easy
-
-// engine systems might be assuming we are playing the game (have a player spawned)
-// can either fake a player or set a flag, setting a flag might be better to avoid weird behavior where its asusmed we are spawned
 
 class Command
 {

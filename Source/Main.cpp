@@ -498,12 +498,6 @@ Model* Game_Media::get_game_model_from_index(int index)
 	return model_cache[index];
 }
 
-void Entity::set_model(const char* model_name)
-{
-	renderable.model = mods.find_or_load(model_name);
-}
-
-
 struct Sound
 {
 	char* buffer;
@@ -813,7 +807,7 @@ DECLARE_ENGINE_CMD(spawn_npc)
 		auto npc = eng->create_entity("NPC");
 		if (npc) {
 			npc->position = rh.pos;
-			npc->spawn({});
+			//npc->spawn({});
 		}
 	}
 }
@@ -1258,22 +1252,9 @@ void Game_Engine::build_physics_world(float time)
 
 void Game_Engine::update_game_tick()
 {
-
-	for (auto ei = Ent_Iterator(); ei.finish_at(Ent_Iterator(MAX_CLIENTS)); ei = ei.next()) {
-		Entity& e = ei.get();
-
-		Player* p = e.cast_to<Player>();
-		assert(p);
-
-		// fixme
-		p->update();
-		p->present();
-	}
-
-	for (auto ei = Ent_Iterator(MAX_CLIENTS); !ei.finished(); ei = ei.next()) {
+	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
 		Entity& e = ei.get();
 		e.update();
-		e.present();
 	}
 }
 
@@ -1464,15 +1445,7 @@ void Game_Engine::game_update_tick()
 	//}
 
 	// fixme:
-	CPUSCOPESTART(animation_update); 
-	{
-		for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-			Entity& e = ei.get();
-			if (!e.get_animator())
-				continue;
-			e.get_animator()->tick_tree_new(eng->tick_interval);
-		}
-	}
+
 }
 
 void perf_tracker()

@@ -15,20 +15,11 @@ class Animation_Set;
 
 
 
-class Player;
-struct ViewmodelComponent
-{
-	ViewmodelComponent(Player* player); 
-	~ViewmodelComponent();
+CLASS_H(PlayerGun, Entity)
+public:
+	MeshComponent gunmesh;
 
-	Model* model = nullptr;
-	AnimatorInstance animator;
-	Player* player = nullptr;
-
-	void update();
-	void update_visuals();
-
-	handle<Render_Object> viewmodel_handle;
+	Player* owner = nullptr;
 
 	glm::vec3 lastoffset;
 	glm::quat lastrot;
@@ -46,6 +37,7 @@ struct ViewmodelComponent
 	glm::vec3 viewmodel_recoil_ofs = glm::vec3(0.f);
 	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
 };
+
 
 extern void find_spawn_position(Entity* ent);
 
@@ -69,10 +61,25 @@ CLASS_H(Player, Entity)
 
 	Player();
 
+public:
+	MeshComponent player_mesh;
+
+	CapsuleComponent player_capsule;
+
+	MeshComponent viewmodel_mesh;
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(Player)
+			REG_COMPONENT(player_capsule,PROP_DEFAULT,"Root"),
+			REG_COMPONENT(player_mesh,PROP_DEFAULT,""),
+			REG_COMPONENT(viewmodel_mesh, PROP_DEFAULT, ""),
+		END_PROPS(Player)
+	};
+
+public:
+
 	// Entity overrides
-	void spawn(const Dict& spawnargs) override;
 	void update() override;
-	void present() override;
 
 	// called by game before calling update
 	void set_input_command(Move_Command cmd);
@@ -94,15 +101,6 @@ CLASS_H(Player, Entity)
 	bool is_on_ground() const { return action != Action_State::Falling && action != Action_State::Jumped; }
 
 	Move_Command cmd;
-
-	PhysicsActor* kinematic_actor = nullptr;
-
-	unique_ptr<ViewmodelComponent> viewmodel;
-	unique_ptr<LagCompensationComponent> lagcomp;
-
-	// animation system driver
-	CharacterGraphDriver animator;
-	AnimatorInstance* get_animator() override { return &animator; }
 
 	virtual glm::vec3 get_velocity() const  override {
 		return velocity;

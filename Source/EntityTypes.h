@@ -7,20 +7,26 @@
 #include "Framework/Dict.h"
 
 
-
 using namespace glm;
 CLASS_H(NPC, Entity)
 
 	NPC() {
-		set_model("player_FINAL.glb");
 		pathfind_state = going_towards_waypoint;
 		position = vec3(0.f);
-
 		rotation.y = HALFPI;
 	}
 	glm::vec3 velocity = glm::vec3(0.f);
 
-	virtual void spawn(const Dict& spawnargs) override;
+	CapsuleComponent npc_hitbox;
+	MeshComponent npc_model;
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(NPC)
+			REG_COMPONENT(npc_model, PROP_DEFAULT, ""),
+			REG_COMPONENT(npc_hitbox, PROP_DEFAULT,"")
+		END_PROPS(NPC)
+	}
+
 	virtual void update() override {
 
 		glm::vec3 waypoints[3] = {
@@ -88,9 +94,6 @@ CLASS_H(NPC, Entity)
 		turning_to_next_waypoint
 	}pathfind_state;
 
-	void update_animation_inputs() {
-		
-	}
 
 	bool strafe_only = true;
 	float ground_accel = 6.5f;
@@ -100,25 +103,42 @@ CLASS_H(NPC, Entity)
 };
 
 CLASS_H(Door, Entity)
-
+public:
 	enum {
 		OPEN,
 		CLOSED
 	}doorstate;
 
-	void spawn(const Dict& spawnargs) override;
+	bool start_open = false;
+	bool start_locked = false;
+
+	MeshComponent door_mesh;
+	MeshComponent door_handle;
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(Door)
+			REG_BOOL(start_locked,PROP_DEFAULT,""),
+			REG_BOOL(start_open,PROP_DEFAULT,""),
+			REG_COMPONENT(door_mesh, PROP_DEFAULT, ""),
+			REG_COMPONENT(door_handle, PROP_DEFAULT, ""),
+		END_PROPS(Door)
+	
+	}
+
 	void update() override;
 };
 
 CLASS_H(Grenade, Entity)
-
+public:
 	Grenade();
+
+	CapsuleComponent grenade_collider;
+	MeshComponent grenade_mesh;
 
 	void set_thrower(entityhandle handle) {
 		thrower = handle;
 	}
 
-	void spawn(const Dict& spawnargs) override;
 	void update() override;
 
 	float throw_time = 0.0;

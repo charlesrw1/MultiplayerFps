@@ -58,6 +58,12 @@
     <Filter Include="Source\Animation\Runtime\ValueNode">
       <UniqueIdentifier>{8af99ab6-1a95-4d41-8116-cf4777c60443}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Game\Editor">
+      <UniqueIdentifier>{41d11b73-e30f-4a8d-85c3-c8a5ea138cbd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\Components">
+      <UniqueIdentifier>{4efdd015-6f44-40e3-bfe6-7198efa7ec88}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -460,6 +466,9 @@
     <ClInclude Include="Source\Render\MaterialPublic.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Game\SchemaEditLocal.h">
+      <Filter>Source\Game\Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -609,7 +618,7 @@
     <ClCompile Include="Source\Player.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
-    <ClCompile Include="Source\EntityTypes.cpp">
+    <ClCompile Include="Source\Entity.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Physics\Editor\PhysicsEditorLocal.cpp">
@@ -693,6 +702,9 @@
     </ClCompile>
     <ClCompile Include="Source\Framework\Sequencer.cpp">
       <Filter>Source\Framework\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\SchemaEditLocal.cpp">
+      <Filter>Source\Game\Editor</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

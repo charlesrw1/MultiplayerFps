@@ -11,6 +11,8 @@
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringName.h"
 #include "Framework/ClassBase.h"
+#include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/ReflectionProp.h"
 
 class Model;
 class GeomContact;
@@ -28,95 +30,6 @@ struct EntityFlags
 
 typedef uint32_t entityhandle;
 
-class Entity;
-class EntityRef
-{
-public:
-	EntityRef() : index(0), guid(0) {}
-	explicit EntityRef(const Entity* e) {}
-	EntityRef(uint32_t index, uint32_t guid) : index(index), guid(guid) {}
-
-	Entity* get() const;
-	void print() const;
-private:
-	uint32_t index : 20;
-	uint32_t guid : 12;
-};
-
-enum class GenericAttachment_e : uint8_t
-{
-	Mesh,
-	Fx,
-	Light,
-	Decal,
-};
-
-class GenericAttachment_t
-{
-public:
-	bool is_attached_to_bone() const { return bone != 0xff; }
-	int get_bone() const { return bone; }
-	GenericAttachment_e get_type() const { return type; }
-	// returns false if should be removed
-	bool update();
-
-	void create_render();
-	void create_fx();
-	void create_light();
-	void create_decal();
-
-	union {
-		int render_handle = -1;
-		int fx_handle;
-		int light_handle;
-		int decal_handle;
-	};
-	uint16_t custom = 0;
-	GenericAttachment_e type = GenericAttachment_e::Mesh;
-	uint8_t bone = 0xff;
-	glm::mat4x3 transform = glm::mat4(1.0);
-};
-
-
-enum class call_type_e : uint8_t
-{
-	event_on_handle,
-	event_on_self,
-	event_on_activator,
-};
-
-struct RegisteredEvent
-{
-	StringName ev_name;
-	call_type_e call_type = call_type_e::event_on_handle;
-	entityhandle call_this_on;
-	float delay = 0.0;
-	RegisteredEvent* next = nullptr;
-};
-
-
-// list of observers that are connected to signals, such as OnTrigger, OnTouch, OnPlayerKilled etc.
-// these then either send an event to an entity or broadcast it globally
-class SignalObservers
-{
-public:
-	void post_signal(StringName name, entityhandle handle);
-	std::vector<RegisteredEvent> signal_map;
-};
-
-struct EntInputEvent
-{
-	// args
-	// entityhandle to call on
-	// entityhandle that kicked off the chain
-};
-
-
-// specific input commands like Damage, Kill, Open, Close, Play, Pause, etc. that can be queued up, or called immeadeatley
-class EntityEventBus
-{
-public:
-};
 
 struct UpdateFlags
 {
@@ -130,51 +43,139 @@ struct UpdateFlags
 class PhysicsActor;
 class Dict;
 
-CLASS_H(Entity, ClassBase)
 
+// EntityComponents are used for shared data/logic between Entities
+// such as Meshes, Physics, Sounds, Fx, etc.
+// is ordered in a heirarchy
+class Entity;
+CLASS_H(EntityComponent, ClassBase)
+public:
+	virtual ~EntityComponent() {}
+
+	void destroy();
+
+	virtual void tick() {}
+
+	template<typename T>
+	static PropertyInfo generate_prop_info(T* dummyptr, const char* name, uint16_t offset, uint32_t flags, const char* hint_str="") {
+		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
+		PropertyInfo pi;
+		pi.name = name;
+		pi.offset = offset;
+		pi.custom_type_str = "EntityComponent";
+		pi.flags = flags;
+		pi.type = core_type_id::Struct;
+		pi.range_hint = hint_str;
+		return pi;
+	}
+
+	Entity* get_owner() { return entity_owner; }
+
+	void attach_to_component(EntityComponent* parent_component, StringName point);
+
+	void remove_this(EntityComponent* component) {}
+
+#ifdef EDITOR_ONLY
+	// compile any data relevant to the node
+	virtual bool editor_compile() { return true; }
+	virtual bool editor_only() const { return false; }
+	virtual void editor_begin()  {}
+	virtual void editor_tick() {}
+	virtual void editor_on_change_property(const PropertyInfo& property_) {}
+	uint64_t editor_uid = 0;
+	bool editor_is_selected = false;
+#endif
+
+private:
+	Entity* entity_owner = nullptr;
+
+	EntityComponent* attached_parent = nullptr;
+	StringName attached_bone_name;	// if non 0, determines 
+	glm::vec3 location = glm::vec3(0.f);
+	glm::quat rotation = glm::quat();
+	glm::vec3 scale = glm::vec3(1.f);
+
+	std::vector<EntityComponent*> children;
+
+	StringName self_name;
+	std::vector<StringName> tags;
+};
+
+
+#define REG_COMPONENT(name, flags, hint) EntityComponent::generate_prop_info( \
+&((TYPE_FROM_START*)0)->name, \
+#name, offsetof(TYPE_FROM_START,name), flags, hint)
+
+
+CLASS_H(EmptyComponent, EntityComponent)
+public:
+	~EmptyComponent() override {}
+};
+
+CLASS_H(MeshComponent, EntityComponent)
+public:
+	MeshComponent();
+	~MeshComponent() override;
+
+	void tick() override;
+
+	void set_model(const char* model_path);
+	
+	template<typename T>
+	void set_animator_class() {
+		set_animator_class(&T::StaticType);
+	}
+	void set_animator_class(const ClassTypeInfo* ti);
+
+	bool is_simulating = false;
+	bool is_hidden = false;
+private:
+	const ClassTypeInfo* animator_type = nullptr;
+	unique_ptr<AnimatorInstance> animator;
+	handle<Render_Object> draw_handle;
+	Render_Object renderable;
+	PhysicsActor* physics_actor = nullptr;
+	Model* model = nullptr;
+};
+
+CLASS_H(CapsuleComponent, EntityComponent)
+public:
+
+};
+CLASS_H(BoxComponent, EntityComponent)
+public:
+
+};
+// sound,particle,light, etc. components
+
+CLASS_H(Entity, ClassBase)
 	Entity();
 	virtual ~Entity();
 
-	// initialize values
-	virtual void spawn(const Dict& spawn_args);
-	// initialize anything that depends on references to other entities
-	virtual void post_spawn(const Dict& spawn_args) {}
-	virtual void update();
-	virtual void present();
+	// called after properties were copied over
+	virtual void post_load_properties() {}
 
-	bool has_physics_actor() const { return physics_actor; }
+	// called on spawn
+	virtual void start() {}
+
+	// called every game tick when actor is ticking
+	virtual void update() {}
+
+	void update_entity_and_components();
 
 	entityhandle selfid = 0;	// eng->ents[]
 	std::string name_id;		// name of entity frome editor
 
-	PhysicsActor* physics_actor = nullptr;
 	glm::vec3 scale = glm::vec3(1.f);
 	glm::vec3 position = glm::vec3(0.0);
 	glm::quat rotation = glm::quat();
+
 	glm::vec3 esimated_accel = glm::vec3(0.f);
-
 	EntityFlags::Enum flags = EntityFlags::Enum(0);
-	int health = 100;
-	
-	// fix this garbo
-	Game_Inventory inv;
-
-	handle<Render_Object> render_handle;
-	Render_Object renderable;
-
-	virtual AnimatorInstance* get_animator() { return nullptr; }
-
-	void set_model(const char* model);
 
 	virtual glm::vec3 get_velocity() const {
 		return glm::vec3(0.f);
 	}
-
-	void move();
-	void projectile_physics();
-	void gravity_physics();
-	void mover_physics();
-
 
 	bool has_flag(EntityFlags::Enum flag) const {
 		return flags & flag;
@@ -186,11 +187,65 @@ CLASS_H(Entity, ClassBase)
 			flags = EntityFlags::Enum(flags & (~flag));
 	}
 	glm::mat4 get_world_transform();
-	bool can_render_this_object() const {
-		return renderable.model && !is_object_hidden();
+
+
+	void attach_to_entity(Entity* parent, StringName bone) {
+		attach_to_component(parent->get_root_component(), bone);
 	}
-	bool is_object_hidden() const {
-		return flags & EntityFlags::Hidden;
+	void attach_to_component(EntityComponent* parent_comp, StringName bone);
+
+	template<typename T>
+	T* get_first_component() {
+		for (int i = 0; i < all_components.size(); i++)
+			if (all_components[i]->is_a<T>())
+				return all_components[i];
+		return nullptr;
 	}
-	Model* get_model() const { return renderable.model; }
+	EntityComponent* get_root_component() {
+		return root_component;
+	}
+	template<typename T>
+	void get_all_components(std::vector<T*>& array) {
+		for (int i = 0; i < all_components.size(); i++)
+			if (all_components[i]->is_a<T>())
+				array.push_back(all_components[i]);
+	}
+
+	void remove_this_component(EntityComponent* component) {}
+private:
+	// if no components are set to root, this is used as a substitute
+	// thus an entity always has a root component to attach stuff to
+	EmptyComponent default_root;
+
+	EntityComponent* root_component = nullptr;
+	std::vector<EntityComponent*> all_components;
+	// components created either in code or defined in schema or created per instance
+	std::vector<unique_ptr<EntityComponent>> dynamic_components;
+public:
+	template<typename T>
+	static PropertyInfo generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags) {
+		static_assert(std::is_base_of<Entity, T>::value, "Type not derived from Entity");
+		PropertyInfo pi;
+		pi.name = name;
+		pi.offset = offset;
+		pi.flags = flags;
+		pi.range_hint = T::StaticType.classname;
+		pi.custom_type_str = "EntityRef";
+		pi.type = core_type_id::Struct;
+		return pi;
+	}
+
+#ifdef EDITOR_ONLY
+	virtual bool editor_compile() { return true; }
+	virtual bool editor_only() const { return false; }
+	virtual void editor_begin() {}
+	virtual void editor_tick() {}
+	virtual void editor_on_change_property(const PropertyInfo& property_) {}
+	uint64_t editor_uid = 0;
+	bool editor_is_selected = false;
+#endif
+
 };
+#define REG_ENTITY_REF(name, flags) Entity::generate_entity_ref_property( \
+&((TYPE_FROM_START*)0)->name, \
+#name, offsetof(TYPE_FROM_START,name), flags)
