@@ -68,11 +68,14 @@ public:
 
 	MeshComponent viewmodel_mesh;
 
+	AssetPtr<Model> a_second_model;
+
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)
 			REG_COMPONENT(player_capsule,PROP_DEFAULT,"Root"),
 			REG_COMPONENT(player_mesh,PROP_DEFAULT,""),
 			REG_COMPONENT(viewmodel_mesh, PROP_DEFAULT, ""),
+			REG_ASSET_PTR(a_second_model, PROP_DEFAULT)
 		END_PROPS(Player)
 	};
 

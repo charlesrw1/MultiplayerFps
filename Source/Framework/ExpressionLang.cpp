@@ -1,7 +1,10 @@
 #include "Framework/ExpressionLang.h"
 #include "Framework/Handle.h"
-
 #include "Framework/StringUtil.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ReflectionProp.h"
+#include "Framework/EnumDefReflection.h"
+
 static void replace(std::string& str, const std::string& from, const std::string& to) {
 	if (from.empty())
 		return;
@@ -1240,9 +1243,7 @@ Program::find_tuple Program::find_def(const std::string& name) const
 	return find_tuple();
 }
 
-#include "Framework/ReflectionRegisterDefines.h"
-#include "Framework/ReflectionProp.h"
-#include "Framework/EnumDefReflection.h"
+
 ENUM_START(script_types)
 	STRINGIFY_EUNM(script_types::bool_t, 0),
 	STRINGIFY_EUNM(script_types::int_t, 1),
@@ -1261,7 +1262,7 @@ const PropertyInfoList* ScriptVariable::get_props()
 		REG_ENUM(type,PROP_DEFAULT, "", script_types)
 	END_PROPS(ScriptVariable)
 }
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ArrayReflection.h"
 const PropertyInfoList* Script::get_props()
 {
 	MAKE_VECTORCALLBACK(ScriptVariable, variables);

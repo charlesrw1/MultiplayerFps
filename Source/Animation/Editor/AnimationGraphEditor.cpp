@@ -8,9 +8,9 @@
 
 #include "Framework/EnumDefReflection.h"
 #include "Framework/DictWriter.h"
-#include "Framework/ReflectionRegisterDefines.h"
-#include "Framework/StdVectorReflection.h"
-#include "Framework/WriteObject.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ArrayReflection.h"
+#include "Framework/ObjectSerialization.h"
 #include "Framework/MyImguiLib.h"
 #include "Framework/Files.h"
 
@@ -1572,7 +1572,7 @@ void AnimationGraphEditor::tick(float dt)
 
 }
 
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ArrayReflection.h"
 
 ControlParamsWindow::ControlParamsWindow()
 {

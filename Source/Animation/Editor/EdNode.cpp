@@ -5,7 +5,7 @@
 #include "State_node.h"
 #include "Statemachine_node.h"
 #include "Framework/AddClassToFactory.h"
-#include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/ReflectionMacros.h"
 
 
 CLASS_IMPL(Base_EdNode);

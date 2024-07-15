@@ -2,10 +2,10 @@
 #include "../AnimationUtil.h"
 #include "Framework/DictWriter.h"
 #include "Framework/DictParser.h"
-#include "Framework/ReflectionRegisterDefines.h"
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ArrayReflection.h"
 #include "Framework/AddClassToFactory.h"
-#include "Framework/WriteObject.h"
+#include "Framework/ObjectSerialization.h"
 
 #include "Statemachine_cfg.h"
 
@@ -39,9 +39,9 @@ public:
 		return "./Data/Graphs/";
 	}
 	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
+	virtual const ClassTypeInfo* get_asset_class_type() { return &Animation_Tree_CFG::StaticType; }
 };
-static AutoRegisterAsset<AnimGraphAssetMeta> animgraph_register_0987;
-
+REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);
 
 
 

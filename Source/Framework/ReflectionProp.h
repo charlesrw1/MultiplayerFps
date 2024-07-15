@@ -30,10 +30,19 @@ enum class core_type_id : uint8_t
 
 enum SerializedPropFlags
 {
+	// generic editable flag, if 0, then doesnt show up in property grid's
 	PROP_EDITABLE = 1,
+	// if 0, then not serialized
 	PROP_SERIALIZE = 2,
 
-	PROP_DEFAULT = PROP_EDITABLE | PROP_SERIALIZE
+	PROP_DEFAULT = PROP_EDITABLE | PROP_SERIALIZE,
+	// Specific flags below:
+
+	// if 1, then property is only editable/serialized with editor state
+	PROP_EDITOR_ONLY = 4,
+	// if 1, then instances of an entity in a level can edit it (if only editable, then only schemas can edit it)
+	PROP_INSTANCE_EDITABLE = 8,
+
 };
 
 struct ParsedHintStr
@@ -55,13 +64,13 @@ class IListCallback;
 struct PropertyInfoList;
 struct PropertyInfo {
 	PropertyInfo() {}
-	PropertyInfo(const char* name, uint16_t offset, uint8_t flags) 
+	PropertyInfo(const char* name, uint16_t offset, uint32_t flags) 
 		: name(name), offset(offset), flags(flags) {}
 
 	const char* name = "";
 	uint16_t offset = 0;
 	core_type_id type = core_type_id::Int32;
-	uint8_t flags = PROP_DEFAULT;
+	uint32_t flags = PROP_DEFAULT;
 	const char* range_hint = "";
 	IListCallback* list_ptr = nullptr;
 	const char* custom_type_str = "";
@@ -93,15 +102,15 @@ struct PropertyInfo {
 
 ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop);
 
-PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
-PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint = "", const char* customtype = "");
-PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const EnumTypeInfo* t, const char* hint= "");
-PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "");
-PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype = "");
-PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype = "", const char* hint = "");
-PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
-PropertyInfo make_quat_property(const char* name, uint16_t offset, uint8_t flags, const char* hint = "");
+PropertyInfo make_bool_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
+PropertyInfo make_integer_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const char* hint = "", const char* customtype = "");
+PropertyInfo make_float_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
+PropertyInfo make_enum_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const EnumTypeInfo* t, const char* hint= "");
+PropertyInfo make_string_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "");
+PropertyInfo make_list_property(const char* name, uint16_t offset, uint32_t flags, IListCallback* ptr, const char* customtype = "");
+PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "", const char* hint = "");
+PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
+PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 
 
 struct PropertyInfoList
@@ -135,11 +144,28 @@ public:
 	IListCallback(const PropertyInfoList* struct_) 
 		: props_in_list(struct_) {}
 
+
+	// create based on a single prop, not struct type
+	// hacky, but I based everything on PropertyInfoList, not singular types like is needed for an array of 1 type
+	IListCallback(PropertyInfo atom_prop) {
+		StaticList.count = 1;
+		atom_prop.name = "_value";
+		atom_prop.offset = 0;
+		StaticProp = atom_prop;
+		StaticList.list = &StaticProp;
+
+		this->props_in_list = &StaticList;
+	}
+
 	const PropertyInfoList* props_in_list = nullptr;
 	virtual uint8_t* get_index(void* inst, int index) = 0;
 	virtual uint32_t get_size(void* inst) = 0;
 	virtual void resize(void* inst, uint32_t new_size) = 0;
 	virtual void swap_elements(void* inst, int item0, int item1) = 0;
+private:
+	// for atom types
+	PropertyInfo StaticProp;
+	PropertyInfoList StaticList;
 };
 
 

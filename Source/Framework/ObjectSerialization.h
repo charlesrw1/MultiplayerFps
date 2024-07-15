@@ -5,10 +5,11 @@
 #include "Framework/DictParser.h"
 #include "Framework/ClassBase.h"
 #include <string>
+#include <cassert>
 
 inline void copy_object_properties( ClassBase* from, ClassBase* to, TypedVoidPtr userptr)
 {
-	ASSERT(from->get_type() == to->get_type());
+	assert(from->get_type() == to->get_type());
 
 	std::vector<const PropertyInfoList*> props;
 	const ClassTypeInfo* typeinfo = &from->get_type();

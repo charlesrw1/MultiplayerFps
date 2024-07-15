@@ -13,8 +13,8 @@
 
 #include "Framework/Factory.h"
 #include "Framework/PropertyEd.h"
-#include "Framework/ReflectionRegisterDefines.h"
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ArrayReflection.h"
 
 #include "Physics/Physics2.h"
 #include "External/ImGuizmo.h"
@@ -128,14 +128,21 @@ public:
 	}
 	std::unordered_map<std::string,ObjectSchema> all_schema_list;
 };
-
+#include "Player.h"
 class PhysicsActor;
 class EditorDoc;
 class EditorNode
 {
 public:
-	EditorNode()  {}
-	~EditorNode();
+	EditorNode()  {
+		player_ent.add_native_components();
+		player_ent.register_components();
+	
+	}
+	~EditorNode() {
+		player_ent.destroy();
+		hide();
+	}
 
 	virtual void hide();
 	virtual void show();
@@ -151,7 +158,7 @@ public:
 	}
 	glm::mat4 get_transform();
 
-	std::unique_ptr<Entity> editing_entity;
+	Player player_ent;
 
 	handle<Render_Object> render_handle;
 	PhysicsActor* physics = nullptr;

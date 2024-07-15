@@ -113,6 +113,7 @@ ClassTypeInfo classname::StaticType = ClassTypeInfo( \
 #define CLASS_H_EXPLICIT_SUPER(classname, cpp_supername, reflected_super) \
 class classname : public cpp_supername { \
 public: \
+	using MyClassType = classname; \
 	using SuperClassType = reflected_super; \
 	static ClassTypeInfo StaticType; \
 	const ClassTypeInfo& get_type() const override { return classname::StaticType; }

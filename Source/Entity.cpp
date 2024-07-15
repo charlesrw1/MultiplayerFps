@@ -3,6 +3,9 @@
 #include "Physics/Physics2.h"
 
 #include "Animation/Runtime/Animation.h"
+#include "Render/Material.h"
+
+#include "Framework/ArrayReflection.h"
 
 CLASS_IMPL(Entity);
 
@@ -17,58 +20,16 @@ CLASS_IMPL(MeshComponent);
 CLASS_IMPL(BoxComponent);
 CLASS_IMPL(CapsuleComponent);
 
-// Database:
-// map asset path to id, id gets incremented every time a new asset is made
 
 
-// global object table:
-// 1 handle, no bullshit
-// any models, sounds, etc. that get referenced are put into the table
-
-// entity ptrs get serialized as an index into a descriptor table
-// on unserialization 
-
-template<typename T>
-class RawPtr
-{
-public:
-	static_assert(std::is_base_of<ClassBase, T>::value, "RawPtr must derive from ClassBase");
-	T* ptr = nullptr;
-};
-
-
-template<typename T>
-class EntityPtr
-{
-public:
-	static_assert(std::is_base_of<Entity, T>::value, "EntityPtr must derive from Entity");
-
-	bool is_valid() const;
-	T* get() const;
-	void assign(T* ptr);
-
-	uint32_t handle=0;
-	uint32_t id=0;
-};
-
-CLASS_H(MyEntityComp, EntityComponent)
-public:
-	EntityPtr<Door> Model;
-};
 // database to map an integer to any type of object, for example models or entities, automatically resolved and editable in the editor
 
-MeshComponent::~MeshComponent()
-{
-	if (draw_handle.is_valid())
-		idraw->remove_obj(draw_handle);
-	if (physics_actor)
-		g_physics->free_physics_actor(physics_actor);
-}
-MeshComponent::MeshComponent() {}
 
 Entity::Entity()
 {
-	// initialize native components
+}
+void Entity::add_native_components()
+{
 	// this should be moved out into ClassTypeInfo itself on static init
 	const ClassTypeInfo* ti = &get_type();
 	InlineVec<const PropertyInfoList*, 10> allprops;
@@ -79,12 +40,26 @@ Entity::Entity()
 	for (int i = 0; i < allprops.size(); i++) {
 		auto props = allprops[i];
 		for (int j = 0; j < props->count; j++) {
+			auto& p = props->list[j];
 			if (strcmp(props->list[j].custom_type_str, "EntityComponent") == 0) {
 				all_components.push_back((EntityComponent*)props->list[j].get_ptr(this));
 			}
 		}
 	}
 	// TODO: root+parenting components
+}
+
+void Entity::register_components()
+{
+	for (int i = 0; i < all_components.size(); i++)
+		all_components[i]->on_init();
+}
+void Entity::destroy()
+{
+	for (int i = 0; i < all_components.size(); i++)
+		all_components[i]->on_deinit();
+	all_components.clear();	// clears native+dynamic references
+	dynamic_components.clear();	// calls delete because unique_ptr
 }
 
 
@@ -94,19 +69,137 @@ void Entity::update_entity_and_components() {
 
 	// tick components, update renderables, animations etc.
 	for (int i = 0; i < all_components.size(); i++)
-		all_components[i]->tick();
+		all_components[i]->on_tick();
 }
-
-void EntityComponent::destroy()
+void EntityComponent::remove_this(EntityComponent* child_component)
 {
-	attached_parent->remove_this(this);
+#ifdef _DEBUG
+	bool found = false;
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i] == child_component) {
+			if (found)
+				assert(!"component was added twice");
+			children.erase(children.begin() + i);
+			i--;
+			found = true;
+		}
+	}
+#else
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i] == child_component) {
+			children.erase(children.begin() + i);
+			return;
+		}
+	}
+#endif
+	assert(!"component couldn't be found to remove in remove_this");
+}
+void EntityComponent::attach_to_parent(EntityComponent* parent_component, StringName point)
+{
+	if (attached_parent.get()) {
+		remove_this(attached_parent.get());
+		attached_parent = nullptr;
+	}
+	parent_component->children.push_back(this);
+	attached_parent = parent_component;
+	attached_bone_name = point;
+
+}
+void EntityComponent::unlink_and_destroy() 
+{
+	if (attached_parent.get())
+		attached_parent->remove_this(this);
+	for (int i = 0; i < children.size(); i++)
+		children[i]->destroy_children_no_unlink();
+	on_deinit();
+}
+void EntityComponent::destroy_children_no_unlink()
+{
+	for (int i = 0; i < children.size(); i++)
+		children[i]->destroy_children_no_unlink();
+	on_deinit();
 	entity_owner->remove_this_component(this);
 }
 
-void MeshComponent::tick()
+#include "Animation/Runtime/Animation.h"
+#include "Animation/AnimationTreePublic.h"
+
+
+glm::mat4 EntityComponent::get_local_transform()
 {
-	// stuff to do:
-	// if parent transform not dirty and state not dirty, return
-	// allocate render model / animator if not already done so
-	// get transform from parent
+	mat4 model;
+	model = glm::translate(mat4(1), position);
+	model = model * glm::mat4_cast(rotation);
+	model = glm::scale(model, vec3(1.f));
+
+	return model;
+}
+
+MeshComponent::~MeshComponent()
+{
+	assert(!animator && !draw_handle.is_valid());
+}
+MeshComponent::MeshComponent() {}
+void MeshComponent::set_model(const char* model_path)
+{
+
+}
+
+const PropertyInfoList* MeshComponent::get_props() {
+#ifndef RUNTIME
+	MAKE_VECTORCALLBACK_ATOM(AssetPtr<Material>, eMaterialOverride);
+#endif // !RUNTIME
+	MAKE_VECTORCALLBACK_ATOM(AssetPtr<Material>, MaterialOverride_compilied)
+
+	START_PROPS(MeshComponent)
+		REG_ASSET_PTR(model, PROP_DEFAULT),
+		REG_ASSET_PTR(animator_tree, PROP_DEFAULT),
+
+#ifndef RUNTIME
+		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
+		REG_BOOL(eAnimateInEditor, PROP_DEFAULT | PROP_EDITOR_ONLY, "0"),
+#endif // !RUNTIME
+
+		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
+	END_PROPS(MeshCompponent)
+}
+
+
+void MeshComponent::on_init()
+{
+	draw_handle = idraw->register_obj();
+	if (model.get()) {
+		if (model->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
+			assert(animator_tree->get_script());
+			assert(animator_tree->get_script()->get_native_class());
+			assert(animator_tree->get_script()->get_native_class()->allocate);
+
+			ClassBase* c = animator_tree->get_script()->get_native_class()->allocate();
+			assert(c->is_a<AnimatorInstance>());
+			animator.reset(c->cast_to<AnimatorInstance>());
+
+			bool good = animator->initialize_animator(model.get(), animator_tree.get(), get_owner());
+			if (!good) {
+				sys_print("!!! couldnt initialize animator\n");
+				animator.reset(nullptr);	// free animator
+				animator_tree = nullptr;	// free tree reference
+			}
+		}
+
+		Render_Object obj;
+		obj.model = model.get();
+		obj.visible = !is_hidden;
+		obj.transform = get_local_transform();
+
+		idraw->update_obj(draw_handle, obj);
+	}
+}
+void MeshComponent::on_tick()
+{
+
+}
+void MeshComponent::on_deinit()
+{
+	idraw->remove_obj(draw_handle);
+	animator.reset();
 }

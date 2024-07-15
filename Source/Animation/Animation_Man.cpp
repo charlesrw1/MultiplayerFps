@@ -7,8 +7,11 @@
 #include "SkeletonData.h"
 #include <algorithm>
 #include "Framework/Files.h"
-
+#include "Assets/AssetLoaderRegistry.h"
 static const char* MODEL_DIRECTORY = "Data/Models/";
+
+CLASS_IMPL(Animation_Tree_CFG);
+REGISTERASSETLOADER_MACRO(Animation_Tree_CFG, anim_tree_man);
 
 Animation_Tree_CFG* Animation_Tree_Manager::load_animation_tree_file(const char* filename, DictParser& parser)
 {

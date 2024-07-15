@@ -23,8 +23,8 @@ struct PropertyInfoList;
 class NodeRt_Ctx;
 class Script;
 class BaseAGNode;
-class Animation_Tree_CFG : public IAsset
-{
+
+CLASS_H(Animation_Tree_CFG, IAsset)
 public:
 	Animation_Tree_CFG();
 	~Animation_Tree_CFG();
@@ -96,9 +96,13 @@ private:
 
 class DictParser;
 class AnimationGraphEditor;
-class Animation_Tree_Manager
+class Animation_Tree_Manager : public IAssetLoader
 {
 public:
+	virtual IAsset* load_asset(const std::string& filename) override {
+		return find_animation_tree(filename.c_str());
+	}
+
 	void init();
 	Animation_Tree_CFG* find_animation_tree(const char* filename);
 private:

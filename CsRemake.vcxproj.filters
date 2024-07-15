@@ -64,6 +64,15 @@
     <Filter Include="Source\Game\Components">
       <UniqueIdentifier>{4efdd015-6f44-40e3-bfe6-7198efa7ec88}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Framework\ReflectionSys">
+      <UniqueIdentifier>{de91ffb3-c3ce-49d7-abd6-cc2ffe855377}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Framework\PropertyGridSys">
+      <UniqueIdentifier>{7e5d1629-0694-4d1c-91aa-915790827e75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Framework\ClassSystem">
+      <UniqueIdentifier>{b3c98808-983c-48f8-954f-1ccdc9dd0657}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -123,9 +132,6 @@
     <ClInclude Include="Source\Framework\Config.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\EnumDefReflection.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\ExpressionLang.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
@@ -141,19 +147,7 @@
     <ClInclude Include="Source\Framework\MyImguiLib.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\PropertyEd.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ReflectionProp.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ReflectionRegisterDefines.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\ScriptValue.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\StdVectorReflection.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\StringName.h">
@@ -166,9 +160,6 @@
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\TypeInfo.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\WriteObject.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\AnimationTreePublic.h">
@@ -454,9 +445,6 @@
     <ClInclude Include="Source\IAsset.h">
       <Filter>Source\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ClassBase.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\MaterialLocal.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
@@ -468,6 +456,45 @@
     </ClInclude>
     <ClInclude Include="Source\Game\SchemaEditLocal.h">
       <Filter>Source\Game\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Schema.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\EntityComponent.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\SerializePtrHelpers.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\EntityComponentTypes.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Assets\AssetLoaderRegistry.h">
+      <Filter>Source\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EditorFolder.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ReflectionProp.h">
+      <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ArrayReflection.h">
+      <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ReflectionMacros.h">
+      <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\PropertyEd.h">
+      <Filter>Source\Framework\PropertyGridSys</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ClassBase.h">
+      <Filter>Source\Framework\ClassSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ObjectSerialization.h">
+      <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\EnumDefReflection.h">
+      <Filter>Source\Framework\ReflectionSys</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -510,19 +537,10 @@
     <ClCompile Include="Source\Framework\Config.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\ExpressionLang.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\MyImguiLib.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\PropertyEd.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\ReflectionProp.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\StringName.cpp">
@@ -691,9 +709,6 @@
     <ClCompile Include="Source\IEditorTool.cpp">
       <Filter>Source\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\ClassBase.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\MaterialLocal.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
@@ -705,6 +720,27 @@
     </ClCompile>
     <ClCompile Include="Source\Game\SchemaEditLocal.cpp">
       <Filter>Source\Game\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Schema.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\SerializePtrHelpers.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Assets\IAsset.cpp">
+      <Filter>Source\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\ReflectionProp.cpp">
+      <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\PropertyEd.cpp">
+      <Filter>Source\Framework\PropertyGridSys</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\ClassBase.cpp">
+      <Filter>Source\Framework\ClassSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
+      <Filter>Source\Framework\ReflectionSys</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

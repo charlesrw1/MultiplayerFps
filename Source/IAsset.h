@@ -2,11 +2,12 @@
 
 #include <string>
 #include "Framework/Util.h"
+#include "Framework/ClassBase.h"
 
-class IAssetLoader;
-class IAsset
-{
+CLASS_H(IAsset, ClassBase)
 public:
+	virtual ~IAsset() {}
+
 	const std::string& get_name() const { return path; }
 	bool is_loaded_in_memory() const { return is_loaded; }
 	bool did_load_fail() const { return load_failed; }
@@ -20,4 +21,11 @@ protected:
 	bool system_asset = false;		// system assets never get deleted
 
 	// types: material, model, texture, anim graph, schema, level, curve, sound, particle, data-table
+};
+
+// have a path, want an IAsset
+class IAssetLoader 
+{
+public:
+	virtual IAsset* load_asset(const std::string& path) = 0;
 };

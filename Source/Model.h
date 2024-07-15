@@ -123,9 +123,10 @@ struct MeshLod
 
 class MSkeleton;
 class PhysicsBody;
-class Model : public IAsset
-{
+CLASS_H(Model,IAsset)
 public:
+	~Model() override;
+
 	uint32_t get_uid() const { return uid; }
 	int bone_for_name(StringName name) const;
 	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
@@ -210,9 +211,15 @@ private:
 	void append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 
-class ModelMan
+class ModelMan : public IAssetLoader
 {
 public:
+	// IAssetLoader
+	virtual IAsset* load_asset(const std::string& path) override {
+		return find_or_load(path.c_str());
+	}
+
+
 	void init();
 	Model* find_or_load(const char* filename);
 

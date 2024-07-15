@@ -8,8 +8,8 @@
 
 #include "EnumDefReflection.h"
 #include "ReflectionProp.h"
-#include "ReflectionRegisterDefines.h"
-#include "StdVectorReflection.h"
+#include "ReflectionMacros.h"
+#include "ArrayReflection.h"
 
 enum class CurvePointType
 {

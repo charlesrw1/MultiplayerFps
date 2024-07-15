@@ -6,7 +6,7 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/Factory.h"
 #include "Framework/Util.h"
-#include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/ReflectionMacros.h"
 #include "Framework/ClassBase.h"
 class Animator;
 

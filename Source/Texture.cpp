@@ -12,11 +12,17 @@
 #include "Framework/Files.h"
 #include "Framework/DictParser.h"
 
+
 #undef OPAQUE
 
 static const char* const texture_folder_path = "./Data/Textures/";
 
+#include "Assets/AssetLoaderRegistry.h"
+CLASS_IMPL(Texture);
+REGISTERASSETLOADER_MACRO(Texture, &g_imgs);
+
 TextureMan g_imgs;
+
 
 void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
 {

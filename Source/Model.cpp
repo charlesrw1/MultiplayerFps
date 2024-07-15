@@ -14,7 +14,7 @@
 #include "AssetCompile/Compiliers.h"
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
-#include "Framework/WriteObject.h"
+#include "Framework/ObjectSerialization.h"
 #include "Memory.h"
 
 #include "Framework/Config.h"
@@ -33,8 +33,12 @@ static const char* const model_folder_path = "./Data/Models/";
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
 #include "AssetRegistry.h"
-
+#include "Assets/AssetLoaderRegistry.h"
 extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
+
+CLASS_IMPL(Model);
+REGISTERASSETLOADER_MACRO(Model, &mods);
+
 class ModelAssetMetadata : public AssetMetadata
 {
 public:
@@ -78,9 +82,10 @@ public:
 	{
 		return model_folder_path;
 	}
+	virtual const ClassTypeInfo* get_asset_class_type() { return &Model::StaticType; }
 };
-static AutoRegisterAsset<ModelAssetMetadata> model_register_0983;
-
+REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
+Model::~Model() {}
 
 static const int MODEL_FORMAT_VERSION = 7;
 

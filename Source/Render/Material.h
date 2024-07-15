@@ -44,12 +44,11 @@ enum class billboard_setting : uint8_t
 };
 
 class Texture;
-class Material : public IAsset
-{
+CLASS_H(Material, IAsset)
 public:
 	static const int MAX_REFERENCES = 2;
 	static const uint32_t INVALID_MAPPING = uint32_t(-1);
-
+	~Material() {}
 	Material() {
 		memset(images, 0, sizeof images);
 		memset(references, 0, sizeof references);
@@ -90,9 +89,13 @@ public:
 namespace gpu {
 	struct Material_Data;
 }
-class MaterialMan
+class MaterialMan : public IAssetLoader
 {
 public:
+	virtual IAsset* load_asset(const std::string& path) override {
+		return find_for_name(path.c_str());
+	}
+
 	void init();
 
 	Material* find_for_name(const char* name);

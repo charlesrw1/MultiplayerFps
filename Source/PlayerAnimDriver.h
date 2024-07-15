@@ -5,7 +5,7 @@
 #include "glm/gtc/quaternion.hpp"
 
 #include "Animation/Runtime/Animation.h"
-#include "Framework/ReflectionRegisterDefines.h"
+#include "Framework/ReflectionMacros.h"
 
 CLASS_H(CharacterGraphDriver, AnimatorInstance)
 

@@ -5,7 +5,7 @@
 
 #include "Framework/Util.h"
 
-#include "Framework/WriteObject.h"
+#include "Framework/ObjectSerialization.h"
 
 ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr);
 const ClassTypeInfo& ClassBase::get_type() const { return ClassBase::StaticType; }

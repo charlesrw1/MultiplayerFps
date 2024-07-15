@@ -1,7 +1,7 @@
 #include "Statemachine_cfg.h"
 
-#include "Framework/ReflectionRegisterDefines.h"
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ArrayReflection.h"
 
 #include "Animation/AnimationUtil.h"
 

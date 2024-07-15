@@ -27,9 +27,10 @@ enum Texture_Type
 	TEXTYPE_CUBEMAP,
 };
 
-class Texture : public IAsset
-{
+CLASS_H(Texture, IAsset)
 public:
+	~Texture() {}
+
 	int width = 0;
 	int height = 0;
 	int channels = 0;
@@ -47,9 +48,13 @@ public:
 	friend class TextureMan;
 };
 
-class TextureMan
+class TextureMan : public IAssetLoader
 {
 public:
+	IAsset* load_asset(const std::string& path) override {
+		return find_texture(path.c_str());
+	}
+
 	// owner: caller manages lifetime if true
 	// search_img_directory: prefixes the default image directory to file
 	Texture* find_texture(const char* file, bool search_img_directory = true, bool owner = false);

@@ -615,7 +615,7 @@ struct BlendSpace2d_RT : public Rt_Vars_Base
 	}
 };
 
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ArrayReflection.h"
 NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 	ValueNode* xparam = nullptr;
 	ValueNode* yparam = nullptr;

@@ -3,7 +3,7 @@
 #include "Framework/DictWriter.h"
 #include "Framework/Util.h"
 #include <cassert>
-#include "Framework/StdVectorReflection.h"
+#include "Framework/ArrayReflection.h"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 inline std::string string_view_to_std_string(StringView view) {
@@ -98,21 +98,21 @@ ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop)
 
 	return parsed;
 }
-PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint8_t flags, const char* hint )
+PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* hint )
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Vec3;
 	prop.range_hint = hint;
 	return prop;
 }
-PropertyInfo make_quat_property(const char* name, uint16_t offset, uint8_t flags, const char* hint)
+PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Quat;
 	prop.range_hint = hint;
 	return prop;
 }
-PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags, const char* hint)
+PropertyInfo make_bool_property(const char* name, uint16_t offset, uint32_t flags, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Bool;
@@ -120,7 +120,7 @@ PropertyInfo make_bool_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
-PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const char* hint, const char* customtype)
+PropertyInfo make_integer_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const char* hint, const char* customtype)
 {
 	PropertyInfo prop(name, offset, flags);
 
@@ -140,7 +140,7 @@ PropertyInfo make_integer_property(const char* name, uint16_t offset, uint8_t fl
 	return prop;
 }
 
-PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flags, const char* hint)
+PropertyInfo make_float_property(const char* name, uint16_t offset, uint32_t flags, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Float;
@@ -148,7 +148,7 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint8_t flag
 	return prop;
 }
 
-PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags, int bytes, const EnumTypeInfo* enumtype, const char* hint)
+PropertyInfo make_enum_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const EnumTypeInfo* enumtype, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.range_hint = hint;
@@ -164,7 +164,7 @@ PropertyInfo make_enum_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
-PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype)
+PropertyInfo make_string_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.custom_type_str = customtype;
@@ -172,7 +172,7 @@ PropertyInfo make_string_property(const char* name, uint16_t offset, uint8_t fla
 	return prop;
 }
 
-PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags, IListCallback* ptr, const char* customtype)
+PropertyInfo make_list_property(const char* name, uint16_t offset, uint32_t flags, IListCallback* ptr, const char* customtype)
 {
 	PropertyInfo prop(name,offset,flags);
 	prop.type = core_type_id::List;
@@ -181,7 +181,7 @@ PropertyInfo make_list_property(const char* name, uint16_t offset, uint8_t flags
 	return prop;
 }
 
-PropertyInfo make_struct_property(const char* name, uint16_t offset, uint8_t flags, const char* customtype, const char* hint)
+PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype, const char* hint)
 {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Struct;
@@ -537,51 +537,25 @@ PropertyInfo* PropertyInfoList::find(const char* name) const
 	return nullptr;
 }
 
-#include "Framework/StdVectorReflection.h"
+PropertyInfo GetAtomValueWrapper<std::string>::get() {
+	return make_string_property("", 0/* 0 offset */, PROP_DEFAULT);
+}
+PropertyInfo GetAtomValueWrapper<bool>::get() {
+	return make_bool_property("", 0/* 0 offset */, PROP_DEFAULT);
+}
+PropertyInfo GetAtomValueWrapper<uint16_t>::get() {
+	return make_integer_property("", 0/* 0 offset */, PROP_DEFAULT, sizeof(uint16_t));
+}
+PropertyInfo GetAtomValueWrapper<int32_t>::get() {
+	return make_integer_property("", 0/* 0 offset */, PROP_DEFAULT, sizeof(int32_t));
+}
+PropertyInfo GetAtomValueWrapper<uint32_t>::get() {
+	return make_integer_property("", 0/* 0 offset */, PROP_DEFAULT, sizeof(uint32_t));
+}
+PropertyInfo GetAtomValueWrapper<float>::get() {
+	return make_float_property("", 0/* 0 offset */, PROP_DEFAULT);
+}
 
-template<>
-PropertyInfoList* get_list_value<uint32_t>() {
-	static PropertyInfo info[] = {
-		make_integer_property("_value",0/* 0 offset */,PROP_DEFAULT,sizeof(uint32_t))
-	};
-	static PropertyInfoList list = { info,1,"_uint32" };
-	return &list;
-
-}
-template<>
-PropertyInfoList* get_list_value<std::string>() {
-	static PropertyInfo info[] = {
-		make_string_property("_value",0/* 0 offset */,PROP_DEFAULT)
-	};
-	static PropertyInfoList list = { info,1,"_std::string" };
-	return &list;
-}
-template<>
-PropertyInfoList* get_list_value<uint16_t>() {
-	static PropertyInfo info[] = {
-		make_integer_property("_value",0/* 0 offset */,PROP_DEFAULT,sizeof(uint16_t))
-	};
-	static PropertyInfoList list = { info,1,"_uint16" };
-	return &list;
-
-}
-template<>
-PropertyInfoList* get_list_value<int32_t>() {
-	static PropertyInfo info[] = {
-		make_integer_property("_value",0/* 0 offset */,PROP_DEFAULT,sizeof(int32_t))
-	};
-	static PropertyInfoList list = { info,1,"_int32" };
-	return &list;
-
-}
-template<>
-PropertyInfoList* get_list_value<float>() {
-	static PropertyInfo info[] = {
-		make_float_property("_value",0/* 0 offset */,PROP_DEFAULT)
-	};
-	static PropertyInfoList list = { info,1,"_float" };
-	return &list;
-}
 
 Factory<std::string, IPropertySerializer>& IPropertySerializer::get_factory()
 {

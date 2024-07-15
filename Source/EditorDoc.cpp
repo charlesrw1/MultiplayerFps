@@ -14,6 +14,9 @@
 
 #include "External/ImGuizmo.h"
 #include "Render/Material.h"
+
+#include "EditorFolder.h"
+
 #include <stdexcept>
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
@@ -24,6 +27,7 @@ Factory<std::string, EditorNode>& get_editor_node_factory()
 	return inst;
 };
 
+CLASS_IMPL(EditorFolder);
 
 
 static std::string to_string(StringView view) {
@@ -455,11 +459,6 @@ Dict& EditorNode::get_dict()
 	return dictionary;
 }
 
-
-EditorNode::~EditorNode()
-{
-	hide();	// remove any handles
-}
 
 EditorNode* EditorNode::duplicate()
 {
@@ -1700,6 +1699,26 @@ void EdPropertyGrid::set(EditorNode* node_new)
 		node = nullptr;
 		return;
 	}
+
+	auto ti = &node->player_ent.get_type();
+	while (ti) {
+		if (ti->props) {
+			grid.add_property_list_to_grid(ti->props, &node->player_ent);
+		}
+		ti = ti->super_typeinfo;
+	}
+	auto& allcomp = node->player_ent.get_all_components();
+	for (auto& c : allcomp) {
+		ti = &c->get_type();
+		while (ti) {
+			if (ti->props)
+				grid.add_property_list_to_grid(ti->props, c);
+			ti = ti->super_typeinfo;
+		}
+	}
+
+
+	return;
 
 	for (const auto& prop : node->template_class->properties) {
 		if (prop.dont_expose)

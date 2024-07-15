@@ -6,20 +6,13 @@
 #include "../Shaders/SharedGpuTypes.txt"
 #include "AssetCompile/Someutils.h"
 #include "AssetRegistry.h"
+#include "Assets/AssetLoaderRegistry.h"
 class MaterialAssetMetadata : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() override
-	{
-		return { 219, 189, 68 };
-	}
-
-	virtual std::string get_type_name() override
-	{
-		return "Material";
-	}
-
+	virtual Color32 get_browser_color() override{ return { 219, 189, 68 }; }
+	virtual std::string get_type_name() override { return "Material"; }
 	virtual void index_assets(std::vector<std::string>& filepaths) override
 	{
 		auto tree = FileSys::find_files("./Data/Materials");
@@ -28,21 +21,18 @@ public:
 		}
 	}
 	virtual bool assets_are_filepaths() { return false; }
-	virtual std::string root_filepath() override
-	{
-		return "./Data/Materials/";
-	}
+	virtual std::string root_filepath() override { return "./Data/Materials/"; }
+	virtual const ClassTypeInfo* get_asset_class_type() { return &Material::StaticType; }
 };
-static AutoRegisterAsset<MaterialAssetMetadata> material_register_0987;
-
+CLASS_IMPL(Material);
+REGISTERASSETLOADER_MACRO(Material, &mats);
+REGISTER_ASSETMETADATA_MACRO(MaterialAssetMetadata);
 
 using std::string;
 MaterialMan mats;
 void MaterialMan::reload_all()
 {
-	for (auto mat : materials) {
-
-	}
+	assert(0);
 }
 bool MaterialMan::update_gpu_material_buffer(gpu::Material_Data* buffer, size_t buffer_size, size_t* num_materials)
 {

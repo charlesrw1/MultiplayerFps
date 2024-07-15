@@ -6,6 +6,15 @@
 #include "Interaction.h"
 #include "Framework/Dict.h"
 
+CLASS_H(StaticMeshInstance, Entity)
+public:
+	MeshComponent Mesh;
+	static const PropertyInfoList* get_props() {
+		START_PROPS(StaticMeshInstance)
+			REG_COMPONENT(Mesh, PROP_DEFAULT, ""),
+		END_PROPS(StaticMeshInstance)
+	}
+};
 
 using namespace glm;
 CLASS_H(NPC, Entity)
