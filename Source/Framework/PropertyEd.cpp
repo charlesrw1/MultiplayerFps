@@ -6,10 +6,10 @@ static uint32_t color32_to_uint(Color32 color) {
 }
 
 
-static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx)
+static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask)
 {
 	if (prop->type == core_type_id::List) {
-		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop, row_idx);
+		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop, row_idx, property_flag_mask);
 		return array_;
 	}
 	else {
@@ -22,17 +22,17 @@ static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, in
 	}
 }
 
-void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags)
+void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags, uint32_t property_flag_mask)
 {
 	IGridRow* row = nullptr;
 
 	if (flags & PG_LIST_PASSTHROUGH && list->count == 1 && list->list[0].type == core_type_id::List) {
-		row = create_row(nullptr, list->list, inst, -1);
+		row = create_row(nullptr, list->list, inst, -1, property_flag_mask);
 		row->set_name_override(list->type_name);
 		ASSERT(row);
 	}
 	else {
-		row = new GroupRow(nullptr, inst, list, -1);
+		row = new GroupRow(nullptr, inst, list, -1, property_flag_mask);
 	}
 
 	rows.push_back(std::unique_ptr<IGridRow>(row));
@@ -362,7 +362,8 @@ Factory<std::string, IArrayHeader>& IArrayHeader::get_factory()
 	return inst;
 }
 
-ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
+ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask) 
+	: IGridRow(parent, row_idx), instance(instance), prop(prop), property_flag_mask(property_flag_mask)
 {
 	header = std::unique_ptr<IArrayHeader>(IArrayHeader::get_factory().createObject(prop->custom_type_str));
 	if(header)
@@ -543,7 +544,7 @@ void ArrayRow::draw_row_controls()
 
 
 	 for (int i = 0; i < count; i++) {
-		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(prop->get_ptr(instance), i), struct_, i)));
+		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(prop->get_ptr(instance), i), struct_, i, property_flag_mask)));
 	 }
  }
 
@@ -563,7 +564,7 @@ void ArrayRow::draw_row_controls()
 
 
  GroupRow::GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* list, 
-	 int row_idx) 
+	 int row_idx, uint32_t property_flag_mask) 
 	 : IGridRow(parent, row_idx), proplist(list), 
 	 inst(instance)
  {
@@ -572,8 +573,11 @@ void ArrayRow::draw_row_controls()
 		 auto& prop = list->list[i];
 		 if (!prop.can_edit())
 			 continue;
+		 bool passed_mask_check = (prop.flags & property_flag_mask)!= 0;
+		 if (!passed_mask_check)
+			 continue;
 
-		 auto row = create_row(this, &prop, inst, -1);
+		 auto row = create_row(this, &prop, inst, -1, property_flag_mask);
 		 if (row)
 			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
 	 }

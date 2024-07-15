@@ -1,3 +1,5 @@
+#include "Entity.h"
+
 #include "EntityTypes.h"
 #include "Framework/Factory.h"
 #include "Physics/Physics2.h"
@@ -6,6 +8,10 @@
 #include "Render/Material.h"
 
 #include "Framework/ArrayReflection.h"
+#include "Game/Schema.h"
+
+
+#include "glm/gtx/euler_angles.hpp"
 
 CLASS_IMPL(Entity);
 
@@ -24,6 +30,12 @@ CLASS_IMPL(CapsuleComponent);
 
 // database to map an integer to any type of object, for example models or entities, automatically resolved and editable in the editor
 
+const PropertyInfoList* Entity::get_props() {
+	START_PROPS(Entity)
+		REG_OBJECT_PTR(root_component, PROP_DEFAULT),
+		REG_ASSET_PTR(schema_type, PROP_SERIALIZE)
+	END_PROPS(Entity)
+}
 
 Entity::Entity()
 {
@@ -202,4 +214,20 @@ void MeshComponent::on_deinit()
 {
 	idraw->remove_obj(draw_handle);
 	animator.reset();
+}
+
+Entity::~Entity()
+{
+
+
+}
+
+glm::mat4 Entity::get_world_transform()
+{
+	mat4 model;
+	model = glm::translate(mat4(1), position);
+	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
+	model = glm::scale(model, vec3(1.f));
+
+	return model;
 }

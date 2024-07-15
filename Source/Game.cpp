@@ -315,20 +315,3 @@ Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
 	//e->velocity = direction * grenade_vel.real();
 	return e;
 }
-Entity::~Entity()
-{
-	
-
-}
-
-
-#include "glm/gtx/euler_angles.hpp"
-glm::mat4 Entity::get_world_transform()
-{
-	mat4 model;
-	model = glm::translate(mat4(1), position);
-	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
-	model = glm::scale(model, vec3(1.f));
-
-	return model;
-}

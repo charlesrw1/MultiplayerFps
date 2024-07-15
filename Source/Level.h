@@ -9,20 +9,7 @@
 #include "Framework/DictParser.h"
 #include "DrawPublic.h"
 
-enum {
-	LIGHT_DIRECTIONAL, 
-	LIGHT_POINT, 
-	LIGHT_SPOT,
-};
-
-struct StaticLight
-{
-	int type = 0;
-	glm::vec3 position;
-	glm::vec3 direction;
-	glm::vec3 color; // rgb*intensity
-	float spot_angle;
-};
+#include "Framework/Hashmap.h"
 
 struct Texture;
 struct StaticEnv
@@ -76,8 +63,7 @@ class PhysicsActor;
 class Level
 {
 public:
-	Level() = default;
-	Level(const Level& o) = delete;
+	Level();
 	~Level() {
 		free_level();
 	}
@@ -85,6 +71,14 @@ public:
 	bool open_from_file(const std::string& path);
 
 	std::string name;
+	
+	// all entities in the map
+	hash_map<Entity> all_world_ents;
+	uint64_t last_id = 0;
+
+	uint64_t local_player_id = 0;
+
+
 	unique_ptr<Physics_Mesh> scollision;	// merged collision of all level_meshes
 	
 	// static lights/meshes/physics

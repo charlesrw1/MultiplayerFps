@@ -73,6 +73,9 @@
     <Filter Include="Source\Framework\ClassSystem">
       <UniqueIdentifier>{b3c98808-983c-48f8-954f-1ccdc9dd0657}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Framework\Memory">
+      <UniqueIdentifier>{4555f275-334c-4727-832c-d1467cad3d14}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -321,9 +324,6 @@
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\PoolAllocator.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\Percentage.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
@@ -377,9 +377,6 @@
     </ClInclude>
     <ClInclude Include="Source\EditorDocPublic.h">
       <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\MemArena.h">
-      <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h">
       <Filter>Source\Framework\Render</Filter>
@@ -495,6 +492,15 @@
     </ClInclude>
     <ClInclude Include="Source\Framework\EnumDefReflection.h">
       <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MemArena.h">
+      <Filter>Source\Framework\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\PoolAllocator.h">
+      <Filter>Source\Framework\Memory</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Hashmap.h">
+      <Filter>Source\Framework\Containers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -2,17 +2,53 @@
 #include "Framework/Files.h"
 #include "Framework/DictParser.h"
 #include "Framework/ObjectSerialization.h"
+#include "Assets/AssetLoaderRegistry.h"
+#include "Entity.h"
 static const char* schema_base = "./Data/Schema/";
 CLASS_IMPL(InlinePtrFixup);
 
-Entity* SchemaLoader::create_but_dont_instantiate_schema(const std::string& schemafile)
+CLASS_IMPL(Schema);
+REGISTERASSETLOADER_MACRO(Schema, &g_schema_loader);
+
+SchemaLoader g_schema_loader;
+
+Schema* SchemaLoader::load_schema(const std::string& schemafile)
 {
+	if (cached_files.find(schemafile) != cached_files.end())
+		return cached_files.find(schemafile)->second;
 	std::string path = schema_base + schemafile;
 	auto file = FileSys::open_read(path.c_str());
 	if (!file)
 		return nullptr;
+	Schema* s = new Schema;
+	s->properties = std::string(file->size(), 0);
+	file->read((char*)s->properties.data(), s->properties.size());
+	
+	bool is_valid = s->check_validity_of_file();
+	if (is_valid) {
+		cached_files[schemafile] = s;
+		s->path = schemafile;
+		s->is_loaded = true;
+	}
+	else {
+		delete s;
+		s = nullptr;
+		cached_files[schemafile] = nullptr;
+	}
+	return s;
+}
+
+bool Schema::check_validity_of_file()
+{
+	bool is_valid = create_entity_from_properties_internal(true) != nullptr;
+	return is_valid;
+}
+
+Entity* Schema::create_entity_from_properties_internal(bool just_check_valid)
+{
+
 	DictParser in;
-	in.load_from_file(file.get());
+	in.load_from_memory((uint8_t*)properties.data(), properties.size(),"");
 
 	StringView tok;
 	in.read_string(tok);
@@ -30,6 +66,11 @@ Entity* SchemaLoader::create_but_dont_instantiate_schema(const std::string& sche
 			objs.push_back(obj);
 		return true;
 		});
+	if (!good) {
+		for (auto obj : objs)
+			delete obj;
+		return nullptr;
+	}
 
 	// find the entity, should be the first in the list
 	Entity* e = nullptr;
@@ -40,6 +81,19 @@ Entity* SchemaLoader::create_but_dont_instantiate_schema(const std::string& sche
 			break;
 		}
 	}
+	if (!e) {
+		for (auto obj : objs)
+			delete obj;
+		return nullptr;
+	}
+
+	// okay this is epic, only called internally obviously
+	if (just_check_valid) {
+		for (auto obj : objs)
+			delete obj;
+		return (Entity*)(1);
+	}
+
 	// now add the components
 	for (int i = 0; i < objs.size(); i++) {
 		if (!objs[i])

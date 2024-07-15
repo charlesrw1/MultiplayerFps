@@ -132,38 +132,9 @@ void make_static_mesh_from_dict(vector<handle<Render_Object>>& objs, vector<Phys
 	}
 }
 
-handle<Render_Light> make_light_from_dict(const Dict& dict)
-{
-
-
-	const char* type = dict.get_string("type", "point");
-	glm::vec3 color = dict.get_vec3("color", glm::vec3(1.f));
-	Render_Light light;
-	light.color = color;
-	light.position = dict.get_vec3("position");
-	glm::vec3 angles = dict.get_vec3("angles");
-	light.normal = AnglesToVector(angles.x, angles.y);
-	if (strcmp(type, "directional") == 0) {
-		light.type = LIGHT_DIRECTIONAL;
-		light.main_light_override = true;
-	}
-	else if (strcmp(type, "point") == 0) {
-		light.type = LIGHT_POINT;
-	}
-	else {
-		light.type = LIGHT_SPOT;
-		light.conemin = dict.get_float("outer_cone", 0.7f);
-	}
-
-	auto handle = idraw->register_light(light);
-	return handle;
-}
-
 
 
 #include "Framework/Files.h"
-
-
 
 
 bool MapLoadFile::parse(const std::string name)

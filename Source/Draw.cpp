@@ -3194,11 +3194,6 @@ void Renderer::remove_light(handle<Render_Light>& handle)
 }
 RL_Internal* Render_Scene::get_main_directional_light()
 {
-	for (int i = 0; i < light_list.objects.size(); i++) {
-		auto& light = light_list.objects[i].type_.light;
-		if (light.type == LIGHT_DIRECTIONAL)
-			return &light_list.objects[i].type_;
-	}
 	return nullptr;
 }
 void Renderer::on_level_end()

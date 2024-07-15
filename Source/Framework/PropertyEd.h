@@ -114,7 +114,12 @@ public:
 		rows.clear();
 	}
 
-	void add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags = 0 /* PropertyGridFlags */);
+	void add_property_list_to_grid(
+		const PropertyInfoList* list, 
+		void* inst, 
+		uint32_t flags = 0 /* PropertyGridFlags */, 
+		uint32_t property_flag_mask = UINT32_MAX /* specifiy a mask that gets ANDd with each properties flags, will skip if its 0 */
+	);
 	void update();
 
 	void set_read_only(bool read_only) {
@@ -129,7 +134,7 @@ public:
 class GroupRow : public IGridRow
 {
 public:
-	GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx);
+	GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx, uint32_t property_flag_mask);
 
 	virtual void internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -153,7 +158,7 @@ public:
 class ArrayRow : public IGridRow
 {
 public:
-	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
+	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask);
 
 	virtual void internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -201,6 +206,8 @@ private:
 
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
+
+	uint32_t property_flag_mask = UINT32_MAX;
 };
 class PropertyRow : public IGridRow
 {

@@ -63,7 +63,7 @@ public:
 			REG_QUAT(rotation, PROP_DEFAULT),
 			REG_VEC3(scale, PROP_DEFAULT),
 
-			REG_OBJECT_PTR(attached_parent, PROP_DEFAULT),
+			REG_OBJECT_PTR(attached_parent, PROP_SERIALIZE),
 
 			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY),
 			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY)

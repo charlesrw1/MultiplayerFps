@@ -49,18 +49,19 @@ struct UpdateFlags
 class PhysicsActor;
 class Dict;
 
+
+// A gobally unique identifier in the game level
+// every entity is assigned one, and its used to reference others
 template<typename T>
 class EntityPtr
 {
 public:
 	static_assert(std::is_base_of<Entity, T>::value, "EntityPtr must derive from Entity");
 
-	bool is_valid() const;
+	bool is_valid() const { return handle != 0; }
 	T* get() const;
-	void assign(T* ptr);
 
-	uint32_t handle = 0;
-	uint32_t id = 0;
+	uint64_t handle = 0;
 };
 
 
@@ -89,6 +90,7 @@ public:
 // set any variables etc. FinishEntitySpawn(ptr)
 // Or: CreateAndSpawnEntity("schemaname",transform)
 
+class Schema;
 class EditorFolder;
 CLASS_H(Entity, ClassBase)
 	Entity();
@@ -222,14 +224,10 @@ private:
 	// components created either in code or defined in schema or created per instance
 	std::vector<std::unique_ptr<EntityComponent>> dynamic_components;
 
-	friend class SchemaLoader;
+	friend class Schema;
 public:
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(Entity)
-			REG_OBJECT_PTR(root_component, PROP_DEFAULT)
-		END_PROPS(Entity)
-	}
+	static const PropertyInfoList* get_props();
 
 	template<typename T>
 	static PropertyInfo generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags) {
@@ -254,6 +252,8 @@ public:
 	bool editor_is_selected = false;
 	ObjPtr<EditorFolder> editor_folder;
 #endif
+	EntityPtr<Entity> self_id;// global identifier for this entity
+	AssetPtr<Schema> schema_type;		// what spawned type are we ( could be editor only or not )
 
 };
 #define REG_ENTITY_REF(name, flags) Entity::generate_entity_ref_property( \

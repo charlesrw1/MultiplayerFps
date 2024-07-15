@@ -43,6 +43,9 @@ enum SerializedPropFlags
 	// if 1, then instances of an entity in a level can edit it (if only editable, then only schemas can edit it)
 	PROP_INSTANCE_EDITABLE = 8,
 
+	// DONT USE
+	PROP_IS_ENTITY_COMPONENT_TRANSFORM = 16,
+
 };
 
 struct ParsedHintStr
