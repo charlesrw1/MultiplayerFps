@@ -19,25 +19,25 @@ class MapAssetMetadata : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() override
+	virtual Color32 get_browser_color()  const override
 	{
 		return { 185, 235, 237 };
 	}
 
-	virtual std::string get_type_name() override
+	virtual std::string get_type_name() const  override
 	{
 		return "Map";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) override
+	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
 		auto tree = FileSys::find_files("./Data/Maps",true);
 		for (auto file : tree) {
 			filepaths.push_back((file.substr(12)));
 		}
 	}
-	virtual bool assets_are_filepaths() { return true; }
-	virtual std::string root_filepath() override
+	virtual bool assets_are_filepaths()  const { return true; }
+	virtual std::string root_filepath()  const override
 	{
 		return "./Data/Maps/";
 	}
@@ -238,4 +238,8 @@ void Level::free_level()
 	smeshes.clear();
 	slights.clear();
 	sphysics.clear();
+}
+Level::Level() : all_world_ents(4/*2^4*/)
+{
+
 }

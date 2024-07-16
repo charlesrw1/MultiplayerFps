@@ -9,30 +9,34 @@
 class SerializeImNodeState : public IPropertySerializer
 {
 	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr) override;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr) override;
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* userptr) override;
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* userptr) override;
 };
 class SerializeNodeCFGRef : public IPropertySerializer
 {
 	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr) override;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr) override;
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* userptr) override;
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* userptr) override;
 };
 
-std::string SerializeNodeCFGRef::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)
+std::string SerializeNodeCFGRef::serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* userptr)
 {
-	ASSERT(userptr.name == NAME("AgSerializeContext"));
-	AgSerializeContext* context = (AgSerializeContext*)userptr.ptr;
+	ASSERT(userptr);
+	AgSerializeContext* context = userptr->cast_to<AgSerializeContext>();
+	ASSERT(context);
+
 	auto node = *(BaseAGNode**)info.get_ptr(inst);
 	ASSERT(context->ptr_to_index.find(node) != context->ptr_to_index.end());
 
 	return std::to_string(context->ptr_to_index.find(node)->second);
 }
 
-void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr)
+void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* userptr)
 {
-	ASSERT(userptr.name == NAME("AgSerializeContext"));
-	AgSerializeContext* context = (AgSerializeContext*)userptr.ptr;
+	ASSERT(userptr);
+	AgSerializeContext* context = userptr->cast_to<AgSerializeContext>();
+	ASSERT(context);
+
 	auto node_ptr = (BaseAGNode**)info.get_ptr(inst);
 	int index = atoi(token.to_stack_string().c_str());
 	ASSERT(index >= 0 && index < context->tree->all_nodes.size());
@@ -40,7 +44,7 @@ void SerializeNodeCFGRef::unserialize(DictParser& in, const PropertyInfo& info, 
 }
 
 
-std::string SerializeImNodeState::serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr userptr)
+std::string SerializeImNodeState::serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* userptr)
 {
 	auto context = *(ImNodesEditorContext**)info.get_ptr(inst);
 	if (!context)
@@ -49,7 +53,7 @@ std::string SerializeImNodeState::serialize(DictWriter& out, const PropertyInfo&
 	return ImNodes::SaveEditorStateToIniString(context);
 }
 
-void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr userptr)
+void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* userptr)
 {
 	std::string inistring(token.str_start, token.str_len);
 	auto context = (ImNodesEditorContext**)info.get_ptr(inst);

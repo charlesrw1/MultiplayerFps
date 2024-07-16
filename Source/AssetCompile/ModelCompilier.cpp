@@ -2695,7 +2695,7 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 			for (int i = 0; i < seq.second.events.size(); i++) {
 				auto ev = seq.second.events[i].get();
 				DictWriter writer;
-				write_object_properties(ev, TypedVoidPtr(), writer);
+				write_object_properties(ev,nullptr, writer);
 				out.write_string(writer.get_output());
 			}
 		}

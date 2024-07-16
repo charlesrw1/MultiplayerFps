@@ -32,17 +32,24 @@ CLASS_IMPL(CapsuleComponent);
 
 const PropertyInfoList* Entity::get_props() {
 	START_PROPS(Entity)
-		REG_OBJECT_PTR(root_component, PROP_DEFAULT),
-		REG_ASSET_PTR(schema_type, PROP_SERIALIZE)
+		REG_OBJECT_PTR(root_component, PROP_SERIALIZE),
+		REG_ENTITY_PTR(self_id,PROP_SERIALIZE)
 	END_PROPS(Entity)
 }
 
 Entity::Entity()
 {
 }
-void Entity::add_native_components()
+void Entity::register_components()
 {
-	// this should be moved out into ClassTypeInfo itself on static init
+	// by the time you get here, root must be something
+	// either defined in a C++ class, or the editor must have added an instance component to it
+	assert(root_component.get());
+
+	auto level = eng->get_level();
+	const bool is_editor_level = level->is_editor_level();
+
+	// find all EntityComponent INLINED fields (part of classtype)
 	const ClassTypeInfo* ti = &get_type();
 	InlineVec<const PropertyInfoList*, 10> allprops;
 	for (; ti; ti = ti->super_typeinfo) {
@@ -53,19 +60,32 @@ void Entity::add_native_components()
 		auto props = allprops[i];
 		for (int j = 0; j < props->count; j++) {
 			auto& p = props->list[j];
-			if (strcmp(props->list[j].custom_type_str, "EntityComponent") == 0) {
-				all_components.push_back((EntityComponent*)props->list[j].get_ptr(this));
+			if (strcmp(props->list[j].custom_type_str, "EntityComponent") == 0) 
+			{
+				EntityComponent* ec = (EntityComponent*)props->list[j].get_ptr(this);
+				// if the inlined field didnt get attached to something, attach it now
+				if (!ec->attached_parent.get())
+					ec->attach_to_parent(root_component.get(), {});
+
+				// append it to all component array
+				all_components.push_back(ec);
 			}
 		}
 	}
-	// TODO: root+parenting components
+	// now do dynamically added components
+	for (int i = 0; i < dynamic_components.size(); i++) {
+		// insert logic for editor only components here
+		auto& c = dynamic_components[i];
+		assert(c->attached_parent.get() || root_component.get() == c.get());
+		all_components.push_back(c.get());
+	}
+
+	// now run register functions
+	for (int i = 0; i < all_components.size(); i++) {
+		all_components[i]->on_init();
+	}
 }
 
-void Entity::register_components()
-{
-	for (int i = 0; i < all_components.size(); i++)
-		all_components[i]->on_init();
-}
 void Entity::destroy()
 {
 	for (int i = 0; i < all_components.size(); i++)
@@ -163,6 +183,8 @@ const PropertyInfoList* MeshComponent::get_props() {
 #endif // !RUNTIME
 	MAKE_VECTORCALLBACK_ATOM(AssetPtr<Material>, MaterialOverride_compilied)
 
+		auto t = &Model::StaticType.classname;
+		const char* str = Model::StaticType.classname;
 	START_PROPS(MeshComponent)
 		REG_ASSET_PTR(model, PROP_DEFAULT),
 		REG_ASSET_PTR(animator_tree, PROP_DEFAULT),
@@ -176,6 +198,18 @@ const PropertyInfoList* MeshComponent::get_props() {
 	END_PROPS(MeshCompponent)
 }
 
+void MeshComponent::editor_on_change_property(const PropertyInfo& property_)
+{
+	bool remake = false;
+	void* prop_ptr = (void*)property_.get_ptr(this);
+	if (prop_ptr == &model) {
+		remake = true;
+	}
+	else if (prop_ptr == &visible)
+		remake = true;
+	else if (prop_ptr == &eMaterialOverride)
+		remake = true;
+}
 
 void MeshComponent::on_init()
 {
@@ -200,7 +234,7 @@ void MeshComponent::on_init()
 
 		Render_Object obj;
 		obj.model = model.get();
-		obj.visible = !is_hidden;
+		obj.visible = visible;
 		obj.transform = get_local_transform();
 
 		idraw->update_obj(draw_handle, obj);

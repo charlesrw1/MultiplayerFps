@@ -120,6 +120,7 @@
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />
+    <ClInclude Include="Source\Game\EditorCommands.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\EntityComponentTypes.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />

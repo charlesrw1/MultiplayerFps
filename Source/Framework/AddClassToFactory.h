@@ -11,3 +11,4 @@ struct AddClassToFactory
     }
 };
 #define ADDTOFACTORYMACRO(Class,Base) static AddClassToFactory<Class,Base> Class##factory_12345(Base::get_factory(), #Class)
+#define ADDTOFACTORYMACRO_NAME(Class,Base, name) static AddClassToFactory<Class,Base> Class##factory_12345(Base::get_factory(), name)

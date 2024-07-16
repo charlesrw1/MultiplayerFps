@@ -7,7 +7,8 @@
 
 #include "Framework/ObjectSerialization.h"
 
-ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr);
+ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr, false);
+const bool ClassBase::CreateDefaultObject = false;
 const ClassTypeInfo& ClassBase::get_type() const { return ClassBase::StaticType; }
 
 struct TypeInfoWithExtra
@@ -24,6 +25,7 @@ struct TypeInfoWithExtra
 		this->next = owner->child;
 		owner->child = this;
 	}
+
 
 	void init();
 };
@@ -43,13 +45,17 @@ static ClassRegistryData& get_registry()
 }
 
 
-ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, const PropertyInfoList* props, CreateObjectFunc alloc)
+ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, GetPropsFunc_t get_props_func, CreateObjectFunc alloc, bool create_default_obj)
 {
 	this->classname = classname;
 	this->superclassname = "";
 	this->props = props;
 	this->allocate = alloc;
 	this->super_typeinfo = super_typeinfo;
+	this->get_props_function = get_props_func;
+
+	// this gets fixed up later
+	this->default_class_object = (ClassBase*)create_default_obj;
 
 	// register this
 	ClassBase::register_class(this);
@@ -127,6 +133,21 @@ void ClassBase::init()
 	ASSERT(root_class != get_registry().string_to_typeinfo.end());
 	set_typenum_R(&root_class->second);
 
+	// now call get props functions
+	for (auto& classtype : get_registry().id_to_typeinfo) {
+		if (classtype->get_props_function)
+			classtype->props = classtype->get_props_function();
+	}
+	// now call default constructors
+	for (auto& classtype : get_registry().id_to_typeinfo) {
+		if (classtype->default_class_object != nullptr) {
+			if (classtype->allocate)
+				classtype->default_class_object = classtype->allocate();
+			else
+				classtype->default_class_object = nullptr;
+		}
+	}
+
 	sys_print("``` Initialized Classes; num classes: %d\n", (int)get_registry().id_to_typeinfo.size());
 
 	get_registry().initialzed = true;
@@ -156,7 +177,7 @@ const ClassTypeInfo* ClassBase::find_class(uint16_t id)
 	return nullptr;
 }
 
-ClassBase* ClassBase::create_copy(TypedVoidPtr userptr)
+ClassBase* ClassBase::create_copy(ClassBase* userptr)
 {
 	ASSERT(get_type().allocate);
 	ClassBase* copied = get_type().allocate();

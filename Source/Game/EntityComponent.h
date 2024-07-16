@@ -63,11 +63,10 @@ public:
 			REG_QUAT(rotation, PROP_DEFAULT),
 			REG_VEC3(scale, PROP_DEFAULT),
 
-			REG_OBJECT_PTR(attached_parent, PROP_SERIALIZE),
-
-			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY),
-			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY)
-			END_PROPS(EntityComponent)
+			REG_OBJECT_PTR(attached_parent, PROP_SERIALIZE | PROP_READ_ONLY_IF_NATIVE),
+			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY | PROP_READ_ONLY_IF_NATIVE),
+			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY | PROP_READ_ONLY_IF_NATIVE)
+		END_PROPS(EntityComponent)
 	}
 
 	glm::mat4 get_local_transform();
@@ -79,6 +78,11 @@ public:
 	void set_world_transform(const glm::mat4& transform);
 
 	bool get_is_native_component() const { return is_native_componenent; }
+
+	StringName self_name;
+#ifndef RUNTIME
+	std::string eSelfNameString;
+#endif // !RUNTIME
 private:
 	Entity* entity_owner = nullptr;
 
@@ -95,14 +99,15 @@ private:
 
 	std::vector<EntityComponent*> children;
 
-	StringName self_name;
-#ifndef RUNTIME
-	std::string eSelfNameString;
-#endif // !RUNTIME
 
 	std::vector<StringName> tags;
 
 	bool is_native_componenent = true;
+	bool is_editor_only = false;
+
+	friend class Entity;
+
+	friend class EdPropertyGrid;
 };
 
 #define REG_COMPONENT(name, flags, hint) EntityComponent::generate_prop_info( \

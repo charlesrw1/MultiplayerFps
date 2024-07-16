@@ -18,20 +18,33 @@ public:
 	}
 };
 
+// Schemas/Archtypes represent an Entity with defined properties
+// Its essentially a prefab, but only 1 entity
+// Supports inheritance
+// All schemas start with an Entity class as a root
+// Then you can define schemas that inherit from other schemas, etc.
+// Schemas can change properties and add dynamic components
+// To load them: calls recursivley up the inheritance tree
+// If a schema inherits from schema B, create an entity from B, if B has class Player as a root, 
+// then create Player and overwrite properties
+
 class Entity;
-// Schemas are just serialized Entities
 CLASS_H(Schema, IAsset)
 public:
 	Entity* create_entity_from_properties() {
 		return create_entity_from_properties_internal(false);
 	}
 
+	// temp
+	void write_to_file(Entity* ent);
 private:
 	bool check_validity_of_file();
 
 	Entity* create_entity_from_properties_internal(bool just_check_validity = false/* always call with false, only called with true in check_validity_of_file*/);
 
 	friend class SchemaLoader;
+
+	Entity* default_schema_obj = nullptr;	// used for diffing
 	std::string properties;	// this is a text serialized form of an entity, from disk
 };
 

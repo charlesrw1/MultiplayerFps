@@ -43,17 +43,17 @@ class ModelAssetMetadata : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() override
+	virtual Color32 get_browser_color() const  override
 	{
 		return { 20, 125, 245 };
 	}
 
-	virtual std::string get_type_name() override
+	virtual std::string get_type_name() const  override
 	{
 		return "Model";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) override
+	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
 		std::unordered_set<std::string> stuff;
 		auto find_tree = FileSys::find_files("./Data/Models");
@@ -78,11 +78,11 @@ public:
 		}
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
-	virtual std::string root_filepath() override
+	virtual std::string root_filepath() const  override
 	{
 		return model_folder_path;
 	}
-	virtual const ClassTypeInfo* get_asset_class_type() { return &Model::StaticType; }
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &Model::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 Model::~Model() {}
@@ -529,7 +529,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 				parser.read_string(tok);
 				parser.load_from_memory((uint8_t*)buffer.c_str(), buffer.size(), "abc");
 				AnimationEvent* event = read_object_properties<AnimationEvent>(
-					TypedVoidPtr(), parser, tok
+					nullptr, parser, tok
 					);
 				if (!event) {
 					sys_print("??? couldn't load animation event '%s'\n", buffer.c_str());

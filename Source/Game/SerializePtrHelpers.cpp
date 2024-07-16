@@ -3,20 +3,19 @@
 #include "Framework/ClassBase.h"
 #include "Framework/Util.h"
 #include "Assets/AssetLoaderRegistry.h"
+#include "Entity.h"
 
-struct SerializeEntityObjectContext
-{
-	std::unordered_map<void*, uint32_t> to_serialize_index;
-};
+CLASS_IMPL(SerializeEntityObjectContext);
 
 class SerializeObjectPtr : public IPropertySerializer
 {
 public:
 	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) override
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
-		assert(user.name == NAME("SerializeEntityObjectContext"));
-		auto ctx = (SerializeEntityObjectContext*)user.ptr;
+		assert(user);
+		auto ctx = user->cast_to<SerializeEntityObjectContext>();
+		assert(ctx);
 
 		void** ptr_prop = (void**)info.get_ptr(inst);
 
@@ -30,7 +29,7 @@ public:
 		}
 	}
 
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	{
 		// unserializing has no context, gets fixup at a later step
 		void** ptr_prop = (void**)info.get_ptr(inst);
@@ -50,7 +49,7 @@ class SerializeAssetPtr : public IPropertySerializer
 {
 public:
 	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) override
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
 		IAsset** ptr_prop = (IAsset**)info.get_ptr(inst);
 		if (*ptr_prop) {
@@ -62,7 +61,7 @@ public:
 		}
 	}
 
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	{
 		IAsset** ptr_prop = (IAsset**)info.get_ptr(inst);
 		
@@ -86,5 +85,28 @@ public:
 	}
 };
 
-ADDTOFACTORYMACRO(SerializeObjectPtr, IPropertySerializer);
-ADDTOFACTORYMACRO(SerializeAssetPtr, IPropertySerializer);
+class SerializeEntityPtr : public IPropertySerializer
+{
+	// Inherited via IPropertySerializer
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		uint64_t* p = (uint64_t*)info.get_ptr(inst);
+		return std::to_string(*p);
+	}
+
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		uint64_t* p = (uint64_t*)info.get_ptr(inst);
+		auto stack = token.to_stack_string();
+		int fields = sscanf(stack.c_str(), "%llu", p);
+		if (fields != 1) {
+			sys_print("!!! unserialize EntityPtr error\n");
+			*p = 0;
+		}
+	}
+};
+
+ADDTOFACTORYMACRO_NAME(SerializeObjectPtr, IPropertySerializer, "ObjectPtr");
+ADDTOFACTORYMACRO_NAME(SerializeAssetPtr, IPropertySerializer,	"AssetPtr");
+ADDTOFACTORYMACRO_NAME(SerializeEntityPtr, IPropertySerializer, "EntityPtr");
+

@@ -828,11 +828,6 @@ void ViewmodelComponent::update_visuals()
 
 
 
-Player::Player() 
-{
-
-}
-
 void Player::find_a_spawn_point()
 {
 	MapEntity* spawnpoint = eng->level->find_by_schema_name(NAME("PlayerSpawn"));

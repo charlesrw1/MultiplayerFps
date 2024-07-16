@@ -21,148 +21,67 @@
 #include "AssetRegistry.h"
 #include "Assets/AssetBrowser.h"
 
+#include <functional>
+
+template<typename... Args>
+class MulticastDelegate
+{
+public:
+	void add(void* key, std::function<void(Args...)> func)
+	{
+		functions_[key] = func;
+	}
+	void remove(void* key)
+	{
+		functions_.erase(key);
+	}
+	void invoke(Args... args) {
+		for (const auto& pair : functions_)
+		{
+			pair.second(args...);
+		}
+	}
+	template<typename T>
+	void add(T* instance, void (T::* memberFunction)(Args...))
+	{
+		functions_[instance] = [instance, memberFunction](Args... args) {
+			(instance->*memberFunction)(args...);
+		};
+	}
+private:
+	std::unordered_map<void*, std::function<void(Args...)>> functions_;
+};
+
 extern ConfigVar g_mousesens;
 
-class ConnectionList : public IArrayHeader
-{
-	using IArrayHeader::IArrayHeader;
-	virtual bool imgui_draw_header(int index);
-	virtual void imgui_draw_closed_body(int index);
-	virtual bool has_delete_all() { return false; }
-	virtual bool can_edit_array() { return true; }
-};
 
-class SchemaProperty
-{
-public:
-	std::string type;
-	std::string name;
-	std::string hint;	// default values etc
-	std::string tooltip;
-	bool dont_expose = false;
-};
 
-struct string_and_tooltip
-{
-	std::string str;
-	std::string tooltip;
-};
-
-class ObjectConnections
-{
-public:
-	std::vector<string_and_tooltip> signals;
-	std::vector<string_and_tooltip> events;
-};
-
-class EditorNode;
-struct SignalProperty
-{
-	EditorNode* self = nullptr;	// hack
-	std::string signal_name;
-	std::string target_name;
-	std::string event_name;
-	std::string parameter_override;
-	float delay = 0.0;
-	bool fire_multiple_times = false;
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(SignalProperty)
-			REG_STDSTRING_CUSTOM_TYPE(signal_name,PROP_DEFAULT,"LevelEd_SignalName"),
-			REG_STDSTRING_CUSTOM_TYPE(target_name, PROP_DEFAULT, "LevelEd_TargetName"),
-			REG_STDSTRING_CUSTOM_TYPE(event_name, PROP_DEFAULT, "LevelEd_EventName"),
-			REG_FLOAT(delay,PROP_DEFAULT,"0.0"),
-			REG_BOOL(fire_multiple_times,PROP_DEFAULT,"0"),
-			REG_STDSTRING(parameter_override, PROP_DEFAULT, ""),
-		END_PROPS(SignalProperty)
-	}
-};
-
-class ObjectSchema
-{
-public:
-	std::string name;
-	std::string tooltip;
-	bool display_in_editor = true;
-	std::vector<SchemaProperty> properties;
-	ObjectConnections connections;
-
-	std::string edimage;
-	std::string edtype;
-	std::string edmodel;
-	Color32 edcolor;
-
-	SchemaProperty* find_property_name(const std::string& name) {
-		for (int i = 0; i < properties.size(); i++) {
-			if (properties[i].name == name)
-				return &properties[i];
-		}
-		return nullptr;
-	}
-
-	void inherit_from(const ObjectSchema* other) {
-
-		for (int i = 0; i < other->properties.size(); i++) {
-			if (find_property_name(other->properties[i].name) != nullptr)
-				throw std::runtime_error("tried inheriting property but already exists " + other->properties[i].name + " " + name + " " + other->name);
-			properties.push_back(other->properties[i]);
-		}
-		for (int i = 0; i < other->connections.signals.size(); i++) {	
-			connections.signals.push_back(other->connections.signals[i]);
-		}
-		for (int i = 0; i < other->connections.events.size(); i++) {
-			connections.events.push_back(other->connections.events[i]);
-		}
-	}
-};
-
-class EditorSchemaManager
-{
-public:
-	bool load(const char* file);
-	const ObjectSchema* find_schema(const std::string& name) {
-		auto find = all_schema_list.find(name);
-		if (find != all_schema_list.end())
-			return &find->second;
-		return nullptr;
-	}
-	std::unordered_map<std::string,ObjectSchema> all_schema_list;
-};
 #include "Player.h"
+
+
 class PhysicsActor;
 class EditorDoc;
 class EditorNode
 {
 public:
 	EditorNode()  {
-		player_ent.add_native_components();
 		player_ent.register_components();
 	
 	}
 	~EditorNode() {
 		player_ent.destroy();
-		hide();
+		//hide();
 	}
-
-	virtual void hide();
-	virtual void show();
-
-	virtual EditorNode* duplicate();
-
-	virtual void per_frame_tick() {}
 
 	void init_on_new_espawn();
 
 	const char* get_schema_name() const {
-		return template_class ? template_class->name.c_str() : "unknown schema";
+		return  "unknown schema";
 	}
 	glm::mat4 get_transform();
 
 	Player player_ent;
 
-	handle<Render_Object> render_handle;
-	PhysicsActor* physics = nullptr;
-	
 	Dict& get_dict();
 
 	glm::vec3 get_position() {
@@ -184,54 +103,24 @@ public:
 		r = glm::quat(r_v.x, r_v.y, r_v.z, r_v.w);
 		s = get_dict().get_vec3("scale",glm::vec3(1));
 	}
-	void set_model(const std::string& name) {
-		get_dict().set_string("model", name.c_str());
-		model_is_dirty = true;
-	}
-	Model* get_rendering_model() {
-		if (!model_is_dirty)
-			return current_model;
-		model_is_dirty = false;
-		std::string s = get_dict().get_string("model");
-		if (!s.empty()) {
-			current_model = mods.find_or_load(s.c_str());
-		}
-		else if (!template_class)
-			current_model = nullptr;
-		else if (!template_class->edmodel.empty())
-			current_model = mods.find_or_load(template_class->edmodel.c_str());
-		else
-			current_model = nullptr;
-		return current_model;
-	}
-	uint32_t get_uid() {
-		return get_dict().get_int("_editor_uid", 0);
-	}
-	void set_uid(uint32_t uid) {
-		get_dict().set_int("_editor_uid", (int)uid);	// fixme
-	}
-	Color32 get_rendering_color() {
-		return get_dict().get_color("color");
-	}
-	Material* get_sprite_material();
+
+
+	//Color32 get_rendering_color() {
+	//	return get_dict().get_color("color");
+	//}
+	//Material* get_sprite_material();
 
 	// only write these when initially spawning like position/model, dont get queued in command system
 	void write_dict_value_spawn();
 	void write_dict_value(std::string key, std::string value);
-
-	void init_from_schema(const ObjectSchema* t);
 
 	void set_selected(bool selected) {
 		is_selected = selected;
 	}
 private:
 	Dict dictionary;
-	std::vector<SignalProperty> signals;
-	const ObjectSchema* template_class = nullptr;
 	friend class EdPropertyGrid;
 	bool is_selected = false;
-	bool model_is_dirty = true;
-	 Model* current_model = nullptr;
 };
 
 class Command
@@ -321,35 +210,33 @@ public:
 class EdPropertyGrid
 {
 public:
-	EdPropertyGrid() : callback_for_signals(SignalProperty::get_props()) {}
-	void set(EditorNode* node);
-	void clear() {
-		set(nullptr);
-	}
-	void refresh_props() {
-		EditorNode* n = node;
-		set(nullptr);
-		set(n);
-	}
+	EdPropertyGrid();
 	void draw();
 
 	EditorNode* get_node() {
 		return node;
 	}
 private:
-	// currently editing this
+	void on_selection_changed();
+	void on_node_deleted(EditorNode* n);
+	void on_close() {
+		node = nullptr;
+		selected_component = nullptr;
+		grid.clear_all();
+	}
+	void refresh_grid();
+
 	EditorNode* node = nullptr;
-	struct display_grid {
-		PropertyInfoList list;
-		std::vector<PropertyInfo> props;
-	};
-	display_grid props_from_node;
-	display_grid connection_props_from_node;
-	// regular properties
+	EntityComponent* selected_component = nullptr;
+	bool refresh_prop_flag = false;
+
+	void on_select_component(EntityComponent* ec) {
+		selected_component = ec;
+		refresh_prop_flag = true;
+	}
+	void draw_components_R(EntityComponent* ec, float ofs);
+
 	PropertyGrid grid;
-	// signals/events
-	PropertyGrid connection_grid;
-	StdVectorCallback<SignalProperty> callback_for_signals;
 
 };
 
@@ -394,13 +281,19 @@ using SharedNodeList = std::vector<std::shared_ptr<EditorNode>>;
 class SelectionState
 {
 public:
+	SelectionState();
+
+	MulticastDelegate<EditorNode*> on_select_new_node;
+	MulticastDelegate<> on_selection_changed;
+
 	bool has_any_selected() const { return num_selected() > 0; }
 	int num_selected() const { return selected_nodes.size(); }
 	const SharedNodeList& get_selection() const { return selected_nodes; }
 	void add_to_selection(const std::shared_ptr<EditorNode>& node) {
 		if (get_index(node.get())==-1) {
 			selected_nodes.push_back(node);
-			selection_dirty = true;
+
+			on_selection_changed.invoke();
 		}
 		node->set_selected(true);
 	}
@@ -408,29 +301,38 @@ public:
 		int index = get_index(node);
 		if (index != -1) {
 			selected_nodes.erase(selected_nodes.begin() + index);
-			selection_dirty = true;
+
+			on_selection_changed.invoke();
 		}
 		node->set_selected(false);
+
 	}
 	void clear_all_selected(bool show_this = true) {
 		for (int i = 0; i < selected_nodes.size(); i++) {
 			selected_nodes[i]->set_selected(false);
-			if(show_this)
-				selected_nodes[i]->show();	// update the model
+			//if(show_this)
+			//	selected_nodes[i]->show();	// update the model
 		}
 		selected_nodes.clear();
-		selection_dirty = true;
+
+		on_selection_changed.invoke();
 	}
 	void set_select_only_this(const std::shared_ptr<EditorNode>& node) {
 		clear_all_selected();
 		add_to_selection(node);
 	}
-	bool is_selection_dirty() const { return selection_dirty; }
-	void clear_selection_dirty() { selection_dirty = false; }
+
 	bool is_node_selected(EditorNode* node) const {
 		return get_index(node) != -1;
 	}
 private:
+	void on_node_deleted(EditorNode* node) {
+		remove_from_selection(node);
+	}
+	void on_close() {
+		selected_nodes.clear();
+	}
+
 	int get_index(EditorNode* node) const {
 		for (int i = 0; i < selected_nodes.size(); i++) {
 			if (selected_nodes[i].get() == node)
@@ -438,8 +340,6 @@ private:
 		}
 		return -1;
 	}
-
-	bool selection_dirty = false;
 	SharedNodeList selected_nodes;
 };
 
@@ -484,7 +384,6 @@ private:
 	std::vector<SavedTransform> saved_of_set;
 };
 
-
 // maps/
 //	both prefabs and maps
 //	build_<map_name>/
@@ -494,7 +393,10 @@ class Model;
 class EditorDoc : public IEditorTool
 {
 public:
-	EditorDoc() {}
+	EditorDoc() {
+		selection_state = std::make_unique<SelectionState>();
+		prop_editor = std::make_unique<EdPropertyGrid>();
+	}
 	virtual void init();
 	virtual bool can_save_document() override { return true; }
 	virtual void open_document_internal(const char* levelname) override;
@@ -523,8 +425,6 @@ public:
 
 	void duplicate_selected_and_select_them();
 
-	void remove_any_references(EditorNode* node);
-
 	void hook_imgui_newframe() override {
 		ImGuizmo::BeginFrame();
 	}
@@ -545,7 +445,6 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
-	SelectionState selection_state;
 
 	// dont want to deal with patching up another index
 	int get_node_index(EditorNode* node) {
@@ -555,15 +454,13 @@ public:
 		ASSERT(0);
 	}
 
-	EditorNode* create_node_from_dict(const Dict& d);
-	EditorNode* spawn_from_schema_type(const char* schema_name);
-
 	bool is_open = false;
 	UndoRedoSystem command_mgr;
 	View_Setup vs_setup;
-	EdPropertyGrid prop_editor;
+	std::unique_ptr<SelectionState> selection_state;
+	std::unique_ptr<EdPropertyGrid> prop_editor;
 	MapLoadFile editing_map;
-	EditorSchemaManager ed_schema;
+
 	ObjectOutliner outliner;
 	ManipulateTransformTool manipulate;
 
@@ -574,6 +471,11 @@ public:
 
 	std::vector<std::shared_ptr<EditorNode>> nodes;
 	std::vector<std::string> ent_files;
+
+	MulticastDelegate<EditorNode*> on_node_deleted;
+	MulticastDelegate<EditorNode*> on_node_created;
+	MulticastDelegate<> on_start;
+	MulticastDelegate<> on_close;
 
 	// Inherited via IEditorTool
 	virtual void on_change_focus(editor_focus_state newstate) override;

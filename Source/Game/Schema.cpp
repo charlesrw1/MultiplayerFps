@@ -144,8 +144,6 @@ Entity* Schema::create_entity_from_properties_internal(bool just_check_valid)
 					}
 				}
 			}
-
-			e->all_components.push_back(ptr.get());
 			e->dynamic_components.push_back(std::move(ptr));
 		}
 		else if (!objs[i]->is_a<InlinePtrFixup>()) {
@@ -159,4 +157,72 @@ Entity* Schema::create_entity_from_properties_internal(bool just_check_valid)
 
 	return e;
 
+}
+
+void Schema::write_to_file(Entity* e)
+{
+	SerializeEntityObjectContext ctx;
+	ctx.serialzing_entity_index = 0;
+	ctx.to_serialize_index[e] = 0;
+
+	const ClassBase* diffclass = (e->schema_type.get()) ? e->schema_type->default_schema_obj : e->get_type().default_class_object;
+
+	assert(e->get_type() == diffclass->get_type());
+
+	DictWriter out;
+	out.write_item_start();
+	if (e->schema_type.get()) {
+		out.write_key_value("schema", e->schema_type->get_name().c_str());
+	}
+	else
+		out.write_key_value("class", e->get_type().classname);
+
+	std::vector<PropertyListInstancePair> props;
+	const ClassTypeInfo* typeinfo = &e->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, e });
+		typeinfo = typeinfo->super_typeinfo;
+	}
+
+	for (auto& proplist : props) {
+		if (proplist.list)
+			write_properties(*const_cast<PropertyInfoList*>(proplist.list), proplist.instance, out, &ctx);
+	}
+
+	out.write_item_end();
+
+}
+
+inline void write_object_properties_with_diff(
+	ClassBase* obj,
+	const ClassBase* diffed_obj,	/* obj.type == diffed_obj.type ALWAYS */
+	ClassBase* userptr,
+	DictWriter& out
+)
+{
+	assert(obj->get_type() == diffed_obj->get_type());
+
+	// if obj != diffed_obj
+	//		
+
+	std::vector<PropertyListInstancePair> props;
+	const ClassTypeInfo* typeinfo = &obj->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, obj });
+		typeinfo = typeinfo->super_typeinfo;
+	}
+
+	typeinfo = &obj->get_type();
+
+	out.write_item_start();
+
+	out.write_key_value("type", typeinfo->classname);
+	for (auto& proplist : props) {
+		if (proplist.list)
+			write_properties(*const_cast<PropertyInfoList*>(proplist.list), proplist.instance, out, userptr);
+	}
+
+	out.write_item_end();
 }

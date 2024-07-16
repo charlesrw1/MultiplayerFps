@@ -701,16 +701,16 @@ void CurveEditorImgui::draw()
    ImGui::End();
 
 }
-
+class ClassBase;
 class CurvePointSerialize : public IPropertySerializer
 {
 public:
-    virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) {
+    virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override {
         CurvePoint* point = (CurvePoint*)inst;
         std::string outs = string_format("\"%i %f %f %f %f %f %f\"", point->type, point->time, point->value, point->tangent0.x, point->tangent0.y, point->tangent1.x, point->tangent1.y);
         return outs;
     }
-    virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) {
+    virtual void unserialize(DictParser& in, const PropertyInfo& info,  void* inst, StringView token, ClassBase* user) override {
         std::string str = std::string(token.str_start, token.str_len);
         CurvePoint* point = (CurvePoint*)inst;
         int param = 0;

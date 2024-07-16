@@ -56,9 +56,9 @@ inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_i
 
 
 using AnimGraphVariable = handle<ScriptVariable>;
-struct AgSerializeContext
-{
-	AgSerializeContext(Animation_Tree_CFG* tree);
+CLASS_H(AgSerializeContext,ClassBase)
+public:
+	void set_tree(Animation_Tree_CFG* tree);
 
 	AnimGraphVariable find_variable_index(std::string name, anim_graph_value& type) const {
 		auto& vars = tree->get_script()->get_variables();

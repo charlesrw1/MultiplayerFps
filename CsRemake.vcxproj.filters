@@ -76,6 +76,9 @@
     <Filter Include="Source\Framework\Memory">
       <UniqueIdentifier>{4555f275-334c-4727-832c-d1467cad3d14}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\LevelEditor\Commands">
+      <UniqueIdentifier>{37f4b120-00f7-420e-b33d-231eea4510a8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -501,6 +504,9 @@
     </ClInclude>
     <ClInclude Include="Source\Framework\Hashmap.h">
       <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\EditorCommands.h">
+      <Filter>Source\LevelEditor\Commands</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

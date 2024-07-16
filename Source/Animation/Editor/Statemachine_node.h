@@ -4,7 +4,7 @@
 #include "Basic_nodes.h"
 #include "../Runtime/Statemachine_cfg.h"
 
-
+class AgSerializeContext;
 CLASS_H(Statemachine_EdNode, Base_EdNode)
 
 	~Statemachine_EdNode() override {

@@ -69,15 +69,30 @@ public:
 	}
 
 	bool open_from_file(const std::string& path);
+	bool is_editor_level() const {
+		return bIsEditorLevel;
+	}
+	bool is_game_level() const {
+		return !bIsEditorLevel;
+	}
 
 	std::string name;
 	
+
 	// all entities in the map
 	hash_map<Entity> all_world_ents;
 	uint64_t last_id = 0;
 
 	uint64_t local_player_id = 0;
 
+	Entity* get_local_player() const {
+		return all_world_ents.find(local_player_id);
+	}
+	Entity* get_entity(uint64_t handle) {
+		return all_world_ents.find(handle);
+	}
+
+	bool bIsEditorLevel=false;
 
 	unique_ptr<Physics_Mesh> scollision;	// merged collision of all level_meshes
 	

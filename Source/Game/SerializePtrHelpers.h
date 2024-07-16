@@ -3,6 +3,14 @@
 #include "Framework/ReflectionProp.h"
 #include "IAsset.h"
 #include "Framework/ArrayReflection.h"
+#include <unordered_map>
+CLASS_H(SerializeEntityObjectContext,ClassBase)
+	std::unordered_map<void*, uint64_t> to_serialize_index;
+
+	uint64_t serialzing_entity_index = 0;
+};
+
+
 template<typename T>
 class AssetPtr
 {
@@ -22,8 +30,8 @@ public:
 
 
 template<typename T>
-inline PropertyInfo make_asset_ptr_property(const char* name, uint16_t offset, uint32_t flags, T* dummy) {
-	return make_struct_property(name, offset, flags, "AssetPtr", T::TYPE::StaticType.classname);
+inline PropertyInfo make_asset_ptr_property(const char* name, uint16_t offset, uint32_t flags, AssetPtr<T>* dummy) {
+	return make_struct_property(name, offset, flags, "AssetPtr", T::StaticType.classname);
 }
 #define REG_ASSET_PTR(name, flags) make_asset_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
 
@@ -55,8 +63,8 @@ public:
 
 
 template<typename T>
-inline PropertyInfo make_object_ptr_property(const char* name, uint16_t offset, uint32_t flags, T* dummy) {
-	return make_struct_property(name, offset, flags, "ObjectPointer", T::TYPE::StaticType.classname);
+inline PropertyInfo make_object_ptr_property(const char* name, uint16_t offset, uint32_t flags, ObjPtr<T>* dummy) {
+	return make_struct_property(name, offset, flags, "ObjectPointer", T::StaticType.classname);
 }
 #define REG_OBJECT_PTR(name, flags) make_object_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
 

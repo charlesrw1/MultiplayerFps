@@ -58,10 +58,14 @@ struct PlayerFlags
 };
 
 CLASS_H(Player, Entity)
-
-	Player();
-
 public:
+
+	Player() {
+		root_component = &player_capsule;
+		player_mesh.attach_to_parent(root_component.get(), {});
+		viewmodel_mesh.attach_to_parent(&player_mesh, NAME("Prop_Gun"));
+	}
+
 	MeshComponent player_mesh;
 
 	CapsuleComponent player_capsule;
@@ -70,8 +74,11 @@ public:
 
 	AssetPtr<Model> a_second_model;
 
+	EntityPtr<Entity> gun_entity;
+	
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)
+			REG_ENTITY_PTR(gun_entity,PROP_DEFAULT),
 			REG_COMPONENT(player_capsule,PROP_DEFAULT,"Root"),
 			REG_COMPONENT(player_mesh,PROP_DEFAULT,""),
 			REG_COMPONENT(viewmodel_mesh, PROP_DEFAULT, ""),

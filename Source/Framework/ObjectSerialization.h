@@ -7,7 +7,7 @@
 #include <string>
 #include <cassert>
 
-inline void copy_object_properties( ClassBase* from, ClassBase* to, TypedVoidPtr userptr)
+inline void copy_object_properties( ClassBase* from, ClassBase* to, ClassBase* userptr)
 {
 	assert(from->get_type() == to->get_type());
 
@@ -23,7 +23,7 @@ inline void copy_object_properties( ClassBase* from, ClassBase* to, TypedVoidPtr
 
 inline void write_object_properties(
 	ClassBase* obj,
-	TypedVoidPtr userptr,
+	ClassBase* userptr,
 	DictWriter& out
 )
 {
@@ -50,7 +50,7 @@ inline void write_object_properties(
 
 template<typename BASE>
 inline BASE* read_object_properties(
-	TypedVoidPtr userptr,
+	ClassBase* userptr,
 	DictParser& in,
 	StringView tok
 )

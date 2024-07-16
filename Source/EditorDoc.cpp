@@ -34,169 +34,6 @@ static std::string to_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
 
-
-// hint string : "<default>,<min>,<max>"
-// or: "<default>
-// or: "<default>,<option1>,<option2>,.."
-
-std::vector<StringView> parse_hint_string(const char* cstr)
-{
-	std::vector<StringView> out;
-	int start = 0;
-	size_t find = 0;
-	std::string hint = cstr;
-	while ((find = hint.find(',',start))!=std::string::npos) {
-		out.push_back(StringView(cstr +start, (find-start)));
-		start = find + 1;
-	}
-	out.push_back(StringView(cstr + start, (hint.size() - start)));
-	return out;
-}
-
-bool EditorSchemaManager::load(const char* path)
-{
-	all_schema_list.clear();
-
-	auto file = FileSys::open_read_os(path);
-	if (!file)
-		throw std::runtime_error("couldnt open file");
-
-	DictParser in;
-	in.load_from_file(file.get());
-	StringView tok;
-	while (in.read_string(tok) && !in.is_eof()) {
-		auto os = ObjectSchema();
-		os.name = to_string(tok);
-
-		if (find_schema(os.name) != nullptr)
-			throw std::runtime_error("schema has duplicate names " + os.name);
-
-
-		in.read_string(tok);
-		if (tok.cmp("abstract"))
-			os.display_in_editor = false;
-		else
-			in.return_string(tok);
-
-		in.read_string(tok);
-		if (tok.cmp(":")) {
-			in.read_string(tok);
-			os.tooltip = to_string(tok);
-		}
-		else
-			in.return_string(tok);
-
-
-		if (!in.expect_item_start())
-			throw std::runtime_error("expected item_start for " + os.name);
-
-		while (in.read_string(tok) && !in.is_eof() && !in.check_item_end(tok)) {
-			SchemaProperty prop;
-			prop.type = to_string(tok);
-
-			if (prop.type == "SIGNAL" || prop.type == "EVENT") {
-				const bool is_signal = prop.type == "SIGNAL";
-				in.read_string(tok);
-				std::string name = to_string(tok);
-				in.read_string(tok);
-				std::string tooltip;
-				if (tok.cmp(":")) {
-					in.read_string(tok);
-					tooltip = to_string(tok);
-				}
-				else
-					in.return_string(tok);
-				string_and_tooltip st;
-				st.str = name;
-				st.tooltip = tooltip;
-				if (is_signal)
-					os.connections.signals.push_back(st);
-				else
-					os.connections.events.push_back(st);
-
-				continue;
-			}
-			else if (tok.cmp("_edimage")) {
-				in.read_string(tok);
-				os.edimage = to_string(tok);
-				continue;
-			}
-			else if (tok.cmp("_edtype")) {
-				in.read_string(tok);
-				os.edtype = to_string(tok);
-				continue;
-			}
-			else if (tok.cmp("_edmodel")) {
-				in.read_string(tok);
-				os.edmodel = to_string(tok);
-				continue;
-			}
-			else if (tok.cmp("_edcolor")) {
-				float r, g, b;
-				in.read_float3(r, g, b);
-				os.edcolor.r = r;
-				os.edcolor.g = g;
-				os.edcolor.b = b;
-				continue;
-			}
-			else if (tok.cmp("SET")) {
-				in.read_string(tok);
-				std::string name = to_string(tok);
-				auto find = os.find_property_name(name);
-				if (!find)
-					throw std::runtime_error("SET called but couldn't find field to override " + os.name + " " + name);
-				in.read_string(tok);
-				std::string default_new = to_string(tok);
-
-				// overwrite default
-				auto vec = parse_hint_string(find->hint.c_str());
-				for (int i = 1; i < vec.size(); i++) {
-					default_new += ',';
-					default_new += to_string(vec.at(i));
-				}
-				find->hint = default_new;
-				continue;
-			}
-
-
-			in.read_string(tok);
-			prop.name = to_string(tok);
-
-			if (prop.name.size() > 0 && prop.name[0] == '_')
-				prop.dont_expose = true;
-
-			if (prop.type == "inherits") {
-				auto find = find_schema(prop.name);
-				if (!find)
-					throw std::runtime_error("couldnt find 'inherits' type " + prop.name);
-
-				os.inherit_from(find);
-
-				continue;
-			}
-
-			prop.type = "Leveled_" + prop.type;
-
-			in.read_string(tok);
-			prop.hint = to_string(tok);
-
-			in.read_string(tok);
-			if (tok.cmp(":")) {
-				in.read_string(tok);
-				prop.tooltip = to_string(tok);
-			}
-			else
-				in.return_string(tok);
-
-			os.properties.push_back(prop);
-		}
-
-		all_schema_list.insert({ os.name,os });
-	}
-
-	return true;
-}
-
 class EditPropertyCommand : public Command
 {
 public:
@@ -224,7 +61,7 @@ public:
 			for (auto& k : g.changes.keyvalues) {
 				g.n->get_dict().set_string(k.first.c_str(), k.second.c_str());
 			}
-			g.n->show();
+			//g.n->show();
 		}
 	}
 	void undo() {
@@ -238,7 +75,7 @@ public:
 				else
 					g.n->get_dict().remove_key(k.first.c_str());
 			}
-			g.n->show();
+			//g.n->show();
 
 			i++;
 		}
@@ -280,15 +117,17 @@ public:
 	void execute() {
 		for (auto& n : nodes) {
 			ed_doc.nodes.push_back(n);
-			n->show();
+			ed_doc.on_node_created.invoke(n.get());
+			//n->show();
 		}
 	}
 	void undo() {
 		for (auto& n : nodes) {
 			assert(ed_doc.nodes.back().get() == n.get());
-			n->hide();
+			//n->hide();
 			ed_doc.nodes.pop_back();
-			ed_doc.remove_any_references(n.get());
+
+			ed_doc.on_node_deleted.invoke(n.get());
 		}
 	}
 	std::string to_string() override {
@@ -327,16 +166,18 @@ public:
 	void execute() {
 		for (int i = 0; i < nodes.size();i++) {
 			auto& node = nodes[i];
-			node->hide();
+			//node->hide();
 			ed_doc.nodes.erase(ed_doc.nodes.begin() + ed_doc.get_node_index(node.get()));
-			ed_doc.remove_any_references(node.get());
+
+			ed_doc.on_node_deleted.invoke(node.get());
 		}
 	}
 	void undo() {
 		for (int i = 0; i < nodes.size(); i++) {
 			auto& node = nodes[i];
 			ed_doc.nodes.push_back(node);
-			node->show();
+			ed_doc.on_node_created.invoke(node.get());
+			//node->show();
 		}
 	}
 	std::string to_string() override {
@@ -375,25 +216,25 @@ class SchemaAssetMetadata : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() override
+	virtual Color32 get_browser_color() const  override
 	{
 		return { 242, 68, 117 };
 	}
 
-	virtual std::string get_type_name() override
+	virtual std::string get_type_name() const  override
 	{
 		return "Schema";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) override
+	virtual void index_assets(std::vector<std::string>& filepaths) const override
 	{
-		for (const auto& schema : ed_doc.ed_schema.all_schema_list) {
-			if (schema.second.display_in_editor)
-				filepaths.push_back(schema.first);
-		}
+		//for (const auto& schema : ed_doc.ed_schema.all_schema_list) {
+		//	if (schema.second.display_in_editor)
+		//		filepaths.push_back(schema.first);
+		//}
 	}
 
-	virtual std::string root_filepath() override
+	virtual std::string root_filepath() const override
 	{
 		return "";
 	}
@@ -460,32 +301,22 @@ Dict& EditorNode::get_dict()
 }
 
 
-EditorNode* EditorNode::duplicate()
-{
-	EditorNode* other = new EditorNode;
-	other->dictionary = this->dictionary;
-	other->model_is_dirty = true;
-	other->template_class = this->template_class;
-	
-	return other;
-}
-
 void EditorDoc::duplicate_selected_and_select_them()
 {
-	if (selection_state.num_selected() == 0) {
+	if (selection_state->num_selected() == 0) {
 		sys_print("??? duplicate_selected_and_select_them but nothing selected\n");
 		return;
 	}
 	std::vector<std::shared_ptr<EditorNode>> nodes;
-	for (int i = 0; i < selection_state.get_selection().size(); i++) {
-		nodes.push_back(std::shared_ptr<EditorNode>(selection_state.get_selection().at(i)->duplicate()));
-	}
-	for (int i = 0; i < nodes.size(); i++)
-		nodes[i]->set_uid(get_next_id());
-	selection_state.clear_all_selected();
+	//for (int i = 0; i < selection_state->get_selection().size(); i++) {
+	//	nodes.push_back(std::shared_ptr<EditorNode>(selection_state->get_selection().at(i)->duplicate()));
+	//}
+	//for (int i = 0; i < nodes.size(); i++)
+	//	nodes[i]->set_uid(get_next_id());
+	selection_state->clear_all_selected();
 	command_mgr.add_command(new CreateNodeCommand(nodes));
 	for (int i = 0; i < nodes.size(); i++)
-		selection_state.add_to_selection(nodes[i]);
+		selection_state->add_to_selection(nodes[i]);
 }
 static Material* generate_spritemat_from_texture(Texture* t)
 {
@@ -506,6 +337,7 @@ static Material* generate_spritemat_from_texture(Texture* t)
 	return mat;
 }
 
+#if 0
 Material* EditorNode::get_sprite_material()
 {
 	if (template_class && !template_class->edimage.empty()) {
@@ -519,17 +351,8 @@ Material* EditorNode::get_sprite_material()
 	return generate_spritemat_from_texture(t);
 
 }
- void EditorNode::init_from_schema(const ObjectSchema* t) {
-	template_class = t;
-	dictionary = {};	// empty dict means deafult values
-
-	for (int i = 0; i < template_class->properties.size(); i++) {
-		auto& prop = template_class->properties[i];
-		auto parsevec = parse_hint_string(prop.hint.c_str());
-		if (parsevec.empty()) continue;
-		dictionary.set_string(prop.name.c_str(), to_std_string_sv(parsevec[0]).c_str());
-	}
-}
+#endif
+#if 0
 void EditorNode::show()
 {
 	assert(ed_doc.get_focus_state() == editor_focus_state::Focused);
@@ -603,6 +426,7 @@ void EditorNode::hide()
 	idraw->remove_obj(render_handle);
 	g_physics->free_physics_actor(physics);
 }
+#endif
 
 
 glm::mat4 EditorNode::get_transform()
@@ -622,22 +446,7 @@ void EditorNode::init_on_new_espawn()
 	
 }
 
-EditorNode* EditorDoc::create_node_from_dict(const Dict& d)
-{
-	const char* template_class = d.get_string("_schema_name");
-	EditorNode* node = new EditorNode;
-	auto template_obj = ed_schema.find_schema(template_class);
-	if (!template_obj) {
-		sys_print("node schema type doesnt exist %s\n", template_class);
-	}
-	else
-		node->init_from_schema(template_obj);
-	for (auto& kv : d.keyvalues) {
-		node->get_dict().set_string(kv.first.c_str(), kv.second.c_str());
-	}
-	return node;
-}
-
+#if 0
 EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 {
 	auto template_obj = ed_schema.find_schema(schema_type);
@@ -647,7 +456,7 @@ EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 	if(!node)
 		node = new EditorNode();
 	node->init_from_schema(template_obj);
-	node->set_uid(get_next_id());
+	//node->set_uid(get_next_id());
 	
 	std::shared_ptr<EditorNode> shared(node);
 
@@ -655,7 +464,7 @@ EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
 
 	return node;
 }
-
+#endif
 void EditorDoc::draw_menu_bar()
 {
 	if (ImGui::BeginMenuBar())
@@ -701,20 +510,20 @@ void EditorDoc::on_change_focus(editor_focus_state newstate)
 
 void EditorDoc::hide_everything()
 {
-	for (int i = 0; i < nodes.size(); i++)
-		nodes[i]->hide();
+	//for (int i = 0; i < nodes.size(); i++)
+	//	nodes[i]->hide();
 }
 void EditorDoc::show_everything()
 {
-	for (int i = 0; i < nodes.size(); i++)
-		nodes[i]->show();
+	//for (int i = 0; i < nodes.size(); i++)
+	//	nodes[i]->show();
 }
 
 void EditorDoc::init()
 {
 	// set my parent
 	set_parent(eng->get_gui());
-	ed_schema.load("./Data/classes.txt");
+	//ed_schema.load("./Data/classes.txt");
 	global_asset_browser.init();
 }
 #include "Framework/DictWriter.h"
@@ -746,15 +555,15 @@ void EditorDoc::open_document_internal(const char* levelname)
 		std::string path = get_save_root_dir() + levelname;
 		bool good = editing_map.parse(path);
 		if (good) {
-			for (int i = 0; i < editing_map.spawners.size(); i++) {
-				EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
-				if (node) {
-					nodes.push_back(std::shared_ptr<EditorNode>(node));
-					if (get_focus_state() == editor_focus_state::Focused)
-						node->show();
-					id_start = glm::max(id_start, node->get_uid()+1);
-				}
-			}
+			//for (int i = 0; i < editing_map.spawners.size(); i++) {
+			//	EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
+			//	if (node) {
+			//		nodes.push_back(std::shared_ptr<EditorNode>(node));
+			//		if (get_focus_state() == editor_focus_state::Focused)
+			//			node->show();
+			//		//id_start = glm::max(id_start, node->get_uid()+1);
+			//	}
+			//}
 			needs_new_doc = false;
 			set_doc_name(levelname);
 		}
@@ -773,24 +582,13 @@ void EditorDoc::close_internal()
 	nodes.clear();
 	command_mgr.clear_all();
 	manipulate.free_refs();
-	selection_state.clear_all_selected(false);
+	
+	on_close.invoke();
+
 	is_open = false;
 }
 
-void EditorDoc::leave_transform_tool(bool apply_delta)
-{
 
-}
-
-void EditorDoc::enter_transform_tool(TransformType type)
-{
-	return;
-	if (!selection_state.has_any_selected()) return;
-	//transform_tool_type = type;
-	//axis_bit_mask = 7;
-	//transform_tool_origin = selected_node->get_dict().get_vec3("position");
-	//mode = TOOL_TRANSFORM;
-}
 
 void EditorDoc::ui_paint() 
 {
@@ -800,7 +598,7 @@ void EditorDoc::ui_paint()
 void ManipulateTransformTool::handle_event(const SDL_Event& event)
 {
 
-	if (event.type == SDL_KEYDOWN && !eng->get_game_focused() && ed_doc.selection_state.has_any_selected()) {
+	if (event.type == SDL_KEYDOWN && !eng->get_game_focused() && ed_doc.selection_state->has_any_selected()) {
 		uint32_t scancode = event.key.keysym.scancode;
 		bool has_shift = event.key.keysym.mod & KMOD_SHIFT;
 		if (scancode == SDL_SCANCODE_R) {
@@ -856,10 +654,10 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			uint32_t scancode = event.key.keysym.scancode;
 			const float ORTHO_DIST = 20.0;
 			if (scancode == SDL_SCANCODE_DELETE) {
-				if (selection_state.has_any_selected()) {
-					RemoveNodeCommand* com = new RemoveNodeCommand(selection_state.get_selection());
+				if (selection_state->has_any_selected()) {
+					RemoveNodeCommand* com = new RemoveNodeCommand(selection_state->get_selection());
 					command_mgr.add_command(com);
-					selection_state.clear_all_selected();	// should already be cleared but just checking
+					selection_state->clear_all_selected();	// should already be cleared but just checking
 				}
 			}
 			else if (scancode == SDL_SCANCODE_KP_5) {
@@ -903,15 +701,15 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 
 				if (rh.fraction == 1.0) {
 					// no hit
-					selection_state.clear_all_selected();
+					selection_state->clear_all_selected();
 				}
 				else {
 					int index = ed_doc.get_node_index(rh.actor->get_editor_node_owner());
 					if (eng->keys[SDL_SCANCODE_LSHIFT]) {
-						selection_state.add_to_selection(nodes[index]);
+						selection_state->add_to_selection(nodes[index]);
 					}
 					else
-						selection_state.set_select_only_this(nodes[index]);
+						selection_state->set_select_only_this(nodes[index]);
 				}
 			}
 		}
@@ -1077,15 +875,15 @@ void EditorDoc::overlay_draw()
 	static MeshBuilder mb;
 	mb.Begin();
 	mb.PushLineBox(glm::vec3(-1), glm::vec3(1), COLOR_BLUE);
-	if (selection_state.has_any_selected()) {
+	if (selection_state->has_any_selected()) {
 		Bounds total_bounds;
-		auto& selected = selection_state.get_selection();
+		auto& selected = selection_state->get_selection();
 		for (auto& s : selected) {
-			Model* m = s->get_rendering_model();
-			if (m) {
-				auto transform = s->get_transform();
-				total_bounds = bounds_union(total_bounds,transform_bounds(transform,m->get_bounds()));
-			}
+			//Model* m = s->get_rendering_model();
+			//if (m) {
+			//	auto transform = s->get_transform();
+			//	total_bounds = bounds_union(total_bounds,transform_bounds(transform,m->get_bounds()));
+			//}
 		}
 		mb.PushLineBox(total_bounds.bmin, total_bounds.bmax, COLOR_RED);
 	}
@@ -1097,12 +895,7 @@ uint32_t color_to_uint(Color32 c) {
 	return c.r | c.g << 8 | c.b << 16 | c.a << 24;
 }
 
-void EditorDoc::remove_any_references(EditorNode* node)
-{
-	selection_state.remove_from_selection(node);
-	if (prop_editor.get_node() == node)
-		prop_editor.set(nullptr);
-}
+
 #include <glm/gtc/type_ptr.hpp>
 bool ManipulateTransformTool::is_hovered()
 {
@@ -1122,7 +915,7 @@ void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q,
 
 void ManipulateTransformTool::update()
 {
-	if (ed_doc.selection_state.num_selected() == 0) {
+	if (ed_doc.selection_state->num_selected() == 0) {
 		if (state == MANIPULATING_OBJS)
 			state = IDLE;
 		saved_of_set.clear();
@@ -1132,14 +925,14 @@ void ManipulateTransformTool::update()
 	if (state == IDLE) {
 		saved_of_set.clear();
 		// calculate transform
-		if (ed_doc.selection_state.num_selected() == 1) {
-			current_transform_of_group = ed_doc.selection_state.get_selection()[0]->get_transform();
+		if (ed_doc.selection_state->num_selected() == 1) {
+			current_transform_of_group = ed_doc.selection_state->get_selection()[0]->get_transform();
 		}
 		else {
 			glm::vec3 center = glm::vec3(0.0);
-			for (auto& n : ed_doc.selection_state.get_selection())
+			for (auto& n : ed_doc.selection_state->get_selection())
 				center += n->get_position();
-			center /= (float)ed_doc.selection_state.num_selected();
+			center /= (float)ed_doc.selection_state->num_selected();
 			current_transform_of_group = glm::translate(glm::mat4(1.0), center);
 		}
 	}
@@ -1173,7 +966,7 @@ void ManipulateTransformTool::update()
 			if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl))
 				ed_doc.duplicate_selected_and_select_them();
 
-			for (auto& s : ed_doc.selection_state.get_selection()) {
+			for (auto& s : ed_doc.selection_state->get_selection()) {
 				SavedTransform st;
 				st.node = s;
 				st.pretransform = s->get_transform();
@@ -1191,8 +984,8 @@ void ManipulateTransformTool::update()
 
 	if (state == MANIPULATING_OBJS || create_command) {
 		// calculate transform
-		if (ed_doc.selection_state.num_selected() == 1) {
-			auto& n = ed_doc.selection_state.get_selection()[0];
+		if (ed_doc.selection_state->num_selected() == 1) {
+			auto& n = ed_doc.selection_state->get_selection()[0];
 			glm::vec3 scale, p;
 			glm::quat r;
 			decompose_transform(current_transform_of_group, p, r, scale);
@@ -1226,134 +1019,18 @@ void ManipulateTransformTool::update()
 void EditorDoc::imgui_draw()
 {
 	outliner.draw();
-	if (selection_state.num_selected() == 1)
-		prop_editor.set(selection_state.get_selection()[0].get());
-	else
-		prop_editor.set(nullptr);
-	prop_editor.draw();
 
-	if (get_focus_state() == editor_focus_state::Focused) {
-		for (int i = 0; i < selection_state.num_selected(); i++) {
-			selection_state.get_selection()[i]->show();
-		}
-	}
+	prop_editor->draw();
+
+	//if (get_focus_state() == editor_focus_state::Focused) {
+	//	for (int i = 0; i < selection_state->num_selected(); i++) {
+	//		selection_state->get_selection()[i]->show();
+	//	}
+	//}
 
 	IEditorTool::imgui_draw();
 
-	return;
-#if 0
-	ImGui::SetNextWindowPos(ImVec2(10, 10));
 
-	float alpha = (eng->game_focused) ? 0.3 : 0.7;
-
-	ImGui::SetNextWindowBgAlpha(alpha);
-	//ImGui::SetNextWindowSize(ImVec2(250, 500));
-	uint32_t flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
-	if (ImGui::Begin("EdDoc",nullptr, flags))
-	{
-
-		ImGui::DragFloat3("cam pos", &camera.position.x);
-		ImGui::DragFloat("cam pitch", &camera.pitch);
-		ImGui::DragFloat("cam yaw", &camera.yaw);
-
-
-		uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
-        if (ImGui::BeginTable("Entity list",1, ent_list_flags, ImVec2(0, 300.f), 0.f))
-        {
-            // Declare columns
-            // We use the "user_id" parameter of TableSetupColumn() to specify a user id that will be stored in the sort specifications.
-            // This is so our sort function can identify a column given our own identifier. We could also identify them based on their index!
-            ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 0.0f, 0);
-            ImGui::TableSetupScrollFreeze(1, 1);
-            ImGui::TableHeadersRow();
-
-
-            for (int row_n = 0; row_n < nodes.size(); row_n++)
-            {
-				EditorNode* n = nodes[row_n].get();
-
-				const char* name = n->get_name();
-                //if (!filter.PassFilter(item->Name))
-                //    continue;
-
-                const bool item_is_selected = item_selected == row_n;
-                ImGui::PushID(row_n);
-                ImGui::TableNextRow(ImGuiTableRowFlags_None, 0.f);
-
-				ImU32 row_bg_color = color_to_uint(n->get_object_color());
-				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
-
-                // For the demo purpose we can select among different type of items submitted in the first column
-                ImGui::TableSetColumnIndex(0);
-                char label[32];
-                //sprintf(label, "%04d", item->ID);
-                {
-                    ImGuiSelectableFlags selectable_flags =ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-                    if (ImGui::Selectable(name, item_is_selected, selectable_flags, ImVec2(0, 0.f)))
-                    {
-						item_selected = row_n;
-						selected_node = nodes[row_n];
-                    }
-                }
-
-				ImGui::PopID();
-            }
-			ImGui::EndTable();
-        }
-
-		if (selected_node != nullptr) {
-
-			ImGui::SeparatorText("Property editor");
-
-			uint32_t prop_editor_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
-
-			if (ImGui::BeginTable("Property editor", 2, prop_editor_flags))
-			{
-				ImGui::TableSetupColumn("Key", ImGuiTableColumnFlags_WidthFixed,80.f, 0);
-				ImGui::TableSetupColumn("Value", 0, 0.0f, 1);
-				ImGui::TableHeadersRow();
-
-				ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
-
-				Dict* d = &selected_node->get_dict();
-
-				int cell = 0;
-				for (auto& kv : d->keyvalues)
-				{
-					ImGui::TableNextRow();
-
-					ImGui::TableSetColumnIndex(0);
-					ImGui::SetNextItemWidth(-FLT_MIN);
-					ImGui::PushID(cell);
-					ImGui::TextUnformatted(kv.first.c_str());
-
-					ImGui::TableSetColumnIndex(1);
-					static char buffer[256];
-					memcpy(buffer, kv.second.c_str(), kv.second.size());
-					buffer[kv.second.size()] = 0;
-					if (ImGui::InputText("##cell", buffer, 256)) {
-						kv.second = buffer;
-					}
-					ImGui::PopID();
-
-					cell++;
-				}
-				ImGui::PopStyleColor();
-				ImGui::EndTable();
-			}
-
-
-
-			ImGui::DragFloat3("Position", &selected_node->position.x);
-			ImGui::DragFloat3("Rotation", &selected_node->rotation.x);
-			ImGui::DragFloat3("Scale", &selected_node->scale.x);
-			
-
-
-		}
-	}
-	ImGui::End();
-#endif
 }
 
 void EditorDoc::hook_scene_viewport_draw()
@@ -1369,16 +1046,16 @@ void EditorDoc::hook_scene_viewport_draw()
 
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 		{
-			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-			auto type = resource->type->get_type_name();
-			if (type == "Model") {
-				auto node = spawn_from_schema_type("StaticMesh");
-				node->set_model(resource->filename);
-				node->show();
-			}
-			else if (type == "Schema") {
-				spawn_from_schema_type(resource->filename.c_str());
-			}
+			//AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+			//auto type = resource->type->get_type_name();
+			//if (type == "Model") {
+			//	auto node = spawn_from_schema_type("StaticMesh");
+			//	node->set_model(resource->filename);
+			//	node->show();
+			//}
+			//else if (type == "Schema") {
+			//	spawn_from_schema_type(resource->filename.c_str());
+			//}
 		}
 		ImGui::EndDragDropTarget();
 	}
@@ -1393,34 +1070,7 @@ const View_Setup& EditorDoc::get_vs()
 	return vs_setup;
 }
 
-bool ConnectionList::imgui_draw_header(int index)
-{
-	std::vector<SignalProperty>* array_ = (std::vector<SignalProperty>*)prop->get_ptr(instance);
-	ASSERT(index >= 0 && index < array_->size());
-	SignalProperty& prop_ = array_->at(index);
-	bool open = ImGui::TreeNode("##header");
-	if (open)
-		ImGui::TreePop();
-	ImGui::SameLine(0);
-
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5,0.5,0.5,1.0));
-	ImGui::Text(prop_.signal_name.c_str());
-	ImGui::PopStyleColor();
-
-	return open;
-}
-void ConnectionList::imgui_draw_closed_body(int index)
-{
-	std::vector<SignalProperty>* array_ = (std::vector<SignalProperty>*)prop->get_ptr(instance);
-	ASSERT(index >= 0 && index < array_->size());
-	SignalProperty& prop_ = array_->at(index);
-
-	ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 153, 152, 156 }));
-	ImGui::Text("%s -> %s",prop_.target_name.c_str(), prop_.event_name.c_str());
-	ImGui::PopStyleColor();
-}
-
-
+#if 0
 class IDictEditor : public IPropertyEditor
 {
 public:
@@ -1601,12 +1251,13 @@ struct AutoStruct_asdf134 {
 
 	 auto& afac = IArrayHeader::get_factory();
 
-	 afac.registerClass<ConnectionList>("LevelEd_ConnectionList");
+
 
 	 auto& sfac = IPropertySerializer::get_factory();
  }
 };
 static AutoStruct_asdf134 AutoStruct_asdf134asdfa;
+#endif
 
 void ObjectOutliner::draw_table_R(EditorNode* node, int depth)
 {
@@ -1618,13 +1269,13 @@ void ObjectOutliner::draw_table_R(EditorNode* node, int depth)
 
 	ImGui::PushID(node);
 	{
-		const bool item_is_selected = node != nullptr && ed_doc.selection_state.is_node_selected(node);
+		const bool item_is_selected = node != nullptr && ed_doc.selection_state->is_node_selected(node);
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (node == nullptr)
-				ed_doc.selection_state.clear_all_selected();
+				ed_doc.selection_state->clear_all_selected();
 			else
-				ed_doc.selection_state.set_select_only_this(ed_doc.nodes[ed_doc.get_node_index(node)]);// cursed
+				ed_doc.selection_state->set_select_only_this(ed_doc.nodes[ed_doc.get_node_index(node)]);// cursed
 		}
 	}
 	
@@ -1665,14 +1316,33 @@ void ObjectOutliner::draw()
 	}
 	ImGui::End();
 }
+void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
+{
+	ImGui::TableNextRow();
+	ImGui::TableNextColumn();
 
+	ImGui::PushID(ec);
+	ImGui::Dummy(ImVec2(ofs,0.0));
+
+	ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+	if (ImGui::Selectable("##selectednode", ec == selected_component, selectable_flags, ImVec2(0, 0))) {
+		on_select_component(ec);
+	}
+
+	ImGui::SameLine();
+	ImGui::Text(ec->eSelfNameString.c_str());
+
+	for (int i = 0; i < ec->children.size(); i++) {
+		draw_components_R(ec->children[i], ofs + 2.0);
+	}
+
+	ImGui::PopID();
+}
 void EdPropertyGrid::draw()
 {
 	if (ImGui::Begin("Properties")) {
 		if (node) {
 			grid.update();
-			if (!connection_props_from_node.props.empty())
-				connection_grid.update();
 		}
 		else {
 			ImGui::Text("Nothing selected\n");
@@ -1680,80 +1350,194 @@ void EdPropertyGrid::draw()
 	}
 
 	ImGui::End();
+
+	if (ImGui::Begin("Components")) {
+
+		if (!node) {
+			ImGui::Text("Nothing selected\n");
+		}
+		else {
+
+			if (ImGui::Button("Add Component")) {
+				// ...
+			}
+			uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+				ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
+			if (ImGui::BeginTable("animadfedBrowserlist", 1, ent_list_flags))
+			{
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
+
+				auto& array = node->player_ent.get_all_components();
+				for (int row_n = 0; row_n < array.size(); row_n++)
+				{
+					auto& res = array[row_n];		
+					draw_components_R(res, 2.0);
+				}
+				ImGui::EndTable();
+			}
+		}
+
+
+	}
+	ImGui::End();
+
+	if (refresh_prop_flag) {
+		refresh_prop_flag = false;
+		refresh_grid();
+	}
+
 }
 
-void EdPropertyGrid::set(EditorNode* node_new)
+#include "Assets/AssetLoaderRegistry.h"
+
+class AssetPropertyEditor : public IPropertyEditor
 {
-	if (this->node == node_new)
-		return;
-	this->node = node_new;
-
-	grid.clear_all();
-	connection_grid.clear_all();
-	connection_props_from_node = display_grid();
-	props_from_node = display_grid();
-
-	if (!node)
-		return;
-	if (!node->template_class) {
-		node = nullptr;
-		return;
-	}
-
-	auto ti = &node->player_ent.get_type();
-	while (ti) {
-		if (ti->props) {
-			grid.add_property_list_to_grid(ti->props, &node->player_ent);
+public:
+	virtual void internal_update() {
+		if (!has_init) {
+			IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
+			has_init = true;
+			if(*ptr_to_asset)
+				asset_str = (*ptr_to_asset)->get_name();
+			metadata = AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class(prop->range_hint));
+			loader = AssetLoaderRegistry::get().get_loader_for_type_name(prop->range_hint);
 		}
-		ti = ti->super_typeinfo;
+		if (!metadata) {
+			ImGui::Text("Asset has no metadata: %s\n", prop->range_hint);
+			return;
+		}
+		if (!loader) {
+			ImGui::Text("Asset has no loader: %s\n", prop->range_hint);
+			return;
+		}
+
+		auto drawlist = ImGui::GetWindowDrawList();
+		auto& style = ImGui::GetStyle();
+		auto min = ImGui::GetCursorScreenPos();
+		auto sz = ImGui::CalcTextSize(asset_str.c_str());
+		float width = ImGui::CalcItemWidth();
+		Color32 color = metadata->get_browser_color();
+		color.r *= 0.4;
+		color.g *= 0.4;
+		color.b *= 0.4;
+
+		drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y), ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), 
+			color.to_uint());
+		auto cursor = ImGui::GetCursorPos();
+		ImGui::Text(asset_str.c_str());
+		ImGui::SetCursorPos(cursor);
+		ImGui::InvisibleButton("##adfad", ImVec2(width, sz.y + style.FramePadding.y * 2.f));
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+			ImGui::BeginTooltip();
+			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
+			ImGui::EndTooltip();
+		}
+		if (ImGui::BeginDragDropTarget())
+		{
+			//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+			//if (payload->IsDataType("AssetBrowserDragDrop"))
+			//	sys_print("``` accepting\n");
+
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
+			if (payload) {
+
+				AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+				bool actually_accept = false;
+				if (resource->type == metadata) {
+					actually_accept = true;
+				}
+
+				if (actually_accept) {
+					if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
+					{
+						IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
+						*ptr_to_asset = loader->load_asset(resource->filename);
+						
+						if (*ptr_to_asset)
+							asset_str = (*ptr_to_asset)->get_name();
+						else
+							asset_str = "";
+					}
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
 	}
-	auto& allcomp = node->player_ent.get_all_components();
-	for (auto& c : allcomp) {
-		ti = &c->get_type();
+	virtual int extra_row_count() { return 0; }
+	virtual bool can_reset() { return !asset_str.empty(); }
+	virtual void reset_value() {
+		asset_str = "";
+		auto ptr = (IAsset**)prop->get_ptr(instance);
+		*ptr = nullptr;
+	}
+private:
+	bool has_init = false;
+	std::string asset_str;
+	const AssetMetadata* metadata = nullptr;
+	IAssetLoader* loader = nullptr;
+};
+
+ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
+
+EdPropertyGrid::EdPropertyGrid()
+{
+	auto& ss = ed_doc.selection_state;
+	ss->on_selection_changed.add(this, &EdPropertyGrid::on_selection_changed);
+	ed_doc.on_node_deleted.add(this, &EdPropertyGrid::on_node_deleted);
+	ed_doc.on_close.add(this, &EdPropertyGrid::on_close);
+}
+void EdPropertyGrid::on_selection_changed()
+{
+	auto& ss = ed_doc.selection_state;
+	if (ss->num_selected() != 1) {
+		node = nullptr;
+		selected_component = nullptr;
+		grid.clear_all();
+	}
+	else if (ss->get_selection()[0].get() != node) {
+		node = ss->get_selection()[0].get();
+		selected_component = nullptr;
+		refresh_grid();
+	}
+}
+void EdPropertyGrid::on_node_deleted(EditorNode* deleted_node)
+{
+	if (node == deleted_node) {
+		node = nullptr;
+		selected_component = nullptr;
+		grid.clear_all();
+	}
+}
+void EdPropertyGrid::refresh_grid()
+{
+	grid.clear_all();
+	if (!node) {
+		return;
+	}
+
+	if (!selected_component) {
+		auto ti = &node->player_ent.get_type();
+		while (ti) {
+			if (ti->props) {
+				grid.add_property_list_to_grid(ti->props, &node->player_ent);
+			}
+			ti = ti->super_typeinfo;
+		}
+	}
+	else {
+		auto c = selected_component;
+		auto ti = &c->get_type();
 		while (ti) {
 			if (ti->props)
 				grid.add_property_list_to_grid(ti->props, c);
 			ti = ti->super_typeinfo;
 		}
 	}
+}
 
-
-	return;
-
-	for (const auto& prop : node->template_class->properties) {
-		if (prop.dont_expose)
-			continue;
-		PropertyInfo inf;
-		// these hold ptrs to std::strings, make sure template_class never gets updated without reseting this
-		inf.custom_type_str = prop.type.c_str();
-		inf.flags = PROP_DEFAULT;
-		inf.type = core_type_id::Struct;
-		inf.name = prop.name.c_str();
-		inf.range_hint = prop.hint.c_str();
-		inf.tooltip = prop.tooltip.c_str();
-		props_from_node.props.push_back(inf);
-	}
-	props_from_node.list.list = props_from_node.props.data();
-	props_from_node.list.count = props_from_node.props.size();
-	props_from_node.list.type_name = node->template_class->name.c_str();
-
-	grid.add_property_list_to_grid(&props_from_node.list, node);
-
-	if (node->template_class->connections.signals.size() > 0) {
-		PropertyInfo signal_list_prop;
-		signal_list_prop.custom_type_str = "LevelEd_ConnectionList";
-		signal_list_prop.flags = PROP_DEFAULT;
-		signal_list_prop.tooltip = "in/out functions, this specifies what events to call on the target object when the entity emits the signal";
-		signal_list_prop.name = "Connections";
-		signal_list_prop.list_ptr = &callback_for_signals;
-		signal_list_prop.offset = offsetof(EditorNode, signals);
-		signal_list_prop.type = core_type_id::List;
-
-		connection_props_from_node.props.push_back(signal_list_prop);
-		connection_props_from_node.list.list = connection_props_from_node.props.data();
-		connection_props_from_node.list.count = connection_props_from_node.props.size();
-		connection_props_from_node.list.type_name = "Signals";
-
-		connection_grid.add_property_list_to_grid(&connection_props_from_node.list, node,PG_LIST_PASSTHROUGH);
-	}
+SelectionState::SelectionState()
+{
+	ed_doc.on_node_deleted.add(this, &SelectionState::on_node_deleted);
+	ed_doc.on_close.add(this, &SelectionState::on_close);
 }

@@ -2,6 +2,7 @@
 #include "Statemachine_node.h"
 #include "AnimationGraphEditor.h"
 #include "Root_node.h"
+#include "Animation/Runtime/AnimationTreeLocal.h"
 
 bool State_EdNode::is_start_node() const
 {

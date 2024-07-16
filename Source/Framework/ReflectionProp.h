@@ -5,6 +5,8 @@
 #include "Framework/Factory.h"
 #include "TypedVoidPtr.h"
 
+#include "Framework/ClassBase.h"
+
 // If you modify this, change the autoenumdef!!
 enum class core_type_id : uint8_t
 {
@@ -45,6 +47,7 @@ enum SerializedPropFlags
 
 	// DONT USE
 	PROP_IS_ENTITY_COMPONENT_TRANSFORM = 16,
+	PROP_READ_ONLY_IF_NATIVE = 32,		// marks a prop as being read-only only if its from native component
 
 };
 
@@ -80,14 +83,14 @@ struct PropertyInfo {
 	const char* tooltip = "";
 	const EnumTypeInfo* enum_type = nullptr;
 
-	uint8_t* get_ptr(void* inst) const {
+	uint8_t* get_ptr(const void* inst) const {
 		return (uint8_t*)inst + offset;
 	}
 	
-	float get_float(void* ptr) const;
+	float get_float(const void* ptr) const;
 	void set_float(void* ptr, float f) const;
 
-	uint64_t get_int(void* ptr) const;
+	uint64_t get_int(const void* ptr) const;
 	void set_int(void* ptr, uint64_t i) const;
 
 	bool can_edit() const {
@@ -136,10 +139,15 @@ struct PropertyListInstancePair
 };
 
 struct Prop_Flag_Overrides;
-void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr);
-std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, TypedVoidPtr userptr);
-std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, TypedVoidPtr userptr);
-void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, TypedVoidPtr userptr);
+
+void write_properties_with_diff(const PropertyInfoList& list, void* ptr, const void* diff_class, DictWriter& out, ClassBase* user = nullptr);
+
+
+void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, ClassBase* user = nullptr);
+std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, ClassBase* user = nullptr);
+std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, ClassBase* user = nullptr);
+
+void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, ClassBase* user = nullptr);
 
 class IListCallback
 {
@@ -178,6 +186,6 @@ class IPropertySerializer
 public:
 	static Factory<std::string, IPropertySerializer>& get_factory();
 
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) = 0;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) = 0;
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) = 0;
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) = 0;
 };

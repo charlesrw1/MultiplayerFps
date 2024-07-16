@@ -145,6 +145,10 @@ public:
 	Player* get_client_player(int slot);
 
 	UIControl* get_gui() { return (UIControl*)gui_root.get(); }
+
+	Level* get_level() {
+		return level;
+	}
 public:
 	bool map_spawned() { return level != nullptr; }
 

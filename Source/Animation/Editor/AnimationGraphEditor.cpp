@@ -448,15 +448,16 @@ bool AnimationGraphEditor::save_document_internal()
 
 bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 {
-	AgSerializeContext context(get_tree());
-	TypedVoidPtr userptr(NAME("AgSerializeContext"), &context);
+	AgSerializeContext context;
+	context.set_tree(get_tree());
+
 
 	if (!in.expect_string("editor") || !in.expect_item_start())
 		return false;
 	{
 		if (!in.expect_string("rootstate") || !in.expect_item_start())
 			return false;
-		auto out = read_properties(*get_props(), this, in, {}, userptr);
+		auto out = read_properties(*get_props(), this, in, {}, &context);
 		if (!out.second || !in.check_item_end(out.first))
 			return false;
 	}
@@ -465,7 +466,7 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 		if (!in.expect_string("nodes") || !in.expect_list_start())
 			return false;
 		bool good = in.read_list_and_apply_functor([&](StringView view) -> bool {
-			Base_EdNode* node = read_object_properties<Base_EdNode>(userptr, in, view);
+			Base_EdNode* node = read_object_properties<Base_EdNode>(&context, in, view);
 			if (node) {
 				nodes.push_back(node);
 				return true;
@@ -484,8 +485,8 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 
 void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 {
-	AgSerializeContext context(get_tree());
-	TypedVoidPtr userptr(NAME("AgSerializeContext"), &context);
+	AgSerializeContext context;
+	context.set_tree(get_tree());
 
 	out.write_value("editor");
 	out.write_item_start();
@@ -498,7 +499,7 @@ void AnimationGraphEditor::save_editor_nodes(DictWriter& out)
 	out.write_key_list_start("nodes");
 	for (int i = 0; i < nodes.size(); i++) {
 		Base_EdNode* node = nodes[i];
-		write_object_properties(node, userptr, out);
+		write_object_properties(node, &context, out);
 	}
 	out.write_list_end();
 
@@ -1431,7 +1432,8 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	editing_tree->direct_slot_names.clear();
 
 	// to get access to ptr->index hashmap
-	AgSerializeContext ctx(get_tree());
+	AgSerializeContext ctx;
+	ctx.set_tree(get_tree());
 
 	// compile all nodes
 	for (int i = 0; i < nodes.size(); i++) {
@@ -2055,8 +2057,8 @@ void AnimGraphClipboard::handle_event(const SDL_Event& event) {
 void AnimGraphClipboard::paste_selected()
 {
 	// copying expects the serialize context ...
-	AgSerializeContext context(ed.get_tree());
-	TypedVoidPtr userptr(NAME("AgSerializeContext"), &context);
+	AgSerializeContext context;
+	context.set_tree(ed.get_tree());
 
 	// create copy of the animation graph node
 	// create copy of the editor node with the node* set to the copied agraph node
@@ -2078,7 +2080,7 @@ void AnimGraphClipboard::paste_selected()
 			continue;
 		}
 
-		Base_EdNode* copied_node = source->create_copy(userptr)->cast_to<Base_EdNode>();
+		Base_EdNode* copied_node = source->create_copy(&context)->cast_to<Base_EdNode>();
 
 		const ClassTypeInfo* ti = &copied_node->get_type();
 		for (; ti; ti = ti->super_typeinfo) {
@@ -2091,7 +2093,7 @@ void AnimGraphClipboard::paste_selected()
 					// found a property that references a runtime graph node, copy its data
 					BaseAGNode* runtime_node = *(BaseAGNode**)prop.get_ptr(source);
 					
-					BaseAGNode* copied_runtime = runtime_node->create_copy(userptr)->cast_to<BaseAGNode>();
+					BaseAGNode* copied_runtime = runtime_node->create_copy(&context)->cast_to<BaseAGNode>();
 
 					BaseAGNode** runtime_node_ptr_copy = (BaseAGNode**)prop.get_ptr(copied_node);
 					*runtime_node_ptr_copy = copied_runtime;

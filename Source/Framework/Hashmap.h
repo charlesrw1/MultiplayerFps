@@ -64,7 +64,9 @@ public:
         }
     }
 
-    T* find(uint64_t handle) {
+    T* find(uint64_t handle) const {
+        if (handle == 0) return nullptr;
+
         uint64_t index = std::hash<uint64_t>()(handle);
         index = index & mask;
         uint64_t count = items.size();
@@ -78,6 +80,8 @@ public:
         return nullptr;
     }
     void remove(uint64_t handle) {
+        if (handle == 0) return;
+
         uint64_t index = std::hash<uint64_t>()(handle);
         index = index & mask;
         uint64_t count = items.size();
@@ -95,6 +99,7 @@ public:
         }
     }
     void insert(uint64_t handle, T* ptr) {
+        assert(handle != 0);
         check_to_rehash(1);
         uint64_t index = std::hash<uint64_t>()(handle);
         index = index & mask;

@@ -64,6 +64,13 @@ public:
 	uint64_t handle = 0;
 };
 
+template<typename T>
+inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, uint32_t flags, EntityPtr<T>* dummy) {
+	return make_struct_property(name, offset, flags, "EntityPtr", T::StaticType.classname);
+}
+#define REG_ENTITY_PTR(name, flags) make_entity_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
+
+
 
 
 // Destroy all components at end
@@ -93,27 +100,32 @@ public:
 class Schema;
 class EditorFolder;
 CLASS_H(Entity, ClassBase)
+public:
+	const static bool CreateDefaultObject = true;
+
 	Entity();
 	virtual ~Entity();
 
 	// both game and editor:
-	// CTOR
+	// Object constructors
+	// Sets any default values, these values are also what drives the override/inherit system of class types
 
-	// adds native components to all_components
-	void add_native_components();
-
-	// load_props(), also creates schema+instance components
-
-	// pointer fixups for extern references
+	// This is where stuff gets unserialized from an asset/level
+	// Fields are overwritten by inherited members, dynamic components are added and attached to the heirarchy
+	// After this is called, dynamic_components will be finialized, components will be in a heirarchy, root_component is valid
+	// However: all_components is empty still and no components have run on_init(); these are done inside register_components()
+	// At this point there is still no logic being run that is dependent on the game state
+	// load_props()
 
 	// called after properties were copied over
+	// use for any extra logic to change property values etc.
 	virtual void post_load_properties() {}
 
 	// called after post_load
 	// registers and initializes any components that were serialized with object
 	void register_components();
 
-	// GAME ONLY:
+	// GAME ONLY: (editor doesnt call any of these)
 
 	// called when spawning entity, all variables are initialized, components are initialized
 	// execute any logic to start up this entity
@@ -215,10 +227,8 @@ CLASS_H(Entity, ClassBase)
 	}
 
 	const std::vector<EntityComponent*>& get_all_components() { return all_components; }
-private:
-	// if no components are set to root, this is used as a substitute
-	// thus an entity always has a root component to attach stuff to
-	EmptyComponent default_root;
+protected:
+
 	ObjPtr<EntityComponent> root_component;
 	std::vector<EntityComponent*> all_components;
 	// components created either in code or defined in schema or created per instance
@@ -252,7 +262,7 @@ public:
 	bool editor_is_selected = false;
 	ObjPtr<EditorFolder> editor_folder;
 #endif
-	EntityPtr<Entity> self_id;// global identifier for this entity
+	EntityPtr<Entity> self_id;			// global identifier for this entity
 	AssetPtr<Schema> schema_type;		// what spawned type are we ( could be editor only or not )
 
 };

@@ -17,29 +17,29 @@ class AnimGraphAssetMeta : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() override
+	virtual Color32 get_browser_color()  const override
 	{
 		return { 152, 237, 149 };
 	}
 
-	virtual std::string get_type_name() override
+	virtual std::string get_type_name() const  override
 	{
 		return "AnimGraph";
 	}
-	virtual void index_assets(std::vector<std::string>& filepaths) override
+	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
 		auto tree = FileSys::find_files("./Data/Graphs");
 		for (auto file : tree) {
 			filepaths.push_back((file.substr(14)));
 		}
 	}
-	virtual bool assets_are_filepaths() { return true; }
-	virtual std::string root_filepath() override
+	virtual bool assets_are_filepaths() const { return true; }
+	virtual std::string root_filepath() const  override
 	{
 		return "./Data/Graphs/";
 	}
 	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
-	virtual const ClassTypeInfo* get_asset_class_type() { return &Animation_Tree_CFG::StaticType; }
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &Animation_Tree_CFG::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);
 
@@ -81,6 +81,7 @@ CLASS_IMPL(VariableNode);
 CLASS_IMPL(RotationConstant);
 
 
+CLASS_IMPL(AgSerializeContext);
 
 ENUM_START(anim_graph_value)
 	STRINGIFY_EUNM(anim_graph_value::bool_t,	0),
@@ -512,13 +513,13 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 out.write_key("runtime");
 	 out.write_item_start();
 
-	 AgSerializeContext ctx(this);
-	 TypedVoidPtr ctxptr(NAME("AgSerializeContext"), &ctx);
+	 AgSerializeContext ctx;
+	 ctx.set_tree(this);
 
 	 {
 		 out.write_key("rootdata");
 		 out.write_item_start();
-		 write_properties(*get_props(), this, out, ctxptr);
+		 write_properties(*get_props(), this, out, &ctx);
 		 out.write_item_end();
 	 }
 
@@ -526,14 +527,14 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 out.write_key_list_start("nodes");
 		 for (int i = 0; i < all_nodes.size(); i++) {
 			 auto& node = all_nodes[i];
-			 write_object_properties(node, ctxptr, out);
+			 write_object_properties(node, &ctx, out);
 		 }
 		 out.write_list_end();
 	 }
 	 { 
 		 out.write_key("params");
 		 out.write_item_start();
-		 write_properties(*Script::get_props(), code.get(), out, ctxptr);
+		 write_properties(*Script::get_props(), code.get(), out, &ctx);
 		 out.write_item_end();
 	 }
 
@@ -576,7 +577,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  }
 
 
- float PropertyInfo::get_float(void* ptr) const
+ float PropertyInfo::get_float(const void* ptr) const
  {
 	 ASSERT(type == core_type_id::Float);
 
@@ -590,7 +591,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 *(float*)((char*)ptr + offset) = f;
  }
 
- uint64_t PropertyInfo::get_int(void* ptr) const
+ uint64_t PropertyInfo::get_int(const void* ptr) const
  {
 	 ASSERT(is_integral_type());
 	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
@@ -635,7 +636,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 
 
- AgSerializeContext::AgSerializeContext(Animation_Tree_CFG* tree)
+ void AgSerializeContext::set_tree(Animation_Tree_CFG* tree)
  {
 	 this->tree = tree;
 	 for (int i = 0; i < tree->all_nodes.size(); i++) {
@@ -646,16 +647,16 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  class AgSerializeNodeCfg : public IPropertySerializer
  {
 	 // Inherited via IPropertySerializer
-	 virtual std::string serialize(DictWriter& out, const PropertyInfo& info, void* inst, TypedVoidPtr user) override
+	 virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	 {
-		 ASSERT(user.name == NAME("AgSerializeContext"));
+		 ASSERT(user && user->is_a<AgSerializeContext>());
 		 Node_CFG* ptr = *(Node_CFG**)info.get_ptr(inst);
 
 		 int64_t num = (int64_t)ptr;
 
 		 return std::to_string(num);
 	 }
-	 virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, TypedVoidPtr user) override
+	 virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	 {
 		 uintptr_t index = atoi(token.to_stack_string().c_str());
 

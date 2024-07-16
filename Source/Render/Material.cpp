@@ -11,18 +11,18 @@ class MaterialAssetMetadata : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() override{ return { 219, 189, 68 }; }
-	virtual std::string get_type_name() override { return "Material"; }
-	virtual void index_assets(std::vector<std::string>& filepaths) override
+	virtual Color32 get_browser_color()  const override{ return { 219, 189, 68 }; }
+	virtual std::string get_type_name()  const override { return "Material"; }
+	virtual void index_assets(std::vector<std::string>& filepaths)  const override
 	{
 		auto tree = FileSys::find_files("./Data/Materials");
 		for (auto file : tree) {
 			filepaths.push_back(strip_extension(file.substr(17)));
 		}
 	}
-	virtual bool assets_are_filepaths() { return false; }
-	virtual std::string root_filepath() override { return "./Data/Materials/"; }
-	virtual const ClassTypeInfo* get_asset_class_type() { return &Material::StaticType; }
+	virtual bool assets_are_filepaths() const override { return false; }
+	virtual std::string root_filepath()  const override { return "./Data/Materials/"; }
+	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &Material::StaticType; }
 };
 CLASS_IMPL(Material);
 REGISTERASSETLOADER_MACRO(Material, &mats);

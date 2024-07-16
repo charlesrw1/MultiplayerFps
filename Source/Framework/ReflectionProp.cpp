@@ -190,8 +190,8 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t fl
 	return prop;
 }
 
-void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, TypedVoidPtr userptr);
-std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, PropertyInfo& prop, DictWriter& out, TypedVoidPtr userptr) {
+void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, ClassBase* userptr);
+std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, DictWriter& out, ClassBase* userptr) {
 	std::string value_str;
 
 	switch (prop.type)
@@ -201,10 +201,24 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 	case core_type_id::Int16:
 	case core_type_id::Int32:
 	case core_type_id::Int64:
+
+		if (diff_ptr) {
+			uint64_t mine = prop.get_int(ptr);
+			uint64_t other = prop.get_int(diff_ptr);
+			if (mine == other)	// skip
+				return { {}, false };
+		}
 		value_str = string_format("%lld", prop.get_int(ptr));
 		break;
 
 	case core_type_id::Float:
+		if (diff_ptr) {
+			float mine = prop.get_float(ptr);
+			float other = prop.get_float(diff_ptr);
+			if (std::abs(mine-other)<0.00001)	// skip
+				return { {}, false };
+		}
+
 		value_str = string_format("%f", prop.get_float(ptr));
 		break;
 
@@ -217,6 +231,13 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 	}break;
 
 	case core_type_id::StdString: {
+		if (diff_ptr) {
+			std::string* mine = (std::string*)prop.get_ptr(ptr);
+			std::string* other = (std::string*)prop.get_ptr(diff_ptr);
+			if (*mine==*other)	// skip
+				return { {}, false };
+		}
+
 		std::string* i = (std::string*)((char*)ptr + prop.offset);
 		value_str = i->c_str();
 	}break;
@@ -233,7 +254,16 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 		auto& fac = IPropertySerializer::get_factory();
 		auto serializer = fac.createObject(prop.custom_type_str);
 		if (serializer) {
+			// FIXME?? this has lots of issues tbh
+
 			auto str = serializer->serialize(out, prop, ptr, userptr);
+			if (diff_ptr) {
+				auto str_other = serializer->serialize(out, prop, diff_ptr, userptr);
+				if (str == str_other) {
+					delete serializer;// skip
+					return { {}, false };
+				}
+			}
 			delete serializer;	// fixme: inplace new/free instead?
 			value_str = std::move(str);
 		}
@@ -259,7 +289,7 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, Prope
 	return { value_str,true };
 }
 
-void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr userptr)
+void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* userptr)
 {
 	out.write_list_start();
 
@@ -278,7 +308,7 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr
 
 			uint8_t* member_dat = list_ptr->get_index(ptr, i);
 
-			auto str = write_field_type(prop.type, member_dat, prop, out, userptr);
+			auto str = write_field_type(prop.type, member_dat, nullptr, prop, out, userptr);
 			ASSERT(str.second);
 			buf += str.first;
 			buf += ' ';
@@ -303,7 +333,25 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, TypedVoidPtr
 }
 
 
-void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, TypedVoidPtr userptr)
+void write_properties_with_diff(const PropertyInfoList& list, void* ptr, const void* diff_class, DictWriter& out, ClassBase* userptr)
+{
+	for (int i = 0; i < list.count; i++)
+	{
+		auto& prop = list.list[i];
+
+		uint32_t flags = prop.flags;
+
+
+		if (!(flags & PROP_SERIALIZE))
+			continue;
+
+		out.write_key(prop.name);
+		auto write_val = write_field_type(prop.type, ptr, diff_class, prop, out, userptr);
+		if (write_val.second)
+			out.write_value_quoted(write_val.first.c_str());
+	}
+}
+void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, ClassBase* userptr)
 {
 	for (int i = 0; i < list.count; i++)
 	{
@@ -316,13 +364,13 @@ void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, 
 			continue;
 		
 		out.write_key(prop.name);
-		auto write_val = write_field_type(prop.type, ptr, prop, out, userptr);
+		auto write_val = write_field_type(prop.type, ptr, nullptr, prop, out, userptr);
 		if (write_val.second)
 			out.write_value_quoted(write_val.first.c_str());
 	}
 }
 
-void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, void* to, TypedVoidPtr userptr)
+void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, void* to, ClassBase* userptr)
 {
 	DictWriter out;
 	for(auto l : lists)
@@ -338,8 +386,8 @@ void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, voi
 
 
 
-bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr);
-bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
+bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr);
+bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	if (!in.check_list_start(tok))
 		return false;
@@ -381,7 +429,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 	}
 	return true;
 }
-bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
+bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
 {
 
 	switch (prop->type)
@@ -483,7 +531,7 @@ FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePai
 	return { nullptr,nullptr };
 }
 
-std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, TypedVoidPtr userptr)
+std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	// expect { (start field list) if not a null token
 	if (tok.str_len > 0 && !in.check_item_start(tok))
@@ -520,7 +568,7 @@ std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstan
 	return { tok, true };
 }
 
-std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, TypedVoidPtr userptr)
+std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	std::vector<PropertyListInstancePair> props(1);
 	props[0] = { &list,ptr };

@@ -36,10 +36,11 @@ public:
 	void set_animator_class(const ClassTypeInfo* ti);
 
 	bool simulate_physics = false;
-	bool is_hidden = false;
+	bool visible = true;
 
 #ifndef RUNTIME
 	bool eAnimateInEditor = false;
+	void editor_on_change_property(const PropertyInfo& property_) override;
 #endif // !RUNTIME
 
 	static const PropertyInfoList* get_props();
@@ -60,7 +61,7 @@ private:
 
 CLASS_H(CapsuleComponent, EntityComponent)
 public:
-
+	static const PropertyInfoList* get_props() = delete;
 };
 CLASS_H(BoxComponent, EntityComponent)
 public:

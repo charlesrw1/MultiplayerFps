@@ -10,8 +10,14 @@ struct ClassTypeInfo
 {
 public:
 	typedef ClassBase* (*CreateObjectFunc)();
+	typedef const PropertyInfoList* (*GetPropsFunc_t)();
 
-	ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, const PropertyInfoList* props, CreateObjectFunc alloc);
+	ClassTypeInfo(const char* classname, 
+		const ClassTypeInfo* super_typeinfo, 
+		GetPropsFunc_t get_prop_func, 
+		CreateObjectFunc alloc,
+		bool create_default_obj
+	);
 
 	uint16_t id = 0;
 	uint16_t last_child = 0;
@@ -20,6 +26,14 @@ public:
 	ClassBase*(*allocate)()=nullptr;
 	const PropertyInfoList* props = nullptr;
 	const ClassTypeInfo* super_typeinfo = nullptr;
+
+	// store this, get_props might rely on other Class's typinfo being registered, so call these after init
+	GetPropsFunc_t get_props_function = nullptr;
+
+	// an allocated object of the same type
+	// use for default props etc.
+	// not every class type will have this
+	const ClassBase* default_class_object = nullptr;
 
 	template<typename T>
 	static ClassBase* default_allocate() {
@@ -65,10 +79,11 @@ public:
 };
 
 
+
 template<typename T>
-const PropertyInfoList* call_get_props_if_it_exists() {
+ClassTypeInfo::GetPropsFunc_t get_get_props_if_it_exists() {
 	if constexpr (has_get_props<T, const PropertyInfoList*()>::value) {
-		return T::get_props();
+		return T::get_props;
 	}
 	else {
 		return nullptr;
@@ -106,8 +121,9 @@ typename std::enable_if<is_abstract<T>::value, ClassTypeInfo::CreateObjectFunc>:
 ClassTypeInfo classname::StaticType = ClassTypeInfo( \
 	#classname, \
 	&classname::SuperClassType::StaticType, \
-	call_get_props_if_it_exists<classname>(), \
-	default_class_create<classname>() \
+	get_get_props_if_it_exists<classname>(), \
+	default_class_create<classname>(), \
+	classname::CreateDefaultObject \
 );
 
 #define CLASS_H_EXPLICIT_SUPER(classname, cpp_supername, reflected_super) \
@@ -142,6 +158,8 @@ class ClassBase
 {
 public:
 	static ClassTypeInfo StaticType;
+	const static bool CreateDefaultObject;	/* = false, default setting */
+
 	virtual const ClassTypeInfo& get_type() const;
 
 	// cast this class to type T, returns nullptr if failed
@@ -161,7 +179,7 @@ public:
 	}
 
 	// creates a copy of class and copies serializable fields
-	ClassBase* create_copy(TypedVoidPtr userptr = TypedVoidPtr());
+	ClassBase* create_copy(ClassBase* userptr = nullptr);
 public:
 	// called by ClassTypeInfo only during static init
 	static void register_class(ClassTypeInfo* cti);
