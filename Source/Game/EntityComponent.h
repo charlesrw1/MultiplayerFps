@@ -11,6 +11,8 @@
 class Entity;
 CLASS_H(EntityComponent, ClassBase)
 public:
+	const static bool CreateDefaultObject = true;
+
 	virtual ~EntityComponent() {}
 
 	// callbacks
@@ -36,7 +38,7 @@ public:
 	void remove_this(EntityComponent* component);
 
 	template<typename T>
-	static PropertyInfo generate_prop_info(T* dummyptr, const char* name, uint16_t offset, uint32_t flags, const char* hint_str = "") {
+	static PropertyInfo generate_prop_info(T** dummyptr, const char* name, uint16_t offset, uint32_t flags, const char* hint_str = "") {
 		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
 		PropertyInfo pi;
 		pi.name = name;
@@ -63,9 +65,9 @@ public:
 			REG_QUAT(rotation, PROP_DEFAULT),
 			REG_VEC3(scale, PROP_DEFAULT),
 
-			REG_OBJECT_PTR(attached_parent, PROP_SERIALIZE | PROP_READ_ONLY_IF_NATIVE),
-			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY | PROP_READ_ONLY_IF_NATIVE),
-			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY | PROP_READ_ONLY_IF_NATIVE)
+			REG_ENTITY_COMPONENT_PTR(attached_parent, PROP_SERIALIZE ),
+			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY),
+			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY)
 		END_PROPS(EntityComponent)
 	}
 
@@ -104,7 +106,9 @@ private:
 
 	bool is_native_componenent = true;
 	bool is_editor_only = false;
+	bool is_inherited = true;
 
+	friend class Schema;
 	friend class Entity;
 
 	friend class EdPropertyGrid;

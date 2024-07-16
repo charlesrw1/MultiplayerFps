@@ -4,6 +4,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "IAsset.h"
 #include <string>
+#include <unordered_set>
 // A class that is serizlied along with Entities and Components
 // its used to allow pointers to member fields and not standalone objects
 // sort of hacky

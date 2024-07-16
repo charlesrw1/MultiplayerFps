@@ -32,7 +32,7 @@ CLASS_IMPL(CapsuleComponent);
 
 const PropertyInfoList* Entity::get_props() {
 	START_PROPS(Entity)
-		REG_OBJECT_PTR(root_component, PROP_SERIALIZE),
+		REG_ENTITY_COMPONENT_PTR(root_component, PROP_SERIALIZE),
 		REG_ENTITY_PTR(self_id,PROP_SERIALIZE)
 	END_PROPS(Entity)
 }
@@ -40,16 +40,9 @@ const PropertyInfoList* Entity::get_props() {
 Entity::Entity()
 {
 }
-void Entity::register_components()
+const EntityComponent* Entity::get_default_component_for_string_name(const std::string& name) const
 {
-	// by the time you get here, root must be something
-	// either defined in a C++ class, or the editor must have added an instance component to it
-	assert(root_component.get());
-
-	auto level = eng->get_level();
-	const bool is_editor_level = level->is_editor_level();
-
-	// find all EntityComponent INLINED fields (part of classtype)
+	auto default_obj = get_type().default_class_object;
 	const ClassTypeInfo* ti = &get_type();
 	InlineVec<const PropertyInfoList*, 10> allprops;
 	for (; ti; ti = ti->super_typeinfo) {
@@ -60,38 +53,42 @@ void Entity::register_components()
 		auto props = allprops[i];
 		for (int j = 0; j < props->count; j++) {
 			auto& p = props->list[j];
-			if (strcmp(props->list[j].custom_type_str, "EntityComponent") == 0) 
+			if (strcmp(props->list[j].custom_type_str, "EntityComponent") == 0)
 			{
 				EntityComponent* ec = (EntityComponent*)props->list[j].get_ptr(this);
-				// if the inlined field didnt get attached to something, attach it now
-				if (!ec->attached_parent.get())
-					ec->attach_to_parent(root_component.get(), {});
-
-				// append it to all component array
-				all_components.push_back(ec);
+				if (ec->eSelfNameString == name)
+					return ec;
 			}
 		}
 	}
-	// now do dynamically added components
-	for (int i = 0; i < dynamic_components.size(); i++) {
-		// insert logic for editor only components here
-		auto& c = dynamic_components[i];
-		assert(c->attached_parent.get() || root_component.get() == c.get());
-		all_components.push_back(c.get());
-	}
+	return nullptr;
+}
+void Entity::register_components()
+{
+	// by the time you get here, root must be something
+	// either defined in a C++ class, or the editor must have added an instance component to it
+	assert(root_component.get());
+
+	auto level = eng->get_level();
+	//const bool is_editor_level = level->is_editor_level();
+
+	// find all EntityComponent INLINED fields (part of classtype)
 
 	// now run register functions
 	for (int i = 0; i < all_components.size(); i++) {
-		all_components[i]->on_init();
+		// insert logic for editor only components here
+		auto& c = all_components[i];
+		assert(c->attached_parent.get() || root_component.get() == c.get());
+		c->on_init();
 	}
+
 }
 
 void Entity::destroy()
 {
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->on_deinit();
-	all_components.clear();	// clears native+dynamic references
-	dynamic_components.clear();	// calls delete because unique_ptr
+	all_components.clear();	// deletes all
 }
 
 
@@ -174,7 +171,7 @@ MeshComponent::~MeshComponent()
 MeshComponent::MeshComponent() {}
 void MeshComponent::set_model(const char* model_path)
 {
-
+	model = mods.find_or_load(model_path);
 }
 
 const PropertyInfoList* MeshComponent::get_props() {

@@ -751,8 +751,8 @@ extern void benchmark_gltf();
 extern void at_test();
 #include "Framework/ExpressionLang.h"
 
-
-
+#include "EntityTypes.h"
+#include "Game/Schema.h"
 int main(int argc, char** argv)
 {
 
@@ -761,6 +761,17 @@ int main(int argc, char** argv)
 	eng->argc = argc;
 	eng->argv = argv;
 	eng->init();
+
+	Player player;
+	Door door;
+	Schema s;
+	door.register_components();
+	//player.player_mesh->set_model("player_FINAL.cmdl");
+	s.write_to_file(&door);
+	door.destroy();
+
+	return 1;
+
 
 	eng->loop();
 

@@ -4,9 +4,12 @@
 #include "IAsset.h"
 #include "Framework/ArrayReflection.h"
 #include <unordered_map>
+
+class Entity;
 CLASS_H(SerializeEntityObjectContext,ClassBase)
 	std::unordered_map<void*, uint64_t> to_serialize_index;
 
+	Entity* entity_serialzing = nullptr;
 	uint64_t serialzing_entity_index = 0;
 };
 
@@ -67,6 +70,13 @@ inline PropertyInfo make_object_ptr_property(const char* name, uint16_t offset, 
 	return make_struct_property(name, offset, flags, "ObjectPointer", T::StaticType.classname);
 }
 #define REG_OBJECT_PTR(name, flags) make_object_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
+
+
+class EntityComponent;
+inline PropertyInfo make_entity_comp_ptr_property(const char* name, uint16_t offset, uint32_t flags, ObjPtr<EntityComponent>* dummy) {
+	return make_struct_property(name, offset, flags, "EntityCompPtr", "");
+}
+#define REG_ENTITY_COMPONENT_PTR(name, flags) make_entity_comp_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
 
 template<typename T>
 struct GetAtomValueWrapper<ObjPtr<T>> {

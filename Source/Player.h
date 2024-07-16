@@ -61,27 +61,27 @@ CLASS_H(Player, Entity)
 public:
 
 	Player() {
-		root_component = &player_capsule;
-		player_mesh.attach_to_parent(root_component.get(), {});
-		viewmodel_mesh.attach_to_parent(&player_mesh, NAME("Prop_Gun"));
+		player_mesh = create_sub_component<MeshComponent>("CharMesh");
+		player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
+		viewmodel_mesh = create_sub_component<MeshComponent>("ViewmodelMesh");
+
+		root_component = player_capsule;
+
+		player_mesh->attach_to_parent(player_capsule, {});
+		viewmodel_mesh->attach_to_parent(player_mesh, {});
 	}
 
-	MeshComponent player_mesh;
-
-	CapsuleComponent player_capsule;
-
-	MeshComponent viewmodel_mesh;
+	MeshComponent* player_mesh{};
+	CapsuleComponent* player_capsule{};
+	MeshComponent* viewmodel_mesh{};
 
 	AssetPtr<Model> a_second_model;
-
-	EntityPtr<Entity> gun_entity;
 	
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)
-			REG_ENTITY_PTR(gun_entity,PROP_DEFAULT),
-			REG_COMPONENT(player_capsule,PROP_DEFAULT,"Root"),
-			REG_COMPONENT(player_mesh,PROP_DEFAULT,""),
-			REG_COMPONENT(viewmodel_mesh, PROP_DEFAULT, ""),
+			REG_COMPONENT(player_capsule,0,""),
+			REG_COMPONENT(player_mesh,0,""),
+			REG_COMPONENT(viewmodel_mesh, 0, ""),
 			REG_ASSET_PTR(a_second_model, PROP_DEFAULT)
 		END_PROPS(Player)
 	};

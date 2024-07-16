@@ -106,7 +106,46 @@ class SerializeEntityPtr : public IPropertySerializer
 	}
 };
 
-ADDTOFACTORYMACRO_NAME(SerializeObjectPtr, IPropertySerializer, "ObjectPtr");
+class SerializeECPtr : public IPropertySerializer
+{
+public:
+	// Inherited via IPropertySerializer
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		assert(user);
+		auto ctx = user->cast_to<SerializeEntityObjectContext>();
+		assert(ctx);
+
+		ObjPtr<EntityComponent>* ptr_prop = (ObjPtr<EntityComponent>*)info.get_ptr(inst);
+
+		if (!ptr_prop->get())
+			return "";
+		else
+			return ptr_prop->get()->eSelfNameString;
+	}
+
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		// unserializing has no context, gets fixup at a later step
+
+		assert(user);
+		auto ctx = user->cast_to<SerializeEntityObjectContext>();
+		assert(ctx);
+		assert(ctx->entity_serialzing);
+
+		auto stack = token.to_stack_string();
+		ObjPtr<EntityComponent>* ptr_prop = (ObjPtr<EntityComponent>*)info.get_ptr(inst);
+
+		if (stack.size() == 0) {
+			ptr_prop->ptr = nullptr;
+		}
+		else {
+			ptr_prop->ptr = ctx->entity_serialzing->find_component_for_string_name(stack.c_str());
+		}
+	}
+};
+ADDTOFACTORYMACRO_NAME(SerializeECPtr, IPropertySerializer, "EntityCompPtr");
+ADDTOFACTORYMACRO_NAME(SerializeObjectPtr, IPropertySerializer, "ObjectPointer");
 ADDTOFACTORYMACRO_NAME(SerializeAssetPtr, IPropertySerializer,	"AssetPtr");
 ADDTOFACTORYMACRO_NAME(SerializeEntityPtr, IPropertySerializer, "EntityPtr");
 

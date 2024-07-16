@@ -280,11 +280,20 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 	case core_type_id::Vec3:
 	{
 		glm::vec3* v = (glm::vec3*)prop.get_ptr(ptr);
+
+		if (diff_ptr) {
+			glm::vec3* other = (glm::vec3*)prop.get_ptr(diff_ptr);
+			if (glm::dot(*other-*v, *other-*v) < 0.001) {
+				return { {}, false };
+			}
+		}
+
 		value_str = string_format("%f %f %f", v->x, v->y, v->z);
 	}break;
 	case core_type_id::Quat:
 	{
 		glm::quat* v = (glm::quat*)prop.get_ptr(ptr);
+
 		value_str = string_format("%f %f %f %f", v->x, v->y, v->z, v->w);
 	}break;
 
@@ -498,6 +507,7 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	case core_type_id::Vec3:
 	{
 		glm::vec3* v = (glm::vec3*)prop->get_ptr(ptr);
+
 		int field = sscanf(tok.to_stack_string().c_str(), "%f %f %f", &v->x, &v->y, &v->z);
 		return true;
 	}

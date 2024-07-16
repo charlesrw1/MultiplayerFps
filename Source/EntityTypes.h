@@ -8,7 +8,12 @@
 
 CLASS_H(StaticMeshInstance, Entity)
 public:
-	MeshComponent Mesh;
+	StaticMeshInstance() {
+		Mesh = create_sub_component<MeshComponent>("Mesh");
+		root_component = Mesh;
+	}
+
+	MeshComponent* Mesh;
 	static const PropertyInfoList* get_props() {
 		START_PROPS(StaticMeshInstance)
 			REG_COMPONENT(Mesh, PROP_DEFAULT, ""),
@@ -23,11 +28,16 @@ CLASS_H(NPC, Entity)
 		pathfind_state = going_towards_waypoint;
 		position = vec3(0.f);
 		rotation.y = HALFPI;
+
+		npc_model = create_sub_component<MeshComponent>("NpcModel");
+		npc_hitbox = create_sub_component<CapsuleComponent>("NpcCollider");
+		root_component = npc_hitbox;
+		npc_model->attach_to_parent(npc_hitbox, {});
 	}
 	glm::vec3 velocity = glm::vec3(0.f);
 
-	CapsuleComponent npc_hitbox;
-	MeshComponent npc_model;
+	CapsuleComponent* npc_hitbox{};
+	MeshComponent* npc_model{};
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(NPC)
@@ -113,6 +123,13 @@ CLASS_H(NPC, Entity)
 
 CLASS_H(Door, Entity)
 public:
+	Door() {
+		door_mesh = create_sub_component<MeshComponent>("DoorMesh");
+		door_handle = create_sub_component<MeshComponent>("DoorHandle");
+		root_component = door_mesh;
+		door_handle->attach_to_parent(door_mesh, {});
+	}
+
 	enum {
 		OPEN,
 		CLOSED
@@ -121,15 +138,15 @@ public:
 	bool start_open = false;
 	bool start_locked = false;
 
-	MeshComponent door_mesh;
-	MeshComponent door_handle;
+	MeshComponent* door_mesh;
+	MeshComponent* door_handle;
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Door)
 			REG_BOOL(start_locked,PROP_DEFAULT,""),
 			REG_BOOL(start_open,PROP_DEFAULT,""),
-			REG_COMPONENT(door_mesh, PROP_DEFAULT, ""),
-			REG_COMPONENT(door_handle, PROP_DEFAULT, ""),
+			REG_COMPONENT(door_mesh, 0, ""),
+			REG_COMPONENT(door_handle, 0, ""),
 		END_PROPS(Door)
 	
 	}
@@ -141,8 +158,6 @@ CLASS_H(Grenade, Entity)
 public:
 	Grenade();
 
-	CapsuleComponent grenade_collider;
-	MeshComponent grenade_mesh;
 
 	void set_thrower(entityhandle handle) {
 		thrower = handle;

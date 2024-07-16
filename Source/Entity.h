@@ -192,50 +192,57 @@ public:
 	template<typename T>
 	T* create_and_attach_component_type(EntityComponent* parent = nullptr, StringName bone = {}) {
 		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
-		T* ptr = (T*)T::StaticType.allocate();
+		T* ptr = new T;
 		ptr->set_owner(this);
-		all_components.push_back(ptr);
-		dynamic_components.push_back(std::unique_ptr<EntityComponent>(ptr));
+		all_components.push_back(std::unique_ptr<EntityComponent>(ptr));
 		ptr->attach_to_parent(parent == nullptr ? root_component.get() : parent, bone);
 		ptr->on_init();
 		return ptr;
 	}
 
+	template<typename T>
+	T* create_sub_component(const std::string& name) {
+		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
+		auto ptr = std::make_unique<T>();
+		ptr->eSelfNameString = name;
+		all_components.push_back(std::move(ptr));
+		return (T*)all_components.back().get();
+	}
+
 	// DELETES the EntityComponent, dont use the ptr again after this call
+
 	void remove_this_component(EntityComponent* component) {
 		assert(component != root_component.get() && "cant delete the root component");
 		bool found = false;
 		for (int i = 0; i < all_components.size(); i++) {
-			if (all_components[i] == component) {
+			if (all_components[i].get() == component) {
 				all_components.erase(all_components.begin() + i);
 				found = true;
 				break;
 			}
 		}
+
 		assert(found && "component not found in remove_this_component");
-		if (component->get_is_native_component()) {
-			found = false;
-			for (int i = 0; i < dynamic_components.size(); i++) {
-				if (dynamic_components[i].get() == component) {
-					dynamic_components.erase(dynamic_components.begin() + i);
-					found = true;
-					break;
-				}
-			}
-			assert(found && "dynamic component not found in remove_this_component");
-		}
 	}
 
-	const std::vector<EntityComponent*>& get_all_components() { return all_components; }
+	const std::vector<std::unique_ptr<EntityComponent>>& get_all_components() { return all_components; }
 protected:
 
 	ObjPtr<EntityComponent> root_component;
-	std::vector<EntityComponent*> all_components;
 	// components created either in code or defined in schema or created per instance
-	std::vector<std::unique_ptr<EntityComponent>> dynamic_components;
+	std::vector<std::unique_ptr<EntityComponent>> all_components;
 
 	friend class Schema;
 public:
+
+	const EntityComponent* get_default_component_for_string_name(const std::string& name) const;
+
+	EntityComponent* find_component_for_string_name(const std::string& name) const {
+		for (auto& c : all_components)
+			if (c->eSelfNameString == name)
+				return c.get();
+		return nullptr;
+	}
 
 	static const PropertyInfoList* get_props();
 

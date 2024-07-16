@@ -144,7 +144,7 @@ Entity* Schema::create_entity_from_properties_internal(bool just_check_valid)
 					}
 				}
 			}
-			e->dynamic_components.push_back(std::move(ptr));
+			e->all_components.push_back(std::move(ptr));
 		}
 		else if (!objs[i]->is_a<InlinePtrFixup>()) {
 			sys_print("!!! unknown type got into schema file\n");
@@ -158,14 +158,29 @@ Entity* Schema::create_entity_from_properties_internal(bool just_check_valid)
 	return e;
 
 }
+void write_just_props(ClassBase* e, const ClassBase* diff, DictWriter& out, SerializeEntityObjectContext* ctx)
+{
+	std::vector<PropertyListInstancePair> props;
+	const ClassTypeInfo* typeinfo = &e->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, e });
+		typeinfo = typeinfo->super_typeinfo;
+	}
 
+	for (auto& proplist : props) {
+		if (proplist.list)
+			write_properties_with_diff(*const_cast<PropertyInfoList*>(proplist.list), e,diff, out, ctx);
+	}
+
+}
 void Schema::write_to_file(Entity* e)
 {
 	SerializeEntityObjectContext ctx;
 	ctx.serialzing_entity_index = 0;
 	ctx.to_serialize_index[e] = 0;
 
-	const ClassBase* diffclass = (e->schema_type.get()) ? e->schema_type->default_schema_obj : e->get_type().default_class_object;
+	const Entity* diffclass = (e->schema_type.get()) ? e->schema_type->default_schema_obj : (Entity*)e->get_type().default_class_object;
 
 	assert(e->get_type() == diffclass->get_type());
 
@@ -177,52 +192,36 @@ void Schema::write_to_file(Entity* e)
 	else
 		out.write_key_value("class", e->get_type().classname);
 
-	std::vector<PropertyListInstancePair> props;
-	const ClassTypeInfo* typeinfo = &e->get_type();
-	while (typeinfo) {
-		if (typeinfo->props)
-			props.push_back({ typeinfo->props, e });
-		typeinfo = typeinfo->super_typeinfo;
-	}
-
-	for (auto& proplist : props) {
-		if (proplist.list)
-			write_properties(*const_cast<PropertyInfoList*>(proplist.list), proplist.instance, out, &ctx);
-	}
+	write_just_props(e, diffclass, out, &ctx);
 
 	out.write_item_end();
 
-}
+	for (int i = 0; i < e->all_components.size(); i++) {
 
-inline void write_object_properties_with_diff(
-	ClassBase* obj,
-	const ClassBase* diffed_obj,	/* obj.type == diffed_obj.type ALWAYS */
-	ClassBase* userptr,
-	DictWriter& out
-)
-{
-	assert(obj->get_type() == diffed_obj->get_type());
+		out.write_item_start();
 
-	// if obj != diffed_obj
-	//		
+		auto& c = e->all_components[i];
+		EntityComponent* ec = nullptr;
 
-	std::vector<PropertyListInstancePair> props;
-	const ClassTypeInfo* typeinfo = &obj->get_type();
-	while (typeinfo) {
-		if (typeinfo->props)
-			props.push_back({ typeinfo->props, obj });
-		typeinfo = typeinfo->super_typeinfo;
+		ec =diffclass->find_component_for_string_name(c->eSelfNameString);
+		const bool is_owned = ec == nullptr || !ec->is_native_componenent;
+		if (is_owned) {
+			out.write_key("component_instance");
+			out.write_value("0");
+			out.write_value(c->get_type().classname);
+			auto type = c->get_type().default_class_object;
+			write_just_props(c.get(), type, out, &ctx);
+		}
+		else {
+			out.write_key("component_override");
+			out.write_value("0");
+			out.write_value(c->eSelfNameString.c_str());
+			write_just_props(c.get(), ec, out, &ctx);
+		}
+
+		out.write_item_end();
 	}
 
-	typeinfo = &obj->get_type();
-
-	out.write_item_start();
-
-	out.write_key_value("type", typeinfo->classname);
-	for (auto& proplist : props) {
-		if (proplist.list)
-			write_properties(*const_cast<PropertyInfoList*>(proplist.list), proplist.instance, out, userptr);
-	}
-
-	out.write_item_end();
+	sys_print(out.get_output().c_str());
 }
+
