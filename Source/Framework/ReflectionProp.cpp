@@ -191,7 +191,7 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t fl
 }
 
 void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, ClassBase* userptr);
-std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, DictWriter& out, ClassBase* userptr) {
+std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, DictWriter& out, ClassBase* userptr) {
 	std::string value_str;
 
 	switch (prop.type)
@@ -244,6 +244,9 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, const
 
 	case core_type_id::List: {
 
+		if(write_name)
+			out.write_key(prop.name);
+
 		write_list(&prop, prop.get_ptr(ptr), out, userptr);
 
 		return std::pair<std::string,bool>{ {},false };
@@ -286,6 +289,10 @@ std::pair<std::string,bool> write_field_type(core_type_id type, void* ptr, const
 	}break;
 
 	}
+
+	if (write_name)
+		out.write_key(prop.name);
+
 	return { value_str,true };
 }
 
@@ -308,7 +315,7 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* u
 
 			uint8_t* member_dat = list_ptr->get_index(ptr, i);
 
-			auto str = write_field_type(prop.type, member_dat, nullptr, prop, out, userptr);
+			auto str = write_field_type(false/* dont write name */, prop.type, member_dat, nullptr, prop, out, userptr);
 			ASSERT(str.second);
 			buf += str.first;
 			buf += ' ';
@@ -345,8 +352,7 @@ void write_properties_with_diff(const PropertyInfoList& list, void* ptr, const v
 		if (!(flags & PROP_SERIALIZE))
 			continue;
 
-		out.write_key(prop.name);
-		auto write_val = write_field_type(prop.type, ptr, diff_class, prop, out, userptr);
+		auto write_val = write_field_type(true, prop.type, ptr, diff_class, prop, out, userptr);
 		if (write_val.second)
 			out.write_value_quoted(write_val.first.c_str());
 	}
@@ -363,8 +369,7 @@ void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, 
 		if (!(flags & PROP_SERIALIZE))
 			continue;
 		
-		out.write_key(prop.name);
-		auto write_val = write_field_type(prop.type, ptr, nullptr, prop, out, userptr);
+		auto write_val = write_field_type(true, prop.type, ptr, nullptr, prop, out, userptr);
 		if (write_val.second)
 			out.write_value_quoted(write_val.first.c_str());
 	}
