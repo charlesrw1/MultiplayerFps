@@ -103,6 +103,7 @@
     <ClInclude Include="Source\Framework\MathLib.h" />
     <ClInclude Include="Source\Framework\MemArena.h" />
     <ClInclude Include="Source\Framework\MeshBuilder.h" />
+    <ClInclude Include="Source\Framework\MulticastDelegate.h" />
     <ClInclude Include="Source\Framework\MyImguiLib.h" />
     <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h" />
     <ClInclude Include="Source\Framework\PoolAllocator.h" />
@@ -225,7 +226,6 @@
     <ClCompile Include="Source\Game\Schema.cpp" />
     <ClCompile Include="Source\Game\SchemaEditLocal.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
-    <ClCompile Include="Source\Game_Engine.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />

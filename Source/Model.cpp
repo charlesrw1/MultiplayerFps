@@ -84,7 +84,10 @@ public:
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Model::StaticType; }
 };
+
 REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
+
+
 Model::~Model() {}
 
 static const int MODEL_FORMAT_VERSION = 7;

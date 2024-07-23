@@ -129,9 +129,13 @@ void AssetBrowser::imgui_draw()
 					double_clicked_selected = true;
 					if (selected_resource.type->tool_to_edit_me()) {
 						std::string cmdstr = "start_ed ";
+						cmdstr += '"';
 						cmdstr += selected_resource.type->get_type_name();
+						cmdstr += '"';
 						cmdstr += " ";
+						cmdstr += '"';
 						cmdstr += selected_resource.filename;
+						cmdstr += '"';
 						Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmdstr.c_str());
 					}
 				}

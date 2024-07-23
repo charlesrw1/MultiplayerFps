@@ -16,6 +16,8 @@
 #include "GameEnginePublic.h"
 #include "DrawPublic.h"
 
+#include "AssetRegistry.h"
+
 CLASS_IMPL(Entity);
 
 CLASS_IMPL(Door);
@@ -28,6 +30,38 @@ CLASS_IMPL(EmptyComponent);
 CLASS_IMPL(MeshComponent);
 CLASS_IMPL(BoxComponent);
 CLASS_IMPL(CapsuleComponent);
+
+// create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
+extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
+class EntityTypeMetadata : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() const  override
+	{
+		return { 117, 75, 242 };
+	}
+
+	virtual std::string get_type_name() const  override
+	{
+		return "Entity (C++)";
+	}
+
+	virtual void index_assets(std::vector<std::string>& filepaths) const  override {
+		auto subclasses = ClassBase::get_subclasses<Entity>();
+		for (; !subclasses.is_end(); subclasses.next()) {
+			if (subclasses.get_type()->allocate)
+				filepaths.push_back(subclasses.get_type()->classname);
+		}
+	}
+	virtual IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
+	virtual std::string root_filepath() const  override
+	{
+		return "";
+	}
+	virtual bool assets_are_filepaths() const { return false; }
+};
+REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 
 
 

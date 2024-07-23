@@ -508,6 +508,9 @@
     <ClInclude Include="Source\OsInput.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\MulticastDelegate.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -754,6 +757,5 @@
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
       <Filter>Source\Framework\ReflectionSys</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game_Engine.cpp" />
   </ItemGroup>
 </Project>
