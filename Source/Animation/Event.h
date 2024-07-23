@@ -2,7 +2,6 @@
 
 #include <string>
 #include "Framework/StringName.h"
-#include "Framework/TypeInfo.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/Factory.h"
 #include "Framework/Util.h"

@@ -162,12 +162,6 @@
     <ClInclude Include="Source\Framework\StringUtil.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\TypedVoidPtr.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\TypeInfo.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\AnimationTreePublic.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>

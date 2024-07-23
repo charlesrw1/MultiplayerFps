@@ -12,7 +12,6 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/Factory.h"
 #include "Framework/PoolAllocator.h"
-#include "Framework/TypeInfo.h"
 #include "Framework/ClassBase.h"
 #include "Animation/SkeletonData.h"
 

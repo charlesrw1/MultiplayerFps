@@ -16,7 +16,6 @@
 #include <vector>
 #include "Framework/Factory.h"
 #include "Framework/ReflectionProp.h"
-#include "Framework/TypeInfo.h"
 
 #include "Framework/ClassBase.h"
 

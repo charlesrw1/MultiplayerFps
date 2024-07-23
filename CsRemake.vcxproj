@@ -115,8 +115,6 @@
     <ClInclude Include="Source\Framework\ArrayReflection.h" />
     <ClInclude Include="Source\Framework\StringName.h" />
     <ClInclude Include="Source\Framework\StringUtil.h" />
-    <ClInclude Include="Source\Framework\TypedVoidPtr.h" />
-    <ClInclude Include="Source\Framework\TypeInfo.h" />
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />

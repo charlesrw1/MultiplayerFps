@@ -37,9 +37,7 @@ public:
 	void attach_to_parent(EntityComponent* parent_component, StringName point);
 	void remove_this(EntityComponent* component);
 
-	template<typename T>
-	static PropertyInfo generate_prop_info(T** dummyptr, const char* name, uint16_t offset, uint32_t flags, const char* hint_str = "") {
-		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
+	static PropertyInfo generate_prop_info(const char* name, uint16_t offset, uint32_t flags, const char* hint_str = "") {
 		PropertyInfo pi;
 		pi.name = name;
 		pi.offset = offset;
@@ -114,7 +112,6 @@ private:
 	friend class EdPropertyGrid;
 };
 
-#define REG_COMPONENT(name, flags, hint) EntityComponent::generate_prop_info( \
-&((TYPE_FROM_START*)0)->name, \
+#define REG_COMPONENT(name, flags, hint) EntityComponent::generate_prop_info(\
 #name, offsetof(TYPE_FROM_START,name), flags, hint)
 

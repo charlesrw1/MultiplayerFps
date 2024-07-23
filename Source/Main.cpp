@@ -755,12 +755,13 @@ extern void at_test();
 #include "Game/Schema.h"
 int main(int argc, char** argv)
 {
-
+	//_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
 	eng = new Game_Engine;
 
 	eng->argc = argc;
 	eng->argv = argv;
 	eng->init();
+
 
 	Player player;
 	Door door;

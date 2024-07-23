@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <type_traits>
-#include "Framework/TypedVoidPtr.h"
 
 struct PropertyInfoList;
 class ClassBase;

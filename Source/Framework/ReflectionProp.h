@@ -3,7 +3,6 @@
 #include "Framework/EnumDefReflection.h"
 #include "Framework/StringUtil.h"
 #include "Framework/Factory.h"
-#include "TypedVoidPtr.h"
 
 #include "Framework/ClassBase.h"
 

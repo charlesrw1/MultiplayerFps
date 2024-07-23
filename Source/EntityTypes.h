@@ -133,13 +133,13 @@ public:
 	enum {
 		OPEN,
 		CLOSED
-	}doorstate;
+	}doorstate=OPEN;
 
 	bool start_open = false;
 	bool start_locked = false;
 
-	MeshComponent* door_mesh;
-	MeshComponent* door_handle;
+	MeshComponent* door_mesh = nullptr;
+	MeshComponent* door_handle = nullptr;
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Door)

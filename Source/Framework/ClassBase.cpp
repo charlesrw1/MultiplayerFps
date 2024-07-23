@@ -139,7 +139,8 @@ void ClassBase::init()
 			classtype->props = classtype->get_props_function();
 	}
 	// now call default constructors
-	for (auto& classtype : get_registry().id_to_typeinfo) {
+	auto& id_to_typeinfo = get_registry().id_to_typeinfo;
+	for (auto classtype : id_to_typeinfo) {
 		if (classtype->default_class_object != nullptr) {
 			if (classtype->allocate)
 				classtype->default_class_object = classtype->allocate();

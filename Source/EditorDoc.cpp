@@ -1371,7 +1371,7 @@ void EdPropertyGrid::draw()
 				for (int row_n = 0; row_n < array.size(); row_n++)
 				{
 					auto& res = array[row_n];		
-					draw_components_R(res, 2.0);
+					draw_components_R(res.get(), 2.0);
 				}
 				ImGui::EndTable();
 			}

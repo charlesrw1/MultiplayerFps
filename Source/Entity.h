@@ -7,7 +7,6 @@
 #include "BaseComponents.h"
 #include "Interaction.h"
 
-#include "Framework/TypeInfo.h"
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringName.h"
 #include "Framework/ClassBase.h"

@@ -8,7 +8,6 @@
 
 #include "../Runtime/AnimationTreeLocal.h"
 #include "Framework/Factory.h"
-#include "Framework/TypeInfo.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ReflectionProp.h"
 

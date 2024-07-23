@@ -2,7 +2,7 @@
 #include <vector>
 #include "Framework/Handle.h"
 #include "Framework/CurveEditorImgui.h"
-
+#include "Framework/StringName.h"
 class FileWriter;
 class FileReader;
 class BakedCurve
