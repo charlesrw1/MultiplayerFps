@@ -5,7 +5,7 @@
 #include "imgui.h"
 #include "Framework/Files.h"
 #include "Framework/Util.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include <cassert>
 #include <SDL2/SDL.h>
 
@@ -29,7 +29,7 @@ bool IEditorTool::open(const char* name) {
 		const char* window_name = "unnamed";
 		if (current_document_has_path())
 			window_name = this->name.c_str();
-		SDL_SetWindowTitle(eng->window, string_format("%s: %s",get_editor_name(), window_name));
+		SDL_SetWindowTitle(eng->get_os_window(), string_format("%s: %s",get_editor_name(), window_name));
 	}
 
 	return true;
@@ -45,7 +45,7 @@ void IEditorTool::close()
 	close_internal();
 	name = "";
 
-	SDL_SetWindowTitle(eng->window,"CsRemake");
+	SDL_SetWindowTitle(eng->get_os_window(),"CsRemake");
 
 	ASSERT(!has_document_open());
 }
@@ -64,7 +64,7 @@ bool IEditorTool::save()
 		const char* window_name = "unnamed";
 		if (current_document_has_path())
 			window_name = this->name.c_str();
-		SDL_SetWindowTitle(eng->window, string_format("%s: %s", get_editor_name(), window_name));
+		SDL_SetWindowTitle(eng->get_os_window(), string_format("%s: %s", get_editor_name(), window_name));
 	}
 
 	return save_document_internal();

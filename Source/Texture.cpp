@@ -7,8 +7,6 @@
 #include "glad/glad.h"
 #include "Framework/Util.h"
 
-#include "Game_Engine.h"
-
 #include "Framework/Files.h"
 #include "Framework/DictParser.h"
 

@@ -3,8 +3,6 @@
 #include "imgui.h"
 #include "MyImguiLib.h"
 
-// not mine :)
-#include "beziercurveeditor.h"
 
 void MyImSeperator(float x1, float x2, float width)
 {

@@ -1,7 +1,7 @@
 #include "Animation/Runtime/Animation.h"
 #include "Framework/Util.h"
 #include "Model.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include "Framework/Config.h"
 
 #include <fstream>

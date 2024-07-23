@@ -6,7 +6,7 @@
 #include "Framework/Config.h"
 #include "Framework/Bytepacker.h"
 
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 
 //#define DebugOut(fmt, ...)
 

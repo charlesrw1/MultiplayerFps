@@ -4,7 +4,7 @@
 #include <chrono>
 #include <SDL2/SDL.h>
 #include <vector>
-#include "Game_Engine.h"
+#include "Config.h"
 
 using std::chrono::steady_clock;
 using std::chrono::microseconds;

@@ -44,7 +44,7 @@ bool Schema::check_validity_of_file()
 	return is_valid;
 }
 
-Entity* Schema::create_entity_from_properties_internal(bool just_check_valid)
+Entity* Schema::create_entity_from_properties_internal(bool just_check_valid) const
 {
 
 	DictParser in;

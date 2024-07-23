@@ -2,160 +2,97 @@
 #include "Types.h"
 #include "Level.h"
 #include "Player.h"
-#include "Game_Engine.h"
+#include "GameEngineLocal.h"
 #include "Net.h"
 #include "EntityTypes.h"
 
 #include "DrawPublic.h"
 #include "Physics/Physics2.h"
 
-void find_spawn_position(Entity* ent)
-{
-	int index = eng->find_by_classtype(0, ("Spawnpoint") );
-	bool found = false;
-	while (index != -1) {
-		Entity& e = *eng->get_ent(index);
-
-		// do a small test for nearby players
-		GeomContact contact = eng->phys.trace_shape(Trace_Shape(e.position, CHAR_HITBOX_RADIUS), ent->selfid, PF_PLAYERS);
-
-		if (!contact.found) {
-			ent->position = e.position;
-			ent->rotation = e.rotation;
-			return;
-		}
-		
-		index = eng->find_by_classtype(index + 1, ("Spawnpoint") );
-	}
-
-	sys_print("No valid spawn positions for entity\n");
-
-	ent->position = glm::vec3(0);
-	ent->rotation = glm::vec3(0);
-}
-
-enum Door_State
-{
-	DOOR_CLOSED,
-	DOOR_OPENING,
-	DOOR_OPENED
-};
+#include "Game/Schema.h"
 
 void Door::update()
 {
-	rotation.y = eng->time;
+	rotation.y = eng->get_game_time();
 }
 
 
-void Game_Engine::populate_map()
-{
-	// call spawn functions
-	auto& spawners = level->loadfile.spawners;
-	for (int i = 0; i < spawners.size(); i++) {
-		if (spawners[i].type != NAME("entity") && spawners[i].type != NAME(""))
-			continue;
-		const char* classname = spawners[i].dict.get_string("classname");
-
-		Entity* e = create_entity(classname, -1);
-		if (!e)
-			continue;
-		//e->spawn(spawners[i].dict);
-	}
-}
-
-void Game_Engine::client_leave(int slot)
-{
-	sys_print("client leave\n");
-	entityhandle handle = ents[slot]->selfid;
-	free_entity(handle);
-}
-
-void Game_Engine::make_client(int slot)
-{
-	sys_print("making client %d\n", slot);
-	Player* p = (Player*)create_entity("Player", slot);
-	//p->spawn({});
-}
 #include "EntityTypes.h"
 
-Entity* Game_Engine::create_entity(const char* classname, int forceslot)
-{
-	int slot = forceslot;
-	if (slot == -1) {
-		for (slot = MAX_CLIENTS; slot < NUM_GAME_ENTS; slot++) {
-			if (!ents[slot])
-				break;
-		}
-	}
-	ASSERT(slot != NUM_GAME_ENTS && "create_entity overfow");
-	
-	Entity* e = nullptr;
-	e = ClassBase::create_class<Entity>(classname);
+void GameEngineLocal::login_new_player(uint32_t index) {
 
+	sys_print("*** making client %d\n", index);
+
+	auto player = spawn_entity_class<Player>();
+	level->local_player_id = player->self_id.handle;
+
+}
+void GameEngineLocal::logout_player(uint32_t index) {
+	sys_print("*** removing client %d\n", index);
+
+	remove_entity(get_player_slot(index));
+}
+void GameEngineLocal::remove_entity(Entity* e)
+{
+	ASSERT(get_level());
+	// can pass nullptr and still be valid
+	if (!e)
+		return;
+	uint64_t id = e->self_id.handle;
+
+	sys_print("*** removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
+
+	// call actor specific destruction
+	e->end();
+	// remove components
+	e->destroy();
+	// call destructor
+	delete e;
+	// remove from hashmap
+	get_level()->remove_entity_handle(id);
+}
+
+void GameEngineLocal::call_startup_functions_for_new_entity(Entity* ec)
+{
+	// add to master list
+	get_level()->insert_entity_into_hashmap(ec);
+	// register components
+	ec->register_components();
+	// call start function
+	ec->start();
+}
+
+Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo* ti) {
+	ASSERT(ti && ti->allocate);
+	ASSERT(get_level());
+
+	ClassBase* e = ti->allocate();	// allocate + call constructor
+	ASSERT(e);
+
+	Entity* ec = nullptr;
+#ifdef _DEBUG
+	ec = e->cast_to<Entity>();
+	ASSERT(ec);
+#else
+	ec = (Entity*)e;	// just static cast, should always be true since classtypeinfo gets a templated check in the public interface
+#endif // _DEBUG
+
+	call_startup_functions_for_new_entity(ec);
+
+	return ec;
+}
+Entity* GameEngineLocal::spawn_entity_schema(const Schema* schema) {
+	assert(schema);
+	assert(level);
+	
+	Entity* e = schema->create_entity_from_properties();
 	if (!e) {
-		printf("no class defined for name %s\n", classname);
+		sys_print("??? couldn't spawn entity from schema: %s\n", schema->get_name().c_str());
 		return nullptr;
 	}
-
-	num_entities++;
-	e->selfid = (entityhandle)slot;
-	ents[slot] = e;
+	call_startup_functions_for_new_entity(e);
 
 	return e;
-}
-
-int Game_Engine::find_by_classtype(int index, const char* classtype)
-{
-	const ClassTypeInfo* ci = ClassBase::find_class(classtype);
-	if (!ci)
-		return -1;
-
-	for (int i = index; i < NUM_GAME_ENTS; i++) {
-		if (!ents[i]) continue;
-		if (ents[i]->get_type() == *ci)
-			return i;
-	}
-	return -1;
-}
-
-void Game_Engine::free_entity(entityhandle handle)
-{
-	ASSERT(handle < NUM_GAME_ENTS);
-
-	delete ents[handle];
-	ents[handle] = nullptr;
-	num_entities -= 1;
-}
-
-void Game_Engine::fire_bullet(Entity* from, vec3 direction, vec3 origin)
-{
-	if (!is_host())
-		return;
-
-	Ray r(origin, direction);
-	RayHit hit = eng->phys.trace_ray(r, from->selfid, PF_ALL);
-	if (hit.hit_world) {
-		//local.pm.add_dust_hit(hit.pos-direction*0.1f);
-		// add particles + decals here
-
-		//local.pm.add_blood_effect(hit.pos, -direction);
-	}
-	else if(hit.ent_id!=-1){
-		Entity* hit_entitiy = eng->get_ent_from_handle(hit.ent_id);
-		//hit_entitiy->damage(from, direction, 100);
-
-		//local.pm.add_blood_effect(hit.pos, -direction);
-	}
-
-	//create_grenade(from, origin + direction * 0.5f, direction);
-}
-
-Player* Game_Engine::get_client_player(int slot)
-{
-	ASSERT(slot < MAX_CLIENTS);
-	if (!ents[slot]) return nullptr;
-	ASSERT(ents[slot]->is_a<Player>());
-	return (Player*)ents[slot];
 }
 
 
@@ -300,18 +237,9 @@ Grenade::Grenade()
 void Grenade::update()
 {
 
-	if (eng->time - throw_time > 2.5) {
+	if (eng->get_game_time() - throw_time > 2.5) {
 		sys_print("BOOM\n");
-		eng->free_entity(selfid);
-	}
-}
 
-Entity* create_grenade(Entity* thrower, glm::vec3 org, glm::vec3 direction)
-{
-	ASSERT(thrower);
-	Grenade* e = (Grenade*)eng->create_entity("Grenade");
-	e->thrower = thrower->selfid;
-	e->position = org;
-	//e->velocity = direction * grenade_vel.real();
-	return e;
+		eng->remove_entity(this);
+	}
 }

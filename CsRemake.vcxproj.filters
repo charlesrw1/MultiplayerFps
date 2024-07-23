@@ -96,7 +96,7 @@
     <ClInclude Include="Source\EmulatedSocket.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game_Engine.h">
+    <ClInclude Include="Source\GameEngineLocal.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\GlmInclude.h">
@@ -127,9 +127,6 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\AddClassToFactory.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\beziercurveeditor.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Bytepacker.h">
@@ -502,6 +499,15 @@
     <ClInclude Include="Source\Game\EditorCommands.h">
       <Filter>Source\LevelEditor\Commands</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GameEnginePublic.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SubclassType.h">
+      <Filter>Source\Framework\ClassSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\OsInput.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -748,5 +754,6 @@
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
       <Filter>Source\Framework\ReflectionSys</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game_Engine.cpp" />
   </ItemGroup>
 </Project>

@@ -1,10 +1,12 @@
 #ifndef PLAYERMOVE_H
 #define PLAYERMOVE_H
 #include "Types.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include <memory>
 
 #include "PlayerAnimDriver.h"
+#include "Entity.h"
+#include "Game/EntityComponentTypes.h"
 
 using std::unique_ptr;
 using std::vector;
@@ -13,11 +15,26 @@ class Entity;
 class MeshBuilder;
 class Animation_Set;
 
+CLASS_H(PlayerSpawnPoint, Entity)
+public:
+	PlayerSpawnPoint() {
+		empty = create_sub_component<EmptyComponent>("Root");
+		root_component = empty;
+	}
+	EmptyComponent* empty = nullptr;
 
+	static const PropertyInfoList* get_props() {
+		START_PROPS(PlayerSpawnPoint)
+			REG_COMPONENT(empty,0,""),
+			REG_INT(team, PROP_DEFAULT, "0")
+		END_PROPS(PlayerSpawnPoint)
+	};
+	int team = 0;
+};
 
 CLASS_H(PlayerGun, Entity)
 public:
-	MeshComponent gunmesh;
+	MeshComponent* gunmesh = nullptr;
 
 	Player* owner = nullptr;
 

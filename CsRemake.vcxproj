@@ -82,7 +82,6 @@
     <ClInclude Include="Source\External\stb_image_write.h" />
     <ClInclude Include="Source\External\tiny_gltf.h" />
     <ClInclude Include="Source\Framework\AddClassToFactory.h" />
-    <ClInclude Include="Source\Framework\beziercurveeditor.h" />
     <ClInclude Include="Source\Framework\BinaryReadWrite.h" />
     <ClInclude Include="Source\Framework\BVH.h" />
     <ClInclude Include="Source\Framework\Bytepacker.h" />
@@ -115,9 +114,11 @@
     <ClInclude Include="Source\Framework\ArrayReflection.h" />
     <ClInclude Include="Source\Framework\StringName.h" />
     <ClInclude Include="Source\Framework\StringUtil.h" />
+    <ClInclude Include="Source\Framework\SubclassType.h" />
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />
+    <ClInclude Include="Source\GameEnginePublic.h" />
     <ClInclude Include="Source\Game\EditorCommands.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\EntityComponentTypes.h" />
@@ -125,7 +126,7 @@
     <ClInclude Include="Source\Game\Schema.h" />
     <ClInclude Include="Source\Game\SchemaEditLocal.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
-    <ClInclude Include="Source\Game_Engine.h" />
+    <ClInclude Include="Source\GameEngineLocal.h" />
     <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IAsset.h" />
     <ClInclude Include="Source\IEditorTool.h" />
@@ -135,6 +136,7 @@
     <ClInclude Include="Source\Meshlet.h" />
     <ClInclude Include="Source\Model.h" />
     <ClInclude Include="Source\Net.h" />
+    <ClInclude Include="Source\OsInput.h" />
     <ClInclude Include="Source\ParticlesLocal.h" />
     <ClInclude Include="Source\ParticlesPublic.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
@@ -223,6 +225,7 @@
     <ClCompile Include="Source\Game\Schema.cpp" />
     <ClCompile Include="Source\Game\SchemaEditLocal.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
+    <ClCompile Include="Source\Game_Engine.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />

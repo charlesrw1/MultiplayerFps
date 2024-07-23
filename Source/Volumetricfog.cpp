@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "glad/glad.h"
 
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 
 static const ivec3 volfog_sizes[] = { {0,0,0},{160,90,128},{80,45,64} };
 
@@ -113,7 +113,7 @@ void Volumetric_Fog_System::compute()
 		glBindTexture(GL_TEXTURE_3D, texture.last_volume);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
-		prog.lightcalc.set_vec3("perlin_offset", glm::vec3(eng->time * 0.2, 0, eng->time));
+		prog.lightcalc.set_vec3("perlin_offset", glm::vec3(eng->get_game_time() * 0.2, 0, eng->get_game_time()));
 
 
 		prog.lightcalc.set_int("num_lights", 0);

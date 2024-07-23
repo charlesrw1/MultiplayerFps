@@ -1,5 +1,5 @@
 #include "Server.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include "Framework/Bytepacker.h"
 
 RemoteClient::RemoteClient(Server* sv, int slot)
@@ -38,7 +38,7 @@ void RemoteClient::Disconnect(const char* debug_reason)
 	sys_print("Disconnecting client %d because %s\n", client_num, debug_reason);
 
 	if (state == SCS_SPAWNED) {
-		eng->client_leave(client_num);
+		eng->logout_player(client_num);
 	}
 
 	uint8_t buffer[8];
@@ -81,15 +81,15 @@ bool RemoteClient::OnMoveCmd(ByteReader& msg)
 		printf("simming dropped %d cmds\n", commands_to_run - 1);
 	}
 
-	Entity& e = *eng->get_ent(client_num);
+	//Entity& e = *eng->get_ent(client_num);
 	ASSERT(0);
-	// FIXME: exploit to send inputs at increased rate
-	for (int i = commands_to_run - 1; i >= 0; i--) {
-		Move_Command c = commands[i];
-	//	eng->execute_player_move(client_num, c);
-
-		//e.add_to_last();
-	}
+	//// FIXME: exploit to send inputs at increased rate
+	//for (int i = commands_to_run - 1; i >= 0; i--) {
+	//	Move_Command c = commands[i];
+	////	eng->execute_player_move(client_num, c);
+	//
+	//	//e.add_to_last();
+	//}
 
 	return true;
 }
@@ -117,7 +117,7 @@ void RemoteClient::Update()
 		return;
 	}
 
-	next_snapshot_time -= eng->tick_interval;
+	next_snapshot_time -= eng->get_tick_interval();
 	if (next_snapshot_time > 0.f)
 		return;
 
@@ -127,7 +127,7 @@ void RemoteClient::Update()
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
 
 	writer.WriteByte(SV_TICK);
-	writer.WriteLong(eng->tick);
+	writer.WriteLong(eng->get_game_tick());
 
 	writer.WriteByte(SV_SNAPSHOT);
 	static ConfigVar never_delta("sv.never_delta", "0",CVAR_BOOL|CVAR_DEV);
@@ -135,7 +135,7 @@ void RemoteClient::Update()
 	int delta_frame = (never_delta.get_bool()) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);
 
-	Entity& e = *eng->get_ent(client_num);
+	//Entity& e = *eng->get_ent(client_num);
 	ASSERT(0);
 	//if (e.force_angles == 1) {
 	//	writer.WriteByte(SV_UPDATE_VIEW);
@@ -453,7 +453,7 @@ void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int 
 		p1.increment();
 	}
 
-	// MOTHER FUCKER!!!!
+
 	msg.AlignToByteBoundary();
 	msg.WriteBits(ENTITY_SENTINAL, ENTITY_BITS);
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "Types.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 
 #include "Entity.h"
 #include "Interaction.h"
@@ -58,7 +58,7 @@ CLASS_H(NPC, Entity)
 
 		float speed = length(velocity);
 		if (speed >= 0.0001) {
-			float dropamt = ground_friction * speed * eng->tick_interval;
+			float dropamt = ground_friction * speed * eng->get_tick_interval();
 			float newspd = speed - dropamt;
 			if (newspd < 0)
 				newspd = 0;
@@ -66,7 +66,7 @@ CLASS_H(NPC, Entity)
 			velocity.x *= factor;
 			velocity.z *= factor;
 		} 
-		float dt = eng->tick_interval;
+		float dt = eng->get_tick_interval();
 		switch (pathfind_state)
 		{
 		case going_towards_waypoint: {
@@ -91,8 +91,8 @@ CLASS_H(NPC, Entity)
 				pathfind_state = turning_to_next_waypoint;
 			}
 
-			RayHit rh = eng->phys.trace_ray(Ray(position + vec3(0, 2, 0), glm::vec3(0, -1, 0)),-1,PF_WORLD);
-			if (rh.dist > 0) position.y = rh.pos.y;
+			//RayHit rh = eng->phys.trace_ray(Ray(position + vec3(0, 2, 0), glm::vec3(0, -1, 0)),-1,PF_WORLD);
+			//if (rh.dist > 0) position.y = rh.pos.y;
 
 		}break;
 
@@ -104,7 +104,7 @@ CLASS_H(NPC, Entity)
 			pathfind_state = going_towards_waypoint;
 		}break;
 		};
-		esimated_accel =(velocity - prevel) / (float)eng->tick_interval;
+		esimated_accel =(velocity - prevel) / (float)eng->get_tick_interval();
 	}
 
 	enum state {

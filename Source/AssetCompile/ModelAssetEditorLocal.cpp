@@ -1,10 +1,16 @@
 #include "AssetCompile/ModelAssetEditorLocal.h"
-#include "Game_Engine.h"
-#include "Framework/MyImguiLib.h"
-#include "Someutils.h"
-#include "Framework/Files.h"
-#include "Animation/AnimationUtil.h"
 #include <stdexcept>
+#include <SDL2/SDL.h>
+
+#include "Someutils.h"
+#include "Framework/MyImguiLib.h"
+#include "Framework/Files.h"
+#include "Framework/DictParser.h"
+#include "Animation/AnimationUtil.h"
+
+#include "GameEnginePublic.h"
+#include "OsInput.h"
+
 static ModelEditorTool g_model_editor_static;
 IEditorTool* g_model_editor = &g_model_editor_static;
 
@@ -19,13 +25,13 @@ bool ModelEditorTool::handle_event(const SDL_Event& event)
 
 void ModelEditorTool::tick(float dt)
 {
-	auto window_sz = eng->get_game_viewport_dimensions();
+	auto window_sz = eng->get_game_viewport_size();
 	float aratio = (float)window_sz.y / window_sz.x;
 	{
 		int x = 0, y = 0;
-		if (eng->get_game_focused()) {
+		if (eng->is_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
-				camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+				camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
 		}
 	}
 

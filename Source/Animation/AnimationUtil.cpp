@@ -77,7 +77,7 @@ static bool face_foward = true;
 static bool apply_to_local = false;
 static bool apply_to_all = false;
 #include "imgui.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 void menu1235()
 {
 	if(ImGui::Begin("abc")) {

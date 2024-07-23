@@ -11,6 +11,9 @@
 
 #include "Framework/Hashmap.h"
 
+#include "Framework/InlineVec.h"
+#include "Entity.h"
+
 struct Texture;
 struct StaticEnv
 {
@@ -82,8 +85,38 @@ public:
 	// all entities in the map
 	hash_map<Entity> all_world_ents;
 	uint64_t last_id = 0;
-
 	uint64_t local_player_id = 0;
+
+	template<typename T, size_t COUNT>
+	bool find_all_entities_of_class(InlineVec<T*, COUNT>& out) {
+		static_assert(std::is_base_of<Entity, T>::value, "find_all_entities_of_class needs T=Entity subclass");
+		for (auto e : all_world_ents) {
+			if (e->is_a<T>())
+				out.push_back((T*)e);
+		}
+		return out.size() != 0;
+	}
+
+	void insert_entity_into_hashmap(Entity* e) {
+		ASSERT(e);
+		ASSERT(!e->self_id.is_valid());
+		e->self_id.handle = get_next_id_and_increment();
+		ASSERT(all_world_ents.find(e->self_id.handle) == nullptr);
+
+		all_world_ents.insert(e->self_id.handle, e);
+	}
+	uint64_t get_next_id_and_increment() {
+		return ++last_id;	// prefix
+	}
+	void remove_entity_handle(uint64_t handle) {
+#ifdef _DEBUG
+		auto ent = all_world_ents.find(handle);
+		if (!ent) {
+			sys_print("??? remove_entity_handle: entity does not exist in hashmap, double delete?\n");
+		}
+#endif // _DEBUG
+		all_world_ents.remove(handle);
+	}
 
 	Entity* get_local_player() const {
 		return all_world_ents.find(local_player_id);

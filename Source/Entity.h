@@ -70,8 +70,6 @@ inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, 
 #define REG_ENTITY_PTR(name, flags) make_entity_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
 
 
-
-
 // Destroy all components at end
 //		de_init()
 // Destroy an added dynamic component (and all subchildren)
@@ -145,9 +143,6 @@ public:
 
 
 	// Editor calls tick on components but not on entity
-
-	entityhandle selfid = 0;	// eng->ents[]
-	std::string name_id;		// name of entity frome editor
 	
 	glm::vec3 scale = glm::vec3(1.f);
 	glm::vec3 position = glm::vec3(0.0);

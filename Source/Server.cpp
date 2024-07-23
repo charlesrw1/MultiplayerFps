@@ -1,6 +1,6 @@
 #include "Server.h"
 #include "Framework/Util.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include "Model.h"
 #include <cstdarg>
 #include "Framework/Bytepacker.h"
@@ -46,7 +46,7 @@ void Server::init()
 		tick_rate.set_float( 150.f );
 
 	// initialize tick_interval here
-	eng->tick_interval = 1.0 / tick_rate.get_float();
+	eng->set_tick_interval( 1.0 / tick_rate.get_float() );
 }
 void Server::end(const char* log_reason)
 {
@@ -67,13 +67,13 @@ void Server::start()
 
 	socket.Init(host_port);
 	initialized = true;
-	eng->tick_interval = 1.0 / tick_rate.get_float();
+	eng->set_tick_interval(1.0 / tick_rate.get_float());
 }
 
 
 Frame2* Server::GetSnapshotFrame()
 {
-	return &frame_storage.get_frame(eng->tick);
+	return &frame_storage.get_frame(eng->get_game_tick());
 }
 
 
@@ -92,7 +92,7 @@ void Server::connect_local_client()
 	clients[0].connection.Init(&socket, ip);
 	clients[0].local_client = true;
 
-	eng->make_client(0);
+	eng->login_new_player(0);
 }
 
 int Server::FindClient(IPAndPort addr) const {
@@ -135,8 +135,12 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	writer.WriteLong(CONNECTIONLESS_SEQUENCE);
 	writer.write_string("accept");
 	writer.WriteByte(spot);
-	writer.write_string(eng->mapname);
-	writer.WriteLong(eng->tick);
+	auto level = eng->get_level();
+	assert(level);
+	auto& lvlname = level->name;
+
+	writer.write_string(lvlname);
+	writer.WriteLong(eng->get_game_tick());
 	writer.WriteFloat(tick_rate.get_float());
 	writer.EndWrite();
 	socket.Send(accept_buf, writer.BytesWritten(), addr);
@@ -146,7 +150,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 		new_client.init(addr);
 		new_client.state = SCS_SPAWNED;
 		sys_print("Spawning client %d : %s\n", spot, addr.ToString().c_str());
-		eng->make_client(spot);
+		eng->login_new_player(spot);
 	}
 }
 

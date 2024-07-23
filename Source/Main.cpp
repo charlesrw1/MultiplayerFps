@@ -23,7 +23,7 @@
 #include "Level.h"
 #include "Physics.h"
 #include "Net.h"
-#include "Game_Engine.h"
+#include "GameEngineLocal.h"
 #include "Types.h"
 #include "Client.h"
 #include "Server.h"
@@ -45,7 +45,9 @@
 #include "Framework/ClassBase.h"
 
 MeshBuilder phys_debug;
-Game_Engine* eng;
+
+GameEngineLocal eng_local;
+GameEnginePublic* eng = &eng_local;
 
 static double program_time_start;
 
@@ -122,7 +124,7 @@ char* string_format(const char* fmt, ...) {
 void Quit()
 {
 	sys_print("Quiting...\n");
-	eng->cleanup();
+	eng_local.cleanup();
 	exit(0);
 }
 void sys_print(const char* fmt, ...)
@@ -199,7 +201,7 @@ void Fatalf(const char* format, ...)
 	sys_vprint(format, list);
 	va_end(list);
 	fflush(stdout);
-	eng->cleanup();
+	eng_local.cleanup();
 	exit(-1);
 }
 double GetTime()
@@ -233,13 +235,17 @@ static void view_angle_update(glm::vec3& view_angles)
 
 }
 
-void Game_Engine::make_move()
+template<typename T>
+T* checked_cast(ClassBase* c) {
+	return c ? c->cast_to<T>() : nullptr;
+}
+
+void GameEngineLocal::make_move()
 {
-	Player* p = get_local_player();
+	Player* p = checked_cast<Player>(get_local_player());
 
 	if (!p)
 		return;
-
 
 	Move_Command command;
 	command.view_angles = p->view_angles;
@@ -250,7 +256,7 @@ void Game_Engine::make_move()
 	if (g_fakemovedebug.get_integer() == 2)
 		command.button_mask |= BUTTON_JUMP;
 
-	if (!get_game_focused()) {
+	if (!is_game_focused()) {
 		p->set_input_command(command);
 		if(cl->get_state()>=CS_CONNECTED) 
 			cl->get_command(cl->OutSequence()) = command;
@@ -264,29 +270,29 @@ void Game_Engine::make_move()
 	int forwards_key = SDL_SCANCODE_W;
 	int back_key = SDL_SCANCODE_S;
 
-	if (keys[forwards_key])
+	if (inp.keys[forwards_key])
 		command.forward_move += 1.f;
-	if (keys[back_key])
+	if (inp.keys[back_key])
 		command.forward_move -= 1.f;
-	if (keys[SDL_SCANCODE_A])
+	if (inp.keys[SDL_SCANCODE_A])
 		command.lateral_move += 1.f;
-	if (keys[SDL_SCANCODE_D])
+	if (inp.keys[SDL_SCANCODE_D])
 		command.lateral_move -= 1.f;
-	if (keys[SDL_SCANCODE_Z])
+	if (inp.keys[SDL_SCANCODE_Z])
 		command.up_move += 1.f;
-	if (keys[SDL_SCANCODE_X])
+	if (inp.keys[SDL_SCANCODE_X])
 		command.up_move -= 1.f;
-	if (keys[SDL_SCANCODE_SPACE])
+	if (inp.keys[SDL_SCANCODE_SPACE])
 		command.button_mask |= BUTTON_JUMP;
-	if (keys[SDL_SCANCODE_LSHIFT])
+	if (inp.keys[SDL_SCANCODE_LSHIFT])
 		command.button_mask |= BUTTON_DUCK;
-	if (mousekeys & (1<<1))
+	if (inp.mousekeys & (1<<1))
 		command.button_mask |= BUTTON_FIRE1;
-	if (keys[SDL_SCANCODE_E])
+	if (inp.keys[SDL_SCANCODE_E])
 		command.button_mask |= BUTTON_RELOAD;
-	if (keychanges[SDL_SCANCODE_LEFTBRACKET])
+	if (inp.keychanges[SDL_SCANCODE_LEFTBRACKET])
 		command.button_mask |= BUTTON_ITEM_PREV;
-	if (keychanges[SDL_SCANCODE_RIGHTBRACKET])
+	if (inp.keychanges[SDL_SCANCODE_RIGHTBRACKET])
 		command.button_mask |= BUTTON_ITEM_NEXT;
 	// quantize and unquantize for local prediction
 	command.forward_move	= Move_Command::unquantize(Move_Command::quantize(command.forward_move));
@@ -299,7 +305,7 @@ void Game_Engine::make_move()
 		cl->get_command(cl->OutSequence()) = command;
 }
 
-void Game_Engine::init_sdl_window()
+void GameEngineLocal::init_sdl_window()
 {
 	ASSERT(!window);
 
@@ -463,40 +469,7 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 	}
 }
 #include "Framework/Files.h"
-void Game_Media::load()
-{
-	model_manifest.clear();
 
-	
-	model_cache.resize(model_manifest.size());
-
-}
-
-Model* Game_Media::get_game_model(const char* model, int* out_index)
-{
-	int i = 0;
-	for (; i < model_manifest.size(); i++) {
-		if (model_manifest[i] == model)
-			break;
-	}
-	if (i == model_manifest.size()) {
-		sys_print("Model %s not in manifest\n", model);
-		if (out_index) *out_index = -1;
-		return nullptr;
-	}
-
-	if(out_index) *out_index = i;
-	if (model_cache[i]) return model_cache[i];
-	model_cache[i] = mods.find_or_load(model);
-	return model_cache[i];
-}
-Model* Game_Media::get_game_model_from_index(int index)
-{
-	if (index < 0 || index >= model_manifest.size()) return nullptr;
-	if (model_cache[index]) return model_cache[index];
-	model_cache[index] = mods.find_or_load(model_manifest[index].c_str());
-	return model_cache[index];
-}
 
 struct Sound
 {
@@ -504,27 +477,8 @@ struct Sound
 	int length;
 };
 
-int Game_Engine::player_num()
-{
-	if (is_host())
-		return 0;
-	if (cl && cl->client_num != -1)
-		return cl->client_num;
-	return -1;
-}
-Entity& Game_Engine::local_player()
-{
-	if (player_num() < 0) ASSERT(!"player not assigned");
-	ASSERT(ents[player_num()]);
-	return *ents[player_num()];
-}
-Player* Game_Engine::get_local_player()
-{
-	if (player_num() < 0) return nullptr;
-	return (Player*)ents[player_num()];
-}
 
-void Game_Engine::connect_to(string address)
+void GameEngineLocal::connect_to(string address)
 {
 	ASSERT(0);
 	///travel_to_engine_state(Engine_State::Loading, "connecting to another server");
@@ -538,7 +492,7 @@ void Game_Engine::connect_to(string address)
 
 DECLARE_ENGINE_CMD(close_ed)
 {
-	eng->change_editor_state(nullptr);
+	eng_local.change_editor_state(nullptr);
 }
 
 DECLARE_ENGINE_CMD(start_ed)
@@ -555,7 +509,7 @@ DECLARE_ENGINE_CMD(start_ed)
 		const char* file_to_open = "";	// make a new map
 		if (args.size() == 3)
 			file_to_open = args.at(2);
-		eng->change_editor_state(metadata->tool_to_edit_me(), file_to_open);
+		eng_local.change_editor_state(metadata->tool_to_edit_me(), file_to_open);
 	}
 	else {
 		sys_print("unknown editor\n");
@@ -575,7 +529,7 @@ static void disable_imgui_docking()
 
 #define ASSERT_ENUM_STRING( enumstr, index )		( 1 / (int)!( (int)enumstr - index ) ) ? #enumstr : ""
 
-void Game_Engine::change_editor_state(IEditorTool* next_tool, const char* file)
+void GameEngineLocal::change_editor_state(IEditorTool* next_tool, const char* file)
 {
 	sys_print("--------- Change Editor State ---------\n");
 	if (active_tool != next_tool && active_tool != nullptr) {
@@ -622,14 +576,14 @@ DECLARE_ENGINE_CMD(bind)
 	int scancode = SDL_GetScancodeFromName(args.at(1));
 	if (scancode == SDL_SCANCODE_UNKNOWN) return;
 	if (args.size() < 3)
-		eng->bind_key(scancode, "");
+		eng_local.bind_key(scancode, "");
 	else
-		eng->bind_key(scancode, args.at(2));
+		eng_local.bind_key(scancode, args.at(2));
 }
 
 DECLARE_ENGINE_CMD_CAT("cl.",force_update)
 {
-	eng->cl->ForceFullUpdate();
+	eng->get_client()->ForceFullUpdate();
 }
 
 DECLARE_ENGINE_CMD(connect)
@@ -639,16 +593,16 @@ DECLARE_ENGINE_CMD(connect)
 		return;
 	}
 
-	eng->connect_to(args.at(1));
+	eng_local.connect_to(args.at(1));
 }
 DECLARE_ENGINE_CMD(disconnect)
 {
-	eng->leave_current_game();
+	eng->leave_level();
 }
 DECLARE_ENGINE_CMD(reconnect)
 {
-	if(eng->cl->get_state() != CS_DISCONNECTED)
-		eng->cl->Reconnect();
+	if(eng->get_client()->get_state() != CS_DISCONNECTED)
+		eng->get_client()->Reconnect();
 }
 
 DECLARE_ENGINE_CMD(map)
@@ -657,7 +611,7 @@ DECLARE_ENGINE_CMD(map)
 		sys_print("usage map <map name>");
 		return;
 	}
-	eng->queue_load_map(args.at(1));
+	eng->open_level(args.at(1));
 }
 DECLARE_ENGINE_CMD(exec)
 {
@@ -676,7 +630,7 @@ DECLARE_ENGINE_CMD(net_stat)
 	int maxbytes = -5000;
 	int totalbytes = 0;
 	for (int i = 0; i < 64; i++) {
-		auto& entry = eng->cl->server.incoming[i];
+		auto& entry = eng->get_client()->server.incoming[i];
 		maxbytes = glm::max(maxbytes, entry.bytes);
 		totalbytes += entry.bytes;
 		mintime = glm::min(mintime, entry.time);
@@ -684,7 +638,7 @@ DECLARE_ENGINE_CMD(net_stat)
 	}
 
 	sys_print("Client Network Stats:\n");
-	sys_print("%--15s %f\n", "Rtt", eng->cl->server.rtt);
+	sys_print("%--15s %f\n", "Rtt", eng->get_client()->server.rtt);
 	sys_print("%--15s %f\n", "Interval", maxtime - mintime);
 	sys_print("%--15s %d\n", "Biggest packet", maxbytes);
 	sys_print("%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
@@ -696,9 +650,10 @@ DECLARE_ENGINE_CMD(print_ents)
 {
 
 	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-		Entity& e = ei.get();
-		sys_print("%-15d %-15s %-15f %-15f\n", ei.get_index(), ei.get().get_type().classname, e.position.x, e.position.z);
+	auto level = eng->get_level();
+	for (auto eptr : level->all_world_ents) {
+		Entity& e = *eptr;
+		sys_print("%-15llu %-15s %-15f %-15f\n", e.self_id.handle, e.get_type().classname, e.position.x, e.position.z);
 	}
 }
 #endif
@@ -755,28 +710,20 @@ extern void at_test();
 #include "Game/Schema.h"
 int main(int argc, char** argv)
 {
-	//_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
-	eng = new Game_Engine;
-
-	eng->argc = argc;
-	eng->argv = argv;
-	eng->init();
-
+	eng_local.argc = argc;
+	eng_local.argv = argv;
+	eng_local.init();
 
 	Player player;
 	Door door;
 	Schema s;
-	door.register_components();
-	//player.player_mesh->set_model("player_FINAL.cmdl");
-	s.write_to_file(&door);
-	door.destroy();
+	player.register_components();
+	player.player_mesh->set_model("player_FINAL.cmdl");
+	s.write_to_file(&player);
+	player.destroy();
 
-	return 1;
-
-
-	eng->loop();
-
-	eng->cleanup();
+	eng_local.loop();
+	eng_local.cleanup();
 	
 	return 0;
 }
@@ -801,10 +748,10 @@ ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV);
 
 DECLARE_ENGINE_CMD(spawn_npc)
 {
-	if (!eng->is_in_game())
+	if (!eng->get_level())
 		return;
 	
-	auto p = eng->get_local_player();
+	auto p = checked_cast<Player>(eng->get_local_player());
 	if (!p) {
 		sys_print("no player\n");
 		return;
@@ -813,34 +760,27 @@ DECLARE_ENGINE_CMD(spawn_npc)
 	vec3 front = AnglesToVector(va.x, va.y);
 	vec3 pos = p->calc_eye_position();
 
-	RayHit rh = eng->phys.trace_ray(Ray(pos, front), -1, PF_WORLD);
-	if (rh.dist > 0) {
-
-		auto npc = eng->create_entity("NPC");
-		if (npc) {
-			npc->position = rh.pos;
-			//npc->spawn({});
-		}
-	}
+	auto npc = eng->spawn_entity_class<NPC>();
+	npc->position = pos;
 }
 
-void Game_Engine::queue_load_map(string nextname)
+void GameEngineLocal::open_level(string nextname)
 {
 	// level will get loaded in next ::loop()
-	mapname = nextname;
+	queued_mapname = nextname;
 	state = Engine_State::Loading;
 }
 
-void Game_Engine::leave_current_game()
+void GameEngineLocal::leave_level()
 {
 	// disconnect clients etc.
 	// current map gets unloaded in next ::loop()
 	state = Engine_State::Idle;
 }
 
-void Game_Engine::execute_map_change()
+void GameEngineLocal::execute_map_change()
 {
-	sys_print("-------- Map Change: %s --------\n", mapname.c_str());
+	sys_print("-------- Map Change: %s --------\n", queued_mapname.c_str());
 
 	// free current map
 	stop_game();
@@ -848,7 +788,7 @@ void Game_Engine::execute_map_change()
 	// try loading map
 	level = new Level;
 
-	if (!level->open_from_file(mapname)) {
+	if (!level->open_from_file(queued_mapname)) {
 		delete level;
 		level = nullptr;
 		sys_print("!!! couldn't load map !!!\n");
@@ -856,19 +796,15 @@ void Game_Engine::execute_map_change()
 		return;
 	}
 
-	num_entities = 0;
 	tick = 0;
 	time = 0.0;
-	ents.resize(NUM_GAME_ENTS, nullptr);
-
-	populate_map();
 
 	if (is_host())
 		spawn_starting_players(true);
 
 	idraw->on_level_start();
 
-	sys_print("changed state to Engine_State::Game\n");
+	sys_print("*** changed state to Engine_State::Game\n");
 
 	// fixme, for server set state to game, but clients will sit in a wait loop till they recieve their first
 	// snapshot before continuing
@@ -876,13 +812,13 @@ void Game_Engine::execute_map_change()
 }
 
 
-void Game_Engine::spawn_starting_players(bool initial)
+void GameEngineLocal::spawn_starting_players(bool initial)
 {
 	// fixme for multiplayer, spawn in clients that are connected to server ex on restart
-	make_client(0);
+	login_new_player(0);	// player 0
 }
 
-void Game_Engine::set_tick_rate(float tick_rate)
+void GameEngineLocal::set_tick_rate(float tick_rate)
 {
 	if (state == Engine_State::Game) {
 		sys_print("Can't change tick rate while running\n");
@@ -891,7 +827,7 @@ void Game_Engine::set_tick_rate(float tick_rate)
 	tick_interval = 1.0 / tick_rate;
 }
 
-void Game_Engine::set_game_focused(bool focused)
+void GameEngineLocal::set_game_focused(bool focused)
 {
 	if (focused == game_focused)
 		return;
@@ -908,7 +844,7 @@ void Game_Engine::set_game_focused(bool focused)
 	game_focused = focused;
 }
 
-void Game_Engine::key_event(SDL_Event event)
+void GameEngineLocal::key_event(SDL_Event event)
 {
 	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
@@ -924,32 +860,32 @@ void Game_Engine::key_event(SDL_Event event)
 
 	if (event.type == SDL_KEYDOWN) {
 		int scancode = event.key.keysym.scancode;
-		keys[scancode] = true;
-		keychanges[scancode] = true;
+		inp.keys[scancode] = true;
+		inp.keychanges[scancode] = true;
 
 		if (binds[scancode]) {
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, binds[scancode]->c_str());
 		}
 	}
 	else if (event.type == SDL_KEYUP) {
-		keys[event.key.keysym.scancode] = false;
+		inp.keys[event.key.keysym.scancode] = false;
 	}
 	// when drawing to windowed viewport, handle game_focused during drawing
 	else if (event.type == SDL_MOUSEBUTTONDOWN) {
-		if (event.button.button == 3 && !eng->is_drawing_to_window_viewport()) {
+		if (event.button.button == 3 && !is_drawing_to_window_viewport()) {
 			set_game_focused(true);
 		}
-		mousekeys |= (1<<event.button.button);
+		inp.mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
-		if (event.button.button == 3 && !eng->is_drawing_to_window_viewport()) {
+		if (event.button.button == 3 && !is_drawing_to_window_viewport()) {
 			set_game_focused(false);
 		}
-		mousekeys &= ~(1 << event.button.button);
+		inp.mousekeys &= ~(1 << event.button.button);
 	}
 }
 
-void Game_Engine::bind_key(int key, string command)
+void GameEngineLocal::bind_key(int key, string command)
 {
 	ASSERT(key >= 0 && key < SDL_NUM_SCANCODES);
 	if (!binds[key])
@@ -957,7 +893,7 @@ void Game_Engine::bind_key(int key, string command)
 	*binds[key] = std::move(command);
 }
 
-void Game_Engine::cleanup()
+void GameEngineLocal::cleanup()
 {
 	if (get_current_tool())
 		get_current_tool()->set_focus_state(editor_focus_state::Closed);
@@ -1058,12 +994,12 @@ Debug_Interface* Debug_Interface::get()
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, 0.0001, 5.0);
 
 
-bool Game_Engine::is_drawing_to_window_viewport()
+bool GameEngineLocal::is_drawing_to_window_viewport() const
 {
 	return is_in_an_editor_state();
 }
 
-glm::ivec2 Game_Engine::get_game_viewport_dimensions()
+glm::ivec2 GameEngineLocal::get_game_viewport_size() const
 {
 	if (is_drawing_to_window_viewport())
 		return window_viewport_size;
@@ -1083,11 +1019,11 @@ void f345()
 	ImGui::Text("window_focused: %d", int(window_focused));
 	ImGui::Text("scene_hovered: %d", int(scene_hovered));
 	ImGui::Text("scene_focused: %d", int(scene_focused));
-	ImGui::Text("eng->game_focused: %d", int(eng->get_game_focused()));
+	ImGui::Text("eng->game_focused: %d", int(eng_local.is_game_focused()));
 }
 AddToDebugMenu asdf45("func", f345);
 #include "Framework/MyImguiLib.h"
-void Game_Engine::draw_any_imgui_interfaces()
+void GameEngineLocal::draw_any_imgui_interfaces()
 {
 	CPUSCOPESTART(imgui_draw);
 
@@ -1156,12 +1092,12 @@ void Game_Engine::draw_any_imgui_interfaces()
 		ImGui::ShowDemoWindow();
 }
 
-bool Game_Engine::game_draw_screen()
+bool GameEngineLocal::game_draw_screen()
 {
-	SceneDrawParamsEx params(eng->time,eng->frame_time);
-	params.output_to_screen = !eng->is_drawing_to_window_viewport();
+	SceneDrawParamsEx params(time,frame_time);
+	params.output_to_screen = !is_drawing_to_window_viewport();
 	View_Setup vs_for_gui;
-	auto viewport = get_game_viewport_dimensions();
+	auto viewport = get_game_viewport_size();
 	vs_for_gui.width = viewport.x;
 	vs_for_gui.height = viewport.y;
 
@@ -1173,7 +1109,8 @@ bool Game_Engine::game_draw_screen()
 		return true;
 	}
 
-	Player* p = get_local_player();
+	Player* p = checked_cast<Player>(get_local_player());
+	ASSERT(p)
 	
 	glm::vec3 position(0,0,0);
 	glm::vec3 angles(0, 0, 0);
@@ -1188,7 +1125,7 @@ bool Game_Engine::game_draw_screen()
 	return true;
 }
 
-void Game_Engine::draw_screen()
+void GameEngineLocal::draw_screen()
 {
 	GPUFUNCTIONSTART;
 
@@ -1197,11 +1134,11 @@ void Game_Engine::draw_screen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	SceneDrawParamsEx params(eng->time, eng->frame_time);
-	params.output_to_screen = !eng->is_drawing_to_window_viewport();
+	SceneDrawParamsEx params(time, frame_time);
+	params.output_to_screen = !is_drawing_to_window_viewport();
 	// so the width/height parameters are valid
 	View_Setup vs_for_gui;
-	auto viewport = get_game_viewport_dimensions();
+	auto viewport = get_game_viewport_size();
 	vs_for_gui.width = viewport.x;
 	vs_for_gui.height = viewport.y;
 
@@ -1252,24 +1189,6 @@ void Game_Engine::draw_screen()
 
 extern IEditorTool* g_model_editor;
 
-IEditorTool* Game_Engine::get_current_tool()
-{
-	return active_tool;
-}
-
-void Game_Engine::build_physics_world(float time)
-{
-
-}
-
-void Game_Engine::update_game_tick()
-{
-	for (auto ei = Ent_Iterator(); !ei.finished(); ei = ei.next()) {
-		Entity& e = ei.get();
-		e.update();
-	}
-}
-
 
 DECLARE_ENGINE_CMD(reload_mats)
 {
@@ -1288,13 +1207,9 @@ View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near,
 
 #define TIMESTAMP(x) sys_print("```%s in %f\n",x,(float)GetTime()-start); start = GetTime();
 
-Game_Engine::Game_Engine() :
-	ents(NUM_GAME_ENTS, nullptr),
-	spawnids(NUM_GAME_ENTS,0)
+GameEngineLocal::GameEngineLocal()
 {
 	memset(binds, 0, sizeof binds);
-	memset(keychanges, 0, sizeof keychanges);
-	memset(keys, 0, sizeof keys);
 }
 
 extern ModelMan mods;
@@ -1304,7 +1219,7 @@ ImNodesContext* ImNodesCreateContext()
 	return nullptr;
 }
 
-void Game_Engine::init()
+void GameEngineLocal::init()
 {
 	sys_print("--------- Initializing Engine ---------\n");
 
@@ -1316,11 +1231,7 @@ void Game_Engine::init()
 	// initialize class reflection/creation system
 	ClassBase::init();
 
-	memset(keys, 0, sizeof(keys));
-	memset(keychanges, 0, sizeof(keychanges));
 	memset(binds, 0, sizeof(binds));
-	mousekeys = 0;
-	num_entities = 0;
 	level = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 	state = Engine_State::Idle;
@@ -1418,7 +1329,7 @@ listens dont run prediction for local player
 */
 
 
-void Game_Engine::game_update_tick()
+void GameEngineLocal::game_update_tick()
 {
 	CPUFUNCTIONSTART;
 
@@ -1430,10 +1341,12 @@ void Game_Engine::game_update_tick()
 	//	cl->SendMovesAndMessages();
 
 	time = tick * tick_interval;
-	build_physics_world(0.f);
+	//build_physics_world(0.f);
 	
 	// update entities
-	update_game_tick();
+	for (auto ent : level->all_world_ents) {
+		ent->update_entity_and_components();
+	}
 
 	// update the physics
 	g_physics->simulate_and_fetch(tick_interval);
@@ -1464,7 +1377,7 @@ void perf_tracker()
 {
 	static std::vector<float> time(200,0.f);
 	static int index = 0;
-	time.at(index) = eng->frame_time;
+	time.at(index) = eng->get_frame_time();
 	index = index + 1;
 	index %= 200;
 
@@ -1478,7 +1391,7 @@ void perf_tracker()
 
 
 // unloads all game state
-void Game_Engine::stop_game()
+void GameEngineLocal::stop_game()
 {
 	if (!map_spawned())
 		return;
@@ -1487,12 +1400,11 @@ void Game_Engine::stop_game()
 
 	ASSERT(level);
 	
-	for (auto ei = Ent_Iterator(0); !ei.finished(); ei = ei.next()) {
-		ASSERT(&ei.get());
-		delete &ei.get();
+	for (auto ent : level->all_world_ents) {
+		ent->end();
+		ent->destroy();
+		delete ent;
 	}
-	ents.clear();
-	num_entities = 0;
 
 	idraw->on_level_end();
 	
@@ -1505,7 +1417,7 @@ void Game_Engine::stop_game()
 	Debug::on_fixed_update_start();
 }
 
-void Game_Engine::loop()
+void GameEngineLocal::loop()
 {
 	double last = GetTime() - 0.1;
 
@@ -1520,12 +1432,12 @@ void Game_Engine::loop()
 		frame_time = dt;
 
 		// reset cursor if in relative mode
-		if (get_game_focused()) {
+		if (is_game_focused()) {
 			SDL_WarpMouseInWindow(window, saved_mouse_x, saved_mouse_y);
 		}
 
 		// update input
-		memset(keychanges, 0, sizeof keychanges);
+		memset(inp.keychanges, 0, sizeof inp.keychanges);
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
@@ -1556,7 +1468,7 @@ void Game_Engine::loop()
 				key_event(event);
 				break;
 			}
-			if (!get_game_focused()) {
+			if (!is_game_focused()) {
 				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 					continue;
 				if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
@@ -1644,48 +1556,8 @@ void Game_Engine::loop()
 	}
 }
 
-bool Ent_Iterator::finished() const
-{
-	return index == -1;
-}
-Ent_Iterator& Ent_Iterator::next()
-{
-	*this = Ent_Iterator(index + 1, summed_count);
-	return *this;
-}
-Ent_Iterator::Ent_Iterator(int index_, int summed_count_)
-{
-	this->index = -1;
-	this->summed_count = 0;
-	while (index_ < NUM_GAME_ENTS && summed_count_ < eng->num_entities) {
-		if (eng->ents[index_]) {
-			this->index = index_;
-			this->summed_count = summed_count_ + 1;
-			break;
-		}
-		index_++;
-	}
-}
-Entity& Ent_Iterator::get() const
-{
-	return *eng->get_ent(index);
-}
 
-Entity* Game_Engine::get_ent(int index)
-{
-	if (index < 0 || index >= ents.size())
-		return nullptr;
-
-	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
-	return ents[index];
-}
-Entity* Game_Engine::get_ent_from_handle(entityhandle index)
-{
-	ASSERT(index >= 0 && index < NUM_GAME_ENTS);
-	return ents[index];
-}
-
-void Game_Engine::pre_render_update()
+void GameEngineLocal::pre_render_update()
 {
 	ASSERT(state == Engine_State::Game);
 

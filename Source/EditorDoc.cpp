@@ -1,7 +1,7 @@
 #include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include <algorithm>
 #include "DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
@@ -16,6 +16,9 @@
 #include "Render/Material.h"
 
 #include "EditorFolder.h"
+
+#include "OsInput.h"
+#include "Debug.h"
 
 #include <stdexcept>
 EditorDoc ed_doc;
@@ -598,7 +601,7 @@ void EditorDoc::ui_paint()
 void ManipulateTransformTool::handle_event(const SDL_Event& event)
 {
 
-	if (event.type == SDL_KEYDOWN && !eng->get_game_focused() && ed_doc.selection_state->has_any_selected()) {
+	if (event.type == SDL_KEYDOWN && !eng->is_game_focused() && ed_doc.selection_state->has_any_selected()) {
 		uint32_t scancode = event.key.keysym.scancode;
 		bool has_shift = event.key.keysym.mod & KMOD_SHIFT;
 		if (scancode == SDL_SCANCODE_R) {
@@ -705,7 +708,7 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 				}
 				else {
 					int index = ed_doc.get_node_index(rh.actor->get_editor_node_owner());
-					if (eng->keys[SDL_SCANCODE_LSHIFT]) {
+					if (eng->get_input_state()->keys[SDL_SCANCODE_LSHIFT]) {
 						selection_state->add_to_selection(nodes[index]);
 					}
 					else
@@ -722,7 +725,7 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			command_mgr.undo();
 	}
 
-	if (eng->get_game_focused() && event.type == SDL_MOUSEWHEEL) {
+	if (eng->is_game_focused() && event.type == SDL_MOUSEWHEEL) {
 		if (using_ortho)
 			ortho_camera.scroll_callback(event.wheel.y);
 		else
@@ -762,16 +765,16 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 void EditorDoc::tick(float dt)
 {
 
-	auto window_sz = eng->get_game_viewport_dimensions();
+	auto window_sz = eng->get_game_viewport_size();
 	float aratio = (float)window_sz.y / window_sz.x;
 	{
 		int x=0, y=0;
-		if (eng->get_game_focused()) {
+		if (eng->is_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
 			if (using_ortho)
-				ortho_camera.update_from_input(eng->keys, x, y, aratio);
+				ortho_camera.update_from_input(eng->get_input_state()->keys, x, y, aratio);
 			else
-				camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+				camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
 		}
 	}
 
@@ -944,7 +947,7 @@ void ManipulateTransformTool::update()
 
 	float* model = glm::value_ptr(current_transform_of_group);
 
-	ImGuizmo::SetImGuiContext(eng->imgui_context);
+	ImGuizmo::SetImGuiContext(eng->get_imgui_context());
 	ImGuizmo::SetDrawlist();
 	Rect2d rect = ed_doc.get_size();
 	ImGuizmo::SetRect(rect.x, rect.y, rect.w, rect.h);

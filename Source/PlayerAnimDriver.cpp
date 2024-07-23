@@ -1,6 +1,6 @@
 #include "PlayerAnimDriver.h"
 #include "Entity.h"
-#include "Game_Engine.h" // Debug::
+#include "Debug.h" // Debug::
 
 #include "Animation/AnimationUtil.h"
 #include "Player.h"
@@ -40,10 +40,10 @@ void CharacterGraphDriver::on_update(float dt) {
 	ismoving = has_input;
 	injump = !player.is_on_ground();
 
-	auto ray = eng->phys.trace_ray(Ray(player.position, glm::vec3(0, -1, 0)), player.selfid, PF_WORLD);
-	float dist_to_ground = ray.dist < 0.0 ? 100000.0 : ray.dist;
-
-	bool should_transition_out_of_jump_or_fall = !player.is_on_ground() && player.velocity.y < 0 && ray.dist < 0.6;
+	//auto ray = eng->phys.trace_ray(Ray(player.position, glm::vec3(0, -1, 0)), player.selfid, PF_WORLD);
+	//float dist_to_ground = ray.dist < 0.0 ? 100000.0 : ray.dist;
+	float dist_to_ground = 0.0;
+	bool should_transition_out_of_jump_or_fall = false;// !player.is_on_ground() && player.velocity.y < 0 && ray.dist < 0.6;
 
 
 	bRunning =(  ismoving && player.is_on_ground());

@@ -1,5 +1,5 @@
 #include "Client.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 
 #include "Framework/Bytepacker.h"
 //#define DebugOut(fmt, ...)
@@ -131,14 +131,14 @@ void Client::HandleServerPacket(ByteReader& buf)
 		case SV_TICK:
 		{
 			int server_tick = buf.ReadLong();	// this is the server's current tick
-			float server_time = server_tick * eng->tick_interval;
-			time_delta = eng->time - server_time;
+			float server_time = server_tick * eng->get_tick_interval();
+			time_delta = eng->get_game_time() - server_time;
 
 			// hard reset the time values
 			if (abs(time_delta) > time_reset_threshold.get_float()) {
 				sys_print("reset time %f\n", time_delta);
-				eng->tick = server_tick;
-				eng->time = server_time;
+				eng->set_game_tick( server_tick );
+				eng->set_game_time( server_time );
 				time_delta = 0.0;
 			}
 			last_recieved_server_tick = server_tick;
@@ -209,7 +209,7 @@ void Client::SendMovesAndMessages()
 	// input format
 	// tick of command
 	// num commands total
-	writer.WriteLong(eng->tick);
+	writer.WriteLong(eng->get_game_tick());
 
 
 	int total_commands =  glm::min(server.out_sequence + 1, 8);

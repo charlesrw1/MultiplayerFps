@@ -1,6 +1,6 @@
 #include "ParticlesLocal.h"
 
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include "Framework/MathLib.h"
 #include "DrawLocal.h"
 #include "glad/glad.h"

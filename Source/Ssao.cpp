@@ -3,7 +3,7 @@
 #include "glad/glad.h"
 #include "glm/gtc/type_ptr.hpp"
 
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 
 
 void draw_hbao_menu()

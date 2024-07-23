@@ -3,17 +3,21 @@
 #include "Physics.h"
 #include "Framework/MeshBuilder.h"
 
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 #include "imgui.h"
 
 #include "DrawPublic.h"
 
 #include "Physics/Physics2.h"
 
+#include "Debug.h"
 
 #include "Framework/Dict.h"
 
+#include "Framework/Config.h"
+
 CLASS_IMPL(Player);
+CLASS_IMPL(PlayerSpawnPoint);
 
 //
 //	PLAYER MOVEMENT CODE
@@ -120,7 +124,7 @@ bool Player::check_perch()
 		ray.dir = vec3(0, -1, 0);
 
 		RayHit rh;
-		rh = eng->phys.trace_ray(ray, selfid, PF_WORLD);
+		//rh = eng->phys.trace_ray(ray, selfid, PF_WORLD);
 
 		// perched on ledge
 		if (rh.hit_world) {
@@ -161,7 +165,7 @@ Action_State Player::update_state(const float grnd_speed, bool& dont_add_grav)
 
 	GeomContact result;
 	vec3 where = position - vec3(0, 0.005 - standing_capsule.radius, 0);
-	result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), selfid, PF_ALL);
+	//result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), selfid, PF_ALL);
 
 	bool should_be_airbourne = (!result.found || result.surf_normal.y < 0.3);
 
@@ -209,7 +213,7 @@ void Player::get_crouch_state(bool& out_is_crouching)
 			// uncrouch
 
 			if (is_on_ground()) {
-				auto gc = player_physics_trace_character(selfid, false, position+vec3(0,0.001,0));
+				auto gc = player_physics_trace_character(0, false, position+vec3(0,0.001,0));
 
 				if (!gc.found) {
 					out_is_crouching = false;
@@ -217,19 +221,19 @@ void Player::get_crouch_state(bool& out_is_crouching)
 			}
 			else {
 				vec3 end = position - vec3(0, diff, 0) + vec3(0,0.001,0);
-				auto gc = player_physics_trace_character(selfid, false, end);
+				auto gc = player_physics_trace_character(0, false, end);
 
 				if (!gc.found) {
 					// one more check
 					Ray r;
 					r.pos = position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
 					r.dir = vec3(0, -1, 0);
-					auto tc = eng->phys.trace_ray(r, selfid, PF_ALL);
-					if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
-						out_is_crouching = false;
-						position.y -= diff;
-						sys_print("passed");
-					}
+					//auto tc = eng->phys.trace_ray(r, 0, PF_ALL);
+					//if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
+					//	out_is_crouching = false;
+					//	position.y -= diff;
+					//	sys_print("passed");
+					//}
 				}
 			}
 		}
@@ -238,15 +242,16 @@ void Player::get_crouch_state(bool& out_is_crouching)
 
 GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
 {
-	float height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
-	return eng->phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
+	return {};
+	//float height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
+	//return eng->phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
 }
 
 
 void sweep_move(glm::vec3& velocity, glm::vec3& position)
 {
 	world_query_result res;
-	float move_time = eng->tick_interval;
+	float move_time = eng->get_tick_interval();
 	float length = glm::length(velocity) * move_time;
 
 	if (length < 0.00001)
@@ -271,7 +276,7 @@ void Player::slide_move()
 
 	int num_bumps = 4;
 
-	float move_time = eng->tick_interval;
+	float move_time = eng->get_tick_interval();
 
 	// lateral
 	glm::vec3 lateral_velocity = glm::vec3(velocity.x, 0, velocity.z);
@@ -343,7 +348,7 @@ float lensquared_noy(vec3 v)
 
 void Player::ground_move()
 {
-	state_time += eng->tick_interval;
+	state_time += eng->get_tick_interval();
 
 	bool dont_add_grav = false;
 	Action_State last = action;
@@ -379,7 +384,7 @@ void Player::ground_move()
 	float wishspeed = inputlen * maxspeed_val;
 	float addspeed = wishspeed - dot(xz_velocity, wishdir);
 	addspeed = glm::max(addspeed, 0.f);
-	float accelspeed = acceleation_val * wishspeed * eng->tick_interval;
+	float accelspeed = acceleation_val * wishspeed * eng->get_tick_interval();
 	accelspeed = glm::min(accelspeed, addspeed);
 	xz_velocity += accelspeed * wishdir;
 
@@ -391,7 +396,7 @@ void Player::ground_move()
 	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
 
 	if (!dont_add_grav) {
-		velocity.y -= phys_gravity.get_float() * eng->tick_interval;
+		velocity.y -= phys_gravity.get_float() * eng->get_tick_interval();
 	}
 	
 	slide_move();
@@ -417,18 +422,7 @@ void player_physics_check_nans(Player& player)
 void draw_entity_info()
 {
 	static int current_index = 0;
-	ImGui::Text("entity index: %d", current_index);
-	if (ImGui::SmallButton("next")) {
-
-		Ent_Iterator ei(current_index);
-		ei = ei.next();
-		if (ei.finished())
-			current_index = 0;
-		else
-			current_index = ei.get_index();
-	}
-
-	Entity* e = eng->get_ent(current_index);
+	Entity* e = nullptr;
 	if (!e)
 		return;
 	glm::vec3 vel = e->get_velocity();
@@ -486,7 +480,7 @@ void Player::move()
 	float speed = glm::length(velocity);
 
 	if (speed >= 0.0001) {
-		float dropamt = friction_value * speed * eng->tick_interval;
+		float dropamt = friction_value * speed * eng->get_tick_interval();
 		float newspd = speed - dropamt;
 		if (newspd < 0)
 			newspd = 0;
@@ -528,7 +522,7 @@ void Player::move()
 	//Debug::add_sphere(pos + vec3(0, height- width, 0), width, COLOR_PINK,-1.f);
 
 
-	esimated_accel = (velocity - last_velocity) / (float)eng->tick_interval;
+	esimated_accel = (velocity - last_velocity) / (float)eng->get_tick_interval();
 }
 
 void player_fire_weapon()
@@ -830,15 +824,11 @@ void ViewmodelComponent::update_visuals()
 
 void Player::find_a_spawn_point()
 {
-	MapEntity* spawnpoint = eng->level->find_by_schema_name(NAME("PlayerSpawn"));
-	if (!spawnpoint) {
-		sys_print("!!! player has no spawn point\n");
-	}
+	InlineVec<PlayerSpawnPoint*, 16> points;
+	if (!eng->get_level()->find_all_entities_of_class(points))
+		sys_print("!!! no spawn points");
 	else {
-		glm::vec3 eul = glm::eulerAngles(spawnpoint->dict.get_quat("rotation"));
-		view_angles.y = eul.y;
-		rotation = glm::quat(eul);
-		position = spawnpoint->dict.get_vec3("position");
+		position = points[0]->get_root_component()->get_local_transform()[3];
 	}
 }
 
@@ -903,7 +893,7 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 
 static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& viewmodel_offsets)
 {
-	Entity& e = eng->local_player();
+	Entity& e = *eng->get_local_player();
 	glm::vec3 velocity = e.get_velocity();
 	glm::vec3 view_front = AnglesToVector(view_angles.x, view_angles.y);
 	view_front.y = 0;
@@ -921,7 +911,7 @@ static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& v
 	if (crouching)
 		up_ofs_ideal += 0.04;
 
-	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, eng->frame_time * 100.f);
+	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, eng->get_frame_time() * 100.f);
 
 
 }

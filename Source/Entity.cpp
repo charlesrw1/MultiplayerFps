@@ -13,6 +13,9 @@
 
 #include "glm/gtx/euler_angles.hpp"
 
+#include "GameEnginePublic.h"
+#include "DrawPublic.h"
+
 CLASS_IMPL(Entity);
 
 CLASS_IMPL(Door);

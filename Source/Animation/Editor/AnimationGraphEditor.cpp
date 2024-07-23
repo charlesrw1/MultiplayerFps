@@ -4,7 +4,7 @@
 #include "glm/glm.hpp"
 
 #include "Texture.h"
-#include "Game_Engine.h"
+#include "GameEnginePublic.h"
 
 #include "Framework/EnumDefReflection.h"
 #include "Framework/DictWriter.h"
@@ -18,7 +18,7 @@
 
 #include "State_node.h"
 #include "Statemachine_node.h"
-
+#include "OsInput.h"
 #include "Root_node.h"
 
 std::string remove_whitespace(const char* str)
@@ -721,20 +721,7 @@ void AnimationGraphEditor::handle_imnode_creations(bool* open_popup_menu_from_dr
 
 }
 
-void draw_curve_test()
-{
-	return;
 
-	static ImVec2 points[20];
-	static int init = true;
-	static int selected = 0;
-	if (init) {
-		for (int i = 0; i < 20; i++)
-			points[i].x = 1000.0;
-		init = false;
-	}
-	ImGui::Curve("test", ImVec2(300, 200), 10, points, &selected);
-}
 
 #include "Framework/CurveEditorImgui.h"
 
@@ -763,7 +750,6 @@ void AnimationGraphEditor::imgui_draw()
 
 
 	ImGui::Begin("animation graph editor");
-	draw_curve_test();
 
 	if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 
@@ -1119,7 +1105,7 @@ bool AnimationGraphEditor::handle_event(const SDL_Event& event)
 
 	clipboard.handle_event(event);
 
-	if (eng->get_game_focused()) {
+	if (eng->is_game_focused()) {
 		if (event.type == SDL_MOUSEWHEEL) {
 			out.camera.scroll_callback(event.wheel.y);
 		}
@@ -1552,9 +1538,9 @@ void AnimationGraphEditor::tick(float dt)
 		assert(eng->get_state() != Engine_State::Game);
 
 		int x = 0, y = 0;
-		if (eng->get_game_focused()) {
+		if (eng->is_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
-			out.camera.update_from_input(eng->keys, x, y, glm::mat4(1.f));
+			out.camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
 		}
 
 		if (get_playback_state() == graph_playback_state::running) {
@@ -1565,7 +1551,7 @@ void AnimationGraphEditor::tick(float dt)
 		
 		out.show(get_playback_state() != graph_playback_state::stopped);
 
-		auto window_sz = eng->get_game_viewport_dimensions();
+		auto window_sz = eng->get_game_viewport_size();
 		out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 	}
 	else {	// not focused, game running likely
