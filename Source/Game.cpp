@@ -42,8 +42,10 @@ void GameEngineLocal::remove_entity(Entity* e)
 
 	sys_print("*** removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 
-	// call actor specific destruction
-	e->end();
+	// call actor specific destruction if not in editor
+	if (!get_level()->is_editor_level()) {
+		e->end();
+	}
 	// remove components
 	e->destroy();
 	// call destructor
@@ -58,8 +60,11 @@ void GameEngineLocal::call_startup_functions_for_new_entity(Entity* ec)
 	get_level()->insert_entity_into_hashmap(ec);
 	// register components
 	ec->register_components();
-	// call start function
-	ec->start();
+
+	// call start function if not created by editor
+	if (!get_level()->is_editor_level()) {
+		ec->start();
+	}
 }
 
 Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo* ti) {
@@ -70,12 +75,14 @@ Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo* ti) {
 	ASSERT(e);
 
 	Entity* ec = nullptr;
-#ifdef _DEBUG
+
 	ec = e->cast_to<Entity>();
-	ASSERT(ec);
-#else
-	ec = (Entity*)e;	// just static cast, should always be true since classtypeinfo gets a templated check in the public interface
-#endif // _DEBUG
+	if (!ec) {
+		sys_print("!!! spawn_entity_from_classtype failed for %s\n", ti->classname);
+		delete e;
+		return nullptr;
+	}
+
 
 	call_startup_functions_for_new_entity(ec);
 

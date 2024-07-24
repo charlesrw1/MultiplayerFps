@@ -15,6 +15,8 @@
 
 #include "Game/EntityComponentTypes.h"
 
+#include "GameEnginePublic.h"
+
 #ifndef NO_EDITOR
 #include "EditorFolder.h"
 #endif // !NO_EDITOR
@@ -58,7 +60,10 @@ public:
 	static_assert(std::is_base_of<Entity, T>::value, "EntityPtr must derive from Entity");
 
 	bool is_valid() const { return handle != 0; }
-	T* get() const;
+	T* get() const {
+		auto e = eng->get_entity(handle);
+		return e ? e->cast_to<T>() : nullptr;
+	}
 
 	uint64_t handle = 0;
 };
@@ -164,7 +169,6 @@ public:
 		else
 			flags = EntityFlags::Enum(flags & (~flag));
 	}
-	glm::mat4 get_world_transform();
 
 	template<typename T>
 	T* get_first_component() {
@@ -183,41 +187,26 @@ public:
 				array.push_back(all_components[i]);
 	}
 
+	// USE IN GAMEPLAY! use create_sub_component to setup object in the constructor
 	template<typename T>
-	T* create_and_attach_component_type(EntityComponent* parent = nullptr, StringName bone = {}) {
-		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
-		T* ptr = new T;
-		ptr->set_owner(this);
-		all_components.push_back(std::unique_ptr<EntityComponent>(ptr));
-		ptr->attach_to_parent(parent == nullptr ? root_component.get() : parent, bone);
-		ptr->on_init();
-		return ptr;
-	}
+	T* create_and_attach_component_type(EntityComponent* parent = nullptr, StringName bone = {});
 
+	// ONLY USE in Constructor!, use create_and_attach for normal usage
 	template<typename T>
-	T* create_sub_component(const std::string& name) {
-		static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
-		auto ptr = std::make_unique<T>();
-		ptr->eSelfNameString = name;
-		all_components.push_back(std::move(ptr));
-		return (T*)all_components.back().get();
-	}
+	T* create_sub_component(const std::string& name);
 
 	// DELETES the EntityComponent, dont use the ptr again after this call
+	void remove_this_component(EntityComponent* component);
 
-	void remove_this_component(EntityComponent* component) {
-		assert(component != root_component.get() && "cant delete the root component");
-		bool found = false;
-		for (int i = 0; i < all_components.size(); i++) {
-			if (all_components[i].get() == component) {
-				all_components.erase(all_components.begin() + i);
-				found = true;
-				break;
-			}
-		}
-
-		assert(found && "component not found in remove_this_component");
-	}
+	// get/set world space transform  (transform of the root component)
+	const glm::mat4& get_ws_transform() { return get_root_component()->get_ws_transform(); }
+	glm::vec3 get_ws_position() { return get_root_component()->position; }
+	glm::quat get_ws_rotation() { return get_root_component()->rotation; }
+	glm::vec3 get_ws_scale() { return get_root_component()->scale; }
+	void set_ws_transform(const glm::mat4& mat) { return get_root_component()->set_ws_transform(mat); }
+	void set_ws_transform(const glm::vec3& pos, const glm::quat& q, const glm::vec3& scale) { return get_root_component()->set_ls_transform(pos,q,scale); }
+	void set_ws_position(const glm::vec3& v) { return get_root_component()->set_ls_transform(v, get_ws_rotation(), get_ws_scale()); }
+	void set_ws_rotation(const glm::quat& q) { return get_root_component()->set_ls_transform(get_ws_position(), q, get_ws_scale()); }
 
 	const std::vector<std::unique_ptr<EntityComponent>>& get_all_components() { return all_components; }
 protected:
@@ -227,10 +216,8 @@ protected:
 	std::vector<std::unique_ptr<EntityComponent>> all_components;
 
 	friend class Schema;
+	friend class LevelSerialization;
 public:
-
-	const EntityComponent* get_default_component_for_string_name(const std::string& name) const;
-
 	EntityComponent* find_component_for_string_name(const std::string& name) const {
 		for (auto& c : all_components)
 			if (c->eSelfNameString == name)
@@ -241,27 +228,16 @@ public:
 	static const PropertyInfoList* get_props();
 
 	template<typename T>
-	static PropertyInfo generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags) {
-		static_assert(std::is_base_of<Entity, T>::value, "Type not derived from Entity");
-		PropertyInfo pi;
-		pi.name = name;
-		pi.offset = offset;
-		pi.flags = flags;
-		pi.range_hint = T::StaticType.classname;
-		pi.custom_type_str = "EntityRef";
-		pi.type = core_type_id::Struct;
-		return pi;
-	}
-
+	static PropertyInfo generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags);
 #ifndef NO_EDITOR
 	virtual bool editor_compile() { return true; }
 	virtual bool editor_only() const { return false; }
 	virtual void editor_begin() {}
 	virtual void editor_tick() {}
 	virtual void editor_on_change_property(const PropertyInfo& property_) {}
-	uint64_t editor_uid = 0;
 	bool editor_is_selected = false;
 	ObjPtr<EditorFolder> editor_folder;
+	std::string editor_name;
 #endif
 	EntityPtr<Entity> self_id;			// global identifier for this entity
 	AssetPtr<Schema> schema_type;		// what spawned type are we ( could be editor only or not )
@@ -270,3 +246,50 @@ public:
 #define REG_ENTITY_REF(name, flags) Entity::generate_entity_ref_property( \
 &((TYPE_FROM_START*)0)->name, \
 #name, offsetof(TYPE_FROM_START,name), flags)
+
+inline void Entity::remove_this_component(EntityComponent* component) {
+	assert(component != root_component.get() && "cant delete the root component");
+	bool found = false;
+	for (int i = 0; i < all_components.size(); i++) {
+		if (all_components[i].get() == component) {
+			all_components.erase(all_components.begin() + i);
+			found = true;
+			break;
+		}
+	}
+
+	assert(found && "component not found in remove_this_component");
+}
+
+template<typename T>
+inline T* Entity::create_sub_component(const std::string& name) {
+	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
+	auto ptr = std::make_unique<T>();
+	ptr->eSelfNameString = name;
+	all_components.push_back(std::move(ptr));
+	return (T*)all_components.back().get();
+}
+
+template<typename T>
+inline T* Entity::create_and_attach_component_type(EntityComponent* parent, StringName bone) {
+	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
+	T* ptr = new T;
+	ptr->set_owner(this);
+	all_components.push_back(std::unique_ptr<EntityComponent>(ptr));
+	ptr->attach_to_parent(parent == nullptr ? root_component.get() : parent, bone);
+	ptr->on_init();
+	return ptr;
+}
+
+template<typename T>
+inline static PropertyInfo Entity::generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags) {
+	static_assert(std::is_base_of<Entity, T>::value, "Type not derived from Entity");
+	PropertyInfo pi;
+	pi.name = name;
+	pi.offset = offset;
+	pi.flags = flags;
+	pi.range_hint = T::StaticType.classname;
+	pi.custom_type_str = "EntityRef";
+	pi.type = core_type_id::Struct;
+	return pi;
+}

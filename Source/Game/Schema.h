@@ -33,16 +33,14 @@ class Entity;
 CLASS_H(Schema, IAsset)
 public:
 	Entity* create_entity_from_properties() const {
-		return create_entity_from_properties_internal(false);
+		return create_entity_from_properties_internal();
 	}
 
-	// temp
-	void write_to_file(Entity* ent);
+	const Entity* get_default_schema_obj() const { return default_schema_obj; }
 private:
-	bool check_validity_of_file();
+	bool init();
 
-	Entity* create_entity_from_properties_internal(
-		bool just_check_validity = false/* always call with false, only called with true in check_validity_of_file*/) const;
+	Entity* create_entity_from_properties_internal() const;
 
 	friend class SchemaLoader;
 

@@ -165,7 +165,7 @@ enum class PhysicsShapeType
 // Wrapper around PxActor
 class Model;
 class Entity;
-class EditorNode;
+class EntityComponent;
 class PhysicsActor
 {
 public:
@@ -227,30 +227,11 @@ public:
 	}
 
 	// querying/setting who owns this shape
-	void set_entity(Entity* e) {
+	void set_entity(EntityComponent* e) {
 		owner = e;
-		is_entity = true;
 	}
-	Entity* get_entity_owner() {
-		ASSERT(is_entity);
+	EntityComponent* get_entity_owner() {
 		return owner;
-	}
-	void set_editornode(EditorNode* node) {
-		editor_owner = node;
-		is_entity = false;
-	}
-	EditorNode* get_editor_node_owner() {
-		ASSERT(!is_entity);
-		return editor_owner;
-	}
-	void set_bone_index(int16_t index) {
-		bone_index = index;
-	}
-	int16_t get_bone_index() const {
-		return bone_index;
-	}
-	bool is_parented_to_bone() const {
-		return bone_index != -1;
 	}
 private:
 	physx::PxRigidActor* get_actor() const { return actor; }
@@ -259,12 +240,7 @@ private:
 		return (physx::PxRigidDynamic*)actor;
 	}
 	PhysContents::Enum flags = (PhysContents::Enum)0;
-	union {
-		Entity* owner = nullptr;
-		EditorNode* editor_owner;
-	};
-	bool is_entity = false;	// else is editornode
-	int16_t bone_index = -1;
+	EntityComponent* owner = nullptr;
 	physx::PxRigidActor* actor = nullptr;
 };
 

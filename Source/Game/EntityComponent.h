@@ -8,6 +8,8 @@
 
 #include "Game/SerializePtrHelpers.h"
 
+#include "Framework/StringName.h"
+
 class Entity;
 CLASS_H(EntityComponent, ClassBase)
 public:
@@ -34,20 +36,8 @@ public:
 	// destruction functions
 	void unlink_and_destroy();
 	void destroy_children_no_unlink();
-	void attach_to_parent(EntityComponent* parent_component, StringName point);
+	void attach_to_parent(EntityComponent* parent_component, StringName point = StringName());
 	void remove_this(EntityComponent* component);
-
-	static PropertyInfo generate_prop_info(const char* name, uint16_t offset, uint32_t flags, const char* hint_str = "") {
-		PropertyInfo pi;
-		pi.name = name;
-		pi.offset = offset;
-		pi.custom_type_str = "EntityComponent";
-		pi.flags = flags;
-		pi.type = core_type_id::Struct;
-		pi.range_hint = hint_str;
-		return pi;
-	}
-
 
 #ifndef NO_EDITOR
 	// compile any data relevant to the node
@@ -69,49 +59,50 @@ public:
 		END_PROPS(EntityComponent)
 	}
 
-	glm::mat4 get_local_transform();
-	void set_local_transform(const glm::mat4& transform);
-	void set_local_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
-	void set_local_euler_rotation(const glm::vec3& euler);
-
-	glm::mat4 get_world_transform();
-	void set_world_transform(const glm::mat4& transform);
+	// ws = world space, ls = local space
+	glm::mat4 get_ls_transform() const;
+	void set_ls_transform(const glm::mat4& transform);
+	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	void set_ls_euler_rotation(const glm::vec3& euler);
+	const glm::mat4& get_ws_transform();
+	glm::vec3 get_ls_position() const { return position; }
+	glm::vec3 get_ls_scale() const { return scale; }
+	glm::quat get_ls_rotation() const { return rotation; }
+	glm::vec3 get_ws_position()  { return get_ws_transform()[3]; }
+	void set_ws_transform(const glm::mat4& transform);
 
 	bool get_is_native_component() const { return is_native_componenent; }
 
-	StringName self_name;
 #ifndef RUNTIME
-	std::string eSelfNameString;
 #endif // !RUNTIME
-private:
-	Entity* entity_owner = nullptr;
+	void post_change_transform_R(bool ws_is_dirty = true);
 
-	ObjPtr<EntityComponent> attached_parent;
-
+	StringName self_name;
 	StringName attached_bone_name;	// if non 0, determines
 #ifndef RUNTIME
+	std::string eSelfNameString;
 	std::string eAttachedBoneName;
 #endif // !RUNTIME
+private:
 
 	glm::vec3 position = glm::vec3(0.f);
 	glm::quat rotation = glm::quat();
 	glm::vec3 scale = glm::vec3(1.f);
 
+	glm::mat4 cached_world_transform = glm::mat4(1);
+
+	Entity* entity_owner = nullptr;
+	ObjPtr<EntityComponent> attached_parent;
 	std::vector<EntityComponent*> children;
-
-
 	std::vector<StringName> tags;
 
+	bool world_transform_is_dirty = true;
 	bool is_native_componenent = true;
 	bool is_editor_only = false;
 	bool is_inherited = true;
 
 	friend class Schema;
 	friend class Entity;
-
 	friend class EdPropertyGrid;
+	friend class LevelSerialization;
 };
-
-#define REG_COMPONENT(name, flags, hint) EntityComponent::generate_prop_info(\
-#name, offsetof(TYPE_FROM_START,name), flags, hint)
-

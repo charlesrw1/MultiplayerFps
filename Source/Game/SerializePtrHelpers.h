@@ -7,10 +7,11 @@
 
 class Entity;
 CLASS_H(SerializeEntityObjectContext,ClassBase)
-	std::unordered_map<void*, uint64_t> to_serialize_index;
+public:
+	std::unordered_map<ClassBase*, uint64_t> to_serialize_index;
+	std::vector<Entity*> unserialized;
 
 	Entity* entity_serialzing = nullptr;
-	uint64_t serialzing_entity_index = 0;
 };
 
 
@@ -64,13 +65,13 @@ public:
 };
 
 
-
+#if 0
 template<typename T>
 inline PropertyInfo make_object_ptr_property(const char* name, uint16_t offset, uint32_t flags, ObjPtr<T>* dummy) {
 	return make_struct_property(name, offset, flags, "ObjectPointer", T::StaticType.classname);
 }
 #define REG_OBJECT_PTR(name, flags) make_object_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
-
+#endif
 
 class EntityComponent;
 inline PropertyInfo make_entity_comp_ptr_property(const char* name, uint16_t offset, uint32_t flags, ObjPtr<EntityComponent>* dummy) {

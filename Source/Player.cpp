@@ -828,7 +828,7 @@ void Player::find_a_spawn_point()
 	if (!eng->get_level()->find_all_entities_of_class(points))
 		sys_print("!!! no spawn points");
 	else {
-		position = points[0]->get_root_component()->get_local_transform()[3];
+		position = points[0]->get_ws_position();
 	}
 }
 

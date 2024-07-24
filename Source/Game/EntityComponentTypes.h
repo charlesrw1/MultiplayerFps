@@ -28,12 +28,15 @@ public:
 	void on_deinit() override;
 
 	void set_model(const char* model_path);
+	void set_model(Model* model);
 
 	template<typename T>
 	void set_animator_class() {
 		set_animator_class(&T::StaticType);
 	}
 	void set_animator_class(const ClassTypeInfo* ti);
+
+	void on_changed_transform() override;
 
 	bool simulate_physics = false;
 	bool visible = true;

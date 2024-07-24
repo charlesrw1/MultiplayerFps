@@ -123,18 +123,14 @@ public:
 
 	string queued_mapname;
 	Level* level= nullptr;
-	PhysicsWorld phys;
-
 
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_GLContext gl_context = nullptr;
 
 	bool show_console = false;
-
 	bool dedicated_server = false;
 	
-
 	bool is_game_focused() const override { return game_focused; }
 	void set_game_focused(bool focus);
 

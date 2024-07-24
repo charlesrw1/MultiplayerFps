@@ -71,7 +71,7 @@ public:
 		Entity* e = spawn_entity_from_classtype(&T::StaticType);
 		return (T*)e;
 	}
-
+	virtual Entity* spawn_entity_from_classtype(const ClassTypeInfo* ti) = 0;
 	virtual Entity* spawn_entity_schema(const Schema* schema) = 0;
 	virtual void remove_entity(Entity* e) = 0;
 
@@ -103,7 +103,6 @@ public:
 		time = newtime;
 	}
 protected:
-	virtual Entity* spawn_entity_from_classtype(const ClassTypeInfo* ti) = 0;
 
 	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
 	uint32_t tick = 0;				// this is the discretized time tick

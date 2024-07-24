@@ -714,13 +714,6 @@ int main(int argc, char** argv)
 	eng_local.argv = argv;
 	eng_local.init();
 
-	Player player;
-	Door door;
-	Schema s;
-	player.register_components();
-	player.player_mesh->set_model("player_FINAL.cmdl");
-	s.write_to_file(&player);
-	player.destroy();
 
 	eng_local.loop();
 	eng_local.cleanup();
@@ -786,15 +779,13 @@ void GameEngineLocal::execute_map_change()
 	stop_game();
 
 	// try loading map
-	level = new Level;
-
-	if (!level->open_from_file(queued_mapname)) {
-		delete level;
-		level = nullptr;
+	level = LevelLoadManager::get().load_level(queued_mapname, false/* not for editor*/);
+	if (!level) {
 		sys_print("!!! couldn't load map !!!\n");
 		state = Engine_State::Idle;
 		return;
 	}
+	level->init_entities_post_load();
 
 	tick = 0;
 	time = 0.0;
@@ -1399,19 +1390,11 @@ void GameEngineLocal::stop_game()
 	sys_print("-------- Clearing Map --------\n");
 
 	ASSERT(level);
-	
-	for (auto ent : level->all_world_ents) {
-		ent->end();
-		ent->destroy();
-		delete ent;
-	}
 
 	idraw->on_level_end();
 	
 	delete level;
 	level = nullptr;
-
-	phys.ClearObjs();
 
 	// clear any debug shapes
 	Debug::on_fixed_update_start();
@@ -1486,7 +1469,7 @@ void GameEngineLocal::loop()
 		case Engine_State::Idle:
 			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
 
-			if (map_spawned()) {
+			if (map_spawned() && !get_level()->is_editor_level()) {
 				stop_game();
 				continue;	// goto next frame
 			}

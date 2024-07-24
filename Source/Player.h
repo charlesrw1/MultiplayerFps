@@ -25,7 +25,6 @@ public:
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(PlayerSpawnPoint)
-			REG_COMPONENT(empty,0,""),
 			REG_INT(team, PROP_DEFAULT, "0")
 		END_PROPS(PlayerSpawnPoint)
 	};
@@ -96,9 +95,6 @@ public:
 	
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)
-			REG_COMPONENT(player_capsule,0,""),
-			REG_COMPONENT(player_mesh,0,""),
-			REG_COMPONENT(viewmodel_mesh, 0, ""),
 			REG_ASSET_PTR(a_second_model, PROP_DEFAULT)
 		END_PROPS(Player)
 	};

@@ -511,6 +511,9 @@
     <ClInclude Include="Source\Framework\MulticastDelegate.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Game\StdEntityTypes.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -756,6 +759,9 @@
     </ClCompile>
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
       <Filter>Source\Framework\ReflectionSys</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\EntityComponent.cpp">
+      <Filter>Source\Game</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

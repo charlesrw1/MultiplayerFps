@@ -6,21 +6,6 @@
 #include "Interaction.h"
 #include "Framework/Dict.h"
 
-CLASS_H(StaticMeshInstance, Entity)
-public:
-	StaticMeshInstance() {
-		Mesh = create_sub_component<MeshComponent>("Mesh");
-		root_component = Mesh;
-	}
-
-	MeshComponent* Mesh;
-	static const PropertyInfoList* get_props() {
-		START_PROPS(StaticMeshInstance)
-			REG_COMPONENT(Mesh, PROP_DEFAULT, ""),
-		END_PROPS(StaticMeshInstance)
-	}
-};
-
 using namespace glm;
 CLASS_H(NPC, Entity)
 
@@ -38,13 +23,6 @@ CLASS_H(NPC, Entity)
 
 	CapsuleComponent* npc_hitbox{};
 	MeshComponent* npc_model{};
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(NPC)
-			REG_COMPONENT(npc_model, PROP_DEFAULT, ""),
-			REG_COMPONENT(npc_hitbox, PROP_DEFAULT,"")
-		END_PROPS(NPC)
-	}
 
 	virtual void update() override {
 
@@ -145,8 +123,6 @@ public:
 		START_PROPS(Door)
 			REG_BOOL(start_locked,PROP_DEFAULT,""),
 			REG_BOOL(start_open,PROP_DEFAULT,""),
-			REG_COMPONENT(door_mesh, 0, ""),
-			REG_COMPONENT(door_handle, 0, ""),
 		END_PROPS(Door)
 	
 	}

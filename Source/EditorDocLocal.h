@@ -22,76 +22,9 @@
 #include "Assets/AssetBrowser.h"
 #include "Framework/MulticastDelegate.h"
 
+#include "GameEngineLocal.h"	// has local access to internals
+
 extern ConfigVar g_mousesens;
-
-
-
-#include "Player.h"
-
-
-class PhysicsActor;
-class EditorDoc;
-class EditorNode
-{
-public:
-	EditorNode()  {
-		player_ent.register_components();
-	
-	}
-	~EditorNode() {
-		player_ent.destroy();
-		//hide();
-	}
-
-	void init_on_new_espawn();
-
-	const char* get_schema_name() const {
-		return  "unknown schema";
-	}
-	glm::mat4 get_transform();
-
-	Player player_ent;
-
-	Dict& get_dict();
-
-	glm::vec3 get_position() {
-		return get_dict().get_vec3("position");
-	}
-
-	Color32 get_object_color() { return COLOR_WHITE; }
-	const char* get_name() {
-		return get_dict().get_string("name", "no_name");
-	}
-	void save_transform_to_dict(glm::vec3 v, glm::quat r, glm::vec3 s) {
-		get_dict().set_vec3("position", v);
-		get_dict().set_vec4("rotation", glm::vec4(r.w,r.x,r.y,r.z));
-		get_dict().set_vec3("scale", s);
-	}
-	void read_transform_from_dict(glm::vec3& v, glm::quat& r, glm::vec3& s) {
-		v = get_dict().get_vec3("position");
-		glm::vec4 r_v = get_dict().get_vec4("rotation");
-		r = glm::quat(r_v.x, r_v.y, r_v.z, r_v.w);
-		s = get_dict().get_vec3("scale",glm::vec3(1));
-	}
-
-
-	//Color32 get_rendering_color() {
-	//	return get_dict().get_color("color");
-	//}
-	//Material* get_sprite_material();
-
-	// only write these when initially spawning like position/model, dont get queued in command system
-	void write_dict_value_spawn();
-	void write_dict_value(std::string key, std::string value);
-
-	void set_selected(bool selected) {
-		is_selected = selected;
-	}
-private:
-	Dict dictionary;
-	friend class EdPropertyGrid;
-	bool is_selected = false;
-};
 
 class Command
 {
@@ -100,6 +33,7 @@ public:
 	virtual void execute() = 0;
 	virtual void undo() = 0;
 	virtual std::string to_string() = 0;
+	virtual bool is_valid() { return true; }
 };
 
 class UndoRedoSystem
@@ -115,6 +49,13 @@ public:
 		}
 	}
 	void add_command(Command* c) {
+
+		if (!c->is_valid()) {
+			sys_print("??? command not valid %s\n", c->to_string().c_str());
+			delete c;
+			return;
+		}
+
 		if (hist[index]) {
 			delete hist[index];
 		}
@@ -163,7 +104,7 @@ class ObjectOutliner
 public:
 	void draw();
 private:
-	void draw_table_R( EditorNode* node, int depth);
+	void draw_table_R(uint64_t handle, int depth);
 };
 
 class ObjectPlacerTool
@@ -183,25 +124,24 @@ public:
 	EdPropertyGrid();
 	void draw();
 
-	EditorNode* get_node() {
-		return node;
-	}
 private:
-	void on_selection_changed();
-	void on_node_deleted(EditorNode* n);
+	void on_selection_changed() {
+		refresh_grid();
+	}
+	void on_node_deleted(uint64_t n) {
+		refresh_grid();
+	}
+	void on_ec_deleted(EntityComponent* ec) {
+		refresh_grid();
+	}
 	void on_close() {
-		node = nullptr;
-		selected_component = nullptr;
 		grid.clear_all();
 	}
 	void refresh_grid();
 
-	EditorNode* node = nullptr;
-	EntityComponent* selected_component = nullptr;
 	bool refresh_prop_flag = false;
 
 	void on_select_component(EntityComponent* ec) {
-		selected_component = ec;
 		refresh_prop_flag = true;
 	}
 	void draw_components_R(EntityComponent* ec, float ofs);
@@ -247,75 +187,106 @@ public:
 		return glm::ortho(-width, width, -width*aspect_ratio, width * aspect_ratio,0.001f, 100.0f);
 	}
 };
-using SharedNodeList = std::vector<std::shared_ptr<EditorNode>>;
+
+struct WorldSelection
+{
+	EntityPtr<Entity> ent;
+	EntityComponent* component = nullptr;
+};
+
 class SelectionState
 {
 public:
 	SelectionState();
 
-	MulticastDelegate<EditorNode*> on_select_new_node;
 	MulticastDelegate<> on_selection_changed;
 
-	bool has_any_selected() const { return num_selected() > 0; }
-	int num_selected() const { return selected_nodes.size(); }
-	const SharedNodeList& get_selection() const { return selected_nodes; }
-	void add_to_selection(const std::shared_ptr<EditorNode>& node) {
-		if (get_index(node.get())==-1) {
-			selected_nodes.push_back(node);
+	// set only selected
+	// clear selected
+	// unselect
+	// add to selected
+	// get selected
 
-			on_selection_changed.invoke();
-		}
-		node->set_selected(true);
+
+	bool has_any_selected() const {
+		return ec != nullptr || ptrs.size() > 0;
 	}
-	void remove_from_selection(EditorNode* node) {
-		int index = get_index(node);
-		if (index != -1) {
-			selected_nodes.erase(selected_nodes.begin() + index);
-
-			on_selection_changed.invoke();
-		}
-		node->set_selected(false);
-
+	bool is_selecting_entity_component() const {
+		return ec != nullptr;
 	}
-	void clear_all_selected(bool show_this = true) {
-		for (int i = 0; i < selected_nodes.size(); i++) {
-			selected_nodes[i]->set_selected(false);
-			//if(show_this)
-			//	selected_nodes[i]->show();	// update the model
-		}
-		selected_nodes.clear();
+	int num_entities_selected() const {
+		return ptrs.size();
+	}
 
+	const std::vector<EntityPtr<Entity>>& get_selection() const { return ptrs; }
+	EntityComponent* get_ec_selected() const { return ec; }
+
+	void set_entity_component_select(EntityComponent* ec) {
+		ptrs.clear();
+		this->ec = ec;
 		on_selection_changed.invoke();
 	}
-	void set_select_only_this(const std::shared_ptr<EditorNode>& node) {
+	void unselect_ent_component() {
+		ec = nullptr;
+		on_selection_changed.invoke();
+	}
+
+	void add_to_selection(EntityPtr<Entity> node) {
+		ec = nullptr;
+		bool already_selected = is_node_selected(node);
+		if (!already_selected) {
+			ptrs.push_back(node);
+			on_selection_changed.invoke();
+		}
+	}
+	void remove_from_selection(EntityPtr<Entity> node) {
+		ec = nullptr;
+		for(int i=0;i<ptrs.size();i++)
+			if (ptrs[i].handle == node.handle) {
+				ptrs.erase(ptrs.begin() + i);
+				i--;
+				on_selection_changed.invoke();
+			}
+	}
+	void clear_all_selected(bool show_this = true) {
+		ptrs.clear();
+		ec = nullptr;
+		on_selection_changed.invoke();
+	}
+	void set_select_only_this(EntityPtr<Entity> node) {
 		clear_all_selected();
 		add_to_selection(node);
 	}
 
-	bool is_node_selected(EditorNode* node) const {
-		return get_index(node) != -1;
+	bool is_node_selected(EntityPtr<Entity> node) const {
+		for (int i = 0; i < ptrs.size(); i++)
+			if (ptrs[i].handle == node.handle)
+				return true;
+		return false;
 	}
 private:
-	void on_node_deleted(EditorNode* node) {
-		remove_from_selection(node);
+	void on_node_deleted(uint64_t node) {
+		remove_from_selection({ node });
 	}
-	void on_close() {
-		selected_nodes.clear();
+	void on_entity_component_delete(EntityComponent* ec) {
+		if (ec == this->ec)
+			unselect_ent_component();
 	}
 
-	int get_index(EditorNode* node) const {
-		for (int i = 0; i < selected_nodes.size(); i++) {
-			if (selected_nodes[i].get() == node)
-				return i;
-		}
-		return -1;
+	void on_close() {
+		ptrs.clear();
+		ec = nullptr;
+		on_selection_changed.invoke();
 	}
-	SharedNodeList selected_nodes;
+
+	EntityComponent* ec = nullptr;
+	std::vector<EntityPtr<Entity>> ptrs;
 };
 
 class ManipulateTransformTool
 {
 public:
+	ManipulateTransformTool();
 	void update();
 	void handle_event(const SDL_Event& event);
 	bool is_hovered();
@@ -325,6 +296,17 @@ public:
 		saved_of_set.clear();
 	}
 private:
+
+	void on_component_deleted(EntityComponent* ec) {
+
+	}
+	void on_entity_deleted(uint64_t handle) {
+	
+	}
+	void on_selection_changed() {
+
+	}
+
 	void swap_mode() {
 		if (mode == ImGuizmo::LOCAL)
 			mode = ImGuizmo::WORLD;
@@ -335,6 +317,7 @@ private:
 		IDLE,
 		MANIPULATING_OBJS,
 	}state = IDLE;
+
 
 	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
 	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
@@ -349,7 +332,8 @@ private:
 
 	struct SavedTransform {
 		glm::mat4 pretransform;
-		std::shared_ptr<EditorNode> node;
+		EntityComponent* ec = nullptr;
+		uint64_t handle = 0;
 	};
 	std::vector<SavedTransform> saved_of_set;
 };
@@ -366,6 +350,7 @@ public:
 	EditorDoc() {
 		selection_state = std::make_unique<SelectionState>();
 		prop_editor = std::make_unique<EdPropertyGrid>();
+		manipulate = std::make_unique<ManipulateTransformTool>();
 	}
 	virtual void init();
 	virtual bool can_save_document() override { return true; }
@@ -407,6 +392,11 @@ public:
 		TOOL_TRANSFORM,	// translation/rotation/scale tool
 	}mode = TOOL_TRANSFORM;
 
+
+	// schema vs level editing
+	bool is_editing_a_schema = false;
+
+
 	bool local_transform = false;
 	TransformType transform_tool_type;
 	int axis_bit_mask = 0;
@@ -415,35 +405,22 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
-
-	// dont want to deal with patching up another index
-	int get_node_index(EditorNode* node) {
-		for (int i = 0; i < nodes.size(); i++) {
-			if (nodes[i].get() == node) return i;
-		}
-		ASSERT(0);
-	}
-
 	bool is_open = false;
 	UndoRedoSystem command_mgr;
 	View_Setup vs_setup;
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
-	MapLoadFile editing_map;
-
+	std::unique_ptr<ManipulateTransformTool> manipulate;
 	ObjectOutliner outliner;
-	ManipulateTransformTool manipulate;
 
 	bool using_ortho = false;
 	User_Camera camera;
 	OrthoCamera ortho_camera;
 
-
-	std::vector<std::shared_ptr<EditorNode>> nodes;
-	std::vector<std::string> ent_files;
-
-	MulticastDelegate<EditorNode*> on_node_deleted;
-	MulticastDelegate<EditorNode*> on_node_created;
+	MulticastDelegate<EntityComponent*> on_component_deleted;
+	MulticastDelegate<EntityComponent*> on_component_created;
+	MulticastDelegate<uint64_t> on_node_deleted;
+	MulticastDelegate<uint64_t> on_node_created;
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;
 

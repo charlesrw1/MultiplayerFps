@@ -128,6 +128,7 @@
     <ClInclude Include="Source\Game\SchemaEditLocal.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
+    <ClInclude Include="Source\Game\StdEntityTypes.h" />
     <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IAsset.h" />
     <ClInclude Include="Source\IEditorTool.h" />
@@ -222,6 +223,7 @@
     <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game.cpp" />
+    <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
     <ClCompile Include="Source\Game\Schema.cpp" />
     <ClCompile Include="Source\Game\SchemaEditLocal.cpp" />

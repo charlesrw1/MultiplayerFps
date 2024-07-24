@@ -137,7 +137,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	writer.WriteByte(spot);
 	auto level = eng->get_level();
 	assert(level);
-	auto& lvlname = level->name;
+	auto& lvlname = level->get_name();
 
 	writer.write_string(lvlname);
 	writer.WriteLong(eng->get_game_tick());

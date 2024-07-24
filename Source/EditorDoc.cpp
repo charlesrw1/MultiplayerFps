@@ -1,7 +1,6 @@
 #include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
-#include "GameEnginePublic.h"
 #include <algorithm>
 #include "DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
@@ -19,16 +18,12 @@
 
 #include "OsInput.h"
 #include "Debug.h"
-
+#include "Game/StdEntityTypes.h"
+#include "Game/Schema.h"
 #include <stdexcept>
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
-Factory<std::string, EditorNode>& get_editor_node_factory()
-{
-	static Factory<std::string, EditorNode> inst;
-	return inst;
-};
 
 CLASS_IMPL(EditorFolder);
 
@@ -37,165 +32,146 @@ static std::string to_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
 
-class EditPropertyCommand : public Command
+// Create from a class, create from a schema, create from a duplication
+// -> serialize to use as an interchange format
+
+class CreateSchemaCommand : public Command
 {
 public:
-	struct Group {
-		Group(const std::shared_ptr<EditorNode>& n, Dict changes) :
-			n(n), changes(changes) {}
-		std::shared_ptr<EditorNode> n;
-		Dict changes;
+	CreateSchemaCommand(const std::string& schemaname, const glm::mat4& transform) {
+		s = g_schema_loader.load_schema(schemaname);
+	}
+
+	bool is_valid() override { return s != nullptr; }
+
+	void execute() {
+		auto ent = eng->spawn_entity_schema(s);
+		ent->set_ws_transform(transform);
+		handle = ent->self_id.handle;
+		ed_doc.on_node_created.invoke(handle);
+	}
+	void undo() {
+		ed_doc.on_node_deleted.invoke(handle);
+		eng->remove_entity(eng->get_entity(handle));
+		handle = 0;
+	}
+	std::string to_string() override {
+		return "CreateSchemaCommand";
+	}
+
+	uint64_t handle = 0;
+	const Schema* s=nullptr;
+	glm::mat4 transform;
+};
+class CreateStaticMeshCommand : public Command
+{
+public:
+	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform) {
+		m = mods.find_or_load(modelname.c_str());
+		this->transform = transform;
+	}
+	bool is_valid() override { return m != nullptr; }
+
+	void execute() {
+		auto ent = eng->spawn_entity_class<StaticMeshEntity>();
+		ent->Mesh->set_model(m);
+		ent->set_ws_transform(transform);
+		handle = ent->self_id.handle;
+		ed_doc.on_node_created.invoke(handle);
+	}
+	void undo() {
+		ed_doc.on_node_deleted.invoke(handle);
+		eng->remove_entity(eng->get_entity(handle));
+		handle = 0;
+	}
+	std::string to_string() override {
+		return "CreateStaticMeshCommand";
+	}
+
+	uint64_t handle = 0;
+	Model* m{};
+	glm::mat4 transform;
+};
+class CreateCppClassCommand : public Command
+{
+public:
+	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform) {
+		ti = ClassBase::find_class(cppclassname.c_str());
+	}
+	bool is_valid() override { return ti != nullptr; }
+
+	void execute() {
+		auto ent = eng->spawn_entity_from_classtype(ti);
+		ent->set_ws_transform(transform);
+		handle = ent->self_id.handle;
+		ed_doc.on_node_created.invoke(handle);
+	}
+	void undo() {
+		ed_doc.on_node_deleted.invoke(handle);
+		eng->remove_entity(eng->get_entity(handle));
+		handle = 0;
+	}
+	std::string to_string() override {
+		return "CreateCppClassCommand";
+	}
+	const ClassTypeInfo* ti = nullptr;
+	glm::mat4 transform;
+	uint64_t handle = 0;
+};
+
+class PropertyChangeCommand
+{
+public:
+	PropertyChangeCommand(std::string field, std::vector<ClassBase*> classes);
+	void commit_post_change();
+private:
+	struct Change {
+		ClassBase* instance = nullptr;
+		std::string field_name;
+		std::string pre_serialized_string;
+		std::string post_serialized_string;
 	};
-
-	EditPropertyCommand(const std::vector<Group>& change_vec) {
-		this->change_vec = change_vec;
-		for (auto& n : this->change_vec) {
-			Dict oldval;
-			for (auto& key : n.changes.keyvalues) {
-				if (n.n->get_dict().has_key(key.first.c_str()))
-					oldval.set_string(key.first.c_str(), n.n->get_dict().get_string(key.first.c_str()));
-			}
-			oldvals.push_back(oldval);
-		}
-	}
-	~EditPropertyCommand() {}
-	void execute() {
-		for (auto& g : change_vec) {
-			for (auto& k : g.changes.keyvalues) {
-				g.n->get_dict().set_string(k.first.c_str(), k.second.c_str());
-			}
-			//g.n->show();
-		}
-	}
-	void undo() {
-		int i = 0;
-		for (auto& g : change_vec) {
-			Dict& olddict = oldvals[i];
-			for (auto& k : g.changes.keyvalues) {
-				if (olddict.has_key(k.first.c_str())) {
-					g.n->get_dict().set_string(k.first.c_str(), olddict.get_string(k.first.c_str()));
-				}
-				else
-					g.n->get_dict().remove_key(k.first.c_str());
-			}
-			//g.n->show();
-
-			i++;
-		}
-	}
-	std::string to_string() override {
-		std::string str =  "EditProperties:";
-		for (auto& g : change_vec) {
-			str += " ";
-			str += g.n->get_schema_name();
-			str += "{";
-			for (auto& k : g.changes.keyvalues) {
-				str += k.first;
-				str += ":";
-				str += k.second;
-				str += ",";
-			}
-			str += "},";
-		}
-		return str;
-	}
-
-	std::vector<Group> change_vec;
-	std::vector<Dict> oldvals;
+	std::vector<Change> changes;
+	std::vector<std::string> fields;
 };
 
-class CreateNodeCommand : public Command
+class RemoveEntitiesCommand : public Command
 {
 public:
-	CreateNodeCommand(const std::shared_ptr<EditorNode>& node) {
-		nodes.push_back(node);
-	}
+	RemoveEntitiesCommand(std::vector<uint64_t> handles) {
+		std::vector<Entity*> ents;
+		for (auto h : handles) {
+			ents.push_back(eng->get_entity(h));
+		}
+		serialized_str = LevelSerialization::serialize_entities_to_string(ents);
 
-	CreateNodeCommand(const SharedNodeList& list) :
-		nodes(list) {}
-
-	~CreateNodeCommand() {
+		this->handles = handles;
 	}
 
 	void execute() {
-		for (auto& n : nodes) {
-			ed_doc.nodes.push_back(n);
-			ed_doc.on_node_created.invoke(n.get());
-			//n->show();
+		for (auto h : handles) {
+
+			ed_doc.on_node_deleted.invoke(h);
+
+			eng->remove_entity(eng->get_entity(h));
 		}
 	}
 	void undo() {
-		for (auto& n : nodes) {
-			assert(ed_doc.nodes.back().get() == n.get());
-			//n->hide();
-			ed_doc.nodes.pop_back();
-
-			ed_doc.on_node_deleted.invoke(n.get());
-		}
+		auto all_ents = LevelSerialization::unserialize_entities_from_string(serialized_str);
+		eng->get_level()->insert_unserialized_entities_into_level(all_ents, false/* keep ids*/);
+		for (auto e : all_ents)
+			ed_doc.on_node_created.invoke(e->self_id.handle);
 	}
 	std::string to_string() override {
-		std::string str = "CreateNodes:";
-		for (int i = 0; i < nodes.size(); i++) {
-			str += ' ';
-			str += nodes[i]->get_schema_name();
-			str += ",";
-		}
-		str.pop_back();
-		return str;
+		return "RemoveEntitiesCommand";
 	}
 
-	SharedNodeList nodes;
+	std::string serialized_str;
+	std::vector<uint64_t> handles;
 };
 
 
 
-class RemoveNodeCommand : public Command
-{
-public:
-	RemoveNodeCommand(const SharedNodeList& list)
-		 {
-		assert(!list.empty());
-		nodes = list;
-
-	}
-	RemoveNodeCommand(const std::shared_ptr<EditorNode>& n)
-	{
-		nodes.push_back(n);
-	}
-
-	~RemoveNodeCommand() {
-	}
-
-	void execute() {
-		for (int i = 0; i < nodes.size();i++) {
-			auto& node = nodes[i];
-			//node->hide();
-			ed_doc.nodes.erase(ed_doc.nodes.begin() + ed_doc.get_node_index(node.get()));
-
-			ed_doc.on_node_deleted.invoke(node.get());
-		}
-	}
-	void undo() {
-		for (int i = 0; i < nodes.size(); i++) {
-			auto& node = nodes[i];
-			ed_doc.nodes.push_back(node);
-			ed_doc.on_node_created.invoke(node.get());
-			//node->show();
-		}
-	}
-	std::string to_string() override {
-		std::string str = "RemoveNodes:";
-		for (int i = 0; i < nodes.size(); i++) {
-			str += ' ';
-			str += nodes[i]->get_schema_name();
-			str += ",";
-		}
-		str.pop_back();
-		return str;
-	}
-	
-	SharedNodeList nodes;
-};
 
 static float alphadither = 0.0;
 void menu_temp()
@@ -211,40 +187,8 @@ ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR
 
 #include "Texture.h"
 
-
-
 #include "AssetCompile/Someutils.h"// string stuff
 #include "AssetRegistry.h"
-class SchemaAssetMetadata : public AssetMetadata
-{
-public:
-	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return { 242, 68, 117 };
-	}
-
-	virtual std::string get_type_name() const  override
-	{
-		return "Schema";
-	}
-
-	virtual void index_assets(std::vector<std::string>& filepaths) const override
-	{
-		//for (const auto& schema : ed_doc.ed_schema.all_schema_list) {
-		//	if (schema.second.display_in_editor)
-		//		filepaths.push_back(schema.first);
-		//}
-	}
-
-	virtual std::string root_filepath() const override
-	{
-		return "";
-	}
-	virtual bool assets_are_filepaths() { return false; }
-};
-static AutoRegisterAsset<SchemaAssetMetadata> schema_register_0983;
-
 
 
 // Unproject mouse coords into a vector, cast that into the world via physics
@@ -298,14 +242,12 @@ Color32 to_color32(glm::vec4 v) {
 }
 
 
-Dict& EditorNode::get_dict()
-{
-	return dictionary;
-}
 
 
 void EditorDoc::duplicate_selected_and_select_them()
 {
+	return;
+#if 0
 	if (selection_state->num_selected() == 0) {
 		sys_print("??? duplicate_selected_and_select_them but nothing selected\n");
 		return;
@@ -320,6 +262,7 @@ void EditorDoc::duplicate_selected_and_select_them()
 	command_mgr.add_command(new CreateNodeCommand(nodes));
 	for (int i = 0; i < nodes.size(); i++)
 		selection_state->add_to_selection(nodes[i]);
+#endif
 }
 static Material* generate_spritemat_from_texture(Texture* t)
 {
@@ -432,42 +375,6 @@ void EditorNode::hide()
 #endif
 
 
-glm::mat4 EditorNode::get_transform()
-{
-	glm::vec3 position, scale;
-	glm::quat rotation;
-	read_transform_from_dict(position, rotation, scale);
-
-	glm::mat4 transform;
-	transform = glm::translate(glm::mat4(1), position);
-	transform = transform * glm::mat4_cast(rotation);
-	transform = glm::scale(transform, scale);
-	return transform;
-}
-void EditorNode::init_on_new_espawn()
-{
-	
-}
-
-#if 0
-EditorNode* EditorDoc::spawn_from_schema_type(const char* schema_type)
-{
-	auto template_obj = ed_schema.find_schema(schema_type);
-	EditorNode* node = nullptr;
-	if (!template_obj->edtype.empty())
-		node = get_editor_node_factory().createObject(template_obj->edtype);
-	if(!node)
-		node = new EditorNode();
-	node->init_from_schema(template_obj);
-	//node->set_uid(get_next_id());
-	
-	std::shared_ptr<EditorNode> shared(node);
-
-	command_mgr.add_command(new CreateNodeCommand(shared) );	// add command
-
-	return node;
-}
-#endif
 void EditorDoc::draw_menu_bar()
 {
 	if (ImGui::BeginMenuBar())
@@ -533,19 +440,19 @@ void EditorDoc::init()
 #include <fstream>
 bool EditorDoc::save_document_internal()
 {
-	MapLoadFile mlf;
-
-	for (int i = 0; i < nodes.size(); i++) {
-
-		auto& node = nodes[i];
-		Dict dict = node->get_dict(); /* copy */
-		const char* template_name = node->get_schema_name();
-		dict.set_string("_schema_name", template_name);
-		mlf.add_spawner(dict);
-	}
-
-	// do any compile steps like nav mesh generation, light computation, etc here
-	mlf.write_to_disk(get_save_root_dir() + get_doc_name());
+	//MapLoadFile mlf;
+	//
+	//for (int i = 0; i < nodes.size(); i++) {
+	//
+	//	auto& node = nodes[i];
+	//	Dict dict = node->get_dict(); /* copy */
+	//	const char* template_name = node->get_schema_name();
+	//	dict.set_string("_schema_name", template_name);
+	//	mlf.add_spawner(dict);
+	//}
+	//
+	//// do any compile steps like nav mesh generation, light computation, etc here
+	//mlf.write_to_disk(get_save_root_dir() + get_doc_name());
 
 	return true;
 }
@@ -556,7 +463,7 @@ void EditorDoc::open_document_internal(const char* levelname)
 	bool needs_new_doc = true;
 	if (strlen(levelname) != 0) {
 		std::string path = get_save_root_dir() + levelname;
-		bool good = editing_map.parse(path);
+		bool good = false;//editing_map.parse(path);
 		if (good) {
 			//for (int i = 0; i < editing_map.spawners.size(); i++) {
 			//	EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
@@ -577,14 +484,19 @@ void EditorDoc::open_document_internal(const char* levelname)
 		set_empty_name();
 	}
 
+	eng_local.level = new Level;
+	eng_local.level->bIsEditorLevel = true;
+
 	is_open = true;
 }
 
 void EditorDoc::close_internal()
 {
-	nodes.clear();
+	delete eng_local.level;
+	eng_local.level = nullptr;
+
 	command_mgr.clear_all();
-	manipulate.free_refs();
+	manipulate->free_refs();
 	
 	on_close.invoke();
 
@@ -651,16 +563,15 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 	{
 	case TOOL_TRANSFORM: {
 
-		manipulate.handle_event(event);
+		manipulate->handle_event(event);
 
 		if (event.type == SDL_KEYDOWN) {
 			uint32_t scancode = event.key.keysym.scancode;
 			const float ORTHO_DIST = 20.0;
 			if (scancode == SDL_SCANCODE_DELETE) {
 				if (selection_state->has_any_selected()) {
-					RemoveNodeCommand* com = new RemoveNodeCommand(selection_state->get_selection());
-					command_mgr.add_command(com);
-					selection_state->clear_all_selected();	// should already be cleared but just checking
+
+					
 				}
 			}
 			else if (scancode == SDL_SCANCODE_KP_5) {
@@ -696,24 +607,24 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			if (!get_size().is_point_inside(event.button.x, event.button.y))
 				return false;
 
-			if (manipulate.is_hovered() || manipulate.is_using())
+			if (manipulate->is_hovered() || manipulate->is_using())
 				return false;
 
 			if (event.button.button == 1) {
-				world_query_result rh = cast_ray_into_world(nullptr, event.button.x, event.button.y);
-
-				if (rh.fraction == 1.0) {
-					// no hit
-					selection_state->clear_all_selected();
-				}
-				else {
-					int index = ed_doc.get_node_index(rh.actor->get_editor_node_owner());
-					if (eng->get_input_state()->keys[SDL_SCANCODE_LSHIFT]) {
-						selection_state->add_to_selection(nodes[index]);
-					}
-					else
-						selection_state->set_select_only_this(nodes[index]);
-				}
+				//world_query_result rh = cast_ray_into_world(nullptr, event.button.x, event.button.y);
+				//
+				//if (rh.fraction == 1.0) {
+				//	// no hit
+				//	selection_state->clear_all_selected();
+				//}
+				//else {
+				//	int index = ed_doc.get_node_index(rh.actor->get_editor_node_owner());
+				//	if (eng->get_input_state()->keys[SDL_SCANCODE_LSHIFT]) {
+				//		selection_state->add_to_selection(nodes[index]);
+				//	}
+				//	else
+				//		selection_state->set_select_only_this(nodes[index]);
+				//}
 			}
 		}
 
@@ -909,15 +820,17 @@ bool ManipulateTransformTool::is_using()
 	return ImGuizmo::IsUsing();
 }
 
-void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
+static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
 {
 	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
 	q = glm::normalize(glm::quat_cast(transform));
 	p = transform[3];
 }
 
+
 void ManipulateTransformTool::update()
 {
+#if 0
 	if (ed_doc.selection_state->num_selected() == 0) {
 		if (state == MANIPULATING_OBJS)
 			state = IDLE;
@@ -1017,6 +930,7 @@ void ManipulateTransformTool::update()
 		
 		}
 	}
+#endif
 }
 
 void EditorDoc::imgui_draw()
@@ -1049,21 +963,32 @@ void EditorDoc::hook_scene_viewport_draw()
 
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 		{
-			//AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-			//auto type = resource->type->get_type_name();
-			//if (type == "Model") {
-			//	auto node = spawn_from_schema_type("StaticMesh");
-			//	node->set_model(resource->filename);
-			//	node->show();
-			//}
-			//else if (type == "Schema") {
-			//	spawn_from_schema_type(resource->filename.c_str());
-			//}
+			glm::mat4 drop_transform = glm::mat4(1.f);
+
+			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+			if (resource->type->get_type_name() == "Entity (C++)") {
+				command_mgr.add_command(new CreateCppClassCommand(
+					resource->filename, 
+					drop_transform)
+				);
+			}
+			else if (resource->type->get_type_name() == "Model") {
+				command_mgr.add_command(new CreateStaticMeshCommand(
+					resource->filename, 
+					drop_transform)
+				);
+			}
+			else if (resource->type->get_type_name() == "Schema") {
+				command_mgr.add_command(new CreateSchemaCommand(
+					resource->filename,
+					drop_transform)
+				);
+			}
 		}
 		ImGui::EndDragDropTarget();
 	}
 
-	manipulate.update();
+	manipulate->update();
 
 
 }
@@ -1262,7 +1187,7 @@ struct AutoStruct_asdf134 {
 static AutoStruct_asdf134 AutoStruct_asdf134asdfa;
 #endif
 
-void ObjectOutliner::draw_table_R(EditorNode* node, int depth)
+void ObjectOutliner::draw_table_R(uint64_t handle, int depth)
 {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
@@ -1270,33 +1195,34 @@ void ObjectOutliner::draw_table_R(EditorNode* node, int depth)
 	ImGui::Dummy(ImVec2(depth*5.f, 0));
 	ImGui::SameLine();
 
-	ImGui::PushID(node);
+	ImGui::PushID(handle);
 	{
-		const bool item_is_selected = node != nullptr && ed_doc.selection_state->is_node_selected(node);
+		const bool item_is_selected = ed_doc.selection_state->is_node_selected({ handle });
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-			if (node == nullptr)
-				ed_doc.selection_state->clear_all_selected();
+			if (handle != 0)
+				ed_doc.selection_state->set_select_only_this({ handle });
 			else
-				ed_doc.selection_state->set_select_only_this(ed_doc.nodes[ed_doc.get_node_index(node)]);// cursed
+				ed_doc.selection_state->clear_all_selected();
 		}
 	}
 	
 	ImGui::SameLine();
 
-	if (node == nullptr) {
+	if (handle == 0) {
 		ImGui::Text(ed_doc.get_full_output_path().c_str());
 	}
 	else {
-		ImGui::Text(node->get_schema_name());
+		auto entity = eng->get_entity(handle);
+		ImGui::Text(entity->editor_name.c_str());
 	}
 
-	if (node == nullptr) {
-		for (int i = 0; i < ed_doc.nodes.size(); i++) {
-			if (ed_doc.nodes[i])
-				draw_table_R(ed_doc.nodes[i].get(), depth + 1);
-		}
-	}
+	//if (handle == 0) {
+	//	for (int i = 0; i < ed_doc.nodes.size(); i++) {
+	//		if (ed_doc.nodes[i])
+	//			draw_table_R(ed_doc.nodes[i].get(), depth + 1);
+	//	}
+	//}
 	ImGui::PopID();
 }
 
@@ -1313,7 +1239,7 @@ void ObjectOutliner::draw()
 	if (ImGui::BeginTable("Table", 1, flags)) {
 		ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch);
 
-		draw_table_R(nullptr, 0);
+		draw_table_R(0, 0);
 
 		ImGui::EndTable();
 	}
@@ -1328,7 +1254,7 @@ void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
 	ImGui::Dummy(ImVec2(ofs,0.0));
 
 	ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-	if (ImGui::Selectable("##selectednode", ec == selected_component, selectable_flags, ImVec2(0, 0))) {
+	if (ImGui::Selectable("##selectednode", ec == ed_doc.selection_state->get_ec_selected(), selectable_flags, ImVec2(0, 0))) {
 		on_select_component(ec);
 	}
 
@@ -1344,7 +1270,7 @@ void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
 void EdPropertyGrid::draw()
 {
 	if (ImGui::Begin("Properties")) {
-		if (node) {
+		if (ed_doc.selection_state->has_any_selected()) {
 			grid.update();
 		}
 		else {
@@ -1356,10 +1282,12 @@ void EdPropertyGrid::draw()
 
 	if (ImGui::Begin("Components")) {
 
-		if (!node) {
+		if (ed_doc.selection_state->num_entities_selected()!=1) {
 			ImGui::Text("Nothing selected\n");
 		}
 		else {
+
+			auto ent = eng->get_entity(ed_doc.selection_state->get_selection()[0].handle);
 
 			if (ImGui::Button("Add Component")) {
 				// ...
@@ -1370,7 +1298,7 @@ void EdPropertyGrid::draw()
 			{
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 
-				auto& array = node->player_ent.get_all_components();
+				auto& array = ent->get_all_components();
 				for (int row_n = 0; row_n < array.size(); row_n++)
 				{
 					auto& res = array[row_n];		
@@ -1489,51 +1417,35 @@ EdPropertyGrid::EdPropertyGrid()
 	ss->on_selection_changed.add(this, &EdPropertyGrid::on_selection_changed);
 	ed_doc.on_node_deleted.add(this, &EdPropertyGrid::on_node_deleted);
 	ed_doc.on_close.add(this, &EdPropertyGrid::on_close);
+	ed_doc.on_component_deleted.add(this, &EdPropertyGrid::on_ec_deleted);
 }
-void EdPropertyGrid::on_selection_changed()
-{
-	auto& ss = ed_doc.selection_state;
-	if (ss->num_selected() != 1) {
-		node = nullptr;
-		selected_component = nullptr;
-		grid.clear_all();
-	}
-	else if (ss->get_selection()[0].get() != node) {
-		node = ss->get_selection()[0].get();
-		selected_component = nullptr;
-		refresh_grid();
-	}
-}
-void EdPropertyGrid::on_node_deleted(EditorNode* deleted_node)
-{
-	if (node == deleted_node) {
-		node = nullptr;
-		selected_component = nullptr;
-		grid.clear_all();
-	}
-}
+
 void EdPropertyGrid::refresh_grid()
 {
 	grid.clear_all();
-	if (!node) {
-		return;
-	}
+	
+	auto& ss = ed_doc.selection_state;
 
-	if (!selected_component) {
-		auto ti = &node->player_ent.get_type();
-		while (ti) {
-			if (ti->props) {
-				grid.add_property_list_to_grid(ti->props, &node->player_ent);
-			}
-			ti = ti->super_typeinfo;
-		}
-	}
-	else {
-		auto c = selected_component;
+	if (!ss->has_any_selected())
+		return;
+
+
+	if(ss->is_selecting_entity_component()) {
+		auto c = ss->get_ec_selected();
 		auto ti = &c->get_type();
 		while (ti) {
 			if (ti->props)
 				grid.add_property_list_to_grid(ti->props, c);
+			ti = ti->super_typeinfo;
+		}
+	}
+	else if(ss->num_entities_selected()==1){
+		auto entity = eng->get_entity(ss->get_selection()[0].handle);
+		auto ti = &entity->get_type();
+		while (ti) {
+			if (ti->props) {
+				grid.add_property_list_to_grid(ti->props, entity);
+			}
 			ti = ti->super_typeinfo;
 		}
 	}
@@ -1543,4 +1455,12 @@ SelectionState::SelectionState()
 {
 	ed_doc.on_node_deleted.add(this, &SelectionState::on_node_deleted);
 	ed_doc.on_close.add(this, &SelectionState::on_close);
+	ed_doc.on_component_deleted.add(this, &SelectionState::on_entity_component_delete);
+}
+ManipulateTransformTool::ManipulateTransformTool()
+{
+	ed_doc.on_node_deleted.add(this, &ManipulateTransformTool::on_entity_deleted);
+	ed_doc.on_component_deleted.add(this, &ManipulateTransformTool::on_component_deleted);
+	ed_doc.selection_state->on_selection_changed.add(this, 
+		&ManipulateTransformTool::on_selection_changed);
 }

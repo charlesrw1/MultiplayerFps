@@ -7,6 +7,7 @@
 
 CLASS_IMPL(SerializeEntityObjectContext);
 
+#if 0
 class SerializeObjectPtr : public IPropertySerializer
 {
 public:
@@ -45,6 +46,8 @@ public:
 		*ptr_prop_as_int = res;
 	}
 };
+#endif
+
 class SerializeAssetPtr : public IPropertySerializer
 {
 public:
@@ -145,7 +148,6 @@ public:
 	}
 };
 ADDTOFACTORYMACRO_NAME(SerializeECPtr, IPropertySerializer, "EntityCompPtr");
-ADDTOFACTORYMACRO_NAME(SerializeObjectPtr, IPropertySerializer, "ObjectPointer");
 ADDTOFACTORYMACRO_NAME(SerializeAssetPtr, IPropertySerializer,	"AssetPtr");
 ADDTOFACTORYMACRO_NAME(SerializeEntityPtr, IPropertySerializer, "EntityPtr");
 

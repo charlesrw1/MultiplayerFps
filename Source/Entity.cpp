@@ -18,11 +18,20 @@
 
 #include "AssetRegistry.h"
 
+#include "Game/StdEntityTypes.h"
+
 CLASS_IMPL(Entity);
 
 CLASS_IMPL(Door);
 CLASS_IMPL(Grenade);
 CLASS_IMPL(NPC);
+CLASS_IMPL(StaticMeshEntity);
+CLASS_IMPL(PrefabEntity);
+CLASS_IMPL(PrefabSelection);
+CLASS_IMPL(PointLightEntity);
+CLASS_IMPL(SpotLightEntity);
+
+
 
 CLASS_IMPL(EntityComponent);
 
@@ -70,41 +79,21 @@ REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 const PropertyInfoList* Entity::get_props() {
 	START_PROPS(Entity)
 		REG_ENTITY_COMPONENT_PTR(root_component, PROP_SERIALIZE),
-		REG_ENTITY_PTR(self_id,PROP_SERIALIZE)
+		REG_ENTITY_PTR(self_id,PROP_SERIALIZE),
+		REG_STDSTRING(editor_name, PROP_DEFAULT)	// edit+serialize
 	END_PROPS(Entity)
 }
 
 Entity::Entity()
 {
 }
-const EntityComponent* Entity::get_default_component_for_string_name(const std::string& name) const
-{
-	auto default_obj = get_type().default_class_object;
-	const ClassTypeInfo* ti = &get_type();
-	InlineVec<const PropertyInfoList*, 10> allprops;
-	for (; ti; ti = ti->super_typeinfo) {
-		if (ti->props)
-			allprops.push_back(ti->props);
-	}
-	for (int i = 0; i < allprops.size(); i++) {
-		auto props = allprops[i];
-		for (int j = 0; j < props->count; j++) {
-			auto& p = props->list[j];
-			if (strcmp(props->list[j].custom_type_str, "EntityComponent") == 0)
-			{
-				EntityComponent* ec = (EntityComponent*)props->list[j].get_ptr(this);
-				if (ec->eSelfNameString == name)
-					return ec;
-			}
-		}
-	}
-	return nullptr;
-}
+
 void Entity::register_components()
 {
-	// by the time you get here, root must be something
-	// either defined in a C++ class, or the editor must have added an instance component to it
-	assert(root_component.get());
+	if (!root_component.get()) {
+		root_component = create_sub_component<EmptyComponent>("DefaultRoot");
+		root_component->is_native_componenent = false;
+	}
 
 	auto level = eng->get_level();
 	//const bool is_editor_level = level->is_editor_level();
@@ -115,7 +104,8 @@ void Entity::register_components()
 	for (int i = 0; i < all_components.size(); i++) {
 		// insert logic for editor only components here
 		auto& c = all_components[i];
-		assert(c->attached_parent.get() || root_component.get() == c.get());
+		if (c->attached_parent.get() == nullptr && root_component.get() != c.get())
+			c->attach_to_parent(root_component.get());
 		c->on_init();
 	}
 
@@ -191,16 +181,6 @@ void EntityComponent::destroy_children_no_unlink()
 #include "Animation/AnimationTreePublic.h"
 
 
-glm::mat4 EntityComponent::get_local_transform()
-{
-	mat4 model;
-	model = glm::translate(mat4(1), position);
-	model = model * glm::mat4_cast(rotation);
-	model = glm::scale(model, vec3(1.f));
-
-	return model;
-}
-
 MeshComponent::~MeshComponent()
 {
 	assert(!animator && !draw_handle.is_valid());
@@ -208,7 +188,18 @@ MeshComponent::~MeshComponent()
 MeshComponent::MeshComponent() {}
 void MeshComponent::set_model(const char* model_path)
 {
-	model = mods.find_or_load(model_path);
+	Model* modelnext = mods.find_or_load(model_path);
+	if (modelnext != model.get()) {
+		model = modelnext;
+		on_changed_transform();	//fixme
+	}
+}
+void MeshComponent::set_model(Model* modelnext)
+{
+	if (modelnext != model.get()) {
+		model = modelnext;
+		on_changed_transform();	//fixme
+	}
 }
 
 const PropertyInfoList* MeshComponent::get_props() {
@@ -243,6 +234,9 @@ void MeshComponent::editor_on_change_property(const PropertyInfo& property_)
 		remake = true;
 	else if (prop_ptr == &eMaterialOverride)
 		remake = true;
+
+	if (remake)
+		on_changed_transform();//fixme
 }
 
 void MeshComponent::on_init()
@@ -269,15 +263,30 @@ void MeshComponent::on_init()
 		Render_Object obj;
 		obj.model = model.get();
 		obj.visible = visible;
-		obj.transform = get_local_transform();
+		obj.transform = get_ws_transform();
 
 		idraw->update_obj(draw_handle, obj);
 	}
 }
+
+void MeshComponent::on_changed_transform()
+{
+	if (!model.get())
+		return;
+
+	Render_Object obj;
+	obj.model = model.get();
+	obj.visible = visible;
+	obj.transform = get_ws_transform();
+
+	idraw->update_obj(draw_handle, obj);
+}
+
 void MeshComponent::on_tick()
 {
 
 }
+
 void MeshComponent::on_deinit()
 {
 	idraw->remove_obj(draw_handle);
@@ -288,14 +297,4 @@ Entity::~Entity()
 {
 
 
-}
-
-glm::mat4 Entity::get_world_transform()
-{
-	mat4 model;
-	model = glm::translate(mat4(1), position);
-	model = model * glm::eulerAngleXYZ(rotation.x, rotation.y, rotation.z);
-	model = glm::scale(model, vec3(1.f));
-
-	return model;
 }
