@@ -514,6 +514,12 @@
     <ClInclude Include="Source\Game\StdEntityTypes.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\Hashset.h">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Hashset.cpp">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

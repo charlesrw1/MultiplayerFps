@@ -24,6 +24,8 @@
 
 #include "GameEngineLocal.h"	// has local access to internals
 
+#include "AssetCompile/Someutils.h"
+#include <algorithm>
 extern ConfigVar g_mousesens;
 
 class Command
@@ -102,20 +104,80 @@ class EditorDoc;
 class ObjectOutliner
 {
 public:
+	ObjectOutliner();
 	void draw();
 private:
-	void draw_table_R(uint64_t handle, int depth);
-};
 
-class ObjectPlacerTool
-{
-public:
-	void draw();
-};
+	void rebuild_tree() {
+		delete_tree();
 
-class DragAndDropAsset
-{
-public:
+		rootnode = new Node;
+
+		auto level = eng->get_level();
+		for (auto ent : level->all_world_ents) {
+			auto rootc = ent->get_root_component();
+			if (!rootc->get_parent_component()) {
+				Node* me = new Node(this, ent);
+				rootnode->add_child(me);
+			}
+		}
+		rootnode->sort_children();
+
+	}
+	void delete_tree() {
+		delete rootnode;
+		rootnode = nullptr;
+		map.clear();
+	}
+
+	void on_delete_ent(uint64_t handle) { 
+		rebuild_tree();
+	}
+	void on_add_ent(uint64_t handle) { rebuild_tree(); }
+	void on_start() { rebuild_tree(); }
+	void on_close() { delete_tree(); }
+	void on_change_name(uint64_t handle) {
+		map.find(handle)->second->parent->sort_children();
+	}
+
+	struct Node {
+		Node() {}
+		Node(ObjectOutliner* oo, Entity* initfrom) {
+			handle = initfrom->self_id.handle;
+			for (int i = 0; i < initfrom->get_all_components().size(); i++) {
+				auto c = initfrom->get_all_components()[i].get();
+				if (c->get_owner() != initfrom && c->get_owner() != nullptr)
+				{
+					Node* other = new Node(oo, c->get_owner());
+					add_child(other);
+				}
+			}
+			sort_children();
+			oo->map.insert({ handle, this });
+		}
+
+		void add_child(Node* other) {
+			other->parent = this;
+			children.push_back(other);
+		}
+
+		~Node() {
+			for (int i = 0; i < children.size(); i++)
+				delete children[i];
+		}
+		uint64_t handle = 0;
+		Node* parent = nullptr;
+		std::vector<Node*> children;
+		void sort_children() {
+			std::sort(children.begin(), children.end(), [](const Node* a, const Node* b)->bool {
+				return to_lower(eng->get_entity(a->handle)->editor_name) < to_lower(eng->get_entity(b->handle)->editor_name);
+				});
+		}
+	};
+	std::unordered_map<uint64_t, Node*> map;
+	Node* rootnode = nullptr;
+
+	void draw_table_R(Node* n, int depth);
 };
 
 class EdPropertyGrid
@@ -186,13 +248,7 @@ public:
 	glm::mat4 get_proj_matrix(float aspect_ratio) const {
 		return glm::ortho(-width, width, -width*aspect_ratio, width * aspect_ratio,0.001f, 100.0f);
 	}
-};
-
-struct WorldSelection
-{
-	EntityPtr<Entity> ent;
-	EntityComponent* component = nullptr;
-};
+}; 
 
 class SelectionState
 {
@@ -292,20 +348,19 @@ public:
 	bool is_hovered();
 	bool is_using();
 
-	void free_refs() {
-		saved_of_set.clear();
-	}
 private:
 
-	void on_component_deleted(EntityComponent* ec) {
+	void on_close();
+	void on_open();
+	void on_component_deleted(EntityComponent* ec);
+	void on_entity_deleted(uint64_t handle);
+	void on_selection_changed();
+	void on_selected_tarnsform_change(uint64_t);
 
-	}
-	void on_entity_deleted(uint64_t handle) {
-	
-	}
-	void on_selection_changed() {
+	void update_pivot_and_cached();
 
-	}
+	void begin_drag();
+	void end_drag();
 
 	void swap_mode() {
 		if (mode == ImGuizmo::LOCAL)
@@ -315,13 +370,16 @@ private:
 	}
 	enum StateEnum {
 		IDLE,
+		SELECTED,
 		MANIPULATING_OBJS,
 	}state = IDLE;
 
-
 	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
 	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
+
+	std::vector<glm::mat4> world_space_of_selected; // pre transform, ie transform of them is 
 	glm::mat4 current_transform_of_group = glm::mat4(1.0);
+	glm::mat4 pivot_transform = glm::mat4(1.f);
 	
 	bool has_translation_snap = true;
 	float translation_snap = 1.0;
@@ -329,19 +387,70 @@ private:
 	float scale_snap = 1.0;
 	bool has_rotation_snap = true;
 	float rotation_snap = 45.0;
-
-	struct SavedTransform {
-		glm::mat4 pretransform;
-		EntityComponent* ec = nullptr;
-		uint64_t handle = 0;
-	};
-	std::vector<SavedTransform> saved_of_set;
 };
 
 // maps/
 //	both prefabs and maps
 //	build_<map_name>/
 //		cubemaps,...
+#include <unordered_map>
+#include <unordered_set>
+class EntityNameDatabase_Ed
+{
+public:
+	std::string find_unique_name_for_name(bool& different_name, std::string wantname) {
+		different_name = false;
+		if (wantname.empty()) {
+			different_name = true;
+			wantname = "_";
+		}
+		std::string search_name = wantname;
+		int integer = 2;
+		while (all_names.find(search_name) != all_names.end()) {
+			search_name = wantname + std::to_string(integer++);
+			different_name = true;
+		}
+		return search_name;
+	}
+
+	EntityNameDatabase_Ed();
+	std::unordered_set<std::string> all_names;
+	std::unordered_map<uint64_t, std::string> id_to_name;
+
+	void index_all_names() {
+		for (auto ent : eng->get_level()->all_world_ents) {
+			bool changed_name = false;
+			ent->editor_name = find_unique_name_for_name(changed_name, ent->editor_name);
+			all_names.insert(ent->editor_name);
+			id_to_name.insert({ ent->self_id.handle, ent->editor_name });
+			if(changed_name)
+				invoke_change_name(ent->self_id.handle);
+		}
+	}
+
+	void on_start() {
+		index_all_names();
+	}
+	void on_close() {
+		all_names.clear();
+		id_to_name.clear();
+	}
+	void on_delete(uint64_t h) {
+		all_names.erase(id_to_name.find(h)->second);
+	}
+	void on_add(uint64_t h) {
+		auto ent = eng->get_entity(h);
+		bool changed_name = false;
+		ent->editor_name = find_unique_name_for_name(changed_name, ent->editor_name);
+		all_names.insert(ent->editor_name);
+		id_to_name.insert({ ent->self_id.handle, ent->editor_name });
+		if(changed_name)
+			invoke_change_name(ent->self_id.handle);
+	}
+	void invoke_change_name(uint64_t h);
+
+	void on_property_change();
+};
 
 class Model;
 class EditorDoc : public IEditorTool
@@ -351,6 +460,8 @@ public:
 		selection_state = std::make_unique<SelectionState>();
 		prop_editor = std::make_unique<EdPropertyGrid>();
 		manipulate = std::make_unique<ManipulateTransformTool>();
+		outliner = std::make_unique<ObjectOutliner>();
+		database = std::make_unique<EntityNameDatabase_Ed>();
 	}
 	virtual void init();
 	virtual bool can_save_document() override { return true; }
@@ -411,7 +522,8 @@ public:
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
-	ObjectOutliner outliner;
+	std::unique_ptr<ObjectOutliner> outliner;
+	std::unique_ptr<EntityNameDatabase_Ed> database;
 
 	bool using_ortho = false;
 	User_Camera camera;
@@ -423,6 +535,7 @@ public:
 	MulticastDelegate<uint64_t> on_node_created;
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;
+	MulticastDelegate<uint64_t> on_change_name;
 
 	// Inherited via IEditorTool
 	virtual void on_change_focus(editor_focus_state newstate) override;

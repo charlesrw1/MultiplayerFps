@@ -40,6 +40,7 @@ class CreateSchemaCommand : public Command
 public:
 	CreateSchemaCommand(const std::string& schemaname, const glm::mat4& transform) {
 		s = g_schema_loader.load_schema(schemaname);
+		this->transform = transform;
 	}
 
 	bool is_valid() override { return s != nullptr; }
@@ -47,12 +48,14 @@ public:
 	void execute() {
 		auto ent = eng->spawn_entity_schema(s);
 		ent->set_ws_transform(transform);
+		ent->editor_name = s->get_name();
+
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
 	}
 	void undo() {
-		ed_doc.on_node_deleted.invoke(handle);
 		eng->remove_entity(eng->get_entity(handle));
+		ed_doc.on_node_deleted.invoke(handle);
 		handle = 0;
 	}
 	std::string to_string() override {
@@ -76,12 +79,13 @@ public:
 		auto ent = eng->spawn_entity_class<StaticMeshEntity>();
 		ent->Mesh->set_model(m);
 		ent->set_ws_transform(transform);
+		ent->editor_name = m->get_name();
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
 	}
 	void undo() {
-		ed_doc.on_node_deleted.invoke(handle);
 		eng->remove_entity(eng->get_entity(handle));
+		ed_doc.on_node_deleted.invoke(handle);
 		handle = 0;
 	}
 	std::string to_string() override {
@@ -97,12 +101,14 @@ class CreateCppClassCommand : public Command
 public:
 	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform) {
 		ti = ClassBase::find_class(cppclassname.c_str());
+		this->transform = transform;
 	}
 	bool is_valid() override { return ti != nullptr; }
 
 	void execute() {
 		auto ent = eng->spawn_entity_from_classtype(ti);
 		ent->set_ws_transform(transform);
+		ent->editor_name = ent->get_type().classname;
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
 	}
@@ -150,10 +156,8 @@ public:
 
 	void execute() {
 		for (auto h : handles) {
-
-			ed_doc.on_node_deleted.invoke(h);
-
 			eng->remove_entity(eng->get_entity(h));
+			ed_doc.on_node_deleted.invoke(h);
 		}
 	}
 	void undo() {
@@ -440,19 +444,13 @@ void EditorDoc::init()
 #include <fstream>
 bool EditorDoc::save_document_internal()
 {
-	//MapLoadFile mlf;
-	//
-	//for (int i = 0; i < nodes.size(); i++) {
-	//
-	//	auto& node = nodes[i];
-	//	Dict dict = node->get_dict(); /* copy */
-	//	const char* template_name = node->get_schema_name();
-	//	dict.set_string("_schema_name", template_name);
-	//	mlf.add_spawner(dict);
-	//}
-	//
-	//// do any compile steps like nav mesh generation, light computation, etc here
-	//mlf.write_to_disk(get_save_root_dir() + get_doc_name());
+	sys_print("*** saving map document\n");
+
+	std::string str = LevelSerialization::serialize_level(eng->get_level());
+	
+	std::ofstream outfile(get_save_root_dir() + get_doc_name());
+	outfile.write(str.c_str(), str.size());
+	outfile.close();
 
 	return true;
 }
@@ -463,17 +461,13 @@ void EditorDoc::open_document_internal(const char* levelname)
 	bool needs_new_doc = true;
 	if (strlen(levelname) != 0) {
 		std::string path = get_save_root_dir() + levelname;
-		bool good = false;//editing_map.parse(path);
-		if (good) {
-			//for (int i = 0; i < editing_map.spawners.size(); i++) {
-			//	EditorNode* node = create_node_from_dict(editing_map.spawners[i].dict);
-			//	if (node) {
-			//		nodes.push_back(std::shared_ptr<EditorNode>(node));
-			//		if (get_focus_state() == editor_focus_state::Focused)
-			//			node->show();
-			//		//id_start = glm::max(id_start, node->get_uid()+1);
-			//	}
-			//}
+
+		Level* level = LevelSerialization::unserialize_level(path, true/*for editor*/);
+		if (level) {
+			eng_local.set_level_manually_for_editor(level);
+
+			level->init_entities_post_load();
+
 			needs_new_doc = false;
 			set_doc_name(levelname);
 		}
@@ -482,21 +476,25 @@ void EditorDoc::open_document_internal(const char* levelname)
 	if(needs_new_doc) {
 		sys_print("creating new document\n");
 		set_empty_name();
+
+		Level* newlevel = LevelSerialization::create_empty_level("empty.txt", true/* for editor */);
+		eng_local.set_level_manually_for_editor(newlevel);
+
+		newlevel->init_entities_post_load();	// should be nothing, but maybe in the future empty levels have some extras
 	}
 
-	eng_local.level = new Level;
-	eng_local.level->bIsEditorLevel = true;
-
 	is_open = true;
+
+	on_start.invoke();
 }
 
 void EditorDoc::close_internal()
 {
+	sys_print("*** deleting map file for editor...\n");
 	delete eng_local.level;
-	eng_local.level = nullptr;
+	eng_local.clear_level_manually_for_editor(); // sets eng->level to null
 
 	command_mgr.clear_all();
-	manipulate->free_refs();
 	
 	on_close.invoke();
 
@@ -569,9 +567,12 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			uint32_t scancode = event.key.keysym.scancode;
 			const float ORTHO_DIST = 20.0;
 			if (scancode == SDL_SCANCODE_DELETE) {
-				if (selection_state->has_any_selected()) {
-
-					
+				if (selection_state->has_any_selected()&&!selection_state->get_ec_selected()) {
+					std::vector<uint64_t> handles;
+					auto& s = selection_state->get_selection();
+					for (auto e : s) handles.push_back(e.handle);
+					RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(handles);
+					command_mgr.add_command(cmd);
 				}
 			}
 			else if (scancode == SDL_SCANCODE_KP_5) {
@@ -828,30 +829,87 @@ static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::q
 }
 
 
-void ManipulateTransformTool::update()
+ManipulateTransformTool::ManipulateTransformTool()
 {
-#if 0
-	if (ed_doc.selection_state->num_selected() == 0) {
-		if (state == MANIPULATING_OBJS)
-			state = IDLE;
-		saved_of_set.clear();
-		return;
+	ed_doc.on_node_deleted.add(this, &ManipulateTransformTool::on_entity_deleted);
+	ed_doc.on_component_deleted.add(this, &ManipulateTransformTool::on_component_deleted);
+	ed_doc.selection_state->on_selection_changed.add(this,
+		&ManipulateTransformTool::on_selection_changed);
+	ed_doc.on_close.add(this, &ManipulateTransformTool::on_close);
+	ed_doc.on_start.add(this, &ManipulateTransformTool::on_open);
+
+	ed_doc.selection_state->on_selection_changed.add(this, &ManipulateTransformTool::on_selection_changed);
+}
+
+void ManipulateTransformTool::on_close() {
+	state = IDLE;
+	world_space_of_selected.clear();
+}
+void ManipulateTransformTool::on_open() {
+	state = IDLE;
+	world_space_of_selected.clear();
+}
+void ManipulateTransformTool::on_component_deleted(EntityComponent* ec) {
+	update_pivot_and_cached();
+}
+void ManipulateTransformTool::on_entity_deleted(uint64_t handle) {
+	update_pivot_and_cached();
+}
+void ManipulateTransformTool::on_selection_changed() {
+	update_pivot_and_cached();
+}
+
+void ManipulateTransformTool::update_pivot_and_cached()
+{
+	world_space_of_selected.clear();
+	auto& ss = ed_doc.selection_state;
+	if (ss->is_selecting_entity_component()) {
+		auto ec = ss->get_ec_selected();
+		world_space_of_selected.push_back(ec->get_ws_transform());
+	}
+	else if (ss->has_any_selected()) {
+		for (auto e : ss->get_selection()) {
+			world_space_of_selected.push_back(e.get()->get_ws_transform());
+		}
 	}
 
-	if (state == IDLE) {
-		saved_of_set.clear();
-		// calculate transform
-		if (ed_doc.selection_state->num_selected() == 1) {
-			current_transform_of_group = ed_doc.selection_state->get_selection()[0]->get_transform();
-		}
-		else {
-			glm::vec3 center = glm::vec3(0.0);
-			for (auto& n : ed_doc.selection_state->get_selection())
-				center += n->get_position();
-			center /= (float)ed_doc.selection_state->num_selected();
-			current_transform_of_group = glm::translate(glm::mat4(1.0), center);
-		}
+	if (world_space_of_selected.size() == 1) {
+		pivot_transform = world_space_of_selected[0];
 	}
+	else if (world_space_of_selected.size() > 1) {
+		glm::vec3 v = glm::vec3(0.f);
+		for (int i = 0; i < world_space_of_selected.size(); i++) {
+			v += glm::vec3(world_space_of_selected[i][3]);
+		}
+		v /= (float)world_space_of_selected.size();
+		pivot_transform = glm::translate(glm::mat4(1), v);
+	}
+	current_transform_of_group = pivot_transform;
+
+	if (world_space_of_selected.size() == 0)
+		state = IDLE;
+	else
+		state = SELECTED;
+}
+
+void ManipulateTransformTool::on_selected_tarnsform_change(uint64_t h) {
+	update_pivot_and_cached();
+}
+
+void ManipulateTransformTool::begin_drag() {
+	ASSERT(state == SELECTED);
+	state = MANIPULATING_OBJS;
+}
+
+void ManipulateTransformTool::end_drag() {
+	ASSERT(state == MANIPULATING_OBJS);
+	update_pivot_and_cached();
+}
+
+void ManipulateTransformTool::update()
+{
+	if (state == IDLE)
+		return;
 
 	//auto selected = ed_doc.selection_state.sel
 
@@ -867,87 +925,59 @@ void ManipulateTransformTool::update()
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
 
-	glm::vec3 snap;
-	if (operation_mask == ImGuizmo::TRANSLATE)
+	glm::vec3 snap(-1);
+	if (operation_mask == ImGuizmo::TRANSLATE && has_translation_snap)
 		snap = glm::vec3(translation_snap);
-	else if (operation_mask == ImGuizmo::SCALE)
+	else if (operation_mask == ImGuizmo::SCALE && has_scale_snap)
 		snap = glm::vec3(scale_snap);
-	else if (operation_mask == ImGuizmo::ROTATE)
+	else if (operation_mask == ImGuizmo::ROTATE&&has_rotation_snap)
 		snap = glm::vec3(rotation_snap);
 
-	bool good = ImGuizmo::Manipulate(view, proj, operation_mask, mode, model,nullptr,&snap.x);
+
+	bool good = ImGuizmo::Manipulate(view, proj, operation_mask, mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
+	
+	if (ImGuizmo::IsOver() && state == SELECTED && ImGui::GetIO().MouseClicked[2]) {
+		ImGui::OpenPopup("manipulate tool menu");
+	}
+	if (ImGui::BeginPopup("manipulate tool menu")) {
+		ImGui::Checkbox("T Snap", &has_translation_snap);
+		ImGui::Checkbox("R Snap", &has_rotation_snap);
+		ImGui::Checkbox("S Snap", &has_scale_snap);
+
+		ImGui::EndPopup();
+	}
+	
 	bool create_command = false;
-	if (ImGuizmo::IsUsingAny()) {
-		if (state == IDLE) {
-			if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl))
-				ed_doc.duplicate_selected_and_select_them();
-
-			for (auto& s : ed_doc.selection_state->get_selection()) {
-				SavedTransform st;
-				st.node = s;
-				st.pretransform = s->get_transform();
-				saved_of_set.push_back(st);
-			}
-		}
-		state = MANIPULATING_OBJS;
+	if (ImGuizmo::IsUsingAny() && state == SELECTED) {
+		begin_drag();
 	}
-	else {
-		if (state == MANIPULATING_OBJS) {
-			create_command = true;
-		}
-		state = IDLE;
+	else if (!ImGuizmo::IsUsingAny() && state == MANIPULATING_OBJS) {
+		end_drag();
 	}
-
-	if (state == MANIPULATING_OBJS || create_command) {
-		// calculate transform
-		if (ed_doc.selection_state->num_selected() == 1) {
-			auto& n = ed_doc.selection_state->get_selection()[0];
-			glm::vec3 scale, p;
-			glm::quat r;
-			decompose_transform(current_transform_of_group, p, r, scale);
-
-			if (create_command) {
-				auto& prev = saved_of_set[0];
-				glm::vec3 p_scale, p_p;
-				glm::quat p_r;
-				decompose_transform(prev.pretransform, p_p, p_r, p_scale);
-				n->save_transform_to_dict(p_p, p_r, p_scale);
-
-				Dict changes;
-				changes.set_vec3("position", p);
-				changes.set_vec4("rotation", glm::vec4(r.w,r.x,r.y,r.z));
-				changes.set_vec3("scale", scale);
-				std::vector<EditPropertyCommand::Group> groups;
-				groups.push_back({ n,changes });
-				ed_doc.command_mgr.add_command(new EditPropertyCommand(groups));
-			}
-			else {
-				n->save_transform_to_dict(p, r, scale);
-
-			}
+	if (state == MANIPULATING_OBJS) {
+		// save off
+		auto& ss = ed_doc.selection_state;
+		if (ss->get_ec_selected()) {
+			glm::mat4 ws =  current_transform_of_group;
+			ss->get_ec_selected()->set_ws_transform(ws);
 		}
 		else {
-		
+			auto& arr = ss->get_selection();
+			for (int i = 0; i < arr.size(); i++) {
+				glm::mat4 ws = current_transform_of_group * glm::inverse(pivot_transform) * world_space_of_selected[i];
+				arr[i].get()->set_ws_transform(ws);
+			}
 		}
 	}
-#endif
 }
 
 void EditorDoc::imgui_draw()
 {
-	outliner.draw();
+	outliner->draw();
 
 	prop_editor->draw();
 
-	//if (get_focus_state() == editor_focus_state::Focused) {
-	//	for (int i = 0; i < selection_state->num_selected(); i++) {
-	//		selection_state->get_selection()[i]->show();
-	//	}
-	//}
-
 	IEditorTool::imgui_draw();
-
-
 }
 
 void EditorDoc::hook_scene_viewport_draw()
@@ -1186,8 +1216,15 @@ struct AutoStruct_asdf134 {
 };
 static AutoStruct_asdf134 AutoStruct_asdf134asdfa;
 #endif
-
-void ObjectOutliner::draw_table_R(uint64_t handle, int depth)
+ObjectOutliner::ObjectOutliner()
+{
+	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
+	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
+	ed_doc.on_node_created.add(this, &ObjectOutliner::on_add_ent);
+	ed_doc.on_node_deleted.add(this, &ObjectOutliner::on_delete_ent);
+	ed_doc.on_change_name.add(this, &ObjectOutliner::on_change_name);
+}
+void ObjectOutliner::draw_table_R(Node* n, int depth)
 {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
@@ -1195,13 +1232,17 @@ void ObjectOutliner::draw_table_R(uint64_t handle, int depth)
 	ImGui::Dummy(ImVec2(depth*5.f, 0));
 	ImGui::SameLine();
 
-	ImGui::PushID(handle);
+	ImGui::PushID(n);
 	{
-		const bool item_is_selected = ed_doc.selection_state->is_node_selected({ handle });
+		const bool item_is_selected = ed_doc.selection_state->is_node_selected({ n->handle });
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-			if (handle != 0)
-				ed_doc.selection_state->set_select_only_this({ handle });
+			if (n->handle != 0) {
+				if(ImGui::GetIO().KeyShift)
+					ed_doc.selection_state->add_to_selection({ n->handle });
+				else
+					ed_doc.selection_state->set_select_only_this({ n->handle });
+			}
 			else
 				ed_doc.selection_state->clear_all_selected();
 		}
@@ -1209,20 +1250,17 @@ void ObjectOutliner::draw_table_R(uint64_t handle, int depth)
 	
 	ImGui::SameLine();
 
-	if (handle == 0) {
+	if (n->handle == 0) {
 		ImGui::Text(ed_doc.get_full_output_path().c_str());
 	}
 	else {
-		auto entity = eng->get_entity(handle);
+		auto entity = eng->get_entity(n->handle);
 		ImGui::Text(entity->editor_name.c_str());
 	}
 
-	//if (handle == 0) {
-	//	for (int i = 0; i < ed_doc.nodes.size(); i++) {
-	//		if (ed_doc.nodes[i])
-	//			draw_table_R(ed_doc.nodes[i].get(), depth + 1);
-	//	}
-	//}
+	for (int i = 0; i < n->children.size(); i++)
+		draw_table_R(n->children[i], depth + 1);
+
 	ImGui::PopID();
 }
 
@@ -1239,7 +1277,7 @@ void ObjectOutliner::draw()
 	if (ImGui::BeginTable("Table", 1, flags)) {
 		ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch);
 
-		draw_table_R(0, 0);
+		draw_table_R(rootnode, 0);
 
 		ImGui::EndTable();
 	}
@@ -1457,10 +1495,15 @@ SelectionState::SelectionState()
 	ed_doc.on_close.add(this, &SelectionState::on_close);
 	ed_doc.on_component_deleted.add(this, &SelectionState::on_entity_component_delete);
 }
-ManipulateTransformTool::ManipulateTransformTool()
+
+EntityNameDatabase_Ed::EntityNameDatabase_Ed()
 {
-	ed_doc.on_node_deleted.add(this, &ManipulateTransformTool::on_entity_deleted);
-	ed_doc.on_component_deleted.add(this, &ManipulateTransformTool::on_component_deleted);
-	ed_doc.selection_state->on_selection_changed.add(this, 
-		&ManipulateTransformTool::on_selection_changed);
+	ed_doc.on_node_created.add(this, &EntityNameDatabase_Ed::on_add);
+	ed_doc.on_node_deleted.add(this, &EntityNameDatabase_Ed::on_delete);
+	ed_doc.on_start.add(this, &EntityNameDatabase_Ed::on_start);
+	ed_doc.on_close.add(this, &EntityNameDatabase_Ed::on_close);
+}
+void EntityNameDatabase_Ed::invoke_change_name(uint64_t h)
+{
+	ed_doc.on_change_name.invoke(h);
 }

@@ -40,7 +40,7 @@ class ClassTypeInfo;
 class GameEnginePublic
 {
 public:
-	virtual Level* get_level() = 0;
+	virtual Level* get_level() const = 0;
 	virtual Entity* get_entity(uint64_t handle) = 0;
 	virtual Entity* get_local_player() = 0;
 	virtual Entity* get_player_slot(uint32_t index) = 0;
@@ -56,6 +56,7 @@ public:
 	virtual glm::ivec2 get_game_viewport_size() const = 0;
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;
+	virtual bool is_editor_level() const = 0;
 
 	virtual void leave_level() = 0;
 	// queues a level to be loaded

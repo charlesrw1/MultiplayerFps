@@ -42,11 +42,6 @@ void GameEngineLocal::remove_entity(Entity* e)
 
 	sys_print("*** removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 
-	// call actor specific destruction if not in editor
-	if (!get_level()->is_editor_level()) {
-		e->end();
-	}
-	// remove components
 	e->destroy();
 	// call destructor
 	delete e;
@@ -54,17 +49,11 @@ void GameEngineLocal::remove_entity(Entity* e)
 	get_level()->remove_entity_handle(id);
 }
 
-void GameEngineLocal::call_startup_functions_for_new_entity(Entity* ec)
+void GameEngineLocal::call_startup_functions_for_new_entity(Entity* e)
 {
 	// add to master list
-	get_level()->insert_entity_into_hashmap(ec);
-	// register components
-	ec->register_components();
-
-	// call start function if not created by editor
-	if (!get_level()->is_editor_level()) {
-		ec->start();
-	}
+	get_level()->insert_entity_into_hashmap(e);
+	e->initialize();
 }
 
 Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo* ti) {

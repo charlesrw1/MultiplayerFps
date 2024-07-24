@@ -14,21 +14,13 @@
 #include "Framework/InlineVec.h"
 #include "Entity.h"
 
-struct Texture;
-struct StaticEnv
-{
-	std::string skyname;
-	const Texture* sky_texture = nullptr;
-};
-
+#include "Framework/Hashset.h"
 
 class PhysicsActor;
 CLASS_H(Level, IAsset)
 public:
 	Level();
-	~Level() {
-		free_level();
-	}
+	~Level();
 
 	// only call once after initialization
 	void init_entities_post_load();
@@ -36,11 +28,12 @@ public:
 	// will call spawn funcs
 	void insert_unserialized_entities_into_level(std::vector<Entity*> ents, bool assign_new_ids = false);
 
-	bool open_from_file(const std::string& path);
 	bool is_editor_level() const {
 		return bIsEditorLevel;
 	}
 	
+	hash_set<Entity> tick_list;
+
 	// all entities in the map
 	hash_map<Entity> all_world_ents;
 	uint64_t last_id = 0;
@@ -81,45 +74,32 @@ public:
 		return all_world_ents.find(handle);
 	}
 
-	bool bIsEditorLevel=false;
 
-	unique_ptr<Physics_Mesh> scollision;	// merged collision of all level_meshes
-	// static lights/meshes/physics
-	vector<handle<Render_Light>> slights;
-	vector<handle<Render_Object>> smeshes;
-
-	StaticEnv senv;
-	int main_sun = -1;
-
-	bool has_main_sun() const { return main_sun != -1; }
 	uint64_t get_next_id_and_increment() {
 		return ++last_id;	// prefix
 	}
 private:
+	bool bIsEditorLevel=false;
 
-	void free_level();
+	friend class LevelSerialization;
 };
 
 class SerializeEntityObjectContext;
 class LevelSerialization
 {
 public:
+	// Does not manage the memory!
+	// Doesnt call init_entities_post_load() !
+	static Level* unserialize_level(const std::string& file, bool for_editor = false);
+
+	static Level* create_empty_level(const std::string& file, bool for_editor = false);
+
+	static std::string serialize_level(Level* l);
+
 	// doesnt call register/unregister on components, just creates everything
 	static std::string serialize_entities_to_string(const std::vector<Entity*>& entities);
 	static std::vector<Entity*> unserialize_entities_from_string(const std::string& str);
 private:
 	static void serialize_one_entity(Entity* e, DictWriter& out, SerializeEntityObjectContext& ctx);
 	static bool unserialize_one_item(StringView tok, DictParser& in, SerializeEntityObjectContext& ctx);
-};
-
-// Does not manage the memory!
-class LevelLoadManager
-{
-public:
-	static LevelLoadManager& get() {
-		static LevelLoadManager inst;
-		return inst;
-	}
-	Level* load_level(const std::string& file, bool for_editor = false);
-	void free_level(Level* level);
 };

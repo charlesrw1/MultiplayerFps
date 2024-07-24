@@ -19,6 +19,9 @@ CLASS_H(NPC, Entity)
 		root_component = npc_hitbox;
 		npc_model->attach_to_parent(npc_hitbox, {});
 	}
+
+	static const PropertyInfoList* get_props() = delete;
+
 	glm::vec3 velocity = glm::vec3(0.f);
 
 	CapsuleComponent* npc_hitbox{};

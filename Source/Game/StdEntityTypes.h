@@ -8,6 +8,7 @@ public:
 		Mesh = create_sub_component<MeshComponent>("Mesh");
 		root_component = Mesh;
 	}
+	static const PropertyInfoList* get_props() = delete;
 
 	MeshComponent* Mesh = nullptr;
 

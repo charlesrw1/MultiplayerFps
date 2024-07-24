@@ -70,6 +70,10 @@ public:
 	glm::quat get_ls_rotation() const { return rotation; }
 	glm::vec3 get_ws_position()  { return get_ws_transform()[3]; }
 	void set_ws_transform(const glm::mat4& transform);
+	const EntityComponent* get_parent_component() const {
+		return attached_parent.get();
+	}
+
 
 	bool get_is_native_component() const { return is_native_componenent; }
 

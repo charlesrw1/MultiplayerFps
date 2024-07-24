@@ -108,44 +108,39 @@ public:
 	Entity();
 	virtual ~Entity();
 
-	// both game and editor:
-	// Object constructors
-	// Sets any default values, these values are also what drives the override/inherit system of class types
+	// Entity lifecycle:
+	// 
+	// Contstructor						: set any default variable values here, setup native components here
+	//		V
+	// Unserialize						: loads data from disk in a level or a schema (this section can also be hooked to set properties when spawning during gameplay)
+	//		V
+	// register_components				: components (such as MeshComponent) initialize here like allocating handles into systems
+	//		| ------------------|
+	//		V				    |
+	// ##################		|
+	//	  *start()		#		V		: start() is called on the Entity to initialize itself before ticking
+	//		V			#		|
+	// @..*update().........*component ticks ...@
+	//		V			#		|
+	//    *end()		#		V		: end() is the counter part to start(), do any logic before deletion
+	// ##################		|
+	//		| ------------------|
+	//		V					
+	// unregister_components			: removes itself from systems
+	//		V
+	// Destructor
+	// 
+	// "*" are functions that are virtual
+	// "#" boxed functions are only called during gameplay (NOT in the editor)
+	//	update and component ticks are called per frame or on a regular interval (game and/or editor)
+	// register_components + start and end + unregister_components are bundled in initialize and destroy
 
-	// This is where stuff gets unserialized from an asset/level
-	// Fields are overwritten by inherited members, dynamic components are added and attached to the heirarchy
-	// After this is called, dynamic_components will be finialized, components will be in a heirarchy, root_component is valid
-	// However: all_components is empty still and no components have run on_init(); these are done inside register_components()
-	// At this point there is still no logic being run that is dependent on the game state
-	// load_props()
-
-	// called after properties were copied over
-	// use for any extra logic to change property values etc.
-	virtual void post_load_properties() {}
-
-	// called after post_load
-	// registers and initializes any components that were serialized with object
-	void register_components();
-
-	// GAME ONLY: (editor doesnt call any of these)
-
-	// called when spawning entity, all variables are initialized, components are initialized
-	// execute any logic to start up this entity
-	virtual void start() {}
+	void initialize();
+	void destroy();
 
 	// called every game tick when actor is ticking
 	virtual void update() {}
 	void update_entity_and_components();
-
-	// called on entity exit
-	// free resources used by the entity that were aquired in start() or update() calls
-	virtual void end() {}
-
-	// BOTH game and editor:
-	// called after end(), frees component data
-	void destroy();
-	// delete is called then DTOR is called
-
 
 	// Editor calls tick on components but not on entity
 	
@@ -241,7 +236,9 @@ public:
 #endif
 	EntityPtr<Entity> self_id;			// global identifier for this entity
 	AssetPtr<Schema> schema_type;		// what spawned type are we ( could be editor only or not )
-
+private:
+	virtual void start() {}
+	virtual void end() {}
 };
 #define REG_ENTITY_REF(name, flags) Entity::generate_entity_ref_property( \
 &((TYPE_FROM_START*)0)->name, \

@@ -47,3 +47,10 @@ inline std::string to_std_string_sv(StringView sv)
 }
 
 
+inline std::string to_lower(const std::string& s) {
+	std::string out;
+	out.reserve(s.size());
+	for (auto c : s)
+		out.push_back(tolower(c));
+	return out;
+}

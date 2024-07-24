@@ -4,15 +4,11 @@
 #include <algorithm>
 #include "Framework/MyImguiLib.h"
 #include "Framework/Config.h"
+
+#include "AssetCompile/Someutils.h"
+
 AssetBrowser global_asset_browser;
 
-static std::string to_lower(const std::string& s) {
-	std::string out;
-	out.reserve(s.size());
-	for (auto c : s)
-		out.push_back(tolower(c));
-	return out;
-}
 
 void AssetBrowser::init()
 {

@@ -58,9 +58,9 @@ public:
 	}
 	ObjPtr() = default;
 	ObjPtr(T* p) :ptr(p) {}
-	T* get() { return ptr; }
-	T* operator->() { return ptr; }
-	T& operator*() { return *ptr; }
+	T* get() const { return ptr; }
+	T* operator->() const { return ptr; }
+	T& operator*() const { return *ptr; }
 	T* ptr = nullptr;
 };
 

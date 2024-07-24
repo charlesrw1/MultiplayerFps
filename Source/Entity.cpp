@@ -20,6 +20,8 @@
 
 #include "Game/StdEntityTypes.h"
 
+#include "Level.h"
+
 CLASS_IMPL(Entity);
 
 CLASS_IMPL(Door);
@@ -88,17 +90,13 @@ Entity::Entity()
 {
 }
 
-void Entity::register_components()
+void Entity::initialize()
 {
 	if (!root_component.get()) {
 		root_component = create_sub_component<EmptyComponent>("DefaultRoot");
 		root_component->is_native_componenent = false;
 	}
 
-	auto level = eng->get_level();
-	//const bool is_editor_level = level->is_editor_level();
-
-	// find all EntityComponent INLINED fields (part of classtype)
 
 	// now run register functions
 	for (int i = 0; i < all_components.size(); i++) {
@@ -109,10 +107,17 @@ void Entity::register_components()
 		c->on_init();
 	}
 
+	if (!eng->is_editor_level()) {
+		start();
+	}
 }
 
 void Entity::destroy()
 {
+	if (!eng->is_editor_level()) {
+		end();
+	}
+
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->on_deinit();
 	all_components.clear();	// deletes all

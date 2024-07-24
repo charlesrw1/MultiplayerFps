@@ -142,51 +142,31 @@ void make_static_mesh_from_dict(vector<handle<Render_Object>>& objs, vector<Phys
 #include <fstream>
 CLASS_IMPL(Level);
 
-bool Level::open_from_file(const std::string& path)
-{
-	//std::string fullpath = maps_directory + path + ".txt";
-	//bool b = loadfile.parse(fullpath);
-	//if (!b)
-	//	return false;
-	//
-	//for (int i = 0; i < loadfile.spawners.size(); i++) {
-	//	auto& spawner = loadfile.spawners[i];
-	//	if (strcmp(spawner.dict.get_string("_schema_name"), "StaticMesh") == 0)
-	//		make_static_mesh_from_dict(smeshes, sphysics, spawner.dict);
-	//
-	//}
-	return true;
-}
 
-void Level::free_level()
+Level::Level() : all_world_ents(4/*2^4*/), tick_list(4)
+{
+
+}
+Level::~Level()
 {
 	for (auto ent : all_world_ents) {
-		if(!is_editor_level())
-			ent->end();
 		ent->destroy();
 		delete ent;
 	}
 	all_world_ents.clear_all();
-
-	for (int i = 0; i < smeshes.size(); i++)
-		idraw->remove_obj(smeshes[i]);
-
-	for (int i = 0; i < slights.size(); i++)
-		idraw->remove_light(slights[i]);
-
-
-	smeshes.clear();
-	slights.clear();
-}
-Level::Level() : all_world_ents(4/*2^4*/)
-{
-
 }
 
-Level* LevelLoadManager::load_level(const std::string& file, bool is_editor)
+Level* LevelSerialization::create_empty_level(const std::string& file, bool is_editor)
 {
-	std::string fullpath = maps_directory + file;
-	auto fileptr  = FileSys::open_read(fullpath.c_str());
+	Level* l = new Level;
+	l->path = file;
+	l->bIsEditorLevel = is_editor;
+	return l;
+}
+
+Level* LevelSerialization::unserialize_level(const std::string& file, bool is_editor)
+{
+	auto fileptr  = FileSys::open_read(file.c_str());
 	if (!fileptr) {
 		sys_print("!!! couldn't open level %s\n", file.c_str());
 		return nullptr;
@@ -203,6 +183,8 @@ Level* LevelLoadManager::load_level(const std::string& file, bool is_editor)
 			level->last_id = glm::max(ent->self_id.handle, level->last_id);
 		}
 	}
+
+	return level;
 }
 
 std::string LevelSerialization::serialize_entities_to_string(const std::vector<Entity*>& entities)
@@ -218,7 +200,7 @@ std::string LevelSerialization::serialize_entities_to_string(const std::vector<E
 	return out.get_output();
 }
 
-static bool read_just_props(ClassBase* e, DictParser& parser, SerializeEntityObjectContext* ctx)
+static std::pair<StringView,bool> read_just_props(ClassBase* e, DictParser& parser, SerializeEntityObjectContext* ctx)
 {
 	std::vector<PropertyListInstancePair> props;
 	const ClassTypeInfo* typeinfo = &e->get_type();
@@ -228,7 +210,7 @@ static bool read_just_props(ClassBase* e, DictParser& parser, SerializeEntityObj
 		typeinfo = typeinfo->super_typeinfo;
 	}
 
-	return read_multi_properties(props, parser, {}, ctx).second;
+	return read_multi_properties(props, parser, {}, ctx);
 }
 
 bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, SerializeEntityObjectContext& ctx)
@@ -258,9 +240,13 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			}
 			e = schematype->create_entity_from_properties();
 		}
-		bool good = read_just_props(e,in,&ctx);
-		if (!good)
+		auto res = read_just_props(e,in,&ctx);
+		bool good = res.second;
+		tok = res.first;
+		if (!good) {
 			delete e;
+			return false;
+		}
 		else
 			ctx.unserialized.push_back(e);
 	}
@@ -299,9 +285,13 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			}
 		
 
-			bool good = read_just_props(ec, in, &ctx);
-			if (!good)
+			auto res = read_just_props(ec, in, &ctx);
+			bool good = res.second;
+			tok = res.first;
+			if (!good) {
 				delete ec;
+				return false;
+			}
 			else {
 				if (!is_component_override)
 					parent->all_components.push_back(std::unique_ptr<EntityComponent>(ec));
@@ -313,7 +303,9 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 		}
 	}
 	
-	if (!in.expect_item_end()) return false;
+	if (!in.check_item_end(tok)) 
+		return false;
+	return true;
 }
 
 std::vector<Entity*> LevelSerialization::unserialize_entities_from_string(const std::string& str)
@@ -346,6 +338,8 @@ void LevelSerialization::serialize_one_entity(Entity* e, DictWriter& out, Serial
 {
 	ctx.entity_serialzing = e;
 
+	const int myindex = ctx.to_serialize_index.find((ClassBase*)e)->second;
+
 	const Entity* diffclass = (e->schema_type.get()) ? e->schema_type->get_default_schema_obj() : (Entity*)e->get_type().default_class_object;
 
 	assert(e->get_type() == diffclass->get_type());
@@ -372,31 +366,27 @@ void LevelSerialization::serialize_one_entity(Entity* e, DictWriter& out, Serial
 		const bool is_owned = ec == nullptr || !ec->is_native_componenent;
 		if (is_owned) {
 			out.write_key("component_instance");
-			out.write_value("0");
+			out.write_value(string_format("%d", myindex));
 			out.write_value(c->get_type().classname);
 			auto type = c->get_type().default_class_object;
 			write_just_props(c.get(), type, out, &ctx);
 		}
 		else {
 			out.write_key("component_override");
-			out.write_value("0");
+			out.write_value(string_format("%d",myindex));
 			out.write_value(c->eSelfNameString.c_str());
 			write_just_props(c.get(), ec, out, &ctx);
 		}
 
 		out.write_item_end();
 	}
-
-	sys_print(out.get_output().c_str());
 }
 
 void Level::init_entities_post_load()
 {
 	// after inserting everything, call spawn functions
 	for (auto ent : all_world_ents) {
-		ent->register_components();
-		if (!bIsEditorLevel)
-			ent->start();
+		ent->initialize();
 	}
 }
 
@@ -415,8 +405,14 @@ void Level::insert_unserialized_entities_into_level(std::vector<Entity*> ents, b
 		}
 		all_world_ents.insert(ent->self_id.handle, ent);
 
-		ent->register_components();
-		if (!is_editor_level())
-			ent->start();
+		ent->initialize();
 	}
+}
+
+std::string LevelSerialization::serialize_level(Level* l)
+{
+	std::vector<Entity*> all_ents;
+	for (auto ent : l->all_world_ents)
+		all_ents.push_back(ent);
+	return serialize_entities_to_string(all_ents);
 }

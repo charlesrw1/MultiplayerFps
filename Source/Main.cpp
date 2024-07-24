@@ -779,7 +779,7 @@ void GameEngineLocal::execute_map_change()
 	stop_game();
 
 	// try loading map
-	level = LevelLoadManager::get().load_level(queued_mapname, false/* not for editor*/);
+	level = LevelSerialization::unserialize_level(queued_mapname, false/* not for editor*/);
 	if (!level) {
 		sys_print("!!! couldn't load map !!!\n");
 		state = Engine_State::Idle;

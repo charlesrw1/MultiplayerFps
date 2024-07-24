@@ -99,6 +99,8 @@
     <ClInclude Include="Source\Framework\FreeList.h" />
     <ClInclude Include="Source\Framework\Handle.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
+    <ClInclude Include="Source\Framework\Hashset.h" />
+    <ClInclude Include="Source\Framework\Hashset.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
     <ClInclude Include="Source\Framework\MathLib.h" />
     <ClInclude Include="Source\Framework\MemArena.h" />

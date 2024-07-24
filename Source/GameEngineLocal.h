@@ -31,7 +31,7 @@ public:
 	GameEngineLocal();
 
 	// Public Interface
-	virtual Level* get_level() override {
+	virtual Level* get_level() const override {
 		return level;
 	}
 	virtual Entity* get_entity(uint64_t handle) {
@@ -81,6 +81,10 @@ public:
 	virtual void open_level(string levelname) override;
 	virtual void connect_to(string address) override;
 
+	virtual bool is_editor_level() const {
+		return get_level()->is_editor_level();
+	}
+
 	glm::ivec2 get_game_viewport_size() const override;	// either full window or sub window
 
 	void init();
@@ -115,6 +119,21 @@ public:
 
 public:
 	bool map_spawned() { return level != nullptr; }
+
+	// does not manage memory for you
+	void set_level_manually_for_editor(Level* l) {
+		ASSERT(l->is_editor_level());
+		ASSERT(get_state() == Engine_State::Idle);
+		ASSERT(is_in_an_editor_state());
+		level = l;
+	}
+	void clear_level_manually_for_editor() {
+		ASSERT(level);
+		ASSERT(level->is_editor_level());
+		ASSERT(is_in_an_editor_state());
+		level = nullptr;
+	}
+
 
 	unique_ptr<GUI_RootControl> gui_root;
 	unique_ptr<Client> cl;
