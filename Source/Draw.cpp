@@ -322,32 +322,6 @@ void Renderer::draw_sprite(glm::vec3 origin, Color32 color, glm::vec2 size, Text
 	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
 }
 
-void Renderer::AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width)
-{
-	MbVertex corners[4];
-
-	glm::vec3 side = (glm::abs(normal.x) < 0.999) ? cross(normal, vec3(1, 0, 0)) : cross(normal, vec3(0, 1, 0));
-	side = glm::normalize(side);
-	glm::vec3 side2 = cross(side, normal);
-
-	float halfwidth = width / 2.f;
-
-	for (int i = 0; i < 4; i++) corners[i].color = COLOR_BLACK;
-	corners[0].position = org + side * halfwidth + side2 * halfwidth;
-	corners[1].position = org - side * halfwidth + side2 * halfwidth;
-	corners[2].position = org - side * halfwidth - side2 * halfwidth;
-	corners[3].position = org + side * halfwidth - side2 * halfwidth;
-	corners[0].uv = glm::vec2(0);
-	corners[1].uv = glm::vec2(0, 1);
-	corners[2].uv = glm::vec2(1, 1);
-	corners[3].uv = glm::vec2(1, 0);
-	int base = shadowverts.GetBaseVertex();
-	for (int i = 0; i < 4; i++) {
-		shadowverts.AddVertex(corners[i]);
-	}
-	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
-}
-
 void Renderer::bind_texture(int bind, int id)
 {
 	ASSERT(bind >= 0 && bind < MAX_SAMPLER_BINDINGS);
@@ -1389,11 +1363,8 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		active_constants_ubo = view_ubo;
 	}
 
-	glCheckError();
-
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
 	
-	glCheckError();
 	
 	set_standard_draw_data(params);
 
@@ -1442,15 +1413,10 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 			execute_render_lists(*lists, *pass);
 	}
 
-	glCheckError();
-
 	if (params.pass == Render_Level_Params::OPAQUE) {
 		glDepthFunc(GL_LEQUAL);	// for post z prepass
 		DrawSkybox();
 	}
-
-	glCheckError();
-
 
 	if (params.pass == Render_Level_Params::SHADOWMAP) {
 		glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1460,8 +1426,6 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 
 	if (params.has_clip_plane)
 		glDisable(GL_CLIP_DISTANCE0);
-
-	glCheckError();
 
 	using_skybox_for_specular = false;
 }
@@ -1692,16 +1656,6 @@ void Render_Pass::add_object(
 #include <iterator>
 void Render_Pass::make_batches(Render_Scene& scene)
 {
-	//if (creations.empty() && deletions.empty())
-	//	return;
-
-
-	const auto& sort_functor = [](const Pass_Object& a, const Pass_Object& b)
-	{ 
-		auto a64 = a.sort_key.as_uint64();
-		auto b64 = b.sort_key.as_uint64();
-		return a64 < b64;
-	};
 	const auto& merge_functor = [](const Pass_Object& a, const Pass_Object& b)
 	{
 		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
@@ -1718,40 +1672,6 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			return a.submesh_index < b.submesh_index;
 		else return false;
 	};
-	const auto& del_functor = [](const Pass_Object& a, const Pass_Object& b)
-	{
-		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
-		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
-			return  a.render_obj.id < b.render_obj.id && a.submesh_index < b.submesh_index;
-		else return false;
-	};
-	//if (!deletions.empty()) {
-	//
-	//	std::sort(deletions.begin(), deletions.end(), sort_functor);
-	//
-	//	std::vector<Pass_Object> dest;
-	//	dest.reserve(sorted_list.size());
-	//
-	//	std::set_difference(sorted_list.begin(), sorted_list.end(), deletions.begin(), deletions.end(), std::back_inserter(dest), del_functor);
-	//
-	//	sorted_list = std::move(dest);
-	//	deletions.clear();
-	//}
-
-	//if (!creations.empty()) {
-	//	std::sort(creations.begin(), creations.end(), merge_functor);
-	//	size_t start_index = sorted_list.size();
-	//	sorted_list.reserve(sorted_list.size() + creations.size());
-	//	for (auto p : creations)
-	//		sorted_list.push_back(p);
-	//	Pass_Object* start = sorted_list.data();
-	//	Pass_Object* mid = sorted_list.data() + start_index;
-	//	Pass_Object* end = sorted_list.data() + sorted_list.size();
-	//
-	//	std::inplace_merge(start, mid, end, merge_functor);
-	//
-	//	creations.clear();
-	//}
 
 	if (type == pass_type::TRANSPARENT)
 		std::sort(objects.begin(), objects.end(), sort_functor_transparent);
@@ -1761,7 +1681,8 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	batches.clear();
 	mesh_batches.clear();
 
-	if (objects.empty()) return;
+	if (objects.empty()) 
+		return;
 
 	{
 		const auto& functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch
@@ -1873,11 +1794,21 @@ void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz)
 	glCreateBuffers(1, &glinstance_to_instance);
 }
 
-extern bool use_32_bit_indicies;
-void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
+struct ObjGpu
 {
-	list.commands.clear();
-	list.command_count.clear();
+	uint hlobj_idx;			// index into Render_Pass.hl_objs
+	uint mylod;				// this objs lod
+	uint batch_idx;			// this objs batch
+	uint multibatch_idx;	// this objs multibatch
+	uint instance_index;	// index into Render_Object
+};
+// uint MultidrawCounts[] = {0, 0, 0, 0}
+// uint MultidrawOffsets[] = {0,3,5,6}
+extern bool use_32_bit_indicies;
+void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list)
+{
+	commands.clear();
+	command_count.clear();
 
 	static std::vector<uint32_t> instance_to_instance;
 	static std::vector<uint32_t> draw_to_material;
@@ -1906,7 +1837,7 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			cmd.primCount = meshb.count;
 			cmd.baseInstance = base_instance;
 
-			list.commands.push_back(cmd);
+			commands.push_back(cmd);
 
 			for (int k = 0; k < meshb.count; k++) {
 				instance_to_instance.push_back(proxy_list.handle_to_obj[src.objects[meshb.first + k].render_obj.id]);
@@ -1920,14 +1851,14 @@ void Render_Scene::build_render_list(Render_Lists& list, Render_Pass& src)
 			draw.stats.tris_drawn += cmd.primCount * cmd.count / 3;
 		}
 
-		list.command_count.push_back(mdb.count);
+		command_count.push_back(mdb.count);
 	}
 
-	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * list.indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
-	glNamedBufferSubData(list.glinstance_to_instance, 0, sizeof(uint32_t) * instance_to_instance.size(), instance_to_instance.data());
+	glNamedBufferData(glinstance_to_instance, sizeof(uint32_t) * indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
+	glNamedBufferSubData(glinstance_to_instance, 0, sizeof(uint32_t) * instance_to_instance.size(), instance_to_instance.data());
 
-	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * list.indirect_drawid_buf_size, nullptr, GL_DYNAMIC_DRAW);
-	glNamedBufferSubData(list.gldrawid_to_submesh_material, 0, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data());
+	glNamedBufferData(gldrawid_to_submesh_material, sizeof(uint32_t) * indirect_drawid_buf_size, nullptr, GL_DYNAMIC_DRAW);
+	glNamedBufferSubData(gldrawid_to_submesh_material, 0, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data());
 }
 
 
@@ -1986,6 +1917,33 @@ const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_time
 	}
 	return object.model->get_lod(0);
 }
+
+// RenderObject new property: cache_static
+//	this property is used for objects that arent changing their mesh etc. every frame
+
+// So for every frame:
+//		for objects that updated:
+//			update object list
+//		for materials that updated
+//			update material list
+// 
+//		clear dynamic mesh pass sections
+//		For all objects if not obj.cache_static
+//			add every part in every lod to respective mesh passes (dynamic section)
+//			sort+merge mesh dynamic passes
+//		if cache invalidated
+//			for all objs if obj.cache_static
+//				add every part to static cache mesh passes
+//			sort+merge mesh static passes
+//
+//		for all dynamic and static mesh passes, create render lists
+//			cull object level and get results from array?
+//			cull, cpu or gpu, remove the unused lods
+//			add to final render lists
+//
+//		
+//		
+
 
 void Render_Scene::build_scene_data()
 {
@@ -2096,30 +2054,17 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART(make_batches);
 
-		auto transtask = std::async(std::launch::async, [&]() {
-			transparents.make_batches(*this);
-			});
-		auto opaquetask = std::async(std::launch::async, [&]() {
-			opaque.make_batches(*this);
-			});
-		auto depthtask = std::async(std::launch::async, [&]() {
-			depth.make_batches(*this);
-			});
-
-			//transparents.make_batches(*this);
-			//opaque.make_batches(*this);
-			//depth.make_batches(*this);
-		transtask.wait();
-		opaquetask.wait();
-		depthtask.wait();
+		transparents.make_batches(*this);
+		opaque.make_batches(*this);
+		depth.make_batches(*this);
 	}
 	{
 		CPUSCOPESTART(make_render_lists);
 		// build draw calls
-		build_render_list(vis_list, depth);
-		build_render_list(shadow_lists, depth);
-		build_render_list(opaque_list, opaque);
-		build_render_list(transparents_list, transparents);
+		vis_list.build_from(depth, proxy_list);
+		shadow_lists.build_from(depth, proxy_list);
+		opaque_list.build_from(opaque, proxy_list);
+		transparents_list.build_from(transparents, proxy_list);
 	}
 }
 
@@ -2748,13 +2693,66 @@ void draw_debug_grid()
 	mb.Draw(GL_LINES);
 }
 
+// ORDER:
+// pre draw:
+//		setup framebuffers
+//		setup view stuff
+//		setup material buffer
+//		setup scene buffers
+// main draw:
+//		kick off shadow map drawing
+//			directional cascades + any point/spot lights
+// 
+//		if GPU culling:
+//			dispatch GPU culling compute shader
+//			gbuffer pass 1
+//				unoccluded opaques drawn to buffer
+//			rebuild HZB
+//			dispatch GPU culing compute shader for occluded objs+
+//			gbuffer pass 2
+//				unoccluded opaques draw to buffer
+//			build HZB for next frame
+//		else:
+//			gbuffer pass
+//				draw all objects
+// 
+//		editor outline pass:
+//			for selected objects, draw to outline buffer
+//		custom depth pass:
+//			for all custom depth objects: draw to custom depth buffer with stencil etc.	
+// 
+//		screenspace passes using gbuffers:
+//			ssao pass (use depth buffer)
+//			ssr pass with gbuffer
+//			screen space shadows
+// 	
+//		decal pass
+//			for all decals: draw OOB and modify gbuffers
+//		lighting passes
+//			for all lights: accumulate lighting + shadowing
+//		ambient light pass
+//			add ambient light to scene (use probes in future)
+//		reflection pass
+//			sample scene cubemaps for each pixel and accumulate
+//		transcluent pass
+//			all transcluents get rendered to lighting buffer
+//				optional forward lighting for N relevant lights (Sun + nearby point lights?)
+// post draw:
+//		combine ss shadows to color buffer
+//		combine SSR to color buffer
+//		combine SSAO on to color buffer
+//		bloom pass on color buffer	
+//		post processing FXs
+//		composite post process and bloom
+
+
+
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool)
 {
 	GPUFUNCTIONSTART;
 
 	mem_arena.free_bottom();
 	stats = Render_Stats();
-
 	state_machine.invalidate_all();
 
 	const bool needs_composite = !params.output_to_screen;
@@ -2764,7 +2762,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	lastframe_vs = current_frame_main_view;
 
 	current_frame_main_view = view;
-	
+
 	if (enable_vsync.get_bool())
 		SDL_GL_SetSwapInterval(1);
 	else
@@ -2777,15 +2775,13 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		gui->ui_paint();
 		return;
 	}
-
 	vs = current_frame_main_view;
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
-
-	//if (editor_mode)
-	//	g_editor_doc->scene_draw_callback();
-
 	scene.build_scene_data();
+
+
+
 
 	shadowmap.update();
 
@@ -2863,8 +2859,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
 	//multidraw_testing();
 
-	DrawEntBlobShadows();
-
 	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
@@ -2879,8 +2873,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 	if (g_draw_grid.get_bool())
 		draw_debug_grid();
-
-	glCheckError();
 	
 	// Bloom update
 	render_bloom_chain();
@@ -2911,7 +2903,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 	//cubemap_positions_debug();
 
-	glCheckError();
 	glClear(GL_DEPTH_BUFFER_BIT);
 
 	// FIXME: ubo view constant buffer might be wrong since its changed around a lot (bad design)

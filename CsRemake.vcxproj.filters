@@ -79,6 +79,9 @@
     <Filter Include="Source\LevelEditor\Commands">
       <UniqueIdentifier>{37f4b120-00f7-420e-b33d-231eea4510a8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Render\Material">
+      <UniqueIdentifier>{b2af5032-9104-481a-a83d-b66dc63bdc2a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">

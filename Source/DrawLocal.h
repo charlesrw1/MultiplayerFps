@@ -35,6 +35,7 @@ extern ConfigVar enable_volumetric_fog;
 extern ConfigVar enable_ssao;
 extern ConfigVar use_halfres_reflections;
 
+
 const int BLOOM_MIPS = 6;
 
 typedef int program_handle;
@@ -137,20 +138,20 @@ struct Pass_Object
 // in the end: want a flat list of batches that are merged with neighbors
 enum class pass_type
 {
-	OPAQUE,
-	TRANSPARENT,
-	DEPTH
+	OPAQUE,			// front to back sorting
+	TRANSPARENT,	// back to front sorting
+	DEPTH			// front to back sorting, ignores material textures unless alpha tested
 };
-
  
 typedef int passobj_handle;
 
+// A render_pass is one collection of POSSIBLE draw calls
+// A render_list is created from a pass which is the actual draw calls to submit along with extra buffers to facilitate it
 class Render_Scene;
 class Render_Pass
 {
 public:
 	Render_Pass(pass_type type);
-
 
 	void make_batches(Render_Scene& scene);
 	
@@ -173,10 +174,17 @@ public:
 		objects.clear();
 	}
 
-	pass_type type;
-	std::vector<Pass_Object> objects;
-	std::vector<Mesh_Batch> mesh_batches;
-	std::vector<Multidraw_Batch> batches;
+	const pass_type type{};					// modifies batching+sorting logic
+
+	// all Render_Objects in the pass
+	// there will likely be multiple Pass_Objects from 1 R_O like multiple submeshes and LODs all get added
+	// this is the array that gets frustum + occlusion culled to make the final Render_Lists structure
+	// this means static objects can cache LODs
+	std::vector<handle<Render_Object>> high_level_objects_in_pass;
+
+	std::vector<Pass_Object> objects;		// geometry + material id + object id
+	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
+	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
 };
 
 // RenderObject internal data
@@ -205,15 +213,32 @@ struct RL_Internal
 // only does frustum, cull objects for each cascade
 // create draw calls for each cascade
 
+// Render lists: represents opengl commands that have been uploaded (or kept CPU side)
+//				 these are fed into glMultiDrawElementsIndirect()
+//				 these are built around Render_Pass which contains the objects that will be renderered
+
+// Gpu occlusion culling:	
+
+// Reprsents a structure for storing DrawElementsIndirectCommands
+// These can be cpu or gpu stored, when using gpu culling, the gpu buffer is culled and used
+// This gets fed into "execute_render_lists"
 struct Render_Lists
 {
 	void init(uint32_t drawidsz, uint32_t instbufsz);
+
+	void build_from(Render_Pass& src,
+		Free_List<ROP_Internal>& proxy_list);
+
 	uint32_t indirect_drawid_buf_size=0;
 	uint32_t indirect_instance_buf_size=0;
 
-
+	// commands to input to glMultiDrawElementsIndirect
 	std::vector<gpu::DrawElementsIndirectCommand> commands;
 	bufferhandle gpu_command_list = 0;
+	// command_count is the number of commands per glMultiDrawElementsIndirect command
+	// for now its just set to batches[i].count in the Render_Pass
+	// when calling glMDEI, the offset into commands is the summation of previous command counts essentially
+	// it works like an indirection into commands
 	std::vector<int> command_count;
 	bufferhandle gpu_command_count = 0;
 
@@ -221,6 +246,74 @@ struct Render_Lists
 	bufferhandle gldrawid_to_submesh_material;
 	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
 	bufferhandle glinstance_to_instance;
+
+	// where are we getting our objects from
+	const Render_Pass* parent_pass = nullptr;
+};
+
+// For CPU culling
+struct CpuRenderLists
+{
+	std::vector<gpu::DrawElementsIndirectCommand> commands;
+	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
+	bufferhandle gldrawid_to_submesh_material;
+	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
+	bufferhandle glinstance_to_instance;
+	const Render_Pass* parent_pass = nullptr;
+};
+
+// Optional GPU path
+struct GpuRenderLists
+{
+	bufferhandle gpu_command_list = 0;
+	bufferhandle gpu_command_count = 0;
+
+	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
+	bufferhandle gldrawid_to_submesh_material;
+	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
+	bufferhandle glinstance_to_instance;
+	const Render_Pass* parent_pass = nullptr;
+};
+
+
+// In theory render passes can be made once and cached if the object is static and do culling on the gpu
+// Render lists are updated every frame though
+// Render passes are  1 to 1 with render lists except gbuffer and shadow lists
+
+// Render passes: (describes objects to be drawn in a render list with a material+geometry)
+// Gbuffer objects
+// Shadow casting objects
+// Transparent objects
+// Custom depth objects
+// editor selected objects
+
+// render lists: (contains glmultidrawelementsindirect commands, generated on cpu or on gpu)
+// gbuffer pass 1 (all gbuffer objects get added to this)
+//		gbuffer pass 1 gets culled to last HZB
+// gbuffer pass 2 (objects that failed first HZB)
+//		gets culled again to 2nd HZB
+// shadow lists for N lights (cull per shadow caster, or render entire list per light)
+// transparent list
+// custom depth list
+// editor selected list
+
+
+// The lowest level data
+// Litteraly just feeding vertex data and a shader into glMultiDrawElementsIndirect
+// particles are just a dynamic mesh with their own handle into the proxy list
+struct DrawCommand
+{
+	// handle into a vertex buffer
+	// this is likely the same for all static meshes
+	// but particles/meshbuilders might have unique vertex buffers
+	// the handle points to a vao/vbo/ebo resource
+	uint64_t vertex_buffer_handle = 0;
+
+	// handle for a material to render this with
+	uint64_t material_handle = 0;
+
+	// per object data
+	uint64_t object_handle = 0;
 };
 
 class Render_Scene
@@ -245,10 +338,26 @@ public:
 	}
 
 	void build_scene_data();
-	void build_render_list(Render_Lists& list, Render_Pass& src);
 	void upload_scene_materials();
 
 	RL_Internal* get_main_directional_light();
+
+	std::unique_ptr<Render_Pass> gbuffer;
+	std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling
+	std::unique_ptr<Render_Lists> gbuffer2;				// 2nd pass for new unoccluded objects if using gpu culling
+
+	std::unique_ptr<Render_Pass> transparent_objs;
+	std::unique_ptr<Render_Lists> transparents_ren_list;// draw in forward pass of transparents
+
+	std::unique_ptr<Render_Pass> custom_depth;
+	std::unique_ptr<Render_Lists> custom_depth_list;	// draw to custom depth buffer
+
+	std::unique_ptr<Render_Pass> editor_selection;
+	std::unique_ptr<Render_Lists> editor_sel_list;		// drawn to editor selection buffer
+
+	std::unique_ptr<Render_Pass> shadow_casters;
+	std::unique_ptr<Render_Lists> global_shadow_list;	// unculled shadow casters
+
 
 	Render_Pass depth;			// vis/shadow objects, same as opaque but grouped with minimal draw clls
 	Render_Pass opaque;			// opaque objects that have full sorting
@@ -362,6 +471,7 @@ public:
 };
 
 
+
 class Renderer : public RendererPublic
 {
 public:
@@ -391,16 +501,23 @@ public:
 		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
 
 	void create_shaders();
-
 	void ui_render();
-
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
-
 	void cubemap_positions_debug();
-
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass);
-
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
+
+	void scene_draw_presetup(const SceneDrawParamsEx& params, const View_Setup& view);
+	void scene_draw_setup(const SceneDrawParamsEx& params, const View_Setup& view);
+
+	void scene_draw_main();
+	void scene_draw_gbuffer_pass();
+	void scene_draw_aux_geom_passes();
+	void scene_draw_decal_pass();
+	void scene_draw_lighting_pass();
+	void scene_draw_translucent_pass();
+
+	void scene_draw_post();
 
 	Memory_Arena mem_arena;
 
@@ -439,6 +556,9 @@ public:
 		fbohandle reflected_scene;
 		fbohandle bloom;
 		fbohandle composite = 0;
+
+		fbohandle gbuffer{};	// 4 MRT (gbuffer0-2, scene_color)
+		fbohandle forward_render{};	// scene_color, use for translucents
 	}fbo;
 
 
@@ -499,7 +619,6 @@ public:
 	void set_shader(program_handle handle);
 	void set_blend_state(blend_state blend);
 	void set_show_backfaces(bool show_backfaces);
-
 	Shader shader();
 
 	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
