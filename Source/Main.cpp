@@ -708,11 +708,17 @@ extern void at_test();
 
 #include "EntityTypes.h"
 #include "Game/Schema.h"
+
+#include "Render/MaterialLocal.h"
+
 int main(int argc, char** argv)
 {
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 	eng_local.init();
+
+	MasterMaterialLocal localm;
+	localm.load_from_file("terrain/terrainMaster.txt");
 
 
 	eng_local.loop();

@@ -5,8 +5,8 @@
 #include "glad/glad.h"
 #include <glm/gtc/type_ptr.hpp>
 
-const char* const SHADER_PATH = "Shaders\\";
-const char* const INCLUDE_SPECIFIER = "#include";
+static const char* const SHADER_PATH = "Shaders\\";
+static const char* const INCLUDE_SPECIFIER = "#include";
 
 
 static bool read_and_add_recursive(std::string filepath, std::string& text)

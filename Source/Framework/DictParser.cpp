@@ -125,6 +125,19 @@ bool DictParser::read_next_token(StringView& token) {
 
         c = get_character(read_ptr++);
     }
+    if (double_slash_comments) {
+        while (read_ptr < buffer_size - 1 && c == '/' && get_character(read_ptr) == '/') {
+            skip_to_next_line();
+            skip_whitespace();
+
+            if (is_eof()) {
+                raise_error("tried to read past end");
+                return false;
+            }
+
+            c = get_character(read_ptr++);
+        }
+    }
 
     if (c == '\"') {
         is_quote = true;

@@ -8,6 +8,11 @@
 
 #include "Framework/Handle.h"
 #include "Shader.h"
+
+const int MAX_INSTANCE_PARAMETERS = 8;	// 8 scalars/color32s
+const uint32_t MATERIAL_SIZE = 64;	// 64 bytes
+const uint32_t MAX_MAXTERIALS = MATERIAL_SIZE * 1024;
+
 using program_handle_NEW = handle<Shader>;
 
 class ProgramManagerNEW
@@ -75,10 +80,25 @@ public:
 	std::vector<material_shader_internal> shader_hash_map;
 };
 
+struct InstanceData
+{
+	std::string name;
+	bool is_vector_type = false;	/* true = is scalar */
+	uint32_t index = 0;
+};
 
-class MaterialTypeLocal : public MaterialType
+class MasterMaterialLocal : public MasterMaterial
 {
 public:
+
+	bool load_from_file(const std::string& filename);
+	void create_material_instance();
+	std::string create_glsl_shader(
+		std::string& vs_code,
+		std::string& fs_code,
+		const std::vector<InstanceData>& instdat
+	);
+
 	// shader details
 
 	// get shader for runtime
@@ -91,35 +111,23 @@ public:
 	// public interface
 	void pre_render_update() override;
 	const MaterialInstance* find_material_instance(const char* mat_inst_name) override;
-	DynamicMatView* create_dynmaic_material(const MaterialInstance* material) override;
-	void free_dynamic_material(DynamicMatView*& mat) override;
-	const MaterialType* find_master_material(const char* master_name) override;
+	MaterialInstance* create_dynmaic_material(const MaterialInstance* material) override;
+	void free_dynamic_material(MaterialInstance*& mat) override;
 
 	MaterialParameterBuffer* find_parameter_buffer(const char* name) override;
 
-	// local interface
-	void add_to_changed_queue(DynamicMatView* mat);
-
+	MasterMaterialLocal* find_master_material(const std::string& mastername);
 private:
 	MaterialShaderTableNEW shader_table;
-
 
 	bufferhandle gpuMaterialBuffer = 0;
 	uint32_t materialBufferSize = 0;
 
-	// hardcoded values, these should be dynamic in the future
-	static const uint32_t MATERIAL_SIZE = 64;	// 64 bytes
-	static const uint32_t MAX_MAXTERIALS = MATERIAL_SIZE * 1024;
-
 	// bitmap allocator for materials
 	std::vector<uint64_t> materialBitmapAllocator;
 
-	std::unordered_map<std::string, MaterialTypeLocal*> master_materials;
+	std::unordered_map<std::string, MasterMaterial*> master_materials;
 	std::unordered_map<std::string, MaterialInstance*> static_materials;
-	std::unordered_set<DynamicMatView*> dynamic_materials;
-
+	std::unordered_set<MasterMaterial*> dynamic_materials;
 	std::unordered_map<std::string, MaterialParameterBuffer*> parameter_buffers;
-
-	std::vector<DynamicMatView*> changed_queue;
-
 };

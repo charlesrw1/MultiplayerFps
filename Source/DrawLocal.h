@@ -361,6 +361,7 @@ public:
 	std::vector<material_shader_internal> shader_hash_map;
 };
 
+
 class Renderer : public RendererPublic
 {
 public:
@@ -440,9 +441,31 @@ public:
 		fbohandle composite = 0;
 	}fbo;
 
+
 	struct textures {
-		texhandle scene_color;
-		texhandle scene_depthstencil;
+		texhandle scene_color{};
+		texhandle scene_depthstencil{};
+
+		texhandle scene_gbuffer0{};	
+		texhandle scene_gbuffer1{};
+		texhandle scene_gbuffer2{};
+
+		// ----------------------------------------------------------------------------------
+		// | gbuffer		|		X		|		Y		|		Z		|		A		|
+		// ----------------------------------------------------------------------------------
+		// | R10,G10,B10	|	NORMAL X	|	NORMAL Y	|	NORMAL Z	|				|
+		// | R8G8B8A8		|	albedo R	|	albedo G	|	albedo B	|	AO			|
+		// | R8G8B8A8		|	Metallic	|	Roughness	|	Custom		|	MatID		|
+		// ----------------------------------------------------------------------------------
+
+		// Emissive outputs to scene color
+
+		// Scene color: RGBA16
+
+		texhandle scene_custom_depthstencil{};
+		texhandle editor_selection_buffer{};
+
+
 		texhandle reflected_color;
 		texhandle reflected_depth;
 		texhandle output_composite = 0;

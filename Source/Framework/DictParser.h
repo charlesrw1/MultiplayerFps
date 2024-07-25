@@ -125,6 +125,8 @@ public:
     }
     void skip_to_next_line();
     void skip_whitespace();
+
+    bool double_slash_comments = false;
 private:
     void raise_error(const char* msg) {
         had_error = true;
