@@ -7,13 +7,24 @@ using namespace glm;
 
 struct Chunk
 {
-	vec4 cone_apex;
-    vec4 cone_axis_cutoff;
     vec4 bounding_sphere;
-
-	int index_offset;	// offset into model's index buffer
-    int index_count;	// number of indicies in this chunk, max = 64*3
+	uint32_t cone;
+	uint32_t count; // number of indicies in this chunk, max = 64*3
+	uint32_t offset; // offset into model's index buffer
+	uint32_t padding;
 };
+
+// Meshlet global_meshlet_table[]
+// struct Submesh {
+//	..
+// meshlet_ofs = 0;
+// meshlet_count = 0;
+// ..
+// };
+// 
+// uint global_index_buffer[]
+// Vertex global_vertex_buffer[]
+// 
 
 struct Subpart_ext
 {

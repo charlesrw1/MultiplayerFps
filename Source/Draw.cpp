@@ -59,6 +59,36 @@ ConfigVar enable_ssao("r.ssao","1",CVAR_BOOL);
 ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL);
 ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV);
 
+
+DECLARE_ENGINE_CMD(output_texture)
+{
+	static const char* usage_str = "Usage: output_texture <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
+	if (args.size() != 5) {
+		sys_print(usage_str);
+		return;
+	}
+
+	float scale = atof(args.at(1));
+	float alpha = atof(args.at(2));
+	float mip = atof(args.at(3));
+	const char* texture_name = args.at(4);
+
+	draw.debug_tex_out.output_tex = g_imgs.find_texture(texture_name);
+	draw.debug_tex_out.scale = scale;
+	draw.debug_tex_out.alpha = alpha;
+	draw.debug_tex_out.mip = mip;
+
+
+	if (!draw.debug_tex_out.output_tex) {
+		sys_print("output_texture: couldn't find texture %s\n", texture_name);
+	}
+}
+DECLARE_ENGINE_CMD(clear_output_texture)
+{
+	draw.debug_tex_out.output_tex = nullptr;
+}
+
+
 /*
 Defined in Shaders/SharedGpuTypes.txt
 
@@ -391,7 +421,7 @@ void set_standard_draw_data(const Render_Level_Params& params)
 	draw.bind_texture(SSAO_TEX_LOC, ssao_tex);
 	glCheckError();
 
-	draw.bind_texture(CAUSTICS_LOC, draw.casutics->gl_id);
+	//draw.bind_texture(CAUSTICS_LOC, draw.casutics->gl_id);
 
 	glCheckError();
 
@@ -699,11 +729,13 @@ void Renderer::create_shaders()
 
 
 	prog.simple = prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt");
-	prog.textured = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt");
-	prog.textured3d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
-	prog.texturedarray = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
+	//prog.textured = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt");
+	//prog.textured3d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
+	//prog.texturedarray = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
 	prog.skybox = prog_man.create_raster("MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
-	prog.particle_basic = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	//prog.particle_basic = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
+	prog.tex_debug_2d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_VERSION");
+	prog.tex_debug_2d_array = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_ARRAY_VERSION");
 
 	// Bloom shaders
 	prog.bloom_downsample = prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
@@ -850,7 +882,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		}
 	}();
 
-	printf("%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
+	sys_print("!!! %s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
 }
 
 void imgui_stat_hook()
@@ -870,26 +902,14 @@ void imgui_stat_hook()
 	ImGui::Text("opaque mesh batches: %d", (int)draw.scene.opaque.mesh_batches.size());
 }
 
-void Renderer::init()
+void Renderer::check_hardware_options()
 {
-	sys_print("--------- Initializing Renderer ---------\n");
-
-
 	bool supports_compression = false;
 	bool supports_sprase_tex = false;
 	bool supports_bindless = false;
 	bool supports_filter_minmax = false;
 	bool supports_atomic64 = false;
 	bool supports_int64 = false;
-
-
-
-#ifdef _DEBUG
-	glEnable(GL_DEBUG_OUTPUT);
-	glDebugMessageCallback(debug_message_callback, nullptr);
-	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
-	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-#endif
 
 	int num_extensions = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
@@ -904,31 +924,31 @@ void Renderer::init()
 
 	}
 
-	printf("Extension support:\n");
-	printf("-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
-	printf("-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
-	printf("-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
-	printf("-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
-	printf("-GL_NV_shader_atomic_int64: %s\n", (supports_atomic64) ? "yes" : "no");
-	printf("-GL_ARB_gpu_shader_int64: %s\n", (supports_int64) ? "yes" : "no");
-
+	sys_print("``` ==== Extension support ====\n");
+	sys_print("-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
+	sys_print("-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
+	sys_print("-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
+	sys_print("-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
+	sys_print("-GL_NV_shader_atomic_int64: %s\n", (supports_atomic64) ? "yes" : "no");
+	sys_print("-GL_ARB_gpu_shader_int64: %s\n", (supports_int64) ? "yes" : "no");
 
 	if (!supports_compression) {
 		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
 	}
+	sys_print("\n");
 
+	sys_print("``` ==== GL Hardware Values ====\n");
 	int max_buffer_bindings = 0;
 	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
-	printf("-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
+	sys_print("-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
+	int max_texture_units = 0;
+	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_texture_units);
+	sys_print("-GL_MAX_TEXTURE_IMAGE_UNITS: %d\n", max_texture_units);
+	sys_print("\n");
+}
 
-	InitGlState();
-	mem_arena.init("Render Temp", 4'000'000);
-	scene.init();
-
-	float start = GetTime();
-	create_shaders();
-	printf("compiled shaders in %f\n", (float)GetTime() - start);
-
+void Renderer::create_default_textures()
+{
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
 	const uint8_t normaldata[] = { 128,128,255 };
@@ -954,14 +974,56 @@ void Renderer::init()
 	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glGenerateTextureMipmap(flat_normal_texture.gl_id);
 
+	// this is sort of leaking memory but not really, these are persitant over lifetime of program
+	// anybody (like materials) can reference them with strings which is the point
+
+	auto white_tex = g_imgs.install_system_texture("_white");
+	auto black_tex = g_imgs.install_system_texture("_black");
+	auto flat_normal = g_imgs.install_system_texture("_flat_normal");
+
+	white_tex->update_specs(white_texture.gl_id, 1, 1, 3, {});
+	black_tex->update_specs(black_texture.gl_id, 1, 1, 3, {});
+	flat_normal->update_specs(flat_normal_texture.gl_id, 1, 1, 3, {});
+
+	// create the "virtual texture system" handles so materials/debuging can reference these
+	tex.bloom_vts_handle = g_imgs.install_system_texture("_bloom_result");
+	tex.scene_color_vts_handle = g_imgs.install_system_texture("_scene_color");
+	tex.scene_depth_vts_handle = g_imgs.install_system_texture("_scene_depth");
+	tex.gbuffer0_vts_handle = g_imgs.install_system_texture("_gbuffer0");
+	tex.gbuffer1_vts_handle = g_imgs.install_system_texture("_gbuffer1");
+	tex.gbuffer2_vts_handle = g_imgs.install_system_texture("_gbuffer2");
+}
+
+void Renderer::init()
+{
+	sys_print("--------- Initializing Renderer ---------\n");
+
+	// Check hardware settings like extension availibility
+	check_hardware_options();
+
+	// Enable debug output on debug builds
+#ifdef _DEBUG
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(debug_message_callback, nullptr);
+	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+#endif
+	InitGlState();
+
+	// Initialize memory arena, 4mb
+	mem_arena.init("Render Temp", 4'000'000);
+
+	// Init scene draw buffers
+	scene.init();
+
+	create_shaders();
+	
+	create_default_textures();
+
 	glCreateBuffers(1, &ubo.current_frame);
 
-	perlin3d = generate_perlin_3d({ 16,16,16 }, 0x578437adU, 4, 2, 0.4, 2.0);
+	depth_pyramid_maker.init();
 
-	fbo.scene = 0;
-	fbo.reflected_scene = 0;
-	tex.scene_color = tex.scene_depthstencil = 0;
-	tex.reflected_color = tex.reflected_depth = 0;
 	InitFramebuffers(true, g_window_w.get_integer(), g_window_h.get_integer());
 
 	EnviornmentMapHelper::get().init();
@@ -970,8 +1032,6 @@ void Renderer::init()
 	ssao.init();
 
 	lens_dirt = g_imgs.find_texture("lens_dirt.jpg");
-	casutics = g_imgs.find_texture("caustics.png");
-	waternormal = g_imgs.find_texture("waternormal.png");
 
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
@@ -985,8 +1045,21 @@ void Renderer::init()
 
 void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 {
-	glDeleteTextures(1, &tex.scene_color);
+	auto set_default_parameters = [](uint32_t handle) {
+		glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	};
 
+	auto create_and_delete_texture = [](uint32_t& texture) {
+		glDeleteTextures(1, &texture);
+		glCreateTextures(GL_TEXTURE_2D, 1, &texture);
+	};
+
+
+
+	glDeleteTextures(1, &tex.scene_color);
 	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_color);
 	glTextureStorage2D(tex.scene_color, 1, GL_RGBA16F, s_w, s_h);
 	glTextureParameteri(tex.scene_color, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -994,24 +1067,38 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glTextureParameteri(tex.scene_color, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTextureParameteri(tex.scene_color, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	glDeleteTextures(1, &tex.scene_depthstencil);
-	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_depthstencil);
-	glTextureStorage2D(tex.scene_depthstencil, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
-	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(tex.scene_depthstencil, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glDeleteTextures(1, &tex.scene_depth);
+	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_depth);
+	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
+	glTextureParameteri(tex.scene_depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.scene_depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(tex.scene_depth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(tex.scene_depth, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glDeleteFramebuffers(1, &fbo.scene);
 	glCreateFramebuffers(1, &fbo.scene);
 	glNamedFramebufferTexture(fbo.scene, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
-	glNamedFramebufferTexture(fbo.scene, GL_DEPTH_ATTACHMENT, tex.scene_depthstencil, 0);
+	glNamedFramebufferTexture(fbo.scene, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
 	
 	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
 	glNamedFramebufferDrawBuffers(fbo.scene, 1, attachments);
 	
-	glCheckError();
 
+	// See the comment above these var's decleration in DrawLocal.h for details
+
+	create_and_delete_texture(tex.scene_gbuffer0);
+	glTextureStorage2D(tex.scene_gbuffer0, 1, GL_R11F_G11F_B10F, s_w, s_h);
+	set_default_parameters(tex.scene_gbuffer0);
+
+	create_and_delete_texture(tex.scene_gbuffer1);
+	glTextureStorage2D(tex.scene_gbuffer1, 1, GL_RGBA8, s_w, s_h);
+	set_default_parameters(tex.scene_gbuffer1);
+
+	create_and_delete_texture(tex.scene_gbuffer2);
+	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
+	set_default_parameters(tex.scene_gbuffer2);
+
+#if 0
 	glDeleteTextures(1, &tex.reflected_color);
 	glCreateTextures(GL_TEXTURE_2D, 1, &tex.reflected_color);
 	ivec2 reflect_size = ivec2(s_w, s_h);
@@ -1034,6 +1121,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glCreateFramebuffers(1, &fbo.reflected_scene);
 	glNamedFramebufferTexture(fbo.reflected_scene, GL_COLOR_ATTACHMENT0, tex.reflected_color, 0);
 	glNamedFramebufferTexture(fbo.reflected_scene, GL_DEPTH_ATTACHMENT, tex.reflected_depth, 0);
+#endif
 
 	glDeleteFramebuffers(1, &fbo.composite);
 	glDeleteTextures(1, &tex.output_composite);
@@ -1052,23 +1140,30 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	cur_w = s_w;
 	cur_h = s_h;
 
+	tex.scene_color_vts_handle->update_specs(tex.scene_color, s_w, s_h, 4, {});
+	tex.scene_depth_vts_handle->update_specs(tex.scene_depth, s_w, s_h, 4, {});
+
 	init_bloom_buffers();
+
+	// alert any observers that they need to update their buffer sizes
+	on_viewport_size_changed.invoke(cur_w, cur_h);
 }
 
 void Renderer::init_bloom_buffers()
 {
 	glDeleteFramebuffers(1, &fbo.bloom);
-	glDeleteTextures(BLOOM_MIPS, tex.bloom_chain);
-
+	if(tex.number_bloom_mips>0)
+		glDeleteTextures(tex.number_bloom_mips, tex.bloom_chain);
 	glCreateFramebuffers(1, &fbo.bloom);
-
-
-	glCreateTextures(GL_TEXTURE_2D, BLOOM_MIPS, tex.bloom_chain);
+	
 	int x = cur_w / 2;
 	int y = cur_h / 2;
+	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, get_mip_map_count(x, y));
+	glCreateTextures(GL_TEXTURE_2D, tex.number_bloom_mips, tex.bloom_chain);
+
 	float fx = x;
 	float fy = y;
-	for (int i = 0; i < BLOOM_MIPS; i++) {
+	for (int i = 0; i < tex.number_bloom_mips; i++) {
 		tex.bloom_chain_isize[i] = { x,y };
 		tex.bloom_chain_size[i] = { fx,fy };
 		glTextureStorage2D(tex.bloom_chain[i], 1, GL_R11F_G11F_B10F, x, y);
@@ -1081,6 +1176,8 @@ void Renderer::init_bloom_buffers()
 		fx *= 0.5;
 		fy *= 0.5;
 	}
+
+	tex.bloom_vts_handle->update_specs(tex.bloom_chain[0], cur_w / 2, cur_h / 2, 3, {});
 }
 
 void Renderer::render_bloom_chain()
@@ -1105,7 +1202,7 @@ void Renderer::render_bloom_chain()
 
 	glBindTextureUnit(0, tex.scene_color);
 	glClearColor(0, 0, 0, 1);
-	for (int i = 0; i < BLOOM_MIPS; i++)
+	for (int i = 0; i < tex.number_bloom_mips; i++)
 	{
 		glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i], 0);
 
@@ -1126,7 +1223,7 @@ void Renderer::render_bloom_chain()
 	glBlendFunc(GL_ONE, GL_ONE);
 
 	set_shader(prog.bloom_upsample);
-	for (int i = BLOOM_MIPS - 1; i > 0; i--)
+	for (int i = tex.number_bloom_mips - 1; i > 0; i--)
 	{
 		glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i - 1], 0);
 
@@ -1434,8 +1531,9 @@ void Renderer::ui_render()
 {
 	GPUFUNCTIONSTART;
 
+	return;
 
-	set_shader(prog.textured3d);
+	//set_shader(prog.textured3d);
 	shader().set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
 	shader().set_mat4("ViewProj", proj);
@@ -1472,7 +1570,7 @@ void Renderer::ui_render()
 
 	glDisable(GL_BLEND);
 	if (0) {
-		set_shader(prog.textured3d);
+		//set_shader(prog.textured3d);
 		glCheckError();
 
 		shader().set_mat4("Model", mat4(1));
@@ -1484,7 +1582,7 @@ void Renderer::ui_render()
 		ui_builder.Push2dQuad(glm::vec2(-1, 1), glm::vec2(1, -1), glm::vec2(0, 0),
 			glm::vec2(1, 1), COLOR_WHITE);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, tex.scene_depthstencil);
+		glBindTexture(GL_TEXTURE_2D, tex.scene_depth);
 
 		glCheckError();
 
@@ -1642,6 +1740,7 @@ void Render_Pass::add_object(
 	Material* material,
 	uint32_t camera_dist,
 	uint32_t submesh,
+	uint32_t lod,
 	uint32_t layer) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
@@ -1650,6 +1749,12 @@ void Render_Pass::add_object(
 	obj.render_obj = handle;
 	obj.submesh_index = submesh;
 	obj.material = material;
+	obj.lod_index = lod;
+	uint32_t size = high_level_objects_in_pass.size();
+	if (size==0||high_level_objects_in_pass[size-1].id != handle.id)
+		high_level_objects_in_pass.push_back(handle);
+	obj.hl_obj_index = high_level_objects_in_pass.size()-1;
+
 	ASSERT(material->gpu_material_mapping != Material::INVALID_MAPPING);
 	objects.push_back(obj);
 }
@@ -1701,6 +1806,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		Pass_Object* batch_obj = &objects[0];
 		const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
 		Mesh_Batch batch = functor(0, batch_obj, batch_proxy);
+		batch_obj->batch_idx = 0;
 
 		for (int i = 1; i < objects.size(); i++) {
 			Pass_Object* this_obj = &objects[i];
@@ -1716,6 +1822,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 				batch_obj = this_obj;
 				batch_proxy = this_proxy;
 			}
+			this_obj->batch_idx = mesh_batches.size();
 		}
 		mesh_batches.push_back(batch);
 	}
@@ -1804,16 +1911,142 @@ struct ObjGpu
 };
 // uint MultidrawCounts[] = {0, 0, 0, 0}
 // uint MultidrawOffsets[] = {0,3,5,6}
+
+struct PerObjResult
+{
+	int8_t lod_choosen = -1;
+};
+
+
+glm::vec4 normalize_plane(glm::vec4 p)
+{
+	return p / glm::length(glm::vec3(p));
+}
+
+// Use RAII here, this is allocated on the heap post OpenGL initialization
+class GpuDataForGbufferCulling
+{
+public:
+	GpuDataForGbufferCulling();
+	~GpuDataForGbufferCulling();
+
+
+	bufferhandle out_command_buffer{};
+	bufferhandle in_command_buffer{};
+	bufferhandle mdi_counts{};
+	bufferhandle mdi_offsets{};
+	bufferhandle occluded_list{};
+	bufferhandle hlobjs{};
+	bufferhandle instances{};
+	bufferhandle meshlet_cull_args{};
+	bufferhandle tri_cull_args{};
+};
+
+class RenderListBuilder
+{
+public:
+	static void build_standard_cpu(
+		Render_Lists& list,
+		Render_Pass& src,
+		Free_List<ROP_Internal>& proxy_list
+	)
+	{
+		// first build the lists
+		list.build_from(src, proxy_list);
+
+		// Frustum cull and choose LOD
+		glm::mat4 projectionT = glm::transpose(draw.vs.proj);
+		glm::vec4 frustumX = normalize_plane(projectionT[3] + projectionT[0]); // x + w < 0
+		glm::vec4 frustumY = normalize_plane(projectionT[3] + projectionT[1]); // y + w < 0
+		glm::vec4 cullfrustum = glm::vec4(
+			frustumX.x,
+			frustumX.z,
+			frustumY.y,
+			frustumY.z
+		);
+
+		auto& arena = draw.get_arena();
+		const int count = src.high_level_objects_in_pass.size();
+		const auto marker = arena.get_bottom_marker();
+		PerObjResult* results = (PerObjResult*)arena.alloc_bottom(sizeof(PerObjResult) * count);
+		const float near = draw.vs.near;
+		const float far = draw.vs.far;
+		const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
+		const glm::mat4 view = draw.vs.view;
+		for (int hlIndex = 0; hlIndex < count; hlIndex++) {
+			// this can all be optimized later, cache center+radius in the Render_Object when it changes
+			auto& proxy = proxy_list.get(src.high_level_objects_in_pass[hlIndex].id).proxy;
+			const Model* m = proxy.model;
+			glm::vec4 boundingsphere = m->get_bounding_sphere();
+			vec3 center = glm::vec3(boundingsphere);
+			center = (view * proxy.transform * vec4(center, 1.0));
+			float radius = boundingsphere.w;	// fixme scale not applied to radius
+
+			bool visible = true;
+			visible = visible && center.z * cullfrustum[1] - abs(center.x) * cullfrustum[0] > -radius;
+			visible = visible && center.z * cullfrustum[3] - abs(center.y) * cullfrustum[2] > -radius;
+			visible = visible && center.z - radius < -near && center.z + radius > -far;
+
+			results[hlIndex].lod_choosen = visible ? 0 : -1;
+			if (!visible)
+				continue;
+
+			float percentage = inv_two_times_tanfov / -center.z;
+			percentage *= radius;
+
+			for (int i = m->get_num_lods() - 1; i > 0; i--) {
+				if (percentage <= m->get_lod(i).end_percentage) {
+					results[hlIndex].lod_choosen = i;
+					break;
+				}
+			}
+		}
+
+		const int objCount = src.objects.size();
+		uint32_t* glinstance_to_instance = (uint32_t*)arena.alloc_bottom(sizeof(uint32_t) * objCount);
+
+		for (int objIndex = 0; objIndex < objCount; objIndex++) {
+			auto& obj = src.objects[objIndex];
+			bool visible = results[obj.hl_obj_index].lod_choosen == obj.lod_index;
+			if (!visible) 
+				continue; 
+			uint32_t precount = list.commands[obj.batch_idx].primCount++;	// increment count
+			uint32_t ofs = list.commands[obj.batch_idx].baseInstance;
+
+			// set the pointer to the Render_Object strucutre that will be found on the gpu
+			glinstance_to_instance[ofs+precount] = proxy_list.handle_to_obj[obj.render_obj.id];
+		}
+
+		glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
+		glNamedBufferSubData(list.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
+
+
+		arena.free_bottom_to_marker(marker);
+
+	}
+
+
+	static void prep_for_gpu()
+	{
+
+	}
+};
+
+
+
 extern bool use_32_bit_indicies;
 void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list)
 {
+	// This function essentially just loops over all batches and creates gpu commands for them
+	// its O(n) to the number of batches, not n^2 which it kind of looks like it is
+
 	commands.clear();
 	command_count.clear();
 
-	static std::vector<uint32_t> instance_to_instance;
+	//static std::vector<uint32_t> instance_to_instance;
 	static std::vector<uint32_t> draw_to_material;
 	draw_to_material.clear();
-	instance_to_instance.clear();
+	//instance_to_instance.clear();
 
 	int base_instance = 0;
 
@@ -1834,28 +2067,30 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 			cmd.count = part.element_count;
 			cmd.firstIndex = part.element_offset + proxy.model->get_merged_index_ptr();
 			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
-			cmd.primCount = meshb.count;
+
+			// Important! Set primCount to 0 because visible instances will increment this
+			cmd.primCount = 0;// meshb.count;
 			cmd.baseInstance = base_instance;
 
 			commands.push_back(cmd);
 
-			for (int k = 0; k < meshb.count; k++) {
-				instance_to_instance.push_back(proxy_list.handle_to_obj[src.objects[meshb.first + k].render_obj.id]);
-			}
+			//for (int k = 0; k < meshb.count; k++) {
+			//	instance_to_instance.push_back(proxy_list.handle_to_obj[src.objects[meshb.first + k].render_obj.id]);
+			//}
 
-			base_instance += cmd.primCount;
+			base_instance += meshb.count;// cmd.primCount;
 
 			auto batch_material = meshb.material;
 			draw_to_material.push_back(batch_material->gpu_material_mapping);
 
-			draw.stats.tris_drawn += cmd.primCount * cmd.count / 3;
+			draw.stats.tris_drawn += meshb.count * cmd.count / 3;
 		}
 
 		command_count.push_back(mdb.count);
 	}
 
-	glNamedBufferData(glinstance_to_instance, sizeof(uint32_t) * indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
-	glNamedBufferSubData(glinstance_to_instance, 0, sizeof(uint32_t) * instance_to_instance.size(), instance_to_instance.data());
+	//glNamedBufferData(glinstance_to_instance, sizeof(uint32_t) * indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
+	//glNamedBufferSubData(glinstance_to_instance, 0, sizeof(uint32_t) * instance_to_instance.size(), instance_to_instance.data());
 
 	glNamedBufferData(gldrawid_to_submesh_material, sizeof(uint32_t) * indirect_drawid_buf_size, nullptr, GL_DYNAMIC_DRAW);
 	glNamedBufferSubData(gldrawid_to_submesh_material, 0, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data());
@@ -1978,35 +2213,39 @@ void Render_Scene::build_scene_data()
 			handle<Render_Object> objhandle{obj.handle};
 			auto& proxy = obj.type_.proxy;
 			if (proxy.visible && proxy.model) {
-				// When CPU culling do that here
-				
-				// determine LOD:
-				float cam_dist = 0.0;
-				const auto& lod = get_lod_to_render(proxy, inv_two_times_tanfov, cam_dist);
 
-				const int pstart = lod.part_ofs;
-				const int pend = pstart + lod.part_count;
+				auto& vs = draw.get_current_frame_vs();
+				glm::vec3 to_origin = glm::vec3(proxy.transform[3]) - vs.origin;
+				float CAM_DIST = glm::dot(to_origin, vs.front);
+				float far = draw.get_current_frame_vs().far;
+				CAM_DIST = 2.0 * (CAM_DIST / (far + CAM_DIST));
+				CAM_DIST = glm::max(CAM_DIST, 0.f);
+				uint32_t quantized_CAM_DIST = CAM_DIST * (1 << 15);
+				if (quantized_CAM_DIST >= (1 << 15)) quantized_CAM_DIST = (1 << 15) - 1;
 
-				// Both GPU/CPU culling: select LOD based on camera dist
+				auto model = proxy.model;
+				for (int iLOD = 0; iLOD < model->get_num_lods(); iLOD++) {
+					auto& lod = model->get_lod(iLOD);
 
-				for (int j = pstart; j < pend; j++) {
-					auto& part = proxy.model->get_part(j);
+					const int pstart = lod.part_ofs;
+					const int pend = pstart + lod.part_count;
 
-					Material* mat = proxy.model->get_material(part.material_idx);
-					if (obj.type_.proxy.mat_override)
-						mat = obj.type_.proxy.mat_override;
-					if (mat->is_translucent()) {
-						float far = draw.get_current_frame_vs().far;
-						cam_dist = 2.0 * (cam_dist / (far + cam_dist));
-						cam_dist = glm::max(cam_dist, 0.f);
-						uint32_t quantized = cam_dist * (1 << 15);
-						if (quantized >= (1 << 15)) quantized = (1 << 15) - 1;
-						transparents.add_object(proxy, objhandle, mat, quantized, j, 0);
+					for (int j = pstart; j < pend; j++) {
+						auto& part = proxy.model->get_part(j);
+
+						Material* mat = proxy.model->get_material(part.material_idx);
+						if (obj.type_.proxy.mat_override)
+							mat = obj.type_.proxy.mat_override;
+						if (mat->is_translucent()) {
+							transparents.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0);
+						}
+						else {
+							depth.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
+							opaque.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
+						}
 					}
-					else {
-						depth.add_object(proxy, objhandle, mat, 0, j, 0);
-						opaque.add_object(proxy, objhandle, mat, 0,j, 0);
-					}
+
+
 				}
 
 				if (proxy.animator) {
@@ -2060,11 +2299,29 @@ void Render_Scene::build_scene_data()
 	}
 	{
 		CPUSCOPESTART(make_render_lists);
-		// build draw calls
-		vis_list.build_from(depth, proxy_list);
-		shadow_lists.build_from(depth, proxy_list);
-		opaque_list.build_from(opaque, proxy_list);
-		transparents_list.build_from(transparents, proxy_list);
+		
+		// cull + build draw calls
+
+		RenderListBuilder::build_standard_cpu(
+			vis_list,
+			depth,
+			proxy_list
+		);
+		RenderListBuilder::build_standard_cpu(
+			shadow_lists,
+			depth,
+			proxy_list
+		);
+		RenderListBuilder::build_standard_cpu(
+			opaque_list,
+			opaque,
+			proxy_list
+		);
+		RenderListBuilder::build_standard_cpu(
+			transparents_list,
+			transparents,
+			proxy_list
+		);
 	}
 }
 
@@ -2180,7 +2437,7 @@ void mdi_test_imgui()
 }
 #include "Meshlet.h"
 
-
+#if 0
 void create_full_mdi_buffers(Chunked_Model* mod, 
 	uint32_t& chunk_buffer,
 	uint32_t& drawid_to_instance_buffer,
@@ -2221,12 +2478,7 @@ void create_full_mdi_buffers(Chunked_Model* mod,
 	glCreateBuffers(1, &draw_count_buffer);
 	glNamedBufferStorage(draw_count_buffer, sizeof(glm::uvec4), nullptr, GL_DYNAMIC_STORAGE_BIT);
 }
-
-glm::vec4 normalize_plane(glm::vec4 p)
-{
-	return p / glm::length(glm::vec3(p));
-}
-
+#endif
 static glm::vec4 bounds_to_sphere(Bounds b)
 {
 	glm::vec3 center = b.get_center();
@@ -2809,10 +3061,10 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		ssao.render();
 
 	// planar reflection render
-	{
-		GPUSCOPESTART("Planar reflection");
-		planar_reflection_pass();
-	}
+	//{
+	//	GPUSCOPESTART("Planar reflection");
+	//	planar_reflection_pass();
+	//}
 
 	// main level render
 	{
@@ -2901,6 +3153,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	if (gui && params.draw_ui)
 		gui->ui_paint();
 
+
+	debug_tex_out.draw_out();
+
 	//cubemap_positions_debug();
 
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -2945,7 +3200,7 @@ void Renderer::DrawEntBlobShadows()
 	shadowverts.End();
 	glCheckError();
 
-	set_shader(prog.particle_basic);
+	//set_shader(prog.particle_basic);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.0));
 	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
@@ -2990,10 +3245,10 @@ void Renderer::set_wind_constants()
 void Renderer::set_water_constants()
 {
 	// use sampler1 for reflection map, sampler2 for the depth of the current render
-	bind_texture(ALBEDO1_LOC, tex.reflected_color);
-	bind_texture(ROUGH1_LOC, tex.scene_depthstencil);
-	bind_texture(NORMAL1_LOC, waternormal->gl_id);
-	bind_texture(SPECIAL_LOC, tex.reflected_depth);
+	bind_texture(ALBEDO1_LOC, white_texture.gl_id);	// reflected_color
+	bind_texture(ROUGH1_LOC, tex.scene_depth);
+	//bind_texture(NORMAL1_LOC, waternormal->gl_id);
+	bind_texture(SPECIAL_LOC, white_texture.gl_id);	// reflected_depth
 }
 
 program_handle Renderer::get_mat_shader(bool has_animated_matricies, bool color_overlay, const Model* mod, const Material* mat, bool depth_pass, bool dither)
@@ -3033,6 +3288,8 @@ else bind_texture(where, fallback.gl_id);
 
 void Renderer::planar_reflection_pass()
 {
+	ASSERT(0);
+
 	glm::vec3 plane_n = glm::vec3(0, 1, 0);
 	float plane_d = 2.0;
 
@@ -3059,7 +3316,7 @@ void Renderer::planar_reflection_pass()
 	params.custom_clip_plane = vec4(plane_n, plane_d);
 	params.pass = params.OPAQUE;
 	params.clear_framebuffer = true;
-	params.output_framebuffer = fbo.reflected_scene;
+	//params.output_framebuffer = fbo.reflected_scene;
 	params.draw_viewmodel = false;
 	params.upload_constants = true;
 	params.is_water_reflection_pass = true;
@@ -3365,10 +3622,104 @@ void Render_Scene::update(handle<Render_Object> handle, const Render_Object& pro
 	in.proxy = proxy;
 	if (!proxy.viewmodel_layer) 
 		in.inv_transform = glm::inverse(proxy.transform);
+	if (proxy.model)
+		in.bounding_sphere_and_radius = proxy.transform * proxy.model->get_bounding_sphere();
 }
 
 void Render_Scene::remove(handle<Render_Object> handle) {
 	if (handle.id != -1) {
 		proxy_list.free(handle.id);
 	}
+}
+
+
+void DepthPyramid::init()
+{
+	depth_pyramid = g_imgs.install_system_texture("_depth_pyramid");
+	assert(depth_pyramid);
+	draw.on_viewport_size_changed.add(this, &DepthPyramid::on_viewport_size_changed);
+	draw.prog.cCreateDepthPyramid = draw.prog_man.create_compute("misc/depth_pyramid.txt");
+}
+void DepthPyramid::free()
+{
+
+}
+void DepthPyramid::dispatch_depth_pyramid_creation()
+{
+
+}
+void DepthPyramid::on_viewport_size_changed(int x, int y)
+{
+	texhandle handle = depth_pyramid->gl_id;
+
+	glDeleteTextures(1, &handle);
+
+	// allocate a depth pyramid
+	const uint width = x / 2;
+	const uint height = y / 2;
+	const uint32_t mip_count = get_mip_map_count(width, height);
+	glCreateTextures(GL_TEXTURE_2D, 1, &handle);
+	glTextureStorage2D(handle, mip_count, GL_DEPTH_COMPONENT24, width, height);
+	glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// 2x2 min filter, special extension but has pretty wide support for any newish hardware
+	glTextureParameteri(handle, GL_TEXTURE_REDUCTION_MODE_ARB, GL_MIN);
+	// update virtual texture
+	depth_pyramid->update_specs(handle, width, height, 3, Texture_Format::TEXFMT_RGB8);
+	depth_pyramid->type = Texture_Type::TEXTYPE_2D;
+}
+
+void DebuggingTextureOutput::draw_out()
+{
+	if (!output_tex)
+		return;
+	if (output_tex->gl_id == 0) {
+		sys_print("!!! DebuggingTextureOutput has invalid texture\n");
+		output_tex = nullptr;
+		return;
+	}
+	if (output_tex->type == Texture_Type::TEXTYPE_2D)
+		draw.set_shader(draw.prog.tex_debug_2d);
+	else if (output_tex->type == Texture_Type::TEXTYPE_2D_ARRAY)
+		draw.set_shader(draw.prog.tex_debug_2d_array);
+	else {
+		sys_print("!!! can only debug 2d and 2d array textures\n");
+		output_tex = nullptr;
+		return;
+	}
+
+	const int w = output_tex->width;
+	const int h = output_tex->height;
+
+	const float cur_w = draw.get_current_frame_vs().width;
+	const float cur_h = draw.get_current_frame_vs().height;
+
+	draw.shader().set_mat4("Model", mat4(1));
+	glm::mat4 proj = glm::ortho(0.f, cur_w, cur_h, 0.f);
+	draw.shader().set_mat4("ViewProj", proj);
+
+	draw.shader().set_float("alpha", alpha);
+	draw.shader().set_float("mip_slice", -1);
+
+	draw.bind_texture(0, output_tex->gl_id);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glm::vec2 upper_left = glm::vec2(0, 1);
+	glm::vec2 size = glm::vec2(1, -1);
+
+
+	MeshBuilder mb;
+	mb.Begin();
+	mb.Push2dQuad(glm::vec2(0, 0), glm::vec2(w * scale, h * scale), upper_left, size, {});
+	mb.End();
+	mb.Draw(MeshBuilder::TRIANGLES);
+
+	glDisable(GL_BLEND);
+
+	mb.Free();
+
 }

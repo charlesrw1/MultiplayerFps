@@ -523,6 +523,9 @@
     <ClInclude Include="Source\Framework\Hashset.cpp">
       <Filter>Source\Framework\Containers</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\ConsolePrint.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

@@ -2,8 +2,8 @@
 #include "imgui.h"
 #include "glad/glad.h"
 #include "glm/gtc/type_ptr.hpp"
-
 #include "GameEnginePublic.h"
+#include <random>
 
 
 void draw_hbao_menu()
@@ -17,9 +17,12 @@ void draw_hbao_menu()
 static const int NOISE_RES = 4;
 static const int NUM_MRT = 8;
 
-#include <random>
 void SSAO_System::init()
 {
+	texture.result_vts_handle = g_imgs.install_system_texture("_ssao_result");
+	texture.blur_vts_handle = g_imgs.install_system_texture("_ssao_blur");
+	texture.view_normal_vts_handle = g_imgs.install_system_texture("_ssao_view_normal");
+
 	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
 
 	make_render_targets(true, g_window_w.get_integer(), g_window_h.get_integer());
@@ -187,6 +190,10 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 
 	this->width = width;
 	this->height = height;
+
+	texture.blur_vts_handle->update_specs(texture.result, width, height, 2, {});
+	texture.result_vts_handle->update_specs(texture.blur, width, height, 2, {});
+	texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
 }
 
 #define USE_AO_LAYERED_SINGLEPASS 2
@@ -287,7 +294,7 @@ void SSAO_System::render()
 			far,
 			1.0
 		));
-		glBindTextureUnit(0, draw.tex.scene_depthstencil);
+		glBindTextureUnit(0, draw.tex.scene_depth);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glCheckError();

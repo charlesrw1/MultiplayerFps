@@ -1,19 +1,25 @@
 
-
 out vec4 FS_OUT_Color;
 
 in vec4 FS_IN_Color;
 in vec2 FS_IN_TexCoord;
 
-#ifdef TEXTUREARRAY
-uniform sampler2DArray basecolor;
-uniform int slice;
-#else
-uniform sampler2D basecolor;
+
+#ifdef TEXTURE_2D_VERSION
+layout(binding = 0) uniform sampler2D the_texture;
+#endif
+#ifdef TEXTURE_2D_ARRAY_VERSION
+layout(binding = 0) uniform sampler2DArray the_texture;
 #endif
 
-float near = 0.01; 
-float far  = 100.0; 
+uniform float near = 0.01; 
+uniform float far  = 100.0; 
+uniform float alpha = 1.0;
+uniform float mip_slice = 0.0;
+uniform bool linearize_depth = false;
+uniform bool fetch_texel = false;
+uniform int texture_width = 100;
+uniform int texture_height = 100;
   
 float LinearizeDepth(float depth) 
 {
@@ -21,27 +27,29 @@ float LinearizeDepth(float depth)
     return (2.0 * near * far) / (far + near - z * (far - near));	
 }
 
-
-uniform vec4 tint;
-
 void main()
 {
-#ifdef TEXTUREARRAY
-	vec4 color = texture(basecolor, vec3(FS_IN_TexCoord, slice));
-	FS_OUT_Color = vec4(color.r,0,0,1.0);
-#else
-	vec4 color = texture(basecolor,FS_IN_TexCoord);
-	color.r = LinearizeDepth(color.r)/far;
-
-#ifdef PARTICLE_SHADER
-	//if(color.r < 0.2)
-	//	discard;
+	vec4 tex_color = vec4(0.0);
 	
-	FS_OUT_Color = vec4(FS_IN_Color.rgb, FS_IN_Color.a*color.r);
-#else
-	FS_OUT_Color = color*FS_IN_Color;
+#ifdef TEXTURE_2D_VERSION
+	if(mip_slice < 0) {
+		tex_color = texture(the_texture, FS_IN_TexCoord);
+	}
+	else {
+		if(fetch_texel) {
+			ivec2 coords = ivec2(FS_IN_TexCoord.x * texture_width, FS_IN_TexCoord.y * texture_height);
+			tex_color = texelFetch(the_texture, coords, int(mip_slice));
+		}
+		else {
+			tex_color = textureLod(the_texture, FS_IN_TexCoord, mip_slice);
+		}
+	}
 #endif
 
+#ifdef TEXTURE_2D_ARRAY_VERSION
+	tex_color = texture(the_texture, vec3(FS_IN_TexCoord,0.0));
 #endif
+
+FS_OUT_Color = vec4(tex_color.rgb, alpha);
 }
 	

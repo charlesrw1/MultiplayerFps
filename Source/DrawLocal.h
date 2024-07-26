@@ -16,6 +16,9 @@
 #include "Render/RenderExtra.h"
 #include "Render/Material.h"
 #include "Framework/MemArena.h"
+
+#include "Framework/MulticastDelegate.h"
+
 #pragma optimize("", on)
 
 class MeshPart;
@@ -36,7 +39,6 @@ extern ConfigVar enable_ssao;
 extern ConfigVar use_halfres_reflections;
 
 
-const int BLOOM_MIPS = 6;
 
 typedef int program_handle;
 
@@ -125,14 +127,13 @@ static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
 
 struct Pass_Object
 {
-	Pass_Object() {
-		submesh_index = 0;
-	}
-
 	draw_call_key sort_key;
 	const Material* material = nullptr;
 	handle<Render_Object> render_obj{};	// entity instance
-	uint32_t submesh_index;		// what submesh am i
+	uint16_t submesh_index = 0;		// what submesh am i
+	uint16_t lod_index = 0;
+	uint32_t hl_obj_index{};
+	uint32_t batch_idx = 0;
 };
 
 // in the end: want a flat list of batches that are merged with neighbors
@@ -161,6 +162,7 @@ public:
 		Material* material,
 		uint32_t camera_dist,
 		uint32_t submesh, 
+		uint32_t lod,
 		uint32_t layer);
 
 	draw_call_key create_sort_key_from_obj(
@@ -172,6 +174,7 @@ public:
 
 	void clear() {
 		objects.clear();
+		high_level_objects_in_pass.clear();
 	}
 
 	const pass_type type{};					// modifies batching+sorting logic
@@ -181,7 +184,6 @@ public:
 	// this is the array that gets frustum + occlusion culled to make the final Render_Lists structure
 	// this means static objects can cache LODs
 	std::vector<handle<Render_Object>> high_level_objects_in_pass;
-
 	std::vector<Pass_Object> objects;		// geometry + material id + object id
 	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
 	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
@@ -192,6 +194,7 @@ struct ROP_Internal
 {
 	Render_Object proxy;
 	glm::mat4 inv_transform;
+	glm::vec4 bounding_sphere_and_radius;
 };
 
 // RenderLight internal data
@@ -202,17 +205,6 @@ struct RL_Internal
 	int shadow_array_index = -1;
 };
 
-// cull main view
-// first pass does objects visible last frame
-// render visible ones last frame
-// second pass works on objects not visible, check if they are this frame
-
-// use the culling result to create draw calls for opaque, transparent
-
-// shadow view culling
-// only does frustum, cull objects for each cascade
-// create draw calls for each cascade
-
 // Render lists: represents opengl commands that have been uploaded (or kept CPU side)
 //				 these are fed into glMultiDrawElementsIndirect()
 //				 these are built around Render_Pass which contains the objects that will be renderered
@@ -222,6 +214,7 @@ struct RL_Internal
 // Reprsents a structure for storing DrawElementsIndirectCommands
 // These can be cpu or gpu stored, when using gpu culling, the gpu buffer is culled and used
 // This gets fed into "execute_render_lists"
+
 struct Render_Lists
 {
 	void init(uint32_t drawidsz, uint32_t instbufsz);
@@ -239,7 +232,7 @@ struct Render_Lists
 	// for now its just set to batches[i].count in the Render_Pass
 	// when calling glMDEI, the offset into commands is the summation of previous command counts essentially
 	// it works like an indirection into commands
-	std::vector<int> command_count;
+	std::vector<uint32_t> command_count;
 	bufferhandle gpu_command_count = 0;
 
 	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
@@ -250,31 +243,6 @@ struct Render_Lists
 	// where are we getting our objects from
 	const Render_Pass* parent_pass = nullptr;
 };
-
-// For CPU culling
-struct CpuRenderLists
-{
-	std::vector<gpu::DrawElementsIndirectCommand> commands;
-	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
-	bufferhandle gldrawid_to_submesh_material;
-	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
-	bufferhandle glinstance_to_instance;
-	const Render_Pass* parent_pass = nullptr;
-};
-
-// Optional GPU path
-struct GpuRenderLists
-{
-	bufferhandle gpu_command_list = 0;
-	bufferhandle gpu_command_count = 0;
-
-	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
-	bufferhandle gldrawid_to_submesh_material;
-	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
-	bufferhandle glinstance_to_instance;
-	const Render_Pass* parent_pass = nullptr;
-};
-
 
 // In theory render passes can be made once and cached if the object is static and do culling on the gpu
 // Render lists are updated every frame though
@@ -297,24 +265,6 @@ struct GpuRenderLists
 // custom depth list
 // editor selected list
 
-
-// The lowest level data
-// Litteraly just feeding vertex data and a shader into glMultiDrawElementsIndirect
-// particles are just a dynamic mesh with their own handle into the proxy list
-struct DrawCommand
-{
-	// handle into a vertex buffer
-	// this is likely the same for all static meshes
-	// but particles/meshbuilders might have unique vertex buffers
-	// the handle points to a vao/vbo/ebo resource
-	uint64_t vertex_buffer_handle = 0;
-
-	// handle for a material to render this with
-	uint64_t material_handle = 0;
-
-	// per object data
-	uint64_t object_handle = 0;
-};
 
 class Render_Scene
 {
@@ -342,21 +292,21 @@ public:
 
 	RL_Internal* get_main_directional_light();
 
-	std::unique_ptr<Render_Pass> gbuffer;
-	std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling
-	std::unique_ptr<Render_Lists> gbuffer2;				// 2nd pass for new unoccluded objects if using gpu culling
-
-	std::unique_ptr<Render_Pass> transparent_objs;
-	std::unique_ptr<Render_Lists> transparents_ren_list;// draw in forward pass of transparents
-
-	std::unique_ptr<Render_Pass> custom_depth;
-	std::unique_ptr<Render_Lists> custom_depth_list;	// draw to custom depth buffer
-
-	std::unique_ptr<Render_Pass> editor_selection;
-	std::unique_ptr<Render_Lists> editor_sel_list;		// drawn to editor selection buffer
-
-	std::unique_ptr<Render_Pass> shadow_casters;
-	std::unique_ptr<Render_Lists> global_shadow_list;	// unculled shadow casters
+	//std::unique_ptr<Render_Pass> gbuffer;
+	//std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling
+	//std::unique_ptr<Render_Lists> gbuffer2;				// 2nd pass for new unoccluded objects if using gpu culling
+	//
+	//std::unique_ptr<Render_Pass> transparent_objs;
+	//std::unique_ptr<Render_Lists> transparents_ren_list;// draw in forward pass of transparents
+	//
+	//std::unique_ptr<Render_Pass> custom_depth;
+	//std::unique_ptr<Render_Lists> custom_depth_list;	// draw to custom depth buffer
+	//
+	//std::unique_ptr<Render_Pass> editor_selection;
+	//std::unique_ptr<Render_Lists> editor_sel_list;		// drawn to editor selection buffer
+	//
+	//std::unique_ptr<Render_Pass> shadow_casters;
+	//std::unique_ptr<Render_Lists> global_shadow_list;	// unculled shadow casters
 
 
 	Render_Pass depth;			// vis/shadow objects, same as opaque but grouped with minimal draw clls
@@ -470,12 +420,49 @@ public:
 	std::vector<material_shader_internal> shader_hash_map;
 };
 
+//
+//   /
+//  /
+// /---------\
+
+
+class DepthPyramid
+{
+public:
+	void init();
+	void free();
+
+	void dispatch_depth_pyramid_creation();
+
+	void on_viewport_size_changed(int x, int y);
+
+	Texture* depth_pyramid = nullptr;
+};
+
+class DebuggingTextureOutput
+{
+public:
+	void draw_out();
+
+	Texture* output_tex = nullptr;
+	float alpha = 1.0;
+	float mip = 0.0;
+	float scale = 1.0;
+	bool explicit_texel = false;
+};
+
+
+const uint32_t MAX_BLOOM_MIPS = 6;
+
 
 
 class Renderer : public RendererPublic
 {
 public:
 	Renderer();
+
+	// local delegates
+	MulticastDelegate<int, int> on_viewport_size_changed;	// hook up to change buffers etc.
 
 	// public interface
 	virtual void init() override;
@@ -493,6 +480,10 @@ public:
 	virtual handle<Render_Light> register_light(const Render_Light& l) override;
 	virtual void update_light(handle<Render_Light> handle, const Render_Light& l) override;
 	virtual void remove_light(handle<Render_Light>& handle) override;
+
+
+	void check_hardware_options();
+	void create_default_textures();
 
 	void render_level_to_target(Render_Level_Params params);
 
@@ -535,27 +526,33 @@ public:
 	Material_Shader_Table mat_table;
 	struct programs
 	{
-		program_handle simple;
-		program_handle textured;
-		program_handle textured3d;
-		program_handle texturedarray;
-		program_handle skybox;
+		program_handle simple{};
+		//program_handle textured;
+		//program_handle textured3d;
+		//program_handle texturedarray;
+		program_handle skybox{};
 
-		program_handle particle_basic;
-		program_handle bloom_downsample;
-		program_handle bloom_upsample;
-		program_handle combine;
-		program_handle hbao;
-		program_handle xblur;
-		program_handle yblur;
-		program_handle mdi_testing;
+		//program_handle particle_basic;
+		program_handle bloom_downsample{};
+		program_handle bloom_upsample{};
+		program_handle combine{};
+		program_handle hbao{};
+		program_handle xblur{};
+		program_handle yblur{};
+		program_handle mdi_testing{};
+
+		// depth pyramid compute shader
+		program_handle cCreateDepthPyramid{};
+
+		program_handle tex_debug_2d{};
+		program_handle tex_debug_2d_array{};
 	}prog;
 
 	struct framebuffers {
-		fbohandle scene;
-		fbohandle reflected_scene;
-		fbohandle bloom;
-		fbohandle composite = 0;
+		fbohandle scene{};
+		//fbohandle reflected_scene{};
+		fbohandle bloom{};
+		fbohandle composite{};
 
 		fbohandle gbuffer{};	// 4 MRT (gbuffer0-2, scene_color)
 		fbohandle forward_render{};	// scene_color, use for translucents
@@ -564,7 +561,7 @@ public:
 
 	struct textures {
 		texhandle scene_color{};
-		texhandle scene_depthstencil{};
+		texhandle scene_depth{};
 
 		texhandle scene_gbuffer0{};	
 		texhandle scene_gbuffer1{};
@@ -586,25 +583,35 @@ public:
 		texhandle editor_selection_buffer{};
 
 
-		texhandle reflected_color;
-		texhandle reflected_depth;
-		texhandle output_composite = 0;
+		//texhandle reflected_color{};
+		//texhandle reflected_depth{};
+		
+		texhandle output_composite{};
 
-		texhandle bloom_chain[BLOOM_MIPS];
-		glm::ivec2 bloom_chain_isize[BLOOM_MIPS];
-		glm::vec2 bloom_chain_size[BLOOM_MIPS];
+		texhandle bloom_chain[MAX_BLOOM_MIPS];
+		glm::ivec2 bloom_chain_isize[MAX_BLOOM_MIPS];
+		glm::vec2 bloom_chain_size[MAX_BLOOM_MIPS];
+		uint32_t number_bloom_mips = 0;
+
+		// "virtual texture system" handles, does that even make sense?
+		Texture* bloom_vts_handle = nullptr;
+		Texture* scene_color_vts_handle = nullptr;
+		Texture* scene_depth_vts_handle = nullptr;
+		Texture* gbuffer0_vts_handle = nullptr;
+		Texture* gbuffer1_vts_handle = nullptr;
+		Texture* gbuffer2_vts_handle = nullptr;
 	}tex;
 
 	struct uniform_buffers {
-		bufferhandle current_frame;
+		bufferhandle current_frame{};
 	}ubo;
 
 	struct buffers {
-		bufferhandle default_vb;
+		bufferhandle default_vb{};
 	}buf;
 
 	struct vertex_array_objects {
-		vertexarrayhandle default_;
+		vertexarrayhandle default_{};
 	}vao;
 
 	bufferhandle active_constants_ubo = 0;
@@ -637,15 +644,15 @@ public:
 	glm::vec3 ambientvfog;
 	bool using_skybox_for_specular = false;
 
-	Texture* lens_dirt;
-	Texture* casutics;
-	Texture* waternormal;
+	Texture* lens_dirt = nullptr;
 
 	SSAO_System ssao;
 	Shadow_Map_System shadowmap;
 	Volumetric_Fog_System volfog;
-	float slice_3d=0.0;
+	DepthPyramid depth_pyramid_maker;
+	DebuggingTextureOutput debug_tex_out;
 
+	float slice_3d=0.0;
 
 	Render_Scene scene;
 

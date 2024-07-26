@@ -118,6 +118,7 @@
     <ClInclude Include="Source\Framework\StringName.h" />
     <ClInclude Include="Source\Framework\StringUtil.h" />
     <ClInclude Include="Source\Framework\SubclassType.h" />
+    <ClInclude Include="Source\Framework\ConsolePrint.h" />
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />

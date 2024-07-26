@@ -1,11 +1,11 @@
-#if 0
+#if 1
 #include <meshoptimizer.h>
 #include <vector>
 #include "Model.h"
 #include "glad/glad.h"
 #include "Meshlet.h"
 using std::vector;
-
+#if 0
 const static uint32_t MAX_CHUNK_VERTS = 64;
 const static uint32_t MAX_CHUNK_TRIS = 256;
 
@@ -48,6 +48,8 @@ Chunked_Model* get_chunked_mod(const char* filename)
 			MAX_CHUNK_VERTS,
 			MAX_CHUNK_TRIS,
 			0.5);
+
+		
 		const meshopt_Meshlet& last = meshlets[num_meshlets - 1];
 		size_t num_meshlet_indicies = last.vertex_offset + last.vertex_count;
 		size_t num_micro_indicies = last.triangle_offset + last.triangle_count * 3;
@@ -165,4 +167,5 @@ Chunked_Model* get_chunked_mod(const char* filename)
 
 	return chunked_mesh;
 }
+#endif
 #endif

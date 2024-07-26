@@ -23,9 +23,15 @@ enum Texture_Format
 enum Texture_Type
 {
 	TEXTYPE_2D,
+	TEXTYPE_2D_ARRAY,
 	TEXTYPE_3D,
 	TEXTYPE_CUBEMAP,
 };
+
+inline int get_mip_map_count(int width, int height)
+{
+	return floor(log2(glm::max(width, height))) + 1;
+}
 
 CLASS_H(Texture, IAsset)
 public:
@@ -34,8 +40,8 @@ public:
 	int width = 0;
 	int height = 0;
 	int channels = 0;
-	Texture_Type type;
-	Texture_Format format;
+	Texture_Type type = Texture_Type::TEXTYPE_2D;
+	Texture_Format format{};
 	bool no_filtering = false;
 	bool has_mips = false;
 	bool is_float = false;
@@ -46,6 +52,15 @@ public:
 	bindlesstexhandle bindless_handle = 0;
 
 	friend class TextureMan;
+
+	// used for system textures
+	void update_specs(texhandle handle, int w, int h, int channels, Texture_Format fmt) {
+		this->gl_id = handle;
+		this->width = w;
+		this->height = h;
+		this->channels = channels;
+		this->format = fmt;
+	}
 };
 
 class TextureMan : public IAssetLoader
@@ -59,6 +74,9 @@ public:
 	// search_img_directory: prefixes the default image directory to file
 	Texture* find_texture(const char* file, bool search_img_directory = true, bool owner = false);
 	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy);
+
+	// User for stuff like scene color, scene depth, etc. so shaders can use them like any other texture
+	Texture* install_system_texture(const std::string& name);
 private:
 
 	Texture* create_unloaded_ptr(const char* filename);

@@ -62,6 +62,8 @@ public:
 
 	struct textures {
 		texhandle shadow_array;
+
+		Texture* shadow_vts_handle = nullptr;
 	}texture;
 
 	struct params {
@@ -125,6 +127,10 @@ public:
 		texhandle deptharray = 0;
 		texhandle resultarray = 0;
 		texhandle depthview[RANDOM_ELEMENTS];
+
+		Texture* result_vts_handle = nullptr;
+		Texture* blur_vts_handle = nullptr;
+		Texture* view_normal_vts_handle = nullptr;
 	}texture;
 
 	struct uniform_buffers {

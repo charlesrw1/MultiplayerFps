@@ -127,6 +127,10 @@ void Quit()
 	eng_local.cleanup();
 	exit(0);
 }
+
+#include "Framework/ConsolePrint.h"
+
+
 void sys_print(const char* fmt, ...)
 {
 	va_list args;
@@ -494,6 +498,7 @@ DECLARE_ENGINE_CMD(close_ed)
 {
 	eng_local.change_editor_state(nullptr);
 }
+
 
 DECLARE_ENGINE_CMD(start_ed)
 {

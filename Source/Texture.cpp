@@ -132,11 +132,6 @@ typedef struct
 	unsigned long Reserved2[3];
 } ddsFileHeader_t;
 
-int get_mip_map_count(int width, int height)
-{
-	return floor(log2(glm::max(width, height))) + 1;
-}
-
 static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
 static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 {
@@ -346,6 +341,8 @@ bool TextureMan::load_texture(const std::string& path, Texture* t)
 	}
 	t->is_loaded = true;
 
+	t->type = Texture_Type::TEXTYPE_2D;
+
 	//t->bindless_handle = glGetTextureHandleARB(t->gl_id);
 	//glMakeTextureHandleResidentARB(t->bindless_handle);
 
@@ -353,6 +350,14 @@ bool TextureMan::load_texture(const std::string& path, Texture* t)
 }
 
 
+Texture* TextureMan::install_system_texture(const std::string& name)
+{
+	Texture* t = new Texture;
+	t->path = name;
+	t->system_asset = true;
+	textures.insert({ name,t });
+	return t;
+}
 
 void benchmark_run()
 {

@@ -21,6 +21,9 @@ void shadow_map_tweaks()
 
 void Shadow_Map_System::init()
 {
+	texture.shadow_vts_handle = g_imgs.install_system_texture("_csm_shadow");
+	texture.shadow_vts_handle->type = Texture_Type::TEXTYPE_2D_ARRAY;
+
 	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);
 
 	make_csm_rendertargets();
@@ -46,6 +49,8 @@ void Shadow_Map_System::make_csm_rendertargets()
 	glTextureParameterfv(texture.shadow_array, GL_TEXTURE_BORDER_COLOR, bordercolor);
 
 	glCreateFramebuffers(1, &fbo.shadow);
+
+	texture.shadow_vts_handle->update_specs(texture.shadow_array, csm_resolution, csm_resolution, 1, {});
 }
 
 
