@@ -97,7 +97,7 @@ void make_static_mesh_from_dict(vector<handle<Render_Object>>& objs, vector<Phys
 
 	Color32 color = dict.get_color("color");
 
-	auto handle = idraw->register_obj();
+	auto handle = idraw->get_scene()->register_obj();
 	Render_Object rop;
 	rop.param1 = color;
 	rop.model = model;
@@ -107,7 +107,7 @@ void make_static_mesh_from_dict(vector<handle<Render_Object>>& objs, vector<Phys
 	rop.shadow_caster = dict.get_int("casts_shadows", 1);
 
 	bool has_collisions = dict.get_int("has_collisions", 1);
-	idraw->update_obj(handle, rop);
+	idraw->get_scene()->update_obj(handle, rop);
 	objs.push_back(handle);
 
 	if (has_collisions) {

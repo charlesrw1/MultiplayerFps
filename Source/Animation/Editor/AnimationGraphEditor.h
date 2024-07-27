@@ -187,7 +187,7 @@ public:
 
 	void set_model(Model* model) {
 		this->model = model;
-		idraw->remove_obj(obj);
+		idraw->get_scene()->remove_obj(obj);
 	}
 
 	void set_animator_instance(AnimatorInstance* inst);

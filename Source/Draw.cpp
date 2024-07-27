@@ -102,8 +102,8 @@ const uint DEBUG_DIFFUSE = 6;
 const uint DEBUG_SPECULAR = 7;
 const uint DEBUG_OBJID = 8;
 const uint DEBUG_LIGHTING_ONLY = 9;
-
 */
+
 ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, 0, 9);
 
 // Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
@@ -520,72 +520,22 @@ void Program_Manager::recompile(program_def& def)
 	}
 }
 
-Material_Shader_Table::Material_Shader_Table() : shader_hash_map(128)
+Material_Shader_Table::Material_Shader_Table() 
 {
-	ASSERT(((shader_hash_map.size() & (shader_hash_map.size() - 1)) == 0) && "must be power of 2");
+
 }
 
 program_handle Material_Shader_Table::lookup(shader_key key)
 {
 	uint32_t key32 = key.as_uint32();
-	uint32_t hash = std::hash<uint32_t>()(key32);
-	uint32_t size = shader_hash_map.size();
-	for (uint32_t i = 0; i < size; i++) {
-		uint32_t index = (hash + i) & (size - 1);
-		if (shader_hash_map[index].handle == -1) return -1;
-		if (shader_hash_map[index].key.as_uint32() == key32)
-			return shader_hash_map[index].handle;
-		//printf("material table collision\n");
-	}
-	return -1;
+	auto find = shader_key_to_program_handle.find(key32);
+	return find == shader_key_to_program_handle.end() ? -1 : find->second;
 }
 void Material_Shader_Table::insert(shader_key key, program_handle handle)
 {
-	uint32_t key32 = key.as_uint32();
-	uint32_t hash = std::hash<uint32_t>()(key32);
-	uint32_t size = shader_hash_map.size();
-	hash %= size;
-	for (uint32_t i = 0; i < size; i++) {
-		uint32_t index = (hash + i) % size;
-		if (shader_hash_map[index].handle == -1) {
-			shader_hash_map[index].key = key;
-			shader_hash_map[index].handle = handle;
-			return;
-		}
-	}
-	ASSERT(!"material table overflow\n");
+	shader_key_to_program_handle.insert({ key.as_uint32(), handle });
 }
 
-
-shader_key get_real_shader_key_from_shader_type(shader_key key)
-{
-	material_type type = (material_type)key.shader_type;
-	if (key.depth_only) {
-		key.normal_mapped = 0;
-		key.vertex_colors = 0;
-	
-		// FIXME dithering
-
-		// windsway has vertex shader modifications
-		if(type !=material_type::WINDSWAY)
-			key.shader_type = (int)material_type::DEFAULT;
-	}
-	else {
-		if (type == material_type::WINDSWAY) {
-			key.animated = 0;
-			key.vertex_colors = 0;
-		}
-		else if (type == material_type::TWOWAYBLEND)
-			key.vertex_colors = 1;
-		else if (type == material_type::WATER)
-			key.normal_mapped = 1;
-		else if (type == material_type::UNLIT) {
-			key.normal_mapped = 0;
-			key.alpha_tested = 0;
-		}
-	}
-	return key;
-}
 
 void Renderer::bind_vao(uint32_t vao)
 {
@@ -647,47 +597,31 @@ void Renderer::set_shader(program_handle handle)
 	}
 }
 
-program_handle compile_mat_shader(shader_key key)
+program_handle compile_mat_shader(const Material* mat, shader_key key)
 {
 	std::string params;
 	const char* vert_shader = "";
 	const char* frag_shader = "";
-
-	material_type type = (material_type)key.shader_type;
-	switch (type) {
-	case material_type::DEFAULT:
-	case material_type::WINDSWAY:
-	case material_type::TWOWAYBLEND:
-	case material_type::UNLIT:
+	
+	if (mat->is_translucent()) {
+		// use forward rendering shader
 		vert_shader = "AnimBasicV.txt";
-		if (key.depth_only) 
-			frag_shader = "DepthF.txt";
-		else 
-			frag_shader = "PbrBasicF.txt";
-		break;
-	case material_type::WATER:
+		frag_shader = "ForwardF.txt";
+	}
+	else {
+		// use deferred rendering shader
 		vert_shader = "AnimBasicV.txt";
-		frag_shader = "WaterF.txt";
-		break;
-	default:
-		ASSERT(!"material type not defined\n");
-		break;
+		frag_shader = "DeferredF.txt";
 	}
 
-	if (key.alpha_tested) params += "ALPHATEST,";
 	if (key.animated) params += "ANIMATED,";
-	if (key.normal_mapped) params += "NORMALMAPPED,";
-	if (key.vertex_colors) params += "VERTEX_COLOR,";
 	if (key.dither) params += "DITHER,";
-	if (type == material_type::WINDSWAY) params += "WIND,";
-	if (type == material_type::UNLIT) params += "UNLIT,";
-	if (key.billboard_type == (int)billboard_setting::ROTATE_AXIS || key.billboard_type == (int)billboard_setting::FACE_CAMERA) params += "BILLBOARD,";
-	else if (key.billboard_type == (int)billboard_setting::SCREENSPACE) params += "BILLBOARD_SCREENSPACE,";
-	if (key.color_overlay) params += "COLOR_OVERLAY,";
+	if (key.editor_id) params += "EDITOR_ID,";
+	if (key.depth_only) params += "DEPTH_ONLY,";
 	if (key.debug) params += "DEBUG_SHADER,";
 	if (!params.empty())params.pop_back();
 
-	printf("INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
+	sys_print("*** INFO: compiling shader: %s %s (%s)\n", vert_shader, frag_shader, params.c_str());
 
 	program_handle handle = draw.prog_man.create_raster(vert_shader, frag_shader, params);
 	ASSERT(handle != -1);
@@ -790,9 +724,9 @@ void Renderer::reload_shaders()
 	shader().set_int("scene_depth", 0);
 	shader().set_int("noise_texture", 1);
 
-	for (int i = 0; i < mat_table.shader_hash_map.size(); i++) {
-		if (mat_table.shader_hash_map[i].handle != -1) {
-			set_shader(mat_table.shader_hash_map[i].handle);
+	for (auto x : mat_table.shader_key_to_program_handle) {
+		if (x.second != -1) {
+			set_shader(x.second);
 			set_shader_sampler_locations();
 		}
 	}
@@ -894,12 +828,12 @@ void imgui_stat_hook()
 	ImGui::Text("Vao binds: %d", draw.stats.vaos_bound);
 	ImGui::Text("Blend changes: %d", draw.stats.blend_changes);
 
-	ImGui::Text("opaque batches: %d", (int)draw.scene.opaque.batches.size());
-	ImGui::Text("depth batches: %d", (int)draw.scene.depth.batches.size());
-	ImGui::Text("transparent batches: %d", (int)draw.scene.transparents.batches.size());
+	ImGui::Text("opaque batches: %d", (int)draw.scene.gbuffer_pass.batches.size());
+	ImGui::Text("depth batches: %d", (int)draw.scene.shadow_pass.batches.size());
+	ImGui::Text("transparent batches: %d", (int)draw.scene.transparent_pass.batches.size());
 
 	ImGui::Text("total objects: %d", (int)draw.scene.proxy_list.objects.size());
-	ImGui::Text("opaque mesh batches: %d", (int)draw.scene.opaque.mesh_batches.size());
+	ImGui::Text("opaque mesh batches: %d", (int)draw.scene.gbuffer_pass.mesh_batches.size());
 }
 
 void Renderer::check_hardware_options()
@@ -1057,35 +991,32 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		glCreateTextures(GL_TEXTURE_2D, 1, &texture);
 	};
 
+	auto create_and_delete_fb = [](uint32_t & framebuffer) {
+		glDeleteFramebuffers(1, &framebuffer);
+		glCreateFramebuffers(1, &framebuffer);
+	};
 
 
-	glDeleteTextures(1, &tex.scene_color);
-	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_color);
+	// Main accumulation buffer, 16 bit color
+	create_and_delete_texture(tex.scene_color);
 	glTextureStorage2D(tex.scene_color, 1, GL_RGBA16F, s_w, s_h);
-	glTextureParameteri(tex.scene_color, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.scene_color, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.scene_color, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(tex.scene_color, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	set_default_parameters(tex.scene_color);
 
-	glDeleteTextures(1, &tex.scene_depth);
-	glCreateTextures(GL_TEXTURE_2D, 1, &tex.scene_depth);
+	// Main scene depth
+	create_and_delete_texture(tex.scene_depth);
 	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
-	glTextureParameteri(tex.scene_depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.scene_depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.scene_depth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(tex.scene_depth, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	set_default_parameters(tex.scene_depth);
 
-	glDeleteFramebuffers(1, &fbo.scene);
-	glCreateFramebuffers(1, &fbo.scene);
-	glNamedFramebufferTexture(fbo.scene, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
-	glNamedFramebufferTexture(fbo.scene, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
-	
+	// Create forward render framebuffer
+	// Transparents and other immediate stuff get rendered to this
+	create_and_delete_fb(fbo.forward_render);
+	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
+	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
 	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
-	glNamedFramebufferDrawBuffers(fbo.scene, 1, attachments);
+	glNamedFramebufferDrawBuffers(fbo.forward_render, 1, attachments);
 	
-
+	// Gbuffer textures
 	// See the comment above these var's decleration in DrawLocal.h for details
-
 	create_and_delete_texture(tex.scene_gbuffer0);
 	glTextureStorage2D(tex.scene_gbuffer0, 1, GL_R11F_G11F_B10F, s_w, s_h);
 	set_default_parameters(tex.scene_gbuffer0);
@@ -1098,54 +1029,39 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
 	set_default_parameters(tex.scene_gbuffer2);
 
-#if 0
-	glDeleteTextures(1, &tex.reflected_color);
-	glCreateTextures(GL_TEXTURE_2D, 1, &tex.reflected_color);
-	ivec2 reflect_size = ivec2(s_w, s_h);
-	if (use_halfres_reflections.get_bool()) reflect_size /= 2;
-	glTextureStorage2D(tex.reflected_color, 1, GL_RGBA16F, reflect_size.x, reflect_size.y);
-	glTextureParameteri(tex.reflected_color, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.reflected_color, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.reflected_color, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(tex.reflected_color, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// Create Gbuffer
+	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives
+	create_and_delete_fb(fbo.gbuffer);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0, 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1, 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2, 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
+	const uint32_t gbuffer_attach_count = 4;
+	unsigned int gbuffer_attachments[gbuffer_attach_count] = { GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2,GL_COLOR_ATTACHMENT3 };
+	glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
 
-	glDeleteTextures(1, &tex.reflected_depth);
-	glCreateTextures(GL_TEXTURE_2D, 1, &tex.reflected_depth);
-	glTextureStorage2D(tex.reflected_depth, 1, GL_DEPTH_COMPONENT24, reflect_size.x, reflect_size.y);
-	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(tex.reflected_depth, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glDeleteFramebuffers(1, &fbo.reflected_scene);
-	glCreateFramebuffers(1, &fbo.reflected_scene);
-	glNamedFramebufferTexture(fbo.reflected_scene, GL_COLOR_ATTACHMENT0, tex.reflected_color, 0);
-	glNamedFramebufferTexture(fbo.reflected_scene, GL_DEPTH_ATTACHMENT, tex.reflected_depth, 0);
-#endif
-
-	glDeleteFramebuffers(1, &fbo.composite);
-	glDeleteTextures(1, &tex.output_composite);
-	if (create_composite_texture) {
-		glCreateTextures(GL_TEXTURE_2D, 1, &tex.output_composite);
-		glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
-		glTextureParameteri(tex.output_composite, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTextureParameteri(tex.output_composite, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteri(tex.output_composite, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(tex.output_composite, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		glCreateFramebuffers(1, &fbo.composite);
-		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
-	}
+	// Composite textures
+	create_and_delete_fb(fbo.composite);
+	create_and_delete_texture(tex.output_composite);
+	glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
+	set_default_parameters(tex.output_composite);
+	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
 
 	cur_w = s_w;
 	cur_h = s_h;
 
+	// Update vts handles
 	tex.scene_color_vts_handle->update_specs(tex.scene_color, s_w, s_h, 4, {});
 	tex.scene_depth_vts_handle->update_specs(tex.scene_depth, s_w, s_h, 4, {});
+	tex.gbuffer0_vts_handle->update_specs(tex.scene_gbuffer0, s_w, s_h, 3, {});
+	tex.gbuffer1_vts_handle->update_specs(tex.scene_gbuffer1, s_w, s_h, 3, {});
+	tex.gbuffer2_vts_handle->update_specs(tex.scene_gbuffer2, s_w, s_h, 3, {});
 
+	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
 
-	// alert any observers that they need to update their buffer sizes
+	// alert any observers that they need to update their buffer sizes (like SSAO, etc.)
 	on_viewport_size_changed.invoke(cur_w, cur_h);
 }
 
@@ -1439,7 +1355,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass)
 	}
 }
 
-void Renderer::render_level_to_target(Render_Level_Params params)
+void Renderer::render_level_to_target(const Render_Level_Params& params)
 {
 	vs = params.view;
 
@@ -1448,7 +1364,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	if (params.is_probe_render)
 		using_skybox_for_specular = true;
 
-	if (1) {
+	{
 		uint32_t view_ubo = params.provied_constant_buffer;
 		bool upload = params.upload_constants;
 		if (params.provied_constant_buffer == 0) {
@@ -1469,7 +1385,7 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 	glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
 	glViewport(0, 0, vs.width, vs.height);
 	if (params.clear_framebuffer) {
-		glClearColor(0.f, 0.f, 0.f, 1.f);
+		glClearColor(0.f, 0.0f, 0.f, 1.f);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
 
@@ -1492,27 +1408,12 @@ void Renderer::render_level_to_target(Render_Level_Params params)
 		//	Draw_Call& dc = (*list)[d];
 		//	draw_model_real(dc, state);
 		//}
-		Render_Lists* lists = &scene.opaque_list;
-		Render_Pass* pass = &scene.opaque;
-		if (params.pass == params.SHADOWMAP || params.pass == params.DEPTH) {
-			lists = &scene.vis_list;	// FIXME
-			pass = &scene.depth;
-		}
-		else if (params.pass == params.TRANSLUCENT) {
-			lists = &scene.transparents_list;
-			pass = &scene.transparents;
-		}
 
 		// renderdoc seems to hate mdi for some reason, so heres an option to disable it
 		if(dont_use_mdi.get_bool())
-			render_lists_old_way(*lists, *pass);
+			render_lists_old_way(*params.rl, *params.rp);
 		else
-			execute_render_lists(*lists, *pass);
-	}
-
-	if (params.pass == Render_Level_Params::OPAQUE) {
-		glDepthFunc(GL_LEQUAL);	// for post z prepass
-		DrawSkybox();
+			execute_render_lists(*params.rl, *params.rp);
 	}
 
 	if (params.pass == Render_Level_Params::SHADOWMAP) {
@@ -1709,7 +1610,13 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, 
 {
 	draw_call_key key;
 
-	key.shader = draw.get_mat_shader(proxy.animator!=nullptr, proxy.color_overlay, proxy.model, material, (type == pass_type::DEPTH), proxy.dither);
+	key.shader = draw.get_mat_shader(
+		proxy.animator!=nullptr, 
+		proxy.model, material, 
+		(type == pass_type::DEPTH),
+		false
+	);
+
 	key.blending = (uint64_t)material->blend;
 	key.backface = material->backface;
 	key.texture = material->material_id;
@@ -1885,9 +1792,10 @@ void Render_Pass::make_batches(Render_Scene& scene)
 
 
 Render_Scene::Render_Scene() 
-	: opaque(pass_type::OPAQUE),
-	transparents(pass_type::TRANSPARENT),
-	depth(pass_type::DEPTH)
+	: gbuffer_pass(pass_type::OPAQUE),
+	transparent_pass(pass_type::TRANSPARENT),
+	shadow_pass(pass_type::DEPTH),
+	editor_sel_pass(pass_type::OPAQUE)
 {
 
 }
@@ -2102,10 +2010,9 @@ void Render_Scene::init()
 	int obj_count = 20'000;
 	int mat_count = 500;
 
-	vis_list.init(mat_count,obj_count);
-	opaque_list.init(mat_count,obj_count);
-	transparents_list.init(mat_count,obj_count);
-	shadow_lists.init(mat_count,obj_count);
+	gbuffer_rlist.init(mat_count,obj_count);
+	transparent_rlist.init(mat_count,obj_count);
+	csm_shadow_rlist.init(mat_count,obj_count);
 
 	glCreateBuffers(1, &gpu_render_material_buffer);
 	glCreateBuffers(1, &gpu_render_instance_buffer);
@@ -2187,9 +2094,10 @@ void Render_Scene::build_scene_data()
 	// upload materials, FIXME: cache this
 	upload_scene_materials();
 
-	transparents.clear();
-	depth.clear();
-	opaque.clear();
+
+	gbuffer_pass.clear();
+	transparent_pass.clear();
+	shadow_pass.clear();
 
 	// add draw calls and sort them
 	//gpu_objects.resize(proxy_list.objects.size());
@@ -2237,11 +2145,11 @@ void Render_Scene::build_scene_data()
 						if (obj.type_.proxy.mat_override)
 							mat = obj.type_.proxy.mat_override;
 						if (mat->is_translucent()) {
-							transparents.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0);
+							transparent_pass.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0);
 						}
 						else {
-							depth.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
-							opaque.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
+							shadow_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
+							gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
 						}
 					}
 
@@ -2293,9 +2201,9 @@ void Render_Scene::build_scene_data()
 	{
 		CPUSCOPESTART(make_batches);
 
-		transparents.make_batches(*this);
-		opaque.make_batches(*this);
-		depth.make_batches(*this);
+		gbuffer_pass.make_batches(*this);
+		shadow_pass.make_batches(*this);
+		transparent_pass.make_batches(*this);
 	}
 	{
 		CPUSCOPESTART(make_render_lists);
@@ -2303,23 +2211,18 @@ void Render_Scene::build_scene_data()
 		// cull + build draw calls
 
 		RenderListBuilder::build_standard_cpu(
-			vis_list,
-			depth,
+			gbuffer_rlist,
+			gbuffer_pass,
 			proxy_list
 		);
 		RenderListBuilder::build_standard_cpu(
-			shadow_lists,
-			depth,
+			csm_shadow_rlist,
+			shadow_pass,
 			proxy_list
 		);
 		RenderListBuilder::build_standard_cpu(
-			opaque_list,
-			opaque,
-			proxy_list
-		);
-		RenderListBuilder::build_standard_cpu(
-			transparents_list,
-			transparents,
+			transparent_rlist,
+			transparent_pass,
 			proxy_list
 		);
 	}
@@ -3043,18 +2946,18 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	// depth prepass
-	if (!is_wireframe_mode)
-	{
-		GPUSCOPESTART("Depth prepass");
-		Render_Level_Params params;
-		params.output_framebuffer = fbo.scene;
-		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::DEPTH;
-		params.upload_constants = false;
-		params.provied_constant_buffer = ubo.current_frame;
-		params.draw_viewmodel = true;
-		render_level_to_target(params);
-	}
+	//if (!is_wireframe_mode)
+	//{
+	//	GPUSCOPESTART("Depth prepass");
+	//	Render_Level_Params params;
+	//	params.output_framebuffer = fbo.scene;
+	//	params.view = current_frame_main_view;
+	//	params.pass = Render_Level_Params::DEPTH;
+	//	params.upload_constants = false;
+	//	params.provied_constant_buffer = ubo.current_frame;
+	//	params.draw_viewmodel = true;
+	//	render_level_to_target(params);
+	//}
 
 	// render ssao using prepass buffer
 	if (enable_ssao.get_bool())
@@ -3068,48 +2971,48 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 	// main level render
 	{
-		GPUSCOPESTART("Main level render opaques");
-		Render_Level_Params params;
-		params.output_framebuffer = fbo.scene;
-		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::OPAQUE;
-		params.clear_framebuffer = true;
+		GPUSCOPESTART("GBUFFER PASS");
+		Render_Level_Params params(
+			current_frame_main_view,
+			&scene.gbuffer_rlist,
+			&scene.gbuffer_pass,
+			fbo.gbuffer,
+			true,	/* clear framebuffer */
+			Render_Level_Params::OPAQUE
+		);
+		
 		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
 
-		if (!is_wireframe_mode) {
-			glDepthMask(GL_FALSE);
-			glDepthFunc(GL_EQUAL);
-		}
 		render_level_to_target(params);
-		glDepthFunc(GL_LESS);
-		glDepthMask(GL_TRUE);
 	}
 	{
-		GPUSCOPESTART("Main level translucents");
-		Render_Level_Params params;
-		params.output_framebuffer = fbo.scene;
-		params.view = current_frame_main_view;
-		params.pass = Render_Level_Params::TRANSLUCENT;
-		params.clear_framebuffer = false;
+		GPUSCOPESTART("TRANSPARENTS");
+		Render_Level_Params params(
+			current_frame_main_view,
+			&scene.transparent_rlist,
+			&scene.transparent_pass,
+			fbo.forward_render,
+			false,	/* dont clear framebuffer */
+			Render_Level_Params::TRANSLUCENT
+		);
+		
 		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
-		if (!is_wireframe_mode) {
-			glDepthMask(GL_FALSE);
-			glDepthFunc(GL_LEQUAL);
-		}
+		glDepthMask(GL_FALSE);
+		glDepthFunc(GL_LEQUAL);
 		render_level_to_target(params);
 		glDepthMask(GL_TRUE);
 	}
+
 	set_blend_state(blend_state::OPAQUE);
 
 	if (is_wireframe_mode)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.scene);
-	//multidraw_testing();
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
 
 	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
@@ -3251,35 +3154,26 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, white_texture.gl_id);	// reflected_depth
 }
 
-program_handle Renderer::get_mat_shader(bool has_animated_matricies, bool color_overlay, const Model* mod, const Material* mat, bool depth_pass, bool dither)
+program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model* mod, const Material* mat, bool depth_pass, bool dither)
 {
-	bool is_alpha_test = mat->alpha_tested;
-	bool is_lightmapped = mod->has_lightmap_coords();
-	bool has_colors = mod->has_colors();
-	material_type shader_type = mat->type;
-	bool is_normal_mapped = mod->has_tangents();
 	bool is_animated = mod->has_bones() && has_animated_matricies;
+	mat = (depth_pass && mat->can_use_shared_depth()) ? mats.shared_depth : mat;
 
 	shader_key key;
-	key.alpha_tested = is_alpha_test;
-	key.vertex_colors = has_colors;
-	key.shader_type = (uint32_t)shader_type;
-	key.normal_mapped = is_normal_mapped;
 	key.animated = is_animated;
 	key.depth_only = depth_pass;
 	key.dither = dither;
-	key.billboard_type = (int)mat->billboard;
-	key.color_overlay = color_overlay;
+	key.material_id = mat->material_id;
+
 #ifdef _DEBUG
 	key.debug = (r_debug_mode.get_integer()!=0);
 #else 
 	key.debug = false;
 #endif
 
-	key = get_real_shader_key_from_shader_type(key);
 	program_handle handle = mat_table.lookup(key);
 	if (handle != -1) return handle;
-	return compile_mat_shader(key);	// dynamic compilation ...
+	return compile_mat_shader(mat, key);	// dynamic compilation ...
 }
 #undef SET_OR_USE_FALLBACK
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
@@ -3289,7 +3183,7 @@ else bind_texture(where, fallback.gl_id);
 void Renderer::planar_reflection_pass()
 {
 	ASSERT(0);
-
+#if 0
 	glm::vec3 plane_n = glm::vec3(0, 1, 0);
 	float plane_d = 2.0;
 
@@ -3322,6 +3216,7 @@ void Renderer::planar_reflection_pass()
 	params.is_water_reflection_pass = true;
 
 	render_level_to_target(params);
+#endif
 }
 
 #if 0
@@ -3392,12 +3287,17 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 
 		glCheckError();
 
-		Render_Level_Params params;
-		params.view = cubemap_view;
-		params.output_framebuffer = fbo;
-		params.clear_framebuffer = true;
+		Render_Level_Params params(
+			cubemap_view,
+			&scene.gbuffer_rlist,
+			&scene.gbuffer_pass,
+			fbo,
+			true,
+			Render_Level_Params::OPAQUE
+			);
+	
 		params.provied_constant_buffer = 0;
-		params.pass = Render_Level_Params::OPAQUE;
+	
 		params.upload_constants = true;
 		params.is_probe_render = true;
 
@@ -3407,39 +3307,7 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 	}
 }
 
-handle<Render_Object> Renderer::register_obj()
-{
-	return scene.register_renderable();
-}
 
-void Renderer::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
-{
-	scene.update(handle, proxy);
-}
-
-void Renderer::remove_obj(handle<Render_Object>& handle)
-{
-	scene.remove(handle);
-	handle.id = -1;
-}
-
-handle<Render_Light> Renderer::register_light(const Render_Light& proxy)
-{
-	auto handle = scene.register_light();
-	scene.update_light(handle, proxy);
-	return handle;
-}
-
-void Renderer::update_light(handle<Render_Light> handle, const Render_Light& proxy)
-{
-	scene.update_light(handle, proxy);
-}
-
-void Renderer::remove_light(handle<Render_Light>& handle)
-{
-	scene.remove_light(handle);
-	handle.id = -1;
-}
 RL_Internal* Render_Scene::get_main_directional_light()
 {
 	return nullptr;
@@ -3611,12 +3479,7 @@ void Renderer::on_level_start()
 	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* size, probes, GL_STATIC_DRAW);
 }
 
-handle<Render_Object> Render_Scene::register_renderable() {
-	handle<Render_Object> handle{ proxy_list.make_new() };
-	return handle;
-}
-
-void Render_Scene::update(handle<Render_Object> handle, const Render_Object& proxy)
+void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
 {
 	ROP_Internal& in = proxy_list.get(handle.id);
 	in.proxy = proxy;
@@ -3624,12 +3487,6 @@ void Render_Scene::update(handle<Render_Object> handle, const Render_Object& pro
 		in.inv_transform = glm::inverse(proxy.transform);
 	if (proxy.model)
 		in.bounding_sphere_and_radius = proxy.transform * proxy.model->get_bounding_sphere();
-}
-
-void Render_Scene::remove(handle<Render_Object> handle) {
-	if (handle.id != -1) {
-		proxy_list.free(handle.id);
-	}
 }
 
 

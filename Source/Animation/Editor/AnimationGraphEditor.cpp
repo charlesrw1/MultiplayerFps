@@ -1868,29 +1868,29 @@ void AgEditor_BlendspaceNode::init()
 void GraphOutput::show(bool is_playing)
 {
 	if (!obj.is_valid())
-		obj = idraw->register_obj();
+		obj = idraw->get_scene()->register_obj();
 	Render_Object obj_data;
 	obj_data.model = model;
 	if (is_playing && model->get_skel() && anim) {
 		obj_data.animator = anim.get();
 		obj_data.transform = model->get_root_transform();
 	}
-	idraw->update_obj(obj,obj_data);
+	idraw->get_scene()->update_obj(obj,obj_data);
 }
 void GraphOutput::hide()
 {
-	idraw->remove_obj(obj);
+	idraw->get_scene()->remove_obj(obj);
 }
 void GraphOutput::clear()
 {
 	model = nullptr;
 	anim.reset();
-	idraw->remove_obj(obj);
+	idraw->get_scene()->remove_obj(obj);
 }
 void GraphOutput::set_animator_instance(AnimatorInstance* inst)
 {
 	anim.reset( inst );
-	idraw->remove_obj(obj);
+	idraw->get_scene()->remove_obj(obj);
 }
 
 #include "Player.h"

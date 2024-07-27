@@ -135,9 +135,6 @@ void Shadow_Map_System::update()
 
 			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array, 0, i);
 
-			Render_Level_Params params;
-			params.output_framebuffer = fbo.shadow;
-			params.pass = Render_Level_Params::SHADOWMAP;
 			View_Setup setup;
 			setup.width = csm_resolution;
 			setup.height = csm_resolution;
@@ -145,7 +142,16 @@ void Shadow_Map_System::update()
 			setup.far = farplanes[i];
 			setup.viewproj = matricies[i];
 			setup.view = setup.proj = mat4(1);
-			params.view = setup;
+
+			Render_Level_Params params(
+				setup,
+				&draw.scene.csm_shadow_rlist,
+				&draw.scene.shadow_pass,
+				fbo.shadow,
+				true,
+				Render_Level_Params::SHADOWMAP
+			);
+
 			params.provied_constant_buffer = ubo.frame_view[i];
 			params.upload_constants = true;
 

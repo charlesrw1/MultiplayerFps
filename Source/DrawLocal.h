@@ -11,7 +11,6 @@
 #include "Texture.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
-#include "RenderObj.h"
 #include "Framework/FreeList.h"
 #include "Render/RenderExtra.h"
 #include "Render/Material.h"
@@ -19,7 +18,7 @@
 
 #include "Framework/MulticastDelegate.h"
 
-#pragma optimize("", on)
+#include "Render/RenderScene.h"
 
 class MeshPart;
 class Model;
@@ -38,10 +37,6 @@ extern ConfigVar enable_volumetric_fog;
 extern ConfigVar enable_ssao;
 extern ConfigVar use_halfres_reflections;
 
-
-
-typedef int program_handle;
-
 struct Texture3d
 {
 	glm::ivec3 size;
@@ -49,27 +44,37 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
-
-struct Render_Box_Cubemap
-{
-	vec3 boxmin;
-	vec3 boxmax;
-	vec3 probe_pos = vec3(0.f);
-	int priority = 0;
-	bool found_probe_flag = false;
-	int id = -1;
-};
-
+class Render_Lists;
+class Render_Pass;
 struct Render_Level_Params {
-	View_Setup view;
-	uint32_t output_framebuffer;
-	bool clear_framebuffer = true;
+
 	enum Pass_Type { 
 		OPAQUE, 
 		TRANSLUCENT, 
 		DEPTH, 
 		SHADOWMAP 
 	};
+	Render_Level_Params(
+		const View_Setup& view,
+		Render_Lists* render_list,
+		Render_Pass* render_pass,
+		uint32_t output_framebuffer,
+		bool clear_framebuffer,
+		Pass_Type type
+		) : view(view), rl(render_list), rp(render_pass), 
+		clear_framebuffer(clear_framebuffer),
+		output_framebuffer(output_framebuffer)
+	{
+
+	}
+
+	View_Setup view;
+	uint32_t output_framebuffer;
+	bool clear_framebuffer = true;
+
+	Render_Lists* rl = nullptr;
+	Render_Pass* rp = nullptr;
+
 	Pass_Type pass = OPAQUE;
 	bool draw_viewmodel = false;
 	bool is_probe_render = false;
@@ -82,129 +87,6 @@ struct Render_Level_Params {
 };
 
 
-// represents a singular call to glDrawElements() with same state and mesh, batchable
-struct Mesh_Batch
-{
-	uint32_t first = 0;	// indexes into pass.sorted_list
-	uint32_t count = 0;
-
-	uint32_t shader_index = 0;	// indexes into shader_list[]
-	const Material* material = nullptr;
-};
-
-// represents multiple Mesh_Batch calls packaged into one glMultidrawIndirect()
-struct Multidraw_Batch
-{
-	uint32_t first = 0;
-	uint32_t count = 0;
-};
-
-// represents one draw call of a mesh with a material and various state, sorted and put into Mesh_Batch's
-struct draw_call_key  {
-	draw_call_key() {
-		shader = blending = backface = texture = vao = mesh = 0;
-		distance = 0;
-		layer = 0;
-	}
-
-	// lowest
-	uint64_t distance : 14;
-	uint64_t mesh : 14;
-	uint64_t vao : 3;
-	uint64_t texture : 14;
-	uint64_t backface : 1;
-	uint64_t blending : 3;
-	uint64_t shader : 12;
-	uint64_t layer : 3;
-	// highest
-	
-	// :)
-	uint64_t as_uint64() const{
-		return *(reinterpret_cast<const uint64_t*>(this));
-	}
-};
-static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
-
-struct Pass_Object
-{
-	draw_call_key sort_key;
-	const Material* material = nullptr;
-	handle<Render_Object> render_obj{};	// entity instance
-	uint16_t submesh_index = 0;		// what submesh am i
-	uint16_t lod_index = 0;
-	uint32_t hl_obj_index{};
-	uint32_t batch_idx = 0;
-};
-
-// in the end: want a flat list of batches that are merged with neighbors
-enum class pass_type
-{
-	OPAQUE,			// front to back sorting
-	TRANSPARENT,	// back to front sorting
-	DEPTH			// front to back sorting, ignores material textures unless alpha tested
-};
- 
-typedef int passobj_handle;
-
-// A render_pass is one collection of POSSIBLE draw calls
-// A render_list is created from a pass which is the actual draw calls to submit along with extra buffers to facilitate it
-class Render_Scene;
-class Render_Pass
-{
-public:
-	Render_Pass(pass_type type);
-
-	void make_batches(Render_Scene& scene);
-	
-	void add_object(
-		const Render_Object& proxy, 
-		handle<Render_Object> handle,
-		Material* material,
-		uint32_t camera_dist,
-		uint32_t submesh, 
-		uint32_t lod,
-		uint32_t layer);
-
-	draw_call_key create_sort_key_from_obj(
-		const Render_Object& proxy, 
-		Material* material, 
-		uint32_t camera_dist,
-		uint32_t submesh, 
-		uint32_t layer);
-
-	void clear() {
-		objects.clear();
-		high_level_objects_in_pass.clear();
-	}
-
-	const pass_type type{};					// modifies batching+sorting logic
-
-	// all Render_Objects in the pass
-	// there will likely be multiple Pass_Objects from 1 R_O like multiple submeshes and LODs all get added
-	// this is the array that gets frustum + occlusion culled to make the final Render_Lists structure
-	// this means static objects can cache LODs
-	std::vector<handle<Render_Object>> high_level_objects_in_pass;
-	std::vector<Pass_Object> objects;		// geometry + material id + object id
-	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
-	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
-};
-
-// RenderObject internal data
-struct ROP_Internal
-{
-	Render_Object proxy;
-	glm::mat4 inv_transform;
-	glm::vec4 bounding_sphere_and_radius;
-};
-
-// RenderLight internal data
-struct RL_Internal
-{
-	Render_Light light;
-	// stuff like shadowmap indicies etc.
-	int shadow_array_index = -1;
-};
-
 // Render lists: represents opengl commands that have been uploaded (or kept CPU side)
 //				 these are fed into glMultiDrawElementsIndirect()
 //				 these are built around Render_Pass which contains the objects that will be renderered
@@ -215,131 +97,6 @@ struct RL_Internal
 // These can be cpu or gpu stored, when using gpu culling, the gpu buffer is culled and used
 // This gets fed into "execute_render_lists"
 
-struct Render_Lists
-{
-	void init(uint32_t drawidsz, uint32_t instbufsz);
-
-	void build_from(Render_Pass& src,
-		Free_List<ROP_Internal>& proxy_list);
-
-	uint32_t indirect_drawid_buf_size=0;
-	uint32_t indirect_instance_buf_size=0;
-
-	// commands to input to glMultiDrawElementsIndirect
-	std::vector<gpu::DrawElementsIndirectCommand> commands;
-	bufferhandle gpu_command_list = 0;
-	// command_count is the number of commands per glMultiDrawElementsIndirect command
-	// for now its just set to batches[i].count in the Render_Pass
-	// when calling glMDEI, the offset into commands is the summation of previous command counts essentially
-	// it works like an indirection into commands
-	std::vector<uint32_t> command_count;
-	bufferhandle gpu_command_count = 0;
-
-	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
-	bufferhandle gldrawid_to_submesh_material;
-	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
-	bufferhandle glinstance_to_instance;
-
-	// where are we getting our objects from
-	const Render_Pass* parent_pass = nullptr;
-};
-
-// In theory render passes can be made once and cached if the object is static and do culling on the gpu
-// Render lists are updated every frame though
-// Render passes are  1 to 1 with render lists except gbuffer and shadow lists
-
-// Render passes: (describes objects to be drawn in a render list with a material+geometry)
-// Gbuffer objects
-// Shadow casting objects
-// Transparent objects
-// Custom depth objects
-// editor selected objects
-
-// render lists: (contains glmultidrawelementsindirect commands, generated on cpu or on gpu)
-// gbuffer pass 1 (all gbuffer objects get added to this)
-//		gbuffer pass 1 gets culled to last HZB
-// gbuffer pass 2 (objects that failed first HZB)
-//		gets culled again to 2nd HZB
-// shadow lists for N lights (cull per shadow caster, or render entire list per light)
-// transparent list
-// custom depth list
-// editor selected list
-
-
-class Render_Scene
-{
-public:
-	Render_Scene();
-
-	void init();
-
-	handle<Render_Object> register_renderable();
-	void update(handle<Render_Object> handle, const Render_Object& proxy);
-	void remove(handle<Render_Object> handle);
-	const Render_Object& get(handle<Render_Object> handle) {
-		return proxy_list.get(handle.id).proxy;
-	}
-
-	handle<Render_Light> register_light() { return { 0 }; }
-	void update_light(handle<Render_Light> handle, const Render_Light& proxy) {}
-	void remove_light(handle<Render_Light> handle) {}
-	const Render_Light& get_light(handle<Render_Light> handle) {
-		return light_list.get(handle.id).light;
-	}
-
-	void build_scene_data();
-	void upload_scene_materials();
-
-	RL_Internal* get_main_directional_light();
-
-	//std::unique_ptr<Render_Pass> gbuffer;
-	//std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling
-	//std::unique_ptr<Render_Lists> gbuffer2;				// 2nd pass for new unoccluded objects if using gpu culling
-	//
-	//std::unique_ptr<Render_Pass> transparent_objs;
-	//std::unique_ptr<Render_Lists> transparents_ren_list;// draw in forward pass of transparents
-	//
-	//std::unique_ptr<Render_Pass> custom_depth;
-	//std::unique_ptr<Render_Lists> custom_depth_list;	// draw to custom depth buffer
-	//
-	//std::unique_ptr<Render_Pass> editor_selection;
-	//std::unique_ptr<Render_Lists> editor_sel_list;		// drawn to editor selection buffer
-	//
-	//std::unique_ptr<Render_Pass> shadow_casters;
-	//std::unique_ptr<Render_Lists> global_shadow_list;	// unculled shadow casters
-
-
-	Render_Pass depth;			// vis/shadow objects, same as opaque but grouped with minimal draw clls
-	Render_Pass opaque;			// opaque objects that have full sorting
-	Render_Pass transparents;	// transparent objects added in back to front order
-
-	Render_Lists vis_list;
-	Render_Lists opaque_list;
-	Render_Lists transparents_list;
-	Render_Lists shadow_lists;
-
-	bufferhandle gpu_skinned_mats_buffer = 0;
-	bufferhandle gpu_render_instance_buffer = 0;
-	bufferhandle gpu_render_material_buffer = 0;
-
-	Free_List<ROP_Internal> proxy_list;
-	Free_List<RL_Internal> light_list;
-
-	bufferhandle light_ssbo;
-	bufferhandle light_grid_ssbo;
-	bufferhandle indirect_to_light_ssbo;
-
-	// list of IBL cubemaps and boxes
-	// list of irradiance probe volumes and boxes
-
-	uint32_t skybox = 0;
-	std::vector<Render_Box_Cubemap> cubemaps;
-	uint32_t cubemap_ssbo;
-	uint32_t levelcubemapirradiance_array = 0;
-	uint32_t levelcubemapspecular_array = 0;
-	int levelcubemap_num = 0;
-
-};
 
 struct Render_Stats
 {
@@ -379,24 +136,18 @@ private:
 struct shader_key
 {
 	shader_key() {
-		shader_type = 0;
+		material_id = 0;
 		depth_only = 0;
-		alpha_tested = 0;
-		normal_mapped = 0;
 		animated = 0;
-		vertex_colors = 0;
+		editor_id = 0;
 		dither = 0;
-		billboard_type = 0;
+		debug = 0;
 	}
-	uint32_t shader_type : 22;
+	uint32_t material_id : 27;
 	uint32_t animated : 1;
-	uint32_t alpha_tested : 1;
-	uint32_t normal_mapped : 1;
-	uint32_t vertex_colors : 1;
+	uint32_t editor_id : 1;
 	uint32_t depth_only : 1;
 	uint32_t dither : 1;
-	uint32_t billboard_type : 2;
-	uint32_t color_overlay : 1;
 	uint32_t debug : 1;
 
 	uint32_t as_uint32() const {
@@ -405,19 +156,39 @@ struct shader_key
 };
 static_assert(sizeof(shader_key) == 4, "shader key needs 4 bytes");
 
+
+
+// opaque materials get one path
+// transparent materials get another path
+// post process materials get another
+// (different output targets, different inputs)
+
+// materials also vary depending on context:
+// is it animated?
+// is it outputting editor id?
+
+// so step 1: determine WHAT material we have (ie what shader)
+//		if this is a depth pass, then get a special shader that is more easily batched
+// now we have the shader, the options function like "#ifdefs for the shader" so check if the shader already exists first
+
+// Essentially we want a hashmap of uint64(shader id, shader parameters) maped to a shader object
+// to make sorting them easier, each shader object is also assigned a program id the first time its created (thus we can store shader id under, say, 16 bits)
+// hashmap<uint64_t, {glShader, uint16}> shaderid_to_shaderobj
+// and vector<uint64_t> (maps from uint16 back to shader key)
+// if the shader doesnt modify verticies then it can get the uber depth shader, if it does, then it gets its own depth shader but fragment part is simplified
+// if its alpha tested, then the depth material gets its own shader
+// thus basic opaques can be merged, but anything else cant be merged in the depth pass
+
+
 class Material_Shader_Table
 {
 public:
 	Material_Shader_Table();
-	struct material_shader_internal {
-		shader_key key;
-		program_handle handle = -1;
-	};
 
 	program_handle lookup(shader_key key); 
 	void insert(shader_key key, program_handle handle);
 
-	std::vector<material_shader_internal> shader_hash_map;
+	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
 
 //
@@ -470,22 +241,14 @@ public:
 	virtual void on_level_start() override;
 	virtual void on_level_end() override;
 	virtual void reload_shaders() override;
-	virtual handle<Render_Object> register_obj() override;
-	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
-	virtual void remove_obj(handle<Render_Object>& handle) override;
-	virtual uint32_t get_composite_output_texture_handle() override {
-		ASSERT(tex.output_composite!=0);
-		return tex.output_composite;
-	}
-	virtual handle<Render_Light> register_light(const Render_Light& l) override;
-	virtual void update_light(handle<Render_Light> handle, const Render_Light& l) override;
-	virtual void remove_light(handle<Render_Light>& handle) override;
-
+	virtual RenderScenePublic* get_scene() override { return &scene; }
+	virtual void bake_cubemaps() override {}
+	virtual uint32_t get_composite_output_texture_handle() override { return tex.output_composite; }
 
 	void check_hardware_options();
 	void create_default_textures();
 
-	void render_level_to_target(Render_Level_Params params);
+	void render_level_to_target(const Render_Level_Params& params);
 
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
@@ -549,7 +312,6 @@ public:
 	}prog;
 
 	struct framebuffers {
-		fbohandle scene{};
 		//fbohandle reflected_scene{};
 		fbohandle bloom{};
 		fbohandle composite{};
@@ -656,7 +418,7 @@ public:
 
 	Render_Scene scene;
 
-	program_handle get_mat_shader(bool is_animated, bool color_overlay, const Model* mod, const Material* gs, bool depth_pass, bool dither);
+	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither);
 	
 	Render_Stats stats;
 

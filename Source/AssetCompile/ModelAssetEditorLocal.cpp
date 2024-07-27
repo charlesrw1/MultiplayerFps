@@ -11,6 +11,8 @@
 #include "GameEnginePublic.h"
 #include "OsInput.h"
 
+#include "RenderObj.h"
+
 static ModelEditorTool g_model_editor_static;
 IEditorTool* g_model_editor = &g_model_editor_static;
 
@@ -41,13 +43,13 @@ void ModelEditorTool::tick(float dt)
 
 	if (get_focus_state() != editor_focus_state::Background && compilied_model) {
 		if (!object.is_valid())
-			object = idraw->register_obj();
+			object = idraw->get_scene()->register_obj();
 		Render_Object obj;
 		obj.model = compilied_model;
 		obj.transform = glm::mat4(1.f);
 		obj.visible = true;
 		editanims.add_to_obj(obj, dt);
-		idraw->update_obj(object,obj);
+		idraw->get_scene()->update_obj(object,obj);
 	}
 }
 
@@ -300,7 +302,7 @@ void ModelEditorTool::on_change_focus(editor_focus_state newstate)
 	if (newstate == editor_focus_state::Closed)
 		close();
 	else if (newstate == editor_focus_state::Background)
-		idraw->remove_obj(object);
+		idraw->get_scene()->remove_obj(object);
 }
 
 void ModelEditorTool::init()
@@ -374,7 +376,7 @@ void ModelEditorTool::open_document_internal(const char* name)
 
 void ModelEditorTool::close_internal()
 {
-	idraw->remove_obj(object);
+	idraw->get_scene()->remove_obj(object);
 	model_def.reset();
 	is_open = false;
 }

@@ -246,7 +246,7 @@ void MeshComponent::editor_on_change_property(const PropertyInfo& property_)
 
 void MeshComponent::on_init()
 {
-	draw_handle = idraw->register_obj();
+	draw_handle = idraw->get_scene()->register_obj();
 	if (model.get()) {
 		if (model->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
 			assert(animator_tree->get_script());
@@ -270,7 +270,7 @@ void MeshComponent::on_init()
 		obj.visible = visible;
 		obj.transform = get_ws_transform();
 
-		idraw->update_obj(draw_handle, obj);
+		idraw->get_scene()->update_obj(draw_handle, obj);
 	}
 }
 
@@ -284,7 +284,7 @@ void MeshComponent::on_changed_transform()
 	obj.visible = visible;
 	obj.transform = get_ws_transform();
 
-	idraw->update_obj(draw_handle, obj);
+	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 
 void MeshComponent::on_tick()
@@ -294,7 +294,7 @@ void MeshComponent::on_tick()
 
 void MeshComponent::on_deinit()
 {
-	idraw->remove_obj(draw_handle);
+	idraw->get_scene()->remove_obj(draw_handle);
 	animator.reset();
 }
 

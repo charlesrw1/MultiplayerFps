@@ -10,3 +10,5 @@ typedef uint32_t vertexbufferhandle;
 typedef uint32_t indexbufferhandle;
 typedef uint32_t vertexarrayhandle;
 
+
+typedef int program_handle;

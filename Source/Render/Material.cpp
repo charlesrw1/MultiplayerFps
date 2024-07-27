@@ -318,4 +318,6 @@ void MaterialMan::init()
 	outline_hull->type = material_type::OUTLINE_HULL;
 	outline_hull->backface = true;
 	outline_hull->is_loaded = true;
+
+	shared_depth = create_temp_shader("_shared_depth");
 }

@@ -159,6 +159,11 @@
     <ClInclude Include="Source\Render\MaterialPublic.h" />
     <ClInclude Include="Source\Render\RenderExtra.h" />
     <ClInclude Include="Source\AssetRegistry.h" />
+    <ClInclude Include="Source\Render\RenderScene.h" />
+    <ClInclude Include="Source\Render\Render_Decal.h" />
+    <ClInclude Include="Source\Render\Render_Light.h" />
+    <ClInclude Include="Source\Render\Render_Sun.h" />
+    <ClInclude Include="Source\Render\Render_Volumes.h" />
     <ClInclude Include="Source\ScehmaMan.h" />
     <ClInclude Include="Source\Server.h" />
     <ClInclude Include="Source\Shader.h" />

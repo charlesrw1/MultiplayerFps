@@ -53,11 +53,16 @@ public:
 		memset(images, 0, sizeof images);
 		memset(references, 0, sizeof references);
 	}
+	
 	uint32_t material_id = 0;
+
 	Texture* images[(int)material_texture::COUNT];
 
 	Texture*& get_image(material_texture texture) {
 		return images[(int)texture];
+	}
+	bool can_use_shared_depth() const {
+		return !is_alphatested() && !is_translucent();	// and check if it modifies vertex positions
 	}
 
 	Material* references[MAX_REFERENCES];
@@ -100,6 +105,9 @@ public:
 
 	Material* find_for_name(const char* name);
 	Material* create_temp_shader(const char* name);
+
+
+	Material* shared_depth = nullptr;
 
 	Material* unlit;
 	Material* outline_hull;
