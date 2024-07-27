@@ -233,6 +233,7 @@
     <ClCompile Include="Source\Game.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
+    <ClCompile Include="Source\Game\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Schema.cpp" />
     <ClCompile Include="Source\Game\SchemaEditLocal.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />

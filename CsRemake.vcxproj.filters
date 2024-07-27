@@ -790,5 +790,8 @@
     <ClCompile Include="Source\Game\EntityComponent.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\LightComponents.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

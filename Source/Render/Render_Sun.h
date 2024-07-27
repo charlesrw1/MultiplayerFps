@@ -4,6 +4,7 @@
 // use for directional lights
 struct Render_Sun
 {
+	glm::vec3 color = glm::vec3(2.f);
 	glm::vec3 direction = glm::vec3(0, -1, 0);
 
 	bool enabled = true;

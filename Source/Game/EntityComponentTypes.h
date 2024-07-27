@@ -18,6 +18,7 @@ class Animation_Tree_CFG;
 class AnimatorInstance;
 class Render_Object;
 class Material;
+class Texture;
 CLASS_H(MeshComponent, EntityComponent)
 public:
 	MeshComponent();
@@ -69,6 +70,74 @@ public:
 CLASS_H(BoxComponent, EntityComponent)
 public:
 
+};
+
+
+struct Render_Light;
+CLASS_H(SpotLightComponent, EntityComponent)
+public:
+	void on_init() override;
+	void on_deinit() override;
+	void on_changed_transform() override;
+	~SpotLightComponent() override;
+	SpotLightComponent();
+
+
+	static const PropertyInfoList* get_props();
+
+	float cone_angle = 45.0;
+	float inner_cone = 40.0;
+
+	float radius = 20.f;
+	glm::vec3 color = glm::vec3(1.f);
+
+	void build_render_light(Render_Light& light);
+
+	AssetPtr<Texture> cookie_asset;
+	bool visible = true;
+	handle<Render_Light> light_handle;
+};
+
+CLASS_H(PointLightComponent, EntityComponent)
+public:
+	void on_init() override;
+	void on_deinit() override;
+	void on_changed_transform() override;
+	~PointLightComponent() override;
+
+
+	void build_render_light(Render_Light& light);
+
+	static const PropertyInfoList* get_props();
+
+	float radius = 20.f;
+	glm::vec3 color = glm::vec3(1.f);
+
+	bool visible = true;
+	handle<Render_Light> light_handle;
+};
+
+struct Render_Sun;
+CLASS_H(SunLightComponent, EntityComponent)
+public:
+	void on_init() override;
+	void on_deinit() override;
+	void on_changed_transform() override;
+	void build_render_light(Render_Sun& light);
+	~SunLightComponent() override;
+
+	static const PropertyInfoList* get_props();
+
+	glm::vec3 color = glm::vec3(1.f);
+
+	bool fit_to_scene = true;
+	float log_lin_lerp_factor = 0.5;
+	float max_shadow_dist = 80.f;
+	float epsilon = 0.008f;
+	float z_dist_scaling = 1.f;
+
+	bool visible = true;
+	handle<Render_Sun> light_handle;
 };
 
 #if 0

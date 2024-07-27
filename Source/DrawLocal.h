@@ -191,11 +191,6 @@ public:
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
 
-//
-//   /
-//  /
-// /---------\
-
 
 class DepthPyramid
 {
@@ -225,8 +220,6 @@ public:
 
 const uint32_t MAX_BLOOM_MIPS = 6;
 
-
-
 class Renderer : public RendererPublic
 {
 public:
@@ -249,6 +242,7 @@ public:
 	void create_default_textures();
 
 	void render_level_to_target(const Render_Level_Params& params);
+	void accumulate_gbuffer_lighting();
 
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 

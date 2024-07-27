@@ -211,6 +211,11 @@ struct Render_Lists
 // custom depth list
 // editor selected list
 
+struct RSunInternal
+{
+	Render_Sun sun;
+	int unique_id = 0;
+};
 
 class Render_Scene : public RenderScenePublic
 {
@@ -233,11 +238,20 @@ public:
 		return proxy_list.get(handle.id).proxy;
 	}
 
-	handle<Render_Light> register_light(const Render_Light& proxy) override { return { 0 }; }
-	void update_light(handle<Render_Light> handle, const Render_Light& proxy) override {}
-	void remove_light(handle<Render_Light>& handle) override {}
-	const Render_Light& get_light(handle<Render_Light> handle) {
-		return light_list.get(handle.id).light;
+	handle<Render_Light> register_light(const Render_Light& proxy) override { 
+		handle<Render_Light> handle = { light_list.make_new() };
+		update_light(handle, proxy);
+		return handle;
+	}
+	void update_light(handle<Render_Light> handle, const Render_Light& proxy) override {
+		auto& l = light_list.get(handle.id);
+		l.light = proxy;
+	}
+	void remove_light(handle<Render_Light>& handle) override {
+		if (!handle.is_valid())
+			return;
+		light_list.free(handle.id);
+		handle = { -1 };
 	}
 
 	handle<Render_Decal> register_decal(const Render_Decal& decal) override {
@@ -255,13 +269,39 @@ public:
 
 	}
 	handle<Render_Sun> register_sun(const Render_Sun& sun) override {
-		return { -1 };
+		handle<Render_Sun> id = { unique_id_counter++ };
+		RSunInternal internal_sun;
+		internal_sun.sun = sun;
+		internal_sun.unique_id = id.id;
+		suns.push_back(internal_sun);
+		return id;
 	}
 	void update_sun(handle<Render_Sun> handle, const Render_Sun& sun) override {
-
+		int i = 0;
+		for (; i < suns.size(); i++) {
+			if (suns[i].unique_id == handle.id)
+				break;
+		}
+		if (i == suns.size()) {
+			sys_print("??? update_sun couldn't find handle\n");
+			return;
+		}
+		suns[i].sun = sun;
 	}
 	void remove_sun(handle<Render_Sun>& handle) override {
-
+		if (!handle.is_valid())
+			return;
+		int i = 0;
+		for (; i < suns.size(); i++) {
+			if (suns[i].unique_id == handle.id)
+				break;
+		}
+		if (i == suns.size()) {
+			sys_print("??? remove_sun couldn't find handle\n");
+			return;
+		}
+		suns.erase(suns.begin() + i);
+		handle = { -1 };
 	}
 	handle<Render_Irradiance_Volume> register_irradiance_volume(const Render_Irradiance_Volume& vol) override {
 		return { -1 };
@@ -328,11 +368,14 @@ public:
 	bufferhandle gpu_render_instance_buffer = 0;
 	bufferhandle gpu_render_material_buffer = 0;
 
+	// use for stuff that isnt getting alloced much multiple times like suns,skylights
+	uint32_t unique_id_counter = 0;
+
 	Free_List<ROP_Internal> proxy_list;
 	Free_List<RL_Internal> light_list;
 	Free_List<RDecal_Internal> decal_list;
 	// should just be one, but I let multiple ones exist too
-	std::vector<Render_Sun> suns;
+	std::vector<RSunInternal> suns;
 	std::vector<Render_Skylight> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
 	Free_List<Render_Irradiance_Volume> irradiance_volumes;

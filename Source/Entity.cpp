@@ -32,6 +32,7 @@ CLASS_IMPL(PrefabEntity);
 CLASS_IMPL(PrefabSelection);
 CLASS_IMPL(PointLightEntity);
 CLASS_IMPL(SpotLightEntity);
+CLASS_IMPL(SunLightEntity);
 
 
 
@@ -41,6 +42,10 @@ CLASS_IMPL(EmptyComponent);
 CLASS_IMPL(MeshComponent);
 CLASS_IMPL(BoxComponent);
 CLASS_IMPL(CapsuleComponent);
+CLASS_IMPL(PointLightComponent);
+CLASS_IMPL(SpotLightComponent);
+CLASS_IMPL(SunLightComponent);
+
 
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 extern IEditorTool* g_editor_doc;	// EditorDocPublic.h

@@ -2892,6 +2892,8 @@ void draw_debug_grid()
 //		transcluent pass
 //			all transcluents get rendered to lighting buffer
 //				optional forward lighting for N relevant lights (Sun + nearby point lights?)
+// 
+// 
 // post draw:
 //		combine ss shadows to color buffer
 //		combine SSR to color buffer
@@ -2900,6 +2902,20 @@ void draw_debug_grid()
 //		post processing FXs
 //		composite post process and bloom
 
+
+// main function for lighting the gbuffer
+// directional lights
+// point+spotlights
+void Renderer::accumulate_gbuffer_lighting()
+{
+	// stencil buffer trick for point/spot lights
+
+	// fullscreen pass for directional light(s)
+
+	// indirect lighting pass (full screen, use constant ambient for now), multiple with SSAO
+
+	// reflection pass (use static for now)
+}
 
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool)

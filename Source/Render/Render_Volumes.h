@@ -6,6 +6,7 @@
 class Texture;
 class IrradianceVolume;
 
+// 3, 3d float rgb textures
 struct Render_Irradiance_Volume
 {
 	glm::mat4 transform = glm::mat4(1);
@@ -28,4 +29,12 @@ struct Render_Reflection_Volume
 struct Render_Skylight
 {
 	Texture* generated_cube = nullptr;
+};
+
+struct LevelIrradianceFieldAsset;
+// Singleton asset
+struct Render_Irradiance_Field_System
+{
+	LevelIrradianceFieldAsset* asset = nullptr;
+	bool enable_dynamic_updates = false;
 };

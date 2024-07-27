@@ -25,10 +25,11 @@ void AssetRegistrySystem::reindex_all_assets()
 				buf = type->root_filepath() + aod.filename;
 				auto file = FileSys::open_read_os(buf.c_str());
 				if (!file) {
-					sys_print("should be filename but isnt %s\n", buf.c_str());
-					continue;
+					sys_print("should be filename but isnt (this could be an uncompiled model, if so, ignore) %s\n", buf.c_str());
+					//continue;
 				}
-				aod.filesize = file->size();
+				else
+					aod.filesize = file->size();
 			}
 			aod.type = type;
 
