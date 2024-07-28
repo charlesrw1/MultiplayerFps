@@ -208,6 +208,8 @@ private:
 	}
 	void draw_components_R(EntityComponent* ec, float ofs);
 
+	EntityComponent* dragging_component = nullptr;
+
 	PropertyGrid grid;
 
 };

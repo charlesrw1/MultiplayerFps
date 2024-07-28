@@ -80,16 +80,19 @@ public:
 		player_mesh = create_sub_component<MeshComponent>("CharMesh");
 		player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
 		viewmodel_mesh = create_sub_component<MeshComponent>("ViewmodelMesh");
-
+		spotlight = create_sub_component<SpotLightComponent>("Flashlight");
 		root_component = player_capsule;
 
 		player_mesh->attach_to_parent(player_capsule, {});
 		viewmodel_mesh->attach_to_parent(player_mesh, {});
+		spotlight->attach_to_parent(root_component.get(), {});
 	}
 
 	MeshComponent* player_mesh{};
 	CapsuleComponent* player_capsule{};
 	MeshComponent* viewmodel_mesh{};
+
+	SpotLightComponent* spotlight{};
 
 	AssetPtr<Model> a_second_model;
 	
@@ -103,6 +106,9 @@ public:
 
 	// Entity overrides
 	void update() override;
+	void start() override {
+		player_mesh->set_model("player_FINAL.cmdl");
+	}
 
 	// called by game before calling update
 	void set_input_command(Move_Command cmd);

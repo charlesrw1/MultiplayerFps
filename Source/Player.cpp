@@ -848,6 +848,9 @@ void Player::update()
 
 	move();
 	item_update();
+
+	set_ws_transform(position, glm::quat(rotation), scale);
+	root_component->on_changed_transform();
 }
 
 glm::vec3 Player::calc_eye_position()

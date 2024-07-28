@@ -1301,22 +1301,65 @@ void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
 	ImGui::TableNextColumn();
 
 	ImGui::PushID(ec);
-	ImGui::Dummy(ImVec2(ofs,0.0));
 
 	ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 	if (ImGui::Selectable("##selectednode", ec == ed_doc.selection_state->get_ec_selected(), selectable_flags, ImVec2(0, 0))) {
 		on_select_component(ec);
 	}
 
+	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+	{
+		dragging_component = ec;
+
+		ImGui::SetDragDropPayload("SetComponentParent",nullptr, 0);
+
+		ImGui::Text("Set parent of: %s", dragging_component->eSelfNameString.c_str());
+
+		ImGui::EndDragDropSource();
+	}
+	if (ImGui::BeginDragDropTarget())
+	{
+		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+		//if (payload->IsDataType("AssetBrowserDragDrop"))
+		//	sys_print("``` accepting\n");
+
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SetComponentParent");
+		if (payload) {
+			if (dragging_component != dragging_component->get_owner()->get_root_component() && ec != dragging_component) {
+				dragging_component->attach_to_parent(ec);
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+
+	ImGui::SameLine();
+	ImGui::Dummy(ImVec2(ofs,1.0));
 	ImGui::SameLine();
 	ImGui::Text(ec->eSelfNameString.c_str());
 
 	for (int i = 0; i < ec->children.size(); i++) {
-		draw_components_R(ec->children[i], ofs + 2.0);
+		draw_components_R(ec->children[i], ofs + 10.0);
 	}
 
 	ImGui::PopID();
 }
+
+void set_component_default_name(EntityComponent* ec)
+{
+	std::unordered_set<std::string> names;
+	auto parent = ec->get_owner();
+	for (int i = 0; i < parent->get_all_components().size(); i++) {
+		names.insert(parent->get_all_components()[i]->eSelfNameString);
+	}
+	std::string wantname = ec->get_type().classname;
+	std::string testname = wantname;
+	int number = 2;
+	while (names.find(testname) != names.end())
+		testname = wantname + std::to_string(number++);
+	ec->eSelfNameString = testname;
+}
+
 void EdPropertyGrid::draw()
 {
 	if (ImGui::Begin("Properties")) {
@@ -1347,19 +1390,45 @@ void EdPropertyGrid::draw()
 				ent = eng->get_entity(ed_doc.selection_state->get_selection()[0].handle);
 
 			if (ImGui::Button("Add Component")) {
-				// ...
+				ImGui::OpenPopup("addcomponentpopup");
 			}
+			if (ImGui::BeginPopup("addcomponentpopup")) {
+				auto iter = ClassBase::get_subclasses<EntityComponent>();
+				for (; !iter.is_end(); iter.next()) {
+					if (ImGui::Selectable(iter.get_type()->classname)) {
+						auto ec = ent->create_and_attach_component_type(iter.get_type(), nullptr);
+
+						set_component_default_name(ec);
+
+						ImGui::CloseCurrentPopup();
+					}
+				}
+				ImGui::EndPopup();
+			}
+
 			uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
 				ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 			if (ImGui::BeginTable("animadfedBrowserlist", 1, ent_list_flags))
 			{
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, Color32{ 59, 0, 135 }.to_uint());
+				ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+				if (ImGui::Selectable("##selectednode", ed_doc.selection_state->get_ec_selected()==nullptr, selectable_flags, ImVec2(0, 0))) {
+					if (ed_doc.selection_state->get_ec_selected() != nullptr)
+						ed_doc.selection_state->set_select_only_this(ed_doc.selection_state->get_ec_selected()->get_owner()->self_id);
+				}
+
+				ImGui::SameLine();
+				ImGui::Text(ent->get_type().classname);
 				auto& array = ent->get_all_components();
 				for (int row_n = 0; row_n < array.size(); row_n++)
 				{
 					auto& res = array[row_n];		
-					draw_components_R(res.get(), 2.0);
+					if(res.get()->attached_parent.get()==nullptr)
+						draw_components_R(res.get(), 8.0);
 				}
 				ImGui::EndTable();
 			}
@@ -1504,6 +1573,16 @@ void EdPropertyGrid::refresh_grid()
 			if (ti->props) {
 				grid.add_property_list_to_grid(ti->props, entity);
 			}
+			ti = ti->super_typeinfo;
+		}
+
+
+		auto c = entity->get_root_component();
+		ASSERT(c);
+		ti = &c->get_type();
+		while (ti) {
+			if (ti->props)
+				grid.add_property_list_to_grid(ti->props, c);
 			ti = ti->super_typeinfo;
 		}
 	}

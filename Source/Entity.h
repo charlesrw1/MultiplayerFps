@@ -161,6 +161,7 @@ public:
 	// USE IN GAMEPLAY! use create_sub_component to setup object in the constructor
 	template<typename T>
 	T* create_and_attach_component_type(EntityComponent* parent = nullptr, StringName bone = {});
+	EntityComponent* create_and_attach_component_type(const ClassTypeInfo* info, EntityComponent* parent = nullptr, StringName bone = {});
 
 	// ONLY USE in Constructor!, use create_and_attach for normal usage
 	template<typename T>
@@ -256,6 +257,20 @@ inline T* Entity::create_and_attach_component_type(EntityComponent* parent, Stri
 	ptr->on_init();
 	return ptr;
 }
+inline EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* info, EntityComponent* parent, StringName bone)
+{
+	if (!info->is_a(EntityComponent::StaticType)) {
+		sys_print("!!! create_and_attach_component_type not subclass of entity component\n");
+		return nullptr;
+	}
+	EntityComponent* ec = (EntityComponent*)info->allocate();
+	ec->set_owner(this);
+	all_components.push_back(std::unique_ptr<EntityComponent>(ec));
+	ec->attach_to_parent(parent == nullptr ? root_component.get() : parent, bone);
+	ec->on_init();
+	return ec;
+}
+
 
 template<typename T>
 inline static PropertyInfo Entity::generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags) {

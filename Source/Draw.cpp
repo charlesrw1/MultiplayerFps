@@ -2938,6 +2938,8 @@ void Renderer::accumulate_gbuffer_lighting()
 {
 	GPUSCOPESTART("accumulate_gbuffer_lighting");
 
+
+
 	
 	Model* LIGHT_CONE = mods.get_light_cone();
 	Model* LIGHT_SPHERE = mods.get_light_sphere();
@@ -2990,6 +2992,10 @@ void Renderer::accumulate_gbuffer_lighting()
 			shader().set_mat4("Model", ModelTransform);
 			shader().set_vec3("position", light.position);
 			shader().set_float("radius", light.radius);
+			shader().set_bool("is_spot_light", light.is_spotlight);
+			shader().set_float("spot_inner", cos(glm::radians(light.conemin)));
+			shader().set_float("spot_angle", cos(glm::radians(light.conemax)));
+			shader().set_vec3("spot_normal",light.normal);
 
 			glMultiDrawElementsIndirect(
 				GL_TRIANGLES,
@@ -3145,7 +3151,8 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		render_level_to_target(params);
 	}
 
-	accumulate_gbuffer_lighting();
+	if(r_debug_mode.get_integer() == 0)
+		accumulate_gbuffer_lighting();
 
 	{
 		GPUSCOPESTART("TRANSPARENTS");

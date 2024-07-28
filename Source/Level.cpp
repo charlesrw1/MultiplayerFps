@@ -75,68 +75,6 @@ void Physics_Mesh::build()
 
 
 
-void make_static_mesh_from_dict(vector<handle<Render_Object>>& objs, vector<PhysicsActor*>& phys, const Dict& dict)
-{
-	const char* get_str = "";
-
-	const char* modelname = dict.get_string("model");
-	if (*modelname == 0) {
-		return;
-	}
-	Model* model = mods.find_or_load(modelname);
-	if (!model)
-		return;
-
-	glm::vec3 p = dict.get_vec3("position");
-	glm::vec3 s = dict.get_vec3("scale",glm::vec3(1.f));
-	glm::vec4 qvec = dict.get_vec4("rotation");
-	glm::quat q = glm::quat(qvec.x, qvec.y, qvec.z, qvec.w);
-	glm::mat4 transform = glm::translate(glm::mat4(1), p);
-	transform *= glm::mat4_cast(q);
-	transform = glm::scale(transform, s);
-
-	Color32 color = dict.get_color("color");
-
-	auto handle = idraw->get_scene()->register_obj();
-	Render_Object rop;
-	rop.param1 = color;
-	rop.model = model;
-	rop.transform = transform;
-	rop.animator = nullptr;
-	rop.visible = true;
-	rop.shadow_caster = dict.get_int("casts_shadows", 1);
-
-	bool has_collisions = dict.get_int("has_collisions", 1);
-	idraw->get_scene()->update_obj(handle, rop);
-	objs.push_back(handle);
-
-	if (has_collisions) {
-		// create physics
-		PhysicsActor* actor = g_physics->allocate_physics_actor();
-		assert(actor);
-		actor->set_entity(nullptr);
-
-		PhysTransform pt;
-		pt.position = p;
-		pt.rotation = q;
-
-		glm::vec3 halfsize = (model->get_bounds().bmax - model->get_bounds().bmin) * 0.5f * glm::abs(s);
-		glm::vec3 center = model->get_bounds().get_center() * s;
-		center = glm::mat4_cast(q) * glm::vec4(center, 1.0);
-		PhysTransform tr;
-		tr.position = p;	// fixme: scaling for models
-		tr.rotation = q;
-		if (model->get_physics_body())
-			actor->create_static_actor_from_model(model, tr);
-		else
-			actor->create_static_actor_from_shape(physics_shape_def::create_box(halfsize, p + center, q));
-	
-		phys.push_back(actor);
-	}
-}
-
-
-
 #include "Framework/Files.h"
 #include "Framework/DictWriter.h"
 #include <fstream>
@@ -293,8 +231,9 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 				return false;
 			}
 			else {
-				if (!is_component_override)
-					parent->add_component_from_loading(ec);
+				if (!is_component_override) {
+					ec->post_unserialize_created_component(parent);
+				}
 			}
 		}
 		else {

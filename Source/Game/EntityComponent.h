@@ -37,7 +37,8 @@ public:
 	void unlink_and_destroy();
 	void destroy_children_no_unlink();
 	void attach_to_parent(EntityComponent* parent_component, StringName point = StringName());
-	void remove_this(EntityComponent* component);
+	void remove_this(EntityComponent* component);	// not destructuve, better name is unlink_this()
+	void post_unserialize_created_component(Entity* owner_ent);
 
 #ifndef NO_EDITOR
 	// compile any data relevant to the node
