@@ -110,7 +110,7 @@ public:
 
 	static const PropertyInfoList* get_props();
 
-	float radius = 20.f;
+	float radius = 5.f;
 	glm::vec3 color = glm::vec3(1.f);
 
 	bool visible = true;

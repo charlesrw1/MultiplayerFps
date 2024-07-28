@@ -234,7 +234,19 @@ public:
 
 	Model* get_error_model() { return error_model; }
 	Model* get_sprite_model() { return _sprite; }
+
+
+	Model* get_light_dome() { return LIGHT_DOME; }
+	Model* get_light_sphere() { return LIGHT_SPHERE; }
+	Model* get_light_cone() { return LIGHT_CONE; }
+
 private:
+
+	// Used for gbuffer lighting
+	Model* LIGHT_DOME = nullptr;
+	Model* LIGHT_SPHERE = nullptr;
+	Model* LIGHT_CONE = nullptr;
+
 	Model* error_model = nullptr;
 	Model* _sprite = nullptr;
 

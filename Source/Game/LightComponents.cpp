@@ -51,7 +51,7 @@ void SpotLightComponent::on_changed_transform()
 
 const PropertyInfoList* PointLightComponent::get_props() {
 	START_PROPS(PointLightComponent)
-		REG_FLOAT(radius, PROP_DEFAULT, "20.0"),
+		REG_FLOAT(radius, PROP_DEFAULT, "5.0"),
 		REG_BOOL(visible, PROP_DEFAULT, "1"),
 	END_PROPS(PointLightComponent)
 }

@@ -686,6 +686,16 @@ void ModelMan::init()
 
 
 	create_default_models();
+
+	LIGHT_CONE = mods.find_or_load("LIGHT_CONE.cmdl");
+	LIGHT_SPHERE = mods.find_or_load("LIGHT_SPHERE.cmdl");
+	LIGHT_DOME = mods.find_or_load("LIGHT_DOME.cmdl");
+	LIGHT_CONE->system_asset = true;
+	LIGHT_SPHERE->system_asset = true;
+	LIGHT_DOME->system_asset = true;
+
+	if (!LIGHT_CONE || !LIGHT_SPHERE || !LIGHT_DOME)
+		Fatalf("!!! ModelMan::init: couldn't load default LIGHT_x volumes (used for gbuffer lighting)\n");
 }
 
 void ModelMan::create_default_models()

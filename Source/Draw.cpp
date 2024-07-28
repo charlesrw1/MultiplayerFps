@@ -692,6 +692,10 @@ void Renderer::create_shaders()
 
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
+	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
+	prog.light_accumulation_depth = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt","DEPTHONLY");
+
+
 
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
@@ -974,6 +978,7 @@ void Renderer::init()
 	on_level_start();
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
+
 }
 
 
@@ -2909,6 +2914,68 @@ void draw_debug_grid()
 void Renderer::accumulate_gbuffer_lighting()
 {
 	// stencil buffer trick for point/spot lights
+	
+	Model* LIGHT_CONE = mods.get_light_cone();
+	Model* LIGHT_SPHERE = mods.get_light_sphere();
+	Model* LIGHT_DOME = mods.get_light_dome();
+	{
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+
+		bind_vao(mods.get_vao(true/* animated */));
+
+		// bind the forward_render framebuffer
+		// outputs to the scene_color texture
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
+		glViewport(0, 0, vs.width, vs.height);
+		
+		// disable depth writes
+		glDepthMask(GL_FALSE);
+
+		// enable additive blending to the color buffer
+		//set_blend_state(blend_state::ADD);
+		//set_show_backfaces(true);
+
+		set_shader(prog.light_accumulation);
+
+		bind_texture(0, tex.scene_gbuffer0);
+		bind_texture(1, tex.scene_gbuffer1);
+		bind_texture(2, tex.scene_gbuffer2);
+		bind_texture(3, tex.scene_depth);
+
+		for (auto& light_pair : scene.light_list.objects) {
+			auto& light = light_pair.type_.light;
+			
+			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
+			const float scale = light.radius;
+			ModelTransform = glm::scale(ModelTransform, glm::vec3(scale));
+
+			shader().set_mat4("Model", ModelTransform);
+
+			const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+
+			// Copied code from execute_render_lists
+			auto& part = LIGHT_SPHERE->get_part(0);
+			gpu::DrawElementsIndirectCommand cmd;
+			cmd.baseVertex = part.base_vertex + LIGHT_SPHERE->get_merged_vertex_ofs();
+			cmd.count = part.element_count;
+			cmd.firstIndex = part.element_offset + LIGHT_SPHERE->get_merged_index_ptr();
+			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
+			cmd.primCount = 1;
+			cmd.baseInstance = 0;
+
+			glMultiDrawElementsIndirect(
+				GL_TRIANGLES,
+				index_type,
+				(void*)&cmd,
+				1,
+				sizeof(gpu::DrawElementsIndirectCommand)
+			);
+		}
+
+		// undo state changes
+		glDepthMask(GL_TRUE);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 
 	// fullscreen pass for directional light(s)
 
@@ -3003,6 +3070,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 		render_level_to_target(params);
 	}
+
+	accumulate_gbuffer_lighting();
+
 	{
 		GPUSCOPESTART("TRANSPARENTS");
 		Render_Level_Params params(
