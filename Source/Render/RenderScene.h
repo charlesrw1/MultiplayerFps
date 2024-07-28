@@ -111,14 +111,14 @@ public:
 		uint32_t camera_dist,
 		uint32_t submesh,
 		uint32_t lod,
-		uint32_t layer);
+		uint32_t layer, bool is_editor_mode);
 
 	draw_call_key create_sort_key_from_obj(
 		const Render_Object& proxy,
 		Material* material,
 		uint32_t camera_dist,
 		uint32_t submesh,
-		uint32_t layer);
+		uint32_t layer, bool is_editor_mode);
 
 	void clear() {
 		objects.clear();
@@ -331,8 +331,12 @@ public:
 
 	}
 
+	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) override {
+		if (!handle.is_valid()) return nullptr;
+		return &proxy_list.get(handle.id).proxy;
+	}
 
-	void build_scene_data();
+	void build_scene_data(bool is_for_editor);
 	void upload_scene_materials();
 
 	RL_Internal* get_main_directional_light();

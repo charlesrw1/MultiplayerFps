@@ -1147,6 +1147,7 @@ void GameEngineLocal::draw_screen()
 	if (state == Engine_State::Idle) {
 		// draw general ui
 		if (get_current_tool() != nullptr) {
+			params.is_editor = true;	// draw to the id buffer for mouse picking
 			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui(), get_current_tool());
 		}
 		else {

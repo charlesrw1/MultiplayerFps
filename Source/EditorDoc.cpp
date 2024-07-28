@@ -195,8 +195,9 @@ ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR
 #include "AssetRegistry.h"
 
 
+
 // Unproject mouse coords into a vector, cast that into the world via physics
-world_query_result EditorDoc::cast_ray_into_world(Ray* out_ray, const int mx, const int my)
+glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
 	Ray r;
 	// get ui size
@@ -226,14 +227,7 @@ world_query_result EditorDoc::cast_ray_into_world(Ray* out_ray, const int mx, co
 
 		r.dir = dir;
 	}
-
-	if (out_ray)
-		*out_ray = r;
-
-	world_query_result res;
-	g_physics->trace_ray(res, r.pos, r.dir, 100.0, {});
-	Debug::add_line(r.pos,r.pos+ r.dir * 50.0f, COLOR_PINK, 0.66);
-	return res;
+	return r.dir;
 }
 
 Color32 to_color32(glm::vec4 v) {
@@ -608,24 +602,24 @@ bool EditorDoc::handle_event(const SDL_Event& event)
 			if (!get_size().is_point_inside(event.button.x, event.button.y))
 				return false;
 
-			if (manipulate->is_hovered() || manipulate->is_using())
+			if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
 				return false;
 
+			const int x = event.button.x - size.x;
+			const int y = event.button.y - size.y;
+
+
 			if (event.button.button == 1) {
-				//world_query_result rh = cast_ray_into_world(nullptr, event.button.x, event.button.y);
-				//
-				//if (rh.fraction == 1.0) {
-				//	// no hit
-				//	selection_state->clear_all_selected();
-				//}
-				//else {
-				//	int index = ed_doc.get_node_index(rh.actor->get_editor_node_owner());
-				//	if (eng->get_input_state()->keys[SDL_SCANCODE_LSHIFT]) {
-				//		selection_state->add_to_selection(nodes[index]);
-				//	}
-				//	else
-				//		selection_state->set_select_only_this(nodes[index]);
-				//}
+				auto handle = idraw->mouse_pick_scene_for_editor(x, y);
+
+
+				if (handle.is_valid()) {
+					auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
+					if (component_ptr&&component_ptr->get_owner()) {
+						selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
+					}
+				}
+
 			}
 		}
 
@@ -869,7 +863,8 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	}
 	else if (ss->has_any_selected()) {
 		for (auto e : ss->get_selection()) {
-			world_space_of_selected.push_back(e.get()->get_ws_transform());
+			if(e.get())
+				world_space_of_selected.push_back(e.get()->get_ws_transform());
 		}
 	}
 
@@ -994,6 +989,15 @@ void EditorDoc::hook_scene_viewport_draw()
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 		{
 			glm::mat4 drop_transform = glm::mat4(1.f);
+
+			int x, y;
+			SDL_GetMouseState(&x, &y);
+
+			const float scene_depth = idraw->get_scene_depth_for_editor(x-size.x, y-size.y);
+
+			glm::vec3 dir = unproject_mouse_to_ray(x, y);
+			glm::vec3 worldpos = (scene_depth > 30.0) ? vs_setup.origin + dir * 5.0f : vs_setup.origin + dir * scene_depth;
+			drop_transform[3] = glm::vec4(worldpos, 1.0);
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 			if (resource->type->get_type_name() == "Entity (C++)") {

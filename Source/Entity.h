@@ -75,30 +75,6 @@ inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, 
 #define REG_ENTITY_PTR(name, flags) make_entity_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
 
 
-// Destroy all components at end
-//		de_init()
-// Destroy an added dynamic component (and all subchildren)
-// Move a dynamic component to a different parent
-
-
-// EntityComponents are used for shared data/logic between Entities
-// such as Meshes, Physics, Sounds, Fx, etc.
-// is ordered in a heirarchy
-
-
-
-// Entity::CTOR,Component::CTOR: set any flags, booleans
-// Entity::PostLoad: after loading properties from disk
-// Component::Register: after PostLoad, registers components
-// Entity::Start,Component::Start: called before object is spawned in
-
-// In Editor, CTOR,PostLoad, and Register
-// Editor also calls tick function on components if its variable is set
-
-// Spawning entities in gameplay: CreateEntity<EntityClass>("schemaname", transform)
-// set any variables etc. FinishEntitySpawn(ptr)
-// Or: CreateAndSpawnEntity("schemaname",transform)
-
 class Schema;
 class EditorFolder;
 CLASS_H(Entity, ClassBase)
@@ -204,6 +180,8 @@ public:
 	void set_ws_rotation(const glm::quat& q) { return get_root_component()->set_ls_transform(get_ws_position(), q, get_ws_scale()); }
 
 	const std::vector<std::unique_ptr<EntityComponent>>& get_all_components() { return all_components; }
+
+	void add_component_from_loading(EntityComponent* component);
 protected:
 
 	ObjPtr<EntityComponent> root_component;
@@ -263,6 +241,7 @@ inline T* Entity::create_sub_component(const std::string& name) {
 	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
 	auto ptr = std::make_unique<T>();
 	ptr->eSelfNameString = name;
+	ptr->set_owner(this);
 	all_components.push_back(std::move(ptr));
 	return (T*)all_components.back().get();
 }
@@ -289,4 +268,9 @@ inline static PropertyInfo Entity::generate_entity_ref_property(T* dummy, const 
 	pi.custom_type_str = "EntityRef";
 	pi.type = core_type_id::Struct;
 	return pi;
+}
+inline void Entity::add_component_from_loading(EntityComponent* component)
+{
+	component->set_owner(this);
+	all_components.push_back(std::unique_ptr<EntityComponent>(component));
 }

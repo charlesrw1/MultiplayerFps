@@ -31,7 +31,7 @@ public:
 	virtual void on_tick() {}
 
 	void set_owner(Entity* owner) { entity_owner = owner; }
-	Entity* get_owner() { return entity_owner; }
+	Entity* get_owner() const { return entity_owner; }
 
 	// destruction functions
 	void unlink_and_destroy();

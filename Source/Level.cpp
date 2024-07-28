@@ -294,7 +294,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			}
 			else {
 				if (!is_component_override)
-					parent->all_components.push_back(std::unique_ptr<EntityComponent>(ec));
+					parent->add_component_from_loading(ec);
 			}
 		}
 		else {

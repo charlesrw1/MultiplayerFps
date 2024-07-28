@@ -238,6 +238,9 @@ public:
 	virtual void bake_cubemaps() override {}
 	virtual uint32_t get_composite_output_texture_handle() override { return tex.output_composite; }
 
+	virtual handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) override;
+	virtual float get_scene_depth_for_editor(int x, int y) override;
+
 	void check_hardware_options();
 	void create_default_textures();
 
@@ -341,6 +344,7 @@ public:
 
 		texhandle scene_custom_depthstencil{};
 		texhandle editor_selection_buffer{};
+		texhandle editor_id_buffer{};
 
 
 		//texhandle reflected_color{};
@@ -360,6 +364,8 @@ public:
 		Texture* gbuffer0_vts_handle = nullptr;
 		Texture* gbuffer1_vts_handle = nullptr;
 		Texture* gbuffer2_vts_handle = nullptr;
+		Texture* editorid_vts_handle = nullptr;
+
 	}tex;
 
 	struct uniform_buffers {
@@ -416,7 +422,7 @@ public:
 
 	Render_Scene scene;
 
-	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither);
+	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither, bool is_editor_mode);
 	
 	Render_Stats stats;
 

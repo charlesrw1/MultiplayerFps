@@ -931,6 +931,8 @@ void Renderer::create_default_textures()
 	tex.gbuffer0_vts_handle = g_imgs.install_system_texture("_gbuffer0");
 	tex.gbuffer1_vts_handle = g_imgs.install_system_texture("_gbuffer1");
 	tex.gbuffer2_vts_handle = g_imgs.install_system_texture("_gbuffer2");
+	tex.editorid_vts_handle = g_imgs.install_system_texture("_editorid");
+
 }
 
 void Renderer::init()
@@ -1020,14 +1022,14 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Main scene depth
 	create_and_delete_texture(tex.scene_depth);
-	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH24_STENCIL8, s_w, s_h);
+	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
 	set_default_parameters(tex.scene_depth);
 
 	// Create forward render framebuffer
 	// Transparents and other immediate stuff get rendered to this
 	create_and_delete_fb(fbo.forward_render);
 	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
-	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_STENCIL_ATTACHMENT, tex.scene_depth, 0);
+	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
 	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
 	glNamedFramebufferDrawBuffers(fbo.forward_render, 1, attachments);
 	
@@ -1045,6 +1047,11 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
 	set_default_parameters(tex.scene_gbuffer2);
 
+	// for mouse picking
+	create_and_delete_texture(tex.editor_id_buffer);
+	glTextureStorage2D(tex.editor_id_buffer, 1, GL_RGBA8, s_w, s_h);
+	set_default_parameters(tex.editor_id_buffer);
+
 	// Create Gbuffer
 	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives
 	create_and_delete_fb(fbo.gbuffer);
@@ -1053,8 +1060,16 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1, 0);
 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2, 0);
 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
-	const uint32_t gbuffer_attach_count = 4;
-	unsigned int gbuffer_attachments[gbuffer_attach_count] = { GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2,GL_COLOR_ATTACHMENT3 };
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
+
+	const uint32_t gbuffer_attach_count = 5;
+	unsigned int gbuffer_attachments[gbuffer_attach_count] = { 
+		GL_COLOR_ATTACHMENT0,
+		GL_COLOR_ATTACHMENT1,
+		GL_COLOR_ATTACHMENT2,
+		GL_COLOR_ATTACHMENT3,
+		GL_COLOR_ATTACHMENT4,
+	};
 	glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
 
 	// Composite textures
@@ -1073,6 +1088,8 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	tex.gbuffer0_vts_handle->update_specs(tex.scene_gbuffer0, s_w, s_h, 3, {});
 	tex.gbuffer1_vts_handle->update_specs(tex.scene_gbuffer1, s_w, s_h, 3, {});
 	tex.gbuffer2_vts_handle->update_specs(tex.scene_gbuffer2, s_w, s_h, 3, {});
+	tex.editorid_vts_handle->update_specs(tex.editor_id_buffer, s_w, s_h, 4, {});
+
 
 	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
@@ -1622,7 +1639,7 @@ void Render_Pass::update_batches()
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
-draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, Material* material,uint32_t camera_dist, uint32_t submesh, uint32_t layer)
+draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, Material* material,uint32_t camera_dist, uint32_t submesh, uint32_t layer, bool is_editor_mode)
 {
 	draw_call_key key;
 
@@ -1630,7 +1647,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, 
 		proxy.animator!=nullptr, 
 		proxy.model, material, 
 		(type == pass_type::DEPTH),
-		false
+		false,
+		is_editor_mode
 	);
 
 	key.blending = (uint64_t)material->blend;
@@ -1664,11 +1682,12 @@ void Render_Pass::add_object(
 	uint32_t camera_dist,
 	uint32_t submesh,
 	uint32_t lod,
-	uint32_t layer) {
+	uint32_t layer,
+	bool is_editor_mode) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
 	Pass_Object obj;
-	obj.sort_key = create_sort_key_from_obj(proxy, material,camera_dist, submesh, layer);
+	obj.sort_key = create_sort_key_from_obj(proxy, material,camera_dist, submesh, layer, is_editor_mode);
 	obj.render_obj = handle;
 	obj.submesh_index = submesh;
 	obj.material = material;
@@ -2103,7 +2122,7 @@ const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_time
 //		
 
 
-void Render_Scene::build_scene_data()
+void Render_Scene::build_scene_data(bool build_for_editor)
 {
 	CPUFUNCTIONSTART;
 
@@ -2161,11 +2180,11 @@ void Render_Scene::build_scene_data()
 						if (obj.type_.proxy.mat_override)
 							mat = obj.type_.proxy.mat_override;
 						if (mat->is_translucent()) {
-							transparent_pass.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0);
+							transparent_pass.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0, build_for_editor);
 						}
 						else {
-							shadow_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
-							gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0);
+							shadow_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
+							gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
 						}
 					}
 
@@ -3038,7 +3057,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	vs = current_frame_main_view;
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
-	scene.build_scene_data();
+	scene.build_scene_data(params.is_editor);
 
 
 
@@ -3262,7 +3281,11 @@ void Renderer::set_water_constants()
 	bind_texture(SPECIAL_LOC, white_texture.gl_id);	// reflected_depth
 }
 
-program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model* mod, const Material* mat, bool depth_pass, bool dither)
+program_handle Renderer::get_mat_shader(bool has_animated_matricies, 
+	const Model* mod, const Material* mat, 
+	bool depth_pass, 
+	bool dither,
+	bool is_editor_mode)
 {
 	bool is_animated = mod->has_bones() && has_animated_matricies;
 	mat = (depth_pass && mat->can_use_shared_depth()) ? mats.shared_depth : mat;
@@ -3272,6 +3295,7 @@ program_handle Renderer::get_mat_shader(bool has_animated_matricies, const Model
 	key.depth_only = depth_pass;
 	key.dither = dither;
 	key.material_id = mat->material_id;
+	key.editor_id = is_editor_mode;
 
 #ifdef _DEBUG
 	key.debug = (r_debug_mode.get_integer()!=0);
@@ -3687,4 +3711,78 @@ void DebuggingTextureOutput::draw_out()
 
 	mb.Free();
 
+}
+
+static float linearize_depth(float d, float zNear, float zFar)
+{
+	float z_n = 2.0 * d - 1.0;
+	return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+}
+
+float Renderer::get_scene_depth_for_editor(int x, int y)
+{
+	// super slow garbage functions obviously
+
+	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {
+		sys_print("!!! invalid mouse coords for mouse_pick_scene\n");
+		return { -1 };
+	}
+
+	glFlush();
+	glFinish();
+
+	const size_t size = cur_h * cur_w;
+	float* buffer_pixels = new float[size];
+
+	glGetTextureImage(tex.scene_depth, 0, GL_DEPTH_COMPONENT, GL_FLOAT, size*sizeof(float), buffer_pixels);
+
+	y = cur_h - y - 1;
+
+	const size_t ofs = cur_w * y + x;
+	const float depth = buffer_pixels[ofs];
+	delete[] buffer_pixels;
+
+	return linearize_depth(depth, vs.near, vs.far);
+}
+
+handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
+{
+	// super slow garbage functions obviously
+
+	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {
+		sys_print("!!! invalid mouse coords for mouse_pick_scene\n");
+		return { -1 };
+	}
+
+	glFlush();
+	glFinish();
+
+	const size_t size = cur_h * cur_w * 4;
+	uint8_t* buffer_pixels = new uint8_t[size];
+
+	glGetTextureImage(tex.editor_id_buffer,0, GL_RGBA,GL_UNSIGNED_BYTE, size, buffer_pixels);
+
+	y = cur_h - y - 1;
+
+	const size_t ofs = cur_w * y * 4 + x * 4;
+	uint8_t* ptr = &buffer_pixels[ofs];
+	uint32_t id = uint32_t(ptr[0]) | uint32_t(ptr[1]) << 8 | uint32_t(ptr[1]) << 16 | uint32_t(ptr[3]) << 24;
+	delete[] buffer_pixels;
+
+	if (id == 0xff000000) {
+		sys_print("NONE\n");
+		return { -1 };
+	}
+
+	uint32_t realid = id - 1;	// allow for nullptr
+
+	if (realid >= scene.proxy_list.objects.size()) {
+		sys_print("!!! invalid editorid\n");
+		return { -1 };
+	}
+	int handle_out = scene.proxy_list.objects.at(realid).handle;
+
+	sys_print("MODEL: %s\n", scene.proxy_list.objects.at(realid).type_.proxy.model->get_name().c_str());
+
+	return { handle_out };
 }

@@ -274,6 +274,7 @@ void MeshComponent::on_init()
 		obj.model = model.get();
 		obj.visible = visible;
 		obj.transform = get_ws_transform();
+		obj.owner = this;
 
 		idraw->get_scene()->update_obj(draw_handle, obj);
 	}
@@ -288,6 +289,7 @@ void MeshComponent::on_changed_transform()
 	obj.model = model.get();
 	obj.visible = visible;
 	obj.transform = get_ws_transform();
+	obj.owner = this;
 
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }

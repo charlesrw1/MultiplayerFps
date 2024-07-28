@@ -10,6 +10,7 @@ class AnimatorInstance;
 class Material;
 class Entity;
 class Model;
+class EntityComponent;
 struct Render_Object
 {
 	Render_Object() {
@@ -36,9 +37,8 @@ struct Render_Object
 	bool dither : 1;
 	bool opposite_dither : 1;
 
-	// for debugging only
-	Entity* owner = nullptr;
-
+	// for debugging only (also editor uses this for picking)
+	const EntityComponent* owner = nullptr;
 
 	glm::mat4 transform = glm::mat4(1.f);
 };

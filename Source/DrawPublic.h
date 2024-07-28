@@ -22,6 +22,7 @@ struct SceneDrawParamsEx {
 	bool draw_world = true;
 	float time;
 	float dt;
+	bool is_editor = false;
 };
 
 struct Render_Object;
@@ -44,6 +45,9 @@ public:
 	virtual handle<Render_Object> register_obj() = 0;
 	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) = 0;
 	virtual void remove_obj(handle<Render_Object>& handle) = 0;
+	// returns null on a bad handle
+	// DONT cache this! just use for quick reads of an existing object
+	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) = 0;
 
 	// Decal API
 	virtual handle<Render_Decal> register_decal(const Render_Decal& d) = 0;
@@ -95,6 +99,13 @@ public:
 
 	// only used by animation editor to draw to an imgui window
 	virtual uint32_t get_composite_output_texture_handle() = 0;
+
+	// tests the output buffer from last frame and returns whatever object was drawn
+	// ONLY for level editor (requires SceneDrawParamEx::is_editor to have been true LAST frame)
+	// returns -1 on none
+	virtual handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) = 0;
+	// test the depth buffer, returns LINEAR depth, ONLY for editor!
+	virtual float get_scene_depth_for_editor(int x, int y) = 0;
 };
 
 extern RendererPublic* idraw;

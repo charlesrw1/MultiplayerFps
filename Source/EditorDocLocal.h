@@ -137,6 +137,11 @@ private:
 	void on_start() { rebuild_tree(); }
 	void on_close() { delete_tree(); }
 	void on_change_name(uint64_t handle) {
+		if (map.find(handle) == map.end()) {
+			sys_print("??? on_change_name couldnt find handle??\n");
+			return;
+		}
+
 		map.find(handle)->second->parent->sort_children();
 	}
 
@@ -496,7 +501,7 @@ public:
 	}
 	void hook_scene_viewport_draw() override;
 
-	world_query_result cast_ray_into_world(Ray* out_ray, int mx, int my);
+	glm::vec3 unproject_mouse_to_ray(int mx, int my);
 
 	
 	enum ToolMode {
