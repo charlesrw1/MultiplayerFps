@@ -11,73 +11,53 @@
 
 const int MAX_INSTANCE_PARAMETERS = 8;	// 8 scalars/color32s
 const uint32_t MATERIAL_SIZE = 64;	// 64 bytes
-const uint32_t MAX_MAXTERIALS = MATERIAL_SIZE * 1024;
+const uint32_t MAX_MAXTERIALS_BUFFER_SIZE = MATERIAL_SIZE * 1024;
 
-using program_handle_NEW = handle<Shader>;
-
-class ProgramManagerNEW
+enum class LightingMode : uint8_t
 {
-public:
-	program_handle_NEW create_raster(const char* frag, const char* vert, const std::string& defines = {});
-	program_handle_NEW create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
-	program_handle_NEW create_compute(const char* compute, const std::string& defines = {});
-	Shader get_obj(program_handle_NEW handle) {
-		return programs[handle.id].shader_obj;
-	}
-	void recompile_all();
-
-	struct program_def {
-		std::string defines;
-		const char* frag = nullptr;
-		const char* vert = nullptr;
-		const char* geo = nullptr;
-		bool is_compute = false;
-		bool compile_failed = false;
-		Shader shader_obj;
-	};
-	std::vector<program_def> programs;
-private:
-	void recompile(program_def& def);
+	Lit,
+	Unlit
+};
+enum class MaterialUsage : uint8_t
+{
+	Default,
+	Postprocess,
 };
 
-struct shader_key_NEW
+// Parameter types
+enum class MatParamType : uint8_t
 {
-	shader_key_NEW() {
-		shader_type = 0;
-		depth_only = 0;
-		animated = 0;
-		debug = 0;
-		particle = 0;
-		forward_lit = 0;
-		postprocess = 0;
-	}
-	uint32_t shader_type : 26;
-	uint32_t animated : 1;
-	uint32_t depth_only : 1;
-	uint32_t debug : 1;
-	uint32_t particle : 1;
-	uint32_t postprocess : 1;
-	uint32_t forward_lit : 1;
-
-	uint32_t as_uint32() const {
-		return *((uint32_t*)this);
-	}
+	Empty,
+	FloatVec,	// float[4]
+	Float,		// float
+	Vector,		// uint8[4]
+	Bool,		// uint8
+	Texture2D,
+	ConstTexture2D,
 };
-static_assert(sizeof(shader_key_NEW) == 4, "shader key needs 4 bytes");
 
-class MaterialShaderTableNEW
+// Variant for material parameters
+struct MaterialParameterValue
 {
-public:
-	MaterialShaderTableNEW();
-	struct material_shader_internal {
-		shader_key_NEW key;
-		program_handle_NEW handle = { -1 };
+	MatParamType type = MatParamType::Empty;
+	union {
+		glm::vec4 vector;
+		bool boolean;
+		unsigned int color32;
+		float scalar = 0.0;
+		const Texture* tex_ptr;
 	};
+};
 
-	program_handle_NEW lookup(shader_key_NEW key);
-	void insert(shader_key_NEW key, program_handle_NEW handle);
-
-	std::vector<material_shader_internal> shader_hash_map;
+// Defines a modifiable property
+struct MaterialParameterDefinition
+{
+	std::string name;
+	StringName hashed_name;
+	MaterialParameterValue default_value;
+	// For textures: offset = texture index
+	// Else: offset = byte offset in parameter SSBO buffer
+	uint32_t offset = 0;
 };
 
 struct InstanceData
@@ -87,9 +67,66 @@ struct InstanceData
 	uint32_t index = 0;
 };
 
-class MasterMaterialLocal : public MasterMaterial
+class MaterialBufferLocal : public MaterialParameterBuffer
 {
 public:
+	std::vector<MaterialParameterDefinition> param_defs;
+	std::vector<MaterialParameterValue> values;
+
+	bufferhandle ubo_buffer = 0;
+	uint32_t buffer_size = 0;
+};
+
+class MaterialInstanceLocal : public MaterialInstance
+{
+public:
+	using MaterialInstance::MaterialInstance;
+
+	const std::vector<const Texture*>& get_textures() const { return texture_bindings; }
+	std::vector<const Texture*> texture_bindings;
+	std::vector<MaterialParameterValue> params;
+	uint32_t gpu_handle = 0;	// offset in buffer if uploaded
+	void upload_parameters_to_buffer();
+	void init();
+	friend class MaterialManagerLocal;
+
+	void set_float_parameter(StringName name, float f) override {}
+	void set_bool_parameter(StringName name, bool b)override {}
+	void set_vec_parameter(StringName name, Color32 c) override {}
+	void set_fvec_parameter(StringName name, glm::vec4 v4) override {}
+	void set_tex_parameter(StringName name, const Texture* t) override {}
+};
+
+// compilied material, material instances can be based off it to allow for variation but minimize draw call changes
+CLASS_H(MasterMaterial, IAsset)
+public:
+	MasterMaterial() : default_inst(false) {}
+
+	// generated glsl fragment and vertex shader
+	const MaterialInstance* get_default_material_inst() const { return &default_inst; }
+
+	// All parameters that can be set by instances
+	std::vector<MaterialParameterDefinition> param_defs;
+
+	struct UboBinding {
+		MaterialParameterBuffer* buffer = nullptr;
+		uint32_t binding_loc = 0;
+	};
+	std::vector<UboBinding> constant_buffers;
+
+	MaterialInstanceLocal default_inst;
+
+	// Material state parameters
+	bool alpha_tested = false;
+	blend_state blend = blend_state::OPAQUE;
+	LightingMode light_mode = LightingMode::Lit;
+	bool backface = false;
+
+	// uses the shared depth material
+	// this is true when nothing writes to worldPositionOffset and the material mode is not masked
+	bool is_using_default_depth = false;
+
+	uint32_t material_id = 0;
 
 	bool load_from_file(const std::string& filename);
 	void create_material_instance();
@@ -98,28 +135,31 @@ public:
 		std::string& fs_code,
 		const std::vector<InstanceData>& instdat
 	);
-
-	// shader details
-
-	// get shader for runtime
-
 };
+
 
 class MaterialManagerLocal : public MaterialManagerPublic
 {
 public:
+	void init() override {
+		MasterMaterial mm;
+		mm.load_from_file("terrain/terrainMaster.txt");
+
+		Shader s;
+		Shader::compile_vert_frag_single_file(&s, "./Data/Materials/terrain/terrainMaster_shader.glsl");
+	}
+
 	// public interface
-	void pre_render_update() override;
-	const MaterialInstance* find_material_instance(const char* mat_inst_name) override;
-	MaterialInstance* create_dynmaic_material(const MaterialInstance* material) override;
-	void free_dynamic_material(MaterialInstance*& mat) override;
+	void pre_render_update() override {}
+	const MaterialInstance* find_material_instance(const char* mat_inst_name) override { return nullptr; }
+	MaterialInstance* create_dynmaic_material(const MaterialInstance* material) override { return nullptr; }
+	void free_dynamic_material(MaterialInstance*& mat) override {}
 
-	MaterialParameterBuffer* find_parameter_buffer(const char* name) override;
+	MaterialParameterBuffer* find_parameter_buffer(const char* name) override { return nullptr; }
 
-	MasterMaterialLocal* find_master_material(const std::string& mastername);
+	MasterMaterial* find_master_material(const std::string& mastername);
 private:
-	MaterialShaderTableNEW shader_table;
-
+	
 	bufferhandle gpuMaterialBuffer = 0;
 	uint32_t materialBufferSize = 0;
 
@@ -127,7 +167,7 @@ private:
 	std::vector<uint64_t> materialBitmapAllocator;
 
 	std::unordered_map<std::string, MasterMaterial*> master_materials;
-	std::unordered_map<std::string, MaterialInstance*> static_materials;
+	std::unordered_map<std::string, MaterialInstanceLocal*> static_materials;
 	std::unordered_set<MasterMaterial*> dynamic_materials;
 	std::unordered_map<std::string, MaterialParameterBuffer*> parameter_buffers;
 };

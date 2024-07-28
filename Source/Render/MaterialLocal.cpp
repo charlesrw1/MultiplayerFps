@@ -7,6 +7,13 @@
 #include "Texture.h"
 
 #include <algorithm>
+#include <stdexcept>
+#include <fstream>
+
+static const char* const MATERIAL_DIR = "./Data/Materials/";
+
+static MaterialManagerLocal matman;
+MaterialManagerPublic* imaterials = &matman;
 
 CLASS_IMPL(MasterMaterial);
 CLASS_IMPL(MaterialInstance);
@@ -25,25 +32,18 @@ inline std::string remove_filename_from_path(std::string& path)
 	}
 }
 
-MasterMaterialLocal* MaterialManagerLocal::find_master_material(const std::string& mastername)
+MasterMaterial* MaterialManagerLocal::find_master_material(const std::string& mastername)
 {
-	
 	return {};
 }
 
-static const char* const MATERIAL_DIR = "./Data/Materials/";
-
-
-#include <stdexcept>
-
-#include <fstream>
 class MasterMaterialExcept : public std::runtime_error
 {
 public:
 	MasterMaterialExcept(const std::string& path, const std::string& error) 
 		: std::runtime_error("!!! load MasterMaterial " + path + "error: " + error + "\n") {}
 };
-bool MasterMaterialLocal::load_from_file(const std::string& filename)
+bool MasterMaterial::load_from_file(const std::string& filename)
 {
 	DictParser in;
 	std::string fullpath = MATERIAL_DIR + filename;
@@ -224,8 +224,10 @@ bool MasterMaterialLocal::load_from_file(const std::string& filename)
 	}
 
 	auto str = create_glsl_shader(vs_code, fs_code, inst_dats);
-	std::ofstream outfile("file.txt");
+	auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";
+	std::ofstream outfile(out_glsl_path);
 	outfile.write(str.data(), str.size());
+
 }
 
 
@@ -279,16 +281,16 @@ static void replace(std::string& str, const std::string& from, const std::string
 	}
 }
 
-std::string MasterMaterialLocal::create_glsl_shader(
+std::string MasterMaterial::create_glsl_shader(
 	std::string& vs_code,
 	std::string& fs_code,
 	const std::vector<InstanceData>& instdat
 )
 {
 	std::string masterShader;
-	bool good = read_and_add_recursive("MasterShader.txt", masterShader);
+	bool good = read_and_add_recursive("MasterDeferredShader.txt", masterShader);
 	if (!good)
-		throw MasterMaterialExcept("...", "couldnt open MasterShader.txt");
+		throw MasterMaterialExcept("...", "couldnt open MasterDeferredShader.txt");
 
 	std::string actual_vs_code;
 
@@ -324,19 +326,19 @@ std::string MasterMaterialLocal::create_glsl_shader(
 			std::string replacement_code;
 			switch (type) {
 			case MatParamType::Float:
-				replacement_code = "uintBitsToFloat( g_materials[FS_IN_Matid + ";
+				replacement_code = "uintBitsToFloat( _material_param_buffer[FS_IN_Matid + ";
 				replacement_code += std::to_string(UINT_OFS) + "] )";
 				break;
 			case MatParamType::Vector:
-				replacement_code = "unpackUnorm4x8( g_materials[FS_IN_Matid + ";
+				replacement_code = "unpackUnorm4x8( _material_param_buffer[FS_IN_Matid + ";
 				replacement_code += std::to_string(UINT_OFS) + "] )";
 				break;
 			case MatParamType::FloatVec:
 				replacement_code = "vec4( ";
-				replacement_code += "uintBitsToFloat(g_materials[FS_IN_Matid + " + std::to_string(UINT_OFS) + "] ), ";
-				replacement_code += "uintBitsToFloat(g_materials[FS_IN_Matid + " + std::to_string(UINT_OFS + 1) + "] ), ";
-				replacement_code += "uintBitsToFloat(g_materials[FS_IN_Matid + " + std::to_string(UINT_OFS + 2) + "] ), ";
-				replacement_code += "uintBitsToFloat(g_materials[FS_IN_Matid + " + std::to_string(UINT_OFS + 3) + "] )";
+				replacement_code += "uintBitsToFloat(_material_param_buffer[FS_IN_Matid + " + std::to_string(UINT_OFS) + "] ), ";
+				replacement_code += "uintBitsToFloat(_material_param_buffer[FS_IN_Matid + " + std::to_string(UINT_OFS + 1) + "] ), ";
+				replacement_code += "uintBitsToFloat(_material_param_buffer[FS_IN_Matid + " + std::to_string(UINT_OFS + 2) + "] ), ";
+				replacement_code += "uintBitsToFloat(_material_param_buffer[FS_IN_Matid + " + std::to_string(UINT_OFS + 3) + "] )";
 				replacement_code += ")";
 				break;
 			}
@@ -366,6 +368,12 @@ std::string MasterMaterialLocal::create_glsl_shader(
 
 	replace(masterShader, "___USER_VS_CODE___", actual_vs_code);
 	replace(masterShader, "___USER_FS_CODE___", actual_fs_code);
+
+	masterShader.insert(0, 
+		"// ***********************************\n"
+		"// **** GENERATED MATERIAL SHADER ****\n"
+		"// ***********************************\n"
+	);
 
 	return masterShader;
 }

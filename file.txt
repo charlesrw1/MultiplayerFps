@@ -155,66 +155,76 @@ struct Post_Process_Settings
 
 #endif
 
-// global variables like view matrix, time, etc.
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
-// object data
-// includes transform matrix, per instance parameters, animation buffer offset
 layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
 	Object_Instance g_objects[];
 };
-
-// skinning matricies for animation
 layout (binding = 3, std140) readonly buffer Object_Skin_Matricies {
 	mat4 g_skin_matricies[];
 };
-// all materials that are being used, stores dynamic data that are accessed in shaders
 layout(binding = 4,std430) readonly buffer Material_Buffer {
-	uint g_materials[];
+	Material_Data g_materials[];
 };
-
 layout (binding = 5, std430) readonly buffer Indirect_Instance_Buf {
 	uint indirect_instance[];
 };
 layout(binding = 6, std430) readonly buffer Indirect_Mat_Buf {
 	uint indirect_materials[];
 };
+layout (binding = 7, std430) readonly buffer GlobalMaterialBuffer {
+	uint _material_param_buffer[];
+}
 
-uniform int indirect_material_offset = 0;
+#ifdef _VERTEX_SHADER
 
-#ifdef VERTEX_SHADER
 
-// inputs
 layout (location = 0) in vec3 VS_IN_Postion;
 layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
 layout (location = 3) in vec3 VS_IN_Tangent;
+
 layout (location = 4) in ivec4 VS_IN_BoneIndicies;
 layout (location = 5) in vec4 VS_IN_BoneWeights;
 
-// standard outputs
-vec3 WS_OFFSET = vec3(0.0);	// offsets final world position by this amount
 
+flat out uint FS_IN_Objid;
+flat out uint FS_IN_Matid;
+out vec3 FS_IN_FragPos;
+out vec3 FS_IN_Normal;
+out vec2 FS_IN_Texcoord;
+out vec3 FS_IN_BoneColor;
+out vec4 FS_IN_NDC;
+
+out mat3 FS_IN_TBN;
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+uniform int indirect_material_offset = 0;
+
+// START USER CODE
 void VSmain() { }
 
+// END USER CODE
 
 void main()
 {
 	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
 	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
 	FS_IN_Objid = obj_index;
-	
+
 	mat4 Model = g_objects[obj_index].model;
 	mat4 InverseModel = g_objects[obj_index].invmodel;
 
-#ifdef ANIMATED
 	vec3 local_pos = vec3(0.0);
 	vec3 local_normal = vec3(0.0);
-	#ifdef NORMALMAPPED
 	vec3 local_tangent = vec3(0.0);
-	#endif // NORMALMAPPED
+#ifdef ANIMATED
 
 	uint obj_skin_offset = g_objects[obj_index].anim_mat_offset;
 
@@ -227,30 +237,68 @@ void main()
 		vec3 normaladded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Normal;
 		local_normal += normaladded * VS_IN_BoneWeights[i];
 		
-	#ifdef NORMALMAPPED
 		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Tangent;
 		local_tangent += tangentadded;
-	#endif // NORMALMAPPED
-	}	
+	}
+	
 #else	// (NOT ANIMATED)
-	vec3 local_pos = VS_IN_Postion;
-	vec3 local_normal = VS_IN_Normal;
-
-	#ifdef NORMALMAPPED
-	vec3 local_tangent = VS_IN_Tangent;
-	#endif // NORMALMAPPED
+	local_pos = VS_IN_Postion;
+	local_normal = VS_IN_Normal;
+	local_tangent = VS_IN_Tangent;
 
 #endif // ANIMATED
 
+//	vec3 local_pos = vec3(BoneTransform[VS_IN_Bone]*vec4(VS_IN_Postion,1.0));
+#ifdef ANIMATED
+	FS_IN_BoneColor = randColor(VS_IN_BoneIndicies.x)*VS_IN_BoneWeights.x+
+		randColor(VS_IN_BoneIndicies.y)*VS_IN_BoneWeights.y+
+		randColor(VS_IN_BoneIndicies.z)*VS_IN_BoneWeights.z+
+		randColor(VS_IN_BoneIndicies.w)*VS_IN_BoneWeights.w;
+#endif // ANIMATED
 
-	VSmain();
+	FS_IN_FragPos = vec3(Model * vec4(local_pos,1.0));
+    FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
 	
-	
+	vec3 world_tangent = mat3(transpose(InverseModel))*normalize(local_tangent);
+	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
+	FS_IN_TBN = mat3(
+	normalize(local_tangent  ), 
+	normalize(world_bitangent), 
+	normalize(FS_IN_Normal   ));
+    
+    FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
+
+	gl_Position = FS_IN_NDC;
+	FS_IN_Texcoord = VS_IN_TexCoord;
 }
 
+#endif // _VERTEX_SHADER
+
+#ifdef _FRAGMENT_SHADER
+
+layout (location = 0) out vec3 GBUFFER_OUT_Normal;
+layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
+layout (location = 2) out vec4 GBUFFER_OUT_M_R_Custom_Matid;
+layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
+
+#ifdef EDITOR_ID
+layout(location = 4) out vec4 GBUFFER_OUT_EditorID;
 #endif
 
-#ifdef FRAGMENT_SHADER
+flat in uint FS_IN_Objid;
+flat in uint FS_IN_Matid;
+in vec3 FS_IN_FragPos;
+in vec3 FS_IN_Normal;
+in vec2 FS_IN_Texcoord;
+in vec3 FS_IN_BoneColor;
+in vec4 FS_IN_NDC;
+
+
+in mat3 FS_IN_TBN;
+
+vec3 randColor(uint number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
 
 // standard outputs
 vec3 BASE_COLOR = vec3(0.0);	// albedo
@@ -261,17 +309,62 @@ vec3 NORMALMAP = vec3(0.5,1.0,0.5);		// tangent space normal map
 float OPACITY = 1.0;					// opacity, for alpha test
 float AOMAP = 0.0;						// small detail ao map
 
+// START USER CODE
 // Texture defs
 layout(binding = 0 ) uniform sampler2D BaseColor;
 layout(binding = 1 ) uniform sampler2D NoiseTex;
 
 void FSmain(){	BASE_COLOR = vec3(1.0,0.0,0.0);	ROUGHNESS = 0.5;}
+// END USER CODE
 
 void main()
 {
 	FSmain();
-}
 
+#ifdef ALPHATEST
+	if(OPACITY<0.5)
+		discard;
+#endif // ALPHATEST
+
+	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR, AOMAP);
+	GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,0);
+	GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);
+	
+	vec3 Normalized_IN_N = normalize(FS_IN_Normal);
+	
+	// World space normal
+
+#ifdef NORMALMAPPED
+	vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
+	Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
+	GBUFFER_OUT_Normal = Final_Normal;
+#else
+	GBUFFER_OUT_Normal = Normalized_IN_N;
 #endif
 
+#ifdef DEBUG_SHADER
+	if(g.debug_options == DEBUG_OBJID)
+		GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_Objid);
+	else if(g.debug_options == DEBUG_MATID)
+		GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_Matid+279343);
+	else if(g.debug_options == DEBUG_NORMAL)
+		GBUFFER_OUT_Emissive.rgb = (GBUFFER_OUT_Normal.rgb*0.5+vec3(0.5));
+	else if(g.debug_options == DEBUG_ALBEDO)
+		GBUFFER_OUT_Emissive.rgb = BASE_COLOR;
+	else if(g.debug_options == DEBUG_WIREFRAME)
+		GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);
+#endif // DEBUG_SHADER
 
+#ifdef EDITOR_ID
+	uint color_to_output = FS_IN_Objid + 1;	// to use nullptr,...
+	uint R = color_to_output & 255;
+	uint G = (color_to_output >> 8) & 255;
+	uint B = (color_to_output >> 16) & 255;
+	uint A = (color_to_output >> 24) & 255;
+	
+	GBUFFER_OUT_EditorID = vec4(R/255.0,G/255.0,B/255.0,A/255.0);
+#endif
+
+}
+
+#endif // _FRAGMENT_SHADER

@@ -44,6 +44,8 @@
 
 #include "Framework/ClassBase.h"
 
+#include "Render/MaterialPublic.h"
+
 MeshBuilder phys_debug;
 
 GameEngineLocal eng_local;
@@ -722,10 +724,6 @@ int main(int argc, char** argv)
 	eng_local.argv = argv;
 	eng_local.init();
 
-	MasterMaterialLocal localm;
-	localm.load_from_file("terrain/terrainMaster.txt");
-
-
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1255,6 +1253,7 @@ void GameEngineLocal::init()
 	network_init();
 	idraw->init();
 	mats.init();
+	imaterials->init();
 
 	gui_root.reset(new GUI_RootControl );
 

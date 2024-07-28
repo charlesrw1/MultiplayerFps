@@ -9,9 +9,9 @@ static const char* const SHADER_PATH = "Shaders\\";
 static const char* const INCLUDE_SPECIFIER = "#include";
 
 
-static bool read_and_add_recursive(std::string filepath, std::string& text)
+static bool read_and_add_recursive(std::string filepath, std::string& text, bool path_is_relative)
 {
-	std::string path(SHADER_PATH);
+	std::string path = path_is_relative ? SHADER_PATH : "";
 	path += filepath;
 	std::ifstream infile(path);
 	if (!infile) {
@@ -41,7 +41,7 @@ static bool read_and_add_recursive(std::string filepath, std::string& text)
 				printf("ERROR: include missing ending quote\n");
 				return false;
 			}
-			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text);
+			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text, path_is_relative);
 
 			//text += "#line ";
 			//text += std::to_string(linenum);
@@ -68,11 +68,11 @@ static std::string get_definess_with_directive(std::string& defines)
 	}
 	return defines_with_directive;
 }
-static std::string get_source(const char* path, const std::string& defines)
+static std::string get_source(const char* path, const std::string& defines, bool paths_are_relative = true)
 {
 	std::string source = "#version 460 core\n";;
 	source += defines;
-	bool result = read_and_add_recursive(path, source);
+	bool result = read_and_add_recursive(path, source, paths_are_relative);
 	if (!result) {
 		return {};
 	}
@@ -92,6 +92,63 @@ static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, ch
 		return false;
 	}
 	return true;
+}
+
+ShaderResult Shader::compile_vert_frag_single_file(
+	Shader* shader,
+	const char* shared_path,
+	std::string shader_defines
+)
+{
+	if (shader->ID != 0)
+		glDeleteProgram(shader->ID);
+	shader->ID = 0;
+
+	std::string defines_with_directive = get_definess_with_directive(shader_defines);
+	std::string vertex_source = get_source(shared_path, defines_with_directive+"\n#define _VERTEX_SHADER\n#line 0\n", false);
+	std::string fragment_source = get_source(shared_path, defines_with_directive+"\n#define _FRAGMENT_SHADER\n#line 0\n",false);
+
+	if (vertex_source.empty() || fragment_source.empty()) {
+		printf("Parse fail %s\n", shared_path);
+		return ShaderResult::SHADER_PARSE_FAIL;
+	}
+
+	unsigned int vertex;
+	unsigned int fragment;
+	unsigned int program;
+	int success = 0;
+	char infolog[512];
+
+	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
+	if (!good) {
+		printf("Error: vertex shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
+	if (!good) {
+		printf("Error: fragment shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+
+	program = glCreateProgram();
+	glAttachShader(program, vertex);
+	glAttachShader(program, fragment);
+	glLinkProgram(program);
+
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(program, 512, NULL, infolog);
+		printf("Error: shader program link failed: %s\n", infolog);
+
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+
+	glDeleteShader(vertex);
+	glDeleteShader(fragment);
+
+	shader->ID = program;
+
+	return ShaderResult::SHADER_SUCCESS;
 }
 
 bool Shader::compile(

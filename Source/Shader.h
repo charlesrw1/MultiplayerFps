@@ -34,6 +34,15 @@ public:
 		const char* geometry_path,
 		std::string shader_defines = {}
 	);
+
+	// use ifdefs for vertex/fragment
+	static ShaderResult compile_vert_frag_single_file(
+		Shader* shader,
+		const char* shared_path,
+		std::string shader_defines = {}
+	);
+
+
 	void use();
 
 	void set_bool(const char* name, bool value);
