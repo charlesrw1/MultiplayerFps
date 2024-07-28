@@ -52,10 +52,12 @@ public:
 
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
+		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
+		ed_doc.on_node_will_delete.invoke(handle);
 		eng->remove_entity(eng->get_entity(handle));
-		ed_doc.on_node_deleted.invoke(handle);
+		ed_doc.post_node_changes.invoke();
 		handle = 0;
 	}
 	std::string to_string() override {
@@ -82,10 +84,12 @@ public:
 		ent->editor_name = m->get_name();
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
+		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
+		ed_doc.on_node_will_delete.invoke(handle);
 		eng->remove_entity(eng->get_entity(handle));
-		ed_doc.on_node_deleted.invoke(handle);
+		ed_doc.post_node_changes.invoke();
 		handle = 0;
 	}
 	std::string to_string() override {
@@ -111,10 +115,12 @@ public:
 		ent->editor_name = ent->get_type().classname;
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
+		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
-		ed_doc.on_node_deleted.invoke(handle);
+		ed_doc.on_node_will_delete.invoke(handle);
 		eng->remove_entity(eng->get_entity(handle));
+		ed_doc.post_node_changes.invoke();
 		handle = 0;
 	}
 	std::string to_string() override {
@@ -156,15 +162,17 @@ public:
 
 	void execute() {
 		for (auto h : handles) {
+			ed_doc.on_node_will_delete.invoke(h);
 			eng->remove_entity(eng->get_entity(h));
-			ed_doc.on_node_deleted.invoke(h);
 		}
+		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
 		auto all_ents = LevelSerialization::unserialize_entities_from_string(serialized_str);
 		eng->get_level()->insert_unserialized_entities_into_level(all_ents, false/* keep ids*/);
 		for (auto e : all_ents)
 			ed_doc.on_node_created.invoke(e->self_id.handle);
+		ed_doc.post_node_changes.invoke();
 	}
 	std::string to_string() override {
 		return "RemoveEntitiesCommand";
@@ -825,7 +833,7 @@ static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::q
 
 ManipulateTransformTool::ManipulateTransformTool()
 {
-	ed_doc.on_node_deleted.add(this, &ManipulateTransformTool::on_entity_deleted);
+	ed_doc.post_node_changes.add(this, &ManipulateTransformTool::on_entity_changes);
 	ed_doc.on_component_deleted.add(this, &ManipulateTransformTool::on_component_deleted);
 	ed_doc.selection_state->on_selection_changed.add(this,
 		&ManipulateTransformTool::on_selection_changed);
@@ -846,7 +854,7 @@ void ManipulateTransformTool::on_open() {
 void ManipulateTransformTool::on_component_deleted(EntityComponent* ec) {
 	update_pivot_and_cached();
 }
-void ManipulateTransformTool::on_entity_deleted(uint64_t handle) {
+void ManipulateTransformTool::on_entity_changes() {
 	update_pivot_and_cached();
 }
 void ManipulateTransformTool::on_selection_changed() {
@@ -1224,8 +1232,7 @@ ObjectOutliner::ObjectOutliner()
 {
 	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
 	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
-	ed_doc.on_node_created.add(this, &ObjectOutliner::on_add_ent);
-	ed_doc.on_node_deleted.add(this, &ObjectOutliner::on_delete_ent);
+	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
 	ed_doc.on_change_name.add(this, &ObjectOutliner::on_change_name);
 }
 void ObjectOutliner::draw_table_R(Node* n, int depth)
@@ -1287,6 +1294,7 @@ void ObjectOutliner::draw()
 	}
 	ImGui::End();
 }
+
 void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
 {
 	ImGui::TableNextRow();
@@ -1324,12 +1332,19 @@ void EdPropertyGrid::draw()
 
 	if (ImGui::Begin("Components")) {
 
-		if (ed_doc.selection_state->num_entities_selected()!=1) {
+		if (!ed_doc.selection_state->has_any_selected()) {
 			ImGui::Text("Nothing selected\n");
+		}
+		else if (ed_doc.selection_state->num_entities_selected() != 1 && !ed_doc.selection_state->get_ec_selected()) {
+			ImGui::Text("Select 1 entity to see components\n");
 		}
 		else {
 
-			auto ent = eng->get_entity(ed_doc.selection_state->get_selection()[0].handle);
+			Entity* ent = nullptr;
+			if (ed_doc.selection_state->get_ec_selected())
+				ent = ed_doc.selection_state->get_ec_selected()->get_owner();
+			else
+				ent = eng->get_entity(ed_doc.selection_state->get_selection()[0].handle);
 
 			if (ImGui::Button("Add Component")) {
 				// ...
@@ -1354,9 +1369,10 @@ void EdPropertyGrid::draw()
 	}
 	ImGui::End();
 
-	if (refresh_prop_flag) {
-		refresh_prop_flag = false;
-		refresh_grid();
+	if (wants_set_component) {
+		ed_doc.selection_state->set_entity_component_select(set_this_component);
+		set_this_component = nullptr;
+		wants_set_component = false;
 	}
 
 }
@@ -1456,8 +1472,8 @@ ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
 EdPropertyGrid::EdPropertyGrid()
 {
 	auto& ss = ed_doc.selection_state;
-	ss->on_selection_changed.add(this, &EdPropertyGrid::on_selection_changed);
-	ed_doc.on_node_deleted.add(this, &EdPropertyGrid::on_node_deleted);
+	ss->on_selection_changed.add(this, &EdPropertyGrid::refresh_grid);
+	ed_doc.post_node_changes.add(this, &EdPropertyGrid::refresh_grid);
 	ed_doc.on_close.add(this, &EdPropertyGrid::on_close);
 	ed_doc.on_component_deleted.add(this, &EdPropertyGrid::on_ec_deleted);
 }
@@ -1495,7 +1511,7 @@ void EdPropertyGrid::refresh_grid()
 
 SelectionState::SelectionState()
 {
-	ed_doc.on_node_deleted.add(this, &SelectionState::on_node_deleted);
+	ed_doc.on_node_will_delete.add(this, &SelectionState::on_node_deleted);
 	ed_doc.on_close.add(this, &SelectionState::on_close);
 	ed_doc.on_component_deleted.add(this, &SelectionState::on_entity_component_delete);
 }
@@ -1503,7 +1519,7 @@ SelectionState::SelectionState()
 EntityNameDatabase_Ed::EntityNameDatabase_Ed()
 {
 	ed_doc.on_node_created.add(this, &EntityNameDatabase_Ed::on_add);
-	ed_doc.on_node_deleted.add(this, &EntityNameDatabase_Ed::on_delete);
+	ed_doc.on_node_will_delete.add(this, &EntityNameDatabase_Ed::on_delete);
 	ed_doc.on_start.add(this, &EntityNameDatabase_Ed::on_start);
 	ed_doc.on_close.add(this, &EntityNameDatabase_Ed::on_close);
 }

@@ -72,7 +72,7 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 
 	return planedistances;
 }
-
+#include "Render/Render_Sun.h"
 void Shadow_Map_System::update()
 {
 	//int setting = draw.shadow_quality_setting.integer();
@@ -95,13 +95,19 @@ void Shadow_Map_System::update()
 		return;
 
 	auto directional_light = draw.scene.get_main_directional_light();
+
 	if (!directional_light)
 		return;
 
+	auto& sun = directional_light->sun;
+	tweak.max_shadow_dist = sun.max_shadow_dist;
+	tweak.log_lin_lerp_factor = sun.log_lin_lerp_factor;
+	tweak.max_shadow_dist = sun.max_shadow_dist;
+	tweak.z_dist_scaling = sun.z_dist_scaling;
 	{
 		GPUSCOPESTART("Csm setup");
 
-		glm::vec3 directional_dir = directional_light->light.normal;
+		glm::vec3 directional_dir = sun.direction;
 
 		const View_Setup& view = draw.vs;
 

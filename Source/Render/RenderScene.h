@@ -339,7 +339,7 @@ public:
 	void build_scene_data(bool is_for_editor);
 	void upload_scene_materials();
 
-	RL_Internal* get_main_directional_light();
+	RSunInternal* get_main_directional_light();
 
 	//std::unique_ptr<Render_Pass> gbuffer;
 	//std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling

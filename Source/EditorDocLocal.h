@@ -130,10 +130,9 @@ private:
 		map.clear();
 	}
 
-	void on_delete_ent(uint64_t handle) { 
+	void on_changed_ents() { 
 		rebuild_tree();
 	}
-	void on_add_ent(uint64_t handle) { rebuild_tree(); }
 	void on_start() { rebuild_tree(); }
 	void on_close() { delete_tree(); }
 	void on_change_name(uint64_t handle) {
@@ -192,12 +191,6 @@ public:
 	void draw();
 
 private:
-	void on_selection_changed() {
-		refresh_grid();
-	}
-	void on_node_deleted(uint64_t n) {
-		refresh_grid();
-	}
 	void on_ec_deleted(EntityComponent* ec) {
 		refresh_grid();
 	}
@@ -206,10 +199,12 @@ private:
 	}
 	void refresh_grid();
 
-	bool refresh_prop_flag = false;
+	bool wants_set_component = false;
+	EntityComponent* set_this_component = nullptr;
 
 	void on_select_component(EntityComponent* ec) {
-		refresh_prop_flag = true;
+		set_this_component = ec;
+		wants_set_component = true;
 	}
 	void draw_components_R(EntityComponent* ec, float ofs);
 
@@ -318,6 +313,11 @@ public:
 		clear_all_selected();
 		add_to_selection(node);
 	}
+	void set_select_only_this(EntityComponent* ec) {
+		clear_all_selected();
+		this->ec = ec;
+		on_selection_changed.invoke();
+	}
 
 	bool is_node_selected(EntityPtr<Entity> node) const {
 		for (int i = 0; i < ptrs.size(); i++)
@@ -358,7 +358,7 @@ private:
 	void on_close();
 	void on_open();
 	void on_component_deleted(EntityComponent* ec);
-	void on_entity_deleted(uint64_t handle);
+	void on_entity_changes();
 	void on_selection_changed();
 	void on_selected_tarnsform_change(uint64_t);
 
@@ -534,10 +534,13 @@ public:
 	User_Camera camera;
 	OrthoCamera ortho_camera;
 
+
 	MulticastDelegate<EntityComponent*> on_component_deleted;
 	MulticastDelegate<EntityComponent*> on_component_created;
-	MulticastDelegate<uint64_t> on_node_deleted;
-	MulticastDelegate<uint64_t> on_node_created;
+	MulticastDelegate<uint64_t> on_node_will_delete;	// called before its deleted
+	MulticastDelegate<uint64_t> on_node_created;	// after creation
+	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
+
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;
 	MulticastDelegate<uint64_t> on_change_name;

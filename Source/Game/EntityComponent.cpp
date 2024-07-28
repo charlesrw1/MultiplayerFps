@@ -13,7 +13,7 @@ glm::mat4 EntityComponent::get_ls_transform() const
 	glm::mat4 model;
 	model = glm::translate(glm::mat4(1), position);
 	model = model * glm::mat4_cast(rotation);
-	model = glm::scale(model, glm::vec3(1.f));
+	model = glm::scale(model, glm::vec3(scale));
 
 	return model;
 }

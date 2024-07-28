@@ -110,7 +110,7 @@ void SunLightComponent::build_render_light(Render_Sun& light)
 	light.cast_shadows = true;
 
 	auto& transform = get_ws_transform();
-	light.direction = transform[3];
+	light.direction = glm::normalize(transform[0]);
 }
 
 void SunLightComponent::on_init()

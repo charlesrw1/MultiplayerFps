@@ -693,9 +693,7 @@ void Renderer::create_shaders()
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
-	prog.light_accumulation_depth = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt","DEPTHONLY");
-
-
+	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
@@ -757,13 +755,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
 
-	auto light = scene.get_main_directional_light();
-	if (light) {
-		constants.directional_light_dir_and_used = vec4(light->light.normal, 1.0);
-		constants.directional_light_color = vec4(light->light.color, 0.0);
-	}
-	else
-		constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
+	constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
 
 	constants.numcubemaps = scene.cubemaps.size();
 
@@ -2946,7 +2938,6 @@ void Renderer::accumulate_gbuffer_lighting()
 {
 	GPUSCOPESTART("accumulate_gbuffer_lighting");
 
-	// stencil buffer trick for point/spot lights
 	
 	Model* LIGHT_CONE = mods.get_light_cone();
 	Model* LIGHT_SPHERE = mods.get_light_sphere();
@@ -3018,7 +3009,52 @@ void Renderer::accumulate_gbuffer_lighting()
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
+
 	// fullscreen pass for directional light(s)
+	RSunInternal* sun_internal = scene.get_main_directional_light();
+	if(sun_internal)
+	{
+		// bind the forward_render framebuffer
+		// outputs to the scene_color texture
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
+		glViewport(0, 0, vs.width, vs.height);
+
+		// disable depth writes
+		glDepthMask(GL_FALSE);
+
+		glEnable(GL_BLEND);	// enable additive blending
+		glBlendFunc(GL_ONE, GL_ONE);
+
+		glDisable(GL_DEPTH_TEST);
+
+		set_shader(prog.sunlight_accumulation);
+
+		bind_texture(0, tex.scene_gbuffer0);
+		bind_texture(1, tex.scene_gbuffer1);
+		bind_texture(2, tex.scene_gbuffer2);
+		bind_texture(3, tex.scene_depth);
+		bind_texture(4, draw.shadowmap.texture.shadow_array);
+		glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.ubo.info);
+
+		shader().set_vec3("uSunDirection", sun_internal->sun.direction);
+		shader().set_vec3("uSunColor", sun_internal->sun.color);
+		
+		// fullscreen shader, no vao used
+		glBindVertexArray(vao.default_);
+		// to prevent crashes??
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glBindVertexBuffer(0, buf.default_vb, 0, 0);
+		glBindVertexBuffer(1, buf.default_vb, 0, 0);
+		glBindVertexBuffer(2, buf.default_vb, 0, 0);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glDepthMask(GL_TRUE);
+		glDisable(GL_STENCIL_TEST);
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 
 	// indirect lighting pass (full screen, use constant ambient for now), multiple with SSAO
 
@@ -3058,9 +3094,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
 	scene.build_scene_data(params.is_editor);
-
-
-
 
 	shadowmap.update();
 
@@ -3440,8 +3473,10 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 }
 
 
-RL_Internal* Render_Scene::get_main_directional_light()
+RSunInternal* Render_Scene::get_main_directional_light()
 {
+	if (!suns.empty())
+		return &suns.at(suns.size() - 1);
 	return nullptr;
 }
 void Renderer::on_level_end()

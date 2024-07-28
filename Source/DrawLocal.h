@@ -308,8 +308,8 @@ public:
 		program_handle tex_debug_2d{};
 		program_handle tex_debug_2d_array{};
 
-		program_handle light_accumulation_depth{};
 		program_handle light_accumulation{};
+		program_handle sunlight_accumulation{};
 	}prog;
 
 	struct framebuffers {
