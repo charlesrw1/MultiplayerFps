@@ -49,6 +49,7 @@ struct Ubo_View_Constants_Struct
 	mat4 viewproj;
 	mat4 invview;
 	mat4 invproj;
+	mat4 inv_viewproj;
 	vec4 viewpos_time;
 	vec4 viewfront;
 	vec4 viewport_size;

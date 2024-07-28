@@ -744,6 +744,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.viewproj = vs.viewproj;
 	constants.invview = glm::inverse(vs.view);
 	constants.invproj = glm::inverse(vs.proj);
+	constants.inv_viewproj = glm::inverse(vs.viewproj);
 	constants.viewpos_time = glm::vec4(vs.origin, this->current_time);
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
@@ -979,6 +980,16 @@ void Renderer::init()
 
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
 
+	Random random(4523456);
+	//for (int i = 0; i < 20; i++) {
+	//	float box = 5.0;
+	//	glm::vec3 pos(random.RandF(-box, box), random.RandF(-box, box), random.RandF(-box, box));
+	//	float radius = random.RandF(3.0, 10.0);
+	//	Render_Light rl;
+	//	rl.radius = radius;
+	//	rl.position = pos;
+	//	scene.register_light(rl);
+	//}
 }
 
 
@@ -1009,21 +1020,21 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Main scene depth
 	create_and_delete_texture(tex.scene_depth);
-	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
+	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH24_STENCIL8, s_w, s_h);
 	set_default_parameters(tex.scene_depth);
 
 	// Create forward render framebuffer
 	// Transparents and other immediate stuff get rendered to this
 	create_and_delete_fb(fbo.forward_render);
 	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
-	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
+	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_STENCIL_ATTACHMENT, tex.scene_depth, 0);
 	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
 	glNamedFramebufferDrawBuffers(fbo.forward_render, 1, attachments);
 	
 	// Gbuffer textures
 	// See the comment above these var's decleration in DrawLocal.h for details
 	create_and_delete_texture(tex.scene_gbuffer0);
-	glTextureStorage2D(tex.scene_gbuffer0, 1, GL_R11F_G11F_B10F, s_w, s_h);
+	glTextureStorage2D(tex.scene_gbuffer0, 1, GL_RGB16F, s_w, s_h);
 	set_default_parameters(tex.scene_gbuffer0);
 
 	create_and_delete_texture(tex.scene_gbuffer1);
@@ -2911,8 +2922,11 @@ void draw_debug_grid()
 // main function for lighting the gbuffer
 // directional lights
 // point+spotlights
+
 void Renderer::accumulate_gbuffer_lighting()
 {
+	GPUSCOPESTART("accumulate_gbuffer_lighting");
+
 	// stencil buffer trick for point/spot lights
 	
 	Model* LIGHT_CONE = mods.get_light_cone();
@@ -2927,15 +2941,18 @@ void Renderer::accumulate_gbuffer_lighting()
 		// outputs to the scene_color texture
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
 		glViewport(0, 0, vs.width, vs.height);
-		
+
 		// disable depth writes
 		glDepthMask(GL_FALSE);
 
-		// enable additive blending to the color buffer
-		//set_blend_state(blend_state::ADD);
-		//set_show_backfaces(true);
+		glEnable(GL_BLEND);	// enable additive blending
+		glBlendFunc(GL_ONE, GL_ONE);
 
 		set_shader(prog.light_accumulation);
+
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
 
 		bind_texture(0, tex.scene_gbuffer0);
 		bind_texture(1, tex.scene_gbuffer1);
@@ -2944,17 +2961,14 @@ void Renderer::accumulate_gbuffer_lighting()
 
 		for (auto& light_pair : scene.light_list.objects) {
 			auto& light = light_pair.type_.light;
-			
+
 			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
 			const float scale = light.radius;
 			ModelTransform = glm::scale(ModelTransform, glm::vec3(scale));
 
-			shader().set_mat4("Model", ModelTransform);
-
-			const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-
 			// Copied code from execute_render_lists
 			auto& part = LIGHT_SPHERE->get_part(0);
+			const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
 			gpu::DrawElementsIndirectCommand cmd;
 			cmd.baseVertex = part.base_vertex + LIGHT_SPHERE->get_merged_vertex_ofs();
 			cmd.count = part.element_count;
@@ -2962,6 +2976,10 @@ void Renderer::accumulate_gbuffer_lighting()
 			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
 			cmd.primCount = 1;
 			cmd.baseInstance = 0;
+
+			shader().set_mat4("Model", ModelTransform);
+			shader().set_vec3("position", light.position);
+			shader().set_float("radius", light.radius);
 
 			glMultiDrawElementsIndirect(
 				GL_TRIANGLES,
@@ -2974,6 +2992,10 @@ void Renderer::accumulate_gbuffer_lighting()
 
 		// undo state changes
 		glDepthMask(GL_TRUE);
+		glDisable(GL_STENCIL_TEST);
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+		glCullFace(GL_BACK);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 

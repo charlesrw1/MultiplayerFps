@@ -330,14 +330,14 @@ public:
 		// ----------------------------------------------------------------------------------
 		// | gbuffer		|		X		|		Y		|		Z		|		A		|
 		// ----------------------------------------------------------------------------------
-		// | R10,G10,B10	|	NORMAL X	|	NORMAL Y	|	NORMAL Z	|				|
+		// | RGB16F			|	NORMAL X	|	NORMAL Y	|	NORMAL Z	|				|
 		// | R8G8B8A8		|	albedo R	|	albedo G	|	albedo B	|	AO			|
 		// | R8G8B8A8		|	Metallic	|	Roughness	|	Custom		|	MatID		|
 		// ----------------------------------------------------------------------------------
 
 		// Emissive outputs to scene color
-
 		// Scene color: RGBA16
+		// Storing normals in rgb16f, can/should optimize this down later
 
 		texhandle scene_custom_depthstencil{};
 		texhandle editor_selection_buffer{};
