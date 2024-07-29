@@ -2,7 +2,6 @@
 
 #include "Framework/Rect2d.h"
 class UIFont;
-class Material;
 class Texture;
 
 const int UI_SCREEN_WIDTH = 640;

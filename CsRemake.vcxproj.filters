@@ -258,9 +258,6 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DecalsPublic.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\DrawLocal.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
@@ -423,9 +420,6 @@
     </ClInclude>
     <ClInclude Include="Source\Game\GameAnimEvents.h">
       <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\Material.h">
-      <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\AssetRegistry.h">
       <Filter>Source\Asset</Filter>

@@ -5,7 +5,7 @@
 #include "Physics/Physics2.h"
 
 #include "Animation/Runtime/Animation.h"
-#include "Render/Material.h"
+#include "Render/MaterialPublic.h"
 
 #include "Framework/ArrayReflection.h"
 #include "Game/Schema.h"
@@ -241,9 +241,9 @@ void MeshComponent::set_model(Model* modelnext)
 
 const PropertyInfoList* MeshComponent::get_props() {
 #ifndef RUNTIME
-	MAKE_VECTORCALLBACK_ATOM(AssetPtr<Material>, eMaterialOverride);
+	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, eMaterialOverride);
 #endif // !RUNTIME
-	MAKE_VECTORCALLBACK_ATOM(AssetPtr<Material>, MaterialOverride_compilied)
+	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, MaterialOverride_compilied)
 
 		auto t = &Model::StaticType.classname;
 		const char* str = Model::StaticType.classname;

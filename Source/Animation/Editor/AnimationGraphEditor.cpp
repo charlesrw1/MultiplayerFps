@@ -1714,7 +1714,7 @@ void AnimationGraphEditor::create_new_document()
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
 }
-#include "Render/Material.h"
+
 void AnimationGraphEditor::set_animator_instance_from_string(std::string str) {
 	auto class_ = ClassBase::create_class<AnimatorInstance>(str.c_str());
 	if (!class_) {

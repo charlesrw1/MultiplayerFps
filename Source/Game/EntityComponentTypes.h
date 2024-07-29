@@ -17,7 +17,7 @@ class PhysicsActor;
 class Animation_Tree_CFG;
 class AnimatorInstance;
 class Render_Object;
-class Material;
+class MaterialInstance;
 class Texture;
 CLASS_H(MeshComponent, EntityComponent)
 public:
@@ -58,9 +58,9 @@ private:
 	AssetPtr<Animation_Tree_CFG> animator_tree;
 
 #ifndef RUNTIME
-	std::vector<AssetPtr<Material>> eMaterialOverride;
+	std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 #endif RUNTIME
-	std::vector<AssetPtr<Material>> MaterialOverride_compilied;
+	std::vector<AssetPtr<MaterialInstance>> MaterialOverride_compilied;
 };
 
 CLASS_H(CapsuleComponent, EntityComponent)

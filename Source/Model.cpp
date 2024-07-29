@@ -24,7 +24,7 @@
 
 #include "Physics/Physics2.h"
 
-#include "Render/Material.h"
+#include "Render/MaterialPublic.h"
 
 ModelMan mods;
 
@@ -414,11 +414,11 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 	std::string buffer;
 	for (int i = 0; i < num_materials; i++) {
 		read.read_string(buffer);
-		m->materials.push_back(mats.find_for_name(buffer.c_str()));
+		m->materials.push_back(imaterials->find_material_instance(buffer.c_str()));
 
 		if (!m->materials.back()) {
 			sys_print("!!! model doesn't have material %s\n", buffer.c_str());
-			m->materials.back() = mats.fallback;
+			m->materials.back() = imaterials->get_fallback();
 		}
 	}
 
@@ -705,7 +705,7 @@ void ModelMan::create_default_models()
 	_sprite = new Model;
 	_sprite->aabb = Bounds(glm::vec3(-0.5), glm::vec3(0.5));
 	_sprite->bounding_sphere = bounds_to_sphere(_sprite->aabb);
-	_sprite->materials.push_back(mats.fallback);
+	_sprite->materials.push_back(imaterials->get_fallback());
 	{
 		ModelVertex corners[4];
 		corners[0].pos = glm::vec3(0.5, 0.5, 0.0);

@@ -37,7 +37,7 @@ struct ModelVertex
 static_assert(sizeof(ModelVertex) == 40, "vertex size wrong");
 
 
-class Material;
+class MaterialInstance;
 
 
 
@@ -141,7 +141,7 @@ public:
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
 
-	Material* get_material(int index) const { return materials[index]; }
+	const MaterialInstance* get_material(int index) const { return materials[index]; }
 
 	bool has_lightmap_coords() const;
 	bool has_colors() const;
@@ -178,7 +178,7 @@ private:
 	unique_ptr<PhysicsBody> collision;
 
 	vector<ModelTag> tags;
-	vector<Material*> materials;
+	vector<const MaterialInstance*> materials;
 
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
 

@@ -1,6 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
-class Material;
+class MaterialInstance;
 struct Render_Decal
 {
 	Render_Decal() {
@@ -8,6 +8,6 @@ struct Render_Decal
 	}
 	glm::mat4 transform = glm::mat4(1.0);
 	glm::vec2 uv_scale = glm::vec2(1.f);
-	Material* material = nullptr;
+	MaterialInstance* material = nullptr;
 	bool visible : 1;
 };

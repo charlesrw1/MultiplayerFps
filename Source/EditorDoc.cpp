@@ -12,7 +12,7 @@
 #include "Physics/Physics2.h"
 
 #include "External/ImGuizmo.h"
-#include "Render/Material.h"
+
 
 #include "EditorFolder.h"
 
@@ -270,6 +270,7 @@ void EditorDoc::duplicate_selected_and_select_them()
 		selection_state->add_to_selection(nodes[i]);
 #endif
 }
+#if 0
 static Material* generate_spritemat_from_texture(Texture* t)
 {
 	// generate hash based on name, yes this is hacked
@@ -288,6 +289,7 @@ static Material* generate_spritemat_from_texture(Texture* t)
 
 	return mat;
 }
+#endif
 
 #if 0
 Material* EditorNode::get_sprite_material()

@@ -1,11 +1,11 @@
 #pragma once
 
 #include "IAsset.h"
-#include "Material.h"
 #include "DrawTypedefs.h"
 
 #include <string>
 #include "Framework/StringName.h"
+#include "glm/glm.hpp"
 
 // A global "UBO" of material params
 // Cant hold texture types
@@ -18,10 +18,9 @@ public:
 };
 
 class MasterMaterial;
+class Texture;
 CLASS_H(MaterialInstance, IAsset)
 public:
-	MaterialInstance(bool is_dynamic_mat = false) : is_dynamic_material(is_dynamic_mat) {}
-
 	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
 	virtual void set_float_parameter(StringName name, float f) = 0;
 	virtual void set_bool_parameter(StringName name, bool b) = 0;
@@ -32,15 +31,19 @@ public:
 	const MasterMaterial* get_master_material() const { return master; }
 	bool is_this_a_dynamic_material() const { return is_dynamic_material; }
 protected:
+	MaterialInstance(bool is_dynamic_mat = false) : is_dynamic_material(is_dynamic_mat) {}
 	bool is_dynamic_material = false;
 	const MasterMaterial* master = nullptr;
 };
 
-class MaterialManagerPublic
+class MaterialManagerPublic : public IAssetLoader
 {
 public:
 	virtual void init() = 0;
 
+	IAsset* load_asset(const std::string& path) override {
+		return (IAsset*)find_material_instance(path.c_str());
+	}
 
 	// Find a material instance with the given name (or a MasterMaterial and return the default instance)
 	virtual const MaterialInstance* find_material_instance(const char* mat_inst_name) = 0;
@@ -54,11 +57,11 @@ public:
 
 	virtual void pre_render_update() = 0;
 
-	MaterialInstance* get_shared_depth() const { return shared_depth; }
-	MaterialInstance* get_fallback() const { return fallback; }
+	// same shader, may change this in future (depth shaders get ifdef'd anyways)
+	const MaterialInstance* get_shared_depth() const { return fallback; }
+	const MaterialInstance* get_fallback() const { return fallback; }
 protected:
-	MaterialInstance* shared_depth = nullptr;
-	MaterialInstance* fallback = nullptr;
+	const MaterialInstance* fallback = nullptr;
 };
 
 extern MaterialManagerPublic* imaterials;

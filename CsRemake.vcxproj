@@ -49,7 +49,6 @@
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\Debug.h" />
-    <ClInclude Include="Source\DecalsPublic.h" />
     <ClInclude Include="Source\DrawLocal.h" />
     <ClInclude Include="Source\DrawPublic.h" />
     <ClInclude Include="Source\DrawTypedefs.h" />
@@ -154,7 +153,6 @@
     <ClInclude Include="Source\ProgramCaching.h" />
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h" />
-    <ClInclude Include="Source\Render\Material.h" />
     <ClInclude Include="Source\Render\MaterialLocal.h" />
     <ClInclude Include="Source\Render\MaterialPublic.h" />
     <ClInclude Include="Source\Render\RenderExtra.h" />

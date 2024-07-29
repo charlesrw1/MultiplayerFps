@@ -15,8 +15,8 @@
 #include "DrawTypedefs.h"
 
 #include <cstdint>
-class Material;
 
+#include "Render/MaterialLocal.h"
 
 
 struct Render_Box_Cubemap
@@ -37,7 +37,7 @@ struct Mesh_Batch
 	uint32_t count = 0;
 
 	uint32_t shader_index = 0;	// indexes into shader_list[]
-	const Material* material = nullptr;
+	const MaterialInstanceLocal* material = nullptr;
 };
 
 // represents multiple Mesh_Batch calls packaged into one glMultidrawIndirect()
@@ -76,7 +76,7 @@ static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
 struct Pass_Object
 {
 	draw_call_key sort_key;
-	const Material* material = nullptr;
+	const MaterialInstanceLocal* material = nullptr;
 	handle<Render_Object> render_obj{};	// entity instance
 	uint16_t submesh_index = 0;		// what submesh am i
 	uint16_t lod_index = 0;
@@ -107,7 +107,7 @@ public:
 	void add_object(
 		const Render_Object& proxy,
 		handle<Render_Object> handle,
-		Material* material,
+		const MaterialInstanceLocal* material,
 		uint32_t camera_dist,
 		uint32_t submesh,
 		uint32_t lod,
@@ -115,7 +115,7 @@ public:
 
 	draw_call_key create_sort_key_from_obj(
 		const Render_Object& proxy,
-		Material* material,
+		const MaterialInstanceLocal* material,
 		uint32_t camera_dist,
 		uint32_t submesh,
 		uint32_t layer, bool is_editor_mode);
@@ -337,7 +337,6 @@ public:
 	}
 
 	void build_scene_data(bool is_for_editor);
-	void upload_scene_materials();
 
 	RSunInternal* get_main_directional_light();
 
@@ -370,7 +369,6 @@ public:
 
 	bufferhandle gpu_skinned_mats_buffer = 0;
 	bufferhandle gpu_render_instance_buffer = 0;
-	bufferhandle gpu_render_material_buffer = 0;
 
 	// use for stuff that isnt getting alloced much multiple times like suns,skylights
 	uint32_t unique_id_counter = 0;

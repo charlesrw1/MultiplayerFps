@@ -32,7 +32,7 @@
 #include "DrawPublic.h"
 #include "Entity.h"
 #include "Physics/Physics2.h"
-#include "Render/Material.h"
+
 #include "Assets/AssetBrowser.h"
 #include "Animation/AnimationTreePublic.h"
 #include "Animation/Editor/AnimationGraphEditorPublic.h"
@@ -1252,7 +1252,6 @@ void GameEngineLocal::init()
 	init_audio();
 	network_init();
 	idraw->init();
-	mats.init();
 	imaterials->init();
 
 	gui_root.reset(new GUI_RootControl );

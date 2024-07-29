@@ -13,7 +13,7 @@
 #include "DrawTypedefs.h"
 #include "Framework/FreeList.h"
 #include "Render/RenderExtra.h"
-#include "Render/Material.h"
+#include "Render/MaterialLocal.h"
 #include "Framework/MemArena.h"
 
 #include "Framework/MulticastDelegate.h"
@@ -25,7 +25,6 @@ class Model;
 class Animator;
 class Texture;
 class Entity;
-class Material;
 
 extern ConfigVar draw_collision_tris;
 extern ConfigVar draw_sv_colliders;
@@ -111,6 +110,7 @@ struct Render_Stats
 class Program_Manager
 {
 public:
+	program_handle create_single_file(const char* shared_file, const std::string& defines = {});
 	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
 	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
 	program_handle create_compute(const char* compute, const std::string& defines = {});
@@ -126,69 +126,13 @@ public:
 		const char* geo = nullptr;
 		bool is_compute = false;
 		bool compile_failed = false;
+
+		bool is_shared() const { return vert && frag == nullptr && !is_compute; }
 		Shader shader_obj;
 	};
 	std::vector<program_def> programs;
 private:
 	void recompile(program_def& def);
-};
-
-struct shader_key
-{
-	shader_key() {
-		material_id = 0;
-		depth_only = 0;
-		animated = 0;
-		editor_id = 0;
-		dither = 0;
-		debug = 0;
-	}
-	uint32_t material_id : 27;
-	uint32_t animated : 1;
-	uint32_t editor_id : 1;
-	uint32_t depth_only : 1;
-	uint32_t dither : 1;
-	uint32_t debug : 1;
-
-	uint32_t as_uint32() const {
-		return *((uint32_t*)this);
-	}
-};
-static_assert(sizeof(shader_key) == 4, "shader key needs 4 bytes");
-
-
-
-// opaque materials get one path
-// transparent materials get another path
-// post process materials get another
-// (different output targets, different inputs)
-
-// materials also vary depending on context:
-// is it animated?
-// is it outputting editor id?
-
-// so step 1: determine WHAT material we have (ie what shader)
-//		if this is a depth pass, then get a special shader that is more easily batched
-// now we have the shader, the options function like "#ifdefs for the shader" so check if the shader already exists first
-
-// Essentially we want a hashmap of uint64(shader id, shader parameters) maped to a shader object
-// to make sorting them easier, each shader object is also assigned a program id the first time its created (thus we can store shader id under, say, 16 bits)
-// hashmap<uint64_t, {glShader, uint16}> shaderid_to_shaderobj
-// and vector<uint64_t> (maps from uint16 back to shader key)
-// if the shader doesnt modify verticies then it can get the uber depth shader, if it does, then it gets its own depth shader but fragment part is simplified
-// if its alpha tested, then the depth material gets its own shader
-// thus basic opaques can be merged, but anything else cant be merged in the depth pass
-
-
-class Material_Shader_Table
-{
-public:
-	Material_Shader_Table();
-
-	program_handle lookup(shader_key key); 
-	void insert(shader_key key, program_handle handle);
-
-	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
 
 
@@ -227,6 +171,8 @@ public:
 
 	// local delegates
 	MulticastDelegate<int, int> on_viewport_size_changed;	// hook up to change buffers etc.
+	MulticastDelegate<> on_reload_shaders;	// called before shaders are reloaded
+
 
 	// public interface
 	virtual void init() override;
@@ -284,7 +230,6 @@ public:
 	static const int MAX_SAMPLER_BINDINGS = 16;
 
 	Program_Manager prog_man;
-	Material_Shader_Table mat_table;
 	struct programs
 	{
 		program_handle simple{};
@@ -397,8 +342,6 @@ public:
 	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
 		bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face);
 
-	void set_shader_constants();
-	void set_depth_shader_constants();
 
 
 	// >>> PBR BRANCH
@@ -421,14 +364,11 @@ public:
 	float slice_3d=0.0;
 
 	Render_Scene scene;
-
-	program_handle get_mat_shader(bool is_animated, const Model* mod, const Material* gs, bool depth_pass, bool dither, bool is_editor_mode);
 	
 	Render_Stats stats;
 
 	const View_Setup& get_current_frame_vs()const { return current_frame_main_view; }
 
-	void set_shader_sampler_locations();
 	View_Setup current_frame_main_view;
 private:
 
@@ -456,8 +396,6 @@ private:
 	void DrawEntBlobShadows();
 	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
 
-	void set_wind_constants();
-	void set_water_constants();
 
 
 	int cur_w = 0;
