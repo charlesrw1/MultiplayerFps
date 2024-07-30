@@ -32,6 +32,7 @@ struct Render_Sun;
 struct Render_Irradiance_Volume;
 struct Render_Reflection_Volume;
 struct Render_Skylight;
+class TerrainInterfacePublic;
 
 class MeshBuilder;
 class IEditorTool;
@@ -74,6 +75,8 @@ public:
 	virtual handle<Render_Skylight> register_skylight(const Render_Skylight& v) = 0;
 	virtual void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& v) = 0;
 	virtual void remove_skylight(handle<Render_Skylight>& handle) = 0;
+
+	virtual TerrainInterfacePublic* get_terrain_interface() = 0;
 };
 
 class RendererPublic

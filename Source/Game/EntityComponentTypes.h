@@ -41,6 +41,7 @@ public:
 
 	bool simulate_physics = false;
 	bool visible = true;
+	bool cast_shadows = true;
 
 #ifndef RUNTIME
 	bool eAnimateInEditor = false;

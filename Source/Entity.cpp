@@ -250,7 +250,7 @@ const PropertyInfoList* MeshComponent::get_props() {
 	START_PROPS(MeshComponent)
 		REG_ASSET_PTR(model, PROP_DEFAULT),
 		REG_ASSET_PTR(animator_tree, PROP_DEFAULT),
-
+		REG_BOOL(cast_shadows, PROP_DEFAULT, "1"),
 #ifndef RUNTIME
 		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
 		REG_BOOL(eAnimateInEditor, PROP_DEFAULT | PROP_EDITOR_ONLY, "0"),
@@ -302,6 +302,10 @@ void MeshComponent::on_init()
 		obj.visible = visible;
 		obj.transform = get_ws_transform();
 		obj.owner = this;
+		obj.shadow_caster = cast_shadows;
+
+		if (!eMaterialOverride.empty())
+			obj.mat_override = eMaterialOverride[0].get();
 
 		idraw->get_scene()->update_obj(draw_handle, obj);
 	}
@@ -317,7 +321,9 @@ void MeshComponent::on_changed_transform()
 	obj.visible = visible;
 	obj.transform = get_ws_transform();
 	obj.owner = this;
-
+	obj.shadow_caster = cast_shadows;
+	if (!eMaterialOverride.empty())
+		obj.mat_override = eMaterialOverride[0].get();
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 

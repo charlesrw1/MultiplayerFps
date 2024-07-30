@@ -18,3 +18,5 @@ bind F4 "r.debug_mode 8"
 bind F5 "r.debug_mode 2"
 
 dbg.fly 1
+
+output_texture 0.5 1.0 0.0 _gbuffer0

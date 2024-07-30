@@ -20,6 +20,8 @@
 
 #include "Level.h"
 
+#include "Render/TerrainInterfaceLocal.h"
+
 //#pragma optimize("", off)
 
 extern ConfigVar g_window_w;
@@ -1819,7 +1821,7 @@ public:
 			visible = visible && center.z * cullfrustum[1] - abs(center.x) * cullfrustum[0] > -radius;
 			visible = visible && center.z * cullfrustum[3] - abs(center.y) * cullfrustum[2] > -radius;
 			visible = visible && center.z - radius < -near && center.z + radius > -far;
-
+			visible = true;
 			results[hlIndex].lod_choosen = visible ? 0 : -1;
 			if (!visible)
 				continue;
@@ -1941,6 +1943,10 @@ void Render_Scene::init()
 
 	glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
+
+
+	terrain_interface = std::make_unique<TerrainInterfaceLocal>();
+	terrain_interface->init();
 }
 
 glm::vec4 to_vec4(Color32 color) {
@@ -2057,7 +2063,8 @@ void Render_Scene::build_scene_data(bool build_for_editor)
 							transparent_pass.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0, build_for_editor);
 						}
 						else {
-							shadow_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
+							if(proxy.shadow_caster)
+								shadow_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
 							gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
 						}
 					}
@@ -2948,7 +2955,7 @@ void Renderer::accumulate_gbuffer_lighting()
 
 	// reflection pass (use static for now)
 }
-
+ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV);
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool)
 {
@@ -3008,8 +3015,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	//}
 
 	// render ssao using prepass buffer
-	if (enable_ssao.get_bool())
-		ssao.render();
 
 	// planar reflection render
 	//{
@@ -3035,6 +3040,13 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 		render_level_to_target(params);
 	}
+
+	if(r_drawterrain.get_bool())
+		scene.terrain_interface->draw_to_gbuffer();
+	state_machine.invalidate_all();
+
+	if (enable_ssao.get_bool())
+		ssao.render();
 
 	if(r_debug_mode.get_integer() == 0)
 		accumulate_gbuffer_lighting();
@@ -3317,6 +3329,11 @@ RSunInternal* Render_Scene::get_main_directional_light()
 		return &suns.at(suns.size() - 1);
 	return nullptr;
 }
+TerrainInterfacePublic* Render_Scene::get_terrain_interface() { 
+	return terrain_interface.get(); 
+}
+Render_Scene::~Render_Scene() {}
+
 void Renderer::on_level_end()
 {
 

@@ -10,7 +10,6 @@
 
 #include "Framework/FreeList.h"
 #include "ParticlesPublic.h"
-#include "Render/Material.h"
 
 #include <unordered_map>
 
@@ -91,7 +90,6 @@ struct Effect_Spawn_Def
 	Value_Range<glm::vec4> color_end;
 	Value_Range<glm::vec2> size_start;
 	Value_Range<glm::vec2> size_end;
-	Material* mat = nullptr;
 };
 
 struct Particle_System_Def

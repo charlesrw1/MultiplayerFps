@@ -217,10 +217,12 @@ struct RSunInternal
 	int unique_id = 0;
 };
 
+class TerrainInterfaceLocal;
 class Render_Scene : public RenderScenePublic
 {
 public:
 	Render_Scene();
+	~Render_Scene();
 
 	void init();
 
@@ -339,6 +341,10 @@ public:
 	void build_scene_data(bool is_for_editor);
 
 	RSunInternal* get_main_directional_light();
+
+	TerrainInterfacePublic* get_terrain_interface() override;
+
+	std::unique_ptr<TerrainInterfaceLocal> terrain_interface;
 
 	//std::unique_ptr<Render_Pass> gbuffer;
 	//std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling

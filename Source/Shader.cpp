@@ -94,6 +94,87 @@ static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, ch
 	return true;
 }
 
+
+
+ShaderResult Shader::compile_vert_frag_tess_single_file(
+	Shader* shader,
+	const char* shared_path,
+	std::string shader_defines
+)
+{
+	if (shader->ID != 0)
+		glDeleteProgram(shader->ID);
+	shader->ID = 0;
+
+
+	std::string defines_with_directive = get_definess_with_directive(shader_defines);
+	std::string vertex_source = get_source(shared_path, defines_with_directive + "\n#define _VERTEX_SHADER\n#line 0\n", false);
+	std::string fragment_source = get_source(shared_path, defines_with_directive + "\n#define _FRAGMENT_SHADER\n#line 0\n", false);
+	std::string tess_eval_source = get_source(shared_path, defines_with_directive + "\n#define _TESS_EVAL_SHADER\n#line 0\n", false);
+	std::string tess_ctrl_source = get_source(shared_path, defines_with_directive + "\n#define _TESS_CTRL_SHADER\n#line 0\n", false);
+
+
+	if (vertex_source.empty() || fragment_source.empty() || tess_eval_source.empty()||tess_ctrl_source.empty()) {
+		printf("Parse fail %s\n", shared_path);
+		return ShaderResult::SHADER_PARSE_FAIL;
+	}
+
+	unsigned int vertex{};
+	unsigned int fragment{};
+	unsigned int tess_control{};
+	unsigned int tess_eval{};
+
+	unsigned int program{};
+	int success = 0;
+	char infolog[512];
+
+	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
+	if (!good) {
+		printf("Error: vertex shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
+	if (!good) {
+		printf("Error: fragment shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+	good = make_shader(tess_eval_source.c_str(), GL_TESS_EVALUATION_SHADER, &tess_eval, infolog, 512);
+	if (!good) {
+		printf("Error: tesselation eval shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+	good = make_shader(tess_ctrl_source.c_str(), GL_TESS_CONTROL_SHADER, &tess_control, infolog, 512);
+	if (!good) {
+		printf("Error: tesselation control shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+
+	program = glCreateProgram();
+	glAttachShader(program, vertex);
+	glAttachShader(program, fragment);
+	glAttachShader(program, tess_control);
+	glAttachShader(program, tess_eval);
+	glLinkProgram(program);
+
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(program, 512, NULL, infolog);
+		printf("Error: shader program link failed: %s\n", infolog);
+
+		return ShaderResult::SHADER_COMPILE_FAIL;
+	}
+
+	glDeleteShader(vertex);
+	glDeleteShader(fragment);
+	glDeleteShader(tess_eval);
+	glDeleteShader(tess_control);
+
+	shader->ID = program;
+
+	return ShaderResult::SHADER_SUCCESS;
+
+}
+
 ShaderResult Shader::compile_vert_frag_single_file(
 	Shader* shader,
 	const char* shared_path,

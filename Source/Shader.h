@@ -41,6 +41,12 @@ public:
 		const char* shared_path,
 		std::string shader_defines = {}
 	);
+	// this is getting out of hand...
+	static ShaderResult compile_vert_frag_tess_single_file(
+		Shader* shader,
+		const char* shared_path,
+		std::string shader_defines = {}
+	);
 
 
 	void use();

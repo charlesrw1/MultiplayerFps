@@ -79,8 +79,8 @@
     <Filter Include="Source\LevelEditor\Commands">
       <UniqueIdentifier>{37f4b120-00f7-420e-b33d-231eea4510a8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\Render\Material">
-      <UniqueIdentifier>{b2af5032-9104-481a-a83d-b66dc63bdc2a}</UniqueIdentifier>
+    <Filter Include="Source\Render\Public">
+      <UniqueIdentifier>{37d87765-abeb-4ca0-b068-b78944958bb1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -261,22 +261,13 @@
     <ClInclude Include="Source\DrawLocal.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DrawPublic.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\DrawTypedefs.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\EnvProbe.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Texture.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Shader.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\RenderObj.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\ProgramCaching.h">
@@ -289,9 +280,6 @@
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\ParticlesLocal.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Model.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Util.h">
@@ -357,9 +345,6 @@
     <ClInclude Include="Source\Particles\ParticlesLocal.h">
       <Filter>Source\Particles</Filter>
     </ClInclude>
-    <ClInclude Include="Source\UI.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\UIEditorLocal.h">
       <Filter>Source\Render\Editor</Filter>
     </ClInclude>
@@ -403,9 +388,6 @@
     <ClInclude Include="Source\External\ImGuizmo.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\RenderExtra.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h">
       <Filter>Source\AssetCompile</Filter>
     </ClInclude>
@@ -438,9 +420,6 @@
     </ClInclude>
     <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h">
       <Filter>Source\Render\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\MaterialPublic.h">
-      <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\SchemaEditLocal.h">
       <Filter>Source\Game\Editor</Filter>
@@ -520,19 +499,46 @@
     <ClInclude Include="Source\Framework\ConsolePrint.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\Render_Sun.h">
+    <ClInclude Include="Source\Render\RenderScene.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\Render_Light.h">
-      <Filter>Source\Render</Filter>
+    <ClInclude Include="Source\DrawPublic.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\MaterialPublic.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\RenderObj.h">
+      <Filter>Source\Render\Public</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\Render_Decal.h">
-      <Filter>Source\Render</Filter>
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\Render_Light.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\Render_Sun.h">
+      <Filter>Source\Render\Public</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\Render_Volumes.h">
-      <Filter>Source\Render</Filter>
+      <Filter>Source\Render\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\RenderScene.h">
+    <ClInclude Include="Source\Render\RenderExtra.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Model.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Texture.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\UI.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\TerrainPublic.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\TerrainInterfaceLocal.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
   </ItemGroup>
@@ -736,9 +742,6 @@
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
-    <ClCompile Include="Source\Render\Material.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Assets\AssetRegistry.cpp">
       <Filter>Source\Asset</Filter>
     </ClCompile>
