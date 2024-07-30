@@ -88,7 +88,8 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MasterMaterial* ma
 
 	sys_print("*** INFO: compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
 
-	program_handle handle = draw.prog_man.create_single_file(name.c_str(), params);
+	const bool is_tesselation = mat->usage == MaterialUsage::Terrain;
+	program_handle handle = draw.prog_man.create_single_file(name.c_str(), is_tesselation, params);
 	ASSERT(handle != -1);
 
 	mat_table.insert(key, handle);
@@ -106,7 +107,7 @@ program_handle MaterialManagerLocal::get_mat_shader(
 {
 	const MasterMaterial* mm = mat->get_master_material();
 
-	bool is_animated = mod->has_bones() && has_animated_matricies;
+	bool is_animated = mod && mod->has_bones() && has_animated_matricies;
 
 	shader_key key;
 	key.material_id = mm->material_id;
@@ -436,6 +437,9 @@ bool MasterMaterial::load_from_file(const std::string& fullpath, IFile* file)
 				fs_code += to_std_string_sv(tok);
 			}
 		}
+		else if(tok.cmp("DOMAIN")) {
+			usage = (MaterialUsage)parse_options({ "Default","PostProcess","Terrain" });
+		}
 		else {
 			throw MasterMaterialExcept(fullpath, "Unknown cmd : " + to_std_string_sv(tok));
 		}
@@ -572,9 +576,14 @@ std::string MasterMaterial::create_glsl_shader(
 )
 {
 	std::string masterShader;
-	bool good = read_and_add_recursive("MasterDeferredShader.txt", masterShader);
+
+	const char* master_shader_path = "MasterDeferredShader.txt";
+	if (usage == MaterialUsage::Terrain)
+		master_shader_path = "MasterTerrainShader.txt";
+
+	bool good = read_and_add_recursive(master_shader_path, masterShader);
 	if (!good)
-		throw MasterMaterialExcept("...", "couldnt open MasterDeferredShader.txt");
+		throw MasterMaterialExcept("...", "couldnt open master shader: " + std::string( master_shader_path ));
 
 	std::string actual_vs_code;
 
@@ -661,6 +670,13 @@ std::string MasterMaterial::create_glsl_shader(
 
 	return masterShader;
 }
+
+void MaterialManagerLocal::on_reload_shader_invoke()
+{
+
+
+}
+
 
 void MaterialManagerLocal::init() {
 	draw.on_reload_shaders.add(this, &MaterialManagerLocal::on_reload_shader_invoke);

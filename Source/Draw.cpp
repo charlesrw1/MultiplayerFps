@@ -425,13 +425,14 @@ static const char* sdp_strs[] = {
 	"ANIMATED,",
 	"VERTEX_COLOR,",
 };
-program_handle Program_Manager::create_single_file(const char* shared_file, const std::string& defines)
+program_handle Program_Manager::create_single_file(const char* shared_file, bool is_tesseltion, const std::string& defines)
 {
 	program_def def;
 	def.vert = shared_file;
 	def.frag = nullptr;
 	def.defines = defines;
 	def.is_compute = false;
+	def.is_tesselation = is_tesseltion;
 	programs.push_back(def);
 	recompile(programs.back());
 	return programs.size() - 1;
@@ -482,7 +483,10 @@ void Program_Manager::recompile(program_def& def)
 			!= ShaderResult::SHADER_SUCCESS;
 	}
 	else if (def.is_shared()) {
-		def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines)!=ShaderResult::SHADER_SUCCESS;
+		if (def.is_tesselation)
+			def.compile_failed = Shader::compile_vert_frag_tess_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
+		else
+			def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines)!=ShaderResult::SHADER_SUCCESS;
 	}
 	else {
 		if (def.geo)
@@ -859,6 +863,9 @@ void Renderer::create_default_textures()
 
 }
 
+// 4mb arena
+ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "4000000", CVAR_INTEGER|CVAR_UNBOUNDED);
+
 void Renderer::init()
 {
 	sys_print("--------- Initializing Renderer ---------\n");
@@ -875,8 +882,7 @@ void Renderer::init()
 #endif
 	InitGlState();
 
-	// Initialize memory arena, 4mb
-	mem_arena.init("Render Temp", 4'000'000);
+	mem_arena.init("Render Temp", renderer_memory_arena_size.get_integer());
 
 	// Init scene draw buffers
 	scene.init();
@@ -1814,7 +1820,7 @@ public:
 			const Model* m = proxy.model;
 			glm::vec4 boundingsphere = m->get_bounding_sphere();
 			vec3 center = glm::vec3(boundingsphere);
-			center = (view * proxy.transform * vec4(center, 1.0));
+			//center = (view * proxy.transform * vec4(center, 1.0));
 			float radius = boundingsphere.w;	// fixme scale not applied to radius
 
 			bool visible = true;
@@ -2961,6 +2967,8 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 {
 	GPUFUNCTIONSTART;
 
+	current_time = GetTime();
+
 	mem_arena.free_bottom();
 	stats = Render_Stats();
 	state_machine.invalidate_all();
@@ -3042,7 +3050,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	}
 
 	if(r_drawterrain.get_bool())
-		scene.terrain_interface->draw_to_gbuffer();
+		scene.terrain_interface->draw_to_gbuffer(params.is_editor, r_debug_mode.get_integer()!=0);
 	state_machine.invalidate_all();
 
 	if (enable_ssao.get_bool())

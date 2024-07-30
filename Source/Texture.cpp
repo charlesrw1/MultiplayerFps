@@ -10,8 +10,8 @@
 #include "Framework/Files.h"
 #include "Framework/DictParser.h"
 
-
 #undef OPAQUE
+#include "AssetRegistry.h"
 
 static const char* const texture_folder_path = "./Data/Textures/";
 
@@ -20,7 +20,40 @@ CLASS_IMPL(Texture);
 REGISTERASSETLOADER_MACRO(Texture, &g_imgs);
 
 TextureMan g_imgs;
+#include "AssetCompile/Someutils.h"
 
+class TextureAssetMetadata : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() const  override
+	{
+		return { 227, 39, 39 };
+	}
+
+	virtual std::string get_type_name() const  override
+	{
+		return "Texture";
+	}
+
+	virtual void index_assets(std::vector<std::string>& filepaths) const override
+	{
+		auto find_tree = FileSys::find_files("./Data/Textures");
+		for (const auto _file : find_tree) {
+			auto file = _file.substr(16);
+			if (has_extension(file, "png"))
+				filepaths.push_back(file);
+		}
+	}
+	virtual IEditorTool* tool_to_edit_me() const override { return nullptr; }
+	virtual std::string root_filepath() const  override
+	{
+		return texture_folder_path;
+	}
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &Texture::StaticType; }
+};
+
+REGISTER_ASSETMETADATA_MACRO(TextureAssetMetadata);
 
 void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
 {
@@ -411,35 +444,17 @@ Texture* TextureMan::find_texture(const char* file, bool search_img_directory, b
 			return find->second;
 		t = new Texture;
 		textures[file] = t;
-		t->path = path;
+		t->path = file;
 	}
 	else {
 		t = new Texture;
-		t->path = path;
+		t->path = file;
 	}
 
 	bool good = load_texture(path, t);
 	return t;
 }
 
-
-Texture* TextureMan::create_unloaded_ptr(const char* file)
-{
-	std::string path;
-	path.reserve(256);
-	path += texture_folder_path;
-	path += file;
-
-	auto find = textures.find(file);
-	if (find != textures.end())
-		return find->second;
-
-	Texture* t = new Texture;
-	textures[file] = t;
-	t->path = path;
-	t->is_loaded = false;
-	return t;
-}
 
 Texture* TextureMan::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
 {

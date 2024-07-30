@@ -1608,3 +1608,21 @@ void EntityNameDatabase_Ed::invoke_change_name(uint64_t h)
 {
 	ed_doc.on_change_name.invoke(h);
 }
+
+DECLARE_ENGINE_CMD(STRESS_TEST)
+{
+	auto model = mods.find_or_load("cube.cmdl");
+	for (int z = 0; z < 20; z++) {
+		for (int y = 0; y < 20; y++) {
+			for (int x = 0; x < 20; x++) {
+				glm::vec3 p(x, y, z);
+				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
+
+				auto ent = eng->spawn_entity_class<StaticMeshEntity>();
+				ent->Mesh->set_model(model);
+				ent->set_ws_transform(transform);
+				
+			}
+		}
+	}
+}

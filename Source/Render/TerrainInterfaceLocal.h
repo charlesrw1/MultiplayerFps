@@ -3,6 +3,7 @@
 #include "DrawTypedefs.h"
 #include "DrawLocal.h"
 #include "glad/glad.h"
+#include "Render/MaterialLocal.h"
 enum class TerrainCommand
 {
 	DrawBrush,
@@ -101,18 +102,45 @@ public:
 
 	}
 
-	void draw_to_gbuffer() {
+	void draw_to_gbuffer(bool is_editor_pass, bool is_debug_pass) {
+		GPUSCOPESTART("TerrainRender");
+
+		if (!has_terrain)
+			return;
+
+		if (!active_terrain.assetptr_heightfield)
+			return;
+
+		MaterialInstanceLocal* local = (MaterialInstanceLocal*)active_terrain.assetptr_material;
+
+		if (!active_terrain.assetptr_material || !local || local->get_master_material()->usage != MaterialUsage::Terrain)
+			return;
+
+		program_handle prog = matman.get_mat_shader(false, nullptr, local, false, false, is_editor_pass, is_debug_pass);
+
+		draw.set_shader(prog);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, draw.fbo.gbuffer);
 
-		shad.use();
-		shad.set_mat4("ViewProj", draw.current_frame_main_view.viewproj);
-		shad.set_mat4("Model", glm::mat4(1));
-		auto tex = g_imgs.find_texture("HEIGHTMAP2.png");
-		shad.set_float("WorldScale", W);
-		shad.set_float("VerticalScale", 12.0);
+		
+		draw.shader().set_mat4("ViewProj", draw.current_frame_main_view.viewproj);
+		draw.shader().set_mat4("Model", glm::mat4(1));
+		draw.shader().set_float("WorldScale", W);
+		draw.shader().set_float("VerticalScale", active_terrain.vertical_scale);
+		draw.shader().set_int("MIN_TESS_LEVEL", active_terrain.min_tess_level);
+		draw.shader().set_int("MAX_TESS_LEVEL", active_terrain.max_tess_level);
+		draw.shader().set_float("MIN_DISTANCE", active_terrain.min_distance);
+		draw.shader().set_float("MAX_DISTANCE", active_terrain.max_distance);
 
-		draw.bind_texture(0, tex->gl_id);
+
+		auto& textures = local->get_textures();
+		for (int i = 0; i < textures.size(); i++)
+			draw.bind_texture(i, textures[i]->gl_id);
+
+		draw.shader().set_uint("FS_IN_Matid", local->gpu_buffer_offset);
+		draw.shader().set_uint("FS_IN_Objid", 0);
+
+		draw.bind_texture(12/*fixme*/, active_terrain.assetptr_heightfield->gl_id);
 
 		glBindVertexArray(vao);
 
@@ -122,24 +150,26 @@ public:
 
 	}
 
-	handle<CompiliedTerrainAsset> register_terrain(const CompiliedTerrainAsset* asset) override {
-		return { -1 };
+	handle<Render_Terrain> register_terrain(const Render_Terrain& asset) override {
+		if (has_terrain) {
+			sys_print("!!! can only register one terrain at once\n");
+			return { -1 };
+		}
+		has_terrain = true;
+		active_terrain = asset;
+		return { 0 };
 	}
-	void update_terrain(handle<CompiliedTerrainAsset> asset) override {
-
+	void update_terrain(handle<Render_Terrain> handle, const Render_Terrain& asset) override {
+		if (!handle.is_valid())
+			return;
+		active_terrain = asset;
 	}
-	void remove_terrain(handle<CompiliedTerrainAsset>& asset) {
-
-	}
-
-	handle<EditorTerrainAsset> register_editor_terrain(const EditorTerrainAsset* asset)override {
-		return { -1 };
-	}
-	void update_editor_terrain(handle<CompiliedTerrainAsset> asset)override {
-
-	}
-	void remove_editor_terrain(handle<EditorTerrainAsset>& asset) override {
-
+	void remove_terrain(handle<Render_Terrain>& handle) {
+		if (!handle.is_valid())
+			return;
+		has_terrain = false;
+		active_terrain = {};
+		handle = { -1 };
 	}
 
 	void draw_brush_to_layer(
@@ -157,6 +187,9 @@ public:
 		const Texture* layer)override {
 
 	}
+
+	bool has_terrain = false;
+	Render_Terrain active_terrain{};
 
 	Shader shad{};
 	vertexarrayhandle vao{};

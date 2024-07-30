@@ -32,28 +32,28 @@ public:
 
 };
 
-class CompiliedTerrainAsset
+class Render_Terrain
 {
 public:
 	const Texture* assetptr_heightfield{};
 	const MaterialInstance* assetptr_material{};
-	uint32_t w{};
-	uint32_t h{};
-	// cooked heightfield
-	// const PhysicsHeightfield* assetptr_heightfield{};
+	float dimensions = 100.f;
+	float vertical_scale = 10.f;
+
+	int min_tess_level = 4;
+	int max_tess_level = 40;
+	float min_distance = 0.5;
+	float max_distance = 80;
 };
 
 
 class TerrainInterfacePublic
 {
 public:
-	virtual handle<CompiliedTerrainAsset> register_terrain(const CompiliedTerrainAsset* asset) = 0;
-	virtual void update_terrain(handle<CompiliedTerrainAsset> asset) = 0;
-	virtual void remove_terrain(handle<CompiliedTerrainAsset>& asset) = 0;
+	virtual handle<Render_Terrain> register_terrain(const Render_Terrain& asset) = 0;
+	virtual void update_terrain(handle<Render_Terrain> handle, const Render_Terrain& asset) = 0;
+	virtual void remove_terrain(handle<Render_Terrain>& handle) = 0;
 
-	virtual handle<EditorTerrainAsset> register_editor_terrain(const EditorTerrainAsset* asset) = 0;
-	virtual void update_editor_terrain(handle<CompiliedTerrainAsset> asset) = 0;
-	virtual void remove_editor_terrain(handle<EditorTerrainAsset>& asset) = 0;
 
 	virtual void draw_brush_to_layer(
 		handle<EditorTerrainAsset> asset,

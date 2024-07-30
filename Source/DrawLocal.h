@@ -110,7 +110,7 @@ struct Render_Stats
 class Program_Manager
 {
 public:
-	program_handle create_single_file(const char* shared_file, const std::string& defines = {});
+	program_handle create_single_file(const char* shared_file, bool is_tesselation = false, const std::string& defines = {});
 	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
 	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
 	program_handle create_compute(const char* compute, const std::string& defines = {});
@@ -126,6 +126,7 @@ public:
 		const char* geo = nullptr;
 		bool is_compute = false;
 		bool compile_failed = false;
+		bool is_tesselation = false;
 
 		bool is_shared() const { return vert && frag == nullptr && !is_compute; }
 		Shader shader_obj;

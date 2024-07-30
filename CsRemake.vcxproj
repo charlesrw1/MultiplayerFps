@@ -250,6 +250,7 @@
     <ClCompile Include="Source\Player.cpp" />
     <ClCompile Include="Source\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
+    <ClCompile Include="Source\Render\TerrainComponent.cpp" />
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Shader.cpp" />

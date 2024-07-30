@@ -79,7 +79,6 @@ public:
 	Texture* install_system_texture(const std::string& name);
 private:
 
-	Texture* create_unloaded_ptr(const char* filename);
 	bool load_texture(const std::string& path, Texture* t);
 
 	std::unordered_map<std::string, Texture*> textures;

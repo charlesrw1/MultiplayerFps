@@ -26,6 +26,7 @@ enum class MaterialUsage : uint8_t
 {
 	Default,
 	Postprocess,
+	Terrain,
 };
 
 
@@ -162,6 +163,7 @@ public:
 	bool alpha_tested = false;
 	blend_state blend = blend_state::OPAQUE;
 	LightingMode light_mode = LightingMode::Lit;
+	MaterialUsage usage = MaterialUsage::Default;
 	bool backface = false;
 
 	// uses the shared depth material
@@ -292,7 +294,7 @@ private:
 	MasterMaterial* fallback_master = nullptr;
 	MasterMaterial* shared_depth_master = nullptr;
 
-	void on_reload_shader_invoke() {}
+	void on_reload_shader_invoke();
 
 	program_handle compile_mat_shader(const MasterMaterial* mat, shader_key key);
 	Material_Shader_Table mat_table;
