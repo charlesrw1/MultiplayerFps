@@ -62,7 +62,8 @@ struct Render_Level_Params {
 		Pass_Type type
 		) : view(view), rl(render_list), rp(render_pass), 
 		clear_framebuffer(clear_framebuffer),
-		output_framebuffer(output_framebuffer)
+		output_framebuffer(output_framebuffer),
+		pass(type)
 	{
 
 	}
@@ -202,7 +203,7 @@ public:
 	void ui_render();
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
 	void cubemap_positions_debug();
-	void execute_render_lists(Render_Lists& lists, Render_Pass& pass);
+	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool force_backface_state);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	void scene_draw_presetup(const SceneDrawParamsEx& params, const View_Setup& view);
@@ -237,15 +238,12 @@ public:
 		//program_handle textured;
 		//program_handle textured3d;
 		//program_handle texturedarray;
-		program_handle skybox{};
 
 		//program_handle particle_basic;
 		program_handle bloom_downsample{};
 		program_handle bloom_upsample{};
 		program_handle combine{};
-		program_handle hbao{};
-		program_handle xblur{};
-		program_handle yblur{};
+		
 		program_handle mdi_testing{};
 
 		// depth pyramid compute shader
@@ -256,6 +254,7 @@ public:
 
 		program_handle light_accumulation{};
 		program_handle sunlight_accumulation{};
+		program_handle sunlight_accumulation_debug{};
 	}prog;
 
 	struct framebuffers {
@@ -382,7 +381,7 @@ private:
 	void draw_sprite_buffer();
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
-	void render_lists_old_way(Render_Lists& list, Render_Pass& pass);
+	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state);
 
 	void init_bloom_buffers();
 	void render_bloom_chain();
@@ -391,11 +390,6 @@ private:
 
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
-
-	void DrawSkybox();
-
-	void DrawEntBlobShadows();
-	void AddBlobShadow(glm::vec3 org, glm::vec3 normal, float width);
 
 
 

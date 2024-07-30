@@ -168,6 +168,7 @@
     <ClInclude Include="Source\Server.h" />
     <ClInclude Include="Source\Shader.h" />
     <ClInclude Include="Source\Socket.h" />
+    <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Texture.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\UI.h" />
@@ -256,6 +257,7 @@
     <ClCompile Include="Source\Shader.cpp" />
     <ClCompile Include="Source\Shadowmap.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
+    <ClCompile Include="Source\Sound\SoundLocal.h" />
     <ClCompile Include="Source\Ssao.cpp" />
     <ClCompile Include="Source\Texture.cpp" />
     <ClCompile Include="Source\UIEditorLocal.cpp" />

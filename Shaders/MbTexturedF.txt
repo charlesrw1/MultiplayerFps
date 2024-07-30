@@ -47,7 +47,7 @@ void main()
 #endif
 
 #ifdef TEXTURE_2D_ARRAY_VERSION
-	tex_color = texture(the_texture, vec3(FS_IN_TexCoord,0.0));
+	tex_color = texture(the_texture, vec3(FS_IN_TexCoord,mip_slice));
 #endif
 
 FS_OUT_Color = vec4(tex_color.rgb, alpha);

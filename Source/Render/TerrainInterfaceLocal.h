@@ -116,6 +116,8 @@ public:
 		if (!active_terrain.assetptr_material || !local || local->get_master_material()->usage != MaterialUsage::Terrain)
 			return;
 
+		glDepthFunc(GL_GREATER);
+
 		program_handle prog = matman.get_mat_shader(false, nullptr, local, false, false, is_editor_pass, is_debug_pass);
 
 		draw.set_shader(prog);
@@ -147,6 +149,9 @@ public:
 		glDrawArrays(GL_PATCHES, 0, ROWS * ROWS * PATCH_POINTS);
 		glBindVertexArray(0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+		glDepthFunc(GL_LESS);
 
 	}
 

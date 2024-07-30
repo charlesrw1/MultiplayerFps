@@ -81,7 +81,7 @@ public:
 		auto ent = eng->spawn_entity_class<StaticMeshEntity>();
 		ent->Mesh->set_model(m);
 		ent->set_ws_transform(transform);
-		ent->editor_name = m->get_name();
+		ent->editor_name = strip_extension(m->get_name());
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
@@ -919,7 +919,9 @@ void ManipulateTransformTool::update()
 	//auto selected = ed_doc.selection_state.sel
 
 	const float* view = glm::value_ptr(ed_doc.vs_setup.view);
-	const float* proj = glm::value_ptr(ed_doc.vs_setup.proj);
+
+	const glm::mat4 friendly_proj_matrix = ed_doc.vs_setup.make_opengl_perspective_with_near_far();
+	const float* proj = glm::value_ptr(friendly_proj_matrix);
 
 	float* model = glm::value_ptr(current_transform_of_group);
 

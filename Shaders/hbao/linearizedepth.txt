@@ -24,8 +24,13 @@ layout(binding=0)  uniform sampler2D inputTexture;
 
 layout(location=0,index=0) out float out_Color;
 
+
+uniform float zNear =0.01;
+
 float reconstructCSZ(float d, vec4 clipInfo) {
-   return (clipInfo[0] / (clipInfo[1] * d + clipInfo[2]));
+   //return (clipInfo[0] / (clipInfo[1] * d + clipInfo[2]));
+   // 7/30: depth buffer change
+   return zNear / d;
 }
 void main() {
   float depth = texelFetch(inputTexture, ivec2(gl_FragCoord.xy), 0).x;

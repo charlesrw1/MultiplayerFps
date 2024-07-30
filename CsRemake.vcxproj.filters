@@ -82,6 +82,9 @@
     <Filter Include="Source\Render\Public">
       <UniqueIdentifier>{37d87765-abeb-4ca0-b068-b78944958bb1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Sound">
+      <UniqueIdentifier>{1dffa3ed-3d1c-437a-872e-c993b673a060}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\BaseComponents.h">
@@ -541,6 +544,9 @@
     <ClInclude Include="Source\Render\TerrainInterfaceLocal.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Sound\SoundPublic.h">
+      <Filter>Source\Sound</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -792,6 +798,9 @@
     </ClCompile>
     <ClCompile Include="Source\Render\TerrainComponent.cpp">
       <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Sound\SoundLocal.h">
+      <Filter>Source\Sound</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

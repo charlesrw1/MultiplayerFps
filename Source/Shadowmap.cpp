@@ -147,7 +147,7 @@ void Shadow_Map_System::update()
 			setup.near = nearplanes[i];
 			setup.far = farplanes[i];
 			setup.viewproj = matricies[i];
-			setup.view = setup.proj = mat4(1);
+			setup.view = setup.proj = mat4(1);	// unused
 
 			Render_Level_Params params(
 				setup,
@@ -195,10 +195,12 @@ void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, 
 	if (tweak.fit_to_scene)
 		near = view.near;
 
+	// 7/30: this doesnt need to be zero to one, not used to rendering, just in GetFrustumnCorners
 	mat4 camera_cascaded_proj = glm::perspective(
-		glm::radians(view.near),
+		view.fov,
 		(float)view.width / view.height,
 		near, far);
+
 	// World space corners
 	glm::vec3* corners = GetFrustumCorners(view.view, camera_cascaded_proj);
 	vec3 frustum_center = vec3(0);
@@ -249,7 +251,8 @@ void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, 
 
 	vec3 cascade_extent = viewspace_max - viewspace_min;
 
-	mat4 light_cascade_proj = glm::ortho(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y, viewspace_min.z, viewspace_max.z);
+	// 7/30: reverse z update: make ortho matrix from zero to one
+	mat4 light_cascade_proj = glm::orthoRH_ZO(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y, viewspace_min.z, viewspace_max.z);
 	mat4 shadow_matrix = light_cascade_proj * light_cascade_view;
 	if (tweak.reduce_shimmering)
 	{

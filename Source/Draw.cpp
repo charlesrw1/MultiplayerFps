@@ -52,9 +52,9 @@ ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL);
 ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV);
 
 
-DECLARE_ENGINE_CMD(output_texture)
+DECLARE_ENGINE_CMD(ot)
 {
-	static const char* usage_str = "Usage: output_texture <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
+	static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
 	if (args.size() != 5) {
 		sys_print(usage_str);
 		return;
@@ -75,7 +75,7 @@ DECLARE_ENGINE_CMD(output_texture)
 		sys_print("output_texture: couldn't find texture %s\n", texture_name);
 	}
 }
-DECLARE_ENGINE_CMD(clear_output_texture)
+DECLARE_ENGINE_CMD(cot)
 {
 	draw.debug_tex_out.output_tex = nullptr;
 }
@@ -263,6 +263,14 @@ void Renderer::InitGlState()
 	glEnable(GL_CULL_FACE);
 	glClearColor(0.5f, 0.3f, 0.2f, 1.f);
 	glDepthFunc(GL_LEQUAL);
+
+	// Fix opengl's clip space
+	// now outputs from 0,1 instead of -1,1
+	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+
+	// init clear depth to 0
+	// for reverse Z, it clears to 1, that gets set in the scene drawer
+	glClearDepth(0.0);
 }
 
 void Renderer::draw_sprite_buffer()
@@ -607,7 +615,6 @@ void Renderer::create_shaders()
 	//prog.textured = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt");
 	//prog.textured3d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE3D");
 	//prog.texturedarray = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTUREARRAY");
-	prog.skybox = prog_man.create_raster("MbSimpleV.txt", "SkyboxF.txt", "SKYBOX");
 	//prog.particle_basic = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 	prog.tex_debug_2d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_VERSION");
 	prog.tex_debug_2d_array = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_ARRAY_VERSION");
@@ -616,25 +623,14 @@ void Renderer::create_shaders()
 	prog.bloom_downsample = prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
 	prog.bloom_upsample = prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
 	prog.combine = prog_man.create_raster("fullscreenquad.txt", "CombineF.txt");
-	prog.hbao = prog_man.create_raster("MbTexturedV.txt", "HbaoF.txt");
-	prog.xblur = prog_man.create_raster("MbTexturedV.txt", "BilateralBlurF.txt");
-	prog.yblur = prog_man.create_raster("MbTexturedV.txt", "BilateralBlurF.txt", "YBLUR");
 
-	set_shader(prog.xblur);
-	shader().set_int("input_img", 0);
-	shader().set_int("scene_depth", 1);
-	set_shader(prog.yblur);
-	shader().set_int("input_img", 0);
-	shader().set_int("scene_depth", 1);
-	set_shader(prog.hbao);
-	shader().set_int("scene_depth", 0);
-	shader().set_int("noise_texture", 1);
 
 
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
+	prog.sunlight_accumulation_debug = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt","DEBUG");
 
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
@@ -659,15 +655,6 @@ void Renderer::reload_shaders()
 	ssao.reload_shaders();
 	prog_man.recompile_all();
 
-	set_shader(prog.xblur);
-	shader().set_int("input_img", 0);
-	shader().set_int("scene_depth", 1);
-	set_shader(prog.yblur);
-	shader().set_int("input_img", 0);
-	shader().set_int("scene_depth", 1);
-	set_shader(prog.hbao);
-	shader().set_int("scene_depth", 0);
-	shader().set_int("noise_texture", 1);
 }
 
 
@@ -952,7 +939,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Main scene depth
 	create_and_delete_texture(tex.scene_depth);
-	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT24, s_w, s_h);
+	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
 	set_default_parameters(tex.scene_depth);
 
 	// Create forward render framebuffer
@@ -1120,39 +1107,11 @@ void Renderer::render_bloom_chain()
 	glCheckError();
 }
 
-void Renderer::DrawSkybox()
-{
-	MeshBuilder mb;
-	mb.Begin();
-	mb.PushSolidBox(-vec3(1), vec3(1), COLOR_WHITE);
-	mb.End();
-
-	set_shader(prog.skybox);
-	glm::mat4 view = vs.view;
-	view[3] = vec4(0, 0, 0, 1);	// remove translation
-	shader().set_mat4("ViewProj", vs.proj * view);
-	shader().set_vec2("screen_size", vec2(vs.width, vs.height));
-	shader().set_int("volumetric_fog", 1);
-	shader().set_int("cube", 0);
-
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, scene.skybox);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_3D, volfog.texture.volume);
-
-
-	glDisable(GL_CULL_FACE);
-	mb.Draw(GL_TRIANGLES);
-	glEnable(GL_CULL_FACE);
-	mb.Free();
-}
-
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \
 if(mat->images[(int)texture]) bind_texture(where, mat->images[(int)texture]->gl_id); \
 else bind_texture(where, fallback.gl_id);
 
-void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
+void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool force_backface_state)
 {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
@@ -1185,7 +1144,9 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 
 		bind_vao(mods.get_vao(true/* animated */));
 
-		set_show_backfaces(backface);
+		if(!force_backface_state)
+			set_show_backfaces(backface);
+
 		set_blend_state(blend);
 
 		shader().set_int("indirect_material_offset", offset);
@@ -1212,7 +1173,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass)
 	}
 }
 
-void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass)
+void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state)
 {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
@@ -1246,7 +1207,9 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass)
 
 			bind_vao(mods.get_vao(true/* animated */));
 
-			set_show_backfaces(backface);
+			if(!force_backface_state)
+				set_show_backfaces(backface);
+
 			set_blend_state(blend);
 
 			auto& textures = mat->get_textures();
@@ -1307,7 +1270,15 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 	glViewport(0, 0, vs.width, vs.height);
 	if (params.clear_framebuffer) {
 		glClearColor(0.f, 0.0f, 0.f, 1.f);
+
+		if (params.pass != Render_Level_Params::SHADOWMAP) {
+			// set clear depth to 0 
+			// reversed Z has 1.0 being closest to camera and 0 being furthest
+			glClearDepth(0.0);
+		}
+
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
 	}
 
 	if (params.pass == Render_Level_Params::SHADOWMAP) {
@@ -1318,34 +1289,36 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 	}
 
 
+
+
 	if (params.has_clip_plane) {
 		glEnable(GL_CLIP_DISTANCE0);
 	}
 	
 	
 	{
-		//Model_Drawing_State state;
-		//for (int d = 0; d < list->size(); d++) {
-		//	Draw_Call& dc = (*list)[d];
-		//	draw_model_real(dc, state);
-		//}
+		// shadows map dont have reversed Z, just standard 0,1 depth
+		if (params.pass != Render_Level_Params::SHADOWMAP)
+			glDepthFunc(GL_GREATER);
+
+		const bool force_backface_state = params.pass == Render_Level_Params::SHADOWMAP;
 
 		// renderdoc seems to hate mdi for some reason, so heres an option to disable it
 		if(dont_use_mdi.get_bool())
-			render_lists_old_way(*params.rl, *params.rp);
+			render_lists_old_way(*params.rl, *params.rp, force_backface_state);
 		else
-			execute_render_lists(*params.rl, *params.rp);
-	}
+			execute_render_lists(*params.rl, *params.rp, force_backface_state);
 
-	if (params.pass == Render_Level_Params::SHADOWMAP) {
-		glDisable(GL_POLYGON_OFFSET_FILL);
-		glCullFace(GL_BACK);
-		glEnable(GL_CULL_FACE);
 	}
 
 	if (params.has_clip_plane)
 		glDisable(GL_CLIP_DISTANCE0);
 
+	glClearDepth(1.0);
+	glDepthFunc(GL_LESS);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glCullFace(GL_BACK);
+	glEnable(GL_CULL_FACE);
 	using_skybox_for_specular = false;
 }
 
@@ -1930,7 +1903,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 		command_count.push_back(mdb.count);
 	}
 
-	//glNamedBufferData(glinstance_to_instance, sizeof(uint32_t) * indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
+	//glNamedBufferData(:stance_to_instance, sizeof(uint32_t) * indirect_instance_buf_size, nullptr, GL_DYNAMIC_DRAW);
 	//glNamedBufferSubData(glinstance_to_instance, 0, sizeof(uint32_t) * instance_to_instance.size(), instance_to_instance.data());
 
 	glNamedBufferData(gldrawid_to_submesh_material, sizeof(uint32_t) * indirect_drawid_buf_size, nullptr, GL_DYNAMIC_DRAW);
@@ -2829,6 +2802,9 @@ void draw_debug_grid()
 // directional lights
 // point+spotlights
 
+
+ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV);
+
 void Renderer::accumulate_gbuffer_lighting()
 {
 	GPUSCOPESTART("accumulate_gbuffer_lighting");
@@ -2923,12 +2899,20 @@ void Renderer::accumulate_gbuffer_lighting()
 		// disable depth writes
 		glDepthMask(GL_FALSE);
 
-		glEnable(GL_BLEND);	// enable additive blending
-		glBlendFunc(GL_ONE, GL_ONE);
+		// output solid color if debugging
+		if (debug_sun_shadow.get_bool()) {
+			glDisable(GL_BLEND);
+			set_shader(prog.sunlight_accumulation_debug);
+		}
+		else {
+			glEnable(GL_BLEND);	// enable additive blending
+			glBlendFunc(GL_ONE, GL_ONE);
+			set_shader(prog.sunlight_accumulation);
+		}
 
 		glDisable(GL_DEPTH_TEST);
 
-		set_shader(prog.sunlight_accumulation);
+		
 
 		bind_texture(0, tex.scene_gbuffer0);
 		bind_texture(1, tex.scene_gbuffer1);
@@ -3161,40 +3145,6 @@ Shader Renderer::shader()
 {
 	if (state_machine.active_program == -1) return Shader();
 	return prog_man.get_obj(state_machine.active_program);
-}
-
-void Renderer::DrawEntBlobShadows()
-{
-	return;
-
-	shadowverts.Begin();
-
-	
-	glCheckError();
-
-	shadowverts.End();
-	glCheckError();
-
-	//set_shader(prog.particle_basic);
-	shader().set_mat4("ViewProj", vs.viewproj);
-	shader().set_mat4("Model", mat4(1.0));
-	shader().set_vec4("tint_color", vec4(0, 0, 0, 1));
-	glCheckError();
-
-	//bind_texture(0, eng->media.blob_shadow->gl_id);
-	glDepthMask(GL_FALSE);
-	glDisable(GL_CULL_FACE);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	shadowverts.Draw(GL_TRIANGLES);
-
-	glDisable(GL_BLEND);
-	glEnable(GL_CULL_FACE);
-	glDepthMask(GL_TRUE);
-
-	glCheckError();
-
 }
 
 
@@ -3588,7 +3538,9 @@ void DebuggingTextureOutput::draw_out()
 	draw.shader().set_mat4("ViewProj", proj);
 
 	draw.shader().set_float("alpha", alpha);
-	draw.shader().set_float("mip_slice", -1);
+	draw.shader().set_float("mip_slice", output_tex->type == Texture_Type::TEXTYPE_2D ?
+		-1.f
+		: mip);
 
 	draw.bind_texture(0, output_tex->gl_id);
 
@@ -3640,7 +3592,7 @@ float Renderer::get_scene_depth_for_editor(int x, int y)
 	const float depth = buffer_pixels[ofs];
 	delete[] buffer_pixels;
 
-	return linearize_depth(depth, vs.near, vs.far);
+	return -vs.near / depth;// linearize_depth(depth, vs.near, vs.far);
 }
 
 handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)

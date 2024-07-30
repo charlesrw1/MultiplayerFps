@@ -1196,13 +1196,30 @@ DECLARE_ENGINE_CMD(reload_mats)
 	ASSERT(0);
 }
 
+// RH, reverse Z, infinite far plane perspective matrix
 
-
+glm::mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, float zNear)
+{
+	float f = 1.0f / tan(fovY_radians / 2.0f);
+	return glm::mat4(
+		f / aspectWbyH, 0.0f, 0.0f, 0.0f,
+		0.0f, f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, -1.0f,
+		0.0f, 0.0f, zNear, 0.0f);
+}
+glm::mat4 View_Setup::make_opengl_perspective_with_near_far() const
+{
+	return glm::perspectiveRH_NO(fov, width / (float)height, near, far);
+}
 View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height)
 	: origin(origin),front(front),fov(fov),near(near),far(far),width(width),height(height)
 {
 	view = glm::lookAt(origin, origin + front, glm::vec3(0, 1.f, 0));
-	proj = glm::perspective(fov, width / (float)height, near, far);
+	//proj = glm::perspective(fov, width / (float)height, near, far);
+
+	const float aspectRatio = width / (float)height;
+	proj = MakeInfReversedZProjRH(fov, aspectRatio, near);
+
 	viewproj = proj * view;
 }
 

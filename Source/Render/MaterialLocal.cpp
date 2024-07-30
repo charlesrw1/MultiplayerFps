@@ -35,7 +35,8 @@ public:
 	{
 		auto tree = FileSys::find_files("./Data/Materials");
 		for (auto file : tree) {
-			filepaths.push_back(strip_extension(file.substr(17)));
+			if(has_extension(file,"mi")||has_extension(file,"mm"))
+				filepaths.push_back(strip_extension(file.substr(17)));
 		}
 	}
 	virtual bool assets_are_filepaths() const override { return false; }

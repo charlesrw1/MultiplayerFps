@@ -131,6 +131,7 @@ public:
 		Texture* result_vts_handle = nullptr;
 		Texture* blur_vts_handle = nullptr;
 		Texture* view_normal_vts_handle = nullptr;
+		Texture* linear_depth_vts_handle = nullptr;
 	}texture;
 
 	struct uniform_buffers {
