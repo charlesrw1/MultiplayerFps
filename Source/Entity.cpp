@@ -260,20 +260,25 @@ const PropertyInfoList* MeshComponent::get_props() {
 	END_PROPS(MeshCompponent)
 }
 
-void MeshComponent::editor_on_change_property(const PropertyInfo& property_)
+void MeshComponent::editor_on_change_property()
 {
-	bool remake = false;
-	void* prop_ptr = (void*)property_.get_ptr(this);
-	if (prop_ptr == &model) {
-		remake = true;
-	}
-	else if (prop_ptr == &visible)
-		remake = true;
-	else if (prop_ptr == &eMaterialOverride)
-		remake = true;
+	update_handle();
+}
 
-	if (remake)
-		on_changed_transform();//fixme
+void MeshComponent::update_handle()
+{
+	if (!model.get())
+		return;
+
+	Render_Object obj;
+	obj.model = model.get();
+	obj.visible = visible;
+	obj.transform = get_ws_transform();
+	obj.owner = this;
+	obj.shadow_caster = cast_shadows;
+	if (!eMaterialOverride.empty())
+		obj.mat_override = eMaterialOverride[0].get();
+	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 
 void MeshComponent::on_init()
@@ -313,18 +318,7 @@ void MeshComponent::on_init()
 
 void MeshComponent::on_changed_transform()
 {
-	if (!model.get())
-		return;
-
-	Render_Object obj;
-	obj.model = model.get();
-	obj.visible = visible;
-	obj.transform = get_ws_transform();
-	obj.owner = this;
-	obj.shadow_caster = cast_shadows;
-	if (!eMaterialOverride.empty())
-		obj.mat_override = eMaterialOverride[0].get();
-	idraw->get_scene()->update_obj(draw_handle, obj);
+	update_handle();
 }
 
 void MeshComponent::on_tick()

@@ -186,6 +186,7 @@ vec3 gradientDirection(uint32_t hash) {
 	case 15:
 		return vec3(0, -1, -1);
 	}
+	return{};
 }
 
 float interpolate(float value1, float value2, float value3, float value4, float value5, float value6, float value7, float value8, vec3 t) {
@@ -632,6 +633,8 @@ void Renderer::create_shaders()
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 	prog.sunlight_accumulation_debug = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt","DEBUG");
 
+	prog.height_fog = prog_man.create_raster("fullscreenquad.txt", "HeightFogF.txt");
+
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
 	Shader::compute_compile(&volfog.prog.raymarch, "VfogRaymarchC.txt");
@@ -712,6 +715,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		case GL_DEBUG_SOURCE_APPLICATION: return "APPLICATION";
 		case GL_DEBUG_SOURCE_OTHER: return "OTHER";
 		}
+		return "";
 	}();
 
 	auto const type_str = [type]() {
@@ -725,6 +729,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		case GL_DEBUG_TYPE_MARKER: return "MARKER";
 		case GL_DEBUG_TYPE_OTHER: return "OTHER";
 		}
+		return "";
 	}();
 
 	auto const severity_str = [severity]() {
@@ -734,6 +739,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		case GL_DEBUG_SEVERITY_MEDIUM: return "MEDIUM";
 		case GL_DEBUG_SEVERITY_HIGH: return "HIGH";
 		}
+		return "";
 	}();
 
 	sys_print("!!! %s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
@@ -2867,6 +2873,8 @@ void Renderer::accumulate_gbuffer_lighting()
 			shader().set_float("spot_inner", cos(glm::radians(light.conemin)));
 			shader().set_float("spot_angle", cos(glm::radians(light.conemax)));
 			shader().set_vec3("spot_normal",light.normal);
+			shader().set_vec3("color", light.color);
+
 
 			glMultiDrawElementsIndirect(
 				GL_TRIANGLES,
@@ -2945,6 +2953,56 @@ void Renderer::accumulate_gbuffer_lighting()
 
 	// reflection pass (use static for now)
 }
+
+ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV);
+
+void Renderer::draw_height_fog()
+{
+	if (!scene.has_fog)
+		return;
+	if (!r_drawfog.get_bool())
+		return;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
+
+	set_shader(prog.height_fog);
+
+	shader().set_float("directionalExp", scene.fog.directional_exponent);
+	shader().set_float("height_falloff", scene.fog.fog_height_falloff);
+	shader().set_float("height_start", scene.fog.height);
+	shader().set_float("density", scene.fog.fog_density);
+	glm::vec3 color = glm::vec3(scene.fog.inscattering_color.r, scene.fog.inscattering_color.g, scene.fog.inscattering_color.b);
+	color *= 1.0f / 255.f;
+	shader().set_vec3("inscatteringColor", color);
+
+	glDepthMask(GL_FALSE);
+	glDisable(GL_DEPTH_TEST);
+
+	// enable blending
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	bind_texture(3, tex.scene_depth);
+
+	// fullscreen shader, no vao used
+	glBindVertexArray(vao.default_);
+	// to prevent crashes??
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindVertexBuffer(0, buf.default_vb, 0, 0);
+	glBindVertexBuffer(1, buf.default_vb, 0, 0);
+	glBindVertexBuffer(2, buf.default_vb, 0, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	glDepthMask(GL_TRUE);
+	glDisable(GL_STENCIL_TEST);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
+	glCullFace(GL_BACK);
+	glDisable(GL_BLEND);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV);
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool)
@@ -3042,6 +3100,8 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 	if(r_debug_mode.get_integer() == 0)
 		accumulate_gbuffer_lighting();
+
+	draw_height_fog();
 
 	{
 		GPUSCOPESTART("TRANSPARENTS");

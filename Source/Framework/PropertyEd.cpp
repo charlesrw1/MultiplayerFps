@@ -41,6 +41,10 @@ void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void*
 
 void PropertyGrid::update()
 {
+	if (rows_had_changes)
+		sys_print("cleared change flag\n");
+	rows_had_changes = false;
+
 	if (rows.empty()) {
 		ImGui::Text("nothing to edit");
 		return;
@@ -56,7 +60,7 @@ void PropertyGrid::update()
 			ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
 
 			for (int i = 0; i < rows.size(); i++) {
-				rows[i]->update(0.0);
+				rows[i]->update(this, 0.0);
 			}
 
 			ImGui::EndTable();
@@ -71,7 +75,7 @@ void IGridRow::clear_children()
 {
 	child_rows.clear();	// unique_ptr handles destruction
 }
-void IGridRow::update(float header_ofs)
+void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 {
 	ImGui::PushID(this);
 
@@ -98,20 +102,27 @@ void IGridRow::update(float header_ofs)
 		ImGui::TableNextColumn();
 		ImGui::AlignTextToFramePadding();
 		
-		internal_update();
+		const bool had_changes = internal_update();
+		if (had_changes)
+			parentGrid->set_rows_had_changes();
+
 
 		if (has_row_controls())
 		{
 			ImGui::TableNextColumn();
-			draw_row_controls();
+			const bool changes = draw_row_controls();
+			if (changes)
+				parentGrid->set_rows_had_changes();
 		}
 
 		ImGui::TableNextColumn();
 		if (has_reset_button())
 		{
 			auto reset_img = g_imgs.find_texture("icon/undo.png");
-			if (ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14)))
+			if (ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14))) {
 				on_reset();
+				parentGrid->set_rows_had_changes();
+			}
 		}
 
 		ImGui::EndTable();
@@ -121,19 +132,20 @@ void IGridRow::update(float header_ofs)
 
 	if (draw_children() && expanded) {
 		for (int i = 0; i < child_rows.size(); i++)
-			child_rows[i]->update(header_ofs + get_indent_width());
+			child_rows[i]->update(parentGrid, header_ofs + get_indent_width());
 	}
 }
 
-void IPropertyEditor::update()
+bool IPropertyEditor::update()
 {
 	ASSERT(prop && instance);
 	ImGui::PushID(this);
-	internal_update();
+	bool ret= internal_update();
 	ImGui::PopID();
+	return ret;
 }
 
-void StringEditor::internal_update()
+bool StringEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::StdString);
 
@@ -141,8 +153,12 @@ void StringEditor::internal_update()
 
 	ImguiInputTextCallbackUserStruct user;
 	user.string = str;
-	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1/* null terminator byte */, ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user))
+	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1/* null terminator byte */, 
+		ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user)) {
 		str->resize(strlen(str->c_str()));	// imgui messes with buffer size
+		return true;
+	}
+	return false;
 
 }
 
@@ -162,47 +178,51 @@ void StringEditor::reset_value()
 	*str = prop->range_hint;
 }
 
-void FloatEditor::internal_update()
+bool FloatEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::Float);
 
 	float* ptr = (float*)((char*)instance + prop->offset);
 
-	ImGui::InputFloat("##input_float", ptr, 0.05);
+	if (ImGui::InputFloat("##input_float", ptr, 0.05))
+		return true;
+	return false;
 }
 
-void EnumEditor::internal_update()
+bool EnumEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::Enum8 || prop->type == core_type_id::Enum16 || prop->type == core_type_id::Enum32);
 
 	int enum_val = prop->get_int(instance);
 	ASSERT(enum_val >= 0 && enum_val < prop->enum_type->str_count);
 
-	ImGui::Combo("##combo", &enum_val, prop->enum_type->strs, prop->enum_type->str_count);
+	bool ret = ImGui::Combo("##combo", &enum_val, prop->enum_type->strs, prop->enum_type->str_count);
 
 	prop->set_int(instance, enum_val);
+	return ret;
 }
 
-void BooleanEditor::internal_update()
+bool BooleanEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::Bool);
 
 	bool b = prop->get_int(instance);
-
-	ImGui::Checkbox("##checkbox", &b);
+	bool ret = ImGui::Checkbox("##checkbox", &b);
 
 	prop->set_int(instance, b);
+	return ret;
 }
 
-void IntegerEditor::internal_update()
+bool IntegerEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::Int8 || prop->type == core_type_id::Int16 || prop->type == core_type_id::Int32 || prop->type == core_type_id::Int64);
 
 	int val = prop->get_int(instance);
 
-	ImGui::InputInt("##input_int", &val);
+	bool ret = ImGui::InputInt("##input_int", &val);
 
 	prop->set_int(instance, val);
+	return ret;
 }
 
 class VectorEditor : public IPropertyEditor
@@ -211,9 +231,12 @@ public:
 	VectorEditor(void* ins, PropertyInfo* inf) {
 		prop = inf; instance = ins;
 	}
-	virtual void internal_update() {
+	virtual bool internal_update() {
 		glm::vec3* v = (glm::vec3*)prop->get_ptr(instance);
-		ImGui::DragFloat3("##vec", (float*)v, 0.05);
+		bool ret = false;
+		if (ImGui::DragFloat3("##vec", (float*)v, 0.05))
+			ret = true;
+		return ret;
 	}
 };
 #include "glm/gtx/euler_angles.hpp"
@@ -224,7 +247,7 @@ public:
 		prop = inf; instance = ins;
 	}
 
-	virtual void internal_update() {
+	virtual bool internal_update() {
 		glm::quat* v = (glm::quat*)prop->get_ptr(instance);
 
 		glm::vec3 eul = glm::eulerAngles(*v);
@@ -232,7 +255,10 @@ public:
 		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
 			eul *= PI / 180.f;
 			*v = glm::quat(eul);
+
+			return true;
 		}
+		return false;
 	}
 };
 
@@ -399,11 +425,11 @@ bool ArrayRow::are_any_nodes_open()
 	return false;
 }
 
-void ArrayRow::draw_row_controls()
+bool ArrayRow::draw_row_controls()
 {
 	if (header && !header->can_edit_array())
-		return;
-
+		return false;
+	bool ret = false;
 	auto trashimg = g_imgs.find_texture("icon/trash.png");
 	auto addimg = g_imgs.find_texture("icon/plus.png");
 
@@ -419,6 +445,7 @@ void ArrayRow::draw_row_controls()
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
 	if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
+		ret = true;
 		clear_children();
 		prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) + 1);	// might invalidate childrens ptrs, so refresh
 		rebuild_child_rows();
@@ -429,7 +456,7 @@ void ArrayRow::draw_row_controls()
 	if (!header || header->has_delete_all()) {
 		ImGui::BeginDisabled(child_rows.empty());
 		if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
-
+			ret = true;
 			clear_children();
 			prop->list_ptr->resize(list_instance_ptr, 0);
 		}
@@ -451,10 +478,14 @@ void ArrayRow::draw_row_controls()
 	}
 
 	ImGui::PopStyleColor(3);
+
+	return ret;
 }
 
- void ArrayRow::internal_update() 
+ bool ArrayRow::internal_update() 
 {
+	 bool ret = false;
+
 
 	 uint8_t* list_instance_ptr = prop->get_ptr(instance);
 	 {
@@ -507,10 +538,12 @@ void ArrayRow::draw_row_controls()
 	 }
 
 	 if (!commands.empty()) {
+		 ret = true;
 		 clear_children();
 		 rebuild_child_rows();
 		 commands.clear();
 	 }
+	 return ret;
 }
 
  void ArrayRow::draw_header(float header_ofs)
@@ -557,9 +590,9 @@ void ArrayRow::draw_row_controls()
 
  }
 
- void PropertyRow::internal_update()
+ bool PropertyRow::internal_update()
  {
-	 prop_editor->update();
+	 return prop_editor->update();
  }
 
 
@@ -594,7 +627,7 @@ void ArrayRow::draw_row_controls()
 	 return !passthrough_to_child();
  }
 
- void GroupRow::draw_row_controls()
+ bool GroupRow::draw_row_controls()
  {
 	 ASSERT(parent);
 	 ASSERT(row_index != -1);
@@ -602,7 +635,7 @@ void ArrayRow::draw_row_controls()
 	 ArrayRow* array_ = (ArrayRow*)parent;
 
 	 if (array_->header && !array_->header->can_edit_array())
-		 return;
+		 return false;
 
 	 bool canmoveup = row_index > 0;
 	 bool canmovedown = (row_index != array_->get_size() - 1);
@@ -633,6 +666,8 @@ void ArrayRow::draw_row_controls()
 	 }
 
 	 ImGui::PopStyleColor(3);
+
+	 return false;	// array will update the flag itself
  }
 
 
@@ -668,13 +703,14 @@ void ArrayRow::draw_row_controls()
 	ImGui::PopStyleColor(3);
  }
 
- void GroupRow::internal_update() {
+ bool GroupRow::internal_update() {
 
+	 bool ret = false;
 	 if (passthrough_to_child())
 	 {
 		 auto row = (IGridRow*)child_rows[0].get();
 
-		 row->internal_update();
+		ret =  row->internal_update();
 
 	 }
 
@@ -685,5 +721,5 @@ void ArrayRow::draw_row_controls()
 			 array_->header->imgui_draw_closed_body(row_index);
 		 }
 	 }
-
+	 return ret;
  }

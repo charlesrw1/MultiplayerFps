@@ -843,6 +843,9 @@ ManipulateTransformTool::ManipulateTransformTool()
 	ed_doc.on_start.add(this, &ManipulateTransformTool::on_open);
 
 	ed_doc.selection_state->on_selection_changed.add(this, &ManipulateTransformTool::on_selection_changed);
+
+	// refresh cached data
+	ed_doc.prop_editor->on_property_change.add(this, &ManipulateTransformTool::on_selection_changed);
 }
 
 void ManipulateTransformTool::on_close() {
@@ -1369,6 +1372,26 @@ void EdPropertyGrid::draw()
 	if (ImGui::Begin("Properties")) {
 		if (ed_doc.selection_state->has_any_selected()) {
 			grid.update();
+
+
+			if (grid.rows_had_changes) {
+				auto& ss = ed_doc.selection_state;
+				if (ss->is_selecting_entity_component()) {
+					auto c = ss->get_ec_selected();
+					c->post_change_transform_R();	// for good measure, call this, updates stuff if the transform was the changed property
+					c->editor_on_change_property();
+				}
+				else if (ss->num_entities_selected() == 1) {
+					auto e = ss->get_selection()[0].get();
+					assert(e->get_root_component());
+					e->get_root_component()->post_change_transform_R();
+					e->get_root_component()->editor_on_change_property();
+				}
+
+				on_property_change.invoke();
+
+			}
+
 		}
 		else {
 			ImGui::Text("Nothing selected\n");
@@ -1455,7 +1478,7 @@ void EdPropertyGrid::draw()
 class AssetPropertyEditor : public IPropertyEditor
 {
 public:
-	virtual void internal_update() {
+	virtual bool internal_update() {
 		if (!has_init) {
 			IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
 			has_init = true;
@@ -1466,11 +1489,11 @@ public:
 		}
 		if (!metadata) {
 			ImGui::Text("Asset has no metadata: %s\n", prop->range_hint);
-			return;
+			return false;
 		}
 		if (!loader) {
 			ImGui::Text("Asset has no loader: %s\n", prop->range_hint);
-			return;
+			return false;
 		}
 
 		auto drawlist = ImGui::GetWindowDrawList();
@@ -1494,6 +1517,7 @@ public:
 			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
 			ImGui::EndTooltip();
 		}
+		bool ret = false;
 		if (ImGui::BeginDragDropTarget())
 		{
 			//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
@@ -1519,11 +1543,16 @@ public:
 							asset_str = (*ptr_to_asset)->get_name();
 						else
 							asset_str = "";
+
+
+						ret = true;
 					}
 				}
 			}
 			ImGui::EndDragDropTarget();
 		}
+
+		return ret;
 
 	}
 	virtual int extra_row_count() { return 0; }
@@ -1541,6 +1570,36 @@ private:
 };
 
 ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
+
+class ColorEditor : public IPropertyEditor
+{
+public:
+	virtual bool internal_update() {
+		assert(prop->type == core_type_id::Int32);
+		Color32* c = (Color32*)prop->get_ptr(instance);
+		ImVec4 col = ImGui::ColorConvertU32ToFloat4(c->to_uint());
+		if (ImGui::ColorEdit3("##coloredit", &col.x)) {
+			auto uint_col = ImGui::ColorConvertFloat4ToU32(col);
+			uint32_t* prop_int = (uint32_t*)prop->get_ptr(instance);
+			*prop_int = uint_col;
+			return true;
+		}
+		return false;
+	}
+	virtual int extra_row_count() { return 0; }
+	virtual bool can_reset() { 
+		Color32* c = (Color32*)prop->get_ptr(instance);
+		return c->r != 255 || c->g != 255 || c->b != 255;
+	
+	}
+	virtual void reset_value() {
+		Color32* c = (Color32*)prop->get_ptr(instance);
+		*c = COLOR_WHITE;
+	}
+private:
+};
+
+ADDTOFACTORYMACRO_NAME(ColorEditor, IPropertyEditor, "ColorUint");
 
 EdPropertyGrid::EdPropertyGrid()
 {
@@ -1605,6 +1664,8 @@ EntityNameDatabase_Ed::EntityNameDatabase_Ed()
 	ed_doc.on_node_will_delete.add(this, &EntityNameDatabase_Ed::on_delete);
 	ed_doc.on_start.add(this, &EntityNameDatabase_Ed::on_start);
 	ed_doc.on_close.add(this, &EntityNameDatabase_Ed::on_close);
+
+	ed_doc.prop_editor->on_property_change.add(this, &EntityNameDatabase_Ed::on_property_change);
 }
 void EntityNameDatabase_Ed::invoke_change_name(uint64_t h)
 {

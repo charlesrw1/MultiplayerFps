@@ -39,18 +39,21 @@ public:
 
 	void on_changed_transform() override;
 
+
 	bool simulate_physics = false;
 	bool visible = true;
 	bool cast_shadows = true;
 
 #ifndef RUNTIME
 	bool eAnimateInEditor = false;
-	void editor_on_change_property(const PropertyInfo& property_) override;
+	void editor_on_change_property() override;
 #endif // !RUNTIME
 
 	static const PropertyInfoList* get_props();
 
 private:
+	void update_handle();
+
 	std::unique_ptr<AnimatorInstance> animator;
 	handle<Render_Object> draw_handle;
 	PhysicsActor* physics_actor = nullptr;
@@ -86,13 +89,17 @@ public:
 
 	static const PropertyInfoList* get_props();
 
+
+
+	Color32 color=COLOR_WHITE;
+	float intensity = 1.f;
+	float radius = 20.f;
 	float cone_angle = 45.0;
 	float inner_cone = 40.0;
 
-	float radius = 20.f;
-	glm::vec3 color = glm::vec3(1.f);
-
 	void build_render_light(Render_Light& light);
+
+	void editor_on_change_property() override;
 
 	AssetPtr<Texture> cookie_asset;
 	bool visible = true;
@@ -106,13 +113,15 @@ public:
 	void on_changed_transform() override;
 	~PointLightComponent() override;
 
+	void editor_on_change_property() override;
 
 	void build_render_light(Render_Light& light);
 
 	static const PropertyInfoList* get_props();
 
+	Color32 color=COLOR_WHITE;
+	float intensity = 1.f;
 	float radius = 5.f;
-	glm::vec3 color = glm::vec3(1.f);
 
 	bool visible = true;
 	handle<Render_Light> light_handle;
@@ -127,9 +136,12 @@ public:
 	void build_render_light(Render_Sun& light);
 	~SunLightComponent() override;
 
+	void editor_on_change_property() override;
+
 	static const PropertyInfoList* get_props();
 
-	glm::vec3 color = glm::vec3(12.f);
+	Color32 color=COLOR_WHITE;
+	float intensity = 2.f;
 
 	bool fit_to_scene = true;
 	float log_lin_lerp_factor = 0.5;

@@ -43,7 +43,7 @@ public:
 #ifndef NO_EDITOR
 	// compile any data relevant to the node
 	virtual bool editor_compile() { return true; }
-	virtual void editor_on_change_property(const PropertyInfo& property_) {}
+	virtual void editor_on_change_property() {}
 	bool editor_is_selected = false;
 	bool editor_is_editor_only = false;	// set in CTOR
 #endif

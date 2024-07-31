@@ -306,7 +306,7 @@ public:
 	};
 
 	graph_playback_state get_playback_state() { return playback; }
-	bool graph_is_read_only() { return playback != graph_playback_state::stopped(); }
+	bool graph_is_read_only() { return playback != graph_playback_state::stopped; }
 	void pause_playback();
 	void start_or_resume_playback();
 	void stop_playback();

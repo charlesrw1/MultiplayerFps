@@ -17,6 +17,7 @@
 #include <cstdint>
 
 #include "Render/MaterialLocal.h"
+#include "Render/RenderFog.h"
 
 
 struct Render_Box_Cubemap
@@ -271,7 +272,7 @@ public:
 
 	}
 	handle<Render_Sun> register_sun(const Render_Sun& sun) override {
-		handle<Render_Sun> id = { unique_id_counter++ };
+		handle<Render_Sun> id = { int(unique_id_counter++) };
 		RSunInternal internal_sun;
 		internal_sun.sun = sun;
 		internal_sun.unique_id = id.id;
@@ -332,6 +333,27 @@ public:
 	void remove_skylight(handle<Render_Skylight>& handle) override {
 
 	}
+	handle<RenderFog> register_fog(const RenderFog& fog) {
+		if (has_fog) {
+			sys_print("??? only one fog allowed in a scene\n");
+			return { -1 };
+		}
+		has_fog = true;
+		this->fog = fog;
+		return { 0 };
+	}
+	void update_fog(handle<RenderFog> handle, const RenderFog& fog) {
+		if (handle.is_valid()) {
+			assert(has_fog);
+			this->fog = fog;
+		}
+	}
+	void remove_fog(handle<RenderFog>& handle) {
+		if (handle.is_valid()) {
+			has_fog = false;
+			handle = { -1 };
+		}
+	}
 
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) override {
 		if (!handle.is_valid()) return nullptr;
@@ -387,6 +409,9 @@ public:
 	std::vector<Render_Skylight> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
 	Free_List<Render_Irradiance_Volume> irradiance_volumes;
+
+	bool has_fog = false;
+	RenderFog fog;
 
 
 	bufferhandle light_ssbo;

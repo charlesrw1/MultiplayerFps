@@ -550,6 +550,9 @@
     <ClInclude Include="Source\AssetCompile\ImageCompile.h">
       <Filter>Source\AssetCompile</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\RenderFog.h">
+      <Filter>Source\Render\Public</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -804,6 +807,9 @@
     </ClCompile>
     <ClCompile Include="Source\Sound\SoundLocal.h">
       <Filter>Source\Sound</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\FogComponent.cpp">
+      <Filter>Source\Game\Components</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

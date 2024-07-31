@@ -154,6 +154,7 @@
     <ClInclude Include="Source\ProgramCaching.h" />
     <ClInclude Include="Source\RenderObj.h" />
     <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h" />
+    <ClInclude Include="Source\Render\RenderFog.h" />
     <ClInclude Include="Source\Render\MaterialLocal.h" />
     <ClInclude Include="Source\Render\MaterialPublic.h" />
     <ClInclude Include="Source\Render\RenderExtra.h" />
@@ -234,6 +235,7 @@
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
+    <ClCompile Include="Source\Game\FogComponent.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
     <ClCompile Include="Source\Game\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Schema.cpp" />

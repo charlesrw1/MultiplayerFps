@@ -255,6 +255,8 @@ public:
 		program_handle light_accumulation{};
 		program_handle sunlight_accumulation{};
 		program_handle sunlight_accumulation_debug{};
+
+		program_handle height_fog{};
 	}prog;
 
 	struct framebuffers {
@@ -391,6 +393,7 @@ private:
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
 
+	void draw_height_fog();
 
 
 	int cur_w = 0;

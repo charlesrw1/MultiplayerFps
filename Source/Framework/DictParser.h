@@ -157,10 +157,10 @@ private:
     }
 
     const uint8_t* buffer = nullptr;
-    int buffer_size = 0;
+    uint32_t buffer_size = 0;
     bool allocated = false;
 
-    int read_ptr = 0;
+    uint32_t read_ptr = 0;
     bool had_error = false;
     const char* error_msg = "";
 

@@ -41,7 +41,7 @@ public:
     }
 
     hash_map(uint32_t starting_power_of_2) {
-        const uint64_t SIZE = 1 << starting_power_of_2;
+        const uint64_t SIZE = 1ull << starting_power_of_2;
         items.clear();
         items.resize(SIZE);
         mask = SIZE - 1;
@@ -50,7 +50,7 @@ public:
     }
 
     void init(uint32_t starting_power_of_2 = 10) {
-        const uint64_t SIZE = 1 << starting_power_of_2;
+        const uint64_t SIZE = 1ull << starting_power_of_2;
         items.clear();
         items.resize(SIZE);
         mask = SIZE - 1;

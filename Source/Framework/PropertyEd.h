@@ -34,8 +34,10 @@ public:
 		this->prop = prop;
 	}
 
-	void update();
-	virtual void internal_update() = 0;
+	bool update();
+
+	// return true if the property was updated
+	virtual bool internal_update() = 0;
 	virtual int extra_row_count() { return 0; }
 	virtual bool can_reset() { return false; }
 	virtual void reset_value() {}
@@ -69,13 +71,14 @@ public:
 	PropertyInfo* prop = nullptr;
 };
 
+class PropertyGrid;
 class IGridRow
 {
 public:
 	IGridRow(IGridRow* parent, int row_index = -1) : parent(parent), row_index(row_index) {}
 	virtual ~IGridRow() {}
-	virtual void update(float header_ofs);
-	virtual void internal_update() = 0;
+	virtual void update(PropertyGrid* parentGrid, float header_ofs);
+	virtual bool internal_update() = 0;
 	virtual void draw_header(float header_ofs) = 0;
 
 	virtual bool draw_children() {
@@ -88,7 +91,7 @@ public:
 	virtual bool has_reset_button() { return false; }
 	virtual void on_reset() {}
 	virtual bool has_row_controls() { return false; }
-	virtual void draw_row_controls() {}
+	virtual bool draw_row_controls() { return false; }
 	virtual bool passthrough_to_child() { return false; }
 	virtual bool is_array() { return false; }
 
@@ -126,6 +129,11 @@ public:
 		this->read_only = read_only;
 	}
 
+	void set_rows_had_changes() {
+		rows_had_changes = true;
+	}
+
+	bool rows_had_changes = false;
 	bool read_only = false;
 	std::vector<std::unique_ptr<IGridRow>> rows;
 };
@@ -136,13 +144,13 @@ class GroupRow : public IGridRow
 public:
 	GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx, uint32_t property_flag_mask);
 
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
 	virtual bool draw_children() override;
 
 	virtual float get_indent_width() { return 30.0; }
 
-	virtual void draw_row_controls() override;
+	virtual bool draw_row_controls() override;
 	virtual bool has_row_controls() { return row_index != -1; }
 
 	virtual bool passthrough_to_child() override {
@@ -160,10 +168,10 @@ class ArrayRow : public IGridRow
 public:
 	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask);
 
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
 	virtual bool has_row_controls() override { return true; }
-	virtual void draw_row_controls();
+	virtual bool draw_row_controls();
 	virtual float get_indent_width() { return 30.0; }
 	virtual bool is_array() override { return true; }
 	void rebuild_child_rows();
@@ -214,7 +222,7 @@ class PropertyRow : public IGridRow
 public:
 	PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
 
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
 	virtual bool has_reset_button() override { return prop_editor->can_reset(); }
 	virtual void on_reset() override { prop_editor->reset_value(); }
@@ -233,7 +241,7 @@ public:
 		this->prop = prop;
 	}
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 
 	virtual bool can_reset() override;
 	virtual void reset_value() override;
@@ -249,7 +257,7 @@ public:
 	}
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 
 	virtual bool can_reset() override {
 		return hint_str.has_default&& (abs(prop->get_float(instance) - hint_str.default_f) > 0.000001);
@@ -272,7 +280,7 @@ public:
 
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 	virtual bool can_reset() override {
 		return hint_str.has_default&& prop->get_int(instance) != hint_str.default_i;
 	}
@@ -292,7 +300,7 @@ public:
 	}
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 	virtual bool can_reset() override {
 		return hint_str.has_default&& prop->get_int(instance) != hint_str.default_i;
 	}
@@ -312,7 +320,7 @@ public:
 	}
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override;
+	virtual bool internal_update() override;
 	virtual bool can_reset() override {
 		return hint_str.has_default&& prop->get_int(instance) != hint_str.default_i;
 	}

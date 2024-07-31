@@ -71,7 +71,7 @@ class AnimatorInstanceParentEditor : public IPropertyEditor
 {
 public:
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		ASSERT(prop->type == core_type_id::StdString);
 
@@ -99,8 +99,11 @@ public:
 				*str = options[index];
 
 				ed.set_animator_instance_from_string(*str);
+
+				return true;
 			}
 		}
+		return false;
 	}
 
 	std::vector<const char*> options;
@@ -109,7 +112,7 @@ public:
 };
 
 template<typename FUNCTOR>
-static void drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&& callback, const char* targetname, const char* tooltip)
+static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&& callback, const char* targetname, const char* tooltip)
 {
 
 	//ImGui::PushStyleColor(Imguicolba)
@@ -132,6 +135,7 @@ static void drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 		ImGui::Text(string_format("Drag and drop %s asset here", tooltip));
 		ImGui::EndTooltip();
 	}
+	bool return_val = false;
 	if (ImGui::BeginDragDropTarget())
 	{
 		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
@@ -140,11 +144,12 @@ static void drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(targetname))
 		{
-			callback(payload->Data);
+			return_val= callback(payload->Data);
 
 		}
 		ImGui::EndDragDropTarget();
 	}
+	return return_val;
 
 }
 
@@ -157,18 +162,20 @@ public:
 
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		ASSERT(prop->type == core_type_id::StdString);
 
 		auto str = (std::string*)prop->get_ptr(instance);
-		drag_drop_property_ed_func(str, Color32{ 11, 50, 94 }, [&](void* payload) {
+		return drag_drop_property_ed_func(str, Color32{ 11, 50, 94 }, [&](void* payload) -> bool {
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload;
 			if (resource->type->get_type_name() == "Model") {
 				*str = resource->filename;
 				ed.set_model_from_str(*str);
+				return true;
 			}
+			return false;
 
 
 			}, "AssetBrowserDragDrop", "model");
@@ -178,13 +185,15 @@ public:
 
 class FindAnimGraphVariableProp : public IPropertyEditor
 {
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		auto str = (VariableNameAndType*)prop->get_ptr(instance);
-		drag_drop_property_ed_func(&str->str, Color32{ 62, 27, 82 }, [&](void* payload) {
+		return drag_drop_property_ed_func(&str->str, Color32{ 62, 27, 82 }, [&](void* payload) {
 
 			VariableNameAndType* resource = *(VariableNameAndType**)payload;
 			*str = *resource;
+
+			return true;
 
 			}, "AnimGraphVariableDrag", "variable");
 
@@ -196,15 +205,17 @@ class FindAnimationClipPropertyEditor : public IPropertyEditor
 public:
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		ASSERT(prop->type == core_type_id::StdString);
 
 		auto str = (std::string*)prop->get_ptr(instance);
-		drag_drop_property_ed_func(str, Color32{ 39, 56, 35 }, [&](void* payload) {
+		return drag_drop_property_ed_func(str, Color32{ 39, 56, 35 }, [&](void* payload) {
 
 			std::string* resource = *(std::string**)payload;
 			*str = *resource;
+
+			return true;
 
 			}, "AnimationItemAnimGraphEd", "animation");
 
@@ -220,7 +231,7 @@ public:
 	using IPropertyEditor::IPropertyEditor;
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		ASSERT(prop->type == core_type_id::StdString);
 
@@ -236,8 +247,10 @@ public:
 			imgui_input_text_callback_function,
 			&user)) {
 			script->resize(strlen(script->data()));
-		}
 
+			return true;
+		}
+		return false;
 	}
 
 	bool initial = true;
@@ -252,11 +265,13 @@ public:
 	using IPropertyEditor::IPropertyEditor;
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		ASSERT(prop->type == core_type_id::Int32);
 
 		ImGui::Text("Hello world\n");
+
+		return false;
 	}
 
 };
@@ -277,10 +292,11 @@ public:
 	}
 
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		ASSERT(prop->type == core_type_id::StdString);
 		std::string* str = (std::string*)prop->get_ptr(instance);
+		bool ret = false;
 		if (no_model)
 			ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "no model set");
 		else if(bones.empty())
@@ -292,12 +308,14 @@ public:
 					bool is_selected = *str == bones[i];
 					if (ImGui::Selectable(bones[i].c_str(), &is_selected)) {
 						*str = bones[i];
+						ret = true;
 					}
 				}
 				ImGui::EndCombo();
 			}
 
 		}
+		return ret;
 	}
 	bool no_model = false;
 	// copy in as std strings, could be c_strs but that opens up more room for bugs
@@ -324,47 +342,17 @@ class AgEdtior_BlendSpaceParameteriation : public IPropertyEditor
 {
 	using IPropertyEditor::IPropertyEditor;
 	// Inherited via IPropertyEditor
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 
-		std::vector<ImVec2> verts;
-		std::vector<const char*> names;
-
-		std::vector<int> indicies;
-
-		verts.push_back(ImVec2(0.5, 0.5));
-		names.push_back("[0]");
-
-		verts.push_back(ImVec2(0, 0));
-		names.push_back("[1]");
-
-		verts.push_back(ImVec2(0, 1));
-		names.push_back("[2]");
-
-		verts.push_back(ImVec2(1, 1));
-		names.push_back("[3]");
-
-		verts.push_back(ImVec2(1, 0));
-		names.push_back("[4]");
-
-		indicies.push_back(0);
-		indicies.push_back(1);
-		indicies.push_back(2);
-
-		indicies.push_back(0);
-		indicies.push_back(1);
-		indicies.push_back(4);
-
-
-
-		//MyImDrawBlendSpace("##label", verts, indicies, names, ImVec2(0, 0), ImVec2(1, 1), nullptr);
+		return false;
 
 	}
 };
 #include "Blendspace_nodes.h"
 class BlendspaceGridEd : public IPropertyEditor
 {
-	virtual void internal_update() override
+	virtual bool internal_update() override
 	{
 		//auto str = (VariableNameAndType*)prop->get_ptr(instance);
 		//drag_drop_property_ed_func(&str->str, Color32{ 62, 27, 82 }, [&](void* payload) {
@@ -478,6 +466,8 @@ class BlendspaceGridEd : public IPropertyEditor
 			ImGui::EndPopup();
 		}
 
+
+		return false;
 	}
 };
 

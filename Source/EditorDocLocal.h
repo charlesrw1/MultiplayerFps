@@ -189,7 +189,8 @@ class EdPropertyGrid
 public:
 	EdPropertyGrid();
 	void draw();
-
+	
+	MulticastDelegate<> on_property_change;
 private:
 	void on_ec_deleted(EntityComponent* ec) {
 		refresh_grid();
@@ -456,7 +457,7 @@ public:
 	}
 	void invoke_change_name(uint64_t h);
 
-	void on_property_change();
+	void on_property_change() {}
 };
 
 class Model;

@@ -36,6 +36,7 @@ struct Render_Irradiance_Volume;
 struct Render_Reflection_Volume;
 struct Render_Skylight;
 class TerrainInterfacePublic;
+struct RenderFog;
 
 class MeshBuilder;
 class IEditorTool;
@@ -78,6 +79,11 @@ public:
 	virtual handle<Render_Skylight> register_skylight(const Render_Skylight& v) = 0;
 	virtual void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& v) = 0;
 	virtual void remove_skylight(handle<Render_Skylight>& handle) = 0;
+
+	// only one fog allowed in a scene, others will just not work
+	virtual handle<RenderFog> register_fog(const RenderFog& fog) = 0;
+	virtual void update_fog(handle<RenderFog> handle, const RenderFog& fog) = 0;
+	virtual void remove_fog(handle<RenderFog>& handle) = 0;
 
 	virtual TerrainInterfacePublic* get_terrain_interface() = 0;
 };

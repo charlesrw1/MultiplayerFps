@@ -6,9 +6,11 @@
 
 const PropertyInfoList* SpotLightComponent::get_props() {
 	START_PROPS(SpotLightComponent)
+		REG_INT_W_CUSTOM(color, PROP_DEFAULT, "", "ColorUint"),
+		REG_FLOAT(intensity, PROP_DEFAULT, "1.0"),
+		REG_FLOAT(radius, PROP_DEFAULT, "20.0"),
 		REG_FLOAT(cone_angle, PROP_DEFAULT, "45.0"),
 		REG_FLOAT(inner_cone, PROP_DEFAULT, "40.0"),
-		REG_FLOAT(radius, PROP_DEFAULT, "20.0"),
 		REG_BOOL(visible, PROP_DEFAULT, "1"),
 		REG_ASSET_PTR(cookie_asset, PROP_DEFAULT)
 	END_PROPS(SpotLightComponent)
@@ -16,7 +18,7 @@ const PropertyInfoList* SpotLightComponent::get_props() {
 
 void SpotLightComponent::build_render_light(Render_Light& light)
 {
-	light.color = color;
+	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
 	light.projected_texture = cookie_asset.get();
 	light.conemax = cone_angle;
 	light.conemin = inner_cone;
@@ -36,6 +38,14 @@ void SpotLightComponent::on_init()
 	light_handle = idraw->get_scene()->register_light(light);
 }
 
+void SpotLightComponent::editor_on_change_property()
+{
+	assert(light_handle.is_valid());
+	Render_Light light;
+	build_render_light(light);
+	idraw->get_scene()->update_light(light_handle, light);
+}
+
 void SpotLightComponent::on_deinit()
 {
 	idraw->get_scene()->remove_light(light_handle);
@@ -51,6 +61,8 @@ void SpotLightComponent::on_changed_transform()
 
 const PropertyInfoList* PointLightComponent::get_props() {
 	START_PROPS(PointLightComponent)
+		REG_INT_W_CUSTOM(color, PROP_DEFAULT, "", "ColorUint"),
+		REG_FLOAT(intensity, PROP_DEFAULT, "1.0"),
 		REG_FLOAT(radius, PROP_DEFAULT, "5.0"),
 		REG_BOOL(visible, PROP_DEFAULT, "1"),
 	END_PROPS(PointLightComponent)
@@ -59,7 +71,7 @@ const PropertyInfoList* PointLightComponent::get_props() {
 
 void PointLightComponent::build_render_light(Render_Light& light)
 {
-	light.color = color;
+	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
 	light.radius = radius;
 	light.is_spotlight = false;
 
@@ -88,8 +100,18 @@ void PointLightComponent::on_changed_transform()
 	idraw->get_scene()->update_light(light_handle, light);
 }
 
+void PointLightComponent::editor_on_change_property()
+{
+	assert(light_handle.is_valid());
+	Render_Light light;
+	build_render_light(light);
+	idraw->get_scene()->update_light(light_handle, light);
+}
+
 const PropertyInfoList* SunLightComponent::get_props() {
 	START_PROPS(SunLightComponent)
+		REG_INT_W_CUSTOM(color, PROP_DEFAULT, "", "ColorUint"),
+		REG_FLOAT(intensity,PROP_DEFAULT,"1.0"),
 		REG_BOOL(visible, PROP_DEFAULT, "1"),
 		REG_BOOL(fit_to_scene, PROP_DEFAULT, "1"),
 		REG_FLOAT(log_lin_lerp_factor, PROP_DEFAULT, "0.5"),
@@ -99,9 +121,17 @@ const PropertyInfoList* SunLightComponent::get_props() {
 	END_PROPS(SunLightComponent)
 }
 
+void SunLightComponent::editor_on_change_property()
+{
+	assert(light_handle.is_valid());
+	Render_Sun light;
+	build_render_light(light);
+	idraw->get_scene()->update_sun(light_handle, light);
+}
+
 void SunLightComponent::build_render_light(Render_Sun& light)
 {
-	light.color = color;
+	light.color = glm::vec3(color.r,color.g,color.b)*(intensity/255.f);
 	light.fit_to_scene = fit_to_scene;
 	light.log_lin_lerp_factor = log_lin_lerp_factor;
 	light.z_dist_scaling = z_dist_scaling;

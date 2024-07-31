@@ -44,6 +44,11 @@ public:
 		return rt;
 	}
 
+	void editor_on_change_property() override {
+		Render_Terrain rt = make_terrain();
+		idraw->get_scene()->get_terrain_interface()->update_terrain(handle, rt);
+	}
+
 	// use to get handles, setup state
 	virtual void on_init() {
 

@@ -337,6 +337,8 @@ private:
 			ASSERT(0);	// should have found a bit
 		}
 		Fatalf("allocate_material_instance: out of memory\n");
+
+		return  0;
 	}
 
 	uint32_t current_master_id = 0;
