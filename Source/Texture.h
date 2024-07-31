@@ -18,6 +18,10 @@ enum Texture_Format
 	TEXFMT_RGBA8_DXT5,
 	TEXFMT_RGB8_DXT1,	
 	TEXFMT_RGBA8_DXT1,
+
+	TEXFMT_BC4,	// grey scale encoding
+	TEXFMT_BC5,	// normal map encoding
+	TEXFMT_BC6,	// float rgb data
 };
 
 enum Texture_Type

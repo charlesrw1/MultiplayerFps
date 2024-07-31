@@ -1,11 +1,17 @@
-#include "AssetCompile/Compiliers.h"
+#include "AssetCompile/ImageCompile.h"
 #include "Framework/DictParser.h"
-
+#include "Someutils.h"
 #include <cstdlib>
-
-bool ImageCompilier::compile(const char* name)
+#include "Framework/Files.h"
+#include <stdexcept>
+// auto
+bool ImageCompilier::compile(const std::string& file, Texture_Format default_output_fmt)
 {
-
-	int output = std::system(".\\x64\\Debug\\texconv.exe");
+	return false;
+	// compile, write out, return
+}
+// manual
+bool ImageCompilier::compile_from_params(const ImageCompileParams& params)
+{
 	return false;
 }

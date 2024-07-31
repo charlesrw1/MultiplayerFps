@@ -547,6 +547,9 @@
     <ClInclude Include="Source\Sound\SoundPublic.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
+    <ClInclude Include="Source\AssetCompile\ImageCompile.h">
+      <Filter>Source\AssetCompile</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

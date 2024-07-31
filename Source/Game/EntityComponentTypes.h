@@ -129,7 +129,7 @@ public:
 
 	static const PropertyInfoList* get_props();
 
-	glm::vec3 color = glm::vec3(1.f);
+	glm::vec3 color = glm::vec3(12.f);
 
 	bool fit_to_scene = true;
 	float log_lin_lerp_factor = 0.5;

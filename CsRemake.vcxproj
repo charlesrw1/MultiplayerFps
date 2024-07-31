@@ -39,6 +39,7 @@
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
     <ClInclude Include="Source\AssetCompile\Compiliers.h" />
+    <ClInclude Include="Source\AssetCompile\ImageCompile.h" />
     <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
     <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h" />
     <ClInclude Include="Source\AssetCompile\Someutils.h" />

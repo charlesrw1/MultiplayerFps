@@ -57,7 +57,7 @@ REGISTER_ASSETMETADATA_MACRO(TextureAssetMetadata);
 
 void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
 {
-	if (infmt == TEXFMT_RGBA16F || infmt == TEXFMT_RGB16F)
+	if (infmt == TEXFMT_RGBA16F || infmt == TEXFMT_RGB16F || infmt == TEXFMT_BC6)
 		*type = GL_FLOAT;
 	else
 		*type = GL_UNSIGNED_BYTE;
@@ -105,6 +105,18 @@ void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal
 		*format = GL_RED;
 		*internal_format = GL_RED;
 		break;
+	case TEXFMT_BC4:
+		*format = GL_RED;
+		*internal_format = GL_COMPRESSED_RED_RGTC1;
+		*compressed = true;
+		break;
+	case TEXFMT_BC5:
+		*format = GL_RG;
+		*internal_format = GL_COMPRESSED_RG_RGTC2;
+		*compressed = true;
+		break;
+	default:
+		ASSERT(0);
 	};
 
 
@@ -165,6 +177,140 @@ typedef struct
 	unsigned long Reserved2[3];
 } ddsFileHeader_t;
 
+
+typedef enum DXGI_FORMAT {
+	DXGI_FORMAT_UNKNOWN = 0,
+	DXGI_FORMAT_R32G32B32A32_TYPELESS = 1,
+	DXGI_FORMAT_R32G32B32A32_FLOAT = 2,
+	DXGI_FORMAT_R32G32B32A32_UINT = 3,
+	DXGI_FORMAT_R32G32B32A32_SINT = 4,
+	DXGI_FORMAT_R32G32B32_TYPELESS = 5,
+	DXGI_FORMAT_R32G32B32_FLOAT = 6,
+	DXGI_FORMAT_R32G32B32_UINT = 7,
+	DXGI_FORMAT_R32G32B32_SINT = 8,
+	DXGI_FORMAT_R16G16B16A16_TYPELESS = 9,
+	DXGI_FORMAT_R16G16B16A16_FLOAT = 10,
+	DXGI_FORMAT_R16G16B16A16_UNORM = 11,
+	DXGI_FORMAT_R16G16B16A16_UINT = 12,
+	DXGI_FORMAT_R16G16B16A16_SNORM = 13,
+	DXGI_FORMAT_R16G16B16A16_SINT = 14,
+	DXGI_FORMAT_R32G32_TYPELESS = 15,
+	DXGI_FORMAT_R32G32_FLOAT = 16,
+	DXGI_FORMAT_R32G32_UINT = 17,
+	DXGI_FORMAT_R32G32_SINT = 18,
+	DXGI_FORMAT_R32G8X24_TYPELESS = 19,
+	DXGI_FORMAT_D32_FLOAT_S8X24_UINT = 20,
+	DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS = 21,
+	DXGI_FORMAT_X32_TYPELESS_G8X24_UINT = 22,
+	DXGI_FORMAT_R10G10B10A2_TYPELESS = 23,
+	DXGI_FORMAT_R10G10B10A2_UNORM = 24,
+	DXGI_FORMAT_R10G10B10A2_UINT = 25,
+	DXGI_FORMAT_R11G11B10_FLOAT = 26,
+	DXGI_FORMAT_R8G8B8A8_TYPELESS = 27,
+	DXGI_FORMAT_R8G8B8A8_UNORM = 28,
+	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29,
+	DXGI_FORMAT_R8G8B8A8_UINT = 30,
+	DXGI_FORMAT_R8G8B8A8_SNORM = 31,
+	DXGI_FORMAT_R8G8B8A8_SINT = 32,
+	DXGI_FORMAT_R16G16_TYPELESS = 33,
+	DXGI_FORMAT_R16G16_FLOAT = 34,
+	DXGI_FORMAT_R16G16_UNORM = 35,
+	DXGI_FORMAT_R16G16_UINT = 36,
+	DXGI_FORMAT_R16G16_SNORM = 37,
+	DXGI_FORMAT_R16G16_SINT = 38,
+	DXGI_FORMAT_R32_TYPELESS = 39,
+	DXGI_FORMAT_D32_FLOAT = 40,
+	DXGI_FORMAT_R32_FLOAT = 41,
+	DXGI_FORMAT_R32_UINT = 42,
+	DXGI_FORMAT_R32_SINT = 43,
+	DXGI_FORMAT_R24G8_TYPELESS = 44,
+	DXGI_FORMAT_D24_UNORM_S8_UINT = 45,
+	DXGI_FORMAT_R24_UNORM_X8_TYPELESS = 46,
+	DXGI_FORMAT_X24_TYPELESS_G8_UINT = 47,
+	DXGI_FORMAT_R8G8_TYPELESS = 48,
+	DXGI_FORMAT_R8G8_UNORM = 49,
+	DXGI_FORMAT_R8G8_UINT = 50,
+	DXGI_FORMAT_R8G8_SNORM = 51,
+	DXGI_FORMAT_R8G8_SINT = 52,
+	DXGI_FORMAT_R16_TYPELESS = 53,
+	DXGI_FORMAT_R16_FLOAT = 54,
+	DXGI_FORMAT_D16_UNORM = 55,
+	DXGI_FORMAT_R16_UNORM = 56,
+	DXGI_FORMAT_R16_UINT = 57,
+	DXGI_FORMAT_R16_SNORM = 58,
+	DXGI_FORMAT_R16_SINT = 59,
+	DXGI_FORMAT_R8_TYPELESS = 60,
+	DXGI_FORMAT_R8_UNORM = 61,
+	DXGI_FORMAT_R8_UINT = 62,
+	DXGI_FORMAT_R8_SNORM = 63,
+	DXGI_FORMAT_R8_SINT = 64,
+	DXGI_FORMAT_A8_UNORM = 65,
+	DXGI_FORMAT_R1_UNORM = 66,
+	DXGI_FORMAT_R9G9B9E5_SHAREDEXP = 67,
+	DXGI_FORMAT_R8G8_B8G8_UNORM = 68,
+	DXGI_FORMAT_G8R8_G8B8_UNORM = 69,
+	DXGI_FORMAT_BC1_TYPELESS = 70,
+	DXGI_FORMAT_BC1_UNORM = 71,
+	DXGI_FORMAT_BC1_UNORM_SRGB = 72,
+	DXGI_FORMAT_BC2_TYPELESS = 73,
+	DXGI_FORMAT_BC2_UNORM = 74,
+	DXGI_FORMAT_BC2_UNORM_SRGB = 75,
+	DXGI_FORMAT_BC3_TYPELESS = 76,
+	DXGI_FORMAT_BC3_UNORM = 77,
+	DXGI_FORMAT_BC3_UNORM_SRGB = 78,
+	DXGI_FORMAT_BC4_TYPELESS = 79,
+	DXGI_FORMAT_BC4_UNORM = 80,
+	DXGI_FORMAT_BC4_SNORM = 81,
+	DXGI_FORMAT_BC5_TYPELESS = 82,
+	DXGI_FORMAT_BC5_UNORM = 83,
+	DXGI_FORMAT_BC5_SNORM = 84,
+	DXGI_FORMAT_B5G6R5_UNORM = 85,
+	DXGI_FORMAT_B5G5R5A1_UNORM = 86,
+	DXGI_FORMAT_B8G8R8A8_UNORM = 87,
+	DXGI_FORMAT_B8G8R8X8_UNORM = 88,
+	DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM = 89,
+	DXGI_FORMAT_B8G8R8A8_TYPELESS = 90,
+	DXGI_FORMAT_B8G8R8A8_UNORM_SRGB = 91,
+	DXGI_FORMAT_B8G8R8X8_TYPELESS = 92,
+	DXGI_FORMAT_B8G8R8X8_UNORM_SRGB = 93,
+	DXGI_FORMAT_BC6H_TYPELESS = 94,
+	DXGI_FORMAT_BC6H_UF16 = 95,
+	DXGI_FORMAT_BC6H_SF16 = 96,
+	DXGI_FORMAT_BC7_TYPELESS = 97,
+	DXGI_FORMAT_BC7_UNORM = 98,
+	DXGI_FORMAT_BC7_UNORM_SRGB = 99,
+	DXGI_FORMAT_AYUV = 100,
+	DXGI_FORMAT_Y410 = 101,
+	DXGI_FORMAT_Y416 = 102,
+	DXGI_FORMAT_NV12 = 103,
+	DXGI_FORMAT_P010 = 104,
+	DXGI_FORMAT_P016 = 105,
+	DXGI_FORMAT_420_OPAQUE = 106,
+	DXGI_FORMAT_YUY2 = 107,
+	DXGI_FORMAT_Y210 = 108,
+	DXGI_FORMAT_Y216 = 109,
+	DXGI_FORMAT_NV11 = 110,
+	DXGI_FORMAT_AI44 = 111,
+	DXGI_FORMAT_IA44 = 112,
+	DXGI_FORMAT_P8 = 113,
+	DXGI_FORMAT_A8P8 = 114,
+	DXGI_FORMAT_B4G4R4A4_UNORM = 115,
+	DXGI_FORMAT_P208 = 130,
+	DXGI_FORMAT_V208 = 131,
+	DXGI_FORMAT_V408 = 132,
+	DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE,
+	DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE,
+	DXGI_FORMAT_FORCE_UINT = 0xffffffff
+};
+struct DDS_HEADER_DXT10
+{
+	DXGI_FORMAT     dxgiFormat;
+	uint32_t        resourceDimension;
+	uint32_t        miscFlag; // see D3D11_RESOURCE_MISC_FLAG
+	uint32_t        arraySize;
+	uint32_t        miscFlags2; // see DDS_MISC_FLAGS2
+};
+
 static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
 static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 {
@@ -173,8 +319,10 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	// BIG ENDIAN ISSUE:
 	ddsFileHeader_t* header = (ddsFileHeader_t*)(buffer + 4);
 	
-	uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);
-	uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);
+	uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);	// aka bc1
+	uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);	// aka bc3
+	uint32_t bc4u_fourcc = 'B' | ('C' << 8) | ('4' << 16) | ('U' << 24);
+	uint32_t bc5u_fourcc = 'B' | ('C' << 8) | ('5' << 16) | ('U' << 24);
 
 	Texture_Format input_format;
 	int input_width = header->Width;
@@ -189,6 +337,12 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		}
 		else if (header->ddspf.FourCC == dxt5_fourcc) {
 			input_format = TEXFMT_RGBA8_DXT5;
+		}
+		else if (header->ddspf.FourCC == bc4u_fourcc) {
+			input_format = TEXFMT_BC4;
+		}
+		else if (header->ddspf.FourCC == bc5u_fourcc) {
+			input_format = TEXFMT_BC5;
 		}
 		else
 			ASSERT(0 && "bad fourcc");
@@ -224,16 +378,18 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	int ux = input_width;
 	int uy = input_height;
 	uint8_t* data_ptr = (buffer+4+sizeof(ddsFileHeader_t));
+
+	const uint32_t compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
 	for (int i = 0; i < numMipmaps; i++) {
 		size_t size = 0;
 		if (compressed) {
 			size = ((ux + 3) / 4) * ((uy + 3) / 4) *
-				(input_format == TEXFMT_RGBA8_DXT5 ? 16 : 8);
+				compressed_stride;
 		}
 		else {
 			size = ux*uy* (header->ddspf.RGBBitCount / 8);
 		}
-
+		
 		if (compressed)
 			glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
 		else
@@ -322,17 +478,9 @@ bool TextureMan::load_texture(const std::string& path, Texture* t)
 	bool good = false;
 	bool is_float = false;
 
-	std::string path_to_use = path.substr(0, path.rfind('.')) + ".dds";
+	std::string path_to_use = path; 
 
 	auto file = FileSys::open_read(path_to_use.c_str());
-
-	if (!file) {
-		path_to_use = path;
-		file = FileSys::open_read(path_to_use.c_str());
-	}
-
-	// check archive
-
 
 	if (!file) {
 		sys_print("!!! Couldn't load texture: %s", path.c_str());

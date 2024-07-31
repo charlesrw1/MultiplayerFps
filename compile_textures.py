@@ -1,100 +1,69 @@
 import os
 import sys
 import subprocess
-
+from pathlib import Path
+import time
 MAT_DIR = "./Data/Materials/"
 TEXTURE_DIR = "./Data/Textures/"
 
-#read mat files, for each texture, determine type (specular/normal/color)
-#if dds doesn't exist or source file modified, generate dds file with nvdxt
+current_time = time.time()
 
-ALBEDO_MAX_SIZE = 1024
-NORMAL_MAX_SIZE = 512
-ROUGHNESS_MAX_SIZE = 512
-METALNESS_MAX_SIZE = 512
-AO_MAX_SIZE = 512
+def process_tex_file(filepath):
+    with open(filepath, "r") as file:
 
-def compile_texture_list(texture_list, alphamode):
-    for ttype, path in texture_list:
-        last_modified_time = os.path.getmtime(TEXTURE_DIR+path)
-    
-        dds_file = TEXTURE_DIR + path[0:path.rfind('.')]+".dds"
-        if os.path.isfile(dds_file) and os.path.getmtime(dds_file) > last_modified_time:
-            continue
+        modification_time_of_def = os.path.getmtime(filepath)
 
-        path_folder = ""
-        if path.rfind('/')!=-1:
-            path_folder = path[0:path.rfind('/')+1]
-
-        if ttype[-1].isdigit():
-            ttype = ttype[:-1]
-
-        #specular textures get dxt1, normalmaps get uncompressed, color textures get dxt1 or dxt5
-        args = "-dxt1a"
-
-        if ttype == "albedo":
-            if alphamode:
-                args = "-dxt5"
-            else:
-                args = "-dxt1a"
-        elif ttype == "normal":
-            args = "-u888 -swapRB"
-        elif ttype == "special" or ttype == "aux":
-            args = "-dxt1a"
-        else:
-            print("unknown tex type {}".format(ttype))
-            continue
-
-        nvdxt_args = "-outdir {}".format(TEXTURE_DIR+path_folder)
-        nvdxt_args += " " + args
-        nvdxt_args += " -file {}".format(TEXTURE_DIR + path)
-        nvdxt_args += " -quick"
-
-        print("Executing: nvdxt.exe "+ nvdxt_args)
-
-        command_line = ["nvdxt.exe"]
-        for arg in nvdxt_args.split():
-            command_line.append(arg)
-
-        subprocess.run(command_line)
-
-
-matfiles = os.listdir(MAT_DIR)
-
-IMAGE_DECL = ["albedo","normal","rough","metal","ao","special"]
-
-for matfile in matfiles:
-    if os.path.isdir(MAT_DIR+matfile):
-        continue
-    with open(MAT_DIR+matfile, "r") as file:
-        cur_name : str = ""
-        alphamode : str = ""
-        images = []
         for line in file:
-            stripped_line = line.strip()
-            if not stripped_line or stripped_line[0]=='#':
+            if len(line) == 0:
                 continue
-            if line[0]!='\t':
-                #if we are entering a new material, compile last one's textures
-                if cur_name:
-                    compile_texture_list(images, alphamode)
-                
-                cur_name = line
-                alphamode = ""
-                images.clear()
-            else:
-                tokens = line.strip().split()
-                if tokens:
-                    if tokens[0] in IMAGE_DECL:
-                        images.append((tokens[0],tokens[1].replace('"','')))
-                    elif tokens[0] == "pbr_full":
-                        images.append(("albedo", tokens[1]+"_albedo.png" ))
-                        images.append(("normal", tokens[1]+"_normal-ogl.png" ))
-                        images.append(("ao", tokens[1]+"_ao.png" ))
-                        images.append(("rough", tokens[1]+"_roughness.png" ))
-                        images.append(("metal", tokens[1]+"_metallic.png" ))
-                    elif tokens[0] == "alpha":
-                        alphamode = tokens[1]
+            tokens = line.split()
+            input_image = TEXTURE_DIR+tokens[0]
+            
+            if not os.path.exists(input_image):
+                print("input image does not exist: {}".format(input_image))
+                continue
 
-        if cur_name:
-            compile_texture_list(images, alphamode)
+            dds_file = TEXTURE_DIR+Path(input_image).stem + ".dds"
+
+            needs_output = not os.path.exists(dds_file) or os.path.getmtime(dds_file) < modification_time_of_def
+            needs_output = needs_output or os.path.getmtime(input_image) >  os.path.getmtime(dds_file)
+
+            if not needs_output:
+                continue
+
+            format = "BC1_UNORM"
+            if len(tokens)>1:
+                format = tokens[1]
+            
+            nvdxt_args = "-f " + format 
+            nvdxt_args += " -y "
+            nvdxt_args += " -o " + str(Path(input_image).parent) + " "
+            nvdxt_args += input_image
+
+            print("Executing: texconv.exe "+ nvdxt_args)
+
+            command_line = ["./x64/Debug/texconv.exe"]
+            for arg in nvdxt_args.split():
+                command_line.append(arg)
+
+            subprocess.run(command_line)
+
+
+
+
+
+
+
+
+
+
+def walk_directory_and_process_tex_files(root_directory):
+    for dirpath, dirnames, filenames in os.walk(root_directory):
+        for filename in filenames:
+            if filename.endswith('.tex'):
+                file_path = os.path.join(dirpath, filename)
+                process_tex_file(file_path)
+
+if __name__ == "__main__":
+    root_directory = TEXTURE_DIR
+    walk_directory_and_process_tex_files(root_directory)

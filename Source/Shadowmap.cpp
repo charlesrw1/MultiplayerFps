@@ -112,7 +112,7 @@ void Shadow_Map_System::update()
 		const View_Setup& view = draw.vs;
 
 		float near = view.near;
-		float far = glm::min(view.far, tweak.max_shadow_dist);
+		float far = tweak.max_shadow_dist;
 
 		split_distances = CalcPlaneSplits(near, far, tweak.log_lin_lerp_factor);
 		for (int i = 0; i < MAXCASCADES; i++)
