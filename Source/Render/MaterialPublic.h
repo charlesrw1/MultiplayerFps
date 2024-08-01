@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 #include "DrawTypedefs.h"
 
 #include <string>

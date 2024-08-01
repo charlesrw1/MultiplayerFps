@@ -2,7 +2,7 @@
 #include <SDL2/SDL_mixer.h>
 #include "Framework/Util.h"
 #include "Framework/FreeList.h"
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 #include <glm/glm.hpp>
 CLASS_H(SoundFile,IAsset)
 public:

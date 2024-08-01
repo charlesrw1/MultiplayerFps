@@ -1,5 +1,5 @@
 #pragma once
-#include "Texture.h"
+#include "Render/Texture.h"
 #include "glm/glm.hpp"
 #include <vector>
 #include "Framework/Util.h"
@@ -9,7 +9,7 @@
 #include "Framework/MathLib.h"
 
 #include "Framework/FreeList.h"
-#include "ParticlesPublic.h"
+#include "Render/ParticlesPublic.h"
 
 #include <unordered_map>
 

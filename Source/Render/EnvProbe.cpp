@@ -1,7 +1,7 @@
 #include "EnvProbe.h"
 #include "glad/glad.h"
 #include <glm/ext.hpp>
-#include "Texture.h"
+#include "Render/Texture.h"
 #include "Framework/MeshBuilder.h"
 #include "DrawLocal.h"
 

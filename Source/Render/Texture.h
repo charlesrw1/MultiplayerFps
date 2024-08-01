@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 
 enum Texture_Format
 {

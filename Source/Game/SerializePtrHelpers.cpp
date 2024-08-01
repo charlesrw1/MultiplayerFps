@@ -3,7 +3,7 @@
 #include "Framework/ClassBase.h"
 #include "Framework/Util.h"
 #include "Assets/AssetLoaderRegistry.h"
-#include "Entity.h"
+#include "Game/Entity.h"
 
 CLASS_IMPL(SerializeEntityObjectContext);
 

@@ -154,7 +154,7 @@ static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 }
 
 
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 class FindModelForEdAnimG : public IPropertyEditor
 {
 public:

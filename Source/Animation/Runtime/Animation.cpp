@@ -1,6 +1,6 @@
 #include "Animation/Runtime/Animation.h"
 #include "Framework/Util.h"
-#include "Model.h"
+#include "Render/Model.h"
 #include "GameEnginePublic.h"
 #include "Framework/Config.h"
 

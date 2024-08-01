@@ -6,8 +6,8 @@
 
 #include "DrawLocal.h"
 
-#include "Texture.h"
-#include "Model.h"
+#include "Render/Texture.h"
+#include "Render/Model.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -23,7 +23,7 @@ CLASS_IMPL(MasterMaterial);
 CLASS_IMPL(MaterialInstance);
 CLASS_IMPL(MaterialParameterBuffer);
 
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 #include "Assets/AssetLoaderRegistry.h"
 class MaterialAssetMetadata : public AssetMetadata
 {

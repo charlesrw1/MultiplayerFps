@@ -1,5 +1,5 @@
 #pragma once
-#include "Entity.h"
+#include "Game/Entity.h"
 #include "EntityComponentTypes.h"
 // a static mesh
 CLASS_H(StaticMeshEntity, Entity)

@@ -10,7 +10,7 @@
 #include "../AnimationTypes.h"
 #include "../AnimationTreePublic.h"
 
-#include "Model.h"
+#include "Render/Model.h"
 #include "Framework/ExpressionLang.h"
 
 #include <vector>

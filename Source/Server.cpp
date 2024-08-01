@@ -1,7 +1,7 @@
 #include "Server.h"
 #include "Framework/Util.h"
 #include "GameEnginePublic.h"
-#include "Model.h"
+#include "Render/Model.h"
 #include <cstdarg>
 #include "Framework/Bytepacker.h"
 #include "Framework/Config.h"

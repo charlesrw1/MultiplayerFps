@@ -1,6 +1,6 @@
 #pragma once
 #include "IEditorTool.h"
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 #include "Types.h"
 
 #include "Framework/CurveEditorImgui.h"

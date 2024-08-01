@@ -70,7 +70,7 @@ void PropertyGrid::update()
 //	}
 	//ImGui::End();
 }
-#include "Texture.h"
+#include "Render/Texture.h"
 void IGridRow::clear_children()
 {
 	child_rows.clear();	// unique_ptr handles destruction

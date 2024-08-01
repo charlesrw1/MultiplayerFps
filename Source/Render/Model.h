@@ -12,7 +12,7 @@
 #include "DrawTypedefs.h"
 #include "Framework/StringName.h"
 #include "Framework/InlineVec.h"
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 
 // Hardcoded attribute locations for shaders
 const int POSITION_LOC  = 0;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 
 class AssetBrowser
 {

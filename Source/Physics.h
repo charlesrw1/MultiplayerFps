@@ -4,7 +4,7 @@
 #include "Framework/MathLib.h"
 #include <vector>
 #include "Level.h"
-#include "Model.h"
+#include "Render/Model.h"
 
 struct RayHit
 {

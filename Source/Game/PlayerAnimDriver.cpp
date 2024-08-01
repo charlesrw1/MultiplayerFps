@@ -1,9 +1,9 @@
 #include "PlayerAnimDriver.h"
-#include "Entity.h"
+#include "Game/Entity.h"
 #include "Debug.h" // Debug::
 
 #include "Animation/AnimationUtil.h"
-#include "Player.h"
+#include "Game/Player.h"
 
 #include "Framework/AddClassToFactory.h"
 

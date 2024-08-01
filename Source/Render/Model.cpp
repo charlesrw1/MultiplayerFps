@@ -32,7 +32,7 @@ static const char* const model_folder_path = "./Data/Models/";
 
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 #include "Assets/AssetLoaderRegistry.h"
 extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 

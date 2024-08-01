@@ -10,7 +10,7 @@
 #include "Statemachine_cfg.h"
 
 #include "AssetCompile/Someutils.h"
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 #include "Animation/Editor/AnimationGraphEditorPublic.h"
 class AnimGraphAssetMeta : public AssetMetadata

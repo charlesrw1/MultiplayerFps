@@ -87,9 +87,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\BaseComponents.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\CamData.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -118,9 +115,6 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Physics.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\PlayerAnimDriver.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Server.h">
@@ -261,50 +255,11 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DrawLocal.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DrawTypedefs.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EnvProbe.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Shader.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ProgramCaching.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Meshlet.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ParticlesPublic.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\ParticlesLocal.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\Util.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Debug.h">
       <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EntityTypes.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Entity.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Player.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Interaction.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Physics\Editor\PublicPhysicsEditor.h">
-      <Filter>Source\Physics\Editor</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h">
       <Filter>Source\Animation\Runtime</Filter>
@@ -339,17 +294,11 @@
     <ClInclude Include="Source\AssetCompile\Someutils.h">
       <Filter>Source\AssetCompile</Filter>
     </ClInclude>
-    <ClInclude Include="Source\ScehmaMan.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Particles\ParticlesPublic.h">
       <Filter>Source\Particles</Filter>
     </ClInclude>
     <ClInclude Include="Source\Particles\ParticlesLocal.h">
       <Filter>Source\Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\UIEditorLocal.h">
-      <Filter>Source\Render\Editor</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Rect2d.h">
       <Filter>Source\Framework</Filter>
@@ -387,7 +336,6 @@
     <ClInclude Include="Source\Framework\InlineVec.h">
       <Filter>Source\Framework\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DynamicMesh.h" />
     <ClInclude Include="Source\External\ImGuizmo.h">
       <Filter>Source\External</Filter>
     </ClInclude>
@@ -406,16 +354,10 @@
     <ClInclude Include="Source\Game\GameAnimEvents.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AssetRegistry.h">
-      <Filter>Source\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Assets\AssetBrowser.h">
       <Filter>Source\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\IEditorTool.h">
-      <Filter>Source\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\IAsset.h">
       <Filter>Source\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\MaterialLocal.h">
@@ -423,9 +365,6 @@
     </ClInclude>
     <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h">
       <Filter>Source\Render\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\SchemaEditLocal.h">
-      <Filter>Source\Game\Editor</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Schema.h">
       <Filter>Source\Game</Filter>
@@ -505,13 +444,7 @@
     <ClInclude Include="Source\Render\RenderScene.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\DrawPublic.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\MaterialPublic.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\RenderObj.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\Render_Decal.h">
@@ -527,12 +460,6 @@
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\RenderExtra.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Model.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Texture.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
     <ClInclude Include="Source\UI.h">
@@ -553,6 +480,42 @@
     <ClInclude Include="Source\Render\RenderFog.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\ParticlesPublic.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\EnvProbe.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\DrawLocal.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\DrawTypedefs.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\ParticlesLocal.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\ProgramCaching.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\PlayerAnimDriver.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Entity.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Player.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Assets\AssetRegistry.h" />
+    <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\Render\DrawPublic.h" />
+    <ClInclude Include="Source\Render\Meshlet.h" />
+    <ClInclude Include="Source\Render\Model.h" />
+    <ClInclude Include="Source\Render\RenderObj.h" />
+    <ClInclude Include="Source\Render\Shader.h" />
+    <ClInclude Include="Source\Game\EntityTypes.h" />
+    <ClInclude Include="Source\Render\Texture.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -562,9 +525,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Connection.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Level.cpp">
@@ -577,9 +537,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Physics.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\PlayerAnimDriver.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Server.cpp">
@@ -654,50 +611,11 @@
     <ClCompile Include="Source\External\ImSequencer.cpp">
       <Filter>Source\External</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Draw.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EnvProbe.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Volumetricfog.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Texture.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Ssao.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Shadowmap.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Shader.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Meshlet.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Particles.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Model.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\Profilier.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Animation\Editor\EdNode.cpp">
       <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Player.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Entity.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Physics\Editor\PhysicsEditorLocal.cpp">
-      <Filter>Source\Physics\Editor</Filter>
     </ClCompile>
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
       <Filter>Source\Animation\Runtime</Filter>
@@ -708,17 +626,7 @@
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DrawLocal.cpp" />
-    <ClCompile Include="Source\Files.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AssetCompile\MaterialCompile.cpp">
-      <Filter>Source\AssetCompile</Filter>
-    </ClCompile>
     <ClCompile Include="Source\EditorDocLocal.cpp" />
-    <ClCompile Include="Source\UIEditorLocal.cpp">
-      <Filter>Source\Render\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Physics\Physics2.cpp">
       <Filter>Source\Physics</Filter>
     </ClCompile>
@@ -772,9 +680,6 @@
     <ClCompile Include="Source\Framework\Sequencer.cpp">
       <Filter>Source\Framework\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\SchemaEditLocal.cpp">
-      <Filter>Source\Game\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\Schema.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
@@ -811,5 +716,51 @@
     <ClCompile Include="Source\Game\FogComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\Files.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Draw.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\DrawLocal.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\EnvProbe.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\PlayerAnimDriver.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Entity.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Ssao.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Texture.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Volumetricfog.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Game.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Player.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Shader.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Shadowmap.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Model.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Particles.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Meshlet.cpp" />
   </ItemGroup>
 </Project>

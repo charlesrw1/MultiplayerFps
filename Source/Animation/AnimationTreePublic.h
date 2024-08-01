@@ -8,7 +8,7 @@
 #include "Framework/StringName.h"
 #include "Framework/ScriptValue.h"
 
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 
 class DictParser;
 class DictWriter;

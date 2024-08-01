@@ -1,8 +1,8 @@
 #include "Game/EntityComponent.h"
-#include "Texture.h"
+#include "Render/Texture.h"
 #include "MaterialPublic.h"
-#include "Entity.h"
-#include "DrawPublic.h"
+#include "Game/Entity.h"
+#include "Render/DrawPublic.h"
 #include "Render/TerrainPublic.h"
 CLASS_H(TerrainComponent,EntityComponent)
 public:

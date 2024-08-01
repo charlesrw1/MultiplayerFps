@@ -14,9 +14,9 @@
 #include "glm/gtx/euler_angles.hpp"
 
 #include "GameEnginePublic.h"
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 
 #include "Game/StdEntityTypes.h"
 

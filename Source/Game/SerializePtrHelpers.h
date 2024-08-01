@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Framework/ReflectionProp.h"
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 #include "Framework/ArrayReflection.h"
 #include <unordered_map>
 

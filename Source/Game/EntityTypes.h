@@ -2,8 +2,7 @@
 #include "Types.h"
 #include "GameEnginePublic.h"
 
-#include "Entity.h"
-#include "Interaction.h"
+#include "Game/Entity.h"
 #include "Framework/Dict.h"
 
 using namespace glm;

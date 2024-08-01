@@ -1,8 +1,8 @@
 #pragma once
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 
 // All the renderable types
-#include "RenderObj.h"
+#include "Render/RenderObj.h"
 #include "Render/Render_Decal.h"
 #include "Render/Render_Light.h"
 #include "Render/Render_Sun.h"

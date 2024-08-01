@@ -3,7 +3,7 @@
 #include "imnodes.h"
 #include "glm/glm.hpp"
 
-#include "Texture.h"
+#include "Render/Texture.h"
 #include "GameEnginePublic.h"
 
 #include "Framework/EnumDefReflection.h"
@@ -1893,7 +1893,7 @@ void GraphOutput::set_animator_instance(AnimatorInstance* inst)
 	idraw->get_scene()->remove_obj(obj);
 }
 
-#include "Player.h"
+#include "Game/Player.h"
 
 AnimatorInstance* GraphOutput::get_animator()
 {

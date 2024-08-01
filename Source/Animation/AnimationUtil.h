@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Animation/Runtime/Animation.h"
-#include "Model.h"
+#include "Render/Model.h"
 using glm::vec3;
 using std::vector;
 using glm::quat;

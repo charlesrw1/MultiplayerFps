@@ -2,10 +2,7 @@
 
 #include <cstdint>
 #include "glm/glm.hpp"
-#include "RenderObj.h"
-
-#include "BaseComponents.h"
-#include "Interaction.h"
+#include "Render/RenderObj.h"
 
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringName.h"

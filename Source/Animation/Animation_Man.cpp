@@ -2,7 +2,7 @@
 
 #include "Framework/DictParser.h"
 
-#include "Model.h"
+#include "Render/Model.h"
 #include "Framework/Util.h"
 #include "SkeletonData.h"
 #include <algorithm>

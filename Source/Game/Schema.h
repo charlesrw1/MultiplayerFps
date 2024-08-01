@@ -2,7 +2,7 @@
 #include "Framework/ClassBase.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/ReflectionMacros.h"
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 #include <string>
 #include <unordered_set>
 // A class that is serizlied along with Entities and Components

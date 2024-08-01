@@ -2,7 +2,7 @@
 #include "imgui.h"
 #include "glad/glad.h"
 #include <algorithm>
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
 #include "Framework/MeshBuilder.h"
 #include "Framework/Dict.h"
@@ -197,10 +197,10 @@ void menu_temp()
 // check every 5 seconds
 ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR_FLOAT | CVAR_UNBOUNDED);
 
-#include "Texture.h"
+#include "Render/Texture.h"
 
 #include "AssetCompile/Someutils.h"// string stuff
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 
 
 

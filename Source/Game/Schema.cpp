@@ -3,7 +3,7 @@
 #include "Framework/DictParser.h"
 #include "Framework/ObjectSerialization.h"
 #include "Assets/AssetLoaderRegistry.h"
-#include "Entity.h"
+#include "Game/Entity.h"
 
 #include "Level.h"
 

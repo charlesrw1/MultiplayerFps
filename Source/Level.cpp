@@ -1,11 +1,11 @@
 #include "Level.h"
-#include "Model.h"
+#include "Render/Model.h"
 #include "cgltf.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "Physics.h"
-#include "Texture.h"
+#include "Render/Texture.h"
 #include <array>
 
 #include "Physics/Physics2.h"
@@ -13,7 +13,7 @@
 static const char* const maps_directory = "./Data/Maps/";
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 #include "EditorDocPublic.h"
 
 #include "Game/Schema.h"

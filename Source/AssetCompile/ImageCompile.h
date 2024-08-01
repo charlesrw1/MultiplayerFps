@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Texture.h"
+#include "Render/Texture.h"
 
 // explcit params
 struct ImageCompileParams

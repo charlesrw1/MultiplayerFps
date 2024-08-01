@@ -2,17 +2,17 @@
 
 #include <vector>
 #include <string>
-#include "Model.h"
+#include "Render/Model.h"
 #include "Framework/BVH.h"
 #include "Framework/Config.h"
 #include "Framework/Dict.h"
 #include "Framework/DictParser.h"
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 
 #include "Framework/Hashmap.h"
 
 #include "Framework/InlineVec.h"
-#include "Entity.h"
+#include "Game/Entity.h"
 
 #include "Framework/Hashset.h"
 

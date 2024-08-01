@@ -1,8 +1,8 @@
 #include "EntityComponentTypes.h"
 #include "Render/Render_Light.h"
 #include "Render/Render_Sun.h"
-#include "DrawPublic.h"
-#include "Texture.h"
+#include "Render/DrawPublic.h"
+#include "Render/Texture.h"
 
 const PropertyInfoList* SpotLightComponent::get_props() {
 	START_PROPS(SpotLightComponent)

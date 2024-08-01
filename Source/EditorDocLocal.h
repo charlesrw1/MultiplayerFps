@@ -2,13 +2,13 @@
 #include "EditorDocPublic.h"
 
 #include "glm/glm.hpp"
-#include "Model.h"
+#include "Render/Model.h"
 #include "Types.h"
 #include "Level.h"
 #include <SDL2/SDL.h>
 #include <memory>
 #include "Physics.h"
-#include "RenderObj.h"
+#include "Render/RenderObj.h"
 #include <stdexcept>
 
 #include "Framework/Factory.h"
@@ -18,7 +18,7 @@
 
 #include "Physics/Physics2.h"
 #include "External/ImGuizmo.h"
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 #include "Assets/AssetBrowser.h"
 #include "Framework/MulticastDelegate.h"
 

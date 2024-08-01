@@ -28,7 +28,7 @@
 // for debug drawing
 #include "Framework/MeshBuilder.h"
 
-#include "Model.h"
+#include "Render/Model.h"
 
 #define WARN_ONCE(a,...) { \
 	static bool has_warned = false; \

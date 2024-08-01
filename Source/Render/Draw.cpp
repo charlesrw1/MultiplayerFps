@@ -2,7 +2,7 @@
 
 #include "Framework/Util.h"
 #include "glad/glad.h"
-#include "Texture.h"
+#include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"

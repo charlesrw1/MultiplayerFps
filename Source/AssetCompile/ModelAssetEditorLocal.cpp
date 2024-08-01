@@ -11,7 +11,7 @@
 #include "GameEnginePublic.h"
 #include "OsInput.h"
 
-#include "RenderObj.h"
+#include "Render/RenderObj.h"
 
 static ModelEditorTool g_model_editor_static;
 IEditorTool* g_model_editor = &g_model_editor_static;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Model.h"
+#include "Render/Model.h"
 #include "glm/glm.hpp"
 
 #include "Animation.h"

@@ -2,7 +2,7 @@
 #include "Animation/SkeletonData.h"
 #include "Framework/DictParser.h"
 #include "Compiliers.h"
-#include "Model.h"
+#include "Render/Model.h"
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 #define USE_CGLTF
@@ -2185,7 +2185,7 @@ static std::string create_material_and_export(const std::string& generated_name,
 
 	// update it in case
 	if (does_exist) {
-		bool good = MaterialCompilier::compile(generated_name.c_str());
+		bool good = true;// MaterialCompilier::compile(generated_name.c_str());
 		if (!good) {
 			sys_print("!!! MaterialCompilier failed on generated material %s even though it already exists\n", generated_name.c_str());
 		}
@@ -2252,7 +2252,7 @@ static std::string create_material_and_export(const std::string& generated_name,
 	outfile.write(out.get_output().c_str(), count);
 	outfile.close();
 
-	bool good = MaterialCompilier::compile(generated_name.c_str());
+	bool good = true;// MaterialCompilier::compile(generated_name.c_str());
 
 	if (!good) {
 		sys_print("!!! MaterialCompilier failed on material that was just generated\n");
@@ -2285,7 +2285,7 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 		if (!def.root_material_dir.empty())
 			mat_name = def.root_material_dir + mat_name;
 
-		bool good = MaterialCompilier::compile(mat_name.c_str());
+		bool good = true;// MaterialCompilier::compile(mat_name.c_str());
 
 		if (good)
 			continue;

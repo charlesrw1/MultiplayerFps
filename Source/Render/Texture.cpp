@@ -11,7 +11,7 @@
 #include "Framework/DictParser.h"
 
 #undef OPAQUE
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 
 static const char* const texture_folder_path = "./Data/Textures/";
 

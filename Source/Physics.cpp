@@ -7,7 +7,7 @@
 #include "glad/glad.h"
 #include "Framework/BVH.h"
 #include "Types.h"
-#include "Model.h"
+#include "Render/Model.h"
 
 
 void BoxVsBox(Bounds b1, Bounds b2, GeomContact* out);

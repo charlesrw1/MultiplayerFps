@@ -1,3 +1,3 @@
-#include "IAsset.h"
+#include "Assets/IAsset.h"
 
 CLASS_IMPL(IAsset);

@@ -6,7 +6,7 @@
 #include "GameEnginePublic.h"
 #include "imgui.h"
 
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 
 #include "Physics/Physics2.h"
 
@@ -535,7 +535,7 @@ void player_fire_weapon()
 
 }
 
-
+#if 0
 
 Game_Item_Stats stats[Game_Inventory::NUM_GAME_ITEMS] = {
 	{"unequip","","",ITEM_CAT_MELEE},
@@ -550,6 +550,7 @@ Game_Item_Stats* get_item_stats()
 {
 	return stats;
 }
+#endif
 
 static float fire_time = 0.15f;
 static float reload_time = 1.9f;

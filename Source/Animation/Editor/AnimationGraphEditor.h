@@ -10,9 +10,9 @@
 #include "imnodes.h"
 
 #include "Types.h"
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 #include "Framework/Util.h"
-#include "RenderObj.h"
+#include "Render/RenderObj.h"
 
 #include "AnimationGraphEditorPublic.h"
 

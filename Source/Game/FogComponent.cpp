@@ -1,7 +1,7 @@
 #include "Game/EntityComponent.h"
-#include "Texture.h"
-#include "Entity.h"
-#include "DrawPublic.h"
+#include "Render/Texture.h"
+#include "Game/Entity.h"
+#include "Render/DrawPublic.h"
 #include "Render/RenderFog.h"
 
 CLASS_H(FogComponent, EntityComponent)

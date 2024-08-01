@@ -1,4 +1,4 @@
-#include "AssetRegistry.h"
+#include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 AssetRegistrySystem& AssetRegistrySystem::get()
 {

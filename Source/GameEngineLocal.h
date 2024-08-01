@@ -3,9 +3,9 @@
 #include <string>
 #include "Types.h"
 #include "Framework/Config.h"
-#include "ParticlesPublic.h"
+#include "Render/ParticlesPublic.h"
 #include "Physics.h"
-#include "Entity.h"
+#include "Game/Entity.h"
 
 #include "Debug.h"
 

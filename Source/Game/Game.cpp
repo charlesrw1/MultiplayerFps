@@ -6,7 +6,7 @@
 #include "Net.h"
 #include "EntityTypes.h"
 
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"
 
 #include "Game/Schema.h"
@@ -92,13 +92,6 @@ Entity* GameEngineLocal::spawn_entity_schema(const Schema* schema) {
 }
 
 
-RenderInterpolationComponent::InterpolationData& RenderInterpolationComponent::get(int index)
-{
-	int s = interpdata.size();
-	index = ((index % s) + s) % s;
-	return interpdata[index];
-}
-
 static float mid_lerp(float min, float max, float mid_val)
 {
 	return (mid_val - min) / (max - min);
@@ -119,6 +112,7 @@ float modulo_lerp(float start, float end, float mod, float alpha)
 	}
 }
 
+#if 0
 void RenderInterpolationComponent::evaluate(float time)
 {
 	int entry_index = 0;
@@ -208,7 +202,7 @@ void RenderInterpolationComponent::clear()
 {
 	for (int i = 0; i < interpdata.size(); i++) interpdata[i].time = -1.f;
 }
-
+#endif
 
 #include <PxPhysics.h>
 

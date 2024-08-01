@@ -15,10 +15,10 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-#include "Shader.h"
-#include "Texture.h"
+#include "Render/Shader.h"
+#include "Render/Texture.h"
 #include "Framework/MathLib.h"
-#include "Model.h"
+#include "Render/Model.h"
 
 #include "Level.h"
 #include "Physics.h"
@@ -27,11 +27,12 @@
 #include "Types.h"
 #include "Client.h"
 #include "Server.h"
-#include "Player.h"
+#include "Game/Player.h"
 #include "Framework/Config.h"
-#include "DrawPublic.h"
-#include "Entity.h"
+#include "Render/DrawPublic.h"
+#include "Game/Entity.h"
 #include "Physics/Physics2.h"
+#include "Level.h"
 
 #include "Assets/AssetBrowser.h"
 #include "Animation/AnimationTreePublic.h"
@@ -713,7 +714,7 @@ extern void benchmark_gltf();
 extern void at_test();
 #include "Framework/ExpressionLang.h"
 
-#include "EntityTypes.h"
+#include "Game/EntityTypes.h"
 #include "Game/Schema.h"
 
 #include "Render/MaterialLocal.h"

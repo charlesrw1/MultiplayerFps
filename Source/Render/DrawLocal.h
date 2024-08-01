@@ -1,5 +1,5 @@
 #pragma once
-#include "DrawPublic.h"
+#include "Render/DrawPublic.h"
 #include "Framework/Config.h"
 #include "glm/glm.hpp"
 #include "Framework/Util.h"
@@ -8,7 +8,7 @@
 #include "Framework/MeshBuilder.h"
 #include "Shader.h"
 #include "EnvProbe.h"
-#include "Texture.h"
+#include "Render/Texture.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
 #include "Framework/FreeList.h"
