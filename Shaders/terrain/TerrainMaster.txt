@@ -1,0 +1,174 @@
+
+#ifdef _VERTEX_SHADER
+
+layout (location = 0) in vec3 VS_IN_Pos;
+layout (location = 1) in vec2 VS_IN_Texcoord;
+
+out vec2 TCS_IN_Texcoord;
+
+void main()
+{
+    TCS_IN_Texcoord = VS_IN_Texcoord;
+    gl_Position = vec4(VS_IN_Pos, 1.0);
+}
+#endif
+
+#ifdef _TESS_CTRL_SHADER
+
+layout (vertices=4) out;
+in vec2 TCS_IN_Texcoord[];	// from vertex shader
+out vec2 TES_IN_Texcoord[];	// to tess eval shader
+
+in gl_PerVertex
+{
+	vec4 gl_Position;
+	float gl_PointSize;
+	float gl_ClipDistance[];
+} gl_in[gl_MaxPatchVertices];
+uniform mat4 ViewProj;
+uniform mat4 Model = mat4(1);
+void main()
+{
+	gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+	TES_IN_Texcoord[gl_InvocationID] = TCS_IN_Texcoord[gl_InvocationID];
+	// set tesselation level
+	if (gl_InvocationID == 0) {
+
+		const int MIN_TESS_LEVEL = 4;
+		const int MAX_TESS_LEVEL = 40;
+		const float MIN_DISTANCE = 0.5;
+		const float MAX_DISTANCE = 80;
+
+		vec4 eyeSpacePos00 = ViewProj * gl_in[0].gl_Position;
+		vec4 eyeSpacePos01 = ViewProj * gl_in[1].gl_Position;
+		vec4 eyeSpacePos10 = ViewProj * gl_in[2].gl_Position;
+		vec4 eyeSpacePos11 = ViewProj * gl_in[3].gl_Position;
+
+    // Step 3: "distance" from camera scaled between 0 and 1
+    float distance00 = clamp((abs(eyeSpacePos00.z)-MIN_DISTANCE) / (MAX_DISTANCE-MIN_DISTANCE), 0.0, 1.0);
+    float distance01 = clamp((abs(eyeSpacePos01.z)-MIN_DISTANCE) / (MAX_DISTANCE-MIN_DISTANCE), 0.0, 1.0);
+    float distance10 = clamp((abs(eyeSpacePos10.z)-MIN_DISTANCE) / (MAX_DISTANCE-MIN_DISTANCE), 0.0, 1.0);
+    float distance11 = clamp((abs(eyeSpacePos11.z)-MIN_DISTANCE) / (MAX_DISTANCE-MIN_DISTANCE), 0.0, 1.0);
+
+    // ----------------------------------------------------------------------
+    // Step 4: interpolate edge tessellation level based on closer vertex
+    float tessLevel0 = mix( MAX_TESS_LEVEL, MIN_TESS_LEVEL, min(distance10, distance00) );
+    float tessLevel1 = mix( MAX_TESS_LEVEL, MIN_TESS_LEVEL, min(distance00, distance01) );
+    float tessLevel2 = mix( MAX_TESS_LEVEL, MIN_TESS_LEVEL, min(distance01, distance11) );
+    float tessLevel3 = mix( MAX_TESS_LEVEL, MIN_TESS_LEVEL, min(distance11, distance10) );
+
+    // ----------------------------------------------------------------------
+    // Step 5: set the corresponding outer edge tessellation levels
+    gl_TessLevelOuter[0] = tessLevel0;
+    gl_TessLevelOuter[1] = tessLevel1;
+    gl_TessLevelOuter[2] = tessLevel2;
+    gl_TessLevelOuter[3] = tessLevel3;
+
+    // ----------------------------------------------------------------------
+    // Step 6: set the inner tessellation levels to the max of the two parallel edges
+    gl_TessLevelInner[0] = max(tessLevel1, tessLevel3);
+    gl_TessLevelInner[1] = max(tessLevel0, tessLevel2);
+	}
+}
+
+#endif // _TESS_CTRL_SHADER
+
+#ifdef _TESS_EVAL_SHADER
+
+layout (quads, fractional_odd_spacing, ccw) in;
+layout(binding = 0) uniform sampler2D HeightMap;
+in vec2 TES_IN_Texcoord[];	// from tess control shader
+
+out vec3 FS_IN_Normal;
+out vec3 FS_IN_Fragpos;
+out vec2 FS_IN_Texcoord;
+
+uniform mat4 ViewProj;
+uniform mat4 Model = mat4(1);
+uniform float WorldScale;
+uniform float VerticalScale;
+void main()
+{
+	// patch coordinates
+	float u = gl_TessCoord.x;
+    float v = gl_TessCoord.y;
+	
+	// texture coords from patch corners
+    vec2 t00 = TES_IN_Texcoord[0];
+    vec2 t01 = TES_IN_Texcoord[1];
+    vec2 t10 = TES_IN_Texcoord[2];
+    vec2 t11 = TES_IN_Texcoord[3];
+    // bilinear interp over patch
+    vec2 t0 = (t01 - t00) * u + t00;
+    vec2 t1 = (t11 - t10) * u + t10;
+    vec2 texCoord = (t1 - t0) * v + t0;
+	// sample the heightmap
+	
+	// position of patch corners
+	vec4 p00 = gl_in[0].gl_Position;
+    vec4 p01 = gl_in[1].gl_Position;
+    vec4 p10 = gl_in[2].gl_Position;
+    vec4 p11 = gl_in[3].gl_Position;
+
+    // bilinearly interpolate position coordinate across patch
+    vec4 p0 = (p01 - p00) * u + p00;
+    vec4 p1 = (p11 - p10) * u + p10;
+    vec4 position = (p1 - p0) * v + p0;
+	
+	const float HScale = VerticalScale;
+	
+	// Calculate the model-space position
+    position.y = HScale * texture( HeightMap, texCoord ).r;
+    position.w = 1.0;
+
+   FS_IN_Normal = vec3(0,1,0);
+	FS_IN_Texcoord = texCoord;
+	FS_IN_Fragpos = position.xyz;
+    // ----------------------------------------------------------------------
+    // output patch point position in clip space
+    gl_Position = ViewProj  * vec4(position.xyz,1.0);
+}
+
+
+#endif // _TESS_EVAL_SHADER
+
+#ifdef _FRAGMENT_SHADER
+
+layout (location = 0) out vec3 GBUFFER_OUT_Normal;
+layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
+layout (location = 2) out vec4 GBUFFER_OUT_M_R_Custom_Matid;
+layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
+
+in vec3 FS_IN_Fragpos;
+in vec2 FS_IN_Texcoord;
+out vec4 FS_OUT_Color;
+in vec3 FS_IN_Normal;
+uniform float VerticalScale;
+layout(binding = 0) uniform sampler2D HeightMap;
+uniform float WorldScale;
+
+void main()
+{
+	const vec2 texCoord = FS_IN_Texcoord;
+	const float HScale = VerticalScale;
+	
+	const ivec3 offset = ivec3( -1, 0, 1 ); // Texel offsets
+    float delta = 2.0 * WorldScale / textureSize( HeightMap, 0 ).x; // Horizontal displacement in world coords
+    float left   = HScale * textureOffset( HeightMap, texCoord, offset.xy ).r;
+    float right  = HScale * textureOffset( HeightMap,texCoord, offset.zy ).r;
+    float top    = HScale * textureOffset( HeightMap, texCoord, offset.yz ).r;
+    float bottom = HScale * textureOffset( HeightMap, texCoord, offset.yx ).r;
+
+    vec3 x = normalize( vec3( delta, right - left, 0.0 ) );
+    vec3 z = normalize( vec3( 0.0, top - bottom, delta ) );
+    const vec3 n = cross( z, x );
+
+	GBUFFER_OUT_Normal = normalize(n);//normalize(vec3(0,1,0));
+	vec3 Albedo = mix(vec3(0.1,0.2,0.02),vec3(0.1,0.1,0.2),pow(n.y,50.0));
+	GBUFFER_OUT_Albedo_AO = vec4(Albedo,0.0);
+	GBUFFER_OUT_M_R_Custom_Matid = vec4(0);
+
+	GBUFFER_OUT_Emissive =vec4(Albedo*vec3(0.1),0.0);// vec4(pow(n.y,50.0));//vec4(h, h, h, 1.0);
+}
+
+#endif // _FRAGMENT_SHADER

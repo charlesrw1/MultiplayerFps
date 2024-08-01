@@ -2,7 +2,16 @@
 Debug/
 Release/
 Data/
-imgui.ini
+x64/
+
+*.ttf
+*.glb
+*.cmdl
+*.dds
+*.png
+*.tga
+*.jpg
+
 *.dll
 *.bin
 
@@ -16,4 +25,6 @@ imgui.ini
 *.dat
 *.ini
 
-*.txt
+*.bat
+
+todo.txt

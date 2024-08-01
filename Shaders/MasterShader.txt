@@ -1,0 +1,118 @@
+
+#include "SharedGpuTypes.txt"
+
+// global variables like view matrix, time, etc.
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+// object data
+// includes transform matrix, per instance parameters, animation buffer offset
+layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
+	Object_Instance g_objects[];
+};
+
+// skinning matricies for animation
+layout (binding = 3, std140) readonly buffer Object_Skin_Matricies {
+	mat4 g_skin_matricies[];
+};
+// all materials that are being used, stores dynamic data that are accessed in shaders
+layout(binding = 4,std430) readonly buffer Material_Buffer {
+	uint g_materials[];
+};
+
+layout (binding = 5, std430) readonly buffer Indirect_Instance_Buf {
+	uint indirect_instance[];
+};
+layout(binding = 6, std430) readonly buffer Indirect_Mat_Buf {
+	uint indirect_materials[];
+};
+
+uniform int indirect_material_offset = 0;
+
+#ifdef _VERTEX_SHADER
+
+// inputs
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec2 VS_IN_TexCoord;
+layout (location = 2) in vec3 VS_IN_Normal;
+layout (location = 3) in vec3 VS_IN_Tangent;
+layout (location = 4) in ivec4 VS_IN_BoneIndicies;
+layout (location = 5) in vec4 VS_IN_BoneWeights;
+
+// standard outputs
+vec3 WS_OFFSET = vec3(0.0);	// offsets final world position by this amount
+
+___USER_VS_CODE___
+
+void main()
+{
+	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
+	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
+	FS_IN_Objid = obj_index;
+	
+	mat4 Model = g_objects[obj_index].model;
+	mat4 InverseModel = g_objects[obj_index].invmodel;
+
+#ifdef ANIMATED
+	vec3 local_pos = vec3(0.0);
+	vec3 local_normal = vec3(0.0);
+	#ifdef NORMALMAPPED
+	vec3 local_tangent = vec3(0.0);
+	#endif // NORMALMAPPED
+
+	uint obj_skin_offset = g_objects[obj_index].anim_mat_offset;
+
+	for(int i=0;i<4;i++) {
+		if(VS_IN_BoneIndicies[i]==-1)
+			continue;
+		vec3 posadded = vec3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
+		local_pos += posadded * VS_IN_BoneWeights[i];
+		
+		vec3 normaladded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Normal;
+		local_normal += normaladded * VS_IN_BoneWeights[i];
+		
+	#ifdef NORMALMAPPED
+		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Tangent;
+		local_tangent += tangentadded;
+	#endif // NORMALMAPPED
+	}	
+#else	// (NOT ANIMATED)
+	vec3 local_pos = VS_IN_Postion;
+	vec3 local_normal = VS_IN_Normal;
+
+	#ifdef NORMALMAPPED
+	vec3 local_tangent = VS_IN_Tangent;
+	#endif // NORMALMAPPED
+
+#endif // ANIMATED
+
+
+	VSmain();
+	
+	
+}
+
+#endif // _VERTEX_SHADER
+
+#ifdef _FRAGMENT_SHADER
+
+// standard outputs
+vec3 BASE_COLOR = vec3(0.0);	// albedo
+float ROUGHNESS = 0.5;
+float METALLIC = 0.0;
+vec3 EMISSIVE = vec3(0.0);		// emissive color, added after lighting (also main input for unlit)
+vec3 NORMALMAP = vec3(0.5,1.0,0.5);		// tangent space normal map
+float OPACITY = 1.0;					// opacity, for alpha test
+float AOMAP = 0.0;						// small detail ao map
+
+___USER_FS_CODE___
+
+void main()
+{
+	FSmain();
+}
+
+#endif //_FRAGMENT_SHADER
+
+

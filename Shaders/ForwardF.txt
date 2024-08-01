@@ -1,0 +1,116 @@
+
+layout (location = 0) out vec4 FS_OUT_Color;
+
+flat in uint FS_IN_Objid;
+flat in uint FS_IN_Matid;
+in vec3 FS_IN_FragPos;
+in vec3 FS_IN_Normal;
+in vec2 FS_IN_Texcoord;
+in vec3 FS_IN_BoneColor;
+in vec4 FS_IN_NDC;
+
+
+#ifdef VERTEX_COLOR
+in vec4 FS_IN_Color;
+#endif
+
+#ifdef LIGHTMAPPED
+in vec2 FS_IN_TexCoord2;
+uniform sampler2D lightmap;
+#endif
+
+#ifdef NORMALMAPPED
+in mat3 FS_IN_TBN;
+#endif
+
+uniform sampler2D basecolor;
+uniform sampler2D normal_tex;
+uniform sampler2D roughness_tex;
+uniform sampler2D metalness_tex;
+uniform sampler2D ao_tex;
+
+uniform sampler2D caustictex;
+
+#include "SharedGpuTypes.txt"
+
+layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
+	Object_Instance g_objects[];
+};
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout(binding = 4,std430) readonly buffer Material_Buffer {
+	Material_Data g_materials[];
+};
+
+
+vec3 randColor(uint number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+float dither_pattern[16] = {
+	1.0 / 17.0,  9.0 / 17.0,  3.0 / 17.0, 11.0 / 17.0,
+13.0 / 17.0,  5.0 / 17.0, 15.0 / 17.0,  7.0 / 17.0,
+4.0 / 17.0, 12.0 / 17.0,  2.0 / 17.0, 10.0 / 17.0,
+16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
+};
+
+// standard outputs
+vec3 BASE_COLOR = vec3(0.0);	// albedo
+float ROUGHNESS = 0.5;
+float METALLIC = 0.0;
+vec3 EMISSIVE = vec3(0.0);		// emissive color, added after lighting (also main input for unlit)
+vec3 NORMALMAP = vec3(0.5,1.0,0.5);		// tangent space normal map
+float OPACITY = 1.0;					// opacity, for alpha test
+float AOMAP = 0.0;						// small detail ao map
+
+void FSmain()
+{
+#ifdef UNLIT
+	EMISSIVE = vec3(1,0,1);
+	OPACITY = 0.5;
+#else
+	vec2 roughness_metal = texture(roughness_tex, FS_IN_Texcoord).gb;
+	float ambient_occlusion = texture(ao_tex, FS_IN_Texcoord).r;
+	float metalness = texture(metalness_tex,FS_IN_Texcoord).r;
+	
+	vec3 color_tint = g_objects[FS_IN_Objid].colorval;
+	
+	vec4 albedo = texture(basecolor, vec2(FS_IN_Texcoord.x,FS_IN_Texcoord.y));
+	albedo.rgb = pow(albedo.rgb,vec3(2.2));
+	
+	OPACITY = albedo.a;
+	BASE_COLOR = vec3(albedo)*color_tint;
+	METALLIC = metalness;
+	AOMAP = ambient_occlusion;
+	ROUGHNESS = roughness_metal.x;
+	
+	EMISSIVE = albedo.rgb;
+#endif
+}
+
+void main()
+{
+	FSmain();
+
+	FS_OUT_Color = vec4(EMISSIVE + BASE_COLOR,OPACITY);
+	
+#ifdef DEBUG_SHADER
+	if(g.debug_options == DEBUG_OBJID)
+		FS_OUT_Color.rgb = randColor(FS_IN_Objid);
+	else if(g.debug_options == DEBUG_MATID)
+		FS_OUT_Color.rgb = randColor(FS_IN_Matid);
+	else if(g.debug_options == DEBUG_NORMAL)
+		FS_OUT_Color.rgb = (N*0.5+vec3(0.5));
+	else if(g.debug_options == DEBUG_ALBEDO)
+		FS_OUT_Color.rgb = BASE_COLOR;
+	else if(g.debug_options == DEBUG_WIREFRAME)
+		FS_OUT_Color = vec4(0.0,0.5,0.5,1.0);
+	
+	FS_OUT_Color.a = 1.0;
+#endif // DEBUG_SHADER
+
+}	

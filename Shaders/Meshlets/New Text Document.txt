@@ -1,0 +1,110 @@
+
+FOR MESHLETS:
+global_meshlet_buffer[]
+uint global_index_buffer[]
+vec3 global_vert_buffer[]
+
+uint mdi_counts[]
+uint mdi_offsets[]
+
+glDrawElementsCommands in_commands[]
+
+glDrawElementsCommands out_commands[]
+
+uint occluded_list[];
+
+struct Render_Object {
+	mat4 transform;
+	mat4 last_transform;
+	uint animation_ofs;
+	vec4 bounding_sphere;
+};
+
+Render_Object objects[];
+
+struct HighlevelObject {
+	uint proxy_index_and_selected_lod;	// index into objects[] and high 8 bits is lod from C++
+};
+HighlevelObject hlobjs[];
+
+struct Instance {
+	uint high_level_obj_index;
+	uint lod_of_self;
+	uint batch_index;	// index into out_commands
+	uint mdi_index;
+	uint meshlet_index;
+	uint meshlet_count;
+};
+
+Instance instances[];
+
+struct MeshletCullWorkArgs
+{
+	uint inst_index;
+};
+
+MeshletCullWorkArgs meshlet_cull_args[];
+
+struct TriangleCullWorkArgs
+{
+	uint meshlet_index;
+	uint obj_index;
+};
+
+MeshletCullTriangleWorkArgs triangle_cull_args[];
+
+Cull highlevel_objects
+	run compute for all hlobjs
+		set_selected_lod to -1 if bounding sphere is out of frustum or bounding sphere is occluded (get bounding sphere from proxy_index)
+		if frustum passed but occluded:
+			occluded_list[occluded_count++] = gl_Thisindex;
+Cull instances
+	run compute for all instances (draw calls)
+		increment out_commands[batch_index].primCount if lod_of_self == hlobjs[high_level_obj_index].selected_lod	
+Compact instances
+Draw instances
+Build HZB
+Cull highlevel_objects_2
+	run compute for occluded_list
+		hl_obj = hlobjs[occluded_list[index]];
+		if not occluded in new HZB
+Cull instances 2
+	run compute for all instances (draw calls)
+		increment out_commands[batch_index].primCount if lod_of_self == hlobjs[high_level_obj_index].selected_lod	
+Compact instances
+Draw instances
+Build HZB for next frame
+
+
+// Gpu culling requires min depth extension, 64 bit atomics
+// Options: no culling, cpu culling, gpu culling, gpu culling with meshlets
+
+=== STEP 1 ===
+
+Frustum cull highlevel_objects
+Run through instances and check highlevel_obj cull state
+	if has meshlets and passed:
+		append work args if passed (use 64 bit atomics) (and increment primCount)
+	else if passed
+		increment primCount (were done here)
+Binary search work args to get index of meshlet
+	frustum cull and occlusion cull
+		if occluded:
+			add to occluded meshlet list
+		else
+			append work buffer
+Cull triangles in meshlet work buffer (append indicies to allocated space in part 1)
+Compact instances
+Draw instances
+Build HZB
+
+=== STEP 2 ===
+
+for all occluded meshlets
+	run occlusion test again with new HZB
+		if passed:
+			append work buffer
+cull triangles in meshlet work buffer (...)
+compact instances
+draw instances
+Build HZB for next frame

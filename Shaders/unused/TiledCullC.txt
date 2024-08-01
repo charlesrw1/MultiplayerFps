@@ -1,0 +1,131 @@
+#extension GL_NV_shader_atomic_int64 : enable
+#extension GL_ARB_gpu_shader_int64 : enable
+layout(local_size_x = 64, local_size_y=1,local_size_z=1) in;
+
+#include "SharedGpuTypes.txt"
+#include "Meshlets/meshlet_shared.txt"
+#include "Meshlets/prefix.txt"
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+uniform int num_instances = 0;
+
+// first pass: expand chunks for instances
+
+// second pass: append to out_indicies
+
+uniform int meshlets_in_mesh = 0;
+uniform int mesh_basevertex = 0;
+
+uniform vec4 frustum_plane;
+
+bool cull_meshlet(in Chunk meshlet, uint instance_index)
+{
+	mat4 model = instances[instance_index].transform;
+
+	vec3 center = meshlet.bounding_sphere.xyz;
+	center = (g.view * model * vec4(center,1.0)).xyz;
+	float radius = meshlet.bounding_sphere.w;
+	
+	// frustum cull
+	bool visible = true;
+	visible = visible && center.z * frustum_plane[1] - abs(center.x) * frustum_plane[0] > -radius;
+	visible = visible && center.z * frustum_plane[3] - abs(center.y) * frustum_plane[2] > -radius;
+	visible = visible && center.z - radius < -g.near && center.z + radius > -g.far;
+
+	if(!visible)
+		return false;
+
+	vec3 apex = (model * vec4(meshlet.cone_apex.xyz,1.0)).xyz;
+    vec3 axis = meshlet.cone_axis_cutoff.xyz;// normalize(mat3(model) * meshlet.cone_axis_cutoff.xyz);
+	
+    return dot(normalize(apex - g.viewpos_time.xyz), axis)
+        < meshlet.cone_axis_cutoff.w;
+}
+
+
+bool cull_instance(vec4 mesh_bounds, uint instance_index)
+{
+	mat4 model = instances[instance_index].transform;
+
+	vec3 center = mesh_bounds.xyz;
+	center = (g.view * model * vec4(center,1.0)).xyz;
+	float radius = mesh_bounds.w;
+	
+	// frustum cull
+	bool visible = true;
+	visible = visible && center.z * frustum_plane[1] - abs(center.x) * frustum_plane[0] > -radius;
+	visible = visible && center.z * frustum_plane[3] - abs(center.y) * frustum_plane[2] > -radius;
+	visible = visible && center.z - radius < -g.near && center.z + radius > -g.far;
+	
+	return visible;
+}
+
+#ifdef INSTANCE_CULLING
+
+uniform vec4 meshbounds;
+
+void main()
+{
+	uint id = gl_GlobalInvocationID.x;
+
+	if(id >= num_instances)
+		return;
+	
+	Instance instance = instances[id];
+	
+	if(!cull_instance(meshbounds, id))
+		return;
+	
+	prefix_sum_inclusive_append(id, meshlets_in_mesh);
+}
+
+#endif // INSTANCE_CULLING
+
+#ifdef MESHLET_CULLING
+
+void main()
+{
+	uint id = gl_GlobalInvocationID.x;
+	
+	if(id >= uint(buf.counter))
+		return;
+		
+	PrefixSumValue val = prefix_sum_binary_search(id);
+	uint instance_index = val.index_;
+	uint meshlet_index = val.sum - id - 1;
+	
+	Chunk meshlet = chunks[meshlet_index];
+	
+	if(!cull_meshlet(meshlet, instance_index))
+		return;
+	
+	//
+	uint draw_call_index = atomicAdd(num_indirect_calls.x, 1);
+	//
+	DrawElementsIndirectCommand cmd;
+	cmd.count = meshlet.index_count;
+	cmd.primCount = 1;
+	cmd.firstIndex = meshlet.index_offset;
+	cmd.baseVertex = mesh_basevertex;
+	cmd.baseInstance = 0;
+	//
+	indirect_calls[draw_call_index] = cmd;
+	index_to_inst[draw_call_index] =  instance_index;
+}
+
+#endif // MESHLET_CULLING
+
+#ifdef TRI_CULLING
+
+void main()
+{
+	// second work buffer for meshlet id + mesh id
+	// pick 
+
+}
+
+
+#endif // TRI_CULLING

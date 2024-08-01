@@ -1,8 +1,0 @@
-arms.glb
-HIPOL.glb
-manifest.txt
-monkey.glb
-monkey_lod1.glb
-orb.glb
-player_FINAL.glb
-sphere.glb

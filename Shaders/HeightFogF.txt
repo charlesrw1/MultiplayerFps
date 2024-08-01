@@ -1,0 +1,66 @@
+
+layout(location = 0) out vec4 FS_OUT_Color;
+
+layout(binding = 3) uniform sampler2D DEPTH;// depth texture (writes disabled)
+
+#include "SharedGpuTypes.txt"
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+uniform vec3 inscatteringColor;
+uniform vec3 sunDirection;
+uniform bool has_sun = false;
+uniform vec3 sunColor;
+uniform float directionalExp;
+uniform float height_falloff;
+uniform float height_start;
+uniform float density;
+
+vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
+
+	// 7/30: reverse-Z change
+    float z = depth;// * 2.0 - 1.0;
+
+    vec4 clipSpacePosition = vec4(TexCoord * 2.0 - 1.0, z, 1.0);
+    vec4 viewSpacePosition = g.inv_viewproj * clipSpacePosition;
+
+    // Perspective division
+    viewSpacePosition /= viewSpacePosition.w;
+
+    return viewSpacePosition.xyz;
+}
+float calc_density(float heightfalloff, float ray_dir_y, float ray_org)
+{
+	float Falloff = max(-127.0f, heightfalloff * ray_dir_y);    // if it's lower than -127.0, then exp2() goes crazy in OpenGL's GLSL.
+	float LineIntegral = (1.0 - exp2(-Falloff)) / Falloff;
+	float LineIntegralTaylor = log(2.0) - (0.5 * log(2.0)*log(2.0)) * Falloff;		// Taylor expansion around 0
+
+	return ray_org * (abs(Falloff) > 0.00001 ? LineIntegral : LineIntegralTaylor);
+}
+
+void main()
+{
+	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
+	float depth_value = texture(DEPTH,uv).r;
+	
+	float linear_depth = g.near/depth_value;
+	
+	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
+
+	float t = length(worldspace-g.viewpos_time.xyz);
+	vec3 ro = g.viewpos_time.xyz;
+	vec3 rd = normalize(worldspace-g.viewpos_time.xyz);
+	float a = density;
+	float b = height_falloff;
+
+	float fac = ro.y*b;
+	fac = max(fac,0);
+	fac = min(fac,20);
+
+	float fogAmount = (a/b) * exp(-fac) * (1.0-exp(-t*rd.y*b))/rd.y;
+	
+
+	FS_OUT_Color = vec4(inscatteringColor,fogAmount);
+}

@@ -1,3 +1,0 @@
-my_ent
-	classname player_spawn
-	position 1.0 0.0 0.0

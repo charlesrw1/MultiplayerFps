@@ -1,0 +1,116 @@
+
+
+out vec4 FS_OUT_Color;
+
+in vec3 FS_IN_FragPos;
+in vec3 FS_IN_Normal;
+in vec2 FS_IN_Texcoord;
+in vec3 FS_IN_BoneColor;
+
+uniform vec3 view_pos;
+uniform vec3 view_front;
+
+uniform sampler2D basecolor;
+uniform sampler2D auxcolor;
+
+#ifdef BLEND2
+uniform sampler2D basecolor2;
+uniform sampler2D auxcolor2;
+uniform sampler2D special;
+#endif
+
+uniform float fog_start;
+uniform float fog_end;
+uniform vec3 fog_color;
+uniform float fog_max_density;
+uniform float near;
+uniform float far;
+
+uniform bool no_light;
+
+uniform bool has_uv_scroll;
+uniform vec2 uv_scroll_offset;
+
+uniform bool has_glassfresnel;
+uniform float glassfresnel_opacity;
+
+uniform vec3 light_dir;
+
+float linearize_depth(float d,float zNear,float zFar)
+{
+    float z_n = 2.0 * d - 1.0;
+    return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+}
+
+vec3 apply_simple_fog(vec3 input_color, float ndc_z)
+{
+	float dist = linearize_depth(ndc_z,near,far);
+	float density = ((dist-fog_start)/(fog_end-fog_start))*fog_max_density;
+	density = clamp(density,0.0,1.0);
+	return mix(input_color,fog_color,density);
+}
+
+#ifdef VERTEX_COLOR
+in vec4 FS_IN_Color;
+#endif
+
+#ifdef LIGHTMAPPED
+in vec2 FS_IN_TexCoord2;
+uniform sampler2D lightmap;
+#endif
+
+void main()
+{
+	vec2 texcoords = FS_IN_Texcoord;
+	if(has_uv_scroll)
+		texcoords += uv_scroll_offset;
+
+	vec4 tex = texture(basecolor, texcoords);
+	tex.rgb = pow(tex.rgb,vec3(2.2));
+#ifdef ALPHATEST
+	if(tex.a < 0.5)
+		discard;
+#endif
+
+#ifdef BLEND2
+	vec4 tex2 = texture(basecolor2, texcoords);
+	tex2 = pow(tex2,vec4(2.2));
+	vec2 blend = texture(special, texcoords).rg;
+	blend.g = 0.1;
+	float a = FS_IN_Color.r;
+	
+	a = smoothstep(max(0,blend.r-blend.g), min(1,blend.r+blend.g), a);
+	tex = mix(tex,tex2,a);
+#endif
+	
+// regular models
+	vec4 c = vec4(0,0,0,1.0);
+	c.a = tex.a;
+	c.rgb = tex.rgb*(vec3(0.55)+max(dot(FS_IN_Normal, -light_dir), 0.0)*vec3(1.5));
+	c.rgb = apply_simple_fog(c.rgb, gl_FragCoord.z);
+	
+	if(has_glassfresnel) {
+		vec3 l = normalize(view_pos - FS_IN_FragPos);
+		c.a = 1 - pow(dot(l, FS_IN_Normal),1.5)*glassfresnel_opacity;
+	}
+
+#ifdef LIGHTMAPPED
+	vec3 color = tex.rgb;
+	if(!no_light) {
+		vec3 lm = texture(lightmap, FS_IN_TexCoord2).rgb;
+		color.rgb *= lm;
+		color = color/(vec3(1)+color);
+	}
+	color = pow(color, vec3(1.0/2.2));
+	FS_OUT_Color = vec4(color,1.0);
+#else
+	c.rgb = pow(c.rgb,vec3(1.0/2.2));
+	FS_OUT_Color = c;
+#endif
+
+
+#ifdef BLEND2
+	//FS_OUT_Color = vec4(FS_IN_Color.rgb,1.0);
+#endif
+}
+	

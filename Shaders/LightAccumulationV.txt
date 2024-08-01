@@ -1,0 +1,19 @@
+
+layout (location = 0) in vec3 VS_IN_Postion;
+out vec3 FS_IN_FragPos;
+out vec4 FS_IN_NDC;
+
+#include "SharedGpuTypes.txt"
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+uniform mat4 Model;
+
+void main()
+{
+	FS_IN_FragPos = vec3(Model * vec4(VS_IN_Postion,1.0));
+    FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
+	gl_Position = FS_IN_NDC;
+}
