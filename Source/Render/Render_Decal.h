@@ -8,6 +8,6 @@ struct Render_Decal
 	}
 	glm::mat4 transform = glm::mat4(1.0);
 	glm::vec2 uv_scale = glm::vec2(1.f);
-	MaterialInstance* material = nullptr;
+	const MaterialInstance* material = nullptr;
 	bool visible : 1;
 };

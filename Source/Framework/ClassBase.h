@@ -5,6 +5,7 @@
 struct PropertyInfoList;
 class ClassBase;
 
+struct PropHashTable;
 struct ClassTypeInfo
 {
 public:
@@ -33,6 +34,9 @@ public:
 	// use for default props etc.
 	// not every class type will have this
 	const ClassBase* default_class_object = nullptr;
+
+	// opaque pointer to hash table for props
+	const PropHashTable* prop_hash_table = nullptr;
 
 	template<typename T>
 	static ClassBase* default_allocate() {

@@ -41,6 +41,15 @@ public:
 	static const PropertyInfoList* get_props() = delete;
 	SunLightComponent* Sun = nullptr;
 };
+CLASS_H(DecalEntity, Entity)
+public:
+	DecalEntity() {
+		Decal = create_sub_component<DecalComponent>("Decal");
+		root_component = Decal;
+	}
+	static const PropertyInfoList* get_props() = delete;
+	DecalComponent* Decal{};
+};
 
 
 

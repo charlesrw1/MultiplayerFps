@@ -74,6 +74,7 @@ DECLARE_ENGINE_CMD(ot)
 	if (!draw.debug_tex_out.output_tex) {
 		sys_print("output_texture: couldn't find texture %s\n", texture_name);
 	}
+
 }
 DECLARE_ENGINE_CMD(cot)
 {
@@ -3002,6 +3003,72 @@ void Renderer::draw_height_fog()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV);
+void Renderer::deferred_decal_pass()
+{
+	GPUFUNCTIONSTART;
+
+	if (!r_drawdecals.get_bool())
+		return;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.gbuffer);		// bind gbuffer
+	glDepthMask(GL_FALSE);	// disable depth writes
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);	// cull the back face, keep front face
+	glDisable(GL_DEPTH_TEST);	// keep depth tests
+
+	Model* cube = mods.find_or_load("cube.cmdl");	// cube model
+	// Copied code from execute_render_lists
+	auto& part = cube->get_part(0);
+	const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	gpu::DrawElementsIndirectCommand cmd;
+	cmd.baseVertex = part.base_vertex + cube->get_merged_vertex_ofs();
+	cmd.count = part.element_count;
+	cmd.firstIndex = part.element_offset + cube->get_merged_index_ptr();
+	cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
+	cmd.primCount = 1;
+	cmd.baseInstance = 0;
+
+	bind_texture(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
+
+	bind_vao(mods.get_vao(true/* animated */));
+
+	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
+		auto& obj = scene.decal_list.objects[i].type_.decal;
+		if (!obj.material)
+			continue;
+		MaterialInstanceLocal* l = (MaterialInstanceLocal*)obj.material;
+		if (l->get_master_material()->usage != MaterialUsage::Decal)
+			continue;
+
+		program_handle program = matman.get_mat_shader(false, nullptr, l, false, false, false, false);
+		set_shader(program);
+
+		glm::mat4 ModelTransform = obj.transform;
+		auto invTransform = glm::inverse(ModelTransform);
+
+		shader().set_vec2("DecalTCScale", obj.uv_scale);
+		shader().set_mat4("Model", ModelTransform);
+		shader().set_mat4("DecalViewProj", invTransform);
+		shader().set_mat4("InverseModel", invTransform);
+		shader().set_uint("FS_IN_Matid", l->gpu_buffer_offset);
+
+		auto& texs = l->get_textures();
+		for (int j = 0; j < texs.size(); j++)
+			bind_texture(j, texs[j]->gl_id);
+
+		glMultiDrawElementsIndirect(
+			GL_TRIANGLES,
+			index_type,
+			(void*)&cmd,
+			1,
+			sizeof(gpu::DrawElementsIndirectCommand)
+		);
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glEnable(GL_DEPTH_TEST);
+}
 
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV);
 
@@ -3093,6 +3160,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 
 	if(r_drawterrain.get_bool())
 		scene.terrain_interface->draw_to_gbuffer(params.is_editor, r_debug_mode.get_integer()!=0);
+	state_machine.invalidate_all();
+
+	deferred_decal_pass();
 	state_machine.invalidate_all();
 
 	if (enable_ssao.get_bool())

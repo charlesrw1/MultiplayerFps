@@ -27,6 +27,7 @@ enum class MaterialUsage : uint8_t
 	Default,
 	Postprocess,
 	Terrain,
+	Decal,
 };
 
 

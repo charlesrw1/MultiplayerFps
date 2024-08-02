@@ -1,0 +1,157 @@
+
+// ******** START "include "SharedGpuTypes.txt"" ********
+
+#include "SharedGpuTypes.txt"
+
+// ******** END "include "SharedGpuTypes.txt"" ********
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout (binding = 4, std430) readonly buffer GlobalMaterialBuffer {
+	uint _material_param_buffer[];
+};
+
+#ifdef _VERTEX_SHADER
+
+
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec2 VS_IN_TexCoord;
+layout (location = 2) in vec3 VS_IN_Normal;
+layout (location = 3) in vec3 VS_IN_Tangent;
+
+layout (location = 4) in ivec4 VS_IN_BoneIndicies;
+layout (location = 5) in vec4 VS_IN_BoneWeights;
+
+
+out vec3 FS_IN_FragPos;
+out vec3 FS_IN_Normal;
+out vec4 FS_IN_NDC;
+
+out mat3 FS_IN_TBN;
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+uniform mat4 Model;
+uniform mat4 InverseModel;
+
+void main()
+{
+	vec3 local_pos = vec3(0.0);
+	vec3 local_normal = vec3(0.0);
+	vec3 local_tangent = vec3(0.0);
+
+	local_pos = VS_IN_Postion;
+	local_normal = VS_IN_Normal;
+	local_tangent = VS_IN_Tangent;
+
+	FS_IN_FragPos = vec3(Model * vec4(local_pos,1.0));
+    FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
+	
+	vec3 world_tangent = mat3(transpose(InverseModel))*normalize(local_tangent);
+	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
+	
+	FS_IN_TBN = mat3(
+	normalize(local_tangent  ), 
+	normalize(world_bitangent), 
+	normalize(FS_IN_Normal   ));
+    
+    FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
+
+	gl_Position = FS_IN_NDC;
+}
+
+#endif // _VERTEX_SHADER
+
+#ifdef _FRAGMENT_SHADER
+
+//layout (location = 0) out vec3 GBUFFER_OUT_Normal;
+layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;		
+layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
+
+layout(binding = 20) uniform sampler2D DEPTH;		// depth texture (writes disabled)
+
+vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
+
+	// 7/30: reverse-Z change
+    float z = depth;// * 2.0 - 1.0;
+
+    vec4 clipSpacePosition = vec4(TexCoord * 2.0 - 1.0, z, 1.0);
+    vec4 viewSpacePosition = g.inv_viewproj * clipSpacePosition;
+
+    // Perspective division
+    viewSpacePosition /= viewSpacePosition.w;
+
+    return viewSpacePosition.xyz;
+}
+
+in vec3 FS_IN_FragPos;
+in vec3 FS_IN_Normal;
+in vec4 FS_IN_NDC;
+in mat3 FS_IN_TBN;
+
+// "fake" FS_IN variables
+uniform uint FS_IN_Objid = 0;
+uniform uint FS_IN_Matid = 0;
+vec2 FS_IN_Texcoord;
+
+// standard outputs for decals
+vec3 BASE_COLOR = vec3(0.0);	// albedo
+float ROUGHNESS = 0.5;
+vec3 EMISSIVE = vec3(0.0);		// emissive color, added after lighting (also main input for unlit)
+vec3 NORMALMAP = vec3(0.5,0.5,1.0);		// tangent space normal map
+float OPACITY = 1.0;					// opacity, for alpha test
+
+// Decal specific inputs
+vec3 FS_DecalFragPos;
+float FS_DecalDepth;
+
+// ********** START USER CODE **********
+___USER_FS_CODE___
+// ********** END USER CODE **********
+
+
+uniform mat4 DecalViewProj;
+uniform vec2 DecalTCScale = vec2(1.0);
+void main()
+{
+	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
+	
+	float depth_value = texture(DEPTH,uv).r;
+	FS_DecalFragPos = WorldPosFromDepth(uv, depth_value);
+	
+	vec4 proj = DecalViewProj * vec4(FS_DecalFragPos,1.0);
+	
+	proj/=proj.w;
+	
+	// projected coords are outside of the OOB, fixme: Z
+	float val = 1.0;
+	if(proj.x<0||proj.x>1||proj.y<0||proj.y>1||proj.z < -1 || proj.z > 0)
+		discard;
+		//val = 0.0;
+		
+	FS_IN_Texcoord = vec2(proj.x,proj.y)*DecalTCScale;
+	
+	// call to user code
+	FSmain();
+	
+	// decals wants to discard
+	if(OPACITY < 0.5)
+		discard;
+	
+	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*val,0.0);//vec4(vec3(-proj.z),0.0);//vec2(FS_IN_Texcoord)*val,0.0, 0.0);
+	GBUFFER_OUT_Emissive = vec4(EMISSIVE,0.0);
+
+	vec3 Normalized_IN_N = normalize(FS_IN_Normal);
+	
+	// World space normal
+	vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
+	Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
+	//GBUFFER_OUT_Normal = Final_Normal;
+}
+
+#endif // _FRAGMENT_SHADER

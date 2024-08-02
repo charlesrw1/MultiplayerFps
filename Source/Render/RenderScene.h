@@ -154,11 +154,9 @@ struct RL_Internal
 	int shadow_array_index = -1;
 };
 
-// kinda cursed, render decal maintains a handle for a render object ...
 struct RDecal_Internal
 {
 	Render_Decal decal;
-	handle<Render_Object> object;
 };
 
 
@@ -261,15 +259,20 @@ public:
 		auto handle = decal_list.make_new();
 		auto& internal = decal_list.get(handle);
 		internal.decal = decal;
-		internal.object = register_obj();
-		return { -1 };
+		return { handle };
 
 	}
 	void update_decal(handle<Render_Decal> handle, const Render_Decal& decal) override {
-
+		if (!handle.is_valid()) 
+			return;
+		auto& i = decal_list.get(handle.id);
+		i.decal = decal;
 	}
 	void remove_decal(handle<Render_Decal>& handle) override {
-
+		if (!handle.is_valid())
+			return;
+		decal_list.free(handle.id);
+		handle = { -1 };
 	}
 	handle<Render_Sun> register_sun(const Render_Sun& sun) override {
 		handle<Render_Sun> id = { int(unique_id_counter++) };

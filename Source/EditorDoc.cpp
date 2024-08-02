@@ -1689,3 +1689,19 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 		}
 	}
 }
+#include "Render/MaterialPublic.h"
+DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)
+{
+	for (int z = 0; z < 10; z++) {
+		for (int y = 0; y < 10; y++) {
+			for (int x = 0; x < 10; x++) {
+				glm::vec3 p(x, y, z);
+				glm::mat4 transform = glm::translate(glm::mat4(1), p * 2.0f);
+
+				auto ent = eng->spawn_entity_class<DecalEntity>();
+				ent->Decal->set_material(imaterials->find_material_instance("bulletDecal"));
+				ent->set_ws_transform(transform);
+			}
+		}
+	}
+}

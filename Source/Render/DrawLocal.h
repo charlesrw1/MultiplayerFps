@@ -194,6 +194,7 @@ public:
 
 	void render_level_to_target(const Render_Level_Params& params);
 	void accumulate_gbuffer_lighting();
+	void deferred_decal_pass();
 
 	void draw_text();
 	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
@@ -206,17 +207,6 @@ public:
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool force_backface_state);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
-	void scene_draw_presetup(const SceneDrawParamsEx& params, const View_Setup& view);
-	void scene_draw_setup(const SceneDrawParamsEx& params, const View_Setup& view);
-
-	void scene_draw_main();
-	void scene_draw_gbuffer_pass();
-	void scene_draw_aux_geom_passes();
-	void scene_draw_decal_pass();
-	void scene_draw_lighting_pass();
-	void scene_draw_translucent_pass();
-
-	void scene_draw_post();
 
 	Memory_Arena mem_arena;
 
@@ -229,7 +219,7 @@ public:
 	Texture3d perlin3d;
 	
 	int cubemap_index = 0;
-	static const int MAX_SAMPLER_BINDINGS = 16;
+	static const int MAX_SAMPLER_BINDINGS = 32;
 
 	Program_Manager prog_man;
 	struct programs
@@ -403,7 +393,7 @@ private:
 	struct Opengl_State_Machine
 	{
 		program_handle active_program = -1;
-		texhandle textures_bound[16];
+		texhandle textures_bound[MAX_SAMPLER_BINDINGS];
 		blend_state blending = blend_state::OPAQUE;
 		bool backface_state = false;
 		uint32_t current_vao = 0;
@@ -415,12 +405,13 @@ private:
 			VAO_BIT,
 			TEXTURE0_BIT,
 		};
-		uint32_t invalid_bits = UINT32_MAX;
 
-		bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1 << bit); }
-		void set_bit_valid(uint32_t bit) { invalid_bits &= ~(1 << bit); }
-		void set_bit_invalid(uint32_t bit) { invalid_bits |= (1 << bit); }
-		void invalidate_all() { invalid_bits = UINT32_MAX; }
+		bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1ull << bit); }
+		void set_bit_valid(uint32_t bit) { invalid_bits &= ~(1ull << bit); }
+		void set_bit_invalid(uint32_t bit) { invalid_bits |= (1ull << bit); }
+		void invalidate_all() { invalid_bits = UINT64_MAX; }
+	private:
+		uint64_t invalid_bits = UINT32_MAX;
 	};
 
 	Opengl_State_Machine state_machine;

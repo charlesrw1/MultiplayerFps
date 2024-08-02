@@ -65,6 +65,13 @@ struct ParsedHintStr
 	int step_i = 1;
 };
 
+class DictWriter;
+class DictParser;
+struct PropertyInfo;
+typedef std::string(*SerializePropFunc_t)(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user);
+typedef void(*UnSerializePropFunc_t)(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user);
+
+
 class IListCallback;
 struct PropertyInfoList;
 struct PropertyInfo {
@@ -81,6 +88,8 @@ struct PropertyInfo {
 	const char* custom_type_str = "";
 	const char* tooltip = "";
 	const EnumTypeInfo* enum_type = nullptr;
+	SerializePropFunc_t serialize_func = nullptr;
+	UnSerializePropFunc_t unserialize_func = nullptr;
 
 	uint8_t* get_ptr(const void* inst) const {
 		return (uint8_t*)inst + offset;

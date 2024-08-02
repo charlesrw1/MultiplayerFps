@@ -7,6 +7,8 @@
 
 #include "Framework/ObjectSerialization.h"
 
+#include "PropHashTable.h"
+
 ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr, false);
 const bool ClassBase::CreateDefaultObject = false;
 const ClassTypeInfo& ClassBase::get_type() const { return ClassBase::StaticType; }
@@ -135,8 +137,21 @@ void ClassBase::init()
 
 	// now call get props functions
 	for (auto& classtype : get_registry().id_to_typeinfo) {
-		if (classtype->get_props_function)
+		if (classtype->get_props_function) {
 			classtype->props = classtype->get_props_function();
+			
+		}
+		PropHashTable* table = new PropHashTable;
+		if (classtype->super_typeinfo)
+			table->prop_table = classtype->super_typeinfo->prop_hash_table->prop_table;	// copy parents hashtable
+		// write the keys
+		if (classtype->props) {
+			for (int i = 0; i < classtype->props->count; i++) {
+				auto& prop = classtype->props->list[i];
+				StringView prop_name_as_sv(prop.name);
+				table->prop_table.insert({ prop_name_as_sv, &prop });
+			}
+		}
 	}
 	// now call default constructors
 	auto& id_to_typeinfo = get_registry().id_to_typeinfo;

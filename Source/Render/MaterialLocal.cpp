@@ -439,7 +439,7 @@ bool MasterMaterial::load_from_file(const std::string& fullpath, IFile* file)
 			}
 		}
 		else if(tok.cmp("DOMAIN")) {
-			usage = (MaterialUsage)parse_options({ "Default","PostProcess","Terrain" });
+			usage = (MaterialUsage)parse_options({ "Default","PostProcess","Terrain","Decal"});
 		}
 		else {
 			throw MasterMaterialExcept(fullpath, "Unknown cmd : " + to_std_string_sv(tok));
@@ -581,6 +581,8 @@ std::string MasterMaterial::create_glsl_shader(
 	const char* master_shader_path = "MasterDeferredShader.txt";
 	if (usage == MaterialUsage::Terrain)
 		master_shader_path = "MasterTerrainShader.txt";
+	else if (usage == MaterialUsage::Decal)
+		master_shader_path = "MasterDecalShader.txt";
 
 	bool good = read_and_add_recursive(master_shader_path, masterShader);
 	if (!good)
@@ -662,6 +664,10 @@ std::string MasterMaterial::create_glsl_shader(
 
 	replace(masterShader, "___USER_VS_CODE___", actual_vs_code);
 	replace(masterShader, "___USER_FS_CODE___", actual_fs_code);
+
+	if (is_alphatested())
+		masterShader.insert(0,
+			"#define ALPHATEST\n");
 
 	masterShader.insert(0, 
 		"// ***********************************\n"

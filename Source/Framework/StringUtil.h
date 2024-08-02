@@ -132,6 +132,13 @@ public:
 	}
 	bool is_empty() const { return str_len == 0; }
 
+	bool operator==(const StringView& other) const {
+		if (str_len != other.str_len) {
+			return false;
+		}
+		return std::memcmp(str_start, other.str_start, str_len) == 0;
+	}
+
 	const char* str_start = nullptr;
 	int str_len = 0;
 };

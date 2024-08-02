@@ -33,7 +33,7 @@ CLASS_IMPL(PrefabSelection);
 CLASS_IMPL(PointLightEntity);
 CLASS_IMPL(SpotLightEntity);
 CLASS_IMPL(SunLightEntity);
-
+CLASS_IMPL(DecalEntity);
 
 
 CLASS_IMPL(EntityComponent);
@@ -45,7 +45,7 @@ CLASS_IMPL(CapsuleComponent);
 CLASS_IMPL(PointLightComponent);
 CLASS_IMPL(SpotLightComponent);
 CLASS_IMPL(SunLightComponent);
-
+CLASS_IMPL(DecalComponent);
 
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
@@ -336,4 +336,41 @@ Entity::~Entity()
 {
 
 
+}
+
+#include "Render/Render_Decal.h"
+void DecalComponent::on_init() {
+	handle = idraw->get_scene()->register_decal(Render_Decal());
+	update_handle();
+}
+void DecalComponent::on_deinit() {
+	idraw->get_scene()->remove_decal(handle);
+}
+void DecalComponent::on_changed_transform() {
+	update_handle();
+}
+void DecalComponent::editor_on_change_property() {
+	update_handle();
+}
+void DecalComponent::update_handle()
+{
+	Render_Decal rd;
+	rd.transform = get_ws_transform();
+	rd.visible = true;
+	rd.material = material.get();
+	idraw->get_scene()->update_decal(handle, rd);
+}
+const PropertyInfoList* DecalComponent::get_props()
+{
+	START_PROPS(DecalComponent)
+		REG_ASSET_PTR(material, PROP_DEFAULT)
+	END_PROPS(DecalComponent)
+}
+DecalComponent::~DecalComponent() {}
+DecalComponent::DecalComponent() {}
+
+void DecalComponent::set_material(const MaterialInstance* mat)
+{
+	material.ptr = (MaterialInstance*)mat;
+	update_handle();
 }
