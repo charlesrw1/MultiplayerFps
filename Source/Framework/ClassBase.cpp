@@ -152,6 +152,7 @@ void ClassBase::init()
 				table->prop_table.insert({ prop_name_as_sv, &prop });
 			}
 		}
+		classtype->prop_hash_table = table;
 	}
 	// now call default constructors
 	auto& id_to_typeinfo = get_registry().id_to_typeinfo;

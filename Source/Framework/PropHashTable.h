@@ -10,9 +10,11 @@ struct StringViewHasher
         constexpr uint64_t FNV_PRIME = 0x100000001b3;
         uint64_t hash = FNV_OFFSET_BASIS;
         const char* str = k.str_start;
-        while (*str) {
+        uint32_t count = k.str_len;
+        while (count) {
             hash ^= static_cast<uint64_t>(*str++);
             hash *= FNV_PRIME;
+            count--;
         }
         return hash;
     }

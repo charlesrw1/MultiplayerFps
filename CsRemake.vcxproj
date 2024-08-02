@@ -104,6 +104,7 @@
     <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h" />
     <ClInclude Include="Source\Framework\PoolAllocator.h" />
     <ClInclude Include="Source\Framework\PropertyEd.h" />
+    <ClInclude Include="Source\Framework\PropHashTable.h" />
     <ClInclude Include="Source\Framework\Rect2d.h" />
     <ClInclude Include="Source\Framework\ReflectionProp.h" />
     <ClInclude Include="Source\Framework\ReflectionMacros.h" />

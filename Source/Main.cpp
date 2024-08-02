@@ -718,12 +718,16 @@ extern void at_test();
 #include "Game/Schema.h"
 
 #include "Render/MaterialLocal.h"
-
+#include "Framework/PropHashTable.h"
 int main(int argc, char** argv)
 {
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 	eng_local.init();
+
+	auto prop = MeshComponent::StaticType.prop_hash_table->prop_table.find(StringView("position"));
+	auto prop2 = MeshComponent::StaticType.prop_hash_table->prop_table.find(StringView("rotation"));
+
 
 	eng_local.loop();
 	eng_local.cleanup();

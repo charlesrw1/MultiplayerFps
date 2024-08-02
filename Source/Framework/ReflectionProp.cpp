@@ -545,7 +545,43 @@ FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePai
 	}
 	return { nullptr,nullptr };
 }
+#include "PropHashTable.h"
+std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const ClassTypeInfo* typeinfo, DictParser& in, StringView tok, ClassBase* userptr)
+{
+	// expect { (start field list) if not a null token
+	if (tok.str_len > 0 && !in.check_item_start(tok))
+		return { tok, false };
 
+	in.read_string(tok);
+	while (!in.is_eof() && !in.check_item_end(tok))	// exit out if } (end field list)
+	{
+		auto find = typeinfo->prop_hash_table->prop_table.find(tok);// dest_obj->find_in_proplists(name.c_str(), proplists);
+
+		if (find == typeinfo->prop_hash_table->prop_table.end()) {
+			auto name = tok.to_stack_string();
+			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
+
+			in.read_string(tok);	// ERROR
+			if (tok.cmp("[")) {
+				while (in.read_string(tok) && !tok.cmp("]")) {}
+			}
+
+
+			in.read_string(tok);
+			//ASSERT(0);
+			continue;
+		}
+
+		in.read_string(tok);
+		if (!read_propety_field(find->second, dest_obj, in, tok, userptr))
+			return { tok, false };
+
+
+		in.read_string(tok);
+	}
+
+	return { tok, true };
+}
 std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	// expect { (start field list) if not a null token

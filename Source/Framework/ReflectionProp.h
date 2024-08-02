@@ -155,6 +155,9 @@ void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, 
 std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, ClassBase* user = nullptr);
 std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, ClassBase* user = nullptr);
 
+std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, DictParser& in, StringView first_token, ClassBase* user = nullptr);
+
+
 void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, ClassBase* user = nullptr);
 
 class IListCallback

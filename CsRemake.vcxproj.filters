@@ -516,6 +516,7 @@
     <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Game\EntityTypes.h" />
     <ClInclude Include="Source\Render\Texture.h" />
+    <ClInclude Include="Source\Framework\PropHashTable.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

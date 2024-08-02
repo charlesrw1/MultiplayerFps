@@ -138,6 +138,7 @@ std::string LevelSerialization::serialize_entities_to_string(const std::vector<E
 	return out.get_output();
 }
 
+#if 0
 static std::pair<StringView,bool> read_just_props(ClassBase* e, DictParser& parser, SerializeEntityObjectContext* ctx)
 {
 	std::vector<PropertyListInstancePair> props;
@@ -150,6 +151,7 @@ static std::pair<StringView,bool> read_just_props(ClassBase* e, DictParser& pars
 
 	return read_multi_properties(props, parser, {}, ctx);
 }
+#endif
 
 bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, SerializeEntityObjectContext& ctx)
 {
@@ -159,10 +161,11 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 	const bool is_class = tok.cmp("class");
 	if (is_class || tok.cmp("schema")) {
 
+		const ClassTypeInfo* typeinfo{};
 		Entity* e = nullptr;
 		if (is_class) {
 			in.read_string(tok);
-			auto typeinfo = ClassBase::find_class(tok.to_stack_string().c_str());
+			typeinfo = ClassBase::find_class(tok.to_stack_string().c_str());
 			if (!typeinfo || !typeinfo->allocate || !typeinfo->is_a(Entity::StaticType)) {
 				sys_print("!!! no typeinfo to spawn level serialization %s\n", tok.to_stack_string().c_str());
 				return false;
@@ -177,8 +180,11 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 				return false;
 			}
 			e = schematype->create_entity_from_properties();
+			typeinfo = &e->get_type();
 		}
-		auto res = read_just_props(e,in,&ctx);
+		//auto res = read_just_props(e,in,&ctx);
+		auto res = read_props_to_object(e, typeinfo, in, {}, &ctx);
+
 		bool good = res.second;
 		tok = res.first;
 		if (!good) {
@@ -192,6 +198,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 		const bool is_component_override = tok.cmp("component_override");
 		if (is_component_override || tok.cmp("component_instance")) {
 			EntityComponent* ec = nullptr;
+			const ClassTypeInfo* ec_typeinfo = nullptr;
 			int integer{};
 			in.read_int(integer);
 			if (integer < 0)integer = 0xfffffff;
@@ -212,18 +219,19 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 					sys_print("!!! no entitycmp for var name existing %s\n", classname_or_varname.c_str());
 					return false;
 				}
+				ec_typeinfo = &ec->get_type();
 			}
 			else {
-				auto typeinfo = ClassBase::find_class(classname_or_varname.c_str());
-				if (!typeinfo || !typeinfo->is_a(EntityComponent::StaticType) || !typeinfo->allocate) {
+				ec_typeinfo = ClassBase::find_class(classname_or_varname.c_str());
+				if (!ec_typeinfo || !ec_typeinfo->is_a(EntityComponent::StaticType) || !ec_typeinfo->allocate) {
 					sys_print("!!! no entitycmp for type info to instance %s\n", classname_or_varname.c_str());
 					return false;
 				}
-				ec = (EntityComponent*)typeinfo->allocate();
+				ec = (EntityComponent*)ec_typeinfo->allocate();
 			}
 		
-
-			auto res = read_just_props(ec, in, &ctx);
+			auto res = read_props_to_object(ec, ec_typeinfo, in, {}, &ctx);
+			//auto res = read_just_props(ec, in, &ctx);
 			bool good = res.second;
 			tok = res.first;
 			if (!good) {
