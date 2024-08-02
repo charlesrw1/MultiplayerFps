@@ -110,6 +110,7 @@
     <ClInclude Include="Source\Framework\ReflectionMacros.h" />
     <ClInclude Include="Source\Framework\ScriptValue.h" />
     <ClInclude Include="Source\Framework\ArrayReflection.h" />
+    <ClInclude Include="Source\Framework\SerializerFunctions.h" />
     <ClInclude Include="Source\Framework\StringName.h" />
     <ClInclude Include="Source\Framework\StringUtil.h" />
     <ClInclude Include="Source\Framework\SubclassType.h" />
@@ -220,6 +221,7 @@
     <ClCompile Include="Source\Framework\Profilier.cpp" />
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
+    <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />

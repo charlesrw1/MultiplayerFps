@@ -33,6 +33,14 @@ public:
 			read_bytes_ptr((uint8_t*)s.data(), count);
 		}
 	}
+	StringView read_string_view() {
+		uint16_t count = read_int16();
+		if (!can_read_these_bytes(count))
+			return{};// null
+		StringView ret = StringView((const char*)&data[ptr], count);
+		ptr += count;
+		return ret;
+	}
 
 	uint8_t read_byte() {
 		if (!can_read_these_bytes(1))

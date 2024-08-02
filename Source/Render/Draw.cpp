@@ -857,8 +857,8 @@ void Renderer::create_default_textures()
 
 }
 
-// 4mb arena
-ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "4000000", CVAR_INTEGER|CVAR_UNBOUNDED);
+// 8mb arena
+ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "8000000", CVAR_INTEGER|CVAR_UNBOUNDED);
 
 void Renderer::init()
 {

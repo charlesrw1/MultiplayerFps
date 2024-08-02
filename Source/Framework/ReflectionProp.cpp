@@ -533,7 +533,7 @@ struct FindInst
 	void* instptr = nullptr;
 };
 
-FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePair>& proplists)
+static FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePair>& proplists)
 {
 	for (auto& prop : proplists) {
 		if (!prop.list)
@@ -546,6 +546,7 @@ FindInst find_in_proplists(const char* name, std::vector<PropertyListInstancePai
 	return { nullptr,nullptr };
 }
 #include "PropHashTable.h"
+
 std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const ClassTypeInfo* typeinfo, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	// expect { (start field list) if not a null token

@@ -84,6 +84,8 @@ private:
 	friend class LevelSerialization;
 };
 
+class FileWriter;
+class BinaryReader;
 class SerializeEntityObjectContext;
 class LevelSerialization
 {
@@ -96,10 +98,19 @@ public:
 
 	static std::string serialize_level(Level* l);
 
+	static void serialize_level_binary(Level* l, FileWriter& writer);
+	static void unserialize_level_binary(Level* l, BinaryReader& writer);
+
+
 	// doesnt call register/unregister on components, just creates everything
 	static std::string serialize_entities_to_string(const std::vector<Entity*>& entities);
 	static std::vector<Entity*> unserialize_entities_from_string(const std::string& str);
 private:
+
+	static void serialize_one_entity_binary(Entity* e, FileWriter& out, SerializeEntityObjectContext& ctx);
+
+	static bool unserialize_one_item_binary(BinaryReader& in, SerializeEntityObjectContext& ctx);
+
 	static void serialize_one_entity(Entity* e, DictWriter& out, SerializeEntityObjectContext& ctx);
 	static bool unserialize_one_item(StringView tok, DictParser& in, SerializeEntityObjectContext& ctx);
 };

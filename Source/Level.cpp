@@ -363,3 +363,200 @@ std::string LevelSerialization::serialize_level(Level* l)
 		all_ents.push_back(ent);
 	return serialize_entities_to_string(all_ents);
 }
+
+
+enum class SerializeTypeHeader
+{
+	Schema,
+	Class,
+	ComponentInstance,
+	ComponentOverride
+};
+#include "Framework/BinaryReadWrite.h"
+#include "Framework/SerializerFunctions.h"
+static void write_just_props_binary(ClassBase* e, const ClassBase* diff, FileWriter& out, SerializeEntityObjectContext* ctx)
+{
+	std::vector<PropertyListInstancePair> props;
+	const ClassTypeInfo* typeinfo = &e->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, e });
+		typeinfo = typeinfo->super_typeinfo;
+	}
+
+	for (auto& proplist : props) {
+		if (proplist.list)
+			write_properties_with_diff_binary(*const_cast<PropertyInfoList*>(proplist.list), e, diff, out, ctx);
+	}
+	out.write_string("");
+}
+void LevelSerialization::serialize_one_entity_binary(Entity* e, FileWriter& out, SerializeEntityObjectContext& ctx)
+{
+	ctx.entity_serialzing = e;
+
+	const int myindex = ctx.to_serialize_index.find((ClassBase*)e)->second;
+
+	const Entity* diffclass = (e->schema_type.get()) ? e->schema_type->get_default_schema_obj() : (Entity*)e->get_type().default_class_object;
+
+	assert(e->get_type() == diffclass->get_type());
+
+	if (e->schema_type.get()) {
+		out.write_byte((int)SerializeTypeHeader::Schema);
+		out.write_string(e->schema_type->get_name());
+	}
+	else {
+		out.write_byte((int)SerializeTypeHeader::Class);
+		out.write_string(e->get_type().classname);
+	}
+
+	write_just_props_binary(e, diffclass, out, &ctx);
+
+
+	for (int i = 0; i < e->all_components.size(); i++) {
+
+
+		auto& c = e->all_components[i];
+		EntityComponent* ec = nullptr;
+
+		ec = diffclass->find_component_for_string_name(c->eSelfNameString);
+		const bool is_owned = ec == nullptr || !ec->is_native_componenent;
+		if (is_owned) {
+
+			out.write_byte((int)SerializeTypeHeader::ComponentInstance);
+			out.write_int32(myindex);
+			out.write_string(c->get_type().classname);
+
+			auto type = c->get_type().default_class_object;
+			write_just_props_binary(c.get(), type, out, &ctx);
+		}
+		else {
+			out.write_byte((int)SerializeTypeHeader::ComponentOverride);
+			out.write_int32(myindex);
+			out.write_string(c->eSelfNameString.c_str());
+
+			write_just_props_binary(c.get(), ec, out, &ctx);
+		}
+	}
+}
+void LevelSerialization::serialize_level_binary(Level* l, FileWriter& out)
+{
+	std::vector<Entity*> all_ents;
+	for (auto ent : l->all_world_ents)
+		all_ents.push_back(ent);
+
+	SerializeEntityObjectContext ctx;
+	for (int i = 0; i < all_ents.size(); i++)
+		ctx.to_serialize_index[all_ents[i]] = i;
+
+	for (int i = 0; i < all_ents.size(); i++)
+		serialize_one_entity_binary(all_ents[i], out, ctx);
+}
+
+bool LevelSerialization::unserialize_one_item_binary(BinaryReader& in, SerializeEntityObjectContext& ctx)
+{
+	
+	SerializeTypeHeader header_type = (SerializeTypeHeader)in.read_byte();
+	switch (header_type)
+	{
+	case SerializeTypeHeader::Class: {
+		auto classname = in.read_string_view();
+		auto str = std::string(classname.str_start, classname.str_len);
+		auto typeinfo = ClassBase::find_class(str.c_str());
+		if (!typeinfo || !typeinfo->allocate || !typeinfo->is_a(Entity::StaticType)) {
+			sys_print("!!! no typeinfo to spawn level serialization %s\n", str.c_str());
+			return false;
+		}
+		Entity* e = (Entity*)typeinfo->allocate();
+
+		read_props_to_object_binary(e, typeinfo, in, &ctx);
+		ctx.unserialized.push_back(e);
+	}
+		break;
+	case SerializeTypeHeader::Schema: {
+		auto schemaname = in.read_string_view();
+		auto str = std::string(schemaname.str_start, schemaname.str_len);
+		auto schematype = g_schema_loader.load_schema(str.c_str());
+		if (!schematype) {
+			sys_print("!!! no schematype to spawn level serialization %s\n", str.c_str());
+			return false;
+		}
+		Entity* e = schematype->create_entity_from_properties();
+		auto typeinfo = &e->get_type();
+		read_props_to_object_binary(e, typeinfo, in, &ctx);
+		ctx.unserialized.push_back(e);
+	}
+		break;
+	case SerializeTypeHeader::ComponentInstance:
+	case SerializeTypeHeader::ComponentOverride: {
+		uint32_t integer = in.read_int32();
+		auto classname_or_varname = in.read_string_view();
+		auto str = std::string(classname_or_varname.str_start, classname_or_varname.str_len);
+
+		if (integer >= ctx.unserialized.size()) {
+			throw std::runtime_error("!!! comp_X parent integer greater than unserialized so far");
+		}
+		Entity* parent = ctx.unserialized.at(integer);
+		ctx.entity_serialzing = parent;
+
+		if (header_type == SerializeTypeHeader::ComponentOverride) {
+			EntityComponent* ec = parent->find_component_for_string_name(str.c_str());
+			if (!ec) {
+				throw std::runtime_error("!!! no entitycmp for var name existing");
+			}
+			const ClassTypeInfo* ec_typeinfo = &ec->get_type();
+
+
+			read_props_to_object_binary(ec, ec_typeinfo, in, &ctx);
+
+		}
+		else {
+			const ClassTypeInfo*  ec_typeinfo = ClassBase::find_class(str.c_str());
+			if (!ec_typeinfo || !ec_typeinfo->is_a(EntityComponent::StaticType) || !ec_typeinfo->allocate) {
+				throw std::runtime_error("!!! no entitycmp for type info to instance");
+			}
+			auto ec = (EntityComponent*)ec_typeinfo->allocate();
+
+			read_props_to_object_binary(ec, ec_typeinfo, in, &ctx);
+
+			ec->post_unserialize_created_component(parent);
+		}
+	}break;
+	default:
+		throw std::runtime_error("bad header type schema/classname\n");
+
+	}
+
+}
+void LevelSerialization::unserialize_level_binary(Level* l, BinaryReader& writer)
+{
+	SerializeEntityObjectContext ctx;
+	while (!writer.has_failed() && !writer.is_eof()) {
+		unserialize_one_item_binary(writer, ctx);
+	}
+}
+
+DECLARE_ENGINE_CMD(SLB)
+{
+	auto start = GetTime();
+
+	auto lvl = eng->get_level();
+	if (!lvl) return;
+	FileWriter out;
+	LevelSerialization::serialize_level_binary(lvl, out);
+
+	auto diff = GetTime() - start;
+	sys_print("TIME: %f\n", (float)diff);
+	std::ofstream outfile("file.bin",std::ios::binary);
+	outfile.write(out.get_buffer(), out.get_size());
+
+}
+DECLARE_ENGINE_CMD(LLB)
+{
+	auto start = GetTime();
+	auto lvl = new Level;
+	auto file = FileSys::open_read("file.bin");
+	BinaryReader in(file.get());
+	LevelSerialization::unserialize_level_binary(lvl, in);
+	auto diff = GetTime() - start;
+	sys_print("TIME: %f\n", (float)diff);
+}

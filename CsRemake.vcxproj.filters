@@ -517,6 +517,7 @@
     <ClInclude Include="Source\Game\EntityTypes.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Framework\PropHashTable.h" />
+    <ClInclude Include="Source\Framework\SerializerFunctions.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -763,5 +764,6 @@
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\Meshlet.cpp" />
+    <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
   </ItemGroup>
 </Project>
