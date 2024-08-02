@@ -118,10 +118,10 @@ program_handle MaterialManagerLocal::get_mat_shader(
 	key.editor_id = is_editor_mode;
 
 #ifdef _DEBUG
-	key.debug = debug_mode;
 #else 
-	key.debug = false;
+	//key.debug = false;
 #endif
+	key.debug = debug_mode;
 
 	program_handle handle = mat_table.lookup(key);
 	if (handle != -1) return handle;

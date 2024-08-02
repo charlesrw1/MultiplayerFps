@@ -11,6 +11,7 @@
 #include "DictParser.h"
 #include "DictWriter.h"
 
+// Implments binary serialization for Class system (as opposed to older text method, both still work, however)
 
 void write_properties_binary(const PropertyInfoList& list, void* ptr, FileWriter& out, ClassBase* userptr);
 void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr);
@@ -34,14 +35,14 @@ static FindInst2 find_in_proplists(const char* name, std::vector<PropertyListIns
 	return { nullptr,nullptr };
 }
 
-void write_field_name_and_type(PropertyInfo* prop, FileWriter* out)
+static void write_field_name_and_type(PropertyInfo* prop, FileWriter* out)
 {
 	out->write_string(prop->name);
 	out->write_byte((int)prop->type);
 }
 
-void write_list_binary(PropertyInfo* prop, void* ptr, FileWriter& out, ClassBase* userptr);
-void write_field_type_binary(bool write_name, core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, FileWriter& out, ClassBase* userptr) {
+static void write_list_binary(PropertyInfo* prop, void* ptr, FileWriter& out, ClassBase* userptr);
+static void write_field_type_binary(bool write_name, core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, FileWriter& out, ClassBase* userptr) {
 
 
 	switch (prop.type)
@@ -229,7 +230,7 @@ void write_field_type_binary(bool write_name, core_type_id type, void* ptr, cons
 	out.write_int32(0xDEADBEEF);
 }
 
-void write_list_binary(PropertyInfo* listprop, void* ptr, FileWriter& out, ClassBase* userptr)
+static void write_list_binary(PropertyInfo* listprop, void* ptr, FileWriter& out, ClassBase* userptr)
 {
 	// special case for atom types
 	auto list_ptr = listprop->list_ptr;
@@ -282,7 +283,7 @@ void write_properties_with_diff_binary(const PropertyInfoList& list, void* ptr, 
 		write_field_type_binary(true, prop.type, ptr, diff_class, prop, out, userptr);
 	}
 }
-void write_properties_binary(const PropertyInfoList& list, void* ptr, FileWriter& out, ClassBase* userptr)
+static void write_properties_binary(const PropertyInfoList& list, void* ptr, FileWriter& out, ClassBase* userptr)
 {
 	for (int i = 0; i < list.count; i++)
 	{
@@ -298,8 +299,8 @@ void write_properties_binary(const PropertyInfoList& list, void* ptr, FileWriter
 	}
 }
 
-void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr);
-bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryReader& in, ClassBase* userptr)
+static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr);
+static bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryReader& in, ClassBase* userptr)
 {
 	auto listcallback = prop->list_ptr;
 	bool is_atom_type =
@@ -330,7 +331,7 @@ bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryReader& in,
 	}
 	return true;
 }
-void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr)
+static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr)
 {
 	switch (prop->type)
 	{
@@ -417,7 +418,7 @@ void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, 
 }
 
 
-void read_multi_properties_binary(std::vector<PropertyListInstancePair>& proplists, BinaryReader& in,  ClassBase* userptr)
+static void read_multi_properties_binary(std::vector<PropertyListInstancePair>& proplists, BinaryReader& in,  ClassBase* userptr)
 {
 	while (!in.has_failed())
 	{
@@ -443,7 +444,7 @@ void read_multi_properties_binary(std::vector<PropertyListInstancePair>& proplis
 	}
 }
 
-void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr)
+static void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr)
 {
 	std::vector<PropertyListInstancePair> props(1);
 	props[0] = { &list,ptr };
@@ -451,26 +452,77 @@ void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReade
 }
 
 
+static void attempt_to_skip_existing_prop(BinaryReader& in, core_type_id type)
+{
+	switch (type)
+	{
+	case core_type_id::Bool:
+	case core_type_id::Int8: {
+		auto i = in.read_byte();
+	}break;
+	case core_type_id::Int16: {
+		auto i = in.read_int16();
+		break;
+	}
+	case core_type_id::Enum8:
+	case core_type_id::Enum16:
+	case core_type_id::Enum32:
+	case core_type_id::Int32: {
+		auto i = in.read_int32();
+	}break;
+	case core_type_id::Int64: {
+		auto i = in.read_int64();
+	}break;
+	case core_type_id::Float: {
+		auto i = in.read_float();
+	}break;
+	case core_type_id::Vec3: {
+		auto i = in.read_float();
+		i = in.read_float();
+		i = in.read_float();
+	}break;
+	case core_type_id::Quat: {
+		auto i = in.read_float();
+		i = in.read_float();
+		i = in.read_float();
+		i = in.read_float();
+	}break;
+	case core_type_id::StdString: {
+		auto sv = in.read_string_view();
+	}break;
+	case core_type_id::Struct: {
+		auto sv = in.read_string_view();
+	}break;
+	default:
+		throw std::runtime_error("existing param not found, had to throw (likely list type)");
+	}
+	auto t = in.read_int32();	//0xdeadbeef
+}
 
 void read_props_to_object_binary(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, BinaryReader& in, ClassBase* userptr)
 {
-
 	while (!in.has_failed())
 	{
 		StringView prop_name = in.read_string_view();
 		if (prop_name.str_len == 0)	// null terminator
 			return;
+		core_type_id type = (core_type_id)in.read_byte();
 
 		auto find = typeinfo->prop_hash_table->prop_table.find(prop_name);// dest_obj->find_in_proplists(name.c_str(), proplists);
 
 		if (find == typeinfo->prop_hash_table->prop_table.end()) {
 			std::string prop_name_as_std(prop_name.str_start, prop_name.str_len);
 			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", prop_name_as_std.c_str());
-			throw std::runtime_error("couldnt find param error: " + prop_name_as_std);
+			attempt_to_skip_existing_prop(in, type); // throws if it cant skip it
 			continue;
 		}
 
-		core_type_id type = (core_type_id)in.read_byte();
+		if (find->second->type != type) {
+			std::string prop_name_as_std(prop_name.str_start, prop_name.str_len);
+			printf("\n\n!!! PARAM MISMATCHES EXISTING TYPE %s !!!\n\n", prop_name_as_std.c_str());
+			attempt_to_skip_existing_prop(in, type);	// throws if it cant skip it
+			continue;
+		}
 
 		read_propety_field_binary(find->second, dest_obj, in, userptr);
 	}

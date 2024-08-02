@@ -725,9 +725,6 @@ int main(int argc, char** argv)
 	eng_local.argv = argv;
 	eng_local.init();
 
-	auto prop = MeshComponent::StaticType.prop_hash_table->prop_table.find(StringView("position"));
-	auto prop2 = MeshComponent::StaticType.prop_hash_table->prop_table.find(StringView("rotation"));
-
 
 	eng_local.loop();
 	eng_local.cleanup();
@@ -784,6 +781,20 @@ void GameEngineLocal::leave_level()
 	// current map gets unloaded in next ::loop()
 	state = Engine_State::Idle;
 }
+
+// Animation debugger is seperate
+
+// In 1 world at a time: editor world, game world, animation editor world, etc.
+// when switching maps, you implicity leave any editor state behind
+// can have 0 or 1 map loaded
+// gui is always loaded, insert explicit branch logic for editor vs game for the GUI
+// use world ticks if any map is loaded
+
+// execute map change then handles all logic for editor/game switching
+
+// switching to another editor or closing it goes through the same queued path
+// when a map is loaded, all the subsystems are ticked, like physics, sound, etc.
+
 
 void GameEngineLocal::execute_map_change()
 {
