@@ -170,7 +170,6 @@
     <ClInclude Include="Source\Socket.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Types.h" />
-    <ClInclude Include="Source\UI.h" />
     <ClInclude Include="Source\UI\GUILocal.h" />
     <ClInclude Include="Source\UI\GUIPublic.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />

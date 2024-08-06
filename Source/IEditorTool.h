@@ -1,6 +1,5 @@
 #pragma once
 
-#include "UI.h"
 #include <string>
 #include <cassert>
 union SDL_Event;

@@ -3,7 +3,6 @@
 #include "Assets/IAsset.h"
 #include "Framework/MulticastDelegate.h"
 #include "Game/SerializePtrHelpers.h"
-#include "UI.h"
 #include <glm/glm.hpp>
 #include "Render/MaterialPublic.h"
 #include <unordered_map>
@@ -160,16 +159,18 @@ public:
 
 	bool recieve_events = true;
 
+	// non owning ptr
 	GUI* parent = nullptr;
 
 	// localspace attributes for positioning
 	UIAnchorPos anchor{};	// anchors this widget to a spot on the screen
-	glm::ivec2 ls_position{};
-	glm::ivec2 ls_sz{};
+	glm::ivec2 ls_position{0,0};
+	glm::ivec2 ls_sz{50,50};
 	glm::vec2 pivot_ofs{};
 	GuiAlignment w_alignment{};	// how this widget is aligned in the parents size
 	GuiAlignment h_alignment{};
 	glm::ivec4 padding{};	// padding to apply to position
+	bool use_desired_size = false;
 
 	// worldspace, these are cached on update_layout and used for input/rendering
 	glm::ivec2 ws_position{};
@@ -177,24 +178,34 @@ public:
 	glm::ivec2 desired_size{};
 
 
+	// GUI will maintain a owning version of the ptr
 	void add_this(GUI* gui) {
 		if (gui->parent == this)
 			return;
-		children.push_back(gui);
+		children.push_back(std::unique_ptr<GUI>(gui));
 		//set_layout_dirty(true);
 		gui->parent = this;
 	}
-	void remove_this(GUI* gui) {
+	// you are responsible for the lifetime of the GUI now!
+	void release_this(GUI* gui) {
 		assert(gui->parent == this);
 		for (int i = 0; i < children.size(); i++) {
-			if (children[i] == gui) {
+			if (children[i].get() == gui) {
+				children[i].release();	// relase it!!
 				children.erase(children.begin() + i);
 				return;
 			}
 		}
 	}
+	// you are responsible for the lifetime of the GUI now!
+	void unlink_and_release_from_parent() {
+		if (!parent)
+			return;
+		parent->release_this(this);
+		parent = nullptr;
+	}
 protected:
-	std::vector<GUI*> children;
+	std::vector<std::unique_ptr<GUI>> children;
 
 	friend class GuiSystemLocal;
 };

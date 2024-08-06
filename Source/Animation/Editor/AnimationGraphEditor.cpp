@@ -53,6 +53,9 @@ public:
 	void on_key_up(const SDL_KeyboardEvent& key_event) override {
 		key_up_delegate.invoke(key_event);
 	}
+	void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) override {
+		wheel_delegate.invoke(wheel);
+	}
 
 	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
 	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
@@ -1520,10 +1523,7 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
 {
 	if (newstate == editor_focus_state::Background) {
-
-		if (gui->parent)
-			gui->parent->remove_this(gui.get());
-
+		gui->unlink_and_release_from_parent();
 		if (eng->get_state() != Engine_State::Game) {
 			stop_playback();
 			compile_and_run();
@@ -1534,8 +1534,7 @@ void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else if(newstate == editor_focus_state::Closed){
-		if (gui->parent)
-			gui->parent->remove_this(gui.get());
+		gui->unlink_and_release_from_parent();
 
 		close();
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");

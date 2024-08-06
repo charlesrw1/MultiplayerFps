@@ -8,7 +8,7 @@
 #include "Framework/MeshBuilder.h"
 #include "Framework/FreeList.h"
 #include "Framework/Config.h"
-
+#include "Framework/Rect2d.h"
 // Navigation, up down left right (both keyboard nad controller)
 
 // push down "go left"
@@ -77,6 +77,9 @@ public:
 		case SDL_MOUSEBUTTONUP: {
 			if (event.button.button == 1) {
 				if (dragging) {
+					if (ui_debug_press.get_bool())
+						sys_print("*** UI dragged released: %s\n", dragging->get_type().classname);
+
 					const glm::ivec2 where = { event.button.x - dragging->ws_position.x,event.button.y - dragging->ws_position.y };
 					dragging->on_released(where.x, where.y, 1);
 					dragging = nullptr;
@@ -85,6 +88,9 @@ public:
 			else {
 				GUI* g = find_gui_under_mouse_R(root, event.button.x, event.button.y);
 				if (g) {
+					if (ui_debug_press.get_bool())
+						sys_print("*** UI released: %s\n", g->get_type().classname);
+
 					const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
 					g->on_released(where.x, where.y, event.button.button);
 				}
@@ -94,10 +100,12 @@ public:
 	}
 
 	void post_handle_events() override {
-		int x = 0, y = 0;
-		SDL_GetMouseState(&x, &y);
-		GUI* g = find_gui_under_mouse_R(root, (int16_t)x, (int16_t)y);
-		set_hovering(g);
+		if (!dragging) {
+			int x = 0, y = 0;
+			SDL_GetMouseState(&x, &y);
+			GUI* g = find_gui_under_mouse_R(root, (int16_t)x, (int16_t)y);
+			set_hovering(g);
+		}
 	}
 
 	void think() override {
@@ -129,9 +137,6 @@ public:
 
 	void add_gui_panel_to_root(GUI* panel) override {
 		root->add_this(panel);
-	}
-	void remove_gui_panel_from_root(GUI* panel) override {
-		root->remove_this(panel);
 	}
 	void remove_reference(GUI* this_panel) override {
 		if (hovering == this_panel) hovering = nullptr;
@@ -211,18 +216,18 @@ public:
 
 	void update_widget_sizes_R(GUI* g) {
 		for (int i = 0; i < g->children.size(); i++)
-			update_widget_sizes_R(g->children[i]);
+			update_widget_sizes_R(g->children[i].get());
 		g->update_widget_size();
 	}
 	void update_widget_positions_R(GUI* g) {
 		g->update_subwidget_positions();
 		for (int i = 0; i < g->children.size(); i++)
-			update_widget_positions_R(g->children[i]);
+			update_widget_positions_R(g->children[i].get());
 	}
 	void paint_widgets_R(GUI* g, UIBuilder& builder) {
 		g->paint(builder);
 		for (int i = 0; i < g->children.size(); i++)
-			paint_widgets_R(g->children[i], builder);
+			paint_widgets_R(g->children[i].get(), builder);
 	}
 
 	GUI* find_gui_under_mouse_R(GUI* g, int16_t x, int16_t y) {
@@ -230,7 +235,7 @@ public:
 		if (!r.is_point_inside(x, y))
 			return nullptr;
 		for (int i = 0; i < g->children.size(); i++) {
-			auto child = g->children[i];
+			auto child = g->children[i].get();
 			GUI* g_sub = find_gui_under_mouse_R(child, x, y);
 			if (g_sub&&g_sub->recieve_events)
 				return g_sub;

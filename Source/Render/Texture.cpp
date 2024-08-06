@@ -103,7 +103,7 @@ void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal
 		break;
 	case TEXFMT_R8:
 		*format = GL_RED;
-		*internal_format = GL_RED;
+		*internal_format = GL_R8;
 		break;
 	case TEXFMT_BC4:
 		*format = GL_RED;

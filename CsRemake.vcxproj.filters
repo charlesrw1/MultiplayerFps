@@ -462,9 +462,6 @@
     <ClInclude Include="Source\Render\RenderExtra.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Source\UI.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\TerrainPublic.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>

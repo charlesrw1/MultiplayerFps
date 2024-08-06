@@ -26,7 +26,6 @@ public:
 	virtual void set_focus_to_this(GUI* panel) = 0;
 
 	virtual void add_gui_panel_to_root(GUI* panel) = 0;
-	virtual void remove_gui_panel_from_root(GUI* panel) = 0;
 	virtual void remove_reference(GUI* panel) = 0;
 	virtual void add_to_think_list(GUI* panel) = 0;
 	virtual void remove_from_think_list(GUI* panel) = 0;

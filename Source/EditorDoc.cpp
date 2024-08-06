@@ -36,20 +36,64 @@ IEditorTool* g_editor_doc = &ed_doc;
 
 
 #include "UI/Widgets/Layouts.h"
+#include "UI/Widgets/Interactables.h"
+
 #include "UI/Widgets/Visuals.h"
 #include "UI/GUISystemPublic.h"
 class EditorUILayout : public GUIFullscreen
 {
 public:
+
+	static GUIButton* create_button(const char* textstr) {
+		GUIButton* button = new GUIButton;
+		button->padding = { 5,5,5,5 };
+		button->w_alignment = GuiAlignment::Fill;
+
+		GUIText* text = new GUIText;
+		text->text = textstr;
+		text->color = COLOR_WHITE;
+		text->ls_position = { 0,0 };
+		text->w_alignment = GuiAlignment::Left;
+		text->h_alignment = GuiAlignment::Center;
+		text->padding = { 10,10,10,10 };
+
+
+		button->add_this(text);
+
+		return button;
+	}
+
 	EditorUILayout() {
 		test = new GUIBox;
 		test->color = COLOR_RED;
 		test->ls_sz = { 100,100 };
 		test->ls_position = { 0,0 };
 		test->pivot_ofs = { 0.5,0.5 };
-		//test->anchor = BottomRightAnchor;
-		add_this(test);
+		test->padding = { 5,5,5,5 };
+		test->h_alignment = GuiAlignment::Center;
+		test->w_alignment = GuiAlignment::Left;
+
+		vbox = new GUIVerticalBox;
+		vbox->ls_position = { 100,100 };
+		vbox->ls_sz = { 200,500 };
+
+	
+		GUIButton* b = create_button("PLAY");
+		vbox->add_this(b);
+		b = create_button("EXIT GAME");
+		vbox->add_this(b);
+
+		add_this(vbox);
+		//t2 = new GUIText;
+		//t2->text = "something else that I want to say";
+		//t2->ls_position = { 0,0 };
+		//t2->use_desired_size = true;
+		//add_this(t2);
 	}
+	void print_something() {
+		sys_print("---------------HELLO WORLD---------------\n");
+	}
+
 	void on_pressed(int x, int y, int button) override {
 		eng->get_gui()->set_focus_to_this(this);
 		mouse_down_delegate.invoke(x, y, button);
@@ -63,6 +107,9 @@ public:
 	void on_key_up(const SDL_KeyboardEvent& key_event) override {
 		key_up_delegate.invoke(key_event);
 	}
+	void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) override {
+		wheel_delegate.invoke(wheel);
+	}
 
 	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
 	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
@@ -70,7 +117,11 @@ public:
 	MulticastDelegate<int, int, int> mouse_up_delegate;
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 
+
+
 	GUIBox* test = nullptr;
+
+	GUIVerticalBox* vbox = nullptr;
 };
 
 CLASS_IMPL(EditorFolder);
@@ -319,15 +370,12 @@ void EditorDoc::draw_menu_bar()
 void EditorDoc::on_change_focus(editor_focus_state newstate)
 {
 	if (newstate == editor_focus_state::Background) {
-		if (gui->parent)
-			gui->parent->remove_this(gui.get());
+		gui->unlink_and_release_from_parent();
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
 		hide_everything();
 	}
 	else if (newstate == editor_focus_state::Closed) {
-		if (gui->parent)
-			gui->parent->remove_this(gui.get());
-
+		gui->unlink_and_release_from_parent();
 		close();
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
 	}

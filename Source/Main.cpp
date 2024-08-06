@@ -42,7 +42,7 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
 
-
+#include "UI/UILoader.h"
 #include "Framework/ClassBase.h"
 
 #include "Render/MaterialPublic.h"
@@ -1048,13 +1048,19 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		if (scene_hovered)
 			flags |=  ImGuiWindowFlags_NoMove;
 		bool next_focus = false;
+		//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		if (ImGui::Begin("Scene viewport",nullptr, flags)) {
 
 			auto size = ImGui::GetWindowSize();
+			size.y -= 50;
+			size.x -= 30;
+			if (size.y < 0) size.y = 0;
+			if (size.x < 0) size.x = 0;
+
 			auto pos = ImGui::GetCursorPos();
 			auto winpos = ImGui::GetWindowPos();
 			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), 
-				ImVec2(size.x-15, size.y-30), /* magic numbers ;) */
+				ImVec2(size.x, size.y), /* magic numbers ;) */
 				ImVec2(0,1),ImVec2(1,0));	// this is the scene draw texture
 			auto sz = ImGui::GetItemRectSize();
 			scene_hovered = ImGui::IsItemHovered();
@@ -1076,8 +1082,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		}
 
 		set_game_focused(next_focus);
-
 		ImGui::End();
+		//ImGui::PopStyleVar();
 	}
 	else {
 		// normal game path, scene view was already drawn the the window framebuffer
@@ -1267,7 +1273,7 @@ void GameEngineLocal::init()
 	network_init();
 	idraw->init();
 	imaterials->init();
-
+	g_fonts.init();
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 
 	anim_tree_man->init();

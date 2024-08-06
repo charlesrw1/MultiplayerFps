@@ -11,7 +11,6 @@
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"
 #include "Physics/Physics2.h"	// for g_physics->debug_draw()
-#include "UI.h"					// for gui->ui_paint()
 #include "IEditorTool.h"		// for overlay_draw()
 
 #include "Debug.h"
@@ -3242,6 +3241,11 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	if (gui && params.draw_ui && !r_force_hide_ui.get_bool())
 		gui->paint();
 
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_output);
+	glDisable(GL_BLEND);
+	set_shader(prog.simple);
+	shader().set_mat4("ViewProj", vs.viewproj);
+	shader().set_mat4("Model", mat4(1.f));
 
 	debug_tex_out.draw_out();
 

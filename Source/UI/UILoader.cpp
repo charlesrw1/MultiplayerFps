@@ -103,7 +103,7 @@ const GuiFont* GuiFontLoader::load_font(const std::string& path)
 		font->character_to_glyph.insert({ id,glyph });
 	}
 
-	font->font_texture = g_imgs.find_texture("courier_20_0.png");
+	font->font_texture = g_imgs.find_texture("sengo24_0.png");
 	font->path = path;
 	fonts.insert({ path,font });
 	return font;
@@ -116,7 +116,10 @@ DECLARE_ENGINE_CMD(FONT_TEST)
 
 	auto sz = GuiHelpers::calc_text_size("This is a string", font);
 }
-
+void GuiFontLoader::init()
+{
+	defaultFont = (GuiFont*)load_font("sengo24.fnt");
+}
 glm::ivec2 GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)
 {
 	int x = 0;
@@ -131,7 +134,7 @@ glm::ivec2 GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* fo
 
 		str++;
 	}
-	return { x, font->ptSz };
+	return { x, 24 };
 }
 glm::ivec2 GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int force_width )
 {

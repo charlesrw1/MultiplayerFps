@@ -3,7 +3,6 @@
 #include "Assets/IAsset.h"
 #include "Framework/MulticastDelegate.h"
 #include "Game/SerializePtrHelpers.h"
-#include "UI.h"
 #include <glm/glm.hpp>
 
 #include "Render/MaterialPublic.h"
