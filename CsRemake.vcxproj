@@ -125,6 +125,7 @@
     <ClInclude Include="Source\Game\EntityComponentTypes.h" />
     <ClInclude Include="Source\Game\EntityTypes.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
+    <ClInclude Include="Source\Game\GameMode.h" />
     <ClInclude Include="Source\Game\Player.h" />
     <ClInclude Include="Source\Game\PlayerAnimDriver.h" />
     <ClInclude Include="Source\Game\Schema.h" />
@@ -170,6 +171,13 @@
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\UI.h" />
+    <ClInclude Include="Source\UI\GUILocal.h" />
+    <ClInclude Include="Source\UI\GUIPublic.h" />
+    <ClInclude Include="Source\UI\GUISystemPublic.h" />
+    <ClInclude Include="Source\UI\UILoader.h" />
+    <ClInclude Include="Source\UI\Widgets\Interactables.h" />
+    <ClInclude Include="Source\UI\Widgets\Layouts.h" />
+    <ClInclude Include="Source\UI\Widgets\Visuals.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
@@ -229,6 +237,7 @@
     <ClCompile Include="Source\Game\FogComponent.cpp" />
     <ClCompile Include="Source\Game\Game.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
+    <ClCompile Include="Source\Game\GameMode.cpp" />
     <ClCompile Include="Source\Game\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Player.cpp" />
     <ClCompile Include="Source\Game\PlayerAnimDriver.cpp" />
@@ -257,6 +266,8 @@
     <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.h" />
+    <ClCompile Include="Source\UI\GUILocal.cpp" />
+    <ClCompile Include="Source\UI\UILoader.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

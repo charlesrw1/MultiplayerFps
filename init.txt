@@ -22,3 +22,7 @@ dbg.fly 1
 #output_texture 0.5 1.0 0.0 _csm_shadow
 
 #r.debug_csm 1
+
+FONT_TEST
+
+ui.debug_press 1

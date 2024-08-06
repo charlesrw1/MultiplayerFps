@@ -22,6 +22,8 @@
 
 #include "Render/TerrainInterfaceLocal.h"
 
+#include "UI/GUISystemPublic.h"	// for GuiSystemPublic::paint
+
 //#pragma optimize("", off)
 
 extern ConfigVar g_window_w;
@@ -3071,8 +3073,9 @@ void Renderer::deferred_decal_pass()
 }
 
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV);
+ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL);
 
-void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* gui, IEditorTool* tool)
+void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
 	GPUFUNCTIONSTART;
 
@@ -3102,7 +3105,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 		return;
 	else if (gui && !params.draw_world && params.draw_ui) {
 		// just paint ui and then return
-		gui->ui_paint();
+		gui->paint();
 		return;
 	}
 	vs = current_frame_main_view;
@@ -3209,9 +3212,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	// hook in physics debugging, function determines if its drawing or not
 	g_physics->debug_draw_shapes();
 
-	if (tool)
-		tool->overlay_draw();
-
 	if (g_draw_grid.get_bool())
 		draw_debug_grid();
 	
@@ -3239,8 +3239,8 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, UIControl* 
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
-	if (gui && params.draw_ui)
-		gui->ui_paint();
+	if (gui && params.draw_ui && !r_force_hide_ui.get_bool())
+		gui->paint();
 
 
 	debug_tex_out.draw_out();

@@ -1,0 +1,67 @@
+
+// ******** START "include "SharedGpuTypes.txt"" ********
+
+#include "SharedGpuTypes.txt"
+
+// ******** END "include "SharedGpuTypes.txt"" ********
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout (binding = 4, std430) readonly buffer GlobalMaterialBuffer {
+	uint _material_param_buffer[];
+};
+
+#ifdef _VERTEX_SHADER
+
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec4 VS_IN_Color;
+layout (location = 2) in vec2 VS_IN_TexCoord;
+
+out vec4 FS_IN_Color;
+out vec3 FS_IN_FragPos;
+out vec2 FS_IN_Texcoord;
+
+uniform mat4 ViewProj=mat4(1);
+
+void main()
+{
+	FS_IN_Color = VS_IN_Color;
+	FS_IN_FragPos = VS_IN_Postion;
+	FS_IN_Texcoord = VS_IN_TexCoord;
+	vec4 pos = ViewProj * vec4(VS_IN_Postion, 1.0);
+	
+	gl_Position = pos;
+}
+
+#endif // _VERTEX_SHADER
+
+#ifdef _FRAGMENT_SHADER
+
+layout (location = 0) out vec4 FS_OUT_Color;
+
+in vec4 FS_IN_Color;
+in vec3 FS_IN_FragPos;
+in vec2 FS_IN_Texcoord;
+
+// special inputs for UI
+uniform ivec2 uUiRectPos = ivec2(0,0);
+uniform ivec2 uUiRectSize = ivec2(1,1);
+
+// standard outputs for UI
+vec3 EMISSIVE = vec3(0.0);		// emissive color
+float OPACITY = 1.0;			// opacity, for alpha test
+
+// ********** START USER CODE **********
+___USER_FS_CODE___
+// ********** END USER CODE **********
+
+void main()
+{
+	FSmain();
+	
+	FS_OUT_Color = vec4(EMISSIVE*FS_IN_Color.rgb, OPACITY*FS_IN_Color.a);
+}
+
+#endif // _FRAGMENT_SHADER

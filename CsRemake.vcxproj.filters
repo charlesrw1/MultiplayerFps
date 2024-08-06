@@ -518,6 +518,14 @@
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Framework\PropHashTable.h" />
     <ClInclude Include="Source\Framework\SerializerFunctions.h" />
+    <ClInclude Include="Source\UI\UILoader.h" />
+    <ClInclude Include="Source\UI\GUIPublic.h" />
+    <ClInclude Include="Source\UI\GUILocal.h" />
+    <ClInclude Include="Source\UI\Widgets\Layouts.h" />
+    <ClInclude Include="Source\UI\Widgets\Interactables.h" />
+    <ClInclude Include="Source\UI\Widgets\Visuals.h" />
+    <ClInclude Include="Source\Game\GameMode.h" />
+    <ClInclude Include="Source\UI\GUISystemPublic.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -765,5 +773,8 @@
     </ClCompile>
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
+    <ClCompile Include="Source\UI\UILoader.cpp" />
+    <ClCompile Include="Source\UI\GUILocal.cpp" />
+    <ClCompile Include="Source\Game\GameMode.cpp" />
   </ItemGroup>
 </Project>

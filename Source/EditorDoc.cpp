@@ -437,12 +437,45 @@ void EditorDoc::show_everything()
 	//	nodes[i]->show();
 }
 
+#include "UI/Widgets/Layouts.h"
+#include "UI/Widgets/Visuals.h"
+#include "UI/GUISystemPublic.h"
+class EditorLayout : public GUIFullscreen
+{
+public:
+	EditorLayout() {
+		test = new GUIBox;
+		test->color = COLOR_RED;
+		test->ls_sz = { 100,100 };
+		test->ls_position = { 0,0 };
+		test->pivot_ofs = { 0.5,0.5 };
+		//test->anchor = BottomRightAnchor;
+		add_this(test);
+
+		eng->get_gui()->add_gui_panel_to_root(this);
+
+		eng->get_gui()->set_focus_to_this(this);
+	}
+	void on_pressed() override {
+		eng->get_gui()->set_focus_to_this(this);
+	}
+
+	~EditorLayout() {
+		eng->get_gui()->remove_gui_panel_from_root(this);
+	}
+
+	GUIBox* test = nullptr;
+};
+
+EditorLayout* gedlayout{};
 void EditorDoc::init()
 {
 	// set my parent
-	set_parent(eng->get_gui());
+	set_parent(eng->get_gui_old());
 	//ed_schema.load("./Data/classes.txt");
 	global_asset_browser.init();
+
+	gedlayout = new EditorLayout;
 }
 #include "Framework/DictWriter.h"
 #include <fstream>
@@ -677,6 +710,18 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 	return out;
 }
 
+void some_funcs()
+{
+	ImGui::DragInt2("box pos", &gedlayout->test->ls_position.x, 1.f, -1000, 1000);
+	auto& a = gedlayout->test->anchor;
+	int x[2] = { a.positions[0][0],a.positions[1][1] };
+	ImGui::SliderInt2("anchor", x, 0, 255);
+	a.positions[0][0] = x[0];
+	a.positions[0][1] = x[0];
+	a.positions[1][0] = x[1];
+	a.positions[1][1] = x[1];
+}
+AddToDebugMenu myfuncs("edbox test", some_funcs);
 
 void EditorDoc::tick(float dt)
 {

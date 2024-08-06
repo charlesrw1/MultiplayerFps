@@ -7,13 +7,6 @@ class Texture;
 const int UI_SCREEN_WIDTH = 640;
 const int UI_SCREEN_HEIGHT = 480;
 
-enum class UIAnchor : uint8_t
-{
-	TopL,Top,TopR,
-	L,C,R,
-	BottomL,Bottom,BottomR
-};
-
 
 // base class for all UI functions
 union SDL_Event;

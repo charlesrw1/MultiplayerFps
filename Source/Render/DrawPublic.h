@@ -88,6 +88,7 @@ public:
 	virtual TerrainInterfacePublic* get_terrain_interface() = 0;
 };
 
+class GuiSystemPublic;
 class RendererPublic
 {
 public:
@@ -100,8 +101,8 @@ public:
 	virtual void scene_draw(
 		SceneDrawParamsEx params,
 		View_Setup view,	/* camera */
-		UIControl* ui_root = nullptr /* ui_paint callback */, 
-		IEditorTool* tool = nullptr /* overlay_draw callback (might remove this)*/) = 0;
+		GuiSystemPublic* gui /* ui_paint callback */
+	) = 0;
 	virtual void on_level_start() = 0;
 	virtual void on_level_end() = 0;
 	

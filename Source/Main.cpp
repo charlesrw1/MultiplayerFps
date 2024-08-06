@@ -47,6 +47,8 @@
 
 #include "Render/MaterialPublic.h"
 
+#include "UI/GUISystemPublic.h"
+
 MeshBuilder phys_debug;
 
 GameEngineLocal eng_local;
@@ -724,13 +726,25 @@ int main(int argc, char** argv)
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 	eng_local.init();
-
-
 	eng_local.loop();
 	eng_local.cleanup();
 	
 	return 0;
 }
+
+// Set these in vars.txt (or init.txt) located in $ROOT
+// They function identically, but vars is preferred for "const" configuration and init for short term changes
+// init.txt is ran after vars.txt, so it will overwrite
+
+// The entry point of the game! (not used in the editor)
+// Takes in a string of the level to start with on the final game
+// Should look like: "mylevel.bin" for $ROOT/Data/Maps/mylevel.bin
+ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV);
+// The default gamemode and player to choose when undefined by the WorldSettings entity
+// Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
+// and for a subtype of Player defined in Game/Player.h
+ConfigVar g_default_gamemode("g_default_gamemode", "", CVAR_DEV);
+ConfigVar g_default_playerclass("g_default_player", "", CVAR_DEV);
 
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
@@ -793,7 +807,6 @@ void GameEngineLocal::leave_level()
 // execute map change then handles all logic for editor/game switching
 
 // switching to another editor or closing it goes through the same queued path
-// when a map is loaded, all the subsystems are ticked, like physics, sound, etc.
 
 
 void GameEngineLocal::execute_map_change()
@@ -1065,7 +1078,10 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			auto size = ImGui::GetWindowSize();
 			auto pos = ImGui::GetCursorPos();
 			auto winpos = ImGui::GetWindowPos();
-			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), ImVec2(size.x, size.y), ImVec2(0,1),ImVec2(1,0));	// this is the scene draw texture
+			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), 
+				ImVec2(size.x-15, size.y-30), /* magic numbers ;) */
+				ImVec2(0,1),ImVec2(1,0));	// this is the scene draw texture
+			auto sz = ImGui::GetItemRectSize();
 			scene_hovered = ImGui::IsItemHovered();
 			window_viewport_size = { size.x,size.y };
 			window_hovered = ImGui::IsWindowHovered();
@@ -1079,6 +1095,9 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			rect.w = size.x;
 			rect.h = size.y;
 			gui_root->set_screen_rect_base(rect);
+
+			get_gui()->set_viewport_size(size.x, size.y);
+			get_gui()->set_viewport_ofs(pos.x + winpos.x, pos.y + winpos.y);
 
 			bool focused_window = scene_hovered;
 			next_focus = focused_window && ImGui::GetIO().MouseDown[1];
@@ -1102,6 +1121,9 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		rect.h = g_window_h.get_integer();
 
 		gui_root->set_screen_rect_base(rect);
+
+		get_gui()->set_viewport_size(g_window_w.get_integer(), g_window_h.get_integer());
+		get_gui()->set_viewport_ofs(0,0);
 	}
 
 	if(g_drawimguidemo.get_bool())
@@ -1121,7 +1143,7 @@ bool GameEngineLocal::game_draw_screen()
 	if (get_local_player() == nullptr) {
 		params.draw_world = false;
 		params.draw_ui = true;
-		idraw->scene_draw(params, vs_for_gui, get_gui(), nullptr);	// not spawned, so just update the UI
+		idraw->scene_draw(params, vs_for_gui, get_gui());	// not spawned, so just update the UI
 		return true;
 	}
 
@@ -1136,7 +1158,7 @@ bool GameEngineLocal::game_draw_screen()
 
 	View_Setup vs = View_Setup(position, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
-	idraw->scene_draw(params,vs, get_gui(), nullptr);
+	idraw->scene_draw(params,vs, get_gui());
 
 	return true;
 }
@@ -1162,17 +1184,17 @@ void GameEngineLocal::draw_screen()
 		// draw general ui
 		if (get_current_tool() != nullptr) {
 			params.is_editor = true;	// draw to the id buffer for mouse picking
-			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui(), get_current_tool());
+			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui());
 		}
 		else {
 			params.draw_world = false;	// no world to draw
-			idraw->scene_draw(params, vs_for_gui, get_gui(), nullptr);
+			idraw->scene_draw(params, vs_for_gui, get_gui());
 		}
 	}
 	else if (state == Engine_State::Loading) {
 		// draw loading ui etc.
 		params.draw_world = false;
-		idraw->scene_draw(params, vs_for_gui, get_gui(), nullptr);
+		idraw->scene_draw(params, vs_for_gui, get_gui());
 	}
 	else if (state == Engine_State::Game) {
 		bool good = game_draw_screen();
@@ -1286,6 +1308,8 @@ void GameEngineLocal::init()
 	network_init();
 	idraw->init();
 	imaterials->init();
+
+	gui_sys.reset(GuiSystemPublic::create_gui_system());
 
 	gui_root.reset(new GUI_RootControl );
 
@@ -1501,8 +1525,11 @@ void GameEngineLocal::loop()
 					continue;
 			}
 
+			get_gui_old()->handle_event(event);
+
 			get_gui()->handle_event(event);
 		}
+		get_gui()->post_handle_events();
 
 		Cmd_Manager::get()->execute_buffer();
 
@@ -1575,6 +1602,8 @@ void GameEngineLocal::loop()
 				g_physics->simulate_and_fetch(dt);
 			}
 		}
+
+		get_gui()->think();
 
 		draw_screen();
 

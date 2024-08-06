@@ -37,6 +37,7 @@ class Level;
 class OsInput;
 struct ImGuiContext;
 class ClassTypeInfo;
+class GuiSystemPublic;
 class GameEnginePublic
 {
 public:
@@ -45,7 +46,7 @@ public:
 	virtual Entity* get_local_player() = 0;
 	virtual Entity* get_player_slot(uint32_t index) = 0;
 	virtual uint32_t get_local_player_slot() = 0;
-	virtual UIControl* get_gui() = 0;
+	virtual UIControl* get_gui_old() = 0;
 	virtual Client* get_client() = 0;
 	virtual Server* get_server() = 0;
 	virtual SDL_Window* get_os_window() = 0;
@@ -57,6 +58,7 @@ public:
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;
 	virtual bool is_editor_level() const = 0;
+	virtual GuiSystemPublic* get_gui() const = 0;
 
 	virtual void leave_level() = 0;
 	// queues a level to be loaded
