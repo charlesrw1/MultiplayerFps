@@ -77,7 +77,6 @@ public:
 	virtual void tick(float dt) override;
 	virtual const View_Setup& get_vs() override;
 	virtual void overlay_draw() override;
-	virtual void on_change_focus(editor_focus_state newstate) override;
 	virtual void init() override;
 	virtual bool can_save_document() override;
 	virtual const char* get_editor_name() override;

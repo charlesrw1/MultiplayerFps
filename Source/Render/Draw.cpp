@@ -3084,8 +3084,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	stats = Render_Stats();
 	state_machine.invalidate_all();
 
-	const bool needs_composite = !params.output_to_screen;
-
 	if (cur_w != view.width || cur_h != view.height)
 		InitFramebuffers(true, view.width, view.height);
 	lastframe_vs = current_frame_main_view;
@@ -3221,7 +3219,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	int y = vs.height;
 
 
-	uint32_t framebuffer_to_output = (needs_composite) ? fbo.composite : 0;
+	uint32_t framebuffer_to_output = fbo.composite;// (needs_composite) ? fbo.composite : 0;
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_output);
 	glViewport(0, 0, cur_w, cur_h);
 
@@ -3248,6 +3246,19 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	shader().set_mat4("Model", mat4(1.f));
 
 	debug_tex_out.draw_out();
+
+	if (params.output_to_screen) {
+		GPUSCOPESTART("Blit composite to backbuffer");
+
+		glBlitNamedFramebuffer(
+			fbo.composite,
+			0,	/* blit to backbuffer */
+			0, 0, cur_w, cur_h,
+			0, 0, cur_w, cur_h,
+			GL_COLOR_BUFFER_BIT,
+			GL_NEAREST
+		);
+	}
 
 	//cubemap_positions_debug();
 

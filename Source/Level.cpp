@@ -87,11 +87,11 @@ Level::Level() : all_world_ents(4/*2^4*/), tick_list(4)
 }
 Level::~Level()
 {
-	for (auto ent : all_world_ents) {
-		ent->destroy();
-		delete ent;
-	}
-	all_world_ents.clear_all();
+	//for (auto ent : all_world_ents) {
+	//	ent->destroy();
+	//	delete ent;
+	//}
+	//all_world_ents.clear_all();
 }
 
 Level* LevelSerialization::create_empty_level(const std::string& file, bool is_editor)

@@ -16,6 +16,19 @@
 
 #include "Framework/Config.h"
 
+
+CLASS_H(PlayerNull, PlayerBase)
+public:
+	void get_view(
+		glm::vec3& pos,
+		glm::vec3& front,
+		float& fov
+	) override {}
+	void set_input_command(Move_Command cmd) override {}
+};
+CLASS_IMPL(PlayerNull);
+
+CLASS_IMPL(PlayerBase);
 CLASS_IMPL(Player);
 CLASS_IMPL(PlayerSpawnPoint);
 
@@ -1022,3 +1035,68 @@ void ViewmodelComponent::update()
 //		for all objects
 //			client update
 #endif
+
+#include "UI/GUISystemPublic.h"
+#include "UI/Widgets/Layouts.h"
+#include "UI/Widgets/Visuals.h"
+
+
+class PlayerHUD : public GUIFullscreen
+{
+public:
+	PlayerHUD(Player* p) {
+		recieve_events = false;
+
+		p->score_update_delegate.add(this, &PlayerHUD::on_set_score);
+
+		scoreWidget = new GUIText;
+		scoreWidget->anchor.positions[0][1] = 128;
+		scoreWidget->anchor.positions[1][0] = 128;
+		scoreWidget->anchor.positions[0][0] = 128;
+		scoreWidget->anchor.positions[1][1] = 128;
+		scoreWidget->pivot_ofs = { 0.5,0.5 };
+		scoreWidget->use_desired_size = true;
+
+		add_this(scoreWidget);
+
+		boxWidget = new GUIBox;
+		boxWidget->ls_position = { 0,0 };
+		boxWidget->ls_sz = { 200,200 };
+		boxWidget->color = COLOR_CYAN;
+		add_this(boxWidget);
+
+		eng->get_gui()->add_gui_panel_to_root(this);
+	}
+	~PlayerHUD() {
+		unlink_and_release_from_parent();
+	}
+
+	void on_set_score(int count) {
+		scoreWidget->text = "Score: " + std::to_string(count);
+	}
+
+	GUIText* scoreWidget = nullptr;
+	GUIBox* boxWidget = nullptr;
+};
+
+ void Player::start()  {
+	 player_mesh->set_model("player_FINAL.cmdl");
+
+	 hud = std::make_unique<PlayerHUD>(this);
+
+	 score_update_delegate.invoke(10);
+}
+ Player::~Player() {
+ }
+ Player::Player() {
+	 player_mesh = create_sub_component<MeshComponent>("CharMesh");
+	 player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
+	 viewmodel_mesh = create_sub_component<MeshComponent>("ViewmodelMesh");
+	 spotlight = create_sub_component<SpotLightComponent>("Flashlight");
+	 root_component = player_capsule;
+
+	 player_mesh->attach_to_parent(player_capsule, {});
+	 viewmodel_mesh->attach_to_parent(player_mesh, {});
+	 spotlight->attach_to_parent(root_component.get(), {});
+ }
+

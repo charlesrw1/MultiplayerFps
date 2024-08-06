@@ -21,7 +21,7 @@
 #include "Game/StdEntityTypes.h"
 
 #include "Level.h"
-
+#include "WorldSettings.h"
 CLASS_IMPL(Entity);
 
 CLASS_IMPL(Door);
@@ -34,6 +34,8 @@ CLASS_IMPL(PointLightEntity);
 CLASS_IMPL(SpotLightEntity);
 CLASS_IMPL(SunLightEntity);
 CLASS_IMPL(DecalEntity);
+
+CLASS_IMPL(WorldSettings);
 
 
 CLASS_IMPL(EntityComponent);
@@ -374,15 +376,3 @@ void DecalComponent::set_material(const MaterialInstance* mat)
 	material.ptr = (MaterialInstance*)mat;
 	update_handle();
 }
-
-// A pure data container entity for storing level specific information
-// Cruicially, it stores the "game mode" (yes im copying unreal here ;) )
-// A Player class is also spawned per player. For a menu level, you can set this to be a null class to skip any functionality
-// Override to add any more special data saved per level that can then be referenced by the game_mode or other classes
-// This persists through the levels lifetime, but shouldn't be ticked
-CLASS_H(WorldSettingsEntity, Entity)
-public:
-	const ClassTypeInfo* game_mode = nullptr;
-	const ClassTypeInfo* player_class = nullptr;
-};
-CLASS_IMPL(WorldSettingsEntity);

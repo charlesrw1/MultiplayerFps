@@ -80,6 +80,7 @@
     <ClInclude Include="Source\Framework\BVH.h" />
     <ClInclude Include="Source\Framework\Bytepacker.h" />
     <ClInclude Include="Source\Framework\ClassBase.h" />
+    <ClInclude Include="Source\Framework\ClassTypePtr.h" />
     <ClInclude Include="Source\Framework\Config.h" />
     <ClInclude Include="Source\Framework\Curve.h" />
     <ClInclude Include="Source\Framework\CurveEditorImgui.h" />
@@ -119,6 +120,7 @@
     <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />
     <ClInclude Include="Source\GameEnginePublic.h" />
+    <ClInclude Include="Source\Game\BasePlayer.h" />
     <ClInclude Include="Source\Game\EditorCommands.h" />
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
@@ -126,12 +128,14 @@
     <ClInclude Include="Source\Game\EntityTypes.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
     <ClInclude Include="Source\Game\GameMode.h" />
+    <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Player.h" />
     <ClInclude Include="Source\Game\PlayerAnimDriver.h" />
     <ClInclude Include="Source\Game\Schema.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
     <ClInclude Include="Source\Game\StdEntityTypes.h" />
+    <ClInclude Include="Source\Game\WorldSettings.h" />
     <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Level.h" />
@@ -215,6 +219,7 @@
     <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
     <ClCompile Include="Source\Framework\ClassBase.cpp" />
+    <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
     <ClCompile Include="Source\Framework\DictParser.cpp" />

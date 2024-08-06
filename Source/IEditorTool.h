@@ -5,18 +5,6 @@
 union SDL_Event;
 struct View_Setup;
 
-// Focus state allows an editor tool to be run in the background while the game is running.
-// This allows for debugging or editing while playing.
-// However the engine only has 1 rendering+physics world, thus when a game starts, all the
-// editor renderables/lights/physics/etc. handles need to removed.
-// When the game closes and returns focus to the editor, all the editor stuff should be brought back.
-// Do this in on_change_focus()
-enum class editor_focus_state
-{
-	Closed,		// not open
-	Background,	// open but game is active
-	Focused,	// open and active
-};
 
 // Base editor tool class, inherits from UIControl for paint() and handle_event() calls
 class IEditorTool
@@ -27,35 +15,17 @@ public:
 	void close();
 	bool save();
 
-	editor_focus_state get_focus_state() const {
-		return focus_state;
-	}
-	// call this when the game starts or the game ends
-	void set_focus_state(editor_focus_state state) {
-		if (focus_state != state) {
-			focus_state = state;
-			on_change_focus(state);
-		}
-		assert(has_document_open() != (state == editor_focus_state::Closed));
-	}
+
 	// this is how documents are opened from the engine layer
-	// you must provide the editor_focus_state to enter the editor in
-	bool open_and_set_focus(const char* path, editor_focus_state state) {
+	bool open_document(const char* path) {
 		if (!is_initialized) {
 			init();
 			is_initialized = true;
 		}
-		
-		if (focus_state != state) {
-			focus_state = state;
-			on_change_focus(state);
-		}
+	
 		bool could_open = open(path);
-		if (!could_open) {
-			focus_state = editor_focus_state::Closed;
-			on_change_focus(editor_focus_state::Closed);
-		}
-		assert(!could_open || (has_document_open() != (state == editor_focus_state::Closed)));
+
+		assert(!could_open || has_document_open());
 
 		return could_open;
 	}
@@ -68,11 +38,6 @@ public:
 	virtual void overlay_draw() = 0;
 	// called every frame to make imgui calls
 	virtual void imgui_draw();
-
-	// this is called when the focus_state changes, when you get a call to
-	// editor_focus_state::closed, you must close
-	// this is guaranteed to call before open()
-	virtual void on_change_focus(editor_focus_state newstate) = 0;
 
 	// various hooks to add imgui calls
 	virtual void hook_imgui_newframe() {}
@@ -138,5 +103,5 @@ private:
 	bool is_initialized = false;
 	bool open_open_popup = false;
 	bool open_save_popup = false;
-	editor_focus_state focus_state = editor_focus_state::Closed;
+	bool is_open = false;
 };

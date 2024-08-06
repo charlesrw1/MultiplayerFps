@@ -7,6 +7,9 @@
 #include "PlayerAnimDriver.h"
 #include "Entity.h"
 #include "Game/EntityComponentTypes.h"
+#include "Framework/MulticastDelegate.h"
+
+#include "BasePlayer.h"
 
 using std::unique_ptr;
 using std::vector;
@@ -73,20 +76,12 @@ struct PlayerFlags
 	};
 };
 
-CLASS_H(Player, Entity)
+class PlayerHUD;
+CLASS_H(Player, PlayerBase)
 public:
 
-	Player() {
-		player_mesh = create_sub_component<MeshComponent>("CharMesh");
-		player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
-		viewmodel_mesh = create_sub_component<MeshComponent>("ViewmodelMesh");
-		spotlight = create_sub_component<SpotLightComponent>("Flashlight");
-		root_component = player_capsule;
-
-		player_mesh->attach_to_parent(player_capsule, {});
-		viewmodel_mesh->attach_to_parent(player_mesh, {});
-		spotlight->attach_to_parent(root_component.get(), {});
-	}
+	Player();
+	~Player() override;
 
 	MeshComponent* player_mesh{};
 	CapsuleComponent* player_capsule{};
@@ -95,6 +90,10 @@ public:
 	SpotLightComponent* spotlight{};
 
 	AssetPtr<Model> a_second_model;
+
+	MulticastDelegate<int> score_update_delegate;
+
+	std::unique_ptr<PlayerHUD> hud;
 	
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)
@@ -106,15 +105,14 @@ public:
 
 	// Entity overrides
 	void update() override;
-	void start() override {
-		player_mesh->set_model("player_FINAL.cmdl");
-	}
+	void start() override;
 
+	// PlayerBase interface
 	// called by game before calling update
-	void set_input_command(Move_Command cmd);
+	void set_input_command(Move_Command cmd) override;
+	void get_view(glm::vec3& origin, glm::vec3& angles, float& fov) override;
 
 	glm::vec3 calc_eye_position();
-	void get_view(glm::vec3& origin, glm::vec3& angles, float& fov);
 
 	void find_a_spawn_point();
 

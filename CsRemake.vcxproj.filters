@@ -523,6 +523,10 @@
     <ClInclude Include="Source\UI\Widgets\Visuals.h" />
     <ClInclude Include="Source\Game\GameMode.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
+    <ClInclude Include="Source\Game\WorldSettings.h" />
+    <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
+    <ClInclude Include="Source\Framework\ClassTypePtr.h" />
+    <ClInclude Include="Source\Game\BasePlayer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -772,5 +776,6 @@
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\Game\GameMode.cpp" />
+    <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
   </ItemGroup>
 </Project>

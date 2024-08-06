@@ -11,7 +11,7 @@
 
 #include "GameEnginePublic.h"
 #include "OsInput.h"
-
+#include "Framework/MulticastDelegate.h"
 using glm::vec3;
 class IEditorTool;
 class Player;
@@ -31,6 +31,9 @@ public:
 	GameEngineLocal();
 
 	// Public Interface
+	virtual GameMode* get_gamemode() const override {
+		return gamemode;
+	}
 	virtual Level* get_level() const override {
 		return level;
 	}
@@ -118,30 +121,18 @@ public:
 	// Host functions
 
 public:
+	MulticastDelegate<bool> on_map_load_return;
+
 	bool map_spawned() { return level != nullptr; }
 
-	// does not manage memory for you
-	void set_level_manually_for_editor(Level* l) {
-		ASSERT(l->is_editor_level());
-		ASSERT(get_state() == Engine_State::Idle);
-		ASSERT(is_in_an_editor_state());
-		level = l;
-	}
-	void clear_level_manually_for_editor() {
-		ASSERT(level);
-		ASSERT(level->is_editor_level());
-		ASSERT(is_in_an_editor_state());
-		level = nullptr;
-	}
-
 	std::unique_ptr<GuiSystemPublic> gui_sys;
-
-	unique_ptr<Client> cl;
-	unique_ptr<Server> sv;
+	std::unique_ptr<Client> cl;
+	std::unique_ptr<Server> sv;
 	OsInput inp;
 
 	string queued_mapname;
 	Level* level= nullptr;
+	GameMode* gamemode = nullptr;
 
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;

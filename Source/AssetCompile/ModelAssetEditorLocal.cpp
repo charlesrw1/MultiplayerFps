@@ -33,7 +33,7 @@ void ModelEditorTool::tick(float dt)
 
 	view = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 
-	if (get_focus_state() != editor_focus_state::Background && compilied_model) {
+	if (compilied_model) {
 		if (!object.is_valid())
 			object = idraw->get_scene()->register_obj();
 		Render_Object obj;
@@ -289,13 +289,6 @@ void ModelEditorTool::overlay_draw()
 {
 }
 
-void ModelEditorTool::on_change_focus(editor_focus_state newstate)
-{
-	if (newstate == editor_focus_state::Closed)
-		close();
-	else if (newstate == editor_focus_state::Background)
-		idraw->get_scene()->remove_obj(object);
-}
 
 void ModelEditorTool::init()
 {

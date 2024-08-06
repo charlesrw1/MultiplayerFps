@@ -17,6 +17,7 @@
 #include "Framework/Hashset.h"
 
 class PhysicsActor;
+class WorldSettings;
 CLASS_H(Level, IAsset)
 public:
 	Level();
@@ -38,6 +39,7 @@ public:
 	hash_map<Entity> all_world_ents;
 	uint64_t last_id = 0;
 	uint64_t local_player_id = 0;
+	const WorldSettings* world_settings = nullptr;	// the world settings entity, shouldnt be nullptr
 
 	template<typename T, size_t COUNT>
 	bool find_all_entities_of_class(InlineVec<T*, COUNT>& out) {
@@ -47,6 +49,15 @@ public:
 				out.push_back((T*)e);
 		}
 		return out.size() != 0;
+	}
+	template<typename T>
+	T* find_first_of() {
+		static_assert(std::is_base_of<Entity, T>::value, "find_first_of needs T=Entity subclass");
+		for (auto e : all_world_ents) {
+			if (e->is_a<T>())
+				return (T*)e;
+		}
+		return nullptr;
 	}
 
 	void insert_entity_into_hashmap(Entity* e) {

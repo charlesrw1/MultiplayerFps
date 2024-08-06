@@ -5,17 +5,18 @@
 class Player;
 CLASS_H(GameMode, ClassBase)
 public:
+	virtual ~GameMode() {}
 	// called post unserialization, before anything has reg'd 
 	// can handle any loading from a save file here
-	virtual void init() = 0;
+	virtual void init() {}
 	// called after entities reg'ing, but before any have start()'d
-	virtual void start() = 0;
+	virtual void start() {}
 	// called when map is getting removed
-	virtual void end() = 0;
+	virtual void end() {}
 
 	// called every frame
-	virtual void tick() = 0;
+	virtual void tick() {}
 
 	// called when spawning a player for a client slot
-	virtual void on_player_create(int slot, Player* player) = 0;
+	virtual void on_player_create(int slot, Player* player) {}
 };

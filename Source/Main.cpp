@@ -49,6 +49,10 @@
 
 #include "UI/GUISystemPublic.h"
 
+#include "Game/GameMode.h"
+
+#include "Game/WorldSettings.h"
+
 MeshBuilder phys_debug;
 
 GameEngineLocal eng_local;
@@ -221,6 +225,33 @@ template<typename T>
 T* checked_cast(ClassBase* c) {
 	return c ? c->cast_to<T>() : nullptr;
 }
+
+
+template<typename T>
+struct GameInput
+{
+	const T& get_val() const { return val; }
+	T val{};
+
+	MulticastDelegate<T> on_send;
+};
+
+
+struct InputContext
+{
+	// input name ("weapon_fire") ("keybind") ("modifier")
+};
+
+class GameInputMgr
+{
+public:
+	GameInput<glm::vec2> directional_move;
+	GameInput<glm::vec2> look_delta;
+	GameInput<bool> weapon_fire;
+	GameInput<bool> weapon_reload;
+	GameInput<bool> crouch;
+	GameInput<bool> jump;
+};
 
 void GameEngineLocal::make_move()
 {
@@ -517,13 +548,13 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool, const char* fi
 	sys_print("--------- Change Editor State ---------\n");
 	if (active_tool != next_tool && active_tool != nullptr) {
 		// this should call close internally
-		get_current_tool()->set_focus_state(editor_focus_state::Closed);
+		get_current_tool()->close();
 	}
 	active_tool = next_tool;
 	if (active_tool != nullptr) {
 		enable_imgui_docking();
 		global_asset_browser.init();
-		bool could_open = get_current_tool()->open_and_set_focus(file, (get_state() == Engine_State::Game) ? editor_focus_state::Background : editor_focus_state::Focused);
+		bool could_open = get_current_tool()->open_document(file);
 		if (!could_open) {
 			active_tool = nullptr;
 		}
@@ -588,18 +619,25 @@ DECLARE_ENGINE_CMD(reconnect)
 		eng->get_client()->Reconnect();
 }
 
+// open a map for playing
 DECLARE_ENGINE_CMD(map)
 {
 	if (args.size() < 2) {
-		sys_print("usage map <map name>");
+		sys_print("usage: map <map name>");
 		return;
 	}
+
+	if (eng->get_current_tool() != nullptr) {
+		sys_print("*** starting game so closing any editors\n");
+		eng_local.change_editor_state(nullptr);	// close any editors
+	}
+
 	eng->open_level(args.at(1));
 }
 DECLARE_ENGINE_CMD(exec)
 {
 	if (args.size() < 2) {
-		sys_print("usage map <map name>");
+		sys_print("usage: exec <exec filename>");
 		return;
 	}
 
@@ -716,8 +754,8 @@ ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV);
 // The default gamemode and player to choose when undefined by the WorldSettings entity
 // Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
 // and for a subtype of Player defined in Game/Player.h
-ConfigVar g_default_gamemode("g_default_gamemode", "", CVAR_DEV);
-ConfigVar g_default_playerclass("g_default_player", "", CVAR_DEV);
+ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV);
+ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV);
 
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
@@ -781,6 +819,37 @@ void GameEngineLocal::leave_level()
 
 // switching to another editor or closing it goes through the same queued path
 
+// either: in an idle state (almost never here, only if in editor mode and no editor is open)
+//		   in a game state (menu map, in game map, in editor with map)
+//			in a loading state (queued map, loading it)
+//			freeing of resources happens between map loads (no streaming stuff)
+//			start editor->editor queues a map load (editor version)
+//			main tick then loads the map and either fails or succeeds
+//			can also pass in a "null" map to just create an empty map, but it goes through same path
+//	when loading map for the actual game:
+//		load all the entities (only unserialize) (this can be async along with model/texture loads)
+//		find the world settings entity
+//		create the gamemode
+//		gamemode->init()
+//		register entities
+//		gamemode->begin()
+//		begin() all entities
+//		create player entity from worldsettings
+//		gamemode->spawn_player()
+//		*ready for ticks*
+// when loading map for the editor
+//		load all the entities
+//		register all entities
+//		*read for ticks*
+// when freeing editor map
+//		unregister all entities
+// when freeing actual game map
+//		gamemode->end()
+//		unregister all entities
+//		end() all entities
+
+// execute_map_change(editor_tool /* can be null */, mapname)
+
 
 void GameEngineLocal::execute_map_change()
 {
@@ -788,21 +857,73 @@ void GameEngineLocal::execute_map_change()
 
 	// free current map
 	stop_game();
+	assert(!level);
 
 	// try loading map
-	level = LevelSerialization::unserialize_level(queued_mapname, false/* not for editor*/);
+	const bool this_is_for_editor = is_in_an_editor_state();
+
+	// special name to create a map
+	if (this_is_for_editor && queued_mapname == "__empty__") {	
+		level = LevelSerialization::create_empty_level("empty.txt", true/* is for editor*/);
+		assert(level);
+	}
+	else {
+
+		const std::string& fullpath = "./Data/Maps/" + queued_mapname;
+
+		level = LevelSerialization::unserialize_level(fullpath, this_is_for_editor/* is for editor?*/);
+	}
+
 	if (!level) {
 		sys_print("!!! couldn't load map !!!\n");
 		state = Engine_State::Idle;
+
+		on_map_load_return.invoke(false);
 		return;
 	}
+
+	if (!this_is_for_editor) {
+		level->world_settings = level->find_first_of<WorldSettings>();
+		const ClassTypeInfo* gamemode_type = {};
+		if (!level->world_settings || !level->world_settings->gamemode_type.ptr)
+			gamemode_type = ClassBase::find_class(g_default_gamemode.get_string());
+		else
+			gamemode_type = level->world_settings->gamemode_type.ptr;
+
+		assert(gamemode_type);
+		assert(gamemode_type->is_a(GameMode::StaticType));
+
+		assert(!gamemode);
+		gamemode = (GameMode*)gamemode_type->allocate();
+
+		// call init on game mode
+		gamemode->init();
+	}
+
+	// registers components
+	// calls start() if this is not an editor level
 	level->init_entities_post_load();
 
 	tick = 0;
 	time = 0.0;
+	set_tick_rate(60.f);
 
-	if (is_host())
-		spawn_starting_players(true);
+	// spawn in the player
+	if (!this_is_for_editor) {
+		const ClassTypeInfo* player_type = {};
+		if (!level->world_settings || !level->world_settings->player_type.ptr)
+			player_type = ClassBase::find_class(g_default_playerclass.get_string());
+		else
+			player_type = level->world_settings->player_type.ptr;
+		
+		assert(player_type);
+		assert(player_type->is_a(PlayerBase::StaticType));
+
+		auto p = spawn_entity_from_classtype(player_type);
+		level->local_player_id = p->self_id.handle;
+
+		gamemode->on_player_create(0, (Player*)p);
+	}
 
 	idraw->on_level_start();
 
@@ -811,6 +932,8 @@ void GameEngineLocal::execute_map_change()
 	// fixme, for server set state to game, but clients will sit in a wait loop till they recieve their first
 	// snapshot before continuing
 	state = Engine_State::Game;
+
+	on_map_load_return.invoke(true);
 }
 
 
@@ -898,7 +1021,7 @@ void GameEngineLocal::bind_key(int key, string command)
 void GameEngineLocal::cleanup()
 {
 	if (get_current_tool())
-		get_current_tool()->set_focus_state(editor_focus_state::Closed);
+		get_current_tool()->close();
 
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
@@ -913,14 +1036,6 @@ void GameEngineLocal::cleanup()
 
 	gui_sys.reset(nullptr);
 }
-
-static int bloom_layer = 0;
-extern float wsheight;
-extern float wsradius;
-extern float wsstartheight;
-extern float wsstartradius;
-extern vec3 wswind_dir;
-extern float speed;
 
 
 class Debug_Interface_Impl : public Debug_Interface
@@ -1112,7 +1227,7 @@ bool GameEngineLocal::game_draw_screen()
 		return true;
 	}
 
-	Player* p = checked_cast<Player>(get_local_player());
+	PlayerBase* p = checked_cast<PlayerBase>(get_local_player());
 	ASSERT(p)
 	
 	glm::vec3 position(0,0,0);
@@ -1145,28 +1260,25 @@ void GameEngineLocal::draw_screen()
 	vs_for_gui.width = viewport.x;
 	vs_for_gui.height = viewport.y;
 
-	if (state == Engine_State::Idle) {
+
+	if (state == Engine_State::Loading) {
+		// draw loading ui etc.
+		params.draw_world = false;
+		idraw->scene_draw(params, vs_for_gui, get_gui());
+	}
+	else if (state == Engine_State::Game) {
+
 		// draw general ui
 		if (get_current_tool() != nullptr) {
 			params.is_editor = true;	// draw to the id buffer for mouse picking
 			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui());
 		}
 		else {
-			params.draw_world = false;	// no world to draw
-			idraw->scene_draw(params, vs_for_gui, get_gui());
-		}
-	}
-	else if (state == Engine_State::Loading) {
-		// draw loading ui etc.
-		params.draw_world = false;
-		idraw->scene_draw(params, vs_for_gui, get_gui());
-	}
-	else if (state == Engine_State::Game) {
-		bool good = game_draw_screen();
-
-		if (!good) {
-			glClearColor(1.0, 1.0, 1.0, 1.0);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			bool good = game_draw_screen();
+			if (!good) {
+				glClearColor(1.0, 1.0, 1.0, 1.0);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			}
 		}
 	}
 
@@ -1333,6 +1445,11 @@ void GameEngineLocal::init()
 
 	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
 
+	// not in editor and no queued map, load the entry point
+	if (!is_in_an_editor_state() && get_state() != Engine_State::Loading) {
+		open_level(g_entry_level.get_string());
+	}
+
 	TIMESTAMP("execute startup");
 }
 
@@ -1356,6 +1473,10 @@ void GameEngineLocal::game_update_tick()
 
 	Debug::on_fixed_update_start();
 
+	assert(level);
+	if (level->is_editor_level())
+		return;
+
 	// create input
 	make_move();
 	//if (!is_host())
@@ -1364,6 +1485,9 @@ void GameEngineLocal::game_update_tick()
 	time = tick * tick_interval;
 	//build_physics_world(0.f);
 	
+	// tick the gamemode
+	gamemode->tick();
+
 	// update entities
 	for (auto ent : level->all_world_ents) {
 		ent->update_entity_and_components();
@@ -1421,10 +1545,25 @@ void GameEngineLocal::stop_game()
 
 	ASSERT(level);
 
+	// hook any system calls
 	idraw->on_level_end();
-	
-	delete level;
+
+	const bool is_this_editor_level = level->is_editor_level();
+	ASSERT(is_this_editor_level == (gamemode==nullptr));
+	if (!is_this_editor_level) {
+		gamemode->end();
+		// delete gamemode
+		delete gamemode;
+		gamemode = nullptr;
+	}
+	for (auto ent : level->all_world_ents) {
+		ent->destroy();	// calls end() if not editor level and unregisters all components
+		delete ent;	// call destructor
+	}
+
+	delete level;	// delete level object
 	level = nullptr;
+
 
 	// clear any debug shapes
 	Debug::on_fixed_update_start();
@@ -1497,21 +1636,14 @@ void GameEngineLocal::loop()
 		switch (state)
 		{
 		case Engine_State::Idle:
-			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
-
-			if (map_spawned() && !get_level()->is_editor_level()) {
+			if (map_spawned()) {	// map is spawned, unload it
 				stop_game();
-				continue;	// goto next frame
+				continue;			// goto next frame
 			}
-			else if(is_in_an_editor_state()){
-				get_current_tool()->set_focus_state(editor_focus_state::Focused);
-			}
+
+			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
 			break;
 		case Engine_State::Loading:
-
-			// for compiling data etc.
-			if (is_in_an_editor_state())
-				get_current_tool()->set_focus_state(editor_focus_state::Background);
 
 			execute_map_change();
 			continue; // goto next frame
@@ -1543,7 +1675,7 @@ void GameEngineLocal::loop()
 			}
 
 			if (state != Engine_State::Game)
-				continue;	// goto next frame
+				continue;	// goto next frame (to exit or change map)
 
 			pre_render_update();
 
@@ -1553,18 +1685,15 @@ void GameEngineLocal::loop()
 		
 		}
 
-		// can tick() tool when in a game state
+		// tick any tools
 		if (is_in_an_editor_state()) {
 			get_current_tool()->tick(frame_time);
-			// hack: when in editor state, still want physics simulation
-			if (state != Engine_State::Game) {
-				float dt = frame_time * g_slomo.get_float();
-				g_physics->simulate_and_fetch(dt);
-			}
 		}
 
+		// tick the gui
 		get_gui()->think();
 
+		// draw
 		draw_screen();
 
 		Profiler::end_frame_tick();

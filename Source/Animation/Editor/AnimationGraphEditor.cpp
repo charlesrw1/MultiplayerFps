@@ -241,6 +241,8 @@ void AnimationGraphEditor::close_internal()
 	node_props->clear_all();
 
 	ImNodes::EditorContextFree(default_editor);
+
+	gui->unlink_and_release_from_parent();
 }
 
 static std::string saved_settings = "";
@@ -1520,43 +1522,43 @@ std::vector<const char*>* anim_completion_callback_function(void* user, const ch
 	return &vec;
 }
 
-void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
-{
-	if (newstate == editor_focus_state::Background) {
-		gui->unlink_and_release_from_parent();
-		if (eng->get_state() != Engine_State::Game) {
-			stop_playback();
-			compile_and_run();
-		}
-		control_params->refresh_props();
-		out.hide();
-		playback = graph_playback_state::running;
-		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
-	}
-	else if(newstate == editor_focus_state::Closed){
-		gui->unlink_and_release_from_parent();
-
-		close();
-		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
-	}
-	else {
-		eng->get_gui()->add_gui_panel_to_root(gui.get());
-		eng->get_gui()->set_focus_to_this(gui.get());
-
-		// focused, stuff can start being rendered
-		playback = graph_playback_state::stopped;
-		control_params->refresh_props();
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
-	}
-}
+//void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
+//{
+//	//if (newstate == editor_focus_state::Background) {
+//	//	gui->unlink_and_release_from_parent();
+//	//	if (eng->get_state() != Engine_State::Game) {
+//	//		stop_playback();
+//	//		compile_and_run();
+//	//	}
+//	//	control_params->refresh_props();
+//	//	out.hide();
+//	//	playback = graph_playback_state::running;
+//	//	//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+//	//}
+//	//else if(newstate == editor_focus_state::Closed){
+//	//	gui->unlink_and_release_from_parent();
+//	//
+//	//	close();
+//	//	//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
+//	//}
+//	//else {
+//	//	eng->get_gui()->add_gui_panel_to_root(gui.get());
+//	//	eng->get_gui()->set_focus_to_this(gui.get());
+//	//
+//	//	// focused, stuff can start being rendered
+//	//	playback = graph_playback_state::stopped;
+//	//	control_params->refresh_props();
+//	//	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
+//	//}
+//}
 
 
 
 void AnimationGraphEditor::tick(float dt)
 {
-	assert(get_focus_state() != editor_focus_state::Closed);
+	///assert(get_focus_state() != editor_focus_state::Closed);
 
-	if(get_focus_state()==editor_focus_state::Focused)
+	if(1)
 	{
 		assert(eng->get_state() != Engine_State::Game);
 
@@ -1785,6 +1787,7 @@ void AnimationGraphEditor::try_load_preview_models()
 
 void AnimationGraphEditor::open_document_internal(const char* name)
 {
+
 	bool needs_new_doc = true;
 	if (strlen(name)!=0) {
 		// try loading graphname, create new document on fail
@@ -1837,6 +1840,14 @@ void AnimationGraphEditor::open_document_internal(const char* name)
 
 	// refresh control_param editor
 	//control_params.init_from_tree(get_tree()->params.get());
+
+	eng->get_gui()->add_gui_panel_to_root(gui.get());
+	eng->get_gui()->set_focus_to_this(gui.get());
+
+	// focused, stuff can start being rendered
+	playback = graph_playback_state::stopped;
+	control_params->refresh_props();
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 }
 
 

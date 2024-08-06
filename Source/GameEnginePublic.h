@@ -37,9 +37,11 @@ class OsInput;
 struct ImGuiContext;
 class ClassTypeInfo;
 class GuiSystemPublic;
+class GameMode;
 class GameEnginePublic
 {
 public:
+	virtual GameMode* get_gamemode() const = 0;
 	virtual Level* get_level() const = 0;
 	virtual Entity* get_entity(uint64_t handle) = 0;
 	virtual Entity* get_local_player() = 0;

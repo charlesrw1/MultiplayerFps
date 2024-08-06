@@ -502,7 +502,7 @@ public:
 		else
 			camera.scroll_callback(wheel.y);
 	}
-
+	void on_map_load_return(bool good);
 
 	void duplicate_selected_and_select_them();
 
@@ -557,11 +557,8 @@ public:
 	MulticastDelegate<uint64_t> on_change_name;
 
 	// Inherited via IEditorTool
-	virtual void on_change_focus(editor_focus_state newstate) override;
 private:
 
-	void hide_everything();
-	void show_everything();
 
 	uint32_t get_next_id() {
 		return id_start++;

@@ -2,13 +2,13 @@
 thirdperson 1
 
 
-start_ed Map thisIsTheMap.txt
+#start_ed Map mainMenuMap.txt
 
 g_draw_physx_scene 31
 g_drawdebugmenu 1
 g_drawimguidemo 1
 
-bind 1 "map m"
+bind 1 "map thisIsTheMap.txt"
 bind 6 "start_ed map m.txt"
 
 bind F1 "r.debug_mode 0"

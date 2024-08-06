@@ -2,6 +2,7 @@
 #include "UI/GUIPublic.h"
 #include "UI/UILoader.h"
 #include <string>
+#include "Framework/Config.h"
 CLASS_H(GUIBox, GUI)
 public:
 	GUIBox() {

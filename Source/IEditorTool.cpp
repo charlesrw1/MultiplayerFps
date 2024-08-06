@@ -13,12 +13,12 @@
 
 
 bool IEditorTool::open(const char* name) {
-	assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
+	//assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
 
-	if (get_focus_state() == editor_focus_state::Background) {
-		sys_print("!!! cant open %s while game is running. Close the level then try again.\n", get_editor_name());
-		return false;
-	}
+	//if (get_focus_state() == editor_focus_state::Background) {
+	//	sys_print("!!! cant open %s while game is running. Close the level then try again.\n", get_editor_name());
+	//	return false;
+	//}
 	// close currently open document
 	close();
 	assert(!has_document_open());
@@ -179,7 +179,7 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 	if (ImGui::BeginPopupModal("Open file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
-			tool->open_and_set_focus(buf, tool->get_focus_state());
+			tool->open_document(buf);
 			}, prefix.c_str(), false);
 	}
 }

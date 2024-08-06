@@ -367,40 +367,6 @@ void EditorDoc::draw_menu_bar()
 
 }
 
-void EditorDoc::on_change_focus(editor_focus_state newstate)
-{
-	if (newstate == editor_focus_state::Background) {
-		gui->unlink_and_release_from_parent();
-		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
-		hide_everything();
-	}
-	else if (newstate == editor_focus_state::Closed) {
-		gui->unlink_and_release_from_parent();
-		close();
-		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
-	}
-	else {
-		// focused, stuff can start being rendered
-		assert(!gui->parent);
-		eng->get_gui()->add_gui_panel_to_root(gui.get());
-		eng->get_gui()->set_focus_to_this(gui.get());
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
-		show_everything();
-	}
-}
-
-void EditorDoc::hide_everything()
-{
-	//for (int i = 0; i < nodes.size(); i++)
-	//	nodes[i]->hide();
-}
-void EditorDoc::show_everything()
-{
-	//for (int i = 0; i < nodes.size(); i++)
-	//	nodes[i]->show();
-}
-
-
 void EditorDoc::init()
 {
 	//ed_schema.load("./Data/classes.txt");
@@ -420,48 +386,56 @@ bool EditorDoc::save_document_internal()
 	return true;
 }
 
+void EditorDoc::on_map_load_return(bool good)
+{
+	if (!good) {
+		eng->open_level("__empty__");
+	}
+	else {
+		set_doc_name(eng->get_level()->get_name());
+		on_start.invoke();
+
+		//eng_local.on_map_load_return.remove(this);
+	}
+
+}
 void EditorDoc::open_document_internal(const char* levelname)
 {
 	id_start = 0;
 	bool needs_new_doc = true;
 	if (strlen(levelname) != 0) {
-		std::string path = get_save_root_dir() + levelname;
-
-		Level* level = LevelSerialization::unserialize_level(path, true/*for editor*/);
-		if (level) {
-			eng_local.set_level_manually_for_editor(level);
-
-			level->init_entities_post_load();
-
-			needs_new_doc = false;
-			set_doc_name(levelname);
-		}
+		eng->open_level(levelname);	// queues load
+		needs_new_doc = false;
 	}
 
 	if(needs_new_doc) {
 		sys_print("creating new document\n");
 		set_empty_name();
-
-		Level* newlevel = LevelSerialization::create_empty_level("empty.txt", true/* for editor */);
-		eng_local.set_level_manually_for_editor(newlevel);
-
-		newlevel->init_entities_post_load();	// should be nothing, but maybe in the future empty levels have some extras
+		eng->open_level("__empty__");	// queues load
 	}
 
+	eng_local.on_map_load_return.add(this, &EditorDoc::on_map_load_return);
 	is_open = true;
 
-	on_start.invoke();
+	assert(!gui->parent);
+	eng->get_gui()->add_gui_panel_to_root(gui.get());
+	eng->get_gui()->set_focus_to_this(gui.get());
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
 }
 
 void EditorDoc::close_internal()
 {
+	eng_local.on_map_load_return.remove(this);
+
+	// level will get unloaded in the main loop
+
 	sys_print("*** deleting map file for editor...\n");
-	delete eng_local.level;
-	eng_local.clear_level_manually_for_editor(); // sets eng->level to null
 
 	command_mgr->clear_all();
 	
 	on_close.invoke();
+
+	gui->unlink_and_release_from_parent();
 
 	is_open = false;
 }
@@ -927,8 +901,8 @@ void EditorDoc::imgui_draw()
 
 void EditorDoc::hook_scene_viewport_draw()
 {
-	if (get_focus_state() != editor_focus_state::Focused)
-		return;
+	//if (get_focus_state() != editor_focus_state::Focused)
+	//	return;
 
 	if (ImGui::BeginDragDropTarget())
 	{

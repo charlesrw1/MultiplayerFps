@@ -223,4 +223,8 @@ public:
 	static ClassTypeIterator get_subclasses() {
 		return ClassTypeIterator(&T::StaticType);
 	}
+
+	static ClassTypeIterator get_subclasses(const ClassTypeInfo* typeinfo) {
+		return ClassTypeIterator((ClassTypeInfo*)typeinfo/* remove const here, doesnt matter tho*/);
+	}
 };

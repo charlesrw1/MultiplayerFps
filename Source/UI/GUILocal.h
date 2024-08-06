@@ -127,7 +127,7 @@ public:
 		update_widget_positions_R(root);
 	}
 	void paint() override {
-		CPUFUNCTIONSTART;
+		GPUFUNCTIONSTART;
 
 		UIBuilder build(this);
 		build.init_drawing_state();
