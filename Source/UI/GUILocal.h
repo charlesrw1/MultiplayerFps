@@ -58,28 +58,36 @@ public:
 			if (focusing)
 				focusing->on_mouse_scroll(event.wheel);
 		}break;
+
 		case SDL_MOUSEBUTTONDOWN: {
 			GUI* g = find_gui_under_mouse_R(root, event.button.x, event.button.y);
-			if (pressing) {
-				sys_print("??? GuiHandleEvent: pressing is not null when mousebuttondown event sent\n");
-				pressing->on_released();
-			}
-
-			pressing = g;
-			if (pressing) {
+			if (g) {
+				const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
+				
 				if (ui_debug_press.get_bool())
-					sys_print("*** UI pressed: %s\n", pressing->get_type().classname);
-				pressing->on_pressed();
+					sys_print("*** UI pressed: %s\n", g->get_type().classname);
+				g->on_pressed(where.x, where.y, event.button.button);
+
+				if (event.button.button == 1)
+				{
+					dragging = g;
+				}
 			}
 		}break;
 		case SDL_MOUSEBUTTONUP: {
-			if (!pressing)
-				sys_print("??? GuiHandleEvent: pressing is null when mousebuttonup event sent\n");
+			if (event.button.button == 1) {
+				if (dragging) {
+					const glm::ivec2 where = { event.button.x - dragging->ws_position.x,event.button.y - dragging->ws_position.y };
+					dragging->on_released(where.x, where.y, 1);
+					dragging = nullptr;
+				}
+			}
 			else {
-				if (ui_debug_press.get_bool())
-					sys_print("*** UI released: %s\n", pressing->get_type().classname);
-				pressing->on_released();
-				pressing = nullptr;
+				GUI* g = find_gui_under_mouse_R(root, event.button.x, event.button.y);
+				if (g) {
+					const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
+					g->on_released(where.x, where.y, event.button.button);
+				}
 			}
 		}break;
 		}
@@ -95,10 +103,13 @@ public:
 	void think() override {
 		CPUFUNCTIONSTART;
 
+		int x = 0, y = 0;
+		SDL_GetMouseState(&x, &y);
+
 		if (hovering)
-			hovering->on_hovering();
-		if (pressing)
-			pressing->on_dragging();
+			hovering->on_hovering(x,y);
+		if (dragging)
+			dragging->on_dragging(x,y);
 		if (focusing)
 			focusing->on_focusing();
 		//for (auto gui : think_list)
@@ -124,7 +135,7 @@ public:
 	}
 	void remove_reference(GUI* this_panel) override {
 		if (hovering == this_panel) hovering = nullptr;
-		if (pressing == this_panel) pressing = nullptr;
+		if (dragging == this_panel) dragging = nullptr;
 		if (focusing == this_panel) focusing = nullptr;
 		//think_list.remove(this_panel);
 	}
@@ -177,7 +188,7 @@ public:
 
 
 	GUI* hovering = nullptr;
-	GUI* pressing = nullptr;
+	GUI* dragging = nullptr;
 	GUI* focusing = nullptr;
 
 	//hash_set<GUI> think_list;

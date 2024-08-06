@@ -50,9 +50,6 @@ public:
 	virtual uint32_t get_local_player_slot() override {
 		return 0;
 	}
-	virtual UIControl* get_gui_old() override {
-		return (UIControl*)gui_root.get();	// static_cast since type is incomplete here
-	}
 	virtual GuiSystemPublic* get_gui() const override {
 		return gui_sys.get();
 	}
@@ -137,9 +134,8 @@ public:
 		level = nullptr;
 	}
 
-	unique_ptr<GuiSystemPublic> gui_sys;
+	std::unique_ptr<GuiSystemPublic> gui_sys;
 
-	unique_ptr<GUI_RootControl> gui_root;
 	unique_ptr<Client> cl;
 	unique_ptr<Server> sv;
 	OsInput inp;

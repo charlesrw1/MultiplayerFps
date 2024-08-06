@@ -20,7 +20,8 @@
 #include "Statemachine_node.h"
 #include "OsInput.h"
 #include "Root_node.h"
-
+#include "UI/Widgets/Layouts.h"
+#include "UI/GUISystemPublic.h"
 std::string remove_whitespace(const char* str)
 {
 	std::string s = str;
@@ -34,6 +35,31 @@ std::string remove_whitespace(const char* str)
 
 AnimationGraphEditor ed;
 IEditorTool* g_anim_ed_graph = &ed;
+
+
+class AG_GuiLayout : public GUIFullscreen
+{
+public:
+	void on_pressed(int x, int y, int button) override {
+		eng->get_gui()->set_focus_to_this(this);
+		mouse_down_delegate.invoke(x, y, button);
+	}
+	void on_released(int x, int y, int button) override {
+		mouse_up_delegate.invoke(x, y, button);
+	}
+	void on_key_down(const SDL_KeyboardEvent& key_event) override {
+		key_down_delegate.invoke(key_event);
+	}
+	void on_key_up(const SDL_KeyboardEvent& key_event) override {
+		key_up_delegate.invoke(key_event);
+	}
+
+	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
+	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
+	MulticastDelegate<int, int, int> mouse_down_delegate;
+	MulticastDelegate<int, int, int> mouse_up_delegate;
+	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
+};
 
 
 struct AnimCompletionCallbackUserData
@@ -184,7 +210,7 @@ void AnimationGraphEditor::init()
 
 void AnimationGraphEditor::close_internal()
 {
-	notify_observers("OnClose");
+	on_close.invoke();
 
 	out.clear();
 
@@ -208,8 +234,8 @@ void AnimationGraphEditor::close_internal()
 	current_layer = 1;
 
 	opt = settings();
-	graph_tabs = TabState(this);
-	node_props.clear_all();
+	*graph_tabs = TabState(this);
+	node_props->clear_all();
 
 	ImNodes::EditorContextFree(default_editor);
 }
@@ -562,7 +588,7 @@ void AnimationGraphEditor::start_or_resume_playback()
 	else
 		playback = graph_playback_state::running;
 
-	control_params.refresh_props();
+	control_params->refresh_props();
 }
 
 inline void add_props_from_ClassBase(std::vector<PropertyListInstancePair>& info, ClassBase* base)
@@ -590,7 +616,7 @@ void AnimationGraphEditor::draw_prop_editor()
 		if (node != sel.node_last_frame || reset_prop_editor_next_tick) {
 			sel.link_last_frame = -1;
 
-			node_props.clear_all();
+			node_props->clear_all();
 
 			std::vector<PropertyListInstancePair> info;
 
@@ -600,7 +626,7 @@ void AnimationGraphEditor::draw_prop_editor()
 
 			for (int i = 0; i < info.size(); i++) {
 				if(info[i].list) /* some nodes have null props */
-					node_props.add_property_list_to_grid(info[i].list, info[i].instance);
+					node_props->add_property_list_to_grid(info[i].list, info[i].instance);
 			}
 
 			sel.node_last_frame = node;
@@ -624,14 +650,14 @@ void AnimationGraphEditor::draw_prop_editor()
 			if (link != sel.link_last_frame || reset_prop_editor_next_tick) {
 				sel.node_last_frame = -1;
 
-				node_props.clear_all();
+				node_props->clear_all();
 
 				std::vector<PropertyListInstancePair> info;
 				node_s->get_link_props(info, slot);
 
 				for (int i = 0; i < info.size(); i++) {
 					if (info[i].list) /* some nodes have null props */
-						node_props.add_property_list_to_grid(info[i].list, info[i].instance);
+						node_props->add_property_list_to_grid(info[i].list, info[i].instance);
 				}
 
 				sel.link_last_frame = link;
@@ -651,7 +677,7 @@ void AnimationGraphEditor::draw_prop_editor()
 	if (ImGui::Begin("animation graph property editor"))
 	{
 		if (should_draw)
-			node_props.update();
+			node_props->update();
 		else
 			ImGui::Text("No node selected\n");
 	}
@@ -662,7 +688,7 @@ void AnimationGraphEditor::stop_playback()
 {
 	playback = graph_playback_state::stopped;
 
-	control_params.refresh_props();
+	control_params->refresh_props();
 }
 
 
@@ -731,14 +757,14 @@ void AnimationGraphEditor::imgui_draw()
 	//seqimgui.draw();
 	//cei.draw();
 
-	node_props.set_read_only(graph_is_read_only());
+	node_props->set_read_only(graph_is_read_only());
 
 	if (opt.open_prop_editor)
 		draw_prop_editor();
 
-	control_params.imgui_draw();
+	control_params->imgui_draw();
 
-	animation_list.imgui_draw();
+	animation_list->imgui_draw();
 
 	if (ImGui::Begin("AnimGraph settings")) {
 		self_grid.update();
@@ -762,12 +788,12 @@ void AnimationGraphEditor::imgui_draw()
 			const editor_layer* layer = mynode->get_layer();
 
 			if (layer) {
-				auto findtab = graph_tabs.find_tab_index(mynode);
+				auto findtab = graph_tabs->find_tab_index(mynode);
 				if (findtab!=-1) {
-					graph_tabs.push_tab_to_view(findtab);
+					graph_tabs->push_tab_to_view(findtab);
 				}
 				else {
-					graph_tabs.add_tab(layer, mynode, glm::vec2(0.f), true);
+					graph_tabs->add_tab(layer, mynode, glm::vec2(0.f), true);
 				}
 			}
 			ImNodes::ClearNodeSelection();
@@ -823,7 +849,7 @@ void AnimationGraphEditor::imgui_draw()
 	}
 
 
-	graph_tabs.imgui_draw();
+	graph_tabs->imgui_draw();
 
 	static ImVec2 mouse_click_pos = ImVec2(0, 0);
 	if (!graph_is_read_only()) {
@@ -840,7 +866,7 @@ void AnimationGraphEditor::imgui_draw()
 		}
 		if (ImGui::BeginPopup("my_select_popup"))
 		{
-			bool is_sm = graph_tabs.get_active_tab()->is_statemachine_tab();
+			bool is_sm = graph_tabs->get_active_tab()->is_statemachine_tab();
 			draw_node_creation_menu(is_sm, mouse_click_pos);
 			ImGui::EndPopup();
 		}
@@ -1042,8 +1068,8 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
 		//if (payload->IsDataType("AssetBrowserDragDrop"))
 		//	sys_print("``` accepting\n");
-		bool is_sm = graph_tabs.get_active_tab()->is_statemachine_tab();
-		uint32_t layer = graph_tabs.get_current_layer_from_tab();
+		bool is_sm = graph_tabs->get_active_tab()->is_statemachine_tab();
+		uint32_t layer = graph_tabs->get_current_layer_from_tab();
 		if (!is_sm) {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimationItemAnimGraphEd"))
 			{
@@ -1075,43 +1101,32 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 	}
 }
 
-
-bool AnimationGraphEditor::handle_event(const SDL_Event& event)
-{
-	switch (event.type)
+void AnimationGraphEditor::on_key_down(const SDL_KeyboardEvent& key) {
+	switch (key.keysym.scancode)
 	{
-	case SDL_KEYDOWN:
-		switch (event.key.keysym.scancode)
-		{
-		case SDL_SCANCODE_DELETE:
-			if (is_focused) {
-				delete_selected();
-			}
-			break;
-
-		case SDL_SCANCODE_SPACE:
-			if (event.key.keysym.mod & KMOD_LCTRL && !ImGui::GetIO().WantCaptureKeyboard) {
-				if (get_playback_state() == graph_playback_state::running)
-					pause_playback();
-				else
-					start_or_resume_playback();
-			}
-
-			break;
+	case SDL_SCANCODE_DELETE:
+		if (is_focused) {
+			delete_selected();
 		}
 		break;
-	
-	}
 
-	clipboard.handle_event(event);
-
-	if (eng->is_game_focused()) {
-		if (event.type == SDL_MOUSEWHEEL) {
-			out.camera.scroll_callback(event.wheel.y);
+	case SDL_SCANCODE_SPACE:
+		if (key.keysym.mod & KMOD_LCTRL && !ImGui::GetIO().WantCaptureKeyboard) {
+			if (get_playback_state() == graph_playback_state::running)
+				pause_playback();
+			else
+				start_or_resume_playback();
 		}
+
+		break;
 	}
-	return false;
 }
+void AnimationGraphEditor::on_wheel(const SDL_MouseWheelEvent& wheel) {
+	if (eng->is_game_focused()) {
+		out.camera.scroll_callback(wheel.y);
+	}
+}
+
 
 void AnimationGraphEditor::delete_selected()
 {
@@ -1165,7 +1180,7 @@ void AnimationGraphEditor::nuke_layer(uint32_t id)
 
 		auto sublayer = nodes[i]->get_layer();
 		if (sublayer) {
-			graph_tabs.remove_nodes_tab(nodes[i]);
+			graph_tabs->remove_nodes_tab(nodes[i]);
 			nuke_layer(sublayer->id);
 		}
 
@@ -1181,7 +1196,7 @@ void AnimationGraphEditor::remove_node_from_index(int index, bool force)
 	if (!node->can_delete() && !force)
 		return;
 
-	clipboard.remove_references(node);
+	clipboard->remove_references(node);
 
 	for (int i = 0; i < nodes.size(); i++) {
 		if (i != index) {
@@ -1194,7 +1209,7 @@ void AnimationGraphEditor::remove_node_from_index(int index, bool force)
 	auto sublayer = node->get_layer();
 	if (sublayer) {
 		// remove tab reference
-		graph_tabs.remove_nodes_tab(node);
+		graph_tabs->remove_nodes_tab(node);
 		nuke_layer(sublayer->id);
 		// FIXME: clipboard doesnt get nuked
 	}
@@ -1263,7 +1278,7 @@ void AnimationGraphEditor::draw_node_creation_menu(bool is_state_mode, ImVec2 mo
 
 		if (ImGui::Selectable(name.c_str())) {
 
-			int cur_layer = graph_tabs.get_current_layer_from_tab();
+			int cur_layer = graph_tabs->get_current_layer_from_tab();
 
 			Base_EdNode* a  = user_create_new_graphnode(node->get_type().classname, cur_layer);
 
@@ -1408,7 +1423,7 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 	// add control parameters to cfg list
 	editing_tree->code.reset();										// delete script
-	editing_tree->code = control_params.add_parameters_to_tree();	// recreate script
+	editing_tree->code = control_params->add_parameters_to_tree();	// recreate script
 	editing_tree->code->link_to_native_class();
 
 	// initialize memory offets for runtime
@@ -1448,7 +1463,7 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	// recreate script AGAIN because nodes compilied functions into the script
 	// but it gets compilied again after this
 	editing_tree->code.reset();										// delete script
-	editing_tree->code = control_params.add_parameters_to_tree();	// recreate script
+	editing_tree->code = control_params->add_parameters_to_tree();	// recreate script
 
 	return tree_is_good_to_run;
 }
@@ -1506,23 +1521,32 @@ void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
 {
 	if (newstate == editor_focus_state::Background) {
 
+		if (gui->parent)
+			gui->parent->remove_this(gui.get());
+
 		if (eng->get_state() != Engine_State::Game) {
 			stop_playback();
 			compile_and_run();
 		}
-		control_params.refresh_props();
+		control_params->refresh_props();
 		out.hide();
 		playback = graph_playback_state::running;
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else if(newstate == editor_focus_state::Closed){
+		if (gui->parent)
+			gui->parent->remove_this(gui.get());
+
 		close();
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
 	}
 	else {
+		eng->get_gui()->add_gui_panel_to_root(gui.get());
+		eng->get_gui()->set_focus_to_this(gui.get());
+
 		// focused, stuff can start being rendered
 		playback = graph_playback_state::stopped;
-		control_params.refresh_props();
+		control_params->refresh_props();
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 	}
 }
@@ -1564,20 +1588,12 @@ void AnimationGraphEditor::tick(float dt)
 
 ControlParamsWindow::ControlParamsWindow()
 {
-	ed.register_me("OnSetAnimatorInstance", this);
-	ed.register_me("OnClose", this);
-	ed.register_me("OnOpenNewDocument", this);
+	ed.on_set_animator_instance.add(this, &ControlParamsWindow::on_set_animator_instance);
+	ed.on_close.add(this, &ControlParamsWindow::on_close);
+
 }
 
-void ControlParamsWindow::on_notify(const std::string& str)
-{
-	if (str == "OnSetAnimatorInstance") {
-		refresh_props();
-	}
-	else if (str == "OnClose") {
-		props.clear();
-	}
-}
+
 #include "glm/gtx/euler_angles.hpp"
 void ControlParamsWindow::imgui_draw()
 {
@@ -1722,8 +1738,7 @@ void AnimationGraphEditor::set_animator_instance_from_string(std::string str) {
 	}
 
 	out.set_animator_instance(class_);
-
-	notify_observers("OnSetAnimatorInstance");
+	on_set_animator_instance.invoke(class_);
 }
 void AnimationGraphEditor::set_model_from_str(std::string str) {
 	auto mod = mods.find_or_load(str.c_str());
@@ -1731,8 +1746,7 @@ void AnimationGraphEditor::set_model_from_str(std::string str) {
 		sys_print("!!! couldnt find preview model %s\n", str.c_str());
 	}
 	out.set_model(mod);
-
-	notify_observers("OnSetModel");
+	on_set_model.invoke(mod);
 }
 void AnimationGraphEditor::try_load_preview_models()
 {
@@ -1811,16 +1825,16 @@ void AnimationGraphEditor::open_document_internal(const char* name)
 	ASSERT(editing_tree);
 
 	// initialize other state
-	graph_tabs = TabState(this);
+	*graph_tabs = TabState(this);
 	// push root tab, always visible
-	graph_tabs.add_tab(nullptr, nullptr, glm::vec2(0.f), true);
+	graph_tabs->add_tab(nullptr, nullptr, glm::vec2(0.f), true);
 
 	self_grid.add_property_list_to_grid(get_props(), this);
 
 	// load preview model and set and register renderable
 	try_load_preview_models();
 
-	notify_observers("OnOpenNewDocument");
+	on_open_new_doc.invoke();
 
 	// refresh control_param editor
 	//control_params.init_from_tree(get_tree()->params.get());
@@ -1902,8 +1916,10 @@ AnimatorInstance* GraphOutput::get_animator()
 
 ListAnimationDataInModel::ListAnimationDataInModel()
 {
-	ed.register_me("OnSetModel", this);
-	ed.register_me("OnClose", this);
+	ed.on_set_model.add(this, &ListAnimationDataInModel::set_model);
+	ed.on_close.add(this, &ListAnimationDataInModel::on_close);
+
+
 	name_filter[0] = 0;
 }
 static std::string to_lower(const std::string& s) {
@@ -2004,42 +2020,38 @@ void ListAnimationDataInModel::imgui_draw()
 	}
 	ImGui::End();
 }
-void ListAnimationDataInModel::on_notify(const std::string& str)
+
+void ListAnimationDataInModel::on_close()
 {
-	if (str == "OnClose") {
-		model = nullptr;
-		vec.clear();
-	}
-	else if (str == "OnSetModel") {
-		set_model(ed.out.get_model());
-	}
+	model = nullptr;
+	vec.clear();
 }
 
 AnimGraphClipboard::AnimGraphClipboard()
 {
-	ed.register_me("OnClose",this);
+	ed.gui->key_down_delegate.add(this, &AnimGraphClipboard::on_key_down);
+	ed.on_close.add(this, &AnimGraphClipboard::on_close);
 }
-void AnimGraphClipboard::on_notify(const std::string& strname) {
-	if (strname == "OnClose")
-		clipboard.clear();
+void AnimGraphClipboard::on_close() {
+	clipboard.clear();
 }
 
-void AnimGraphClipboard::handle_event(const SDL_Event& event) {
-	if (event.type == SDL_KEYDOWN) {
-		if (event.key.keysym.scancode == SDL_SCANCODE_C && event.key.keysym.mod & KMOD_LCTRL) {
-			int count = ImNodes::NumSelectedNodes();
-			std::vector<int> ids(count,0);
-			ImNodes::GetSelectedNodes(ids.data());
-			
-			clipboard.clear();
-			for (int i = 0; i < ids.size(); i++)
-				clipboard.push_back(ed.find_node_from_id(ids[i]));
-		}
-		else if (event.key.keysym.scancode == SDL_SCANCODE_V && event.key.keysym.mod & KMOD_LCTRL) {
-			paste_selected();
-		}
+void AnimGraphClipboard::on_key_down(const SDL_KeyboardEvent& key)
+{
+	if (key.keysym.scancode == SDL_SCANCODE_C && key.keysym.mod & KMOD_LCTRL) {
+		int count = ImNodes::NumSelectedNodes();
+		std::vector<int> ids(count, 0);
+		ImNodes::GetSelectedNodes(ids.data());
+
+		clipboard.clear();
+		for (int i = 0; i < ids.size(); i++)
+			clipboard.push_back(ed.find_node_from_id(ids[i]));
+	}
+	else if (key.keysym.scancode == SDL_SCANCODE_V && key.keysym.mod & KMOD_LCTRL) {
+		paste_selected();
 	}
 }
+
 void AnimGraphClipboard::paste_selected()
 {
 	// copying expects the serialize context ...
@@ -2103,7 +2115,7 @@ void AnimGraphClipboard::paste_selected()
 
 		copied_node->id = ed.current_id++;
 
-		copied_node->graph_layer = ed.graph_tabs.get_current_layer_from_tab();
+		copied_node->graph_layer = ed.graph_tabs->get_current_layer_from_tab();
 	
 		ed.nodes.push_back(copied_node);
 
@@ -2154,4 +2166,18 @@ DECLARE_ENGINE_CMD(animed_play_slot)
 	std::string anim = args.at(2);
 
 	ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
+}
+AnimationGraphEditor::AnimationGraphEditor() {
+	gui = std::make_unique<AG_GuiLayout>();
+
+	gui->wheel_delegate.add(this, &AnimationGraphEditor::on_wheel);
+	gui->key_down_delegate.add(this, &AnimationGraphEditor::on_key_down);
+
+
+	animation_list = std::make_unique<ListAnimationDataInModel>();
+	control_params = std::make_unique<ControlParamsWindow>();
+	node_props = std::make_unique<PropertyGrid>();
+	graph_tabs = std::make_unique<TabState>(this);
+	clipboard = std::make_unique<AnimGraphClipboard>();
+
 }

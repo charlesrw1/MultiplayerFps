@@ -636,7 +636,6 @@
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
-    <ClCompile Include="Source\EditorDocLocal.cpp" />
     <ClCompile Include="Source\Physics\Physics2.cpp">
       <Filter>Source\Physics</Filter>
     </ClCompile>

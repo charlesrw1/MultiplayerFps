@@ -20,7 +20,7 @@ enum class editor_focus_state
 };
 
 // Base editor tool class, inherits from UIControl for paint() and handle_event() calls
-class IEditorTool : public UIControl
+class IEditorTool
 {
 public:
 	// these are called by both engine and internally to close/save

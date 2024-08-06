@@ -203,7 +203,6 @@
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\EditorDoc.cpp" />
-    <ClCompile Include="Source\EditorDocLocal.cpp" />
     <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="Source\External\ImGuizmo.cpp" />

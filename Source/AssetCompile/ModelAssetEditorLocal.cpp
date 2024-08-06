@@ -16,14 +16,6 @@
 static ModelEditorTool g_model_editor_static;
 IEditorTool* g_model_editor = &g_model_editor_static;
 
-void ModelEditorTool::ui_paint()
-{
-}
-
-bool ModelEditorTool::handle_event(const SDL_Event& event)
-{
-	return false;
-}
 
 void ModelEditorTool::tick(float dt)
 {

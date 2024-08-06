@@ -73,8 +73,7 @@ class ModelEditorTool : public IEditorTool
 public:
 	void draw_menu_bar() override;
 	// Inherited via IEditorTool
-	virtual void ui_paint() override;
-	virtual bool handle_event(const SDL_Event& event) override;
+
 	virtual void tick(float dt) override;
 	virtual const View_Setup& get_vs() override;
 	virtual void overlay_draw() override;

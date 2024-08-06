@@ -6,6 +6,7 @@
 #include "Widgets/Layouts.h"
 #include "Widgets/Visuals.h"
 
+#include "GameEnginePublic.h"
 
 // include
 
@@ -83,4 +84,13 @@ void UIBuilder::draw_solid_rect(glm::ivec2 global_coords,
 
 GuiSystemPublic* GuiSystemPublic::create_gui_system() {
 	return new GuiSystemLocal;
+}
+
+
+GUI::~GUI()
+{
+	if (parent)
+		parent->remove_this(this);
+	if(eng->get_gui())
+		eng->get_gui()->remove_reference(this);
 }

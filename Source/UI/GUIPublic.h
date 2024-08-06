@@ -132,7 +132,7 @@ struct SDL_KeyboardEvent;
 struct SDL_MouseWheelEvent;
 CLASS_H(GUI, IAsset)
 public:
-	virtual ~GUI() {}
+	virtual ~GUI();
 
 	virtual void paint(UIBuilder& builder) {}
 
@@ -144,15 +144,15 @@ public:
 	virtual void update_subwidget_positions() {}
 
 	// callbacks
-	virtual void on_pressed() {}
-	virtual void on_released() {}
-	virtual void on_dragging() {}
+	virtual void on_pressed(int x, int y, int button) {}
+	virtual void on_released(int x, int y, int button) {}
+	virtual void on_dragging(int x, int y) {}
 	virtual void on_focus_start() {}
 	virtual void on_focus_end() {}
 	virtual void on_focusing() {}
 	virtual void on_hover_start() {}
 	virtual void on_hover_end() {}
-	virtual void on_hovering() {}
+	virtual void on_hovering(int x, int y) {}
 	virtual void on_think() {}
 	virtual void on_key_down(const SDL_KeyboardEvent& key_event) {}
 	virtual void on_key_up(const SDL_KeyboardEvent& key_event) {}

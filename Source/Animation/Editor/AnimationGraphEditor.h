@@ -24,31 +24,7 @@
 
 #include "Base_node.h"
 
-class IObserver
-{
-public:
-	virtual void on_notify(const std::string& strname) = 0;
-};
-class ISubject
-{
-public:
-	void register_me(const std::string& callback, IObserver* obj) {
-		map[callback].insert(obj);
-	}
-	void unregister(IObserver* obj) {
-		for (auto& a : map)
-			a.second.erase(obj);
-	}
-protected:
-	void notify_observers(const std::string& str) {
-		auto set = map.find(str);
-		if (set != map.end())
-			for (auto& obs : set->second)
-				obs->on_notify(str);
-	}
-private:
-	std::unordered_map<std::string, std::unordered_set<IObserver*>> map;
-};
+#include "Framework/MulticastDelegate.h"
 
 
 struct GraphTab {
@@ -211,7 +187,7 @@ struct VariableNameAndType
 };
 
 class ControlParamArrayHeader;
-class ControlParamsWindow : public IObserver
+class ControlParamsWindow
 {
 public:
 	ControlParamsWindow();
@@ -232,8 +208,13 @@ public:
 		return props[var.id].type;
 	}
 
-	void on_notify(const std::string& strname) override;
 private:
+	void on_set_animator_instance(AnimatorInstance* a) {
+		refresh_props();
+	}
+	void on_close() {
+		props.clear();
+	}
 
 	struct VariableParam
 	{
@@ -248,13 +229,15 @@ private:
 	//PropertyGrid control_params;
 };
 
-class ListAnimationDataInModel : public IObserver
+class ListAnimationDataInModel
 {
 public:
 	ListAnimationDataInModel();
 	void imgui_draw();
-	void on_notify(const std::string& strname) override;
+
 private:
+	void on_close();
+
 	void set_model(const Model* model);
 	const Model* model = nullptr;
 	char name_filter[256];
@@ -263,31 +246,31 @@ private:
 	std::string selected_name;
 };
 
-class AnimGraphClipboard : public IObserver
+class AnimGraphClipboard
 {
 public:
 	AnimGraphClipboard();
-	void handle_event(const SDL_Event& event);
 	void remove_references(Base_EdNode* node);
-	void on_notify(const std::string& strname) override;
 private:
+	void on_close();
+	void on_key_down(const SDL_KeyboardEvent& k);
 	void paste_selected();
 	std::vector<Base_EdNode*> clipboard;
 };
 
 class Texture;
-class AnimationGraphEditor : public IEditorTool, public ISubject
+class AG_GuiLayout;
+class AnimationGraphEditor : public IEditorTool
 {
 public:
 
-	AnimationGraphEditor() : graph_tabs(this) {
-	}
+	AnimationGraphEditor();
+
 	virtual void init() override;
 	virtual void open_document_internal(const char* name) override;
 	virtual void close_internal() override;
 	virtual void tick(float dt) override;
-	virtual bool handle_event(const SDL_Event& event) override;
-	virtual void ui_paint() override {}
+
 	virtual void overlay_draw() override;
 	virtual const View_Setup& get_vs() override{
 		return out.vs;
@@ -363,11 +346,22 @@ public:
 		return default_editor;
 	}
 
-	ListAnimationDataInModel animation_list;
-	ControlParamsWindow control_params;
-	PropertyGrid node_props;
-	TabState graph_tabs;
-	AnimGraphClipboard clipboard;
+	MulticastDelegate<> on_open_new_doc;
+	MulticastDelegate<> on_close;
+	MulticastDelegate<const Model*> on_set_model;
+	MulticastDelegate<AnimatorInstance*> on_set_animator_instance;
+
+
+	std::unique_ptr<AG_GuiLayout> gui;
+	void on_key_down(const SDL_KeyboardEvent& key);
+	void on_wheel(const SDL_MouseWheelEvent& wheel);
+
+
+	std::unique_ptr<ListAnimationDataInModel> animation_list;
+	std::unique_ptr<ControlParamsWindow> control_params;
+	std::unique_ptr<PropertyGrid> node_props;
+	std::unique_ptr<TabState> graph_tabs;
+	std::unique_ptr<AnimGraphClipboard> clipboard;
 
 	Animation_Tree_CFG* get_tree() {
 		return editing_tree;

@@ -169,33 +169,6 @@ void sys_print(const char* fmt, ...)
 		printf("\033[0m");
 }
 
-class GUI_RootControl : public UIControl
-{
-public:
-	// Inherited from UIControl
-	void ui_paint() override {
-		if (eng->get_current_tool() != nullptr)
-			eng->get_current_tool()->ui_paint();
-	}
-	bool handle_event(const SDL_Event& event) override {
-		if (eng->get_current_tool() != nullptr)
-			return eng->get_current_tool()->handle_event(event);
-
-		return false;
-	}
-
-public:
-	void init();
-	void set_ui_rect();
-
-	void set_screen_rect_base(Rect2d rect) {
-		this->size = rect;
-	}
-
-	// game panel
-	// tool panel
-	// log panel
-};
 
 void sys_vprint(const char* fmt, va_list args)
 {
@@ -937,6 +910,8 @@ void GameEngineLocal::cleanup()
 	for (int i = 0; i < SDL_NUM_SCANCODES; i++) {
 		delete binds[i];
 	}
+
+	gui_sys.reset(nullptr);
 }
 
 static int bloom_layer = 0;
@@ -1089,13 +1064,6 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			scene_focused = ImGui::IsItemFocused();
 
 			// save off where the viewport is the GUI for mouse events
-			Rect2d rect;
-			rect.x = pos.x+winpos.x;
-			rect.y = pos.y+winpos.y;
-			rect.w = size.x;
-			rect.h = size.y;
-			gui_root->set_screen_rect_base(rect);
-
 			get_gui()->set_viewport_size(size.x, size.y);
 			get_gui()->set_viewport_ofs(pos.x + winpos.x, pos.y + winpos.y);
 
@@ -1113,15 +1081,6 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	}
 	else {
 		// normal game path, scene view was already drawn the the window framebuffer
-
-		Rect2d rect;
-		rect.x = 0;
-		rect.y = 0;
-		rect.w = g_window_w.get_integer();
-		rect.h = g_window_h.get_integer();
-
-		gui_root->set_screen_rect_base(rect);
-
 		get_gui()->set_viewport_size(g_window_w.get_integer(), g_window_h.get_integer());
 		get_gui()->set_viewport_ofs(0,0);
 	}
@@ -1310,8 +1269,6 @@ void GameEngineLocal::init()
 	imaterials->init();
 
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
-
-	gui_root.reset(new GUI_RootControl );
 
 	anim_tree_man->init();
 	mods.init();
@@ -1524,9 +1481,6 @@ void GameEngineLocal::loop()
 				if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
 					continue;
 			}
-
-			get_gui_old()->handle_event(event);
-
 			get_gui()->handle_event(event);
 		}
 		get_gui()->post_handle_events();

@@ -21,9 +21,57 @@
 #include "Game/StdEntityTypes.h"
 #include "Game/Schema.h"
 #include <stdexcept>
+
+#include "Framework/DictWriter.h"
+#include <fstream>
+
+#include "Render/Texture.h"
+
+#include "AssetCompile/Someutils.h"// string stuff
+#include "Assets/AssetRegistry.h"
+
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
+
+
+#include "UI/Widgets/Layouts.h"
+#include "UI/Widgets/Visuals.h"
+#include "UI/GUISystemPublic.h"
+class EditorUILayout : public GUIFullscreen
+{
+public:
+	EditorUILayout() {
+		test = new GUIBox;
+		test->color = COLOR_RED;
+		test->ls_sz = { 100,100 };
+		test->ls_position = { 0,0 };
+		test->pivot_ofs = { 0.5,0.5 };
+		//test->anchor = BottomRightAnchor;
+		add_this(test);
+	}
+	void on_pressed(int x, int y, int button) override {
+		eng->get_gui()->set_focus_to_this(this);
+		mouse_down_delegate.invoke(x, y, button);
+	}
+	void on_released(int x, int y, int button) override {
+		mouse_up_delegate.invoke(x, y, button);
+	}
+	void on_key_down(const SDL_KeyboardEvent& key_event) override {
+		key_down_delegate.invoke(key_event);
+	}
+	void on_key_up(const SDL_KeyboardEvent& key_event) override {
+		key_up_delegate.invoke(key_event);
+	}
+
+	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
+	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
+	MulticastDelegate<int, int, int> mouse_down_delegate;
+	MulticastDelegate<int, int, int> mouse_up_delegate;
+	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
+
+	GUIBox* test = nullptr;
+};
 
 CLASS_IMPL(EditorFolder);
 
@@ -197,21 +245,15 @@ void menu_temp()
 // check every 5 seconds
 ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR_FLOAT | CVAR_UNBOUNDED);
 
-#include "Render/Texture.h"
-
-#include "AssetCompile/Someutils.h"// string stuff
-#include "Assets/AssetRegistry.h"
-
-
 
 // Unproject mouse coords into a vector, cast that into the world via physics
 glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
 	Ray r;
 	// get ui size
-	const Rect2d size = get_size();
-	const int wx = size.w;
-	const int wy = size.h;
+	const auto size = gui->ws_position;
+	const int wx = gui->ws_size.x;
+	const int wy = gui->ws_size.y;
 	const float aratio = float(wy) / wx;
 	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
 		ndc = ndc * 2.f - 1.f;
@@ -249,140 +291,6 @@ Color32 to_color32(glm::vec4 v) {
 
 
 
-
-void EditorDoc::duplicate_selected_and_select_them()
-{
-	return;
-#if 0
-	if (selection_state->num_selected() == 0) {
-		sys_print("??? duplicate_selected_and_select_them but nothing selected\n");
-		return;
-	}
-	std::vector<std::shared_ptr<EditorNode>> nodes;
-	//for (int i = 0; i < selection_state->get_selection().size(); i++) {
-	//	nodes.push_back(std::shared_ptr<EditorNode>(selection_state->get_selection().at(i)->duplicate()));
-	//}
-	//for (int i = 0; i < nodes.size(); i++)
-	//	nodes[i]->set_uid(get_next_id());
-	selection_state->clear_all_selected();
-	command_mgr.add_command(new CreateNodeCommand(nodes));
-	for (int i = 0; i < nodes.size(); i++)
-		selection_state->add_to_selection(nodes[i]);
-#endif
-}
-#if 0
-static Material* generate_spritemat_from_texture(Texture* t)
-{
-	// generate hash based on name, yes this is hacked
-	StringName name_(t->get_name().c_str());
-	Material* mat = mats.find_for_name(std::to_string(name_.get_hash()).c_str());
-	if (mat)
-		return mat;
-
-	mat = mats.create_temp_shader(std::to_string(name_.get_hash()).c_str());
-	mat->billboard = billboard_setting::FACE_CAMERA;
-	mat->images[0] = t;
-	mat->type = material_type::UNLIT;
-	mat->alpha_tested = true;
-
-	mat->diffuse_tint = glm::vec4(1.0);
-
-	return mat;
-}
-#endif
-
-#if 0
-Material* EditorNode::get_sprite_material()
-{
-	if (template_class && !template_class->edimage.empty()) {
-		Texture* t = g_imgs.find_texture(template_class->edimage.c_str());
-		if (t) {
-			return generate_spritemat_from_texture(t);
-		}
-	}
-	Texture* t = g_imgs.find_texture("icon/mesh.png");
-	assert(t);
-	return generate_spritemat_from_texture(t);
-
-}
-#endif
-#if 0
-void EditorNode::show()
-{
-	assert(ed_doc.get_focus_state() == editor_focus_state::Focused);
-
-	hide();
-
-	Model* m = get_rendering_model();
-	render_handle = idraw->register_obj();
-	physics = g_physics->allocate_physics_actor();
-	if (m) {
-		Render_Object ro;
-		ro.model = m;
-		ro.transform = get_transform();
-		ro.visible = true;
-		ro.color_overlay = is_selected;
-		ro.param1 = get_rendering_color();
-		if (is_selected) {
-			float alpha = sin(GetTime()*2.5);
-			alpha *= alpha;
-
-			uint8_t alphau = alpha * 80 + 10;
-
-			ro.param2 = { 0xff, 128, 0, alphau };
-		}
-		idraw->update_obj(render_handle, ro);
-
-		glm::quat q;
-		glm::vec3 p, s;
-		read_transform_from_dict(p, q, s);
-		glm::vec3 halfsize = (m->get_bounds().bmax - m->get_bounds().bmin)*0.5f*glm::abs(s);
-		glm::vec3 center = m->get_bounds().get_center()*s;
-		center = glm::mat4_cast(q) * glm::vec4(center, 1.0);
-		PhysTransform tr;
-		tr.position = p;
-		tr.rotation = q;
-		if (m->get_physics_body())
-			physics->create_static_actor_from_model(m, tr);
-		else
-			physics->create_static_actor_from_shape(physics_shape_def::create_box(halfsize,p+ center,q));
-	}
-	else {
-		Material* mat = get_sprite_material();
-		Render_Object ro;
-		ro.model = mods.get_sprite_model();
-
-		glm::vec3 position = get_dict().get_vec3("position");
-		ro.param1 = get_rendering_color();
-		ro.transform = glm::scale(glm::translate(glm::mat4(1), position),glm::vec3(0.5));
-		ro.mat_override = mat;
-		ro.visible = true;
-		
-		ro.color_overlay = is_selected;
-		if (is_selected) {
-			float alpha = sin(GetTime() * 2.5);
-			alpha *= alpha;
-			uint8_t alphau = alpha * 80 + 10;
-
-			ro.param2 = { 0xff, 128, 0, alphau };
-		}
-
-		idraw->update_obj(render_handle, ro);
-
-
-		physics->create_static_actor_from_shape(physics_shape_def::create_sphere(position, 0.25));
-	}
-
-	physics->set_editornode(this);
-}
-void EditorNode::hide()
-{
-	idraw->remove_obj(render_handle);
-	g_physics->free_physics_actor(physics);
-}
-#endif
-
-
 void EditorDoc::draw_menu_bar()
 {
 	if (ImGui::BeginMenuBar())
@@ -411,16 +319,23 @@ void EditorDoc::draw_menu_bar()
 void EditorDoc::on_change_focus(editor_focus_state newstate)
 {
 	if (newstate == editor_focus_state::Background) {
-
+		if (gui->parent)
+			gui->parent->remove_this(gui.get());
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
 		hide_everything();
 	}
 	else if (newstate == editor_focus_state::Closed) {
+		if (gui->parent)
+			gui->parent->remove_this(gui.get());
+
 		close();
 		//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini leveldock.ini");
 	}
 	else {
 		// focused, stuff can start being rendered
+		assert(!gui->parent);
+		eng->get_gui()->add_gui_panel_to_root(gui.get());
+		eng->get_gui()->set_focus_to_this(gui.get());
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
 		show_everything();
 	}
@@ -437,48 +352,13 @@ void EditorDoc::show_everything()
 	//	nodes[i]->show();
 }
 
-#include "UI/Widgets/Layouts.h"
-#include "UI/Widgets/Visuals.h"
-#include "UI/GUISystemPublic.h"
-class EditorLayout : public GUIFullscreen
-{
-public:
-	EditorLayout() {
-		test = new GUIBox;
-		test->color = COLOR_RED;
-		test->ls_sz = { 100,100 };
-		test->ls_position = { 0,0 };
-		test->pivot_ofs = { 0.5,0.5 };
-		//test->anchor = BottomRightAnchor;
-		add_this(test);
 
-		eng->get_gui()->add_gui_panel_to_root(this);
-
-		eng->get_gui()->set_focus_to_this(this);
-	}
-	void on_pressed() override {
-		eng->get_gui()->set_focus_to_this(this);
-	}
-
-	~EditorLayout() {
-		eng->get_gui()->remove_gui_panel_from_root(this);
-	}
-
-	GUIBox* test = nullptr;
-};
-
-EditorLayout* gedlayout{};
 void EditorDoc::init()
 {
-	// set my parent
-	set_parent(eng->get_gui_old());
 	//ed_schema.load("./Data/classes.txt");
 	global_asset_browser.init();
-
-	gedlayout = new EditorLayout;
 }
-#include "Framework/DictWriter.h"
-#include <fstream>
+
 bool EditorDoc::save_document_internal()
 {
 	sys_print("*** saving map document\n");
@@ -531,158 +411,115 @@ void EditorDoc::close_internal()
 	delete eng_local.level;
 	eng_local.clear_level_manually_for_editor(); // sets eng->level to null
 
-	command_mgr.clear_all();
+	command_mgr->clear_all();
 	
 	on_close.invoke();
 
 	is_open = false;
 }
 
-
-
-void EditorDoc::ui_paint() 
+void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 {
-	size = parent->get_size();	// update my size
-}
-
-void ManipulateTransformTool::handle_event(const SDL_Event& event)
-{
-
-	if (event.type == SDL_KEYDOWN && !eng->is_game_focused() && ed_doc.selection_state->has_any_selected()) {
-		uint32_t scancode = event.key.keysym.scancode;
-		bool has_shift = event.key.keysym.mod & KMOD_SHIFT;
-		if (scancode == SDL_SCANCODE_R) {
-			if (operation_mask == ImGuizmo::ROTATE)
-				swap_mode();
-			else
-				operation_mask = ImGuizmo::ROTATE;
-		}
-		else if (scancode == SDL_SCANCODE_G) {
-			if (operation_mask == ImGuizmo::TRANSLATE)
-				swap_mode();
-			else
-				operation_mask = ImGuizmo::TRANSLATE;
-		}
-		else if (scancode == SDL_SCANCODE_S) {
-			operation_mask = ImGuizmo::SCALE;
-			mode = ImGuizmo::LOCAL;	// local scaling only
-		}
-
-
-		else if (scancode == SDL_SCANCODE_LEFTBRACKET) {
-			if (operation_mask == ImGuizmo::TRANSLATE) {
-				translation_snap = translation_snap * 2.0;
-			}
-			else if (operation_mask == ImGuizmo::SCALE) {
-				translation_snap = translation_snap * 2.0;
-			}
-		}
-		else if (scancode == SDL_SCANCODE_RIGHTBRACKET) {
-			if (operation_mask == ImGuizmo::TRANSLATE) {
-				translation_snap = translation_snap * 0.5;
-			}
-			else if (operation_mask == ImGuizmo::SCALE) {
-				translation_snap = translation_snap * 9.5;
-			}
-		}
-	}
-}
-
-bool EditorDoc::handle_event(const SDL_Event& event)
-{
-	if (get_focus_state() != editor_focus_state::Focused)
-		return false;
-
-
-	switch (mode)
-	{
-	case TOOL_TRANSFORM: {
-
-		manipulate->handle_event(event);
-
-		if (event.type == SDL_KEYDOWN) {
-			uint32_t scancode = event.key.keysym.scancode;
-			const float ORTHO_DIST = 20.0;
-			if (scancode == SDL_SCANCODE_DELETE) {
-				if (selection_state->has_any_selected()&&!selection_state->get_ec_selected()) {
-					std::vector<uint64_t> handles;
-					auto& s = selection_state->get_selection();
-					for (auto e : s) handles.push_back(e.handle);
-					RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(handles);
-					command_mgr.add_command(cmd);
-				}
-			}
-			else if (scancode == SDL_SCANCODE_KP_5) {
-				using_ortho = false;
-			}
-			else if (scancode == SDL_SCANCODE_KP_7 && event.key.keysym.mod & KMOD_CTRL) {
-				using_ortho = true;
-				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, ORTHO_DIST, 0), glm::vec3(0, -1, 0));
-			}
-			else if (scancode == SDL_SCANCODE_KP_7) {
-				using_ortho = true;
-				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, -ORTHO_DIST, 0), glm::vec3(0, 1, 0));
-			}
-			else if (scancode == SDL_SCANCODE_KP_3 && event.key.keysym.mod & KMOD_CTRL) {
-				using_ortho = true;
-				ortho_camera.set_position_and_front(camera.position + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
-			}
-			else if (scancode == SDL_SCANCODE_KP_3) {
-				using_ortho = true;
-				ortho_camera.set_position_and_front(camera.position + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
-			}
-			else if (scancode == SDL_SCANCODE_KP_1 && event.key.keysym.mod & KMOD_CTRL) {
-				using_ortho = true;
-				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
-			}
-			else if (scancode == SDL_SCANCODE_KP_1) {
-				using_ortho = true;
-				ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
-			}
-
-		}
-		else if (event.type == SDL_MOUSEBUTTONDOWN) {
-			if (!get_size().is_point_inside(event.button.x, event.button.y))
-				return false;
-
-			if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
-				return false;
-
-			const int x = event.button.x - size.x;
-			const int y = event.button.y - size.y;
-
-
-			if (event.button.button == 1) {
-				auto handle = idraw->mouse_pick_scene_for_editor(x, y);
-
-
-				if (handle.is_valid()) {
-					auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-					if (component_ptr&&component_ptr->get_owner()) {
-						selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
-					}
-				}
-
-			}
-		}
-
-	}break;
-	}
-
-	if (event.type == SDL_KEYDOWN) {
-		if (event.key.keysym.scancode == SDL_SCANCODE_Z && event.key.keysym.mod & KMOD_CTRL)
-			command_mgr.undo();
-	}
-
-	if (eng->is_game_focused() && event.type == SDL_MOUSEWHEEL) {
-		if (using_ortho)
-			ortho_camera.scroll_callback(event.wheel.y);
+	if (eng->is_game_focused() || !ed_doc.selection_state->has_any_selected())
+		return;
+	uint32_t scancode = key.keysym.scancode;
+	bool has_shift = key.keysym.mod & KMOD_SHIFT;
+	if (scancode == SDL_SCANCODE_R) {
+		if (operation_mask == ImGuizmo::ROTATE)
+			swap_mode();
 		else
-			camera.scroll_callback(event.wheel.y);
+			operation_mask = ImGuizmo::ROTATE;
+	}
+	else if (scancode == SDL_SCANCODE_G) {
+		if (operation_mask == ImGuizmo::TRANSLATE)
+			swap_mode();
+		else
+			operation_mask = ImGuizmo::TRANSLATE;
+	}
+	else if (scancode == SDL_SCANCODE_S) {
+		operation_mask = ImGuizmo::SCALE;
+		mode = ImGuizmo::LOCAL;	// local scaling only
 	}
 
-	return true;
+
+	else if (scancode == SDL_SCANCODE_LEFTBRACKET) {
+		if (operation_mask == ImGuizmo::TRANSLATE) {
+			translation_snap = translation_snap * 2.0;
+		}
+		else if (operation_mask == ImGuizmo::SCALE) {
+			translation_snap = translation_snap * 2.0;
+		}
+	}
+	else if (scancode == SDL_SCANCODE_RIGHTBRACKET) {
+		if (operation_mask == ImGuizmo::TRANSLATE) {
+			translation_snap = translation_snap * 0.5;
+		}
+		else if (operation_mask == ImGuizmo::SCALE) {
+			translation_snap = translation_snap * 9.5;
+		}
+	}
 }
+void EditorDoc::on_mouse_down(int x, int y, int button)
+{
+
+	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
+		return;
+
+	if (button == 1) {
+		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
+
+		if (handle.is_valid()) {
+			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
+			if (component_ptr && component_ptr->get_owner()) {
+				selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
+			}
+		}
+
+	}
+}
+
+void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
+{
+	uint32_t scancode = key.keysym.scancode;
+	const float ORTHO_DIST = 20.0;
+	if (scancode == SDL_SCANCODE_DELETE) {
+		if (selection_state->has_any_selected() && !selection_state->get_ec_selected()) {
+			std::vector<uint64_t> handles;
+			auto& s = selection_state->get_selection();
+			for (auto e : s) handles.push_back(e.handle);
+			RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(handles);
+			command_mgr->add_command(cmd);
+		}
+	}
+	else if (scancode == SDL_SCANCODE_KP_5) {
+		using_ortho = false;
+	}
+	else if (scancode == SDL_SCANCODE_KP_7 && key.keysym.mod & KMOD_CTRL) {
+		using_ortho = true;
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, ORTHO_DIST, 0), glm::vec3(0, -1, 0));
+	}
+	else if (scancode == SDL_SCANCODE_KP_7) {
+		using_ortho = true;
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, -ORTHO_DIST, 0), glm::vec3(0, 1, 0));
+	}
+	else if (scancode == SDL_SCANCODE_KP_3 && key.keysym.mod & KMOD_CTRL) {
+		using_ortho = true;
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
+	}
+	else if (scancode == SDL_SCANCODE_KP_3) {
+		using_ortho = true;
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
+	}
+	else if (scancode == SDL_SCANCODE_KP_1 && key.keysym.mod & KMOD_CTRL) {
+		using_ortho = true;
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
+	}
+	else if (scancode == SDL_SCANCODE_KP_1) {
+		using_ortho = true;
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
+	}
+}
+
 
 Bounds transform_bounds(glm::mat4 transform, Bounds b)
 {
@@ -712,6 +549,7 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 
 void some_funcs()
 {
+	auto gedlayout = ed_doc.gui.get();
 	ImGui::DragInt2("box pos", &gedlayout->test->ls_position.x, 1.f, -1000, 1000);
 	auto& a = gedlayout->test->anchor;
 	int x[2] = { a.positions[0][0],a.positions[1][1] };
@@ -891,6 +729,8 @@ ManipulateTransformTool::ManipulateTransformTool()
 
 	// refresh cached data
 	ed_doc.prop_editor->on_property_change.add(this, &ManipulateTransformTool::on_selection_changed);
+
+	ed_doc.gui->key_down_delegate.add(this, &ManipulateTransformTool::on_key_down);
 }
 
 void ManipulateTransformTool::on_close() {
@@ -975,8 +815,10 @@ void ManipulateTransformTool::update()
 
 	ImGuizmo::SetImGuiContext(eng->get_imgui_context());
 	ImGuizmo::SetDrawlist();
-	Rect2d rect = ed_doc.get_size();
-	ImGuizmo::SetRect(rect.x, rect.y, rect.w, rect.h);
+	const auto s_pos = ed_doc.gui->ws_position;
+	const auto s_sz = ed_doc.gui->ws_size;
+
+	ImGuizmo::SetRect(s_pos.x, s_pos.y, s_sz.x, s_sz.y);
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
 
@@ -1052,7 +894,7 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			int x, y;
 			SDL_GetMouseState(&x, &y);
-
+			auto size = gui->ws_position;
 			const float scene_depth = idraw->get_scene_depth_for_editor(x-size.x, y-size.y);
 
 			glm::vec3 dir = unproject_mouse_to_ray(x, y);
@@ -1061,19 +903,19 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 			if (resource->type->get_type_name() == "Entity (C++)") {
-				command_mgr.add_command(new CreateCppClassCommand(
+				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename, 
 					drop_transform)
 				);
 			}
 			else if (resource->type->get_type_name() == "Model") {
-				command_mgr.add_command(new CreateStaticMeshCommand(
+				command_mgr->add_command(new CreateStaticMeshCommand(
 					resource->filename, 
 					drop_transform)
 				);
 			}
 			else if (resource->type->get_type_name() == "Schema") {
-				command_mgr.add_command(new CreateSchemaCommand(
+				command_mgr->add_command(new CreateSchemaCommand(
 					resource->filename,
 					drop_transform)
 				);
@@ -1092,194 +934,7 @@ const View_Setup& EditorDoc::get_vs()
 	return vs_setup;
 }
 
-#if 0
-class IDictEditor : public IPropertyEditor
-{
-public:
-	using IPropertyEditor::IPropertyEditor;
 
-	EditorNode* get_node() {
-		return (EditorNode*)instance;
-	}
-
-	virtual bool can_reset() override  { 
-		auto node = get_node();
-
-		auto vec = parse_hint_string(prop->range_hint);
-		if (vec.empty() || vec[0].is_empty())
-			return false;
-		return (!vec[0].cmp(node->get_dict().get_string(prop->name)));
-	}
-	virtual void reset_value() override final {
-		auto node = get_node();
-		auto vec = parse_hint_string(prop->range_hint);
-		assert(!vec.empty()&&!vec[0].is_empty());
-		node->get_dict().set_string(prop->name, to_std_string_sv(vec[0]).c_str());
-	}
-	virtual void internal_update() override {
-		auto node = get_node();
-		if (!node->get_dict().has_key(prop->name)) {
-			if (can_reset())
-				reset_value();
-		}
-	}
-};
-
-class int_t_editor : public IDictEditor
-{
-	using IDictEditor::IDictEditor;
-
-	// Inherited via IDictEditor
-	virtual void internal_update() override {
-		IDictEditor::internal_update();
-		auto node = get_node();
-		int i = node->get_dict().get_int(prop->name);
-		auto vec = parse_hint_string(prop->range_hint);
-		if (vec.size() == 3) {
-			int min = atoi(vec[1].to_stack_string().c_str());
-			int max = atoi(vec[2].to_stack_string().c_str());
-			ImGui::SliderInt("##inputint", &i, min, max);
-		}
-		else
-			ImGui::InputInt("##inputint", &i);
-		node->get_dict().set_int(prop->name, i);
-	}
-};
-
-class float_t_editor : public IDictEditor
-{
-	using IDictEditor::IDictEditor;
-
-	// Inherited via IDictEditor
-	virtual void internal_update() override {
-		IDictEditor::internal_update();
-		auto node = get_node();
-		float f = node->get_dict().get_float(prop->name);
-		auto vec = parse_hint_string(prop->range_hint);
-		if (vec.size() == 3) {
-			float min = atof(vec[1].to_stack_string().c_str());
-			float max = atof(vec[2].to_stack_string().c_str());
-			ImGui::SliderFloat("##inputfl", &f, min, max);
-		}
-		else
-			ImGui::InputFloat("##inputfl", &f);
-		node->get_dict().set_float(prop->name, f);
-	}
-};
-
-class bool_t_editor : public IDictEditor
-{
-	using IDictEditor::IDictEditor;
-
-	// Inherited via IDictEditor
-	virtual void internal_update() override {
-		IDictEditor::internal_update();
-		auto node = get_node();
-		bool b = node->get_dict().get_int(prop->name);
-		auto vec = parse_hint_string(prop->range_hint);
-		ImGui::Checkbox("##inputbool", &b);
-		node->get_dict().set_int(prop->name, b);
-	}
-};
-
-class vec3_t_editor : public IDictEditor
-{
-	using IDictEditor::IDictEditor;
-
-	// Inherited via IDictEditor
-	virtual void internal_update() override {
-		IDictEditor::internal_update();
-		auto node = get_node();
-		glm::vec3 v = node->get_dict().get_vec3(prop->name);
-		ImGui::DragFloat3("##vec3", &v.x,0.2);
-		node->get_dict().set_vec3(prop->name, v);
-	}
-
-	virtual bool can_reset() override {
-		auto node = get_node();
-		auto vec = parse_hint_string(prop->range_hint);
-		if (vec.empty() || vec[0].is_empty())
-			return false;
-		glm::vec3 v;
-		int fields = sscanf(vec[0].to_stack_string().c_str(), "%f %f %f", &v.x, &v.y, &v.z);
-		glm::vec3 dv = node->get_dict().get_vec3(prop->name);
-
-		return glm::dot(v - dv, v - dv) > 0.00001;
-	}
-};
-
-class color32_t_editor : public IDictEditor
-{
-	using IDictEditor::IDictEditor;
-
-	// Inherited via IDictEditor
-	virtual void internal_update() override {
-		IDictEditor::internal_update();
-		auto node = get_node();
-		Color32 color = node->get_dict().get_color(prop->name);
-		ImVec4 colorvec4 = ImGui::ColorConvertU32ToFloat4(color.to_uint());
-		ImGui::ColorEdit4("##colorpicker", &colorvec4.x);
-		uint32_t res = ImGui::ColorConvertFloat4ToU32(colorvec4);
-		// im lazy
-		color = *(Color32*)(&res);
-		node->get_dict().set_color(prop->name, color);
-	}
-};
-
-class quat_t_editor : public IDictEditor
-{
-	using IDictEditor::IDictEditor;
-
-	// Inherited via IDictEditor
-	virtual void internal_update() override {
-		IDictEditor::internal_update();
-		auto node = get_node();
-		glm::vec4 v = node->get_dict().get_vec4(prop->name);
-		glm::vec3 eul = glm::eulerAngles(glm::quat(v.x, v.y, v.z, v.w));
-		eul *= 180.f / PI;
-		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
-			eul *= PI / 180.f;
-			glm::quat q = glm::quat(eul);
-			node->get_dict().set_vec4("rotation",glm::vec4(q.w, q.x, q.y, q.z));
-		}
-	}
-
-	virtual bool can_reset() override {
-		auto node = get_node();
-		auto vec = parse_hint_string(prop->range_hint);
-		if (vec.empty() || vec[0].is_empty())
-			return false;
-		glm::vec4 v;
-		int fields = sscanf(vec[0].to_stack_string().c_str(), "%f %f %f %f", &v.x, &v.y, &v.z,&v.w);
-		glm::vec4 dv = node->get_dict().get_vec4(prop->name);
-
-		return glm::dot(v - dv, v - dv) > 0.00001;
-	}
-};
-
-
-
-struct AutoStruct_asdf134 {
- AutoStruct_asdf134() {
-	 auto& pfac = IPropertyEditor::get_factory();
-
-	 pfac.registerClass<float_t_editor>("Leveled_float");
-	 pfac.registerClass<int_t_editor>("Leveled_int");
-	 pfac.registerClass<bool_t_editor>("Leveled_bool");
-	 pfac.registerClass<color32_t_editor>("Leveled_color32");
-	 pfac.registerClass<vec3_t_editor>("Leveled_vec3");
-	 pfac.registerClass<quat_t_editor>("Leveled_quat");
-
-
-	 auto& afac = IArrayHeader::get_factory();
-
-
-
-	 auto& sfac = IPropertySerializer::get_factory();
- }
-};
-static AutoStruct_asdf134 AutoStruct_asdf134asdfa;
-#endif
 ObjectOutliner::ObjectOutliner()
 {
 	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
@@ -1696,6 +1351,7 @@ void EdPropertyGrid::refresh_grid()
 	}
 }
 
+
 SelectionState::SelectionState()
 {
 	ed_doc.on_node_will_delete.add(this, &SelectionState::on_node_deleted);
@@ -1749,4 +1405,30 @@ DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)
 			}
 		}
 	}
+}
+
+UndoRedoSystem::UndoRedoSystem() {
+	hist.resize(HIST_SIZE, nullptr);
+
+	ed_doc.gui->key_down_delegate.add(this, &UndoRedoSystem::on_key_event);
+}
+void UndoRedoSystem::on_key_event(const SDL_KeyboardEvent& key)
+{
+	if (key.keysym.scancode == SDL_SCANCODE_Z && key.keysym.mod & KMOD_CTRL)
+		undo();
+}
+
+EditorDoc::EditorDoc() {
+	gui = std::make_unique<EditorUILayout>();
+
+	gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
+	gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
+	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
+
+	command_mgr = std::make_unique<UndoRedoSystem>();
+	selection_state = std::make_unique<SelectionState>();
+	prop_editor = std::make_unique<EdPropertyGrid>();
+	manipulate = std::make_unique<ManipulateTransformTool>();
+	outliner = std::make_unique<ObjectOutliner>();
+	database = std::make_unique<EntityNameDatabase_Ed>();
 }

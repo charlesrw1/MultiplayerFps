@@ -41,9 +41,10 @@ public:
 class UndoRedoSystem
 {
 public:
-	UndoRedoSystem() {
-		hist.resize(HIST_SIZE,nullptr);
-	}
+	UndoRedoSystem();
+
+	void on_key_event(const SDL_KeyboardEvent& k);
+
 	void clear_all() {
 		for (int i = 0; i < hist.size(); i++) {
 			delete hist[i];
@@ -258,6 +259,7 @@ class SelectionState
 public:
 	SelectionState();
 
+
 	MulticastDelegate<> on_selection_changed;
 
 	// set only selected
@@ -352,11 +354,12 @@ class ManipulateTransformTool
 public:
 	ManipulateTransformTool();
 	void update();
-	void handle_event(const SDL_Event& event);
 	bool is_hovered();
 	bool is_using();
 
 private:
+
+	void on_key_down(const SDL_KeyboardEvent& k);
 
 	void on_close();
 	void on_open();
@@ -460,17 +463,12 @@ public:
 	void on_property_change() {}
 };
 
+class EditorUILayout;
 class Model;
 class EditorDoc : public IEditorTool
 {
 public:
-	EditorDoc() {
-		selection_state = std::make_unique<SelectionState>();
-		prop_editor = std::make_unique<EdPropertyGrid>();
-		manipulate = std::make_unique<ManipulateTransformTool>();
-		outliner = std::make_unique<ObjectOutliner>();
-		database = std::make_unique<EntityNameDatabase_Ed>();
-	}
+	EditorDoc();
 	virtual void init();
 	virtual bool can_save_document() override { return true; }
 	virtual void open_document_internal(const char* levelname) override;
@@ -484,8 +482,6 @@ public:
 	}
 	virtual void draw_menu_bar() override;
 
-	virtual bool handle_event(const SDL_Event& event) override;
-	virtual void ui_paint() override;
 	virtual void tick(float dt) override;
 	virtual void overlay_draw() override;
 	virtual void imgui_draw() override;
@@ -494,6 +490,17 @@ public:
 
 	std::string get_full_output_path() {
 		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
+	}
+
+	void on_mouse_down(int x, int y, int button);
+	void on_key_down(const SDL_KeyboardEvent& k);
+	void on_mouse_wheel(const SDL_MouseWheelEvent& wheel) {
+		if (!eng->is_game_focused())
+			return;
+		if (using_ortho)
+			ortho_camera.scroll_callback(wheel.y);
+		else
+			camera.scroll_callback(wheel.y);
 	}
 
 
@@ -525,13 +532,14 @@ public:
 	void leave_transform_tool(bool apply_delta);
 
 	bool is_open = false;
-	UndoRedoSystem command_mgr;
+	std::unique_ptr<UndoRedoSystem> command_mgr;
 	View_Setup vs_setup;
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<EntityNameDatabase_Ed> database;
+	std::unique_ptr<EditorUILayout> gui;
 
 	bool using_ortho = false;
 	User_Camera camera;
