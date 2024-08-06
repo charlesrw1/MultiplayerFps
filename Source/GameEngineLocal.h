@@ -108,7 +108,7 @@ public:
 	}
 	virtual Engine_State get_state() const override { return state; }
 	bool is_in_an_editor_state() const { return get_current_tool() != nullptr; }
-	void change_editor_state(IEditorTool* next_tool, const char* file = "");
+	void change_editor_state(IEditorTool* next_tool, const char* arg, const char* file = "");
 
 	void queue_load_map(string nextmap);
 

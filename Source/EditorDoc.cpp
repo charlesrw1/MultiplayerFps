@@ -390,30 +390,50 @@ void EditorDoc::on_map_load_return(bool good)
 {
 	if (!good) {
 		eng->open_level("__empty__");
+		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
 	else {
 		set_doc_name(eng->get_level()->get_name());
+
+		if (is_editing_a_schema) {
+			if(schema_source)
+				eng->spawn_entity_schema(schema_source);
+		}
+
 		on_start.invoke();
-
-		//eng_local.on_map_load_return.remove(this);
 	}
-
 }
-void EditorDoc::open_document_internal(const char* levelname)
+void EditorDoc::open_document_internal(const char* levelname, const char* arg)
 {
+	// schema vs level edit switch
+	if (strcmp(arg, "schema") == 0)
+		is_editing_a_schema = true;
+	else
+		is_editing_a_schema = false;
+
 	id_start = 0;
-	bool needs_new_doc = true;
-	if (strlen(levelname) != 0) {
-		eng->open_level(levelname);	// queues load
-		needs_new_doc = false;
-	}
 
-	if(needs_new_doc) {
-		sys_print("creating new document\n");
-		set_empty_name();
-		eng->open_level("__empty__");	// queues load
-	}
+	if (!is_editing_a_schema) {
+		bool needs_new_doc = true;
+		if (strlen(levelname) != 0) {
+			set_doc_name(levelname);
+			eng->open_level(levelname);	// queues load
+			needs_new_doc = false;
+		}
 
+		if (needs_new_doc) {
+			sys_print("creating new document\n");
+			set_empty_name();
+			eng->open_level("__empty__");	// queues load
+		}
+	}
+	else {
+		// flow: tell engine to open an empty level
+		// after succeding, add the schema in the callback
+		schema_source = g_schema_loader.load_schema(levelname);
+		set_doc_name(levelname);
+		eng->open_level("__empty__");
+	}
 	eng_local.on_map_load_return.add(this, &EditorDoc::on_map_load_return);
 	is_open = true;
 
@@ -920,7 +940,7 @@ void EditorDoc::hook_scene_viewport_draw()
 			const float scene_depth = idraw->get_scene_depth_for_editor(x-size.x, y-size.y);
 
 			glm::vec3 dir = unproject_mouse_to_ray(x, y);
-			glm::vec3 worldpos = (scene_depth > 30.0) ? vs_setup.origin + dir * 5.0f : vs_setup.origin + dir * scene_depth;
+			glm::vec3 worldpos = (abs(scene_depth) > 30.0) ? vs_setup.origin + dir * 5.0f : vs_setup.origin + dir * scene_depth;
 			drop_transform[3] = glm::vec4(worldpos, 1.0);
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;

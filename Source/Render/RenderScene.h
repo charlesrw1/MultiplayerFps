@@ -216,6 +216,14 @@ struct RSunInternal
 	int unique_id = 0;
 };
 
+
+struct RSkylight_Internal
+{
+	Render_Skylight skylight;
+	glm::vec3 ambientCube[6];
+	int unique_id = 0;
+};
+
 class TerrainInterfaceLocal;
 class Render_Scene : public RenderScenePublic
 {
@@ -327,14 +335,40 @@ public:
 	void remove_reflection_volume(handle<Render_Reflection_Volume>& handle)override {
 
 	}
-	handle<Render_Skylight> register_skylight(const Render_Skylight& vol) override {
-		return { -1 };
+	handle<Render_Skylight> register_skylight(const Render_Skylight& skylight) override {
+		handle<Render_Skylight> id = { int(unique_id_counter++) };
+		RSkylight_Internal internal_skylight;
+		internal_skylight.skylight = skylight;
+		internal_skylight.unique_id = id.id;
+		skylights.push_back(internal_skylight);
+		return id;
 	}
-	void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& sun)override {
-
+	void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& sky)override {
+		int i = 0;
+		for (; i < skylights.size(); i++) {
+			if (skylights[i].unique_id == handle.id)
+				break;
+		}
+		if (i == skylights.size()) {
+			sys_print("??? update_skylight couldn't find handle\n");
+			return;
+		}
+		skylights[i].skylight = sky;
 	}
 	void remove_skylight(handle<Render_Skylight>& handle) override {
-
+		if (!handle.is_valid())
+			return;
+		int i = 0;
+		for (; i < skylights.size(); i++) {
+			if (skylights[i].unique_id == handle.id)
+				break;
+		}
+		if (i == skylights.size()) {
+			sys_print("??? remove_skylight couldn't find handle\n");
+			return;
+		}
+		skylights.erase(skylights.begin() + i);
+		handle = { -1 };
 	}
 	handle<RenderFog> register_fog(const RenderFog& fog) {
 		if (has_fog) {
@@ -409,7 +443,7 @@ public:
 	Free_List<RDecal_Internal> decal_list;
 	// should just be one, but I let multiple ones exist too
 	std::vector<RSunInternal> suns;
-	std::vector<Render_Skylight> skylights;	// again should just be 1
+	std::vector<RSkylight_Internal> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
 	Free_List<Render_Irradiance_Volume> irradiance_volumes;
 

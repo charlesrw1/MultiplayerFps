@@ -167,3 +167,45 @@ SunLightComponent::~SunLightComponent() {}
 PointLightComponent::~PointLightComponent() {}
 SpotLightComponent::~SpotLightComponent() {}
 SpotLightComponent::SpotLightComponent() {}
+#include "Render/Render_Volumes.h"
+CLASS_H(SkylightComponent,EntityComponent)
+public:
+	void on_init() override {
+
+		mytexture = new Texture;
+		Render_Skylight sl;
+		sl.generated_cube = mytexture;
+		sl.wants_update = true;
+
+		handle = idraw->get_scene()->register_skylight(sl);
+	}
+	void on_deinit() override {
+		idraw->get_scene()->remove_skylight(handle);
+		delete mytexture;
+		mytexture = nullptr;
+	}
+	void on_changed_transform() override {
+	}
+
+	void editor_on_change_property() override {
+
+	}
+
+	static const PropertyInfoList* get_props() = delete;
+
+	Texture* mytexture = nullptr;
+	handle<Render_Skylight> handle;
+};
+CLASS_IMPL(SkylightComponent);
+#include "Entity.h"
+CLASS_H(SkylightEntity, Entity)
+public:
+	SkylightEntity() {
+		Skylight = create_sub_component<SkylightComponent>("Skylight");
+		root_component = Skylight;
+	}
+	SkylightComponent* Skylight = nullptr;
+
+	static const PropertyInfoList* get_props() = delete;
+};
+CLASS_IMPL(SkylightEntity);

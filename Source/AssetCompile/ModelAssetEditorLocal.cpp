@@ -309,7 +309,7 @@ bool ModelEditorTool::has_document_open() const
 	return is_open;
 }
 
-void ModelEditorTool::open_document_internal(const char* name)
+void ModelEditorTool::open_document_internal(const char* name, const char* arg)
 {
 	if (strlen(name) > 0) {
 		// try to find def_name

@@ -28,7 +28,8 @@ struct Render_Reflection_Volume
 // sky reflection and ambient
 struct Render_Skylight
 {
-	Texture* generated_cube = nullptr;
+	bool wants_update = false;
+	const Texture* generated_cube = nullptr;
 };
 
 struct LevelIrradianceFieldAsset;

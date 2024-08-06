@@ -259,6 +259,7 @@ const PropertyInfoList* MeshComponent::get_props() {
 #endif // !RUNTIME
 
 		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
+		REG_BOOL(is_skybox, PROP_DEFAULT, "0")
 	END_PROPS(MeshCompponent)
 }
 
@@ -277,6 +278,7 @@ void MeshComponent::update_handle()
 	obj.visible = visible;
 	obj.transform = get_ws_transform();
 	obj.owner = this;
+	obj.is_skybox = is_skybox;
 	obj.shadow_caster = cast_shadows;
 	if (!eMaterialOverride.empty())
 		obj.mat_override = eMaterialOverride[0].get();
@@ -310,6 +312,7 @@ void MeshComponent::on_init()
 		obj.transform = get_ws_transform();
 		obj.owner = this;
 		obj.shadow_caster = cast_shadows;
+		obj.is_skybox = is_skybox;
 
 		if (!eMaterialOverride.empty())
 			obj.mat_override = eMaterialOverride[0].get();

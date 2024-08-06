@@ -471,7 +471,7 @@ public:
 	EditorDoc();
 	virtual void init();
 	virtual bool can_save_document() override { return true; }
-	virtual void open_document_internal(const char* levelname) override;
+	virtual void open_document_internal(const char* levelname, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
 	virtual bool has_document_open() const override {
@@ -521,7 +521,7 @@ public:
 
 	// schema vs level editing
 	bool is_editing_a_schema = false;
-
+	const Schema* schema_source = nullptr;
 
 	bool local_transform = false;
 	TransformType transform_tool_type;

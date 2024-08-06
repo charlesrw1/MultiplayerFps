@@ -12,7 +12,7 @@
 #include "Assets/AssetBrowser.h"
 
 
-bool IEditorTool::open(const char* name) {
+bool IEditorTool::open(const char* name, const char* arg) {
 	//assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
 
 	//if (get_focus_state() == editor_focus_state::Background) {
@@ -23,7 +23,7 @@ bool IEditorTool::open(const char* name) {
 	close();
 	assert(!has_document_open());
 
-	open_document_internal(name);
+	open_document_internal(name, arg);
 
 	{
 		const char* window_name = "unnamed";

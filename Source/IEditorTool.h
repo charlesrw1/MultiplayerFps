@@ -17,13 +17,13 @@ public:
 
 
 	// this is how documents are opened from the engine layer
-	bool open_document(const char* path) {
+	bool open_document(const char* path, const char* arg = "" /* optional argument*/) {
 		if (!is_initialized) {
 			init();
 			is_initialized = true;
 		}
 	
-		bool could_open = open(path);
+		bool could_open = open(path, arg);
 
 		assert(!could_open || has_document_open());
 
@@ -49,7 +49,7 @@ protected:
 	// this works with the asset browser for nice integration
 	//virtual const char* asset_type_name() = 0;
 
-	bool open(const char* name);
+	bool open(const char* name, const char* arg = "");
 	bool current_document_has_path() const { return !name.empty(); }
 	void open_the_open_popup() {
 		open_open_popup = true;
@@ -90,7 +90,7 @@ protected:
 	const std::string& get_doc_name() const { return name; }
 private:
 	// this is called by open(), if the document doesnt exist or fails to parse, you MUST open something, so create a new doc, this will be checked
-	virtual void open_document_internal(const char* name) = 0;
+	virtual void open_document_internal(const char* name, const char* arg) = 0;
 	// this is called by close(), remove all internal references to the currently open document, this only gets called if 
 	// has_document_open() is true, so you dont have to check
 	virtual void close_internal() = 0;

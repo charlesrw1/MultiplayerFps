@@ -21,6 +21,7 @@ struct Render_Object
 		color_overlay = false;
 		dither = false;
 		opposite_dither = false;
+		is_skybox = false;
 	}
 
 	Model* model = nullptr;
@@ -36,6 +37,7 @@ struct Render_Object
 	bool color_overlay : 1;
 	bool dither : 1;
 	bool opposite_dither : 1;
+	bool is_skybox : 1;	// if true, then this is included in the global skylight reflection probe
 
 	// for debugging only (also editor uses this for picking)
 	const EntityComponent* owner = nullptr;

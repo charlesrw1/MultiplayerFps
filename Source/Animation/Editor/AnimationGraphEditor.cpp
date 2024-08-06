@@ -1785,7 +1785,7 @@ void AnimationGraphEditor::try_load_preview_models()
 	set_model_from_str(opt.PreviewModel);
 }
 
-void AnimationGraphEditor::open_document_internal(const char* name)
+void AnimationGraphEditor::open_document_internal(const char* name, const char* arg)
 {
 
 	bool needs_new_doc = true;

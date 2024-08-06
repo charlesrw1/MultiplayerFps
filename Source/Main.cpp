@@ -505,7 +505,7 @@ void GameEngineLocal::connect_to(string address)
 
 DECLARE_ENGINE_CMD(close_ed)
 {
-	eng_local.change_editor_state(nullptr);
+	eng_local.change_editor_state(nullptr,"");
 }
 
 
@@ -523,7 +523,7 @@ DECLARE_ENGINE_CMD(start_ed)
 		const char* file_to_open = "";	// make a new map
 		if (args.size() == 3)
 			file_to_open = args.at(2);
-		eng_local.change_editor_state(metadata->tool_to_edit_me(), file_to_open);
+		eng_local.change_editor_state(metadata->tool_to_edit_me(),metadata->get_arg_for_editortool(), file_to_open);
 	}
 	else {
 		sys_print("unknown editor\n");
@@ -543,7 +543,7 @@ static void disable_imgui_docking()
 
 #define ASSERT_ENUM_STRING( enumstr, index )		( 1 / (int)!( (int)enumstr - index ) ) ? #enumstr : ""
 
-void GameEngineLocal::change_editor_state(IEditorTool* next_tool, const char* file)
+void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
 	sys_print("--------- Change Editor State ---------\n");
 	if (active_tool != next_tool && active_tool != nullptr) {
@@ -554,7 +554,7 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool, const char* fi
 	if (active_tool != nullptr) {
 		enable_imgui_docking();
 		global_asset_browser.init();
-		bool could_open = get_current_tool()->open_document(file);
+		bool could_open = get_current_tool()->open_document(file, arg);
 		if (!could_open) {
 			active_tool = nullptr;
 		}
@@ -629,11 +629,24 @@ DECLARE_ENGINE_CMD(map)
 
 	if (eng->get_current_tool() != nullptr) {
 		sys_print("*** starting game so closing any editors\n");
-		eng_local.change_editor_state(nullptr);	// close any editors
+		eng_local.change_editor_state(nullptr,"");	// close any editors
 	}
 
 	eng->open_level(args.at(1));
 }
+extern ConfigVar g_entry_level;
+// start game from the entry map
+DECLARE_ENGINE_CMD(goto_entry_map)
+{
+	if (args.size() != 1) {
+		sys_print("usage: goto_entry_map");
+		return;
+	}
+
+	const char* cmd = string_format("map %s\n", g_entry_level.get_string());
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, cmd);
+}
+
 DECLARE_ENGINE_CMD(exec)
 {
 	if (args.size() < 2) {

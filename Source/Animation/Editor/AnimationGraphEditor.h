@@ -267,7 +267,7 @@ public:
 	AnimationGraphEditor();
 
 	virtual void init() override;
-	virtual void open_document_internal(const char* name) override;
+	virtual void open_document_internal(const char* name, const char* arg) override;
 	virtual void close_internal() override;
 	virtual void tick(float dt) override;
 

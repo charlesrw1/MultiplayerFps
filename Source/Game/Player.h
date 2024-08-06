@@ -101,17 +101,15 @@ public:
 		END_PROPS(Player)
 	};
 
-public:
-
+	// PlayerBase overrides
+	void set_input_command(Move_Command cmd) override; 	// called by game before calling update
+	void get_view(glm::vec3& origin, glm::vec3& angles, float& fov) override;
+	
 	// Entity overrides
 	void update() override;
 	void start() override;
 
-	// PlayerBase interface
-	// called by game before calling update
-	void set_input_command(Move_Command cmd) override;
-	void get_view(glm::vec3& origin, glm::vec3& angles, float& fov) override;
-
+public:
 	glm::vec3 calc_eye_position();
 
 	void find_a_spawn_point();

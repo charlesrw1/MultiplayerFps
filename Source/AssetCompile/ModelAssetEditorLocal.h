@@ -81,7 +81,7 @@ public:
 	virtual bool can_save_document() override;
 	virtual const char* get_editor_name() override;
 	virtual bool has_document_open() const override;
-	virtual void open_document_internal(const char* name) override;
+	virtual void open_document_internal(const char* name, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
 	void imgui_draw() override;

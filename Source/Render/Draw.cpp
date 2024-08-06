@@ -2737,7 +2737,8 @@ void draw_debug_grid()
 {
 	static MeshBuilder mb;
 	static bool init = true;
-
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
 	if (init) {
 		mb.Begin();
 		for (int x = 0; x < 11; x++) {
@@ -2747,8 +2748,9 @@ void draw_debug_grid()
 		mb.End();
 		init = false;
 	}
-	glEnable(GL_DEPTH_TEST);
 	mb.Draw(GL_LINES);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
 }
 
 // ORDER:

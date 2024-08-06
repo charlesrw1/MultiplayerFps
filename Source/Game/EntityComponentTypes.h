@@ -43,6 +43,7 @@ public:
 	bool simulate_physics = false;
 	bool visible = true;
 	bool cast_shadows = true;
+	bool is_skybox = false;
 
 #ifndef RUNTIME
 	bool eAnimateInEditor = false;
