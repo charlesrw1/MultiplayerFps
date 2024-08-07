@@ -172,7 +172,7 @@ CLASS_H(SkylightComponent,EntityComponent)
 public:
 	void on_init() override {
 
-		mytexture = new Texture;
+		mytexture = g_imgs.install_system_texture("_skylight");
 		Render_Skylight sl;
 		sl.generated_cube = mytexture;
 		sl.wants_update = true;

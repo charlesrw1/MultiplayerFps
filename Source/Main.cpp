@@ -1339,6 +1339,17 @@ glm::mat4 View_Setup::make_opengl_perspective_with_near_far() const
 {
 	return glm::perspectiveRH_NO(fov, width / (float)height, near, far);
 }
+
+View_Setup::View_Setup(glm::mat4 viewMat, float fov, float near, float far, int width, int height)
+	: view(viewMat), fov(fov), near(near), far(far), width(width), height(height)
+{
+	this->origin = viewMat[3];
+	this->front = viewMat[2];
+	const float aspectRatio = width / (float)height;
+	proj = MakeInfReversedZProjRH(fov, aspectRatio, near);
+	viewproj = proj * view;
+}
+
 View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height)
 	: origin(origin),front(front),fov(fov),near(near),far(far),width(width),height(height)
 {

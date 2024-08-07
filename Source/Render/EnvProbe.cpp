@@ -63,6 +63,9 @@ void EnviornmentMapHelper::init()
     Shader::compile(&prefilter_irradiance, "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterIrradianceF.txt");
     Shader::compile(&prefilter_specular, "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterSpecularF.txt");
 
+    Shader::compile(&prefilter_specular_new, "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterSpecularNewF.txt");
+
+
     glGenFramebuffers(1, &fbo);
     glGenRenderbuffers(1, &rbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -189,6 +192,166 @@ void EnviornmentMapHelper::convolute_irradiance(EnvCubemap* env_map)
     env_map->irradiance_cm = cm_id;
 }
 
+
+#include "Texture.h"
+
+// convolutes a rendered cubemap
+void EnviornmentMapHelper::compute_specular_new(
+    Texture* t	// in-out cubemap, scene drawn to mip level 0
+)
+{
+    assert(t);
+    int size = t->width;
+    const uint32_t num_mips = get_mip_map_count(size, size);
+
+    glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
+    glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, 0);
+
+    glDepthMask(GL_FALSE);
+    glDisable(GL_DEPTH_TEST);
+
+    glBindVertexArray(vao);
+    glDisable(GL_CULL_FACE);
+
+    fbohandle temp_fbo{};
+    glCreateFramebuffers(1, &temp_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
+
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind texture, mip reading is limited to highest
+
+    prefilter_specular_new.use();
+
+    for (int mip = 1/* skip mip level 0*/; mip < num_mips; mip++)
+    {
+        size >>= 1;
+
+        glViewport(0, 0, size, size);
+        float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
+        prefilter_specular_new.set_float("roughness", roughness);
+
+        for (int i = 0; i < 6; i++) {
+            prefilter_specular_new.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+            //glFramebufferTexture2D(temp_fbo, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, mip);
+         
+            glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, t->gl_id, mip, i);
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+    }
+
+    glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
+    glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, num_mips);
+
+    glDeleteFramebuffers(1, &temp_fbo);
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glBindVertexArray(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// causes pipeline stall to read back texture
+void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, scene draw to mip level 0
+    glm::vec3 ambient_cube[6]		// out 6 vec3s representing irradiance of cubemap
+)
+{
+    texhandle temp_tex{};
+    const uint32_t irrad_size = 16;
+
+    glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &temp_tex);
+    glTextureStorage2D(temp_tex, 1/* 1 level*/, GL_RGB16F, irrad_size, irrad_size);
+
+    glTextureParameteri(temp_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(temp_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(temp_tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(temp_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(temp_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    prefilter_irradiance.use();
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind the read cubemap, mip0 is the original scene render
+
+    fbohandle temp_fbo{};
+    glCreateFramebuffers(1, &temp_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
+
+    glViewport(0, 0, irrad_size, irrad_size);
+    glBindVertexArray(vao);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+    for (int i = 0; i < 6; i++) {
+        prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+
+        glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0/* first mip*/, i);
+
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+
+
+    glFlush();
+    glFinish();
+
+    float* input = new float[irrad_size * irrad_size * 3 * 6];
+    float weights[6];
+    glm::vec3 dirs[6];
+    for (int i = 0; i < 6; i++) {
+        weights[i] = 0.f;
+        ambient_cube[i] = glm::vec3(0.f);
+        dirs[i] = cubemap_views[i][2];
+
+        glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0/* first mip*/, i);
+        const int ofs = i * irrad_size * irrad_size *3;
+        glReadPixels(0, 0, irrad_size, irrad_size, GL_RGB, GL_FLOAT, (void*)&input[ofs]);
+    }
+    for (int i = 0; i < 6; i++) {
+        glm::mat4 inv = glm::inverse(cubemap_projection * cubemap_views[i]);
+        glm::vec3 up = cubemap_views[i][1];
+        glm::vec3 right = cubemap_views[i][0];
+
+        const float inv_irrad_size = 1.0 / (irrad_size-1);
+        for (int y = 0; y < irrad_size; y++) {
+            for (int x = 0; x < irrad_size; x++) {
+                const float xf = (x * inv_irrad_size) * 2.0 - 1.0;
+                const float yf = (y * inv_irrad_size) * 2.0 - 1.0;
+                const int ofs = (i * irrad_size * irrad_size  + y * irrad_size + x)*3;
+                glm::vec3 c = { input[ofs],input[ofs + 1],input[ofs + 2] };
+                glm::vec3 v = glm::normalize(xf * right + yf*up + dirs[i]);
+                for (int dir = 0; dir < 6; dir++) {
+                    float weight = glm::max(dot(v, dirs[dir]), 0.0f);
+                    weights[dir] += weight;
+                    ambient_cube[dir] += c * weight;
+                }
+            }
+        }
+    }
+    for (int dir = 0; dir < 6; dir++) {
+        ambient_cube[dir] /= weights[dir];
+    }
+
+
+
+
+    glDeleteFramebuffers(1, &temp_fbo);
+
+    glEnable(GL_CULL_FACE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+
+
+    glDeleteTextures(1, &temp_tex);
+
+    delete[] input;
+
+}
 void EnviornmentMapHelper::compute_specular(EnvCubemap* env_map)
 {
     assert(env_map);

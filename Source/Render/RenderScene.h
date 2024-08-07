@@ -397,7 +397,7 @@ public:
 		return &proxy_list.get(handle.id).proxy;
 	}
 
-	void build_scene_data(bool is_for_editor);
+	void build_scene_data(bool skybox_only, bool is_for_editor);
 
 	RSunInternal* get_main_directional_light();
 

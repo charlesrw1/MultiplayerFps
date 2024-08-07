@@ -266,7 +266,7 @@ void SSAO_System::update_ubo()
 
 	glNamedBufferSubData(ubo.data, 0, sizeof(gpu::HBAOData), &data);
 }
-
+ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV);
 void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;
@@ -364,6 +364,7 @@ void SSAO_System::render()
 	}
 
 	// depth aware blur, writes to texture.result
+	if(r_ssao_blur.get_bool())
 	{
 		prog.hbao_blur.use();
 		// framebuffer = fbo.finalresolve

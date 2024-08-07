@@ -621,7 +621,7 @@ void Renderer::create_shaders()
 	//prog.particle_basic = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "PARTICLE_SHADER");
 	prog.tex_debug_2d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_VERSION");
 	prog.tex_debug_2d_array = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_ARRAY_VERSION");
-
+	prog.tex_debug_cubemap = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_CUBEMAP_VERSION");
 	// Bloom shaders
 	prog.bloom_downsample = prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
 	prog.bloom_upsample = prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
@@ -634,6 +634,9 @@ void Renderer::create_shaders()
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 	prog.sunlight_accumulation_debug = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt","DEBUG");
+
+	prog.ambient_accumulation = prog_man.create_raster("fullscreenquad.txt", "AmbientLightingF.txt");
+	prog.reflection_accumulation = prog_man.create_raster("fullscreenquad.txt", "SampleCubemapsF.txt");
 
 	prog.height_fog = prog_man.create_raster("fullscreenquad.txt", "HeightFogF.txt");
 
@@ -942,7 +945,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Main accumulation buffer, 16 bit color
 	create_and_delete_texture(tex.scene_color);
-	glTextureStorage2D(tex.scene_color, 1, GL_RGBA16F, s_w, s_h);
+	glTextureStorage2D(tex.scene_color, 1, GL_RGB16F, s_w, s_h);
 	set_default_parameters(tex.scene_color);
 
 	// Main scene depth
@@ -1989,7 +1992,7 @@ const MeshLod& get_lod_to_render(const Render_Object& object, float inv_two_time
 //		
 
 
-void Render_Scene::build_scene_data(bool build_for_editor)
+void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
 	CPUFUNCTIONSTART;
 
@@ -2020,7 +2023,7 @@ void Render_Scene::build_scene_data(bool build_for_editor)
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{obj.handle};
 			auto& proxy = obj.type_.proxy;
-			if (proxy.visible && proxy.model) {
+			if (proxy.visible && proxy.model && (!skybox_only || proxy.is_skybox)) {
 
 				auto& vs = draw.get_current_frame_vs();
 				glm::vec3 to_origin = glm::vec3(proxy.transform[3]) - vs.origin;
@@ -2953,7 +2956,58 @@ void Renderer::accumulate_gbuffer_lighting()
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	// indirect lighting pass (full screen, use constant ambient for now), multiple with SSAO
+	if (!scene.skylights.empty() && !scene.skylights.front().skylight.wants_update) {
+		auto& skylight = scene.skylights.front();
+
+		// bind the forward_render framebuffer
+		// outputs to the scene_color texture
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
+		glViewport(0, 0, vs.width, vs.height);
+
+		// disable depth writes
+		glDepthMask(GL_FALSE);
+
+	
+		glEnable(GL_BLEND);	// enable additive blending
+		glBlendFunc(GL_ONE, GL_ONE);
+		set_shader(prog.ambient_accumulation);
+
+		glDisable(GL_DEPTH_TEST);
+
+		bind_texture(0, tex.scene_gbuffer0);
+		bind_texture(1, tex.scene_gbuffer1);
+		bind_texture(2, tex.scene_gbuffer2);
+		bind_texture(3, tex.scene_depth);
+		bind_texture(4, ssao.texture.result);
+
+		for(int i=0;i<6;i++)
+			shader().set_vec3(string_format("AmbientCube[%d]",i), skylight.ambientCube[i]);
+
+		// fullscreen shader, no vao used
+		glBindVertexArray(vao.default_);
+		// to prevent crashes??
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glBindVertexBuffer(0, buf.default_vb, 0, 0);
+		glBindVertexBuffer(1, buf.default_vb, 0, 0);
+		glBindVertexBuffer(2, buf.default_vb, 0, 0);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
+		set_shader(prog.reflection_accumulation);
+		bind_texture(4, skylight.skylight.generated_cube->gl_id);
+		bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
+		glDepthMask(GL_TRUE);
+		glDisable(GL_STENCIL_TEST);
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_DEPTH_TEST);
+		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
 
 	// reflection pass (use static for now)
 }
@@ -3080,6 +3134,112 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 {
 	GPUFUNCTIONSTART;
 
+	if (enable_vsync.get_bool())
+		SDL_GL_SetSwapInterval(1);
+	else
+		SDL_GL_SetSwapInterval(0);
+
+	// Update any gpu materials that became invalidated or got newly allocated
+	matman.pre_render_update();
+
+	check_cubemaps_dirty();
+
+	scene_draw_internal(params, view, gui);
+}
+
+void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front);
+
+void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only)
+{
+	const uint32_t specular_cubemap_size = CUBEMAP_SIZE;
+	const uint32_t num_mips = get_mip_map_count(specular_cubemap_size, specular_cubemap_size);
+	assert(cubemap);
+	//static Texture* somthing = nullptr;
+	if (cubemap->gl_id == 0) {	// not created yet
+		glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &cubemap->gl_id);
+		glTextureStorage2D(cubemap->gl_id, num_mips, GL_RGB16F, specular_cubemap_size, specular_cubemap_size);	
+		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		cubemap->type = Texture_Type::TEXTYPE_CUBEMAP;
+		cubemap->width = cubemap->height = specular_cubemap_size;
+
+		auto set_default_parameters = [](uint32_t handle) {
+			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		};
+
+		//somthing = g_imgs.install_system_texture("_TEST");
+		//glCreateTextures(GL_TEXTURE_2D, 1, &somthing->gl_id);
+		//glTextureStorage2D(somthing->gl_id, 1, GL_RGB16F, 512, 512);
+		//set_default_parameters(somthing->gl_id);
+		//somthing->width = somthing->height = 512;
+		//somthing->type = Texture_Type::TEXTYPE_2D;
+	}
+	
+	auto& helper = EnviornmentMapHelper::get();
+
+	fbohandle cubemap_fbo{};
+	glCreateFramebuffers(1, &cubemap_fbo);
+	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
+	glNamedFramebufferDrawBuffers(cubemap_fbo, 1, attachments);
+
+	for (int i = 0; i < 6; i++) {
+		glm::mat4 viewmat;
+		glm::vec3 viewfront;
+		get_view_mat(i, position, viewmat, viewfront);
+		View_Setup cubemap_view(viewmat, glm::radians(90.f), 0.01, 100.f, specular_cubemap_size, specular_cubemap_size);
+
+		SceneDrawParamsEx params(GetTime(),0.016f);
+		params.draw_ui = false;
+		params.draw_world = true;
+		params.is_editor = false;
+		params.output_to_screen = false;
+		params.is_cubemap_view = true;
+		params.skybox_only = skybox_only;
+
+		scene_draw_internal(params, cubemap_view, nullptr);
+
+		glCheckError();
+
+		// set cubemap texture to a temp framebuffer
+		glNamedFramebufferTextureLayer(cubemap_fbo, GL_COLOR_ATTACHMENT0, cubemap->gl_id, 0/* highest mip*/, i/* face index*/);
+		//glNamedFramebufferTexture(cubemap_fbo, GL_COLOR_ATTACHMENT0, somthing->gl_id, 0);
+		// blit output to framebuffer
+		glBlitNamedFramebuffer(fbo.forward_render, cubemap_fbo,
+			0, 0, specular_cubemap_size, specular_cubemap_size,
+			0, 0, specular_cubemap_size, specular_cubemap_size,
+			GL_COLOR_BUFFER_BIT,
+			GL_NEAREST);
+	}
+
+	glDeleteFramebuffers(1, &cubemap_fbo);
+
+	helper.compute_specular_new(cubemap);
+	helper.compute_irradiance_new(cubemap, ambientCube);
+}
+
+ConfigVar force_render_cubemaps("r.force_cubemap_render", "0", CVAR_BOOL | CVAR_DEV);
+
+void Renderer::check_cubemaps_dirty()
+{
+	GPUFUNCTIONSTART;
+
+	if (!scene.skylights.empty() && (scene.skylights[0].skylight.wants_update|| force_render_cubemaps.get_bool())) {
+		force_render_cubemaps.set_bool(false);
+		auto& skylight = scene.skylights[0];
+		update_cubemap_specular_irradiance(skylight.ambientCube, (Texture*)skylight.skylight.generated_cube, glm::vec3(0.f), true);
+		skylight.skylight.wants_update = false;
+	}
+}
+
+void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
+{
 	current_time = GetTime();
 
 	mem_arena.free_bottom();
@@ -3092,14 +3252,6 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 
 	current_frame_main_view = view;
 
-	if (enable_vsync.get_bool())
-		SDL_GL_SetSwapInterval(1);
-	else
-		SDL_GL_SetSwapInterval(0);
-
-	// Update any gpu materials that became invalidated or got newly allocated
-	matman.pre_render_update();
-
 	if (!params.draw_world && (!params.draw_ui || !gui))
 		return;
 	else if (gui && !params.draw_world && params.draw_ui) {
@@ -3110,7 +3262,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	vs = current_frame_main_view;
 	upload_ubo_view_constants(ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
-	scene.build_scene_data(params.is_editor);
+	scene.build_scene_data(params.skybox_only, params.is_editor);
 
 	shadowmap.update();
 
@@ -3160,7 +3312,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 		render_level_to_target(params);
 	}
 
-	if(r_drawterrain.get_bool())
+	if(r_drawterrain.get_bool() && !params.skybox_only)
 		scene.terrain_interface->draw_to_gbuffer(params.is_editor, r_debug_mode.get_integer()!=0);
 	state_machine.invalidate_all();
 
@@ -3196,6 +3348,11 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	}
 
 	set_blend_state(blend_state::OPAQUE);
+
+	// cubemap views end here
+	// dont need to draw post processing or UI stuff
+	if (params.is_cubemap_view)
+		return;
 
 	if (is_wireframe_mode)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -3389,7 +3546,6 @@ void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t textu
 	glCheckError();
 	auto& helper = EnviornmentMapHelper::get();
 
-
 	for (int i = 0; i < 6; i++) {
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 		glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture, 0, i);
@@ -3445,6 +3601,10 @@ void Renderer::on_level_end()
 
 }
 
+// cubemap rendering:
+// if cubemap not allocated: allocate a cubemap (rgb16f)
+// for each side of cubemap: 
+
 void Renderer::on_level_start()
 {
 	scene.cubemaps.clear();
@@ -3461,60 +3621,7 @@ void Renderer::on_level_start()
 	// Render cubemaps
 	scene.cubemaps.push_back({});		// skybox probe
 	scene.cubemaps[0].found_probe_flag = true;
-#if 0
-	auto& espawns = eng->level->espawns;
-	for (int i = 0; i < espawns.size(); i++) {
-		if (espawns[i].classname == "cubemap_box") {
-			Render_Box_Cubemap bc;
-			bc.boxmin = espawns[i].position - espawns[i].scale;
-			bc.boxmax = espawns[i].position + espawns[i].scale;
 
-			if (espawns[i].name.rfind("_!p1") != std::string::npos)
-				bc.priority = 1;
-			else if (espawns[i].name.rfind("_!p-1") != std::string::npos)
-				bc.priority = -1;
-
-			size_t idfind = espawns[i].name.find("_!i:");
-			if (idfind != std::string::npos) {
-				bc.id = std::atoi(espawns[i].name.substr(idfind + 4).c_str());
-			}
-
-			scene.cubemaps.push_back(bc);
-
-			if (scene.cubemaps.size() >= 128) break;
-		}
-	}
-	for (int i = 0; i < espawns.size(); i++) {
-		if (espawns[i].classname == "cubemap") {
-			bool found = false;
-			int id = -1;
-			size_t idfind = espawns[i].name.find("_!i:");
-			if (idfind != std::string::npos) {
-				id = std::atoi(espawns[i].name.substr(idfind + 4).c_str());
-			}
-
-			for (int j = 0; j < scene.cubemaps.size(); j++) {
-				auto& bc = scene.cubemaps[j];
-
-				if (id != bc.id) continue;
-
-				Bounds b(bc.boxmin, bc.boxmax);
-				if (!b.inside(espawns[i].position, 0.0))
-					continue;
-				if (bc.found_probe_flag) {
-					sys_print("Cubemap box with 2 probes\n");
-					continue;
-				}
-				found = true;
-				bc.found_probe_flag = true;
-				bc.probe_pos = espawns[i].position;
-			}
-			if (!found) {
-				sys_print("Cubemap not inside box\n");
-			}
-		}
-	}
-#endif
 	for (int i = 0; i < scene.cubemaps.size(); i++) {
 		if (!scene.cubemaps[i].found_probe_flag) {
 			scene.cubemaps.erase(scene.cubemaps.begin() + i);
@@ -3668,6 +3775,8 @@ void DebuggingTextureOutput::draw_out()
 		draw.set_shader(draw.prog.tex_debug_2d);
 	else if (output_tex->type == Texture_Type::TEXTYPE_2D_ARRAY)
 		draw.set_shader(draw.prog.tex_debug_2d_array);
+	else if (output_tex->type == Texture_Type::TEXTYPE_CUBEMAP)
+		draw.set_shader(draw.prog.tex_debug_cubemap);
 	else {
 		sys_print("!!! can only debug 2d and 2d array textures\n");
 		output_tex = nullptr;

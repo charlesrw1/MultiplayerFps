@@ -178,7 +178,9 @@ public:
 
 	// public interface
 	virtual void init() override;
+
 	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui) override;
+
 	virtual void on_level_start() override;
 	virtual void on_level_end() override;
 	virtual void reload_shaders() override;
@@ -207,6 +209,9 @@ public:
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool force_backface_state);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
+	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui);
+	void check_cubemaps_dirty();	// render any cubemaps
+	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only);
 
 	Memory_Arena mem_arena;
 
@@ -241,10 +246,14 @@ public:
 
 		program_handle tex_debug_2d{};
 		program_handle tex_debug_2d_array{};
+		program_handle tex_debug_cubemap{};
+
 
 		program_handle light_accumulation{};
 		program_handle sunlight_accumulation{};
 		program_handle sunlight_accumulation_debug{};
+		program_handle ambient_accumulation{};
+		program_handle reflection_accumulation{};
 
 		program_handle height_fog{};
 	}prog;

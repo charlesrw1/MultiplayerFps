@@ -6,6 +6,7 @@ struct View_Setup
 {
 	View_Setup() {}
 	View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height);
+	View_Setup(glm::mat4 viewMat, float fov, float near, float far, int width, int height);
 
 	// dont use this, just for some things that dont play nice with infinite Z
 	glm::mat4 make_opengl_perspective_with_near_far() const;
@@ -26,6 +27,8 @@ struct SceneDrawParamsEx {
 	float time;
 	float dt;
 	bool is_editor = false;
+	bool is_cubemap_view = false;
+	bool skybox_only = false;
 };
 
 struct Render_Object;
