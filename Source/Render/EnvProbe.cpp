@@ -305,7 +305,7 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
     for (int i = 0; i < 6; i++) {
         weights[i] = 0.f;
         ambient_cube[i] = glm::vec3(0.f);
-        dirs[i] = cubemap_views[i][2];
+        dirs[i] = -cubemap_views[i][2];
 
         glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0/* first mip*/, i);
         const int ofs = i * irrad_size * irrad_size *3;
@@ -324,8 +324,9 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
                 const int ofs = (i * irrad_size * irrad_size  + y * irrad_size + x)*3;
                 glm::vec3 c = { input[ofs],input[ofs + 1],input[ofs + 2] };
                 glm::vec3 v = glm::normalize(xf * right + yf*up + dirs[i]);
-                for (int dir = 0; dir < 6; dir++) {
+                for (int dir = i; dir < i+1; dir++) {
                     float weight = glm::max(dot(v, dirs[dir]), 0.0f);
+                    weight = weight * weight;
                     weights[dir] += weight;
                     ambient_cube[dir] += c * weight;
                 }
