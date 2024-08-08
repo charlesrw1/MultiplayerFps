@@ -499,7 +499,7 @@ void draw_entity_info()
 
 static AddToDebugMenu addmovevars("move vars", move_variables_menu);
 static AddToDebugMenu adddrawentinfo("entity physics info", draw_entity_info);
-
+#include "Sound/SoundPublic.h"
 void Player::move()
 {
 	glm::vec3 last_velocity = velocity;
@@ -555,6 +555,14 @@ void Player::move()
 
 
 	esimated_accel = (velocity - last_velocity) / (float)eng->get_tick_interval();
+
+	distTraveledSinceLastFootstep += speed * (float)eng->get_tick_interval();
+
+	if (distTraveledSinceLastFootstep >= 5.0) {
+		const SoundFile* s = isound->load_sound_file("footstep_jack_01.wav");
+		isound->play_sound(s);
+		distTraveledSinceLastFootstep = 0.0;
+	}
 }
 
 void player_fire_weapon()

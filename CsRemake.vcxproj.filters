@@ -531,6 +531,7 @@
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
     <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
+    <ClInclude Include="Source\Game\Components\SoundComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -791,5 +792,6 @@
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
+    <ClCompile Include="Source\Sound\SoundLocal.cpp" />
   </ItemGroup>
 </Project>

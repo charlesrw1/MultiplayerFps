@@ -55,6 +55,7 @@
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
+    <ClInclude Include="Source\Game\Components\SoundComponent.h" />
     <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\EditorDocLocal.h" />
@@ -284,6 +285,7 @@
     <ClCompile Include="Source\Server.cpp" />
     <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
+    <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.h" />
     <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />

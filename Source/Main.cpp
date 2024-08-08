@@ -38,6 +38,8 @@
 #include "Animation/AnimationTreePublic.h"
 #include "Animation/Editor/AnimationGraphEditorPublic.h"
 
+#include "Sound/SoundPublic.h"
+
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
@@ -1396,6 +1398,7 @@ void GameEngineLocal::init()
 	imaterials->init();
 	g_fonts.init();
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
+	isound->init();
 
 	anim_tree_man->init();
 	mods.init();
@@ -1701,6 +1704,9 @@ void GameEngineLocal::loop()
 
 		// tick the gui
 		get_gui()->think();
+
+		// tick the sound system
+		isound->tick(frame_time);
 
 		// draw
 		draw_screen();

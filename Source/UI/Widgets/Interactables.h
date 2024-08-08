@@ -45,11 +45,13 @@ public:
 	void on_pressed(int x, int y, int b) override {
 		if (b == 1) {
 			is_clicked = true;
-			on_selected.invoke();
 		}
 	}
 	void on_released(int x, int y, int b) override {
 		is_clicked = false;
+
+		if (b == 1)
+			on_selected.invoke();
 	}
 	void on_hover_start() override {
 		is_hovered = true;

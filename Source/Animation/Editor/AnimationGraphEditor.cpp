@@ -1560,7 +1560,7 @@ void AnimationGraphEditor::tick(float dt)
 
 	if(1)
 	{
-		assert(eng->get_state() != Engine_State::Game);
+		//assert(eng->get_state() != Engine_State::Game);
 
 		int x = 0, y = 0;
 		if (eng->is_game_focused()) {

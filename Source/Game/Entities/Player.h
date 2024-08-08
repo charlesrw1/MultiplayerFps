@@ -119,6 +119,8 @@ public:
 	// current viewangles for player
 	glm::vec3 view_angles = glm::vec3(0.f);
 
+	float distTraveledSinceLastFootstep = 0.0;
+
 	// how long has current state been active
 	// how long in air? how long on ground?
 	float state_time = 0.0;	
