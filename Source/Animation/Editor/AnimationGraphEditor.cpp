@@ -1917,7 +1917,6 @@ void GraphOutput::set_animator_instance(AnimatorInstance* inst)
 	idraw->get_scene()->remove_obj(obj);
 }
 
-#include "Game/Player.h"
 
 AnimatorInstance* GraphOutput::get_animator()
 {

@@ -698,6 +698,10 @@ void MaterialManagerLocal::init() {
 	fallback = find_material_instance("fallback");
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
+
+	defaultBillboard = find_material_instance("billboardDefault");
+	if (!defaultBillboard)
+		Fatalf("couldnt load the default billboard material\n");
 }
 
 void MaterialManagerLocal::pre_render_update()

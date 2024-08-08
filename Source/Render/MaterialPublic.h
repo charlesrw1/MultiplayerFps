@@ -60,7 +60,10 @@ public:
 	// same shader, may change this in future (depth shaders get ifdef'd anyways)
 	const MaterialInstance* get_shared_depth() const { return fallback; }
 	const MaterialInstance* get_fallback() const { return fallback; }
+	const MaterialInstance* get_default_billboard() const { return defaultBillboard; }
 protected:
+
+	const MaterialInstance* defaultBillboard = nullptr;
 	const MaterialInstance* fallback = nullptr;
 };
 

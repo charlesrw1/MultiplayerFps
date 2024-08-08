@@ -1,8 +1,13 @@
-#include "EntityComponentTypes.h"
+
+#include "LightComponents.h"
 #include "Render/Render_Light.h"
 #include "Render/Render_Sun.h"
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
+
+CLASS_IMPL(SpotLightComponent);
+CLASS_IMPL(PointLightComponent);
+CLASS_IMPL(SunLightComponent);
 
 const PropertyInfoList* SpotLightComponent::get_props() {
 	START_PROPS(SpotLightComponent)
@@ -197,7 +202,7 @@ public:
 	handle<Render_Skylight> handle;
 };
 CLASS_IMPL(SkylightComponent);
-#include "Entity.h"
+#include "Game/Entity.h"
 CLASS_H(SkylightEntity, Entity)
 public:
 	SkylightEntity() {

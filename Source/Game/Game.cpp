@@ -1,29 +1,21 @@
 #include "Server.h"
 #include "Types.h"
 #include "Level.h"
-#include "Player.h"
+#include "BasePlayer.h"
 #include "GameEngineLocal.h"
 #include "Net.h"
-#include "EntityTypes.h"
 
 #include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"
 
 #include "Game/Schema.h"
 
-void Door::update()
-{
-	rotation.y = eng->get_game_time();
-}
-
-
-#include "EntityTypes.h"
-
 void GameEngineLocal::login_new_player(uint32_t index) {
 
+	ASSERT(0);
 	sys_print("*** making client %d\n", index);
 
-	auto player = spawn_entity_class<Player>();
+	auto player = spawn_entity_class<PlayerBase>();
 	level->local_player_id = player->self_id.handle;
 
 }
@@ -212,24 +204,3 @@ void RenderInterpolationComponent::clear()
 #include "Framework/Config.h"
 
 
-void grenade_hit_wall(Entity* ent, glm::vec3 normal)
-{
-	
-}
-
-
-
-Grenade::Grenade()
-{
-}
-
-
-void Grenade::update()
-{
-
-	if (eng->get_game_time() - throw_time > 2.5) {
-		sys_print("BOOM\n");
-
-		eng->remove_entity(this);
-	}
-}

@@ -397,6 +397,25 @@ public:
 		return &proxy_list.get(handle.id).proxy;
 	}
 
+
+	Free_List<MeshBuilder_Object> meshbuilder_objs;
+	virtual handle<MeshBuilder_Object> register_meshbuilder(const MeshBuilder_Object& mbobj) {
+		int handle = meshbuilder_objs.make_new();
+		meshbuilder_objs.get(handle) = mbobj;
+		return { handle };
+	}
+	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) {
+		assert(handle.is_valid());
+		meshbuilder_objs.get(handle.id) = mbobj;
+	}
+	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) {
+		if (handle.is_valid()) {
+			meshbuilder_objs.free(handle.id);
+			handle = { -1 };
+		}
+	}
+
+
 	void build_scene_data(bool skybox_only, bool is_for_editor);
 
 	RSunInternal* get_main_directional_light();

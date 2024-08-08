@@ -701,6 +701,11 @@ void ModelMan::init()
 void ModelMan::create_default_models()
 {
 	error_model = find_or_load("question.cmdl");
+	if (!error_model)
+		Fatalf("couldnt load error model (question.cmdl)\n");
+	defaultPlane = find_or_load("plane.cmdl");
+	if (!defaultPlane)
+		Fatalf("couldnt load defaultPlane model\n");
 
 	_sprite = new Model;
 	_sprite->aabb = Bounds(glm::vec3(-0.5), glm::vec3(0.5));

@@ -1,7 +1,7 @@
 #pragma once
 #include "Entity.h"
 #include "Framework/ClassTypePtr.h"
-#include "Player.h"
+#include "BasePlayer.h"
 #include "GameMode.h"
 // A pure data container entity for storing level specific information
 // Cruicially, it stores the "game mode" (yes im copying unreal here ;) )

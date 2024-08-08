@@ -1,13 +1,17 @@
 #pragma once
+
 #include "Types.h"
 #include "GameEnginePublic.h"
 
 #include "Game/Entity.h"
-#include "Framework/Dict.h"
+
+#include "Game/Components/MeshComponent.h"
+#include "Game/Components/PhysicsComponents.h"
+
 
 using namespace glm;
 CLASS_H(NPC, Entity)
-
+public:
 	NPC() {
 		pathfind_state = going_towards_waypoint;
 		position = vec3(0.f);
@@ -45,16 +49,16 @@ CLASS_H(NPC, Entity)
 			float factor = newspd / speed;
 			velocity.x *= factor;
 			velocity.z *= factor;
-		} 
+		}
 		float dt = eng->get_tick_interval();
 		switch (pathfind_state)
 		{
 		case going_towards_waypoint: {
 			//waypoints[current_waypoint] = eng->local_player().position;
 			glm::vec3 towaypoint = waypoints[current_waypoint] - position;
-			glm::vec3 grnd_face_dir = glm::normalize( vec3(towaypoint.x, 0, towaypoint.z) );
+			glm::vec3 grnd_face_dir = glm::normalize(vec3(towaypoint.x, 0, towaypoint.z));
 			float speed = 5.5f;
-			vec3 idealvelocity = normalize(towaypoint)*speed;
+			vec3 idealvelocity = normalize(towaypoint) * speed;
 			vec3 add_vel_dir = idealvelocity - velocity;
 			if (!VarMan::get()->find("stopai")->get_float()) {
 				float lenavd = length(add_vel_dir);
@@ -63,7 +67,7 @@ CLASS_H(NPC, Entity)
 				else
 					velocity += grnd_face_dir * ground_accel * speed * (dt);
 			}
-			position += velocity*dt;
+			position += velocity * dt;
 
 			float len = glm::length(position - waypoints[current_waypoint]);
 			if (len <= 1.f) {
@@ -84,7 +88,7 @@ CLASS_H(NPC, Entity)
 			pathfind_state = going_towards_waypoint;
 		}break;
 		};
-		esimated_accel =(velocity - prevel) / (float)eng->get_tick_interval();
+		esimated_accel = (velocity - prevel) / (float)eng->get_tick_interval();
 	}
 
 	enum state {
@@ -113,7 +117,7 @@ public:
 	enum {
 		OPEN,
 		CLOSED
-	}doorstate=OPEN;
+	}doorstate = OPEN;
 
 	bool start_open = false;
 	bool start_locked = false;
@@ -123,10 +127,10 @@ public:
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Door)
-			REG_BOOL(start_locked,PROP_DEFAULT,""),
-			REG_BOOL(start_open,PROP_DEFAULT,""),
-		END_PROPS(Door)
-	
+			REG_BOOL(start_locked, PROP_DEFAULT, ""),
+			REG_BOOL(start_open, PROP_DEFAULT, ""),
+			END_PROPS(Door)
+
 	}
 
 	void update() override;
@@ -138,7 +142,7 @@ public:
 
 
 	void set_thrower(entityhandle handle) {
-		thrower = handle;
+			thrower = handle;
 	}
 
 	void update() override;

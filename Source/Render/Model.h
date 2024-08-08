@@ -232,13 +232,13 @@ public:
 
 	int get_index_type_size() const;
 
-	Model* get_error_model() { return error_model; }
-	Model* get_sprite_model() { return _sprite; }
+	Model* get_error_model() const { return error_model; }
+	Model* get_sprite_model() const { return _sprite; }
+	Model* get_default_plane_model() const { return defaultPlane; }
 
-
-	Model* get_light_dome() { return LIGHT_DOME; }
-	Model* get_light_sphere() { return LIGHT_SPHERE; }
-	Model* get_light_cone() { return LIGHT_CONE; }
+	Model* get_light_dome() const { return LIGHT_DOME; }
+	Model* get_light_sphere() const { return LIGHT_SPHERE; }
+	Model* get_light_cone() const { return LIGHT_CONE; }
 
 private:
 
@@ -249,6 +249,7 @@ private:
 
 	Model* error_model = nullptr;
 	Model* _sprite = nullptr;
+	Model* defaultPlane = nullptr;
 
 	void create_default_models();
 

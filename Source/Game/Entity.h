@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include "glm/glm.hpp"
-#include "Render/RenderObj.h"
 
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringName.h"
@@ -10,7 +9,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ReflectionProp.h"
 
-#include "Game/EntityComponentTypes.h"
+#include "Game/EntityComponent.h"
 
 #include "GameEnginePublic.h"
 

@@ -8,7 +8,7 @@
 #include "Framework/ReflectionMacros.h"
 
 CLASS_H(CharacterGraphDriver, AnimatorInstance)
-
+public:
 
 	virtual void on_init() override;
 	virtual void on_update(float dt) override;

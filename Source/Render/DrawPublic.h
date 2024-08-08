@@ -32,6 +32,7 @@ struct SceneDrawParamsEx {
 };
 
 struct Render_Object;
+struct MeshBuilder_Object;
 struct Render_Decal;
 struct Render_Light;
 struct Render_Sun;
@@ -89,6 +90,12 @@ public:
 	virtual void remove_fog(handle<RenderFog>& handle) = 0;
 
 	virtual TerrainInterfacePublic* get_terrain_interface() = 0;
+
+
+	// Debug line renderer handles
+	virtual handle<MeshBuilder_Object> register_meshbuilder(const MeshBuilder_Object& mbobj) = 0;
+	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) = 0;
+	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) = 0;
 };
 
 class GuiSystemPublic;

@@ -27,7 +27,7 @@
 #include "Types.h"
 #include "Client.h"
 #include "Server.h"
-#include "Game/Player.h"
+#include "Game/Entities/Player.h"
 #include "Framework/Config.h"
 #include "Render/DrawPublic.h"
 #include "Game/Entity.h"
@@ -740,7 +740,6 @@ extern void benchmark_gltf();
 extern void at_test();
 #include "Framework/ExpressionLang.h"
 
-#include "Game/EntityTypes.h"
 #include "Game/Schema.h"
 
 #include "Render/MaterialLocal.h"
@@ -788,23 +787,7 @@ ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,0,UINT16
 ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV);
 
 
-DECLARE_ENGINE_CMD(spawn_npc)
-{
-	if (!eng->get_level())
-		return;
-	
-	auto p = checked_cast<Player>(eng->get_local_player());
-	if (!p) {
-		sys_print("no player\n");
-		return;
-	}
-	auto va = p->view_angles;
-	vec3 front = AnglesToVector(va.x, va.y);
-	vec3 pos = p->calc_eye_position();
 
-	auto npc = eng->spawn_entity_class<NPC>();
-	npc->position = pos;
-}
 
 void GameEngineLocal::open_level(string nextname)
 {

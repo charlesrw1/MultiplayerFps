@@ -1,45 +1,44 @@
 #include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
-#include <algorithm>
-#include "Render/DrawPublic.h"
 #include "glm/gtx/euler_angles.hpp"
+#include "External/ImGuizmo.h"
+
 #include "Framework/MeshBuilder.h"
 #include "Framework/Dict.h"
 #include "Framework/Files.h"
 #include "Framework/MyImguiLib.h"
-#include "AssetCompile/Someutils.h"
+#include "Framework/DictWriter.h"
+
 #include "Physics/Physics2.h"
 
-#include "External/ImGuizmo.h"
-
-
 #include "EditorFolder.h"
-
 #include "OsInput.h"
 #include "Debug.h"
+
 #include "Game/StdEntityTypes.h"
 #include "Game/Schema.h"
-#include <stdexcept>
 
-#include "Framework/DictWriter.h"
+#include <algorithm>
+#include <stdexcept>
 #include <fstream>
 
+#include "Render/DrawPublic.h"
 #include "Render/Texture.h"
 
+#include "AssetCompile/Someutils.h"
 #include "AssetCompile/Someutils.h"// string stuff
 #include "Assets/AssetRegistry.h"
+
+#include "UI/Widgets/Layouts.h"
+#include "UI/Widgets/Interactables.h"
+#include "UI/Widgets/Visuals.h"
+#include "UI/GUISystemPublic.h"
 
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
 
-
-#include "UI/Widgets/Layouts.h"
-#include "UI/Widgets/Interactables.h"
-
-#include "UI/Widgets/Visuals.h"
-#include "UI/GUISystemPublic.h"
 class EditorUILayout : public GUIFullscreen
 {
 public:

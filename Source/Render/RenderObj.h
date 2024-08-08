@@ -44,3 +44,18 @@ struct Render_Object
 
 	glm::mat4 transform = glm::mat4(1.f);
 };
+
+class MeshBuilder;
+struct MeshBuilder_Object
+{
+	MeshBuilder_Object() {
+		visible = false;
+		depth_tested = true;
+	}
+
+	const EntityComponent* owner = nullptr;
+	MeshBuilder* meshbuilder = nullptr;
+	bool visible : 1;
+	bool depth_tested : 1;
+	glm::mat4 transform = glm::mat4(1.f);
+};

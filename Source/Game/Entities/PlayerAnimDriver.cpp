@@ -3,7 +3,7 @@
 #include "Debug.h" // Debug::
 
 #include "Animation/AnimationUtil.h"
-#include "Game/Player.h"
+#include "Game/Entities/Player.h"
 
 #include "Framework/AddClassToFactory.h"
 

@@ -375,7 +375,7 @@
     <ClInclude Include="Source\Game\SerializePtrHelpers.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\EntityComponentTypes.h">
+    <ClInclude Include="Source\Game\Components\EntityComponentTypes.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
     <ClInclude Include="Source\Assets\AssetLoaderRegistry.h">
@@ -413,9 +413,6 @@
     </ClInclude>
     <ClInclude Include="Source\Framework\Hashmap.h">
       <Filter>Source\Framework\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\EditorCommands.h">
-      <Filter>Source\LevelEditor\Commands</Filter>
     </ClInclude>
     <ClInclude Include="Source\GameEnginePublic.h">
       <Filter>Source</Filter>
@@ -495,13 +492,13 @@
     <ClInclude Include="Source\Render\ProgramCaching.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\PlayerAnimDriver.h">
+    <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Entity.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Player.h">
+    <ClInclude Include="Source\Game\Entities\Player.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
@@ -511,7 +508,6 @@
     <ClInclude Include="Source\Render\Model.h" />
     <ClInclude Include="Source\Render\RenderObj.h" />
     <ClInclude Include="Source\Render\Shader.h" />
-    <ClInclude Include="Source\Game\EntityTypes.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Framework\PropHashTable.h" />
     <ClInclude Include="Source\Framework\SerializerFunctions.h" />
@@ -527,6 +523,13 @@
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Framework\ClassTypePtr.h" />
     <ClInclude Include="Source\Game\BasePlayer.h" />
+    <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
+    <ClInclude Include="Source\Game\Components\MeshComponent.h" />
+    <ClInclude Include="Source\Game\Components\LightComponents.h" />
+    <ClInclude Include="Source\Game\Components\DecalComponent.h" />
+    <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
+    <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
+    <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -714,7 +717,7 @@
     <ClCompile Include="Source\Game\EntityComponent.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\LightComponents.cpp">
+    <ClCompile Include="Source\Game\Components\LightComponents.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\TerrainComponent.cpp">
@@ -723,7 +726,7 @@
     <ClCompile Include="Source\Sound\SoundLocal.h">
       <Filter>Source\Sound</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\FogComponent.cpp">
+    <ClCompile Include="Source\Game\Components\FogComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Files.cpp">
@@ -738,7 +741,7 @@
     <ClCompile Include="Source\Render\EnvProbe.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\PlayerAnimDriver.cpp">
+    <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Entity.cpp">
@@ -756,7 +759,7 @@
     <ClCompile Include="Source\Game\Game.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\Player.cpp">
+    <ClCompile Include="Source\Game\Entities\Player.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\Shader.cpp">
@@ -777,5 +780,14 @@
     <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\Game\GameMode.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
+    <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
+    <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
+    <ClCompile Include="Source\Game\StdEntityTypes.cpp" />
+    <ClCompile Include="Source\Game\WorldSettings.cpp" />
+    <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
+    <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
+    <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
   </ItemGroup>
 </Project>

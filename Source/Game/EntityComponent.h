@@ -111,3 +111,8 @@ private:
 	friend class EdPropertyGrid;
 	friend class LevelSerialization;
 };
+
+CLASS_H(EmptyComponent, EntityComponent)
+public:
+	~EmptyComponent() override {}
+};

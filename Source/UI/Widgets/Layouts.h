@@ -34,6 +34,26 @@ public:
 	}
 };
 
+class LayoutUtils
+{
+public:
+	static int get_coord_for_align(int min, int max, GuiAlignment align, int size, int& outsize) {
+		outsize = size;
+		if (align == GuiAlignment::Left)
+			return min;
+		if (align == GuiAlignment::Right)
+			return max - size;
+		if (align == GuiAlignment::Center) {
+			auto w = max - min;
+			return (w - size) * 0.5 + min;
+		}
+		// else align == fill
+		outsize = (max - min);
+		return min;
+	}
+
+};
+
 CLASS_H(GUIVerticalBox,GUI)
 public:
 	void update_widget_size() override {
@@ -62,25 +82,11 @@ public:
 			auto corner = cursor + glm::ivec2(pad.x, pad.y);
 			auto sz = ws_size - glm::ivec2(pad.x + pad.z, pad.y + pad.w);
 
-			auto get_coord_for_align = [](int min, int max, GuiAlignment align, int size, int& outsize)->int {
-				outsize = size;
-				if (align == GuiAlignment::Left)
-					return min;
-				if (align == GuiAlignment::Right)
-					return max - size;
-				if (align == GuiAlignment::Center) {
-					auto w = max - min;
-					return (w - size) * 0.5 + min;
-				}
-				// else align == fill
-				outsize = (max - min);
-				return min;
-			};
 			glm::ivec2 out_corner = cursor;
 			out_corner.y += pad.y;
 			glm::ivec2 out_sz = { 0,child->desired_size.y + pad.y + pad.w };
 
-			out_corner.x = get_coord_for_align(corner.x, corner.x + sz.x, child->w_alignment, child->desired_size.x, out_sz.x);
+			out_corner.x = LayoutUtils::get_coord_for_align(corner.x, corner.x + sz.x, child->w_alignment, child->desired_size.x, out_sz.x);
 
 			child->ws_position = out_corner;
 			child->ws_size = out_sz;

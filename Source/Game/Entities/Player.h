@@ -5,11 +5,13 @@
 #include <memory>
 
 #include "PlayerAnimDriver.h"
-#include "Entity.h"
-#include "Game/EntityComponentTypes.h"
+#include "Game/Entity.h"
+#include "Game/Components/MeshComponent.h"
+#include "Game/Components/LightComponents.h"
+#include "Game/Components/PhysicsComponents.h"
 #include "Framework/MulticastDelegate.h"
 
-#include "BasePlayer.h"
+#include "Game/BasePlayer.h"
 
 using std::unique_ptr;
 using std::vector;

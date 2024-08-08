@@ -1,5 +1,9 @@
 #include "EntityComponent.h"
 #include "glm/gtx/euler_angles.hpp"
+#include "Entity.h"
+
+CLASS_IMPL(EntityComponent);
+CLASS_IMPL(EmptyComponent);
 
 static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
 {
@@ -68,4 +72,81 @@ const glm::mat4& EntityComponent::get_ws_transform() {
 		world_transform_is_dirty = false;
 	}
 	return cached_world_transform;
+}
+
+void EntityComponent::remove_this(EntityComponent* child_component)
+{
+#ifdef _DEBUG
+	bool found = false;
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i] == child_component) {
+			if (found)
+				assert(!"component was added twice");
+			children.erase(children.begin() + i);
+			i--;
+			found = true;
+		}
+	}
+	assert(found && "component couldn't be found to remove in remove_this");
+	return;
+#else
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i] == child_component) {
+			children.erase(children.begin() + i);
+			return;
+		}
+	}
+	assert("component couldn't be found to remove in remove_this");
+#endif
+}
+
+void EntityComponent::post_unserialize_created_component(Entity* parent)
+{
+	parent->add_component_from_loading(this);	// add the component to the list (doesnt initalize it yet)
+	if (attached_parent.get())	// set the parent if it got serialized, might redo this to make it clearer
+		attached_parent->children.push_back(this);
+}
+
+void EntityComponent::attach_to_parent(EntityComponent* parent_component, StringName point)
+{
+	ASSERT(parent_component);
+
+	// prevents circular parent creations
+	// checks the node we are parenting to's tree to see if THIS is one of the parent nodes
+	EntityComponent* cur_node = parent_component;
+	while (cur_node) {
+
+		if (cur_node->get_parent_component() == this) {
+			ASSERT(attached_parent.get());
+			remove_this(cur_node);
+			cur_node->attached_parent = {};
+			cur_node->attach_to_parent(attached_parent.get());
+			break;
+		}
+		cur_node = cur_node->attached_parent.get();
+	}
+
+	if (attached_parent.get()) {
+		attached_parent->remove_this(this);
+		attached_parent = nullptr;
+	}
+	parent_component->children.push_back(this);
+	attached_parent = parent_component;
+	attached_bone_name = point;
+
+}
+void EntityComponent::unlink_and_destroy()
+{
+	if (attached_parent.get())
+		attached_parent->remove_this(this);
+	for (int i = 0; i < children.size(); i++)
+		children[i]->destroy_children_no_unlink();
+	on_deinit();
+}
+void EntityComponent::destroy_children_no_unlink()
+{
+	for (int i = 0; i < children.size(); i++)
+		children[i]->destroy_children_no_unlink();
+	on_deinit();
+	entity_owner->remove_this_component(this);
 }
