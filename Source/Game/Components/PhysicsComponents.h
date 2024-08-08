@@ -10,4 +10,3 @@ CLASS_H(BoxComponent, EntityComponent)
 public:
 
 };
-

@@ -3,12 +3,24 @@
 #include "Render/Render_Decal.h"
 #include "Render/DrawPublic.h"
 #include "Render/MaterialPublic.h"
+#include "GameEnginePublic.h"
+#include "Render/Texture.h"
+#include "Game/Entity.h"
+#include "BillboardComponent.h"
 
 CLASS_IMPL(DecalComponent);
 
 void DecalComponent::on_init() {
 	handle = idraw->get_scene()->register_decal(Render_Decal());
 	update_handle();
+
+
+	if (eng->is_editor_level())
+	{
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		b->set_texture(g_imgs.find_texture("icon/decalBig.png"));
+		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+	}
 }
 void DecalComponent::on_deinit() {
 	idraw->get_scene()->remove_decal(handle);

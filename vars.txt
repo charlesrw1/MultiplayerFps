@@ -1,7 +1,6 @@
 bind T "thirdperson_camera 1"
 bind R "thirdperson_camera 0"
 
-bind 1 "map Map0"
 bind 2 "connect localhost"
 bind 3 "disconnect"
 bind 4 "sv.end"
@@ -13,7 +12,6 @@ bind 8 "start_ed anim out.txt"
 
 bind / reload_shaders
 
-bind , "animedit out.txt"
 
 bind P "spawn_npc"
 

@@ -49,7 +49,6 @@ REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 
 const PropertyInfoList* Entity::get_props() {
 	START_PROPS(Entity)
-		REG_ENTITY_COMPONENT_PTR(root_component, PROP_SERIALIZE),
 		REG_ENTITY_PTR(self_id,PROP_SERIALIZE),
 		REG_STDSTRING(editor_name, PROP_DEFAULT)	// edit+serialize
 	END_PROPS(Entity)
@@ -62,13 +61,28 @@ Entity::Entity()
 void Entity::initialize()
 {
 	if (!root_component.get()) {
-		root_component = create_sub_component<EmptyComponent>("DefaultRoot");
-		root_component->is_native_componenent = false;
+
+		// try to find a root if it wasnt set by now
+		for (int i = 0; i < all_components.size(); i++) {
+			if (all_components[i]->is_force_root) {
+				root_component.ptr = all_components[i].get();
+				break;
+			}
+		}
+		// couldnt find root, create an empty one
+		if (!root_component.get()) {
+			root_component = create_sub_component<EmptyComponent>("DefaultRoot");
+			root_component->is_native_componenent = false;
+			root_component->is_force_root = true;
+		}
 	}
 
 
 	// now run register functions
-	for (int i = 0; i < all_components.size(); i++) {
+	// important!: store the number of components here before running init()s, some components might create components in their functions
+	// and on_init shouldnt be run twice for them
+	const size_t num_components_pre_init = all_components.size();
+	for (int i = 0; i < num_components_pre_init; i++) {
 		// insert logic for editor only components here
 		auto& c = all_components[i];
 		if (c->attached_parent.get() == nullptr && root_component.get() != c.get())

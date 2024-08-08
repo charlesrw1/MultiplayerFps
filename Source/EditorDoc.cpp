@@ -1031,6 +1031,9 @@ void ObjectOutliner::draw()
 
 		return;
 	}
+	if (!rootnode)
+		return;
+
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
 	if (ImGui::BeginTable("Table", 1, flags)) {
@@ -1045,6 +1048,9 @@ void ObjectOutliner::draw()
 
 void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
 {
+	if (ec->dont_serialize_or_edit_this())
+		return;
+
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 

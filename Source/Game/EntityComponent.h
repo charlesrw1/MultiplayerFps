@@ -53,7 +53,7 @@ public:
 			REG_VEC3(position, PROP_DEFAULT),
 			REG_QUAT(rotation, PROP_DEFAULT),
 			REG_VEC3(scale, PROP_DEFAULT),
-
+			REG_BOOL(is_force_root, PROP_SERIALIZE, "0"),
 			REG_ENTITY_COMPONENT_PTR(attached_parent, PROP_SERIALIZE ),
 			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY),
 			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY)
@@ -82,12 +82,10 @@ public:
 #endif // !RUNTIME
 	void post_change_transform_R(bool ws_is_dirty = true);
 
-	StringName self_name;
-	StringName attached_bone_name;	// if non 0, determines
-#ifndef RUNTIME
 	std::string eSelfNameString;
 	std::string eAttachedBoneName;
-#endif // !RUNTIME
+
+	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 private:
 
 	glm::vec3 position = glm::vec3(0.f);
@@ -105,11 +103,16 @@ private:
 	bool is_native_componenent = true;
 	bool is_editor_only = false;
 	bool is_inherited = true;
+	bool is_force_root = false;
 
 	friend class Schema;
 	friend class Entity;
 	friend class EdPropertyGrid;
 	friend class LevelSerialization;
+
+public:
+	// expose this publically so you can set this in constructors or wherever
+	bool dont_serialize_or_edit = false;	// if true, then this component (and its children) wont be serialized or be editable in the editor
 };
 
 CLASS_H(EmptyComponent, EntityComponent)

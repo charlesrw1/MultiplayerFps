@@ -5,6 +5,10 @@
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
 
+#include "BillboardComponent.h"
+
+#include "Game/Entity.h"
+
 CLASS_IMPL(SpotLightComponent);
 CLASS_IMPL(PointLightComponent);
 CLASS_IMPL(SunLightComponent);
@@ -41,6 +45,13 @@ void SpotLightComponent::on_init()
 	Render_Light light;
 	build_render_light(light);
 	light_handle = idraw->get_scene()->register_light(light);
+
+	if (eng->is_editor_level())
+	{
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		b->set_texture(g_imgs.find_texture("icon/spotlightBig.png"));
+		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+	}
 }
 
 void SpotLightComponent::editor_on_change_property()
@@ -90,6 +101,13 @@ void PointLightComponent::on_init()
 	Render_Light light;
 	build_render_light(light);
 	light_handle = idraw->get_scene()->register_light(light);
+
+	if (eng->is_editor_level())
+	{
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		b->set_texture(g_imgs.find_texture("icon/pointBig.png"));
+		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+	}
 }
 
 void PointLightComponent::on_deinit()
@@ -153,6 +171,13 @@ void SunLightComponent::on_init()
 	Render_Sun light;
 	build_render_light(light);
 	light_handle = idraw->get_scene()->register_sun(light);
+
+	if (eng->is_editor_level())
+	{
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		b->set_texture(g_imgs.find_texture("icon/sunBig.png"));
+		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+	}
 }
 
 void SunLightComponent::on_deinit()

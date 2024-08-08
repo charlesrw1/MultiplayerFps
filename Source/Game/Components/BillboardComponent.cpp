@@ -40,6 +40,13 @@ void BillboardComponent::editor_on_change_property() {
 	idraw->get_scene()->update_obj(handle, obj);
 }
 void BillboardComponent::set_texture(const Texture* tex) {
+	if (tex == texture.get())
+		return;
+	texture.ptr = (Texture*)tex; // FIXME
+	if (!handle.is_valid())	// could be initialization setting
+		return;
+
+
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 	Render_Object obj;
 	fill_out_render_obj(obj);
@@ -51,6 +58,7 @@ void BillboardComponent::fill_out_render_obj(Render_Object& obj)
 	obj.visible = visible;
 	obj.model = mods.get_default_plane_model();
 	obj.mat_override = dynamicMaterial;
-	obj.transform = get_ws_transform();
+	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;
+	obj.owner = this;
 }

@@ -38,6 +38,9 @@ public:
 	void exit_game() {
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "quit\n");
 	}
+	void open_editor() {
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map mainMenuMap.txt");
+	}
 
 	MainMenuUILayout() {
 		auto vbox = new GUIVerticalBox;
@@ -45,12 +48,15 @@ public:
 		vbox->ls_sz = { 200,500 };
 
 		GUIButton* b = create_button("PLAY");
-		vbox->add_this(b);
 		b->on_selected.add(this, &MainMenuUILayout::start_game);
+		vbox->add_this(b);
 
 		b = create_button("EXIT GAME");
 		b->on_selected.add(this, &MainMenuUILayout::exit_game);
+		vbox->add_this(b);
 
+		b = create_button("OPEN EDITOR");
+		b->on_selected.add(this, &MainMenuUILayout::open_editor);
 		vbox->add_this(b);
 
 		add_this(vbox);

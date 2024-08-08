@@ -85,7 +85,9 @@ public:
 	virtual void connect_to(string address) override;
 
 	virtual bool is_editor_level() const {
-		return get_level()->is_editor_level();
+		/* this passes when you are in the loading phase or past the loading phase */
+		/* added is_loading... to work with constructors before level gets set */
+		return is_loading_editor_level || (get_level() && get_level()->is_editor_level());
 	}
 
 	glm::ivec2 get_game_viewport_size() const override;	// either full window or sub window
@@ -131,6 +133,7 @@ public:
 	OsInput inp;
 
 	string queued_mapname;
+	bool is_loading_editor_level = false;
 	Level* level= nullptr;
 	GameMode* gamemode = nullptr;
 

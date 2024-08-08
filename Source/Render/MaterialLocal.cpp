@@ -336,6 +336,7 @@ bool MasterMaterial::load_from_file(const std::string& fullpath, IFile* file)
 			def.default_value.type = (MatParamType)parse_options({ "_null_","float_vec4","float","vec4","bool","texture2D","constTexture2D" });
 			in.read_string(tok);
 			def.name = to_std_string_sv(tok);
+			def.hashed_name = StringName(def.name.c_str());
 			
 			switch (def.default_value.type)
 			{
@@ -752,4 +753,20 @@ void MaterialManagerLocal::pre_render_update()
 
 	}
 	dirty_list.clear();
+}
+
+void MaterialInstanceLocal::set_tex_parameter(StringName name, const Texture* t)
+{
+	if (!t) return;
+	const int count = master->param_defs.size();
+	for (int i = 0; i < count; i++) {
+		if (master->param_defs[i].default_value.type == MatParamType::Texture2D &&
+			master->param_defs[i].hashed_name == name) {
+			params[i].tex_ptr = t;
+
+			matman.add_to_dirty_list(this);
+			return;
+		}
+	}
+	sys_print("!!! couldnt find parameter for set_tex_parameter\n");
 }

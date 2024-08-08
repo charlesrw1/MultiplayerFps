@@ -121,7 +121,7 @@ public:
 	void set_bool_parameter(StringName name, bool b)override {}
 	void set_vec_parameter(StringName name, Color32 c) override {}
 	void set_fvec_parameter(StringName name, glm::vec4 v4) override {}
-	void set_tex_parameter(StringName name, const Texture* t) override {}
+	void set_tex_parameter(StringName name, const Texture* t) override;
 
 	bool load_from_file(const std::string& fullpath, IFile* file);
 };
@@ -285,7 +285,7 @@ public:
 		if (mlocal->dirty_buffer_index != -1)
 			dirty_list.at(mlocal->dirty_buffer_index) = nullptr;
 		delete mlocal;
-		mlocal = nullptr;
+		mat = nullptr;	// set callers ptr to null
 	}
 	MaterialParameterBuffer* find_parameter_buffer(const char* name) override { return nullptr; }
 

@@ -773,12 +773,12 @@ ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL);
 ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, 0,2);
-ConfigVar g_drawimguidemo("g_drawimguidemo", "1", CVAR_BOOL);
+ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL);
 ConfigVar g_debug_skeletons("g_debug_skeletons", "1", CVAR_BOOL);
 ConfigVar g_draw_grid("g_draw_grid", "1", CVAR_BOOL);
 ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, 0.01,10);
 
-ConfigVar g_drawdebugmenu("g_drawdebugmenu","1",CVAR_BOOL);
+ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL);
 
 ConfigVar g_window_w("vid.width","1200",CVAR_INTEGER,1,4000);
 ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, 1, 4000);
@@ -857,6 +857,7 @@ void GameEngineLocal::execute_map_change()
 
 	// try loading map
 	const bool this_is_for_editor = is_in_an_editor_state();
+	is_loading_editor_level = this_is_for_editor;	// set temporary variable
 
 	// special name to create a map
 	if (this_is_for_editor && queued_mapname == "__empty__") {	
@@ -869,6 +870,7 @@ void GameEngineLocal::execute_map_change()
 
 		level = LevelSerialization::unserialize_level(fullpath, this_is_for_editor/* is for editor?*/);
 	}
+	is_loading_editor_level = false;
 
 	if (!level) {
 		sys_print("!!! couldn't load map !!!\n");

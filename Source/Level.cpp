@@ -303,10 +303,13 @@ void LevelSerialization::serialize_one_entity(Entity* e, DictWriter& out, Serial
 	out.write_item_end();
 
 	for (int i = 0; i < e->all_components.size(); i++) {
+		auto& c = e->all_components[i];
+
+		if (c->dont_serialize_or_edit_this())
+			continue;
 
 		out.write_item_start();
 
-		auto& c = e->all_components[i];
 		EntityComponent* ec = nullptr;
 
 		ec = diffclass->find_component_for_string_name(c->eSelfNameString);

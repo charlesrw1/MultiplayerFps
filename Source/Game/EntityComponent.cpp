@@ -132,7 +132,7 @@ void EntityComponent::attach_to_parent(EntityComponent* parent_component, String
 	}
 	parent_component->children.push_back(this);
 	attached_parent = parent_component;
-	attached_bone_name = point;
+	//attached_bone_name = point;
 
 }
 void EntityComponent::unlink_and_destroy()

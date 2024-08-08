@@ -16,15 +16,34 @@
 
 #include "Framework/Config.h"
 
+#include "CameraPoint.h"
 
 CLASS_H(PlayerNull, PlayerBase)
 public:
+
+	void start() override {
+		camera = eng->get_level()->find_first_of<CameraPoint>();
+	}
+
 	void get_view(
 		glm::vec3& pos,
 		glm::vec3& front,
 		float& fov
-	) override {}
+	) override {
+		if (!camera)
+			return;
+
+		fov = 70.f;
+		pos = camera->get_ws_position();
+
+		glm::vec3 euler = glm::eulerAngles(camera->get_ws_rotation());
+		front = euler;
+		//front = AnglesToVector(euler.x, euler.y);
+	}
 	void set_input_command(Move_Command cmd) override {}
+
+	// for main menu
+	CameraPoint* camera = nullptr;
 };
 CLASS_IMPL(PlayerNull);
 
