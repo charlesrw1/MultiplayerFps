@@ -114,6 +114,13 @@ public:
 		int x = 0, y = 0;
 		SDL_GetMouseState(&x, &y);
 
+		if (hovering && hovering->hidden)
+			hovering = nullptr;
+		if (dragging && dragging->hidden)
+			dragging = nullptr;
+		if (focusing && focusing->hidden)
+			focusing = nullptr;
+
 		if (hovering)
 			hovering->on_hovering(x,y);
 		if (dragging)
@@ -215,22 +222,31 @@ public:
 	}
 
 	void update_widget_sizes_R(GUI* g) {
+		if (g->hidden)
+			return;
 		for (int i = 0; i < g->children.size(); i++)
 			update_widget_sizes_R(g->children[i].get());
 		g->update_widget_size();
 	}
 	void update_widget_positions_R(GUI* g) {
+		if (g->hidden)
+			return;
 		g->update_subwidget_positions();
 		for (int i = 0; i < g->children.size(); i++)
 			update_widget_positions_R(g->children[i].get());
 	}
 	void paint_widgets_R(GUI* g, UIBuilder& builder) {
+		if (g->hidden)
+			return;
 		g->paint(builder);
 		for (int i = 0; i < g->children.size(); i++)
 			paint_widgets_R(g->children[i].get(), builder);
 	}
 
 	GUI* find_gui_under_mouse_R(GUI* g, int16_t x, int16_t y) {
+		if (g->hidden)
+			return nullptr;
+
 		Rect2d r(g->ws_position.x,g->ws_position.y,g->ws_size.x,g->ws_size.y);
 		if (!r.is_point_inside(x, y))
 			return nullptr;

@@ -534,6 +534,10 @@
     <ClInclude Include="Source\Game\Components\SoundComponent.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
+    <ClInclude Include="Source\Sound\SoundLocal.h">
+      <Filter>Source\Sound</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -727,9 +731,6 @@
     <ClCompile Include="Source\Render\TerrainComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Sound\SoundLocal.h">
-      <Filter>Source\Sound</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\Components\FogComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
@@ -797,5 +798,6 @@
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
+    <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
   </ItemGroup>
 </Project>

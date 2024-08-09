@@ -1113,13 +1113,100 @@ void ViewmodelComponent::update()
 #include "UI/GUISystemPublic.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/Widgets/Visuals.h"
+#include "UI/Widgets/Interactables.h"
 
+#include <SDL2/SDL_events.h>
+
+#include "Game/GameModes/MainMenuMode.h"
 
 class PlayerHUD : public GUIFullscreen
 {
 public:
+	void on_enter_pause_menu() {
+		scoreWidget->hidden = true;
+
+		paused_menu->hidden = false;
+		pause_menu_outline->hidden = false;
+
+		eng->set_game_focused(false);
+
+		is_in_pause = true;
+	}
+	void on_leave_pause_menu() {
+		scoreWidget->hidden = false;
+
+		paused_menu->hidden = true;
+		pause_menu_outline->hidden = true;
+
+		eng->set_game_focused(true);
+
+		is_in_pause = false;
+	}
+
+	static GUIButtonWithSound* create_button(const char* textstr, const SoundFile* s) {
+		GUIButtonWithSound* button = new GUIButtonWithSound(s);
+		button->padding = { 5,5,5,5 };
+		button->w_alignment = GuiAlignment::Fill;
+
+		GUIText* text = new GUIText;
+		text->text = textstr;
+		text->color = COLOR_WHITE;
+		text->ls_position = { 0,0 };
+		text->w_alignment = GuiAlignment::Center;
+		text->h_alignment = GuiAlignment::Center;
+		text->padding = { 10,10,10,10 };
+
+
+		button->add_this(text);
+
+		return button;
+	}
+
+
+	void to_main_menu() {
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map mainMenuMap.txt");
+	}
+
+	GUIVerticalBox* create_menu() {
+		GUIVerticalBox* vbox = new GUIVerticalBox;
+		vbox->ls_position = { 0,0 };
+		vbox->ls_sz = { 200,500 };
+		vbox->pivot_ofs = { 0.5,0.5 };
+		vbox->anchor = UIAnchorPos::create_single(0.5, 0.5);
+
+		GUIText* paused_text = new GUIText;
+		paused_text->text = "PAUSED";
+		paused_text->padding = { 5,30,5,30 };
+		paused_text->h_alignment = GuiAlignment::Center;
+		paused_text->w_alignment = GuiAlignment::Center;
+		paused_text->color = COLOR_WHITE;
+		vbox->add_this(paused_text);
+
+		const SoundFile* s = isound->load_sound_file("switch2.wav");
+		auto b = create_button("TO MAIN MENU", s);
+		b->on_selected.add(this, &PlayerHUD::to_main_menu);
+		vbox->add_this(b);
+		b = create_button("CONTINUE", s);
+		b->on_selected.add(this, &PlayerHUD::on_leave_pause_menu);
+		vbox->add_this(b);
+
+		return vbox;
+	}
+
+	bool is_in_pause = false;
+
 	PlayerHUD(Player* p) {
-		recieve_events = false;
+		recieve_events = true;
+
+		pause_menu_outline = new GUIBox;
+		pause_menu_outline->color = { 255,200,200,60 };
+		pause_menu_outline->anchor = UIAnchorPos::create_single(0.5, 0.5);
+		pause_menu_outline->ls_sz = { 200,1500 };
+		pause_menu_outline->pivot_ofs = { 0.5,0.5 };
+		pause_menu_outline->hidden = true;
+		add_this(pause_menu_outline);
+		paused_menu = create_menu();
+		add_this(paused_menu);
 
 		p->score_update_delegate.add(this, &PlayerHUD::on_set_score);
 
@@ -1140,6 +1227,10 @@ public:
 		add_this(boxWidget);
 
 		eng->get_gui()->add_gui_panel_to_root(this);
+
+		eng->get_gui()->set_focus_to_this(this);
+
+		on_leave_pause_menu();
 	}
 	~PlayerHUD() {
 		unlink_and_release_from_parent();
@@ -1148,6 +1239,20 @@ public:
 	void on_set_score(int count) {
 		scoreWidget->text = "Score: " + std::to_string(count);
 	}
+	void on_pressed(int x, int y, int b) override {
+		
+	}
+	void on_key_down(const SDL_KeyboardEvent& k) override {
+		if (k.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+			if (is_in_pause)
+				on_leave_pause_menu();
+			else
+				on_enter_pause_menu();
+		}
+	}
+
+	GUIVerticalBox* paused_menu = nullptr;
+	GUIBox* pause_menu_outline = nullptr;
 
 	GUIText* scoreWidget = nullptr;
 	GUIBox* boxWidget = nullptr;
@@ -1159,6 +1264,8 @@ public:
 	 hud = std::make_unique<PlayerHUD>(this);
 
 	 score_update_delegate.invoke(10);
+
+	 eng->set_game_focused(true);
 }
  Player::~Player() {
  }

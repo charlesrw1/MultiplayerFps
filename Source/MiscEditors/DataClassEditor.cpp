@@ -75,12 +75,16 @@ void DataClassEditor::open_document_internal(const char* name, const char* arg)
 {
 	assert(editing_object == nullptr);
 
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini DataClassEditor.ini");
+
 	// loading a file
 	if (has_extension(name, "dc")) {
 		const DataClass* dc = g_dc_loader.load_dataclass_no_check(name);
 		if (dc) {
 			editing_object = dc->get_obj()->get_type().allocate();
 			copy_object_properties((ClassBase*)dc->get_obj(), editing_object, nullptr);
+
+			set_doc_name(name);
 		}
 	}
 	else {

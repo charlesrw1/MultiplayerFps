@@ -5,6 +5,8 @@
 #include "Render/RenderObj.h"
 #include "Render/MaterialPublic.h"
 
+#include "Physics/ChannelsAndPresets.h"
+
 CLASS_IMPL(MeshComponent);
 
 
@@ -12,7 +14,9 @@ MeshComponent::~MeshComponent()
 {
 	assert(!animator && !draw_handle.is_valid());
 }
-MeshComponent::MeshComponent() {}
+MeshComponent::MeshComponent() {
+	physicsPreset.ptr = &PP_DefaultBlockAll::StaticType;
+}
 
 void MeshComponent::set_model(const char* model_path)
 {
@@ -57,7 +61,9 @@ const PropertyInfoList* MeshComponent::get_props() {
 #endif // !RUNTIME
 
 		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
-		REG_BOOL(is_skybox, PROP_DEFAULT, "0")
+		REG_BOOL(is_skybox, PROP_DEFAULT, "0"),
+
+		REG_CLASSTYPE_PTR(physicsPreset, PROP_DEFAULT)
 	END_PROPS(MeshCompponent)
 }
 

@@ -158,6 +158,7 @@ public:
 	virtual void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) {}
 
 	bool recieve_events = true;
+	bool hidden = false;
 
 	// non owning ptr
 	GUI* parent = nullptr;

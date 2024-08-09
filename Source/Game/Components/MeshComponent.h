@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Game/EntityComponent.h"
-
+#include "Framework/ClassTypePtr.h"
+class PhysicsFilterPresetBase;
 class Model;
 class AnimatorInstance;
 struct Render_Object;
@@ -29,7 +30,6 @@ public:
 	void on_changed_transform() override;
 
 
-	bool simulate_physics = false;
 	bool visible = true;
 	bool cast_shadows = true;
 	bool is_skybox = false;
@@ -45,15 +45,15 @@ public:
 private:
 	void update_handle();
 
+	AssetPtr<Model> model;
+	std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
+	AssetPtr<Animation_Tree_CFG> animator_tree;
 	std::unique_ptr<AnimatorInstance> animator;
 	handle<Render_Object> draw_handle;
+
+
+	ClassTypePtr<PhysicsFilterPresetBase> physicsPreset;
+	bool simulate_physics = false;
+
 	PhysicsActor* physics_actor = nullptr;
-
-	AssetPtr<Model> model;
-	AssetPtr<Animation_Tree_CFG> animator_tree;
-
-#ifndef RUNTIME
-	std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
-#endif RUNTIME
-	std::vector<AssetPtr<MaterialInstance>> MaterialOverride_compilied;
 };

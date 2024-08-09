@@ -54,6 +54,7 @@ public:
 	virtual Engine_State get_state() const = 0;
 	virtual const OsInput* get_input_state() = 0;
 	virtual bool is_game_focused() const = 0;
+	virtual void set_game_focused(bool focus) = 0;
 	virtual glm::ivec2 get_game_viewport_size() const = 0;
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;

@@ -154,6 +154,7 @@
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesPublic.h" />
     <ClInclude Include="Source\Physics.h" />
+    <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
     <ClInclude Include="Source\Physics\Physics2.h" />
     <ClInclude Include="Source\Render\DrawLocal.h" />
     <ClInclude Include="Source\Render\DrawPublic.h" />
@@ -272,6 +273,7 @@
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
+    <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2.cpp" />
     <ClCompile Include="Source\Render\Draw.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
@@ -290,7 +292,7 @@
     <ClCompile Include="Source\ServerClMgr.cpp" />
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
-    <ClCompile Include="Source\Sound\SoundLocal.h" />
+    <ClInclude Include="Source\Sound\SoundLocal.h" />
     <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
   </ItemGroup>

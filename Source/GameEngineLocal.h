@@ -145,7 +145,7 @@ public:
 	bool dedicated_server = false;
 	
 	bool is_game_focused() const override { return game_focused; }
-	void set_game_focused(bool focus);
+	void set_game_focused(bool focus) override;
 
 	bool is_drawing_to_window_viewport() const;
 

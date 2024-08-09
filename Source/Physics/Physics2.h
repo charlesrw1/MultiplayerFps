@@ -24,17 +24,6 @@ namespace physx
 	class PxActor;
 }
 
-struct PhysContents
-{
-	enum Enum : uint16_t
-	{
-		Solid			= 1,	// solid to all line traces
-		PlayerSolid		= 2,	// solid to players/npc movement
-		Trigger			= 4,	// non solid but sends collision events
-	};
-};
-
-
 enum class ShapeType_e : uint8_t
 {
 	None,
@@ -166,6 +155,7 @@ enum class PhysicsShapeType
 class Model;
 class Entity;
 class EntityComponent;
+class PhysicsFilterPresetBase;
 class PhysicsActor
 {
 public:
@@ -218,14 +208,6 @@ public:
 	// disables the object from everyting (queries/simulate/triggers)
 	bool disable_physics();
 
-	// set gameplay side contents of actor
-	void set_contents(PhysContents::Enum flags) {
-		this->flags = flags;
-	}
-	PhysContents::Enum get_contents() const {
-		return flags;
-	}
-
 	// querying/setting who owns this shape
 	void set_entity(EntityComponent* e) {
 		owner = e;
@@ -239,15 +221,17 @@ private:
 		assert(actor&&is_dynamic());
 		return (physx::PxRigidDynamic*)actor;
 	}
-	PhysContents::Enum flags = (PhysContents::Enum)0;
+	const PhysicsFilterPresetBase* presetMask = nullptr;
 	EntityComponent* owner = nullptr;
 	physx::PxRigidActor* actor = nullptr;
+	int ragDollBoneIndex = -1;	// if not -1, then this PxActor is part of a ragdoll and the index is the bone in the component
 };
 
 // Constraint wrapper for gameplay
 class PhysicsConstraint
 {
 public:
+	EntityComponent* owner = nullptr;
 	physx::PxConstraint* constraint = nullptr;
 };
 
@@ -287,8 +271,8 @@ class PhysicsManPublic
 public:
 	virtual void init() = 0;
 
-	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, PhysContents::Enum mask) = 0;
-	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, PhysContents::Enum mask) = 0;
+	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t channel_mask) = 0;
+	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t channel_mask) = 0;
 	
 	virtual bool sweep_capsule(
 		world_query_result& out,
@@ -296,34 +280,32 @@ public:
 		const glm::vec3& start, 
 		const glm::vec3& dir, 
 		float length, 
-		PhysContents::Enum mask) = 0;
+		uint32_t channel_mask) = 0;
 	virtual bool sweep_sphere(
 		world_query_result& out,
 		float radius,
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		PhysContents::Enum mask) = 0;
+		uint32_t channel_mask) = 0;
 	virtual bool capsule_is_overlapped(
 		const vertical_capsule_def_t& capsule,
 		const glm::vec3& start,
-		PhysContents::Enum mask) = 0;
+		uint32_t channel_mask) = 0;
 	virtual bool sphere_is_overlapped(
 		world_query_result& out,
 		float radius,
 		const glm::vec3& start,
-		PhysContents::Enum mask) = 0;
+		uint32_t channel_mask) = 0;
 	
 	virtual PhysicsActor* allocate_physics_actor() = 0;
 	virtual void free_physics_actor(PhysicsActor*& actor) = 0;
+
 	virtual PhysicsConstraint* allocate_constraint() = 0;
 	virtual void free_constraint(PhysicsConstraint*& constraint) = 0;
 	
 	virtual void clear_scene() = 0;
 	
-	virtual void on_level_start() = 0;
-	virtual void on_level_end() = 0;
-
 	// simulate scene and fetch the results, thus a blocking update
 	virtual void simulate_and_fetch(float dt) = 0;
 

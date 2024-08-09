@@ -25,6 +25,10 @@
 #include "physx/cooking/PxCooking.h"
 #include "Framework/Util.h"
 
+#include <physx/PxFiltering.h>
+
+#include "Framework/Hashset.h"
+
 // for debug drawing
 #include "Framework/MeshBuilder.h"
 
@@ -41,6 +45,17 @@
 ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_BOOL);
 ConfigVar g_draw_every_physx_ray_hit("g_draw_every_physx_ray_hit", "0", CVAR_DEV | CVAR_BOOL);
 ConfigVar g_draw_every_physx_contact("g_draw_every_physx_contact", "0", CVAR_DEV | CVAR_BOOL);
+
+
+struct CollisionResponse
+{
+	uint32_t blockMask = 0;	// mask of objects to block
+	uint32_t overlapMask = 0; // mask of objects to overlap with 
+	uint8_t type = 0;	// 0-32 value to set what "type" the object is
+	uint8_t preset = 0;
+	bool generateHitEvent : 1;
+	bool generateOverlapEvent : 1;
+};
 
 
 inline glm::vec3 physx_to_glm(const physx::PxVec3& v) {
@@ -63,12 +78,14 @@ physx::PxTransform PhysTransform::get_physx() const
 class PhysicsManLocal : public PhysicsManPublic
 {
 public:
-	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, PhysContents::Enum mask) override {
+	PhysicsManLocal() : awake_dynamic_actors(3), all_physics_actors(3) {}
+
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t mask) override {
 		float length = glm::length(end - start);
 		glm::vec3 dir = (end - start) / length;
 		return trace_ray(out, start, dir, length, mask);
 	}
-	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, PhysContents::Enum mask) override {
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t mask) override {
 		physx::PxRaycastBuffer hit;
 		bool status = scene->raycast(
 			glm_to_physx(start), glm_to_physx(dir), length, hit);
@@ -90,7 +107,7 @@ public:
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		PhysContents::Enum mask)
+		uint32_t mask)
 	{
 		physx::PxSweepBuffer sweep;
 		physx::PxTransform local(glm_to_physx(start));
@@ -111,7 +128,7 @@ public:
 	bool overlap_shared(
 		physx::PxGeometry& geom,
 		const glm::vec3& start,
-		PhysContents::Enum mask)
+		uint32_t mask)
 	{
 		physx::PxOverlapBuffer overlap;
 		physx::PxTransform local(glm_to_physx(start));
@@ -124,7 +141,7 @@ public:
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		PhysContents::Enum mask) 
+		uint32_t mask)
 	{
 		auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
 		return sweep_shared(out, geom, start, dir, length, mask);
@@ -135,14 +152,14 @@ public:
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		PhysContents::Enum mask) {
+		uint32_t mask) {
 		auto geom = physx::PxSphereGeometry(radius);
 		return sweep_shared(out, geom, start, dir, length, mask);
 	}
 	virtual bool capsule_is_overlapped(
 		const vertical_capsule_def_t& capsule,
 		const glm::vec3& start,
-		PhysContents::Enum mask) {
+		uint32_t mask) {
 		auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
 		return overlap_shared(geom, start, mask);
 
@@ -151,7 +168,7 @@ public:
 		world_query_result& out,
 		float radius,
 		const glm::vec3& start,
-		PhysContents::Enum mask) {
+		uint32_t mask) {
 		auto geom = physx::PxSphereGeometry(radius);
 		return overlap_shared(geom, start, mask);
 	}
@@ -197,11 +214,11 @@ public:
 	}
 	void clear_scene() override {}
 	void simulate_and_fetch(float dt) override {
+		CPUFUNCTIONSTART;
+
 		scene->simulate(dt);
 		scene->fetchResults(true/* block */);
 	}
-	void on_level_start() override {}
-	void on_level_end() override {}
 
 	void debug_draw_shapes() override;
 
@@ -228,6 +245,10 @@ public:
 	physx::PxFoundation* foundation = nullptr;
 
 	MeshBuilder debug_mesh;
+
+
+	hash_set<PhysicsActor> all_physics_actors;
+	hash_set<PhysicsActor> awake_dynamic_actors;	// issues callbacks for these
 };
 
 static PhysicsManLocal physics_local;
@@ -307,6 +328,7 @@ void PhysicsActor::create_static_actor_from_model(const Model* model, PhysTransf
 
 		physx::PxShape* aConvexShape = physx::PxRigidActorExt::createExclusiveShape(*static_actor,
 			physx::PxConvexMeshGeometry(shape.convex_mesh), *physics_local.default_material);
+	
 	}
 	physics_local.scene->addActor(*static_actor);
 	actor = static_actor;

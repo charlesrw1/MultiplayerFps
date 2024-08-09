@@ -93,6 +93,7 @@ public:
     }
 
     void tick(float dt) override {
+        CPUFUNCTIONSTART;
 
         auto& sound_objs = all_sound_players.objects;
 

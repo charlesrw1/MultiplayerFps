@@ -93,6 +93,8 @@ public:
 	void init() {
 		ui = new MainMenuUILayout;
 		eng->get_gui()->add_gui_panel_to_root(ui);
+
+		eng->set_game_focused(false);	// disable mouse capture
 	}
 
 	void start() {

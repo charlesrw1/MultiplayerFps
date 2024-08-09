@@ -348,7 +348,7 @@ void EditorDoc::on_map_load_return(bool good)
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
 	else {
-		set_doc_name(eng->get_level()->get_name());
+		//set_doc_name(eng->get_level()->get_name());
 
 		if (is_editing_a_schema) {
 			if(schema_source)

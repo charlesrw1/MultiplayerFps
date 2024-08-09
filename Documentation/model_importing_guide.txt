@@ -1,0 +1,101 @@
+Index: 
+".def model files"
+".glb export naming conventions"
+
+
+************* .DEF MODEL FILES *************
+
+MODEL .def
+Models that are used by the engine have the prefix .cmdl
+To make a .cmdl, you need a .def file with the same path and filename as the output .cmdl
+The .def contains info to compile 1 or more .glb's into a model
+It stores vertex data, LODs, material paths, a skeleton, animations (with animation events and curves), skeleton bone masks, and physics shapes (with cooked physx data)
+For specific info about the file format, see ModelAssetCompile.cpp and Model.cpp
+
+.defs are text based and have various commands, here is the list:
+
+$ source <.glb path>
+all .defs need this, defines the .glb path in the ./Data/Models/ folder
+
+$ armature_name <name>
+if a source file has multiple armatures, this string defines which to pick
+
+$ animation <name> {
+$ 	...
+$ }
+defines parameters to apply to an animation. Below is the list of parameters:
+
+--------- START ANIMATION PARAMS ---------------
+
+$ event {
+$ ...
+$ }
+defines an event in the animation, this shouldnt be set by the user, use the model editor for this
+
+$ curve <string>
+defines a metadata curve, this shouldnt be set by the user, use the model editor for this
+
+$ subtract <name>
+defines a clip to subtract from this, making this animation as an additive clip (if <name> is "this", then it will substract from this animation)
+
+$ crop <start: int> <end: int>
+crops the clip to FRAME [start,end]. If <end> is "END", then will crop to the length of the clip
+
+$ fixloop
+sets the last frame to the first frame to fix any looping issues
+
+---------- END ANIMATION COMMANDS --------------
+
+$ rename_bone <bone1: string> <bone2: string>
+renames bone1 to bone2
+
+$ mirror <boneR> <boneL>
+defines a mirroring of left and right bones, use with the "mirror" node in the graph editor
+
+$ weightlist <string> [
+$ <bone> <weight: float>
+$ ...
+$ ]
+defines a weightlist that can be used with the skeleton. Bone is the name of the bone, weight is a 0,1 weight
+to apply to the bone AND all children
+you can define multiple bone:weight pairs, later ones overwrite previous ones
+
+$ lod <level> <dist>
+defines what level to change the lod. level is a 0,1,2 etc. lod level. dist is a 0-1 factor where 1 is fullscreen
+
+$ keep_bone <bone>
+defines that a bone should be kept even if its "unused" by the model
+use for auxillary bones like weapon bones that are going to be used to attach or reference but arent weighted to a vertex
+
+$ rename_mat <src_mat> <dest_mat>
+renames an exported material to an engine material, otherwise the exported name is used to find the material
+
+$ include ["file","folder","model] <name>
+defines a .glb file ("file"), a folder of .glb files ("folder"), or a .cmdl ("model) to include for animations
+
+$ include_ex ["file","folder","model"] <name> {
+$ ...
+$ }
+like "include" but with extra options:
+------ START include_ex OPTIONS ---------
+
+$ retarget
+applies basic retargeting from the source to the final dest skeleton
+
+------ END include_ex OPTIONS -----------
+
+
+************* GLB EXPORT NAMING CONVENTIONS *************
+
+To export specific lods prefix every mesh with LOD0_, LOD1_, LOD2_, etc.
+
+To export specific physics meshes, use these prefixes:
+"BOX_": uses the meshes local space bounds as a bbox
+"SPH_": uses the meshes local space bounds as a sphere
+"CAP_": uses the meshes local space bounds as a capsule
+"CVX_": assumes the mesh is a convex shape, uses it as a convex collider (this is preferred for flexibility)
+
+
+
+
+

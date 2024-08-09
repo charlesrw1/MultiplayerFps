@@ -733,9 +733,6 @@ void Audio_System::init()
 
 }
 
-void init_audio()
-{
-}
 
 extern void benchmark_run();
 extern void benchmark_gltf();
@@ -976,7 +973,8 @@ void GameEngineLocal::key_event(SDL_Event event)
 		//console.set_keyboard_focus = show_console;
 	}
 
-	if ((event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse) {
+	const bool is_in_game_level = eng->get_level() && !eng->is_editor_level();
+	if (!is_in_game_level && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse) {
 		set_game_focused(false);
 		return;
 	}
@@ -997,13 +995,13 @@ void GameEngineLocal::key_event(SDL_Event event)
 	}
 	// when drawing to windowed viewport, handle game_focused during drawing
 	else if (event.type == SDL_MOUSEBUTTONDOWN) {
-		if (event.button.button == 3 && !is_drawing_to_window_viewport()) {
+		if (!is_in_game_level && event.button.button == 3 && !is_drawing_to_window_viewport()) {
 			set_game_focused(true);
 		}
 		inp.mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
-		if (event.button.button == 3 && !is_drawing_to_window_viewport()) {
+		if (!is_in_game_level && event.button.button == 3 && !is_drawing_to_window_viewport()) {
 			set_game_focused(false);
 		}
 		inp.mousekeys &= ~(1 << event.button.button);
@@ -1392,7 +1390,6 @@ void GameEngineLocal::init()
 	FileSys::init();
 
 	g_physics->init();
-	init_audio();
 	network_init();
 	idraw->init();
 	imaterials->init();

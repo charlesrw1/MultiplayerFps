@@ -155,7 +155,8 @@ static std::pair<StringView,bool> read_just_props(ClassBase* e, DictParser& pars
 
 bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, SerializeEntityObjectContext& ctx)
 {
-	if (!in.check_item_start(tok)) return false;
+	if (!in.check_item_start(tok)) 
+		return false;
 	in.read_string(tok);
 
 	const bool is_class = tok.cmp("class");
@@ -528,7 +529,7 @@ bool LevelSerialization::unserialize_one_item_binary(BinaryReader& in, Serialize
 		throw std::runtime_error("bad header type schema/classname\n");
 
 	}
-
+	return true;
 }
 void LevelSerialization::unserialize_level_binary(Level* l, BinaryReader& writer)
 {

@@ -34,7 +34,7 @@ enum Texture_Type
 
 inline int get_mip_map_count(int width, int height)
 {
-	return floor(log2(glm::max(width, height))) + 1;
+	return floor(glm::log2((double)glm::max(width, height))) + 1;
 }
 
 CLASS_H(Texture, IAsset)
