@@ -30,6 +30,15 @@ void MeshComponent::set_model(Model* modelnext)
 	}
 }
 
+void MeshComponent::set_material_override(const MaterialInstance* mi)
+{
+	if (eMaterialOverride.empty())
+		eMaterialOverride.push_back({ (MaterialInstance*)mi });
+	else
+		eMaterialOverride[0] = { (MaterialInstance*)mi };
+	on_changed_transform();	//fixme
+}
+
 const PropertyInfoList* MeshComponent::get_props() {
 #ifndef RUNTIME
 	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, eMaterialOverride);

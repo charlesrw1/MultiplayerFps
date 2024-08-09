@@ -41,6 +41,7 @@ public:
 
 	static const PropertyInfoList* get_props();
 
+	void set_material_override(const MaterialInstance* mi);
 private:
 	void update_handle();
 

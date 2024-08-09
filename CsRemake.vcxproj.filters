@@ -532,6 +532,8 @@
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
     <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
     <ClInclude Include="Source\Game\Components\SoundComponent.h" />
+    <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
+    <ClInclude Include="Source\MiscEditors\DataClass.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -793,5 +795,7 @@
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
+    <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
+    <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
   </ItemGroup>
 </Project>

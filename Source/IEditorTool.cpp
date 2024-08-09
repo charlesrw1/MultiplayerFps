@@ -25,6 +25,9 @@ bool IEditorTool::open(const char* name, const char* arg) {
 
 	open_document_internal(name, arg);
 
+	if (!has_document_open())
+		return false;
+
 	{
 		const char* window_name = "unnamed";
 		if (current_document_has_path())

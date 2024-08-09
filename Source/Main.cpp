@@ -776,8 +776,8 @@ ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL);
 ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, 0,2);
 ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL);
-ConfigVar g_debug_skeletons("g_debug_skeletons", "1", CVAR_BOOL);
-ConfigVar g_draw_grid("g_draw_grid", "1", CVAR_BOOL);
+ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL);
+ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL);
 ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, 0.01,10);
 
 ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL);
@@ -1157,7 +1157,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	}
 
 	// will only be true if in a tool state
-	if (is_drawing_to_window_viewport()) {
+	if (is_drawing_to_window_viewport()&&state!=Engine_State::Idle) {
 
 		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 		if (scene_hovered)

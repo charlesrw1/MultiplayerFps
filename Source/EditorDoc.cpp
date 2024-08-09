@@ -42,52 +42,8 @@ IEditorTool* g_editor_doc = &ed_doc;
 class EditorUILayout : public GUIFullscreen
 {
 public:
-
-	static GUIButton* create_button(const char* textstr) {
-		GUIButton* button = new GUIButton;
-		button->padding = { 5,5,5,5 };
-		button->w_alignment = GuiAlignment::Fill;
-
-		GUIText* text = new GUIText;
-		text->text = textstr;
-		text->color = COLOR_WHITE;
-		text->ls_position = { 0,0 };
-		text->w_alignment = GuiAlignment::Left;
-		text->h_alignment = GuiAlignment::Center;
-		text->padding = { 10,10,10,10 };
-
-
-		button->add_this(text);
-
-		return button;
-	}
-
 	EditorUILayout() {
-		test = new GUIBox;
-		test->color = COLOR_RED;
-		test->ls_sz = { 100,100 };
-		test->ls_position = { 0,0 };
-		test->pivot_ofs = { 0.5,0.5 };
-		test->padding = { 5,5,5,5 };
-		test->h_alignment = GuiAlignment::Center;
-		test->w_alignment = GuiAlignment::Left;
-
-		vbox = new GUIVerticalBox;
-		vbox->ls_position = { 100,100 };
-		vbox->ls_sz = { 200,500 };
-
-	
-		GUIButton* b = create_button("PLAY");
-		vbox->add_this(b);
-		b = create_button("EXIT GAME");
-		vbox->add_this(b);
-
-		add_this(vbox);
-		//t2 = new GUIText;
-		//t2->text = "something else that I want to say";
-		//t2->ls_position = { 0,0 };
-		//t2->use_desired_size = true;
-		//add_this(t2);
+		
 	}
 	void print_something() {
 		sys_print("---------------HELLO WORLD---------------\n");
@@ -457,6 +413,9 @@ void EditorDoc::close_internal()
 	gui->unlink_and_release_from_parent();
 
 	is_open = false;
+
+	// close the level document, its already been saved at this point
+	eng->leave_level();
 }
 
 void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)

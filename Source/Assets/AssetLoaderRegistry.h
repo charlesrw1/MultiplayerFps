@@ -2,7 +2,7 @@
 
 #include "Assets/IAsset.h"
 #include <unordered_map>
-
+#include <cassert>
 
 class AssetLoaderRegistry
 {

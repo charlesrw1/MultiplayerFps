@@ -22,6 +22,9 @@
 #include "Root_node.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/GUISystemPublic.h"
+
+#include "GameEngineLocal.h"	// for on_map_load callback
+
 std::string remove_whitespace(const char* str)
 {
 	std::string s = str;
@@ -243,6 +246,10 @@ void AnimationGraphEditor::close_internal()
 	ImNodes::EditorContextFree(default_editor);
 
 	gui->unlink_and_release_from_parent();
+
+	eng_local.on_map_load_return.remove(this);
+
+	eng->leave_level();
 }
 
 static std::string saved_settings = "";
@@ -1785,8 +1792,42 @@ void AnimationGraphEditor::try_load_preview_models()
 	set_model_from_str(opt.PreviewModel);
 }
 
+#include "Game/StdEntityTypes.h"
+
+void AnimationGraphEditor::on_open_map_callback(bool success)
+{
+	assert(success);
+
+	// spawn default entities
+
+	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
+	dome->Mesh->set_model(mods.find_or_load("skydome2.cmdl"));
+	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
+	dome->Mesh->is_skybox = true;	// FIXME
+	dome->Mesh->cast_shadows = false;
+	dome->Mesh->set_material_override(imaterials->find_material_instance("hdriSky"));
+
+	auto plane = eng->spawn_entity_class<StaticMeshEntity>();
+	plane->Mesh->set_model(mods.get_default_plane_model());
+	plane->set_ws_transform({}, {}, glm::vec3(20.f));
+	plane->Mesh->set_material_override(imaterials->find_material_instance("defaultWhite"));
+
+	auto sun = eng->spawn_entity_class<SunLightEntity>();
+	sun->Sun->intensity = 3.0;
+	sun->Sun->visible = true;
+	sun->Sun->log_lin_lerp_factor = 0.8;
+	sun->Sun->max_shadow_dist = 40.0;
+	sun->Sun->set_ls_euler_rotation(glm::vec3(0.f, glm::radians(15.f), -glm::radians(45.f)));
+
+	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
+	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
+}
+
 void AnimationGraphEditor::open_document_internal(const char* name, const char* arg)
 {
+	eng_local.on_map_load_return.add(this, &AnimationGraphEditor::on_open_map_callback);
+
+	eng->open_level("__empty__");	// queue an empty level
 
 	bool needs_new_doc = true;
 	if (strlen(name)!=0) {
@@ -1898,7 +1939,9 @@ void GraphOutput::show(bool is_playing)
 	if (is_playing && model->get_skel() && anim) {
 		obj_data.animator = anim.get();
 		obj_data.transform = model->get_root_transform();
+
 	}
+	obj_data.mat_override = (MaterialInstance*)imaterials->find_material_instance("orborbmat"); // fixme
 	idraw->get_scene()->update_obj(obj,obj_data);
 }
 void GraphOutput::hide()

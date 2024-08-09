@@ -575,6 +575,53 @@ void player_fire_weapon()
 
 }
 
+#include "MiscEditors/DataClass.h"
+
+#include "Framework/ClassTypePtr.h"
+#include "Render/Texture.h"
+CLASS_H(PlayerWeaponData,ClassBase )
+public:
+	
+	static const PropertyInfoList* get_props() {
+		START_PROPS(PlayerWeaponData)
+			REG_CLASSTYPE_PTR(entityToSpawn, PROP_DEFAULT),
+			REG_ASSET_PTR(model, PROP_DEFAULT),
+			REG_ASSET_PTR(sound, PROP_DEFAULT),
+			REG_FLOAT(damage,PROP_DEFAULT,"1.0"),
+			REG_FLOAT(fire_rate,PROP_DEFAULT,"200.0"),
+			REG_INT(mag_size,PROP_DEFAULT,"30"),
+			REG_INT(max_reserve_ammo,PROP_DEFAULT,"90"),
+			REG_ASSET_PTR(ui_texture, PROP_DEFAULT)
+		END_PROPS(PlayerWeaponData)
+	}
+
+	ClassTypePtr<Entity> entityToSpawn;
+
+	AssetPtr<Texture> ui_texture;
+	AssetPtr<Model> model;
+	AssetPtr<SoundFile> sound;
+	float damage = 1.f;
+	float fire_rate = 200.f;
+	int mag_size = 30;
+	int max_reserve_ammo = 300;
+};
+CLASS_IMPL(PlayerWeaponData);
+
+CLASS_H(AllPlayerItems,ClassBase)
+public:
+
+	static const PropertyInfoList* get_props() {
+		MAKE_VECTORCALLBACK_ATOM(AssetPtr<DataClass>, items);
+		START_PROPS(AllPlayerItems)
+			REG_STDVECTOR(items,PROP_DEFAULT)
+		END_PROPS(AllPlayerItems)
+	}
+
+	std::vector<AssetPtr<DataClass>> items;
+};
+CLASS_IMPL(AllPlayerItems);
+
+
 #if 0
 
 Game_Item_Stats stats[Game_Inventory::NUM_GAME_ITEMS] = {

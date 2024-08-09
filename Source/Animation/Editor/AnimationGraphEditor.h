@@ -287,6 +287,8 @@ public:
 		paused,
 	};
 
+	void on_open_map_callback(bool success);
+
 	graph_playback_state get_playback_state() { return playback; }
 	bool graph_is_read_only() { return playback != graph_playback_state::stopped; }
 	void pause_playback();

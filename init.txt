@@ -27,3 +27,5 @@ dbg.fly 1
 FONT_TEST
 
 ui.debug_press 1
+
+start_ed AnimGraph ik_test.txt

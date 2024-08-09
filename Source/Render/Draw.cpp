@@ -3246,6 +3246,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	stats = Render_Stats();
 	state_machine.invalidate_all();
 
+	if (view.width < 4 || view.height < 4) {
+		sys_print("!!! framebuffer too small for scene draw internal\n");
+		return;
+	}
+
 	if (cur_w != view.width || cur_h != view.height)
 		InitFramebuffers(true, view.width, view.height);
 	lastframe_vs = current_frame_main_view;

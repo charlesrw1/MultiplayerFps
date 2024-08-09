@@ -147,6 +147,8 @@
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Local.h" />
+    <ClInclude Include="Source\MiscEditors\DataClass.h" />
+    <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\OsInput.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
@@ -266,6 +268,8 @@
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />
+    <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
+    <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Physics\Physics2.cpp" />
