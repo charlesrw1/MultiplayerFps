@@ -531,8 +531,8 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 				read.read_string(buffer);
 				DictParser parser;
 				StringView tok;
-				parser.read_string(tok);
 				parser.load_from_memory((uint8_t*)buffer.c_str(), buffer.size(), "abc");
+				parser.read_string(tok);
 				AnimationEvent* event = read_object_properties<AnimationEvent>(
 					nullptr, parser, tok
 					);

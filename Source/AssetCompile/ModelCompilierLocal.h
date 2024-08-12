@@ -33,11 +33,7 @@ struct ClipCrop
 	float end = 10000.0;
 	bool has_crop = false;
 };
-struct ClipStart
-{
-	float new_start = 0.0;
-	bool has_start = false;
-};
+
 
 
 struct AnimationClip_Load
@@ -46,7 +42,7 @@ struct AnimationClip_Load
 	std::string subtract_clipname;
 	float fps = 30.0;
 	ClipCrop crop;
-	ClipStart start;
+
 	bool fixloop = false;
 	std::vector<std::unique_ptr<AnimationEvent>> events;
 	std::vector<EditingCurve> curves;

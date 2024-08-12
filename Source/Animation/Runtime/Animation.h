@@ -133,6 +133,7 @@ private:
 
 	friend class NodeRt_Ctx;
 	friend class EditModelAnimations;
+	friend class AnimationEditorTool;
 };
 
 

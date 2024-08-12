@@ -52,7 +52,7 @@ public:
 	PropertyGrid eventdetails;
 	float CURRENT_TIME = 0.0;
 };
-
+#include "Animation/Runtime/Animation.h"
 class StaticMeshEntity;
 class AnimationEditorTool : public IEditorTool
 {
@@ -77,13 +77,14 @@ public:
 	void imgui_draw() override;
 
 	void on_open_map_callback(bool good);
+	void add_to_obj(Render_Object& obj, float dt);
 
 	View_Setup view;
 	User_Camera camera;
-	//AnimatorInstance animator;
+	AnimatorInstance animator;
 
 	PropertyGrid propGrid;
-	StaticMeshEntity* outputEntity = nullptr;
+	handle<Render_Object> outputObj;
 	Model* outputModel = nullptr;
 	ModelImportSettings* importSettings = nullptr;
 	AnimImportSettings* animImportSettings = nullptr;

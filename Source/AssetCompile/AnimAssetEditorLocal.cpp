@@ -25,6 +25,28 @@
 static AnimationEditorTool g_animseq_editor_static;
 IEditorTool* g_animseq_editor = &g_animseq_editor_static;
 
+void AnimationEditorTool::add_to_obj(Render_Object& obj, float dt)
+{
+	auto mod = g_animseq_editor_static.outputModel;
+	if (!mod || !mod->get_skel())
+		return;
+
+	Pose pose;
+	util_calc_rotations(mod->get_skel(), g_animseq_editor_static.sequence, g_animseq_editor_static.animEdit->CURRENT_TIME, nullptr, pose);
+	auto& animator = g_animseq_editor_static.animator;
+	animator.model = mod;
+	animator.cached_bonemats.resize(mod->get_skel()->get_num_bones());
+	animator.matrix_palette.resize(mod->get_skel()->get_num_bones());
+	util_localspace_to_meshspace_ptr_2(pose, animator.cached_bonemats.data(), mod->get_skel());
+
+	animator.ConcatWithInvPose();
+
+	obj.animator = &animator;
+	obj.model = mod;
+	obj.visible = true;
+
+	obj.transform = mod->get_root_transform();
+}
 
 void AnimationEditorTool::tick(float dt)
 {
@@ -37,6 +59,10 @@ void AnimationEditorTool::tick(float dt)
 			camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
 		}
 	}
+
+	Render_Object o;
+	add_to_obj(o, dt);
+	idraw->get_scene()->update_obj(outputObj, o);
 
 	view = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 }
@@ -56,37 +82,8 @@ void AnimationEditorTool::imgui_draw()
 
 	IEditorTool::imgui_draw();
 }
-void EditModelAnimations::add_to_obj(Render_Object& obj, float dt)
-{
-#if 0
-	auto mod = g_model_editor_static.compilied_model;
-	if (!mod || !mod->get_skel())
-		return;
 
-	if (selected_index != -1) {
-		auto& a = names[selected_index];
-		Pose pose;
-		util_calc_rotations(mod->get_skel(), a.seq, CURRENT_TIME, nullptr, pose);
-		animator.model = mod;
-		animator.cached_bonemats.resize(mod->get_skel()->get_num_bones());
-		animator.matrix_palette.resize(mod->get_skel()->get_num_bones());
-		util_localspace_to_meshspace_ptr_2(pose, animator.cached_bonemats.data(), mod->get_skel());
 
-		animator.ConcatWithInvPose();
-
-		obj.animator = &animator;
-
-		obj.transform = mod->get_root_transform();
-	}
-#endif
-}
-#if 0
-AnimationClip_Load& EditModelAnimations::find_or_create_for_selected()
-{
-
-	return g_model_editor_static.model_def->str_to_clip_def[names[selected_index].name];
-}
-#endif
 EditModelAnimations::EditModelAnimations()
 {
 	g_animseq_editor_static.on_close.add(this, &EditModelAnimations::on_quit);
@@ -253,9 +250,7 @@ void AnimationEditorTool::on_open_map_callback(bool good)
 {
 	assert(good);
 
-	outputEntity = eng->spawn_entity_class<StaticMeshEntity>();
-	assert(outputEntity);
-	outputEntity->Mesh->set_model(outputModel);
+	outputObj = idraw->get_scene()->register_obj();
 	///outputEntity->Mesh->
 
 	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
@@ -272,12 +267,12 @@ void AnimationEditorTool::on_open_map_callback(bool good)
 
 void AnimationEditorTool::open_document_internal(const char* name, const char* arg)
 {
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini AnimSeqEditorImgui.ini");
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini AnimSeqEditor.ini");
 	if (strlen(name) == 0)
 		return;
 
 	assert(!importSettings);
-	assert(!outputEntity);
+
 	assert(!outputModel);
 	assert(!animImportSettings);
 
@@ -344,7 +339,8 @@ void AnimationEditorTool::close_internal()
 {
 	on_close.invoke();
 
-	outputEntity = nullptr;	// gets cleaned up in the level
+	idraw->get_scene()->remove_obj(outputObj);
+
 	outputModel = nullptr;
 	delete importSettings;
 	importSettings = nullptr;

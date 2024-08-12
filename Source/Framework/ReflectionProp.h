@@ -23,6 +23,8 @@ enum class core_type_id : uint8_t
 	Vec3,
 	Quat,
 
+	StdUniquePtr,	// unique_ptr<> to a property, type found in classname
+
 	Struct,
 	StdString,
 	List,

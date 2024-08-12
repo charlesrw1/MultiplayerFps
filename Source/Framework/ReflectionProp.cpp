@@ -189,6 +189,11 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t fl
 	prop.range_hint = hint;
 	return prop;
 }
+#include "ObjectSerialization.h"
+void write_unique_ptr(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* userptr)
+{
+	write_object_properties(*(ClassBase**)ptr, userptr, out);
+}
 
 void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, ClassBase* userptr);
 std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, DictWriter& out, ClassBase* userptr) {
@@ -251,6 +256,14 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 
 		return std::pair<std::string,bool>{ {},false };
 	}break;
+	case core_type_id::StdUniquePtr: {
+
+		if (write_name)
+			out.write_key(prop.name);
+		write_unique_ptr(&prop, prop.get_ptr(ptr), out, userptr);
+
+		return std::pair<std::string, bool>{ {}, false };
+	}
 
 	case core_type_id::Struct: {
 
@@ -305,6 +318,7 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 	return { value_str,true };
 }
 
+
 void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* userptr)
 {
 	out.write_list_start();
@@ -325,8 +339,9 @@ void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* u
 			uint8_t* member_dat = list_ptr->get_index(ptr, i);
 
 			auto str = write_field_type(false/* dont write name */, prop.type, member_dat, nullptr, prop, out, userptr);
-			ASSERT(str.second);
-			buf += str.first;
+			//ASSERT(str.second); // FIXME???
+			if(str.second)
+				buf += str.first;
 			buf += ' ';
 			out.write_value_no_ln(buf.c_str());
 			buf.clear();
@@ -399,7 +414,12 @@ void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, voi
 }
 
 
-
+bool read_unique_ptr(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
+{
+	ClassBase* p = read_object_properties<ClassBase>(userptr, in, tok);
+	*(ClassBase**)ptr = p;
+	return true;
+}
 bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr);
 bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, ClassBase* userptr)
 {
@@ -487,7 +507,8 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 
 	case core_type_id::List:
 		return read_list_field(prop, prop->get_ptr(ptr), in, tok, userptr);
-
+	case core_type_id::StdUniquePtr:
+		return read_unique_ptr(prop, prop->get_ptr(ptr), in, tok, userptr);
 	case core_type_id::Struct: {
 
 		auto& fac = IPropertySerializer::get_factory();

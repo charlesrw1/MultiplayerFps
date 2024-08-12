@@ -13,7 +13,18 @@
 #include "AnimationSeqLoader.h"
 
 
-inline PropertyInfo
+template<>
+struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
+	static PropertyInfo get() {
+		PropertyInfo pi;
+		pi.offset = 0;
+		pi.name = "_value";
+		pi.type = core_type_id::StdUniquePtr;
+		pi.flags = PROP_DEFAULT;
+		return pi;
+	}
+};
+
 
 CLASS_H(AnimImportSettings, ClassBase)
 public:
@@ -33,6 +44,7 @@ public:
 	AssetPtr<AnimationSeqAsset> otherClipToSubtract;
 
 	static const PropertyInfoList* get_props() {
+		MAKE_VECTORCALLBACK_ATOM(std::unique_ptr<AnimationEvent>, events);
 		MAKE_VECTORCALLBACK(EditingCurve, curves);
 		START_PROPS(AnimImportSettings)
 			REG_STDSTRING(clipName, PROP_SERIALIZE),
@@ -45,6 +57,7 @@ public:
 			REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
 			REG_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
 			REG_STDVECTOR(curves,PROP_SERIALIZE),
+			REG_STDVECTOR(events,PROP_SERIALIZE),
 		END_PROPS(AnimImportSettings)
 	}
 };

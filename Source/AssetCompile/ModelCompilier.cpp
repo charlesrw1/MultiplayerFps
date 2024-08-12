@@ -1135,6 +1135,30 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 			mdd.imports.push_back(imp);
 		}
 	}
+
+	for (int i = 0; i < is->animations.size(); i++) {
+		auto str = is->animations[i].clipName;
+		auto& isa = is->animations[i];
+		AnimationClip_Load acl;
+		acl.curves = isa.curves;
+		acl.fixloop = isa.fixLoop;
+		acl.crop.has_crop = isa.hasEndCrop | isa.hasStartCrop;
+		acl.crop.start = isa.cropStart;
+		acl.crop.end = isa.cropEnd;
+		acl.sub = isa.makeAdditive ? SubtractType_Load::FromThis : SubtractType_Load::None;
+		acl.fixloop = isa.fixLoop;
+		
+		for (auto& ev : isa.events) {
+			ClassBase* newEvent = ev->get_type().allocate();
+			copy_object_properties(ev.get(), newEvent, nullptr);
+			assert(newEvent->is_a<AnimationEvent>());
+			acl.events.push_back(std::unique_ptr<AnimationEvent>((AnimationEvent*)newEvent));
+		}
+
+		mdd.str_to_clip_def.insert({ str,std::move(acl) });
+	}
+
+
 	return mdd;
 }
 ModelDefData new_import_settings_to_modeldef_data(IFile* file)
