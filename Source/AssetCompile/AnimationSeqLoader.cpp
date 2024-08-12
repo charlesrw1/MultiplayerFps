@@ -76,7 +76,7 @@ AnimationSeqAsset* AnimationSeqLoader::find_animation_seq_and_load_model(const s
 	std::string modName = seq.substr(0, pos)+".cmdl";
 	std::string animName = seq.substr(pos + 1);
 	AnimationSeqAsset* asa = new AnimationSeqAsset;
-	asa->path = animName;
+	asa->path = seq;
 	asa->srcModel = mods.find_or_load(modName.c_str());
 	int remapIndex{};
 	if (asa->srcModel && asa->srcModel->get_skel())

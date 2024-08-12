@@ -15,6 +15,9 @@
 #include "Framework/ClassBase.h"
 #include "Animation/SkeletonData.h"
 
+#include "Game/SerializePtrHelpers.h"	// for AssetPtr
+#include "AssetCompile/AnimationSeqLoader.h"
+
 #include <type_traits>
 #include <cassert>
 
@@ -341,9 +344,8 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
 
-	
-		rt->clip = ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
-
+		rt->clip = (Clip.ptr) ? Clip.ptr->seq : nullptr;// ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
+		rt->remap_index = -1;
 		if (rt->clip) {
 			const int root_index = 0;
 			rt->root_pos_first_frame = rt->clip->get_keyframe(0, 0, 0.0).pos;
@@ -359,7 +361,8 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	static const PropertyInfoList* get_props()
 	{
 		START_PROPS(Clip_Node_CFG)
-			REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE"),
+			//REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE"),
+			REG_ASSET_PTR(Clip,PROP_DEFAULT),
 
 			REG_ENUM(rm[0], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
 			REG_ENUM(rm[1], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
@@ -395,7 +398,8 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	}
 
 	rootmotion_setting rm[3] = { rootmotion_setting::keep ,rootmotion_setting::keep, rootmotion_setting::keep };
-	std::string clip_name;
+	AssetPtr<AnimationSeqAsset> Clip;
+	//std::string clip_name;
 	bool loop = true;
 
 	StringName hashed_syncgroupname;

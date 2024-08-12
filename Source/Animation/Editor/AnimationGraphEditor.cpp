@@ -1090,7 +1090,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 				Clip_EdNode* cl = node->cast_to<Clip_EdNode>();
 				ASSERT(cl);
 
-				cl->node->clip_name = *resource;
+				//cl->node->clip_name = *resource;
 
 				ImNodes::ClearNodeSelection();
 				ImNodes::SetNodeScreenSpacePos(cl->id, ImGui::GetMousePos());

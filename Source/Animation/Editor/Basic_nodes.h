@@ -242,15 +242,15 @@ CLASS_H_EXPLICIT_SUPER(Clip_EdNode, BaseNodeUtil_EdNode<Clip_Node_CFG>, Base_EdN
 	MAKE_STANARD_SERIALIZE(Clip_EdNode);
 	
 	bool compile_my_data(const AgSerializeContext* ctx) override {
-		if (node->clip_name.empty())
+		if (!node->Clip.ptr||!node->Clip.ptr->seq)
 			append_fail_msg("[ERROR] clip name is empty\n");
 
 		return has_errors();
 	}
 	
 	std::string get_title() const override {
-		if (node->clip_name.empty()) return get_name();
-		return node->clip_name;
+		if (!node->Clip.ptr) return get_name();
+		return node->Clip->get_name();
 	}
 };
 

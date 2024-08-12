@@ -175,7 +175,7 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 
 		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
 
-			rt->anim_time += pose.dt * speed;
+			rt->anim_time += pose.dt * speed * 0.8;	// HACK !!!!!!! fixme, should be 24 fps instead of 30 but setting it breaks stuff, just do this for now 
 
 			if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
 				if (loop)
@@ -200,7 +200,7 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 	else {
 		const float time_to_evaluate_sequence = rt->anim_time;
 
-		rt->anim_time += pose.dt * speed;
+		rt->anim_time += pose.dt * speed * 0.8;	// see above
 
 		if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
 			if (loop)

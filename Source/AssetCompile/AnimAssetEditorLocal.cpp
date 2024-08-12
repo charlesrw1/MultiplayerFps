@@ -57,6 +57,8 @@ void AnimationEditorTool::tick(float dt)
 		if (eng->is_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
 			camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
+
+			
 		}
 	}
 
@@ -64,7 +66,9 @@ void AnimationEditorTool::tick(float dt)
 	add_to_obj(o, dt);
 	idraw->get_scene()->update_obj(outputObj, o);
 
-	view = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+	glm::vec3 hipsCenter = animator.get_global_bonemats()[0][3];
+	hipsCenter = outputModel->get_root_transform() * glm::vec4(hipsCenter,1.0);
+	view = View_Setup(camera.position+ hipsCenter, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 }
 
 void AnimationEditorTool::imgui_draw()
@@ -187,9 +191,9 @@ void EditModelAnimations::draw_imgui()
 	ImGui::End();
 
 	curveedit.draw();
-	CURRENT_TIME = curveedit.current_time / 30.0;
-	seqimgui.current_time = curveedit.current_time;
-
+	CURRENT_TIME = seqimgui.current_time / 30.0;
+	//seqimgui.current_time = curveedit.current_time;
+	curveedit.current_time = seqimgui.current_time;
 }
 void AnimationEditorTool::draw_menu_bar()
 {

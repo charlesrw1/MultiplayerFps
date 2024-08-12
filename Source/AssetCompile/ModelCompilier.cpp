@@ -818,292 +818,7 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 
 	return set;
 }
-void ModelDefData::write_to_dict(DictWriter& out)
-{
-	out.write_key_value("source", model_source.c_str());
-	if (!armature_name.empty())
-		out.write_key_value("armature_name", armature_name.c_str());
-	for (auto rename : bone_rename) {
-		out.write_key("rename_bone");
-		out.write_value_no_ln(rename.first.c_str());
-		out.write_value(rename.second.c_str());
-	}
-	for (auto retarget : bone_retarget_type) {
-		out.write_key("bone_retarget");
-		out.write_value_no_ln(retarget.first.c_str());
-		if (retarget.second == RetargetBoneType::FromAnimationScaled)
-			out.write_value("AScaled");
-		else if (retarget.second == RetargetBoneType::FromAnimation)
-			out.write_value("Keep");
-		else if (retarget.second == RetargetBoneType::FromTargetBindPose)
-			out.write_value("TBind");
-		else
-			ASSERT(0);
-	}
-	for (int i = 0; i < weightlists.size(); i++) {
-		auto& wld = weightlists[i];
-		out.write_key("weightlist");
-		out.write_value(wld.name.c_str());
-		out.write_list_start();
-		for (int k = 0; k < wld.defs.size(); k++) {
-			out.write_key_value(wld.defs[k].first.c_str(), std::to_string(wld.defs[k].second).c_str());
-		}
-		out.write_list_end();
-	}
-	for (int i = 0; i < mirrored_bones.size(); i++) {
-		out.write_key("mirror");
-		out.write_value_no_ln(mirrored_bones[i].bone1.c_str());
-		out.write_value(mirrored_bones[i].bone2.c_str());
-	}
-	for (auto& lod : loddefs) {
-		out.write_key("LOD");
-		out.write_key(std::to_string(lod.lod_num).c_str());
-		out.write_key(std::to_string(lod.distance).c_str());
-	}
-	if (!root_material_dir.empty())
-		out.write_key_value("material_dir", root_material_dir.c_str());
-	for (auto& keepbone : keepbones)
-		out.write_key_value("keep_bone", keepbone.c_str());
-	for (auto& matrename : material_rename) {
-		out.write_key("rename_mat");
-		out.write_value(matrename.first.c_str());
-		out.write_value(matrename.second.c_str());
-	}
-	for (auto& ais : imports) {
 
-		if (ais.retarget)
-			out.write_key("include_ex");
-		else
-			out.write_key("include");
-
-		if (ais.type == AnimImportType_Load::File)
-			out.write_value("file");
-		else if (ais.type == AnimImportType_Load::Folder)
-			out.write_value("folder");
-		else if (ais.type == AnimImportType_Load::Model)
-			out.write_value("model");
-		out.write_value(ais.name.c_str());
-
-		if (ais.retarget) {
-			out.write_item_start();
-			out.write_key("retarget");
-			out.write_item_end();
-		}
-	}
-	for (auto& acl : str_to_clip_def) {
-		out.write_key("animation");
-		out.write_value(acl.first.c_str());
-		out.write_item_start();
-		if (acl.second.sub != SubtractType_Load::None) {
-			out.write_key("subtract");
-			if (acl.second.sub == SubtractType_Load::FromAnother)
-				out.write_value(acl.second.subtract_clipname.c_str());
-			else
-				out.write_value("this");
-		}
-		if (acl.second.fixloop)
-			out.write_key("fixloop");
-		if (acl.second.crop.has_crop) {
-			out.write_key("crop");
-			out.write_value(string_format("%f", acl.second.crop.start));
-			out.write_value(string_format("%f", acl.second.crop.end));
-		}
-		for (auto& curve : acl.second.curves) {
-			out.write_key("curve");
-			out.write_item_start();
-			write_properties(*EditingCurve::get_props(), &curve, out, {});
-			out.write_item_end();
-		}
-
-		for (auto& ev : acl.second.events) {
-			out.write_key("event");
-			write_object_properties(ev.get(), {}, out);
-		}
-		out.write_item_end();
-	}
-}
-void ModelDefData::read_from_dict(DictParser& in)
-{
-	StringView tok;
-	while (in.read_string(tok) && !in.is_eof()) {
-		if (tok.cmp("source")) {
-			in.read_string(tok);
-			model_source = to_std_string_sv(tok);
-		}
-		else if (tok.cmp("armature_name")) {
-			in.read_string(tok);
-			armature_name = to_std_string_sv(tok);
-		}
-		else if (tok.cmp("animation")) {
-			AnimationClip_Load acl;
-			in.read_string(tok);
-			auto name = to_std_string_sv(tok);
-
-			if (!in.expect_item_start()) throw std::runtime_error("expected {");
-			while (in.read_string(tok) && !in.is_eof() && !in.check_item_end(tok)) {
-				if (tok.cmp("event")) {
-					in.read_string(tok);
-					auto event = read_object_properties<AnimationEvent>({}, in, tok);
-					if (!event) throw std::runtime_error("couldnt find animation event\n");
-
-					acl.events.push_back(std::unique_ptr<AnimationEvent>(event));
-				}
-				if (tok.cmp("curve")) {
-					EditingCurve curve;
-					in.read_string(tok);
-					auto ret = read_properties(*EditingCurve::get_props(), &curve, in, tok, {});
-					if (!ret.second)
-						throw std::runtime_error("couldnt read curve");
-					acl.curves.push_back(curve);
-				}
-				else if (tok.cmp("rename")) {
-
-				}
-				else if (tok.cmp("subtract")) {
-					in.read_string(tok);
-					auto str1 = to_std_string_sv(tok);
-					if (str1 == "this") {
-						acl.sub = SubtractType_Load::FromThis;
-					}
-					else {
-						acl.sub = SubtractType_Load::FromAnother;
-						acl.subtract_clipname = str1;
-					}
-				}
-				else if (tok.cmp("fps")) {
-
-				}
-				else if (tok.cmp("crop")) {
-					float start = 0.0;
-					in.read_float(start);
-					in.read_string(tok);
-					float end = 10000.0;
-					if (!tok.cmp("END")) {
-						end = atof(tok.to_stack_string().c_str());
-					}
-					acl.crop.has_crop = true;
-					acl.crop.start = start;
-					acl.crop.end = end;
-				}
-				else if (tok.cmp("start")) {
-
-				}
-				else if (tok.cmp("fixloop")) {
-					acl.fixloop = true;
-				}
-			}
-
-			str_to_clip_def[name] = std::move(acl);
-		}
-		else if (tok.cmp("rename_bone")) {
-			in.read_string(tok);
-			auto str1 = to_std_string_sv(tok);
-			in.read_string(tok);
-			auto str2 = to_std_string_sv(tok);
-			bone_rename[str1] = str2;
-		}
-		else if (tok.cmp("bone_retarget")) {
-			in.read_string(tok);
-			std::string bone = to_std_string_sv(tok);
-			in.read_string(tok);
-			RetargetBoneType type{};
-			if (tok.cmp("AScaled"))type = RetargetBoneType::FromAnimationScaled;
-			else if (tok.cmp("Keep")) type = RetargetBoneType::FromAnimation;
-			else if (tok.cmp("TBind")) type = RetargetBoneType::FromTargetBindPose;
-			else throw std::runtime_error("unknown bone_retarget type");
-			bone_retarget_type[bone] = type;
-		}
-		else if (tok.cmp("weightlist")) {
-			in.read_string(tok);
-			WeightlistDef wd;
-			wd.name = to_std_string_sv(tok);
-			if (!in.expect_list_start()) throw std::runtime_error("expected [");
-			while (in.read_string(tok) && !in.is_eof() && !in.check_list_end(tok)) {
-				auto bone = to_std_string_sv(tok);
-				float weight = 0.0;
-				in.read_float(weight);
-				wd.defs.push_back({ bone,weight });
-			}
-			weightlists.push_back(wd);
-		}
-		else if (tok.cmp("mirror")) {
-			ModelDefData::mirror m;
-			in.read_string(tok);
-			m.bone1 = to_std_string_sv(tok);
-			in.read_string(tok);
-			m.bone2 = to_std_string_sv(tok);
-			mirrored_bones.push_back(m);
-		}
-		else if (tok.cmp("lod_skeleton")) {
-
-		}
-		else if (tok.cmp("LOD")) {
-			int level = 0;
-			in.read_int(level);
-			float dist = 1.0;
-			in.read_float(dist);
-
-			LODDef l;
-			l.lod_num = level;
-			l.distance = dist;
-			loddefs.push_back(l);
-		}
-		else if (tok.cmp("physics")) {
-
-		}
-		else if (tok.cmp("collider")) {
-
-		}
-		else if (tok.cmp("material_dir")) {
-			in.read_string(tok);
-			auto str1 = to_std_string_sv(tok);
-			root_material_dir = str1;
-		}
-		else if (tok.cmp("keep_bone")) {
-			in.read_string(tok);
-			auto str1 = to_std_string_sv(tok);
-			keepbones.push_back(str1);
-		}
-		else if (tok.cmp("rename_mat")) {
-			in.read_string(tok);
-			auto str1 = to_std_string_sv(tok);
-			in.read_string(tok);
-			auto str2 = to_std_string_sv(tok);
-			material_rename[str1] = str2;
-		}
-		else if (tok.cmp("include") || tok.cmp("include_ex")) {
-			bool extended = tok.cmp("include_ex");
-			in.read_string(tok);
-			AnimImportType_Load type{};
-			if (tok.cmp("file")) type = AnimImportType_Load::File;
-			else if (tok.cmp("folder")) type = AnimImportType_Load::Folder;
-			else if (tok.cmp("model")) type = AnimImportType_Load::Model;
-			else throw std::runtime_error("bad include type");
-			in.read_string(tok);
-			std::string name = to_std_string_sv(tok);
-			AnimImportedSet_Load ais;
-			ais.name = name;
-			ais.type = type;
-
-			if (extended) {
-				if (!in.expect_item_start()) throw std::runtime_error("expected { for include_ex");
-
-				while (in.read_string(tok) && !in.is_eof() && !in.check_item_end(tok)) {
-					if (tok.cmp("retarget")) {
-						ais.retarget = true;
-					}
-				}
-			}
-
-
-			imports.push_back(ais);
-
-		}
-		else {
-			throw std::runtime_error("unknown key" + to_std_string_sv(tok));
-		}
-	}
-}
 #include "ModelAsset2.h"
 ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 {
@@ -1184,22 +899,11 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) 
 		std::string pathNew = strip_extension(name);
 		pathNew += ".mis";	// model import settings
 		auto filenew = FileSys::open_read_os(pathNew.c_str());
-		if (filenew)
-			return new_import_settings_to_modeldef_data(filenew.get());
+		if (!filenew)
+			throw std::runtime_error("couldn't open dict");
+		return new_import_settings_to_modeldef_data(filenew.get());
 	}
 
-	auto file = FileSys::open_read_os(name.c_str());
-	if (!file)
-		throw std::runtime_error("couldn't open dict");
-
-
-	DictParser in;
-	in.load_from_file(file.get());
-
-	ModelDefData out;
-	out.read_from_dict(in);
-
-	return out;
 }
 
 glm::mat4 compute_world_space(glm::mat4 localtransform, int bone, MSkeleton* skel)
@@ -1373,6 +1077,8 @@ void mark_used_bones_R(int this_index, const SkeletonCompileData* scd, std::vect
 	}
 }
 
+ConfigVar modcompile_print_pruned_bones("modcompile.print_pruned_bones", "0", CVAR_BOOL);
+
 ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const SkeletonCompileData* scd, const ModelDefData& def)
 {
 	std::vector<bool> material_is_used(mcd.gltf_file->materials_count + 1, false);
@@ -1453,7 +1159,8 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				 LOAD_to_FINAL_bones[i] = count++;
 			 }
 			 else {
-				 sys_print("*** bone will be pruned %s\n", scd->bones[i].strname.c_str());
+				 if(modcompile_print_pruned_bones.get_bool())
+					 sys_print("*** bone will be pruned %s\n", scd->bones[i].strname.c_str());
 			 }
 		 }
 		 FINAL_to_LOAD_bones.resize(count);
@@ -2378,29 +2085,10 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 		const auto& cgltf_mat = d->materials[i];
 		std::string mat_name = cgltf_mat.name;
 
-		if (def.material_rename.find(mat_name) != def.material_rename.end())
-			mat_name = def.material_rename.find(mat_name)->second;
-
-		if (!def.root_material_dir.empty())
-			mat_name = def.root_material_dir + mat_name;
-
-		bool good = true;// MaterialCompilier::compile(mat_name.c_str());
-
 		if (index_accum < def.directMaterialSet.size())
 			mat_name = def.directMaterialSet[index_accum];
 		final_mats[i] = mat_name;
 		index_accum++;
-		if (good)
-			continue;
-
-		// not good, this means the material does not exist, thus we should create one
-		std::string justname = strip_extension(modelname);
-		get_filename(justname);
-
-		std::string generated_mat_name = justname + cgltf_mat.name;
-		generated_mat_name = make_non_proplematic_name(generated_mat_name);
-
-		final_mats[i] = create_material_and_export(generated_mat_name, d, &cgltf_mat);
 	}
 	if (!def.directMaterialSet.empty())
 		final_mats[num_materials] = def.directMaterialSet.front();

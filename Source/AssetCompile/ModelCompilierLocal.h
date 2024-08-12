@@ -84,16 +84,12 @@ struct WeightlistDef
 class ModelDefData
 {
 public:
-	void read_from_dict(DictParser& in);
-	void write_to_dict(DictWriter& out);
 
 
 	std::string model_source;
 	uint64_t timestamp_of_def = 0;
 
 	// MATERIALS
-	std::string root_material_dir;
-	std::unordered_map<std::string, std::string> material_rename;
 	std::vector<std::string> directMaterialSet;	// use final index
 
 	// LODS
