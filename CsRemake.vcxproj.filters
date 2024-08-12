@@ -539,6 +539,7 @@
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
+    <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -800,5 +801,6 @@
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
+    <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
   </ItemGroup>
 </Project>

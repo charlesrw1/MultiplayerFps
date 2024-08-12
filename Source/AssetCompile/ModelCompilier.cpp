@@ -333,6 +333,7 @@ public:
 	static ProcessMeshOutput process_mesh(ModelCompileData& comp, const SkeletonCompileData* scd, const ModelDefData& data);
 
 	static unique_ptr<FinalSkeletonOutput> create_final_skeleton(
+		std::string outputName,
 		const std::vector<int>& LOAD_bone_to_FINAL_bone,
 		const std::vector<int>& FINAL_bone_to_LOAD_bone,
 		const SkeletonCompileData* compile_data, 
@@ -1104,30 +1105,18 @@ void ModelDefData::read_from_dict(DictParser& in)
 	}
 }
 #include "ModelAsset2.h"
-
-ModelDefData new_import_settings_to_modeldef_data(IFile* file)
+ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 {
-	DictParser dp;
-	dp.load_from_file(file);
-	StringView tok;
-	dp.read_string(tok);
-
-	auto is = read_object_properties<ModelImportSettings>(nullptr, dp, tok);
-
-	if (!is)
-		throw std::runtime_error("couldnt parse new class import sttings");
-
 	ModelDefData mdd;
 	mdd.model_source = is->srcGlbFile;
-	for (int i = 0; i < is->importedMaterialNames.size() && i < is->myMaterials.size(); i++)
-		if(is->myMaterials[i].get())
-			mdd.material_rename[is->importedMaterialNames[i]] = is->myMaterials[i]->get_name();
 	for (int i = 0; i < is->lodScreenSpaceSizes.size(); i++) {
 		LODDef lodd;
 		lodd.lod_num = i;
 		lodd.distance = is->lodScreenSpaceSizes[i];
 		mdd.loddefs.push_back(lodd);
 	}
+	for (int i = 0; i < is->myMaterials.size(); i++)
+		mdd.directMaterialSet.push_back(is->myMaterials.at(i).ptr ? is->myMaterials.at(i)->get_name() : "fallback");
 	mdd.keepbones = is->keepBones;
 	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {
 		auto& p = is->additionalAnimationGlbFiles[i];
@@ -1146,6 +1135,22 @@ ModelDefData new_import_settings_to_modeldef_data(IFile* file)
 			mdd.imports.push_back(imp);
 		}
 	}
+	return mdd;
+}
+ModelDefData new_import_settings_to_modeldef_data(IFile* file)
+{
+	DictParser dp;
+	dp.load_from_file(file);
+	StringView tok;
+	dp.read_string(tok);
+
+	auto is = read_object_properties<ModelImportSettings>(nullptr, dp, tok);
+
+	if (!is)
+		throw std::runtime_error("couldnt parse new class import sttings");
+
+	ModelDefData mdd = new_import_settings_to_modeldef_data(is);
+
 	delete is;
 	return mdd;
 }
@@ -2122,8 +2127,9 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		 }
 	 }
 }
-
+#include "AnimationSeqLoader.h"
 unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
+	std::string outputName,
 	const std::vector<int>& LOAD_bone_to_FINAL_bone, 
 	const std::vector<int>& FINAL_bone_to_LOAD_bone,
 	const SkeletonCompileData* compile_data, 
@@ -2190,6 +2196,16 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 	final_out->bones = get_final_bone_data(FINAL_bone_to_LOAD_bone,LOAD_bone_to_FINAL_bone, compile_data);
 	final_out->imported_models = get_imported_models(data);
 	final_out->masks = get_bone_masks(FINAL_bone_to_LOAD_bone, LOAD_bone_to_FINAL_bone, FINAL_bone_to_LOAD_bone.size(), data, compile_data);
+
+
+	{
+		std::vector<std::string> animNames;
+		outputName = outputName.substr(14);
+		for (auto& o : final_out->allseqs)
+			animNames.push_back(o.first);
+		g_animseq.update_manifest_with_model(outputName, animNames);
+	}
+
 
 	return unique_ptr<FinalSkeletonOutput>(final_out);
 }
@@ -2329,9 +2345,12 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 	std::vector<std::string> final_mats(num_materials+1);
 
 	const cgltf_data* d = comp.gltf_file;
+	int index_accum = 0;
 	for (int i = 0; i < num_materials; i++) {
 		if (!materials_used[i])
 			continue;
+
+
 		const auto& cgltf_mat = d->materials[i];
 		std::string mat_name = cgltf_mat.name;
 
@@ -2343,6 +2362,10 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 
 		bool good = true;// MaterialCompilier::compile(mat_name.c_str());
 
+		if (index_accum < def.directMaterialSet.size())
+			mat_name = def.directMaterialSet[index_accum];
+		final_mats[i] = mat_name;
+		index_accum++;
 		if (good)
 			continue;
 
@@ -2355,7 +2378,10 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 
 		final_mats[i] = create_material_and_export(generated_mat_name, d, &cgltf_mat);
 	}
-	final_mats[num_materials] = "_NULL";
+	if (!def.directMaterialSet.empty())
+		final_mats[num_materials] = def.directMaterialSet.front();
+	else
+		final_mats[num_materials] = "_NULL";
 	return final_mats;
 }
 
@@ -2820,6 +2846,9 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 	if (!out.data)
 		return false;
 
+	std::string finalpath = strip_extension(defname);
+	finalpath += ".cmdl";
+
 	unique_ptr<SkeletonCompileData> skeleton_data = get_skin_from_file(out.data, defname.c_str(), def.armature_name);
 	if(skeleton_data)
 		add_bone_def_data_to_skeleton(def, skeleton_data.get());
@@ -2838,6 +2867,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 	);
 
 	unique_ptr<FinalSkeletonOutput> final_skeleton = ModelCompileHelper::create_final_skeleton(
+		finalpath,
 		post_traverse.meshout.LOAD_bone_to_FINAL_bone, 
 		post_traverse.meshout.FINAL_bone_to_LOAD_bone,
 		skeleton_data.get(), 
@@ -2851,9 +2881,6 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 		post_traverse.meshout.LOAD_bone_to_FINAL_bone,
 		def);
 
-	std::string finalpath = strip_extension(defname);
-	finalpath += ".cmdl";
-
 	bool res =  write_out_compilied_model(finalpath, &final_model, final_skeleton.get());
 	out.free();
 	return res;
@@ -2861,22 +2888,28 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 
 static bool compile_everything = false;
 
+bool ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings)
+{
+	sys_print("----- Compiling Model from settings -----\n");
+	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
+	return ModelCompileHelper::compile_model(output, def_data);
+}
 bool ModelCompilier::compile(const char* name)
 {
 	sys_print("----- Compiling Model %s -----\n", name);
 
-	//auto file = FileSys::open_read_os(name);
-	//if (!file) {
-	//	sys_print("!!! coudln't open model def file %s\n", name);
-	//	return false;
-	//}
-	uint64_t timestamp_of_def = UINT64_MAX;// file->get_timestamp();
-	//file.reset();	// close it
+	auto file = FileSys::open_read_os(name);
+	if (!file) {
+		sys_print("!!! coudln't open model def file %s\n", name);
+		return false;
+	}
+	uint64_t timestamp_of_def =  file->get_timestamp();
+	file.reset();	// close it
 
 	uint64_t timestamp_of_cmdl = 0;
 
 	std::string compilied = strip_extension(name) + ".cmdl";
-	auto file = FileSys::open_read_os(compilied.c_str());
+	file = FileSys::open_read_os(compilied.c_str());
 
 
 	bool needs_compile = compile_everything;

@@ -392,11 +392,11 @@ private:
 	glm::mat4 current_transform_of_group = glm::mat4(1.0);
 	glm::mat4 pivot_transform = glm::mat4(1.f);
 	
-	bool has_translation_snap = true;
+	bool has_translation_snap = false;
 	float translation_snap = 1.0;
-	bool has_scale_snap = true;
+	bool has_scale_snap = false;
 	float scale_snap = 1.0;
-	bool has_rotation_snap = true;
+	bool has_rotation_snap = false;
 	float rotation_snap = 45.0;
 };
 

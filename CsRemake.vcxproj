@@ -39,6 +39,7 @@
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
+    <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
     <ClInclude Include="Source\AssetCompile\Compiliers.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
@@ -209,6 +210,7 @@
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
+    <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />

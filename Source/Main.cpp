@@ -55,6 +55,8 @@
 
 #include "Game/WorldSettings.h"
 
+#include "AssetCompile/AnimationSeqLoader.h"
+
 MeshBuilder phys_debug;
 
 GameEngineLocal eng_local;
@@ -554,6 +556,7 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 	}
 	active_tool = next_tool;
 	if (active_tool != nullptr) {
+		leave_level();
 		enable_imgui_docking();
 		global_asset_browser.init();
 		bool could_open = get_current_tool()->open_document(file, arg);
@@ -748,6 +751,7 @@ int main(int argc, char** argv)
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 	eng_local.init();
+	auto s = SDL_GetScancodeName(SDL_SCANCODE_KP_1);
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1246,6 +1250,12 @@ void GameEngineLocal::draw_screen()
 	GPUFUNCTIONSTART;
 
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
+	
+	if (g_window_fullscreen.get_bool())
+		SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	else
+		SDL_SetWindowFullscreen(window, 0);
+
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1391,12 +1401,12 @@ void GameEngineLocal::init()
 
 	g_physics->init();
 	network_init();
+	g_animseq.init();
 	idraw->init();
 	imaterials->init();
 	g_fonts.init();
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 	isound->init();
-
 	anim_tree_man->init();
 	mods.init();
 	iparticle->init();

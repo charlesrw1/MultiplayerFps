@@ -493,6 +493,8 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 			command_mgr->add_command(cmd);
 		}
 	}
+	else if (1)
+		return;
 	else if (scancode == SDL_SCANCODE_KP_5) {
 		using_ortho = false;
 	}
@@ -1224,6 +1226,11 @@ public:
 			ImGui::BeginTooltip();
 			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
 			ImGui::EndTooltip();
+
+			if (ImGui::GetIO().MouseClicked[0]) {
+				global_asset_browser.filter_all();
+				global_asset_browser.unset_filter(1<<metadata->self_index);
+			}
 		}
 		bool ret = false;
 		if (ImGui::BeginDragDropTarget())

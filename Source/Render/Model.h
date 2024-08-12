@@ -184,6 +184,7 @@ private:
 
 	friend class ModelMan;
 	friend class ModelCompileHelper;
+	friend class ModelEditorTool;
 };
 
 

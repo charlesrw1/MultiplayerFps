@@ -18,6 +18,11 @@ bind F3 "r.debug_mode 5"
 bind F4 "r.debug_mode 8"
 bind F5 "r.debug_mode 2"
 
+bind "Keypad 1" "FILTER_FOR Model"
+bind "Keypad 2" "FILTER_FOR Map"
+bind "Keypad 3" "FILTER_FOR Material"
+bind "Keypad 0" "CLEAR_AB_FILTER"
+
 dbg.fly 1
 
 #output_texture 0.5 1.0 0.0 _csm_shadow
@@ -27,5 +32,3 @@ dbg.fly 1
 FONT_TEST
 
 ui.debug_press 1
-
-start_ed AnimGraph ik_test.txt

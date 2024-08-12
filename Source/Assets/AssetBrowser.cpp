@@ -163,3 +163,24 @@ void AssetBrowser::imgui_draw()
 	ImGui::End();
 
 }
+
+DECLARE_ENGINE_CMD(CLEAR_AB_FILTER)
+{
+	global_asset_browser.clear_filter();
+}
+DECLARE_ENGINE_CMD(FILTER_FOR)
+{
+	if (args.size() != 2) {
+		sys_print("??? FILTER_FOR <asset type>\n");
+		return;
+	}
+	auto type = AssetRegistrySystem::get().find_type(args.at(1));
+	if (!type)
+	{
+		sys_print("??? no FILTER_FOR type name\n");
+		return;
+	}
+	global_asset_browser.filter_all();
+	global_asset_browser.unset_filter(1<<type->self_index);
+
+}

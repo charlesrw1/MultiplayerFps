@@ -98,6 +98,7 @@ public:
 	// MATERIALS
 	std::string root_material_dir;
 	std::unordered_map<std::string, std::string> material_rename;
+	std::vector<std::string> directMaterialSet;	// use final index
 
 	// LODS
 	std::vector<LODDef> loddefs;

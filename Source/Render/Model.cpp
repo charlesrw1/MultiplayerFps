@@ -88,6 +88,8 @@ public:
 REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 
 
+
+
 Model::~Model() {}
 
 static const int MODEL_FORMAT_VERSION = 7;
@@ -622,7 +624,7 @@ Model* ModelMan::find_or_load(const char* filename)
 
 	if (developer_mode.get_bool()) {
 		std::string model_def = model_folder_path + strip_extension(filename);
-		model_def += ".def";
+		model_def += ".mis";
 
 		bool good = ModelCompilier::compile(model_def.c_str());
 		if (!good) {

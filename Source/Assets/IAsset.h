@@ -4,13 +4,18 @@
 #include "Framework/Util.h"
 #include "Framework/ClassBase.h"
 
+//struct OnUpdatedCallback;
+
 CLASS_H(IAsset, ClassBase)
 public:
-	virtual ~IAsset() {}
+	IAsset();
+	virtual ~IAsset();
 
 	const std::string& get_name() const { return path; }
 	bool is_loaded_in_memory() const { return is_loaded; }
 	bool did_load_fail() const { return load_failed; }
+
+	//OnUpdatedCallback* OnUpdate = nullptr;
 protected:
 	std::string path;				// filepath or name of asset
 	uint64_t load_timestamp = 0;	// os timestamp of when asset was loaded

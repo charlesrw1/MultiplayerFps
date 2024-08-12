@@ -12,67 +12,8 @@
 #include "ModelAsset2.h"
 
 #include "Game/StdEntityTypes.h"
-class Model;
-// defines 
-enum class ModelEditType
-{
-	General,
-	Animation,
-	Physics,
-};
 
-class EventTimelineSequencer : public SequencerImgui
-{
-public:
-	void context_menu_callback() override;
-};
-class EventSequenceItem : public SequencerEditorItem
-{
-public:
-	EventSequenceItem(AnimationEvent* ev) : event(ev) {
-		color = ev->get_editor_color();
-		instant_item = !ev->is_duration_event();
-	}
-	virtual std::string get_name() { return event->get_type().classname; };
-
-	std::unique_ptr<AnimationEvent> event;
-};
-
-class EditModelAnimations
-{
-public:
-	EditModelAnimations() {
-		name_filter[0] = 0;
-	}
-	void draw_imgui();
-	void add_to_obj(Render_Object& obj, float dt);
-
-	void init_from_model(const Model* m);
-	void on_select_new_animation(int next);
-
-	struct ALdat {
-		std::string name;
-		const AnimationSeq* seq = nullptr;
-	};
-	std::vector<ALdat> names;
-	const EventSequenceItem* selected_event_item = nullptr;
-
-	int selected_index = -1;
-	AnimationClip_Load& find_or_create_for_selected();
-
-	CurveEditorImgui curveedit;
-	EventTimelineSequencer seqimgui;
-	PropertyGrid eventdetails;
-
-	char name_filter[256];
-	float CURRENT_TIME = 0.0;
-
-	AnimatorInstance animator;
-
-
-};
 class StaticMeshEntity;
-
 class ModelEditorTool : public IEditorTool
 {
 public:
@@ -96,12 +37,8 @@ public:
 	View_Setup view;
 	User_Camera camera;
 
-	ModelImportSettings* importSettings = nullptr;
 	PropertyGrid propGrid;
 	StaticMeshEntity* outputEntity = nullptr;
 	Model* outputModel = nullptr;
-
-	//EditModelAnimations editanims;
-
-	void draw_imgui_anim_state();
+	ModelImportSettings* importSettings = nullptr;
 };

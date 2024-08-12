@@ -10,6 +10,11 @@
 #include "MiscEditors/DataClass.h"
 #include "Framework/Curve.h"
 #include "Animation/Event.h"
+#include "AnimationSeqLoader.h"
+
+
+inline PropertyInfo
+
 CLASS_H(AnimImportSettings, ClassBase)
 public:
 	std::string clipName;
@@ -25,18 +30,21 @@ public:
 
 	std::vector<std::unique_ptr<AnimationEvent>> events;
 	std::vector<EditingCurve> curves;
-
-	//AssetPtr<AnimationSeqAsset> otherClipToSubtract;
+	AssetPtr<AnimationSeqAsset> otherClipToSubtract;
 
 	static const PropertyInfoList* get_props() {
+		MAKE_VECTORCALLBACK(EditingCurve, curves);
 		START_PROPS(AnimImportSettings)
-			REG_STDSTRING(clipName, PROP_DEFAULT),
+			REG_STDSTRING(clipName, PROP_SERIALIZE),
+			REG_BOOL(hasStartCrop, PROP_DEFAULT, "0"),
 			REG_INT(cropStart, PROP_DEFAULT, "0"),
+			REG_BOOL(hasEndCrop,PROP_DEFAULT,"0"),
 			REG_INT(cropEnd, PROP_DEFAULT, "20000"),
 			REG_BOOL(fixLoop, PROP_DEFAULT, "0"),
 			REG_BOOL(makeAdditive, PROP_DEFAULT, "0"),
 			REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
-			//REG_ASSET_PTR(otherClipToSubtract, PROP_DEFAULT),
+			REG_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
+			REG_STDVECTOR(curves,PROP_SERIALIZE),
 		END_PROPS(AnimImportSettings)
 	}
 };
@@ -45,7 +53,6 @@ CLASS_H(ModelImportSettings, ClassBase)
 public:
 	std::string srcGlbFile;									// what .glb file did this come from
 	// Mesh data
-	std::vector<std::string> importedMaterialNames;			// array of names of the imported materials (from blender, etc.)
 	std::vector<float> lodScreenSpaceSizes;					// array of lod sizes
 	std::vector<AssetPtr<MaterialInstance>> myMaterials;
 
@@ -59,21 +66,22 @@ public:
 	std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
 
 	static const PropertyInfoList* get_props() {
-		MAKE_VECTORCALLBACK_ATOM(std::string, importedMaterialNames);
+
 		MAKE_VECTORCALLBACK_ATOM(float, lodScreenSpaceSizes);
 		MAKE_VECTORCALLBACK_ATOM(std::string, additionalAnimationGlbFiles);
 		MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, myMaterials);
 		MAKE_VECTORCALLBACK_ATOM(std::string, keepBones);
 		MAKE_VECTORCALLBACK(AnimImportSettings, animations);
 		START_PROPS(ModelImportSettings)
-			REG_STDVECTOR(animations, PROP_SERIALIZE),
-			REG_ASSET_PTR(mirrorTableAsset, PROP_DEFAULT),
-			REG_STDVECTOR(keepBones, PROP_DEFAULT),
-			REG_BOOL(useSharedSkeleton, PROP_DEFAULT, "0"),
 			REG_STDSTRING(srcGlbFile, PROP_DEFAULT),
-			REG_STDVECTOR(importedMaterialNames, PROP_SERIALIZE),
+			REG_STDVECTOR(myMaterials, PROP_DEFAULT),
 			REG_STDVECTOR(lodScreenSpaceSizes, PROP_DEFAULT),
+			REG_BOOL(useSharedSkeleton, PROP_DEFAULT, "0"),
+			REG_ASSET_PTR(shareSkeletonWithThis, PROP_DEFAULT),
+			REG_STDVECTOR(keepBones, PROP_DEFAULT),
+			REG_ASSET_PTR(mirrorTableAsset, PROP_DEFAULT),
 			REG_STDVECTOR(additionalAnimationGlbFiles, PROP_DEFAULT),
+			REG_STDVECTOR(animations, PROP_SERIALIZE),
 		END_PROPS(ModelImportSettings)
 	}
 };

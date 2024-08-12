@@ -557,7 +557,7 @@ void AnimationGraphEditor::draw_menu_bar()
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem("New")) {
-				open("");
+				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed AnimGraph \"\"");
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
 				open_the_open_popup();
@@ -1801,7 +1801,7 @@ void AnimationGraphEditor::on_open_map_callback(bool success)
 	// spawn default entities
 
 	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-	dome->Mesh->set_model(mods.find_or_load("skydome2.cmdl"));
+	dome->Mesh->set_model(mods.find_or_load("skydome.cmdl"));
 	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->is_skybox = true;	// FIXME
 	dome->Mesh->cast_shadows = false;
@@ -1825,6 +1825,7 @@ void AnimationGraphEditor::on_open_map_callback(bool success)
 
 void AnimationGraphEditor::open_document_internal(const char* name, const char* arg)
 {
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 	eng_local.on_map_load_return.add(this, &AnimationGraphEditor::on_open_map_callback);
 
 	eng->open_level("__empty__");	// queue an empty level
@@ -1888,7 +1889,6 @@ void AnimationGraphEditor::open_document_internal(const char* name, const char* 
 	// focused, stuff can start being rendered
 	playback = graph_playback_state::stopped;
 	control_params->refresh_props();
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 }
 
 
@@ -1941,7 +1941,7 @@ void GraphOutput::show(bool is_playing)
 		obj_data.transform = model->get_root_transform();
 
 	}
-	obj_data.mat_override = (MaterialInstance*)imaterials->find_material_instance("orborbmat"); // fixme
+	//obj_data.mat_override = (MaterialInstance*)imaterials->find_material_instance("orborbmat"); // fixme
 	idraw->get_scene()->update_obj(obj,obj_data);
 }
 void GraphOutput::hide()
