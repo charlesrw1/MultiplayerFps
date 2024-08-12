@@ -240,6 +240,8 @@ public:
 	Model* get_light_sphere() const { return LIGHT_SPHERE; }
 	Model* get_light_cone() const { return LIGHT_CONE; }
 
+	// called by model editor to recompile a model
+	void reload_this_model(Model* m);
 private:
 
 	// Used for gbuffer lighting

@@ -3,6 +3,8 @@
 #include "Framework/Util.h"
 #include "Connection.h"
 
+#include "Framework/ClassBase.h"
+
 #include <glm/glm.hpp>
 #include <vector>
 const int CLIENT_SNAPSHOT_HISTORY = 16;	// buffer last 16 snapshots
@@ -43,6 +45,22 @@ enum Client_To_Server
 	CL_DELTA,
 	CL_SET_BASELINE,
 };
+
+// server RPC are always executed on the server unless its called by a client who doesnt own the entity (then its dropped, you cant do that)
+// client RPCs execute on whoever owns the entity, unless its called by a client in which its just called locally (you shouldnt do this) 
+
+class Entity;
+CLASS_H(NetRPC, ClassBase)
+public:
+	// validate is called before execute (when rpc was sent over the network)
+	// return true if the RPC has valid data and can execute, return false if it cant (and drop the sender)
+	virtual bool validate(Entity* recipient) = 0;
+	virtual void execute(Entity* recipient) = 0;
+protected:
+	bool isServerRpc = false;	// false=client,true=server
+	bool isReliable = false;
+};
+
 
 struct Net_Prop
 {

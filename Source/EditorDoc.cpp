@@ -304,7 +304,9 @@ void EditorDoc::draw_menu_bar()
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem("New")) {
-				open("");
+				//open("");
+
+				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map \"\"");
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
 				open_the_open_popup();

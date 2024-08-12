@@ -13,6 +13,13 @@
 
 #include "Render/RenderObj.h"
 
+#include "Framework/ObjectSerialization.h"
+
+#include "GameEngineLocal.h"
+
+#include "Framework/DictWriter.h"
+#include <fstream>
+
 static ModelEditorTool g_model_editor_static;
 IEditorTool* g_model_editor = &g_model_editor_static;
 
@@ -29,51 +36,25 @@ void ModelEditorTool::tick(float dt)
 		}
 	}
 
-
-
 	view = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
-
-	if (compilied_model) {
-		if (!object.is_valid())
-			object = idraw->get_scene()->register_obj();
-		Render_Object obj;
-		obj.model = compilied_model;
-		obj.transform = glm::mat4(1.f);
-		obj.visible = true;
-		editanims.add_to_obj(obj, dt);
-		idraw->get_scene()->update_obj(object,obj);
-	}
 }
 
 void ModelEditorTool::imgui_draw()
 {
 	if (ImGui::Begin("Main properties")) {
 
-		if (!compilied_model) {
+		if (!outputModel) {
 			ImGui::TextColored(color32_to_imvec4({ 150,150,150 }), "No compilied model");
 		}
-		const char* strs[] = { "General","Animation","Physics" };
-		if (ImGui::BeginCombo("Edit mode", strs[(int)edit_state_type])) {
-			for (int i = 0; i < 3; i++) {
-				if (ImGui::Selectable(strs[i], (int)edit_state_type == i)) {
-					edit_state_type = ModelEditType(i);
-				}
-			}
-			ImGui::EndCombo();
-		}
+		propGrid.update();
 	}
 	ImGui::End();
-
-		editanims.draw_imgui();
-	//switch (edit_state_type) {
-	//case ModelEditType::Animation:
-	//	break;
-	//}
 
 	IEditorTool::imgui_draw();
 }
 void EditModelAnimations::add_to_obj(Render_Object& obj, float dt)
 {
+#if 0
 	auto mod = g_model_editor_static.compilied_model;
 	if (!mod || !mod->get_skel())
 		return;
@@ -93,11 +74,15 @@ void EditModelAnimations::add_to_obj(Render_Object& obj, float dt)
 
 		obj.transform = mod->get_root_transform();
 	}
+#endif
 }
+#if 0
 AnimationClip_Load& EditModelAnimations::find_or_create_for_selected()
 {
+
 	return g_model_editor_static.model_def->str_to_clip_def[names[selected_index].name];
 }
+#endif
  void EditModelAnimations::init_from_model(const Model* m) {
 	animator = AnimatorInstance();
 	names.clear();
@@ -117,6 +102,7 @@ AnimationClip_Load& EditModelAnimations::find_or_create_for_selected()
 #include "Framework/Curve.h"
 void EditModelAnimations::on_select_new_animation(int next)
 {
+#if 0
 	if (next == selected_index)
 		return;
 	if (selected_index != -1) {
@@ -171,6 +157,7 @@ void EditModelAnimations::on_select_new_animation(int next)
 		c.events.clear();
 	}
 	CURRENT_TIME = 0.0;
+#endif
 }
 void EditModelAnimations::draw_imgui()
 {
@@ -306,81 +293,111 @@ const char* ModelEditorTool::get_editor_name()
 
 bool ModelEditorTool::has_document_open() const
 {
-	return is_open;
+	return importSettings != nullptr;
+}
+
+
+void ModelEditorTool::on_open_map_callback(bool good)
+{
+	assert(good);
+
+	outputEntity = eng->spawn_entity_class<StaticMeshEntity>();
+	assert(outputEntity);
+	outputEntity->Mesh->set_model(outputModel);
+
+
+	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
+	dome->Mesh->set_model(mods.find_or_load("skydome2.cmdl"));
+	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
+	dome->Mesh->is_skybox = true;	// FIXME
+	dome->Mesh->cast_shadows = false;
+	dome->Mesh->set_material_override(imaterials->find_material_instance("hdriSky"));
+
+	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
+	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
+
 }
 
 void ModelEditorTool::open_document_internal(const char* name, const char* arg)
 {
+	assert(!importSettings);
+	assert(!outputEntity);
+	assert(!outputModel);
+
 	if (strlen(name) > 0) {
 		// try to find def_name
-		std::string def_name = strip_extension(name) + ".def";
-		compilied_model = mods.find_or_load(name);	// find the compilied model, this could be an error and loading still 'works'
+		std::string def_name = strip_extension(name) + ".mis";
+		outputModel = mods.find_or_load(name);	// find the compilied model, this could be an error and loading still 'works'
 		std::string fullpath = "./Data/Models/" + def_name;
 		auto file = FileSys::open_read_os(fullpath.c_str());
-		bool error = false;
+
 		if (!file) {
-			error = true;
 			sys_print("!!! ModelEditor: couldnt find path %s\n", fullpath.c_str());
 		}
 		else {
-			DictParser parser;
-			parser.load_from_file(file.get());
-			model_def = std::make_unique<ModelDefData>();
-			try {
-				model_def->read_from_dict(parser);		
-			}
-			catch (std::runtime_error er) {
-				sys_print("!!! ModelEditor caught error in loading .def file: %s", er.what());
-				error = true;
-			}
-		}
-		if (error) {
-			set_empty_name();
-			compilied_model = nullptr;
-			model_def.reset(new ModelDefData());	// allocate new model def data
-		}
-		else {
-			if (!compilied_model)
-				sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
+			DictParser dp;
+			dp.load_from_file(file.get());
+			StringView tok;
+			dp.read_string(tok);
 
-			set_doc_name(name);
+			importSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok);
+
 		}
+	}
+	if (!importSettings) {
+		set_empty_name();
+		importSettings = new ModelImportSettings;
 	}
 	else {
-		set_empty_name();
-		compilied_model = nullptr;
-		model_def.reset(new ModelDefData());
+		if (!outputModel)
+			sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
+		set_doc_name(name);
 	}
 
-	edit_state_type = ModelEditType::General;
+	eng->open_level("__empty__");
+	eng_local.on_map_load_return.add(this, &ModelEditorTool::on_open_map_callback);
+	assert(importSettings);
 
-	editanims.init_from_model(compilied_model);
-
-	is_open = true;
+	auto ti = &importSettings->get_type();
+	while (ti) {
+		if (ti->props)
+			propGrid.add_property_list_to_grid(ti->props, importSettings);
+		ti = ti->super_typeinfo;
+	}
 }
 
 void ModelEditorTool::close_internal()
 {
-	idraw->get_scene()->remove_obj(object);
-	model_def.reset();
-	is_open = false;
+	outputEntity = nullptr;	// gets cleaned up in the level
+	outputModel = nullptr;
+	delete importSettings;
+	importSettings = nullptr;
+
+	eng_local.on_map_load_return.remove(this);
+
+	propGrid.clear_all();
 }
-#include "Framework/DictWriter.h"
-#include <fstream>
+#include "Compiliers.h"
 bool ModelEditorTool::save_document_internal()
 {
-	ASSERT(model_def);
+	ASSERT(importSettings);
 
 	DictWriter write;
-	model_def->write_to_dict(write);
-	auto out = write.get_output();
-	std::ofstream outfile("abc.txt");
-	outfile.write(out.c_str(), out.size());
+	write_object_properties(importSettings, nullptr, write);
 
-	DictParser in;
-	in.load_from_memory((uint8_t*)out.data(), out.size(), "a");
-	model_def->read_from_dict(in);
-	return false;
+	std::string path = "./Data/Models/" + strip_extension(get_name()) + ".mis";
+	std::ofstream outfile(path);
+	outfile.write(write.get_output().data(), write.get_output().size());
+	outfile.close();
+
+	ModelCompilier::compile(path.c_str());
+
+	if (!outputModel)
+		outputModel = mods.find_or_load(get_name());
+	else
+		mods.reload_this_model(outputModel);
+
+	return true;
 }
 
 void EventTimelineSequencer::context_menu_callback() {
@@ -395,3 +412,4 @@ void EventTimelineSequencer::context_menu_callback() {
 		}
 	}
 }
+

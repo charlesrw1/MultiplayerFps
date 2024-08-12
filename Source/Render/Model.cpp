@@ -578,6 +578,36 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 
 ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL);
 
+void ModelMan::reload_this_model(Model* m)
+{
+	auto saved_id = m->uid;
+	auto filenamestr = m->path;
+
+	m->~Model();
+	m = new(m)(Model);
+	m->uid = saved_id;
+	m->is_loaded = false;
+	m->path = filenamestr;
+
+	string path(model_folder_path);
+	path += filenamestr;
+	bool good = read_model_into_memory(m, std::move(path));
+
+	if (!good) {
+		sys_print("!!! reload_this_model failed\n");
+		return;
+	}
+
+	good = upload_model(m);
+
+	if (!good) {
+		sys_print("!!! reload_this_model upload_model failed\n");
+		return;
+	}
+
+	m->is_loaded = true;
+}
+
 Model* ModelMan::find_or_load(const char* filename)
 {
 	std::string filenamestr = filename;
@@ -795,3 +825,38 @@ bool ModelMan::upload_model(Model* mesh)
 	return true;
 }
 
+#include "AssetCompile/ModelAsset2.h"
+#include <fstream>
+DECLARE_ENGINE_CMD(IMPORT_MODEL)
+{
+	if (args.size() != 2) {
+		sys_print("!!! usage: IMPORT_MODEL <.glb path>");
+		return;
+	}
+
+	std::string savepath = "./Data/Models/";
+	savepath += strip_extension(args.at(1)) + ".mis";
+	{
+		//auto existingFile = FileSys::open_read_os(savepath.c_str());
+		//if (existingFile) {
+		//	sys_print("??? IMPORT_MODE: import settings file already exists. Try editing it in the model editor instead or delete the file and try again\n");
+		//	return;
+		//}
+	}
+
+
+	ModelImportSettings mis;
+	mis.srcGlbFile = args.at(1);
+
+
+	DictWriter dw;
+	write_object_properties(&mis, nullptr, dw);
+
+	// save as text
+	std::ofstream outfile(savepath);
+	outfile.write(dw.get_output().data(), dw.get_output().size());
+	outfile.close();
+
+	std::string misF = strip_extension(args.at(1)) + ".mis";
+	ModelCompilier::compile(savepath.c_str());
+}

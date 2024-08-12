@@ -468,9 +468,6 @@
     <ClInclude Include="Source\Sound\SoundPublic.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AssetCompile\ImageCompile.h">
-      <Filter>Source\AssetCompile</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\RenderFog.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
@@ -538,6 +535,10 @@
       <Filter>Source\Sound</Filter>
     </ClInclude>
     <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
+    <ClInclude Include="Source\Game\SoftAssetPtr.h" />
+    <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
+    <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
+    <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -641,9 +642,6 @@
     </ClCompile>
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
       <Filter>Source\Animation\Runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ImageCompile.cpp">
-      <Filter>Source\AssetCompile</Filter>
     </ClCompile>
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <Filter>Source\AssetCompile</Filter>
@@ -799,5 +797,8 @@
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
+    <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
+    <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
+    <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
   </ItemGroup>
 </Project>

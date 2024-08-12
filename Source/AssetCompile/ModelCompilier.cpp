@@ -1103,11 +1103,67 @@ void ModelDefData::read_from_dict(DictParser& in)
 		}
 	}
 }
+#include "ModelAsset2.h"
+
+ModelDefData new_import_settings_to_modeldef_data(IFile* file)
+{
+	DictParser dp;
+	dp.load_from_file(file);
+	StringView tok;
+	dp.read_string(tok);
+
+	auto is = read_object_properties<ModelImportSettings>(nullptr, dp, tok);
+
+	if (!is)
+		throw std::runtime_error("couldnt parse new class import sttings");
+
+	ModelDefData mdd;
+	mdd.model_source = is->srcGlbFile;
+	for (int i = 0; i < is->importedMaterialNames.size() && i < is->myMaterials.size(); i++)
+		if(is->myMaterials[i].get())
+			mdd.material_rename[is->importedMaterialNames[i]] = is->myMaterials[i]->get_name();
+	for (int i = 0; i < is->lodScreenSpaceSizes.size(); i++) {
+		LODDef lodd;
+		lodd.lod_num = i;
+		lodd.distance = is->lodScreenSpaceSizes[i];
+		mdd.loddefs.push_back(lodd);
+	}
+	mdd.keepbones = is->keepBones;
+	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {
+		auto& p = is->additionalAnimationGlbFiles[i];
+		if (p.rfind('/') != std::string::npos) {
+			AnimImportedSet_Load imp;
+			imp.name = p;
+			imp.type = AnimImportType_Load::Folder;
+			imp.retarget = true;
+			mdd.imports.push_back(imp);
+		}
+		else {
+			AnimImportedSet_Load imp;
+			imp.name = p;
+			imp.type = AnimImportType_Load::File;
+			imp.retarget = true;
+			mdd.imports.push_back(imp);
+		}
+	}
+	delete is;
+	return mdd;
+}
 
 ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) {
+	{
+		std::string pathNew = strip_extension(name);
+		pathNew += ".mis";	// model import settings
+		auto filenew = FileSys::open_read_os(pathNew.c_str());
+		if (filenew)
+			return new_import_settings_to_modeldef_data(filenew.get());
+	}
+
 	auto file = FileSys::open_read_os(name.c_str());
 	if (!file)
 		throw std::runtime_error("couldn't open dict");
+
+
 	DictParser in;
 	in.load_from_file(file.get());
 
@@ -2809,18 +2865,18 @@ bool ModelCompilier::compile(const char* name)
 {
 	sys_print("----- Compiling Model %s -----\n", name);
 
-	auto file = FileSys::open_read_os(name);
-	if (!file) {
-		sys_print("!!! coudln't open model def file %s\n", name);
-		return false;
-	}
-	uint64_t timestamp_of_def = file->get_timestamp();
-	file.reset();	// close it
+	//auto file = FileSys::open_read_os(name);
+	//if (!file) {
+	//	sys_print("!!! coudln't open model def file %s\n", name);
+	//	return false;
+	//}
+	uint64_t timestamp_of_def = UINT64_MAX;// file->get_timestamp();
+	//file.reset();	// close it
 
 	uint64_t timestamp_of_cmdl = 0;
 
 	std::string compilied = strip_extension(name) + ".cmdl";
-	file = FileSys::open_read_os(compilied.c_str());
+	auto file = FileSys::open_read_os(compilied.c_str());
 
 
 	bool needs_compile = compile_everything;

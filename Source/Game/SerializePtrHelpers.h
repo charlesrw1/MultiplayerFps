@@ -47,6 +47,7 @@ struct GetAtomValueWrapper<AssetPtr<T>> {
 	}
 };
 
+
 // A pointer to a ClassBase, this has serilization possibilities
 template<typename T>
 class ObjPtr

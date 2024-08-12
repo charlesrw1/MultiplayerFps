@@ -8,6 +8,10 @@
 
 #include "ModelCompilierLocal.h"
 #include "Animation/Runtime/Animation.h"
+
+#include "ModelAsset2.h"
+
+#include "Game/StdEntityTypes.h"
 class Model;
 // defines 
 enum class ModelEditType
@@ -67,6 +71,7 @@ public:
 
 
 };
+class StaticMeshEntity;
 
 class ModelEditorTool : public IEditorTool
 {
@@ -86,20 +91,17 @@ public:
 	virtual bool save_document_internal() override;
 	void imgui_draw() override;
 
-	bool is_open = false;
+	void on_open_map_callback(bool good);
+
 	View_Setup view;
 	User_Camera camera;
 
-	 Model* compilied_model = nullptr;
+	ModelImportSettings* importSettings = nullptr;
+	PropertyGrid propGrid;
+	StaticMeshEntity* outputEntity = nullptr;
+	Model* outputModel = nullptr;
 
-	unique_ptr<ModelDefData> model_def;
-	handle<Render_Object> object;
-
-	void hide();
-
-	EditModelAnimations editanims;
+	//EditModelAnimations editanims;
 
 	void draw_imgui_anim_state();
-
-	ModelEditType edit_state_type = ModelEditType::General;
 };

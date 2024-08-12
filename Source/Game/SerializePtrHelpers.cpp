@@ -48,6 +48,7 @@ public:
 };
 #endif
 
+
 class SerializeAssetPtr : public IPropertySerializer
 {
 public:
