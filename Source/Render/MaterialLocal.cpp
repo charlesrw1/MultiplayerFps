@@ -15,16 +15,19 @@
 
 #include "glad/glad.h"
 
+#include "Assets/AssetRegistry.h"
+#include "Assets/AssetLoaderRegistry.h"
+
 static const char* const MATERIAL_DIR = "./Data/Materials/";
 MaterialManagerLocal matman;
 MaterialManagerPublic* imaterials = &matman;
+
+extern IEditorTool* g_mateditor;
 
 CLASS_IMPL(MasterMaterial);
 CLASS_IMPL(MaterialInstance);
 CLASS_IMPL(MaterialParameterBuffer);
 
-#include "Assets/AssetRegistry.h"
-#include "Assets/AssetLoaderRegistry.h"
 class MaterialAssetMetadata : public AssetMetadata
 {
 public:
@@ -42,6 +45,7 @@ public:
 	virtual bool assets_are_filepaths() const override { return false; }
 	virtual std::string root_filepath()  const override { return "./Data/Materials/"; }
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
+	IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
 };
 
 REGISTERASSETLOADER_MACRO(MaterialInstance, &matman);
@@ -128,6 +132,18 @@ program_handle MaterialManagerLocal::get_mat_shader(
 	return compile_mat_shader(mm, key);	// dynamic compilation ...
 }
 
+void MaterialManagerLocal::reload_material(const std::string& matName)
+{
+	MaterialInstanceLocal* mat = (MaterialInstanceLocal*)find_material_instance(matName.c_str());
+	if (!mat)
+		return;
+	std::string findname = MATERIAL_DIR + matName + ".mi";
+	auto file = FileSys::open_read(findname.c_str());
+	if (!file)
+		return;
+	mat->load_from_file(findname, file.get());
+	add_to_dirty_list(mat);
+}
 
 const MaterialInstance* MaterialManagerLocal::find_material_instance(const char* mat_inst_name)
 {
@@ -233,6 +249,10 @@ void MaterialInstanceLocal::init_from(MaterialInstanceLocal* parent)
 }
 bool MaterialInstanceLocal::load_from_file(const std::string& fullpath, IFile* file)
 {
+	// for reloading
+	params.clear();
+	master = nullptr;
+
 	DictParser in;
 	in.load_from_file(file);
 	StringView tok;

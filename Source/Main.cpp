@@ -751,7 +751,6 @@ int main(int argc, char** argv)
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 	eng_local.init();
-	auto s = SDL_GetScancodeName(SDL_SCANCODE_KP_1);
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -780,6 +779,9 @@ ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL);
 ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL);
 ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL);
 ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, 0.01,10);
+
+// defualt sky material to use for editors like materials/models/etc.
+ConfigVar ed_default_sky_material("ed_default_sky_material", "hdriSky", CVAR_DEV);
 
 ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL);
 

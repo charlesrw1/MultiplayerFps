@@ -289,8 +289,6 @@ public:
 	}
 	MaterialParameterBuffer* find_parameter_buffer(const char* name) override { return nullptr; }
 
-	void reload_all();
-
 	program_handle get_mat_shader(
 		bool is_animated, 
 		const Model* mod, 
@@ -314,6 +312,8 @@ public:
 			dirty_list[mat->dirty_buffer_index] = nullptr;
 		}
 	}
+
+	void reload_material(const std::string& matName);
 private:
 	MasterMaterial* fallback_master = nullptr;
 	MasterMaterial* shared_depth_master = nullptr;

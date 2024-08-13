@@ -284,6 +284,7 @@
     <ClCompile Include="Source\Physics\Physics2.cpp" />
     <ClCompile Include="Source\Render\Draw.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
+    <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Meshlet.cpp" />

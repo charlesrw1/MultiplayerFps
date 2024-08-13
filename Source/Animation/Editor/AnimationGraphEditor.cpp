@@ -1794,6 +1794,8 @@ void AnimationGraphEditor::try_load_preview_models()
 
 #include "Game/StdEntityTypes.h"
 
+extern ConfigVar ed_default_sky_material;
+
 void AnimationGraphEditor::on_open_map_callback(bool success)
 {
 	assert(success);
@@ -1805,7 +1807,7 @@ void AnimationGraphEditor::on_open_map_callback(bool success)
 	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->is_skybox = true;	// FIXME
 	dome->Mesh->cast_shadows = false;
-	dome->Mesh->set_material_override(imaterials->find_material_instance("hdriSky"));
+	dome->Mesh->set_material_override(imaterials->find_material_instance(ed_default_sky_material.get_string()));
 
 	auto plane = eng->spawn_entity_class<StaticMeshEntity>();
 	plane->Mesh->set_model(mods.get_default_plane_model());

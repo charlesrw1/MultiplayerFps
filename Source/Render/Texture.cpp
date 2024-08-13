@@ -41,9 +41,12 @@ public:
 		auto find_tree = FileSys::find_files("./Data/Textures");
 		for (const auto _file : find_tree) {
 			auto file = _file.substr(16);
-			if (has_extension(file, "png"))
+			if (has_extension(file, "dds")||has_extension(file,"png")||has_extension(file,"hdr"))
 				filepaths.push_back(file);
 		}
+		filepaths.push_back("_white");
+		filepaths.push_back("_black");
+		filepaths.push_back("_flat_normal");
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return nullptr; }
 	virtual std::string root_filepath() const  override

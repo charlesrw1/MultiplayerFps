@@ -920,6 +920,12 @@ void Renderer::init()
 	//	rl.position = pos;
 	//	scene.register_light(rl);
 	//}
+
+	auto brdf_lut = g_imgs.install_system_texture("_brdf_lut");
+	brdf_lut->gl_id = EnviornmentMapHelper::get().integrator.lut_id;
+	brdf_lut->width = BRDF_PREINTEGRATE_LUT_SIZE;
+	brdf_lut->height = BRDF_PREINTEGRATE_LUT_SIZE;
+	brdf_lut->type = Texture_Type::TEXTYPE_2D;
 }
 
 
@@ -2817,7 +2823,7 @@ void draw_debug_grid()
 
 
 ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV);
-
+ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV);
 void Renderer::accumulate_gbuffer_lighting()
 {
 	GPUSCOPESTART("accumulate_gbuffer_lighting");
@@ -2968,8 +2974,13 @@ void Renderer::accumulate_gbuffer_lighting()
 		glDepthMask(GL_FALSE);
 
 	
-		glEnable(GL_BLEND);	// enable additive blending
-		glBlendFunc(GL_ONE, GL_ONE);
+		if (!debug_specular_reflection.get_bool()) {
+			glEnable(GL_BLEND);	// enable additive blending
+			glBlendFunc(GL_ONE, GL_ONE);
+		}
+		else
+			glDisable(GL_BLEND);
+
 		set_shader(prog.ambient_accumulation);
 
 		glDisable(GL_DEPTH_TEST);

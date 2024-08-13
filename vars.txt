@@ -35,3 +35,4 @@ view.sens 0.005
 #the main entry point into the game
 g_entry_level "mainMenuMap.txt"
 
+ed_default_sky_material "indoorHdriSky"

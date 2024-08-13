@@ -249,7 +249,7 @@ bool AnimationEditorTool::has_document_open() const
 }
 
 #include "Game/StdEntityTypes.h"
-
+extern ConfigVar ed_default_sky_material;
 void AnimationEditorTool::on_open_map_callback(bool good)
 {
 	assert(good);
@@ -262,7 +262,7 @@ void AnimationEditorTool::on_open_map_callback(bool good)
 	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->is_skybox = true;	// FIXME
 	dome->Mesh->cast_shadows = false;
-	dome->Mesh->set_material_override(imaterials->find_material_instance("hdriSky"));
+	dome->Mesh->set_material_override(imaterials->find_material_instance(ed_default_sky_material.get_string()));
 
 	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
 	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));

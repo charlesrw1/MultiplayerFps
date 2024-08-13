@@ -802,5 +802,6 @@
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
+    <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
   </ItemGroup>
 </Project>
