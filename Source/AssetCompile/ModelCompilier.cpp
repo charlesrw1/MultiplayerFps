@@ -1101,7 +1101,10 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 
 	 for (int i = 0; i < mcd.lod_where.size(); i++) {
 		 auto& lod = mcd.lod_where[i];
-		 for (auto& mesh : lod.mesh_nodes) {
+
+		 const int NUM_NODES_PRE_ADD = lod.mesh_nodes.size();
+		 for (int MESH_NODE_IDX = 0; MESH_NODE_IDX < NUM_NODES_PRE_ADD;MESH_NODE_IDX++) {
+			 auto& mesh = lod.mesh_nodes[MESH_NODE_IDX];
 
 			 if (!mesh.has_bones() && scd != nullptr) {
 				 sys_print("??? nobone mesh made it past filters?\n");
@@ -1120,6 +1123,71 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				 material_is_used.at(mesh.submesh.material_idx) = true;
 			 else
 				 material_is_used.at(material_is_used.size() - 1) = true;	// null material needed
+
+			 const uint32_t MAX_VERTICIES_PER_SUBMESH = UINT16_MAX - 9; /*just give me some buffer room just in case...*/
+			 if (mesh.submesh.vertex_count >= MAX_VERTICIES_PER_SUBMESH) {
+
+				 // need to split up the mesh so stuff doesnt get cut off
+				 // go triangle by triangle and add new verticies
+				 uint32_t added_verticies = 0;
+				 uint32_t added_indicies = 0;
+				 const int index_offset = mesh.submesh.element_offset / sizeof(uint32_t);
+				 std::unordered_map<uint32_t, uint32_t> new_vertex_to_old_vertex;
+				 Submesh NEW_SUBMESH;
+				 NEW_SUBMESH.element_offset = mcd.indicies.size() * sizeof(uint32_t);
+				 NEW_SUBMESH.base_vertex = mcd.verticies.size();
+				 NEW_SUBMESH.material_idx = mesh.submesh.material_idx;
+				 auto find_or_append = [&](uint32_t OLD_INDEX) -> uint32_t {
+					 auto find = new_vertex_to_old_vertex.find(OLD_INDEX);
+					 if (find != new_vertex_to_old_vertex.end())
+						 return find->second;
+					 new_vertex_to_old_vertex.insert({ OLD_INDEX, added_verticies });				// insert mapping from new to old vertex
+					 added_verticies++;	// increment added verticies, check this too
+					 mcd.verticies.push_back(mcd.verticies.at(mesh.submesh.base_vertex + OLD_INDEX));	// add the old vertex
+					 return added_verticies - 1;
+				 };
+				 for (int INDEX = 0; INDEX < mesh.submesh.element_count; INDEX+=3) {
+					 uint32_t i0 = mcd.indicies[index_offset + INDEX];
+					 uint32_t i1 = mcd.indicies[index_offset + INDEX + 1];
+					 uint32_t i2 = mcd.indicies[index_offset + INDEX + 2];
+					 uint32_t newIndex0 = find_or_append(i0);
+					 uint32_t newIndex1 = find_or_append(i1);
+					 uint32_t newIndex2 = find_or_append(i2);
+					 added_indicies += 3;
+					 mcd.indicies.push_back(newIndex0);
+					 mcd.indicies.push_back(newIndex1);
+					 mcd.indicies.push_back(newIndex2);
+
+					 if (added_verticies >= MAX_VERTICIES_PER_SUBMESH) {
+						 NEW_SUBMESH.element_count = added_indicies;
+						 NEW_SUBMESH.vertex_count = added_verticies;
+						 
+						 LODMesh copiedLodMesh = mesh;
+						 copiedLodMesh.submesh = NEW_SUBMESH;
+						 lod.mesh_nodes.push_back(copiedLodMesh);	// fixme BREAKS UB!! for each
+
+						 NEW_SUBMESH.base_vertex = mcd.verticies.size();
+						 NEW_SUBMESH.element_count = 0;
+						 NEW_SUBMESH.vertex_count = 0;
+						 NEW_SUBMESH.element_offset = mcd.indicies.size() * sizeof(uint32_t);
+						 added_verticies = 0;
+						 added_indicies = 0;
+						 new_vertex_to_old_vertex = {};	// clear the hash map
+					 }
+
+				 }
+				 if (added_verticies != 0) {
+					 NEW_SUBMESH.element_count = added_indicies;
+					 NEW_SUBMESH.vertex_count = added_verticies;
+
+					 LODMesh copiedLodMesh = mesh;
+					 copiedLodMesh.submesh = NEW_SUBMESH;
+					 lod.mesh_nodes.push_back(copiedLodMesh);	// fixme BREAKS UB!! for each
+				 }
+
+				 mesh.mark_for_delete = true;	// delete this since we are using newly created submeshes
+			 }
+
 
 			 // mark bones that should be kept
 			 if (scd) {

@@ -165,7 +165,7 @@ float METALLIC = 0.0;
 vec3 EMISSIVE = vec3(0.0);		// emissive color, added after lighting (also main input for unlit)
 vec3 NORMALMAP = vec3(0.5,0.5,1.0);		// tangent space normal map
 float OPACITY = 1.0;					// opacity, for alpha test
-float AOMAP = 0.0;						// small detail ao map
+float AOMAP = 1.0;						// small detail ao map
 
 // ********** START USER CODE **********
 ___USER_FS_CODE___
@@ -181,7 +181,7 @@ void main()
 
 #ifndef DEPTH_ONLY
 
-	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR, AOMAP);
+	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*AOMAP, AOMAP);
 	GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,0);
 	GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);
 	

@@ -254,7 +254,7 @@ public:
 		eul *= 180.f / PI;
 		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
 			eul *= PI / 180.f;
-			*v = glm::quat(eul);
+			*v = glm::normalize(glm::quat(eul));
 
 			return true;
 		}
@@ -291,7 +291,7 @@ static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
 	case core_type_id::Vec3:
 		return new VectorEditor(instance, prop);
 	case core_type_id::Quat:
-		return new VectorEditor(instance, prop);
+		return new RotationEditor(instance, prop);
 	default:
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;

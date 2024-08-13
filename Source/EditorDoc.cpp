@@ -787,6 +787,29 @@ void ManipulateTransformTool::update_pivot_and_cached()
 		state = IDLE;
 	else
 		state = SELECTED;
+
+	auto snap_to_value = [](float x, float snap) {
+		return glm::round(x / snap) * snap;
+	};
+
+	glm::vec3 p, s;
+	glm::quat q;
+	decompose_transform(current_transform_of_group, p, q, s);
+	glm::vec3 asEuler = glm::eulerAngles(q);
+	if (has_translation_snap) {
+		p.x = snap_to_value(p.x, translation_snap);
+		p.y = snap_to_value(p.y, translation_snap);
+		p.z = snap_to_value(p.z, translation_snap);
+	}
+	if (has_rotation_snap) {
+		float rsnap = glm::radians(rotation_snap);
+		asEuler.x = snap_to_value(asEuler.x, rsnap);
+		asEuler.y = snap_to_value(asEuler.y, rsnap);
+		asEuler.z = snap_to_value(asEuler.z, rsnap);
+	}
+	current_transform_of_group = glm::translate(glm::mat4(1), p);
+	current_transform_of_group = current_transform_of_group * glm::mat4_cast(glm::normalize(glm::quat(asEuler)));
+	current_transform_of_group = glm::scale(current_transform_of_group, glm::vec3(s));
 }
 
 void ManipulateTransformTool::on_selected_tarnsform_change(uint64_t h) {
@@ -802,6 +825,19 @@ void ManipulateTransformTool::end_drag() {
 	ASSERT(state == MANIPULATING_OBJS);
 	update_pivot_and_cached();
 }
+
+// ie: snap = base
+//	on_increment()
+//		snap = snap * exp
+// on_decrement()
+//		snap = snap / mult
+
+
+ConfigVar ed_translation_snap_base("ed_translation_snap_base", "1", CVAR_FLOAT, 0.1, 128);
+ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, 1, 10);
+ConfigVar ed_rotation_snap_base("ed_rotation_snap_base", "15", CVAR_FLOAT, 1, 180);
+ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, 1, 10);
+
 
 void ManipulateTransformTool::update()
 {

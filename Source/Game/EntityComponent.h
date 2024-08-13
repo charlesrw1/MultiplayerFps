@@ -118,4 +118,6 @@ public:
 CLASS_H(EmptyComponent, EntityComponent)
 public:
 	~EmptyComponent() override {}
+
+	static const PropertyInfoList* get_props() = delete;
 };

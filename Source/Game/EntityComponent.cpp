@@ -8,7 +8,7 @@ CLASS_IMPL(EmptyComponent);
 static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
 {
 	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-	q = glm::normalize(glm::quat_cast(transform));
+	q = (glm::quat_cast(transform));
 	p = transform[3];
 }
 

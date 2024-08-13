@@ -307,7 +307,9 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 	{
 		glm::quat* v = (glm::quat*)prop.get_ptr(ptr);
 
-		value_str = string_format("%f %f %f %f", v->x, v->y, v->z, v->w);
+		glm::vec3 eulerA=glm::eulerAngles(*v);
+
+		value_str = string_format("%f %f %f", eulerA.x, eulerA.y, eulerA.z);
 	}break;
 
 	}
@@ -535,7 +537,9 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	case core_type_id::Quat:
 	{
 		glm::quat* v = (glm::quat*)prop->get_ptr(ptr);
-		int field = sscanf(tok.to_stack_string().c_str(), "%f %f %f %f", &v->x, &v->y, &v->z, &v->w);
+		glm::vec3 eulerA{};
+		int field = sscanf(tok.to_stack_string().c_str(), "%f %f %f", &eulerA.x, &eulerA.y, &eulerA.z);
+		*v = glm::quat(eulerA);
 		return true;
 	}
 
