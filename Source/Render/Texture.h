@@ -41,6 +41,13 @@ CLASS_H(Texture, IAsset)
 public:
 	~Texture() {}
 
+	void uninstall() override;
+	void sweep_references() const override {}
+	void post_load(ClassBase* userStruct) override;
+	bool load_asset(ClassBase*& userStruct) override;
+	void move_construct(IAsset* src) override;
+
+
 	int width = 0;
 	int height = 0;
 	int channels = 0;
@@ -55,8 +62,6 @@ public:
 	bool is_resident = false;
 	bindlesstexhandle bindless_handle = 0;
 
-	friend class TextureMan;
-
 	// used for system textures
 	void update_specs(texhandle handle, int w, int h, int channels, Texture_Format fmt) {
 		this->gl_id = handle;
@@ -65,31 +70,10 @@ public:
 		this->channels = channels;
 		this->format = fmt;
 	}
+
+	static Texture* install_system(const std::string& path);
 };
 
-class TextureMan : public IAssetLoader
-{
-public:
-	IAsset* load_asset(const std::string& path) override {
-		return find_texture(path.c_str());
-	}
-
-	// owner: caller manages lifetime if true
-	// search_img_directory: prefixes the default image directory to file
-	Texture* find_texture(const char* file, bool search_img_directory = true, bool owner = false);
-	Texture* create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy);
-
-	// User for stuff like scene color, scene depth, etc. so shaders can use them like any other texture
-	Texture* install_system_texture(const std::string& name);
-private:
-
-	bool load_texture(const std::string& path, Texture* t);
-
-	std::unordered_map<std::string, Texture*> textures;
-	friend class MaterialMan;
-};
-
-extern TextureMan g_imgs;
 
 
 #endif // !TEXTURE_H

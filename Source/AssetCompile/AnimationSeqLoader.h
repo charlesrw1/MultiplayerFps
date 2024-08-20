@@ -5,7 +5,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ArrayReflection.h"
 #include "Assets/IAsset.h"
-#include "Assets/AssetLoaderRegistry.h"
+#include "Game/SerializePtrHelpers.h"
 CLASS_H(AnimationListManifest, ClassBase)
 public:
 	struct Item {
@@ -31,27 +31,34 @@ public:
 };
 class Model;
 class AnimationSeq;
-// an "alias" asset meant to refernce an animation clip to use with the asset browser
+// an "alias" asset meant to refernce an animation clip inside a model to use with the asset browser and asset ptr's
 CLASS_H(AnimationSeqAsset, IAsset)
 public:
+	void uninstall() override {
+		srcModel = nullptr;
+		seq = nullptr;
+	}
+	void post_load(ClassBase* user) override {}
+	bool load_asset(ClassBase*& user) override;
+	void sweep_references() const override;
+	void move_construct(IAsset* _other) override {
+		auto other = (AnimationSeqAsset*)_other;
+		*this = std::move(*other);
+	}
+
 	// get_name() is the animation name
-	Model* srcModel = nullptr;
+	AssetPtr<Model> srcModel;
 	const AnimationSeq* seq = nullptr;
 	friend class AnimationSeqLoader;
 };
 
-class AnimationSeqLoader : public IAssetLoader
+class AnimationSeqLoader
 {
 public:
 	void init();
-	IAsset* load_asset(const std::string& file) {
-		return find_animation_seq_and_load_model(file);
-	}
-	AnimationSeqAsset* find_animation_seq_and_load_model(const std::string& seq);
 	void update_manifest_with_model(const std::string& modelName, const std::vector<std::string>& animNames);
 private:
 	AnimationListManifest* manifest = nullptr;
-	std::unordered_map<std::string, AnimationSeqAsset*> animNameToSeq;
 
 	friend class AnimationSeqAssetMetadata;
 };

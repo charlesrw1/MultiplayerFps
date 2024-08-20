@@ -4,6 +4,13 @@
 #include "Net.h"
 #include <vector>
 
+#include "Framework/ClassBase.h"
+
+
+CLASS_H(NetMessage,ClassBase)
+public:
+};
+
 class Connection
 {
 public:
@@ -35,5 +42,17 @@ public:
 	std::vector<uint8_t> reliable_out;		// "backbuffered" reliable messages to send
 	int reliable_unacked_len = 0;
 	std::vector<uint8_t> reliable_unacked;	// un-acked data to send each packet
+};
+
+class NetChannel
+{
+
+	// channel is over a connection
+	// send and recieve packets through this
+
+	void send();
+	void recieve();
+
+
 };
 #endif // !CONNECTION_H

@@ -2,7 +2,7 @@
 
 #include "Assets/IAsset.h"
 #include "DrawTypedefs.h"
-
+#include <memory>
 #include <string>
 #include "Framework/StringName.h"
 #include "glm/glm.hpp"
@@ -17,36 +17,42 @@ public:
 	virtual void set_fvec_parameter(StringName name, glm::vec4 v4) = 0;
 };
 
-class MasterMaterial;
+class MasterMaterialImpl;
 class Texture;
+class MaterialImpl;
 CLASS_H(MaterialInstance, IAsset)
 public:
-	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
-	virtual void set_float_parameter(StringName name, float f) = 0;
-	virtual void set_bool_parameter(StringName name, bool b) = 0;
-	virtual void set_vec_parameter(StringName name, Color32 c) = 0;
-	virtual void set_fvec_parameter(StringName name, glm::vec4 v4) = 0;
-	virtual void set_tex_parameter(StringName name, const Texture* t) = 0;
+	MaterialInstance();
+	~MaterialInstance() override;
+	MaterialInstance& operator=(MaterialInstance&& other) = default;
 
-	const MasterMaterial* get_master_material() const { return master; }
-	bool is_this_a_dynamic_material() const { return is_dynamic_material; }
+	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
+	void set_float_parameter(StringName name, float f);
+	void set_bool_parameter(StringName name, bool b);
+	void set_vec_parameter(StringName name, Color32 c);
+	void set_fvec_parameter(StringName name, glm::vec4 v4);
+	void set_tex_parameter(StringName name, const Texture* t);
+
+	const MasterMaterialImpl* get_master_material() const;
+	bool is_this_a_dynamic_material() const;
+
+	// IAsset interface
+	void uninstall();
+	void post_load(ClassBase*);
+	bool load_asset(ClassBase*&);
+	void sweep_references() const;
+	void move_construct(IAsset* other);
+
+	std::unique_ptr<MaterialImpl> impl;
 protected:
-	MaterialInstance(bool is_dynamic_mat = false) : is_dynamic_material(is_dynamic_mat) {}
-	bool is_dynamic_material = false;
-	const MasterMaterial* master = nullptr;
+	friend class MaterialManagerLocal;
 };
 
-class MaterialManagerPublic : public IAssetLoader
+class MaterialManagerPublic 
 {
 public:
 	virtual void init() = 0;
 
-	IAsset* load_asset(const std::string& path) override {
-		return (IAsset*)find_material_instance(path.c_str());
-	}
-
-	// Find a material instance with the given name (or a MasterMaterial and return the default instance)
-	virtual const MaterialInstance* find_material_instance(const char* mat_inst_name) = 0;
 	// Create a dynamic material from a material instance
 	virtual MaterialInstance* create_dynmaic_material(const MaterialInstance* material) = 0;
 	// Delete a created dynamic materials (NOT for static/normal materials!)

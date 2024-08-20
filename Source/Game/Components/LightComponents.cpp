@@ -8,6 +8,7 @@
 #include "BillboardComponent.h"
 
 #include "Game/Entity.h"
+#include "Assets/AssetDatabase.h"
 
 CLASS_IMPL(SpotLightComponent);
 CLASS_IMPL(PointLightComponent);
@@ -49,7 +50,7 @@ void SpotLightComponent::on_init()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
-		b->set_texture(g_imgs.find_texture("icon/spotlightBig.png"));
+		b->set_texture(default_asset_load<Texture>("icon/spotlightBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
 }
@@ -105,7 +106,7 @@ void PointLightComponent::on_init()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
-		b->set_texture(g_imgs.find_texture("icon/pointBig.png"));
+		b->set_texture(default_asset_load<Texture>("icon/pointBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
 }
@@ -175,7 +176,7 @@ void SunLightComponent::on_init()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
-		b->set_texture(g_imgs.find_texture("icon/sunBig.png"));
+		b->set_texture(default_asset_load<Texture>("icon/sunBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
 }

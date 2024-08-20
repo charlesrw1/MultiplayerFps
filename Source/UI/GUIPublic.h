@@ -129,7 +129,7 @@ const static UIAnchorPos BottomRightAnchor = UIAnchorPos::create_single(1, 1);
 
 struct SDL_KeyboardEvent;
 struct SDL_MouseWheelEvent;
-CLASS_H(GUI, IAsset)
+CLASS_H(GUI, ClassBase)
 public:
 	virtual ~GUI();
 
@@ -194,6 +194,7 @@ public:
 			if (children[i].get() == gui) {
 				children[i].release();	// relase it!!
 				children.erase(children.begin() + i);
+				gui->parent = nullptr;
 				return;
 			}
 		}
@@ -209,5 +210,6 @@ protected:
 	std::vector<std::unique_ptr<GUI>> children;
 
 	friend class GuiSystemLocal;
+private:
 };
 

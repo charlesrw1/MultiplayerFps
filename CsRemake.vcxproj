@@ -47,7 +47,7 @@
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\Someutils.h" />
     <ClInclude Include="Source\Assets\AssetBrowser.h" />
-    <ClInclude Include="Source\Assets\AssetLoaderRegistry.h" />
+    <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\CamData.h" />
@@ -155,6 +155,7 @@
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Net.h" />
     <ClInclude Include="Source\OsInput.h" />
+    <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesPublic.h" />
     <ClInclude Include="Source\Physics.h" />
@@ -216,6 +217,7 @@
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\Assets\AssetBrowser.cpp" />
+    <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
@@ -279,6 +281,8 @@
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\Net.cpp" />
+    <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
+    <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2.cpp" />

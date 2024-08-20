@@ -127,6 +127,13 @@ CLASS_H(Model,IAsset)
 public:
 	~Model() override;
 
+	void uninstall() override;
+	void sweep_references() const override;
+	void post_load(ClassBase* u) override;
+	bool load_asset(ClassBase*& u) override;
+	void move_construct(IAsset* src) override;
+
+
 	uint32_t get_uid() const { return uid; }
 	int bone_for_name(StringName name) const;
 	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
@@ -185,6 +192,7 @@ private:
 	friend class ModelMan;
 	friend class ModelCompileHelper;
 	friend class ModelEditorTool;
+	friend class ModelLoadJob;
 };
 
 
@@ -212,17 +220,12 @@ private:
 	void append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 
-class ModelMan : public IAssetLoader
+class ModelMan
 {
 public:
 	// IAssetLoader
-	virtual IAsset* load_asset(const std::string& path) override {
-		return find_or_load(path.c_str());
-	}
-
 
 	void init();
-	Model* find_or_load(const char* filename);
 
 	void compact_memory();
 	void print_usage() const;
@@ -241,8 +244,6 @@ public:
 	Model* get_light_sphere() const { return LIGHT_SPHERE; }
 	Model* get_light_cone() const { return LIGHT_CONE; }
 
-	// called by model editor to recompile a model
-	void reload_this_model(Model* m);
 private:
 
 	// Used for gbuffer lighting
@@ -265,9 +266,9 @@ private:
 	MainVbIbAllocator allocator;
 
 	uint32_t cur_mesh_id = 0;
-	std::unordered_map<string, Model*> models;
 
 	friend class Model;
+	friend class ModelLoadJob;
 };
 extern ModelMan mods;
 

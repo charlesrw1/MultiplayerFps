@@ -33,11 +33,14 @@ static const char* const model_folder_path = "./Data/Models/";
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
 #include "Assets/AssetRegistry.h"
-#include "Assets/AssetLoaderRegistry.h"
+
+#include "Assets/AssetDatabase.h"
+
+
 extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 
 CLASS_IMPL(Model);
-REGISTERASSETLOADER_MACRO(Model, &mods);
+
 
 class ModelAssetMetadata : public AssetMetadata
 {
@@ -86,8 +89,6 @@ public:
 };
 
 REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
-
-
 
 
 Model::~Model() {}
@@ -412,13 +413,16 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 	assert(DEBUG_MARKER == 'HELP');
 
 	uint32_t num_materials = read.read_int32();
-	m->materials.reserve(num_materials);
+	m->materials.resize(num_materials);
 	std::string buffer;
 	for (int i = 0; i < num_materials; i++) {
 		read.read_string(buffer);
-		m->materials.push_back(imaterials->find_material_instance(buffer.c_str()));
+		
+		//m->materials.push_back(imaterials->find_material_instance(buffer.c_str()));
 
-		if (!m->materials.back()) {
+		m->materials[i] = GetAssets().find_assetptr_unsafe<MaterialInstance>(buffer);
+
+		if (!m->materials[i]->is_valid_to_use()) {
 			sys_print("!!! model doesn't have material %s\n", buffer.c_str());
 			m->materials.back() = imaterials->get_fallback();
 		}
@@ -578,86 +582,79 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 	return true;
 }
 
-ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL);
+ConfigVar developer_mode("developer_mode", "0", CVAR_DEV | CVAR_BOOL);
 
-void ModelMan::reload_this_model(Model* m)
+void Model::uninstall()
 {
-	auto saved_id = m->uid;
-	auto filenamestr = m->path;
-
-	m->~Model();
-	m = new(m)(Model);
-	m->uid = saved_id;
-	m->is_loaded = false;
-	m->path = filenamestr;
-
-	string path(model_folder_path);
-	path += filenamestr;
-	bool good = read_model_into_memory(m, std::move(path));
-
-	if (!good) {
-		sys_print("!!! reload_this_model failed\n");
-		return;
-	}
-
-	good = upload_model(m);
-
-	if (!good) {
-		sys_print("!!! reload_this_model upload_model failed\n");
-		return;
-	}
-
-	m->is_loaded = true;
+	lods.resize(0);
+	parts.clear();
+	merged_index_pointer = merged_vert_offset = 0;
+	data = RawMeshData();
+	skel.reset(nullptr);
+	collision.reset();
+	tags.clear();
+	materials.clear();
+	uid = 0;	// reset the UID
 }
 
-Model* ModelMan::find_or_load(const char* filename)
-{
-	std::string filenamestr = filename;
-
-	auto find = models.find(filenamestr);
-	if (find != models.end()) {
-		if (!find->second)
-			return error_model;
-		return find->second;
+void Model::sweep_references() const {
+	for (int i = 0; i < materials.size(); i++) {
+		auto mat = materials[i];
+		GetAssets().touch_asset(mat);
 	}
-
+}
+void Model::post_load(ClassBase* u) {
+	if (did_load_fail()) {
+		return;
+	}
+	mods.upload_model(this);
+}
+bool Model::load_asset(ClassBase*& u) {
+	const auto& path = get_name();
 
 	if (developer_mode.get_bool()) {
-		std::string model_def = model_folder_path + strip_extension(filename);
+		std::string model_def = model_folder_path + strip_extension(path.c_str());
 		model_def += ".mis";
 
 		bool good = ModelCompilier::compile(model_def.c_str());
 		if (!good) {
 			sys_print("compilier failed on model %s\n", model_def.c_str());
-			return error_model;
 		}
 	}
 
-	Model* model = new Model;
-	model->path = filenamestr;
-	model->is_loaded = false;
+	const std::string pathToUse = model_folder_path + path;
 
-	string path(model_folder_path);
-	path += filenamestr;
-	bool good = read_model_into_memory(model,std::move(path));
+	bool good = mods.read_model_into_memory(this, pathToUse);
 
-	if (!good) {
-		delete model;
-		return error_model;
-	}
+	if (good)
+		return true;
 
-	good = upload_model(model);
-
-	if (!good) {
-		delete model;
-		return error_model;
-	}
-
-	model->is_loaded = true;
-	models.insert({ std::move(filenamestr), model });
-
-	return model;
+	printf("failed to load model into memory\n");
+	return false;
 }
+void Model::move_construct(IAsset* _src)
+{
+	uninstall();
+
+	Model* src = _src->cast_to<Model>();
+	this->uid = src->uid;
+	for (int i = 0; i < src->lods.size(); i++)
+		this->lods.push_back(src->lods[i]);
+	parts = std::move(src->parts);
+	merged_index_pointer = src->merged_index_pointer;
+	merged_vert_offset = src->merged_vert_offset;
+	aabb = src->aabb;
+	bounding_sphere = src->bounding_sphere;
+	data = std::move(src->data);
+	skel = std::move(src->skel);
+	collision = std::move(src->collision);
+	tags = std::move(src->tags);
+	materials = std::move(src->materials);
+	skeleton_root_transform = src->skeleton_root_transform;
+
+	src->uninstall();
+}
+
 
 #if 0
 bool ModelMan::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t input_length)
@@ -718,13 +715,10 @@ void ModelMan::init()
 
 
 	create_default_models();
-
-	LIGHT_CONE = mods.find_or_load("LIGHT_CONE.cmdl");
-	LIGHT_SPHERE = mods.find_or_load("LIGHT_SPHERE.cmdl");
-	LIGHT_DOME = mods.find_or_load("LIGHT_DOME.cmdl");
-	LIGHT_CONE->system_asset = true;
-	LIGHT_SPHERE->system_asset = true;
-	LIGHT_DOME->system_asset = true;
+	auto& a = GetAssets();
+	LIGHT_CONE = a.find_global_sync<Model>("LIGHT_CONE.cmdl").get();
+	LIGHT_SPHERE = a.find_global_sync<Model>("LIGHT_SPHERE.cmdl").get();
+	LIGHT_DOME = a.find_global_sync<Model>("LIGHT_DOME.cmdl").get();
 
 	if (!LIGHT_CONE || !LIGHT_SPHERE || !LIGHT_DOME)
 		Fatalf("!!! ModelMan::init: couldn't load default LIGHT_x volumes (used for gbuffer lighting)\n");
@@ -732,10 +726,10 @@ void ModelMan::init()
 
 void ModelMan::create_default_models()
 {
-	error_model = find_or_load("question.cmdl");
+	error_model = GetAssets().find_global_sync<Model>("question.cmdl").get();
 	if (!error_model)
 		Fatalf("couldnt load error model (question.cmdl)\n");
-	defaultPlane = find_or_load("plane.cmdl");
+	defaultPlane = GetAssets().find_global_sync<Model>("plane.cmdl").get();
 	if (!defaultPlane)
 		Fatalf("couldnt load defaultPlane model\n");
 
@@ -793,12 +787,9 @@ void ModelMan::create_default_models()
 
 		_sprite->parts.push_back(sm);
 		_sprite->lods.push_back(lod);
-		_sprite->is_loaded = true;
-
-		_sprite->path = "_SPRITE";
-		models["_SPRITE.cmdl"] = _sprite;
-
 		upload_model(_sprite);
+
+		GetAssets().install_system_asset(_sprite, "_SPRITE");
 	}
 }
 

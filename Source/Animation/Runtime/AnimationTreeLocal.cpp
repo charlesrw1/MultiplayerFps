@@ -391,17 +391,6 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 
 
 
-Animation_Tree_CFG::Animation_Tree_CFG()
-{
-	code = std::make_unique<Script>();
-}
-
-Animation_Tree_CFG::~Animation_Tree_CFG()
-{
-	for (int i = 0; i < all_nodes.size(); i++) {
-		delete all_nodes[i];
-	}
-}
 
  uint32_t Animation_Tree_CFG::get_num_vars() const { return code ? code->num_variables() : 0; }
 

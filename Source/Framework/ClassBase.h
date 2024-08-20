@@ -163,6 +163,9 @@ public:
 	static ClassTypeInfo StaticType;
 	const static bool CreateDefaultObject;	/* = false, default setting */
 
+	virtual ~ClassBase() {
+	}
+
 	virtual const ClassTypeInfo& get_type() const;
 
 	// cast this class to type T, returns nullptr if failed

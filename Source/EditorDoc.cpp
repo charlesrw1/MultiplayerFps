@@ -93,7 +93,7 @@ class CreateSchemaCommand : public Command
 {
 public:
 	CreateSchemaCommand(const std::string& schemaname, const glm::mat4& transform) {
-		s = g_schema_loader.load_schema(schemaname);
+		s = GetAssets().find_sync<Schema>(schemaname).get();
 		this->transform = transform;
 	}
 
@@ -126,7 +126,7 @@ class CreateStaticMeshCommand : public Command
 {
 public:
 	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform) {
-		m = mods.find_or_load(modelname.c_str());
+		m = GetAssets().find_sync<Model>(modelname.c_str()).get();
 		this->transform = transform;
 	}
 	bool is_valid() override { return m != nullptr; }
@@ -387,7 +387,7 @@ void EditorDoc::open_document_internal(const char* levelname, const char* arg)
 	else {
 		// flow: tell engine to open an empty level
 		// after succeding, add the schema in the callback
-		schema_source = g_schema_loader.load_schema(levelname);
+		schema_source = GetAssets().find_sync<Schema>(levelname).get();
 		set_doc_name(levelname);
 		eng->open_level("__empty__");
 	}
@@ -1025,13 +1025,12 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 void ObjectOutliner::draw()
 {
 
-	if (!ImGui::Begin("Outliner")) {
+	if (!ImGui::Begin("Outliner") || !rootnode) {
 		ImGui::End();
 
 		return;
 	}
-	if (!rootnode)
-		return;
+
 
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
@@ -1219,8 +1218,6 @@ void EdPropertyGrid::draw()
 
 }
 
-#include "Assets/AssetLoaderRegistry.h"
-
 class AssetPropertyEditor : public IPropertyEditor
 {
 public:
@@ -1231,16 +1228,12 @@ public:
 			if(*ptr_to_asset)
 				asset_str = (*ptr_to_asset)->get_name();
 			metadata = AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class(prop->range_hint));
-			loader = AssetLoaderRegistry::get().get_loader_for_type_name(prop->range_hint);
 		}
 		if (!metadata) {
 			ImGui::Text("Asset has no metadata: %s\n", prop->range_hint);
 			return false;
 		}
-		if (!loader) {
-			ImGui::Text("Asset has no loader: %s\n", prop->range_hint);
-			return false;
-		}
+
 
 		auto drawlist = ImGui::GetWindowDrawList();
 		auto& style = ImGui::GetStyle();
@@ -1288,7 +1281,8 @@ public:
 					if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 					{
 						IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
-						*ptr_to_asset = loader->load_asset(resource->filename);
+						auto classtype = ClassBase::find_class(prop->range_hint);
+						*ptr_to_asset = GetAssets().find_sync(resource->filename, classtype,0).get();// loader->load_asset(resource->filename);
 						
 						if (*ptr_to_asset)
 							asset_str = (*ptr_to_asset)->get_name();
@@ -1317,7 +1311,6 @@ private:
 	bool has_init = false;
 	std::string asset_str;
 	const AssetMetadata* metadata = nullptr;
-	IAssetLoader* loader = nullptr;
 };
 
 ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
@@ -1426,7 +1419,7 @@ void EntityNameDatabase_Ed::invoke_change_name(uint64_t h)
 
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {
-	auto model = mods.find_or_load("cube.cmdl");
+	auto model = GetAssets().find_sync<Model>("cube.cmdl");
 	for (int z = 0; z < 20; z++) {
 		for (int y = 0; y < 20; y++) {
 			for (int x = 0; x < 20; x++) {
@@ -1434,7 +1427,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
 
 				auto ent = eng->spawn_entity_class<StaticMeshEntity>();
-				ent->Mesh->set_model(model);
+				ent->Mesh->set_model(model.get());
 				ent->set_ws_transform(transform);
 				
 			}
@@ -1451,7 +1444,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)
 				glm::mat4 transform = glm::translate(glm::mat4(1), p * 2.0f);
 
 				auto ent = eng->spawn_entity_class<DecalEntity>();
-				ent->Decal->set_material(imaterials->find_material_instance("bulletDecal"));
+				ent->Decal->set_material(GetAssets().find_sync<MaterialInstance>("bulletDecal").get());
 				ent->set_ws_transform(transform);
 			}
 		}

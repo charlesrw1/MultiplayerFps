@@ -89,6 +89,18 @@ public:
 	uint64_t get_next_id_and_increment() {
 		return ++last_id;	// prefix
 	}
+
+
+	// IAsset overrides
+	void sweep_references() const override {}
+	bool load_asset(ClassBase*& user) override;
+	void post_load(ClassBase*) override {}
+	void uninstall() override {}
+	void move_construct(IAsset*) override {}
+
+	void set_editor_level(bool isEditorLevel) {
+		bIsEditorLevel = isEditorLevel;
+	}
 private:
 	bool bIsEditorLevel=false;
 

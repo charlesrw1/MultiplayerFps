@@ -18,6 +18,9 @@ static const char* const maps_directory = "./Data/Maps/";
 
 #include "Game/Schema.h"
 
+
+#include "Assets/AssetDatabase.h"
+
 class MapAssetMetadata : public AssetMetadata
 {
 public:
@@ -97,8 +100,11 @@ Level::~Level()
 Level* LevelSerialization::create_empty_level(const std::string& file, bool is_editor)
 {
 	Level* l = new Level;
-	l->path = file;
 	l->bIsEditorLevel = is_editor;
+
+
+	GetAssets().install_system_asset(l, file);
+
 	return l;
 }
 
@@ -124,6 +130,32 @@ Level* LevelSerialization::unserialize_level(const std::string& file, bool is_ed
 
 	return level;
 }
+
+
+bool Level::load_asset(ClassBase*&)
+{
+	auto& path = get_name();
+
+	auto fileptr = FileSys::open_read(path.c_str());
+	if (!fileptr) {
+		printf("!!! couldn't open level %s\n", path.c_str());
+		return false;
+	}
+	std::string str(fileptr->size(), ' ');
+	fileptr->read((void*)str.data(), str.size());
+	auto ents = LevelSerialization::unserialize_entities_from_string(str);
+
+	for (auto ent : ents) {
+		if (ent) {
+			all_world_ents.insert(ent->self_id.handle, ent);
+			last_id = glm::max(ent->self_id.handle, last_id);
+		}
+	}
+
+	return true;
+}
+
+
 
 std::string LevelSerialization::serialize_entities_to_string(const std::vector<Entity*>& entities)
 {
@@ -175,7 +207,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 		}
 		else {
 			in.read_string(tok);
-			auto schematype = g_schema_loader.load_schema(tok.to_stack_string().c_str());
+			auto schematype = GetAssets().find_sync<Schema>(std::string(tok.str_start,tok.str_len));
 			if (!schematype) {
 				sys_print("!!! no schematype to spawn level serialization %s\n", tok.to_stack_string().c_str());
 				return false;
@@ -479,7 +511,7 @@ bool LevelSerialization::unserialize_one_item_binary(BinaryReader& in, Serialize
 	case SerializeTypeHeader::Schema: {
 		auto schemaname = in.read_string_view();
 		auto str = std::string(schemaname.str_start, schemaname.str_len);
-		auto schematype = g_schema_loader.load_schema(str.c_str());
+		auto schematype = GetAssets().find_sync<Schema>(str);
 		if (!schematype) {
 			sys_print("!!! no schematype to spawn level serialization %s\n", str.c_str());
 			return false;

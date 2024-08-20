@@ -10,12 +10,11 @@
 #include "Render/MaterialLocal.h"
 #include "Game/SerializePtrHelpers.h"// AssetPtr
 #include "Framework/ReflectionMacros.h"
-
-#include"GameEngineLocal.h"
+#include "Framework/MulticastDelegate.h"
 #include "Game/StdEntityTypes.h"
-
+#include "Render/Model.h"
 #include "Render/Texture.h"
-
+#include "Assets/AssetDatabase.h"
 extern ConfigVar ed_default_sky_material;
 
 class StaticMeshEntity;
@@ -55,7 +54,7 @@ public:
 			}
 			materialParamGrid.update();
 			if (materialParamGrid.rows_had_changes) {
-				matman.add_to_dirty_list((MaterialInstanceLocal*)dynamicMat);
+				matman.add_to_dirty_list(dynamicMat);
 			}
 		}
 		ImGui::End();
@@ -71,7 +70,7 @@ public:
 			{
 				if (ImGui::MenuItem("New")) {
 					std::string cmd = "open Material ";
-					cmd += dynamicMat->get_master_material()->get_name();
+					cmd += dynamicMat->get_name();
 
 					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmd.c_str());
 				}
@@ -96,8 +95,11 @@ public:
 	void on_map_load_callback(bool good) {
 		assert(good);
 
+
+		auto skydomeModel = GetAssets().find_sync<Model>("skydome.cmdl");
+
 		auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-		dome->Mesh->set_model(mods.find_or_load("skydome.cmdl"));
+		dome->Mesh->set_model(skydomeModel.get());
 		dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 		dome->Mesh->is_skybox = true;	// FIXME
 		dome->Mesh->cast_shadows = false;
@@ -141,6 +143,6 @@ public:
 	StaticMeshEntity* skyEntity = nullptr;
 
 	// dynamic material to edit params into
-	MaterialInstanceLocal* parentMat = nullptr;
+	MaterialInstance* parentMat = nullptr;
 	MaterialInstance* dynamicMat = nullptr;
 };

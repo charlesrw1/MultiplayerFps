@@ -15,8 +15,6 @@
 
 #include "Framework/ObjectSerialization.h"
 
-#include "GameEngineLocal.h"
-
 #include "Framework/DictWriter.h"
 #include <fstream>
 
@@ -62,13 +60,15 @@ void AnimationEditorTool::tick(float dt)
 		}
 	}
 
-	Render_Object o;
-	add_to_obj(o, dt);
-	idraw->get_scene()->update_obj(outputObj, o);
+	if (outputObj.is_valid()) {
+		Render_Object o;
+		add_to_obj(o, dt);
+		idraw->get_scene()->update_obj(outputObj, o);
 
-	glm::vec3 hipsCenter = animator.get_global_bonemats()[0][3];
-	hipsCenter = outputModel->get_root_transform() * glm::vec4(hipsCenter,1.0);
-	view = View_Setup(camera.position+ hipsCenter, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+		glm::vec3 hipsCenter = animator.get_global_bonemats()[0][3];
+		hipsCenter = outputModel->get_root_transform() * glm::vec4(hipsCenter, 1.0);
+		view = View_Setup(camera.position + hipsCenter, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+	}
 }
 
 void AnimationEditorTool::imgui_draw()
@@ -247,7 +247,7 @@ bool AnimationEditorTool::has_document_open() const
 {
 	return importSettings != nullptr;
 }
-
+#include "Assets/AssetDatabase.h"
 #include "Game/StdEntityTypes.h"
 extern ConfigVar ed_default_sky_material;
 void AnimationEditorTool::on_open_map_callback(bool good)
@@ -258,11 +258,11 @@ void AnimationEditorTool::on_open_map_callback(bool good)
 	///outputEntity->Mesh->
 
 	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-	dome->Mesh->set_model(mods.find_or_load("skydome.cmdl"));
+	dome->Mesh->set_model(default_asset_load<Model>("skydome.cmdl"));
 	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->is_skybox = true;	// FIXME
 	dome->Mesh->cast_shadows = false;
-	dome->Mesh->set_material_override(imaterials->find_material_instance(ed_default_sky_material.get_string()));
+	dome->Mesh->set_material_override(default_asset_load<MaterialInstance>(ed_default_sky_material.get_string()));
 
 	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
 	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
@@ -287,7 +287,7 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 
 	// try to find def_name
 	std::string def_name = modelName + ".mis";
-	outputModel = mods.find_or_load((modelName+".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
+	outputModel = default_asset_load<Model>((modelName+".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
 	std::string fullpath = "./Data/Models/" + def_name;
 	auto file = FileSys::open_read_os(fullpath.c_str());
 
@@ -324,7 +324,7 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 	int remapIndx;
 	sequence = outputModel->get_skel()->find_clip(animName, remapIndx);
 	eng->open_level("__empty__");
-	eng_local.on_map_load_return.add(this, &AnimationEditorTool::on_open_map_callback);
+	eng->get_on_map_delegate().add(this, &AnimationEditorTool::on_open_map_callback);
 	assert(importSettings);
 	assert(animImportSettings);
 
@@ -352,7 +352,7 @@ void AnimationEditorTool::close_internal()
 
 	eng->leave_level();
 
-	eng_local.on_map_load_return.remove(this);
+	eng->get_on_map_delegate().remove(this);
 
 	propGrid.clear_all();
 }
@@ -378,18 +378,33 @@ bool AnimationEditorTool::save_document_internal()
 	outfile.write(write.get_output().data(), write.get_output().size());
 	outfile.close();
 
-	ModelCompilier::compile_from_settings(path.c_str(), importSettings);
 
-	if (!outputModel)
-		outputModel = mods.find_or_load(get_name());
-	else
-		mods.reload_this_model(outputModel);
+	if (!outputModel) {
+		ModelCompilier::compile_from_settings(path.c_str(), importSettings);
+		outputModel = default_asset_load<Model>(get_name());
+		int dummy;
+		sequence = outputModel->get_skel()->find_clip(animName, dummy);
 
-	int dummy;
-	sequence = outputModel->get_skel()->find_clip(animName, dummy);
+		on_post_save.invoke();
+	}
+	else {
 
-	on_post_save.invoke();
+		GetAssets().reload_async(outputModel, [](GenericAssetPtr ptr) {
 
+			if (!g_animseq_editor_static.outputModel)
+				return;
+
+			auto str = std::string(g_animseq_editor_static.get_name());
+			auto slash = str.rfind('/');
+			auto animName = str.substr(slash + 1);
+
+			int dummy;
+			g_animseq_editor_static.sequence = g_animseq_editor_static.outputModel->get_skel()->find_clip(animName, dummy);
+			g_animseq_editor_static.on_post_save.invoke();
+		});
+
+	//	GetAssets().reload_sync(outputModel);
+	}
 	return true;
 }
 

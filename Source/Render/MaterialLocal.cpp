@@ -16,7 +16,7 @@
 #include "glad/glad.h"
 
 #include "Assets/AssetRegistry.h"
-#include "Assets/AssetLoaderRegistry.h"
+#include "Assets/AssetDatabase.h"
 
 static const char* const MATERIAL_DIR = "./Data/Materials/";
 MaterialManagerLocal matman;
@@ -24,7 +24,6 @@ MaterialManagerPublic* imaterials = &matman;
 
 extern IEditorTool* g_mateditor;
 
-CLASS_IMPL(MasterMaterial);
 CLASS_IMPL(MaterialInstance);
 CLASS_IMPL(MaterialParameterBuffer);
 
@@ -48,10 +47,7 @@ public:
 	IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
 };
 
-REGISTERASSETLOADER_MACRO(MaterialInstance, &matman);
 REGISTER_ASSETMETADATA_MACRO(MaterialAssetMetadata);
-
-
 
 inline std::string remove_filename_from_path(std::string& path)
 {
@@ -75,7 +71,7 @@ public:
 };
 
 
-program_handle MaterialManagerLocal::compile_mat_shader(const MasterMaterial* mat, shader_key key)
+program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* mat, shader_key key)
 {
 	// FIXME: make this faster
 
@@ -93,7 +89,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MasterMaterial* ma
 
 	sys_print("*** INFO: compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
 
-	const bool is_tesselation = mat->usage == MaterialUsage::Terrain;
+	const bool is_tesselation = mat->get_master_material()->usage == MaterialUsage::Terrain;
 	program_handle handle = draw.prog_man.create_single_file(name.c_str(), is_tesselation, params);
 	ASSERT(handle != -1);
 
@@ -104,13 +100,13 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MasterMaterial* ma
 program_handle MaterialManagerLocal::get_mat_shader(
 	bool has_animated_matricies,
 	const Model* mod, 
-	const MaterialInstanceLocal* mat,
+	const MaterialInstance* mat,
 	bool depth_pass,
 	bool dither,
 	bool is_editor_mode,
 	bool debug_mode)
 {
-	const MasterMaterial* mm = mat->get_master_material();
+	const MasterMaterialImpl* mm = mat->get_master_material();
 
 	bool is_animated = mod && mod->has_bones() && has_animated_matricies;
 
@@ -129,129 +125,107 @@ program_handle MaterialManagerLocal::get_mat_shader(
 
 	program_handle handle = mat_table.lookup(key);
 	if (handle != -1) return handle;
-	return compile_mat_shader(mm, key);	// dynamic compilation ...
+	return compile_mat_shader(mm->self, key);	// dynamic compilation ...
 }
 
-void MaterialManagerLocal::reload_material(const std::string& matName)
+#include "Assets/AssetDatabase.h"
+
+const MasterMaterialImpl* MaterialInstance::get_master_material() const
 {
-	MaterialInstanceLocal* mat = (MaterialInstanceLocal*)find_material_instance(matName.c_str());
-	if (!mat)
+	return impl->masterMaterial;
+}
+
+bool MaterialInstance::load_asset(ClassBase*&)
+{
+	impl = std::make_unique<MaterialImpl>();
+
+	bool good = impl->load_from_file(this, get_name());
+
+	return good;
+}
+void MaterialInstance::sweep_references()const {
+
+	GetAssets().touch_asset(impl->parentMatInstance.get_unsafe());
+	for (int i = 0; i < impl->params.size(); i++) {
+		auto& p = impl->params[i];
+		if (p.type == MatParamType::Texture2D || p.type == MatParamType::ConstTexture2D) {
+			GetAssets().touch_asset(p.tex_ptr);
+		}
+	}
+}
+void MaterialInstance::uninstall()
+{
+	matman.free_material_instance(this);
+	impl.reset();
+}
+void MaterialInstance::post_load(ClassBase*)
+{
+	if (did_load_fail())
 		return;
-	std::string findname = MATERIAL_DIR + matName + ".mi";
-	auto file = FileSys::open_read(findname.c_str());
-	if (!file)
-		return;
-	mat->load_from_file(findname, file.get());
-	add_to_dirty_list(mat);
+	assert(impl->masterMaterial);
+	impl->post_load(this);
+}
+void MaterialInstance::move_construct(IAsset* _other)
+{
+	auto other = (MaterialInstance*)_other;
+	uninstall();	// fixme: unsafe for materials already referencing us
+	*this = std::move(*other);
 }
 
-const MaterialInstance* MaterialManagerLocal::find_material_instance(const char* mat_inst_name)
+
+void MaterialImpl::post_load(MaterialInstance* self)
 {
-	std::string name = mat_inst_name;
-	if (all_materials.find(name) != all_materials.end()) {
-		auto& item = all_materials.find(name)->second;
-		MaterialInstanceLocal* l = nullptr;
-		if (item.is_master_material)
-			l = (MaterialInstanceLocal*)item.mm->get_default_material_inst();
-		else
-			l = item.mi;
-		ASSERT(l);
-
-		if (!l->is_this_currently_uploaded()) {
-			add_to_dirty_list(l);
-		}
-		return l;
+	if (masterImpl) {
+		masterImpl->material_id = matman.get_next_master_id();
 	}
-	
-	// try to find it
-	std::string findname = MATERIAL_DIR + name + ".mm";
-	auto file = FileSys::open_read(findname.c_str());
-	if (file) {
-		// load the master material
-		MasterMaterial* mm = new MasterMaterial;
-		try {
-			mm->load_from_file(findname, file.get());
-		}
-		catch (std::runtime_error er) {
-			sys_print(er.what());
-			delete mm;
-			return nullptr;
-		}
-
-		mm->create_material_instance();
-		mm->path = name;
-		mm->is_loaded = true;
-		mm->material_id = current_master_id++;
-		mm->default_inst.unique_id = current_instance_id++;
-		mm->default_inst.path = name;
-		add_to_dirty_list(&mm->default_inst);
-
-		MaterialItem something;
-		something.is_master_material = true;
-		something.mm = mm;
-		all_materials.insert({ name,something });
-
-		return mm->get_default_material_inst();
-	}
-	else {
-		findname = MATERIAL_DIR + name + ".mi";
-		file = FileSys::open_read(findname.c_str());
-		if (!file) {
-			// no material
-			sys_print("!!! no material found\n");
-			return nullptr;
-		}
-		// load the material instance
-
-		// load the master material
-		MaterialInstanceLocal* mi = new MaterialInstanceLocal(false/* not dynamic*/);
-		try {
-			mi->load_from_file(findname, file.get());
-		}
-		catch (std::runtime_error er) {
-			sys_print(er.what());
-			delete mi;
-			return nullptr;
-		}
-
-		mi->path = name;
-		mi->is_loaded = true;
-		mi->unique_id = current_instance_id++;
-		add_to_dirty_list(mi);
-
-		MaterialItem something;
-		something.is_master_material = false;
-		something.mi = mi;
-		all_materials.insert({ name,something });
-
-		return mi;
-	}
-	ASSERT(0);
-	return nullptr;
+	unique_id = matman.get_next_instance_id();
+	matman.add_to_dirty_list(self);
 }
-void MaterialInstanceLocal::init_from(MasterMaterial* parent)
+
+void MaterialImpl::init_from(const MaterialInstance* parent)
 {
-	params.resize(parent->param_defs.size());
-	for (int i = 0; i < parent->param_defs.size(); i++)
-		params[i] = parent->param_defs[i].default_value;
-	texture_bindings.resize(parent->num_texture_bindings, nullptr);
-	master = parent;
-}
-void MaterialInstanceLocal::init_from(MaterialInstanceLocal* parent)
-{
-	auto parent_master = parent->master;
+	auto parent_master = parent->get_master_material();
+	parentMatInstance.ptr = (MaterialInstance*)parent;
 
 	params.resize(parent_master->param_defs.size());
 	for (int i = 0; i < parent_master->param_defs.size(); i++)
-		params[i] = parent->params[i];
+		params[i] = parent->impl->params[i];
 	texture_bindings.resize(parent_master->num_texture_bindings, nullptr);
-	master = parent_master;
+	masterMaterial = parent_master;
 }
-bool MaterialInstanceLocal::load_from_file(const std::string& fullpath, IFile* file)
+
+bool MaterialImpl::load_master(MaterialInstance* self, IFile* file)
 {
+	masterImpl = std::make_unique<MasterMaterialImpl>();
+	masterImpl->self = self;
+	bool good = masterImpl->load_from_file(self->get_name(), file);
+	if (!good) return false;
+	
+	// init default instance, textures get filled in the dirty list
+	params.resize(masterImpl->param_defs.size());
+	for (int i = 0; i < masterImpl->param_defs.size(); i++)
+		params[i] = masterImpl->param_defs[i].default_value;
+	texture_bindings.resize(masterImpl->num_texture_bindings, nullptr);
+	masterMaterial = masterImpl.get();
+
+	return true;
+}
+
+MaterialInstance::MaterialInstance()
+{
+
+}
+MaterialInstance::~MaterialInstance()
+{
+
+}
+
+bool MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
+{
+	const auto& fullpath = self->get_name();
+
 	// for reloading
 	params.clear();
-	master = nullptr;
 
 	DictParser in;
 	in.load_from_file(file);
@@ -263,20 +237,21 @@ bool MaterialInstanceLocal::load_from_file(const std::string& fullpath, IFile* f
 		throw MasterMaterialExcept(fullpath, "Expceted PARENT ...");
 	}
 	std::string parent_mat = to_std_string_sv(tok);
-	MaterialInstanceLocal* parent = (MaterialInstanceLocal*)matman.find_material_instance(parent_mat.c_str());
-	if(!parent)
+	AssetPtr<MaterialInstance> parent = GetAssets().find_sync<MaterialInstance>(parent_mat.c_str());
+	if (!parent)
 		throw MasterMaterialExcept(fullpath, "Couldnt find parent material" + fullpath);
-	
-	init_from(parent);
+
+	init_from(parent.get());
+	assert(masterMaterial);
 
 	while (in.read_string(tok) && !in.is_eof()) {
 		if (tok.cmp("VAR")) {
-			
+
 			in.read_string(tok);
 			std::string paramname = to_std_string_sv(tok);
 			int index = 0;
-			auto ptr = master->find_definition(paramname,index);
-			if(!ptr)
+			auto ptr = masterMaterial->find_definition(paramname, index);
+			if (!ptr)
 				throw MasterMaterialExcept(fullpath, "Couldnt find parent parameter: " + paramname);
 			auto& myparam = params[index];
 
@@ -315,7 +290,7 @@ bool MaterialInstanceLocal::load_from_file(const std::string& fullpath, IFile* f
 			case MatParamType::ConstTexture2D:
 			{
 				in.read_string(tok);
-				myparam.tex_ptr = g_imgs.find_texture(to_std_string_sv(tok).c_str());
+				myparam.tex_ptr = GetAssets().find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
 			}break;
 
 			default:
@@ -328,8 +303,29 @@ bool MaterialInstanceLocal::load_from_file(const std::string& fullpath, IFile* f
 	}
 	return true;
 }
-bool MasterMaterial::load_from_file(const std::string& fullpath, IFile* file)
+
+bool MaterialImpl::load_from_file(MaterialInstance* self, const std::string& fullpath)
 {
+	const auto& name = self->get_name();
+	// try to find master file
+	std::string findname = MATERIAL_DIR + name + ".mm";
+	auto file = FileSys::open_read(findname.c_str());
+	if (file) {
+		return load_master(self, file.get());
+	}
+	findname = MATERIAL_DIR + name + ".mi";
+	file = FileSys::open_read(findname.c_str());
+	if (file) {
+		return load_instance(self,file.get());
+	}
+
+	return false;
+
+
+}
+bool MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file)
+{
+
 	DictParser in;
 	
 	in.load_from_file(file);
@@ -393,7 +389,7 @@ bool MasterMaterial::load_from_file(const std::string& fullpath, IFile* file)
 			case MatParamType::ConstTexture2D:
 			{
 				in.read_string(tok);
-				def.default_value.tex_ptr = g_imgs.find_texture(to_std_string_sv(tok).c_str());
+				def.default_value.tex_ptr = GetAssets().find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
 			}break;
 
 			default:
@@ -514,6 +510,7 @@ bool MasterMaterial::load_from_file(const std::string& fullpath, IFile* file)
 	std::ofstream outfile(out_glsl_path);
 	outfile.write(str.data(), str.size());
 
+	return true;
 }
 
 
@@ -591,7 +588,7 @@ static void replace_variable(std::string& str, const std::string& from, const st
 	}
 }
 
-std::string MasterMaterial::create_glsl_shader(
+std::string MasterMaterialImpl::create_glsl_shader(
 	std::string& vs_code,
 	std::string& fs_code,
 	const std::vector<InstanceData>& instdat
@@ -716,11 +713,11 @@ void MaterialManagerLocal::init() {
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
-	fallback = find_material_instance("fallback");
+	fallback = GetAssets().find_global_sync<MaterialInstance>("fallback").get();
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
 
-	defaultBillboard = find_material_instance("billboardDefault");
+	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("billboardDefault").get();
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 }
@@ -731,25 +728,27 @@ void MaterialManagerLocal::pre_render_update()
 		// dynamic or static material got removed after it got added to the dirty list, skip
 		if (!mat)
 			continue;
-		mat->dirty_buffer_index = -1;
+		mat->impl->dirty_buffer_index = -1;
 
+		auto& gpu_buffer_offset = mat->impl->gpu_buffer_offset;
 		// allocate it if it doesnt exist
-		if (mat->gpu_buffer_offset == MaterialInstanceLocal::INVALID_MAPPING) {
-			mat->gpu_buffer_offset = allocate_material_instance() * MATERIAL_SIZE/4;
-			ASSERT(mat->gpu_buffer_offset >= 0 && mat->gpu_buffer_offset < materialBufferSize/4);
+		if (gpu_buffer_offset == MaterialImpl::INVALID_MAPPING) {
+			gpu_buffer_offset = allocate_material_instance() * MATERIAL_SIZE/4;
+			ASSERT(gpu_buffer_offset >= 0 && gpu_buffer_offset < materialBufferSize/4);
 		}
 
 		uint8_t data_to_upload[MATERIAL_SIZE];
 		memset(data_to_upload, 0, MATERIAL_SIZE);
 
-		const MasterMaterial* mm = mat->master;
-		ASSERT(mm->param_defs.size() == mat->params.size());
-		for (int i = 0; i < mat->params.size(); i++) {
+		auto mm = mat->get_master_material();
+		auto& params = mat->impl->params;
+		ASSERT(mm->param_defs.size() == mat->impl->params.size());
+		for (int i = 0; i < params.size(); i++) {
 
-			auto& param = mat->params[i];
+			auto& param = params[i];
 			auto& def = mm->param_defs[i];
 			if (param.type == MatParamType::Texture2D || param.type == MatParamType::ConstTexture2D)
-				mat->texture_bindings.at(def.offset) = param.tex_ptr;
+				mat->impl->texture_bindings.at(def.offset) = param.tex_ptr;
 			else {
 				if (param.type == MatParamType::Float) {
 					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - 4);
@@ -769,15 +768,17 @@ void MaterialManagerLocal::pre_render_update()
 		}
 
 		// update the buffer
-		glNamedBufferSubData(gpuMaterialBuffer, mat->gpu_buffer_offset * sizeof(uint), MATERIAL_SIZE, data_to_upload);
+		glNamedBufferSubData(gpuMaterialBuffer, mat->impl->gpu_buffer_offset * sizeof(uint), MATERIAL_SIZE, data_to_upload);
 
 	}
 	dirty_list.clear();
 }
 
-void MaterialInstanceLocal::set_tex_parameter(StringName name, const Texture* t)
+void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 {
 	if (!t) return;
+	auto master = get_master_material();
+	auto& params = impl->params;
 	const int count = master->param_defs.size();
 	for (int i = 0; i < count; i++) {
 		if (master->param_defs[i].default_value.type == MatParamType::Texture2D &&

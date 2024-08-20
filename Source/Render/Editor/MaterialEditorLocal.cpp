@@ -3,7 +3,9 @@
 static MaterialEditorLocal g_mateditor_local;
 IEditorTool* g_mateditor = &g_mateditor_local;
 
-
+#include "Assets/AssetDatabase.h"
+#include <SDL2/SDL.h>
+#include "OsInput.h"
 
 class MaterialParamPropEditor : public IPropertyEditor
 {
@@ -15,8 +17,8 @@ public:
 			const int index = prop->offset;
 			MaterialEditorLocal* mLocal = (MaterialEditorLocal*)instance;
 			auto& paramDef = mLocal->dynamicMat->get_master_material()->param_defs.at(index);
-			MaterialInstanceLocal* mInstLocal = (MaterialInstanceLocal*)mLocal->dynamicMat;
-			auto& param = mInstLocal->params.at(index);
+			MaterialInstance* mInstLocal = (MaterialInstance*)mLocal->dynamicMat;
+			auto& param = mInstLocal->impl->params.at(index);
 			pi.name = paramDef.name.c_str();
 			pi.offset = offsetof(MaterialParameterValue, tex_ptr);
 			if (param.type == MatParamType::Bool) {
@@ -73,32 +75,34 @@ void MaterialEditorLocal::open_document_internal(const char* name, const char* a
 	assert(!dynamicMat);
 	assert(!outputEntity);
 
-	const MaterialInstance* mat = imaterials->find_material_instance(name);
+	auto mat = GetAssets().find_sync<MaterialInstance>(name);
 	if (!mat) {
 		sys_print("!!! couldnt open material %s\n", name);
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
 		return;
 	}
-	parentMat = (MaterialInstanceLocal*)mat;
-	if (parentMat->is_a_default_inst)
+	parentMat = (MaterialInstance*)mat.get();
+	if (parentMat->impl->masterImpl)
 		set_empty_name();
 	else
 		set_doc_name(name);
 	
-	dynamicMat = imaterials->create_dynmaic_material(mat);
+	dynamicMat = imaterials->create_dynmaic_material(mat.get());
 	assert(dynamicMat);
 	eng->open_level("__empty__");
-	eng_local.on_map_load_return.add(this, &MaterialEditorLocal::on_map_load_callback);
+	eng->get_on_map_delegate().add(this, &MaterialEditorLocal::on_map_load_callback);
 
-	model.ptr = mods.find_or_load("skydome.cmdl");
-	skyMaterial.ptr = (MaterialInstance*)imaterials->find_material_instance(ed_default_sky_material.get_string());
+	auto skydomeModel = GetAssets().find_global_sync<Model>("skydome.cmdl");
+	auto skyMat = GetAssets().find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
+	model.ptr = skydomeModel.get();
+	skyMaterial.ptr = skyMat.get();
 
 	// context params (model changes)
 	myPropGrid.add_property_list_to_grid(get_props(), this);
 	
 	// material params
 	propInfosForMats.clear();
-	MaterialInstanceLocal* mLocal = (MaterialInstanceLocal*)dynamicMat;
+	MaterialInstance* mLocal = (MaterialInstance*)dynamicMat;
 	auto& paramDefs = mLocal->get_master_material()->param_defs;
 	for (int i = 0; i < paramDefs.size(); i++) {
 		auto& def = paramDefs[i];
@@ -116,14 +120,14 @@ void MaterialEditorLocal::open_document_internal(const char* name, const char* a
 	}
 	propInfoListForMats.count = propInfosForMats.size();
 	propInfoListForMats.list = propInfosForMats.data();
-	propInfoListForMats.type_name = dynamicMat->get_master_material()->get_name().c_str();
+	propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
 	materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
 }
 
 void MaterialEditorLocal::close_internal()
 {
 	eng->leave_level();
-	eng_local.on_map_load_return.remove(this);
+	eng->get_on_map_delegate().remove(this);
 	imaterials->free_dynamic_material(dynamicMat);
 	dynamicMat = nullptr;
 	outputEntity = nullptr;
@@ -136,12 +140,12 @@ bool MaterialEditorLocal::save_document_internal()
 	std::string output;
 	output += "TYPE MaterialInstance\n";
 	output += "PARENT ";
-	output += dynamicMat->get_master_material()->get_name();
+	output += dynamicMat->get_master_material()->self->get_name();
 	output += "\n";
 
-	MaterialInstanceLocal* mLocal = (MaterialInstanceLocal*)dynamicMat;
+	MaterialInstance* mLocal = (MaterialInstance*)dynamicMat;
 	auto& paramDefs = mLocal->get_master_material()->param_defs;
-	auto& params = mLocal->params;
+	auto& params = mLocal->impl->params;
 	assert(params.size() == paramDefs.size());
 	for (int i = 0; i < params.size(); i++) {
 		auto& def = paramDefs[i];
@@ -193,7 +197,9 @@ bool MaterialEditorLocal::save_document_internal()
 	outfile.write(output.data(), output.size());
 	outfile.close();
 
-	matman.reload_material(get_name());
+	// kinda shit ngl
+	auto ptr = GetAssets().find_sync<MaterialInstance>(get_name());
+	GetAssets().reload_sync(ptr);
 
 	return true;
 }

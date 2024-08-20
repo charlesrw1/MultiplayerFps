@@ -2,8 +2,8 @@
 #include "Framework/AddClassToFactory.h"
 #include "Framework/ClassBase.h"
 #include "Framework/Util.h"
-#include "Assets/AssetLoaderRegistry.h"
 #include "Game/Entity.h"
+#include "Assets/AssetDatabase.h"
 
 CLASS_IMPL(SerializeEntityObjectContext);
 
@@ -76,15 +76,16 @@ public:
 		}
 		else {
 
-			// find factory
-			IAssetLoader* loader = AssetLoaderRegistry::get().get_loader_for_type_name(info.range_hint);
-			if (!loader) {
+			// this does a sync or async depending on the parent request
+
+			auto typeInfo = ClassBase::find_class(info.range_hint);
+			if (typeInfo)
+				*ptr_prop = GetAssets().find_assetptr_unsafe(to_str, typeInfo);
+			else {
 				sys_print("!!! no asset loader defined for asset type %s\n", info.range_hint);
 				*ptr_prop = nullptr;
 			}
-			else {
-				*ptr_prop = loader->load_asset(to_str);
-			}
+
 		}
 	}
 };

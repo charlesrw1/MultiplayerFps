@@ -11,6 +11,7 @@
 #include <unordered_map>
 
 #include "Framework/Files.h"
+#include "Game/SerializePtrHelpers.h"
 
 const int MAX_INSTANCE_PARAMETERS = 8;	// 8 scalars/color32s
 const uint32_t MATERIAL_SIZE = 64;	// 64 bytes
@@ -92,47 +93,14 @@ public:
 	uint32_t buffer_size = 0;
 };
 
-class MasterMaterial;
-class MaterialInstanceLocal : public MaterialInstance
-{
-public:
-	static const uint32_t INVALID_MAPPING = uint32_t(-1);
-	MaterialInstanceLocal(bool is_dynamic_mat=false) : MaterialInstance(is_dynamic_mat) {}
-
-	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
-
-	bool is_a_default_inst = false;
-
-	uint32_t unique_id = 0;	
-
-	const std::vector<const Texture*>& get_textures() const { return texture_bindings; }
-	std::vector<const Texture*> texture_bindings;
-	std::vector<MaterialParameterValue> params;
-	uint32_t gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
-
-	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
-
-	void init_from(MasterMaterial* parent);
-	void init_from(MaterialInstanceLocal* parent);
-
-	friend class MaterialManagerLocal;
-
-	void set_float_parameter(StringName name, float f) override {}
-	void set_bool_parameter(StringName name, bool b)override {}
-	void set_vec_parameter(StringName name, Color32 c) override {}
-	void set_fvec_parameter(StringName name, glm::vec4 v4) override {}
-	void set_tex_parameter(StringName name, const Texture* t) override;
-
-	bool load_from_file(const std::string& fullpath, IFile* file);
-};
 
 // compilied material, material instances can be based off it to allow for variation but minimize draw call changes
-CLASS_H(MasterMaterial, IAsset)
+class MasterMaterialImpl
+{
 public:
-	MasterMaterial() : default_inst(false) {}
+	MasterMaterialImpl() {}
 
 	// generated glsl fragment and vertex shader
-	const MaterialInstance* get_default_material_inst() const { return &default_inst; }
 
 	const MaterialParameterDefinition* find_definition(const std::string& str, int& index) const {
 		for (int i = 0; i < param_defs.size(); i++)
@@ -143,6 +111,7 @@ public:
 		return nullptr;
 	}
 
+	MaterialInstance* self = nullptr;
 	// All parameters that can be set by instances
 	std::vector<MaterialParameterDefinition> param_defs;
 	uint32_t num_texture_bindings = 0;
@@ -151,8 +120,6 @@ public:
 		uint32_t binding_loc = 0;
 	};
 	std::vector<UboBinding> constant_buffers;
-
-	MaterialInstanceLocal default_inst;
 
 	bool is_translucent() const {
 		return blend == blend_state::ADD || blend == blend_state::BLEND;
@@ -175,10 +142,7 @@ public:
 	uint32_t material_id = 0;
 
 	bool load_from_file(const std::string& fullpath, IFile* file);
-	void create_material_instance() {
-		default_inst.is_a_default_inst = true;
-		default_inst.init_from(this);
-	}
+
 	std::string create_glsl_shader(
 		std::string& vs_code,
 		std::string& fs_code,
@@ -186,6 +150,42 @@ public:
 	);
 
 	friend class MaterialManagerLocal;
+	friend class MaterialLodJob;
+};
+
+class MaterialImpl
+{
+public:
+	static const uint32_t INVALID_MAPPING = uint32_t(-1);
+	MaterialImpl(bool is_dynamic_mat=false)  {}
+
+	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
+
+	bool is_dynamic_material = false;
+
+	uint32_t unique_id = 0;	// unique id of this material instance (always valid)
+
+	AssetPtr<MaterialInstance> parentMatInstance;
+	const MasterMaterialImpl* masterMaterial = nullptr;	// this points to what master material this is instancing (valid on every material!)
+	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
+
+	const std::vector<const Texture*>& get_textures() const { return texture_bindings; }
+	std::vector<const Texture*> texture_bindings;
+	std::vector<MaterialParameterValue> params;
+	uint32_t gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
+
+	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
+
+	void init_from(const MaterialInstance* parent);
+	bool load_from_file(MaterialInstance* self, const std::string& fullpath);
+
+	bool load_instance(MaterialInstance* self, IFile* file);
+	bool load_master(MaterialInstance* self, IFile* file);
+
+	void post_load(MaterialInstance* self);
+
+	friend class MaterialManagerLocal;
+	friend class MaterialLodJob;
 };
 
 
@@ -261,16 +261,17 @@ public:
 
 	// public interface
 	void pre_render_update() override;	// material buffer updates
-	const MaterialInstance* find_material_instance(const char* mat_inst_name) override;
 
 	MaterialInstance* create_dynmaic_material(const MaterialInstance* material) override { 
 		assert(material);
-		MaterialInstanceLocal* dynamicMat = new MaterialInstanceLocal(true/*dynamic material*/);
-		dynamicMat->init_from((MaterialInstanceLocal*)material);
-		dynamicMat->unique_id = current_instance_id++;
-		dynamicMat->is_loaded = true;
-		dynamicMat->path = "%_DM_%";
-		add_to_dirty_list(dynamicMat);
+		MaterialInstance* dynamicMat = new MaterialInstance();
+
+		dynamicMat->impl = std::make_unique<MaterialImpl>();
+		dynamicMat->impl->init_from(material);
+		dynamicMat->impl->is_dynamic_material = true;
+		dynamicMat->impl->post_load(dynamicMat);	// add to dirty list, set material id
+
+		dynamicMat->set_loaded_manually_unsafe("%_DM_%");
 
 		dynamic_materials.insert(dynamicMat);
 
@@ -278,12 +279,12 @@ public:
 	}
 	void free_dynamic_material(MaterialInstance*& mat) override {
 		if (!mat) return;
-		if (dynamic_materials.find((MaterialInstanceLocal*)mat) == dynamic_materials.end())
+		if (dynamic_materials.find((MaterialInstance*)mat) == dynamic_materials.end())
 			Fatalf("free_dynamic_material used on a material not in dynamic_material list (double delete?)");
-		MaterialInstanceLocal* mlocal = (MaterialInstanceLocal*)mat;
+		MaterialInstance* mlocal = (MaterialInstance*)mat;
 		dynamic_materials.erase(mlocal);
-		if (mlocal->dirty_buffer_index != -1)
-			dirty_list.at(mlocal->dirty_buffer_index) = nullptr;
+		if (mlocal->impl->dirty_buffer_index != -1)
+			dirty_list.at(mlocal->impl->dirty_buffer_index) = nullptr;
 		delete mlocal;
 		mat = nullptr;	// set callers ptr to null
 	}
@@ -292,7 +293,7 @@ public:
 	program_handle get_mat_shader(
 		bool is_animated, 
 		const Model* mod, 
-		const MaterialInstanceLocal* gs, 
+		const MaterialInstance* gs, 
 		bool depth_pass, 
 		bool dither, 
 		bool is_editor_mode,
@@ -300,27 +301,45 @@ public:
 	);
 
 	bufferhandle get_gpu_material_buffer() { return gpuMaterialBuffer; }
-	void add_to_dirty_list(MaterialInstanceLocal* mat) {
-		if (mat->dirty_buffer_index == -1) {
+	void add_to_dirty_list(MaterialInstance* mat) {
+		if (mat->impl->dirty_buffer_index == -1) {
 			dirty_list.push_back(mat);
-			mat->dirty_buffer_index = dirty_list.size() - 1;
+			mat->impl->dirty_buffer_index = dirty_list.size() - 1;
 		}
 	}
-	void remove_from_dirty_list_if_it_is(MaterialInstanceLocal* mat) {
-		if (mat->dirty_buffer_index != -1) {
-			ASSERT(mat->dirty_buffer_index >= 0 && mat->dirty_buffer_index < dirty_list.size());
-			dirty_list[mat->dirty_buffer_index] = nullptr;
+	void remove_from_dirty_list_if_it_is(MaterialInstance* mat) {
+		if (mat->impl->dirty_buffer_index != -1) {
+			ASSERT(mat->impl->dirty_buffer_index >= 0 && mat->impl->dirty_buffer_index < dirty_list.size());
+			dirty_list[mat->impl->dirty_buffer_index] = nullptr;
 		}
 	}
 
-	void reload_material(const std::string& matName);
+	void free_material_instance(MaterialInstance* m)
+	{
+		remove_from_dirty_list_if_it_is(m);
+		if (m->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING) {
+			int byteIndex = (m->impl->gpu_buffer_offset * 4) / MATERIAL_SIZE;
+			int bitmapIndex = byteIndex / 64;
+			int bitIndex = byteIndex % 64;
+			materialBitmapAllocator[bitmapIndex] &= ~(1ull << bitIndex);
+		}
+
+	}
+
+	uint32_t get_next_master_id() {
+		return ++current_master_id;
+	}
+	uint32_t get_next_instance_id() {
+		return ++current_instance_id;
+	}
+
 private:
-	MasterMaterial* fallback_master = nullptr;
-	MasterMaterial* shared_depth_master = nullptr;
+	MaterialInstance* fallback_master = nullptr;
+	MaterialInstance* shared_depth_master = nullptr;
 
 	void on_reload_shader_invoke();
 
-	program_handle compile_mat_shader(const MasterMaterial* mat, shader_key key);
+	program_handle compile_mat_shader(const MaterialInstance* mat, shader_key key);
 	Material_Shader_Table mat_table;
 
 	// global material buffer, all parameters get stuff in here and accessed by shaders
@@ -330,21 +349,12 @@ private:
 	// bitmap allocator for materials
 	std::vector<uint64_t> materialBitmapAllocator;
 
-	struct MaterialItem {
-		union {
-			MasterMaterial* mm = nullptr;
-			MaterialInstanceLocal* mi;
-		};
-		bool is_master_material = false;
-	};
-
-	std::unordered_map<std::string, MaterialItem> all_materials;
-	std::unordered_set<MaterialInstanceLocal*> dynamic_materials;
+	std::unordered_set<MaterialInstance*> dynamic_materials;
 
 	std::unordered_map<std::string, MaterialParameterBuffer*> parameter_buffers;
 
 	// materials to allocate or update
-	std::vector<MaterialInstanceLocal*> dirty_list;
+	std::vector<MaterialInstance*> dirty_list;
 
 	// returns INDEX, not POINTER
 	uint32_t allocate_material_instance() {
@@ -364,6 +374,7 @@ private:
 
 		return  0;
 	}
+
 
 	uint32_t current_master_id = 0;
 	uint32_t current_instance_id = 0;

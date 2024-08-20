@@ -111,7 +111,7 @@ public:
 		if (!active_terrain.assetptr_heightfield)
 			return;
 
-		MaterialInstanceLocal* local = (MaterialInstanceLocal*)active_terrain.assetptr_material;
+		MaterialInstance* local = (MaterialInstance*)active_terrain.assetptr_material;
 
 		if (!active_terrain.assetptr_material || !local || local->get_master_material()->usage != MaterialUsage::Terrain)
 			return;
@@ -135,11 +135,11 @@ public:
 		draw.shader().set_float("MAX_DISTANCE", active_terrain.max_distance);
 
 
-		auto& textures = local->get_textures();
+		auto& textures = local->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++)
 			draw.bind_texture(i, textures[i]->gl_id);
 
-		draw.shader().set_uint("FS_IN_Matid", local->gpu_buffer_offset);
+		draw.shader().set_uint("FS_IN_Matid", local->impl->gpu_buffer_offset);
 		draw.shader().set_uint("FS_IN_Objid", 0);
 
 		draw.bind_texture(12/*fixme*/, active_terrain.assetptr_heightfield->gl_id);

@@ -211,33 +211,28 @@ public:
 
     }
 
-    const SoundFile* load_sound_file(const std::string& file) {
-        if (loaded_sounds.find(file)!=loaded_sounds.end()) {
-            return loaded_sounds.find(file)->second;
-        }
 
-        std::string pathfull = SOUND_DIRECTORY + file;
-        Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
-        if (!data) {
-            sys_print("!!! couldnt load sound file %s\n", file.c_str());
-            return nullptr;
-        }
-        SoundFile* sf = new SoundFile;
-        sf->internal_data = data;
-        sf->path = file;
-        sf->duration = data->alen / 44100.0;
-
-        loaded_sounds.insert({ file,sf });
-
-        return sf;
-    }
     void get_sound_player_status(handle<SoundPlayer> handle, float& duration, bool& finished) override {
 
     }
 
-    std::unordered_map<std::string, SoundFile*> loaded_sounds;
     glm::vec3 listener_position{};
     glm::vec3 listener_front{};
     std::vector<handle<SoundPlayer>> active_voices;
 	Free_List<SoundPlayerInternal> all_sound_players;
 };
+
+inline bool SoundFile::load_asset(ClassBase*&)
+{
+    std::string pathfull = SOUND_DIRECTORY + get_name();
+    Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
+    if (!data) {
+        return false;
+    }
+
+    this->internal_data = data;
+    //sf->path = file;
+    this->duration = data->alen / 44100.0;
+
+    return true;
+}

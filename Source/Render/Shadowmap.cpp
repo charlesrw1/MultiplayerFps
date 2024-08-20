@@ -21,7 +21,7 @@ void shadow_map_tweaks()
 
 void Shadow_Map_System::init()
 {
-	texture.shadow_vts_handle = g_imgs.install_system_texture("_csm_shadow");
+	texture.shadow_vts_handle = Texture::install_system("_csm_shadow");
 	texture.shadow_vts_handle->type = Texture_Type::TEXTYPE_2D_ARRAY;
 
 	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);

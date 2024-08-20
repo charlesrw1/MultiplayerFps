@@ -70,7 +70,7 @@ bool DataClassEditor::has_document_open() const
 {
 	return editing_object!=nullptr;
 }
-
+#include "Assets/AssetDatabase.h"
 void DataClassEditor::open_document_internal(const char* name, const char* arg)
 {
 	assert(editing_object == nullptr);
@@ -79,7 +79,7 @@ void DataClassEditor::open_document_internal(const char* name, const char* arg)
 
 	// loading a file
 	if (has_extension(name, "dc")) {
-		const DataClass* dc = g_dc_loader.load_dataclass_no_check(name);
+		const DataClass* dc = GetAssets().find_sync<DataClass>(name).get();
 		if (dc) {
 			editing_object = dc->get_obj()->get_type().allocate();
 			copy_object_properties((ClassBase*)dc->get_obj(), editing_object, nullptr);

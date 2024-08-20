@@ -118,7 +118,12 @@ public:
 };
 static Debug_Console dbg_console;
 
+#include <mutex>
+static std::mutex printMutex;
+
 char* string_format(const char* fmt, ...) {
+	std::lock_guard<std::mutex> printLock(printMutex);
+
 	va_list argptr;
 	static int index = 0;
 	static char string[4][512];
@@ -143,9 +148,10 @@ void Quit()
 
 #include "Framework/ConsolePrint.h"
 
-
 void sys_print(const char* fmt, ...)
 {
+	std::lock_guard<std::mutex> printLock(printMutex);
+
 	va_list args;
 	va_start(args, fmt);
 	
@@ -180,12 +186,16 @@ void sys_print(const char* fmt, ...)
 
 void sys_vprint(const char* fmt, va_list args)
 {
+	std::lock_guard<std::mutex> printLock(printMutex);
+
 	vprintf(fmt, args);
 	dbg_console.print_args(fmt, args);
 }
 
 void Fatalf(const char* format, ...)
 {
+	std::lock_guard<std::mutex> printLock(printMutex);
+
 	va_list list;
 	va_start(list, format);
 	sys_vprint(format, list);
@@ -275,8 +285,8 @@ void GameEngineLocal::make_move()
 
 	if (!is_game_focused()) {
 		p->set_input_command(command);
-		if(cl->get_state()>=CS_CONNECTED) 
-			cl->get_command(cl->OutSequence()) = command;
+		//if(cl->get_state()>=CS_CONNECTED) 
+		//	cl->get_command(cl->OutSequence()) = command;
 		return;
 	}
 
@@ -318,8 +328,8 @@ void GameEngineLocal::make_move()
 	
 	// FIXME:
 	p->set_input_command(command);
-	if(cl->get_state()>=CS_CONNECTED)
-		cl->get_command(cl->OutSequence()) = command;
+	//if(cl->get_state()>=CS_CONNECTED)
+	//	cl->get_command(cl->OutSequence()) = command;
 }
 
 void GameEngineLocal::init_sdl_window()
@@ -515,7 +525,7 @@ DECLARE_ENGINE_CMD(close_ed)
 
 DECLARE_ENGINE_CMD(start_ed)
 {
-	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset name>] <file>\n";
+	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset metadata typename>] <file>\n";
 	if (args.size() != 2 && args.size()!=3) {
 		sys_print(usage_str);
 		return;
@@ -547,6 +557,8 @@ static void disable_imgui_docking()
 
 #define ASSERT_ENUM_STRING( enumstr, index )		( 1 / (int)!( (int)enumstr - index ) ) ? #enumstr : ""
 
+
+
 void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
 	sys_print("--------- Change Editor State ---------\n");
@@ -565,7 +577,7 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 		}
 	}
 
-	if (!active_tool )
+	if (!active_tool)
 		disable_imgui_docking();
 }
 
@@ -851,30 +863,12 @@ void GameEngineLocal::leave_level()
 
 // execute_map_change(editor_tool /* can be null */, mapname)
 
-
-void GameEngineLocal::execute_map_change()
+void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, Level* loadedLevel)
 {
-	sys_print("-------- Map Change: %s --------\n", queued_mapname.c_str());
+	GetAssets().remove_unreferences();
 
-	// free current map
-	stop_game();
-	assert(!level);
+	this->level = loadedLevel;
 
-	// try loading map
-	const bool this_is_for_editor = is_in_an_editor_state();
-	is_loading_editor_level = this_is_for_editor;	// set temporary variable
-
-	// special name to create a map
-	if (this_is_for_editor && queued_mapname == "__empty__") {	
-		level = LevelSerialization::create_empty_level("empty.txt", true/* is for editor*/);
-		assert(level);
-	}
-	else {
-
-		const std::string& fullpath = "./Data/Maps/" + queued_mapname;
-
-		level = LevelSerialization::unserialize_level(fullpath, this_is_for_editor/* is for editor?*/);
-	}
 	is_loading_editor_level = false;
 
 	if (!level) {
@@ -918,7 +912,7 @@ void GameEngineLocal::execute_map_change()
 			player_type = ClassBase::find_class(g_default_playerclass.get_string());
 		else
 			player_type = level->world_settings->player_type.ptr;
-		
+
 		assert(player_type);
 		assert(player_type->is_a(PlayerBase::StaticType));
 
@@ -937,6 +931,44 @@ void GameEngineLocal::execute_map_change()
 	state = Engine_State::Game;
 
 	on_map_load_return.invoke(true);
+}
+
+#include "Assets/AssetDatabase.h"
+void GameEngineLocal::execute_map_change()
+{
+	sys_print("-------- Map Change: %s --------\n", queued_mapname.c_str());
+
+	// free current map
+	stop_game();
+	assert(!level);
+
+	// try loading map
+	const bool this_is_for_editor = is_in_an_editor_state();
+	is_loading_editor_level = this_is_for_editor;	// set temporary variable
+
+	// special name to create a map
+	if (this_is_for_editor && queued_mapname == "__empty__") {	
+		auto levelLoaded = LevelSerialization::create_empty_level("empty.txt", true/* is for editor*/);
+		assert(levelLoaded);
+		
+		on_map_change_callback(this_is_for_editor, levelLoaded);
+	}
+	else {
+		const std::string& fullpath = "./Data/Maps/" + queued_mapname;
+
+		GetAssets().find_async<Level>(fullpath, [this_is_for_editor](GenericAssetPtr ptr)
+			{
+				auto level = ptr.cast_to<Level>();
+				if (level) {
+					level->set_editor_level(this_is_for_editor);
+				}
+				eng_local.on_map_change_callback(this_is_for_editor, level.get());
+
+			}, 0);
+
+		// goto idle while we wait for loading to finish
+		state = Engine_State::Idle;
+	}
 }
 
 
@@ -992,8 +1024,9 @@ void GameEngineLocal::key_event(SDL_Event event)
 		inp.keys[scancode] = true;
 		inp.keychanges[scancode] = true;
 
-		if (binds[scancode]) {
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, binds[scancode]->c_str());
+		auto find = keybinds.find(scancode);
+		if (find!=keybinds.end()) {
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, find->second.c_str());
 		}
 	}
 	else if (event.type == SDL_KEYUP) {
@@ -1017,9 +1050,8 @@ void GameEngineLocal::key_event(SDL_Event event)
 void GameEngineLocal::bind_key(int key, string command)
 {
 	ASSERT(key >= 0 && key < SDL_NUM_SCANCODES);
-	if (!binds[key])
-		binds[key] = new string;
-	*binds[key] = std::move(command);
+
+	keybinds[key] = std::move(command);
 }
 
 void GameEngineLocal::cleanup()
@@ -1034,9 +1066,6 @@ void GameEngineLocal::cleanup()
 		SDL_DestroyWindow(window);
 	}
 
-	for (int i = 0; i < SDL_NUM_SCANCODES; i++) {
-		delete binds[i];
-	}
 
 	gui_sys.reset(nullptr);
 }
@@ -1161,7 +1190,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	}
 
 	// will only be true if in a tool state
-	if (is_drawing_to_window_viewport()&&state!=Engine_State::Idle) {
+	if (is_drawing_to_window_viewport()) {
 
 		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 		if (scene_hovered)
@@ -1271,7 +1300,7 @@ void GameEngineLocal::draw_screen()
 	vs_for_gui.height = viewport.y;
 
 
-	if (state == Engine_State::Loading) {
+	if (state == Engine_State::Loading || state == Engine_State::Idle) {
 		// draw loading ui etc.
 		params.draw_world = false;
 		idraw->scene_draw(params, vs_for_gui, get_gui());
@@ -1363,7 +1392,7 @@ View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near,
 
 GameEngineLocal::GameEngineLocal()
 {
-	memset(binds, 0, sizeof binds);
+
 }
 
 extern ModelMan mods;
@@ -1385,7 +1414,7 @@ void GameEngineLocal::init()
 	// initialize class reflection/creation system
 	ClassBase::init();
 
-	memset(binds, 0, sizeof(binds));
+
 	level = nullptr;
 	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
 	state = Engine_State::Idle;
@@ -1401,6 +1430,8 @@ void GameEngineLocal::init()
 	Profiler::init();
 	FileSys::init();
 
+	GetAssets().init();
+
 	g_physics->init();
 	network_init();
 	g_animseq.init();
@@ -1409,7 +1440,6 @@ void GameEngineLocal::init()
 	g_fonts.init();
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 	isound->init();
-	anim_tree_man->init();
 	mods.init();
 	iparticle->init();
 	cl->init();
@@ -1582,9 +1612,9 @@ void GameEngineLocal::stop_game()
 		delete ent;	// call destructor
 	}
 
-	delete level;	// delete level object
-	level = nullptr;
+	GetAssets().explicit_asset_free(level);
 
+	GetAssets().unreference_this_channel(0);
 
 	// clear any debug shapes
 	Debug::on_fixed_update_start();
@@ -1665,7 +1695,6 @@ void GameEngineLocal::loop()
 			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
 			break;
 		case Engine_State::Loading:
-
 			execute_map_change();
 			continue; // goto next frame
 			break;
@@ -1716,6 +1745,9 @@ void GameEngineLocal::loop()
 
 		// tick the sound system
 		isound->tick(frame_time);
+
+		// tick asyncs
+		GetAssets().tick_asyncs();
 
 		// draw
 		draw_screen();

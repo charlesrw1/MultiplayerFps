@@ -8,6 +8,7 @@
 #include "Render/MaterialPublic.h"
 
 #include <unordered_map>
+#include "Assets/AssetDatabase.h"
 
 class GuiFont;
 
@@ -29,19 +30,28 @@ public:
 	std::unordered_map<uint32_t, GuiFontGlyph> character_to_glyph;
 	friend class GuiFontLoader;
 	friend class GuiHelpers;
+
+	void uninstall() override {
+		character_to_glyph.clear();
+	}
+	bool load_asset(ClassBase*& user);
+	void post_load(ClassBase*) {}
+	void move_construct(IAsset* _other) {
+		GuiFont* other = (GuiFont*)_other;
+		*this = std::move(*other);
+	}
+	void sweep_references() const override {
+		GetAssets().touch_asset((IAsset*)font_texture);
+	}
 };
-class GuiFontLoader : public IAssetLoader
+class GuiFontLoader
 {
 public:
-	IAsset* load_asset(const std::string& path) {
-		return (IAsset*)load_font(path);
-	}
+
 	void init();
-	const GuiFont* load_font(const std::string& fontname);
-	const GuiFont* get_default_font() const { return defaultFont; }
-private:
-	GuiFont* defaultFont{};
-	std::unordered_map<std::string, GuiFont*> fonts;
+	const GuiFont* get_default_font() const { return defaultFont.get(); }
+
+	AssetPtr<GuiFont> defaultFont{};
 };
 extern GuiFontLoader g_fonts;
 #include "GUIPublic.h"

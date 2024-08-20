@@ -21,7 +21,7 @@ ConfigVar ui_draw_text_bbox("ui.draw_text_bbox", "0", CVAR_BOOL | CVAR_DEV);
 
 struct UIBuilderImpl
 {
-	const MaterialInstanceLocal* current_mat = nullptr;
+	const MaterialInstance* current_mat = nullptr;
 	const Texture* current_t = nullptr;	// when using default
 
 	// Ortho matrix of screen
@@ -66,13 +66,13 @@ void UIBuilder::draw_solid_rect(glm::ivec2 global_coords,
 	mb->Push2dQuad(global_coords, size, glm::vec2(0, 1), glm::vec2(1, -1), color);
 	mb->End();
 
-	auto mat = (MaterialInstanceLocal*)sys->ui_default;
+	auto mat = (MaterialInstance*)sys->ui_default;
 
 
 	auto shader = matman.get_mat_shader(false, nullptr,
 		mat, false, false, false, false);
 
-	auto& texs = mat->get_textures();
+	auto& texs = mat->impl->get_textures();
 
 	draw.set_shader(shader);
 
@@ -132,12 +132,12 @@ void UIBuilder::draw_text(
 
 	mb->End();
 
-	auto mat = (MaterialInstanceLocal*)sys->ui_default;
+	auto mat = (MaterialInstance*)sys->ui_default;
 
 	auto shader = matman.get_mat_shader(false, nullptr,
 		mat, false, false, false, false);
 
-	auto& texs = mat->get_textures();
+	auto& texs = mat->impl->get_textures();
 
 	draw.set_shader(shader);
 

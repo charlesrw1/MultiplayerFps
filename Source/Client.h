@@ -9,7 +9,7 @@
 #include <array>
 #include "Framework/Config.h"
 #include "Types.h"
-
+#include "Framework/MulticastDelegate.h"
 
 struct Interp_Entry
 {
@@ -38,11 +38,33 @@ enum Client_State {
 	CS_CONNECTED,		// connected and receiving inital state
 	CS_SPAWNED,			// in server as normal
 };
+enum class ClConnectReturn
+{
+	Success,			// connected succesfully
+	NoResponse,			// server didnt respond to join request
+	Rejected,			// server rejected our connection
+};
+enum class ClNetEvent
+{
+	ServerTimedOut,		// server conneciton timed out
+	Kicked,				// server kicked us
+	ServerQuit,			// server sent a quit message
+	ServerChangeLevel,	// server sent a change level command
+};
 
 class Client
 {
 public:
 	Client();
+
+	MulticastDelegate<ClConnectReturn> on_post_connect;
+	MulticastDelegate<ClNetEvent> on_net_change;
+
+	void _init();
+	void _connect(string URL);
+	void _disconnect();
+	void _poll();
+	void _send_messages();
 
 	void init();
 	void connect(string address);
@@ -51,9 +73,9 @@ public:
 
 	float adjust_time_step(int ticks_running);
 
-	void interpolate_states();
-	void run_prediction();
-	Move_Command& get_command(int sequence);
+	//void interpolate_states();
+	//void run_prediction();
+	//Move_Command& get_command(int sequence);
 
 	void TrySendingConnect();
 
@@ -77,14 +99,14 @@ public:
 	int last_recieved_server_tick = 0;
 	int cur_snapshot_idx = 0;
 
-	Frame_Storage frame_storage;
+	//Frame_Storage frame_storage;
 
-	Entity_Interp interpolation_data[NUM_GAME_ENTS];
-	vector<Move_Command> commands;
-	vector<glm::vec3> origin_history;
-	glm::vec3 last_origin;
-	float smooth_time = 0.0;
-	int offset_debug = 0;
+	//Entity_Interp interpolation_data[NUM_GAME_ENTS];
+	//vector<Move_Command> commands;
+	//vector<glm::vec3> origin_history;
+	//glm::vec3 last_origin;
+	//float smooth_time = 0.0;
+	//int offset_debug = 0;
 
 	int server_tick = 0;
 	float time_delta = 0;

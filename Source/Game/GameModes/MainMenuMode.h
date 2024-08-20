@@ -11,6 +11,38 @@
 
 #include "Sound/SoundPublic.h"
 
+#include "UI/Widgets/Visuals.h"
+class GameTransitionUI
+{
+public:
+	GameTransitionUI() {
+		loadText = new GUIText;
+		loadText->text = "LOADING...";
+		loadText->myFont = g_fonts.get_default_font();
+		loadText->color = COLOR_RED;
+		loadText->anchor = UIAnchorPos::create_single(0.5, 0.5);
+		loadText->pivot_ofs = { 0.5,0.5 };
+
+		layout = new GUIFullscreen;
+		layout->add_this(loadText);
+
+		eng->get_on_map_delegate().add(this, &GameTransitionUI::close);
+	}
+	static GameTransitionUI& get() {
+		static GameTransitionUI inst;
+		return inst;
+	}
+	void open() {
+		eng->get_gui()->add_gui_panel_to_root(layout);
+	}
+	void close(bool b) {
+		if (layout->parent)
+			layout->parent->release_this(layout);
+	}
+	GUIText* loadText = nullptr;
+	GUIFullscreen* layout = nullptr;
+};
+
 class GUIButtonWithSound : public GUIButton
 {
 public:
@@ -52,6 +84,7 @@ public:
 
 	void start_game() {
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map thisIsTheMap.txt\n");
+		GameTransitionUI::get().open();
 	}
 
 	void exit_game() {
@@ -69,7 +102,7 @@ public:
 		vbox->ls_position = { 100,100 };
 		vbox->ls_sz = { 200,500 };
 
-		const SoundFile* s = isound->load_sound_file("switch2.wav");
+		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("switch2.wav").get();
 
 		GUIButton* b = create_button("PLAY",s);
 		b->on_selected.add(this, &MainMenuUILayout::start_game);
@@ -87,6 +120,9 @@ public:
 	}
 
 };
+
+
+
 CLASS_H(MainMenuMode, GameMode)
 public:
 

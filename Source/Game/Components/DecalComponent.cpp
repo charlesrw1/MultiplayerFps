@@ -7,7 +7,7 @@
 #include "Render/Texture.h"
 #include "Game/Entity.h"
 #include "BillboardComponent.h"
-
+#include "Assets/AssetDatabase.h"
 CLASS_IMPL(DecalComponent);
 
 void DecalComponent::on_init() {
@@ -18,7 +18,7 @@ void DecalComponent::on_init() {
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
-		b->set_texture(g_imgs.find_texture("icon/decalBig.png"));
+		b->set_texture(default_asset_load<Texture>("icon/decalBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
 }

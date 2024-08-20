@@ -13,6 +13,7 @@
 #include "Framework/ObjectSerialization.h"
 #include "Framework/MyImguiLib.h"
 #include "Framework/Files.h"
+#include "Framework/MulticastDelegate.h"
 
 #include <fstream>
 
@@ -23,7 +24,6 @@
 #include "UI/Widgets/Layouts.h"
 #include "UI/GUISystemPublic.h"
 
-#include "GameEngineLocal.h"	// for on_map_load callback
 
 std::string remove_whitespace(const char* str)
 {
@@ -247,7 +247,7 @@ void AnimationGraphEditor::close_internal()
 
 	gui->unlink_and_release_from_parent();
 
-	eng_local.on_map_load_return.remove(this);
+	eng->get_on_map_delegate().remove(this);
 
 	eng->leave_level();
 }
@@ -302,6 +302,7 @@ Color32 add_brightness(Color32 c, int brightness) {
 	c.b = b;
 	return c;
 }
+#include "Assets/AssetDatabase.h"
 
 void TabState::imgui_draw() {
 
@@ -311,8 +312,8 @@ void TabState::imgui_draw() {
 
 	if (tabs.empty()) return;
 
-	auto forward_img = g_imgs.find_texture("icon/forward.png");
-	auto back_img = g_imgs.find_texture("icon/back.png");
+	auto forward_img = GetAssets().find_global_sync<Texture>("icon/forward.png");
+	auto back_img = GetAssets().find_global_sync<Texture>("icon/back.png");
 
 
 	bool wants_back = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_LeftArrow));
@@ -814,10 +815,10 @@ void AnimationGraphEditor::imgui_draw()
 	}
 
 	{
-		auto playimg = g_imgs.find_texture("icon/play.png");
-		auto stopimg = g_imgs.find_texture("icon/stop.png");
-		auto pauseimg = g_imgs.find_texture("icon/pause.png");
-		auto saveimg = g_imgs.find_texture("icon/save.png");
+		auto playimg = GetAssets().find_global_sync<Texture>("icon/play.png");
+		auto stopimg = GetAssets().find_global_sync<Texture>("icon/stop.png");
+		auto pauseimg = GetAssets().find_global_sync<Texture>("icon/pause.png");
+		auto saveimg = GetAssets().find_global_sync<Texture>("icon/save.png");
 
 		ImGui::PushStyleColor(ImGuiCol_Button,0);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.5));
@@ -896,9 +897,9 @@ void AnimationGraphEditor::imgui_draw()
 
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
-	auto strong_error = g_imgs.find_texture("icon/fatalerr.png");
-	auto weak_error = g_imgs.find_texture("icon/error.png");
-	auto info_img = g_imgs.find_texture("icon/question.png");
+	auto strong_error = GetAssets().find_global_sync<Texture>("icon/fatalerr.png");
+	auto weak_error = GetAssets().find_global_sync<Texture>("icon/error.png");
+	auto info_img = GetAssets().find_global_sync<Texture>("icon/question.png");
 
 	ImNodes::BeginNodeEditor();
 	for (auto node : nodes) {
@@ -1749,12 +1750,12 @@ void AnimationGraphEditor::set_animator_instance_from_string(std::string str) {
 	on_set_animator_instance.invoke(class_);
 }
 void AnimationGraphEditor::set_model_from_str(std::string str) {
-	auto mod = mods.find_or_load(str.c_str());
+	auto mod = GetAssets().find_sync<Model>(str.c_str());
 	if (!mod) {
 		sys_print("!!! couldnt find preview model %s\n", str.c_str());
 	}
-	out.set_model(mod);
-	on_set_model.invoke(mod);
+	out.set_model(mod.get());
+	on_set_model.invoke(mod.get());
 }
 void AnimationGraphEditor::try_load_preview_models()
 {
@@ -1803,16 +1804,16 @@ void AnimationGraphEditor::on_open_map_callback(bool success)
 	// spawn default entities
 
 	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-	dome->Mesh->set_model(mods.find_or_load("skydome.cmdl"));
+	dome->Mesh->set_model(GetAssets().find_sync<Model>("skydome.cmdl").get());
 	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->is_skybox = true;	// FIXME
 	dome->Mesh->cast_shadows = false;
-	dome->Mesh->set_material_override(imaterials->find_material_instance(ed_default_sky_material.get_string()));
+	dome->Mesh->set_material_override(GetAssets().find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
 	auto plane = eng->spawn_entity_class<StaticMeshEntity>();
 	plane->Mesh->set_model(mods.get_default_plane_model());
 	plane->set_ws_transform({}, {}, glm::vec3(20.f));
-	plane->Mesh->set_material_override(imaterials->find_material_instance("defaultWhite"));
+	plane->Mesh->set_material_override((GetAssets().find_sync<MaterialInstance>("defaultWhite").get()));
 
 	auto sun = eng->spawn_entity_class<SunLightEntity>();
 	sun->Sun->intensity = 3.0;
@@ -1828,7 +1829,7 @@ void AnimationGraphEditor::on_open_map_callback(bool success)
 void AnimationGraphEditor::open_document_internal(const char* name, const char* arg)
 {
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
-	eng_local.on_map_load_return.add(this, &AnimationGraphEditor::on_open_map_callback);
+	eng->get_on_map_delegate().add(this, &AnimationGraphEditor::on_open_map_callback);
 
 	eng->open_level("__empty__");	// queue an empty level
 
@@ -1838,7 +1839,7 @@ void AnimationGraphEditor::open_document_internal(const char* name, const char* 
 		DictParser parser;
 
 		double start = GetTime();
-		editing_tree = anim_tree_man->load_animation_tree_file(name, parser);
+		editing_tree = GetAssets().find_sync<Animation_Tree_CFG>(name, 0).get();
 		printf("loaded in %f\n", GetTime() - start);
 		if (editing_tree) {
 

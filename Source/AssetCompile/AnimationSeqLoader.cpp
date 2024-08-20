@@ -45,7 +45,6 @@ public:
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 
 CLASS_IMPL(AnimationSeqAsset);
-REGISTERASSETLOADER_MACRO(AnimationSeqAsset, &g_animseq);
 
 void AnimationSeqLoader::init()
 {
@@ -63,27 +62,33 @@ void AnimationSeqLoader::init()
 }
 #include "Render/Model.h"
 #include "Animation/SkeletonData.h"
-AnimationSeqAsset* AnimationSeqLoader::find_animation_seq_and_load_model(const std::string & seq)
+#include "Assets/AssetDatabase.h"
+bool AnimationSeqAsset::load_asset(ClassBase*& user)
 {
-	if (animNameToSeq.find(seq) != animNameToSeq.end()) {
-		return animNameToSeq.find(seq)->second;
-	}
-	auto pos = seq.rfind('/');
+	auto& path = get_name();
+	auto pos = path.rfind('/');
 	if (pos == std::string::npos) {
 		sys_print("!!! no forward slash in animation seq\n");
-		return nullptr;
+		return false;
 	}
-	std::string modName = seq.substr(0, pos)+".cmdl";
-	std::string animName = seq.substr(pos + 1);
-	AnimationSeqAsset* asa = new AnimationSeqAsset;
-	asa->path = seq;
-	asa->srcModel = mods.find_or_load(modName.c_str());
-	int remapIndex{};
-	if (asa->srcModel && asa->srcModel->get_skel())
-		asa->seq = asa->srcModel->get_skel()->find_clip(animName, remapIndex);
-	animNameToSeq.insert({ seq,asa });
-	return asa;
+	std::string modName = path.substr(0, pos) + ".cmdl";
+	std::string animName = path.substr(pos + 1);
+
+	srcModel = GetAssets().find_sync<Model>(modName);
+	if (srcModel && srcModel->get_skel()) {
+		int dummy{};
+		seq = srcModel->get_skel()->find_clip(animName, dummy);
+		return true;
+	}
+	else
+		return false;
 }
+
+void AnimationSeqAsset::sweep_references() const
+{
+	GetAssets().touch_asset(srcModel.get_unsafe());
+}
+
 #include <fstream>
 void AnimationSeqLoader::update_manifest_with_model(const std::string& modelName, const std::vector<std::string>& animNames)
 {

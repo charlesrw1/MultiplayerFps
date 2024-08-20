@@ -5,14 +5,12 @@
 
 #include "AssetCompile/Someutils.h"//fixme, for has_extension
 
+#include "Assets/AssetDatabase.h"
+
 class IEditorTool;
 extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEditor.h
 
-
-DataClassLoader g_dc_loader;
-
 CLASS_IMPL(DataClass);
-REGISTERASSETLOADER_MACRO(DataClass, &g_dc_loader);
 
 static const char* const DATACLASS_FOLDER = "./Data/DataClasses/";
 
@@ -53,16 +51,16 @@ REGISTER_ASSETMETADATA_MACRO(DataClassAssetMetadata);
 
 #include "Framework/ObjectSerialization.h"
 
-const DataClass* DataClassLoader::load_dataclass_no_check(const std::string& filepath)
-{
-	if (all_dataclasses.find(filepath) != all_dataclasses.end())
-		return all_dataclasses.find(filepath)->second;
 
-	std::string fullpath = DATACLASS_FOLDER + filepath;
+bool DataClass::load_asset(ClassBase*&)
+{
+	assert(object == nullptr);
+
+	std::string fullpath = DATACLASS_FOLDER + get_name();
 	auto file = FileSys::open_read(fullpath.c_str());
 	if (!file.get()) {
-		sys_print("!!! couldnt load dataclass (file not found): %s\n", filepath.c_str());
-		return nullptr;
+		sys_print("!!! couldnt load dataclass (file not found): %s\n", fullpath.c_str());
+		return false;
 	}
 
 	DictParser dp;
@@ -71,14 +69,33 @@ const DataClass* DataClassLoader::load_dataclass_no_check(const std::string& fil
 	dp.read_string(tok);
 	auto classLoaded = read_object_properties<ClassBase>(nullptr, dp, tok);
 	if (!classLoaded) {
-		sys_print("!!! couldnt load dataclass (parse error): %s\n", filepath.c_str());
-		return nullptr;
+		sys_print("!!! couldnt load dataclass (parse error): %s\n", fullpath.c_str());
+		return false;
 	}
 
-	DataClass* dc = new DataClass;
-	dc->object = classLoaded;
-	dc->path = filepath;
-	all_dataclasses.insert({ filepath,dc });
+	object = classLoaded;
+}
+void DataClass::sweep_references() const
+{
+	// im lazy af rn
+	// this marks references though
+	
+	std::string fullpath = DATACLASS_FOLDER + get_name();
+	auto file = FileSys::open_read(fullpath.c_str());
+	if (!file.get()) {
+		sys_print("!!! couldnt load dataclass (file not found): %s\n", fullpath.c_str());
+		return;
+	}
 
-	return dc;
+	DictParser dp;
+	dp.load_from_file(file.get());
+	StringView tok;
+	dp.read_string(tok);
+	auto classLoaded = read_object_properties<ClassBase>(nullptr, dp, tok);
+	if (!classLoaded) {
+		sys_print("!!! couldnt load dataclass (parse error): %s\n", fullpath.c_str());
+		return;
+	}
+
+	delete classLoaded;
 }

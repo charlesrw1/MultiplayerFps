@@ -2,28 +2,54 @@
 #include "Framework/Util.h"
 #include "Framework/Handle.h"
 #include "glm/glm.hpp"
+#include "Assets/IAsset.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ArrayReflection.h"
+
+#include <glm/gtc/quaternion.hpp>
 
 class ParticleEmitter;
-class ParticleManPublic
+CLASS_H(ParticleFXAsset, IAsset)
+public:
+	ParticleFXAsset();
+	~ParticleFXAsset();
+	static const PropertyInfoList* get_props();
+
+
+	void post_load(ClassBase*) {}
+	bool load_asset(ClassBase*&) {
+		return false;
+	}
+	void uninstall() {}
+	void move_construct(IAsset*) {}
+	void sweep_references() const {}
+private:
+	std::vector<std::unique_ptr<ParticleEmitter>> emitters;
+	friend class ParticleSystemLocal;
+};
+
+struct ParticleFx
+{
+	glm::vec3 pos{};
+	glm::quat rot{};
+	ParticleFXAsset* asset = nullptr;
+	bool playing = false;
+};
+
+class ParticleSystemPublic
 {
 public:
+
+	virtual ParticleFXAsset* load_particle_fx(const std::string& file) = 0;
+
 	// ParticleEmitter manipulation
-	virtual handle<ParticleEmitter> create_fx(const char* name) = 0;
-	void set_fx_position(handle<ParticleEmitter> emitter, glm::vec3 position) {
-		set_fx_control_point(emitter, 0, position);
-	}
-	void set_fx_target(handle<ParticleEmitter> emitter, glm::vec3 target) {
-		set_fx_control_point(emitter, 1, target);
-	}
-	virtual void set_fx_velocity(handle<ParticleEmitter> emitter, glm::vec3 velocity) = 0;
-	virtual void set_fx_rotation(handle<ParticleEmitter> emitter, glm::quat rotation) = 0;
-	virtual void set_fx_playback(handle<ParticleEmitter> emitter, bool playing) = 0;
+	virtual handle<ParticleFx> create_fx(const ParticleFx& fx) = 0;
+	virtual void update_fx(handle<ParticleEmitter> emitter, const ParticleFx& fx) = 0;
 	virtual void free_fx(handle<ParticleEmitter>& handle) = 0;
 
 	virtual void simulate_all_systems() = 0;
-	virtual void render_systems() = 0;
-private:
-	virtual void set_fx_control_point(handle<ParticleEmitter> emitter, int index, glm::vec3 position) = 0;
+
+	virtual void init() = 0;
 };
 
-extern ParticleManPublic* g_particles;
+extern ParticleSystemPublic* g_particles;

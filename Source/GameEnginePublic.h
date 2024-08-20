@@ -24,6 +24,10 @@ enum class Engine_State
 	Game,		// in game state
 };
 
+
+template<typename... Args>
+class MulticastDelegate;
+
 class Level;
 class Entity;
 class Player;
@@ -106,7 +110,9 @@ public:
 	void set_game_time(double newtime) {
 		time = newtime;
 	}
-protected:
+
+	// callbacks
+	virtual MulticastDelegate<bool>& get_on_map_delegate() = 0;	// called after a map was loaded (both editor and game, called after gamemode.init)protected:
 
 	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
 	uint32_t tick = 0;				// this is the discretized time tick

@@ -5,6 +5,8 @@
 #include "GameEnginePublic.h"
 #include <random>
 
+#include "Assets/AssetDatabase.h"
+
 
 void draw_hbao_menu()
 {
@@ -19,10 +21,11 @@ static const int NUM_MRT = 8;
 
 void SSAO_System::init()
 {
-	texture.result_vts_handle = g_imgs.install_system_texture("_ssao_result");
-	texture.blur_vts_handle = g_imgs.install_system_texture("_ssao_blur");
-	texture.view_normal_vts_handle = g_imgs.install_system_texture("_ssao_view_normal");
-	texture.linear_depth_vts_handle = g_imgs.install_system_texture("_linear_depth");
+
+	texture.result_vts_handle = Texture::install_system("_ssao_result");
+	texture.blur_vts_handle = Texture::install_system("_ssao_blur");
+	texture.view_normal_vts_handle = Texture::install_system("_ssao_view_normal");
+	texture.linear_depth_vts_handle = Texture::install_system("_linear_depth");
 
 	Debug_Interface::get()->add_hook("hbao", draw_hbao_menu);
 

@@ -24,9 +24,9 @@ ConfigVar max_adjust_time("cl.max_adjust", "1.0", CVAR_FLOAT, 0.0, 2.0);
 
 
 
-Client::Client() :
+Client::Client()// :
 
-	frame_storage(CLIENT_SNAPSHOT_HISTORY*256,CLIENT_SNAPSHOT_HISTORY)
+	//frame_storage(CLIENT_SNAPSHOT_HISTORY*256,CLIENT_SNAPSHOT_HISTORY)
 {
 
 }
@@ -49,15 +49,15 @@ void Client::connect(string address)
 	client_num = -1;
 	force_full_update = false;
 
-	commands.clear();
-	origin_history.clear();
-	commands.resize(CLIENT_MOVE_HISTORY);
-	origin_history.resize(36);
+	//commands.clear();
+	//origin_history.clear();
+	//commands.resize(CLIENT_MOVE_HISTORY);
+	//origin_history.resize(36);
 
 	last_recieved_server_tick = -1;
 	cur_snapshot_idx = 0;
-	for (int i = 0; i < NUM_GAME_ENTS; i++)
-		interpolation_data[i] = Entity_Interp();
+	//for (int i = 0; i < NUM_GAME_ENTS; i++)
+	//	interpolation_data[i] = Entity_Interp();
 
 	TrySendingConnect();
 }
@@ -129,15 +129,15 @@ void Client::Reconnect()
 	connect(address);
 }
 
-Move_Command& Client::get_command(int sequence) {
-	return commands.at(sequence % CLIENT_MOVE_HISTORY);
-}
+//Move_Command& Client::get_command(int sequence) {
+//	return commands.at(sequence % CLIENT_MOVE_HISTORY);
+//}
 
 
+#if 0
 void Client::run_prediction()
 {
 	ASSERT(0);
-#if 0
 
 	if (get_state() != CS_SPAWNED)
 		return;
@@ -188,9 +188,9 @@ void Client::run_prediction()
 	// for prediction errors
 	origin_history.at((end-1)%origin_history.size()) = eng->local_player().position;
 
-#endif
 }
 
+#endif
 static int NegModulo(int a, int b)
 {
 	return (b + (a % b)) % b;
@@ -238,10 +238,10 @@ void set_entity_interp_vars(Entity& e, Interp_Entry& ie)
 	e.rotation = ie.angles;
 }
 
+#if 0
 void Client::interpolate_states()
 {
 	ASSERT(0);
-#if 0
 
 	static Auto_Config_Var dbg_print("dbg.print_interp_state", 0);
 
@@ -344,8 +344,8 @@ void Client::interpolate_states()
 			ent.rotation[i] = interpolate_modulo(s1->angles[i], s2->angles[i], TWOPI, midlerp);
 		}
 	}
-#endif
 }
+#endif
 
 
 // will add/subtract a small value to adjust the number of ticks running

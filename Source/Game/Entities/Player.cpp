@@ -18,6 +18,8 @@
 
 #include "CameraPoint.h"
 
+#include "Assets/AssetDatabase.h"
+
 CLASS_H(PlayerNull, PlayerBase)
 public:
 
@@ -559,7 +561,7 @@ void Player::move()
 	distTraveledSinceLastFootstep += speed * (float)eng->get_tick_interval();
 
 	if (distTraveledSinceLastFootstep >= 5.0) {
-		const SoundFile* s = isound->load_sound_file("footstep_jack_01.wav");
+		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("footstep_jack_01.wav").get();
 		isound->play_sound(s);
 		distTraveledSinceLastFootstep = 0.0;
 	}
@@ -1182,7 +1184,7 @@ public:
 		paused_text->color = COLOR_WHITE;
 		vbox->add_this(paused_text);
 
-		const SoundFile* s = isound->load_sound_file("switch2.wav");
+		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("switch2.wav").get();
 		auto b = create_button("TO MAIN MENU", s);
 		b->on_selected.add(this, &PlayerHUD::to_main_menu);
 		vbox->add_this(b);

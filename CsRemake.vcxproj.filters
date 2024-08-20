@@ -378,9 +378,6 @@
     <ClInclude Include="Source\Game\Components\EntityComponentTypes.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Assets\AssetLoaderRegistry.h">
-      <Filter>Source\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="Source\EditorFolder.h">
       <Filter>Source\LevelEditor</Filter>
     </ClInclude>
@@ -540,6 +537,8 @@
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
     <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
+    <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
+    <ClInclude Include="Source\Assets\AssetDatabase.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -803,5 +802,8 @@
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
+    <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
+    <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
+    <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
   </ItemGroup>
 </Project>

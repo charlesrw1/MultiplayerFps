@@ -15,12 +15,13 @@
 
 static const char* const texture_folder_path = "./Data/Textures/";
 
-#include "Assets/AssetLoaderRegistry.h"
-CLASS_IMPL(Texture);
-REGISTERASSETLOADER_MACRO(Texture, &g_imgs);
 
-TextureMan g_imgs;
+CLASS_IMPL(Texture);
+
+
 #include "AssetCompile/Someutils.h"
+
+#include "Assets/AssetDatabase.h"
 
 class TextureAssetMetadata : public AssetMetadata
 {
@@ -314,7 +315,7 @@ struct DDS_HEADER_DXT10
 	uint32_t        miscFlags2; // see DDS_MISC_FLAGS2
 };
 
-static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
+static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
 static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 {
 	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
@@ -417,7 +418,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
 
-static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat)
+static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat)
 {
 	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
@@ -452,13 +453,18 @@ static bool make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 	output->width = x;
 	output->height = y;
 	output->format = informat;
-
-	return true;
 }
 
 using std::string;
 using std::vector;
 
+
+enum class TextureMipLevel
+{
+	Highest,
+	Medium,
+	Low,
+};
 
 Texture_Format to_format(int n, bool isfloat)
 {
@@ -472,74 +478,110 @@ Texture_Format to_format(int n, bool isfloat)
 	return TEXFMT_RGB8;
 }
 
+CLASS_H(TextureLoadUser, ClassBase)
+public:
+	~TextureLoadUser() override {
+	}
 
-bool TextureMan::load_texture(const std::string& path, Texture* t)
-{
-	int x, y, channels;
-	stbi_set_flip_vertically_on_load(false);
-	void* data = nullptr;
-	bool good = false;
+	std::vector<uint8_t> filedata;
+	bool isDDSFile = false;
+	int x{}, y{}, channels{};
 	bool is_float = false;
+	void* data = nullptr;
+};
+CLASS_IMPL(TextureLoadUser);
 
-	std::string path_to_use = path; 
+void Texture::move_construct(IAsset* _src)
+{
+	Texture* src = (Texture*)_src;
+	uninstall();
+	width = src->width;
+	height = src->height;
+	gl_id = src->gl_id;
+	channels = src->channels;
+	type = src->type;
+	format = src->format;
+
+	src->gl_id = 0;	// dont uninstall it since were just stealing it
+}
+void Texture::post_load(ClassBase* userStruct) {
+	if (did_load_fail())
+		return;
+	assert(userStruct);
+	TextureLoadUser* user = userStruct->cast_to<TextureLoadUser>();
+	int& x = user->x;
+	int& y = user->y;
+	auto& data = user->data;
+	auto& filedata = user->filedata;
+	auto& is_float = user->is_float;
+
+	if (user->isDDSFile)
+		load_dds_file(this, filedata.data(), filedata.size());
+	else
+		make_from_data(this, x, y, data, to_format(channels, is_float));
+
+	if (data)
+		stbi_image_free(data);
+
+	type = Texture_Type::TEXTYPE_2D;
+}
+bool Texture::load_asset(ClassBase*& userStruct) {
+	const auto& path = get_name();
+
+	std::string path_to_use = texture_folder_path + path;
 
 	auto file = FileSys::open_read(path_to_use.c_str());
 
 	if (!file) {
-		sys_print("!!! Couldn't load texture: %s", path.c_str());
 		return false;
 	}
 
-	std::vector<uint8_t> filedata;
-	filedata.resize(file->size());
-	file->read(filedata.data(), filedata.size());
+	TextureLoadUser* user = new TextureLoadUser;
+	userStruct = user;
+	int& x = user->x;
+	int& y = user->y;
+	auto& data = user->data;
+	auto& filedata = user->filedata;
+	auto& is_float = user->is_float;
 
-	if (path_to_use.find(".dds")!=std::string::npos) {
-		load_dds_file(t, filedata.data(), filedata.size());
+
+	user->filedata.resize(file->size());
+	file->read(user->filedata.data(), user->filedata.size());
+
+	if (path_to_use.find(".dds") != std::string::npos) {
+		user->isDDSFile = true;
 		return true;
 	}
 	else if (path_to_use.find(".hdr") != std::string::npos) {
-		stbi_set_flip_vertically_on_load(true);
 		data = stbi_loadf_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
+		filedata = {};
 		is_float = true;
 	}
 	else {
-		stbi_set_flip_vertically_on_load(false);
 		data = stbi_load_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
-		printf("%d %d\n", x, y);
+		filedata = {};
 		is_float = false;
 	}
 	file->close();
 
-
 	if (data == nullptr) {
-		sys_print("Couldn't load texture: %s", path.c_str());
 		return false;
 	}
-
-	good = make_from_data(t, x, y, data, to_format(channels, is_float));
-	stbi_image_free(data);
-
-	if (!good) {
-		return false;
-	}
-	t->is_loaded = true;
-
-	t->type = Texture_Type::TEXTYPE_2D;
-
-	//t->bindless_handle = glGetTextureHandleARB(t->gl_id);
-	//glMakeTextureHandleResidentARB(t->bindless_handle);
 
 	return true;
 }
 
-
-Texture* TextureMan::install_system_texture(const std::string& name)
+void Texture::uninstall()
+{
+	if (gl_id != 0) {
+		glDeleteTextures(1, &gl_id);
+		width = height = 0;
+	}
+}
+Texture* Texture::install_system(const std::string& path)
 {
 	Texture* t = new Texture;
-	t->path = name;
-	t->system_asset = true;
-	textures.insert({ name,t });
+	AssetDatabase::get().install_system_asset(t, path);
 	return t;
 }
 
@@ -580,33 +622,7 @@ void benchmark_run()
 
 }
 
-Texture* TextureMan::find_texture(const char* file, bool search_img_directory, bool owner)
-{
-	std::string path;
-	path.reserve(256);
-	if(search_img_directory)
-		path += texture_folder_path;
-	path += file;
-
-	Texture* t = nullptr;
-	if (!owner) {
-		auto find = textures.find(file);
-		if (find != textures.end())
-			return find->second;
-		t = new Texture;
-		textures[file] = t;
-		t->path = file;
-	}
-	else {
-		t = new Texture;
-		t->path = file;
-	}
-
-	bool good = load_texture(path, t);
-	return t;
-}
-
-
+#if 0
 Texture* TextureMan::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
 {
 	auto find = textures.find(name);
@@ -629,3 +645,4 @@ Texture* TextureMan::create_texture_from_memory(const char* name, const uint8_t*
 
 	return t;
 }
+#endif

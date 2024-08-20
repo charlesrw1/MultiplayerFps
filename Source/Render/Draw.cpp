@@ -23,6 +23,8 @@
 
 #include "UI/GUISystemPublic.h"	// for GuiSystemPublic::paint
 
+#include "Assets/AssetDatabase.h"
+
 //#pragma optimize("", off)
 
 extern ConfigVar g_window_w;
@@ -66,7 +68,7 @@ DECLARE_ENGINE_CMD(ot)
 	float mip = atof(args.at(3));
 	const char* texture_name = args.at(4);
 
-	draw.debug_tex_out.output_tex = g_imgs.find_texture(texture_name);
+	draw.debug_tex_out.output_tex = GetAssets().find_sync<Texture>(texture_name).get();
 	draw.debug_tex_out.scale = scale;
 	draw.debug_tex_out.alpha = alpha;
 	draw.debug_tex_out.mip = mip;
@@ -842,22 +844,22 @@ void Renderer::create_default_textures()
 	// this is sort of leaking memory but not really, these are persitant over lifetime of program
 	// anybody (like materials) can reference them with strings which is the point
 
-	auto white_tex = g_imgs.install_system_texture("_white");
-	auto black_tex = g_imgs.install_system_texture("_black");
-	auto flat_normal = g_imgs.install_system_texture("_flat_normal");
+	auto white_tex = Texture::install_system("_white");
+	auto black_tex = Texture::install_system("_black");
+	auto flat_normal = Texture::install_system("_flat_normal");
 
 	white_tex->update_specs(white_texture.gl_id, 1, 1, 3, {});
 	black_tex->update_specs(black_texture.gl_id, 1, 1, 3, {});
 	flat_normal->update_specs(flat_normal_texture.gl_id, 1, 1, 3, {});
 
 	// create the "virtual texture system" handles so materials/debuging can reference these
-	tex.bloom_vts_handle = g_imgs.install_system_texture("_bloom_result");
-	tex.scene_color_vts_handle = g_imgs.install_system_texture("_scene_color");
-	tex.scene_depth_vts_handle = g_imgs.install_system_texture("_scene_depth");
-	tex.gbuffer0_vts_handle = g_imgs.install_system_texture("_gbuffer0");
-	tex.gbuffer1_vts_handle = g_imgs.install_system_texture("_gbuffer1");
-	tex.gbuffer2_vts_handle = g_imgs.install_system_texture("_gbuffer2");
-	tex.editorid_vts_handle = g_imgs.install_system_texture("_editorid");
+	tex.bloom_vts_handle = Texture::install_system("_bloom_result");
+	tex.scene_color_vts_handle = Texture::install_system("_scene_color");
+	tex.scene_depth_vts_handle = Texture::install_system("_scene_depth");
+	tex.gbuffer0_vts_handle = Texture::install_system("_gbuffer0");
+	tex.gbuffer1_vts_handle = Texture::install_system("_gbuffer1");
+	tex.gbuffer2_vts_handle = Texture::install_system("_gbuffer2");
+	tex.editorid_vts_handle = Texture::install_system("_editorid");
 
 }
 
@@ -900,7 +902,7 @@ void Renderer::init()
 	shadowmap.init();
 	ssao.init();
 
-	lens_dirt = g_imgs.find_texture("lens_dirt.jpg");
+	lens_dirt = GetAssets().find_sync<Texture>("lens_dirt.jpg").get();
 
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
@@ -921,7 +923,7 @@ void Renderer::init()
 	//	scene.register_light(rl);
 	//}
 
-	auto brdf_lut = g_imgs.install_system_texture("_brdf_lut");
+	auto brdf_lut = Texture::install_system("_brdf_lut");
 	brdf_lut->gl_id = EnviornmentMapHelper::get().integrator.lut_id;
 	brdf_lut->width = BRDF_PREINTEGRATE_LUT_SIZE;
 	brdf_lut->height = BRDF_PREINTEGRATE_LUT_SIZE;
@@ -1146,7 +1148,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 		int count = list.command_count[i];
 
 		// static cast, dangerous kinda but not really
-		const MaterialInstanceLocal* mat = (MaterialInstanceLocal*)pass.mesh_batches[pass.batches[i].first].material;
+		const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
 		draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
 
 		program_handle program = (program_handle)batch_key.shader;
@@ -1168,7 +1170,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 
 		shader().set_int("indirect_material_offset", offset);
 
-		auto& textures = mat->get_textures();
+		auto& textures = mat->impl->get_textures();
 
 		for (int i = 0; i < textures.size(); i++) {
 			bind_texture(i, textures[i]->gl_id);
@@ -1209,7 +1211,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 		for (int dc = 0; dc < batch.count; dc++) {
 			auto& cmd = list.commands[offset + dc];
 
-			const MaterialInstanceLocal* mat = (MaterialInstanceLocal*)pass.mesh_batches[pass.batches[i].first].material;
+			const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
 			draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
 
 			program_handle program = (program_handle)batch_key.shader;
@@ -1229,7 +1231,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 
 			set_blend_state(blend);
 
-			auto& textures = mat->get_textures();
+			auto& textures = mat->impl->get_textures();
 
 			for (int i = 0; i < textures.size(); i++) {
 				bind_texture(i, textures[i]->gl_id);
@@ -1356,18 +1358,18 @@ void Renderer::ui_render()
 	glDisable(GL_CULL_FACE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	Texture* t = g_imgs.find_texture("crosshair007.png");
-	int centerx = cur_w / 2;
-	int centery = cur_h / 2;
-
-	float crosshair_scale = 0.7f;
-	Color32 crosshair_color = { 0, 0xff, 0, 0xff };
-	float width = t->width * crosshair_scale;
-	float height = t->height * crosshair_scale;
-
-
-	draw_rect(centerx - width / 2, centery - height / 2, width, height, crosshair_color, t, t->width, t->height);
-
+	//Texture* t = g_imgs.find_texture("crosshair007.png");
+	//int centerx = cur_w / 2;
+	//int centery = cur_h / 2;
+	//
+	//float crosshair_scale = 0.7f;
+	//Color32 crosshair_color = { 0, 0xff, 0, 0xff };
+	//float width = t->width * crosshair_scale;
+	//float height = t->height * crosshair_scale;
+	//
+	//
+	//draw_rect(centerx - width / 2, centery - height / 2, width, height, crosshair_color, t, t->width, t->height);
+	//
 	//draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
 
 	ASSERT(0);
@@ -1520,7 +1522,7 @@ Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
 draw_call_key Render_Pass::create_sort_key_from_obj(
 	const Render_Object& proxy, 
-	const MaterialInstanceLocal* material,
+	const MaterialInstance* material,
 	uint32_t camera_dist, 
 	uint32_t submesh, 
 	uint32_t layer,
@@ -1537,11 +1539,11 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 		is_editor_mode,
 		r_debug_mode.get_integer()!=0
 	);
-	const MasterMaterial* mm = material->get_master_material();
+	const MasterMaterialImpl* mm = material->get_master_material();
 
 	key.blending = (uint64_t)mm->blend;
 	key.backface = mm->backface;
-	key.texture = material->unique_id;
+	key.texture = material->impl->unique_id;
 	key.vao = 0;// (uint64_t)proxy.mesh->format;
 	key.mesh = proxy.model->get_uid();
 	key.layer = layer;
@@ -1566,7 +1568,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 void Render_Pass::add_object(
 	const Render_Object& proxy, 
 	handle<Render_Object> handle,
-	const MaterialInstanceLocal* material,
+	const MaterialInstance* material,
 	uint32_t camera_dist,
 	uint32_t submesh,
 	uint32_t lod,
@@ -1586,7 +1588,7 @@ void Render_Pass::add_object(
 	obj.hl_obj_index = high_level_objects_in_pass.size()-1;
 
 	// ensure this material maps to a gpu material
-	ASSERT(material->gpu_buffer_offset != MaterialInstanceLocal::INVALID_MAPPING);
+	ASSERT(material->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING);
 	objects.push_back(obj);
 }
 #include <iterator>
@@ -1912,7 +1914,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 			base_instance += meshb.count;// cmd.primCount;
 
 			auto batch_material = meshb.material;
-			draw_to_material.push_back(batch_material->gpu_buffer_offset);
+			draw_to_material.push_back(batch_material->impl->gpu_buffer_offset);
 
 			draw.stats.tris_drawn += meshb.count * cmd.count / 3;
 		}
@@ -2050,10 +2052,14 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 					for (int j = pstart; j < pend; j++) {
 						auto& part = proxy.model->get_part(j);
 
-						const MaterialInstanceLocal* mat = (MaterialInstanceLocal*)proxy.model->get_material(part.material_idx);
+						const MaterialInstance* mat = (MaterialInstance*)proxy.model->get_material(part.material_idx);
 						if (obj.type_.proxy.mat_override)
-							mat = (MaterialInstanceLocal*)obj.type_.proxy.mat_override;
-						const MasterMaterial* mm = mat->get_master_material();
+							mat = (MaterialInstance*)obj.type_.proxy.mat_override;
+
+						if (!mat->is_valid_to_use())
+							mat = matman.get_fallback();
+
+						const MasterMaterialImpl* mm = mat->get_master_material();
 						
 						if (mm->is_translucent()) {
 							transparent_pass.add_object(proxy, objhandle, mat, quantized_CAM_DIST, j, iLOD, 0, build_for_editor);
@@ -3085,7 +3091,7 @@ void Renderer::deferred_decal_pass()
 	glCullFace(GL_BACK);	// cull the back face, keep front face
 	glDisable(GL_DEPTH_TEST);	// keep depth tests
 
-	Model* cube = mods.find_or_load("cube.cmdl");	// cube model
+	static Model* cube = find_global_asset_s<Model>("cube.cmdl");	// cube model
 	// Copied code from execute_render_lists
 	auto& part = cube->get_part(0);
 	const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
@@ -3105,7 +3111,7 @@ void Renderer::deferred_decal_pass()
 		auto& obj = scene.decal_list.objects[i].type_.decal;
 		if (!obj.material)
 			continue;
-		MaterialInstanceLocal* l = (MaterialInstanceLocal*)obj.material;
+		MaterialInstance* l = (MaterialInstance*)obj.material;
 		if (l->get_master_material()->usage != MaterialUsage::Decal)
 			continue;
 
@@ -3119,9 +3125,9 @@ void Renderer::deferred_decal_pass()
 		shader().set_mat4("Model", ModelTransform);
 		shader().set_mat4("DecalViewProj", invTransform);
 		shader().set_mat4("InverseModel", invTransform);
-		shader().set_uint("FS_IN_Matid", l->gpu_buffer_offset);
+		shader().set_uint("FS_IN_Matid", l->impl->gpu_buffer_offset);
 
-		auto& texs = l->get_textures();
+		auto& texs = l->impl->get_textures();
 		for (int j = 0; j < texs.size(); j++)
 			bind_texture(j, texs[j]->gl_id);
 
@@ -3272,7 +3278,25 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		return;
 	else if (gui && !params.draw_world && params.draw_ui) {
 		// just paint ui and then return
+		uint32_t framebuffer_to_output = fbo.composite;// (needs_composite) ? fbo.composite : 0;
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_output);
+		glViewport(0, 0, cur_w, cur_h);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
 		gui->paint();
+
+		if (params.output_to_screen) {
+			GPUSCOPESTART("Blit composite to backbuffer");
+
+			glBlitNamedFramebuffer(
+				fbo.composite,
+				0,	/* blit to backbuffer */
+				0, 0, cur_w, cur_h,
+				0, 0, cur_w, cur_h,
+				GL_COLOR_BUFFER_BIT,
+				GL_NEAREST
+			);
+		}
 		return;
 	}
 	vs = current_frame_main_view;
@@ -3742,7 +3766,7 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 
 void DepthPyramid::init()
 {
-	depth_pyramid = g_imgs.install_system_texture("_depth_pyramid");
+	depth_pyramid = Texture::install_system("_depth_pyramid");
 	assert(depth_pyramid);
 	draw.on_viewport_size_changed.add(this, &DepthPyramid::on_viewport_size_changed);
 	draw.prog.cCreateDepthPyramid = draw.prog_man.create_compute("misc/depth_pyramid.txt");

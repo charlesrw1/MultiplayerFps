@@ -683,16 +683,7 @@ void AnimatorInstance::tick_tree_new(float dt)
 
 
 #include "Framework/DictParser.h"
-Animation_Tree_CFG* Animation_Tree_Manager::find_animation_tree(const char* n) {
-	if (trees.find(n) != trees.end())
-		return &trees[n];
-	
-	DictParser parser;
-	return load_animation_tree_file(n, parser);
-}
 
-static Animation_Tree_Manager anim_tree_man__;
-Animation_Tree_Manager* anim_tree_man = &anim_tree_man__;
 
 SyncGroupData& AnimatorInstance::find_or_create_sync_group(StringName name)
 {

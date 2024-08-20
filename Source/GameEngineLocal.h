@@ -12,6 +12,8 @@
 #include "GameEnginePublic.h"
 #include "OsInput.h"
 #include "Framework/MulticastDelegate.h"
+
+
 using glm::vec3;
 class IEditorTool;
 class Player;
@@ -74,6 +76,7 @@ public:
 	virtual ImGuiContext* get_imgui_context() const {
 		return imgui_context;
 	}
+
 	virtual void login_new_player(uint32_t index) override;
 	virtual void logout_player(uint32_t index) override;
 	virtual Entity* spawn_entity_schema(const Schema* schema) override;
@@ -115,6 +118,8 @@ public:
 	void queue_load_map(string nextmap);
 
 	void execute_map_change();
+	void on_map_change_callback(bool is_for_editor, Level* loadedLevel);
+
 	void stop_game();
 	void spawn_starting_players(bool initial);
 
@@ -122,8 +127,11 @@ public:
 
 	// Host functions
 
-public:
+	MulticastDelegate<bool>& get_on_map_delegate() override {
+		return on_map_load_return;
+	}
 	MulticastDelegate<bool> on_map_load_return;
+public:
 
 	bool map_spawned() { return level != nullptr; }
 
@@ -151,7 +159,7 @@ public:
 
 	glm::ivec2 window_viewport_size = glm::ivec2(DEFAULT_WIDTH,DEFAULT_HEIGHT);
 
-	string* binds[SDL_NUM_SCANCODES];
+	std::unordered_map<uint32_t, string> keybinds;
 
 	int argc = 0;
 	char** argv = nullptr;

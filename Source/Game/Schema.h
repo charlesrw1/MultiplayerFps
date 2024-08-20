@@ -24,26 +24,27 @@ public:
 	}
 
 	const Entity* get_default_schema_obj() const { return default_schema_obj; }
+
+	// IAsset overrides
+	void move_construct(IAsset* o) {
+		auto other = (Schema*)o;
+		delete default_schema_obj;
+		default_schema_obj = other->default_schema_obj;
+		properties = std::move(other->properties);
+	}
+	bool load_asset(ClassBase*& user);
+	void post_load(ClassBase*) {}
+	void uninstall() override {
+		delete default_schema_obj;
+		default_schema_obj = nullptr;
+	}
+	void sweep_references() const override;
 private:
-	bool init();
 
 	Entity* create_entity_from_properties_internal() const;
 
-	friend class SchemaLoader;
-
 	Entity* default_schema_obj = nullptr;	// used for diffing
 	std::string properties;	// this is a text serialized form of an entity, from disk
-};
 
-class SchemaLoader : public IAssetLoader
-{
-public:
-	virtual IAsset* load_asset(const std::string& file) {
-		return load_schema(file);
-	}
-
-	Schema* load_schema(const std::string& file);
-private:
-	std::unordered_map<std::string, Schema*> cached_files;
+	friend class SchemaLoadJob;
 };
-extern SchemaLoader g_schema_loader;

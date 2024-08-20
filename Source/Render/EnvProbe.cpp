@@ -96,7 +96,7 @@ void EnviornmentMapHelper::init()
 
     integrator.run();
 }
-
+#include "Assets/AssetDatabase.h"
 EnvCubemap EnviornmentMapHelper::create_from_file(std::string hdr_file)
 {
 	auto pos = hdr_file.rfind('.');
@@ -106,7 +106,7 @@ EnvCubemap EnviornmentMapHelper::create_from_file(std::string hdr_file)
 	}
 
 
-    Texture* hdr_image = g_imgs.find_texture(hdr_file.c_str(), true, true);
+    Texture* hdr_image = GetAssets().find_sync<Texture>(hdr_file.c_str()).get();
 	if (!hdr_image)
         return {};
 

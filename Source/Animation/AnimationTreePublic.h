@@ -27,7 +27,13 @@ class BaseAGNode;
 CLASS_H(Animation_Tree_CFG, IAsset)
 public:
 	Animation_Tree_CFG();
-	~Animation_Tree_CFG();
+	~Animation_Tree_CFG() override;
+
+	void uninstall() override;
+	bool load_asset(ClassBase*& user);
+	void post_load(ClassBase*) {}
+	void move_construct(IAsset* other);
+	void sweep_references() const override {}
 
 	const Node_CFG* get_root_node() const {
 		return root;
@@ -90,25 +96,10 @@ private:
 	friend class SerializeNodeCFGRef;
 	friend class AgSerializeContext;
 	friend class DirectPlaySlot_EdNode;// hack for editor nodes to append direct_slot
+	friend class AnimTreeLoadJob;
 
-	bool is_initialized() { return !path.empty(); }
+	//bool is_initialized() { return !path.empty(); }
 };
 
 class DictParser;
 class AnimationGraphEditor;
-class Animation_Tree_Manager : public IAssetLoader
-{
-public:
-	virtual IAsset* load_asset(const std::string& filename) override {
-		return find_animation_tree(filename.c_str());
-	}
-
-	void init();
-	Animation_Tree_CFG* find_animation_tree(const char* filename);
-private:
-	Animation_Tree_CFG* load_animation_tree_file(const char* filename, DictParser& parser);
-	std::unordered_map<std::string, Animation_Tree_CFG> trees;
-	friend class AnimationGraphEditor;
-};
-
-extern Animation_Tree_Manager* anim_tree_man;

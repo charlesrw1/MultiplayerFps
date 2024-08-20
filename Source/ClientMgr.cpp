@@ -201,7 +201,7 @@ void Client::SendMovesAndMessages()
 		return;
 
 	// Send move
-	Move_Command lastmove = get_command(server.out_sequence);
+	//Move_Command lastmove = get_command(server.out_sequence);
 
 	uint8_t buffer[512];
 	ByteWriter writer(buffer, 512);
@@ -216,10 +216,10 @@ void Client::SendMovesAndMessages()
 	writer.WriteByte(total_commands);
 
 	Move_Command last = Move_Command();
-	for (int i = 0; i < total_commands; i++) {
-		write_delta_move_command(writer, last, get_command(server.out_sequence - i));	// FIXME negative index edge case!!
-		last = get_command(server.out_sequence - i);
-	}
+	//for (int i = 0; i < total_commands; i++) {
+	//	write_delta_move_command(writer, last, get_command(server.out_sequence - i));	// FIXME negative index edge case!!
+	//	last = get_command(server.out_sequence - i);
+	//}
 
 	writer.AlignToByteBoundary();
 

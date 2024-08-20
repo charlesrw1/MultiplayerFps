@@ -35,6 +35,18 @@ private:
     };
     //std::vector<SoundClip> sounds;
 
+    void post_load(ClassBase*) {}
+    bool load_asset(ClassBase*&);
+    
+    void uninstall() {
+        delete internal_data;
+        internal_data = nullptr;
+    }
+    void move_construct(IAsset* o) {
+        *this = std::move(*(SoundFile*)o);
+    }
+    void sweep_references() const {}
+
     friend class SoundSystemLocal;
 };
 
@@ -70,7 +82,5 @@ public:
     virtual void stop_sound_player(handle<SoundPlayer> player) = 0;
     virtual void get_sound_player_status(handle<SoundPlayer> handle, float& duration, bool& finished) = 0;
     virtual void remove_sound_player(handle<SoundPlayer>& handle) = 0;
-
-    virtual const SoundFile* load_sound_file(const std::string& path) = 0;
 };
 extern SoundSystemPublic* isound;

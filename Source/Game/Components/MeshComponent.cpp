@@ -6,7 +6,7 @@
 #include "Render/MaterialPublic.h"
 
 #include "Physics/ChannelsAndPresets.h"
-
+#include "Assets/AssetDatabase.h"
 CLASS_IMPL(MeshComponent);
 
 
@@ -20,7 +20,7 @@ MeshComponent::MeshComponent() {
 
 void MeshComponent::set_model(const char* model_path)
 {
-	Model* modelnext = mods.find_or_load(model_path);
+	Model* modelnext = GetAssets().find_sync<Model>(model_path).get();
 	if (modelnext != model.get()) {
 		model = modelnext;
 		on_changed_transform();	//fixme
