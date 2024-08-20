@@ -429,9 +429,6 @@
     <ClInclude Include="Source\Framework\Hashset.h">
       <Filter>Source\Framework\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\Hashset.cpp">
-      <Filter>Source\Framework\Containers</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\ConsolePrint.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
@@ -539,6 +536,7 @@
     <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
     <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
+    <ClInclude Include="Source\Game\BaseUpdater.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -805,5 +803,9 @@
     <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
+    <ClCompile Include="Source\Game\BaseUpdater.cpp" />
+    <ClCompile Include="Source\Framework\Hashset.cpp">
+      <Filter>Source\Framework\Containers</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

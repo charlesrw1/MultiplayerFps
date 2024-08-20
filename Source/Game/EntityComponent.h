@@ -9,13 +9,17 @@
 #include "Game/SerializePtrHelpers.h"
 
 #include "Framework/StringName.h"
+#include "Game/BaseUpdater.h"
 
 class Entity;
-CLASS_H(EntityComponent, ClassBase)
+CLASS_H(EntityComponent, BaseUpdater)
 public:
 	const static bool CreateDefaultObject = true;
 
 	virtual ~EntityComponent() {}
+
+	void init();
+	void deinit();
 
 	// callbacks
 	// called after component had properties unserialized
@@ -28,7 +32,11 @@ public:
 	virtual void on_changed_transform() {}
 
 	// components are ticked every frame (todo)
-	virtual void on_tick() {}
+	virtual void update() override {}
+
+	// physics functions, only used if the item is adding itself to the physics system
+	// kinda an OOP bubble up issue but whatev
+
 
 	void set_owner(Entity* owner) { entity_owner = owner; }
 	Entity* get_owner() const { return entity_owner; }

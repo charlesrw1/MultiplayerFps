@@ -13,7 +13,7 @@ struct hash_map_iterator
     bool operator!=(const hash_map_iterator& other) {
         return index < other.index;
     }
-    T* operator*();
+    T operator*();
     hash_map_iterator<T>& operator++() {
         index++;
         advance();
@@ -64,7 +64,7 @@ public:
         }
     }
 
-    T* find(uint64_t handle) const {
+    T find(uint64_t handle) const {
         if (handle == 0) return nullptr;
 
         uint64_t index = std::hash<uint64_t>()(handle);
@@ -73,11 +73,11 @@ public:
         for (uint64_t i = 0; i < count; i++) {
             uint64_t actual_index = (index + i) & mask;
             if (items[actual_index].handle == handle)
-                return items[actual_index].ptr;
+                return items[actual_index].data;
             else if (items[actual_index].handle == 0)
-                return nullptr;
+                return T();
         }
-        return nullptr;
+        return T();
     }
     void remove(uint64_t handle) {
         if (handle == 0) return;
@@ -88,7 +88,7 @@ public:
         for (uint64_t i = 0; i < count; i++) {
             uint64_t actual_index = (index + i) & mask;
             if (items[actual_index].handle == handle) {
-                items[actual_index].ptr = nullptr;
+                items[actual_index].data = T();
                 items[actual_index].handle = TOMBSTONE;
                 num_used--;
                 num_tombstones++;
@@ -98,7 +98,7 @@ public:
                 return;
         }
     }
-    void insert(uint64_t handle, T* ptr) {
+    void insert(uint64_t handle, T dataToAdd) {
         assert(handle != 0);
         check_to_rehash(1);
         uint64_t index = std::hash<uint64_t>()(handle);
@@ -111,7 +111,7 @@ public:
                 num_tombstones -= items[actual_index].handle == TOMBSTONE;
                 num_used += items[actual_index].handle != handle;
 
-                items[actual_index].ptr = ptr;
+                items[actual_index].data = dataToAdd;
                 items[actual_index].handle = handle;
                 return;
             }
@@ -133,14 +133,14 @@ public:
         num_tombstones = 0;
         num_used = 0;
         for (auto& item : prev_array) {
-            if (item.ptr != nullptr)
-                insert(item.handle, item.ptr);
+            if (item.handle != 0 && item.handle != TOMBSTONE)
+                insert(item.handle, item.data);
         }
     }
 
     struct item {
         uint64_t handle = 0;
-        T* ptr = nullptr;
+        T data = T();
     };
 
     friend class hash_map_iterator<T>;
@@ -152,8 +152,8 @@ public:
 };
 
 template<typename T>
-inline T* hash_map_iterator<T>::operator*() {
-    return parent->items[index].ptr;
+inline T hash_map_iterator<T>::operator*() {
+    return parent->items[index].data;
 }
 
 

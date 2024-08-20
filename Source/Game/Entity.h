@@ -12,6 +12,7 @@
 #include "Game/EntityComponent.h"
 
 #include "GameEnginePublic.h"
+#include "Game/BaseUpdater.h"
 
 #ifndef NO_EDITOR
 #include "EditorFolder.h"
@@ -73,7 +74,7 @@ inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, 
 
 class Schema;
 class EditorFolder;
-CLASS_H(Entity, ClassBase)
+CLASS_H(Entity, BaseUpdater)
 public:
 	const static bool CreateDefaultObject = true;
 
@@ -111,8 +112,7 @@ public:
 	void destroy();
 
 	// called every game tick when actor is ticking
-	virtual void update() {}
-	void update_entity_and_components();
+	virtual void update() override {}
 
 	// Editor calls tick on components but not on entity
 	
@@ -205,15 +205,26 @@ public:
 	virtual void editor_begin() {}
 	virtual void editor_tick() {}
 	virtual void editor_on_change_property(const PropertyInfo& property_) {}
-	bool editor_is_selected = false;
+
 	ObjPtr<EditorFolder> editor_folder;
 	std::string editor_name;
 #endif
 	EntityPtr<Entity> self_id;			// global identifier for this entity
 	AssetPtr<Schema> schema_type;		// what spawned type are we ( could be editor only or not )
+
+	bool is_selected_in_editor() const
+	{
+		return selectedInEditor;
+	}
 private:
+	// editor only obviously
+	bool selectedInEditor = false;
+
 	virtual void start() {}
 	virtual void end() {}
+
+	friend class EditorDoc;
+	friend class SelectionState;
 };
 #define REG_ENTITY_REF(name, flags) Entity::generate_entity_ref_property( \
 &((TYPE_FROM_START*)0)->name, \

@@ -12,6 +12,7 @@
 #include "Framework/Util.h"
 #include "Framework/Config.h"
 
+
 namespace physx
 {
 
@@ -22,6 +23,7 @@ namespace physx
 	class PxScene;
 	class PxConvexMesh;
 	class PxActor;
+	class PxShape;
 }
 
 enum class ShapeType_e : uint8_t
@@ -151,6 +153,8 @@ enum class PhysicsShapeType
 	TriggerOnly,		// most common for invisible triggers
 };
 
+
+
 // Wrapper around PxActor
 class Model;
 class Entity;
@@ -169,62 +173,79 @@ public:
 	PhysicsActor(PhysicsActor&& other);
 
 	// releases any actor associated with this
-	void free();
-
-	bool is_allocated() const {
+	bool has_initialized() const {
 		return actor;
 	}
 
-	// creation functions, if an actor already exists, will warn and delete it, you should explicitly call free()
-	// creates physics from the models collision bodies, falls back to an AABB
-	void create_static_actor_from_model(const Model* model, PhysTransform transform, PhysicsShapeType type = PhysicsShapeType::SimulateAndQuery);
-	void create_dynamic_actor_from_model(const Model* model);
-	// create from primitives
-	void create_static_actor_from_shape(const physics_shape_def& shape, PhysicsShapeType type = PhysicsShapeType::SimulateAndQuery);
-	void create_dynamic_actor_from_shape(const physics_shape_def& shape, PhysicsShapeType type = PhysicsShapeType::SimulateAndQuery);
+	void init_physics_shape(
+		const PhysicsFilterPresetBase* filter,	// the filter to apply
+		const glm::mat4& initalTransform,			// starting transform
+		bool isSimulating,						// if this is a simulating shape 
+		bool sendOverlap,	// if overlap events will be sent to entity component
+		bool sendHit,		// if hit events will be sent to EC
+		bool isStatic,	// if this should create a static actor, not compatible with isSimulating
+		bool isTrigger,	// if true, then this shape is not solid but a trigger
+		bool startDisabled
+	);
 
-	// set how the actor's shape should simulate, all shapes are the same type
-	// ex: trigger only, query only, query and simulate...
-	void set_all_shapes_as_type(PhysicsShapeType type);
+	void add_model_shape_to_actor(const Model* m);
+	void add_sphere_shape_to_actor(const glm::vec3& pos, float radius);
+	void add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius);
+	void add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents);
+	void update_mass();
 
-	// wether actor was created with dynamic/static
-	bool is_dynamic() const;
+	// wether actor was created with isStatic
 	bool is_static() const;
+
+	// set if actor should be simulating their shape, only for dynamic actors (else its kinematic for non-static physics objs)
+	void set_simulate(bool simulating);
+	void set_enabled(bool enabled);
+	void set_set_my_transform(bool setMyTransform) {
+		this->setMyTransformWhenSimulating = setMyTransform;
+	}
 
 	// valid for dynamic actors only
 	glm::vec3 get_linear_velocity() const;
-	void apply_impulse(glm::vec3 worldspace, glm::vec3 impulse);
+	void set_linear_velocity(const glm::vec3& v);
+	void apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse);
 	void set_objects_mass(float mass);
 	void set_objects_density(float density);
-	// kinematic actors are controlled by setting position/rotation manually
-	// use for doors, platforms
-	bool set_kinematic_flag(bool is_kinematic);
-	// set if actor should be simulating their shape, only for dynamic actors
-	bool set_simulate(bool simulating);
+	void set_transform(const glm::mat4& transform, bool teleport = false);
 
-	// valid for both dynamic and static
-	PhysTransform get_transform() const;
+	glm::mat4 get_transform() const;
 
-	// disables the object from everyting (queries/simulate/triggers)
-	bool disable_physics();
 
 	// querying/setting who owns this shape
-	void set_entity(EntityComponent* e) {
-		owner = e;
-	}
 	EntityComponent* get_entity_owner() {
 		return owner;
 	}
+
+	void set_filter_preset(const PhysicsFilterPresetBase* filter);
 private:
+
+	void set_shape_flags(physx::PxShape* shape);
+
+	void free();
+	void set_entity(EntityComponent* e) {
+		owner = e;
+	}
 	physx::PxRigidActor* get_actor() const { return actor; }
 	physx::PxRigidDynamic* get_dynamic_actor() const {
-		assert(actor&&is_dynamic());
+		assert(actor&&!is_static());
 		return (physx::PxRigidDynamic*)actor;
 	}
 	const PhysicsFilterPresetBase* presetMask = nullptr;
 	EntityComponent* owner = nullptr;
 	physx::PxRigidActor* actor = nullptr;
-	int ragDollBoneIndex = -1;	// if not -1, then this PxActor is part of a ragdoll and the index is the bone in the component
+	char ragDollBoneIndex = -1;	// if not -1, then this PxActor is part of a ragdoll and the index is the bone in the component
+	bool isSimulating = false;
+	bool disabled = false;
+	bool sendHitEvents = false;
+	bool sendOverlapEvents = false;
+	bool setMyTransformWhenSimulating = true;
+	bool isTrigger = false;
+	bool isStatic = false;
+	friend class PhysicsManLocal;
 };
 
 // Constraint wrapper for gameplay
@@ -235,22 +256,6 @@ public:
 	physx::PxConstraint* constraint = nullptr;
 };
 
-class Model;
-class SkeletonPhysicsActor
-{
-public:
-	void set_group_as_simulating(StringName group, bool simulate);
-	void set_ragdoll_simulating(bool simulate);
-	bool set_jiggle_simulating(bool simulate);
-
-	void update();
-
-	std::vector<PhysicsActor*> bones;
-	std::vector<PhysicsConstraint*> constraints;
-
-	Model* skeleton = nullptr;
-	Entity* owner = nullptr;
-};
 
 struct world_query_result
 {
@@ -298,7 +303,7 @@ public:
 		const glm::vec3& start,
 		uint32_t channel_mask) = 0;
 	
-	virtual PhysicsActor* allocate_physics_actor() = 0;
+	virtual PhysicsActor* allocate_physics_actor(EntityComponent* ecOwner) = 0;
 	virtual void free_physics_actor(PhysicsActor*& actor) = 0;
 
 	virtual PhysicsConstraint* allocate_constraint() = 0;

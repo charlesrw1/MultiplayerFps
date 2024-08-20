@@ -332,8 +332,11 @@ public:
 	uint32_t get_next_instance_id() {
 		return ++current_instance_id;
 	}
-
+	MaterialInstance* get_default_editor_sel_PP() {
+		return PPeditorSelectMat;
+	}
 private:
+	MaterialInstance* PPeditorSelectMat = nullptr;
 	MaterialInstance* fallback_master = nullptr;
 	MaterialInstance* shared_depth_master = nullptr;
 

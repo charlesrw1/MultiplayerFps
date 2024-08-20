@@ -1,0 +1,58 @@
+
+// ******** START "include "SharedGpuTypes.txt"" ********
+
+#include "SharedGpuTypes.txt"
+
+// ******** END "include "SharedGpuTypes.txt"" ********
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout (binding = 4, std430) readonly buffer GlobalMaterialBuffer {
+	uint _material_param_buffer[];
+};
+
+#ifdef _VERTEX_SHADER
+
+out vec2 FS_IN_Texcoord;
+
+void main()
+{
+  uint idx = gl_VertexID % 3; // allows rendering multiple fullscreen triangles
+  vec4 pos =  vec4(
+      (float( idx     &1U)) * 4.0 - 1.0,
+      (float((idx>>1U)&1U)) * 4.0 - 1.0,
+      0, 1.0);
+  gl_Position = pos;
+  FS_IN_Texcoord = pos.xy * 0.5 + 0.5;
+}
+
+
+#endif // _VERTEX_SHADER
+
+#ifdef _FRAGMENT_SHADER
+
+layout (location = 0) out vec4 FS_OUT_Color;
+
+in vec2 FS_IN_Texcoord;
+
+uniform uint FS_IN_Matid = 0;
+
+
+// standard outputs for UI
+vec3 EMISSIVE = vec3(0.0);		// emissive color
+float OPACITY = 1.0;			// opacity, for alpha test
+
+// ********** START USER CODE **********
+___USER_FS_CODE___
+// ********** END USER CODE **********
+
+void main()
+{
+	FSmain();
+	
+	FS_OUT_Color = vec4(EMISSIVE, OPACITY);
+}
+
+#endif // _FRAGMENT_SHADER

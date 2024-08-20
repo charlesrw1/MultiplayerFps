@@ -758,6 +758,29 @@ extern void at_test();
 
 #include "Render/MaterialLocal.h"
 #include "Framework/PropHashTable.h"
+
+
+class IDamageableInterface
+{
+public:
+	virtual void take_damage() = 0;
+	virtual void on_death() = 0;
+};
+class IInteractable
+{
+public:
+	virtual void interact() = 0;
+};
+template<typename Derived, typename Base>
+static ptrdiff_t ComputePointerOffset()
+{
+	Derived* derivedPtr = (Derived*)1;
+	Base* basePtr = static_cast<Base*>(derivedPtr);
+	return (intptr_t)basePtr - (intptr_t)derivedPtr;
+}
+
+
+
 int main(int argc, char** argv)
 {
 	eng_local.argc = argc;
@@ -1525,11 +1548,11 @@ void GameEngineLocal::game_update_tick()
 	Debug::on_fixed_update_start();
 
 	assert(level);
-	if (level->is_editor_level())
-		return;
+
 
 	// create input
-	make_move();
+	if (!level->is_editor_level())
+		make_move();
 	//if (!is_host())
 	//	cl->SendMovesAndMessages();
 
@@ -1537,12 +1560,11 @@ void GameEngineLocal::game_update_tick()
 	//build_physics_world(0.f);
 	
 	// tick the gamemode
-	gamemode->tick();
+	if (!level->is_editor_level())
+		gamemode->tick();
 
 	// update entities
-	for (auto ent : level->all_world_ents) {
-		ent->update_entity_and_components();
-	}
+	level->update_level();
 
 	// update the physics
 	g_physics->simulate_and_fetch(tick_interval);

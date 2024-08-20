@@ -79,6 +79,7 @@ struct PlayerFlags
 };
 
 class PlayerHUD;
+class HealthComponent;
 CLASS_H(Player, PlayerBase)
 public:
 
@@ -88,6 +89,9 @@ public:
 	MeshComponent* player_mesh{};
 	CapsuleComponent* player_capsule{};
 	MeshComponent* viewmodel_mesh{};
+	HealthComponent* health{};
+
+	EntityPtr<Entity> someEntity;
 
 	SpotLightComponent* spotlight{};
 
@@ -99,7 +103,8 @@ public:
 	
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)
-			REG_ASSET_PTR(a_second_model, PROP_DEFAULT)
+			REG_ASSET_PTR(a_second_model, PROP_DEFAULT),
+			REG_ENTITY_PTR(someEntity, PROP_DEFAULT)
 		END_PROPS(Player)
 	};
 

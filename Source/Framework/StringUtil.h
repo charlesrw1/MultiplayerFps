@@ -115,6 +115,8 @@ public:
 	}
 
 	bool cmp(const char* other) const {
+		if (!str_start) return false;
+
 		const char* p1 = str_start;
 		int count = 0;
 		while (*other) {

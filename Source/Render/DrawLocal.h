@@ -186,7 +186,9 @@ public:
 	virtual void reload_shaders() override;
 	virtual RenderScenePublic* get_scene() override { return &scene; }
 	virtual void bake_cubemaps() override {}
-	virtual uint32_t get_composite_output_texture_handle() override { return tex.output_composite; }
+	virtual uint32_t get_composite_output_texture_handle() override { 
+		return tex.actual_output_composite; 
+	}
 
 	virtual handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) override;
 	virtual float get_scene_depth_for_editor(int x, int y) override;
@@ -210,6 +212,7 @@ public:
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui);
+	void do_post_process_stack(const std::vector<MaterialInstance*>& stack);
 	void check_cubemaps_dirty();	// render any cubemaps
 	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only);
 
@@ -265,6 +268,7 @@ public:
 
 		fbohandle gbuffer{};	// 4 MRT (gbuffer0-2, scene_color)
 		fbohandle forward_render{};	// scene_color, use for translucents
+		fbohandle editorSelectionDepth{};	// just a depth buffer for the editor to draw selected objs into
 	}fbo;
 
 
@@ -289,7 +293,7 @@ public:
 		// Storing normals in rgb16f, can/should optimize this down later
 
 		texhandle scene_custom_depthstencil{};
-		texhandle editor_selection_buffer{};
+		texhandle editor_selection_depth_buffer{};
 		texhandle editor_id_buffer{};
 
 
@@ -297,6 +301,8 @@ public:
 		//texhandle reflected_depth{};
 		
 		texhandle output_composite{};
+		texhandle output_composite_2{};
+		texhandle actual_output_composite{};
 
 		texhandle bloom_chain[MAX_BLOOM_MIPS];
 		glm::ivec2 bloom_chain_isize[MAX_BLOOM_MIPS];
@@ -311,7 +317,8 @@ public:
 		Texture* gbuffer1_vts_handle = nullptr;
 		Texture* gbuffer2_vts_handle = nullptr;
 		Texture* editorid_vts_handle = nullptr;
-
+		Texture* editorSel_vts_handle = nullptr;
+		Texture* postProcessInput_vts_handle = nullptr;
 	}tex;
 
 	struct uniform_buffers {

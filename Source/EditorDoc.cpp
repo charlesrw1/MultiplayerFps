@@ -126,16 +126,43 @@ class CreateStaticMeshCommand : public Command
 {
 public:
 	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform) {
-		m = GetAssets().find_sync<Model>(modelname.c_str()).get();
+
+		// UNSAFE WHEN THIS COMMAND GETS DELETED!!
+		auto ModelPtr = &m;
+		auto handlePtr = &handle;
+		GetAssets().find_async<Model>(modelname.c_str(), [ModelPtr,handlePtr](GenericAssetPtr p) {
+			if (p) {
+				auto modelP = p.cast_to<Model>();
+				*ModelPtr = modelP.get();
+				if (*handlePtr != 0) {
+					auto ent = eng->get_entity(*handlePtr);
+					if (ent) {
+						auto staticMeshEnt = ent->cast_to<StaticMeshEntity>();
+						assert(staticMeshEnt);
+
+						staticMeshEnt->Mesh->set_model(*ModelPtr);
+						ent->editor_name = strip_extension((*ModelPtr)->get_name());
+
+						ed_doc.post_node_changes.invoke();
+					}
+					else
+						sys_print("``` CreateStaticMeshCommand: ent handle invalid\n");
+				}
+			}
+			});
+
 		this->transform = transform;
 	}
-	bool is_valid() override { return m != nullptr; }
+	bool is_valid() override { return true; }
 
 	void execute() {
 		auto ent = eng->spawn_entity_class<StaticMeshEntity>();
 		ent->Mesh->set_model(m);
 		ent->set_ws_transform(transform);
-		ent->editor_name = strip_extension(m->get_name());
+\
+		if (!m) {
+			ent->editor_name = "NoModel";
+		}
 		handle = ent->self_id.handle;
 		ed_doc.on_node_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
@@ -199,6 +226,44 @@ private:
 	};
 	std::vector<Change> changes;
 	std::vector<std::string> fields;
+};
+
+class DuplicateEntitiesCommand : public Command
+{
+public:
+	DuplicateEntitiesCommand(std::vector<uint64_t> handles) {
+		std::vector<Entity*> ents;
+		for (auto h : handles) {
+			ents.push_back(eng->get_entity(h));
+		}
+		serialized_str = LevelSerialization::serialize_entities_to_string(ents);
+	}
+	void execute() {
+		auto duplicated = LevelSerialization::unserialize_entities_from_string(serialized_str);
+		eng->get_level()->insert_unserialized_entities_into_level(duplicated, true/*assign new ids*/);
+		handles.clear();
+		for (auto e : duplicated) {
+			ed_doc.on_node_created.invoke(e->self_id.handle);
+			handles.push_back(e->self_id.handle);
+		}
+		ed_doc.selection_state->set_select_only_this(duplicated.front()->self_id);
+
+		ed_doc.post_node_changes.invoke();
+	}
+	void undo() {
+		for (auto h : handles) {
+			ed_doc.on_node_will_delete.invoke(h);
+			eng->remove_entity(eng->get_entity(h));
+		}
+
+		ed_doc.post_node_changes.invoke();
+	}
+	std::string to_string() override {
+		return "DuplicateEntitiesCommand";
+	}
+
+	std::string serialized_str;
+	std::vector<uint64_t> handles;
 };
 
 class RemoveEntitiesCommand : public Command
@@ -483,6 +548,7 @@ void EditorDoc::on_mouse_down(int x, int y, int button)
 void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 {
 	uint32_t scancode = key.keysym.scancode;
+	bool has_shift = key.keysym.mod & KMOD_SHIFT;
 	const float ORTHO_DIST = 20.0;
 	if (scancode == SDL_SCANCODE_DELETE) {
 		if (selection_state->has_any_selected() && !selection_state->get_ec_selected()) {
@@ -493,6 +559,18 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 			command_mgr->add_command(cmd);
 		}
 	}
+	else if (scancode == SDL_SCANCODE_D && has_shift) {
+		if (selection_state->has_any_selected() && !selection_state->get_ec_selected()) {
+			std::vector<uint64_t> handles;
+			auto& s = selection_state->get_selection();
+			for (auto e : s) handles.push_back(e.handle);
+			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(handles);
+			command_mgr->add_command(cmd);
+		}
+
+
+	}
+
 	else if (1)
 		return;
 	else if (scancode == SDL_SCANCODE_KP_5) {

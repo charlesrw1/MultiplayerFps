@@ -940,7 +940,6 @@ void Player::update()
 	item_update();
 
 	set_ws_transform(position, glm::quat(rotation), scale);
-	root_component->on_changed_transform();
 }
 
 glm::vec3 Player::calc_eye_position()
@@ -1260,9 +1259,32 @@ public:
 	GUIBox* boxWidget = nullptr;
 };
 
- void Player::start()  {
-	 player_mesh->set_model("player_FINAL.cmdl");
+CLASS_H(HealthComponent, EntityComponent)
+public:
 
+	MulticastDelegate<Entity* /* inflictor*/, int/* damage */> on_take_damage;
+	MulticastDelegate<> on_death;
+
+	int healthCounter = 0;
+	int maxHealth = 100;
+
+	void reset() {}
+
+	void set_to_full() {}
+
+	void take_damage() {
+		on_take_damage.invoke(nullptr, 0);
+	}
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(HealthComponent)
+			REG_INT(maxHealth,PROP_DEFAULT,"100")
+		END_PROPS(HealthComponent)
+	}
+};
+CLASS_IMPL(HealthComponent);
+
+ void Player::start()  {
 	 hud = std::make_unique<PlayerHUD>(this);
 
 	 score_update_delegate.invoke(10);
@@ -1271,15 +1293,26 @@ public:
 }
  Player::~Player() {
  }
+#include "Physics/ChannelsAndPresets.h"
  Player::Player() {
 	 player_mesh = create_sub_component<MeshComponent>("CharMesh");
 	 player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
 	 viewmodel_mesh = create_sub_component<MeshComponent>("ViewmodelMesh");
 	 spotlight = create_sub_component<SpotLightComponent>("Flashlight");
+	 health = create_sub_component<HealthComponent>("PlayerHealth");
 	 root_component = player_capsule;
 
 	 player_mesh->attach_to_parent(player_capsule, {});
 	 viewmodel_mesh->attach_to_parent(player_mesh, {});
 	 spotlight->attach_to_parent(root_component.get(), {});
+
+	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
+	 player_mesh->set_model(playerMod);
+
+	 player_capsule->physicsPreset.ptr = &PP_Character::StaticType;
+	 player_capsule->isTrigger = false;
+	 player_capsule->sendOverlap = true;
+
+	 tickEnabled = true;
  }
 

@@ -7,6 +7,10 @@
 
 #include "Physics/ChannelsAndPresets.h"
 #include "Assets/AssetDatabase.h"
+#include "Physics/Physics2.h"
+#include "GameEnginePublic.h"
+#include "Game/Entity.h"
+
 CLASS_IMPL(MeshComponent);
 
 
@@ -55,14 +59,18 @@ const PropertyInfoList* MeshComponent::get_props() {
 		REG_ASSET_PTR(model, PROP_DEFAULT),
 		REG_ASSET_PTR(animator_tree, PROP_DEFAULT),
 		REG_BOOL(cast_shadows, PROP_DEFAULT, "1"),
+		REG_BOOL(is_skybox, PROP_DEFAULT, "0"),
 #ifndef RUNTIME
 		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
 		REG_BOOL(eAnimateInEditor, PROP_DEFAULT | PROP_EDITOR_ONLY, "0"),
 #endif // !RUNTIME
 
+		REG_BOOL(sendHit,PROP_DEFAULT,"0"),
+		REG_BOOL(sendOverlap,PROP_DEFAULT,"0"),
+		REG_BOOL(disablePhysics,PROP_DEFAULT,"0"),
 		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
-		REG_BOOL(is_skybox, PROP_DEFAULT, "0"),
-
+		REG_BOOL(isStatic,PROP_DEFAULT,"0"),
+		REG_BOOL(isTrigger,PROP_DEFAULT,"0"),
 		REG_CLASSTYPE_PTR(physicsPreset, PROP_DEFAULT)
 	END_PROPS(MeshCompponent)
 }
@@ -84,6 +92,7 @@ void MeshComponent::update_handle()
 	obj.owner = this;
 	obj.is_skybox = is_skybox;
 	obj.shadow_caster = cast_shadows;
+	obj.outline = get_owner()->is_selected_in_editor();
 	if (!eMaterialOverride.empty())
 		obj.mat_override = eMaterialOverride[0].get();
 	idraw->get_scene()->update_obj(draw_handle, obj);
@@ -92,6 +101,8 @@ void MeshComponent::update_handle()
 void MeshComponent::on_init()
 {
 	draw_handle = idraw->get_scene()->register_obj();
+	physActor = g_physics->allocate_physics_actor(this);
+	
 	if (model.get()) {
 		if (model->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
 			assert(animator_tree->get_script());
@@ -122,15 +133,25 @@ void MeshComponent::on_init()
 			obj.mat_override = eMaterialOverride[0].get();
 
 		idraw->get_scene()->update_obj(draw_handle, obj);
+
+		physActor->init_physics_shape(nullptr, get_ws_transform(), 
+			simulate_physics && !eng->is_editor_level(), 
+			sendOverlap, sendHit, isStatic, isTrigger, false);
+		physActor->add_model_shape_to_actor(model.get());
+		physActor->update_mass();
 	}
 }
 
 void MeshComponent::on_changed_transform()
 {
-	update_handle();
+	if(draw_handle.is_valid())
+		update_handle();
+	const bool is_simulating = simulate_physics && !eng->is_editor_level();
+	if (physActor && physActor->has_initialized() && !is_simulating)
+		physActor->set_transform(get_ws_transform());
 }
 
-void MeshComponent::on_tick()
+void MeshComponent::update()
 {
 
 }
@@ -139,4 +160,6 @@ void MeshComponent::on_deinit()
 {
 	idraw->get_scene()->remove_obj(draw_handle);
 	animator.reset();
+
+	g_physics->free_physics_actor(physActor);
 }

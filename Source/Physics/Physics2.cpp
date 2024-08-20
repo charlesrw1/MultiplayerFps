@@ -26,13 +26,15 @@
 #include "Framework/Util.h"
 
 #include <physx/PxFiltering.h>
-
+#include <physx/PxScene.h>
 #include "Framework/Hashset.h"
 
 // for debug drawing
 #include "Framework/MeshBuilder.h"
 
 #include "Render/Model.h"
+
+#include "Game/EntityComponent.h"
 
 #define WARN_ONCE(a,...) { \
 	static bool has_warned = false; \
@@ -56,7 +58,7 @@ struct CollisionResponse
 	bool generateHitEvent : 1;
 	bool generateOverlapEvent : 1;
 };
-
+using namespace physx;
 
 inline glm::vec3 physx_to_glm(const physx::PxVec3& v) {
 	return glm::vec3(v.x, v.y, v.z);
@@ -182,10 +184,16 @@ public:
 		constraint = nullptr;
 	}
 
-	PhysicsActor* allocate_physics_actor() override {
-		return new PhysicsActor; 
+	PhysicsActor* allocate_physics_actor(EntityComponent* ecOwner) override {
+		auto a = new PhysicsActor();
+		a->set_entity(ecOwner);
+		all_physics_actors.insert(a);
+		return a;
 	}
 	void free_physics_actor(PhysicsActor*& actor) override {
+		all_physics_actors.remove(actor);
+		awake_dynamic_actors.remove(actor);
+
 		delete actor;
 		actor = nullptr;
 	}
@@ -211,6 +219,9 @@ public:
 		scene = physics_factory->createScene(sceneDesc);
 
 		default_material = physics_factory->createMaterial(0.5f, 0.5f, 0.1f);
+
+		scene->setFlag(PxSceneFlag::eENABLE_ACTIVE_ACTORS, true);
+		scene->setFlag(PxSceneFlag::eEXCLUDE_KINEMATICS_FROM_ACTIVE_ACTORS, true);
 	}
 	void clear_scene() override {}
 	void simulate_and_fetch(float dt) override {
@@ -218,6 +229,21 @@ public:
 
 		scene->simulate(dt);
 		scene->fetchResults(true/* block */);
+
+		// retrieve array of actors that moved
+		PxU32 nbActiveTransforms;
+		auto activeTransforms = scene->getActiveActors(nbActiveTransforms);
+
+		// update each render object with the new transform
+		for (PxU32 i = 0; i < nbActiveTransforms; ++i)
+		{
+			auto physActor = (PhysicsActor*)activeTransforms[i]->userData;
+			if (physActor) {
+				auto ec = physActor->get_entity_owner();
+				if (ec)
+					ec->set_ws_transform(physActor->get_transform());
+			}
+		}
 	}
 
 	void debug_draw_shapes() override;
@@ -257,7 +283,7 @@ PhysicsManPublic* g_physics = &physics_local;
 PhysTransform::PhysTransform(const physx::PxTransform& t) :
 	position(physx_to_glm(t.p)), rotation(physx_to_glm(t.q)) {}
 
-void PhysicsActor::apply_impulse(glm::vec3 worldspace, glm::vec3 impulse)
+void PhysicsActor::apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse)
 {
 	physx::PxRigidBodyExt::addForceAtPos(
 		*get_dynamic_actor(),
@@ -265,15 +291,15 @@ void PhysicsActor::apply_impulse(glm::vec3 worldspace, glm::vec3 impulse)
 		glm_to_physx(worldspace),
 		physx::PxForceMode::eIMPULSE);
 }
-PhysTransform PhysicsActor::get_transform() const
+glm::mat4 PhysicsActor::get_transform() const
 {
-	return actor->getGlobalPose();
+	auto pose = actor->getGlobalPose();
+	auto mat = glm::translate(glm::mat4(1), physx_to_glm(pose.p));
+	mat = mat *  glm::mat4_cast(physx_to_glm(pose.q));
+	return mat;
 }
 
-bool PhysicsActor::is_dynamic() const {
-	assert(actor);
-	return actor->getType() == physx::PxActorType::eRIGID_DYNAMIC;
-}
+
 bool PhysicsActor::is_static() const {
 	assert(actor);
 	return actor->getType() == physx::PxActorType::eRIGID_STATIC;
@@ -285,56 +311,188 @@ glm::vec3 PhysicsActor::get_linear_velocity() const {
 
 void PhysicsActor::free()
 {
-	if (is_allocated()) {
-		//physics_local.scene->removeActor(*(physx::PxActor*)actor);
+	if (has_initialized()) {
+		physics_local.scene->removeActor(*(physx::PxActor*)actor);
 		actor->release();
 		actor = nullptr;
 	}
 }
-void PhysicsActor::create_static_actor_from_shape(const physics_shape_def& shape, PhysicsShapeType type)
+
+using namespace physx;
+#include <glm/gtc/type_ptr.hpp>
+inline PxTransform glm_to_physx(const glm::mat4& mI)
 {
-	if (is_allocated()) {
-		sys_print("??? physics actor wasn't freed before call to create()\n");
+	return PxTransform(PxMat44(
+		glm_to_physx(mI[0]),
+		glm_to_physx(mI[1]),
+		glm_to_physx(mI[2]),
+		glm_to_physx(mI[3])
+	));
+}
+void PhysicsActor::set_shape_flags(PxShape* shape)
+{
+	if (isTrigger)
+		shape->setFlags(PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eTRIGGER_SHAPE | PxShapeFlag::eVISUALIZATION);
+	else
+		shape->setFlags(PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE | PxShapeFlag::eVISUALIZATION);
+}
+void PhysicsActor::add_model_shape_to_actor(const Model* model)
+{
+	if (model->get_physics_body()) {
+		auto body = model->get_physics_body();
+		for (int i = 0; i < body->num_shapes_of_main; i++) {
+			auto& shape = body->shapes[i];
+			if (shape.shape != ShapeType_e::ConvexShape)
+				continue;
+
+			PxShape* aConvexShape = PxRigidActorExt::createExclusiveShape(*actor,
+				PxConvexMeshGeometry(shape.convex_mesh), *physics_local.default_material);
+			set_shape_flags(aConvexShape);
+		}
+	}
+	else {
+		auto aabb = model->get_bounds();
+		auto boxGeom = PxBoxGeometry(glm_to_physx((aabb.bmax - aabb.bmin) * 0.5f));
+
+		auto shape = PxRigidActorExt::createExclusiveShape(*actor,
+			boxGeom, *physics_local.default_material);
+
+		auto middle = (aabb.bmax + aabb.bmin) * 0.5f;
+
+		shape->setLocalPose(PxTransform(glm_to_physx(middle)));
+
+		set_shape_flags(shape);
+	}
+}
+void PhysicsActor::add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius)
+{
+	auto capGeom = PxCapsuleGeometry(radius, height * 0.5);
+	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
+		capGeom, *physics_local.default_material);
+
+	glm::vec3 targetCenter = base + glm::vec3(0.f, height * 0.5f, 0.f);
+
+	shape->setLocalPose(PxTransform(glm_to_physx(targetCenter)));
+	set_shape_flags(shape);
+}
+void PhysicsActor::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
+{
+	auto boxGeom = PxSphereGeometry(radius);
+	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
+		boxGeom, *physics_local.default_material);
+	shape->setLocalPose(PxTransform(glm_to_physx(pos)));
+	set_shape_flags(shape);
+}
+void PhysicsActor::add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents)
+{
+	auto boxGeom = PxBoxGeometry(glm_to_physx(halfExtents));
+	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
+		boxGeom, *physics_local.default_material);
+	shape->setLocalPose(glm_to_physx(localTransform));
+	set_shape_flags(shape);
+}
+
+void PhysicsActor::init_physics_shape(
+	const PhysicsFilterPresetBase* filter,	// the filter to apply
+	const glm::mat4& initalTransform,			// starting transform
+	bool isSimulating,						// if this is a simulating shape 
+	bool sendOverlap,	// if overlap events will be sent to entity component
+	bool sendHit,		// if hit events will be sent to EC
+	bool isStatic,	// if this should create a static actor, not compatible with isSimulating
+	bool isTrigger,
+	bool startDisabled
+)
+{
+	if (has_initialized()) {
+		sys_print("??? physics actor wasn't freed before call to init_physics_shape()\n");
 		free();
 	}
-	physx::PxTransform t(glm_to_physx(shape.local_p),glm_to_physx(shape.local_q));
-	physx::PxRigidStatic* static_actor = physics_local.physics_factory->createRigidStatic(t);
-	switch (shape.shape)
-	{
-	case ShapeType_e::Box:
-		physx::PxRigidActorExt::createExclusiveShape(*static_actor,
-			physx::PxBoxGeometry(glm_to_physx(shape.box.halfsize)), *physics_local.default_material);
-		break;
-	case ShapeType_e::Sphere:
-		physx::PxRigidActorExt::createExclusiveShape(*static_actor,
-			physx::PxSphereGeometry(shape.sph.radius), *physics_local.default_material);
-		break;
+	this->disabled = startDisabled;
+	this->presetMask = filter;
+	this->isSimulating = isSimulating;
+	this->sendHitEvents = sendHit;
+	this->sendOverlapEvents = sendOverlap;
+	this->isTrigger = isTrigger;
+	this->isStatic = isStatic;
+
+	auto factory = physics_local.physics_factory;
+	if (isStatic) {
+		actor = factory->createRigidStatic(glm_to_physx(initalTransform));
 	}
-	physics_local.scene->addActor(*static_actor);
-	actor = static_actor;
+	else {
+		auto t = glm_to_physx(initalTransform);
+		t.q.normalize();
+
+		actor = factory->createRigidDynamic(t);
+		auto dyn = (PxRigidDynamic*)actor;
+		dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->isSimulating);
+	}
+
+	physics_local.scene->addActor(*actor);
 
 	actor->userData = this;
+
+	actor->setActorFlag(physx::PxActorFlag::eSEND_SLEEP_NOTIFIES, true);
+	actor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, disabled);
 }
-void PhysicsActor::create_static_actor_from_model(const Model* model, PhysTransform transform, PhysicsShapeType type)
+
+void PhysicsActor::set_simulate(bool isSimulating)
 {
-	if (!model->get_physics_body())
-		return;
-	auto body = model->get_physics_body();
-	physx::PxRigidStatic* static_actor = physics_local.physics_factory->createRigidStatic(transform.get_physx());
-	for (int i = 0; i < body->num_shapes_of_main; i++) {
-		auto& shape = body->shapes[i];
-		if (shape.shape != ShapeType_e::ConvexShape)
-			continue;
-
-		physx::PxShape* aConvexShape = physx::PxRigidActorExt::createExclusiveShape(*static_actor,
-			physx::PxConvexMeshGeometry(shape.convex_mesh), *physics_local.default_material);
-	
+	assert(actor);
+	if (this->isSimulating != isSimulating) {
+		this->isSimulating = isSimulating;
+		if (!is_static()) {
+			auto dyn = (PxRigidDynamic*)actor;
+			dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->isSimulating);
+		}
+		else
+			sys_print("??? set_simulating set on a static PhysicsActor\n");
 	}
-	physics_local.scene->addActor(*static_actor);
-	actor = static_actor;
-
-	actor->userData = this;
 }
+void PhysicsActor::set_enabled(bool enabled)
+{
+	assert(actor);
+	this->disabled = enabled;
+	actor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, disabled);
+}
+
+void PhysicsActor::update_mass()
+{
+	if (!isStatic) {
+		auto dyn = (PxRigidDynamic*)actor;
+		PxRigidBodyExt::updateMassAndInertia(*dyn, 1.f);
+	}
+}
+void PhysicsActor::set_transform(const glm::mat4& transform, bool teleport)
+{
+	if (is_static() || !teleport) {
+		auto t = glm_to_physx(transform);
+		t.q.normalize();
+		actor->setGlobalPose(t);
+		if(isSimulating)
+			set_linear_velocity({});
+	}
+	else{
+		if (isSimulating) {
+			sys_print("??? set_transform on a simulating PhysicsActor\n");
+		}
+		auto dyn = get_dynamic_actor();
+		dyn->setKinematicTarget(glm_to_physx(transform));
+	}
+}
+void PhysicsActor::set_linear_velocity(const glm::vec3& v)
+{
+	if (is_static()) {
+		sys_print("??? set_linear_velocity on a static PhysicsActor\n");
+	}
+	else {
+		auto dyn = get_dynamic_actor();
+		dyn->setLinearVelocity(glm_to_physx(v));
+	}
+}
+
+
+
 
 static vec3 randColor(uint32_t number) {
 	return fract(sin(vec3(number + 1) * vec3(12.8787, 1.97, 20.73739)));
@@ -444,7 +602,7 @@ void PhysicsManLocal::debug_draw_shapes()
 	using namespace physx;
 	static bool init = false;
 	if (!init) {
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 10.0);
+		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 2.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);

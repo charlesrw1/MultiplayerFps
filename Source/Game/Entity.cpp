@@ -87,11 +87,12 @@ void Entity::initialize()
 		auto& c = all_components[i];
 		if (c->attached_parent.get() == nullptr && root_component.get() != c.get())
 			c->attach_to_parent(root_component.get());
-		c->on_init();
+		c->init();
 	}
 
 	if (!eng->is_editor_level()) {
 		start();
+		init_updater();
 	}
 }
 
@@ -99,22 +100,14 @@ void Entity::destroy()
 {
 	if (!eng->is_editor_level()) {
 		end();
+		shutdown_updater();
 	}
 
 	for (int i = 0; i < all_components.size(); i++)
-		all_components[i]->on_deinit();
+		all_components[i]->deinit();
 	all_components.clear();	// deletes all
 }
 
-
-void Entity::update_entity_and_components() {
-	// call the entity tick function
-	update();
-
-	// tick components, update renderables, animations etc.
-	for (int i = 0; i < all_components.size(); i++)
-		all_components[i]->on_tick();
-}
 
 Entity::~Entity()
 {

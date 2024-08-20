@@ -33,10 +33,39 @@ public:
 		return bIsEditorLevel;
 	}
 	
-	hash_set<Entity> tick_list;
+	hash_set<BaseUpdater> tick_list;
+
+	void add_to_update_list(BaseUpdater* b) {
+		if (bIsInUpdateTick)
+			wantsToAddToUpdate.push_back(b);
+		else
+			tick_list.insert(b);
+	}
+	void remove_from_update_list(BaseUpdater* b);
+
+	void add_to_post_update_list(EntityComponent* b) {
+	}
+	void remove_from_post_update_list(EntityComponent* b) {
+	}
+
+	void update_level() {
+		bIsInUpdateTick = true;
+
+		for (auto updater : tick_list)
+			updater->update();
+
+		bIsInUpdateTick = false;
+
+		for (auto want : wantsToAddToUpdate) {
+			if (want)
+				tick_list.insert(want);
+		}
+		wantsToAddToUpdate.clear();
+	}
+
 
 	// all entities in the map
-	hash_map<Entity> all_world_ents;
+	hash_map<Entity*> all_world_ents;
 	uint64_t last_id = 0;
 	uint64_t local_player_id = 0;
 	const WorldSettings* world_settings = nullptr;	// the world settings entity, shouldnt be nullptr
@@ -102,6 +131,9 @@ public:
 		bIsEditorLevel = isEditorLevel;
 	}
 private:
+	bool bIsInUpdateTick = false;
+	std::vector<BaseUpdater*> wantsToAddToUpdate;
+
 	bool bIsEditorLevel=false;
 
 	friend class LevelSerialization;

@@ -15,7 +15,7 @@ public:
 	~MeshComponent() override;
 
 	void on_init() override;
-	void on_tick() override;
+	void update() override;
 	void on_deinit() override;
 
 	void set_model(const char* model_path);
@@ -42,6 +42,15 @@ public:
 	static const PropertyInfoList* get_props();
 
 	void set_material_override(const MaterialInstance* mi);
+
+	// physics settings
+	bool disablePhysics = false;
+	ClassTypePtr<PhysicsFilterPresetBase> physicsPreset;
+	bool simulate_physics = false;
+	bool isTrigger = false;
+	bool sendOverlap = false;
+	bool sendHit = false;
+	bool isStatic = false;
 private:
 	void update_handle();
 
@@ -52,8 +61,5 @@ private:
 	handle<Render_Object> draw_handle;
 
 
-	ClassTypePtr<PhysicsFilterPresetBase> physicsPreset;
-	bool simulate_physics = false;
-
-	PhysicsActor* physics_actor = nullptr;
+	PhysicsActor* physActor = nullptr;
 };

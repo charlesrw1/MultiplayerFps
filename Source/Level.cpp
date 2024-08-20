@@ -155,6 +155,13 @@ bool Level::load_asset(ClassBase*&)
 	return true;
 }
 
+void Level::remove_from_update_list(BaseUpdater* b) {
+	tick_list.remove(b);
+	for(int i=0;i<wantsToAddToUpdate.size();i++)
+		if (wantsToAddToUpdate[i] == b) {
+			wantsToAddToUpdate[i] = nullptr;
+		}
+}
 
 
 std::string LevelSerialization::serialize_entities_to_string(const std::vector<Entity*>& entities)

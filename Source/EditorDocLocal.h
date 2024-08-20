@@ -296,12 +296,18 @@ public:
 		ec = nullptr;
 		bool already_selected = is_node_selected(node);
 		if (!already_selected) {
+			node.get()->selectedInEditor = true;
+			node.get()->set_ws_transform(node.get()->get_ws_transform());
+
 			ptrs.push_back(node);
 			on_selection_changed.invoke();
 		}
 	}
 	void remove_from_selection(EntityPtr<Entity> node) {
 		ec = nullptr;
+		node.get()->selectedInEditor = false;
+		node.get()->set_ws_transform(node.get()->get_ws_transform());
+
 		for(int i=0;i<ptrs.size();i++)
 			if (ptrs[i].handle == node.handle) {
 				ptrs.erase(ptrs.begin() + i);
@@ -310,7 +316,16 @@ public:
 			}
 	}
 	void clear_all_selected(bool show_this = true) {
+		for (int i = 0; i < ptrs.size(); i++)
+			if (ptrs[i].get()) {
+				ptrs[i].get()->selectedInEditor = false;
+				ptrs[i].get()->set_ws_transform(ptrs[i].get()->get_ws_transform());
+			}
 		ptrs.clear();
+		if (ec) {
+			ec->get_owner()->selectedInEditor = false;
+			ec->get_owner()->set_ws_transform(ec->get_owner()->get_ws_transform());
+		}
 		ec = nullptr;
 		on_selection_changed.invoke();
 	}

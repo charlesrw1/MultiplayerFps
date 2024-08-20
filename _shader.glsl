@@ -1,6 +1,7 @@
 // ***********************************
 // **** GENERATED MATERIAL SHADER ****
 // ***********************************
+#define ALPHATEST
 
 // ******** START "include "SharedGpuTypes.txt"" ********
 
@@ -218,8 +219,10 @@ mat4 ObjModelMatrix;
 mat4 ObjInvModelMatrix;
 
 // ********** START USER CODE **********
-void VSmain() { }
+// Texture defs
+layout(binding = 0 ) uniform sampler2D Sprite;
 
+void VSmain(){	float dist = dot(g.viewfront.xyz, ObjModelMatrix[3].xyz-g.viewpos_time.xyz);	vec3 want_pos = VS_IN_Postion.xzy * mix(1.0, dist * 0.1, 1.0 - smoothstep(4,30,dist)) * 0.6;	want_pos.y *= -1;	want_pos.xy *= vec2(ObjModelMatrix[0].x,ObjModelMatrix[1].y);		mat3 inv_view = transpose(mat3(g.view));		vec3 p = inv_view * want_pos;		p.xyz += ObjModelMatrix[3].xyz;			WORLD_POSITION_OFFSET = p.xyz - FS_IN_FragPos;}
 // ********** END USER CODE **********
 
 void main()
@@ -327,14 +330,9 @@ float AOMAP = 1.0;						// small detail ao map
 
 // ********** START USER CODE **********
 // Texture defs
-layout(binding = 0 ) uniform sampler2D Albedo;
-layout(binding = 1 ) uniform sampler2D Normalmap;
-layout(binding = 2 ) uniform sampler2D Roughness;
-layout(binding = 3 ) uniform sampler2D AOmap;
-layout(binding = 4 ) uniform sampler2D MetalMap;
-layout(binding = 5 ) uniform sampler2D EmissiveMap;
+layout(binding = 0 ) uniform sampler2D Sprite;
 
-vec3 uncompress_normal(vec3 bc_normal){	vec3 stored_normal = bc_normal*2.0 - vec3(1.0);	float x2 = stored_normal.x*stored_normal.x;	float y2 = stored_normal.y*stored_normal.y;	float z = sqrt(max(1-x2-y2,0));	return vec3(bc_normal.x, bc_normal.y, z);}vec4 TriplanarProjection_float(    sampler2D Texture,	vec3 Position,    vec3 Normal,           // world space    float Tile,    float Blend){    vec3 Node_UV = Position * Tile;    vec3 Node_Blend = pow(abs(Normal), vec3(Blend));    Node_Blend /= dot(Node_Blend, vec3(1.0));    vec4 Node_X = texture(Texture,Node_UV.zy);     vec4 Node_Y =  texture(Texture,Node_UV.xz);     vec4 Node_Z = texture(Texture,Node_UV.xy);    return Node_X * Node_Blend.x + Node_Y * Node_Blend.y + Node_Z * Node_Blend.z;}void FSmain(){	vec3 WS_Normal = normalize(FS_IN_Normal);		//BASE_COLOR = TriplanarProjection_float(Albedo, FS_IN_FragPos, WS_Normal, uintBitsToFloat( _material_param_buffer[FS_IN_Matid + 2] ) /* TexCoordMult */ , 5.0).rgb * unpackUnorm4x8( _material_param_buffer[FS_IN_Matid + 3] ) /* colorMult */ .rgb;	BASE_COLOR = texture(Albedo,FS_IN_Texcoord).rgb;	BASE_COLOR = pow(BASE_COLOR,vec3(2.2));	NORMALMAP = uncompress_normal(texture(Normalmap,FS_IN_Texcoord).rgb);	ROUGHNESS = texture(Roughness,FS_IN_Texcoord).r;	METALLIC = texture(MetalMap,FS_IN_Texcoord).r;	EMISSIVE = texture(EmissiveMap,FS_IN_Texcoord).rgb;	//NORMALMAP = uncompress_normal(TriplanarProjection_float(Normalmap, FS_IN_FragPos, WS_Normal, uintBitsToFloat( _material_param_buffer[FS_IN_Matid + 2] ) /* TexCoordMult */ , 5.0).xyz);	//AOMAP = TriplanarProjection_float(AOmap, FS_IN_FragPos, WS_Normal, uintBitsToFloat( _material_param_buffer[FS_IN_Matid + 2] ) /* TexCoordMult */ , 5.0).r;	//ROUGHNESS = TriplanarProjection_float(Roughness, FS_IN_FragPos, WS_Normal, uintBitsToFloat( _material_param_buffer[FS_IN_Matid + 2] ) /* TexCoordMult */ , 5.0).r * uintBitsToFloat( _material_param_buffer[FS_IN_Matid + 1] ) /* RoughnessMult */ ;}
+void FSmain(){	vec4 col_alpha = texture(Sprite,FS_IN_Texcoord);	EMISSIVE = pow(col_alpha.rgb,vec3(2.2));	OPACITY = col_alpha.a;	BASE_COLOR = vec3(0.0);	ROUGHNESS = 1.0;}
 // ********** END USER CODE **********
 
 void main()

@@ -198,7 +198,8 @@ bool MaterialImpl::load_master(MaterialInstance* self, IFile* file)
 {
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
-	bool good = masterImpl->load_from_file(self->get_name(), file);
+	std::string findname = MATERIAL_DIR + self->get_name() + ".mm";
+	bool good = masterImpl->load_from_file(findname, file);
 	if (!good) return false;
 	
 	// init default instance, textures get filled in the dirty list
@@ -603,6 +604,8 @@ std::string MasterMaterialImpl::create_glsl_shader(
 		master_shader_path = "MasterDecalShader.txt";
 	else if (usage == MaterialUsage::UI)
 		master_shader_path = "MasterUIShader.txt";
+	else if (usage == MaterialUsage::Postprocess)
+		master_shader_path = "MasterPostProcessShader.txt";
 
 	bool good = read_and_add_recursive(master_shader_path, masterShader);
 	if (!good)
@@ -720,6 +723,10 @@ void MaterialManagerLocal::init() {
 	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("billboardDefault").get();
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
+
+	PPeditorSelectMat = GetAssets().find_global_sync<MaterialInstance>("defaultEditorSelect").get();
+	if (!PPeditorSelectMat)
+		Fatalf("couldnt load the default editor select material\n");
 }
 
 void MaterialManagerLocal::pre_render_update()

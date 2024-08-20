@@ -53,6 +53,7 @@
     <ClInclude Include="Source\CamData.h" />
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
+    <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
     <ClInclude Include="Source\Game\Components\DecalComponent.h" />
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
@@ -105,7 +106,7 @@
     <ClInclude Include="Source\Framework\Handle.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
-    <ClInclude Include="Source\Framework\Hashset.cpp" />
+    <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
     <ClInclude Include="Source\Framework\MathLib.h" />
     <ClInclude Include="Source\Framework\MemArena.h" />
@@ -254,6 +255,7 @@
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
+    <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />

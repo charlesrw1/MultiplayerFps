@@ -860,7 +860,8 @@ void Renderer::create_default_textures()
 	tex.gbuffer1_vts_handle = Texture::install_system("_gbuffer1");
 	tex.gbuffer2_vts_handle = Texture::install_system("_gbuffer2");
 	tex.editorid_vts_handle = Texture::install_system("_editorid");
-
+	tex.editorSel_vts_handle = Texture::install_system("_editorSelDepth");
+	tex.postProcessInput_vts_handle = Texture::install_system("_PostProcessInput");
 }
 
 // 8mb arena
@@ -968,6 +969,15 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
 	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
 	glNamedFramebufferDrawBuffers(fbo.forward_render, 1, attachments);
+
+	// Editor selection
+	create_and_delete_texture(tex.editor_selection_depth_buffer);
+	glTextureStorage2D(tex.editor_selection_depth_buffer, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
+	set_default_parameters(tex.scene_depth);
+
+	create_and_delete_fb(fbo.editorSelectionDepth);
+	glNamedFramebufferTexture(fbo.editorSelectionDepth, GL_DEPTH_ATTACHMENT, tex.editor_selection_depth_buffer, 0);
+
 	
 	// Gbuffer textures
 	// See the comment above these var's decleration in DrawLocal.h for details
@@ -1011,8 +1021,11 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	// Composite textures
 	create_and_delete_fb(fbo.composite);
 	create_and_delete_texture(tex.output_composite);
+	create_and_delete_texture(tex.output_composite_2);
 	glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
+	glTextureStorage2D(tex.output_composite_2, 1, GL_RGB8, s_w, s_h);
 	set_default_parameters(tex.output_composite);
+	set_default_parameters(tex.output_composite_2);
 	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
 
 	cur_w = s_w;
@@ -1025,7 +1038,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	tex.gbuffer1_vts_handle->update_specs(tex.scene_gbuffer1, s_w, s_h, 3, {});
 	tex.gbuffer2_vts_handle->update_specs(tex.scene_gbuffer2, s_w, s_h, 3, {});
 	tex.editorid_vts_handle->update_specs(tex.editor_id_buffer, s_w, s_h, 4, {});
-
+	tex.editorSel_vts_handle->update_specs(tex.editor_selection_depth_buffer, s_w, s_h, 4, {});
 
 	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
@@ -1147,7 +1160,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 
 		int count = list.command_count[i];
 
-		// static cast, dangerous kinda but not really
+
 		const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
 		draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
 
@@ -1720,7 +1733,7 @@ Render_Scene::Render_Scene()
 	: gbuffer_pass(pass_type::OPAQUE),
 	transparent_pass(pass_type::TRANSPARENT),
 	shadow_pass(pass_type::DEPTH),
-	editor_sel_pass(pass_type::OPAQUE)
+	editor_sel_pass(pass_type::DEPTH)
 {
 
 }
@@ -1938,6 +1951,7 @@ void Render_Scene::init()
 	gbuffer_rlist.init(mat_count,obj_count);
 	transparent_rlist.init(mat_count,obj_count);
 	csm_shadow_rlist.init(mat_count,obj_count);
+	editor_sel_rlist.init(50, 50);
 
 	glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
@@ -2009,6 +2023,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	gbuffer_pass.clear();
 	transparent_pass.clear();
 	shadow_pass.clear();
+	editor_sel_pass.clear();
 
 	// add draw calls and sort them
 	//gpu_objects.resize(proxy_list.objects.size());
@@ -2069,6 +2084,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 								shadow_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
 							gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
 						}
+
+						if (obj.type_.proxy.outline) {
+							editor_sel_pass.add_object(proxy, objhandle, mat, 0, j, iLOD, 0, build_for_editor);
+						}
 					}
 
 
@@ -2122,6 +2141,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		gbuffer_pass.make_batches(*this);
 		shadow_pass.make_batches(*this);
 		transparent_pass.make_batches(*this);
+		editor_sel_pass.make_batches(*this);
 	}
 	{
 		CPUSCOPESTART(make_render_lists);
@@ -2141,6 +2161,12 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		RenderListBuilder::build_standard_cpu(
 			transparent_rlist,
 			transparent_pass,
+			proxy_list
+		);
+
+		RenderListBuilder::build_standard_cpu(
+			editor_sel_rlist,
+			editor_sel_pass,
 			proxy_list
 		);
 	}
@@ -3254,7 +3280,7 @@ void Renderer::check_cubemaps_dirty()
 		skylight.skylight.wants_update = false;
 	}
 }
-
+ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV);
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
 	current_time = GetTime();
@@ -3394,6 +3420,21 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	if (params.is_cubemap_view)
 		return;
 
+	if(params.is_editor)
+	{
+		GPUSCOPESTART("EDITORSELECT");
+		Render_Level_Params params(
+			current_frame_main_view,
+			&scene.editor_sel_rlist,
+			&scene.editor_sel_pass,
+			fbo.editorSelectionDepth,
+			true,
+			Render_Level_Params::DEPTH
+		);
+		params.provied_constant_buffer = ubo.current_frame;
+		render_level_to_target(params);
+	}
+
 	if (is_wireframe_mode)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	
@@ -3403,10 +3444,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
 
-	draw_debug_shapes(params.dt);
+	{
+		glDepthFunc(GL_GREATER);
 
-	// hook in physics debugging, function determines if its drawing or not
-	g_physics->debug_draw_shapes();
+		draw_debug_shapes(params.dt);
+
+		// hook in physics debugging, function determines if its drawing or not
+		g_physics->debug_draw_shapes();
+
+		glDepthFunc(GL_LEQUAL);
+	}
 
 	if (g_draw_grid.get_bool())
 		draw_debug_grid();
@@ -3420,6 +3467,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 
 	uint32_t framebuffer_to_output = fbo.composite;// (needs_composite) ? fbo.composite : 0;
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_output);
+	glClear(GL_COLOR_BUFFER_BIT);
 	glViewport(0, 0, cur_w, cur_h);
 
 	set_shader(prog.combine);
@@ -3430,6 +3478,13 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	bind_texture(1, bloom_tex);
 	bind_texture(2, lens_dirt->gl_id);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	std::vector<MaterialInstance*> postProcesses;
+	if (params.is_editor)
+		postProcesses.push_back(matman.get_default_editor_sel_PP());
+	if(!r_no_postprocess.get_bool())
+		do_post_process_stack(postProcesses);
+	//tex.actual_output_composite = tex.output_composite_2;
 
 	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
@@ -3491,6 +3546,48 @@ Shader Renderer::shader()
 	return prog_man.get_obj(state_machine.active_program);
 }
 
+
+void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo.composite);
+
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_DEPTH_TEST);
+	auto renderToTexture = tex.output_composite_2;
+	auto renderFromTexture = tex.output_composite;
+	tex.actual_output_composite = renderFromTexture;
+	for (int i = 0; i < postProcessMats.size(); i++) {
+		if (!postProcessMats[i])
+			continue;
+		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture, 0);
+		tex.postProcessInput_vts_handle->update_specs(renderFromTexture, cur_w, cur_h, 3, {});
+
+		auto mat = postProcessMats[i];
+
+		set_shader(matman.get_mat_shader(false,nullptr,mat,false,false,false,false));
+		set_blend_state(mat->get_master_material()->blend);
+		auto& texs = mat->impl->get_textures();
+
+		for (int i = 0; i < texs.size(); i++) {
+			bind_texture(i, texs[i]->gl_id);
+		}
+
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
+		tex.actual_output_composite = renderToTexture;
+
+		auto temp = renderFromTexture;
+		renderFromTexture = renderToTexture;
+		renderToTexture = temp;
+	}
+
+	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
+}
 
 #undef SET_OR_USE_FALLBACK
 #define SET_OR_USE_FALLBACK(texture, where, fallback) \

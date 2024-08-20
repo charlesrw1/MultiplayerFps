@@ -1,6 +1,7 @@
 #include "EntityComponent.h"
 #include "glm/gtx/euler_angles.hpp"
 #include "Entity.h"
+#include "Level.h"
 
 CLASS_IMPL(EntityComponent);
 CLASS_IMPL(EmptyComponent);
@@ -149,4 +150,15 @@ void EntityComponent::destroy_children_no_unlink()
 		children[i]->destroy_children_no_unlink();
 	on_deinit();
 	entity_owner->remove_this_component(this);
+}
+
+void EntityComponent::init()
+{
+	on_init();
+	shutdown_updater();
+}
+void EntityComponent::deinit()
+{
+	on_deinit();
+	init_updater();
 }
