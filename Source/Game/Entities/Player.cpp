@@ -28,18 +28,15 @@ public:
 	}
 
 	void get_view(
-		glm::vec3& pos,
-		glm::vec3& front,
+		glm::mat4& view,
 		float& fov
 	) override {
 		if (!camera)
 			return;
 
 		fov = 70.f;
-		pos = camera->get_ws_position();
+		view = glm::inverse(camera->get_ws_transform());
 
-		glm::vec3 euler = glm::eulerAngles(camera->get_ws_rotation());
-		front = euler;
 		//front = AnglesToVector(euler.x, euler.y);
 	}
 	void set_input_command(Move_Command cmd) override {}
@@ -948,7 +945,7 @@ glm::vec3 Player::calc_eye_position()
 	return position + vec3(0, view_height, 0);
 }
 
-void Player::get_view(glm::vec3& org, glm::vec3& ang, float& fov)
+void Player::get_view(glm::mat4& viewMat, float& fov)
 {
 	if (g_thirdperson.get_bool()) {
 
@@ -956,16 +953,20 @@ void Player::get_view(glm::vec3& org, glm::vec3& ang, float& fov)
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
 		vec3 camera_pos = position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
 
-		org = camera_pos;
-		ang = view_angles;
+		viewMat = glm::lookAt(camera_pos, camera_pos + front, glm::vec3(0, 1, 0));
+
+		//org = camera_pos;
+		//ang = view_angles;
 		fov = g_fov.get_float();
 	}
 	else
 	{
 		vec3 cam_position = calc_eye_position();
+		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 
-		org = cam_position;
-		ang = view_angles;
+		viewMat = glm::lookAt(cam_position, cam_position + front, glm::vec3(0, 1, 0));
+		//org = cam_position;
+		//ang = view_angles;
 		fov = g_fov.get_float();
 	}
 }

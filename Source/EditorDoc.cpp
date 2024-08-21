@@ -164,6 +164,9 @@ public:
 			ent->editor_name = "NoModel";
 		}
 		handle = ent->self_id.handle;
+
+		ed_doc.selection_state->set_select_only_this(ent->self_id);
+
 		ed_doc.on_node_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
 	}
@@ -195,6 +198,7 @@ public:
 		ent->set_ws_transform(transform);
 		ent->editor_name = ent->get_type().classname;
 		handle = ent->self_id.handle;
+		ed_doc.selection_state->set_select_only_this(ent->self_id);
 		ed_doc.on_node_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
 	}
@@ -246,7 +250,10 @@ public:
 			ed_doc.on_node_created.invoke(e->self_id.handle);
 			handles.push_back(e->self_id.handle);
 		}
-		ed_doc.selection_state->set_select_only_this(duplicated.front()->self_id);
+		ed_doc.selection_state->clear_all_selected();
+		for (auto e : duplicated) {
+			ed_doc.selection_state->add_to_selection(e->self_id);
+		}
 
 		ed_doc.post_node_changes.invoke();
 	}
@@ -536,9 +543,13 @@ void EditorDoc::on_mouse_down(int x, int y, int button)
 		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
 
 		if (handle.is_valid()) {
+
 			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
 			if (component_ptr && component_ptr->get_owner()) {
-				selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
+				if (ImGui::GetIO().KeyShift) 
+					selection_state->add_to_selection(component_ptr->get_owner()->self_id);
+				else
+					selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
 			}
 		}
 
@@ -847,8 +858,8 @@ void ManipulateTransformTool::update_pivot_and_cached()
 				world_space_of_selected.push_back(e.get()->get_ws_transform());
 		}
 	}
-
-	if (world_space_of_selected.size() == 1) {
+	static bool selectFirstOnly = true;
+	if (world_space_of_selected.size() == 1 || (!world_space_of_selected.empty() && selectFirstOnly)) {
 		pivot_transform = world_space_of_selected[0];
 	}
 	else if (world_space_of_selected.size() > 1) {

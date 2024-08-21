@@ -110,7 +110,7 @@ public:
 
 	// PlayerBase overrides
 	void set_input_command(Move_Command cmd) override; 	// called by game before calling update
-	void get_view(glm::vec3& origin, glm::vec3& angles, float& fov) override;
+	void get_view(glm::mat4& viewMatrix, float& fov) override;
 	
 	// Entity overrides
 	void update() override;

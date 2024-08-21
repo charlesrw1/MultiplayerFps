@@ -2976,6 +2976,8 @@ void Renderer::accumulate_gbuffer_lighting()
 
 		shader().set_vec3("uSunDirection", sun_internal->sun.direction);
 		shader().set_vec3("uSunColor", sun_internal->sun.color);
+		shader().set_float("uEpsilon", sun_internal->sun.epsilon);
+
 		
 		// fullscreen shader, no vao used
 		glBindVertexArray(vao.default_);
@@ -3274,6 +3276,7 @@ void Renderer::check_cubemaps_dirty()
 	GPUFUNCTIONSTART;
 
 	if (!scene.skylights.empty() && (scene.skylights[0].skylight.wants_update|| force_render_cubemaps.get_bool())) {
+		sys_print("``` rendering skylight cubemap\n");
 		force_render_cubemaps.set_bool(false);
 		auto& skylight = scene.skylights[0];
 		update_cubemap_specular_irradiance(skylight.ambientCube, (Texture*)skylight.skylight.generated_cube, glm::vec3(0.f), true);
@@ -3485,7 +3488,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	if(!r_no_postprocess.get_bool())
 		do_post_process_stack(postProcesses);
 	//tex.actual_output_composite = tex.output_composite_2;
-
+	glEnable(GL_BLEND);
 	set_shader(prog.simple);
 	shader().set_mat4("ViewProj", vs.viewproj);
 	shader().set_mat4("Model", mat4(1.f));
@@ -4009,7 +4012,7 @@ handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
 
 	const size_t ofs = cur_w * y * 4 + x * 4;
 	uint8_t* ptr = &buffer_pixels[ofs];
-	uint32_t id = uint32_t(ptr[0]) | uint32_t(ptr[1]) << 8 | uint32_t(ptr[1]) << 16 | uint32_t(ptr[3]) << 24;
+	uint32_t id = uint32_t(ptr[0]) | uint32_t(ptr[1]) << 8 | uint32_t(ptr[2]) << 16 | uint32_t(ptr[3]) << 24;
 	delete[] buffer_pixels;
 
 	if (id == 0xff000000) {

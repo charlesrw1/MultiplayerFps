@@ -54,6 +54,7 @@
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
+    <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
     <ClInclude Include="Source\Game\Components\DecalComponent.h" />
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
@@ -138,6 +139,7 @@
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\Components\EntityComponentTypes.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
+    <ClInclude Include="Source\Game\GameMain.h" />
     <ClInclude Include="Source\Game\GameMode.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
@@ -256,6 +258,7 @@
     <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
+    <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
@@ -268,6 +271,7 @@
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />
     <ClCompile Include="Source\Game\Game.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
+    <ClCompile Include="Source\Game\GameMain.cpp" />
     <ClCompile Include="Source\Game\GameMode.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Entities\Player.cpp" />

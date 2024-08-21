@@ -170,7 +170,7 @@ float sample_sun_shadow(vec3 WorldSpace
 #ifdef DEBUG
 	OUTlayer = layer;
 #endif	
-	float bias = g.shadowmap_epsilon;
+	float bias = uEpsilon;
 	
 	float shadow = 0.0;
 	vec2 texelSize = 1.0 / vec2(textureSize(cascade_shadow_map, 0));

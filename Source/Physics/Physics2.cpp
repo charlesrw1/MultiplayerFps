@@ -417,7 +417,10 @@ void PhysicsActor::init_physics_shape(
 
 	auto factory = physics_local.physics_factory;
 	if (isStatic) {
-		actor = factory->createRigidStatic(glm_to_physx(initalTransform));
+		auto t = glm_to_physx(initalTransform);
+		t.q.normalize();
+
+		actor = factory->createRigidStatic(t);
 	}
 	else {
 		auto t = glm_to_physx(initalTransform);

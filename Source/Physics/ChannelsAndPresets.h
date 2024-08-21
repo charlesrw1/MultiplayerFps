@@ -27,6 +27,8 @@ public:
 		Overlap,
 		Block
 	};
+	bool isQueryable = true;
+	bool hasCollisions = true;
 protected:
 	void set_self(PhysicsChannel self) {
 		physicsChannelBaseType = self;

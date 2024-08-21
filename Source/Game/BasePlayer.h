@@ -7,8 +7,7 @@
 CLASS_H(PlayerBase, Entity)
 public:
 	virtual void get_view(
-		glm::vec3& pos,
-		glm::vec3& front,
+		glm::mat4& viewMatrix,
 		float& fov
 	) = 0;
 	virtual void set_input_command(Move_Command cmd) = 0;

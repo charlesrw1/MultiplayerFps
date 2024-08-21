@@ -537,6 +537,8 @@
     <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
+    <ClInclude Include="Source\Game\GameMain.h" />
+    <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -807,5 +809,7 @@
     <ClCompile Include="Source\Framework\Hashset.cpp">
       <Filter>Source\Framework\Containers</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\GameMain.cpp" />
+    <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
   </ItemGroup>
 </Project>

@@ -4,6 +4,7 @@
 #include "Render/DrawPublic.h"
 #include "Render/RenderObj.h"
 #include "Render/Model.h"
+#include "Game/Entity.h"
 CLASS_IMPL(BillboardComponent);
 
 BillboardComponent::BillboardComponent() {}
@@ -61,4 +62,5 @@ void BillboardComponent::fill_out_render_obj(Render_Object& obj)
 	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;
 	obj.owner = this;
+	obj.outline = get_owner()->is_selected_in_editor();
 }

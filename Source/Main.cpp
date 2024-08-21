@@ -806,6 +806,9 @@ ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV);
 ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV);
 ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV);
 
+ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV);
+
+
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL);
@@ -1286,13 +1289,13 @@ bool GameEngineLocal::game_draw_screen()
 	PlayerBase* p = checked_cast<PlayerBase>(get_local_player());
 	ASSERT(p)
 	
-	glm::vec3 position(0,0,0);
-	glm::vec3 angles(0, 0, 0);
-	float fov = g_fov.get_float();
-	p->get_view(position, angles, fov);
-	glm::vec3 front = AnglesToVector(angles.x, angles.y);
 
-	View_Setup vs = View_Setup(position, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
+	glm::mat4 view;
+	float fov = g_fov.get_float();
+	p->get_view(view, fov);
+
+
+	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
 	idraw->scene_draw(params,vs, get_gui());
 
