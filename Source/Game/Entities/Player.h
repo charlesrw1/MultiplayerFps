@@ -141,11 +141,7 @@ public:
 
 	Move_Command cmd;
 
-	virtual glm::vec3 get_velocity() const  override {
-		return velocity;
-	}
-
-	glm::vec3 velocity = glm::vec3(0.f);
+	glm::vec3 velocity{};
 
 	bool has_flag(PlayerFlags::Enum flag) const {
 		return flags & flag;

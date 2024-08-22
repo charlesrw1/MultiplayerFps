@@ -28,7 +28,7 @@
 
 ModelMan mods;
 
-static const char* const model_folder_path = "./Data/Models/";
+static const char* const model_folder_path = "./Data/";
 
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
@@ -58,25 +58,11 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		std::unordered_set<std::string> stuff;
-		auto find_tree = FileSys::find_files("./Data/Models");
+		auto find_tree = FileSys::find_files("./Data");
 		for (const auto _file : find_tree) {
-			auto file = _file.substr(14);
+			auto file = _file.substr(7);
 			if (has_extension(file, "cmdl")) {
-				auto resource_exists = stuff.find(file) != stuff.end();
-				if (!resource_exists) {
-					stuff.insert(file);
-					filepaths.push_back(file);
-				}
-			}
-			// if a .cmdl hasn't been compilied yet, still include .defs as .cmdls as they will be autocompilied
-			else if (has_extension(file, "def")) {
-				std::string path = strip_extension(file) + ".cmdl";
-				auto resource_exists = stuff.find(path) != stuff.end();
-				if (!resource_exists) {
-					stuff.insert(path);
-					filepaths.push_back(path);
-				}
+				filepaths.push_back(file);	
 			}
 		}
 	}
@@ -827,7 +813,7 @@ DECLARE_ENGINE_CMD(IMPORT_MODEL)
 		return;
 	}
 
-	std::string savepath = "./Data/Models/";
+	std::string savepath = "./Data/";
 	savepath += strip_extension(args.at(1)) + ".mis";
 	{
 		//auto existingFile = FileSys::open_read_os(savepath.c_str());

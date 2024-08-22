@@ -18,7 +18,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetDatabase.h"
 
-static const char* const MATERIAL_DIR = "./Data/Materials/";
+static const char* const MATERIAL_DIR = "./Data/";
 MaterialManagerLocal matman;
 MaterialManagerPublic* imaterials = &matman;
 
@@ -35,14 +35,14 @@ public:
 	virtual std::string get_type_name()  const override { return "Material"; }
 	virtual void index_assets(std::vector<std::string>& filepaths)  const override
 	{
-		auto tree = FileSys::find_files("./Data/Materials");
+		auto tree = FileSys::find_files("./Data");
 		for (auto file : tree) {
 			if(has_extension(file,"mi")||has_extension(file,"mm"))
-				filepaths.push_back(strip_extension(file.substr(17)));
+				filepaths.push_back(strip_extension(file.substr(7)));
 		}
 	}
 	virtual bool assets_are_filepaths() const override { return false; }
-	virtual std::string root_filepath()  const override { return "./Data/Materials/"; }
+	virtual std::string root_filepath()  const override { return "./Data/"; }
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
 	IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
 };

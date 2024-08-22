@@ -232,12 +232,6 @@ float interpolate_modulo(float start, float end, float mod, float alpha)
 
 
 
-void set_entity_interp_vars(Entity& e, Interp_Entry& ie)
-{
-	e.position = ie.position;
-	e.rotation = ie.angles;
-}
-
 #if 0
 void Client::interpolate_states()
 {

@@ -151,7 +151,7 @@ bool MaterialEditorLocal::save_document_internal()
 		}
 	}
 
-	std::string path = "./Data/Materials/" + (std::string)get_name() +".mi";
+	std::string path = "./Data/" + (std::string)get_name() +".mi";
 	std::ofstream outfile(path);
 	outfile.write(output.data(), output.size());
 	outfile.close();

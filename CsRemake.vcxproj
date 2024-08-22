@@ -143,6 +143,7 @@
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
+    <ClInclude Include="Source\Game\Map.h" />
     <ClInclude Include="Source\Game\Schema.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />

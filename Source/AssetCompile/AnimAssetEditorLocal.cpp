@@ -304,7 +304,7 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 
 	// try to find def_name
 	std::string def_name = modelName + ".mis";
-	std::string fullpath = "./Data/Models/" + def_name;
+	std::string fullpath = "./Data/" + def_name;
 	auto file = FileSys::open_read_os(fullpath.c_str());
 
 	if (!file) {
@@ -384,7 +384,7 @@ bool AnimationEditorTool::save_document_internal()
 	std::string animName = str.substr(slash + 1);
 
 
-	std::string path = "./Data/Models/" + modelName + ".mis";
+	std::string path = "./Data/" + modelName + ".mis";
 	std::ofstream outfile(path);
 	outfile.write(write.get_output().data(), write.get_output().size());
 	outfile.close();

@@ -16,34 +16,7 @@
 
 
 class Model;
-class GeomContact;
-
-
-struct EntityFlags
-{
-	enum Enum
-	{
-		Dead = 1,
-		Hidden = 2,
-	};
-};
-
-
-typedef uint32_t entityhandle;
-
-
-struct UpdateFlags
-{
-	enum Enum : uint8_t
-	{
-		UPDATE = 1,	// pre physics
-		PRESENT = 2,	// post physics
-	};
-};
-
 class PhysicsActor;
-class Dict;
-
 
 // A gobally unique identifier in the game level
 // every entity is assigned one, and its used to reference others
@@ -67,6 +40,14 @@ public:
 	}
 	T* operator->() const {
 		return get();
+	}
+	template<typename K>
+	bool operator==(const EntityPtr<K>& other) {
+		return handle == other.handle;
+	}
+	template<typename K>
+	bool operator!=(const EntityPtr<K>& other) {
+		return handle != other.handle;
 	}
 
 	uint64_t handle = 0;
@@ -118,31 +99,14 @@ public:
 	void initialize();
 	void destroy();
 
-	// called every game tick when actor is ticking
+	// called every game tick when actor has tick enabled
 	virtual void update() override {}
-
-	// Editor calls tick on components but not on entity
-	
-	glm::vec3 scale = glm::vec3(1.f);
-	glm::vec3 position = glm::vec3(0.0);
-	glm::quat rotation = glm::quat();
-	
-	glm::vec3 esimated_accel = glm::vec3(0.f);
-	EntityFlags::Enum flags = EntityFlags::Enum(0);
-
-	virtual glm::vec3 get_velocity() const {
-		return glm::vec3(0.f);
-	}
-
-	bool has_flag(EntityFlags::Enum flag) const {
-		return flags & flag;
-	}
-	void set_flag(EntityFlags::Enum flag, bool val) {
-		if (val)
-			flags = EntityFlags::Enum(flags | flag);
-		else
-			flags = EntityFlags::Enum(flags & (~flag));
-	}
+private:
+	// called when entity spawns in game only
+	virtual void start() {}
+	// called when entity is destroyed in game only
+	virtual void end() {}
+public:
 
 	template<typename T>
 	T* get_first_component() {
@@ -162,6 +126,7 @@ public:
 	}
 
 	// USE IN GAMEPLAY! use create_sub_component to setup object in the constructor
+	// this calls on_init()
 	template<typename T>
 	T* create_and_attach_component_type(EntityComponent* parent = nullptr, StringName bone = {});
 	EntityComponent* create_and_attach_component_type(const ClassTypeInfo* info, EntityComponent* parent = nullptr, StringName bone = {});
@@ -169,30 +134,37 @@ public:
 	// ONLY USE in Constructor!, use create_and_attach for normal usage
 	template<typename T>
 	T* create_sub_component(const std::string& name);
+	// ONLY USE in serialization!
+	void add_component_from_loading(EntityComponent* component);
+	// create_sub_component<T>("name") is equivlent to:
+	// T* component = new T()
+	// component->name = "name"
+	// add_component_from_loading(component)
 
-	// DELETES the EntityComponent, dont use the ptr again after this call
+	// DELETES the EntityComponent (and calls component->deinit()), dont use the ptr again after this call
 	void remove_this_component(EntityComponent* component);
 
 	// get/set world space transform  (transform of the root component)
 	const glm::mat4& get_ws_transform() { return get_root_component()->get_ws_transform(); }
-	glm::vec3 get_ws_position() { return get_root_component()->position; }
-	glm::quat get_ws_rotation() { return get_root_component()->rotation; }
-	glm::vec3 get_ws_scale() { return get_root_component()->scale; }
-	void set_ws_transform(const glm::mat4& mat) { return get_root_component()->set_ws_transform(mat); }
-	void set_ws_transform(const glm::vec3& pos, const glm::quat& q, const glm::vec3& scale) { return get_root_component()->set_ls_transform(pos,q,scale); }
-	void set_ws_position(const glm::vec3& v) { return get_root_component()->set_ls_transform(v, get_ws_rotation(), get_ws_scale()); }
-	void set_ws_rotation(const glm::quat& q) { return get_root_component()->set_ls_transform(get_ws_position(), q, get_ws_scale()); }
-	
-	void parent_to_entity(Entity* parentEntity);
-	void parent_to_component(EntityComponent* parentEntityComponent);
+	glm::vec3 get_ws_position() { return get_root_component()->get_ws_position(); }
+	glm::quat get_ws_rotation() { return get_root_component()->get_ws_rotation(); }
+	glm::vec3 get_ws_scale() { return get_root_component()->get_ws_scale(); }
+	void set_ws_transform(const glm::mat4& mat) { get_root_component()->set_ws_transform(mat); }
+	void set_ws_transform(const glm::vec3& pos, const glm::quat& q, const glm::vec3& scale) { get_root_component()->set_ws_transform(pos,q,scale); }
+	void set_ws_position(const glm::vec3& v) {  get_root_component()->set_ws_transform(v, get_ws_rotation(), get_ws_scale()); }
+	void set_ws_rotation(const glm::quat& q) {  get_root_component()->set_ws_transform(get_ws_position(), q, get_ws_scale()); }
+	void set_ws_scale(const glm::vec3& s) { get_root_component()->set_ws_transform(get_ws_position(), get_ws_rotation(), s); }
 
+	// parent the root component of this to another entity
+	// can use nullptr to unparent
+	void parent_to_entity(Entity* parentEntity);	// parents to root component
+	void parent_to_component(EntityComponent* parentEntityComponent);	// parent to specified component
 
 	const std::vector<std::unique_ptr<EntityComponent>>& get_all_components() { return all_components; }
 
-	void add_component_from_loading(EntityComponent* component);
 protected:
 
-	EntityPtr<Entity> parentedEntity;	// used for serialization purposes
+	EntityPtr<Entity> parentedEntity;	// what is root component parented to, this can be accessed inside it too, but this is used for serialization
 	EntityComponent* root_component = nullptr;
 	// components created either in code or defined in schema or created per instance
 	std::vector<std::unique_ptr<EntityComponent>> all_components;
@@ -209,8 +181,7 @@ public:
 
 	static const PropertyInfoList* get_props();
 
-	template<typename T>
-	static PropertyInfo generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags);
+
 #ifndef NO_EDITOR
 	virtual bool editor_compile() { return true; }
 	virtual bool editor_only() const { return false; }
@@ -232,29 +203,10 @@ private:
 	// editor only obviously
 	bool selectedInEditor = false;
 
-	virtual void start() {}
-	virtual void end() {}
 
 	friend class EditorDoc;
 	friend class SelectionState;
 };
-#define REG_ENTITY_REF(name, flags) Entity::generate_entity_ref_property( \
-&((TYPE_FROM_START*)0)->name, \
-#name, offsetof(TYPE_FROM_START,name), flags)
-
-inline void Entity::remove_this_component(EntityComponent* component) {
-	assert(component != root_component && "cant delete the root component");
-	bool found = false;
-	for (int i = 0; i < all_components.size(); i++) {
-		if (all_components[i].get() == component) {
-			all_components.erase(all_components.begin() + i);
-			found = true;
-			break;
-		}
-	}
-
-	assert(found && "component not found in remove_this_component");
-}
 
 template<typename T>
 inline T* Entity::create_sub_component(const std::string& name) {
@@ -291,18 +243,6 @@ inline EntityComponent* Entity::create_and_attach_component_type(const ClassType
 }
 
 
-template<typename T>
-inline static PropertyInfo Entity::generate_entity_ref_property(T* dummy, const char* name, uint16_t offset, uint32_t flags) {
-	static_assert(std::is_base_of<Entity, T>::value, "Type not derived from Entity");
-	PropertyInfo pi;
-	pi.name = name;
-	pi.offset = offset;
-	pi.flags = flags;
-	pi.range_hint = T::StaticType.classname;
-	pi.custom_type_str = "EntityRef";
-	pi.type = core_type_id::Struct;
-	return pi;
-}
 inline void Entity::add_component_from_loading(EntityComponent* component)
 {
 	component->set_owner(this);

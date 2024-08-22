@@ -24,7 +24,7 @@ void Grenade::update()
 
 void Door::update()
 {
-	rotation.y = eng->get_game_time();
+	//rotation.y = eng->get_game_time();
 }
 
 DECLARE_ENGINE_CMD(spawn_npc)

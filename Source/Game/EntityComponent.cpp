@@ -13,14 +13,18 @@ static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::q
 	p = transform[3];
 }
 
-glm::mat4 EntityComponent::get_ls_transform() const
+static glm::mat4 compose_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& s)
 {
 	glm::mat4 model;
-	model = glm::translate(glm::mat4(1), position);
-	model = model * glm::mat4_cast(rotation);
-	model = glm::scale(model, glm::vec3(scale));
-
+	model = glm::translate(glm::mat4(1), v);
+	model = model * glm::mat4_cast(q);
+	model = glm::scale(model, glm::vec3(s));
 	return model;
+}
+
+glm::mat4 EntityComponent::get_ls_transform() const
+{
+	return compose_transform(position,rotation,scale);
 }
 void EntityComponent::set_ls_transform(const glm::mat4& transform) {
 	decompose_transform(transform, position, rotation, scale);
@@ -44,6 +48,18 @@ void EntityComponent::post_change_transform_R(bool ws_is_dirty)
 	// recurse to children
 	for (int i = 0; i < children.size(); i++)
 		children[i]->post_change_transform_R();
+}
+
+void EntityComponent::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale)
+{
+	if (!attached_parent.get()) {
+		set_ls_transform(v, q, scale);
+		return;
+	}
+
+	auto matrix = compose_transform(v, q, scale);
+	set_ws_transform(matrix);
+	post_change_transform_R();
 }
 
 
@@ -148,14 +164,26 @@ void EntityComponent::init()
 	on_init();
 	init_updater();
 }
-void EntityComponent::deinit()
+void EntityComponent::deinit(bool destruct_subcomponents)
 {
+	if (destruct_subcomponents && attached_parent.get())
+		attached_parent->remove_this(this);
+
 	for (int i = 0; i < children.size(); i++) {
 		if (children[i]->entity_owner != entity_owner) {	// from a different entity
 			const int preSize = children.size();
 			eng->remove_entity(children[i]->entity_owner);	// remove it, this will call back up to us to remove from our child list
 			assert(children.size() == preSize - 1);
 			i--;	// since item was deleted, decrement to go to next element
+		}
+	}
+
+	if (destruct_subcomponents) {
+		for (int i = 0; i < children.size(); i++) {
+			int preSize = children.size();
+			entity_owner->remove_this_component(children[i]);
+			assert(preSize == children.size() - 1);
+			i--;
 		}
 	}
 

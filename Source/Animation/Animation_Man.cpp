@@ -11,7 +11,7 @@
 
 #include "Framework/ExpressionLang.h"
 
-static const char* MODEL_DIRECTORY = "Data/Models/";
+static const char* MODEL_DIRECTORY = "Data/";
 
 CLASS_IMPL(Animation_Tree_CFG);
 

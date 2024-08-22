@@ -2,12 +2,11 @@
 thirdperson 1
 
 
-#start_ed Map mainMenuMap.txt
+#start_ed Map mainMenuMap.tmap
 
 g_draw_physx_scene 0
 
-bind 1 "map mainMenuMap.txt"
-bind 6 "start_ed map m.txt"
+bind 1 "map mainMenuMap.tmap"
 
 bind . "g_drawdebugmenu 1"
 bind , "g_drawdebugmenu 0"

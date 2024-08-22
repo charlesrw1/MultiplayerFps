@@ -23,6 +23,7 @@ public:
 	// override this to add a new tool to the editor, used for maps, models, animations, everything
 	virtual IEditorTool* tool_to_edit_me() const { return nullptr; }
 	virtual const char* get_arg_for_editortool() const { return ""; }
+
 	// return <AssetName>::StaticType
 	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
 

@@ -129,7 +129,7 @@ bool DataClassEditor::save_document_internal()
 
 	assert(editing_object);
 
-	std::string savepath = "./Data/DataClasses/";
+	std::string savepath = "./Data/";
 	savepath += get_doc_name();
 
 	DictWriter dw;

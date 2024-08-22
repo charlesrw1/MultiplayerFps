@@ -505,7 +505,7 @@ public:
 	virtual void overlay_draw() override;
 	virtual void imgui_draw() override;
 	virtual const View_Setup& get_vs() override;
-	virtual std::string get_save_root_dir() override { return "./Data/Maps/"; }
+	virtual std::string get_save_root_dir() override { return "./Data/"; }
 
 	std::string get_full_output_path() {
 		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();

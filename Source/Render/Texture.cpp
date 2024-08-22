@@ -13,7 +13,7 @@
 #undef OPAQUE
 #include "Assets/AssetRegistry.h"
 
-static const char* const texture_folder_path = "./Data/Textures/";
+static const char* const texture_folder_path = "./Data/";
 
 
 CLASS_IMPL(Texture);
@@ -39,9 +39,9 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const override
 	{
-		auto find_tree = FileSys::find_files("./Data/Textures");
+		auto find_tree = FileSys::find_files("./Data");
 		for (const auto _file : find_tree) {
-			auto file = _file.substr(16);
+			auto file = _file.substr(7);
 			if (has_extension(file, "dds")||has_extension(file,"png")||has_extension(file,"hdr"))
 				filepaths.push_back(file);
 		}

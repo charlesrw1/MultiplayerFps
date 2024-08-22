@@ -536,6 +536,7 @@
     <ClInclude Include="Source\Input\InputAction.h" />
     <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
+    <ClInclude Include="Source\Game\Map.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

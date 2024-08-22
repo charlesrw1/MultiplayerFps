@@ -14,8 +14,8 @@ CLASS_H(NPC, Entity)
 public:
 	NPC() {
 		pathfind_state = going_towards_waypoint;
-		position = vec3(0.f);
-		rotation.y = HALFPI;
+		//position = vec3(0.f);
+		//rotation.y = HALFPI;
 
 		npc_model = create_sub_component<MeshComponent>("NpcModel");
 		npc_hitbox = create_sub_component<CapsuleComponent>("NpcCollider");
@@ -55,7 +55,7 @@ public:
 		{
 		case going_towards_waypoint: {
 			//waypoints[current_waypoint] = eng->local_player().position;
-			glm::vec3 towaypoint = waypoints[current_waypoint] - position;
+			glm::vec3 towaypoint = waypoints[current_waypoint];// -position;
 			glm::vec3 grnd_face_dir = glm::normalize(vec3(towaypoint.x, 0, towaypoint.z));
 			float speed = 5.5f;
 			vec3 idealvelocity = normalize(towaypoint) * speed;
@@ -67,9 +67,9 @@ public:
 				else
 					velocity += grnd_face_dir * ground_accel * speed * (dt);
 			}
-			position += velocity * dt;
+			//position += velocity * dt;
 
-			float len = glm::length(position - waypoints[current_waypoint]);
+			float len = 0;// glm::length(position - waypoints[current_waypoint]);
 			if (len <= 1.f) {
 				current_waypoint = (current_waypoint + 1) % 3;
 				pathfind_state = turning_to_next_waypoint;
@@ -88,7 +88,7 @@ public:
 			pathfind_state = going_towards_waypoint;
 		}break;
 		};
-		esimated_accel = (velocity - prevel) / (float)eng->get_tick_interval();
+		//esimated_accel = (velocity - prevel) / (float)eng->get_tick_interval();
 	}
 
 	enum state {
@@ -141,13 +141,9 @@ public:
 	Grenade();
 
 
-	void set_thrower(entityhandle handle) {
-			thrower = handle;
-	}
 
 	void update() override;
 
 	float throw_time = 0.0;
 
-	entityhandle thrower = -1;
 };

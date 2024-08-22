@@ -12,7 +12,7 @@ extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEdito
 
 CLASS_IMPL(DataClass);
 
-static const char* const DATACLASS_FOLDER = "./Data/DataClasses/";
+static const char* const DATACLASS_FOLDER = "./Data/";
 
 class DataClassAssetMetadata : public AssetMetadata
 {
@@ -32,7 +32,7 @@ public:
 	{
 		auto find_tree = FileSys::find_files(DATACLASS_FOLDER);
 		for (const auto _file : find_tree) {
-			auto file = _file.substr(20);
+			auto file = _file.substr(8);
 			if (has_extension(file, "dc")) {
 				std::string path = strip_extension(file);
 				filepaths.push_back(file);

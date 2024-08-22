@@ -695,12 +695,7 @@ DECLARE_ENGINE_CMD(net_stat)
 DECLARE_ENGINE_CMD(print_ents)
 {
 
-	sys_print("%--15s %--15s %--15s %--15s\n", "index", "class", "posx", "posz", "has_model");
-	auto level = eng->get_level();
-	for (auto eptr : level->all_world_ents) {
-		Entity& e = *eptr;
-		sys_print("%-15llu %-15s %-15f %-15f\n", e.self_id.handle, e.get_type().classname, e.position.x, e.position.z);
-	}
+
 }
 #endif
 
@@ -975,7 +970,7 @@ void GameEngineLocal::execute_map_change()
 		on_map_change_callback(this_is_for_editor, levelLoaded);
 	}
 	else {
-		const std::string& fullpath = "./Data/Maps/" + queued_mapname;
+		const std::string& fullpath = "./Data/" + queued_mapname;
 
 		GetAssets().find_async<Level>(fullpath, [this_is_for_editor](GenericAssetPtr ptr)
 			{

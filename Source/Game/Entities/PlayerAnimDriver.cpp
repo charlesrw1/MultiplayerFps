@@ -20,7 +20,7 @@ void CharacterGraphDriver::on_update(float dt) {
 	Player& player = *get_owner()->cast_to<Player>();
 
 	meshoffset = glm::vec3(0.f);
-
+#if 0
 	glm::vec2 next_vel = glm::vec2(player.velocity.x, player.velocity.z);
 
 	glm::vec2 groundvelocity = next_vel;
@@ -34,7 +34,7 @@ void CharacterGraphDriver::on_update(float dt) {
 	glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
 	glm::vec2 relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
 
-
+#endif
 	bool has_input = abs( player.cmd.forward_move ) > 0.01 || abs( player.cmd.lateral_move ) > 0.01;
 
 	ismoving = has_input;
@@ -50,9 +50,9 @@ void CharacterGraphDriver::on_update(float dt) {
 	bCrouch = (player.is_crouching);
 	bJumping =(  player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
 	bFalling =(  player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
-	flSpeed = glm::length(relmovedir);
-	flMovex = relmovedir.x;
-	flMovey = relmovedir.y;
+	flSpeed = glm::length(1.f);
+	flMovex = 0;// relmovedir.x;
+	flMovey = 0;// relmovedir.y;
 
 	bLeftFootForwards= left_foot_is_forward;
 	bRightFootForwards= !left_foot_is_forward;

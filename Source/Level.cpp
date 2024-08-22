@@ -10,7 +10,7 @@
 
 #include "Physics/Physics2.h"
 
-static const char* const maps_directory = "./Data/Maps/";
+static const char* const maps_directory = "./Data/";
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetRegistry.h"
@@ -37,15 +37,16 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto tree = FileSys::find_files("./Data/Maps",true);
+		auto tree = FileSys::find_files("./Data",true);
 		for (auto file : tree) {
-			filepaths.push_back((file.substr(12)));
+			if(has_extension(file,"tmap")||has_extension(file,"bmap"))
+				filepaths.push_back((file.substr(7)));
 		}
 	}
 	virtual bool assets_are_filepaths()  const { return true; }
 	virtual std::string root_filepath()  const override
 	{
-		return "./Data/Maps/";
+		return "./Data/";
 	}
 	virtual IEditorTool* tool_to_edit_me() const { return g_editor_doc; }
 };

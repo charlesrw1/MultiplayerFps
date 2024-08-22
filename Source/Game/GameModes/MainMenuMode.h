@@ -59,7 +59,7 @@ public:
 		GUIButton::on_released(x, y, b);
 	}
 };
-
+extern ConfigVar g_entry_level;
 class MainMenuUILayout : public GUIFullscreen
 {
 public:
@@ -83,7 +83,7 @@ public:
 	}
 
 	void start_game() {
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map thisIsTheMap.txt\n");
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map thisIsTheMap.tmap\n");
 		GameTransitionUI::get().open();
 	}
 
@@ -93,8 +93,8 @@ public:
 	void open_editor() {
 		//auto file = isound->load_sound_file("wind1.wav");
 		//isound->play_sound(file);
-
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map mainMenuMap.txt");
+		const char* cmd = string_format("start_ed Map %s\n", g_entry_level.get_string());
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmd);
 	}
 
 	MainMenuUILayout() {

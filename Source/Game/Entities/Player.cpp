@@ -207,6 +207,7 @@ void sweep_move(glm::vec3& velocity, glm::vec3& position)
 
 void Player::slide_move()
 {
+#if 0
 	vec3 orig_velocity = velocity;
 	vec3 orig_position = position;
 
@@ -275,6 +276,7 @@ void Player::slide_move()
 			position = end;
 		}
 	}
+#endif
 }
 
 float lensquared_noy(vec3 v)
@@ -342,6 +344,7 @@ void Player::ground_move()
 
 void player_physics_check_nans(Player& player)
 {
+#if 0
 	if (player.position.x != player.position.x || player.position.y != player.position.y ||
 		player.position.z != player.position.z)
 	{
@@ -354,10 +357,12 @@ void player_physics_check_nans(Player& player)
 		printf("velocity nan found in PlayerPhysics\n");
 		player.velocity = vec3(0);
 	}
+#endif
 }
 
 void draw_entity_info()
 {
+#if 0
 	static int current_index = 0;
 	Entity* e = nullptr;
 	if (!e)
@@ -399,7 +404,7 @@ void draw_entity_info()
 			Debug::add_sphere(pos, 0.5, COLOR_BLUE, -1.0, false);
 		}
 	}
-
+#endif
 }
 
 static AddToDebugMenu addmovevars("move vars", move_variables_menu);
@@ -450,14 +455,14 @@ void Player::move()
 	player_physics_check_nans(*this);
 
 
-	auto pos = position;
+	//auto pos = position;
 	auto height = CHAR_STANDING_HB_HEIGHT;
 	auto width = CHAR_HITBOX_RADIUS;
 	//Debug::add_sphere(pos + vec3(0, width, 0), width, COLOR_PINK, -1.f);
 	//Debug::add_sphere(pos + vec3(0, height- width, 0), width, COLOR_PINK,-1.f);
 
 
-	esimated_accel = (velocity - last_velocity) / (float)eng->get_tick_interval();
+	//esimated_accel = (velocity - last_velocity) / (float)eng->get_tick_interval();
 
 	distTraveledSinceLastFootstep += speed * (float)eng->get_tick_interval();
 
@@ -604,7 +609,7 @@ void Player::find_a_spawn_point()
 	if (!eng->get_level()->find_all_entities_of_class(points))
 		sys_print("!!! no spawn points");
 	else {
-		position = points[0]->get_ws_position();
+		auto pos = points[0]->get_ws_position();
 	}
 }
 
@@ -615,22 +620,15 @@ void Player::set_input_command(Move_Command newcmd) {
 
 void Player::update()
 {
-	if (Entity::has_flag(EntityFlags::Dead)) {
-		cmd.forward_move = 0;
-		cmd.lateral_move = 0;
-		cmd.up_move = 0;
-		cmd.button_mask = 0;
-	}
-
 	move();
 
-	set_ws_transform(position, glm::quat(rotation), scale);
+	//set_ws_transform(position, glm::quat(rotation), scale);
 }
 
 glm::vec3 Player::calc_eye_position()
 {
 	float view_height = (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
-	return position + vec3(0, view_height, 0);
+	return get_ws_position() + vec3(0, view_height, 0);
 }
 
 void Player::get_view(glm::mat4& viewMat, float& fov)
@@ -639,7 +637,7 @@ void Player::get_view(glm::mat4& viewMat, float& fov)
 
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
-		vec3 camera_pos = position + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
+		vec3 camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
 
 		viewMat = glm::lookAt(camera_pos, camera_pos + front, glm::vec3(0, 1, 0));
 
@@ -674,6 +672,7 @@ glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
 
 static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& viewmodel_offsets)
 {
+#if 0
 	Entity& e = *eng->get_local_player();
 	glm::vec3 velocity = e.get_velocity();
 	glm::vec3 view_front = AnglesToVector(view_angles.x, view_angles.y);
@@ -694,7 +693,7 @@ static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& v
 
 	viewmodel_offsets = damp(viewmodel_offsets, vec3(side_ofs_ideal, up_ofs_ideal, front_ofs_ideal), 0.01f, eng->get_frame_time() * 100.f);
 
-
+#endif
 }
 #if 0
 void ViewmodelComponent::update()
@@ -854,7 +853,7 @@ public:
 
 
 	void to_main_menu() {
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map mainMenuMap.txt");
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map mainMenuMap.tmap");
 	}
 
 	GUIVerticalBox* create_menu() {

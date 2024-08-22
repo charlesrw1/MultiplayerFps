@@ -20,7 +20,7 @@ class DataClassEditor : public IEditorTool
 	virtual bool save_document_internal() override;
 	void draw_menu_bar() override;
 	void imgui_draw() override;
-	std::string get_save_root_dir() override { return "./Data/DataClasses/"; }
+	std::string get_save_root_dir() override { return "./Data/"; }
 
 	PropertyGrid grid;
 	std::string dc_name;

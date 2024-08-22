@@ -33,6 +33,6 @@ dbg.fly 0
 view.sens 0.005
 
 #the main entry point into the game
-g_entry_level "mainMenuMap.txt"
+g_entry_level "mainMenuMap.tmap"
 
 ed_default_sky_material "indoorHdriSky"

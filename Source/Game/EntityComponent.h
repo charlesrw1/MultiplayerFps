@@ -18,8 +18,9 @@ public:
 
 	virtual ~EntityComponent() {}
 
+private:
 	void init();
-	void deinit();
+	void deinit(bool destruct_subcomponents);
 
 	// callbacks
 	// called after component had properties unserialized
@@ -28,6 +29,7 @@ public:
 	// called when component is being removed, remove all handles
 	virtual void on_deinit() {}
 
+public:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}
 
@@ -68,25 +70,42 @@ public:
 	}
 
 	// ws = world space, ls = local space
-	glm::mat4 get_ls_transform() const;
 	void set_ls_transform(const glm::mat4& transform);
 	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
 	void set_ls_euler_rotation(const glm::vec3& euler);
-	const glm::mat4& get_ws_transform();
+	glm::mat4 get_ls_transform() const;
 	glm::vec3 get_ls_position() const { return position; }
 	glm::vec3 get_ls_scale() const { return scale; }
 	glm::quat get_ls_rotation() const { return rotation; }
-	glm::vec3 get_ws_position()  { return get_ws_transform()[3]; }
+	
 	void set_ws_transform(const glm::mat4& transform);
+	void set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	const glm::mat4& get_ws_transform();
+	glm::vec3 get_ws_position()  { 
+		if (!attached_parent.get())
+			return position;
+		auto& ws = get_ws_transform();
+		return ws[3];
+	}
+	glm::quat get_ws_rotation() { 
+		if (!attached_parent.get())
+			return rotation;
+		auto& ws = get_ws_transform();
+		return glm::quat_cast(ws);
+	}
+	glm::vec3 get_ws_scale() {
+		if (!attached_parent.get())
+			return scale;
+		// fixme
+		return glm::vec3(1.f);
+	}
+
 	const EntityComponent* get_parent_component() const {
 		return attached_parent.get();
 	}
 
-
 	bool get_is_native_component() const { return is_native_componenent; }
 
-#ifndef RUNTIME
-#endif // !RUNTIME
 	void post_change_transform_R(bool ws_is_dirty = true);
 
 	std::string eSelfNameString;

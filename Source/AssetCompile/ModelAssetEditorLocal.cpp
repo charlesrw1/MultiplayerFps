@@ -174,7 +174,7 @@ void ModelEditorTool::open_document_internal(const char* name, const char* arg)
 	if (strlen(name) > 0) {
 		// try to find def_name
 		std::string def_name = strip_extension(name) + ".mis";
-		std::string fullpath = "./Data/Models/" + def_name;
+		std::string fullpath = "./Data/" + def_name;
 		auto file = FileSys::open_read_os(fullpath.c_str());
 
 		if (!file) {
@@ -231,7 +231,7 @@ bool ModelEditorTool::save_document_internal()
 	DictWriter write;
 	write_object_properties(importSettings, nullptr, write);
 
-	std::string path = "./Data/Models/" + strip_extension(get_name()) + ".mis";
+	std::string path = "./Data/" + strip_extension(get_name()) + ".mis";
 	std::ofstream outfile(path);
 	outfile.write(write.get_output().data(), write.get_output().size());
 	outfile.close();

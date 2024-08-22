@@ -114,7 +114,7 @@ void Entity::destroy()
 	root_component->unlink_from_parent();	// unlink this from another parent entity potentially
 
 	for (int i = 0; i < all_components.size(); i++)
-		all_components[i]->deinit();
+		all_components[i]->deinit(false /* dont destroy subcomponents, were doing that already*/);
 	all_components.clear();	// deletes all
 }
 
@@ -139,6 +139,26 @@ void Entity::parent_to_component(EntityComponent* other)
 	}
 }
 
+void Entity::remove_this_component(EntityComponent* c)
+{
+	if (c == root_component) {
+		sys_print("??? cant delete root component\n");
+		return;
+	}
+	sys_print("*** removing this component %s\n", c->get_type().classname);
+	assert(c->entity_owner == this);
+	bool found = false;
+	for (int i = 0; i < all_components.size(); i++) {
+		if (all_components[i].get() == c) {
+			c->deinit(true /* destroy sub components*/);
+			all_components.erase(all_components.begin() + i);
+			found = true;
+			break;
+		}
+	}
+	assert(found && "component not found in remove_this_component");
+
+}
 
 Entity::~Entity()
 {

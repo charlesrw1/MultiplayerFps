@@ -11,7 +11,7 @@
 
 #include "Framework/Config.h"
 
-static const char* const SOUND_DIRECTORY = "./Data/Sounds/";
+static const char* const SOUND_DIRECTORY = "./Data/";
 
 class PostProcessSoundEffect
 {
