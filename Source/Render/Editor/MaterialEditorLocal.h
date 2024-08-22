@@ -33,7 +33,7 @@ public:
 	}
 	virtual bool can_save_document() override { return true; }
 	virtual const char* get_editor_name() override { return "Material Editor"; }
-	virtual bool has_document_open() const override { return dynamicMat != nullptr; }
+	virtual bool has_document_open() const override { return isOpen; }
 	virtual void open_document_internal(const char* name, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
@@ -95,8 +95,10 @@ public:
 	void on_map_load_callback(bool good) {
 		assert(good);
 
-
 		auto skydomeModel = GetAssets().find_sync<Model>("skydome.cmdl");
+		auto skyMat = GetAssets().find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
+		model.ptr = skydomeModel.get();
+		skyMaterial.ptr = skyMat.get();
 
 		auto dome = eng->spawn_entity_class<StaticMeshEntity>();
 		dome->Mesh->set_model(skydomeModel.get());
@@ -124,6 +126,47 @@ public:
 		outputEntity->Mesh->set_model(model.get());
 		outputEntity->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
 
+
+		auto mat = GetAssets().find_sync<MaterialInstance>(get_name());
+		if (!mat) {
+			sys_print("!!! couldnt open material %s\n", get_name());
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
+			return;
+		}
+
+		parentMat = (MaterialInstance*)mat.get();
+		if (parentMat->impl->masterImpl)
+			set_empty_name();
+		dynamicMat = imaterials->create_dynmaic_material(mat.get());
+		assert(dynamicMat);
+
+
+		// context params (model changes)
+		myPropGrid.add_property_list_to_grid(get_props(), this);
+
+		// material params
+		propInfosForMats.clear();
+		MaterialInstance* mLocal = (MaterialInstance*)dynamicMat;
+		auto& paramDefs = mLocal->get_master_material()->param_defs;
+		for (int i = 0; i < paramDefs.size(); i++) {
+			auto& def = paramDefs[i];
+			auto type = def.default_value.type;
+			if (type == MatParamType::Bool || type == MatParamType::Float || type == MatParamType::Texture2D || type == MatParamType::Vector)
+			{
+				PropertyInfo pi;
+				pi.offset = i;
+				pi.name = def.name.c_str();
+				pi.custom_type_str = "MaterialEditParam";
+				pi.flags = PROP_DEFAULT;
+				pi.type = core_type_id::Struct;
+				propInfosForMats.push_back(pi);
+			}
+		}
+		propInfoListForMats.count = propInfosForMats.size();
+		propInfoListForMats.list = propInfosForMats.data();
+		propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
+		materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
+
 		outputEntity->Mesh->set_material_override(dynamicMat);
 	}
 
@@ -145,4 +188,6 @@ public:
 	// dynamic material to edit params into
 	MaterialInstance* parentMat = nullptr;
 	MaterialInstance* dynamicMat = nullptr;
+
+	bool isOpen = false;
 };

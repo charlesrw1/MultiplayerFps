@@ -50,7 +50,8 @@ REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 const PropertyInfoList* Entity::get_props() {
 	START_PROPS(Entity)
 		REG_ENTITY_PTR(self_id,PROP_SERIALIZE),
-		REG_STDSTRING(editor_name, PROP_DEFAULT)	// edit+serialize
+		REG_STDSTRING(editor_name, PROP_DEFAULT),	// edit+serialize
+		REG_ENTITY_PTR(parentedEntity, PROP_SERIALIZE)
 	END_PROPS(Entity)
 }
 
@@ -60,23 +61,28 @@ Entity::Entity()
 
 void Entity::initialize()
 {
-	if (!root_component.get()) {
+	if (!root_component) {
 
 		// try to find a root if it wasnt set by now
 		for (int i = 0; i < all_components.size(); i++) {
 			if (all_components[i]->is_force_root) {
-				root_component.ptr = all_components[i].get();
+				root_component = all_components[i].get();
 				break;
 			}
 		}
 		// couldnt find root, create an empty one
-		if (!root_component.get()) {
+		if (!root_component) {
 			root_component = create_sub_component<EmptyComponent>("DefaultRoot");
 			root_component->is_native_componenent = false;
 			root_component->is_force_root = true;
 		}
 	}
 
+	// parented entity from the level
+	if (parentedEntity) {
+		root_component->attach_to_parent(parentedEntity->root_component);
+		root_component->post_change_transform_R(true);	// just call this here
+	}
 
 	// now run register functions
 	// important!: store the number of components here before running init()s, some components might create components in their functions
@@ -85,10 +91,11 @@ void Entity::initialize()
 	for (int i = 0; i < num_components_pre_init; i++) {
 		// insert logic for editor only components here
 		auto& c = all_components[i];
-		if (c->attached_parent.get() == nullptr && root_component.get() != c.get())
-			c->attach_to_parent(root_component.get());
+		if (c->attached_parent.get() == nullptr && root_component != c.get())
+			c->attach_to_parent(root_component);
 		c->init();
 	}
+
 
 	if (!eng->is_editor_level()) {
 		start();
@@ -103,9 +110,33 @@ void Entity::destroy()
 		shutdown_updater();
 	}
 
+	assert(root_component);
+	root_component->unlink_from_parent();	// unlink this from another parent entity potentially
+
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->deinit();
 	all_components.clear();	// deletes all
+}
+
+void Entity::parent_to_entity(Entity* other)
+{
+	parent_to_component((other)?other->root_component:nullptr);
+}
+void Entity::parent_to_component(EntityComponent* other)
+{
+	if (!other)
+	{
+		root_component->unlink_from_parent();
+		return;
+	}
+
+	if (other->entity_owner == this) {
+		sys_print("??? cant parent entity to its own component\n");
+	}
+	else {
+		root_component->attach_to_parent(other);
+		parentedEntity = other->entity_owner->self_id;
+	}
 }
 
 

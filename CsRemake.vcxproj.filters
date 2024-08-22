@@ -114,9 +114,6 @@
     <ClInclude Include="Source\Net.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Physics.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Server.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -378,9 +375,6 @@
     <ClInclude Include="Source\Game\Components\EntityComponentTypes.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EditorFolder.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\ReflectionProp.h">
       <Filter>Source\Framework\ReflectionSys</Filter>
     </ClInclude>
@@ -539,6 +533,9 @@
     <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\GameMain.h" />
     <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
+    <ClInclude Include="Source\Input\InputAction.h" />
+    <ClInclude Include="Source\Input\InputShared.h" />
+    <ClInclude Include="Source\Input\InputSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -557,9 +554,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Net.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Physics.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Server.cpp">
@@ -811,5 +805,6 @@
     </ClCompile>
     <ClCompile Include="Source\Game\GameMain.cpp" />
     <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
+    <ClCompile Include="Source\Input\InputSystem.cpp" />
   </ItemGroup>
 </Project>

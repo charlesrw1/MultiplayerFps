@@ -7,17 +7,16 @@
 #include "Render/Render_Light.h"
 #include "Render/Render_Sun.h"
 #include "Render/Render_Volumes.h"
+#include "Render/DrawTypedefs.h"
+#include "Render/MaterialLocal.h"
+#include "Render/RenderFog.h"
 
 #include "Framework/FreeList.h"
 
 #include "../Shaders/SharedGpuTypes.txt"
 
-#include "DrawTypedefs.h"
-
 #include <cstdint>
 
-#include "Render/MaterialLocal.h"
-#include "Render/RenderFog.h"
 
 class MaterialInstance;
 struct Render_Box_Cubemap
@@ -473,15 +472,4 @@ public:
 	bufferhandle light_ssbo;
 	bufferhandle light_grid_ssbo;
 	bufferhandle indirect_to_light_ssbo;
-
-	// list of IBL cubemaps and boxes
-	// list of irradiance probe volumes and boxes
-
-	uint32_t skybox = 0;
-	std::vector<Render_Box_Cubemap> cubemaps;
-	uint32_t cubemap_ssbo;
-	uint32_t levelcubemapirradiance_array = 0;
-	uint32_t levelcubemapspecular_array = 0;
-	int levelcubemap_num = 0;
-
 };

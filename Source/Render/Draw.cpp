@@ -11,13 +11,10 @@
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"
 #include "Physics/Physics2.h"	// for g_physics->debug_draw()
-#include "IEditorTool.h"		// for overlay_draw()
 
 #include "Debug.h"
 
 #include <SDL2/SDL.h>
-
-#include "Level.h"
 
 #include "Render/TerrainInterfaceLocal.h"
 
@@ -377,9 +374,6 @@ void set_standard_draw_data(const Render_Level_Params& params)
 {
 	glCheckError();
 
-	// >>> PBR BRANCH
-	draw.bind_texture(IRRADIANCE_CM_LOC, draw.scene.levelcubemapirradiance_array);
-	draw.bind_texture(SPECULAR_CM_LOC, draw.scene.levelcubemapspecular_array);
 
 	glCheckError();
 	draw.bind_texture(BRDF_LUT_LOC, EnviornmentMapHelper::get().integrator.lut_id);
@@ -419,7 +413,6 @@ void set_standard_draw_data(const Render_Level_Params& params)
 
 	glCheckError();
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, draw.scene.cubemap_ssbo);
 
 
 	glCheckError();
@@ -690,7 +683,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 
 	constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
 
-	constants.numcubemaps = scene.cubemaps.size();
+	constants.numcubemaps = 0;
 
 	if (using_skybox_for_specular)
 		constants.forcecubemap = 0.0;
@@ -3528,24 +3521,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	// FIXME: ubo view constant buffer might be wrong since its changed around a lot (bad design)
 }
 
-void Renderer::cubemap_positions_debug()
-{
-	set_shader(prog.simple);
-	shader().set_mat4("ViewProj", vs.viewproj);
-	shader().set_mat4("Model", mat4(1.f));
 
-	MeshBuilder mb;
-	mb.Begin();
-	for (auto& cube : scene.cubemaps) {
-		mb.PushLineBox(cube.boxmin, cube.boxmax, COLOR_CYAN);
-		mb.AddSphere(cube.probe_pos, 1.0, 5, 5, COLOR_RED);
-	}
-	mb.End();
-	glDisable(GL_DEPTH_TEST);
-	mb.Draw(GL_LINES);
-	glEnable(GL_DEPTH_TEST);
-	mb.Free();
-}
 
 Shader Renderer::shader()
 {
@@ -3751,110 +3727,7 @@ void Renderer::on_level_end()
 
 void Renderer::on_level_start()
 {
-	scene.cubemaps.clear();
 
-	glDeleteBuffers(1, &scene.cubemap_ssbo);
-	glDeleteBuffers(1, &scene.light_ssbo);
-	glDeleteTextures(1, &scene.levelcubemapirradiance_array);
-	glDeleteTextures(1, &scene.levelcubemapspecular_array);
-	glDeleteTextures(1, &scene.skybox);
-	scene.cubemap_ssbo = 0;
-	scene.levelcubemapirradiance_array = scene.levelcubemapspecular_array = 0;
-
-
-	// Render cubemaps
-	scene.cubemaps.push_back({});		// skybox probe
-	scene.cubemaps[0].found_probe_flag = true;
-
-	for (int i = 0; i < scene.cubemaps.size(); i++) {
-		if (!scene.cubemaps[i].found_probe_flag) {
-			scene.cubemaps.erase(scene.cubemaps.begin() + i);
-			i--;
-		}
-	}
-
-	scene.levelcubemap_num = scene.cubemaps.size();
-	glGenTextures(1, &scene.levelcubemapspecular_array);
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, scene.levelcubemapspecular_array);
-	glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_R11F_G11F_B10F, CUBEMAP_SIZE, CUBEMAP_SIZE, 6 * scene.levelcubemap_num, 0, GL_RGB, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);
-	glCheckError();
-	glGenTextures(1, &scene.levelcubemapirradiance_array);
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, scene.levelcubemapirradiance_array);
-	glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_R11F_G11F_B10F, 32, 32, 6 * scene.levelcubemap_num, 0, GL_RGB, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glCheckError();
-
-	uint32_t cmfbo, cmrbo;
-	glGenFramebuffers(1, &cmfbo);
-	glGenRenderbuffers(1, &cmrbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, cmfbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, cmrbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_SIZE, CUBEMAP_SIZE);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, cmrbo);
-
-	uint32_t temp_buffer;
-	glGenTextures(1, &temp_buffer);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, temp_buffer);
-	for (int i = 0; i < 6; i++)
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_SIZE, CUBEMAP_SIZE, 0, GL_RGB, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	draw.using_skybox_for_specular = true;
-	auto& helper = EnviornmentMapHelper::get();
-
-	scene.skybox = helper.create_from_file("hdr_sky2.hdr").original_cubemap;
-	// CUBEMAP_SIZE isnt the size of skybox, but its unused anyways
-	helper.convolute_irradiance_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, 0, 32);
-	helper.compute_specular_array(scene.skybox, CUBEMAP_SIZE, scene.levelcubemapspecular_array, 0, CUBEMAP_SIZE);
-
-
-	for (int i = 1; i < scene.cubemaps.size(); i++) {
-		Render_Box_Cubemap& bc = scene.cubemaps[i];
-
-		render_world_cubemap(bc.probe_pos, cmfbo, temp_buffer, CUBEMAP_SIZE);
-
-		helper.convolute_irradiance_array(temp_buffer, CUBEMAP_SIZE, scene.levelcubemapirradiance_array, i, 32);
-		helper.compute_specular_array(temp_buffer, CUBEMAP_SIZE, scene.levelcubemapspecular_array, i, CUBEMAP_SIZE);
-
-		glCheckError();
-	}
-	draw.using_skybox_for_specular = false;
-
-	glDeleteRenderbuffers(1, &cmrbo);
-	glDeleteFramebuffers(1, &cmfbo);
-	glDeleteTextures(1, &temp_buffer);
-
-
-
-	struct Cubemap_Ssbo_Struct {
-		glm::vec4 bmin;
-		glm::vec4 bmax;
-		glm::vec4 probepos_priority;
-	};
-	static Cubemap_Ssbo_Struct probes[128];
-	for (int i = 0; i < 128 && i < scene.cubemaps.size(); i++) {
-		probes[i].bmin = vec4(scene.cubemaps[i].boxmin,0.0);
-		probes[i].bmax = vec4(scene.cubemaps[i].boxmax,0.0);
-		probes[i].probepos_priority = vec4(scene.cubemaps[i].probe_pos, scene.cubemaps[i].priority);
-	}
-
-	glCreateBuffers(1, &scene.cubemap_ssbo);
-	size_t size = glm::min((int)scene.cubemaps.size(), 128);
-	glNamedBufferData(scene.cubemap_ssbo, (sizeof Cubemap_Ssbo_Struct)* size, probes, GL_STATIC_DRAW);
 }
 
 void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)

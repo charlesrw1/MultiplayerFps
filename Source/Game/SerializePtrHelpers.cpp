@@ -125,8 +125,10 @@ public:
 
 		if (!ptr_prop->get())
 			return "";
-		else
+		else if (ptr_prop->get()->get_owner() == ctx->entity_serialzing)
 			return ptr_prop->get()->eSelfNameString;
+		else
+			return "";
 	}
 
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override

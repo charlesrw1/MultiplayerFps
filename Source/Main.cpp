@@ -21,7 +21,7 @@
 #include "Render/Model.h"
 
 #include "Level.h"
-#include "Physics.h"
+
 #include "Net.h"
 #include "GameEngineLocal.h"
 #include "Types.h"
@@ -56,6 +56,8 @@
 #include "Game/WorldSettings.h"
 
 #include "AssetCompile/AnimationSeqLoader.h"
+
+#include "Input/InputSystem.h"
 
 MeshBuilder phys_debug;
 
@@ -240,32 +242,6 @@ T* checked_cast(ClassBase* c) {
 	return c ? c->cast_to<T>() : nullptr;
 }
 
-
-template<typename T>
-struct GameInput
-{
-	const T& get_val() const { return val; }
-	T val{};
-
-	MulticastDelegate<T> on_send;
-};
-
-
-struct InputContext
-{
-	// input name ("weapon_fire") ("keybind") ("modifier")
-};
-
-class GameInputMgr
-{
-public:
-	GameInput<glm::vec2> directional_move;
-	GameInput<glm::vec2> look_delta;
-	GameInput<bool> weapon_fire;
-	GameInput<bool> weapon_reload;
-	GameInput<bool> crouch;
-	GameInput<bool> jump;
-};
 
 void GameEngineLocal::make_move()
 {
@@ -604,12 +580,31 @@ DECLARE_ENGINE_CMD(quit)
 DECLARE_ENGINE_CMD(bind)
 {
 	if (args.size() < 2) return;
-	int scancode = SDL_GetScancodeFromName(args.at(1));
+	SDL_Scancode scancode = SDL_GetScancodeFromName(args.at(1));
 	if (scancode == SDL_SCANCODE_UNKNOWN) return;
-	if (args.size() < 3)
-		eng_local.bind_key(scancode, "");
-	else
-		eng_local.bind_key(scancode, args.at(2));
+	if (args.size() <= 2)
+		eng_local.set_keybind(scancode,0, "");
+	else if (args.size() <= 3)
+		eng_local.set_keybind(scancode,0, args.at(2));
+	else {
+		
+		uint16_t modifiers = 0;
+		for (int i = 2; i < args.size() - 1; i++) {
+			const char* m = args.at(i);
+			if (strcmp(m, "Ctrl"))
+				modifiers |= KMOD_CTRL;
+			else if (strcmp(m, "Alt"))
+				modifiers |= KMOD_ALT;
+			else if (strcmp(m, "Shift"))
+				modifiers |= KMOD_SHIFT;
+			else
+				sys_print("??? unknown modifier for 'bind': %s\n", m);
+		}
+
+		// bind M Ctrl Alt "mycommand"
+		
+		eng_local.set_keybind(scancode, modifiers, args.at(args.size() - 1));
+	}
 }
 
 DECLARE_ENGINE_CMD_CAT("cl.",force_update)
@@ -1046,13 +1041,14 @@ void GameEngineLocal::key_event(SDL_Event event)
 		return;
 
 	if (event.type == SDL_KEYDOWN) {
-		int scancode = event.key.keysym.scancode;
+		SDL_Scancode scancode = event.key.keysym.scancode;
 		inp.keys[scancode] = true;
 		inp.keychanges[scancode] = true;
 
-		auto find = keybinds.find(scancode);
-		if (find!=keybinds.end()) {
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, find->second.c_str());
+		std::string* keybind = find_keybind(scancode, event.key.keysym.mod);
+	
+		if (keybind != nullptr) {
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, keybind->c_str());
 		}
 	}
 	else if (event.type == SDL_KEYUP) {
@@ -1071,13 +1067,6 @@ void GameEngineLocal::key_event(SDL_Event event)
 		}
 		inp.mousekeys &= ~(1 << event.button.button);
 	}
-}
-
-void GameEngineLocal::bind_key(int key, string command)
-{
-	ASSERT(key >= 0 && key < SDL_NUM_SCANCODES);
-
-	keybinds[key] = std::move(command);
 }
 
 void GameEngineLocal::cleanup()
@@ -1374,12 +1363,6 @@ void GameEngineLocal::draw_screen()
 
 extern IEditorTool* g_model_editor;
 
-
-DECLARE_ENGINE_CMD(reload_mats)
-{
-	ASSERT(0);
-}
-
 // RH, reverse Z, infinite far plane perspective matrix
 
 glm::mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, float zNear)
@@ -1454,17 +1437,21 @@ void GameEngineLocal::init()
 	
 	dbg_console.init();
 
-	// engine initilization
+	// window initilization
 	init_sdl_window();
 
 	Profiler::init();
-	FileSys::init();
 
+	// file system and asset init
+	FileSys::init();
 	GetAssets().init();
+
+	GetGInput().init();
 
 	g_physics->init();
 	network_init();
 	g_animseq.init();
+	// renderer init
 	idraw->init();
 	imaterials->init();
 	g_fonts.init();
@@ -1556,6 +1543,8 @@ void GameEngineLocal::game_update_tick()
 
 	assert(level);
 
+	// tick input
+	GetGInput().tick_users(eng->get_tick_interval());
 
 	// create input
 	if (!level->is_editor_level())
@@ -1675,6 +1664,7 @@ void GameEngineLocal::loop()
 		{
 			ImGui_ImplSDL2_ProcessEvent(&event);
 
+
 			switch (event.type) {
 			case SDL_QUIT:
 				::Quit();
@@ -1700,6 +1690,9 @@ void GameEngineLocal::loop()
 				key_event(event);
 				break;
 			}
+			
+			GetGInput().handle_event(event);
+			
 			if (!is_game_focused()) {
 				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 					continue;

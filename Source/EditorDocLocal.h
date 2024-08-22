@@ -7,7 +7,7 @@
 #include "Level.h"
 #include <SDL2/SDL.h>
 #include <memory>
-#include "Physics.h"
+
 #include "Render/RenderObj.h"
 #include <stdexcept>
 
@@ -183,6 +183,10 @@ private:
 	Node* rootnode = nullptr;
 
 	void draw_table_R(Node* n, int depth);
+
+	uint64_t contextMenuHandle = 0;
+
+	char nameFilter[256];
 };
 
 class EdPropertyGrid

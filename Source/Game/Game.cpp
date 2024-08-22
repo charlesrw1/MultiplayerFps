@@ -48,6 +48,42 @@ void GameEngineLocal::call_startup_functions_for_new_entity(Entity* e)
 	e->initialize();
 }
 
+std::string* GameEngineLocal::find_keybind(SDL_Scancode code, uint16_t keymod) {
+
+	auto mod_to_integer = [](uint16_t mod) -> uint16_t {
+		if (mod & KMOD_CTRL)
+			mod |= KMOD_CTRL;
+		if (mod & KMOD_SHIFT)
+			mod |= KMOD_SHIFT;
+		if (mod & KMOD_ALT)
+			mod |= KMOD_ALT;
+		mod &= KMOD_CTRL | KMOD_SHIFT | KMOD_ALT;
+		return mod;
+	};
+
+
+	uint32_t both = uint32_t(code) | ((uint32_t)mod_to_integer(keymod) << 16);
+
+	auto find = keybinds.find(both);
+	if (find == keybinds.end()) return nullptr;
+	return &find->second;
+}
+
+void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::string bind) {
+	auto mod_to_integer = [](uint16_t mod) -> uint16_t {
+		if (mod & KMOD_CTRL)
+			mod |= KMOD_CTRL;
+		if (mod & KMOD_SHIFT)
+			mod |= KMOD_SHIFT;
+		if (mod & KMOD_ALT)
+			mod |= KMOD_ALT;
+		mod &= KMOD_CTRL | KMOD_SHIFT | KMOD_ALT;
+		return mod;
+	};
+	uint32_t both = uint32_t(code) | ((uint32_t)mod_to_integer(keymod) << 16);
+	keybinds.insert({ both,bind });
+}
+
 Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo* ti) {
 	ASSERT(ti && ti->allocate);
 	ASSERT(get_level());

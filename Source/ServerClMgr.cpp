@@ -28,7 +28,7 @@ void RemoteClient::init(IPAndPort address)
 	baseline = -1;
 	next_snapshot_time = 0.f;
 
-	commands.resize(5);
+	//commands.resize(5);
 }
 
 void RemoteClient::Disconnect(const char* debug_reason)

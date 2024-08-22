@@ -1,23 +1,26 @@
 #pragma once
 #include "Render/DrawPublic.h"
-#include "Framework/Config.h"
-#include "glm/glm.hpp"
+
 #include "Framework/Util.h"
-#include "Types.h"
-#include "GlmInclude.h"
-#include "Framework/MeshBuilder.h"
-#include "Shader.h"
-#include "EnvProbe.h"
-#include "Render/Texture.h"
-#include "../Shaders/SharedGpuTypes.txt"
-#include "DrawTypedefs.h"
+#include "Framework/Config.h"
+#include "Framework/MemArena.h"
+#include "Framework/MulticastDelegate.h"
 #include "Framework/FreeList.h"
+#include "Framework/MeshBuilder.h"
+
+// shared types with glsl shaders
+#include "../Shaders/SharedGpuTypes.txt"
+
+#include "glm/glm.hpp"
+#include "Types.h"
+
+#include "GlmInclude.h"
+#include "Render/Shader.h"
+#include "Render/EnvProbe.h"
+#include "Render/Texture.h"
+#include "Render/DrawTypedefs.h"
 #include "Render/RenderExtra.h"
 #include "Render/MaterialLocal.h"
-#include "Framework/MemArena.h"
-
-#include "Framework/MulticastDelegate.h"
-
 #include "Render/RenderScene.h"
 
 class MeshPart;

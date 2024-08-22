@@ -42,10 +42,9 @@ public:
 	Entity* get_owner() const { return entity_owner; }
 
 	// destruction functions
-	void unlink_and_destroy();
-	void destroy_children_no_unlink();
 	void attach_to_parent(EntityComponent* parent_component, StringName point = StringName());
-	void remove_this(EntityComponent* component);	// not destructuve, better name is unlink_this()
+	void remove_this(EntityComponent* child_component);	// not destructuve, better name is unlink_this()
+	void unlink_from_parent();
 	void post_unserialize_created_component(Entity* owner_ent);
 
 #ifndef NO_EDITOR

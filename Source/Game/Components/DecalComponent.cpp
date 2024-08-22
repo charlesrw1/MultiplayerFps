@@ -8,6 +8,8 @@
 #include "Game/Entity.h"
 #include "BillboardComponent.h"
 #include "Assets/AssetDatabase.h"
+#include "ArrowComponent.h"
+
 CLASS_IMPL(DecalComponent);
 
 void DecalComponent::on_init() {
@@ -20,6 +22,8 @@ void DecalComponent::on_init() {
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
 		b->set_texture(default_asset_load<Texture>("icon/decalBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		auto a = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
+		a->dont_serialize_or_edit = true;
 	}
 }
 void DecalComponent::on_deinit() {

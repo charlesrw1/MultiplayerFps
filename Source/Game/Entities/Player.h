@@ -80,6 +80,7 @@ struct PlayerFlags
 
 class PlayerHUD;
 class HealthComponent;
+class InputUser;
 CLASS_H(Player, PlayerBase)
 public:
 
@@ -90,6 +91,8 @@ public:
 	CapsuleComponent* player_capsule{};
 	MeshComponent* viewmodel_mesh{};
 	HealthComponent* health{};
+
+	InputUser* inputPtr = nullptr;
 
 	EntityPtr<Entity> someEntity;
 
@@ -115,6 +118,8 @@ public:
 	// Entity overrides
 	void update() override;
 	void start() override;
+
+	void end() override;
 
 public:
 	glm::vec3 calc_eye_position();
@@ -157,16 +162,13 @@ private:
 
 	// physics stuff
 	void move();
-	bool check_perch();
-	void ground_move();
+
 
 	void get_crouch_state(bool& is_crouching);
 	Action_State update_state(const float grnd_speed, bool& dont_add_grav);
 	Action_State get_ground_state_based_on_speed(float speed) const;
 	void slide_move();
 
-	void item_update();
-	void change_to_item(int next);
 
 	glm::vec3 get_look_vec() {
 		return AnglesToVector(view_angles.x, view_angles.y);

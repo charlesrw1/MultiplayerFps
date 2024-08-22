@@ -75,57 +75,16 @@ void MaterialEditorLocal::open_document_internal(const char* name, const char* a
 	assert(!dynamicMat);
 	assert(!outputEntity);
 
-	auto mat = GetAssets().find_sync<MaterialInstance>(name);
-	if (!mat) {
-		sys_print("!!! couldnt open material %s\n", name);
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
-		return;
-	}
-	parentMat = (MaterialInstance*)mat.get();
-	if (parentMat->impl->masterImpl)
-		set_empty_name();
-	else
-		set_doc_name(name);
-	
-	dynamicMat = imaterials->create_dynmaic_material(mat.get());
-	assert(dynamicMat);
 	eng->open_level("__empty__");
 	eng->get_on_map_delegate().add(this, &MaterialEditorLocal::on_map_load_callback);
 
-	auto skydomeModel = GetAssets().find_global_sync<Model>("skydome.cmdl");
-	auto skyMat = GetAssets().find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
-	model.ptr = skydomeModel.get();
-	skyMaterial.ptr = skyMat.get();
-
-	// context params (model changes)
-	myPropGrid.add_property_list_to_grid(get_props(), this);
-	
-	// material params
-	propInfosForMats.clear();
-	MaterialInstance* mLocal = (MaterialInstance*)dynamicMat;
-	auto& paramDefs = mLocal->get_master_material()->param_defs;
-	for (int i = 0; i < paramDefs.size(); i++) {
-		auto& def = paramDefs[i];
-		auto type = def.default_value.type;
-		if (type == MatParamType::Bool || type == MatParamType::Float || type == MatParamType::Texture2D || type == MatParamType::Vector)
-		{
-			PropertyInfo pi;
-			pi.offset = i;
-			pi.name = def.name.c_str();
-			pi.custom_type_str = "MaterialEditParam";
-			pi.flags = PROP_DEFAULT;
-			pi.type = core_type_id::Struct;
-			propInfosForMats.push_back(pi);
-		}
-	}
-	propInfoListForMats.count = propInfosForMats.size();
-	propInfoListForMats.list = propInfosForMats.data();
-	propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
-	materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
+	set_doc_name(name);
+	isOpen = true;
 }
 
 void MaterialEditorLocal::close_internal()
 {
+	isOpen = false;
 	eng->leave_level();
 	eng->get_on_map_delegate().remove(this);
 	imaterials->free_dynamic_material(dynamicMat);

@@ -56,8 +56,11 @@ public:
 		free_handles.push_back(handle);
 	}
 
+	// NOT INTERNALLY SAFE
+	// ONLY USE IN MAIN THREAD AND SYNC PERIOD
 	handle_type first_free = 0;
 	std::vector<handle_type> free_handles;
+
 	std::vector<int> handle_to_obj;
 	struct pair {
 		handle_type handle = -1;

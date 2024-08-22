@@ -65,7 +65,6 @@
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\EditorDocLocal.h" />
     <ClInclude Include="Source\EditorDocPublic.h" />
-    <ClInclude Include="Source\EditorFolder.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\External\cgltf.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
@@ -152,6 +151,9 @@
     <ClInclude Include="Source\Game\WorldSettings.h" />
     <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IEditorTool.h" />
+    <ClInclude Include="Source\Input\InputAction.h" />
+    <ClInclude Include="Source\Input\InputShared.h" />
+    <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Local.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
@@ -161,7 +163,6 @@
     <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesPublic.h" />
-    <ClInclude Include="Source\Physics.h" />
     <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
     <ClInclude Include="Source\Physics\Physics2.h" />
     <ClInclude Include="Source\Render\DrawLocal.h" />
@@ -282,6 +283,7 @@
     <ClCompile Include="Source\Game\StdEntityTypes.cpp" />
     <ClCompile Include="Source\Game\WorldSettings.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
+    <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
@@ -289,7 +291,6 @@
     <ClCompile Include="Source\Net.cpp" />
     <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
-    <ClCompile Include="Source\Physics.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2.cpp" />
     <ClCompile Include="Source\Render\Draw.cpp" />

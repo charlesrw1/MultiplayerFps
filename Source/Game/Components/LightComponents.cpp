@@ -38,7 +38,7 @@ void SpotLightComponent::build_render_light(Render_Light& light)
 	auto& transform = get_ws_transform();
 
 	light.position = transform[3];
-	light.normal = glm::normalize(transform[0]);
+	light.normal = glm::normalize(-transform[2]);
 }
 
 void SpotLightComponent::on_init()
@@ -52,6 +52,10 @@ void SpotLightComponent::on_init()
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
 		b->set_texture(default_asset_load<Texture>("icon/spotlightBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+
+		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
+		s->dont_serialize_or_edit = true;
+		s->set_ls_transform({}, {}, glm::vec3(0.25f));
 	}
 }
 

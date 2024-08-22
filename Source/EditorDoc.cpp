@@ -12,7 +12,6 @@
 
 #include "Physics/Physics2.h"
 
-#include "EditorFolder.h"
 #include "OsInput.h"
 #include "Debug.h"
 
@@ -79,7 +78,7 @@ public:
 	GUIVerticalBox* vbox = nullptr;
 };
 
-CLASS_IMPL(EditorFolder);
+
 
 
 static std::string to_string(StringView view) {
@@ -490,6 +489,22 @@ void EditorDoc::close_internal()
 
 	// close the level document, its already been saved at this point
 	eng->leave_level();
+}
+
+
+DECLARE_ENGINE_CMD(ManipulateRotateCommand)
+{
+
+}
+
+DECLARE_ENGINE_CMD(ManipulateTranslateCommand)
+{
+
+}
+
+DECLARE_ENGINE_CMD(ManipulateScaleCommand)
+{
+
 }
 
 void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
@@ -950,6 +965,11 @@ void ManipulateTransformTool::update()
 	ImGuizmo::SetRect(s_pos.x, s_pos.y, s_sz.x, s_sz.y);
 	ImGuizmo::Enable(true);
 	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
+	//ImGuizmo::GetStyle().TranslationLineArrowSize = 20.0;
+	ImGuizmo::GetStyle().TranslationLineThickness = 6.0;
+	ImGuizmo::GetStyle().RotationLineThickness = 6.0;
+	ImGuizmo::GetStyle().ScaleLineThickness = 6.0;
+
 
 	glm::vec3 snap(-1);
 	if (operation_mask == ImGuizmo::TRANSLATE && has_translation_snap)
@@ -1066,6 +1086,7 @@ const View_Setup& EditorDoc::get_vs()
 
 ObjectOutliner::ObjectOutliner()
 {
+	nameFilter[0] = 0;
 	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
 	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
 	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
@@ -1092,6 +1113,44 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			}
 			else
 				ed_doc.selection_state->clear_all_selected();
+		}
+		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[2]) {
+			ImGui::OpenPopup("outliner_ctx_menu");
+			ed_doc.selection_state->add_to_selection({ n->handle });
+			contextMenuHandle = n->handle;
+		}
+		if (ImGui::BeginPopup("outliner_ctx_menu")) {
+
+			if (eng->get_entity(contextMenuHandle) == nullptr) {
+				contextMenuHandle = 0;
+				ImGui::CloseCurrentPopup();
+			}
+			else {
+				if (ImGui::Button("Parent To This")) {
+					auto me = eng->get_entity(contextMenuHandle);
+					auto& ents = ed_doc.selection_state->get_selection();
+					for (int i = 0; i < ents.size(); i++) {
+						if (ents[i].get() == me) continue;
+						auto transform = ents[i]->get_ws_transform();
+						ents[i]->parent_to_entity(me);
+						ents[i]->set_ws_transform(transform);
+					}
+					contextMenuHandle = 0;
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::Button("Remove Parent")) {
+					auto& ents = ed_doc.selection_state->get_selection();
+					for (int i = 0; i < ents.size(); i++) {
+						auto transform = ents[i]->get_ws_transform();
+						ents[i]->parent_to_entity(nullptr);
+						ents[i]->set_ws_transform(transform);
+					}
+					contextMenuHandle = 0;
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			ImGui::EndPopup();
 		}
 	}
 	
@@ -1131,6 +1190,8 @@ void ObjectOutliner::draw()
 		ImGui::EndTable();
 	}
 	ImGui::End();
+	
+
 }
 
 void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
@@ -1564,4 +1625,5 @@ EditorDoc::EditorDoc() {
 	manipulate = std::make_unique<ManipulateTransformTool>();
 	outliner = std::make_unique<ObjectOutliner>();
 	database = std::make_unique<EntityNameDatabase_Ed>();
+
 }

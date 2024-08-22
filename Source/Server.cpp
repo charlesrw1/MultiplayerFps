@@ -137,13 +137,14 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	writer.WriteByte(spot);
 	auto level = eng->get_level();
 	assert(level);
-	auto& lvlname = level->get_name();
-
-	writer.write_string(lvlname);
-	writer.WriteLong(eng->get_game_tick());
-	writer.WriteFloat(tick_rate.get_float());
-	writer.EndWrite();
-	socket.Send(accept_buf, writer.BytesWritten(), addr);
+	assert(0);
+	//auto& lvlname = level->get_name();
+	//
+	//writer.write_string(lvlname);
+	//writer.WriteLong(eng->get_game_tick());
+	//writer.WriteFloat(tick_rate.get_float());
+	//writer.EndWrite();
+	//socket.Send(accept_buf, writer.BytesWritten(), addr);
 
 	RemoteClient& new_client = clients[spot];
 	if (!already_connected) {

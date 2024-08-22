@@ -33,6 +33,9 @@ public:
 	{
 		add<T>(instance, memberFunction, true);
 	}
+	bool has_any_listeners() const {
+		return !functions_.empty();
+	}
 private:
 	//a
 	std::unordered_map<void*, std::function<void(Args...)>> functions_;

@@ -1,6 +1,5 @@
 #include "Player.h"
 #include "Framework/Util.h"
-#include "Physics.h"
 #include "Framework/MeshBuilder.h"
 
 #include "GameEnginePublic.h"
@@ -19,6 +18,8 @@
 #include "CameraPoint.h"
 
 #include "Assets/AssetDatabase.h"
+
+#include "Level.h"
 
 CLASS_H(PlayerNull, PlayerBase)
 public:
@@ -53,9 +54,6 @@ CLASS_IMPL(PlayerSpawnPoint);
 //
 //	PLAYER MOVEMENT CODE
 //
-
-static const Capsule standing_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_STANDING_HB_HEIGHT,0) };
-static const Capsule crouch_capsule = { CHAR_HITBOX_RADIUS,vec3(0.f),vec3(0,CHAR_CROUCING_HB_HEIGHT,0) };
 
 static float fall_speed_threshold = -0.05f;
 static float grnd_speed_threshold = 0.6f;
@@ -142,10 +140,10 @@ static ConfigVar stair_rad("phys.stair_radius", "0.01",CVAR_FLOAT);
 static ConfigVar phys_gravity("phys.gravity", "16.0",CVAR_FLOAT,-20,20);
 static ConfigVar debug_fly("dbg.fly", "0", CVAR_BOOL);
 
+#if 0
 // hacky way to move up stairs
 bool Player::check_perch()
 {
-
 	glm::vec2 dirs[8] = { vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1),
 		vec2(SQRT2,SQRT2),vec2(SQRT2,-SQRT2), vec2(-SQRT2,-SQRT2), vec2(-SQRT2,SQRT2) };
 	for (int i = 0; i < 8; i++) {
@@ -173,6 +171,7 @@ bool Player::check_perch()
 	return false;
 }
 
+#endif
 Action_State Player::get_ground_state_based_on_speed(float s) const
 {
 	if (s > 0.1)
@@ -181,102 +180,8 @@ Action_State Player::get_ground_state_based_on_speed(float s) const
 		return Action_State::Idle;
 }
 
-Action_State Player::update_state(const float grnd_speed, bool& dont_add_grav)
-{
-
-	Action_State next_action = action;
-	get_crouch_state(is_crouching);
-
-	if (velocity.y > 2.f) {
-		if (!is_on_ground())
-			return Action_State::Falling;
-		else
-			return action;
-	}
-
-	GeomContact result;
-	vec3 where = position - vec3(0, 0.005 - standing_capsule.radius, 0);
-	//result = eng->phys.trace_shape(Trace_Shape(where, CHAR_HITBOX_RADIUS), selfid, PF_ALL);
-
-	bool should_be_airbourne = (!result.found || result.surf_normal.y < 0.3);
-
-	bool perched = check_perch();
-	should_be_airbourne = should_be_airbourne && !perched;
-	dont_add_grav = perched;
-
-	if (should_be_airbourne) {
-		if(is_on_ground())
-			next_action = Action_State::Falling;
-	}
-	else {
-
-		if (cmd.button_mask & BUTTON_JUMP) {
-			printf("jump\n");
-			velocity.y = jumpimpulse;
-			next_action = Action_State::Jumped;
-		}
-		else {
-			next_action = get_ground_state_based_on_speed(grnd_speed);
-		}
-	}
-	
-	return next_action;
-}
 
 
-
-GeomContact player_physics_trace_character(int index, bool crouching, vec3 end);
-void Player::get_crouch_state(bool& out_is_crouching)
-{
-	const float diff = CHAR_STANDING_HB_HEIGHT - CHAR_CROUCING_HB_HEIGHT;
-
-	out_is_crouching = is_crouching;
-
-	if (cmd.button_mask & BUTTON_DUCK) {
-		if (!is_on_ground() && !is_crouching) {
-			// Move legs of player up
-			position.y += diff;		
-		}
-		out_is_crouching = true;
-	}
-	else {
-		if (is_crouching) {
-			// uncrouch
-
-			if (is_on_ground()) {
-				auto gc = player_physics_trace_character(0, false, position+vec3(0,0.001,0));
-
-				if (!gc.found) {
-					out_is_crouching = false;
-				}
-			}
-			else {
-				vec3 end = position - vec3(0, diff, 0) + vec3(0,0.001,0);
-				auto gc = player_physics_trace_character(0, false, end);
-
-				if (!gc.found) {
-					// one more check
-					Ray r;
-					r.pos = position + glm::vec3(0, CHAR_CROUCING_HB_HEIGHT, 0);
-					r.dir = vec3(0, -1, 0);
-					//auto tc = eng->phys.trace_ray(r, 0, PF_ALL);
-					//if (tc.dist < 0 || tc.dist >= CHAR_STANDING_HB_HEIGHT+0.01) {
-					//	out_is_crouching = false;
-					//	position.y -= diff;
-					//	sys_print("passed");
-					//}
-				}
-			}
-		}
-	}
-}
-
-GeomContact player_physics_trace_character(int index, bool crouching, vec3 end)
-{
-	return {};
-	//float height = (crouching) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT;
-	//return eng->phys.trace_shape(Trace_Shape(end, CHAR_HITBOX_RADIUS, height), index, PF_ALL);
-}
 
 
 void sweep_move(glm::vec3& velocity, glm::vec3& position)
@@ -377,6 +282,7 @@ float lensquared_noy(vec3 v)
 	return v.x * v.x + v.z * v.z;
 }
 
+#if 0
 void Player::ground_move()
 {
 	state_time += eng->get_tick_interval();
@@ -432,7 +338,7 @@ void Player::ground_move()
 	
 	slide_move();
 }
-
+#endif
 
 void player_physics_check_nans(Player& player)
 {
@@ -520,7 +426,7 @@ void Player::move()
 		velocity.z *= factor;
 	}
 
-	if (eng->is_host() && debug_fly.get_bool()) {
+	{
 		action = Action_State::Falling;
 
 		vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
@@ -540,8 +446,6 @@ void Player::move()
 		velocity = wishdir * 12.0f;
 		slide_move();
 	}
-	else
-		ground_move();
 	
 	player_physics_check_nans(*this);
 
@@ -564,18 +468,8 @@ void Player::move()
 	}
 }
 
-void player_fire_weapon()
-{
-	// play sounds
-	// play animation (viewmodel for local player)
-	// on server: do raycast and do damage
-	// effects (muzzle flash, gun tracer, ...)
-	// recoil for local player
-
-}
 
 #include "MiscEditors/DataClass.h"
-
 #include "Framework/ClassTypePtr.h"
 #include "Render/Texture.h"
 CLASS_H(PlayerWeaponData,ClassBase )
@@ -620,211 +514,6 @@ public:
 };
 CLASS_IMPL(AllPlayerItems);
 
-
-#if 0
-
-Game_Item_Stats stats[Game_Inventory::NUM_GAME_ITEMS] = {
-	{"unequip","","",ITEM_CAT_MELEE},
-	{"m16", "m16.glb","",ITEM_CAT_RIFLE, 0, 13.0, 2.0, 0.1,0.1,10,30,90,0.5},
-	{"ak47","ak47.glb","",ITEM_CAT_RIFLE, 0, 10.0, 2.0, 0.1, 0.1, 12, 30, 90, 0.5},
-	{"m24", "m24.glb", "", ITEM_CAT_BOLT_ACTION, 0, 0.7, 3.0, 0.1, 0.1, 75, 0, 30, 0.0},
-	{"knife", "knife.glb", "", ITEM_CAT_MELEE, 0, 2.0},
-	{"bomb", "bomb.glb", "", ITEM_CAT_BOMB},
-	{"grenade","grenade_he.glb", "", ITEM_CAT_THROWABLE, 0}
-};
-Game_Item_Stats* get_item_stats()
-{
-	return stats;
-}
-#endif
-
-static float fire_time = 0.15f;
-static float reload_time = 1.9f;
-
-
-void Player::change_to_item(int next_item)
-{
-#if 0
-	ASSERT(next_item >= 0 && next_item < Game_Inventory::NUM_GAME_ITEMS);
-	ASSERT(inv.active_item >= 0 && inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
-
-	if (next_item == inv.active_item)
-		return;
-	if (next_item == inv.pending_item)
-		return;
-	if (inv.state == ITEM_RAISING) {
-		Game_Item_Stats& next = get_item_stats()[next_item];
-		inv.active_item = next_item;
-		inv.state = ITEM_RAISING;
-		inv.timer = next.draw_time;
-		inv.pending_item = -1;
-		return;
-	}
-
-	Game_Item_Stats& cur = get_item_stats()[inv.active_item];
-	inv.pending_item = next_item;
-	inv.state = ITEM_LOWERING;
-	inv.timer = cur.holster_time;
-#endif
-}
-
-void Player::item_update()
-{
-#if 0
-	Game_Inventory& inv = this->inv;
-	bool is_simulated_client = !eng->is_host();
-
-	if (is_simulated_client && inv.tick_for_staging != -1) {
-		int delta = eng->tick - inv.tick_for_staging;
-		if (delta > 30) { // 30 ticks since the inventory synced up, assume there was packet loss or something
-			inv.active_item =inv.staging_item;
-			ASSERT(inv.active_item >= 0 && inv.active_item < Game_Inventory::NUM_GAME_ITEMS);
-			inv.ammo[inv.active_item] = inv.staging_ammo;
-			inv.clip[inv.active_item] = inv.staging_clip;
-		}
-	}
-
-
-	if (inv.active_item < 0 || inv.active_item >= Game_Inventory::NUM_GAME_ITEMS) {
-		sys_print("invalid item");
-		inv.active_item = Game_Inventory::UNEQUIP;
-		inv.state = ITEM_IDLE;
-		inv.timer = 0.f;
-	}
-
-	if (inv.pending_item != -1 && inv.state != ITEM_LOWERING) {
-		sys_print("pending but lowering?\n");
-		inv.pending_item = -1;
-	}
-
-	// check swaps
-	if (cmd.button_mask & BUTTON_ITEM_PREV) {
-		int next_item = inv.active_item - 1;
-		if (next_item < 0) next_item = Game_Inventory::NUM_GAME_ITEMS - 1;
-		change_to_item(next_item);
-	}
-	else if (cmd.button_mask & BUTTON_ITEM_NEXT) {
-		int next_item = (inv.active_item + 1) % Game_Inventory::NUM_GAME_ITEMS;
-		change_to_item(next_item);
-	}
-
-
-	// tick timer
-	if (inv.timer > 0)
-		inv.timer -= eng->tick_interval;
-
-	vec3 look_vec = get_look_vec();
-	bool wants_shoot = cmd.button_mask & BUTTON_FIRE1;
-	bool wants_reload = cmd.button_mask & BUTTON_RELOAD;
-	Game_Item_Stats& item_stats = get_item_stats()[inv.active_item];
-	int cat = item_stats.category;
-
-	if (inv.clip[inv.active_item] <= 0) wants_reload = true;
-
-	switch (inv.state)
-	{
-	case ITEM_IDLE:
-		if (wants_shoot) {
-			if (cat == ITEM_CAT_RIFLE && inv.clip[inv.active_item] <= 0) {
-				// empty sound
-			}
-			else if (cat == ITEM_CAT_RIFLE || cat == ITEM_CAT_MELEE || cat == ITEM_CAT_BOLT_ACTION) {
-				inv.timer = 1.0 / item_stats.fire_rate;
-				inv.state = ITEM_IN_FIRE;
-
-				if (item_stats.category == ITEM_CAT_RIFLE) {
-					//p->anim.set_anim("act_shoot", true);
-					//eng->fire_bullet(this, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
-				}
-				else if (item_stats.category == ITEM_CAT_BOLT_ACTION) {
-					//p->anim.set_anim("act_shoot_sniper", true);
-					//eng->fire_bullet(p, look_vec, p->position + vec3(0, STANDING_EYE_OFFSET, 0));
-				}
-				else if (item_stats.category == ITEM_CAT_MELEE) {
-					//p->anim.set_anim("act_knife_attack", true);
-				}
-				//p->anim.m.loop = false;
-
-
-				//if (is_local) {
-				//	//eng->local.viewmodel_animator.set_anim("act_shoot", true);
-					//eng->local.viewmodel_animator.m.loop = false;
-				//}
-
-				break;
-			}
-			else if (cat == ITEM_CAT_BOMB || cat == ITEM_CAT_THROWABLE) {
-				// todo
-			}
-		}
-		else if (wants_reload && cat == ITEM_CAT_RIFLE && inv.ammo[inv.active_item] > 0) {
-			inv.timer = item_stats.reload_time;
-			inv.state = ITEM_RELOAD;
-
-			//p->anim.set_anim("act_reload", true);
-			//p->anim.m.loop = false;
-			//p->anim.m.speed = 0.8f;
-
-			//if (is_local) {
-			//	Player* player = (Player*)p;
-				//player->viewmodel->animator.set_anim("ak47_reload", true);
-			///}
-		}
-		else {
-			if (cat == ITEM_CAT_RIFLE) {
-				//p->anim.set_anim("act_idle", false);
-			}
-			else if (cat == ITEM_CAT_BOLT_ACTION) {
-				//p->anim.set_anim("act_idle_sniper", false);
-			}
-			else if (cat == ITEM_CAT_MELEE) {
-				//p->anim.set_anim("act_idle_knife", true);
-			}
-			else if (cat == ITEM_CAT_BOMB || cat == ITEM_CAT_THROWABLE) {
-				//p->anim.set_anim("act_idle_item", true);
-			}
-			//p->anim.m.loop = true;
-
-		}
-			break;
-	case ITEM_LOWERING:
-		if (inv.timer <= 0) {
-			ASSERT(inv.pending_item >= 0 && inv.pending_item < Game_Inventory::NUM_GAME_ITEMS);
-			Game_Item_Stats& next = get_item_stats()[inv.pending_item];
-			inv.active_item = inv.pending_item;
-			inv.pending_item = -1;
-			inv.state = ITEM_RAISING;
-			inv.timer = next.draw_time;
-			sys_print("changed to raising: %d\n", inv.active_item);
-		}
-		break;
-	case ITEM_RAISING:
-		if (inv.timer <= 0) {
-			inv.state = ITEM_IDLE;
-			sys_print("changed to: %d\n", inv.active_item);
-		}
-		break;
-	case ITEM_RELOAD:
-		if (inv.timer <= 0) {
-			inv.ammo[inv.active_item] += inv.clip[inv.active_item];
-			inv.clip[inv.active_item] = 0;
-			int reload = glm::min(item_stats.clip_size, inv.ammo[inv.active_item]);
-			inv.clip[inv.active_item] += reload;
-			inv.ammo[inv.active_item] -= reload;
-
-			sys_print("reloaded %d %d\n", inv.active_item, inv.clip[inv.active_item]);
-
-			inv.state = ITEM_IDLE;
-		}
-		break;
-	case ITEM_IN_FIRE:
-		if (inv.timer <= 0) inv.state = ITEM_IDLE;
-		break;
-	case ITEM_USING:
-		break;
-	}
-#endif
-}
 
 #if 0
 ViewmodelComponent::~ViewmodelComponent()
@@ -934,7 +623,6 @@ void Player::update()
 	}
 
 	move();
-	item_update();
 
 	set_ws_transform(position, glm::quat(rotation), scale);
 }
@@ -1285,13 +973,22 @@ public:
 };
 CLASS_IMPL(HealthComponent);
 
+#include "Input/InputSystem.h"
+#include "Input/InputAction.h"
+
  void Player::start()  {
 	 hud = std::make_unique<PlayerHUD>(this);
 
 	 score_update_delegate.invoke(10);
 
 	 eng->set_game_focused(true);
+
+	 inputPtr = GameInputSystem::get().register_input_user(0);
 }
+ void Player::end() {
+	 GameInputSystem::get().free_input_user(inputPtr);
+ }
+
  Player::~Player() {
  }
 #include "Physics/ChannelsAndPresets.h"
@@ -1305,7 +1002,7 @@ CLASS_IMPL(HealthComponent);
 
 	 player_mesh->attach_to_parent(player_capsule, {});
 	 viewmodel_mesh->attach_to_parent(player_mesh, {});
-	 spotlight->attach_to_parent(root_component.get(), {});
+	 spotlight->attach_to_parent(root_component, {});
 
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);

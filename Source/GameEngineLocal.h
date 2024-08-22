@@ -4,7 +4,6 @@
 #include "Types.h"
 #include "Framework/Config.h"
 #include "Render/ParticlesPublic.h"
-#include "Physics.h"
 #include "Game/Entity.h"
 
 #include "Debug.h"
@@ -101,10 +100,6 @@ public:
 	void loop();
 	void draw_screen();
 	void pre_render_update();
-
-	void bind_key(int key, string command);	// binds key to command
-
-
 	// state relevant functions
 	void set_tick_rate(float tick_rate);
 
@@ -133,6 +128,8 @@ public:
 	MulticastDelegate<bool> on_map_load_return;
 public:
 
+	void set_keybind(SDL_Scancode code, uint16_t keymod, std::string bind);
+
 	bool map_spawned() { return level != nullptr; }
 
 	std::unique_ptr<GuiSystemPublic> gui_sys;
@@ -158,8 +155,6 @@ public:
 	bool is_drawing_to_window_viewport() const;
 
 	glm::ivec2 window_viewport_size = glm::ivec2(DEFAULT_WIDTH,DEFAULT_HEIGHT);
-
-	std::unordered_map<uint32_t, string> keybinds;
 
 	int argc = 0;
 	char** argv = nullptr;
@@ -189,6 +184,11 @@ private:
 	friend class Ent_Iterator;
 
 	void call_startup_functions_for_new_entity(Entity* e);
+
+
+	std::string* find_keybind(SDL_Scancode code, uint16_t keymod);
+
+	std::unordered_map<uint32_t, string> keybinds;
 };
 
 extern GameEngineLocal eng_local;

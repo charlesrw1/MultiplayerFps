@@ -14,9 +14,6 @@
 #include "GameEnginePublic.h"
 #include "Game/BaseUpdater.h"
 
-#ifndef NO_EDITOR
-#include "EditorFolder.h"
-#endif // !NO_EDITOR
 
 class Model;
 class GeomContact;
@@ -56,10 +53,20 @@ class EntityPtr
 public:
 	static_assert(std::is_base_of<Entity, T>::value, "EntityPtr must derive from Entity");
 
-	bool is_valid() const { return handle != 0; }
+	bool is_valid() const { return get() != nullptr; }
 	T* get() const {
+		if (handle == 0) return nullptr;
 		auto e = eng->get_entity(handle);
 		return e ? e->cast_to<T>() : nullptr;
+	}
+	T& operator*() const {
+		return *get();
+	}
+	operator bool() const {
+		return is_valid();
+	}
+	T* operator->() const {
+		return get();
 	}
 
 	uint64_t handle = 0;
@@ -73,7 +80,7 @@ inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, 
 
 
 class Schema;
-class EditorFolder;
+
 CLASS_H(Entity, BaseUpdater)
 public:
 	const static bool CreateDefaultObject = true;
@@ -145,7 +152,7 @@ public:
 		return nullptr;
 	}
 	EntityComponent* get_root_component() {
-		return root_component.get();
+		return root_component;
 	}
 	template<typename T>
 	void get_all_components(std::vector<T*>& array) {
@@ -175,13 +182,18 @@ public:
 	void set_ws_transform(const glm::vec3& pos, const glm::quat& q, const glm::vec3& scale) { return get_root_component()->set_ls_transform(pos,q,scale); }
 	void set_ws_position(const glm::vec3& v) { return get_root_component()->set_ls_transform(v, get_ws_rotation(), get_ws_scale()); }
 	void set_ws_rotation(const glm::quat& q) { return get_root_component()->set_ls_transform(get_ws_position(), q, get_ws_scale()); }
+	
+	void parent_to_entity(Entity* parentEntity);
+	void parent_to_component(EntityComponent* parentEntityComponent);
+
 
 	const std::vector<std::unique_ptr<EntityComponent>>& get_all_components() { return all_components; }
 
 	void add_component_from_loading(EntityComponent* component);
 protected:
 
-	ObjPtr<EntityComponent> root_component;
+	EntityPtr<Entity> parentedEntity;	// used for serialization purposes
+	EntityComponent* root_component = nullptr;
 	// components created either in code or defined in schema or created per instance
 	std::vector<std::unique_ptr<EntityComponent>> all_components;
 
@@ -206,7 +218,7 @@ public:
 	virtual void editor_tick() {}
 	virtual void editor_on_change_property(const PropertyInfo& property_) {}
 
-	ObjPtr<EditorFolder> editor_folder;
+	//ObjPtr<EditorFolder> editor_folder;
 	std::string editor_name;
 #endif
 	EntityPtr<Entity> self_id;			// global identifier for this entity
@@ -231,7 +243,7 @@ private:
 #name, offsetof(TYPE_FROM_START,name), flags)
 
 inline void Entity::remove_this_component(EntityComponent* component) {
-	assert(component != root_component.get() && "cant delete the root component");
+	assert(component != root_component && "cant delete the root component");
 	bool found = false;
 	for (int i = 0; i < all_components.size(); i++) {
 		if (all_components[i].get() == component) {
@@ -260,7 +272,7 @@ inline T* Entity::create_and_attach_component_type(EntityComponent* parent, Stri
 	T* ptr = new T;
 	ptr->set_owner(this);
 	all_components.push_back(std::unique_ptr<EntityComponent>(ptr));
-	ptr->attach_to_parent(parent == nullptr ? root_component.get() : parent, bone);
+	ptr->attach_to_parent(parent == nullptr ? root_component : parent, bone);
 	ptr->on_init();
 	return ptr;
 }
@@ -273,7 +285,7 @@ inline EntityComponent* Entity::create_and_attach_component_type(const ClassType
 	EntityComponent* ec = (EntityComponent*)info->allocate();
 	ec->set_owner(this);
 	all_components.push_back(std::unique_ptr<EntityComponent>(ec));
-	ec->attach_to_parent(parent == nullptr ? root_component.get() : parent, bone);
+	ec->attach_to_parent(parent == nullptr ? root_component : parent, bone);
 	ec->on_init();
 	return ec;
 }

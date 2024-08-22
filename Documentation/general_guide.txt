@@ -17,6 +17,11 @@ A useful (boolean) variable is g_drawdebugmenu
 When true, it draws a side panel debug menu. The console is the most useful part. Click to open the console.
 You can input any commands or variables like you would input in the init.txt or vars.txt to edit configuration live
 
+A useful rendering command is "ot <scale:float> <alpha:float> <mip:float> <texture_name>"
+It outputs a texture or internal render texture to the screen for debugging. Use "cot" to clear it
+Some "internal render texture names" are "_gbuffer0,_gbuffer1,"_gbuffer2","_csm_shadow"
+Ex: "ot 1 1 0 _gbuffer0" outputs the normal buffer at full scale (covers the whole screen)
+
 AssetBrowser:
 The asset browser is the main tool when creating levels. As said above, double click on an asset to open its editor. You can also drag some of the assets from the browser onto the viewport to instantiate it in the level editor.
 All assets can be dragged and dropped on to "AssetPtr's"!! These allow very easy ways to set assets. An AssetPtr is a property field in the property grid that looks like a solid colored rectangle.

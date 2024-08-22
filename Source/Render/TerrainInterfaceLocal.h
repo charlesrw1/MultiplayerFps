@@ -200,6 +200,4 @@ public:
 	vertexarrayhandle vao{};
 	vertexbufferhandle vbo{};
 
-	// for editor
-	std::vector<TerrainEditorQueuedItem> command_queue;
 };

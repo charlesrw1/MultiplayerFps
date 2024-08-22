@@ -2,7 +2,6 @@
 #define SERVER_H
 #include "Net.h"
 
-#include "Physics.h"
 #include "Framework/Config.h"
 #include "Types.h"
 #include "Framework/MeshBuilder.h"
@@ -63,8 +62,8 @@ public:
 
 	int highest_tick_recieved = 0;
 	int num_commands = 0;
-	vector<Move_Command> commands;
-	Move_Command last_command;
+	//vector<Move_Command> commands;
+	//Move_Command last_command;
 };
 
 class Server

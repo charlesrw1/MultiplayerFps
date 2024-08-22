@@ -77,6 +77,8 @@ const glm::mat4& EntityComponent::get_ws_transform() {
 
 void EntityComponent::remove_this(EntityComponent* child_component)
 {
+	assert(child_component->attached_parent.ptr == this);
+	child_component->attached_parent.ptr = nullptr;
 #ifdef _DEBUG
 	bool found = false;
 	for (int i = 0; i < children.size(); i++) {
@@ -108,6 +110,13 @@ void EntityComponent::post_unserialize_created_component(Entity* parent)
 		attached_parent->children.push_back(this);
 }
 
+void EntityComponent::unlink_from_parent()
+{
+	if (attached_parent.get() == nullptr)
+		return;
+	attached_parent->remove_this(this);
+}
+
 void EntityComponent::attach_to_parent(EntityComponent* parent_component, StringName point)
 {
 	ASSERT(parent_component);
@@ -120,45 +129,36 @@ void EntityComponent::attach_to_parent(EntityComponent* parent_component, String
 		if (cur_node->get_parent_component() == this) {
 			ASSERT(attached_parent.get());
 			remove_this(cur_node);
-			cur_node->attached_parent = {};
 			cur_node->attach_to_parent(attached_parent.get());
 			break;
 		}
 		cur_node = cur_node->attached_parent.get();
 	}
 
-	if (attached_parent.get()) {
-		attached_parent->remove_this(this);
-		attached_parent = nullptr;
-	}
+	unlink_from_parent();
+
 	parent_component->children.push_back(this);
 	attached_parent = parent_component;
 	//attached_bone_name = point;
+}
 
-}
-void EntityComponent::unlink_and_destroy()
-{
-	if (attached_parent.get())
-		attached_parent->remove_this(this);
-	for (int i = 0; i < children.size(); i++)
-		children[i]->destroy_children_no_unlink();
-	on_deinit();
-}
-void EntityComponent::destroy_children_no_unlink()
-{
-	for (int i = 0; i < children.size(); i++)
-		children[i]->destroy_children_no_unlink();
-	on_deinit();
-	entity_owner->remove_this_component(this);
-}
 
 void EntityComponent::init()
 {
 	on_init();
-	shutdown_updater();
+	init_updater();
 }
 void EntityComponent::deinit()
 {
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i]->entity_owner != entity_owner) {	// from a different entity
+			const int preSize = children.size();
+			eng->remove_entity(children[i]->entity_owner);	// remove it, this will call back up to us to remove from our child list
+			assert(children.size() == preSize - 1);
+			i--;	// since item was deleted, decrement to go to next element
+		}
+	}
+
 	on_deinit();
-	init_updater();
+	shutdown_updater();
 }

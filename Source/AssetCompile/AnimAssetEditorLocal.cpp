@@ -59,8 +59,8 @@ void AnimationEditorTool::tick(float dt)
 			
 		}
 	}
-
-	if (outputObj.is_valid()) {
+	auto mod = g_animseq_editor_static.outputModel;
+	if (outputObj.is_valid()&&mod&&mod->get_skel()) {
 		Render_Object o;
 		add_to_obj(o, dt);
 		idraw->get_scene()->update_obj(outputObj, o);
@@ -267,6 +267,23 @@ void AnimationEditorTool::on_open_map_callback(bool good)
 	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
 	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
 
+
+	auto str = std::string(get_name());
+	auto slash = str.rfind('/');
+	std::string modelName = str.substr(0, slash);
+	std::string animName = str.substr(slash + 1);
+
+	// try to find def_name
+	std::string def_name = modelName + ".mis";
+	outputModel = default_asset_load<Model>((modelName + ".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
+	if (!outputModel)
+		sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
+	else {
+		int remapIndx;
+		sequence = outputModel->get_skel()->find_clip(animName, remapIndx);
+	}
+
+	on_start.invoke();
 }
 
 void AnimationEditorTool::open_document_internal(const char* name, const char* arg)
@@ -282,12 +299,11 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 
 	auto str = std::string(name);
 	auto slash = str.rfind('/');
-	std::string modelName = str.substr(0,slash);
-	std::string animName = str.substr(slash+1);
+	std::string modelName = str.substr(0, slash);
+	std::string animName = str.substr(slash + 1);
 
 	// try to find def_name
 	std::string def_name = modelName + ".mis";
-	outputModel = default_asset_load<Model>((modelName+".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
 	std::string fullpath = "./Data/Models/" + def_name;
 	auto file = FileSys::open_read_os(fullpath.c_str());
 
@@ -307,8 +323,6 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 		return;
 	}
 	else {
-		if (!outputModel)
-			sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
 		set_doc_name(name);
 	}
 
@@ -321,10 +335,6 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 		animImportSettings = &importSettings->animations.back();
 		animImportSettings->clipName = animName;
 	}
-	int remapIndx;
-	sequence = outputModel->get_skel()->find_clip(animName, remapIndx);
-	eng->open_level("__empty__");
-	eng->get_on_map_delegate().add(this, &AnimationEditorTool::on_open_map_callback);
 	assert(importSettings);
 	assert(animImportSettings);
 
@@ -336,7 +346,8 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 		ti = ti->super_typeinfo;
 	}
 
-	on_start.invoke();
+	eng->open_level("__empty__");
+	eng->get_on_map_delegate().add(this, &AnimationEditorTool::on_open_map_callback);
 }
 
 void AnimationEditorTool::close_internal()
