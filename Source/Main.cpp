@@ -1294,8 +1294,12 @@ bool GameEngineLocal::game_draw_screen()
 	float fov = g_fov.get_float();
 	p->get_view(view, fov);
 
+	glm::mat4 in = glm::inverse(view);
+	auto pos = in[3];
+	auto front = -in[2];
+	View_Setup vs = View_Setup(pos, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
-	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
+	//View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
 	idraw->scene_draw(params,vs, get_gui());
 

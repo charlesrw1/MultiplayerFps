@@ -3437,6 +3437,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		params.provied_constant_buffer = ubo.current_frame;
 		render_level_to_target(params);
 	}
+	state_machine.invalidate_all();
 
 	if (is_wireframe_mode)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -3487,6 +3488,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		postProcesses.push_back(matman.get_default_editor_sel_PP());
 	if(!r_no_postprocess.get_bool())
 		do_post_process_stack(postProcesses);
+	state_machine.invalidate_all();
+
+
 	//tex.actual_output_composite = tex.output_composite_2;
 	glEnable(GL_BLEND);
 	set_shader(prog.simple);

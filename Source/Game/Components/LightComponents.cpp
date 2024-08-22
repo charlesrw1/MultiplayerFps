@@ -6,10 +6,10 @@
 #include "Render/Texture.h"
 
 #include "BillboardComponent.h"
+#include "ArrowComponent.h"
 
 #include "Game/Entity.h"
 #include "Assets/AssetDatabase.h"
-
 CLASS_IMPL(SpotLightComponent);
 CLASS_IMPL(PointLightComponent);
 CLASS_IMPL(SunLightComponent);
@@ -164,7 +164,7 @@ void SunLightComponent::build_render_light(Render_Sun& light)
 	light.cast_shadows = true;
 
 	auto& transform = get_ws_transform();
-	light.direction = glm::normalize(transform[0]);
+	light.direction = glm::normalize(-transform[2]);
 }
 
 void SunLightComponent::on_init()
@@ -178,6 +178,9 @@ void SunLightComponent::on_init()
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
 		b->set_texture(default_asset_load<Texture>("icon/sunBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+
+		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
+		s->dont_serialize_or_edit = true;
 	}
 }
 

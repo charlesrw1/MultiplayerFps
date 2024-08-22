@@ -32,3 +32,5 @@ dbg.fly 1
 FONT_TEST
 
 ui.debug_press 1
+
+#r.debug_specular 1
