@@ -591,11 +591,11 @@ DECLARE_ENGINE_CMD(bind)
 		uint16_t modifiers = 0;
 		for (int i = 2; i < args.size() - 1; i++) {
 			const char* m = args.at(i);
-			if (strcmp(m, "Ctrl"))
+			if (strcmp(m, "Ctrl")==0)
 				modifiers |= KMOD_CTRL;
-			else if (strcmp(m, "Alt"))
+			else if (strcmp(m, "Alt")==0)
 				modifiers |= KMOD_ALT;
-			else if (strcmp(m, "Shift"))
+			else if (strcmp(m, "Shift")==0)
 				modifiers |= KMOD_SHIFT;
 			else
 				sys_print("??? unknown modifier for 'bind': %s\n", m);
@@ -1032,7 +1032,7 @@ void GameEngineLocal::key_event(SDL_Event event)
 		set_game_focused(false);
 		return;
 	}
-	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
+	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard && event.key.keysym.mod == 0 /* if mod is active, then skip this BS ImGui taking over input shit*/)
 		return;
 
 	if (event.type == SDL_KEYDOWN) {

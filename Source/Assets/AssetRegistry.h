@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <unordered_map>
+
 #include "IAsset.h"
 
 // All assets that you want showing in the asset browser should be registered here
@@ -37,6 +39,35 @@ struct AssetOnDisk
 	size_t filesize = 0;
 };
 
+struct AssetFilesystemNode {
+	bool folderIsOpen = true;
+	AssetOnDisk asset;
+	std::string name;
+	std::unordered_map<std::string, AssetFilesystemNode*> children;
+	AssetFilesystemNode(std::string name) : name(name) {}
+
+	// Add a path to the tree
+	void addPath(const AssetOnDisk& a, const std::vector<std::string>& path, size_t index = 0) {
+		if (index == path.size()) {
+			asset = a;
+			return; // Base case: reached the end of the path
+		}
+
+		const std::string& part = path[index];
+		if (children.find(part) == children.end()) {
+			children[part] = new AssetFilesystemNode(part); // Create a new node if not present
+		}
+		children[part]->addPath(a,path, index + 1); // Recursively add the rest of the path
+	}
+
+	// Destructor to clean up memory
+	~AssetFilesystemNode() {
+		for (auto& pair : children) {
+			delete pair.second;
+		}
+	}
+};
+
 class AssetRegistrySystem
 {
 public:
@@ -62,7 +93,11 @@ public:
 		}
 		return nullptr;
 	}
+
+	AssetFilesystemNode* get_root_files() const { return root.get(); }
 private:
+	std::unique_ptr<AssetFilesystemNode> root;
+
 	size_t last_index_time = 0;
 	std::vector<AssetOnDisk> all_disk_assets;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;

@@ -24,14 +24,22 @@ public:
 
 	virtual std::string get_type_name() const  override
 	{
-		return "Entity (C++)";
+		return "EntityClass";
 	}
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override {
 		auto subclasses = ClassBase::get_subclasses<Entity>();
 		for (; !subclasses.is_end(); subclasses.next()) {
-			if (subclasses.get_type()->allocate)
-				filepaths.push_back(subclasses.get_type()->classname);
+			if (subclasses.get_type()->allocate) {
+				std::string path = subclasses.get_type()->classname;
+				auto parent = subclasses.get_type();
+				while (parent && parent != &Entity::StaticType) {
+					path.insert(0, std::string(parent->super_typeinfo->classname) + "/");
+					parent = parent->super_typeinfo;
+				}
+				
+				filepaths.push_back(path);
+			}
 		}
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }

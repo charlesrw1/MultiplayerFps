@@ -34,7 +34,9 @@ public:
 			}
 		}
 	}
-	virtual IEditorTool* tool_to_edit_me() const override { return g_animseq_editor; }
+	virtual IEditorTool* tool_to_edit_me() const override {
+		return g_animseq_editor; 
+	}
 	virtual bool assets_are_filepaths() const override { return false; }
 	virtual std::string root_filepath() const  override
 	{

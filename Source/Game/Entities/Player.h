@@ -20,17 +20,40 @@ class Entity;
 class MeshBuilder;
 class Animation_Set;
 
+CLASS_H(SpawnLogic, ClassBase)
+public:
+	virtual bool can_spawn_this(PlayerBase* player) const = 0;
+};
+
+CLASS_H(SpawnIfOnRedTeam, SpawnLogic)
+public:
+	bool can_spawn_this(PlayerBase* player) const {
+		return true;
+	}
+};
+
 CLASS_H(PlayerSpawnPoint, Entity)
 public:
 	PlayerSpawnPoint() {
 		empty = create_sub_component<EmptyComponent>("Root");
 		root_component = empty;
 	}
+
+	bool check_spawn(PlayerBase* b) {
+		if (logicClass.ptr != nullptr) {
+			auto logic = logicClass.ptr->allocate()->cast_to<SpawnLogic>();
+			return logic->can_spawn_this(b);
+		}
+		return true;
+	}
+
 	EmptyComponent* empty = nullptr;
+	ClassTypePtr<SpawnLogic> logicClass;
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(PlayerSpawnPoint)
-			REG_INT(team, PROP_DEFAULT, "0")
+			REG_INT(team, PROP_DEFAULT, "0"),
+			REG_CLASSTYPE_PTR(logicClass, PROP_DEFAULT),
 		END_PROPS(PlayerSpawnPoint)
 	};
 	int team = 0;

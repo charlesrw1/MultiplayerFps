@@ -1,9 +1,28 @@
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
+#include <algorithm>
+#include <unordered_map>
+#include <sstream>
 AssetRegistrySystem& AssetRegistrySystem::get()
 {
 	static AssetRegistrySystem inst;
 	return inst;
+}
+
+
+
+
+// Helper function to split a string by a delimiter
+std::vector<std::string> split(const std::string& str, char delimiter) {
+    std::vector<std::string> tokens;
+    std::stringstream ss(str);
+    std::string token;
+
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
+    }
+
+    return tokens;
 }
 
 void AssetRegistrySystem::reindex_all_assets()
@@ -35,6 +54,14 @@ void AssetRegistrySystem::reindex_all_assets()
 
 			all_disk_assets.push_back(aod);
 		}
+	}
 
+	root.reset();
+	root = std::make_unique<AssetFilesystemNode>("root");
+
+	for (auto a : all_disk_assets) {
+		auto& filename = a.filename;
+		std::vector<std::string> path = split(filename, '/');
+		root->addPath(a,path);
 	}
 }

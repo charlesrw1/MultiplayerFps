@@ -51,6 +51,10 @@ CLASS_IMPL(PlayerBase);
 CLASS_IMPL(Player);
 CLASS_IMPL(PlayerSpawnPoint);
 
+CLASS_IMPL(SpawnLogic);
+CLASS_IMPL(SpawnIfOnRedTeam);
+
+
 //
 //	PLAYER MOVEMENT CODE
 //

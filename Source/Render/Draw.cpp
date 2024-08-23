@@ -2064,7 +2064,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 						if (obj.type_.proxy.mat_override)
 							mat = (MaterialInstance*)obj.type_.proxy.mat_override;
 
-						if (!mat->is_valid_to_use())
+						if (!mat || !mat->is_valid_to_use())
 							mat = matman.get_fallback();
 
 						const MasterMaterialImpl* mm = mat->get_master_material();

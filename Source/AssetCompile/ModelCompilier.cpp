@@ -831,7 +831,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		mdd.loddefs.push_back(lodd);
 	}
 	for (int i = 0; i < is->myMaterials.size(); i++)
-		mdd.directMaterialSet.push_back(is->myMaterials.at(i).ptr ? is->myMaterials.at(i)->get_name() : "fallback");
+		mdd.directMaterialSet.push_back(is->myMaterials.at(i).is_valid() ? is->myMaterials.at(i)->get_name() : "fallback");
 	mdd.keepbones = is->keepBones;
 	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {
 		auto& p = is->additionalAnimationGlbFiles[i];

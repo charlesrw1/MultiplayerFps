@@ -17,10 +17,16 @@ bind F3 "r.debug_mode 5"
 bind F4 "r.debug_mode 8"
 bind F5 "r.debug_mode 2"
 
-bind "Keypad 1" "FILTER_FOR Model"
-bind "Keypad 2" "FILTER_FOR Map"
-bind "Keypad 3" "FILTER_FOR Material"
-bind "Keypad 0" "CLEAR_AB_FILTER"
+bind "Keypad 1" Ctrl "FILTER_FOR Model"
+bind "Keypad 2" Ctrl "FILTER_FOR Map"
+bind "Keypad 3" Ctrl "FILTER_FOR Material"
+bind "Keypad 4" Ctrl "FILTER_FOR Texture"
+bind "Keypad 5" Ctrl "FILTER_FOR AnimGraph"
+bind "Keypad 6" Ctrl "FILTER_FOR DataClass"
+bind "Keypad 7" Ctrl "FILTER_FOR AnimationSeq"
+bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
+
+bind "Keypad 0" Ctrl "CLEAR_AB_FILTER"
 
 dbg.fly 1
 
