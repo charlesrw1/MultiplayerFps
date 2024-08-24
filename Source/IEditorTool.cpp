@@ -10,47 +10,53 @@
 #include <SDL2/SDL.h>
 
 #include "Assets/AssetBrowser.h"
+#include "Assets/AssetRegistry.h"
 
+void IEditorTool::set_window_title()
+{
+	auto metadata = AssetRegistrySystem::get().find_for_classtype(&get_asset_type_info());
+	assert(metadata);
+	const char* window_name = "unnamed";
+	if (current_document_has_path())
+		window_name = this->name.c_str();
+	auto name = string_format("%s Editor: %s\n", metadata->get_type_name().c_str(), window_name);
 
+	SDL_SetWindowTitle(eng->get_os_window(), name);
+}
 bool IEditorTool::open(const char* name, const char* arg) {
-	//assert(get_focus_state() != editor_focus_state::Closed);	// must have opened
 
-	//if (get_focus_state() == editor_focus_state::Background) {
-	//	sys_print("!!! cant open %s while game is running. Close the level then try again.\n", get_editor_name());
-	//	return false;
-	//}
-	// close currently open document
+	if (!is_initialized) {
+		init();
+		is_initialized = true;
+	}
+
 	close();
-	assert(!has_document_open());
 
-	open_document_internal(name, arg);
+	this->name = name;
+	bool good = open_document_internal(name, arg);
 
-	if (!has_document_open())
+	if (!good)
 		return false;
 
-	{
-		const char* window_name = "unnamed";
-		if (current_document_has_path())
-			window_name = this->name.c_str();
-		SDL_SetWindowTitle(eng->get_os_window(), string_format("%s: %s",get_editor_name(), window_name));
-	}
+	is_open = true;
+
+	set_window_title();
 
 	return true;
 }
 
 void IEditorTool::close()
 {
-	if (!has_document_open())
+	if (!is_open)
 		return;
-	// fixme: prompt to save?
+	// fixme: prompt to save or not save?
 	save();
 	open_open_popup = open_save_popup = false;
 	close_internal();
 	name = "";
+	is_open = false;
 
-	SDL_SetWindowTitle(eng->get_os_window(),"CsRemake");
-
-	ASSERT(!has_document_open());
+	SDL_SetWindowTitle(eng->get_os_window(),"CSRE");
 }
 bool IEditorTool::save()
 {
@@ -63,12 +69,7 @@ bool IEditorTool::save()
 		return false;
 	}
 
-	{
-		const char* window_name = "unnamed";
-		if (current_document_has_path())
-			window_name = this->name.c_str();
-		SDL_SetWindowTitle(eng->get_os_window(), string_format("%s: %s", get_editor_name(), window_name));
-	}
+	set_window_title();
 
 	return save_document_internal();
 }
@@ -182,13 +183,50 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 	if (ImGui::BeginPopupModal("Open file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
-			tool->open_document(buf);
+			tool->open(buf);
 			}, prefix.c_str(), false);
 	}
 }
 /* "./Data/Animations/Graphs/"*/
 
-void IEditorTool::imgui_draw()
+void IEditorTool::draw_imgui_public()
 {
-	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, get_save_root_dir());
+	imgui_draw();
+	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, "./Data/");
+}
+
+void IEditorTool::draw_menu_bar()
+{
+	if (ImGui::BeginMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (has_create_new_menu_item()) {
+				if (ImGui::MenuItem("New")) {
+					//open("");
+
+					//Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map \"\"");
+					auto metadata = AssetRegistrySystem::get().find_for_classtype(&get_asset_type_info());
+					assert(metadata);
+					char* command = string_format("start_ed %s \"\"", metadata->get_type_name());;
+					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, command);
+				}
+			}
+			if (ImGui::MenuItem("Open", "Ctrl+O")) {
+				open_the_open_popup();
+
+			}
+			if (ImGui::MenuItem("Save", "Ctrl+S")) {
+				save();
+			}
+			
+			hook_menu_bar_file_menu();
+
+			ImGui::EndMenu();
+		}
+
+		hook_menu_bar();
+
+		ImGui::EndMenuBar();
+	}
 }

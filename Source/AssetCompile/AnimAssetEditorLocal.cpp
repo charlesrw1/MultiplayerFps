@@ -48,26 +48,17 @@ void AnimationEditorTool::add_to_obj(Render_Object& obj, float dt)
 
 void AnimationEditorTool::tick(float dt)
 {
-	auto window_sz = eng->get_game_viewport_size();
-	float aratio = (float)window_sz.y / window_sz.x;
-	{
-		int x = 0, y = 0;
-		if (eng->is_game_focused()) {
-			SDL_GetRelativeMouseState(&x, &y);
-			camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
+	EditorTool3d::tick(dt);
 
-			
-		}
-	}
 	auto mod = g_animseq_editor_static.outputModel;
 	if (outputObj.is_valid()&&mod&&mod->get_skel()) {
 		Render_Object o;
 		add_to_obj(o, dt);
 		idraw->get_scene()->update_obj(outputObj, o);
 
-		glm::vec3 hipsCenter = animator.get_global_bonemats()[0][3];
-		hipsCenter = outputModel->get_root_transform() * glm::vec4(hipsCenter, 1.0);
-		view = View_Setup(camera.position + hipsCenter, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+		//glm::vec3 hipsCenter = animator.get_global_bonemats()[0][3];
+		//hipsCenter = outputModel->get_root_transform() * glm::vec4(hipsCenter, 1.0);
+		//view = View_Setup(camera.position + hipsCenter, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 	}
 }
 
@@ -195,109 +186,25 @@ void EditModelAnimations::draw_imgui()
 	//seqimgui.current_time = curveedit.current_time;
 	curveedit.current_time = seqimgui.current_time;
 }
-void AnimationEditorTool::draw_menu_bar()
-{
-	if (ImGui::BeginMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("New")) {
-				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "open Model \"\"");
-			}
-			if (ImGui::MenuItem("Open", "Ctrl+O")) {
-				open_the_open_popup();
-
-			}
-			if (ImGui::MenuItem("Save", "Ctrl+S")) {
-				save();
-			}
-
-			ImGui::EndMenu();
-		}
-
-		ImGui::EndMenuBar();
-	}
-}
-const View_Setup& AnimationEditorTool::get_vs()
-{
-	// TODO: insert return statement here
-	return view;
-}
-
-void AnimationEditorTool::overlay_draw()
-{
-}
 
 
-void AnimationEditorTool::init()
-{
-}
 
-bool AnimationEditorTool::can_save_document()
-{
-	return true;
-}
 
-const char* AnimationEditorTool::get_editor_name()
-{
-	return "Animation Seq Editor";
-}
 
-bool AnimationEditorTool::has_document_open() const
-{
-	return importSettings != nullptr;
-}
 #include "Assets/AssetDatabase.h"
 #include "Game/StdEntityTypes.h"
 extern ConfigVar ed_default_sky_material;
-void AnimationEditorTool::on_open_map_callback(bool good)
-{
-	assert(good);
-
-	outputObj = idraw->get_scene()->register_obj();
-	///outputEntity->Mesh->
-
-	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-	dome->Mesh->set_model(default_asset_load<Model>("skydome.cmdl"));
-	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
-	dome->Mesh->is_skybox = true;	// FIXME
-	dome->Mesh->cast_shadows = false;
-	dome->Mesh->set_material_override(default_asset_load<MaterialInstance>(ed_default_sky_material.get_string()));
-
-	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
-	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
-
-
-	auto str = std::string(get_name());
-	auto slash = str.rfind('/');
-	std::string modelName = str.substr(0, slash);
-	std::string animName = str.substr(slash + 1);
-
-	// try to find def_name
-	std::string def_name = modelName + ".mis";
-	outputModel = default_asset_load<Model>((modelName + ".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
-	if (!outputModel)
-		sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
-	else {
-		int remapIndx;
-		sequence = outputModel->get_skel()->find_clip(animName, remapIndx);
-	}
-
-	on_start.invoke();
-}
-
-void AnimationEditorTool::open_document_internal(const char* name, const char* arg)
+void AnimationEditorTool::post_map_load_callback()
 {
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini AnimSeqEditor.ini");
-	if (strlen(name) == 0)
-		return;
+
 
 	assert(!importSettings);
 
 	assert(!outputModel);
 	assert(!animImportSettings);
 
-	auto str = std::string(name);
+	auto str = std::string(get_doc_name());
 	auto slash = str.rfind('/');
 	std::string modelName = str.substr(0, slash);
 	std::string animName = str.substr(slash + 1);
@@ -322,9 +229,7 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
 		return;
 	}
-	else {
-		set_doc_name(name);
-	}
+
 
 	for (int i = 0; i < importSettings->animations.size(); i++) {
 		if (importSettings->animations[i].clipName == animName)
@@ -346,12 +251,27 @@ void AnimationEditorTool::open_document_internal(const char* name, const char* a
 		ti = ti->super_typeinfo;
 	}
 
-	eng->open_level("__empty__");
-	eng->get_on_map_delegate().add(this, &AnimationEditorTool::on_open_map_callback);
+
+	outputObj = idraw->get_scene()->register_obj();
+	///outputEntity->Mesh->
+
+
+
+	outputModel = default_asset_load<Model>((modelName + ".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
+	if (!outputModel)
+		sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
+	else {
+		int remapIndx;
+		sequence = outputModel->get_skel()->find_clip(animName, remapIndx);
+	}
+
+	on_start.invoke();
 }
 
 void AnimationEditorTool::close_internal()
 {
+	EditorTool3d::close_internal();
+
 	on_close.invoke();
 
 	idraw->get_scene()->remove_obj(outputObj);
@@ -360,10 +280,6 @@ void AnimationEditorTool::close_internal()
 	delete importSettings;
 	importSettings = nullptr;
 	animImportSettings = nullptr;
-
-	eng->leave_level();
-
-	eng->get_on_map_delegate().remove(this);
 
 	propGrid.clear_all();
 }
@@ -378,7 +294,7 @@ bool AnimationEditorTool::save_document_internal()
 	write_object_properties(importSettings, nullptr, write);
 
 
-	auto str = std::string(get_name());
+	auto str = std::string(get_doc_name());
 	auto slash = str.rfind('/');
 	std::string modelName = str.substr(0, slash);
 	std::string animName = str.substr(slash + 1);
@@ -392,7 +308,7 @@ bool AnimationEditorTool::save_document_internal()
 
 	if (!outputModel) {
 		ModelCompilier::compile_from_settings(path.c_str(), importSettings);
-		outputModel = default_asset_load<Model>(get_name());
+		outputModel = default_asset_load<Model>(get_doc_name());
 		int dummy;
 		sequence = outputModel->get_skel()->find_clip(animName, dummy);
 
@@ -405,7 +321,7 @@ bool AnimationEditorTool::save_document_internal()
 			if (!g_animseq_editor_static.outputModel)
 				return;
 
-			auto str = std::string(g_animseq_editor_static.get_name());
+			auto str = std::string(g_animseq_editor_static.get_doc_name());
 			auto slash = str.rfind('/');
 			auto animName = str.substr(slash + 1);
 

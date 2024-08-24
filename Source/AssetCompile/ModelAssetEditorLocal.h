@@ -12,30 +12,22 @@
 #include "ModelAsset2.h"
 
 #include "Game/StdEntityTypes.h"
+#include "EditorTool3d.h"
 
 class StaticMeshEntity;
-class ModelEditorTool : public IEditorTool
+class ModelEditorTool : public EditorTool3d
 {
 public:
-	void draw_menu_bar() override;
-	// Inherited via IEditorTool
+	const ClassTypeInfo& get_asset_type_info() const override {
+		return Model::StaticType;
+	}
 
-	virtual void tick(float dt) override;
-	virtual const View_Setup& get_vs() override;
-	virtual void overlay_draw() override;
-	virtual void init() override;
-	virtual bool can_save_document() override;
-	virtual const char* get_editor_name() override;
-	virtual bool has_document_open() const override;
-	virtual void open_document_internal(const char* name, const char* arg) override;
+	void post_map_load_callback() override;
+
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
 	void imgui_draw() override;
 
-	void on_open_map_callback(bool good);
-
-	View_Setup view;
-	User_Camera camera;
 
 	PropertyGrid propGrid;
 	StaticMeshEntity* outputEntity = nullptr;

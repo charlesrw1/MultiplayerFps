@@ -25,7 +25,7 @@
 #include "Base_node.h"
 
 #include "Framework/MulticastDelegate.h"
-
+#include "EditorTool3d.h"
 
 struct GraphTab {
 	const editor_layer* layer = nullptr;
@@ -155,9 +155,6 @@ public:
 	void hide();
 	void show(bool is_playing);
 	
-	View_Setup vs;
-	User_Camera camera;
-
 	AnimatorInstance* get_animator();
 	Model* get_model() { return model; }
 
@@ -260,34 +257,27 @@ private:
 
 class Texture;
 class AG_GuiLayout;
-class AnimationGraphEditor : public IEditorTool
+class AnimationGraphEditor : public EditorTool3d
 {
 public:
 
 	AnimationGraphEditor();
 
 	virtual void init() override;
-	virtual void open_document_internal(const char* name, const char* arg) override;
+
 	virtual void close_internal() override;
 	virtual void tick(float dt) override;
+	void hook_menu_bar() override;
 
-	virtual void overlay_draw() override;
-	virtual const View_Setup& get_vs() override{
-		return out.vs;
-	}
 	bool can_save_document() override;
 	virtual void imgui_draw() override;
 
-	std::string get_save_root_dir()  override {
-		return "./Data/Graphs/";
-	}
 	enum class graph_playback_state {
 		stopped,
 		running,
 		paused,
 	};
 
-	void on_open_map_callback(bool success);
 
 	graph_playback_state get_playback_state() { return playback; }
 	bool graph_is_read_only() { return playback != graph_playback_state::stopped; }
@@ -390,7 +380,7 @@ public:
 	}
 
 	void draw_node_creation_menu(bool is_state_mode, ImVec2 mouse_click_pos);
-	void draw_menu_bar() override;
+
 	void draw_popups();
 	void draw_prop_editor();
 	void handle_imnode_creations(bool* open_popup_menu_from_drop);
@@ -400,9 +390,6 @@ public:
 		reset_prop_editor_next_tick = true;
 	}
 
-	bool has_document_open() const override {
-		return editing_tree != nullptr;
-	}
 
 	void try_load_preview_models();
 
@@ -416,12 +403,7 @@ public:
 			REG_BOOL(opt.open_control_params, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.position.x,PROP_SERIALIZE,""),
-			REG_FLOAT(out.camera.position.y, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.position.z, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.yaw, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.pitch, PROP_SERIALIZE, ""),
-			REG_FLOAT(out.camera.move_speed, PROP_SERIALIZE, ""),
+
 
 			// Editable options
 			REG_STDSTRING_CUSTOM_TYPE(opt.PreviewModel, PROP_DEFAULT,"FindModelForEdAnimG"),
@@ -471,17 +453,21 @@ public:
 	// otherwise, the pointer is a reference to a loaded graph stored in anim_graph_man
 	bool is_owning_editing_tree = false;
 	Animation_Tree_CFG* editing_tree = nullptr;
+
 	GraphOutput out;
 	uint32_t current_id = 0;
 	uint32_t current_layer = 1;	// layer 0 is root
 
 	PropertyGrid self_grid;
 
-	const char* get_editor_name() override { return "Animation Editor"; }
-
 	void add_node_to_tree_manual(BaseAGNode* n) {
 		editing_tree->all_nodes.push_back(n);
 	}
+
+	const ClassTypeInfo& get_asset_type_info() const override {
+		return Animation_Tree_CFG::StaticType;
+	}
+	void post_map_load_callback();
 };
 
 extern AnimationGraphEditor ed;

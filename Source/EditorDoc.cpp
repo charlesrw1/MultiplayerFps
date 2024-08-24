@@ -187,7 +187,9 @@ class CreateCppClassCommand : public Command
 {
 public:
 	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform) {
-		ti = ClassBase::find_class(cppclassname.c_str());
+		auto find = cppclassname.rfind('/');
+		auto types = cppclassname.substr(find==std::string::npos ? 0 : find+1);
+		ti = ClassBase::find_class(types.c_str());
 		this->transform = transform;
 	}
 	bool is_valid() override { return ti != nullptr; }
@@ -307,21 +309,8 @@ public:
 	std::vector<uint64_t> handles;
 };
 
-
-
-
-static float alphadither = 0.0;
-void menu_temp()
-{
-	ImGui::SliderFloat("alpha", &alphadither, 0.0, 1.0);
-}
-
-
-
-
-// check every 5 seconds
+// check every X seconds
 ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR_FLOAT | CVAR_UNBOUNDED);
-
 
 // Unproject mouse coords into a vector, cast that into the world via physics
 glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
@@ -368,33 +357,6 @@ Color32 to_color32(glm::vec4 v) {
 
 
 
-void EditorDoc::draw_menu_bar()
-{
-	if (ImGui::BeginMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("New")) {
-				//open("");
-
-				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map \"\"");
-			}
-			if (ImGui::MenuItem("Open", "Ctrl+O")) {
-				open_the_open_popup();
-
-			}
-			if (ImGui::MenuItem("Save", "Ctrl+S")) {
-				save();
-			}
-
-			ImGui::EndMenu();
-		}
-		
-		ImGui::EndMenuBar();
-	}
-
-}
-
 void EditorDoc::init()
 {
 	//ed_schema.load("./Data/classes.txt");
@@ -407,7 +369,7 @@ bool EditorDoc::save_document_internal()
 
 	std::string str = LevelSerialization::serialize_level(eng->get_level());
 	
-	std::ofstream outfile(get_save_root_dir() + get_doc_name());
+	std::ofstream outfile("./Data/" + get_doc_name());
 	outfile.write(str.c_str(), str.size());
 	outfile.close();
 
@@ -431,7 +393,7 @@ void EditorDoc::on_map_load_return(bool good)
 		on_start.invoke();
 	}
 }
-void EditorDoc::open_document_internal(const char* levelname, const char* arg)
+bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 {
 	// schema vs level edit switch
 	if (strcmp(arg, "schema") == 0)
@@ -444,14 +406,13 @@ void EditorDoc::open_document_internal(const char* levelname, const char* arg)
 	if (!is_editing_a_schema) {
 		bool needs_new_doc = true;
 		if (strlen(levelname) != 0) {
-			set_doc_name(levelname);
 			eng->open_level(levelname);	// queues load
 			needs_new_doc = false;
 		}
 
 		if (needs_new_doc) {
 			sys_print("creating new document\n");
-			set_empty_name();
+			set_empty_doc();
 			eng->open_level("__empty__");	// queues load
 		}
 	}
@@ -459,16 +420,16 @@ void EditorDoc::open_document_internal(const char* levelname, const char* arg)
 		// flow: tell engine to open an empty level
 		// after succeding, add the schema in the callback
 		schema_source = GetAssets().find_sync<Schema>(levelname).get();
-		set_doc_name(levelname);
 		eng->open_level("__empty__");
 	}
 	eng_local.on_map_load_return.add(this, &EditorDoc::on_map_load_return);
-	is_open = true;
 
 	assert(!gui->parent);
 	eng->get_gui()->add_gui_panel_to_root(gui.get());
 	eng->get_gui()->set_focus_to_this(gui.get());
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
+
+	return true;
 }
 
 void EditorDoc::close_internal()
@@ -484,8 +445,6 @@ void EditorDoc::close_internal()
 	on_close.invoke();
 
 	gui->unlink_and_release_from_parent();
-
-	is_open = false;
 
 	// close the level document, its already been saved at this point
 	eng->leave_level();
@@ -780,27 +739,6 @@ void EditorDoc::transform_tool_update()
 }
 
 
-void EditorDoc::overlay_draw()
-{
-	static MeshBuilder mb;
-	mb.Begin();
-	mb.PushLineBox(glm::vec3(-1), glm::vec3(1), COLOR_BLUE);
-	if (selection_state->has_any_selected()) {
-		Bounds total_bounds;
-		auto& selected = selection_state->get_selection();
-		for (auto& s : selected) {
-			//Model* m = s->get_rendering_model();
-			//if (m) {
-			//	auto transform = s->get_transform();
-			//	total_bounds = bounds_union(total_bounds,transform_bounds(transform,m->get_bounds()));
-			//}
-		}
-		mb.PushLineBox(total_bounds.bmin, total_bounds.bmax, COLOR_RED);
-	}
-	mb.End();
-	mb.Draw(GL_LINES);
-}
-
 uint32_t color_to_uint(Color32 c) {
 	return c.r | c.g << 8 | c.b << 16 | c.a << 24;
 }
@@ -1047,23 +985,23 @@ void EditorDoc::hook_scene_viewport_draw()
 			const float scene_depth = idraw->get_scene_depth_for_editor(x-size.x, y-size.y);
 
 			glm::vec3 dir = unproject_mouse_to_ray(x, y);
-			glm::vec3 worldpos = (abs(scene_depth) > 30.0) ? vs_setup.origin + dir * 5.0f : vs_setup.origin + dir * scene_depth;
+			glm::vec3 worldpos = (abs(scene_depth) > 50.0) ? vs_setup.origin - dir * 25.0f : vs_setup.origin + dir * scene_depth;
 			drop_transform[3] = glm::vec4(worldpos, 1.0);
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-			if (resource->type->get_type_name() == "Entity (C++)") {
+			if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
 				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename, 
 					drop_transform)
 				);
 			}
-			else if (resource->type->get_type_name() == "Model") {
+			else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
 				command_mgr->add_command(new CreateStaticMeshCommand(
 					resource->filename, 
 					drop_transform)
 				);
 			}
-			else if (resource->type->get_type_name() == "Schema") {
+			else if (resource->type->get_asset_class_type()->is_a(Schema::StaticType)) {
 				command_mgr->add_command(new CreateSchemaCommand(
 					resource->filename,
 					drop_transform)
@@ -1077,12 +1015,6 @@ void EditorDoc::hook_scene_viewport_draw()
 
 
 }
-
-const View_Setup& EditorDoc::get_vs()
-{
-	return vs_setup;
-}
-
 
 ObjectOutliner::ObjectOutliner()
 {

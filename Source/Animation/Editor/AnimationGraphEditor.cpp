@@ -24,6 +24,10 @@
 #include "UI/Widgets/Layouts.h"
 #include "UI/GUISystemPublic.h"
 
+#include "Game/StdEntityTypes.h"
+#include "Framework/AddClassToFactory.h"
+
+#include "GameEnginePublic.h"
 
 std::string remove_whitespace(const char* str)
 {
@@ -216,6 +220,8 @@ void AnimationGraphEditor::init()
 
 void AnimationGraphEditor::close_internal()
 {
+	EditorTool3d::close_internal();
+
 	on_close.invoke();
 
 	out.clear();
@@ -246,10 +252,6 @@ void AnimationGraphEditor::close_internal()
 	ImNodes::EditorContextFree(default_editor);
 
 	gui->unlink_and_release_from_parent();
-
-	eng->get_on_map_delegate().remove(this);
-
-	eng->leave_level();
 }
 
 static std::string saved_settings = "";
@@ -472,7 +474,7 @@ bool AnimationGraphEditor::save_document_internal()
 	editing_tree->write_to_dict(write);
 	save_editor_nodes(write);
 
-	std::ofstream outfile(get_save_root_dir() + get_doc_name());
+	std::ofstream outfile("./Data/" + get_doc_name());
 	outfile.write(write.get_output().c_str(), write.get_output().size());
 	outfile.close();
 
@@ -551,49 +553,17 @@ void AnimationGraphEditor::pause_playback()
 	playback = graph_playback_state::paused;
 }
 
-void AnimationGraphEditor::draw_menu_bar()
+void AnimationGraphEditor::hook_menu_bar()
 {
-	if (ImGui::BeginMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("New")) {
-				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed AnimGraph \"\"");
-			}
-			if (ImGui::MenuItem("Open", "Ctrl+O")) {
-				open_the_open_popup();
-
-			}
-			if (ImGui::MenuItem("Save", "Ctrl+S")) {
-				save();
-			}
-
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("View")) {
-			ImGui::Checkbox("Graph", &opt.open_graph);
-			ImGui::Checkbox("Control params", &opt.open_control_params);
-			ImGui::Checkbox("Viewport", &opt.open_viewport);
-			ImGui::Checkbox("Property Ed", &opt.open_prop_editor);
-			ImGui::EndMenu();
-
-		}
-
-		if (ImGui::BeginMenu("Settings")) {
-			ImGui::Checkbox("Statemachine passthrough", &opt.statemachine_passthrough);
-			if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
-				ImGui::Text("Enable passing through the blend tree\n"
-					"when selecting a state node if the\n" 
-					"blend tree is just a nested statemachine");
-				ImGui::EndTooltip();
-			}
-			ImGui::EndMenu();
-
-
-		}
-		ImGui::EndMenuBar();
+	if (ImGui::BeginMenu("View")) {
+		ImGui::Checkbox("Graph", &opt.open_graph);
+		ImGui::Checkbox("Control params", &opt.open_control_params);
+		ImGui::Checkbox("Viewport", &opt.open_viewport);
+		ImGui::Checkbox("Property Ed", &opt.open_prop_editor);
+		ImGui::EndMenu();
 	}
 }
+
 void AnimationGraphEditor::start_or_resume_playback()
 {
 	if (playback == graph_playback_state::stopped)
@@ -1135,9 +1105,7 @@ void AnimationGraphEditor::on_key_down(const SDL_KeyboardEvent& key) {
 	}
 }
 void AnimationGraphEditor::on_wheel(const SDL_MouseWheelEvent& wheel) {
-	if (eng->is_game_focused()) {
-		out.camera.scroll_callback(wheel.y);
-	}
+	
 }
 
 
@@ -1566,16 +1534,11 @@ void AnimationGraphEditor::tick(float dt)
 {
 	///assert(get_focus_state() != editor_focus_state::Closed);
 
+	EditorTool3d::tick(dt);
+
 	if(1)
 	{
 		//assert(eng->get_state() != Engine_State::Game);
-
-		int x = 0, y = 0;
-		if (eng->is_game_focused()) {
-			SDL_GetRelativeMouseState(&x, &y);
-			out.camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
-		}
-
 		if (get_playback_state() == graph_playback_state::running) {
 			auto animator = out.get_animator();
 			if(animator)
@@ -1584,8 +1547,6 @@ void AnimationGraphEditor::tick(float dt)
 		
 		out.show(get_playback_state() != graph_playback_state::stopped);
 
-		auto window_sz = eng->get_game_viewport_size();
-		out.vs = View_Setup(out.camera.position, out.camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
 	}
 	else {	// not focused, game running likely
 		playback = graph_playback_state::running;
@@ -1721,16 +1682,10 @@ void AnimationGraphEditor::compile_and_run()
 	}
 }
 
-void AnimationGraphEditor::overlay_draw()
-{
-
-}
-
-
 void AnimationGraphEditor::create_new_document()
 {
 	printf("creating new document");
-	set_empty_name();	// when saving, user is prompted
+	set_empty_doc();	// when saving, user is prompted
 	editing_tree = new Animation_Tree_CFG;
 	is_owning_editing_tree = true;
 	// add the output pose node to the root layer
@@ -1739,6 +1694,8 @@ void AnimationGraphEditor::create_new_document()
 	default_editor = ImNodes::EditorContextCreate();
 	ImNodes::EditorContextSet(default_editor);
 }
+
+
 
 void AnimationGraphEditor::set_animator_instance_from_string(std::string str) {
 	auto class_ = ClassBase::create_class<AnimatorInstance>(str.c_str());
@@ -1793,78 +1750,55 @@ void AnimationGraphEditor::try_load_preview_models()
 	set_model_from_str(opt.PreviewModel);
 }
 
-#include "Game/StdEntityTypes.h"
 
 extern ConfigVar ed_default_sky_material;
 
-void AnimationGraphEditor::on_open_map_callback(bool success)
-{
-	assert(success);
 
-	// spawn default entities
 
-	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-	dome->Mesh->set_model(GetAssets().find_sync<Model>("skydome.cmdl").get());
-	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
-	dome->Mesh->is_skybox = true;	// FIXME
-	dome->Mesh->cast_shadows = false;
-	dome->Mesh->set_material_override(GetAssets().find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
-
-	auto plane = eng->spawn_entity_class<StaticMeshEntity>();
-	plane->Mesh->set_model(mods.get_default_plane_model());
-	plane->set_ws_transform({}, {}, glm::vec3(20.f));
-	plane->Mesh->set_material_override((GetAssets().find_sync<MaterialInstance>("defaultWhite").get()));
-
-	auto sun = eng->spawn_entity_class<SunLightEntity>();
-	sun->Sun->intensity = 3.0;
-	sun->Sun->visible = true;
-	sun->Sun->log_lin_lerp_factor = 0.8;
-	sun->Sun->max_shadow_dist = 40.0;
-	sun->Sun->set_ls_euler_rotation(glm::vec3(0.f, glm::radians(15.f), -glm::radians(45.f)));
-
-	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
-	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
-}
-
-void AnimationGraphEditor::open_document_internal(const char* name, const char* arg)
+void AnimationGraphEditor::post_map_load_callback()
 {
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
-	eng->get_on_map_delegate().add(this, &AnimationGraphEditor::on_open_map_callback);
 
-	eng->open_level("__empty__");	// queue an empty level
+	auto& name = get_doc_name();
 
 	bool needs_new_doc = true;
-	if (strlen(name)!=0) {
+	if (!name.empty()) {
 		// try loading graphname, create new document on fail
-		DictParser parser;
+		editing_tree = GetAssets().find_sync<Animation_Tree_CFG>(name).get();
 
-		double start = GetTime();
-		editing_tree = GetAssets().find_sync<Animation_Tree_CFG>(name, 0).get();
-		printf("loaded in %f\n", GetTime() - start);
 		if (editing_tree) {
+			DictParser parser;
+			auto editorFilePath = "./Data/"+std::string(name) + "_e";
+			auto file = FileSys::open_read_os(editorFilePath.c_str());
+			if (file) {
+				parser.load_from_file(file.get());
+				bool good = load_editor_nodes(parser);
+				if (good) {
 
-			bool good = load_editor_nodes(parser);
-			if (!good) {
-				editing_tree = nullptr;
-				sys_print("!!! couldn't load editor nodes for tree %s\n", name);
-			}
-			else {
-				needs_new_doc = false;
-				is_owning_editing_tree = false;
-				set_doc_name(name);
+					sys_print("*** graph successfully loaded\n");
 
-				for (int i = 0; i < nodes.size(); i++) {
-					nodes[i]->init();
+					// tree was loaded and editor nodes were loaded
+					needs_new_doc = false;
+					is_owning_editing_tree = false;
+
+					for (int i = 0; i < nodes.size(); i++) {
+						nodes[i]->init();
+					}
 				}
-
+				else
+					sys_print("!!! couldn't load editor nodes for tree %s\n", name);
 			}
+			else
+				sys_print("!!! couldnt open animation graph editor file %s\n", editorFilePath.c_str());
 		}
-		if(needs_new_doc)
+		else
 			sys_print("!!! Couldn't open animation tree file %s, creating new document instead\n", name);
 	}
 
 	if (needs_new_doc) {
-		set_empty_name();
+		if (editing_tree)
+			editing_tree = nullptr;	// not memory leak since the tree gets cleaned up later with references
+		set_empty_doc();
 		create_new_document();
 		ASSERT(!current_document_has_path());
 	}
@@ -1883,9 +1817,6 @@ void AnimationGraphEditor::open_document_internal(const char* name, const char* 
 
 	on_open_new_doc.invoke();
 
-	// refresh control_param editor
-	//control_params.init_from_tree(get_tree()->params.get());
-
 	eng->get_gui()->add_gui_panel_to_root(gui.get());
 	eng->get_gui()->set_focus_to_this(gui.get());
 
@@ -1893,43 +1824,6 @@ void AnimationGraphEditor::open_document_internal(const char* name, const char* 
 	playback = graph_playback_state::stopped;
 	control_params->refresh_props();
 }
-
-
-#if 0
-void AgEditor_BlendspaceNode::init()
-{
-	AgEditor_BaseNode::init();
-	num_inputs = 0;	// these are EDITOR inputs, not CFG inputs
-	if (type == animnode_type::blend2d) {
-		BlendSpace2d_CFG* node = (BlendSpace2d_CFG*)this->node;
-		if (node->is_additive_blend_space)
-			num_inputs = 1;
-
-		int number_of_inputs_on_input = node->input.size();
-
-		// default on creation to 9 vert blend space because its useful
-		if (number_of_inputs_on_input == 0 || number_of_inputs_on_input == 9)
-			topology_2d = BlendSpace2dTopology::NineVert;
-		else if(number_of_inputs_on_input == 5)
-			topology_2d = BlendSpace2dTopology::FiveVert;
-		else if (number_of_inputs_on_input == 15)
-			topology_2d = BlendSpace2dTopology::FifteenVert;
-		else {
-			printf("!!! AgEditor_BlendspaceNode got bad input count !!! (%d)", number_of_inputs_on_input);
-			node->input.resize(0);
-			topology_2d = BlendSpace2dTopology::NineVert;
-		}
-	}
-	else {
-		BlendSpace1d_CFG* node = (BlendSpace1d_CFG*)this->node;
-		if (node->is_additive_blend_space)
-			num_inputs = 1;
-	}
-}
-#endif
-
-#include "Framework/AddClassToFactory.h"
-
 
 
 

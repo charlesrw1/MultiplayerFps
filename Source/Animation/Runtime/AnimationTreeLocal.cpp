@@ -28,15 +28,16 @@ public:
 	}
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto tree = FileSys::find_files("./Data/Graphs");
+		auto tree = FileSys::find_files("./Data");
 		for (auto file : tree) {
-			filepaths.push_back((file.substr(14)));
+			if(has_extension(file,"ag"))
+				filepaths.push_back((file.substr(7)));
 		}
 	}
 	virtual bool assets_are_filepaths() const { return true; }
 	virtual std::string root_filepath() const  override
 	{
-		return "./Data/Graphs/";
+		return "./Data/";
 	}
 	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Animation_Tree_CFG::StaticType; }

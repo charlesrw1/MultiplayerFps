@@ -323,7 +323,7 @@ void GameEngineLocal::init_sdl_window()
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-	window = SDL_CreateWindow("CsRemake", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+	window = SDL_CreateWindow("CREngine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
 		sys_print("!!! create sdl window failed: %s\n", SDL_GetError());
@@ -547,7 +547,7 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 		leave_level();
 		enable_imgui_docking();
 		global_asset_browser.init();
-		bool could_open = get_current_tool()->open_document(file, arg);
+		bool could_open = get_current_tool()->open(file, arg);
 		if (!could_open) {
 			active_tool = nullptr;
 		}
@@ -769,6 +769,114 @@ static ptrdiff_t ComputePointerOffset()
 	return (intptr_t)basePtr - (intptr_t)derivedPtr;
 }
 
+#include <direct.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+// read file: searches current engine directory for files, also checks packaged files
+// read saved file
+// write file: (have a resource file that came from somewhere, want to get its path (might be in a mounted folder), get full path)
+// write saved file
+
+// distributed engine
+// /CSRE/
+//		x64/Release/
+//			CSRE.exe
+//			Physx.dll
+//			...
+//		mod/
+//			
+//		packages.bin
+//		data0.pak
+//		data1.pak
+
+
+// Cvars:
+//	g_projectname = "CsRe_Engine"
+//	g_selfcontained = false (if true, then set save dir to engine root folder, else use %APPDATA%/g_projectname/ for user saves)
+//	g_default_asset_folder = "data"
+//	
+// Cmds:
+// 
+// mount $relative_folder (mounts a folder inside the game path
+//
+// 	
+//
+
+// Dev engine
+// 
+// 
+// %USER_SAVE%/$PROJECTNAME/
+//		shader_cache/
+//			dump.bin
+//		saves/
+//			user0.sav
+//		user.cfg
+//	
+// %USER_SAVE% = $ENGINE
+// 
+// $ENGINE_DIR: engine binary location
+// $SAVE_DIR: user files (shader cache, saves, cfg changes)
+// $PROJECT_DIR: data files, most likely 	
+// 
+// default: 
+// 
+// editor.pak
+// engine.pak
+// data0.pak
+// data1.pak
+// data2.pak
+// data3.pak
+// dlc0.pak
+// dlc1.pak
+// 
+// 
+// /CSRE/
+//		x64/Release/
+//			CSRE.exe
+//			Physx.dll
+//			...
+//		source/
+//			main.cpp
+//			...
+// 
+//		mygame/
+//			game.cfg
+//				g_project_name "My Game"
+//				g_entry_point mainMenuMap.tmap
+//				g_player_class PlayerMyGame
+//				r_shadow_quality 2
+//			
+//			sound/
+//				gunshot.wav
+//			mainMenuMap.tmap
+// 
+//			maps/
+// 		
+// 
+//		engine_dat/
+//			shaders/
+//				myshader.glsl
+//			materials/
+//				defaultTerrain.mm
+//				defaultMaterial.mm
+//				defaultUI.mm
+//				defaultDecal.mm
+//			models/
+//				defaultCube.cmdl
+//				defaultSphere.cmdl
+//			animgraphs/
+//				defaultAnimGraph.ag
+//			textures/
+//
+//		engine.cfg
+//			g_game_folder mygame
+// 
+//		init.cfg
+//			start_ed Map mainMenuMap.tmap
+// 	
+// 
+//
 
 
 int main(int argc, char** argv)
@@ -788,7 +896,7 @@ int main(int argc, char** argv)
 
 // The entry point of the game! (not used in the editor)
 // Takes in a string of the level to start with on the final game
-// Should look like: "mylevel.bin" for $ROOT/Data/Maps/mylevel.bin
+// Should look like: "mylevel.tmap" for $ROOT/Data/mylevel.tmap
 ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV);
 // The default gamemode and player to choose when undefined by the WorldSettings entity
 // Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
@@ -797,7 +905,7 @@ ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV);
 ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV);
 
 ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV);
-
+ConfigVar g_project_name("g_project_name", "CSREMAKE", CVAR_DEV);
 
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
@@ -1032,14 +1140,16 @@ void GameEngineLocal::key_event(SDL_Event event)
 		set_game_focused(false);
 		return;
 	}
-	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard && event.key.keysym.mod == 0 /* if mod is active, then skip this BS ImGui taking over input shit*/)
+	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard && event.key.keysym.mod == 0 /* if mod is active, then skip this BS ImGui taking over input*/)
 		return;
 
 	if (event.type == SDL_KEYDOWN) {
+
 		SDL_Scancode scancode = event.key.keysym.scancode;
 		inp.keys[scancode] = true;
 		inp.keychanges[scancode] = true;
 
+		// check keybind activation
 		std::string* keybind = find_keybind(scancode, event.key.keysym.mod);
 	
 		if (keybind != nullptr) {
@@ -1195,7 +1305,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	// draw tool interface if its active
 	if (is_in_an_editor_state()) {
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, get_current_tool());
-		get_current_tool()->imgui_draw();
+		get_current_tool()->draw_imgui_public();
 		global_asset_browser.imgui_draw();
 	}
 
@@ -1324,7 +1434,12 @@ void GameEngineLocal::draw_screen()
 		// draw general ui
 		if (get_current_tool() != nullptr) {
 			params.is_editor = true;	// draw to the id buffer for mouse picking
-			idraw->scene_draw(params, get_current_tool()->get_vs(), get_gui());
+			auto vs = get_current_tool()->get_vs();
+			if (!vs) {
+				params.draw_world = false;
+				vs = &vs_for_gui;
+			}
+			idraw->scene_draw(params,*vs, get_gui());
 		}
 		else {
 			bool good = game_draw_screen();
@@ -1716,8 +1831,6 @@ void GameEngineLocal::loop()
 			continue; // goto next frame
 			break;
 		case Engine_State::Game: {
-			//ASSERT(cl->get_state() == CS_SPAWNED || is_host);
-
 			double secs_per_tick = tick_interval;
 			frame_remainder += dt;
 			int num_ticks = (int)floor(frame_remainder / secs_per_tick);

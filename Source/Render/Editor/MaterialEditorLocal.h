@@ -15,26 +15,21 @@
 #include "Render/Model.h"
 #include "Render/Texture.h"
 #include "Assets/AssetDatabase.h"
+
+#include "EditorTool3d.h"
+
 extern ConfigVar ed_default_sky_material;
 
 class StaticMeshEntity;
-class MaterialEditorLocal : public IEditorTool
+class MaterialEditorLocal : public EditorTool3d
 {
 public:
 	using MyClassType = MaterialEditorLocal;	// to work with REG_ASSET_PTR macros (they expect a ClassBase which has this defined, otherwise they work fine)
 
-	// Inherited via IEditorTool
-	virtual void tick(float dt) override;
-	virtual const View_Setup& get_vs() override {
-		return view;
-	}
-	virtual void overlay_draw() override {}
 	virtual void init() override {
 	}
-	virtual bool can_save_document() override { return true; }
-	virtual const char* get_editor_name() override { return "Material Editor"; }
-	virtual bool has_document_open() const override { return isOpen; }
-	virtual void open_document_internal(const char* name, const char* arg) override;
+
+	const ClassTypeInfo& get_asset_type_info() const override { return MaterialInstance::StaticType; }
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
 	void imgui_draw() override
@@ -44,13 +39,13 @@ public:
 			if (myPropGrid.rows_had_changes) {
 				if (outputEntity)
 					outputEntity->Mesh->set_model(model.get());
-				if (skyEntity) {
-					skyEntity->Mesh->set_material_override(skyMaterial.get());
-					
-					// refresh the skylight, do this better tbh
-					eng->remove_entity(skylightEntity);
-					skylightEntity = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
-				}
+				//if (skyEntity) {
+				//	skyEntity->Mesh->set_material_override(skyMaterial.get());
+				//	
+				//	// refresh the skylight, do this better tbh
+				//	eng->remove_entity(skylightEntity);
+				//	skylightEntity = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
+				//}
 			}
 			materialParamGrid.update();
 			if (materialParamGrid.rows_had_changes) {
@@ -61,7 +56,7 @@ public:
 
 		IEditorTool::imgui_draw();
 	}
-
+#if 0
 	void draw_menu_bar() override
 	{
 		if (ImGui::BeginMenuBar())
@@ -84,59 +79,35 @@ public:
 			ImGui::EndMenuBar();
 		}
 	}
+#endif
 
 	static PropertyInfoList* get_props() {
 		START_PROPS(MaterialEditorLocal)
 			REG_ASSET_PTR(model,PROP_DEFAULT),
-			REG_ASSET_PTR(skyMaterial,PROP_DEFAULT)
 		END_PROPS(MaterialEditorLocal)
 	}
 
-	void on_map_load_callback(bool good) {
-		assert(good);
+	void post_map_load_callback() override {
+		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini MaterialEditor.ini");
+
+		assert(!dynamicMat);
+		assert(!outputEntity);
 
 		auto skydomeModel = GetAssets().find_sync<Model>("skydome.cmdl");
 		auto skyMat = GetAssets().find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
 		model.ptr = skydomeModel.get();
-		skyMaterial.ptr = skyMat.get();
-
-		auto dome = eng->spawn_entity_class<StaticMeshEntity>();
-		dome->Mesh->set_model(skydomeModel.get());
-		dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
-		dome->Mesh->is_skybox = true;	// FIXME
-		dome->Mesh->cast_shadows = false;
-		dome->Mesh->set_material_override(skyMaterial.get());
-		skyEntity = dome;
-
-		auto plane = eng->spawn_entity_class<StaticMeshEntity>();
-		plane->Mesh->set_model(mods.get_default_plane_model());
-		plane->set_ws_transform({}, {}, glm::vec3(20.0));
-
-		auto sun = eng->spawn_entity_class<SunLightEntity>();
-		sun->Sun->intensity = 3.0;
-		sun->Sun->visible = true;
-		sun->Sun->log_lin_lerp_factor = 0.8;
-		sun->Sun->max_shadow_dist = 40.0;
-		sun->Sun->set_ls_euler_rotation(glm::vec3(0.f, glm::radians(15.f), -glm::radians(45.f)));
-
-		// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
-		skylightEntity = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
-
-		outputEntity = eng->spawn_entity_class<StaticMeshEntity>();
-		outputEntity->Mesh->set_model(model.get());
-		outputEntity->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
 
 
-		auto mat = GetAssets().find_sync<MaterialInstance>(get_name());
+		auto mat = GetAssets().find_sync<MaterialInstance>(get_doc_name());
 		if (!mat) {
-			sys_print("!!! couldnt open material %s\n", get_name());
+			sys_print("!!! couldnt open material %s\n", get_doc_name());
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
 			return;
 		}
 
 		parentMat = (MaterialInstance*)mat.get();
 		if (parentMat->impl->masterImpl)
-			set_empty_name();
+			set_empty_doc();
 		dynamicMat = imaterials->create_dynmaic_material(mat.get());
 		assert(dynamicMat);
 
@@ -167,27 +138,22 @@ public:
 		propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
 		materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
 
+		outputEntity = eng->spawn_entity_class<StaticMeshEntity>();
+		outputEntity->Mesh->set_model(model.get());
+		outputEntity->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
 		outputEntity->Mesh->set_material_override(dynamicMat);
 	}
 
 	AssetPtr<Model> model;
-	AssetPtr<MaterialInstance> skyMaterial;
-
-	View_Setup view;
-	User_Camera camera;
 
 	PropertyGrid myPropGrid;	// model,parent
 	PropertyGrid materialParamGrid; // material params
 	std::vector<PropertyInfo> propInfosForMats;	// immutable!!
 	PropertyInfoList propInfoListForMats;
 
-	Entity* skylightEntity = nullptr;
 	StaticMeshEntity* outputEntity = nullptr;
-	StaticMeshEntity* skyEntity = nullptr;
 
 	// dynamic material to edit params into
 	MaterialInstance* parentMat = nullptr;
 	MaterialInstance* dynamicMat = nullptr;
-
-	bool isOpen = false;
 };

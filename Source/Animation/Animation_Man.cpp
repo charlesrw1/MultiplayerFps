@@ -41,7 +41,7 @@ void Animation_Tree_CFG::uninstall()
 bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
 
 	auto& path = get_name();
-	std::string fullpath = "./Data/Graphs/";
+	std::string fullpath = "./Data/";
 	fullpath += get_name();
 
 	auto file = FileSys::open_read_os(fullpath.c_str());

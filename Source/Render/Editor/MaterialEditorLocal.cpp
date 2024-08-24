@@ -54,39 +54,12 @@ public:
 ADDTOFACTORYMACRO_NAME(MaterialParamPropEditor, IPropertyEditor, "MaterialEditParam");
 
 
-void MaterialEditorLocal::tick(float dt)
-{
-	auto window_sz = eng->get_game_viewport_size();
-	float aratio = (float)window_sz.y / window_sz.x;
-	{
-		int x = 0, y = 0;
-		if (eng->is_game_focused()) {
-			SDL_GetRelativeMouseState(&x, &y);
-			camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
-		}
-	}
-	view = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
-}
 
-void MaterialEditorLocal::open_document_internal(const char* name, const char* arg)
-{
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini MaterialEditor.ini");
-
-	assert(!dynamicMat);
-	assert(!outputEntity);
-
-	eng->open_level("__empty__");
-	eng->get_on_map_delegate().add(this, &MaterialEditorLocal::on_map_load_callback);
-
-	set_doc_name(name);
-	isOpen = true;
-}
 
 void MaterialEditorLocal::close_internal()
 {
-	isOpen = false;
-	eng->leave_level();
-	eng->get_on_map_delegate().remove(this);
+	EditorTool3d::close_internal();
+
 	imaterials->free_dynamic_material(dynamicMat);
 	dynamicMat = nullptr;
 	outputEntity = nullptr;
@@ -151,13 +124,13 @@ bool MaterialEditorLocal::save_document_internal()
 		}
 	}
 
-	std::string path = "./Data/" + (std::string)get_name() +".mi";
+	std::string path = "./Data/" + (std::string)get_doc_name() +".mi";
 	std::ofstream outfile(path);
 	outfile.write(output.data(), output.size());
 	outfile.close();
 
 	// kinda shit ngl
-	auto ptr = GetAssets().find_sync<MaterialInstance>(get_name());
+	auto ptr = GetAssets().find_sync<MaterialInstance>(get_doc_name());
 	GetAssets().reload_sync(ptr);
 
 	return true;

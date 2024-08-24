@@ -53,6 +53,7 @@
     <ClInclude Include="Source\CamData.h" />
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
+    <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
@@ -106,6 +107,7 @@
     <ClInclude Include="Source\Framework\Handle.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
+    <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
     <ClInclude Include="Source\Framework\MathLib.h" />

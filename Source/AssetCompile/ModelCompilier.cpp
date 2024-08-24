@@ -831,7 +831,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		mdd.loddefs.push_back(lodd);
 	}
 	for (int i = 0; i < is->myMaterials.size(); i++)
-		mdd.directMaterialSet.push_back(is->myMaterials.at(i).is_valid() ? is->myMaterials.at(i)->get_name() : "fallback");
+		mdd.directMaterialSet.push_back(is->myMaterials.at(i).ptr ? is->myMaterials.at(i)->get_name() : "fallback");
 	mdd.keepbones = is->keepBones;
 	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {
 		auto& p = is->additionalAnimationGlbFiles[i];
@@ -934,7 +934,7 @@ const AnimationSeq* MSkeleton::find_clip(const std::string& name, int& remap_ind
 	return nullptr;
 }
 
-static const char* MODELDIR = "./Data/";
+static const char* MODELDIR = "./Data/Models/";
 static std::string modelpath_to_fullpath(const std::string& m) {
 	return MODELDIR + m;
 }
@@ -2026,7 +2026,7 @@ static void output_embedded_texture(const std::string& outputname, const cgltf_i
 {
 	sys_print("*** writing out embedded texture %s\n", outputname.c_str());
 
-	std::string image_path = "./Data/" + outputname;
+	std::string image_path = "./Data/Textures/" + outputname;
 	std::ofstream outfile(image_path.c_str(), std::ios::binary);
 	if (!outfile) {
 		sys_print("!!! couldn't open file to output embedded texture %s\n", image_path.c_str());
@@ -2049,6 +2049,88 @@ static void output_embedded_texture(const std::string& outputname, const cgltf_i
 }
 
 
+static std::string create_material_and_export(const std::string& generated_name, const cgltf_data* data, const cgltf_material* mat)
+{
+	std::string material_dir_path = "./Data/Materials/" + generated_name + ".txt";
+	bool does_exist = FileSys::does_os_file_exist(material_dir_path.c_str());
+
+	// update it in case
+	if (does_exist) {
+		bool good = true;// MaterialCompilier::compile(generated_name.c_str());
+		if (!good) {
+			sys_print("!!! MaterialCompilier failed on generated material %s even though it already exists\n", generated_name.c_str());
+		}
+		return generated_name;
+	}
+
+	// create it
+	
+	DictWriter out;
+	out.write_key(generated_name.c_str());
+	out.write_item_start();
+
+	if (mat->has_pbr_metallic_roughness) {
+		const cgltf_pbr_metallic_roughness& base = mat->pbr_metallic_roughness;
+		out.write_key_value("metal_val", string_format("%f", base.metallic_factor));
+		out.write_key_value("rough_val", string_format("%f", base.roughness_factor));
+		out.write_key_value("tint", 
+			string_format("%f %f %f",
+				base.base_color_factor[0],
+				base.base_color_factor[1],
+				base.base_color_factor[2])
+		);
+
+		if (base.base_color_texture.texture) {
+			std::string output_name =  base.base_color_texture.texture->image->name;
+			output_name += ".png";
+			output_embedded_texture(output_name, base.base_color_texture.texture->image, data);
+			
+			out.write_key_value("albedo", output_name.c_str());
+		}
+		if (base.metallic_roughness_texture.texture) {
+			std::string output_name =  base.metallic_roughness_texture.texture->image->name;
+			output_name += ".png";
+			output_embedded_texture(output_name, base.metallic_roughness_texture.texture->image, data);
+
+			out.write_key_value("rough", output_name.c_str());
+		}
+
+	}
+	if (mat->normal_texture.texture) {
+		std::string output_name =  mat->normal_texture.texture->image->name;
+		output_name += ".png";
+		output_embedded_texture(output_name, mat->normal_texture.texture->image, data);
+
+		out.write_key_value("normal", output_name.c_str());
+	}
+
+	if (mat->double_sided)
+		out.write_key("showbackface\n");
+
+	if (mat->alpha_mode == cgltf_alpha_mode_blend)
+		out.write_key("alpha blend\n");
+	else if (mat->alpha_mode == cgltf_alpha_mode_mask)
+		out.write_key("alpha test\n");
+
+	out.write_item_end();
+	
+	std::ofstream outfile(material_dir_path.c_str());
+	if (!outfile) {
+		sys_print("!!! couldn't write out generated material %s\n", material_dir_path.c_str());
+		return material_dir_path;
+	}
+	size_t count = out.get_output().size();
+	outfile.write(out.get_output().c_str(), count);
+	outfile.close();
+
+	bool good = true;// MaterialCompilier::compile(generated_name.c_str());
+
+	if (!good) {
+		sys_print("!!! MaterialCompilier failed on material that was just generated\n");
+	}
+
+	return generated_name;
+}
 
 std::vector<std::string> ModelCompileHelper::create_final_material_names(
 	const std::string& modelname,

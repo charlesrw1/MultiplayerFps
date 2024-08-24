@@ -490,22 +490,17 @@ public:
 	EditorDoc();
 	virtual void init();
 	virtual bool can_save_document() override { return true; }
-	virtual void open_document_internal(const char* levelname, const char* arg) override;
+	virtual bool open_document_internal(const char* levelname, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
-	virtual bool has_document_open() const override {
-		return is_open;
+
+	const ClassTypeInfo& get_asset_type_info() const override {
+		return Level::StaticType;
 	}
-	virtual const char* get_editor_name()  override {
-		return "Level Editor";
-	}
-	virtual void draw_menu_bar() override;
 
 	virtual void tick(float dt) override;
-	virtual void overlay_draw() override;
 	virtual void imgui_draw() override;
-	virtual const View_Setup& get_vs() override;
-	virtual std::string get_save_root_dir() override { return "./Data/"; }
+	virtual const View_Setup* get_vs() override { return &vs_setup; }
 
 	std::string get_full_output_path() {
 		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
@@ -550,7 +545,6 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
-	bool is_open = false;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
 	View_Setup vs_setup;
 	std::unique_ptr<SelectionState> selection_state;

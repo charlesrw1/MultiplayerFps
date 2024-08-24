@@ -49,6 +49,8 @@ public:
 		return "./Data/";
 	}
 	virtual IEditorTool* tool_to_edit_me() const { return g_editor_doc; }
+
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &Level::StaticType; }
 };
 static AutoRegisterAsset<MapAssetMetadata> map_register_0987;
 

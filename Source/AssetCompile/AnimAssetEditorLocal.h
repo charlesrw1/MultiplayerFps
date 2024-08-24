@@ -53,34 +53,31 @@ public:
 	float CURRENT_TIME = 0.0;
 };
 #include "Animation/Runtime/Animation.h"
+
+#include "EditorTool3d.h"
+
 class StaticMeshEntity;
-class AnimationEditorTool : public IEditorTool
+class AnimationEditorTool : public EditorTool3d
 {
 public:
 	AnimationEditorTool() {
 		animEdit = std::make_unique<EditModelAnimations>();
 	}
 
-	void draw_menu_bar() override;
 	// Inherited via IEditorTool
+	void tick(float dt) override;
+	const ClassTypeInfo& get_asset_type_info() const override {
+		return AnimationSeqAsset::StaticType;
+	}
 
-	virtual void tick(float dt) override;
-	virtual const View_Setup& get_vs() override;
-	virtual void overlay_draw() override;
-	virtual void init() override;
-	virtual bool can_save_document() override;
-	virtual const char* get_editor_name() override;
-	virtual bool has_document_open() const override;
-	virtual void open_document_internal(const char* name, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
+	void post_map_load_callback() override;
 	void imgui_draw() override;
 
-	void on_open_map_callback(bool good);
 	void add_to_obj(Render_Object& obj, float dt);
 
-	View_Setup view;
-	User_Camera camera;
+
 	AnimatorInstance animator;
 
 	PropertyGrid propGrid;
