@@ -48,6 +48,7 @@ inline void write_object_properties(
 	out.write_item_end();
 }
 
+
 template<typename BASE>
 inline BASE* read_object_properties(
 	ClassBase* userptr,
@@ -81,4 +82,14 @@ inline BASE* read_object_properties(
 		return nullptr;
 	}
 	return obj;
+}
+
+template<typename BASE>
+inline BASE* read_object_properties_no_input_tok(
+	ClassBase* userptr,
+	DictParser& in)
+{
+	StringView tok;
+	in.read_string(tok);
+	return read_object_properties<BASE>(userptr, in, tok);
 }

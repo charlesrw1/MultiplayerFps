@@ -86,6 +86,4 @@ void DataClassEditor::imgui_draw() {
 		grid.update();
 	}
 	ImGui::End();
-
-	IEditorTool::imgui_draw();
 }

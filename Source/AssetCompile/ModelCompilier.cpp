@@ -1343,7 +1343,8 @@ std::vector<ImportedSkeleton> read_animation_imports(
 			std::string full_path_folder = FileSys::get_game_path();
 			full_path_folder += "/";
 			full_path_folder += game_folder_path;
-
+			if (!full_path_folder.empty() && full_path_folder.back() == '/')
+				full_path_folder.pop_back();
 
 			FileTree tree = FileSys::find_files(full_path_folder.c_str());
 
@@ -1355,9 +1356,9 @@ std::vector<ImportedSkeleton> read_animation_imports(
 				ImportedSkeleton is;
 				is.retarget_this = data.imports[i].retarget;
 
-				int size = strlen(FileSys::get_game_path());
-				assert(!"check this");
-				is.skeleton = open_file_and_read_skeleton(full_path.substr(size));
+				auto pathToUse = FileSys::get_game_path_from_full_path(full_path);
+
+				is.skeleton = open_file_and_read_skeleton(pathToUse);
 
 				if (!is.skeleton) {
 					sys_print("!!! import animation failed %s\n", full_path.c_str());
@@ -2653,7 +2654,7 @@ bool ModelCompilier::compile(const char* game_path)
 	// check dependencies
 	auto check_timestamp_file = [](uint64_t cmdl_time, const std::string& full_path) -> bool {
 
-		auto input_file = FileSys::open_read_engine(full_path.c_str());
+		auto input_file = FileSys::open_read_game(full_path.c_str());
 		if (!input_file)
 			return false;	// no file = doesnt need update
 
@@ -2667,7 +2668,7 @@ bool ModelCompilier::compile(const char* game_path)
 		for (const auto& file : tree) {
 			if (get_extension(file) != ".glb")
 				continue;
-			bool res = check_timestamp_file(cmdl_time, file);
+			bool res = check_timestamp_file(cmdl_time, FileSys::get_game_path_from_full_path(file));
 			if (res)
 				return true;
 		}

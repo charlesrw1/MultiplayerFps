@@ -116,4 +116,5 @@ public:
 	static std::string get_full_path_from_relative(const std::string& relative, WhereEnum where) {
 		return get_path(where) + ("/" + relative);
 	}
+	static std::string get_game_path_from_full_path(const std::string& fullpath);
 };

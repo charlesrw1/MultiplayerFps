@@ -14,6 +14,8 @@
 static ConfigVar g_project_base("g_project_base", "gamedat", CVAR_DEV, "what folder to search for assets in");
 static ConfigVar g_user_save_dir("g_user_save_dir", "user", CVAR_DEV, "what folder to save user config/settings to");
 
+static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL, "prints an error for all CreateFile errors");
+
 class OSFile : public IFile
 {
 public:
@@ -26,9 +28,15 @@ public:
 		if (winhandle != INVALID_HANDLE_VALUE) {
 			len = GetFileSize(winhandle, nullptr);
 		}
+		else if (file_print_all_openfile_fails.get_bool())
+			sys_print("!!! OSFile failed to open read: %s\n", path);
+
 	}
 	void init_write(const char* path) {
 		winhandle = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+		if (winhandle == INVALID_HANDLE_VALUE && file_print_all_openfile_fails.get_bool())
+			sys_print("!!! OSFile failed to open write: %s\n", path);
 	}
 
 	// Inherited via IFile
@@ -251,6 +259,20 @@ const char* FileSys::get_path(WhereEnum where)
 		return g_project_base.get_string();
 	else if (where == ENGINE_DIR)
 		return ".";
+}
+
+std::string FileSys::get_game_path_from_full_path(const std::string& fullpath) {
+	std::string gamedir = get_path(GAME_DIR);
+	gamedir += "/";
+	int i = 0;
+	for (; i < gamedir.size() && i < fullpath.size(); i++)
+		if (gamedir[i] != fullpath[i])
+			break;
+	if (i != gamedir.size()) {
+		sys_print("??? get_game_path_from_full_path not a game path\n");
+		return fullpath;
+	}
+	return fullpath.substr(gamedir.size());
 }
 
 void FileSys::init()

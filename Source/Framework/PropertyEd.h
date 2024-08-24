@@ -109,7 +109,7 @@ enum PropertyGridFlags
 {
 	PG_LIST_PASSTHROUGH = 1
 };
-
+class ClassBase;
 class PropertyGrid
 {
 public:
@@ -123,6 +123,11 @@ public:
 		uint32_t flags = 0 /* PropertyGridFlags */, 
 		uint32_t property_flag_mask = UINT32_MAX /* specifiy a mask that gets ANDd with each properties flags, will skip if its 0 */
 	);
+
+	void add_class_to_grid(
+		ClassBase* classinst
+	);
+
 	void update();
 
 	void set_read_only(bool read_only) {

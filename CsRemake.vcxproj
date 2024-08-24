@@ -172,6 +172,7 @@
     <ClInclude Include="Source\Render\DrawPublic.h" />
     <ClInclude Include="Source\Render\DrawTypedefs.h" />
     <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h" />
+    <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
     <ClInclude Include="Source\Render\EnvProbe.h" />
     <ClInclude Include="Source\Render\Meshlet.h" />
     <ClInclude Include="Source\Render\Model.h" />
@@ -300,6 +301,7 @@
     <ClCompile Include="Source\Render\Draw.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
+    <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Meshlet.cpp" />

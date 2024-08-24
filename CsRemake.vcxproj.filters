@@ -539,6 +539,7 @@
     <ClInclude Include="Source\Game\Map.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Test\Test.h" />
+    <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -811,5 +812,6 @@
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Test\Test.cpp" />
+    <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
   </ItemGroup>
 </Project>

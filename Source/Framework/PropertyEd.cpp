@@ -40,6 +40,16 @@ void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void*
 
 }
 
+void PropertyGrid::add_class_to_grid(ClassBase* classinst)
+{
+	auto ti = &classinst->get_type();
+	while (ti) {
+		if (ti->props)
+			add_property_list_to_grid(ti->props, classinst);
+		ti = ti->super_typeinfo;
+	}
+}
+
 void PropertyGrid::update()
 {
 	if (rows_had_changes)

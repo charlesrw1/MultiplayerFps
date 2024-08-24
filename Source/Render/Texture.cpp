@@ -9,17 +9,18 @@
 
 #include "Framework/Files.h"
 #include "Framework/DictParser.h"
-
 #undef OPAQUE
 #include "Assets/AssetRegistry.h"
-
+#include "AssetCompile/Someutils.h"
+#include "Assets/AssetDatabase.h"
+#include "Framework/Config.h"
 
 CLASS_IMPL(Texture);
 
 
-#include "AssetCompile/Someutils.h"
-
-#include "Assets/AssetDatabase.h"
+// TextureEditor.cpp
+extern bool compile_texture_asset(const std::string& gamepath);
+extern IEditorTool* g_texture_editor_tool;
 
 class TextureAssetMetadata : public AssetMetadata
 {
@@ -47,7 +48,7 @@ public:
 		filepaths.push_back("_black");
 		filepaths.push_back("_flat_normal");
 	}
-	virtual IEditorTool* tool_to_edit_me() const override { return nullptr; }
+	virtual IEditorTool* tool_to_edit_me() const override { return g_texture_editor_tool; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Texture::StaticType; }
 };
@@ -520,8 +521,16 @@ void Texture::post_load(ClassBase* userStruct) {
 
 	type = Texture_Type::TEXTYPE_2D;
 }
+
+extern ConfigVar developer_mode;
+
 bool Texture::load_asset(ClassBase*& userStruct) {
 	const auto& path = get_name();
+
+	if (developer_mode.get_bool()) {
+		// this will check if a compile is needed
+		compile_texture_asset(path);
+	}
 
 	auto file = FileSys::open_read_game(path);
 

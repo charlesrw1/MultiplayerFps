@@ -1,7 +1,0 @@
-source "snd.wav"
-radius ...
-group 
-pitch 
-vol
-
-soundgroup.txt
