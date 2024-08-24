@@ -269,7 +269,7 @@ void SSAO_System::update_ubo()
 
 	glNamedBufferSubData(ubo.data, 0, sizeof(gpu::HBAOData), &data);
 }
-ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV);
+ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV,"option to disable ssao blur for debug");
 void SSAO_System::render()
 {
 	GPUFUNCTIONSTART;

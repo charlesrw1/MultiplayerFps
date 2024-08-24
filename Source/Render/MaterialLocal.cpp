@@ -18,7 +18,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetDatabase.h"
 
-static const char* const MATERIAL_DIR = "./Data/";
+
 MaterialManagerLocal matman;
 MaterialManagerPublic* imaterials = &matman;
 
@@ -35,14 +35,14 @@ public:
 	virtual std::string get_type_name()  const override { return "Material"; }
 	virtual void index_assets(std::vector<std::string>& filepaths)  const override
 	{
-		auto tree = FileSys::find_files("./Data");
+		auto tree = FileSys::find_game_files();
 		for (auto file : tree) {
 			if(has_extension(file,"mi")||has_extension(file,"mm"))
-				filepaths.push_back(strip_extension(file.substr(7)));
+				filepaths.push_back(strip_extension(file));
 		}
 	}
-	virtual bool assets_are_filepaths() const override { return false; }
-	virtual std::string root_filepath()  const override { return "./Data/"; }
+	virtual bool assets_are_filepaths() const override { return true; }
+
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
 	IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
 };
@@ -75,7 +75,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 {
 	// FIXME: make this faster
 
-	std::string name = MATERIAL_DIR + mat->get_name();
+	std::string name = FileSys::get_game_path() + ("/"  + mat->get_name());
 //	name = strip_extension(name);
 	name += "_shader.glsl";
 
@@ -198,9 +198,10 @@ bool MaterialImpl::load_master(MaterialInstance* self, IFile* file)
 {
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
-	std::string findname = MATERIAL_DIR + self->get_name() + ".mm";
+	std::string findname = self->get_name() + ".mm";
 	bool good = masterImpl->load_from_file(findname, file);
-	if (!good) return false;
+	if (!good) 
+		return false;
 	
 	// init default instance, textures get filled in the dirty list
 	params.resize(masterImpl->param_defs.size());
@@ -309,13 +310,13 @@ bool MaterialImpl::load_from_file(MaterialInstance* self, const std::string& ful
 {
 	const auto& name = self->get_name();
 	// try to find master file
-	std::string findname = MATERIAL_DIR + name + ".mm";
-	auto file = FileSys::open_read(findname.c_str());
+	std::string findname = name + ".mm";
+	auto file = FileSys::open_read_game(findname.c_str());
 	if (file) {
 		return load_master(self, file.get());
 	}
-	findname = MATERIAL_DIR + name + ".mi";
-	file = FileSys::open_read(findname.c_str());
+	findname =  name + ".mi";
+	file = FileSys::open_read_game(findname.c_str());
 	if (file) {
 		return load_instance(self,file.get());
 	}
@@ -508,8 +509,9 @@ bool MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 
 	auto str = create_glsl_shader(vs_code, fs_code, inst_dats);
 	auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";
-	std::ofstream outfile(out_glsl_path);
-	outfile.write(str.data(), str.size());
+	auto outfile = FileSys::open_write_game(out_glsl_path.c_str());
+
+	outfile->write(str.data(), str.size());
 
 	return true;
 }
@@ -783,7 +785,8 @@ void MaterialManagerLocal::pre_render_update()
 
 void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 {
-	if (!t) return;
+	if (!t) 
+		return;
 	auto master = get_master_material();
 	auto& params = impl->params;
 	const int count = master->param_defs.size();

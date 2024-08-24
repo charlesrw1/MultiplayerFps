@@ -67,16 +67,14 @@ bool DataClassEditor::save_document_internal()
 
 	assert(editing_object);
 
-	std::string savepath = "./Data/";
-	savepath += get_doc_name();
 
 	DictWriter dw;
 	write_object_properties(editing_object, nullptr, dw);
 
 	// save as text
-	std::ofstream outfile(savepath);
-	outfile.write(dw.get_output().data(), dw.get_output().size());
-	outfile.close();
+	auto outfile = FileSys::open_write_game(get_doc_name());
+	outfile->write(dw.get_output().data(), dw.get_output().size());
+	outfile->close();
 
 	return true;
 }

@@ -195,6 +195,7 @@
     <ClInclude Include="Source\Server.h" />
     <ClInclude Include="Source\Socket.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
+    <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\UI\GUILocal.h" />
     <ClInclude Include="Source\UI\GUIPublic.h" />
@@ -315,6 +316,7 @@
     <ClCompile Include="Source\Socket.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />
+    <ClCompile Include="Source\Test\Test.cpp" />
     <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
   </ItemGroup>

@@ -13,8 +13,6 @@
 #undef OPAQUE
 #include "Assets/AssetRegistry.h"
 
-static const char* const texture_folder_path = "./Data/";
-
 
 CLASS_IMPL(Texture);
 
@@ -39,9 +37,9 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const override
 	{
-		auto find_tree = FileSys::find_files("./Data");
-		for (const auto _file : find_tree) {
-			auto file = _file.substr(7);
+		auto find_tree = FileSys::find_game_files();
+		for (const auto file : find_tree) {
+
 			if (has_extension(file, "dds")||has_extension(file,"png")||has_extension(file,"hdr"))
 				filepaths.push_back(file);
 		}
@@ -50,10 +48,7 @@ public:
 		filepaths.push_back("_flat_normal");
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return nullptr; }
-	virtual std::string root_filepath() const  override
-	{
-		return texture_folder_path;
-	}
+
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Texture::StaticType; }
 };
 
@@ -528,9 +523,7 @@ void Texture::post_load(ClassBase* userStruct) {
 bool Texture::load_asset(ClassBase*& userStruct) {
 	const auto& path = get_name();
 
-	std::string path_to_use = texture_folder_path + path;
-
-	auto file = FileSys::open_read(path_to_use.c_str());
+	auto file = FileSys::open_read_game(path);
 
 	if (!file) {
 		return false;
@@ -548,11 +541,11 @@ bool Texture::load_asset(ClassBase*& userStruct) {
 	user->filedata.resize(file->size());
 	file->read(user->filedata.data(), user->filedata.size());
 
-	if (path_to_use.find(".dds") != std::string::npos) {
+	if (path.find(".dds") != std::string::npos) {
 		user->isDDSFile = true;
 		return true;
 	}
-	else if (path_to_use.find(".hdr") != std::string::npos) {
+	else if (path.find(".hdr") != std::string::npos) {
 		data = stbi_loadf_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
 		filedata = {};
 		is_float = true;

@@ -35,20 +35,14 @@ void AssetRegistrySystem::reindex_all_assets()
 		type->index_assets(filepaths);
 		bool is_filenames = type->assets_are_filepaths();
 
+		const int len = strlen(FileSys::get_game_path());
 		std::string buf;
 		for (int j = 0; j < filepaths.size(); j++) {
 			AssetOnDisk aod;
 			aod.filename = std::move(filepaths[j]);
 			if (is_filenames) {
-				buf.clear();
-				buf = type->root_filepath() + aod.filename;
-				auto file = FileSys::open_read_os(buf.c_str());
-				if (!file) {
-					sys_print("should be filename but isnt (this could be an uncompiled model, if so, ignore) %s\n", buf.c_str());
-					//continue;
-				}
-				else
-					aod.filesize = file->size();
+				if(aod.filename.find(FileSys::get_game_path()) == 0)
+					aod.filename = aod.filename.substr(len + 1);
 			}
 			aod.type = type;
 
@@ -65,3 +59,15 @@ void AssetRegistrySystem::reindex_all_assets()
 		root->addPath(a,path);
 	}
 }
+#include "Test/Test.h"
+#ifdef WITH_TESTS
+int ReindexAssetTest()
+{
+	int erCount = 0;
+	{
+		AssetRegistrySystem::get().reindex_all_assets();
+	}
+	return erCount;
+}
+ADD_TEST(ReindexAssetTest);
+#endif

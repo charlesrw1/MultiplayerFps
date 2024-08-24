@@ -28,8 +28,6 @@
 
 ModelMan mods;
 
-static const char* const model_folder_path = "./Data/";
-
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
 #include "Assets/AssetRegistry.h"
@@ -58,19 +56,15 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto find_tree = FileSys::find_files("./Data");
-		for (const auto _file : find_tree) {
-			auto file = _file.substr(7);
+		auto find_tree = FileSys::find_game_files();
+		for (const auto file : find_tree) {
 			if (has_extension(file, "cmdl")) {
 				filepaths.push_back(file);	
 			}
 		}
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
-	virtual std::string root_filepath() const  override
-	{
-		return model_folder_path;
-	}
+
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Model::StaticType; }
 };
 
@@ -353,13 +347,12 @@ static glm::vec4 bounds_to_sphere(Bounds b)
 }
 
 // Format definied in ModelCompilier.cpp
-bool ModelMan::read_model_into_memory(Model* m, std::string path)
+bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 {
-	std::string binpath = path;
 
-	auto file = FileSys::open_read(binpath.c_str());
+	auto file = FileSys::open_read_game(modelName.c_str());
 	if (!file) {
-		sys_print("!!! model %s does not exist\n", binpath.c_str());
+		sys_print("!!! model %s does not exist\n", modelName.c_str());
 		return false;
 	}
 
@@ -568,7 +561,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string path)
 	return true;
 }
 
-ConfigVar developer_mode("developer_mode", "0", CVAR_DEV | CVAR_BOOL);
+extern ConfigVar developer_mode;
 
 void Model::uninstall()
 {
@@ -599,7 +592,7 @@ bool Model::load_asset(ClassBase*& u) {
 	const auto& path = get_name();
 
 	if (developer_mode.get_bool()) {
-		std::string model_def = model_folder_path + strip_extension(path.c_str());
+		std::string model_def = strip_extension(path.c_str());
 		model_def += ".mis";
 
 		bool good = ModelCompilier::compile(model_def.c_str());
@@ -608,9 +601,7 @@ bool Model::load_asset(ClassBase*& u) {
 		}
 	}
 
-	const std::string pathToUse = model_folder_path + path;
-
-	bool good = mods.read_model_into_memory(this, pathToUse);
+	bool good = mods.read_model_into_memory(this, path);
 
 	if (good)
 		return true;
@@ -813,16 +804,8 @@ DECLARE_ENGINE_CMD(IMPORT_MODEL)
 		return;
 	}
 
-	std::string savepath = "./Data/";
-	savepath += strip_extension(args.at(1)) + ".mis";
-	{
-		//auto existingFile = FileSys::open_read_os(savepath.c_str());
-		//if (existingFile) {
-		//	sys_print("??? IMPORT_MODE: import settings file already exists. Try editing it in the model editor instead or delete the file and try again\n");
-		//	return;
-		//}
-	}
-
+	auto savepath = strip_extension(args.at(1)) + ".mis";
+	
 
 	ModelImportSettings mis;
 	mis.srcGlbFile = args.at(1);
@@ -832,10 +815,9 @@ DECLARE_ENGINE_CMD(IMPORT_MODEL)
 	write_object_properties(&mis, nullptr, dw);
 
 	// save as text
-	std::ofstream outfile(savepath);
-	outfile.write(dw.get_output().data(), dw.get_output().size());
-	outfile.close();
+	auto outfile = FileSys::open_write_game(savepath);
+	outfile->write(dw.get_output().data(), dw.get_output().size());
+	outfile->close();
 
-	std::string misF = strip_extension(args.at(1)) + ".mis";
 	ModelCompilier::compile(savepath.c_str());
 }

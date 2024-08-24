@@ -28,17 +28,14 @@ public:
 	}
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto tree = FileSys::find_files("./Data");
+		auto tree = FileSys::find_game_files();
 		for (auto file : tree) {
 			if(has_extension(file,"ag"))
-				filepaths.push_back((file.substr(7)));
+				filepaths.push_back(file);
 		}
 	}
 	virtual bool assets_are_filepaths() const { return true; }
-	virtual std::string root_filepath() const  override
-	{
-		return "./Data/";
-	}
+
 	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Animation_Tree_CFG::StaticType; }
 };

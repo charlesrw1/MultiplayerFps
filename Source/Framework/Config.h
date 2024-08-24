@@ -21,6 +21,7 @@ class ConfigVarDataPublic
 public:
 	const char* name = "";
 	const char* value = "";
+	const char* description = "";
 	int flags = 0;	// CVarFlags
 	float minVal = 0.f;
 	float maxVal = 1.f;
@@ -32,7 +33,7 @@ class ConfigVarDataInternal;
 class ConfigVar
 {
 public:
-	ConfigVar(const char* name, const char* value, int flags, float min = -1.f, float max = 1.f);
+	ConfigVar(const char* name, const char* value, int flags, const char* description, float min = -1.f, float max = 1.f);
 
 	int get_integer() const { return ptr->integerVal; }
 	float get_float() const { return ptr->floatVal; }

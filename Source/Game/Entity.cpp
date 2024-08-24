@@ -43,10 +43,7 @@ public:
 		}
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
-	virtual std::string root_filepath() const  override
-	{
-		return "";
-	}
+
 	virtual bool assets_are_filepaths() const { return false; }
 };
 REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);

@@ -3,8 +3,8 @@ import sys
 import subprocess
 from pathlib import Path
 import time
-MAT_DIR = "./Data/"
-TEXTURE_DIR = "./Data/"
+MAT_DIR = "."
+TEXTURE_DIR = "."
 
 current_time = time.time()
 

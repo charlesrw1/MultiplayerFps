@@ -42,15 +42,15 @@ static const int SSAO_TEX_LOC = 8;
 extern ConfigVar g_debug_skeletons;
 
 
-ConfigVar draw_viewmodel("r.draw_viewmodel","1",CVAR_BOOL);
-ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL);
-ConfigVar shadow_quality_setting("r.shadow_setting","0",CVAR_INTEGER,0,3);
-ConfigVar enable_bloom("r.bloom","1",CVAR_BOOL);
-ConfigVar enable_volumetric_fog("r.vol_fog","0",CVAR_BOOL);
-ConfigVar enable_ssao("r.ssao","1",CVAR_BOOL);
-ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL);
-ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV);
-
+ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL,"enable/disable vsync");
+ConfigVar shadow_quality_setting("r.shadow_setting","0",CVAR_INTEGER,"csm shadow quality",0,3);
+ConfigVar enable_bloom("r.bloom","1",CVAR_BOOL,"enable/disable bloom");
+ConfigVar enable_volumetric_fog("r.vol_fog","0",CVAR_BOOL,"enable/disable volumetric fog");
+ConfigVar enable_ssao("r.ssao","1",CVAR_BOOL,"enable/disable screen space ambient occlusion");
+ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL,"");
+ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV,"disable multidrawindirect and use drawelements instead");
+// 8mb arena
+ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "8000000", CVAR_INTEGER | CVAR_UNBOUNDED, "size of the renderers memory arena in bytes");
 
 DECLARE_ENGINE_CMD(ot)
 {
@@ -97,7 +97,7 @@ const uint DEBUG_OBJID = 8;
 const uint DEBUG_LIGHTING_ONLY = 9;
 */
 
-ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, 0, 9);
+ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV,"render debug mode, see Draw.cpp for DEBUG_x values, 0 to disable", 0, 9);
 
 // Perlin noise generator taken from: https://www.shadertoy.com/view/slB3z3
 uint32_t hash(uint32_t x, uint32_t seed) {
@@ -857,8 +857,6 @@ void Renderer::create_default_textures()
 	tex.postProcessInput_vts_handle = Texture::install_system("_PostProcessInput");
 }
 
-// 8mb arena
-ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "8000000", CVAR_INTEGER|CVAR_UNBOUNDED);
 
 void Renderer::init()
 {
@@ -2847,8 +2845,9 @@ void draw_debug_grid()
 // point+spotlights
 
 
-ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV);
-ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV);
+ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV,"debug csm shadow rendering");
+ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV, "debug specular lighting");
+
 void Renderer::accumulate_gbuffer_lighting()
 {
 	GPUSCOPESTART("accumulate_gbuffer_lighting");
@@ -3050,7 +3049,7 @@ void Renderer::accumulate_gbuffer_lighting()
 	// reflection pass (use static for now)
 }
 
-ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV);
+ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
 void Renderer::draw_height_fog()
 {
@@ -3098,7 +3097,7 @@ void Renderer::draw_height_fog()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV);
+ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of decals");
 void Renderer::deferred_decal_pass()
 {
 	GPUFUNCTIONSTART;
@@ -3165,8 +3164,8 @@ void Renderer::deferred_decal_pass()
 	glEnable(GL_DEPTH_TEST);
 }
 
-ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV);
-ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL);
+ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
+ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
@@ -3262,7 +3261,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 	helper.compute_irradiance_new(cubemap, ambientCube);
 }
 
-ConfigVar force_render_cubemaps("r.force_cubemap_render", "0", CVAR_BOOL | CVAR_DEV);
+ConfigVar force_render_cubemaps("r.force_cubemap_render", "0", CVAR_BOOL | CVAR_DEV, "force cubemaps to re-render, treated like a flag and not a setting");
 
 void Renderer::check_cubemaps_dirty()
 {
@@ -3276,7 +3275,8 @@ void Renderer::check_cubemaps_dirty()
 		skylight.skylight.wants_update = false;
 	}
 }
-ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV);
+ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post processing");
+
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
 	current_time = GetTime();

@@ -894,11 +894,11 @@ ModelDefData new_import_settings_to_modeldef_data(IFile* file)
 	return mdd;
 }
 
-ModelDefData ModelCompileHelper::parse_definition_file(const std::string& name) {
+ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path) {
 	{
-		std::string pathNew = strip_extension(name);
+		std::string pathNew = strip_extension(game_path);
 		pathNew += ".mis";	// model import settings
-		auto filenew = FileSys::open_read_os(pathNew.c_str());
+		auto filenew = FileSys::open_read_game(pathNew.c_str());
 		if (!filenew)
 			throw std::runtime_error("couldn't open dict");
 		return new_import_settings_to_modeldef_data(filenew.get());
@@ -934,10 +934,6 @@ const AnimationSeq* MSkeleton::find_clip(const std::string& name, int& remap_ind
 	return nullptr;
 }
 
-static const char* MODELDIR = "./Data/Models/";
-static std::string modelpath_to_fullpath(const std::string& m) {
-	return MODELDIR + m;
-}
 
 struct cgltf_and_binary
 {
@@ -959,7 +955,7 @@ cgltf_and_binary load_cgltf_data(const std::string& path)
 	cgltf_options options = {};
 	cgltf_data* data = NULL;
 
-	auto sourceFile = FileSys::open_read_os(path.c_str());
+	auto sourceFile = FileSys::open_read_game(path.c_str());
 	if (!sourceFile) {
 		sys_print("!!! couldn't open souce file %s\n",path.c_str());
 		return {};
@@ -1077,7 +1073,7 @@ void mark_used_bones_R(int this_index, const SkeletonCompileData* scd, std::vect
 	}
 }
 
-ConfigVar modcompile_print_pruned_bones("modcompile.print_pruned_bones", "0", CVAR_BOOL);
+ConfigVar modcompile_print_pruned_bones("modcompile.print_pruned_bones", "0", CVAR_BOOL, "print bones that were pruned when a model compiles");
 
 ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const SkeletonCompileData* scd, const ModelDefData& def)
 {
@@ -1329,12 +1325,12 @@ std::vector<ImportedSkeleton> read_animation_imports(
 			ImportedSkeleton is;
 			is.retarget_this = data.imports[i].retarget;
 
-			std::string full_path = modelpath_to_fullpath(data.imports[i].name);
+			std::string gamepath = data.imports[i].name;
 
-			is.skeleton = open_file_and_read_skeleton(full_path);
+			is.skeleton = open_file_and_read_skeleton(gamepath);
 
 			if (!is.skeleton) {
-				sys_print("!!! import animation failed %s\n", full_path.c_str());
+				sys_print("!!! import animation failed %s\n", gamepath.c_str());
 			}
 			else {
 				is.remap_from_LOAD_to_THIS = create_remap_table(is.skeleton.get(), compile_data);
@@ -1343,8 +1339,13 @@ std::vector<ImportedSkeleton> read_animation_imports(
 		}
 		else if (data.imports[i].type == AnimImportType_Load::Folder) {
 
-			std::string full_path_to_folder = modelpath_to_fullpath(data.imports[i].name);
-			FileTree tree = FileSys::find_files(full_path_to_folder.c_str());
+			std::string game_folder_path = data.imports[i].name;
+			std::string full_path_folder = FileSys::get_game_path();
+			full_path_folder += "/";
+			full_path_folder += game_folder_path;
+
+
+			FileTree tree = FileSys::find_files(full_path_folder.c_str());
 
 			for (const auto& file : tree) {
 
@@ -1353,7 +1354,10 @@ std::vector<ImportedSkeleton> read_animation_imports(
 					continue;
 				ImportedSkeleton is;
 				is.retarget_this = data.imports[i].retarget;
-				is.skeleton = open_file_and_read_skeleton(full_path);
+
+				int size = strlen(FileSys::get_game_path());
+				assert(!"check this");
+				is.skeleton = open_file_and_read_skeleton(full_path.substr(size));
 
 				if (!is.skeleton) {
 					sys_print("!!! import animation failed %s\n", full_path.c_str());
@@ -2026,8 +2030,10 @@ static void output_embedded_texture(const std::string& outputname, const cgltf_i
 {
 	sys_print("*** writing out embedded texture %s\n", outputname.c_str());
 
-	std::string image_path = "./Data/Textures/" + outputname;
-	std::ofstream outfile(image_path.c_str(), std::ios::binary);
+	std::string image_path = outputname;
+	auto outfile = FileSys::open_write_game(image_path);
+
+
 	if (!outfile) {
 		sys_print("!!! couldn't open file to output embedded texture %s\n", image_path.c_str());
 		return;
@@ -2043,93 +2049,8 @@ static void output_embedded_texture(const std::string& outputname, const cgltf_i
 	if (!name) name = "";
 
 
-	outfile.write((char*)(buffer_bytes + bv.offset), bv.size);
+	outfile->write((char*)(buffer_bytes + bv.offset), bv.size);
 
-	outfile.close();
-}
-
-
-static std::string create_material_and_export(const std::string& generated_name, const cgltf_data* data, const cgltf_material* mat)
-{
-	std::string material_dir_path = "./Data/Materials/" + generated_name + ".txt";
-	bool does_exist = FileSys::does_os_file_exist(material_dir_path.c_str());
-
-	// update it in case
-	if (does_exist) {
-		bool good = true;// MaterialCompilier::compile(generated_name.c_str());
-		if (!good) {
-			sys_print("!!! MaterialCompilier failed on generated material %s even though it already exists\n", generated_name.c_str());
-		}
-		return generated_name;
-	}
-
-	// create it
-	
-	DictWriter out;
-	out.write_key(generated_name.c_str());
-	out.write_item_start();
-
-	if (mat->has_pbr_metallic_roughness) {
-		const cgltf_pbr_metallic_roughness& base = mat->pbr_metallic_roughness;
-		out.write_key_value("metal_val", string_format("%f", base.metallic_factor));
-		out.write_key_value("rough_val", string_format("%f", base.roughness_factor));
-		out.write_key_value("tint", 
-			string_format("%f %f %f",
-				base.base_color_factor[0],
-				base.base_color_factor[1],
-				base.base_color_factor[2])
-		);
-
-		if (base.base_color_texture.texture) {
-			std::string output_name =  base.base_color_texture.texture->image->name;
-			output_name += ".png";
-			output_embedded_texture(output_name, base.base_color_texture.texture->image, data);
-			
-			out.write_key_value("albedo", output_name.c_str());
-		}
-		if (base.metallic_roughness_texture.texture) {
-			std::string output_name =  base.metallic_roughness_texture.texture->image->name;
-			output_name += ".png";
-			output_embedded_texture(output_name, base.metallic_roughness_texture.texture->image, data);
-
-			out.write_key_value("rough", output_name.c_str());
-		}
-
-	}
-	if (mat->normal_texture.texture) {
-		std::string output_name =  mat->normal_texture.texture->image->name;
-		output_name += ".png";
-		output_embedded_texture(output_name, mat->normal_texture.texture->image, data);
-
-		out.write_key_value("normal", output_name.c_str());
-	}
-
-	if (mat->double_sided)
-		out.write_key("showbackface\n");
-
-	if (mat->alpha_mode == cgltf_alpha_mode_blend)
-		out.write_key("alpha blend\n");
-	else if (mat->alpha_mode == cgltf_alpha_mode_mask)
-		out.write_key("alpha test\n");
-
-	out.write_item_end();
-	
-	std::ofstream outfile(material_dir_path.c_str());
-	if (!outfile) {
-		sys_print("!!! couldn't write out generated material %s\n", material_dir_path.c_str());
-		return material_dir_path;
-	}
-	size_t count = out.get_output().size();
-	outfile.write(out.get_output().c_str(), count);
-	outfile.close();
-
-	bool good = true;// MaterialCompilier::compile(generated_name.c_str());
-
-	if (!good) {
-		sys_print("!!! MaterialCompilier failed on material that was just generated\n");
-	}
-
-	return generated_name;
 }
 
 std::vector<std::string> ModelCompileHelper::create_final_material_names(
@@ -2427,7 +2348,7 @@ FinalModelData create_final_model_data(
 }
 
 
-bool write_out_compilied_model(const std::string& path, const FinalModelData* model, const FinalSkeletonOutput* skel)
+bool write_out_compilied_model(const std::string& gamepath, const FinalModelData* model, const FinalSkeletonOutput* skel)
 {
 	FileWriter out;
 	out.write_int32('CMDL');
@@ -2587,13 +2508,13 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 	}
 
 
-	const std::string fullpath = path;// modelpath_to_fullpath(path);
-	std::ofstream outfile(fullpath, std::ios::binary);
+
+	auto outfile = FileSys::open_write_game(gamepath);
 	if (!outfile) {
-		sys_print("!!! Couldn't open file to write out model %s\n", path.c_str());
+		sys_print("!!! Couldn't open file to write out model %s\n", gamepath.c_str());
 		return false;
 	}
-	sys_print("*** Writing out model (%s) (size: %d)\n", path.c_str(), (int)out.get_size());
+	sys_print("*** Writing out model (%s) (size: %d)\n", gamepath.c_str(), (int)out.get_size());
 	sys_print("***     -vert bytes: %d\n", (int)vert_size);
 	sys_print("***     -index bytes: %d\n", (int)index_size);
 	sys_print("***     -bone bytes: %d\n", (int)skel_size);
@@ -2602,8 +2523,8 @@ bool write_out_compilied_model(const std::string& path, const FinalModelData* mo
 
 
 
-	outfile.write(out.get_buffer(), out.get_size());
-	outfile.close();
+	outfile->write(out.get_buffer(), out.get_size());
+	outfile->close();
 
 	return true;
 }
@@ -2621,7 +2542,7 @@ void add_bone_def_data_to_skeleton(const ModelDefData& def, SkeletonCompileData*
 
 bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDefData& def)
 {
-	cgltf_and_binary out = load_cgltf_data(modelpath_to_fullpath(def.model_source));
+	cgltf_and_binary out = load_cgltf_data(def.model_source);
 
 	if (!out.data)
 		return false;
@@ -2674,13 +2595,13 @@ bool ModelCompilier::compile_from_settings(const std::string& output, ModelImpor
 	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
 	return ModelCompileHelper::compile_model(output, def_data);
 }
-bool ModelCompilier::compile(const char* name)
+bool ModelCompilier::compile(const char* game_path)
 {
-	sys_print("----- Compiling Model %s -----\n", name);
+	sys_print("----- Compiling Model %s -----\n", game_path);
 
-	auto file = FileSys::open_read_os(name);
+	auto file = FileSys::open_read_game(game_path);
 	if (!file) {
-		sys_print("!!! coudln't open model def file %s\n", name);
+		sys_print("!!! coudln't open model def file %s\n", game_path);
 		return false;
 	}
 	uint64_t timestamp_of_def =  file->get_timestamp();
@@ -2688,8 +2609,8 @@ bool ModelCompilier::compile(const char* name)
 
 	uint64_t timestamp_of_cmdl = 0;
 
-	std::string compilied = strip_extension(name) + ".cmdl";
-	file = FileSys::open_read_os(compilied.c_str());
+	std::string compilied = strip_extension(game_path) + ".cmdl";
+	file = FileSys::open_read_game(compilied.c_str());
 
 
 	bool needs_compile = compile_everything;
@@ -2721,10 +2642,10 @@ bool ModelCompilier::compile(const char* name)
 	
 	ModelDefData def_data;
 	try {
-		def_data = ModelCompileHelper::parse_definition_file(name);
+		def_data = ModelCompileHelper::parse_definition_file(game_path);
 	}
 	catch (std::runtime_error er) {
-		sys_print("!!! error parsing compile file %s: %s\n", name, er.what());
+		sys_print("!!! error parsing compile file %s: %s\n", game_path, er.what());
 		return false;
 	}
 
@@ -2732,7 +2653,7 @@ bool ModelCompilier::compile(const char* name)
 	// check dependencies
 	auto check_timestamp_file = [](uint64_t cmdl_time, const std::string& full_path) -> bool {
 
-		auto input_file = FileSys::open_read_os(full_path.c_str());
+		auto input_file = FileSys::open_read_engine(full_path.c_str());
 		if (!input_file)
 			return false;	// no file = doesnt need update
 
@@ -2741,7 +2662,7 @@ bool ModelCompilier::compile(const char* name)
 	};
 	auto check_timestamp_folder = [&](uint64_t cmdl_time, const std::string& folder) -> bool {
 
-		auto tree = FileSys::find_files(folder.c_str());
+		auto tree = FileSys::find_game_files_path(folder);
 
 		for (const auto& file : tree) {
 			if (get_extension(file) != ".glb")
@@ -2756,12 +2677,12 @@ bool ModelCompilier::compile(const char* name)
 	bool needs_compile_before_src = needs_compile;
 
 	if (!needs_compile)
-		needs_compile |= check_timestamp_file(timestamp_of_cmdl, modelpath_to_fullpath(def_data.model_source));
+		needs_compile |= check_timestamp_file(timestamp_of_cmdl, def_data.model_source);
 	for (int i = 0; i < def_data.imports.size() && !needs_compile; i++) {
 		if(def_data.imports[i].type == AnimImportType_Load::File)
-			needs_compile |= check_timestamp_file(timestamp_of_cmdl, modelpath_to_fullpath(def_data.imports[i].name));
+			needs_compile |= check_timestamp_file(timestamp_of_cmdl, def_data.imports[i].name);
 		else if (def_data.imports[i].type == AnimImportType_Load::Folder)
-			needs_compile |= check_timestamp_folder(timestamp_of_cmdl, modelpath_to_fullpath(def_data.imports[i].name));
+			needs_compile |= check_timestamp_folder(timestamp_of_cmdl, def_data.imports[i].name);
 	}
 	if (!needs_compile_before_src && needs_compile)
 		sys_print("*** source files out of data, recompiling\n");
@@ -2771,5 +2692,5 @@ bool ModelCompilier::compile(const char* name)
 		return true;	// no need to compile
 	}
 
-	return ModelCompileHelper::compile_model(name, def_data);
+	return ModelCompileHelper::compile_model(game_path, def_data);
 }

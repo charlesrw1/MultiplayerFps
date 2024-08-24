@@ -44,9 +44,8 @@
 	} }
 
 
-ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_BOOL);
-ConfigVar g_draw_every_physx_ray_hit("g_draw_every_physx_ray_hit", "0", CVAR_DEV | CVAR_BOOL);
-ConfigVar g_draw_every_physx_contact("g_draw_every_physx_contact", "0", CVAR_DEV | CVAR_BOOL);
+ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_BOOL, "draw the physx debug scene");
+
 
 
 struct CollisionResponse

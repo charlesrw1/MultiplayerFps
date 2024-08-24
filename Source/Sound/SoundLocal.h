@@ -11,7 +11,6 @@
 
 #include "Framework/Config.h"
 
-static const char* const SOUND_DIRECTORY = "./Data/";
 
 class PostProcessSoundEffect
 {
@@ -221,10 +220,10 @@ public:
     std::vector<handle<SoundPlayer>> active_voices;
 	Free_List<SoundPlayerInternal> all_sound_players;
 };
-
+#include "Framework/Files.h"
 inline bool SoundFile::load_asset(ClassBase*&)
 {
-    std::string pathfull = SOUND_DIRECTORY + get_name();
+    std::string pathfull = FileSys::get_full_path_from_game_path( get_name() );
     Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
     if (!data) {
         return false;

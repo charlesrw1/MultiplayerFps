@@ -84,7 +84,7 @@ ConfigVar::ConfigVar(ConfigVarDataInternal* ptr)
 	this->ptr = ptr;
 }
 
-ConfigVar::ConfigVar(const char* name, const char* value, int flags, float min , float max )
+ConfigVar::ConfigVar(const char* name, const char* value, int flags, const char* description, float min , float max )
 {
 	ConfigVarDataPublic init;
 	init.name = name;
@@ -92,6 +92,7 @@ ConfigVar::ConfigVar(const char* name, const char* value, int flags, float min ,
 	init.flags = flags;
 	init.minVal = min;
 	init.maxVal = max;
+	init.description = description;
 	VarMan::get()->register_var(this, init);
 }
 
@@ -343,7 +344,7 @@ public:
 	}
 	void execute_file(Cmd_Execute_Mode mode, const char* path) {
 
-		auto file = FileSys::open_read_os(path);
+		auto file = FileSys::open_read_engine(path);
 		if(!file) {
 			sys_print("!!! couldn't open config file to execute: %s\n", path);
 			return;

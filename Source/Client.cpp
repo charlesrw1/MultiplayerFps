@@ -10,17 +10,17 @@
 
 //#define DebugOut(fmt, ...)
 
-ConfigVar interp_time("cl.interp", "0.1", CVAR_FLOAT, 0.0, 0.3);
-ConfigVar fake_lag("cl.fake_lag", "0", CVAR_INTEGER, 0,1000);
-ConfigVar fake_loss("cl.fake_loss", "0", CVAR_INTEGER, 0.0, 100.0);
-ConfigVar time_out("cl.timeout", "5.0", CVAR_FLOAT | CVAR_READONLY, 0.0, 10.0);
-ConfigVar interpolate("cl.do_interp", "1", CVAR_BOOL);
-ConfigVar smooth_error_time("cl.smooth_error", "1.0", CVAR_FLOAT, 0.5, 2.0);
-ConfigVar predict("cl.predict", "1", CVAR_BOOL);
-ConfigVar dont_replicate_player("cl.dont_rep_player", "0", CVAR_BOOL);
-ConfigVar time_reset_threshold("cl.time_reset", "0.1", CVAR_FLOAT, 0.0, 0.3);
-ConfigVar do_adjust_time("cl.do_adjust_time", "1", CVAR_BOOL);
-ConfigVar max_adjust_time("cl.max_adjust", "1.0", CVAR_FLOAT, 0.0, 2.0);
+ConfigVar interp_time("cl.interp", "0.1", CVAR_FLOAT,"interp time for client", 0.0, 0.3);
+ConfigVar fake_lag("cl.fake_lag", "0", CVAR_INTEGER, "", 0,1000);
+ConfigVar fake_loss("cl.fake_loss", "0", CVAR_INTEGER, "", 0.0, 100.0);
+ConfigVar time_out("cl.timeout", "5.0", CVAR_FLOAT | CVAR_READONLY,"", 0.0, 10.0);
+ConfigVar interpolate("cl.do_interp", "1", CVAR_BOOL,"");
+ConfigVar smooth_error_time("cl.smooth_error", "1.0", CVAR_FLOAT,"", 0.5, 2.0);
+ConfigVar predict("cl.predict", "1", CVAR_BOOL,"");
+ConfigVar dont_replicate_player("cl.dont_rep_player", "0", CVAR_BOOL,"");
+ConfigVar time_reset_threshold("cl.time_reset", "0.1", CVAR_FLOAT,"", 0.0, 0.3);
+ConfigVar do_adjust_time("cl.do_adjust_time", "1", CVAR_BOOL,"");
+ConfigVar max_adjust_time("cl.max_adjust", "1.0", CVAR_FLOAT,"", 0.0, 2.0);
 
 
 

@@ -7,9 +7,9 @@
 #include "Framework/Config.h"
 
 
-ConfigVar snapshot_rate("sv.snapshot_rate","30.0",CVAR_FLOAT | CVAR_READONLY,10,120);
-ConfigVar max_time_out("sv.time_out","10.0",CVAR_FLOAT,0.0,20.0);
-ConfigVar tick_rate("sv.tick_rate", "66.6", CVAR_FLOAT, 20.0, 120.0);
+ConfigVar snapshot_rate("sv.snapshot_rate","30.0",CVAR_FLOAT | CVAR_READONLY,"snapshot rate to send to clients",10,120);
+ConfigVar max_time_out("sv.time_out","10.0",CVAR_FLOAT,"max time before disconnecting unresponsive clients",0.0,20.0);
+ConfigVar tick_rate("sv.tick_rate", "66.6", CVAR_FLOAT, "default tick rate",20.0, 120.0);
 
 void NetDebugPrintf(const char* fmt, ...)
 {

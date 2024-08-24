@@ -65,11 +65,10 @@ void ModelEditorTool::post_map_load_callback()
 	if (!get_doc_name().empty()) {
 		// try to find def_name
 		std::string def_name = strip_extension(get_doc_name()) + ".mis";
-		std::string fullpath = "./Data/" + def_name;
-		auto file = FileSys::open_read_os(fullpath.c_str());
+		auto file = FileSys::open_read_game(def_name);
 
 		if (!file) {
-			sys_print("!!! ModelEditor: couldnt find path %s\n", fullpath.c_str());
+			sys_print("!!! ModelEditor: couldnt find path %s\n", def_name.c_str());
 		}
 		else {
 			DictParser dp;
@@ -143,10 +142,10 @@ bool ModelEditorTool::save_document_internal()
 	DictWriter write;
 	write_object_properties(importSettings, nullptr, write);
 
-	std::string path = "./Data/" + strip_extension(get_doc_name()) + ".mis";
-	std::ofstream outfile(path);
-	outfile.write(write.get_output().data(), write.get_output().size());
-	outfile.close();
+	std::string path = strip_extension(get_doc_name()) + ".mis";
+	auto outfile = FileSys::open_write_game(path);
+	outfile->write(write.get_output().data(), write.get_output().size());
+	outfile->close();
 
 	ModelCompilier::compile_from_settings(path.c_str(), importSettings);
 

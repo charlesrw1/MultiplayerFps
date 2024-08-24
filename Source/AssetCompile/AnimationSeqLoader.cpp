@@ -38,10 +38,7 @@ public:
 		return g_animseq_editor; 
 	}
 	virtual bool assets_are_filepaths() const override { return false; }
-	virtual std::string root_filepath() const  override
-	{
-		return "";
-	}
+
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &AnimationSeqAsset::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
@@ -50,7 +47,7 @@ CLASS_IMPL(AnimationSeqAsset);
 
 void AnimationSeqLoader::init()
 {
-	auto file = FileSys::open_read_os("./Data/AnimManifest.txt");
+	auto file = FileSys::open_read_game("AnimManifest.txt");
 	if (file) {
 		DictParser dp;
 		dp.load_from_file(file.get());
@@ -108,6 +105,6 @@ void AnimationSeqLoader::update_manifest_with_model(const std::string& modelName
 
 	DictWriter dw;
 	write_object_properties(manifest, nullptr, dw);
-	std::ofstream outfile("./Data/AnimManifest.txt");
-	outfile.write(dw.get_output().data(), dw.get_output().size());
+	auto outfile = FileSys::open_write_game("AnimManifest.txt");
+	outfile->write(dw.get_output().data(), dw.get_output().size());
 }

@@ -11,8 +11,6 @@
 
 #include "Framework/ExpressionLang.h"
 
-static const char* MODEL_DIRECTORY = "Data/";
-
 CLASS_IMPL(Animation_Tree_CFG);
 
 Animation_Tree_CFG::Animation_Tree_CFG()
@@ -41,10 +39,8 @@ void Animation_Tree_CFG::uninstall()
 bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
 
 	auto& path = get_name();
-	std::string fullpath = "./Data/";
-	fullpath += get_name();
 
-	auto file = FileSys::open_read_os(fullpath.c_str());
+	auto file = FileSys::open_read_game(path);
 
 	if (!file) {
 		sys_print("!!! couldn't load animation tree file %s\n", path.c_str());

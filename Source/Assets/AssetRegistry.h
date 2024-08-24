@@ -18,8 +18,7 @@ public:
 	// append all filepaths/assets
 	// if its a filepath, dont append full relative path, use "($root_filepath()) + <appended string>" filepath
 	virtual void index_assets(std::vector<std::string>& filepaths) const = 0;
-	// return the base filepath for indexed assets, like ./Data/Models
-	virtual std::string root_filepath() const = 0;
+
 	// if false, then asset names wont be treated like filepaths
 	virtual bool assets_are_filepaths() const { return true; }
 	// override this to add a new tool to the editor, used for maps, models, animations, everything

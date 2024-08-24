@@ -138,12 +138,6 @@ bool item_state_changed = false;
 bool finished = false;
 bool force_animation = false;
 
-static ConfigVar min_stair("phys.min_stair", "0.25",CVAR_FLOAT);
-static ConfigVar max_stair("phys.max_stair", "0.5",CVAR_FLOAT);
-static ConfigVar stair_rad("phys.stair_radius", "0.01",CVAR_FLOAT);
-static ConfigVar phys_gravity("phys.gravity", "16.0",CVAR_FLOAT,-20,20);
-static ConfigVar debug_fly("dbg.fly", "0", CVAR_BOOL);
-
 #if 0
 // hacky way to move up stairs
 bool Player::check_perch()

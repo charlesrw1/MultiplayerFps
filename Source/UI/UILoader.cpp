@@ -12,8 +12,6 @@ CLASS_IMPL(GuiFont);
 // global
 GuiFontLoader g_fonts;
 
-static const char* const FONT_FOLDER = "./Data/Fonts/";
-
 class FontAssetMetadata : public AssetMetadata
 {
 public:
@@ -30,19 +28,14 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto find_tree = FileSys::find_files(FONT_FOLDER);
-		for (const auto _file : find_tree) {
-			auto file = _file.substr(14);
+		auto find_tree = FileSys::find_game_files();
+		for (const auto file : find_tree) {
 			if (has_extension(file, "fnt")) {
-				std::string path = strip_extension(file);
 				filepaths.push_back(file);
 			}
 		}
 	}
-	virtual std::string root_filepath() const  override
-	{
-		return FONT_FOLDER;
-	}
+
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &GuiFont::StaticType; }
 };
 #include "Render/Texture.h"
@@ -53,8 +46,7 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 bool GuiFont::load_asset(ClassBase*& user)
 {
 	auto& path = get_name();
-	std::string fullpath = FONT_FOLDER + path;
-	auto file = FileSys::open_read(fullpath.c_str());
+	auto file = FileSys::open_read_game(path.c_str());
 	if (!file)
 	{
 		sys_print("!!! couldn't open font: %s\n", path.c_str());

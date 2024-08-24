@@ -294,9 +294,9 @@ public:
 	ParticleFXAsset* load_particle_fx(const std::string& file) {
 
 
-		std::string path = "./Data/" + file;
+		std::string path = file;
 
-		auto filePtr = FileSys::open_read_os(path.c_str());
+		auto filePtr = FileSys::open_read_game(path.c_str());
 		if (!filePtr) {
 			sys_print("!!! couldnt load particle fx file %s\n", file.c_str());
 			return nullptr;

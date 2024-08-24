@@ -10,7 +10,6 @@
 
 #include "Physics/Physics2.h"
 
-static const char* const maps_directory = "./Data/";
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetRegistry.h"
@@ -37,17 +36,14 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto tree = FileSys::find_files("./Data",true);
+		auto tree = FileSys::find_game_files();
 		for (auto file : tree) {
 			if(has_extension(file,"tmap")||has_extension(file,"bmap"))
-				filepaths.push_back((file.substr(7)));
+				filepaths.push_back(file);
 		}
 	}
 	virtual bool assets_are_filepaths()  const { return true; }
-	virtual std::string root_filepath()  const override
-	{
-		return "./Data/";
-	}
+
 	virtual IEditorTool* tool_to_edit_me() const { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Level::StaticType; }
@@ -113,7 +109,7 @@ Level* LevelSerialization::create_empty_level(const std::string& file, bool is_e
 
 Level* LevelSerialization::unserialize_level(const std::string& file, bool is_editor)
 {
-	auto fileptr  = FileSys::open_read(file.c_str());
+	auto fileptr  = FileSys::open_read_game(file.c_str());
 	if (!fileptr) {
 		sys_print("!!! couldn't open level %s\n", file.c_str());
 		return nullptr;
@@ -139,7 +135,7 @@ bool Level::load_asset(ClassBase*&)
 {
 	auto& path = get_name();
 
-	auto fileptr = FileSys::open_read(path.c_str());
+	auto fileptr = FileSys::open_read_game(path.c_str());
 	if (!fileptr) {
 		printf("!!! couldn't open level %s\n", path.c_str());
 		return false;
@@ -600,7 +596,7 @@ DECLARE_ENGINE_CMD(LLB)
 {
 	auto start = GetTime();
 	auto lvl = new Level;
-	auto file = FileSys::open_read("file.bin");
+	auto file = FileSys::open_read_game("file.bin");
 	BinaryReader in(file.get());
 	LevelSerialization::unserialize_level_binary(lvl, in);
 	auto diff = GetTime() - start;

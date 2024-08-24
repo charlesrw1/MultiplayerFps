@@ -12,7 +12,6 @@ extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEdito
 
 CLASS_IMPL(DataClass);
 
-static const char* const DATACLASS_FOLDER = "./Data/";
 
 class DataClassAssetMetadata : public AssetMetadata
 {
@@ -30,20 +29,16 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const  override
 	{
-		auto find_tree = FileSys::find_files(DATACLASS_FOLDER);
-		for (const auto _file : find_tree) {
-			auto file = _file.substr(8);
+		auto find_tree = FileSys::find_game_files();
+		for (const auto file : find_tree) {
 			if (has_extension(file, "dc")) {
-				std::string path = strip_extension(file);
+
 				filepaths.push_back(file);
 			}
 		}
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_dataclass_editor; }
-	virtual std::string root_filepath() const  override
-	{
-		return DATACLASS_FOLDER;
-	}
+
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &DataClass::StaticType; }
 };
 
@@ -56,10 +51,10 @@ bool DataClass::load_asset(ClassBase*&)
 {
 	assert(object == nullptr);
 
-	std::string fullpath = DATACLASS_FOLDER + get_name();
-	auto file = FileSys::open_read(fullpath.c_str());
+
+	auto file = FileSys::open_read_game(get_name());
 	if (!file.get()) {
-		sys_print("!!! couldnt load dataclass (file not found): %s\n", fullpath.c_str());
+		sys_print("!!! couldnt load dataclass (file not found): %s\n", get_name().c_str());
 		return false;
 	}
 
@@ -69,7 +64,7 @@ bool DataClass::load_asset(ClassBase*&)
 	dp.read_string(tok);
 	auto classLoaded = read_object_properties<ClassBase>(nullptr, dp, tok);
 	if (!classLoaded) {
-		sys_print("!!! couldnt load dataclass (parse error): %s\n", fullpath.c_str());
+		sys_print("!!! couldnt load dataclass (parse error): %s\n", get_name().c_str());
 		return false;
 	}
 
@@ -80,8 +75,8 @@ void DataClass::sweep_references() const
 	// im lazy af rn
 	// this marks references though
 	
-	std::string fullpath = DATACLASS_FOLDER + get_name();
-	auto file = FileSys::open_read(fullpath.c_str());
+	std::string fullpath = get_name();
+	auto file = FileSys::open_read_game(fullpath.c_str());
 	if (!file.get()) {
 		sys_print("!!! couldnt load dataclass (file not found): %s\n", fullpath.c_str());
 		return;

@@ -124,10 +124,9 @@ bool MaterialEditorLocal::save_document_internal()
 		}
 	}
 
-	std::string path = "./Data/" + (std::string)get_doc_name() +".mi";
-	std::ofstream outfile(path);
-	outfile.write(output.data(), output.size());
-	outfile.close();
+	auto outfile = FileSys::open_write_game(get_doc_name() + ".mi");
+	outfile->write(output.data(), output.size());
+	outfile->close();
 
 	// kinda shit ngl
 	auto ptr = GetAssets().find_sync<MaterialInstance>(get_doc_name());

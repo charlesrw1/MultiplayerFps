@@ -309,8 +309,6 @@ public:
 	std::vector<uint64_t> handles;
 };
 
-// check every X seconds
-ConfigVar g_assetbrowser_reindex_time("g_assetbrowser_reindex_time", "5.0", CVAR_FLOAT | CVAR_UNBOUNDED);
 
 // Unproject mouse coords into a vector, cast that into the world via physics
 glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
@@ -359,7 +357,6 @@ Color32 to_color32(glm::vec4 v) {
 
 void EditorDoc::init()
 {
-	//ed_schema.load("./Data/classes.txt");
 	global_asset_browser.init();
 }
 
@@ -369,9 +366,8 @@ bool EditorDoc::save_document_internal()
 
 	std::string str = LevelSerialization::serialize_level(eng->get_level());
 	
-	std::ofstream outfile("./Data/" + get_doc_name());
-	outfile.write(str.c_str(), str.size());
-	outfile.close();
+	auto outfile = FileSys::open_write_game(get_doc_name().c_str());
+	outfile->write(str.c_str(), str.size());
 
 	return true;
 }
@@ -875,10 +871,10 @@ void ManipulateTransformTool::end_drag() {
 //		snap = snap / mult
 
 
-ConfigVar ed_translation_snap_base("ed_translation_snap_base", "1", CVAR_FLOAT, 0.1, 128);
-ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, 1, 10);
-ConfigVar ed_rotation_snap_base("ed_rotation_snap_base", "15", CVAR_FLOAT, 1, 180);
-ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, 1, 10);
+ConfigVar ed_translation_snap_base("ed_translation_snap_base", "1", CVAR_FLOAT,		"editor translation snap", 0.1, 128);
+ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT,		"editor translation snap", 1, 10);
+ConfigVar ed_rotation_snap_base("ed_rotation_snap_base", "15", CVAR_FLOAT,			"editor rotation snap",1, 180);
+ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT,				"editor rotation snap",1, 10);
 
 
 void ManipulateTransformTool::update()

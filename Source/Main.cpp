@@ -897,36 +897,37 @@ int main(int argc, char** argv)
 // The entry point of the game! (not used in the editor)
 // Takes in a string of the level to start with on the final game
 // Should look like: "mylevel.tmap" for $ROOT/Data/mylevel.tmap
-ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV);
+ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "the entry point of the game, this takes in a level filepath");
 // The default gamemode and player to choose when undefined by the WorldSettings entity
 // Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
 // and for a subtype of Player defined in Game/Player.h
-ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV);
-ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV);
+ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV, "the default gamemode when none is present in a level");
+ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV, "the default player class to spawn when none is specified in a level");
 
-ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV);
-ConfigVar g_project_name("g_project_name", "CSREMAKE", CVAR_DEV);
+ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV, "the default gamemain class of the program");
+ConfigVar g_project_name("g_project_name", "CSREMAKE", CVAR_DEV, "the project name of the game, used for save file folders");
 
-ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, 0.0, 1.0);
-ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, 55.0, 110.0);
-ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL);
-ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, 0,2);
-ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL);
-ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL);
-ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL);
-ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, 0.01,10);
+ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
+ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 55.0, 110.0);
+ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL,"");
+ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER,"", 0, 2);
+ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL,"");
+ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL,"draw skeletons of active animated renderables");
+ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL,"draw a debug grid around the origin");
+ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01,10);
 
 // defualt sky material to use for editors like materials/models/etc.
-ConfigVar ed_default_sky_material("ed_default_sky_material", "hdriSky", CVAR_DEV);
+ConfigVar ed_default_sky_material("ed_default_sky_material", "hdriSky", CVAR_DEV, "default sky material used for editors");
 
-ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL);
+ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL, "draw the debug menu");
 
-ConfigVar g_window_w("vid.width","1200",CVAR_INTEGER,1,4000);
-ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, 1, 4000);
-ConfigVar g_window_fullscreen("vid.fullscreen", "0",CVAR_BOOL);
-ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,0,UINT16_MAX);
-ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV);
+ConfigVar g_window_w("vid.width","1200",CVAR_INTEGER,"",1,4000);
+ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, "",1, 4000);
+ConfigVar g_window_fullscreen("vid.fullscreen", "0",CVAR_BOOL,"");
+ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,"",0,UINT16_MAX);
+ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV,"");
 
+ConfigVar developer_mode("developer_mode", "0", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
 
 
 
@@ -1078,9 +1079,8 @@ void GameEngineLocal::execute_map_change()
 		on_map_change_callback(this_is_for_editor, levelLoaded);
 	}
 	else {
-		const std::string& fullpath = "./Data/" + queued_mapname;
 
-		GetAssets().find_async<Level>(fullpath, [this_is_for_editor](GenericAssetPtr ptr)
+		GetAssets().find_async<Level>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
 			{
 				auto level = ptr.cast_to<Level>();
 				if (level) {
@@ -1263,7 +1263,7 @@ Debug_Interface* Debug_Interface::get()
 	return &inst;
 }
 
-ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, 0.0001, 5.0);
+ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop",0.0001, 5.0);
 
 
 bool GameEngineLocal::is_drawing_to_window_viewport() const
@@ -1577,7 +1577,8 @@ void GameEngineLocal::init()
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
-	ImGui::GetIO().Fonts->AddFontFromFileTTF("./Data/Inconsolata-Bold.ttf", 14.0);
+	auto path = FileSys::get_full_path_from_game_path("Inconsolata-Bold.ttf");
+	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	ImGui::GetIO().Fonts->Build();
 
 	Cmd_Manager::get()->set_set_unknown_variables(true);
@@ -2013,4 +2014,37 @@ void Debug_Console::print(const char* fmt, ...)
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
 	va_end(args);
 	lines.push_back(buf);
+}
+
+ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "editor_cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
+
+DECLARE_ENGINE_CMD(dump_imgui_ini)
+{
+	if (args.size() != 2) {
+		sys_print("usage: dump_imgui_ini  ($g_editor_cfg_folder)/<file>");
+		return;
+	}
+
+	std::string relative = g_editor_cfg_folder.get_string();
+	relative += "/";
+	relative += args.at(1);
+
+	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);	// might change this to user dir
+
+	ImGui::SaveIniSettingsToDisk(path.c_str());
+}
+DECLARE_ENGINE_CMD(load_imgui_ini)
+{
+	if (args.size() != 2) {
+		sys_print("usage: load_imgui_ini ($g_editor_cfg_folder)/<file>");
+		return;
+	}
+
+	std::string relative = g_editor_cfg_folder.get_string();
+	relative += "/";
+	relative += args.at(1);
+
+	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);
+
+	ImGui::LoadIniSettingsFromDisk(path.c_str());
 }

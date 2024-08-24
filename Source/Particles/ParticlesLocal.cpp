@@ -16,10 +16,7 @@ class ParticleFXAssetMetadata : public AssetMetadata
 	virtual void index_assets(std::vector<std::string>& filepaths) const override
 	{
 	}
-	virtual std::string root_filepath() const override
-	{
-		return "";
-	}
+
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &ParticleFXAsset::StaticType; }
 };
 

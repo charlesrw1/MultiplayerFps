@@ -39,3 +39,5 @@ FONT_TEST
 ui.debug_press 1
 
 #r.debug_specular 1
+
+RUN_TESTS

@@ -130,7 +130,7 @@ void RemoteClient::Update()
 	writer.WriteLong(eng->get_game_tick());
 
 	writer.WriteByte(SV_SNAPSHOT);
-	static ConfigVar never_delta("sv.never_delta", "0",CVAR_BOOL|CVAR_DEV);
+	static ConfigVar never_delta("sv.never_delta", "0",CVAR_BOOL|CVAR_DEV, "");
 
 	int delta_frame = (never_delta.get_bool()) ? -1 : baseline;
 	myserver->write_delta_entities_to_client(writer, delta_frame, client_num);

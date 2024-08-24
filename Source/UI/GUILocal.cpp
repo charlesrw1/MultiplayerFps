@@ -16,8 +16,8 @@ CLASS_IMPL(GUIFullscreen);
 CLASS_IMPL(GUIButton);
 CLASS_IMPL(GUIText);
 CLASS_IMPL(GUIVerticalBox);
-ConfigVar ui_debug_press("ui.debug_press", "0", CVAR_BOOL | CVAR_DEV);
-ConfigVar ui_draw_text_bbox("ui.draw_text_bbox", "0", CVAR_BOOL | CVAR_DEV);
+ConfigVar ui_debug_press("ui.debug_press", "0", CVAR_BOOL | CVAR_DEV,"");
+ConfigVar ui_draw_text_bbox("ui.draw_text_bbox", "0", CVAR_BOOL | CVAR_DEV,"");
 
 struct UIBuilderImpl
 {

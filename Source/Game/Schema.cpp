@@ -7,7 +7,6 @@
 #include "Assets/AssetRegistry.h"
 #include "Level.h"
 
-static const char* schema_base = "./Data/Schema/";
 
 CLASS_IMPL(Schema);
 
@@ -22,7 +21,6 @@ public:
 
 	virtual void index_assets(std::vector<std::string>& filepaths) const {}
 	// return the base filepath for indexed assets, like ./Data/Models
-	virtual std::string root_filepath() const { return "./Data/Schema"; }
 	virtual bool assets_are_filepaths() const { return true; }
 	virtual IEditorTool* tool_to_edit_me() const { 
 		return g_editor_doc; 
@@ -38,8 +36,8 @@ REGISTER_ASSETMETADATA_MACRO(SchemaAssetMetadata);
 
 bool Schema::load_asset(ClassBase*&)
 {
-	std::string path = schema_base + path;
-	auto file = FileSys::open_read(path.c_str());
+	std::string path = get_name();
+	auto file = FileSys::open_read_game(path.c_str());
 	if (!file)
 		return false;
 

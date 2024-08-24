@@ -256,22 +256,6 @@ void AnimationGraphEditor::close_internal()
 
 static std::string saved_settings = "";
 
-DECLARE_ENGINE_CMD(dump_imgui_ini)
-{
-	if (args.size() != 2) {
-		sys_print("usage: dump_imgui_ini <file>");
-		return;
-	}
-	ImGui::SaveIniSettingsToDisk(args.at(1));
-}
-DECLARE_ENGINE_CMD(load_imgui_ini)
-{
-	if (args.size() != 2) {
-		sys_print("usage: load_imgui_ini <file>");
-		return;
-	}
-	ImGui::LoadIniSettingsFromDisk(args.at(1));
-}
 
 static Color32 to_color32(glm::vec4 v) {
 	Color32 c;
@@ -474,9 +458,9 @@ bool AnimationGraphEditor::save_document_internal()
 	editing_tree->write_to_dict(write);
 	save_editor_nodes(write);
 
-	std::ofstream outfile("./Data/" + get_doc_name());
-	outfile.write(write.get_output().c_str(), write.get_output().size());
-	outfile.close();
+	auto outfile = FileSys::open_write_game(get_doc_name());
+	outfile->write(write.get_output().c_str(), write.get_output().size());
+	outfile->close();
 
 	// now the graph is in a compilied state with serialized nodes, unserialize it so it works again
 	// with the engine
@@ -1768,8 +1752,8 @@ void AnimationGraphEditor::post_map_load_callback()
 
 		if (editing_tree) {
 			DictParser parser;
-			auto editorFilePath = "./Data/"+std::string(name) + "_e";
-			auto file = FileSys::open_read_os(editorFilePath.c_str());
+			auto editorFilePath = std::string(name) + "_e";
+			auto file = FileSys::open_read_game(editorFilePath);
 			if (file) {
 				parser.load_from_file(file.get());
 				bool good = load_editor_nodes(parser);

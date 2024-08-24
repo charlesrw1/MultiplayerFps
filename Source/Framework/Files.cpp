@@ -1,3 +1,5 @@
+
+
 #include "Framework/Util.h"
 #include <unordered_map>
 #include <string>
@@ -7,6 +9,10 @@
 #include "Framework/BinaryReadWrite.h"
 #include <fstream>
 #include <direct.h>
+#include "Config.h"
+
+static ConfigVar g_project_base("g_project_base", "gamedat", CVAR_DEV, "what folder to search for assets in");
+static ConfigVar g_user_save_dir("g_user_save_dir", "user", CVAR_DEV, "what folder to save user config/settings to");
 
 class OSFile : public IFile
 {
@@ -17,9 +23,12 @@ public:
 
 	void init(const char* path) {
 		winhandle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-		if (winhandle!= INVALID_HANDLE_VALUE) {
-			len =GetFileSize(winhandle, nullptr);
+		if (winhandle != INVALID_HANDLE_VALUE) {
+			len = GetFileSize(winhandle, nullptr);
 		}
+	}
+	void init_write(const char* path) {
+		winhandle = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	}
 
 	// Inherited via IFile
@@ -60,6 +69,11 @@ public:
 		GetFileTime(winhandle, nullptr, nullptr, &ft);
 		return (uint64_t)ft.dwLowDateTime | ((uint64_t)ft.dwHighDateTime << 32);
 	}
+	bool write(const void* data, size_t size) override {
+		bool good = WriteFile(winhandle, data, size, nullptr, nullptr);
+		return good;
+	}
+
 	bool handle_is_valid() const { return winhandle != INVALID_HANDLE_VALUE; }
 	bool eof_triggered = false;
 	size_t len = 0;
@@ -67,34 +81,78 @@ public:
 };
 
 
-struct ArchiveFiles
+// a basic archive file
+struct OneArchiveFile
 {
 	uint32_t data_offset = 0;
 	uint32_t data_len = 0;
 	uint32_t uncompressed_size = 0;
 };
-
-class Archive
+class ArchiveFile
 {
 public:
-	~Archive() {
+	~ArchiveFile() {
 	}
 
 	bool open(const char* file);
 
 	IFilePtr file = nullptr;
-	std::unordered_map<std::string, ArchiveFiles> hash_to_index;
+	std::unordered_map<std::string, OneArchiveFile> hash_to_index;
 };
 
-
-bool Archive::open(const char* archive_path)
+class PackagedFile : public IFile
 {
-	file = FileSys::open_read_os(archive_path);
+
+public:
+
+	bool handle_is_valid() const { return self; }
+
+	void seek(size_t ofs) override
+	{
+		parentFile->file->seek(self->data_offset + ofs);
+	}
+	size_t tell() const override
+	{
+		return parentFile->file->tell() - self->data_offset;
+	}
+
+	bool write(const void* data, size_t size) override {
+		assert(0);
+		Fatalf("cant write to packaged file\n");
+		return false;
+	}
+
+	bool is_eof() const override
+	{
+		return eof_triggered;
+	}
+
+	size_t size() const override {
+		return self->data_len;
+	}
+	void close() override
+	{
+
+	}
+	void read(void* dest, size_t count) override
+	{
+		parentFile->file->read(dest, count);
+	}
+
+	bool eof_triggered = false;
+	size_t ptr = 0;
+	OneArchiveFile* self = nullptr;
+	ArchiveFile* parentFile = nullptr;
+};
+
+bool ArchiveFile::open(const char* archive_path)
+{
+	///file = FileSys::open_read(archive_path);
+
 	if (!file) {
 		sys_print("!!! couldn't open archive file %s\n", archive_path);
 		return false;
 	}
-
 
 	char magic[4];
 	file->read(magic, 4);
@@ -133,19 +191,67 @@ bool Archive::open(const char* archive_path)
 
 }
 
-IFilePtr FileSys::open_read(const char* p, int flags)
+IFilePtr open_read_dir(const std::string& root, const std::string& relative)
 {
+	auto fullpath = root + "/" + relative;
 	OSFile* file = new OSFile;
-	file->init(p);
-
-	if (!file->handle_is_valid()) {
-		delete file;
-		return nullptr;
-	}
-
-	return IFilePtr(file);
+	file->init(fullpath.c_str());
+	if (file->handle_is_valid())
+		return IFilePtr(file);
+	delete file;
+	return nullptr;
+}
+IFilePtr open_write_dir(const std::string& root, const std::string& relative)
+{
+	auto fullpath = root + "/" + relative;
+	OSFile* file = new OSFile;
+	file->init_write(fullpath.c_str());
+	if (file->handle_is_valid())
+		return IFilePtr(file);
+	delete file;
+	return nullptr;
 }
 
+IFilePtr FileSys::open_read(const char* p, WhereEnum flags)
+{
+
+	if (flags == FileSys::USER_DIR) {
+		return open_read_dir(g_user_save_dir.get_string(), p);
+	}
+	else if (flags == FileSys::GAME_DIR) {
+		return open_read_dir(g_project_base.get_string(), p);
+	}
+	else if (flags == FileSys::ENGINE_DIR) {
+		return open_read_dir(".", p);
+	}
+	assert(0);
+
+	return nullptr;
+}
+IFilePtr FileSys::open_write(const char* relative_path, WhereEnum where)
+{
+	if (where == FileSys::USER_DIR) {
+		return open_write_dir(g_user_save_dir.get_string(), relative_path);
+	}
+	else if (where == FileSys::GAME_DIR) {
+		return open_write_dir(g_project_base.get_string(), relative_path);
+	}
+	else if (where == FileSys::ENGINE_DIR) {
+		return open_write_dir(".", relative_path);
+	}
+	assert(0);
+
+	return nullptr;
+}
+const char* FileSys::get_path(WhereEnum where)
+{
+	if (where == USER_DIR)
+		return g_user_save_dir.get_string();
+	else if (where == GAME_DIR)
+		return g_project_base.get_string();
+	else if (where == ENGINE_DIR)
+		return ".";
+}
 
 void FileSys::init()
 {
@@ -161,7 +267,7 @@ void FileSys::init()
 		auto find = path.rfind('\\');
 		if (find == std::string::npos)
 			Fatalf("!!! bad getmodulefilename\n");
-		path = path.substr(0,find);
+		path = path.substr(0, find);
 		path += "\\..\\..\\";
 		int ret = _chdir(path.c_str());
 		if (ret != 0)
@@ -260,7 +366,7 @@ FileTreeIter::FileTreeIter()
 	ptr = std::make_unique<FileTreeIterator>();
 }
 
- FileTreeIter::FileTreeIter(FileTreeIter&& other) {
+FileTreeIter::FileTreeIter(FileTreeIter&& other) {
 	ptr = std::move(other.ptr);
 }
 

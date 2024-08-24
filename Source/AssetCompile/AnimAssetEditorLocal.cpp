@@ -211,11 +211,11 @@ void AnimationEditorTool::post_map_load_callback()
 
 	// try to find def_name
 	std::string def_name = modelName + ".mis";
-	std::string fullpath = "./Data/" + def_name;
-	auto file = FileSys::open_read_os(fullpath.c_str());
+
+	auto file = FileSys::open_read_game(def_name.c_str());
 
 	if (!file) {
-		sys_print("!!! AnimEditor: couldnt find path %s\n", fullpath.c_str());
+		sys_print("!!! AnimEditor: couldnt find path %s\n", def_name.c_str());
 	}
 	else {
 		DictParser dp;
@@ -299,15 +299,14 @@ bool AnimationEditorTool::save_document_internal()
 	std::string modelName = str.substr(0, slash);
 	std::string animName = str.substr(slash + 1);
 
-
-	std::string path = "./Data/" + modelName + ".mis";
-	std::ofstream outfile(path);
-	outfile.write(write.get_output().data(), write.get_output().size());
-	outfile.close();
-
+	{
+		auto outfile = FileSys::open_write_game(modelName + ".mis");
+		outfile->write(write.get_output().data(), write.get_output().size());
+	}
 
 	if (!outputModel) {
-		ModelCompilier::compile_from_settings(path.c_str(), importSettings);
+		auto fullpath = FileSys::get_game_path() + ("/" + modelName + ".mis");
+		ModelCompilier::compile_from_settings(fullpath.c_str(), importSettings);
 		outputModel = default_asset_load<Model>(get_doc_name());
 		int dummy;
 		sequence = outputModel->get_skel()->find_clip(animName, dummy);

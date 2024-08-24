@@ -74,7 +74,6 @@ bool IEditorTool::save()
 	return save_document_internal();
 }
 
-/* "./Data/Animations/Graphs/%s" */
 template<typename FUNCTOR>
 static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog)
 {
@@ -99,7 +98,7 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 
 	if (returned_true) {
 		const char* full_path = string_format("%s%s", path_prefix.c_str(), buffer);
-		bool file_already_exists = FileSys::does_os_file_exist(full_path);
+		bool file_already_exists = FileSys::does_file_exist(buffer,FileSys::GAME_DIR);
 		cant_open_path = false;
 		alread_exists = false;
 
@@ -187,12 +186,12 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 			}, prefix.c_str(), false);
 	}
 }
-/* "./Data/Animations/Graphs/"*/
+
 
 void IEditorTool::draw_imgui_public()
 {
 	imgui_draw();
-	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, "./Data/");
+	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, FileSys::get_game_path());
 }
 
 void IEditorTool::draw_menu_bar()
