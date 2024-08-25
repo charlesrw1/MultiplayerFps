@@ -131,8 +131,11 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 		device.selfHandle = { -1 };
 		SDL_GameControllerClose(device.devicePtr);
 		device.devicePtr = nullptr;
+		device.user = nullptr;
+
 		if (user) {
-			assert(device.user->assigned_device.id == wasId.id);
+			sys_print("*** user lost device\n");
+			assert(user->assigned_device.id == wasId.id);
 			device.user->assigned_device = { -1 };
 			user_lost_device.invoke(user);
 		}
@@ -189,7 +192,7 @@ float sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device)
 	else if (b <= GlobalInputBinding::ControllerAxisEnd) {
 		int index = (int)b - (int)GlobalInputBinding::ControllerAxisStart;
 		int16_t state = SDL_GameControllerGetAxis(device->devicePtr, (SDL_GameControllerAxis)index);
-		return glm::clamp((double)state / INT16_MAX,0.0,1.0);
+		return glm::clamp((double)state / INT16_MAX,-1.0,1.0);
 	}
 
 }
@@ -205,19 +208,20 @@ void GameInputSystem::tick_users(float dt)
 		assert(device);
 		const auto myType = device->type;
 
-		for (auto bindAndCallback : u->trackedActions) {
+		for (auto& bindAndCallback : u->trackedActions) {
 			auto action = bindAndCallback.first;
-			auto callbacks = bindAndCallback.second;
+			auto& callbacks = bindAndCallback.second;
 			if (!callbacks.isEnabled) continue;
 
 			InputValue deviceValue = {};
 			for (int b = 0; b < action->binds.size(); b++) {
 				auto& bind = action->binds[b];
-				if (get_device_type_for_keybind(bind.currentBinding) != myType)
+				auto binding = (bind.currentBinding == GlobalInputBinding::Empty) ? bind.defaultBinding : bind.currentBinding;
+				if (get_device_type_for_keybind(binding) != myType)
 					continue;
 				
 				InputValue rawValue;
-				rawValue.v.x = sample_device_value_for_binding(bind.currentBinding, device);
+				rawValue.v.x = sample_device_value_for_binding(binding, device);
 				if (bind.modifier)
 					rawValue = bind.modifier->modify(rawValue, dt);
 				
@@ -229,7 +233,7 @@ void GameInputSystem::tick_users(float dt)
 						(*callbacks.triggeredCallback)();
 					if (isActive && !callbacks.isActive && callbacks.startCallback)
 						(*callbacks.startCallback)();
-					else if(isActive&&callbacks.isActive&&callbacks.activeCallback)
+					else if (isActive && callbacks.isActive && callbacks.activeCallback)
 						(*callbacks.activeCallback)();
 					if (!isActive && callbacks.isActive && callbacks.endCallback)
 						(*callbacks.endCallback)();
@@ -240,6 +244,7 @@ void GameInputSystem::tick_users(float dt)
 						callbacks.activeDuration = 0.0;
 				}
 
+
 				if (action->isAdditive)
 					deviceValue.v += rawValue.v;
 				else
@@ -248,4 +253,27 @@ void GameInputSystem::tick_users(float dt)
 			callbacks.state = deviceValue;
 		}
 	}
+}
+
+void GameInputSystem::set_my_device(InputUser* u, handle<InputDevice> handle)
+{
+	if (u->assigned_device.id == handle.id)
+		return;
+	if (u->assigned_device.is_valid()) {
+		auto device = (InputDevice*)get_device(u->assigned_device);
+		assert(device->user == u);
+		device->user = nullptr;
+
+	}
+	if (!handle.is_valid())
+		return;
+
+	auto device = (InputDevice*)get_device(handle);
+	if (device->user) {
+		sys_print("??? stealing a device from another inputuser\n");
+		device->user->assigned_device = { -1 };
+		device->user = nullptr;
+	}
+	device->user = u;
+	u->assigned_device = device->selfHandle;
 }

@@ -6,12 +6,127 @@ static uint32_t color32_to_uint(Color32 color) {
 	return *(uint32_t*)&color;
 }
 
+IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask);
+
+class UniquePtrRow : public IGridRow
+{
+public:
+	UniquePtrRow(IGridRow* parent, void* instance, PropertyInfo* info, int row_idx, uint32_t prop_flag_mask) : IGridRow(parent, row_idx) {
+		assert(info->type == core_type_id::StdUniquePtr);
+		flagmask = prop_flag_mask;
+		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(instance);
+
+		add_children(*uniquePtr);
+		type_of_base = ClassBase::find_class(info->range_hint);
+		this->info = info;
+		this->inst = instance;
+	}
+	bool internal_update() override {
+		auto classroot = info->range_hint;
+
+		if (!type_of_base) {
+			ImGui::Text("Couldnt find base class: %s\n", info->range_hint);
+			return false;
+		}
+		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(inst);
+		bool has_update = false;
+		const ClassTypeInfo* thisType = (*uniquePtr) ? &(*uniquePtr)->get_type() : nullptr;
+		const char* preview = (thisType) ? thisType->classname : "<empty>";
+
+		if (ImGui::BeginCombo("##combocalsstype", preview)) {
+			auto subclasses = ClassBase::get_subclasses(type_of_base);
+			if (ImGui::Selectable("<empty>", !(*uniquePtr))) {
+				thisType = nullptr;
+				has_update = true;
+			}
+			for (; !subclasses.is_end(); subclasses.next()) {
+
+				if (subclasses.get_type()->allocate) {
+					if (ImGui::Selectable(subclasses.get_type()->classname,
+						subclasses.get_type() == thisType
+					)) {
+						thisType = subclasses.get_type();
+						has_update = true;
+					}
+				}
+
+			}
+			ImGui::EndCombo();
+		}
+
+		if (has_update) {
+			delete* uniquePtr;
+			*uniquePtr = nullptr;
+			if (thisType) {
+				assert(thisType->allocate);
+				*uniquePtr = thisType->allocate();
+			}
+			
+			add_children(*uniquePtr);
+		}
+
+		return has_update;
+
+	}
+	void draw_header(float header_ofs) override {
+		ImGui::Dummy(ImVec2(header_ofs, 0));
+		ImGui::SameLine();
+
+
+		ImGui::PushStyleColor(ImGuiCol_Header, 0);
+		ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5, 1, 0.3, 1));
+		{
+
+			uint32_t flags = ImGuiTreeNodeFlags_DefaultOpen;
+
+			expanded = ImGui::TreeNodeEx(info->name, flags);
+			if (expanded)
+				ImGui::TreePop();
+		}
+		ImGui::PopStyleColor(4);
+	}
+	void add_children(ClassBase* b) {
+		child_rows.clear();
+
+		if (!b)
+			return;
+
+		auto prop_list = b->get_type().props;
+		if (!prop_list)
+			return;
+
+		for (int i = 0; i < prop_list->count; i++) {
+			auto& prop = prop_list->list[i];
+			if (!prop.can_edit())
+				continue;
+			bool passed_mask_check = (prop.flags & flagmask) != 0;
+			if (!passed_mask_check)
+				continue;
+
+			auto row = create_row(this, &prop, b, -1, flagmask);
+			if (row)
+				child_rows.push_back(std::unique_ptr<IGridRow>(row));
+		}
+	}
+	uint32_t flagmask = 0;
+	void* inst = nullptr;
+	PropertyInfo* info = nullptr;
+	const ClassTypeInfo* type_of_base = nullptr;
+};
+
+
 
 static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask)
 {
 	if (prop->type == core_type_id::List) {
 		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop, row_idx, property_flag_mask);
 		return array_;
+	}
+	else if (prop->type == core_type_id::StdUniquePtr) {
+		auto row = new UniquePtrRow(nullptr, inst, prop, row_idx, property_flag_mask);
+		return row;
 	}
 	else {
 		PropertyRow* prop_ = new PropertyRow(nullptr, inst, prop, row_idx);

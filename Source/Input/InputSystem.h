@@ -45,6 +45,8 @@ public:
 	// get the internal device ptr
 	const InputDevice* get_device(handle<InputDevice> handle);
 
+	void set_my_device(InputUser* user, handle<InputDevice> handle);
+
 	// called when an InputUser's device was disconnected
 	MulticastDelegate<InputUser*> user_lost_device;
 	// called when a device gained/lost connection (controllers)

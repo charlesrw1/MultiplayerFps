@@ -814,5 +814,6 @@
     <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Test\Test.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
+    <ClCompile Include="Source\Input\InputAction.cpp" />
   </ItemGroup>
 </Project>

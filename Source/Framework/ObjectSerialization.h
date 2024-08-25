@@ -27,6 +27,12 @@ inline void write_object_properties(
 	DictWriter& out
 )
 {
+	if (!obj) {
+		out.write_item_start();
+		out.write_item_end();
+		return;
+	}
+
 	std::vector<PropertyListInstancePair> props;
 	const ClassTypeInfo* typeinfo = &obj->get_type();
 	while (typeinfo) {
@@ -59,7 +65,7 @@ inline BASE* read_object_properties(
 	if (!in.check_item_start(tok))
 		return nullptr;
 	in.read_string(tok);
-	if (!tok.cmp("type"))
+	if (!tok.cmp("type"))	// if the item is SUPPOSED to be nullptr, then that occurs here (as it will be a cmp with '}')
 		return nullptr;
 	in.read_string(tok);
 	BASE* obj = ClassBase::create_class<BASE>(tok.to_stack_string().c_str());

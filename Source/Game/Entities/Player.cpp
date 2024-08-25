@@ -614,14 +614,15 @@ void Player::find_a_spawn_point()
 void Player::set_input_command(Move_Command newcmd) {
 	this->cmd = newcmd;
 }
+#include "Input/InputSystem.h"
+#include "Input/InputAction.h"
 
-
-void Player::update()
+struct PlayerActions
 {
-	move();
-
-	//set_ws_transform(position, glm::quat(rotation), scale);
-}
+	unique_ptr<InputAction> move;
+	unique_ptr<InputAction> jump;
+	unique_ptr<InputAction> reload;
+};
 
 glm::vec3 Player::calc_eye_position()
 {
@@ -970,20 +971,107 @@ public:
 };
 CLASS_IMPL(HealthComponent);
 
-#include "Input/InputSystem.h"
-#include "Input/InputAction.h"
+CLASS_H(HoldTrigger, Trigger)
+public:
+	TriggerMask check_trigger(InputValue value, float dt) const override {
+		auto val = (value.get_value<float>() > 0.5) ? TriggerMask::Active : TriggerMask();
+		return val;
+	}
+	static const PropertyInfoList* get_props() {
+		START_PROPS(HoldTrigger)
+			REG_FLOAT(value,PROP_DEFAULT,"0.5")
+		END_PROPS(HoldTrigger)
+	}
+
+	float value = 0.5;
+};
+CLASS_IMPL(HoldTrigger);
+
+void Player::on_jump_callback()
+{
+	static int i = 0;
+	sys_print("jump %d\n",i++);
+}
+
+
+void Player::update()
+{
+	move();
+
+	glm::vec3 pos = root_component->get_ws_position();
+
+	auto f = inputPtr->get_value<glm::vec2>(actions->move.get());
+
+	pos.x += f.x * eng->get_tick_interval();
+
+	set_ws_position(pos);
+}
+
 
  void Player::start()  {
+
+
+
 	 hud = std::make_unique<PlayerHUD>(this);
 
 	 score_update_delegate.invoke(10);
 
 	 eng->set_game_focused(true);
 
-	 inputPtr = GameInputSystem::get().register_input_user(0);
+	 inputPtr = GetGInput().register_input_user(0);
+
+	 {
+		 std::vector<const InputDevice*> devices;
+		 GetGInput().get_connected_devices(devices);
+		 int deviceIdx = 0;
+		 for (; deviceIdx < devices.size(); deviceIdx++) {
+			 if (devices[deviceIdx]->type == InputDeviceType::Controller) {
+				 inputPtr->assign_device(devices[deviceIdx]->selfHandle);
+				 break;
+			 }
+		 }
+		 if (deviceIdx == devices.size())
+			 inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
+
+		 GetGInput().device_connected.add(this, [&](handle<InputDevice> handle)
+			 {
+
+				 inputPtr->assign_device(handle);
+			 });
+
+		 GetGInput().user_lost_device.add(this, [&](InputUser* user)
+			 {
+				 if (user == inputPtr) {
+					 inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
+				 }
+			 });
+	 }
+
+	 actions = std::make_unique<PlayerActions>();
+	 actions->jump = std::make_unique<InputAction>();
+	 {
+		 InputAction::Binding b;
+		 b.defaultBinding = GlobalInputBinding((int)GlobalInputBinding::KeyboardStart + SDL_SCANCODE_SPACE);
+		 b.trigger = std::make_unique<HoldTrigger>();
+		 actions->jump->binds.push_back(std::move(b));
+	 }
+	 actions->move = std::make_unique<InputAction>();
+	 {
+		 InputAction::Binding b;
+		 b.defaultBinding = GlobalInputBinding((int)GlobalInputBinding::KeyboardStart + SDL_SCANCODE_W);
+		 actions->move->binds.push_back(std::move(b));
+		 b.defaultBinding = GlobalInputBinding((int)GlobalInputBinding::ControllerAxisStart + SDL_CONTROLLER_AXIS_LEFTY);
+		 actions->move->binds.push_back(std::move(b));
+	 }
+
+	 inputPtr->bind_function(actions->jump.get(), ActionStateCallback::OnStart, [&] {
+		 this->on_jump_callback();
+		});
 }
  void Player::end() {
 	 GameInputSystem::get().free_input_user(inputPtr);
+
+	 GetGInput().device_connected.remove(this);
  }
 
  Player::~Player() {

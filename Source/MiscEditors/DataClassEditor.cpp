@@ -19,6 +19,8 @@ bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini DataClassEditor.ini");
 
+	eng->leave_level();
+
 	// loading a file
 	if (has_extension(name, "dc")) {
 		const DataClass* dc = GetAssets().find_sync<DataClass>(name).get();
@@ -48,6 +50,7 @@ bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 			grid.add_property_list_to_grid(ti->props, editing_object);
 		ti = ti->super_typeinfo;
 	}
+	return true;
 }
 
 void DataClassEditor::close_internal()

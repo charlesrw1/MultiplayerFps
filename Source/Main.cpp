@@ -1310,7 +1310,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	}
 
 	// will only be true if in a tool state
-	if (is_drawing_to_window_viewport()) {
+	if (is_drawing_to_window_viewport() && eng->get_state()==Engine_State::Game) {
 
 		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 		if (scene_hovered)

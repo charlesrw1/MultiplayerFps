@@ -104,6 +104,7 @@ struct PlayerFlags
 class PlayerHUD;
 class HealthComponent;
 class InputUser;
+class PlayerActions;
 CLASS_H(Player, PlayerBase)
 public:
 
@@ -116,6 +117,7 @@ public:
 	HealthComponent* health{};
 
 	InputUser* inputPtr = nullptr;
+	unique_ptr<PlayerActions> actions;
 
 	EntityPtr<Entity> someEntity;
 
@@ -143,6 +145,8 @@ public:
 	void start() override;
 
 	void end() override;
+
+	void on_jump_callback();
 
 public:
 	glm::vec3 calc_eye_position();

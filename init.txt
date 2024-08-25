@@ -44,3 +44,5 @@ developer_mode 1
 file_print_all_openfile_fails 1
 
 RUN_TESTS
+
+start_ed DataClass InputAction
