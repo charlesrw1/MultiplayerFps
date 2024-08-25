@@ -15,6 +15,9 @@ GuiFontLoader g_fonts;
 class FontAssetMetadata : public AssetMetadata
 {
 public:
+	FontAssetMetadata() {
+		extensions.push_back("fnt");
+	}
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override
 	{
@@ -26,15 +29,6 @@ public:
 		return "Font";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override
-	{
-		auto find_tree = FileSys::find_game_files();
-		for (const auto file : find_tree) {
-			if (has_extension(file, "fnt")) {
-				filepaths.push_back(file);
-			}
-		}
-	}
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &GuiFont::StaticType; }
 };

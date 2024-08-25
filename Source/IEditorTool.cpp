@@ -97,7 +97,7 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 	}
 
 	if (returned_true) {
-		const char* full_path = string_format("%s%s", path_prefix.c_str(), buffer);
+		const char* full_path = string_format("%s/%s", path_prefix.c_str(), buffer);
 		bool file_already_exists = FileSys::does_file_exist(buffer,FileSys::GAME_DIR);
 		cant_open_path = false;
 		alread_exists = false;

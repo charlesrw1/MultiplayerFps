@@ -23,6 +23,11 @@
 class MapAssetMetadata : public AssetMetadata
 {
 public:
+	MapAssetMetadata() {
+		extensions.push_back("tmap");
+		extensions.push_back("bmap");
+	}
+
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color()  const override
 	{
@@ -34,14 +39,6 @@ public:
 		return "Map";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override
-	{
-		auto tree = FileSys::find_game_files();
-		for (auto file : tree) {
-			if(has_extension(file,"tmap")||has_extension(file,"bmap"))
-				filepaths.push_back(file);
-		}
-	}
 	virtual bool assets_are_filepaths()  const { return true; }
 
 	virtual IEditorTool* tool_to_edit_me() const { return g_editor_doc; }

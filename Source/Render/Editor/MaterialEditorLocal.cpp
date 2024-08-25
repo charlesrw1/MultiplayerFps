@@ -69,6 +69,9 @@ void MaterialEditorLocal::close_internal()
 #include <fstream>
 bool MaterialEditorLocal::save_document_internal()
 {
+	if (!dynamicMat || !dynamicMat->get_master_material())
+		return false;
+
 	std::string output;
 	output += "TYPE MaterialInstance\n";
 	output += "PARENT ";
@@ -124,7 +127,7 @@ bool MaterialEditorLocal::save_document_internal()
 		}
 	}
 
-	auto outfile = FileSys::open_write_game(get_doc_name() + ".mi");
+	auto outfile = FileSys::open_write_game(get_doc_name());
 	outfile->write(output.data(), output.size());
 	outfile->close();
 

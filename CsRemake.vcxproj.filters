@@ -540,6 +540,7 @@
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
+    <ClInclude Include="Source\Framework\Guid.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

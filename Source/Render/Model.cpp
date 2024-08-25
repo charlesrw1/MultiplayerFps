@@ -43,6 +43,10 @@ CLASS_IMPL(Model);
 class ModelAssetMetadata : public AssetMetadata
 {
 public:
+	ModelAssetMetadata() {
+		extensions.push_back("cmdl");
+		pre_compilied_extension ="mis" ;
+	}
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override
 	{
@@ -54,15 +58,6 @@ public:
 		return "Model";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override
-	{
-		auto find_tree = FileSys::find_game_files();
-		for (const auto file : find_tree) {
-			if (has_extension(file, "cmdl")) {
-				filepaths.push_back(file);	
-			}
-		}
-	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Model::StaticType; }

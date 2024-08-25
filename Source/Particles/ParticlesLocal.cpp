@@ -4,6 +4,10 @@
 
 class ParticleFXAssetMetadata : public AssetMetadata
 {
+public:
+	ParticleFXAssetMetadata() {
+		extensions.push_back("pfx");
+	}
 	// Inherited via AssetMetadata
 	virtual std::string get_type_name() const override
 	{
@@ -12,9 +16,6 @@ class ParticleFXAssetMetadata : public AssetMetadata
 	virtual Color32 get_browser_color() const override
 	{
 		return { 245, 186, 213 };
-	}
-	virtual void index_assets(std::vector<std::string>& filepaths) const override
-	{
 	}
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &ParticleFXAsset::StaticType; }

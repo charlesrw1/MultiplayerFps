@@ -16,6 +16,10 @@
 class AnimGraphAssetMeta : public AssetMetadata
 {
 public:
+	AnimGraphAssetMeta() {
+		extensions.push_back("ag");
+	}
+
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color()  const override
 	{
@@ -26,14 +30,7 @@ public:
 	{
 		return "AnimGraph";
 	}
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override
-	{
-		auto tree = FileSys::find_game_files();
-		for (auto file : tree) {
-			if(has_extension(file,"ag"))
-				filepaths.push_back(file);
-		}
-	}
+
 	virtual bool assets_are_filepaths() const { return true; }
 
 	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }

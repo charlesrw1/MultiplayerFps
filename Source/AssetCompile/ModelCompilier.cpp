@@ -830,8 +830,11 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		lodd.distance = is->lodScreenSpaceSizes[i];
 		mdd.loddefs.push_back(lodd);
 	}
-	for (int i = 0; i < is->myMaterials.size(); i++)
-		mdd.directMaterialSet.push_back(is->myMaterials.at(i).ptr ? is->myMaterials.at(i)->get_name() : "fallback");
+	for (int i = 0; i < is->myMaterials.size(); i++) {
+		auto mat = is->myMaterials.at(i).get_unsafe();
+
+		mdd.directMaterialSet.push_back((mat)?mat->get_name() : "fallback.mm");
+	}
 	mdd.keepbones = is->keepBones;
 	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {
 		auto& p = is->additionalAnimationGlbFiles[i];

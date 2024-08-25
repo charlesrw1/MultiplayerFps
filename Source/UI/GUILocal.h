@@ -38,7 +38,7 @@ public:
 		root = new GuiRootPanel;
 
 
-		ui_default = GetAssets().find_global_sync<MaterialInstance>("uiDefault").get();
+		ui_default = GetAssets().find_global_sync<MaterialInstance>("uiDefault.mm").get();
 		if (!ui_default)
 			Fatalf("Couldnt find default ui material");
 	}

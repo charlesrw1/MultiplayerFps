@@ -19,7 +19,6 @@ public:
 	// color of type in browser
 	virtual Color32 get_browser_color() const { return { 173, 88, 23 }; }
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const {}
 	// return the base filepath for indexed assets, like ./Data/Models
 	virtual bool assets_are_filepaths() const { return true; }
 	virtual IEditorTool* tool_to_edit_me() const { 

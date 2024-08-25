@@ -25,6 +25,14 @@ extern IEditorTool* g_texture_editor_tool;
 class TextureAssetMetadata : public AssetMetadata
 {
 public:
+	TextureAssetMetadata() {
+		extensions.push_back("dds");
+		extensions.push_back("hdr");
+
+		pre_compilied_extension = "tis";
+	}
+
+
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override
 	{
@@ -36,14 +44,8 @@ public:
 		return "Texture";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const override
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const override
 	{
-		auto find_tree = FileSys::find_game_files();
-		for (const auto file : find_tree) {
-
-			if (has_extension(file, "dds")||has_extension(file,"png")||has_extension(file,"hdr"))
-				filepaths.push_back(file);
-		}
 		filepaths.push_back("_white");
 		filepaths.push_back("_black");
 		filepaths.push_back("_flat_normal");

@@ -27,7 +27,7 @@ public:
 		return "EntityClass";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override {
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
 		auto subclasses = ClassBase::get_subclasses<Entity>();
 		for (; !subclasses.is_end(); subclasses.next()) {
 			if (subclasses.get_type()->allocate) {

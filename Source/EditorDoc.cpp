@@ -1334,9 +1334,22 @@ public:
 			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
 			ImGui::EndTooltip();
 
-			if (ImGui::GetIO().MouseClicked[0]) {
+
+			if (ImGui::GetIO().MouseDoubleClicked[0]) {
+				if (metadata->tool_to_edit_me()) {
+					std::string cmdstr = "start_ed ";
+					cmdstr += '"';
+					cmdstr += metadata->get_type_name();
+					cmdstr += '"';
+					cmdstr += " ";
+					cmdstr += '"';
+					cmdstr += asset_str.c_str();
+					cmdstr += '"';
+					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmdstr.c_str());
+				}
+			} else if (ImGui::GetIO().MouseClicked[0]) {
 				global_asset_browser.filter_all();
-				global_asset_browser.unset_filter(1<<metadata->self_index);
+				global_asset_browser.unset_filter(1 << metadata->self_index);
 			}
 		}
 		bool ret = false;

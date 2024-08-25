@@ -41,6 +41,7 @@ public:
 	bool double_clicked_selected = false;
 
 	AssetOnDisk drag_drop;
+	std::string all_lower_cast_filter_name;
 };
 
 extern AssetBrowser global_asset_browser;

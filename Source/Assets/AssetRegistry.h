@@ -15,9 +15,6 @@ public:
 	virtual std::string get_type_name() const = 0;
 	// color of type in browser
 	virtual Color32 get_browser_color() const = 0;
-	// append all filepaths/assets
-	// if its a filepath, dont append full relative path, use "($root_filepath()) + <appended string>" filepath
-	virtual void index_assets(std::vector<std::string>& filepaths) const = 0;
 
 	// if false, then asset names wont be treated like filepaths
 	virtual bool assets_are_filepaths() const { return true; }
@@ -28,6 +25,11 @@ public:
 	// return <AssetName>::StaticType
 	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
 
+	// fills extra assets
+	virtual void fill_extra_assets(std::vector<std::string>& out) const {}
+
+	std::vector<std::string> extensions; // "dds" "cmdl" (no period)
+	std::string pre_compilied_extension;
 	uint32_t self_index = 0;
 };
 
@@ -35,7 +37,6 @@ struct AssetOnDisk
 {
 	AssetMetadata* type = nullptr;
 	std::string filename;
-	size_t filesize = 0;
 };
 
 struct AssetFilesystemNode {
@@ -72,13 +73,16 @@ class AssetRegistrySystem
 public:
 	static AssetRegistrySystem& get();
 
+	void init();
+
 	void register_asset_type(AssetMetadata* metadata) {
 		metadata->self_index = all_assettypes.size();
 		all_assettypes.push_back(std::unique_ptr<AssetMetadata>(metadata));
 	}
 	void reindex_all_assets();
-	std::vector<AssetOnDisk>& get_all_assets() { return all_disk_assets; }
+
 	const std::vector<std::unique_ptr<AssetMetadata>>& get_types() { return all_assettypes; }
+
 	const AssetMetadata* find_type(const char* type_name) const {
 		for (auto& a : all_assettypes) {
 			if (a->get_type_name() == type_name) return a.get();
@@ -94,11 +98,10 @@ public:
 	}
 
 	AssetFilesystemNode* get_root_files() const { return root.get(); }
+
+	const ClassTypeInfo* find_asset_type_for_ext(const std::string& ext);
 private:
 	std::unique_ptr<AssetFilesystemNode> root;
-
-	size_t last_index_time = 0;
-	std::vector<AssetOnDisk> all_disk_assets;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;
 };
 

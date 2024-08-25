@@ -18,14 +18,24 @@ void AssetBrowser::init()
 
 static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node)
 {
+	const int name_filter_len = strlen(b->asset_name_filter);
 	for (auto n : node->children)
 	{
 		// leaf node
 		if (n.second->children.empty()) {
 			auto& asset = n.second->asset;
-
 			if (!b->should_type_show(1 << asset.type->self_index)) {
 				continue;
+			}
+			if (!b->filter_match_case && name_filter_len > 0) {
+				std::string path = asset.filename;
+				for (int i = 0; i < path.size(); i++) path[i] = tolower(path[i]);
+				if (path.find(b->all_lower_cast_filter_name, 0) == std::string::npos)
+					continue;
+			}
+			else if (name_filter_len > 0) {
+				if (asset.filename.find(b->asset_name_filter) == std::string::npos)
+					continue;
 			}
 
 			ImGui::PushID(n.second);
@@ -107,28 +117,6 @@ static void draw_browser_tree_view(AssetBrowser* b)
 		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
 
-		auto& resources = AssetRegistrySystem::get().get_all_assets();
-		if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs())
-			if (sorts_specs->SpecsDirty)
-			{
-
-				std::sort(resources.begin(), resources.end(),
-					[&](const AssetOnDisk& a, const AssetOnDisk& b) -> bool {
-						if (sorts_specs->Specs[0].ColumnIndex == 0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
-							return to_lower(a.filename) > to_lower(b.filename);
-						else if (sorts_specs->Specs[0].ColumnIndex == 0 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
-							return to_lower(a.filename) < to_lower(b.filename);
-						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Ascending)
-							return to_lower(a.type->get_type_name()) > to_lower(b.type->get_type_name());
-						else if (sorts_specs->Specs[0].ColumnIndex == 1 && sorts_specs->Specs[0].SortDirection == ImGuiSortDirection_Descending)
-							return to_lower(a.type->get_type_name()) < to_lower(b.type->get_type_name());
-						return true;
-					}
-				);
-				sorts_specs->SpecsDirty = false;
-			}
-
-
 		ImGui::TableHeadersRow();
 
 		
@@ -163,6 +151,7 @@ void AssetBrowser::imgui_draw()
 	ImGui::SameLine();
 	ImGui::Checkbox("MATCH CASE", &match_case);
 	const int name_filter_len = strlen(asset_name_filter);
+	filter_match_case = match_case;
 
 	if (show_filter_type_options && ImGui::SmallButton("Type filters..."))
 		ImGui::OpenPopup("type_popup_assets");
@@ -184,7 +173,7 @@ void AssetBrowser::imgui_draw()
 	}
 
 
-	std::string all_lower_cast_filter_name;
+
 	if (!match_case) {
 		all_lower_cast_filter_name = asset_name_filter;
 		for (int i = 0; i < name_filter_len; i++)
@@ -310,9 +299,5 @@ DECLARE_ENGINE_CMD(FILTER_FOR)
 	}
 	global_asset_browser.filter_all();
 	global_asset_browser.unset_filter(1<<type->self_index);
-
-}
-DECLARE_ENGINE_CMD(FOCUS_ASSET_FILTER)
-{
 
 }

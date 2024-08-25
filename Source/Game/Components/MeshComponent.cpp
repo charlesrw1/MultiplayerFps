@@ -103,8 +103,11 @@ void MeshComponent::on_init()
 	draw_handle = idraw->get_scene()->register_obj();
 	physActor = g_physics->allocate_physics_actor(this);
 	
-	if (model.get()) {
-		if (model->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
+	if (model.get()||model.did_fail()) {
+
+		auto modToUse = (model.did_fail()) ? mods.get_error_model() : model.get();
+
+		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
 			assert(animator_tree->get_script());
 			assert(animator_tree->get_script()->get_native_class());
 			assert(animator_tree->get_script()->get_native_class()->allocate);
@@ -113,7 +116,7 @@ void MeshComponent::on_init()
 			assert(c->is_a<AnimatorInstance>());
 			animator.reset(c->cast_to<AnimatorInstance>());
 
-			bool good = animator->initialize_animator(model.get(), animator_tree.get(), get_owner());
+			bool good = animator->initialize_animator(modToUse, animator_tree.get(), get_owner());
 			if (!good) {
 				sys_print("!!! couldnt initialize animator\n");
 				animator.reset(nullptr);	// free animator
@@ -122,7 +125,7 @@ void MeshComponent::on_init()
 		}
 
 		Render_Object obj;
-		obj.model = model.get();
+		obj.model = modToUse;
 		obj.visible = visible;
 		obj.transform = get_ws_transform();
 		obj.owner = this;
@@ -137,7 +140,7 @@ void MeshComponent::on_init()
 		physActor->init_physics_shape(nullptr, get_ws_transform(), 
 			simulate_physics && !eng->is_editor_level(), 
 			sendOverlap, sendHit, isStatic, isTrigger, false);
-		physActor->add_model_shape_to_actor(model.get());
+		physActor->add_model_shape_to_actor(modToUse);
 		physActor->update_mass();
 	}
 }

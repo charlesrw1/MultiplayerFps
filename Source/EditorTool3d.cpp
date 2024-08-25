@@ -49,7 +49,7 @@ void EditorTool3d::map_callback(bool b)
 	auto plane = eng->spawn_entity_class<StaticMeshEntity>();
 	plane->Mesh->set_model(mods.get_default_plane_model());
 	plane->set_ws_transform({}, {}, glm::vec3(20.f));
-	plane->Mesh->set_material_override((GetAssets().find_sync<MaterialInstance>("defaultWhite").get()));
+	plane->Mesh->set_material_override((GetAssets().find_sync<MaterialInstance>("defaultWhite.mi").get()));
 
 	auto sun = eng->spawn_entity_class<SunLightEntity>();
 	sun->Sun->intensity = 3.0;

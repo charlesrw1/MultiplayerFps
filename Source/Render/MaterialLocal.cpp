@@ -30,17 +30,15 @@ CLASS_IMPL(MaterialParameterBuffer);
 class MaterialAssetMetadata : public AssetMetadata
 {
 public:
+	MaterialAssetMetadata() {
+		extensions.push_back("mi");
+		extensions.push_back("mm");
+	}
+
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color()  const override { return { 219, 189, 68 }; }
 	virtual std::string get_type_name()  const override { return "Material"; }
-	virtual void index_assets(std::vector<std::string>& filepaths)  const override
-	{
-		auto tree = FileSys::find_game_files();
-		for (auto file : tree) {
-			if(has_extension(file,"mi")||has_extension(file,"mm"))
-				filepaths.push_back(strip_extension(file));
-		}
-	}
+
 	virtual bool assets_are_filepaths() const override { return true; }
 
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
@@ -76,7 +74,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	// FIXME: make this faster
 
 	std::string name = FileSys::get_game_path() + ("/"  + mat->get_name());
-//	name = strip_extension(name);
+	name = strip_extension(name);
 	name += "_shader.glsl";
 
 	std::string params;
@@ -198,8 +196,7 @@ bool MaterialImpl::load_master(MaterialInstance* self, IFile* file)
 {
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
-	std::string findname = self->get_name() + ".mm";
-	bool good = masterImpl->load_from_file(findname, file);
+	bool good = masterImpl->load_from_file(self->get_name(), file);
 	if (!good) 
 		return false;
 	
@@ -310,17 +307,23 @@ bool MaterialImpl::load_from_file(MaterialInstance* self, const std::string& ful
 {
 	const auto& name = self->get_name();
 	// try to find master file
-	std::string findname = name + ".mm";
-	auto file = FileSys::open_read_game(findname.c_str());
-	if (file) {
-		return load_master(self, file.get());
+	try {
+		if (has_extension(name, "mm")) {
+			auto file = FileSys::open_read_game(name.c_str());
+			if (file) {
+				return load_master(self, file.get());
+			}
+		}
+		else {
+			auto file = FileSys::open_read_game(name.c_str());
+			if (file) {
+				return load_instance(self, file.get());
+			}
+		}
 	}
-	findname =  name + ".mi";
-	file = FileSys::open_read_game(findname.c_str());
-	if (file) {
-		return load_instance(self,file.get());
+	catch (MasterMaterialExcept exppt) {
+		sys_print("!!! error loading material: %s\n", exppt.what());
 	}
-
 	return false;
 
 
@@ -718,15 +721,15 @@ void MaterialManagerLocal::init() {
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
-	fallback = GetAssets().find_global_sync<MaterialInstance>("fallback").get();
+	fallback = GetAssets().find_global_sync<MaterialInstance>("fallback.mm").get();
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
 
-	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("billboardDefault").get();
+	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("billboardDefault.mm").get();
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 
-	PPeditorSelectMat = GetAssets().find_global_sync<MaterialInstance>("defaultEditorSelect").get();
+	PPeditorSelectMat = GetAssets().find_global_sync<MaterialInstance>("defaultEditorSelect.mm").get();
 	if (!PPeditorSelectMat)
 		Fatalf("couldnt load the default editor select material\n");
 }

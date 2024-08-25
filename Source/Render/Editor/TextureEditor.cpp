@@ -2,13 +2,11 @@
 #include "Framework/Config.h"
 
 #include <Windows.h>
-
+#include <unordered_set>
 static TextureEditorTool s_texture_editor_tool;
 IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
 
 CLASS_IMPL(TextureImportSettings);
-
-
 
 
 DECLARE_ENGINE_CMD(IMPORT_TEX)
@@ -33,6 +31,47 @@ DECLARE_ENGINE_CMD(IMPORT_TEX)
 
 	compile_texture_asset(strip_extension(gamepath) + ".dds");
 }
+#include "AssetCompile/Someutils.h"
+DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
+{
+	if (args.size() != 2) {
+		sys_print("!!! usage IMPORT_TEX_FOLDER <folder>");
+		return;
+	}
+
+	std::unordered_set<std::string> tis_files;
+	std::unordered_set<std::string> png_files;
+	for (auto file : FileSys::find_game_files_path(args.at(1))) {
+		if (get_extension_no_dot(file) == "tis")
+			tis_files.insert(file);
+		else if (get_extension_no_dot(file) == "png")
+			png_files.insert(file);
+	}
+	for (auto png_f : png_files) {
+		auto tis = strip_extension(png_f) + ".tis";
+		if (tis_files.find(tis) == tis_files.end()) {
+
+			auto gamepath = FileSys::get_game_path_from_full_path(png_f);
+
+			TextureImportSettings tis;
+			auto findSlash = gamepath.rfind('/');
+			tis.src_file = gamepath;
+			if (findSlash != std::string::npos)
+				tis.src_file = gamepath.substr(findSlash + 1);
+
+			DictWriter out;
+			write_object_properties(&tis, nullptr, out);
+			auto outfile = FileSys::open_write_game(strip_extension(gamepath) + ".tis");
+			assert(outfile);
+			outfile->write(out.get_output().data(), out.get_output().size());
+			outfile->close();
+
+			compile_texture_asset(strip_extension(gamepath) + ".dds");
+
+		}
+	}
+}
+
 
 DECLARE_ENGINE_CMD(COMPILE_TEX)
 {
@@ -48,27 +87,30 @@ bool compile_texture_asset(const std::string& gamepath)
 {
 #ifdef WITH_TEXTURE_COMPILE
 	sys_print("*** Compiling texture asset %s\n", gamepath.c_str());
-	auto texfile = FileSys::open_read_game(gamepath);
-	auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
-	if (!tisfile) {
-		sys_print("!!! couldn't find texture import settings file\n");
-		return false;
-	}
-	bool needsCompile = texfile == nullptr;
-	if (!needsCompile) {
-		needsCompile = texfile->get_timestamp() < tisfile->get_timestamp();
-	}
-	if (!needsCompile) {
-		sys_print("*** skipping compile\n");
-		return true;
-	}
+	TextureImportSettings* tis = nullptr;
+	{
+		auto texfile = FileSys::open_read_game(gamepath);
+		auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
+		if (!tisfile) {
+			sys_print("!!! couldn't find texture import settings file\n");
+			return false;
+		}
+		bool needsCompile = texfile == nullptr;
+		if (!needsCompile) {
+			needsCompile = texfile->get_timestamp() < tisfile->get_timestamp();
+		}
+		if (!needsCompile) {
+			sys_print("*** skipping compile\n");
+			return true;
+		}
 
-	DictParser in;
-	in.load_from_file(tisfile.get());
-	auto tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in);
-	if (!tis) {
-		sys_print("!!! couldnt parse texture import settings\n");
-		return false;
+		DictParser in;
+		in.load_from_file(tisfile.get());
+		tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in);
+		if (!tis) {
+			sys_print("!!! couldnt parse texture import settings\n");
+			return false;
+		}
 	}
 
 	std::string parentDir = FileSys::get_full_path_from_game_path(gamepath);

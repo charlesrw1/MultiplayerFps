@@ -44,6 +44,10 @@ public:
 		return is_valid() ? ptr : nullptr; 
 	}
 
+	bool did_fail() {
+		return ptr && ptr->did_load_fail();
+	}
+
 	operator bool() const {
 		return is_valid();
 	}

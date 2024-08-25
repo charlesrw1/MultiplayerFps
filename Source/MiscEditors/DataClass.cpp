@@ -16,6 +16,10 @@ CLASS_IMPL(DataClass);
 class DataClassAssetMetadata : public AssetMetadata
 {
 public:
+	DataClassAssetMetadata() {
+		extensions.push_back("dc");
+	}
+
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override
 	{
@@ -27,16 +31,6 @@ public:
 		return "DataClass";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override
-	{
-		auto find_tree = FileSys::find_game_files();
-		for (const auto file : find_tree) {
-			if (has_extension(file, "dc")) {
-
-				filepaths.push_back(file);
-			}
-		}
-	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_dataclass_editor; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &DataClass::StaticType; }

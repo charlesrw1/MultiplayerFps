@@ -54,6 +54,7 @@
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
+    <ClInclude Include="Source\Framework\Guid.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />

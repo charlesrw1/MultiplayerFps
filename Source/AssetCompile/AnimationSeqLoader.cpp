@@ -11,6 +11,7 @@ extern IEditorTool* g_animseq_editor;
 class AnimationSeqAssetMetadata : public AssetMetadata
 {
 public:
+
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override
 	{
@@ -22,7 +23,7 @@ public:
 		return "AnimationSeq";
 	}
 
-	virtual void index_assets(std::vector<std::string>& filepaths) const  override
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override
 	{
 		auto manifest = g_animseq.manifest;
 

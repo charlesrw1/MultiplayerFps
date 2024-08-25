@@ -8,6 +8,16 @@ inline std::string get_extension(const std::string& name)
 		return {};
 	return name.substr(find);
 }
+inline std::string get_extension_no_dot(const std::string& name)
+{
+	auto find = name.rfind('.');
+	if (find == std::string::npos)
+		return {};
+	if (find >= name.size() - 1)
+		return {};
+	return name.substr(find+1);
+}
+
 
 inline std::string strip_extension(const std::string& name)
 {
