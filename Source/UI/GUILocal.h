@@ -121,10 +121,15 @@ public:
 		if (focusing && focusing->hidden)
 			focusing = nullptr;
 
-		if (hovering)
-			hovering->on_hovering(x,y);
-		if (dragging)
-			dragging->on_dragging(x,y);
+		if (hovering) {
+			const glm::ivec2 where = { x - hovering->ws_position.x,y - hovering->ws_position.y };
+			hovering->on_hovering(where.x, where.y);
+		}
+		if (dragging) {
+			const glm::ivec2 where = { x - dragging->ws_position.x,y - dragging->ws_position.y };
+			dragging->on_dragging(where.x, where.y);
+		
+		}
 		if (focusing)
 			focusing->on_focusing();
 		//for (auto gui : think_list)

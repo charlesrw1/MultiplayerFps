@@ -44,7 +44,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
 	for (auto file : FileSys::find_game_files_path(args.at(1))) {
 		if (get_extension_no_dot(file) == "tis")
 			tis_files.insert(file);
-		else if (get_extension_no_dot(file) == "png")
+		else if (get_extension_no_dot(file) == "png" || get_extension_no_dot(file)=="jpg")
 			png_files.insert(file);
 	}
 	for (auto png_f : png_files) {
@@ -53,11 +53,14 @@ DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
 
 			auto gamepath = FileSys::get_game_path_from_full_path(png_f);
 
+
 			TextureImportSettings tis;
 			auto findSlash = gamepath.rfind('/');
 			tis.src_file = gamepath;
 			if (findSlash != std::string::npos)
 				tis.src_file = gamepath.substr(findSlash + 1);
+			if (gamepath.find("normal")!=std::string::npos || gamepath.find("Normal") != std::string::npos||gamepath.find("NRM")!=std::string::npos)
+				tis.is_normalmap = true;
 
 			DictWriter out;
 			write_object_properties(&tis, nullptr, out);

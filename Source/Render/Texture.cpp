@@ -416,7 +416,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
 
-static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat)
+static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat, bool nearest_filtered = false)
 {
 	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
@@ -435,16 +435,24 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
 	}
 
-	glTextureStorage2D(output->gl_id, get_mip_map_count(x,y), internal_format, x, y);
+	glTextureStorage2D(output->gl_id, get_mip_map_count(x, y), internal_format, x, y);
 	assert(x == x_real && y == y_real);
 	if (compressed)
 		glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
 	else
 		glTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, format, type, data);
-	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
-	glGenerateTextureMipmap(output->gl_id);
+
+	if (!nearest_filtered) {
+
+		glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+		glGenerateTextureMipmap(output->gl_id);
+	}
+	else {
+		glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
 
 	glCheckError();
 
@@ -486,6 +494,7 @@ public:
 	int x{}, y{}, channels{};
 	bool is_float = false;
 	void* data = nullptr;
+	bool wantsNearestFiltering = false;
 };
 CLASS_IMPL(TextureLoadUser);
 
@@ -516,7 +525,7 @@ void Texture::post_load(ClassBase* userStruct) {
 	if (user->isDDSFile)
 		load_dds_file(this, filedata.data(), filedata.size());
 	else
-		make_from_data(this, x, y, data, to_format(channels, is_float));
+		make_from_data(this, x, y, data, to_format(channels, is_float), user->wantsNearestFiltering);
 
 	if (data)
 		stbi_image_free(data);
@@ -547,6 +556,9 @@ bool Texture::load_asset(ClassBase*& userStruct) {
 	auto& data = user->data;
 	auto& filedata = user->filedata;
 	auto& is_float = user->is_float;
+
+	if (path.find("_nearest"))
+		user->wantsNearestFiltering = true;	// hack moment
 
 
 	user->filedata.resize(file->size());

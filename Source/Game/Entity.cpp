@@ -42,6 +42,9 @@ public:
 			}
 		}
 	}
+
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &Entity::StaticType; }
+
 	virtual IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual bool assets_are_filepaths() const { return false; }

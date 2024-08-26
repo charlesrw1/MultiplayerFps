@@ -16,7 +16,7 @@ CLASS_H(EntityComponent, BaseUpdater)
 public:
 	const static bool CreateDefaultObject = true;
 
-	virtual ~EntityComponent() {}
+	virtual ~EntityComponent() override;
 
 private:
 	void init();
@@ -112,6 +112,10 @@ public:
 	std::string eAttachedBoneName;
 
 	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
+protected:
+	bool get_has_initialized() const {
+		return has_initialized;
+	}
 private:
 
 	glm::vec3 position = glm::vec3(0.f);
@@ -130,6 +134,7 @@ private:
 	bool is_editor_only = false;
 	bool is_inherited = true;
 	bool is_force_root = false;
+	bool has_initialized = false;
 
 	friend class Schema;
 	friend class Entity;

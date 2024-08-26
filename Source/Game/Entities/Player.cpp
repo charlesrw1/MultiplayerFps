@@ -1,25 +1,41 @@
 #include "Player.h"
 #include "Framework/Util.h"
 #include "Framework/MeshBuilder.h"
+#include "Framework/Config.h"
+#include "Framework/Dict.h"
 
 #include "GameEnginePublic.h"
 #include "imgui.h"
 
 #include "Render/DrawPublic.h"
 
-#include "Physics/Physics2.h"
-
 #include "Debug.h"
-
-#include "Framework/Dict.h"
-
-#include "Framework/Config.h"
 
 #include "CameraPoint.h"
 
 #include "Assets/AssetDatabase.h"
 
 #include "Level.h"
+
+#include "Physics/Physics2.h"
+#include "Physics/ChannelsAndPresets.h"
+
+
+#include "MiscEditors/DataClass.h"
+#include "Framework/ClassTypePtr.h"
+#include "Render/Texture.h"
+
+#include "Input/InputSystem.h"
+#include "Input/InputAction.h"
+
+#include "UI/GUISystemPublic.h"
+#include "UI/Widgets/Layouts.h"
+#include "UI/Widgets/Visuals.h"
+#include "UI/Widgets/Interactables.h"
+
+#include <SDL2/SDL_events.h>
+
+#include "Game/GameModes/MainMenuMode.h"
 
 CLASS_H(PlayerNull, PlayerBase)
 public:
@@ -49,10 +65,53 @@ CLASS_IMPL(PlayerNull);
 
 CLASS_IMPL(PlayerBase);
 CLASS_IMPL(Player);
-CLASS_IMPL(PlayerSpawnPoint);
+
 
 CLASS_IMPL(SpawnLogic);
 CLASS_IMPL(SpawnIfOnRedTeam);
+
+#include "Game/Components/BillboardComponent.h"
+#include "Game/Components/ArrowComponent.h"
+
+
+CLASS_H(PlayerSpawnPoint, Entity)
+public:
+	PlayerSpawnPoint() {
+		empty = create_sub_component<EmptyComponent>("Root");
+		root_component = empty;
+
+		if (eng->is_editor_level())
+		{
+			auto b = create_sub_component<BillboardComponent>("Billboard");
+			b->set_texture(default_asset_load<Texture>("icon/_nearest/player_start.png"));
+			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+			auto a = create_sub_component<ArrowComponent>("Arrow");
+			a->dont_serialize_or_edit = true;
+			a->set_ls_transform({}, {}, glm::vec3(0.3));
+		}
+	}
+
+	bool check_spawn(PlayerBase* b) {
+		if (logicClass.ptr != nullptr) {
+			auto logic = logicClass.ptr->allocate()->cast_to<SpawnLogic>();
+			return logic->can_spawn_this(b);
+		}
+		return true;
+	}
+
+	EmptyComponent* empty = nullptr;
+	ClassTypePtr<SpawnLogic> logicClass;
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(PlayerSpawnPoint)
+			REG_INT(team, PROP_DEFAULT, "0"),
+			REG_CLASSTYPE_PTR(logicClass, PROP_DEFAULT),
+			END_PROPS(PlayerSpawnPoint)
+	};
+	int team = 0;
+};
+
+CLASS_IMPL(PlayerSpawnPoint);
 
 
 //
@@ -87,56 +146,7 @@ using glm::vec2;
 using glm::dot;
 using glm::cross;
 
-enum Player_Item_State
-{
-	ITEM_STATE_IDLE,
-	ITEM_STATE_SHOOT,
-	ITEM_STATE_RELOAD,
-	ITEM_STATE_HOLSTER,
-	ITEM_STATE_EQUIP,
-};
 
-// state machine: (there isnt really one, its just one)
-/*
-	idle
-	running
-	mid-air
-
-	client_prediction
-	physics sim all inputs from last authoritative state
-	only output effects for last state (this can be a global state to simplify code)
-	run shared item code which updates view model and local effects
-	update character third person animations
-
-server_side/listen
-	physics sim inputs
-	output effects for all sims
-	run shared item code
-	run think routine
-	update character animations
-
-physics (operates on player_state)
-animations, think, item (operates on entity)
-
-
-"taunt 2"
-sends to server, server sets your animation and flag that says you are in taunt
-server sends your animation state back
-
-local animation is not predicted, your character sets its own animation locally
-server sends animation in entity_state which is ignored unless flag is set
-
-Your character dies on server, server functions set your animation to death one with server animation override flag
-
-
-*/
-
-int character_state = 0;
-int item_state = 0;
-bool character_state_changed = false;
-bool item_state_changed = false;
-bool finished = false;
-bool force_animation = false;
 
 #if 0
 // hacky way to move up stairs
@@ -472,9 +482,6 @@ void Player::move()
 }
 
 
-#include "MiscEditors/DataClass.h"
-#include "Framework/ClassTypePtr.h"
-#include "Render/Texture.h"
 CLASS_H(PlayerWeaponData,ClassBase )
 public:
 	
@@ -614,8 +621,7 @@ void Player::find_a_spawn_point()
 void Player::set_input_command(Move_Command newcmd) {
 	this->cmd = newcmd;
 }
-#include "Input/InputSystem.h"
-#include "Input/InputAction.h"
+
 
 struct PlayerActions
 {
@@ -798,14 +804,6 @@ void ViewmodelComponent::update()
 //			client update
 #endif
 
-#include "UI/GUISystemPublic.h"
-#include "UI/Widgets/Layouts.h"
-#include "UI/Widgets/Visuals.h"
-#include "UI/Widgets/Interactables.h"
-
-#include <SDL2/SDL_events.h>
-
-#include "Game/GameModes/MainMenuMode.h"
 
 class PlayerHUD : public GUIFullscreen
 {
@@ -1010,8 +1008,6 @@ void Player::update()
 
  void Player::start()  {
 
-
-
 	 hud = std::make_unique<PlayerHUD>(this);
 
 	 score_update_delegate.invoke(10);
@@ -1076,7 +1072,7 @@ void Player::update()
 
  Player::~Player() {
  }
-#include "Physics/ChannelsAndPresets.h"
+
  Player::Player() {
 	 player_mesh = create_sub_component<MeshComponent>("CharMesh");
 	 player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
@@ -1092,9 +1088,9 @@ void Player::update()
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);
 
-	 player_capsule->physicsPreset.ptr = &PP_Character::StaticType;
-	 player_capsule->isTrigger = false;
-	 player_capsule->sendOverlap = true;
+	 player_capsule->physics_preset.ptr = &PP_Character::StaticType;
+	 player_capsule->is_trigger = false;
+	 player_capsule->send_overlap = true;
 
 	 tickEnabled = true;
  }

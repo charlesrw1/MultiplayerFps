@@ -20,6 +20,7 @@ public:
 		type_of_base = ClassBase::find_class(info->range_hint);
 		this->info = info;
 		this->inst = instance;
+
 	}
 	bool internal_update() override {
 		auto classroot = info->range_hint;

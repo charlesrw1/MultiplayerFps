@@ -44,6 +44,10 @@ void EntityComponent::set_ls_euler_rotation(const glm::vec3& euler) {
 void EntityComponent::post_change_transform_R(bool ws_is_dirty)
 {
 	world_transform_is_dirty = ws_is_dirty;
+
+	if (!has_initialized)
+		return;
+
 	on_changed_transform();	// call down to derived
 	// recurse to children
 	for (int i = 0; i < children.size(); i++)
@@ -161,11 +165,19 @@ void EntityComponent::attach_to_parent(EntityComponent* parent_component, String
 
 void EntityComponent::init()
 {
+	assert(!has_initialized);
+	has_initialized = true;
 	on_init();
 	init_updater();
 }
 void EntityComponent::deinit(bool destruct_subcomponents)
 {
+	if (!has_initialized) {
+		// this path is for stuff like editor only components that get created but not initialized
+		assert(children.empty());
+		return;
+	}
+
 	if (destruct_subcomponents && attached_parent.get())
 		attached_parent->remove_this(this);
 
@@ -189,4 +201,10 @@ void EntityComponent::deinit(bool destruct_subcomponents)
 
 	on_deinit();
 	shutdown_updater();
+
+	has_initialized = false;
+}
+
+EntityComponent::~EntityComponent() {
+	assert(!get_has_initialized());	// assert that deinit() got called if init() was called (which sets has_ininitialized to false)
 }

@@ -62,15 +62,15 @@ const PropertyInfoList* MeshComponent::get_props() {
 		REG_BOOL(is_skybox, PROP_DEFAULT, "0"),
 #ifndef RUNTIME
 		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
-		REG_BOOL(eAnimateInEditor, PROP_DEFAULT | PROP_EDITOR_ONLY, "0"),
+		REG_BOOL(e_animate_in_editor, PROP_DEFAULT | PROP_EDITOR_ONLY, "0"),
 #endif // !RUNTIME
 
-		REG_BOOL(sendHit,PROP_DEFAULT,"0"),
-		REG_BOOL(sendOverlap,PROP_DEFAULT,"0"),
-		REG_BOOL(disablePhysics,PROP_DEFAULT,"0"),
+		REG_BOOL(send_hit,PROP_DEFAULT,"0"),
+		REG_BOOL(send_overlap,PROP_DEFAULT,"0"),
+		REG_BOOL(disable_physics,PROP_DEFAULT,"0"),
 		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
-		REG_BOOL(isStatic,PROP_DEFAULT,"0"),
-		REG_BOOL(isTrigger,PROP_DEFAULT,"0"),
+		REG_BOOL(is_static,PROP_DEFAULT,"0"),
+		REG_BOOL(is_trigger,PROP_DEFAULT,"0"),
 		REG_CLASSTYPE_PTR(physicsPreset, PROP_DEFAULT)
 	END_PROPS(MeshCompponent)
 }
@@ -139,7 +139,7 @@ void MeshComponent::on_init()
 
 		physActor->init_physics_shape(nullptr, get_ws_transform(), 
 			simulate_physics && !eng->is_editor_level(), 
-			sendOverlap, sendHit, isStatic, isTrigger, false);
+			send_overlap, send_hit, is_static, is_trigger, false);
 		physActor->add_model_shape_to_actor(modToUse);
 		physActor->update_mass();
 	}

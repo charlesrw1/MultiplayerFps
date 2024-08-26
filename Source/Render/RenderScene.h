@@ -234,7 +234,8 @@ public:
 
 	// UGGGGGGGGH
 	handle<Render_Object> register_obj() override {
-		return { proxy_list.make_new() };
+		handle<Render_Object> handle = { proxy_list.make_new() };
+		return handle;
 	}
 	void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
 	void remove_obj(handle<Render_Object>& handle) override {

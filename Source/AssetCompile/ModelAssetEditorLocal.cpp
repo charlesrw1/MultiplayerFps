@@ -100,6 +100,11 @@ void ModelEditorTool::post_map_load_callback()
 	GetAssets().find_async<Model>(get_doc_name(), [&](GenericAssetPtr ptr) {
 		if (!importSettings || !outputEntity)
 			return;
+		if (!ptr)
+		{
+			sys_print("*** no output model\n");
+			return;
+		}
 
 		assert(outputEntity);
 

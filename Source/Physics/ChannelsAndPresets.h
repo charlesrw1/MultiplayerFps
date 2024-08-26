@@ -12,7 +12,7 @@ enum class PhysicsChannel : uint8_t
 	Visiblity,		// any ray casts of the world
 };
 
-// Abusing reflection like an enum lmfao, but I really like the property of it being staticlly compiled but also extenable (and it easily plugs in already to the reflection system for properties).
+// Abusing class reflection like an enum, but I really like the property of it being staticlly compiled but also extenable (and it easily plugs in already to the reflection system for properties).
 // physics presets, these are an instance of a channel along with masks of other physics channels
 CLASS_H(PhysicsFilterPresetBase, ClassBase)
 public:

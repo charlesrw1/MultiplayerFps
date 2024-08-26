@@ -207,7 +207,7 @@ void IEditorTool::draw_menu_bar()
 					//Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map \"\"");
 					auto metadata = AssetRegistrySystem::get().find_for_classtype(&get_asset_type_info());
 					assert(metadata);
-					char* command = string_format("start_ed %s \"\"", metadata->get_type_name());;
+					char* command = string_format("start_ed %s \"\"", metadata->get_type_name().c_str());;
 					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, command);
 				}
 			}
@@ -221,6 +221,25 @@ void IEditorTool::draw_menu_bar()
 			
 			hook_menu_bar_file_menu();
 
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Tools")) {
+
+			auto& types = AssetRegistrySystem::get().get_types();
+
+			for (int i = 0; i < types.size(); i++) {
+				auto& type = types[i];
+				if (type->tool_to_edit_me()) {
+					std::string name = type->get_type_name();
+					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(type->get_browser_color().to_uint()));
+					if (ImGui::MenuItem(name.c_str())) {
+						const char* command = string_format("start_ed %s \"\"", type->get_type_name().c_str());;
+						Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, command);
+					}
+					ImGui::PopStyleColor();
+				}
+
+			}
 			ImGui::EndMenu();
 		}
 

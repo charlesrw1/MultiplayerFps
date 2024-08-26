@@ -35,7 +35,7 @@ public:
 	bool is_skybox = false;
 
 #ifndef RUNTIME
-	bool eAnimateInEditor = false;
+	bool e_animate_in_editor = false;
 	void editor_on_change_property() override;
 #endif // !RUNTIME
 
@@ -44,13 +44,21 @@ public:
 	void set_material_override(const MaterialInstance* mi);
 
 	// physics settings
-	bool disablePhysics = false;
-	ClassTypePtr<PhysicsFilterPresetBase> physicsPreset;
-	bool simulate_physics = false;
-	bool isTrigger = false;
-	bool sendOverlap = false;
-	bool sendHit = false;
-	bool isStatic = false;
+	bool disable_physics = false;	// component disables all physics
+	ClassTypePtr<PhysicsFilterPresetBase> physicsPreset;	//  preset to determine collision masks (like an enum)
+	
+	bool simulate_physics = false;		// if true, then object is a DYNAMIC object driven by the physics simulation
+	
+	bool is_static = true;				// if true, then the object is a STATIC object driven that cant ever move
+										// if false, then this object is KINEMATIC if simulate_physics is false or DYNAMIC if its true
+										// isStatic and simulate_physics is illogical so it falls back to isStatic in that case
+
+	bool is_trigger = false;			// if true, then the objects shapes are treated like triggers and sends OVERLAP events
+										// for a generic static trigger box, use with is_static = true
+	
+	bool send_overlap = false;			// if true on both objects, then a overlap event will be sent (one of the objects has to be a trigger object)
+	
+	bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
 private:
 	void update_handle();
 

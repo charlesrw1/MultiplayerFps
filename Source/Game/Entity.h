@@ -225,7 +225,7 @@ inline T* Entity::create_and_attach_component_type(EntityComponent* parent, Stri
 	ptr->set_owner(this);
 	all_components.push_back(std::unique_ptr<EntityComponent>(ptr));
 	ptr->attach_to_parent(parent == nullptr ? root_component : parent, bone);
-	ptr->on_init();
+	ptr->init();
 	return ptr;
 }
 inline EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* info, EntityComponent* parent, StringName bone)
@@ -238,7 +238,7 @@ inline EntityComponent* Entity::create_and_attach_component_type(const ClassType
 	ec->set_owner(this);
 	all_components.push_back(std::unique_ptr<EntityComponent>(ec));
 	ec->attach_to_parent(parent == nullptr ? root_component : parent, bone);
-	ec->on_init();
+	ec->init();
 	return ec;
 }
 

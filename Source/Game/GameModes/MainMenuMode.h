@@ -83,7 +83,7 @@ public:
 	}
 
 	void start_game() {
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map thisIsTheMap.tmap\n");
+		eng->open_level("maps/lvl0/level0_map.tmap");
 		GameTransitionUI::get().open();
 	}
 

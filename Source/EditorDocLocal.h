@@ -572,6 +572,7 @@ public:
 	// Inherited via IEditorTool
 private:
 
+	void on_mouse_drag(int x, int y);
 
 	uint32_t get_next_id() {
 		return id_start++;

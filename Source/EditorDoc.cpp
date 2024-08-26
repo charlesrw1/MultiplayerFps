@@ -64,10 +64,15 @@ public:
 	void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) override {
 		wheel_delegate.invoke(wheel);
 	}
+	void on_dragging(int x, int y) override {
+		mouse_drag_delegate.invoke(x, y);
+	}
 
 	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
 	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
 	MulticastDelegate<int, int, int> mouse_down_delegate;
+	MulticastDelegate<int, int> mouse_drag_delegate;
+
 	MulticastDelegate<int, int, int> mouse_up_delegate;
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 
@@ -503,6 +508,29 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 		}
 	}
 }
+void EditorDoc::on_mouse_drag(int x, int y)
+{
+	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
+		return;
+	if (ImGui::GetIO().KeyShift) {
+		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
+		if (handle.is_valid()) {
+			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
+			if (component_ptr && component_ptr->get_owner()) {
+				selection_state->add_to_selection(component_ptr->get_owner()->self_id);
+			}
+		}
+	}
+	else if (ImGui::GetIO().KeyCtrl) {
+		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
+		if (handle.is_valid()) {
+			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
+			if (component_ptr && component_ptr->get_owner()) {
+				selection_state->remove_from_selection(component_ptr->get_owner()->self_id);
+			}
+		}
+	}
+}
 void EditorDoc::on_mouse_down(int x, int y, int button)
 {
 
@@ -516,8 +544,10 @@ void EditorDoc::on_mouse_down(int x, int y, int button)
 
 			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
 			if (component_ptr && component_ptr->get_owner()) {
-				if (ImGui::GetIO().KeyShift) 
+				if (ImGui::GetIO().KeyShift)
 					selection_state->add_to_selection(component_ptr->get_owner()->self_id);
+				else if (ImGui::GetIO().KeyCtrl)
+					selection_state->remove_from_selection(component_ptr->get_owner()->self_id);
 				else
 					selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
 			}
@@ -1558,6 +1588,8 @@ EditorDoc::EditorDoc() {
 
 	gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
 	gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
+	gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
+
 	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
 
 	command_mgr = std::make_unique<UndoRedoSystem>();
