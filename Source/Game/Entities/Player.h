@@ -79,6 +79,7 @@ class PlayerHUD;
 class HealthComponent;
 class InputUser;
 class PlayerActions;
+class CharacterController;
 CLASS_H(Player, PlayerBase)
 public:
 
@@ -102,6 +103,8 @@ public:
 	MulticastDelegate<int> score_update_delegate;
 
 	std::unique_ptr<PlayerHUD> hud;
+
+	std::unique_ptr<CharacterController> ccontroller;
 	
 	static const PropertyInfoList* get_props() {
 		START_PROPS(Player)

@@ -50,7 +50,7 @@ void SpotLightComponent::on_init()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
-		b->set_texture(default_asset_load<Texture>("icon/spotlightBig.png"));
+		b->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
 		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
@@ -180,7 +180,7 @@ void SunLightComponent::on_init()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
-		b->set_texture(default_asset_load<Texture>("icon/sunBig.png"));
+		b->set_texture(default_asset_load<Texture>("icon/_nearest/sun.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
 		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
@@ -208,6 +208,9 @@ SpotLightComponent::SpotLightComponent() {}
 #include "Render/Render_Volumes.h"
 CLASS_H(SkylightComponent,EntityComponent)
 public:
+	SkylightComponent() {
+	}
+
 	void on_init() override {
 
 		mytexture = new Texture; // g_imgs.install_system_texture("_skylight");
@@ -241,6 +244,12 @@ public:
 	SkylightEntity() {
 		Skylight = create_sub_component<SkylightComponent>("Skylight");
 		root_component = Skylight;
+
+		if (eng->is_editor_level()) {
+			auto b = create_sub_component<BillboardComponent>("Billboard");
+			b->set_texture(default_asset_load<Texture>("icon/_nearest/skylight.png"));
+			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		}
 	}
 	SkylightComponent* Skylight = nullptr;
 

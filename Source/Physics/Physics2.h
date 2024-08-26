@@ -245,7 +245,8 @@ private:
 	bool setMyTransformWhenSimulating = true;
 	bool isTrigger = false;
 	bool isStatic = false;
-	friend class PhysicsManLocal;
+
+	friend class PhysicsManImpl;
 };
 
 // Constraint wrapper for gameplay
@@ -271,54 +272,57 @@ struct world_query_result
 	float distance = 0.0;
 };
 class BinaryReader;
-class PhysicsManPublic
+class PhysicsManImpl;
+class PhysicsManager
 {
 public:
-	virtual void init() = 0;
+	void init();
 
-	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t channel_mask) = 0;
-	virtual bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t channel_mask) = 0;
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t channel_mask);
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t channel_mask);
 	
-	virtual bool sweep_capsule(
+	bool sweep_capsule(
 		world_query_result& out,
 		const vertical_capsule_def_t& capsule, 
 		const glm::vec3& start, 
 		const glm::vec3& dir, 
 		float length, 
-		uint32_t channel_mask) = 0;
-	virtual bool sweep_sphere(
+		uint32_t channel_mask);
+	bool sweep_sphere(
 		world_query_result& out,
 		float radius,
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		uint32_t channel_mask) = 0;
-	virtual bool capsule_is_overlapped(
+		uint32_t channel_mask);
+	bool capsule_is_overlapped(
 		const vertical_capsule_def_t& capsule,
 		const glm::vec3& start,
-		uint32_t channel_mask) = 0;
-	virtual bool sphere_is_overlapped(
+		uint32_t channel_mask);
+	bool sphere_is_overlapped(
 		world_query_result& out,
 		float radius,
 		const glm::vec3& start,
-		uint32_t channel_mask) = 0;
+		uint32_t channel_mask);
 	
-	virtual PhysicsActor* allocate_physics_actor(EntityComponent* ecOwner) = 0;
-	virtual void free_physics_actor(PhysicsActor*& actor) = 0;
+	PhysicsActor* allocate_physics_actor(EntityComponent* ecOwner);
+	void free_physics_actor(PhysicsActor*& actor);
 
-	virtual PhysicsConstraint* allocate_constraint() = 0;
-	virtual void free_constraint(PhysicsConstraint*& constraint) = 0;
+	PhysicsConstraint* allocate_constraint();
+	void free_constraint(PhysicsConstraint*& constraint);
 	
-	virtual void clear_scene() = 0;
 	
 	// simulate scene and fetch the results, thus a blocking update
-	virtual void simulate_and_fetch(float dt) = 0;
+	void simulate_and_fetch(float dt);
 
 	// called by renderer only, matrix/shader/etc. already set
-	virtual void debug_draw_shapes() = 0;
+	void debug_draw_shapes();
 
 	// used only by model loader
-	virtual bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) = 0;
+	bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def);
+
+private:
+	PhysicsManImpl* impl=nullptr;
 };
 
-extern PhysicsManPublic* g_physics;
+extern PhysicsManager g_physics;

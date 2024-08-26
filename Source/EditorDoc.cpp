@@ -37,6 +37,8 @@
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
+ConfigVar g_editor_newmap_template("g_editor_newmap_template", "default_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
+
 
 class EditorUILayout : public GUIFullscreen
 {
@@ -412,9 +414,13 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 		}
 
 		if (needs_new_doc) {
-			sys_print("creating new document\n");
+			// uses the newmap template to load
+			const char* name = g_editor_newmap_template.get_string();
+			sys_print("creating new map using template map: %s\n",name);
 			set_empty_doc();
-			eng->open_level("__empty__");	// queues load
+
+
+			eng->open_level(name);	// queues load
 		}
 	}
 	else {

@@ -101,7 +101,7 @@ void MeshComponent::update_handle()
 void MeshComponent::on_init()
 {
 	draw_handle = idraw->get_scene()->register_obj();
-	physActor = g_physics->allocate_physics_actor(this);
+	physActor = g_physics.allocate_physics_actor(this);
 	
 	if (model.get()||model.did_fail()) {
 
@@ -164,5 +164,5 @@ void MeshComponent::on_deinit()
 	idraw->get_scene()->remove_obj(draw_handle);
 	animator.reset();
 
-	g_physics->free_physics_actor(physActor);
+	g_physics.free_physics_actor(physActor);
 }

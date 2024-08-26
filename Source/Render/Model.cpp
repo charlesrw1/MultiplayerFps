@@ -109,74 +109,6 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-#if 0
-class Vertex_Descriptor
-{
-public:
-	Vertex_Descriptor(int default_size, int mask_of_attributes)
-		: mask(mask_of_attributes), default_buffer_size(default_size){}
-
-	void set_all_contained_attributes(Game_Mod_Manager::Gpu_Buffer* buffers) {
-		for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-			if (mask & (1 << i)) {
-				glBindBuffer(GL_ARRAY_BUFFER, buffers[i].handle);
-				vertex_attribute_formats[i].opengl_set_vertex_attribute(i);
-				glBindBuffer(GL_ARRAY_BUFFER, 0);
-			}
-		}
-	}
-
-	void generate_buffers(Game_Mod_Manager::Gpu_Buffer* out_buffers) {
-		for (int i = 0; i < MAX_ATTRIBUTES; i++) {
-			if (mask & (1 << i)) {
-				glGenBuffers(1, &out_buffers[i].handle);
-				glBindBuffer(GL_ARRAY_BUFFER, out_buffers[i].handle);
-				glBufferData(GL_ARRAY_BUFFER,
-					default_buffer_size * vertex_attribute_formats[i].get_size(),
-					nullptr,
-					GL_STATIC_DRAW);
-				out_buffers[i].allocated = default_buffer_size*vertex_attribute_formats[i].get_size();
-				out_buffers[i].target = GL_ARRAY_BUFFER;
-				glBindBuffer(GL_ARRAY_BUFFER, 0);
-			}
-		}
-	}
-
-	int default_buffer_size = 1'000'000;
-	int mask = 0;
-};
-
-#define TO_MASK(x) (1<<x)
-Vertex_Descriptor vertex_buffer_formats[(int)mesh_format::COUNT] =
-{
-	// skinned format
-	Vertex_Descriptor(
-		100'000,
-		TO_MASK(ATTRIBUTE_POS) |
-		TO_MASK(ATTRIBUTE_UV) |
-		TO_MASK(ATTRIBUTE_NORMAL) |
-		TO_MASK(ATTRIBUTE_JOINT) |
-		TO_MASK(ATTRIBUTE_WEIGHT) |
-		TO_MASK(ATTRIBUTE_TANGENT)),
-	// static format
-	Vertex_Descriptor(
-		500'000,
-		TO_MASK(ATTRIBUTE_POS) |
-		TO_MASK(ATTRIBUTE_UV) |
-		TO_MASK(ATTRIBUTE_NORMAL)|
-		TO_MASK(ATTRIBUTE_TANGENT)),
-	// static plus format
-	Vertex_Descriptor(
-		500'000,
-		TO_MASK(ATTRIBUTE_POS) |
-		TO_MASK(ATTRIBUTE_UV) |
-		TO_MASK(ATTRIBUTE_NORMAL) |
-		TO_MASK(ATTRIBUTE_TANGENT) |
-		TO_MASK(ATTRIBUTE_COLOR) |
-		TO_MASK(ATTRIBUTE_UV2)),
-};
-static const int default_index_buffer_size = 3'000'000;
-#endif
 bool Model::has_lightmap_coords() const
 {
 	return false;
@@ -453,7 +385,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 		body.shapes.resize(read.read_int32());
 		for (int i = 0; i < body.shapes.size(); i++) {
 			read.read_bytes_ptr(&body.shapes[i], sizeof(physics_shape_def));
-			g_physics->load_physics_into_shape(read, body.shapes[i]);
+			g_physics.load_physics_into_shape(read, body.shapes[i]);
 			DEBUG_MARKER = read.read_int32();
 			assert(DEBUG_MARKER == 'HELP');
 		}

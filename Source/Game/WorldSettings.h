@@ -10,8 +10,7 @@
 // This persists through the levels lifetime, but shouldn't be ticked
 CLASS_H(WorldSettings, Entity)
 public:
-	WorldSettings() {
-	}
+	WorldSettings();
 
 	static const PropertyInfoList* get_props()  {
 		START_PROPS(WorldSettings)

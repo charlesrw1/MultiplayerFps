@@ -557,7 +557,7 @@ bool Texture::load_asset(ClassBase*& userStruct) {
 	auto& filedata = user->filedata;
 	auto& is_float = user->is_float;
 
-	if (path.find("_nearest"))
+	if (path.find("/_nearest"))
 		user->wantsNearestFiltering = true;	// hack moment
 
 
@@ -592,6 +592,7 @@ void Texture::uninstall()
 	if (gl_id != 0) {
 		glDeleteTextures(1, &gl_id);
 		width = height = 0;
+		gl_id = 0;
 	}
 }
 Texture* Texture::install_system(const std::string& path)

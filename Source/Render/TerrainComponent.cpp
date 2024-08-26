@@ -68,12 +68,19 @@ public:
 };
 
 CLASS_IMPL(TerrainComponent);
-
+#include "Game/Components/BillboardComponent.h"
+#include "Assets/AssetDatabase.h"
 CLASS_H(TerrainEntity, Entity)
 public:
 	TerrainEntity() {
 		Terrain = create_sub_component<TerrainComponent>("Terrain");
 		root_component = Terrain;
+
+		if (eng->is_editor_level()) {
+			auto b = create_sub_component<BillboardComponent>("Billboard");
+			b->set_texture(default_asset_load<Texture>("icon/_nearest/terrain.png"));
+			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		}
 	}
 	static const PropertyInfoList* get_props() = delete;
 	TerrainComponent* Terrain{};

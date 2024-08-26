@@ -189,7 +189,62 @@ Action_State Player::get_ground_state_based_on_speed(float s) const
 }
 
 
+// bitmask for what controller collided with
+enum CharacterControllerCollisionFlags
+{
+	CCCF_ABOVE = 1,
+	CCCF_BELOW = 2,
+	CCCF_SIDES = 4
+};
 
+class CharacterController
+{
+public:
+	// continuous move
+	void move(const glm::vec3& displacement, float dt, uint32_t& out_ccfg_flags);
+	// teleport move
+	void set_position(const glm::vec3& v) {
+		position = v;
+	}
+
+	const glm::vec3& get_character_pos() const {
+		return position;
+	}
+
+	// parameters
+	float gravity_mult = 1.f;
+	glm::vec3 gravity_dir = glm::vec3(0, -1, 0);
+	float capsule_height = 2.f;
+	float capsule_radius = 0.5f;
+
+private:
+	void sweep_capsule();
+
+	uint32_t cached_flags = 0;
+	glm::vec3 position{};	// internal position
+};
+
+void CharacterController::move(const glm::vec3& disp, float dt, uint32_t& out_ccfg_flags)
+{
+	world_query_result wqr;
+	vertical_capsule_def_t shape_def;
+	shape_def.half_height = capsule_height * 0.5;
+	shape_def.radius = capsule_radius;
+
+	float disp_len = glm::length(disp);
+	if (disp_len <= 0.0000001) {
+		out_ccfg_flags = cached_flags;
+		return;
+	}
+
+	auto dir = disp / disp_len;
+	bool has_hit = g_physics.sweep_capsule(wqr, shape_def, position, dir, disp_len, UINT32_MAX);
+
+}
+void CharacterController::sweep_capsule()
+{
+
+}
 
 
 void sweep_move(glm::vec3& velocity, glm::vec3& position)
@@ -202,7 +257,7 @@ void sweep_move(glm::vec3& velocity, glm::vec3& position)
 		return;
 
 	glm::vec3 dir = glm::normalize(velocity);
-	bool found = g_physics->sweep_sphere(res, 1.0, position, dir, length, {});
+	bool found = g_physics.sweep_sphere(res, 1.0, position, dir, length, {});
 	if (found) {
 		position = position + dir * length * res.fraction+res.hit_normal*0.01f;
 		velocity = glm::vec3(0.0);
@@ -237,7 +292,7 @@ void Player::slide_move()
 	world_query_result res;
 	glm::vec3 dir = glm::normalize(velocity);
 	float length = glm::length(velocity) * move_time;
-	bool found = g_physics->sweep_sphere(res, 1.0, position, dir, length,{});
+	bool found = g_physics.sweep_sphere(res, 1.0, position, dir, length,{});
 	if (found) {
 		position = position + dir * length * res.fraction;
 		velocity = glm::vec3(0.0);
@@ -257,7 +312,7 @@ void Player::slide_move()
 
 
 		world_query_result res;
-		bool found = g_physics->sweep_sphere(res, 5.0, position, glm::normalize(velocity), glm::length(velocity) * (move_time / num_bumps), {});
+		bool found = g_physics.sweep_sphere(res, 5.0, position, glm::normalize(velocity), glm::length(velocity) * (move_time / num_bumps), {});
 
 		if (found) {
 			vec3 penetration_velocity = dot(velocity, res.hit_normal) * res.hit_normal;
@@ -615,6 +670,8 @@ void Player::find_a_spawn_point()
 		sys_print("!!! no spawn points");
 	else {
 		auto pos = points[0]->get_ws_position();
+
+		set_ws_position(pos);
 	}
 }
 
@@ -996,13 +1053,13 @@ void Player::update()
 {
 	move();
 
+
 	glm::vec3 pos = root_component->get_ws_position();
 
 	auto f = inputPtr->get_value<glm::vec2>(actions->move.get());
 
 	pos.x += f.x * eng->get_tick_interval();
 
-	set_ws_position(pos);
 }
 
 
@@ -1063,6 +1120,11 @@ void Player::update()
 	 inputPtr->bind_function(actions->jump.get(), ActionStateCallback::OnStart, [&] {
 		 this->on_jump_callback();
 		});
+
+	 Player::find_a_spawn_point();
+
+	 ccontroller = std::make_unique<CharacterController>();
+	 ccontroller->set_position(get_ws_position());
 }
  void Player::end() {
 	 GameInputSystem::get().free_input_user(inputPtr);

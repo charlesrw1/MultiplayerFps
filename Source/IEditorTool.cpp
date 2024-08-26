@@ -45,6 +45,7 @@ bool IEditorTool::open(const char* name, const char* arg) {
 	return true;
 }
 
+extern ConfigVar g_project_name;
 void IEditorTool::close()
 {
 	if (!is_open)
@@ -56,7 +57,7 @@ void IEditorTool::close()
 	name = "";
 	is_open = false;
 
-	SDL_SetWindowTitle(eng->get_os_window(),"CSRE");
+	SDL_SetWindowTitle(eng->get_os_window(), g_project_name.get_string());
 }
 bool IEditorTool::save()
 {

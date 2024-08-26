@@ -307,6 +307,7 @@ void GameEngineLocal::make_move()
 	//if(cl->get_state()>=CS_CONNECTED)
 	//	cl->get_command(cl->OutSequence()) = command;
 }
+extern ConfigVar g_project_name;
 
 void GameEngineLocal::init_sdl_window()
 {
@@ -323,7 +324,8 @@ void GameEngineLocal::init_sdl_window()
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-	window = SDL_CreateWindow("CREngine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+	const char* title = g_project_name.get_string();
+	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
 		sys_print("!!! create sdl window failed: %s\n", SDL_GetError());
@@ -773,110 +775,6 @@ static ptrdiff_t ComputePointerOffset()
 #include <stdlib.h>
 #include <stdio.h>
 
-// read file: searches current engine directory for files, also checks packaged files
-// read saved file
-// write file: (have a resource file that came from somewhere, want to get its path (might be in a mounted folder), get full path)
-// write saved file
-
-// distributed engine
-// /CSRE/
-//		x64/Release/
-//			CSRE.exe
-//			Physx.dll
-//			...
-//		mod/
-//			
-//		packages.bin
-//		data0.pak
-//		data1.pak
-
-
-// Cvars:
-//	g_projectname = "CsRe_Engine"
-//	g_selfcontained = false (if true, then set save dir to engine root folder, else use %APPDATA%/g_projectname/ for user saves)
-//	g_default_asset_folder = "data"
-//	
-// Cmds:
-// 
-// mount $relative_folder (mounts a folder inside the game path
-//
-// 	
-//
-
-// Dev engine
-// 
-// 
-// %USER_SAVE%/$PROJECTNAME/
-//		shader_cache/
-//			dump.bin
-//		saves/
-//			user0.sav
-//		user.cfg
-//	
-// %USER_SAVE% = $ENGINE
-// 
-// $ENGINE_DIR: engine binary location
-// $SAVE_DIR: user files (shader cache, saves, cfg changes)
-// $PROJECT_DIR: data files, most likely 	
-// 
-// default: 
-// 
-// editor.pak
-// engine.pak
-// data0.pak
-// data1.pak
-// data2.pak
-// data3.pak
-// dlc0.pak
-// dlc1.pak
-// 
-// 
-// /CSRE/
-//		x64/Release/
-//			CSRE.exe
-//			Physx.dll
-//			...
-//		source/
-//			main.cpp
-//			...
-// 
-//		mygame/
-//			game.cfg
-//				g_project_name "My Game"
-//				g_entry_point mainMenuMap.tmap
-//				g_player_class PlayerMyGame
-//				r_shadow_quality 2
-//			
-//			sound/
-//				gunshot.wav
-//			mainMenuMap.tmap
-// 
-//			maps/
-// 		
-// 
-//		engine_dat/
-//			shaders/
-//				myshader.glsl
-//			materials/
-//				defaultTerrain.mm
-//				defaultMaterial.mm
-//				defaultUI.mm
-//				defaultDecal.mm
-//			models/
-//				defaultCube.cmdl
-//				defaultSphere.cmdl
-//			animgraphs/
-//				defaultAnimGraph.ag
-//			textures/
-//
-//		engine.cfg
-//			g_game_folder mygame
-// 
-//		init.cfg
-//			start_ed Map mainMenuMap.tmap
-// 	
-// 
-//
 
 
 int main(int argc, char** argv)
@@ -891,12 +789,12 @@ int main(int argc, char** argv)
 }
 
 // Set these in vars.txt (or init.txt) located in $ROOT
-// They function identically, but vars is preferred for "const" configuration and init for short term changes
+// They function identically, but vars is preferred for const configuration and init for short term changes
 // init.txt is ran after vars.txt, so it will overwrite
 
 // The entry point of the game! (not used in the editor)
 // Takes in a string of the level to start with on the final game
-// Should look like: "mylevel.tmap" for $ROOT/Data/mylevel.tmap
+// Should look like: "mylevel.tmap" for $ROOT/gamedat/mylevel.tmap
 ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "the entry point of the game, this takes in a level filepath");
 // The default gamemode and player to choose when undefined by the WorldSettings entity
 // Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
@@ -905,7 +803,7 @@ ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV, "the de
 ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV, "the default player class to spawn when none is specified in a level");
 
 ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV, "the default gamemain class of the program");
-ConfigVar g_project_name("g_project_name", "CSREMAKE", CVAR_DEV, "the project name of the game, used for save file folders");
+ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
 
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 55.0, 110.0);
@@ -917,7 +815,7 @@ ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL,"draw a debug grid around th
 ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01,10);
 
 // defualt sky material to use for editors like materials/models/etc.
-ConfigVar ed_default_sky_material("ed_default_sky_material", "hdriSky", CVAR_DEV, "default sky material used for editors");
+ConfigVar ed_default_sky_material("ed_default_sky_material", "hdriSky.mm", CVAR_DEV, "default sky material used for editors");
 
 ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL, "draw the debug menu");
 
@@ -1082,13 +980,13 @@ void GameEngineLocal::execute_map_change()
 
 		GetAssets().find_async<Level>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
 			{
-				auto level = ptr.cast_to<Level>();
+				auto level = (ptr)?ptr.cast_to<Level>():nullptr;
 				if (level) {
 					level->set_editor_level(this_is_for_editor);
 				}
 				eng_local.on_map_change_callback(this_is_for_editor, level.get());
 
-			}, 0);
+			}, 0 /* default lifetime channel 0*/);
 
 		// goto idle while we wait for loading to finish
 		state = Engine_State::Idle;
@@ -1558,7 +1456,7 @@ void GameEngineLocal::init()
 
 	GetGInput().init();
 
-	g_physics->init();
+	g_physics.init();
 	network_init();
 	g_animseq.init();
 	// renderer init
@@ -1601,7 +1499,8 @@ void GameEngineLocal::init()
 			g_window_h.set_integer(atoi(argv[++i]));
 		}
 		else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
-			SDL_SetWindowTitle(window, "CsRemake - VISUAL STUDIO\n");
+			const char* projName = g_project_name.get_string();
+			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
 		}
 
 		else if (argv[i][0] == '-') {
@@ -1633,18 +1532,6 @@ void GameEngineLocal::init()
 }
 
 
-/*
-make input (both listen and clients)
-client send input to server (listens do not)
-
-listens read packets from clients
-listens update game (sim local character with frame's input)
-listen build a snapshot frame for sending to clients
-
-listens dont have packets to "read" from server, stuff like sounds/particles are just branched when they are created on sim frames
-listens dont run prediction for local player
-*/
-
 
 void GameEngineLocal::game_update_tick()
 {
@@ -1654,12 +1541,13 @@ void GameEngineLocal::game_update_tick()
 
 	assert(level);
 
-	// tick input
+	// tick input, this wall execute event callbacks
 	GetGInput().tick_users(eng->get_tick_interval());
 
 	// create input
 	if (!level->is_editor_level())
 		make_move();
+
 	//if (!is_host())
 	//	cl->SendMovesAndMessages();
 
@@ -1670,13 +1558,11 @@ void GameEngineLocal::game_update_tick()
 	if (!level->is_editor_level())
 		gamemode->tick();
 
-	// update entities
+	// update entities+components
 	level->update_level();
 
-	// update the physics
-	g_physics->simulate_and_fetch(tick_interval);
-
-	// call present() on any entities that need it (get physics results)
+	// update the physics, for physics driven objects, their transforms are updated in here
+	g_physics.simulate_and_fetch(tick_interval);
 
 	tick += 1;
 

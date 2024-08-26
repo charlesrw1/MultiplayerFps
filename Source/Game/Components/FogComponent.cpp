@@ -39,12 +39,19 @@ public:
 	RenderFog f;
 };
 CLASS_IMPL(FogComponent);
-
+#include "BillboardComponent.h"
+#include "Assets/AssetDatabase.h"
 CLASS_H(FogEntity, Entity)
 public:
 	FogEntity() {
 		Fog = create_sub_component<FogComponent>("Fog");
 		root_component = Fog;
+
+		if (eng->is_editor_level()) {
+			auto b = create_sub_component<BillboardComponent>("Billboard");
+			b->set_texture(default_asset_load<Texture>("icon/_nearest/fog.png"));
+			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		}
 	}
 	const PropertyInfoList* get_props() = delete;
 

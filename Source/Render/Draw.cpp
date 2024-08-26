@@ -10,7 +10,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"
-#include "Physics/Physics2.h"	// for g_physics->debug_draw()
+#include "Physics/Physics2.h"	// for g_physics.debug_draw()
 
 #include "Debug.h"
 
@@ -894,7 +894,7 @@ void Renderer::init()
 	shadowmap.init();
 	ssao.init();
 
-	lens_dirt = GetAssets().find_sync<Texture>("lens_dirt.jpg").get();
+	lens_dirt = GetAssets().find_global_sync<Texture>("lens_dirt.jpg").get();
 
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
@@ -3447,7 +3447,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		draw_debug_shapes(params.dt);
 
 		// hook in physics debugging, function determines if its drawing or not
-		g_physics->debug_draw_shapes();
+		g_physics.debug_draw_shapes();
 
 		glDepthFunc(GL_LEQUAL);
 	}

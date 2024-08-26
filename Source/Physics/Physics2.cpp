@@ -76,33 +76,15 @@ physx::PxTransform PhysTransform::get_physx() const
 {
 	return physx::PxTransform(glm_to_physx(position), glm_to_physx(rotation));
 }
-class PhysicsManLocal : public PhysicsManPublic
+
+
+class PhysicsManImpl
 {
 public:
-	PhysicsManLocal() : awake_dynamic_actors(3), all_physics_actors(3) {}
+	PhysicsManImpl() : awake_dynamic_actors(3), all_physics_actors(3) {}
 
-	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t mask) override {
-		float length = glm::length(end - start);
-		glm::vec3 dir = (end - start) / length;
-		return trace_ray(out, start, dir, length, mask);
-	}
-	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t mask) override {
-		physx::PxRaycastBuffer hit;
-		bool status = scene->raycast(
-			glm_to_physx(start), glm_to_physx(dir), length, hit);
-		sys_print("ray: %d\n", (int)status);
-		if (!status) {
-			out.fraction = 1.0;
-			return status;
-		}
-		out.fraction = hit.block.distance / length;
-		out.actor = (PhysicsActor*)hit.block.actor->userData;
-		out.hit_pos = physx_to_glm(hit.block.position);
-		out.hit_normal = physx_to_glm(hit.block.normal);
-		out.trace_dir = dir;
-		out.distance = hit.block.distance;
-		return status;
-	}
+
+	
 	bool sweep_shared(world_query_result& out,
 		physx::PxGeometry& geom,
 		const glm::vec3& start,
@@ -136,60 +118,24 @@ public:
 		bool status = scene->overlap(geom, local, overlap);
 		return status;
 	}
-	virtual bool sweep_capsule(
-		world_query_result& out,
-		const vertical_capsule_def_t& capsule,
-		const glm::vec3& start,
-		const glm::vec3& dir,
-		float length,
-		uint32_t mask)
-	{
-		auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
-		return sweep_shared(out, geom, start, dir, length, mask);
-	}
-	virtual bool sweep_sphere(
-		world_query_result& out,
-		float radius,
-		const glm::vec3& start,
-		const glm::vec3& dir,
-		float length,
-		uint32_t mask) {
-		auto geom = physx::PxSphereGeometry(radius);
-		return sweep_shared(out, geom, start, dir, length, mask);
-	}
-	virtual bool capsule_is_overlapped(
-		const vertical_capsule_def_t& capsule,
-		const glm::vec3& start,
-		uint32_t mask) {
-		auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
-		return overlap_shared(geom, start, mask);
 
-	}
-	virtual bool sphere_is_overlapped(
-		world_query_result& out,
-		float radius,
-		const glm::vec3& start,
-		uint32_t mask) {
-		auto geom = physx::PxSphereGeometry(radius);
-		return overlap_shared(geom, start, mask);
-	}
 
 	
-	PhysicsConstraint* allocate_constraint() override {
+	PhysicsConstraint* allocate_constraint() {
 		return new PhysicsConstraint;
 	}
-	void free_constraint(PhysicsConstraint*& constraint) override {
+	void free_constraint(PhysicsConstraint*& constraint) {
 		delete constraint;
 		constraint = nullptr;
 	}
 
-	PhysicsActor* allocate_physics_actor(EntityComponent* ecOwner) override {
+	PhysicsActor* allocate_physics_actor(EntityComponent* ecOwner) {
 		auto a = new PhysicsActor();
 		a->set_entity(ecOwner);
 		all_physics_actors.insert(a);
 		return a;
 	}
-	void free_physics_actor(PhysicsActor*& actor) override {
+	void free_physics_actor(PhysicsActor*& actor) {
 		all_physics_actors.remove(actor);
 		awake_dynamic_actors.remove(actor);
 
@@ -199,7 +145,7 @@ public:
 
 	physx::PxScene* get_physx_scene() { return scene; }
 
-	void init() override {
+	void init() {
 		sys_print("Initializing Physics\n");
 
 		foundation = PxCreateFoundation(PX_PHYSICS_VERSION, alloc, err);
@@ -222,8 +168,7 @@ public:
 		scene->setFlag(PxSceneFlag::eENABLE_ACTIVE_ACTORS, true);
 		scene->setFlag(PxSceneFlag::eEXCLUDE_KINEMATICS_FROM_ACTIVE_ACTORS, true);
 	}
-	void clear_scene() override {}
-	void simulate_and_fetch(float dt) override {
+	void simulate_and_fetch(float dt) {
 		CPUFUNCTIONSTART;
 
 		scene->simulate(dt);
@@ -244,8 +189,6 @@ public:
 			}
 		}
 	}
-
-	void debug_draw_shapes() override;
 
 	// used only by model loader
 	bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
@@ -276,8 +219,93 @@ public:
 	hash_set<PhysicsActor> awake_dynamic_actors;	// issues callbacks for these
 };
 
-static PhysicsManLocal physics_local;
-PhysicsManPublic* g_physics = &physics_local;
+PhysicsManager g_physics;
+static PhysicsManImpl* local_impl = nullptr;
+
+void PhysicsManager::init()
+{
+	impl = new PhysicsManImpl();
+	local_impl = impl;
+	impl->init();
+}
+
+bool PhysicsManager::sweep_capsule(
+	world_query_result& out,
+	const vertical_capsule_def_t& capsule,
+	const glm::vec3& start,
+	const glm::vec3& dir,
+	float length,
+	uint32_t mask)
+{
+	auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
+	return impl->sweep_shared(out, geom, start, dir, length, mask);
+}
+bool PhysicsManager::sweep_sphere(
+	world_query_result& out,
+	float radius,
+	const glm::vec3& start,
+	const glm::vec3& dir,
+	float length,
+	uint32_t mask) {
+	auto geom = physx::PxSphereGeometry(radius);
+	return impl->sweep_shared(out, geom, start, dir, length, mask);
+}
+bool PhysicsManager::capsule_is_overlapped(
+	const vertical_capsule_def_t& capsule,
+	const glm::vec3& start,
+	uint32_t mask) {
+	auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
+	return impl->overlap_shared(geom, start, mask);
+
+}
+bool PhysicsManager::sphere_is_overlapped(
+	world_query_result& out,
+	float radius,
+	const glm::vec3& start,
+	uint32_t mask) {
+	auto geom = physx::PxSphereGeometry(radius);
+	return impl->overlap_shared(geom, start, mask);
+}
+void PhysicsManager::simulate_and_fetch(float dt)
+{
+	impl->simulate_and_fetch(dt);
+}
+PhysicsActor* PhysicsManager::allocate_physics_actor(EntityComponent* ecOwner)
+{
+	return impl->allocate_physics_actor(ecOwner);
+}
+void PhysicsManager::free_physics_actor(PhysicsActor*& actor)
+{
+	impl->free_physics_actor(actor);
+}
+
+bool PhysicsManager::load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
+	return impl->load_physics_into_shape(reader, def);
+}
+
+bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t mask) {
+	float length = glm::length(end - start);
+	glm::vec3 dir = (end - start) / length;
+	return trace_ray(out, start, dir, length, mask);
+}
+bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t mask) {
+	physx::PxRaycastBuffer hit;
+	bool status = impl->scene->raycast(
+		glm_to_physx(start), glm_to_physx(dir), length, hit);
+	sys_print("ray: %d\n", (int)status);
+	if (!status) {
+		out.fraction = 1.0;
+		return status;
+	}
+	out.fraction = hit.block.distance / length;
+	out.actor = (PhysicsActor*)hit.block.actor->userData;
+	out.hit_pos = physx_to_glm(hit.block.position);
+	out.hit_normal = physx_to_glm(hit.block.normal);
+	out.trace_dir = dir;
+	out.distance = hit.block.distance;
+	return status;
+}
+
 
 PhysTransform::PhysTransform(const physx::PxTransform& t) :
 	position(physx_to_glm(t.p)), rotation(physx_to_glm(t.q)) {}
@@ -311,7 +339,7 @@ glm::vec3 PhysicsActor::get_linear_velocity() const {
 void PhysicsActor::free()
 {
 	if (has_initialized()) {
-		physics_local.scene->removeActor(*(physx::PxActor*)actor);
+		local_impl->scene->removeActor(*(physx::PxActor*)actor);
 		actor->release();
 		actor = nullptr;
 	}
@@ -345,7 +373,7 @@ void PhysicsActor::add_model_shape_to_actor(const Model* model)
 				continue;
 
 			PxShape* aConvexShape = PxRigidActorExt::createExclusiveShape(*actor,
-				PxConvexMeshGeometry(shape.convex_mesh), *physics_local.default_material);
+				PxConvexMeshGeometry(shape.convex_mesh), *local_impl->default_material);
 			set_shape_flags(aConvexShape);
 		}
 	}
@@ -354,7 +382,7 @@ void PhysicsActor::add_model_shape_to_actor(const Model* model)
 		auto boxGeom = PxBoxGeometry(glm_to_physx((aabb.bmax - aabb.bmin) * 0.5f));
 
 		auto shape = PxRigidActorExt::createExclusiveShape(*actor,
-			boxGeom, *physics_local.default_material);
+			boxGeom, *local_impl->default_material);
 
 		auto middle = (aabb.bmax + aabb.bmin) * 0.5f;
 
@@ -367,7 +395,7 @@ void PhysicsActor::add_vertical_capsule_to_actor(const glm::vec3& base, float he
 {
 	auto capGeom = PxCapsuleGeometry(radius, height * 0.5);
 	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
-		capGeom, *physics_local.default_material);
+		capGeom, *local_impl->default_material);
 
 	glm::vec3 targetCenter = base + glm::vec3(0.f, height * 0.5f, 0.f);
 
@@ -378,7 +406,7 @@ void PhysicsActor::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
 {
 	auto boxGeom = PxSphereGeometry(radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
-		boxGeom, *physics_local.default_material);
+		boxGeom, *local_impl->default_material);
 	shape->setLocalPose(PxTransform(glm_to_physx(pos)));
 	set_shape_flags(shape);
 }
@@ -386,7 +414,7 @@ void PhysicsActor::add_box_shape_to_actor(const glm::mat4& localTransform, const
 {
 	auto boxGeom = PxBoxGeometry(glm_to_physx(halfExtents));
 	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
-		boxGeom, *physics_local.default_material);
+		boxGeom, *local_impl->default_material);
 	shape->setLocalPose(glm_to_physx(localTransform));
 	set_shape_flags(shape);
 }
@@ -414,7 +442,7 @@ void PhysicsActor::init_physics_shape(
 	this->isTrigger = isTrigger;
 	this->isStatic = isStatic;
 
-	auto factory = physics_local.physics_factory;
+	auto factory = local_impl->physics_factory;
 	if (isStatic) {
 		auto t = glm_to_physx(initalTransform);
 		t.q.normalize();
@@ -430,7 +458,7 @@ void PhysicsActor::init_physics_shape(
 		dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->isSimulating);
 	}
 
-	physics_local.scene->addActor(*actor);
+	local_impl->scene->addActor(*actor);
 
 	actor->userData = this;
 
@@ -593,15 +621,16 @@ void PhysicsManLocal::debug_draw_shapes()
 }
 #endif
 
-void PhysicsManLocal::debug_draw_shapes()
+void PhysicsManager::debug_draw_shapes()
 {
-	ASSERT(scene);
+	ASSERT(impl->scene);
 
 	if (g_draw_physx_scene.get_integer() == 0) {
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
+		impl->scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
 		return;
 	}
 	using namespace physx;
+	auto scene = impl->scene;
 	static bool init = false;
 	if (!init) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 2.0);
@@ -611,15 +640,15 @@ void PhysicsManLocal::debug_draw_shapes()
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
 		init = true;
 	}
-	debug_mesh.Begin();
+	impl->debug_mesh.Begin();
 
 	auto& rb = scene->getRenderBuffer();
 	for (PxU32 i = 0; i < rb.getNbLines(); i++)
 	{
 		const PxDebugLine& line = rb.getLines()[i];
 		// render the line
-		debug_mesh.PushLine(physx_to_glm(line.pos0), physx_to_glm(line.pos1), *((Color32*)&line.color0));
+		impl->debug_mesh.PushLine(physx_to_glm(line.pos0), physx_to_glm(line.pos1), *((Color32*)&line.color0));
 	}
-	debug_mesh.End();
-	debug_mesh.Draw(MeshBuilder::LINES);
+	impl->debug_mesh.End();
+	impl->debug_mesh.Draw(MeshBuilder::LINES);
 }
