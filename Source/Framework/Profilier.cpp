@@ -18,6 +18,11 @@ struct Profile_Event
 	uint64_t cpustart = 0;
 	uint64_t cputime = 0;	// microseconds
 	uint32_t accumulated_cpu = 0;
+
+	uint64_t last_period_high = 0;
+	uint64_t period_high = 0;
+
+
 	bool started = false;
 
 	uint64_t last_interval_time_gpu = 0;
@@ -34,13 +39,51 @@ std::vector<Profile_Event> events;
 std::vector<int> stack;
 uint64_t intervalstart = 0;
 int accumulated = 1;
+struct FrameHighStruct
+{
+	float accumulator = 0.0;
+	float high_this_period = 0.0;
+	float high_last_period = 0.0;
+	int tick_count = 0;
+	int tick_count_last_period = 0;
+
+	int ticks_above_average_epsilon_last = 0;
+
+	int ticks_above_average_epsilon = 0;
+
+
+	void update(float dt, float interval) {
+		accumulator += dt;
+		tick_count++;
+		if (accumulator >= interval) {
+			high_last_period = high_this_period;
+			high_this_period = 0.0;
+			accumulator = 0.0;
+			tick_count_last_period = tick_count;
+			tick_count = 0;
+
+			ticks_above_average_epsilon_last = ticks_above_average_epsilon;
+			ticks_above_average_epsilon = 0;
+		}
+		high_this_period = std::max(high_this_period, dt);
+		const float avg_last = interval / tick_count_last_period;
+		if (dt >= avg_last * 1.3) {
+			ticks_above_average_epsilon++;
+		}
+	}
+};
+FrameHighStruct one_second;
+FrameHighStruct ten_second;
+
+
 
 // super not optimized lol
 static void draw_node_children(int index)
 {
 	Profile_Event& e = events[index];
 	if (ImGui::TreeNodeEx(e.name, ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::Text("CPU: %3.5f\n", e.last_interval_time_cpu / 1000.0);
+		ImGui::Text("CPU avg: %3.5f\n", e.last_interval_time_cpu / 1000.0);
+		ImGui::Text("CPU max: %3.5f\n", e.last_period_high / 1000.0);
 		if (e.is_gpu_event) {
 			ImGui::Text("GPU: %3.5f\n", e.last_interval_time_gpu / 1000000.0);
 		}
@@ -57,7 +100,14 @@ static void draw_node_children(int index)
 
 static void draw_imgui_profile_window()
 {
+
 	{
+		ImGui::Text("1s high: %f", one_second.high_last_period);
+		ImGui::Text("1s avg: %f", 1.0/one_second.tick_count_last_period);
+		ImGui::Text("1s percent above middle: %f", one_second.ticks_above_average_epsilon_last / (float)one_second.tick_count_last_period);
+		ImGui::Text("10s high: %f", ten_second.high_last_period);
+		ImGui::Text("10s avg: %f", 10.0/ten_second.tick_count_last_period);
+
 		for (int i = 0; i < events.size(); i++) {
 			if (events[i].parent_event == -1) {
 				draw_node_children(i);
@@ -76,9 +126,14 @@ void Profiler::init()
 
 }
 
-void Profiler::end_frame_tick()
+void Profiler::end_frame_tick(float dt)
 {
 	uint64_t timenow = SDL_GetPerformanceCounter();
+
+	one_second.update(dt, 1.0);
+	ten_second.update(dt, 10.0);
+
+
 	if ((timenow - intervalstart) / (double)SDL_GetPerformanceFrequency() > 1.0) {
 		
 		accumulated = 0;
@@ -87,6 +142,9 @@ void Profiler::end_frame_tick()
 			e.last_interval_time_cpu = (e.accumulated_cpu > 0) ? e.cputime / e.accumulated_cpu : 0;
 			e.cputime = 0;
 			e.accumulated_cpu = 0;
+
+			e.last_period_high = e.period_high;
+			e.period_high = 0;
 
 			if (e.is_gpu_event) {
 				e.last_interval_time_gpu = (e.accumulated_gpu > 0) ? e.gputime / e.accumulated_gpu : 0;
@@ -148,7 +206,10 @@ void Profiler::end_scope(const char* name)
 	ASSERT(e.started);
 	e.started = false;
 	uint64_t timenow = std::chrono::duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
-	e.cputime += timenow - e.cpustart;
+	const uint64_t dt = timenow - e.cpustart;
+	e.cputime += dt;
+	e.period_high = std::max(e.period_high, dt);
+
 	e.accumulated_cpu++;
 
 	if (e.is_gpu_event) {

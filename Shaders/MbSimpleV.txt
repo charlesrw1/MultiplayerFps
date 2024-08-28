@@ -7,13 +7,13 @@ out vec4 FS_IN_Color;
 out vec3 FS_IN_Fragpos;
 
 uniform mat4 ViewProj=mat4(1);
-
+uniform mat4 Model = mat4(1);
 
 void main()
 {
 	FS_IN_Color = VS_IN_Color;
 	FS_IN_Fragpos = VS_IN_Postion;
-	vec4 pos = ViewProj * vec4(VS_IN_Postion, 1.0);
+	vec4 pos =  ViewProj *  Model * vec4(VS_IN_Postion, 1.0);
 	
 	#ifdef SKYBOX
 	gl_Position = pos.xyww;	// so z will always = 1

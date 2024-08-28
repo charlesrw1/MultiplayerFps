@@ -275,86 +275,7 @@ void Renderer::InitGlState()
 	glClearDepth(0.0);
 }
 
-void Renderer::draw_sprite_buffer()
-{
-	if (shadowverts.GetBaseVertex() == 0)
-		return;
-	shadowverts.End();
-	if (sprite_state.in_world_space)
-		shader().set_mat4("ViewProj", vs.viewproj);
-	else
-		shader().set_mat4("ViewProj", mat4(1));
 
-	shadowverts.Draw(GL_TRIANGLES);
-	shadowverts.Begin();
-
-}
-void Renderer::draw_sprite(glm::vec3 origin, Color32 color, glm::vec2 size, Texture* mat,
-	bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face)
-{
-	ASSERT(0);
-
-	int tex = (mat) ? mat->gl_id : white_texture.gl_id;
-	if ((in_world_space != sprite_state.in_world_space || tex != sprite_state.current_t
-		|| additive != sprite_state.additive))
-		draw_sprite_buffer();
-
-	sprite_state.in_world_space = in_world_space;
-	if (sprite_state.current_t != tex || sprite_state.force_set) {
-		//bind_texture(ALBEDO1_LOC, tex);
-		sprite_state.current_t = tex;
-	}
-	if (sprite_state.additive != additive || sprite_state.force_set) {
-		if (additive) {
-			glBlendFunc(GL_ONE, GL_ONE);
-		}
-		else {
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		}
-		sprite_state.additive = additive;
-	}
-	sprite_state.force_set = false;
-
-	MbVertex v[4];
-	glm::vec3 side1;
-	glm::vec3 side2;
-	if (in_world_space)
-	{
-		if (billboard)
-		{
-			side1 = cross(draw.vs.front, vec3(0.f, 1.f, 0.f));
-			side2 = cross(side1, draw.vs.front);
-		}
-		else
-		{
-			side1 = (glm::abs(orient_face.x) < 0.999) ? cross(orient_face, vec3(1, 0, 0)) : cross(orient_face, vec3(0, 1, 0));
-			side2 = cross(side1, orient_face);
-		}
-	}
-	else
-	{
-		side1 = glm::vec3(1, 0, 0);
-		side2 = glm::vec3(0, 1, 0);
-		glm::vec4 neworigin = vs.viewproj * vec4(origin, 1.0);
-		neworigin /= neworigin.w;
-		origin = neworigin;
-	}
-	int base = shadowverts.GetBaseVertex();
-	glm::vec2 uvbase = glm::vec2(0);
-	glm::vec2 uvsize = glm::vec2(1);
-
-	v[0].position = origin - size.x * side1 + size.y * side2;
-	v[3].position = origin + size.x * side1 + size.y * side2;
-	v[2].position = origin + size.x * side1 - size.y * side2;
-	v[1].position = origin - size.x * side1 - size.y * side2;
-	v[0].uv = uvbase;
-	v[3].uv = glm::vec2(uvbase.x + uvsize.x, uvbase.y);
-	v[2].uv = uvbase + uvsize;
-	v[1].uv = glm::vec2(uvbase.x, uvbase.y + uvsize.y);
-	for (int j = 0; j < 4; j++) v[j].color = color;
-	for (int j = 0; j < 4; j++)shadowverts.AddVertex(v[j]);
-	shadowverts.AddQuad(base, base + 1, base + 2, base + 3);
-}
 
 void Renderer::bind_texture(int bind, int id)
 {
@@ -372,6 +293,8 @@ void Renderer::bind_texture(int bind, int id)
 
 void set_standard_draw_data(const Render_Level_Params& params)
 {
+	return;
+
 	glCheckError();
 
 
@@ -1345,78 +1268,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 	using_skybox_for_specular = false;
 }
 
-void Renderer::ui_render()
-{
-	GPUFUNCTIONSTART;
-
-	return;
-
-	//set_shader(prog.textured3d);
-	shader().set_mat4("Model", mat4(1));
-	glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
-	shader().set_mat4("ViewProj", proj);
-	building_ui_texture = 0;
-	ui_builder.Begin();
-	glEnable(GL_BLEND);
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	//Texture* t = g_imgs.find_texture("crosshair007.png");
-	//int centerx = cur_w / 2;
-	//int centery = cur_h / 2;
-	//
-	//float crosshair_scale = 0.7f;
-	//Color32 crosshair_color = { 0, 0xff, 0, 0xff };
-	//float width = t->width * crosshair_scale;
-	//float height = t->height * crosshair_scale;
-	//
-	//
-	//draw_rect(centerx - width / 2, centery - height / 2, width, height, crosshair_color, t, t->width, t->height);
-	//
-	//draw_rect(0, 300, 300, 300, COLOR_WHITE, mats.find_for_name("tree_bark")->images[0],500,500,0,0);
-
-	ASSERT(0);
-	//if (ui_builder.GetBaseVertex() > 0) {
-	//	bind_texture(ALBEDO1_LOC, building_ui_texture);
-	//	ui_builder.End();
-	//	ui_builder.Draw(GL_TRIANGLES);
-	//}
-
-	glCheckError();
-
-
-	glDisable(GL_BLEND);
-	if (0) {
-		//set_shader(prog.textured3d);
-		glCheckError();
-
-		shader().set_mat4("Model", mat4(1));
-		glm::mat4 proj = glm::ortho(0.f, (float)cur_w, -(float)cur_h, 0.f);
-		shader().set_mat4("ViewProj", mat4(1));
-		shader().set_int("slice", (int)slice_3d);
-
-		ui_builder.Begin();
-		ui_builder.Push2dQuad(glm::vec2(-1, 1), glm::vec2(1, -1), glm::vec2(0, 0),
-			glm::vec2(1, 1), COLOR_WHITE);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, tex.scene_depth);
-
-		glCheckError();
-
-		ui_builder.End();
-		ui_builder.Draw(GL_TRIANGLES);
-
-		glCheckError();
-	}
-
-
-
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_BLEND);
-}
-
 void Renderer::draw_rect(int x, int y, int w, int h, Color32 color, Texture* t, float srcw, float srch, float srcx, float srcy)
 {
 
@@ -1467,60 +1318,6 @@ void draw_skeleton(const AnimatorInstance* a,float line_len,const mat4& transfor
 #include <algorithm>
 
 
-#if 0
-void Render_Pass::remove_from_batch(passobj_handle handle)
-{
-	Pass_Object& obj = pass_objects.get(handle);
-	int batch_idx = obj.batch_index;
-	Batch& batch = batches.at(batch_idx);
-
-	assert(obj.index_in_batch <= batch.pass_obj_count);
-	batch_draw_list.at(batch.pass_obj_start + obj.index_in_batch) = batch_draw_list.at(batch.pass_obj_start + batch.pass_obj_count - 1);
-	batch_draw_list.at(batch.pass_obj_start + batch.pass_obj_count - 1) = -1;
-
-	batch.pass_obj_count -= 1;
-}
-
-void Render_Pass::update_batches()
-{
-	// if any new/removed/refreshed objects
-	if (refresh_queue.empty() && creation_queue.empty() && deletion_queue.empty())
-		return;
-
-	// for removed objects
-	// find batch and decrment object count
-	for (auto& objhandle : deletion_queue) {
-		remove_from_batch(objhandle);
-		pass_objects.free(objhandle);
-	}
-
-	// for new and refreshed objects
-	// compute hash for state
-	// try to find existing batch with binary search
-	// if it exists and has space, then add to it
-
-	for (auto& objhandle : refresh_queue) {
-
-	}
-
-	for (auto& objhandle : creation_queue) {
-
-	}
-
-	// for new/refreshed objects that are left
-	// create new batches and add objects to end of obj list
-	
-	// sort new batches
-	// merge new batches into main batches (now all sorted)
-
-	// compute merged_batches
-
-	// recompute draw call buffer, one draw call per geometry, and add submesh instances with dc index and instance index
-
-	// now: have merged batch list with a start and end count draw calls
-	// have a list of submesh instances which index into draw calls and instance list for transform
-}
-#endif
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
@@ -2762,6 +2559,19 @@ void draw_debug_shapes(float dt)
 	builder.Free();
 }
 
+void Renderer::draw_meshbuilders()
+{
+	auto& mbFL = scene.meshbuilder_objs;
+	auto& mbObjs = scene.meshbuilder_objs.objects;
+	glEnable(GL_DEPTH_TEST);
+	for (auto mbPair : mbObjs)
+	{
+		auto& mb = mbPair.type_;
+		shader().set_mat4("Model", mb.transform);
+		mb.meshbuilder->Draw(MeshBuilder::LINES);
+	}
+}
+
 extern ConfigVar g_draw_grid;
 extern ConfigVar g_grid_size;
 
@@ -3333,28 +3143,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	if(is_wireframe_mode)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-	// depth prepass
-	//if (!is_wireframe_mode)
-	//{
-	//	GPUSCOPESTART("Depth prepass");
-	//	Render_Level_Params params;
-	//	params.output_framebuffer = fbo.scene;
-	//	params.view = current_frame_main_view;
-	//	params.pass = Render_Level_Params::DEPTH;
-	//	params.upload_constants = false;
-	//	params.provied_constant_buffer = ubo.current_frame;
-	//	params.draw_viewmodel = true;
-	//	render_level_to_target(params);
-	//}
-
-	// render ssao using prepass buffer
-
-	// planar reflection render
-	//{
-	//	GPUSCOPESTART("Planar reflection");
-	//	planar_reflection_pass();
-	//}
-
 	// main level render
 	{
 		GPUSCOPESTART("GBUFFER PASS");
@@ -3432,6 +3220,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	}
 	state_machine.invalidate_all();
 
+
 	if (is_wireframe_mode)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	
@@ -3445,6 +3234,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		glDepthFunc(GL_GREATER);
 
 		draw_debug_shapes(params.dt);
+
+		draw_meshbuilders();
+		shader().set_mat4("Model", mat4(1.f));
 
 		// hook in physics debugging, function determines if its drawing or not
 		g_physics.debug_draw_shapes();
@@ -3572,66 +3364,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 	glEnable(GL_DEPTH_TEST);
 }
 
-#undef SET_OR_USE_FALLBACK
-#define SET_OR_USE_FALLBACK(texture, where, fallback) \
-if(gs->images[(int)texture]) bind_texture(where, gs->images[(int)texture]->gl_id); \
-else bind_texture(where, fallback.gl_id);
 
-void Renderer::planar_reflection_pass()
-{
-	ASSERT(0);
-#if 0
-	glm::vec3 plane_n = glm::vec3(0, 1, 0);
-	float plane_d = 2.0;
-
-	View_Setup setup = current_frame_main_view;
-
-	// X-\     /-
-	//	  -\ /-
-	//	----O----------
-	//    -/
-	// C-/
-	setup.front.y *= -1;
-	float dist_to_plane = current_frame_main_view.origin.y + plane_d;
-	setup.origin.y -= dist_to_plane * 2.0f;
-	setup.view = glm::lookAt(setup.origin, setup.origin + setup.front, glm::vec3(0, 1, 0));
-	setup.viewproj = setup.proj * setup.view;
-	if (use_halfres_reflections.get_bool()) {
-		setup.width /= 2;
-		setup.height /= 2;
-	}
-	
-	Render_Level_Params params;
-	params.view = setup;
-	params.has_clip_plane = true;
-	params.custom_clip_plane = vec4(plane_n, plane_d);
-	params.pass = params.OPAQUE;
-	params.clear_framebuffer = true;
-	//params.output_framebuffer = fbo.reflected_scene;
-	params.draw_viewmodel = false;
-	params.upload_constants = true;
-	params.is_water_reflection_pass = true;
-
-	render_level_to_target(params);
-#endif
-}
-
-#if 0
-void Renderer::AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color)
-{
-	vec3 origin = e.position;
-	Capsule c;
-	c.base = origin;
-	c.tip = origin + vec3(0, (false) ? CHAR_CROUCING_HB_HEIGHT : CHAR_STANDING_HB_HEIGHT, 0);
-	c.radius = CHAR_HITBOX_RADIUS;
-	float radius = CHAR_HITBOX_RADIUS;
-	vec3 a, b;
-	c.GetSphereCenters(a, b);
-	mb->AddSphere(a, radius, 10, 7, color);
-	mb->AddSphere(b, radius, 10, 7, color);
-	mb->AddSphere((a + b) / 2.f, (c.tip.y - c.base.y) / 2.f, 10, 7, COLOR_RED);
-}
-#endif
 void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front)
 {
 	vec3 up = vec3(0, -1, 0);
@@ -3717,17 +3450,9 @@ Render_Scene::~Render_Scene() {}
 
 void Renderer::on_level_end()
 {
-
-
 }
-
-// cubemap rendering:
-// if cubemap not allocated: allocate a cubemap (rgb16f)
-// for each side of cubemap: 
-
 void Renderer::on_level_start()
 {
-
 }
 
 void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)

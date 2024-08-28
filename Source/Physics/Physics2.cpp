@@ -93,8 +93,9 @@ public:
 		uint32_t mask)
 	{
 		physx::PxSweepBuffer sweep;
-		physx::PxTransform local(glm_to_physx(start));
-		bool status = scene->sweep(geom, local, glm_to_physx(dir), length, sweep);
+		PxTransform relativePose(glm_to_physx(start),PxQuat(PxHalfPi, PxVec3(0, 0, 1)));
+		physx::PxTransform local(relativePose);
+		bool status = scene->sweep(geom, local, glm_to_physx(dir), length, sweep, PxHitFlag::eDEFAULT | PxHitFlag::eMTD /* for initial overlaps */);
 		if (!status) {
 			out.fraction = 1.0;
 			return status;
@@ -104,6 +105,7 @@ public:
 		out.fraction = sweep.block.distance / length;
 		out.actor = (PhysicsActor*)sweep.block.actor->userData;
 		out.hit_pos = physx_to_glm(sweep.block.position);
+
 		out.hit_normal = physx_to_glm(sweep.block.normal);
 		out.trace_dir = dir;
 		return status;
@@ -365,6 +367,8 @@ void PhysicsActor::set_shape_flags(PxShape* shape)
 }
 void PhysicsActor::add_model_shape_to_actor(const Model* model)
 {
+	if (disabled)
+		return;
 	if (model->get_physics_body()) {
 		auto body = model->get_physics_body();
 		for (int i = 0; i < body->num_shapes_of_main; i++) {
@@ -393,6 +397,8 @@ void PhysicsActor::add_model_shape_to_actor(const Model* model)
 }
 void PhysicsActor::add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius)
 {
+	if (disabled)
+		return;
 	auto capGeom = PxCapsuleGeometry(radius, height * 0.5);
 	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
 		capGeom, *local_impl->default_material);
@@ -404,6 +410,8 @@ void PhysicsActor::add_vertical_capsule_to_actor(const glm::vec3& base, float he
 }
 void PhysicsActor::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
 {
+	if (disabled)
+		return;
 	auto boxGeom = PxSphereGeometry(radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
 		boxGeom, *local_impl->default_material);
@@ -412,6 +420,9 @@ void PhysicsActor::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
 }
 void PhysicsActor::add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents)
 {
+	if (disabled)
+		return;
+
 	auto boxGeom = PxBoxGeometry(glm_to_physx(halfExtents));
 	auto shape = PxRigidActorExt::createExclusiveShape(*actor,
 		boxGeom, *local_impl->default_material);
@@ -442,6 +453,7 @@ void PhysicsActor::init_physics_shape(
 	this->isTrigger = isTrigger;
 	this->isStatic = isStatic;
 
+
 	auto factory = local_impl->physics_factory;
 	if (isStatic) {
 		auto t = glm_to_physx(initalTransform);
@@ -464,6 +476,7 @@ void PhysicsActor::init_physics_shape(
 
 	actor->setActorFlag(physx::PxActorFlag::eSEND_SLEEP_NOTIFIES, true);
 	actor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, disabled);
+
 }
 
 void PhysicsActor::set_simulate(bool isSimulating)

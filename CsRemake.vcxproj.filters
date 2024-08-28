@@ -108,9 +108,6 @@
     <ClInclude Include="Source\Level.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Local.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Net.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -541,6 +538,9 @@
     <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
+    <ClInclude Include="Source\Framework\ScopedBoolean.h" />
+    <ClInclude Include="Source\Game\Entities\TriggerEntities.h" />
+    <ClInclude Include="Source\Game\Entities\CharacterController.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -815,5 +815,7 @@
     <ClCompile Include="Source\Test\Test.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
     <ClCompile Include="Source\Input\InputAction.cpp" />
+    <ClCompile Include="Source\Game\Entities\TriggerEntities.cpp" />
+    <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
   </ItemGroup>
 </Project>

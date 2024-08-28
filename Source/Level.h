@@ -15,6 +15,7 @@
 #include "Game/Entity.h"
 
 #include "Framework/Hashset.h"
+#include "Framework/ScopedBoolean.h"
 
 class PhysicsActor;
 class WorldSettings;
@@ -36,7 +37,7 @@ public:
 	hash_set<BaseUpdater> tick_list;
 
 	void add_to_update_list(BaseUpdater* b) {
-		if (bIsInUpdateTick)
+		if (b_is_in_update_tick.get_value())
 			wantsToAddToUpdate.push_back(b);
 		else
 			tick_list.insert(b);
@@ -49,12 +50,12 @@ public:
 	}
 
 	void update_level() {
-		bIsInUpdateTick = true;
+		{
+			BooleanScope scope(b_is_in_update_tick);
 
-		for (auto updater : tick_list)
-			updater->update();
-
-		bIsInUpdateTick = false;
+			for (auto updater : tick_list)
+				updater->update();
+		}
 
 		for (auto want : wantsToAddToUpdate) {
 			if (want)
@@ -131,7 +132,7 @@ public:
 		bIsEditorLevel = isEditorLevel;
 	}
 private:
-	bool bIsInUpdateTick = false;
+	ScopedBooleanValue b_is_in_update_tick;
 	std::vector<BaseUpdater*> wantsToAddToUpdate;
 
 	bool bIsEditorLevel=false;

@@ -55,6 +55,7 @@
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
+    <ClInclude Include="Source\Framework\ScopedBoolean.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
@@ -136,7 +137,9 @@
     <ClInclude Include="Source\GameEnginePublic.h" />
     <ClInclude Include="Source\Game\BasePlayer.h" />
     <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
+    <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
+    <ClInclude Include="Source\Game\Entities\TriggerEntities.h" />
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\Components\EntityComponentTypes.h" />
@@ -159,7 +162,6 @@
     <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
-    <ClInclude Include="Source\Local.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Net.h" />
@@ -272,7 +274,9 @@
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
     <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
     <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
+    <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
+    <ClCompile Include="Source\Game\Entities\TriggerEntities.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />

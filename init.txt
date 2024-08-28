@@ -2,9 +2,8 @@
 thirdperson 1
 
 
-#start_ed Map mainMenuMap.tmap
 
-g_draw_physx_scene 0
+g_draw_physx_scene 31
 
 bind 1 "map mainMenuMap.tmap"
 
@@ -45,4 +44,4 @@ file_print_all_openfile_fails 1
 
 RUN_TESTS
 
-start_ed DataClass InputAction
+r.enable_vsync 1

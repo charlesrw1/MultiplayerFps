@@ -26,7 +26,7 @@ std::vector<std::string> split(const std::string& str, char delimiter) {
 }
 #include "AssetCompile/Someutils.h"
 #include <unordered_set>
-
+#include <cassert>
 void AssetRegistrySystem::reindex_all_assets()
 {
 	std::vector<AssetOnDisk> diskAssets;

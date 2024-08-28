@@ -208,9 +208,8 @@ public:
 		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
 
 	void create_shaders();
-	void ui_render();
+
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
-	void cubemap_positions_debug();
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool force_backface_state);
 	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
@@ -350,10 +349,7 @@ public:
 	void set_show_backfaces(bool show_backfaces);
 	Shader shader();
 
-	void draw_sprite(glm::vec3 pos, Color32 color, glm::vec2 size, Texture* mat, 
-		bool billboard, bool in_world_space, bool additive, glm::vec3 orient_face);
-
-
+	void draw_meshbuilders();
 
 	// >>> PBR BRANCH
 	EnvCubemap skybox;

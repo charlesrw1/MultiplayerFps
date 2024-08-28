@@ -58,7 +58,7 @@ public:
 	static void init();
 	static void start_scope(const char* name, bool include_gpu);
 	static void end_scope(const char* name);
-	static void end_frame_tick();
+	static void end_frame_tick(float dt);
 };
 
 struct Profile_Scope_Wrapper

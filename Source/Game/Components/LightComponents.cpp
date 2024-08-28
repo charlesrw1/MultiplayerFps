@@ -55,7 +55,7 @@ void SpotLightComponent::on_init()
 
 		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
 		s->dont_serialize_or_edit = true;
-		s->set_ls_transform({}, {}, glm::vec3(0.25f));
+		s->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
 	}
 }
 

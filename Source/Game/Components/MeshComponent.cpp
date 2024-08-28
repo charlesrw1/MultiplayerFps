@@ -137,9 +137,12 @@ void MeshComponent::on_init()
 
 		idraw->get_scene()->update_obj(draw_handle, obj);
 
+		if (disable_physics)
+			return;
+
 		physActor->init_physics_shape(nullptr, get_ws_transform(), 
 			simulate_physics && !eng->is_editor_level(), 
-			send_overlap, send_hit, is_static, is_trigger, false);
+			send_overlap, send_hit, is_static, is_trigger, disable_physics);
 		physActor->add_model_shape_to_actor(modToUse);
 		physActor->update_mass();
 	}

@@ -1,7 +1,6 @@
 #include <SDL2/SDL.h>
 
 #include "glad/glad.h"
-#include "stb_image.h"
 
 #include <cstdio>
 #include <vector>
@@ -15,29 +14,26 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-#include "Render/Shader.h"
 #include "Render/Texture.h"
 #include "Framework/MathLib.h"
-#include "Render/Model.h"
 
 #include "Level.h"
 
 #include "Net.h"
+
 #include "GameEngineLocal.h"
+
 #include "Types.h"
+
 #include "Client.h"
 #include "Server.h"
+
 #include "Game/Entities/Player.h"
 #include "Framework/Config.h"
 #include "Render/DrawPublic.h"
 #include "Game/Entity.h"
 #include "Physics/Physics2.h"
-#include "Level.h"
-
 #include "Assets/AssetBrowser.h"
-#include "Animation/AnimationTreePublic.h"
-#include "Animation/Editor/AnimationGraphEditorPublic.h"
-
 #include "Sound/SoundPublic.h"
 
 #include "imgui.h"
@@ -124,7 +120,7 @@ static Debug_Console dbg_console;
 static std::mutex printMutex;
 
 char* string_format(const char* fmt, ...) {
-	std::lock_guard<std::mutex> printLock(printMutex);
+	std::lock_guard<std::mutex> printLock(printMutex);	// fixme
 
 	va_list argptr;
 	static int index = 0;
@@ -476,13 +472,6 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 #include "Framework/Files.h"
 
 
-struct Sound
-{
-	char* buffer;
-	int length;
-};
-
-
 void GameEngineLocal::connect_to(string address)
 {
 	ASSERT(0);
@@ -563,16 +552,6 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 
 #endif
 
-
-enum class NetState
-{
-	Idle,					// => Idle
-	WaitingForConnect,		// => Idle
-	Connecting,				// => Idle
-	Loading,				// => Loading
-	WatingForInitialState,	// => Idle
-	Game,					// => Game
-};
 
 DECLARE_ENGINE_CMD(quit)
 {
@@ -693,88 +672,11 @@ DECLARE_ENGINE_CMD(net_stat)
 	sys_print("%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
 }
 
-#ifdef _DEBUG
-DECLARE_ENGINE_CMD(print_ents)
-{
-
-
-}
-#endif
-
-DECLARE_ENGINE_CMD(print_vars)
-{
-	//if (args.size() == 1)
-	//	Var_Manager::get()->print_vars(nullptr);
-	//else
-	//	Var_Manager::get()->print_vars(args.at(1));
-}
 
 DECLARE_ENGINE_CMD(reload_shaders)
 {
 	idraw->reload_shaders();
 }
-
-
-typedef int sound_handle;
-enum Sound_Channels
-{
-	UI_LAYER,
-
-
-};
-
-class Audio_System
-{
-public:
-	void init();
-	sound_handle start_sound(const char* sound, bool looping);
-	void set_sound_position(sound_handle handle, vec3 position);
-	void free_sound(sound_handle* handle);
-
-	
-
-};
-
-void Audio_System::init()
-{
-
-}
-
-
-extern void benchmark_run();
-extern void benchmark_gltf();
-extern void at_test();
-#include "Framework/ExpressionLang.h"
-
-#include "Game/Schema.h"
-
-#include "Render/MaterialLocal.h"
-#include "Framework/PropHashTable.h"
-
-
-class IDamageableInterface
-{
-public:
-	virtual void take_damage() = 0;
-	virtual void on_death() = 0;
-};
-class IInteractable
-{
-public:
-	virtual void interact() = 0;
-};
-template<typename Derived, typename Base>
-static ptrdiff_t ComputePointerOffset()
-{
-	Derived* derivedPtr = (Derived*)1;
-	Base* basePtr = static_cast<Base*>(derivedPtr);
-	return (intptr_t)basePtr - (intptr_t)derivedPtr;
-}
-
-#include <direct.h>
-#include <stdlib.h>
-#include <stdio.h>
-
 
 
 int main(int argc, char** argv)
@@ -843,48 +745,6 @@ void GameEngineLocal::leave_level()
 	state = Engine_State::Idle;
 }
 
-// Animation debugger is seperate
-
-// In 1 world at a time: editor world, game world, animation editor world, etc.
-// when switching maps, you implicity leave any editor state behind
-// can have 0 or 1 map loaded
-// gui is always loaded, insert explicit branch logic for editor vs game for the GUI
-// use world ticks if any map is loaded
-
-// execute map change then handles all logic for editor/game switching
-
-// switching to another editor or closing it goes through the same queued path
-
-// either: in an idle state (almost never here, only if in editor mode and no editor is open)
-//		   in a game state (menu map, in game map, in editor with map)
-//			in a loading state (queued map, loading it)
-//			freeing of resources happens between map loads (no streaming stuff)
-//			start editor->editor queues a map load (editor version)
-//			main tick then loads the map and either fails or succeeds
-//			can also pass in a "null" map to just create an empty map, but it goes through same path
-//	when loading map for the actual game:
-//		load all the entities (only unserialize) (this can be async along with model/texture loads)
-//		find the world settings entity
-//		create the gamemode
-//		gamemode->init()
-//		register entities
-//		gamemode->begin()
-//		begin() all entities
-//		create player entity from worldsettings
-//		gamemode->spawn_player()
-//		*ready for ticks*
-// when loading map for the editor
-//		load all the entities
-//		register all entities
-//		*read for ticks*
-// when freeing editor map
-//		unregister all entities
-// when freeing actual game map
-//		gamemode->end()
-//		unregister all entities
-//		end() all entities
-
-// execute_map_change(editor_tool /* can be null */, mapname)
 
 void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, Level* loadedLevel)
 {
@@ -1289,7 +1149,7 @@ bool GameEngineLocal::game_draw_screen()
 	glm::mat4 in = glm::inverse(view);
 	auto pos = in[3];
 	auto front = -in[2];
-	View_Setup vs = View_Setup(pos, front, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
+	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
 	//View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
@@ -1390,8 +1250,9 @@ glm::mat4 View_Setup::make_opengl_perspective_with_near_far() const
 View_Setup::View_Setup(glm::mat4 viewMat, float fov, float near, float far, int width, int height)
 	: view(viewMat), fov(fov), near(near), far(far), width(width), height(height)
 {
-	this->origin = viewMat[3];
-	this->front = viewMat[2];
+	auto inv = glm::inverse(viewMat);
+	this->origin = inv[3];
+	this->front = -inv[2];
 	const float aspectRatio = width / (float)height;
 	proj = MakeInfReversedZProjRH(fov, aspectRatio, near);
 	viewproj = proj * view;
@@ -1541,7 +1402,7 @@ void GameEngineLocal::game_update_tick()
 
 	assert(level);
 
-	// tick input, this wall execute event callbacks
+	// tick input, this will execute event callbacks
 	GetGInput().tick_users(eng->get_tick_interval());
 
 	// create input
@@ -1729,6 +1590,9 @@ void GameEngineLocal::loop()
 			float orig_ft = frame_time;
 			float orig_ti = tick_interval;
 
+			//num_ticks = 1;
+			//tick_interval = frame_time;
+
 			frame_time *= g_slomo.get_float();
 			tick_interval *= g_slomo.get_float();
 
@@ -1769,7 +1633,7 @@ void GameEngineLocal::loop()
 		// draw
 		draw_screen();
 
-		Profiler::end_frame_tick();
+		Profiler::end_frame_tick(frame_time);
 	}
 }
 

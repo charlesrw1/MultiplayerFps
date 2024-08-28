@@ -37,6 +37,8 @@
 
 #include "Game/GameModes/MainMenuMode.h"
 
+#include "CharacterController.h"
+
 CLASS_H(PlayerNull, PlayerBase)
 public:
 
@@ -51,7 +53,7 @@ public:
 		if (!camera)
 			return;
 
-		fov = 70.f;
+		fov = camera->fov;
 		view = glm::inverse(camera->get_ws_transform());
 
 		//front = AnglesToVector(euler.x, euler.y);
@@ -189,84 +191,6 @@ Action_State Player::get_ground_state_based_on_speed(float s) const
 }
 
 
-// bitmask for what controller collided with
-enum CharacterControllerCollisionFlags
-{
-	CCCF_ABOVE = 1,
-	CCCF_BELOW = 2,
-	CCCF_SIDES = 4
-};
-
-class CharacterController
-{
-public:
-	// continuous move
-	void move(const glm::vec3& displacement, float dt, uint32_t& out_ccfg_flags);
-	// teleport move
-	void set_position(const glm::vec3& v) {
-		position = v;
-	}
-
-	const glm::vec3& get_character_pos() const {
-		return position;
-	}
-
-	// parameters
-	float gravity_mult = 1.f;
-	glm::vec3 gravity_dir = glm::vec3(0, -1, 0);
-	float capsule_height = 2.f;
-	float capsule_radius = 0.5f;
-
-private:
-	void sweep_capsule();
-
-	uint32_t cached_flags = 0;
-	glm::vec3 position{};	// internal position
-};
-
-void CharacterController::move(const glm::vec3& disp, float dt, uint32_t& out_ccfg_flags)
-{
-	world_query_result wqr;
-	vertical_capsule_def_t shape_def;
-	shape_def.half_height = capsule_height * 0.5;
-	shape_def.radius = capsule_radius;
-
-	float disp_len = glm::length(disp);
-	if (disp_len <= 0.0000001) {
-		out_ccfg_flags = cached_flags;
-		return;
-	}
-
-	auto dir = disp / disp_len;
-	bool has_hit = g_physics.sweep_capsule(wqr, shape_def, position, dir, disp_len, UINT32_MAX);
-
-}
-void CharacterController::sweep_capsule()
-{
-
-}
-
-
-void sweep_move(glm::vec3& velocity, glm::vec3& position)
-{
-	world_query_result res;
-	float move_time = eng->get_tick_interval();
-	float length = glm::length(velocity) * move_time;
-
-	if (length < 0.00001)
-		return;
-
-	glm::vec3 dir = glm::normalize(velocity);
-	bool found = g_physics.sweep_sphere(res, 1.0, position, dir, length, {});
-	if (found) {
-		position = position + dir * length * res.fraction+res.hit_normal*0.01f;
-		velocity = glm::vec3(0.0);
-	}
-	else {
-		position = position + dir * length;
-	}
-
-}
 
 void Player::slide_move()
 {
@@ -475,6 +399,7 @@ static AddToDebugMenu adddrawentinfo("entity physics info", draw_entity_info);
 #include "Sound/SoundPublic.h"
 void Player::move()
 {
+#if 0
 	glm::vec3 last_velocity = velocity;
 
 	// fixme:
@@ -534,6 +459,7 @@ void Player::move()
 		isound->play_sound(s);
 		distTraveledSinceLastFootstep = 0.0;
 	}
+#endif
 }
 
 
@@ -697,6 +623,7 @@ void Player::get_view(glm::mat4& viewMat, float& fov)
 {
 	if (g_thirdperson.get_bool()) {
 
+		view_angles = cmd.view_angles;
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
 		vec3 camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
@@ -1046,6 +973,8 @@ void Player::on_jump_callback()
 {
 	static int i = 0;
 	sys_print("jump %d\n",i++);
+	if(is_on_ground())
+		velocity.y += 5.0;
 }
 
 
@@ -1053,13 +982,73 @@ void Player::update()
 {
 	move();
 
+	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
+	float speed = glm::length(velocity);
 
-	glm::vec3 pos = root_component->get_ws_position();
+	if (speed >= 0.0001) {
+		float dropamt = friction_value * speed * eng->get_tick_interval();
+		float newspd = speed - dropamt;
+		if (newspd < 0)
+			newspd = 0;
+		float factor = newspd / speed;
+		velocity.x *= factor;
+		velocity.z *= factor;
+	}
 
-	auto f = inputPtr->get_value<glm::vec2>(actions->move.get());
+	vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
+	float inputlen = length(inputvec);
+	if (inputlen > 0.00001)
+		inputvec = inputvec / inputlen;
+	if (inputlen > 1)
+		inputlen = 1;
 
-	pos.x += f.x * eng->get_tick_interval();
+	vec3 look_front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
+	look_front.y = 0;
+	look_front = normalize(look_front);
+	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
+	const bool player_on_ground =  is_on_ground();
+	float acceleation_val = (player_on_ground) ? ground_accel : air_accel;
+	acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
+	float maxspeed_val = (player_on_ground) ? max_ground_speed : max_air_speed;
+
+	vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
+	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
+	vec3 xz_velocity = vec3(velocity.x, 0, velocity.z);
+
+	float wishspeed = inputlen * maxspeed_val;
+	float addspeed = wishspeed - dot(xz_velocity, wishdir);
+	addspeed = glm::max(addspeed, 0.f);
+	float accelspeed = acceleation_val * wishspeed * eng->get_tick_interval();
+	accelspeed = glm::min(accelspeed, addspeed);
+	xz_velocity += accelspeed * wishdir;
+
+	float len = length(xz_velocity);
+	//if (len > maxspeed)
+	//	xz_velocity = xz_velocity * (maxspeed / len);
+	if (len < 0.3 && accelspeed < 0.0001)
+		xz_velocity = vec3(0);
+	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
+	
+	velocity.y -= 10.0 * eng->get_tick_interval();
+
+	uint32_t flags = 0;
+
+	glm::vec3 out_vel;
+	ccontroller->move(velocity*(float)eng->get_tick_interval(), eng->get_tick_interval(), 0.001f, flags, out_vel);
+	
+	velocity = out_vel;
+	action = (flags & CCCF_BELOW) ? Action_State::Idle : Action_State::Falling;
+
+	set_ws_position(ccontroller->get_character_pos());
+
+	if (flags & CCCF_BELOW)
+		Debug::add_box(ccontroller->get_character_pos(), glm::vec3(0.5), COLOR_RED, 0);
+	if (flags & CCCF_ABOVE)
+		Debug::add_box(ccontroller->get_character_pos() + glm::vec3(0, ccontroller->capsule_height, 0), glm::vec3(0.5), COLOR_GREEN, 0.5);
+
+	auto line_start = ccontroller->get_character_pos() + glm::vec3(0, 0.5, 0);
+	Debug::add_line(line_start, line_start + velocity * 3.0f, COLOR_CYAN,0);
 }
 
 
@@ -1125,6 +1114,9 @@ void Player::update()
 
 	 ccontroller = std::make_unique<CharacterController>();
 	 ccontroller->set_position(get_ws_position());
+	 ccontroller->capsule_height = player_capsule->height;
+	 ccontroller->capsule_radius = player_capsule->radius;
+
 }
  void Player::end() {
 	 GameInputSystem::get().free_input_user(inputPtr);
@@ -1138,22 +1130,41 @@ void Player::update()
  Player::Player() {
 	 player_mesh = create_sub_component<MeshComponent>("CharMesh");
 	 player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
-	 viewmodel_mesh = create_sub_component<MeshComponent>("ViewmodelMesh");
 	 spotlight = create_sub_component<SpotLightComponent>("Flashlight");
 	 health = create_sub_component<HealthComponent>("PlayerHealth");
 	 root_component = player_capsule;
 
 	 player_mesh->attach_to_parent(player_capsule, {});
-	 viewmodel_mesh->attach_to_parent(player_mesh, {});
 	 spotlight->attach_to_parent(root_component, {});
 
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);
+	 player_mesh->disable_physics = true;
+
 
 	 player_capsule->physics_preset.ptr = &PP_Character::StaticType;
-	 player_capsule->is_trigger = false;
+	 player_capsule->is_trigger = true;
 	 player_capsule->send_overlap = true;
+	 player_capsule->disable_physics = true;
+	 player_capsule->is_static = false;
+	 player_capsule->height = 1.7;
+	 player_capsule->radius = 0.3;
 
 	 tickEnabled = true;
  }
 
+CLASS_H(CoverPositionMarker,Entity)
+public:
+	CoverPositionMarker() {
+		if (eng->is_editor_level()) {
+			auto billboard = create_sub_component<BillboardComponent>("EditorBillboard");
+			billboard->set_texture(GetAssets().find_global_sync<Texture>("icon/_nearest/blue_poi.png").get());
+			billboard->dont_serialize_or_edit = true;
+
+			auto arrow = create_sub_component<ArrowComponent>("Arrow");
+			arrow->dont_serialize_or_edit = true;
+			arrow->set_ws_transform({}, {}, glm::vec3(0.2));
+		}
+	}
+};
+CLASS_IMPL(CoverPositionMarker);

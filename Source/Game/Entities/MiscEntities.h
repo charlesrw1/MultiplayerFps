@@ -104,20 +104,19 @@ public:
 
 	int current_waypoint = 0;
 };
-
+#include "Assets/AssetDatabase.h"
+#include "Render/Model.h"
 CLASS_H(Door, Entity)
 public:
 	Door() {
 		door_mesh = create_sub_component<MeshComponent>("DoorMesh");
-		door_handle = create_sub_component<MeshComponent>("DoorHandle");
 		root_component = door_mesh;
-		door_handle->attach_to_parent(door_mesh, {});
+
+		door_mesh->is_static = false;
+		door_mesh->simulate_physics = false;	// kinematic object
+		door_mesh->set_model(GetAssets().find_assetptr_unsafe<Model>("door.cmdl"));
 	}
 
-	enum {
-		OPEN,
-		CLOSED
-	}doorstate = OPEN;
 
 	bool start_open = false;
 	bool start_locked = false;
@@ -129,10 +128,12 @@ public:
 		START_PROPS(Door)
 			REG_BOOL(start_locked, PROP_DEFAULT, ""),
 			REG_BOOL(start_open, PROP_DEFAULT, ""),
-			END_PROPS(Door)
+		END_PROPS(Door)
 
 	}
-
+	void start() override {
+		tickEnabled = true;	// tick me
+	}
 	void update() override;
 };
 

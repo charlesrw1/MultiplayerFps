@@ -2078,6 +2078,11 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 		const auto& cgltf_mat = d->materials[i];
 		std::string mat_name = cgltf_mat.name;
 
+		if (cgltf_mat.pbr_metallic_roughness.base_color_texture.texture)
+			output_embedded_texture(strip_extension(modelname) + "_ALB.png", cgltf_mat.pbr_metallic_roughness.base_color_texture.texture->image, d);
+		if (cgltf_mat.normal_texture.texture)
+			output_embedded_texture(strip_extension(modelname) + "_NRM.png", cgltf_mat.normal_texture.texture->image, d);
+
 		if (index_accum < def.directMaterialSet.size())
 			mat_name = def.directMaterialSet[index_accum];
 		final_mats[i] = mat_name;
