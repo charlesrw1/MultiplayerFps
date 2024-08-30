@@ -541,6 +541,7 @@
     <ClInclude Include="Source\Framework\ScopedBoolean.h" />
     <ClInclude Include="Source\Game\Entities\TriggerEntities.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
+    <ClInclude Include="Source\Framework\UniquePtrReflection.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

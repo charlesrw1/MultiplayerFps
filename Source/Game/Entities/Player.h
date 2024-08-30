@@ -78,7 +78,6 @@ struct PlayerFlags
 class PlayerHUD;
 class HealthComponent;
 class InputUser;
-class PlayerActions;
 class CharacterController;
 CLASS_H(Player, PlayerBase)
 public:
@@ -92,7 +91,6 @@ public:
 	HealthComponent* health{};
 
 	InputUser* inputPtr = nullptr;
-	unique_ptr<PlayerActions> actions;
 
 	EntityPtr<Entity> someEntity;
 
@@ -161,13 +159,6 @@ public:
 private:
 
 	// physics stuff
-	void move();
-
-
-	void get_crouch_state(bool& is_crouching);
-	Action_State update_state(const float grnd_speed, bool& dont_add_grav);
-	Action_State get_ground_state_based_on_speed(float speed) const;
-	void slide_move();
 
 
 	glm::vec3 get_look_vec() {

@@ -218,29 +218,6 @@ struct shader_key
 static_assert(sizeof(shader_key) == 4, "shader key needs 4 bytes");
 
 
-
-// opaque materials get one path
-// transparent materials get another path
-// post process materials get another
-// (different output targets, different inputs)
-
-// materials also vary depending on context:
-// is it animated?
-// is it outputting editor id?
-
-// so step 1: determine WHAT material we have (ie what shader)
-//		if this is a depth pass, then get a special shader that is more easily batched
-// now we have the shader, the options function like "#ifdefs for the shader" so check if the shader already exists first
-
-// Essentially we want a hashmap of uint64(shader id, shader parameters) maped to a shader object
-// to make sorting them easier, each shader object is also assigned a program id the first time its created (thus we can store shader id under, say, 16 bits)
-// hashmap<uint64_t, {glShader, uint16}> shaderid_to_shaderobj
-// and vector<uint64_t> (maps from uint16 back to shader key)
-// if the shader doesnt modify verticies then it can get the uber depth shader, if it does, then it gets its own depth shader but fragment part is simplified
-// if its alpha tested, then the depth material gets its own shader
-// thus basic opaques can be merged, but anything else cant be merged in the depth pass
-
-
 class Material_Shader_Table
 {
 public:

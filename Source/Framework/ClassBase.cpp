@@ -183,7 +183,7 @@ const ClassTypeInfo* ClassBase::find_class(const char* classname)
 	return nullptr;
 }
 // find a ClassTypeInfo by integer id
-const ClassTypeInfo* ClassBase::find_class(uint16_t id)
+const ClassTypeInfo* ClassBase::find_class(int32_t id)
 {
 	ASSERT(get_registry().initialzed);
 

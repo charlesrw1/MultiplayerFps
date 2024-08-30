@@ -182,19 +182,11 @@ bool Player::check_perch()
 }
 
 #endif
-Action_State Player::get_ground_state_based_on_speed(float s) const
-{
-	if (s > 0.1)
-		return Action_State::Moving;
-	else
-		return Action_State::Idle;
-}
 
 
-
+#if 0
 void Player::slide_move()
 {
-#if 0
 	vec3 orig_velocity = velocity;
 	vec3 orig_position = position;
 
@@ -263,8 +255,8 @@ void Player::slide_move()
 			position = end;
 		}
 	}
-#endif
 }
+#endif
 
 float lensquared_noy(vec3 v)
 {
@@ -397,9 +389,9 @@ void draw_entity_info()
 static AddToDebugMenu addmovevars("move vars", move_variables_menu);
 static AddToDebugMenu adddrawentinfo("entity physics info", draw_entity_info);
 #include "Sound/SoundPublic.h"
+#if 0
 void Player::move()
 {
-#if 0
 	glm::vec3 last_velocity = velocity;
 
 	// fixme:
@@ -459,8 +451,8 @@ void Player::move()
 		isound->play_sound(s);
 		distTraveledSinceLastFootstep = 0.0;
 	}
-#endif
 }
+#endif
 
 
 CLASS_H(PlayerWeaponData,ClassBase )
@@ -606,13 +598,6 @@ void Player::set_input_command(Move_Command newcmd) {
 }
 
 
-struct PlayerActions
-{
-	unique_ptr<InputAction> move;
-	unique_ptr<InputAction> jump;
-	unique_ptr<InputAction> reload;
-};
-
 glm::vec3 Player::calc_eye_position()
 {
 	float view_height = (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
@@ -623,12 +608,15 @@ void Player::get_view(glm::mat4& viewMat, float& fov)
 {
 	if (g_thirdperson.get_bool()) {
 
-		view_angles = cmd.view_angles;
-		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
-		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
-		vec3 camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
 
-		viewMat = glm::lookAt(camera_pos, camera_pos + front, glm::vec3(0, 1, 0));
+		auto pos = get_ws_position();
+		auto camera_pos = glm::vec3(pos.x, 6.0, pos.z - 6);
+
+		//vec3 front = AnglesToVector(view_angles.x, view_angles.y);
+		//vec3 side = normalize(cross(front, vec3(0, 1, 0)));
+		//vec3 camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
+
+		viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
 
 		//org = camera_pos;
 		//ang = view_angles;
@@ -953,21 +941,6 @@ public:
 };
 CLASS_IMPL(HealthComponent);
 
-CLASS_H(HoldTrigger, Trigger)
-public:
-	TriggerMask check_trigger(InputValue value, float dt) const override {
-		auto val = (value.get_value<float>() > 0.5) ? TriggerMask::Active : TriggerMask();
-		return val;
-	}
-	static const PropertyInfoList* get_props() {
-		START_PROPS(HoldTrigger)
-			REG_FLOAT(value,PROP_DEFAULT,"0.5")
-		END_PROPS(HoldTrigger)
-	}
-
-	float value = 0.5;
-};
-CLASS_IMPL(HoldTrigger);
 
 void Player::on_jump_callback()
 {
@@ -980,7 +953,23 @@ void Player::on_jump_callback()
 
 void Player::update()
 {
-	move();
+	auto moveAction = inputPtr->get("game/move");
+	auto lookAction = inputPtr->get("game/look");
+
+	{
+		auto off = lookAction->get_value<glm::vec2>();
+		view_angles.x -= off.y;	// pitch
+		view_angles.y += off.x;	// yaw
+		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+		view_angles.y = fmod(view_angles.y, TWOPI);
+	}
+	{
+		auto move = moveAction->get_value<glm::vec2>();
+		cmd.forward_move = move.y;
+		cmd.lateral_move = move.x;
+
+		printf("%f %f\n", move.x, move.y);
+	}
 
 	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
 	float speed = glm::length(velocity);
@@ -1002,7 +991,7 @@ void Player::update()
 	if (inputlen > 1)
 		inputlen = 1;
 
-	vec3 look_front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
+	vec3 look_front = AnglesToVector(view_angles.x, view_angles.y);
 	look_front.y = 0;
 	look_front = normalize(look_front);
 	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
@@ -1081,34 +1070,19 @@ void Player::update()
 				 inputPtr->assign_device(handle);
 			 });
 
-		 GetGInput().user_lost_device.add(this, [&](InputUser* user)
+		 inputPtr->on_lost_device.add(this, [&]()
 			 {
-				 if (user == inputPtr) {
-					 inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
-				 }
+				inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
 			 });
 	 }
 
-	 actions = std::make_unique<PlayerActions>();
-	 actions->jump = std::make_unique<InputAction>();
-	 {
-		 InputAction::Binding b;
-		 b.defaultBinding = GlobalInputBinding((int)GlobalInputBinding::KeyboardStart + SDL_SCANCODE_SPACE);
-		 b.trigger = std::make_unique<HoldTrigger>();
-		 actions->jump->binds.push_back(std::move(b));
-	 }
-	 actions->move = std::make_unique<InputAction>();
-	 {
-		 InputAction::Binding b;
-		 b.defaultBinding = GlobalInputBinding((int)GlobalInputBinding::KeyboardStart + SDL_SCANCODE_W);
-		 actions->move->binds.push_back(std::move(b));
-		 b.defaultBinding = GlobalInputBinding((int)GlobalInputBinding::ControllerAxisStart + SDL_CONTROLLER_AXIS_LEFTY);
-		 actions->move->binds.push_back(std::move(b));
-	 }
+	 inputPtr->enable_mapping("game");
 
-	 inputPtr->bind_function(actions->jump.get(), ActionStateCallback::OnStart, [&] {
-		 this->on_jump_callback();
-		});
+	 auto jumpAction = inputPtr->get("game/jump");
+	 assert(jumpAction);
+	 jumpAction->bind_start_function([this] {
+		 on_jump_callback();
+		 });
 
 	 Player::find_a_spawn_point();
 

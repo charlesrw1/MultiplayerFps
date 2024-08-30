@@ -19,8 +19,8 @@ public:
 		bool create_default_obj
 	);
 
-	uint16_t id = 0;
-	uint16_t last_child = 0;
+	int32_t id = 0;
+	int32_t last_child = 0;
 	const char* classname = "";
 	const char* superclassname = "";
 	ClassBase*(*allocate)()=nullptr;
@@ -153,8 +153,8 @@ struct ClassTypeIterator
 	bool is_end() const { return index >= end; }
 	const ClassTypeInfo* get_type() const;
 private:
-	uint16_t index = 0;
-	uint16_t end = 0;
+	int32_t index = 0;
+	int32_t end = 0;
 };
 
 class ClassBase
@@ -196,7 +196,7 @@ public:
 	// find a ClassTypeInfo by classname string
 	static const ClassTypeInfo* find_class(const char* classname);
 	// find a ClassTypeInfo by integer id
-	static const ClassTypeInfo* find_class(uint16_t id);
+	static const ClassTypeInfo* find_class(int32_t id);
 
 	static bool does_class_exist(const char* classname) {
 		return find_class(classname) != nullptr;
@@ -213,7 +213,7 @@ public:
 	}
 	// allocate by id
 	template<typename T>
-	static T* create_class(uint16_t id) {
+	static T* create_class(int16_t id) {
 		auto classinfo = find_class(id);
 		if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
 			return nullptr;

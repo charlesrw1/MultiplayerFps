@@ -1,6 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <SDL2/SDL.h>	// for enums
+#include <string>
 
 struct InputValue
 {
@@ -55,6 +56,7 @@ enum class InputDeviceType : uint8_t
 	Controller,
 };
 
+
 enum class GlobalInputBinding
 {
 	Empty,
@@ -79,6 +81,10 @@ enum class GlobalInputBinding
 
 	ControllerAxisStart,
 	ControllerAxisEnd = ControllerAxisStart + SDL_CONTROLLER_AXIS_MAX - 1,
+
+	NumInputs
 };
 
 InputDeviceType get_device_type_for_keybind(GlobalInputBinding bind);
+std::string get_button_type_string(GlobalInputBinding bind);
+std::string get_device_type_string(InputDeviceType type);

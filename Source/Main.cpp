@@ -219,20 +219,6 @@ static void SDLError(const char* msg)
 }
 
 
-static void view_angle_update(glm::vec3& view_angles)
-{
-	int x, y;
-	SDL_GetRelativeMouseState(&x, &y);
-	float x_off = g_mousesens.get_float() * x;
-	float y_off = g_mousesens.get_float() * y;
-
-	view_angles.x -= y_off;	// pitch
-	view_angles.y += x_off;	// yaw
-	view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
-	view_angles.y = fmod(view_angles.y, TWOPI);
-
-}
-
 template<typename T>
 T* checked_cast(ClassBase* c) {
 	return c ? c->cast_to<T>() : nullptr;
@@ -241,6 +227,7 @@ T* checked_cast(ClassBase* c) {
 
 void GameEngineLocal::make_move()
 {
+#if 0
 	Player* p = checked_cast<Player>(get_local_player());
 
 	if (!p)
@@ -302,6 +289,7 @@ void GameEngineLocal::make_move()
 	p->set_input_command(command);
 	//if(cl->get_state()>=CS_CONNECTED)
 	//	cl->get_command(cl->OutSequence()) = command;
+#endif
 }
 extern ConfigVar g_project_name;
 
@@ -677,6 +665,138 @@ DECLARE_ENGINE_CMD(reload_shaders)
 {
 	idraw->reload_shaders();
 }
+
+#include "Input/InputAction.h"
+
+class SwizzleModifier : public InputModifier
+{
+public:
+	SwizzleModifier(bool swizzle, bool negate, float exp = 1.f) : swizzle(swizzle), negate(negate), exp(exp) {}
+	InputValue modify(InputValue value, float dt) const {
+
+		float f = value.v.x;
+		if (abs(f) <= 0.05)
+			f = 0;
+
+		f = glm::pow(abs(f), exp) * glm::sign(f);
+
+		if (negate) {
+			f = -f;
+		}
+		
+		InputValue out;
+		if (swizzle)
+			out.v.y = f;
+		else
+			out.v.x = f;
+
+		return out;
+	}
+	bool swizzle;
+	bool negate;
+	float exp;
+};
+
+
+class LookModifier : public InputModifier
+{
+public:
+	LookModifier(bool swizzle) : swizzle(swizzle) {}
+	InputValue modify(InputValue value, float dt) const {
+		if (swizzle)
+			std::swap(value.v.x, value.v.y);
+		value.v *= g_mousesens.get_float();
+		return value;
+	}
+	bool swizzle;
+};
+class LookModifierController : public InputModifier
+{
+public:
+	LookModifierController(bool swizzle) : swizzle(swizzle) {}
+	InputValue modify(InputValue value, float dt) const {
+
+		float f = value.v.x;
+		if (abs(f) <= 0.05)
+			f = 0;
+
+		float exp = 2.0;
+		f = glm::pow(abs(f),exp) * glm::sign(f);
+
+		f *= 0.1f;
+		InputValue v;
+		if (swizzle) {
+			v.v.y = f;
+		}
+		else
+			v.v.x = f;
+		return v;
+	}
+	bool swizzle;
+};
+class BasicButtonTrigger : public InputTrigger
+{
+public:
+	BasicButtonTrigger(float thresh = 0.5f) : thresh(thresh){
+	}
+	TriggerMask check_trigger(InputValue value, float dt) const {
+ 		return value.get_value<float>() >= thresh ? TriggerMask::Active : TriggerMask();
+	}
+
+	float thresh;
+};
+
+void register_input_actions_for_game()
+{
+	using IA = InputAction;
+	using GIB = GlobalInputBinding;
+
+	IA::register_action("game", "move", true)
+		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTX), new SwizzleModifier(false,false,1.5), nullptr)
+		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTY), new SwizzleModifier(true, false,1.5), nullptr)
+		->add_bind("y+", IA::keyboard_key(SDL_SCANCODE_W), new SwizzleModifier(true, false), nullptr)
+		->add_bind("y-", IA::keyboard_key(SDL_SCANCODE_S), new SwizzleModifier(true, true), {})
+		->add_bind("x-", IA::keyboard_key(SDL_SCANCODE_A), new SwizzleModifier(false, true), {})
+		->add_bind("x+", IA::keyboard_key(SDL_SCANCODE_D), new SwizzleModifier(false, false), {});
+	IA::register_action("game", "look", true)
+		->add_bind("x", GIB::MouseX, new LookModifier(false), {})
+		->add_bind("y", GIB::MouseY, new LookModifier(true), {})
+		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTX), new LookModifierController(false), {})
+		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTY), new LookModifierController(true), {});
+	IA::register_action("game", "inv_next")
+		->add_bind("", GIB::MouseScroll, {}, {})
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {});
+	IA::register_action("game", "inv_prev")
+		->add_bind("", GIB::MouseScroll, {}, {})
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_LEFT), {}, {});
+	IA::register_action("game", "inv_0")
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_0), {}, {});
+	IA::register_action("game", "inv_1")
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_1), {}, {});
+	IA::register_action("game", "inv_2")
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_2), {}, {});
+
+	IA::register_action("game", "jump")
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_A), nullptr, new BasicButtonTrigger())
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_SPACE), nullptr, new BasicButtonTrigger());
+	IA::register_action("ui", "right")
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {})
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_RIGHT), {}, {});
+	IA::register_action("game", "reload")
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_X), {}, new BasicButtonTrigger())
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_R), {}, new BasicButtonTrigger());
+
+}
+
+// game/inv_0/keyboard/ 0
+// game/look/keyboard/lookX MouseX
+// game/look/keyboard/lookY MouseY
+// "ui/left/controller/abutton"
+// "game/reload/controller/xbutton"
+// "game/move/keyboard/y+ W"
+// "game/move/keyboard/y- S"
+// "game/jump/controller Space"
+// "game/jump/keyboard_1/y+
 
 
 int main(int argc, char** argv)
@@ -1279,11 +1399,8 @@ GameEngineLocal::GameEngineLocal()
 
 extern ModelMan mods;
 
-ImNodesContext* ImNodesCreateContext()
-{
-	return nullptr;
-}
 
+extern void register_input_actions_for_game();
 void GameEngineLocal::init()
 {
 	sys_print("--------- Initializing Engine ---------\n");
@@ -1316,6 +1433,7 @@ void GameEngineLocal::init()
 	GetAssets().init();
 
 	GetGInput().init();
+	register_input_actions_for_game();
 
 	g_physics.init();
 	network_init();
@@ -1403,11 +1521,9 @@ void GameEngineLocal::game_update_tick()
 	assert(level);
 
 	// tick input, this will execute event callbacks
-	GetGInput().tick_users(eng->get_tick_interval());
-
-	// create input
 	if (!level->is_editor_level())
-		make_move();
+		GetGInput().tick_users(eng->get_tick_interval());
+
 
 	//if (!is_host())
 	//	cl->SendMovesAndMessages();

@@ -1,4 +1,5 @@
 #pragma once
+#include "ReflectionProp.h"
 
 #define REG_INT(name, flags, hint) make_integer_property(#name,offsetof(TYPE_FROM_START, name), flags, sizeof(TYPE_FROM_START::name), hint)
 #define REG_FLOAT(name, flags, hint) make_float_property(#name,offsetof(TYPE_FROM_START, name), flags, hint)
@@ -21,4 +22,3 @@
 #define END_PROPS(type)  }; \
  static PropertyInfoList properties = { props, sizeof(props) / sizeof(PropertyInfo), #type }; \
 return &properties;
-
