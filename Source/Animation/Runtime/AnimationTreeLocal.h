@@ -975,7 +975,7 @@ CLASS_H(VariableNode, ValueNode)
 		END_PROPS(VariableNode)
 	}
 	virtual void initialize(Animation_Tree_CFG* cfg) override {
-		if (!var_name.empty())
+		if (var_name.empty())
 			sys_print("??? invalid handle for variable node on initialization\n");
 		else {
 			pi = cfg->find_animator_instance_variable(var_name);

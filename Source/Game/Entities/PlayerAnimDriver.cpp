@@ -48,6 +48,11 @@ void CharacterGraphDriver::on_update(float dt) {
 
 	bRunning =(  ismoving && player.is_on_ground());
 	bCrouch = (player.is_crouching);
+	if (bCrouch)
+		vLeftFootPosition = glm::vec3(-0.2, -0.3, 0);
+	else
+		vLeftFootPosition = {};
+
 	bJumping =(  player.action == Action_State::Jumped && !should_transition_out_of_jump_or_fall);
 	bFalling =(  player.action == Action_State::Falling && !should_transition_out_of_jump_or_fall);
 	flSpeed = glm::length(1.f);

@@ -26,6 +26,7 @@ public:
 		set_animator_class(&T::StaticType);
 	}
 	void set_animator_class(const ClassTypeInfo* ti);
+	void set_animation_graph(const char* graph);
 
 	void on_changed_transform() override;
 

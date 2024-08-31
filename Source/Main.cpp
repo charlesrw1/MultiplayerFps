@@ -688,6 +688,8 @@ void register_input_actions_for_game()
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_1), {}, {});
 	IA::register_action("game", "inv_2")
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_2), {}, {});
+	IA::register_action("game", "crouch")
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_LEFTSHOULDER), {}, {});
 
 	IA::register_action("game", "jump")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_A), nullptr, new BasicButtonTrigger())

@@ -377,3 +377,52 @@ void Statemachine_Node_CFG::reset(NodeRt_Ctx& ctx) const
 	const State* state = get_state(rt->active_state);
 	state->tree->reset(ctx);
 }
+
+class StateTransitionScriptSerializer : public IPropertySerializer
+{
+public:
+	std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override {
+		StateTransitionScript* self = (StateTransitionScript*)inst;
+		std::string outstr;
+		outstr.reserve(32);
+		outstr += "\"";
+		outstr += 'a' + (int)self->comparison;
+		outstr += 'a' + (int)self->lhs.type;
+		outstr += " ";
+		outstr += self->lhs.str;
+		outstr += " ";
+		outstr += 'a' + (int)self->rhs.type;
+		outstr += " ";
+		outstr += self->rhs.str;
+		outstr += " ";
+		outstr += "\"";
+
+		return outstr;
+	}
+	int parse(std::string& s, int index, StateTransitionScript::ValueData& vd)
+	{
+		int type = s.at(index++) - 'a';
+		vd.type = ScriptValueType(type);
+		index++;	// skip space
+		int str_start = index;
+		while (s.at(index) != ' ') {
+			index++;
+		}
+		int count = index - str_start;
+		vd.str = s.substr(str_start, count);
+		index++;	// skip space
+		return index;
+	}
+	void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user)override {
+		StateTransitionScript* self = (StateTransitionScript*)inst;
+		std::string s(token.str_start, token.str_len);
+		int comp = s.at(0) - 'a';
+		if (comp < 0||comp>=6)comp = 0;
+		self->comparison = ScriptComparison(comp);
+		int index = 1;
+		index = parse(s, index, self->lhs);
+		index = parse(s, index, self->rhs);
+	}
+};
+#include "Framework/AddClassToFactory.h"
+ADDTOFACTORYMACRO_NAME(StateTransitionScriptSerializer, IPropertySerializer, "StateTransitionScript");

@@ -490,16 +490,6 @@ void vm_menu()
 	ImGui::DragFloat("f", &move_f, 0.01);
 	ImGui::DragFloat("g", &move_g, 0.01);
 }
-template<typename T>
-T neg_modulo(T x, T mod_)
-{
-	return glm::mod(glm::mod(x, mod_) + mod_, mod_);
-}
-static float modulo_lerp_(float start, float end, float mod, float t)
-{
-	return neg_modulo(t - start,mod) / neg_modulo(end - start, mod);
-}
-
 
 #include "glm/gtx/euler_angles.hpp"
 
@@ -529,6 +519,16 @@ void ViewmodelComponent::update_visuals()
 	idraw->update_obj(viewmodel_handle, proxy);
 }
 #endif
+template<typename T>
+T neg_modulo(T x, T mod_)
+{
+	return glm::mod(glm::mod(x, mod_) + mod_, mod_);
+}
+static float modulo_lerp_(float start, float end, float mod, float t)
+{
+	return neg_modulo(t - start, mod) / neg_modulo(end - start, mod);
+}
+
 
 
 
@@ -948,6 +948,7 @@ void Player::update()
 	auto moveAction = inputPtr->get("game/move");
 	auto lookAction = inputPtr->get("game/look");
 	auto jumpAction = inputPtr->get("game/jump");
+	is_crouching = inputPtr->get("game/crouch")->get_value<bool>();
 	{
 		auto off = lookAction->get_value<glm::vec2>();
 		view_angles.x -= off.y;	// pitch
@@ -1130,6 +1131,7 @@ void Player::update()
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);
 	 player_mesh->disable_physics = true;
+	 player_mesh->set_animation_graph("ik_test.ag");
 
 
 	 player_capsule->physics_preset.ptr = &PP_Character::StaticType;

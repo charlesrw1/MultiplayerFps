@@ -396,21 +396,31 @@ void TabState::imgui_draw() {
 bool AnimationGraphEditor::can_save_document() {
 	return playback != graph_playback_state::running;
 }
+#include "AssetCompile/Someutils.h"
+
 bool AnimationGraphEditor::save_document_internal()
 {
 	// first compile, compiling writes editor node data out to the CFG node
 	// this converts data to serialized form (ie Node* become indicies)
 	bool good = compile_graph_for_playing();
 
-	DictWriter write;
-	write.set_should_add_indents(false);
+	{
+		DictWriter write;
+		write.set_should_add_indents(false);
 
-	editing_tree->write_to_dict(write);
-	save_editor_nodes(write);
-
-	auto outfile = FileSys::open_write_game(get_doc_name());
-	outfile->write(write.get_output().c_str(), write.get_output().size());
-	outfile->close();
+		editing_tree->write_to_dict(write);
+		auto outfile = FileSys::open_write_game(get_doc_name());
+		outfile->write(write.get_output().c_str(), write.get_output().size());
+		outfile->close();
+	}
+	{
+		DictWriter write;
+		save_editor_nodes(write);
+		auto name = strip_extension(get_doc_name()) + ".ag_e";
+		auto outfile = FileSys::open_write_game(name);
+		outfile->write(write.get_output().c_str(), write.get_output().size());
+		outfile->close();
+	}
 
 	// now the graph is in a compilied state with serialized nodes, unserialize it so it works again
 	// with the engine

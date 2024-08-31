@@ -37,6 +37,28 @@ void MeshComponent::set_model(Model* modelnext)
 		on_changed_transform();	//fixme
 	}
 }
+void MeshComponent::set_animation_graph(const char* graph)
+{
+	Animation_Tree_CFG* tree = GetAssets().find_assetptr_unsafe<Animation_Tree_CFG>(graph);
+	if (tree != animator_tree.get()) {
+
+		animator_tree.ptr = tree;
+		//animator.reset();
+		//if (animator_tree) {
+		//	AnimatorInstance* c = animator_tree->allocate_animator_class();
+		//	animator.reset(c);
+		//
+		//	bool good = animator->initialize_animator(model.get(), animator_tree.get(), get_owner());
+		//	if (!good) {
+		//		sys_print("!!! couldnt initialize animator\n");
+		//		animator.reset(nullptr);	// free animator
+		//		animator_tree = nullptr;	// free tree reference
+		//	}
+		//	else
+		//		set_ticking(true);	// start ticking the animator
+		//}
+	}
+}
 
 void MeshComponent::set_material_override(const MaterialInstance* mi)
 {
@@ -93,6 +115,8 @@ void MeshComponent::update_handle()
 	obj.is_skybox = is_skybox;
 	obj.shadow_caster = cast_shadows;
 	obj.outline = get_owner()->is_selected_in_editor();
+	if (animator)
+		obj.animator = animator.get();
 	if (!eMaterialOverride.empty())
 		obj.mat_override = eMaterialOverride[0].get();
 	idraw->get_scene()->update_obj(draw_handle, obj);
@@ -129,6 +153,8 @@ void MeshComponent::on_init()
 		obj.owner = this;
 		obj.shadow_caster = cast_shadows;
 		obj.is_skybox = is_skybox;
+		if (animator)
+			obj.animator = animator.get();
 
 		if (!eMaterialOverride.empty())
 			obj.mat_override = eMaterialOverride[0].get();

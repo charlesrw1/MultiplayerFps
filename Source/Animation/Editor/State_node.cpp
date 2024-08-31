@@ -394,7 +394,7 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 			 if (ret == 0) vd.str = "0";
 			 if (ImGui::InputFloat("##value", &f)) {
 				 vd.str = string_format("%f", f);
-			}
+			 }
 		 }
 		 else if (vd.type == ScriptValueType::Variable) {
 
@@ -431,6 +431,8 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 				 ImGui::EndCombo();
 			 }
 		 }
+		 else if (vd.type == ScriptValueType::None)
+			 vd.str.clear();
 
 
 		 ImGui::PopID();

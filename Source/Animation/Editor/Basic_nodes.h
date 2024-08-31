@@ -161,15 +161,19 @@ bool compile_my_data(const AgSerializeContext* ctx) override {
 	node->var_name = variable.str;
 	auto pi = ctx->tree->find_animator_instance_variable(variable.str);
 
-
 	if (!pi)
 		append_fail_msg("[ERROR] node variable handle is invalid");
-	if (pi && found_type != variable.type) {
-		append_info_msg("[INFO] variable found type differs from current type, overriding it");
-		sys_print("??? After compiling, variable %s's type differs from previous type stored, overriding it...\n", variable.str.c_str());
-		variable.type = found_type;
+	else {
+		bool good = false;
+	
+		found_type = core_type_id_to_anim_graph_value(&good, pi->type);
+		if (found_type == anim_graph_value::bool_t) found_type == anim_graph_value::float_t;
+			if (found_type != variable.type) {
+				append_info_msg("[INFO] variable found type differs from current type, overriding it");
+				sys_print("??? After compiling, variable %s's type differs from previous type stored, overriding it...\n", variable.str.c_str());
+				variable.type = found_type;
+			}
 	}
-
 	return util_compile_default(this, ctx);
 }
 
