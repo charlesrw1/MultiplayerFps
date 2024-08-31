@@ -387,7 +387,6 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 
 
 
- uint32_t Animation_Tree_CFG::get_num_vars() const { return code ? code->num_variables() : 0; }
 
 void Animation_Tree_CFG::construct_all_nodes(NodeRt_Ctx& ctx) const {
 	for (int i = 0; i < all_nodes.size(); i++)
@@ -399,12 +398,7 @@ bool Animation_Tree_CFG::post_load_init()
 {
 	// initialize script
 
-	code->link_to_native_class();
-	
-	bool good = code->check_is_valid();
-	if (!good) {
-		sys_print("!!! script failed 'check_is_valid' for AnimGraph %s\n", get_name().c_str());
-	}
+
 
 	for (int i = 0; i < all_nodes.size(); i++) {
 		all_nodes[i]->initialize(this);
@@ -417,10 +411,10 @@ bool Animation_Tree_CFG::post_load_init()
 	else
 		root = nullptr;
 
-	if (!root || !good)
+	if (!root)
 		graph_is_valid = false;
 
-	return good;
+	return graph_is_valid;
 }
 
 int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
@@ -438,7 +432,8 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
 		REG_INT(data_used, PROP_SERIALIZE, ""),
 		REG_BOOL(graph_is_valid, PROP_SERIALIZE, ""),
-		REG_STDVECTOR(direct_slot_names, PROP_SERIALIZE)
+		REG_STDVECTOR(direct_slot_names, PROP_SERIALIZE),
+		REG_CLASSTYPE_PTR(animator_class, PROP_DEFAULT),
 	END_PROPS()
  }
 
@@ -476,11 +471,8 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 }
 
 	 {
-		 if (!in.expect_string("params") || !in.expect_item_start())
-			 return false;
-		 auto res = read_properties(*Script::get_props(), code.get(), in, {}, {});
-
-		 if (!res.second || !in.check_item_end(res.first))
+		 // old version
+		 if (!in.expect_string("params") || !in.expect_item_start() || !in.expect_item_end())
 			 return false;
 	 }
 
@@ -518,7 +510,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 { 
 		 out.write_key("params");
 		 out.write_item_start();
-		 write_properties(*Script::get_props(), code.get(), out, &ctx);
 		 out.write_item_end();
 	 }
 

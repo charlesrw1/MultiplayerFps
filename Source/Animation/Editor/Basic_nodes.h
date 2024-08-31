@@ -158,11 +158,13 @@ std::string get_title() const override {
 bool compile_my_data(const AgSerializeContext* ctx) override {
 
 	anim_graph_value found_type{};
-	node->handle = ctx->find_variable_index(variable.str, found_type);
+	node->var_name = variable.str;
+	auto pi = ctx->tree->find_animator_instance_variable(variable.str);
 
-	if (!node->handle.is_valid())
+
+	if (!pi)
 		append_fail_msg("[ERROR] node variable handle is invalid");
-	if (node->handle.is_valid() && found_type != variable.type) {
+	if (pi && found_type != variable.type) {
 		append_info_msg("[INFO] variable found type differs from current type, overriding it");
 		sys_print("??? After compiling, variable %s's type differs from previous type stored, overriding it...\n", variable.str.c_str());
 		variable.type = found_type;

@@ -5,7 +5,7 @@
 
 #include "Animation.h"
 #include "Animation/AnimationTreePublic.h"
-#include "Framework/ExpressionLang.h"
+
 #include "Framework/MemArena.h"
 #include "Framework/InlineVec.h"
 #include "Framework/EnumDefReflection.h"
@@ -57,26 +57,11 @@ inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_i
 }
 
 
-using AnimGraphVariable = handle<ScriptVariable>;
+
 CLASS_H(AgSerializeContext,ClassBase)
 public:
 	void set_tree(Animation_Tree_CFG* tree);
 
-	AnimGraphVariable find_variable_index(std::string name, anim_graph_value& type) const {
-		auto& vars = tree->get_script()->get_variables();
-		for (int i = 0; i < vars.size(); i++) {
-			if (name == vars[i].name && vars[i].native_pi_of_variable) {
-				bool good = false;
-				type = core_type_id_to_anim_graph_value(&good, vars[i].native_pi_of_variable->type);
-				if (!good) {
-					sys_print("!!! bad type for variable %s\n", name.c_str());
-					return { -1 };
-				}
-				return { i };
-			}
-		}
-		return { -1 };
-	}
 
 	std::unordered_map<BaseAGNode*, int> ptr_to_index;
 	Animation_Tree_CFG* tree = nullptr;
@@ -112,18 +97,12 @@ struct Node_CFG;
 class NodeRt_Ctx
 {
 public:
-	NodeRt_Ctx(AnimatorInstance* inst, script_value_t* stack, int stack_size);
+	NodeRt_Ctx(AnimatorInstance* inst);
 
 	const Model* model = nullptr;
 	AnimatorInstance* anim = nullptr;
-	const Script* script = nullptr;
 	uint16_t tick = 0;
 
-
-	ScriptInstance& get_script_inst() { return anim->get_script_inst(); }
-
-	int stack_size = 0;
-	script_value_t* stack = nullptr;
 
 	const MSkeleton* get_skeleton() const {
 		return model->get_skel();
@@ -986,7 +965,7 @@ CLASS_H(VectorConstant, ValueNode)
 CLASS_H(VariableNode, ValueNode)
 	static const PropertyInfoList* get_props() {
 		START_PROPS(VariableNode) 
-			REG_INT(handle, PROP_SERIALIZE, ""),
+			REG_STDSTRING(var_name, PROP_SERIALIZE, ""),
 			REG_FLOAT(scale, PROP_DEFAULT, "1"),
 			REG_FLOAT(bias, PROP_DEFAULT, "0"),
 			REG_BOOL(apply_clamp, PROP_DEFAULT, "0"),
@@ -996,13 +975,11 @@ CLASS_H(VariableNode, ValueNode)
 		END_PROPS(VariableNode)
 	}
 	virtual void initialize(Animation_Tree_CFG* cfg) override {
-		if (!handle.is_valid())
+		if (!var_name.empty())
 			sys_print("??? invalid handle for variable node on initialization\n");
 		else {
-			auto& vars = cfg->get_script()->get_variables();
-			if (handle.id >= 0 && handle.id < vars.size())
-				pi = vars.at(handle.id).native_pi_of_variable;
-
+			pi = cfg->find_animator_instance_variable(var_name);
+			
 			if (!pi)
 				sys_print("??? variable wasnt linked to native class\n");
 			else {
@@ -1049,7 +1026,7 @@ CLASS_H(VariableNode, ValueNode)
 	float max_bounds = 1.0;
 
 	anim_graph_value var_type = {};
-	AnimGraphVariable handle;
+	std::string var_name;
 	const PropertyInfo* pi = nullptr;
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "AnimationTreeLocal.h"
-
+#include <string>
 enum class Easing : uint8_t
 {
 	Linear,
@@ -32,15 +32,68 @@ inline float evaluate_easing(Easing type, float t)
 	}
 }
 
+enum class ScriptComparison : int8_t
+{
+	Eq,
+	NotEq,
+	Lt,
+	LtEq,
+	Gt,
+	GtEq
+};
+enum class ScriptValueType : int8_t
+{
+	None,
+	Variable,	// references an AnimatorInstance variable
+	Constant,	// references a constant
+	Curve,		// references a curve value
+	TimeRemaining,
+	StateTime,
+};
+
+class StateTransitionScript
+{
+public:
+	ScriptComparison comparison = ScriptComparison::NotEq;
+	struct ValueData {
+		ScriptValueType type = ScriptValueType::None;
+		std::string str;
+		union {
+			float number;
+			int curve_handle;
+			const PropertyInfo* pi;
+		};
+	};
+	ValueData lhs;
+	ValueData rhs;
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(StateTransitionScript)
+			make_struct_property("_value",0,PROP_DEFAULT, "StateTransitionScript")
+		END_PROPS(StateTransitionScript)
+	}
+	void init(Animation_Tree_CFG* tree) {
+		init_value(lhs, tree);
+		init_value(rhs, tree);
+	}
+
+	bool evaluate(NodeRt_Ctx& ctx) const;
+private:
+	double get_value(const ValueData& vd, NodeRt_Ctx& ctx) const;
+	void init_value(ValueData& vd, Animation_Tree_CFG* tree);
+};
+
 struct State;
 struct State_Transition
 {
 	static const PropertyInfoList* get_props();
+
 	bool is_a_continue_transition() const { return is_continue_transition; }
 	bool is_an_auto() const { return automatic_transition_rule; }
+
+	std::vector<StateTransitionScript> conditions;
+
 	handle<State> transition_state;
-	ScriptHandle handle;
-	std::string script_uncompilied;		// TODO: save to disk precompilied, compiling is fast though so not a huge deal
 	bool is_continue_transition = false;
 	float transition_time = 0.2f;
 	bool automatic_transition_rule = false;

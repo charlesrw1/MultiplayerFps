@@ -101,7 +101,6 @@
     <ClInclude Include="Source\Framework\DictParser.h" />
     <ClInclude Include="Source\Framework\DictWriter.h" />
     <ClInclude Include="Source\Framework\EnumDefReflection.h" />
-    <ClInclude Include="Source\Framework\ExpressionLang.h" />
     <ClInclude Include="Source\Framework\Factory.h" />
     <ClInclude Include="Source\Framework\Files.h" />
     <ClInclude Include="Source\Framework\FreeList.h" />
@@ -253,7 +252,6 @@
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
     <ClCompile Include="Source\Framework\DictParser.cpp" />
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp" />
-    <ClCompile Include="Source\Framework\ExpressionLang.cpp" />
     <ClCompile Include="Source\Framework\Files.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />

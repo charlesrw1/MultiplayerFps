@@ -113,21 +113,6 @@ ImVec4 graph_pin_type_to_color(GraphPinType pin)
 	return ImVec4(1, 1, 1, 1);
 }
 
-
-
-script_types anim_graph_value_to_script_value(anim_graph_value type)
-{
-	switch (type)
-	{
-	case anim_graph_value::bool_t: return script_types::bool_t;
-	case anim_graph_value::int_t: return script_types::int_t;
-	case anim_graph_value::float_t: return script_types::float_t;
-
-	default:
-		return script_types::custom_t;
-	}
-}
-
 void ControlParamsWindow::refresh_props() {
 	props.clear();
 	const AnimatorInstance* a = ed.out.get_animator();
@@ -156,41 +141,6 @@ void ControlParamsWindow::refresh_props() {
 }
 
 
- unique_ptr<Script> ControlParamsWindow::add_parameters_to_tree() {
-	std::vector<ScriptVariable> vars;
-	for (int i = 0; i < props.size(); i++) {
-		ScriptVariable var;
-		var.is_native = true;
-		var.name = props[i].str;
-		var.type = anim_graph_value_to_script_value(props[i].type);
-		var.native_pi_of_variable = nullptr;//FIXME ??? inspect how this is initialized later
-		vars.push_back(var);
-	}
-
-	// create script with variables and the AnimatorInstance classname
-	auto script = std::make_unique<Script>(vars, ed.opt.AnimatorClass);
-
-	return script;
-}
-#include "Framework/CurveEditorImgui.h"
-static SequencerImgui seqimgui;
-
-
-class AnimationEventEditor : public SequencerEditorItem
-{
-public:
-	AnimationEventEditor(int start, int end, Color32 c) {
-		this->time_start = start;
-		this->time_end = end;
-		this->color = c;
-	}
-	AnimationEventEditor(int start, Color32 c) {
-		this->time_start = start;
-		this->instant_item = true;
-		this->color = c;
-	}
-	virtual std::string get_name() { return "name"; }
-};
 //static CurveEditorImgui cei;
 void AnimationGraphEditor::init()
 {
@@ -434,7 +384,7 @@ void TabState::imgui_draw() {
 				if (st->is_a_continue_transition())
 					ImGui::TextColored(ImVec4(0.2, 1.0, 0.2, 1.0), "CONTINUE");
 				else
-					ImGui::TextColored(ImVec4(1.0, 0.3, 0.3, 1.0), st->script_uncompilied.c_str());
+					ImGui::TextColored(ImVec4(1.0, 0.3, 0.3, 1.0), "read conditions");
 
 				ImGui::EndTooltip();
 			}
@@ -731,10 +681,16 @@ void AnimationGraphEditor::imgui_draw()
 
 	control_params->imgui_draw();
 
-	animation_list->imgui_draw();
 
 	if (ImGui::Begin("AnimGraph settings")) {
 		self_grid.update();
+		if (self_grid.rows_had_changes) {
+			auto anim_instance = (!anim_class_type.ptr) ? new AnimatorInstance : (AnimatorInstance*)anim_class_type.ptr->allocate();
+			ed.out.set_animator_instance(anim_instance);
+			on_set_animator_instance.invoke(ed.out.get_animator());
+			ed.out.set_model(output_model.get());
+			on_set_model.invoke(output_model.get());
+		}
 	}
 	ImGui::End();
 
@@ -1356,6 +1312,8 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 	{
 		auto tree = get_tree();
 
+		tree->animator_class = anim_class_type;
+
 		std::unordered_set<BaseAGNode*> refed_nodes;
 
 		std::vector<BaseAGNode*> extra_nodes;
@@ -1386,10 +1344,6 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 		printf("Deleted %d unreferenced nodes\n", num_deleted);
 	}
 
-	// add control parameters to cfg list
-	editing_tree->code.reset();										// delete script
-	editing_tree->code = control_params->add_parameters_to_tree();	// recreate script
-	editing_tree->code->link_to_native_class();
 
 	// initialize memory offets for runtime
 	editing_tree->data_used = 0;
@@ -1425,10 +1379,6 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 	editing_tree->graph_is_valid = tree_is_good_to_run;
 
-	// recreate script AGAIN because nodes compilied functions into the script
-	// but it gets compilied again after this
-	editing_tree->code.reset();										// delete script
-	editing_tree->code = control_params->add_parameters_to_tree();	// recreate script
 
 	return tree_is_good_to_run;
 }
@@ -1681,67 +1631,29 @@ void AnimationGraphEditor::create_new_document()
 
 
 
-void AnimationGraphEditor::set_animator_instance_from_string(std::string str) {
-	auto class_ = ClassBase::create_class<AnimatorInstance>(str.c_str());
-	if (!class_) {
-		sys_print("!!! couldnt find animatorInstance class %s\n", str.c_str());
-	}
-
-	out.set_animator_instance(class_);
-	on_set_animator_instance.invoke(class_);
-}
-void AnimationGraphEditor::set_model_from_str(std::string str) {
-	auto mod = GetAssets().find_sync<Model>(str.c_str());
-	if (!mod) {
-		sys_print("!!! couldnt find preview model %s\n", str.c_str());
-	}
-	out.set_model(mod.get());
-	on_set_model.invoke(mod.get());
-}
 void AnimationGraphEditor::try_load_preview_models()
 {
-#if 0
-	{
-		Material* mymat = mats.create_temp_shader("sprite_texture");
-		mymat->billboard = billboard_setting::SCREENSPACE;
-		mymat->images[0] = g_imgs.find_texture("icon/light.png");
-		mymat->blend = blend_state::BLEND;
-		mymat->type = material_type::UNLIT;
-		mymat->diffuse_tint = glm::vec4(1.0);
-	
-		auto handle= idraw->register_obj();
-		Render_Object obj;
-		obj.model = mods.get_sprite_model();
-		obj.transform = glm::scale(glm::translate(glm::mat4(1.0),glm::vec3(0, 2.0, 0.0)),glm::vec3(0.08,0.08,1.0));
-		obj.mat_override = mymat;
-		obj.visible = true;
+	if (anim_class_type.ptr)
+		ed.out.set_animator_instance((AnimatorInstance*)anim_class_type.ptr->allocate());	// fixme
+	else
+		ed.out.set_animator_instance(new AnimatorInstance);
 
-
-		idraw->update_obj(handle, obj);
-
-		handle = idraw->register_obj();
-		obj=Render_Object();
-		obj.model = mods.get_sprite_model();
-		obj.transform = glm::scale(glm::translate(glm::mat4(1.0), glm::vec3(1.0, 2.0, 0.0)), glm::vec3(0.08, 0.08, 1.0));
-		obj.mat_override = mymat;
-		obj.visible = true;
-
-
-		idraw->update_obj(handle, obj);
-	}
-#endif
-	set_animator_instance_from_string(opt.AnimatorClass);
-	set_model_from_str(opt.PreviewModel);
+	on_set_model.invoke(output_model.get());
+	on_set_animator_instance.invoke(ed.out.get_animator());
 }
 
 
 extern ConfigVar ed_default_sky_material;
 
 
+ConfigVar animed_default_model("animed_default_model", "SWAT_model.cmdl", CVAR_DEV, "sets the default model for the anim editor");
 
 void AnimationGraphEditor::post_map_load_callback()
 {
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
+
+	output_model = GetAssets().find_sync<Model>(animed_default_model.get_string());
+	ed.out.set_model(output_model.get());
 
 	auto& name = get_doc_name();
 
@@ -1788,6 +1700,8 @@ void AnimationGraphEditor::post_map_load_callback()
 	}
 
 	ASSERT(editing_tree);
+
+	anim_class_type = editing_tree->animator_class;
 
 	// initialize other state
 	*graph_tabs = TabState(this);
@@ -1847,118 +1761,7 @@ AnimatorInstance* GraphOutput::get_animator()
 	return anim.get();
 }
 
-ListAnimationDataInModel::ListAnimationDataInModel()
-{
-	ed.on_set_model.add(this, &ListAnimationDataInModel::set_model);
-	ed.on_close.add(this, &ListAnimationDataInModel::on_close);
 
-
-	name_filter[0] = 0;
-}
-static std::string to_lower(const std::string& s) {
-	std::string out;
-	out.reserve(s.size());
-	for (auto c : s)
-		out.push_back(tolower(c));
-	return out;
-}
-
-void ListAnimationDataInModel::set_model(const Model* model)
-{
-	drag_drop_name = "";
-	vec.clear();
-	name_filter[0] = 0;
-	selected_name = "";
-	this->model = model;
-	if (!model||!model->get_skel())
-		return;
-	auto& clips = model->get_skel()->get_clips_hashmap();
-	for (auto& clip : clips) {
-		vec.push_back(clip.first);
-	}
-	std::sort(vec.begin(), vec.end(), [](const std::string& a, const std::string& b) -> bool { return to_lower(a) < to_lower(b); });
-}
-void ListAnimationDataInModel::imgui_draw()
-{
-	if (!ImGui::Begin("Animation List")) {
-		ImGui::End();
-		return;
-	}
-
-	uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
-		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
-
-	//if (set_keyboard_focus) {
-	//	ImGui::SetKeyboardFocusHere();
-	//	set_keyboard_focus = false;
-	//}
-	static bool match_case = false;
-	ImGui::SetNextItemWidth(200.0);
-	ImGui::InputTextWithHint("FILTER", "filter animation name", name_filter, 256);
-	const int name_filter_len = strlen(name_filter);
-
-
-	std::string all_lower_cast_filter_name;
-	if (!match_case) {
-		all_lower_cast_filter_name = name_filter;
-		for (int i = 0; i < name_filter_len; i++)
-			all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
-	}
-
-	if (ImGui::BeginTable("animedBrowserlist", 1, ent_list_flags))
-	{
-		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
-
-		ImGui::TableHeadersRow();
-
-		for (int row_n = 0; row_n < vec.size(); row_n++)
-		{
-			auto& res = vec[row_n];
-
-			if (name_filter_len > 0) {
-				if (res.find(name_filter) == std::string::npos)
-					continue;
-			}
-
-			ImGui::PushID(res.c_str());
-			const bool item_is_selected = res == selected_name;
-
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-
-			ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-			if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-				selected_name = res;
-			}
-
-			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-			{
-				drag_drop_name = res;
-				auto ptr = &drag_drop_name;
-
-
-				ImGui::SetDragDropPayload("AnimationItemAnimGraphEd", &ptr, sizeof(std::string*));
-
-				ImGui::Text(res.c_str());
-
-				ImGui::EndDragDropSource();
-			}
-
-			ImGui::SameLine();
-			ImGui::Text(res.c_str());
-
-			ImGui::PopID();
-		}
-		ImGui::EndTable();
-	}
-	ImGui::End();
-}
-
-void ListAnimationDataInModel::on_close()
-{
-	model = nullptr;
-	vec.clear();
-}
 
 AnimGraphClipboard::AnimGraphClipboard()
 {
@@ -2107,7 +1910,6 @@ AnimationGraphEditor::AnimationGraphEditor() {
 	gui->key_down_delegate.add(this, &AnimationGraphEditor::on_key_down);
 
 
-	animation_list = std::make_unique<ListAnimationDataInModel>();
 	control_params = std::make_unique<ControlParamsWindow>();
 	node_props = std::make_unique<PropertyGrid>();
 	graph_tabs = std::make_unique<TabState>(this);

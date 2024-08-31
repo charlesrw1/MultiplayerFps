@@ -212,36 +212,10 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 		st->transition_state = output[i].output_to->state_handle_internal;
 
 		// compile transition script
-		if (!st->script_uncompilied.empty() && st->is_a_continue_transition()) {
-			append_info_msg(string_format("[INFO] is_continue_transition == true, but script is not empty.\n"));
+		if (!st->conditions.empty() && st->is_a_continue_transition()) {
+			append_info_msg(string_format("[INFO] is_continue_transition == true, but conditions is not empty.\n"));
 		}
 		else if (!st->is_a_continue_transition()) {
-
-			const std::string& code = st->script_uncompilied;
-			std::string err_str;
-			try {
-				ScriptHandle handle;
-
-				// discard the handle, actually compiling is done when the graph is loaded to run
-				// compiling here is just to check for errors, although there is a possibility for errors to creep in
-				// if the AnimatorInstance variables change types without compiling again
-				auto ret = ed.editing_tree->get_script()->compile(handle, code, "anim_inst");
-
-				// must return boolean
-				if (ret.out_types.size() != 1 || ret.out_types[0] != script_types::bool_t)
-					err_str = "script must return boolean";
-			}
-			catch (CompileError err) {
-				err_str = std::move(err.str);
-			}
-			catch (...) {
-				err_str = "unknown error";
-
-			}
-
-			if (!err_str.empty()) {
-				append_fail_msg(string_format("[ERROR] script (-> %s) compile failed ( %s )\n", out_state->get_title().c_str(), err_str.c_str()));
-			}
 		}
 
 		sm_cfg->transitions.push_back(*st);
@@ -344,3 +318,122 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 	 }
 #endif // _DEBUG
  }
+
+#include "Framework/AddClassToFactory.h"
+#include "AnimationGraphEditor.h"
+
+ class StateTransitionPropertyEditor : public IPropertyEditor
+ {
+	 bool internal_update() override {
+		 StateTransitionScript* self = (StateTransitionScript*)instance;
+		 ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame;
+
+		 if(ImGui::BeginTable("mytable", 3, flags)) {
+
+			 ImGui::TableNextRow();
+			 ImGui::TableNextColumn();
+
+			 draw_value_header_side(self, false);
+
+			 ImGui::TableNextColumn();
+
+			 const char* drop_down_opt[] = { "==","!=","<","<=",">",">=" };
+			 auto preview_value = drop_down_opt[(int)self->comparison];
+			 if (ImGui::BeginCombo("##optmenu", preview_value)) {
+				 for (int i = 0; i < 6; i++) {
+					 bool selected = (i == (int)self->comparison);
+					 if (ImGui::Selectable(drop_down_opt[i], &selected)) {
+						 self->comparison = (ScriptComparison)i;
+					 }
+				 }
+				 ImGui::EndCombo();
+			 }
+
+			 ImGui::TableNextColumn();
+
+			 draw_value_header_side(self, true);
+
+			 ImGui::TableNextRow();
+			 ImGui::TableNextColumn();
+			 draw_value_side(self, false);
+			 ImGui::TableNextColumn();
+			 ImGui::TableNextColumn();
+			 draw_value_side(self, true);
+
+			 ImGui::EndTable();
+		 }
+
+		 return false;
+	 }
+	 void draw_value_header_side(StateTransitionScript* self, bool rhs) {
+		 const char* opt[] = { "<none>","Variable","Constant" };
+		 auto& vd = (rhs)? self->rhs:self->lhs;
+		 if ((int)vd.type > 2 || (int)vd.type<0) vd.type = ScriptValueType::None;
+		 auto preview = opt[(int)vd.type];
+		 auto id = (rhs) ? "##rhs" : "##lhs";
+
+		 if (ImGui::BeginCombo(id, preview)) {
+			 for (int i = 0; i < 3; i++) {
+				 bool selected = (int)vd.type == i;
+				 if (ImGui::Selectable(opt[i], &selected)) {
+					 vd.type = ScriptValueType(i);
+					 vd.str = "";
+				 }
+			 }
+			 ImGui::EndCombo();
+		 }
+	 }
+	 void draw_value_side(StateTransitionScript* self, bool rhs) {
+		 auto& vd = (rhs) ? self->rhs : self->lhs;
+		 auto id = (rhs) ? "##rhs" : "##lhs";
+		 ImGui::PushID(id);
+
+		 if (vd.type == ScriptValueType::Constant) {
+			 float f = 0.0;
+			 int ret = sscanf(vd.str.c_str(), "%f", &f);
+			 if (ret == 0) vd.str = "0";
+			 if (ImGui::InputFloat("##value", &f)) {
+				 vd.str = string_format("%f", f);
+			}
+		 }
+		 else if (vd.type == ScriptValueType::Variable) {
+
+			 const AnimatorInstance* a = ed.out.get_animator();
+			 if (!a) {
+				 ImGui::PopID();
+				 return;
+			 }
+
+			 std::vector<const PropertyInfoList*> getprop;
+			 const ClassTypeInfo* type = &a->get_type();
+			 for (; type; type = type->super_typeinfo)
+				 getprop.push_back(type->props);
+			 auto preview = vd.str.empty() ? "<none>" : vd.str;
+			 if (ImGui::BeginCombo("##varlist", preview.c_str())) {
+				 for (int i = 0; i < getprop.size(); i++) {
+					 auto list = getprop[i];
+					 for (int j = 0; list && j < list->count; j++) {
+
+						 bool good = false;
+						 auto type = core_type_id_to_anim_graph_value(&good, list->list[j].type);
+						 if (!good)
+							 continue;
+						 if (type != anim_graph_value::float_t && type != anim_graph_value::bool_t && type != anim_graph_value::int_t)
+							 continue;
+						 auto& prop = list->list[j];
+						 bool selected = prop.name == vd.str;
+						 if (ImGui::Selectable(prop.name, &selected)) {
+							 vd.str = prop.name;
+						 }
+
+					 }
+				 }
+				 ImGui::EndCombo();
+			 }
+		 }
+
+
+		 ImGui::PopID();
+	 }
+ };
+ ADDTOFACTORYMACRO_NAME(StateTransitionPropertyEditor, IPropertyEditor, "StateTransitionScript");

@@ -192,18 +192,7 @@ public:
 	void imgui_draw();
 	void refresh_props();
 
-	unique_ptr<Script> add_parameters_to_tree();
-	
-	AnimGraphVariable get_index_of_prop_for_compiling(std::string str) {
-		for (int i = 0; i < props.size(); i++)
-			if (props[i].str == str)
-				return { i };
-		return { -1 };
-	}
-	anim_graph_value get_type(AnimGraphVariable var) {
-		assert(var.is_valid());
-		return props[var.id].type;
-	}
+
 
 private:
 	void on_set_animator_instance(AnimatorInstance* a) {
@@ -226,22 +215,6 @@ private:
 	//PropertyGrid control_params;
 };
 
-class ListAnimationDataInModel
-{
-public:
-	ListAnimationDataInModel();
-	void imgui_draw();
-
-private:
-	void on_close();
-
-	void set_model(const Model* model);
-	const Model* model = nullptr;
-	char name_filter[256];
-	std::vector<std::string> vec;
-	std::string drag_drop_name;
-	std::string selected_name;
-};
 
 class AnimGraphClipboard
 {
@@ -348,7 +321,6 @@ public:
 	void on_wheel(const SDL_MouseWheelEvent& wheel);
 
 
-	std::unique_ptr<ListAnimationDataInModel> animation_list;
 	std::unique_ptr<ControlParamsWindow> control_params;
 	std::unique_ptr<PropertyGrid> node_props;
 	std::unique_ptr<TabState> graph_tabs;
@@ -394,6 +366,7 @@ public:
 	void try_load_preview_models();
 
 	static const PropertyInfoList* get_props() {
+		using MyClassType = AnimationGraphEditor;
 		START_PROPS(AnimationGraphEditor)
 			REG_INT(current_id, PROP_SERIALIZE, ""),
 			REG_INT(current_layer, PROP_SERIALIZE, ""),
@@ -404,10 +377,8 @@ public:
 			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
 
-
-			// Editable options
-			REG_STDSTRING_CUSTOM_TYPE(opt.PreviewModel, PROP_DEFAULT,"FindModelForEdAnimG"),
-			REG_STDSTRING_CUSTOM_TYPE(opt.AnimatorClass, PROP_DEFAULT, "AnimatorInstanceParentEditor")
+			REG_CLASSTYPE_PTR(anim_class_type,PROP_EDITABLE),
+			REG_ASSET_PTR(output_model,PROP_DEFAULT)
 		END_PROPS(AnimationGraphEditor)
 	}
 
@@ -418,20 +389,17 @@ public:
 
 	graph_playback_state playback = graph_playback_state::stopped;
 
-	void set_animator_instance_from_string(std::string str);
-	void set_model_from_str(std::string str);
-
 	struct settings {
 		bool open_graph = true;
 		bool open_control_params = true;
 		bool open_viewport = true;
 		bool open_prop_editor = true;
 		bool statemachine_passthrough = false;
-
-		// defaults
-		std::string PreviewModel = "player_FINAL.cmdl";
-		std::string AnimatorClass = "AnimatorInstance";
 	}opt;
+
+	ClassTypePtr<AnimatorInstance> anim_class_type;
+	AssetPtr<Model> output_model;
+
 
 	bool reset_prop_editor_next_tick = false;
 

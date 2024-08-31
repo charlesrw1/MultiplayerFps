@@ -11,7 +11,7 @@
 #include "../AnimationTreePublic.h"
 
 #include "Render/Model.h"
-#include "Framework/ExpressionLang.h"
+
 
 #include <vector>
 #include "Framework/Factory.h"
@@ -64,7 +64,6 @@ CLASS_H(AnimatorInstance, ClassBase)
 	}
 	int num_bones() const { return cached_bonemats.size(); }
 	Entity* get_owner() const { return owner; }
-	ScriptInstance& get_script_inst() { return script_inst; }
 	bool is_initialized() const { return model != nullptr; }
 
 
@@ -97,7 +96,6 @@ private:
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
 
-	ScriptInstance script_inst;
 	std::vector<uint8_t> data;	// runtime data
 
 	// active sync groups for graph

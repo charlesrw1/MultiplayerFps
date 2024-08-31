@@ -67,49 +67,6 @@ void SerializeImNodeState::unserialize(DictParser& in, const PropertyInfo& info,
 }
 
 
-class AnimatorInstanceParentEditor : public IPropertyEditor
-{
-public:
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		ASSERT(prop->type == core_type_id::StdString);
-
-		auto str = (std::string*)prop->get_ptr(instance);
-
-		if (initial) {
-			auto iter = ClassBase::get_subclasses<AnimatorInstance>();
-			for (; !iter.is_end(); iter.next()) {
-				if (iter.get_type()->allocate)
-					options.push_back(iter.get_type()->classname);
-			}
-
-			index = 0;
-			for (int i = 0; i < options.size(); i++) {
-				if (*str == options.at(i)) {
-					index = i;
-					break;
-				}
-			}
-			initial = false;
-		}
-		int prev_index = index;
-		if (ImGui::Combo("##combo", &index, options.data(), options.size())) {
-			if (index != prev_index && index >= 0) {
-				*str = options[index];
-
-				ed.set_animator_instance_from_string(*str);
-
-				return true;
-			}
-		}
-		return false;
-	}
-
-	std::vector<const char*> options;
-	bool initial = true;
-	int index = 0;
-};
 
 template<typename FUNCTOR>
 static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&& callback, const char* targetname, const char* tooltip)
@@ -155,33 +112,7 @@ static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 
 
 #include "Assets/AssetRegistry.h"
-class FindModelForEdAnimG : public IPropertyEditor
-{
-public:
-	using IPropertyEditor::IPropertyEditor;
 
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		ASSERT(prop->type == core_type_id::StdString);
-
-		auto str = (std::string*)prop->get_ptr(instance);
-		return drag_drop_property_ed_func(str, Color32{ 11, 50, 94 }, [&](void* payload) -> bool {
-
-			AssetOnDisk* resource = *(AssetOnDisk**)payload;
-			if (resource->type->get_type_name() == "Model") {
-				*str = resource->filename;
-				ed.set_model_from_str(*str);
-				return true;
-			}
-			return false;
-
-
-			}, "AssetBrowserDragDrop", "model");
-
-	}
-};
 
 class FindAnimGraphVariableProp : public IPropertyEditor
 {
@@ -478,7 +409,7 @@ struct AutoStruct_asdf {
 		pfac.registerClass<FindAnimationClipPropertyEditor>("AG_CLIP_TYPE");
 		pfac.registerClass<FindAnimGraphVariableProp>("FindAnimGraphVariableProp");
 		pfac.registerClass<AgBoneFinder>("AgBoneFinder");
-		pfac.registerClass<FindModelForEdAnimG>("FindModelForEdAnimG");
+
 		pfac.registerClass<BlendspaceGridEd>("BlendspaceGridEd");
 
 		pfac.registerClass<AgLispCodeEditorProperty>("AG_LISP_CODE");
@@ -486,7 +417,6 @@ struct AutoStruct_asdf {
 
 		pfac.registerClass<AgEdtior_BlendSpaceParameteriation>("AG_EDITOR_BLEND_SPACE_PARAMETERIZATION");
 		
-		pfac.registerClass<AnimatorInstanceParentEditor>("AnimatorInstanceParentEditor");
 
 		auto& afac = IArrayHeader::get_factory();
 

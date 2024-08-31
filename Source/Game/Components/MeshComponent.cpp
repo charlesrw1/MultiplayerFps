@@ -108,13 +108,9 @@ void MeshComponent::on_init()
 		auto modToUse = (model.did_fail()) ? mods.get_error_model() : model.get();
 
 		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
-			assert(animator_tree->get_script());
-			assert(animator_tree->get_script()->get_native_class());
-			assert(animator_tree->get_script()->get_native_class()->allocate);
-
-			ClassBase* c = animator_tree->get_script()->get_native_class()->allocate();
-			assert(c->is_a<AnimatorInstance>());
-			animator.reset(c->cast_to<AnimatorInstance>());
+			
+			AnimatorInstance* c = animator_tree->allocate_animator_class();
+			animator.reset(c);
 
 			bool good = animator->initialize_animator(modToUse, animator_tree.get(), get_owner());
 			if (!good) {
@@ -122,6 +118,8 @@ void MeshComponent::on_init()
 				animator.reset(nullptr);	// free animator
 				animator_tree = nullptr;	// free tree reference
 			}
+			else
+				set_ticking(true);	// start ticking the animator
 		}
 
 		Render_Object obj;
@@ -159,7 +157,9 @@ void MeshComponent::on_changed_transform()
 
 void MeshComponent::update()
 {
-
+	if (animator) {
+		animator->tick_tree_new(eng->get_tick_interval());
+	}
 }
 
 void MeshComponent::on_deinit()

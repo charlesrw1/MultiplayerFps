@@ -7,13 +7,12 @@
 #include "Framework/StringUtil.h"
 #include "Framework/StringName.h"
 #include "Framework/ScriptValue.h"
+#include "Framework/ClassTypePtr.h"
 
 #include "Assets/IAsset.h"
-
 class DictParser;
 class DictWriter;
 class Model;
-class Animation_Set;
 class Node_CFG;
 
 
@@ -23,6 +22,7 @@ struct PropertyInfoList;
 class NodeRt_Ctx;
 class Script;
 class BaseAGNode;
+class AnimatorInstance;
 
 CLASS_H(Animation_Tree_CFG, IAsset)
 public:
@@ -41,19 +41,13 @@ public:
 	 Node_CFG* get_root_node()  {
 		return root;
 	}
-	const Script* get_script() const {
-		return code.get();
-	}
-	 Script* get_script()  {
-		return code.get();
-	}
+
 	bool post_load_init();
 	int get_index_of_node(Node_CFG* ptr);
 	void write_to_dict(DictWriter& out);
 	bool read_from_dict(DictParser& in);
 
 	uint32_t get_data_used() const { return data_used; }
-	uint32_t get_num_vars() const;
 
 	void construct_all_nodes(NodeRt_Ctx& ctx) const;
 
@@ -69,6 +63,9 @@ public:
 	bool get_graph_is_valid() const { return graph_is_valid; }
 
 	const std::vector<std::string>& get_slot_names() const { return direct_slot_names; }
+
+	const PropertyInfo* find_animator_instance_variable(const std::string& var_name) const;
+	AnimatorInstance* allocate_animator_class() const;
 private:
 	bool graph_is_valid = false;
 
@@ -80,8 +77,7 @@ private:
 
 	std::vector<BaseAGNode*> all_nodes;
 
-	// stores variables and functions for evaulating transitions
-	std::unique_ptr<Script> code;
+	ClassTypePtr<AnimatorInstance> animator_class;
 
 	// provides names + indicies for playing animations directly
 	// these get provided by adding 'Direct play' nodes and setting their names

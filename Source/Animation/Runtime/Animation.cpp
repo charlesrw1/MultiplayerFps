@@ -11,7 +11,7 @@ using namespace glm;
 #include <iostream>
 #include <iomanip>
 
-#include "Framework/ExpressionLang.h"
+
 #include "Framework/MemArena.h"
 #include "../AnimationUtil.h"
 #include "AnimationTreeLocal.h"
@@ -143,12 +143,7 @@ bool AnimatorInstance::initialize_animator(
 		slots[i].name = graph->get_slot_names()[i].c_str();	// set hashed name for gamecode to find
 
 	// Initialize script instance, sets pointer of AnimatorInstance for native variables
-	bool good = script_inst.init_from(graph->get_script(), this);
-	
-	if (!good) {
-		sys_print("!!! script instance failed to init\n");
-		return false;
-	}
+
 
 	this->cfg = graph;
 	this->model = model;
@@ -159,7 +154,7 @@ bool AnimatorInstance::initialize_animator(
 	data.resize(cfg->get_data_used(), 0);
 
 	// Construct nodes
-	NodeRt_Ctx ctx(this,nullptr,0);
+	NodeRt_Ctx ctx(this);
 	cfg->construct_all_nodes(ctx);
 
 	// Reset root node here to kick things off
@@ -580,13 +575,11 @@ void modify_pose_debug(Pose& pose)
 	if(normalize_)
 		pose.q[0] = glm::normalize(pose.q[0]);
 }
-NodeRt_Ctx::NodeRt_Ctx(AnimatorInstance* inst, script_value_t* stack, int stack_size)
+NodeRt_Ctx::NodeRt_Ctx(AnimatorInstance* inst)
 {
-	this->stack = stack;
-	this->stack_size = stack_size;
+	
 	this->anim = inst;
 	this->model = inst->get_model();
-	this->script = inst->get_tree()->get_script();
 }
 
 void AnimatorInstance::tick_tree_new(float dt)
@@ -598,7 +591,7 @@ void AnimatorInstance::tick_tree_new(float dt)
 
 	script_value_t stack[64];
 
-	NodeRt_Ctx ctx(this,stack,64);
+	NodeRt_Ctx ctx(this);
 
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;

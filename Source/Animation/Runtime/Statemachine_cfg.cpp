@@ -23,11 +23,12 @@ ENUM_IMPL(Easing);
 
 const PropertyInfoList* State_Transition::get_props()
 {
+	MAKE_VECTORCALLBACK(StateTransitionScript, conditions);
 	START_PROPS(State_Transition)
 		REG_INT(transition_state, PROP_SERIALIZE, "-1"),
 		REG_BOOL(automatic_transition_rule, PROP_DEFAULT, "0"),
 		REG_FLOAT(transition_time, PROP_DEFAULT, "0.2"),
-		REG_STDSTRING_CUSTOM_TYPE(script_uncompilied, PROP_DEFAULT, "AG_LISP_CODE"),
+		REG_STDVECTOR(conditions,PROP_DEFAULT),
 		REG_BOOL(is_continue_transition, PROP_DEFAULT, "0"),
 		REG_BOOL(can_be_interrupted, PROP_DEFAULT, "1"),
 		REG_INT(priority, PROP_DEFAULT, "0"),
@@ -62,6 +63,61 @@ const PropertyInfoList* Statemachine_Node_CFG::get_props()
 }
 
 
+bool StateTransitionScript::evaluate(NodeRt_Ctx& ctx) const
+{
+	double d1 = get_value(lhs,ctx);
+	double d2 = get_value(rhs,ctx);
+	switch (comparison)
+	{
+	case ScriptComparison::Eq:
+		return glm::abs(d1 - d2) <= 0.00001;
+	case ScriptComparison::NotEq:
+		return glm::abs(d1 - d2) > 0.00001;
+	case ScriptComparison::GtEq:
+		return d1 >= d2;
+	case ScriptComparison::Gt:
+		return d1 > d2;
+	case ScriptComparison::Lt:
+		return d1 < d2;
+	case ScriptComparison::LtEq:
+		return d1 <= d2;
+	}
+	return false;
+}
+double StateTransitionScript::get_value(const ValueData& vd, NodeRt_Ctx& ctx) const
+{
+	switch (vd.type)
+	{
+	case ScriptValueType::None: return 0;
+	case ScriptValueType::Constant: 
+		return vd.number;
+	case ScriptValueType::Variable:
+	{
+		if (!vd.pi)
+			return 0.0;
+		if (vd.pi->is_integral_type())
+			return vd.pi->get_int(ctx.anim);
+		else if (vd.pi->type == core_type_id::Float)
+			return vd.pi->get_float(ctx.anim);
+		return 0.0;
+	}break;
+	}
+	return 0.0;
+}
+void StateTransitionScript::init_value(ValueData& vd, Animation_Tree_CFG* tree)
+{
+	if (vd.type == ScriptValueType::Constant) {
+		int ret = sscanf(vd.str.c_str(), "%f", &vd.number);
+		if (ret != 1)
+			vd.number = 0.0;
+	}
+	else if (vd.type == ScriptValueType::Variable) {
+		vd.pi = tree->find_animator_instance_variable(vd.str);
+	}
+	else
+		vd.number = 0.0;
+}
+
 void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 	init_memory_internal(tree, sizeof(RT_TYPE));
 
@@ -70,35 +126,17 @@ void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
 	}
 
 	if (tree->get_graph_is_valid()) {
-		// this can be serialized to a bytestream but for now just compile it on load
-		// since the graph is valid, there shoudnt be and runtime errors
-		// however, graph_is_valid can be true and the script is bad ONLY IF
-		// this statemachine isnt referenced in the final tree, thus a bad script
-		// has no effect on the final graph
-		// theres an assert checking that the script is valid when its checked in the 
-		// graphs real path
 
 		for (int i = 0; i < transitions.size(); i++) {
 			if (transitions[i].is_a_continue_transition())
 				continue;
 
-			bool bad = false;
-			const std::string& code = transitions[i].script_uncompilied;
-			try {
-				auto ret = tree->get_script()->compile(transitions[i].handle, code, "anim_inst");
-
-				// must return boolean
-				if (ret.out_types.size() != 1 || ret.out_types[0] != script_types::bool_t)
-					bad = true;
-			}
-			catch (...) {
-				bad = true;
-			}
-			if (bad)
-				transitions[i].handle.id = -1;
+			for (int j = 0; j < transitions[i].conditions.size(); j++)
+				transitions[i].conditions[j].init(tree);
 		}
 	}
 }
+
 
 const State_Transition* Statemachine_Node_CFG::find_continue_transition_for_state(const State* s) const
 {
@@ -124,11 +162,12 @@ handle<State> Statemachine_Node_CFG::find_enter_state(Statemachine_Node_RT* rt, 
 			break;
 		}
 
-		// some error, should assert
-		ASSERT(st.handle.is_valid());
-		script_state state(stack, 0, 32, nullptr);
-		ctx.script->execute(st.handle, &state, &ctx.get_script_inst());
-		bool yes = state.pop_int();
+		bool yes = false;
+		for (int i = 0; i < st.conditions.size(); i++) {
+			yes = st.conditions[i].evaluate(ctx);
+			if (!yes)
+				break;
+		}
 
 		if (yes) {
 			firststate = { index };
@@ -157,10 +196,12 @@ const State_Transition* Statemachine_Node_CFG::find_state_transition(NodeRt_Ctx&
 		if (st.is_a_continue_transition())
 			return &st;
 
-		ASSERT(st.handle.is_valid());
-		script_state state(ctx.stack, 0, 32, nullptr);
-		ctx.script->execute(st.handle, &state, &ctx.get_script_inst());
-		bool yes = state.pop_int();
+		bool yes = false;
+		for (int i = 0; i < st.conditions.size(); i++) {
+			yes = st.conditions[i].evaluate(ctx);
+			if (!yes)
+				break;
+		}
 
 		if (yes) {
 			return &st;

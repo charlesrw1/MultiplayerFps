@@ -126,9 +126,6 @@
     <ClInclude Include="Source\Framework\Config.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ExpressionLang.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\Factory.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
@@ -559,9 +556,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Config.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\ExpressionLang.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\MyImguiLib.cpp">

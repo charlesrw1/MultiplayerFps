@@ -8,14 +8,13 @@
 #include <algorithm>
 #include "Framework/Files.h"
 #include "Assets/AssetDatabase.h"
-
-#include "Framework/ExpressionLang.h"
+#include "Animation/Runtime/Animation.h"
 
 CLASS_IMPL(Animation_Tree_CFG);
 
 Animation_Tree_CFG::Animation_Tree_CFG()
 {
-	code = std::make_unique<Script>();
+	
 }
 
 Animation_Tree_CFG::~Animation_Tree_CFG()
@@ -31,7 +30,6 @@ void Animation_Tree_CFG::uninstall()
 		delete node;
 	all_nodes.clear();
 	root = nullptr;
-	code.reset();
 	data_used = 0;
 	direct_slot_names.clear();
 }
@@ -70,7 +68,26 @@ void Animation_Tree_CFG::move_construct(IAsset* _other) {
 	Animation_Tree_CFG* other = (Animation_Tree_CFG*)_other;
 	all_nodes = std::move(other->all_nodes);
 	root = other->root;
-	code = std::move(other->code);
 	data_used = other->data_used;
 	direct_slot_names = std::move(other->direct_slot_names);
+}
+AnimatorInstance* Animation_Tree_CFG::allocate_animator_class() const {
+	if (!animator_class.ptr)
+		return new AnimatorInstance;
+	else {
+		assert(animator_class.ptr->is_a(AnimatorInstance::StaticType));
+		return (AnimatorInstance*)animator_class.ptr->allocate();
+	}
+}
+
+#include "Framework/PropHashTable.h"
+
+const PropertyInfo* Animation_Tree_CFG::find_animator_instance_variable(const std::string& var_name) const
+{
+	if (!animator_class.ptr)
+		return nullptr;
+	StringView sv(var_name.c_str(), var_name.size());
+	auto& table = animator_class.ptr->prop_hash_table->prop_table;
+	auto find = table.find(sv);
+	return find == table.end() ? nullptr : find->second;
 }
