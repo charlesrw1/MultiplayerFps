@@ -266,10 +266,7 @@ static glm::vec4 bounds_to_sphere(Bounds b)
 	glm::vec3 center = b.get_center();
 	glm::vec3 mindiff = center - b.bmin;
 	glm::vec3 maxdiff = b.bmax - center;
-	glm::vec3 diff = glm::max(mindiff, maxdiff);
-	float radius = diff.x;
-	if (diff.y > radius)radius = diff.y;
-	if (diff.z > radius)radius = diff.z;
+	float radius = glm::max(glm::length(mindiff), glm::length(maxdiff));
 	return glm::vec4(center, radius);
 }
 

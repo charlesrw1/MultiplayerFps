@@ -10,7 +10,6 @@ public:
 		glm::mat4& viewMatrix,
 		float& fov
 	) = 0;
-	virtual void set_input_command(Move_Command cmd) = 0;
 
 
 	static const PropertyInfoList* get_props() = delete;

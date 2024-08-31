@@ -103,7 +103,7 @@ public:
 	}
 
 	void draw_to_gbuffer(bool is_editor_pass, bool is_debug_pass) {
-		GPUSCOPESTART("TerrainRender");
+		GPUSCOPESTART(TerrainRender);
 
 		if (!has_terrain)
 			return;

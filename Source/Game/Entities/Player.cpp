@@ -58,7 +58,6 @@ public:
 
 		//front = AnglesToVector(euler.x, euler.y);
 	}
-	void set_input_command(Move_Command cmd) override {}
 
 	// for main menu
 	CameraPoint* camera = nullptr;
@@ -130,6 +129,8 @@ static float ground_accel_crouch = 4;
 static float air_accel = 3;
 static float jumpimpulse = 5.f;
 static float max_ground_speed = 5.7;
+static float max_sprint_speed = 8.0;
+static float sprint_accel = 8;
 static float max_air_speed = 2;
 
 void move_variables_menu()
@@ -392,57 +393,7 @@ static AddToDebugMenu adddrawentinfo("entity physics info", draw_entity_info);
 #if 0
 void Player::move()
 {
-	glm::vec3 last_velocity = velocity;
 
-	// fixme:
-	view_angles = cmd.view_angles;
-
-	// Friction
-	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
-	float speed = glm::length(velocity);
-
-	if (speed >= 0.0001) {
-		float dropamt = friction_value * speed * eng->get_tick_interval();
-		float newspd = speed - dropamt;
-		if (newspd < 0)
-			newspd = 0;
-		float factor = newspd / speed;
-		velocity.x *= factor;
-		velocity.z *= factor;
-	}
-
-	{
-		action = Action_State::Falling;
-
-		vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
-		float inputlen = length(inputvec);
-		if (inputlen > 0.00001)
-			inputvec = inputvec / inputlen;
-		if (inputlen > 1)
-			inputlen = 1;
-
-		vec3 look_front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-		look_front = normalize(look_front);
-		vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
-
-		vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
-
-		//position += wishdir * 12.0f*(float)eng->tick_interval;
-		velocity = wishdir * 12.0f;
-		slide_move();
-	}
-	
-	player_physics_check_nans(*this);
-
-
-	//auto pos = position;
-	auto height = CHAR_STANDING_HB_HEIGHT;
-	auto width = CHAR_HITBOX_RADIUS;
-	//Debug::add_sphere(pos + vec3(0, width, 0), width, COLOR_PINK, -1.f);
-	//Debug::add_sphere(pos + vec3(0, height- width, 0), width, COLOR_PINK,-1.f);
-
-
-	//esimated_accel = (velocity - last_velocity) / (float)eng->get_tick_interval();
 
 	distTraveledSinceLastFootstep += speed * (float)eng->get_tick_interval();
 
@@ -593,11 +544,6 @@ void Player::find_a_spawn_point()
 	}
 }
 
-void Player::set_input_command(Move_Command newcmd) {
-	this->cmd = newcmd;
-}
-
-
 glm::vec3 Player::calc_eye_position()
 {
 	float view_height = (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
@@ -612,11 +558,13 @@ void Player::get_view(glm::mat4& viewMat, float& fov)
 		auto pos = get_ws_position();
 		auto camera_pos = glm::vec3(pos.x, 6.0, pos.z - 6);
 
-		//vec3 front = AnglesToVector(view_angles.x, view_angles.y);
-		//vec3 side = normalize(cross(front, vec3(0, 1, 0)));
-		//vec3 camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
+		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
+		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
+		camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
 
-		viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
+		//viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
+
+		viewMat = glm::lookAt(camera_pos, camera_pos+front, glm::vec3(0, 1, 0));
 
 		//org = camera_pos;
 		//ang = view_angles;
@@ -780,6 +728,7 @@ void ViewmodelComponent::update()
 class PlayerHUD : public GUIFullscreen
 {
 public:
+
 	void on_enter_pause_menu() {
 		scoreWidget->hidden = true;
 
@@ -787,6 +736,8 @@ public:
 		pause_menu_outline->hidden = false;
 
 		eng->set_game_focused(false);
+
+		p->inputPtr->disable_mapping("game");
 
 		is_in_pause = true;
 	}
@@ -797,6 +748,8 @@ public:
 		pause_menu_outline->hidden = true;
 
 		eng->set_game_focused(true);
+
+		p->inputPtr->enable_mapping("game");
 
 		is_in_pause = false;
 	}
@@ -821,9 +774,6 @@ public:
 	}
 
 
-	void to_main_menu() {
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map mainMenuMap.tmap");
-	}
 
 	GUIVerticalBox* create_menu() {
 		GUIVerticalBox* vbox = new GUIVerticalBox;
@@ -842,10 +792,14 @@ public:
 
 		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("switch2.wav").get();
 		auto b = create_button("TO MAIN MENU", s);
-		b->on_selected.add(this, &PlayerHUD::to_main_menu);
+		b->on_selected.add(this, [] {
+				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map mainMenuMap.tmap");
+			});
 		vbox->add_this(b);
 		b = create_button("CONTINUE", s);
-		b->on_selected.add(this, &PlayerHUD::on_leave_pause_menu);
+		b->on_selected.add(this, [this] {
+				on_leave_pause_menu();
+			});
 		vbox->add_this(b);
 
 		return vbox;
@@ -853,7 +807,7 @@ public:
 
 	bool is_in_pause = false;
 
-	PlayerHUD(Player* p) {
+	PlayerHUD(Player* p) : p(p){
 		recieve_events = true;
 
 		pause_menu_outline = new GUIBox;
@@ -900,13 +854,16 @@ public:
 	void on_pressed(int x, int y, int b) override {
 		
 	}
+
+	void toggle_menu_mode() {
+		if (is_in_pause)
+			on_leave_pause_menu();
+		else
+			on_enter_pause_menu();
+	}
+
 	void on_key_down(const SDL_KeyboardEvent& k) override {
-		if (k.keysym.scancode == SDL_SCANCODE_ESCAPE) {
-			if (is_in_pause)
-				on_leave_pause_menu();
-			else
-				on_enter_pause_menu();
-		}
+		
 	}
 
 	GUIVerticalBox* paused_menu = nullptr;
@@ -914,6 +871,8 @@ public:
 
 	GUIText* scoreWidget = nullptr;
 	GUIBox* boxWidget = nullptr;
+
+	Player* p = nullptr;
 };
 
 CLASS_H(HealthComponent, EntityComponent)
@@ -945,17 +904,50 @@ CLASS_IMPL(HealthComponent);
 void Player::on_jump_callback()
 {
 	static int i = 0;
-	sys_print("jump %d\n",i++);
 	if(is_on_ground())
 		velocity.y += 5.0;
+	else if(wall_jump_cooldown<=0.0){
+		glm::vec2 stick = glm::vec2(cmd.forward_move, cmd.lateral_move);
+		if (glm::length(stick) > 0.7) {
+
+			vec3 look_front = AnglesToVector(view_angles.x, view_angles.y);
+			look_front.y = 0;
+			look_front = normalize(look_front);
+			vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
+
+
+			vec3 wishdir = (look_front * stick.x + look_side * stick.y);
+			wishdir = vec3(wishdir.x, 0.f, wishdir.z);
+
+			if (dot(wishdir, velocity) >= 0)
+				return;
+
+			world_query_result wqr;
+			auto pos = get_ws_position() + glm::vec3(0, 0.7, 0);
+			const float test_len = ccontroller->capsule_radius+0.4;
+			bool good = g_physics.trace_ray(wqr, pos, pos - wishdir * test_len, UINT32_MAX);
+			if (good) {
+				velocity = wqr.hit_normal * 8.0f;
+				velocity.y = 4.5;
+				sys_print("wall jump\n");
+
+				wall_jump_cooldown = 0.2;
+			}
+
+		}
+	}
 }
 
 
 void Player::update()
 {
+	if (wall_jump_cooldown > 0)
+		wall_jump_cooldown -= eng->get_tick_interval();
+
+
 	auto moveAction = inputPtr->get("game/move");
 	auto lookAction = inputPtr->get("game/look");
-
+	auto jumpAction = inputPtr->get("game/jump");
 	{
 		auto off = lookAction->get_value<glm::vec2>();
 		view_angles.x -= off.y;	// pitch
@@ -965,11 +957,19 @@ void Player::update()
 	}
 	{
 		auto move = moveAction->get_value<glm::vec2>();
+		float length = glm::length(move);
+		if (length > 1.0)
+			move /= length;
+
 		cmd.forward_move = move.y;
 		cmd.lateral_move = move.x;
+		//printf("%f %f %f\n", move.x, move.y,length);
 
-		printf("%f %f\n", move.x, move.y);
 	}
+	if (jumpAction->get_value<bool>())
+		on_jump_callback();
+
+	const bool is_sprinting = inputPtr->get("game/sprint")->get_value<bool>();
 
 	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
 	float speed = glm::length(velocity);
@@ -986,10 +986,10 @@ void Player::update()
 
 	vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
 	float inputlen = length(inputvec);
-	if (inputlen > 0.00001)
-		inputvec = inputvec / inputlen;
-	if (inputlen > 1)
-		inputlen = 1;
+	//if (inputlen > 0.00001)
+	//	inputvec = inputvec / inputlen;
+	//if (inputlen > 1)
+	//	inputlen = 1;
 
 	vec3 look_front = AnglesToVector(view_angles.x, view_angles.y);
 	look_front.y = 0;
@@ -997,9 +997,15 @@ void Player::update()
 	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
 	const bool player_on_ground =  is_on_ground();
-	float acceleation_val = (player_on_ground) ? ground_accel : air_accel;
+	float acceleation_val = (player_on_ground) ? 
+		((is_sprinting) ? sprint_accel : ground_accel) :
+		air_accel;
 	acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
-	float maxspeed_val = (player_on_ground) ? max_ground_speed : max_air_speed;
+
+
+	float maxspeed_val = (player_on_ground) ? 
+		((is_sprinting) ? max_sprint_speed : max_ground_speed) :
+		max_air_speed;
 
 	vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
@@ -1038,14 +1044,13 @@ void Player::update()
 
 	auto line_start = ccontroller->get_character_pos() + glm::vec3(0, 0.5, 0);
 	Debug::add_line(line_start, line_start + velocity * 3.0f, COLOR_CYAN,0);
+
+	Debug::add_line(line_start, line_start + wishdir * 2.0f, COLOR_RED, 0);
 }
 
 
  void Player::start()  {
 
-	 hud = std::make_unique<PlayerHUD>(this);
-
-	 score_update_delegate.invoke(10);
 
 	 eng->set_game_focused(true);
 
@@ -1077,12 +1082,19 @@ void Player::update()
 	 }
 
 	 inputPtr->enable_mapping("game");
+	 inputPtr->enable_mapping("ui");
 
 	 auto jumpAction = inputPtr->get("game/jump");
-	 assert(jumpAction);
-	 jumpAction->bind_start_function([this] {
-		 on_jump_callback();
+
+	 inputPtr->get("ui/menu")->bind_start_function([this] {
+			 if(hud)
+				 hud->toggle_menu_mode();
 		 });
+
+	 assert(jumpAction);
+	// jumpAction->bind_start_function([this] {
+	//	 on_jump_callback();
+	//	 });
 
 	 Player::find_a_spawn_point();
 
@@ -1090,6 +1102,10 @@ void Player::update()
 	 ccontroller->set_position(get_ws_position());
 	 ccontroller->capsule_height = player_capsule->height;
 	 ccontroller->capsule_radius = player_capsule->radius;
+
+
+	 hud = std::make_unique<PlayerHUD>(this);
+	 score_update_delegate.invoke(10);
 
 }
  void Player::end() {

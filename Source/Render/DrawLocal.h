@@ -140,20 +140,6 @@ private:
 	void recompile(program_def& def);
 };
 
-
-class DepthPyramid
-{
-public:
-	void init();
-	void free();
-
-	void dispatch_depth_pyramid_creation();
-
-	void on_viewport_size_changed(int x, int y);
-
-	Texture* depth_pyramid = nullptr;
-};
-
 class DebuggingTextureOutput
 {
 public:
@@ -203,15 +189,10 @@ public:
 	void accumulate_gbuffer_lighting();
 	void deferred_decal_pass();
 
-	void draw_text();
-	void draw_rect(int x, int y, int width, int height, Color32 color, Texture* texture=nullptr, 
-		float srcw=0, float srch=0, float srcx=0, float srcy=0);	// src* are in pixel coords
-
 	void create_shaders();
 
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool force_backface_state);
-	void AddPlayerDebugCapsule(Entity& e, MeshBuilder* mb, Color32 color);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui);
 	void do_post_process_stack(const std::vector<MaterialInstance*>& stack);
@@ -226,7 +207,6 @@ public:
 	Texture black_texture;
 	Texture flat_normal_texture;
 
-	Texture3d perlin3d;
 	
 	int cubemap_index = 0;
 	static const int MAX_SAMPLER_BINDINGS = 32;
@@ -351,24 +331,13 @@ public:
 
 	void draw_meshbuilders();
 
-	// >>> PBR BRANCH
-	EnvCubemap skybox;
-	float rough = 1.f;
-	float metal = 0.f;
-	glm::vec3 aosphere;
-	glm::vec2 vfog = glm::vec2(10,0.0);
-	glm::vec3 ambientvfog;
-	bool using_skybox_for_specular = false;
-
 	Texture* lens_dirt = nullptr;
 
 	SSAO_System ssao;
 	Shadow_Map_System shadowmap;
 	Volumetric_Fog_System volfog;
-	DepthPyramid depth_pyramid_maker;
-	DebuggingTextureOutput debug_tex_out;
 
-	float slice_3d=0.0;
+	DebuggingTextureOutput debug_tex_out;
 
 	Render_Scene scene;
 	

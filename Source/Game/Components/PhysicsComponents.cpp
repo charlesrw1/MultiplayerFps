@@ -7,48 +7,13 @@
 #include "Render/Texture.h"
 #include "Framework/MeshBuilder.h"
 #include "Render/DrawPublic.h"
+#include "MeshbuilderComponent.h"
 
 CLASS_IMPL(PhysicsComponentBase);
 CLASS_IMPL(BoxComponent);
 CLASS_IMPL(CapsuleComponent);
 CLASS_IMPL(SphereComponent);
 
-CLASS_H(MeshBuilderComponent, EntityComponent)
-public:
-	MeshBuilderComponent() {
-		dont_serialize_or_edit = true;
-	}
-	~MeshBuilderComponent() {
-		assert(!editor_mb_handle.is_valid());
-	}
-
-	static const PropertyInfoList* get_props() = delete;
-	void on_init() override {
-		MeshBuilder_Object mbo;
-		fill_out_struct(mbo);
-		editor_mb_handle = idraw->get_scene()->register_meshbuilder(mbo);
-	}
-	void on_deinit() override {
-		idraw->get_scene()->remove_meshbuilder(editor_mb_handle);
-		editor_mb.Free();
-	}
-	void on_changed_transform() override {
-		MeshBuilder_Object mbo;
-		fill_out_struct(mbo);
-		idraw->get_scene()->update_meshbuilder(editor_mb_handle, mbo);
-	}
-	void fill_out_struct(MeshBuilder_Object& obj) {
-		obj.depth_tested = true;
-		obj.owner = this;
-		obj.transform = get_ws_transform();
-		obj.visible = true;
-		obj.meshbuilder = &editor_mb;
-	}
-
-	handle<MeshBuilder_Object> editor_mb_handle;
-	MeshBuilder editor_mb;
-};
-CLASS_IMPL(MeshBuilderComponent);
 
 void CapsuleComponent::on_init() {
 	if (disable_physics)

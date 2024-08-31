@@ -81,7 +81,7 @@ physx::PxTransform PhysTransform::get_physx() const
 class PhysicsManImpl
 {
 public:
-	PhysicsManImpl() : awake_dynamic_actors(3), all_physics_actors(3) {}
+	PhysicsManImpl() : awake_dynamic_actors(3), all_physics_actors(16) {}
 
 
 	

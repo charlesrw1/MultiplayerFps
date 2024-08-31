@@ -675,7 +675,7 @@ public:
 	InputValue modify(InputValue value, float dt) const {
 
 		float f = value.v.x;
-		if (abs(f) <= 0.05)
+		if (abs(f) <= 0.3)
 			f = 0;
 
 		f = glm::pow(abs(f), exp) * glm::sign(f);
@@ -752,17 +752,20 @@ void register_input_actions_for_game()
 	using GIB = GlobalInputBinding;
 
 	IA::register_action("game", "move", true)
-		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTX), new SwizzleModifier(false,false,1.5), nullptr)
-		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTY), new SwizzleModifier(true, false,1.5), nullptr)
+		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTX), new SwizzleModifier(false,true,1.0), nullptr)
+		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTY), new SwizzleModifier(true, true,1.0), nullptr)
 		->add_bind("y+", IA::keyboard_key(SDL_SCANCODE_W), new SwizzleModifier(true, false), nullptr)
 		->add_bind("y-", IA::keyboard_key(SDL_SCANCODE_S), new SwizzleModifier(true, true), {})
-		->add_bind("x-", IA::keyboard_key(SDL_SCANCODE_A), new SwizzleModifier(false, true), {})
-		->add_bind("x+", IA::keyboard_key(SDL_SCANCODE_D), new SwizzleModifier(false, false), {});
+		->add_bind("x-", IA::keyboard_key(SDL_SCANCODE_A), new SwizzleModifier(false, false), {})
+		->add_bind("x+", IA::keyboard_key(SDL_SCANCODE_D), new SwizzleModifier(false, true), {});
 	IA::register_action("game", "look", true)
 		->add_bind("x", GIB::MouseX, new LookModifier(false), {})
 		->add_bind("y", GIB::MouseY, new LookModifier(true), {})
 		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTX), new LookModifierController(false), {})
 		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTY), new LookModifierController(true), {});
+	IA::register_action("game", "sprint")
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), {}, {})
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_LSHIFT), {}, {});
 	IA::register_action("game", "inv_next")
 		->add_bind("", GIB::MouseScroll, {}, {})
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {});
@@ -782,6 +785,9 @@ void register_input_actions_for_game()
 	IA::register_action("ui", "right")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {})
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_RIGHT), {}, {});
+	IA::register_action("ui", "menu")
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_START), {}, new BasicButtonTrigger())
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_ESCAPE), {}, new BasicButtonTrigger());
 	IA::register_action("game", "reload")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_X), {}, new BasicButtonTrigger())
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_R), {}, new BasicButtonTrigger());
@@ -1282,12 +1288,6 @@ void GameEngineLocal::draw_screen()
 {
 	GPUFUNCTIONSTART;
 
-	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
-	
-	if (g_window_fullscreen.get_bool())
-		SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-	else
-		SDL_SetWindowFullscreen(window, 0);
 
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1343,7 +1343,7 @@ void GameEngineLocal::draw_screen()
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	{
-		GPUSCOPESTART("SDL_GL_SwapWindow");
+		GPUSCOPESTART(SwapWindow);
 		SDL_GL_SwapWindow(window);
 	}
 }
@@ -1654,6 +1654,8 @@ void GameEngineLocal::loop()
 						g_window_w.set_integer(x);
 					if (y != g_window_h.get_integer())
 						g_window_h.set_integer(y);
+
+					SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 				}
 				break;
 			case SDL_KEYUP:

@@ -100,9 +100,9 @@ void Volumetric_Fog_System::compute()
 		prog.lightcalc.set_mat4("InvView", glm::inverse(draw.vs.view));
 		prog.lightcalc.set_mat4("InvProjection", glm::inverse(draw.vs.proj));
 
-		prog.lightcalc.set_float("density", draw.vfog.x);
-		prog.lightcalc.set_float("anisotropy", draw.vfog.y);
-		prog.lightcalc.set_vec3("ambient", draw.ambientvfog);
+		//prog.lightcalc.set_float("density", draw.vfog.x);
+		//prog.lightcalc.set_float("anisotropy", draw.vfog.y);
+		//prog.lightcalc.set_vec3("ambient", draw.ambientvfog);
 
 		prog.lightcalc.set_vec3("spotlightpos", vec3(0, 2, 0));
 		prog.lightcalc.set_vec3("spotlightnormal", vec3(0, -1, 0));
@@ -112,7 +112,7 @@ void Volumetric_Fog_System::compute()
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_3D, texture.last_volume);
 		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
+		//glBindTexture(GL_TEXTURE_3D, draw.perlin3d.id);
 		prog.lightcalc.set_vec3("perlin_offset", glm::vec3(eng->get_game_time() * 0.2, 0, eng->get_game_time()));
 
 

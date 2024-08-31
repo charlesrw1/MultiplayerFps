@@ -27,8 +27,6 @@ struct Render_Object
 	Model* model = nullptr;
 	AnimatorInstance* animator = nullptr;
 	MaterialInstance* mat_override = nullptr;
-	Color32 param1 = COLOR_WHITE;
-	Color32 param2 = COLOR_WHITE;
 
 	bool visible : 1;
 	bool shadow_caster : 1;

@@ -1546,11 +1546,13 @@ void EntityNameDatabase_Ed::invoke_change_name(uint64_t h)
 
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {
-	auto model = GetAssets().find_sync<Model>("cube.cmdl");
+	static int counter = 0;
+
+	auto model = GetAssets().find_sync<Model>("wall2x2.cmdl");
 	for (int z = 0; z < 20; z++) {
 		for (int y = 0; y < 20; y++) {
 			for (int x = 0; x < 20; x++) {
-				glm::vec3 p(x, y, z);
+				glm::vec3 p(x, y, z + counter * 20);
 				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
 
 				auto ent = eng->spawn_entity_class<StaticMeshEntity>();
@@ -1560,6 +1562,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 			}
 		}
 	}
+	counter++;
 }
 #include "Render/MaterialPublic.h"
 DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)

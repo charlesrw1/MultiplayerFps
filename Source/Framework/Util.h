@@ -78,7 +78,7 @@ struct Profile_Scope_Wrapper
 #define MAKEPROF_(type, include_gpu) Profile_Scope_Wrapper PROFILEEVENT##__LINE__(type, include_gpu)
 #define CPUFUNCTIONSTART MAKEPROF_(__FUNCTION__, false)
 #define GPUFUNCTIONSTART MAKEPROF_(__FUNCTION__, true)
-#define GPUSCOPESTART(name) MAKEPROF_(name, true)
+#define GPUSCOPESTART(name) Profile_Scope_Wrapper profileevent##name(#name, true)
 #define CPUSCOPESTART(name) Profile_Scope_Wrapper profileevent##name(#name, false)
 
 

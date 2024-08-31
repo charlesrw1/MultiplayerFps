@@ -105,7 +105,7 @@ void Shadow_Map_System::update()
 	tweak.max_shadow_dist = sun.max_shadow_dist;
 	tweak.z_dist_scaling = sun.z_dist_scaling;
 	{
-		GPUSCOPESTART("Csm setup");
+		GPUSCOPESTART(CSM_SETUP);
 
 		glm::vec3 directional_dir = sun.direction;
 
@@ -136,7 +136,7 @@ void Shadow_Map_System::update()
 	// now setup scene for rendering
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
 	{
-		GPUSCOPESTART("Render csm layer");
+		GPUSCOPESTART(RENDER_CSM_LAYERS);
 		for (int i = 0; i < 4; i++) {
 
 			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array, 0, i);

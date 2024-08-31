@@ -122,17 +122,17 @@ public:
 
 	void clear() {
 		objects.clear();
-		high_level_objects_in_pass.clear();
+	}
+	void clear_static() {
+		cached_static_objects.clear();
 	}
 
 	const pass_type type{};					// modifies batching+sorting logic
 
-	// all Render_Objects in the pass
-	// there will likely be multiple Pass_Objects from 1 R_O like multiple submeshes and LODs all get added
-	// this is the array that gets frustum + occlusion culled to make the final Render_Lists structure
-	// this means static objects can cache LODs
-	std::vector<handle<Render_Object>> high_level_objects_in_pass;
+
 	std::vector<Pass_Object> objects;		// geometry + material id + object id
+	std::vector<Pass_Object> cached_static_objects;	// copied into objects
+
 	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
 	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
 };
@@ -166,8 +166,6 @@ struct Render_Lists
 	void build_from(Render_Pass& src,
 		Free_List<ROP_Internal>& proxy_list);
 
-	uint32_t indirect_drawid_buf_size = 0;
-	uint32_t indirect_instance_buf_size = 0;
 
 	// commands to input to glMultiDrawElementsIndirect
 	std::vector<gpu::DrawElementsIndirectCommand> commands;
@@ -424,22 +422,6 @@ public:
 
 	std::unique_ptr<TerrainInterfaceLocal> terrain_interface;
 
-	//std::unique_ptr<Render_Pass> gbuffer;
-	//std::unique_ptr<Render_Lists> gbuffer1;				// main draw list, or 1st pass if using gpu culling
-	//std::unique_ptr<Render_Lists> gbuffer2;				// 2nd pass for new unoccluded objects if using gpu culling
-	//
-	//std::unique_ptr<Render_Pass> transparent_objs;
-	//std::unique_ptr<Render_Lists> transparents_ren_list;// draw in forward pass of transparents
-	//
-	//std::unique_ptr<Render_Pass> custom_depth;
-	//std::unique_ptr<Render_Lists> custom_depth_list;	// draw to custom depth buffer
-	//
-	//std::unique_ptr<Render_Pass> editor_selection;
-	//std::unique_ptr<Render_Lists> editor_sel_list;		// drawn to editor selection buffer
-	//
-	//std::unique_ptr<Render_Pass> shadow_casters;
-	//std::unique_ptr<Render_Lists> global_shadow_list;	// unculled shadow casters
-
 
 	Render_Pass gbuffer_pass;
 	Render_Pass transparent_pass;
@@ -458,6 +440,8 @@ public:
 	uint32_t unique_id_counter = 0;
 
 	Free_List<ROP_Internal> proxy_list;
+	std::vector<glm::vec4> proxy_list_bounding_spheres;	// SOA bounding spheres for culling
+
 	Free_List<RL_Internal> light_list;
 	Free_List<RDecal_Internal> decal_list;
 	// should just be one, but I let multiple ones exist too

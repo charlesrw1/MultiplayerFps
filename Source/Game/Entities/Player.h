@@ -89,14 +89,9 @@ public:
 	CapsuleComponent* player_capsule{};
 	MeshComponent* viewmodel_mesh{};
 	HealthComponent* health{};
-
-	InputUser* inputPtr = nullptr;
-
-	EntityPtr<Entity> someEntity;
-
 	SpotLightComponent* spotlight{};
 
-	AssetPtr<Model> a_second_model;
+	InputUser* inputPtr = nullptr;
 
 	MulticastDelegate<int> score_update_delegate;
 
@@ -104,15 +99,9 @@ public:
 
 	std::unique_ptr<CharacterController> ccontroller;
 	
-	static const PropertyInfoList* get_props() {
-		START_PROPS(Player)
-			REG_ASSET_PTR(a_second_model, PROP_DEFAULT),
-			REG_ENTITY_PTR(someEntity, PROP_DEFAULT)
-		END_PROPS(Player)
-	};
+	static const PropertyInfoList* get_props() = delete;
 
 	// PlayerBase overrides
-	void set_input_command(Move_Command cmd) override; 	// called by game before calling update
 	void get_view(glm::mat4& viewMatrix, float& fov) override;
 	
 	// Entity overrides
@@ -122,7 +111,6 @@ public:
 	void end() override;
 
 	void on_jump_callback();
-
 public:
 	glm::vec3 calc_eye_position();
 
@@ -157,7 +145,7 @@ public:
 
 	PlayerFlags::Enum flags = {};
 private:
-
+	float wall_jump_cooldown = 0.0;
 	// physics stuff
 
 

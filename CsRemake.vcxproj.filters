@@ -542,6 +542,8 @@
     <ClInclude Include="Source\Game\Entities\TriggerEntities.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Framework\UniquePtrReflection.h" />
+    <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h" />
+    <ClInclude Include="Source\Render\Frustum.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -735,9 +737,6 @@
     <ClCompile Include="Source\Framework\Files.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\Draw.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
@@ -818,5 +817,6 @@
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Game\Entities\TriggerEntities.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
+    <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
   </ItemGroup>
 </Project>
