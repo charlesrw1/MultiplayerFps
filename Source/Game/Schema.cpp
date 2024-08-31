@@ -11,7 +11,8 @@
 CLASS_IMPL(Schema);
 
 
-#include "EditorDocPublic.h"
+extern IEditorTool* g_editor_doc;
+
 class SchemaAssetMetadata : public AssetMetadata
 {
 public:

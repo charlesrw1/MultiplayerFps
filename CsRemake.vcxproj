@@ -50,7 +50,6 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
-    <ClInclude Include="Source\CamData.h" />
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
@@ -69,7 +68,6 @@
     <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\EditorDocLocal.h" />
-    <ClInclude Include="Source\EditorDocPublic.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\External\cgltf.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
@@ -132,9 +130,7 @@
     <ClInclude Include="Source\Framework\StringName.h" />
     <ClInclude Include="Source\Framework\StringUtil.h" />
     <ClInclude Include="Source\Framework\SubclassType.h" />
-    <ClInclude Include="Source\Framework\ConsolePrint.h" />
     <ClInclude Include="Source\Framework\Util.h" />
-    <ClInclude Include="Source\Framework\Vs.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />
     <ClInclude Include="Source\GameEnginePublic.h" />
     <ClInclude Include="Source\Game\BasePlayer.h" />

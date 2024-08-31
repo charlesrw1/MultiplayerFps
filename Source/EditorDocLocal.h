@@ -1,5 +1,5 @@
 #pragma once
-#include "EditorDocPublic.h"
+#include "IEditorTool.h"
 
 #include "glm/glm.hpp"
 #include "Render/Model.h"

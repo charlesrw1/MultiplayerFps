@@ -54,8 +54,9 @@
 #include "AssetCompile/AnimationSeqLoader.h"
 
 #include "Input/InputSystem.h"
+#include "Framework/Files.h"
+#include "IEditorTool.h"
 
-MeshBuilder phys_debug;
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -117,7 +118,7 @@ public:
 static Debug_Console dbg_console;
 
 #include <mutex>
-static std::mutex printMutex;
+static std::mutex printMutex;	// fixme
 
 char* string_format(const char* fmt, ...) {
 	std::lock_guard<std::mutex> printLock(printMutex);	// fixme
@@ -143,8 +144,6 @@ void Quit()
 	eng_local.cleanup();
 	exit(0);
 }
-
-#include "Framework/ConsolePrint.h"
 
 void sys_print(const char* fmt, ...)
 {
@@ -219,78 +218,6 @@ static void SDLError(const char* msg)
 }
 
 
-template<typename T>
-T* checked_cast(ClassBase* c) {
-	return c ? c->cast_to<T>() : nullptr;
-}
-
-
-void GameEngineLocal::make_move()
-{
-#if 0
-	Player* p = checked_cast<Player>(get_local_player());
-
-	if (!p)
-		return;
-
-	Move_Command command;
-	command.view_angles = p->view_angles;
-	command.tick = tick;
-
-	if (g_fakemovedebug.get_integer() != 0)
-		command.lateral_move = std::fmod(GetTime(), 2.f) > 1.f ? -1.f : 1.f;
-	if (g_fakemovedebug.get_integer() == 2)
-		command.button_mask |= BUTTON_JUMP;
-
-	if (!is_game_focused()) {
-		p->set_input_command(command);
-		//if(cl->get_state()>=CS_CONNECTED) 
-		//	cl->get_command(cl->OutSequence()) = command;
-		return;
-	}
-
-	if (!p->has_flag(PlayerFlags::FrozenView))
-		view_angle_update(command.view_angles);
-
-
-	int forwards_key = SDL_SCANCODE_W;
-	int back_key = SDL_SCANCODE_S;
-
-	if (inp.keys[forwards_key])
-		command.forward_move += 1.f;
-	if (inp.keys[back_key])
-		command.forward_move -= 1.f;
-	if (inp.keys[SDL_SCANCODE_A])
-		command.lateral_move += 1.f;
-	if (inp.keys[SDL_SCANCODE_D])
-		command.lateral_move -= 1.f;
-	if (inp.keys[SDL_SCANCODE_Z])
-		command.up_move += 1.f;
-	if (inp.keys[SDL_SCANCODE_X])
-		command.up_move -= 1.f;
-	if (inp.keys[SDL_SCANCODE_SPACE])
-		command.button_mask |= BUTTON_JUMP;
-	if (inp.keys[SDL_SCANCODE_LSHIFT])
-		command.button_mask |= BUTTON_DUCK;
-	if (inp.mousekeys & (1<<1))
-		command.button_mask |= BUTTON_FIRE1;
-	if (inp.keys[SDL_SCANCODE_E])
-		command.button_mask |= BUTTON_RELOAD;
-	if (inp.keychanges[SDL_SCANCODE_LEFTBRACKET])
-		command.button_mask |= BUTTON_ITEM_PREV;
-	if (inp.keychanges[SDL_SCANCODE_RIGHTBRACKET])
-		command.button_mask |= BUTTON_ITEM_NEXT;
-	// quantize and unquantize for local prediction
-	command.forward_move	= Move_Command::unquantize(Move_Command::quantize(command.forward_move));
-	command.lateral_move	= Move_Command::unquantize(Move_Command::quantize(command.lateral_move));
-	command.up_move			= Move_Command::unquantize(Move_Command::quantize(command.up_move));
-	
-	// FIXME:
-	p->set_input_command(command);
-	//if(cl->get_state()>=CS_CONNECTED)
-	//	cl->get_command(cl->OutSequence()) = command;
-#endif
-}
 extern ConfigVar g_project_name;
 
 void GameEngineLocal::init_sdl_window()
@@ -346,7 +273,7 @@ void User_Camera::scroll_callback(int amt)
 			move_speed = 0.0001;
 	}
 }
-#define PRINTVEC(name,v) printf(name": %f %f %f\n", v.x,v.y,v.z);
+
 void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, glm::mat4 invproj)
 {
 	int xpos, ypos;
@@ -408,19 +335,13 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 
 		vec3 newlookatpoint = newtoorbit - otol;
 		float len_ = glm::length(newlookatpoint - newposition);
-		
-		PRINTVEC("pos          ", newposition);
-		printf(  "lapdist      %f\n", lookatpointdist);
-		PRINTVEC("tolookat     ", tolookat);
-		PRINTVEC("look-at-point", newlookatpoint);
-		PRINTVEC("to-orbit     ", newtoorbit);
-		PRINTVEC("otol         ", otol);
+
 		if (abs(len_) > 0.000001f) {
 			vec3 oldfront = front;
 			front = (newlookatpoint - newposition) / len_;
-		PRINTVEC("frontdelta   ", (oldfront - front));
+		
 		}
-		printf("----------------------------\n");
+
 		position = newposition;
 	}
 	else {
@@ -457,8 +378,6 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 		position += delta;
 	}
 }
-#include "Framework/Files.h"
-
 
 void GameEngineLocal::connect_to(string address)
 {
@@ -468,9 +387,6 @@ void GameEngineLocal::connect_to(string address)
 	sys_print("Connecting to server %s\n", address.c_str());
 	cl->connect(address);
 }
-
-#ifdef EDITDOC
-#include "EditorDocPublic.h"
 
 DECLARE_ENGINE_CMD(close_ed)
 {
@@ -510,9 +426,6 @@ static void disable_imgui_docking()
 	ImGui::GetIO().ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable);
 }
 
-#define ASSERT_ENUM_STRING( enumstr, index )		( 1 / (int)!( (int)enumstr - index ) ) ? #enumstr : ""
-
-
 
 void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
@@ -536,9 +449,6 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 		disable_imgui_docking();
 }
 
-
-
-#endif
 
 
 DECLARE_ENGINE_CMD(quit)
@@ -855,6 +765,7 @@ ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV,"");
 
 ConfigVar developer_mode("developer_mode", "0", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
 
+ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
 
 
 void GameEngineLocal::open_level(string nextname)
@@ -1147,8 +1058,6 @@ Debug_Interface* Debug_Interface::get()
 	return &inst;
 }
 
-ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop",0.0001, 5.0);
-
 
 bool GameEngineLocal::is_drawing_to_window_viewport() const
 {
@@ -1163,21 +1072,10 @@ glm::ivec2 GameEngineLocal::get_game_viewport_size() const
 		return { g_window_w.get_integer(), g_window_h.get_integer() };
 }
 
-static bool window_hovered = true;
-static bool window_focused = true;
+
 static bool scene_hovered = false;
-static bool scene_focused = false;
 
 
-void f345()
-{
-	ImGui::Text("window_hovered: %d",int(window_hovered));
-	ImGui::Text("window_focused: %d", int(window_focused));
-	ImGui::Text("scene_hovered: %d", int(scene_hovered));
-	ImGui::Text("scene_focused: %d", int(scene_focused));
-	ImGui::Text("eng->game_focused: %d", int(eng_local.is_game_focused()));
-}
-AddToDebugMenu asdf45("func", f345);
 #include "Framework/MyImguiLib.h"
 void GameEngineLocal::draw_any_imgui_interfaces()
 {
@@ -1217,9 +1115,6 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			auto sz = ImGui::GetItemRectSize();
 			scene_hovered = ImGui::IsItemHovered();
 			window_viewport_size = { size.x,size.y };
-			window_hovered = ImGui::IsWindowHovered();
-			window_focused = ImGui::IsWindowFocused();
-			scene_focused = ImGui::IsItemFocused();
 
 			// save off where the viewport is the GUI for mouse events
 			get_gui()->set_viewport_size(size.x, size.y);
@@ -1264,7 +1159,9 @@ bool GameEngineLocal::game_draw_screen()
 		return true;
 	}
 
-	PlayerBase* p = checked_cast<PlayerBase>(get_local_player());
+	auto player = get_local_player();
+	assert(player);
+	auto p = player->cast_to<PlayerBase>();
 	ASSERT(p)
 	
 
@@ -1347,9 +1244,6 @@ void GameEngineLocal::draw_screen()
 		SDL_GL_SwapWindow(window);
 	}
 }
-
-
-extern IEditorTool* g_model_editor;
 
 // RH, reverse Z, infinite far plane perspective matrix
 

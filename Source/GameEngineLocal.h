@@ -110,8 +110,6 @@ public:
 	bool is_in_an_editor_state() const { return get_current_tool() != nullptr; }
 	void change_editor_state(IEditorTool* next_tool, const char* arg, const char* file = "");
 
-	void queue_load_map(string nextmap);
-
 	void execute_map_change();
 	void on_map_change_callback(bool is_for_editor, Level* loadedLevel);
 
@@ -172,7 +170,6 @@ private:
 
 	bool is_hosting_game = false;
 
-	void make_move();
 	void init_sdl_window();
 	void key_event(SDL_Event event);
 
@@ -184,7 +181,6 @@ private:
 	friend class Ent_Iterator;
 
 	void call_startup_functions_for_new_entity(Entity* e);
-
 
 	std::string* find_keybind(SDL_Scancode code, uint16_t keymod);
 

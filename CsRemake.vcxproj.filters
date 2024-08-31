@@ -87,9 +87,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\CamData.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Client.h">
       <Filter>Source</Filter>
     </ClInclude>
@@ -300,13 +297,7 @@
     <ClInclude Include="Source\EditorDocLocal.h">
       <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EditorDocPublic.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h">
-      <Filter>Source\Framework\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Vs.h">
       <Filter>Source\Framework\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\MeshBuilder.h">
@@ -419,9 +410,6 @@
     </ClInclude>
     <ClInclude Include="Source\Framework\Hashset.h">
       <Filter>Source\Framework\Containers</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ConsolePrint.h">
-      <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\RenderScene.h">
       <Filter>Source\Render</Filter>
