@@ -312,9 +312,6 @@
     <ClInclude Include="Source\Framework\DictParser.h">
       <Filter>Source\Framework\Containers</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\Dict.h">
-      <Filter>Source\Framework\Containers</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\FreeList.h">
       <Filter>Source\Framework\Containers</Filter>
     </ClInclude>

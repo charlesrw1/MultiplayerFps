@@ -98,7 +98,6 @@
     <ClInclude Include="Source\Framework\Config.h" />
     <ClInclude Include="Source\Framework\Curve.h" />
     <ClInclude Include="Source\Framework\CurveEditorImgui.h" />
-    <ClInclude Include="Source\Framework\Dict.h" />
     <ClInclude Include="Source\Framework\DictParser.h" />
     <ClInclude Include="Source\Framework\DictWriter.h" />
     <ClInclude Include="Source\Framework\EnumDefReflection.h" />
