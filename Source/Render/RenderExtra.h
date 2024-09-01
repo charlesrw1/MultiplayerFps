@@ -110,12 +110,12 @@ public:
 	}fbo;
 
 	struct programs {
-		Shader hbao_calc;
-		Shader linearize_depth;
-		Shader make_viewspace_normals;
-		Shader hbao_blur;
-		Shader hbao_deinterleave;
-		Shader hbao_reinterleave;
+		program_handle hbao_calc;
+		program_handle linearize_depth;
+		program_handle make_viewspace_normals;
+		program_handle hbao_blur;
+		program_handle hbao_deinterleave;
+		program_handle hbao_reinterleave;
 	}prog;
 
 	struct textures {

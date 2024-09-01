@@ -88,7 +88,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	sys_print("*** INFO: compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
 
 	const bool is_tesselation = mat->get_master_material()->usage == MaterialUsage::Terrain;
-	program_handle handle = draw.prog_man.create_single_file(name.c_str(), is_tesselation, params);
+	program_handle handle = draw.get_device().get_prog_man().create_single_file(name.c_str(), is_tesselation, params);
 	ASSERT(handle != -1);
 
 	mat_table.insert(key, handle);

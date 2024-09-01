@@ -57,6 +57,13 @@ void MeshBuilder::Draw(uint32_t gl_type)
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glDrawElements((GLenum)gl_type, indicies.size(), GL_UNSIGNED_INT, (void*)0);
 }
+void MeshBuilder::get_data_to_render_with(uint32_t& vao, uint32_t& vbo, int& count, int& type)
+{
+	vao = this->VAO;
+	vbo = this->VBO;
+	count = indicies.size();
+	type = GL_UNSIGNED_INT;
+}
 
 void MeshBuilder::PushLine(vec3 start, vec3 end, Color32 color)
 {

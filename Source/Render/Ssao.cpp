@@ -77,12 +77,15 @@ Shader make_program(const char* vert, const char* frag, const std::string& defin
 
 void SSAO_System::reload_shaders()
 {
-	Shader::compile(prog.hbao_calc, "fullscreenquad.txt", "hbao/hbao.txt", "hbao/hbaoG.txt", {});
-	prog.hbao_blur = make_program("fullscreenquad.txt", "hbao/hbaoblur.txt");
-	prog.hbao_deinterleave = make_program("fullscreenquad.txt", "hbao/hbaodeinterleave.txt");
-	prog.hbao_reinterleave = make_program("fullscreenquad.txt", "hbao/hbaoreinterleave.txt");
-	prog.linearize_depth = make_program("fullscreenquad.txt", "hbao/linearizedepth.txt");
-	prog.make_viewspace_normals = make_program("fullscreenquad.txt", "hbao/viewnormal.txt");
+
+
+	//Shader::compile(prog.hbao_calc, "fullscreenquad.txt", "hbao/hbao.txt", "hbao/hbaoG.txt", {});
+	auto& prog_man = draw.get_device().get_prog_man();
+	prog.hbao_blur = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaoblur.txt");
+	prog.hbao_deinterleave = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaodeinterleave.txt");
+	prog.hbao_reinterleave = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaoreinterleave.txt");
+	prog.linearize_depth = prog_man.create_raster("fullscreenquad.txt", "hbao/linearizedepth.txt");
+	prog.make_viewspace_normals = prog_man.create_raster("fullscreenquad.txt", "hbao/viewnormal.txt");
 }
 
 
@@ -285,49 +288,90 @@ void SSAO_System::render()
 	const int quarterWidth = ((width + 3) / 4);
 	const int quarterHeight = ((height + 3) / 4);
 
-	glViewport(0, 0, width, height);
+	//glViewport(0, 0, width, height);
 
 	// linearize depth, writes to texture.depthlinear
+	auto& device = draw.get_device();
 	{
 		float near = draw.vs.near;
 		float far = draw.vs.far;
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthlinear);
-		prog.linearize_depth.use();
-		prog.linearize_depth.set_vec4("clipInfo", glm::vec4(
+
+		RenderPassSetup setup("depth_linearlize", fbo.depthlinear, false, false, 0,0, width, height);
+
+		GpuRenderPassScope scope = device.start_render_pass(setup);
+
+		RenderPipelineState state;
+		state.program = prog.linearize_depth;
+		state.vao = 0;
+		state.blend = blend_state::OPAQUE;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		device.set_pipeline(state);
+
+		auto shader = device.shader();
+		shader.set_vec4("clipInfo", glm::vec4(
 			near * far,
 			near - far,
 			far,
 			1.0
 		));
-		prog.linearize_depth.set_float("zNear", near);
+		shader.set_float("zNear", near);
 
 
-		glBindTextureUnit(0, draw.tex.scene_depth);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		device.bind_texture(0, draw.tex.scene_depth);
+		device.draw_arrays(GL_TRIANGLES, 0, 3);
+
+		//glBindTextureUnit(0, draw.tex.scene_depth);
+		//glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glCheckError();
 	}
 
 	// create viewspace normals, writes to texture.viewnormal
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.viewnormal);
-		prog.make_viewspace_normals.use();
-		prog.make_viewspace_normals.set_int("projOrtho", 0);
-		prog.make_viewspace_normals.set_vec4("projInfo", data.projInfo);
-		prog.make_viewspace_normals.set_vec2("InvFullResolution", data.InvFullResolution);
-		glBindTextureUnit(0, texture.depthlinear);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		RenderPassSetup setup("depth_linearlize", fbo.viewnormal, false, false, 0, 0, width, height);
+		GpuRenderPassScope scope = device.start_render_pass(setup);
+
+		RenderPipelineState state;
+		state.program = prog.make_viewspace_normals;
+		state.vao = 0;
+		state.blend = blend_state::OPAQUE;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		device.set_pipeline(state);
+
+		auto shader = device.shader();
+		shader.set_int("projOrtho", 0);
+		shader.set_vec4("projInfo", data.projInfo);
+		shader.set_vec2("InvFullResolution", data.InvFullResolution);
+
+		device.bind_texture(0, texture.depthlinear);
+		device.draw_arrays(GL_TRIANGLES, 0, 3);
+
 	}
 
 	// deinterleave, writes to texture.deptharray
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_deinterleave);
-		glViewport(0, 0, quarterWidth, quarterHeight);
-		glBindTextureUnit(0, texture.depthlinear);
-		prog.hbao_deinterleave.use();
+		RenderPassSetup setup("hbao2_deinterleave", fbo.hbao2_deinterleave, false, false, 0, 0, quarterWidth, quarterHeight);
+		GpuRenderPassScope scope = device.start_render_pass(setup);
+
+
+		//glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_deinterleave);
+		//glViewport(0, 0, quarterWidth, quarterHeight);
+
+		device.bind_texture(0, texture.depthlinear);
+
+		RenderPipelineState state;
+		state.program = prog.hbao_deinterleave;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		device.set_pipeline(state);
+
+		auto shader = device.shader();
+
 		// two passes
 		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
-			prog.hbao_deinterleave.set_vec4("info", glm::vec4(
+			shader.set_vec4("info", glm::vec4(
 				float(i % 4) + 0.5f,
 				float(i / 4) + 0.5f,
 				data.InvFullResolution.x,
@@ -336,61 +380,95 @@ void SSAO_System::render()
 
 			for (int layer = 0; layer < NUM_MRT; layer++)
 				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+
+			device.draw_arrays(GL_TRIANGLES, 0, 3);
+
+			//glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
 	}
 
 	// calculate hbao, writes to texture.resultarray
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
-		glViewport(0, 0, quarterWidth, quarterHeight);
-		glBindTextureUnit(0, texture.deptharray);
-		glBindTextureUnit(1, texture.viewnormal);
+		RenderPassSetup setup("hbao2_calc", fbo.hbao2_calc, false, false, 0, 0, quarterWidth, quarterHeight);
+		GpuRenderPassScope scope = device.start_render_pass(setup);
+
+
+		//glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
+		//glViewport(0, 0, quarterWidth, quarterHeight);
+
+		RenderPipelineState state;
+		state.program = prog.hbao_calc;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		device.set_pipeline(state);
+
+
+		device.bind_texture(0, texture.deptharray);
+		device.bind_texture(1, texture.viewnormal);
 
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
 
-		prog.hbao_calc.use();
+		//prog.hbao_calc.use();
 
-		glDrawArrays(GL_TRIANGLES, 0, 3 * RANDOM_ELEMENTS);
+		//glDrawArrays(GL_TRIANGLES, 0, 3 * RANDOM_ELEMENTS);
+		device.draw_arrays(GL_TRIANGLES, 0, 3 * RANDOM_ELEMENTS);
 	}
 
 	// reinterleave, writes to texture.result
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo.finalresolve);
-		glViewport(0, 0, width, height);
+		RenderPassSetup setup("finalresolve", fbo.finalresolve, false, false, 0, 0, width, height);
+		GpuRenderPassScope scope = device.start_render_pass(setup);
+
+		//glBindFramebuffer(GL_FRAMEBUFFER, fbo.finalresolve);
+		//glViewport(0, 0, width, height);
+
+
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		prog.hbao_reinterleave.use();
 
-		glBindTextureUnit(0, texture.resultarray);
+		RenderPipelineState state;
+		state.program = prog.hbao_reinterleave;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		device.set_pipeline(state);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		//prog.hbao_reinterleave.use();
+
+		device.bind_texture(0, texture.resultarray);
+
+		device.draw_arrays(GL_TRIANGLES, 0, 3);
 	}
 
 	// depth aware blur, writes to texture.result
 	if(r_ssao_blur.get_bool())
 	{
-		prog.hbao_blur.use();
+		RenderPassSetup setup("ssao_blur", fbo.finalresolve, false, false, 0, 0, width, height);
+		GpuRenderPassScope scope = device.start_render_pass(setup);
+
+		RenderPipelineState state;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		state.program = prog.hbao_blur;
+		device.set_pipeline(state);
+
+		auto shader = device.shader();
+
 		// framebuffer = fbo.finalresolve
 		glDrawBuffer(GL_COLOR_ATTACHMENT1);
-		glBindTextureUnit(0, texture.result);
-		prog.hbao_blur.set_float("g_Sharpness",
+		device.bind_texture(0, texture.result);
+		shader.set_float("g_Sharpness",
 			tweak.blur_sharpness);
-		prog.hbao_blur.set_vec2("g_InvResolutionDirection", glm::vec2(
+		shader.set_vec2("g_InvResolutionDirection", glm::vec2(
 			1.0f / float(width),
 			0
 		));
-		glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .result and write to .blur
+		device.draw_arrays(GL_TRIANGLES, 0, 3);	// read from .result and write to .blur
 
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		glBindTextureUnit(0, texture.blur);
-		prog.hbao_blur.set_vec2("g_InvResolutionDirection", glm::vec2(
+		device.bind_texture(0, texture.blur);
+		shader.set_vec2("g_InvResolutionDirection", glm::vec2(
 			0,
 			1.0f / float(height)
 		));
-		glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .blur and write to .result
+		device.draw_arrays(GL_TRIANGLES, 0, 3);	// read from .blur and write to .result
 	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glEnable(GL_DEPTH_TEST);
-	glUseProgram(0);
 }

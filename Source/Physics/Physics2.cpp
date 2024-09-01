@@ -663,5 +663,5 @@ void PhysicsManager::debug_draw_shapes()
 		impl->debug_mesh.PushLine(physx_to_glm(line.pos0), physx_to_glm(line.pos1), *((Color32*)&line.color0));
 	}
 	impl->debug_mesh.End();
-	impl->debug_mesh.Draw(MeshBuilder::LINES);
+	//impl->debug_mesh.Draw(MeshBuilder::LINES);
 }

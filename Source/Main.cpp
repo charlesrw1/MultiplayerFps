@@ -97,6 +97,49 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	return has_error;
 }
 
+
+struct Debug_Shape
+{
+	enum type {
+		sphere,
+		line,
+		box
+	}type;
+	glm::vec3 pos;
+	glm::vec3 size;
+	Color32 color;
+	float lifetime = 0.0;
+};
+
+class DebugShapeCtx
+{
+public:
+	static DebugShapeCtx& get() {
+		static DebugShapeCtx inst;
+		return inst;
+	}
+
+	void init() {
+		MeshBuilder_Object obj;
+		obj.visible = false;
+		this->handle = idraw->get_scene()->register_meshbuilder(obj);
+	}
+	void update(float dt);
+	void add(Debug_Shape shape, bool fixedupdate) {
+		if (shape.lifetime <= 0.f && fixedupdate)
+			one_frame_fixedupdate.push_back(shape);
+		else
+			shapes.push_back(shape);
+	}
+	void fixed_update_start();
+private:
+	std::vector<Debug_Shape> shapes;
+	std::vector<Debug_Shape> one_frame_fixedupdate;
+	handle<MeshBuilder_Object> handle;
+	MeshBuilder mb;
+};
+
+
 class Debug_Console
 {
 public:
@@ -1344,6 +1387,7 @@ void GameEngineLocal::init()
 	iparticle->init();
 	cl->init();
 	sv->init();
+	DebugShapeCtx::get().init();
 	imgui_context = ImGui::CreateContext();
 	TIMESTAMP("init everything");
 
@@ -1412,7 +1456,8 @@ void GameEngineLocal::game_update_tick()
 {
 	CPUFUNCTIONSTART;
 
-	Debug::on_fixed_update_start();
+	// clear any fixed frame debug shapes
+	DebugShapeCtx::get().fixed_update_start();
 
 	assert(level);
 
@@ -1434,7 +1479,7 @@ void GameEngineLocal::game_update_tick()
 	// update entities+components
 	level->update_level();
 
-	// update the physics, for physics driven objects, their transforms are updated in here
+	// update the physics. for physics driven objects, their transforms are updated in here
 	g_physics.simulate_and_fetch(tick_interval);
 
 	tick += 1;
@@ -1505,7 +1550,7 @@ void GameEngineLocal::stop_game()
 	GetAssets().unreference_this_channel(0);
 
 	// clear any debug shapes
-	Debug::on_fixed_update_start();
+	DebugShapeCtx::get().fixed_update_start();
 }
 
 void GameEngineLocal::loop()
@@ -1563,6 +1608,7 @@ void GameEngineLocal::loop()
 				break;
 			}
 			
+			// let game input system handle events like controller connections
 			GetGInput().handle_event(event);
 			
 			if (!is_game_focused()) {
@@ -1575,6 +1621,7 @@ void GameEngineLocal::loop()
 		}
 		get_gui()->post_handle_events();
 
+		// only place stored "APPEND" commands get executed
 		Cmd_Manager::get()->execute_buffer();
 
 		// update state
@@ -1586,13 +1633,16 @@ void GameEngineLocal::loop()
 				continue;			// goto next frame
 			}
 
-			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
+			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit
 			break;
 		case Engine_State::Loading:
-			execute_map_change();
+			execute_map_change();	// this will cause the state machine to enter the Game or Idle state (likely Idle if async loading, then the load callback sends it to Game if succesful)
 			continue; // goto next frame
 			break;
 		case Engine_State::Game: {
+			// game state, this is more like "map is loaded" state. 
+			//If a map is loaded (normal level, main menu level, or an editor tool with a world, etc.), then it passes through here
+
 			double secs_per_tick = tick_interval;
 			frame_remainder += dt;
 			int num_ticks = (int)floor(frame_remainder / secs_per_tick);
@@ -1643,6 +1693,9 @@ void GameEngineLocal::loop()
 
 		// tick asyncs
 		GetAssets().tick_asyncs();
+
+		// tick debug shapes
+		DebugShapeCtx::get().update(frame_time);
 
 		// draw
 		draw_screen();
@@ -1811,4 +1864,83 @@ DECLARE_ENGINE_CMD(load_imgui_ini)
 	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);
 
 	ImGui::LoadIniSettingsFromDisk(path.c_str());
+}
+
+
+void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::line;
+	shape.pos = f;
+	shape.size = to;
+	shape.color = color;
+	shape.lifetime = duration;
+	DebugShapeCtx::get().add(shape, fixedupdate);
+}
+void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::box;
+	shape.pos = c;
+	shape.size = size;
+	shape.color = color;
+	shape.lifetime = duration;
+	DebugShapeCtx::get().add(shape, fixedupdate);
+}
+void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::sphere;
+	shape.pos = c;
+	shape.size = vec3(radius);
+	shape.color = color;
+	shape.lifetime = duration;
+	DebugShapeCtx::get().add(shape, fixedupdate);
+}
+
+void DebugShapeCtx::update(float dt)
+{
+
+	auto& builder = mb;
+	builder.Begin();
+
+	vector<Debug_Shape>* shapearrays[2] = { &one_frame_fixedupdate,&shapes };
+	for (int i = 0; i < 2; i++) {
+		vector<Debug_Shape>& shapes = *shapearrays[i];
+		for (int j = 0; j < shapes.size(); j++) {
+			switch (shapes[j].type)
+			{
+			case Debug_Shape::line:
+				builder.PushLine(shapes[j].pos, shapes[j].size, shapes[j].color);
+				break;
+			case Debug_Shape::box:
+				builder.PushLineBox(shapes[j].pos - shapes[j].size * 0.5f, shapes[j].pos + shapes[j].size * 0.5f, shapes[j].color);
+				break;
+			case Debug_Shape::sphere:
+				builder.AddSphere(shapes[j].pos, shapes[j].size.x, 8, 6, shapes[j].color);
+				break;
+			}
+		}
+	}
+	builder.End();
+	MeshBuilder_Object mbo;
+	mbo.transform = glm::mat4(1.f);
+	mbo.owner = nullptr;
+	mbo.meshbuilder = &mb;
+	mbo.visible = true;
+
+	idraw->get_scene()->update_meshbuilder(handle, mbo);
+
+
+	for (int i = 0; i < shapes.size(); i++) {
+		shapes[i].lifetime -= dt;
+		if (shapes[i].lifetime <= 0.f) {
+			shapes.erase(shapes.begin() + i);
+			i--;
+		}
+	}
+}
+void DebugShapeCtx::fixed_update_start()
+{
+	one_frame_fixedupdate.clear();
 }

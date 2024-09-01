@@ -100,17 +100,6 @@ struct Render_Level_Params {
 // These can be cpu or gpu stored, when using gpu culling, the gpu buffer is culled and used
 // This gets fed into "execute_render_lists"
 
-
-struct Render_Stats
-{
-	int textures_bound = 0;
-	int shaders_bound = 0;
-	int tris_drawn = 0;
-	int draw_calls = 0;
-	int vaos_bound = 0;
-	int blend_changes = 0;
-};
-
 class Program_Manager
 {
 public:
@@ -118,10 +107,14 @@ public:
 	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
 	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
 	program_handle create_compute(const char* compute, const std::string& defines = {});
-	Shader get_obj(program_handle handle) {
+	Shader get_obj(program_handle handle) const {
 		return programs[handle].shader_obj;
 	}
 	void recompile_all();
+
+	int get_num_programs() const {
+		return programs.size();
+	}
 
 	struct program_def {
 		std::string defines;
@@ -139,6 +132,174 @@ public:
 private:
 	void recompile(program_def& def);
 };
+#include "MaterialLocal.h"
+struct RenderPipelineState
+{
+	RenderPipelineState() = default;
+	RenderPipelineState(
+		bool backface_culling,
+		bool cull_front_face,
+		bool depth_testing,
+		bool depth_less_than,
+		bool depth_writes,
+		blend_state blend_state,
+		program_handle shader,
+		vertexarrayhandle vao,
+		fbohandle framebuffer);
+
+	bool backface_culling = true;
+	bool cull_front_face = false;
+	bool depth_testing = true;
+	bool depth_less_than = true;
+	bool depth_writes = true;
+	blend_state blend = blend_state::OPAQUE;
+	program_handle program = 0;
+	vertexarrayhandle vao = 0;
+};
+
+struct RenderPassSetup
+{
+	RenderPassSetup(
+		const char* debug_name,
+		fbohandle framebuffer,
+		bool clear_color,
+		bool clear_depth,
+		int x,
+		int y,
+		int w,
+		int h
+	) : debug_name(debug_name), framebuffer(framebuffer), clear_color(clear_color), clear_depth(clear_depth),
+		x(x), y(y), w(w), h(h) {}
+
+	const char* debug_name = "";
+	fbohandle framebuffer = 0;
+	bool clear_color = false;
+	bool clear_depth = false;
+	float clear_depth_value = 0.0;
+	int x = 0;
+	int y = 0;
+	int w = 0;
+	int h = 0;
+};
+
+struct GpuRenderPassScope
+{
+	GpuRenderPassScope& operator=(const GpuRenderPassScope& other) = delete;
+	GpuRenderPassScope(const GpuRenderPassScope& other) = default;
+private:
+	GpuRenderPassScope(const RenderPassSetup& setup) : setup(setup) {};
+
+	const RenderPassSetup setup;
+	friend class OpenglRenderDevice;
+};
+#include "glad/glad.h"
+
+struct RenderStats {
+	int tris_drawn = 0;
+	int total_draw_calls = 0;
+	int program_changes = 0;
+	int texture_binds = 0;
+	int vertex_array_changes = 0;
+	int blend_changes = 0;
+	int framebuffer_changes = 0;
+	int framebuffer_clears = 0;
+};
+class OpenglRenderDevice
+{
+public:
+	Shader shader() const {
+		if (active_program == -1) return Shader();
+		return prog_man.get_obj(active_program);
+	}
+	Program_Manager& get_prog_man() {
+		return prog_man;
+	}
+
+	void set_pipeline(const RenderPipelineState& pipeline);
+	GpuRenderPassScope start_render_pass(const RenderPassSetup& setup);
+
+	void draw_arrays(int mode, int first, int count) {
+		activeStats.total_draw_calls++;
+		glDrawArrays(mode, first, count);
+	}
+	void draw_elements_base_vertex(int mode, int count, int type, const void* indicies, int base_vertex) {
+		activeStats.total_draw_calls++;
+		glDrawElementsBaseVertex(mode, count, type, indicies, base_vertex);
+	}
+	void multi_draw_elements_indirect(int mode, int type, const void* indirect, int drawcount, int stride) {
+		activeStats.total_draw_calls++;
+		glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
+	}
+
+	const RenderStats& get_stats() {
+		return lastStats;
+	}
+
+	void reset_states() {
+		active_program = -1;
+		invalidate_all();
+	}
+	void on_frame_start() {
+		lastStats = activeStats;
+		activeStats = RenderStats();
+	}
+
+	void bind_texture(int bind, int id);
+	void set_shader(program_handle handle);
+private:
+	void set_vao(vertexarrayhandle vao);
+	void set_blend_state(blend_state blend);
+	void set_show_backfaces(bool show_backfaces);
+	void set_depth_write_enabled(bool enabled);
+	void set_depth_test_enabled(bool enabled);
+	void set_cull_front_face(bool enabled);
+	void set_depth_less_than(bool enable_less_than);
+	void end_render_pass(GpuRenderPassScope& scope) {
+		assert(in_render_pass);
+		in_render_pass = false;
+	}
+	friend class GpuRenderPassScope;
+
+	static const int MAX_SAMPLER_BINDINGS = 32;
+	program_handle active_program = -1;
+	texhandle textures_bound[MAX_SAMPLER_BINDINGS];
+	blend_state blending = blend_state::OPAQUE;
+	bool show_backface = false;
+	bool depth_test_enabled = true;
+	bool depth_write_enabled = true;
+	bool depth_less_than_enabled = true;
+	bool cullfrontface = false;
+	fbohandle current_framebuffer = 0;
+	vertexarrayhandle current_vao = 0;
+
+	bool in_render_pass = false;
+
+	int framebuffer_changes = 0;
+	RenderStats activeStats;
+	RenderStats lastStats;
+
+	enum invalid_bits {
+		PROGRAM_BIT,
+		BLENDING_BIT,
+		BACKFACE_BIT,
+		CULLFRONTFACE_BIT,
+		DEPTHTEST_BIT,
+		DEPTHWRITE_BIT,
+		DEPTHLESS_THAN_BIT,
+		VAO_BIT,
+		FBO_BIT,
+		TEXTURE0_BIT,
+	};
+
+	bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1ull << bit); }
+	void set_bit_valid(uint32_t bit) { invalid_bits &= ~(1ull << bit); }
+	void set_bit_invalid(uint32_t bit) { invalid_bits |= (1ull << bit); }
+	void invalidate_all() { invalid_bits = UINT64_MAX; }
+
+	Program_Manager prog_man;
+private:
+	uint64_t invalid_bits = UINT32_MAX;
+};
 
 class DebuggingTextureOutput
 {
@@ -155,6 +316,7 @@ public:
 
 const uint32_t MAX_BLOOM_MIPS = 6;
 
+class GpuRenderPass;
 class Renderer : public RendererPublic
 {
 public:
@@ -192,7 +354,24 @@ public:
 	void create_shaders();
 
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
-	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool force_backface_state);
+	void execute_render_lists(
+		Render_Lists& lists, 
+		Render_Pass& pass, 
+		bool depth_write,
+		bool depth_test,
+		bool disable_backface_culling,
+		bool depth_less_than,
+		bool cull_front_face
+	);
+	void render_lists_old_way(
+		Render_Lists& lists,
+		Render_Pass& pass,
+		bool depth_write,
+		bool depth_test,
+		bool disable_backface_culling,
+		bool depth_less_than,
+		bool cull_front_face
+	);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui);
 	void do_post_process_stack(const std::vector<MaterialInstance*>& stack);
@@ -211,7 +390,6 @@ public:
 	int cubemap_index = 0;
 	static const int MAX_SAMPLER_BINDINGS = 32;
 
-	Program_Manager prog_man;
 	struct programs
 	{
 		program_handle simple{};
@@ -322,12 +500,15 @@ public:
 
 	// graphics_settings
 
-	void bind_vao(uint32_t vao);
-	void bind_texture(int bind, int id);
-	void set_shader(program_handle handle);
-	void set_blend_state(blend_state blend);
-	void set_show_backfaces(bool show_backfaces);
-	Shader shader();
+
+	OpenglRenderDevice& get_device() {
+		return device;
+	}
+
+	Shader shader() {
+		return device.shader();
+	}
+	
 
 	void draw_meshbuilders();
 
@@ -340,8 +521,6 @@ public:
 	DebuggingTextureOutput debug_tex_out;
 
 	Render_Scene scene;
-	
-	Render_Stats stats;
 
 	const View_Setup& get_current_frame_vs()const { return current_frame_main_view; }
 
@@ -357,12 +536,9 @@ private:
 	void draw_sprite_buffer();
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
-	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state);
 
 	void init_bloom_buffers();
 	void render_bloom_chain();
-
-	void planar_reflection_pass();
 
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
@@ -373,32 +549,7 @@ private:
 	int cur_w = 0;
 	int cur_h = 0;
 
-
-	struct Opengl_State_Machine
-	{
-		program_handle active_program = -1;
-		texhandle textures_bound[MAX_SAMPLER_BINDINGS];
-		blend_state blending = blend_state::OPAQUE;
-		bool backface_state = false;
-		uint32_t current_vao = 0;
-
-		enum invalid_bits {
-			PROGRAM_BIT,
-			BLENDING_BIT,
-			BACKFACE_BIT,
-			VAO_BIT,
-			TEXTURE0_BIT,
-		};
-
-		bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1ull << bit); }
-		void set_bit_valid(uint32_t bit) { invalid_bits &= ~(1ull << bit); }
-		void set_bit_invalid(uint32_t bit) { invalid_bits |= (1ull << bit); }
-		void invalidate_all() { invalid_bits = UINT64_MAX; }
-	private:
-		uint64_t invalid_bits = UINT32_MAX;
-	};
-
-	Opengl_State_Machine state_machine;
+	OpenglRenderDevice device;
 
 	MeshBuilder ui_builder;
 	texhandle building_ui_texture;

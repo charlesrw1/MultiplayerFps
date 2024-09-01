@@ -44,10 +44,6 @@ public:
 	}
 	void remove_from_update_list(BaseUpdater* b);
 
-	void add_to_post_update_list(EntityComponent* b) {
-	}
-	void remove_from_post_update_list(EntityComponent* b) {
-	}
 
 	void update_level() {
 		{

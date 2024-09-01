@@ -134,7 +134,6 @@ void Shadow_Map_System::update()
 		glNamedBufferData(ubo.info, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
 	}
 	// now setup scene for rendering
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
 	{
 		GPUSCOPESTART(RENDER_CSM_LAYERS);
 		for (int i = 0; i < 4; i++) {
