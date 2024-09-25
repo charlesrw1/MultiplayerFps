@@ -86,14 +86,7 @@ public:
 		return nullptr;
 	}
 
-	void insert_entity_into_hashmap(Entity* e) {
-		ASSERT(e);
-		ASSERT(!e->self_id.is_valid());
-		e->self_id.handle = get_next_id_and_increment();
-		ASSERT(all_world_ents.find(e->self_id.handle) == nullptr);
-
-		all_world_ents.insert(e->self_id.handle, e);
-	}
+	void insert_entity_into_hashmap(Entity* e);
 	void remove_entity_handle(uint64_t handle) {
 #ifdef _DEBUG
 		auto ent = all_world_ents.find(handle);
@@ -128,8 +121,11 @@ public:
 		bIsEditorLevel = isEditorLevel;
 	}
 private:
+	ScopedBooleanValue b_in_in_level_initialize;
 	ScopedBooleanValue b_is_in_update_tick;
+
 	std::vector<BaseUpdater*> wantsToAddToUpdate;
+	std::vector<Entity*> deferredSpawnList;
 
 	bool bIsEditorLevel=false;
 

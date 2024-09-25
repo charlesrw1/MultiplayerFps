@@ -58,12 +58,11 @@ EnviornmentMapHelper& EnviornmentMapHelper::get()
 }
 void EnviornmentMapHelper::init()
 {
+    auto& prog_man = draw.get_prog_man();
+   
+    prefilter_irradiance = prog_man.create_raster("Helpers/EqrtCubemapV.txt", "Helpers/PrefilterIrradianceF.txt");
 
-    Shader::compile(&to_cubemap_shader, "Helpers/EqrtCubemapV.txt", "Helpers/EqrtCubemapF.txt");
-    Shader::compile(&prefilter_irradiance, "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterIrradianceF.txt");
-    Shader::compile(&prefilter_specular, "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterSpecularF.txt");
-
-    Shader::compile(&prefilter_specular_new, "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterSpecularNewF.txt");
+    prefilter_specular_new= prog_man.create_raster( "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterSpecularNewF.txt");
 
 
     glGenFramebuffers(1, &fbo);
@@ -96,102 +95,6 @@ void EnviornmentMapHelper::init()
 
     integrator.run();
 }
-#include "Assets/AssetDatabase.h"
-EnvCubemap EnviornmentMapHelper::create_from_file(std::string hdr_file)
-{
-	auto pos = hdr_file.rfind('.');
-	if (pos == std::string::npos || hdr_file.substr(pos) != ".hdr") {
-		printf("Cubemap conversion needs .hdr file\n");
-        return {};
-	}
-
-
-    Texture* hdr_image = GetAssets().find_sync<Texture>(hdr_file.c_str()).get();
-	if (!hdr_image)
-        return {};
-
-    EnvCubemap cubemap;
-	cubemap.hdr_file_name = hdr_file;
-    cubemap.size = CUBEMAP_SIZE;
-    
-    uint32_t cm_id;
-
-    glGenTextures(1, &cm_id);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cm_id);
-    for (int i = 0; i < 6; i++)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, CUBEMAP_SIZE, CUBEMAP_SIZE, 0, GL_RGB, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
-    to_cubemap_shader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, hdr_image->gl_id);
-
-
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glViewport(0, 0, CUBEMAP_SIZE, CUBEMAP_SIZE);
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
-    for (int i = 0; i < 6; i++) {
-        to_cubemap_shader.set_mat4("ViewProj", cubemap_projection*cubemap_views[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, 0);
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    glEnable(GL_CULL_FACE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    cubemap.original_cubemap = cm_id;
-
-    return cubemap;
-}
-
-void EnviornmentMapHelper::convolute_irradiance(EnvCubemap* env_map)
-{
-    assert(env_map);
-
-    uint32_t cm_id;
-
-    glGenTextures(1, &cm_id);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cm_id);
-    for (int i = 0; i < 6; i++)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
-    prefilter_irradiance.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, env_map->original_cubemap);
-
-
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glViewport(0, 0, 32, 32);
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
-    for (int i = 0; i < 6; i++) {
-        prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, 0);
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    glEnable(GL_CULL_FACE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    env_map->irradiance_cm = cm_id;
-}
-
 
 #include "Texture.h"
 
@@ -207,37 +110,56 @@ void EnviornmentMapHelper::compute_specular_new(
     glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
     glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, 0);
 
-    glDepthMask(GL_FALSE);
-    glDisable(GL_DEPTH_TEST);
 
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
+    //*glDepthMask(GL_FALSE);
+    //*glDisable(GL_DEPTH_TEST);
+
+    //*glBindVertexArray(vao);
+    //*glDisable(GL_CULL_FACE);
 
     fbohandle temp_fbo{};
     glCreateFramebuffers(1, &temp_fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
 
+    auto& device = draw.get_device();
+    device.reset_states();
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind texture, mip reading is limited to highest
-
-    prefilter_specular_new.use();
-
-    for (int mip = 1/* skip mip level 0*/; mip < num_mips; mip++)
     {
-        size >>= 1;
+        RenderPassSetup setup("compute_specular_new", temp_fbo, false, false, 0, 0, size, size);
+        auto scope = device.start_render_pass(setup);
 
-        glViewport(0, 0, size, size);
-        float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
-        prefilter_specular_new.set_float("roughness", roughness);
+        RenderPipelineState state;
+        state.depth_testing = state.depth_testing = false;
+        state.vao = vao;
+        state.backface_culling = false;
+        state.program = prefilter_specular_new;
+        device.set_pipeline(state);
+        auto shader = device.shader();
 
-        for (int i = 0; i < 6; i++) {
-            prefilter_specular_new.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-            //glFramebufferTexture2D(temp_fbo, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, mip);
-         
-            glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, t->gl_id, mip, i);
+        //*glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
 
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind texture, mip reading is limited to highest
+
+        //*prefilter_specular_new.use();
+
+        for (int mip = 1/* skip mip level 0*/; mip < num_mips; mip++)
+        {
+            size >>= 1;
+
+            //glViewport(0, 0, size, size);
+            device.set_viewport(0, 0, size, size);
+            float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
+            shader.set_float("roughness", roughness);
+
+            for (int i = 0; i < 6; i++) {
+                shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+                //glFramebufferTexture2D(temp_fbo, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, mip);
+
+                glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, t->gl_id, mip, i);
+
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+            }
         }
     }
 
@@ -246,11 +168,13 @@ void EnviornmentMapHelper::compute_specular_new(
 
     glDeleteFramebuffers(1, &temp_fbo);
 
+    device.reset_states();
+
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glBindVertexArray(0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   //*glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 // causes pipeline stall to read back texture
@@ -270,30 +194,44 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
     glTextureParameteri(temp_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(temp_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    prefilter_irradiance.use();
+   //* prefilter_irradiance.use();
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind the read cubemap, mip0 is the original scene render
 
     fbohandle temp_fbo{};
     glCreateFramebuffers(1, &temp_fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
+   //* glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
 
-    glViewport(0, 0, irrad_size, irrad_size);
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
+    auto& device = draw.get_device();
+    device.reset_states();
+    {
+        RenderPassSetup setup("compute_irradiance_new", temp_fbo, false, false, 0, 0, irrad_size, irrad_size);
+        auto scope = device.start_render_pass(setup);
 
-    for (int i = 0; i < 6; i++) {
-        prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+        RenderPipelineState state;
+        state.program = prefilter_irradiance;
+        state.depth_testing = state.depth_writes = false;
+        state.backface_culling = false;
+        state.vao = vao;
+        device.set_pipeline(state);
+        auto shader = device.shader();
 
-        glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0/* first mip*/, i);
+        //*glViewport(0, 0, irrad_size, irrad_size);
+        //*glBindVertexArray(vao);
+        //*glDisable(GL_CULL_FACE);
+        //*glDisable(GL_DEPTH_TEST);
+        //*glDepthMask(GL_FALSE);
 
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (int i = 0; i < 6; i++) {
+            shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+
+            glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0/* first mip*/, i);
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     }
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-
 
 
     glFlush();
@@ -343,104 +281,18 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
     glDeleteFramebuffers(1, &temp_fbo);
 
     glEnable(GL_CULL_FACE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    //*glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
 
+    device.reset_states();
 
     glDeleteTextures(1, &temp_tex);
 
     delete[] input;
 
 }
-void EnviornmentMapHelper::compute_specular(EnvCubemap* env_map)
-{
-    assert(env_map);
 
-    uint32_t cm_id;
-    glGenTextures(1, &cm_id);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cm_id);
-    for (int i = 0; i < 6; i++)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-
-    prefilter_specular.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, env_map->original_cubemap);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
-    int size = 128;
-    for (int mip = 0; mip < MAX_MIP_ROUGHNESS; mip++) 
-    {
-        glViewport(0, 0, size, size);
-        float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
-        prefilter_specular.set_float("roughness", roughness);
-
-        for (int i = 0; i < 6; i++) {
-            prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id,mip);
-            glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
-        size >>= 1;
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    env_map->prefiltered_specular_cm = cm_id;
-}
-void EnviornmentMapHelper::convolute_irradiance_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size)
-{
-    prefilter_irradiance.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, input_cubemap);
-
-
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glViewport(0, 0, output_size, output_size);
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
-    for (int i = 0; i < 6; i++) {
-        prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-        glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, output_array, 0, 6 * output_index + i);
-        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-    glEnable(GL_CULL_FACE);
-}
-void EnviornmentMapHelper::compute_specular_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size)
-{
-    prefilter_specular.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,input_cubemap);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glBindVertexArray(vao);
-    glDisable(GL_CULL_FACE);
-    int size = output_size;
-    for (int mip = 0; mip < MAX_MIP_ROUGHNESS; mip++)
-    {
-        glViewport(0, 0, size, size);
-        float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
-        prefilter_specular.set_float("roughness", roughness);
-
-        for (int i = 0; i < 6; i++) {
-            prefilter_irradiance.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, output_array, mip, 6 * output_index + i);
-            glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
-        size /= 2;
-    }
-}
 static const float quad_verts[] =
 {
     -1,-1,0,

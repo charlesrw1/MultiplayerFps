@@ -9,7 +9,7 @@ public:
 	// called post unserialization, before anything has reg'd 
 	// can handle any loading from a save file here
 	virtual void init() {}
-	// called after entities reg'ing, but before any have start()'d
+	// called after all entities start()'d
 	virtual void start() {}
 	// called when map is getting removed
 	virtual void end() {}

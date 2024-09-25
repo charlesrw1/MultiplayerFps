@@ -315,9 +315,6 @@ public:
 	// simulate scene and fetch the results, thus a blocking update
 	void simulate_and_fetch(float dt);
 
-	// called by renderer only, matrix/shader/etc. already set
-	void debug_draw_shapes();
-
 	// used only by model loader
 	bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def);
 

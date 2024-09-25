@@ -59,7 +59,7 @@ void EditorTool3d::map_callback(bool b)
 	sun->Sun->set_ls_euler_rotation(glm::vec3(-glm::radians(45.f), glm::radians(15.f), 0.f));
 
 	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
-	auto skylight = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
+	auto skylight = eng->spawn_entity_from_classtype(*ClassBase::find_class("SkylightEntity"));
 
 
 	post_map_load_callback();

@@ -79,6 +79,7 @@ class PlayerHUD;
 class HealthComponent;
 class InputUser;
 class CharacterController;
+class BikeEntity;
 CLASS_H(Player, PlayerBase)
 public:
 
@@ -91,12 +92,12 @@ public:
 	HealthComponent* health{};
 	SpotLightComponent* spotlight{};
 
+	BikeEntity* bike = nullptr;
 	InputUser* inputPtr = nullptr;
 
 	MulticastDelegate<int> score_update_delegate;
 
 	std::unique_ptr<PlayerHUD> hud;
-
 	std::unique_ptr<CharacterController> ccontroller;
 	
 	static const PropertyInfoList* get_props() = delete;
@@ -116,8 +117,12 @@ public:
 
 	void find_a_spawn_point();
 
+	void on_foot_update();
+
 	// current viewangles for player
 	glm::vec3 view_angles = glm::vec3(0.f);
+	glm::quat view_quat{};
+	glm::vec3 view_pos{};
 
 	float distTraveledSinceLastFootstep = 0.0;
 

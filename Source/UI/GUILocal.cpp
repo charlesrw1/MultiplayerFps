@@ -43,9 +43,9 @@ UIBuilder::~UIBuilder()
 
 void UIBuilder::init_drawing_state()
 {
-	//draw.set_blend_state(blend_state::BLEND);
+	draw.set_blend_state(blend_state::BLEND);
 	//glBindFramebuffer(GL_FRAMEBUFFER, draw.fbo.composite);
-	//glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
 	float x = sys->root->ws_position.x;
 	float x1 = x + sys->root->ws_size.x;
 	float y1 = sys->root->ws_position.y;
@@ -55,49 +55,33 @@ void UIBuilder::init_drawing_state()
 }
 void UIBuilder::post_draw()
 {
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void UIBuilder::draw_solid_rect(glm::ivec2 global_coords,
 	glm::ivec2 size,
 	Color32 color)
 {
-
 	mb->Begin();
 	mb->Push2dQuad(global_coords, size, glm::vec2(0, 1), glm::vec2(1, -1), color);
 	mb->End();
 
 	auto mat = (MaterialInstance*)sys->ui_default;
 
-	auto& device = draw.get_device();
 
-	auto program = matman.get_mat_shader(false, nullptr,
+	auto shader = matman.get_mat_shader(false, nullptr,
 		mat, false, false, false, false);
-	
-	uint32_t vao, vbo;
-	int count, type;
-	mb->get_data_to_render_with(vao, vbo, count, type);
-
-	RenderPipelineState state;
-	state.program = program;
-	state.blend = blend_state::BLEND;
-	state.depth_testing = false;
-	state.depth_writes = false;
-	state.vao = vao;
-	device.set_pipeline(state);
 
 	auto& texs = mat->impl->get_textures();
 
+	draw.set_shader(shader);
 
 	for (int i = 0; i < texs.size(); i++)
-		device.bind_texture(i, texs.at(i)->gl_id);
+		draw.bind_texture(i, texs.at(i)->gl_id);
 
-	device.shader().set_mat4("ViewProj", impl->ViewProj);
+	draw.shader().set_mat4("ViewProj", impl->ViewProj);
 
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	device.draw_elements_base_vertex(GL_TRIANGLES, count, type, (void*)0, 0);
-
-	//mb->Draw(MeshBuilder::TRIANGLES);
+	mb->Draw(MeshBuilder::TRIANGLES);
 }
 
 static void get_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const GuiFont* f)
@@ -148,33 +132,20 @@ void UIBuilder::draw_text(
 
 	mb->End();
 
-	auto& device = draw.get_device();
-
 	auto mat = (MaterialInstance*)sys->ui_default;
 
-	auto program = matman.get_mat_shader(false, nullptr,
+	auto shader = matman.get_mat_shader(false, nullptr,
 		mat, false, false, false, false);
-	uint32_t vao, vbo;
-	int count, type;
-	mb->get_data_to_render_with(vao, vbo, count, type);
-
-	RenderPipelineState state;
-	state.program = program;
-	state.blend = blend_state::BLEND;
-	state.depth_testing = false;
-	state.depth_writes = false;
-	state.vao = vao;
-	device.set_pipeline(state);
 
 	auto& texs = mat->impl->get_textures();
 
+	draw.set_shader(shader);
 
-	device.bind_texture(0, font->font_texture->gl_id);
+	draw.bind_texture(0, font->font_texture->gl_id);
 
-	device.shader().set_mat4("ViewProj", impl->ViewProj);
+	draw.shader().set_mat4("ViewProj", impl->ViewProj);
 
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	device.draw_elements_base_vertex(GL_TRIANGLES, count, type, (void*)0, 0);
+	mb->Draw(MeshBuilder::TRIANGLES);
 }
 
 GuiSystemPublic* GuiSystemPublic::create_gui_system() {

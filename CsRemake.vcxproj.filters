@@ -526,6 +526,10 @@
     <ClInclude Include="Source\Framework\UniquePtrReflection.h" />
     <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h" />
     <ClInclude Include="Source\Render\Frustum.h" />
+    <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
+    <ClInclude Include="Source\DeferredSpawnScope.h" />
+    <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
+    <ClInclude Include="Source\BikeGame\Components\BikeAI.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -797,5 +801,7 @@
     <ClCompile Include="Source\Game\Entities\TriggerEntities.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
+    <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
+    <ClCompile Include="Source\DeferredSpawnScope.cpp" />
   </ItemGroup>
 </Project>

@@ -60,20 +60,16 @@ struct Render_Level_Params {
 		const View_Setup& view,
 		Render_Lists* render_list,
 		Render_Pass* render_pass,
-		uint32_t output_framebuffer,
-		bool clear_framebuffer,
 		Pass_Type type
 		) : view(view), rl(render_list), rp(render_pass), 
-		clear_framebuffer(clear_framebuffer),
-		output_framebuffer(output_framebuffer),
+
 		pass(type)
 	{
 
 	}
 
 	View_Setup view;
-	uint32_t output_framebuffer;
-	bool clear_framebuffer = true;
+
 
 	Render_Lists* rl = nullptr;
 	Render_Pass* rp = nullptr;
@@ -100,39 +96,7 @@ struct Render_Level_Params {
 // These can be cpu or gpu stored, when using gpu culling, the gpu buffer is culled and used
 // This gets fed into "execute_render_lists"
 
-class Program_Manager
-{
-public:
-	program_handle create_single_file(const char* shared_file, bool is_tesselation = false, const std::string& defines = {});
-	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
-	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
-	program_handle create_compute(const char* compute, const std::string& defines = {});
-	Shader get_obj(program_handle handle) const {
-		return programs[handle].shader_obj;
-	}
-	void recompile_all();
 
-	int get_num_programs() const {
-		return programs.size();
-	}
-
-	struct program_def {
-		std::string defines;
-		const char* frag = nullptr;
-		const char* vert = nullptr;
-		const char* geo = nullptr;
-		bool is_compute = false;
-		bool compile_failed = false;
-		bool is_tesselation = false;
-
-		bool is_shared() const { return vert && frag == nullptr && !is_compute; }
-		Shader shader_obj;
-	};
-	std::vector<program_def> programs;
-private:
-	void recompile(program_def& def);
-};
-#include "MaterialLocal.h"
 struct RenderPipelineState
 {
 	RenderPipelineState() = default;
@@ -150,7 +114,7 @@ struct RenderPipelineState
 	bool backface_culling = true;
 	bool cull_front_face = false;
 	bool depth_testing = true;
-	bool depth_less_than = true;
+	bool depth_less_than = false;
 	bool depth_writes = true;
 	blend_state blend = blend_state::OPAQUE;
 	program_handle program = 0;
@@ -194,7 +158,7 @@ private:
 };
 #include "glad/glad.h"
 
-struct RenderStats {
+struct Render_Stats {
 	int tris_drawn = 0;
 	int total_draw_calls = 0;
 	int program_changes = 0;
@@ -204,6 +168,37 @@ struct RenderStats {
 	int framebuffer_changes = 0;
 	int framebuffer_clears = 0;
 };
+
+class Program_Manager
+{
+public:
+	program_handle create_single_file(const char* shared_file, bool is_tesselation = false, const std::string& defines = {});
+	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
+	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
+	program_handle create_compute(const char* compute, const std::string& defines = {});
+	Shader get_obj(program_handle handle) const {
+		assert(handle >= 0 && handle < programs.size());
+		return programs[handle].shader_obj;
+	}
+	void recompile_all();
+
+	struct program_def {
+		std::string defines;
+		const char* frag = nullptr;
+		const char* vert = nullptr;
+		const char* geo = nullptr;
+		bool is_compute = false;
+		bool compile_failed = false;
+		bool is_tesselation = false;
+
+		bool is_shared() const { return vert && frag == nullptr && !is_compute; }
+		Shader shader_obj;
+	};
+	std::vector<program_def> programs;
+private:
+	void recompile(program_def& def);
+};
+
 class OpenglRenderDevice
 {
 public:
@@ -231,7 +226,7 @@ public:
 		glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
 	}
 
-	const RenderStats& get_stats() {
+	const Render_Stats& get_stats() {
 		return lastStats;
 	}
 
@@ -241,8 +236,13 @@ public:
 	}
 	void on_frame_start() {
 		lastStats = activeStats;
-		activeStats = RenderStats();
+		activeStats = Render_Stats();
 	}
+
+	void set_viewport(int x, int y, int w, int h) {
+		glViewport(x, y, w, h);
+	}
+	void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value = 0.f);
 
 	void bind_texture(int bind, int id);
 	void set_shader(program_handle handle);
@@ -275,8 +275,8 @@ private:
 	bool in_render_pass = false;
 
 	int framebuffer_changes = 0;
-	RenderStats activeStats;
-	RenderStats lastStats;
+	Render_Stats activeStats;
+	Render_Stats lastStats;
 
 	enum invalid_bits {
 		PROGRAM_BIT,
@@ -299,7 +299,12 @@ private:
 	Program_Manager prog_man;
 private:
 	uint64_t invalid_bits = UINT32_MAX;
+	friend class Renderer;
 };
+
+
+
+
 
 class DebuggingTextureOutput
 {
@@ -316,7 +321,6 @@ public:
 
 const uint32_t MAX_BLOOM_MIPS = 6;
 
-class GpuRenderPass;
 class Renderer : public RendererPublic
 {
 public:
@@ -354,23 +358,11 @@ public:
 	void create_shaders();
 
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
-	void execute_render_lists(
-		Render_Lists& lists, 
-		Render_Pass& pass, 
-		bool depth_write,
-		bool depth_test,
-		bool disable_backface_culling,
-		bool depth_less_than,
-		bool cull_front_face
-	);
-	void render_lists_old_way(
-		Render_Lists& lists,
-		Render_Pass& pass,
-		bool depth_write,
-		bool depth_test,
-		bool disable_backface_culling,
-		bool depth_less_than,
-		bool cull_front_face
+	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, 
+		bool depth_test_enabled,
+		bool depth_write_enabled,
+		bool force_show_backfaces,
+		bool depth_less_than_op
 	);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui);
@@ -500,15 +492,12 @@ public:
 
 	// graphics_settings
 
-
-	OpenglRenderDevice& get_device() {
-		return device;
-	}
-
-	Shader shader() {
-		return device.shader();
-	}
-	
+	void bind_vao(uint32_t vao);
+	void bind_texture(int bind, int id);
+	void set_shader(program_handle handle);
+	void set_blend_state(blend_state blend);
+	void set_show_backfaces(bool show_backfaces);
+	Shader shader();
 
 	void draw_meshbuilders();
 
@@ -521,24 +510,30 @@ public:
 	DebuggingTextureOutput debug_tex_out;
 
 	Render_Scene scene;
+	
+	Render_Stats stats;
 
 	const View_Setup& get_current_frame_vs()const { return current_frame_main_view; }
 
 	View_Setup current_frame_main_view;
+
+	OpenglRenderDevice& get_device() {
+		return device;
+	}
+	Program_Manager& get_prog_man() {
+		return device.get_prog_man();
+	}
 private:
 
-	struct Sprite_Drawing_State {
-		bool force_set = true;
-		bool in_world_space = false;
-		bool additive = false;
-		uint32_t current_t = 0;
-	}sprite_state;
-	void draw_sprite_buffer();
+
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
+	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state);
 
 	void init_bloom_buffers();
 	void render_bloom_chain();
+
+
 
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);

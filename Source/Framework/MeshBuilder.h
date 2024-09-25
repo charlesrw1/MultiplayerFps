@@ -62,9 +62,6 @@ public:
 
 	const std::vector<MbVertex>& get_v() { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }
-
-	// hack for now
-	void get_data_to_render_with(uint32_t& vao, uint32_t& vbo, int& count, int& type);
 private:
 	uint32_t VBO = 0, VAO = 0, EBO = 0;
 	std::vector<MbVertex> verticies;

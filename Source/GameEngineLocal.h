@@ -80,7 +80,9 @@ public:
 	virtual void logout_player(uint32_t index) override;
 	virtual Entity* spawn_entity_schema(const Schema* schema) override;
 	virtual void remove_entity(Entity* e) override;
-	virtual Entity* spawn_entity_from_classtype(const ClassTypeInfo* ti) override;
+	virtual Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti) override;
+	Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) override;
+
 
 	virtual void leave_level() override;
 	virtual void open_level(string levelname) override;

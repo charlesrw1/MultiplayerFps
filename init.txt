@@ -45,3 +45,5 @@ file_print_all_openfile_fails 1
 RUN_TESTS
 
 r.enable_vsync 1
+
+start_ed Map "mainMenuMap.tmap"

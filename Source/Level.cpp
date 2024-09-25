@@ -362,12 +362,41 @@ void LevelSerialization::serialize_one_entity(Entity* e, DictWriter& out, Serial
 	}
 }
 
+void Level::insert_entity_into_hashmap(Entity* e) {
+	ASSERT(e);
+	ASSERT(!e->self_id.is_valid());
+	e->self_id.handle = get_next_id_and_increment();
+	ASSERT(all_world_ents.find(e->self_id.handle) == nullptr);
+
+	if (b_in_in_level_initialize.get_value()) {
+		deferredSpawnList.push_back(e);
+	}
+	else
+		all_world_ents.insert(e->self_id.handle, e);
+
+}
+
 void Level::init_entities_post_load()
 {
-	// after inserting everything, call spawn functions
-	for (auto ent : all_world_ents) {
-		ent->initialize();
+	{
+		BooleanScope scope(b_is_in_update_tick);
+		// after inserting everything, call spawn functions
+		for (auto ent : all_world_ents) {
+			ent->initialize();
+		}
 	}
+	for (auto wantToAdd : deferredSpawnList) {
+		if (!wantToAdd)
+			continue;
+		if (all_world_ents.find(wantToAdd->self_id.handle)) {
+			sys_print("!!! insert_unserialized_entities_into_level without assign_new_ids: bad handle\n");
+			ASSERT(0);
+			delete wantToAdd;
+			continue;
+		}
+		all_world_ents.insert(wantToAdd->self_id.handle, wantToAdd);
+	}
+	deferredSpawnList.clear();
 }
 
 void Level::insert_unserialized_entities_into_level(std::vector<Entity*> ents, bool assign_new_ids)

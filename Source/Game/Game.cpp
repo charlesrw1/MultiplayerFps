@@ -84,24 +84,43 @@ void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::strin
 	keybinds.insert({ both,bind });
 }
 
-Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo* ti) {
-	ASSERT(ti && ti->allocate);
+Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo& ti) {
+	ASSERT(ti.allocate);
 	ASSERT(get_level());
 
-	ClassBase* e = ti->allocate();	// allocate + call constructor
+	ClassBase* e = ti.allocate();	// allocate + call constructor
 	ASSERT(e);
 
 	Entity* ec = nullptr;
 
 	ec = e->cast_to<Entity>();
 	if (!ec) {
-		sys_print("!!! spawn_entity_from_classtype failed for %s\n", ti->classname);
+		sys_print("!!! spawn_entity_from_classtype failed for %s\n", ti.classname);
 		delete e;
 		return nullptr;
 	}
 
 
 	call_startup_functions_for_new_entity(ec);
+
+	return ec;
+}
+Entity* GameEngineLocal::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) {
+	ASSERT(get_level());
+	ASSERT(ti.allocate);
+	ClassBase* e = ti.allocate();	// allocate + call constructor
+	ASSERT(e);
+
+	Entity* ec = nullptr;
+
+	ec = e->cast_to<Entity>();
+	if (!ec) {
+		sys_print("!!! spawn_entity_class_deferred_internal failed for %s\n", ti.classname);
+		delete e;
+		return nullptr;
+	}
+
+	get_level()->insert_entity_into_hashmap(ec);	// insert into hashmap but DONT call initialize, that is done by the RAII DeferredSpawnScope
 
 	return ec;
 }

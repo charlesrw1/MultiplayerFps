@@ -116,21 +116,22 @@ public:
 		if (!active_terrain.assetptr_material || !local || local->get_master_material()->usage != MaterialUsage::Terrain)
 			return;
 
-		auto& device = draw.get_device();
+
 
 		program_handle prog = matman.get_mat_shader(false, nullptr, local, false, false, is_editor_pass, is_debug_pass);
-
-		RenderPassSetup setup("terrain",draw.fbo.gbuffer,false,false,0,0,draw.vs.width,draw.vs.height);
-		auto scope = device.start_render_pass(setup);
+		
+		auto& device = draw.get_device();
 		RenderPipelineState state;
-		state.program = prog;
 		state.vao = vao;
+		state.program = prog;
 		state.depth_less_than = false;
 		device.set_pipeline(state);
+		//glDepthFunc(GL_GREATER);
 
+		//*draw.set_shader(prog);
 
 		auto shader = device.shader();
-
+		
 		shader.set_mat4("ViewProj", draw.current_frame_main_view.viewproj);
 		shader.set_mat4("Model", glm::mat4(1));
 		shader.set_float("WorldScale", W);
@@ -143,14 +144,21 @@ public:
 
 		auto& textures = local->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++)
-			device.bind_texture(i, textures[i]->gl_id);
+			draw.bind_texture(i, textures[i]->gl_id);
 
 		shader.set_uint("FS_IN_Matid", local->impl->gpu_buffer_offset);
 		shader.set_uint("FS_IN_Objid", 0);
 
-		device.bind_texture(12/*fixme*/, active_terrain.assetptr_heightfield->gl_id);
+		draw.bind_texture(12/*fixme*/, active_terrain.assetptr_heightfield->gl_id);
 
-		device.draw_arrays(GL_PATCHES, 0, ROWS * ROWS * PATCH_POINTS);
+		//glBindVertexArray(vao);
+
+		glDrawArrays(GL_PATCHES, 0, ROWS * ROWS * PATCH_POINTS);
+		//glBindVertexArray(0);
+
+
+	//	glDepthFunc(GL_LESS);
+
 	}
 
 	handle<Render_Terrain> register_terrain(const Render_Terrain& asset) override {

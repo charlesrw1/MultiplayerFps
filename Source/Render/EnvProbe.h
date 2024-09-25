@@ -43,14 +43,6 @@ public:
 	static EnviornmentMapHelper& get();
 	void init();
 
-	EnvCubemap create_from_file(std::string hdr_file);
-	void convolute_irradiance(EnvCubemap* env_map);
-	void compute_specular(EnvCubemap* env_map);
-
-	void convolute_irradiance_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size);
-	void compute_specular_array(uint32_t input_cubemap, int input_size, uint32_t output_array, int output_index, int output_size);
-
-
 	// convolutes a rendered cubemap
 	void compute_specular_new(
 		Texture* t	// in-out cubemap, scene drawn to mip level 0
@@ -67,11 +59,8 @@ public:
 	glm::mat4 cubemap_views[6];
 
 private:
-	Shader to_cubemap_shader;
-	Shader prefilter_irradiance;
-	Shader prefilter_specular;
-
-	Shader prefilter_specular_new;
+	program_handle prefilter_irradiance;
+	program_handle prefilter_specular_new;
 
 	uint32_t fbo,rbo;
 	uint32_t vbo, vao;

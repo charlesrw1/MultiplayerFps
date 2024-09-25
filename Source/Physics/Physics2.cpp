@@ -36,6 +36,8 @@
 
 #include "Game/EntityComponent.h"
 
+#include "Render/DrawPublic.h"
+
 #define WARN_ONCE(a,...) { \
 	static bool has_warned = false; \
 	if (!has_warned) { \
@@ -190,6 +192,8 @@ public:
 					ec->set_ws_transform(physActor->get_transform());
 			}
 		}
+
+		update_debug_physics_shapes();
 	}
 
 	// used only by model loader
@@ -206,6 +210,7 @@ public:
 		return true;
 	}
 
+
 	physx::PxMaterial* default_material = nullptr;
 	physx::PxDefaultCpuDispatcher* dispatcher = nullptr;
 	physx::PxDefaultErrorCallback err;
@@ -215,7 +220,8 @@ public:
 	physx::PxFoundation* foundation = nullptr;
 
 	MeshBuilder debug_mesh;
-
+	handle<MeshBuilder_Object> debug_mesh_handle;
+	void update_debug_physics_shapes();
 
 	hash_set<PhysicsActor> all_physics_actors;
 	hash_set<PhysicsActor> awake_dynamic_actors;	// issues callbacks for these
@@ -550,100 +556,20 @@ static Color32 randcolor32(uint32_t number)
 	c32.a = 255;
 	return c32;
 }
-#if 0
-void PhysicsManLocal::debug_draw_shapes()
+#include "Render/RenderObj.h"
+
+void PhysicsManImpl::update_debug_physics_shapes()
 {
 	ASSERT(scene);
 
 	if (g_draw_physx_scene.get_integer() == 0) {
+		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
+		if (debug_mesh_handle.is_valid())
+			idraw->get_scene()->remove_meshbuilder(debug_mesh_handle);
 		return;
 	}
+	MeshBuilder_Object o;
 	using namespace physx;
-
-
-	const bool draw_dynamic = g_draw_physx_scene.get_integer() & DebugPhysxSceneFlags::Dynamic;
-	const bool draw_static = g_draw_physx_scene.get_integer() & DebugPhysxSceneFlags::Static;
-	const bool draw_triggers = g_draw_physx_scene.get_integer() & DebugPhysxSceneFlags::Trigger;
-	const bool draw_constraints = g_draw_physx_scene.get_integer() & DebugPhysxSceneFlags::Contraints;
-	const bool draw_kinematic = g_draw_physx_scene.get_integer() & DebugPhysxSceneFlags::Kinematic;
-
-	debug_mesh.Begin();
-	{
-		PxActor* actor_buffer[256];
-
-		uint32_t actor_flags = 0;
-		if (draw_dynamic)
-			actor_flags |= PxActorTypeFlag::eRIGID_DYNAMIC;
-		if (draw_static)
-			actor_flags |= PxActorTypeFlag::eRIGID_STATIC;
-
-		uint32_t count = scene->getActors((PxActorTypeFlags)actor_flags, actor_buffer, 256, 0);
-
-		for (uint32_t i = 0; i < count; i++) {
-			PxActor* actor = actor_buffer[i];
-			if (actor->getType() != PxActorType::eRIGID_DYNAMIC && actor->getType() != PxActorType::eRIGID_STATIC)
-				continue;
-			PxRigidActor* rigid = (PxRigidActor*)actor;
-			PxTransform transform = rigid->getGlobalPose();
-			PhysTransform myt(transform);
-			const glm::mat4 worldmatrix = glm::mat4_cast(myt.rotation) * glm::translate(glm::mat4(1), myt.position);
-
-			PxShape* shapebuffer[64];
-			uint32_t numshapes = rigid->getShapes(shapebuffer, 64, 0);
-
-			const Color32 random_obj_color = randcolor32(i);
-			for (uint32_t shape_idx = 0; shape_idx < numshapes; shape_idx++) {
-				PxShape* shape = shapebuffer[shape_idx];
-				PhysTransform myt_shape(shape->getLocalPose());
-				const PxGeometry* geombase = &shape->getGeometry();
-
-				const glm::mat4 shapematrix = worldmatrix * glm::mat4_cast(myt_shape.rotation) * glm::translate(glm::mat4(1), myt_shape.position);
-				switch (geombase->getType())
-				{
-				case PxGeometryType::eBOX:
-				{
-					PxBoxGeometry* box = (PxBoxGeometry*)geombase;
-					debug_mesh.PushOrientedLineBox(glm::vec3(0.0), physx_to_glm(box->halfExtents)*2.f, shapematrix, random_obj_color);
-				}break;
-
-				case PxGeometryType::eSPHERE:
-					
-				{
-					PxSphereGeometry* sphere = (PxSphereGeometry*)geombase;
-					glm::vec3 center = shapematrix[3];
-					debug_mesh.AddSphere(center, sphere->radius, 12, 12, random_obj_color);
-				} break;
-
-				case PxGeometryType::eCONVEXMESH:
-
-					break;
-
-				case PxGeometryType::eCAPSULE:
-
-					break;
-
-				case PxGeometryType::eTRIANGLEMESH:
-
-					break;
-				}
-			}
-		}
-	}
-	debug_mesh.End();
-	debug_mesh.Draw(MeshBuilder::LINES);
-}
-#endif
-
-void PhysicsManager::debug_draw_shapes()
-{
-	ASSERT(impl->scene);
-
-	if (g_draw_physx_scene.get_integer() == 0) {
-		impl->scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
-		return;
-	}
-	using namespace physx;
-	auto scene = impl->scene;
 	static bool init = false;
 	if (!init) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 2.0);
@@ -653,15 +579,24 @@ void PhysicsManager::debug_draw_shapes()
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
 		init = true;
 	}
-	impl->debug_mesh.Begin();
+	debug_mesh.Begin();
 
 	auto& rb = scene->getRenderBuffer();
 	for (PxU32 i = 0; i < rb.getNbLines(); i++)
 	{
 		const PxDebugLine& line = rb.getLines()[i];
 		// render the line
-		impl->debug_mesh.PushLine(physx_to_glm(line.pos0), physx_to_glm(line.pos1), *((Color32*)&line.color0));
+		debug_mesh.PushLine(physx_to_glm(line.pos0), physx_to_glm(line.pos1), *((Color32*)&line.color0));
 	}
-	impl->debug_mesh.End();
-	//impl->debug_mesh.Draw(MeshBuilder::LINES);
+	debug_mesh.End();
+	debug_mesh.Draw(MeshBuilder::LINES);
+
+	o.visible = true;
+	o.transform = glm::mat4(1.f);
+	o.meshbuilder = &debug_mesh;
+
+	if (!debug_mesh_handle.is_valid())
+		debug_mesh_handle = idraw->get_scene()->register_meshbuilder(o);
+	else
+		idraw->get_scene()->update_meshbuilder(debug_mesh_handle, o);
 }

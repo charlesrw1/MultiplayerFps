@@ -204,6 +204,7 @@ private:
 	bool selectedInEditor = false;
 
 
+
 	friend class EditorDoc;
 	friend class SelectionState;
 };

@@ -97,7 +97,6 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	return has_error;
 }
 
-
 struct Debug_Shape
 {
 	enum type {
@@ -110,7 +109,6 @@ struct Debug_Shape
 	Color32 color;
 	float lifetime = 0.0;
 };
-
 class DebugShapeCtx
 {
 public:
@@ -138,7 +136,6 @@ private:
 	handle<MeshBuilder_Object> handle;
 	MeshBuilder mb;
 };
-
 
 class Debug_Console
 {
@@ -711,6 +708,9 @@ void register_input_actions_for_game()
 		->add_bind("y-", IA::keyboard_key(SDL_SCANCODE_S), new SwizzleModifier(true, true), {})
 		->add_bind("x-", IA::keyboard_key(SDL_SCANCODE_A), new SwizzleModifier(false, false), {})
 		->add_bind("x+", IA::keyboard_key(SDL_SCANCODE_D), new SwizzleModifier(false, true), {});
+	IA::register_action("game", "accelerate")
+		->add_bind("", IA::controller_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT), {}, {})
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_W), {}, {});
 	IA::register_action("game", "look", true)
 		->add_bind("x", GIB::MouseX, new LookModifier(false), {})
 		->add_bind("y", GIB::MouseY, new LookModifier(true), {})
@@ -866,6 +866,9 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, Level* loa
 	// calls start() if this is not an editor level
 	level->init_entities_post_load();
 
+	if (!this_is_for_editor)
+		gamemode->start();
+
 	tick = 0;
 	time = 0.0;
 	set_tick_rate(60.f);
@@ -881,13 +884,14 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, Level* loa
 		assert(player_type);
 		assert(player_type->is_a(PlayerBase::StaticType));
 
-		auto p = spawn_entity_from_classtype(player_type);
+		auto p = spawn_entity_from_classtype(*player_type);
 		level->local_player_id = p->self_id.handle;
 
 		gamemode->on_player_create(0, (Player*)p);
 	}
 
 	idraw->on_level_start();
+
 
 	sys_print("*** changed state to Engine_State::Game\n");
 
@@ -1387,8 +1391,8 @@ void GameEngineLocal::init()
 	iparticle->init();
 	cl->init();
 	sv->init();
-	DebugShapeCtx::get().init();
 	imgui_context = ImGui::CreateContext();
+	DebugShapeCtx::get().init();
 	TIMESTAMP("init everything");
 
 	ImGui::SetCurrentContext(imgui_context);
@@ -1456,7 +1460,6 @@ void GameEngineLocal::game_update_tick()
 {
 	CPUFUNCTIONSTART;
 
-	// clear any fixed frame debug shapes
 	DebugShapeCtx::get().fixed_update_start();
 
 	assert(level);
@@ -1479,7 +1482,7 @@ void GameEngineLocal::game_update_tick()
 	// update entities+components
 	level->update_level();
 
-	// update the physics. for physics driven objects, their transforms are updated in here
+	// update the physics, for physics driven objects, their transforms are updated in here
 	g_physics.simulate_and_fetch(tick_interval);
 
 	tick += 1;
@@ -1608,7 +1611,6 @@ void GameEngineLocal::loop()
 				break;
 			}
 			
-			// let game input system handle events like controller connections
 			GetGInput().handle_event(event);
 			
 			if (!is_game_focused()) {
@@ -1621,7 +1623,6 @@ void GameEngineLocal::loop()
 		}
 		get_gui()->post_handle_events();
 
-		// only place stored "APPEND" commands get executed
 		Cmd_Manager::get()->execute_buffer();
 
 		// update state
@@ -1633,16 +1634,13 @@ void GameEngineLocal::loop()
 				continue;			// goto next frame
 			}
 
-			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit
+			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
 			break;
 		case Engine_State::Loading:
-			execute_map_change();	// this will cause the state machine to enter the Game or Idle state (likely Idle if async loading, then the load callback sends it to Game if succesful)
+			execute_map_change();
 			continue; // goto next frame
 			break;
 		case Engine_State::Game: {
-			// game state, this is more like "map is loaded" state. 
-			//If a map is loaded (normal level, main menu level, or an editor tool with a world, etc.), then it passes through here
-
 			double secs_per_tick = tick_interval;
 			frame_remainder += dt;
 			int num_ticks = (int)floor(frame_remainder / secs_per_tick);
@@ -1694,7 +1692,6 @@ void GameEngineLocal::loop()
 		// tick asyncs
 		GetAssets().tick_asyncs();
 
-		// tick debug shapes
 		DebugShapeCtx::get().update(frame_time);
 
 		// draw
@@ -1944,3 +1941,4 @@ void DebugShapeCtx::fixed_update_start()
 {
 	one_frame_fixedupdate.clear();
 }
+

@@ -202,7 +202,8 @@ public:
 	bool is_valid() override { return ti != nullptr; }
 
 	void execute() {
-		auto ent = eng->spawn_entity_from_classtype(ti);
+		assert(ti);
+		auto ent = eng->spawn_entity_from_classtype(*ti);
 		ent->set_ws_transform(transform);
 		ent->editor_name = ent->get_type().classname;
 		handle = ent->self_id.handle;

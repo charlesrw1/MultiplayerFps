@@ -39,6 +39,8 @@
 
 #include "CharacterController.h"
 
+#include "BikeEntity.h"
+
 CLASS_H(PlayerNull, PlayerBase)
 public:
 
@@ -151,259 +153,16 @@ using glm::cross;
 
 
 
-#if 0
-// hacky way to move up stairs
-bool Player::check_perch()
-{
-	glm::vec2 dirs[8] = { vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1),
-		vec2(SQRT2,SQRT2),vec2(SQRT2,-SQRT2), vec2(-SQRT2,-SQRT2), vec2(-SQRT2,SQRT2) };
-	for (int i = 0; i < 8; i++) {
-		float height = CHAR_HITBOX_RADIUS;
-		Ray ray;
-		ray.pos = position + vec3(dirs[i].x, 0, dirs[i].y) * (CHAR_HITBOX_RADIUS+ stair_rad.get_float()) + vec3(0, height, 0);
-		ray.dir = vec3(0, -1, 0);
-
-		RayHit rh;
-		//rh = eng->phys.trace_ray(ray, selfid, PF_WORLD);
-
-		// perched on ledge
-		if (rh.hit_world) {
-			if (((height - rh.dist) >= min_stair.get_float()) && (height - rh.dist) <= max_stair.get_float() && rh.normal.y > 0.98) {
-				position.y = position.y + (height - rh.dist);
-				velocity.y = 0;
-				return true;
-			}
-			else if (abs(height - rh.dist) < 0.005) {
-				// stay in perched state
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-#endif
-
-
-#if 0
-void Player::slide_move()
-{
-	vec3 orig_velocity = velocity;
-	vec3 orig_position = position;
-
-	int num_bumps = 4;
-
-	float move_time = eng->get_tick_interval();
-
-	// lateral
-	glm::vec3 lateral_velocity = glm::vec3(velocity.x, 0, velocity.z);
-	sweep_move(lateral_velocity, position);
-
-	// down
-	glm::vec3 down_velocity = glm::vec3(0, velocity.y, 0);
-	sweep_move(down_velocity, position);
-
-	velocity = glm::vec3(lateral_velocity.x, down_velocity.y, lateral_velocity.z);
-	return;
-
-	world_query_result res;
-	glm::vec3 dir = glm::normalize(velocity);
-	float length = glm::length(velocity) * move_time;
-	bool found = g_physics.sweep_sphere(res, 1.0, position, dir, length,{});
-	if (found) {
-		position = position + dir * length * res.fraction;
-		velocity = glm::vec3(0.0);
-	}
-	else {
-		position = position + dir * length;
-	}
-	return;
-
-	for (int i = 0; i < num_bumps; i++)
-	{
-		if (glm::length(velocity) < 0.0001)
-			return;
-
-		vec3 end = position + velocity * (move_time/num_bumps);
-
-
-
-		world_query_result res;
-		bool found = g_physics.sweep_sphere(res, 5.0, position, glm::normalize(velocity), glm::length(velocity) * (move_time / num_bumps), {});
-
-		if (found) {
-			vec3 penetration_velocity = dot(velocity, res.hit_normal) * res.hit_normal;
-			vec3 slide_velocity = velocity - penetration_velocity;
-			
-			vec3 neg_vunit = -glm::normalize(velocity);
-			float d = dot(res.hit_normal, neg_vunit);
-			
-			//if (abs(d) > 0.001f) {
-			//	float push_out_depth = trace.penetration_depth / d;
-			//	player.position = end + push_out_depth * neg_vunit;
-			//}
-			//else {
-			position = res.hit_pos;
-			//}
-			velocity = slide_velocity;
-			if (dot(velocity, orig_velocity) < 0) {
-				sys_print("opposite velocity\n");
-			//	velocity = vec3(0.f);
-				break;
-			}
-		}
-		else {
-			position = end;
-		}
-	}
-}
-#endif
 
 float lensquared_noy(vec3 v)
 {
 	return v.x * v.x + v.z * v.z;
 }
 
-#if 0
-void Player::ground_move()
-{
-	state_time += eng->get_tick_interval();
 
-	bool dont_add_grav = false;
-	Action_State last = action;
-	action = Action_State::Moving;// update_state(glm::length(velocity), dont_add_grav);
-
-	if (last != action) {
-		state_time = 0.0;
-	}
-
-	vec3 prevel = velocity;
-
-	vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
-	float inputlen = length(inputvec);
-	if (inputlen > 0.00001)
-		inputvec = inputvec / inputlen;
-	if (inputlen > 1)
-		inputlen = 1;
-
-	vec3 look_front = AnglesToVector(cmd.view_angles.x, cmd.view_angles.y);
-	look_front.y = 0;
-	look_front = normalize(look_front);
-	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
-
-	const bool player_on_ground = is_on_ground();
-	float acceleation_val = (player_on_ground) ? ground_accel : air_accel;
-	acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
-	float maxspeed_val = (player_on_ground) ? max_ground_speed : max_air_speed;
-
-	vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
-	wishdir = vec3(wishdir.x, 0.f, wishdir.z);
-	vec3 xz_velocity = vec3(velocity.x, 0, velocity.z);
-
-	float wishspeed = inputlen * maxspeed_val;
-	float addspeed = wishspeed - dot(xz_velocity, wishdir);
-	addspeed = glm::max(addspeed, 0.f);
-	float accelspeed = acceleation_val * wishspeed * eng->get_tick_interval();
-	accelspeed = glm::min(accelspeed, addspeed);
-	xz_velocity += accelspeed * wishdir;
-
-	float len = length(xz_velocity);
-	//if (len > maxspeed)
-	//	xz_velocity = xz_velocity * (maxspeed / len);
-	if (len < 0.3 && accelspeed < 0.0001)
-		xz_velocity = vec3(0);
-	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
-
-	if (!dont_add_grav) {
-		velocity.y -= phys_gravity.get_float() * eng->get_tick_interval();
-	}
-	
-	slide_move();
-}
-#endif
-
-void player_physics_check_nans(Player& player)
-{
-#if 0
-	if (player.position.x != player.position.x || player.position.y != player.position.y ||
-		player.position.z != player.position.z)
-	{
-		printf("origin nan found in PlayerPhysics\n");
-		player.position = vec3(0);
-	}
-	if (player.velocity.x != player.velocity.x
-		|| player.velocity.y != player.velocity.y || player.velocity.z != player.velocity.z)
-	{
-		printf("velocity nan found in PlayerPhysics\n");
-		player.velocity = vec3(0);
-	}
-#endif
-}
-
-void draw_entity_info()
-{
-#if 0
-	static int current_index = 0;
-	Entity* e = nullptr;
-	if (!e)
-		return;
-	glm::vec3 vel = e->get_velocity();
-	ImGui::InputFloat3("position", &e->position.x);
-	ImGui::InputFloat3("velocity", &vel.x);
-	ImGui::InputFloat3("acceleration", &e->esimated_accel.x);
-
-	static bool predict_brake = true;
-	ImGui::Checkbox("Predict stop pos", &predict_brake);
-	Player* p = e->cast_to<Player>();
-	if (predict_brake && p) {
-
-		if (glm::abs(p->cmd.forward_move) < 0.000001 && glm::abs(p->cmd.lateral_move) < 0.000001) {
-			glm::vec3 pos = e->position;
-			glm::vec3 v = vel;
-			v.y = 0.0;
-			// assume accel = 0
-			int iter = 0;
-			float dt = 0.025;	// use a big dt
-			while (dot(v, v) > 0.0001*0.0001 && iter < 100) {
-				float speed = glm::length(v);
-
-				if (speed < 0.3)
-					break;
-
-				float dropamt = ground_friction * speed * dt;
-				float newspd = speed - dropamt;
-				if (newspd < 0)
-					newspd = 0;
-				float factor = newspd / speed;
-				v *= factor;
-				pos += v * (float)dt;
-				iter++;
-			}
-			ImGui::Text("%d", iter);
-			ImGui::Text("%f %f %f", pos.x, pos.y, pos.z);
-			Debug::add_sphere(pos, 0.5, COLOR_BLUE, -1.0, false);
-		}
-	}
-#endif
-}
 
 static AddToDebugMenu addmovevars("move vars", move_variables_menu);
-static AddToDebugMenu adddrawentinfo("entity physics info", draw_entity_info);
 #include "Sound/SoundPublic.h"
-#if 0
-void Player::move()
-{
-
-
-	distTraveledSinceLastFootstep += speed * (float)eng->get_tick_interval();
-
-	if (distTraveledSinceLastFootstep >= 5.0) {
-		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("footstep_jack_01.wav").get();
-		isound->play_sound(s);
-		distTraveledSinceLastFootstep = 0.0;
-	}
-}
-#endif
 
 
 CLASS_H(PlayerWeaponData,ClassBase )
@@ -550,21 +309,34 @@ glm::vec3 Player::calc_eye_position()
 	return get_ws_position() + vec3(0, view_height, 0);
 }
 
+float bike_view_damp = 0.01;
+void bike_view_menu()
+{
+	ImGui::InputFloat("bike_view_damp", &bike_view_damp);
+}
+ADD_TO_DEBUG_MENU(bike_view_menu);
+
 void Player::get_view(glm::mat4& viewMat, float& fov)
 {
 	if (g_thirdperson.get_bool()) {
 
-
+		auto dir = bike->bike_direction;
 		auto pos = get_ws_position();
 		auto camera_pos = glm::vec3(pos.x, 6.0, pos.z - 6);
+		auto dir_mat = glm::lookAt(glm::vec3(0), glm::vec3(dir.x,-0.1f,dir.z), glm::vec3(0, 1, 0));
+		auto dir_quat = glm::quat(dir_mat);
+		this->view_quat = damp_dt_independent(dir_quat, this->view_quat, bike_view_damp, eng->get_tick_interval());
+		auto actual_dir = glm::inverse(this->view_quat) * glm::vec3(0, 0, 1);
 
-		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
+		vec3 front = dir;// AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
-		camera_pos = get_ws_position() + vec3(0, STANDING_EYE_OFFSET, 0) - front * 2.5f + side * 0.8f;
+		camera_pos = get_ws_position() + vec3(0, 3.0, 0) - front * 2.5f + side * 0.f;
+
+		this->view_pos = damp_dt_independent(camera_pos, this->view_pos, bike_view_damp, eng->get_tick_interval());
 
 		//viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
 
-		viewMat = glm::lookAt(camera_pos, camera_pos+front, glm::vec3(0, 1, 0));
+		viewMat = glm::lookAt(this->view_pos, this->view_pos - actual_dir, glm::vec3(0, 1, 0));
 
 		//org = camera_pos;
 		//ang = view_angles;
@@ -938,8 +710,24 @@ void Player::on_jump_callback()
 	}
 }
 
-
 void Player::update()
+{
+	auto moveAction = inputPtr->get("game/move");
+	auto lookAction = inputPtr->get("game/look");
+	auto accelAction = inputPtr->get("game/accelerate");
+	bike->forward_strength = accelAction->get_value<float>();
+	bike->turn_strength = moveAction->get_value<glm::vec2>().x;
+	{
+		auto off = lookAction->get_value<glm::vec2>();
+		view_angles.x -= off.y;	// pitch
+		view_angles.y += off.x;	// yaw
+		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+		view_angles.y = fmod(view_angles.y, TWOPI);
+	}
+	//set_ws_position(bike->get_ws_position());
+}
+
+void Player::on_foot_update()
 {
 	if (wall_jump_cooldown > 0)
 		wall_jump_cooldown -= eng->get_tick_interval();
@@ -1049,6 +837,7 @@ void Player::update()
 	Debug::add_line(line_start, line_start + wishdir * 2.0f, COLOR_RED, 0);
 }
 
+#include "BikeEntity.h"
 
  void Player::start()  {
 
@@ -1093,9 +882,7 @@ void Player::update()
 		 });
 
 	 assert(jumpAction);
-	// jumpAction->bind_start_function([this] {
-	//	 on_jump_callback();
-	//	 });
+
 
 	 Player::find_a_spawn_point();
 
@@ -1108,6 +895,12 @@ void Player::update()
 	 hud = std::make_unique<PlayerHUD>(this);
 	 score_update_delegate.invoke(10);
 
+	 {
+		 auto scope = eng->spawn_entity_class_deferred<BikeEntity>(bike);
+		 bike->set_ws_position(get_ws_position());
+	 }
+	 set_ws_position(glm::vec3(0, 0, 0.5));
+	 parent_to_entity(bike);
 }
  void Player::end() {
 	 GameInputSystem::get().free_input_user(inputPtr);
@@ -1132,7 +925,7 @@ void Player::update()
 	 player_mesh->set_model(playerMod);
 	 player_mesh->disable_physics = true;
 	 player_mesh->set_animation_graph("ik_test.ag");
-
+	 player_mesh->visible = false;
 
 	 player_capsule->physics_preset.ptr = &PP_Character::StaticType;
 	 player_capsule->is_trigger = true;

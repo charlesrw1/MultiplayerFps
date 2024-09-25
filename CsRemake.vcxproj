@@ -50,8 +50,10 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\BikeGame\Components\BikeAI.h" />
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
+    <ClInclude Include="Source\DeferredSpawnScope.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
     <ClInclude Include="Source\Framework\ScopedBoolean.h" />
@@ -107,6 +109,7 @@
     <ClInclude Include="Source\Framework\Handle.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
+    <ClCompile Include="Source\DeferredSpawnScope.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
@@ -132,6 +135,8 @@
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />
     <ClInclude Include="Source\GameEnginePublic.h" />
     <ClInclude Include="Source\Game\BasePlayer.h" />
+    <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
+    <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
     <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
@@ -270,6 +275,7 @@
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
     <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
+    <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
