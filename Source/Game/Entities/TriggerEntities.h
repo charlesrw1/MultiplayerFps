@@ -6,8 +6,8 @@
 CLASS_H(TriggerBox, Entity)
 public:
 	TriggerBox() {
-		box = create_sub_component<BoxComponent>("TriggerBox");
-		root_component = box;
+		box = construct_sub_component<BoxComponent>("TriggerBox");
+
 		box->is_trigger = true;
 		box->simulate_physics = false;
 		box->physics_preset.ptr = &PP_Trigger::StaticType;
@@ -20,8 +20,8 @@ public:
 CLASS_H(TriggerSphere, Entity)
 public:
 	TriggerSphere() {
-		sphere = create_sub_component<SphereComponent>("TriggerSphere");
-		root_component = sphere;
+		sphere = construct_sub_component<SphereComponent>("TriggerSphere");
+
 		sphere->is_trigger = true;
 		sphere->simulate_physics = false;
 		sphere->physics_preset.ptr = &PP_Trigger::StaticType;

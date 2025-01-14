@@ -7,6 +7,7 @@
 #include "Render/Model.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/MaterialPublic.h"
+#include "Level.h"
 
 extern ConfigVar ed_default_sky_material;
 
@@ -39,27 +40,27 @@ void EditorTool3d::map_callback(bool b)
 {
 	assert(b);
 
-	auto dome = eng->spawn_entity_class<StaticMeshEntity>();
+	auto dome = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 	dome->Mesh->set_model(GetAssets().find_sync<Model>("skydome.cmdl").get());
-	dome->Mesh->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
+	dome->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->is_skybox = true;	// FIXME
 	dome->Mesh->cast_shadows = false;
 	dome->Mesh->set_material_override(GetAssets().find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
-	auto plane = eng->spawn_entity_class<StaticMeshEntity>();
+	auto plane = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 	plane->Mesh->set_model(mods.get_default_plane_model());
 	plane->set_ws_transform({}, {}, glm::vec3(20.f));
 	plane->Mesh->set_material_override((GetAssets().find_sync<MaterialInstance>("defaultWhite.mi").get()));
 
-	auto sun = eng->spawn_entity_class<SunLightEntity>();
+	auto sun = eng->get_level()->spawn_entity_class<SunLightEntity>();
 	sun->Sun->intensity = 3.0;
 	sun->Sun->visible = true;
 	sun->Sun->log_lin_lerp_factor = 0.8;
 	sun->Sun->max_shadow_dist = 40.0;
-	sun->Sun->set_ls_euler_rotation(glm::vec3(-glm::radians(45.f), glm::radians(15.f), 0.f));
+	sun->set_ls_euler_rotation(glm::vec3(-glm::radians(45.f), glm::radians(15.f), 0.f));
 
 	// i dont expose skylight through a header, could change that or just do this (only meant to be spawned by the level editor)
-	auto skylight = eng->spawn_entity_from_classtype(*ClassBase::find_class("SkylightEntity"));
+	auto skylight = eng->get_level()->spawn_entity_from_classtype(*ClassBase::find_class("SkylightEntity"));
 
 
 	post_map_load_callback();

@@ -14,39 +14,16 @@ void GameEngineLocal::login_new_player(uint32_t index) {
 
 	ASSERT(0);
 	sys_print("*** making client %d\n", index);
-
-	auto player = spawn_entity_class<PlayerBase>();
-	level->local_player_id = player->self_id.handle;
-
+	ASSERT(level);
+	auto player = level->spawn_entity_class<PlayerBase>();
+	level->set_local_player(player);
 }
 void GameEngineLocal::logout_player(uint32_t index) {
 	sys_print("*** removing client %d\n", index);
-
-	remove_entity(get_player_slot(index));
-}
-void GameEngineLocal::remove_entity(Entity* e)
-{
-	ASSERT(get_level());
-	// can pass nullptr and still be valid
-	if (!e)
-		return;
-	uint64_t id = e->self_id.handle;
-
-	sys_print("*** removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
-
-	e->destroy();
-	// call destructor
-	delete e;
-	// remove from hashmap
-	get_level()->remove_entity_handle(id);
+	ASSERT(level);
+	level->destroy_entity(get_player_slot(index));
 }
 
-void GameEngineLocal::call_startup_functions_for_new_entity(Entity* e)
-{
-	// add to master list
-	get_level()->insert_entity_into_hashmap(e);
-	e->initialize();
-}
 
 std::string* GameEngineLocal::find_keybind(SDL_Scancode code, uint16_t keymod) {
 
@@ -82,60 +59,6 @@ void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::strin
 	};
 	uint32_t both = uint32_t(code) | ((uint32_t)mod_to_integer(keymod) << 16);
 	keybinds.insert({ both,bind });
-}
-
-Entity* GameEngineLocal::spawn_entity_from_classtype(const ClassTypeInfo& ti) {
-	ASSERT(ti.allocate);
-	ASSERT(get_level());
-
-	ClassBase* e = ti.allocate();	// allocate + call constructor
-	ASSERT(e);
-
-	Entity* ec = nullptr;
-
-	ec = e->cast_to<Entity>();
-	if (!ec) {
-		sys_print("!!! spawn_entity_from_classtype failed for %s\n", ti.classname);
-		delete e;
-		return nullptr;
-	}
-
-
-	call_startup_functions_for_new_entity(ec);
-
-	return ec;
-}
-Entity* GameEngineLocal::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) {
-	ASSERT(get_level());
-	ASSERT(ti.allocate);
-	ClassBase* e = ti.allocate();	// allocate + call constructor
-	ASSERT(e);
-
-	Entity* ec = nullptr;
-
-	ec = e->cast_to<Entity>();
-	if (!ec) {
-		sys_print("!!! spawn_entity_class_deferred_internal failed for %s\n", ti.classname);
-		delete e;
-		return nullptr;
-	}
-
-	get_level()->insert_entity_into_hashmap(ec);	// insert into hashmap but DONT call initialize, that is done by the RAII DeferredSpawnScope
-
-	return ec;
-}
-Entity* GameEngineLocal::spawn_entity_schema(const Schema* schema) {
-	assert(schema);
-	assert(level);
-	
-	Entity* e = schema->create_entity_from_properties();
-	if (!e) {
-		sys_print("??? couldn't spawn entity from schema: %s\n", schema->get_name().c_str());
-		return nullptr;
-	}
-	call_startup_functions_for_new_entity(e);
-
-	return e;
 }
 
 

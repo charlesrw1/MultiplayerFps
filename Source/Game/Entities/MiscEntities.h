@@ -17,10 +17,8 @@ public:
 		//position = vec3(0.f);
 		//rotation.y = HALFPI;
 
-		npc_model = create_sub_component<MeshComponent>("NpcModel");
-		npc_hitbox = create_sub_component<CapsuleComponent>("NpcCollider");
-		root_component = npc_hitbox;
-		npc_model->attach_to_parent(npc_hitbox, {});
+		npc_model = construct_sub_component<MeshComponent>("NpcModel");
+		npc_hitbox = construct_sub_component<CapsuleComponent>("NpcCollider");
 	}
 
 	static const PropertyInfoList* get_props() = delete;
@@ -109,8 +107,7 @@ public:
 CLASS_H(Door, Entity)
 public:
 	Door() {
-		door_mesh = create_sub_component<MeshComponent>("DoorMesh");
-		root_component = door_mesh;
+		door_mesh = construct_sub_component<MeshComponent>("DoorMesh");
 
 		door_mesh->is_static = false;
 		door_mesh->simulate_physics = false;	// kinematic object

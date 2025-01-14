@@ -17,6 +17,9 @@
 #include "Assets/AssetDatabase.h"
 
 #include "EditorTool3d.h"
+#include "Framework/Config.h"
+#include "GameEnginePublic.h"
+#include "Level.h"
 
 extern ConfigVar ed_default_sky_material;
 
@@ -138,7 +141,7 @@ public:
 		propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
 		materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
 
-		outputEntity = eng->spawn_entity_class<StaticMeshEntity>();
+		outputEntity = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 		outputEntity->Mesh->set_model(model.get());
 		outputEntity->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
 		outputEntity->Mesh->set_material_override(dynamicMat);

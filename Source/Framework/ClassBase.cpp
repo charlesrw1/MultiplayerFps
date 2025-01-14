@@ -123,7 +123,7 @@ static void set_typenum_R(TypeInfoWithExtra* node)
 }
 
 
-void ClassBase::init()
+void ClassBase::init_class_reflection_system()
 {
 	// create class tree graph
 	for (auto& class_ : get_registry().string_to_typeinfo) {

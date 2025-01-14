@@ -35,7 +35,7 @@ void SpotLightComponent::build_render_light(Render_Light& light)
 	light.radius = radius;
 	light.is_spotlight = true;
 
-	auto& transform = get_ws_transform();
+	auto& transform = get_owner()->get_ws_transform();
 
 	light.position = transform[3];
 	light.normal = glm::normalize(-transform[2]);
@@ -49,13 +49,14 @@ void SpotLightComponent::on_init()
 
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
-		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
-		s->dont_serialize_or_edit = true;
-		s->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
+		auto arrow_obj = get_owner()->create_and_attach_entity<Entity>();
+		arrow_obj->create_and_attach_component_type<ArrowComponent>();
+		arrow_obj->dont_serialize_or_edit = true;
+		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
 	}
 }
 
@@ -96,7 +97,7 @@ void PointLightComponent::build_render_light(Render_Light& light)
 	light.radius = radius;
 	light.is_spotlight = false;
 
-	auto& transform = get_ws_transform();
+	auto& transform = get_owner()->get_ws_transform();
 
 	light.position = transform[3];
 }
@@ -109,7 +110,7 @@ void PointLightComponent::on_init()
 
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/pointBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
@@ -167,7 +168,7 @@ void SunLightComponent::build_render_light(Render_Sun& light)
 	light.epsilon = epsilon;
 	light.cast_shadows = true;
 
-	auto& transform = get_ws_transform();
+	auto& transform = get_owner()->get_ws_transform();
 	light.direction = glm::normalize(-transform[2]);
 }
 
@@ -179,11 +180,11 @@ void SunLightComponent::on_init()
 
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>(this);
+		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/_nearest/sun.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
-		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>(this);
+		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>();
 		s->dont_serialize_or_edit = true;
 	}
 }
@@ -242,11 +243,10 @@ CLASS_IMPL(SkylightComponent);
 CLASS_H(SkylightEntity, Entity)
 public:
 	SkylightEntity() {
-		Skylight = create_sub_component<SkylightComponent>("Skylight");
-		root_component = Skylight;
+		Skylight = construct_sub_component<SkylightComponent>("Skylight");
 
 		if (eng->is_editor_level()) {
-			auto b = create_sub_component<BillboardComponent>("Billboard");
+			auto b = construct_sub_component<BillboardComponent>("Billboard");
 			b->set_texture(default_asset_load<Texture>("icon/_nearest/skylight.png"));
 			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		}

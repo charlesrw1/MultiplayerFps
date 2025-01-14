@@ -16,7 +16,7 @@ public:
 		dont_serialize_or_edit = true;
 	}
 	void on_init() override {
-		mbview = get_owner()->create_and_attach_component_type<MeshBuilderComponent>(this);
+		mbview = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
 		mbview->use_transform = false;
 		update_meshbuilder();
 	}
@@ -60,10 +60,10 @@ CameraPoint::CameraPoint()
 {
 	if (eng->is_editor_level()) {
 
-		auto m = create_sub_component<MeshComponent>("CameraModel");
+		auto m = construct_sub_component<MeshComponent>("CameraModel");
 		m->set_model(GetAssets().find_global_sync<Model>("camera_model.cmdl").get());
 		m->dont_serialize_or_edit = true;
 
-		create_sub_component<FakeCameraComponent>("EditorViewier");
+		construct_sub_component<FakeCameraComponent>("EditorViewier");
 	}
 }

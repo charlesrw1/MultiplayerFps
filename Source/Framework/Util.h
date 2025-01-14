@@ -3,9 +3,10 @@
 #include <cstdint>
 #include "Framework/Handle.h"
 
+void handle_assert_internal(const char* msg);
 #define ASSERT(x) \
 	do { if(!(x)) {	\
-	printf("Assertion failed: %s", #x); std::abort(); \
+		handle_assert_internal(#x); \
 	} }while (0);
 bool CheckGlErrorInternal_(const char* file, int line);
 #define glCheckError() CheckGlErrorInternal_(__FILE__,__LINE__)

@@ -20,6 +20,7 @@
 
 #include "Framework/MulticastDelegate.h"
 
+#include "Level.h"
 
 static ModelEditorTool g_model_editor_static;
 IEditorTool* g_model_editor = &g_model_editor_static;
@@ -94,7 +95,7 @@ void ModelEditorTool::post_map_load_callback()
 	}
 
 
-	outputEntity = eng->spawn_entity_class<StaticMeshEntity>();
+	outputEntity = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 
 
 	GetAssets().find_async<Model>(get_doc_name(), [&](GenericAssetPtr ptr) {

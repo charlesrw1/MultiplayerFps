@@ -12,9 +12,8 @@ CLASS_IMPL(BikeEntity);
 BikeEntity::BikeEntity()
 {
 	bike_direction = { 0,0,1 };
-	auto m = create_sub_component<MeshComponent>("BikeMesh");
+	auto m = construct_sub_component<MeshComponent>("BikeMesh");
 	m->set_model(GetAssets().find_assetptr_unsafe<Model>("bike.cmdl"));
-	root_component = m;
 	m->disable_physics = true;
 
 	set_ticking(true);

@@ -8,50 +8,40 @@
 CLASS_H(StaticMeshEntity, Entity)
 public:
 	StaticMeshEntity() {
-		Mesh = create_sub_component<MeshComponent>("Mesh");
-		root_component = Mesh;
+		Mesh = construct_sub_component<MeshComponent>("Mesh");
 	}
-	static const PropertyInfoList* get_props() = delete;
-
 	MeshComponent* Mesh = nullptr;
-
+	static const PropertyInfoList* get_props() = delete;
 };
 
 CLASS_H(PointLightEntity,Entity)
 public:
 	PointLightEntity() {
-		PointLight = create_sub_component<PointLightComponent>("PointLight");
-		root_component = PointLight;
+		construct_sub_component<PointLightComponent>("PointLight");
 	}
 	static const PropertyInfoList* get_props() = delete;
-	PointLightComponent* PointLight = nullptr;
 };
 CLASS_H(SpotLightEntity, Entity)
 public:
 	SpotLightEntity() {
-		SpotLight = create_sub_component<SpotLightComponent>("SpotLight");
-		root_component = SpotLight;
+		construct_sub_component<SpotLightComponent>("SpotLight");
 	}
 	static const PropertyInfoList* get_props() = delete;
-	SpotLightComponent* SpotLight = nullptr;
 };
 CLASS_H(SunLightEntity, Entity)
 public:
 	SunLightEntity() {
-		Sun = create_sub_component<SunLightComponent>("Sun");
-		root_component = Sun;
+		Sun = construct_sub_component<SunLightComponent>("Sun");
 	}
-	static const PropertyInfoList* get_props() = delete;
 	SunLightComponent* Sun = nullptr;
+	static const PropertyInfoList* get_props() = delete;
 };
 CLASS_H(DecalEntity, Entity)
 public:
 	DecalEntity() {
-		Decal = create_sub_component<DecalComponent>("Decal");
-		root_component = Decal;
+		construct_sub_component<DecalComponent>("Decal");
 	}
 	static const PropertyInfoList* get_props() = delete;
-	DecalComponent* Decal{};
 };
 
 

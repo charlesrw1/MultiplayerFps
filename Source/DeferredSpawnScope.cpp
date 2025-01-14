@@ -1,6 +1,8 @@
 #include "DeferredSpawnScope.h"
 #include "Game/Entity.h"
+#include "GameEnginePublic.h"
+#include "Level.h"
 DeferredSpawnScope::~DeferredSpawnScope()
 {
-	entityPtr->initialize();
+	eng->get_level()->initialize_new_entity_safe(entityPtr);
 }

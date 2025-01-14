@@ -69,7 +69,8 @@
     <ClInclude Include="Source\Game\Components\SoundComponent.h" />
     <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Debug.h" />
-    <ClInclude Include="Source\EditorDocLocal.h" />
+    <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
+    <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\External\cgltf.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
@@ -150,7 +151,6 @@
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
-    <ClInclude Include="Source\Game\Map.h" />
     <ClInclude Include="Source\Game\Schema.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
@@ -163,6 +163,7 @@
     <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
+    <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Net.h" />
@@ -238,7 +239,8 @@
     <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
-    <ClCompile Include="Source\EditorDoc.cpp" />
+    <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorDoc.cpp" />
     <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="Source\External\ImGuizmo.cpp" />
@@ -267,6 +269,8 @@
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
+    <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
+    <ClCompile Include="Source\Framework\Util.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
@@ -294,11 +298,16 @@
     <ClCompile Include="Source\Game\Schema.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
     <ClCompile Include="Source\Game\StdEntityTypes.cpp" />
+    <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\Game\WorldSettings.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Old.cpp" />
+    <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
@@ -391,6 +400,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>

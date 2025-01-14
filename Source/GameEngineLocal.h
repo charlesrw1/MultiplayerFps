@@ -33,12 +33,16 @@ public:
 
 	// Public Interface
 	virtual GameMode* get_gamemode() const override {
-		return gamemode;
+		return level ? level->get_gamemode() : nullptr;
 	}
 	virtual Level* get_level() const override {
-		return level;
+		return level.get();
 	}
 	virtual Entity* get_entity(uint64_t handle) {
+		ASSERT(get_level());
+		return level->get_entity(handle)->cast_to<Entity>();
+	}
+	virtual BaseUpdater* get_object(uint64_t handle) {
 		ASSERT(get_level());
 		return level->get_entity(handle);
 	}
@@ -78,11 +82,6 @@ public:
 
 	virtual void login_new_player(uint32_t index) override;
 	virtual void logout_player(uint32_t index) override;
-	virtual Entity* spawn_entity_schema(const Schema* schema) override;
-	virtual void remove_entity(Entity* e) override;
-	virtual Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti) override;
-	Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) override;
-
 
 	virtual void leave_level() override;
 	virtual void open_level(string levelname) override;
@@ -113,7 +112,7 @@ public:
 	void change_editor_state(IEditorTool* next_tool, const char* arg, const char* file = "");
 
 	void execute_map_change();
-	void on_map_change_callback(bool is_for_editor, Level* loadedLevel);
+	void on_map_change_callback(bool is_for_editor, LevelAsset* loadedLevel);
 
 	void stop_game();
 	void spawn_starting_players(bool initial);
@@ -139,8 +138,7 @@ public:
 
 	string queued_mapname;
 	bool is_loading_editor_level = false;
-	Level* level= nullptr;
-	GameMode* gamemode = nullptr;
+	std::unique_ptr<Level> level= nullptr;
 
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
@@ -179,10 +177,8 @@ private:
 
 	void game_update_tick();
 
-
 	friend class Ent_Iterator;
 
-	void call_startup_functions_for_new_entity(Entity* e);
 
 	std::string* find_keybind(SDL_Scancode code, uint16_t keymod);
 

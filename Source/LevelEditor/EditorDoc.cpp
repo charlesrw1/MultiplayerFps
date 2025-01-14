@@ -95,39 +95,7 @@ static std::string to_string(StringView view) {
 // Create from a class, create from a schema, create from a duplication
 // -> serialize to use as an interchange format
 
-class CreateSchemaCommand : public Command
-{
-public:
-	CreateSchemaCommand(const std::string& schemaname, const glm::mat4& transform) {
-		s = GetAssets().find_sync<Schema>(schemaname).get();
-		this->transform = transform;
-	}
 
-	bool is_valid() override { return s != nullptr; }
-
-	void execute() {
-		auto ent = eng->spawn_entity_schema(s);
-		ent->set_ws_transform(transform);
-		ent->editor_name = s->get_name();
-
-		handle = ent->self_id.handle;
-		ed_doc.on_node_created.invoke(handle);
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() {
-		ed_doc.on_node_will_delete.invoke(handle);
-		eng->remove_entity(eng->get_entity(handle));
-		ed_doc.post_node_changes.invoke();
-		handle = 0;
-	}
-	std::string to_string() override {
-		return "CreateSchemaCommand";
-	}
-
-	uint64_t handle = 0;
-	const Schema* s=nullptr;
-	glm::mat4 transform;
-};
 class CreateStaticMeshCommand : public Command
 {
 public:
@@ -136,7 +104,10 @@ public:
 		// UNSAFE WHEN THIS COMMAND GETS DELETED!!
 		auto ModelPtr = &m;
 		auto handlePtr = &handle;
-		GetAssets().find_async<Model>(modelname.c_str(), [ModelPtr,handlePtr](GenericAssetPtr p) {
+		bool* ptr_to_waiting = &waiting_on_callback;
+		waiting_on_callback = true;
+		GetAssets().find_async<Model>(modelname.c_str(), [ptr_to_waiting, ModelPtr,handlePtr](GenericAssetPtr p) {
+			*ptr_to_waiting = false;
 			if (p) {
 				auto modelP = p.cast_to<Model>();
 				*ModelPtr = modelP.get();
@@ -159,36 +130,41 @@ public:
 
 		this->transform = transform;
 	}
+	~CreateStaticMeshCommand() override {
+		ASSERT(!waiting_on_callback);
+	}
+
 	bool is_valid() override { return true; }
 
 	void execute() {
-		auto ent = eng->spawn_entity_class<StaticMeshEntity>();
+		auto ent = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 		ent->Mesh->set_model(m);
 		ent->set_ws_transform(transform);
 \
 		if (!m) {
 			ent->editor_name = "NoModel";
 		}
-		handle = ent->self_id.handle;
+		handle = ent->get_self_ptr();
 
-		ed_doc.selection_state->set_select_only_this(ent->self_id);
+		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
 
-		ed_doc.on_node_created.invoke(handle);
+		ed_doc.on_entity_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
-		ed_doc.on_node_will_delete.invoke(handle);
-		eng->remove_entity(eng->get_entity(handle));
+		ed_doc.on_entity_will_delete.invoke(handle);
+		eng->get_level()->destroy_entity(eng->get_entity(handle));
 		ed_doc.post_node_changes.invoke();
-		handle = 0;
+		handle = {};
 	}
 	std::string to_string() override {
 		return "CreateStaticMeshCommand";
 	}
 
-	uint64_t handle = 0;
+	EntityPtr<Entity> handle;
 	Model* m{};
 	glm::mat4 transform;
+	bool waiting_on_callback = false;
 };
 class CreateCppClassCommand : public Command
 {
@@ -203,26 +179,26 @@ public:
 
 	void execute() {
 		assert(ti);
-		auto ent = eng->spawn_entity_from_classtype(*ti);
+		auto ent = eng->get_level()->spawn_entity_from_classtype(*ti);
 		ent->set_ws_transform(transform);
 		ent->editor_name = ent->get_type().classname;
-		handle = ent->self_id.handle;
-		ed_doc.selection_state->set_select_only_this(ent->self_id);
-		ed_doc.on_node_created.invoke(handle);
+		handle = ent->get_self_ptr();
+		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
+		ed_doc.on_entity_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
-		ed_doc.on_node_will_delete.invoke(handle);
-		eng->remove_entity(eng->get_entity(handle));
+		ed_doc.on_entity_will_delete.invoke(handle);
+		eng->get_level()->destroy_entity(eng->get_entity(handle));
 		ed_doc.post_node_changes.invoke();
-		handle = 0;
+		handle = {};
 	}
 	std::string to_string() override {
 		return "CreateCppClassCommand";
 	}
 	const ClassTypeInfo* ti = nullptr;
 	glm::mat4 transform;
-	uint64_t handle = 0;
+	EntityPtr<Entity> handle;
 };
 
 class PropertyChangeCommand
@@ -241,35 +217,42 @@ private:
 	std::vector<std::string> fields;
 };
 
+
 class DuplicateEntitiesCommand : public Command
 {
 public:
-	DuplicateEntitiesCommand(std::vector<uint64_t> handles) {
+	DuplicateEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
 		std::vector<Entity*> ents;
 		for (auto h : handles) {
-			ents.push_back(eng->get_entity(h));
+			ents.push_back(h.get());
 		}
-		serialized_str = LevelSerialization::serialize_entities_to_string(ents);
+
+		ed_doc.validate_fileids_before_serialize();
+		scene = std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents));
 	}
 	void execute() {
-		auto duplicated = LevelSerialization::unserialize_entities_from_string(serialized_str);
-		eng->get_level()->insert_unserialized_entities_into_level(duplicated, true/*assign new ids*/);
+		auto duplicated = unserialize_entities_from_text(scene->text);
+		eng->get_level()->insert_unserialized_entities_into_level(duplicated);
 		handles.clear();
-		for (auto e : duplicated) {
-			ed_doc.on_node_created.invoke(e->self_id.handle);
-			handles.push_back(e->self_id.handle);
+		auto& objs = duplicated.get_objects();
+		for (auto& o : objs) {
+			if (auto e = o.second->cast_to<Entity>())
+			{
+				ed_doc.on_entity_created.invoke(e->get_self_ptr());
+				handles.push_back(e->get_self_ptr());
+			}
 		}
 		ed_doc.selection_state->clear_all_selected();
-		for (auto e : duplicated) {
-			ed_doc.selection_state->add_to_selection(e->self_id);
+		for (auto e : handles) {
+			ed_doc.selection_state->add_to_entity_selection(e);
 		}
 
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
 		for (auto h : handles) {
-			ed_doc.on_node_will_delete.invoke(h);
-			eng->remove_entity(eng->get_entity(h));
+			ed_doc.on_entity_will_delete.invoke(h);
+			h->destroy();
 		}
 
 		ed_doc.post_node_changes.invoke();
@@ -278,43 +261,48 @@ public:
 		return "DuplicateEntitiesCommand";
 	}
 
-	std::string serialized_str;
-	std::vector<uint64_t> handles;
+	std::unique_ptr<SerializedSceneFile> scene;
+	std::vector<EntityPtr<Entity>> handles;
 };
 
 class RemoveEntitiesCommand : public Command
 {
 public:
-	RemoveEntitiesCommand(std::vector<uint64_t> handles) {
+	RemoveEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
 		std::vector<Entity*> ents;
 		for (auto h : handles) {
 			ents.push_back(eng->get_entity(h));
 		}
-		serialized_str = LevelSerialization::serialize_entities_to_string(ents);
+
+		ed_doc.validate_fileids_before_serialize();
+		scene = std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents));
 
 		this->handles = handles;
 	}
 
 	void execute() {
 		for (auto h : handles) {
-			ed_doc.on_node_will_delete.invoke(h);
-			eng->remove_entity(eng->get_entity(h));
+			ed_doc.on_entity_will_delete.invoke(h);
+			h->destroy();
 		}
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
-		auto all_ents = LevelSerialization::unserialize_entities_from_string(serialized_str);
-		eng->get_level()->insert_unserialized_entities_into_level(all_ents, false/* keep ids*/);
-		for (auto e : all_ents)
-			ed_doc.on_node_created.invoke(e->self_id.handle);
+		auto restored = unserialize_entities_from_text(scene->text);
+		eng->get_level()->insert_unserialized_entities_into_level(restored);
+		auto& objs = restored.get_objects();
+		for (auto& o : objs) {
+			if (auto e = o.second->cast_to<Entity>())
+				ed_doc.on_entity_created.invoke(e->get_self_ptr());
+		}
 		ed_doc.post_node_changes.invoke();
 	}
 	std::string to_string() override {
 		return "RemoveEntitiesCommand";
 	}
 
-	std::string serialized_str;
-	std::vector<uint64_t> handles;
+	std::unique_ptr<SerializedSceneFile> scene;
+	std::vector<EntityPtr<Entity>> handles;
 };
 
 
@@ -362,6 +350,20 @@ Color32 to_color32(glm::vec4 v) {
 }
 
 
+void EditorDoc::validate_fileids_before_serialize()
+{
+	// first find max
+	auto level = eng->get_level();
+	auto& objs = level->get_all_objects();
+	for (auto o : objs)
+		if (o->creator_source == nullptr) {
+			file_id_start = std::max(file_id_start, uint32_t(o->unique_file_id));
+		}
+	for (auto o : objs)
+		if (o->creator_source == nullptr && o->unique_file_id == 0)
+			o->unique_file_id = get_next_file_id();
+
+}
 
 void EditorDoc::init()
 {
@@ -372,10 +374,21 @@ bool EditorDoc::save_document_internal()
 {
 	sys_print("*** saving map document\n");
 
-	std::string str = LevelSerialization::serialize_level(eng->get_level());
+	auto& all_objs = eng->get_level()->get_all_objects();
+
+	ed_doc.validate_fileids_before_serialize();
+
+	std::vector<Entity*> all_ents;
+	for (auto o : all_objs)
+		if(auto e = o->cast_to<Entity>())
+			all_ents.push_back(e);
+	auto serialized = serialize_entities_to_text(all_ents);
 	
-	auto outfile = FileSys::open_write_game(get_doc_name().c_str());
-	outfile->write(str.c_str(), str.size());
+	auto path = get_doc_name();
+	auto outfile = FileSys::open_write_game(path.c_str());
+	outfile->write(serialized.text.c_str(), serialized.text.size());
+
+	sys_print("``` Wrote out to %s\n", path.c_str());
 
 	return true;
 }
@@ -389,10 +402,7 @@ void EditorDoc::on_map_load_return(bool good)
 	else {
 		//set_doc_name(eng->get_level()->get_name());
 
-		if (is_editing_a_schema) {
-			if(schema_source)
-				eng->spawn_entity_schema(schema_source);
-		}
+		validate_fileids_before_serialize();
 
 		on_start.invoke();
 	}
@@ -405,7 +415,7 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 	else
 		is_editing_a_schema = false;
 
-	id_start = 0;
+	file_id_start = 0;
 
 	if (!is_editing_a_schema) {
 		bool needs_new_doc = true;
@@ -523,8 +533,11 @@ void EditorDoc::on_mouse_drag(int x, int y)
 		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
 		if (handle.is_valid()) {
 			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-			if (component_ptr && component_ptr->get_owner()) {
-				selection_state->add_to_selection(component_ptr->get_owner()->self_id);
+			if (component_ptr) {
+				auto owner = component_ptr->get_owner();
+				ASSERT(owner);
+				auto ptr = owner->get_self_ptr();
+				selection_state->add_to_entity_selection(ptr);
 			}
 		}
 	}
@@ -532,8 +545,11 @@ void EditorDoc::on_mouse_drag(int x, int y)
 		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
 		if (handle.is_valid()) {
 			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-			if (component_ptr && component_ptr->get_owner()) {
-				selection_state->remove_from_selection(component_ptr->get_owner()->self_id);
+			if (component_ptr) {
+				auto owner = component_ptr->get_owner();
+				ASSERT(owner);
+				auto ptr = owner->get_self_ptr();
+				selection_state->remove_from_selection(ptr);
 			}
 		}
 	}
@@ -551,12 +567,16 @@ void EditorDoc::on_mouse_down(int x, int y, int button)
 
 			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
 			if (component_ptr && component_ptr->get_owner()) {
+				auto owner = component_ptr->get_owner();
+				ASSERT(owner);
+				auto ptr = owner->get_self_ptr();
+
 				if (ImGui::GetIO().KeyShift)
-					selection_state->add_to_selection(component_ptr->get_owner()->self_id);
+					selection_state->add_to_entity_selection(ptr);
 				else if (ImGui::GetIO().KeyCtrl)
-					selection_state->remove_from_selection(component_ptr->get_owner()->self_id);
+					selection_state->remove_from_selection(ptr);
 				else
-					selection_state->set_select_only_this(component_ptr->get_owner()->self_id);
+					selection_state->set_select_only_this(ptr);
 			}
 		}
 
@@ -569,20 +589,17 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 	bool has_shift = key.keysym.mod & KMOD_SHIFT;
 	const float ORTHO_DIST = 20.0;
 	if (scancode == SDL_SCANCODE_DELETE) {
-		if (selection_state->has_any_selected() && !selection_state->get_ec_selected()) {
-			std::vector<uint64_t> handles;
-			auto& s = selection_state->get_selection();
-			for (auto e : s) handles.push_back(e.handle);
-			RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(handles);
+		if (selection_state->has_any_selected()) {
+			auto selected_handles = selection_state->get_selection_as_vector();
+		
+			RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(selected_handles);
 			command_mgr->add_command(cmd);
 		}
 	}
 	else if (scancode == SDL_SCANCODE_D && has_shift) {
-		if (selection_state->has_any_selected() && !selection_state->get_ec_selected()) {
-			std::vector<uint64_t> handles;
-			auto& s = selection_state->get_selection();
-			for (auto e : s) handles.push_back(e.handle);
-			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(handles);
+		if (selection_state->has_any_selected()) {
+			auto selected_handles = selection_state->get_selection_as_vector();;
+			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(selected_handles);
 			command_mgr->add_command(cmd);
 		}
 
@@ -834,24 +851,21 @@ void ManipulateTransformTool::update_pivot_and_cached()
 {
 	world_space_of_selected.clear();
 	auto& ss = ed_doc.selection_state;
-	if (ss->is_selecting_entity_component()) {
-		auto ec = ss->get_ec_selected();
-		world_space_of_selected.push_back(ec->get_ws_transform());
-	}
-	else if (ss->has_any_selected()) {
-		for (auto e : ss->get_selection()) {
+	if (ss->has_any_selected()) {
+		for (auto ehandle : ss->get_selection()) {
+			EntityPtr<Entity> e = { ehandle };
 			if(e.get())
-				world_space_of_selected.push_back(e.get()->get_ws_transform());
+				world_space_of_selected[e.handle]=(e.get()->get_ws_transform());
 		}
 	}
 	static bool selectFirstOnly = true;
 	if (world_space_of_selected.size() == 1 || (!world_space_of_selected.empty() && selectFirstOnly)) {
-		pivot_transform = world_space_of_selected[0];
+		pivot_transform = world_space_of_selected.begin()->second;
 	}
 	else if (world_space_of_selected.size() > 1) {
 		glm::vec3 v = glm::vec3(0.f);
-		for (int i = 0; i < world_space_of_selected.size(); i++) {
-			v += glm::vec3(world_space_of_selected[i][3]);
+		for (auto s: world_space_of_selected) {
+			v += glm::vec3(s.second[3]);
 		}
 		v /= (float)world_space_of_selected.size();
 		pivot_transform = glm::translate(glm::mat4(1), v);
@@ -974,15 +988,14 @@ void ManipulateTransformTool::update()
 	if (state == MANIPULATING_OBJS) {
 		// save off
 		auto& ss = ed_doc.selection_state;
-		if (ss->get_ec_selected()) {
-			glm::mat4 ws =  current_transform_of_group;
-			ss->get_ec_selected()->set_ws_transform(ws);
-		}
-		else {
+		{
 			auto& arr = ss->get_selection();
-			for (int i = 0; i < arr.size(); i++) {
-				glm::mat4 ws = current_transform_of_group * glm::inverse(pivot_transform) * world_space_of_selected[i];
-				arr[i].get()->set_ws_transform(ws);
+			for (auto elm : arr) {
+				ASSERT(world_space_of_selected.find(elm) != world_space_of_selected.end());
+				glm::mat4 ws = current_transform_of_group * glm::inverse(pivot_transform) * world_space_of_selected.find(elm)->second;
+				EntityPtr<Entity> e = { elm };
+				ASSERT(e.get());
+				e.get()->set_ws_transform(ws);
 			}
 		}
 	}
@@ -1034,12 +1047,7 @@ void EditorDoc::hook_scene_viewport_draw()
 					drop_transform)
 				);
 			}
-			else if (resource->type->get_asset_class_type()->is_a(Schema::StaticType)) {
-				command_mgr->add_command(new CreateSchemaCommand(
-					resource->filename,
-					drop_transform)
-				);
-			}
+	
 		}
 		ImGui::EndDragDropTarget();
 	}
@@ -1067,12 +1075,12 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 
 	ImGui::PushID(n);
 	{
-		const bool item_is_selected = ed_doc.selection_state->is_node_selected({ n->handle });
+		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr<Entity>{n->handle});
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (n->handle != 0) {
 				if(ImGui::GetIO().KeyShift)
-					ed_doc.selection_state->add_to_selection({ n->handle });
+					ed_doc.selection_state->add_to_entity_selection({ n->handle });
 				else
 					ed_doc.selection_state->set_select_only_this({ n->handle });
 			}
@@ -1081,7 +1089,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 		}
 		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[2]) {
 			ImGui::OpenPopup("outliner_ctx_menu");
-			ed_doc.selection_state->add_to_selection({ n->handle });
+			ed_doc.selection_state->add_to_entity_selection({ n->handle });
 			contextMenuHandle = n->handle;
 		}
 		if (ImGui::BeginPopup("outliner_ctx_menu")) {
@@ -1094,21 +1102,23 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				if (ImGui::Button("Parent To This")) {
 					auto me = eng->get_entity(contextMenuHandle);
 					auto& ents = ed_doc.selection_state->get_selection();
-					for (int i = 0; i < ents.size(); i++) {
-						if (ents[i].get() == me) continue;
-						auto transform = ents[i]->get_ws_transform();
-						ents[i]->parent_to_entity(me);
-						ents[i]->set_ws_transform(transform);
+					for (auto& ehandle : ents) {
+						EntityPtr<Entity> ptr = { ehandle };
+						if (ptr.get() == me) continue;
+						auto transform = ptr->get_ws_transform();
+						ptr->parent_to_entity(me);
+						ptr->set_ws_transform(transform);
 					}
 					contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Remove Parent")) {
 					auto& ents = ed_doc.selection_state->get_selection();
-					for (int i = 0; i < ents.size(); i++) {
-						auto transform = ents[i]->get_ws_transform();
-						ents[i]->parent_to_entity(nullptr);
-						ents[i]->set_ws_transform(transform);
+					for (auto& ehandle : ents) {
+						EntityPtr<Entity> ptr = { ehandle };
+						auto transform = ptr->get_ws_transform();
+						ptr->parent_to_entity(nullptr);
+						ptr->set_ws_transform(transform);
 					}
 					contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
@@ -1159,94 +1169,53 @@ void ObjectOutliner::draw()
 
 }
 
-void EdPropertyGrid::draw_components_R(EntityComponent* ec, float ofs)
+void EdPropertyGrid::draw_components(Entity* entity)
 {
-	if (ec->dont_serialize_or_edit_this())
-		return;
+	ASSERT(selected_component != 0);
+	ASSERT(eng->get_object(selected_component)->is_a<EntityComponent>());
+	ASSERT(eng->get_object(selected_component)->cast_to<EntityComponent>()->entity_owner == entity);
 
-	ImGui::TableNextRow();
-	ImGui::TableNextColumn();
+	auto draw_component = [&](Entity* e, EntityComponent* ec) {
+		ASSERT(ec && e && ec->get_owner() == e);
 
-	ImGui::PushID(ec);
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
 
-	ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-	if (ImGui::Selectable("##selectednode", ec == ed_doc.selection_state->get_ec_selected(), selectable_flags, ImVec2(0, 0))) {
-		on_select_component(ec);
-	}
+		ImGui::PushID(ec);
 
-	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-	{
-		dragging_component = ec;
-
-		ImGui::SetDragDropPayload("SetComponentParent",nullptr, 0);
-
-		ImGui::Text("Set parent of: %s", dragging_component->eSelfNameString.c_str());
-
-		ImGui::EndDragDropSource();
-	}
-	if (ImGui::BeginDragDropTarget())
-	{
-		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-		//if (payload->IsDataType("AssetBrowserDragDrop"))
-		//	sys_print("``` accepting\n");
-
-		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SetComponentParent");
-		if (payload) {
-			if (dragging_component != dragging_component->get_owner()->get_root_component() && ec != dragging_component) {
-				dragging_component->attach_to_parent(ec);
-			}
+		ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+		if (ImGui::Selectable("##selectednode", ec->instance_id == selected_component, selectable_flags, ImVec2(0, 0))) {
+			on_select_component(ec);
 		}
-		ImGui::EndDragDropTarget();
-	}
 
+		ImGui::SameLine();
+		ImGui::Dummy(ImVec2(5.f,1.0));
+		ImGui::SameLine();
+		ImGui::Text(ec->get_type().classname);
+		ImGui::PopID();
+	};
 
-	ImGui::SameLine();
-	ImGui::Dummy(ImVec2(ofs,1.0));
-	ImGui::SameLine();
-	ImGui::Text(ec->eSelfNameString.c_str());
-
-	for (int i = 0; i < ec->children.size(); i++) {
-		draw_components_R(ec->children[i], ofs + 10.0);
-	}
-
-	ImGui::PopID();
+	for (auto& c : entity->get_all_components())
+		draw_component(entity, c);
 }
 
-void set_component_default_name(EntityComponent* ec)
-{
-	std::unordered_set<std::string> names;
-	auto parent = ec->get_owner();
-	for (int i = 0; i < parent->get_all_components().size(); i++) {
-		names.insert(parent->get_all_components()[i]->eSelfNameString);
-	}
-	std::string wantname = ec->get_type().classname;
-	std::string testname = wantname;
-	int number = 2;
-	while (names.find(testname) != names.end())
-		testname = wantname + std::to_string(number++);
-	ec->eSelfNameString = testname;
-}
 
 void EdPropertyGrid::draw()
 {
+	auto& ss = ed_doc.selection_state;
 	if (ImGui::Begin("Properties")) {
-		if (ed_doc.selection_state->has_any_selected()) {
+		if (ed_doc.selection_state->has_only_one_selected()) {
 			grid.update();
 
-
 			if (grid.rows_had_changes) {
-				auto& ss = ed_doc.selection_state;
-				if (ss->is_selecting_entity_component()) {
-					auto c = ss->get_ec_selected();
-					c->post_change_transform_R();	// for good measure, call this, updates stuff if the transform was the changed property
-					c->editor_on_change_property();
-				}
-				else if (ss->num_entities_selected() == 1) {
-					auto e = ss->get_selection()[0].get();
-					assert(e->get_root_component());
-					e->get_root_component()->post_change_transform_R();
-					e->get_root_component()->editor_on_change_property();
-				}
+			
+				auto e = ss->get_only_one_selected();
+				e->editor_on_change_properties();
+				e->post_change_transform_R();
+				
+				auto ec = get_selected_component();
+				if (ec)
+					ec->editor_on_change_property();
 
 				on_property_change.invoke();
 
@@ -1262,19 +1231,17 @@ void EdPropertyGrid::draw()
 
 	if (ImGui::Begin("Components")) {
 
-		if (!ed_doc.selection_state->has_any_selected()) {
+		if (!ss->has_any_selected()) {
 			ImGui::Text("Nothing selected\n");
+			selected_component = 0;
 		}
-		else if (ed_doc.selection_state->num_entities_selected() != 1 && !ed_doc.selection_state->get_ec_selected()) {
+		else if (ss->has_only_one_selected()) {
 			ImGui::Text("Select 1 entity to see components\n");
+			selected_component = 0;
 		}
 		else {
 
-			Entity* ent = nullptr;
-			if (ed_doc.selection_state->get_ec_selected())
-				ent = ed_doc.selection_state->get_ec_selected()->get_owner();
-			else
-				ent = eng->get_entity(ed_doc.selection_state->get_selection()[0].handle);
+			Entity* ent = ss->get_only_one_selected().get();
 
 			if (ImGui::Button("Add Component")) {
 				ImGui::OpenPopup("addcomponentpopup");
@@ -1283,9 +1250,9 @@ void EdPropertyGrid::draw()
 				auto iter = ClassBase::get_subclasses<EntityComponent>();
 				for (; !iter.is_end(); iter.next()) {
 					if (ImGui::Selectable(iter.get_type()->classname)) {
-						auto ec = ent->create_and_attach_component_type(iter.get_type(), nullptr);
-
-						set_component_default_name(ec);
+						auto ec = ent->create_and_attach_component_type(iter.get_type());
+						ASSERT(ec);
+						selected_component = ec->instance_id;
 
 						ImGui::CloseCurrentPopup();
 					}
@@ -1293,44 +1260,37 @@ void EdPropertyGrid::draw()
 				ImGui::EndPopup();
 			}
 
-			uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
-			if (ImGui::BeginTable("animadfedBrowserlist", 1, ent_list_flags))
-			{
-				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
+			
+			auto& comps = ent->get_all_components();
+			if (comps.empty()) {
+				ImGui::Text("No components. Add one above.");
+			}
+			else {
 
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-				ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, Color32{ 59, 0, 135 }.to_uint());
-				ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-				if (ImGui::Selectable("##selectednode", ed_doc.selection_state->get_ec_selected()==nullptr, selectable_flags, ImVec2(0, 0))) {
-					if (ed_doc.selection_state->get_ec_selected() != nullptr)
-						ed_doc.selection_state->set_select_only_this(ed_doc.selection_state->get_ec_selected()->get_owner()->self_id);
-				}
-
-				ImGui::SameLine();
-				ImGui::Text(ent->get_type().classname);
-				auto& array = ent->get_all_components();
-				for (int row_n = 0; row_n < array.size(); row_n++)
+				uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+					ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
+				if (ImGui::BeginTable("animadfedBrowserlist", 1, ent_list_flags))
 				{
-					auto& res = array[row_n];		
-					if(res.get()->attached_parent.get()==nullptr)
-						draw_components_R(res.get(), 8.0);
+					ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
+
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, Color32{ 59, 0, 135 }.to_uint());
+					ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+
+					ImGui::SameLine();
+					ImGui::Text(ent->get_type().classname);
+
+					draw_components(ent);
+
+					ImGui::EndTable();
 				}
-				ImGui::EndTable();
 			}
 		}
 
 
 	}
 	ImGui::End();
-
-	if (wants_set_component) {
-		ed_doc.selection_state->set_entity_component_select(set_this_component);
-		set_this_component = nullptr;
-		wants_set_component = false;
-	}
-
 }
 
 class AssetPropertyEditor : public IPropertyEditor
@@ -1491,28 +1451,33 @@ void EdPropertyGrid::refresh_grid()
 	if (!ss->has_any_selected())
 		return;
 
+	if(ss->has_only_one_selected()) {
+		auto entity = ss->get_only_one_selected();
+		printf("adding to grid: %s\n", entity->get_type().classname);
 
-	if(ss->is_selecting_entity_component()) {
-		auto c = ss->get_ec_selected();
-		auto ti = &c->get_type();
-		while (ti) {
-			if (ti->props)
-				grid.add_property_list_to_grid(ti->props, c);
-			ti = ti->super_typeinfo;
-		}
-	}
-	else if(ss->num_entities_selected()==1){
-		auto entity = eng->get_entity(ss->get_selection()[0].handle);
 		auto ti = &entity->get_type();
 		while (ti) {
 			if (ti->props) {
-				grid.add_property_list_to_grid(ti->props, entity);
+				grid.add_property_list_to_grid(ti->props, entity.get());
 			}
 			ti = ti->super_typeinfo;
 		}
 
+		
+		auto& comps = entity->get_all_components();
 
-		auto c = entity->get_root_component();
+		if (selected_component == 0)
+			selected_component = comps[0]->instance_id;
+		if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<EntityComponent>() == nullptr ||
+			eng->get_object(selected_component)->cast_to<EntityComponent>()->get_owner() != entity.get())
+			selected_component = comps[0]->instance_id;
+
+		ASSERT(selected_component != 0);
+
+
+		auto c = eng->get_object(selected_component)->cast_to<EntityComponent>();
+		printf("adding to grid: %s\n", c->get_type().classname);
+
 		ASSERT(c);
 		ti = &c->get_type();
 		while (ti) {
@@ -1526,24 +1491,10 @@ void EdPropertyGrid::refresh_grid()
 
 SelectionState::SelectionState()
 {
-	ed_doc.on_node_will_delete.add(this, &SelectionState::on_node_deleted);
+	ed_doc.on_entity_will_delete.add(this, &SelectionState::on_node_deleted);
 	ed_doc.on_close.add(this, &SelectionState::on_close);
-	ed_doc.on_component_deleted.add(this, &SelectionState::on_entity_component_delete);
 }
 
-EntityNameDatabase_Ed::EntityNameDatabase_Ed()
-{
-	ed_doc.on_node_created.add(this, &EntityNameDatabase_Ed::on_add);
-	ed_doc.on_node_will_delete.add(this, &EntityNameDatabase_Ed::on_delete);
-	ed_doc.on_start.add(this, &EntityNameDatabase_Ed::on_start);
-	ed_doc.on_close.add(this, &EntityNameDatabase_Ed::on_close);
-
-	ed_doc.prop_editor->on_property_change.add(this, &EntityNameDatabase_Ed::on_property_change);
-}
-void EntityNameDatabase_Ed::invoke_change_name(uint64_t h)
-{
-	ed_doc.on_change_name.invoke(h);
-}
 
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {
@@ -1556,7 +1507,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 				glm::vec3 p(x, y, z + counter * 20);
 				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
 
-				auto ent = eng->spawn_entity_class<StaticMeshEntity>();
+				auto ent = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 				ent->Mesh->set_model(model.get());
 				ent->set_ws_transform(transform);
 				
@@ -1566,6 +1517,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 	counter++;
 }
 #include "Render/MaterialPublic.h"
+#if 0
 DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)
 {
 	for (int z = 0; z < 10; z++) {
@@ -1581,17 +1533,8 @@ DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)
 		}
 	}
 }
+#endif
 
-UndoRedoSystem::UndoRedoSystem() {
-	hist.resize(HIST_SIZE, nullptr);
-
-	ed_doc.gui->key_down_delegate.add(this, &UndoRedoSystem::on_key_event);
-}
-void UndoRedoSystem::on_key_event(const SDL_KeyboardEvent& key)
-{
-	if (key.keysym.scancode == SDL_SCANCODE_Z && key.keysym.mod & KMOD_CTRL)
-		undo();
-}
 
 EditorDoc::EditorDoc() {
 	gui = std::make_unique<EditorUILayout>();
@@ -1603,10 +1546,11 @@ EditorDoc::EditorDoc() {
 	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
 
 	command_mgr = std::make_unique<UndoRedoSystem>();
+	gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
+
 	selection_state = std::make_unique<SelectionState>();
 	prop_editor = std::make_unique<EdPropertyGrid>();
 	manipulate = std::make_unique<ManipulateTransformTool>();
 	outliner = std::make_unique<ObjectOutliner>();
-	database = std::make_unique<EntityNameDatabase_Ed>();
 
 }

@@ -1,23 +1,33 @@
 #pragma once
 #include "Framework/Util.h"
+
 #define WITH_TESTS
 
 #ifdef WITH_TESTS
 
-#if DONT_STOP_ON_ERROR
-#define TEST_VERIFY(condition) \
-	if(!condition) {\
-		return erCount + 1;\
+#define TEST_TRUE_COMMENT(code, comment) \
+	if(!(code)) { \
+		ProgramTester::get().set_test_failed(#code, comment); \
+		return; \
 	}
-#else
-#define TEST_VERIFY(condition) ASSERT(condition)
-#endif
 
+#define TEST_TRUE(code) \
+	TEST_TRUE_COMMENT(code, "expected true")
+
+	
+#define TEST_THROW(code) \
+	try { \
+		code; \
+		ProgramTester::get().set_test_failed(#code, "expected exception"); \
+		return; \
+	} \
+	catch (...) { \
+	} \
+
+
+typedef void(*test_func_t)();
 
 #include <vector>
-
-typedef int(*test_func_t)();
-
 class ProgramTester
 {
 public:
@@ -25,25 +35,44 @@ public:
 		static ProgramTester inst;
 		return inst;
 	}
-	void run_all();
-	void add_test(const char* name, test_func_t func) {
-		allTests.push_back({ name,func });
+	bool run_all(bool print_good);
+	void add_test(const char* category, const char* subcategory, test_func_t func) {
+		allTests.push_back({ category,subcategory, func });
 	}
+	void set_test_failed(const char* expression, const char* reason) {
+		test_failed = true;
+		this->expression = expression;
+		this->reason = reason;
+
+	}
+	bool get_is_in_test() const { return is_in_test; }
 private:
 	struct Test {
-		const char* strName = "";
+		const char* category = "";
+		const char* sub_category = "";
 		test_func_t func = nullptr;
 	};
 	std::vector<Test> allTests;
+	bool test_failed = false;
+	const char* expression = "";
+	const char* reason = "";
+	bool is_in_test = false;
+
 };
 
 struct AutoTestCaseAdd {
-	AutoTestCaseAdd(const char* name, test_func_t f) {
-		ProgramTester::get().add_test(name, f);
+	AutoTestCaseAdd(const char* name, const char* subcat, test_func_t f) {
+		ProgramTester::get().add_test(name,subcat, f);
 	}
 };
 
-#define ADD_TEST(func_name)  static AutoTestCaseAdd autotester_##func_name = AutoTestCaseAdd(#func_name,func_name);
+#define ADD_TEST(category, subcategory) void category##subcategory(); \
+static AutoTestCaseAdd autotester_##category##subcategory = AutoTestCaseAdd(#category,#subcategory, category##subcategory); \
+void category##subcategory()
+
 #else
-#define ADD_TEST(func_name);
+#define ADD_TEST(func_name, string_name) void  category##subcategory() {
+#define TEST_TRUE_COMMENT(code, comment)
+#define TEST_THROW(code)
+#define TEST_TRUE(code)
 #endif

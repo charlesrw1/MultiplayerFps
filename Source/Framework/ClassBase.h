@@ -191,7 +191,7 @@ public:
 	static void register_class(ClassTypeInfo* cti);
 
 	// called in main() after all classes have been reg'd
-	static void init();
+	static void init_class_reflection_system();
 	
 	// find a ClassTypeInfo by classname string
 	static const ClassTypeInfo* find_class(const char* classname);

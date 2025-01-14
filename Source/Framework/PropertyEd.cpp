@@ -294,7 +294,7 @@ bool StringEditor::can_reset()
 	ASSERT(prop->type == core_type_id::StdString);
 
 	auto str = (std::string*)((char*)instance + prop->offset);
-	*str != prop->range_hint;
+	return *str != prop->range_hint;
 }
 
 void StringEditor::reset_value()

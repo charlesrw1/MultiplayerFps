@@ -291,7 +291,7 @@
     <ClInclude Include="Source\Framework\Rect2d.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EditorDocLocal.h">
+    <ClInclude Include="Source\LevelEditor\EditorDocLocal.h">
       <Filter>Source\LevelEditor</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h">
@@ -515,7 +515,6 @@
     <ClInclude Include="Source\Input\InputAction.h" />
     <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
-    <ClInclude Include="Source\Game\Map.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
@@ -530,6 +529,8 @@
     <ClInclude Include="Source\DeferredSpawnScope.h" />
     <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
     <ClInclude Include="Source\BikeGame\Components\BikeAI.h" />
+    <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
+    <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -634,7 +635,7 @@
     <ClCompile Include="Source\Physics\Physics2.cpp">
       <Filter>Source\Physics</Filter>
     </ClCompile>
-    <ClCompile Include="Source\EditorDoc.cpp">
+    <ClCompile Include="Source\LevelEditor\EditorDoc.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp">
@@ -803,5 +804,13 @@
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
+    <ClCompile Include="Source\Framework\Util.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Old.cpp" />
+    <ClCompile Include="Source\Game\EntityTest.cpp" />
+    <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
+    <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
+    <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
   </ItemGroup>
 </Project>

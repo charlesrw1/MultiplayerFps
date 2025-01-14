@@ -43,12 +43,14 @@ struct ImGuiContext;
 class ClassTypeInfo;
 class GuiSystemPublic;
 class GameMode;
+class BaseUpdater;
 class GameEnginePublic
 {
 public:
 	virtual GameMode* get_gamemode() const = 0;
 	virtual Level* get_level() const = 0;
 	virtual Entity* get_entity(uint64_t handle) = 0;
+	virtual BaseUpdater* get_object(uint64_t handle) = 0;
 	virtual Entity* get_local_player() = 0;
 	virtual Entity* get_player_slot(uint32_t index) = 0;
 	virtual uint32_t get_local_player_slot() = 0;
@@ -73,23 +75,6 @@ public:
 
 	virtual void login_new_player(uint32_t index) = 0;
 	virtual void logout_player(uint32_t index) = 0;
-
-	template<typename T>
-	T* spawn_entity_class() {
-		static_assert(std::is_base_of<Entity, T>::value, "spawn_entity_class not derived from Entity");
-		Entity* e = spawn_entity_from_classtype(T::StaticType);
-		return (T*)e;
-	}
-	virtual Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti) = 0;
-	virtual Entity* spawn_entity_schema(const Schema* schema) = 0;
-	virtual void remove_entity(Entity* e) = 0;
-	template<typename T>
-	DeferredSpawnScope spawn_entity_class_deferred(T*& ptrOut) {
-		auto ptr = spawn_entity_class_deferred_internal(T::StaticType);
-		ptrOut = (T*)ptr;
-		return DeferredSpawnScope(ptr);
-	}
-
 
 	double get_game_time() const {
 		return time;
@@ -127,9 +112,6 @@ public:
 	double frame_time = 0.0;	// total frame time of program
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 1.0/60.0;	// 1/tick_rate
-
-private:
-	virtual Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) = 0;
 };
 
 

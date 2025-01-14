@@ -4,6 +4,8 @@
 #include <type_traits>
 #include <cassert>
 #include <memory>
+#include "Framework/Util.h"
+
 template<typename T, uint32_t INLINE_COUNT>
 class InlineVec
 {
@@ -50,11 +52,11 @@ public:
     }
 
     const T& operator[](SIZE_TYPE index) const {
-        assert(index < size());
+        ASSERT(index < size());
         return data()[index];
     }
     T& operator[](SIZE_TYPE index) {
-        assert(index < size());
+        ASSERT(index < size());
         return data()[index];
     }
 

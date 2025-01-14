@@ -828,15 +828,15 @@ void GameEngineLocal::leave_level()
 }
 
 
-void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, Level* loadedLevel)
+void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, LevelAsset* loadedLevel)
 {
 	GetAssets().remove_unreferences();
 
-	this->level = loadedLevel;
+	ASSERT(!level);
 
 	is_loading_editor_level = false;
 
-	if (!level) {
+	if (!loadedLevel) {
 		sys_print("!!! couldn't load map !!!\n");
 		state = Engine_State::Idle;
 
@@ -844,50 +844,30 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, Level* loa
 		return;
 	}
 
-	if (!this_is_for_editor) {
-		level->world_settings = level->find_first_of<WorldSettings>();
-		const ClassTypeInfo* gamemode_type = {};
-		if (!level->world_settings || !level->world_settings->gamemode_type.ptr)
-			gamemode_type = ClassBase::find_class(g_default_gamemode.get_string());
-		else
-			gamemode_type = level->world_settings->gamemode_type.ptr;
-
-		assert(gamemode_type);
-		assert(gamemode_type->is_a(GameMode::StaticType));
-
-		assert(!gamemode);
-		gamemode = (GameMode*)gamemode_type->allocate();
-
-		// call init on game mode
-		gamemode->init();
-	}
-
-	// registers components
-	// calls start() if this is not an editor level
-	level->init_entities_post_load();
-
-	if (!this_is_for_editor)
-		gamemode->start();
+	// constructor initializes level state
+	this->level = std::make_unique<Level>(loadedLevel, this_is_for_editor);
 
 	tick = 0;
 	time = 0.0;
 	set_tick_rate(60.f);
 
+	auto world_settings = level->get_world_settings();
+
 	// spawn in the player
 	if (!this_is_for_editor) {
 		const ClassTypeInfo* player_type = {};
-		if (!level->world_settings || !level->world_settings->player_type.ptr)
+		if (!world_settings || !world_settings->player_type.ptr)
 			player_type = ClassBase::find_class(g_default_playerclass.get_string());
 		else
-			player_type = level->world_settings->player_type.ptr;
+			player_type = world_settings->player_type.ptr;
 
 		assert(player_type);
 		assert(player_type->is_a(PlayerBase::StaticType));
 
-		auto p = spawn_entity_from_classtype(*player_type);
-		level->local_player_id = p->self_id.handle;
+		auto p = level->spawn_entity_from_classtype(*player_type);
+		level->set_local_player(p);
 
-		gamemode->on_player_create(0, (Player*)p);
+		level->get_gamemode()->on_player_create(0, (Player*)p);
 	}
 
 	idraw->on_level_start();
@@ -909,7 +889,7 @@ void GameEngineLocal::execute_map_change()
 
 	// free current map
 	stop_game();
-	assert(!level);
+	ASSERT(!level);
 
 	// try loading map
 	const bool this_is_for_editor = is_in_an_editor_state();
@@ -917,19 +897,18 @@ void GameEngineLocal::execute_map_change()
 
 	// special name to create a map
 	if (this_is_for_editor && queued_mapname == "__empty__") {	
-		auto levelLoaded = LevelSerialization::create_empty_level("empty.txt", true/* is for editor*/);
-		assert(levelLoaded);
+
+		// not memory leak, gets cleaned up
+		LevelAsset* temp = new LevelAsset;
+		GetAssets().install_system_asset(temp, "empty.txt");
 		
-		on_map_change_callback(this_is_for_editor, levelLoaded);
+		on_map_change_callback(true /* == this_is_for_editor */, temp);
 	}
 	else {
 
-		GetAssets().find_async<Level>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
+		GetAssets().find_async<LevelAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
 			{
-				auto level = (ptr)?ptr.cast_to<Level>():nullptr;
-				if (level) {
-					level->set_editor_level(this_is_for_editor);
-				}
+				auto level = (ptr)?ptr.cast_to<LevelAsset>():nullptr;
 				eng_local.on_map_change_callback(this_is_for_editor, level.get());
 
 			}, 0 /* default lifetime channel 0*/);
@@ -1354,7 +1333,7 @@ void GameEngineLocal::init()
 	program_time_start = GetTime();
 
 	// initialize class reflection/creation system
-	ClassBase::init();
+	ClassBase::init_class_reflection_system();
 
 
 	level = nullptr;
@@ -1474,10 +1453,6 @@ void GameEngineLocal::game_update_tick()
 
 	time = tick * tick_interval;
 	//build_physics_world(0.f);
-	
-	// tick the gamemode
-	if (!level->is_editor_level())
-		gamemode->tick();
 
 	// update entities+components
 	level->update_level();
@@ -1532,25 +1507,11 @@ void GameEngineLocal::stop_game()
 
 	ASSERT(level);
 
-	// hook any system calls
+		// hook any system calls
 	idraw->on_level_end();
 
-	const bool is_this_editor_level = level->is_editor_level();
-	ASSERT(is_this_editor_level == (gamemode==nullptr));
-	if (!is_this_editor_level) {
-		gamemode->end();
-		// delete gamemode
-		delete gamemode;
-		gamemode = nullptr;
-	}
-	for (auto ent : level->all_world_ents) {
-		ent->destroy();	// calls end() if not editor level and unregisters all components
-		delete ent;	// call destructor
-	}
-
-	GetAssets().explicit_asset_free(level);
-
-	GetAssets().unreference_this_channel(0);
+	level->close_level();
+	level.reset();
 
 	// clear any debug shapes
 	DebugShapeCtx::get().fixed_update_start();

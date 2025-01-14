@@ -18,14 +18,15 @@ public:
 
 	virtual ~EntityComponent() override;
 
+	void destroy();
+
 private:
-	void init();
-	void deinit(bool destruct_subcomponents);
 
 	// callbacks
 	// called after component had properties unserialized
 	// use to get handles, setup state
 	virtual void on_init() {}
+
 	// called when component is being removed, remove all handles
 	virtual void on_deinit() {}
 
@@ -36,18 +37,9 @@ public:
 	// components are ticked every frame (todo)
 	virtual void update() override {}
 
-	// physics functions, only used if the item is adding itself to the physics system
-	// kinda an OOP bubble up issue but whatev
-
-
-	void set_owner(Entity* owner) { entity_owner = owner; }
+	// entity owner of this component
 	Entity* get_owner() const { return entity_owner; }
 
-	// destruction functions
-	void attach_to_parent(EntityComponent* parent_component, StringName point = StringName());
-	void remove_this(EntityComponent* child_component);	// not destructuve, better name is unlink_this()
-	void unlink_from_parent();
-	void post_unserialize_created_component(Entity* owner_ent);
 
 #ifndef NO_EDITOR
 	// compile any data relevant to the node
@@ -57,89 +49,42 @@ public:
 	bool editor_is_editor_only = false;	// set in CTOR
 #endif
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(EntityComponent)
-			REG_VEC3(position, PROP_DEFAULT),
-			REG_QUAT(rotation, PROP_DEFAULT),
-			REG_VEC3(scale, PROP_DEFAULT),
-			REG_BOOL(is_force_root, PROP_SERIALIZE, "0"),
-			REG_ENTITY_COMPONENT_PTR(attached_parent, PROP_SERIALIZE ),
-			REG_STDSTRING(eSelfNameString, PROP_DEFAULT | PROP_EDITOR_ONLY),
-			REG_STDSTRING(eAttachedBoneName, PROP_DEFAULT | PROP_EDITOR_ONLY)
-		END_PROPS(EntityComponent)
-	}
-
-	// ws = world space, ls = local space
-	void set_ls_transform(const glm::mat4& transform);
-	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
-	void set_ls_euler_rotation(const glm::vec3& euler);
-	glm::mat4 get_ls_transform() const;
-	glm::vec3 get_ls_position() const { return position; }
-	glm::vec3 get_ls_scale() const { return scale; }
-	glm::quat get_ls_rotation() const { return rotation; }
-	
-	void set_ws_transform(const glm::mat4& transform);
-	void set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
-	const glm::mat4& get_ws_transform();
-	glm::vec3 get_ws_position()  { 
-		if (!attached_parent.get())
-			return position;
-		auto& ws = get_ws_transform();
-		return ws[3];
-	}
-	glm::quat get_ws_rotation() { 
-		if (!attached_parent.get())
-			return rotation;
-		auto& ws = get_ws_transform();
-		return glm::quat_cast(ws);
-	}
-	glm::vec3 get_ws_scale() {
-		if (!attached_parent.get())
-			return scale;
-		// fixme
-		return glm::vec3(1.f);
-	}
-
-	const EntityComponent* get_parent_component() const {
-		return attached_parent.get();
-	}
+	static const PropertyInfoList* get_props() = delete;
 
 	bool get_is_native_component() const { return is_native_componenent; }
 
-	void post_change_transform_R(bool ws_is_dirty = true);
-
-	std::string eSelfNameString;
-	std::string eAttachedBoneName;
-
 	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
-protected:
-	bool get_has_initialized() const {
-		return has_initialized;
+
+	const glm::mat4& get_ws_transform();
+	glm::vec3 get_ws_position() {
+		return get_ws_transform()[3];
 	}
+
+protected:
+
 private:
 
-	glm::vec3 position = glm::vec3(0.f);
-	glm::quat rotation = glm::quat();
-	glm::vec3 scale = glm::vec3(1.f);
+	void set_owner(Entity* e) {
+		ASSERT(entity_owner == nullptr);
+		entity_owner = e;
+	}
 
-	glm::mat4 cached_world_transform = glm::mat4(1);
+	void initialize_internal();
+
+	void destroy_internal();
 
 	Entity* entity_owner = nullptr;
-	ObjPtr<EntityComponent> attached_parent;
-	std::vector<EntityComponent*> children;
-	std::vector<StringName> tags;
 
-	bool world_transform_is_dirty = true;
 	bool is_native_componenent = true;
 	bool is_editor_only = false;
 	bool is_inherited = true;
 	bool is_force_root = false;
-	bool has_initialized = false;
 
 	friend class Schema;
 	friend class Entity;
 	friend class EdPropertyGrid;
 	friend class LevelSerialization;
+	friend class Level;
 
 public:
 	// expose this publically so you can set this in constructors or wherever

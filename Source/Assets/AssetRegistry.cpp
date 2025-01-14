@@ -100,18 +100,8 @@ void AssetRegistrySystem::reindex_all_assets()
 		root->addPath(a,path);
 	}
 }
-#include "Test/Test.h"
-#ifdef WITH_TESTS
-int ReindexAssetTest()
-{
-	int erCount = 0;
-	{
-		AssetRegistrySystem::get().reindex_all_assets();
-	}
-	return erCount;
-}
-ADD_TEST(ReindexAssetTest);
-#endif
+
+
 const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::string& ext)
 {
 	for (auto& type : all_assettypes) {

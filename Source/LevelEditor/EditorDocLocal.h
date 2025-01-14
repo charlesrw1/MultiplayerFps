@@ -1,6 +1,6 @@
 #pragma once
 #include "IEditorTool.h"
-
+#include "CommandMgr.h"
 #include "glm/glm.hpp"
 #include "Render/Model.h"
 #include "Types.h"
@@ -26,72 +26,12 @@
 
 #include "AssetCompile/Someutils.h"
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
+
+
 extern ConfigVar g_mousesens;
 
-class Command
-{
-public:
-	virtual ~Command() {}
-	virtual void execute() = 0;
-	virtual void undo() = 0;
-	virtual std::string to_string() = 0;
-	virtual bool is_valid() { return true; }
-};
-
-class UndoRedoSystem
-{
-public:
-	UndoRedoSystem();
-
-	void on_key_event(const SDL_KeyboardEvent& k);
-
-	void clear_all() {
-		for (int i = 0; i < hist.size(); i++) {
-			delete hist[i];
-			hist[i] = nullptr;
-		}
-	}
-	void add_command(Command* c) {
-
-		if (!c->is_valid()) {
-			sys_print("??? command not valid %s\n", c->to_string().c_str());
-			delete c;
-			return;
-		}
-
-		if (hist[index]) {
-			delete hist[index];
-		}
-		hist[index] = c;
-		index += 1;
-		index %= HIST_SIZE;
-
-		sys_print("``` Executing: %s\n", c->to_string().c_str());
-
-		c->execute();
-	}
-	void undo() {
-		index -= 1;
-		if (index < 0) index = HIST_SIZE - 1;
-		if (hist[index]) {
-
-			sys_print("``` Undoing: %s\n", hist[index]->to_string().c_str());
-
-
-			hist[index]->undo();
-			delete hist[index];
-			hist[index] = nullptr;
-		}
-		else {
-			sys_print("*** nothing to undo\n");
-		}
-	}
-
-
-	const int HIST_SIZE = 128;
-	int index = 0;
-	std::vector<Command*> hist;
-};
 
 enum TransformType
 {
@@ -115,11 +55,14 @@ private:
 		rootnode = new Node;
 
 		auto level = eng->get_level();
-		for (auto ent : level->all_world_ents) {
-			auto rootc = ent->get_root_component();
-			if (!rootc->get_parent_component()) {
-				Node* me = new Node(this, ent);
-				rootnode->add_child(me);
+		auto& all_objs = level->get_all_objects();
+		for (auto ent : all_objs) {
+			if (Entity* e = ent->cast_to<Entity>()) {
+				if (!e->get_entity_parent())
+				{
+					Node* me = new Node(this, e);
+					rootnode->add_child(me);
+				}
 			}
 		}
 		rootnode->sort_children();
@@ -148,14 +91,11 @@ private:
 	struct Node {
 		Node() {}
 		Node(ObjectOutliner* oo, Entity* initfrom) {
-			handle = initfrom->self_id.handle;
-			for (int i = 0; i < initfrom->get_all_components().size(); i++) {
-				auto c = initfrom->get_all_components()[i].get();
-				if (c->get_owner() != initfrom && c->get_owner() != nullptr)
-				{
-					Node* other = new Node(oo, c->get_owner());
-					add_child(other);
-				}
+			handle = initfrom->instance_id;
+			auto& children = initfrom->get_all_children();
+			for (auto& c : children) {
+				Node* other = new Node(oo, c);
+				add_child(other);
 			}
 			sort_children();
 			oo->map.insert({ handle, this });
@@ -205,16 +145,20 @@ private:
 	}
 	void refresh_grid();
 
-	bool wants_set_component = false;
-	EntityComponent* set_this_component = nullptr;
+	uint64_t selected_component = 0;
 
 	void on_select_component(EntityComponent* ec) {
-		set_this_component = ec;
-		wants_set_component = true;
+		selected_component = ec->instance_id;
 	}
-	void draw_components_R(EntityComponent* ec, float ofs);
 
-	EntityComponent* dragging_component = nullptr;
+	EntityComponent* get_selected_component() const {
+		if (selected_component == 0) return nullptr;
+		auto o = eng->get_object(selected_component);
+		if (!o) return nullptr;
+		return o->cast_to<EntityComponent>();
+	}
+	
+	void draw_components(Entity* entity);
 
 	PropertyGrid grid;
 
@@ -263,109 +207,106 @@ class SelectionState
 public:
 	SelectionState();
 
-
 	MulticastDelegate<> on_selection_changed;
 
-	// set only selected
-	// clear selected
-	// unselect
-	// add to selected
-	// get selected
-
-
 	bool has_any_selected() const {
-		return ec != nullptr || ptrs.size() > 0;
+		return !selected_entity_handles.empty();
 	}
-	bool is_selecting_entity_component() const {
-		return ec != nullptr;
-	}
+
 	int num_entities_selected() const {
-		return ptrs.size();
+		return selected_entity_handles.size();
 	}
 
-	const std::vector<EntityPtr<Entity>>& get_selection() const { return ptrs; }
-	EntityComponent* get_ec_selected() const { return ec; }
-
-	void set_entity_component_select(EntityComponent* ec) {
-		ptrs.clear();
-		this->ec = ec;
-		on_selection_changed.invoke();
-	}
-	void unselect_ent_component() {
-		ec = nullptr;
-		on_selection_changed.invoke();
+	bool has_only_one_selected() const {
+		return num_entities_selected() == 1;
 	}
 
-	void add_to_selection(EntityPtr<Entity> node) {
-		ec = nullptr;
-		bool already_selected = is_node_selected(node);
+	EntityPtr<Entity> get_only_one_selected() const {
+		ASSERT(has_only_one_selected());
+		return { *selected_entity_handles.begin() };
+	}
+
+	const std::unordered_set<uint64_t>& get_selection() const { return selected_entity_handles; }
+	std::vector<EntityPtr<Entity>> get_selection_as_vector() const {
+		std::vector<EntityPtr<Entity>> out;
+		for (auto e : selected_entity_handles) {
+			out.push_back({ e });
+			ASSERT(eng->get_object(e)->is_a<Entity>());
+		}
+		return out;
+	}
+
+	void add_to_entity_selection(EntityPtr<Entity> ptr) {
+		ASSERT(eng->get_object(ptr.handle) && eng->get_object(ptr.handle)->is_a<Entity>());
+
+
+		bool already_selected = is_entity_selected(ptr);
 		if (!already_selected) {
-			node.get()->selectedInEditor = true;
-			node.get()->set_ws_transform(node.get()->get_ws_transform());
+			auto e = eng->get_entity(ptr.handle);
+			e->selected_in_editor = true;
+			e->set_ws_transform(e->get_ws_transform());
 
-			ptrs.push_back(node);
+			selected_entity_handles.insert(ptr);
+
 			on_selection_changed.invoke();
 		}
 	}
-	void remove_from_selection(EntityPtr<Entity> node) {
-		ec = nullptr;
-		node.get()->selectedInEditor = false;
-		node.get()->set_ws_transform(node.get()->get_ws_transform());
-
-		for(int i=0;i<ptrs.size();i++)
-			if (ptrs[i].handle == node.handle) {
-				ptrs.erase(ptrs.begin() + i);
-				i--;
-				on_selection_changed.invoke();
-			}
+	void add_to_entity_selection(Entity* e) {
+		return add_to_entity_selection(e->get_self_ptr());
 	}
-	void clear_all_selected(bool show_this = true) {
-		for (int i = 0; i < ptrs.size(); i++)
-			if (ptrs[i].get()) {
-				ptrs[i].get()->selectedInEditor = false;
-				ptrs[i].get()->set_ws_transform(ptrs[i].get()->get_ws_transform());
+
+	void remove_from_selection(EntityPtr<Entity> ptr) {
+
+		auto e = ptr.get();
+
+		ASSERT(e);
+		e->selected_in_editor = false;
+		e->set_ws_transform(e->get_ws_transform());
+
+		selected_entity_handles.erase(ptr.handle);
+		on_selection_changed.invoke();
+	}
+	void remove_from_selection(Entity* e) {
+		remove_from_selection(e->get_self_ptr());
+	}
+
+	void clear_all_selected() {
+		for (auto o : selected_entity_handles) {
+			auto e = eng->get_entity(o);
+			if (e) {
+				e->selected_in_editor = false;
+				e->set_ws_transform(e->get_ws_transform());
 			}
-		ptrs.clear();
-		if (ec) {
-			ec->get_owner()->selectedInEditor = false;
-			ec->get_owner()->set_ws_transform(ec->get_owner()->get_ws_transform());
 		}
-		ec = nullptr;
+		selected_entity_handles.clear();
+		
 		on_selection_changed.invoke();
 	}
-	void set_select_only_this(EntityPtr<Entity> node) {
+	void set_select_only_this(EntityPtr<Entity> ptr) {
 		clear_all_selected();
-		add_to_selection(node);
+		add_to_entity_selection(ptr);
 	}
-	void set_select_only_this(EntityComponent* ec) {
-		clear_all_selected();
-		this->ec = ec;
-		on_selection_changed.invoke();
+	void set_select_only_this(Entity* e) {
+		set_select_only_this(e->get_self_ptr());
 	}
 
-	bool is_node_selected(EntityPtr<Entity> node) const {
-		for (int i = 0; i < ptrs.size(); i++)
-			if (ptrs[i].handle == node.handle)
-				return true;
-		return false;
+	bool is_entity_selected(EntityPtr<Entity> ptr) const {
+		return selected_entity_handles.find(ptr.handle) != selected_entity_handles.end();
+	}
+	bool is_entity_selected(Entity* e) const {
+		return is_entity_selected(e->get_self_ptr());
 	}
 private:
-	void on_node_deleted(uint64_t node) {
-		remove_from_selection({ node });
+	void on_node_deleted(EntityPtr<Entity> ptr) {
+		remove_from_selection(ptr);
 	}
-	void on_entity_component_delete(EntityComponent* ec) {
-		if (ec == this->ec)
-			unselect_ent_component();
-	}
-
+	
 	void on_close() {
-		ptrs.clear();
-		ec = nullptr;
+		selected_entity_handles.clear();
 		on_selection_changed.invoke();
 	}
 
-	EntityComponent* ec = nullptr;
-	std::vector<EntityPtr<Entity>> ptrs;
+	std::unordered_set<uint64_t> selected_entity_handles;
 };
 
 class ManipulateTransformTool
@@ -407,7 +348,7 @@ private:
 	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
 	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
 
-	std::vector<glm::mat4> world_space_of_selected; // pre transform, ie transform of them is 
+	std::unordered_map<uint64_t,glm::mat4> world_space_of_selected; // pre transform, ie transform of them is 
 	glm::mat4 current_transform_of_group = glm::mat4(1.0);
 	glm::mat4 pivot_transform = glm::mat4(1.f);
 	
@@ -417,69 +358,6 @@ private:
 	float scale_snap = 1.0;
 	bool has_rotation_snap = false;
 	float rotation_snap = 15.0;
-};
-
-// maps/
-//	both prefabs and maps
-//	build_<map_name>/
-//		cubemaps,...
-#include <unordered_map>
-#include <unordered_set>
-class EntityNameDatabase_Ed
-{
-public:
-	std::string find_unique_name_for_name(bool& different_name, std::string wantname) {
-		different_name = false;
-		if (wantname.empty()) {
-			different_name = true;
-			wantname = "_";
-		}
-		std::string search_name = wantname;
-		int integer = 2;
-		while (all_names.find(search_name) != all_names.end()) {
-			search_name = wantname + std::to_string(integer++);
-			different_name = true;
-		}
-		return search_name;
-	}
-
-	EntityNameDatabase_Ed();
-	std::unordered_set<std::string> all_names;
-	std::unordered_map<uint64_t, std::string> id_to_name;
-
-	void index_all_names() {
-		for (auto ent : eng->get_level()->all_world_ents) {
-			bool changed_name = false;
-			ent->editor_name = find_unique_name_for_name(changed_name, ent->editor_name);
-			all_names.insert(ent->editor_name);
-			id_to_name.insert({ ent->self_id.handle, ent->editor_name });
-			if(changed_name)
-				invoke_change_name(ent->self_id.handle);
-		}
-	}
-
-	void on_start() {
-		index_all_names();
-	}
-	void on_close() {
-		all_names.clear();
-		id_to_name.clear();
-	}
-	void on_delete(uint64_t h) {
-		all_names.erase(id_to_name.find(h)->second);
-	}
-	void on_add(uint64_t h) {
-		auto ent = eng->get_entity(h);
-		bool changed_name = false;
-		ent->editor_name = find_unique_name_for_name(changed_name, ent->editor_name);
-		all_names.insert(ent->editor_name);
-		id_to_name.insert({ ent->self_id.handle, ent->editor_name });
-		if(changed_name)
-			invoke_change_name(ent->self_id.handle);
-	}
-	void invoke_change_name(uint64_t h);
-
-	void on_property_change() {}
 };
 
 class EditorUILayout;
@@ -495,7 +373,7 @@ public:
 	virtual bool save_document_internal() override;
 
 	const ClassTypeInfo& get_asset_type_info() const override {
-		return Level::StaticType;
+		return LevelAsset::StaticType;
 	}
 
 	virtual void tick(float dt) override;
@@ -551,7 +429,6 @@ public:
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<ObjectOutliner> outliner;
-	std::unique_ptr<EntityNameDatabase_Ed> database;
 	std::unique_ptr<EditorUILayout> gui;
 
 	bool using_ortho = false;
@@ -561,8 +438,8 @@ public:
 
 	MulticastDelegate<EntityComponent*> on_component_deleted;
 	MulticastDelegate<EntityComponent*> on_component_created;
-	MulticastDelegate<uint64_t> on_node_will_delete;	// called before its deleted
-	MulticastDelegate<uint64_t> on_node_created;	// after creation
+	MulticastDelegate<EntityPtr<Entity>> on_entity_will_delete;	// called before its deleted
+	MulticastDelegate<EntityPtr<Entity>> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
 
 	MulticastDelegate<> on_start;
@@ -570,13 +447,15 @@ public:
 	MulticastDelegate<uint64_t> on_change_name;
 
 	// Inherited via IEditorTool
+
+	void validate_fileids_before_serialize();
 private:
 
 	void on_mouse_drag(int x, int y);
 
-	uint32_t get_next_id() {
-		return id_start++;
+	uint32_t get_next_file_id() {
+		return ++file_id_start;
 	}
 
-	uint32_t id_start = 0;
+	uint32_t file_id_start = 0;
 };

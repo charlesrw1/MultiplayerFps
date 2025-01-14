@@ -35,6 +35,7 @@
 #include "Render/Model.h"
 
 #include "Game/EntityComponent.h"
+#include "Game/Entity.h"
 
 #include "Render/DrawPublic.h"
 
@@ -189,7 +190,7 @@ public:
 			if (physActor) {
 				auto ec = physActor->get_entity_owner();
 				if (ec)
-					ec->set_ws_transform(physActor->get_transform());
+					ec->get_owner()->set_ws_transform(physActor->get_transform());
 			}
 		}
 

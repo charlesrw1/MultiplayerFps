@@ -16,56 +16,55 @@
 
 #include "Framework/Hashset.h"
 #include "Framework/ScopedBoolean.h"
+#include "DeferredSpawnScope.h"
+
+#include "LevelSerialization/SerializationAPI.h"
 
 class PhysicsActor;
 class WorldSettings;
-CLASS_H(Level, IAsset)
+
+CLASS_H(LevelAsset, IAsset)
 public:
-	Level();
+	// IAsset overrides
+	void sweep_references() const override {}
+	bool load_asset(ClassBase*& user) override;
+	void post_load(ClassBase*) override {}
+	void uninstall() override {}
+	void move_construct(IAsset*) override {}
+
+	std::unique_ptr<UnserializedSceneFile> sceneFile;
+};
+
+class Entity;
+class GameMode;
+class Level
+{
+public:
+
+	// constructed in GameEngineLocal::on_map_change_callback
+	// this starts the level, essentially
+
+	Level(LevelAsset* source, bool is_editor);
 	~Level();
 
 	// only call once after initialization
 	void init_entities_post_load();
 
-	// will call spawn funcs
-	void insert_unserialized_entities_into_level(std::vector<Entity*> ents, bool assign_new_ids = false);
+	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids = nullptr); // was bool assign_new_ids=false
 
-	bool is_editor_level() const {
-		return bIsEditorLevel;
-	}
+	// ends the level
+	void close_level();
+
+	void update_level();
 	
-	hash_set<BaseUpdater> tick_list;
-
 	void add_to_update_list(BaseUpdater* b) {
 		if (b_is_in_update_tick.get_value())
 			wantsToAddToUpdate.push_back(b);
 		else
 			tick_list.insert(b);
 	}
+
 	void remove_from_update_list(BaseUpdater* b);
-
-
-	void update_level() {
-		{
-			BooleanScope scope(b_is_in_update_tick);
-
-			for (auto updater : tick_list)
-				updater->update();
-		}
-
-		for (auto want : wantsToAddToUpdate) {
-			if (want)
-				tick_list.insert(want);
-		}
-		wantsToAddToUpdate.clear();
-	}
-
-
-	// all entities in the map
-	hash_map<Entity*> all_world_ents;
-	uint64_t last_id = 0;
-	uint64_t local_player_id = 0;
-	const WorldSettings* world_settings = nullptr;	// the world settings entity, shouldnt be nullptr
 
 	template<typename T, size_t COUNT>
 	bool find_all_entities_of_class(InlineVec<T*, COUNT>& out) {
@@ -76,6 +75,7 @@ public:
 		}
 		return out.size() != 0;
 	}
+
 	template<typename T>
 	T* find_first_of() {
 		static_assert(std::is_base_of<Entity, T>::value, "find_first_of needs T=Entity subclass");
@@ -86,79 +86,92 @@ public:
 		return nullptr;
 	}
 
-	void insert_entity_into_hashmap(Entity* e);
-	void remove_entity_handle(uint64_t handle) {
-#ifdef _DEBUG
-		auto ent = all_world_ents.find(handle);
-		if (!ent) {
-			sys_print("??? remove_entity_handle: entity does not exist in hashmap, double delete?\n");
-		}
-#endif // _DEBUG
-		all_world_ents.remove(handle);
+	// destroy an entity, calls desroy_internal(), deletes, removes from list
+	void destroy_entity(Entity* e);
+	
+	void destroy_component(EntityComponent* e);
+
+	Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti);
+	
+	template<typename T>
+	T* spawn_entity_class() {
+		static_assert(std::is_base_of<Entity, T>::value, "spawn_entity_class not derived from Entity");
+		Entity* e = spawn_entity_from_classtype(T::StaticType);
+		return (T*)e;
 	}
 
-	Entity* get_local_player() const {
-		return all_world_ents.find(local_player_id);
+	template<typename T>
+	DeferredSpawnScope spawn_entity_class_deferred(T*& ptrOut) {
+		auto ptr = spawn_entity_class_deferred_internal(T::StaticType);
+		ptrOut = (T*)ptr;
+		return DeferredSpawnScope(ptr);
 	}
-	Entity* get_entity(uint64_t handle) {
+
+	void add_and_init_created_runtime_component(EntityComponent* c);
+
+	Entity* get_local_player() const {
+		return all_world_ents.find(local_player_id)->cast_to<Entity>();
+	}
+
+	BaseUpdater* get_entity(uint64_t handle) {
 		return all_world_ents.find(handle);
 	}
 
+	void set_local_player(Entity* e);
+
+	LevelAsset* get_source_asset() const {
+		return source_asset;
+	}
+
+	GameMode* get_gamemode() const {
+		return gamemode.get();
+	}
+
+	const WorldSettings* get_world_settings() const {
+		return world_settings;
+	}
+
+	bool is_editor_level() const {
+		return b_is_editor_level;
+	}
+
+	const hash_map<BaseUpdater*>& get_all_objects() const {
+		return all_world_ents;
+	}
+
+private:
+	LevelAsset* source_asset = nullptr;
+
+	std::unique_ptr<GameMode> gamemode = nullptr;
+
+	// all entities/components in the map
+	hash_map<BaseUpdater*> all_world_ents;
+
+	hash_set<BaseUpdater> tick_list;
+
+	// last instance id, incremented to add objs
+	uint64_t last_id = 0;
+	uint64_t local_player_id = 0;
+
+	// the world settings entity (owned in all_world_ents), shouldnt be nullptr
+	const WorldSettings* world_settings = nullptr;
+
+	ScopedBooleanValue b_is_in_update_tick;
+
+	std::vector<BaseUpdater*> wantsToAddToUpdate;
+
+	// is this an editor level
+	bool b_is_editor_level =false;
+	bool b_has_initialized_map = false;
+
+	void insert_new_native_entity_into_hashmap_R(Entity* e);
+	void initialize_new_entity_safe(Entity* e);
+
+	Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti);
 
 	uint64_t get_next_id_and_increment() {
 		return ++last_id;	// prefix
 	}
 
-
-	// IAsset overrides
-	void sweep_references() const override {}
-	bool load_asset(ClassBase*& user) override;
-	void post_load(ClassBase*) override {}
-	void uninstall() override {}
-	void move_construct(IAsset*) override {}
-
-	void set_editor_level(bool isEditorLevel) {
-		bIsEditorLevel = isEditorLevel;
-	}
-private:
-	ScopedBooleanValue b_in_in_level_initialize;
-	ScopedBooleanValue b_is_in_update_tick;
-
-	std::vector<BaseUpdater*> wantsToAddToUpdate;
-	std::vector<Entity*> deferredSpawnList;
-
-	bool bIsEditorLevel=false;
-
-	friend class LevelSerialization;
-};
-
-class FileWriter;
-class BinaryReader;
-class SerializeEntityObjectContext;
-class LevelSerialization
-{
-public:
-	// Does not manage the memory!
-	// Doesnt call init_entities_post_load() !
-	static Level* unserialize_level(const std::string& file, bool for_editor = false);
-
-	static Level* create_empty_level(const std::string& file, bool for_editor = false);
-
-	static std::string serialize_level(Level* l);
-
-	static void serialize_level_binary(Level* l, FileWriter& writer);
-	static void unserialize_level_binary(Level* l, BinaryReader& writer);
-
-
-	// doesnt call register/unregister on components, just creates everything
-	static std::string serialize_entities_to_string(const std::vector<Entity*>& entities);
-	static std::vector<Entity*> unserialize_entities_from_string(const std::string& str);
-private:
-
-	static void serialize_one_entity_binary(Entity* e, FileWriter& out, SerializeEntityObjectContext& ctx);
-
-	static bool unserialize_one_item_binary(BinaryReader& in, SerializeEntityObjectContext& ctx);
-
-	static void serialize_one_entity(Entity* e, DictWriter& out, SerializeEntityObjectContext& ctx);
-	static bool unserialize_one_item(StringView tok, DictParser& in, SerializeEntityObjectContext& ctx);
+	friend class DeferredSpawnScope;	// for initialize_new_entity_safe
 };

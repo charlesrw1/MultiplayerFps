@@ -15,7 +15,6 @@ BillboardComponent::~BillboardComponent() {
 }
 
 void BillboardComponent::on_init() {
-	assert(get_has_initialized());
 	dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 
@@ -26,7 +25,6 @@ void BillboardComponent::on_init() {
 	idraw->get_scene()->update_obj(handle, obj);
 }
 void BillboardComponent::on_deinit() {
-	assert(get_has_initialized());
 
 	imaterials->free_dynamic_material(dynamicMaterial);
 	idraw->get_scene()->remove_obj(handle);

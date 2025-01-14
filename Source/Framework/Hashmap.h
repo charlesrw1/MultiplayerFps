@@ -1,13 +1,13 @@
 #pragma once
 #include <vector>
-
+#include <cassert>
 template<typename T>
 class hash_map;
 
 template<typename T>
 struct hash_map_iterator
 {
-    hash_map_iterator(hash_map<T>* p, uint64_t i);
+    hash_map_iterator(const hash_map<T>* p, uint64_t i);
     hash_map_iterator(uint64_t i) : index(i) {}
 
     bool operator!=(const hash_map_iterator& other) {
@@ -23,7 +23,7 @@ struct hash_map_iterator
     void advance();
 
     uint64_t index = 0;
-    hash_map<T>* parent = nullptr;
+    const hash_map<T>* parent = nullptr;
 };
 
 template<typename T>
@@ -33,10 +33,10 @@ public:
     static const uint64_t INVALID_HANDLE = 0;
     static const uint64_t TOMBSTONE = UINT64_MAX;
 
-    hash_map_iterator<T> begin() {
+    hash_map_iterator<T> begin() const {
         return hash_map_iterator<T>(this, 0);
     }
-    hash_map_iterator<T> end() {
+    hash_map_iterator<T> end() const {
         return hash_map_iterator<T>(items.size());
     }
 
@@ -158,7 +158,7 @@ inline T hash_map_iterator<T>::operator*() {
 
 
 template<typename T>
-inline hash_map_iterator<T>::hash_map_iterator(hash_map<T>* parent, uint64_t i) {
+inline hash_map_iterator<T>::hash_map_iterator(const hash_map<T>* parent, uint64_t i) {
     this->parent = parent;
     index = i;
     advance();

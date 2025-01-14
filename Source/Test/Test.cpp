@@ -2,28 +2,43 @@
 #include "Framework/Util.h"
 #include "Framework/Config.h"
 #ifdef WITH_TESTS
-void ProgramTester::run_all()
+bool ProgramTester::run_all(bool print_good)
 {
 	sys_print("--------- Running Tests ----------\n");
 	sys_print("-num tests: %d\n", (int)allTests.size());
 	int er = 0;
 	for (int i = 0; i < allTests.size(); i++) {
-		int numErrs = allTests[i].func();
-		if (numErrs == 0)
-			sys_print("``` %s good\n", allTests[i].strName);
-		else
-			sys_print("!!! %s has %d errors\n", allTests[i].strName, numErrs);
-		er += numErrs;
+		test_failed = false;
+		expression = reason = "";
+
+		is_in_test = true;
+		try {
+			allTests[i].func();
+		}
+		catch (...) {
+			set_test_failed("<unknown>", "threw an exception");
+		}
+		is_in_test = false;
+
+		if (!test_failed) {
+			if(print_good)
+				sys_print("``` %s:%s good\n", allTests[i].category, allTests[i].sub_category);
+		}
+		else {
+			sys_print("!!! %s:%s FAILED (%s:%s)\n", allTests[i].category,allTests[i].sub_category, expression,reason);
+			er++;
+		}
 	}
 	if (er == 0)
 		sys_print("``` all tests passed\n");
 	else
 		sys_print("!!! tests had %d errors\n", er);
+	return er == 0;
 }
 
 DECLARE_ENGINE_CMD(RUN_TESTS)
 {
-	ProgramTester::get().run_all();
+	bool res = ProgramTester::get().run_all(true);
 }
 
 #endif

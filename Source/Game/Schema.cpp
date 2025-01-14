@@ -36,34 +36,16 @@ REGISTER_ASSETMETADATA_MACRO(SchemaAssetMetadata);
 
 bool Schema::load_asset(ClassBase*&)
 {
-	std::string path = get_name();
-	auto file = FileSys::open_read_game(path.c_str());
-	if (!file)
-		return false;
-
-	properties = std::string(file->size(), 0);
-	file->read((char*)properties.data(), properties.size());
-
-	default_schema_obj = create_entity_from_properties_internal();
-
-	return default_schema_obj != nullptr;
+	return false;
 }
 
 void Schema::sweep_references() const
 {
-	// create and uncreate to mark refs
-	auto temp = create_entity_from_properties_internal();
-	delete temp;
+
 }
 
 
 Entity* Schema::create_entity_from_properties_internal() const
 {
-	auto ents = LevelSerialization::unserialize_entities_from_string(properties);
-	if (ents.size() != 1) {
-		sys_print("!!! bad Schema file for %s\n", get_name().c_str());
-		for (auto e : ents) delete e;
-		return nullptr;
-	}
-	return ents[0];
+	return nullptr;
 }

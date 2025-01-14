@@ -122,11 +122,11 @@ public:
 		assert(ctx);
 
 		ObjPtr<EntityComponent>* ptr_prop = (ObjPtr<EntityComponent>*)info.get_ptr(inst);
-
+		ASSERT(0);
 		if (!ptr_prop->get())
 			return "";
 		else if (ptr_prop->get()->get_owner() == ctx->entity_serialzing)
-			return ptr_prop->get()->eSelfNameString;
+			return "";
 		else
 			return "";
 	}
@@ -134,7 +134,7 @@ public:
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	{
 		// unserializing has no context, gets fixup at a later step
-
+		ASSERT(0);
 		assert(user);
 		auto ctx = user->cast_to<SerializeEntityObjectContext>();
 		assert(ctx);
@@ -147,7 +147,7 @@ public:
 			ptr_prop->ptr = nullptr;
 		}
 		else {
-			ptr_prop->ptr = ctx->entity_serialzing->find_component_for_string_name(stack.c_str());
+			//ptr_prop->ptr = ctx->entity_serialzing->find_component_for_string_name(stack.c_str());
 		}
 	}
 };

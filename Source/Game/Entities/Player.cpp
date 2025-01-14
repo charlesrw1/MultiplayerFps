@@ -80,17 +80,17 @@ CLASS_IMPL(SpawnIfOnRedTeam);
 CLASS_H(PlayerSpawnPoint, Entity)
 public:
 	PlayerSpawnPoint() {
-		empty = create_sub_component<EmptyComponent>("Root");
-		root_component = empty;
 
 		if (eng->is_editor_level())
 		{
-			auto b = create_sub_component<BillboardComponent>("Billboard");
+			auto b = construct_sub_component<BillboardComponent>("Billboard");
 			b->set_texture(default_asset_load<Texture>("icon/_nearest/player_start.png"));
 			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-			auto a = create_sub_component<ArrowComponent>("Arrow");
-			a->dont_serialize_or_edit = true;
-			a->set_ls_transform({}, {}, glm::vec3(0.3));
+			
+			auto a_obj = construct_sub_entity<Entity>("arrow-obj");
+			a_obj->construct_sub_component<ArrowComponent>("arrow-comp");
+			a_obj->set_ls_transform({}, {}, glm::vec3(0.3));
+			a_obj->dont_serialize_or_edit = true;
 		}
 	}
 
@@ -102,7 +102,6 @@ public:
 		return true;
 	}
 
-	EmptyComponent* empty = nullptr;
 	ClassTypePtr<SpawnLogic> logicClass;
 
 	static const PropertyInfoList* get_props() {
@@ -896,7 +895,7 @@ void Player::on_foot_update()
 	 score_update_delegate.invoke(10);
 
 	 {
-		 auto scope = eng->spawn_entity_class_deferred<BikeEntity>(bike);
+		 auto scope = eng->get_level()->spawn_entity_class_deferred<BikeEntity>(bike);
 		 bike->set_ws_position(get_ws_position());
 	 }
 	 set_ws_position(glm::vec3(0, 0, 0.5));
@@ -912,14 +911,10 @@ void Player::on_foot_update()
  }
 
  Player::Player() {
-	 player_mesh = create_sub_component<MeshComponent>("CharMesh");
-	 player_capsule = create_sub_component<CapsuleComponent>("CharCapsule");
-	 spotlight = create_sub_component<SpotLightComponent>("Flashlight");
-	 health = create_sub_component<HealthComponent>("PlayerHealth");
-	 root_component = player_capsule;
-
-	 player_mesh->attach_to_parent(player_capsule, {});
-	 spotlight->attach_to_parent(root_component, {});
+	 player_mesh = construct_sub_component<MeshComponent>("CharMesh");
+	 player_capsule = construct_sub_component<CapsuleComponent>("CharCapsule");
+	 spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
+	 health = construct_sub_component<HealthComponent>("PlayerHealth");
 
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);
@@ -942,13 +937,14 @@ CLASS_H(CoverPositionMarker,Entity)
 public:
 	CoverPositionMarker() {
 		if (eng->is_editor_level()) {
-			auto billboard = create_sub_component<BillboardComponent>("EditorBillboard");
+			auto billboard = construct_sub_component<BillboardComponent>("EditorBillboard");
 			billboard->set_texture(GetAssets().find_global_sync<Texture>("icon/_nearest/blue_poi.png").get());
 			billboard->dont_serialize_or_edit = true;
 
-			auto arrow = create_sub_component<ArrowComponent>("Arrow");
-			arrow->dont_serialize_or_edit = true;
-			arrow->set_ws_transform({}, {}, glm::vec3(0.2));
+			auto arrowobj = construct_sub_entity<Entity>("ArrowObj");
+			arrowobj->construct_sub_component<ArrowComponent>("Arrow");
+			arrowobj->dont_serialize_or_edit = true;
+			arrowobj->set_ws_transform({}, {}, glm::vec3(0.2));
 		}
 	}
 };
