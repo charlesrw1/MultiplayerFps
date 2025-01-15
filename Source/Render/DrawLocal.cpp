@@ -1851,6 +1851,7 @@ extern ConfigVar g_grid_size;
 
 void draw_debug_grid()
 {
+	draw.shader().set_mat4("Model", glm::mat4(1));
 	static MeshBuilder mb;
 	static bool init = true;
 	glDisable(GL_DEPTH_TEST);

@@ -68,6 +68,8 @@ public:
 	virtual bool is_editor_level() const = 0;
 	virtual GuiSystemPublic* get_gui() const = 0;
 
+	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
+
 	virtual void leave_level() = 0;
 	// queues a level to be loaded
 	virtual void open_level(std::string levelname) = 0;

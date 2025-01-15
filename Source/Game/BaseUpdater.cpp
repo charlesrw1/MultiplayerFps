@@ -6,13 +6,13 @@ CLASS_IMPL(BaseUpdater);
 void BaseUpdater::set_ticking(bool shouldTick)
 {
 	auto level = eng->get_level();
-	if (level&&tickEnabled != shouldTick) {
+	if (level&&tickEnabled != shouldTick&&init_state==initialization_state::INITIALIZED) {
 		if (shouldTick)
 			level->add_to_update_list(this);
 		else
 			level->remove_from_update_list(this);
-		tickEnabled = shouldTick;
 	}
+	tickEnabled = shouldTick;
 }
 void BaseUpdater::init_updater()
 {

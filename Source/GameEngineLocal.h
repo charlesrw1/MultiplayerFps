@@ -13,6 +13,9 @@
 #include "Framework/MulticastDelegate.h"
 
 
+class GUIFullscreen;
+class OnScreenLogGui;
+
 using glm::vec3;
 class IEditorTool;
 class Player;
@@ -40,7 +43,8 @@ public:
 	}
 	virtual Entity* get_entity(uint64_t handle) {
 		ASSERT(get_level());
-		return level->get_entity(handle)->cast_to<Entity>();
+		auto o = level->get_entity(handle);
+		return o ? o->cast_to<Entity>() : nullptr;
 	}
 	virtual BaseUpdater* get_object(uint64_t handle) {
 		ASSERT(get_level());
@@ -79,6 +83,8 @@ public:
 	virtual ImGuiContext* get_imgui_context() const {
 		return imgui_context;
 	}
+
+	virtual void log_to_fullscreen_gui(LogType type, const char* msg) override;
 
 	virtual void login_new_player(uint32_t index) override;
 	virtual void logout_player(uint32_t index) override;
@@ -134,6 +140,10 @@ public:
 	std::unique_ptr<GuiSystemPublic> gui_sys;
 	std::unique_ptr<Client> cl;
 	std::unique_ptr<Server> sv;
+
+	GUIFullscreen* engine_fullscreen_gui{};
+	OnScreenLogGui* gui_log{};
+
 	OsInput inp;
 
 	string queued_mapname;

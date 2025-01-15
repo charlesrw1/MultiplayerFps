@@ -531,6 +531,7 @@
     <ClInclude Include="Source\BikeGame\Components\BikeAI.h" />
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
+    <ClInclude Include="Source\UI\OnScreenLogGui.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -807,10 +808,10 @@
     <ClCompile Include="Source\Framework\Util.cpp" />
     <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Old.cpp" />
     <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
+    <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
   </ItemGroup>
 </Project>

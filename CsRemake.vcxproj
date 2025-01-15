@@ -167,6 +167,7 @@
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Net.h" />
+    <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\OsInput.h" />
     <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
@@ -239,6 +240,7 @@
     <ClCompile Include="Source\Client.cpp" />
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
+    <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDoc.cpp" />
     <ClCompile Include="Source\External\glad.c" />
@@ -304,7 +306,6 @@
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Old.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />

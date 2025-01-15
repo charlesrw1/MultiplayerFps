@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "Framework/Util.h"
+#include "GameEnginePublic.h"
 
 class Command
 {
@@ -53,12 +54,15 @@ public:
 
 			sys_print(Debug,"Undoing: %s\n", hist[index]->to_string().c_str());
 
+			eng->log_to_fullscreen_gui(Info, "Undo");
 
 			hist[index]->undo();
 			delete hist[index];
 			hist[index] = nullptr;
 		}
 		else {
+			eng->log_to_fullscreen_gui(Warning, "Nothing to undo");
+
 			sys_print(Debug,"nothing to undo\n");
 		}
 	}

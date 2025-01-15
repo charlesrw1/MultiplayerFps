@@ -56,7 +56,8 @@
 #include "Input/InputSystem.h"
 #include "Framework/Files.h"
 #include "IEditorTool.h"
-
+#include "UI/Widgets/Layouts.h"
+#include "UI/OnScreenLogGui.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -245,6 +246,21 @@ double GetTime()
 double TimeSinceStart()
 {
 	return GetTime() - program_time_start;
+}
+
+
+void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
+{
+	const Color32 err = { 255, 105, 105 };
+	const Color32 warn = { 252, 224, 121 };
+	const Color32 info = COLOR_WHITE;
+	const Color32 debug = { 136, 161, 252 };
+	Color32 out = info;
+	if (type == LogType::Error) out = err;
+	else if (type == LogType::Warning)out = warn;
+	else if (type == LogType::Debug) out = debug;
+
+	gui_log->add_text(out, msg);
 }
 
 static void SDLError(const char* msg)
@@ -774,6 +790,8 @@ int main(int argc, char** argv)
 // The entry point of the game! (not used in the editor)
 // Takes in a string of the level to start with on the final game
 // Should look like: "mylevel.tmap" for $ROOT/gamedat/mylevel.tmap
+
+
 ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "the entry point of the game, this takes in a level filepath");
 // The default gamemode and player to choose when undefined by the WorldSettings entity
 // Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
@@ -1378,6 +1396,13 @@ void GameEngineLocal::init()
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	ImGui::GetIO().Fonts->Build();
 
+	
+	engine_fullscreen_gui = new GUIFullscreen();
+	gui_log = new OnScreenLogGui();
+	engine_fullscreen_gui->add_this(gui_log);
+	engine_fullscreen_gui->recieve_events = false;
+	gui_sys->add_gui_panel_to_root(engine_fullscreen_gui);
+
 	Cmd_Manager::get()->set_set_unknown_variables(true);
 	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
 	
@@ -1770,6 +1795,7 @@ void Debug_Console::print_args(const char* fmt, va_list args)
 {
 	if (lines.size() > 1000)
 		lines.clear();
+
 
 	char buf[1024];
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);

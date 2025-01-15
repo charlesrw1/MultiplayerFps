@@ -39,6 +39,8 @@ IEditorTool* g_editor_doc = &ed_doc;
 
 ConfigVar g_editor_newmap_template("g_editor_newmap_template", "default_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
 
+const ImColor non_owner_source_color = ImColor(252, 226, 131);
+
 
 class EditorUILayout : public GUIFullscreen
 {
@@ -46,15 +48,18 @@ public:
 	EditorUILayout() {
 		
 	}
-	void print_something() {
-		sys_print(Info, "---------------HELLO WORLD---------------\n");
-	}
 
 	void on_pressed(int x, int y, int button) override {
 		eng->get_gui()->set_focus_to_this(this);
+
+
+
 		mouse_down_delegate.invoke(x, y, button);
 	}
 	void on_released(int x, int y, int button) override {
+
+
+
 		mouse_up_delegate.invoke(x, y, button);
 	}
 	void on_key_down(const SDL_KeyboardEvent& key_event) override {
@@ -154,7 +159,7 @@ public:
 	}
 	void undo() {
 		ed_doc.on_entity_will_delete.invoke(handle);
-		eng->get_level()->destroy_entity(eng->get_entity(handle));
+		handle->destroy();
 		ed_doc.post_node_changes.invoke();
 		handle = {};
 	}
@@ -227,6 +232,8 @@ public:
 	}
 
 	void execute() {
+		eng->log_to_fullscreen_gui(Info, "Duplicate");
+
 		auto duplicated = unserialize_entities_from_text(scene->text);
 
 		// zero out file ids so new ones are set
@@ -269,6 +276,26 @@ public:
 	std::vector<EntityPtr<Entity>> handles;
 };
 
+
+void validate_remove_entities(std::vector<EntityPtr<Entity>>& input)
+{
+	bool had_errors = false;
+	for (int i = 0; i < input.size(); i++)
+	{
+		auto e = input[i];
+		Entity* ent = e.get();
+		if (!ent) continue;	// whatever, doesnt matter
+
+		if (ent->creator_source) {
+			had_errors = true;
+			input.erase(input.begin() + i);
+			i--;
+		}
+	}
+	if (had_errors)
+		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
+}
+
 class RemoveEntitiesCommand : public Command
 {
 public:
@@ -280,6 +307,8 @@ public:
 	}
 
 	void execute() {
+		eng->log_to_fullscreen_gui(Info, "Remove entity");
+
 		for (auto h : handles) {
 			ed_doc.on_entity_will_delete.invoke(h);
 			h->destroy();
@@ -371,6 +400,7 @@ void EditorDoc::init()
 
 bool EditorDoc::save_document_internal()
 {
+	eng->log_to_fullscreen_gui(Info, "Saving");
 	sys_print(Info, "saving map document\n");
 
 	auto& all_objs = eng->get_level()->get_all_objects();
@@ -590,9 +620,11 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 	if (scancode == SDL_SCANCODE_DELETE) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();
-		
-			RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(selected_handles);
-			command_mgr->add_command(cmd);
+			validate_remove_entities(selected_handles);
+			if (!selected_handles.empty()) {
+				RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(selected_handles);
+				command_mgr->add_command(cmd);
+			}
 		}
 	}
 	else if (scancode == SDL_SCANCODE_D && has_shift) {
@@ -604,9 +636,8 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 
 
 	}
+#if 0
 
-	else if (1)
-		return;
 	else if (scancode == SDL_SCANCODE_KP_5) {
 		using_ortho = false;
 	}
@@ -634,6 +665,7 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
 	}
+#endif
 }
 
 
@@ -1086,6 +1118,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			else
 				ed_doc.selection_state->clear_all_selected();
 		}
+
 		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[2]) {
 			ImGui::OpenPopup("outliner_ctx_menu");
 			ed_doc.selection_state->add_to_entity_selection({ n->handle });
@@ -1135,10 +1168,16 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 	}
 	else {
 		auto entity = eng->get_entity(n->handle);
+		const char* str = "";
 		if (!entity->editor_name.empty())
-			ImGui::Text(entity->editor_name.c_str());
+			str = entity->editor_name.c_str();
 		else
-			ImGui::Text(entity->get_type().classname);
+			str = entity->get_type().classname;
+		if (entity->creator_source)
+			ImGui::TextColored(non_owner_source_color, str);
+		else
+			ImGui::Text(str);
+
 	}
 
 	for (int i = 0; i < n->children.size(); i++)
@@ -1193,7 +1232,10 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		ImGui::SameLine();
 		ImGui::Dummy(ImVec2(5.f,1.0));
 		ImGui::SameLine();
-		ImGui::Text(ec->get_type().classname);
+		if(ec->creator_source)
+			ImGui::TextColored(non_owner_source_color, ec->get_type().classname);
+		else
+			ImGui::Text(ec->get_type().classname);
 		ImGui::PopID();
 	};
 
@@ -1440,7 +1482,6 @@ EdPropertyGrid::EdPropertyGrid()
 {
 	auto& ss = ed_doc.selection_state;
 	ss->on_selection_changed.add(this, &EdPropertyGrid::refresh_grid);
-	ed_doc.post_node_changes.add(this, &EdPropertyGrid::refresh_grid);
 	ed_doc.on_close.add(this, &EdPropertyGrid::on_close);
 	ed_doc.on_component_deleted.add(this, &EdPropertyGrid::on_ec_deleted);
 }

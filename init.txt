@@ -5,7 +5,7 @@ thirdperson 1
 
 g_draw_physx_scene 31
 
-bind 1 "map mainMenuMap.tmap"
+bind 1 "map template_map.tmap"
 
 bind . "g_drawdebugmenu 1"
 bind , "g_drawdebugmenu 0"

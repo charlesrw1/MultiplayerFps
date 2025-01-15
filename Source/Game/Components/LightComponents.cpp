@@ -54,8 +54,8 @@ void SpotLightComponent::on_init()
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
 		auto arrow_obj = get_owner()->create_and_attach_entity<Entity>();
-		arrow_obj->create_and_attach_component_type<ArrowComponent>();
 		arrow_obj->dont_serialize_or_edit = true;
+		arrow_obj->create_and_attach_component_type<ArrowComponent>();
 		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
 	}
 }

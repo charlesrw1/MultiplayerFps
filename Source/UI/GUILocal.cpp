@@ -7,6 +7,7 @@
 #include "Widgets/Visuals.h"
 #include "Widgets/Interactables.h"
 #include "GameEnginePublic.h"
+#include "OnScreenLogGui.h"
 
 // include
 
@@ -16,6 +17,8 @@ CLASS_IMPL(GUIFullscreen);
 CLASS_IMPL(GUIButton);
 CLASS_IMPL(GUIText);
 CLASS_IMPL(GUIVerticalBox);
+CLASS_IMPL(OnScreenLogGui);
+
 ConfigVar ui_debug_press("ui.debug_press", "0", CVAR_BOOL | CVAR_DEV,"");
 ConfigVar ui_draw_text_bbox("ui.draw_text_bbox", "0", CVAR_BOOL | CVAR_DEV,"");
 

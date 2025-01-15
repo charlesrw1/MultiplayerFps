@@ -404,6 +404,7 @@ bool AnimationGraphEditor::save_document_internal()
 	// this converts data to serialized form (ie Node* become indicies)
 	bool good = compile_graph_for_playing();
 
+	eng->log_to_fullscreen_gui(Info, "Saving");
 	{
 		DictWriter write;
 		write.set_should_add_indents(false);
@@ -1624,6 +1625,8 @@ void AnimationGraphEditor::compile_and_run()
 		out.initialize_animator(get_tree());
 		playback = graph_playback_state::running;
 	}
+	else
+		eng->log_to_fullscreen_gui(Error, "Graph has errors");
 }
 
 void AnimationGraphEditor::create_new_document()

@@ -140,6 +140,31 @@ static void write_just_props(ClassBase* e, const ClassBase* diff, DictWriter& ou
 	}
 }
 
+// fixme: cache a table or something
+const Entity* find_entity_diff_in_children_R(const Entity* input, const Entity* check)
+{
+	if (input->unique_file_id == check->unique_file_id)
+		return check;
+	for (auto c : check->get_all_children()) {
+		auto ptr = find_entity_diff_in_children_R(input, c);
+		if (ptr) return ptr;
+	}
+	return nullptr;
+}
+const EntityComponent* find_component_diff_in_children_R(const EntityComponent* input, const Entity* check)
+{
+	for (auto c : check->get_all_components()) {
+		if (c->unique_file_id == input->unique_file_id)
+			return c;
+	}
+
+	for (auto c : check->get_all_children()) {
+		auto ptr = find_component_diff_in_children_R(input, c);
+		if (ptr) return ptr;
+	}
+	return nullptr;
+}
+
 
 // to serialize:
 // 1. sort by hierarchy
@@ -192,14 +217,12 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 		else {
 			ASSERT(obj->creator_source->is_a<Entity>());
 			auto source_owner_default = (const Entity*)obj->creator_source->get_type().default_class_object;
-			auto& children = source_owner_default->get_all_components();
-			for (auto& c : children) {
-				if (c->unique_file_id == obj->unique_file_id) {
-					ASSERT(c->get_type() == obj->get_type());
-					return c;
-				}
+			if (obj->is_a<Entity>())
+				return find_entity_diff_in_children_R((Entity*)obj, source_owner_default);
+			else {
+				ASSERT(obj->is_a<EntityComponent>());
+				return find_component_diff_in_children_R((EntityComponent*)obj, source_owner_default);
 			}
-			return nullptr;
 		}
 	};
 

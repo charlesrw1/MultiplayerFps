@@ -56,7 +56,7 @@ private:
 		auto& all_objs = level->get_all_objects();
 		for (auto ent : all_objs) {
 			if (Entity* e = ent->cast_to<Entity>()) {
-				if (!e->get_entity_parent())
+				if (!e->get_entity_parent() && !e->dont_serialize_or_edit)
 				{
 					Node* me = new Node(this, e);
 					rootnode->add_child(me);
@@ -92,8 +92,10 @@ private:
 			handle = initfrom->instance_id;
 			auto& children = initfrom->get_all_children();
 			for (auto& c : children) {
-				Node* other = new Node(oo, c);
-				add_child(other);
+				if (!c->dont_serialize_or_edit) {
+					Node* other = new Node(oo, c);
+					add_child(other);
+				}
 			}
 			sort_children();
 			oo->map.insert({ handle, this });
@@ -197,7 +199,7 @@ public:
 		return glm::lookAt(position, position+front, up);
 	}
 	glm::mat4 get_proj_matrix(float aspect_ratio) const {
-		return glm::ortho(-width, width, -width*aspect_ratio, width * aspect_ratio,0.001f, 100.0f);
+		return glm::ortho(-width, width, -width*aspect_ratio, width * aspect_ratio,-0.001f, -100.0f);
 	}
 }; 
 
@@ -257,16 +259,29 @@ public:
 	void remove_from_selection(EntityPtr<Entity> ptr) {
 
 		auto e = ptr.get();
-
-		ASSERT(e);
-		e->selected_in_editor = false;
-		e->set_ws_transform(e->get_ws_transform());
-
+		if (e) {	// can be null
+			e->selected_in_editor = false;
+			e->set_ws_transform(e->get_ws_transform());
+		}
 		selected_entity_handles.erase(ptr.handle);
 		on_selection_changed.invoke();
 	}
 	void remove_from_selection(Entity* e) {
 		remove_from_selection(e->get_self_ptr());
+	}
+
+	void validate_selection() {
+		auto presize = selected_entity_handles.size();
+		for (auto it = selected_entity_handles.begin(); it != selected_entity_handles.end();)
+		{
+			EntityPtr<Entity> ptr = { *it };
+			if (!ptr.get())
+				it = selected_entity_handles.erase(it);
+			else
+				++it;
+		}
+		if(selected_entity_handles.size()!=presize)
+			on_selection_changed.invoke();
 	}
 
 	void clear_all_selected() {
@@ -297,7 +312,7 @@ public:
 	}
 private:
 	void on_node_deleted(EntityPtr<Entity> ptr) {
-		remove_from_selection(ptr);
+		validate_selection();
 	}
 	
 	void on_close() {
