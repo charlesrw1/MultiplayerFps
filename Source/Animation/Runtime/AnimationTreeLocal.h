@@ -110,15 +110,13 @@ public:
 	uint32_t num_bones() const { return model->get_skel()->get_num_bones(); }
 
 	template<typename T>
-	T* get(uint32_t offset) {
-		ASSERT(offset + sizeof(T) <= anim->data.size());
-		return (T*)(anim->data.data() + offset);
+	T* get(int node_index) {
+		return (T*)anim->runtime_graph_data[node_index].get();
 	}
 	template<typename T>
-	T* construct_rt(uint32_t ofs) {
-		T* ptr = get<T>(ofs);
-		ptr = new(ptr)(T);
-		return ptr;
+	void construct_runtime_node(int node_index) {
+		ASSERT(!anim->runtime_graph_data[node_index]);
+		anim->runtime_graph_data[node_index].reset(new T());
 	}
 
 	// always returns valid sync group, DONT cache this!!
@@ -175,7 +173,10 @@ CLASS_H(BaseAGNode, ClassBase)
 	// called once per instance of Graph
 	virtual void construct(NodeRt_Ctx& ctx) const {
 	}
+	int get_node_index() const { return node_index; }
 protected:
+	friend class Animation_Tree_CFG;
+
 	void fixup_ptrs(Animation_Tree_CFG* cfg) {
 		const PropertyInfoList* l = get_type().props;
 		if (!l)
@@ -190,6 +191,8 @@ protected:
 		}
 
 	}
+private:
+	int node_index = 0;
 };
 
 class NodeRt_Ctx;
@@ -252,23 +255,22 @@ CLASS_H(Node_CFG, BaseAGNode)
 	}
 
 protected:
-	template<typename T>
-	T* construct_this(NodeRt_Ctx& ctx) const {
-		return ctx.construct_rt<T>(rt_offset);
-	}
+	//template<typename T>
+	//T* construct_this(NodeRt_Ctx& ctx) const {
+	//	return ctx.construct_rt<T>(rt_offset);
+	//}
 
-	void init_memory_internal(Animation_Tree_CFG* cfg, uint32_t rt_size) {
-		rt_offset = cfg->get_data_used();
-		ASSERT(rt_size >= sizeof(Rt_Vars_Base));
+	void init_memory_internal(Animation_Tree_CFG* cfg) {
+		//rt_offset = cfg->get_data_used();
+		//ASSERT(rt_size >= sizeof(Rt_Vars_Base));
 
-		cfg->add_data_used(rt_size);
+		//cfg->add_data_used(rt_size);
 
 		fixup_ptrs(cfg);
 	}
-	uint32_t rt_offset = 0;
 private:
 	Rt_Vars_Base* get_rt_base(NodeRt_Ctx& ctx) const {
-		return ctx.get<Rt_Vars_Base>(rt_offset);
+		return ctx.get<Rt_Vars_Base>(get_node_index());
 	}
 };
 
@@ -279,13 +281,17 @@ public:
 	using RT_TYPE = T;
 	static_assert(std::is_base_of<Rt_Vars_Base, T>::value, "runtime structs must inherit from Rt_Vars_Base");
 	virtual void initialize(Animation_Tree_CFG* tree) override {
-		init_memory_internal(tree, sizeof(RT_TYPE));
+		init_memory_internal(tree);
+	}
+	void construct_runtime_node(NodeRt_Ctx& ctx) const {
+		ctx.construct_runtime_node<RT_TYPE>(get_node_index());
 	}
 	virtual void construct(NodeRt_Ctx& ctx) const {
-		construct_this<RT_TYPE>(ctx);
+		construct_runtime_node(ctx);
 	}
+
 	RT_TYPE* get_rt(NodeRt_Ctx& ctx)const {
-		return ctx.get<RT_TYPE>(rt_offset);
+		return ctx.get<RT_TYPE>(get_node_index());
 	}
 };
 
@@ -316,12 +322,13 @@ ENUM_HEADER(rootmotion_setting);
 NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 
 	virtual void initialize(Animation_Tree_CFG* tree) override {
-		init_memory_internal(tree, sizeof(RT_TYPE));
+		init_memory_internal(tree);
 		hashed_syncgroupname = SyncGroupName.c_str();
 	}
 
 	virtual void construct(NodeRt_Ctx& ctx) const {
-		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
+		construct_runtime_node(ctx);
+		RT_TYPE* rt = get_rt(ctx);
 
 		rt->clip = (Clip.ptr) ? Clip.ptr->seq : nullptr;// ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
 		rt->remap_index = -1;
@@ -400,8 +407,8 @@ struct Frame_Evaluate_RT : public Rt_Vars_Base
 };
 NODECFG_HEADER(Frame_Evaluate_CFG, Frame_Evaluate_RT)
 	virtual void construct(NodeRt_Ctx& ctx) const {
-		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
-	
+		construct_runtime_node(ctx);
+		RT_TYPE* rt = get_rt(ctx);
 	
 		rt->clip = ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
 	}
@@ -653,7 +660,7 @@ struct Blend_Masked_RT : public Rt_Vars_Base
 
 NODECFG_HEADER(Blend_Masked_CFG, Blend_Masked_RT)
 	virtual void construct(NodeRt_Ctx& ctx) const override {
-		construct_this<RT_TYPE>(ctx);
+		construct_runtime_node(ctx);
 		auto rt = get_rt(ctx);
 		//FIXME
 		rt->mask = ctx.get_skeleton()->find_mask(maskname);
@@ -801,7 +808,8 @@ struct ModifyBone_RT : public Rt_Vars_Base
 NODECFG_HEADER(ModifyBone_CFG, ModifyBone_RT)
 
 	void construct(NodeRt_Ctx& ctx) const override {
-		RT_TYPE* rt = construct_this<RT_TYPE>(ctx);
+		construct_runtime_node(ctx);
+		RT_TYPE* rt = get_rt(ctx);
 		rt->bone_index = ctx.get_skeleton()->get_bone_index(bone_name.c_str());
 	}
 	
@@ -851,7 +859,9 @@ NODECFG_HEADER(TwoBoneIK_CFG, TwoBoneIK_RT)
 
 	bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 	void construct(NodeRt_Ctx& ctx) const override {
-		auto rt = construct_this<RT_TYPE>(ctx);
+		construct_runtime_node(ctx);
+		auto rt = get_rt(ctx);
+
 		rt->bone_index = ctx.get_skeleton()->get_bone_index(bone_name.c_str());
 		rt->target_bone_index = ctx.get_skeleton()->get_bone_index(other_bone.c_str());
 	
@@ -898,7 +908,8 @@ NODECFG_HEADER(CopyBone_CFG, CopyBone_RT)
 
 	bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const;
 	void construct(NodeRt_Ctx& ctx) const override {
-		auto rt = construct_this<RT_TYPE>(ctx);
+		construct_runtime_node(ctx);
+		auto rt = get_rt(ctx);
 		rt->src_bone_index = ctx.get_skeleton()->get_bone_index(src_bone.c_str());
 		rt->target_bone_index = ctx.get_skeleton()->get_bone_index(dest_bone.c_str());
 	

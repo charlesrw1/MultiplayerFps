@@ -381,26 +381,17 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 	return ret;
 }
 
-
 // Inherited via At_Node
-
-
-
-
 
 void Animation_Tree_CFG::construct_all_nodes(NodeRt_Ctx& ctx) const {
 	for (int i = 0; i < all_nodes.size(); i++)
 		all_nodes[i]->construct(ctx);
 }
 
-
 bool Animation_Tree_CFG::post_load_init()
 {
-	// initialize script
-
-
-
 	for (int i = 0; i < all_nodes.size(); i++) {
+		all_nodes[i]->node_index = i;
 		all_nodes[i]->initialize(this);
 	}
 	BaseAGNode* rootagnode = serialized_nodecfg_ptr_to_ptr(root, this);
@@ -430,7 +421,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 MAKE_VECTORCALLBACK_ATOM(std::string, direct_slot_names);
 	 START_PROPS(Animation_Tree_CFG)
 		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
-		REG_INT(data_used, PROP_SERIALIZE, ""),
 		REG_BOOL(graph_is_valid, PROP_SERIALIZE, ""),
 		REG_STDVECTOR(direct_slot_names, PROP_SERIALIZE),
 		REG_CLASSTYPE_PTR(animator_class, PROP_DEFAULT),

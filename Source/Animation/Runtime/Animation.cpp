@@ -118,7 +118,7 @@ int Animation_Set::find(const char* name) const
 	}
 	return -1;
 }
-
+AnimatorInstance::~AnimatorInstance() {}
 bool AnimatorInstance::initialize_animator(
 	const Model* model, 
 	const Animation_Tree_CFG* graph, 
@@ -149,9 +149,9 @@ bool AnimatorInstance::initialize_animator(
 	this->model = model;
 	this->owner = ent;
 
-	// Initialize runtime data, runtime nodes get constructed in this array of bytes
-	data.clear();
-	data.resize(cfg->get_data_used(), 0);
+	// Initialize runtime data, runtime nodes get constructed here
+	runtime_graph_data.clear();
+	runtime_graph_data.resize(cfg->get_num_nodes());
 
 	// Construct nodes
 	NodeRt_Ctx ctx(this);

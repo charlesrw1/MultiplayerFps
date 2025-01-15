@@ -47,16 +47,16 @@ public:
 	void write_to_dict(DictWriter& out);
 	bool read_from_dict(DictParser& in);
 
-	uint32_t get_data_used() const { return data_used; }
+	//uint32_t get_data_used() const { return data_used; }
 
 	void construct_all_nodes(NodeRt_Ctx& ctx) const;
 
-	void add_data_used(uint32_t amt) {
-		data_used += amt;
-		uintptr_t modulo = data_used % 16;
-		if (modulo != 0)
-			data_used =  data_used + 16 - modulo;
-	}
+	//void add_data_used(uint32_t amt) {
+	//	data_used += amt;
+	//	uintptr_t modulo = data_used % 16;
+	//	if (modulo != 0)
+	//		data_used =  data_used + 16 - modulo;
+	//}
 
 	BaseAGNode* get_node(uint32_t index) { return all_nodes.at(index); }
 
@@ -66,6 +66,10 @@ public:
 
 	const PropertyInfo* find_animator_instance_variable(const std::string& var_name) const;
 	AnimatorInstance* allocate_animator_class() const;
+
+	int get_num_nodes() const {
+		return all_nodes.size();
+	}
 private:
 	bool graph_is_valid = false;
 
@@ -73,7 +77,7 @@ private:
 	Node_CFG* root = nullptr;
 	
 	// data in bytes for runtime nodes
-	uint32_t data_used = 0;
+	//uint32_t data_used = 0;
 
 	std::vector<BaseAGNode*> all_nodes;
 

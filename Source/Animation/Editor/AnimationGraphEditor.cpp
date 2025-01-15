@@ -1355,10 +1355,6 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 		printf("Deleted %d unreferenced nodes\n", num_deleted);
 	}
 
-
-	// initialize memory offets for runtime
-	editing_tree->data_used = 0;
-
 	// clear slot_names, direct play nodes will append this
 	editing_tree->direct_slot_names.clear();
 

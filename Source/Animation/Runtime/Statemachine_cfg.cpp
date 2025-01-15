@@ -119,7 +119,7 @@ void StateTransitionScript::init_value(ValueData& vd, Animation_Tree_CFG* tree)
 }
 
 void Statemachine_Node_CFG::initialize(Animation_Tree_CFG* tree) {
-	init_memory_internal(tree, sizeof(RT_TYPE));
+	init_memory_internal(tree);
 
 	for (int i = 0; i < states.size(); i++) {
 		states[i].tree = (Node_CFG*)serialized_nodecfg_ptr_to_ptr(states[i].tree, tree);

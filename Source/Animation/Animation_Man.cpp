@@ -30,7 +30,6 @@ void Animation_Tree_CFG::uninstall()
 		delete node;
 	all_nodes.clear();
 	root = nullptr;
-	data_used = 0;
 	direct_slot_names.clear();
 }
 
@@ -68,7 +67,6 @@ void Animation_Tree_CFG::move_construct(IAsset* _other) {
 	Animation_Tree_CFG* other = (Animation_Tree_CFG*)_other;
 	all_nodes = std::move(other->all_nodes);
 	root = other->root;
-	data_used = other->data_used;
 	direct_slot_names = std::move(other->direct_slot_names);
 }
 AnimatorInstance* Animation_Tree_CFG::allocate_animator_class() const {

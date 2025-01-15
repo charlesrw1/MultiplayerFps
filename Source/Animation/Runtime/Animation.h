@@ -6,7 +6,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include <vector>
-
+#include <memory>
 #include "../AnimationTypes.h"
 #include "../AnimationTreePublic.h"
 
@@ -29,8 +29,11 @@ class Entity;
 class AnimationSeq;
 class Animation_Tree_CFG;
 
+struct Rt_Vars_Base;
 CLASS_H(AnimatorInstance, ClassBase)
+public:
 	AnimatorInstance();
+	~AnimatorInstance();
 
 	// returns true on success
 	// fails if AnimatorInstance isnt compatible with AnimationGraph
@@ -96,7 +99,7 @@ private:
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
 
-	std::vector<uint8_t> data;	// runtime data
+	std::vector<std::unique_ptr<Rt_Vars_Base>> runtime_graph_data;
 
 	// active sync groups for graph
 	std::vector<SyncGroupData> active_sync_groups;
