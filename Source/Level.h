@@ -44,8 +44,10 @@ public:
 	// constructed in GameEngineLocal::on_map_change_callback
 	// this starts the level, essentially
 
-	Level(LevelAsset* source, bool is_editor);
+	Level();
 	~Level();
+
+	void create(LevelAsset* source, bool is_editor);
 
 	// only call once after initialization
 	void init_entities_post_load();

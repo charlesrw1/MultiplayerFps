@@ -95,12 +95,12 @@ void serialize_new_object_text_R(
 
 		BaseUpdater* parent = nullptr;
 		if (auto ent = b->cast_to<Entity>()) {
-			auto parent = ent->get_entity_parent();
+			parent = ent->get_entity_parent();
 		}
 		else {
 			auto ec = b->cast_to<EntityComponent>();
 			ASSERT(ec);
-			auto parent = ec->get_owner();
+			parent = ec->get_owner();
 			ASSERT(parent);
 		}
 		if (parent) {
@@ -177,7 +177,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 		auto ent = obj->cast_to<Entity>();
 		ASSERT(ent);
 		auto root_parent = ent->get_entity_parent();
-		if (!find_in_set(root_parent)) {
+		if (!find_in_set(root_parent)&&!ent->dont_serialize_or_edit) {
 			
 			if (root_parent)
 				add_to_extern_parents(obj, root_parent);
@@ -221,10 +221,12 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 			out.write_item_end();
 		};
 
-		write_obj(inobj);
-
-		for (auto comp : inobj->get_all_components())
-			write_obj(comp);
+		if (!inobj->dont_serialize_or_edit) {
+			write_obj(inobj);
+			for (auto comp : inobj->get_all_components())
+				if (!comp->dont_serialize_or_edit)
+					write_obj(comp);
+		}
 	}
 
 	output.text = std::move(out.get_output());

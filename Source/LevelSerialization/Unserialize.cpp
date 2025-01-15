@@ -106,6 +106,7 @@ void unserialize_one_item_text(const std::string& root_path, BaseUpdater* root_p
 		// check for parent
 		std::string parentid;
 		if (tok.cmp("parent")) {
+			in.read_string(tok);
 			parentid = to_std_string_sv(tok);
 			in.read_string(tok);
 		}
@@ -122,7 +123,7 @@ void unserialize_one_item_text(const std::string& root_path, BaseUpdater* root_p
 			ASSERT(obj&&obj->is_a<BaseUpdater>());
 
 			auto parent = parentid.empty() ? root_parent : scene.find(parentid);
-			ASSERT(parent==nullptr || parentid.empty());
+			ASSERT(parent!=nullptr || parentid.empty());
 
 
 			// PUSH BACK OBJ

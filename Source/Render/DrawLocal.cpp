@@ -2492,8 +2492,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 
 		draw_meshbuilders();
 
-		//if (g_draw_grid.get_bool())
-		//	draw_debug_grid();
+		if (g_draw_grid.get_bool())
+			draw_debug_grid();
 	}
 
 	// Bloom update

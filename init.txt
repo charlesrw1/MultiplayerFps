@@ -46,4 +46,6 @@ RUN_TESTS
 
 r.enable_vsync 1
 
+g_draw_grid 1
+
 start_ed Map "mainMenuMap.tmap"

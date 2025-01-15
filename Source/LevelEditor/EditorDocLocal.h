@@ -29,9 +29,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-
 extern ConfigVar g_mousesens;
-
 
 enum TransformType
 {
@@ -149,6 +147,7 @@ private:
 
 	void on_select_component(EntityComponent* ec) {
 		selected_component = ec->instance_id;
+		refresh_grid();
 	}
 
 	EntityComponent* get_selected_component() const {
@@ -246,7 +245,7 @@ public:
 			e->selected_in_editor = true;
 			e->set_ws_transform(e->get_ws_transform());
 
-			selected_entity_handles.insert(ptr);
+			selected_entity_handles.insert(ptr.handle);
 
 			on_selection_changed.invoke();
 		}

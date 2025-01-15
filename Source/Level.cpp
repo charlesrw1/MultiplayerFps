@@ -182,7 +182,12 @@ extern ConfigVar g_default_gamemode;
 
 #include "Game/WorldSettings.h"
 
-Level::Level(LevelAsset* source, bool is_editor) : all_world_ents(4/*2^4*/), tick_list(4)
+Level::Level() : all_world_ents(4/*2^4*/), tick_list(4)
+{
+
+}
+
+void Level::create(LevelAsset* source, bool is_editor) 
 {
 	ASSERT(source);
 
@@ -379,6 +384,7 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 {
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());
+	all_world_ents.insert(c->instance_id, c);
 	c->initialize_internal();
 }
 

@@ -204,7 +204,7 @@ private:
 	virtual void end() {}
 
 	bool selected_in_editor = false;
-	bool world_transform_is_dirty = false;
+	bool world_transform_is_dirty = true;
 
 	// called by Level for init/destruct
 	void initialize_internal();

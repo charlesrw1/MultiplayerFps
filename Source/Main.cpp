@@ -845,7 +845,8 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, LevelAsset
 	}
 
 	// constructor initializes level state
-	this->level = std::make_unique<Level>(loadedLevel, this_is_for_editor);
+	this->level = std::make_unique<Level>();
+	this->level->create(loadedLevel, this_is_for_editor);
 
 	tick = 0;
 	time = 0.0;

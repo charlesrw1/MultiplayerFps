@@ -96,60 +96,61 @@ static std::string to_string(StringView view) {
 // -> serialize to use as an interchange format
 
 
+class CommandSerializeUtil
+{
+public:
+	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(std::vector<EntityPtr<Entity>> handles) {
+		std::vector<Entity*> ents;
+		for (auto h : handles) {
+			ents.push_back(h.get());
+		}
+		ed_doc.validate_fileids_before_serialize();
+		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents));
+	}
+
+};
+
 class CreateStaticMeshCommand : public Command
 {
 public:
 	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform) {
 
-		// UNSAFE WHEN THIS COMMAND GETS DELETED!!
-		auto ModelPtr = &m;
-		auto handlePtr = &handle;
-		bool* ptr_to_waiting = &waiting_on_callback;
-		waiting_on_callback = true;
-		GetAssets().find_async<Model>(modelname.c_str(), [ptr_to_waiting, ModelPtr,handlePtr](GenericAssetPtr p) {
-			*ptr_to_waiting = false;
-			if (p) {
-				auto modelP = p.cast_to<Model>();
-				*ModelPtr = modelP.get();
-				if (*handlePtr != 0) {
-					auto ent = eng->get_entity(*handlePtr);
-					if (ent) {
-						auto staticMeshEnt = ent->cast_to<StaticMeshEntity>();
-						assert(staticMeshEnt);
-
-						staticMeshEnt->Mesh->set_model(*ModelPtr);
-						ent->editor_name = strip_extension((*ModelPtr)->get_name());
-
-						ed_doc.post_node_changes.invoke();
-					}
-					else
-						sys_print("``` CreateStaticMeshCommand: ent handle invalid\n");
-				}
-			}
-			});
-
 		this->transform = transform;
+		this->modelname = modelname;
 	}
 	~CreateStaticMeshCommand() override {
-		ASSERT(!waiting_on_callback);
 	}
 
 	bool is_valid() override { return true; }
 
 	void execute() {
 		auto ent = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
-		ent->Mesh->set_model(m);
 		ent->set_ws_transform(transform);
-\
-		if (!m) {
-			ent->editor_name = "NoModel";
-		}
+
 		handle = ent->get_self_ptr();
 
 		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
 
 		ed_doc.on_entity_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
+
+
+		GetAssets().find_async<Model>(modelname.c_str(), [the_handle = ent->instance_id](GenericAssetPtr p) {
+			if (p) {
+				auto modelP = p.cast_to<Model>();
+				
+				if (modelP) {
+					auto ent = eng->get_entity(the_handle);
+					if (ent) {
+						auto mesh_ent = ent->cast_to<StaticMeshEntity>();
+						ASSERT(mesh_ent);
+						mesh_ent->Mesh->set_model(modelP.get());
+					}
+					else
+						sys_print("``` CreateStaticMeshCommand: ent handle invalid in async callback\n");
+				}
+			}
+			});
 	}
 	void undo() {
 		ed_doc.on_entity_will_delete.invoke(handle);
@@ -162,9 +163,8 @@ public:
 	}
 
 	EntityPtr<Entity> handle;
-	Model* m{};
 	glm::mat4 transform;
-	bool waiting_on_callback = false;
+	std::string modelname{};
 };
 class CreateCppClassCommand : public Command
 {
@@ -222,17 +222,21 @@ class DuplicateEntitiesCommand : public Command
 {
 public:
 	DuplicateEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
-		std::vector<Entity*> ents;
-		for (auto h : handles) {
-			ents.push_back(h.get());
-		}
 
-		ed_doc.validate_fileids_before_serialize();
-		scene = std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents));
+		scene = CommandSerializeUtil::serialize_entities_text(handles);
 	}
+
 	void execute() {
 		auto duplicated = unserialize_entities_from_text(scene->text);
+
+		// zero out file ids so new ones are set
+		for (auto o : duplicated.get_objects())
+			if(o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
+				o.second->unique_file_id = 0;
+
 		eng->get_level()->insert_unserialized_entities_into_level(duplicated);
+
+
 		handles.clear();
 		auto& objs = duplicated.get_objects();
 		for (auto& o : objs) {
@@ -269,13 +273,8 @@ class RemoveEntitiesCommand : public Command
 {
 public:
 	RemoveEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
-		std::vector<Entity*> ents;
-		for (auto h : handles) {
-			ents.push_back(eng->get_entity(h));
-		}
 
-		ed_doc.validate_fileids_before_serialize();
-		scene = std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents));
+		scene = CommandSerializeUtil::serialize_entities_text(handles);
 
 		this->handles = handles;
 	}
@@ -1136,7 +1135,10 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 	}
 	else {
 		auto entity = eng->get_entity(n->handle);
-		ImGui::Text(entity->editor_name.c_str());
+		if (!entity->editor_name.empty())
+			ImGui::Text(entity->editor_name.c_str());
+		else
+			ImGui::Text(entity->get_type().classname);
 	}
 
 	for (int i = 0; i < n->children.size(); i++)
@@ -1196,7 +1198,8 @@ void EdPropertyGrid::draw_components(Entity* entity)
 	};
 
 	for (auto& c : entity->get_all_components())
-		draw_component(entity, c);
+		if(!c->dont_serialize_or_edit)
+			draw_component(entity, c);
 }
 
 
@@ -1235,7 +1238,7 @@ void EdPropertyGrid::draw()
 			ImGui::Text("Nothing selected\n");
 			selected_component = 0;
 		}
-		else if (ss->has_only_one_selected()) {
+		else if (!ss->has_only_one_selected()) {
 			ImGui::Text("Select 1 entity to see components\n");
 			selected_component = 0;
 		}
@@ -1252,7 +1255,7 @@ void EdPropertyGrid::draw()
 					if (ImGui::Selectable(iter.get_type()->classname)) {
 						auto ec = ent->create_and_attach_component_type(iter.get_type());
 						ASSERT(ec);
-						selected_component = ec->instance_id;
+						on_select_component(ec);
 
 						ImGui::CloseCurrentPopup();
 					}
