@@ -12,7 +12,7 @@ CLASS_IMPL(TextureImportSettings);
 DECLARE_ENGINE_CMD(IMPORT_TEX)
 {
 	if (args.size() != 2) {
-		sys_print("!!! usage IMPORT_TEX <.png/.tga/.jpg/.hdr>");
+		sys_print(Error, "usage IMPORT_TEX <.png/.tga/.jpg/.hdr>");
 		return;
 	}
 	std::string gamepath = args.at(1);
@@ -35,7 +35,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX)
 DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
 {
 	if (args.size() != 2) {
-		sys_print("!!! usage IMPORT_TEX_FOLDER <folder>");
+		sys_print(Error, "usage IMPORT_TEX_FOLDER <folder>");
 		return;
 	}
 
@@ -79,7 +79,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
 DECLARE_ENGINE_CMD(COMPILE_TEX)
 {
 	if (args.size() != 2) {
-		sys_print("!!! usage COMPILE_TEX <.dds>");
+		sys_print(Error, "usage COMPILE_TEX <.dds>");
 		return;
 	}
 	compile_texture_asset(args.at(1));
@@ -89,13 +89,13 @@ DECLARE_ENGINE_CMD(COMPILE_TEX)
 bool compile_texture_asset(const std::string& gamepath)
 {
 #ifdef WITH_TEXTURE_COMPILE
-	sys_print("*** Compiling texture asset %s\n", gamepath.c_str());
+	sys_print(Info,"Compiling texture asset %s\n", gamepath.c_str());
 	TextureImportSettings* tis = nullptr;
 	{
 		auto texfile = FileSys::open_read_game(gamepath);
 		auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
 		if (!tisfile) {
-			sys_print("!!! couldn't find texture import settings file\n");
+			sys_print(Error, "couldn't find texture import settings file\n");
 			return false;
 		}
 		bool needsCompile = texfile == nullptr;
@@ -103,7 +103,7 @@ bool compile_texture_asset(const std::string& gamepath)
 			needsCompile = texfile->get_timestamp() < tisfile->get_timestamp();
 		}
 		if (!needsCompile) {
-			sys_print("*** skipping compile\n");
+			sys_print(Info,"skipping compile\n");
 			return true;
 		}
 
@@ -111,7 +111,7 @@ bool compile_texture_asset(const std::string& gamepath)
 		in.load_from_file(tisfile.get());
 		tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in);
 		if (!tis) {
-			sys_print("!!! couldnt parse texture import settings\n");
+			sys_print(Error, "couldnt parse texture import settings\n");
 			return false;
 		}
 	}
@@ -129,7 +129,7 @@ bool compile_texture_asset(const std::string& gamepath)
 	commandLine += " -y ";
 	commandLine += " -o " + parentDir;
 	commandLine += " " + parentDir + tis->src_file;
-	sys_print("*** executing texture compile: %s\n", commandLine.c_str());
+	sys_print(Info,"executing texture compile: %s\n", commandLine.c_str());
 
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};
@@ -138,7 +138,7 @@ bool compile_texture_asset(const std::string& gamepath)
 	tis = nullptr;
 
 	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
-		sys_print("!!! couldn't create process\n");
+		sys_print(Error, "couldn't create process\n");
 		return false;
 	}
 	WaitForSingleObject(out.hProcess, INFINITE);

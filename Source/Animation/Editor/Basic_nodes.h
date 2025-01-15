@@ -170,7 +170,7 @@ bool compile_my_data(const AgSerializeContext* ctx) override {
 		if (found_type == anim_graph_value::bool_t) found_type == anim_graph_value::float_t;
 			if (found_type != variable.type) {
 				append_info_msg("[INFO] variable found type differs from current type, overriding it");
-				sys_print("??? After compiling, variable %s's type differs from previous type stored, overriding it...\n", variable.str.c_str());
+				sys_print(Warning, "After compiling, variable %s's type differs from previous type stored, overriding it...\n", variable.str.c_str());
 				variable.type = found_type;
 			}
 	}
@@ -417,7 +417,7 @@ bool compile_my_data(const AgSerializeContext* ctx) override {
 			tree->direct_slot_names.push_back(slot_name);
 			node->slot_index = tree->direct_slot_names.size() - 1;
 
-			sys_print("``` compilied slot name: %s\n", slot_name.c_str());
+			sys_print(Debug, "compilied slot name: %s\n", slot_name.c_str());
 		}
 	}
 	return util_compile_default(this, ctx);

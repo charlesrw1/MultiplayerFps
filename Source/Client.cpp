@@ -96,7 +96,7 @@ void Client::disconnect_from_server(const char* reason)
 {
 	if (state == CS_DISCONNECTED)
 		return;
-	sys_print("Disconnecting from server because %s\n", reason);
+	sys_print(Info, "Disconnecting from server because %s\n", reason);
 	if (state != CS_TRYINGCONNECT) {
 		uint8_t buffer[8];
 		ByteWriter write(buffer, 8);
@@ -124,7 +124,7 @@ void Client::disconnect_to_menu(const char* debug_reason)
 void Client::Reconnect()
 {
 	string address = std::move(serveraddr);
-	sys_print("Reconnecting to server: %s\n", address);
+	sys_print(Info, "Reconnecting to server: %s\n", address);
 	disconnect_from_server("reconnecting");
 	connect(address);
 }

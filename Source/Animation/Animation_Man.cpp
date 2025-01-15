@@ -41,11 +41,11 @@ bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
 	auto file = FileSys::open_read_game(path);
 
 	if (!file) {
-		sys_print("!!! couldn't load animation tree file %s\n", path.c_str());
+		sys_print(Error, "couldn't load animation tree file %s\n", path.c_str());
 		return false;
 	}
 	if (file->size() == 0) {
-		sys_print("!!! animation tree file empty %s\n", path.c_str());
+		sys_print(Error, "animation tree file empty %s\n", path.c_str());
 		return false;
 	}
 
@@ -55,7 +55,7 @@ bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
 
 	bool good = read_from_dict(dp);
 	if (!good) {
-		sys_print("!!! animation tree file parsing failed \n");
+		sys_print(Error, "animation tree file parsing failed \n");
 		graph_is_valid = false;
 		return false;
 	}

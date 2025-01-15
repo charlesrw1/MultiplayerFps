@@ -1681,7 +1681,7 @@ void AnimationGraphEditor::post_map_load_callback()
 				bool good = load_editor_nodes(parser);
 				if (good) {
 
-					sys_print("*** graph successfully loaded\n");
+					sys_print(Debug,"graph successfully loaded\n");
 
 					// tree was loaded and editor nodes were loaded
 					needs_new_doc = false;
@@ -1692,13 +1692,13 @@ void AnimationGraphEditor::post_map_load_callback()
 					}
 				}
 				else
-					sys_print("!!! couldn't load editor nodes for tree %s\n", name);
+					sys_print(Error, "couldn't load editor nodes for tree %s\n", name);
 			}
 			else
-				sys_print("!!! couldnt open animation graph editor file %s\n", editorFilePath.c_str());
+				sys_print(Error, "couldnt open animation graph editor file %s\n", editorFilePath.c_str());
 		}
 		else
-			sys_print("!!! Couldn't open animation tree file %s, creating new document instead\n", name);
+			sys_print(Error, "Couldn't open animation tree file %s, creating new document instead\n", name);
 	}
 
 	if (needs_new_doc) {
@@ -1819,7 +1819,7 @@ void AnimGraphClipboard::paste_selected()
 			continue;
 
 		if (source->is_a<Statemachine_EdNode>() || source->is_a<State_EdNode>()) {
-			sys_print("??? Can't copy+paste statemachine or state nodes (maybe a future feature)\n");
+			sys_print(Warning, "Can't copy+paste statemachine or state nodes (maybe a future feature)\n");
 			/* would have to do recursive stuff to copy layers and states work a bit funky */
 			continue;
 		}
@@ -1901,11 +1901,11 @@ void AnimGraphClipboard::remove_references(Base_EdNode* node)
 DECLARE_ENGINE_CMD(animed_play_slot)
 {
 	if (args.size() != 3) {
-		sys_print("usage animed_play_slot <slot> <anim>");
+		sys_print(Info, "usage animed_play_slot <slot> <anim>");
 		return;
 	}
 	if (ed.playback != AnimationGraphEditor::graph_playback_state::running) {
-		sys_print("!!! can only play slots when graph is running\n");
+		sys_print(Error, "can only play slots when graph is running\n");
 		return;
 	}
 	std::string slotname = args.at(1);

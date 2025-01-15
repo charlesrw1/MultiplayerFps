@@ -49,7 +49,7 @@ bool SequencerImgui::draw_items()
 
     if (is_dragging_selected) {
         if (selectedEntry == -1 || selectedEntry >= items.size()) {
-            sys_print("??? is_dragging_slected null entry\n");
+            sys_print(Warning, "is_dragging_slected null entry\n");
         }
         else {
             auto mousepos = ImGui::GetMousePos();
@@ -166,7 +166,7 @@ bool SequencerImgui::draw_items()
     }
     if (ImGui::BeginPopup("item_popup")) {
         if (selectedEntry == -1 || selectedEntry >= items.size()) {
-            sys_print("??? item_popup invalid item\n");
+            sys_print(Warning, "item_popup invalid item\n");
             selectedEntry = -1;
             ImGui::CloseCurrentPopup();
         }

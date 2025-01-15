@@ -681,7 +681,7 @@ void ModelCompileHelper::load_gltf_skeleton(cgltf_data* data, glm::mat4& armatur
 	armature_root = glm::mat4(1);
 
 	if (bones[0].parent != -1) {
-		sys_print("!!! root bone not first bone\n");
+		sys_print(Error, "root bone not first bone\n");
 		std::abort();
 	}
 	cgltf_node* node = skin->joints[0];
@@ -960,7 +960,7 @@ cgltf_and_binary load_cgltf_data(const std::string& path)
 
 	auto sourceFile = FileSys::open_read_game(path.c_str());
 	if (!sourceFile) {
-		sys_print("!!! couldn't open souce file %s\n",path.c_str());
+		sys_print(Error, "couldn't open souce file %s\n",path.c_str());
 		return {};
 	}
 	out.bin_file = new uint8_t[sourceFile->size()];
@@ -972,7 +972,7 @@ cgltf_and_binary load_cgltf_data(const std::string& path)
 	cgltf_result result = cgltf_parse(&options, out.bin_file, out.bin_len, &data);
 
 	if (result != cgltf_result_success) {
-		sys_print("!!! cgltf failed to parse file\n");
+		sys_print(Error, "cgltf failed to parse file\n");
 		delete[] out.bin_file;
 		return {};
 	}
@@ -1002,7 +1002,7 @@ unique_ptr<SkeletonCompileData> get_skin_from_file(cgltf_data* dat, const char* 
 			}
 		}
 		if (s == nullptr) {
-			sys_print("??? multiple skins in %s, trunacting to first", name);
+			sys_print(Warning, "multiple skins in %s, trunacting to first", name);
 			s = &dat->skins[0];
 		}
 	}
@@ -1050,13 +1050,13 @@ static void traverse_model_nodes(
 	bool has_mesh = node->mesh;
 	if (shape != ShapeType_e::None) {
 		if (has_mesh)
-			sys_print("*** found collision item %s\n", node_name.c_str());
+			sys_print(Debug,"found collision item %s\n", node_name.c_str());
 		else
-			sys_print("??? node has collision name but no mesh %s\n", node_name.c_str());
+			sys_print(Warning, "node has collision name but no mesh %s\n", node_name.c_str());
 	}
 	else if (using_skin != node->skin && has_mesh) {
 		has_mesh = false;
-		sys_print("??? this model is skinned but found a mesh node that isn't parented to it, skipping it\n");
+		sys_print(Warning,"this model is skinned but found a mesh node that isn't parented to it, skipping it\n");
 	}
 
 	if (has_mesh) {
@@ -1091,7 +1091,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 
 			int index = scd->get_bone_for_name(def.keepbones[i]);
 			if (index == -1) {
-				sys_print("!!! keepbone does not name a skeleton bone %s\n", def.keepbones[i].c_str());
+				sys_print(Error, "keepbone does not name a skeleton bone %s\n", def.keepbones[i].c_str());
 			}
 			else
 				bone_is_referenced[index] = true;
@@ -1106,13 +1106,13 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 			 auto& mesh = lod.mesh_nodes[MESH_NODE_IDX];
 
 			 if (!mesh.has_bones() && scd != nullptr) {
-				 sys_print("??? nobone mesh made it past filters?\n");
+				 sys_print(Warning, "nobone mesh made it past filters?\n");
 				 mesh.mark_for_delete = true;
 				 continue;
 			 }
 
 			 if (!mesh.has_normals()) {
-				 sys_print("??? mesh was exported without normals, skipping it...\n");
+				 sys_print(Warning, "mesh was exported without normals, skipping it...\n");
 				 mesh.mark_for_delete = true;
 				 continue;
 			 }
@@ -1227,7 +1227,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 			 }
 			 else {
 				 if(modcompile_print_pruned_bones.get_bool())
-					 sys_print("*** bone will be pruned %s\n", scd->bones[i].strname.c_str());
+					 sys_print(Info,"bone will be pruned %s\n", scd->bones[i].strname.c_str());
 			 }
 		 }
 		 FINAL_to_LOAD_bones.resize(count);
@@ -1236,7 +1236,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				FINAL_to_LOAD_bones.at(LOAD_to_FINAL_bones[i]) = i;
 
 		 FINAL_bone_count = count;
-		 sys_print("*** final bone count %d\n", FINAL_bone_count);
+		 sys_print(Info,"final bone count %d\n", FINAL_bone_count);
 
 		 for (int i = 0; i < mcd.lod_where.size(); i++) {
 			 for (int j = 0; j < mcd.lod_where[i].mesh_nodes.size(); j++) {
@@ -1333,7 +1333,7 @@ std::vector<ImportedSkeleton> read_animation_imports(
 			is.skeleton = open_file_and_read_skeleton(gamepath);
 
 			if (!is.skeleton) {
-				sys_print("!!! import animation failed %s\n", gamepath.c_str());
+				sys_print(Error, "import animation failed %s\n", gamepath.c_str());
 			}
 			else {
 				is.remap_from_LOAD_to_THIS = create_remap_table(is.skeleton.get(), compile_data);
@@ -1364,7 +1364,7 @@ std::vector<ImportedSkeleton> read_animation_imports(
 				is.skeleton = open_file_and_read_skeleton(pathToUse);
 
 				if (!is.skeleton) {
-					sys_print("!!! import animation failed %s\n", full_path.c_str());
+					sys_print(Error, "import animation failed %s\n", full_path.c_str());
 				}
 				else {
 					is.remap_from_LOAD_to_THIS = create_remap_table(is.skeleton.get(), compile_data);
@@ -1373,7 +1373,7 @@ std::vector<ImportedSkeleton> read_animation_imports(
 			}
 		}
 	}
-	sys_print("*** imported %d files\n", (int)imports.size());
+	sys_print(Info,"imported %d files\n", (int)imports.size());
 	return imports;
 }
 
@@ -1454,13 +1454,13 @@ std::vector<int16_t> get_mirror_table(const SkeletonCompileData* myskel,
 		int index0 = myskel->get_bone_for_name(mir.bone1);
 		int index1 = myskel->get_bone_for_name(mir.bone2);
 		if (index0 == -1 || index1 == -1) {
-			sys_print("!!! mirrored bone not found %s %s\n", mir.bone1.c_str(), mir.bone2.c_str());
+			sys_print(Error, "mirrored bone not found %s %s\n", mir.bone1.c_str(), mir.bone2.c_str());
 			continue;
 		}
 		int final_index0 = LOAD_bone_to_FINAL_bone[index0];
 		int final_index1 = LOAD_bone_to_FINAL_bone[index1];
 		if (final_index0 == -1 || final_index1 == -1) {
-			sys_print("!!! mirrored bone was pruned %s %s\n", mir.bone1.c_str(), mir.bone2.c_str());
+			sys_print(Error, "mirrored bone was pruned %s %s\n", mir.bone1.c_str(), mir.bone2.c_str());
 			continue;
 		}
 
@@ -1979,7 +1979,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 		// warn about unused definitions
 		AnimationSeq* a = final_out->find_sequence(clip.first);
 		if (!a) {
-			sys_print("??? clip defintion was not applied to any animations %s\n", clip.first.c_str());
+			sys_print(Warning, "clip defintion was not applied to any animations %s\n", clip.first.c_str());
 			continue;
 		}
 
@@ -1988,7 +1988,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 			if (clip.second.sub == SubtractType_Load::FromAnother) {
 				other = final_out->find_sequence(clip.second.subtract_clipname);
 				if (!other) {
-					sys_print("!!! subtract clip not found (%s from %s)\n", clip.first.c_str(), clip.second.subtract_clipname.c_str());
+					sys_print(Error, "subtract clip not found (%s from %s)\n", clip.first.c_str(), clip.second.subtract_clipname.c_str());
 				}
 			}
 			if (other) {
@@ -2032,14 +2032,14 @@ std::string make_non_proplematic_name(const std::string& name)
 #include <fstream>
 static void output_embedded_texture(const std::string& outputname, const cgltf_image* i, const cgltf_data* d)
 {
-	sys_print("*** writing out embedded texture %s\n", outputname.c_str());
+	sys_print(Info,"writing out embedded texture %s\n", outputname.c_str());
 
 	std::string image_path = outputname;
 	auto outfile = FileSys::open_write_game(image_path);
 
 
 	if (!outfile) {
-		sys_print("!!! couldn't open file to output embedded texture %s\n", image_path.c_str());
+		sys_print(Error, "couldn't open file to output embedded texture %s\n", image_path.c_str());
 		return;
 	}
 
@@ -2300,7 +2300,7 @@ FinalModelData create_final_model_data(
 
 		if (i != 0) {
 			if (lods_to_def[i] == -1) {
-				sys_print("!!! mesh has LOD_%d parts, but distance wasn't definied in .def, skipping...\n", i);
+				sys_print(Error, "mesh has LOD_%d parts, but distance wasn't definied in .def, skipping...\n", i);
 				continue;
 			}
 			out_lod.end_percentage = def.loddefs[lods_to_def[i]].distance;
@@ -2343,7 +2343,7 @@ FinalModelData create_final_model_data(
 	}
 
 	if (final_mod.lods.size() == 0) {
-		sys_print("??? model has no lods to output, creating an empty default one\n");
+		sys_print(Warning, "model has no lods to output, creating an empty default one\n");
 		MeshLod loddefault;
 		loddefault.part_count = 0;
 		loddefault.part_ofs = 0;
@@ -2395,7 +2395,7 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 
 
 	marker = out.tell();
-	sys_print("*** MARKER: %d\n", (int)marker);
+	sys_print(Debug,"MARKER: %d\n", (int)marker);
 	out.write_int32(model->verticies.size());
 	out.write_bytes_ptr((uint8_t*)model->verticies.data(), model->verticies.size() * sizeof(ModelVertex));
 	size_t vert_size = out.tell()- marker;
@@ -2520,14 +2520,14 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 
 	auto outfile = FileSys::open_write_game(gamepath);
 	if (!outfile) {
-		sys_print("!!! Couldn't open file to write out model %s\n", gamepath.c_str());
+		sys_print(Error, "Couldn't open file to write out model %s\n", gamepath.c_str());
 		return false;
 	}
-	sys_print("*** Writing out model (%s) (size: %d)\n", gamepath.c_str(), (int)out.get_size());
-	sys_print("***     -vert bytes: %d\n", (int)vert_size);
-	sys_print("***     -index bytes: %d\n", (int)index_size);
-	sys_print("***     -bone bytes: %d\n", (int)skel_size);
-	sys_print("***     -anim bytes: %d\n", (int)animation_size);
+	sys_print(Debug, "Writing out model (%s) (size: %d)\n", gamepath.c_str(), (int)out.get_size());
+	sys_print(Debug, "    -vert bytes: %d\n", (int)vert_size);
+	sys_print(Debug, "    -index bytes: %d\n", (int)index_size);
+	sys_print(Debug, "    -bone bytes: %d\n", (int)skel_size);
+	sys_print(Debug, "    -anim bytes: %d\n", (int)animation_size);
 
 
 
@@ -2600,17 +2600,17 @@ static bool compile_everything = false;
 
 bool ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings)
 {
-	sys_print("----- Compiling Model from settings -----\n");
+	sys_print(Info, "----- Compiling Model from settings -----\n");
 	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
 	return ModelCompileHelper::compile_model(output, def_data);
 }
 bool ModelCompilier::compile(const char* game_path)
 {
-	sys_print("----- Compiling Model %s -----\n", game_path);
+	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
 
 	auto file = FileSys::open_read_game(game_path);
 	if (!file) {
-		sys_print("!!! coudln't open model def file %s\n", game_path);
+		sys_print(Error, "coudln't open model def file %s\n", game_path);
 		return false;
 	}
 	uint64_t timestamp_of_def =  file->get_timestamp();
@@ -2636,7 +2636,7 @@ bool ModelCompilier::compile(const char* game_path)
 				needs_compile = true;
 			}
 			else if (version != MODEL_VERSION) {
-				sys_print("*** .cmdl version out of data (found %d, current %d), recompiling\n", version, MODEL_VERSION);
+				sys_print(Info,".cmdl version out of data (found %d, current %d), recompiling\n", version, MODEL_VERSION);
 				needs_compile = true;
 			}
 		}
@@ -2644,7 +2644,7 @@ bool ModelCompilier::compile(const char* game_path)
 	file.reset();
 
 	if (!needs_compile && timestamp_of_cmdl <= timestamp_of_def) {
-		sys_print("*** .def newer than .cmdl, recompiling\n");
+		sys_print(Info, "*** .def newer than .cmdl, recompiling\n");
 		needs_compile = true;
 	}
 
@@ -2654,7 +2654,7 @@ bool ModelCompilier::compile(const char* game_path)
 		def_data = ModelCompileHelper::parse_definition_file(game_path);
 	}
 	catch (std::runtime_error er) {
-		sys_print("!!! error parsing compile file %s: %s\n", game_path, er.what());
+		sys_print(Error, "error parsing compile file %s: %s\n", game_path, er.what());
 		return false;
 	}
 
@@ -2694,10 +2694,10 @@ bool ModelCompilier::compile(const char* game_path)
 			needs_compile |= check_timestamp_folder(timestamp_of_cmdl, def_data.imports[i].name);
 	}
 	if (!needs_compile_before_src && needs_compile)
-		sys_print("*** source files out of data, recompiling\n");
+		sys_print(Info, "source files out of data, recompiling\n");
 
 	if (!needs_compile) {
-		sys_print("*** skipping compile\n");
+		sys_print(Info, "skipping compile\n");
 		return true;	// no need to compile
 	}
 

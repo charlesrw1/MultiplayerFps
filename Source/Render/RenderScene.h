@@ -295,7 +295,7 @@ public:
 				break;
 		}
 		if (i == suns.size()) {
-			sys_print("??? update_sun couldn't find handle\n");
+			sys_print(Warning, "update_sun couldn't find handle\n");
 			return;
 		}
 		suns[i].sun = sun;
@@ -309,7 +309,7 @@ public:
 				break;
 		}
 		if (i == suns.size()) {
-			sys_print("??? remove_sun couldn't find handle\n");
+			sys_print(Warning, "remove_sun couldn't find handle\n");
 			return;
 		}
 		suns.erase(suns.begin() + i);
@@ -348,7 +348,7 @@ public:
 				break;
 		}
 		if (i == skylights.size()) {
-			sys_print("??? update_skylight couldn't find handle\n");
+			sys_print(Warning, "update_skylight couldn't find handle\n");
 			return;
 		}
 		skylights[i].skylight = sky;
@@ -362,7 +362,7 @@ public:
 				break;
 		}
 		if (i == skylights.size()) {
-			sys_print("??? remove_skylight couldn't find handle\n");
+			sys_print(Warning, "remove_skylight couldn't find handle\n");
 			return;
 		}
 		skylights.erase(skylights.begin() + i);
@@ -370,7 +370,7 @@ public:
 	}
 	handle<RenderFog> register_fog(const RenderFog& fog) {
 		if (has_fog) {
-			sys_print("??? only one fog allowed in a scene\n");
+			sys_print(Warning, "only one fog allowed in a scene\n");
 			return { -1 };
 		}
 		has_fog = true;

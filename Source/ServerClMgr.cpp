@@ -35,7 +35,7 @@ void RemoteClient::Disconnect(const char* debug_reason)
 {
 	if (state == SCS_DEAD)
 		return;
-	sys_print("Disconnecting client %d because %s\n", client_num, debug_reason);
+	sys_print(Info, "Disconnecting client %d because %s\n", client_num, debug_reason);
 
 	if (state == SCS_SPAWNED) {
 		eng->logout_player(client_num);
@@ -337,7 +337,7 @@ void Server::make_snapshot()
 	writer.WriteByte(0xff);	// sentinal index
 
 	if (writer.HasFailed())
-		sys_print("make_snapshot buffer failed\n");
+		sys_print(Info, "make_snapshot buffer failed\n");
 
 #endif
 }

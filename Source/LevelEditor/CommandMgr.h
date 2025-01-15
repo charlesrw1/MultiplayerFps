@@ -30,7 +30,7 @@ public:
 	void add_command(Command* c) {
 
 		if (!c->is_valid()) {
-			sys_print("??? command not valid %s\n", c->to_string().c_str());
+			sys_print(Warning, "command not valid %s\n", c->to_string().c_str());
 			delete c;
 			return;
 		}
@@ -42,7 +42,7 @@ public:
 		index += 1;
 		index %= HIST_SIZE;
 
-		sys_print("``` Executing: %s\n", c->to_string().c_str());
+		sys_print(Debug,"Executing: %s\n", c->to_string().c_str());
 
 		c->execute();
 	}
@@ -51,7 +51,7 @@ public:
 		if (index < 0) index = HIST_SIZE - 1;
 		if (hist[index]) {
 
-			sys_print("``` Undoing: %s\n", hist[index]->to_string().c_str());
+			sys_print(Debug,"Undoing: %s\n", hist[index]->to_string().c_str());
 
 
 			hist[index]->undo();
@@ -59,7 +59,7 @@ public:
 			hist[index] = nullptr;
 		}
 		else {
-			sys_print("*** nothing to undo\n");
+			sys_print(Debug,"nothing to undo\n");
 		}
 	}
 

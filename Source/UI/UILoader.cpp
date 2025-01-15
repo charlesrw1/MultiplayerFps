@@ -43,13 +43,13 @@ bool GuiFont::load_asset(ClassBase*& user)
 	auto file = FileSys::open_read_game(path.c_str());
 	if (!file)
 	{
-		sys_print("!!! couldn't open font: %s\n", path.c_str());
+		sys_print(Error, "couldn't open font: %s\n", path.c_str());
 		return false;
 	}
 	BinaryReader in(file.get());
 	auto magic_and_id = in.read_int32();
 	if (magic_and_id != MAKE_FOUR('B', 'M', 'F', 3)) {
-		sys_print("!!! bad magic in font file\n");
+		sys_print(Error, "bad magic in font file\n");
 		return false;
 	}
 	uint8_t blockid = in.read_byte();

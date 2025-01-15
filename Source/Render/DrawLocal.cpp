@@ -55,7 +55,7 @@ DECLARE_ENGINE_CMD(ot)
 {
 	static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
 	if (args.size() != 5) {
-		sys_print(usage_str);
+		sys_print(Info, usage_str);
 		return;
 	}
 
@@ -71,7 +71,7 @@ DECLARE_ENGINE_CMD(ot)
 
 
 	if (!draw.debug_tex_out.output_tex) {
-		sys_print("output_texture: couldn't find texture %s\n", texture_name);
+		sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
 	}
 
 }
@@ -539,7 +539,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		return "";
 	}();
 
-	sys_print("!!! %s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
+	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
 }
 
 void imgui_stat_hook()
@@ -581,27 +581,26 @@ void Renderer::check_hardware_options()
 
 	}
 
-	sys_print("``` ==== Extension support ====\n");
-	sys_print("-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
-	sys_print("-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
-	sys_print("-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
-	sys_print("-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
-	sys_print("-GL_NV_shader_atomic_int64: %s\n", (supports_atomic64) ? "yes" : "no");
-	sys_print("-GL_ARB_gpu_shader_int64: %s\n", (supports_int64) ? "yes" : "no");
+	sys_print(Debug,"==== Extension support ====\n");
+	sys_print(Debug,"-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
+	sys_print(Debug,"-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
+	sys_print(Debug,"-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
+	sys_print(Debug,"-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
+	sys_print(Debug,"-GL_NV_shader_atomic_int64: %s\n", (supports_atomic64) ? "yes" : "no");
+	sys_print(Debug,"-GL_ARB_gpu_shader_int64: %s\n", (supports_int64) ? "yes" : "no");
 
 	if (!supports_compression) {
 		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
 	}
-	sys_print("\n");
 
-	sys_print("``` ==== GL Hardware Values ====\n");
+	sys_print(Debug,"==== GL Hardware Values ====\n");
 	int max_buffer_bindings = 0;
 	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
-	sys_print("-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
+	sys_print(Debug,"-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
 	int max_texture_units = 0;
 	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_texture_units);
-	sys_print("-GL_MAX_TEXTURE_IMAGE_UNITS: %d\n", max_texture_units);
-	sys_print("\n");
+	sys_print(Debug,"-GL_MAX_TEXTURE_IMAGE_UNITS: %d\n", max_texture_units);
+	sys_print(Debug,"\n");
 }
 
 void Renderer::create_default_textures()
@@ -657,7 +656,7 @@ void Renderer::create_default_textures()
 
 void Renderer::init()
 {
-	sys_print("--------- Initializing Renderer ---------\n");
+	sys_print(Info, "--------- Initializing Renderer ---------\n");
 
 	// Check hardware settings like extension availibility
 	check_hardware_options();
@@ -2329,7 +2328,7 @@ void Renderer::check_cubemaps_dirty()
 	GPUFUNCTIONSTART;
 
 	if (!scene.skylights.empty() && (scene.skylights[0].skylight.wants_update|| force_render_cubemaps.get_bool())) {
-		sys_print("``` rendering skylight cubemap\n");
+		sys_print(Debug,"rendering skylight cubemap\n");
 		force_render_cubemaps.set_bool(false);
 		auto& skylight = scene.skylights[0];
 		update_cubemap_specular_irradiance(skylight.ambientCube, (Texture*)skylight.skylight.generated_cube, glm::vec3(0.f), true);
@@ -2347,7 +2346,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	device.reset_states();
 
 	if (view.width < 4 || view.height < 4) {
-		sys_print("!!! framebuffer too small for scene draw internal\n");
+		sys_print(Error, "framebuffer too small for scene draw internal\n");
 		return;
 	}
 
@@ -2735,7 +2734,7 @@ void DebuggingTextureOutput::draw_out()
 	if (!output_tex)
 		return;
 	if (output_tex->gl_id == 0) {
-		sys_print("!!! DebuggingTextureOutput has invalid texture\n");
+		sys_print(Error, "DebuggingTextureOutput has invalid texture\n");
 		output_tex = nullptr;
 		return;
 	}
@@ -2753,7 +2752,7 @@ void DebuggingTextureOutput::draw_out()
 	else if (output_tex->type == Texture_Type::TEXTYPE_CUBEMAP)
 		state.program = (draw.prog.tex_debug_cubemap);
 	else {
-		sys_print("!!! can only debug 2d and 2d array textures\n");
+		sys_print(Error, "can only debug 2d and 2d array textures\n");
 		output_tex = nullptr;
 		return;
 	}
@@ -2803,7 +2802,7 @@ float Renderer::get_scene_depth_for_editor(int x, int y)
 	// super slow garbage functions obviously
 
 	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {
-		sys_print("!!! invalid mouse coords for mouse_pick_scene\n");
+		sys_print(Error, "invalid mouse coords for mouse_pick_scene\n");
 		return { -1 };
 	}
 
@@ -2829,7 +2828,7 @@ handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
 	// super slow garbage functions obviously
 
 	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {
-		sys_print("!!! invalid mouse coords for mouse_pick_scene\n");
+		sys_print(Error, "invalid mouse coords for mouse_pick_scene\n");
 		return { -1 };
 	}
 
@@ -2849,19 +2848,19 @@ handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
 	delete[] buffer_pixels;
 
 	if (id == 0xff000000) {
-		sys_print("NONE\n");
+		sys_print(Error,"NONE\n");
 		return { -1 };
 	}
 
 	uint32_t realid = id - 1;	// allow for nullptr
 
 	if (realid >= scene.proxy_list.objects.size()) {
-		sys_print("!!! invalid editorid\n");
+		sys_print(Error, "invalid editorid\n");
 		return { -1 };
 	}
 	int handle_out = scene.proxy_list.objects.at(realid).handle;
 
-	sys_print("MODEL: %s\n", scene.proxy_list.objects.at(realid).type_.proxy.model->get_name().c_str());
+	sys_print(Debug, "MODEL: %s\n", scene.proxy_list.objects.at(realid).type_.proxy.model->get_name().c_str());
 
 	return { handle_out };
 }

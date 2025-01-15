@@ -34,12 +34,12 @@ public:
 
 
 	void init() {
-		sys_print("*** terraininterface init\n");
+		sys_print(Info, "terraininterface init\n");
 
 
 		GLint maxTessLevel{};
 		glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
-		sys_print("-GL_MAX_TESS_GEN_LEVEL %d\n", maxTessLevel);
+		sys_print(Debug, "-GL_MAX_TESS_GEN_LEVEL %d\n", maxTessLevel);
 
 		// create vertex buffer for terrain
 		struct TerVer {
@@ -163,7 +163,7 @@ public:
 
 	handle<Render_Terrain> register_terrain(const Render_Terrain& asset) override {
 		if (has_terrain) {
-			sys_print("!!! can only register one terrain at once\n");
+			sys_print(Error, "can only register one terrain at once\n");
 			return { -1 };
 		}
 		has_terrain = true;

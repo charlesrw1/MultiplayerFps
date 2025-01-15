@@ -151,7 +151,7 @@ public:
 	physx::PxScene* get_physx_scene() { return scene; }
 
 	void init() {
-		sys_print("Initializing Physics\n");
+		sys_print(Info, "Initializing Physics\n");
 
 		foundation = PxCreateFoundation(PX_PHYSICS_VERSION, alloc, err);
 
@@ -301,7 +301,7 @@ bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, 
 	physx::PxRaycastBuffer hit;
 	bool status = impl->scene->raycast(
 		glm_to_physx(start), glm_to_physx(dir), length, hit);
-	sys_print("ray: %d\n", (int)status);
+	sys_print(Debug,"ray: %d\n", (int)status);
 	if (!status) {
 		out.fraction = 1.0;
 		return status;
@@ -449,7 +449,7 @@ void PhysicsActor::init_physics_shape(
 )
 {
 	if (has_initialized()) {
-		sys_print("??? physics actor wasn't freed before call to init_physics_shape()\n");
+		sys_print(Warning, "physics actor wasn't freed before call to init_physics_shape()\n");
 		free();
 	}
 	this->disabled = startDisabled;
@@ -496,7 +496,7 @@ void PhysicsActor::set_simulate(bool isSimulating)
 			dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->isSimulating);
 		}
 		else
-			sys_print("??? set_simulating set on a static PhysicsActor\n");
+			sys_print(Warning, "set_simulating set on a static PhysicsActor\n");
 	}
 }
 void PhysicsActor::set_enabled(bool enabled)
@@ -524,7 +524,7 @@ void PhysicsActor::set_transform(const glm::mat4& transform, bool teleport)
 	}
 	else{
 		if (isSimulating) {
-			sys_print("??? set_transform on a simulating PhysicsActor\n");
+			sys_print(Warning, "set_transform on a simulating PhysicsActor\n");
 		}
 		auto dyn = get_dynamic_actor();
 		dyn->setKinematicTarget(glm_to_physx(transform));
@@ -533,7 +533,7 @@ void PhysicsActor::set_transform(const glm::mat4& transform, bool teleport)
 void PhysicsActor::set_linear_velocity(const glm::vec3& v)
 {
 	if (is_static()) {
-		sys_print("??? set_linear_velocity on a static PhysicsActor\n");
+		sys_print(Warning, "set_linear_velocity on a static PhysicsActor\n");
 	}
 	else {
 		auto dyn = get_dynamic_actor();

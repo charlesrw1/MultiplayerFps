@@ -48,7 +48,7 @@ bool DataClass::load_asset(ClassBase*&)
 
 	auto file = FileSys::open_read_game(get_name());
 	if (!file.get()) {
-		sys_print("!!! couldnt load dataclass (file not found): %s\n", get_name().c_str());
+		sys_print(Error, "couldnt load dataclass (file not found): %s\n", get_name().c_str());
 		return false;
 	}
 
@@ -58,7 +58,7 @@ bool DataClass::load_asset(ClassBase*&)
 	dp.read_string(tok);
 	auto classLoaded = read_object_properties<ClassBase>(nullptr, dp, tok);
 	if (!classLoaded) {
-		sys_print("!!! couldnt load dataclass (parse error): %s\n", get_name().c_str());
+		sys_print(Error, "couldnt load dataclass (parse error): %s\n", get_name().c_str());
 		return false;
 	}
 
@@ -72,7 +72,7 @@ void DataClass::sweep_references() const
 	std::string fullpath = get_name();
 	auto file = FileSys::open_read_game(fullpath.c_str());
 	if (!file.get()) {
-		sys_print("!!! couldnt load dataclass (file not found): %s\n", fullpath.c_str());
+		sys_print(Error, "couldnt load dataclass (file not found): %s\n", fullpath.c_str());
 		return;
 	}
 
@@ -82,7 +82,7 @@ void DataClass::sweep_references() const
 	dp.read_string(tok);
 	auto classLoaded = read_object_properties<ClassBase>(nullptr, dp, tok);
 	if (!classLoaded) {
-		sys_print("!!! couldnt load dataclass (parse error): %s\n", fullpath.c_str());
+		sys_print(Error, "couldnt load dataclass (parse error): %s\n", fullpath.c_str());
 		return;
 	}
 

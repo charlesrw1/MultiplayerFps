@@ -67,7 +67,7 @@ inline bool TextureEditorTool::open_document_internal(const char* name, const ch
 
 	auto file = FileSys::open_read_game(path.c_str());
 	if (!file) {
-		sys_print("!!! couldn't open texture import settings file %s\n", name);
+		sys_print(Error, "couldn't open texture import settings file %s\n", name);
 		return false;
 	}
 	textureAsset = GetAssets().find_sync<Texture>(name).get();
@@ -77,7 +77,7 @@ inline bool TextureEditorTool::open_document_internal(const char* name, const ch
 	dp.load_from_file(file.get());
 	auto classLoaded = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, dp);
 	if (!classLoaded) {
-		sys_print("!!! couldnt parse texture import settings %s\n", name);
+		sys_print(Error, "couldnt parse texture import settings %s\n", name);
 		return false;
 	}
 	editing_object = classLoaded;

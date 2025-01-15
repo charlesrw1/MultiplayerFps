@@ -111,7 +111,7 @@ Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
 
 	ec = e->cast_to<Entity>();
 	if (!ec) {
-		sys_print("!!! spawn_entity_class_deferred_internal failed for %s\n", ti.classname);
+		sys_print(Error, "spawn_entity_class_deferred_internal failed for %s\n", ti.classname);
 		delete e;
 		return nullptr;
 	}
@@ -132,7 +132,7 @@ Entity* Level::spawn_entity_from_classtype(const ClassTypeInfo& ti)
 
 	ec = e->cast_to<Entity>();
 	if (!ec) {
-		sys_print("!!! spawn_entity_from_classtype failed for %s\n", ti.classname);
+		sys_print(Error, "spawn_entity_from_classtype failed for %s\n", ti.classname);
 		delete e;
 		return nullptr;
 	}
@@ -148,14 +148,14 @@ void Level::destroy_entity(Entity* e)
 {
 	if (!e) return;
 	uint64_t id = e->instance_id;
-	sys_print("*** removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
+	sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 	e->destroy_internal();
 	delete e;
 	// remove from hashmap
 	#ifdef _DEBUG
 		auto ent = all_world_ents.find(id);
 		if (!ent) {
-			sys_print("??? destroy_entity: entity does not exist in hashmap, double delete?\n");
+			sys_print(Warning,"destroy_entity: entity does not exist in hashmap, double delete?\n");
 		}
 	#endif // _DEBUG
 	all_world_ents.remove(id);
@@ -164,14 +164,14 @@ void Level::destroy_component(EntityComponent* ec)
 {
 	if (!ec) return;
 	uint64_t id = ec->instance_id;
-	sys_print("*** removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
+	sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
 	ec->destroy_internal();
 	delete ec;
 	// remove from hashmap
 	#ifdef _DEBUG
 		auto ent = all_world_ents.find(id);
 		if (!ent) {
-			sys_print("??? destroy_component: entity does not exist in hashmap, double delete?\n");
+			sys_print(Warning,"destroy_component: entity does not exist in hashmap, double delete?\n");
 		}
 	#endif // _DEBUG
 	all_world_ents.remove(id);

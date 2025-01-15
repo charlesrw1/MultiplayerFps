@@ -45,7 +45,7 @@ Level* LevelSerialization::unserialize_level(const std::string& file, bool is_ed
 {
 	auto fileptr  = FileSys::open_read_game(file.c_str());
 	if (!fileptr) {
-		sys_print("!!! couldn't open level %s\n", file.c_str());
+		sys_print(Error, "couldn't open level %s\n", file.c_str());
 		return nullptr;
 	}
 	std::string str(fileptr->size(), ' ');
@@ -107,7 +107,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			in.read_string(tok);
 			typeinfo = ClassBase::find_class(tok.to_stack_string().c_str());
 			if (!typeinfo || !typeinfo->allocate || !typeinfo->is_a(Entity::StaticType)) {
-				sys_print("!!! no typeinfo to spawn level serialization %s\n", tok.to_stack_string().c_str());
+				sys_print(Error, "no typeinfo to spawn level serialization %s\n", tok.to_stack_string().c_str());
 				return false;
 			}
 			e = (Entity*)typeinfo->allocate();
@@ -116,7 +116,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			in.read_string(tok);
 			auto schematype = GetAssets().find_sync<Schema>(std::string(tok.str_start,tok.str_len));
 			if (!schematype) {
-				sys_print("!!! no schematype to spawn level serialization %s\n", tok.to_stack_string().c_str());
+				sys_print(Error, "no schematype to spawn level serialization %s\n", tok.to_stack_string().c_str());
 				return false;
 			}
 			e = schematype->create_entity_from_properties();
@@ -146,7 +146,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			auto classname_or_varname = tok.to_stack_string();
 
 			if (integer > ctx.unserialized.size()) {
-				sys_print("!!! comp_X parent integer greater than unserialized so far\n");
+				sys_print(Error, "comp_X parent integer greater than unserialized so far\n");
 				return false;
 			}
 			Entity* parent = ctx.unserialized.at(integer);
@@ -156,7 +156,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			if (is_component_override) {
 				ec = parent->find_component_for_string_name(classname_or_varname.c_str());
 				if (!ec) {
-					sys_print("!!! no entitycmp for var name existing %s\n", classname_or_varname.c_str());
+					sys_print(Error, "no entitycmp for var name existing %s\n", classname_or_varname.c_str());
 					return false;
 				}
 				ec_typeinfo = &ec->get_type();
@@ -164,7 +164,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			else {
 				ec_typeinfo = ClassBase::find_class(classname_or_varname.c_str());
 				if (!ec_typeinfo || !ec_typeinfo->is_a(EntityComponent::StaticType) || !ec_typeinfo->allocate) {
-					sys_print("!!! no entitycmp for type info to instance %s\n", classname_or_varname.c_str());
+					sys_print(Error, "no entitycmp for type info to instance %s\n", classname_or_varname.c_str());
 					return false;
 				}
 				ec = (EntityComponent*)ec_typeinfo->allocate();
@@ -185,7 +185,7 @@ bool LevelSerialization::unserialize_one_item(StringView tok, DictParser& in, Se
 			}
 		}
 		else {
-			sys_print("!!! unknown item type on level serialization %s\n", tok.to_stack_string().c_str());
+			sys_print(Error, "unknown item type on level serialization %s\n", tok.to_stack_string().c_str());
 			return false;
 		}
 	}
@@ -378,7 +378,7 @@ bool LevelSerialization::unserialize_one_item_binary(BinaryReader& in, Serialize
 		auto str = std::string(classname.str_start, classname.str_len);
 		auto typeinfo = ClassBase::find_class(str.c_str());
 		if (!typeinfo || !typeinfo->allocate || !typeinfo->is_a(Entity::StaticType)) {
-			sys_print("!!! no typeinfo to spawn level serialization %s\n", str.c_str());
+			sys_print(Error, "no typeinfo to spawn level serialization %s\n", str.c_str());
 			return false;
 		}
 		Entity* e = (Entity*)typeinfo->allocate();
@@ -392,7 +392,7 @@ bool LevelSerialization::unserialize_one_item_binary(BinaryReader& in, Serialize
 		auto str = std::string(schemaname.str_start, schemaname.str_len);
 		auto schematype = GetAssets().find_sync<Schema>(str);
 		if (!schematype) {
-			sys_print("!!! no schematype to spawn level serialization %s\n", str.c_str());
+			sys_print(Error, "no schematype to spawn level serialization %s\n", str.c_str());
 			return false;
 		}
 		Entity* e = schematype->create_entity_from_properties();

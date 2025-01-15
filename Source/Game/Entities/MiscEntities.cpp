@@ -13,12 +13,6 @@ Grenade::Grenade()
 
 void Grenade::update()
 {
-
-	if (eng->get_game_time() - throw_time > 2.5) {
-		sys_print("BOOM\n");
-
-
-	}
 }
 
 

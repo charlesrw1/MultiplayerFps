@@ -294,7 +294,7 @@ void Player::find_a_spawn_point()
 {
 	InlineVec<PlayerSpawnPoint*, 16> points;
 	if (!eng->get_level()->find_all_entities_of_class(points))
-		sys_print("!!! no spawn points");
+		sys_print(Error, "no spawn points");
 	else {
 		auto pos = points[0]->get_ws_position();
 
@@ -700,7 +700,7 @@ void Player::on_jump_callback()
 			if (good) {
 				velocity = wqr.hit_normal * 8.0f;
 				velocity.y = 4.5;
-				sys_print("wall jump\n");
+				sys_print(Debug, "wall jump\n");
 
 				wall_jump_cooldown = 0.2;
 			}

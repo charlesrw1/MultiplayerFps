@@ -69,7 +69,7 @@ void ModelEditorTool::post_map_load_callback()
 		auto file = FileSys::open_read_game(def_name);
 
 		if (!file) {
-			sys_print("!!! ModelEditor: couldnt find path %s\n", def_name.c_str());
+			sys_print(Error, "ModelEditor: couldnt find path %s\n", def_name.c_str());
 		}
 		else {
 			DictParser dp;
@@ -103,7 +103,7 @@ void ModelEditorTool::post_map_load_callback()
 			return;
 		if (!ptr)
 		{
-			sys_print("*** no output model\n");
+			sys_print(Warning,"no output model\n");
 			return;
 		}
 
@@ -111,7 +111,7 @@ void ModelEditorTool::post_map_load_callback()
 
 		outputModel = ptr.cast_to<Model>().get();
 		if (!outputModel)
-			sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
+			sys_print(Warning,"compilied model didnt load but loading .def didnt error, continuing as normal\n");
 		outputEntity->Mesh->set_model(outputModel);
 		if (outputModel) {
 			importSettings->myMaterials.clear();

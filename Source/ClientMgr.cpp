@@ -44,7 +44,7 @@ void Client::ReadPackets()
 				float tickrate = buf.ReadFloat();
 
 
-				sys_print("Accepted into server. Player#: %d. Map: %s. Tickrate %f.\n", client_num, mapname.c_str(), tickrate);
+				sys_print(Info,"Accepted into server. Player#: %d. Map: %s. Tickrate %f.\n", client_num, mapname.c_str(), tickrate);
 
 				// We now have a valid connection with the server
 				server.Init(&sock, server.remote_addr);
@@ -62,7 +62,7 @@ void Client::ReadPackets()
 				disconnect_to_menu("rejected by server");
 			}
 			else {
-				sys_print("Unknown connectionless packet type\n");
+				sys_print(Debug, "Unknown connectionless packet type\n");
 			}
 
 			continue;
@@ -136,7 +136,7 @@ void Client::HandleServerPacket(ByteReader& buf)
 
 			// hard reset the time values
 			if (abs(time_delta) > time_reset_threshold.get_float()) {
-				sys_print("reset time %f\n", time_delta);
+				sys_print(Debug, "reset time %f\n", time_delta);
 				eng->set_game_tick( server_tick );
 				eng->set_game_time( server_time );
 				time_delta = 0.0;

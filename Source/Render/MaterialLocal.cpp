@@ -85,7 +85,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (key.debug) params += "DEBUG_SHADER,";
 	if (!params.empty())params.pop_back();
 
-	sys_print("*** INFO: compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
+	sys_print(Debug,"compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
 
 	const bool is_tesselation = mat->get_master_material()->usage == MaterialUsage::Terrain;
 	program_handle handle = draw.get_prog_man().create_single_file(name.c_str(), is_tesselation, params);
@@ -322,7 +322,7 @@ bool MaterialImpl::load_from_file(MaterialInstance* self, const std::string& ful
 		}
 	}
 	catch (MasterMaterialExcept exppt) {
-		sys_print("!!! error loading material: %s\n", exppt.what());
+		sys_print(Error, "error loading material: %s\n", exppt.what());
 	}
 	return false;
 
@@ -802,5 +802,5 @@ void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 			return;
 		}
 	}
-	sys_print("!!! couldnt find parameter for set_tex_parameter\n");
+	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
 }

@@ -70,7 +70,7 @@ inline void* Memory_Arena::alloc_top(uint32_t size)
 	uintptr_t ret = align_backward(top_pointer - size);
 
 	if (ret <= bottom_pointer) {
-		sys_print("OUT OF MEMORY %s\n", debug_name);
+		sys_print(Error, "OUT OF MEMORY %s\n", debug_name);
 		fflush(stdout);
 		std::abort();
 		return nullptr;
@@ -92,7 +92,7 @@ inline void* Memory_Arena::alloc_bottom(uint32_t size)
 	uintptr_t ret = align_forward(bottom_pointer);
 
 	if (ret + size >= top_pointer) {
-		sys_print("OUT OF MEMORY %s\n", debug_name);
+		sys_print(Error,"OUT OF MEMORY %s\n", debug_name);
 		fflush(stdout);
 		std::abort();
 		return nullptr;

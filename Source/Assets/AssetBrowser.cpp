@@ -288,13 +288,13 @@ DECLARE_ENGINE_CMD(CLEAR_AB_FILTER)
 DECLARE_ENGINE_CMD(FILTER_FOR)
 {
 	if (args.size() != 2) {
-		sys_print("??? FILTER_FOR <asset type>\n");
+		sys_print(Warning, "FILTER_FOR <asset type>\n");
 		return;
 	}
 	auto type = AssetRegistrySystem::get().find_type(args.at(1));
 	if (!type)
 	{
-		sys_print("??? no FILTER_FOR type name\n");
+		sys_print(Warning, "no FILTER_FOR type name\n");
 		return;
 	}
 	global_asset_browser.filter_all();

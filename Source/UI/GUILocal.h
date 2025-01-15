@@ -65,7 +65,7 @@ public:
 				const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
 				
 				if (ui_debug_press.get_bool())
-					sys_print("*** UI pressed: %s\n", g->get_type().classname);
+					sys_print(Debug, "UI pressed: %s\n", g->get_type().classname);
 				g->on_pressed(where.x, where.y, event.button.button);
 
 				if (event.button.button == 1)
@@ -78,7 +78,7 @@ public:
 			if (event.button.button == 1) {
 				if (dragging) {
 					if (ui_debug_press.get_bool())
-						sys_print("*** UI dragged released: %s\n", dragging->get_type().classname);
+						sys_print(Debug, "UI dragged released: %s\n", dragging->get_type().classname);
 
 					const glm::ivec2 where = { event.button.x - dragging->ws_position.x,event.button.y - dragging->ws_position.y };
 					dragging->on_released(where.x, where.y, 1);
@@ -89,7 +89,7 @@ public:
 				GUI* g = find_gui_under_mouse_R(root, event.button.x, event.button.y);
 				if (g) {
 					if (ui_debug_press.get_bool())
-						sys_print("*** UI released: %s\n", g->get_type().classname);
+						sys_print(Debug, "UI released: %s\n", g->get_type().classname);
 
 					const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
 					g->on_released(where.x, where.y, event.button.button);
@@ -161,13 +161,13 @@ public:
 			return;
 		if (focusing) {
 			if (ui_debug_press.get_bool())
-				sys_print("*** UI focus end: %s\n", focusing->get_type().classname);
+				sys_print(Debug, "UI focus end: %s\n", focusing->get_type().classname);
 			focusing->on_focus_end();
 		}
 		focusing = panel;
 		if (panel) {
 			if (ui_debug_press.get_bool())
-				sys_print("*** UI focus start: %s\n", focusing->get_type().classname);
+				sys_print(Debug, "UI focus start: %s\n", focusing->get_type().classname);
 			panel->on_focus_start();
 		}
 	}
@@ -215,13 +215,13 @@ public:
 			return;
 		if (hovering) {
 			if (ui_debug_press.get_bool())
-				sys_print("*** UI hover end: %s\n", hovering->get_type().classname);
+				sys_print(Debug, "UI hover end: %s\n", hovering->get_type().classname);
 			hovering->on_hover_end();
 		}
 		hovering = panel;
 		if (panel) {
 			if (ui_debug_press.get_bool())
-				sys_print("*** UI hover start: %s\n", hovering->get_type().classname);
+				sys_print(Debug, "UI hover start: %s\n", hovering->get_type().classname);
 			panel->on_hover_start();
 		}
 	}

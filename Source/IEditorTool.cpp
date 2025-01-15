@@ -62,7 +62,7 @@ void IEditorTool::close()
 bool IEditorTool::save()
 {
 	if (!can_save_document()) {
-		sys_print("!!! cant save graph while playing\n");
+		sys_print(Error, "cant save graph while playing\n");
 		return false;
 	}
 	if (!current_document_has_path()) {

@@ -103,7 +103,7 @@ public:
 
 		auto mat = GetAssets().find_sync<MaterialInstance>(get_doc_name());
 		if (!mat) {
-			sys_print("!!! couldnt open material %s\n", get_doc_name().c_str());
+			sys_print(Error, "couldnt open material %s\n", get_doc_name().c_str());
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "close_ed");
 			return;
 		}

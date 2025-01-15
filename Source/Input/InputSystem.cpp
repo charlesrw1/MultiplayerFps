@@ -67,7 +67,7 @@ void GameInputSystem::init()
 	}
 
 	int numjoysticks = SDL_NumJoysticks();
-	sys_print("``` %d existing controllers connected\n", numjoysticks);
+	sys_print(Debug,"%d existing controllers connected\n", numjoysticks);
 	using GIB = GlobalInputBinding;
 	const int count = (int)GIB::NumInputs;
 	for (int i = 0; i < count; i++)
@@ -170,7 +170,7 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 	{
 		int joyindex = event.cdevice.which;
 		if (joyindex >= 4) {
-			sys_print("SDL_CONTROLLERDEVICEADDED: device index is greater than 3\n");
+			sys_print(Warning,"SDL_CONTROLLERDEVICEADDED: device index is greater than 3\n");
 		}
 		else {
 			auto controller = SDL_GameControllerOpen(joyindex);
@@ -178,7 +178,7 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 			impl->controllerDevices[joyindex].devicePtr = controller;
 			impl->controllerDevices[joyindex].selfHandle = { joyindex + 1 };
 
-			sys_print("Controller %d added to game system\n",joyindex);
+			sys_print(Debug,"Controller %d added to game system\n",joyindex);
 
 			device_connected.invoke(impl->controllerDevices[joyindex].selfHandle);
 		}
@@ -199,7 +199,7 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 		}
 		assert(myIndex != 4);
 
-		sys_print("Controller %d removed from game system\n", myIndex);
+		sys_print(Debug,"Controller %d removed from game system\n", myIndex);
 		auto& device = impl->controllerDevices[myIndex];
 		auto wasId = device.selfHandle;
 		device_disconnected.invoke(wasId);
@@ -211,7 +211,7 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 		device.user = nullptr;
 
 		if (user) {
-			sys_print("*** user lost device\n");
+			sys_print(Debug,"user lost device\n");
 			assert(user->assigned_device.id == wasId.id);
 			user->assigned_device = { -1 };
 			user->on_lost_device.invoke();
@@ -357,7 +357,7 @@ void GameInputSystem::set_my_device(InputUser* u, handle<InputDevice> handle)
 
 	auto device =impl->get_device(handle);
 	if (device->user) {
-		sys_print("??? stealing a device from another inputuser\n");
+		sys_print(Warning, "stealing a device from another inputuser\n");
 		device->user->assigned_device = { -1 };
 		device->user->on_lost_device.invoke();
 		device->user = nullptr;

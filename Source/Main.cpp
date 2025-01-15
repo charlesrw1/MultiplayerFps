@@ -90,7 +90,7 @@ bool CheckGlErrorInternal_(const char* file, int line)
 		default:
 			break;
 		}
-		sys_print("%s | %s (%d)\n", error_name, file, line);
+		sys_print(Error, "%s | %s (%d)\n", error_name, file, line);
 
 		error_code = glGetError();
 	}
@@ -180,12 +180,12 @@ char* string_format(const char* fmt, ...) {
 
 void Quit()
 {
-	sys_print("Quiting...\n");
+	sys_print(Info, "Quiting...\n");
 	eng_local.cleanup();
 	exit(0);
 }
 
-void sys_print(const char* fmt, ...)
+void sys_print(LogType type, const char* fmt, ...)
 {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
@@ -194,16 +194,13 @@ void sys_print(const char* fmt, ...)
 	
 	int len = strlen(fmt);
 	bool print_end = true;
-	if (len >= 3 && fmt[0] == '!' && fmt[1] == '!' && fmt[2] == '!') {
+	if (type == LogType::Error) {
 		printf("\033[91m");
 	}
-	else if (len >= 3 && fmt[0] == '?' && fmt[1] == '?' && fmt[2] == '?') {
+	else if (type==LogType::Warning) {
 		printf("\033[33m");
 	}
-	else if (len >= 3 && fmt[0] == '*' && fmt[1] == '*' && fmt[2] == '*') {
-		printf("\033[94m");
-	}
-	else if (len >= 3 && fmt[0] == '`' && fmt[1] == '`' && fmt[2] == '`') {
+	else if (type==LogType::Debug) {
 		printf("\033[32m");
 	}
 	else if (len >= 1 && fmt[0] == '>') {
@@ -265,7 +262,7 @@ void GameEngineLocal::init_sdl_window()
 	ASSERT(!window);
 
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
-		sys_print("!!! init sdl failed: %s\n", SDL_GetError());
+		sys_print(Error,"init sdl failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
 
@@ -279,16 +276,16 @@ void GameEngineLocal::init_sdl_window()
 	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
-		sys_print("!!! create sdl window failed: %s\n", SDL_GetError());
+		sys_print(Error, "create sdl window failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
 
 	gl_context = SDL_GL_CreateContext(window);
-	sys_print("OpenGL loaded\n");
+	sys_print(Debug, "OpenGL loaded\n");
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
-	sys_print("``` Vendor: %s\n", glGetString(GL_VENDOR));
-	sys_print("``` Renderer: %s\n", glGetString(GL_RENDERER));
-	sys_print("``` Version: %s\n\n", glGetString(GL_VERSION));
+	sys_print(Debug, "Vendor: %s\n", glGetString(GL_VENDOR));
+	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
+	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
 
 	SDL_GL_SetSwapInterval(0);
 }
@@ -424,7 +421,7 @@ void GameEngineLocal::connect_to(string address)
 	ASSERT(0);
 	///travel_to_engine_state(Engine_State::Loading, "connecting to another server");
 
-	sys_print("Connecting to server %s\n", address.c_str());
+	sys_print(Info, "Connecting to server %s\n", address.c_str());
 	cl->connect(address);
 }
 
@@ -438,7 +435,7 @@ DECLARE_ENGINE_CMD(start_ed)
 {
 	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset metadata typename>] <file>\n";
 	if (args.size() != 2 && args.size()!=3) {
-		sys_print(usage_str);
+		sys_print(Info, usage_str);
 		return;
 	}
 
@@ -451,11 +448,10 @@ DECLARE_ENGINE_CMD(start_ed)
 		eng_local.change_editor_state(metadata->tool_to_edit_me(),metadata->get_arg_for_editortool(), file_to_open);
 	}
 	else {
-		sys_print("unknown editor\n");
-		sys_print(usage_str);
+		sys_print(Error, "unknown editor\n");
+		sys_print(Info, usage_str);
 	}
 }
-
 
 static void enable_imgui_docking()
 {
@@ -469,7 +465,7 @@ static void disable_imgui_docking()
 
 void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
-	sys_print("--------- Change Editor State ---------\n");
+	sys_print(Info, "--------- Change Editor State ---------\n");
 	if (active_tool != next_tool && active_tool != nullptr) {
 		// this should call close internally
 		get_current_tool()->close();
@@ -517,7 +513,7 @@ DECLARE_ENGINE_CMD(bind)
 			else if (strcmp(m, "Shift")==0)
 				modifiers |= KMOD_SHIFT;
 			else
-				sys_print("??? unknown modifier for 'bind': %s\n", m);
+				sys_print(Warning, "unknown modifier for 'bind': %s\n", m);
 		}
 
 		// bind M Ctrl Alt "mycommand"
@@ -534,7 +530,7 @@ DECLARE_ENGINE_CMD_CAT("cl.",force_update)
 DECLARE_ENGINE_CMD(connect)
 {
 	if (args.size() < 2) {
-		sys_print("usage connect <address>");
+		sys_print(Info, "usage connect <address>");
 		return;
 	}
 
@@ -554,12 +550,12 @@ DECLARE_ENGINE_CMD(reconnect)
 DECLARE_ENGINE_CMD(map)
 {
 	if (args.size() < 2) {
-		sys_print("usage: map <map name>");
+		sys_print(Info, "usage: map <map name>");
 		return;
 	}
 
 	if (eng->get_current_tool() != nullptr) {
-		sys_print("*** starting game so closing any editors\n");
+		sys_print(Warning,"starting game so closing any editors\n");
 		eng_local.change_editor_state(nullptr,"");	// close any editors
 	}
 
@@ -570,7 +566,7 @@ extern ConfigVar g_entry_level;
 DECLARE_ENGINE_CMD(goto_entry_map)
 {
 	if (args.size() != 1) {
-		sys_print("usage: goto_entry_map");
+		sys_print(Info,"usage: goto_entry_map");
 		return;
 	}
 
@@ -581,7 +577,7 @@ DECLARE_ENGINE_CMD(goto_entry_map)
 DECLARE_ENGINE_CMD(exec)
 {
 	if (args.size() < 2) {
-		sys_print("usage: exec <exec filename>");
+		sys_print(Info,"usage: exec <exec filename>");
 		return;
 	}
 
@@ -602,12 +598,12 @@ DECLARE_ENGINE_CMD(net_stat)
 		maxtime = glm::max(maxtime, entry.time);
 	}
 
-	sys_print("Client Network Stats:\n");
-	sys_print("%--15s %f\n", "Rtt", eng->get_client()->server.rtt);
-	sys_print("%--15s %f\n", "Interval", maxtime - mintime);
-	sys_print("%--15s %d\n", "Biggest packet", maxbytes);
-	sys_print("%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
-	sys_print("%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
+	sys_print(Debug,"Client Network Stats:\n");
+	sys_print(Debug,"%--15s %f\n", "Rtt", eng->get_client()->server.rtt);
+	sys_print(Debug,"%--15s %f\n", "Interval", maxtime - mintime);
+	sys_print(Debug,"%--15s %d\n", "Biggest packet", maxbytes);
+	sys_print(Debug,"%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
+	sys_print(Debug,"%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
 }
 
 
@@ -837,7 +833,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, LevelAsset
 	is_loading_editor_level = false;
 
 	if (!loadedLevel) {
-		sys_print("!!! couldn't load map !!!\n");
+		sys_print(Error, "couldn't load map !!!\n");
 		state = Engine_State::Idle;
 
 		on_map_load_return.invoke(false);
@@ -874,7 +870,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, LevelAsset
 	idraw->on_level_start();
 
 
-	sys_print("*** changed state to Engine_State::Game\n");
+	sys_print(Info, "changed state to Engine_State::Game\n");
 
 	// fixme, for server set state to game, but clients will sit in a wait loop till they recieve their first
 	// snapshot before continuing
@@ -886,7 +882,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, LevelAsset
 #include "Assets/AssetDatabase.h"
 void GameEngineLocal::execute_map_change()
 {
-	sys_print("-------- Map Change: %s --------\n", queued_mapname.c_str());
+	sys_print(Info, "-------- Map Change: %s --------\n", queued_mapname.c_str());
 
 	// free current map
 	stop_game();
@@ -929,7 +925,7 @@ void GameEngineLocal::spawn_starting_players(bool initial)
 void GameEngineLocal::set_tick_rate(float tick_rate)
 {
 	if (state == Engine_State::Game) {
-		sys_print("Can't change tick rate while running\n");
+		sys_print(Warning, "Can't change tick rate while running\n");
 		return;
 	}
 	tick_interval = 1.0 / tick_rate;
@@ -1313,7 +1309,7 @@ View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near,
 	viewproj = proj * view;
 }
 
-#define TIMESTAMP(x) sys_print("```%s in %f\n",x,(float)GetTime()-start); start = GetTime();
+#define TIMESTAMP(x) sys_print(Debug, "%s in %f\n",x,(float)GetTime()-start); start = GetTime();
 
 GameEngineLocal::GameEngineLocal()
 {
@@ -1326,7 +1322,7 @@ extern ModelMan mods;
 extern void register_input_actions_for_game();
 void GameEngineLocal::init()
 {
-	sys_print("--------- Initializing Engine ---------\n");
+	sys_print(Info, "--------- Initializing Engine ---------\n");
 
 	float first_start = GetTime();
 	float start = GetTime();
@@ -1504,7 +1500,7 @@ void GameEngineLocal::stop_game()
 	if (!map_spawned())
 		return;
 
-	sys_print("-------- Clearing Map --------\n");
+	sys_print(Info,"-------- Clearing Map --------\n");
 
 	ASSERT(level);
 
@@ -1797,7 +1793,7 @@ ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "editor_cfg", CVAR_DEV, "wh
 DECLARE_ENGINE_CMD(dump_imgui_ini)
 {
 	if (args.size() != 2) {
-		sys_print("usage: dump_imgui_ini  ($g_editor_cfg_folder)/<file>");
+		sys_print(Info, "usage: dump_imgui_ini  ($g_editor_cfg_folder)/<file>");
 		return;
 	}
 
@@ -1812,7 +1808,7 @@ DECLARE_ENGINE_CMD(dump_imgui_ini)
 DECLARE_ENGINE_CMD(load_imgui_ini)
 {
 	if (args.size() != 2) {
-		sys_print("usage: load_imgui_ini ($g_editor_cfg_folder)/<file>");
+		sys_print(Info, "usage: load_imgui_ini ($g_editor_cfg_folder)/<file>");
 		return;
 	}
 

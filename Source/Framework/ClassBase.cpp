@@ -165,7 +165,7 @@ void ClassBase::init_class_reflection_system()
 		}
 	}
 
-	sys_print("``` Initialized Classes; num classes: %d\n", (int)get_registry().id_to_typeinfo.size());
+	sys_print(Debug, "Initialized Classes; num classes: %d\n", (int)get_registry().id_to_typeinfo.size());
 
 	get_registry().initialzed = true;
 }

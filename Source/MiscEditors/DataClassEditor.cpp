@@ -38,7 +38,7 @@ bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 		}
 	}
 	if (!editing_object) {
-		sys_print("!!! DataClassEditor couldnt find class to edit with name: %s\n", name);
+		sys_print(Error, "DataClassEditor couldnt find class to edit with name: %s\n", name);
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
 		// this should call close_internal etc.
 		return false;

@@ -127,12 +127,12 @@ bool AnimatorInstance::initialize_animator(
 	ASSERT(model);
 
 	if (!model->get_skel()) {
-		sys_print("!!! model doesnt have skeleton for AnimatorInstance\n");
+		sys_print(Error, "model doesnt have skeleton for AnimatorInstance\n");
 		return false;
 	}
 
 	if (!graph) {
-		sys_print("!!! graph not provided for animator instance\n");
+		sys_print(Error, "graph not provided for animator instance\n");
 		return false;
 	}
 
@@ -706,7 +706,7 @@ bool AnimatorInstance::play_animation_in_slot(
 
 	auto slot_to_play_in = find_slot_with_name(slot);
 	if (!slot_to_play_in) {
-		sys_print("??? no slot with name\n");
+		sys_print(Warning, "no slot with name\n");
 		return false;
 	}
 	int remap_idx = -1;

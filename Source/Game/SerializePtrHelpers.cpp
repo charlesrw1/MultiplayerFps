@@ -22,7 +22,7 @@ public:
 
 		auto find = ctx->to_serialize_index.find(*ptr_prop);
 		if (find == ctx->to_serialize_index.end()) {
-			sys_print("!!! Couldn't find ObjectPtr to serialize %s\n", info.name);
+			sys_print(Error, "Couldn't find ObjectPtr to serialize %s\n", info.name);
 			return std::string("0");
 		}
 		else {
@@ -39,7 +39,7 @@ public:
 		uint32_t res = 0;
 		int number = sscanf(stack.c_str(), "%d", &res);
 		if (number != 1) {
-			sys_print("!!! Error on ObjectPtr unserialize\n");
+			sys_print(Error, "Error on ObjectPtr unserialize\n");
 			res = 0;
 		}
 		uintptr_t* ptr_prop_as_int = (uintptr_t*)(*ptr_prop);
@@ -82,7 +82,7 @@ public:
 			if (typeInfo)
 				*ptr_prop = GetAssets().find_assetptr_unsafe(to_str, typeInfo);
 			else {
-				sys_print("!!! no asset loader defined for asset type %s\n", info.range_hint);
+				sys_print(Error, "no asset loader defined for asset type %s\n", info.range_hint);
 				*ptr_prop = nullptr;
 			}
 
@@ -105,7 +105,7 @@ class SerializeEntityPtr : public IPropertySerializer
 		auto stack = token.to_stack_string();
 		int fields = sscanf(stack.c_str(), "%llu", p);
 		if (fields != 1) {
-			sys_print("!!! unserialize EntityPtr error\n");
+			sys_print(Error, "unserialize EntityPtr error\n");
 			*p = 0;
 		}
 	}

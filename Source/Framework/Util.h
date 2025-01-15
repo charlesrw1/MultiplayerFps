@@ -13,8 +13,16 @@ bool CheckGlErrorInternal_(const char* file, int line);
 double GetTime();
 double TimeSinceStart();
 
+enum LogType
+{
+	Error,
+	Warning,
+	Info,
+	Debug
+};
+
 void Fatalf(const char* format, ...);
-void sys_print(const char* fmt, ...);
+void sys_print(LogType type, const char* fmt, ...);
 
 char* string_format(const char* fmt, ...);
 

@@ -298,7 +298,7 @@ public:
 
 		auto filePtr = FileSys::open_read_game(path.c_str());
 		if (!filePtr) {
-			sys_print("!!! couldnt load particle fx file %s\n", file.c_str());
+			sys_print(Error, "couldnt load particle fx file %s\n", file.c_str());
 			return nullptr;
 		}
 
@@ -309,7 +309,7 @@ public:
 		auto newAsset = read_object_properties<ParticleFXAsset>(nullptr, dp, tok);
 
 		if (!newAsset) {
-			sys_print("!!! couldnt load particle fx %s\n", file.c_str());
+			sys_print(Error, "couldnt load particle fx %s\n", file.c_str());
 			return nullptr;
 		}
 

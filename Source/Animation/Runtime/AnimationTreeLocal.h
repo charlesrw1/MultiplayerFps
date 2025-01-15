@@ -78,7 +78,7 @@ class BaseAGNode;
 inline BaseAGNode* serialized_nodecfg_ptr_to_ptr(BaseAGNode* ptr, Animation_Tree_CFG* cfg) {
 	uintptr_t index = (uintptr_t)ptr;	// serialized as indicies
 	if (index >= 0xffff && index != -1) { // assume anything larger is a bad pointer error
-		sys_print("!!! pointer serialized wrong for node\n");
+		sys_print(Error, "pointer serialized wrong for node\n");
 		return nullptr;
 	}
 	return (index == -1) ? nullptr : cfg->get_node(index);
@@ -658,7 +658,7 @@ NODECFG_HEADER(Blend_Masked_CFG, Blend_Masked_RT)
 		//FIXME
 		rt->mask = ctx.get_skeleton()->find_mask(maskname);
 		if (!rt->mask)
-			sys_print("??? blend_masked_cfg has no valid mask\n");
+			sys_print(Warning, "blend_masked_cfg has no valid mask\n");
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {
 		base->reset(ctx);
@@ -856,9 +856,9 @@ NODECFG_HEADER(TwoBoneIK_CFG, TwoBoneIK_RT)
 		rt->target_bone_index = ctx.get_skeleton()->get_bone_index(other_bone.c_str());
 	
 		if (!rt->bone_index)
-			sys_print("??? no bone index for twoboneik node\n");
+			sys_print(Warning, "no bone index for twoboneik node\n");
 		if (ik_in_bone_space && !rt->target_bone_index)
-			sys_print("??? no target bone when its required for twoboneik\n");
+			sys_print(Warning, "no target bone when its required for twoboneik\n");
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const {
 		input->reset(ctx);
@@ -903,7 +903,7 @@ NODECFG_HEADER(CopyBone_CFG, CopyBone_RT)
 		rt->target_bone_index = ctx.get_skeleton()->get_bone_index(dest_bone.c_str());
 	
 		if (rt->src_bone_index==-1||rt->target_bone_index==-1)
-			sys_print("??? no bone index for copybone node\n");
+			sys_print(Warning, "no bone index for copybone node\n");
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const {
 		input->reset(ctx);
@@ -976,18 +976,18 @@ CLASS_H(VariableNode, ValueNode)
 	}
 	virtual void initialize(Animation_Tree_CFG* cfg) override {
 		if (var_name.empty())
-			sys_print("??? invalid handle for variable node on initialization\n");
+			sys_print(Warning, "invalid handle for variable node on initialization\n");
 		else {
 			pi = cfg->find_animator_instance_variable(var_name);
 			
 			if (!pi)
-				sys_print("??? variable wasnt linked to native class\n");
+				sys_print(Warning, "variable wasnt linked to native class\n");
 			else {
 				bool good = false;
 				var_type = core_type_id_to_anim_graph_value(&good, pi->type);
 				if (!good) {
 					pi = nullptr;
-					sys_print("??? variable type wasn't found right\n");
+					sys_print(Warning, "variable type wasn't found right\n");
 				}
 			}
 		}

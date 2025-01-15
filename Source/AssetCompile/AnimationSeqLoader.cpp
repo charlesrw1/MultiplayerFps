@@ -68,7 +68,7 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 	auto& path = get_name();
 	auto pos = path.rfind('/');
 	if (pos == std::string::npos) {
-		sys_print("!!! no forward slash in animation seq\n");
+		sys_print(Error, "no forward slash in animation seq\n");
 		return false;
 	}
 	std::string modName = path.substr(0, pos) + ".cmdl";

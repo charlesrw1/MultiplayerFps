@@ -37,7 +37,7 @@ public:
 
 	void set_string(const char* value) {
 		if (flags & CVAR_READONLY) {
-			sys_print("!!! cant set readonly var %s\n", value);
+			sys_print(Error, "cant set readonly var %s\n", value);
 			return;
 		}
 
@@ -170,7 +170,7 @@ public:
 
 	
 	void print_vars(const char* match) {
-		sys_print("%--36s %s", "name", "value");
+		sys_print(Info, "%--36s %s", "name", "value");
 		//for (int i = 0; i < num_vars; i++)
 			//if (!match || all_vars[i].name.find(match) != std::string::npos)
 				//sys_print("%--36s %s\n", all_vars[i].name.c_str(), all_vars[i].value.c_str());
@@ -309,7 +309,7 @@ public:
 	}
 	void execute_string(const char* command_string) {
 
-		sys_print("> %s\n", command_string);
+		sys_print(Info, "> %s\n", command_string);
 		Cmd_Args args;
 		std::string command = command_string;
 		tokenize_string(command, args);
@@ -321,7 +321,7 @@ public:
 		else {
 			ConfigVar* var = VarMan::get()->find(args.at(0));
 			if (var && args.size() == 1) {
-				sys_print("%s %s\n", var->get_name(), var->get_string());
+				sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
 			}
 
 			else if (!var && set_unknown_variables && args.size() == 2)
@@ -329,7 +329,7 @@ public:
 			else if (var && args.size() == 2)
 				var->set_string(args.at(1));
 			else
-				sys_print("unknown command: %s\n", args.at(0));
+				sys_print(Error, "unknown command: %s\n", args.at(0));
 		}
 	}
 
@@ -346,7 +346,7 @@ public:
 
 		auto file = FileSys::open_read_engine(path);
 		if(!file) {
-			sys_print("!!! couldn't open config file to execute: %s\n", path);
+			sys_print(Error, "couldn't open config file to execute: %s\n", path);
 			return;
 		}
 		

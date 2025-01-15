@@ -127,7 +127,7 @@ struct AssetDatabaseImpl
 			auto asset_to_load = (force_reload) ? copiedAsset : asset;
 			asset_to_load->load_failed = !asset_to_load->load_asset(userStruct) /* not success */;
 			if (asset_to_load->load_failed) {
-				sys_print("!!! failed to load %s asset %s\n", asset_to_load->get_type().classname, asset_to_load->path.c_str());
+				sys_print(Error, "failed to load %s asset %s\n", asset_to_load->get_type().classname, asset_to_load->path.c_str());
 			}
 			asset_to_load->reference_bitmask_internal = (force_reload) ? asset->reference_bitmask_internal : reference_mask;
 			asset_to_load->is_loaded = true;
@@ -176,7 +176,7 @@ struct AssetDatabaseImpl
 	void finalize_job_with_main_thread(LoadJob*& job)
 	{
 #ifdef _DEBUG
-		sys_print("*** finalize job %s resource %s\n", job->thisAsset->get_type().classname, job->thisAsset->get_name().c_str());
+		sys_print(Debug,"finalize job %s resource %s\n", job->thisAsset->get_type().classname, job->thisAsset->get_name().c_str());
 #endif
 
 		if (!job->skipPostLoad) {
@@ -315,7 +315,7 @@ struct AssetDatabaseImpl
 			if (asset.second->reference_bitmask_threadsafe == 0 && asset.second->is_loaded) {
 
 #ifdef _DEBUG
-			sys_print("*** uninstalling %s resource %s\n", asset.second->get_type().classname, asset.second->get_name().c_str());
+			sys_print(Debug,"uninstalling %s resource %s\n", asset.second->get_type().classname, asset.second->get_name().c_str());
 #endif
 				asset.second->uninstall();
 				asset.second->set_not_loaded_main_thread();

@@ -116,16 +116,16 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 DECLARE_ENGINE_CMD(TOUCH_ASSET)
 {
 	if (args.size() != 2) {
-		sys_print("TOUCH_ASSET <asset path>\n");
+		sys_print(Warning, "TOUCH_ASSET <asset path>\n");
 		return;
 	}
 	auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(args.at(1)));
 	if (type) {
 		auto res = GetAssets().find_sync(args.at(1), type, 0);
 		if (!res)
-			sys_print("!!! TOUCH_ASSET failed\n");
+			sys_print(Error, "TOUCH_ASSET failed\n");
 	}
 	else {
-		sys_print("!!! couldnt find type\n");
+		sys_print(Error, "couldnt find type\n");
 	}
 }

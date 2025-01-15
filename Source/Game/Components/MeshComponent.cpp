@@ -50,7 +50,7 @@ void MeshComponent::set_animation_graph(const char* graph)
 		//
 		//	bool good = animator->initialize_animator(model.get(), animator_tree.get(), get_owner());
 		//	if (!good) {
-		//		sys_print("!!! couldnt initialize animator\n");
+		//		sys_print(Error, "couldnt initialize animator\n");
 		//		animator.reset(nullptr);	// free animator
 		//		animator_tree = nullptr;	// free tree reference
 		//	}
@@ -138,7 +138,7 @@ void MeshComponent::on_init()
 
 			bool good = animator->initialize_animator(modToUse, animator_tree.get(), get_owner());
 			if (!good) {
-				sys_print("!!! couldnt initialize animator\n");
+				sys_print(Error, "couldnt initialize animator\n");
 				animator.reset(nullptr);	// free animator
 				animator_tree = nullptr;	// free tree reference
 			}

@@ -41,7 +41,7 @@ std::string get_tooltip() const override {
 	bool push_input(AnimationGraphEditor* ed, Base_EdNode* input)  {
 		
 		if (inputs.size() >= MAX_INPUTS) {
-			sys_print("!!! state node inputs full\n");
+			sys_print(Error, "state node inputs full\n");
 			return false;
 		}
 		

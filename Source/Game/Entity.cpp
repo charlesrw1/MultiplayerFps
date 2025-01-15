@@ -232,7 +232,7 @@ EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* i
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
 	if (!info->is_a(EntityComponent::StaticType)) {
-		sys_print("!!! create_and_attach_component_type not subclass of entity component\n");
+		sys_print(Error, "create_and_attach_component_type not subclass of entity component\n");
 		return nullptr;
 	}
 	EntityComponent* ec = (EntityComponent*)info->allocate();

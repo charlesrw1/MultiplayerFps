@@ -50,7 +50,7 @@ void Server::init()
 }
 void Server::end(const char* log_reason)
 {
-	sys_print("Ending server because %s\n", log_reason);
+	sys_print(Info, "Ending server because %s\n", log_reason);
 	for (int i = 0; i < clients.size(); i++)
 		clients[i].Disconnect("server is ending");
 	socket.Shutdown();
@@ -61,7 +61,7 @@ void Server::start()
 {
 	if (initialized)
 		end("restarting server");;
-	sys_print("Starting server...\n");
+	sys_print(Info, "Starting server...\n");
 
 	int host_port = g_host_port.get_integer();
 
@@ -79,10 +79,10 @@ Frame2* Server::GetSnapshotFrame()
 
 void Server::connect_local_client()
 {
-	sys_print("Putting local client in server\n");
+	sys_print(Info, "Putting local client in server\n");
 
 	if (clients[0].IsConnected()) {
-		sys_print(__FUNCTION__": clients[0] is taken??\n");
+		sys_print(Info, ": clients[0] is taken??\n");
 		clients[0].Disconnect("client[0] shouldn't be here");
 	}
 	clients[0].client_num = 0;
@@ -128,7 +128,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 		return;
 	}
 	if (!already_connected)
-		sys_print("New client connected %s\n", addr.ToString().c_str());
+		sys_print(Info, "New client connected %s\n", addr.ToString().c_str());
 
 	uint8_t accept_buf[256];
 	ByteWriter writer(accept_buf, 256);
@@ -150,7 +150,7 @@ void Server::ConnectNewClient(ByteReader& buf, IPAndPort addr)
 	if (!already_connected) {
 		new_client.init(addr);
 		new_client.state = SCS_SPAWNED;
-		sys_print("Spawning client %d : %s\n", spot, addr.ToString().c_str());
+		sys_print(Info, "Spawning client %d : %s\n", spot, addr.ToString().c_str());
 		eng->login_new_player(spot);
 	}
 }
@@ -169,14 +169,14 @@ void Server::ReadPackets()
 			ByteReader buf(inbuffer, recv_len, sizeof(inbuffer));
 			buf.ReadLong();	// skip header
 			
-			sys_print("Connectionless packet recieved from %s\n", from.ToString().c_str());
+			sys_print(Info, "Connectionless packet recieved from %s\n", from.ToString().c_str());
 			string msg;
 			buf.read_string(msg);
 			if (msg == "connect") {
 				ConnectNewClient(buf, from);
 			}
 			else {
-				sys_print("Unknown connectionless packet\n");
+				sys_print(Info, "Unknown connectionless packet\n");
 			}
 
 			continue;
@@ -184,7 +184,7 @@ void Server::ReadPackets()
 
 		int cl_index = FindClient(from);
 		if (cl_index == -1) {
-			sys_print("Packet recieved from unknown source: %s\n", from.ToString().c_str());
+			sys_print(Info, "Packet recieved from unknown source: %s\n", from.ToString().c_str());
 			continue;
 		}
 

@@ -227,9 +227,9 @@ void MainVbIbAllocator::print_usage() const
 
 		int used_elements = b.used / element_size;
 		int allocated_elements = b.allocated / element_size;
-		sys_print("%s: %d/%d (%.1f%%) (bytes:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used);
+		sys_print(Debug, "%s: %d/%d (%.1f%%) (bytes:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used);
 	};
-	sys_print("---- MainVbIbAllocator::print_usage ----\n");
+	sys_print(Info, "---- MainVbIbAllocator::print_usage ----\n");
 
 	print_facts("Index buffer", ibuffer, INDEX_TYPE_SIZE);
 	print_facts("Vertex buffer", vbuffer, sizeof(ModelVertex));
@@ -245,7 +245,7 @@ void MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
 void MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
 {
 	if (size + buf.used > buf.allocated) {
-		sys_print("!!! %s buffer overflow %d/%d !!!\n",name, int(size + vbuffer.used), int(vbuffer.allocated));
+		sys_print(Error, "%s buffer overflow %d/%d !!!\n",name, int(size + vbuffer.used), int(vbuffer.allocated));
 		std::fflush(stdout);
 		std::abort();
 	}
@@ -276,7 +276,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 
 	auto file = FileSys::open_read_game(modelName.c_str());
 	if (!file) {
-		sys_print("!!! model %s does not exist\n", modelName.c_str());
+		sys_print(Error, "model %s does not exist\n", modelName.c_str());
 		return false;
 	}
 
@@ -284,12 +284,12 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 
 	uint32_t magic = read.read_int32();
 	if (magic != 'CMDL') {
-		sys_print("bad model format\n");
+		sys_print(Error, "bad model format\n");
 		return false;
 	}
 	uint32_t version = read.read_int32();
 	if (version != MODEL_FORMAT_VERSION) {
-		sys_print("out of date format\n");
+		sys_print(Error, "out of date format\n");
 		return false;
 	}
 	read.read_struct(&m->skeleton_root_transform);
@@ -326,7 +326,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 		m->materials[i] = GetAssets().find_assetptr_unsafe<MaterialInstance>(buffer);
 
 		if (!m->materials[i]->is_valid_to_use()) {
-			sys_print("!!! model doesn't have material %s\n", buffer.c_str());
+			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
 			m->materials.back() = imaterials->get_fallback();
 		}
 	}
@@ -444,7 +444,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 					nullptr, parser, tok
 					);
 				if (!event) {
-					sys_print("??? couldn't load animation event '%s'\n", buffer.c_str());
+					sys_print(Warning, "couldn't load animation event '%s'\n", buffer.c_str());
 				}
 				else
 					aseq->events.push_back(std::unique_ptr<AnimationEvent>(event));
@@ -521,7 +521,7 @@ bool Model::load_asset(ClassBase*& u) {
 
 		bool good = ModelCompilier::compile(model_def.c_str());
 		if (!good) {
-			sys_print("compilier failed on model %s\n", model_def.c_str());
+			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
 		}
 	}
 
@@ -724,7 +724,7 @@ bool ModelMan::upload_model(Model* mesh)
 DECLARE_ENGINE_CMD(IMPORT_MODEL)
 {
 	if (args.size() != 2) {
-		sys_print("!!! usage: IMPORT_MODEL <.glb path>");
+		sys_print(Error, "usage: IMPORT_MODEL <.glb path>");
 		return;
 	}
 

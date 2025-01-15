@@ -169,7 +169,7 @@ void PropertyGrid::add_class_to_grid(ClassBase* classinst)
 void PropertyGrid::update()
 {
 	if (rows_had_changes)
-		sys_print("cleared change flag\n");
+		sys_print(Debug, "cleared change flag\n");
 	rows_had_changes = false;
 
 	if (rows.empty()) {
@@ -443,7 +443,7 @@ int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, Imgui
 	if (candidates.empty())
 	{
 		// No match
-		sys_print("No match for \"%.*s\"!\n", (int)(word_end - word_start), word_start);
+		sys_print(Info, "No match for \"%.*s\"!\n", (int)(word_end - word_start), word_start);
 	}
 	else if (candidates.size() == 1)
 	{
@@ -478,9 +478,9 @@ int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, Imgui
 		}
 
 		// List matches
-		sys_print("Possible matches:\n");
+		sys_print(Info, "Possible matches:\n");
 		for (int i = 0; i < candidates.size(); i++)
-			sys_print("- %s\n", candidates[i]);
+			sys_print(Info, "- %s\n", candidates[i]);
 	}
 	return 0;
 }

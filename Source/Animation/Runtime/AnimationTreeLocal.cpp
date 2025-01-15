@@ -746,7 +746,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	 }
 
 	 if (count <= 2) {
-		 sys_print("??? ik attempted on some root bone %s\n", bone_name.c_str());
+		 sys_print(Warning, "ik attempted on some root bone %s\n", bone_name.c_str());
 		 return res;
 	 }
 

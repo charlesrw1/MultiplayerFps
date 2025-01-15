@@ -47,7 +47,7 @@ public:
 		
 	}
 	void print_something() {
-		sys_print("---------------HELLO WORLD---------------\n");
+		sys_print(Info, "---------------HELLO WORLD---------------\n");
 	}
 
 	void on_pressed(int x, int y, int button) override {
@@ -147,7 +147,7 @@ public:
 						mesh_ent->Mesh->set_model(modelP.get());
 					}
 					else
-						sys_print("``` CreateStaticMeshCommand: ent handle invalid in async callback\n");
+						sys_print(Warning,"CreateStaticMeshCommand: ent handle invalid in async callback\n");
 				}
 			}
 			});
@@ -371,7 +371,7 @@ void EditorDoc::init()
 
 bool EditorDoc::save_document_internal()
 {
-	sys_print("*** saving map document\n");
+	sys_print(Info, "saving map document\n");
 
 	auto& all_objs = eng->get_level()->get_all_objects();
 
@@ -387,7 +387,7 @@ bool EditorDoc::save_document_internal()
 	auto outfile = FileSys::open_write_game(path.c_str());
 	outfile->write(serialized.text.c_str(), serialized.text.size());
 
-	sys_print("``` Wrote out to %s\n", path.c_str());
+	sys_print(Info, "Wrote out to %s\n", path.c_str());
 
 	return true;
 }
@@ -426,7 +426,7 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 		if (needs_new_doc) {
 			// uses the newmap template to load
 			const char* name = g_editor_newmap_template.get_string();
-			sys_print("creating new map using template map: %s\n",name);
+			sys_print(Debug, "creating new map using template map: %s\n",name);
 			set_empty_doc();
 
 
@@ -455,7 +455,7 @@ void EditorDoc::close_internal()
 
 	// level will get unloaded in the main loop
 
-	sys_print("*** deleting map file for editor...\n");
+	sys_print(Debug, "deleting map file for editor...\n");
 
 	command_mgr->clear_all();
 	

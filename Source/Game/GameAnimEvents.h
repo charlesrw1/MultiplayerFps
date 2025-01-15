@@ -5,7 +5,7 @@ CLASS_H(SoundAnimEvent, AnimationEvent)
 
 
 	virtual void on_event(Animator* a) override {
-		sys_print("--- sound! %d\n", some_number);
+		sys_print(Debug,"--- sound! %d\n", some_number);
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(SoundAnimEvent)
@@ -19,7 +19,7 @@ CLASS_H(SoundAnimEvent, AnimationEvent)
 CLASS_H(FootstepAnimEvent, AnimationEvent)
 
 	virtual void on_event(Animator* a) override {
-		sys_print("--- footstep %d\n");
+		sys_print(Debug,"--- footstep %d\n");
 	}
 	static const PropertyInfoList* get_props() {
 		return nullptr;

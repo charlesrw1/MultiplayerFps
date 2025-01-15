@@ -4,8 +4,8 @@
 #ifdef WITH_TESTS
 bool ProgramTester::run_all(bool print_good)
 {
-	sys_print("--------- Running Tests ----------\n");
-	sys_print("-num tests: %d\n", (int)allTests.size());
+	sys_print(Info,"--------- Running Tests ----------\n");
+	sys_print(Info, "-num tests: %d\n", (int)allTests.size());
 	int er = 0;
 	for (int i = 0; i < allTests.size(); i++) {
 		test_failed = false;
@@ -22,17 +22,17 @@ bool ProgramTester::run_all(bool print_good)
 
 		if (!test_failed) {
 			if(print_good)
-				sys_print("``` %s:%s good\n", allTests[i].category, allTests[i].sub_category);
+				sys_print(Info,"%s:%s good\n", allTests[i].category, allTests[i].sub_category);
 		}
 		else {
-			sys_print("!!! %s:%s FAILED (%s:%s)\n", allTests[i].category,allTests[i].sub_category, expression,reason);
+			sys_print(Error, "%s:%s FAILED (%s:%s)\n", allTests[i].category,allTests[i].sub_category, expression,reason);
 			er++;
 		}
 	}
 	if (er == 0)
-		sys_print("``` all tests passed\n");
+		sys_print(Info,"all tests passed\n");
 	else
-		sys_print("!!! tests had %d errors\n", er);
+		sys_print(Error, "tests had %d errors\n", er);
 	return er == 0;
 }
 

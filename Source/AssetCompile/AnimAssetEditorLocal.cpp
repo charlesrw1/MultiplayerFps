@@ -215,7 +215,7 @@ void AnimationEditorTool::post_map_load_callback()
 	auto file = FileSys::open_read_game(def_name.c_str());
 
 	if (!file) {
-		sys_print("!!! AnimEditor: couldnt find path %s\n", def_name.c_str());
+		sys_print(Error, "AnimEditor: couldnt find path %s\n", def_name.c_str());
 	}
 	else {
 		DictParser dp;
@@ -259,7 +259,7 @@ void AnimationEditorTool::post_map_load_callback()
 
 	outputModel = default_asset_load<Model>((modelName + ".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
 	if (!outputModel)
-		sys_print("*** compilied model didnt load but loading .def didnt error, continuing as normal\n");
+		sys_print(Debug,"compilied model didnt load but loading .def didnt error, continuing as normal\n");
 	else {
 		int remapIndx;
 		sequence = outputModel->get_skel()->find_clip(animName, remapIndx);

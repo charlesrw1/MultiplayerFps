@@ -79,7 +79,7 @@ private:
 	void on_close() { delete_tree(); }
 	void on_change_name(uint64_t handle) {
 		if (map.find(handle) == map.end()) {
-			sys_print("??? on_change_name couldnt find handle??\n");
+			sys_print(Warning, "on_change_name couldnt find handle??\n");
 			return;
 		}
 

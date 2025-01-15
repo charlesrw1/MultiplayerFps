@@ -316,12 +316,12 @@ void CurveEditorImgui::draw_editor_space()
     }
     if (ImGui::BeginPopup("point_popup")) {
         if (selected_curve == -1 || selected_curve >= curves.size()) {
-            sys_print("??? selected_curve == -1 or invalid in point_popup\n");
+            sys_print(Warning, "selected_curve == -1 or invalid in point_popup\n");
             set_selected_curve(-1);
             ImGui::CloseCurrentPopup();
         }
         else if (point_index_for_popup < 0 || point_index_for_popup >= curves[selected_curve].points.size()) {
-            sys_print("??? point_index_for_popup invalid\n");
+            sys_print(Warning, "point_index_for_popup invalid\n");
             point_index_for_popup = -1;
             ImGui::CloseCurrentPopup();
         }
@@ -363,13 +363,13 @@ void CurveEditorImgui::draw_editor_space()
         auto mousepos = ImGui::GetMousePos();
         auto gridspace = screenspace_to_grid(mousepos);
         if (selected_curve == -1 || selected_curve >= curves.size()) {
-            sys_print("??? dragging_point: selected_curve invalid\n");
+            sys_print(Warning, "dragging_point: selected_curve invalid\n");
             set_selected_curve(-1);
             dragged_point_index = -1;
             dragging_point = false;
         }
         else if (dragged_point_index < 0 || dragged_point_index >= curves[selected_curve].points.size()) {
-            sys_print("??? dragged_point_index invalid\n");
+            sys_print(Warning, "dragged_point_index invalid\n");
             dragged_point_index = -1;
             dragging_point = false;
         }
@@ -419,7 +419,7 @@ void CurveEditorImgui::draw_editor_space()
     }
     if (ImGui::BeginPopup("curve_edit_popup")) {
         if (selected_curve == -1 || selected_curve >= curves.size()) {
-            sys_print("??? selected_curve null in curve_edit_popup\n");
+            sys_print(Warning, "selected_curve null in curve_edit_popup\n");
             ImGui::CloseCurrentPopup();
 
         }
@@ -671,7 +671,7 @@ void CurveEditorImgui::draw()
        ImGui::OpenPopup("curve_popup");
    if (ImGui::BeginPopup("curve_popup")) {
        if (selected_curve < 0 || selected_curve >= curves.size()) {
-           sys_print("??? curve_popup bad selected_curve\n");
+           sys_print(Warning, "curve_popup bad selected_curve\n");
            set_selected_curve(-1);
            ImGui::CloseCurrentPopup();
        }

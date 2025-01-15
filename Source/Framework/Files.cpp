@@ -29,14 +29,14 @@ public:
 			len = GetFileSize(winhandle, nullptr);
 		}
 		else if (file_print_all_openfile_fails.get_bool())
-			sys_print("!!! OSFile failed to open read: %s\n", path);
+			sys_print(Error, "OSFile failed to open read: %s\n", path);
 
 	}
 	void init_write(const char* path) {
 		winhandle = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 
 		if (winhandle == INVALID_HANDLE_VALUE && file_print_all_openfile_fails.get_bool())
-			sys_print("!!! OSFile failed to open write: %s\n", path);
+			sys_print(Error, "OSFile failed to open write: %s\n", path);
 	}
 
 	// Inherited via IFile
@@ -158,7 +158,7 @@ bool ArchiveFile::open(const char* archive_path)
 	///file = FileSys::open_read(archive_path);
 
 	if (!file) {
-		sys_print("!!! couldn't open archive file %s\n", archive_path);
+		sys_print(Error, "couldn't open archive file %s\n", archive_path);
 		return false;
 	}
 
@@ -166,7 +166,7 @@ bool ArchiveFile::open(const char* archive_path)
 	file->read(magic, 4);
 
 	if (magic[0] != 'A' || magic[1] != 'B' || magic[2] != 'C' || magic[3] != 'D') {
-		sys_print("!!! bad archive file %s\n", archive_path);
+		sys_print(Error, "bad archive file %s\n", archive_path);
 		file->close();
 		return false;
 	}
@@ -175,7 +175,7 @@ bool ArchiveFile::open(const char* archive_path)
 	file->read(&version, 4);
 
 	if (version != 2) {
-		sys_print("!!! archive file out of data %s, has version %d not 2\n", archive_path, version);
+		sys_print(Error, "archive file out of data %s, has version %d not 2\n", archive_path, version);
 		file->close();
 		return false;
 	}
@@ -269,7 +269,7 @@ std::string FileSys::get_game_path_from_full_path(const std::string& fullpath) {
 		if (gamedir[i] != fullpath[i])
 			break;
 	if (i != gamedir.size()) {
-		sys_print("??? get_game_path_from_full_path not a game path\n");
+		sys_print(Warning, "get_game_path_from_full_path not a game path\n");
 		return fullpath;
 	}
 	return fullpath.substr(gamedir.size());
@@ -277,7 +277,7 @@ std::string FileSys::get_game_path_from_full_path(const std::string& fullpath) {
 
 void FileSys::init()
 {
-	sys_print("------ FileSys init ------\n");
+	sys_print(Info, "------ FileSys init ------\n");
 
 	// updates working directory to ./CsRemake/*
 	char own_path[256];
