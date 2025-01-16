@@ -221,6 +221,7 @@ private:
 	friend class LevelSerialization;
 	friend class DeferredSpawnScope;
 	friend class EdPropertyGrid;
+	friend class SerializeTestWorkbench;
 };
 
 template<typename T>
@@ -231,6 +232,7 @@ inline T* Entity::construct_sub_component(const char* name) {
 	ptr->set_owner(this);
 	ptr->unique_file_id = uint32_t(StringName(name).get_hash());
 	ptr->creator_source = this;
+	ptr->is_native_created = true;
 	all_components.push_back(ptr);
 	return (T*)all_components.back();
 }
@@ -242,6 +244,7 @@ inline T* Entity::construct_sub_entity(const char* name) {
 	ptr->unique_file_id = uint32_t(StringName(name).get_hash());
 	ptr->creator_source = this;
 	ptr->parent = this;
+	ptr->is_native_created = true;
 	children.push_back(ptr);
 	return (T*)children.back();
 }

@@ -34,6 +34,7 @@ public:
 	uint32_t unique_file_id = 0;			// unique id in source owner (either native c++, prefab, map)
 	bool is_root_of_prefab = false;
 	bool editor_transient = false;	// if true, dont serialize
+	bool is_native_created = false;
 	// <<<<<<<<<<<<<<<<
 
 	void post_unserialization(uint64_t id) {
@@ -51,4 +52,5 @@ protected:
 	initialization_state init_state = initialization_state::CONSTRUCTOR;
 
 	friend class UnserializedSceneFile;
+	friend class SerializeTestWorkbench;
 };

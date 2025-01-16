@@ -10,7 +10,9 @@
 #include "Game/LevelAssets.h"
 
 class UnserializationWrapper;
-Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab);
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, 
+	PrefabAsset* prefab, Entity* starting_root);
+
 
 void UnserializedSceneFile::delete_objs()
 {
@@ -92,6 +94,7 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 		parent_ent->add_component_from_unserialization(comp_obj);
 	}
 
+	ASSERT(all_objs.find(path) == all_objs.end());
 	all_objs.insert({ path, e });
 	
 }
@@ -105,7 +108,8 @@ void unserialize_one_item_text(
 	UnserializedSceneFile& scene,
 	const std::string& root_path,
 	PrefabAsset* root_prefab,
-	Entity*& inout_root_entity)
+	Entity*& inout_root_entity,
+	bool& found_new_root)
 {
 
 	if (!in.check_item_start(tok))
@@ -134,12 +138,12 @@ void unserialize_one_item_text(
 		}
 
 		const bool is_root = parentid.empty() && root_prefab;
-		ASSERT(!is_root || inout_root_entity == nullptr);
+		ASSERT(!is_root || !found_new_root);
 		
 
 		auto get_parent = [&]() -> Entity* {
 			if (parentid.empty()) return nullptr;
-			if (parentid == ".") return inout_root_entity;
+			if (parentid == "/") return inout_root_entity;
 			return scene.find(root_path + parentid)->cast_to<Entity>();
 		};
 
@@ -153,7 +157,7 @@ void unserialize_one_item_text(
 			if (!asset)
 				throw std::runtime_error("couldnt find scene file: " + type);
 
-			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", asset);
+			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", asset, inout_root_entity);
 			this_prefab_root->is_root_of_prefab = true;
 			if(parent)
 				this_prefab_root->parent_to_entity(parent);
@@ -175,8 +179,11 @@ void unserialize_one_item_text(
 			// PUSH BACK OBJ
 			scene.add_obj(path, parent, (BaseUpdater*)obj, inout_root_entity, root_prefab);
 			// set after!
-			if (is_root)
+			if (is_root) {
+				found_new_root = true;
+				((BaseUpdater*)obj)->is_root_of_prefab = true;
 				inout_root_entity = obj->cast_to<Entity>();
+			}
 		}
 	}
 	else if (tok.cmp("override")) {
@@ -204,16 +211,17 @@ void unserialize_one_item_text(
 	}
 }
 
-Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab)
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root)
 {
 	DictParser in;
 	in.load_from_memory((uint8_t*)text.data(), text.size(), "");
 	StringView tok;
 
-	Entity* root_entity = nullptr;
+	Entity* root_entity = starting_root;
+	bool found_new_root = false;
 
 	while (in.read_string(tok) && !in.is_eof()) {
-		unserialize_one_item_text(tok, in, scene,rootpath,prefab,root_entity);
+		unserialize_one_item_text(tok, in, scene,rootpath,prefab,root_entity, found_new_root);
 	}
 
 	return root_entity;
@@ -223,7 +231,7 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 UnserializedSceneFile unserialize_entities_from_text(const std::string& text, PrefabAsset* source_prefab)
 {
 	UnserializedSceneFile scene;
-	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab);
+	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab, nullptr);
 	scene.set_root_entity(root);
 	return std::move(scene);
 }

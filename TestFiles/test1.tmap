@@ -1,0 +1,20 @@
+{
+	new Entity
+	id 1
+}
+{
+	new StaticMeshEntity
+	id 2
+}
+{
+	override 2/~2122221332
+	cast_shadows 0
+}
+{
+	new StaticMeshEntity
+	id 3
+	parent 2
+}
+{
+	override 3/~2122221332
+}
