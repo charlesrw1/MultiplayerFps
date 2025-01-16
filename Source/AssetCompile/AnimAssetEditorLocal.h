@@ -77,6 +77,9 @@ public:
 
 	void add_to_obj(Render_Object& obj, float dt);
 
+	const char* get_save_file_extension() const {
+		return "NONE";
+	}
 
 	AnimatorInstance animator;
 

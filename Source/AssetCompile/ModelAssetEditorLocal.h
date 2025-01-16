@@ -28,6 +28,9 @@ public:
 	virtual bool save_document_internal() override;
 	void imgui_draw() override;
 
+	const char* get_save_file_extension() const {
+		return "cmdl";
+	}
 
 	PropertyGrid propGrid;
 	StaticMeshEntity* outputEntity = nullptr;

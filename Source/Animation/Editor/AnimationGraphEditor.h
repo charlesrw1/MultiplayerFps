@@ -436,6 +436,10 @@ public:
 		return Animation_Tree_CFG::StaticType;
 	}
 	void post_map_load_callback();
+
+	const char* get_save_file_extension() const {
+		return "ag";
+	}
 };
 
 extern AnimationGraphEditor ed;

@@ -31,7 +31,9 @@ public:
 
 	virtual void init() override {
 	}
-
+	const char* get_save_file_extension() const {
+		return "mi";
+	}
 	const ClassTypeInfo& get_asset_type_info() const override { return MaterialInstance::StaticType; }
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;

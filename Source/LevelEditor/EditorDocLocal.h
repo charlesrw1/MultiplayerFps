@@ -29,6 +29,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "Game/LevelAssets.h"
+
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -127,6 +129,7 @@ private:
 	uint64_t contextMenuHandle = 0;
 
 	char nameFilter[256];
+	bool rebuild_flag = false;
 };
 
 class EdPropertyGrid
@@ -275,10 +278,13 @@ public:
 		for (auto it = selected_entity_handles.begin(); it != selected_entity_handles.end();)
 		{
 			EntityPtr<Entity> ptr = { *it };
-			if (!ptr.get())
+			auto ent = ptr.get();
+			if (ent==nullptr) {
 				it = selected_entity_handles.erase(it);
-			else
+			}
+			else {
 				++it;
+			}
 		}
 		if(selected_entity_handles.size()!=presize)
 			on_selection_changed.invoke();
@@ -311,7 +317,7 @@ public:
 		return is_entity_selected(e->get_self_ptr());
 	}
 private:
-	void on_node_deleted(EntityPtr<Entity> ptr) {
+	void on_node_deleted() {
 		validate_selection();
 	}
 	
@@ -387,7 +393,7 @@ public:
 	virtual bool save_document_internal() override;
 
 	const ClassTypeInfo& get_asset_type_info() const override {
-		return LevelAsset::StaticType;
+		return is_editing_scene() ? SceneAsset::StaticType : PrefabAsset::StaticType;
 	}
 
 	virtual void tick(float dt) override;
@@ -419,15 +425,31 @@ public:
 
 	glm::vec3 unproject_mouse_to_ray(int mx, int my);
 
-	
-	enum ToolMode {
-		TOOL_TRANSFORM,	// translation/rotation/scale tool
-	}mode = TOOL_TRANSFORM;
+	const char* get_save_file_extension() const {
+		if (is_editing_prefab()) return "pfb";
+		else return "tmap";
+	}
 
+	enum EditCategory {
+		EDIT_SCENE,
+		EDIT_PREFAB,
+	};
+	EditCategory edit_category = EditCategory::EDIT_SCENE;
 
-	// schema vs level editing
-	bool is_editing_a_schema = false;
-	const Schema* schema_source = nullptr;
+	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
+	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
+
+	void validate_prefab();
+	Entity* get_prefab_root_entity();
+
+	std::string get_name() {
+		auto name = get_doc_name();
+		if (name.empty()) name = "<unnamed>";
+		if (is_editing_prefab())
+			return "Prefab: " + name;
+		else
+			return "Scene: " + name;
+	}
 
 	bool local_transform = false;
 	TransformType transform_tool_type;
@@ -452,7 +474,6 @@ public:
 
 	MulticastDelegate<EntityComponent*> on_component_deleted;
 	MulticastDelegate<EntityComponent*> on_component_created;
-	MulticastDelegate<EntityPtr<Entity>> on_entity_will_delete;	// called before its deleted
 	MulticastDelegate<EntityPtr<Entity>> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
 

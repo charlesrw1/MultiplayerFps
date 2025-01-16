@@ -76,7 +76,7 @@ bool IEditorTool::save()
 }
 
 template<typename FUNCTOR>
-static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog)
+static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog, IEditorTool* tool)
 {
 	static bool alread_exists = false;
 	static bool cant_open_path = false;
@@ -92,13 +92,13 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 
 	bool returned_true = false;
 	if (!alread_exists || !is_save_dialog) {
-		ImGui::Text("Enter path: ");
+		ImGui::Text("Enter path (.%s): ", tool->get_save_file_extension());
 		ImGui::SameLine();
 		returned_true = ImGui::InputText("##pathinput", buffer, 256, ImGuiInputTextFlags_EnterReturnsTrue);
 	}
 
 	if (returned_true) {
-		const char* full_path = string_format("%s/%s", path_prefix.c_str(), buffer);
+		const char* full_path = string_format("%s/%s.%s", path_prefix.c_str(), buffer, tool->get_save_file_extension());
 		bool file_already_exists = FileSys::does_file_exist(buffer,FileSys::GAME_DIR);
 		cant_open_path = false;
 		alread_exists = false;
@@ -175,16 +175,16 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 	if (ImGui::BeginPopupModal("Save file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Will be saved under %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
-			name = buf;
+			name = buf +std::string( "." ) + tool->get_save_file_extension();
 			tool->save();
-			}, prefix.c_str(), true);
+			}, prefix.c_str(), true, tool);
 	}
 
 	if (ImGui::BeginPopupModal("Open file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
-			tool->open(buf);
-			}, prefix.c_str(), false);
+			tool->open( (buf +std::string( "." ) + tool->get_save_file_extension()).c_str() );
+			}, prefix.c_str(), false, tool);
 	}
 }
 

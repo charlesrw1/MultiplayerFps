@@ -12,8 +12,14 @@ class DataClassEditor : public IEditorTool
 	virtual bool save_document_internal() override;
 	const ClassTypeInfo& get_asset_type_info() const override { return DataClass::StaticType; }
 	void imgui_draw() override;
+	const char* get_save_file_extension() const {
+		return "dc";
+	}
+
+	void refresh();
 
 	PropertyGrid grid;
 	std::string dc_name;
 	ClassBase* editing_object = nullptr;
+	const ClassTypeInfo* typeInfo = nullptr;
 };

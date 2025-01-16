@@ -345,9 +345,6 @@
     <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h">
       <Filter>Source\Render\Editor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Schema.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Game\EntityComponent.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
@@ -532,6 +529,7 @@
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
+    <ClInclude Include="Source\Game\LevelAssets.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">
@@ -686,9 +684,6 @@
     <ClCompile Include="Source\Framework\Sequencer.cpp">
       <Filter>Source\Framework\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\Schema.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
@@ -813,5 +808,6 @@
     <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
+    <ClCompile Include="Source\Game\LevelAssets.cpp" />
   </ItemGroup>
 </Project>

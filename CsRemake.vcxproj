@@ -69,6 +69,7 @@
     <ClInclude Include="Source\Game\Components\SoundComponent.h" />
     <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Debug.h" />
+    <ClInclude Include="Source\Game\LevelAssets.h" />
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
@@ -151,7 +152,6 @@
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
-    <ClInclude Include="Source\Game\Schema.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
     <ClInclude Include="Source\Game\SoftAssetPtr.h" />
@@ -241,6 +241,7 @@
     <ClCompile Include="Source\ClientMgr.cpp" />
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
+    <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDoc.cpp" />
     <ClCompile Include="Source\External\glad.c" />
@@ -297,7 +298,6 @@
     <ClCompile Include="Source\Game\Entities\Player.cpp" />
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
-    <ClCompile Include="Source\Game\Schema.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
     <ClCompile Include="Source\Game\StdEntityTypes.cpp" />
     <ClCompile Include="Source\Game\EntityTest.cpp" />

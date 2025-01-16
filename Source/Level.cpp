@@ -10,40 +10,11 @@
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetRegistry.h"
-#include "Game/Schema.h"
+
 #include "Assets/AssetDatabase.h"
 #include "Game/GameMode.h"
 
-extern IEditorTool* g_editor_doc;
-class MapAssetMetadata : public AssetMetadata
-{
-public:
-	MapAssetMetadata() {
-		extensions.push_back("tmap");
-		extensions.push_back("bmap");
-	}
-
-	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color()  const override
-	{
-		return { 185, 235, 237 };
-	}
-
-	virtual std::string get_type_name() const  override
-	{
-		return "Map";
-	}
-
-	virtual bool assets_are_filepaths()  const { return true; }
-
-	virtual IEditorTool* tool_to_edit_me() const { return g_editor_doc; }
-
-	virtual const ClassTypeInfo* get_asset_class_type() const { return &LevelAsset::StaticType; }
-};
-static AutoRegisterAsset<MapAssetMetadata> map_register_0987;
-
-
-
+#include "Game/LevelAssets.h"
 
 void Physics_Mesh::build()
 {
@@ -72,7 +43,6 @@ void Physics_Mesh::build()
 #include "Framework/Files.h"
 #include "Framework/DictWriter.h"
 #include <fstream>
-CLASS_IMPL(LevelAsset);
 
 
 
@@ -187,7 +157,7 @@ Level::Level() : all_world_ents(4/*2^4*/), tick_list(4)
 
 }
 
-void Level::create(LevelAsset* source, bool is_editor) 
+void Level::create(SceneAsset* source, bool is_editor) 
 {
 	ASSERT(source);
 
@@ -219,27 +189,6 @@ void Level::create(LevelAsset* source, bool is_editor)
 
 	if (!b_is_editor_level)
 		gamemode->start();
-}
-
-bool LevelAsset::load_asset(ClassBase*&)
-{
-	auto& path = get_name();
-
-	auto fileptr = FileSys::open_read_game(path.c_str());
-	if (!fileptr) {
-		printf("!!! couldn't open level %s\n", path.c_str());
-		return false;
-	}
-	std::string str(fileptr->size(), ' ');
-	fileptr->read((void*)str.data(), str.size());
-	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(str));
-	}
-	catch (...) {
-		return false;
-	}
-
-	return true;
 }
 
 void Level::remove_from_update_list(BaseUpdater* b) {
@@ -391,4 +340,11 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 void Level::set_local_player(Entity* e) {
 	ASSERT(e);
 	local_player_id = e->instance_id;
+}
+
+Entity* Level::spawn_prefab(PrefabAsset* asset)
+{
+	auto unserialized_scene = unserialize_entities_from_text(asset->text,asset);
+	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
+	return unserialized_scene.get_root_entity();
 }

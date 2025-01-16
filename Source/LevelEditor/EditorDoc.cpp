@@ -16,7 +16,7 @@
 #include "Debug.h"
 
 #include "Game/StdEntityTypes.h"
-#include "Game/Schema.h"
+
 
 #include <algorithm>
 #include <stdexcept>
@@ -33,6 +33,8 @@
 #include "UI/Widgets/Interactables.h"
 #include "UI/Widgets/Visuals.h"
 #include "UI/GUISystemPublic.h"
+
+#include "Game/LevelAssets.h"
 
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
@@ -115,13 +117,55 @@ public:
 
 };
 
+class CreatePrefabCommand : public Command
+{
+public:
+	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr<Entity> parent) {
+		this->prefab_name = prefab_name;
+		this->transform = transform;
+		this->parent_to = parent;
+	}
+	~CreatePrefabCommand() override {
+	}
+	void execute() {
+		auto l = eng->get_level();
+		auto p = GetAssets().find_sync<PrefabAsset>(prefab_name);
+		if (p) {
+			auto ent = l->spawn_prefab(p.get());
+			if (ent) {
+				handle = ent->get_self_ptr();
+				if (parent_to.get())
+					ent->parent_to_entity(parent_to.get());
+				else
+					ent->set_ws_transform(transform);
+				ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
+				ed_doc.on_entity_created.invoke(handle);
+				ed_doc.post_node_changes.invoke();
+			}
+		}
+	}
+	void undo() {
+		handle->destroy();
+		ed_doc.post_node_changes.invoke();
+		handle = {};
+	}
+	std::string to_string() override {
+		return "CreatePrefabCommand";
+	}
+	EntityPtr<Entity> parent_to;
+	EntityPtr<Entity> handle;
+	std::string prefab_name;
+	glm::mat4 transform;
+};
+
 class CreateStaticMeshCommand : public Command
 {
 public:
-	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform) {
+	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr<Entity> parent) {
 
 		this->transform = transform;
 		this->modelname = modelname;
+		this->parent_to = parent;
 	}
 	~CreateStaticMeshCommand() override {
 	}
@@ -130,7 +174,10 @@ public:
 
 	void execute() {
 		auto ent = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
-		ent->set_ws_transform(transform);
+		if (parent_to.get())
+			ent->parent_to_entity(parent_to.get());
+		else
+			ent->set_ws_transform(transform);
 
 		handle = ent->get_self_ptr();
 
@@ -158,7 +205,6 @@ public:
 			});
 	}
 	void undo() {
-		ed_doc.on_entity_will_delete.invoke(handle);
 		handle->destroy();
 		ed_doc.post_node_changes.invoke();
 		handle = {};
@@ -166,7 +212,7 @@ public:
 	std::string to_string() override {
 		return "CreateStaticMeshCommand";
 	}
-
+	EntityPtr<Entity> parent_to;
 	EntityPtr<Entity> handle;
 	glm::mat4 transform;
 	std::string modelname{};
@@ -174,18 +220,22 @@ public:
 class CreateCppClassCommand : public Command
 {
 public:
-	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform) {
+	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr<Entity> parent) {
 		auto find = cppclassname.rfind('/');
 		auto types = cppclassname.substr(find==std::string::npos ? 0 : find+1);
 		ti = ClassBase::find_class(types.c_str());
 		this->transform = transform;
+		this->parent_to = parent;
 	}
 	bool is_valid() override { return ti != nullptr; }
 
 	void execute() {
 		assert(ti);
 		auto ent = eng->get_level()->spawn_entity_from_classtype(*ti);
-		ent->set_ws_transform(transform);
+		if (parent_to.get())
+			ent->parent_to_entity(parent_to.get());
+		else
+			ent->set_ws_transform(transform);
 		ent->editor_name = ent->get_type().classname;
 		handle = ent->get_self_ptr();
 		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
@@ -193,7 +243,6 @@ public:
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
-		ed_doc.on_entity_will_delete.invoke(handle);
 		eng->get_level()->destroy_entity(eng->get_entity(handle));
 		ed_doc.post_node_changes.invoke();
 		handle = {};
@@ -204,6 +253,7 @@ public:
 	const ClassTypeInfo* ti = nullptr;
 	glm::mat4 transform;
 	EntityPtr<Entity> handle;
+	EntityPtr<Entity> parent_to;
 };
 
 class PropertyChangeCommand
@@ -262,7 +312,6 @@ public:
 	}
 	void undo() {
 		for (auto h : handles) {
-			ed_doc.on_entity_will_delete.invoke(h);
 			h->destroy();
 		}
 
@@ -294,6 +343,23 @@ void validate_remove_entities(std::vector<EntityPtr<Entity>>& input)
 	}
 	if (had_errors)
 		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
+	had_errors = false;
+	if (ed_doc.is_editing_prefab()) {
+		auto root = ed_doc.get_prefab_root_entity();
+		if (root) {
+			for (int i = 0; i < input.size();i++) {
+				auto e = input[i];
+				if (e.get() == root) {
+					had_errors = true;
+					input.erase(input.begin() + i);
+					i--;
+				}
+			}
+		}
+
+		if (had_errors)
+			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
+	}
 }
 
 class RemoveEntitiesCommand : public Command
@@ -310,14 +376,33 @@ public:
 		eng->log_to_fullscreen_gui(Info, "Remove entity");
 
 		for (auto h : handles) {
-			ed_doc.on_entity_will_delete.invoke(h);
 			h->destroy();
 		}
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() {
 		auto restored = unserialize_entities_from_text(scene->text);
+		auto& extern_parents = scene->extern_parents;
+		for (auto ep : extern_parents) {
+			auto e = restored.get_objects().find(ep.child_path);
+			ASSERT(e->second->is_a<Entity>());
+			if (e != restored.get_objects().end()) {
+				EntityPtr<Entity> parent = { ep.external_parent_handle };
+				if (parent.get()) {
+					auto ent = (Entity*)e->second;
+					ent->parent_to_entity(parent.get());
+				}
+				else
+					sys_print(Warning, "restored parent doesnt exist\n");
+			}
+			else
+				sys_print(Warning, "restored obj doesnt exist\n");
+		}
+
 		eng->get_level()->insert_unserialized_entities_into_level(restored);
+
+
+
 		auto& objs = restored.get_objects();
 		for (auto& o : objs) {
 			if (auto e = o.second->cast_to<Entity>())
@@ -421,6 +506,53 @@ bool EditorDoc::save_document_internal()
 
 	return true;
 }
+Entity* EditorDoc::get_prefab_root_entity()
+{
+	ASSERT(is_editing_prefab());
+	Entity* root = nullptr;
+	auto level = eng->get_level();
+	auto& objs = level->get_all_objects();
+	for (auto o : objs) {
+		if (auto e = o->cast_to<Entity>()) {
+			if (e->dont_serialize_or_edit)
+				continue;
+			if (!e->get_entity_parent()) {
+				return e;
+			}
+		}
+	}
+	ASSERT(0);
+}
+void EditorDoc::validate_prefab()
+{
+	ASSERT(is_editing_prefab());
+	Entity* root = nullptr;
+	auto level = eng->get_level();
+	auto& objs = level->get_all_objects();
+	std::vector<Entity*> deleteList;
+	for (auto o : objs) {
+		if (auto e = o->cast_to<Entity>()) {
+			if (e->dont_serialize_or_edit)
+				continue;
+			if (!e->get_entity_parent()) {
+				if (root) {
+					deleteList.push_back(e);
+				}
+				else
+					root = e;
+			}
+		}
+	}
+	if (!deleteList.empty()) {
+		eng->log_to_fullscreen_gui(Error, "Prefab had extra root entities, deleting\n");
+		for (auto e : deleteList)
+			e->destroy();
+	}
+	if (!root) {
+		sys_print(Debug, "prefab had no root\n");
+		level->spawn_entity_class<Entity>();
+	}
+}
 
 void EditorDoc::on_map_load_return(bool good)
 {
@@ -429,7 +561,20 @@ void EditorDoc::on_map_load_return(bool good)
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
 	else {
-		//set_doc_name(eng->get_level()->get_name());
+		if (is_editing_prefab()) {
+			if (!get_doc_name().empty()) {
+				auto editing_prefab_asset = GetAssets().find_sync<PrefabAsset>(get_doc_name()).get();
+				if (!editing_prefab_asset) {
+					eng->log_to_fullscreen_gui(Error, "Couldnt load prefab");
+					set_empty_doc();
+				}
+				eng->get_level()->spawn_prefab(editing_prefab_asset);
+			}
+			if (!get_doc_name().empty())
+				eng->get_level()->spawn_entity_class<Entity>();	// spawn empty prefab entity
+
+			validate_prefab();
+		}
 
 		validate_fileids_before_serialize();
 
@@ -439,14 +584,16 @@ void EditorDoc::on_map_load_return(bool good)
 bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 {
 	// schema vs level edit switch
-	if (strcmp(arg, "schema") == 0)
-		is_editing_a_schema = true;
-	else
-		is_editing_a_schema = false;
+	if (strcmp(arg, "prefab") == 0)
+		edit_category = EditCategory::EDIT_PREFAB;
+	else 
+		edit_category = EditCategory::EDIT_SCENE;
+
+	sys_print(Debug, "Edit mode: %s", (edit_category == EDIT_PREFAB) ? "Prefab" : "Scene");
 
 	file_id_start = 0;
 
-	if (!is_editing_a_schema) {
+	if (is_editing_scene()) {
 		bool needs_new_doc = true;
 		if (strlen(levelname) != 0) {
 			eng->open_level(levelname);	// queues load
@@ -464,9 +611,7 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 		}
 	}
 	else {
-		// flow: tell engine to open an empty level
-		// after succeding, add the schema in the callback
-		schema_source = GetAssets().find_sync<Schema>(levelname).get();
+		// wait for level to return
 		eng->open_level("__empty__");
 	}
 	eng_local.on_map_load_return.add(this, &EditorDoc::on_map_load_return);
@@ -1066,17 +1211,33 @@ void EditorDoc::hook_scene_viewport_draw()
 			drop_transform[3] = glm::vec4(worldpos, 1.0);
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+
+			EntityPtr<Entity> parent_to;
+			if (is_editing_prefab()) {
+				auto root = get_prefab_root_entity();
+				if (root)
+					parent_to = root->get_self_ptr();
+			}
 			if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
 				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename, 
-					drop_transform)
+					drop_transform,
+					parent_to)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
 				command_mgr->add_command(new CreateStaticMeshCommand(
 					resource->filename, 
-					drop_transform)
+					drop_transform,
+					parent_to)
 				);
+			}
+			else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
+				command_mgr->add_command(new CreatePrefabCommand(
+					resource->filename,
+					drop_transform,
+					parent_to
+				));
 			}
 	
 		}
@@ -1101,7 +1262,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 
-	ImGui::Dummy(ImVec2(depth*5.f, 0));
+	ImGui::Dummy(ImVec2(depth*10.f, 0));
 	ImGui::SameLine();
 
 	ImGui::PushID(n);
@@ -1119,7 +1280,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				ed_doc.selection_state->clear_all_selected();
 		}
 
-		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[2]) {
+		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[2]&&n->handle!=0) {
 			ImGui::OpenPopup("outliner_ctx_menu");
 			ed_doc.selection_state->add_to_entity_selection({ n->handle });
 			contextMenuHandle = n->handle;
@@ -1142,17 +1303,36 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 						ptr->set_ws_transform(transform);
 					}
 					contextMenuHandle = 0;
+					rebuild_flag = true;
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Remove Parent")) {
-					auto& ents = ed_doc.selection_state->get_selection();
-					for (auto& ehandle : ents) {
-						EntityPtr<Entity> ptr = { ehandle };
-						auto transform = ptr->get_ws_transform();
-						ptr->parent_to_entity(nullptr);
-						ptr->set_ws_transform(transform);
+
+					if (ed_doc.is_editing_prefab()) {
+						Entity* root = ed_doc.get_prefab_root_entity();
+						auto& ents = ed_doc.selection_state->get_selection();
+						for (auto& ehandle : ents) {
+							EntityPtr<Entity> ptr = { ehandle };
+							if (ptr.get() == root) continue;
+
+							auto transform = ptr->get_ws_transform();
+							ptr->parent_to_entity(root);
+							ptr->set_ws_transform(transform);
+						}
+					}
+					else {
+						auto& ents = ed_doc.selection_state->get_selection();
+						for (auto& ehandle : ents) {
+							EntityPtr<Entity> ptr = { ehandle };
+							auto transform = ptr->get_ws_transform();
+							ptr->parent_to_entity(nullptr);
+							ptr->set_ws_transform(transform);
+						}
+
 					}
 					contextMenuHandle = 0;
+					rebuild_flag = true;
+
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -1164,7 +1344,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 	ImGui::SameLine();
 
 	if (n->handle == 0) {
-		ImGui::Text(ed_doc.get_full_output_path().c_str());
+		ImGui::Text(ed_doc.get_name().c_str());
 	}
 	else {
 		auto entity = eng->get_entity(n->handle);
@@ -1206,6 +1386,9 @@ void ObjectOutliner::draw()
 		ImGui::EndTable();
 	}
 	ImGui::End();
+	if(rebuild_flag)
+		rebuild_tree();
+	rebuild_flag = false;
 	
 
 }
@@ -1510,24 +1693,26 @@ void EdPropertyGrid::refresh_grid()
 		
 		auto& comps = entity->get_all_components();
 
-		if (selected_component == 0)
-			selected_component = comps[0]->instance_id;
-		if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<EntityComponent>() == nullptr ||
-			eng->get_object(selected_component)->cast_to<EntityComponent>()->get_owner() != entity.get())
-			selected_component = comps[0]->instance_id;
+		if (!comps.empty()) {
+			if (selected_component == 0)
+				selected_component = comps[0]->instance_id;
+			if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<EntityComponent>() == nullptr ||
+				eng->get_object(selected_component)->cast_to<EntityComponent>()->get_owner() != entity.get())
+				selected_component = comps[0]->instance_id;
 
-		ASSERT(selected_component != 0);
+			ASSERT(selected_component != 0);
 
 
-		auto c = eng->get_object(selected_component)->cast_to<EntityComponent>();
-		printf("adding to grid: %s\n", c->get_type().classname);
+			auto c = eng->get_object(selected_component)->cast_to<EntityComponent>();
+			printf("adding to grid: %s\n", c->get_type().classname);
 
-		ASSERT(c);
-		ti = &c->get_type();
-		while (ti) {
-			if (ti->props)
-				grid.add_property_list_to_grid(ti->props, c);
-			ti = ti->super_typeinfo;
+			ASSERT(c);
+			ti = &c->get_type();
+			while (ti) {
+				if (ti->props)
+					grid.add_property_list_to_grid(ti->props, c);
+				ti = ti->super_typeinfo;
+			}
 		}
 	}
 }
@@ -1535,7 +1720,7 @@ void EdPropertyGrid::refresh_grid()
 
 SelectionState::SelectionState()
 {
-	ed_doc.on_entity_will_delete.add(this, &SelectionState::on_node_deleted);
+	ed_doc.post_node_changes.add(this, &SelectionState::on_node_deleted);
 	ed_doc.on_close.add(this, &SelectionState::on_close);
 }
 

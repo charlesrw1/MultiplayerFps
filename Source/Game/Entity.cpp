@@ -2,7 +2,6 @@
 
 #include "Framework/Factory.h"
 #include "Framework/ArrayReflection.h"
-#include "Game/Schema.h"
 #include "glm/gtx/euler_angles.hpp"
 
 #include "Assets/AssetRegistry.h"
@@ -33,11 +32,11 @@ public:
 		for (; !subclasses.is_end(); subclasses.next()) {
 			if (subclasses.get_type()->allocate) {
 				std::string path = subclasses.get_type()->classname;
-				auto parent = subclasses.get_type();
-				while (parent && parent != &Entity::StaticType) {
-					path.insert(0, std::string(parent->super_typeinfo->classname) + "/");
-					parent = parent->super_typeinfo;
-				}
+				//auto parent = subclasses.get_type();
+				//while (parent && parent != &Entity::StaticType) {
+				//	path.insert(0, std::string(parent->super_typeinfo->classname) + "/");
+				//	parent = parent->super_typeinfo;
+				//}
 				
 				filepaths.push_back(path);
 			}

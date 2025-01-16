@@ -6,6 +6,8 @@
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
 #include "Framework/DictWriter.h"
+#include "Level.h"
+#include "Game/LevelAssets.h"
 #if 0
 bool validate_selection_R(EntityComponent* self_c, const std::unordered_set<const BaseUpdater*>& is_in_set)
 {
@@ -56,18 +58,135 @@ bool validate_selection_for_serialization(const std::vector<BaseUpdater*>& input
 }
 #endif
 
+//
+//	Example:
+//	
+//	C++:
+//	my-entity
+//		mesh-component	(1)
+//	
+//	ThePrefab:
+//	my-entity
+//		mesh-component
+//		another-entity	(1)
+//			mesh-component (2)
+//			
+//	Inherited-ThePrefab:
+//	ThePrefab (my-entity)
+//		mesh-component
+//		another-entity
+//			mesh-component
+//		ability-component (1)
+//	
+//	NestedPrefab:
+//	another-entity
+//		light-component (1)
+//		mesh-component (2)
+//		ThePrefab (my-entity) (3)
+//			mesh-component
+//			another-entity
+//				mesh-component
+//			ability-component
+//		my-entity			(4)
+//			mesh-component
+//	In Map:
+//												| PATH			| owner			| prefab		| is_root_of_prefab
+//	map-root								(0)	| 0				| null			| null			| yes
+//		my-entity 							(1)	| 1				| null			| null			| yes	
+//			mesh-component						| 1/~1			| my-entity		| null			| no	
+//											    |				|				|				|		
+//		ThePrefab (my-entity)				(2) | 2				| null			| ThePrefab		| yes	
+//			mesh-component						| 2/~1			| my-entity		| null			| no	
+//			another-entity						| 2/1			| my-entity		| ThePrefab		| no
+//				mesh-component					| 2/2			| my-entity		| ThePrefab		| no	
+//											    |				|				|				|		
+//		The2ndPrefab (my-entity)			(3) | 3				| null			| 2ndPrefab		| yes		
+//			mesh-component						| 3/*/~1		|				|				|		
+//			another-entity						| 3/*/1			|				|				|		
+//				mesh-component					| 3/*/2			|				|				|		
+//			ability-component					| 3/1			|				|				|		
+//												|				|				|				|		
+//		NestedPrefab (another-entity)		(4)	| 4				| null			| NestedPrefab	| yes		
+//			light-component						| 4/1			| another-entity| NestedPrefab	| no		
+//			mesh-component						| 4/2			| another-entity| NestedPrefab	| no	
+//			The2ndPrefab (my-entity)			| 4/3			| another-entity| The2ndPrefab	| yes	
+//				mesh-component					| 4/*/3/~1		| my-entity		| null			| no		
+//				another-entity					| 4/*/3/1		| my-entity		| ThePrefab		| no		
+//					mesh-component				| 4/*/3/2		| my-entity		| ThePrefab		| no		
+//				ability-component				| 4/3/1			| my-entity		| The2ndPrefab	| no
+//			my-entity2							| 4/4			| another-entity| null			| yes
+//				mesh-component					| 4/4/~1		| my-entity2	| null			| no
+
+
 // TODO prefabs
 // rules:
 // * path based on source
 
+static int find_inheritance_level(const PrefabAsset* owner, const PrefabAsset* me)
+{
+	int count = 0;
+	bool found = false;
+	while (owner) {
+		if (owner == me) {
+			found = true;
+			break;
+		}
+		owner = owner->parent_scene;
+		count++;
+	}
+	ASSERT(found || !me);
+	return count;
+}
+
 std::string build_path_for_object(const BaseUpdater* obj)
 {
+	if(!obj->creator_source)		// no creator source, top level objects
+		return std::to_string(obj->unique_file_id);
+	else {
+		auto parentpath = build_path_for_object(obj->creator_source);
+		if(obj->is_root_of_prefab)
+			return parentpath + "/" + std::to_string(obj->unique_file_id);	// prefab root, just file id
+		else if (!obj->what_prefab) { // native objects
+
+			int level = find_inheritance_level(obj->creator_source->what_prefab, nullptr);
+			int stars = level - 1;
+			auto path = parentpath + "/";
+			for (int i = 0; i < stars; i++) path += "*/";
+			return path + "~" + std::to_string(obj->unique_file_id);
+		}
+		else {	// what_prefab != nullptr
+	
+			int stars = find_inheritance_level(obj->creator_source->what_prefab, obj->what_prefab);
+
+			auto path = parentpath + "/";
+			for (int i = 0; i < stars; i++) path += "*/";
+			return path + std::to_string(obj->unique_file_id);
+		}
+	}
+
+	/*
 	if (obj->creator_source == obj)
 		return std::to_string(obj->unique_file_id) + "/0";
 	else if(obj->creator_source)
 		return build_path_for_object(obj->creator_source) + "/" + std::to_string(obj->unique_file_id);;
 	return std::to_string(obj->unique_file_id);
+	*/
 }
+std::string make_path_relative_to(const std::string& inpath, const std::string& outer_path)
+{
+	// inpath = 4/3/~1
+	// outer_path = 4
+	// return 3/~1
+
+	if (inpath.find(outer_path) == 0) {
+		auto path = inpath.substr(outer_path.size() + 1);	// remove "/" too
+		if (path.empty()) return "/";
+		ASSERT(path[0] != '/');
+		return path;
+	}
+	ASSERT(0);
+}
+
 
 // rules:
 // * gets "new" if object created in current context (if edting map, prefab entities dont count)
@@ -76,16 +195,14 @@ std::string build_path_for_object(const BaseUpdater* obj)
 
 void serialize_new_object_text_R(
 	const Entity* e, 
-	DictWriter& out)
+	DictWriter& out,
+	bool skip_parent)
 {
 	if (e->dont_serialize_or_edit)
 		return;
 
 	auto this_is_newly_created = [&](const BaseUpdater* b) -> bool {
-		if (!b->creator_source) return true;	// no owner, must be new
-		ASSERT(b->creator_source != b);	// todo
-		if (b->creator_source == b) return true;	// source_owner is self, must be new
-		return false;
+		return b->creator_source == nullptr;
 	};
 
 	auto serialize_new = [&](const BaseUpdater* b) {
@@ -103,7 +220,7 @@ void serialize_new_object_text_R(
 			parent = ec->get_owner();
 			ASSERT(parent);
 		}
-		if (parent) {
+		if (!skip_parent && parent) {
 			out.write_key_value("parent", build_path_for_object(parent).c_str());
 		}
 
@@ -120,7 +237,7 @@ void serialize_new_object_text_R(
 	}
 	auto& children = e->get_all_children();
 	for (auto child : children)
-		serialize_new_object_text_R(child, out);
+		serialize_new_object_text_R(child, out, false);
 }
 
 
@@ -207,22 +324,39 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 			if (root_parent)
 				add_to_extern_parents(obj, root_parent);
 			
-			serialize_new_object_text_R(ent, out);
+			serialize_new_object_text_R(ent, out, root_parent!=nullptr);
 		}
 	}
 
 
 	auto find_diff_class = [&](const BaseUpdater* obj) -> const ClassBase* {
-		if (!obj->creator_source) return obj->get_type().default_class_object;
-		else {
-			ASSERT(obj->creator_source->is_a<Entity>());
-			auto source_owner_default = (const Entity*)obj->creator_source->get_type().default_class_object;
+
+		if (!obj->creator_source && !obj->what_prefab) {
+			auto default_ = obj->get_type().default_class_object;
+			return default_;
+		}
+
+
+		auto top_level = obj;
+		while (top_level->creator_source)
+			top_level = top_level->creator_source;
+		ASSERT(!top_level->creator_source && (!top_level->what_prefab || top_level->is_root_of_prefab));
+		if (!top_level->what_prefab) {
+			auto source_owner_default = (const Entity*)top_level->get_type().default_class_object;
+			ASSERT(source_owner_default);
 			if (obj->is_a<Entity>())
 				return find_entity_diff_in_children_R((Entity*)obj, source_owner_default);
 			else {
 				ASSERT(obj->is_a<EntityComponent>());
 				return find_component_diff_in_children_R((EntityComponent*)obj, source_owner_default);
 			}
+		}
+		else {
+			auto& objs = top_level->what_prefab->sceneFile->get_objects();
+			if (top_level == obj)
+				return objs.find("/")->second;
+			else
+				return objs.find(make_path_relative_to(build_path_for_object(obj), build_path_for_object(top_level)))->second;
 		}
 	};
 
@@ -235,9 +369,6 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 			out.write_item_start();
 			out.write_key_value("override", objpath.c_str());
 
-			// finding diff class:
-			// if newly created, use default object
-			// else if native created, use 
 			auto diff = find_diff_class(obj);
 			write_just_props(obj, diff, out, nullptr);
 

@@ -23,18 +23,8 @@
 class PhysicsActor;
 class WorldSettings;
 
-CLASS_H(LevelAsset, IAsset)
-public:
-	// IAsset overrides
-	void sweep_references() const override {}
-	bool load_asset(ClassBase*& user) override;
-	void post_load(ClassBase*) override {}
-	void uninstall() override {}
-	void move_construct(IAsset*) override {}
-
-	std::unique_ptr<UnserializedSceneFile> sceneFile;
-};
-
+class SceneAsset;
+class PrefabAsset;
 class Entity;
 class GameMode;
 class Level
@@ -47,7 +37,7 @@ public:
 	Level();
 	~Level();
 
-	void create(LevelAsset* source, bool is_editor);
+	void create(SceneAsset* source, bool is_editor);
 
 	// only call once after initialization
 	void init_entities_post_load();
@@ -95,6 +85,8 @@ public:
 
 	Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti);
 	
+	Entity* spawn_prefab(PrefabAsset* asset);
+
 	template<typename T>
 	T* spawn_entity_class() {
 		static_assert(std::is_base_of<Entity, T>::value, "spawn_entity_class not derived from Entity");
@@ -121,7 +113,7 @@ public:
 
 	void set_local_player(Entity* e);
 
-	LevelAsset* get_source_asset() const {
+	SceneAsset* get_source_asset() const {
 		return source_asset;
 	}
 
@@ -142,7 +134,7 @@ public:
 	}
 
 private:
-	LevelAsset* source_asset = nullptr;
+	SceneAsset* source_asset = nullptr;
 
 	std::unique_ptr<GameMode> gamemode = nullptr;
 

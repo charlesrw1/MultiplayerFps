@@ -25,7 +25,7 @@ using std::string;
 class Archive;
 class Client;
 class Server;
-class Level;
+class SceneAsset;
 class ImNodesContext;
 class GUI_RootControl;
 class UIControl;
@@ -118,7 +118,7 @@ public:
 	void change_editor_state(IEditorTool* next_tool, const char* arg, const char* file = "");
 
 	void execute_map_change();
-	void on_map_change_callback(bool is_for_editor, LevelAsset* loadedLevel);
+	void on_map_change_callback(bool is_for_editor, SceneAsset* loadedLevel);
 
 	void stop_game();
 	void spawn_starting_players(bool initial);

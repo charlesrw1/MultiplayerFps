@@ -58,6 +58,7 @@
 #include "IEditorTool.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/OnScreenLogGui.h"
+#include "Game/LevelAssets.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -842,7 +843,7 @@ void GameEngineLocal::leave_level()
 }
 
 
-void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, LevelAsset* loadedLevel)
+void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
 {
 	GetAssets().remove_unreferences();
 
@@ -914,16 +915,16 @@ void GameEngineLocal::execute_map_change()
 	if (this_is_for_editor && queued_mapname == "__empty__") {	
 
 		// not memory leak, gets cleaned up
-		LevelAsset* temp = new LevelAsset;
+		SceneAsset* temp = new SceneAsset;
 		GetAssets().install_system_asset(temp, "empty.txt");
 		
 		on_map_change_callback(true /* == this_is_for_editor */, temp);
 	}
 	else {
 
-		GetAssets().find_async<LevelAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
+		GetAssets().find_async<SceneAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
 			{
-				auto level = (ptr)?ptr.cast_to<LevelAsset>():nullptr;
+				auto level = (ptr)?ptr.cast_to<SceneAsset>():nullptr;
 				eng_local.on_map_change_callback(this_is_for_editor, level.get());
 
 			}, 0 /* default lifetime channel 0*/);
@@ -1396,7 +1397,6 @@ void GameEngineLocal::init()
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	ImGui::GetIO().Fonts->Build();
 
-	
 	engine_fullscreen_gui = new GUIFullscreen();
 	gui_log = new OnScreenLogGui();
 	engine_fullscreen_gui->add_this(gui_log);

@@ -230,7 +230,7 @@ inline T* Entity::construct_sub_component(const char* name) {
 	auto ptr = new T;
 	ptr->set_owner(this);
 	ptr->unique_file_id = uint32_t(StringName(name).get_hash());
-	ptr->creator_source = (this->creator_source) ? this->creator_source : this;
+	ptr->creator_source = this;
 	all_components.push_back(ptr);
 	return (T*)all_components.back();
 }
@@ -240,7 +240,7 @@ inline T* Entity::construct_sub_entity(const char* name) {
 	static_assert(std::is_base_of<Entity, T>::value, "Type not derived from Entity");
 	auto ptr = new T;
 	ptr->unique_file_id = uint32_t(StringName(name).get_hash());
-	ptr->creator_source = (this->creator_source) ? this->creator_source : this;
+	ptr->creator_source = this;
 	ptr->parent = this;
 	children.push_back(ptr);
 	return (T*)children.back();

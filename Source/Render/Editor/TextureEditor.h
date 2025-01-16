@@ -35,7 +35,9 @@ public:
 	virtual bool open_document_internal(const char* name, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
-
+	const char* get_save_file_extension() const {
+		return "dds";
+	}
 	void imgui_draw() override {
 		if (ImGui::Begin("TextureEditorTool")) {
 			grid.update();

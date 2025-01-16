@@ -32,6 +32,7 @@ public:
 	Entity* creator_source = nullptr;		// my creator
 	PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's prefab)
 	uint32_t unique_file_id = 0;			// unique id in source owner (either native c++, prefab, map)
+	bool is_root_of_prefab = false;
 	bool editor_transient = false;	// if true, dont serialize
 	// <<<<<<<<<<<<<<<<
 

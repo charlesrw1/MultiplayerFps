@@ -16,6 +16,7 @@ public:
 	UnserializedSceneFile(UnserializedSceneFile&& other) {
 		all_objs = std::move(other.all_objs);
 		objs_with_extern_references = std::move(other.objs_with_extern_references);
+		root_entity = other.root_entity;
 	}
 	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
 	UnserializedSceneFile(const UnserializedSceneFile&) = delete;
@@ -28,8 +29,16 @@ public:
 	std::unordered_map<std::string, BaseUpdater*>& get_objects() {
 		return all_objs;
 	}
+	Entity* get_root_entity() const {
+		return root_entity;
+	}
+	void set_root_entity(Entity* root) {
+		root_entity = root;
+	}
 private:
 	void add_components_and_children_from_entity_R(const std::string& path, Entity* e, Entity* source);
+
+	Entity* root_entity = nullptr;
 	std::unordered_map<std::string, BaseUpdater*> all_objs;	// fileID/.../fileID -> entity/component
 	std::unordered_set<BaseUpdater*> objs_with_extern_references;
 	friend class Level;
@@ -45,7 +54,7 @@ private:
 // * any EntHandle or CompHandle are set to POINTERS! after setting instance handles, go through obj_with_extern_references and update handles to integer values
 // * needs init to be called
 
-UnserializedSceneFile unserialize_entities_from_text(const std::string& text);
+UnserializedSceneFile unserialize_entities_from_text(const std::string& text, PrefabAsset* opt_source_prefab = nullptr);
 
 class SerializedSceneFile
 {

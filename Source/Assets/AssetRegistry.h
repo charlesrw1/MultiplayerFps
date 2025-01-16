@@ -60,7 +60,6 @@ struct AssetFilesystemNode {
 		children[part]->addPath(a,path, index + 1); // Recursively add the rest of the path
 	}
 
-	// Destructor to clean up memory
 	~AssetFilesystemNode() {
 		for (auto& pair : children) {
 			delete pair.second;

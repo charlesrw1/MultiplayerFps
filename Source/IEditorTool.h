@@ -27,6 +27,8 @@ public:
 
 	virtual void hook_scene_viewport_draw() {}
 	virtual void hook_imgui_newframe() {}
+
+	virtual const char* get_save_file_extension() const = 0;
 protected:
 	virtual const ClassTypeInfo& get_asset_type_info() const = 0;
 
