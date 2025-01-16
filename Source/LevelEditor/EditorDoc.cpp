@@ -471,11 +471,11 @@ void EditorDoc::validate_fileids_before_serialize()
 	auto level = eng->get_level();
 	auto& objs = level->get_all_objects();
 	for (auto o : objs)
-		if (o->creator_source == nullptr) {
+		if (can_delete_or_move_this(o)) {
 			file_id_start = std::max(file_id_start, uint32_t(o->unique_file_id));
 		}
 	for (auto o : objs)
-		if (o->creator_source == nullptr && o->unique_file_id == 0)
+		if (can_delete_or_move_this(o) && o->unique_file_id == 0)
 			o->unique_file_id = get_next_file_id();
 
 }

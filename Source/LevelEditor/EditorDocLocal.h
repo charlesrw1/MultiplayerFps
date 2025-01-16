@@ -440,9 +440,8 @@ public:
 	bool can_delete_or_move_this(BaseUpdater* b) {
 		if (edit_category == EditCategory::EDIT_SCENE) return b->creator_source == nullptr;
 		else {
-			if (b->creator_source == nullptr) return true;
-			if (b->what_prefab == editing_prefab) return true;
-			return false;
+			ASSERT(editing_prefab);
+			return this_is_newly_created(b, editing_prefab);
 		}
 	}
 

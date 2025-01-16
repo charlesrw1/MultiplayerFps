@@ -80,3 +80,7 @@ public:
 // * prefab: if provided, then will serialize like a prefab, with root heirarchy
 
 SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab = nullptr);
+
+// helper utils for editor
+bool this_is_newly_created(const BaseUpdater* b, PrefabAsset* for_prefab);
+bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab);

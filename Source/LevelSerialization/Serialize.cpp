@@ -410,6 +410,8 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 		auto objpath = build_path_for_object(obj, for_prefab);
 		auto e = obj->cast_to<Entity>();
 
+		ASSERT(output.path_to_instance_handle.find(objpath) == output.path_to_instance_handle.end());
+
 		output.path_to_instance_handle.insert({ objpath,obj->instance_id });
 		out.write_item_start();
 		out.write_key_value("override", objpath.c_str());

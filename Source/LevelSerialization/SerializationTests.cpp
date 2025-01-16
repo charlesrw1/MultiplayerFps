@@ -138,23 +138,21 @@ std::string get_text_of_file(const char* path)
 
 ADD_TEST(Serialization, UnserializeScene)
 {
-	{
-		auto text = get_text_of_file("TestFiles/test1.tmap");
-		auto unserialized = unserialize_entities_from_text(text);
-		auto& objs = unserialized.get_objects();
-		TEST_TRUE(unserialized.find("1"));
-		TEST_TRUE(unserialized.find("2"));
-		TEST_TRUE(unserialized.find("2/~2122221332"));
-		TEST_TRUE(unserialized.find("3"));
-		TEST_TRUE(unserialized.find("3/~2122221332"));
+	auto text = get_text_of_file("TestFiles/test1.tmap");
+	auto unserialized = unserialize_entities_from_text(text);
+	auto& objs = unserialized.get_objects();
+	TEST_TRUE(unserialized.find("1"));
+	TEST_TRUE(unserialized.find("2"));
+	TEST_TRUE(unserialized.find("2/~2122221332"));
+	TEST_TRUE(unserialized.find("3"));
+	TEST_TRUE(unserialized.find("3/~2122221332"));
 
-		TEST_TRUE(unserialized.find("2/~2122221332")->is_a<MeshComponent>());
-		TEST_TRUE(unserialized.find("2/~2122221332")->cast_to<MeshComponent>()->cast_shadows == false);
+	TEST_TRUE(unserialized.find("2/~2122221332")->is_a<MeshComponent>());
+	TEST_TRUE(unserialized.find("2/~2122221332")->cast_to<MeshComponent>()->cast_shadows == false);
 
-		auto num3 = unserialized.find("3")->cast_to<StaticMeshEntity>();
-		auto num2 = unserialized.find("2")->cast_to<Entity>();
-		TEST_TRUE(num3 && num2 && num3->get_entity_parent() == num2);
-	}
+	auto num3 = unserialized.find("3")->cast_to<StaticMeshEntity>();
+	auto num2 = unserialized.find("2")->cast_to<Entity>();
+	TEST_TRUE(num3 && num2 && num3->get_entity_parent() == num2);
 }
 ADD_TEST(Serialization, UnserializePrefab)
 {

@@ -113,4 +113,7 @@ bool PrefabAsset::load_asset(ClassBase*&)
 
 	return true;
 }
-
+void PrefabAsset::uninstall()
+{
+	sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
+}
