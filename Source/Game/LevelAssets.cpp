@@ -104,7 +104,7 @@ bool PrefabAsset::load_asset(ClassBase*&)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text));
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, this));
 	}
 	catch (...) {
 		sys_print(Error, "error loading PrefabAsset %s\n", path.c_str());

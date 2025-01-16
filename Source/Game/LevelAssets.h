@@ -28,6 +28,4 @@ public:
 
 	std::string text;
 	std::unique_ptr<UnserializedSceneFile> sceneFile;
-	PrefabAsset* parent_scene = nullptr;
-	int inheritance_level = 0;
 };

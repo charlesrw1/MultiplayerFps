@@ -112,7 +112,9 @@ public:
 			ents.push_back(h.get());
 		}
 		ed_doc.validate_fileids_before_serialize();
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents));
+
+
+		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, ed_doc.editing_prefab));
 	}
 
 };
@@ -335,7 +337,7 @@ void validate_remove_entities(std::vector<EntityPtr<Entity>>& input)
 		Entity* ent = e.get();
 		if (!ent) continue;	// whatever, doesnt matter
 
-		if (ent->creator_source) {
+		if (!ed_doc.can_delete_or_move_this(ent)) {
 			had_errors = true;
 			input.erase(input.begin() + i);
 			i--;
@@ -496,7 +498,16 @@ bool EditorDoc::save_document_internal()
 	for (auto o : all_objs)
 		if(auto e = o->cast_to<Entity>())
 			all_ents.push_back(e);
-	auto serialized = serialize_entities_to_text(all_ents);
+	
+	PrefabAsset* pa = nullptr;
+	PrefabAsset temp_pa;
+	if (is_editing_prefab())
+	{
+		pa = get_prefab_root_entity()->what_prefab;
+		if (!pa) pa = &temp_pa;
+	}
+
+	auto serialized = serialize_entities_to_text(all_ents, pa);
 	
 	auto path = get_doc_name();
 	auto outfile = FileSys::open_write_game(path.c_str());
@@ -563,14 +574,15 @@ void EditorDoc::on_map_load_return(bool good)
 	else {
 		if (is_editing_prefab()) {
 			if (!get_doc_name().empty()) {
-				auto editing_prefab_asset = GetAssets().find_sync<PrefabAsset>(get_doc_name()).get();
-				if (!editing_prefab_asset) {
+				editing_prefab = GetAssets().find_sync<PrefabAsset>(get_doc_name()).get();
+				if (!editing_prefab) {
 					eng->log_to_fullscreen_gui(Error, "Couldnt load prefab");
 					set_empty_doc();
 				}
-				eng->get_level()->spawn_prefab(editing_prefab_asset);
+				else
+					eng->get_level()->spawn_prefab(editing_prefab);
 			}
-			if (!get_doc_name().empty())
+			if (get_doc_name().empty())
 				eng->get_level()->spawn_entity_class<Entity>();	// spawn empty prefab entity
 
 			validate_prefab();
@@ -583,6 +595,8 @@ void EditorDoc::on_map_load_return(bool good)
 }
 bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 {
+	editing_prefab = nullptr;
+
 	// schema vs level edit switch
 	if (strcmp(arg, "prefab") == 0)
 		edit_category = EditCategory::EDIT_PREFAB;
@@ -1353,7 +1367,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			str = entity->editor_name.c_str();
 		else
 			str = entity->get_type().classname;
-		if (entity->creator_source)
+		if (!ed_doc.can_delete_or_move_this(entity))
 			ImGui::TextColored(non_owner_source_color, str);
 		else
 			ImGui::Text(str);
@@ -1415,7 +1429,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		ImGui::SameLine();
 		ImGui::Dummy(ImVec2(5.f,1.0));
 		ImGui::SameLine();
-		if(ec->creator_source)
+		if(!ed_doc.can_delete_or_move_this(ec))
 			ImGui::TextColored(non_owner_source_color, ec->get_type().classname);
 		else
 			ImGui::Text(ec->get_type().classname);

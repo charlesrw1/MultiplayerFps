@@ -345,6 +345,7 @@ void Level::set_local_player(Entity* e) {
 Entity* Level::spawn_prefab(PrefabAsset* asset)
 {
 	auto unserialized_scene = unserialize_entities_from_text(asset->text,asset);
+	unserialized_scene.get_root_entity()->is_root_of_prefab = true;
 	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
 	return unserialized_scene.get_root_entity();
 }

@@ -77,5 +77,6 @@ public:
 // * if a object is part of a prefab, then entire prefab has to be selected
 // * all children of a selected object are selected
 // * if root component is selectd, then entity is selected
+// * prefab: if provided, then will serialize like a prefab, with root heirarchy
 
-SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs);
+SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab = nullptr);

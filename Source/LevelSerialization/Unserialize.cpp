@@ -10,7 +10,7 @@
 #include "Game/LevelAssets.h"
 
 class UnserializationWrapper;
-void unserialize_entities_from_text_internal(UnserializationWrapper& scene, const std::string& text);
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab);
 
 void UnserializedSceneFile::delete_objs()
 {
@@ -95,124 +95,6 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 	all_objs.insert({ path, e });
 	
 }
-
-struct RootSettings
-{
-	SceneAsset* root_prefab = nullptr;
-	Entity* creator = nullptr;
-	int root_file_id = 0;
-};
-
-#include <array>
-
-struct PrefabItem
-{
-	PrefabAsset* prefab = nullptr;
-	std::string path;
-};
-struct RootItem
-{
-	Entity* root_and_creator = nullptr;
-	int count = 0;
-
-	std::string id;
-	Entity* parent = nullptr;
-};
-
-class UnserializationWrapper
-{
-public:
-	UnserializedSceneFile* scene = nullptr;
-	std::vector<RootItem> root_stack;
-	std::vector<PrefabItem> prefab_stack;
-
-	BaseUpdater* find(const std::string& path) const {
-		if (path == "/") {
-			ASSERT(!root_stack.empty());
-			return root_stack.back().root_and_creator;
-		}
-		return scene->find(path);
-	}
-	void add_obj(const std::string& path, Entity* parent_ent, BaseUpdater* e) {
-	
-		// check for root
-		if (!root_stack.empty() && !root_stack.back().root_and_creator) {
-			ASSERT(e->is_a<Entity>());
-			root_stack.back().root_and_creator = (Entity*)e;
-			scene->add_obj(get_current_root() + root_stack.back().id, root_stack.back().parent, e, get_current_root_owner(), get_current_root_scene());
-			e->is_root_of_prefab = true;
-		}
-		else
-			scene->add_obj(get_current_root() + path, parent_ent, e, get_current_owner(), get_current_scene());
-	}
-
-	std::string get_current_root() {
-		return prefab_stack.empty() ? "" : prefab_stack.back().path;
-	}
-	Entity* get_current_owner() {
-		if (root_stack.empty()) return nullptr;
-		if (root_stack.back().root_and_creator) return root_stack.back().root_and_creator;
-		return nullptr;
-	}
-	Entity* get_current_root_owner() {
-		if (root_stack.size() >= 2) {
-			auto p = root_stack[root_stack.size() - 2].root_and_creator;
-			ASSERT(p);
-		}
-		return nullptr;
-	}
-	PrefabAsset* get_current_root_scene() {
-		ASSERT(!root_stack.empty());
-		return prefab_stack.at(prefab_stack.size() - root_stack.back().count).prefab;
-	}
-	PrefabAsset* get_current_scene() {
-		if (prefab_stack.empty()) return nullptr;
-		return prefab_stack.back().prefab;
-	}
-
-	void push_new_scene(PrefabAsset* prefab, std::string scene_file_id, Entity* scene_parent)  {
-		
-		if (!prefab)
-			return;
-
-		if (root_stack.empty() || root_stack.back().root_and_creator) {
-			// already has root, so start a new root
-			//ASSERT(scene_parent);
-			
-			RootItem r;
-			r.count = 1;
-			r.id = scene_file_id;
-			r.root_and_creator = nullptr;
-			r.parent = scene_parent;
-
-			PrefabItem pi;
-			pi.prefab = prefab;
-			pi.path = get_current_root() + scene_file_id + "/";
-
-			root_stack.push_back(r);
-			prefab_stack.push_back(pi);
-		}
-		else {
-			ASSERT(!root_stack.empty());
-			ASSERT(!prefab_stack.empty());
-			ASSERT(!scene_parent);
-			ASSERT(scene_file_id == "/");
-			// this is an inherited scene
-			RootItem& back = root_stack.back();
-			back.count += 1;
-
-			PrefabItem pi;
-			pi.path = get_current_root()+ "*/";
-			pi.prefab = prefab;
-			prefab_stack.push_back(pi);
-		}
-	}
-	void pop_scene() {
-		if (root_stack.empty())
-			return;
-
-	}
-};
 // root
 	// unserialize items
 	// root ...
@@ -220,7 +102,10 @@ public:
 void unserialize_one_item_text(
 	StringView tok,						// in token
 	DictParser& in,
-	UnserializationWrapper& scene)
+	UnserializedSceneFile& scene,
+	const std::string& root_path,
+	PrefabAsset* root_prefab,
+	Entity*& inout_root_entity)
 {
 
 	if (!in.check_item_start(tok))
@@ -248,20 +133,29 @@ void unserialize_one_item_text(
 			in.read_string(tok);
 		}
 
-		auto parent = parentid.empty() ? nullptr : scene.find(parentid)->cast_to<Entity>();
-		ASSERT(parent!=nullptr || parentid.empty());
+		const bool is_root = parentid.empty() && root_prefab;
+		ASSERT(!is_root || inout_root_entity == nullptr);
 		
-		const bool is_root = !parent;
 
+		auto get_parent = [&]() -> Entity* {
+			if (parentid.empty()) return nullptr;
+			if (parentid == ".") return inout_root_entity;
+			return scene.find(root_path + parentid)->cast_to<Entity>();
+		};
+
+		auto parent = get_parent();
+		
 		// prefab
-		if (type.rfind(".pfb") == type.size() - 6) {
+		if (type.rfind(".pfb") == type.size() - 4) {
+			ASSERT(!is_root);	// cant have prefabs as root in prefab... yet :)
+
 			PrefabAsset* asset = GetAssets().find_sync<PrefabAsset>(type).get();
 			if (!asset)
 				throw std::runtime_error("couldnt find scene file: " + type);
 
-			scene.push_new_scene(asset, id, parent);
-			unserialize_entities_from_text_internal(scene,asset->text);
-			scene.pop_scene();
+			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", root_prefab);
+			if(parent)
+				this_prefab_root->parent_to_entity(parent);
 		}
 		// entity or component
 		else {
@@ -273,7 +167,10 @@ void unserialize_one_item_text(
 			ASSERT(obj&&obj->is_a<BaseUpdater>());
 
 			// PUSH BACK OBJ
-			scene.add_obj(id, parent?parent->cast_to<Entity>():nullptr, (BaseUpdater*)obj);
+			scene.add_obj(root_path + id, parent, (BaseUpdater*)obj, inout_root_entity, root_prefab);
+			// set after!
+			if (is_root)
+				inout_root_entity = obj->cast_to<Entity>();
 		}
 	}
 	else if (tok.cmp("override")) {
@@ -297,27 +194,26 @@ void unserialize_one_item_text(
 	}
 }
 
-void unserialize_entities_from_text_internal(UnserializationWrapper& scene, const std::string& text)
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab)
 {
 	DictParser in;
 	in.load_from_memory((uint8_t*)text.data(), text.size(), "");
 	StringView tok;
 
+	Entity* root_entity = nullptr;
 
 	while (in.read_string(tok) && !in.is_eof()) {
-		unserialize_one_item_text(tok, in, scene);
+		unserialize_one_item_text(tok, in, scene,rootpath,prefab,root_entity);
 	}
+
+	return root_entity;
 }
 
 
 UnserializedSceneFile unserialize_entities_from_text(const std::string& text, PrefabAsset* source_prefab)
 {
 	UnserializedSceneFile scene;
-	UnserializationWrapper wrapper;
-	wrapper.scene = &scene;
-	wrapper.push_new_scene(source_prefab, "", nullptr);
-	unserialize_entities_from_text_internal(wrapper,text);
-	auto root = source_prefab?wrapper.root_stack.back().root_and_creator:nullptr;
+	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab);
 	scene.set_root_entity(root);
 	return std::move(scene);
 }

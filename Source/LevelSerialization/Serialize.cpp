@@ -122,44 +122,26 @@ bool validate_selection_for_serialization(const std::vector<BaseUpdater*>& input
 // rules:
 // * path based on source
 
-static int find_inheritance_level(const PrefabAsset* owner, const PrefabAsset* me)
-{
-	int count = 0;
-	bool found = false;
-	while (owner) {
-		if (owner == me) {
-			found = true;
-			break;
-		}
-		owner = owner->parent_scene;
-		count++;
-	}
-	ASSERT(found || !me);
-	return count;
-}
-
-std::string build_path_for_object(const BaseUpdater* obj)
+std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab)
 {
 	if(!obj->creator_source)		// no creator source, top level objects
 		return std::to_string(obj->unique_file_id);
 	else {
-		auto parentpath = build_path_for_object(obj->creator_source);
+		if(for_prefab && obj->what_prefab==for_prefab)
+			return std::to_string(obj->unique_file_id);
+
+		auto parentpath = build_path_for_object(obj->creator_source, for_prefab);
 		if(obj->is_root_of_prefab)
 			return parentpath + "/" + std::to_string(obj->unique_file_id);	// prefab root, just file id
 		else if (!obj->what_prefab) { // native objects
 
-			int level = find_inheritance_level(obj->creator_source->what_prefab, nullptr);
-			int stars = level - 1;
 			auto path = parentpath + "/";
-			for (int i = 0; i < stars; i++) path += "*/";
 			return path + "~" + std::to_string(obj->unique_file_id);
 		}
 		else {	// what_prefab != nullptr
 	
-			int stars = find_inheritance_level(obj->creator_source->what_prefab, obj->what_prefab);
-
+	
 			auto path = parentpath + "/";
-			for (int i = 0; i < stars; i++) path += "*/";
 			return path + std::to_string(obj->unique_file_id);
 		}
 	}
@@ -196,21 +178,25 @@ std::string make_path_relative_to(const std::string& inpath, const std::string& 
 void serialize_new_object_text_R(
 	const Entity* e, 
 	DictWriter& out,
-	bool skip_parent)
+	bool is_root_node,
+	PrefabAsset* for_prefab)
 {
 	if (e->dont_serialize_or_edit)
 		return;
 
 	auto this_is_newly_created = [&](const BaseUpdater* b) -> bool {
-		return b->creator_source == nullptr;
+		return b->creator_source == nullptr || (for_prefab && b->what_prefab == for_prefab);
 	};
 
 	auto serialize_new = [&](const BaseUpdater* b) {
 		out.write_item_start();
-		out.write_key_value("new", b->get_type().classname);
-		out.write_key_value("id", build_path_for_object(b).c_str());
 
-		BaseUpdater* parent = nullptr;
+		if (b->what_prefab && b->what_prefab != for_prefab)
+			out.write_key_value("new", b->what_prefab->get_name().c_str());
+		else
+			out.write_key_value("new", b->get_type().classname);
+
+		Entity* parent = nullptr;
 		if (auto ent = b->cast_to<Entity>()) {
 			parent = ent->get_entity_parent();
 		}
@@ -220,8 +206,16 @@ void serialize_new_object_text_R(
 			parent = ec->get_owner();
 			ASSERT(parent);
 		}
-		if (!skip_parent && parent) {
-			out.write_key_value("parent", build_path_for_object(parent).c_str());
+		if (is_root_node && for_prefab && !parent)
+			out.write_key_value("id", "/");
+		else
+			out.write_key_value("id", build_path_for_object(b, for_prefab).c_str());
+
+		if (!is_root_node && parent) {
+			if (for_prefab && !parent->get_entity_parent())
+				out.write_key_value("parent", ".");
+			else
+				out.write_key_value("parent", build_path_for_object(parent, for_prefab).c_str());
 		}
 
 		out.write_item_end();
@@ -237,7 +231,7 @@ void serialize_new_object_text_R(
 	}
 	auto& children = e->get_all_children();
 	for (auto child : children)
-		serialize_new_object_text_R(child, out, false);
+		serialize_new_object_text_R(child, out, false, for_prefab);
 }
 
 
@@ -291,7 +285,7 @@ const EntityComponent* find_component_diff_in_children_R(const EntityComponent* 
 // 5. skip transient components
 // 6. only add "new" commands when the source_owner is nullptr (currently editing source)
 
-SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs)
+SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
 {
 	std::unordered_set<const BaseUpdater*> is_in_set;
 	auto find_in_set = [&](const BaseUpdater* c) -> bool {
@@ -309,22 +303,28 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 
 	auto add_to_extern_parents = [&](const BaseUpdater* obj, const BaseUpdater* parent) {
 		SerializedSceneFile::external_parent ext;
-		ext.child_path = build_path_for_object(obj);
+		ext.child_path = build_path_for_object(obj, for_prefab);
 		ext.external_parent_handle = parent->instance_id;
 		output.extern_parents.push_back(ext);
 	};
 
 	// write out top level objects (no parent in serialize set)
+
+	bool seen_root_yet = false;
+
 	for (auto obj : input_objs) {
 		auto ent = obj->cast_to<Entity>();
 		ASSERT(ent);
 		auto root_parent = ent->get_entity_parent();
 		if (!find_in_set(root_parent)&&!ent->dont_serialize_or_edit) {
+			ASSERT(for_prefab==nullptr || !seen_root_yet);
 			
 			if (root_parent)
 				add_to_extern_parents(obj, root_parent);
 			
-			serialize_new_object_text_R(ent, out, root_parent!=nullptr);
+			serialize_new_object_text_R(ent, out, true, for_prefab);
+
+			seen_root_yet = true;
 		}
 	}
 
@@ -355,8 +355,11 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 			auto& objs = top_level->what_prefab->sceneFile->get_objects();
 			if (top_level == obj)
 				return objs.find("/")->second;
+			else if (!for_prefab)
+				return objs.find(make_path_relative_to(build_path_for_object(obj, for_prefab), build_path_for_object(top_level, for_prefab)))->second;
 			else
-				return objs.find(make_path_relative_to(build_path_for_object(obj), build_path_for_object(top_level)))->second;
+				return objs.find(build_path_for_object(obj, for_prefab))->second;
+
 		}
 	};
 
@@ -364,7 +367,12 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 		// serialize overrides
 
 		auto write_obj = [&](BaseUpdater* obj) {
-			auto objpath = build_path_for_object(obj);
+			auto objpath = build_path_for_object(obj, for_prefab);
+			auto e = obj->cast_to<Entity>();
+
+			if (e&& for_prefab && !e->get_entity_parent())
+				objpath = "/";
+
 			output.path_to_instance_handle.insert({ objpath,obj->instance_id });
 			out.write_item_start();
 			out.write_key_value("override", objpath.c_str());

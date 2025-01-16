@@ -435,6 +435,16 @@ public:
 		EDIT_PREFAB,
 	};
 	EditCategory edit_category = EditCategory::EDIT_SCENE;
+	PrefabAsset* editing_prefab = nullptr;
+
+	bool can_delete_or_move_this(BaseUpdater* b) {
+		if (edit_category == EditCategory::EDIT_SCENE) return b->creator_source == nullptr;
+		else {
+			if (b->creator_source == nullptr) return true;
+			if (b->what_prefab == editing_prefab) return true;
+			return false;
+		}
+	}
 
 	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
 	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
