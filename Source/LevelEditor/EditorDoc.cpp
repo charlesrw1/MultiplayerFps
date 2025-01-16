@@ -714,6 +714,21 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 		}
 	}
 }
+
+void EditorDoc::do_mouse_selection(MouseSelectionAction action, Entity* e)
+{
+	Entity* actual_entity_to_select = e;
+	while (actual_entity_to_select->creator_source && !can_delete_or_move_this(actual_entity_to_select))
+		actual_entity_to_select = actual_entity_to_select->creator_source;
+	ASSERT(actual_entity_to_select);
+	if (action == SELECT_ONLY)
+		selection_state->set_select_only_this(actual_entity_to_select);
+	else if (action == ADD_SELECT)
+		selection_state->add_to_entity_selection(actual_entity_to_select);
+	else if (action == UNSELECT)
+		selection_state->remove_from_selection(actual_entity_to_select);
+}
+
 void EditorDoc::on_mouse_drag(int x, int y)
 {
 	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
@@ -725,8 +740,8 @@ void EditorDoc::on_mouse_drag(int x, int y)
 			if (component_ptr) {
 				auto owner = component_ptr->get_owner();
 				ASSERT(owner);
-				auto ptr = owner->get_self_ptr();
-				selection_state->add_to_entity_selection(ptr);
+
+				do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner);
 			}
 		}
 	}
@@ -737,8 +752,8 @@ void EditorDoc::on_mouse_drag(int x, int y)
 			if (component_ptr) {
 				auto owner = component_ptr->get_owner();
 				ASSERT(owner);
-				auto ptr = owner->get_self_ptr();
-				selection_state->remove_from_selection(ptr);
+
+				do_mouse_selection(MouseSelectionAction::UNSELECT, owner);
 			}
 		}
 	}
@@ -758,14 +773,13 @@ void EditorDoc::on_mouse_down(int x, int y, int button)
 			if (component_ptr && component_ptr->get_owner()) {
 				auto owner = component_ptr->get_owner();
 				ASSERT(owner);
-				auto ptr = owner->get_self_ptr();
 
 				if (ImGui::GetIO().KeyShift)
-					selection_state->add_to_entity_selection(ptr);
+					do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner);
 				else if (ImGui::GetIO().KeyCtrl)
-					selection_state->remove_from_selection(ptr);
+					do_mouse_selection(MouseSelectionAction::UNSELECT, owner);
 				else
-					selection_state->set_select_only_this(ptr);
+					do_mouse_selection(MouseSelectionAction::SELECT_ONLY, owner);
 			}
 		}
 

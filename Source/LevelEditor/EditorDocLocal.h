@@ -404,6 +404,14 @@ public:
 		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
 	}
 
+	enum MouseSelectionAction {
+		SELECT_ONLY,
+		UNSELECT,
+		ADD_SELECT,
+	};
+
+	void do_mouse_selection(MouseSelectionAction action, Entity* e);
+
 	void on_mouse_down(int x, int y, int button);
 	void on_key_down(const SDL_KeyboardEvent& k);
 	void on_mouse_wheel(const SDL_MouseWheelEvent& wheel) {
