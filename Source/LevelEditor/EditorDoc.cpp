@@ -568,6 +568,7 @@ void EditorDoc::validate_prefab()
 void EditorDoc::on_map_load_return(bool good)
 {
 	if (!good) {
+		sys_print(Debug, "failed to load\n");
 		eng->open_level("__empty__");
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}

@@ -153,7 +153,8 @@ void unserialize_one_item_text(
 			if (!asset)
 				throw std::runtime_error("couldnt find scene file: " + type);
 
-			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", root_prefab);
+			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", asset);
+			this_prefab_root->is_root_of_prefab = true;
 			if(parent)
 				this_prefab_root->parent_to_entity(parent);
 		}
@@ -166,8 +167,13 @@ void unserialize_one_item_text(
 			auto obj = classinfo->allocate();
 			ASSERT(obj&&obj->is_a<BaseUpdater>());
 
+			auto path = root_path + id;
+			if (is_root && !root_path.empty())
+				path = root_path.substr(0,root_path.size() - 1);
+
+
 			// PUSH BACK OBJ
-			scene.add_obj(root_path + id, parent, (BaseUpdater*)obj, inout_root_entity, root_prefab);
+			scene.add_obj(path, parent, (BaseUpdater*)obj, inout_root_entity, root_prefab);
 			// set after!
 			if (is_root)
 				inout_root_entity = obj->cast_to<Entity>();
@@ -178,8 +184,12 @@ void unserialize_one_item_text(
 		// get id
 		in.read_string(tok);
 		auto id = to_std_string_sv(tok);
+		auto path = root_path + id;
+		if (id == "/" && !root_path.empty()) {
+			path = root_path.substr(0, root_path.size() - 1);
+		}
 
-		auto obj = scene.find(id);
+		auto obj = scene.find(path);
 		if (!obj)
 			throw std::runtime_error("couldn't find overrided obj: " + id);
 

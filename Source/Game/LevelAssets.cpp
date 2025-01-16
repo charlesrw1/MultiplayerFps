@@ -83,7 +83,7 @@ bool SceneAsset::load_asset(ClassBase*&)
 	try {
 		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text));
 	}
-	catch (...) {
+	catch (int) {
 		sys_print(Error, "error loading SceneAsset %s\n", path.c_str());
 		return false;
 	}
@@ -106,7 +106,7 @@ bool PrefabAsset::load_asset(ClassBase*&)
 	try {
 		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, this));
 	}
-	catch (...) {
+	catch (int) {
 		sys_print(Error, "error loading PrefabAsset %s\n", path.c_str());
 		return false;
 	}
