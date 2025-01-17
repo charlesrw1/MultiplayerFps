@@ -8,115 +8,6 @@
 #include "Framework/DictWriter.h"
 #include "Level.h"
 #include "Game/LevelAssets.h"
-#if 0
-bool validate_selection_R(EntityComponent* self_c, const std::unordered_set<const BaseUpdater*>& is_in_set)
-{
-	if (is_in_set.find(self_c) == is_in_set.end())
-		return false;
-	auto& children = self_c->get_children();
-	for (auto c : children) {
-		if (!validate_selection_R(c, is_in_set))
-			return false;
-	}
-
-	return true;
-}
-
-bool validate_selection_for_serialization(const std::vector<BaseUpdater*>& input_objs, const std::unordered_set<const BaseUpdater*>& is_in_set)
-{
-	auto find_in_set = [&](const BaseUpdater* c) -> bool {
-		return is_in_set.find(c) != is_in_set.end();
-	};
-
-	for (auto obj : input_objs) {
-
-		// * if a object is part of a prefab, then entire prefab has to be selected (children checked below)
-		if (obj->creator_source && !find_in_set(obj->creator_source))
-			return false;
-
-		// * all children of a selected object are selected
-		if (obj->is_a<Entity>()) {
-			auto root = ((Entity*)obj)->get_root_component();
-			ASSERT(root);
-			if (!validate_selection_R(root,is_in_set))
-				return false;
-		}
-		else if (obj->is_a<EntityComponent>()) {
-			auto ec = (EntityComponent*)obj;
-			if (ec->is_root() && !find_in_set(ec->get_owner()))
-				return false;
-
-			if (!validate_selection_R((EntityComponent*)obj,is_in_set))
-				return false;
-		}
-		else
-			ASSERT(0);
-	}
-
-
-	return true;
-}
-#endif
-
-//
-//	Example:
-//	
-//	C++:
-//	my-entity
-//		mesh-component	(1)
-//	
-//	ThePrefab:
-//	my-entity
-//		mesh-component
-//		another-entity	(1)
-//			mesh-component (2)
-//			
-//	Inherited-ThePrefab:
-//	ThePrefab (my-entity)
-//		mesh-component
-//		another-entity
-//			mesh-component
-//		ability-component (1)
-//	
-//	NestedPrefab:
-//	another-entity
-//		light-component (1)
-//		mesh-component (2)
-//		ThePrefab (my-entity) (3)
-//			mesh-component
-//			another-entity
-//				mesh-component
-//			ability-component
-//		my-entity			(4)
-//			mesh-component
-//	In Map:
-//												| PATH			| owner			| prefab		| is_root_of_prefab
-//	map-root								(0)	| 0				| null			| null			| yes
-//		my-entity 							(1)	| 1				| null			| null			| yes	
-//			mesh-component						| 1/~1			| my-entity		| null			| no	
-//											    |				|				|				|		
-//		ThePrefab (my-entity)				(2) | 2				| null			| ThePrefab		| yes	
-//			mesh-component						| 2/~1			| my-entity		| null			| no	
-//			another-entity						| 2/1			| my-entity		| ThePrefab		| no
-//				mesh-component					| 2/2			| my-entity		| ThePrefab		| no	
-//											    |				|				|				|		
-//		The2ndPrefab (my-entity)			(3) | 3				| null			| 2ndPrefab		| yes		
-//			mesh-component						| 3/*/~1		|				|				|		
-//			another-entity						| 3/*/1			|				|				|		
-//				mesh-component					| 3/*/2			|				|				|		
-//			ability-component					| 3/1			|				|				|		
-//												|				|				|				|		
-//		NestedPrefab (another-entity)		(4)	| 4				| null			| NestedPrefab	| yes		
-//			light-component						| 4/1			| another-entity| NestedPrefab	| no		
-//			mesh-component						| 4/2			| another-entity| NestedPrefab	| no	
-//			The2ndPrefab (my-entity)			| 4/3			| another-entity| The2ndPrefab	| yes	
-//				mesh-component					| 4/*/3/~1		| my-entity		| null			| no		
-//				another-entity					| 4/*/3/1		| my-entity		| ThePrefab		| no		
-//					mesh-component				| 4/*/3/2		| my-entity		| ThePrefab		| no		
-//				ability-component				| 4/3/1			| my-entity		| The2ndPrefab	| no
-//			my-entity2							| 4/4			| another-entity| null			| yes
-//				mesh-component					| 4/4/~1		| my-entity2	| null			| no
-
 
 // TODO prefabs
 // rules:
@@ -213,7 +104,7 @@ void serialize_new_object_text_R(
 	if (e->dont_serialize_or_edit)
 		return;
 
-	auto serialize_new = [&](const BaseUpdater* b) {
+	auto serialize_new = [&](const BaseUpdater* b, bool dont_write_parent_for_this) {
 		out.write_item_start();
 
 		out.write_key_value("new", get_type_for_new_serialized_item(b,for_prefab));
@@ -231,7 +122,7 @@ void serialize_new_object_text_R(
 			ASSERT(parent);
 		}
 
-		if (parent && !dont_write_parent) {
+		if (parent && !dont_write_parent_for_this) {
 			out.write_key_value("parent", build_path_for_object(parent, for_prefab).c_str());
 		}
 
@@ -239,12 +130,12 @@ void serialize_new_object_text_R(
 	};
 
 	if (this_is_newly_created(e, for_prefab))
-		serialize_new(e);
+		serialize_new(e, dont_write_parent);
 
 	auto& all_comps = e->get_all_components();
 	for (auto c : all_comps) {
 		if (!c->dont_serialize_or_edit && this_is_newly_created(c, for_prefab))
-			serialize_new(c);
+			serialize_new(c, false);
 	}
 	auto& children = e->get_all_children();
 	for (auto child : children)

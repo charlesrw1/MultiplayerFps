@@ -1465,15 +1465,17 @@ void GameEngineLocal::game_update_tick()
 
 	assert(level);
 
-	// tick input, this will execute event callbacks
-	if (!level->is_editor_level())
-		GetGInput().tick_users(eng->get_tick_interval());
 
 
 	//if (!is_host())
 	//	cl->SendMovesAndMessages();
 
 	time = tick * tick_interval;
+	
+	// tick input, this will execute event callbacks
+	if (!level->is_editor_level())
+		GetGInput().tick_users(eng->get_tick_interval());
+
 	//build_physics_world(0.f);
 
 	// update entities+components

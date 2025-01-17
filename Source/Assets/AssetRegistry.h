@@ -20,6 +20,7 @@ public:
 	virtual bool assets_are_filepaths() const { return true; }
 	// override this to add a new tool to the editor, used for maps, models, animations, everything
 	virtual IEditorTool* tool_to_edit_me() const { return nullptr; }
+	virtual bool show_tool_in_toolbar() const { return true; }	// weather to show tool in the toolbar, if false, can still open editor when opening an asset from browser
 	virtual const char* get_arg_for_editortool() const { return ""; }
 
 	// return <AssetName>::StaticType

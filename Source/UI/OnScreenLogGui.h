@@ -32,10 +32,19 @@ public:
 
 			float time = time_now - it->timestamp;
 
+			const float entrance_time = 0.2;
+
+			glm::ivec2 offset = { 0,height * font->ptSz };
+			if (time < entrance_time) {
+				float x = (entrance_time - time);
+				x = x * x;
+				color.a = int((1-x) * 255.f);
+				offset.x = x  * 150;
+			}
+
 			if ((total_time-time) < time_to_fade)
 				color.a = int((total_time-time) / time_to_fade *255.f);
 
-			glm::ivec2 offset = { 0,height * font->ptSz };
 			b.draw_text(ws_position + glm::ivec2{ 2,2 } + offset, ws_size, font, sv, { 0,0,0,color.a });
 			b.draw_text(ws_position+offset, ws_size, font, sv, color);
 			height++;

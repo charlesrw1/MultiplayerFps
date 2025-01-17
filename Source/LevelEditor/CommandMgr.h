@@ -44,8 +44,8 @@ public:
 		index %= HIST_SIZE;
 
 		sys_print(Debug,"Executing: %s\n", c->to_string().c_str());
-
 		c->execute();
+		eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
 	}
 	void undo() {
 		index -= 1;

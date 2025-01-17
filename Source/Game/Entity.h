@@ -79,7 +79,7 @@ public:
 	T* get_first_component() {
 		for (int i = 0; i < all_components.size(); i++)
 			if (all_components[i]->is_a<T>())
-				return all_components[i];
+				return (T*)all_components[i];
 		return nullptr;
 	}
 

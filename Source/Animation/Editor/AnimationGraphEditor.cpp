@@ -1053,6 +1053,9 @@ void AnimationGraphEditor::on_key_down(const SDL_KeyboardEvent& key) {
 		}
 
 		break;
+	case SDL_SCANCODE_Z:
+		if (key.keysym.mod & KMOD_LCTRL)
+			eng->log_to_fullscreen_gui(Warning, "No undo implmented :(");
 	}
 }
 void AnimationGraphEditor::on_wheel(const SDL_MouseWheelEvent& wheel) {

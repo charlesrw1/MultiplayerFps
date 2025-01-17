@@ -39,7 +39,7 @@
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
-ConfigVar g_editor_newmap_template("g_editor_newmap_template", "default_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
+ConfigVar g_editor_newmap_template("g_editor_newmap_template", "template_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
 
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
@@ -119,6 +119,56 @@ public:
 
 };
 
+class ParentToCommand : public Command
+{
+public:
+	ParentToCommand(std::vector<Entity*> ents, Entity* parent_to) {
+		for (auto e : ents)
+			this->entities.push_back(e->get_self_ptr());
+		for (auto e : ents)
+			this->prev_parents.push_back(e->get_entity_parent() ? e->get_entity_parent()->get_self_ptr() : EntityPtr<Entity>());
+		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr<Entity>();
+	}
+	void execute() {
+
+		auto parent_to_ent = parent_to.get();
+		for (auto ent : entities) {
+			Entity* e = ent.get();
+			if (!e) {
+				sys_print(Warning, "Couldnt find entity for parent to command\n");
+				return;
+			}
+			auto ws_transform = e->get_ws_transform();
+			e->parent_to_entity(parent_to_ent);
+			e->set_ws_transform(ws_transform);
+		}
+
+		ed_doc.post_node_changes.invoke();
+	}
+	void undo() {
+		for (int i = 0; i < entities.size();i++) {
+			Entity* e = entities[i].get();
+			Entity* prev = prev_parents[i].get();
+			if (!e) {
+				sys_print(Warning, "Couldnt find entity for parent to command\n");
+				return;
+			}
+			auto ws_transform = e->get_ws_transform();
+			e->parent_to_entity(prev);
+			e->set_ws_transform(ws_transform);
+		}
+
+		ed_doc.post_node_changes.invoke();
+	}
+	std::string to_string() override {
+		return "Parent To";
+	}
+
+	std::vector<EntityPtr<Entity>> prev_parents;
+	std::vector<EntityPtr<Entity>> entities;
+	EntityPtr<Entity> parent_to;
+};
+
 class CreatePrefabCommand : public Command
 {
 public:
@@ -152,7 +202,7 @@ public:
 		handle = {};
 	}
 	std::string to_string() override {
-		return "CreatePrefabCommand";
+		return "Create Prefab";
 	}
 	EntityPtr<Entity> parent_to;
 	EntityPtr<Entity> handle;
@@ -175,7 +225,8 @@ public:
 	bool is_valid() override { return true; }
 
 	void execute() {
-		auto ent = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
+		auto ent = eng->get_level()->spawn_entity_class<Entity>();
+		ent->create_and_attach_component_type<MeshComponent>();
 		if (parent_to.get())
 			ent->parent_to_entity(parent_to.get());
 		else
@@ -196,9 +247,13 @@ public:
 				if (modelP) {
 					auto ent = eng->get_entity(the_handle);
 					if (ent) {
-						auto mesh_ent = ent->cast_to<StaticMeshEntity>();
+						auto mesh_ent = ent->cast_to<Entity>();
 						ASSERT(mesh_ent);
-						mesh_ent->Mesh->set_model(modelP.get());
+						auto firstmesh = mesh_ent->get_first_component<MeshComponent>();
+						if (firstmesh)
+							firstmesh->set_model(modelP.get());
+						else
+							sys_print(Warning, "CreateStaticMeshCommand couldnt find mesh component\n");
 					}
 					else
 						sys_print(Warning,"CreateStaticMeshCommand: ent handle invalid in async callback\n");
@@ -212,7 +267,7 @@ public:
 		handle = {};
 	}
 	std::string to_string() override {
-		return "CreateStaticMeshCommand";
+		return "Create StaticMesh";
 	}
 	EntityPtr<Entity> parent_to;
 	EntityPtr<Entity> handle;
@@ -250,7 +305,7 @@ public:
 		handle = {};
 	}
 	std::string to_string() override {
-		return "CreateCppClassCommand";
+		return "Create Class";
 	}
 	const ClassTypeInfo* ti = nullptr;
 	glm::mat4 transform;
@@ -284,9 +339,24 @@ public:
 	}
 
 	void execute() {
-		eng->log_to_fullscreen_gui(Info, "Duplicate");
-
 		auto duplicated = unserialize_entities_from_text(scene->text);
+
+		auto& extern_parents = scene->extern_parents;
+		for (auto ep : extern_parents) {
+			auto e = duplicated.get_objects().find(ep.child_path);
+			ASSERT(e->second->is_a<Entity>());
+			if (e != duplicated.get_objects().end()) {
+				EntityPtr<Entity> parent = { ep.external_parent_handle };
+				if (parent.get()) {
+					auto ent = (Entity*)e->second;
+					ent->parent_to_entity(parent.get());
+				}
+				else
+					sys_print(Warning, "duplicated parent doesnt exist\n");
+			}
+			else
+				sys_print(Warning, "duplicated obj doesnt exist\n");
+		}
 
 		// zero out file ids so new ones are set
 		for (auto o : duplicated.get_objects())
@@ -320,7 +390,7 @@ public:
 		ed_doc.post_node_changes.invoke();
 	}
 	std::string to_string() override {
-		return "DuplicateEntitiesCommand";
+		return "Duplicate Entity";
 	}
 
 	std::unique_ptr<SerializedSceneFile> scene;
@@ -375,7 +445,6 @@ public:
 	}
 
 	void execute() {
-		eng->log_to_fullscreen_gui(Info, "Remove entity");
 
 		for (auto h : handles) {
 			h->destroy();
@@ -413,7 +482,7 @@ public:
 		ed_doc.post_node_changes.invoke();
 	}
 	std::string to_string() override {
-		return "RemoveEntitiesCommand";
+		return "Remove Entity";
 	}
 
 	std::unique_ptr<SerializedSceneFile> scene;
@@ -568,12 +637,27 @@ void EditorDoc::validate_prefab()
 void EditorDoc::on_map_load_return(bool good)
 {
 	if (!good) {
-		sys_print(Debug, "failed to load\n");
+		sys_print(Warning, "failed to load editor map\n");
 		eng->open_level("__empty__");
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
 	else {
 		if (is_editing_prefab()) {
+
+			auto level = eng->get_level();
+			auto& objs = level->get_all_objects();
+			for (auto o : objs)
+			{
+				if (auto e = o->cast_to<Entity>())
+					e->dont_serialize_or_edit = true;
+				else
+				{
+					auto ec = (EntityComponent*)o;
+					ec->dont_serialize_or_edit = true;
+				}
+			}
+
+
 			if (!get_doc_name().empty()) {
 				editing_prefab = GetAssets().find_sync<PrefabAsset>(get_doc_name()).get();
 				if (!editing_prefab) {
@@ -626,8 +710,12 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 		}
 	}
 	else {
+		// editing prefab
 		// wait for level to return
-		eng->open_level("__empty__");
+
+		const char* name = g_editor_newmap_template.get_string();
+		sys_print(Debug, "creating new map using template map (for prefab): %s\n",name);
+		eng->open_level(name);	// queues load of template map
 	}
 	eng_local.on_map_load_return.add(this, &EditorDoc::on_map_load_return);
 
@@ -1309,7 +1397,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				ed_doc.selection_state->clear_all_selected();
 		}
 
-		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[2]&&n->handle!=0) {
+		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[1]&&n->handle!=0) {
 			ImGui::OpenPopup("outliner_ctx_menu");
 			ed_doc.selection_state->add_to_entity_selection({ n->handle });
 			contextMenuHandle = n->handle;
@@ -1324,43 +1412,38 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				if (ImGui::Button("Parent To This")) {
 					auto me = eng->get_entity(contextMenuHandle);
 					auto& ents = ed_doc.selection_state->get_selection();
+					std::vector<Entity*> ptrs;
 					for (auto& ehandle : ents) {
 						EntityPtr<Entity> ptr = { ehandle };
 						if (ptr.get() == me) continue;
-						auto transform = ptr->get_ws_transform();
-						ptr->parent_to_entity(me);
-						ptr->set_ws_transform(transform);
+						ptrs.push_back(ptr.get());
 					}
+					send_this_command_after_table_draw.reset(new ParentToCommand(ptrs, me));
+
 					contextMenuHandle = 0;
-					rebuild_flag = true;
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Remove Parent")) {
 
+					Entity* skip_this = nullptr;
+					Entity* parent_to_this = nullptr;
 					if (ed_doc.is_editing_prefab()) {
 						Entity* root = ed_doc.get_prefab_root_entity();
-						auto& ents = ed_doc.selection_state->get_selection();
-						for (auto& ehandle : ents) {
-							EntityPtr<Entity> ptr = { ehandle };
-							if (ptr.get() == root) continue;
-
-							auto transform = ptr->get_ws_transform();
-							ptr->parent_to_entity(root);
-							ptr->set_ws_transform(transform);
-						}
+						parent_to_this = root;
+						skip_this = root;
 					}
-					else {
-						auto& ents = ed_doc.selection_state->get_selection();
-						for (auto& ehandle : ents) {
-							EntityPtr<Entity> ptr = { ehandle };
-							auto transform = ptr->get_ws_transform();
-							ptr->parent_to_entity(nullptr);
-							ptr->set_ws_transform(transform);
-						}
-
+				
+					auto& ents = ed_doc.selection_state->get_selection();
+					std::vector<Entity*> ptrs;
+					for (auto& ehandle : ents) {
+						EntityPtr<Entity> ptr = { ehandle };
+						if (ptr.get() == skip_this) continue;
+						ptrs.push_back(ptr.get());
 					}
+
+					send_this_command_after_table_draw.reset(new ParentToCommand(ptrs, parent_to_this));
+
 					contextMenuHandle = 0;
-					rebuild_flag = true;
 
 					ImGui::CloseCurrentPopup();
 				}
@@ -1404,6 +1487,7 @@ void ObjectOutliner::draw()
 		return;
 	}
 
+	ASSERT(!send_this_command_after_table_draw);
 
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
@@ -1415,11 +1499,12 @@ void ObjectOutliner::draw()
 		ImGui::EndTable();
 	}
 	ImGui::End();
-	if(rebuild_flag)
-		rebuild_tree();
-	rebuild_flag = false;
-	
 
+	if (send_this_command_after_table_draw) {
+		ed_doc.command_mgr->add_command(send_this_command_after_table_draw.release());
+	}
+
+	ASSERT(!send_this_command_after_table_draw);
 }
 
 void EdPropertyGrid::draw_components(Entity* entity)

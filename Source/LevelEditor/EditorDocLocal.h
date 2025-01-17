@@ -129,7 +129,8 @@ private:
 	uint64_t contextMenuHandle = 0;
 
 	char nameFilter[256];
-	bool rebuild_flag = false;
+
+	std::unique_ptr<Command> send_this_command_after_table_draw;
 };
 
 class EdPropertyGrid
@@ -446,9 +447,9 @@ public:
 	PrefabAsset* editing_prefab = nullptr;
 
 	bool can_delete_or_move_this(BaseUpdater* b) {
-		if (edit_category == EditCategory::EDIT_SCENE) return b->creator_source == nullptr;
+		if (edit_category == EditCategory::EDIT_SCENE) return this_is_newly_created(b,nullptr);
 		else {
-			ASSERT(editing_prefab);
+			//ASSERT(editing_prefab);
 			return this_is_newly_created(b, editing_prefab);
 		}
 	}

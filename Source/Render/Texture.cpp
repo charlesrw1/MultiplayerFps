@@ -51,6 +51,9 @@ public:
 		filepaths.push_back("_flat_normal");
 	}
 	virtual IEditorTool* tool_to_edit_me() const override { return g_texture_editor_tool; }
+	bool show_tool_in_toolbar() const override {
+		return false;
+	}
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Texture::StaticType; }
 };

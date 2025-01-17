@@ -230,7 +230,7 @@ void IEditorTool::draw_menu_bar()
 
 			for (int i = 0; i < types.size(); i++) {
 				auto& type = types[i];
-				if (type->tool_to_edit_me()) {
+				if (type->tool_to_edit_me()&&type->show_tool_in_toolbar()) {
 					std::string name = type->get_type_name();
 					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(type->get_browser_color().to_uint()));
 					if (ImGui::MenuItem(name.c_str())) {
