@@ -412,7 +412,7 @@ public:
 		ADD_SELECT,
 	};
 
-	void do_mouse_selection(MouseSelectionAction action, Entity* e);
+	void do_mouse_selection(MouseSelectionAction action, Entity* e, bool select_root_most_entity);
 
 	void on_mouse_down(int x, int y, int button);
 	void on_key_down(const SDL_KeyboardEvent& k);
@@ -455,6 +455,23 @@ public:
 		}
 	}
 
+	bool is_in_eyedropper_mode() const {
+		return eye_dropper_active;
+	}
+	void enable_entity_eyedropper_mode() {
+		eng->log_to_fullscreen_gui(Debug, "entering eyedropper mode...");
+
+		eye_dropper_active = true;
+	}
+	void exit_eyedropper_mode() {
+		if (is_in_eyedropper_mode()) {
+			eng->log_to_fullscreen_gui(Debug, "exiting eyedropper");
+			eye_dropper_active = false;
+		}
+	}
+
+	bool eye_dropper_active = false;
+
 	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
 	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
 
@@ -495,6 +512,8 @@ public:
 	MulticastDelegate<EntityComponent*> on_component_created;
 	MulticastDelegate<EntityPtr<Entity>> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
+
+	MulticastDelegate<Entity*> on_eyedropper_callback;
 
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;

@@ -200,7 +200,11 @@ void unserialize_one_item_text(
 		if (!obj)
 			throw std::runtime_error("couldn't find overrided obj: " + id);
 
-		auto res = read_props_to_object(obj, &obj->get_type(), in, {}, nullptr);
+		LevelSerializationContext ctx;
+		ctx.in = &scene;
+		ctx.in_root = &path;
+
+		auto res = read_props_to_object(obj, &obj->get_type(), in, {}, &ctx);
 		if (!res.second) {
 			throw std::runtime_error("failed prop parse");
 		}
@@ -234,4 +238,39 @@ UnserializedSceneFile unserialize_entities_from_text(const std::string& text, Pr
 	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab, nullptr);
 	scene.set_root_entity(root);
 	return std::move(scene);
+}
+
+void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
+{
+	for (int i = 0; i < list->count; i++) {
+		auto prop = list->list[i];
+		if (strcmp(prop.custom_type_str, "EntityPtr") == 0) {
+			// wtf!
+			Entity** e = (Entity**)prop.get_ptr(inst);
+			EntityPtr<Entity>* eptr = (EntityPtr<Entity>*)prop.get_ptr(inst);
+			if (*e) {
+				*eptr = { (*e)->instance_id };
+			}
+		}
+		else if(prop.type==core_type_id::List) {
+			auto size = prop.list_ptr->get_size(inst);
+			for (int j = 0; j < size; j++) {
+				auto ptr = prop.list_ptr->get_index(inst, j);
+				check_props_for_entityptr(ptr, prop.list_ptr->props_in_list);
+			}
+		}
+	}
+}
+
+void UnserializedSceneFile::unserialize_post_assign_ids()
+{
+	for (auto obj : objs_with_extern_references) {
+		auto type = &obj->get_type();
+		while (type) {
+			auto props = type->props;
+			if(props)
+				check_props_for_entityptr(obj, props);
+			type = type->super_typeinfo;
+		}
+	}
 }

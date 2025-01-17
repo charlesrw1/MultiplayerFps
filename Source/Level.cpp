@@ -312,6 +312,7 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 			o.second->post_unserialization(get_next_id_and_increment());
 			all_world_ents.insert(o.second->instance_id, o.second);
 		}
+		scene.unserialize_post_assign_ids();
 
 		if (b_has_initialized_map) {
 			for (auto o : objs) {

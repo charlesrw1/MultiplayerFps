@@ -190,6 +190,33 @@ ADD_TEST(Serialization, ThisIsNewlyCreated)
 	TEST_TRUE(this_is_newly_created(subent, loadPrefab));
 }
 
+ADD_TEST(Serialization, RelativePaths)
+{
+	TEST_TRUE(serialize_build_relative_path("1/2", "1") == "..");
+	TEST_TRUE(serialize_build_relative_path("1", "1/2") == "2");
+	TEST_TRUE(serialize_build_relative_path("1/2/3", "1/3") == "../../3");
+	TEST_TRUE(serialize_build_relative_path("1/2/3", "2/~3") == "../../../2/~3");
+
+	TEST_TRUE(unserialize_relative_to_absolute("..", "1/2") == "1");
+	TEST_TRUE(unserialize_relative_to_absolute("2", "1") == "1/2");
+	TEST_TRUE(unserialize_relative_to_absolute("../../3","1/2/3")== "1/3");
+	TEST_TRUE(unserialize_relative_to_absolute("../../../2/~3", "1/2/3") == "2/~3");
+
+	SerializeTestWorkbench work;
+	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test4.pfb").get();
+	auto pent = work.add_prefab(loadPrefab);
+	auto subent = pent->get_all_children().at(0);
+	auto newent = work.add_entity<Entity>();
+	auto newcomp = work.add_component<MeshComponent>(newent);
+	pent->parent_to_entity(work.add_entity<Entity>());
+	work.post_unserialization();
+
+	auto from = build_path_for_object((BaseUpdater*)subent,nullptr);
+	auto to = build_path_for_object((BaseUpdater*)pent,nullptr);
+	auto rel = serialize_build_relative_path(from.c_str(),to.c_str());
+	auto abs = unserialize_relative_to_absolute(rel.c_str(), from.c_str());
+}
+
 
 extern const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab);
 ADD_TEST(Serialization, PrefabInPrefabSerialize)
@@ -203,7 +230,7 @@ ADD_TEST(Serialization, PrefabInPrefabSerialize)
 	TEST_TRUE(subent->what_prefab && subent->what_prefab->get_name() == "test2.pfb");
 	TEST_TRUE(find_diff_class(pent, nullptr) == loadPrefab->sceneFile->get_root_entity());
 	TEST_TRUE(find_diff_class(subent, nullptr) == loadPrefab->sceneFile->get_root_entity()->get_all_children().at(0));
-
+	 
 
 
 	auto file = serialize_entities_to_text(work.get_all_entities(), nullptr);

@@ -57,6 +57,8 @@ void SpotLightComponent::on_init()
 		arrow_obj->dont_serialize_or_edit = true;
 		arrow_obj->create_and_attach_component_type<ArrowComponent>();
 		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
+		editor_arrow = arrow_obj->instance_id;
+		editor_billboard = b->instance_id;
 	}
 }
 
@@ -71,6 +73,12 @@ void SpotLightComponent::editor_on_change_property()
 void SpotLightComponent::on_deinit()
 {
 	idraw->get_scene()->remove_light(light_handle);
+	auto e = eng->get_object(editor_billboard);
+	if (e)
+		((EntityComponent*)e)->destroy();
+	e = eng->get_object(editor_arrow);
+	if (e)
+		((EntityComponent*)e)->destroy();
 }
 
 void SpotLightComponent::on_changed_transform()
@@ -113,12 +121,16 @@ void PointLightComponent::on_init()
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/pointBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		editor_billboard = b->instance_id;
 	}
 }
 
 void PointLightComponent::on_deinit()
 {
 	idraw->get_scene()->remove_light(light_handle);
+	auto e = eng->get_object(editor_billboard);
+	if (e)
+		((EntityComponent*)e)->destroy();
 }
 
 void PointLightComponent::on_changed_transform()
@@ -186,12 +198,21 @@ void SunLightComponent::on_init()
 
 		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>();
 		s->dont_serialize_or_edit = true;
+		editor_arrow = s->instance_id;
+		editor_billboard = b->instance_id;
 	}
 }
 
 void SunLightComponent::on_deinit()
 {
 	idraw->get_scene()->remove_sun(light_handle);
+
+	auto e = eng->get_object(editor_billboard);
+	if (e)
+		((EntityComponent*)e)->destroy();
+	e = eng->get_object(editor_arrow);
+	if (e)
+		((EntityComponent*)e)->destroy();
 }
 
 void SunLightComponent::on_changed_transform()

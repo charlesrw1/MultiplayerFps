@@ -13,6 +13,8 @@
 // rules:
 // * path based on source
 
+CLASS_IMPL(LevelSerializationContext);
+
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)
 {
 	if (!for_prefab) return false;
@@ -99,7 +101,8 @@ void serialize_new_object_text_R(
 	const Entity* e, 
 	DictWriter& out,
 	bool dont_write_parent,
-	PrefabAsset* for_prefab)
+	PrefabAsset* for_prefab,
+	SerializedSceneFile& output)
 {
 	if (e->dont_serialize_or_edit)
 		return;
@@ -129,6 +132,10 @@ void serialize_new_object_text_R(
 		out.write_item_end();
 	};
 
+	auto objpath = build_path_for_object(e, for_prefab);
+	ASSERT(output.path_to_instance_handle.find(objpath) == output.path_to_instance_handle.end());
+	output.path_to_instance_handle.insert({ objpath,e->instance_id });
+
 	if (this_is_newly_created(e, for_prefab))
 		serialize_new(e, dont_write_parent);
 
@@ -139,11 +146,11 @@ void serialize_new_object_text_R(
 	}
 	auto& children = e->get_all_children();
 	for (auto child : children)
-		serialize_new_object_text_R(child, out, false /* dont_write_parent=false*/, for_prefab);
+		serialize_new_object_text_R(child, out, false /* dont_write_parent=false*/, for_prefab, output);
 }
 
 
-static void write_just_props(ClassBase* e, const ClassBase* diff, DictWriter& out, SerializeEntityObjectContext* ctx)
+static void write_just_props(ClassBase* e, const ClassBase* diff, DictWriter& out, LevelSerializationContext* ctx)
 {
 	std::vector<PropertyListInstancePair> props;
 	const ClassTypeInfo* typeinfo = &e->get_type();
@@ -295,20 +302,15 @@ const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab
 	}
 }
 
-void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFile& output, DictWriter& out)
+void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFile& output, DictWriter& out, LevelSerializationContext* ctx)
 {
 	auto write_obj = [&](BaseUpdater* obj) {
 		auto objpath = build_path_for_object(obj, for_prefab);
-		auto e = obj->cast_to<Entity>();
-
-		ASSERT(output.path_to_instance_handle.find(objpath) == output.path_to_instance_handle.end());
-
-		output.path_to_instance_handle.insert({ objpath,obj->instance_id });
 		out.write_item_start();
 		out.write_key_value("override", objpath.c_str());
 
 		auto diff = find_diff_class(obj,for_prefab);
-		write_just_props(obj, diff, out, nullptr);
+		write_just_props(obj, diff, out, ctx);
 
 		out.write_item_end();
 	};
@@ -319,7 +321,7 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 			if (!comp->dont_serialize_or_edit)
 				write_obj(comp);
 		for (auto o : e->get_all_children())
-			serialize_overrides_R(o, for_prefab, output, out);
+			serialize_overrides_R(o, for_prefab, output, out, ctx);
 	}
 }
 
@@ -352,19 +354,138 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 		if (root_parent)
 				add_to_extern_parents(obj, root_parent);
 			
-		serialize_new_object_text_R(ent, out, root_parent != nullptr /* dont_write_parent if root_parent exists*/, for_prefab);
+		serialize_new_object_text_R(ent, out, root_parent != nullptr /* dont_write_parent if root_parent exists*/, for_prefab, output);
 	}
 
 
 	
+	LevelSerializationContext ctx;
+	ctx.out = &output;
+	ctx.for_prefab = for_prefab;
 
 	for (auto inobj : roots) {
 		// serialize overrides
 
-		serialize_overrides_R(inobj,for_prefab, output, out);
+		serialize_overrides_R(inobj,for_prefab, output, out, &ctx);
 	}
 
 	output.text = std::move(out.get_output());
 
 	return output;
+}
+
+
+
+
+void split_path_c(const char* path, char** components, char* buffer, int& buffer_ofs, int& count, int num_components, int buffer_size) {
+    count = 0;
+    const char* start = path;
+    while (*path) {
+        if (*path == '/') {
+			if (count >= num_components)
+				throw std::runtime_error("split_path_c out of components");
+			if ((path - start) + 1 + buffer_ofs >= buffer_size)
+				throw std::runtime_error("split_path_c out of buffer");
+			auto len = path - start;
+			strncpy(buffer + buffer_ofs, start, len);
+			buffer[buffer_ofs + len] = 0;
+			*components++ = &buffer[buffer_ofs];
+			buffer_ofs +=len + 1;
+            start = path + 1;
+            count++;
+        }
+        path++;
+    }
+    if (start != path) {
+		if (count >= num_components)
+			throw std::runtime_error("split_path_c out of components");
+		if ((path - start) + 1 + buffer_ofs >= buffer_size)
+			throw std::runtime_error("split_path_c out of buffer");
+		auto len = (path - start);
+		strncpy(buffer+buffer_ofs, start,len);
+		buffer[buffer_ofs + len] = 0;
+		*components++ = &buffer[buffer_ofs];
+		buffer_ofs += len + 1;
+		count++;
+    }
+}
+
+
+std::string serialize_build_relative_path(const char* from, const char* to)
+{
+	const int MAX_COMPONENTS = 10;
+	static char buffer[256];
+    static char* from_components[MAX_COMPONENTS];
+    static char* to_componenets[MAX_COMPONENTS];
+    int from_count=0, to_count=0;
+
+	int buffer_ofs = 0;
+    split_path_c(from, from_components, buffer,buffer_ofs, from_count,MAX_COMPONENTS,256);
+    split_path_c(to, to_componenets, buffer,buffer_ofs, to_count,MAX_COMPONENTS,256);
+
+    int common_length = 0;
+    while (common_length < from_count && common_length < to_count && strcmp(from_components[common_length], to_componenets[common_length]) == 0) {
+        common_length++;
+    }
+
+    static char relativePath[1024];
+    char* p = relativePath;
+
+    for (int i = common_length; i < from_count; ++i) {
+        if (i > common_length) {
+            *p++ = '/';
+        }
+        strcpy(p, "..");
+        p += 2;
+    }
+
+    for (int i = common_length; i < to_count; ++i) {
+        if (p != relativePath) {
+            *p++ = '/';
+        }
+        strcpy(p, to_componenets[i]);
+        p += strlen(to_componenets[i]);
+    }
+
+    *p = '\0';
+
+    return relativePath;
+}
+std::string unserialize_relative_to_absolute(const char* relative, const char* root)
+{
+	const int MAX_COMPONENTS = 10;
+	static char buffer[256];
+	static char* relative_components[MAX_COMPONENTS];
+	static char* root_componenents[MAX_COMPONENTS];
+	int rel_count = 0, root_count = 0;
+
+	char* buffer_ptr = buffer;
+	int buffer_ofs = 0;
+    split_path_c(relative, relative_components, buffer,buffer_ofs, rel_count,MAX_COMPONENTS,256);
+    split_path_c(root, root_componenents, buffer,buffer_ofs, root_count,MAX_COMPONENTS,256);
+
+	for (int i = 0; i < rel_count; i++) {
+		if (strcmp(relative_components[i], "..") == 0) {
+			if (root_count > 0)
+				root_count--;
+		}
+		else {
+			root_componenents[root_count++] = relative_components[i];
+		}
+	}
+
+
+	static char absolutePath[1024];
+	char* p = absolutePath;
+	for (int i = 0; i < root_count; i++) {
+		if (i > 0) {
+			*p++ = '/';
+		}
+		strcpy(p, root_componenents[i]);
+        p += strlen(root_componenents[i]);
+	}
+
+    *p = '\0';
+
+    return absolutePath;
 }

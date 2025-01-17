@@ -28,6 +28,7 @@ public:
 	static Factory<std::string, IPropertyEditor>& get_factory();
 
 	IPropertyEditor()  {}
+	virtual ~IPropertyEditor() {}
 
 	void post_construct_for_custom_type(void* instance, PropertyInfo* prop) {
 		this->instance = instance;

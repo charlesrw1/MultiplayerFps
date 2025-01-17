@@ -4,10 +4,13 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include "Framework/ClassBase.h"
+
 class BaseUpdater;
 class PrefabAsset;
 class Entity;
 class EntityComponent;
+class Level;
 class UnserializedSceneFile
 {
 public:
@@ -35,6 +38,12 @@ public:
 	void set_root_entity(Entity* root) {
 		root_entity = root;
 	}
+	void add_entityptr_refer(BaseUpdater* ptr) {
+		objs_with_extern_references.insert(ptr);
+	}
+
+	void unserialize_post_assign_ids();
+
 private:
 	void add_components_and_children_from_entity_R(const std::string& path, Entity* e, Entity* source);
 
@@ -51,7 +60,7 @@ private:
 
 // with UnserializedSceneFile, you have a collection of entities that havent been initalized yet. 
 // * need to assign instance handles to them
-// * any EntHandle or CompHandle are set to POINTERS! after setting instance handles, go through obj_with_extern_references and update handles to integer values
+// * any EntHandle  are set to POINTERS! after setting instance handles, go through obj_with_extern_references and update handles to integer values
 // * needs init to be called
 
 UnserializedSceneFile unserialize_entities_from_text(const std::string& text, PrefabAsset* opt_source_prefab = nullptr);
@@ -81,6 +90,19 @@ public:
 
 SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab = nullptr);
 
+
 // helper utils for editor
 bool this_is_newly_created(const BaseUpdater* b, PrefabAsset* for_prefab);
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab);
+std::string serialize_build_relative_path(const char* from, const char* to);
+std::string unserialize_relative_to_absolute(const char* relative,const char* root);
+std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab);
+
+// Passed down to serializers
+CLASS_H(LevelSerializationContext,ClassBase)
+public:
+	SerializedSceneFile* out = nullptr;
+	UnserializedSceneFile* in = nullptr;
+	std::string* in_root = nullptr;
+	PrefabAsset* for_prefab = nullptr;
+};

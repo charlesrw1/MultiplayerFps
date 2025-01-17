@@ -4,6 +4,8 @@
 
 class Texture;
 struct Render_Light;
+class BillboardComponent;
+class ArrowComponent;
 CLASS_H(SpotLightComponent, EntityComponent)
 public:
 	void on_init() override;
@@ -30,6 +32,9 @@ public:
 	AssetPtr<Texture> cookie_asset;
 	bool visible = true;
 	handle<Render_Light> light_handle;
+
+	uint64_t editor_billboard = 0;
+	uint64_t editor_arrow = 0;
 };
 
 CLASS_H(PointLightComponent, EntityComponent)
@@ -51,6 +56,7 @@ public:
 
 	bool visible = true;
 	handle<Render_Light> light_handle;
+	uint64_t editor_billboard = 0;
 };
 
 struct Render_Sun;
@@ -77,4 +83,6 @@ public:
 
 	bool visible = true;
 	handle<Render_Sun> light_handle;
+	uint64_t editor_billboard = 0;
+	uint64_t editor_arrow = 0;
 };

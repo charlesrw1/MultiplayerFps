@@ -116,7 +116,6 @@ public:
 
 		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, ed_doc.editing_prefab));
 	}
-
 };
 
 class ParentToCommand : public Command
@@ -876,11 +875,20 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 	}
 }
 
-void EditorDoc::do_mouse_selection(MouseSelectionAction action, Entity* e)
+void EditorDoc::do_mouse_selection(MouseSelectionAction action, Entity* e, bool select_rootmost_entity)
 {
 	Entity* actual_entity_to_select = e;
-	while (actual_entity_to_select->creator_source && !can_delete_or_move_this(actual_entity_to_select))
-		actual_entity_to_select = actual_entity_to_select->creator_source;
+	if (select_rootmost_entity) {
+		while (actual_entity_to_select->creator_source && !can_delete_or_move_this(actual_entity_to_select))
+			actual_entity_to_select = actual_entity_to_select->creator_source;
+	}
+	if (is_in_eyedropper_mode()) {
+		sys_print(Debug, "eyedrop!\n");
+		on_eyedropper_callback.invoke(actual_entity_to_select);
+		exit_eyedropper_mode();
+		return;
+	}
+
 	ASSERT(actual_entity_to_select);
 	if (action == SELECT_ONLY)
 		selection_state->set_select_only_this(actual_entity_to_select);
@@ -902,7 +910,7 @@ void EditorDoc::on_mouse_drag(int x, int y)
 				auto owner = component_ptr->get_owner();
 				ASSERT(owner);
 
-				do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner);
+				do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner, true);
 			}
 		}
 	}
@@ -914,7 +922,7 @@ void EditorDoc::on_mouse_drag(int x, int y)
 				auto owner = component_ptr->get_owner();
 				ASSERT(owner);
 
-				do_mouse_selection(MouseSelectionAction::UNSELECT, owner);
+				do_mouse_selection(MouseSelectionAction::UNSELECT, owner, true);
 			}
 		}
 	}
@@ -936,12 +944,16 @@ void EditorDoc::on_mouse_down(int x, int y, int button)
 				ASSERT(owner);
 
 				if (ImGui::GetIO().KeyShift)
-					do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner);
+					do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner, true);
 				else if (ImGui::GetIO().KeyCtrl)
-					do_mouse_selection(MouseSelectionAction::UNSELECT, owner);
+					do_mouse_selection(MouseSelectionAction::UNSELECT, owner, true);
 				else
-					do_mouse_selection(MouseSelectionAction::SELECT_ONLY, owner);
+					do_mouse_selection(MouseSelectionAction::SELECT_ONLY, owner, true);
 			}
+		}
+		else {
+
+			exit_eyedropper_mode();
 		}
 
 	}
@@ -968,9 +980,10 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(selected_handles);
 			command_mgr->add_command(cmd);
 		}
-
-
 	}
+	else if (scancode == SDL_SCANCODE_ESCAPE)
+		if (is_in_eyedropper_mode())
+			exit_eyedropper_mode();
 #if 0
 
 	else if (scancode == SDL_SCANCODE_KP_5) {
@@ -1463,9 +1476,9 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (n->handle != 0) {
 				if(ImGui::GetIO().KeyShift)
-					ed_doc.selection_state->add_to_entity_selection({ n->handle });
+					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, eng->get_entity(n->handle), false);
 				else
-					ed_doc.selection_state->set_select_only_this({ n->handle });
+					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, eng->get_entity(n->handle), false);
 			}
 			else
 				ed_doc.selection_state->clear_all_selected();
@@ -1536,6 +1549,12 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 
 					contextMenuHandle = 0;
 
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::Button("Add empty entity")) {
+					auto me = eng->get_entity(contextMenuHandle);
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), me->get_self_ptr()));
+					contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -1863,6 +1882,55 @@ private:
 
 ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
 
+
+class EntityPtrAssetEditor : public IPropertyEditor
+{
+public:
+	EntityPtrAssetEditor() {
+		ed_doc.on_eyedropper_callback.add(this, [&](Entity* e)
+			{
+				sys_print(Debug, "entityptr on eye dropper callback\n");
+				EntityPtr<Entity>* ptr_to_asset = (EntityPtr<Entity>*)prop->get_ptr(instance);
+				*ptr_to_asset = e->get_self_ptr();
+			});
+	}
+	~EntityPtrAssetEditor() override {
+		ed_doc.on_eyedropper_callback.remove(this);
+	}
+	virtual bool internal_update() {
+
+		EntityPtr<Entity>* ptr_to_asset = (EntityPtr<Entity>*)prop->get_ptr(instance);
+
+		ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
+		auto eyedropper = GetAssets().find_sync<Texture>("icon/eyedrop.png");
+		if (ImGui::ImageButton((ImTextureID)eyedropper->gl_id, ImVec2(16, 16))) {
+			ed_doc.enable_entity_eyedropper_mode();
+		}
+		ImGui::PopStyleColor();
+		ImGui::SameLine();
+		if (ed_doc.is_in_eyedropper_mode()) {
+			ImGui::TextColored(color32_to_imvec4({ 255, 74, 249 }), "{ eyedropper  active }");
+		}
+		else if (ptr_to_asset->get()) {
+			const char* str = ptr_to_asset->get()->editor_name.c_str();
+			if (!*str)
+				str = ptr_to_asset->get()->get_type().classname;
+			ImGui::Text(str);
+		}
+		else {
+			ImGui::TextColored(color32_to_imvec4({ 128,128,128 }),"<nullptr>");
+
+		}
+
+		return false;
+	}
+	virtual int extra_row_count() { return 0; }
+	virtual bool can_reset() { return false; }
+	virtual void reset_value() {
+	}
+};
+ADDTOFACTORYMACRO_NAME(EntityPtrAssetEditor, IPropertyEditor, "EntityPtr");
+
 class ColorEditor : public IPropertyEditor
 {
 public:
@@ -1962,16 +2030,16 @@ SelectionState::SelectionState()
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {
 	static int counter = 0;
-
+	const int size = 10;
 	auto model = GetAssets().find_sync<Model>("wall2x2.cmdl");
-	for (int z = 0; z < 20; z++) {
-		for (int y = 0; y < 20; y++) {
-			for (int x = 0; x < 20; x++) {
-				glm::vec3 p(x, y, z + counter * 20);
+	for (int z = 0; z < size; z++) {
+		for (int y = 0; y < size; y++) {
+			for (int x = 0; x < size; x++) {
+				glm::vec3 p(x, y, z + counter * size);
 				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
 
-				auto ent = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
-				ent->Mesh->set_model(model.get());
+				auto ent = eng->get_level()->spawn_entity_class<Entity>();
+				ent->create_and_attach_component_type<MeshComponent>()->set_model(model.get());
 				ent->set_ws_transform(transform);
 				
 			}
@@ -1979,24 +2047,6 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 	}
 	counter++;
 }
-#include "Render/MaterialPublic.h"
-#if 0
-DECLARE_ENGINE_CMD(STRESS_TEST_DECAL)
-{
-	for (int z = 0; z < 10; z++) {
-		for (int y = 0; y < 10; y++) {
-			for (int x = 0; x < 10; x++) {
-				glm::vec3 p(x, y, z);
-				glm::mat4 transform = glm::translate(glm::mat4(1), p * 2.0f);
-
-				auto ent = eng->spawn_entity_class<DecalEntity>();
-				ent->Decal->set_material(GetAssets().find_sync<MaterialInstance>("bulletDecal").get());
-				ent->set_ws_transform(transform);
-			}
-		}
-	}
-}
-#endif
 
 
 EditorDoc::EditorDoc() {

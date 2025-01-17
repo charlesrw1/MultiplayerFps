@@ -142,7 +142,7 @@ void Entity::destroy_internal()
 		ASSERT(loop_count < 100);
 		int pre_count = children.size();
 		children.front()->destroy();	// destroy() unparents entity, which shrinks this vec, assert this
-		ASSERT(children.size() == pre_count - 1);
+		ASSERT(children.size() <= pre_count - 1);
 		loop_count++;
 	}
 	ASSERT(children.empty());
@@ -152,7 +152,7 @@ void Entity::destroy_internal()
 		ASSERT(loop_count < 100);
 		int presize = all_components.size();
 		all_components.front()->destroy();
-		ASSERT(all_components.size() == presize - 1);
+		ASSERT(all_components.size() <= presize - 1);	// can be less than if components desroy other components
 		loop_count++;
 	}
 	ASSERT(all_components.empty());

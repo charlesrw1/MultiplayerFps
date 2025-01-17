@@ -3,7 +3,7 @@ thirdperson 1
 
 
 
-g_draw_physx_scene 31
+#g_draw_physx_scene 31
 
 bind 1 "map template_map.tmap"
 

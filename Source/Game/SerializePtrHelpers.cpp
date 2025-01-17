@@ -4,6 +4,9 @@
 #include "Framework/Util.h"
 #include "Game/Entity.h"
 #include "Assets/AssetDatabase.h"
+#include "LevelSerialization/SerializationAPI.h"
+#include "Level.h"
+#include "GameEnginePublic.h"
 
 CLASS_IMPL(SerializeEntityObjectContext);
 
@@ -95,63 +98,51 @@ class SerializeEntityPtr : public IPropertySerializer
 	// Inherited via IPropertySerializer
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
-		uint64_t* p = (uint64_t*)info.get_ptr(inst);
-		return std::to_string(*p);
-	}
-
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
-	{
-		uint64_t* p = (uint64_t*)info.get_ptr(inst);
-		auto stack = token.to_stack_string();
-		int fields = sscanf(stack.c_str(), "%llu", p);
-		if (fields != 1) {
-			sys_print(Error, "unserialize EntityPtr error\n");
-			*p = 0;
+		ASSERT(user->is_a<LevelSerializationContext>());
+		auto ctx = (LevelSerializationContext*)user;
+		uint64_t handle = *(uint64_t*)info.get_ptr(inst);
+		if (handle == 0)
+			return "";
+		auto oent = eng->get_level()->get_entity(handle);
+		if (!oent) {
+			sys_print(Warning, "handle wasnt found when serializing: %d", handle);
+			return "";
 		}
-	}
-};
 
-class SerializeECPtr : public IPropertySerializer
-{
-public:
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
-	{
-		assert(user);
-		auto ctx = user->cast_to<SerializeEntityObjectContext>();
-		assert(ctx);
+		auto ent = oent->cast_to<Entity>();
 
-		ObjPtr<EntityComponent>* ptr_prop = (ObjPtr<EntityComponent>*)info.get_ptr(inst);
-		ASSERT(0);
-		if (!ptr_prop->get())
-			return "";
-		else if (ptr_prop->get()->get_owner() == ctx->entity_serialzing)
-			return "";
-		else
-			return "";
+		auto from = build_path_for_object((BaseUpdater*)inst,nullptr);
+		auto to = build_path_for_object((BaseUpdater*)ent,nullptr);
+
+		return serialize_build_relative_path(from.c_str(),to.c_str());
 	}
 
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	{
-		// unserializing has no context, gets fixup at a later step
-		ASSERT(0);
-		assert(user);
-		auto ctx = user->cast_to<SerializeEntityObjectContext>();
-		assert(ctx);
-		assert(ctx->entity_serialzing);
+		ASSERT(user->is_a<LevelSerializationContext>());
+		auto ctx = (LevelSerializationContext*)user;
+		uint64_t* p = (uint64_t*)info.get_ptr(inst);
 
 		auto stack = token.to_stack_string();
-		ObjPtr<EntityComponent>* ptr_prop = (ObjPtr<EntityComponent>*)info.get_ptr(inst);
-
 		if (stack.size() == 0) {
-			ptr_prop->ptr = nullptr;
+			*p = 0;
+			return;
+		}
+
+		auto path = unserialize_relative_to_absolute(stack.c_str(), ctx->in_root->c_str());
+		auto find = ctx->in->find(path);
+		if (!find) {
+			sys_print(Error, "couldnt find path for entityptr %s\n", path.c_str());
 		}
 		else {
-			//ptr_prop->ptr = ctx->entity_serialzing->find_component_for_string_name(stack.c_str());
+			ASSERT(find->is_a<Entity>());
+			*p = reinterpret_cast<uint64_t>(find);	// to get fixed up later
+
+			ctx->in->add_entityptr_refer((BaseUpdater*)inst);
 		}
 	}
 };
-ADDTOFACTORYMACRO_NAME(SerializeECPtr, IPropertySerializer, "EntityCompPtr");
+
 ADDTOFACTORYMACRO_NAME(SerializeAssetPtr, IPropertySerializer,	"AssetPtr");
 ADDTOFACTORYMACRO_NAME(SerializeEntityPtr, IPropertySerializer, "EntityPtr");
 

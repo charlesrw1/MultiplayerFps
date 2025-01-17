@@ -106,7 +106,7 @@ public:
 
 	void loop();
 	void draw_screen();
-	void pre_render_update();
+
 	// state relevant functions
 	void set_tick_rate(float tick_rate);
 

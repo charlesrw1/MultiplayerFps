@@ -115,6 +115,18 @@ public:
 
 CLASS_IMPL(PlayerSpawnPoint);
 
+CLASS_H(ReferenceComponent, EntityComponent)
+public:
+	static const PropertyInfoList* get_props() {
+		START_PROPS(ReferenceComponent)
+			REG_ENTITY_PTR(my_reference, PROP_DEFAULT),
+		END_PROPS(ReferenceComponent)
+	};
+
+	EntityPtr<Entity> my_reference;
+};
+CLASS_IMPL(ReferenceComponent);
+
 
 //
 //	PLAYER MOVEMENT CODE

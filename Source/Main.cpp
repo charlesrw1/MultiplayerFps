@@ -1655,7 +1655,6 @@ void GameEngineLocal::loop()
 			if (state != Engine_State::Game)
 				continue;	// goto next frame (to exit or change map)
 
-			pre_render_update();
 
 			frame_time = orig_ft;
 			tick_interval = orig_ti;
@@ -1684,13 +1683,6 @@ void GameEngineLocal::loop()
 
 		Profiler::end_frame_tick(frame_time);
 	}
-}
-
-
-void GameEngineLocal::pre_render_update()
-{
-	ASSERT(state == Engine_State::Game);
-
 }
 
 void draw_console_hook() {
