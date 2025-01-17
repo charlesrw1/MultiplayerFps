@@ -129,8 +129,6 @@ private:
 	uint64_t contextMenuHandle = 0;
 
 	char nameFilter[256];
-
-	std::unique_ptr<Command> send_this_command_after_table_draw;
 };
 
 class EdPropertyGrid
@@ -141,7 +139,9 @@ public:
 	
 	MulticastDelegate<> on_property_change;
 private:
-	void on_ec_deleted(EntityComponent* ec) {
+	void on_ec_deleted(uint64_t comp) {
+		if (selected_component == comp)
+			selected_component = 0;
 		refresh_grid();
 	}
 	void on_close() {
@@ -150,6 +150,7 @@ private:
 	void refresh_grid();
 
 	uint64_t selected_component = 0;
+	uint64_t component_context_menu = 0;
 
 	void on_select_component(EntityComponent* ec) {
 		selected_component = ec->instance_id;
@@ -490,7 +491,7 @@ public:
 	OrthoCamera ortho_camera;
 
 
-	MulticastDelegate<EntityComponent*> on_component_deleted;
+	MulticastDelegate<uint64_t> on_component_deleted;
 	MulticastDelegate<EntityComponent*> on_component_created;
 	MulticastDelegate<EntityPtr<Entity>> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created

@@ -51,10 +51,10 @@ static uint32_t parse_fileid(const std::string& path)
 
 		ASSERT(last_slash != path.size() - 1);
 		ASSERT(path.at(last_slash + 1) != '~');
-		return std::stoi(path.substr(last_slash + 1));
+		return std::stoll(path.substr(last_slash + 1));
 	}
 	else
-		return std::stoi(path);
+		return std::stoll(path);
 }
 
 void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent, BaseUpdater* e, Entity* opt_source_owner, PrefabAsset* opt_prefab)

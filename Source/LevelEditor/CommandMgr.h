@@ -28,24 +28,33 @@ public:
 			hist[i] = nullptr;
 		}
 	}
+	
+	void execute_queued_commands() {
+
+		for (auto c : queued_commands) {
+	
+			if (!c->is_valid()) {
+				sys_print(Warning, "command not valid %s\n", c->to_string().c_str());
+				delete c;
+			}
+
+			if (hist[index]) {
+				delete hist[index];
+			}
+			hist[index] = c;
+			index += 1;
+			index %= HIST_SIZE;
+
+			sys_print(Debug, "Executing: %s\n", c->to_string().c_str());
+			c->execute();
+			eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
+		}
+
+		queued_commands.clear();
+	}
+
 	void add_command(Command* c) {
-
-		if (!c->is_valid()) {
-			sys_print(Warning, "command not valid %s\n", c->to_string().c_str());
-			delete c;
-			return;
-		}
-
-		if (hist[index]) {
-			delete hist[index];
-		}
-		hist[index] = c;
-		index += 1;
-		index %= HIST_SIZE;
-
-		sys_print(Debug,"Executing: %s\n", c->to_string().c_str());
-		c->execute();
-		eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
+		queued_commands.push_back(c);
 	}
 	void undo() {
 		index -= 1;
@@ -66,6 +75,8 @@ public:
 			sys_print(Debug,"nothing to undo\n");
 		}
 	}
+
+	std::vector<Command*> queued_commands;
 
 	const int HIST_SIZE = 128;
 	int index = 0;

@@ -489,6 +489,79 @@ public:
 	std::vector<EntityPtr<Entity>> handles;
 };
 
+class CreateComponentCommand : public Command
+{
+public:
+	CreateComponentCommand(Entity* e, const ClassTypeInfo* component_type) {
+		ent = e->get_self_ptr();
+		ASSERT(component_type->is_a(EntityComponent::StaticType));
+		info = component_type;
+	}
+	void execute() {
+		ASSERT(comp_handle == 0);
+		auto e = ent.get();
+		if (!e) {
+			sys_print(Warning, "no entity in createcomponentcommand\n");
+			return;
+		}
+		auto ec = e->create_and_attach_component_type(info);
+		comp_handle = ec->instance_id;
+
+		ed_doc.on_component_created.invoke(ec);
+	}
+	void undo() {
+		ASSERT(comp_handle != 0);
+		auto obj = eng->get_object(comp_handle);
+		ASSERT(obj->is_a<EntityComponent>());
+		auto ec = (EntityComponent*)obj;
+		auto id = ec->instance_id;
+		ec->destroy();
+		ed_doc.on_component_deleted.invoke(id);
+		comp_handle = 0;
+	}
+	std::string to_string() override {
+		return "Create Component";
+	}
+	EntityPtr<Entity> ent;
+	uint64_t comp_handle = 0;
+	const ClassTypeInfo* info = nullptr;
+};
+class RemoveComponentCommand  : public Command
+{
+public:
+	RemoveComponentCommand(Entity* e, EntityComponent* which) {
+		ent = e->get_self_ptr();
+		comp_handle = which->instance_id;
+		info = &which->get_type();
+	}
+	void execute() {
+		ASSERT(comp_handle != 0);
+		auto obj = eng->get_object(comp_handle);
+		ASSERT(obj->is_a<EntityComponent>());
+		auto ec = (EntityComponent*)obj;
+		auto id = ec->instance_id;
+		ec->destroy();
+		ed_doc.on_component_deleted.invoke(id);
+		comp_handle = 0;
+	}
+	void undo() {
+		ASSERT(comp_handle == 0);
+		auto e = ent.get();
+		if (!e) {
+			sys_print(Warning, "no entity in RemoveComponentCommand\n");
+			return;
+		}
+		auto ec = e->create_and_attach_component_type(info);
+		comp_handle = ec->instance_id;
+	}
+	std::string to_string() override {
+		return "Remove Component";
+	}
+	EntityPtr<Entity> ent;
+	uint64_t comp_handle = 0;
+	const ClassTypeInfo* info = nullptr;
+};
+
 
 // Unproject mouse coords into a vector, cast that into the world via physics
 glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
@@ -1108,7 +1181,6 @@ static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::q
 ManipulateTransformTool::ManipulateTransformTool()
 {
 	ed_doc.post_node_changes.add(this, &ManipulateTransformTool::on_entity_changes);
-	ed_doc.on_component_deleted.add(this, &ManipulateTransformTool::on_component_deleted);
 	ed_doc.selection_state->on_selection_changed.add(this,
 		&ManipulateTransformTool::on_selection_changed);
 	ed_doc.on_close.add(this, &ManipulateTransformTool::on_close);
@@ -1301,6 +1373,8 @@ void EditorDoc::imgui_draw()
 	prop_editor->draw();
 
 	IEditorTool::imgui_draw();
+
+	command_mgr->execute_queued_commands();
 }
 
 void EditorDoc::hook_scene_viewport_draw()
@@ -1410,15 +1484,24 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			}
 			else {
 				if (ImGui::Button("Parent To This")) {
+
 					auto me = eng->get_entity(contextMenuHandle);
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
+					bool had_errs = false;
 					for (auto& ehandle : ents) {
 						EntityPtr<Entity> ptr = { ehandle };
 						if (ptr.get() == me) continue;
-						ptrs.push_back(ptr.get());
+
+						if (ed_doc.can_delete_or_move_this(ptr.get()))
+							ptrs.push_back(ptr.get());
+						else
+							had_errs = true;
 					}
-					send_this_command_after_table_draw.reset(new ParentToCommand(ptrs, me));
+					if(!ptrs.empty())
+						ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me));
+					if (had_errs)
+						eng->log_to_fullscreen_gui(Error, "Cant change parent of inherited entities");
 
 					contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
@@ -1435,13 +1518,21 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
+					bool had_errs = false;
 					for (auto& ehandle : ents) {
 						EntityPtr<Entity> ptr = { ehandle };
 						if (ptr.get() == skip_this) continue;
-						ptrs.push_back(ptr.get());
+
+						if (ed_doc.can_delete_or_move_this(ptr.get()))
+							ptrs.push_back(ptr.get());
+						else
+							had_errs = true;
 					}
 
-					send_this_command_after_table_draw.reset(new ParentToCommand(ptrs, parent_to_this));
+					if(!ptrs.empty())
+						ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, parent_to_this));
+					if (had_errs)
+						eng->log_to_fullscreen_gui(Error, "Cant remove parent of inherited entities");
 
 					contextMenuHandle = 0;
 
@@ -1487,8 +1578,6 @@ void ObjectOutliner::draw()
 		return;
 	}
 
-	ASSERT(!send_this_command_after_table_draw);
-
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
 	if (ImGui::BeginTable("Table", 1, flags)) {
@@ -1500,11 +1589,6 @@ void ObjectOutliner::draw()
 	}
 	ImGui::End();
 
-	if (send_this_command_after_table_draw) {
-		ed_doc.command_mgr->add_command(send_this_command_after_table_draw.release());
-	}
-
-	ASSERT(!send_this_command_after_table_draw);
 }
 
 void EdPropertyGrid::draw_components(Entity* entity)
@@ -1525,6 +1609,37 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		if (ImGui::Selectable("##selectednode", ec->instance_id == selected_component, selectable_flags, ImVec2(0, 0))) {
 			on_select_component(ec);
 		}
+
+		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[1]) {
+			ImGui::OpenPopup("outliner_ctx_menu");
+			on_select_component(ec);
+			component_context_menu = ec->instance_id;
+		}
+		if (ImGui::BeginPopup("outliner_ctx_menu")) {
+
+			if (eng->get_object(component_context_menu) == nullptr) {
+				component_context_menu = 0;
+				ImGui::CloseCurrentPopup();
+			}
+			else {
+				if (ImGui::Button("Remove (warning: no undo)")) {
+
+					auto ec_ = eng->get_object(component_context_menu)->cast_to<EntityComponent>();
+					if (ed_doc.can_delete_or_move_this(ec_)) {
+						ed_doc.command_mgr->add_command(new RemoveComponentCommand(ec_->get_owner(), ec_));
+					}
+					else
+						eng->log_to_fullscreen_gui(Error, "Cant remove inherited components");
+
+					ImGui::CloseCurrentPopup();
+					component_context_menu = 0;
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			ImGui::EndPopup();
+		}
+
 
 		ImGui::SameLine();
 		ImGui::Dummy(ImVec2(5.f,1.0));
@@ -1592,9 +1707,10 @@ void EdPropertyGrid::draw()
 				auto iter = ClassBase::get_subclasses<EntityComponent>();
 				for (; !iter.is_end(); iter.next()) {
 					if (ImGui::Selectable(iter.get_type()->classname)) {
-						auto ec = ent->create_and_attach_component_type(iter.get_type());
-						ASSERT(ec);
-						on_select_component(ec);
+
+						ed_doc.command_mgr->add_command(new CreateComponentCommand(
+							ent, iter.get_type()
+						));
 
 						ImGui::CloseCurrentPopup();
 					}
@@ -1608,6 +1724,8 @@ void EdPropertyGrid::draw()
 				ImGui::Text("No components. Add one above.");
 			}
 			else {
+				if (selected_component == 0)
+					selected_component = comps[0]->instance_id;
 
 				uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
 					ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
@@ -1781,6 +1899,8 @@ EdPropertyGrid::EdPropertyGrid()
 	ss->on_selection_changed.add(this, &EdPropertyGrid::refresh_grid);
 	ed_doc.on_close.add(this, &EdPropertyGrid::on_close);
 	ed_doc.on_component_deleted.add(this, &EdPropertyGrid::on_ec_deleted);
+	ed_doc.on_component_created.add(this, &EdPropertyGrid::on_select_component);
+
 }
 
 void EdPropertyGrid::refresh_grid()
