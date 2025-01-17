@@ -17,7 +17,7 @@ public:
 		ed_doc.validate_fileids_before_serialize();
 
 
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, ed_doc.editing_prefab));
+		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, ed_doc.get_editing_prefab()));
 	}
 };
 

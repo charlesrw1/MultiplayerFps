@@ -155,9 +155,7 @@ void EditorDoc::validate_fileids_before_serialize()
 	for (auto o : objs)
 		if (can_delete_or_move_this(o)&&!o->dont_serialize_or_edit) {
 			file_id_start = std::max(file_id_start, o->unique_file_id);
-			ASSERT(file_id_start < 1000);
 		}
-	ASSERT(file_id_start < 1000);
 	for (auto o : objs) {
 		if (can_delete_or_move_this(o) && o->unique_file_id == 0 && !o->dont_serialize_or_edit)
 			o->unique_file_id = get_next_file_id();
@@ -1519,6 +1517,26 @@ private:
 };
 
 ADDTOFACTORYMACRO_NAME(ColorEditor, IPropertyEditor, "ColorUint");
+
+class ButtonPropertyEditor : public IPropertyEditor
+{
+	bool internal_update() {
+		ASSERT(prop->type == core_type_id::Bool);
+
+		bool ret = false;
+		if (ImGui::Button(prop->range_hint)) {
+			ret = true;
+			prop->set_int(instance, true);
+		}
+
+		return ret;
+	}
+	bool can_reset() {
+		return false;
+	}
+};
+ADDTOFACTORYMACRO_NAME(ButtonPropertyEditor, IPropertyEditor, "BoolButton");
+
 
 EdPropertyGrid::EdPropertyGrid()
 {

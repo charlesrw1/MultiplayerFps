@@ -444,8 +444,6 @@ public:
 		EDIT_SCENE,
 		EDIT_PREFAB,
 	};
-	EditCategory edit_category = EditCategory::EDIT_SCENE;
-	PrefabAsset* editing_prefab = nullptr;
 
 	bool can_delete_or_move_this(BaseUpdater* b) {
 		if (edit_category == EditCategory::EDIT_SCENE) return this_is_newly_created(b,nullptr);
@@ -463,13 +461,11 @@ public:
 	void* get_active_eyedropper_user_id() {
 		return active_eyedropper_user_id;
 	}
-
-	bool eye_dropper_active = false;
-	void* active_eyedropper_user_id = nullptr;	// for id purposes only
-
 	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
 	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
-
+	PrefabAsset* get_editing_prefab() {
+		return editing_prefab;
+	}
 	void validate_prefab();
 	Entity* get_prefab_root_entity();
 
@@ -526,4 +522,11 @@ private:
 	}
 
 	uint32_t file_id_start = 0;
+
+	bool eye_dropper_active = false;
+	void* active_eyedropper_user_id = nullptr;	// for id purposes only
+
+	EditCategory edit_category = EditCategory::EDIT_SCENE;
+	PrefabAsset* editing_prefab = nullptr;
+
 };

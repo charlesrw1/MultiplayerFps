@@ -228,6 +228,17 @@ PointLightComponent::~PointLightComponent() {}
 SpotLightComponent::~SpotLightComponent() {}
 SpotLightComponent::SpotLightComponent() {}
 #include "Render/Render_Volumes.h"
+
+#define REG_BOOL_W_CUSTOM(name, flags, custom, hint) make_bool_property_custom(#name,offsetof(TYPE_FROM_START, name), flags, hint, custom)
+PropertyInfo make_bool_property_custom(const char* name, uint16_t offset, uint32_t flags, const char* hint, const char* custom)
+{
+	PropertyInfo prop(name, offset, flags);
+	prop.type = core_type_id::Bool;
+	prop.range_hint = hint;
+	prop.custom_type_str = custom;
+	return prop;
+}
+
 CLASS_H(SkylightComponent,EntityComponent)
 public:
 	SkylightComponent() {
@@ -251,13 +262,25 @@ public:
 	}
 
 	void editor_on_change_property() override {
-
+		if (recapture_skylight) {
+			sys_print(Debug, "recapturing skylight");
+			Render_Skylight sl;
+			sl.generated_cube = mytexture;
+			sl.wants_update = true;
+			idraw->get_scene()->update_skylight(handle, sl);
+		}
+		recapture_skylight = false;
 	}
 
-	static const PropertyInfoList* get_props() = delete;
+	static const PropertyInfoList* get_props() {
+		START_PROPS(SkylightComponent)
+			REG_BOOL_W_CUSTOM(recapture_skylight,PROP_EDITABLE,"BoolButton","Recapture")
+		END_PROPS(SkylightComponent)
+	}
 
 	Texture* mytexture = nullptr;
 	handle<Render_Skylight> handle;
+	bool recapture_skylight = false;
 };
 CLASS_IMPL(SkylightComponent);
 #include "Game/Entity.h"

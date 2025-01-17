@@ -77,7 +77,6 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 	// catch exception later
 
 	e->unique_file_id = parse_fileid(path);
-	ASSERT(e->unique_file_id < 1000);
 	e->creator_source = opt_source_owner;
 	e->what_prefab = opt_prefab;
 	// <<<<<<<<<<<<<<<<<<
