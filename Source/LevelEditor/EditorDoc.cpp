@@ -36,6 +36,8 @@
 
 #include "Game/LevelAssets.h"
 
+#include "LevelEditor/Commands.h"
+
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
@@ -49,18 +51,18 @@ class EditorUILayout : public GUIFullscreen
 public:
 	EditorUILayout() {
 		
+		tool_text = new GUIText;
+		tool_text->hidden = true;
+		add_this(tool_text);
+		tool_text->anchor = UIAnchorPos::create_single(0.5, 0.5);
 	}
 
 	void on_pressed(int x, int y, int button) override {
 		eng->get_gui()->set_focus_to_this(this);
 
-
-
 		mouse_down_delegate.invoke(x, y, button);
 	}
 	void on_released(int x, int y, int button) override {
-
-
 
 		mouse_up_delegate.invoke(x, y, button);
 	}
@@ -86,10 +88,7 @@ public:
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 
 
-
-	GUIBox* test = nullptr;
-
-	GUIVerticalBox* vbox = nullptr;
+	GUIText* tool_text = nullptr;
 };
 
 
@@ -102,464 +101,6 @@ static std::string to_string(StringView view) {
 // Create from a class, create from a schema, create from a duplication
 // -> serialize to use as an interchange format
 
-
-class CommandSerializeUtil
-{
-public:
-	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(std::vector<EntityPtr<Entity>> handles) {
-		std::vector<Entity*> ents;
-		for (auto h : handles) {
-			ents.push_back(h.get());
-		}
-		ed_doc.validate_fileids_before_serialize();
-
-
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, ed_doc.editing_prefab));
-	}
-};
-
-class ParentToCommand : public Command
-{
-public:
-	ParentToCommand(std::vector<Entity*> ents, Entity* parent_to) {
-		for (auto e : ents)
-			this->entities.push_back(e->get_self_ptr());
-		for (auto e : ents)
-			this->prev_parents.push_back(e->get_entity_parent() ? e->get_entity_parent()->get_self_ptr() : EntityPtr<Entity>());
-		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr<Entity>();
-	}
-	void execute() {
-
-		auto parent_to_ent = parent_to.get();
-		for (auto ent : entities) {
-			Entity* e = ent.get();
-			if (!e) {
-				sys_print(Warning, "Couldnt find entity for parent to command\n");
-				return;
-			}
-			auto ws_transform = e->get_ws_transform();
-			e->parent_to_entity(parent_to_ent);
-			e->set_ws_transform(ws_transform);
-		}
-
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() {
-		for (int i = 0; i < entities.size();i++) {
-			Entity* e = entities[i].get();
-			Entity* prev = prev_parents[i].get();
-			if (!e) {
-				sys_print(Warning, "Couldnt find entity for parent to command\n");
-				return;
-			}
-			auto ws_transform = e->get_ws_transform();
-			e->parent_to_entity(prev);
-			e->set_ws_transform(ws_transform);
-		}
-
-		ed_doc.post_node_changes.invoke();
-	}
-	std::string to_string() override {
-		return "Parent To";
-	}
-
-	std::vector<EntityPtr<Entity>> prev_parents;
-	std::vector<EntityPtr<Entity>> entities;
-	EntityPtr<Entity> parent_to;
-};
-
-class CreatePrefabCommand : public Command
-{
-public:
-	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr<Entity> parent) {
-		this->prefab_name = prefab_name;
-		this->transform = transform;
-		this->parent_to = parent;
-	}
-	~CreatePrefabCommand() override {
-	}
-	void execute() {
-		auto l = eng->get_level();
-		auto p = GetAssets().find_sync<PrefabAsset>(prefab_name);
-		if (p) {
-			auto ent = l->spawn_prefab(p.get());
-			if (ent) {
-				handle = ent->get_self_ptr();
-				if (parent_to.get())
-					ent->parent_to_entity(parent_to.get());
-				else
-					ent->set_ws_transform(transform);
-				ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
-				ed_doc.on_entity_created.invoke(handle);
-				ed_doc.post_node_changes.invoke();
-			}
-		}
-	}
-	void undo() {
-		handle->destroy();
-		ed_doc.post_node_changes.invoke();
-		handle = {};
-	}
-	std::string to_string() override {
-		return "Create Prefab";
-	}
-	EntityPtr<Entity> parent_to;
-	EntityPtr<Entity> handle;
-	std::string prefab_name;
-	glm::mat4 transform;
-};
-
-class CreateStaticMeshCommand : public Command
-{
-public:
-	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr<Entity> parent) {
-
-		this->transform = transform;
-		this->modelname = modelname;
-		this->parent_to = parent;
-	}
-	~CreateStaticMeshCommand() override {
-	}
-
-	bool is_valid() override { return true; }
-
-	void execute() {
-		auto ent = eng->get_level()->spawn_entity_class<Entity>();
-		ent->create_and_attach_component_type<MeshComponent>();
-		if (parent_to.get())
-			ent->parent_to_entity(parent_to.get());
-		else
-			ent->set_ws_transform(transform);
-
-		handle = ent->get_self_ptr();
-
-		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
-
-		ed_doc.on_entity_created.invoke(handle);
-		ed_doc.post_node_changes.invoke();
-
-
-		GetAssets().find_async<Model>(modelname.c_str(), [the_handle = ent->instance_id](GenericAssetPtr p) {
-			if (p) {
-				auto modelP = p.cast_to<Model>();
-				
-				if (modelP) {
-					auto ent = eng->get_entity(the_handle);
-					if (ent) {
-						auto mesh_ent = ent->cast_to<Entity>();
-						ASSERT(mesh_ent);
-						auto firstmesh = mesh_ent->get_first_component<MeshComponent>();
-						if (firstmesh)
-							firstmesh->set_model(modelP.get());
-						else
-							sys_print(Warning, "CreateStaticMeshCommand couldnt find mesh component\n");
-					}
-					else
-						sys_print(Warning,"CreateStaticMeshCommand: ent handle invalid in async callback\n");
-				}
-			}
-			});
-	}
-	void undo() {
-		handle->destroy();
-		ed_doc.post_node_changes.invoke();
-		handle = {};
-	}
-	std::string to_string() override {
-		return "Create StaticMesh";
-	}
-	EntityPtr<Entity> parent_to;
-	EntityPtr<Entity> handle;
-	glm::mat4 transform;
-	std::string modelname{};
-};
-class CreateCppClassCommand : public Command
-{
-public:
-	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr<Entity> parent) {
-		auto find = cppclassname.rfind('/');
-		auto types = cppclassname.substr(find==std::string::npos ? 0 : find+1);
-		ti = ClassBase::find_class(types.c_str());
-		this->transform = transform;
-		this->parent_to = parent;
-	}
-	bool is_valid() override { return ti != nullptr; }
-
-	void execute() {
-		assert(ti);
-		auto ent = eng->get_level()->spawn_entity_from_classtype(*ti);
-		if (parent_to.get())
-			ent->parent_to_entity(parent_to.get());
-		else
-			ent->set_ws_transform(transform);
-		ent->editor_name = ent->get_type().classname;
-		handle = ent->get_self_ptr();
-		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
-		ed_doc.on_entity_created.invoke(handle);
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() {
-		eng->get_level()->destroy_entity(eng->get_entity(handle));
-		ed_doc.post_node_changes.invoke();
-		handle = {};
-	}
-	std::string to_string() override {
-		return "Create Class";
-	}
-	const ClassTypeInfo* ti = nullptr;
-	glm::mat4 transform;
-	EntityPtr<Entity> handle;
-	EntityPtr<Entity> parent_to;
-};
-
-class PropertyChangeCommand
-{
-public:
-	PropertyChangeCommand(std::string field, std::vector<ClassBase*> classes);
-	void commit_post_change();
-private:
-	struct Change {
-		ClassBase* instance = nullptr;
-		std::string field_name;
-		std::string pre_serialized_string;
-		std::string post_serialized_string;
-	};
-	std::vector<Change> changes;
-	std::vector<std::string> fields;
-};
-
-
-class DuplicateEntitiesCommand : public Command
-{
-public:
-	DuplicateEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
-
-		scene = CommandSerializeUtil::serialize_entities_text(handles);
-	}
-
-	void execute() {
-		auto duplicated = unserialize_entities_from_text(scene->text);
-
-		auto& extern_parents = scene->extern_parents;
-		for (auto ep : extern_parents) {
-			auto e = duplicated.get_objects().find(ep.child_path);
-			ASSERT(e->second->is_a<Entity>());
-			if (e != duplicated.get_objects().end()) {
-				EntityPtr<Entity> parent = { ep.external_parent_handle };
-				if (parent.get()) {
-					auto ent = (Entity*)e->second;
-					ent->parent_to_entity(parent.get());
-				}
-				else
-					sys_print(Warning, "duplicated parent doesnt exist\n");
-			}
-			else
-				sys_print(Warning, "duplicated obj doesnt exist\n");
-		}
-
-		// zero out file ids so new ones are set
-		for (auto o : duplicated.get_objects())
-			if(o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
-				o.second->unique_file_id = 0;
-
-		eng->get_level()->insert_unserialized_entities_into_level(duplicated);
-
-
-		handles.clear();
-		auto& objs = duplicated.get_objects();
-		for (auto& o : objs) {
-			if (auto e = o.second->cast_to<Entity>())
-			{
-				ed_doc.on_entity_created.invoke(e->get_self_ptr());
-				handles.push_back(e->get_self_ptr());
-			}
-		}
-		ed_doc.selection_state->clear_all_selected();
-		for (auto e : handles) {
-			ed_doc.selection_state->add_to_entity_selection(e);
-		}
-
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() {
-		for (auto h : handles) {
-			h->destroy();
-		}
-
-		ed_doc.post_node_changes.invoke();
-	}
-	std::string to_string() override {
-		return "Duplicate Entity";
-	}
-
-	std::unique_ptr<SerializedSceneFile> scene;
-	std::vector<EntityPtr<Entity>> handles;
-};
-
-
-void validate_remove_entities(std::vector<EntityPtr<Entity>>& input)
-{
-	bool had_errors = false;
-	for (int i = 0; i < input.size(); i++)
-	{
-		auto e = input[i];
-		Entity* ent = e.get();
-		if (!ent) continue;	// whatever, doesnt matter
-
-		if (!ed_doc.can_delete_or_move_this(ent)) {
-			had_errors = true;
-			input.erase(input.begin() + i);
-			i--;
-		}
-	}
-	if (had_errors)
-		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
-	had_errors = false;
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		if (root) {
-			for (int i = 0; i < input.size();i++) {
-				auto e = input[i];
-				if (e.get() == root) {
-					had_errors = true;
-					input.erase(input.begin() + i);
-					i--;
-				}
-			}
-		}
-
-		if (had_errors)
-			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
-	}
-}
-
-class RemoveEntitiesCommand : public Command
-{
-public:
-	RemoveEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
-
-		scene = CommandSerializeUtil::serialize_entities_text(handles);
-
-		this->handles = handles;
-	}
-
-	void execute() {
-
-		for (auto h : handles) {
-			h->destroy();
-		}
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() {
-		auto restored = unserialize_entities_from_text(scene->text);
-		auto& extern_parents = scene->extern_parents;
-		for (auto ep : extern_parents) {
-			auto e = restored.get_objects().find(ep.child_path);
-			ASSERT(e->second->is_a<Entity>());
-			if (e != restored.get_objects().end()) {
-				EntityPtr<Entity> parent = { ep.external_parent_handle };
-				if (parent.get()) {
-					auto ent = (Entity*)e->second;
-					ent->parent_to_entity(parent.get());
-				}
-				else
-					sys_print(Warning, "restored parent doesnt exist\n");
-			}
-			else
-				sys_print(Warning, "restored obj doesnt exist\n");
-		}
-
-		eng->get_level()->insert_unserialized_entities_into_level(restored);
-
-
-
-		auto& objs = restored.get_objects();
-		for (auto& o : objs) {
-			if (auto e = o.second->cast_to<Entity>())
-				ed_doc.on_entity_created.invoke(e->get_self_ptr());
-		}
-		ed_doc.post_node_changes.invoke();
-	}
-	std::string to_string() override {
-		return "Remove Entity";
-	}
-
-	std::unique_ptr<SerializedSceneFile> scene;
-	std::vector<EntityPtr<Entity>> handles;
-};
-
-class CreateComponentCommand : public Command
-{
-public:
-	CreateComponentCommand(Entity* e, const ClassTypeInfo* component_type) {
-		ent = e->get_self_ptr();
-		ASSERT(component_type->is_a(EntityComponent::StaticType));
-		info = component_type;
-	}
-	void execute() {
-		ASSERT(comp_handle == 0);
-		auto e = ent.get();
-		if (!e) {
-			sys_print(Warning, "no entity in createcomponentcommand\n");
-			return;
-		}
-		auto ec = e->create_and_attach_component_type(info);
-		comp_handle = ec->instance_id;
-
-		ed_doc.on_component_created.invoke(ec);
-	}
-	void undo() {
-		ASSERT(comp_handle != 0);
-		auto obj = eng->get_object(comp_handle);
-		ASSERT(obj->is_a<EntityComponent>());
-		auto ec = (EntityComponent*)obj;
-		auto id = ec->instance_id;
-		ec->destroy();
-		ed_doc.on_component_deleted.invoke(id);
-		comp_handle = 0;
-	}
-	std::string to_string() override {
-		return "Create Component";
-	}
-	EntityPtr<Entity> ent;
-	uint64_t comp_handle = 0;
-	const ClassTypeInfo* info = nullptr;
-};
-class RemoveComponentCommand  : public Command
-{
-public:
-	RemoveComponentCommand(Entity* e, EntityComponent* which) {
-		ent = e->get_self_ptr();
-		comp_handle = which->instance_id;
-		info = &which->get_type();
-	}
-	void execute() {
-		ASSERT(comp_handle != 0);
-		auto obj = eng->get_object(comp_handle);
-		ASSERT(obj->is_a<EntityComponent>());
-		auto ec = (EntityComponent*)obj;
-		auto id = ec->instance_id;
-		ec->destroy();
-		ed_doc.on_component_deleted.invoke(id);
-		comp_handle = 0;
-	}
-	void undo() {
-		ASSERT(comp_handle == 0);
-		auto e = ent.get();
-		if (!e) {
-			sys_print(Warning, "no entity in RemoveComponentCommand\n");
-			return;
-		}
-		auto ec = e->create_and_attach_component_type(info);
-		comp_handle = ec->instance_id;
-	}
-	std::string to_string() override {
-		return "Remove Component";
-	}
-	EntityPtr<Entity> ent;
-	uint64_t comp_handle = 0;
-	const ClassTypeInfo* info = nullptr;
-};
 
 
 // Unproject mouse coords into a vector, cast that into the world via physics
@@ -612,12 +153,15 @@ void EditorDoc::validate_fileids_before_serialize()
 	auto level = eng->get_level();
 	auto& objs = level->get_all_objects();
 	for (auto o : objs)
-		if (can_delete_or_move_this(o)) {
-			file_id_start = std::max(file_id_start, uint32_t(o->unique_file_id));
+		if (can_delete_or_move_this(o)&&!o->dont_serialize_or_edit) {
+			file_id_start = std::max(file_id_start, o->unique_file_id);
+			ASSERT(file_id_start < 1000);
 		}
-	for (auto o : objs)
-		if (can_delete_or_move_this(o) && o->unique_file_id == 0)
+	ASSERT(file_id_start < 1000);
+	for (auto o : objs) {
+		if (can_delete_or_move_this(o) && o->unique_file_id == 0 && !o->dont_serialize_or_edit)
 			o->unique_file_id = get_next_file_id();
+	}
 
 }
 
@@ -675,6 +219,25 @@ Entity* EditorDoc::get_prefab_root_entity()
 	}
 	ASSERT(0);
 }
+ void EditorDoc::enable_entity_eyedropper_mode(void* id) {
+	eng->log_to_fullscreen_gui(Debug, "entering eyedropper mode...");
+	active_eyedropper_user_id = id;
+	eye_dropper_active = true;
+	gui->tool_text->hidden = false;
+	gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
+	gui->tool_text->color = { 255,128,128 };
+	gui->tool_text->use_desired_size = true;
+	gui->tool_text->pivot_ofs = { 0.5,0.5 };
+}
+  void EditorDoc::exit_eyedropper_mode() {
+	 if (is_in_eyedropper_mode()) {
+		 eng->log_to_fullscreen_gui(Debug, "exiting eyedropper");
+		 eye_dropper_active = false;
+		 active_eyedropper_user_id = nullptr;
+
+		 gui->tool_text->hidden = true;
+	 }
+ }
 void EditorDoc::validate_prefab()
 {
 	ASSERT(is_editing_prefab());
@@ -718,17 +281,9 @@ void EditorDoc::on_map_load_return(bool good)
 
 			auto level = eng->get_level();
 			auto& objs = level->get_all_objects();
-			for (auto o : objs)
-			{
-				if (auto e = o->cast_to<Entity>())
-					e->dont_serialize_or_edit = true;
-				else
-				{
-					auto ec = (EntityComponent*)o;
-					ec->dont_serialize_or_edit = true;
-				}
+			for (auto o : objs)	{
+				o->dont_serialize_or_edit = true;
 			}
-
 
 			if (!get_doc_name().empty()) {
 				editing_prefab = GetAssets().find_sync<PrefabAsset>(get_doc_name()).get();
@@ -888,6 +443,8 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, Entity* e, bool 
 		exit_eyedropper_mode();
 		return;
 	}
+	if (e->dont_serialize_or_edit)
+		return;
 
 	ASSERT(actual_entity_to_select);
 	if (action == SELECT_ONLY)
@@ -1045,15 +602,15 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 
 void some_funcs()
 {
-	auto gedlayout = ed_doc.gui.get();
-	ImGui::DragInt2("box pos", &gedlayout->test->ls_position.x, 1.f, -1000, 1000);
-	auto& a = gedlayout->test->anchor;
-	int x[2] = { a.positions[0][0],a.positions[1][1] };
-	ImGui::SliderInt2("anchor", x, 0, 255);
-	a.positions[0][0] = x[0];
-	a.positions[0][1] = x[0];
-	a.positions[1][0] = x[1];
-	a.positions[1][1] = x[1];
+	//auto gedlayout = ed_doc.gui.get();
+	//ImGui::DragInt2("box pos", &gedlayout->test->ls_position.x, 1.f, -1000, 1000);
+	//auto& a = gedlayout->test->anchor;
+	//int x[2] = { a.positions[0][0],a.positions[1][1] };
+	//ImGui::SliderInt2("anchor", x, 0, 255);
+	//a.positions[0][0] = x[0];
+	//a.positions[0][1] = x[0];
+	//a.positions[1][0] = x[1];
+	//a.positions[1][1] = x[1];
 }
 AddToDebugMenu myfuncs("edbox test", some_funcs);
 
@@ -1889,9 +1446,11 @@ public:
 	EntityPtrAssetEditor() {
 		ed_doc.on_eyedropper_callback.add(this, [&](Entity* e)
 			{
-				sys_print(Debug, "entityptr on eye dropper callback\n");
-				EntityPtr<Entity>* ptr_to_asset = (EntityPtr<Entity>*)prop->get_ptr(instance);
-				*ptr_to_asset = e->get_self_ptr();
+				if (ed_doc.get_active_eyedropper_user_id() == this) {
+					sys_print(Debug, "entityptr on eye dropper callback\n");
+					EntityPtr<Entity>* ptr_to_asset = (EntityPtr<Entity>*)prop->get_ptr(instance);
+					*ptr_to_asset = e->get_self_ptr();
+				}
 			});
 	}
 	~EntityPtrAssetEditor() override {
@@ -1904,7 +1463,7 @@ public:
 		ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
 		auto eyedropper = GetAssets().find_sync<Texture>("icon/eyedrop.png");
 		if (ImGui::ImageButton((ImTextureID)eyedropper->gl_id, ImVec2(16, 16))) {
-			ed_doc.enable_entity_eyedropper_mode();
+			ed_doc.enable_entity_eyedropper_mode(this);
 		}
 		ImGui::PopStyleColor();
 		ImGui::SameLine();

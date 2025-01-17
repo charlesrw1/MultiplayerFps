@@ -36,6 +36,7 @@ public:
 	bool editor_transient = false;	// if true, dont serialize
 	bool is_native_created = false;
 	// <<<<<<<<<<<<<<<<
+	bool dont_serialize_or_edit = false;
 
 	void post_unserialization(uint64_t id) {
 		ASSERT(init_state == initialization_state::CONSTRUCTOR);

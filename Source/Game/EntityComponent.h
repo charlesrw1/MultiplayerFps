@@ -87,8 +87,6 @@ private:
 	friend class Level;
 
 public:
-	// expose this publically so you can set this in constructors or wherever
-	bool dont_serialize_or_edit = false;	// if true, then this component (and its children) wont be serialized or be editable in the editor
 };
 
 CLASS_H(EmptyComponent, EntityComponent)

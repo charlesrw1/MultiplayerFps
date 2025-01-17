@@ -43,6 +43,6 @@ public:
 		if(ui_draw_text_bbox.get_bool())
 			b.draw_solid_rect(ws_position, ws_size, COLOR_CYAN);
 		b.draw_text(ws_position+glm::ivec2{2,2}, ws_size, font, sv, COLOR_BLACK);
-		b.draw_text(ws_position, ws_size, font, sv, COLOR_WHITE);
+		b.draw_text(ws_position, ws_size, font, sv, color);
 	}
 };

@@ -97,6 +97,8 @@ bool this_is_newly_created(const BaseUpdater* b, PrefabAsset* for_prefab)
 // * if owner isnt in set
 // * "old" entity/component can still have "new" children, so traverse
 
+extern uint32_t parse_fileid(const std::string& path);
+
 void serialize_new_object_text_R(
 	const Entity* e, 
 	DictWriter& out,
@@ -112,7 +114,9 @@ void serialize_new_object_text_R(
 
 		out.write_key_value("new", get_type_for_new_serialized_item(b,for_prefab));
 	
-		out.write_key_value("id", build_path_for_object(b, for_prefab).c_str());
+		auto id = build_path_for_object(b, for_prefab);
+		ASSERT(parse_fileid(id) < 1000);
+		out.write_key_value("id", id.c_str());
 
 		Entity* parent = nullptr;
 		if (auto ent = b->cast_to<Entity>()) {

@@ -71,6 +71,7 @@
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
+    <ClInclude Include="Source\LevelEditor\Commands.h" />
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />
     <ClInclude Include="Source\EmulatedSocket.h" />
     <ClInclude Include="Source\External\cgltf.h" />

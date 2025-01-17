@@ -215,6 +215,25 @@ ADD_TEST(Serialization, RelativePaths)
 	auto to = build_path_for_object((BaseUpdater*)pent,nullptr);
 	auto rel = serialize_build_relative_path(from.c_str(),to.c_str());
 	auto abs = unserialize_relative_to_absolute(rel.c_str(), from.c_str());
+
+	TEST_TRUE(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
+	TEST_TRUE(build_path_for_object(subent, nullptr) == std::to_string(pent->unique_file_id) +"/" + std::to_string(subent->unique_file_id));
+
+}
+
+ADD_TEST(Serialization, RelativePathsPrefab)
+{
+	SerializeTestWorkbench work;
+	auto root = work.add_entity<Entity>();
+	auto prefab = work.create_prefab(root);
+	auto ent2 = work.add_entity<StaticMeshEntity>();
+	ent2->parent_to_entity(root);
+	auto comp = work.add_component<PointLightComponent>(root);
+	PrefabAsset dummy;
+
+
+	TEST_TRUE(build_path_for_object(root, nullptr) == std::to_string(root->unique_file_id));
+	TEST_TRUE(build_path_for_object(ent2, nullptr) == std::to_string(root->unique_file_id) +"/" + std::to_string(ent2->unique_file_id));
 }
 
 

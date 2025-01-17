@@ -178,8 +178,6 @@ public:
 
 	// removes from list (use component->desroy() for real destruction)
 	void remove_this_component_internal(EntityComponent* component);
-
-	bool dont_serialize_or_edit = false;
 protected:
 
 private:

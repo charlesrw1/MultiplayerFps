@@ -530,6 +530,7 @@
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
+    <ClInclude Include="Source\LevelEditor\Commands.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Client.cpp">

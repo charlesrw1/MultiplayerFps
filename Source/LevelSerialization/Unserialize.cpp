@@ -43,7 +43,7 @@ void UnserializedSceneFile::add_components_and_children_from_entity_R(const std:
 	}
 }
 
-static uint32_t parse_fileid(const std::string& path)
+uint32_t parse_fileid(const std::string& path)
 {
 	auto last_slash = path.rfind('/');
 	if (last_slash != std::string::npos) {
@@ -77,6 +77,7 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 	// catch exception later
 
 	e->unique_file_id = parse_fileid(path);
+	ASSERT(e->unique_file_id < 1000);
 	e->creator_source = opt_source_owner;
 	e->what_prefab = opt_prefab;
 	// <<<<<<<<<<<<<<<<<<

@@ -458,19 +458,14 @@ public:
 	bool is_in_eyedropper_mode() const {
 		return eye_dropper_active;
 	}
-	void enable_entity_eyedropper_mode() {
-		eng->log_to_fullscreen_gui(Debug, "entering eyedropper mode...");
-
-		eye_dropper_active = true;
-	}
-	void exit_eyedropper_mode() {
-		if (is_in_eyedropper_mode()) {
-			eng->log_to_fullscreen_gui(Debug, "exiting eyedropper");
-			eye_dropper_active = false;
-		}
+	void enable_entity_eyedropper_mode(void* id);
+	void exit_eyedropper_mode();
+	void* get_active_eyedropper_user_id() {
+		return active_eyedropper_user_id;
 	}
 
 	bool eye_dropper_active = false;
+	void* active_eyedropper_user_id = nullptr;	// for id purposes only
 
 	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
 	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
