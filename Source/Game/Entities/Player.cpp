@@ -930,15 +930,13 @@ void Player::on_foot_update()
 
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);
-	 player_mesh->disable_physics = true;
 	 player_mesh->set_animation_graph("ik_test.ag");
 	 player_mesh->visible = false;
 
-	 player_capsule->physics_preset.ptr = &PP_Character::StaticType;
-	 player_capsule->is_trigger = true;
-	 player_capsule->send_overlap = true;
-	 player_capsule->disable_physics = true;
-	 player_capsule->is_static = false;
+	 player_capsule->set_is_trigger(true);
+	 player_capsule->set_send_overlap(true);
+	 player_capsule->set_is_enable(false);
+	 player_capsule->set_is_static(false);
 	 player_capsule->height = 1.7;
 	 player_capsule->radius = 0.3;
 

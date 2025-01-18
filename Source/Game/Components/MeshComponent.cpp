@@ -7,7 +7,6 @@
 
 #include "Physics/ChannelsAndPresets.h"
 #include "Assets/AssetDatabase.h"
-#include "Physics/Physics2.h"
 #include "GameEnginePublic.h"
 #include "Game/Entity.h"
 
@@ -19,7 +18,6 @@ MeshComponent::~MeshComponent()
 	assert(!animator && !draw_handle.is_valid());
 }
 MeshComponent::MeshComponent() {
-	physicsPreset.ptr = &PP_DefaultBlockAll::StaticType;
 }
 
 void MeshComponent::set_model(const char* model_path)
@@ -86,14 +84,6 @@ const PropertyInfoList* MeshComponent::get_props() {
 		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
 		REG_BOOL(e_animate_in_editor, PROP_DEFAULT | PROP_EDITOR_ONLY, "0"),
 #endif // !RUNTIME
-
-		REG_BOOL(send_hit,PROP_DEFAULT,"0"),
-		REG_BOOL(send_overlap,PROP_DEFAULT,"0"),
-		REG_BOOL(disable_physics,PROP_DEFAULT,"0"),
-		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
-		REG_BOOL(is_static,PROP_DEFAULT,"0"),
-		REG_BOOL(is_trigger,PROP_DEFAULT,"0"),
-		REG_CLASSTYPE_PTR(physicsPreset, PROP_DEFAULT)
 	END_PROPS(MeshCompponent)
 }
 
@@ -125,7 +115,6 @@ void MeshComponent::update_handle()
 void MeshComponent::on_init()
 {
 	draw_handle = idraw->get_scene()->register_obj();
-	physActor = g_physics.allocate_physics_actor(this);
 	
 	if (model.get()||model.did_fail()) {
 
@@ -160,15 +149,6 @@ void MeshComponent::on_init()
 			obj.mat_override = eMaterialOverride[0].get();
 
 		idraw->get_scene()->update_obj(draw_handle, obj);
-
-		if (disable_physics)
-			return;
-
-		physActor->init_physics_shape(nullptr, get_ws_transform(), 
-			simulate_physics && !eng->is_editor_level(), 
-			send_overlap, send_hit, is_static, is_trigger, disable_physics);
-		physActor->add_model_shape_to_actor(modToUse);
-		physActor->update_mass();
 	}
 }
 
@@ -176,9 +156,7 @@ void MeshComponent::on_changed_transform()
 {
 	if(draw_handle.is_valid())
 		update_handle();
-	const bool is_simulating = simulate_physics && !eng->is_editor_level();
-	if (physActor && physActor->has_initialized() && !is_simulating)
-		physActor->set_transform(get_ws_transform());
+
 }
 
 void MeshComponent::update()
@@ -192,6 +170,6 @@ void MeshComponent::on_deinit()
 {
 	idraw->get_scene()->remove_obj(draw_handle);
 	animator.reset();
-
-	g_physics.free_physics_actor(physActor);
 }
+
+const Model* MeshComponent::get_model() const { return model.get(); }

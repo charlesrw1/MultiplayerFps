@@ -50,7 +50,6 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
-    <ClInclude Include="Source\BikeGame\Components\BikeAI.h" />
     <ClInclude Include="Source\Client.h" />
     <ClInclude Include="Source\Connection.h" />
     <ClInclude Include="Source\DeferredSpawnScope.h" />
@@ -70,6 +69,7 @@
     <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
+    <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h" />
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\LevelEditor\Commands.h" />
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />
@@ -143,7 +143,6 @@
     <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
-    <ClInclude Include="Source\Game\Entities\TriggerEntities.h" />
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\Components\EntityComponentTypes.h" />
@@ -168,6 +167,7 @@
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Net.h" />
+    <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\OsInput.h" />
     <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
@@ -243,6 +243,7 @@
     <ClCompile Include="Source\Connection.cpp" />
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
+    <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDoc.cpp" />
     <ClCompile Include="Source\External\glad.c" />
@@ -287,7 +288,6 @@
     <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
-    <ClCompile Include="Source\Game\Entities\TriggerEntities.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />
@@ -317,7 +317,7 @@
     <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
-    <ClCompile Include="Source\Physics\Physics2.cpp" />
+    <ClCompile Include="Source\Physics\Physics2Local.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />

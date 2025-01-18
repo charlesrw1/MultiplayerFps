@@ -14,7 +14,7 @@ BikeEntity::BikeEntity()
 	bike_direction = { 0,0,1 };
 	auto m = construct_sub_component<MeshComponent>("BikeMesh");
 	m->set_model(GetAssets().find_assetptr_unsafe<Model>("bike.cmdl"));
-	m->disable_physics = true;
+	//m->disable_physics = true;
 
 	set_ticking(true);
 }

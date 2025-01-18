@@ -109,8 +109,6 @@ public:
 	Door() {
 		door_mesh = construct_sub_component<MeshComponent>("DoorMesh");
 
-		door_mesh->is_static = false;
-		door_mesh->simulate_physics = false;	// kinematic object
 		door_mesh->set_model(GetAssets().find_assetptr_unsafe<Model>("door.cmdl"));
 	}
 

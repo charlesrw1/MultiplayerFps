@@ -865,7 +865,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 
 	tick = 0;
 	time = 0.0;
-	set_tick_rate(60.f);
+	set_tick_rate(66.f);
 
 	auto world_settings = level->get_world_settings();
 
@@ -1643,6 +1643,8 @@ void GameEngineLocal::loop()
 			frame_time *= g_slomo.get_float();
 			tick_interval *= g_slomo.get_float();
 
+			//printf("%d\n", num_ticks);
+			num_ticks = 1;
 			for (int i = 0; i < num_ticks; i++) {
 
 				game_update_tick();
