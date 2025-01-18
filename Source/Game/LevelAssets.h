@@ -1,7 +1,7 @@
 #pragma once
 #include "LevelSerialization/SerializationAPI.h"
 #include "Assets/IAsset.h"
-
+#include "Framework/Hashmap.h"
 
 CLASS_H(SceneAsset, IAsset)
 public:
@@ -26,6 +26,10 @@ public:
 	void uninstall() override;
 	void move_construct(IAsset*) override {}
 
+	BaseUpdater* find_entity(uint64_t handle) {
+		return instance_ids_for_diffing.find(handle);
+	}
 	std::string text;
 	std::unique_ptr<UnserializedSceneFile> sceneFile;
+	hash_map<BaseUpdater*> instance_ids_for_diffing;
 };

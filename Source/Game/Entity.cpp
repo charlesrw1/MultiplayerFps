@@ -162,17 +162,35 @@ void Entity::destroy_internal()
 
 void Entity::parent_to_entity(Entity* other)
 {
-	ASSERT(other != this);
+	if (other == this) {
+		sys_print(Warning, "cant parent entity to self\n");
+	}
 
 	if (other == parent)
 		return;
 
+	// prevents circular parent creations
+	// checks the node we are parenting to's tree to see if THIS is one of the parent nodes
+	{
+		Entity* cur_node = other;
+		while (cur_node) {
+
+			if (cur_node->get_entity_parent() == this) {
+				remove_this(cur_node);
+				cur_node->parent_to_entity(parent);	// parent circular child entity to my parent
+				break;
+			}
+			cur_node = cur_node->get_entity_parent();
+		}
+	}
+
 	if (get_entity_parent())
 			get_entity_parent()->remove_this(this);
-	ASSERT(parent == nullptr);
-
+	
 	if (!other)
 		return;
+
+	ASSERT(parent == nullptr);
 
 	// check if 'other' has 'this' as a parent (circular) 
 	auto check_circular = [&]() -> bool {

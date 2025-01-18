@@ -15,6 +15,20 @@
 
 CLASS_IMPL(LevelSerializationContext);
 
+Entity* LevelSerializationContext::get_entity(uint64_t handle)
+{
+	ASSERT(out&&!in);
+	ASSERT(diffprefab);
+	bool is_from_diff = handle & (1ull << 63ull);
+	BaseUpdater* obj = nullptr;
+	if (is_from_diff) 
+		obj= diffprefab->find_entity(handle);
+	else
+		obj = eng->get_level()->get_entity(handle);
+	if (obj)
+		return obj->cast_to<Entity>();
+}
+
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)
 {
 	if (!for_prefab) return false;
@@ -25,6 +39,11 @@ bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)
 bool serializing_for_prefab(const PrefabAsset* for_prefab)
 {
 	return for_prefab != nullptr;
+}
+
+bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab)
+{
+	return !b->is_native_created  && (b->creator_source == nullptr || (for_prefab && b->what_prefab == for_prefab) || am_i_the_root_prefab_node(b->creator_source,for_prefab));
 }
 
 std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab)
@@ -39,9 +58,12 @@ std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for
 			// fallthrough
 		}
 
-		if (obj->what_prefab == for_prefab || !obj->creator_source || am_i_the_root_prefab_node(obj->creator_source,for_prefab)) {
+		if (this_is_newly_created(obj,for_prefab)) {
 			return std::to_string(obj->unique_file_id);
 		}
+		if (obj->is_native_created && am_i_the_root_prefab_node(obj->creator_source, for_prefab))
+			return "~" + std::to_string(obj->unique_file_id);
+
 		// fallthrough
 	}
 
@@ -64,20 +86,7 @@ std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for
 		}
 	}
 }
-std::string make_path_relative_to(const std::string& inpath, const std::string& outer_path)
-{
-	// inpath = 4/3/~1
-	// outer_path = 4
-	// return 3/~1
 
-	if (inpath.find(outer_path) == 0) {
-		auto path = inpath.substr(outer_path.size() + 1);	// remove "/" too
-		if (path.empty()) return "/";
-		ASSERT(path[0] != '/');
-		return path;
-	}
-	ASSERT(0);
-}
 
 const char* get_type_for_new_serialized_item(const BaseUpdater* b, PrefabAsset* for_prefab)
 {
@@ -87,10 +96,6 @@ const char* get_type_for_new_serialized_item(const BaseUpdater* b, PrefabAsset* 
 		return b->get_type().classname;
 }
 
-bool this_is_newly_created(const BaseUpdater* b, PrefabAsset* for_prefab)
-{
-	return b->creator_source == nullptr || (for_prefab && b->what_prefab == for_prefab) || am_i_the_root_prefab_node(b->creator_source,for_prefab);
-}
 
 // rules:
 // * gets "new" if object created in current context (if edting map, prefab entities dont count)
@@ -115,7 +120,6 @@ void serialize_new_object_text_R(
 		out.write_key_value("new", get_type_for_new_serialized_item(b,for_prefab));
 	
 		auto id = build_path_for_object(b, for_prefab);
-		ASSERT(parse_fileid(id) < 1000);
 		out.write_key_value("id", id.c_str());
 
 		Entity* parent = nullptr;
@@ -264,7 +268,7 @@ std::vector<Entity*> root_objects_to_write(const std::vector<Entity*>& input_obj
 //		b. look in default object for native constructed
 // 2. class is a created prefab, diff from prefab
 
-const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab)
+const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab, PrefabAsset*& out_prefab_diff)
 {
 	if (!obj->creator_source && !obj->what_prefab) {
 		auto default_ = obj->get_type().default_class_object;
@@ -300,7 +304,7 @@ const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab
 		auto& objs = top_level->what_prefab->sceneFile->get_objects();
 
 		auto path = build_path_for_object(obj, top_level->what_prefab);
-
+		out_prefab_diff = top_level->what_prefab;
 		return objs.find(path)->second;
 
 	}
@@ -313,7 +317,8 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 		out.write_item_start();
 		out.write_key_value("override", objpath.c_str());
 
-		auto diff = find_diff_class(obj,for_prefab);
+		ctx->diffprefab = nullptr;
+		auto diff = find_diff_class(obj,for_prefab,ctx->diffprefab);
 		write_just_props(obj, diff, out, ctx);
 
 		out.write_item_end();

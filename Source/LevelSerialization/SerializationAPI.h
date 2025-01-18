@@ -92,7 +92,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 
 
 // helper utils for editor
-bool this_is_newly_created(const BaseUpdater* b, PrefabAsset* for_prefab);
+bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab);
 std::string serialize_build_relative_path(const char* from, const char* to);
 std::string unserialize_relative_to_absolute(const char* relative,const char* root);
@@ -105,4 +105,6 @@ public:
 	UnserializedSceneFile* in = nullptr;
 	std::string* in_root = nullptr;
 	PrefabAsset* for_prefab = nullptr;
+	PrefabAsset* diffprefab = nullptr;
+	Entity* get_entity(uint64_t handle);
 };

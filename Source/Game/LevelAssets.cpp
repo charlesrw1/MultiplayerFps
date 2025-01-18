@@ -3,6 +3,7 @@
 #include "Assets/AssetRegistry.h"
 
 #include "Framework/Files.h"
+#include "Game/BaseUpdater.h"
 
 CLASS_IMPL(SceneAsset);
 CLASS_IMPL(PrefabAsset);
@@ -105,6 +106,13 @@ bool PrefabAsset::load_asset(ClassBase*&)
 	fileptr->read((void*)text.data(), text.size());
 	try {
 		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, this));
+		// add instance ids here for diff'ing entity references
+		uint64_t id = 1ull << 63ull;
+		for (auto obj : sceneFile->get_objects()) {
+			obj.second->instance_id = ++id;
+			instance_ids_for_diffing.insert(id, obj.second);
+		}
+		sceneFile->unserialize_post_assign_ids();
 	}
 	catch (int) {
 		sys_print(Error, "error loading PrefabAsset %s\n", path.c_str());

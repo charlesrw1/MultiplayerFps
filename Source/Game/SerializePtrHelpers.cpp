@@ -103,7 +103,7 @@ class SerializeEntityPtr : public IPropertySerializer
 		uint64_t handle = *(uint64_t*)info.get_ptr(inst);
 		if (handle == 0)
 			return "";
-		auto oent = eng->get_level()->get_entity(handle);
+		auto oent = ctx->get_entity(handle);
 		if (!oent) {
 			sys_print(Warning, "handle wasnt found when serializing: %d", handle);
 			return "";

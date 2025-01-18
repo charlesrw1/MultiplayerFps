@@ -1128,8 +1128,12 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 		const char* str = "";
 		if (!entity->editor_name.empty())
 			str = entity->editor_name.c_str();
-		else
-			str = entity->get_type().classname;
+		else {
+			if (entity->what_prefab && am_i_the_root_prefab_node(entity, entity->what_prefab))
+				str = entity->what_prefab->get_name().c_str();
+			else
+				str = entity->get_type().classname;
+		}
 		if (!ed_doc.can_delete_or_move_this(entity))
 			ImGui::TextColored(non_owner_source_color, str);
 		else

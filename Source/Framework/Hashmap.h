@@ -40,7 +40,7 @@ public:
         return hash_map_iterator<T>(items.size());
     }
 
-    hash_map(uint32_t starting_power_of_2) {
+    hash_map(uint32_t starting_power_of_2 = 4) {
         const uint64_t SIZE = 1ull << starting_power_of_2;
         items.clear();
         items.resize(SIZE);

@@ -32,12 +32,12 @@ void UnserializedSceneFile::add_components_and_children_from_entity_R(const std:
 {
 	for (auto& c : e->all_components)
 	{
-		auto cpath = path + "/~" + std::to_string(c->unique_file_id);
+		auto cpath = path + "~" + std::to_string(c->unique_file_id);
 		all_objs.insert({ cpath,c });
 	}
 	for (auto& child : e->get_all_children())
 	{
-		auto cpath = path + "/~" + std::to_string(child->unique_file_id);
+		auto cpath = path + "~" + std::to_string(child->unique_file_id) + "/";
 		all_objs.insert({ cpath, child });
 		add_components_and_children_from_entity_R(cpath, child, source);
 	}
@@ -83,7 +83,8 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 
 	auto entity_obj = e->cast_to<Entity>();
 	if (entity_obj) {
-		add_components_and_children_from_entity_R(path,entity_obj, entity_obj);
+		auto path_to_use = (path == "/") ? "" : path + "/";
+		add_components_and_children_from_entity_R(path_to_use,entity_obj, entity_obj);
 		if (parent_ent)
 			entity_obj->parent_to_entity(parent_ent);
 	}

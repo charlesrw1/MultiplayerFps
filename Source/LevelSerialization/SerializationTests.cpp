@@ -8,6 +8,7 @@
 #include "Game/StdEntityTypes.h"
 #include "Game/LevelAssets.h"
 #include "Assets/AssetDatabase.h"
+#include "Game/Entities/Player.h"
 
 // tests
 // * serialize scene
@@ -170,7 +171,7 @@ ADD_TEST(Serialization, UnserializePrefab)
 	TEST_TRUE(unserialized.find("3/~2122221332"));
 }
 
-extern bool this_is_newly_created(const BaseUpdater* b, PrefabAsset* for_prefab);
+extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
 ADD_TEST(Serialization, ThisIsNewlyCreated)
 {
 	SerializeTestWorkbench work;
@@ -221,23 +222,8 @@ ADD_TEST(Serialization, RelativePaths)
 
 }
 
-ADD_TEST(Serialization, RelativePathsPrefab)
-{
-	SerializeTestWorkbench work;
-	auto root = work.add_entity<Entity>();
-	auto prefab = work.create_prefab(root);
-	auto ent2 = work.add_entity<StaticMeshEntity>();
-	ent2->parent_to_entity(root);
-	auto comp = work.add_component<PointLightComponent>(root);
-	PrefabAsset dummy;
 
-
-	TEST_TRUE(build_path_for_object(root, nullptr) == std::to_string(root->unique_file_id));
-	TEST_TRUE(build_path_for_object(ent2, nullptr) == std::to_string(root->unique_file_id) +"/" + std::to_string(ent2->unique_file_id));
-}
-
-
-extern const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab);
+extern const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab, PrefabAsset*& diff_prefab);
 ADD_TEST(Serialization, PrefabInPrefabSerialize)
 {
 	SerializeTestWorkbench work;
@@ -247,8 +233,12 @@ ADD_TEST(Serialization, PrefabInPrefabSerialize)
 	work.post_unserialization();
 
 	TEST_TRUE(subent->what_prefab && subent->what_prefab->get_name() == "test2.pfb");
-	TEST_TRUE(find_diff_class(pent, nullptr) == loadPrefab->sceneFile->get_root_entity());
-	TEST_TRUE(find_diff_class(subent, nullptr) == loadPrefab->sceneFile->get_root_entity()->get_all_children().at(0));
+	PrefabAsset* diff_prefab = nullptr;
+	TEST_TRUE(find_diff_class(pent, nullptr, diff_prefab) == loadPrefab->sceneFile->get_root_entity());
+	TEST_TRUE(diff_prefab == loadPrefab);
+	diff_prefab = nullptr;
+	TEST_TRUE(find_diff_class(subent, nullptr, diff_prefab) == loadPrefab->sceneFile->get_root_entity()->get_all_children().at(0));
+	TEST_TRUE(diff_prefab == loadPrefab);
 	 
 
 
@@ -302,7 +292,59 @@ ADD_TEST(Serialization, WritePrefab)
 
 	//TEST_TRUE(unserialized.get_root_entity());
 }
-extern const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab);
+
+extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
+
+
+CLASS_H(SerializeTesterEntity, Entity)
+public:
+	SerializeTesterEntity() {
+		comp=construct_sub_component<MeshComponent>("sub-mesh");
+		ent=construct_sub_entity<StaticMeshEntity>("sub-mesh-entity");
+	}
+	MeshComponent* comp{};
+	StaticMeshEntity* ent{};
+};
+CLASS_IMPL(SerializeTesterEntity);
+
+ADD_TEST(Serialization, PrefabWithNativeRoot)
+{
+	SerializeTestWorkbench work;
+	auto root = work.add_entity<SerializeTesterEntity>();
+	auto prefab = work.create_prefab(root);
+
+	TEST_TRUE(this_is_newly_created(root, prefab));
+	TEST_TRUE(!this_is_newly_created(root->comp, prefab));
+	TEST_TRUE(!this_is_newly_created(root->ent, prefab));
+	TEST_TRUE(!this_is_newly_created(root->ent->Mesh, prefab));
+
+	TEST_TRUE(build_path_for_object(root,prefab) == "/");
+	TEST_TRUE(root->comp->is_native_created);
+	TEST_TRUE(build_path_for_object(root->comp,prefab) == "~"+std::to_string(root->comp->unique_file_id));
+	TEST_TRUE(build_path_for_object(root->ent,prefab) == "~"+std::to_string(root->ent->unique_file_id));
+	TEST_TRUE(build_path_for_object(root->ent->Mesh,prefab) == "~"+std::to_string(root->ent->unique_file_id)+"/~"+std::to_string(root->ent->Mesh->unique_file_id));
+
+
+
+	TEST_TRUE(build_path_for_object(root,nullptr) == std::to_string(root->unique_file_id));
+	TEST_TRUE(build_path_for_object(root->comp,nullptr) ==  std::to_string(root->unique_file_id) + "/~" +std::to_string(root->comp->unique_file_id));
+	TEST_TRUE(build_path_for_object(root->ent->Mesh,nullptr) == std::to_string(root->unique_file_id) + "/~" +std::to_string(root->ent->unique_file_id)+"/~"+std::to_string(root->ent->Mesh->unique_file_id));
+
+
+
+	auto from = build_path_for_object(root->comp, nullptr);
+	auto to = build_path_for_object(root, nullptr);
+
+	TEST_TRUE(serialize_build_relative_path(from.c_str(), to.c_str()) == "..");
+	TEST_TRUE(serialize_build_relative_path(to.c_str(), from.c_str()) == "~"+std::to_string(root->comp->unique_file_id));
+
+
+
+	auto ent2 = work.add_entity<StaticMeshEntity>();
+	ent2->parent_to_entity(root);
+	auto comp = work.add_component<PointLightComponent>(root);
+}
+
 ADD_TEST(Serialization, FindDiffInPrefab)
 {
 	SerializeTestWorkbench work;
@@ -317,13 +359,14 @@ ADD_TEST(Serialization, FindDiffInPrefab)
 	auto pent = work.add_prefab(loadPrefab);
 	pent->parent_to_entity(root);
 
-	auto diff = find_diff_class(root, prefab);
+	PrefabAsset* diff_prefab = nullptr;
+	auto diff = find_diff_class(root, prefab,diff_prefab);
 	TEST_TRUE(diff == Entity::StaticType.default_class_object);
-	diff = find_diff_class(comp,prefab);
+	diff = find_diff_class(comp,prefab,diff_prefab);
 	TEST_TRUE(diff == PointLightComponent::StaticType.default_class_object);
-	diff = find_diff_class(ent2->Mesh,prefab);
+	diff = find_diff_class(ent2->Mesh,prefab,diff_prefab);
 	TEST_TRUE(diff == ((StaticMeshEntity*)StaticMeshEntity::StaticType.default_class_object)->Mesh);
-	diff = find_diff_class(pent, prefab);
+	diff = find_diff_class(pent, prefab,diff_prefab);
 	TEST_TRUE(diff == loadPrefab->sceneFile->get_root_entity());
 }
 
@@ -338,13 +381,14 @@ ADD_TEST(Serialization, FindDiffInScene)
 	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test2.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 
-	auto diff = find_diff_class(ent1, nullptr);
+	PrefabAsset* diff_prefab = nullptr;
+	auto diff = find_diff_class(ent1, nullptr,diff_prefab);
 	TEST_TRUE(diff == Entity::StaticType.default_class_object);
-	diff = find_diff_class(comp,nullptr);
+	diff = find_diff_class(comp,nullptr,diff_prefab);
 	TEST_TRUE(diff == PointLightComponent::StaticType.default_class_object);
-	diff = find_diff_class(ent2->Mesh,nullptr);
+	diff = find_diff_class(ent2->Mesh,nullptr,diff_prefab);
 	TEST_TRUE(diff == ((StaticMeshEntity*)StaticMeshEntity::StaticType.default_class_object)->Mesh);
-	diff = find_diff_class(pent, nullptr);
+	diff = find_diff_class(pent, nullptr,diff_prefab);
 	TEST_TRUE(diff == loadPrefab->sceneFile->get_root_entity());
 }
 
