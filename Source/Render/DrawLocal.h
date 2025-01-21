@@ -79,6 +79,9 @@ struct Render_Level_Params {
 	bool is_probe_render = false;
 	bool is_water_reflection_pass = false;
 
+	bool is_wireframe_pass = false;
+	bool wireframe_secondpass = false;
+
 	bool has_clip_plane = false;
 	vec4 custom_clip_plane = vec4(0.f);
 	bool upload_constants = false;
@@ -385,6 +388,7 @@ public:
 	struct programs
 	{
 		program_handle simple{};
+		program_handle simple_solid_color{};
 		//program_handle textured;
 		//program_handle textured3d;
 		//program_handle texturedarray;
@@ -527,7 +531,7 @@ private:
 
 
 
-	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0));
+	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0), bool wireframe_secondpass = false);
 	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state);
 
 	void init_bloom_buffers();

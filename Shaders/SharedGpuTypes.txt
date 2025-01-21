@@ -69,6 +69,12 @@ struct Ubo_View_Constants_Struct
 	float forcecubemap;
 	uint debug_options;
 	
+	// bit 0: wireframe first pass or second pass
+	uint flags;	
+	uint padding1;
+	uint padding2;
+	uint padding3;
+	
 	vec4 custom_clip_plane;
 };
 

@@ -21,7 +21,7 @@ public:
 	}
 	void on_deinit() override {
 		idraw->get_scene()->remove_meshbuilder(editor_mb_handle);
-		editor_mb.Free();
+		mb.Free();
 	}
 	void on_changed_transform() override {
 		MeshBuilder_Object mbo;
@@ -36,10 +36,14 @@ public:
 		else
 			obj.transform = glm::mat4(1);
 		obj.visible = true;
-		obj.meshbuilder = &editor_mb;
+		obj.use_background_color = use_background_color;
+		obj.background_color = background_color;
+		obj.meshbuilder = &mb;
 	}
 
+	Color32 background_color = COLOR_BLACK;
+	bool use_background_color = false;
 	bool use_transform = true;
 	handle<MeshBuilder_Object> editor_mb_handle;
-	MeshBuilder editor_mb;
+	MeshBuilder mb;
 };

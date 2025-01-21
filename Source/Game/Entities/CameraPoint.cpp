@@ -18,6 +18,7 @@ public:
 	void on_init() override {
 		mbview = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
 		mbview->use_transform = false;
+		mbview->use_background_color = true;
 		update_meshbuilder();
 	}
 	void on_changed_transform() override {
@@ -34,7 +35,7 @@ public:
 		glm::vec3 arrow_origin[4];
 		build_a_frustum_for_perspective(f, vs, arrow_origin);
 
-		auto& mb = mbview->editor_mb;
+		auto& mb = mbview->mb;
 		mb.Begin();
 		mb.PushLine(arrow_origin[0], arrow_origin[0] + glm::vec3(f.right_plane), COLOR_RED);
 		mb.PushLine(arrow_origin[1], arrow_origin[1] + glm::vec3(f.top_plane), COLOR_GREEN);

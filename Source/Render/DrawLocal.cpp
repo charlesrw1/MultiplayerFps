@@ -419,6 +419,9 @@ void Renderer::create_shaders()
 	auto& prog_man = get_prog_man();
 
 	prog.simple = prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt");
+	prog.simple_solid_color = prog_man.create_raster("MbSimpleV.txt", "MbSimpleF.txt", "USE_SOLID_COLOR");
+
+
 	prog.tex_debug_2d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_VERSION");
 	prog.tex_debug_2d_array = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_ARRAY_VERSION");
 	prog.tex_debug_cubemap = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_CUBEMAP_VERSION");
@@ -461,7 +464,7 @@ void Renderer::reload_shaders()
 }
 
 
-void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane)
+void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane, bool wireframe_secondpass)
 {
 	gpu::Ubo_View_Constants_Struct constants;
 	constants.view = vs.view;
@@ -490,6 +493,9 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.custom_clip_plane = custom_clip_plane;
 
 	constants.debug_options = r_debug_mode.get_integer();
+
+	constants.flags = 0;
+	constants.flags |= wireframe_secondpass;
 
 	glNamedBufferData(ubo, sizeof gpu::Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
 }
@@ -1096,7 +1102,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 			upload = true;
 		}
 		if (upload)
-			upload_ubo_view_constants(view_ubo, params.custom_clip_plane);
+			upload_ubo_view_constants(view_ubo, params.custom_clip_plane, params.wireframe_secondpass);
 		active_constants_ubo = view_ubo;
 	}
 
@@ -1825,13 +1831,36 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	}
 }
 
+static glm::vec4 color32_to_vec4(Color32 color)
+{
+	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
+}
+
 void Renderer::draw_meshbuilders()
 {
 	auto& mbFL = scene.meshbuilder_objs;
 	auto& mbObjs = scene.meshbuilder_objs.objects;
 	//glEnable(GL_DEPTH_TEST);
-	for (auto mbPair : mbObjs)
+	for (auto& mbPair : mbObjs)
 	{
+		auto& mb = mbPair.type_;
+		if (mb.use_background_color) {
+			RenderPipelineState state;
+			state.program = prog.simple_solid_color;
+			state.depth_testing = mbPair.type_.depth_tested;
+			state.depth_writes = false;
+			device.set_pipeline(state);
+
+
+			shader().set_mat4("ViewProj", vs.viewproj);
+			shader().set_mat4("Model", mb.transform);
+			shader().set_vec4("solid_color", color32_to_vec4(mb.background_color));
+
+			glLineWidth(3);
+			mb.meshbuilder->Draw(MeshBuilder::LINES);
+			glLineWidth(1);
+		}
+
 		RenderPipelineState state;
 		state.program = prog.simple;
 		state.depth_testing = mbPair.type_.depth_tested;
@@ -1839,7 +1868,6 @@ void Renderer::draw_meshbuilders()
 		device.set_pipeline(state);
 
 
-		auto& mb = mbPair.type_;
 		shader().set_mat4("ViewProj", vs.viewproj);
 		shader().set_mat4("Model", mb.transform);
 		mb.meshbuilder->Draw(MeshBuilder::LINES);
@@ -1849,25 +1877,33 @@ void Renderer::draw_meshbuilders()
 extern ConfigVar g_draw_grid;
 extern ConfigVar g_grid_size;
 
-void draw_debug_grid()
+static handle<MeshBuilder_Object> debug_grid_handle;
+
+void update_debug_grid()
 {
-	draw.shader().set_mat4("Model", glm::mat4(1));
 	static MeshBuilder mb;
-	static bool init = true;
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_FALSE);
-	if (init) {
+	static bool has_init = false;
+	if (!has_init) {
 		mb.Begin();
 		for (int x = 0; x < 11; x++) {
-			mb.PushLine(glm::vec3(-5, 0, x - 5), glm::vec3(5, 0, x - 5), COLOR_WHITE);
-			mb.PushLine(glm::vec3(x - 5, 0, -5), glm::vec3(x - 5, 0, 5), COLOR_WHITE);
+			Color32 colorx = COLOR_WHITE;
+			Color32 colorz = COLOR_WHITE;
+			if (x == 5) {
+				colorx = COLOR_RED;
+				colorz = COLOR_BLUE;
+			}
+			mb.PushLine(glm::vec3(-5, 0, x - 5), glm::vec3(5, 0, x - 5), colorx);
+			mb.PushLine(glm::vec3(x - 5, 0, -5), glm::vec3(x - 5, 0, 5), colorz);
 		}
 		mb.End();
-		init = false;
+		debug_grid_handle = idraw->get_scene()->register_meshbuilder(MeshBuilder_Object());
+		has_init = true;
 	}
-	mb.Draw(GL_LINES);
-	glDepthMask(GL_TRUE);
-	glEnable(GL_DEPTH_TEST);
+	MeshBuilder_Object mbo;
+	mbo.use_background_color = true;
+	mbo.visible = g_draw_grid.get_bool();
+	mbo.meshbuilder = &mb;
+	idraw->get_scene()->update_meshbuilder(debug_grid_handle, mbo);
 }
 
 ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV,"debug csm shadow rendering");
@@ -2391,13 +2427,15 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 
 	//volfog.compute();
 	const bool is_wireframe_mode = r_debug_mode.get_integer() == gpu::DEBUG_WIREFRAME;
-	if(is_wireframe_mode)
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	// main level render
-	{
+
+	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false) {
 		const auto& view_to_use = current_frame_main_view;
-		RenderPassSetup setup("gbuffer", fbo.gbuffer, true, true, 0, 0, view_to_use.width, view_to_use.height);
+
+		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
+
+		RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 
 		{
@@ -2412,13 +2450,26 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 			cmdparams.upload_constants = true;
 			cmdparams.provied_constant_buffer = ubo.current_frame;
 			cmdparams.draw_viewmodel = true;
+			cmdparams.wireframe_secondpass = wireframe_secondpass;
+			cmdparams.is_wireframe_pass = is_wireframe;
 
 			render_level_to_target(cmdparams);
 		}
 		
 		if(r_drawterrain.get_bool() && !params.skybox_only)
 			scene.terrain_interface->draw_to_gbuffer(params.is_editor, r_debug_mode.get_integer()!=0);
+	};
+
+	if (is_wireframe_mode) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glLineWidth(3);
+		gbuffer_pass(true,false);
+		glLineWidth(1);
+		gbuffer_pass(true,true);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
+	else
+		gbuffer_pass();
 
 	//device.reset_states();
 	
@@ -2455,6 +2506,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		render_level_to_target(params);
 	}
 
+
 	// cubemap views end here
 	// dont need to draw post processing or UI stuff
 	if (params.is_cubemap_view)
@@ -2479,21 +2531,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	}
 
 	device.reset_states();
-
-
-	if (is_wireframe_mode)
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	
 	// mesh builder stuff
 	{
+		update_debug_grid();	// makes it visible/hidden
+
 		const auto& view_to_use = current_frame_main_view;
 		RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 
 		draw_meshbuilders();
-
-		if (g_draw_grid.get_bool())
-			draw_debug_grid();
 	}
 
 	// Bloom update

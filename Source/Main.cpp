@@ -1125,6 +1125,9 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 {
 	CPUSCOPESTART(imgui_draw);
 
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({51, 51, 51 }));
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({35, 35, 35 }));
+
 	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
 
@@ -1184,6 +1187,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 
 	if(g_drawimguidemo.get_bool())
 		ImGui::ShowDemoWindow();
+
+	ImGui::PopStyleColor(2);
 }
 
 bool GameEngineLocal::game_draw_screen()

@@ -49,11 +49,14 @@ struct MeshBuilder_Object
 	MeshBuilder_Object() {
 		visible = false;
 		depth_tested = true;
+		use_background_color = false;
 	}
 
 	const EntityComponent* owner = nullptr;
 	MeshBuilder* meshbuilder = nullptr;
+	Color32 background_color = COLOR_BLACK;
 	bool visible : 1;
 	bool depth_tested : 1;
+	bool use_background_color : 1;
 	glm::mat4 transform = glm::mat4(1.f);
 };

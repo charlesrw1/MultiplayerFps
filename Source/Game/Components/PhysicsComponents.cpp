@@ -24,8 +24,20 @@ using namespace physx;
 
 void PhysicsComponentBase::on_init()
 {
-	if (eng->is_editor_level())
+	if (eng->is_editor_level()) {
+		auto shape = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		shape->dont_serialize_or_edit = true;
+		editor_shape_id = shape->instance_id;
+		auto mb = get_editor_meshbuilder();
+		mb->use_background_color = true;
+		mb->mb.Begin();
+		add_editor_shapes();
+		mb->mb.End();	
+		mb->on_changed_transform();
 		return;
+	}
+
+	ASSERT(editor_shape_id==0);
 
 	auto initial_transform = get_ws_transform();
 
@@ -62,6 +74,15 @@ void PhysicsComponentBase::on_init()
 
 void PhysicsComponentBase::on_deinit()
 {
+	if (editor_shape_id != 0) {
+		auto shapeptr = eng->get_level()->get_entity(editor_shape_id);
+		if (shapeptr) {
+			((EntityComponent*)shapeptr)->destroy();
+		}
+		editor_shape_id = 0;
+	}
+		
+
 	if (has_initialized()) {
 		physics_local_impl->scene->removeActor(*(physx::PxActor*)physxActor);
 		physxActor->release();
@@ -97,6 +118,21 @@ void CapsuleComponent::add_actor_shapes() {
 	//}
 
 	add_vertical_capsule_to_actor(glm::vec3(0.f), height, radius);
+}
+
+static Color32 mb_color = { 86, 150, 252 };
+
+void CapsuleComponent::add_editor_shapes() {
+	auto mb = get_editor_meshbuilder();
+	mb->mb.AddLineCapsule(glm::vec3(0, height_offset, 0), radius, height * 0.5, mb_color);
+}
+void BoxComponent::add_editor_shapes() {
+	auto mb = get_editor_meshbuilder();
+	mb->mb.PushLineBox(glm::vec3(-0.5f),glm::vec3(0.5), mb_color);
+}
+void SphereComponent::add_editor_shapes() {
+	auto mb = get_editor_meshbuilder();
+	mb->mb.AddLineSphere(glm::vec3(0.f), radius, mb_color);
 }
 
 void BoxComponent::add_actor_shapes() {
@@ -153,6 +189,13 @@ void MeshColliderComponent::add_actor_shapes() {
 }
 
 void PhysicsComponentBase::on_changed_transform() {
+	if (editor_shape_id != 0) {
+		auto mb = get_editor_meshbuilder();
+		mb->mb.Begin();
+		add_editor_shapes();
+		mb->mb.End();
+	}
+
 	if (!has_initialized())
 		return;
 	set_transform(get_ws_transform());
@@ -328,4 +371,8 @@ void PhysicsComponentBase::set_send_hit(bool send_hit) {
 void PhysicsComponentBase::set_is_static(bool is_static)
 {
 	this->is_static = is_static;
+}
+
+MeshBuilderComponent* PhysicsComponentBase::get_editor_meshbuilder() const {
+	return (MeshBuilderComponent*)eng->get_level()->get_entity(editor_shape_id);
 }

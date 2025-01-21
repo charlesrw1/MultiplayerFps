@@ -28,9 +28,6 @@ public:
 	void on_deinit() override;
 	void on_changed_transform() override;
 
-	// if you dynamically change shape (or remove mesh), must call this to have effect
-	void resync_shape();
-
 	bool get_is_kinematic() const { return !is_static && !simulate_physics; }
 	void set_is_kinematic(bool kinematic);
 
@@ -47,8 +44,6 @@ public:
 	void set_is_trigger(bool is_trig);
 	void set_send_overlap(bool send_overlap);
 	void set_send_hit(bool send_hit);
-
-
 
 	glm::mat4 get_transform() const;
 
@@ -78,9 +73,12 @@ protected:
 	void add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents);
 	void update_mass();
 
+
+	MeshBuilderComponent* get_editor_meshbuilder() const;
 private:
 	// override this
 	virtual void add_actor_shapes() {}
+	virtual void add_editor_shapes() {}
 
 	bool has_initialized() const { return physxActor != nullptr; }
 	bool get_is_actor_static() const;
@@ -103,10 +101,9 @@ private:
 	
 	bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
 
-
 	physx::PxRigidActor* physxActor = nullptr;
-	MeshBuilderComponent* editor_view = nullptr;
-	BillboardComponent* editor_billboard = nullptr;
+
+	uint64_t editor_shape_id = 0;
 };
 
 
@@ -115,21 +112,25 @@ public:
 	~CapsuleComponent() override {}
 
 	void add_actor_shapes() override;
+	void add_editor_shapes() override;
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(CapsuleComponent)
 			REG_FLOAT(height,PROP_DEFAULT,"2.0"),
 			REG_FLOAT(radius,PROP_DEFAULT,"0.5"),
+			REG_FLOAT(height_offset,PROP_DEFAULT,"0.0"),
 		END_PROPS(CapsuleComponent)
 	};
 
 	float height = 2.f;
 	float radius = 0.5;
+	float height_offset = 0.0;
 };
 CLASS_H(BoxComponent, PhysicsComponentBase)
 public:
 	~BoxComponent() override {}
 	void add_actor_shapes() override;
+	void add_editor_shapes() override;
 
 	static const PropertyInfoList* get_props() = delete;
 };
@@ -137,6 +138,7 @@ CLASS_H(SphereComponent, PhysicsComponentBase)
 public:
 	~SphereComponent() override {}
 	void add_actor_shapes() override;
+	void add_editor_shapes() override;
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(SphereComponent)
@@ -148,6 +150,7 @@ public:
 CLASS_H(MeshColliderComponent, PhysicsComponentBase)
 public:
 	void add_actor_shapes() override;
+
 	static const PropertyInfoList* get_props() = delete;
 };
 

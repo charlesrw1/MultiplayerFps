@@ -156,6 +156,88 @@ void MeshBuilder::PushOrientedLineBox(vec3 min, vec3 max, glm::mat4 transform, C
 	for (int i = start; i < verticies.size(); i++)
 		verticies[i].position = transform * glm::vec4(verticies[i].position,1.0);
 }
+void MeshBuilder::AddLineSphere(vec3 origin, float radius, Color32 color)
+{
+	auto add_half_sphere = [&](glm::vec3 origin, float phi_mult, float radius, int segments) {
+		for (int j = 0; j < 4; j++) {
+			AddVertex(MbVertex(vec3(0, phi_mult*radius, 0) + origin, color));
+			for (int i = 0; i < segments; i++)
+			{
+				auto phi = phi_mult * PI * double(i + 1) / double(segments * 2);
+
+				auto theta = TWOPI * j / 4;
+				auto x = std::sin(phi) * std::cos(theta);
+				auto y = phi_mult*std::cos(phi);
+				auto z = std::sin(phi) * std::sin(theta);
+				AddVertex(MbVertex(vec3(x, y, z)*radius + origin, color));
+				AddLine(verticies.size() - 2, verticies.size() - 1);
+			}
+		}
+	};
+	auto add_circle = [&](glm::vec3 center, float radius, int segments) {
+		AddVertex(MbVertex(glm::vec3(center) + glm::vec3(radius, 0, 0), color));
+		for (int i = 0; i < segments; i++) {
+			auto theta = TWOPI * ((i + 1) / double(segments));
+			auto x = std::cos(theta);
+			auto y = 0.f;
+			auto z = std::sin(theta);
+			AddVertex(MbVertex(vec3(x, 0.f, z) * radius + center, color));
+			AddLine(verticies.size() - 2, verticies.size() - 1);
+		}
+	};
+	add_circle(origin, radius, 16);
+	add_half_sphere(origin, 1.f, radius, 10);
+	add_half_sphere(origin, -1.f, radius, 10);
+}
+void MeshBuilder::AddLineCapsule(vec3 origin, float radius, float realhalfheight, Color32 color)
+{
+	float halfheight = realhalfheight - (radius);
+
+	auto add_half_sphere = [&](glm::vec3 origin, float phi_mult, float radius, int segments) {
+		for (int j = 0; j < 4; j++) {
+			AddVertex(MbVertex(vec3(0, phi_mult*radius, 0) + origin, color));
+			for (int i = 0; i < segments; i++)
+			{
+				auto phi = phi_mult * PI * double(i + 1) / double(segments * 2);
+
+				auto theta = TWOPI * j / 4;
+				auto x = std::sin(phi) * std::cos(theta);
+				auto y = phi_mult*std::cos(phi);
+				auto z = std::sin(phi) * std::sin(theta);
+				AddVertex(MbVertex(vec3(x, y, z)*radius + origin, color));
+				AddLine(verticies.size() - 2, verticies.size() - 1);
+			}
+		}
+	};
+
+	auto add_circle = [&](glm::vec3 center, float radius, int segments) {
+		AddVertex(MbVertex(glm::vec3(center) + glm::vec3(radius, 0, 0), color));
+		for (int i = 0; i < segments; i++) {
+			auto theta = TWOPI * ((i + 1) / double(segments));
+			auto x = std::cos(theta);
+			auto y = 0.f;
+			auto z = std::sin(theta);
+			AddVertex(MbVertex(vec3(x, 0.f, z) * radius + center, color));
+			AddLine(verticies.size() - 2, verticies.size() - 1);
+		}
+	};
+	add_circle(origin + glm::vec3(0, halfheight, 0), radius, 16);
+	add_circle(origin + glm::vec3(0, -halfheight, 0), radius, 16);
+
+	add_half_sphere(origin + glm::vec3(0, halfheight, 0), 1.f, radius, 10);
+	add_half_sphere(origin + glm::vec3(0, -halfheight, 0), -1.f, radius, 10);
+	//
+	for (int j = 0; j < 4; j++) {
+	
+		auto theta = TWOPI * j / 4;
+		auto x = std::cos(theta);
+		auto y = 0.f;
+		auto z = std::sin(theta);
+		AddVertex(MbVertex(vec3(x, y, z)*radius + origin + glm::vec3(0,halfheight,0), color));
+		AddVertex(MbVertex(vec3(x, y, z)*radius + origin - glm::vec3(0,halfheight,0), color));
+		AddLine(verticies.size() - 2, verticies.size() - 1);
+	}
+}
 void MeshBuilder::AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color)
 {
 	int basev = GetBaseVertex();

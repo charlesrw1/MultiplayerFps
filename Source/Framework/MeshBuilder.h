@@ -48,10 +48,10 @@ public:
 	void PushSolidBox(vec3 box_min, vec3 box_max, Color32 color);
 	void PushLineBox(vec3 box_min, vec3 box_max, Color32 color);
 
-
 	void PushOrientedLineBox(vec3 box_min, vec3 box_max, glm::mat4 transform, Color32 color);
-	// line sphere
 	void AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color);
+	void AddLineCapsule(vec3 origin, float radius, float half_height, Color32 color);	
+	void AddLineSphere(vec3 origin, float radius, Color32 color);	
 
 	// GL_TRIANGLES,etc.
 	void Draw(uint32_t gl_type);

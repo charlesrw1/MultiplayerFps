@@ -133,8 +133,12 @@ void main()
 		GBUFFER_OUT_Emissive.rgb = (GBUFFER_OUT_Normal.rgb*0.5+vec3(0.5));
 	else if(g.debug_options == DEBUG_ALBEDO)
 		GBUFFER_OUT_Emissive.rgb = BASE_COLOR;
-	else if(g.debug_options == DEBUG_WIREFRAME)
-		GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);
+	else if(g.debug_options == DEBUG_WIREFRAME) {
+		if(g.flags == 1)	// second pass
+			GBUFFER_OUT_Emissive = vec4(1.0,1.0,1.0,1.0);
+		else	// first pass (black)
+			GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);
+	}
 #endif // DEBUG_SHADER
 
 #ifdef EDITOR_ID
