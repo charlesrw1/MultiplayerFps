@@ -168,6 +168,10 @@ struct world_query_result
 	bool had_initial_overlap = false;
 	float distance = 0.0;
 };
+
+class PhysicsComponentBase;
+using TraceIgnoreVec = InlineVec<PhysicsComponentBase*, 4>;
+
 class BinaryReader;
 class PhysicsManImpl;
 class PhysicsManager
@@ -175,8 +179,8 @@ class PhysicsManager
 public:
 	void init();
 
-	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t channel_mask);
-	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t channel_mask);
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, const TraceIgnoreVec* ignore, uint32_t channel_mask);
+	bool trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, const TraceIgnoreVec* ignore, uint32_t channel_mask);
 	
 	bool sweep_capsule(
 		world_query_result& out,
@@ -184,14 +188,18 @@ public:
 		const glm::vec3& start, 
 		const glm::vec3& dir, 
 		float length, 
-		uint32_t channel_mask);
+		uint32_t channel_mask = UINT32_MAX,
+		const TraceIgnoreVec* ignore = nullptr
+	);
 	bool sweep_sphere(
 		world_query_result& out,
 		float radius,
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		uint32_t channel_mask);
+		uint32_t channel_mask = UINT32_MAX,
+		const TraceIgnoreVec* ignore = nullptr
+	);
 	bool capsule_is_overlapped(
 		const vertical_capsule_def_t& capsule,
 		const glm::vec3& start,

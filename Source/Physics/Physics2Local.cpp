@@ -69,10 +69,11 @@ bool PhysicsManager::sweep_capsule(
 	const glm::vec3& start,
 	const glm::vec3& dir,
 	float length,
-	uint32_t mask)
+	uint32_t channel_mask,
+	const TraceIgnoreVec* ignore)
 {
 	auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
-	return impl->sweep_shared(out, geom, start, dir, length, mask);
+	return impl->sweep_shared(out, geom, start, dir, length, ignore, channel_mask);
 }
 bool PhysicsManager::sweep_sphere(
 	world_query_result& out,
@@ -80,9 +81,10 @@ bool PhysicsManager::sweep_sphere(
 	const glm::vec3& start,
 	const glm::vec3& dir,
 	float length,
-	uint32_t mask) {
+	uint32_t channel_mask,
+	const TraceIgnoreVec* ignore) {
 	auto geom = physx::PxSphereGeometry(radius);
-	return impl->sweep_shared(out, geom, start, dir, length, mask);
+	return impl->sweep_shared(out, geom, start, dir, length,ignore, channel_mask);
 }
 bool PhysicsManager::capsule_is_overlapped(
 	const vertical_capsule_def_t& capsule,
@@ -109,15 +111,52 @@ bool PhysicsManager::load_physics_into_shape(BinaryReader& reader, physics_shape
 	return impl->load_physics_into_shape(reader, def);
 }
 
-bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, uint32_t mask) {
+#include "Render/RenderObj.h"
+#include "Physics2Local.h"
+#include <unordered_set>
+class MyPhysicsQueryFilter : public physx::PxQueryFilterCallback
+{
+public:
+	MyPhysicsQueryFilter(const TraceIgnoreVec* vec) : ignored(vec) {}
+
+	// Inherited via PxQueryFilterCallback
+	virtual PxQueryHitType::Enum preFilter(const PxFilterData& filterData, const PxShape* shape, const PxRigidActor* actor, PxHitFlags& queryFlags) override
+	{
+		PhysicsComponentBase* ptr =(PhysicsComponentBase*)actor->userData;
+		for (int i = 0; i < ignored->size(); i++)
+			if (ptr == (*ignored)[i])
+				return PxQueryHitType::eNONE;
+		return PxQueryHitType::eBLOCK;
+	}
+	virtual PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit, const PxShape* shape, const PxRigidActor* actor) override
+	{
+		return PxQueryHitType::eBLOCK;
+	}
+
+	const TraceIgnoreVec* ignored = nullptr;
+};
+
+bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, const TraceIgnoreVec* ignore, uint32_t mask) {
 	float length = glm::length(end - start);
 	glm::vec3 dir = (end - start) / length;
-	return trace_ray(out, start, dir, length, mask);
+	return trace_ray(out, start, dir, length, ignore, mask);
 }
-bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t mask) {
+bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& dir, float length,const TraceIgnoreVec* ignore, uint32_t channel_mask) {
 	physx::PxRaycastBuffer hit;
+
+	MyPhysicsQueryFilter query_filter(ignore);
+	PxQueryFilterData filter;
+	filter.data.word0 = channel_mask;
+	if(ignore)
+		filter.flags |= PxQueryFlag::ePREFILTER;
+
 	bool status = impl->scene->raycast(
-		glm_to_physx(start), glm_to_physx(dir), length, hit);
+		glm_to_physx(start), glm_to_physx(dir), length, hit, PxHitFlag::eDEFAULT,
+		filter,
+		(ignore) ? &query_filter : nullptr);
+
+
+
 	sys_print(Debug,"ray: %d\n", (int)status);
 	if (!status) {
 		out.fraction = 1.0;
@@ -157,15 +196,24 @@ static Color32 randcolor32(uint32_t number)
 	c32.a = 255;
 	return c32;
 }
-#include "Render/RenderObj.h"
-#include "Physics2Local.h"
 
- bool PhysicsManImpl::sweep_shared(world_query_result& out, physx::PxGeometry& geom, const glm::vec3& start, const glm::vec3& dir, float length, uint32_t mask)
+
+ bool PhysicsManImpl::sweep_shared(world_query_result& out, physx::PxGeometry& geom, const glm::vec3& start, const glm::vec3& dir, float length, const TraceIgnoreVec* ignore, uint32_t channel_mask)
 {
 	physx::PxSweepBuffer sweep;
 	PxTransform relativePose(glm_to_physx(start), PxQuat(PxHalfPi, PxVec3(0, 0, 1)));
 	physx::PxTransform local(relativePose);
-	bool status = scene->sweep(geom, local, glm_to_physx(dir), length, sweep, PxHitFlag::eDEFAULT | PxHitFlag::eMTD /* for initial overlaps */);
+
+	MyPhysicsQueryFilter query_filter(ignore);
+	PxQueryFilterData filter;
+	filter.data.word0 = channel_mask;
+	if(ignore)
+		filter.flags |= PxQueryFlag::ePREFILTER;
+
+	bool status = scene->sweep(geom, local, glm_to_physx(dir), length, sweep, PxHitFlag::eDEFAULT | PxHitFlag::eMTD /* for initial overlaps */,
+		filter,
+		(ignore) ? &query_filter : nullptr);
+
 	if (!status) {
 		out.fraction = 1.0;
 		return status;
@@ -180,6 +228,74 @@ static Color32 randcolor32(uint32_t number)
 	out.trace_dir = dir;
 	return status;
 }
+ class MyPhysicsCallback : public physx::PxSimulationEventCallback
+ {
+	 // Inherited via PxSimulationEventCallback
+	 virtual void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override
+	 {
+	 }
+	 virtual void onWake(PxActor** actors, PxU32 count) override
+	 {
+	 }
+	 virtual void onSleep(PxActor** actors, PxU32 count) override
+	 {
+	 }
+	 virtual void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) override
+	 {
+		 sys_print(Debug, "contact\n");
+	 }
+	 virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override
+	 {
+		 for (int i = 0; i < count; i++) {
+			 auto& pair = pairs[i];
+			 PhysicsComponentBase* trigger_obj = (PhysicsComponentBase*)pair.triggerActor->userData;
+			 PhysicsComponentBase* other_obj = (PhysicsComponentBase*)pair.otherActor->userData;
+			 if (!trigger_obj || !other_obj)
+				 continue;
+			 if (pair.status == physx::PxPairFlag::eNOTIFY_TOUCH_FOUND) {
+				 sys_print(Debug, "trigger found\n");
+				 trigger_obj->on_trigger_start.invoke(other_obj);
+			 }
+			 else {
+				 sys_print(Debug, "trigger lost\n");
+				 trigger_obj->on_trigger_end.invoke(other_obj);
+			 }
+
+		 }
+	 }
+	 virtual void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override
+	 {
+	 }
+ };
+ PhysicsManImpl::~PhysicsManImpl()
+ {
+
+ }
+ PhysicsManImpl::PhysicsManImpl()
+ {
+
+ }
+
+ static PxFilterFlags my_filter_shader(
+    PxFilterObjectAttributes attributes0, PxFilterData filterData0,
+    PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+    PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
+{
+    // let triggers through
+    if(PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
+    {
+        pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+        return PxFilterFlag::eDEFAULT;
+    }
+    // generate contacts for all that were not filtered above
+	if ((filterData0.word0 & filterData1.word1) &&  (filterData1.word0 & filterData0.word1)) {
+		pairFlags = PxPairFlag::eCONTACT_DEFAULT;
+		return PxFilterFlag::eDEFAULT;
+	}
+	else
+		return PxFilterFlag::eKILL;
+
+}
 
   void PhysicsManImpl::init() {
 	 sys_print(Info, "Initializing Physics\n");
@@ -190,8 +306,9 @@ static Color32 randcolor32(uint32_t number)
 
 	 physx::PxSceneDesc sceneDesc(physics_factory->getTolerancesScale());
 	 sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
-	 sceneDesc.filterShader = physx::PxDefaultSimulationFilterShader;
+	 sceneDesc.filterShader = my_filter_shader;// physx::PxDefaultSimulationFilterShader;
 	 dispatcher = physx::PxDefaultCpuDispatcherCreate(2);
+
 
 	 if (!dispatcher)
 		 Fatalf("PxDefaultCpuDispatcherCreate failed!");
@@ -203,6 +320,10 @@ static Color32 randcolor32(uint32_t number)
 
 	 scene->setFlag(PxSceneFlag::eENABLE_ACTIVE_ACTORS, true);
 	 scene->setFlag(PxSceneFlag::eEXCLUDE_KINEMATICS_FROM_ACTIVE_ACTORS, true);
+
+	 mycallback.reset(new MyPhysicsCallback);
+	 scene->setSimulationEventCallback(mycallback.get());
+
  }
 
   void PhysicsManImpl::simulate_and_fetch(float dt) {

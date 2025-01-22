@@ -204,7 +204,7 @@ PhysicsComponentBase::~PhysicsComponentBase()
 {
 }
 PhysicsComponentBase::PhysicsComponentBase() {
-	physics_preset.ptr = &PP_DefaultBlockAll::StaticType;
+	
 }
 
 bool PhysicsComponentBase::get_is_actor_static() const {
@@ -241,9 +241,14 @@ glm::vec3 PhysicsComponentBase::get_linear_velocity() const {
 void PhysicsComponentBase::set_shape_flags(PxShape* shape)
 {
 	if (is_trigger)
-		shape->setFlags(PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eTRIGGER_SHAPE | PxShapeFlag::eVISUALIZATION);
+		shape->setFlags(PxShapeFlag::eTRIGGER_SHAPE | PxShapeFlag::eVISUALIZATION);
 	else
 		shape->setFlags(PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE | PxShapeFlag::eVISUALIZATION);
+	PxFilterData filter;
+	filter.word0 = (1ul << uint32_t(physics_layer));
+	filter.word1 = get_collision_mask_for_physics_layer(physics_layer);
+	shape->setQueryFilterData(filter);
+	shape->setSimulationFilterData(filter);
 }
 void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
 {

@@ -708,7 +708,7 @@ void Player::on_jump_callback()
 			world_query_result wqr;
 			auto pos = get_ws_position() + glm::vec3(0, 0.7, 0);
 			const float test_len = ccontroller->capsule_radius+0.4;
-			bool good = g_physics.trace_ray(wqr, pos, pos - wishdir * test_len, UINT32_MAX);
+			bool good = g_physics.trace_ray(wqr, pos, pos - wishdir * test_len, nullptr, UINT32_MAX);
 			if (good) {
 				velocity = wqr.hit_normal * 8.0f;
 				velocity.y = 4.5;
@@ -897,7 +897,7 @@ void Player::on_foot_update()
 
 	 Player::find_a_spawn_point();
 
-	 ccontroller = std::make_unique<CharacterController>();
+	 ccontroller = std::make_unique<CharacterController>(player_capsule);
 	 ccontroller->set_position(get_ws_position());
 	 ccontroller->capsule_height = player_capsule->height;
 	 ccontroller->capsule_radius = player_capsule->radius;

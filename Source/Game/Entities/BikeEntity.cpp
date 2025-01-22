@@ -20,7 +20,7 @@ BikeEntity::BikeEntity()
 }
 void BikeEntity::start()
 {
-	ccontrol = std::make_unique<CharacterController>();
+	ccontrol = std::make_unique<CharacterController>(nullptr);
 	ccontrol->set_position(get_ws_position());
 }
 

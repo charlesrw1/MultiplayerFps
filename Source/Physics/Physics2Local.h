@@ -24,6 +24,9 @@
 #include "Physics2.h"
 #include "Framework/MeshBuilder.h"
 #include "Render/RenderObj.h"
+
+#include <memory>
+
 struct CollisionResponse
 {
 	uint32_t blockMask = 0;	// mask of objects to block
@@ -63,11 +66,12 @@ inline PxTransform glm_to_physx(const glm::mat4& mI)
 	));
 }
 
-
+class MyPhysicsCallback;
 class PhysicsManImpl
 {
 public:
-	PhysicsManImpl() {}
+	PhysicsManImpl();
+	~PhysicsManImpl();
 
 
 	bool sweep_shared(world_query_result& out,
@@ -75,7 +79,9 @@ public:
 		const glm::vec3& start,
 		const glm::vec3& dir,
 		float length,
-		uint32_t mask);
+		const TraceIgnoreVec* ignored_components = nullptr,
+		uint32_t collision_channel_mask = UINT32_MAX);
+
 	bool overlap_shared(
 		physx::PxGeometry& geom,
 		const glm::vec3& start,
@@ -103,6 +109,8 @@ public:
 	physx::PxScene* scene = nullptr;
 	physx::PxPhysics* physics_factory = nullptr;
 	physx::PxFoundation* foundation = nullptr;
+
+	std::unique_ptr<MyPhysicsCallback> mycallback;
 
 	MeshBuilder debug_mesh;
 	handle<MeshBuilder_Object> debug_mesh_handle;

@@ -1,32 +1,23 @@
 #include "ChannelsAndPresets.h"
 
-CLASS_IMPL(PhysicsFilterPresetBase);
-CLASS_IMPL(PP_DefaultBlockAll);
-CLASS_IMPL(PP_PhysicsEntity);
-CLASS_IMPL(PP_Trigger);
-CLASS_IMPL(PP_Character);
-CLASS_IMPL(PP_NoCollision);
+ENUM_START(PL)
+	STRINGIFY_EUNM(PL::Default,			0),
+	STRINGIFY_EUNM(PL::StaticObject,	1),
+	STRINGIFY_EUNM(PL::DynamicObject,	2),
+	STRINGIFY_EUNM(PL::PhysicsObject,	3),
+	STRINGIFY_EUNM(PL::Character,		4),
+	STRINGIFY_EUNM(PL::Visiblity,		5),
+ENUM_IMPL(PL);
 
-PP_NoCollision::PP_NoCollision() {
-	set_self(PhysicsChannel::StaticObject);
-	set_default(MaskType::Ignore);
-}
+#define GET_MASK(x) (1ul << uint32_t(PL::x))
 
-PP_DefaultBlockAll::PP_DefaultBlockAll() {
-	set_self(PhysicsChannel::StaticObject);
-	set_default(MaskType::Block);
-}
-PP_PhysicsEntity::PP_PhysicsEntity() {
-	set_self(PhysicsChannel::PhysicsObject);
-	set_default(MaskType::Block);
-}
-PP_Trigger::PP_Trigger() {
-	set_self(PhysicsChannel::StaticObject);
-	set_default(MaskType::Overlap);
-	set_state(PhysicsChannel::Visiblity, MaskType::Ignore);	// dont care about overlaps with vis raycasts
-}
-PP_Character::PP_Character() {
-	set_self(PhysicsChannel::Character);
-	set_default(MaskType::Block);
-	set_state(PhysicsChannel::Visiblity, MaskType::Ignore);	// dont block vis channel, use hitboxes for line traces
+uint32_t get_collision_mask_for_physics_layer(PhysicsLayer layer)
+{
+	switch (layer)
+	{
+	case PL::PhysicsObject:
+		return GET_MASK(PhysicsObject) | GET_MASK(Default) | GET_MASK(StaticObject);
+	default:
+		return UINT32_MAX;
+	}
 }

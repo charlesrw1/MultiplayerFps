@@ -1,6 +1,7 @@
 #include "CharacterController.h"
 #include "Physics/Physics2.h"
 #include "Debug.h"
+#include "Physics/ChannelsAndPresets.h"
 
 // movement code taken from physx character controller and quake
 
@@ -55,6 +56,10 @@ void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, u
 	glm::vec3 target_pos = position + disp;
 	int max_iter = 5;
 	out_ccfg_flags = 0;
+
+	TraceIgnoreVec ignore;
+	ignore.push_back(self);
+
 	for (; max_iter >= 0; max_iter--)
 	{
 		auto current_direction = target_pos - current_pos;
@@ -69,7 +74,7 @@ void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, u
 		{
 			// do collision test
 			glm::vec3 actual_capsule_pos = current_pos + glm::vec3(0,capsule_height*0.5,0);
-			bool has_hit = g_physics.sweep_capsule(wqr, shape_def, actual_capsule_pos, current_direction, length+skin_size, UINT32_MAX);
+			bool has_hit = g_physics.sweep_capsule(wqr, shape_def, actual_capsule_pos, current_direction, length+skin_size, 1 >> (int)PL::Default, &ignore);
 			if (!has_hit) {
 				current_pos = target_pos;
 				break;

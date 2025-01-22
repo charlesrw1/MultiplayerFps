@@ -70,17 +70,15 @@ public:
 	}
 	virtual void start() override {
 
-		ccontroller = std::make_unique<CharacterController>();
+		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());
 		ccontroller->capsule_height = capsule->height;
 		ccontroller->capsule_radius = capsule->radius;
 
-		capsule->destroy();
-		capsule = nullptr;
+		//capsule->destroy();
+		//capsule = nullptr;
 
 		eng->set_game_focused(true);
-
-		ccontroller = std::make_unique<CharacterController>();
 
 		inputPtr = GetGInput().register_input_user(0);
 
@@ -232,7 +230,7 @@ public:
 	}
 	void get_view(glm::mat4& viewMat, float& fov) {
 		auto pos = get_ws_position();
-		auto camera_pos = glm::vec3(pos.x, pos.y + 4.0, pos.z - 1.0);
+		auto camera_pos = glm::vec3(pos.x, pos.y + 8.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - pos);
 
 
@@ -281,3 +279,24 @@ public:
 	TopDownPlayer* player = nullptr;
 };
 CLASS_IMPL(TopDownPlayerController);
+
+
+CLASS_H(PlayerTriggerComponent2, EntityComponent)
+public:
+	void on_init() override {
+		if (eng->is_editor_level()) return;
+
+		auto ptr = get_owner()->get_first_component<PhysicsComponentBase>();
+		if (ptr) {
+			ptr->on_trigger_start.add(this, [](EntityComponent*) {
+				sys_print(Debug, "triggered\n");
+				});
+		}
+		else {
+			sys_print(Error, "PlayerTriggerComponent needs physics component\n");
+		}
+	}
+	static const PropertyInfoList* get_props() = delete;
+
+};
+CLASS_IMPL(PlayerTriggerComponent2);

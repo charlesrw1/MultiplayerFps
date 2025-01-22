@@ -58,7 +58,7 @@ public:
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(PhysicsComponentBase)
-			REG_CLASSTYPE_PTR(physics_preset, PROP_DEFAULT),
+			REG_ENUM(physics_layer, PROP_DEFAULT, "PL::Default", PL),
 			REG_BOOL(enabled, PROP_DEFAULT, "1"),
 			REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
 			REG_BOOL(is_trigger, PROP_DEFAULT, "0"),
@@ -91,7 +91,7 @@ private:
 	physx::PxRigidDynamic* get_dynamic_actor() const;
 	void set_shape_flags(physx::PxShape* shape);
 
-	ClassTypePtr<PhysicsFilterPresetBase> physics_preset;
+	PhysicsLayer physics_layer = PL::Default;
 	bool enabled = true;
 	
 	bool simulate_physics = false;		// if true, then object is a DYNAMIC object driven by the physics simulation
