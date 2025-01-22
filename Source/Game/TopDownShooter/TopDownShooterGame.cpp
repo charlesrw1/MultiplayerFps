@@ -110,7 +110,7 @@ public:
 
 		velocity = {};
 
-		ccontroller->set_position(glm::vec3(0,1.0,0));
+		ccontroller->set_position(glm::vec3(0,0.0,0));
 	}
 	virtual void end() override {
 		GameInputSystem::get().free_input_user(inputPtr);
@@ -232,7 +232,7 @@ public:
 	}
 	void get_view(glm::mat4& viewMat, float& fov) {
 		auto pos = get_ws_position();
-		auto camera_pos = glm::vec3(pos.x, pos.y + 10.0, pos.z - 2.0);
+		auto camera_pos = glm::vec3(pos.x, pos.y + 4.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - pos);
 
 

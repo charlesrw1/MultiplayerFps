@@ -17,7 +17,10 @@ void CharacterGraphDriver::on_init() {
 void CharacterGraphDriver::on_update(float dt) {
 
 	if (!get_owner()) return;
+	if (!get_owner()->cast_to<Player>())
+		return;
 	Player& player = *get_owner()->cast_to<Player>();
+
 
 	meshoffset = glm::vec3(0.f);
 #if 0
@@ -30,7 +33,7 @@ void CharacterGraphDriver::on_update(float dt) {
 	glm::vec2 side = glm::vec2(-face_dir.y, face_dir.x);
 	glm::vec2 relmovedir = glm::vec2(glm::dot(face_dir, groundvelocity), glm::dot(side, groundvelocity));
 
-
+	s
 	glm::vec2 grndaccel(player.esimated_accel.x, player.esimated_accel.z);
 	glm::vec2 relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
 

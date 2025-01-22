@@ -60,7 +60,13 @@ inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, 
 #define REG_ENTITY_PTR(name, flags) make_entity_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
 
 
-class Schema;
+class MeshComponent;
+
+struct BoneParentStruct
+{
+	std::string string;	// only in editor
+	StringName name;	
+};
 
 CLASS_H(Entity, BaseUpdater)
 public:
@@ -163,6 +169,8 @@ public:
 
 	static const PropertyInfoList* get_props();
 
+	void invalidate_transform(EntityComponent* skipthis);
+
 #ifndef NO_EDITOR
 	virtual bool editor_compile() { return true; }
 	virtual bool editor_only() const { return false; }
@@ -178,17 +186,41 @@ public:
 
 	// removes from list (use component->desroy() for real destruction)
 	void remove_this_component_internal(EntityComponent* component);
+
+	MeshComponent* get_cached_mesh_component() const {
+		return cached_mesh_component;
+	}
+	void set_cached_mesh_component(MeshComponent* c) {
+		cached_mesh_component = c;
+	}
+
+	glm::mat4 get_parent_transform() const;
+
+	void set_parent_bone(const std::string& bone) {
+		parent_bone.string = bone;
+		if (!bone.empty())
+			parent_bone.name = StringName(bone.c_str());
+		else
+			parent_bone.name = StringName();
+	}
+	bool has_parent_bone() const {
+		return parent_bone.name.get_hash() != 0;
+	}
+
 protected:
 
 private:
 
-	void post_change_transform_R(bool ws_is_dirty = true);
+	void post_change_transform_R(bool ws_is_dirty = true, EntityComponent* skipthis = nullptr);
 
 	// components created either in code or defined in schema or created per instance
 	std::vector<EntityComponent*> all_components;
 
 	Entity* parent = nullptr;
 	std::vector<Entity*> children;
+
+	BoneParentStruct parent_bone;
+	MeshComponent* cached_mesh_component = nullptr;	// for bone lookups
 
 	glm::vec3 position = glm::vec3(0.f);
 	glm::quat rotation = glm::quat();
@@ -203,6 +235,7 @@ private:
 
 	bool selected_in_editor = false;
 	bool world_transform_is_dirty = true;
+
 
 	// called by Level for init/destruct
 	void initialize_internal();

@@ -45,6 +45,8 @@ public:
 	static const PropertyInfoList* get_props();
 
 	void set_material_override(const MaterialInstance* mi);
+
+	glm::mat4 get_ls_transform_of_bone(StringName bone) const;
 private:
 	void update_handle();
 

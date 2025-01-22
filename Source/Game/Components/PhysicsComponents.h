@@ -4,6 +4,7 @@
 #include "Physics/ChannelsAndPresets.h"
 #include "Framework/ClassTypePtr.h"
 #include "Render/RenderObj.h"
+#include "Framework/MulticastDelegate.h"
 
 class PhysicsActor;
 class MeshBuilder;
@@ -66,6 +67,11 @@ public:
 			REG_BOOL(is_static,PROP_DEFAULT,"1"),
 		END_PROPS(PhysicsComponentBase)
 	};
+
+	// event delegates
+	MulticastDelegate<PhysicsComponentBase*> on_trigger_start;
+	MulticastDelegate<PhysicsComponentBase*> on_trigger_end;
+	MulticastDelegate<PhysicsComponentBase*, glm::vec3 /* point */, glm::vec3/* normal */> on_collide;
 protected:
 	void add_model_shape_to_actor(const Model* m);
 	void add_sphere_shape_to_actor(const glm::vec3& pos, float radius);

@@ -117,7 +117,7 @@ void CapsuleComponent::add_actor_shapes() {
 	//	b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	//}
 
-	add_vertical_capsule_to_actor(glm::vec3(0.f), height, radius);
+	add_vertical_capsule_to_actor(glm::vec3(0, height_offset, 0), height, radius);
 }
 
 static Color32 mb_color = { 86, 150, 252 };
@@ -275,13 +275,14 @@ void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
 }
 void PhysicsComponentBase::add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius)
 {
-	auto capGeom = PxCapsuleGeometry(radius, height * 0.5);
+	auto capGeom = PxCapsuleGeometry(radius, height * 0.5 - radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
 		capGeom, *physics_local_impl->default_material);
 
-	glm::vec3 targetCenter = base + glm::vec3(0.f, height * 0.5f, 0.f);
 
-	shape->setLocalPose(PxTransform(glm_to_physx(targetCenter)));
+	auto localpose =  glm::translate(glm::mat4(1), base) * glm::mat4_cast(glm::angleAxis(HALFPI, glm::vec3(0,0,1)));
+
+	shape->setLocalPose(glm_to_physx(localpose));
 	set_shape_flags(shape);
 }
 void PhysicsComponentBase::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)

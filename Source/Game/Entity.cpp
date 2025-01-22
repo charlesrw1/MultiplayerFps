@@ -8,6 +8,8 @@
 #include "Level.h"
 #include "GameEnginePublic.h"
 
+#include "Framework/PropertyEd.h"
+
 CLASS_IMPL(Entity);
 
 
@@ -60,6 +62,7 @@ const PropertyInfoList* Entity::get_props() {
 		REG_QUAT(rotation, PROP_DEFAULT),
 		REG_VEC3(scale, PROP_DEFAULT),
 		REG_STDSTRING(editor_name, PROP_DEFAULT),	// edit+serialize
+		REG_STRUCT_CUSTOM_TYPE(parent_bone, PROP_DEFAULT, "EntityBoneParentString")
 	END_PROPS(Entity)
 }
 
@@ -316,7 +319,7 @@ void Entity::set_ls_euler_rotation(const glm::vec3& euler) {
 	post_change_transform_R();
 }
 
-void Entity::post_change_transform_R(bool ws_is_dirty)
+void Entity::post_change_transform_R(bool ws_is_dirty, EntityComponent* skipthis)
 {
 	world_transform_is_dirty = ws_is_dirty;
 
@@ -324,7 +327,8 @@ void Entity::post_change_transform_R(bool ws_is_dirty)
 		return;
 
 	for (auto c : all_components)
-		c->on_changed_transform();
+		if(c!=skipthis)
+			c->on_changed_transform();
 
 	// recurse to children
 	for (int i = 0; i < children.size(); i++)
@@ -348,7 +352,7 @@ void Entity::set_ws_transform(const glm::mat4& transform)
 {
 	// want local space
 	if (get_entity_parent()) {
-		auto inv_world = glm::inverse(get_entity_parent()->get_ws_transform());
+		auto inv_world = glm::inverse(get_parent_transform());
 		glm::mat4 local = inv_world * transform;
 		decompose_transform(local, position, rotation, scale);
 		cached_world_transform = transform;
@@ -359,15 +363,109 @@ void Entity::set_ws_transform(const glm::mat4& transform)
 	}
 	post_change_transform_R( false /* cached_world_transform doesnt need updating, we already have it*/);
 }
+#include "Game/Components/MeshComponent.h"
+#include "Animation/SkeletonData.h"
+glm::mat4 Entity::get_parent_transform() const
+{
+	ASSERT(get_entity_parent());
+	if (!has_parent_bone() || !get_entity_parent()->get_cached_mesh_component()) {
+		return get_entity_parent()->get_ws_transform();
+	}
+	else {
+		return
+			get_entity_parent()->get_ws_transform()
+			* get_entity_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone.name);
 
+	}
+}
 // lazily evalutated
 const glm::mat4& Entity::get_ws_transform() {
 	if (world_transform_is_dirty) {
-		if (get_entity_parent())
-			cached_world_transform = get_entity_parent()->get_ws_transform() * get_ls_transform();
+		if (get_entity_parent()) {
+			cached_world_transform = get_parent_transform() * get_ls_transform();
+		}
 		else
 			cached_world_transform = get_ls_transform();
 		world_transform_is_dirty = false;
 	}
 	return cached_world_transform;
 }
+
+void Entity::invalidate_transform(EntityComponent* skipthis)
+{
+	post_change_transform_R(true,skipthis);
+}
+
+
+class EntityBoneParentStringEditor : public IPropertyEditor
+{
+public:
+	// Inherited via IPropertyEditor
+	virtual bool internal_update() override
+	{
+		Entity* self = (Entity*)instance;
+		if (!has_init) {
+			Entity* parent = self->get_entity_parent();
+			if (parent) {
+				MeshComponent* mc = parent->get_first_component<MeshComponent>();
+				if (mc && mc->get_model() && mc->get_model()->get_skel()) {
+					const Model* mod = mc->get_model();
+					auto skel = mod->get_skel();
+					auto& allbones = skel->get_all_bones();
+					for (auto& b : allbones) {
+						options.push_back(b.strname);
+					}
+				}
+			}
+			has_init = true;
+		}
+
+		if (options.empty()) {
+			ImGui::Text("No options (add a MeshComponent with a skeleton)");
+			return false;
+		}
+
+		bool has_update = false;
+
+		BoneParentStruct* my_struct = (BoneParentStruct*)prop->get_ptr(instance);
+
+		const char* preview = (!my_struct->string.empty()) ? my_struct->string.c_str() : "<empty>";
+		if (ImGui::BeginCombo("##combocalsstype", preview)) {
+			for (auto& option : options) {
+
+				if (ImGui::Selectable(option.c_str(),
+					my_struct->string == option
+				)) {
+					self->set_parent_bone(option);
+					has_update = true;
+				}
+
+			}
+			ImGui::EndCombo();
+		}
+
+		return has_update;
+	}
+	bool has_init = false;
+	std::vector<std::string> options;
+};
+
+ADDTOFACTORYMACRO_NAME(EntityBoneParentStringEditor, IPropertyEditor, "EntityBoneParentString");
+
+class EntityBoneParentStringSerialize : public IPropertySerializer
+{
+	// Inherited via IPropertySerializer
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		const BoneParentStruct* ptr_prop = (const BoneParentStruct*)info.get_ptr(inst);
+		return ptr_prop->string;
+	}
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		const BoneParentStruct* ptr_prop = (const BoneParentStruct*)info.get_ptr(inst);
+		std::string to_str(token.str_start, token.str_len);
+		Entity* e = (Entity*)inst;
+		e->set_parent_bone(to_str);
+	}
+};
+ADDTOFACTORYMACRO_NAME(EntityBoneParentStringSerialize, IPropertySerializer, "EntityBoneParentString");

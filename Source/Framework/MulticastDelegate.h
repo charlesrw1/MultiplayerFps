@@ -2,31 +2,61 @@
 
 #include <functional>
 #include <unordered_map>
+#include <list>
 
 template<typename... Args>
 class MulticastDelegate
 {
 public:
+	~MulticastDelegate() {
+		Item* ptr = head;
+		while (ptr) {
+			Item* next = ptr->next;
+			delete ptr;
+			ptr = next;
+		}
+	}
+
 	void add(void* key, std::function<void(Args...)> func)
 	{
-		functions_[key] = func;
+		Item* i = new Item;
+		i->key = key;
+		i->func = std::move(func);
+		i->next = head;
+		head = i;
 	}
 	void remove(void* key)
 	{
-		functions_.erase(key);
+		Item* prev = nullptr;
+		Item* ptr = head;
+		while (ptr) {
+			if (key == ptr->key) {
+				if (prev)
+					prev->next = ptr->next;
+				else
+					head = ptr->next;
+				delete ptr;
+				return;
+			}
+			prev = ptr;
+			ptr = ptr->next;
+		}
+		printf("no matching key\n");
 	}
 	void invoke(Args... args) {
-		for (const auto& pair : functions_)
+		Item* ptr = head;
+		while (ptr)
 		{
-			pair.second(args...);
+			ptr->func(args...);
+			ptr = ptr->next;
 		}
 	}
 	template<typename T>
 	void add(T* instance, void (T::* memberFunction)(Args...), bool callOnce = false)
 	{
-		functions_[instance] = [instance, memberFunction](Args... args) {
+		add(instance, [instance, memberFunction](Args... args) {
 			(instance->*memberFunction)(args...);
-		};
+			});
 	}
 	template<typename T>
 	void add_call_once(T* instance, void (T::* memberFunction)(Args...))
@@ -34,9 +64,21 @@ public:
 		add<T>(instance, memberFunction, true);
 	}
 	bool has_any_listeners() const {
-		return !functions_.empty();
+		return !head;
 	}
 private:
-	//a
-	std::unordered_map<void*, std::function<void(Args...)>> functions_;
+	struct Item {
+		void* key = nullptr;
+		std::function<void(Args...)> func;
+		Item* next = nullptr;
+	};
+	Item* find(Item* start, void* key) {
+		Item* i = start;
+		while (i) {
+			if (i->key == key)
+				return i;
+			i = i->next;
+		}
+	}
+	Item* head = nullptr;
 };

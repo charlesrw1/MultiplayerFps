@@ -164,7 +164,9 @@ public:
 		}
 		return nullptr;
 	}
-
+	const std::vector<BoneData>& get_all_bones() const {
+		return bone_dat;
+	}
 private:
 
 	std::vector<BonePoseMask> masks;

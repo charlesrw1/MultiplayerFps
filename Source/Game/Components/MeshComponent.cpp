@@ -9,6 +9,7 @@
 #include "Assets/AssetDatabase.h"
 #include "GameEnginePublic.h"
 #include "Game/Entity.h"
+#include "Animation/SkeletonData.h"
 
 CLASS_IMPL(MeshComponent);
 
@@ -19,7 +20,26 @@ MeshComponent::~MeshComponent()
 }
 MeshComponent::MeshComponent() {
 }
-
+glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const
+{
+	auto mod = model.get();
+	if (!mod || !mod->get_skel())
+		return glm::mat4(1);
+	auto& allbones = mod->get_skel()->get_all_bones();
+	int index = 0;
+	for (auto& bone : allbones) {
+		if (bone.name == bonename) {
+			break;
+		}
+		index++;
+	}
+	if (index == allbones.size())
+		return glm::mat4(1);
+	if (animator)
+		return animator->get_global_bonemats().at(index);
+	else
+		return allbones.at(index).posematrix;
+}
 void MeshComponent::set_model(const char* model_path)
 {
 	Model* modelnext = GetAssets().find_sync<Model>(model_path).get();
@@ -115,24 +135,28 @@ void MeshComponent::update_handle()
 void MeshComponent::on_init()
 {
 	draw_handle = idraw->get_scene()->register_obj();
+
+	get_owner()->set_cached_mesh_component(this);
 	
 	if (model.get()||model.did_fail()) {
 
 		auto modToUse = (model.did_fail()) ? mods.get_error_model() : model.get();
 
-		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
-			
-			AnimatorInstance* c = animator_tree->allocate_animator_class();
-			animator.reset(c);
+		if (!eng->is_editor_level()) {
+			if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
 
-			bool good = animator->initialize_animator(modToUse, animator_tree.get(), get_owner());
-			if (!good) {
-				sys_print(Error, "couldnt initialize animator\n");
-				animator.reset(nullptr);	// free animator
-				animator_tree = nullptr;	// free tree reference
+				AnimatorInstance* c = animator_tree->allocate_animator_class();
+				animator.reset(c);
+
+				bool good = animator->initialize_animator(modToUse, animator_tree.get(), get_owner());
+				if (!good) {
+					sys_print(Error, "couldnt initialize animator\n");
+					animator.reset(nullptr);	// free animator
+					animator_tree = nullptr;	// free tree reference
+				}
+				else
+					set_ticking(true);	// start ticking the animator
 			}
-			else
-				set_ticking(true);	// start ticking the animator
 		}
 
 		Render_Object obj;
@@ -163,11 +187,14 @@ void MeshComponent::update()
 {
 	if (animator) {
 		animator->tick_tree_new(eng->get_tick_interval());
+		get_owner()->invalidate_transform(this);
 	}
 }
 
 void MeshComponent::on_deinit()
 {
+	get_owner()->set_cached_mesh_component(nullptr);
+
 	idraw->get_scene()->remove_obj(draw_handle);
 	animator.reset();
 }
