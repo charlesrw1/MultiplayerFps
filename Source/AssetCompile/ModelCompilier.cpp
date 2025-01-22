@@ -2188,9 +2188,11 @@ FinalPhysicsData create_final_physics_data(
 			physx::PxConvexMeshDesc desc;
 			auto buf = std::make_unique<physx::PxDefaultMemoryOutputStream>();
 			physx::PxCookingParams params = physx::PxCookingParams(physx::PxTolerancesScale());
+			params.meshPreprocessParams |= physx::PxMeshPreprocessingFlag::eWELD_VERTICES;
+			params.meshWeldTolerance = 0.001f;
 
 			desc.flags |= physx::PxConvexFlag::eCOMPUTE_CONVEX;
-			desc.flags |= physx::PxConvexFlag::eCHECK_ZERO_AREA_TRIANGLES;
+			//desc.flags |= physx::PxConvexFlag::eCHECK_ZERO_AREA_TRIANGLES;
 
 			const int index_start = p.submesh.element_offset / sizeof(uint32_t);	
 			const int vertex_start = p.submesh.base_vertex;
@@ -2205,14 +2207,15 @@ FinalPhysicsData create_final_physics_data(
 			desc.points.data = positions.data();
 			desc.points.stride = sizeof(glm::vec3);
 
+			std::vector<uint32_t> indicies;
 
 			desc.indices.count = p.submesh.element_count;
 			desc.indices.data = ((uint8_t*)(compile.indicies.data() + index_start));
 			desc.indices.stride = sizeof(uint32_t);
 
-
-			bool good = PxCookConvexMesh(params, desc, *buf.get());
-			
+			physx::PxConvexMeshCookingResult::Enum res;
+			bool good = PxCookConvexMesh(params, desc, *buf.get(),&res);
+		
 			if (good) {
 
 				out.body.num_shapes_of_main++;
@@ -2223,6 +2226,8 @@ FinalPhysicsData create_final_physics_data(
 				out.output_streams.push_back(std::move(buf));
 				out.body.shapes.push_back(def);
 			}
+			else
+				sys_print(Error, "PxCookConvexMesh failed\n");
 		}break;
 
 		}

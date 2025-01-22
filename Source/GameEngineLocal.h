@@ -66,10 +66,10 @@ public:
 		return gui_sys.get();
 	}
 	virtual Client* get_client() override {
-		return cl.get();
+		return nullptr;// cl.get();
 	}
 	virtual Server* get_server() override {
-		return sv.get();
+		return nullptr;// sv.get();
 	}
 	virtual SDL_Window* get_os_window() override {
 		return window;
@@ -138,8 +138,8 @@ public:
 	bool map_spawned() { return level != nullptr; }
 
 	std::unique_ptr<GuiSystemPublic> gui_sys;
-	std::unique_ptr<Client> cl;
-	std::unique_ptr<Server> sv;
+	//std::unique_ptr<Client> cl;
+	//std::unique_ptr<Server> sv;
 
 	GUIFullscreen* engine_fullscreen_gui{};
 	OnScreenLogGui* gui_log{};

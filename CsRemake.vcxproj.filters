@@ -87,13 +87,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Client.h">
+    <ClInclude Include="Source\Old\Client.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Connection.h">
+    <ClInclude Include="Source\Old\Connection.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\EmulatedSocket.h">
+    <ClInclude Include="Source\Old\EmulatedSocket.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\GameEngineLocal.h">
@@ -105,13 +105,13 @@
     <ClInclude Include="Source\Level.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Net.h">
+    <ClInclude Include="Source\Old\Net.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Server.h">
+    <ClInclude Include="Source\Old\Server.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Socket.h">
+    <ClInclude Include="Source\Old\Socket.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Types.h">
@@ -533,13 +533,13 @@
     <ClInclude Include="Source\Physics\Physics2Local.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Client.cpp">
+    <ClCompile Include="Source\Old\Client.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ClientMgr.cpp">
+    <ClCompile Include="Source\Old\ClientMgr.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Connection.cpp">
+    <ClCompile Include="Source\Old\Connection.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Level.cpp">
@@ -548,16 +548,16 @@
     <ClCompile Include="Source\Main.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Net.cpp">
+    <ClCompile Include="Source\Old\Net.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Server.cpp">
+    <ClCompile Include="Source\Old\Server.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\ServerClMgr.cpp">
+    <ClCompile Include="Source\Old\ServerClMgr.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Socket.cpp">
+    <ClCompile Include="Source\Old\Socket.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Config.cpp">

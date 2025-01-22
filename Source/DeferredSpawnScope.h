@@ -11,3 +11,14 @@ struct DeferredSpawnScope
 
 	Entity* entityPtr = nullptr;
 };
+class UnserializedSceneFile;
+struct DeferredSpawnScopePrefab
+{
+	DeferredSpawnScopePrefab(UnserializedSceneFile* file) : file(file) {}
+	DeferredSpawnScopePrefab(const DeferredSpawnScopePrefab& other) = delete;
+	DeferredSpawnScopePrefab(DeferredSpawnScopePrefab&& other) = default;
+	DeferredSpawnScopePrefab& operator=(const DeferredSpawnScopePrefab& other) = delete;
+	~DeferredSpawnScopePrefab();
+
+	UnserializedSceneFile* file = nullptr;
+};

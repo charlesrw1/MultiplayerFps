@@ -86,6 +86,7 @@ public:
 	Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti);
 	
 	Entity* spawn_prefab(PrefabAsset* asset);
+	
 
 	template<typename T>
 	T* spawn_entity_class() {
@@ -162,6 +163,7 @@ private:
 	void initialize_new_entity_safe(Entity* e);
 
 	Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti);
+
 
 	uint64_t get_next_id_and_increment() {
 		return ++last_id;	// prefix

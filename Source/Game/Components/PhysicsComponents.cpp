@@ -95,7 +95,7 @@ void PhysicsComponentBase::update_mass()
 	ASSERT(physxActor);
 	if (!get_is_actor_static()) {
 		auto dyn = (PxRigidDynamic*)physxActor;
-		PxRigidBodyExt::updateMassAndInertia(*dyn, 1.f);
+		PxRigidBodyExt::updateMassAndInertia(*dyn, 3.f);
 	}
 }
 
@@ -155,7 +155,7 @@ void BoxComponent::add_actor_shapes() {
 	//	mb.End();
 	//}
 
-	add_box_shape_to_actor(get_ws_transform(), get_owner()->get_ls_scale());
+	add_box_shape_to_actor(get_ws_transform(), get_owner()->get_ls_scale()*0.5f);
 }
 
 

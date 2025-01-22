@@ -20,18 +20,6 @@ class Entity;
 class MeshBuilder;
 class Animation_Set;
 
-CLASS_H(SpawnLogic, ClassBase)
-public:
-	virtual bool can_spawn_this(PlayerBase* player) const = 0;
-};
-
-CLASS_H(SpawnIfOnRedTeam, SpawnLogic)
-public:
-	bool can_spawn_this(PlayerBase* player) const {
-		return true;
-	}
-};
-
 
 CLASS_H(PlayerGun, Entity)
 public:

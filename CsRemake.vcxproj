@@ -50,8 +50,8 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
-    <ClInclude Include="Source\Client.h" />
-    <ClInclude Include="Source\Connection.h" />
+    <ClInclude Include="Source\Old\Client.h" />
+    <ClInclude Include="Source\Old\Connection.h" />
     <ClInclude Include="Source\DeferredSpawnScope.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
@@ -73,7 +73,7 @@
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\LevelEditor\Commands.h" />
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />
-    <ClInclude Include="Source\EmulatedSocket.h" />
+    <ClInclude Include="Source\Old\EmulatedSocket.h" />
     <ClInclude Include="Source\External\cgltf.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\imconfig.h" />
@@ -166,7 +166,7 @@
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
-    <ClInclude Include="Source\Net.h" />
+    <ClInclude Include="Source\Old\Net.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\OsInput.h" />
@@ -201,8 +201,8 @@
     <ClInclude Include="Source\Render\TerrainInterfaceLocal.h" />
     <ClInclude Include="Source\Render\TerrainPublic.h" />
     <ClInclude Include="Source\Render\Texture.h" />
-    <ClInclude Include="Source\Server.h" />
-    <ClInclude Include="Source\Socket.h" />
+    <ClInclude Include="Source\Old\Server.h" />
+    <ClInclude Include="Source\Old\Socket.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Types.h" />
@@ -238,9 +238,9 @@
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
-    <ClCompile Include="Source\Client.cpp" />
-    <ClCompile Include="Source\ClientMgr.cpp" />
-    <ClCompile Include="Source\Connection.cpp" />
+    <ClCompile Include="Source\Old\Client.cpp" />
+    <ClCompile Include="Source\Old\ClientMgr.cpp" />
+    <ClCompile Include="Source\Old\Connection.cpp" />
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
@@ -313,7 +313,7 @@
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
-    <ClCompile Include="Source\Net.cpp" />
+    <ClCompile Include="Source\Old\Net.cpp" />
     <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
@@ -332,9 +332,9 @@
     <ClCompile Include="Source\Render\TerrainComponent.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
-    <ClCompile Include="Source\Server.cpp" />
-    <ClCompile Include="Source\ServerClMgr.cpp" />
-    <ClCompile Include="Source\Socket.cpp" />
+    <ClCompile Include="Source\Old\Server.cpp" />
+    <ClCompile Include="Source\Old\ServerClMgr.cpp" />
+    <ClCompile Include="Source\Old\Socket.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />
     <ClCompile Include="Source\Test\Test.cpp" />

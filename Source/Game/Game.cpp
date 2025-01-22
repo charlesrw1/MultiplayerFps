@@ -1,9 +1,8 @@
-#include "Server.h"
+
 #include "Types.h"
 #include "Level.h"
 #include "BasePlayer.h"
 #include "GameEngineLocal.h"
-#include "Net.h"
 
 #include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"

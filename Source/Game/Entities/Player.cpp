@@ -70,8 +70,6 @@ CLASS_IMPL(PlayerBase);
 CLASS_IMPL(Player);
 
 
-CLASS_IMPL(SpawnLogic);
-CLASS_IMPL(SpawnIfOnRedTeam);
 
 #include "Game/Components/BillboardComponent.h"
 #include "Game/Components/ArrowComponent.h"
@@ -94,21 +92,10 @@ public:
 		}
 	}
 
-	bool check_spawn(PlayerBase* b) {
-		if (logicClass.ptr != nullptr) {
-			auto logic = logicClass.ptr->allocate()->cast_to<SpawnLogic>();
-			return logic->can_spawn_this(b);
-		}
-		return true;
-	}
-
-	ClassTypePtr<SpawnLogic> logicClass;
-
 	static const PropertyInfoList* get_props() {
 		START_PROPS(PlayerSpawnPoint)
 			REG_INT(team, PROP_DEFAULT, "0"),
-			REG_CLASSTYPE_PTR(logicClass, PROP_DEFAULT),
-			END_PROPS(PlayerSpawnPoint)
+		END_PROPS(PlayerSpawnPoint)
 	};
 	int team = 0;
 };

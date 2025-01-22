@@ -106,7 +106,7 @@ void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, u
 	position = current_pos;
 
 
-	Debug::add_sphere(current_pos + glm::vec3(0, capsule_radius, 0), capsule_radius, COLOR_PINK, 0);
-	Debug::add_sphere(current_pos + glm::vec3(0, capsule_height - capsule_radius, 0), capsule_radius, COLOR_PINK, 0);
+	//Debug::add_sphere(current_pos + glm::vec3(0, capsule_radius, 0), capsule_radius, COLOR_PINK, 0);
+	//Debug::add_sphere(current_pos + glm::vec3(0, capsule_height - capsule_radius, 0), capsule_radius, COLOR_PINK, 0);
 
 }

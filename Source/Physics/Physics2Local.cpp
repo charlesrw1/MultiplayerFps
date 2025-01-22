@@ -156,8 +156,6 @@ bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, 
 		(ignore) ? &query_filter : nullptr);
 
 
-
-	sys_print(Debug,"ray: %d\n", (int)status);
 	if (!status) {
 		out.fraction = 1.0;
 		return status;

@@ -19,14 +19,10 @@
 
 #include "Level.h"
 
-#include "Net.h"
 
 #include "GameEngineLocal.h"
 
 #include "Types.h"
-
-#include "Client.h"
-#include "Server.h"
 
 #include "Game/Entities/Player.h"
 #include "Framework/Config.h"
@@ -59,6 +55,7 @@
 #include "UI/Widgets/Layouts.h"
 #include "UI/OnScreenLogGui.h"
 #include "Game/LevelAssets.h"
+#include "Framework/MeshBuilder.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -439,7 +436,7 @@ void GameEngineLocal::connect_to(string address)
 	///travel_to_engine_state(Engine_State::Loading, "connecting to another server");
 
 	sys_print(Info, "Connecting to server %s\n", address.c_str());
-	cl->connect(address);
+	//cl->connect(address);
 }
 
 DECLARE_ENGINE_CMD(close_ed)
@@ -541,7 +538,7 @@ DECLARE_ENGINE_CMD(bind)
 
 DECLARE_ENGINE_CMD_CAT("cl.",force_update)
 {
-	eng->get_client()->ForceFullUpdate();
+	//eng->get_client()->ForceFullUpdate();
 }
 
 DECLARE_ENGINE_CMD(connect)
@@ -559,8 +556,8 @@ DECLARE_ENGINE_CMD(disconnect)
 }
 DECLARE_ENGINE_CMD(reconnect)
 {
-	if(eng->get_client()->get_state() != CS_DISCONNECTED)
-		eng->get_client()->Reconnect();
+	//if(eng->get_client()->get_state() != CS_DISCONNECTED)
+	//	eng->get_client()->Reconnect();
 }
 
 // open a map for playing
@@ -607,16 +604,16 @@ DECLARE_ENGINE_CMD(net_stat)
 	float maxtime = -INFINITY;
 	int maxbytes = -5000;
 	int totalbytes = 0;
-	for (int i = 0; i < 64; i++) {
-		auto& entry = eng->get_client()->server.incoming[i];
-		maxbytes = glm::max(maxbytes, entry.bytes);
-		totalbytes += entry.bytes;
-		mintime = glm::min(mintime, entry.time);
-		maxtime = glm::max(maxtime, entry.time);
-	}
+	//for (int i = 0; i < 64; i++) {
+	//	auto& entry = eng->get_client()->server.incoming[i];
+	//	maxbytes = glm::max(maxbytes, entry.bytes);
+	//	totalbytes += entry.bytes;
+	//	mintime = glm::min(mintime, entry.time);
+	//	maxtime = glm::max(maxtime, entry.time);
+	//}
 
 	sys_print(Debug,"Client Network Stats:\n");
-	sys_print(Debug,"%--15s %f\n", "Rtt", eng->get_client()->server.rtt);
+	//sys_print(Debug,"%--15s %f\n", "Rtt", eng->get_client()->server.rtt);
 	sys_print(Debug,"%--15s %f\n", "Interval", maxtime - mintime);
 	sys_print(Debug,"%--15s %d\n", "Biggest packet", maxbytes);
 	sys_print(Debug,"%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
@@ -729,6 +726,8 @@ void register_input_actions_for_game()
 		->add_bind("y", GIB::MouseY, new LookModifier(true), {})
 		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTX), new LookModifierController(false), {})
 		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTY), new LookModifierController(true), {});
+	IA::register_action("game", "shoot", false)
+		->add_bind("", GIB::MBLeft, {}, new BasicButtonTrigger());
 	IA::register_action("game", "sprint")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), {}, {})
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_LSHIFT), {}, {});
@@ -865,7 +864,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 
 	tick = 0;
 	time = 0.0;
-	set_tick_rate(66.f);
+	set_tick_rate(60.f);
 
 	auto world_settings = level->get_world_settings();
 
@@ -1020,7 +1019,7 @@ void GameEngineLocal::cleanup()
 
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
-		NetworkQuit();
+		//NetworkQuit();
 		SDL_GL_DeleteContext(gl_context);
 		SDL_DestroyWindow(window);
 	}
@@ -1222,7 +1221,7 @@ bool GameEngineLocal::game_draw_screen()
 	auto pos = in[3];
 	auto front = -in[2];
 	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
-
+	p->last_view_setup = vs;
 	//View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
 	idraw->scene_draw(params,vs, get_gui());
@@ -1358,11 +1357,11 @@ void GameEngineLocal::init()
 
 
 	level = nullptr;
-	tick_interval = 1.0 / DEFAULT_UPDATE_RATE;
+	tick_interval = 1.0 / 60.0;
 	state = Engine_State::Idle;
 	is_hosting_game = false;
-	sv.reset( new Server );
-	cl.reset( new Client );
+	//sv.reset( new Server );
+	//cl.reset( new Client );
 	
 	dbg_console.init();
 
@@ -1379,7 +1378,7 @@ void GameEngineLocal::init()
 	register_input_actions_for_game();
 
 	g_physics.init();
-	network_init();
+	//network_init();
 	g_animseq.init();
 	// renderer init
 	idraw->init();
@@ -1389,8 +1388,8 @@ void GameEngineLocal::init()
 	isound->init();
 	mods.init();
 	iparticle->init();
-	cl->init();
-	sv->init();
+	//cl->init();
+	//sv->init();
 	imgui_context = ImGui::CreateContext();
 	DebugShapeCtx::get().init();
 	TIMESTAMP("init everything");
@@ -1636,9 +1635,9 @@ void GameEngineLocal::loop()
 			int num_ticks = (int)floor(frame_remainder / secs_per_tick);
 			frame_remainder -= num_ticks * secs_per_tick;
 
-			if (!is_host()) {
-				frame_remainder += cl->adjust_time_step(num_ticks);
-			}
+			//if (!is_host()) {
+			//	frame_remainder += cl->adjust_time_step(num_ticks);
+			//}
 			float orig_ft = frame_time;
 			float orig_ti = tick_interval;
 

@@ -36,6 +36,20 @@ struct Ray
 	glm::vec3 dir;
 };
 
+
+inline bool ray_plane_intersect(const Ray& r, const glm::vec3& plane_normal, const glm::vec3& plane_point,
+                          glm::vec3& intersect) {
+    float dot = glm::dot(r.dir, plane_normal);
+    if (glm::abs(dot) < 0.000001) {
+        return false; 
+    }
+    float distance = glm::dot(plane_normal, plane_point - r.pos) / dot;
+
+    intersect = r.pos + distance * r.dir;
+
+    return true;
+}
+
 struct Bounds
 {
 	Bounds() : bmin(INFINITY), bmax(-INFINITY) {}
