@@ -11,8 +11,10 @@
 #include "ArrowComponent.h"
 
 CLASS_IMPL(DecalComponent);
-
-void DecalComponent::on_init() {
+DecalComponent::DecalComponent() {
+	set_call_init_in_editor(true);
+}
+void DecalComponent::start() {
 	handle = idraw->get_scene()->register_decal(Render_Decal());
 	update_handle();
 
@@ -26,7 +28,7 @@ void DecalComponent::on_init() {
 		a->dont_serialize_or_edit = true;
 	}
 }
-void DecalComponent::on_deinit() {
+void DecalComponent::end() {
 	idraw->get_scene()->remove_decal(handle);
 }
 void DecalComponent::on_changed_transform() {
@@ -50,7 +52,7 @@ const PropertyInfoList* DecalComponent::get_props()
 		END_PROPS(DecalComponent)
 }
 DecalComponent::~DecalComponent() {}
-DecalComponent::DecalComponent() {}
+
 
 void DecalComponent::set_material(const MaterialInstance* mat)
 {

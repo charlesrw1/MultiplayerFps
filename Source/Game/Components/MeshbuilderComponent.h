@@ -8,18 +8,19 @@ CLASS_H(MeshBuilderComponent, EntityComponent)
 public:
 	MeshBuilderComponent() {
 		dont_serialize_or_edit = true;
+		set_call_init_in_editor(true);
 	}
 	~MeshBuilderComponent() {
 		assert(!editor_mb_handle.is_valid());
 	}
 
 	static const PropertyInfoList* get_props() = delete;
-	void on_init() override {
+	void start() override {
 		MeshBuilder_Object mbo;
 		fill_out_struct(mbo);
 		editor_mb_handle = idraw->get_scene()->register_meshbuilder(mbo);
 	}
-	void on_deinit() override {
+	void end() override {
 		idraw->get_scene()->remove_meshbuilder(editor_mb_handle);
 		mb.Free();
 	}

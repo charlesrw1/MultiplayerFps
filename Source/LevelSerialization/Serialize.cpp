@@ -142,7 +142,7 @@ void serialize_new_object_text_R(
 
 	auto objpath = build_path_for_object(e, for_prefab);
 	ASSERT(output.path_to_instance_handle.find(objpath) == output.path_to_instance_handle.end());
-	output.path_to_instance_handle.insert({ objpath,e->instance_id });
+	output.path_to_instance_handle.insert({ objpath,e->get_instance_id() });
 
 	if (this_is_newly_created(e, for_prefab))
 		serialize_new(e, dont_write_parent);
@@ -343,7 +343,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 	auto add_to_extern_parents = [&](const BaseUpdater* obj, const BaseUpdater* parent) {
 		SerializedSceneFile::external_parent ext;
 		ext.child_path = build_path_for_object(obj, for_prefab);
-		ext.external_parent_handle = parent->instance_id;
+		ext.external_parent_handle = parent->get_instance_id();
 		output.extern_parents.push_back(ext);
 	};
 

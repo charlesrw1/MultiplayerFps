@@ -88,7 +88,7 @@ void Entity::initialize_internal()
 	//}
 
 
-	if (!eng->get_level()->is_editor_level()) {
+	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		start();
 		init_updater();
 	}
@@ -131,7 +131,7 @@ void Entity::destroy_internal()
 {
 	ASSERT(init_state == initialization_state::INITIALIZED);
 
-	if (!eng->get_level()->is_editor_level()) {
+	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		end();
 		shutdown_updater();
 	}

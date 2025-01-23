@@ -250,7 +250,7 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 			Entity** e = (Entity**)prop.get_ptr(inst);
 			EntityPtr<Entity>* eptr = (EntityPtr<Entity>*)prop.get_ptr(inst);
 			if (*e) {
-				*eptr = { (*e)->instance_id };
+				*eptr = { (*e)->get_instance_id() };
 			}
 		}
 		else if(prop.type==core_type_id::List) {

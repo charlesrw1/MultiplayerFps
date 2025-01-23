@@ -15,9 +15,9 @@ public:
 	MeshComponent();
 	~MeshComponent() override;
 
-	void on_init() override;
+	void start() override;
 	void update() override;
-	void on_deinit() override;
+	void end() override;
 
 	void set_model(const char* model_path);
 	void set_model(Model* model);

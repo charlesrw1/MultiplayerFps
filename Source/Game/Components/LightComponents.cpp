@@ -41,7 +41,7 @@ void SpotLightComponent::build_render_light(Render_Light& light)
 	light.normal = glm::normalize(-transform[2]);
 }
 
-void SpotLightComponent::on_init()
+void SpotLightComponent::start()
 {
 	Render_Light light;
 	build_render_light(light);
@@ -57,8 +57,8 @@ void SpotLightComponent::on_init()
 		arrow_obj->dont_serialize_or_edit = true;
 		arrow_obj->create_and_attach_component_type<ArrowComponent>();
 		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
-		editor_arrow = arrow_obj->instance_id;
-		editor_billboard = b->instance_id;
+		editor_arrow = arrow_obj->get_instance_id();
+		editor_billboard = b->get_instance_id();
 	}
 }
 
@@ -70,7 +70,7 @@ void SpotLightComponent::editor_on_change_property()
 	idraw->get_scene()->update_light(light_handle, light);
 }
 
-void SpotLightComponent::on_deinit()
+void SpotLightComponent::end()
 {
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
@@ -110,7 +110,7 @@ void PointLightComponent::build_render_light(Render_Light& light)
 	light.position = transform[3];
 }
 
-void PointLightComponent::on_init()
+void PointLightComponent::start()
 {
 	Render_Light light;
 	build_render_light(light);
@@ -121,11 +121,11 @@ void PointLightComponent::on_init()
 		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/pointBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-		editor_billboard = b->instance_id;
+		editor_billboard = b->get_instance_id();
 	}
 }
 
-void PointLightComponent::on_deinit()
+void PointLightComponent::end()
 {
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
@@ -184,7 +184,7 @@ void SunLightComponent::build_render_light(Render_Sun& light)
 	light.direction = glm::normalize(-transform[2]);
 }
 
-void SunLightComponent::on_init()
+void SunLightComponent::start()
 {
 	Render_Sun light;
 	build_render_light(light);
@@ -198,12 +198,12 @@ void SunLightComponent::on_init()
 
 		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>();
 		s->dont_serialize_or_edit = true;
-		editor_arrow = s->instance_id;
-		editor_billboard = b->instance_id;
+		editor_arrow = s->get_instance_id();
+		editor_billboard = b->get_instance_id();
 	}
 }
 
-void SunLightComponent::on_deinit()
+void SunLightComponent::end()
 {
 	idraw->get_scene()->remove_sun(light_handle);
 
@@ -226,7 +226,6 @@ void SunLightComponent::on_changed_transform()
 SunLightComponent::~SunLightComponent() {}
 PointLightComponent::~PointLightComponent() {}
 SpotLightComponent::~SpotLightComponent() {}
-SpotLightComponent::SpotLightComponent() {}
 #include "Render/Render_Volumes.h"
 
 #define REG_BOOL_W_CUSTOM(name, flags, custom, hint) make_bool_property_custom(#name,offsetof(TYPE_FROM_START, name), flags, hint, custom)
@@ -242,9 +241,10 @@ PropertyInfo make_bool_property_custom(const char* name, uint16_t offset, uint32
 CLASS_H(SkylightComponent,EntityComponent)
 public:
 	SkylightComponent() {
+		set_call_init_in_editor(true);
 	}
 
-	void on_init() override {
+	void start() override {
 
 		mytexture = new Texture; // g_imgs.install_system_texture("_skylight");
 		Render_Skylight sl;
@@ -253,7 +253,7 @@ public:
 
 		handle = idraw->get_scene()->register_skylight(sl);
 	}
-	void on_deinit() override {
+	void end() override {
 		idraw->get_scene()->remove_skylight(handle);
 		delete mytexture;
 		mytexture = nullptr;
@@ -300,3 +300,14 @@ public:
 	static const PropertyInfoList* get_props() = delete;
 };
 CLASS_IMPL(SkylightEntity);
+
+SpotLightComponent::SpotLightComponent() {
+	set_call_init_in_editor(true);
+}
+PointLightComponent::PointLightComponent() {
+	set_call_init_in_editor(true);
+}
+
+SunLightComponent::SunLightComponent() {
+	set_call_init_in_editor(true);
+}

@@ -9,15 +9,16 @@
 CLASS_H(ArrowComponent,EntityComponent)
 public:
 	ArrowComponent() {
+		set_call_init_in_editor(true);
 		arrowModel = GetAssets().find_assetptr_unsafe<Model>("arrowModel.cmdl");
 		dont_serialize_or_edit = true;	// default to true
 	}
 
-	void on_init() {
+	void start() override {
 		renderable = idraw->get_scene()->register_obj();
 		update_object();
 	}
-	void on_deinit() {
+	void end() override {
 		idraw->get_scene()->remove_obj(renderable);
 	}
 	void on_changed_transform() override {

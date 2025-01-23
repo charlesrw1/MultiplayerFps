@@ -22,12 +22,34 @@ CLASS_IMPL(MeshColliderComponent);
 
 using namespace physx;
 
-void PhysicsComponentBase::on_init()
+void PhysicsComponentBase::fetch_new_transform()
+{
+	ASSERT(get_is_simulating());
+	ASSERT(has_initialized());
+	auto pose = physxActor->getGlobalPose();
+	last_position = next_position;
+	last_rot = next_rot;
+	next_position = physx_to_glm(pose.p);
+	next_rot = physx_to_glm(pose.q);
+	set_ticking(true);
+}
+void PhysicsComponentBase::update()
+{
+	// interpolate
+	float alpha = eng->get_frame_remainder()/eng->get_fixed_tick_interval();
+	auto ip = glm::mix(last_position, next_position,alpha);
+	auto iq = glm::slerp(last_rot, next_rot, alpha);
+	auto mat = glm::translate(glm::mat4(1),ip);
+	mat = mat *  glm::mat4_cast(iq);
+	get_owner()->set_ws_transform(mat);
+}
+
+void PhysicsComponentBase::start()
 {
 	if (eng->is_editor_level()) {
 		auto shape = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
 		shape->dont_serialize_or_edit = true;
-		editor_shape_id = shape->instance_id;
+		editor_shape_id = shape->get_instance_id();
 		auto mb = get_editor_meshbuilder();
 		mb->use_background_color = true;
 		mb->mb.Begin();
@@ -69,10 +91,15 @@ void PhysicsComponentBase::on_init()
 	// call down to derived
 	add_actor_shapes();
 
+	set_ticking(false);
+	// latch physics interpolation
+	next_position = get_owner()->get_ls_position();
+	next_rot = get_owner()->get_ls_rotation();
+
 	update_mass();
 }
 
-void PhysicsComponentBase::on_deinit()
+void PhysicsComponentBase::end()
 {
 	if (editor_shape_id != 0) {
 		auto shapeptr = eng->get_level()->get_entity(editor_shape_id);
@@ -204,7 +231,7 @@ PhysicsComponentBase::~PhysicsComponentBase()
 {
 }
 PhysicsComponentBase::PhysicsComponentBase() {
-	
+	set_call_init_in_editor(true);
 }
 
 bool PhysicsComponentBase::get_is_actor_static() const {

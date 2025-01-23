@@ -9,8 +9,8 @@ public:
 	BillboardComponent();
 	~BillboardComponent();
 
-	void on_init() override;
-	void on_deinit() override;
+	void start() override;
+	void end() override;
 	void editor_on_change_property() override;
 	void on_changed_transform() override;
 	static const PropertyInfoList* get_props() {

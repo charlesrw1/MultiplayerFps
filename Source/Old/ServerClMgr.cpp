@@ -117,7 +117,8 @@ void RemoteClient::Update()
 		return;
 	}
 
-	next_snapshot_time -= eng->get_tick_interval();
+	ASSERT(0);
+	//next_snapshot_time -= eng->get_tick_interval();
 	if (next_snapshot_time > 0.f)
 		return;
 
@@ -127,7 +128,8 @@ void RemoteClient::Update()
 	ByteWriter writer(buffer, MAX_PAYLOAD_SIZE);
 
 	writer.WriteByte(SV_TICK);
-	writer.WriteLong(eng->get_game_tick());
+	ASSERT(0);
+	//writer.WriteLong(eng->get_game_tick());
 
 	writer.WriteByte(SV_SNAPSHOT);
 	static ConfigVar never_delta("sv.never_delta", "0",CVAR_BOOL|CVAR_DEV, "");

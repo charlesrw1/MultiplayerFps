@@ -7,14 +7,16 @@
 #include "Game/Entity.h"
 CLASS_IMPL(BillboardComponent);
 
-BillboardComponent::BillboardComponent() {}
+BillboardComponent::BillboardComponent() {
+	set_call_init_in_editor(true);
+}
 BillboardComponent::~BillboardComponent() {
 	
 	assert(dynamicMaterial == nullptr);
 	assert(!handle.is_valid());
 }
 
-void BillboardComponent::on_init() {
+void BillboardComponent::start() {
 	dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 
@@ -24,7 +26,7 @@ void BillboardComponent::on_init() {
 	fill_out_render_obj(obj);
 	idraw->get_scene()->update_obj(handle, obj);
 }
-void BillboardComponent::on_deinit() {
+void BillboardComponent::end() {
 
 	imaterials->free_dynamic_material(dynamicMaterial);
 	idraw->get_scene()->remove_obj(handle);

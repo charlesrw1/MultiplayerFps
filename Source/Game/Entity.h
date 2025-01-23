@@ -78,9 +78,6 @@ public:
 
 	void destroy();
 
-	// called every game tick when entity has tick enabled
-	virtual void update() override {}
-
 	template<typename T>
 	T* get_first_component() {
 		for (int i = 0; i < all_components.size(); i++)
@@ -165,20 +162,14 @@ public:
 
 	const std::vector<Entity*>& get_all_children() const { return children; }
 
-	EntityPtr<Entity> get_self_ptr() const { return { instance_id }; }
+	EntityPtr<Entity> get_self_ptr() const { return { get_instance_id() }; }
 
 	static const PropertyInfoList* get_props();
 
 	void invalidate_transform(EntityComponent* skipthis);
 
-#ifndef NO_EDITOR
-	virtual bool editor_compile() { return true; }
-	virtual bool editor_only() const { return false; }
-	virtual void editor_begin() {}
-	virtual void editor_tick() {}
 	virtual void editor_on_change_properties() {}
 	std::string editor_name;
-#endif
 
 	bool is_selected_in_editor() const {
 		return selected_in_editor;
@@ -226,12 +217,6 @@ private:
 	glm::quat rotation = glm::quat();
 	glm::vec3 scale = glm::vec3(1.f);
 	glm::mat4 cached_world_transform = glm::mat4(1);
-
-	// called when entity spawns in game only
-	virtual void start() {}
-
-	// called when entity is destroyed in game only
-	virtual void end() {}
 
 	bool selected_in_editor = false;
 	bool world_transform_is_dirty = true;

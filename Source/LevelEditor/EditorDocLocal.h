@@ -91,7 +91,7 @@ private:
 	struct Node {
 		Node() {}
 		Node(ObjectOutliner* oo, Entity* initfrom) {
-			handle = initfrom->instance_id;
+			handle = initfrom->get_instance_id();
 			auto& children = initfrom->get_all_children();
 			for (auto& c : children) {
 				if (!c->dont_serialize_or_edit) {
@@ -153,7 +153,7 @@ private:
 	uint64_t component_context_menu = 0;
 
 	void on_select_component(EntityComponent* ec) {
-		selected_component = ec->instance_id;
+		selected_component = ec->get_instance_id();
 		refresh_grid();
 	}
 

@@ -1,13 +1,9 @@
-
 #include "Types.h"
 #include "Level.h"
 #include "BasePlayer.h"
 #include "GameEngineLocal.h"
-
 #include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"
-
-
 
 void GameEngineLocal::login_new_player(uint32_t index) {
 

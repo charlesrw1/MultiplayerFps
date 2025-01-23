@@ -20,36 +20,7 @@ public:
 
 	void destroy();
 
-private:
-
-	// callbacks
-	// called after component had properties unserialized
-	// use to get handles, setup state
-	virtual void on_init() {}
-
-	// called when component is being removed, remove all handles
-	virtual void on_deinit() {}
-
-public:
-	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
-	virtual void on_changed_transform() {}
-
-	// components are ticked every frame (todo)
-	virtual void update() override {}
-
-	// entity owner of this component
 	Entity* get_owner() const { return entity_owner; }
-
-
-#ifndef NO_EDITOR
-	// compile any data relevant to the node
-	virtual bool editor_compile() { return true; }
-	virtual void editor_on_change_property() {}
-	bool editor_is_selected = false;
-	bool editor_is_editor_only = false;	// set in CTOR
-#endif
-
-	static const PropertyInfoList* get_props() = delete;
 
 	bool get_is_native_component() const { return is_native_componenent; }
 
@@ -60,7 +31,18 @@ public:
 		return get_ws_transform()[3];
 	}
 
+	static const PropertyInfoList* get_props() = delete;
 protected:
+	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
+	virtual void on_changed_transform() {}
+
+#ifndef NO_EDITOR
+	// compile any data relevant to the node
+	virtual bool editor_compile() { return true; }
+	virtual void editor_on_change_property() {}
+	bool editor_is_selected = false;
+	bool editor_is_editor_only = false;	// set in CTOR
+#endif
 
 private:
 
@@ -87,11 +69,4 @@ private:
 	friend class Level;
 
 public:
-};
-
-CLASS_H(EmptyComponent, EntityComponent)
-public:
-	~EmptyComponent() override {}
-
-	static const PropertyInfoList* get_props() = delete;
 };

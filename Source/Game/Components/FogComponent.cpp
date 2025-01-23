@@ -6,7 +6,9 @@
 
 CLASS_H(FogComponent, EntityComponent)
 public:
-
+	FogComponent() {
+		set_call_init_in_editor(true);
+	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(FogComponent)
 			REG_INT_W_CUSTOM(f.inscattering_color,PROP_DEFAULT,"","ColorUint"),
@@ -19,11 +21,11 @@ public:
 		END_PROPS(FogComponent)
 	}
 
-	void on_init() {
+	void start() {
 		f.height = get_ws_position().y + height_offset;
 		handle = idraw->get_scene()->register_fog(f);
 	}
-	void on_deinit() {
+	void end() {
 		idraw->get_scene()->remove_fog(handle);
 	}
 	void on_changed_transform() {

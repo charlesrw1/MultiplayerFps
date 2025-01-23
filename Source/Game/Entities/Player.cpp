@@ -323,14 +323,14 @@ void Player::get_view(glm::mat4& viewMat, float& fov)
 		auto camera_pos = glm::vec3(pos.x, 6.0, pos.z - 6);
 		auto dir_mat = glm::lookAt(glm::vec3(0), glm::vec3(dir.x,-0.1f,dir.z), glm::vec3(0, 1, 0));
 		auto dir_quat = glm::quat(dir_mat);
-		this->view_quat = damp_dt_independent(dir_quat, this->view_quat, bike_view_damp, eng->get_tick_interval());
+		this->view_quat = damp_dt_independent(dir_quat, this->view_quat, bike_view_damp, eng->get_dt());
 		auto actual_dir = glm::inverse(this->view_quat) * glm::vec3(0, 0, 1);
 
 		vec3 front = dir;// AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
 		camera_pos = get_ws_position() + vec3(0, 3.0, 0) - front * 2.5f + side * 0.f;
 
-		this->view_pos = damp_dt_independent(camera_pos, this->view_pos, bike_view_damp, eng->get_tick_interval());
+		this->view_pos = damp_dt_independent(camera_pos, this->view_pos, bike_view_damp, eng->get_dt());
 
 		//viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
 
@@ -728,7 +728,7 @@ void Player::update()
 void Player::on_foot_update()
 {
 	if (wall_jump_cooldown > 0)
-		wall_jump_cooldown -= eng->get_tick_interval();
+		wall_jump_cooldown -= eng->get_dt();
 
 
 	auto moveAction = inputPtr->get("game/move");
@@ -762,7 +762,7 @@ void Player::on_foot_update()
 	float speed = glm::length(velocity);
 
 	if (speed >= 0.0001) {
-		float dropamt = friction_value * speed * eng->get_tick_interval();
+		float dropamt = friction_value * speed * eng->get_dt();
 		float newspd = speed - dropamt;
 		if (newspd < 0)
 			newspd = 0;
@@ -801,7 +801,7 @@ void Player::on_foot_update()
 	float wishspeed = inputlen * maxspeed_val;
 	float addspeed = wishspeed - dot(xz_velocity, wishdir);
 	addspeed = glm::max(addspeed, 0.f);
-	float accelspeed = acceleation_val * wishspeed * eng->get_tick_interval();
+	float accelspeed = acceleation_val * wishspeed * eng->get_dt();
 	accelspeed = glm::min(accelspeed, addspeed);
 	xz_velocity += accelspeed * wishdir;
 
@@ -812,12 +812,12 @@ void Player::on_foot_update()
 		xz_velocity = vec3(0);
 	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
 	
-	velocity.y -= 10.0 * eng->get_tick_interval();
+	velocity.y -= 10.0 * eng->get_dt();
 
 	uint32_t flags = 0;
 
 	glm::vec3 out_vel;
-	ccontroller->move(velocity*(float)eng->get_tick_interval(), eng->get_tick_interval(), 0.001f, flags, out_vel);
+	ccontroller->move(velocity*(float)eng->get_dt(), eng->get_dt(), 0.001f, flags, out_vel);
 	
 	velocity = out_vel;
 	action = (flags & CCCF_BELOW) ? Action_State::Idle : Action_State::Falling;
@@ -927,7 +927,7 @@ void Player::on_foot_update()
 	 player_capsule->height = 1.7;
 	 player_capsule->radius = 0.3;
 
-	 tickEnabled = true;
+	 set_ticking(true);
  }
 
 CLASS_H(CoverPositionMarker,Entity)

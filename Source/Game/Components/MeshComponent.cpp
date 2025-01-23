@@ -19,6 +19,7 @@ MeshComponent::~MeshComponent()
 	assert(!animator && !draw_handle.is_valid());
 }
 MeshComponent::MeshComponent() {
+	set_call_init_in_editor(true);
 }
 glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const
 {
@@ -132,7 +133,7 @@ void MeshComponent::update_handle()
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 
-void MeshComponent::on_init()
+void MeshComponent::start()
 {
 	draw_handle = idraw->get_scene()->register_obj();
 
@@ -186,12 +187,12 @@ void MeshComponent::on_changed_transform()
 void MeshComponent::update()
 {
 	if (animator) {
-		animator->tick_tree_new(eng->get_tick_interval());
+		animator->tick_tree_new(eng->get_dt());
 		get_owner()->invalidate_transform(this);
 	}
 }
 
-void MeshComponent::on_deinit()
+void MeshComponent::end()
 {
 	get_owner()->set_cached_mesh_component(nullptr);
 

@@ -1184,14 +1184,14 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		ImGui::PushID(ec);
 
 		ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-		if (ImGui::Selectable("##selectednode", ec->instance_id == selected_component, selectable_flags, ImVec2(0, 0))) {
+		if (ImGui::Selectable("##selectednode", ec->get_instance_id() == selected_component, selectable_flags, ImVec2(0, 0))) {
 			on_select_component(ec);
 		}
 
 		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[1]) {
 			ImGui::OpenPopup("outliner_ctx_menu");
 			on_select_component(ec);
-			component_context_menu = ec->instance_id;
+			component_context_menu = ec->get_instance_id();
 		}
 		if (ImGui::BeginPopup("outliner_ctx_menu")) {
 
@@ -1303,7 +1303,7 @@ void EdPropertyGrid::draw()
 			}
 			else {
 				if (selected_component == 0)
-					selected_component = comps[0]->instance_id;
+					selected_component = comps[0]->get_instance_id();
 
 				uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
 					ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
@@ -1578,10 +1578,10 @@ void EdPropertyGrid::refresh_grid()
 
 		if (!comps.empty()) {
 			if (selected_component == 0)
-				selected_component = comps[0]->instance_id;
+				selected_component = comps[0]->get_instance_id();
 			if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<EntityComponent>() == nullptr ||
 				eng->get_object(selected_component)->cast_to<EntityComponent>()->get_owner() != entity.get())
-				selected_component = comps[0]->instance_id;
+				selected_component = comps[0]->get_instance_id();
 
 			ASSERT(selected_component != 0);
 

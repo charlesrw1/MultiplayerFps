@@ -46,7 +46,7 @@ public:
 
 	int max_health = 100;
 
-	void on_init() {
+	void start() {
 		current_health = max_health;
 	}
 
@@ -75,8 +75,7 @@ static float max_air_speed = 2;
 
 CLASS_H(ProjectileComponent,EntityComponent)
 public:
-	void on_init() override {
-		if (eng->is_editor_level()) return;
+	void start() override {
 		set_ticking(true);
 		time_created = eng->get_game_time();
 	}
@@ -88,7 +87,7 @@ public:
 		}
 
 		auto pos = get_ws_position();
-		auto newpos = pos +  direction * speed * (float)eng->get_tick_interval();
+		auto newpos = pos +  direction * speed * (float)eng->get_dt();
 		world_query_result res;
 		TraceIgnoreVec ig;
 		ig.push_back(ignore);
@@ -135,8 +134,7 @@ CLASS_IMPL(ProjectileComponent);
 
 CLASS_H(TopDownEnemyComponent, EntityComponent)
 public:
-	void on_init() {
-		if (eng->is_editor_level()) return;
+	void start() override {
 		auto health = get_owner()->get_first_component<TopDownHealthComponent>();
 		ASSERT(health);
 		set_ticking(false);
@@ -190,7 +188,7 @@ public:
 			glm::vec3 left = glm::normalize( glm::cross(front, glm::vec3(0, 1, 0)) );
 			glm::vec3 up = glm::cross(left, front);
 			float amt = intensity*eval_func(time*10.0) * eval_mult(time);
-			printf("%f\n", amt);
+			//printf("%f\n", amt);
 			time += dt;
 			return pos + (left * dir.x + up*dir.y)*amt;
 		}
@@ -223,7 +221,7 @@ public:
 class TopDownPlayer;
 CLASS_H(TopDownCar, EntityComponent)
 public:
-	void on_init() {
+	void start() {
 
 	}
 	void update();
@@ -286,7 +284,7 @@ public:
 			[&]() {
 				if (shoot_cooldown <= 0.0)
 				{
-					Random r(eng->get_game_tick());
+					Random r(eng->get_game_time());
 					
 					int count = 5;
 					for (int i = 0; i < count; i++) {
@@ -305,7 +303,7 @@ public:
 
 						pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0),glm::quat_cast(rotationMatrix),pc->get_owner()->get_ls_scale());
 					}
-					shake.start(0.04);
+					shake.start(0.1);
 					shoot_cooldown = 0.3;
 				}
 			}
@@ -354,7 +352,7 @@ public:
 		if (is_in_car)
 			return;
 
-		if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_tick_interval();
+		if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();
 
 	
 		this->lookdir=glm::vec3(1,0,0);
@@ -381,7 +379,7 @@ public:
 		float len = glm::length(move);
 		if(len>1.0)
 			move = glm::normalize(move);
-		float dt = eng->get_tick_interval();
+		float dt = eng->get_dt();
 		uint32_t flags = 0;
 		glm::vec3 outvel;
 
@@ -401,8 +399,8 @@ public:
 		glm::vec3 camera_dir = glm::normalize(camera_pos - pos);
 
 
-		this->view_pos =  damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_tick_interval());
-		auto finalpos = shake.evaluate(this->view_pos, camera_dir, eng->get_frame_time());
+		this->view_pos =  damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
+		auto finalpos = shake.evaluate(this->view_pos, camera_dir, eng->get_dt());
 
 		viewMat = glm::lookAt(finalpos, finalpos - camera_dir, glm::vec3(0, 1, 0));
 
@@ -439,11 +437,11 @@ CLASS_IMPL(TopDownPlayer);
 
 CLASS_H(TopDownPlayerController, PlayerBase)
 public:
-	void start() {
+	void start() override {
 		auto prefab = GetAssets().find_sync<PrefabAsset>("top_down/player.pfb");
 		player = (TopDownPlayer*)eng->get_level()->spawn_prefab(prefab.get());
 	}
-	void end() {
+	void end() override {
 
 	}
 	void get_view(glm::mat4& viewMat, float& fov) {
@@ -457,8 +455,7 @@ CLASS_IMPL(TopDownPlayerController);
 
 CLASS_H(PlayerTriggerComponent2, EntityComponent)
 public:
-	void on_init() override {
-		if (eng->is_editor_level()) return;
+	void start() override {
 
 		auto ptr = get_owner()->get_first_component<PhysicsComponentBase>();
 		if (ptr) {

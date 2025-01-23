@@ -142,7 +142,7 @@ public:
 		ed_doc.post_node_changes.invoke();
 
 
-		GetAssets().find_async<Model>(modelname.c_str(), [the_handle = ent->instance_id](GenericAssetPtr p) {
+		GetAssets().find_async<Model>(modelname.c_str(), [the_handle = ent->get_instance_id()](GenericAssetPtr p) {
 			if (p) {
 				auto modelP = p.cast_to<Model>();
 				
@@ -407,7 +407,7 @@ public:
 			return;
 		}
 		auto ec = e->create_and_attach_component_type(info);
-		comp_handle = ec->instance_id;
+		comp_handle = ec->get_instance_id();
 
 		ed_doc.on_component_created.invoke(ec);
 	}
@@ -416,7 +416,7 @@ public:
 		auto obj = eng->get_object(comp_handle);
 		ASSERT(obj->is_a<EntityComponent>());
 		auto ec = (EntityComponent*)obj;
-		auto id = ec->instance_id;
+		auto id = ec->get_instance_id();
 		ec->destroy();
 		ed_doc.on_component_deleted.invoke(id);
 		comp_handle = 0;
@@ -433,7 +433,7 @@ class RemoveComponentCommand  : public Command
 public:
 	RemoveComponentCommand(Entity* e, EntityComponent* which) {
 		ent = e->get_self_ptr();
-		comp_handle = which->instance_id;
+		comp_handle = which->get_instance_id();
 		info = &which->get_type();
 	}
 	void execute() {
@@ -441,7 +441,7 @@ public:
 		auto obj = eng->get_object(comp_handle);
 		ASSERT(obj->is_a<EntityComponent>());
 		auto ec = (EntityComponent*)obj;
-		auto id = ec->instance_id;
+		auto id = ec->get_instance_id();
 		ec->destroy();
 		ed_doc.on_component_deleted.invoke(id);
 		comp_handle = 0;
@@ -454,7 +454,7 @@ public:
 			return;
 		}
 		auto ec = e->create_and_attach_component_type(info);
-		comp_handle = ec->instance_id;
+		comp_handle = ec->get_instance_id();
 	}
 	std::string to_string() override {
 		return "Remove Component";

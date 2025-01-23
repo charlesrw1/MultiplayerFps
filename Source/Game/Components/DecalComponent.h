@@ -8,8 +8,8 @@ public:
 	~DecalComponent();
 	DecalComponent();
 
-	void on_init() override;
-	void on_deinit() override;
+	void start() override;
+	void end() override;
 	void on_changed_transform() override;
 	void editor_on_change_property() override;
 	static const PropertyInfoList* get_props();

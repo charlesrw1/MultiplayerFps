@@ -25,8 +25,9 @@ public:
 	PhysicsComponentBase();
 	~PhysicsComponentBase();
 
-	void on_init() override;
-	void on_deinit() override;
+	void start() override;
+	void end() override;
+	void update() override;
 	void on_changed_transform() override;
 
 	bool get_is_kinematic() const { return !is_static && !simulate_physics; }
@@ -82,6 +83,10 @@ protected:
 
 	MeshBuilderComponent* get_editor_meshbuilder() const;
 private:
+
+	friend class PhysicsManImpl;
+	void fetch_new_transform();
+
 	// override this
 	virtual void add_actor_shapes() {}
 	virtual void add_editor_shapes() {}
@@ -110,6 +115,12 @@ private:
 	physx::PxRigidActor* physxActor = nullptr;
 
 	uint64_t editor_shape_id = 0;
+
+	// will interpolate position if simulated
+	glm::vec3 last_position = glm::vec3(0.f);
+	glm::quat last_rot = glm::quat();
+	glm::vec3 next_position = glm::vec3(0.f);
+	glm::quat next_rot = glm::quat();
 };
 
 

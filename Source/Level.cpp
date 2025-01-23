@@ -117,7 +117,7 @@ Entity* Level::spawn_entity_from_classtype(const ClassTypeInfo& ti)
 void Level::destroy_entity(Entity* e)
 {
 	if (!e) return;
-	uint64_t id = e->instance_id;
+	uint64_t id = e->get_instance_id();
 	sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 	e->destroy_internal();
 	delete e;
@@ -133,7 +133,7 @@ void Level::destroy_entity(Entity* e)
 void Level::destroy_component(EntityComponent* ec)
 {
 	if (!ec) return;
-	uint64_t id = ec->instance_id;
+	uint64_t id = ec->get_instance_id();
 	sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
 	ec->destroy_internal();
 	delete ec;
@@ -236,21 +236,21 @@ void Level::initialize_new_entity_safe(Entity* e)
 void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 	ASSERT(e);
 	ASSERT(e->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
-	ASSERT(e->instance_id==0);
+	ASSERT(e->get_instance_id()==0);
 
 	e->post_unserialization(get_next_id_and_increment());
 
-	ASSERT(all_world_ents.find(e->instance_id) == nullptr);
-	ASSERT(e->instance_id!=0);
+	ASSERT(all_world_ents.find(e->get_instance_id()) == nullptr);
+	ASSERT(e->get_instance_id()!=0);
 
-	all_world_ents.insert(e->instance_id, e);
+	all_world_ents.insert(e->get_instance_id(), e);
 
 	for (int i = 0; i < e->all_components.size(); i++) {
 		auto& c = e->all_components[i];
-		ASSERT(c->instance_id == 0);
+		ASSERT(c->get_instance_id() == 0);
 		c->post_unserialization(get_next_id_and_increment());
-		ASSERT(all_world_ents.find(c->instance_id) == nullptr);
-		all_world_ents.insert(c->instance_id, c);
+		ASSERT(all_world_ents.find(c->get_instance_id()) == nullptr);
+		all_world_ents.insert(c->get_instance_id(), c);
 	}
 
 	for (auto child : e->get_all_children())
@@ -310,7 +310,7 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 		for (auto o : objs) {
 			ASSERT(o.second);
 			o.second->post_unserialization(get_next_id_and_increment());
-			all_world_ents.insert(o.second->instance_id, o.second);
+			all_world_ents.insert(o.second->get_instance_id(), o.second);
 		}
 		scene.unserialize_post_assign_ids();
 
@@ -334,13 +334,13 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 {
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());
-	all_world_ents.insert(c->instance_id, c);
+	all_world_ents.insert(c->get_instance_id(), c);
 	c->initialize_internal();
 }
 
 void Level::set_local_player(Entity* e) {
 	ASSERT(e);
-	local_player_id = e->instance_id;
+	local_player_id = e->get_instance_id();
 }
 
 Entity* Level::spawn_prefab(PrefabAsset* asset)

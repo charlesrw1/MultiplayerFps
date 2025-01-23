@@ -73,7 +73,9 @@ void Server::start()
 
 Frame2* Server::GetSnapshotFrame()
 {
-	return &frame_storage.get_frame(eng->get_game_tick());
+	ASSERT(0);
+	return nullptr;
+	//return &frame_storage.get_frame(eng->get_game_tick());
 }
 
 

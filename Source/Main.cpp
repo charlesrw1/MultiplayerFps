@@ -862,7 +862,6 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	this->level = std::make_unique<Level>();
 	this->level->create(loadedLevel, this_is_for_editor);
 
-	tick = 0;
 	time = 0.0;
 	set_tick_rate(60.f);
 
@@ -1465,54 +1464,51 @@ void GameEngineLocal::game_update_tick()
 {
 	CPUFUNCTIONSTART;
 
-	DebugShapeCtx::get().fixed_update_start();
+	auto fixed_update = [&](double dt) {
+		DebugShapeCtx::get().fixed_update_start();
+		g_physics.simulate_and_fetch(dt);
+	};
+	auto update = [&](double dt) {
+		if (!is_editor_level())
+			GameInputSystem::get().tick_users(dt);
+		level->update_level();
+	};
+	const double dt = frame_time;
 
-	assert(level);
+	double secs_per_tick = tick_interval;
+	frame_remainder += dt;
+	int num_ticks = (int)floor(frame_remainder / secs_per_tick);
+	frame_remainder -= num_ticks * secs_per_tick;
 
-
-
-	//if (!is_host())
-	//	cl->SendMovesAndMessages();
-
-	time = tick * tick_interval;
+	float orig_ft = frame_time;
+	float orig_ti = tick_interval;
 	
-	// tick input, this will execute event callbacks
-	if (!level->is_editor_level())
-		GetGInput().tick_users(eng->get_tick_interval());
+	frame_time *= g_slomo.get_float();
+	tick_interval *= g_slomo.get_float();
 
-	//build_physics_world(0.f);
+	// physics update
 
-	// update entities+components
-	level->update_level();
+	for (int i = 0; i < num_ticks; i++) {
+		fixed_update(tick_interval);
 
-	// update the physics, for physics driven objects, their transforms are updated in here
-	g_physics.simulate_and_fetch(tick_interval);
+		if (state != Engine_State::Game)
+			break;
+	}
 
-	tick += 1;
+	// call level update
+	update(frame_time);
 
-	//if (is_host()) {
-		// build physics world now as ReadPackets() executes player commands
-		//sv->ReadPackets();
-		//sv->make_snapshot();
-		//for (int i = 0; i < sv->clients.size(); i++)
-		//	sv->clients[i].Update();
-	//}
+	time += frame_time;
 
-	//if (!is_host()) {
-	//	cl->ReadPackets();
-	//	cl->run_prediction();
-	//	tick += 1;
-	//}
-
-	// fixme:
-
+	frame_time = orig_ft;
+	tick_interval = orig_ti;
 }
 
 void perf_tracker()
 {
 	static std::vector<float> time(200,0.f);
 	static int index = 0;
-	time.at(index) = eng->get_frame_time();
+	time.at(index) = eng->get_dt();
 	index = index + 1;
 	index %= 200;
 
@@ -1630,40 +1626,10 @@ void GameEngineLocal::loop()
 			continue; // goto next frame
 			break;
 		case Engine_State::Game: {
-			double secs_per_tick = tick_interval;
-			frame_remainder += dt;
-			int num_ticks = (int)floor(frame_remainder / secs_per_tick);
-			frame_remainder -= num_ticks * secs_per_tick;
-
-			//if (!is_host()) {
-			//	frame_remainder += cl->adjust_time_step(num_ticks);
-			//}
-			float orig_ft = frame_time;
-			float orig_ti = tick_interval;
-
-			//num_ticks = 1;
-			//tick_interval = frame_time;
-
-			frame_time *= g_slomo.get_float();
-			tick_interval *= g_slomo.get_float();
-
-			//printf("%d\n", num_ticks);
-			num_ticks = 1;
-			for (int i = 0; i < num_ticks; i++) {
-
-				game_update_tick();
-
-				// if update_tick() causes game to end
-				if (state != Engine_State::Game)
-					break;
-			}
+			game_update_tick();
 
 			if (state != Engine_State::Game)
 				continue;	// goto next frame (to exit or change map)
-
-
-			frame_time = orig_ft;
-			tick_interval = orig_ti;
 		}break;
 		
 		}

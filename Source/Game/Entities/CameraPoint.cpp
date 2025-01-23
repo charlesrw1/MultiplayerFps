@@ -14,8 +14,9 @@ CLASS_H(FakeCameraComponent, EntityComponent)
 public:
 	FakeCameraComponent() {
 		dont_serialize_or_edit = true;
+		set_call_init_in_editor(true);
 	}
-	void on_init() override {
+	void start() override {
 		mbview = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
 		mbview->use_transform = false;
 		mbview->use_background_color = true;

@@ -40,7 +40,7 @@ public:
 
 		float speed = length(velocity);
 		if (speed >= 0.0001) {
-			float dropamt = ground_friction * speed * eng->get_tick_interval();
+			float dropamt = ground_friction * speed * eng->get_dt();
 			float newspd = speed - dropamt;
 			if (newspd < 0)
 				newspd = 0;
@@ -48,7 +48,7 @@ public:
 			velocity.x *= factor;
 			velocity.z *= factor;
 		}
-		float dt = eng->get_tick_interval();
+		float dt = eng->get_dt();
 		switch (pathfind_state)
 		{
 		case going_towards_waypoint: {
@@ -127,7 +127,7 @@ public:
 
 	}
 	void start() override {
-		tickEnabled = true;	// tick me
+		set_ticking(true);
 	}
 	void update() override;
 };

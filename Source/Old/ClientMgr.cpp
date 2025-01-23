@@ -131,13 +131,14 @@ void Client::HandleServerPacket(ByteReader& buf)
 		case SV_TICK:
 		{
 			int server_tick = buf.ReadLong();	// this is the server's current tick
-			float server_time = server_tick * eng->get_tick_interval();
+			float server_time = server_tick * eng->get_dt();
 			time_delta = eng->get_game_time() - server_time;
 
 			// hard reset the time values
 			if (abs(time_delta) > time_reset_threshold.get_float()) {
 				sys_print(Debug, "reset time %f\n", time_delta);
-				eng->set_game_tick( server_tick );
+				ASSERT(0);
+				//eng->set_game_tick( server_tick );
 				eng->set_game_time( server_time );
 				time_delta = 0.0;
 			}
@@ -209,7 +210,8 @@ void Client::SendMovesAndMessages()
 	// input format
 	// tick of command
 	// num commands total
-	writer.WriteLong(eng->get_game_tick());
+	ASSERT(0);
+	//writer.WriteLong(eng->get_game_tick());
 
 
 	int total_commands =  glm::min(server.out_sequence + 1, 8);

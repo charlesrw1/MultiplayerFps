@@ -45,7 +45,7 @@ ADD_TO_DEBUG_MENU(bike_vars_menu);
 #include "Debug.h"
 void BikeEntity::update()
 {
-	const float dt = eng->get_tick_interval();
+	const float dt = eng->get_dt();
 
 
 	float air_friction = bike_friction;
@@ -63,7 +63,7 @@ void BikeEntity::update()
 	}
 
 	glm::vec3 velocity = bike_direction * forward_speed;
-	velocity.y -= 10.f * eng->get_tick_interval();	// not integrated
+	velocity.y -= 10.f * eng->get_dt();	// not integrated
 	glm::vec3 outvel;
 	uint32_t outflags;
 	ccontrol->move(velocity * dt, dt, 0.001, outflags,outvel);

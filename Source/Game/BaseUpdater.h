@@ -12,20 +12,16 @@ class Level;
 
 CLASS_H(BaseUpdater, ClassBase)
 public:
+	virtual void start() {}
 	virtual void update() {}
+	virtual void end() {}
 
 	void init_updater();
 	void shutdown_updater();
 	void set_ticking(bool shouldTick);
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(BaseUpdater)
-			REG_BOOL(tickEnabled,PROP_DEFAULT,"0")
-		END_PROPS(BaseUpdater)
-	}
+	static const PropertyInfoList* get_props() = delete;
 
-	uint64_t instance_id = 0;	// instance id
-	bool tickEnabled = false;
 
 	// Editor Data >>>>
 	void set_editor_transient(bool transient) { editor_transient = true; }
@@ -38,12 +34,21 @@ public:
 	// <<<<<<<<<<<<<<<<
 	bool dont_serialize_or_edit = false;
 
+	void set_call_init_in_editor(bool b) {
+		call_init_in_editor = b;
+	}
+	bool get_call_init_in_editor() const {
+		return call_init_in_editor;
+	}
+
 	void post_unserialization(uint64_t id) {
 		ASSERT(init_state == initialization_state::CONSTRUCTOR);
 		this->instance_id = id;
 		init_state = initialization_state::HAS_ID;
 	}
-
+	uint64_t get_instance_id() const {
+		return instance_id;
+	}
 protected:
 	enum class initialization_state : uint8_t {
 		CONSTRUCTOR,	// base state
@@ -54,4 +59,8 @@ protected:
 
 	friend class UnserializedSceneFile;
 	friend class SerializeTestWorkbench;
+private:
+	uint64_t instance_id = 0;	// instance id
+	bool call_init_in_editor = false;
+	bool tickEnabled = false;
 };

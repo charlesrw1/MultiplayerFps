@@ -71,7 +71,7 @@ public:
 
 		for (int i = 0; i < e->all_components.size(); i++) {
 			auto& c = e->all_components[i];
-			ASSERT(c->instance_id == 0);
+			ASSERT(c->get_instance_id() == 0);
 			all.insert(c);
 		}
 

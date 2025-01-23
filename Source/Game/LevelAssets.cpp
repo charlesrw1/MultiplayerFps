@@ -109,7 +109,7 @@ bool PrefabAsset::load_asset(ClassBase*&)
 		// add instance ids here for diff'ing entity references
 		uint64_t id = 1ull << 63ull;
 		for (auto obj : sceneFile->get_objects()) {
-			obj.second->instance_id = ++id;
+			obj.second->post_unserialization(++id);
 			instance_ids_for_diffing.insert(id, obj.second);
 		}
 		sceneFile->unserialize_post_assign_ids();

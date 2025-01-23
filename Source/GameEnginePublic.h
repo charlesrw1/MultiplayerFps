@@ -81,14 +81,13 @@ public:
 	double get_game_time() const {
 		return time;
 	}
-	double get_frame_time() const {
+	// update() interval
+	double get_dt() const {
 		return frame_time;
 	}
-	double get_tick_interval() const {
+	// physics update() interval
+	double get_fixed_tick_interval() const {
 		return tick_interval;
-	}
-	uint32_t get_game_tick() const {
-		return tick;
 	}
 	double get_frame_remainder() const {
 		return frame_remainder;
@@ -99,9 +98,6 @@ public:
 		assert(get_state() != Engine_State::Game);
 		tick_interval = next_interval;
 	}
-	void set_game_tick(uint32_t newtick) {
-		tick = newtick;
-	}
 	void set_game_time(double newtime) {
 		time = newtime;
 	}
@@ -110,7 +106,6 @@ public:
 	virtual MulticastDelegate<bool>& get_on_map_delegate() = 0;	// called after a map was loaded (both editor and game, called after gamemode.init)protected:
 
 	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
-	uint32_t tick = 0;				// this is the discretized time tick
 	double frame_time = 0.0;	// total frame time of program
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 1.0/60.0;	// 1/tick_rate

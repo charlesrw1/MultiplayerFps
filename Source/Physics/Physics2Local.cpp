@@ -339,7 +339,7 @@ static Color32 randcolor32(uint32_t number)
 	  {
 		  auto phys_comp = (PhysicsComponentBase*)activeTransforms[i]->userData;
 		  if (phys_comp) {
-			  phys_comp->get_owner()->set_ws_transform(phys_comp->get_transform());
+			  phys_comp->fetch_new_transform();
 		  }
 	  }
 

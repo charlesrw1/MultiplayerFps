@@ -8,8 +8,8 @@ class BillboardComponent;
 class ArrowComponent;
 CLASS_H(SpotLightComponent, EntityComponent)
 public:
-	void on_init() override;
-	void on_deinit() override;
+	void start() override;
+	void end() override;
 	void on_changed_transform() override;
 	~SpotLightComponent() override;
 	SpotLightComponent();
@@ -39,8 +39,9 @@ public:
 
 CLASS_H(PointLightComponent, EntityComponent)
 public:
-	void on_init() override;
-	void on_deinit() override;
+	PointLightComponent();
+	void start() override;
+	void end() override;
 	void on_changed_transform() override;
 	~PointLightComponent() override;
 
@@ -62,11 +63,12 @@ public:
 struct Render_Sun;
 CLASS_H(SunLightComponent, EntityComponent)
 public:
-	void on_init() override;
-	void on_deinit() override;
+	void start() override;
+	void end() override;
 	void on_changed_transform() override;
 	void build_render_light(Render_Sun& light);
 	~SunLightComponent() override;
+	SunLightComponent();
 
 	void editor_on_change_property() override;
 
