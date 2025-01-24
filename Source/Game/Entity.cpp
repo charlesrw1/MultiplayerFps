@@ -52,7 +52,9 @@ public:
 };
 REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 
-
+PropertyInfo GetAtomValueWrapper<EntityPtr<Entity>>::get() {
+	return make_entity_ptr_property<Entity>("", 0, PROP_DEFAULT, nullptr);
+}
 
 // database to map an integer to any type of object, for example models or entities, automatically resolved and editable in the editor
 
@@ -62,7 +64,8 @@ const PropertyInfoList* Entity::get_props() {
 		REG_QUAT(rotation, PROP_DEFAULT),
 		REG_VEC3(scale, PROP_DEFAULT),
 		REG_STDSTRING(editor_name, PROP_DEFAULT),	// edit+serialize
-		REG_STRUCT_CUSTOM_TYPE(parent_bone, PROP_DEFAULT, "EntityBoneParentString")
+		REG_STRUCT_CUSTOM_TYPE(parent_bone, PROP_DEFAULT, "EntityBoneParentString"),
+		REG_BOOL(start_disabled, PROP_DEFAULT,"0")
 	END_PROPS(Entity)
 }
 
@@ -71,29 +74,26 @@ Entity::Entity()
 
 }
 
+void Entity::set_active(bool make_active)
+{
+	if (make_active == is_activated()) return;
+	if (make_active) {
+		activate_internal();
+		for (auto c : get_all_components())
+			c->activate_internal();
+	}
+	else {
+		deactivate_internal();
+		for (auto c : get_all_components())
+			c->deactivate_internal();
+	}
+	ASSERT(make_active == is_activated());
+}
 
 void Entity::initialize_internal()
 {
-	ASSERT(init_state == initialization_state::HAS_ID);
-
-	//// now run register functions
-	//// important!: store the number of components here before running init()s, some components might create components in their functions
-	//// and on_init shouldnt be run twice for them
-	//const size_t num_components_pre_init = all_components.size();
-	//for (int i = 0; i < num_components_pre_init; i++) {
-	//	// insert logic for editor only components here
-	//	auto& c = all_components[i];
-	//	ASSERT(c == root_component || c->parent_comp != nullptr);
-	//	c->initialize_internal();
-	//}
-
-
-	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		start();
-		init_updater();
-	}
-
-	init_state = initialization_state::INITIALIZED;
+	if(!start_disabled || eng->is_editor_level())
+		activate_internal();
 }
 
 void Entity::remove_this(Entity* child)
@@ -129,12 +129,8 @@ void Entity::destroy()
 
 void Entity::destroy_internal()
 {
-	ASSERT(init_state == initialization_state::INITIALIZED);
-
-	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		end();
-		shutdown_updater();
-	}
+	if(init_state == initialization_state::INITIALIZED)
+		deactivate_internal();
 
 	if (get_entity_parent())
 		get_entity_parent()->remove_this(this);
@@ -159,8 +155,6 @@ void Entity::destroy_internal()
 		loop_count++;
 	}
 	ASSERT(all_components.empty());
-
-	init_state = initialization_state::CONSTRUCTOR;
 }
 
 void Entity::parent_to_entity(Entity* other)
@@ -242,7 +236,7 @@ void Entity::remove_this_component_internal(EntityComponent* component_to_remove
 
 Entity::~Entity()
 {
-	ASSERT(init_state == initialization_state::CONSTRUCTOR);
+	ASSERT(init_state != initialization_state::INITIALIZED);
 	ASSERT(all_components.empty());
 }
 

@@ -228,6 +228,7 @@ static Color32 randcolor32(uint32_t number)
 }
  class MyPhysicsCallback : public physx::PxSimulationEventCallback
  {
+ public:
 	 // Inherited via PxSimulationEventCallback
 	 virtual void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count) override
 	 {
@@ -250,20 +251,34 @@ static Color32 randcolor32(uint32_t number)
 			 PhysicsComponentBase* other_obj = (PhysicsComponentBase*)pair.otherActor->userData;
 			 if (!trigger_obj || !other_obj)
 				 continue;
-			 if (pair.status == physx::PxPairFlag::eNOTIFY_TOUCH_FOUND) {
-				 sys_print(Debug, "trigger found\n");
-				 trigger_obj->on_trigger_start.invoke(other_obj);
-			 }
-			 else {
-				 sys_print(Debug, "trigger lost\n");
-				 trigger_obj->on_trigger_end.invoke(other_obj);
-			 }
 
+			 triggered_pairs.push_back({ trigger_obj,other_obj, pair.status == physx::PxPairFlag::eNOTIFY_TOUCH_FOUND });
 		 }
 	 }
 	 virtual void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override
 	 {
 	 }
+
+	 void call_all_triggered() {
+		 for (auto& p : triggered_pairs) {
+			if (p.is_start) {
+				 sys_print(Debug, "trigger found\n");
+				 p.trigger->on_trigger_start.invoke(p.other);
+			 }
+			 else {
+				 sys_print(Debug, "trigger lost\n");
+				  p.trigger->on_trigger_end.invoke(p.other);
+			 }
+		 }
+		 triggered_pairs.clear();
+	 }
+
+	 struct trigger_pair {
+		 PhysicsComponentBase* trigger = nullptr;
+		 PhysicsComponentBase* other = nullptr;
+		 bool is_start = false;
+	 };
+	 std::vector<trigger_pair> triggered_pairs;
  };
  PhysicsManImpl::~PhysicsManImpl()
  {
@@ -328,6 +343,8 @@ static Color32 randcolor32(uint32_t number)
 
 	  scene->simulate(dt);
 	  scene->fetchResults(true/* block */);
+
+	  mycallback->call_all_triggered();
 
 	  // retrieve array of actors that moved
 	  PxU32 nbActiveTransforms;

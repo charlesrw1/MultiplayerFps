@@ -103,6 +103,7 @@ CLASS_H(LevelSerializationContext,ClassBase)
 public:
 	SerializedSceneFile* out = nullptr;
 	UnserializedSceneFile* in = nullptr;
+	BaseUpdater* cur_obj = nullptr;
 	std::string* in_root = nullptr;
 	PrefabAsset* for_prefab = nullptr;
 	PrefabAsset* diffprefab = nullptr;

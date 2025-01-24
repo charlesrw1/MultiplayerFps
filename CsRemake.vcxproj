@@ -155,7 +155,6 @@
     <ClInclude Include="Source\Game\SoftAssetPtr.h" />
     <ClInclude Include="Source\Game\StdEntityTypes.h" />
     <ClInclude Include="Source\Game\WorldSettings.h" />
-    <ClInclude Include="Source\GlmInclude.h" />
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Input\InputAction.h" />
     <ClInclude Include="Source\Input\InputShared.h" />

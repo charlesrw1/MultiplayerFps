@@ -99,9 +99,6 @@
     <ClInclude Include="Source\GameEngineLocal.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\GlmInclude.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Level.h">
       <Filter>Source</Filter>
     </ClInclude>

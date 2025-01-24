@@ -111,7 +111,7 @@ class SerializeEntityPtr : public IPropertySerializer
 
 		auto ent = oent->cast_to<Entity>();
 
-		auto from = build_path_for_object((BaseUpdater*)inst,nullptr);
+		auto from = build_path_for_object((BaseUpdater*)ctx->cur_obj,nullptr);
 		auto to = build_path_for_object((BaseUpdater*)ent,nullptr);
 
 		return serialize_build_relative_path(from.c_str(),to.c_str());
@@ -138,7 +138,7 @@ class SerializeEntityPtr : public IPropertySerializer
 			ASSERT(find->is_a<Entity>());
 			*p = reinterpret_cast<uint64_t>(find);	// to get fixed up later
 
-			ctx->in->add_entityptr_refer((BaseUpdater*)inst);
+			ctx->in->add_entityptr_refer((BaseUpdater*)ctx->cur_obj);
 		}
 	}
 };

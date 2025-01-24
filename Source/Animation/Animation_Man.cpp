@@ -46,9 +46,10 @@ static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
 				AssetDatabase::get().touch_asset(*e);
 		}
 		else if(prop.type==core_type_id::List) {
-			auto size = prop.list_ptr->get_size(inst);
+			auto listptr = prop.get_ptr(inst);
+			auto size = prop.list_ptr->get_size(listptr);
 			for (int j = 0; j < size; j++) {
-				auto ptr = prop.list_ptr->get_index(inst, j);
+				auto ptr = prop.list_ptr->get_index(listptr, j);
 				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list);
 			}
 		}

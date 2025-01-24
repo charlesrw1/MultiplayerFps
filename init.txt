@@ -2,14 +2,15 @@
 thirdperson 1
 
 
-
 #g_draw_physx_scene 31
 
 bind 1 "map top_down/map0.tmap"
 bind 2 "TOGGLE_PLAY_EDIT_MAP"
 
-bind . "g_drawdebugmenu 1"
-bind , "g_drawdebugmenu 0"
+drawconsole 1
+
+bind . "drawconsole 1"
+bind , "drawconsole 0"
 
 bind F1 "r.debug_mode 0"
 bind F2 "r.debug_mode 4"
@@ -48,7 +49,7 @@ file_print_all_openfile_fails 1
 
 RUN_TESTS
 
-r.enable_vsync 0
+r.enable_vsync 1
 
 g_draw_grid 1
 

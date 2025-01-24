@@ -29,3 +29,21 @@ void BaseUpdater::shutdown_updater()
 	if (level && tickEnabled)
 		level->remove_from_update_list(this);
 }
+void BaseUpdater::activate_internal()
+{
+	ASSERT(init_state == initialization_state::HAS_ID);
+	if (!eng->is_editor_level() || get_call_init_in_editor()) {
+		start();
+		init_updater();
+	}
+	init_state = initialization_state::INITIALIZED;
+}
+void BaseUpdater::deactivate_internal()
+{
+	ASSERT(init_state == initialization_state::INITIALIZED);
+	if (!eng->is_editor_level() || get_call_init_in_editor()) {
+		end();
+		shutdown_updater();
+	}
+	init_state = initialization_state::HAS_ID;
+}

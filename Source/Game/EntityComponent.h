@@ -52,7 +52,6 @@ private:
 	}
 
 	void initialize_internal();
-
 	void destroy_internal();
 
 	Entity* entity_owner = nullptr;

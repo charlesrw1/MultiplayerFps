@@ -12,33 +12,24 @@ void EntityComponent::destroy()
 	eng->get_level()->destroy_component(this);
 }
 
+
 void EntityComponent::initialize_internal()
 {
-	ASSERT(init_state == initialization_state::HAS_ID);
-	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		start();
-		init_updater();
-	}
-	init_state = initialization_state::INITIALIZED;
+	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
+		activate_internal();
 }
+
 void EntityComponent::destroy_internal()
 {
-	ASSERT(init_state == initialization_state::INITIALIZED);
+	if(init_state==initialization_state::INITIALIZED)
+		deactivate_internal();
 	ASSERT(entity_owner);
-
-	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		end();
-		shutdown_updater();
-	}
-
 	entity_owner->remove_this_component_internal(this);
 	ASSERT(entity_owner == nullptr);
-
-	init_state = initialization_state::CONSTRUCTOR;
 }
 
 EntityComponent::~EntityComponent() {
-	ASSERT(init_state == initialization_state::CONSTRUCTOR);
+	ASSERT(init_state != initialization_state::INITIALIZED);
 }
 
 const glm::mat4& EntityComponent::get_ws_transform() {

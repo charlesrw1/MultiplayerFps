@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "GlmInclude.h"
+
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
@@ -270,39 +270,6 @@ static void SDLError(const char* msg)
 
 
 extern ConfigVar g_project_name;
-
-void GameEngineLocal::init_sdl_window()
-{
-	ASSERT(!window);
-
-	if (SDL_Init(SDL_INIT_EVERYTHING)) {
-		sys_print(Error,"init sdl failed: %s\n", SDL_GetError());
-		exit(-1);
-	}
-
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
-
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-
-	const char* title = g_project_name.get_string();
-	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	if (!window) {
-		sys_print(Error, "create sdl window failed: %s\n", SDL_GetError());
-		exit(-1);
-	}
-
-	gl_context = SDL_GL_CreateContext(window);
-	sys_print(Debug, "OpenGL loaded\n");
-	gladLoadGLLoader(SDL_GL_GetProcAddress);
-	sys_print(Debug, "Vendor: %s\n", glGetString(GL_VENDOR));
-	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
-	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
-
-	SDL_GL_SetSwapInterval(0);
-}
 
 glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
@@ -1114,6 +1081,7 @@ glm::ivec2 GameEngineLocal::get_game_viewport_size() const
 
 static bool scene_hovered = false;
 
+ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
 
 #include "Framework/MyImguiLib.h"
 void GameEngineLocal::draw_any_imgui_interfaces()
@@ -1132,6 +1100,10 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		get_current_tool()->draw_imgui_public();
 		global_asset_browser.imgui_draw();
 	}
+
+	// draw after to enable docking
+	if (g_drawconsole.get_bool())
+		dbg_console.draw();
 
 	// will only be true if in a tool state
 	if (is_drawing_to_window_viewport() && eng->get_state()==Engine_State::Game) {
@@ -1335,6 +1307,41 @@ GameEngineLocal::GameEngineLocal()
 extern ModelMan mods;
 
 
+
+void GameEngineLocal::init_sdl_window()
+{
+	ASSERT(!window);
+
+	if (SDL_Init(SDL_INIT_EVERYTHING)) {
+		sys_print(Error,"init sdl failed: %s\n", SDL_GetError());
+		exit(-1);
+	}
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+	const char* title = g_project_name.get_string();
+	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	if (!window) {
+		sys_print(Error, "create sdl window failed: %s\n", SDL_GetError());
+		exit(-1);
+	}
+
+	gl_context = SDL_GL_CreateContext(window);
+	sys_print(Debug, "OpenGL loaded\n");
+	gladLoadGLLoader(SDL_GL_GetProcAddress);
+	sys_print(Debug, "Vendor: %s\n", glGetString(GL_VENDOR));
+	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
+	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
+
+	SDL_GL_SetSwapInterval(0);
+}
+
+
 extern void register_input_actions_for_game();
 void GameEngineLocal::init()
 {
@@ -1355,8 +1362,7 @@ void GameEngineLocal::init()
 	is_hosting_game = false;
 	//sv.reset( new Server );
 	//cl.reset( new Client );
-	
-	dbg_console.init();
+
 
 	// window initilization
 	init_sdl_window();
@@ -1498,21 +1504,6 @@ void GameEngineLocal::game_update_tick()
 	tick_interval = orig_ti;
 }
 
-void perf_tracker()
-{
-	static std::vector<float> time(200,0.f);
-	static int index = 0;
-	time.at(index) = eng->get_dt();
-	index = index + 1;
-	index %= 200;
-
-	float avg_ft = 0.f;
-	for (int i = 0; i < time.size(); i++)avg_ft += time.at(i);
-	avg_ft /= 200.f;
-
-	ImGui::Text("Frametime: %f", avg_ft*1000.f);
-
-}
 
 
 // unloads all game state
@@ -1651,12 +1642,6 @@ void GameEngineLocal::loop()
 	}
 }
 
-void draw_console_hook() {
-	dbg_console.draw();
-}
-void Debug_Console::init() {
-	Debug_Interface::get()->add_hook("Console", draw_console_hook);
-}
 
 int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 {

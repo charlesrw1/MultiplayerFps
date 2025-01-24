@@ -18,11 +18,12 @@ CLASS_IMPL(LevelSerializationContext);
 Entity* LevelSerializationContext::get_entity(uint64_t handle)
 {
 	ASSERT(out&&!in);
-	ASSERT(diffprefab);
 	bool is_from_diff = handle & (1ull << 63ull);
 	BaseUpdater* obj = nullptr;
-	if (is_from_diff) 
+	if (is_from_diff) {
+		ASSERT(diffprefab)
 		obj= diffprefab->find_entity(handle);
+	}
 	else
 		obj = eng->get_level()->get_entity(handle);
 	if (obj)
@@ -320,7 +321,10 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 
 		ctx->diffprefab = nullptr;
 		auto diff = find_diff_class(obj,for_prefab,ctx->diffprefab);
+
+		ctx->cur_obj = obj;
 		write_just_props(obj, diff, out, ctx);
+		ctx->cur_obj = nullptr;
 
 		out.write_item_end();
 	};

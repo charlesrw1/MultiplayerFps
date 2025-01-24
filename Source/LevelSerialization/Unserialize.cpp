@@ -204,7 +204,7 @@ void unserialize_one_item_text(
 		LevelSerializationContext ctx;
 		ctx.in = &scene;
 		ctx.in_root = &path;
-
+		ctx.cur_obj = obj;
 		auto res = read_props_to_object(obj, &obj->get_type(), in, {}, &ctx);
 		if (!res.second) {
 			throw std::runtime_error("failed prop parse");
@@ -254,9 +254,10 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 			}
 		}
 		else if(prop.type==core_type_id::List) {
-			auto size = prop.list_ptr->get_size(inst);
+			auto listptr = prop.get_ptr(inst);
+			auto size = prop.list_ptr->get_size(listptr);
 			for (int j = 0; j < size; j++) {
-				auto ptr = prop.list_ptr->get_index(inst, j);
+				auto ptr = prop.list_ptr->get_index(listptr, j);
 				check_props_for_entityptr(ptr, prop.list_ptr->props_in_list);
 			}
 		}

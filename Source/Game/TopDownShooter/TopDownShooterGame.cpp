@@ -540,18 +540,36 @@ CLASS_IMPL(TopDownPlayer);
 CLASS_H(PlayerTriggerComponent2, EntityComponent)
 public:
 	void start() override {
-
 		auto ptr = get_owner()->get_first_component<PhysicsComponentBase>();
 		if (ptr) {
-			ptr->on_trigger_start.add(this, [](EntityComponent*) {
-				sys_print(Debug, "triggered\n");
+			ptr->on_trigger_start.add(this, [&](PhysicsComponentBase* c) {
+				if (already_triggered) return;
+
+				if (c->get_owner() == TopDownGameManager::instance->the_player) {
+					already_triggered = true;
+					for (auto eptr : objects_to_active) {
+						auto e = eptr.get();
+						if(e)
+							e->set_active(true);
+					}
+				}
+
 				});
 		}
 		else {
 			sys_print(Error, "PlayerTriggerComponent needs physics component\n");
 		}
 	}
-	static const PropertyInfoList* get_props() = delete;
+
+	bool already_triggered = false;
+	std::vector<EntityPtr<Entity>> objects_to_active;
+
+	static const PropertyInfoList* get_props() {
+		MAKE_VECTORCALLBACK_ATOM(EntityPtr<Entity>, objects_to_active);
+		START_PROPS(PlayerTriggerComponent2)
+			REG_STDVECTOR(objects_to_active,PROP_DEFAULT)
+		END_PROPS(PlayerTriggerComponent2)
+	}
 
 };
 CLASS_IMPL(PlayerTriggerComponent2);

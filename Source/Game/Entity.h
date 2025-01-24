@@ -52,6 +52,10 @@ public:
 
 	uint64_t handle = 0;
 };
+template<>
+struct GetAtomValueWrapper<EntityPtr<Entity>> {
+	static PropertyInfo get();
+};
 
 template<typename T>
 inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, uint32_t flags, EntityPtr<T>* dummy) {
@@ -198,8 +202,11 @@ public:
 		return parent_bone.name.get_hash() != 0;
 	}
 
-protected:
+	void set_active(bool active);
 
+	bool get_start_disabled() const {
+		return start_disabled;
+	}
 private:
 
 	void post_change_transform_R(bool ws_is_dirty = true, EntityComponent* skipthis = nullptr);
@@ -221,6 +228,7 @@ private:
 	bool selected_in_editor = false;
 	bool world_transform_is_dirty = true;
 
+	bool start_disabled = false;
 
 	// called by Level for init/destruct
 	void initialize_internal();

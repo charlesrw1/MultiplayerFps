@@ -12,6 +12,14 @@ class Level;
 
 CLASS_H(BaseUpdater, ClassBase)
 public:
+
+	// initialization pseudo code:
+	// for obj in scene/prefab:
+	//		obj->pre_start()
+	// for obj in scene/prefab:
+ 	//		if !obj->start_disabled
+	//			obj->start()
+
 	virtual void pre_start() {}
 	virtual void start() {}
 	virtual void update() {}
@@ -22,7 +30,6 @@ public:
 	void set_ticking(bool shouldTick);
 
 	static const PropertyInfoList* get_props() = delete;
-
 
 	// Editor Data >>>>
 	void set_editor_transient(bool transient) { editor_transient = true; }
@@ -50,7 +57,14 @@ public:
 	uint64_t get_instance_id() const {
 		return instance_id;
 	}
+
+	bool is_activated() const {
+		return init_state == initialization_state::INITIALIZED;
+	}
 protected:
+	void activate_internal();
+	void deactivate_internal();
+
 	enum class initialization_state : uint8_t {
 		CONSTRUCTOR,	// base state
 		HAS_ID,		// recieve instance_id

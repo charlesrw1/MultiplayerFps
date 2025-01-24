@@ -62,6 +62,8 @@ void CameraComponent::update_meshbuilder() {
 	mb.PushLine(vs.origin, arrow_origin[3], COLOR_PINK);
 
 	mb.End();
+
+	editor_mbview->on_changed_transform();
 }
 void CameraComponent::get_view(glm::mat4& viewMatrix, float& fov)
 {
