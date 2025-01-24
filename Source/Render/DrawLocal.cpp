@@ -1674,7 +1674,6 @@ static void cull_objects(Frustum& frustum, bool* visible_array, int visible_arra
 }
 
 
-extern View_Setup cursed_view_setup;
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
 	CPUFUNCTIONSTART;

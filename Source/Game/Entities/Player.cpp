@@ -11,7 +11,6 @@
 
 #include "Debug.h"
 
-#include "CameraPoint.h"
 
 #include "Assets/AssetDatabase.h"
 
@@ -41,32 +40,7 @@
 
 #include "BikeEntity.h"
 
-CLASS_H(PlayerNull, PlayerBase)
-public:
 
-	void start() override {
-		camera = eng->get_level()->find_first_of<CameraPoint>();
-	}
-
-	void get_view(
-		glm::mat4& view,
-		float& fov
-	) override {
-		if (!camera)
-			return;
-
-		fov = camera->fov;
-		view = glm::inverse(camera->get_ws_transform());
-
-		//front = AnglesToVector(euler.x, euler.y);
-	}
-
-	// for main menu
-	CameraPoint* camera = nullptr;
-};
-CLASS_IMPL(PlayerNull);
-
-CLASS_IMPL(PlayerBase);
 CLASS_IMPL(Player);
 
 
@@ -843,41 +817,41 @@ void Player::on_foot_update()
 	 eng->set_game_focused(true);
 
 	 inputPtr = GetGInput().register_input_user(0);
-
-	 {
-		 std::vector<const InputDevice*> devices;
-		 GetGInput().get_connected_devices(devices);
-		 int deviceIdx = 0;
-		 for (; deviceIdx < devices.size(); deviceIdx++) {
-			 if (devices[deviceIdx]->type == InputDeviceType::Controller) {
-				 inputPtr->assign_device(devices[deviceIdx]->selfHandle);
-				 break;
-			 }
-		 }
-		 if (deviceIdx == devices.size())
-			 inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
-
-		 GetGInput().device_connected.add(this, [&](handle<InputDevice> handle)
-			 {
-
-				 inputPtr->assign_device(handle);
-			 });
-
-		 inputPtr->on_lost_device.add(this, [&]()
-			 {
-				inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
-			 });
-	 }
-
+//
+//	 {
+//		 std::vector<const InputDevice*> devices;
+//		 GetGInput().get_connected_devices(devices);
+//		 int deviceIdx = 0;
+//		 for (; deviceIdx < devices.size(); deviceIdx++) {
+//			 if (devices[deviceIdx]->type == InputDeviceType::Controller) {
+//				 inputPtr->assign_device(devices[deviceIdx]->selfHandle);
+//				 break;
+//			 }
+//		 }
+//		 if (deviceIdx == devices.size())
+//			 inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
+//
+//		 GetGInput().device_connected.add(this, [&](handle<InputDevice> handle)
+//			 {
+//
+//				 inputPtr->assign_device(handle);
+//			 });
+//
+//		 inputPtr->on_lost_device.add(this, [&]()
+//			 {
+//				inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
+//			 });
+//	 }
+//
 	 inputPtr->enable_mapping("game");
 	 inputPtr->enable_mapping("ui");
 
 	 auto jumpAction = inputPtr->get("game/jump");
 
-	 inputPtr->get("ui/menu")->bind_start_function([this] {
-			 if(hud)
-				 hud->toggle_menu_mode();
-		 });
+	// inputPtr->get("ui/menu")->bind_start_function([this] {
+	//		 if(hud)
+	//			 hud->toggle_menu_mode();
+	//	 });
 
 	 assert(jumpAction);
 

@@ -478,12 +478,10 @@
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Visuals.h" />
-    <ClInclude Include="Source\Game\GameMode.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
     <ClInclude Include="Source\Game\WorldSettings.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Framework\ClassTypePtr.h" />
-    <ClInclude Include="Source\Game\BasePlayer.h" />
     <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
@@ -491,7 +489,6 @@
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
-    <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
     <ClInclude Include="Source\Game\Components\SoundComponent.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
@@ -531,6 +528,7 @@
     <ClInclude Include="Source\LevelEditor\Commands.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
+    <ClInclude Include="Source\Game\Components\CameraComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Old\Client.cpp">
@@ -761,7 +759,6 @@
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\GUILocal.cpp" />
-    <ClCompile Include="Source\Game\GameMode.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
     <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
@@ -772,7 +769,6 @@
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
-    <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
@@ -810,5 +806,6 @@
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
+    <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
   </ItemGroup>
 </Project>

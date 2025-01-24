@@ -11,8 +11,6 @@
 #include "Game/Components/PhysicsComponents.h"
 #include "Framework/MulticastDelegate.h"
 
-#include "Game/BasePlayer.h"
-
 using std::unique_ptr;
 using std::vector;
 
@@ -68,7 +66,7 @@ class HealthComponent;
 class InputUser;
 class CharacterController;
 class BikeEntity;
-CLASS_H(Player, PlayerBase)
+CLASS_H(Player, Entity)
 public:
 
 	Player();
@@ -91,7 +89,7 @@ public:
 	static const PropertyInfoList* get_props() = delete;
 
 	// PlayerBase overrides
-	void get_view(glm::mat4& viewMatrix, float& fov) override;
+	void get_view(glm::mat4& viewMatrix, float& fov);
 	
 	// Entity overrides
 	void update() override;

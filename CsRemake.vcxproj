@@ -50,6 +50,7 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\Game\Components\CameraComponent.h" />
     <ClInclude Include="Source\Old\Client.h" />
     <ClInclude Include="Source\Old\Connection.h" />
     <ClInclude Include="Source\DeferredSpawnScope.h" />
@@ -137,10 +138,8 @@
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\Framework\ObjectSerialization.h" />
     <ClInclude Include="Source\GameEnginePublic.h" />
-    <ClInclude Include="Source\Game\BasePlayer.h" />
     <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
     <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
-    <ClInclude Include="Source\Game\Entities\CameraPoint.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
     <ClInclude Include="Source\Game\Entity.h" />
@@ -148,7 +147,6 @@
     <ClInclude Include="Source\Game\Components\EntityComponentTypes.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
     <ClInclude Include="Source\Game\GameMain.h" />
-    <ClInclude Include="Source\Game\GameMode.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
@@ -238,6 +236,7 @@
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
+    <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Old\Client.cpp" />
     <ClCompile Include="Source\Old\ClientMgr.cpp" />
     <ClCompile Include="Source\Old\Connection.cpp" />
@@ -285,7 +284,6 @@
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
     <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
-    <ClCompile Include="Source\Game\Entities\CameraPoint.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />
@@ -294,7 +292,6 @@
     <ClCompile Include="Source\Game\Game.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
     <ClCompile Include="Source\Game\GameMain.cpp" />
-    <ClCompile Include="Source\Game\GameMode.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Entities\Player.cpp" />
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />

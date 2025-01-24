@@ -27,6 +27,7 @@ Entity* LevelSerializationContext::get_entity(uint64_t handle)
 		obj = eng->get_level()->get_entity(handle);
 	if (obj)
 		return obj->cast_to<Entity>();
+	return nullptr;
 }
 
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)

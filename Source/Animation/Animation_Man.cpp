@@ -9,6 +9,7 @@
 #include "Framework/Files.h"
 #include "Assets/AssetDatabase.h"
 #include "Animation/Runtime/Animation.h"
+#include "Animation/Runtime/AnimationTreeLocal.h"
 
 CLASS_IMPL(Animation_Tree_CFG);
 
@@ -33,6 +34,40 @@ void Animation_Tree_CFG::uninstall()
 	direct_slot_names.clear();
 }
 
+
+static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
+{
+	for (int i = 0; i < list->count; i++) {
+		auto prop = list->list[i];
+		if (strcmp(prop.custom_type_str, "AssetPtr") == 0) {
+			// wtf!
+			IAsset** e = (IAsset**)prop.get_ptr(inst);
+			if (*e)
+				AssetDatabase::get().touch_asset(*e);
+		}
+		else if(prop.type==core_type_id::List) {
+			auto size = prop.list_ptr->get_size(inst);
+			for (int j = 0; j < size; j++) {
+				auto ptr = prop.list_ptr->get_index(inst, j);
+				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list);
+			}
+		}
+	}
+}
+
+void Animation_Tree_CFG::sweep_references() const
+{
+	for (auto obj : all_nodes)
+	{
+		auto type = &obj->get_type();
+		while (type) {
+			auto props = type->props;
+			if(props)
+				check_props_for_assetptr(obj, props);
+			type = type->super_typeinfo;
+		}
+	}
+}
 bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
 
 	auto& path = get_name();

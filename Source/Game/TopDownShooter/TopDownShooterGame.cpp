@@ -1,7 +1,7 @@
 #include "TopDownShooterGame.h"
 #include "Game/Entity.h"
-#include "Game/GameMode.h"
-#include "Game/BasePlayer.h"
+
+#include "Game/Components/CameraComponent.h"
 #include "Game/EntityComponent.h"
 #include "Game/Components/MeshComponent.h"
 #include "Game/Components/PhysicsComponents.h"
@@ -21,10 +21,39 @@ public:
 	
 };
 CLASS_IMPL(TopDownSpawnPoint);
-CLASS_H(TopDownGameMode, GameMode)
+
+
+CLASS_H(TopDownGameManager, Entity)
 public:
+	static TopDownGameManager* instance;
+
+	void pre_start() override {
+		ASSERT(instance == nullptr);
+		instance = this;
+	}
+	void start() override {
+		the_player = eng->get_level()->spawn_prefab(player_prefab.get());
+	}
+	void update() {}
+	void end() {
+		ASSERT(instance == this);
+		instance = nullptr;
+	}
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(TopDownGameManager)
+			REG_ASSET_PTR(player_prefab, PROP_DEFAULT)
+		END_PROPS(TopDownGameManager)
+	}
+
+
+	CameraComponent* static_level_cam = nullptr;
+	AssetPtr<PrefabAsset> player_prefab;
+	Entity* the_player = nullptr;
 };
-CLASS_IMPL(TopDownGameMode);
+CLASS_IMPL(TopDownGameManager);
+
+TopDownGameManager* TopDownGameManager::instance = nullptr;
 
 struct DamageEvent
 {
@@ -137,22 +166,61 @@ public:
 	void start() override {
 		auto health = get_owner()->get_first_component<TopDownHealthComponent>();
 		ASSERT(health);
-		set_ticking(false);
 		health->on_death.add(this, [&](DamageEvent dmg)
 			{
 				set_ticking(true);
+				is_dead = true;
 				death_time = eng->get_game_time();
 
 				auto cap = get_owner()->get_first_component<PhysicsComponentBase>();
 				cap->set_is_simulating(true);
 				cap->apply_impulse(dmg.position+glm::vec3(0,0.3,0), dmg.dir*5.0f);
+				cap->set_physics_layer(PhysicsLayer::PhysicsObject);
 			});
+
+		auto capsule = get_owner()->get_first_component<CapsuleComponent>();
+		ccontroller = std::make_unique<CharacterController>(capsule);
+		ccontroller->set_position(get_ws_position());
+		ccontroller->capsule_height = capsule->height;
+		ccontroller->capsule_radius = capsule->radius;
+
+
+		set_ticking(true);
 	}
 	void update() {
-		if (eng->get_game_time() - death_time > 3.0) {
-			get_owner()->destroy();
+		if (is_dead) {
+			if ((eng->get_game_time() - death_time > 3.0)) {
+				get_owner()->destroy();
+			}
+			return;
 		}
+
+		auto the_player = TopDownGameManager::instance->the_player;
+
+		auto to_dir = the_player->get_ws_position() - get_ws_position();
+		if (glm::length(to_dir) < 0.001) to_dir = glm::vec3(1, 0, 0);
+		else to_dir = glm::normalize(to_dir);
+
+		float dt = eng->get_dt();
+		uint32_t flags = 0;
+		glm::vec3 outvel;
+		float move_speed = 5.0;
+		
+		ccontroller->move(glm::vec3(to_dir.x, 0, to_dir.z)*move_speed * dt, dt, 0.005f, flags, outvel);
+
+		
+		float angle = -atan2(-to_dir.x, to_dir.z);
+		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
+
+		get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
+
 	}
+	void end() {
+
+	}
+
+	std::unique_ptr<CharacterController> ccontroller;
+
 	bool is_dead = false;
 	float death_time = 0.0;
 };
@@ -235,8 +303,18 @@ public:
 };
 CLASS_IMPL(TopDownCar);
 
+struct TopDownControls
+{
+	InputActionInstance* shoot{};
+	InputActionInstance* move{};
+	InputActionInstance* look{};
+};
+
 CLASS_H(TopDownPlayer, Entity)
 public:
+
+	TopDownControls con;
+
 	TopDownPlayer() {
 		set_ticking(true);
 		mesh = construct_sub_component<MeshComponent>("body");
@@ -246,7 +324,21 @@ public:
 		gun_entity = construct_sub_entity<Entity>("gun-entity");
 		gun_entity->construct_sub_component<MeshComponent>("gun-model");
 	}
+
+	bool using_controller() const {
+		return inputPtr->get_device()->get_type() == InputDeviceType::Controller;
+	}
+
 	virtual void start() override {
+
+		{
+			auto cameraobj = eng->get_level()->spawn_entity_class<Entity>();
+			the_camera = cameraobj->create_and_attach_component_type<CameraComponent>();
+			the_camera->set_is_enabled(true);
+			ASSERT(CameraComponent::get_scene_camera() == the_camera);
+		}
+
+
 
 		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());
@@ -254,60 +346,26 @@ public:
 		ccontroller->capsule_radius = capsule->radius;
 
 		inputPtr = GetGInput().register_input_user(0);
-
-		std::vector<const InputDevice*> devices;
-		GetGInput().get_connected_devices(devices);
-		int deviceIdx = 0;
-		for (; deviceIdx < devices.size(); deviceIdx++) {
-			if (devices[deviceIdx]->type == InputDeviceType::Controller) {
-				inputPtr->assign_device(devices[deviceIdx]->selfHandle);
+		inputPtr->assign_device(GetGInput().get_keyboard_device());
+		for(auto d : GetGInput().get_connected_devices())
+			if (d->get_type() == InputDeviceType::Controller) {
+				inputPtr->assign_device(d);
 				break;
 			}
-		}
-		if (deviceIdx == devices.size())
-			inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
-
-		 GetGInput().device_connected.add(this, [&](handle<InputDevice> handle) {
-				inputPtr->assign_device(handle);
-			 });
-
-		 inputPtr->on_lost_device.add(this, [&]()
-			 {
-				inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
-			});
+		inputPtr->on_changed_device.add(this, [&]()
+		 {
+			if(!inputPtr->get_device())
+				inputPtr->assign_device(GetGInput().get_keyboard_device());
+		});
 
 
 
 		inputPtr->enable_mapping("game");
 		inputPtr->enable_mapping("ui");
-		inputPtr->get("game/shoot")->bind_active_function(
-			[&]() {
-				if (shoot_cooldown <= 0.0)
-				{
-					Random r(eng->get_game_time());
-					
-					int count = 5;
-					for (int i = 0; i < count; i++) {
+		con.shoot = inputPtr->get("game/shoot");
+		con.move = inputPtr->get("game/move");
+		con.look = inputPtr->get("game/look");
 
-						auto projectile = eng->get_level()->spawn_prefab(GetAssets().find_sync<PrefabAsset>("top_down/projectile.pfb").get());
-						auto pc = projectile->get_first_component<ProjectileComponent>();
-						pc->ignore = capsule;
-						const float spread = 0.15;
-						pc->direction = lookdir+glm::vec3(r.RandF(-spread,spread),0,r.RandF(-spread,spread));
-						pc->direction = glm::normalize(pc->direction);
-						pc->speed += r.RandF(-2, 2);
-
-						glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0,1,0), pc->direction));
-						glm::vec3 up = glm::cross(pc->direction, right);
-						glm::mat3 rotationMatrix(-pc->direction, up, right);
-
-						pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0),glm::quat_cast(rotationMatrix),pc->get_owner()->get_ls_scale());
-					}
-					shake.start(0.1);
-					shoot_cooldown = 0.3;
-				}
-			}
-		);
 		//inputPtr->get("game/use")->bind_triggered_function(
 		//	[&]() {
 		//		if (is_in_car) {
@@ -333,7 +391,7 @@ public:
 		ccontroller->set_position(glm::vec3(0,0.0,0));
 	}
 	virtual void end() override {
-		GameInputSystem::get().free_input_user(inputPtr);
+		GetGInput().free_input_user(inputPtr);
 		GetGInput().device_connected.remove(this);
 	}
 	void exit_car() {
@@ -346,36 +404,72 @@ public:
 		mesh->visible = false;
 	}
 
+	void shoot_gun() {
+		if (shoot_cooldown <= 0.0)
+		{
+			Random r(eng->get_game_time());
+			
+			int count = 5;
+			for (int i = 0; i < count; i++) {
+
+				auto projectile = eng->get_level()->spawn_prefab(GetAssets().find_sync<PrefabAsset>("top_down/projectile.pfb").get());
+				auto pc = projectile->get_first_component<ProjectileComponent>();
+				pc->ignore = capsule;
+				const float spread = 0.15;
+				pc->direction = lookdir+glm::vec3(r.RandF(-spread,spread),0,r.RandF(-spread,spread));
+				pc->direction = glm::normalize(pc->direction);
+				pc->speed += r.RandF(-2, 2);
+
+				glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0,1,0), pc->direction));
+				glm::vec3 up = glm::cross(pc->direction, right);
+				glm::mat3 rotationMatrix(-pc->direction, up, right);
+
+				pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0),glm::quat_cast(rotationMatrix),pc->get_owner()->get_ls_scale());
+			}
+			shake.start(0.08);
+			shoot_cooldown = 0.9;
+		}
+	}
+
 	virtual void update() override {
-		auto moveAction = inputPtr->get("game/move");
 
 		if (is_in_car)
 			return;
 
 		if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();
 
-	
-		this->lookdir=glm::vec3(1,0,0);
+		if (con.shoot->get_value<bool>())
+			shoot_gun();
 
 		if (has_had_update) {
-			glm::ivec2 mouse;
-			SDL_GetMouseState(&mouse.x, &mouse.y);
-			auto player = (PlayerBase*)eng->get_local_player();
-			Ray r;
-			r.dir = unproject_mouse_to_ray(player->last_view_setup, mouse.x, mouse.y);
-			r.pos = view_pos;
-			glm::vec3 intersect(0.f);
-			ray_plane_intersect(r, glm::vec3(0, 1, 0), glm::vec3(0.8f), intersect);
-			auto mypos = get_ws_position();
-			lookdir = intersect - mypos;
-			lookdir.y = 0;
-			if (glm::length(lookdir) < 0.000001) lookdir = glm::vec3(1, 0, 0);
-			else lookdir = glm::normalize(lookdir);
 
-			mouse_pos = intersect;
+			if (using_controller()) {
+				auto stick = con.look->get_value<glm::vec2>();
+				if (glm::length(stick) > 0.01) {
+					lookdir = glm::normalize(glm::vec3(-stick.x, 0, -stick.y));
+				}
+				mouse_pos = get_ws_position();
+			}
+			else {
+				glm::ivec2 mouse;
+				SDL_GetMouseState(&mouse.x, &mouse.y);
+
+				Ray r;
+				r.dir = unproject_mouse_to_ray(CameraComponent::get_scene_camera()->last_vs, mouse.x, mouse.y);
+				r.pos = view_pos;
+				glm::vec3 intersect(0.f);
+				ray_plane_intersect(r, glm::vec3(0, 1, 0), glm::vec3(0.8f), intersect);
+				auto mypos = get_ws_position();
+				lookdir = intersect - mypos;
+				lookdir.y = 0;
+				if (glm::length(lookdir) < 0.000001) lookdir = glm::vec3(1, 0, 0);
+				else lookdir = glm::normalize(lookdir);
+				mouse_pos = intersect;
+			}
+
 		}
 	
-		auto move = moveAction->get_value<glm::vec2>();
+		auto move = con.move->get_value<glm::vec2>();
 		float len = glm::length(move);
 		if(len>1.0)
 			move = glm::normalize(move);
@@ -385,26 +479,29 @@ public:
 
 		ccontroller->move(glm::vec3(move.x, 0, move.y)*move_speed * dt, dt, 0.005f, flags, outvel);
 
-		float angle = -atan2(lookdir.z, lookdir.x);
+		float angle = -atan2(-lookdir.x, lookdir.z);
 		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
 
 		set_ws_transform(ccontroller->get_character_pos(), q, get_ls_scale());
 
 		has_had_update = true;
+
+		update_view();
 	}
-	void get_view(glm::mat4& viewMat, float& fov) {
+	void update_view() {
 		auto pos = get_ws_position();
 		pos = glm::mix(pos, mouse_pos, 0.15);
 		auto camera_pos = glm::vec3(pos.x, pos.y + 16.0, pos.z - 2.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - pos);
 
-
 		this->view_pos =  damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
 		auto finalpos = shake.evaluate(this->view_pos, camera_dir, eng->get_dt());
 
-		viewMat = glm::lookAt(finalpos, finalpos - camera_dir, glm::vec3(0, 1, 0));
+		auto viewMat = glm::lookAt(finalpos, finalpos - camera_dir, glm::vec3(0, 1, 0));
 
-		fov = 50.0;
+		the_camera->get_owner()->set_ws_transform(glm::inverse(viewMat));
+
+		the_camera->fov = 50.0;
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(TopDownPlayer)
@@ -419,6 +516,9 @@ public:
 	MeshComponent* mesh = nullptr;
 	TopDownHealthComponent* health = nullptr;
 	InputUser* inputPtr = nullptr;
+
+	CameraComponent* the_camera = nullptr;
+
 
 	float shoot_cooldown = 0.0;
 
@@ -435,22 +535,6 @@ public:
 };
 CLASS_IMPL(TopDownPlayer);
 
-CLASS_H(TopDownPlayerController, PlayerBase)
-public:
-	void start() override {
-		auto prefab = GetAssets().find_sync<PrefabAsset>("top_down/player.pfb");
-		player = (TopDownPlayer*)eng->get_level()->spawn_prefab(prefab.get());
-	}
-	void end() override {
-
-	}
-	void get_view(glm::mat4& viewMat, float& fov) {
-		player->get_view(viewMat, fov);
-	}
-
-	TopDownPlayer* player = nullptr;
-};
-CLASS_IMPL(TopDownPlayerController);
 
 
 CLASS_H(PlayerTriggerComponent2, EntityComponent)
@@ -477,3 +561,14 @@ void TopDownCar::update()
 	auto moveAction = driver->inputPtr->get("game/move");
 	auto movedir = moveAction->get_value<glm::vec2>();
 }
+
+CLASS_H(TopDownCameraReg, EntityComponent)
+public:
+	void start() override {
+		ASSERT(TopDownGameManager::instance);
+		auto cam = get_owner()->get_first_component<CameraComponent>();
+		TopDownGameManager::instance->static_level_cam = cam;
+		cam->set_is_enabled(true);
+	}
+};
+CLASS_IMPL(TopDownCameraReg);

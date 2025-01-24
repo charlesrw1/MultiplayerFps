@@ -39,8 +39,6 @@ public:
 
 	void create(SceneAsset* source, bool is_editor);
 
-	// only call once after initialization
-	void init_entities_post_load();
 
 	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids = nullptr); // was bool assign_new_ids=false
 
@@ -104,23 +102,16 @@ public:
 
 	void add_and_init_created_runtime_component(EntityComponent* c);
 
-	Entity* get_local_player() const {
-		return all_world_ents.find(local_player_id)->cast_to<Entity>();
-	}
 
 	BaseUpdater* get_entity(uint64_t handle) {
 		return all_world_ents.find(handle);
 	}
 
-	void set_local_player(Entity* e);
 
 	SceneAsset* get_source_asset() const {
 		return source_asset;
 	}
 
-	GameMode* get_gamemode() const {
-		return gamemode.get();
-	}
 
 	const WorldSettings* get_world_settings() const {
 		return world_settings;
@@ -137,8 +128,6 @@ public:
 private:
 	SceneAsset* source_asset = nullptr;
 
-	std::unique_ptr<GameMode> gamemode = nullptr;
-
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
 
@@ -146,7 +135,6 @@ private:
 
 	// last instance id, incremented to add objs
 	uint64_t last_id = 0;
-	uint64_t local_player_id = 0;
 
 	// the world settings entity (owned in all_world_ents), shouldnt be nullptr
 	const WorldSettings* world_settings = nullptr;
@@ -157,7 +145,6 @@ private:
 
 	// is this an editor level
 	bool b_is_editor_level =false;
-	bool b_has_initialized_map = false;
 
 	void insert_new_native_entity_into_hashmap_R(Entity* e);
 	void initialize_new_entity_safe(Entity* e);

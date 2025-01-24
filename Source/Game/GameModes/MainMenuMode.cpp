@@ -1,2 +1,2 @@
 #include "MainMenuMode.h"
-CLASS_IMPL(MainMenuMode);
+CLASS_IMPL(MainMenuModeManager);

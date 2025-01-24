@@ -12,6 +12,7 @@
 #include "OsInput.h"
 #include "Framework/MulticastDelegate.h"
 
+#include "Level.h"
 
 class GUIFullscreen;
 class OnScreenLogGui;
@@ -36,7 +37,7 @@ public:
 
 	// Public Interface
 	virtual GameMode* get_gamemode() const override {
-		return level ? level->get_gamemode() : nullptr;
+		return nullptr;
 	}
 	virtual Level* get_level() const override {
 		return level.get();
@@ -52,7 +53,7 @@ public:
 	}
 	virtual Entity* get_local_player() override {
 		ASSERT(get_level());
-		return level->get_local_player();
+		return nullptr;
 	}
 	virtual Entity* get_player_slot(uint32_t index) override {
 		// fixme:

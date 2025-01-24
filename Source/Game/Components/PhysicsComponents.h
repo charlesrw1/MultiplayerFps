@@ -47,6 +47,11 @@ public:
 	void set_send_overlap(bool send_overlap);
 	void set_send_hit(bool send_hit);
 
+	PhysicsLayer get_physics_layer() const {
+		return physics_layer;
+	}
+	void set_physics_layer(PhysicsLayer l);
+
 	glm::mat4 get_transform() const;
 
 	// valid for dynamic actors only
@@ -83,6 +88,8 @@ protected:
 
 	MeshBuilderComponent* get_editor_meshbuilder() const;
 private:
+
+	void refresh_shapes();
 
 	friend class PhysicsManImpl;
 	void fetch_new_transform();

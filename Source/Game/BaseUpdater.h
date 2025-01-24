@@ -12,6 +12,7 @@ class Level;
 
 CLASS_H(BaseUpdater, ClassBase)
 public:
+	virtual void pre_start() {}
 	virtual void start() {}
 	virtual void update() {}
 	virtual void end() {}

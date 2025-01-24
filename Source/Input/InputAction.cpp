@@ -1,9 +1,6 @@
 #include "InputSystem.h"
 #include "InputAction.h"
 
-void InputUser::assign_device(handle<InputDevice> device) {
-	GetGInput().set_my_device(this, device);
-}
 InputAction* InputAction::register_action(const std::string& binding_group, const std::string& action_name, bool is_additive)
 {
 	InputAction* a = new InputAction;
@@ -18,7 +15,7 @@ InputAction* InputAction::add_bind(const std::string& name, GlobalInputBinding b
 	b.special_name = name;
 	b.modifier = std::unique_ptr<InputModifier>(modifier);
 	b.trigger = std::unique_ptr<InputTrigger>(trigger);
-	b.defaultBinding = binding;
+	b.default_binding = binding;
 	binds.push_back(std::move(b));
 	return this;
 }
@@ -94,14 +91,6 @@ std::string InputAction::get_action_bind_path(const Binding* b) const
 
 	return out;
 }
-InputDeviceType InputUser::get_device_type() const
-{
-	assert(assigned_device.is_valid());
-	auto device = GetGInput().get_device(assigned_device);
-	assert(device);
-	return device->type;
-}
-
 InputActionInstance* InputUser::get(const std::string& name)
 {
 	auto find = trackedActions.find(name);
@@ -115,4 +104,32 @@ void InputUser::enable_mapping(const std::string& mapping_id)
 void InputUser::disable_mapping(const std::string& mapping_id)
 {
 	GetGInput().set_input_mapping_status(this, mapping_id, false);
+}
+
+void InputUser::assign_device(InputDevice* device)
+{
+	if (assigned_device == device)
+		return;
+
+	if (assigned_device) {
+		ASSERT(assigned_device->get_user() == this);
+		assigned_device->set_user(nullptr);
+		assigned_device = nullptr;
+	}
+	ASSERT(assigned_device == nullptr);
+	if (!device) {
+		on_changed_device.invoke();
+	}
+	else {
+		if (device->get_user()) {
+			sys_print(Warning, "stealing a device from another inputuser\n");
+
+			auto user = device->get_user();
+			user->assign_device(nullptr);
+			ASSERT(device->get_user() == nullptr);
+		}
+		assigned_device = device;
+		device->set_user(this);
+		on_changed_device.invoke();
+	}
 }

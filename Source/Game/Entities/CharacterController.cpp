@@ -74,7 +74,10 @@ void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, u
 		{
 			// do collision test
 			glm::vec3 actual_capsule_pos = current_pos + glm::vec3(0,capsule_height*0.5,0);
-			bool has_hit = g_physics.sweep_capsule(wqr, shape_def, actual_capsule_pos, current_direction, length+skin_size, 1 >> (int)PL::Default, &ignore);
+
+			uint32_t flags = (1 << (int)PL::Default) | (1 << (int)PL::Character);
+
+			bool has_hit = g_physics.sweep_capsule(wqr, shape_def, actual_capsule_pos, current_direction, length+skin_size, flags, &ignore);
 			if (!has_hit) {
 				current_pos = target_pos;
 				break;

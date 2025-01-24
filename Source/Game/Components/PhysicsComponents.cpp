@@ -112,6 +112,7 @@ void PhysicsComponentBase::end()
 
 	if (has_initialized()) {
 		physics_local_impl->scene->removeActor(*(physx::PxActor*)physxActor);
+		physxActor->userData = nullptr;	// cursed moment, get a stale pointer in onTrigger after actor has been removed (?), set it null here to avoid that
 		physxActor->release();
 		physxActor = nullptr;
 	}
@@ -229,6 +230,7 @@ void PhysicsComponentBase::on_changed_transform() {
 }
 PhysicsComponentBase::~PhysicsComponentBase()
 {
+	ASSERT(!physxActor);
 }
 PhysicsComponentBase::PhysicsComponentBase() {
 	set_call_init_in_editor(true);
@@ -345,6 +347,9 @@ void PhysicsComponentBase::set_is_simulating(bool simulate_physics)
 			else {
 				auto dyn = get_dynamic_actor();
 				dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->simulate_physics);
+
+				next_position = get_owner()->get_ls_position();
+				next_rot = get_owner()->get_ls_rotation();
 			}
 		}
 	}
@@ -356,6 +361,30 @@ void PhysicsComponentBase::set_is_enable(bool enabled)
 		if (has_initialized()) {
 			physxActor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, !enabled);
 		}
+	}
+}
+void PhysicsComponentBase::set_physics_layer(PhysicsLayer l)
+{
+	if (l == physics_layer) return;
+	physics_layer = l;
+	if (has_initialized())
+		refresh_shapes();
+}
+void PhysicsComponentBase::refresh_shapes()
+{
+	ASSERT(has_initialized());
+
+	PxShape* buffer[64];
+	int num = physxActor->getNbShapes();
+	int start = 0;
+	while (num > 0) {
+		int c = physxActor->getShapes(buffer, 64, start);
+		ASSERT(c <= 64);
+		for (int i = 0; i < c; i++)
+			set_shape_flags(buffer[i]);
+		
+		num -= 64;
+		start += 64;
 	}
 }
 
@@ -393,7 +422,10 @@ void PhysicsComponentBase::set_linear_velocity(const glm::vec3& v)
 }
 
 void PhysicsComponentBase::set_is_trigger(bool is_trig) {
+	if (is_trig == is_trigger) return;
 	is_trigger = is_trig;
+	if (has_initialized())
+		refresh_shapes();
 }
 void PhysicsComponentBase::set_send_overlap(bool send_overlap) {
 	this->send_overlap = send_overlap;

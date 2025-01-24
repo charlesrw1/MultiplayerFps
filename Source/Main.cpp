@@ -43,8 +43,6 @@
 
 #include "UI/GUISystemPublic.h"
 
-#include "Game/GameMode.h"
-
 #include "Game/WorldSettings.h"
 
 #include "AssetCompile/AnimationSeqLoader.h"
@@ -56,6 +54,8 @@
 #include "UI/OnScreenLogGui.h"
 #include "Game/LevelAssets.h"
 #include "Framework/MeshBuilder.h"
+
+#include "Game/Components/CameraComponent.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -439,6 +439,24 @@ void GameEngineLocal::connect_to(string address)
 	//cl->connect(address);
 }
 
+DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
+{
+	if (!eng->is_editor_level()) {
+		auto level = eng->get_level();
+		if(level)
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("start_ed Map %s", level->get_source_asset()->get_name().c_str()));
+	}
+	else {
+		auto tool = eng->get_current_tool();
+		auto level = eng->get_level();
+		auto source = level->get_source_asset();
+		if (source) {
+			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("map %s", source->get_name().c_str()));
+		}
+		else sys_print(Error, "no valid map");
+	}
+}
+
 DECLARE_ENGINE_CMD(close_ed)
 {
 	eng_local.change_editor_state(nullptr,"");
@@ -709,7 +727,6 @@ public:
 void register_input_actions_for_game()
 {
 	using IA = InputAction;
-	using GIB = GlobalInputBinding;
 
 	IA::register_action("game", "move", true)
 		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTX), new SwizzleModifier(false,true,1.0), nullptr)
@@ -727,7 +744,9 @@ void register_input_actions_for_game()
 		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTX), new LookModifierController(false), {})
 		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTY), new LookModifierController(true), {});
 	IA::register_action("game", "shoot", false)
-		->add_bind("", GIB::MBLeft, {}, new BasicButtonTrigger());
+		->add_bind("", GIB::MBLeft, {}, new BasicButtonTrigger())
+		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), {}, new BasicButtonTrigger());
+
 	IA::register_action("game", "sprint")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), {}, {})
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_LSHIFT), {}, {});
@@ -793,11 +812,6 @@ int main(int argc, char** argv)
 
 
 ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "the entry point of the game, this takes in a level filepath");
-// The default gamemode and player to choose when undefined by the WorldSettings entity
-// Takes in a string classname for a subtype of GameMode defined in Game/GameMode.h
-// and for a subtype of Player defined in Game/Player.h
-ConfigVar g_default_gamemode("g_default_gamemode", "GameMode", CVAR_DEV, "the default gamemode when none is present in a level");
-ConfigVar g_default_playerclass("g_default_player", "Player", CVAR_DEV, "the default player class to spawn when none is specified in a level");
 
 ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV, "the default gamemain class of the program");
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
@@ -866,23 +880,6 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	set_tick_rate(60.f);
 
 	auto world_settings = level->get_world_settings();
-
-	// spawn in the player
-	if (!this_is_for_editor) {
-		const ClassTypeInfo* player_type = {};
-		if (!world_settings || !world_settings->player_type.ptr)
-			player_type = ClassBase::find_class(g_default_playerclass.get_string());
-		else
-			player_type = world_settings->player_type.ptr;
-
-		assert(player_type);
-		assert(player_type->is_a(PlayerBase::StaticType));
-
-		auto p = level->spawn_entity_from_classtype(*player_type);
-		level->set_local_player(p);
-
-		level->get_gamemode()->on_player_create(0, (Player*)p);
-	}
 
 	idraw->on_level_start();
 
@@ -1198,29 +1195,28 @@ bool GameEngineLocal::game_draw_screen()
 	vs_for_gui.width = viewport.x;
 	vs_for_gui.height = viewport.y;
 
-	
-	if (get_local_player() == nullptr) {
+	CameraComponent* scene_camera = CameraComponent::get_scene_camera();
+
+	// no camera
+	if (!scene_camera) {
 		params.draw_world = false;
 		params.draw_ui = true;
-		idraw->scene_draw(params, vs_for_gui, get_gui());	// not spawned, so just update the UI
+		idraw->scene_draw(params, vs_for_gui, get_gui());
 		return true;
 	}
 
-	auto player = get_local_player();
-	assert(player);
-	auto p = player->cast_to<PlayerBase>();
-	ASSERT(p)
-	
 
 	glm::mat4 view;
-	float fov = g_fov.get_float();
-	p->get_view(view, fov);
+	float fov = 60.f;
+	scene_camera->get_view(view, fov);
+
 
 	glm::mat4 in = glm::inverse(view);
 	auto pos = in[3];
 	auto front = -in[2];
 	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
-	p->last_view_setup = vs;
+	scene_camera->last_vs = vs;
+
 	//View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
 	idraw->scene_draw(params,vs, get_gui());
@@ -1231,8 +1227,6 @@ bool GameEngineLocal::game_draw_screen()
 void GameEngineLocal::draw_screen()
 {
 	GPUFUNCTIONSTART;
-
-
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

@@ -33,7 +33,7 @@ public:
 	bool load_asset(ClassBase*& user);
 	void post_load(ClassBase*) {}
 	void move_construct(IAsset* other);
-	void sweep_references() const override {}
+	void sweep_references() const override;
 
 	const Node_CFG* get_root_node() const {
 		return root;

@@ -321,7 +321,6 @@ static Color32 randcolor32(uint32_t number)
 
 	 mycallback.reset(new MyPhysicsCallback);
 	 scene->setSimulationEventCallback(mycallback.get());
-
  }
 
   void PhysicsManImpl::simulate_and_fetch(float dt) {

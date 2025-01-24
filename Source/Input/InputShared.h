@@ -84,6 +84,7 @@ enum class GlobalInputBinding
 
 	NumInputs
 };
+using GIB = GlobalInputBinding;
 
 InputDeviceType get_device_type_for_keybind(GlobalInputBinding bind);
 std::string get_button_type_string(GlobalInputBinding bind);

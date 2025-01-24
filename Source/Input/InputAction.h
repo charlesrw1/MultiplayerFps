@@ -28,21 +28,24 @@ class InputAction
 {
 public:
 	static InputAction* register_action(const std::string& binding_group, const std::string& action_name, bool is_additive = false);
-	InputAction* add_bind(const std::string& name, GlobalInputBinding binding, InputModifier* modifier, InputTrigger* trigger);
+	InputAction* add_bind(const std::string& name, GIB binding, InputModifier* modifier, InputTrigger* trigger);
 
 	std::string name_id;
 	std::string mapping_id_str;	// for swappable mappings
+
 	int mapping_id_num = 0;
 
 	struct Binding {
 		std::string special_name;
-		GlobalInputBinding defaultBinding{};
+
 		std::unique_ptr<InputModifier> modifier; // modifies the input value to an output value (optional)
 		std::unique_ptr<InputTrigger> trigger;	// determines if action is started/down/triggered after the hardware was sampled and modifiers applied
-		GlobalInputBinding transient_user_bind{};
+		
+		GIB default_binding{};
+		GIB transient_user_bind{};
 
-		GlobalInputBinding get_bind() const {
-			return transient_user_bind == GlobalInputBinding::Empty ? defaultBinding : transient_user_bind;
+		GIB get_bind() const {
+			return transient_user_bind == GIB::Empty ? default_binding : transient_user_bind;
 		}
 
 		InputDeviceType get_binding_device_type() const{
@@ -52,17 +55,17 @@ public:
 	std::vector<Binding> binds;
 	bool is_additive = false;
 
-	static GlobalInputBinding controller_button(SDL_GameControllerButton button)
+	static GIB controller_button(SDL_GameControllerButton button)
 	{
-		return GlobalInputBinding((int)GlobalInputBinding::ControllerButtonStart + (int)button);
+		return GIB((int)GIB::ControllerButtonStart + (int)button);
 	}
-	static GlobalInputBinding keyboard_key(SDL_Scancode key)
+	static GIB keyboard_key(SDL_Scancode key)
 	{
-		return GlobalInputBinding((int)GlobalInputBinding::KeyboardStart + (int)key);
+		return GIB((int)GIB::KeyboardStart + (int)key);
 	}
-	static GlobalInputBinding controller_axis(SDL_GameControllerAxis axis)
+	static GIB controller_axis(SDL_GameControllerAxis axis)
 	{
-		return GlobalInputBinding((int)GlobalInputBinding::ControllerAxisStart + (int)axis);
+		return GIB((int)GIB::ControllerAxisStart + (int)axis);
 	}
 	
 	std::string get_action_bind_path(const Binding* b) const;
@@ -82,40 +85,16 @@ public:
 	T get_value() const {
 		return state.get_value<T>();
 	}
-
-	void bind_triggered_function(std::function<void()> func) {
-		triggeredCallback = std::make_unique<CallbackFunc>(std::move(func));
-	}
-	void bind_start_function(std::function<void()> func) {
-		startCallback = std::make_unique<CallbackFunc>(std::move(func));
-	}
-	void bind_end_function(std::function<void()> func) {
-		endCallback = std::make_unique<CallbackFunc>(std::move(func));
-	}
-	void bind_active_function(std::function<void()> func) {
-		activeCallback = std::make_unique<CallbackFunc>(std::move(func));
-	}
-	void clear_all_functions() {
-		triggeredCallback.reset();
-		startCallback.reset();
-		endCallback.reset();
-		activeCallback.reset();
-	}
-
 	float get_active_duration() const {
 		return active_duration;
 	}
-
 	const InputAction* get_action() const {
 		return action;
 	}
-private:
-	using CallbackFunc = std::function<void()>;
 
-	std::unique_ptr<CallbackFunc> triggeredCallback = nullptr;
-	std::unique_ptr<CallbackFunc> startCallback = nullptr;
-	std::unique_ptr<CallbackFunc> endCallback = nullptr;
-	std::unique_ptr<CallbackFunc> activeCallback = nullptr;
+	MulticastDelegate<> on_start;
+	MulticastDelegate<> on_trigger;
+private:
 
 	bool is_enabled = false;
 	InputValue state{};
@@ -136,14 +115,10 @@ public:
 
 	InputActionInstance* get(const std::string& name);
 
-	void assign_device(handle<InputDevice> device);
-	handle<InputDevice> get_device() const { return assigned_device; }
-	InputDeviceType get_device_type() const;
-	bool has_device() const {
-		return assigned_device.is_valid();
-	}
+	void assign_device(InputDevice* device);
+	bool has_device() const { return assigned_device != nullptr; }
+	InputDevice* get_device() const { return assigned_device; }
 	
-	MulticastDelegate<> on_lost_device;
 	MulticastDelegate<> on_changed_device;
 
 private:
@@ -156,7 +131,7 @@ private:
 	}
 
 	int playerIndex = 0;	// not the controller index, this is used for player specific bindings
-	handle<InputDevice> assigned_device;
+	InputDevice* assigned_device = nullptr;
 	std::unordered_map<std::string, InputActionInstance> trackedActions;
 	uint32_t tracked_mapping_bitmasks = 0;
 	uint32_t mapping_enabled_bitmask = 0;

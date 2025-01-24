@@ -1,6 +1,5 @@
 #include "Types.h"
 #include "Level.h"
-#include "BasePlayer.h"
 #include "GameEngineLocal.h"
 #include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"
@@ -10,8 +9,7 @@ void GameEngineLocal::login_new_player(uint32_t index) {
 	ASSERT(0);
 	sys_print(Debug,"making client %d\n", index);
 	ASSERT(level);
-	auto player = level->spawn_entity_class<PlayerBase>();
-	level->set_local_player(player);
+	
 }
 void GameEngineLocal::logout_player(uint32_t index) {
 	sys_print(Debug,"removing client %d\n", index);

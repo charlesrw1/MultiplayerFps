@@ -12,8 +12,6 @@
 #include "Assets/AssetRegistry.h"
 
 #include "Assets/AssetDatabase.h"
-#include "Game/GameMode.h"
-
 #include "Game/LevelAssets.h"
 
 void Physics_Mesh::build()
@@ -54,9 +52,6 @@ Level::~Level()
 
 void Level::update_level()
 {
-	// tick the gamemode
-	if (!is_editor_level())
-		gamemode->tick();
 	{
 		BooleanScope scope(b_is_in_update_tick);
 
@@ -166,29 +161,6 @@ void Level::create(SceneAsset* source, bool is_editor)
 
 	if(source->sceneFile)
 		insert_unserialized_entities_into_level(*source->sceneFile);
-
-	if (!b_is_editor_level) {
-		world_settings =find_first_of<WorldSettings>();
-		const ClassTypeInfo* gamemode_type = {};
-		if (!world_settings || !world_settings->gamemode_type.ptr)
-			gamemode_type = ClassBase::find_class(g_default_gamemode.get_string());
-		else
-			gamemode_type = world_settings->gamemode_type.ptr;
-
-		assert(gamemode_type);
-		assert(gamemode_type->is_a(GameMode::StaticType));
-
-		assert(!gamemode);
-		gamemode.reset( (GameMode*)gamemode_type->allocate() );
-
-		// call init on game mode
-		gamemode->init();
-	}
-
-	init_entities_post_load();
-
-	if (!b_is_editor_level)
-		gamemode->start();
 }
 
 void Level::remove_from_update_list(BaseUpdater* b) {
@@ -220,6 +192,17 @@ void Level::initialize_new_entity_safe(Entity* e)
 	InlineVec<EntityComponent*, 16> init_components;
 	add_entities_and_components_to_init_R(e, init_entities, init_components);
 	
+	for (int i = 0; i < init_entities.size();i++) {
+		auto e = init_entities[i];
+		if(!is_editor_level()||e->get_call_init_in_editor())
+			e->pre_start();
+	}
+	for (int i = 0; i < init_components.size();i++) {
+		auto ec = init_components[i];
+		if(!is_editor_level()||ec->get_call_init_in_editor())
+			ec->pre_start();
+	}
+
 	for (int i = 0; i < init_entities.size();i++) {
 		auto e = init_entities[i];
 		ASSERT(e->init_state == BaseUpdater::initialization_state::HAS_ID);
@@ -260,12 +243,7 @@ void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 void Level::close_level()
 {
 	const bool is_this_editor_level = is_editor_level();
-	ASSERT(is_this_editor_level == (gamemode==nullptr));
-	if (!is_this_editor_level) {
-		gamemode->end();
-		// delete gamemode
-		gamemode.reset();
-	}
+	
 	for (auto ent : all_world_ents) {
 		if (Entity* e = ent->cast_to<Entity>())
 			e->destroy();
@@ -278,28 +256,6 @@ void Level::close_level()
 	source_asset = nullptr;
 }
 
-void Level::init_entities_post_load()
-{
-	ASSERT(!b_has_initialized_map);
-	// after inserting everything, call spawn functions
-
-	// to be safe: copy everything to update, then update it because stuff gets added to all_world_ents
-	std::vector<BaseUpdater*> things_to_init;
-	things_to_init.reserve(1000);
-	for (auto ent : all_world_ents)
-		things_to_init.push_back(ent);
-	for (auto ent : things_to_init) {
-		if (Entity* e = ent->cast_to<Entity>())
-			e->initialize_internal();
-		else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
-			ec->initialize_internal();
-		else
-			ASSERT(0);
-	}
-
-
-	b_has_initialized_map = true;
-}
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
 {
 	auto& objs = scene.get_objects();
@@ -313,17 +269,20 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 			all_world_ents.insert(o.second->get_instance_id(), o.second);
 		}
 		scene.unserialize_post_assign_ids();
+		const bool is_editor = is_editor_level();
+		for (auto o : objs) {
+			if(!is_editor||o.second->get_call_init_in_editor())
+				o.second->pre_start();
+		}
 
-		if (b_has_initialized_map) {
-			for (auto o : objs) {
-				auto ent = o.second;
-				if (Entity* e = ent->cast_to<Entity>())
-					e->initialize_internal();
-				else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
-					ec->initialize_internal();
-				else
-					ASSERT(0);
-			}
+		for (auto o : objs) {
+			auto ent = o.second;
+			if (Entity* e = ent->cast_to<Entity>())
+				e->initialize_internal();
+			else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
+				ec->initialize_internal();
+			else
+				ASSERT(0);
 		}
 
 	}
@@ -335,12 +294,9 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());
 	all_world_ents.insert(c->get_instance_id(), c);
+	if(!is_editor_level()||c->get_call_init_in_editor())
+		c->pre_start();
 	c->initialize_internal();
-}
-
-void Level::set_local_player(Entity* e) {
-	ASSERT(e);
-	local_player_id = e->get_instance_id();
 }
 
 Entity* Level::spawn_prefab(PrefabAsset* asset)

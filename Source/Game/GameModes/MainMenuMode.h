@@ -1,5 +1,5 @@
 #pragma once
-#include "Game/GameMode.h"
+
 
 #include "UI/Widgets/Layouts.h"
 #include "UI/Widgets/Interactables.h"
@@ -12,6 +12,8 @@
 #include "Sound/SoundPublic.h"
 
 #include "UI/Widgets/Visuals.h"
+
+#include "Game/Entity.h"
 class GameTransitionUI
 {
 public:
@@ -123,21 +125,18 @@ public:
 
 
 
-CLASS_H(MainMenuMode, GameMode)
+CLASS_H(MainMenuModeManager, Entity)
 public:
 
-	void init() {
+	void start() {
 		ui = new MainMenuUILayout;
 		eng->get_gui()->add_gui_panel_to_root(ui);
 
 		eng->set_game_focused(false);	// disable mouse capture
 	}
 
-	void start() {
 
-	}
-
-	void tick() {
+	void update() {
 
 	}
 
@@ -147,9 +146,6 @@ public:
 		ui = nullptr;
 	}
 
-	void on_player_create(int slot, Player* p) {
-
-	}
 
 	MainMenuUILayout* ui = nullptr;
 };

@@ -24,7 +24,6 @@ public:
 
 	hash_set<InputUser> allUsers;
 
-	// store these internally this way
 	InputDevice keyboardDevice;
 	InputDevice controllerDevices[4];
 
@@ -37,6 +36,8 @@ public:
 		assert(mapping_id_to_integer.find(id) != mapping_id_to_integer.end());
 		return mapping_id_to_integer[id];
 	}
+
+	static float sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device);
 
 	int mouseXAccum = 0;
 	int mouseYAccum = 0;
@@ -52,14 +53,13 @@ GameInputSystem::~GameInputSystem() {
 	implLocal = nullptr;
 }
 
-handle<InputDevice> GameInputSystem::get_keyboard_device_handle()
+InputDevice* GameInputSystem::get_keyboard_device()
 {
-	return impl->keyboardDevice.selfHandle;
+	return &impl->keyboardDevice;
 }
 
 void GameInputSystem::init()
 {
-	impl->keyboardDevice.selfHandle = { 0 };
 	impl->keyboardDevice.type = InputDeviceType::KeyboardMouse;
 	for (int i = 0; i < 4; i++) {
 		impl->controllerDevices[i].index = i;
@@ -96,17 +96,16 @@ GlobalInputBinding GameInputSystem::find_bind_for_string(const std::string & key
 	return find == impl->str_to_keybind.end() ? GlobalInputBinding::Empty : find->second;
 }
 
-const InputDevice* GameInputSystem::get_device(handle<InputDevice> handle)
+
+std::vector<InputDevice*> GameInputSystem::get_connected_devices()
 {
-	return impl->get_device(handle);
-}
-void GameInputSystem::get_connected_devices(std::vector<const InputDevice*>& outDevices)
-{
+	std::vector<InputDevice*> outDevices;
 	outDevices.push_back(&impl->keyboardDevice);
 	for (int i = 0; i < 4; i++) {
-		if (impl->controllerDevices[i].selfHandle.is_valid())
+		if (impl->controllerDevices[i].is_connected())
 			outDevices.push_back(&impl->controllerDevices[i]);
 	}
+	return outDevices;
 }
 void GameInputSystem::set_input_mapping_status(InputUser* user, const std::string& map_id, bool enable)
 {
@@ -151,10 +150,9 @@ InputUser* GameInputSystem::register_input_user(int localPlayerIndex)
 }
 void GameInputSystem::free_input_user(InputUser*& user)
 {
-	if (user->assigned_device.is_valid()) {
-		auto d = impl->get_device(user->assigned_device);
-		assert(d->user == user);
-		d->user = nullptr;
+	if (user->get_device()) {
+		ASSERT(user->get_device()->user == user);
+		user->get_device()->set_user(nullptr);
 	}
 
 	impl->allUsers.remove(user);
@@ -174,13 +172,13 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 		}
 		else {
 			auto controller = SDL_GameControllerOpen(joyindex);
-			assert(impl->controllerDevices[joyindex].devicePtr == nullptr);
-			impl->controllerDevices[joyindex].devicePtr = controller;
-			impl->controllerDevices[joyindex].selfHandle = { joyindex + 1 };
+			assert(impl->controllerDevices[joyindex].sdl_controller_ptr == nullptr);
+			impl->controllerDevices[joyindex].sdl_controller_ptr = controller;
+			impl->controllerDevices[joyindex].self_index = { joyindex + 1 };
 
 			sys_print(Debug,"Controller %d added to game system\n",joyindex);
 
-			device_connected.invoke(impl->controllerDevices[joyindex].selfHandle);
+			device_connected.invoke(&impl->controllerDevices[joyindex]);
 		}
 	}
 		break;
@@ -194,27 +192,27 @@ void GameInputSystem::handle_event(const SDL_Event& event)
 
 		int myIndex = 0;
 		for (; myIndex < 4; myIndex++) {
-			if (impl->controllerDevices[myIndex].devicePtr == controller)
+			if (impl->controllerDevices[myIndex].sdl_controller_ptr == controller)
 				break;
 		}
 		assert(myIndex != 4);
 
 		sys_print(Debug,"Controller %d removed from game system\n", myIndex);
-		auto& device = impl->controllerDevices[myIndex];
-		auto wasId = device.selfHandle;
-		device_disconnected.invoke(wasId);
+		auto device = &impl->controllerDevices[myIndex];
+		auto wasId = device->self_index;
+		device_disconnected.invoke(device);
 
-		auto user = device.user;
-		device.selfHandle = { -1 };
-		SDL_GameControllerClose(device.devicePtr);
-		device.devicePtr = nullptr;
-		device.user = nullptr;
+		auto user = device->user;
+		device->self_index = { 0 };
+		SDL_GameControllerClose(device->sdl_controller_ptr);
+		device->sdl_controller_ptr = nullptr;
+		device->user = nullptr;
 
 		if (user) {
 			sys_print(Debug,"user lost device\n");
-			assert(user->assigned_device.id == wasId.id);
-			user->assigned_device = { -1 };
-			user->on_lost_device.invoke();
+			assert(user->assigned_device == device);
+			user->assigned_device = nullptr;
+			user->on_changed_device.invoke();
 		}
 	}
 		break;
@@ -240,7 +238,7 @@ InputDeviceType get_device_type_for_keybind(GlobalInputBinding bind)
 	return InputDeviceType::Controller;
 }
 
-float sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device)
+float GameInputSystemImpl::sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device)
 {
 	assert(get_device_type_for_keybind(b) == device->type);
 	if (b <= GlobalInputBinding::KeyboardEnd) {
@@ -268,12 +266,12 @@ float sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device)
 	}
 	else if (b <= GlobalInputBinding::ControllerButtonEnd) {
 		int index = (int)b - (int)GlobalInputBinding::ControllerButtonStart;
-		int state = SDL_GameControllerGetButton(device->devicePtr, (SDL_GameControllerButton)index);
+		int state = SDL_GameControllerGetButton(device->sdl_controller_ptr, (SDL_GameControllerButton)index);
 		return (state) ? 1.0 : 0.0;
 	}
 	else if (b <= GlobalInputBinding::ControllerAxisEnd) {
 		int index = (int)b - (int)GlobalInputBinding::ControllerAxisStart;
-		int16_t state = SDL_GameControllerGetAxis(device->devicePtr, (SDL_GameControllerAxis)index);
+		int16_t state = SDL_GameControllerGetAxis(device->sdl_controller_ptr, (SDL_GameControllerAxis)index);
 		return glm::clamp((double)state / INT16_MAX,-1.0,1.0);
 	}
 
@@ -285,84 +283,56 @@ void GameInputSystem::tick_users(float dt)
 
 	for (auto u : impl->allUsers)
 	{
-		if (!u->assigned_device.is_valid())
+		auto device = u->get_device();
+
+		if (!device)
 			continue;	// no valid device
 
-		auto device = impl->get_device(u->assigned_device);
-		assert(device);
+		ASSERT(device&&device->get_user()==u);
 		const auto myType = device->type;
 
 		for (auto& bindAndCallback : u->trackedActions) {
 			auto action = bindAndCallback.second.action;
-			auto& callbacks = bindAndCallback.second;
-			if (!callbacks.is_enabled) 
+			auto& action_inst = bindAndCallback.second;
+			if (!action_inst.is_enabled) 
 				continue;
 
-			InputValue deviceValue = {};
+			InputValue device_val = {};
 			for (int b = 0; b < action->binds.size(); b++) {
 				auto& bind = action->binds[b];
 				auto binding = bind.get_bind();
 				if (get_device_type_for_keybind(binding) != myType)
 					continue;
 				
-				InputValue rawValue;
-				rawValue.v.x = sample_device_value_for_binding(binding, device);
+				InputValue raw_val;
+				raw_val.v.x = GameInputSystemImpl::sample_device_value_for_binding(binding, device);
 				if (bind.modifier)
-					rawValue = bind.modifier->modify(rawValue, dt);
+					raw_val = bind.modifier->modify(raw_val, dt);
 				
 				if (bind.trigger) {
-					int out = (int)bind.trigger->check_trigger(rawValue, dt);
+					int out = (int)bind.trigger->check_trigger(raw_val, dt);
 					bool isActive = (out & (int)TriggerMask::Active);
 					bool isTriggered = (out & (int)TriggerMask::Triggered);
-					if (isTriggered && callbacks.triggeredCallback)
-						(*callbacks.triggeredCallback)();
-					if (isActive && !callbacks.is_active && callbacks.startCallback)
-						(*callbacks.startCallback)();
-					else if (isActive && callbacks.is_active && callbacks.activeCallback)
-						(*callbacks.activeCallback)();
-					if (!isActive && callbacks.is_active && callbacks.endCallback)
-						(*callbacks.endCallback)();
-					if (callbacks.is_active)
-						callbacks.active_duration += dt;
-					callbacks.is_active = isActive;
-					if (!callbacks.is_active)
-						callbacks.active_duration = 0.0;
+					if (isTriggered)
+						action_inst.on_trigger.invoke();
+					if (isActive && !action_inst.is_active)
+						action_inst.on_start.invoke();
+					if (action_inst.is_active)
+						action_inst.active_duration += dt;
+					action_inst.is_active = isActive;
+					if (!action_inst.is_active)
+						action_inst.active_duration = 0.0;
 				}
 
 
 				if (action->is_additive)
-					deviceValue.v += rawValue.v;
+					device_val.v += raw_val.v;
 				else
-					deviceValue.v = glm::max(deviceValue.v, rawValue.v);
+					device_val.v = glm::max(device_val.v, raw_val.v);
 			}
-			callbacks.state = deviceValue;
+			action_inst.state = device_val;
 		}
 	}
 
 	implLocal->mouseScrollAccum = 0;
-}
-
-void GameInputSystem::set_my_device(InputUser* u, handle<InputDevice> handle)
-{
-	if (u->assigned_device.id == handle.id)
-		return;
-	if (u->assigned_device.is_valid()) {
-		auto device = impl->get_device(u->assigned_device);
-		assert(device->user == u);
-		device->user = nullptr;
-
-	}
-	if (!handle.is_valid())
-		return;
-
-	auto device =impl->get_device(handle);
-	if (device->user) {
-		sys_print(Warning, "stealing a device from another inputuser\n");
-		device->user->assigned_device = { -1 };
-		device->user->on_lost_device.invoke();
-		device->user = nullptr;
-	}
-	device->user = u;
-	u->assigned_device = device->selfHandle;
-	u->on_changed_device.invoke();
 }

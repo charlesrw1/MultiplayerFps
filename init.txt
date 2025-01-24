@@ -6,6 +6,7 @@ thirdperson 1
 #g_draw_physx_scene 31
 
 bind 1 "map top_down/map0.tmap"
+bind 2 "TOGGLE_PLAY_EDIT_MAP"
 
 bind . "g_drawdebugmenu 1"
 bind , "g_drawdebugmenu 0"
