@@ -30,6 +30,7 @@ enum class MaterialUsage : uint8_t
 	Terrain,
 	Decal,
 	UI,
+	Particle,
 };
 
 

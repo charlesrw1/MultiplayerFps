@@ -8,17 +8,17 @@ CLASS_H(Root_EdNode, Base_EdNode)
 
 		if (!is_this_node_created()) {
 			if (graph_layer == 0) {	// root layer
-				Base_EdNode* root = ed.editor_node_for_cfg_node(ed.get_tree()->get_root_node());
+				Base_EdNode* root = anim_graph_ed.editor_node_for_cfg_node(anim_graph_ed.get_tree()->get_root_node());
 				if (root)
-					add_input(&ed, root, 0);
+					add_input(&anim_graph_ed, root, 0);
 			}
 			else {
-				Base_EdNode* owning_node = ed.get_owning_node_for_layer(graph_layer);
+				Base_EdNode* owning_node = anim_graph_ed.get_owning_node_for_layer(graph_layer);
 				ASSERT(owning_node->is_state_node());
 				State_EdNode* state_owner = (State_EdNode*)owning_node;
-				Base_EdNode* root_node_in_layer = ed.editor_node_for_cfg_node(state_owner->self_state.tree);
+				Base_EdNode* root_node_in_layer = anim_graph_ed.editor_node_for_cfg_node(state_owner->self_state.tree);
 				if (root_node_in_layer)
-					add_input(&ed, root_node_in_layer, 0);
+					add_input(&anim_graph_ed, root_node_in_layer, 0);
 			}
 		}
 		clear_newly_created();

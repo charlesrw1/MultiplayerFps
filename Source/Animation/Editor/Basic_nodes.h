@@ -15,7 +15,7 @@ inline bool util_create_or_ensure(T*& node)
 		return false;
 	}
 	else {
-		ed.util_create_node(node);
+		anim_graph_ed.util_create_node(node);
 		return true;
 	}
 }
@@ -35,7 +35,7 @@ inline void util_default_init(Base_EdNode* ednode, BaseAGNode* node, bool is_fir
 		if (!*node_prop)
 			continue;
 		
-		Base_EdNode* ed_node = ed.editor_node_for_cfg_node(*node_prop);
+		Base_EdNode* ed_node = anim_graph_ed.editor_node_for_cfg_node(*node_prop);
 
 		if (!ed_node) {
 			printf("!!! couldn't find editor node for cfg !!! (data read wrong from disk or out of date?)\n");
@@ -406,7 +406,7 @@ bool compile_my_data(const AgSerializeContext* ctx) override {
 		append_fail_msg("[ERROR] slot_name is empty, set slot_name to the string that assets reference to play directly");
 	else {
 		bool found = false;
-		auto tree = ed.editing_tree;
+		auto tree = anim_graph_ed.editing_tree;
 		for (int i = 0; i < tree->direct_slot_names.size(); i++) {
 			if (tree->direct_slot_names[i] == slot_name) {
 				node->slot_index = i;

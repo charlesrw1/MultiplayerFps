@@ -212,7 +212,7 @@ class AgBoneFinder : public IPropertyEditor
 public:
 	AgBoneFinder()
 	{
-		auto model = ed.out.get_model();
+		auto model = anim_graph_ed.out.get_model();
 		if (!model || !model->get_skel()) {
 			no_model = true; 
 			return; 

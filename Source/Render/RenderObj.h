@@ -60,3 +60,14 @@ struct MeshBuilder_Object
 	bool use_background_color : 1;
 	glm::mat4 transform = glm::mat4(1.f);
 };
+
+struct Particle_Object
+{
+	Particle_Object() {
+
+	}
+	const EntityComponent* owner = nullptr;
+	MeshBuilder* meshbuilder = nullptr;
+	MaterialInstance* material = nullptr;
+	glm::mat4 transform = glm::mat4(1.f);
+};

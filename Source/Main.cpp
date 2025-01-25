@@ -19,7 +19,6 @@
 
 #include "Level.h"
 
-
 #include "GameEngineLocal.h"
 
 #include "Types.h"
@@ -747,17 +746,6 @@ void register_input_actions_for_game()
 
 }
 
-// game/inv_0/keyboard/ 0
-// game/look/keyboard/lookX MouseX
-// game/look/keyboard/lookY MouseY
-// "ui/left/controller/abutton"
-// "game/reload/controller/xbutton"
-// "game/move/keyboard/y+ W"
-// "game/move/keyboard/y- S"
-// "game/jump/controller Space"
-// "game/jump/keyboard_1/y+
-
-
 int main(int argc, char** argv)
 {
 	eng_local.argc = argc;
@@ -776,8 +764,6 @@ int main(int argc, char** argv)
 // The entry point of the game! (not used in the editor)
 // Takes in a string of the level to start with on the final game
 // Should look like: "mylevel.tmap" for $ROOT/gamedat/mylevel.tmap
-
-
 ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "the entry point of the game, this takes in a level filepath");
 
 ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV, "the default gamemain class of the program");
@@ -817,7 +803,6 @@ void GameEngineLocal::open_level(string nextname)
 
 void GameEngineLocal::leave_level()
 {
-	// disconnect clients etc.
 	// current map gets unloaded in next ::loop()
 	state = Engine_State::Idle;
 }
@@ -846,15 +831,10 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	time = 0.0;
 	set_tick_rate(60.f);
 
-	auto world_settings = level->get_world_settings();
-
 	idraw->on_level_start();
-
 
 	sys_print(Info, "changed state to Engine_State::Game\n");
 
-	// fixme, for server set state to game, but clients will sit in a wait loop till they recieve their first
-	// snapshot before continuing
 	state = Engine_State::Game;
 
 	on_map_load_return.invoke(true);

@@ -4,15 +4,15 @@
  void Statemachine_EdNode::init() {
 	bool is_create = util_create_or_ensure(node);
 	if (is_create) {
-		sublayer = ed.create_new_layer(true);
-		ed.add_root_node_to_layer(this, sublayer.id, true);
+		sublayer = anim_graph_ed.create_new_layer(true);
+		anim_graph_ed.add_root_node_to_layer(this, sublayer.id, true);
 	}
 	else {
 
-		for (int i = 0; i < ed.nodes.size(); i++) {
-			if (ed.nodes[i]->graph_layer == sublayer.id) {
-				ASSERT(ed.nodes[i]->is_state_node());
-				add_node_to_statemachine((State_EdNode*)ed.nodes[i]);
+		for (int i = 0; i < anim_graph_ed.nodes.size(); i++) {
+			if (anim_graph_ed.nodes[i]->graph_layer == sublayer.id) {
+				ASSERT(anim_graph_ed.nodes[i]->is_state_node());
+				add_node_to_statemachine((State_EdNode*)anim_graph_ed.nodes[i]);
 			}
 		}
 		// now have a list of all ed state nodes
@@ -65,7 +65,7 @@ bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 	node->entry_transitions.resize(0);
 	node->transitions.clear();
 
-	node->initialize(ed.editing_tree);
+	node->initialize(anim_graph_ed.editing_tree);
 
 	bool has_errors = false;
 
@@ -85,7 +85,7 @@ bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 		append_fail_msg("[ERROR] state machine states contain errors\n");
 
 
-	auto state_enter = ed.find_first_node_in_layer<StateStart_EdNode>(sublayer.id);
+	auto state_enter = anim_graph_ed.find_first_node_in_layer<StateStart_EdNode>(sublayer.id);
 	ASSERT(state_enter);	// should never be deleted
 
 	bool found_default_entry = false;

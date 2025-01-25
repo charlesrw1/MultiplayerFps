@@ -355,6 +355,8 @@ public:
 	void create_default_textures();
 
 	void render_level_to_target(const Render_Level_Params& params);
+	void render_particles();
+
 	void accumulate_gbuffer_lighting();
 	void deferred_decal_pass();
 

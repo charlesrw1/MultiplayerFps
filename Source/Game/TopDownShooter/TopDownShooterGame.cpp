@@ -204,7 +204,7 @@ public:
 		float dt = eng->get_dt();
 		uint32_t flags = 0;
 		glm::vec3 outvel;
-		float move_speed = 5.0;
+		float move_speed = 3.0;
 		
 		ccontroller->move(glm::vec3(to_dir.x, 0, to_dir.z)*move_speed * dt, dt, 0.005f, flags, outvel);
 
@@ -302,6 +302,28 @@ public:
 	TopDownPlayer* driver = nullptr;
 };
 CLASS_IMPL(TopDownCar);
+
+
+CLASS_H(TopDownWeaponData, ClassBase)
+public:
+	std::string name;
+	AssetPtr<Model> model;
+	int damage = 0; // damage per shot
+	float fire_rate = 1.f;	// per second
+	int type = 0;	// 0 = rifle, 1 = shotgun
+	int pellets = 0;	// for shotgun
+	float accuracy = 1.f;
+	float bullet_speed = 20.f;
+	AssetPtr<PrefabAsset> special_projectile;	// what projectile to spawn
+};
+CLASS_IMPL(TopDownWeaponData);
+
+class TopDownPlayerInventory
+{
+public:
+	TopDownWeaponData* selected = nullptr;
+	std::vector<TopDownWeaponData*> weapons;
+};
 
 struct TopDownControls
 {
@@ -433,6 +455,7 @@ public:
 
 	virtual void update() override {
 
+		did_move = false;
 		if (is_in_car)
 			return;
 
@@ -473,6 +496,8 @@ public:
 		float len = glm::length(move);
 		if(len>1.0)
 			move = glm::normalize(move);
+		if (len > 0.01)
+			did_move = true;
 		float dt = eng->get_dt();
 		uint32_t flags = 0;
 		glm::vec3 outvel;
@@ -531,6 +556,8 @@ public:
 	glm::vec3 lookdir=glm::vec3(1,0,0);
 	glm::vec3 mouse_pos = glm::vec3(0, 0, 0);
 
+	bool did_move = false;
+
 	bool has_had_update = false;
 };
 CLASS_IMPL(TopDownPlayer);
@@ -543,25 +570,20 @@ public:
 		auto ptr = get_owner()->get_first_component<PhysicsComponentBase>();
 		if (ptr) {
 			ptr->on_trigger_start.add(this, [&](PhysicsComponentBase* c) {
-				if (already_triggered) return;
-
 				if (c->get_owner() == TopDownGameManager::instance->the_player) {
-					already_triggered = true;
 					for (auto eptr : objects_to_active) {
 						auto e = eptr.get();
 						if(e)
 							e->set_active(true);
 					}
+					eng->get_level()->queue_deferred_delete(get_owner());
 				}
-
 				});
 		}
 		else {
 			sys_print(Error, "PlayerTriggerComponent needs physics component\n");
 		}
 	}
-
-	bool already_triggered = false;
 	std::vector<EntityPtr<Entity>> objects_to_active;
 
 	static const PropertyInfoList* get_props() {
@@ -590,3 +612,108 @@ public:
 	}
 };
 CLASS_IMPL(TopDownCameraReg);
+#include "Game/Components/LightComponents.h"
+
+float fade(float t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+float lerp(float t, float a, float b) {
+    return a + t * (b - a);
+}
+void randomGradient(int ix, int iy, float& gx, float& gy) {
+    float random = 2920.0f * sin(ix * 21942.0f + iy * 171324.0f + 8912.0f) * cos(ix * 23157.0f * iy * 217832.0f + 9758.0f);
+    gx = cos(random);
+    gy = sin(random);
+}
+float dotGridGradient(int ix, int iy, float x, float y) {
+    float gx, gy;
+	randomGradient(ix, iy, gx, gy);
+    float dx = x - static_cast<float>(ix);
+    float dy = y - static_cast<float>(iy);
+    return (dx * gx + dy * gy);
+}
+float perlin(float x, float y) {
+    int x0 = static_cast<int>(floor(x));
+    int x1 = x0 + 1;
+    int y0 = static_cast<int>(floor(y));
+    int y1 = y0 + 1;
+
+    float sx = fade(x - static_cast<float>(x0));
+    float sy = fade(y - static_cast<float>(y0));
+
+    float n0, n1, ix0, ix1, value;
+    n0 = dotGridGradient(x0, y0, x, y);
+    n1 = dotGridGradient(x1, y0, x, y);
+    ix0 = lerp(sx, n0, n1);
+
+    n0 = dotGridGradient(x0, y1, x, y);
+    n1 = dotGridGradient(x1, y1, x, y);
+    ix1 = lerp(sx, n0, n1);
+
+    value = lerp(sy, ix0, ix1);
+    return (value + 1.0) / 2.0;  // Normalize to [0, 1]
+}
+
+
+CLASS_H(TopDownFireScript,EntityComponent)
+public:
+	TopDownFireScript() {
+		set_call_init_in_editor(true);
+	}
+	void start() override {
+		light = get_owner()->get_first_component<PointLightComponent>();
+		set_ticking(true);
+
+		Random r(get_instance_id());
+		ofs = r.RandF();
+	}
+	void update() override {
+		if (!light) return;
+		float a = perlin(eng->get_game_time() * 2.0+ofs, eng->get_game_time()-ofs*0.2);
+		light->intensity = glm::mix(min_intensity,max_intensity,pow(a,2.0));
+		light->on_changed_transform();
+	}
+
+	float ofs = 0.0;
+	float min_intensity = 0.0;
+	float max_intensity = 30.0;
+	PointLightComponent* light = nullptr;
+};
+CLASS_IMPL(TopDownFireScript);
+
+#include "Animation/Runtime/Animation.h"
+CLASS_H(TopDownAnimDriver, AnimatorInstance)
+public:
+
+	virtual void on_init() override {
+		if (get_owner()) {
+			p = get_owner()->cast_to<TopDownPlayer>();
+		}
+	}
+	virtual void on_update(float dt) override {
+		if (p) {
+			bRunning = p->did_move;
+		}
+		else
+			bRunning = true;
+	}
+	virtual void on_post_update() override {
+
+	}
+
+	TopDownPlayer* p = nullptr;
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(TopDownAnimDriver)
+			REG_FLOAT(flMovex,PROP_DEFAULT,""),
+			REG_FLOAT(flMovey, PROP_DEFAULT, ""),
+			REG_BOOL(bRunning, PROP_DEFAULT, ""),
+		END_PROPS(TopDownAnimDriver)
+	}
+
+	bool bRunning = false;
+	float flMovex = 0.0;
+	float flMovey = 0.0;
+};
+CLASS_IMPL(TopDownAnimDriver);

@@ -51,6 +51,7 @@
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
+    <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
     <ClInclude Include="Source\Old\Client.h" />
     <ClInclude Include="Source\Old\Connection.h" />
     <ClInclude Include="Source\DeferredSpawnScope.h" />
@@ -236,6 +237,7 @@
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Old\Client.cpp" />
     <ClCompile Include="Source\Old\ClientMgr.cpp" />
     <ClCompile Include="Source\Old\Connection.cpp" />

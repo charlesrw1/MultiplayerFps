@@ -22,7 +22,7 @@ void State_EdNode::init()
 		return;
 	// loaded nodes get a different path
 
-	Base_EdNode* parent = ed.get_owning_node_for_layer(graph_layer);
+	Base_EdNode* parent = anim_graph_ed.get_owning_node_for_layer(graph_layer);
 	ASSERT(parent);
 	ASSERT(parent->is_a<Statemachine_EdNode>());
 	parent_statemachine = parent->cast_to<Statemachine_EdNode>();
@@ -30,8 +30,8 @@ void State_EdNode::init()
 
 	if (is_regular_state_node()) {
 		ASSERT(!sublayer.context);
-		sublayer = ed.create_new_layer(false);
-		ed.add_root_node_to_layer(this, sublayer.id, false);
+		sublayer = anim_graph_ed.create_new_layer(false);
+		anim_graph_ed.add_root_node_to_layer(this, sublayer.id, false);
 	}
 	else if (is_start_node()) {
 		// num_inputs implicitly 0
@@ -54,7 +54,7 @@ void State_EdNode::init_for_statemachine(Statemachine_EdNode* parent, std::vecto
 			State_Transition& t = parent_statemachine->node->transitions.at(index);
 			State_EdNode* to = handle_to_ednode[t.transition_state.id];
 			ASSERT(to->is_regular_state_node());
-			to->push_input(&ed, this);
+			to->push_input(&anim_graph_ed, this);
 			// this is horrible, add_input calls on_output on this
 			ASSERT(output.back().output_to == to);
 			output.back().st = t;
@@ -72,7 +72,7 @@ void State_EdNode::init_for_statemachine(Statemachine_EdNode* parent, std::vecto
 			State_Transition& t = parent_statemachine->node->transitions.at(index);
 			State_EdNode* to = handle_to_ednode[t.transition_state.id];
 			ASSERT(to->is_regular_state_node());
-			to->push_input(&ed, this);
+			to->push_input(&anim_graph_ed, this);
 			// this is horrible, add_input calls on_output on this
 			ASSERT(output.back().output_to == to);
 			output.back().st = t;
@@ -97,7 +97,7 @@ std::string State_EdNode::get_title() const
 
 	bool any_non_defaults = false;
 
-	auto startnode = ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
+	auto startnode = anim_graph_ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
 
 	if (!startnode->inputs[0].node || !startnode->inputs[0].node->is_a<Clip_EdNode>())
 		return get_name();
@@ -230,7 +230,7 @@ bool State_EdNode::compile_data_for_statemachine(const AgSerializeContext* ctx)
 
 	// append tree
 	if (is_regular_state_node()) {
-		Root_EdNode* startnode = ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
+		Root_EdNode* startnode = anim_graph_ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
 		ASSERT(startnode);
 
 		Node_CFG* tree = startnode->get_root_node();
@@ -261,7 +261,7 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 	}
 	ASSERT(slot == -1 || already_seen);
 	// output array might become invalidated
-	ed.signal_nessecary_prop_ed_reset();
+	anim_graph_ed.signal_nessecary_prop_ed_reset();
 }
 
  void State_EdNode::get_transition_props(State_EdNode* to, std::vector<PropertyListInstancePair>& props, int slot)
@@ -279,7 +279,7 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
  bool State_EdNode::traverse_and_find_errors() {
 	children_have_errors = false;
 	if (is_regular_state_node()) {
-		auto startnode = ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
+		auto startnode = anim_graph_ed.find_first_node_in_layer<Root_EdNode>(sublayer.id);
 
 		if (startnode->get_root_node())
 			children_have_errors |= !startnode->inputs[0].node->traverse_and_find_errors();
@@ -398,7 +398,7 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 		 }
 		 else if (vd.type == ScriptValueType::Variable) {
 
-			 const AnimatorInstance* a = ed.out.get_animator();
+			 const AnimatorInstance* a = anim_graph_ed.out.get_animator();
 			 if (!a) {
 				 ImGui::PopID();
 				 return;

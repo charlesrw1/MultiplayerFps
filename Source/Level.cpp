@@ -64,6 +64,16 @@ void Level::update_level()
 			tick_list.insert(want);
 	}
 	wantsToAddToUpdate.clear();
+
+
+	for (auto h : deferred_delete_list) {
+		auto e = get_entity(h);
+		if (!e) continue;
+		ASSERT(e->is_a<Entity>());
+		auto ent = (Entity*)e;
+		ent->destroy();
+	}
+	deferred_delete_list.clear();
 }
 
 Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
@@ -305,4 +315,10 @@ Entity* Level::spawn_prefab(PrefabAsset* asset)
 	unserialized_scene.get_root_entity()->is_root_of_prefab = true;
 	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
 	return unserialized_scene.get_root_entity();
+}
+
+void Level::queue_deferred_delete(Entity* e)
+{
+	if (!e) return;
+	deferred_delete_list.insert(e->get_instance_id());
 }

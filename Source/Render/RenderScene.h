@@ -413,6 +413,23 @@ public:
 		}
 	}
 
+	Free_List<Particle_Object> particle_objs;
+	virtual handle<Particle_Object> register_particle_obj(const Particle_Object& mbobj) {
+		int handle = particle_objs.make_new();
+		particle_objs.get(handle) = mbobj;
+		return { handle };
+	}
+	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) {
+		assert(handle.is_valid());
+		particle_objs.get(handle.id) = mbobj;
+	}
+	virtual void remove_particle_obj(handle<Particle_Object>& handle) {
+		if (handle.is_valid()) {
+			particle_objs.free(handle.id);
+			handle = { -1 };
+		}
+	}
+
 
 	void build_scene_data(bool skybox_only, bool is_for_editor);
 

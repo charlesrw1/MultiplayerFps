@@ -6,6 +6,7 @@ thirdperson 1
 
 bind 1 "map top_down/map0.tmap"
 bind 2 "TOGGLE_PLAY_EDIT_MAP"
+bind 3 "start_ed Prefab fire_emit.pfb"
 
 drawconsole 1
 

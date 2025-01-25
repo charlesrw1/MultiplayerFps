@@ -461,7 +461,7 @@ bool MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 			}
 		}
 		else if(tok.cmp("DOMAIN")) {
-			usage = (MaterialUsage)parse_options({ "Default","PostProcess","Terrain","Decal","UI"});
+			usage = (MaterialUsage)parse_options({ "Default","PostProcess","Terrain","Decal","UI","Particle"});
 		}
 		else {
 			throw MasterMaterialExcept(fullpath, "Unknown cmd : " + to_std_string_sv(tok));
@@ -602,15 +602,17 @@ std::string MasterMaterialImpl::create_glsl_shader(
 {
 	std::string masterShader;
 
-	const char* master_shader_path = "MasterDeferredShader.txt";
+	const char* master_shader_path = "MASTER/MasterDeferredShader.txt";
 	if (usage == MaterialUsage::Terrain)
-		master_shader_path = "MasterTerrainShader.txt";
+		master_shader_path = "MASTER/MasterTerrainShader.txt";
 	else if (usage == MaterialUsage::Decal)
-		master_shader_path = "MasterDecalShader.txt";
+		master_shader_path = "MASTER/MasterDecalShader.txt";
 	else if (usage == MaterialUsage::UI)
-		master_shader_path = "MasterUIShader.txt";
+		master_shader_path = "MASTER/MasterUIShader.txt";
 	else if (usage == MaterialUsage::Postprocess)
-		master_shader_path = "MasterPostProcessShader.txt";
+		master_shader_path = "MASTER/MasterPostProcessShader.txt";
+	else if (usage == MaterialUsage::Particle)
+		master_shader_path = "MASTER/MasterParticleShader.txt";
 
 	bool good = read_and_add_recursive(master_shader_path, masterShader);
 	if (!good)
@@ -696,6 +698,10 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	if (is_alphatested())
 		masterShader.insert(0,
 			"#define ALPHATEST\n");
+	if (blend != blend_state::OPAQUE)
+		masterShader.insert(0,
+			"#define FORWARD_SHADER\n"
+		);
 
 	masterShader.insert(0, 
 		"// ***********************************\n"

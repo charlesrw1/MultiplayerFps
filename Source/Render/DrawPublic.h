@@ -31,6 +31,7 @@ struct SceneDrawParamsEx {
 	bool skybox_only = false;
 };
 
+struct Particle_Object;
 struct Render_Object;
 struct MeshBuilder_Object;
 struct Render_Decal;
@@ -96,6 +97,10 @@ public:
 	virtual handle<MeshBuilder_Object> register_meshbuilder(const MeshBuilder_Object& mbobj) = 0;
 	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) = 0;
 	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) = 0;
+
+	virtual handle<Particle_Object> register_particle_obj(const Particle_Object& mbobj) = 0;
+	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) = 0;
+	virtual void remove_particle_obj(handle<Particle_Object>& handle) = 0;
 };
 
 class GuiSystemPublic;

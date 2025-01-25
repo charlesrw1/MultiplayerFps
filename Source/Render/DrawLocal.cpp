@@ -1176,7 +1176,39 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 	device.reset_states();
 }
 
+void Renderer::render_particles()
+{
+	device.reset_states();
+	auto& pobjs = scene.particle_objs.objects;
 
+	for (auto& p_ : pobjs) {
+		auto& p = p_.type_;
+		const MaterialInstance* mat = p.material;
+		if (!mat)
+			continue;
+
+		RenderPipelineState state;
+		state.program = matman.get_mat_shader(false, nullptr, mat, false, false, false, false); ;
+		state.vao = p.meshbuilder->VAO;
+		state.backface_culling = mat->get_master_material()->backface;
+		state.blend = mat->get_master_material()->blend;
+		state.depth_testing = true;
+		state.depth_writes = state.blend == blend_state::OPAQUE;
+		state.depth_less_than = false;
+		device.set_pipeline(state);
+
+		shader().set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
+		shader().set_mat4("Model", p.transform);
+		shader().set_mat4("ViewProj", vs.viewproj);
+
+		auto& textures = mat->impl->get_textures();
+		for (int i = 0; i < textures.size(); i++) {
+			bind_texture(i, textures[i]->gl_id);
+		}
+
+		glDrawElements(GL_TRIANGLES, p.meshbuilder->indicies.size(), GL_UNSIGNED_INT, (void*)0);
+	}
+}
 
 static void draw_skeleton(const AnimatorInstance* a,float line_len,const mat4& transform)
 {
@@ -2260,6 +2292,8 @@ void Renderer::deferred_decal_pass()
 	//glEnable(GL_DEPTH_TEST);
 }
 
+#include "Game/Components/ParticleComponent.h" // FIXME
+
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
 ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
 
@@ -2276,6 +2310,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	matman.pre_render_update();
 
 	check_cubemaps_dirty();
+
+	// update particles, doesnt actually draw, just builds meshes
+	ParticleMgr::get().draw(view);
 
 	scene_draw_internal(params, view, gui);
 }
@@ -2503,6 +2540,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		params.draw_viewmodel = true;
 
 		render_level_to_target(params);
+
+		render_particles();
 	}
 
 

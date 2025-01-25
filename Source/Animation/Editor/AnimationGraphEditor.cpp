@@ -40,8 +40,8 @@ std::string remove_whitespace(const char* str)
 }
 
 
-AnimationGraphEditor ed;
-IEditorTool* g_anim_ed_graph = &ed;
+AnimationGraphEditor anim_graph_ed;
+IEditorTool* g_anim_ed_graph = &anim_graph_ed;
 
 
 class AG_GuiLayout : public GUIFullscreen
@@ -84,10 +84,10 @@ struct AnimCompletionCallbackUserData
 };
 std::vector<const char*>* anim_completion_callback_function(void* user, const char* word_start, int len);
 
-AnimCompletionCallbackUserData param_completion = { &ed, AnimCompletionCallbackUserData::PARAMS };
-AnimCompletionCallbackUserData clip_completion = { &ed, AnimCompletionCallbackUserData::CLIPS };
-AnimCompletionCallbackUserData bone_completion = { &ed, AnimCompletionCallbackUserData::BONES };
-AnimCompletionCallbackUserData prop_type_completion = { &ed, AnimCompletionCallbackUserData::PROP_TYPE };
+AnimCompletionCallbackUserData param_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::PARAMS };
+AnimCompletionCallbackUserData clip_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::CLIPS };
+AnimCompletionCallbackUserData bone_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::BONES };
+AnimCompletionCallbackUserData prop_type_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::PROP_TYPE };
 
 
 ImVec4 scriptparamtype_to_color(anim_graph_value type)
@@ -115,7 +115,7 @@ ImVec4 graph_pin_type_to_color(GraphPinType pin)
 
 void ControlParamsWindow::refresh_props() {
 	props.clear();
-	const AnimatorInstance* a = ed.out.get_animator();
+	const AnimatorInstance* a = anim_graph_ed.out.get_animator();
 	if (!a)
 		return;
 
@@ -361,7 +361,7 @@ void TabState::imgui_draw() {
 
 		uint32_t node_id = Base_EdNode::get_nodeid_from_link_id(link);
 		uint32_t slot = Base_EdNode::get_slot_from_id(link);
-		Base_EdNode* node_s = ed.find_node_from_id(node_id);
+		Base_EdNode* node_s = anim_graph_ed.find_node_from_id(node_id);
 		if (node_s->is_state_node()) {
 
 			auto state = dynamic_cast<State_EdNode*>(node_s);
@@ -684,6 +684,7 @@ void AnimationGraphEditor::imgui_draw()
 	//cei.draw();
 	//seqimgui.draw();
 	//cei.draw();
+	ASSERT(anim_graph_ed.out.get_animator() || !anim_class_type.ptr);
 
 	node_props->set_read_only(graph_is_read_only());
 
@@ -697,9 +698,9 @@ void AnimationGraphEditor::imgui_draw()
 		self_grid.update();
 		if (self_grid.rows_had_changes) {
 			auto anim_instance = (!anim_class_type.ptr) ? new AnimatorInstance : (AnimatorInstance*)anim_class_type.ptr->allocate();
-			ed.out.set_animator_instance(anim_instance);
-			on_set_animator_instance.invoke(ed.out.get_animator());
-			ed.out.set_model(output_model.get());
+			anim_graph_ed.out.set_animator_instance(anim_instance);
+			on_set_animator_instance.invoke(anim_graph_ed.out.get_animator());
+			anim_graph_ed.out.set_model(output_model.get());
 			on_set_model.invoke(output_model.get());
 		}
 	}
@@ -1248,12 +1249,12 @@ bool AgEditor_BaseNode::compile_my_data()
 		if (strcmp(prop_list->list[j].custom_type_str, "AG_PARAM_FINDER") == 0) {
 			ASSERT(prop_list->list[j].type == core_type_id::Int32);
 			int ed_id = prop_list->list[j].get_int(node);
-			int paramid = ed.control_params.get_index_of_prop_for_compiling(ed_id).id;
+			int paramid = anim_graph_ed.control_params.get_index_of_prop_for_compiling(ed_id).id;
 			prop_list->list[j].set_int(node, paramid);
 		}
 	}
 
-	node->init_memory_offsets(ed.editing_tree, num_inputs);
+	node->init_memory_offsets(anim_graph_ed.editing_tree, num_inputs);
 
 	bool has_null_input = false;
 	node->input.resize(num_inputs);
@@ -1502,8 +1503,8 @@ void AnimationGraphEditor::tick(float dt)
 
 ControlParamsWindow::ControlParamsWindow()
 {
-	ed.on_set_animator_instance.add(this, &ControlParamsWindow::on_set_animator_instance);
-	ed.on_close.add(this, &ControlParamsWindow::on_close);
+	anim_graph_ed.on_set_animator_instance.add(this, &ControlParamsWindow::on_set_animator_instance);
+	anim_graph_ed.on_close.add(this, &ControlParamsWindow::on_close);
 
 }
 
@@ -1520,7 +1521,7 @@ void ControlParamsWindow::imgui_draw()
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 
 
-	const bool is_graph_running = ed.playback != AnimationGraphEditor::graph_playback_state::stopped;
+	const bool is_graph_running = anim_graph_ed.playback != AnimationGraphEditor::graph_playback_state::stopped;
 
 	const int num_cols = (is_graph_running) ? 3 : 2;
 
@@ -1566,21 +1567,21 @@ void ControlParamsWindow::imgui_draw()
 				switch (res.type)
 				{
 				case anim_graph_value::float_t: {
-					float f = res.nativepi->get_float(ed.out.get_animator());
+					float f = res.nativepi->get_float(anim_graph_ed.out.get_animator());
 					ImGui::DragFloat("##inpf", &f, 0.05);
-					res.nativepi->set_float(ed.out.get_animator(), f);
+					res.nativepi->set_float(anim_graph_ed.out.get_animator(), f);
 				}break;
 				case anim_graph_value::bool_t: {
-					bool b = res.nativepi->get_int(ed.out.get_animator());
+					bool b = res.nativepi->get_int(anim_graph_ed.out.get_animator());
 					ImGui::Checkbox("##inpf", &b);
-					res.nativepi->set_int(ed.out.get_animator(), b);
+					res.nativepi->set_int(anim_graph_ed.out.get_animator(), b);
 				}break;
 				case anim_graph_value::vec3_t: {
-					glm::vec3* v = (glm::vec3*)res.nativepi->get_ptr(ed.out.get_animator());
+					glm::vec3* v = (glm::vec3*)res.nativepi->get_ptr(anim_graph_ed.out.get_animator());
 					ImGui::DragFloat3("##inpf", &v->x,0.025);
 				}break;
 				case anim_graph_value::quat_t: {
-					glm::quat* v = (glm::quat*)res.nativepi->get_ptr(ed.out.get_animator());
+					glm::quat* v = (glm::quat*)res.nativepi->get_ptr(anim_graph_ed.out.get_animator());
 					
 					glm::vec3 eul = glm::eulerAngles(*v);
 					eul *= 180.f / PI;
@@ -1592,9 +1593,9 @@ void ControlParamsWindow::imgui_draw()
 				}break;
 				case anim_graph_value::int_t:
 				{
-					int b = res.nativepi->get_int(ed.out.get_animator());
+					int b = res.nativepi->get_int(anim_graph_ed.out.get_animator());
 					ImGui::InputInt("##inpf", &b);
-					res.nativepi->set_int(ed.out.get_animator(), b);
+					res.nativepi->set_int(anim_graph_ed.out.get_animator(), b);
 				}break;
 				};
 			}
@@ -1646,12 +1647,12 @@ void AnimationGraphEditor::create_new_document()
 void AnimationGraphEditor::try_load_preview_models()
 {
 	if (anim_class_type.ptr)
-		ed.out.set_animator_instance((AnimatorInstance*)anim_class_type.ptr->allocate());	// fixme
+		anim_graph_ed.out.set_animator_instance((AnimatorInstance*)anim_class_type.ptr->allocate());	// fixme
 	else
-		ed.out.set_animator_instance(new AnimatorInstance);
-
+		anim_graph_ed.out.set_animator_instance(new AnimatorInstance);
+	ASSERT(anim_graph_ed.out.get_animator());
 	on_set_model.invoke(output_model.get());
-	on_set_animator_instance.invoke(ed.out.get_animator());
+	on_set_animator_instance.invoke(anim_graph_ed.out.get_animator());
 }
 
 
@@ -1665,7 +1666,7 @@ void AnimationGraphEditor::post_map_load_callback()
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 
 	output_model = GetAssets().find_sync<Model>(animed_default_model.get_string());
-	ed.out.set_model(output_model.get());
+	anim_graph_ed.out.set_model(output_model.get());
 
 	auto& name = get_doc_name();
 
@@ -1743,8 +1744,8 @@ void GraphOutput::show(bool is_playing)
 		obj = idraw->get_scene()->register_obj();
 	Render_Object obj_data;
 	obj_data.model = model;
-	if (is_playing && model->get_skel() && anim) {
-		obj_data.animator = anim.get();
+	if (is_playing && model->get_skel() && animator) {
+		obj_data.animator = animator;
 		obj_data.transform = model->get_root_transform();
 
 	}
@@ -1758,27 +1759,31 @@ void GraphOutput::hide()
 void GraphOutput::clear()
 {
 	model = nullptr;
-	anim.reset();
+	delete animator;
+	animator = nullptr;
 	idraw->get_scene()->remove_obj(obj);
 }
 void GraphOutput::set_animator_instance(AnimatorInstance* inst)
 {
-	anim.reset( inst );
+	ASSERT(inst);
+	if (animator)
+		delete animator;
+	animator = inst;
 	idraw->get_scene()->remove_obj(obj);
 }
 
 
 AnimatorInstance* GraphOutput::get_animator()
 {
-	return anim.get();
+	return animator;
 }
 
 
 
 AnimGraphClipboard::AnimGraphClipboard()
 {
-	ed.gui->key_down_delegate.add(this, &AnimGraphClipboard::on_key_down);
-	ed.on_close.add(this, &AnimGraphClipboard::on_close);
+	anim_graph_ed.gui->key_down_delegate.add(this, &AnimGraphClipboard::on_key_down);
+	anim_graph_ed.on_close.add(this, &AnimGraphClipboard::on_close);
 }
 void AnimGraphClipboard::on_close() {
 	clipboard.clear();
@@ -1793,7 +1798,7 @@ void AnimGraphClipboard::on_key_down(const SDL_KeyboardEvent& key)
 
 		clipboard.clear();
 		for (int i = 0; i < ids.size(); i++)
-			clipboard.push_back(ed.find_node_from_id(ids[i]));
+			clipboard.push_back(anim_graph_ed.find_node_from_id(ids[i]));
 	}
 	else if (key.keysym.scancode == SDL_SCANCODE_V && key.keysym.mod & KMOD_LCTRL) {
 		paste_selected();
@@ -1804,7 +1809,7 @@ void AnimGraphClipboard::paste_selected()
 {
 	// copying expects the serialize context ...
 	AgSerializeContext context;
-	context.set_tree(ed.get_tree());
+	context.set_tree(anim_graph_ed.get_tree());
 
 	// create copy of the animation graph node
 	// create copy of the editor node with the node* set to the copied agraph node
@@ -1856,16 +1861,16 @@ void AnimGraphClipboard::paste_selected()
 					}
 
 
-					ed.add_node_to_tree_manual(copied_runtime);
+					anim_graph_ed.add_node_to_tree_manual(copied_runtime);
 				}
 			}
 		}
 
-		copied_node->id = ed.current_id++;
+		copied_node->id = anim_graph_ed.current_id++;
 
-		copied_node->graph_layer = ed.graph_tabs->get_current_layer_from_tab();
+		copied_node->graph_layer = anim_graph_ed.graph_tabs->get_current_layer_from_tab();
 	
-		ed.nodes.push_back(copied_node);
+		anim_graph_ed.nodes.push_back(copied_node);
 
 		copied_node->init();
 
@@ -1906,14 +1911,14 @@ DECLARE_ENGINE_CMD(animed_play_slot)
 		sys_print(Info, "usage animed_play_slot <slot> <anim>");
 		return;
 	}
-	if (ed.playback != AnimationGraphEditor::graph_playback_state::running) {
+	if (anim_graph_ed.playback != AnimationGraphEditor::graph_playback_state::running) {
 		sys_print(Error, "can only play slots when graph is running\n");
 		return;
 	}
 	std::string slotname = args.at(1);
 	std::string anim = args.at(2);
 
-	ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
+	anim_graph_ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
 }
 AnimationGraphEditor::AnimationGraphEditor() {
 	gui = std::make_unique<AG_GuiLayout>();

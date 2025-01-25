@@ -114,7 +114,7 @@ public:
 	void on_output_create(State_EdNode* other, int index) {
 		output.push_back({ other, index });
 		// output vector might become invalidated
-		ed.signal_nessecary_prop_ed_reset();
+		anim_graph_ed.signal_nessecary_prop_ed_reset();
 	}
 
 	State_Transition* get_state_transition_to(State_EdNode* to, int index) {

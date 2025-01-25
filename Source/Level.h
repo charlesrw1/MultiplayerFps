@@ -20,9 +20,10 @@
 
 #include "LevelSerialization/SerializationAPI.h"
 
+
+
 class PhysicsActor;
 class WorldSettings;
-
 class SceneAsset;
 class PrefabAsset;
 class Entity;
@@ -85,7 +86,6 @@ public:
 	
 	Entity* spawn_prefab(PrefabAsset* asset);
 	
-
 	template<typename T>
 	T* spawn_entity_class() {
 		static_assert(std::is_base_of<Entity, T>::value, "spawn_entity_class not derived from Entity");
@@ -107,14 +107,8 @@ public:
 		return all_world_ents.find(handle);
 	}
 
-
 	SceneAsset* get_source_asset() const {
 		return source_asset;
-	}
-
-
-	const WorldSettings* get_world_settings() const {
-		return world_settings;
 	}
 
 	bool is_editor_level() const {
@@ -124,6 +118,9 @@ public:
 	const hash_map<BaseUpdater*>& get_all_objects() const {
 		return all_world_ents;
 	}
+
+	// appends object to list that will be destroyed at end of frame, instead of instantly
+	void queue_deferred_delete(Entity* e);
 
 private:
 	SceneAsset* source_asset = nullptr;
@@ -136,12 +133,11 @@ private:
 	// last instance id, incremented to add objs
 	uint64_t last_id = 0;
 
-	// the world settings entity (owned in all_world_ents), shouldnt be nullptr
-	const WorldSettings* world_settings = nullptr;
-
 	ScopedBooleanValue b_is_in_update_tick;
 
 	std::vector<BaseUpdater*> wantsToAddToUpdate;
+
+	std::unordered_set<uint64_t> deferred_delete_list;
 
 	// is this an editor level
 	bool b_is_editor_level =false;

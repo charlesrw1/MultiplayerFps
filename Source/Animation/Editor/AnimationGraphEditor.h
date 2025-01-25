@@ -150,7 +150,7 @@ private:
 class GraphOutput
 {
 public:
-	bool is_valid_for_preview() { return model && anim && model->get_skel(); }
+	bool is_valid_for_preview() { return model && animator && model->get_skel(); }
 	
 	void hide();
 	void show(bool is_playing);
@@ -167,13 +167,13 @@ public:
 	void clear();
 
 	void initialize_animator(Animation_Tree_CFG* tree) {
-		if (anim && model)
-			anim->initialize_animator(model, tree, nullptr);
+		if (animator && model)
+			animator->initialize_animator(model, tree, nullptr);
 	}
 private:
 	handle<Render_Object> obj;
 	Model* model = nullptr;
-	std::unique_ptr<AnimatorInstance> anim = nullptr;
+	AnimatorInstance* animator = nullptr;
 
 };
 
@@ -442,4 +442,4 @@ public:
 	}
 };
 
-extern AnimationGraphEditor ed;
+extern AnimationGraphEditor anim_graph_ed;

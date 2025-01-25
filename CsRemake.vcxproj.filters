@@ -526,6 +526,7 @@
     <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
+    <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Old\Client.cpp">
@@ -804,5 +805,6 @@
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
   </ItemGroup>
 </Project>
