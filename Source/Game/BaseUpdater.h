@@ -13,12 +13,11 @@ class Level;
 CLASS_H(BaseUpdater, ClassBase)
 public:
 
-	// initialization pseudo code:
+	// initialization:
 	// for obj in scene/prefab:
 	//		obj->pre_start()
 	// for obj in scene/prefab:
- 	//		if !obj->start_disabled
-	//			obj->start()
+	//		obj->start()
 
 	virtual void pre_start() {}
 	virtual void start() {}
@@ -59,16 +58,18 @@ public:
 	}
 
 	bool is_activated() const {
-		return init_state == initialization_state::INITIALIZED;
+		return init_state == initialization_state::CALLED_START;
 	}
 protected:
-	void activate_internal();
+	void activate_internal_step1();
+	void activate_internal_step2();
 	void deactivate_internal();
 
 	enum class initialization_state : uint8_t {
 		CONSTRUCTOR,	// base state
 		HAS_ID,		// recieve instance_id
-		INITIALIZED,	// initialize called
+		CALLED_PRE_START,
+		CALLED_START		// fully initialized at this point
 	};
 	initialization_state init_state = initialization_state::CONSTRUCTOR;
 

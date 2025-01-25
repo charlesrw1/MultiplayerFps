@@ -51,7 +51,8 @@ private:
 		entity_owner = e;
 	}
 
-	void initialize_internal();
+	void initialize_internal_step1();
+	void initialize_internal_step2();
 	void destroy_internal();
 
 	Entity* entity_owner = nullptr;

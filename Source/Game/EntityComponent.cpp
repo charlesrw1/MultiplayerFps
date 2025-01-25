@@ -13,15 +13,20 @@ void EntityComponent::destroy()
 }
 
 
-void EntityComponent::initialize_internal()
+void EntityComponent::initialize_internal_step1()
 {
 	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
-		activate_internal();
+		activate_internal_step1();
+}
+void EntityComponent::initialize_internal_step2()
+{
+	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
+		activate_internal_step2();
 }
 
 void EntityComponent::destroy_internal()
 {
-	if(init_state==initialization_state::INITIALIZED)
+	if(init_state==initialization_state::CALLED_START)
 		deactivate_internal();
 	ASSERT(entity_owner);
 	entity_owner->remove_this_component_internal(this);
@@ -29,7 +34,7 @@ void EntityComponent::destroy_internal()
 }
 
 EntityComponent::~EntityComponent() {
-	ASSERT(init_state != initialization_state::INITIALIZED);
+	ASSERT(init_state != initialization_state::CALLED_PRE_START && init_state!=initialization_state::CALLED_START);
 }
 
 const glm::mat4& EntityComponent::get_ws_transform() {

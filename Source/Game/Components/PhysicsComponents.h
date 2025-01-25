@@ -5,6 +5,7 @@
 #include "Framework/ClassTypePtr.h"
 #include "Render/RenderObj.h"
 #include "Framework/MulticastDelegate.h"
+#include "Game/Entity.h"	// fot EntityPtr, fixme
 
 class PhysicsActor;
 class MeshBuilder;
@@ -13,10 +14,14 @@ namespace physx {
 	class PxRigidActor;
 	class PxShape;
 	class PxRigidDynamic;
+	class PxJoint;
+	class PxRevoluteJoint;
+	class PxSphericalJoint;
 }
 
 // wrapper around physx actors
 
+class PhysicsJointComponent;
 class MeshBuilderComponent;
 class BillboardComponent;
 class Model;
@@ -25,6 +30,7 @@ public:
 	PhysicsComponentBase();
 	~PhysicsComponentBase();
 
+	void pre_start() override;
 	void start() override;
 	void end() override;
 	void update() override;
@@ -61,6 +67,11 @@ public:
 	void set_objects_mass(float mass);
 	void set_objects_density(float density);
 	void set_transform(const glm::mat4& transform, bool teleport = false);
+
+
+	physx::PxRigidActor* get_physx_actor() const {
+		return physxActor;
+	}
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(PhysicsComponentBase)
@@ -128,6 +139,8 @@ private:
 	glm::quat last_rot = glm::quat();
 	glm::vec3 next_position = glm::vec3(0.f);
 	glm::quat next_rot = glm::quat();
+
+	friend class PhysicsJointComponent;
 };
 
 
@@ -181,4 +194,81 @@ public:
 CLASS_H(CompoundColliderComponent, PhysicsComponentBase)
 public:
 
+};
+
+CLASS_H(PhysicsJointComponent, EntityComponent)
+public:
+	PhysicsJointComponent();
+	~PhysicsJointComponent();
+
+	void start() override;
+	void end() override;
+	void on_changed_transform() override;
+	void editor_on_change_property() override;
+
+	static const PropertyInfoList* get_props();
+
+	void clear_joint() {
+		set_target(nullptr);
+	}
+	Entity* get_target() {
+		return target.get();
+	}
+	void set_target(Entity* e);
+protected:
+
+	PhysicsComponentBase* get_owner_physics();
+
+	virtual void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) = 0;
+	virtual physx::PxJoint* get_joint() const = 0;
+	virtual void free_joint() = 0;
+	virtual void draw_meshbuilder();
+
+	float limit_spring = 0.f;
+	float limit_damping = 0.f;
+	glm::vec3 local_joint_from_offset = glm::vec3(0.f);
+	int local_joint_axis = 0;	//0=x,1=y,2=z
+
+	glm::vec3 local_joint_to_offset = glm::vec3(0.f);
+
+	MeshBuilderComponent* editor_meshbuilder = nullptr;
+
+	bool has_joint = false;
+	EntityPtr<Entity> target;
+private:
+	void refresh_joint();
+};
+
+CLASS_H(HingeJointComponent, PhysicsJointComponent)
+public:
+
+private:
+	void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) override;
+	physx::PxJoint* get_joint() const override;
+	void free_joint() override;
+
+
+	static const PropertyInfoList* get_props() = delete;
+
+	float limit_min = 0.f;
+	float limit_max = 0.f;
+	physx::PxRevoluteJoint* joint = nullptr;
+};
+CLASS_H(BallSocketJointComponent,PhysicsJointComponent)
+public:
+	void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) override;
+	physx::PxJoint* get_joint() const override;
+	void free_joint() override;
+
+	static const PropertyInfoList* get_props() = delete;
+	physx::PxSphericalJoint* joint = nullptr;
+};
+CLASS_H(DistanceJointComponent, PhysicsJointComponent)
+public:
+};
+CLASS_H(CharacterJointComponent, PhysicsJointComponent)
+public:
+};
+CLASS_H(FixedJointComponent, PhysicsJointComponent)
+public:
 };

@@ -231,7 +231,8 @@ private:
 	bool start_disabled = false;
 
 	// called by Level for init/destruct
-	void initialize_internal();
+	void initialize_internal_step1();
+	void initialize_internal_step2();
 	void destroy_internal();
 
 	// called by child entity to remove it from children list

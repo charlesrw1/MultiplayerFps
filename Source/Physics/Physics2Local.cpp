@@ -392,10 +392,13 @@ void PhysicsManImpl::update_debug_physics_shapes()
 	static bool init = false;
 	if (!init) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 2.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
+		scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
+
+
 		init = true;
 	}
 	debug_mesh.Begin();

@@ -44,20 +44,12 @@ void PhysicsComponentBase::update()
 	get_owner()->set_ws_transform(mat);
 }
 
-void PhysicsComponentBase::start()
+// Initialization done in pre_start now to let joint initialization work properly in start()
+
+void PhysicsComponentBase::pre_start()
 {
-	if (eng->is_editor_level()) {
-		auto shape = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
-		shape->dont_serialize_or_edit = true;
-		editor_shape_id = shape->get_instance_id();
-		auto mb = get_editor_meshbuilder();
-		mb->use_background_color = true;
-		mb->mb.Begin();
-		add_editor_shapes();
-		mb->mb.End();	
-		mb->on_changed_transform();
+	if (eng->is_editor_level()) 
 		return;
-	}
 
 	ASSERT(editor_shape_id==0);
 
@@ -97,6 +89,22 @@ void PhysicsComponentBase::start()
 	next_rot = get_owner()->get_ls_rotation();
 
 	update_mass();
+
+}
+void PhysicsComponentBase::start()
+{
+	if (eng->is_editor_level()) {
+		auto shape = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		shape->dont_serialize_or_edit = true;
+		editor_shape_id = shape->get_instance_id();
+		auto mb = get_editor_meshbuilder();
+		mb->use_background_color = true;
+		mb->mb.Begin();
+		add_editor_shapes();
+		mb->mb.End();	
+		mb->on_changed_transform();
+		return;
+	}
 }
 
 void PhysicsComponentBase::end()
@@ -441,3 +449,189 @@ void PhysicsComponentBase::set_is_static(bool is_static)
 MeshBuilderComponent* PhysicsComponentBase::get_editor_meshbuilder() const {
 	return (MeshBuilderComponent*)eng->get_level()->get_entity(editor_shape_id);
 }
+
+PhysicsJointComponent::PhysicsJointComponent()
+{
+	set_call_init_in_editor(true);
+	set_ticking(false);
+}
+PhysicsJointComponent::~PhysicsJointComponent()
+{
+
+}
+const PropertyInfoList* PhysicsJointComponent::get_props() {
+	START_PROPS(PhysicsJointComponent)
+		REG_ENTITY_PTR(target,PROP_DEFAULT),
+		REG_VEC3(local_joint_from_offset,PROP_DEFAULT),
+		REG_VEC3(local_joint_to_offset,PROP_DEFAULT),
+		REG_INT(local_joint_axis,PROP_DEFAULT,"0")
+	END_PROPS(PhysicsJointComponent)
+}
+void PhysicsJointComponent::refresh_joint()
+{
+	free_joint();
+	has_joint = false;
+
+	// init joint
+	auto self_physics = get_owner_physics();
+	if (!self_physics) {
+		sys_print(Warning, "Joint component has no physics component\n");
+		return;
+	}
+	PhysicsComponentBase* other = nullptr;
+	if (get_target()) {
+		other= get_target()->get_first_component<PhysicsComponentBase>();
+		if (!other) {
+			sys_print(Warning, "Joint component target has no physics component\n");
+		}
+	}
+	init_joint(self_physics, other/* can be nullptr */);
+	ASSERT(get_joint());
+	has_joint = true;
+}
+
+void PhysicsJointComponent::start()
+{
+	if (eng->is_editor_level()) {
+		editor_meshbuilder = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		editor_meshbuilder->dont_serialize_or_edit = true;
+		editor_meshbuilder->use_background_color = true;
+		editor_meshbuilder->use_transform = false;
+	}
+	else {
+		refresh_joint();
+	}
+}
+
+void PhysicsJointComponent::set_target(Entity* e)
+{
+	if (e != target.get()) {
+		target = e->get_self_ptr();
+		refresh_joint();
+	}
+}
+
+void PhysicsJointComponent::end()
+{
+	if (editor_meshbuilder)
+		editor_meshbuilder->destroy();
+}
+
+PhysicsComponentBase* PhysicsJointComponent::get_owner_physics() {
+	return get_owner()->get_first_component<PhysicsComponentBase>();
+}
+static glm::mat4 get_transform_joint(glm::vec3 local, PhysicsComponentBase* b, int axis)
+{
+	auto local_t = glm::translate(glm::mat4(1), local);
+	glm::mat4 m = glm::mat4(1);
+	if (axis == 1) {
+		m[0] = glm::vec4(0, 1, 0,0);
+		m[1] = glm::vec4(-1, 0, 0,0);
+	}
+	else if (axis == 2) {
+		m[0] = glm::vec4(0, 0, 1,0);
+		m[2] = glm::vec4(-1, 0, 0,0);
+	}
+
+	return local_t * m;
+}
+void PhysicsJointComponent::draw_meshbuilder()
+{
+	glm::mat4 world = get_ws_transform();
+	auto local_t = glm::translate(glm::mat4(1), local_joint_from_offset);
+	world = world * local_t;
+	editor_meshbuilder->mb.AddSphere(world[3], 0.25, 10, 10, COLOR_RED);
+
+	if (!get_target())
+		return;
+	auto other_phys = get_target()->get_first_component<PhysicsComponentBase>();
+	if (!other_phys)
+		return;
+	world = get_target()->get_ws_transform();
+	local_t = glm::translate(glm::mat4(1), local_joint_to_offset);
+	world = world * local_t;
+	editor_meshbuilder->mb.AddSphere(world[3], 0.25, 10, 10, COLOR_PINK);
+}
+
+
+void HingeJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b)
+{
+	ASSERT(!joint);
+	ASSERT(get_owner() == a->get_owner());
+	auto my_local = get_transform_joint(local_joint_from_offset, a, local_joint_axis);
+	auto my_world = get_ws_transform() * my_local;
+	if (b) {
+		auto other_world = b->get_ws_transform();
+		auto other_local = glm::inverse(other_world) * my_world;
+		joint = PxRevoluteJointCreate(*physics_local_impl->physics_factory,
+			a->get_physx_actor(), glm_to_physx(my_local),
+			b->get_physx_actor(), glm_to_physx(other_local));
+	}
+	else {
+		joint = PxRevoluteJointCreate(*physics_local_impl->physics_factory,
+			a->get_physx_actor(), glm_to_physx(my_local),
+			nullptr, glm_to_physx(my_world));
+	}
+	joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+
+}
+physx::PxJoint* HingeJointComponent::get_joint() const  {
+	return joint;
+}
+void HingeJointComponent::free_joint()
+{
+	if (joint) {
+		joint->release();
+		joint = nullptr;
+	}
+}
+
+void BallSocketJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b)
+{
+	ASSERT(!joint);
+	ASSERT(get_owner() == a->get_owner());
+	auto my_local = get_transform_joint(local_joint_from_offset, a, local_joint_axis);
+	auto my_world = get_ws_transform() * my_local;
+	if (b) {
+		auto other_world = b->get_ws_transform();
+		auto other_local = glm::inverse(other_world) * my_world;
+		joint = PxSphericalJointCreate(*physics_local_impl->physics_factory,
+			a->get_physx_actor(), glm_to_physx(my_local),
+			b->get_physx_actor(), glm_to_physx(other_local));
+	}
+	else {
+		joint = PxSphericalJointCreate(*physics_local_impl->physics_factory,
+			a->get_physx_actor(), glm_to_physx(my_local),
+			nullptr, glm_to_physx(my_world));
+	}
+	joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+}
+physx::PxJoint* BallSocketJointComponent::get_joint() const  {
+	return joint;
+}
+void BallSocketJointComponent::free_joint()
+{
+	if (joint) {
+		joint->release();
+		joint = nullptr;
+	}
+}
+
+void PhysicsJointComponent::on_changed_transform() {
+	if (editor_meshbuilder) {
+		editor_meshbuilder->mb.Begin();
+		draw_meshbuilder();
+		editor_meshbuilder->mb.End();
+	}
+}
+void PhysicsJointComponent::editor_on_change_property() {
+	if (editor_meshbuilder) {
+		editor_meshbuilder->mb.Begin();
+		draw_meshbuilder();
+		editor_meshbuilder->mb.End();
+	}
+}
+
+CLASS_IMPL(PhysicsJointComponent);
+CLASS_IMPL(HingeJointComponent);
+CLASS_IMPL(BallSocketJointComponent);

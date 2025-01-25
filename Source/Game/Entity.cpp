@@ -78,9 +78,12 @@ void Entity::set_active(bool make_active)
 {
 	if (make_active == is_activated()) return;
 	if (make_active) {
-		activate_internal();
+		activate_internal_step1();
 		for (auto c : get_all_components())
-			c->activate_internal();
+			c->activate_internal_step1();
+		activate_internal_step2();
+		for (auto c : get_all_components())
+			c->activate_internal_step2();
 	}
 	else {
 		deactivate_internal();
@@ -90,10 +93,15 @@ void Entity::set_active(bool make_active)
 	ASSERT(make_active == is_activated());
 }
 
-void Entity::initialize_internal()
+void Entity::initialize_internal_step1()
 {
 	if(!start_disabled || eng->is_editor_level())
-		activate_internal();
+		activate_internal_step1();
+}
+void Entity::initialize_internal_step2()
+{
+	if(!start_disabled || eng->is_editor_level())
+		activate_internal_step2();
 }
 
 void Entity::remove_this(Entity* child)
@@ -129,7 +137,7 @@ void Entity::destroy()
 
 void Entity::destroy_internal()
 {
-	if(init_state == initialization_state::INITIALIZED)
+	if(init_state == initialization_state::CALLED_START)
 		deactivate_internal();
 
 	if (get_entity_parent())
@@ -236,7 +244,7 @@ void Entity::remove_this_component_internal(EntityComponent* component_to_remove
 
 Entity::~Entity()
 {
-	ASSERT(init_state != initialization_state::INITIALIZED);
+	ASSERT(init_state != initialization_state::CALLED_START&&init_state!=initialization_state::CALLED_PRE_START);
 	ASSERT(all_components.empty());
 }
 
@@ -252,7 +260,7 @@ EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* i
 	ec->entity_owner = this;
 	all_components.push_back(ec);
 	eng->get_level()->add_and_init_created_runtime_component(ec);
-	ASSERT(ec->init_state == initialization_state::INITIALIZED);
+	ASSERT(ec->init_state == initialization_state::CALLED_START);
 	return ec;
 }
 
@@ -317,7 +325,7 @@ void Entity::post_change_transform_R(bool ws_is_dirty, EntityComponent* skipthis
 {
 	world_transform_is_dirty = ws_is_dirty;
 
-	if (init_state != initialization_state::INITIALIZED)
+	if (init_state != initialization_state::CALLED_START)
 		return;
 
 	for (auto c : all_components)

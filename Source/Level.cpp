@@ -204,26 +204,24 @@ void Level::initialize_new_entity_safe(Entity* e)
 	
 	for (int i = 0; i < init_entities.size();i++) {
 		auto e = init_entities[i];
-		if(!is_editor_level()||e->get_call_init_in_editor())
-			e->pre_start();
-	}
-	for (int i = 0; i < init_components.size();i++) {
-		auto ec = init_components[i];
-		if(!is_editor_level()||ec->get_call_init_in_editor())
-			ec->pre_start();
-	}
-
-	for (int i = 0; i < init_entities.size();i++) {
-		auto e = init_entities[i];
 		ASSERT(e->init_state == BaseUpdater::initialization_state::HAS_ID);
-		e->initialize_internal();
+		e->initialize_internal_step1();
 	}
 	for (int i = 0; i < init_components.size();i++) {
 		auto ec = init_components[i];
 		ASSERT(ec->init_state == BaseUpdater::initialization_state::HAS_ID);
-		ec->initialize_internal();
+		ec->initialize_internal_step1();
 	}
-
+	for (int i = 0; i < init_entities.size();i++) {
+		auto e = init_entities[i];
+		ASSERT(e->init_state == BaseUpdater::initialization_state::CALLED_PRE_START);
+		e->initialize_internal_step2();
+	}
+	for (int i = 0; i < init_components.size();i++) {
+		auto ec = init_components[i];
+		ASSERT(ec->init_state == BaseUpdater::initialization_state::CALLED_PRE_START);
+		ec->initialize_internal_step2();
+	}
 }
 
 void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
@@ -279,22 +277,26 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 			all_world_ents.insert(o.second->get_instance_id(), o.second);
 		}
 		scene.unserialize_post_assign_ids();
-		const bool is_editor = is_editor_level();
+
 		for (auto o : objs) {
-			if(!is_editor||o.second->get_call_init_in_editor())
-				o.second->pre_start();
+			auto ent = o.second;
+			if (Entity* e = ent->cast_to<Entity>())
+				e->initialize_internal_step1();
+			else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
+				ec->initialize_internal_step1();
+			else
+				ASSERT(0);
 		}
 
 		for (auto o : objs) {
 			auto ent = o.second;
 			if (Entity* e = ent->cast_to<Entity>())
-				e->initialize_internal();
+				e->initialize_internal_step2();
 			else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
-				ec->initialize_internal();
+				ec->initialize_internal_step2();
 			else
 				ASSERT(0);
 		}
-
 	}
 }
 
@@ -304,9 +306,9 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());
 	all_world_ents.insert(c->get_instance_id(), c);
-	if(!is_editor_level()||c->get_call_init_in_editor())
-		c->pre_start();
-	c->initialize_internal();
+
+	c->initialize_internal_step1();
+	c->initialize_internal_step2();
 }
 
 Entity* Level::spawn_prefab(PrefabAsset* asset)
