@@ -547,13 +547,13 @@ public:
 	// Inherited via IEditorTool
 
 	void validate_fileids_before_serialize();
+	uint32_t get_next_file_id() {
+		return ++file_id_start;
+	}
 private:
 
 	void on_mouse_drag(int x, int y);
 
-	uint32_t get_next_file_id() {
-		return ++file_id_start;
-	}
 
 	uint32_t file_id_start = 0;
 

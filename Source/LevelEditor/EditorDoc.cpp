@@ -1127,9 +1127,21 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 
 					ImGui::CloseCurrentPopup();
 				}
-				if (ImGui::Button("Add empty entity")) {
+				if (ImGui::Button("Add entity")) {
+					auto me = eng->get_entity(contextMenuHandle);
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr<Entity>()));
+					contextMenuHandle = 0;
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::Button("Add child entity")) {
 					auto me = eng->get_entity(contextMenuHandle);
 					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), me->get_self_ptr()));
+					contextMenuHandle = 0;
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::Button("Instantiate prefab")) {
+					auto me = eng->get_entity(contextMenuHandle);
+					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(me));
 					contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}

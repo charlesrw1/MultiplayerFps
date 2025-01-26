@@ -258,6 +258,8 @@ void Level::close_level()
 		if (Entity* e = ent->cast_to<Entity>())
 			e->destroy();
 	}
+	ASSERT(all_world_ents.num_used == 0);
+
 	all_world_ents.clear_all();
 
 	GetAssets().explicit_asset_free(source_asset);

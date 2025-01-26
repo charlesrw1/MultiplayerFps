@@ -128,14 +128,42 @@ void PrefabAsset::uninstall()
 		delete o.second;
 	sceneFile.reset(nullptr);
 }
+
+
+static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
+{
+	for (int i = 0; i < list->count; i++) {
+		auto prop = list->list[i];
+		if (strcmp(prop.custom_type_str, "AssetPtr") == 0) {
+			IAsset** e = (IAsset**)prop.get_ptr(inst);
+			if (*e)
+				AssetDatabase::get().touch_asset(*e);
+		}
+		else if(prop.type==core_type_id::List) {
+			auto listptr = prop.get_ptr(inst);
+			auto size = prop.list_ptr->get_size(listptr);
+			for (int j = 0; j < size; j++) {
+				auto ptr = prop.list_ptr->get_index(listptr, j);
+				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list);
+			}
+		}
+	}
+}
+
 void PrefabAsset::sweep_references() const
 {
 	sys_print(Debug, "prefab sweep ref %s\n", get_name().c_str());
 	{
-		auto temp = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, (PrefabAsset*)this));
-		for (auto& o : temp->get_objects())
-			delete o.second;
-		temp.reset();
+		for (auto& obj : sceneFile->get_objects()) {
+			auto o = obj.second;
+			auto type = &o->get_type();
+			while (type) {
+				auto props = type->props;
+				if(props)
+					check_props_for_assetptr(o, props);
+				type = type->super_typeinfo;
+			}
+		}
 	}
 }
 void PrefabAsset::move_construct(IAsset* other)

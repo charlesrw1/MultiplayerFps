@@ -8,6 +8,7 @@ bind 1 "map top_down/map0.tmap"
 bind 2 "TOGGLE_PLAY_EDIT_MAP"
 bind 3 "start_ed Prefab fire_emit.pfb"
 bind 4 "start_ed Prefab top_down/player.pfb"
+bind 5 "map top_down/map1.tmap"
 
 #force_animation_to_bind_pose 1
 drawconsole 1

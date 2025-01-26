@@ -36,6 +36,7 @@ public:
 			if (!c->is_valid()) {
 				sys_print(Warning, "command not valid %s\n", c->to_string().c_str());
 				delete c;
+				continue;
 			}
 
 			if (hist[index]) {

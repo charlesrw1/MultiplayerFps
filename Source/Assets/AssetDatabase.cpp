@@ -261,6 +261,11 @@ struct AssetDatabaseImpl
 	void reload_asset_sync(IAsset* asset) {
 		assert(asset);
 
+		if (!asset->is_loaded) {
+			sys_print(Warning, "asset not loaded\n");
+			return;
+		}
+
 		AsyncQueuedJob myJob;
 		myJob.what = asset;
 		myJob.force_reload = true;

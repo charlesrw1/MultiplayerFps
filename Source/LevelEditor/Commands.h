@@ -4,6 +4,9 @@
 #include "Game/Components/MeshComponent.h"
 #include <memory>
 
+#include "Game/BaseUpdater.h"
+#include "LevelSerialization/SerializationAPI.h"
+
 extern EditorDoc ed_doc;
 
 class CommandSerializeUtil
@@ -215,22 +218,92 @@ public:
 	EntityPtr<Entity> parent_to;
 };
 
-class PropertyChangeCommand
+class InstantiatePrefabCommand : public Command
 {
 public:
-	PropertyChangeCommand(std::string field, std::vector<ClassBase*> classes);
-	void commit_post_change();
-private:
-	struct Change {
-		ClassBase* instance = nullptr;
-		std::string field_name;
-		std::string pre_serialized_string;
-		std::string post_serialized_string;
-	};
-	std::vector<Change> changes;
-	std::vector<std::string> fields;
-};
+	InstantiatePrefabCommand(Entity* e) {
+		me = e->get_self_ptr();
+		asset = me->what_prefab;
+		if (!asset || !me->is_root_of_prefab) {
+			asset = nullptr;
+			sys_print(Error, "Cant instantiate non-prefab, non-root object\n");
+			return;
+		}
+		if (me->creator_source)
+			creator_source = me->creator_source->get_self_ptr();
+	}
 
+	bool is_valid() override {
+		return asset != nullptr;
+	}
+
+	void execute_R(Entity* e) {
+		for (auto c : e->get_all_components()) {
+			if (this_is_newly_created(c, asset)) {
+				created_obj created;
+				created.eng_handle = c->get_instance_id();
+				created.unique_file_id = c->unique_file_id;
+				created_objs.push_back(created);
+
+				c->creator_source = nullptr;
+				if (c->what_prefab == asset)
+					c->what_prefab = nullptr;
+				c->unique_file_id = ed_doc.get_next_file_id();
+			}
+		}
+		for (auto c : e->get_all_children()) {
+			if (this_is_newly_created(c, asset)) {
+				created_obj created;
+				created.eng_handle = c->get_instance_id();
+				created.unique_file_id = c->unique_file_id;
+				created_objs.push_back(created);
+				c->creator_source = nullptr;
+				if (c->what_prefab == asset)
+					c->what_prefab = nullptr;
+				c->unique_file_id = ed_doc.get_next_file_id();
+			}
+			execute_R(c);
+		}
+	}
+
+	void execute() override {
+		ASSERT(created_objs.size() == 0);
+		me->what_prefab = nullptr;
+		me->is_root_of_prefab = false;
+		me->creator_source = nullptr;
+		execute_R(me.get());
+	}
+	void undo() override {
+		if (!me) {
+			sys_print(Warning, "couldnt undo instantiate prefab command\n");
+			return;
+		}
+
+		me->what_prefab = asset;
+		me->is_root_of_prefab = false;
+		me->creator_source = creator_source.get();
+		for (auto c : created_objs) {
+			auto obj = eng->get_level()->get_entity(c.eng_handle);
+			obj->creator_source = me.get();
+			if (!obj->what_prefab)
+				obj->what_prefab = asset;
+			obj->unique_file_id = c.unique_file_id;
+		}
+		created_objs.clear();
+
+	}
+	std::string to_string() override {
+		return "Instantiate Prefab";
+	}
+	struct created_obj {
+		uint64_t eng_handle = 0;
+		uint64_t unique_file_id = 0;
+	};
+	std::vector<created_obj> created_objs;
+	EntityPtr<Entity> me;
+	PrefabAsset* asset = nullptr;
+	EntityPtr<Entity> creator_source;
+};
 
 class DuplicateEntitiesCommand : public Command
 {

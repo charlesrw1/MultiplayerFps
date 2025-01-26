@@ -182,8 +182,13 @@ public:
 				for (auto c : children) {
 					if (c->get_tag() != StringName("Ragdoll")) continue;
 					auto phys = c->get_first_component<PhysicsComponentBase>();
-					if (!phys) continue;
+					if (!phys) 
+						continue;
 					phys->enable_in_future_with_velocity();
+
+					if (c->get_parent_bone() == StringName("mixamorig:Hips")) {
+						phys->apply_impulse(c->get_ws_position(), dmg.dir * 5.0f);
+					}
 				}
 				
 			});
@@ -199,7 +204,7 @@ public:
 	}
 	void update() {
 		if (is_dead) {
-			if ((eng->get_game_time() - death_time > 10.0)) {
+			if ((eng->get_game_time() - death_time > 20.0)) {
 				get_owner()->destroy();
 			}
 			return;
@@ -518,7 +523,15 @@ public:
 		uint32_t flags = 0;
 		glm::vec3 outvel;
 
-		ccontroller->move(glm::vec3(move.x, 0, move.y)*move_speed * dt, dt, 0.005f, flags, outvel);
+		glm::vec3 move_front = glm::vec3(0, 0, 1);
+		glm::vec3 move_side = glm::vec3(1, 0, 0);
+		if (is_jumping) {
+			move_front = glm::normalize(glm::vec3(-1, 0, 1));
+			move_side = -glm::cross(move_front, glm::vec3(0, 1, 0));
+		}
+
+
+		ccontroller->move((move_front*move.y+move_side*move.x)*move_speed * dt, dt, 0.005f, flags, outvel);
 
 		float angle = -atan2(-lookdir.x, lookdir.z);
 		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
@@ -534,7 +547,7 @@ public:
 		//pos = glm::mix(pos, mouse_pos, 0.15);
 		glm::vec3 camera_pos;
 		if (is_jumping)
-			camera_pos = glm::vec3(pos.x, pos.y + 2.0, pos.z - 3.0);
+			camera_pos = glm::vec3(pos.x + 3.0, pos.y + 2.0, pos.z - 3.0);
 		else
 			camera_pos = glm::vec3(pos.x, pos.y + 12.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - (pos + glm::vec3(0,1,0)));
@@ -712,12 +725,16 @@ public:
 	virtual void on_init() override {
 		if (get_owner()) {
 			p = get_owner()->cast_to<TopDownPlayer>();
+			e = get_owner()->get_first_component<TopDownEnemyComponent>();
 		}
 	}
 	virtual void on_update(float dt) override {
 		if (p) {
 			bRunning = p->did_move;
 			bIsJumping = p->is_jumping;
+		}
+		else if (e) {
+			bRunning = !e->is_dead;
 		}
 		else
 			bRunning = true;
@@ -727,6 +744,7 @@ public:
 	}
 
 	TopDownPlayer* p = nullptr;
+	TopDownEnemyComponent* e = nullptr;
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(TopDownAnimDriver)

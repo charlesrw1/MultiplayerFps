@@ -73,6 +73,9 @@ void PhysicsComponentBase::update()
 		auto rot = glm::quat_cast(mat);
 		glm::vec3 lin_vel = (glm::vec3(mat[3]) - next_position) / (float)eng->get_dt();
 		glm::vec3 ang_vel = calc_angular_vel(next_rot, rot, eng->get_dt());
+		last_position = next_position;
+		last_rot = next_rot;
+
 		next_rot = rot;
 		next_position = mat[3];
 
@@ -238,7 +241,7 @@ void PhysicsComponentBase::update_mass()
 	ASSERT(physxActor);
 	if (!get_is_actor_static()) {
 		auto dyn = (PxRigidDynamic*)physxActor;
-		PxRigidBodyExt::updateMassAndInertia(*dyn, 3.f);
+		PxRigidBodyExt::updateMassAndInertia(*dyn,density);
 	}
 }
 

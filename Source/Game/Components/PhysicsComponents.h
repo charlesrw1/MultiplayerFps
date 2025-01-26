@@ -89,7 +89,8 @@ public:
 			REG_BOOL(send_hit,PROP_DEFAULT,"0"),
 			REG_BOOL(send_overlap,PROP_DEFAULT,"0"),
 			REG_BOOL(is_static,PROP_DEFAULT,"1"),
-			REG_BOOL(interpolate_visuals, PROP_DEFAULT, "1")
+			REG_BOOL(interpolate_visuals, PROP_DEFAULT, "1"),
+			REG_FLOAT(density,PROP_DEFAULT,"2.0")
 		END_PROPS(PhysicsComponentBase)
 	};
 
@@ -143,7 +144,9 @@ private:
 
 	bool interpolate_visuals = true;
 
-	enum class enable_in_future_state {
+	float density = 2.0;
+
+	enum class enable_in_future_state : int8_t {
 		none,
 		waiting_for_frame_1,
 		waiting_for_frame_2,
