@@ -1808,6 +1808,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 				auto& mats = proxy.animator->get_matrix_palette();
 				const uint32_t num_bones = proxy.animator->num_bones();
 				ASSERT(num_bones + current_skinned_matrix_index < max_skinned_matricies);
+				ASSERT(mats.size() == num_bones);
 				std::memcpy(skinned_matricies + current_skinned_matrix_index, mats.data(), sizeof(glm::mat4) * num_bones);
 				current_skinned_matrix_index += num_bones;
 			}

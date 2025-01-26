@@ -19,8 +19,8 @@ namespace physx {
 	class PxSphericalJoint;
 }
 
-// wrapper around physx actors
 
+// wrapper around physx actors
 class PhysicsJointComponent;
 class MeshBuilderComponent;
 class BillboardComponent;
@@ -50,8 +50,10 @@ public:
 
 	bool get_is_trigger() const { return is_trigger; }
 	void set_is_trigger(bool is_trig);
+
 	void set_send_overlap(bool send_overlap);
 	void set_send_hit(bool send_hit);
+
 
 	PhysicsLayer get_physics_layer() const {
 		return physics_layer;
@@ -99,6 +101,7 @@ protected:
 
 	MeshBuilderComponent* get_editor_meshbuilder() const;
 private:
+	void update_bone_parent_animator();
 
 	void refresh_shapes();
 
@@ -229,13 +232,11 @@ protected:
 	glm::vec3 local_joint_from_offset = glm::vec3(0.f);
 	int local_joint_axis = 0;	//0=x,1=y,2=z
 
-	glm::vec3 local_joint_to_offset = glm::vec3(0.f);
-
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 
-	bool has_joint = false;
 	EntityPtr<Entity> target;
 private:
+
 	void refresh_joint();
 };
 

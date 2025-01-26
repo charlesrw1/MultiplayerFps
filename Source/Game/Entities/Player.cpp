@@ -421,7 +421,7 @@ void ViewmodelComponent::update()
 	//	animator.set_anim("ak47_idle", false);
 	
 
-	//animator.tick_tree_new(eng->tick_interval);
+	//animator.update(eng->tick_interval);
 
 	//animator.AdvanceFrame(eng->tick_interval);
 	//animator.SetupBones();
@@ -891,8 +891,8 @@ void Player::on_foot_update()
 
 	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 player_mesh->set_model(playerMod);
-	 player_mesh->set_animation_graph("ik_test.ag");
-	 player_mesh->visible = false;
+	// player_mesh->set_animation_graph("ik_test.ag");
+	 player_mesh->set_is_visible(false);
 
 	 player_capsule->set_is_trigger(true);
 	 player_capsule->set_send_overlap(true);

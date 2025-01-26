@@ -60,6 +60,7 @@ PropertyInfo GetAtomValueWrapper<EntityPtr<Entity>>::get() {
 
 const PropertyInfoList* Entity::get_props() {
 	START_PROPS(Entity)
+		REG_STRUCT_CUSTOM_TYPE(tag, PROP_DEFAULT, "EntityTagString"),
 		REG_VEC3(position, PROP_DEFAULT),
 		REG_QUAT(rotation, PROP_DEFAULT),
 		REG_VEC3(scale, PROP_DEFAULT),
@@ -471,3 +472,91 @@ class EntityBoneParentStringSerialize : public IPropertySerializer
 	}
 };
 ADDTOFACTORYMACRO_NAME(EntityBoneParentStringSerialize, IPropertySerializer, "EntityBoneParentString");
+
+class GameTagManager
+{
+public:
+	static GameTagManager& get() {
+		static GameTagManager inst;
+		return inst;
+	}
+	void add_tag(const std::string& tag) {
+		registered_tags.insert(tag);
+	}
+	std::unordered_set<std::string> registered_tags;
+};
+
+DECLARE_ENGINE_CMD(REG_GAME_TAG)
+{
+	if (args.size() != 2) {
+		sys_print(Error, "REG_GAME_TAG <tag>");
+		return;
+	}
+	GameTagManager::get().add_tag(args.at(1));
+}
+
+class EntityTagEditor : public IPropertyEditor
+{
+public:
+	// Inherited via IPropertyEditor
+	virtual bool internal_update() override
+	{
+		Entity* self = (Entity*)instance;
+		if (!has_init) {
+
+			auto& all_tags = GameTagManager::get().registered_tags;
+			for (auto& t : all_tags)
+				options.push_back(t);
+
+			has_init = true;
+		}
+
+		if (options.empty()) {
+			ImGui::Text("No options, add tag in init.txt with REG_GAME_TAG <tag>");
+			return false;
+		}
+
+		bool has_update = false;
+
+		TagStruct* my_struct = (TagStruct*)prop->get_ptr(instance);
+
+		const char* preview = (!my_struct->string.empty()) ? my_struct->string.c_str() : "<untagged>";
+		if (ImGui::BeginCombo("##combocalsstype", preview)) {
+			for (auto& option : options) {
+
+				if (ImGui::Selectable(option.c_str(),
+					my_struct->string == option
+				)) {
+					self->set_tag(option);
+					has_update = true;
+				}
+
+			}
+			ImGui::EndCombo();
+		}
+
+		return has_update;
+	}
+	bool has_init = false;
+	std::vector<std::string> options;
+};
+
+ADDTOFACTORYMACRO_NAME(EntityTagEditor, IPropertyEditor, "EntityTagString");
+
+class EntityTagSerialize : public IPropertySerializer
+{
+	// Inherited via IPropertySerializer
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		const TagStruct* ptr_prop = (const TagStruct*)info.get_ptr(inst);
+		return ptr_prop->string;
+	}
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		const TagStruct* ptr_prop = (const TagStruct*)info.get_ptr(inst);
+		std::string to_str(token.str_start, token.str_len);
+		Entity* e = (Entity*)inst;
+		e->set_tag(to_str);
+	}
+};
+ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");

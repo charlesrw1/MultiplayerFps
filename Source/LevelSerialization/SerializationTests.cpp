@@ -149,7 +149,7 @@ ADD_TEST(Serialization, UnserializeScene)
 	TEST_TRUE(unserialized.find("3/~2122221332"));
 
 	TEST_TRUE(unserialized.find("2/~2122221332")->is_a<MeshComponent>());
-	TEST_TRUE(unserialized.find("2/~2122221332")->cast_to<MeshComponent>()->cast_shadows == false);
+	TEST_TRUE(unserialized.find("2/~2122221332")->cast_to<MeshComponent>()->get_casts_shadows() == false);
 
 	auto num3 = unserialized.find("3")->cast_to<StaticMeshEntity>();
 	auto num2 = unserialized.find("2")->cast_to<Entity>();

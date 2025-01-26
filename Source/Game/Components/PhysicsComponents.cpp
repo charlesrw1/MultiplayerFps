@@ -12,6 +12,7 @@
 #include "Physics/Physics2Local.h"
 #include "Level.h"
 #include "MeshComponent.h"
+#include "Animation/Runtime/Animation.h"
 
 CLASS_IMPL(PhysicsComponentBase);
 CLASS_IMPL(BoxComponent);
@@ -19,6 +20,7 @@ CLASS_IMPL(CapsuleComponent);
 CLASS_IMPL(SphereComponent);
 CLASS_IMPL(MeshColliderComponent);
 
+ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", CVAR_BOOL, "are physics shapes in the editor depth tested");
 
 using namespace physx;
 
@@ -35,6 +37,11 @@ void PhysicsComponentBase::fetch_new_transform()
 }
 void PhysicsComponentBase::update()
 {
+	if (!get_is_simulating()) {
+		set_ticking(false);
+		return;
+	}
+
 	// interpolate
 	float alpha = eng->get_frame_remainder()/eng->get_fixed_tick_interval();
 	auto ip = glm::mix(last_position, next_position,alpha);
@@ -91,6 +98,31 @@ void PhysicsComponentBase::pre_start()
 	update_mass();
 
 }
+
+void PhysicsComponentBase::update_bone_parent_animator()
+{
+	ASSERT(init_state != initialization_state::HAS_ID);
+
+	auto get_the_parent_animator = [&]() -> AnimatorInstance* {
+		if (get_owner()->has_parent_bone()) {
+			if (get_owner()->get_entity_parent()) {
+				auto m = get_owner()->get_entity_parent()->get_cached_mesh_component();
+				if (m) {
+					return m->get_animator_instance();
+				}
+			}
+		}
+		return nullptr;
+	};
+
+	auto a = get_the_parent_animator();
+	if (!a) return;
+	if (!simulate_physics ||!enabled)
+		a->remove_simulating_physics_object(get_owner());
+	else
+		a->add_simulating_physics_object(get_owner());
+}
+
 void PhysicsComponentBase::start()
 {
 	if (eng->is_editor_level()) {
@@ -99,12 +131,15 @@ void PhysicsComponentBase::start()
 		editor_shape_id = shape->get_instance_id();
 		auto mb = get_editor_meshbuilder();
 		mb->use_background_color = true;
+		mb->depth_tested = ed_physics_shapes_depth_tested.get_bool();
 		mb->mb.Begin();
 		add_editor_shapes();
 		mb->mb.End();	
 		mb->on_changed_transform();
 		return;
 	}
+
+	update_bone_parent_animator();
 }
 
 void PhysicsComponentBase::end()
@@ -124,6 +159,9 @@ void PhysicsComponentBase::end()
 		physxActor->release();
 		physxActor = nullptr;
 	}
+
+	simulate_physics = false;
+	update_bone_parent_animator();
 }
 
 void PhysicsComponentBase::update_mass()
@@ -137,21 +175,6 @@ void PhysicsComponentBase::update_mass()
 
 
 void CapsuleComponent::add_actor_shapes() {
-	//if (disable_physics)
-	//	return;
-	//actor = g_physics.allocate_physics_actor(this);
-	//
-	//auto preset = (physics_preset.ptr) ? (PhysicsFilterPresetBase*)physics_preset.ptr->default_class_object : nullptr;
-	//actor->init_physics_shape(preset, get_ws_transform(), simulate_physics, send_overlap, send_hit, is_static, is_trigger, disable_physics);
-	//actor->add_vertical_capsule_to_actor(glm::vec3(0.f), height, radius);
-	//actor->update_mass();
-	//
-	//if (eng->is_editor_level())
-	//{
-	//	auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
-	//	b->set_texture(default_asset_load<Texture>("icon/_nearest/capsule_collider.png"));
-	//	b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-	//}
 
 	add_vertical_capsule_to_actor(glm::vec3(0, height_offset, 0), height, radius);
 }
@@ -172,48 +195,13 @@ void SphereComponent::add_editor_shapes() {
 }
 
 void BoxComponent::add_actor_shapes() {
-	//actor = g_physics.allocate_physics_actor(this);
-	//auto preset = (physics_preset.ptr) ? (PhysicsFilterPresetBase*)physics_preset.ptr->default_class_object : nullptr;
-	//actor->init_physics_shape(preset, get_ws_transform(), simulate_physics, send_overlap, send_hit, is_static, is_trigger, disable_physics);
-	//actor->add_box_shape_to_actor(get_ws_transform(), side_len);
-	//actor->update_mass();
-	//
-	//if (eng->is_editor_level())
-	//{
-	//	auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
-	//	b->set_texture(default_asset_load<Texture>("icon/_nearest/box_collider.png"));
-	//	b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-	//
-	//	editor_view = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
-	//	auto& mb = editor_view->editor_mb;
-	//	mb.Begin();
-	//	mb.PushLineBox(glm::vec3(-0.5),glm::vec3(0.5), COLOR_RED);
-	//	mb.End();
-	//}
-
+	
 	add_box_shape_to_actor(get_ws_transform(), get_owner()->get_ls_scale()*0.5f);
 }
 
 
 void SphereComponent::add_actor_shapes() {
-	//actor = g_physics.allocate_physics_actor(this);
-	//auto preset = (physics_preset.ptr) ? (PhysicsFilterPresetBase*)physics_preset.ptr->default_class_object : nullptr;
-	//actor->init_physics_shape(preset, get_ws_transform(), simulate_physics, send_overlap, send_hit, is_static, is_trigger, disable_physics);
-	//actor->add_sphere_shape_to_actor(get_ws_transform()[3], radius);
-	//actor->update_mass();
-	//
-	//if (eng->is_editor_level())
-	//{
-	//	auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
-	//	b->set_texture(default_asset_load<Texture>("icon/_nearest/sphere_collider.png"));
-	//	b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-	//
-	//	editor_view = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
-	//	auto& mb = editor_view->editor_mb;
-	//	mb.Begin();
-	//	mb.AddSphere({}, radius, 8, 8, COLOR_RED);
-	//	mb.End();
-	//}
+	
 	add_sphere_shape_to_actor(get_ws_transform()[3], radius);
 }
 void MeshColliderComponent::add_actor_shapes() {
@@ -234,6 +222,8 @@ void PhysicsComponentBase::on_changed_transform() {
 
 	if (!has_initialized())
 		return;
+	if (!enabled)	// not enabled, skip
+		return;	
 	set_transform(get_ws_transform());
 }
 PhysicsComponentBase::~PhysicsComponentBase()
@@ -358,6 +348,8 @@ void PhysicsComponentBase::set_is_simulating(bool simulate_physics)
 
 				next_position = get_owner()->get_ls_position();
 				next_rot = get_owner()->get_ls_rotation();
+
+				update_bone_parent_animator();
 			}
 		}
 	}
@@ -368,6 +360,8 @@ void PhysicsComponentBase::set_is_enable(bool enabled)
 		this->enabled = enabled;
 		if (has_initialized()) {
 			physxActor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, !enabled);
+
+			update_bone_parent_animator();
 		}
 	}
 }
@@ -463,14 +457,12 @@ const PropertyInfoList* PhysicsJointComponent::get_props() {
 	START_PROPS(PhysicsJointComponent)
 		REG_ENTITY_PTR(target,PROP_DEFAULT),
 		REG_VEC3(local_joint_from_offset,PROP_DEFAULT),
-		REG_VEC3(local_joint_to_offset,PROP_DEFAULT),
 		REG_INT(local_joint_axis,PROP_DEFAULT,"0")
 	END_PROPS(PhysicsJointComponent)
 }
 void PhysicsJointComponent::refresh_joint()
 {
 	free_joint();
-	has_joint = false;
 
 	// init joint
 	auto self_physics = get_owner_physics();
@@ -487,7 +479,6 @@ void PhysicsJointComponent::refresh_joint()
 	}
 	init_joint(self_physics, other/* can be nullptr */);
 	ASSERT(get_joint());
-	has_joint = true;
 }
 
 void PhysicsJointComponent::start()
@@ -497,6 +488,7 @@ void PhysicsJointComponent::start()
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
 		editor_meshbuilder->use_transform = false;
+		editor_meshbuilder->depth_tested = ed_physics_shapes_depth_tested.get_bool();
 	}
 	else {
 		refresh_joint();
@@ -540,7 +532,7 @@ void PhysicsJointComponent::draw_meshbuilder()
 	glm::mat4 world = get_ws_transform();
 	auto local_t = glm::translate(glm::mat4(1), local_joint_from_offset);
 	world = world * local_t;
-	editor_meshbuilder->mb.AddSphere(world[3], 0.25, 10, 10, COLOR_RED);
+	editor_meshbuilder->mb.AddSphere(world[3], 0.05, 10, 10, COLOR_RED);
 
 	if (!get_target())
 		return;
@@ -548,9 +540,7 @@ void PhysicsJointComponent::draw_meshbuilder()
 	if (!other_phys)
 		return;
 	world = get_target()->get_ws_transform();
-	local_t = glm::translate(glm::mat4(1), local_joint_to_offset);
-	world = world * local_t;
-	editor_meshbuilder->mb.AddSphere(world[3], 0.25, 10, 10, COLOR_PINK);
+	
 }
 
 

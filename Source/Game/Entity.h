@@ -68,8 +68,13 @@ class MeshComponent;
 
 struct BoneParentStruct
 {
-	std::string string;	// only in editor
 	StringName name;	
+	std::string string;	// only in editor
+};
+struct TagStruct
+{
+	StringName name;	// hashed stringname of tag
+	std::string string;	// only in editor
 };
 
 CLASS_H(Entity, BaseUpdater)
@@ -201,11 +206,28 @@ public:
 	bool has_parent_bone() const {
 		return parent_bone.name.get_hash() != 0;
 	}
+	StringName get_parent_bone() const {
+		return parent_bone.name;
+	}
 
 	void set_active(bool active);
 
 	bool get_start_disabled() const {
 		return start_disabled;
+	}
+
+	StringName get_tag() const {
+		return tag.name;
+	}
+	bool has_tag() const {
+		return tag.name.get_hash() != 0;
+	}
+	void set_tag(const std::string& tagstr) {
+		tag.string = tagstr;
+		if (!tagstr.empty())
+			tag.name = StringName(tagstr.c_str());
+		else
+			tag.name = StringName();
 	}
 private:
 
@@ -217,6 +239,7 @@ private:
 	Entity* parent = nullptr;
 	std::vector<Entity*> children;
 
+	TagStruct tag;
 	BoneParentStruct parent_bone;
 	MeshComponent* cached_mesh_component = nullptr;	// for bone lookups
 

@@ -30,7 +30,7 @@ public:
 		idraw->get_scene()->update_meshbuilder(editor_mb_handle, mbo);
 	}
 	void fill_out_struct(MeshBuilder_Object& obj) {
-		obj.depth_tested = true;
+		obj.depth_tested = depth_tested;
 		obj.owner = this;
 		if (use_transform)
 			obj.transform = get_ws_transform();
@@ -45,6 +45,7 @@ public:
 	Color32 background_color = COLOR_BLACK;
 	bool use_background_color = false;
 	bool use_transform = true;
+	bool depth_tested = true;
 	handle<MeshBuilder_Object> editor_mb_handle;
 	MeshBuilder mb;
 };

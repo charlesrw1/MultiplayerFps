@@ -168,7 +168,7 @@ public:
 
 	void initialize_animator(Animation_Tree_CFG* tree) {
 		if (animator && model)
-			animator->initialize_animator(model, tree, nullptr);
+			animator->initialize(model, tree, nullptr);
 	}
 private:
 	handle<Render_Object> obj;

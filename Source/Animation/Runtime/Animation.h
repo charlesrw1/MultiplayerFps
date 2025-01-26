@@ -16,11 +16,11 @@
 #include <vector>
 #include "Framework/Factory.h"
 #include "Framework/ReflectionProp.h"
-
 #include "Framework/ClassBase.h"
-
 #include "Animation/Runtime/SyncTime.h"
+#include "Framework/Hashset.h"
 
+#include <unordered_set>
 
 class Pose;
 class Animator;
@@ -28,7 +28,7 @@ class MSkeleton;
 class Entity;
 class AnimationSeq;
 class Animation_Tree_CFG;
-
+class PhysicsComponentBase;
 struct Rt_Vars_Base;
 CLASS_H(AnimatorInstance, ClassBase)
 public:
@@ -38,14 +38,13 @@ public:
 	// returns true on success
 	// fails if AnimatorInstance isnt compatible with AnimationGraph
 	// or if model doesnt have skeleton
-	bool initialize_animator(
+	bool initialize(
 		const Model* model,
 		const Animation_Tree_CFG* graph,
 		Entity* ent = nullptr);
 
 	// Main update method
-
-	void tick_tree_new(float dt);
+	void update(float dt);
 
 	// what renderer consumes
 	const std::vector<glm::mat4x4> get_matrix_palette() const { 
@@ -55,7 +54,6 @@ public:
 	const std::vector<glm::mat4x4> get_global_bonemats() const {
 		return cached_bonemats;
 	}
-
 	const Model* get_model() const {
 		return model;
 	}
@@ -69,9 +67,7 @@ public:
 	Entity* get_owner() const { return owner; }
 	bool is_initialized() const { return model != nullptr; }
 
-
 	// Slot playing
-
 	// returns weather it was succesful
 	bool play_animation_in_slot(
 		std::string animation,
@@ -80,6 +76,8 @@ public:
 		float start_pos
 	);
 
+	void add_simulating_physics_object(Entity* obj);
+	void remove_simulating_physics_object(Entity* obj);
 private:
 
 	// hooks for derived classes
@@ -87,19 +85,18 @@ private:
 	virtual void on_update(float dt) {}
 	virtual void on_post_update() {}
 
-	// owning entity, can be null for example in editor
-	Entity* owner = nullptr;
 	std::vector<glm::mat4> cached_bonemats;	// global bonemats
 	std::vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
 
 	void ConcatWithInvPose();
-	void add_legs_layer(glm::quat q[], glm::vec3 pos[]);
-	void UpdateGlobalMatricies(const glm::quat localq[], const glm::vec3 localp[], std::vector<glm::mat4x4>& out_bone_matricies);
 	
+	// owning entity, can be null for example in editor
+	Entity* owner = nullptr;
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
 
 	std::vector<std::unique_ptr<Rt_Vars_Base>> runtime_graph_data;
+	std::unordered_set<uint64_t> simulating_physics_objects;
 
 	// active sync groups for graph
 	std::vector<SyncGroupData> active_sync_groups;
@@ -124,13 +121,14 @@ private:
 		float fade_duration = 0.2;
 		float fade_percentage = 0.0;
 	};
-	std::vector<DirectAnimationSlot> slots;
 	DirectAnimationSlot* find_slot_with_name(StringName name) {
 		for (int i = 0; i < slots.size(); i++)
 			if (slots[i].name == name)
 				return &slots[i];
 		return nullptr;
 	}
+
+	std::vector<DirectAnimationSlot> slots;
 
 	friend class NodeRt_Ctx;
 	friend class EditModelAnimations;

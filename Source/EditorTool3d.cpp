@@ -43,8 +43,8 @@ void EditorTool3d::map_callback(bool b)
 	auto dome = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 	dome->Mesh->set_model(GetAssets().find_sync<Model>("skydome.cmdl").get());
 	dome->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
-	dome->Mesh->is_skybox = true;	// FIXME
-	dome->Mesh->cast_shadows = false;
+	dome->Mesh->set_is_skybox( true );	// FIXME
+	dome->Mesh->set_casts_shadows( false );
 	dome->Mesh->set_material_override(GetAssets().find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
 	auto plane = eng->get_level()->spawn_entity_class<StaticMeshEntity>();

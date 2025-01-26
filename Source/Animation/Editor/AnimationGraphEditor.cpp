@@ -1487,7 +1487,7 @@ void AnimationGraphEditor::tick(float dt)
 		if (get_playback_state() == graph_playback_state::running) {
 			auto animator = out.get_animator();
 			if(animator)
-				animator->tick_tree_new(dt * g_slomo.get_float());
+				animator->update(dt * g_slomo.get_float());
 		}
 		
 		out.show(get_playback_state() != graph_playback_state::stopped);

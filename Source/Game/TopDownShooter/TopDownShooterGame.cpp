@@ -387,26 +387,18 @@ public:
 		con.shoot = inputPtr->get("game/shoot");
 		con.move = inputPtr->get("game/move");
 		con.look = inputPtr->get("game/look");
+		inputPtr->get("game/jump")->on_start.add(this, [&]()
+			{
+				ragdoll_enabled = !ragdoll_enabled;
+				auto& children = get_all_children();
+				for (auto c : children) {
+					if (c->get_tag() != StringName("Ragdoll")) continue;
+					auto phys = c->get_first_component<PhysicsComponentBase>();
+					if (!phys) continue;
+					phys->set_is_enable(ragdoll_enabled);
+				}
 
-		//inputPtr->get("game/use")->bind_triggered_function(
-		//	[&]() {
-		//		if (is_in_car) {
-		//			world_query_result res;
-		//			TraceIgnoreVec ig;
-		//			ig.push_back(capsule);
-		//			g_physics.trace_ray(res, get_ws_position() + glm::vec3(0, 0.5, 0), lookdir, 2.0, &ig, UINT32_MAX);
-		//			if (res.component) {
-		//				auto car = res.component->get_owner()->get_first_component<TopDownCar>();
-		//				if (car)
-		//					enter_car(car);
-		//			}
-		//		}
-		//		else {
-		//			exit_car();
-		//		}
-		//
-		//	}
-		//);
+			});
 
 		velocity = {};
 
@@ -418,12 +410,12 @@ public:
 	}
 	void exit_car() {
 		is_in_car = false;
-		mesh->visible = true;
+		mesh->set_is_visible( true );
 	}
 
 	void enter_car(TopDownCar* car) {
 		is_in_car = true;
-		mesh->visible = false;
+		mesh->set_is_visible(false);
 	}
 
 	void shoot_gun() {
@@ -516,7 +508,7 @@ public:
 	void update_view() {
 		auto pos = get_ws_position();
 		pos = glm::mix(pos, mouse_pos, 0.15);
-		auto camera_pos = glm::vec3(pos.x, pos.y + 16.0, pos.z - 2.0);
+		auto camera_pos = glm::vec3(pos.x, pos.y + 5.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - pos);
 
 		this->view_pos =  damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
@@ -541,9 +533,9 @@ public:
 	MeshComponent* mesh = nullptr;
 	TopDownHealthComponent* health = nullptr;
 	InputUser* inputPtr = nullptr;
-
 	CameraComponent* the_camera = nullptr;
 
+	bool ragdoll_enabled = false;
 
 	float shoot_cooldown = 0.0;
 

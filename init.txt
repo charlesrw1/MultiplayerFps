@@ -2,13 +2,14 @@
 thirdperson 1
 
 
-g_draw_physx_scene 31
-
+#g_draw_physx_scene 31
+g_debug_skeletons 1
 bind 1 "map top_down/map0.tmap"
 bind 2 "TOGGLE_PLAY_EDIT_MAP"
 bind 3 "start_ed Prefab fire_emit.pfb"
 
 drawconsole 1
+ed_physics_shapes_depth_tested 0
 
 bind . "drawconsole 1"
 bind , "drawconsole 0"
@@ -21,6 +22,10 @@ bind F5 "r.debug_mode 2"
 bind F6 "r.debug_mode 6"
 bind F7 "r.debug_mode 7"
 bind F8 "r.debug_mode 8"
+
+REG_GAME_TAG Player
+REG_GAME_TAG Hitbox
+REG_GAME_TAG Ragdoll
 
 bind "Keypad 1" Ctrl "FILTER_FOR Model"
 bind "Keypad 2" Ctrl "FILTER_FOR Map"

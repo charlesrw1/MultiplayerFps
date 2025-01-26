@@ -118,6 +118,8 @@ public:
 	void init() {
 		MeshBuilder_Object obj;
 		obj.visible = false;
+		obj.depth_tested = false;
+		obj.use_background_color = true;
 		this->handle = idraw->get_scene()->register_meshbuilder(obj);
 	}
 	void update(float dt);
@@ -1834,6 +1836,8 @@ void DebugShapeCtx::update(float dt)
 	mbo.owner = nullptr;
 	mbo.meshbuilder = &mb;
 	mbo.visible = true;
+	mbo.depth_tested = false;
+	mbo.use_background_color = true;
 
 	idraw->get_scene()->update_meshbuilder(handle, mbo);
 
