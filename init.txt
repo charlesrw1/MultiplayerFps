@@ -11,7 +11,7 @@ bind 4 "start_ed Prefab top_down/player.pfb"
 
 #force_animation_to_bind_pose 1
 drawconsole 1
-ed_physics_shapes_depth_tested 0
+#ed_physics_shapes_depth_tested 0
 
 r.enable_vsync 0
 

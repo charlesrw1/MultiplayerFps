@@ -394,10 +394,10 @@ void PhysicsManImpl::update_debug_physics_shapes()
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
-		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
+		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 1.0);
+		scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.4);
 
 
 

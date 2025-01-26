@@ -59,6 +59,7 @@ public:
     }
 
     void check_to_rehash(uint64_t new_elements_to_insert = 0) {
+
         if (num_tombstones + num_used + new_elements_to_insert >= (items.size() >> 1) /* half of size */) {
             rehash(items.size() << 1);
         }
@@ -109,7 +110,7 @@ public:
             if (items[actual_index].handle == handle || items[actual_index].handle == 0 || items[actual_index].handle == TOMBSTONE) {
 
                 num_tombstones -= items[actual_index].handle == TOMBSTONE;
-                num_used += items[actual_index].handle != handle;
+                num_used++;
 
                 items[actual_index].data = dataToAdd;
                 items[actual_index].handle = handle;

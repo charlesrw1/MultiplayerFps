@@ -50,6 +50,8 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\Framework\Hashmap.h" />
+    <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
     <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
     <ClInclude Include="Source\Old\Client.h" />
@@ -112,11 +114,8 @@
     <ClInclude Include="Source\Framework\Files.h" />
     <ClInclude Include="Source\Framework\FreeList.h" />
     <ClInclude Include="Source\Framework\Handle.h" />
-    <ClInclude Include="Source\Framework\Hashmap.h" />
-    <ClInclude Include="Source\Framework\Hashset.h" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
-    <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
     <ClInclude Include="Source\Framework\MathLib.h" />
     <ClInclude Include="Source\Framework\MemArena.h" />
@@ -236,6 +235,7 @@
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
+    <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Old\Client.cpp" />

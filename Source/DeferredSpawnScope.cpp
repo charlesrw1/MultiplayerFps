@@ -8,5 +8,8 @@ DeferredSpawnScope::~DeferredSpawnScope()
 }
 DeferredSpawnScopePrefab::~DeferredSpawnScopePrefab()
 {
-	eng->get_level()->insert_unserialized_entities_into_level(*file);
+	if (file) {
+		eng->get_level()->insert_unserialized_entities_into_level(*file);
+		delete file;
+	}
 }

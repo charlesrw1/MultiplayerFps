@@ -417,6 +417,8 @@ DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
 	else {
 		auto tool = eng->get_current_tool();
 		auto level = eng->get_level();
+		if (!level)
+			return;
 		auto source = level->get_source_asset();
 		if (source) {
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("map %s", source->get_name().c_str()));
@@ -834,7 +836,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	this->level->create(loadedLevel, this_is_for_editor);
 
 	time = 0.0;
-	set_tick_rate(20.f);
+	set_tick_rate(60.f);
 
 	idraw->on_level_start();
 

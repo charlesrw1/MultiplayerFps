@@ -65,6 +65,8 @@ void Level::update_level()
 	}
 	wantsToAddToUpdate.clear();
 
+	//printf("%d\n",tick_list)
+
 
 	for (auto h : deferred_delete_list) {
 		auto e = get_entity(h);
@@ -310,6 +312,17 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 	c->initialize_internal_step1();
 	c->initialize_internal_step2();
 }
+
+DeferredSpawnScopePrefab Level::spawn_prefab_deferred(Entity*& out, PrefabAsset* asset)
+{
+	if (!asset) {
+		return DeferredSpawnScopePrefab(nullptr);
+	}
+	auto unserialized_scene = unserialize_entities_from_text(asset->text, asset);
+	out = unserialized_scene.get_root_entity();
+	return DeferredSpawnScopePrefab(new UnserializedSceneFile(std::move(unserialized_scene)));
+}
+
 
 Entity* Level::spawn_prefab(PrefabAsset* asset)
 {

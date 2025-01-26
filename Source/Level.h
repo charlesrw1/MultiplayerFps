@@ -85,6 +85,7 @@ public:
 	Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti);
 	
 	Entity* spawn_prefab(PrefabAsset* asset);
+	DeferredSpawnScopePrefab spawn_prefab_deferred(Entity*& out, PrefabAsset* asset);
 	
 	template<typename T>
 	T* spawn_entity_class() {

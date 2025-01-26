@@ -565,7 +565,7 @@ void PhysicsJointComponent::refresh_joint()
 
 void PhysicsJointComponent::start()
 {
-	if (1||eng->is_editor_level()) {
+	if (eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;

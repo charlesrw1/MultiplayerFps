@@ -59,6 +59,7 @@ public:
     }
 
     void check_to_rehash(uint64_t new_elements_to_insert = 0) {
+
         if (num_tombstones + num_used + new_elements_to_insert >= (items.size() >> 1) /* half of size */) {
             rehash(items.size() << 1);
         }
@@ -92,6 +93,8 @@ public:
                 items[actual_index].ptr = (T*)HASHSET_TOMBSTONE;
                 num_used--;
                 num_tombstones++;
+                assert(count_num_used() == num_used);
+                assert(num_used >= 0);
                 return;
             }
             else if (items[actual_index].ptr == nullptr)
@@ -109,9 +112,11 @@ public:
             if (items[actual_index].ptr == ptr || items[actual_index].ptr == nullptr || items[actual_index].ptr == (T*)HASHSET_TOMBSTONE) {
 
                 num_tombstones -= items[actual_index].ptr == (T*)HASHSET_TOMBSTONE;
-                num_used += items[actual_index].ptr == nullptr;
+                num_used++;
 
                 items[actual_index].ptr = ptr;
+
+                assert(count_num_used() == num_used);
                 return;
             }
         }
@@ -123,6 +128,15 @@ public:
         items.resize(count);
         num_used = 0;
         num_tombstones = 0;
+    }
+
+    int count_num_used() {
+        int c = 0;
+        for (auto i : items) {
+            if (i.ptr != nullptr && i.ptr != (T*)HASHSET_TOMBSTONE)
+                c++;
+        }
+        return c;
     }
 
     void rehash(uint64_t next_size) {
@@ -144,8 +158,8 @@ public:
     friend class hash_set_iterator<T>;
 
     uint64_t mask = 0;
-    uint64_t num_tombstones = 0;
-    uint64_t num_used = 0;
+    int64_t num_tombstones = 0;
+    int64_t num_used = 0;
     std::vector<item> items;
 };
 

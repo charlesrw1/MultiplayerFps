@@ -175,9 +175,17 @@ public:
 				death_time = eng->get_game_time();
 
 				auto cap = get_owner()->get_first_component<PhysicsComponentBase>();
-				cap->set_is_simulating(true);
-				cap->apply_impulse(dmg.position+glm::vec3(0,0.3,0), dmg.dir*5.0f);
-				cap->set_physics_layer(PhysicsLayer::PhysicsObject);
+				cap->set_is_enable(false);
+				cap->destroy();
+
+				auto& children = get_owner()->get_all_children();
+				for (auto c : children) {
+					if (c->get_tag() != StringName("Ragdoll")) continue;
+					auto phys = c->get_first_component<PhysicsComponentBase>();
+					if (!phys) continue;
+					phys->enable_in_future_with_velocity();
+				}
+				
 			});
 
 		auto capsule = get_owner()->get_first_component<CapsuleComponent>();
@@ -191,7 +199,7 @@ public:
 	}
 	void update() {
 		if (is_dead) {
-			if ((eng->get_game_time() - death_time > 3.0)) {
+			if ((eng->get_game_time() - death_time > 10.0)) {
 				get_owner()->destroy();
 			}
 			return;
@@ -528,7 +536,7 @@ public:
 		if (is_jumping)
 			camera_pos = glm::vec3(pos.x, pos.y + 2.0, pos.z - 3.0);
 		else
-			camera_pos = glm::vec3(pos.x, pos.y + 7.0, pos.z - 1.0);
+			camera_pos = glm::vec3(pos.x, pos.y + 12.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - (pos + glm::vec3(0,1,0)));
 
 		this->view_pos =  damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
@@ -734,3 +742,23 @@ public:
 	float flMovey = 0.0;
 };
 CLASS_IMPL(TopDownAnimDriver);
+
+CLASS_H(TopDownSpawner,EntityComponent)
+public:
+	void start() {
+		Entity* e{};
+		{
+			auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
+			e->set_ws_position(get_ws_position());
+		}
+	}
+
+	static const PropertyInfoList* get_props() {
+		START_PROPS(TopDownSpawner)
+			REG_ASSET_PTR(prefab,PROP_DEFAULT)
+		END_PROPS(TopDownSpawner)
+	}
+
+	AssetPtr<PrefabAsset> prefab;
+};
+CLASS_IMPL(TopDownSpawner);
