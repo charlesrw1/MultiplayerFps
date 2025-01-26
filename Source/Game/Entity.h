@@ -229,7 +229,15 @@ public:
 		else
 			tag.name = StringName();
 	}
+
+	bool get_is_top_level() const {
+		return is_top_level;
+	}
+	void set_is_top_level(bool b);
 private:
+	bool has_transform_parent() const {
+		return !get_is_top_level() && get_entity_parent() != nullptr;
+	}
 
 	void post_change_transform_R(bool ws_is_dirty = true, EntityComponent* skipthis = nullptr);
 
@@ -250,6 +258,8 @@ private:
 
 	bool selected_in_editor = false;
 	bool world_transform_is_dirty = true;
+
+	bool is_top_level = false;	// if true, then local space is considered the world space transform, even if a parent exists
 
 	bool start_disabled = false;
 

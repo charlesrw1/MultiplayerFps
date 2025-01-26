@@ -193,10 +193,15 @@ bool EditorDoc::save_document_internal()
 	auto serialized = serialize_entities_to_text(all_ents, pa);
 	
 	auto path = get_doc_name();
-	auto outfile = FileSys::open_write_game(path.c_str());
-	outfile->write(serialized.text.c_str(), serialized.text.size());
-
+	{
+		auto outfile = FileSys::open_write_game(path.c_str());
+		outfile->write(serialized.text.c_str(), serialized.text.size());
+	}
 	sys_print(Info, "Wrote out to %s\n", path.c_str());
+
+	if (is_editing_prefab()) {
+		GetAssets().reload_sync(pa);
+	}
 
 	return true;
 }

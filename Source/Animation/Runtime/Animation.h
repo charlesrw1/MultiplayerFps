@@ -75,6 +75,12 @@ public:
 		float play_speed,
 		float start_pos
 	);
+	bool play_animation_in_slot(
+		const AnimationSeq* seq,
+		StringName slot,
+		float play_speed,
+		float start_pos
+	);
 
 	void add_simulating_physics_object(Entity* obj);
 	void remove_simulating_physics_object(Entity* obj);

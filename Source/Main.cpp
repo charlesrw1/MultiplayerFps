@@ -736,6 +736,9 @@ void register_input_actions_for_game()
 	IA::register_action("game", "jump")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_A), nullptr, new BasicButtonTrigger())
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_SPACE), nullptr, new BasicButtonTrigger());
+	IA::register_action("game", "test1")
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_Z), nullptr, new BasicButtonTrigger());
+
 	IA::register_action("ui", "right")
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {})
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_RIGHT), {}, {});
@@ -831,7 +834,7 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	this->level->create(loadedLevel, this_is_for_editor);
 
 	time = 0.0;
-	set_tick_rate(60.f);
+	set_tick_rate(20.f);
 
 	idraw->on_level_start();
 

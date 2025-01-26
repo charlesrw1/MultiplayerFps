@@ -20,11 +20,11 @@ public:
 CLASS_H(PrefabAsset, IAsset)
 public:
 	// IAsset overrides
-	void sweep_references() const override {}
+	void sweep_references() const override;
 	bool load_asset(ClassBase*& user) override;
 	void post_load(ClassBase*) override {}
 	void uninstall() override;
-	void move_construct(IAsset*) override {}
+	void move_construct(IAsset*) override;
 
 	BaseUpdater* find_entity(uint64_t handle) {
 		return instance_ids_for_diffing.find(handle);

@@ -438,15 +438,28 @@ bool AnimatorInstance::play_animation_in_slot(
 	if (!model || !cfg)
 		return false;
 
+	int remap = -1;
+	auto seq = model->get_skel()->find_clip(animation, remap);
+	
+	return play_animation_in_slot(seq, slot, play_speed, start_pos);
+}
+
+bool AnimatorInstance::play_animation_in_slot(
+	const AnimationSeq* seq,
+	StringName slot,
+	float play_speed,
+	float start_pos
+)
+{
+	if (!model || !cfg || !seq)
+		return false;
+
 	auto slot_to_play_in = find_slot_with_name(slot);
 	if (!slot_to_play_in) {
 		sys_print(Warning, "no slot with name\n");
 		return false;
 	}
-	int remap_idx = -1;
-	auto seq = model->get_skel()->find_clip(animation, remap_idx);
-	assert(remap_idx == -1);	// FIXME
-
+	
 	slot_to_play_in->state = DirectAnimationSlot::FadingIn;
 	slot_to_play_in->fade_percentage = 0.0;
 	slot_to_play_in->active = seq;

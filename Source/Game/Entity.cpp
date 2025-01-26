@@ -246,7 +246,7 @@ void Entity::remove_this_component_internal(EntityComponent* component_to_remove
 Entity::~Entity()
 {
 	ASSERT(init_state != initialization_state::CALLED_START&&init_state!=initialization_state::CALLED_PRE_START);
-	ASSERT(all_components.empty());
+	//ASSERT(all_components.empty());
 }
 
 EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* info)
@@ -340,21 +340,20 @@ void Entity::post_change_transform_R(bool ws_is_dirty, EntityComponent* skipthis
 
 void Entity::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale)
 {
-	if (!get_entity_parent()) {
+	if (!has_transform_parent()) {
 		set_ls_transform(v, q, scale);
-		return;
 	}
-
-	auto matrix = compose_transform(v, q, scale);
-	set_ws_transform(matrix);
-	post_change_transform_R();
+	else {
+		auto matrix = compose_transform(v, q, scale);
+		set_ws_transform(matrix);
+	}
 }
 
 
 void Entity::set_ws_transform(const glm::mat4& transform)
 {
 	// want local space
-	if (get_entity_parent()) {
+	if (has_transform_parent()) {
 		auto inv_world = glm::inverse(get_parent_transform());
 		glm::mat4 local = inv_world * transform;
 		decompose_transform(local, position, rotation, scale);
@@ -384,7 +383,7 @@ glm::mat4 Entity::get_parent_transform() const
 // lazily evalutated
 const glm::mat4& Entity::get_ws_transform() {
 	if (world_transform_is_dirty) {
-		if (get_entity_parent()) {
+		if (has_transform_parent()) {
 			cached_world_transform = get_parent_transform() * get_ls_transform();
 		}
 		else
@@ -392,6 +391,12 @@ const glm::mat4& Entity::get_ws_transform() {
 		world_transform_is_dirty = false;
 	}
 	return cached_world_transform;
+}
+
+void Entity::set_is_top_level(bool b)
+{
+	is_top_level = b;
+	world_transform_is_dirty = true;
 }
 
 void Entity::invalidate_transform(EntityComponent* skipthis)

@@ -17,6 +17,7 @@ namespace physx {
 	class PxJoint;
 	class PxRevoluteJoint;
 	class PxSphericalJoint;
+	class PxD6Joint;
 }
 
 
@@ -84,6 +85,7 @@ public:
 			REG_BOOL(send_hit,PROP_DEFAULT,"0"),
 			REG_BOOL(send_overlap,PROP_DEFAULT,"0"),
 			REG_BOOL(is_static,PROP_DEFAULT,"1"),
+			REG_BOOL(interpolate_visuals, PROP_DEFAULT, "1")
 		END_PROPS(PhysicsComponentBase)
 	};
 
@@ -132,6 +134,8 @@ private:
 	bool send_overlap = false;			// if true on both objects, then a overlap event will be sent (one of the objects has to be a trigger object)
 	
 	bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
+
+	bool interpolate_visuals = true;
 
 	physx::PxRigidActor* physxActor = nullptr;
 
@@ -264,10 +268,65 @@ public:
 	static const PropertyInfoList* get_props() = delete;
 	physx::PxSphericalJoint* joint = nullptr;
 };
-CLASS_H(DistanceJointComponent, PhysicsJointComponent)
-public:
+
+enum class JM : uint8_t {
+	Locked,
+	Limited,
+	Free,
 };
-CLASS_H(CharacterJointComponent, PhysicsJointComponent)
+using JointMotion = JM;
+ENUM_HEADER(JointMotion);
+
+CLASS_H(AdvancedJointComponent, PhysicsJointComponent)
+public:
+	void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) override;
+	physx::PxJoint* get_joint() const override;
+	void free_joint() override;
+	static const PropertyInfoList* get_props() {
+		START_PROPS(AdvancedJointComponent)
+			REG_ENUM(x_motion,PROP_DEFAULT,"JM::Locked", JM),
+			REG_ENUM(y_motion,PROP_DEFAULT,"JM::Locked", JM),
+			REG_ENUM(z_motion,PROP_DEFAULT,"JM::Locked", JM),
+			REG_ENUM(ang_x_motion,PROP_DEFAULT,"JM::Locked", JM),
+			REG_ENUM(ang_y_motion,PROP_DEFAULT,"JM::Locked", JM),
+			REG_ENUM(ang_z_motion,PROP_DEFAULT,"JM::Locked", JM),
+			REG_FLOAT(linear_distance_max,PROP_DEFAULT,"0"),
+			REG_FLOAT(linear_damp,PROP_DEFAULT,"0"),
+			REG_FLOAT(linear_stiff,PROP_DEFAULT,"0"),
+			REG_FLOAT(twist_limit_min,PROP_DEFAULT,"0"),
+			REG_FLOAT(twist_limit_max,PROP_DEFAULT,"0"),
+			REG_FLOAT(ang_y_limit,PROP_DEFAULT,"0"),
+			REG_FLOAT(ang_z_limit,PROP_DEFAULT,"0"),
+			REG_FLOAT(twist_damp,PROP_DEFAULT,"0"),
+			REG_FLOAT(twist_stiff,PROP_DEFAULT,"0"),
+			REG_FLOAT(cone_damp,PROP_DEFAULT,"0"),
+			REG_FLOAT(cone_stiff,PROP_DEFAULT,"0"),
+		END_PROPS(AdvancedJointComponent)
+	}
+	void draw_meshbuilder() override;
+
+	JointMotion x_motion = JM::Locked;
+	JointMotion y_motion = JM::Locked;
+	JointMotion z_motion = JM::Locked;
+	JointMotion ang_x_motion = JM::Locked;
+	JointMotion ang_y_motion = JM::Locked;
+	JointMotion ang_z_motion = JM::Locked;
+	float linear_distance_max = 0.0;
+	float linear_damp = 0.0;
+	float linear_stiff = 0.0;
+	float twist_limit_min = 0.0;
+	float twist_limit_max = 0.0;
+	float ang_y_limit = 0.0;
+	float ang_z_limit = 0.0;
+	float twist_damp = 0.0;
+	float twist_stiff = 0.0;
+	float cone_damp = 0.0;
+	float cone_stiff = 0.0;
+
+
+	physx::PxD6Joint* joint = nullptr;
+};
+CLASS_H(DistanceJointComponent, PhysicsJointComponent)
 public:
 };
 CLASS_H(FixedJointComponent, PhysicsJointComponent)

@@ -24,6 +24,7 @@ class SerializeTestWorkbench
 {
 public:
 	~SerializeTestWorkbench() {
+		//
 		for (auto e : all) {
 			e->init_state = BaseUpdater::initialization_state::CONSTRUCTOR;
 			if (auto ent = e->cast_to<Entity>())

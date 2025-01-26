@@ -29,15 +29,30 @@ void PhysicsComponentBase::fetch_new_transform()
 	ASSERT(get_is_simulating());
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
-	last_position = next_position;
-	last_rot = next_rot;
-	next_position = physx_to_glm(pose.p);
-	next_rot = physx_to_glm(pose.q);
-	set_ticking(true);
+
+	if (interpolate_visuals) {
+		last_position = next_position;
+		last_rot = next_rot;
+		next_position = physx_to_glm(pose.p);
+		next_rot = physx_to_glm(pose.q);
+		//if (!get_owner()->get_entity_parent()) {
+		//}
+		//else {
+		//	auto parent_t = get_owner()->get_entity_parent()->get_ws_transform();
+		//	glm::mat4 myworld = glm::translate(glm::mat4(1.f), physx_to_glm(pose.p)) * glm::mat4_cast(physx_to_glm(pose.q));
+		//	auto mylocal = glm::inverse(parent_t) * myworld;
+		//	next_rot = glm::normalize(glm::quat_cast(mylocal));
+		//	next_position = mylocal[3];
+		//}
+		set_ticking(true);
+	}
+	else {
+		get_owner()->set_ws_transform(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
+	}
 }
 void PhysicsComponentBase::update()
 {
-	if (!get_is_simulating()) {
+	if (!get_is_simulating() || !interpolate_visuals) {
 		set_ticking(false);
 		return;
 	}
@@ -48,6 +63,7 @@ void PhysicsComponentBase::update()
 	auto iq = glm::slerp(last_rot, next_rot, alpha);
 	auto mat = glm::translate(glm::mat4(1),ip);
 	mat = mat *  glm::mat4_cast(iq);
+
 	get_owner()->set_ws_transform(mat);
 }
 
@@ -96,6 +112,12 @@ void PhysicsComponentBase::pre_start()
 	next_rot = get_owner()->get_ls_rotation();
 
 	update_mass();
+
+	if (get_is_simulating()) {
+		auto ws = get_ws_transform();
+		get_owner()->set_is_top_level(true);
+		get_owner()->set_ws_transform(ws);
+	}
 
 }
 
@@ -512,7 +534,7 @@ void PhysicsJointComponent::end()
 PhysicsComponentBase* PhysicsJointComponent::get_owner_physics() {
 	return get_owner()->get_first_component<PhysicsComponentBase>();
 }
-static glm::mat4 get_transform_joint(glm::vec3 local, PhysicsComponentBase* b, int axis)
+static glm::mat4 get_transform_joint(glm::vec3 local, int axis)
 {
 	auto local_t = glm::translate(glm::mat4(1), local);
 	glm::mat4 m = glm::mat4(1);
@@ -543,26 +565,34 @@ void PhysicsJointComponent::draw_meshbuilder()
 	
 }
 
+template<typename T>
+static T* make_joint_shared(const glm::mat4& ws_transform, const glm::vec3& local_ofs, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsComponentBase* a, PhysicsComponentBase*b)
+{
+	T* joint = nullptr;
+	auto my_local = get_transform_joint(local_ofs, local_joint_axis);
+	auto my_world = ws_transform * my_local;
+	if (b) {
+		auto other_world = b->get_ws_transform();
+		auto other_local = glm::inverse(other_world) * my_world;
+		joint = create_func(*physics_local_impl->physics_factory,
+			a->get_physx_actor(), glm_to_physx(my_local),
+			b->get_physx_actor(), glm_to_physx(other_local));
+	}
+	else {
+		joint = create_func(*physics_local_impl->physics_factory,
+			a->get_physx_actor(), glm_to_physx(my_local),
+			nullptr, glm_to_physx(my_world));
+	}
+	joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+
+	return joint;
+}
 
 void HingeJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b)
 {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	auto my_local = get_transform_joint(local_joint_from_offset, a, local_joint_axis);
-	auto my_world = get_ws_transform() * my_local;
-	if (b) {
-		auto other_world = b->get_ws_transform();
-		auto other_local = glm::inverse(other_world) * my_world;
-		joint = PxRevoluteJointCreate(*physics_local_impl->physics_factory,
-			a->get_physx_actor(), glm_to_physx(my_local),
-			b->get_physx_actor(), glm_to_physx(other_local));
-	}
-	else {
-		joint = PxRevoluteJointCreate(*physics_local_impl->physics_factory,
-			a->get_physx_actor(), glm_to_physx(my_local),
-			nullptr, glm_to_physx(my_world));
-	}
-	joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+	joint = make_joint_shared(get_ws_transform(), local_joint_from_offset, local_joint_axis, PxRevoluteJointCreate, a, b);
 
 }
 physx::PxJoint* HingeJointComponent::get_joint() const  {
@@ -580,21 +610,8 @@ void BallSocketJointComponent::init_joint(PhysicsComponentBase* a, PhysicsCompon
 {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	auto my_local = get_transform_joint(local_joint_from_offset, a, local_joint_axis);
-	auto my_world = get_ws_transform() * my_local;
-	if (b) {
-		auto other_world = b->get_ws_transform();
-		auto other_local = glm::inverse(other_world) * my_world;
-		joint = PxSphericalJointCreate(*physics_local_impl->physics_factory,
-			a->get_physx_actor(), glm_to_physx(my_local),
-			b->get_physx_actor(), glm_to_physx(other_local));
-	}
-	else {
-		joint = PxSphericalJointCreate(*physics_local_impl->physics_factory,
-			a->get_physx_actor(), glm_to_physx(my_local),
-			nullptr, glm_to_physx(my_world));
-	}
-	joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+
+	joint = make_joint_shared(get_ws_transform(), local_joint_from_offset, local_joint_axis, PxSphericalJointCreate, a, b);
 }
 physx::PxJoint* BallSocketJointComponent::get_joint() const  {
 	return joint;
@@ -625,3 +642,77 @@ void PhysicsJointComponent::editor_on_change_property() {
 CLASS_IMPL(PhysicsJointComponent);
 CLASS_IMPL(HingeJointComponent);
 CLASS_IMPL(BallSocketJointComponent);
+CLASS_IMPL(AdvancedJointComponent);
+
+PxJoint* AdvancedJointComponent::get_joint() const {
+	return joint;
+}
+void AdvancedJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) {
+	ASSERT(!joint);
+	ASSERT(get_owner() == a->get_owner());
+	joint = make_joint_shared(get_ws_transform(), local_joint_from_offset, local_joint_axis, PxD6JointCreate, a, b);
+	auto get_jm_enum = [&](JointMotion jm) {
+		if (jm == JM::Free) return PxD6Motion::eFREE;
+		else if (jm == JM::Limited) return PxD6Motion::eLIMITED;
+		else return PxD6Motion::eLOCKED;
+	};
+	joint->setMotion(PxD6Axis::eX, get_jm_enum(x_motion));
+	joint->setMotion(PxD6Axis::eY, get_jm_enum(x_motion));
+	joint->setMotion(PxD6Axis::eZ, get_jm_enum(x_motion));
+	joint->setMotion(PxD6Axis::eTWIST, get_jm_enum(ang_x_motion));
+	joint->setMotion(PxD6Axis::eSWING1, get_jm_enum(ang_y_motion));
+	joint->setMotion(PxD6Axis::eSWING2, get_jm_enum(ang_z_motion));
+	joint->setLinearLimit(PxJointLinearLimit(linear_distance_max, PxSpring(linear_stiff, linear_damp)));
+	joint->setTwistLimit(PxJointAngularLimitPair(twist_limit_min,twist_limit_max,PxSpring(twist_stiff,twist_damp)));
+	joint->setSwingLimit(PxJointLimitCone(ang_y_limit, ang_z_limit, PxSpring(cone_stiff, cone_damp)));
+}
+void AdvancedJointComponent::free_joint()
+{
+	if (joint) {
+		joint->release();
+		joint = nullptr;
+	}
+}
+void AdvancedJointComponent::draw_meshbuilder()
+{
+	auto myworld = get_ws_transform();
+	auto mylocal = get_transform_joint(local_joint_from_offset, local_joint_axis);
+	myworld = myworld * mylocal;
+
+	// draw x angle
+	auto origin = myworld[3];
+	float length = 0.4;
+	if(ang_x_motion==JM::Limited)
+	{
+		glm::vec3 min = glm::vec3(0,sin(twist_limit_min), cos(twist_limit_min)) * length;
+		glm::vec3 min_vec = myworld * glm::vec4(min,1.0);
+		editor_meshbuilder->mb.PushLine(origin, min_vec, COLOR_RED);
+		glm::vec3 max = glm::vec3(0,sin(twist_limit_max), cos(twist_limit_max)) * length;
+		glm::vec3 max_vec = myworld * glm::vec4(max, 1.0);
+		editor_meshbuilder->mb.PushLine(origin, max_vec, COLOR_RED);
+	}
+	if(ang_y_motion==JM::Limited)
+	{
+		glm::vec3 min = glm::vec3(sin(-ang_y_limit),0, cos(-ang_y_limit)) * length;
+		glm::vec3 min_vec = myworld * glm::vec4(min,1.0);
+		editor_meshbuilder->mb.PushLine(origin, min_vec, COLOR_GREEN);
+		glm::vec3 max = glm::vec3(sin(ang_y_limit),0, cos(ang_y_limit)) * length;
+		glm::vec3 max_vec = myworld * glm::vec4(max, 1.0);
+		editor_meshbuilder->mb.PushLine(origin, max_vec, COLOR_GREEN);
+	}
+	if(ang_z_motion==JM::Limited)
+	{
+		glm::vec3 min = glm::vec3(cos(-ang_z_limit),sin(-ang_z_limit),0) * length;
+		glm::vec3 min_vec = myworld * glm::vec4(min,1.0);
+		editor_meshbuilder->mb.PushLine(origin, min_vec, COLOR_BLUE);
+		glm::vec3 max = glm::vec3(cos(ang_z_limit),sin(ang_z_limit),0) * length;
+		glm::vec3 max_vec = myworld * glm::vec4(max, 1.0);
+		editor_meshbuilder->mb.PushLine(origin, max_vec, COLOR_BLUE);
+	}
+}
+
+ENUM_START(JM)
+	STRINGIFY_EUNM(JM::Locked,0),
+	STRINGIFY_EUNM(JM::Limited,1),
+	STRINGIFY_EUNM(JM::Free,2),
+ENUM_IMPL(JM)

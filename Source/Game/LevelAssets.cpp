@@ -124,4 +124,29 @@ bool PrefabAsset::load_asset(ClassBase*&)
 void PrefabAsset::uninstall()
 {
 	sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
+	for (auto& o : sceneFile->get_objects())
+		delete o.second;
+	sceneFile.reset(nullptr);
+}
+void PrefabAsset::sweep_references() const
+{
+	sys_print(Debug, "prefab sweep ref %s\n", get_name().c_str());
+	{
+		auto temp = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, (PrefabAsset*)this));
+		for (auto& o : temp->get_objects())
+			delete o.second;
+		temp.reset();
+	}
+}
+void PrefabAsset::move_construct(IAsset* other)
+{
+	sys_print(Debug, "prefab move construct %s\n", get_name().c_str());
+	if (sceneFile.get()) {
+		PrefabAsset::uninstall();
+	}
+	ASSERT(!sceneFile.get());
+	PrefabAsset* o = (PrefabAsset*)other;
+	sceneFile = std::move(o->sceneFile);
+	text = std::move(o->text);
+	instance_ids_for_diffing = std::move(o->instance_ids_for_diffing);
 }

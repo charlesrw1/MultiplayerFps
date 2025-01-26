@@ -15,6 +15,8 @@
 #include "Level.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/LevelAssets.h"
+#include "Animation/Runtime/Animation.h"
+#include "AssetCompile/AnimationSeqLoader.h"
 
 CLASS_H(TopDownSpawnPoint, EntityComponent)
 public:
@@ -331,7 +333,7 @@ struct TopDownControls
 	InputActionInstance* move{};
 	InputActionInstance* look{};
 };
-
+#include "Animation/SkeletonData.h"
 CLASS_H(TopDownPlayer, Entity)
 public:
 
@@ -389,6 +391,17 @@ public:
 		con.look = inputPtr->get("game/look");
 		inputPtr->get("game/jump")->on_start.add(this, [&]()
 			{
+				mesh->get_animator_instance()->play_animation_in_slot(
+					jumpSeq.get()->seq,
+					StringName("ACTION"),
+					1.f,
+					0.f
+				);
+
+				is_jumping = !is_jumping;
+			});
+		inputPtr->get("game/test1")->on_start.add(this, [&]()
+			{
 				ragdoll_enabled = !ragdoll_enabled;
 				auto& children = get_all_children();
 				for (auto c : children) {
@@ -397,8 +410,8 @@ public:
 					if (!phys) continue;
 					phys->set_is_enable(ragdoll_enabled);
 				}
-
 			});
+
 
 		velocity = {};
 
@@ -507,9 +520,13 @@ public:
 	}
 	void update_view() {
 		auto pos = get_ws_position();
-		pos = glm::mix(pos, mouse_pos, 0.15);
-		auto camera_pos = glm::vec3(pos.x, pos.y + 5.0, pos.z - 1.0);
-		glm::vec3 camera_dir = glm::normalize(camera_pos - pos);
+		//pos = glm::mix(pos, mouse_pos, 0.15);
+		glm::vec3 camera_pos;
+		if (is_jumping)
+			camera_pos = glm::vec3(pos.x, pos.y + 2.0, pos.z - 3.0);
+		else
+			camera_pos = glm::vec3(pos.x, pos.y + 7.0, pos.z - 1.0);
+		glm::vec3 camera_dir = glm::normalize(camera_pos - (pos + glm::vec3(0,1,0)));
 
 		this->view_pos =  damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
 		auto finalpos = shake.evaluate(this->view_pos, camera_dir, eng->get_dt());
@@ -522,10 +539,12 @@ public:
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(TopDownPlayer)
-			REG_FLOAT(move_speed, PROP_DEFAULT,"5.0")
+			REG_FLOAT(move_speed, PROP_DEFAULT,"5.0"),
+			REG_ASSET_PTR(jumpSeq, PROP_DEFAULT)
 		END_PROPS(TopDownPlayer)
 	}
 
+	AssetPtr<AnimationSeqAsset> jumpSeq;
 	CameraShake shake;
 	std::unique_ptr<CharacterController> ccontroller;
 	Entity* gun_entity = nullptr;
@@ -549,6 +568,7 @@ public:
 	glm::vec3 mouse_pos = glm::vec3(0, 0, 0);
 
 	bool did_move = false;
+	bool is_jumping = false;
 
 	bool has_had_update = false;
 };
@@ -686,6 +706,7 @@ public:
 	virtual void on_update(float dt) override {
 		if (p) {
 			bRunning = p->did_move;
+			bIsJumping = p->is_jumping;
 		}
 		else
 			bRunning = true;
@@ -704,6 +725,7 @@ public:
 		END_PROPS(TopDownAnimDriver)
 	}
 
+	bool bIsJumping = false;
 	bool bRunning = false;
 	float flMovex = 0.0;
 	float flMovey = 0.0;
