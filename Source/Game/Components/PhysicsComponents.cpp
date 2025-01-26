@@ -50,9 +50,44 @@ void PhysicsComponentBase::fetch_new_transform()
 		get_owner()->set_ws_transform(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
 	}
 }
+
+glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {
+    glm::quat dq = q2 * glm::inverse(q1);
+    if (dq.w < 0.0f) {
+        dq = glm::quat(-dq.w, -dq.x, -dq.y, -dq.z);
+    }
+    return 2.0f * glm::vec3(dq.x, dq.y, dq.z) / dt;
+}
 void PhysicsComponentBase::update()
 {
-	if (!get_is_simulating() || !interpolate_visuals) {
+	if (enable_future == enable_in_future_state::waiting_for_frame_1) {
+		auto mat = get_owner()->get_parent_transform();
+		next_position = mat[3];
+		next_rot = glm::quat_cast(mat);
+		enable_future = enable_in_future_state::waiting_for_frame_2;
+		return;
+	}
+	else if (enable_future == enable_in_future_state::waiting_for_frame_2) {
+		enable_future = enable_in_future_state::none;
+		auto mat = get_owner()->get_parent_transform();
+		auto rot = glm::quat_cast(mat);
+		glm::vec3 lin_vel = (glm::vec3(mat[3]) - next_position) / (float)eng->get_dt();
+		glm::vec3 ang_vel = calc_angular_vel(next_rot, rot, eng->get_dt());
+		next_rot = rot;
+		next_position = mat[3];
+
+		set_is_enable(true);
+
+		set_linear_velocity(lin_vel);
+		set_angular_velocity(lin_vel);
+
+		get_owner()->set_is_top_level(true);
+		get_owner()->set_ws_transform(mat);
+		force_set_transform(mat);
+		return;
+	}
+
+	if (!enabled || !get_is_simulating() || !interpolate_visuals) {
 		set_ticking(false);
 		return;
 	}
@@ -65,6 +100,18 @@ void PhysicsComponentBase::update()
 	mat = mat *  glm::mat4_cast(iq);
 
 	get_owner()->set_ws_transform(mat);
+}
+void PhysicsComponentBase::set_linear_velocity(const glm::vec3& v)
+{
+	if (auto d = get_dynamic_actor()) {
+		d->setLinearVelocity(glm_to_physx(v));
+	}
+}
+void PhysicsComponentBase::set_angular_velocity(const glm::vec3& v)
+{
+	if (auto d = get_dynamic_actor()) {
+		d->setAngularVelocity(glm_to_physx(v));
+	}
 }
 
 // Initialization done in pre_start now to let joint initialization work properly in start()
@@ -382,6 +429,8 @@ void PhysicsComponentBase::set_is_enable(bool enabled)
 		this->enabled = enabled;
 		if (has_initialized()) {
 			physxActor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, !enabled);
+			if (!enabled)
+				get_owner()->set_is_top_level(false);
 
 			update_bone_parent_animator();
 		}
@@ -411,6 +460,12 @@ void PhysicsComponentBase::refresh_shapes()
 		start += 64;
 	}
 }
+void PhysicsComponentBase::force_set_transform(const glm::mat4& m)
+{
+	if (has_initialized()) {
+		physxActor->setGlobalPose(glm_to_physx(m), true);
+	}
+}
 
 void PhysicsComponentBase::set_transform(const glm::mat4& transform, bool teleport)
 {
@@ -432,18 +487,7 @@ void PhysicsComponentBase::set_transform(const glm::mat4& transform, bool telepo
 	}
 }
 
-void PhysicsComponentBase::set_linear_velocity(const glm::vec3& v)
-{
-	if (has_initialized()) {
-		if (get_is_actor_static()) {
-			sys_print(Warning, "set_linear_velocity on a static PhysicsActor\n");
-		}
-		else {
-			auto dyn = get_dynamic_actor();
-			dyn->setLinearVelocity(glm_to_physx(v));
-		}
-	}
-}
+
 
 void PhysicsComponentBase::set_is_trigger(bool is_trig) {
 	if (is_trig == is_trigger) return;
@@ -460,6 +504,22 @@ void PhysicsComponentBase::set_send_hit(bool send_hit) {
 void PhysicsComponentBase::set_is_static(bool is_static)
 {
 	this->is_static = is_static;
+}
+void PhysicsComponentBase::enable_in_future_with_velocity()
+{
+	if (enable_future == enable_in_future_state::waiting_for_frame_2) {
+		sys_print(Warning, "enable_in_future_with_velocity: already waiting to start\n");
+	}
+	else if (enabled) {
+		sys_print(Warning, "enable_in_future_with_velocity: already enabled\n");
+	}
+	else if (!simulate_physics) {
+		sys_print(Warning, "enable_in_future_with_velocity: must be simulating\n");
+	}
+	else {
+		enable_future = enable_in_future_state::waiting_for_frame_1;
+		set_ticking(true);
+	}
 }
 
 MeshBuilderComponent* PhysicsComponentBase::get_editor_meshbuilder() const {
@@ -478,7 +538,7 @@ PhysicsJointComponent::~PhysicsJointComponent()
 const PropertyInfoList* PhysicsJointComponent::get_props() {
 	START_PROPS(PhysicsJointComponent)
 		REG_ENTITY_PTR(target,PROP_DEFAULT),
-		REG_VEC3(local_joint_from_offset,PROP_DEFAULT),
+		REG_STRUCT_CUSTOM_TYPE(anchor, PROP_DEFAULT, "JointAnchor"),
 		REG_INT(local_joint_axis,PROP_DEFAULT,"0")
 	END_PROPS(PhysicsJointComponent)
 }
@@ -505,14 +565,15 @@ void PhysicsJointComponent::refresh_joint()
 
 void PhysicsJointComponent::start()
 {
-	if (eng->is_editor_level()) {
+	if (1||eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
 		editor_meshbuilder->use_transform = false;
 		editor_meshbuilder->depth_tested = ed_physics_shapes_depth_tested.get_bool();
 	}
-	else {
+
+	if(!eng->is_editor_level()) {
 		refresh_joint();
 	}
 }
@@ -534,9 +595,9 @@ void PhysicsJointComponent::end()
 PhysicsComponentBase* PhysicsJointComponent::get_owner_physics() {
 	return get_owner()->get_first_component<PhysicsComponentBase>();
 }
-static glm::mat4 get_transform_joint(glm::vec3 local, int axis)
+static glm::mat4 get_transform_joint(JointAnchor anchor, int axis)
 {
-	auto local_t = glm::translate(glm::mat4(1), local);
+	auto local_t = glm::translate(glm::mat4(1), anchor.p) * glm::mat4_cast(anchor.q);
 	glm::mat4 m = glm::mat4(1);
 	if (axis == 1) {
 		m[0] = glm::vec4(0, 1, 0,0);
@@ -552,7 +613,7 @@ static glm::mat4 get_transform_joint(glm::vec3 local, int axis)
 void PhysicsJointComponent::draw_meshbuilder()
 {
 	glm::mat4 world = get_ws_transform();
-	auto local_t = glm::translate(glm::mat4(1), local_joint_from_offset);
+	auto local_t = glm::translate(glm::mat4(1), anchor.p);
 	world = world * local_t;
 	editor_meshbuilder->mb.AddSphere(world[3], 0.05, 10, 10, COLOR_RED);
 
@@ -566,10 +627,10 @@ void PhysicsJointComponent::draw_meshbuilder()
 }
 
 template<typename T>
-static T* make_joint_shared(const glm::mat4& ws_transform, const glm::vec3& local_ofs, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsComponentBase* a, PhysicsComponentBase*b)
+static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsComponentBase* a, PhysicsComponentBase*b)
 {
 	T* joint = nullptr;
-	auto my_local = get_transform_joint(local_ofs, local_joint_axis);
+	auto my_local = get_transform_joint(anchor, local_joint_axis);
 	auto my_world = ws_transform * my_local;
 	if (b) {
 		auto other_world = b->get_ws_transform();
@@ -592,7 +653,7 @@ void HingeJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBa
 {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	joint = make_joint_shared(get_ws_transform(), local_joint_from_offset, local_joint_axis, PxRevoluteJointCreate, a, b);
+	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxRevoluteJointCreate, a, b);
 
 }
 physx::PxJoint* HingeJointComponent::get_joint() const  {
@@ -611,7 +672,7 @@ void BallSocketJointComponent::init_joint(PhysicsComponentBase* a, PhysicsCompon
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
 
-	joint = make_joint_shared(get_ws_transform(), local_joint_from_offset, local_joint_axis, PxSphericalJointCreate, a, b);
+	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxSphericalJointCreate, a, b);
 }
 physx::PxJoint* BallSocketJointComponent::get_joint() const  {
 	return joint;
@@ -650,7 +711,7 @@ PxJoint* AdvancedJointComponent::get_joint() const {
 void AdvancedJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
-	joint = make_joint_shared(get_ws_transform(), local_joint_from_offset, local_joint_axis, PxD6JointCreate, a, b);
+	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxD6JointCreate, a, b);
 	auto get_jm_enum = [&](JointMotion jm) {
 		if (jm == JM::Free) return PxD6Motion::eFREE;
 		else if (jm == JM::Limited) return PxD6Motion::eLIMITED;
@@ -676,7 +737,7 @@ void AdvancedJointComponent::free_joint()
 void AdvancedJointComponent::draw_meshbuilder()
 {
 	auto myworld = get_ws_transform();
-	auto mylocal = get_transform_joint(local_joint_from_offset, local_joint_axis);
+	auto mylocal = get_transform_joint(anchor, local_joint_axis);
 	myworld = myworld * mylocal;
 
 	// draw x angle
@@ -716,3 +777,71 @@ ENUM_START(JM)
 	STRINGIFY_EUNM(JM::Limited,1),
 	STRINGIFY_EUNM(JM::Free,2),
 ENUM_IMPL(JM)
+
+// FIXME!
+#include "LevelEditor/EditorDocLocal.h"
+
+class AnchorJointEditor : public IPropertyEditor
+{
+public:
+	~AnchorJointEditor() {
+		if (ed_doc.manipulate->is_using_key_for_custom(this))
+			ed_doc.manipulate->stop_using_custom();
+	}
+	// Inherited via IPropertyEditor
+	virtual bool internal_update() override
+	{
+		JointAnchor* j = (JointAnchor*)prop->get_ptr(instance);
+
+		Entity* me = ed_doc.selection_state->get_only_one_selected().get();
+		if (!me) {
+			ImGui::Text("no Entity* found\n");
+			return false;
+		}
+
+		if (ed_doc.manipulate->is_using_key_for_custom(this)) {
+			auto last_matrix = ed_doc.manipulate->get_custom_transform();
+			auto local = glm::inverse(me->get_ws_transform()) * last_matrix;
+			j->q = (glm::quat_cast(local));
+			j->p = local[3];
+
+		};
+
+		bool ret = false;
+		if (ImGui::DragFloat3("##vec", (float*)&j->p, 0.05))
+			ret = true;
+		glm::vec3 eul = glm::eulerAngles(j->q);
+		eul *= 180.f / PI;
+		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
+			eul *= PI / 180.f;
+			j->q = glm::normalize(glm::quat(eul));
+
+			ret = true;
+		}
+
+		glm::mat4 matrix = glm::translate(glm::mat4(1.f), j->p) * glm::mat4_cast(j->q);
+		ed_doc.manipulate->set_start_using_custom(this, me->get_ws_transform() *  matrix);
+
+		return true;
+	}
+};
+
+ADDTOFACTORYMACRO_NAME(AnchorJointEditor, IPropertyEditor, "JointAnchor");
+
+class AnchorJointSerializer : public IPropertySerializer
+{
+	// Inherited via IPropertySerializer
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		const JointAnchor* j = (const JointAnchor*)info.get_ptr(inst);
+		return string_format("%f %f %f %f %f %f %f", j->p.x, j->p.y, j->p.z, j->q.w, j->q.x, j->q.y, j->q.z);
+	}
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		JointAnchor* j = (JointAnchor*)info.get_ptr(inst);
+		std::string to_str(token.str_start, token.str_len);
+		int args = sscanf(to_str.c_str(), "%f %f %f %f %f %f %f", &j->p.x, &j->p.y, &j->p.z, &j->q.w, &j->q.x, &j->q.y, &j->q.z);
+		if (args != 7) sys_print(Warning, "Anchor joint unserializer fail\n");
+	}
+};
+ADDTOFACTORYMACRO_NAME(AnchorJointSerializer, IPropertySerializer, "JointAnchor");

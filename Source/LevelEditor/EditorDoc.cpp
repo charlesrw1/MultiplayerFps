@@ -762,7 +762,7 @@ ManipulateTransformTool::ManipulateTransformTool()
 	ed_doc.selection_state->on_selection_changed.add(this, &ManipulateTransformTool::on_selection_changed);
 
 	// refresh cached data
-	ed_doc.prop_editor->on_property_change.add(this, &ManipulateTransformTool::on_selection_changed);
+	ed_doc.prop_editor->on_property_change.add(this, &ManipulateTransformTool::on_prop_change);
 
 	ed_doc.gui->key_down_delegate.add(this, &ManipulateTransformTool::on_key_down);
 }
@@ -776,17 +776,31 @@ void ManipulateTransformTool::on_open() {
 	world_space_of_selected.clear();
 }
 void ManipulateTransformTool::on_component_deleted(EntityComponent* ec) {
+	stop_using_custom();
+
 	update_pivot_and_cached();
 }
 void ManipulateTransformTool::on_entity_changes() {
+	stop_using_custom();
+
 	update_pivot_and_cached();
 }
 void ManipulateTransformTool::on_selection_changed() {
+	stop_using_custom();
+
+	update_pivot_and_cached();
+}
+void ManipulateTransformTool::on_prop_change() {
+
+	// no stop_using_custom
 	update_pivot_and_cached();
 }
 
 void ManipulateTransformTool::update_pivot_and_cached()
 {
+	if (get_is_using_for_custom())
+		return;
+
 	world_space_of_selected.clear();
 	auto& ss = ed_doc.selection_state;
 	if (ss->has_any_selected()) {
@@ -840,6 +854,8 @@ void ManipulateTransformTool::update_pivot_and_cached()
 }
 
 void ManipulateTransformTool::on_selected_tarnsform_change(uint64_t h) {
+	stop_using_custom();
+
 	update_pivot_and_cached();
 }
 
@@ -925,8 +941,8 @@ void ManipulateTransformTool::update()
 	}
 	if (state == MANIPULATING_OBJS) {
 		// save off
-		auto& ss = ed_doc.selection_state;
-		{
+		if (!get_is_using_for_custom()) {
+			auto& ss = ed_doc.selection_state;
 			auto& arr = ss->get_selection();
 			for (auto elm : arr) {
 				ASSERT(world_space_of_selected.find(elm) != world_space_of_selected.end());

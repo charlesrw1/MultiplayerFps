@@ -2,13 +2,14 @@
 thirdperson 1
 
 
-g_draw_physx_scene 31
+#g_draw_physx_scene 31
 #g_debug_skeletons 1
 bind 1 "map top_down/map0.tmap"
 bind 2 "TOGGLE_PLAY_EDIT_MAP"
 bind 3 "start_ed Prefab fire_emit.pfb"
 bind 4 "start_ed Prefab top_down/player.pfb"
 
+#force_animation_to_bind_pose 1
 drawconsole 1
 ed_physics_shapes_depth_tested 0
 

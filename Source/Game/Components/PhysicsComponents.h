@@ -49,6 +49,9 @@ public:
 	bool get_is_enabled() const { return enabled; }
 	void set_is_enable(bool enable);
 
+	// will enable in 2 frames, and set linear/angular velocity
+	void enable_in_future_with_velocity();
+
 	bool get_is_trigger() const { return is_trigger; }
 	void set_is_trigger(bool is_trig);
 
@@ -66,6 +69,7 @@ public:
 	// valid for dynamic actors only
 	glm::vec3 get_linear_velocity() const;
 	void set_linear_velocity(const glm::vec3& v);
+	void set_angular_velocity(const glm::vec3& v);
 	void apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse);
 	void set_objects_mass(float mass);
 	void set_objects_density(float density);
@@ -103,6 +107,8 @@ protected:
 
 	MeshBuilderComponent* get_editor_meshbuilder() const;
 private:
+	void force_set_transform(const glm::mat4& m);
+
 	void update_bone_parent_animator();
 
 	void refresh_shapes();
@@ -136,6 +142,12 @@ private:
 	bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
 
 	bool interpolate_visuals = true;
+
+	enum class enable_in_future_state {
+		none,
+		waiting_for_frame_1,
+		waiting_for_frame_2,
+	}enable_future = enable_in_future_state::none;
 
 	physx::PxRigidActor* physxActor = nullptr;
 
@@ -203,6 +215,12 @@ public:
 
 };
 
+struct JointAnchor
+{
+	glm::quat q = glm::quat();
+	glm::vec3 p = glm::vec3(0.f);
+};
+
 CLASS_H(PhysicsJointComponent, EntityComponent)
 public:
 	PhysicsJointComponent();
@@ -233,7 +251,9 @@ protected:
 
 	float limit_spring = 0.f;
 	float limit_damping = 0.f;
-	glm::vec3 local_joint_from_offset = glm::vec3(0.f);
+	
+	JointAnchor anchor;
+
 	int local_joint_axis = 0;	//0=x,1=y,2=z
 
 	MeshBuilderComponent* editor_meshbuilder = nullptr;

@@ -277,6 +277,8 @@ NodeRt_Ctx::NodeRt_Ctx(AnimatorInstance* inst)
 	this->model = inst->get_model();
 }
 #include "Debug.h"
+
+ConfigVar force_animation_to_bind_pose("force_animation_to_bind_pose", "0", CVAR_BOOL | CVAR_DEV, "");
 void AnimatorInstance::update(float dt)
 {
 	if (!cfg)
@@ -296,7 +298,7 @@ void AnimatorInstance::update(float dt)
 	on_update(dt);
 
 	// call into tree
-	if (get_tree()&& get_tree()->get_root_node())
+	if (!force_animation_to_bind_pose.get_bool() && get_tree()&& get_tree()->get_root_node())
 		get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
 	else
 		util_set_to_bind_pose(poses[0], get_skel());
@@ -357,6 +359,7 @@ void AnimatorInstance::update(float dt)
 				slot.active = nullptr;
 		}
 	}
+
 
 	// add physics driven bones
 	// physics bones are in world space, wont cover every bone

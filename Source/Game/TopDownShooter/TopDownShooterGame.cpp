@@ -408,7 +408,10 @@ public:
 					if (c->get_tag() != StringName("Ragdoll")) continue;
 					auto phys = c->get_first_component<PhysicsComponentBase>();
 					if (!phys) continue;
-					phys->set_is_enable(ragdoll_enabled);
+					if (ragdoll_enabled)
+						phys->enable_in_future_with_velocity();
+					else
+						phys->set_is_enable(false);
 				}
 			});
 

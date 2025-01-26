@@ -84,6 +84,7 @@ public:
 
 	void add_simulating_physics_object(Entity* obj);
 	void remove_simulating_physics_object(Entity* obj);
+
 private:
 
 	// hooks for derived classes

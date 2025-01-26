@@ -448,5 +448,6 @@ void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel)
 	for (int i = 0; i < skel->get_num_bones(); i++) {
 		pose.pos[i] = skel->get_bone_local_transform(i)[3];
 		pose.q[i] = skel->get_bone_local_rotation(i);
+
 	}
 }

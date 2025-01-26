@@ -168,8 +168,8 @@ void PropertyGrid::add_class_to_grid(ClassBase* classinst)
 
 void PropertyGrid::update()
 {
-	if (rows_had_changes)
-		sys_print(Debug, "cleared change flag\n");
+	//if (rows_had_changes)
+	//	sys_print(Debug, "cleared change flag\n");
 	rows_had_changes = false;
 
 	if (rows.empty()) {
