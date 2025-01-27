@@ -49,15 +49,11 @@ public:
 	bool get_is_enabled() const { return enabled; }
 	void set_is_enable(bool enable);
 
-	// will enable in 2 frames, and set linear/angular velocity
-	void enable_in_future_with_velocity();
-
 	bool get_is_trigger() const { return is_trigger; }
 	void set_is_trigger(bool is_trig);
 
 	void set_send_overlap(bool send_overlap);
 	void set_send_hit(bool send_hit);
-
 
 	PhysicsLayer get_physics_layer() const {
 		return physics_layer;
@@ -71,10 +67,13 @@ public:
 	void set_linear_velocity(const glm::vec3& v);
 	void set_angular_velocity(const glm::vec3& v);
 	void apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse);
+	void apply_force(const glm::vec3& worldspace, const glm::vec3& force);
+	float get_mass() const;
 	void set_objects_mass(float mass);
 	void set_objects_density(float density);
 	void set_transform(const glm::mat4& transform, bool teleport = false);
 
+	void enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt);
 
 	physx::PxRigidActor* get_physx_actor() const {
 		return physxActor;
@@ -145,12 +144,6 @@ private:
 	bool interpolate_visuals = true;
 
 	float density = 2.0;
-
-	enum class enable_in_future_state : int8_t {
-		none,
-		waiting_for_frame_1,
-		waiting_for_frame_2,
-	}enable_future = enable_in_future_state::none;
 
 	physx::PxRigidActor* physxActor = nullptr;
 

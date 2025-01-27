@@ -62,6 +62,8 @@ public:
 	const MaterialInstance* get_material_override() const;
 
 	glm::mat4 get_ls_transform_of_bone(StringName bone) const;
+	int get_index_of_bone(StringName bone) const;
+
 private:
 	bool is_visible = true;
 	bool cast_shadows = true;

@@ -705,9 +705,7 @@ void register_input_actions_for_game()
 		->add_bind("y-", IA::keyboard_key(SDL_SCANCODE_S), new SwizzleModifier(true, true), {})
 		->add_bind("x-", IA::keyboard_key(SDL_SCANCODE_A), new SwizzleModifier(false, false), {})
 		->add_bind("x+", IA::keyboard_key(SDL_SCANCODE_D), new SwizzleModifier(false, true), {});
-	IA::register_action("game", "accelerate")
-		->add_bind("", IA::controller_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT), {}, {})
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_W), {}, {});
+
 	IA::register_action("game", "look", true)
 		->add_bind("x", GIB::MouseX, new LookModifier(false), {})
 		->add_bind("y", GIB::MouseY, new LookModifier(true), {})
@@ -751,6 +749,12 @@ void register_input_actions_for_game()
 		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_X), {}, new BasicButtonTrigger())
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_R), {}, new BasicButtonTrigger());
 
+	IA::register_action("game", "accelerate")
+		->add_bind("", IA::controller_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT), {}, {})
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_W), {}, {});
+	IA::register_action("game", "deccelerate")
+		->add_bind("", IA::controller_axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT), {}, {})
+		->add_bind("", IA::keyboard_key(SDL_SCANCODE_S), {}, {});
 }
 
 int main(int argc, char** argv)
@@ -1475,7 +1479,7 @@ void GameEngineLocal::game_update_tick()
 
 	// physics update
 
-	for (int i = 0; i < num_ticks; i++) {
+	for (int i = 0; i < 1; i++) {
 		fixed_update(tick_interval);
 
 		if (state != Engine_State::Game)

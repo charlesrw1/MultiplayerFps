@@ -54,6 +54,12 @@ public:
 	const std::vector<glm::mat4x4> get_global_bonemats() const {
 		return cached_bonemats;
 	}
+	bool is_using_double_buffer() const {
+		return using_global_bonemat_double_buffer;
+	}
+	const std::vector<glm::mat4x4> get_last_global_bonemats() const {
+		return last_cached_bonemats;
+	}
 	const Model* get_model() const {
 		return model;
 	}
@@ -85,6 +91,9 @@ public:
 	void add_simulating_physics_object(Entity* obj);
 	void remove_simulating_physics_object(Entity* obj);
 
+	void set_update_owner_position_to_root(bool b) {
+		update_owner_position_to_root = b;
+	}
 private:
 
 	// hooks for derived classes
@@ -92,15 +101,23 @@ private:
 	virtual void on_update(float dt) {}
 	virtual void on_post_update() {}
 
+
+
 	std::vector<glm::mat4> cached_bonemats;	// global bonemats
 	std::vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
 
 	void ConcatWithInvPose();
+
+	bool update_owner_position_to_root = false;
 	
+	bool using_global_bonemat_double_buffer = true;
+	std::vector<glm::mat4> last_cached_bonemats;
+
 	// owning entity, can be null for example in editor
 	Entity* owner = nullptr;
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
+
 
 	std::vector<std::unique_ptr<Rt_Vars_Base>> runtime_graph_data;
 	std::unordered_set<uint64_t> simulating_physics_objects;

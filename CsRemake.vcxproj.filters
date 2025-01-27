@@ -800,5 +800,6 @@
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
+    <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
   </ItemGroup>
 </Project>

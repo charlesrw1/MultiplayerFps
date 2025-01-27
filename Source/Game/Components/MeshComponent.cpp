@@ -44,6 +44,23 @@ glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const
 	else
 		return allbones.at(index).posematrix;
 }
+
+int MeshComponent::get_index_of_bone(StringName bonename) const
+{
+	auto mod = model.get();
+	if (!mod || !mod->get_skel())
+		return -1;
+	auto& allbones = mod->get_skel()->get_all_bones();
+	int index = 0;
+	for (auto& bone : allbones) {
+		if (bone.name == bonename) {
+			return index;
+		}
+		index++;
+	}
+	return -1;
+}
+
 void MeshComponent::set_model(const char* model_path)
 {
 	Model* modelnext = GetAssets().find_sync<Model>(model_path).get();

@@ -348,6 +348,11 @@ void Entity::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm:
 		set_ws_transform(matrix);
 	}
 }
+void Entity::set_ls_position(const glm::vec3& v)
+{
+	position = v;
+	post_change_transform_R();
+}
 
 
 void Entity::set_ws_transform(const glm::mat4& transform)

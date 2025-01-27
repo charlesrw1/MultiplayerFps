@@ -170,6 +170,8 @@ bool AnimatorInstance::initialize(
 	const int bones = model->get_skel()->get_num_bones();
 	cached_bonemats.resize(bones);
 	matrix_palette.resize(bones);
+	if (using_global_bonemat_double_buffer)
+		last_cached_bonemats.resize(bones);
 
 	ASSERT(is_initialized());
 
@@ -284,6 +286,9 @@ void AnimatorInstance::update(float dt)
 	if (!cfg)
 		return;
 
+	if(using_global_bonemat_double_buffer)
+		last_cached_bonemats.swap(cached_bonemats);
+
 	Pose* poses = Pose_Pool::get().alloc(2);
 
 	script_value_t stack[64];
@@ -364,11 +369,9 @@ void AnimatorInstance::update(float dt)
 	// add physics driven bones
 	// physics bones are in world space, wont cover every bone
 	// 
+
 	if (simulating_physics_objects.size() > 0) {
 		std::vector<bool> is_simulating(num_bones(),0);	// fixme
-
-		auto obj_worldspace = owner->get_ws_transform();
-		auto invobj = glm::inverse(obj_worldspace);
 
 		for (auto it = simulating_physics_objects.begin(); it != simulating_physics_objects.end();)
 		{
@@ -384,11 +387,28 @@ void AnimatorInstance::update(float dt)
 			int parent = get_skel()->get_bone_index(e->get_parent_bone());
 			if (parent == -1) continue;
 			is_simulating[parent] = true;
-			cached_bonemats[parent] = invobj * e->get_ws_transform();
-
+			cached_bonemats[parent] = e->get_ws_transform();
+		}
+		if (update_owner_position_to_root) {
+			glm::mat4 root = cached_bonemats[0];
+			auto inv = glm::inverse(root);
+			for (int i = 0; i < num_bones(); i++) {
+				if (is_simulating[i])
+					cached_bonemats[i] = inv * cached_bonemats[i];
+			}
+			owner->set_ws_transform(root);
+		}
+		else {
+			glm::mat4 obj_worldspace = owner->get_ws_transform();
+			auto invobj = glm::inverse(obj_worldspace);
+			for (int i = 0; i < num_bones(); i++) {
+				if (is_simulating[i])
+					cached_bonemats[i] = invobj * cached_bonemats[i];
+			}
 		}
 
 		util_localspace_to_meshspace_with_physics(poses[0], cached_bonemats, is_simulating, get_skel());
+
 	}
 	else {
 		util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());

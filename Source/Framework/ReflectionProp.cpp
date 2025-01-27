@@ -581,6 +581,16 @@ std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const Class
 	in.read_string(tok);
 	while (!in.is_eof() && !in.check_item_end(tok))	// exit out if } (end field list)
 	{
+		if (!typeinfo||!dest_obj) {
+			auto name = tok.to_stack_string();
+			in.read_string(tok);	// ERROR
+			if (tok.cmp("[")) {
+				while (in.read_string(tok) && !tok.cmp("]")) {}
+			}
+			in.read_string(tok);
+			continue;
+		}
+
 		auto find = typeinfo->prop_hash_table->prop_table.find(tok);// dest_obj->find_in_proplists(name.c_str(), proplists);
 
 		if (find == typeinfo->prop_hash_table->prop_table.end()) {

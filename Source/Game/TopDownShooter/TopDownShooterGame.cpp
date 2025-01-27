@@ -163,6 +163,58 @@ public:
 };
 CLASS_IMPL(ProjectileComponent);
 
+static void enable_ragdoll_shared(Entity* e, const glm::mat4& last_ws, bool enable)
+{
+	auto& children = e->get_all_children();
+	for (auto c : children) {
+		if (c->get_tag() != StringName("Ragdoll")) continue;
+		auto phys = c->get_first_component<PhysicsComponentBase>();
+		if (!phys) 
+			continue;
+
+		auto m = e->get_cached_mesh_component();
+		if (!m||!m->get_animator_instance()) continue;
+		int i = m->get_index_of_bone(c->get_parent_bone());
+		if (i == -1) continue;
+
+		const glm::mat4& this_ws = e->get_ws_transform();
+
+		if (enable) {
+			phys->enable_with_initial_transforms(
+				last_ws * m->get_animator_instance()->get_last_global_bonemats().at(i),
+				this_ws * m->get_animator_instance()->get_global_bonemats().at(i),
+				eng->get_dt());
+		}
+		else {
+			phys->set_is_enable(false);
+		}
+	}
+}
+CLASS_H(EnableRagdollScript,EntityComponent)
+public:
+	void start() override {
+		auto e = get_owner();
+		auto& children = e->get_all_children();
+		for (auto c : children) {
+			if (c->get_tag() != StringName("Ragdoll")) continue;
+			auto phys = c->get_first_component<PhysicsComponentBase>();
+			if (!phys) 
+				continue;
+
+			auto m = e->get_cached_mesh_component();
+			if (!m||!m->get_animator_instance()) continue;
+			int i = m->get_index_of_bone(c->get_parent_bone());
+			if (i == -1) continue;
+
+			const glm::mat4& this_ws = e->get_ws_transform();
+
+			phys->set_is_enable(true);
+		}
+		e->get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(true);
+	}
+};
+CLASS_IMPL(EnableRagdollScript);
+
 CLASS_H(TopDownEnemyComponent, EntityComponent)
 public:
 	void start() override {
@@ -178,16 +230,16 @@ public:
 				cap->set_is_enable(false);
 				cap->destroy();
 
-				auto& children = get_owner()->get_all_children();
-				for (auto c : children) {
-					if (c->get_tag() != StringName("Ragdoll")) continue;
-					auto phys = c->get_first_component<PhysicsComponentBase>();
-					if (!phys) 
-						continue;
-					phys->enable_in_future_with_velocity();
+				enable_ragdoll_shared(get_owner(), last_ws, true);
 
-					if (c->get_parent_bone() == StringName("mixamorig:Hips")) {
-						phys->apply_impulse(c->get_ws_position(), dmg.dir * 5.0f);
+				Random r(get_instance_id());
+				const StringName names[] = { StringName("mixamorig:Hips"),StringName("mixamorig:Neck1"),StringName("mixamorig:RightLeg") };
+				int index = r.RandI(0, 2);
+				for (auto c : get_owner()->get_all_children()) {
+					if (c->get_parent_bone() == names[index]) {
+						auto p = c->get_first_component<PhysicsComponentBase>();
+						p->apply_impulse(c->get_ws_position(), dmg.dir * 2.f);
+						break;
 					}
 				}
 				
@@ -227,6 +279,7 @@ public:
 		float angle = -atan2(-to_dir.x, to_dir.z);
 		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
 
+		last_ws = get_ws_transform();
 		get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
 
 	}
@@ -235,7 +288,7 @@ public:
 	}
 
 	std::unique_ptr<CharacterController> ccontroller;
-
+	glm::mat4 last_ws = glm::mat4(1.f);
 	bool is_dead = false;
 	float death_time = 0.0;
 };
@@ -416,15 +469,21 @@ public:
 		inputPtr->get("game/test1")->on_start.add(this, [&]()
 			{
 				ragdoll_enabled = !ragdoll_enabled;
-				auto& children = get_all_children();
-				for (auto c : children) {
-					if (c->get_tag() != StringName("Ragdoll")) continue;
-					auto phys = c->get_first_component<PhysicsComponentBase>();
-					if (!phys) continue;
-					if (ragdoll_enabled)
-						phys->enable_in_future_with_velocity();
-					else
-						phys->set_is_enable(false);
+
+				enable_ragdoll_shared(this, last_ws, ragdoll_enabled);
+
+				if (!ragdoll_enabled) {
+					int index = get_cached_mesh_component()->get_index_of_bone(StringName("mixamorig:Hips"));
+					glm::mat4 ws = get_ws_transform() * get_cached_mesh_component()->get_animator_instance()->get_global_bonemats().at(index);	//root
+					glm::vec3 pos = ws[3];
+					pos.y = 0;
+					set_ws_position(pos);
+					ccontroller->set_position(pos);
+					get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(false);
+				}
+				else {
+					get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(true);
+					//set_ws_transform(glm::mat4(1.f));
 				}
 			});
 
@@ -479,6 +538,12 @@ public:
 		did_move = false;
 		if (is_in_car)
 			return;
+
+		if (ragdoll_enabled) {
+			update_view();
+			last_ws = get_ws_transform();
+			return;
+		}
 
 		if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();
 
@@ -536,6 +601,8 @@ public:
 		float angle = -atan2(-lookdir.x, lookdir.z);
 		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
 
+
+		last_ws = get_ws_transform();
 		set_ws_transform(ccontroller->get_character_pos(), q, get_ls_scale());
 
 		has_had_update = true;
@@ -558,8 +625,16 @@ public:
 		auto viewMat = glm::lookAt(finalpos, finalpos - camera_dir, glm::vec3(0, 1, 0));
 
 		the_camera->get_owner()->set_ws_transform(glm::inverse(viewMat));
-
-		the_camera->fov = 50.0;
+		if (ragdoll_enabled) {
+			glm::vec3 linvel = glm::vec3(get_ws_transform()[3] - last_ws[3]) / (float)eng->get_dt();
+			float speed = glm::length(linvel);
+			float desire_fov = glm::mix(50.0, 60.0, glm::min(speed*0.1,1.0));
+			fov = damp_dt_independent(desire_fov, fov, 0.002f, (float)eng->get_dt());
+		}
+		else {
+			fov = damp_dt_independent(50.0f, fov, 0.002f, (float)eng->get_dt());
+		}
+		the_camera->fov = fov;
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(TopDownPlayer)
@@ -579,6 +654,7 @@ public:
 	CameraComponent* the_camera = nullptr;
 
 	bool ragdoll_enabled = false;
+	float fov = 50.0;
 
 	float shoot_cooldown = 0.0;
 
@@ -595,6 +671,8 @@ public:
 	bool is_jumping = false;
 
 	bool has_had_update = false;
+
+	glm::mat4 last_ws = glm::mat4(1.f);
 };
 CLASS_IMPL(TopDownPlayer);
 
@@ -700,9 +778,6 @@ public:
 	void start() override {
 		light = get_owner()->get_first_component<PointLightComponent>();
 		set_ticking(true);
-
-		Random r(get_instance_id());
-		ofs = r.RandF();
 	}
 	void update() override {
 		if (!light) return;
@@ -737,7 +812,7 @@ public:
 			bRunning = !e->is_dead;
 		}
 		else
-			bRunning = true;
+			bRunning = false;
 	}
 	virtual void on_post_update() override {
 

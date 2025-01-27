@@ -58,38 +58,29 @@ glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {
     }
     return 2.0f * glm::vec3(dq.x, dq.y, dq.z) / dt;
 }
+
+void PhysicsComponentBase::enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt)
+{
+	set_is_enable(true);
+	auto rot0 = glm::quat_cast(t0);
+	auto rot1 = glm::quat_cast(t1);
+	glm::vec3 lin_vel = (glm::vec3(t1[3]) - glm::vec3(t0[3])) / dt;
+	glm::vec3 ang_vel = calc_angular_vel(rot0, rot1, dt);
+	set_linear_velocity(lin_vel);
+	set_angular_velocity(ang_vel);
+	last_position = t0[3];
+	next_position = t1[3];
+	last_rot = rot0;
+	next_rot = rot1;
+	get_owner()->set_is_top_level(true);
+	get_owner()->set_ws_transform(t1);
+	force_set_transform(t1);
+	set_ticking(true);
+}
+
+
 void PhysicsComponentBase::update()
 {
-	if (enable_future == enable_in_future_state::waiting_for_frame_1) {
-		auto mat = get_owner()->get_parent_transform();
-		next_position = mat[3];
-		next_rot = glm::quat_cast(mat);
-		enable_future = enable_in_future_state::waiting_for_frame_2;
-		return;
-	}
-	else if (enable_future == enable_in_future_state::waiting_for_frame_2) {
-		enable_future = enable_in_future_state::none;
-		auto mat = get_owner()->get_parent_transform();
-		auto rot = glm::quat_cast(mat);
-		glm::vec3 lin_vel = (glm::vec3(mat[3]) - next_position) / (float)eng->get_dt();
-		glm::vec3 ang_vel = calc_angular_vel(next_rot, rot, eng->get_dt());
-		last_position = next_position;
-		last_rot = next_rot;
-
-		next_rot = rot;
-		next_position = mat[3];
-
-		set_is_enable(true);
-
-		set_linear_velocity(lin_vel);
-		set_angular_velocity(lin_vel);
-
-		get_owner()->set_is_top_level(true);
-		get_owner()->set_ws_transform(mat);
-		force_set_transform(mat);
-		return;
-	}
-
 	if (!enabled || !get_is_simulating() || !interpolate_visuals) {
 		set_ticking(false);
 		return;
@@ -244,6 +235,15 @@ void PhysicsComponentBase::update_mass()
 		PxRigidBodyExt::updateMassAndInertia(*dyn,density);
 	}
 }
+float PhysicsComponentBase::get_mass()const
+{
+	ASSERT(physxActor);
+	if (!get_is_actor_static()) {
+		auto dyn = (PxRigidDynamic*)physxActor;
+		return dyn->getMass();
+	}
+	return 0.f;
+}
 
 
 void CapsuleComponent::add_actor_shapes() {
@@ -319,6 +319,16 @@ void PhysicsComponentBase::apply_impulse(const glm::vec3& worldspace, const glm:
 			glm_to_physx(impulse),
 			glm_to_physx(worldspace),
 			physx::PxForceMode::eIMPULSE);
+	}
+}
+void PhysicsComponentBase::apply_force(const glm::vec3& worldspace, const glm::vec3& force)
+{
+	if (has_initialized()) {
+		physx::PxRigidBodyExt::addForceAtPos(
+			*get_dynamic_actor(),
+			glm_to_physx(force),
+			glm_to_physx(worldspace),
+			physx::PxForceMode::eFORCE);
 	}
 }
 glm::mat4 PhysicsComponentBase::get_transform() const
@@ -507,23 +517,9 @@ void PhysicsComponentBase::set_send_hit(bool send_hit) {
 void PhysicsComponentBase::set_is_static(bool is_static)
 {
 	this->is_static = is_static;
+	
 }
-void PhysicsComponentBase::enable_in_future_with_velocity()
-{
-	if (enable_future == enable_in_future_state::waiting_for_frame_2) {
-		sys_print(Warning, "enable_in_future_with_velocity: already waiting to start\n");
-	}
-	else if (enabled) {
-		sys_print(Warning, "enable_in_future_with_velocity: already enabled\n");
-	}
-	else if (!simulate_physics) {
-		sys_print(Warning, "enable_in_future_with_velocity: must be simulating\n");
-	}
-	else {
-		enable_future = enable_in_future_state::waiting_for_frame_1;
-		set_ticking(true);
-	}
-}
+
 
 MeshBuilderComponent* PhysicsComponentBase::get_editor_meshbuilder() const {
 	return (MeshBuilderComponent*)eng->get_level()->get_entity(editor_shape_id);

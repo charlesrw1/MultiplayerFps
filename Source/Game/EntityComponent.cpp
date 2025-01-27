@@ -2,8 +2,39 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "Entity.h"
 #include "Level.h"
-
+#include "Assets/AssetRegistry.h"
 CLASS_IMPL(EntityComponent);
+
+
+// create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
+class ComponentTypeMetadata : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() const  override
+	{
+		return { 181, 159, 245 };
+	}
+
+	virtual std::string get_type_name() const  override
+	{
+		return "Component";
+	}
+
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
+		auto subclasses = ClassBase::get_subclasses<EntityComponent>();
+		for (; !subclasses.is_end(); subclasses.next()) {
+			if (subclasses.get_type()->allocate) {
+				std::string path = subclasses.get_type()->classname;
+
+				filepaths.push_back(path);
+			}
+		}
+	}
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &EntityComponent::StaticType; }
+	virtual bool assets_are_filepaths() const { return false; }
+};
+REGISTER_ASSETMETADATA_MACRO(ComponentTypeMetadata);
 
 
 void EntityComponent::destroy()

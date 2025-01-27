@@ -105,6 +105,11 @@ void InputUser::disable_mapping(const std::string& mapping_id)
 {
 	GetGInput().set_input_mapping_status(this, mapping_id, false);
 }
+void InputUser::destroy()
+{
+	InputUser* u = this;
+	GetGInput().free_input_user(u);
+}
 
 void InputUser::assign_device(InputDevice* device)
 {

@@ -127,6 +127,7 @@ public:
 	// ws = world space, ls = local space
 	void set_ls_transform(const glm::mat4& transform);
 	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	void set_ls_position(const glm::vec3& v);
 	void set_ls_euler_rotation(const glm::vec3& euler);
 	glm::mat4 get_ls_transform() const;
 	glm::vec3 get_ls_position() const { return position; }

@@ -1342,6 +1342,8 @@ void EdPropertyGrid::draw()
 					ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 				if (ImGui::BeginTable("animadfedBrowserlist", 1, ent_list_flags))
 				{
+					
+					
 					ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 
 					ImGui::TableNextRow();
@@ -1355,6 +1357,40 @@ void EdPropertyGrid::draw()
 					draw_components(ent);
 
 					ImGui::EndTable();
+
+					if (ImGui::BeginDragDropTarget())
+					{
+						const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
+						if (payload) {
+
+							auto metadata_to_accept = AssetRegistrySystem::get().find_for_classtype(&EntityComponent::StaticType);
+
+							AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+							bool actually_accept = false;
+							if (resource->type == metadata_to_accept) {
+								actually_accept = true;
+							}
+
+							if (actually_accept) {
+								if ((payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")))
+								{
+									auto comp_type = ClassBase::find_class(resource->filename.c_str());
+									if (comp_type && comp_type->is_a(EntityComponent::StaticType)) {
+										Entity* ent = ss->get_only_one_selected().get();
+										ASSERT(ent);
+										ed_doc.command_mgr->add_command(
+											new CreateComponentCommand(ent, comp_type)
+										);
+									}
+									else {
+										sys_print(Warning, "component drag drop error\n");
+									}
+								}
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+
 				}
 			}
 		}

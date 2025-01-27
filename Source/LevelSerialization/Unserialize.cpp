@@ -198,14 +198,17 @@ void unserialize_one_item_text(
 		}
 
 		auto obj = scene.find(path);
-		if (!obj)
-			throw std::runtime_error("couldn't find overrided obj: " + id);
+		//if (!obj)
+		//	throw std::runtime_error("couldn't find overrided obj: " + id);
+		if (!obj) {
+			sys_print(Warning, "Couldnt find override obj: %s\n", id.c_str());
+		}
 
 		LevelSerializationContext ctx;
 		ctx.in = &scene;
 		ctx.in_root = &path;
 		ctx.cur_obj = obj;
-		auto res = read_props_to_object(obj, &obj->get_type(), in, {}, &ctx);
+		auto res = read_props_to_object(obj, (obj)?&obj->get_type():nullptr, in, {}, &ctx);
 		if (!res.second) {
 			throw std::runtime_error("failed prop parse");
 		}

@@ -110,6 +110,8 @@ struct InputDevice;
 class InputUser
 {
 public:
+	void destroy();
+
 	void enable_mapping(const std::string& mapping_id);
 	void disable_mapping(const std::string& mapping_id);
 

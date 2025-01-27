@@ -84,11 +84,11 @@ void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, u
 			}
 			else if (wqr.had_initial_overlap) {
 				current_pos -= wqr.hit_normal * (wqr.distance-0.0001f /* epsilon */);
-				Debug::add_sphere(wqr.hit_pos, 0.5, COLOR_GREEN, 0.05);
+				//Debug::add_sphere(wqr.hit_pos, 0.5, COLOR_GREEN, 0.05);
 				continue;
 			}
-			else
-				Debug::add_sphere(wqr.hit_pos, 0.5, COLOR_BLUE, 0.0);
+			//else
+				//Debug::add_sphere(wqr.hit_pos, 0.5, COLOR_BLUE, 0.0);
 		}
 
 		if (wqr.hit_normal.y >= 0.85)
