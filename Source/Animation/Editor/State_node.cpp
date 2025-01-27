@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "State_node.h"
 #include "Statemachine_node.h"
 #include "AnimationGraphEditor.h"
@@ -439,3 +440,4 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 	 }
  };
  ADDTOFACTORYMACRO_NAME(StateTransitionPropertyEditor, IPropertyEditor, "StateTransitionScript");
+#endif

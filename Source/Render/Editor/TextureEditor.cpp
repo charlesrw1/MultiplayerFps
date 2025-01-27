@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "TextureEditor.h"
 #include "Framework/Config.h"
 
@@ -147,3 +148,4 @@ bool compile_texture_asset(const std::string& gamepath)
 #endif
 	return true;
 }
+#endif

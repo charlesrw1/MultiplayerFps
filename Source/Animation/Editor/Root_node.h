@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "Base_node.h"
 #include "State_node.h"
 
@@ -44,3 +45,4 @@ CLASS_H(Root_EdNode, Base_EdNode)
 
 
 };
+#endif

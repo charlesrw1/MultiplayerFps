@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #pragma once
 #include <vector>
 #include <array>
@@ -443,3 +444,4 @@ public:
 };
 
 extern AnimationGraphEditor anim_graph_ed;
+#endif

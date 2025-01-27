@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "AssetBrowser.h"
 
 #include "imgui.h"
@@ -301,3 +302,4 @@ DECLARE_ENGINE_CMD(FILTER_FOR)
 	global_asset_browser.unset_filter(1<<type->self_index);
 
 }
+#endif

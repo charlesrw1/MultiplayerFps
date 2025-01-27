@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include <cstdint>
 #include <array>
 #include <vector>
@@ -254,3 +254,4 @@ CLASS_H(Base_EdNode, ClassBase)
 private:
 	bool is_newly_created = false;
 };
+#endif

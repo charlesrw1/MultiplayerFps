@@ -407,6 +407,7 @@ void GameEngineLocal::connect_to(string address)
 	//cl->connect(address);
 }
 
+#ifdef EDITOR_BUILD
 DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
 {
 	if (!eng->is_editor_level()) {
@@ -454,7 +455,7 @@ DECLARE_ENGINE_CMD(start_ed)
 		sys_print(Info, usage_str);
 	}
 }
-
+#endif
 static void enable_imgui_docking()
 {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -464,7 +465,7 @@ static void disable_imgui_docking()
 	ImGui::GetIO().ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable);
 }
 
-
+#ifdef EDITOR_BUILD
 void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
 	sys_print(Info, "--------- Change Editor State ---------\n");
@@ -486,6 +487,7 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 	if (!active_tool)
 		disable_imgui_docking();
 }
+#endif
 
 
 
@@ -556,10 +558,12 @@ DECLARE_ENGINE_CMD(map)
 		return;
 	}
 
+#ifdef EDITOR_BUILD
 	if (eng->get_current_tool() != nullptr) {
 		sys_print(Warning,"starting game so closing any editors\n");
 		eng_local.change_editor_state(nullptr,"");	// close any editors
 	}
+#endif
 
 	eng->open_level(args.at(1));
 }
@@ -861,7 +865,11 @@ void GameEngineLocal::execute_map_change()
 	ASSERT(!level);
 
 	// try loading map
+#ifdef EDITOR_BUILD
 	const bool this_is_for_editor = is_in_an_editor_state();
+#else
+	const bool this_is_for_editor = false;
+#endif
 	is_loading_editor_level = this_is_for_editor;	// set temporary variable
 
 	// special name to create a map
@@ -968,8 +976,10 @@ void GameEngineLocal::key_event(SDL_Event event)
 
 void GameEngineLocal::cleanup()
 {
+#ifdef EDITOR_BUILD
 	if (get_current_tool())
 		get_current_tool()->close();
+#endif
 
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
@@ -1058,7 +1068,11 @@ Debug_Interface* Debug_Interface::get()
 
 bool GameEngineLocal::is_drawing_to_window_viewport() const
 {
+#ifdef EDITOR_BUILD
 	return is_in_an_editor_state();
+#else
+	return false;
+#endif
 }
 
 glm::ivec2 GameEngineLocal::get_game_viewport_size() const
@@ -1085,17 +1099,20 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
 
+#ifdef EDITOR_BUILD
 	// draw tool interface if its active
 	if (is_in_an_editor_state()) {
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, get_current_tool());
 		get_current_tool()->draw_imgui_public();
 		global_asset_browser.imgui_draw();
 	}
+#endif
 
 	// draw after to enable docking
 	if (g_drawconsole.get_bool())
 		dbg_console.draw();
 
+#ifdef EDITOR_BUILD
 	// will only be true if in a tool state
 	if (is_drawing_to_window_viewport() && eng->get_state()==Engine_State::Game) {
 
@@ -1137,7 +1154,9 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		ImGui::End();
 		//ImGui::PopStyleVar();
 	}
-	else {
+	else 
+#endif
+	{
 		// normal game path, scene view was already drawn the the window framebuffer
 		get_gui()->set_viewport_size(g_window_w.get_integer(), g_window_h.get_integer());
 		get_gui()->set_viewport_ofs(0,0);
@@ -1210,6 +1229,7 @@ void GameEngineLocal::draw_screen()
 	}
 	else if (state == Engine_State::Game) {
 
+#ifdef EDITOR_BUILD
 		// draw general ui
 		if (get_current_tool() != nullptr) {
 			params.is_editor = true;	// draw to the id buffer for mouse picking
@@ -1220,7 +1240,9 @@ void GameEngineLocal::draw_screen()
 			}
 			idraw->scene_draw(params,*vs, get_gui());
 		}
-		else {
+		else 
+#endif
+		{
 			bool good = game_draw_screen();
 			if (!good) {
 				glClearColor(1.0, 1.0, 1.0, 1.0);
@@ -1235,8 +1257,11 @@ void GameEngineLocal::draw_screen()
 	ImGui_ImplSDL2_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui::NewFrame();
+
+#ifdef EDITOR_BUILD
 	if (get_current_tool())
 		get_current_tool()->hook_imgui_newframe();
+#endif
 
 	draw_any_imgui_interfaces();
 
@@ -1610,10 +1635,12 @@ void GameEngineLocal::loop()
 		
 		}
 
+#ifdef EDITOR_BUILD
 		// tick any tools
 		if (is_in_an_editor_state()) {
 			get_current_tool()->tick(frame_time);
 		}
+#endif
 
 		// tick the gui
 		get_gui()->think();

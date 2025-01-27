@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include <cstdint>
 #include <string>
 class ModelImportSettings;
@@ -12,3 +12,4 @@ public:
 	static bool compile_from_settings(const std::string& output, ModelImportSettings* settings);
 };
 
+#endif

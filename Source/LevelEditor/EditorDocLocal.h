@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "CommandMgr.h"
 #include "glm/glm.hpp"
@@ -566,3 +567,4 @@ private:
 };
 
 extern EditorDoc ed_doc;
+#endif

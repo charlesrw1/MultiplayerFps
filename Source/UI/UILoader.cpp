@@ -12,6 +12,7 @@ CLASS_IMPL(GuiFont);
 // global
 GuiFontLoader g_fonts;
 
+#ifdef EDITOR_BUILD
 class FontAssetMetadata : public AssetMetadata
 {
 public:
@@ -32,8 +33,10 @@ public:
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &GuiFont::StaticType; }
 };
-#include "Render/Texture.h"
 REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
+#endif
+
+#include "Render/Texture.h"
 #define MAKE_FOUR(a,b,c,d) ( (uint32_t)a | ((uint32_t)b<< 8) | ((uint32_t)c << 16) | ((uint32_t)d<<24) )
 
 

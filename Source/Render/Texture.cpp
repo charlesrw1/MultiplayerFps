@@ -20,8 +20,9 @@ CLASS_IMPL(Texture);
 
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath);
-extern IEditorTool* g_texture_editor_tool;
 
+#ifdef EDITOR_BUILD
+extern IEditorTool* g_texture_editor_tool;
 class TextureAssetMetadata : public AssetMetadata
 {
 public:
@@ -59,6 +60,7 @@ public:
 };
 
 REGISTER_ASSETMETADATA_MACRO(TextureAssetMetadata);
+#endif
 
 void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
 {
@@ -541,10 +543,12 @@ extern ConfigVar developer_mode;
 bool Texture::load_asset(ClassBase*& userStruct) {
 	const auto& path = get_name();
 
+#ifdef EDITOR_BUILD
 	if (developer_mode.get_bool()) {
 		// this will check if a compile is needed
 		compile_texture_asset(path);
 	}
+#endif
 
 	auto file = FileSys::open_read_game(path);
 

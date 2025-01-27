@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "EditorDocLocal.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/MeshComponent.h"
@@ -537,3 +538,4 @@ public:
 	const ClassTypeInfo* info = nullptr;
 };
 
+#endif

@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -432,5 +433,5 @@ struct AutoStruct_asdf {
 };
 
 static AutoStruct_asdf add_to_factories_asdf;
-
+#endif
 

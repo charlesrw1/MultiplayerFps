@@ -13,6 +13,8 @@
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 #include "Animation/Editor/AnimationGraphEditorPublic.h"
+
+#ifdef EDITOR_BUILD
 class AnimGraphAssetMeta : public AssetMetadata
 {
 public:
@@ -37,7 +39,7 @@ public:
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Animation_Tree_CFG::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);
-
+#endif
 
 
 Pool_Allocator g_pose_pool = Pool_Allocator(sizeof(Pose), 8);

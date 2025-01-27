@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include <vector>
 #include <memory>
 #include <unordered_map>
@@ -113,3 +114,5 @@ struct AutoRegisterAsset
 	}
 };
 #define REGISTER_ASSETMETADATA_MACRO(Type) static AutoRegisterAsset<Type> autoregtype##Type;
+
+#endif

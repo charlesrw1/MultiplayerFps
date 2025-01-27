@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "Base_node.h"
 #include "State_node.h"
 #include "Basic_nodes.h"
@@ -64,3 +65,4 @@ public:
 	std::vector<State_EdNode*> states;
 	Statemachine_Node_CFG* node = nullptr;
 };
+#endif

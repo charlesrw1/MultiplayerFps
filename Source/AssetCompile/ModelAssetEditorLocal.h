@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "Render/DrawPublic.h"
 #include "Types.h"
@@ -37,3 +38,4 @@ public:
 	Model* outputModel = nullptr;
 	ModelImportSettings* importSettings = nullptr;
 };
+#endif

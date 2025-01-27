@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include <string>
 #include <cassert>
 #include "Framework/ClassBase.h"
@@ -76,3 +76,4 @@ private:
 	bool open_save_popup = false;
 	bool is_open = false;
 };
+#endif

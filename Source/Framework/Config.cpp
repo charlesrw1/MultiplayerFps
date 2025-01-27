@@ -415,12 +415,12 @@ Cmd_Manager* Cmd_Manager::get()
 	return &inst;
 }
 
-inline const char* Cmd_Args::at(int index) const {
+const char* Cmd_Args::at(int index) const {
 	ASSERT(index >= 0 && index < argc&& index < MAX_ARGS);
 	return &buffer[arg_to_index[index]];
 }
 
-inline void Cmd_Args::add_arg(const char* v, int len) {
+void Cmd_Args::add_arg(const char* v, int len) {
 	if (len + 1 + buffer_index >= BUFFER_SIZE || argc >= MAX_ARGS) return;
 	memcpy(buffer + buffer_index, v, len);
 	buffer[buffer_index + len] = 0;

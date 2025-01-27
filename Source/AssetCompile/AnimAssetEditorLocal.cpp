@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "AnimAssetEditorLocal.h"
 #include <stdexcept>
 #include <SDL2/SDL.h>
@@ -347,3 +348,4 @@ void EventTimelineSequencer::context_menu_callback() {
 	}
 }
 
+#endif

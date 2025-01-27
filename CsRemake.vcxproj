@@ -5,6 +5,14 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="NoEditRelease|Win32">
+      <Configuration>NoEditRelease</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="NoEditRelease|x64">
+      <Configuration>NoEditRelease</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -70,7 +78,6 @@
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
     <ClInclude Include="Source\Game\Components\SoundComponent.h" />
-    <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h" />
@@ -114,6 +121,7 @@
     <ClInclude Include="Source\Framework\Files.h" />
     <ClInclude Include="Source\Framework\FreeList.h" />
     <ClInclude Include="Source\Framework\Handle.h" />
+    <ClCompile Include="Source\Animation\SkeletonData.cpp" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
@@ -167,7 +175,6 @@
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\OsInput.h" />
-    <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
     <ClInclude Include="Source\Particles\ParticlesPublic.h" />
     <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
@@ -216,7 +223,6 @@
     <ClCompile Include="Source\Animation\Animation_Man.cpp" />
     <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor.cpp" />
     <ClCompile Include="Source\Animation\Editor\EdNode.cpp" />
-    <ClCompile Include="Source\Animation\Editor\Sequencetemp.cpp" />
     <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp" />
     <ClCompile Include="Source\Animation\Editor\Statemachine_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\State_node.cpp" />
@@ -284,7 +290,6 @@
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
-    <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
@@ -313,7 +318,6 @@
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\Old\Net.cpp" />
-    <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
@@ -374,6 +378,12 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
@@ -408,6 +418,10 @@
     <LinkIncremental>false</LinkIncremental>
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <VcpkgTriplet>x64-windows</VcpkgTriplet>
   </PropertyGroup>
@@ -418,6 +432,9 @@
     <VcpkgTriplet>x64-windows</VcpkgTriplet>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
     <VcpkgTriplet>x64-windows</VcpkgTriplet>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -456,7 +473,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4244;4099;26451</DisableSpecificWarnings>
@@ -473,7 +490,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4244;4099;26451</DisableSpecificWarnings>
@@ -484,6 +501,19 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <ClCompile>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\debug\lib\manual-link\SDL2maind.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

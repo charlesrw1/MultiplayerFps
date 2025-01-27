@@ -7,6 +7,7 @@
 AnimationSeqLoader g_animseq;
 
 CLASS_IMPL(AnimationListManifest);
+#ifdef EDITOR_BUILD
 extern IEditorTool* g_animseq_editor;
 class AnimationSeqAssetMetadata : public AssetMetadata
 {
@@ -46,6 +47,7 @@ public:
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &AnimationSeqAsset::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
+#endif
 
 CLASS_IMPL(AnimationSeqAsset);
 

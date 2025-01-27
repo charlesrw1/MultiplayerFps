@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "MaterialEditorLocal.h"
 
 static MaterialEditorLocal g_mateditor_local;
@@ -137,3 +138,4 @@ bool MaterialEditorLocal::save_document_internal()
 
 	return true;
 }
+#endif

@@ -2,6 +2,7 @@
 #include "Render/Model.h"
 #include "Render/MaterialLocal.h"
 
+#ifdef EDITOR_BUILD
 class ParticleFXAssetMetadata : public AssetMetadata
 {
 public:
@@ -22,6 +23,8 @@ public:
 };
 
 REGISTER_ASSETMETADATA_MACRO(ParticleFXAssetMetadata);
+#endif
+
 CLASS_IMPL(ParticleFXAsset);
 CLASS_IMPL(ParticleEmitter);
 

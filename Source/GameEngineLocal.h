@@ -115,8 +115,13 @@ public:
 		return state == Engine_State::Game;
 	}
 	virtual Engine_State get_state() const override { return state; }
+
+#ifdef EDITOR_BUILD
 	bool is_in_an_editor_state() const { return get_current_tool() != nullptr; }
 	void change_editor_state(IEditorTool* next_tool, const char* arg, const char* file = "");
+#else
+	bool is_in_an_editor_state() const { return false; }
+#endif
 
 	void execute_map_change();
 	void on_map_change_callback(bool is_for_editor, SceneAsset* loadedLevel);

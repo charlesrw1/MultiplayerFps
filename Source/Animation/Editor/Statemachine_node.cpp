@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "Statemachine_node.h"
 #include <algorithm>
 #include "Animation/Runtime/AnimationTreeLocal.h"
@@ -169,3 +170,4 @@ State* Statemachine_EdNode::get_state(handle<State> state)
 	ASSERT(state.is_valid() && state.id < node->states.size());
 	return &node->states.at(state.id);
 }
+#endif

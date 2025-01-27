@@ -14,6 +14,7 @@ CLASS_IMPL(Entity);
 
 
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
+#ifdef EDITOR_BUILD
 extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
 class EntityTypeMetadata : public AssetMetadata
 {
@@ -51,6 +52,7 @@ public:
 	virtual bool assets_are_filepaths() const { return false; }
 };
 REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
+#endif
 
 PropertyInfo GetAtomValueWrapper<EntityPtr<Entity>>::get() {
 	return make_entity_ptr_property<Entity>("", 0, PROP_DEFAULT, nullptr);

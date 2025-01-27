@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 #include <algorithm>
@@ -129,3 +130,4 @@ DECLARE_ENGINE_CMD(TOUCH_ASSET)
 		sys_print(Error, "couldnt find type\n");
 	}
 }
+#endif

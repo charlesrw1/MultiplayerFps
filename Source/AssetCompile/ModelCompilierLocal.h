@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "Framework/Util.h"
 #include "Animation/SkeletonData.h"
 #include "Physics/Physics2.h"
@@ -123,3 +124,4 @@ public:
 		return nullptr;
 	}
 };
+#endif

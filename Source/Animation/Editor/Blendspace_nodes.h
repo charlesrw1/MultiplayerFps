@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "Base_node.h"
 #include "Basic_nodes.h"
 
@@ -179,3 +180,4 @@ CLASS_H_EXPLICIT_SUPER(Blendspace2d_EdNode, BaseNodeUtil_EdNode<BlendSpace2d_CFG
 		cols--;
 	}
 };
+#endif

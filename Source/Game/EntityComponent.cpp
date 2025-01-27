@@ -5,7 +5,7 @@
 #include "Assets/AssetRegistry.h"
 CLASS_IMPL(EntityComponent);
 
-
+#ifdef EDITOR_BUILD
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 class ComponentTypeMetadata : public AssetMetadata
 {
@@ -35,7 +35,7 @@ public:
 	virtual bool assets_are_filepaths() const { return false; }
 };
 REGISTER_ASSETMETADATA_MACRO(ComponentTypeMetadata);
-
+#endif
 
 void EntityComponent::destroy()
 {

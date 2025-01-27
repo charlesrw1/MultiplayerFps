@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "AnimationGraphEditor.h"
 #include <cstdio>
 #include "imnodes.h"
@@ -1933,3 +1934,4 @@ AnimationGraphEditor::AnimationGraphEditor() {
 	clipboard = std::make_unique<AnimGraphClipboard>();
 
 }
+#endif

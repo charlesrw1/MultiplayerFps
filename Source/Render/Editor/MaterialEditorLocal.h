@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "Render/MaterialLocal.h"
 #include "Framework/ClassBase.h"
@@ -162,3 +162,4 @@ public:
 	MaterialInstance* parentMat = nullptr;
 	MaterialInstance* dynamicMat = nullptr;
 };
+#endif

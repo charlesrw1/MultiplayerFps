@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "Base_node.h"
 #include "Basic_nodes.h"
 #include "imnodes.h"
@@ -183,3 +184,4 @@ std::string get_tooltip() const override {
 	std::string get_output_pin_name() const { return "START"; }
 	bool allow_creation_from_menu() const { return false; }
 };
+#endif

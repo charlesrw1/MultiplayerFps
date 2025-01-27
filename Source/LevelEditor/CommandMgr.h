@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include <string>
 #include <vector>
 #include "Framework/Util.h"
@@ -83,3 +84,4 @@ public:
 	int index = 0;
 	std::vector<Command*> hist;
 };
+#endif

@@ -473,7 +473,6 @@
     <ClInclude Include="Source\Game\WorldSettings.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Framework\ClassTypePtr.h" />
-    <ClInclude Include="Source\Game\Editor\CustomComponentEditor.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
     <ClInclude Include="Source\Game\Components\DecalComponent.h" />
@@ -492,7 +491,6 @@
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
     <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
-    <ClInclude Include="Source\Particles\Editor\ParticleEditorLocal.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\GameMain.h" />
@@ -651,7 +649,6 @@
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp">
       <Filter>Source\Framework\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Animation\Editor\Sequencetemp.cpp" />
     <ClCompile Include="Source\Animation\Event.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
@@ -754,7 +751,6 @@
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
-    <ClCompile Include="Source\Game\Editor\CustomComponentEditors.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
@@ -772,7 +768,6 @@
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
-    <ClCompile Include="Source\Particles\Editor\ParticleEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
@@ -801,5 +796,6 @@
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
+    <ClCompile Include="Source\Animation\SkeletonData.cpp" />
   </ItemGroup>
 </Project>

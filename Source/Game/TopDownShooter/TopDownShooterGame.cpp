@@ -17,7 +17,7 @@
 #include "Game/LevelAssets.h"
 #include "Animation/Runtime/Animation.h"
 #include "AssetCompile/AnimationSeqLoader.h"
-
+#pragma optimize("",off)
 CLASS_H(TopDownSpawnPoint, EntityComponent)
 public:
 	
@@ -529,7 +529,7 @@ public:
 				pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0),glm::quat_cast(rotationMatrix),pc->get_owner()->get_ls_scale());
 			}
 			shake.start(0.08);
-			shoot_cooldown = 0.9;
+			shoot_cooldown = 0.8;
 		}
 	}
 

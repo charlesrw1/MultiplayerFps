@@ -133,6 +133,7 @@ bool MyImDrawBlendSpace(
 
 #include "IEditorTool.h"
 
+#ifdef EDITOR_BUILD
 ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags,IEditorTool* tool, const ImGuiWindowClass* window_class)
 {
     using namespace ImGui;
@@ -166,3 +167,4 @@ ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags doc
 
     return dockspace_id;
 }
+#endif

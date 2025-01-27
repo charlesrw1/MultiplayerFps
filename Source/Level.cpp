@@ -9,7 +9,6 @@
 #include "Physics/Physics2.h"
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
-#include "Assets/AssetRegistry.h"
 
 #include "Assets/AssetDatabase.h"
 #include "Game/LevelAssets.h"

@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "Render/DrawPublic.h"
 #include "Types.h"
@@ -96,3 +97,4 @@ public:
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;
 };
+#endif

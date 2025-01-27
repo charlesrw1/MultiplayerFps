@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "Render/Texture.h"
 #include "Framework/ReflectionMacros.h"
@@ -115,3 +116,4 @@ inline bool TextureEditorTool::save_document_internal()
 
 	return true;
 }
+#endif

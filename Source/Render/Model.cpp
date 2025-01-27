@@ -35,11 +35,11 @@ ModelMan mods;
 #include "Assets/AssetDatabase.h"
 
 
-extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 
 CLASS_IMPL(Model);
 
-
+#ifdef EDITOR_BUILD
+extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 class ModelAssetMetadata : public AssetMetadata
 {
 public:
@@ -64,7 +64,7 @@ public:
 };
 
 REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
-
+#endif
 
 Model::~Model() {}
 
@@ -515,6 +515,7 @@ void Model::post_load(ClassBase* u) {
 bool Model::load_asset(ClassBase*& u) {
 	const auto& path = get_name();
 
+#ifdef EDITOR_BUILD
 	if (developer_mode.get_bool()) {
 		std::string model_def = strip_extension(path.c_str());
 		model_def += ".mis";
@@ -524,6 +525,7 @@ bool Model::load_asset(ClassBase*& u) {
 			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
 		}
 	}
+#endif
 
 	bool good = mods.read_model_into_memory(this, path);
 
@@ -719,6 +721,7 @@ bool ModelMan::upload_model(Model* mesh)
 	return true;
 }
 
+#ifdef EDITOR_BUILD
 #include "AssetCompile/ModelAsset2.h"
 #include <fstream>
 DECLARE_ENGINE_CMD(IMPORT_MODEL)
@@ -745,3 +748,4 @@ DECLARE_ENGINE_CMD(IMPORT_MODEL)
 
 	ModelCompilier::compile(savepath.c_str());
 }
+#endif

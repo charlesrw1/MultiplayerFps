@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "Framework/Util.h"
 #include <string>
@@ -249,3 +250,4 @@ void IEditorTool::draw_menu_bar()
 		ImGui::EndMenuBar();
 	}
 }
+#endif

@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
@@ -1717,3 +1718,4 @@ EditorDoc::EditorDoc() {
 	outliner = std::make_unique<ObjectOutliner>();
 
 }
+#endif

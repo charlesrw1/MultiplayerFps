@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 #include "Types.h"
 #include "Render/DrawPublic.h"
@@ -32,3 +33,4 @@ private:
 	StaticMeshEntity* skyEntity{};
 	StaticMeshEntity* planeEntity{};
 };
+#endif

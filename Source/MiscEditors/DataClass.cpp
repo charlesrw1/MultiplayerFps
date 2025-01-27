@@ -12,7 +12,7 @@ extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEdito
 
 CLASS_IMPL(DataClass);
 
-
+#ifdef EDITOR_BUILD
 class DataClassAssetMetadata : public AssetMetadata
 {
 public:
@@ -37,7 +37,7 @@ public:
 };
 
 REGISTER_ASSETMETADATA_MACRO(DataClassAssetMetadata);
-
+#endif
 #include "Framework/ObjectSerialization.h"
 
 

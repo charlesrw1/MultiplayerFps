@@ -268,13 +268,13 @@ void SphereComponent::add_editor_shapes() {
 
 void BoxComponent::add_actor_shapes() {
 	
-	add_box_shape_to_actor(get_ws_transform(), get_owner()->get_ls_scale()*0.5f);
+	add_box_shape_to_actor(glm::mat4(1.f), get_owner()->get_ls_scale() * 0.5f);
 }
 
 
 void SphereComponent::add_actor_shapes() {
 	
-	add_sphere_shape_to_actor(get_ws_transform()[3], radius);
+	add_sphere_shape_to_actor(glm::vec3(1.f), radius);
 }
 void MeshColliderComponent::add_actor_shapes() {
 	auto mesh = get_owner()->get_first_component<MeshComponent>();
@@ -412,7 +412,7 @@ void PhysicsComponentBase::add_box_shape_to_actor(const glm::mat4& localTransfor
 	auto boxGeom = PxBoxGeometry(glm_to_physx(halfExtents));
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
 		boxGeom, *physics_local_impl->default_material);
-	shape->setLocalPose(glm_to_physx(localTransform));
+
 	set_shape_flags(shape);
 }
 
@@ -722,8 +722,10 @@ void AdvancedJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponen
 	joint->setMotion(PxD6Axis::eTWIST, get_jm_enum(ang_x_motion));
 	joint->setMotion(PxD6Axis::eSWING1, get_jm_enum(ang_y_motion));
 	joint->setMotion(PxD6Axis::eSWING2, get_jm_enum(ang_z_motion));
-	joint->setLinearLimit(PxJointLinearLimit(linear_distance_max, PxSpring(linear_stiff, linear_damp)));
+	//joint->setLinearLimit(PxJointLinearLimit(linear_distance_max, PxSpring(linear_stiff, linear_damp)));
 	joint->setTwistLimit(PxJointAngularLimitPair(twist_limit_min,twist_limit_max,PxSpring(twist_stiff,twist_damp)));
+	if (ang_y_limit <= 0) ang_y_limit = 0.00001;
+	if (ang_z_limit <= 0) ang_z_limit = 0.00001;
 	joint->setSwingLimit(PxJointLimitCone(ang_y_limit, ang_z_limit, PxSpring(cone_stiff, cone_damp)));
 }
 void AdvancedJointComponent::free_joint()
@@ -777,9 +779,9 @@ ENUM_START(JM)
 	STRINGIFY_EUNM(JM::Free,2),
 ENUM_IMPL(JM)
 
+#ifdef EDITOR_BUILD
 // FIXME!
 #include "LevelEditor/EditorDocLocal.h"
-
 class AnchorJointEditor : public IPropertyEditor
 {
 public:
@@ -826,7 +828,7 @@ public:
 };
 
 ADDTOFACTORYMACRO_NAME(AnchorJointEditor, IPropertyEditor, "JointAnchor");
-
+#endif
 class AnchorJointSerializer : public IPropertySerializer
 {
 	// Inherited via IPropertySerializer

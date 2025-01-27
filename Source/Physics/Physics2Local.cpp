@@ -226,6 +226,7 @@ static Color32 randcolor32(uint32_t number)
 	out.trace_dir = dir;
 	return status;
 }
+#pragma optimize("",off)
  class MyPhysicsCallback : public physx::PxSimulationEventCallback
  {
  public:

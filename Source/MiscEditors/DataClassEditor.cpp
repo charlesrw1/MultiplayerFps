@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "DataClassEditor.h"
 
 #include "AssetCompile/Someutils.h"
@@ -142,3 +143,4 @@ void DataClassEditor::imgui_draw() {
 	}
 	ImGui::End();
 }
+#endif

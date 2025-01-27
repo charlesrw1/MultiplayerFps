@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "IEditorTool.h"
 
 #include "DataClass.h"
@@ -23,3 +24,4 @@ class DataClassEditor : public IEditorTool
 	ClassBase* editing_object = nullptr;
 	const ClassTypeInfo* typeInfo = nullptr;
 };
+#endif

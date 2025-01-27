@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "Base_node.h"
 #include "Basic_nodes.h"
 #include "Blendspace_nodes.h"
@@ -72,3 +73,4 @@ bool Base_EdNode::traverse_and_find_errors()
 
 	return !children_have_errors && compile_error_string.empty();
 }
+#endif

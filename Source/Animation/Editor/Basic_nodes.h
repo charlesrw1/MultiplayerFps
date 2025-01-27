@@ -1,4 +1,5 @@
 #pragma once
+#ifdef EDITOR_BUILD
 #include "AnimationGraphEditor.h"
 #include "Base_node.h"
 
@@ -537,3 +538,4 @@ CLASS_H_EXPLICIT_SUPER(Blend_Layered_EdNode, BaseNodeUtil_EdNode<Blend_Masked_CF
 
 	std::string maskname = "";
 };
+#endif

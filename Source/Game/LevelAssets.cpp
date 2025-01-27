@@ -8,7 +8,7 @@
 CLASS_IMPL(SceneAsset);
 CLASS_IMPL(PrefabAsset);
 
-
+#ifdef EDITOR_BUILD
 class IEditorTool;
 extern IEditorTool* g_editor_doc;
 class MapAssetMetadata : public AssetMetadata
@@ -68,7 +68,7 @@ public:
 	const char* get_arg_for_editortool() const { return "prefab"; }
 };
 static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
-
+#endif
 
 bool SceneAsset::load_asset(ClassBase*&)
 {

@@ -1,4 +1,5 @@
 #include "EditorTool3d.h"
+#ifdef EDITOR_BUILD
 #include <SDL2/SDL.h>
 #include "GameEnginePublic.h"
 #include "OsInput.h"
@@ -66,3 +67,4 @@ void EditorTool3d::map_callback(bool b)
 	post_map_load_callback();
 }
 
+#endif

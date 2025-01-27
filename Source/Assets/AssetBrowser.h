@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include "Assets/AssetRegistry.h"
 
 class AssetBrowser
@@ -45,3 +45,4 @@ public:
 };
 
 extern AssetBrowser global_asset_browser;
+#endif

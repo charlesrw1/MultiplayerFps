@@ -27,6 +27,7 @@ extern IEditorTool* g_mateditor;
 CLASS_IMPL(MaterialInstance);
 CLASS_IMPL(MaterialParameterBuffer);
 
+#ifdef EDITOR_BUILD
 class MaterialAssetMetadata : public AssetMetadata
 {
 public:
@@ -46,6 +47,7 @@ public:
 };
 
 REGISTER_ASSETMETADATA_MACRO(MaterialAssetMetadata);
+#endif
 
 inline std::string remove_filename_from_path(std::string& path)
 {

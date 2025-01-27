@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "AssetCompile/ModelAssetEditorLocal.h"
 #include <stdexcept>
 #include <SDL2/SDL.h>
@@ -162,3 +163,4 @@ bool ModelEditorTool::save_document_internal()
 
 	return true;
 }
+#endif
