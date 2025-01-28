@@ -36,21 +36,6 @@ enum class ShapeType_e : uint8_t
 	MeshShape,
 };
 
-enum class ShapeUseage_e : uint8_t
-{
-	Collision,	// Simulate always
-	Ragdoll,	// Simualte when ragdolled
-	Hitbox,		// Scene queryable
-};
-
-enum class PhysicsConstraintType_e : uint8_t
-{
-	Distance,
-	Hinge,
-	BallSocket,
-	D6Joint,
-};
-
 struct sphere_def_t {
 	float radius;
 };
@@ -94,45 +79,16 @@ struct physics_shape_def
 
 };
 
-class PhysicsBodyConstraintDef
-{
-public:
-	int parent_body = -1;
-	int child_body = -1;
-	PhysicsConstraintType_e type = PhysicsConstraintType_e::Hinge;
-	glm::vec3 limit_min = glm::vec3(0.0);
-	glm::vec3 limit_max = glm::vec3(1.0);
-	float damping = 0.0;
-};
-struct PSubBodyDef
-{
-	StringName group_name;					// StringName associated with this, for example hitbox name
-	uint32_t dont_collide_with_mask = 0;	// mask of other subbodies to not collide with (for skeleton meshes)
-	uint16_t shape_start = 0;
-	uint16_t shape_count = 0;
-	int16_t skeletal_mesh_bone = -1;		// associated bone in model's skeleton
-	ShapeUseage_e usage = ShapeUseage_e::Collision;
-};
-
 // Rigid body definition
 class PhysicsBody
 {
 public:
-	bool can_use_for_rigid_body_dynamic() const {
-		return can_be_dynamic;
-	}
-	bool has_skeleton_physics() const {
-		return is_skeleton;
-	}
+	~PhysicsBody();
+	PhysicsBody() = default;
+	PhysicsBody& operator=(const PhysicsBody& other) = delete;
+	PhysicsBody(const PhysicsBody& other) = delete;
 
-	bool can_be_dynamic = false;	// set to true if triangle mesh shape not used
 	std::vector<physics_shape_def> shapes;
-	int num_shapes_of_main = 0;	// these are the main collider shapes
-
-	// subbodies that are used by skeletons for ragdolls/hitboxes
-	bool is_skeleton = false;
-	std::vector<PSubBodyDef> subbodies;
-	std::vector<PhysicsBodyConstraintDef> constraints;
 };
 
 struct PhysTransform
@@ -143,16 +99,6 @@ struct PhysTransform
 	glm::vec3 position=glm::vec3(0.0);
 	glm::quat rotation=glm::quat(0,0,0,0);
 };
-
-enum class PhysicsShapeType
-{
-	SimulateAndQuery,	// most physical things
-	TriggerAndQuery,	// rare usage
-	SimulateOnly,		// simulating things that dont get involved with raycasts/character movement
-	QueryOnly,			// for things like hitboxes
-	TriggerOnly,		// most common for invisible triggers
-};
-
 
 class PhysicsComponentBase;
 struct world_query_result

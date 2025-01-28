@@ -364,14 +364,24 @@ void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
 {
 	if (model->get_physics_body()) {
 		auto body = model->get_physics_body();
-		for (int i = 0; i < body->num_shapes_of_main; i++) {
+		for (int i = 0; i < body->shapes.size(); i++) {
 			auto& shape = body->shapes[i];
-			if (shape.shape != ShapeType_e::ConvexShape)
-				continue;
+			if (shape.shape == ShapeType_e::ConvexShape) {
+				PxMeshScale scale;
+				scale.scale = glm_to_physx(get_owner()->get_ls_scale());
+				PxShape* aConvexShape = PxRigidActorExt::createExclusiveShape(*physxActor,
+					PxConvexMeshGeometry(shape.convex_mesh,scale), *physics_local_impl->default_material);
+				set_shape_flags(aConvexShape);
+			}
+			else if (shape.shape == ShapeType_e::MeshShape) {
+				PxMeshScale scale;
+				scale.scale = glm_to_physx(get_owner()->get_ls_scale());
 
-			PxShape* aConvexShape = PxRigidActorExt::createExclusiveShape(*physxActor,
-				PxConvexMeshGeometry(shape.convex_mesh), *physics_local_impl->default_material);
-			set_shape_flags(aConvexShape);
+				PxShape* tri_shape = PxRigidActorExt::createExclusiveShape(*physxActor,
+					PxTriangleMeshGeometry(shape.tri_mesh,scale), *physics_local_impl->default_material
+				);
+				set_shape_flags(tri_shape);
+			}
 		}
 	}
 	else {

@@ -17,7 +17,7 @@
 #include "Game/LevelAssets.h"
 #include "Animation/Runtime/Animation.h"
 #include "AssetCompile/AnimationSeqLoader.h"
-#pragma optimize("",off)
+
 CLASS_H(TopDownSpawnPoint, EntityComponent)
 public:
 	
@@ -840,18 +840,22 @@ CLASS_H(TopDownSpawner,EntityComponent)
 public:
 	void start() {
 		Entity* e{};
+		float ofs = 0.0;
+		for(int i=0;i<count;i++)
 		{
 			auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
-			e->set_ws_position(get_ws_position());
+			e->set_ws_position(get_ws_position()+glm::vec3(0,ofs,0));
+			ofs += 1.5;
 		}
 	}
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(TopDownSpawner)
-			REG_ASSET_PTR(prefab,PROP_DEFAULT)
+			REG_ASSET_PTR(prefab,PROP_DEFAULT),
+			REG_INT(count,PROP_DEFAULT,"1")
 		END_PROPS(TopDownSpawner)
 	}
-
+	int count = 1;
 	AssetPtr<PrefabAsset> prefab;
 };
 CLASS_IMPL(TopDownSpawner);

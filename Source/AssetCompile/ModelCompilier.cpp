@@ -28,7 +28,7 @@
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 7;
+static const int MODEL_VERSION = 8;
 // int version XXX
 // 
 // mat4 root_transform
@@ -51,13 +51,8 @@ static const int MODEL_VERSION = 7;
 // 
 // **PHYSICS DATA:
 // bool has_physics (if false, skip this section)
-// bool can_be_dynamic
-// int num_bodies
-// PSubBodyDef bodies[num_bodies]
 // int num_shapes
 // physics_shape_def shapes[num_shapes] (pointers are serialized as an offset to { int size, data[] })
-// int num_constraints
-// PhysicsBodyConstraintDef constrains[num_contraints]
 // 
 // **ANIMATION DATA:
 // int num_bones
@@ -2107,7 +2102,7 @@ ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const Skeleto
 // Last stop for stuff thats getting written out
 struct FinalPhysicsData
 {
-	PhysicsBody body;
+	std::vector<physics_shape_def> shapes;
 	std::vector<std::unique_ptr<physx::PxDefaultMemoryOutputStream>> output_streams;
 };
 struct FinalModelData
@@ -2202,19 +2197,58 @@ FinalPhysicsData create_final_physics_data(
 			bool good = PxCookConvexMesh(params, desc, *buf.get(),&res);
 		
 			if (good) {
-
-				out.body.num_shapes_of_main++;
 				physics_shape_def def;
 				// treating convex_mesh like a void* for serialzing
 				def.convex_mesh = (physx::PxConvexMesh*)buf.get();
 				def.shape = ShapeType_e::ConvexShape;
 				out.output_streams.push_back(std::move(buf));
-				out.body.shapes.push_back(def);
+				out.shapes.push_back(def);
 			}
 			else
 				sys_print(Error, "PxCookConvexMesh failed\n");
 		}break;
+		case ShapeType_e::MeshShape:
+		{
+			physx::PxTriangleMeshDesc desc;
+			auto buf = std::make_unique<physx::PxDefaultMemoryOutputStream>();
+			physx::PxCookingParams params = physx::PxCookingParams(physx::PxTolerancesScale());
+			params.meshPreprocessParams |= physx::PxMeshPreprocessingFlag::eWELD_VERTICES;
+			params.meshWeldTolerance = 0.001f;
 
+			//desc.flags |= physx::PxConvexFlag::eCOMPUTE_CONVEX;
+			//desc.flags |= physx::PxConvexFlag::eCHECK_ZERO_AREA_TRIANGLES;
+
+			const int index_start = p.submesh.element_offset / sizeof(uint32_t);	
+			const int vertex_start = p.submesh.base_vertex;
+
+			glm::mat4 transform = p.ref.globaltransform;
+			std::vector<glm::vec3> positions;
+			for (int i = 0; i < p.submesh.vertex_count; i++) {
+				positions.push_back(glm::vec3(transform * glm::vec4(compile.verticies[vertex_start + i].position, 1.0f)));
+			}
+
+			desc.points.count = p.submesh.vertex_count;
+			desc.points.data = positions.data();
+			desc.points.stride = sizeof(glm::vec3);
+
+			desc.triangles.count = p.submesh.element_count / 3;
+			desc.triangles.data = ((uint8_t*)(compile.indicies.data() + index_start));
+			desc.triangles.stride = sizeof(uint32_t)*3;
+
+			physx::PxTriangleMeshCookingResult::Enum res;
+			bool good = PxCookTriangleMesh(params, desc, *buf.get(),&res);
+		
+			if (good) {
+				physics_shape_def def;
+				// treating tri_mesh like a void* for serialzing
+				def.tri_mesh = (physx::PxTriangleMesh*)buf.get();
+				def.shape = ShapeType_e::MeshShape;
+				out.output_streams.push_back(std::move(buf));
+				out.shapes.push_back(def);
+			}
+			else
+				sys_print(Error, "PxCookConvexMesh failed\n");
+		}break;
 		}
 	}
 	return out;
@@ -2404,13 +2438,9 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 // int num_constraints
 // PhysicsBodyConstraintDef constrains[num_contraints]
 
-	if (model->final_physics.body.shapes.size() > 0) {
-		auto& body = model->final_physics.body;
+	if (model->final_physics.shapes.size() > 0) {
+		auto& body = model->final_physics;
 		out.write_byte(1);
-		out.write_byte(body.can_be_dynamic);
-		out.write_int32(body.num_shapes_of_main);
-		out.write_int32(body.subbodies.size());
-		out.write_bytes_ptr((uint8_t*)body.subbodies.data(), body.subbodies.size() * sizeof(PSubBodyDef));
 		out.write_int32(body.shapes.size());
 		for (int i = 0; i < body.shapes.size(); i++) {
 			out.write_bytes_ptr((uint8_t*)&body.shapes[i], sizeof(physics_shape_def));
@@ -2418,12 +2448,14 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 				physx::PxDefaultMemoryOutputStream* output = (physx::PxDefaultMemoryOutputStream*)body.shapes[i].convex_mesh;
 				out.write_int32(output->getSize());
 				out.write_bytes_ptr(output->getData(), output->getSize());
-
+			}
+			else if (body.shapes[i].shape == ShapeType_e::MeshShape) {
+				physx::PxDefaultMemoryOutputStream* output = (physx::PxDefaultMemoryOutputStream*)body.shapes[i].tri_mesh;
+				out.write_int32(output->getSize());
+				out.write_bytes_ptr(output->getData(), output->getSize());
 			}
 			out.write_int32('HELP');
 		}
-		out.write_int32(body.constraints.size());
-		out.write_bytes_ptr((uint8_t*)body.constraints.data(), body.constraints.size() * sizeof(PhysicsBodyConstraintDef));
 	}
 	else {
 		out.write_byte(0);

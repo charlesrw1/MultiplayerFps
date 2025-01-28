@@ -150,7 +150,9 @@ public:
 			world_query_result res;
 			TraceIgnoreVec vec;
 			vec.push_back(body);
-			if (g_physics.trace_ray(res, r.pos, r.pos + r.dir * max_spring, &vec, UINT32_MAX))
+			//if (g_physics.trace_ray(res, r.pos, r.pos + r.dir * max_spring, &vec, UINT32_MAX))
+			//	dist = res.distance;
+			if (g_physics.sweep_sphere(res, wheel_radius, r.pos + up_vec * wheel_radius, -up_vec, max_spring + wheel_radius, UINT32_MAX, &vec))
 				dist = res.distance;
 
 			//                                                                                                                const float max_spring = 1.0;
@@ -215,9 +217,11 @@ public:
 			float yang = (i == 0 || i == 1) ? steer_angle : 0.0;
 			if (i == 1 || i == 3) yang += PI;
 
+			float xang = wheel_angles[i];
+			if (i == 1 || i == 3)xang *= -1;
 			wheels[i]->get_owner()->set_ls_transform(
 				wheelpos,
-				glm::quat(glm::vec3(wheel_angles[i],yang,0)),
+				glm::quat(glm::vec3(xang,yang,0)),
 					glm::vec3(1.f));
 
 			last_dist[i] = touching_ground ? dist : max_spring;
@@ -311,14 +315,14 @@ public:
 			auto front = -t[2];
 
 
-			dir =  glm::vec3(front.x*4.0,3,front.z*4.0)*3.0f;
+			dir =  glm::vec3(front.x*4.0,1.5,front.z*4.0)*3.0f;
 		}
 		else
 			dir =  glm::vec3(0, 2.5, -5);
 		pos = pos + dir;
 
 		camera->fov = 60.0;
-		camera_pos = damp_dt_independent(pos, camera_pos, 0.1, eng->get_dt());
+		camera_pos = damp_dt_independent(pos, camera_pos, 0.02, eng->get_dt());
 		{
 			dir = glm::normalize(dir);
 			glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), dir));

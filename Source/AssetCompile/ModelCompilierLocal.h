@@ -72,7 +72,6 @@ struct PhysicsCollisionShapeDefLoad
 
 	std::string material_name;
 	physics_shape_def def;
-	PhysicsBodyConstraintDef constraint_def;
 };
 
 struct WeightlistDef

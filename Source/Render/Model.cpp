@@ -68,7 +68,7 @@ REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 
 Model::~Model() {}
 
-static const int MODEL_FORMAT_VERSION = 7;
+static const int MODEL_FORMAT_VERSION = 8;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
@@ -360,25 +360,11 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	DEBUG_MARKER = read.read_int32();
 	assert(DEBUG_MARKER == 'HELP');
 
-	// **PHYSICS DATA:
-// bool has_physics (if false, skip this section)
-// bool can_be_dynamic
-// int num_shapes_main
-// int num_bodies
-// PSubBodyDef bodies[num_bodies]
-// int num_shapes
-// physics_shape_def shapes[num_shapes] (pointers are serialized as an offset to { int size, data[] })
-// int num_constraints
-// PhysicsBodyConstraintDef constrains[num_contraints]
 
 	bool has_physics = read.read_byte();
 	if (has_physics) {
 		m->collision = std::make_unique<PhysicsBody>();
 		auto& body = *m->collision.get();
-		body.can_be_dynamic = read.read_byte();
-		body.num_shapes_of_main = read.read_int32();
-		body.subbodies.resize(read.read_int32());
-		read.read_bytes_ptr(body.subbodies.data(), body.subbodies.size() * sizeof(PSubBodyDef));
 		body.shapes.resize(read.read_int32());
 		for (int i = 0; i < body.shapes.size(); i++) {
 			read.read_bytes_ptr(&body.shapes[i], sizeof(physics_shape_def));
@@ -386,8 +372,6 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			DEBUG_MARKER = read.read_int32();
 			assert(DEBUG_MARKER == 'HELP');
 		}
-		body.constraints.resize(read.read_int32());
-		read.read_bytes_ptr(body.constraints.data(), body.constraints.size() * sizeof(PhysicsBodyConstraintDef));
 	}
 
 

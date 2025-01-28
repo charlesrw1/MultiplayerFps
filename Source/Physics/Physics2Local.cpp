@@ -226,7 +226,7 @@ static Color32 randcolor32(uint32_t number)
 	out.trace_dir = dir;
 	return status;
 }
-#pragma optimize("",off)
+
  class MyPhysicsCallback : public physx::PxSimulationEventCallback
  {
  public:
@@ -332,7 +332,7 @@ static Color32 randcolor32(uint32_t number)
 
 	 default_material = physics_factory->createMaterial(0.5f, 0.5f, 0.1f);
 
-	 scene->setFlag(PxSceneFlag::eENABLE_ACTIVE_ACTORS, true);
+	scene->setFlag(PxSceneFlag::eENABLE_ACTIVE_ACTORS, true);
 	 scene->setFlag(PxSceneFlag::eEXCLUDE_KINEMATICS_FROM_ACTIVE_ACTORS, true);
 
 	 mycallback.reset(new MyPhysicsCallback);
@@ -363,25 +363,42 @@ static Color32 randcolor32(uint32_t number)
 	  update_debug_physics_shapes();
   }
 
-  // used only by model loader
 
-   bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
-	  if (def.shape == ShapeType_e::ConvexShape) {
-		  uint32_t count = reader.read_int32();
-		  uint8_t* data = new uint8_t[count];
-		  reader.read_bytes_ptr(data, count);
-		  physx::PxDefaultMemoryInputData inp(data, count);
+PhysicsBody::~PhysicsBody()
+{
+	for (auto& s : shapes) {
+		if (s.shape == ShapeType_e::ConvexShape) { 
+			if (s.convex_mesh)			  
+				s.convex_mesh->release(); 
+		}
+		else if (s.shape == ShapeType_e::MeshShape) { 
+			if (s.tri_mesh)			  
+				s.tri_mesh->release(); 
+		}
+	}
+}
+bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
+	if (def.shape != ShapeType_e::ConvexShape && def.shape != ShapeType_e::MeshShape)	return true;
+	uint32_t count = reader.read_int32();
+	uint8_t* data = new uint8_t[count];
+	reader.read_bytes_ptr(data, count);
+	physx::PxDefaultMemoryInputData inp(data, count);
 
-		  def.convex_mesh = physics_factory->createConvexMesh(inp);
-	  }
+	if (def.shape == ShapeType_e::ConvexShape) {
+		def.convex_mesh = physics_factory->createConvexMesh(inp);
+	}
+	else if (def.shape == ShapeType_e::MeshShape) {
+		def.tri_mesh = physics_factory->createTriangleMesh(inp);
+	}
+	delete[] data;
 
-	  return true;
-  }
+	return true;
+}
 
 void PhysicsManImpl::update_debug_physics_shapes()
 {
 	ASSERT(scene);
-
+	return;
 	if (g_draw_physx_scene.get_integer() == 0) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
 		if (debug_mesh_handle.is_valid())

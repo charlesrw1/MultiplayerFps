@@ -804,7 +804,7 @@ ConfigVar g_window_fullscreen("vid.fullscreen", "0",CVAR_BOOL,"");
 ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,"",0,UINT16_MAX);
 ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV,"");
 
-ConfigVar developer_mode("developer_mode", "0", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
+ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
 
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
 
