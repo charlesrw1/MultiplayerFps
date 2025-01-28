@@ -37,8 +37,9 @@ public:
 // what job are we currently executing
 thread_local AsyncQueuedJob* ACTIVE_THREAD_JOB = nullptr;
 
-struct AssetDatabaseImpl
+class AssetDatabaseImpl
 {
+public:
 	void install_system_direct(IAsset* asset, const std::string& name) {
 		asset->path = name;
 		asset->set_both_reference_bitmasks_unsafe( IAsset::GLOBAL_REFERENCE_MASK );

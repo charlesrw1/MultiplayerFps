@@ -197,6 +197,7 @@ bool ArchiveFile::open(const char* archive_path)
 
 	file->seek(16);
 
+	return true;
 }
 
 IFilePtr open_read_dir(const std::string& root, const std::string& relative)
@@ -258,6 +259,8 @@ const char* FileSys::get_path(WhereEnum where)
 	else if (where == GAME_DIR)
 		return g_project_base.get_string();
 	else if (where == ENGINE_DIR)
+		return ".";
+	else
 		return ".";
 }
 

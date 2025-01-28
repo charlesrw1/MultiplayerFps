@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
-#include "Net.h"
+
+#if 0
 
 #include "Framework/Config.h"
 #include "Types.h"
@@ -104,4 +105,5 @@ private:
 };
 
 
+#endif
 #endif // !SERVER_H

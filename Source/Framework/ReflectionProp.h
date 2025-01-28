@@ -183,8 +183,8 @@ public:
 
 	const PropertyInfoList* props_in_list = nullptr;
 	virtual uint8_t* get_index(void* inst, int index) = 0;
-	virtual uint32_t get_size(void* inst) = 0;
-	virtual void resize(void* inst, uint32_t new_size) = 0;
+	virtual int get_size(void* inst) = 0;
+	virtual void resize(void* inst, int new_size) = 0;
 	virtual void swap_elements(void* inst, int item0, int item1) = 0;
 private:
 	// for atom types

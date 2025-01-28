@@ -10,6 +10,7 @@ extern ConfigVar fake_lag;
 extern ConfigVar time_out;
 extern ConfigVar time_reset_threshold;
 
+#if 0
 
 void Client::ReadPackets()
 {
@@ -431,3 +432,4 @@ bool Client::OnEntSnapshot(ByteReader& msg)
 #endif
 	return false;
 }
+#endif

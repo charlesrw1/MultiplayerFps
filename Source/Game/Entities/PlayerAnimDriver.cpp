@@ -7,7 +7,7 @@
 
 #include "Framework/AddClassToFactory.h"
 
-CLASS_IMPL(CharacterGraphDriver, AnimatorInstance);
+CLASS_IMPL(CharacterGraphDriver);
 
 void CharacterGraphDriver::on_init() {
 	auto model = get_model();

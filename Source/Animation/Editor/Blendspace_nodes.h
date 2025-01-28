@@ -6,11 +6,11 @@
 
 
 CLASS_H_EXPLICIT_SUPER(Blendspace2d_EdNode, BaseNodeUtil_EdNode<BlendSpace2d_CFG>, Base_EdNode)
-
+public:
 	MAKE_STANDARD_FUNCTIONS(
 		"Blendspace 2D",
 		BLEND_COLOR,
-		"Allows placing clips in a triangulated format that blend together.\n",
+		"Allows placing clips in a triangulated format that blend together.\n"
 	);
 
 	static const PropertyInfoList* get_props() {

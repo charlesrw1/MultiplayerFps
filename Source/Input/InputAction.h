@@ -106,7 +106,7 @@ private:
 	friend class GameInputSystem;
 };
 
-struct InputDevice;
+class InputDevice;
 class InputUser
 {
 public:

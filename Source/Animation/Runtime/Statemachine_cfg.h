@@ -28,6 +28,7 @@ inline float evaluate_easing(Easing type, float t)
 		return (t < 0.5) ? 4 * t * t * t : 1.0 - othert * othert * othert * 0.5;
 	}break;
 	default:
+		return t;
 		break;
 	}
 }

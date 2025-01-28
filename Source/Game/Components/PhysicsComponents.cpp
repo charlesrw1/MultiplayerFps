@@ -117,7 +117,7 @@ void PhysicsComponentBase::pre_start()
 
 	ASSERT(editor_shape_id==0);
 
-	auto initial_transform = get_ws_transform();
+	auto& initial_transform = get_ws_transform();
 
 	ASSERT(!has_initialized());
 
@@ -155,7 +155,7 @@ void PhysicsComponentBase::pre_start()
 	update_mass();
 
 	if (get_is_simulating()) {
-		auto ws = get_ws_transform();
+		auto& ws = get_ws_transform();
 		get_owner()->set_is_top_level(true);
 		get_owner()->set_ws_transform(ws);
 	}
@@ -238,7 +238,7 @@ void PhysicsComponentBase::update_mass()
 float PhysicsComponentBase::get_mass()const
 {
 	ASSERT(physxActor);
-	if (!get_is_actor_static()) {
+	if (!get_is_actor_static() && physxActor) {
 		auto dyn = (PxRigidDynamic*)physxActor;
 		return dyn->getMass();
 	}
@@ -307,7 +307,8 @@ PhysicsComponentBase::PhysicsComponentBase() {
 }
 
 bool PhysicsComponentBase::get_is_actor_static() const {
-	ASSERT(physxActor);
+	if (!physxActor)
+		return false;
 	return physxActor->getType() == physx::PxActorType::eRIGID_STATIC;
 }
 
@@ -374,7 +375,7 @@ void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
 		}
 	}
 	else {
-		auto aabb = model->get_bounds();
+		auto& aabb = model->get_bounds();
 		auto boxGeom = PxBoxGeometry(glm_to_physx((aabb.bmax - aabb.bmin) * 0.5f));
 
 		auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
@@ -632,7 +633,7 @@ static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, i
 	auto my_local = get_transform_joint(anchor, local_joint_axis);
 	auto my_world = ws_transform * my_local;
 	if (b) {
-		auto other_world = b->get_ws_transform();
+		auto& other_world = b->get_ws_transform();
 		auto other_local = glm::inverse(other_world) * my_world;
 		joint = create_func(*physics_local_impl->physics_factory,
 			a->get_physx_actor(), glm_to_physx(my_local),

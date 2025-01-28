@@ -68,11 +68,12 @@ inline GraphPinType hint_str_to_GraphPinType(const char* str)
 	if (strcmp(str, "vec3") == 0) return GraphPinType(anim_graph_value::vec3_t);
 	if (strcmp(str, "quat") == 0) return GraphPinType(anim_graph_value::quat_t);
 	ASSERT(0);
+	return GraphPinType(anim_graph_value::float_t);
 }
 
 
 struct PropertyInfo;
-struct Base_EdNode;
+class Base_EdNode;
 struct GraphNodeInput
 {
 	std::string name;
@@ -87,6 +88,7 @@ struct GraphNodeInput
 
 class AnimationGraphEditor;
 CLASS_H(Base_EdNode, ClassBase)
+public:
 	Base_EdNode() {
 		for (int i = 0; i < inputs.size(); i++) 
 			inputs[i].node = nullptr;

@@ -49,7 +49,7 @@ public:
 			FlushScratch();
 		}
 
-		assert(scratch < ((1ll << scratch_bits)));
+		assert(scratch < ((1ull << scratch_bits)));
 		assert(scratch_bits == 0 && scratch == 0 || scratch_bits > 0);
 	}
 	void WriteBool(bool b) {

@@ -155,7 +155,7 @@ public:
         T* ptr = nullptr;
     };
 
-    friend class hash_set_iterator<T>;
+    friend struct hash_set_iterator<T>;
 
     uint64_t mask = 0;
     int64_t num_tombstones = 0;

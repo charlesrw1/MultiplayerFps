@@ -495,7 +495,9 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.debug_options = r_debug_mode.get_integer();
 
 	constants.flags = 0;
-	constants.flags |= wireframe_secondpass;
+	if (wireframe_secondpass)
+		constants.flags |= (1 << 0);
+
 
 	glNamedBufferData(ubo, sizeof gpu::Ubo_View_Constants_Struct, &constants, GL_DYNAMIC_DRAW);
 }
@@ -1007,6 +1009,7 @@ void Renderer::execute_render_lists(
 
 		const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
 
+		#pragma warning(disable : 4312)	// (void*) casting
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
 			index_type,
@@ -1014,6 +1017,7 @@ void Renderer::execute_render_lists(
 			count,
 			sizeof(gpu::DrawElementsIndirectCommand)
 		);
+		#pragma warning(default : 4312)
 
 		offset += count;
 
@@ -1070,6 +1074,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 
 			const GLenum index_type = (mods.get_index_type_size()==4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
 
+			#pragma warning(disable : 4312)	// (void*) casting
 			glDrawElementsBaseVertex(
 				GL_TRIANGLES,
 				cmd.count,
@@ -1077,6 +1082,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 				(void*)(cmd.firstIndex * mods.get_index_type_size()),
 				cmd.baseVertex
 			);
+			#pragma warning(default : 4312)
 
 			stats.total_draw_calls++;
 		}
@@ -1245,8 +1251,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	const Render_Object& proxy, 
 	const MaterialInstance* material,
 	uint32_t camera_dist, 
-	uint32_t submesh, 
-	uint32_t layer,
+	int submesh, 
+	int layer,
 	bool is_editor_mode
 )
 {
@@ -1291,9 +1297,9 @@ void Render_Pass::add_object(
 	handle<Render_Object> handle,
 	const MaterialInstance* material,
 	uint32_t camera_dist,
-	uint32_t submesh,
-	uint32_t lod,
-	uint32_t layer,
+	int submesh,
+	int lod,
+	int layer,
 	bool is_editor_mode) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");

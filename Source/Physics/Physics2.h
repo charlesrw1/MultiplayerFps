@@ -127,7 +127,7 @@ public:
 
 	bool can_be_dynamic = false;	// set to true if triangle mesh shape not used
 	std::vector<physics_shape_def> shapes;
-	uint32_t num_shapes_of_main = 0;	// these are the main collider shapes
+	int num_shapes_of_main = 0;	// these are the main collider shapes
 
 	// subbodies that are used by skeletons for ragdolls/hitboxes
 	bool is_skeleton = false;

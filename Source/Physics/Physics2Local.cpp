@@ -246,7 +246,7 @@ static Color32 randcolor32(uint32_t number)
 	 }
 	 virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override
 	 {
-		 for (int i = 0; i < count; i++) {
+		 for (int i = 0; i < (int)count; i++) {
 			 auto& pair = pairs[i];
 			 PhysicsComponentBase* trigger_obj = (PhysicsComponentBase*)pair.triggerActor->userData;
 			 PhysicsComponentBase* other_obj = (PhysicsComponentBase*)pair.otherActor->userData;

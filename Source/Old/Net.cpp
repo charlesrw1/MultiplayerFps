@@ -1,6 +1,7 @@
 #include "Net.h"
 #include "Types.h"
 #include "Framework/Bytepacker.h"
+#if 0
 #define ESP(x) #x,(int)&((Entity*)0)->x
 #define ESPO(x) (int)&((Entity*)0)->x
 
@@ -271,3 +272,4 @@ void write_delta_entity(ByteWriter& msg, ByteReader& s0, ByteReader& s1, int con
 		}
 	}
 }
+#endif

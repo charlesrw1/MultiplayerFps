@@ -16,15 +16,15 @@ public:
 		std::vector<T>* list = (std::vector<T>*)inst;
 		return (uint8_t*)&list->at(index);
 	}
-	virtual uint32_t get_size(void* inst) override
+	virtual int get_size(void* inst) override
 	{
 		std::vector<T>* list = (std::vector<T>*)inst;
 		return list->size();
 	}
-	virtual void resize(void* inst, uint32_t new_size) override
+	virtual void resize(void* inst, int new_size) override
 	{
 		std::vector<T>* list = (std::vector<T>*)inst;
-		list->resize(new_size);
+		list->resize((size_t)new_size);
 	}
 	virtual void swap_elements(void* inst, int item0, int item1) override
 	{
@@ -45,15 +45,15 @@ public:
 		InlineVec<T,SIZE>* list = (InlineVec<T, SIZE>*)inst;
 		return (uint8_t*)&(*list)[index];
 	}
-	virtual uint32_t get_size(void* inst) override
+	virtual int get_size(void* inst) override
 	{
 		InlineVec<T, SIZE>* list = (InlineVec<T, SIZE>*)inst;
-		return list->size();
+		return (int)list->size();
 	}
-	virtual void resize(void* inst, uint32_t new_size) override
+	virtual void resize(void* inst, int new_size) override
 	{
 		InlineVec<T, SIZE>* list = (InlineVec<T, SIZE>*)inst;
-		list->resize(new_size);
+		list->resize((size_t)new_size);
 	}
 	virtual void swap_elements(void* inst, int item0, int item1) override
 	{

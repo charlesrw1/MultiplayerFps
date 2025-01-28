@@ -246,10 +246,12 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 		if (has_reset_button())
 		{
 			auto reset_img = GetAssets().find_global_sync<Texture>("icon/undo.png");
+			#pragma warning(disable : 4312)
 			if (ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14))) {
 				on_reset();
 				parentGrid->set_rows_had_changes();
 			}
+			#pragma warning(default : 4312)
 		}
 
 		ImGui::EndTable();
@@ -571,6 +573,7 @@ bool ArrayRow::draw_row_controls()
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
+#pragma warning(disable : 4312)
 	if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
 		ret = true;
 		clear_children();
@@ -603,6 +606,7 @@ bool ArrayRow::draw_row_controls()
 			set_next_state = next_state::visible;
 		}
 	}
+#pragma warning(default : 4312)
 
 	ImGui::PopStyleColor(3);
 
@@ -760,7 +764,8 @@ bool ArrayRow::draw_row_controls()
 	 ASSERT(row_index != -1);
 
 	 ArrayRow* array_ = (ArrayRow*)parent;
-
+	 if (!array_)
+		 return false;
 	 if (array_->header && !array_->header->can_edit_array())
 		 return false;
 
@@ -776,6 +781,7 @@ bool ArrayRow::draw_row_controls()
 	 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
 	 ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
+#pragma warning(disable : 4312)
 	 ImGui::BeginDisabled(!canmoveup);
 	 if (ImGui::ImageButton((ImTextureID)moveup->gl_id, ImVec2(16, 16))) {
 		 array_->moveup_index(row_index);
@@ -793,6 +799,7 @@ bool ArrayRow::draw_row_controls()
 	 }
 
 	 ImGui::PopStyleColor(3);
+#pragma warning(default : 4312)
 
 	 return false;	// array will update the flag itself
  }

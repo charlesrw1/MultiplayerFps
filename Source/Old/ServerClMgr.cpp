@@ -1,7 +1,7 @@
 #include "Server.h"
 #include "GameEnginePublic.h"
 #include "Framework/Bytepacker.h"
-
+#if 0
 RemoteClient::RemoteClient(Server* sv, int slot)
 {
 	myserver = sv;
@@ -463,3 +463,4 @@ void Server::write_delta_entities_to_client(ByteWriter& msg, int deltatick, int 
 
 #endif
 }
+#endif

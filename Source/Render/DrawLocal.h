@@ -46,7 +46,7 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
-class Render_Lists;
+struct Render_Lists;
 class Render_Pass;
 struct Render_Level_Params {
 
@@ -205,6 +205,9 @@ private:
 class OpenglRenderDevice
 {
 public:
+	OpenglRenderDevice() {
+		memset(textures_bound, 0, sizeof(textures_bound));
+	}
 	Shader shader() const {
 		if (active_program == -1) return Shader();
 		return prog_man.get_obj(active_program);
@@ -261,7 +264,7 @@ private:
 		assert(in_render_pass);
 		in_render_pass = false;
 	}
-	friend class GpuRenderPassScope;
+	friend struct GpuRenderPassScope;
 
 	static const int MAX_SAMPLER_BINDINGS = 32;
 	program_handle active_program = -1;
@@ -465,7 +468,7 @@ public:
 		texhandle bloom_chain[MAX_BLOOM_MIPS];
 		glm::ivec2 bloom_chain_isize[MAX_BLOOM_MIPS];
 		glm::vec2 bloom_chain_size[MAX_BLOOM_MIPS];
-		uint32_t number_bloom_mips = 0;
+		int number_bloom_mips = 0;
 
 		// "virtual texture system" handles, does that even make sense?
 		Texture* bloom_vts_handle = nullptr;

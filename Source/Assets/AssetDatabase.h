@@ -27,7 +27,7 @@ struct PendingLoadJob;
 //	till the async call on the loader thread finishes (it will also flush the finished queue, calling everything that hasn't post_loaded()'d yet)
 // -sync loading assets on async threads DOES WORK! it takes a different path, it will return a loaded asset that hasnt had post_load called
 
-struct AssetDatabaseImpl;
+class AssetDatabaseImpl;
 class AssetDatabase
 {
 public:

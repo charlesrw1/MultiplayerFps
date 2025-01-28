@@ -92,8 +92,8 @@ inline BaseAGNode* ptr_to_serialized_nodecfg_ptr(BaseAGNode* ptr, const AgSerial
 
 
 
-struct Animation_Tree_CFG;
-struct Node_CFG;
+class Animation_Tree_CFG;
+class Node_CFG;
 class NodeRt_Ctx
 {
 public:
@@ -107,7 +107,8 @@ public:
 	const MSkeleton* get_skeleton() const {
 		return model->get_skel();
 	}
-	uint32_t num_bones() const { return model->get_skel()->get_num_bones(); }
+	//
+	int num_bones() const { return model->get_skel()->get_num_bones(); }
 
 	template<typename T>
 	T* get(int node_index) {
@@ -589,7 +590,7 @@ NODECFG_HEADER(Mirror_Node_CFG, Mirror_Node_RT)
 	bool store_value_on_reset = false;	// if true, then parameter value is saved and becomes const until reset again
 };
 
-struct NodeRt_Ctx;
+class NodeRt_Ctx;
 
 struct BlendSpace2d_RT : public Rt_Vars_Base
 {
@@ -966,7 +967,7 @@ CLASS_H(VectorConstant, ValueNode)
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(VectorConstant)
-			REG_VEC3(vector, PROP_DEFAULT, "")
+			REG_VEC3(vector, PROP_DEFAULT)
 		END_PROPS(VectorConstant)
 	}
 	glm::vec3 vector = {};
@@ -976,7 +977,7 @@ CLASS_H(VectorConstant, ValueNode)
 CLASS_H(VariableNode, ValueNode)
 	static const PropertyInfoList* get_props() {
 		START_PROPS(VariableNode) 
-			REG_STDSTRING(var_name, PROP_SERIALIZE, ""),
+			REG_STDSTRING(var_name, PROP_SERIALIZE),
 			REG_FLOAT(scale, PROP_DEFAULT, "1"),
 			REG_FLOAT(bias, PROP_DEFAULT, "0"),
 			REG_BOOL(apply_clamp, PROP_DEFAULT, "0"),
@@ -1018,10 +1019,10 @@ CLASS_H(VariableNode, ValueNode)
 			*(float*)ptr = f;
 		}
 		else if (type == anim_graph_value::bool_t && var_type == anim_graph_value::bool_t) {
-			*(bool*)ptr = pi->get_int(ctx.anim);
+			*(bool*)ptr = (bool)pi->get_int(ctx.anim);
 		}
 		else if(type == anim_graph_value::int_t && var_type == anim_graph_value::int_t)
-			*(int*)ptr = pi->get_int(ctx.anim);
+			*(int*)ptr = (int)pi->get_int(ctx.anim);
 		else if (type == anim_graph_value::quat_t && var_type == anim_graph_value::quat_t)
 			*(glm::quat*)ptr = *(glm::quat*)pi->get_ptr(ctx.anim);
 		else if (type == anim_graph_value::vec3_t && var_type == anim_graph_value::vec3_t)
@@ -1047,7 +1048,7 @@ CLASS_H(RotationConstant, ValueNode)
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(RotationConstant)
-			REG_QUAT(rotation, PROP_DEFAULT, "") 
+			REG_QUAT(rotation, PROP_DEFAULT) 
 		END_PROPS(RotationConstant)
 	}
 	glm::quat rotation{};

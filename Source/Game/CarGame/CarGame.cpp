@@ -27,6 +27,7 @@ static float steer_mult = 0.04;
 static float wind_resist = 0.80;
 static float epsilon_friction = 0.005;
 static float max_spring = 0.8;
+static float visual_wheel_interp = 0.0002;
 
 void car_debug_menu()
 {
@@ -39,6 +40,9 @@ void car_debug_menu()
 	ImGui::DragFloat("friction_coeff", &friction_coeff,0.01,0,50);
 
 	ImGui::DragFloat("steer_mult", &steer_mult,0.005,0,2);
+
+	ImGui::DragFloat("visual_wheel_interp", &visual_wheel_interp,0.01,0,1);
+
 
 	ImGui::DragFloat("wind_resist", &wind_resist,0.005,0,2);
 
@@ -113,6 +117,8 @@ public:
 		for (int i = 0; i < 4; i++) {
 			last_dist[i] = 0;
 			last_ws_pos[i] = glm::vec3(0.f);
+			visual_wheel_dist[i] = 0.f;
+			wheel_angles[i] = 0;
 		}
 	}
 	void end() {
@@ -126,18 +132,16 @@ public:
 		//const float max_spring = 1.0;
 		const float wheel_radius = 0.46;
 
-		{
 			float current_speed = glm::length(body->get_linear_velocity());
 			const float delta_angle = (current_speed * eng->get_dt()) / wheel_radius;
-			current_wheel_rot += delta_angle * glm::sign(glm::dot(body->get_linear_velocity(),front_vec));
-		}
 
-		Debug::add_line(body_t[3], glm::vec3(body_t[3]) + up_vec*2.f, COLOR_PINK, 0);
+		//Debug::add_line(body_t[3], glm::vec3(body_t[3]) + up_vec*2.f, COLOR_PINK, 0);
 		for (int i = 0; i < 4; i++) {
 			auto w = wheels[i];
 			auto o = w->get_owner();
 			auto ws_pos = glm::vec3(body_t * glm::vec4(localspace_wheel_pos[i],1));
 
+			
 			Ray r;
 			r.pos = ws_pos;
 			r.dir = -up_vec;
@@ -158,12 +162,24 @@ public:
 
 			float dxdt = (dist - last_dist[i]) / (float)eng->get_dt();
 
+			
+			
 			if (touching_ground) {
 				body->apply_force(ws_pos, up_vec * (d * spring_constant - dxdt * spring_damp));
 
+				wheel_angles[i] += delta_angle * glm::sign(glm::dot(body->get_linear_velocity(),front_vec));
 
 				// apply braking force
 				body->apply_force(ws_pos, -glm::sign(glm::dot(body->get_linear_velocity(),front_vec)) * front_vec * brake_force * brake_force_mult);
+			
+				if (i == 0 || i == 1) {
+
+					// apply forward force
+					glm::vec3 front_wheel = localspace_wheel_pos[i];
+					front_wheel.y -= 0.46;
+					auto ws = glm::vec3(body_t * glm::vec4(front_wheel, 1));
+					body->apply_force(ws, front_vec * forward_force * forward_force_mult);
+				}
 			}
 
 			glm::vec3 ddt = (ws_pos - last_ws_pos[i]) / (float)eng->get_dt();
@@ -187,38 +203,33 @@ public:
 				}
 
 			}
-			Debug::add_line(ws_pos, ws_pos - side_ddt, COLOR_RED, 0);
+			//Debug::add_line(ws_pos, ws_pos - side_ddt, COLOR_RED, 0);
 
 
 
 			auto wheelpos = localspace_wheel_pos[i] - glm::vec3(0, glm::min(dist,max_spring) - wheel_radius, 0);
 			if (!touching_ground)
 				wheelpos = localspace_wheel_pos[i] - glm::vec3(0, max_spring - wheel_radius, 0);
+
+
 			float yang = (i == 0 || i == 1) ? steer_angle : 0.0;
+			if (i == 1 || i == 3) yang += PI;
 
 			wheels[i]->get_owner()->set_ls_transform(
 				wheelpos,
-				glm::quat(glm::vec3(current_wheel_rot,yang,0)),
+				glm::quat(glm::vec3(wheel_angles[i],yang,0)),
 					glm::vec3(1.f));
 
 			last_dist[i] = touching_ground ? dist : max_spring;
 			last_ws_pos[i] = ws_pos;
 		}
-		// apply forward forces
-		glm::vec3 front_wheel = localspace_wheel_pos[0];
-		front_wheel.y -= 0.46;
-		auto ws_pos = glm::vec3(body_t * glm::vec4(front_wheel,1));
-		body->apply_force(ws_pos, front_vec  * forward_force * forward_force_mult);
-		front_wheel = localspace_wheel_pos[1];
-		front_wheel.y -= 0.46;
-		ws_pos = glm::vec3(body_t * glm::vec4(front_wheel,1));
-		body->apply_force(ws_pos, front_vec  * forward_force * forward_force_mult);
+
 
 		glm::vec3 velocity = body->get_linear_velocity();
 		float len = glm::length(velocity);
 		if (len > 0.0001) {
 			velocity /= len;
-			body->apply_force(ws_pos, -velocity * len * len * wind_resist);
+			body->apply_force(body->get_ws_position(), -velocity * len * len * wind_resist);
 		}
 		//body->apply_force(ws_pos, side_vec  *steer_force* side_force_mult);
 	}
@@ -229,13 +240,15 @@ public:
 	float steer_angle = 0.0;
 	float brake_force = 0.0;
 
-	float current_wheel_rot = 0.0;
-
 	PhysicsComponentBase* body = nullptr;
 	WheelComponent* wheels[4];
 	glm::vec3 localspace_wheel_pos[4];
 	glm::vec3 last_ws_pos[4];
 	float last_dist[4];
+	float wheel_angles[4];
+
+	float visual_wheel_dist[4];
+
 	// 0 = left front, 1 = right front
 	// 2 = left back, 3 = right back
 };
@@ -282,7 +295,7 @@ public:
 
 		float speed = glm::length(car->body->get_linear_velocity());
 
-		float what_val = glm::max(1.0-speed*steer_mult,0.1)* glm::sign(move_vec.x) * glm::pow(glm::abs(move_vec.x), 2.0);
+		float what_val = glm::max(1.0-speed*steer_mult,0.1)* glm::sign(move_vec.x) * glm::pow(glm::abs(move_vec.x), 2.0) * 0.7;
 
 		set_steer_angle = damp_dt_independent(what_val, set_steer_angle, 0.0001, eng->get_dt());
 
@@ -292,17 +305,31 @@ public:
 		glm::vec3 dir{};
 
 		glm::vec3 pos = get_ws_position();
-		if (top_view)
-			dir =  glm::vec3(0, 10, -4);
+		if (top_view) {
+
+			auto t = car->get_ws_transform();
+			auto front = -t[2];
+
+
+			dir =  glm::vec3(front.x*4.0,3,front.z*4.0)*3.0f;
+		}
 		else
 			dir =  glm::vec3(0, 2.5, -5);
 		pos = pos + dir;
 
+		camera->fov = 60.0;
+		camera_pos = damp_dt_independent(pos, camera_pos, 0.1, eng->get_dt());
+		{
+			dir = glm::normalize(dir);
+			glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), dir));
+			glm::vec3 up = glm::cross(dir, right);
+			glm::mat3 rotationMatrix(right, up, dir);
+			glm::quat q(rotationMatrix);
+			cam_dir = damp_dt_independent(q, cam_dir, 0.02, eng->get_dt());
+		}
+		glm::mat4 cam_transform = glm::translate(glm::mat4(1.f), camera_pos) * glm::mat4_cast(cam_dir);
 
-		camera_pos = damp_dt_independent(pos, camera_pos, 0.001, eng->get_dt());
-
-		auto viewMat = glm::lookAt(camera_pos,camera_pos - dir, glm::vec3(0, 1, 0));
-		camera->get_owner()->set_ws_transform(glm::inverse(viewMat));
+		camera->get_owner()->set_ws_transform(cam_transform);
 	}
 	void end() {
 		inputUser->destroy();
@@ -311,6 +338,8 @@ public:
 	float set_steer_angle = 0.0;
 
 	glm::vec3 camera_pos = glm::vec3(0.f);
+	glm::quat cam_dir = glm::quat();
+
 	bool top_view = false;
 	CarComponent* car = nullptr;
 	CameraComponent* camera = nullptr;

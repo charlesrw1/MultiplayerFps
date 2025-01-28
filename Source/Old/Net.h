@@ -113,6 +113,7 @@ struct Frame2 {
 	int tick=0;
 	int localplayerindex = 0;
 };
+#if 0
 
 class Frame_Storage
 {
@@ -171,5 +172,6 @@ void write_delta_entity(ByteWriter& msg, ByteReader& s0, ByteReader& s1, int con
 void write_delta_entity(const Obj_Net_State& from, const Obj_Net_State& to, ByteWriter& msg, int condition);
 void read_delta_entity(Obj_Net_State& to, ByteReader& reader, int condition);
 
+#endif
 
 #endif

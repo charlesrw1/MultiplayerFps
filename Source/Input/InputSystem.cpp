@@ -251,7 +251,7 @@ float GameInputSystemImpl::sample_device_value_for_binding(GlobalInputBinding b,
 		int index = (int)b - (int)GlobalInputBinding::MouseButtonStart;
 		assert(index >= 0 && index < 5);
 		int dummy{};
-		uint32_t state = SDL_GetMouseState(&dummy,&dummy);
+		uint32_t state = SDL_GetMouseState(&dummy, &dummy);
 		bool down = state & SDL_BUTTON(index + 1);
 		return (down) ? 1.0 : 0.0;
 	}
@@ -272,8 +272,10 @@ float GameInputSystemImpl::sample_device_value_for_binding(GlobalInputBinding b,
 	else if (b <= GlobalInputBinding::ControllerAxisEnd) {
 		int index = (int)b - (int)GlobalInputBinding::ControllerAxisStart;
 		int16_t state = SDL_GameControllerGetAxis(device->sdl_controller_ptr, (SDL_GameControllerAxis)index);
-		return glm::clamp((double)state / INT16_MAX,-1.0,1.0);
+		return glm::clamp((double)state / INT16_MAX, -1.0, 1.0);
 	}
+	else
+		return 0.0;
 
 }
 

@@ -58,7 +58,7 @@ struct Bounds
 
 	float surface_area() const {
 		glm::vec3 size = bmax - bmin;
-		return 2.0 * (size.x * size.y + size.x * size.z + size.y * size.z);
+		return 2.0f * (size.x * size.y + size.x * size.z + size.y * size.z);
 	}
 
 	bool inside(glm::vec3 p, float size) const {

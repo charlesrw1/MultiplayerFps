@@ -46,7 +46,7 @@ public:
 		ImGui::End();
 		if (ImGui::Begin("TextureViewier")) {
 			if (textureAsset)
-				ImGui::Image((ImTextureID)textureAsset->gl_id, { 512,512 });
+				ImGui::Image((ImTextureID)uint64_t(textureAsset->gl_id), { 512,512 });
 			else
 				ImGui::Text("No texture asset to view.\n");
 		}

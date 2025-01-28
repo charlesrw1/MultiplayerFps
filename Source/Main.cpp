@@ -1131,7 +1131,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 
 			auto pos = ImGui::GetCursorPos();
 			auto winpos = ImGui::GetWindowPos();
-			ImGui::Image((ImTextureID)idraw->get_composite_output_texture_handle(), 
+			ImGui::Image((ImTextureID)uint64_t(idraw->get_composite_output_texture_handle()), 
 				ImVec2(size.x, size.y), /* magic numbers ;) */
 				ImVec2(0,1),ImVec2(1,0));	// this is the scene draw texture
 			auto sz = ImGui::GetItemRectSize();

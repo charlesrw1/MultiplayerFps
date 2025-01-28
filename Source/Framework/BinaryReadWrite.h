@@ -96,6 +96,7 @@ public:
 		if (where_ >= size)
 			return false;
 		ptr = where_;
+		return true;
 	}
 	size_t tell() {
 		return ptr;

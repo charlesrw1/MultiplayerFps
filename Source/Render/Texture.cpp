@@ -185,7 +185,7 @@ typedef struct
 } ddsFileHeader_t;
 
 
-typedef enum DXGI_FORMAT {
+enum DXGI_FORMAT {
 	DXGI_FORMAT_UNKNOWN = 0,
 	DXGI_FORMAT_R32G32B32A32_TYPELESS = 1,
 	DXGI_FORMAT_R32G32B32A32_FLOAT = 2,
@@ -331,7 +331,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	uint32_t bc4u_fourcc = 'B' | ('C' << 8) | ('4' << 16) | ('U' << 24);
 	uint32_t bc5u_fourcc = 'B' | ('C' << 8) | ('5' << 16) | ('U' << 24);
 
-	Texture_Format input_format;
+	Texture_Format input_format = TEXFMT_RGB8;
 	int input_width = header->Width;
 	int input_height = header->Height;
 
@@ -417,7 +417,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	output->height = input_height;
 	output->format = input_format;
 
-
+	return true;
 	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
 

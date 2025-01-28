@@ -33,18 +33,18 @@ struct Render_Box_Cubemap
 // represents a singular call to glDrawElements() with same state and mesh, batchable
 struct Mesh_Batch
 {
-	uint32_t first = 0;	// indexes into pass.sorted_list
-	uint32_t count = 0;
+	int first = 0;	// indexes into pass.sorted_list
+	int count = 0;
 
-	uint32_t shader_index = 0;	// indexes into shader_list[]
+	int shader_index = 0;	// indexes into shader_list[]
 	const MaterialInstance* material = nullptr;
 };
 
 // represents multiple Mesh_Batch calls packaged into one glMultidrawIndirect()
 struct Multidraw_Batch
 {
-	uint32_t first = 0;
-	uint32_t count = 0;
+	int first = 0;
+	int count = 0;
 };
 
 // represents one draw call of a mesh with a material and various state, sorted and put into Mesh_Batch's
@@ -78,10 +78,10 @@ struct Pass_Object
 	draw_call_key sort_key;
 	const MaterialInstance* material = nullptr;
 	handle<Render_Object> render_obj{};	// entity instance
-	uint16_t submesh_index = 0;		// what submesh am i
-	uint16_t lod_index = 0;
-	uint32_t hl_obj_index{};
-	uint32_t batch_idx = 0;
+	short submesh_index = 0;		// what submesh am i
+	short lod_index = 0;
+	int hl_obj_index{};
+	int batch_idx = 0;
 };
 
 // in the end: want a flat list of batches that are merged with neighbors
@@ -109,16 +109,16 @@ public:
 		handle<Render_Object> handle,
 		const MaterialInstance* material,
 		uint32_t camera_dist,
-		uint32_t submesh,
-		uint32_t lod,
-		uint32_t layer, bool is_editor_mode);
+		int submesh,
+		int lod,
+		int layer, bool is_editor_mode);
 
 	draw_call_key create_sort_key_from_obj(
 		const Render_Object& proxy,
 		const MaterialInstance* material,
 		uint32_t camera_dist,
-		uint32_t submesh,
-		uint32_t layer, bool is_editor_mode);
+		int submesh,
+		int layer, bool is_editor_mode);
 
 	void clear() {
 		objects.clear();

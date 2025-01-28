@@ -9,8 +9,9 @@ private:
 	friend class BooleanScope;
 	bool value = false;
 };
-struct BooleanScope
+class BooleanScope
 {
+public:
 	BooleanScope(ScopedBooleanValue& v) {
 		assert(!v.value);
 		ptr = &v;

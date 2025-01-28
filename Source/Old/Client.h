@@ -9,7 +9,7 @@
 #include "Framework/Config.h"
 #include "Types.h"
 #include "Framework/MulticastDelegate.h"
-
+#if 0
 struct Interp_Entry
 {
 	int tick = -1;
@@ -123,5 +123,5 @@ private:
 	void disconnect_to_menu(const char* log_reason);
 };
 
-
+#endif
 #endif // !CLIENT_H

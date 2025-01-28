@@ -20,7 +20,7 @@ public:
 		for (int i = 0; i < num_objs - 1; i++) {
 			int offset = obj_size * i;
 			uint8_t** ptr = (uint8_t**)(memory + offset);
-			uint8_t* next_ptr = (memory + obj_size * (i + 1));
+			uint8_t* next_ptr = (memory + uint64_t(obj_size) * (uint64_t(i) + 1));
 			*ptr = next_ptr;
 		}
 		first_free = memory;

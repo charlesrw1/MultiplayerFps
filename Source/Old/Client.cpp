@@ -22,7 +22,7 @@ ConfigVar time_reset_threshold("cl.time_reset", "0.1", CVAR_FLOAT,"", 0.0, 0.3);
 ConfigVar do_adjust_time("cl.do_adjust_time", "1", CVAR_BOOL,"");
 ConfigVar max_adjust_time("cl.max_adjust", "1.0", CVAR_FLOAT,"", 0.0, 2.0);
 
-
+#if 0
 
 Client::Client()// :
 
@@ -415,4 +415,5 @@ void Client::read_snapshot(Frame2* snapshot)
 	eng->build_physics_world(0.f);
 
 }
+#endif
 #endif

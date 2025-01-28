@@ -72,11 +72,11 @@ public:
 
 	// for putting back serialized data into the scene
 	// serialized text references paths ("205/1"), handles are for locating instances in scene
-	std::unordered_map<std::string, int64_t> path_to_instance_handle;
+	std::unordered_map<std::string, uint64_t> path_to_instance_handle;
 
 	// list of parents that didnt get serialized with set, for putting back in scene
 	struct external_parent {
-		int64_t external_parent_handle;
+		uint64_t external_parent_handle;
 		std::string child_path;
 	};
 	std::vector<external_parent> extern_parents;

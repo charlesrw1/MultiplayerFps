@@ -235,3 +235,8 @@ inline bool SoundFile::load_asset(ClassBase*&)
 
     return true;
 }
+inline void SoundFile::uninstall()
+{
+    Mix_FreeChunk(internal_data);
+    internal_data = nullptr;
+}

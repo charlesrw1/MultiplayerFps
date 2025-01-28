@@ -2,7 +2,7 @@
 #include "Framework/Util.h"
 #include "Types.h"
 
-
+#if 0
 static unsigned ReadInt(const uint8_t* data)
 {
 	unsigned i = 0;
@@ -110,3 +110,4 @@ void Connection::Send(const uint8_t* data, int len)
 	bool good = sock->Send(msg_buffer, len + PACKET_HEADER_SIZE, remote_addr);
 	out_sequence++;
 }
+#endif

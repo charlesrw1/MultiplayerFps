@@ -105,7 +105,7 @@ void EnviornmentMapHelper::compute_specular_new(
 {
     assert(t);
     int size = t->width;
-    const uint32_t num_mips = get_mip_map_count(size, size);
+    const int num_mips = get_mip_map_count(size, size);
 
     glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
     glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, 0);

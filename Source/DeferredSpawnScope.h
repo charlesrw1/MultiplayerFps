@@ -1,8 +1,9 @@
 #pragma once
 
 class Entity;
-struct DeferredSpawnScope
+class DeferredSpawnScope
 {
+public:
 	DeferredSpawnScope(Entity* ptr) : entityPtr(ptr) {}
 	DeferredSpawnScope(const DeferredSpawnScope& other) = delete;
 	DeferredSpawnScope(DeferredSpawnScope&& other) = default;
@@ -12,8 +13,9 @@ struct DeferredSpawnScope
 	Entity* entityPtr = nullptr;
 };
 class UnserializedSceneFile;
-struct DeferredSpawnScopePrefab
+class DeferredSpawnScopePrefab
 {
+public:
 	DeferredSpawnScopePrefab(UnserializedSceneFile* file) : file(file) {}
 	DeferredSpawnScopePrefab(const DeferredSpawnScopePrefab& other) = delete;
 	DeferredSpawnScopePrefab(DeferredSpawnScopePrefab&& other) = default;

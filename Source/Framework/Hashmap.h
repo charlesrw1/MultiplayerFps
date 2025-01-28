@@ -144,7 +144,7 @@ public:
         T data = T();
     };
 
-    friend class hash_map_iterator<T>;
+    friend struct hash_map_iterator<T>;
 
     uint64_t mask = 0;
     uint64_t num_tombstones = 0;

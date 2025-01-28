@@ -38,10 +38,7 @@ private:
     void post_load(ClassBase*) {}
     bool load_asset(ClassBase*&);
     
-    void uninstall() {
-        delete internal_data;
-        internal_data = nullptr;
-    }
+    void uninstall();
     void move_construct(IAsset* o) {
         *this = std::move(*(SoundFile*)o);
     }

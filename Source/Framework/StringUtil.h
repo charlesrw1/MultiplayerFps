@@ -100,7 +100,7 @@ public:
 	StringView() {}
 	StringView(const char* str) {
 		str_start = str;
-		str_len = strlen(str);
+		str_len = (int)strlen(str);
 	}
 	StringView(const char* str, int len) {
 		str_start = str;

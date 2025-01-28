@@ -256,9 +256,8 @@ void TabState::imgui_draw() {
 	bool wants_back = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_LeftArrow));
 	bool wants_forward = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_RightArrow));
 
-
 	ImGui::BeginDisabled(active_tab_hist.empty());
-	if (ImGui::ImageButton(ImTextureID(back_img->gl_id), ImVec2(16, 16)) || (wants_back && !active_tab_hist.empty()) ) {
+	if (ImGui::ImageButton(ImTextureID(uint64_t(back_img->gl_id)), ImVec2(16, 16)) || (wants_back && !active_tab_hist.empty()) ) {
 
 		forward_tab_stack.push_back(active_tab);
 		active_tab = active_tab_hist.back();
@@ -268,7 +267,7 @@ void TabState::imgui_draw() {
 	ImGui::EndDisabled();
 	ImGui::SameLine();
 	ImGui::BeginDisabled(forward_tab_stack.empty());
-	if (ImGui::ImageButton(ImTextureID(forward_img->gl_id), ImVec2(16, 16)) || (wants_forward && !forward_tab_stack.empty()) ) {
+	if (ImGui::ImageButton(ImTextureID(uint64_t(forward_img->gl_id)), ImVec2(16, 16)) || (wants_forward && !forward_tab_stack.empty()) ) {
 		active_tab_hist.push_back(active_tab);
 		active_tab = forward_tab_stack.back();
 		forward_tab_stack.pop_back();
@@ -747,13 +746,12 @@ void AnimationGraphEditor::imgui_draw()
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.5));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive,0);
 
-
 		if (get_playback_state() == graph_playback_state::running) {
-			if (ImGui::ImageButton((ImTextureID)pauseimg->gl_id, ImVec2(32, 32)))
+			if (ImGui::ImageButton((ImTextureID)uint64_t(pauseimg->gl_id), ImVec2(32, 32)))
 				pause_playback();
 		}
 		else {
-			if (ImGui::ImageButton((ImTextureID)playimg->gl_id, ImVec2(32, 32)))
+			if (ImGui::ImageButton((ImTextureID)uint64_t(playimg->gl_id), ImVec2(32, 32)))
 				start_or_resume_playback();
 		}
 		ImGui::SameLine();
@@ -761,7 +759,7 @@ void AnimationGraphEditor::imgui_draw()
 		auto greyed_out = ImVec4(1, 1, 1, 0.3);
 
 		ImGui::BeginDisabled(is_stopped);
-		if (ImGui::ImageButton((ImTextureID)stopimg->gl_id,
+		if (ImGui::ImageButton((ImTextureID)uint64_t(stopimg->gl_id),
 			ImVec2(32, 32),
 			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
 			ImVec4(1, 1, 1, 1)))
@@ -773,7 +771,7 @@ void AnimationGraphEditor::imgui_draw()
 
 		ImGui::BeginDisabled(!is_stopped);
 		ImGui::SameLine();
-		if (ImGui::ImageButton((ImTextureID)saveimg->gl_id,
+		if (ImGui::ImageButton((ImTextureID)uint64_t(saveimg->gl_id),
 			ImVec2(32, 32),
 			ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0),
 			ImVec4(1, 1, 1, 1)))
@@ -782,6 +780,7 @@ void AnimationGraphEditor::imgui_draw()
 		}
 		ImGui::PopStyleColor(3);
 		ImGui::EndDisabled();
+
 	}
 
 
@@ -878,7 +877,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 			ImGui::EndTooltip();
 		}
 
-
+#pragma warning(disable: 4312)
 		if (!node->compile_error_string.empty()) {
 			ImGui::SameLine();
 			ImGui::Image((ImTextureID)strong_error->gl_id, ImVec2(16, 16));
@@ -909,6 +908,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 				ImGui::EndTooltip();
 			}
 		}
+#pragma warning(default: 4312)
 
 
 

@@ -172,7 +172,7 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 
 		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
 
-			rt->anim_time += pose.dt * speed * 0.8;	// HACK !!!!!!! fixme, should be 24 fps instead of 30 but setting it breaks stuff, just do this for now 
+			rt->anim_time += pose.dt * speed * 0.8f;	// HACK !!!!!!! fixme, should be 24 fps instead of 30 but setting it breaks stuff, just do this for now 
 
 			if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
 				if (loop)
@@ -197,7 +197,7 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 	else {
 		const float time_to_evaluate_sequence = rt->anim_time;
 
-		rt->anim_time += pose.dt * speed * 0.8;	// see above
+		rt->anim_time += pose.dt * speed * 0.8f;	// see above
 
 		if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
 			if (loop)
@@ -426,7 +426,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		REG_BOOL(graph_is_valid, PROP_SERIALIZE, ""),
 		REG_STDVECTOR(direct_slot_names, PROP_SERIALIZE),
 		REG_CLASSTYPE_PTR(animator_class, PROP_DEFAULT),
-	END_PROPS()
+	END_PROPS(Animation_Tree_CFG)
  }
 
 
@@ -538,7 +538,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 uint32_t bits = (uint32_t)data[idx] | (uint32_t)data[idx + 1] << 8 | (uint32_t)data[idx + 2] << 16;
 		 for (int j = 0; j < 4; j++) {
 			 buf.push_back(byte_to_base64(bits & 63));
-			 bits >= 6;
+			 bits >>= 6;
 		 }
 	 }
  }

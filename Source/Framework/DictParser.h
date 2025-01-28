@@ -113,10 +113,10 @@ public:
 
     const char* get_filename() const { return filename.c_str(); }
 
-    uint32_t get_marker() {
+    int get_marker() {
         return read_ptr;
     }
-    bool get_string_view_for_marker(StringView& sv, uint32_t start, uint32_t end) {
+    bool get_string_view_for_marker(StringView& sv, int start, int end) {
         if (start < buffer_size && end <= buffer_size) {
             sv = StringView((const char*)&buffer[start], end - start);
             return true;
@@ -157,10 +157,10 @@ private:
     }
 
     const uint8_t* buffer = nullptr;
-    uint32_t buffer_size = 0;
+    int buffer_size = 0;
     bool allocated = false;
 
-    uint32_t read_ptr = 0;
+    int read_ptr = 0;
     bool had_error = false;
     const char* error_msg = "";
 

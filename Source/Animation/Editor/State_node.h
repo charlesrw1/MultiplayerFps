@@ -53,6 +53,8 @@ std::string get_tooltip() const override {
 		bool res = add_input(ed, input, slot);
 
 		ensure_that_inputs_are_exposed();
+
+		return true;
 	}
 	void push_empty_node() {
 		init_graph_node_input("<new state>", GraphPinType(GraphPinType::state_t), nullptr);

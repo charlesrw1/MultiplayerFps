@@ -297,14 +297,14 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	read.read_struct(&m->aabb);
 	m->bounding_sphere = bounds_to_sphere(m->aabb);
 
-	uint32_t num_lods = read.read_int32();
+	int num_lods = read.read_int32();
 	m->lods.reserve(num_lods);
 	for (int i = 0; i < num_lods; i++) {
 		MeshLod mlod;
 		read.read_struct(&mlod);
 		m->lods.push_back(mlod);
 	}
-	uint32_t num_parts = read.read_int32();
+	int num_parts = read.read_int32();
 	m->parts.reserve(num_parts);
 	for (int i = 0; i < num_parts; i++) {
 		Submesh submesh;
@@ -315,7 +315,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	uint32_t DEBUG_MARKER = read.read_int32();
 	assert(DEBUG_MARKER == 'HELP');
 
-	uint32_t num_materials = read.read_int32();
+	int num_materials = read.read_int32();
 	m->materials.resize(num_materials);
 	std::string buffer;
 	for (int i = 0; i < num_materials; i++) {
@@ -332,7 +332,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	}
 
 
-	uint32_t num_locators = read.read_int32();
+	int num_locators = read.read_int32();
 	m->tags.reserve(num_locators);
 	for (int i = 0; i < num_locators; i++) {
 		ModelTag tag;
@@ -343,14 +343,14 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	}
 
 
-	uint32_t num_indicies = read.read_int32();
+	int num_indicies = read.read_int32();
 	m->data.indicies.resize(num_indicies);
 	read.read_bytes_ptr(
 		m->data.indicies.data(), 
 		num_indicies * sizeof(uint16_t)
 	);
 
-	uint32_t num_verticies = read.read_int32();
+	int num_verticies = read.read_int32();
 	m->data.verts.resize(num_verticies);
 	read.read_bytes_ptr(
 		m->data.verts.data(), 
@@ -394,7 +394,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	DEBUG_MARKER = read.read_int32();
 	assert(DEBUG_MARKER == 'HELP');
 
-	uint32_t num_bones = read.read_int32();
+	int num_bones = read.read_int32();
 	if (num_bones > 0) {
 
 		m->skel = std::make_unique<MSkeleton>();
@@ -412,7 +412,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			m->skel->bone_dat.push_back(bd);
 		}
 
-		uint32_t num_anims = read.read_int32();
+		int num_anims = read.read_int32();
 		for (int i = 0; i < num_anims; i++) {
 
 			uint32_t DEBUG_MARKER = read.read_int32();
@@ -432,7 +432,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			aseq->pose_data.resize(packed_size);
 			read.read_bytes_ptr(aseq->pose_data.data(), packed_size * sizeof(float));
 
-			uint32_t num_events = read.read_int32();
+			int num_events = read.read_int32();
 			std::string buffer;
 			for (int j = 0; j < num_events; j++) {
 				read.read_string(buffer);
@@ -456,7 +456,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			m->skel->clips.insert({ std::move(name),rc });
 		}
 
-		uint32_t num_includes = read.read_int32();
+		int num_includes = read.read_int32();
 		for (int i = 0; i < num_includes; i++) {
 			std::string str;
 			read.read_string(str);
@@ -468,7 +468,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			read.read_bytes_ptr(m->skel->mirroring_table.data(), num_bones * sizeof(int16_t));
 		}
 
-		uint32_t num_masks = read.read_int32();
+		int num_masks = read.read_int32();
 		m->skel->masks.resize(num_masks);
 		for (int i = 0; i < num_masks; i++) {
 			read.read_string(m->skel->masks[i].strname);
