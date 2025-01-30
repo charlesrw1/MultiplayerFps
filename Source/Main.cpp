@@ -8,25 +8,31 @@
 #include <fstream>
 #include <sstream>
 
+#include "GameEngineLocal.h"
+#include "Level.h"
+#include "IEditorTool.h"
+#include "Types.h"
 
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-#include "Render/Texture.h"
 #include "Framework/MathLib.h"
+#include "Framework/Config.h"
+#include "Framework/ClassBase.h"
+#include "Framework/MeshBuilder.h"
+#include "Framework/Files.h"
 
-#include "Level.h"
-
-#include "GameEngineLocal.h"
-
-#include "Types.h"
+#include "Render/DrawPublic.h"
+#include "Render/Texture.h"
+#include "Render/MaterialPublic.h"
 
 #include "Game/Entities/Player.h"
-#include "Framework/Config.h"
-#include "Render/DrawPublic.h"
 #include "Game/Entity.h"
+#include "Game/LevelAssets.h"
+#include "Game/Components/CameraComponent.h"
+
 #include "Physics/Physics2.h"
 #include "Assets/AssetBrowser.h"
 #include "Sound/SoundPublic.h"
@@ -36,25 +42,19 @@
 #include "imgui_impl_sdl2.h"
 
 #include "UI/UILoader.h"
-#include "Framework/ClassBase.h"
-
-#include "Render/MaterialPublic.h"
-
-#include "UI/GUISystemPublic.h"
-
-#include "Game/WorldSettings.h"
-
-#include "AssetCompile/AnimationSeqLoader.h"
-
-#include "Input/InputSystem.h"
-#include "Framework/Files.h"
-#include "IEditorTool.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/OnScreenLogGui.h"
-#include "Game/LevelAssets.h"
-#include "Framework/MeshBuilder.h"
+#include "UI/GUISystemPublic.h"
 
-#include "Game/Components/CameraComponent.h"
+#include "AssetCompile/AnimationSeqLoader.h"
+#include "Assets/AssetDatabase.h"
+
+#include "Input/InputSystem.h"
+
+#include "Render/RenderObj.h"
+
+#include "LevelSerialization/SerializationAPI.h"
+
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -589,6 +589,20 @@ DECLARE_ENGINE_CMD(exec)
 
 	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
 }
+DECLARE_ENGINE_CMD(toggle)
+{
+	if (args.size() != 2) {
+		sys_print(Warning, "usage: toggle <boolean cvar>");
+		return;
+	}
+	auto var = VarMan::get()->find(args.at(1));
+	if (!var || !(var->get_var_flags() & CVAR_BOOL))
+	{
+		sys_print(Warning, "usage: toggle <boolean cvar>");
+		return;
+	}
+	var->set_bool(!var->get_bool());
+}
 
 DECLARE_ENGINE_CMD(net_stat)
 {
@@ -855,7 +869,6 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	on_map_load_return.invoke(true);
 }
 
-#include "Assets/AssetDatabase.h"
 void GameEngineLocal::execute_map_change()
 {
 	sys_print(Info, "-------- Map Change: %s --------\n", queued_mapname.c_str());
@@ -1702,6 +1715,8 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 
 void Debug_Console::draw()
 {
+	std::lock_guard<std::mutex> printLock(printMutex);
+
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
 	if (!ImGui::Begin("Console")) {
 		ImGui::End();

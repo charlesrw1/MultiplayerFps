@@ -72,8 +72,8 @@ struct FrameHighStruct
 		}
 	}
 };
-FrameHighStruct one_second;
-FrameHighStruct ten_second;
+static FrameHighStruct one_second;
+static FrameHighStruct ten_second;
 
 
 

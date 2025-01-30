@@ -5,6 +5,9 @@
 #include "Render/RenderObj.h"
 #include "Render/Model.h"
 #include "Game/Entity.h"
+#include "Game/AssetPtrMacro.h"
+#include "Framework/ReflectionMacros.h"
+
 CLASS_IMPL(BillboardComponent);
 
 BillboardComponent::BillboardComponent() {
@@ -66,4 +69,10 @@ void BillboardComponent::fill_out_render_obj(Render_Object& obj)
 	obj.shadow_caster = false;
 	obj.owner = this;
 	obj.outline = get_owner()->is_selected_in_editor();
+}
+const PropertyInfoList* BillboardComponent::get_props() {
+	START_PROPS(BillboardComponent)
+		REG_ASSET_PTR(texture, PROP_DEFAULT),
+		REG_BOOL(visible, PROP_DEFAULT, "1"),
+	END_PROPS(BillboardComponent)
 }

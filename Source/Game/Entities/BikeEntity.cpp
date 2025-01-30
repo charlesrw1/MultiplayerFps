@@ -7,6 +7,8 @@
 
 #include "Framework/MathLib.h"
 
+#include "GameEnginePublic.h"
+
 CLASS_IMPL(BikeEntity);
 
 BikeEntity::BikeEntity()

@@ -4,53 +4,13 @@
 #include "Framework/Util.h"
 #include "Game/Entity.h"
 #include "Assets/AssetDatabase.h"
-#include "LevelSerialization/SerializationAPI.h"
 #include "Level.h"
 #include "GameEnginePublic.h"
 
-CLASS_IMPL(SerializeEntityObjectContext);
-
-#if 0
-class SerializeObjectPtr : public IPropertySerializer
-{
-public:
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
-	{
-		assert(user);
-		auto ctx = user->cast_to<SerializeEntityObjectContext>();
-		assert(ctx);
-
-		void** ptr_prop = (void**)info.get_ptr(inst);
-
-		auto find = ctx->to_serialize_index.find(*ptr_prop);
-		if (find == ctx->to_serialize_index.end()) {
-			sys_print(Error, "Couldn't find ObjectPtr to serialize %s\n", info.name);
-			return std::string("0");
-		}
-		else {
-			return std::to_string(find->second);
-		}
-	}
-
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
-	{
-		// unserializing has no context, gets fixup at a later step
-		void** ptr_prop = (void**)info.get_ptr(inst);
-
-		auto stack = token.to_stack_string();
-		uint32_t res = 0;
-		int number = sscanf(stack.c_str(), "%d", &res);
-		if (number != 1) {
-			sys_print(Error, "Error on ObjectPtr unserialize\n");
-			res = 0;
-		}
-		uintptr_t* ptr_prop_as_int = (uintptr_t*)(*ptr_prop);
-		*ptr_prop_as_int = res;
-	}
-};
-#endif
-
+#include "LevelSerialization/SerializationAPI.h"
+#include "Framework/ReflectionProp.h"
+#include "Framework/AddClassToFactory.h"
+#include "Framework/StringUtil.h"
 
 class SerializeAssetPtr : public IPropertySerializer
 {

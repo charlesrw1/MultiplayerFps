@@ -1,17 +1,9 @@
 #pragma once
 
-#include "Framework/Handle.h"
-#include "Framework/FreeList.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/InlineVec.h"
-#include "Framework/StringName.h"
-#include "Framework/FreeList.h"
-// physics system
-#include "physx/foundation/PxTransform.h"
-#include "Framework/Util.h"
-#include "Framework/Config.h"
-
+#include <vector>
 
 namespace physx
 {
@@ -91,14 +83,6 @@ public:
 	std::vector<physics_shape_def> shapes;
 };
 
-struct PhysTransform
-{
-	PhysTransform(const physx::PxTransform& t);
-	PhysTransform() = default;
-	physx::PxTransform get_physx() const;
-	glm::vec3 position=glm::vec3(0.0);
-	glm::quat rotation=glm::quat(0,0,0,0);
-};
 
 class PhysicsComponentBase;
 struct world_query_result
@@ -115,7 +99,7 @@ struct world_query_result
 	float distance = 0.0;
 };
 
-class PhysicsComponentBase;
+
 using TraceIgnoreVec = InlineVec<PhysicsComponentBase*, 4>;
 
 class BinaryReader;

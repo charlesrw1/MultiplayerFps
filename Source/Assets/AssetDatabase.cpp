@@ -205,6 +205,7 @@ public:
 #ifdef _DEBUG
 		sys_print(Debug,"finalize job %s resource %s\n", job->thisAsset->get_type().classname, job->thisAsset->get_name().c_str());
 #endif
+		const bool is_reload = job->thisAsset && job->moveIntoThis;
 
 		if (!job->skipPostLoad) {
 			if (job->moveIntoThis) {
@@ -227,6 +228,15 @@ public:
 			(*job->loadJobCallback)(job->thisAsset);
 			delete job->loadJobCallback;
 		}
+
+#ifdef EDITOR_BUILD
+		// now for a sucky bit: if theres dependencies, they have to be reloaded sync otherwise stale pointers etc
+		if (is_reload) {
+			for (auto d : job->thisAsset->reload_dependents)
+				reload_asset_sync(d);
+		}
+#endif
+	
 
 		delete job;
 		job = nullptr;
@@ -418,19 +428,12 @@ public:
 #ifdef EDITOR_BUILD
 	void hot_reload_assets()
 	{
-		double time = GetTime();
-		int count = 0;
-		//static std::vector<IAsset*> checks;
-		//checks.clear();
+		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
+		for (auto& asset : allAssets)
 		{
-			std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
-			for (auto& asset : allAssets)
-			{
-				if (!asset.second->get_is_loaded())
-					continue;
-				reload_asset_async(asset.second, true, [](GenericAssetPtr) {});
-				//checks.push_back(asset.second);
-			}
+			if (!asset.second->get_is_loaded())
+				continue;
+			reload_asset_async(asset.second, true, [](GenericAssetPtr) {});
 		}
 	}
 #endif

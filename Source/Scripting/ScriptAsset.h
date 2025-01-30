@@ -18,5 +18,6 @@ public:
 		sys_print(Debug, "sweep");
 	}
 	virtual void move_construct(IAsset* src);
+
 	std::string script_str;
 };

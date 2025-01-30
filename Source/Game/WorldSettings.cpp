@@ -2,7 +2,7 @@
 #include "Game/Components/BillboardComponent.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/Texture.h"
-
+#include "GameEnginePublic.h"
 CLASS_IMPL(WorldSettings);
 WorldSettings::WorldSettings()
 {

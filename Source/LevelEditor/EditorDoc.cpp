@@ -38,11 +38,20 @@
 #include "Game/LevelAssets.h"
 
 #include "LevelEditor/Commands.h"
+#include "Framework/Rect2d.h"
+
+#include "Scripting/ScriptAsset.h"
+
+#include "Framework/AddClassToFactory.h"
+
+#include "Game/EntityComponent.h"
 
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
 ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
+ConfigVar editor_draw_name_text("editor_draw_name_text", "0", CVAR_BOOL, "draw text above every entities head in editor");
+ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR_INTEGER, "",0,255);
 
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
@@ -61,7 +70,12 @@ public:
 	void on_pressed(int x, int y, int button) override {
 		eng->get_gui()->set_focus_to_this(this);
 
-		mouse_down_delegate.invoke(x, y, button);
+
+
+		mouse_clicked = true;
+		button_clicked = button;
+		if(!editor_draw_name_text.get_bool())
+			mouse_down_delegate.invoke(x, y, button);
 	}
 	void on_released(int x, int y, int button) override {
 
@@ -79,6 +93,108 @@ public:
 	void on_dragging(int x, int y) override {
 		mouse_drag_delegate.invoke(x, y);
 	}
+	void paint(UIBuilder& builder) override {
+
+		int x, y;
+		SDL_GetMouseState(&x, &y);
+		bool do_mouse_click = mouse_clicked;
+		mouse_clicked = false;
+
+		if (ed_doc.selection_state->has_any_selected() && (ed_doc.manipulate->is_hovered() || ed_doc.manipulate->is_using()))
+			do_mouse_click = false;
+
+		if (!editor_draw_name_text.get_bool())
+			return;
+		if (!eng->get_level())
+			return;
+
+		struct obj {
+			glm::vec3 pos = glm::vec3(0.f);
+			Entity* e = nullptr;
+		};
+		std::vector<obj> objs;
+		auto& all_objs = eng->get_level()->get_all_objects();
+		for (auto o : all_objs) {
+			if (Entity* e = o->cast_to<Entity>()) {
+				obj ob;
+				ob.e = e;
+				glm::vec4 pos = ed_doc.vs_setup.viewproj * glm::vec4(e->get_ws_position(),1.0);
+				ob.pos = pos / pos.w;
+
+				objs.push_back(ob);
+			}
+		}
+		std::sort(objs.begin(), objs.end(), [](const obj& a, const obj& b)->bool
+			{
+				return a.pos.z < b.pos.z;
+			});
+		Entity* clicked = nullptr;
+		for (auto o : objs) {
+			const char* name = (o.e->editor_name.c_str());
+			if (!*name) {
+				if (o.e->is_root_of_prefab && o.e->what_prefab)
+					name = o.e->what_prefab->get_name().c_str();
+				else {
+					if (auto m = o.e->get_first_component<MeshComponent>()) {
+						if (m->get_model())
+							name = m->get_model()->get_name().c_str();
+					}
+				}
+			}
+			if (!*name) {
+				name = o.e->get_type().classname;
+			}
+
+			auto size = GuiHelpers::calc_text_size_no_wrap(name, g_fonts.get_default_font());
+			if (o.pos.z < 0)
+				continue;
+			
+			o.pos.y *= -1;
+			auto coordx = o.pos.x * 0.5 + 0.5;
+			auto coordy = o.pos.y * 0.5 + 0.5;
+			coordx *= this->ws_size.x;
+			coordy *= this->ws_size.y;
+			coordx += this->ws_position.x;
+			coordy += this->ws_position.y;
+			coordx -= size.x/2;
+			coordy -= size.y / 2;
+
+			Color32 color = { 50,50,50,(uint8_t)editor_draw_name_text_alpha.get_integer() };
+			if (o.e->is_selected_in_editor())
+				color = { 255,180,0,150 };
+
+			if (do_mouse_click) {
+				Rect2d r(coordx-3, coordy-3, size.x+6, size.y+6);
+				if (r.is_point_inside(x, y)) {
+
+					clicked = o.e;
+				}
+			}
+
+			builder.draw_solid_rect({ coordx - 3,coordy - 3 },  {size.x+6,size.y+ 6}, color);
+			builder.draw_text({ coordx,coordy }, {}, g_fonts.get_default_font(), name, COLOR_BLACK);
+			builder.draw_text({ coordx+1,coordy+1 }, size, g_fonts.get_default_font(), name, COLOR_WHITE);
+		}
+		if (clicked) {
+			if (ImGui::GetIO().KeyShift) {
+				ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, clicked, true);
+			}
+			else if (ImGui::GetIO().KeyCtrl) {
+				ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::UNSELECT, clicked, true);
+			}
+			else {
+				ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, clicked, true);
+			}
+		}
+		else {
+			if(do_mouse_click)
+				mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
+		}
+
+	}
+	bool mouse_clicked = false;
+	int button_clicked = 0;
+
 
 	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
 	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
@@ -807,7 +923,7 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	auto& ss = ed_doc.selection_state;
 	if (ss->has_any_selected()) {
 		for (auto ehandle : ss->get_selection()) {
-			EntityPtr<Entity> e = { ehandle };
+			EntityPtr e = { ehandle };
 			if(e.get())
 				world_space_of_selected[e.handle]=(e.get()->get_ws_transform());
 		}
@@ -949,7 +1065,7 @@ void ManipulateTransformTool::update()
 			for (auto elm : arr) {
 				ASSERT(world_space_of_selected.find(elm) != world_space_of_selected.end());
 				glm::mat4 ws = current_transform_of_group * glm::inverse(pivot_transform) * world_space_of_selected.find(elm)->second;
-				EntityPtr<Entity> e = { elm };
+				EntityPtr e = { elm };
 				ASSERT(e.get());
 				e.get()->set_ws_transform(ws);
 			}
@@ -994,7 +1110,7 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 
-			EntityPtr<Entity> parent_to;
+			EntityPtr parent_to;
 			if (is_editing_prefab()) {
 				auto root = get_prefab_root_entity();
 				if (root)
@@ -1049,7 +1165,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 
 	ImGui::PushID(n);
 	{
-		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr<Entity>{n->handle});
+		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr{n->handle});
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (n->handle != 0) {
@@ -1081,7 +1197,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 					std::vector<Entity*> ptrs;
 					bool had_errs = false;
 					for (auto& ehandle : ents) {
-						EntityPtr<Entity> ptr = { ehandle };
+						EntityPtr ptr = { ehandle };
 						if (ptr.get() == me) continue;
 
 						if (ed_doc.can_delete_or_move_this(ptr.get()))
@@ -1111,7 +1227,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 					std::vector<Entity*> ptrs;
 					bool had_errs = false;
 					for (auto& ehandle : ents) {
-						EntityPtr<Entity> ptr = { ehandle };
+						EntityPtr ptr = { ehandle };
 						if (ptr.get() == skip_this) continue;
 
 						if (ed_doc.can_delete_or_move_this(ptr.get()))
@@ -1131,7 +1247,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				}
 				if (ImGui::Button("Add entity")) {
 					auto me = eng->get_entity(contextMenuHandle);
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr<Entity>()));
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr()));
 					contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
@@ -1333,11 +1449,8 @@ void EdPropertyGrid::draw()
 
 			
 			auto& comps = ent->get_all_components();
-			if (comps.empty()) {
-				ImGui::Text("No components. Add one above.");
-			}
-			else {
-				if (selected_component == 0)
+			{
+				if (selected_component == 0 && comps.size() > 0)
 					selected_component = comps[0]->get_instance_id();
 
 				uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
@@ -1356,7 +1469,8 @@ void EdPropertyGrid::draw()
 					ImGui::SameLine();
 					ImGui::Text(ent->get_type().classname);
 
-					draw_components(ent);
+					if(comps.size() > 0)
+						draw_components(ent);
 
 					ImGui::EndTable();
 
@@ -1365,27 +1479,38 @@ void EdPropertyGrid::draw()
 						const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
 						if (payload) {
 
-							auto metadata_to_accept = AssetRegistrySystem::get().find_for_classtype(&EntityComponent::StaticType);
+							auto component_metadata = AssetRegistrySystem::get().find_for_classtype(&EntityComponent::StaticType);
+							auto script_metadata = AssetRegistrySystem::get().find_for_classtype(&Script::StaticType);
+							auto mesh_metadata = AssetRegistrySystem::get().find_for_classtype(&Model::StaticType);
+
 
 							AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 							bool actually_accept = false;
-							if (resource->type == metadata_to_accept) {
+							auto type = resource->type;
+							if (type==component_metadata||type==script_metadata||type==mesh_metadata) {
 								actually_accept = true;
 							}
 
 							if (actually_accept) {
 								if ((payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")))
 								{
-									auto comp_type = ClassBase::find_class(resource->filename.c_str());
-									if (comp_type && comp_type->is_a(EntityComponent::StaticType)) {
-										Entity* ent = ss->get_only_one_selected().get();
-										ASSERT(ent);
-										ed_doc.command_mgr->add_command(
-											new CreateComponentCommand(ent, comp_type)
-										);
+									Entity* ent = ss->get_only_one_selected().get();
+									ASSERT(ent);
+									if (type == component_metadata) {
+										auto comp_type = ClassBase::find_class(resource->filename.c_str());
+										if (comp_type && comp_type->is_a(EntityComponent::StaticType)) {
+											ed_doc.command_mgr->add_command(
+												new CreateComponentCommand(ent, comp_type)
+											);
+										}
 									}
-									else {
-										sys_print(Warning, "component drag drop error\n");
+									else if (type == script_metadata) {
+										ed_doc.command_mgr->add_command(
+											new CreateScriptComponentCommand(ent, GetAssets().find_sync<Script>(resource->filename).get()));
+									}
+									else if (type == mesh_metadata) {
+										ed_doc.command_mgr->add_command(
+											new CreateMeshComponentCommand(ent, GetAssets().find_sync<Model>(resource->filename).get()));
 									}
 								}
 							}
@@ -1521,7 +1646,7 @@ public:
 			{
 				if (ed_doc.get_active_eyedropper_user_id() == this) {
 					sys_print(Debug, "entityptr on eye dropper callback\n");
-					EntityPtr<Entity>* ptr_to_asset = (EntityPtr<Entity>*)prop->get_ptr(instance);
+					EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
 					*ptr_to_asset = e->get_self_ptr();
 				}
 			});
@@ -1531,7 +1656,7 @@ public:
 	}
 	virtual bool internal_update() {
 
-		EntityPtr<Entity>* ptr_to_asset = (EntityPtr<Entity>*)prop->get_ptr(instance);
+		EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
 
 		ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
 		auto eyedropper = GetAssets().find_sync<Texture>("icon/eyedrop.png");

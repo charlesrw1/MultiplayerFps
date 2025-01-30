@@ -157,40 +157,6 @@ public:
 
 
 
-class AgLispCodeEditorProperty : public IPropertyEditor
-{
-public:
-	using IPropertyEditor::IPropertyEditor;
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		ASSERT(prop->type == core_type_id::StdString);
-
-		auto script = (std::string*)prop->get_ptr(instance);
-
-		ImguiInputTextCallbackUserStruct user;
-		user.string = script;
-		if (ImGui::InputTextMultiline("##source",
-			(char*)script->data(),
-			script->size() + 1,
-			ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 4),
-			ImGuiInputTextFlags_CallbackResize,
-			imgui_input_text_callback_function,
-			&user)) {
-			script->resize(strlen(script->data()));
-
-			return true;
-		}
-		return false;
-	}
-
-	bool initial = true;
-	int index = 0;
-
-};
-
-
 class AgEnumFinder : public IPropertyEditor
 {
 public:
@@ -413,7 +379,6 @@ struct AutoStruct_asdf {
 
 		pfac.registerClass<BlendspaceGridEd>("BlendspaceGridEd");
 
-		pfac.registerClass<AgLispCodeEditorProperty>("AG_LISP_CODE");
 		pfac.registerClass<AgEnumFinder>("AG_ENUM_TYPE_FINDER");
 
 		pfac.registerClass<AgEdtior_BlendSpaceParameteriation>("AG_EDITOR_BLEND_SPACE_PARAMETERIZATION");

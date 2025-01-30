@@ -17,6 +17,8 @@
 #include "Game/LevelAssets.h"
 #include "Animation/Runtime/Animation.h"
 #include "AssetCompile/AnimationSeqLoader.h"
+#include "Game/AssetPtrMacro.h"
+#include "Game/EntityPtrArrayMacro.h"
 
 CLASS_H(TopDownSpawnPoint, EntityComponent)
 public:
@@ -698,10 +700,10 @@ public:
 			sys_print(Error, "PlayerTriggerComponent needs physics component\n");
 		}
 	}
-	std::vector<EntityPtr<Entity>> objects_to_active;
+	std::vector<EntityPtr> objects_to_active;
 
 	static const PropertyInfoList* get_props() {
-		MAKE_VECTORCALLBACK_ATOM(EntityPtr<Entity>, objects_to_active);
+		MAKE_VECTORCALLBACK_ATOM(EntityPtr, objects_to_active);
 		START_PROPS(PlayerTriggerComponent2)
 			REG_STDVECTOR(objects_to_active,PROP_DEFAULT)
 		END_PROPS(PlayerTriggerComponent2)

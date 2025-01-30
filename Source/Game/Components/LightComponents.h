@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Game/EntityComponent.h"
+#include "Game/SerializePtrHelpers.h"
 
 class Texture;
 struct Render_Light;

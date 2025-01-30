@@ -16,6 +16,8 @@
 #include "Animation/SkeletonData.h"
 
 #include "Game/SerializePtrHelpers.h"	// for AssetPtr
+#include "Game/AssetPtrMacro.h"
+
 #include "AssetCompile/AnimationSeqLoader.h"
 
 #include <type_traits>

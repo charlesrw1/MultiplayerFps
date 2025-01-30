@@ -120,8 +120,6 @@ public:
 	
 	bool is_on_ground() const { return action != Action_State::Falling && action != Action_State::Jumped; }
 
-	Move_Command cmd;
-
 	glm::vec3 velocity{};
 
 	bool has_flag(PlayerFlags::Enum flag) const {

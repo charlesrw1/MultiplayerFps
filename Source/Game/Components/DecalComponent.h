@@ -1,6 +1,6 @@
 #pragma once
 #include "Game/EntityComponent.h"
-
+#include "Game/SerializePtrHelpers.h"
 class MaterialInstance;
 struct Render_Decal;
 CLASS_H(DecalComponent, EntityComponent)

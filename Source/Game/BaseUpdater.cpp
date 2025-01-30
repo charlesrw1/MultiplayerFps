@@ -1,6 +1,9 @@
 #include "BaseUpdater.h"
 #include "Level.h"
 #include "GameEnginePublic.h"
+#include "Scripting/FunctionReflection.h"
+#include "Framework/ReflectionMacros.h"
+
 CLASS_IMPL(BaseUpdater);
 
 void BaseUpdater::set_ticking(bool shouldTick)
@@ -55,4 +58,11 @@ void BaseUpdater::deactivate_internal()
 		shutdown_updater();
 	}
 	init_state = initialization_state::HAS_ID;
+}
+const PropertyInfoList* BaseUpdater::get_props()
+{
+	START_PROPS(BaseUpdater)
+		REG_FUNCTION_EXPLICIT_NAME(get_type_for_script,"get_type"),
+		REG_FUNCTION_EXPLICIT_NAME(is_type_for_script, "is_type"),
+	END_PROPS(BaseUpdater)
 }

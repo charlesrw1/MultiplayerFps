@@ -7,6 +7,7 @@ IEditorTool* g_mateditor = &g_mateditor_local;
 #include "Assets/AssetDatabase.h"
 #include <SDL2/SDL.h>
 #include "OsInput.h"
+#include "Framework/AddClassToFactory.h"
 
 class MaterialParamPropEditor : public IPropertyEditor
 {
@@ -33,12 +34,12 @@ public:
 			else if (param.type == MatParamType::Vector) {
 				pi.type = core_type_id::Int32;
 				internalEditor = std::unique_ptr<IPropertyEditor>(IPropertyEditor::get_factory().createObject("ColorUint"));	// definedin editordoc.cpp
-				internalEditor->post_construct_for_custom_type(&param, &pi);
+				internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
 			}
 			else if (param.type == MatParamType::Texture2D) {
 				pi = make_asset_ptr_property(paramDef.name.c_str(), pi.offset, PROP_DEFAULT, (AssetPtr<Texture>*)(0));
 				internalEditor = std::unique_ptr<IPropertyEditor>(IPropertyEditor::get_factory().createObject(pi.custom_type_str));
-				internalEditor->post_construct_for_custom_type(&param, &pi);
+				internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
 			}
 			has_init = true;
 		}

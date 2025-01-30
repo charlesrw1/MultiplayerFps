@@ -1,17 +1,11 @@
 #pragma once
-#pragma once
-#include "Framework/ClassBase.h"
 #include "Framework/MulticastDelegate.h"
-#include "Assets/IAsset.h"
-#include "Game/SerializePtrHelpers.h"
 #include <glm/glm.hpp>
 #include <SDL2/SDL.h>
-#include "MiscEditors/DataClass.h"
-#include "Framework/InlineVec.h"
 #include "InputShared.h"
-#include "Framework/ReflectionMacros.h"
-#include "Framework/ArrayReflection.h"
 #include <unordered_map>
+#include <memory>
+#include <vector>
 
 class InputModifier
 {

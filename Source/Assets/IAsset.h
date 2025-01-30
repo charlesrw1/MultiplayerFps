@@ -40,6 +40,10 @@ public:
 		load_failed = false;
 	}
 
+#ifdef EDITOR_BUILD
+	std::unordered_set<IAsset*> reload_dependents;	// when asset is reloaded, these will also get reloaded	
+#endif
+
 protected:
 
 private:

@@ -357,6 +357,8 @@ public:
 		while (parser.read_line(view)) {
 			if (view.is_empty())
 				continue;
+
+
 			if (view.str_start[0] == '#' || (view.str_len==1&&view.str_start[0]=='\r'))
 				continue;
 

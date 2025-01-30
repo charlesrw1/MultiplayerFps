@@ -5,6 +5,10 @@
 #include "Framework/Files.h"
 #include "Game/BaseUpdater.h"
 
+#include "LevelSerialization/SerializationAPI.h"
+
+#include "Framework/ReflectionProp.h"
+
 CLASS_IMPL(SceneAsset);
 CLASS_IMPL(PrefabAsset);
 
@@ -70,6 +74,9 @@ public:
 static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
 #endif
 
+SceneAsset::~SceneAsset() {
+}
+
 bool SceneAsset::load_asset(ClassBase*&)
 {
 	auto& path = get_name();
@@ -92,6 +99,8 @@ bool SceneAsset::load_asset(ClassBase*&)
 	return true;
 }
 
+PrefabAsset::~PrefabAsset() {
+}
 
 bool PrefabAsset::load_asset(ClassBase*&)
 {

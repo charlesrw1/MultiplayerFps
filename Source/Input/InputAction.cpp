@@ -1,5 +1,6 @@
 #include "InputSystem.h"
 #include "InputAction.h"
+#include "Framework/Util.h"
 
 InputAction* InputAction::register_action(const std::string& binding_group, const std::string& action_name, bool is_additive)
 {

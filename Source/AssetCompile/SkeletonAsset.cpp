@@ -2,7 +2,7 @@
 
 CLASS_IMPL(SkeletonMask);
 CLASS_IMPL(SkeletonMirror);
-CLASS_IMPL(SkeletonRagdoll);
+
 
 
 // SKELETON BIN FORMAT

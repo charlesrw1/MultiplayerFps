@@ -246,12 +246,10 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 		if (has_reset_button())
 		{
 			auto reset_img = GetAssets().find_global_sync<Texture>("icon/undo.png");
-			#pragma warning(disable : 4312)
-			if (ImGui::ImageButton(ImTextureID(reset_img->gl_id), ImVec2(14, 14))) {
+			if (ImGui::ImageButton(ImTextureID(uint64_t(reset_img->gl_id)), ImVec2(14, 14))) {
 				on_reset();
 				parentGrid->set_rows_had_changes();
 			}
-			#pragma warning(default : 4312)
 		}
 
 		ImGui::EndTable();
@@ -391,12 +389,12 @@ public:
 	}
 };
 
-static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance) {
+static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance, IGridRow* parent) {
 
 	IPropertyEditor* out = nullptr;
 	out = IPropertyEditor::get_factory().createObject(prop->custom_type_str);
 	if (out) {
-		out->post_construct_for_custom_type(instance, prop);
+		out->post_construct_for_custom_type(instance, prop,parent);
 		return out;
 	}
 
@@ -534,7 +532,7 @@ int ArrayRow::get_size()
 
 PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
-	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(prop,instance));
+	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(prop,instance, this));
 }
 
 void ArrayRow::hook_update_pre_tree_node()
@@ -716,8 +714,10 @@ bool ArrayRow::draw_row_controls()
  {
 	 ImGui::Dummy(ImVec2(ofs, 0));
 	 ImGui::SameLine();
-
-	 ImGui::Text(prop->name);
+	 if (name_override.empty())
+		 ImGui::Text(prop->name);
+	 else
+		 ImGui::Text(name_override.c_str());
 
  }
 

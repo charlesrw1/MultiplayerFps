@@ -21,6 +21,8 @@
 
 #include "Assets/AssetDatabase.h"
 
+#include "Game/Components/ParticleMgr.h"	// FIXME
+
 //#pragma optimize("", off)
 
 extern ConfigVar g_window_w;
@@ -2299,7 +2301,6 @@ void Renderer::deferred_decal_pass()
 	//glEnable(GL_DEPTH_TEST);
 }
 
-#include "Game/Components/ParticleComponent.h" // FIXME
 
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
 ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");

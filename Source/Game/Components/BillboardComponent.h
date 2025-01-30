@@ -1,6 +1,6 @@
 #pragma once
 #include "Game/EntityComponent.h"
-
+#include "Game/SerializePtrHelpers.h"
 class Texture;
 class MaterialInstance;
 struct Render_Object;
@@ -13,12 +13,7 @@ public:
 	void end() override;
 	void editor_on_change_property() override;
 	void on_changed_transform() override;
-	static const PropertyInfoList* get_props() {
-		START_PROPS(BillboardComponent)
-			REG_ASSET_PTR(texture, PROP_DEFAULT),
-			REG_BOOL(visible,PROP_DEFAULT,"1"),
-		END_PROPS(BillboardComponent)
-	}
+	static const PropertyInfoList* get_props();
 
 	void set_texture(const Texture* tex);
 

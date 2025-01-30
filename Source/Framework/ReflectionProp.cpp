@@ -285,7 +285,7 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 		}
 		else {
 			printf("!!!!!! NO SERIALIZER FOR STRUCT %s !!!!!!!!", prop.custom_type_str);
-			ASSERT(0);
+			//ASSERT(0);
 		}
 
 	}break;

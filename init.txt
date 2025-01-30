@@ -14,12 +14,12 @@ bind 5 "map car/testmap.tmap"
 drawconsole 1
 #ed_physics_shapes_depth_tested 0
 
-g_drawdebugmenu 1
-
 r.enable_vsync 1
 
-bind . "drawconsole 1"
-bind , "drawconsole 0"
+bind , "toggle g_drawdebugmenu"
+bind . "toggle drawconsole"
+
+bind T "toggle editor_draw_name_text"
 
 bind F1 "r.debug_mode 0"
 bind F2 "r.debug_mode 4"

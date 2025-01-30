@@ -3,6 +3,8 @@
 #include "Game/Entity.h"
 #include "Render/DrawPublic.h"
 #include "Render/RenderFog.h"
+#include "Framework/ReflectionMacros.h"
+#include "GameEnginePublic.h"
 
 CLASS_H(FogComponent, EntityComponent)
 public:

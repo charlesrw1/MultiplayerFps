@@ -1,14 +1,27 @@
 #include "Entity.h"
 
-#include "Framework/Factory.h"
 #include "Framework/ArrayReflection.h"
+#include "Framework/PropertyEd.h"
+#include "Render/Model.h"
+#include "Animation/SkeletonData.h"
 #include "glm/gtx/euler_angles.hpp"
 
 #include "Assets/AssetRegistry.h"
+
 #include "Level.h"
 #include "GameEnginePublic.h"
 
-#include "Framework/PropertyEd.h"
+#include "Scripting/FunctionReflection.h"
+
+#include "Game/EntityPtr.h"
+#include "Game/Components/MeshComponent.h"
+
+#include "Framework/ReflectionProp.h"
+#include "Framework/ReflectionMacros.h"
+#include "Framework/AddClassToFactory.h"
+
+#include "EntityPtrArrayMacro.h"
+#include "EntityPtrMacro.h"
 
 CLASS_IMPL(Entity);
 
@@ -54,8 +67,14 @@ public:
 REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 #endif
 
-PropertyInfo GetAtomValueWrapper<EntityPtr<Entity>>::get() {
-	return make_entity_ptr_property<Entity>("", 0, PROP_DEFAULT, nullptr);
+Entity* EntityPtr::get() const {
+	if (handle == 0) return nullptr;
+	auto e = eng->get_object(handle);
+	return e ? e->cast_to<Entity>() : nullptr;
+}
+
+PropertyInfo GetAtomValueWrapper<EntityPtr>::get() {
+	return make_entity_ptr_property("", 0, PROP_DEFAULT);
 }
 
 // database to map an integer to any type of object, for example models or entities, automatically resolved and editable in the editor
@@ -68,13 +87,23 @@ const PropertyInfoList* Entity::get_props() {
 		REG_VEC3(scale, PROP_DEFAULT),
 		REG_STDSTRING(editor_name, PROP_DEFAULT),	// edit+serialize
 		REG_STRUCT_CUSTOM_TYPE(parent_bone, PROP_DEFAULT, "EntityBoneParentString"),
-		REG_BOOL(start_disabled, PROP_DEFAULT,"0")
+		REG_BOOL(start_disabled, PROP_DEFAULT,"0"),
+
+		REG_FUNCTION_EXPLICIT_NAME(destroy_deferred, "destroy"),
+		REG_FUNCTION_EXPLICIT_NAME(get_first_component_typeinfo,"get_comp"),
+		REG_FUNCTION_EXPLICIT_NAME(get_entity_parent, "get_parent"),
+		//REG_FUNCTION_EXPLICIT_NAME(create_and_attach_component_type,"add_comp"),
+		REG_FUNCTION(set_active)
 	END_PROPS(Entity)
 }
 
 Entity::Entity()
 {
 
+}
+void Entity::destroy_deferred()
+{
+	eng->get_level()->queue_deferred_delete(this);
 }
 
 void Entity::set_active(bool make_active)
@@ -372,8 +401,7 @@ void Entity::set_ws_transform(const glm::mat4& transform)
 	}
 	post_change_transform_R( false /* cached_world_transform doesnt need updating, we already have it*/);
 }
-#include "Game/Components/MeshComponent.h"
-#include "Animation/SkeletonData.h"
+
 glm::mat4 Entity::get_parent_transform() const
 {
 	ASSERT(get_entity_parent());
@@ -572,3 +600,12 @@ class EntityTagSerialize : public IPropertySerializer
 	}
 };
 ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");
+
+EntityComponent* Entity::get_first_component_typeinfo(const ClassTypeInfo* ti) {
+	if (!ti)
+		return nullptr;
+	for (int i = 0; i < all_components.size(); i++)
+		if (all_components[i]->get_type().is_a(*ti))
+			return all_components[i];
+	return nullptr;
+}

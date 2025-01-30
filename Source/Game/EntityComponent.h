@@ -1,16 +1,11 @@
 #pragma once
-#include "Framework/ClassBase.h"
-#include "Framework/ReflectionProp.h"
-#include "Framework/ReflectionMacros.h"
+#include "Game/BaseUpdater.h"
+#include "Framework/StringName.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtx/quaternion.hpp"
 
-#include "Game/SerializePtrHelpers.h"
-
-#include "Framework/StringName.h"
-#include "Game/BaseUpdater.h"
-
+struct PropertyInfoList;
 class Entity;
 CLASS_H(EntityComponent, BaseUpdater)
 public:

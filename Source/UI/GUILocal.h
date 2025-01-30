@@ -9,6 +9,9 @@
 #include "Framework/FreeList.h"
 #include "Framework/Config.h"
 #include "Framework/Rect2d.h"
+
+#include "Assets/AssetDatabase.h"
+
 // Navigation, up down left right (both keyboard nad controller)
 
 // push down "go left"
@@ -184,17 +187,6 @@ public:
 	void remove_from_think_list(GUI* panel) override {
 		//think_list.remove(panel);
 	}
-
-	handle<World_GUI> register_world_gui(const World_GUI& wgui) override {
-		return { -1 };
-	}
-	void update_world_gui(handle<World_GUI> handle, const World_GUI& wgui) override {
-	
-	}
-	void remove_world_gui(handle<World_GUI>& handle) override {
-
-	}
-
 
 
 	// local interface

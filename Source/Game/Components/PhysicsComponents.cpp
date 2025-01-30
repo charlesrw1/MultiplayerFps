@@ -13,6 +13,13 @@
 #include "Level.h"
 #include "MeshComponent.h"
 #include "Animation/Runtime/Animation.h"
+#include "Scripting/FunctionReflection.h"
+
+#include <physx/foundation/PxTransform.h>
+
+#include "Framework/AddClassToFactory.h"
+#include "Game/AssetPtrMacro.h"
+#include "Game/EntityPtrMacro.h"
 
 CLASS_IMPL(PhysicsComponentBase);
 CLASS_IMPL(BoxComponent);
@@ -23,6 +30,21 @@ CLASS_IMPL(MeshColliderComponent);
 ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", CVAR_BOOL, "are physics shapes in the editor depth tested");
 
 using namespace physx;
+
+const PropertyInfoList* PhysicsComponentBase::get_props() {
+	START_PROPS(PhysicsComponentBase)
+		REG_ENUM(physics_layer, PROP_DEFAULT, "PL::Default", PL),
+		REG_BOOL(enabled, PROP_DEFAULT, "1"),
+		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
+		REG_BOOL(is_trigger, PROP_DEFAULT, "0"),
+		REG_BOOL(send_hit, PROP_DEFAULT, "0"),
+		REG_BOOL(send_overlap, PROP_DEFAULT, "0"),
+		REG_BOOL(is_static, PROP_DEFAULT, "1"),
+		REG_BOOL(interpolate_visuals, PROP_DEFAULT, "1"),
+		REG_FLOAT(density, PROP_DEFAULT, "2.0"),
+		REG_MULTICAST_DELEGATE(on_trigger_start),
+	END_PROPS(PhysicsComponentBase)
+};
 
 void PhysicsComponentBase::fetch_new_transform()
 {

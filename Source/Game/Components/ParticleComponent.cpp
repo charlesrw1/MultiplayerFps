@@ -1,6 +1,7 @@
 #include "ParticleComponent.h"
 #include "Render/RenderObj.h"
 #include "GameEnginePublic.h"
+#include "ParticleMgr.h"
 
 CLASS_IMPL(ParticleComponent);
 

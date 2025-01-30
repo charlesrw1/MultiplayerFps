@@ -87,28 +87,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Old\Client.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Old\Connection.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Old\EmulatedSocket.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\GameEngineLocal.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Level.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Old\Net.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Old\Server.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Old\Socket.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Types.h">
@@ -133,9 +115,6 @@
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\MyImguiLib.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ScriptValue.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\StringName.h">
@@ -348,9 +327,6 @@
     <ClInclude Include="Source\Game\SerializePtrHelpers.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Components\EntityComponentTypes.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\ReflectionProp.h">
       <Filter>Source\Framework\ReflectionSys</Filter>
     </ClInclude>
@@ -524,33 +500,18 @@
     <ClInclude Include="Source\Scripting\ScriptAsset.h" />
     <ClInclude Include="Source\Scripting\ScriptComponent.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
+    <ClInclude Include="Source\Game\EntityPtr.h" />
+    <ClInclude Include="Source\Game\AssetPtrArrayMacro.h" />
+    <ClInclude Include="Source\Game\EntityPtrArrayMacro.h" />
+    <ClInclude Include="Source\Game\EntityPtrMacro.h" />
+    <ClInclude Include="Source\Game\AssetPtrMacro.h" />
+    <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Old\Client.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Old\ClientMgr.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Old\Connection.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Level.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Main.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Old\Net.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Old\Server.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Old\ServerClMgr.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Old\Socket.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Config.cpp">

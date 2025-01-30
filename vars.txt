@@ -19,7 +19,4 @@ view.sens 0.005
 #the main entry point into the game
 g_entry_level "mainMenuMap.tmap"
 ed_default_sky_material "indoorHdriSky"
-
-#directories
-mount "EngineData/"
-mount "Data/"
+g_project_name DevEngine

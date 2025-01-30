@@ -1,7 +1,5 @@
 #pragma once
 #include "Framework/ClassBase.h"
-#include "Framework/ReflectionMacros.h"
-#include "Framework/ReflectionProp.h"
 #include "Framework/Util.h"
 
 // Inherited by Entity and Component
@@ -28,7 +26,7 @@ public:
 	void shutdown_updater();
 	void set_ticking(bool shouldTick);
 
-	static const PropertyInfoList* get_props() = delete;
+	static const PropertyInfoList* get_props();
 
 	// Editor Data >>>>
 	void set_editor_transient(bool transient) { editor_transient = true; }
@@ -61,6 +59,15 @@ public:
 		return init_state == initialization_state::CALLED_START;
 	}
 protected:
+	bool is_type_for_script(const ClassTypeInfo* t) {
+		if (!t) return false;
+		return get_type().is_a(*t);
+	}
+	const ClassTypeInfo* get_type_for_script() {
+		return &get_type();
+	}
+
+
 	void activate_internal_step1();
 	void activate_internal_step2();
 	void deactivate_internal();

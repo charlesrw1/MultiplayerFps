@@ -12,6 +12,9 @@
 #include "Framework/ObjectSerialization.h"
 #include "Framework/Files.h"
 #include "Framework/MeshBuilder.h"
+
+#include "Game/AssetPtrMacro.h"
+
 enum class ScalarFields
 {
 	Lifetime,

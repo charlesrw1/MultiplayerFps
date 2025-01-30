@@ -5,14 +5,13 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include "Framework/MathLib.h"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/Util.h"
-#include "Framework/BVH.h"
 #include "DrawTypedefs.h"
 #include "Framework/StringName.h"
 #include "Framework/InlineVec.h"
 #include "Assets/IAsset.h"
+#include "Framework/MathLib.h"
 
 // Hardcoded attribute locations for shaders
 const int POSITION_LOC  = 0;
@@ -45,23 +44,6 @@ using std::string;
 using std::vector;
 using std::unique_ptr;
 
-
-struct Physics_Triangle
-{
-	int indicies[3];
-	glm::vec3 face_normal;
-	float plane_offset = 0.f;
-	int surf_type = 0;
-};
-
-struct Physics_Mesh
-{
-	std::vector<glm::vec3> verticies;
-	std::vector<Physics_Triangle> tris;
-	BVH bvh;
-
-	void build();
-};
 
 class RawMeshData
 {

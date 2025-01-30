@@ -46,12 +46,12 @@ bool Script::load_asset(ClassBase*&)
 	}
 	script_str.resize(file->size(), ' ');
 	file->read((void*)script_str.data(), file->size());
-
+	
 	return true;
 }
 void Script::uninstall()
 {
-
+	script_str.clear();
 }
 void Script::move_construct(IAsset* src)
 {

@@ -7,13 +7,15 @@
 
 #include "Game/BaseUpdater.h"
 #include "LevelSerialization/SerializationAPI.h"
+#include "Scripting/ScriptComponent.h"
+#include "Game/EntityPtr.h"
 
 extern EditorDoc ed_doc;
 
 class CommandSerializeUtil
 {
 public:
-	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(std::vector<EntityPtr<Entity>> handles) {
+	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(std::vector<EntityPtr> handles) {
 		std::vector<Entity*> ents;
 		for (auto h : handles) {
 			ents.push_back(h.get());
@@ -32,8 +34,8 @@ public:
 		for (auto e : ents)
 			this->entities.push_back(e->get_self_ptr());
 		for (auto e : ents)
-			this->prev_parents.push_back(e->get_entity_parent() ? e->get_entity_parent()->get_self_ptr() : EntityPtr<Entity>());
-		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr<Entity>();
+			this->prev_parents.push_back(e->get_entity_parent() ? e->get_entity_parent()->get_self_ptr() : EntityPtr());
+		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr();
 	}
 	void execute() {
 
@@ -70,15 +72,15 @@ public:
 		return "Parent To";
 	}
 
-	std::vector<EntityPtr<Entity>> prev_parents;
-	std::vector<EntityPtr<Entity>> entities;
-	EntityPtr<Entity> parent_to;
+	std::vector<EntityPtr> prev_parents;
+	std::vector<EntityPtr> entities;
+	EntityPtr parent_to;
 };
 
 class CreatePrefabCommand : public Command
 {
 public:
-	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr<Entity> parent) {
+	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent) {
 		this->prefab_name = prefab_name;
 		this->transform = transform;
 		this->parent_to = parent;
@@ -110,8 +112,8 @@ public:
 	std::string to_string() override {
 		return "Create Prefab";
 	}
-	EntityPtr<Entity> parent_to;
-	EntityPtr<Entity> handle;
+	EntityPtr parent_to;
+	EntityPtr handle;
 	std::string prefab_name;
 	glm::mat4 transform;
 };
@@ -119,7 +121,7 @@ public:
 class CreateStaticMeshCommand : public Command
 {
 public:
-	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr<Entity> parent) {
+	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr parent) {
 
 		this->transform = transform;
 		this->modelname = modelname;
@@ -175,15 +177,15 @@ public:
 	std::string to_string() override {
 		return "Create StaticMesh";
 	}
-	EntityPtr<Entity> parent_to;
-	EntityPtr<Entity> handle;
+	EntityPtr parent_to;
+	EntityPtr handle;
 	glm::mat4 transform;
 	std::string modelname{};
 };
 class CreateCppClassCommand : public Command
 {
 public:
-	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr<Entity> parent) {
+	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent) {
 		auto find = cppclassname.rfind('/');
 		auto types = cppclassname.substr(find==std::string::npos ? 0 : find+1);
 		ti = ClassBase::find_class(types.c_str());
@@ -215,8 +217,8 @@ public:
 	}
 	const ClassTypeInfo* ti = nullptr;
 	glm::mat4 transform;
-	EntityPtr<Entity> handle;
-	EntityPtr<Entity> parent_to;
+	EntityPtr handle;
+	EntityPtr parent_to;
 };
 
 class InstantiatePrefabCommand : public Command
@@ -301,15 +303,15 @@ public:
 		uint64_t unique_file_id = 0;
 	};
 	std::vector<created_obj> created_objs;
-	EntityPtr<Entity> me;
+	EntityPtr me;
 	PrefabAsset* asset = nullptr;
-	EntityPtr<Entity> creator_source;
+	EntityPtr creator_source;
 };
 
 class DuplicateEntitiesCommand : public Command
 {
 public:
-	DuplicateEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
+	DuplicateEntitiesCommand(std::vector<EntityPtr> handles) {
 
 		scene = CommandSerializeUtil::serialize_entities_text(handles);
 	}
@@ -322,7 +324,7 @@ public:
 			auto e = duplicated.get_objects().find(ep.child_path);
 			ASSERT(e->second->is_a<Entity>());
 			if (e != duplicated.get_objects().end()) {
-				EntityPtr<Entity> parent = { ep.external_parent_handle };
+				EntityPtr parent = { ep.external_parent_handle };
 				if (parent.get()) {
 					auto ent = (Entity*)e->second;
 					ent->parent_to_entity(parent.get());
@@ -370,11 +372,11 @@ public:
 	}
 
 	std::unique_ptr<SerializedSceneFile> scene;
-	std::vector<EntityPtr<Entity>> handles;
+	std::vector<EntityPtr> handles;
 };
 
 
-void validate_remove_entities(std::vector<EntityPtr<Entity>>& input)
+void validate_remove_entities(std::vector<EntityPtr>& input)
 {
 	bool had_errors = false;
 	for (int i = 0; i < input.size(); i++)
@@ -413,7 +415,7 @@ void validate_remove_entities(std::vector<EntityPtr<Entity>>& input)
 class RemoveEntitiesCommand : public Command
 {
 public:
-	RemoveEntitiesCommand(std::vector<EntityPtr<Entity>> handles) {
+	RemoveEntitiesCommand(std::vector<EntityPtr> handles) {
 
 		scene = CommandSerializeUtil::serialize_entities_text(handles);
 
@@ -434,7 +436,7 @@ public:
 			auto e = restored.get_objects().find(ep.child_path);
 			ASSERT(e->second->is_a<Entity>());
 			if (e != restored.get_objects().end()) {
-				EntityPtr<Entity> parent = { ep.external_parent_handle };
+				EntityPtr parent = { ep.external_parent_handle };
 				if (parent.get()) {
 					auto ent = (Entity*)e->second;
 					ent->parent_to_entity(parent.get());
@@ -462,7 +464,7 @@ public:
 	}
 
 	std::unique_ptr<SerializedSceneFile> scene;
-	std::vector<EntityPtr<Entity>> handles;
+	std::vector<EntityPtr> handles;
 };
 
 class CreateComponentCommand : public Command
@@ -482,8 +484,11 @@ public:
 		}
 		auto ec = e->create_and_attach_component_type(info);
 		comp_handle = ec->get_instance_id();
+		post_create(ec);
 
 		ed_doc.on_component_created.invoke(ec);
+	}
+	virtual void post_create(EntityComponent* ec) {
 	}
 	void undo() {
 		ASSERT(comp_handle != 0);
@@ -498,10 +503,41 @@ public:
 	std::string to_string() override {
 		return "Create Component";
 	}
-	EntityPtr<Entity> ent;
+	EntityPtr ent;
 	uint64_t comp_handle = 0;
 	const ClassTypeInfo* info = nullptr;
 };
+class CreateScriptComponentCommand : public CreateComponentCommand
+{
+public:
+	CreateScriptComponentCommand(Entity* e, Script* s) 
+		: CreateComponentCommand(e,&ScriptComponent::StaticType) {
+		this->s = s;
+	}
+	void post_create(EntityComponent* ec)override {
+		auto sc = ec->cast_to<ScriptComponent>();
+		ASSERT(sc);
+		sc->script = s;
+	}
+
+	Script* s = nullptr;
+};
+class CreateMeshComponentCommand : public CreateComponentCommand
+{
+public:
+	CreateMeshComponentCommand(Entity* e, Model* s)
+		: CreateComponentCommand(e, &MeshComponent::StaticType) {
+		this->s = s;
+	}
+	void post_create(EntityComponent* ec)override {
+		auto sc = ec->cast_to<MeshComponent>();
+		ASSERT(sc);
+		sc->set_model(s);
+	}
+
+	Model* s = nullptr;
+};
+
 class RemoveComponentCommand  : public Command
 {
 public:
@@ -516,8 +552,8 @@ public:
 		ASSERT(obj->is_a<EntityComponent>());
 		auto ec = (EntityComponent*)obj;
 		auto id = ec->get_instance_id();
-		ec->destroy();
 		ed_doc.on_component_deleted.invoke(id);
+		ec->destroy();
 		comp_handle = 0;
 	}
 	void undo() {
@@ -533,7 +569,7 @@ public:
 	std::string to_string() override {
 		return "Remove Component";
 	}
-	EntityPtr<Entity> ent;
+	EntityPtr ent;
 	uint64_t comp_handle = 0;
 	const ClassTypeInfo* info = nullptr;
 };

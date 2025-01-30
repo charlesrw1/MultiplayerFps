@@ -28,6 +28,8 @@
 #include "Framework/MulticastDelegate.h"
 #include "EditorTool3d.h"
 
+#include "Game/AssetPtrMacro.h"
+
 struct GraphTab {
 	const editor_layer* layer = nullptr;
 	Base_EdNode* owner_node = nullptr;

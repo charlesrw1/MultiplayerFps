@@ -168,7 +168,7 @@ public:
 
 	bool is_drawing_to_window_viewport() const;
 
-	glm::ivec2 window_viewport_size = glm::ivec2(DEFAULT_WIDTH,DEFAULT_HEIGHT);
+	glm::ivec2 window_viewport_size = glm::ivec2(1200,800);
 
 	int argc = 0;
 	char** argv = nullptr;

@@ -1,16 +1,22 @@
 #pragma once
 
-#include "Assets/IAsset.h"
-#include "Framework/MulticastDelegate.h"
-#include "Game/SerializePtrHelpers.h"
 #include <glm/glm.hpp>
-#include "Render/MaterialPublic.h"
 #include <unordered_map>
+#include <memory>
+#include <vector>
+#include "Framework/ClassBase.h"
+#include "Framework/StringUtil.h"	// string view
+#include "Framework/Util.h"
 
+template<typename ...Args>
+class MulticastDelegate;
+
+class MaterialInstance;
 class GuiFont;
 class MeshBuilder;
 class GuiSystemLocal;
 struct UIBuilderImpl;
+class Texture;
 class UIBuilder
 {
 public:

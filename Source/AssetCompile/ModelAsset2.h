@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Game/SerializePtrHelpers.h"
 #include "Render/MaterialPublic.h"
 
 #include "SkeletonAsset.h"
@@ -12,6 +11,10 @@
 #include "Animation/Event.h"
 #include "AnimationSeqLoader.h"
 
+#include "Framework/ArrayReflection.h"
+#include "Game/SerializePtrHelpers.h"
+#include "Game/AssetPtrArrayMacro.h"
+#include "Game/AssetPtrMacro.h"
 
 template<>
 struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {

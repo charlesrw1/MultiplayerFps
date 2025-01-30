@@ -14,6 +14,10 @@
 #include "UI/Widgets/Visuals.h"
 
 #include "Game/Entity.h"
+#include "Framework/MulticastDelegate.h"
+
+#include "Assets/AssetDatabase.h"
+
 class GameTransitionUI
 {
 public:

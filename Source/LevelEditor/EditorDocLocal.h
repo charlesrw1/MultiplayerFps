@@ -32,6 +32,12 @@
 
 #include "Game/LevelAssets.h"
 
+#include "LevelSerialization/SerializationAPI.h"
+
+#include "Render/DrawPublic.h"
+
+#include "Game/EntityComponent.h"
+
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -128,6 +134,11 @@ private:
 	void draw_table_R(Node* n, int depth);
 
 	uint64_t contextMenuHandle = 0;
+
+	// filter:
+	// <string> - name
+	// has:<component>
+	// uses:<asset>
 
 	char nameFilter[256];
 };
@@ -228,14 +239,14 @@ public:
 		return num_entities_selected() == 1;
 	}
 
-	EntityPtr<Entity> get_only_one_selected() const {
+	EntityPtr get_only_one_selected() const {
 		ASSERT(has_only_one_selected());
 		return { *selected_entity_handles.begin() };
 	}
 
 	const std::unordered_set<uint64_t>& get_selection() const { return selected_entity_handles; }
-	std::vector<EntityPtr<Entity>> get_selection_as_vector() const {
-		std::vector<EntityPtr<Entity>> out;
+	std::vector<EntityPtr> get_selection_as_vector() const {
+		std::vector<EntityPtr> out;
 		for (auto e : selected_entity_handles) {
 			out.push_back({ e });
 			ASSERT(eng->get_object(e)->is_a<Entity>());
@@ -243,7 +254,7 @@ public:
 		return out;
 	}
 
-	void add_to_entity_selection(EntityPtr<Entity> ptr) {
+	void add_to_entity_selection(EntityPtr ptr) {
 		ASSERT(eng->get_object(ptr.handle) && eng->get_object(ptr.handle)->is_a<Entity>());
 
 
@@ -262,7 +273,7 @@ public:
 		return add_to_entity_selection(e->get_self_ptr());
 	}
 
-	void remove_from_selection(EntityPtr<Entity> ptr) {
+	void remove_from_selection(EntityPtr ptr) {
 
 		auto e = ptr.get();
 		if (e) {	// can be null
@@ -280,7 +291,7 @@ public:
 		auto presize = selected_entity_handles.size();
 		for (auto it = selected_entity_handles.begin(); it != selected_entity_handles.end();)
 		{
-			EntityPtr<Entity> ptr = { *it };
+			EntityPtr ptr = { *it };
 			auto ent = ptr.get();
 			if (ent==nullptr) {
 				it = selected_entity_handles.erase(it);
@@ -305,7 +316,7 @@ public:
 		
 		on_selection_changed.invoke();
 	}
-	void set_select_only_this(EntityPtr<Entity> ptr) {
+	void set_select_only_this(EntityPtr ptr) {
 		clear_all_selected();
 		add_to_entity_selection(ptr);
 	}
@@ -313,7 +324,7 @@ public:
 		set_select_only_this(e->get_self_ptr());
 	}
 
-	bool is_entity_selected(EntityPtr<Entity> ptr) const {
+	bool is_entity_selected(EntityPtr ptr) const {
 		return selected_entity_handles.find(ptr.handle) != selected_entity_handles.end();
 	}
 	bool is_entity_selected(Entity* e) const {
@@ -536,7 +547,7 @@ public:
 
 	MulticastDelegate<uint64_t> on_component_deleted;
 	MulticastDelegate<EntityComponent*> on_component_created;
-	MulticastDelegate<EntityPtr<Entity>> on_entity_created;	// after creation
+	MulticastDelegate<EntityPtr> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
 
 	MulticastDelegate<Entity*> on_eyedropper_callback;

@@ -152,6 +152,7 @@ bool MaterialInstance::load_asset(ClassBase*&)
 		impl = std::make_unique<MaterialImpl>();
 		bool good = impl->load_from_file(this);
 		assert(!good || impl && impl->masterMaterial);
+		
 		if (!good)
 			impl.reset();
 		return good;
@@ -188,17 +189,30 @@ void MaterialInstance::post_load(ClassBase*)
 		assert(impl->masterMaterial);
 		impl->post_load(this);
 		impl->has_called_post_load_already = true;
+#ifdef EDITOR_BUILD
+		if (impl->masterMaterial->self != this)
+			impl->masterMaterial->self->reload_dependents.insert(this);
+#endif
 	}
 }
 void MaterialInstance::move_construct(IAsset* _other)
 {
 	auto other = (MaterialInstance*)_other;
 	//uninstall();	// fixme: unsafe for materials already referencing us
+#ifdef EDITOR_BUILD
+	other->impl->masterMaterial->self->reload_dependents.erase(other);
+	other->reload_dependents = std::move(this->reload_dependents);
+#endif
 	*this = std::move(*other);
 	this->impl->self = this;
 	assert(impl->masterMaterial);
 	if(impl->masterImpl)
 		this->impl->masterImpl->self = this;
+
+#ifdef EDITOR_BUILD
+	if(impl->masterMaterial->self!=this)
+		impl->masterMaterial->self->reload_dependents.insert(this);
+#endif
 }
 
 
@@ -251,7 +265,10 @@ MaterialInstance::MaterialInstance()
 }
 MaterialInstance::~MaterialInstance()
 {
-
+#ifdef EDITOR_BUILD
+	if(impl&&impl->masterMaterial)
+		impl->masterMaterial->self->reload_dependents.erase(this);
+#endif
 }
 
 bool MaterialImpl::load_instance(MaterialInstance* self, IFile* file)

@@ -58,13 +58,17 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\Game\AssetPtrArrayMacro.h" />
+    <ClInclude Include="Source\Game\AssetPtrMacro.h" />
+    <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
+    <ClInclude Include="Source\Game\EntityPtr.h" />
+    <ClInclude Include="Source\Game\EntityPtrArrayMacro.h" />
+    <ClInclude Include="Source\Game\EntityPtrMacro.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
     <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
-    <ClInclude Include="Source\Old\Client.h" />
-    <ClInclude Include="Source\Old\Connection.h" />
     <ClInclude Include="Source\DeferredSpawnScope.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
@@ -85,7 +89,6 @@
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\LevelEditor\Commands.h" />
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />
-    <ClInclude Include="Source\Old\EmulatedSocket.h" />
     <ClInclude Include="Source\External\cgltf.h" />
     <ClInclude Include="Source\External\glad\glad.h" />
     <ClInclude Include="Source\External\imconfig.h" />
@@ -138,7 +141,6 @@
     <ClInclude Include="Source\Framework\Rect2d.h" />
     <ClInclude Include="Source\Framework\ReflectionProp.h" />
     <ClInclude Include="Source\Framework\ReflectionMacros.h" />
-    <ClInclude Include="Source\Framework\ScriptValue.h" />
     <ClInclude Include="Source\Framework\ArrayReflection.h" />
     <ClInclude Include="Source\Framework\SerializerFunctions.h" />
     <ClInclude Include="Source\Framework\StringName.h" />
@@ -153,7 +155,6 @@
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
-    <ClInclude Include="Source\Game\Components\EntityComponentTypes.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
     <ClInclude Include="Source\Game\GameMain.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
@@ -172,7 +173,6 @@
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
-    <ClInclude Include="Source\Old\Net.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptAsset.h" />
     <ClInclude Include="Source\Scripting\ScriptComponent.h" />
@@ -208,8 +208,6 @@
     <ClInclude Include="Source\Render\TerrainInterfaceLocal.h" />
     <ClInclude Include="Source\Render\TerrainPublic.h" />
     <ClInclude Include="Source\Render\Texture.h" />
-    <ClInclude Include="Source\Old\Server.h" />
-    <ClInclude Include="Source\Old\Socket.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Types.h" />
@@ -248,9 +246,6 @@
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
-    <ClCompile Include="Source\Old\Client.cpp" />
-    <ClCompile Include="Source\Old\ClientMgr.cpp" />
-    <ClCompile Include="Source\Old\Connection.cpp" />
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
@@ -320,7 +315,6 @@
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
-    <ClCompile Include="Source\Old\Net.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
@@ -338,9 +332,6 @@
     <ClCompile Include="Source\Render\TerrainComponent.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
-    <ClCompile Include="Source\Old\Server.cpp" />
-    <ClCompile Include="Source\Old\ServerClMgr.cpp" />
-    <ClCompile Include="Source\Old\Socket.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Scripting\ScriptComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
@@ -375,6 +366,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -382,6 +374,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|Win32'">
     <PlatformToolset>v142</PlatformToolset>
@@ -389,6 +382,7 @@
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

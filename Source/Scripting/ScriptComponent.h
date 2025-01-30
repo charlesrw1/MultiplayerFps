@@ -1,5 +1,10 @@
 #pragma once
 #include "Game/EntityComponent.h"
+#include "Game/EntityPtr.h"
+
+#include "ScriptAsset.h"
+#include <memory>
+#include "Game/SerializePtrHelpers.h"
 
 struct lua_State;
 class Script;
@@ -25,13 +30,24 @@ public:
 	void start() override;
 	void update() override;
 	void end() override;
+	void editor_on_change_property() override;
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(ScriptComponent)
-			REG_ASSET_PTR(script,PROP_DEFAULT)
-		END_PROPS(ScriptComponent)
+	Entity* get_ref(int index) {
+		if (index >= 0 && index < refs.size())
+			return refs[index].get();
+		sys_print(Warning, "attempted out of bounds get_ref %d %s\n", index,script->get_name().c_str());
+		return nullptr;
+	}
+	int get_num_refs() {
+		return (int)refs.size();
 	}
 
-	lua_State* state = nullptr;
+	static const PropertyInfoList* get_props();
+
+	std::vector<EntityPtr> refs;
 	AssetPtr<Script> script;
+
+	lua_State* state = nullptr;
+private:
+	void init_vars_from_loading();
 };

@@ -30,9 +30,6 @@ public:
 	virtual void add_to_think_list(GUI* panel) = 0;
 	virtual void remove_from_think_list(GUI* panel) = 0;
 
-	virtual handle<World_GUI> register_world_gui(const World_GUI& wgui) = 0;
-	virtual void update_world_gui(handle<World_GUI> handle, const World_GUI& wgui) = 0;
-	virtual void remove_world_gui(handle<World_GUI>& handle) = 0;
 
 	virtual void set_viewport_ofs(int x, int y) = 0;
 	virtual void set_viewport_size(int x, int y) = 0;

@@ -10,6 +10,14 @@
 
 #include "Game/Entity.h"
 #include "Assets/AssetDatabase.h"
+
+#include "Framework/ReflectionMacros.h"
+#include "Framework/ReflectionProp.h"
+
+#include "GameEnginePublic.h"
+
+#include "Game/AssetPtrMacro.h"
+
 CLASS_IMPL(SpotLightComponent);
 CLASS_IMPL(PointLightComponent);
 CLASS_IMPL(SunLightComponent);

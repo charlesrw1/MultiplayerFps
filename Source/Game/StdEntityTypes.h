@@ -43,15 +43,3 @@ public:
 	}
 	static const PropertyInfoList* get_props() = delete;
 };
-
-
-
-// represents a prefabed level instance
-CLASS_H(PrefabEntity, Entity)
-public:
-};
-
-// multiple prefabs with some randomization options
-CLASS_H(PrefabSelection,Entity)
-public:
-};

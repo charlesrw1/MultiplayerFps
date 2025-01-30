@@ -1,10 +1,14 @@
 #pragma once
-#include "LevelSerialization/SerializationAPI.h"
+
 #include "Assets/IAsset.h"
 #include "Framework/Hashmap.h"
+#include <memory>
 
+class BaseUpdater;
+class UnserializedSceneFile;
 CLASS_H(SceneAsset, IAsset)
 public:
+	~SceneAsset();
 	// IAsset overrides
 	void sweep_references() const override {}
 	bool load_asset(ClassBase*& user) override;
@@ -19,6 +23,7 @@ public:
 
 CLASS_H(PrefabAsset, IAsset)
 public:
+	~PrefabAsset();
 	// IAsset overrides
 	void sweep_references() const override;
 	bool load_asset(ClassBase*& user) override;

@@ -8,6 +8,7 @@
 #include "Level.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/LevelAssets.h"
+#include "Framework/ReflectionProp.h"
 
 class UnserializationWrapper;
 Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, 
@@ -251,7 +252,7 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 		if (strcmp(prop.custom_type_str, "EntityPtr") == 0) {
 			// wtf!
 			Entity** e = (Entity**)prop.get_ptr(inst);
-			EntityPtr<Entity>* eptr = (EntityPtr<Entity>*)prop.get_ptr(inst);
+			EntityPtr* eptr = (EntityPtr*)prop.get_ptr(inst);
 			if (*e) {
 				*eptr = { (*e)->get_instance_id() };
 			}

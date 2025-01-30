@@ -39,31 +39,3 @@ DECLARE_ENGINE_CMD(spawn_npc)
 	//auto npc = eng->spawn_entity_class<NPC>();
 	//npc->position = pos;
 }
-
-#include "Sound/SoundPublic.h"
-#include "Render/Texture.h"
-#include "Render/MaterialPublic.h"
-CLASS_H(PhysicsMaterialDefinition, ClassBase)
-public:
-	float staticFriction = 0.1;
-	float dynamicFriction = 0.7;
-	float restitution = 0.8;
-
-	AssetPtr<SoundFile> footStepSound;
-	AssetPtr<SoundFile> bulletImpactSound;
-	std::vector<AssetPtr<MaterialInstance>> gunshotImpactDecals;
-	// particle effects too
-
-	static const PropertyInfoList* get_props() {
-		MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance >, gunshotImpactDecals);
-		START_PROPS(PhysicsMaterialDefinition)
-			REG_ASSET_PTR(footStepSound,PROP_DEFAULT),
-			REG_ASSET_PTR(bulletImpactSound,PROP_DEFAULT),
-			REG_STDVECTOR(gunshotImpactDecals, PROP_DEFAULT),
-			REG_FLOAT(staticFriction,PROP_DEFAULT, "0.1"),
-			REG_FLOAT(dynamicFriction,PROP_DEFAULT,"0.7"),
-			REG_FLOAT(restitution,PROP_DEFAULT,"0.8")
-		END_PROPS(PhysicsMaterialDefinition)
-	}
-};
-CLASS_IMPL(PhysicsMaterialDefinition);

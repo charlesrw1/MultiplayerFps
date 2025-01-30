@@ -2,7 +2,6 @@
 #define TEXTURE_H
 #include <string>
 #include <cstdint>
-#include <unordered_map>
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
 #include "Assets/IAsset.h"

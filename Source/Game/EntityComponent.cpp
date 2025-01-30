@@ -3,6 +3,8 @@
 #include "Entity.h"
 #include "Level.h"
 #include "Assets/AssetRegistry.h"
+#include "GameEnginePublic.h"
+
 CLASS_IMPL(EntityComponent);
 
 #ifdef EDITOR_BUILD

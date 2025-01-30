@@ -5,6 +5,8 @@
 #include "Render/DrawPublic.h"
 #include "Framework/MathLib.h"
 #include "Framework/Hashset.h"
+#include "Game/AssetPtrMacro.h"
+#include "Framework/ReflectionMacros.h"
 
 // todo: make this an asset instead
 
@@ -129,25 +131,4 @@ private:
 	Random r;
 
 	glm::vec3 last_pos = glm::vec3(0.f);
-};
-
-class ParticleMgr
-{
-public:
-	ParticleMgr() : all_components(4) {}
-
-	static ParticleMgr& get() {
-		static ParticleMgr inst;
-		return inst;
-	}
-
-	void draw(const View_Setup& setup);
-	void register_this(ParticleComponent* c) {
-		all_components.insert(c);
-	}
-	void unregister_this(ParticleComponent* c) {
-		all_components.remove(c);
-	}
-private:
-	hash_set<ParticleComponent> all_components;
 };

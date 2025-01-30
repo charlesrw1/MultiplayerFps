@@ -1,46 +1,13 @@
 #include "Level.h"
-#include "Render/Model.h"
-#include "cgltf.h"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/ext/matrix_transform.hpp"
-#include "glm/gtx/euler_angles.hpp"
-#include "Render/Texture.h"
-#include <array>
-#include "Physics/Physics2.h"
+
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
-
 #include "Assets/AssetDatabase.h"
 #include "Game/LevelAssets.h"
-
-void Physics_Mesh::build()
-{
-	std::vector<Bounds> bound_vec;
-	for (int i = 0; i < tris.size(); i++) {
-		Physics_Triangle& tri = tris[i];
-		glm::vec3 corners[3];
-		for (int i = 0; i < 3; i++)
-			corners[i] = verticies[tri.indicies[i]];
-		Bounds b(corners[0]);
-		b = bounds_union(b, corners[1]);
-		b = bounds_union(b, corners[2]);
-		b.bmin -= glm::vec3(0.01);
-		b.bmax += glm::vec3(0.01);
-
-		bound_vec.push_back(b);
-	}
-
-	float time_start = GetTime();
-	bvh = BVH::build(bound_vec, 1, BVH_SAH);
-	printf("Built bvh in %.2f seconds\n", (float)GetTime() - time_start);
-}
-
-
-
-#include "Framework/Files.h"
-#include "Framework/DictWriter.h"
-#include <fstream>
-
+#include "Game/Entity.h"
+#include "Game/EntityComponent.h"
+#include "Framework/Config.h"
+#include "LevelSerialization/SerializationAPI.h"
 
 
 Level::~Level()
@@ -156,7 +123,6 @@ void Level::destroy_component(EntityComponent* ec)
 
 extern ConfigVar g_default_gamemode;
 
-#include "Game/WorldSettings.h"
 
 Level::Level() : all_world_ents(4/*2^4*/), tick_list(4)
 {
@@ -181,7 +147,6 @@ void Level::remove_from_update_list(BaseUpdater* b) {
 			wantsToAddToUpdate[i] = nullptr;
 		}
 }
-#include "Framework/InlineVec.h"
 
 void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es, InlineVec<EntityComponent*, 16>& cs)
 {

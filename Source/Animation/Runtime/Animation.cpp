@@ -291,8 +291,6 @@ void AnimatorInstance::update(float dt)
 
 	Pose* poses = Pose_Pool::get().alloc(2);
 
-	script_value_t stack[64];
-
 	NodeRt_Ctx ctx(this);
 
 	GetPose_Ctx gp_ctx;

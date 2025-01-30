@@ -2,21 +2,17 @@
 #include <cassert>
 #include <unordered_map>
 
-#include "Framework/MemArena.h"
 #include "Framework/InlineVec.h"
 #include "Framework/StringUtil.h"
 #include "Framework/StringName.h"
-#include "Framework/ScriptValue.h"
 #include "Framework/ClassTypePtr.h"
 
 #include "Assets/IAsset.h"
+
 class DictParser;
 class DictWriter;
 class Model;
 class Node_CFG;
-
-
-// this is the thing loaded from disk once
 class Animation_Tree_Manager;
 struct PropertyInfoList;
 class NodeRt_Ctx;

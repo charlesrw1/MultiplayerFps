@@ -42,6 +42,7 @@
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Entity.h"
 
+#include "Framework/Config.h"
 #define WARN_ONCE(a,...) { \
 	static bool has_warned = false; \
 	if (!has_warned) { \
@@ -170,15 +171,7 @@ bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, 
 }
 
 
-PhysTransform::PhysTransform(const physx::PxTransform& t) :
-	position(physx_to_glm(t.p)), rotation(physx_to_glm(t.q)) {}
-
-
-
 using namespace physx;
-
-
-
 
 
 static vec3 randColor(uint32_t number) {

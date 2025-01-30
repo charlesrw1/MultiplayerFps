@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <unordered_map>
-#include <list>
 
 template<typename... Args>
 class MulticastDelegate

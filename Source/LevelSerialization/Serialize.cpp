@@ -8,6 +8,8 @@
 #include "Framework/DictWriter.h"
 #include "Level.h"
 #include "Game/LevelAssets.h"
+#include "GameEnginePublic.h"
+#include "Framework/ReflectionProp.h"
 
 // TODO prefabs
 // rules:

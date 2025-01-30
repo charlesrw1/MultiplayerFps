@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Game/EntityComponent.h"
-#include "Framework/ClassTypePtr.h"
+#include "Game/SerializePtrHelpers.h"
+
 class PhysicsFilterPresetBase;
 class Model;
 class AnimatorInstance;
@@ -31,7 +32,7 @@ public:
 	void set_animation_graph(Animation_Tree_CFG* tree);
 	const Animation_Tree_CFG* get_animation_tree() const;
 	AnimatorInstance* get_animator_instance() const {
-		return animator.get();
+		return animator;
 	}
 
 	bool get_is_visible() const {
@@ -75,6 +76,6 @@ private:
 	AssetPtr<Model> model;
 	std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 	AssetPtr<Animation_Tree_CFG> animator_tree;
-	std::unique_ptr<AnimatorInstance> animator;
+	AnimatorInstance* animator = nullptr;	// owning ptr
 	handle<Render_Object> draw_handle;
 };

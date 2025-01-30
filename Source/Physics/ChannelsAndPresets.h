@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Framework/ClassBase.h"
 #include "Framework/EnumDefReflection.h"
 
 // physics layers

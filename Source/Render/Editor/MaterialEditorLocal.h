@@ -21,6 +21,10 @@
 #include "GameEnginePublic.h"
 #include "Level.h"
 
+#include "Game/AssetPtrMacro.h"
+
+#include <string>
+
 extern ConfigVar ed_default_sky_material;
 
 class StaticMeshEntity;

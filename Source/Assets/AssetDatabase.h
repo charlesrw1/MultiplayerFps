@@ -1,8 +1,6 @@
 #pragma once
 #include "IAsset.h"
 
-#include "Framework/InlineVec.h"
-#include <vector>
 #include <functional>
 #include <string>
 #include "Game/SerializePtrHelpers.h"

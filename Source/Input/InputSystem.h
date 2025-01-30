@@ -1,7 +1,6 @@
 #pragma once
 #include "InputShared.h"
 #include "Framework/Handle.h"
-#include <array>
 #include "Framework/MulticastDelegate.h"
 #include <vector>
 #include <memory>

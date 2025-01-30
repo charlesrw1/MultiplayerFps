@@ -2,10 +2,9 @@
 
 #include "Game/EntityComponent.h"
 #include "Physics/ChannelsAndPresets.h"
-#include "Framework/ClassTypePtr.h"
-#include "Render/RenderObj.h"
+#include "Game/EntityPtr.h"
+#include "Framework/ReflectionMacros.h"
 #include "Framework/MulticastDelegate.h"
-#include "Game/Entity.h"	// fot EntityPtr, fixme
 
 class PhysicsActor;
 class MeshBuilder;
@@ -79,19 +78,7 @@ public:
 		return physxActor;
 	}
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(PhysicsComponentBase)
-			REG_ENUM(physics_layer, PROP_DEFAULT, "PL::Default", PL),
-			REG_BOOL(enabled, PROP_DEFAULT, "1"),
-			REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
-			REG_BOOL(is_trigger, PROP_DEFAULT, "0"),
-			REG_BOOL(send_hit,PROP_DEFAULT,"0"),
-			REG_BOOL(send_overlap,PROP_DEFAULT,"0"),
-			REG_BOOL(is_static,PROP_DEFAULT,"1"),
-			REG_BOOL(interpolate_visuals, PROP_DEFAULT, "1"),
-			REG_FLOAT(density,PROP_DEFAULT,"2.0")
-		END_PROPS(PhysicsComponentBase)
-	};
+	static const PropertyInfoList* get_props();
 
 	// event delegates
 	MulticastDelegate<PhysicsComponentBase*> on_trigger_start;
@@ -254,7 +241,7 @@ protected:
 
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 
-	EntityPtr<Entity> target;
+	EntityPtr target;
 private:
 
 	void refresh_joint();

@@ -1,7 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 #include "Framework/Util.h"
-#include "Framework/StringUtil.h"
 
 enum CVarFlags
 {

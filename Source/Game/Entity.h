@@ -1,70 +1,20 @@
 #pragma once
 
 #include <cstdint>
-#include "glm/glm.hpp"
-
-#include "Framework/AddClassToFactory.h"
-#include "Framework/StringName.h"
-#include "Framework/ClassBase.h"
-#include "Framework/ReflectionMacros.h"
-#include "Framework/ReflectionProp.h"
-
-#include "Game/EntityComponent.h"
-
 #include "Game/BaseUpdater.h"
-#include "GameEnginePublic.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/quaternion.hpp"
+#include "Framework/StringName.h"
+#include "EntityPtr.h"
+#include <vector>
+#include <string>
 
 class Model;
 class PhysicsActor;
 class Level;
-
-// A gobally unique identifier in the game level
-// every entity is assigned one, and its used to reference others
-template<typename T>
-class EntityPtr
-{
-public:
-	static_assert(std::is_base_of<Entity, T>::value, "EntityPtr must derive from Entity");
-
-	bool is_valid() const { return get() != nullptr; }
-	T* get() const {
-		if (handle == 0) return nullptr;
-		auto e = eng->get_object(handle);
-		return e ? e->cast_to<T>() : nullptr;
-	}
-	T& operator*() const {
-		return *get();
-	}
-	operator bool() const {
-		return is_valid();
-	}
-	T* operator->() const {
-		return get();
-	}
-	template<typename K>
-	bool operator==(const EntityPtr<K>& other) {
-		return handle == other.handle;
-	}
-	template<typename K>
-	bool operator!=(const EntityPtr<K>& other) {
-		return handle != other.handle;
-	}
-
-	uint64_t handle = 0;
-};
-template<>
-struct GetAtomValueWrapper<EntityPtr<Entity>> {
-	static PropertyInfo get();
-};
-
-template<typename T>
-inline PropertyInfo make_entity_ptr_property(const char* name, uint16_t offset, uint32_t flags, EntityPtr<T>* dummy) {
-	return make_struct_property(name, offset, flags, "EntityPtr", T::StaticType.classname);
-}
-#define REG_ENTITY_PTR(name, flags) make_entity_ptr_property(#name, offsetof(MyClassType,name),flags,&((MyClassType*)0)->name)
-
-
 class MeshComponent;
+class EntityComponent;
+struct PropertyInfoList;
 
 struct BoneParentStruct
 {
@@ -89,21 +39,12 @@ public:
 
 	template<typename T>
 	T* get_first_component() {
-		for (int i = 0; i < all_components.size(); i++)
-			if (all_components[i]->is_a<T>())
-				return (T*)all_components[i];
-		return nullptr;
+		return (T*)get_first_component_typeinfo(&T::StaticType);
 	}
+	EntityComponent* get_first_component_typeinfo(const ClassTypeInfo* ti);
 
 	Entity* get_entity_parent() const {
 		return parent;
-	}
-
-	template<typename T>
-	void get_all_components(std::vector<T*>& array) {
-		for (int i = 0; i < all_components.size(); i++)
-			if (all_components[i]->is_a<T>())
-				array.push_back(all_components[i]);
 	}
 	
 	// USE IN RUNTIME! use create_sub_component to setup object in the constructor
@@ -172,7 +113,7 @@ public:
 
 	const std::vector<Entity*>& get_all_children() const { return children; }
 
-	EntityPtr<Entity> get_self_ptr() const { return { get_instance_id() }; }
+	EntityPtr get_self_ptr() const { return { get_instance_id() }; }
 
 	static const PropertyInfoList* get_props();
 
@@ -235,6 +176,8 @@ public:
 		return is_top_level;
 	}
 	void set_is_top_level(bool b);
+
+	void destroy_deferred();
 private:
 	bool has_transform_parent() const {
 		return !get_is_top_level() && get_entity_parent() != nullptr;

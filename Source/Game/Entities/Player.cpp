@@ -39,6 +39,9 @@
 #include "CharacterController.h"
 
 #include "BikeEntity.h"
+#include "Game/AssetPtrArrayMacro.h"
+#include "Game/AssetPtrMacro.h"
+
 
 
 CLASS_IMPL(Player);
@@ -76,47 +79,38 @@ public:
 
 CLASS_IMPL(PlayerSpawnPoint);
 
-CLASS_H(ReferenceComponent, EntityComponent)
-public:
-	static const PropertyInfoList* get_props() {
-		START_PROPS(ReferenceComponent)
-			REG_ENTITY_PTR(my_reference, PROP_DEFAULT),
-		END_PROPS(ReferenceComponent)
-	};
 
-	EntityPtr<Entity> my_reference;
-};
-CLASS_IMPL(ReferenceComponent);
 
 
 //
 //	PLAYER MOVEMENT CODE
 //
 
-static float fall_speed_threshold = -0.05f;
-static float grnd_speed_threshold = 0.6f;
 
-static float ground_friction = 8.2;
-static float air_friction = 0.01;
-static float ground_accel = 6;
-static float ground_accel_crouch = 4;
-static float air_accel = 3;
-static float jumpimpulse = 5.f;
-static float max_ground_speed = 5.7;
-static float max_sprint_speed = 8.0;
-static float sprint_accel = 8;
-static float max_air_speed = 2;
+//static float fall_speed_threshold = -0.05f;
+//static float grnd_speed_threshold = 0.6f;
+//
+//static float ground_friction = 8.2;
+//static float air_friction = 0.01;
+//static float ground_accel = 6;
+//static float ground_accel_crouch = 4;
+//static float air_accel = 3;
+//static float jumpimpulse = 5.f;
+//static float max_ground_speed = 5.7;
+//static float max_sprint_speed = 8.0;
+//static float sprint_accel = 8;
+//static float max_air_speed = 2;
 
-void move_variables_menu()
-{
-	ImGui::SliderFloat("ground_friction", &ground_friction, 0, 20);
-	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
-	ImGui::SliderFloat("ground_accel", &ground_accel, 1, 10);
-	ImGui::SliderFloat("air_accel", &air_accel, 0, 10);
-	ImGui::SliderFloat("max_ground_speed", &max_ground_speed, 2, 20);
-	ImGui::SliderFloat("max_air_speed", &max_air_speed, 0, 10);
-	ImGui::SliderFloat("jumpimpulse", &jumpimpulse, 0, 20);
-}
+//void move_variables_menu()
+//{
+//	ImGui::SliderFloat("ground_friction", &ground_friction, 0, 20);
+//	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
+//	ImGui::SliderFloat("ground_accel", &ground_accel, 1, 10);
+//	ImGui::SliderFloat("air_accel", &air_accel, 0, 10);
+//	ImGui::SliderFloat("max_ground_speed", &max_ground_speed, 2, 20);
+//	ImGui::SliderFloat("max_air_speed", &max_air_speed, 0, 10);
+//	ImGui::SliderFloat("jumpimpulse", &jumpimpulse, 0, 20);
+//}
 
 using glm::vec3;
 using glm::vec2;
@@ -133,7 +127,7 @@ float lensquared_noy(vec3 v)
 
 
 
-static AddToDebugMenu addmovevars("move vars", move_variables_menu);
+//static AddToDebugMenu addmovevars("move vars", move_variables_menu);
 #include "Sound/SoundPublic.h"
 
 
@@ -265,19 +259,19 @@ static float modulo_lerp_(float start, float end, float mod, float t)
 
 void Player::find_a_spawn_point()
 {
-	InlineVec<PlayerSpawnPoint*, 16> points;
-	if (!eng->get_level()->find_all_entities_of_class(points))
-		sys_print(Error, "no spawn points");
-	else {
-		auto pos = points[0]->get_ws_position();
-
-		set_ws_position(pos);
-	}
+	//InlineVec<PlayerSpawnPoint*, 16> points;
+	//if (!eng->get_level()->find_all_entities_of_class(points))
+	//	sys_print(Error, "no spawn points");
+	//else {
+	//	auto pos = points[0]->get_ws_position();
+	//
+	//	set_ws_position(pos);
+	//}
 }
 
 glm::vec3 Player::calc_eye_position()
 {
-	float view_height = (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
+	float view_height = 0.0;// (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
 	return get_ws_position() + vec3(0, view_height, 0);
 }
 
@@ -651,7 +645,7 @@ void Player::on_jump_callback()
 	if(is_on_ground())
 		velocity.y += 5.0;
 	else if(wall_jump_cooldown<=0.0){
-		glm::vec2 stick = glm::vec2(cmd.forward_move, cmd.lateral_move);
+		glm::vec2 stick = {};// glm::vec2(cmd.forward_move, cmd.lateral_move);
 		if (glm::length(stick) > 0.7) {
 
 			vec3 look_front = AnglesToVector(view_angles.x, view_angles.y);
@@ -722,8 +716,8 @@ void Player::on_foot_update()
 		if (length > 1.0)
 			move /= length;
 
-		cmd.forward_move = move.y;
-		cmd.lateral_move = move.x;
+		//cmd.forward_move = move.y;
+		//cmd.lateral_move = move.x;
 		//printf("%f %f %f\n", move.x, move.y,length);
 
 	}
@@ -732,7 +726,7 @@ void Player::on_foot_update()
 
 	const bool is_sprinting = inputPtr->get("game/sprint")->get_value<bool>();
 
-	float friction_value = (is_on_ground()) ? ground_friction : air_friction;
+	float friction_value = 0.0;// (is_on_ground()) ? ground_friction : air_friction;
 	float speed = glm::length(velocity);
 
 	if (speed >= 0.0001) {
@@ -745,7 +739,7 @@ void Player::on_foot_update()
 		velocity.z *= factor;
 	}
 
-	vec2 inputvec = vec2(cmd.forward_move, cmd.lateral_move);
+	vec2 inputvec = {};// vec2(cmd.forward_move, cmd.lateral_move);
 	float inputlen = length(inputvec);
 	//if (inputlen > 0.00001)
 	//	inputvec = inputvec / inputlen;
@@ -758,15 +752,15 @@ void Player::on_foot_update()
 	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
 	const bool player_on_ground =  is_on_ground();
-	float acceleation_val = (player_on_ground) ? 
-		((is_sprinting) ? sprint_accel : ground_accel) :
-		air_accel;
-	acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
+	float acceleation_val = 0.5;// (player_on_ground) ?
+		//((is_sprinting) ? sprint_accel : ground_accel) :
+	//	air_accel;
+	//acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
 
 
-	float maxspeed_val = (player_on_ground) ? 
-		((is_sprinting) ? max_sprint_speed : max_ground_speed) :
-		max_air_speed;
+	float maxspeed_val = 1.0;// (player_on_ground) ?
+	//	((is_sprinting) ? max_sprint_speed : max_ground_speed) :
+	//	max_air_speed;
 
 	vec3 wishdir = (look_front * inputvec.x + look_side * inputvec.y);
 	wishdir = vec3(wishdir.x, 0.f, wishdir.z);

@@ -151,7 +151,6 @@ const State_Transition* Statemachine_Node_CFG::find_continue_transition_for_stat
 handle<State> Statemachine_Node_CFG::find_enter_state(Statemachine_Node_RT* rt, NodeRt_Ctx& ctx) const
 {
 	handle<State> firststate;
-	script_value_t stack[32];
 	for (int i = 0; i < entry_transitions.size(); i++) {
 		uint16_t index = entry_transitions[i];
 		const State_Transition& st = transitions[i];

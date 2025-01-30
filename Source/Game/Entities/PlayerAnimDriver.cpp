@@ -38,7 +38,7 @@ void CharacterGraphDriver::on_update(float dt) {
 	glm::vec2 relaccel = glm::vec2(dot(face_dir, grndaccel), dot(side, grndaccel));
 
 #endif
-	bool has_input = abs( player.cmd.forward_move ) > 0.01 || abs( player.cmd.lateral_move ) > 0.01;
+	bool has_input = false;// abs(player.cmd.forward_move) > 0.01 || abs(player.cmd.lateral_move) > 0.01;
 
 	ismoving = has_input;
 	injump = !player.is_on_ground();

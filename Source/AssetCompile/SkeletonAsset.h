@@ -4,6 +4,7 @@
 #include "Render/MaterialPublic.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ReflectionProp.h"
+#include "Framework/ArrayReflection.h"
 
 // Decided to make these plain DataClass objects instead of IAssets for simplicity
 CLASS_H(SkeletonMirror, ClassBase)
@@ -48,8 +49,4 @@ public:
 			REG_STDVECTOR(masks, PROP_DEFAULT)
 		END_PROPS(SkeletonMask)
 	}
-};
-CLASS_H(SkeletonRagdoll,IAsset)
-public:
-
 };

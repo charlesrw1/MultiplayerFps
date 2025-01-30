@@ -17,6 +17,7 @@
 #include <physx/characterkinematic/PxController.h>
 #include <physx/foundation/PxPhysicsVersion.h>
 #include <physx/common/PxTolerancesScale.h>
+#include <physx/foundation/PxTransform.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -51,10 +52,7 @@ inline physx::PxQuat glm_to_physx(const glm::quat& v) {
 	return physx::PxQuat(v.x, v.y, v.z,v.w);
 }
 
-inline physx::PxTransform PhysTransform::get_physx() const
-{
-	return physx::PxTransform(glm_to_physx(position), glm_to_physx(rotation));
-}
+
 #include <glm/gtc/type_ptr.hpp>
 inline PxTransform glm_to_physx(const glm::mat4& mI)
 {

@@ -12,9 +12,14 @@
 #include "Animation/SkeletonData.h"
 #include "Game/Components/MeshbuilderComponent.h"
 
+#include "Framework/ArrayReflection.h"
+
+#include "Game/AssetPtrMacro.h"
+#include "Game/AssetPtrArrayMacro.h"
+
+
+
 CLASS_IMPL(MeshComponent);
-
-
 
 
 MeshComponent::~MeshComponent()
@@ -132,7 +137,7 @@ void MeshComponent::update_handle()
 	obj.shadow_caster = cast_shadows;
 	obj.outline = get_owner()->is_selected_in_editor();
 	if (animator)
-		obj.animator = animator.get();
+		obj.animator = animator;
 	if (!eMaterialOverride.empty())
 		obj.mat_override = eMaterialOverride[0].get();
 	idraw->get_scene()->update_obj(draw_handle, obj);
@@ -146,22 +151,25 @@ void MeshComponent::update_animator_instance()
 		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
 
 			AnimatorInstance* c = animator_tree->allocate_animator_class();
-			animator.reset(c);	// deletes old animator if it exists
+			delete animator;
+			animator = c;
 
 			bool good = animator->initialize(modToUse, animator_tree.get(), get_owner());
 			if (!good) {
 				sys_print(Error, "couldnt initialize animator\n");
-				animator.reset(nullptr);	// free animator
+				delete animator;
+				animator = nullptr;
 				animator_tree = nullptr;	// free tree reference
 			}
 			else
 				should_set_ticking = true;	// start ticking the animator
 		}
 		else {
-			animator.reset(nullptr);	// clear it
+			delete animator;
+			animator = nullptr;
 		}
 	}
-	ASSERT(should_set_ticking == (animator.get()!=nullptr));
+	ASSERT(should_set_ticking == (animator!=nullptr));
 	set_ticking(should_set_ticking);
 }
 
@@ -201,7 +209,8 @@ void MeshComponent::end()
 {
 	get_owner()->set_cached_mesh_component(nullptr);
 	idraw->get_scene()->remove_obj(draw_handle);
-	animator.reset();
+	delete animator;
+	animator = nullptr;
 }
 
 const Model* MeshComponent::get_model() const { return model.get(); }

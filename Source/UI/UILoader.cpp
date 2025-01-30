@@ -1,4 +1,5 @@
 #include "UILoader.h"
+#include <cassert>
 #include "Assets/AssetDatabase.h"
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
@@ -6,7 +7,7 @@
 
 #include "Framework/BinaryReadWrite.h"
 #include "imgui.h"
-CLASS_IMPL(GUI);
+
 CLASS_IMPL(GuiFont);
 
 // global
@@ -39,6 +40,9 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 #include "Render/Texture.h"
 #define MAKE_FOUR(a,b,c,d) ( (uint32_t)a | ((uint32_t)b<< 8) | ((uint32_t)c << 16) | ((uint32_t)d<<24) )
 
+void GuiFont::sweep_references() const {
+	GetAssets().touch_asset((IAsset*)font_texture);
+}
 
 bool GuiFont::load_asset(ClassBase*& user)
 {
@@ -105,62 +109,4 @@ void GuiFontLoader::init()
 	defaultFont = GetAssets().find_global_sync<GuiFont>("eng/sengo24.fnt");
 	if (!defaultFont)
 		Fatalf("couldnt load default font");
-}
-glm::ivec2 GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)
-{
-	int x = 0;
-	while (*str) {
-		char c = *str;
-		auto find = font->character_to_glyph.find(c);
-		if (find == font->character_to_glyph.end()) {
-			x += 10;	// empty character
-		}
-		else
-			x += find->second.advance;
-
-		str++;
-	}
-	return { x, 24 };
-}
-glm::ivec2 GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int force_width )
-{
-	ASSERT(font);
-
-	if (force_width == -1)
-		return calc_text_size_no_wrap(str, font);
-
-	std::string currentLine;
-	std::string currentWord;
-
-	int x = 0;
-	int y = 0;
-	while (*(str++)) {
-		char c = *str;
-		if (c == ' ' || c == '\n') {
-			auto sz = calc_text_size_no_wrap((currentLine + currentWord).c_str(), font);
-			if (sz.x > force_width)
-			{
-				x = glm::max(sz.x, x);
-				y += font->ptSz;
-				currentLine = currentWord + " ";
-			}
-			else
-				currentLine += currentWord + " ";
-			currentWord.clear();
-			if (c == '\n') {
-				y += font->ptSz;
-				currentLine.clear();
-			}
-		}
-		else
-			currentWord += c;
-	}
-	if (!currentWord.empty()) {
-		currentLine += currentWord;
-
-		x = glm::max(calc_text_size_no_wrap(currentLine.c_str(), font).x, x);
-		y += font->ptSz;
-	}
-
-	return { x, y };
 }

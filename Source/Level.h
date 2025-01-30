@@ -1,33 +1,24 @@
 #pragma once
 
 #include <vector>
-#include <string>
-#include "Render/Model.h"
-#include "Framework/BVH.h"
-#include "Framework/Config.h"
-
-#include "Framework/DictParser.h"
-#include "Render/DrawPublic.h"
-
+#include <unordered_set>
 #include "Framework/Hashmap.h"
-
-#include "Framework/InlineVec.h"
-#include "Game/Entity.h"
-
 #include "Framework/Hashset.h"
 #include "Framework/ScopedBoolean.h"
+#include "Framework/InlineVec.h"
 #include "DeferredSpawnScope.h"
 
-#include "LevelSerialization/SerializationAPI.h"
 
 
-
-class PhysicsActor;
-class WorldSettings;
 class SceneAsset;
 class PrefabAsset;
 class Entity;
 class GameMode;
+class UnserializedSceneFile;
+class SerializedSceneFile;
+class BaseUpdater;
+struct ClassTypeInfo;
+class EntityComponent;
 class Level
 {
 public:
@@ -39,7 +30,6 @@ public:
 	~Level();
 
 	void create(SceneAsset* source, bool is_editor);
-
 
 	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids = nullptr); // was bool assign_new_ids=false
 
@@ -57,26 +47,6 @@ public:
 
 	void remove_from_update_list(BaseUpdater* b);
 
-	template<typename T, size_t COUNT>
-	bool find_all_entities_of_class(InlineVec<T*, COUNT>& out) {
-		static_assert(std::is_base_of<Entity, T>::value, "find_all_entities_of_class needs T=Entity subclass");
-		for (auto e : all_world_ents) {
-			if (e->is_a<T>())
-				out.push_back((T*)e);
-		}
-		return out.size() != 0;
-	}
-
-	template<typename T>
-	T* find_first_of() {
-		static_assert(std::is_base_of<Entity, T>::value, "find_first_of needs T=Entity subclass");
-		for (auto e : all_world_ents) {
-			if (e->is_a<T>())
-				return (T*)e;
-		}
-		return nullptr;
-	}
-
 	// destroy an entity, calls desroy_internal(), deletes, removes from list
 	void destroy_entity(Entity* e);
 	
@@ -89,7 +59,6 @@ public:
 	
 	template<typename T>
 	T* spawn_entity_class() {
-		static_assert(std::is_base_of<Entity, T>::value, "spawn_entity_class not derived from Entity");
 		Entity* e = spawn_entity_from_classtype(T::StaticType);
 		return (T*)e;
 	}

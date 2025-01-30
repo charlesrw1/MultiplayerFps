@@ -22,12 +22,12 @@ static float spring_constant = 4000.0;
 static float forward_force_mult = 600;
 static float brake_force_mult = 500;
 static float side_force_mult = 100;
-static float friction_coeff = 2.2f;
+static float friction_coeff = 2.3f;
 static float steer_mult = 0.04;
 static float wind_resist = 0.80;
 static float epsilon_friction = 0.005;
 static float max_spring = 0.8;
-static float visual_wheel_interp = 0.0002;
+static float visual_wheel_interp = 0.0003;
 
 void car_debug_menu()
 {

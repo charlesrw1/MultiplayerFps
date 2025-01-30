@@ -1,17 +1,12 @@
 #pragma once
 
-#include "Assets/IAsset.h"
-#include "Framework/MulticastDelegate.h"
+
 #include "Game/SerializePtrHelpers.h"
 #include <glm/glm.hpp>
-
-#include "Render/MaterialPublic.h"
-
 #include <unordered_map>
-#include "Assets/AssetDatabase.h"
 
 class GuiFont;
-
+class Texture;
 struct GuiFontGlyph
 {
 	uint16_t x{};
@@ -40,9 +35,7 @@ public:
 		GuiFont* other = (GuiFont*)_other;
 		*this = std::move(*other);
 	}
-	void sweep_references() const override {
-		GetAssets().touch_asset((IAsset*)font_texture);
-	}
+	void sweep_references() const override;
 };
 class GuiFontLoader
 {
@@ -54,85 +47,4 @@ public:
 	AssetPtr<GuiFont> defaultFont{};
 };
 extern GuiFontLoader g_fonts;
-#include "GUIPublic.h"
-
-#if 0
-class Texture;
-CLASS_H(ButtonGui, GUI)
-public:
-	MulticastDelegate<> on_pressed;
-	MulticastDelegate<> on_released;
-
-	AssetPtr<MaterialInstance> bg_unselected_mat;
-	Color32 bg_unselected_color{};
-
-	AssetPtr<MaterialInstance> bg_selected_mat;
-	Color32 bg_selected_color{};
-
-	AssetPtr<MaterialInstance> bg_hovered_mat;
-	Color32 bg_hovered_color{};
-	 
-	AssetPtr<GuiFont> font{};
-	Color32 fg_unselected_color{};
-	Color32 fg_selected_color{};
-	Color32 fg_hovered_color{};
-};
-
-
-CLASS_H(ImageGui, GUI)
-public:
-	AssetPtr<MaterialInstance> image;
-};
-
-CLASS_H(TextGui, GUI)
-public:
-	AssetPtr<GuiFont> font{};
-	Color32 color{};
-	bool drop_shadow = false;
-};
-
-CLASS_H(HboxGui, GUI)
-public:
-	float column_gap{};
-};
-CLASS_H(VboxGui, GUI)
-public:
-	float row_gap{};
-};
-CLASS_H(GridGui, GUI)
-public:
-	float row_gap{};
-	float column_gap{};
-};
-
-CLASS_H(ManiMenuGui, GUI)
-public:
-	ManiMenuGui() {
-
-		select_play = new ButtonGui();
-
-		select_play->on_pressed.add(this, &ManiMenuGui::on_set_play);
-	}
-
-	void on_set_play() {}
-
-
-	// Overriding works like this: 
-	// derivided class sets the pointer 
-	GUI* play_options = nullptr;
-	GUI* render_options = nullptr;
-
-	ButtonGui* select_play = nullptr;
-	ButtonGui* select_options = nullptr;
-	ButtonGui* exit = nullptr;
-};
-
-CLASS_H(PlayerHudGui,GUI)
-public:
-	TextGui* hud_message = nullptr;
-
-
-
-};
-#endif
 

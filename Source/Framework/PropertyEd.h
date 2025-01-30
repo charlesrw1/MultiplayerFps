@@ -22,6 +22,7 @@ struct ImguiInputTextCallbackUserStruct
 int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data);
 
 // draws an imgui tool to edit the property passed in
+class IGridRow;
 class IPropertyEditor
 {
 public:
@@ -30,7 +31,7 @@ public:
 	IPropertyEditor()  {}
 	virtual ~IPropertyEditor() {}
 
-	void post_construct_for_custom_type(void* instance, PropertyInfo* prop) {
+	void post_construct_for_custom_type(void* instance, PropertyInfo* prop, IGridRow* parent) {
 		this->instance = instance;
 		this->prop = prop;
 	}
@@ -45,6 +46,7 @@ public:
 
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
+
 };
 
 // optional: gets the string to use for an array header for a given index and what to draw when the item is closed
@@ -85,7 +87,7 @@ public:
 	virtual bool draw_children() {
 		return true;
 	}
-	virtual float get_indent_width() { return 18.0; }
+	virtual float get_indent_width() { return 18.f; }
 
 	void clear_children();
 

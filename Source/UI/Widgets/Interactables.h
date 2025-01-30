@@ -1,5 +1,7 @@
 #pragma once
 #include "UI/GUIPublic.h"
+#include "Framework/MulticastDelegate.h"
+
 CLASS_H(GUIButton, GUI)
 public:
 	void update_widget_size() override {

@@ -1,6 +1,6 @@
 #pragma once
 #include "Game/Entity.h"
-
+#include <memory>
 class CharacterController;
 CLASS_H(BikeEntity,Entity)
 public:
