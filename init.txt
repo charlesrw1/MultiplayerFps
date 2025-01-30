@@ -58,7 +58,7 @@ ui.debug_press 1
 #r.debug_specular 1
 
 developer_mode 1
-file_print_all_openfile_fails 1
+file_print_all_openfile_fails 0
 
 RUN_TESTS
 

@@ -71,6 +71,17 @@ public:
 };
 
 
+void Material_Shader_Table::recompile_for_material(const MasterMaterialImpl* mat)
+{
+	uint32_t id = mat->material_id;
+	for (auto pair : shader_key_to_program_handle) {
+		uint32_t this_id = pair.first & ((1ul << 27ul) - 1ul);
+		if (this_id == id) {
+			draw.get_prog_man().recompile(pair.second);
+		}
+	}
+}
+
 program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* mat, shader_key key)
 {
 	// FIXME: make this faster
@@ -137,14 +148,25 @@ const MasterMaterialImpl* MaterialInstance::get_master_material() const
 
 bool MaterialInstance::load_asset(ClassBase*&)
 {
-	impl = std::make_unique<MaterialImpl>();
-
-	bool good = impl->load_from_file(this, get_name());
-
-	return good;
+	if (!impl) {
+		impl = std::make_unique<MaterialImpl>();
+		bool good = impl->load_from_file(this);
+		assert(!good || impl && impl->masterMaterial);
+		if (!good)
+			impl.reset();
+		return good;
+	}
+	else {
+		// impl already exists, we have to sweep references
+		// since we cant be uninstalled, this fakes "loading" the resource again
+		sweep_references();
+	}
+	//assert(impl && impl->masterMaterial);
+	return impl.get();
 }
 void MaterialInstance::sweep_references()const {
-
+	if (!impl)
+		return;
 	GetAssets().touch_asset(impl->parentMatInstance.get_unsafe());
 	for (int i = 0; i < impl->params.size(); i++) {
 		auto& p = impl->params[i];
@@ -155,28 +177,38 @@ void MaterialInstance::sweep_references()const {
 }
 void MaterialInstance::uninstall()
 {
-	matman.free_material_instance(this);
-	impl.reset();
+	// materials cant be uninstalled
 }
 void MaterialInstance::post_load(ClassBase*)
 {
 	if (did_load_fail())
 		return;
-	assert(impl->masterMaterial);
-	impl->post_load(this);
+	assert(impl);
+	if (!impl->has_called_post_load_already) {
+		assert(impl->masterMaterial);
+		impl->post_load(this);
+		impl->has_called_post_load_already = true;
+	}
 }
 void MaterialInstance::move_construct(IAsset* _other)
 {
 	auto other = (MaterialInstance*)_other;
-	uninstall();	// fixme: unsafe for materials already referencing us
+	//uninstall();	// fixme: unsafe for materials already referencing us
 	*this = std::move(*other);
+	this->impl->self = this;
+	assert(impl->masterMaterial);
+	if(impl->masterImpl)
+		this->impl->masterImpl->self = this;
 }
 
 
 void MaterialImpl::post_load(MaterialInstance* self)
 {
+	ASSERT(!has_called_post_load_already);
+	ASSERT(this->self == self);
 	if (masterImpl) {
 		masterImpl->material_id = matman.get_next_master_id();
+		ASSERT(masterImpl->self == self);
 	}
 	unique_id = matman.get_next_instance_id();
 	matman.add_to_dirty_list(self);
@@ -186,6 +218,7 @@ void MaterialImpl::init_from(const MaterialInstance* parent)
 {
 	auto parent_master = parent->get_master_material();
 	parentMatInstance.ptr = (MaterialInstance*)parent;
+	
 
 	params.resize(parent_master->param_defs.size());
 	for (int i = 0; i < parent_master->param_defs.size(); i++)
@@ -305,8 +338,9 @@ bool MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
 	return true;
 }
 
-bool MaterialImpl::load_from_file(MaterialInstance* self, const std::string& fullpath)
+bool MaterialImpl::load_from_file(MaterialInstance* self)
 {
+	this->self = self;
 	const auto& name = self->get_name();
 	// try to find master file
 	try {
@@ -512,20 +546,19 @@ bool MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 
 	num_texture_bindings = tex_ofs;
 
+#ifdef EDITOR_BUILD
 	auto str = create_glsl_shader(vs_code, fs_code, inst_dats);
 	auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";
 	auto outfile = FileSys::open_write_game(out_glsl_path.c_str());
-
 	outfile->write(str.data(), str.size());
+#endif
 
 	return true;
 }
 
-
+#ifdef EDITOR_BUILD
 static const char* const SHADER_PATH = "Shaders\\";
 static const char* const INCLUDE_SPECIFIER = "#include";
-
-
 static bool read_and_add_recursive(std::string filepath, std::string& text)
 {
 	std::string path(SHADER_PATH);
@@ -713,6 +746,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 
 	return masterShader;
 }
+#endif
 
 void MaterialManagerLocal::on_reload_shader_invoke()
 {
@@ -750,6 +784,9 @@ void MaterialManagerLocal::pre_render_update()
 			continue;
 		mat->impl->dirty_buffer_index = -1;
 
+		if (mat->impl->masterImpl.get())
+			mat_table.recompile_for_material(mat->impl->masterImpl.get());
+
 		auto& gpu_buffer_offset = mat->impl->gpu_buffer_offset;
 		// allocate it if it doesnt exist
 		if (gpu_buffer_offset == MaterialImpl::INVALID_MAPPING) {
@@ -761,6 +798,7 @@ void MaterialManagerLocal::pre_render_update()
 		memset(data_to_upload, 0, MATERIAL_SIZE);
 
 		auto mm = mat->get_master_material();
+		ASSERT(mm);
 		auto& params = mat->impl->params;
 		ASSERT(mm->param_defs.size() == mat->impl->params.size());
 		for (int i = 0; i < params.size(); i++) {

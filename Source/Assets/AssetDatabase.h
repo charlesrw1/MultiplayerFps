@@ -117,6 +117,11 @@ public:
 		asset = nullptr;
 	}
 	void explicit_asset_free(IAsset*& asset);
+
+#ifdef EDITOR_BUILD
+	// checks for out of date assets and reloads them async
+	void hot_reload_assets();
+#endif
 private:
 	AssetDatabase();
 	~AssetDatabase();

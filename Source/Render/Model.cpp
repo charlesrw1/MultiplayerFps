@@ -496,6 +496,23 @@ void Model::post_load(ClassBase* u) {
 	}
 	mods.upload_model(this);
 }
+
+#ifdef EDITOR_BUILD
+#include "AssetCompile/ModelCompilierLocal.h"
+bool Model::check_import_files_for_out_of_data() const
+{
+	ModelDefData defdat;
+	std::string model_def = strip_extension(get_name().c_str());
+	model_def += ".mis";
+	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat);
+}
+#else
+bool Model::check_import_files_for_out_of_data() const {
+	return false;
+}
+
+#endif
+
 bool Model::load_asset(ClassBase*& u) {
 	const auto& path = get_name();
 

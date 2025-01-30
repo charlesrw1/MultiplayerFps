@@ -132,6 +132,7 @@ public:
 	void post_load(ClassBase* u) override;
 	bool load_asset(ClassBase*& u) override;
 	void move_construct(IAsset* src) override;
+	bool check_import_files_for_out_of_data() const override;
 
 
 	uint32_t get_uid() const { return uid; }

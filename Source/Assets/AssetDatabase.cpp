@@ -10,12 +10,14 @@
 
 #include "Framework/Hashset.h"
 #include "Framework/Hashmap.h"
+#include "Framework/Files.h"
 
 struct AsyncQueuedJob
 {
 	IAsset* what = nullptr;
 	uint32_t referenceMask = 0;
 	bool force_reload = false;
+	bool is_hot_reload = false;
 	std::function<void(GenericAssetPtr)>* loadJobCallback = nullptr;
 };
 
@@ -109,9 +111,27 @@ public:
 		std::lock_guard<std::mutex> finishedLock(finishedQueueMutex);
 		finishedAsyncJobs.push(job);
 	}
-	void load_shared(IAsset* asset, bool force_reload, uint32_t reference_mask, std::function<void(GenericAssetPtr)>* loadJobCallback)
+	void load_shared(IAsset* asset, bool force_reload, uint32_t reference_mask, bool is_hot_reload, std::function<void(GenericAssetPtr)>* loadJobCallback)
 	{
-		if (!asset->is_loaded || force_reload) { /* we can use loaded_internal here, this is the most recent variable and its only written/read under the work lock*/
+#ifdef EDITOR_BUILD
+		if (is_hot_reload) {
+			auto& path = asset->path;
+			auto f = FileSys::open_read_game(path);
+			if (!f) {
+				return;
+			}
+			auto timestamp = f->get_timestamp();
+			f->close();
+			bool should_reload = asset->asset_load_time < timestamp;
+			should_reload |= asset->check_import_files_for_out_of_data();
+
+			if (!should_reload) {
+				return;
+			}
+		}
+#endif
+
+		if (!asset->is_loaded || force_reload) { /*  can use loaded_internal here, this is the most recent variable and its only written/read under the work lock*/
 			ClassBase* userStruct = nullptr;
 			IAsset* copiedAsset = nullptr;
 			LoadJob* job = nullptr;
@@ -124,8 +144,14 @@ public:
 				copiedAsset->is_loaded = false;
 				copiedAsset->has_run_post_load = false;
 			}
-
 			auto asset_to_load = (force_reload) ? copiedAsset : asset;
+#ifdef EDITOR_BUILD
+			{
+				auto f = FileSys::open_read_game(asset_to_load->path);
+				if (f)
+					asset_to_load->asset_load_time = f->get_timestamp();
+			}
+#endif
 			asset_to_load->load_failed = !asset_to_load->load_asset(userStruct) /* not success */;
 			if (asset_to_load->load_failed) {
 				sys_print(Error, "failed to load %s asset %s\n", asset_to_load->get_type().classname, asset_to_load->path.c_str());
@@ -184,6 +210,9 @@ public:
 			if (job->moveIntoThis) {
 				job->moveIntoThis->move_construct(job->thisAsset);
 				job->moveIntoThis->load_failed = job->thisAsset->load_failed;
+#ifdef EDITOR_BUILD
+				job->moveIntoThis->asset_load_time = job->thisAsset->asset_load_time;
+#endif
 				delete job->thisAsset;
 				job->thisAsset = job->moveIntoThis;
 			}
@@ -209,7 +238,7 @@ public:
 	{
 		std::unique_lock<std::mutex> workLock(loadingJobMutex);
 		ACTIVE_THREAD_JOB = job;
-		load_shared(job->what, job->force_reload, job->referenceMask, job->loadJobCallback);
+		load_shared(job->what, job->force_reload, job->referenceMask,job->is_hot_reload, job->loadJobCallback);
 		ACTIVE_THREAD_JOB = nullptr;
 	}
 
@@ -248,14 +277,14 @@ public:
 		auto asset = find_existing_or_create(path, assetType);
 		auto job = ACTIVE_THREAD_JOB;
 		assert(job);
-		load_shared(asset, false, job->referenceMask, nullptr);
+		load_shared(asset, false, job->referenceMask,false, nullptr);
 		return asset;
 	}
 	void touch_asset_loader(const IAsset* asset)
 	{
 		auto job = ACTIVE_THREAD_JOB;
 		assert(job);
-		load_shared((IAsset*)asset /* const cast */, false, job->referenceMask, nullptr);
+		load_shared((IAsset*)asset /* const cast */, false, job->referenceMask,false, nullptr);
 	}
 
 	// reloads the asset right now
@@ -282,23 +311,24 @@ public:
 		tick_asyncs_blocking();
 	}
 
-	void start_async_job_internal(IAsset* asset, bool reload, uint32_t mask, std::function<void(GenericAssetPtr)>& func) {
+	void start_async_job_internal(IAsset* asset, bool reload,bool hot_reload, uint32_t mask, std::function<void(GenericAssetPtr)>& func) {
 		AsyncQueuedJob myJob;
 		myJob.what = asset;
 		myJob.force_reload = reload;
 		myJob.referenceMask = mask;
+		myJob.is_hot_reload = hot_reload;
 		myJob.loadJobCallback = new std::function<void(GenericAssetPtr)>(std::move(func));
 		queue_load_job(myJob);
 	}
 	void load_asset_async(const std::string& str, const ClassTypeInfo* type, uint32_t mask, std::function<void(GenericAssetPtr)>& func) {
 		auto asset = find_existing_or_create(str, type);
-		start_async_job_internal(asset, false, mask, func);
+		start_async_job_internal(asset, false, false,mask, func);
 	}
 
 	// queues asset reload, move data will be called on main thread later
-	void reload_asset_async(IAsset* asset, std::function<void(GenericAssetPtr)>& loadJobCallback)
+	void reload_asset_async(IAsset* asset, bool is_hot_reload, std::function<void(GenericAssetPtr)> loadJobCallback)
 	{
-		start_async_job_internal(asset, true, 0/* unused*/, loadJobCallback);
+		start_async_job_internal(asset, true, is_hot_reload, 0/* unused*/, loadJobCallback);
 	}
 
 	void unreference_this_mask(uint32_t mask)
@@ -313,9 +343,15 @@ public:
 	}
 	void uninstall_unreferenced_assets()
 	{
+		// wait till load jobs are finished to avoid crap
+		std::unique_lock<std::mutex> lock(queueMutex);
+		condition2.wait(lock, [&] { return pendingAsyncJobs.empty(); });
+
 		tick_asyncs_standard();	// clear the queue if anything is there
+
 		std::lock_guard<std::mutex> workLock(loadingJobMutex);
 		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
+
 		for (auto& asset : allAssets)
 		{
 			if (asset.second->reference_bitmask_threadsafe == 0 && asset.second->is_loaded) {
@@ -379,6 +415,26 @@ public:
 	
 	static void loaderThreadMain(int index, AssetDatabaseImpl* impl);
 
+#ifdef EDITOR_BUILD
+	void hot_reload_assets()
+	{
+		double time = GetTime();
+		int count = 0;
+		//static std::vector<IAsset*> checks;
+		//checks.clear();
+		{
+			std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
+			for (auto& asset : allAssets)
+			{
+				if (!asset.second->get_is_loaded())
+					continue;
+				reload_asset_async(asset.second, true, [](GenericAssetPtr) {});
+				//checks.push_back(asset.second);
+			}
+		}
+	}
+#endif
+
 private:
 	
 	void queue_load_job(AsyncQueuedJob j) {
@@ -389,6 +445,7 @@ private:
 		condition.notify_one();
 	}
 
+	std::condition_variable condition2;
 	std::condition_variable condition;
 	std::mutex assetHashmapMutex;	// guards accessing allAssets
 	std::unordered_map<IAsset*, LoadJob*> jobsInQueue;		// maps a path to an outstanding load job
@@ -407,10 +464,13 @@ void AssetDatabaseImpl::loaderThreadMain(int index, AssetDatabaseImpl* impl)
 			impl->pendingAsyncJobs.pop();
 		}
 #ifdef _DEBUG
-		printf("*** executing AsyncQueuedJob on loader thread %s\n", jobQueued.what->get_name().c_str());
+		//printf("*** executing AsyncQueuedJob on loader thread %s\n", jobQueued.what->get_name().c_str());
 #endif
 
 		impl->execute_job_shared(&jobQueued);
+		
+		impl->condition2.notify_one();
+
 	}
 }
 
@@ -419,6 +479,13 @@ AssetDatabase::AssetDatabase() {
 	impl = std::make_unique<AssetDatabaseImpl>();
 }
 AssetDatabase::~AssetDatabase() {}
+
+#ifdef EDITOR_BUILD
+void AssetDatabase::hot_reload_assets()
+{
+	impl->hot_reload_assets();
+}
+#endif
 
 void AssetDatabase::init() {
 	// init the loader thread
@@ -452,7 +519,7 @@ void AssetDatabase::reload_sync(IAsset* asset)
 }
 void AssetDatabase::reload_async(IAsset* asset, std::function<void(GenericAssetPtr)> callback)
 {
-	impl->reload_asset_async(asset,callback);
+	impl->reload_asset_async(asset,false,callback);
 }
 
 void AssetDatabase::install_system_asset(IAsset* assetPtr, const std::string& name)

@@ -290,7 +290,7 @@ public:
 	}
 	void update() override {
 		auto move_vec = move->get_value<glm::vec2>();
-		printf("%f %f\n", move_vec.x, move_vec.y);
+		//printf("%f %f\n", move_vec.x, move_vec.y);
 
 		float accel_val = accel->get_value<float>();
 		float deccel_val = brake->get_value<float>();

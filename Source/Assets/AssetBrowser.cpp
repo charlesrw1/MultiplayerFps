@@ -13,7 +13,6 @@ AssetBrowser global_asset_browser;
 
 void AssetBrowser::init()
 {
-	AssetRegistrySystem::get().reindex_all_assets();
 	asset_name_filter[0] = 0;
 }
 
@@ -122,7 +121,8 @@ static void draw_browser_tree_view(AssetBrowser* b)
 
 		
 		auto root = AssetRegistrySystem::get().get_root_files();
-		draw_browser_tree_view_R(b, 0, root);
+		if(root)
+			draw_browser_tree_view_R(b, 0, root);
 
 		ImGui::EndTable();
 	}

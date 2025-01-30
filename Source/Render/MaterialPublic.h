@@ -23,7 +23,7 @@ class MaterialImpl;
 CLASS_H(MaterialInstance, IAsset)
 public:
 	MaterialInstance();
-	~MaterialInstance() override;
+	virtual ~MaterialInstance() override;
 	MaterialInstance& operator=(MaterialInstance&& other) = default;
 
 	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
@@ -42,6 +42,7 @@ public:
 	bool load_asset(ClassBase*&);
 	void sweep_references() const;
 	void move_construct(IAsset* other);
+
 
 	std::unique_ptr<MaterialImpl> impl;
 protected:

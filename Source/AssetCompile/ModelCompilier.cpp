@@ -2620,22 +2620,14 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 
 static bool compile_everything = false;
 
-bool ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings)
+bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data)
 {
-	sys_print(Info, "----- Compiling Model from settings -----\n");
-	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
-	return ModelCompileHelper::compile_model(output, def_data);
-}
-bool ModelCompilier::compile(const char* game_path)
-{
-	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
-
 	auto file = FileSys::open_read_game(game_path);
 	if (!file) {
 		sys_print(Error, "coudln't open model def file %s\n", game_path);
 		return false;
 	}
-	uint64_t timestamp_of_def =  file->get_timestamp();
+	uint64_t timestamp_of_def = file->get_timestamp();
 	file.reset();	// close it
 
 	uint64_t timestamp_of_cmdl = 0;
@@ -2644,7 +2636,7 @@ bool ModelCompilier::compile(const char* game_path)
 	file = FileSys::open_read_game(compilied.c_str());
 
 
-	bool needs_compile = compile_everything;
+	bool needs_compile = false;
 	if (file) {
 		timestamp_of_cmdl = file->get_timestamp();
 		if (file->size() <= 8)
@@ -2658,27 +2650,29 @@ bool ModelCompilier::compile(const char* game_path)
 				needs_compile = true;
 			}
 			else if (version != MODEL_VERSION) {
-				sys_print(Info,".cmdl version out of data (found %d, current %d), recompiling\n", version, MODEL_VERSION);
+				sys_print(Info, ".cmdl version out of data (found %d, current %d), recompiling\n", version, MODEL_VERSION);
 				needs_compile = true;
 			}
 		}
 	}
 	file.reset();
 
+	if (needs_compile)
+		return true;
+
 	if (!needs_compile && timestamp_of_cmdl <= timestamp_of_def) {
 		sys_print(Info, "*** .def newer than .cmdl, recompiling\n");
-		needs_compile = true;
+		return true;
 	}
 
-	
-	ModelDefData def_data;
-	try {
+
+	//try {
 		def_data = ModelCompileHelper::parse_definition_file(game_path);
-	}
-	catch (std::runtime_error er) {
-		sys_print(Error, "error parsing compile file %s: %s\n", game_path, er.what());
-		return false;
-	}
+	//}
+	//catch (std::runtime_error er) {
+	//	sys_print(Error, "error parsing compile file %s: %s\n", game_path, er.what());
+	//	return false;
+	//}
 
 
 	// check dependencies
@@ -2710,7 +2704,7 @@ bool ModelCompilier::compile(const char* game_path)
 	if (!needs_compile)
 		needs_compile |= check_timestamp_file(timestamp_of_cmdl, def_data.model_source);
 	for (int i = 0; i < def_data.imports.size() && !needs_compile; i++) {
-		if(def_data.imports[i].type == AnimImportType_Load::File)
+		if (def_data.imports[i].type == AnimImportType_Load::File)
 			needs_compile |= check_timestamp_file(timestamp_of_cmdl, def_data.imports[i].name);
 		else if (def_data.imports[i].type == AnimImportType_Load::Folder)
 			needs_compile |= check_timestamp_folder(timestamp_of_cmdl, def_data.imports[i].name);
@@ -2718,11 +2712,24 @@ bool ModelCompilier::compile(const char* game_path)
 	if (!needs_compile_before_src && needs_compile)
 		sys_print(Info, "source files out of data, recompiling\n");
 
-	if (!needs_compile) {
-		sys_print(Info, "skipping compile\n");
-		return true;	// no need to compile
-	}
+	return needs_compile;
+}
 
-	return ModelCompileHelper::compile_model(game_path, def_data);
+bool ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings)
+{
+	sys_print(Info, "----- Compiling Model from settings -----\n");
+	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
+	return ModelCompileHelper::compile_model(output, def_data);
+}
+bool ModelCompilier::compile(const char* game_path)
+{
+	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
+
+	ModelDefData def;
+	bool needs_compile = does_model_need_compile(game_path,def);
+	if (!needs_compile)
+		return true;
+
+	return ModelCompileHelper::compile_model(game_path, def);
 }
 #endif

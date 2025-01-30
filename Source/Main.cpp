@@ -1388,6 +1388,9 @@ void GameEngineLocal::init()
 	// file system and asset init
 	FileSys::init();
 	GetAssets().init();
+#ifdef EDITOR_BUILD
+	AssetRegistrySystem::get().init();
+#endif
 
 	GetGInput().init();
 	register_input_actions_for_game();
@@ -1650,6 +1653,11 @@ void GameEngineLocal::loop()
 
 		// tick asyncs
 		GetAssets().tick_asyncs();
+
+#ifdef EDITOR_BUILD
+		// update hot reloading
+		AssetRegistrySystem::get().update();
+#endif
 
 		DebugShapeCtx::get().update(frame_time);
 

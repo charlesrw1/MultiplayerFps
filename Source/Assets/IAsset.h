@@ -67,6 +67,15 @@ private:
 	// delete temp
 	// asset->post_load(user)
 	virtual void move_construct(IAsset* src) = 0;
+
+	// for hot reloading:
+	// if asset has an import file (models/textures)
+	// then return "true" if the asset should be reloaded by inspection
+	// other assets are handled automatically
+
+	virtual bool check_import_files_for_out_of_data() const {
+		return false;
+	}
 	
 	// reference_bitmask is UNSAFE to access without having the active loader mutex
 	bool is_this_referenced_by_anything() const {
@@ -121,7 +130,12 @@ private:
 	bool has_run_post_load = false; // has post_load been run
 	bool is_from_disk = true;		// otherwise created at runtime
 
+#ifdef EDITOR_BUILD
+	uint64_t asset_load_time = 0;
+#endif
+
 	friend class AssetDatabaseImpl;
 	friend class LoadJob;
 	friend class AssetDatabase;
+	friend class AssetRegistrySystem;
 };

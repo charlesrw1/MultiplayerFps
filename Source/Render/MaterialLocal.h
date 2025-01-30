@@ -158,7 +158,12 @@ class MaterialImpl
 {
 public:
 	static const uint32_t INVALID_MAPPING = uint32_t(-1);
-	MaterialImpl(bool is_dynamic_mat=false)  {}
+	MaterialImpl(
+		bool is_dynamic_mat=false
+	)  {
+	
+	}
+	MaterialInstance* self = nullptr;
 
 	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
 
@@ -177,8 +182,10 @@ public:
 
 	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
 
+	bool has_called_post_load_already = false;
+
 	void init_from(const MaterialInstance* parent);
-	bool load_from_file(MaterialInstance* self, const std::string& fullpath);
+	bool load_from_file(MaterialInstance* self);
 
 	bool load_instance(MaterialInstance* self, IFile* file);
 	bool load_master(MaterialInstance* self, IFile* file);
@@ -205,6 +212,7 @@ struct shader_key
 		dither = 0;
 		debug = 0;
 	}
+
 	uint32_t material_id : 27;
 	uint32_t animated : 1;
 	uint32_t editor_id : 1;
@@ -226,6 +234,7 @@ public:
 
 	program_handle lookup(shader_key key);
 	void insert(shader_key key, program_handle handle);
+	void recompile_for_material(const MasterMaterialImpl* mat);
 
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
@@ -245,6 +254,7 @@ public:
 		MaterialInstance* dynamicMat = new MaterialInstance();
 
 		dynamicMat->impl = std::make_unique<MaterialImpl>();
+		dynamicMat->impl->self = dynamicMat;
 		dynamicMat->impl->init_from(material);
 		dynamicMat->impl->is_dynamic_material = true;
 		dynamicMat->impl->post_load(dynamicMat);	// add to dirty list, set material id

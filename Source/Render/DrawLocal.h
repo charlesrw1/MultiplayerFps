@@ -198,6 +198,13 @@ public:
 		Shader shader_obj;
 	};
 	std::vector<program_def> programs;
+
+	void recompile(program_handle handle) {
+		if (handle >= 0 && handle < programs.size())
+			recompile(programs[handle]);
+		else
+			sys_print(Warning, "recompile handle out of range\n");
+	}
 private:
 	void recompile(program_def& def);
 };

@@ -69,6 +69,7 @@ struct AssetFilesystemNode {
 	}
 };
 
+class HackedAsyncAssetRegReindex;
 class AssetRegistrySystem
 {
 public:
@@ -76,11 +77,12 @@ public:
 
 	void init();
 
+	void update();
+
 	void register_asset_type(AssetMetadata* metadata) {
 		metadata->self_index = all_assettypes.size();
 		all_assettypes.push_back(std::unique_ptr<AssetMetadata>(metadata));
 	}
-	void reindex_all_assets();
 
 	const std::vector<std::unique_ptr<AssetMetadata>>& get_types() { return all_assettypes; }
 
@@ -102,8 +104,11 @@ public:
 
 	const ClassTypeInfo* find_asset_type_for_ext(const std::string& ext);
 private:
+	void reindex_all_assets();
 	std::unique_ptr<AssetFilesystemNode> root;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;
+	double last_reindex_time = 0.f;
+	friend class HackedAsyncAssetRegReindex;
 };
 
 template<typename T>
