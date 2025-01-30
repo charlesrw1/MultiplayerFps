@@ -794,7 +794,7 @@ ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL,"draw a debug grid around th
 ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01,10);
 
 // defualt sky material to use for editors like materials/models/etc.
-ConfigVar ed_default_sky_material("ed_default_sky_material", "hdriSky.mm", CVAR_DEV, "default sky material used for editors");
+ConfigVar ed_default_sky_material("ed_default_sky_material", "eng/hdriSky.mm", CVAR_DEV, "default sky material used for editors");
 
 ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL, "draw the debug menu");
 
@@ -1785,7 +1785,7 @@ void Debug_Console::print(const char* fmt, ...)
 	lines.push_back(buf);
 }
 
-ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "editor_cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
+ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
 
 DECLARE_ENGINE_CMD(dump_imgui_ini)
 {

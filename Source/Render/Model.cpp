@@ -620,9 +620,9 @@ void ModelMan::init()
 
 	create_default_models();
 	auto& a = GetAssets();
-	LIGHT_CONE = a.find_global_sync<Model>("LIGHT_CONE.cmdl").get();
-	LIGHT_SPHERE = a.find_global_sync<Model>("LIGHT_SPHERE.cmdl").get();
-	LIGHT_DOME = a.find_global_sync<Model>("LIGHT_DOME.cmdl").get();
+	LIGHT_CONE = a.find_global_sync<Model>("eng/LIGHT_CONE.cmdl").get();
+	LIGHT_SPHERE = a.find_global_sync<Model>("eng/LIGHT_SPHERE.cmdl").get();
+	LIGHT_DOME = a.find_global_sync<Model>("eng/LIGHT_DOME.cmdl").get();
 
 	if (!LIGHT_CONE || !LIGHT_SPHERE || !LIGHT_DOME)
 		Fatalf("!!! ModelMan::init: couldn't load default LIGHT_x volumes (used for gbuffer lighting)\n");
@@ -630,10 +630,10 @@ void ModelMan::init()
 
 void ModelMan::create_default_models()
 {
-	error_model = GetAssets().find_global_sync<Model>("question.cmdl").get();
+	error_model = GetAssets().find_global_sync<Model>("eng/question.cmdl").get();
 	if (!error_model)
 		Fatalf("couldnt load error model (question.cmdl)\n");
-	defaultPlane = GetAssets().find_global_sync<Model>("plane.cmdl").get();
+	defaultPlane = GetAssets().find_global_sync<Model>("eng/plane.cmdl").get();
 	if (!defaultPlane)
 		Fatalf("couldnt load defaultPlane model\n");
 

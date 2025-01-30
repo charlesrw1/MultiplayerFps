@@ -763,15 +763,15 @@ void MaterialManagerLocal::init() {
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
-	fallback = GetAssets().find_global_sync<MaterialInstance>("fallback.mm").get();
+	fallback = GetAssets().find_global_sync<MaterialInstance>("eng/fallback.mm").get();
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
 
-	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("billboardDefault.mm").get();
+	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("eng/billboardDefault.mm").get();
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 
-	PPeditorSelectMat = GetAssets().find_global_sync<MaterialInstance>("defaultEditorSelect.mm").get();
+	PPeditorSelectMat = GetAssets().find_global_sync<MaterialInstance>("eng/defaultEditorSelect.mm").get();
 	if (!PPeditorSelectMat)
 		Fatalf("couldnt load the default editor select material\n");
 }

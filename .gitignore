@@ -3,7 +3,6 @@ Debug/
 Release/
 Data/
 x64/
-gamedat/
 
 *.ttf
 *.glb

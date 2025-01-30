@@ -11,8 +11,8 @@
 #include <direct.h>
 #include "Config.h"
 
-static ConfigVar g_project_base("g_project_base", "gamedat", CVAR_DEV, "what folder to search for assets in");
-static ConfigVar g_user_save_dir("g_user_save_dir", "user", CVAR_DEV, "what folder to save user config/settings to");
+static ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
+static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what folder to save user config/settings to");
 
 static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL, "prints an error log for all CreateFile errors");
 

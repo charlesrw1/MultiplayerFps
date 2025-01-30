@@ -134,7 +134,7 @@ static HackedAsyncAssetRegReindex* hackedAsset = nullptr;
 void AssetRegistrySystem::init()
 {
 	directoryChangeHandle = FindFirstChangeNotificationA(
-		"C:\\Users\\charl\\source\\repos\\CsRemake\\gamedat\\",		 // directory to watch 
+		".\\",		 // directory to watch 
 		TRUE,                         //  watch subtree 
 		FILE_NOTIFY_CHANGE_LAST_WRITE); 
 

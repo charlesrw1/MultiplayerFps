@@ -830,7 +830,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 	for (int i = 0; i < is->myMaterials.size(); i++) {
 		auto mat = is->myMaterials.at(i).get_unsafe();
 
-		mdd.directMaterialSet.push_back((mat)?mat->get_name() : "fallback.mm");
+		mdd.directMaterialSet.push_back((mat)?mat->get_name() : "eng/fallback.mm");
 	}
 	mdd.keepbones = is->keepBones;
 	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {

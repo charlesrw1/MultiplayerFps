@@ -98,7 +98,7 @@ public:
 		assert(!dynamicMat);
 		assert(!outputEntity);
 
-		auto skydomeModel = GetAssets().find_sync<Model>("skydome.cmdl");
+		auto skydomeModel = GetAssets().find_sync<Model>("eng/skydome.cmdl");
 		auto skyMat = GetAssets().find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
 		model.ptr = skydomeModel.get();
 

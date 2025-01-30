@@ -2238,7 +2238,7 @@ void Renderer::deferred_decal_pass()
 	//*glCullFace(GL_BACK);	// cull the back face, keep front face
 	//*glDisable(GL_DEPTH_TEST);	// keep depth tests
 
-	static Model* cube = find_global_asset_s<Model>("cube.cmdl");	// cube model
+	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
 	// Copied code from execute_render_lists
 	auto& part = cube->get_part(0);
 	const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;

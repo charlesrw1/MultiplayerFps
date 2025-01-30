@@ -88,7 +88,7 @@ bool GuiFont::load_asset(ClassBase*& user)
 
 		character_to_glyph.insert({ id,glyph });
 	}
-	font_texture = GetAssets().find_assetptr_unsafe<Texture>("sengo24_0.png");
+	font_texture = GetAssets().find_assetptr_unsafe<Texture>("eng/sengo24_0.png");
 	return true;
 }
 
@@ -102,7 +102,7 @@ DECLARE_ENGINE_CMD(FONT_TEST)
 }
 void GuiFontLoader::init()
 {
-	defaultFont = GetAssets().find_global_sync<GuiFont>("sengo24.fnt");
+	defaultFont = GetAssets().find_global_sync<GuiFont>("eng/sengo24.fnt");
 	if (!defaultFont)
 		Fatalf("couldnt load default font");
 }

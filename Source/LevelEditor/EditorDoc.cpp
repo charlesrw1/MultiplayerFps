@@ -42,7 +42,7 @@
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
-ConfigVar g_editor_newmap_template("g_editor_newmap_template", "template_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
+ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
 
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
