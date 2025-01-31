@@ -30,6 +30,7 @@ enum class core_type_id : uint8_t
 	List,
 
 	Function,	// not really a property... represents a callable function by script (call_function)
+	GetterFunc,	// a function but it can be called like a variable access, must be const and have no parameters
 	MulticastDelegate,
 };
 

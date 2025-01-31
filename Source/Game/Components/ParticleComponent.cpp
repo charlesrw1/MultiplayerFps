@@ -20,11 +20,13 @@ void ParticleComponent::start()
 	is_playing = true;
 	start_time = eng->get_game_time();
 	last_pos = get_ws_position();
+	active_particles.clear();
 }
 void ParticleComponent::end()
 {
 	idraw->get_scene()->remove_particle_obj(obj);
 	ParticleMgr::get().unregister_this(this);
+	active_particles.clear();
 }
 static bool is_between(float x, float y, float value)
 {

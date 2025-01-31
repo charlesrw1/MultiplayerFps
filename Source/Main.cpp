@@ -890,12 +890,10 @@ void GameEngineLocal::execute_map_change()
 
 		// not memory leak, gets cleaned up
 		SceneAsset* temp = new SceneAsset;
-		GetAssets().install_system_asset(temp, "empty.txt");
-		
+		GetAssets().install_system_asset(temp, "empty.tmap");
 		on_map_change_callback(true /* == this_is_for_editor */, temp);
 	}
 	else {
-
 		GetAssets().find_async<SceneAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
 			{
 				auto level = (ptr)?ptr.cast_to<SceneAsset>():nullptr;
@@ -903,7 +901,7 @@ void GameEngineLocal::execute_map_change()
 
 			}, 0 /* default lifetime channel 0*/);
 
-		// goto idle while we wait for loading to finish
+		// goto idle while waint for loading to finish
 		state = Engine_State::Idle;
 	}
 }
@@ -1205,14 +1203,11 @@ bool GameEngineLocal::game_draw_screen()
 	float fov = 60.f;
 	scene_camera->get_view(view, fov);
 
-
 	glm::mat4 in = glm::inverse(view);
 	auto pos = in[3];
 	auto front = -in[2];
 	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 	scene_camera->last_vs = vs;
-
-	//View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 
 	idraw->scene_draw(params,vs, get_gui());
 
@@ -1548,7 +1543,6 @@ void GameEngineLocal::stop_game()
 
 	ASSERT(level);
 
-		// hook any system calls
 	idraw->on_level_end();
 
 	level->close_level();
@@ -1657,14 +1651,11 @@ void GameEngineLocal::loop()
 			get_current_tool()->tick(frame_time);
 		}
 #endif
-
-		// tick the gui
 		get_gui()->think();
 
-		// tick the sound system
 		isound->tick(frame_time);
 
-		// tick asyncs
+		// tick async loaded assets
 		GetAssets().tick_asyncs();
 
 #ifdef EDITOR_BUILD
@@ -1674,7 +1665,6 @@ void GameEngineLocal::loop()
 
 		DebugShapeCtx::get().update(frame_time);
 
-		// draw
 		draw_screen();
 
 		Profiler::end_frame_tick(frame_time);

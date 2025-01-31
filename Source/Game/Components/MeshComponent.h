@@ -2,6 +2,7 @@
 
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
+#include <vector>
 
 class PhysicsFilterPresetBase;
 class Model;
@@ -24,7 +25,7 @@ public:
 	void on_changed_transform() override;
 	void editor_on_change_property() override;
 
-	void set_model(const char* model_path);
+	void set_model_str(const char* model_path);
 	void set_model(Model* model);
 	const Model* get_model() const;
 

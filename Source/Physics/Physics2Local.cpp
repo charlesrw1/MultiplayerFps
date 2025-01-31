@@ -256,11 +256,11 @@ static Color32 randcolor32(uint32_t number)
 	 void call_all_triggered() {
 		 for (auto& p : triggered_pairs) {
 			if (p.is_start) {
-				 sys_print(Debug, "trigger found\n");
+				 //sys_print(Debug, "trigger found\n");
 				 p.trigger->on_trigger_start.invoke(p.other);
 			 }
 			 else {
-				 sys_print(Debug, "trigger lost\n");
+				 //sys_print(Debug, "trigger lost\n");
 				  p.trigger->on_trigger_end.invoke(p.other);
 			 }
 		 }

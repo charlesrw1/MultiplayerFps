@@ -21,7 +21,7 @@ T get_from_lua(lua_State* L, int index) {
         return (T)get_entity_from_lua(L,index);
     else if (std::is_base_of<EntityComponent, typename std::remove_pointer<T>>::value)
         return (T)get_component_from_lua(L, index);
-    return T();
+    return (T)get_iasset_from_lua(L, index);
 }
 
 template<>
@@ -95,7 +95,7 @@ std::tuple<Args...> get_args_from_lua(std::tuple<Args...>* p, lua_State* L, std:
     return std::make_tuple(get_from_lua<Args>(L, I + 2)...);
 }
 
-void* get_class_from_stack(lua_State* L);
+void* get_class_from_stack(lua_State* L, int index);
 
 template<auto m>
 int lua_callable_func(lua_State* L)
@@ -106,7 +106,7 @@ int lua_callable_func(lua_State* L)
     using ArgsTuple = typename Traits::args_tuple;
     using ClassType = typename Traits::class_type;
 
-    auto obj = (ClassType*)get_class_from_stack(L);
+    auto obj = (ClassType*)get_class_from_stack(L,1);
 
     ArgsTuple args = get_args_from_lua((ArgsTuple*)0, L, std::make_index_sequence<std::tuple_size_v<ArgsTuple>>{});
 
@@ -122,10 +122,10 @@ int lua_callable_func(lua_State* L)
 }
 
 
-inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lua_State*)) {
+inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lua_State*), bool is_getter) {
     PropertyInfo p;
     p.flags = 0;
-    p.type = core_type_id::Function;
+    p.type = is_getter ? core_type_id::GetterFunc : core_type_id::Function;
     p.call_function = call_func;
     p.name = name;
     return p;
@@ -138,11 +138,14 @@ void push_args_to_lua(lua_State* L, Args&&... args) {
 }
 
 
-int call_lua_func_internal(lua_State* L, const char* func_name, int num_args);
+void call_lua_func_internal_part1(lua_State* L, const char* func_name);
+int call_lua_func_internal_part2(lua_State* L, const char* func_name, int num_args);
+
 template <typename... Args>
 int call_lua_function(lua_State* L, const char* function_name, Args&&... args) {
+    call_lua_func_internal_part1(L, function_name);
     push_args_to_lua(L, std::forward<Args>(args)...);
-    return call_lua_func_internal(L, function_name, sizeof...(args));
+    return call_lua_func_internal_part2(L, function_name, sizeof...(args));
 }
 
 template<typename ... Args>
@@ -184,6 +187,7 @@ inline PropertyInfo make_delegate_prop(MulticastDelegate<Args...>* dummy, const 
     return p;
 }
 
-#define REG_FUNCTION(func) make_function_prop_info(#func, lua_callable_func<& TYPE_FROM_START ::func>)
-#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, lua_callable_func<& TYPE_FROM_START ::func>)
+#define REG_FUNCTION(func) make_function_prop_info(#func, lua_callable_func<& TYPE_FROM_START ::func>, false)
+#define REG_GETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, lua_callable_func<& TYPE_FROM_START ::func>, true)
+#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, lua_callable_func<& TYPE_FROM_START ::func>, false)
 #define REG_MULTICAST_DELEGATE(name) make_delegate_prop(&((TYPE_FROM_START*)0)->name,#name, offsetof(TYPE_FROM_START,name))

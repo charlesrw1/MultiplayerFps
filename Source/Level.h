@@ -90,7 +90,7 @@ public:
 	}
 
 	// appends object to list that will be destroyed at end of frame, instead of instantly
-	void queue_deferred_delete(Entity* e);
+	void queue_deferred_delete(BaseUpdater* e);
 
 private:
 	SceneAsset* source_asset = nullptr;

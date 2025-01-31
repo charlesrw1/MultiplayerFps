@@ -93,36 +93,66 @@ const PropertyInfoList* Entity::get_props() {
 		REG_FUNCTION_EXPLICIT_NAME(get_first_component_typeinfo,"get_comp"),
 		REG_FUNCTION_EXPLICIT_NAME(get_entity_parent, "get_parent"),
 		//REG_FUNCTION_EXPLICIT_NAME(create_and_attach_component_type,"add_comp"),
-		REG_FUNCTION(set_active)
+		REG_FUNCTION(activate)
 	END_PROPS(Entity)
 }
+
 
 Entity::Entity()
 {
 
 }
-void Entity::destroy_deferred()
+
+void Entity::set_active_R(Entity* e, bool b, bool step1)
 {
-	eng->get_level()->queue_deferred_delete(this);
+	if (e->is_activated() != b)
+	{
+		if (b) {
+			if (step1)
+				e->activate_internal_step1();
+			else
+				e->activate_internal_step2();
+		}
+		else {
+			e->deactivate_internal();
+		}
+		for (auto c : e->get_all_components()) {
+			if (b) {
+				if (step1)
+					c->activate_internal_step1();
+				else
+					c->activate_internal_step2();
+			}
+			else {
+				c->deactivate_internal();
+			}
+		}
+	}
+	for (auto c : e->get_all_children())
+		set_active_R(c, b, step1);
 }
 
-void Entity::set_active(bool make_active)
+void Entity::activate()
 {
-	if (make_active == is_activated()) return;
-	if (make_active) {
+	if (is_activated()) {
+		sys_print(Warning, "activate called on already activated entity\n");
+		return;
+	}
+	ASSERT(start_disabled);
+	{
 		activate_internal_step1();
-		for (auto c : get_all_components())
-			c->activate_internal_step1();
+		for (auto comp : get_all_components())
+			comp->activate_internal_step1();
+		for (auto c : get_all_children())
+			Entity::set_active_R(c,true, true);
+
 		activate_internal_step2();
-		for (auto c : get_all_components())
-			c->activate_internal_step2();
+		for (auto comp : get_all_components())
+			comp->activate_internal_step2();
+		for (auto c : get_all_children())
+			Entity::set_active_R(c, true, false);
 	}
-	else {
-		deactivate_internal();
-		for (auto c : get_all_components())
-			c->deactivate_internal();
-	}
-	ASSERT(make_active == is_activated());
+	ASSERT(is_activated());
 }
 
 void Entity::initialize_internal_step1()

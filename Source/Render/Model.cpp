@@ -504,7 +504,7 @@ bool Model::check_import_files_for_out_of_data() const
 	ModelDefData defdat;
 	std::string model_def = strip_extension(get_name().c_str());
 	model_def += ".mis";
-	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat);
+	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat, false);
 }
 #else
 bool Model::check_import_files_for_out_of_data() const {

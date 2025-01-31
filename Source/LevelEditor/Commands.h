@@ -552,8 +552,9 @@ public:
 		ASSERT(obj->is_a<EntityComponent>());
 		auto ec = (EntityComponent*)obj;
 		auto id = ec->get_instance_id();
-		ed_doc.on_component_deleted.invoke(id);
 		ec->destroy();
+		// dont move this!
+		ed_doc.on_component_deleted.invoke(id);
 		comp_handle = 0;
 	}
 	void undo() {

@@ -17,6 +17,8 @@
 #include "AssetCompile/AnimationSeqLoader.h"
 #include "imgui.h"
 #include "Physics/Physics2.h"
+#include "Game/AssetPtrMacro.h"
+
 static float spring_damp = 200;
 static float spring_constant = 4000.0;
 static float forward_force_mult = 600;
@@ -72,9 +74,9 @@ public:
 	void end() {
 		instance = nullptr;
 	}
-
-	Entity* the_car = nullptr;
+	Entity* thecar = nullptr;
 };
+CLASS_IMPL(CarGameMode);
 CarGameMode* CarGameMode::instance = nullptr;
 
 
@@ -355,7 +357,6 @@ public:
 };
 CLASS_IMPL(CarDriver);
 
-// HAD TO DO IT TO EM
 CLASS_H(PedestrianComponent, EntityComponent)
 public:
 	void start() override {
@@ -372,3 +373,69 @@ public:
 
 	}
 };
+CLASS_IMPL(PedestrianComponent);
+
+
+
+CLASS_H(CannonballC, EntityComponent)
+public:
+	void start() override {
+		starttime = eng->get_game_time();
+	}
+	void update() override {
+
+
+	}
+	void end() override {
+
+	}
+
+	float starttime = 0.0;
+	glm::vec3 target_pos{};
+	glm::vec3 velocity{};
+	float speed = 0.0;
+};
+CLASS_IMPL(CannonballC);
+
+CLASS_H(CannonC, EntityComponent)
+public:
+	void start() override {
+		set_ticking(true);
+	}
+	void update() override {
+		auto playerpos = CarGameMode::instance->thecar->get_ws_position();
+		
+		if (eng->get_game_time() > next_cannon_time) {
+			
+			auto level = eng->get_level();
+			{
+				Entity* e = nullptr;
+				auto scope = level->spawn_prefab_deferred(e, projectile.get());
+				auto cball = e->get_first_component<CannonballC>();
+				cball->target_pos = playerpos;
+				e->set_ws_position(get_ws_position());
+			}
+
+			update_next_shoot_time();
+		}
+	}
+	void end() override {
+
+	}
+	void update_next_shoot_time() {
+		next_cannon_time = eng->get_game_time() + rand.RandF(cannon_fire_min, cannon_fire_max);
+	}
+	static const PropertyInfoList* get_props() {
+		START_PROPS(CannonC)
+			REG_ASSET_PTR(projectile, PROP_DEFAULT)
+		END_PROPS(CannonC)
+	}
+
+
+	AssetPtr<PrefabAsset> projectile;
+	Random rand;
+	float cannon_fire_min = 2.0;
+	float cannon_fire_max = 3.0;
+	float next_cannon_time = 0.0;
+};
+CLASS_IMPL(CannonC);

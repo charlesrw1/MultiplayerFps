@@ -46,6 +46,7 @@ public:
 		update();
 	}
 	void update() {
+		flags |= CVAR_CHANGED;
 		if (flags & CVAR_BOOL) {
 			integerVal = atoi(value)!=0;
 			valueStr = std::to_string(integerVal);

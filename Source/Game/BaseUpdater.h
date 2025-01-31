@@ -26,6 +26,9 @@ public:
 	void shutdown_updater();
 	void set_ticking(bool shouldTick);
 
+	// queues this entity/component to be destroyed at the end of the frame
+	void destroy_deferred();
+
 	static const PropertyInfoList* get_props();
 
 	// Editor Data >>>>
@@ -67,7 +70,6 @@ protected:
 		return &get_type();
 	}
 
-
 	void activate_internal_step1();
 	void activate_internal_step2();
 	void deactivate_internal();
@@ -85,5 +87,5 @@ protected:
 private:
 	uint64_t instance_id = 0;	// instance id
 	bool call_init_in_editor = false;
-	bool tickEnabled = false;
+	bool tick_enabled = false;
 };

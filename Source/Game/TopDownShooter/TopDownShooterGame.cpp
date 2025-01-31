@@ -20,6 +20,10 @@
 #include "Game/AssetPtrMacro.h"
 #include "Game/EntityPtrArrayMacro.h"
 
+#include "Scripting/FunctionReflection.h"
+
+//afad
+
 CLASS_H(TopDownSpawnPoint, EntityComponent)
 public:
 	
@@ -230,7 +234,7 @@ public:
 
 				auto cap = get_owner()->get_first_component<PhysicsComponentBase>();
 				cap->set_is_enable(false);
-				cap->destroy();
+				cap->destroy_deferred();
 
 				enable_ragdoll_shared(get_owner(), last_ws, true);
 
@@ -240,7 +244,7 @@ public:
 				for (auto c : get_owner()->get_all_children()) {
 					if (c->get_parent_bone() == names[index]) {
 						auto p = c->get_first_component<PhysicsComponentBase>();
-						p->apply_impulse(c->get_ws_position(), dmg.dir * 2.f);
+						p->apply_impulse(c->get_ws_position(), dmg.dir * 1.f);
 						break;
 					}
 				}
@@ -679,39 +683,6 @@ public:
 CLASS_IMPL(TopDownPlayer);
 
 
-
-CLASS_H(PlayerTriggerComponent2, EntityComponent)
-public:
-	void start() override {
-		auto ptr = get_owner()->get_first_component<PhysicsComponentBase>();
-		if (ptr) {
-			ptr->on_trigger_start.add(this, [&](PhysicsComponentBase* c) {
-				if (c->get_owner() == TopDownGameManager::instance->the_player) {
-					for (auto eptr : objects_to_active) {
-						auto e = eptr.get();
-						if(e)
-							e->set_active(true);
-					}
-					eng->get_level()->queue_deferred_delete(get_owner());
-				}
-				});
-		}
-		else {
-			sys_print(Error, "PlayerTriggerComponent needs physics component\n");
-		}
-	}
-	std::vector<EntityPtr> objects_to_active;
-
-	static const PropertyInfoList* get_props() {
-		MAKE_VECTORCALLBACK_ATOM(EntityPtr, objects_to_active);
-		START_PROPS(PlayerTriggerComponent2)
-			REG_STDVECTOR(objects_to_active,PROP_DEFAULT)
-		END_PROPS(PlayerTriggerComponent2)
-	}
-
-};
-CLASS_IMPL(PlayerTriggerComponent2);
-
 void TopDownCar::update()
 {
 	auto moveAction = driver->inputPtr->get("game/move");
@@ -843,20 +814,35 @@ public:
 	void start() {
 		Entity* e{};
 		float ofs = 0.0;
-		for(int i=0;i<count;i++)
+		for(int i=0;i<1;i++)
 		{
 			auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
 			e->set_ws_position(get_ws_position()+glm::vec3(0,ofs,0));
 			ofs += 1.5;
+			e->set_start_disabled(true);
 		}
+		whatSpawned = e->get_self_ptr();
+	}
+
+	void enable_object() {
+		Entity* e = whatSpawned.get();
+		if (!e)
+			return;
+		e->activate();
 	}
 
 	static const PropertyInfoList* get_props() {
 		START_PROPS(TopDownSpawner)
 			REG_ASSET_PTR(prefab,PROP_DEFAULT),
-			REG_INT(count,PROP_DEFAULT,"1")
+			REG_INT(count,PROP_DEFAULT,"1"),
+
+			REG_FUNCTION(enable_object)
 		END_PROPS(TopDownSpawner)
 	}
+
+	EntityPtr whatSpawned;
+	bool wait_to_spawn = false;
+	bool start_disabled = false;
 	int count = 1;
 	AssetPtr<PrefabAsset> prefab;
 };

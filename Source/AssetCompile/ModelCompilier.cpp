@@ -21,6 +21,7 @@
 #include "AssetCompile/Someutils.h"
 #include <stdexcept>
 
+#include "Framework/Config.h"
 
 // Physx needed for cooking meshes:
 #include <physx/cooking/PxCooking.h>
@@ -2620,7 +2621,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 
 static bool compile_everything = false;
 
-bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data)
+bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data, bool needs_def)
 {
 	auto file = FileSys::open_read_game(game_path);
 	if (!file) {
@@ -2657,17 +2658,17 @@ bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData
 	}
 	file.reset();
 
-	if (needs_compile)
-		return true;
 
 	if (!needs_compile && timestamp_of_cmdl <= timestamp_of_def) {
 		sys_print(Info, "*** .def newer than .cmdl, recompiling\n");
-		return true;
+		needs_compile = true;
 	}
 
+	if (needs_compile && !needs_def)
+		return true;
 
 	//try {
-		def_data = ModelCompileHelper::parse_definition_file(game_path);
+	def_data = ModelCompileHelper::parse_definition_file(game_path);
 	//}
 	//catch (std::runtime_error er) {
 	//	sys_print(Error, "error parsing compile file %s: %s\n", game_path, er.what());
@@ -2726,7 +2727,7 @@ bool ModelCompilier::compile(const char* game_path)
 	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
 
 	ModelDefData def;
-	bool needs_compile = does_model_need_compile(game_path,def);
+	bool needs_compile = does_model_need_compile(game_path,def,true);
 	if (!needs_compile)
 		return true;
 

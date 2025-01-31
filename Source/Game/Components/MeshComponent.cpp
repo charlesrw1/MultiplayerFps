@@ -16,7 +16,7 @@
 
 #include "Game/AssetPtrMacro.h"
 #include "Game/AssetPtrArrayMacro.h"
-
+#include "Scripting/FunctionReflection.h"
 
 
 CLASS_IMPL(MeshComponent);
@@ -66,7 +66,7 @@ int MeshComponent::get_index_of_bone(StringName bonename) const
 	return -1;
 }
 
-void MeshComponent::set_model(const char* model_path)
+void MeshComponent::set_model_str(const char* model_path)
 {
 	Model* modelnext = GetAssets().find_sync<Model>(model_path).get();
 	if (modelnext != model.get()) {
@@ -96,14 +96,13 @@ void MeshComponent::set_material_override(const MaterialInstance* mi)
 		eMaterialOverride.push_back({ (MaterialInstance*)mi });
 	else
 		eMaterialOverride[0] = { (MaterialInstance*)mi };
-	on_changed_transform();	//fixme
+	update_handle();	//fixme
 }
 
 const PropertyInfoList* MeshComponent::get_props() {
-#ifndef RUNTIME
+
 	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, eMaterialOverride);
-#endif // !RUNTIME
-	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, MaterialOverride_compilied)
+
 
 		auto t = &Model::StaticType.classname;
 	const char* str = Model::StaticType.classname;
@@ -113,9 +112,12 @@ const PropertyInfoList* MeshComponent::get_props() {
 		REG_BOOL(cast_shadows, PROP_DEFAULT, "1"),
 		REG_BOOL(is_skybox, PROP_DEFAULT, "0"),
 		REG_BOOL(is_visible,PROP_DEFAULT,"1"),
-#ifndef RUNTIME
+
 		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
-#endif // !RUNTIME
+
+		REG_FUNCTION_EXPLICIT_NAME(set_material_override,"set_material"),
+		REG_FUNCTION(set_model),
+		REG_FUNCTION(set_is_visible)
 	END_PROPS(MeshCompponent)
 }
 

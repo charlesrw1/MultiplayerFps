@@ -37,9 +37,14 @@ void Level::update_level()
 	for (auto h : deferred_delete_list) {
 		auto e = get_entity(h);
 		if (!e) continue;
-		ASSERT(e->is_a<Entity>());
-		auto ent = (Entity*)e;
-		ent->destroy();
+		if (e->is_a<Entity>()) {
+			auto ent = (Entity*)e;
+			ent->destroy();
+		}
+		else if (e->is_a<EntityComponent>()) {
+			auto ent = (EntityComponent*)e;
+			ent->destroy();
+		}
 	}
 	deferred_delete_list.clear();
 }
@@ -136,8 +141,10 @@ void Level::create(SceneAsset* source, bool is_editor)
 	source_asset = source;
 	b_is_editor_level = is_editor;
 
-	if(source->sceneFile)
+	if (source->sceneFile) {
 		insert_unserialized_entities_into_level(*source->sceneFile);
+		source->sceneFile.reset();
+	}
 }
 
 void Level::remove_from_update_list(BaseUpdater* b) {
@@ -246,6 +253,10 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 		}
 		scene.unserialize_post_assign_ids();
 
+		// dont call enable, will be manually activated
+		if (scene.get_root_entity() && scene.get_root_entity()->start_disabled && !is_editor_level())
+			return;
+
 		for (auto o : objs) {
 			auto ent = o.second;
 			if (Entity* e = ent->cast_to<Entity>())
@@ -298,7 +309,7 @@ Entity* Level::spawn_prefab(PrefabAsset* asset)
 	return unserialized_scene.get_root_entity();
 }
 
-void Level::queue_deferred_delete(Entity* e)
+void Level::queue_deferred_delete(BaseUpdater* e)
 {
 	if (!e) return;
 	deferred_delete_list.insert(e->get_instance_id());

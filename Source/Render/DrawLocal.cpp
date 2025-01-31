@@ -2309,17 +2309,19 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 {
 	GPUFUNCTIONSTART;
 
-	if (enable_vsync.get_bool())
-		SDL_GL_SetSwapInterval(1);
-	else
-		SDL_GL_SetSwapInterval(0);
+	if (enable_vsync.was_changed()) {
+		if (enable_vsync.get_bool())
+			SDL_GL_SetSwapInterval(1);
+		else
+			SDL_GL_SetSwapInterval(0);
+	}
 
-	// Update any gpu materials that became invalidated or got newly allocated
+	// Update gpu materials that became invalidated or got newly allocated
 	matman.pre_render_update();
 
 	check_cubemaps_dirty();
 
-	// update particles, doesnt actually draw, just builds meshes
+	// update particles, doesnt draw, only builds meshes
 	ParticleMgr::get().draw(view);
 
 	scene_draw_internal(params, view, gui);

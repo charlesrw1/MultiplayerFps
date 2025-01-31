@@ -5,6 +5,7 @@
 #include "ScriptAsset.h"
 #include <memory>
 #include "Game/SerializePtrHelpers.h"
+#include <vector>
 
 struct lua_State;
 class Script;
@@ -22,6 +23,12 @@ private:
 	std::unique_ptr<EngineWrapper> enginewrapper = nullptr;
 };
 
+struct PropertyInfo;
+struct OutstandingScriptDelegate {
+	uint64_t handle = 0;
+	ClassBase* ptr = nullptr;	
+	PropertyInfo* pi = nullptr;
+};
 CLASS_H(ScriptComponent, EntityComponent)
 public:
 	ScriptComponent();
@@ -45,6 +52,7 @@ public:
 	static const PropertyInfoList* get_props();
 
 	std::vector<EntityPtr> refs;
+	std::vector<OutstandingScriptDelegate> outstandings;
 	AssetPtr<Script> script;
 
 	lua_State* state = nullptr;

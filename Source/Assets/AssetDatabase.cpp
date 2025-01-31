@@ -74,7 +74,15 @@ public:
 	}
 
 	void remove_asset_direct(IAsset* asset) {
-		std::lock_guard<std::mutex> lock(assetHashmapMutex);
+		// wait till load jobs are finished to avoid crap
+		std::unique_lock<std::mutex> lock(queueMutex);
+		condition2.wait(lock, [&] { return pendingAsyncJobs.empty(); });
+
+		tick_asyncs_standard();	// clear the queue if anything is there
+
+		std::lock_guard<std::mutex> workLock(loadingJobMutex);
+		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);		
+		
 		allAssets.erase(asset->path);
 	}
 
@@ -362,6 +370,7 @@ public:
 		std::lock_guard<std::mutex> workLock(loadingJobMutex);
 		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
 
+
 		for (auto& asset : allAssets)
 		{
 			if (asset.second->reference_bitmask_threadsafe == 0 && asset.second->is_loaded) {
@@ -428,11 +437,17 @@ public:
 #ifdef EDITOR_BUILD
 	void hot_reload_assets()
 	{
+		auto scenetype = ClassBase::find_class("SceneAsset");
+		assert(scenetype);
+
 		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
 		for (auto& asset : allAssets)
 		{
 			if (!asset.second->get_is_loaded())
 				continue;
+			if (asset.second->get_type().is_a(*scenetype))
+				continue;
+
 			reload_asset_async(asset.second, true, [](GenericAssetPtr) {});
 		}
 	}
@@ -509,7 +524,6 @@ void AssetDatabase::explicit_asset_free(IAsset*& asset)
 	if (!asset)
 		return;
 
-	std::lock_guard<std::mutex> workMutex(impl->loadingJobMutex);
 	impl->remove_asset_direct(asset);
 	asset->uninstall();
 	delete asset;

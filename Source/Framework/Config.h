@@ -12,6 +12,8 @@ enum CVarFlags
 	CVAR_REGISTERED	= (1 << 6),
 	CVAR_DEV		= (1 << 7),
 	CVAR_UNBOUNDED	= (1 << 8),
+	// used internally
+	CVAR_CHANGED	= (1<<9),
 };
 
 
@@ -21,7 +23,7 @@ public:
 	const char* name = "";
 	const char* value = "";
 	const char* description = "";
-	int flags = 0;	// CVarFlags
+	uint32_t flags = 0;	// CVarFlags
 	float minVal = 0.f;
 	float maxVal = 1.f;
 	int integerVal = 0;
@@ -41,6 +43,15 @@ public:
 	int get_var_flags() const { return ptr->flags; }
 	const char* get_name() const { return ptr->name; }
 
+	// this resets the flag too
+	bool was_changed() {
+		bool b = bool(ptr->flags & CVAR_CHANGED);
+		ptr->flags &= ~CVAR_CHANGED;
+		return b;
+	}
+	void force_set_has_changed() {
+		ptr->flags |= CVAR_CHANGED;
+	}
 
 	void set_bool(bool setI);
 	void set_integer(int setI);

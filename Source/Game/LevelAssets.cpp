@@ -77,6 +77,18 @@ static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
 SceneAsset::~SceneAsset() {
 }
 
+void SceneAsset::uninstall() {
+	if (sceneFile.get()) {
+		sys_print(Warning, "scene asset with non-null scenefile\n");
+		for (auto& o : sceneFile->get_objects())
+			delete o.second;
+		sceneFile.reset(nullptr);
+	}
+}
+void SceneAsset::move_construct(IAsset*) {
+	sys_print(Warning, "scene asset move construct, shouldnt have happened\n");
+}
+
 bool SceneAsset::load_asset(ClassBase*&)
 {
 	auto& path = get_name();

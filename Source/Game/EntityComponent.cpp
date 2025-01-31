@@ -4,7 +4,8 @@
 #include "Level.h"
 #include "Assets/AssetRegistry.h"
 #include "GameEnginePublic.h"
-
+#include "Scripting/FunctionReflection.h"
+#include "Framework/ReflectionMacros.h"
 CLASS_IMPL(EntityComponent);
 
 #ifdef EDITOR_BUILD
@@ -45,7 +46,6 @@ void EntityComponent::destroy()
 	eng->get_level()->destroy_component(this);
 }
 
-
 void EntityComponent::initialize_internal_step1()
 {
 	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
@@ -72,4 +72,11 @@ EntityComponent::~EntityComponent() {
 
 const glm::mat4& EntityComponent::get_ws_transform() {
 	return get_owner()->get_ws_transform();
+}
+const PropertyInfoList* EntityComponent::get_props()
+{
+	START_PROPS(EntityComponent)
+		REG_GETTER_FUNCTION(get_owner,"owner"),
+		REG_FUNCTION_EXPLICIT_NAME(destroy_deferred,"destroy")
+	END_PROPS(EntityComponent)
 }

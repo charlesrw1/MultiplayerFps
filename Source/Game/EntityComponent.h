@@ -26,7 +26,7 @@ public:
 		return get_ws_transform()[3];
 	}
 
-	static const PropertyInfoList* get_props() = delete;
+	static const PropertyInfoList* get_props();
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}

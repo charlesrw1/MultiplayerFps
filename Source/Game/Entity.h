@@ -152,11 +152,19 @@ public:
 		return parent_bone.name;
 	}
 
-	void set_active(bool active);
 
 	bool get_start_disabled() const {
 		return start_disabled;
 	}
+
+	// this function only has an effect is called before inserting the entity into the level
+	// either set it in the editor, or spawn_deferred and set it
+	void set_start_disabled(bool b) {
+		start_disabled = b;
+	}
+	// if start_disabled was true, then this function actually calls start()->pre_start() etc. on all sub entities
+	// if this entity was already started, then this function does nothing
+	void activate();
 
 	StringName get_tag() const {
 		return tag.name;
@@ -176,9 +184,9 @@ public:
 		return is_top_level;
 	}
 	void set_is_top_level(bool b);
-
-	void destroy_deferred();
 private:
+	static void set_active_R(Entity* e, bool b, bool step1);
+
 	bool has_transform_parent() const {
 		return !get_is_top_level() && get_entity_parent() != nullptr;
 	}
