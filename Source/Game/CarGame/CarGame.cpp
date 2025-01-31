@@ -132,7 +132,7 @@ public:
 		glm::vec3 front_vec = glm::mat3(body_t) * glm::vec3(0, 0, 1);
 
 		//const float max_spring = 1.0;
-		const float wheel_radius = 0.46;
+		const float wheel_radius = 0.43;
 
 			float current_speed = glm::length(body->get_linear_velocity());
 			const float delta_angle = (current_speed * eng->get_dt()) / wheel_radius;
@@ -157,8 +157,6 @@ public:
 			if (g_physics.sweep_sphere(res, wheel_radius, r.pos + up_vec * wheel_radius, -up_vec, max_spring + wheel_radius, UINT32_MAX, &vec))
 				dist = res.distance;
 
-			//                                                                                                                const float max_spring = 1.0;
-			const float wheel_radius = 0.46;
 
 			float d = glm::max(0.f,max_spring - dist);
 			bool touching_ground = d > 0.f;

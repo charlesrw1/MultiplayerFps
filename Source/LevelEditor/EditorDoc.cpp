@@ -108,6 +108,9 @@ public:
 		if (!eng->get_level())
 			return;
 
+		const GuiFont* font = GetAssets().find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		if (!font) font = g_fonts.get_default_font();
+
 		struct obj {
 			glm::vec3 pos = glm::vec3(0.f);
 			Entity* e = nullptr;
@@ -145,7 +148,7 @@ public:
 				name = o.e->get_type().classname;
 			}
 
-			auto size = GuiHelpers::calc_text_size_no_wrap(name, g_fonts.get_default_font());
+			auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
 			if (o.pos.z < 0)
 				continue;
 			
@@ -156,24 +159,24 @@ public:
 			coordy *= this->ws_size.y;
 			coordx += this->ws_position.x;
 			coordy += this->ws_position.y;
-			coordx -= size.x/2;
-			coordy -= size.y / 2;
+			coordx -= size.w/2;
+			coordy -= size.h / 2;
 
 			Color32 color = { 50,50,50,(uint8_t)editor_draw_name_text_alpha.get_integer() };
 			if (o.e->is_selected_in_editor())
 				color = { 255,180,0,150 };
 
 			if (do_mouse_click) {
-				Rect2d r(coordx-3, coordy-3, size.x+6, size.y+6);
+				Rect2d r(coordx-3, coordy-3, size.w+6, size.h+6);
 				if (r.is_point_inside(x, y)) {
 
 					clicked = o.e;
 				}
 			}
-
-			builder.draw_solid_rect({ coordx - 3,coordy - 3 },  {size.x+6,size.y+ 6}, color);
-			builder.draw_text({ coordx,coordy }, {}, g_fonts.get_default_font(), name, COLOR_BLACK);
-			builder.draw_text({ coordx+1,coordy+1 }, size, g_fonts.get_default_font(), name, COLOR_WHITE);
+			glm::ivec2 textofs = { 0,font->base };
+			builder.draw_solid_rect({ coordx - 3,coordy - 3 },  {size.w+6,size.h+ 6}, color);
+			builder.draw_text(glm::ivec2{ coordx+1,coordy+1 }+ textofs, {}, font, name, COLOR_BLACK);
+			builder.draw_text(glm::ivec2{ coordx,coordy }+ textofs, {}, font, name, COLOR_WHITE);
 		}
 		if (clicked) {
 			if (ImGui::GetIO().KeyShift) {

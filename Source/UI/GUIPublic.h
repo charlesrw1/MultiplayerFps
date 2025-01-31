@@ -7,6 +7,7 @@
 #include "Framework/ClassBase.h"
 #include "Framework/StringUtil.h"	// string view
 #include "Framework/Util.h"
+#include "Framework/Rect2d.h"
 
 template<typename ...Args>
 class MulticastDelegate;
@@ -85,8 +86,8 @@ private:
 class GuiHelpers
 {
 public:
-	static glm::ivec2 calc_text_size(const char* str, const GuiFont* font, int force_width = -1);
-	static glm::ivec2 calc_text_size_no_wrap(const char* str, const GuiFont* font);
+	static Rect2d calc_text_size(const char* str, const GuiFont* font, int force_width = -1);
+	static Rect2d calc_text_size_no_wrap(const char* str, const GuiFont* font);
 };
 
 enum class GuiAlignment : uint8_t

@@ -44,8 +44,18 @@ void GuiFont::sweep_references() const {
 	GetAssets().touch_asset((IAsset*)font_texture);
 }
 
+// path/file.png -> path/
+inline std::string get_directory(const std::string& path)
+{
+	auto pos = path.rfind("/");
+	if (pos == std::string::npos)
+		return "";
+	return path.substr(0,pos+1);
+}
+
 bool GuiFont::load_asset(ClassBase*& user)
 {
+
 	auto& path = get_name();
 	auto file = FileSys::open_read_game(path.c_str());
 	if (!file)
@@ -62,15 +72,33 @@ bool GuiFont::load_asset(ClassBase*& user)
 	uint8_t blockid = in.read_byte();
 	uint32_t blockSz = in.read_int32();
 	ASSERT(blockid == 1);
-	in.seek(in.tell() + blockSz);
+	uintptr_t block2start = in.tell() + blockSz;
+	ptSz = (int16_t)in.read_int16();
+	if (ptSz < 0)
+		ptSz = -ptSz;
+
+	in.seek(block2start);
 	blockid = in.read_byte();
 	blockSz = in.read_int32();
 	ASSERT(blockid == 2);
-	in.seek(in.tell() + blockSz);
+	uintptr_t block3start = in.tell() + blockSz;
+	lineHeight = in.read_int16();
+	base = in.read_int16();
+
+	in.seek(block3start);
 	blockid = in.read_byte();
 	blockSz = in.read_int32();
 	ASSERT(blockid == 3);
-	in.seek(in.tell() + blockSz);
+	uintptr_t block4start = in.tell() + blockSz;
+	std::string texname;
+	for (;;) {
+		auto byte = in.read_byte();
+		if (!byte)
+			break;
+		texname.push_back((char)byte);
+	}
+
+	in.seek(block4start);
 	blockid = in.read_byte();
 	blockSz = in.read_int32();
 	ASSERT(blockid == 4);
@@ -92,7 +120,9 @@ bool GuiFont::load_asset(ClassBase*& user)
 
 		character_to_glyph.insert({ id,glyph });
 	}
-	font_texture = GetAssets().find_assetptr_unsafe<Texture>("eng/sengo24_0.png");
+	std::string texpath = get_directory(get_name()) + texname;
+
+	font_texture = GetAssets().find_sync<Texture>(texpath).get();
 	return true;
 }
 

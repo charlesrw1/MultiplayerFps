@@ -110,7 +110,7 @@ void UIBuilder::draw_text(
 
 
 	int x = global_coords.x;
-	int y = global_coords.y - 6;//HACK fixme
+	int y = global_coords.y - font->base;
 	for(int i=0;i<text.str_len;i++) {
 		char c = text.str_start[i];
 
@@ -162,9 +162,10 @@ GUI::~GUI()
 		eng->get_gui()->remove_reference(this);
 }
 
-glm::ivec2 GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)
+Rect2d GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)
 {
 	int x = 0;
+	int y = -font->base;
 	while (*str) {
 		char c = *str;
 		auto find = font->character_to_glyph.find(c);
@@ -176,9 +177,9 @@ glm::ivec2 GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* fo
 
 		str++;
 	}
-	return { x, 24 };
+	return Rect2d(0, y, x, font->lineHeight);
 }
-glm::ivec2 GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int force_width)
+Rect2d GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int force_width)
 {
 	ASSERT(font);
 
@@ -189,22 +190,22 @@ glm::ivec2 GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int 
 	std::string currentWord;
 
 	int x = 0;
-	int y = 0;
+	int y = -font->base;
 	while (*(str++)) {
 		char c = *str;
 		if (c == ' ' || c == '\n') {
 			auto sz = calc_text_size_no_wrap((currentLine + currentWord).c_str(), font);
-			if (sz.x > force_width)
+			if (sz.w > force_width)
 			{
-				x = glm::max(sz.x, x);
-				y += font->ptSz;
+				x = glm::max((int)sz.w, x);
+				y += font->lineHeight;
 				currentLine = currentWord + " ";
 			}
 			else
 				currentLine += currentWord + " ";
 			currentWord.clear();
 			if (c == '\n') {
-				y += font->ptSz;
+				y += font->lineHeight;
 				currentLine.clear();
 			}
 		}
@@ -214,9 +215,9 @@ glm::ivec2 GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int 
 	if (!currentWord.empty()) {
 		currentLine += currentWord;
 
-		x = glm::max(calc_text_size_no_wrap(currentLine.c_str(), font).x, x);
-		y += font->ptSz;
+		x = glm::max((int)calc_text_size_no_wrap(currentLine.c_str(), font).w, x);
+		y += font->lineHeight;
 	}
 
-	return { x, y };
+	return Rect2d(0,-font->base,x,(y+font->base));
 }

@@ -187,7 +187,6 @@ void Quit()
 
 void sys_print(LogType type, const char* fmt, ...)
 {
-	std::lock_guard<std::mutex> printLock(printMutex);
 
 	va_list args;
 	va_start(args, fmt);
@@ -205,10 +204,16 @@ void sys_print(LogType type, const char* fmt, ...)
 	}
 	else if (len >= 1 && fmt[0] == '>') {
 		printf("\033[35m");
+		char buf[1024];
+		vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
+		buf[IM_ARRAYSIZE(buf) - 1] = 0;
+		eng->log_to_fullscreen_gui(Debug, buf);
 	}
 	else
 		print_end = false;
 
+
+	std::lock_guard<std::mutex> printLock(printMutex);
 	vprintf(fmt, args);
 	dbg_console.print_args(fmt, args);
 	va_end(args);
@@ -307,63 +312,7 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 
 
 	bool pan_in_orbit_model = keys[SDL_SCANCODE_LSHIFT];
-
-
-	// position = cam position
-	// orbit target = what you rotate around = constant
-	// front = what dir camera is pointing
-	// dist = dot(front, orbit_target-position)
-	if (orbit_mode)
 	{
-		float lookatpointdist = dot(position - orbit_target, front);	// project target onto front
-		glm::vec3 lookatpoint = position + front * lookatpointdist;
-		glm::vec3 tolookat = lookatpoint - position;
-
-		glm::vec3 otol = tolookat - orbit_target;
-		glm::vec3 toorbit = orbit_target - position;
-		float toorbitdist = length(toorbit);
-
-		glm::vec3 side = glm::normalize(glm::cross(up, front));
-		glm::vec3 up = cross(side, front);
-		if (pan_in_orbit_model) {
-
-			glm::vec4 offsetdeltafrompanning = invproj * glm::vec4(mouse_dx, mouse_dy, lookatpointdist, 1.f);
-			offsetdeltafrompanning /= offsetdeltafrompanning.w;
-			otol += offsetdeltafrompanning.x * side + offsetdeltafrompanning.y * up;
-		}
-		else {
-			yaw += x_off;
-			pitch -= y_off;
-			//glm::clamp(yaw, 0.f, TWOPI);
-			//glm::clamp(pitch, -HALFPI + 0.01f, HALFPI - 0.01f);
-			if (pitch > HALFPI - 0.01)
-			pitch = HALFPI - 0.01;
-			if (pitch < -HALFPI + 0.01)
-				pitch = -HALFPI + 0.01;
-
-			if (yaw > TWOPI) {
-				yaw -= TWOPI;
-			}
-			if (yaw < 0) {
-				yaw += TWOPI;
-			}
-		}
-
-		vec3 newtoorbit = AnglesToVector(pitch, yaw) * toorbitdist;
-		vec3 newposition = orbit_target - newtoorbit;
-
-		vec3 newlookatpoint = newtoorbit - otol;
-		float len_ = glm::length(newlookatpoint - newposition);
-
-		if (abs(len_) > 0.000001f) {
-			vec3 oldfront = front;
-			front = (newlookatpoint - newposition) / len_;
-		
-		}
-
-		position = newposition;
-	}
-	else {
 		yaw += x_off;
 		pitch -= y_off;
 
@@ -1646,7 +1595,6 @@ void GameEngineLocal::loop()
 		}
 
 #ifdef EDITOR_BUILD
-		// tick any tools
 		if (is_in_an_editor_state()) {
 			get_current_tool()->tick(frame_time);
 		}
@@ -1656,7 +1604,7 @@ void GameEngineLocal::loop()
 		isound->tick(frame_time);
 
 		// tick async loaded assets
-		GetAssets().tick_asyncs();
+		AssetDatabase::get().tick_asyncs();
 
 #ifdef EDITOR_BUILD
 		// update hot reloading

@@ -7,11 +7,13 @@
 
 #include "Framework/Util.h"
 #include "UILoader.h"
+#include "Assets/AssetDatabase.h"
+
 CLASS_H(OnScreenLogGui, GUI)
 public:
 
 	virtual void paint(UIBuilder& b) {
-		auto font = g_fonts.get_default_font();
+		auto font = GetAssets().find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();
 		float total_time = time_at_full_opacity + time_to_fade;
@@ -34,7 +36,7 @@ public:
 
 			const float entrance_time = 0.2;
 
-			glm::ivec2 offset = { 0,height * font->ptSz };
+			glm::ivec2 offset = { 0,height * font->lineHeight };
 			if (time < entrance_time) {
 				float x = (entrance_time - time);
 				x = x * x;
@@ -45,8 +47,9 @@ public:
 			if ((total_time-time) < time_to_fade)
 				color.a = int((total_time-time) / time_to_fade *255.f);
 
-			b.draw_text(ws_position + glm::ivec2{ 2,2 } + offset, ws_size, font, sv, { 0,0,0,color.a });
-			b.draw_text(ws_position+offset, ws_size, font, sv, color);
+			glm::ivec2 texoffset = { 0,font->base };
+			b.draw_text(ws_position + glm::ivec2{ 1,1 } + offset+ texoffset, ws_size, font, sv, { 0,0,0,color.a });
+			b.draw_text(ws_position+offset+ texoffset, ws_size, font, sv, color);
 			height++;
 		}
 	}
