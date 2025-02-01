@@ -435,6 +435,7 @@ public:
 
 		fbohandle gbuffer{};	// 4 MRT (gbuffer0-2, scene_color)
 		fbohandle forward_render{};	// scene_color, use for translucents
+
 		fbohandle editorSelectionDepth{};	// just a depth buffer for the editor to draw selected objs into
 	}fbo;
 

@@ -749,13 +749,20 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
 	set_default_parameters(tex.scene_depth);
 
+	// for mouse picking
+	create_and_delete_texture(tex.editor_id_buffer);
+	glTextureStorage2D(tex.editor_id_buffer, 1, GL_RGBA8, s_w, s_h);
+	set_default_parameters(tex.editor_id_buffer);
+
 	// Create forward render framebuffer
 	// Transparents and other immediate stuff get rendered to this
 	create_and_delete_fb(fbo.forward_render);
 	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
 	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
-	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
-	glNamedFramebufferDrawBuffers(fbo.forward_render, 1, attachments);
+	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
+
+	unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, GL_COLOR_ATTACHMENT4 };
+	glNamedFramebufferDrawBuffers(fbo.forward_render, 5, attachments);
 
 	// Editor selection
 	create_and_delete_texture(tex.editor_selection_depth_buffer);
@@ -779,11 +786,6 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	create_and_delete_texture(tex.scene_gbuffer2);
 	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
 	set_default_parameters(tex.scene_gbuffer2);
-
-	// for mouse picking
-	create_and_delete_texture(tex.editor_id_buffer);
-	glTextureStorage2D(tex.editor_id_buffer, 1, GL_RGBA8, s_w, s_h);
-	set_default_parameters(tex.editor_id_buffer);
 
 	// Create Gbuffer
 	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives

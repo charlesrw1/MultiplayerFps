@@ -9,11 +9,12 @@
 #include <unordered_map>
 #include <algorithm>
 #include <memory>
+#include <unordered_set>
 #include "Framework/Config.h"
 
 #include "Framework/Hashset.h"
 
-//https://gist.github.com/hydren/f60d107f144fcb41dd6f898b126e17b2
+// reworked https://gist.github.com/hydren/f60d107f144fcb41dd6f898b126e17b2
 
 static inline Uint16 formatSampleSize(Uint16 format) { return (format & 0xFF) / 8; }
 
