@@ -3,7 +3,6 @@
 #include <string>
 #include "Types.h"
 #include "Framework/Config.h"
-#include "Render/ParticlesPublic.h"
 #include "Game/Entity.h"
 
 #include "Debug.h"

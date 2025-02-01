@@ -18,9 +18,7 @@
 #include "Game/AssetPtrArrayMacro.h"
 #include "Scripting/FunctionReflection.h"
 
-
-CLASS_IMPL(MeshComponent);
-
+#include "Framework/VectorReflect2.h"
 
 MeshComponent::~MeshComponent()
 {
@@ -97,28 +95,6 @@ void MeshComponent::set_material_override(const MaterialInstance* mi)
 	else
 		eMaterialOverride[0] = { (MaterialInstance*)mi };
 	update_handle();	//fixme
-}
-
-const PropertyInfoList* MeshComponent::get_props() {
-
-	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, eMaterialOverride);
-
-
-		auto t = &Model::StaticType.classname;
-	const char* str = Model::StaticType.classname;
-	START_PROPS(MeshComponent)
-		REG_ASSET_PTR(model, PROP_DEFAULT),
-		REG_ASSET_PTR(animator_tree, PROP_DEFAULT),
-		REG_BOOL(cast_shadows, PROP_DEFAULT, "1"),
-		REG_BOOL(is_skybox, PROP_DEFAULT, "0"),
-		REG_BOOL(is_visible,PROP_DEFAULT,"1"),
-
-		REG_STDVECTOR(eMaterialOverride, PROP_DEFAULT | PROP_EDITOR_ONLY),
-
-		REG_FUNCTION_EXPLICIT_NAME(set_material_override,"set_material"),
-		REG_FUNCTION(set_model),
-		REG_FUNCTION(set_is_visible)
-	END_PROPS(MeshCompponent)
 }
 
 void MeshComponent::editor_on_change_property()

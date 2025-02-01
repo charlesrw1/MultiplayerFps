@@ -3,6 +3,7 @@ Debug/
 Release/
 Data/
 x64/
+Source/.generated/
 
 *.ttf
 *.glb

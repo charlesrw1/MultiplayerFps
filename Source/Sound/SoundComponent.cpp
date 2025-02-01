@@ -4,7 +4,6 @@
 #include "GameEnginePublic.h"
 #include "Game/Components/MeshbuilderComponent.h"
 #include "Game/Entity.h"
-CLASS_IMPL(SoundComponent);
 
 #ifdef EDITOR_BUILD
 void SoundComponent::update_ed_mesh()
@@ -24,7 +23,7 @@ void SoundComponent::update_player()
 	player->asset = sound.get();
 	player->minRadius = minRadius;
 	player->maxRadius = maxRadius;
-	player->attenuation = attenuation;
+	player->attenuation = (SndAttenuation)attenuation;
 	player->attenuate = attenuate;
 	player->spatialize = spatialize;
 	player->spatial_pos = get_ws_position();
@@ -63,7 +62,7 @@ void SoundComponent::play_one_shot_at_pos(const glm::vec3& v)
 {
 	isound->play_sound(
 		sound.get(),
-		1, 1, minRadius, maxRadius, attenuation, attenuate, spatialize, v
+		1, 1, minRadius, maxRadius, (SndAttenuation)attenuation, attenuate, spatialize, v
 	);
 }
 
@@ -83,22 +82,6 @@ void SoundComponent::on_changed_transform()
 	if (player) {
 		player->spatial_pos = get_ws_position();
 	}
-}
-const PropertyInfoList* SoundComponent::get_props()
-{
-	START_PROPS(SoundComponent)
-#ifdef EDITOR_BUILD
-		REG_BOOL_W_CUSTOM(editor_test_sound, PROP_EDITABLE, "BoolButton", "Test Sound"),
-#endif
-		REG_ASSET_PTR(sound,PROP_DEFAULT),
-		REG_FLOAT(minRadius,PROP_DEFAULT,"1"),
-		REG_FLOAT(maxRadius,PROP_DEFAULT,"5"),
-		REG_INT(attenuation,PROP_DEFAULT,"0,0,2"),
-		REG_BOOL(attenuate,PROP_DEFAULT,"1"),
-		REG_BOOL(spatialize, PROP_DEFAULT, "1"),
-		REG_BOOL(looping,PROP_DEFAULT,"0"),
-		REG_BOOL(enable_on_start, PROP_DEFAULT,"0")
-	END_PROPS(SoundComponent)
 }
 
 SoundComponent::SoundComponent() {

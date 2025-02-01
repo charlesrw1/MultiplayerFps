@@ -402,9 +402,6 @@
     <ClInclude Include="Source\Render\RenderFog.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\ParticlesPublic.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\EnvProbe.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
@@ -412,9 +409,6 @@
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\DrawTypedefs.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\ParticlesLocal.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\ProgramCaching.h">
@@ -455,7 +449,6 @@
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
     <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
-    <ClInclude Include="Source\Game\Components\SoundComponent.h" />
     <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\Sound\SoundLocal.h">
@@ -507,6 +500,10 @@
     <ClInclude Include="Source\Game\AssetPtrMacro.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
+    <ClInclude Include="Source\Framework\Reflection2.h" />
+    <ClInclude Include="Source\Game\CarGame\CarGame.h" />
+    <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
+    <ClInclude Include="Source\Framework\VectorReflect2.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -708,9 +705,6 @@
     <ClCompile Include="Source\Render\Model.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\Particles.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
@@ -765,5 +759,8 @@
     <ClCompile Include="Source\Scripting\ScriptComponent.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".clang-format" />
   </ItemGroup>
 </Project>

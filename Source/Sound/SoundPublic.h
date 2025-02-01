@@ -2,9 +2,6 @@
 #include "Assets/IAsset.h"
 #include <glm/glm.hpp>
 
-// rudimentary sound system
-// one shot and retained sounds
-// sound stealing based on distance to listener
 
 enum class SndAttenuation : uint8_t
 {
@@ -79,7 +76,7 @@ public:
         glm::vec3 spatial_pos
     ) = 0;
 
-    // retained functions
+    // retained functions, use set_play()
     virtual SoundPlayer* register_sound_player() = 0;
     virtual void remove_sound_player(SoundPlayer*& sp) = 0;
 };

@@ -3,7 +3,6 @@
 #include "SoundPublic.h"
 #include <SDL2/SDL_mixer.h>
 #include "Framework/Util.h"
-#include "Framework/FreeList.h"
 #include "Assets/IAsset.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
@@ -11,8 +10,8 @@
 #include <memory>
 #include <unordered_set>
 #include "Framework/Config.h"
-
 #include "Framework/Hashset.h"
+#include "Framework/Files.h"
 
 // reworked https://gist.github.com/hydren/f60d107f144fcb41dd6f898b126e17b2
 
@@ -419,7 +418,7 @@ public:
     std::unordered_set<SoundPlayerInternal*> all_sound_players;
     std::vector<PlaybackSpeedEffectHandler<int16_t>> pitch_modifiers;
 };
-#include "Framework/Files.h"
+
 inline bool SoundFile::load_asset(ClassBase*&)
 {
     std::string pathfull = FileSys::get_full_path_from_game_path( get_name() );

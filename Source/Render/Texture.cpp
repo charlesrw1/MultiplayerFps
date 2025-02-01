@@ -3,6 +3,7 @@
 
 #include "glm/glm.hpp"
 
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -11,7 +12,6 @@
 
 #include "Framework/Files.h"
 #include "Framework/DictParser.h"
-#undef OPAQUE
 #include "Assets/AssetRegistry.h"
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetDatabase.h"

@@ -1429,7 +1429,6 @@ void GameEngineLocal::init()
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 	isound->init();
 	mods.init();
-	iparticle->init();
 	//cl->init();
 	//sv->init();
 	imgui_context = ImGui::CreateContext();
