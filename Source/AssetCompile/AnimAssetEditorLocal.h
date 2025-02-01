@@ -89,7 +89,7 @@ public:
 	Model* outputModel = nullptr;
 	ModelImportSettings* importSettings = nullptr;
 	AnimImportSettings* animImportSettings = nullptr;
-	const AnimationSeq* sequence = nullptr;
+	const AnimationSeqAsset* sequence = nullptr;
 	std::unique_ptr<EditModelAnimations> animEdit;
 
 	MulticastDelegate<> on_pre_save;

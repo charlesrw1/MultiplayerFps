@@ -18,7 +18,7 @@
 #include "Game/SerializePtrHelpers.h"	// for AssetPtr
 #include "Game/AssetPtrMacro.h"
 
-#include "AssetCompile/AnimationSeqLoader.h"
+#include "Animation/AnimationSeqAsset.h"
 
 #include <type_traits>
 #include <cassert>

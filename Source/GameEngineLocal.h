@@ -175,6 +175,12 @@ public:
 
 	bool is_host() const override { return true; }
 
+#ifdef EDITOR_BUILD
+	// stores state changes to enable forwards/backwards when editing
+	// like ["start_ed Map mymap", "map mymap"]
+	std::vector<std::string> engine_map_state_history;
+	std::vector<std::string> engine_map_state_future;
+#endif
 private:
 	// when game goes into focus mode, the mouse position is saved so it can be reset when exiting focus mode
 	int saved_mouse_x=0, saved_mouse_y=0;

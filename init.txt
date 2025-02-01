@@ -30,6 +30,8 @@ bind F6 "r.debug_mode 6"
 bind F7 "r.debug_mode 7"
 bind F8 "r.debug_mode 8"
 
+bind F11 "toggle vid.fullscreen"
+
 REG_GAME_TAG Player
 REG_GAME_TAG Hitbox
 REG_GAME_TAG Ragdoll
@@ -42,6 +44,9 @@ bind "Keypad 5" Ctrl "FILTER_FOR AnimGraph"
 bind "Keypad 6" Ctrl "FILTER_FOR DataClass"
 bind "Keypad 7" Ctrl "FILTER_FOR AnimationSeq"
 bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
+
+bind "Left" Alt "EDITOR_BACK_ONE_PAGE"
+bind "Right" Alt "EDITOR_FORWARD_ONE_PAGE"
 
 bind "Keypad 0" Ctrl "CLEAR_AB_FILTER"
 

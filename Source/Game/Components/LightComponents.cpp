@@ -236,15 +236,6 @@ PointLightComponent::~PointLightComponent() {}
 SpotLightComponent::~SpotLightComponent() {}
 #include "Render/Render_Volumes.h"
 
-#define REG_BOOL_W_CUSTOM(name, flags, custom, hint) make_bool_property_custom(#name,offsetof(TYPE_FROM_START, name), flags, hint, custom)
-PropertyInfo make_bool_property_custom(const char* name, uint16_t offset, uint32_t flags, const char* hint, const char* custom)
-{
-	PropertyInfo prop(name, offset, flags);
-	prop.type = core_type_id::Bool;
-	prop.range_hint = hint;
-	prop.custom_type_str = custom;
-	return prop;
-}
 
 CLASS_H(SkylightComponent,EntityComponent)
 public:

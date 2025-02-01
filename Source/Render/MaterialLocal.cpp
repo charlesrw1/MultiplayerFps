@@ -750,7 +750,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	if (is_alphatested())
 		masterShader.insert(0,
 			"#define ALPHATEST\n");
-	if (blend != blend_state::OPAQUE)
+	if (blend != blend_state::OPAQUE || light_mode==LightingMode::Unlit)
 		masterShader.insert(0,
 			"#define FORWARD_SHADER\n"
 		);

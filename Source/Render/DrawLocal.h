@@ -52,7 +52,7 @@ struct Render_Level_Params {
 
 	enum Pass_Type { 
 		OPAQUE, 
-		TRANSLUCENT, 
+		FORWARD_PASS, 
 		DEPTH, 
 		SHADOWMAP 
 	};
@@ -375,7 +375,6 @@ public:
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, 
 		bool depth_test_enabled,
-		bool depth_write_enabled,
 		bool force_show_backfaces,
 		bool depth_less_than_op
 	);

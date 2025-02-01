@@ -96,7 +96,7 @@ bool compile_texture_asset(const std::string& gamepath)
 		auto texfile = FileSys::open_read_game(gamepath);
 		auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
 		if (!tisfile) {
-			sys_print(Error, "couldn't find texture import settings file\n");
+			sys_print(Warning, "couldn't find texture import settings file\n");
 			return false;
 		}
 		bool needsCompile = texfile == nullptr;

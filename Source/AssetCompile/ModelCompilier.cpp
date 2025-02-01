@@ -26,6 +26,8 @@
 // Physx needed for cooking meshes:
 #include <physx/cooking/PxCooking.h>
 
+#include <fstream>
+
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
@@ -1915,7 +1917,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		 }
 	 }
 }
-#include "AnimationSeqLoader.h"
+
 unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 	std::string outputName,
 	const std::vector<int>& LOAD_bone_to_FINAL_bone, 
@@ -1987,11 +1989,13 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 
 
 	{
-		std::vector<std::string> animNames;
-		outputName = outputName.substr(14);
-		for (auto& o : final_out->allseqs)
-			animNames.push_back(o.first);
-		g_animseq.update_manifest_with_model(outputName, animNames);
+		std::string outname = FileSys::get_full_path_from_game_path(strip_extension(outputName) + ".anims");
+		sys_print(Debug, "writing .anims file: %s\n", outname.c_str());
+		std::ofstream outfile(outname);
+		for (auto& o : final_out->allseqs) {
+			outfile << o.first << "\n";
+		}
+		outfile.close();
 	}
 
 

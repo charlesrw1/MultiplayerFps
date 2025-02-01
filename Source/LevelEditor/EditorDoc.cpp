@@ -468,7 +468,7 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 		sys_print(Debug, "creating new map using template map (for prefab): %s\n",name);
 		eng->open_level(name);	// queues load of template map
 	}
-	eng_local.on_map_load_return.add(this, &EditorDoc::on_map_load_return);
+	eng->get_on_map_delegate().add(this, &EditorDoc::on_map_load_return);
 
 	assert(!gui->parent);
 	eng->get_gui()->add_gui_panel_to_root(gui.get());
@@ -480,7 +480,7 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 
 void EditorDoc::close_internal()
 {
-	eng_local.on_map_load_return.remove(this);
+	eng->get_on_map_delegate().remove(this);
 
 	// level will get unloaded in the main loop
 
@@ -1029,6 +1029,7 @@ void ManipulateTransformTool::update()
 	ImGuizmo::GetStyle().TranslationLineThickness = 6.0;
 	ImGuizmo::GetStyle().RotationLineThickness = 6.0;
 	ImGuizmo::GetStyle().ScaleLineThickness = 6.0;
+
 
 
 	glm::vec3 snap(-1);

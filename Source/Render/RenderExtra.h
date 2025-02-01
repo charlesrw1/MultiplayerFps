@@ -142,7 +142,7 @@ public:
 		float radius = 0.4;
 		float intensity = 2.5;
 		float bias = 0.1;
-		float blur_sharpness = 40.0;
+		float blur_sharpness = 3.0;
 	}tweak;
 
 	gpu::HBAOData data = {};

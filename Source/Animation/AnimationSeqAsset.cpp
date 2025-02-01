@@ -1,12 +1,12 @@
-#include "AnimationSeqLoader.h"
+#include "AnimationSeqAsset.h"
 
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
-#include "Someutils.h"
+#include "AssetCompile/Someutils.h"
 #include "Framework/ObjectSerialization.h"
-AnimationSeqLoader g_animseq;
 
-CLASS_IMPL(AnimationListManifest);
+#include <fstream>
+
 #ifdef EDITOR_BUILD
 extern IEditorTool* g_animseq_editor;
 class AnimationSeqAssetMetadata : public AssetMetadata
@@ -25,14 +25,15 @@ public:
 	}
 
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override
-	{
-		auto manifest = g_animseq.manifest;
-
-
-		for (int i = 0; i < manifest->items.size(); i++) {
-			auto& item = manifest->items[i];
-			for (auto& a : item.animList) {
-				filepaths.push_back(strip_extension(item.name) + "/" + a);
+	{	
+		for (auto f : FileSys::find_game_files()) {
+			if (get_extension(f) == ".anims") {
+				std::ifstream infile(f);
+				std::string a;
+				std::string base = strip_extension(FileSys::get_game_path_from_full_path(f)) + "/";
+				while (std::getline(infile, a)) {
+					filepaths.push_back(base + a);
+				}
 			}
 		}
 	}
@@ -51,20 +52,7 @@ REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 
 CLASS_IMPL(AnimationSeqAsset);
 
-void AnimationSeqLoader::init()
-{
-	auto file = FileSys::open_read_game("AnimManifest.txt");
-	if (file) {
-		DictParser dp;
-		dp.load_from_file(file.get());
-		StringView tok;
-		dp.read_string(tok);
-		manifest = read_object_properties<AnimationListManifest>(nullptr, dp, tok);
-	}
-	if (!manifest) {
-		manifest = new AnimationListManifest;
-	}
-}
+
 #include "Render/Model.h"
 #include "Animation/SkeletonData.h"
 #include "Assets/AssetDatabase.h"
@@ -79,10 +67,15 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 	std::string modName = path.substr(0, pos) + ".cmdl";
 	std::string animName = path.substr(pos + 1);
 
-	srcModel = GetAssets().find_sync<Model>(modName);
+	srcModel = GetAssets().find_assetptr_unsafe<Model>(modName);
 	if (srcModel && srcModel->get_skel()) {
 		int dummy{};
 		seq = srcModel->get_skel()->find_clip(animName, dummy);
+
+#ifdef EDITOR_BUILD
+		srcModel->reload_dependents.insert(this);
+#endif
+
 		return true;
 	}
 	else
@@ -93,24 +86,21 @@ void AnimationSeqAsset::sweep_references() const
 {
 	GetAssets().touch_asset(srcModel.get_unsafe());
 }
-
-#include <fstream>
-void AnimationSeqLoader::update_manifest_with_model(const std::string& modelName, const std::vector<std::string>& animNames)
-{
-	bool found = false;
-	for (int i = 0; i < manifest->items.size(); i++) {
-		if (manifest->items[i].name == modelName) {
-			manifest->items.erase(manifest->items.begin() + i);
-			break;
-		}
+void AnimationSeqAsset::move_construct(IAsset* _other) {
+	auto other = (AnimationSeqAsset*)_other;
+#ifdef EDITOR_BUILD
+	if (other->srcModel.get()) {
+		other->srcModel->reload_dependents.erase(other);
+		other->srcModel->reload_dependents.insert(this);
 	}
-	AnimationListManifest::Item i;
-	i.name = modelName;
-	i.animList = animNames;
-	manifest->items.push_back(i);
-
-	DictWriter dw;
-	write_object_properties(manifest, nullptr, dw);
-	auto outfile = FileSys::open_write_game("AnimManifest.txt");
-	outfile->write(dw.get_output().data(), dw.get_output().size());
+#endif
+	*this = std::move(*other);
+}
+void AnimationSeqAsset::uninstall()
+{
+#ifdef EDITOR_BUILD
+	if (srcModel) {
+		srcModel->reload_dependents.erase(this);
+	}
+#endif
 }

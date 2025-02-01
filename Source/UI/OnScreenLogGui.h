@@ -48,6 +48,8 @@ public:
 				color.a = int((total_time-time) / time_to_fade *255.f);
 
 			glm::ivec2 texoffset = { 0,font->base };
+			offset.x += 10;
+			offset.y += 10;
 			b.draw_text(ws_position + glm::ivec2{ 1,1 } + offset+ texoffset, ws_size, font, sv, { 0,0,0,color.a });
 			b.draw_text(ws_position+offset+ texoffset, ws_size, font, sv, color);
 			height++;

@@ -466,7 +466,7 @@
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
-    <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
+    <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
     <ClInclude Include="Source\Game\GameMain.h" />
@@ -506,6 +506,7 @@
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
     <ClInclude Include="Source\Game\AssetPtrMacro.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
+    <ClInclude Include="Source\Sound\SoundComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -730,7 +731,7 @@
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
-    <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
+    <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
@@ -763,5 +764,6 @@
     <ClCompile Include="Source\Animation\SkeletonData.cpp" />
     <ClCompile Include="Source\Scripting\ScriptComponent.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
+    <ClCompile Include="Source\Sound\SoundComponent.cpp" />
   </ItemGroup>
 </Project>

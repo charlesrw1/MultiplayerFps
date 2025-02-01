@@ -9,7 +9,7 @@
 #include "MiscEditors/DataClass.h"
 #include "Framework/Curve.h"
 #include "Animation/Event.h"
-#include "AnimationSeqLoader.h"
+#include "Animation/AnimationSeqAsset.h"
 
 #include "Framework/ArrayReflection.h"
 #include "Game/SerializePtrHelpers.h"

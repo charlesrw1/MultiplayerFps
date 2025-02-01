@@ -16,7 +16,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Game/LevelAssets.h"
 #include "Animation/Runtime/Animation.h"
-#include "AssetCompile/AnimationSeqLoader.h"
+#include "Animation/AnimationSeqAsset.h"
 #include "Game/AssetPtrMacro.h"
 #include "Game/EntityPtrArrayMacro.h"
 
@@ -244,7 +244,7 @@ public:
 				for (auto c : get_owner()->get_all_children()) {
 					if (c->get_parent_bone() == names[index]) {
 						auto p = c->get_first_component<PhysicsComponentBase>();
-						p->apply_impulse(c->get_ws_position(), dmg.dir * 1.f);
+						p->apply_impulse(c->get_ws_position(), dmg.dir * 0.3f);
 						break;
 					}
 				}
@@ -406,10 +406,13 @@ struct TopDownControls
 	InputActionInstance* look{};
 };
 #include "Animation/SkeletonData.h"
+#include "Sound/SoundComponent.h"
 CLASS_H(TopDownPlayer, Entity)
 public:
 
 	TopDownControls con;
+	AssetPtr<PrefabAsset> shotgunSoundAsset;
+	SoundComponent* cachedShotgunSound = nullptr;
 
 	TopDownPlayer() {
 		set_ticking(true);
@@ -434,7 +437,8 @@ public:
 			ASSERT(CameraComponent::get_scene_camera() == the_camera);
 		}
 
-
+		shotgunSoundAsset = GetAssets().find_sync<PrefabAsset>("top_down/shotgun_sound.pfb");
+		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset.get())->get_first_component<SoundComponent>();
 
 		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());
@@ -534,8 +538,11 @@ public:
 
 				pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0),glm::quat_cast(rotationMatrix),pc->get_owner()->get_ls_scale());
 			}
+
 			shake.start(0.08);
 			shoot_cooldown = 0.8;
+
+			cachedShotgunSound->play_one_shot_at_pos(get_ws_position());
 		}
 	}
 

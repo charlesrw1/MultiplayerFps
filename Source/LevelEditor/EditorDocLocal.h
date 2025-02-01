@@ -11,6 +11,7 @@
 
 #include "Render/RenderObj.h"
 #include <stdexcept>
+#include "Game/Entity.h"
 
 #include "Framework/Factory.h"
 #include "Framework/PropertyEd.h"
@@ -23,7 +24,7 @@
 #include "Assets/AssetBrowser.h"
 #include "Framework/MulticastDelegate.h"
 
-#include "GameEngineLocal.h"	// has local access to internals
+#include "GameEnginePublic.h"
 
 #include "AssetCompile/Someutils.h"
 #include <algorithm>

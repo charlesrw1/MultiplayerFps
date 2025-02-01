@@ -955,7 +955,6 @@ void Renderer::execute_render_lists(
 	Render_Lists& list, 
 	Render_Pass& pass, 
 	bool depth_test_enabled,
-	bool depth_write_enabled,
 	bool force_show_backfaces,
 	bool depth_less_than_op)
 {
@@ -988,7 +987,8 @@ void Renderer::execute_render_lists(
 		state.backface_culling = !show_backface&&!force_show_backfaces;
 		state.blend = blend;
 		state.depth_testing = depth_test_enabled;
-		state.depth_writes = depth_write_enabled;
+		//state.depth_writes = depth_write_enabled;
+		state.depth_writes = !mat->get_master_material()->is_translucent();
 		state.depth_less_than = depth_less_than_op;
 		device.set_pipeline(state);
 
@@ -1156,7 +1156,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 		const bool depth_less_than = params.pass == Render_Level_Params::SHADOWMAP;	// else, GL_GREATER
 		const bool depth_testing = true;
-		const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
+		//const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
 
 
 		// renderdoc seems to hate mdi for some reason, so heres an option to disable it
@@ -1165,7 +1165,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		else
 			execute_render_lists(*params.rl, *params.rp, 
 				depth_testing,
-				depth_writes,
 				force_backface_state,
 				depth_less_than
 				);
@@ -1336,6 +1335,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	// objects were added correctly in back to front order, just sort by layer
 	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
 	{
+		if (a.sort_key.blending < b.sort_key.blending) return true;
 		if (a.sort_key.distance > b.sort_key.distance) return true;
 		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
 			return a.submesh_index < b.submesh_index;
@@ -1790,9 +1790,11 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 					mat = matman.get_fallback();
 				const MasterMaterialImpl* mm = mat->get_master_material();
 				
-				if (mm->is_translucent()) {
+				if (mm->render_in_forward_pass()) {
 					if(is_visible)
 						transparent_pass.add_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
+					if (!mm->is_translucent()&&casts_shadow)
+						shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
 				}
 				else {
 					if(casts_shadow)
@@ -2532,7 +2534,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	//draw_height_fog();
 
 	{
-		GPUSCOPESTART(TRANSPARENTS_PASS);
+		GPUSCOPESTART(FORWARD_PASS);
 
 		const auto& view_to_use = current_frame_main_view;
 		RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
@@ -2542,7 +2544,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 			view_to_use,
 			&scene.transparent_rlist,
 			&scene.transparent_pass,
-			Render_Level_Params::TRANSLUCENT
+			Render_Level_Params::FORWARD_PASS
 		);
 		
 		params.upload_constants = true;

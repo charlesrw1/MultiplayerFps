@@ -14,7 +14,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Game/LevelAssets.h"
 #include "Animation/Runtime/Animation.h"
-#include "AssetCompile/AnimationSeqLoader.h"
+#include "Animation/AnimationSeqAsset.h"
 #include "imgui.h"
 #include "Physics/Physics2.h"
 #include "Game/AssetPtrMacro.h"
@@ -136,7 +136,7 @@ public:
 
 			float current_speed = glm::length(body->get_linear_velocity());
 			const float delta_angle = (current_speed * eng->get_dt()) / wheel_radius;
-
+			tire_screech_amt = 0.0;
 		//Debug::add_line(body_t[3], glm::vec3(body_t[3]) + up_vec*2.f, COLOR_PINK, 0);
 		for (int i = 0; i < 4; i++) {
 			auto w = wheels[i];
@@ -198,6 +198,7 @@ public:
 
 			float l = glm::length(side_ddt);
 			if (l > epsilon_friction && touching_ground) {
+				tire_screech_amt += l;
 				side_ddt = glm::normalize(side_ddt);
 				float normal_force = (d * spring_constant - dxdt * spring_damp);
 				if (touching_ground) {
@@ -240,6 +241,8 @@ public:
 
 	static const PropertyInfoList* get_props() = delete;
 
+	float tire_screech_amt = 0.0;
+
 	float forward_force = 0.f;
 	float steer_angle = 0.0;
 	float brake_force = 0.0;
@@ -258,6 +261,79 @@ public:
 };
 CLASS_IMPL(CarComponent);
 CLASS_IMPL(WheelComponent);
+
+float car_pitch_min = 0.5;
+float car_pitch_max = 2.0;
+float pitchinterp = 0.1;
+float sqthresh = 2.0;
+void car_pitch_menu()
+{
+	ImGui::DragFloat("car_pitch_min", &car_pitch_min, 0.01);
+	ImGui::DragFloat("car_pitch_max", &car_pitch_max, 0.01);
+	ImGui::DragFloat("pitchinterp", &pitchinterp, 0.01);
+	ImGui::DragFloat("sqthresh", &sqthresh, 0.01);
+
+
+}
+ADD_TO_DEBUG_MENU(car_pitch_menu);
+
+#include "Sound/SoundComponent.h"
+using PIL = PropertyInfoList;
+
+CLASS_H(CarSoundMaker,EntityComponent)
+public:
+	CarSoundMaker() : r(4052347) {}
+
+	AssetPtr<PrefabAsset> engineSoundAsset;
+	AssetPtr<PrefabAsset> tireSoundAsset;
+	SoundComponent* engineSound{};
+	SoundComponent* tireSound{};
+
+
+	CarComponent* car = nullptr;
+	void start() {
+		car = get_owner()->get_first_component<CarComponent>();
+		{
+			engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_first_component<SoundComponent>();
+			tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_first_component<SoundComponent>();
+			engineSound->get_owner()->parent_to_entity(get_owner());
+			tireSound->get_owner()->parent_to_entity(get_owner());
+
+		}
+		engineSound->set_play(true);
+		set_ticking(true);
+	}
+	static const PIL* get_props() {
+		START_PROPS(CarSoundMaker)
+			REG_ASSET_PTR(engineSoundAsset,PROP_DEFAULT),
+			REG_ASSET_PTR(tireSoundAsset, PROP_DEFAULT),
+		END_PROPS(CarSoundMaker)
+	}
+
+	void update() {
+		float target = glm::mix(car_pitch_min, car_pitch_max,car->forward_force);
+		cur_pitch = damp_dt_independent(target, cur_pitch, pitchinterp, eng->get_dt());
+		engineSound->set_pitch(cur_pitch);
+
+		if (car->tire_screech_amt > sqthresh) {
+			if (!is_squel) {
+				tireSound->set_pitch(r.RandF(0.9, 1.1));
+				is_squel = true;
+			}
+			squel_start = eng->get_game_time();
+			tireSound->set_play(true);
+		}
+		else if (squel_start + 0.4 < eng->get_game_time()) {
+			is_squel = false;
+			tireSound->set_play(false);
+		}
+	}
+	Random r;
+	bool is_squel = false;
+	float squel_start = 0.0;
+	float cur_pitch = 1.0;
+};
+CLASS_IMPL(CarSoundMaker);
 
 
 CLASS_H(CarDriver,EntityComponent)

@@ -47,7 +47,7 @@
     <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
-    <ClInclude Include="Source\AssetCompile\AnimationSeqLoader.h" />
+    <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
     <ClInclude Include="Source\AssetCompile\Compiliers.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
@@ -176,6 +176,7 @@
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptAsset.h" />
     <ClInclude Include="Source\Scripting\ScriptComponent.h" />
+    <ClInclude Include="Source\Sound\SoundComponent.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\OsInput.h" />
     <ClInclude Include="Source\Particles\ParticlesLocal.h" />
@@ -232,7 +233,7 @@
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
-    <ClCompile Include="Source\AssetCompile\AnimationSeqLoader.cpp" />
+    <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />
@@ -334,6 +335,7 @@
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Scripting\ScriptComponent.cpp" />
+    <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />
     <ClCompile Include="Source\Test\Test.cpp" />

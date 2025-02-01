@@ -55,13 +55,22 @@ public:
 	GUIButtonWithSound(const SoundFile* s) : s(s) {}
 	const SoundFile* s = nullptr;
 	void on_pressed(int x, int y, int b) override {
-		if (b == 1 && s)
-			isound->play_sound(s);
+
+		if (b == 1 && s) {
+			isound->play_sound(
+				s,
+				1, 1, 0, 0, {}, false, false, {}
+			);
+		}
 		GUIButton::on_pressed(x, y, b);
 	}
 	void on_released(int x, int y, int b) override {
-		if (b == 1 && s)
-			isound->play_sound(s);
+		if (b == 1 && s) {
+			isound->play_sound(
+				s,
+				1, 1, 0, 0, {}, false, false, {}
+			);
+		}
 		GUIButton::on_released(x, y, b);
 	}
 };

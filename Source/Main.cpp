@@ -46,7 +46,6 @@
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
 
-#include "AssetCompile/AnimationSeqLoader.h"
 #include "Assets/AssetDatabase.h"
 
 #include "Input/InputSystem.h"
@@ -185,8 +184,12 @@ void Quit()
 	exit(0);
 }
 
+ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
+
 void sys_print(LogType type, const char* fmt, ...)
 {
+	if ((int(type)) > loglevel.get_integer())
+		return;
 
 	va_list args;
 	va_start(args, fmt);
@@ -376,9 +379,36 @@ DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
 		else sys_print(Error, "no valid map");
 	}
 }
+DECLARE_ENGINE_CMD(EDITOR_BACK_ONE_PAGE)
+{
+	if (eng_local.engine_map_state_history.size() <= 1) {
+		sys_print(Warning, "history empty\n");
+		return;
+	}
+	eng_local.engine_map_state_future.push_back(eng_local.engine_map_state_history.back());
+	eng_local.engine_map_state_history.pop_back();
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, eng_local.engine_map_state_history.back().c_str());
+	eng_local.engine_map_state_history.pop_back();	// will get appended again
+}
+DECLARE_ENGINE_CMD(EDITOR_FORWARD_ONE_PAGE)
+{
+	if (eng_local.engine_map_state_future.empty()) {
+		sys_print(Warning, "future empty\n");
+		return;
+	}
+	eng_local.engine_map_state_history.push_back(eng_local.engine_map_state_future.back());
+	eng_local.engine_map_state_future.pop_back();
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, eng_local.engine_map_state_history.back().c_str());
+	eng_local.engine_map_state_history.pop_back();	// will get appended again
+}
 
 DECLARE_ENGINE_CMD(close_ed)
 {
+	{
+		eng_local.engine_map_state_history.push_back(
+			"close_ed"
+		);
+	}
 	eng_local.change_editor_state(nullptr,"");
 }
 
@@ -397,6 +427,21 @@ DECLARE_ENGINE_CMD(start_ed)
 		const char* file_to_open = "";	// make a new map
 		if (args.size() == 3)
 			file_to_open = args.at(2);
+		
+		{
+			std::string cmd = args.at(0);
+			cmd += " ";
+			cmd += args.at(1);
+			if (args.size() == 3) {
+				cmd += " ";
+				cmd += args.at(2);
+			}
+			eng_local.engine_map_state_history.push_back(
+				cmd
+			);
+		}
+
+
 		eng_local.change_editor_state(metadata->tool_to_edit_me(),metadata->get_arg_for_editortool(), file_to_open);
 	}
 	else {
@@ -511,6 +556,15 @@ DECLARE_ENGINE_CMD(map)
 	if (eng->get_current_tool() != nullptr) {
 		sys_print(Warning,"starting game so closing any editors\n");
 		eng_local.change_editor_state(nullptr,"");	// close any editors
+	}
+
+	{
+		std::string cmd = args.at(0);
+		cmd += " ";
+		cmd += args.at(1);
+		eng_local.engine_map_state_history.push_back(
+			cmd
+		);
 	}
 #endif
 
@@ -728,6 +782,7 @@ int main(int argc, char** argv)
 {
 	eng_local.argc = argc;
 	eng_local.argv = argv;
+
 	eng_local.init();
 	eng_local.loop();
 	eng_local.cleanup();
@@ -940,6 +995,7 @@ void GameEngineLocal::cleanup()
 	if (get_current_tool())
 		get_current_tool()->close();
 #endif
+	isound->cleanup();
 
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
@@ -1158,6 +1214,10 @@ bool GameEngineLocal::game_draw_screen()
 	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
 	scene_camera->last_vs = vs;
 
+
+	// fixme
+	isound->set_listener_position(vs.origin,in[1]);
+
 	idraw->scene_draw(params,vs, get_gui());
 
 	return true;
@@ -1166,6 +1226,14 @@ bool GameEngineLocal::game_draw_screen()
 void GameEngineLocal::draw_screen()
 {
 	GPUFUNCTIONSTART;
+
+	if (g_window_fullscreen.was_changed()) {
+		uint32_t flags = 0;
+		if (g_window_fullscreen.get_bool())
+			flags = SDL_WINDOW_FULLSCREEN_DESKTOP;
+		SDL_SetWindowFullscreen(window, flags);
+	}
+
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1191,6 +1259,10 @@ void GameEngineLocal::draw_screen()
 		if (get_current_tool() != nullptr) {
 			params.is_editor = true;	// draw to the id buffer for mouse picking
 			auto vs = get_current_tool()->get_vs();
+
+			// fixme
+			isound->set_listener_position(vs->origin,glm::normalize(glm::cross(vs->front,glm::vec3(0,1,0))));
+
 			if (!vs) {
 				params.draw_world = false;
 				vs = &vs_for_gui;
@@ -1325,9 +1397,8 @@ void GameEngineLocal::init()
 
 	program_time_start = GetTime();
 
-	// initialize class reflection/creation system
+	// must come first
 	ClassBase::init_class_reflection_system();
-
 
 	level = nullptr;
 	tick_interval = 1.0 / 60.0;
@@ -1336,25 +1407,21 @@ void GameEngineLocal::init()
 	//sv.reset( new Server );
 	//cl.reset( new Client );
 
-
-	// window initilization
 	init_sdl_window();
 
 	Profiler::init();
 
-	// file system and asset init
 	FileSys::init();
-	GetAssets().init();
+	AssetDatabase::get().init();
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 #endif
 
-	GetGInput().init();
+	GameInputSystem::get().init();
 	register_input_actions_for_game();
 
 	g_physics.init();
 	//network_init();
-	g_animseq.init();
 	// renderer init
 	idraw->init();
 	imaterials->init();

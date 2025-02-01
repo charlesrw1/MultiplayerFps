@@ -31,7 +31,7 @@ void AnimationEditorTool::add_to_obj(Render_Object& obj, float dt)
 		return;
 
 	Pose pose;
-	util_calc_rotations(mod->get_skel(), g_animseq_editor_static.sequence, g_animseq_editor_static.animEdit->CURRENT_TIME, nullptr, pose);
+	util_calc_rotations(mod->get_skel(), g_animseq_editor_static.sequence->seq, g_animseq_editor_static.animEdit->CURRENT_TIME, nullptr, pose);
 	auto& animator = g_animseq_editor_static.animator;
 	animator.model = mod;
 	animator.cached_bonemats.resize(mod->get_skel()->get_num_bones());
@@ -138,8 +138,8 @@ void EditModelAnimations::on_start()
 
 	auto seq = g_animseq_editor_static.sequence;
 
-	curveedit.max_x_value = seq->num_frames;
-	seqimgui.max_x_value = seq->num_frames;
+	curveedit.max_x_value = seq->seq->num_frames;
+	seqimgui.max_x_value = seq->seq->num_frames;
 
 	auto& c = *g_animseq_editor_static.animImportSettings;
 	for (int i = 0; i < c.events.size(); i++) {
@@ -263,7 +263,7 @@ void AnimationEditorTool::post_map_load_callback()
 		sys_print(Debug,"compilied model didnt load but loading .def didnt error, continuing as normal\n");
 	else {
 		int remapIndx;
-		sequence = outputModel->get_skel()->find_clip(animName, remapIndx);
+		sequence = GetAssets().find_sync<AnimationSeqAsset>(modelName + "/" + animName).get();// outputModel->get_skel()->find_clip(animName, remapIndx);
 	}
 
 	on_start.invoke();
@@ -310,7 +310,6 @@ bool AnimationEditorTool::save_document_internal()
 		ModelCompilier::compile_from_settings(fullpath.c_str(), importSettings);
 		outputModel = default_asset_load<Model>(get_doc_name());
 		int dummy;
-		sequence = outputModel->get_skel()->find_clip(animName, dummy);
 
 		on_post_save.invoke();
 	}
@@ -326,7 +325,6 @@ bool AnimationEditorTool::save_document_internal()
 			auto animName = str.substr(slash + 1);
 
 			int dummy;
-			g_animseq_editor_static.sequence = g_animseq_editor_static.outputModel->get_skel()->find_clip(animName, dummy);
 			g_animseq_editor_static.on_post_save.invoke();
 		});
 
