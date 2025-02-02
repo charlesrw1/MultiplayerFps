@@ -22,7 +22,6 @@ Source/.generated/
 *.tlog
 *.exe
 
-*.md
 *.dat
 *.ini
 
