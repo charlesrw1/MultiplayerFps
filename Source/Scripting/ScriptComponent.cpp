@@ -335,7 +335,7 @@ static int special_script_connect(lua_State* L)
 	StringView name(lua_tostring(L, 2));
 	auto p = find_delegate(ent,name);
 	if (!p) {
-		for (auto c : ent->get_all_components()) {
+		for (auto c : ent->get_components()) {
 			p = find_delegate(c, name);
 			if (p) {
 				what = c;

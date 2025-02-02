@@ -41,26 +41,27 @@ public:
 	void destroy();
 
 	template<typename T>
-	T* get_first_component() {
-		return (T*)get_first_component_typeinfo(&T::StaticType);
+	T* get_component() {
+		return (T*)get_component_typeinfo(&T::StaticType);
 	}
 
 	REFLECT(name="get_comp");
-	EntityComponent* get_first_component_typeinfo(const ClassTypeInfo* ti);
+	EntityComponent* get_component_typeinfo(const ClassTypeInfo* ti);
 
 	REFLECT(name="parent",getter)
-	Entity* get_entity_parent() const {
+	Entity* get_parent() const {
 		return parent;
 	}
 	
 	// USE IN RUNTIME! use create_sub_component to setup object in the constructor
 	// this calls on_init()
 	template<typename T>
-	T* create_and_attach_component_type();
-	EntityComponent* create_and_attach_component_type(const ClassTypeInfo* info);
+	T* create_component();
+	EntityComponent* create_component_type(const ClassTypeInfo* info);
+	// will also parent to this
 	template<typename T>
-	T* create_and_attach_entity();
-	Entity* create_and_attach_entity(const ClassTypeInfo* info);
+	T* create_child_entity();
+	Entity* create_child_entity(const ClassTypeInfo* info);
 
 	// USE IN CONSTRUCTOR!, use create_and_attach for normal usage
 	template<typename T>
@@ -113,11 +114,11 @@ public:
 
 	// parent the root component of this to another entity
 	// can use nullptr to unparent
-	void parent_to_entity(Entity* parentEntity);
+	void parent_to(Entity* parentEntity);
 
-	const std::vector<EntityComponent*>& get_all_components() const { return all_components; }
+	const std::vector<EntityComponent*>& get_components() const { return all_components; }
 
-	const std::vector<Entity*>& get_all_children() const { return children; }
+	const std::vector<Entity*>& get_children() const { return children; }
 
 	EntityPtr get_self_ptr() const { return { get_instance_id() }; }
 
@@ -201,7 +202,7 @@ private:
 	static void set_active_R(Entity* e, bool b, bool step1);
 
 	bool has_transform_parent() const {
-		return !get_is_top_level() && get_entity_parent() != nullptr;
+		return !get_is_top_level() && get_parent() != nullptr;
 	}
 
 	void post_change_transform_R(bool ws_is_dirty = true, EntityComponent* skipthis = nullptr);
@@ -282,12 +283,12 @@ inline T* Entity::construct_sub_entity(const char* name) {
 }
 
 template<typename T>
-inline T* Entity::create_and_attach_component_type() {
+inline T* Entity::create_component() {
 	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
-	return (T*)create_and_attach_component_type(&T::StaticType);
+	return (T*)create_component_type(&T::StaticType);
 }
 template<typename T>
-inline T* Entity::create_and_attach_entity() {
+inline T* Entity::create_child_entity() {
 	static_assert(std::is_base_of<Entity, T>::value, "Type not derived from EntityComponent");
-	return (T*)create_and_attach_entity(&T::StaticType);
+	return (T*)create_child_entity(&T::StaticType);
 }

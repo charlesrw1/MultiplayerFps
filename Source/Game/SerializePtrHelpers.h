@@ -64,6 +64,11 @@ public:
 		return AssetPtr<K>(newPtr);
 	}
 
+	// implicit conversion to IAsset*
+	operator const T* () const {
+		return get();
+	}
+
 	T* ptr = nullptr;
 };
 using GenericAssetPtr = AssetPtr<IAsset>;

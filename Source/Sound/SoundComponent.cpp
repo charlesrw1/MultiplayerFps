@@ -33,7 +33,7 @@ void SoundComponent::start()
 {
 #ifdef EDITOR_BUILD
 	if (eng->is_editor_level()) {
-		editor_mesh = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		editor_mesh = get_owner()->create_component<MeshBuilderComponent>();
 		editor_mesh->use_background_color = true;
 		editor_mesh->use_transform = true;
 		update_ed_mesh();

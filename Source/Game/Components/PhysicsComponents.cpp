@@ -36,10 +36,10 @@ void PhysicsComponentBase::fetch_new_transform()
 		last_rot = next_rot;
 		next_position = physx_to_glm(pose.p);
 		next_rot = physx_to_glm(pose.q);
-		//if (!get_owner()->get_entity_parent()) {
+		//if (!get_owner()->get_parent()) {
 		//}
 		//else {
-		//	auto parent_t = get_owner()->get_entity_parent()->get_ws_transform();
+		//	auto parent_t = get_owner()->get_parent()->get_ws_transform();
 		//	glm::mat4 myworld = glm::translate(glm::mat4(1.f), physx_to_glm(pose.p)) * glm::mat4_cast(physx_to_glm(pose.q));
 		//	auto mylocal = glm::inverse(parent_t) * myworld;
 		//	next_rot = glm::normalize(glm::quat_cast(mylocal));
@@ -169,8 +169,8 @@ void PhysicsComponentBase::update_bone_parent_animator()
 
 	auto get_the_parent_animator = [&]() -> AnimatorInstance* {
 		if (get_owner()->has_parent_bone()) {
-			if (get_owner()->get_entity_parent()) {
-				auto m = get_owner()->get_entity_parent()->get_cached_mesh_component();
+			if (get_owner()->get_parent()) {
+				auto m = get_owner()->get_parent()->get_cached_mesh_component();
 				if (m) {
 					return m->get_animator_instance();
 				}
@@ -190,7 +190,7 @@ void PhysicsComponentBase::update_bone_parent_animator()
 void PhysicsComponentBase::start()
 {
 	if (eng->is_editor_level()) {
-		auto shape = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		auto shape = get_owner()->create_component<MeshBuilderComponent>();
 		shape->dont_serialize_or_edit = true;
 		editor_shape_id = shape->get_instance_id();
 		auto mb = get_editor_meshbuilder();
@@ -278,7 +278,7 @@ void SphereComponent::add_actor_shapes() {
 	add_sphere_shape_to_actor(glm::vec3(1.f), radius);
 }
 void MeshColliderComponent::add_actor_shapes() {
-	auto mesh = get_owner()->get_first_component<MeshComponent>();
+	auto mesh = get_owner()->get_component<MeshComponent>();
 	if (!mesh)
 		sys_print(Error, "MeshColliderComponent couldnt find MeshComponent");
 	else
@@ -559,7 +559,7 @@ void PhysicsJointComponent::refresh_joint()
 	}
 	PhysicsComponentBase* other = nullptr;
 	if (get_target()) {
-		other= get_target()->get_first_component<PhysicsComponentBase>();
+		other= get_target()->get_component<PhysicsComponentBase>();
 		if (!other) {
 			sys_print(Warning, "Joint component target has no physics component\n");
 		}
@@ -571,7 +571,7 @@ void PhysicsJointComponent::refresh_joint()
 void PhysicsJointComponent::start()
 {
 	if (eng->is_editor_level()) {
-		editor_meshbuilder = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
 		editor_meshbuilder->use_transform = false;
@@ -598,7 +598,7 @@ void PhysicsJointComponent::end()
 }
 
 PhysicsComponentBase* PhysicsJointComponent::get_owner_physics() {
-	return get_owner()->get_first_component<PhysicsComponentBase>();
+	return get_owner()->get_component<PhysicsComponentBase>();
 }
 static glm::mat4 get_transform_joint(JointAnchor anchor, int axis)
 {
@@ -624,7 +624,7 @@ void PhysicsJointComponent::draw_meshbuilder()
 
 	if (!get_target())
 		return;
-	auto other_phys = get_target()->get_first_component<PhysicsComponentBase>();
+	auto other_phys = get_target()->get_component<PhysicsComponentBase>();
 	if (!other_phys)
 		return;
 	world = get_target()->get_ws_transform();

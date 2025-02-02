@@ -66,7 +66,7 @@ private:
 		auto& all_objs = level->get_all_objects();
 		for (auto ent : all_objs) {
 			if (Entity* e = ent->cast_to<Entity>()) {
-				if (!e->get_entity_parent() && !e->dont_serialize_or_edit)
+				if (!e->get_parent() && !e->dont_serialize_or_edit)
 				{
 					Node* me = new Node(this, e);
 					rootnode->add_child(me);
@@ -100,7 +100,7 @@ private:
 		Node() {}
 		Node(ObjectOutliner* oo, Entity* initfrom) {
 			handle = initfrom->get_instance_id();
-			auto& children = initfrom->get_all_children();
+			auto& children = initfrom->get_children();
 			for (auto& c : children) {
 				if (!c->dont_serialize_or_edit) {
 					Node* other = new Node(oo, c);

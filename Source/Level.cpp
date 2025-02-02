@@ -158,9 +158,9 @@ void Level::remove_from_update_list(BaseUpdater* b) {
 void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es, InlineVec<EntityComponent*, 16>& cs)
 {
 	es.push_back(e);
-	for (auto c : e->get_all_components())
+	for (auto c : e->get_components())
 		cs.push_back(c);
-	for (auto child : e->get_all_children())
+	for (auto child : e->get_children())
 		add_entities_and_components_to_init_R(child, es, cs);
 }
 
@@ -217,7 +217,7 @@ void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 		all_world_ents.insert(c->get_instance_id(), c);
 	}
 
-	for (auto child : e->get_all_children())
+	for (auto child : e->get_children())
 		insert_new_native_entity_into_hashmap_R(child);
 }
 

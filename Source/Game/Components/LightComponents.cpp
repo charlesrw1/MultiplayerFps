@@ -42,13 +42,13 @@ void SpotLightComponent::start()
 
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
+		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
-		auto arrow_obj = get_owner()->create_and_attach_entity<Entity>();
+		auto arrow_obj = get_owner()->create_child_entity<Entity>();
 		arrow_obj->dont_serialize_or_edit = true;
-		arrow_obj->create_and_attach_component_type<ArrowComponent>();
+		arrow_obj->create_component<ArrowComponent>();
 		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
 		editor_arrow = arrow_obj->get_instance_id();
 		editor_billboard = b->get_instance_id();
@@ -102,7 +102,7 @@ void PointLightComponent::start()
 
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
+		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/pointBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		editor_billboard = b->get_instance_id();
@@ -163,11 +163,11 @@ void SunLightComponent::start()
 
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_and_attach_component_type<BillboardComponent>();
+		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("icon/_nearest/sun.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
-		auto s = get_owner()->create_and_attach_component_type<ArrowComponent>();
+		auto s = get_owner()->create_component<ArrowComponent>();
 		s->dont_serialize_or_edit = true;
 		editor_arrow = s->get_instance_id();
 		editor_billboard = b->get_instance_id();

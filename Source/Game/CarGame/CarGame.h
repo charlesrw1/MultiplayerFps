@@ -87,9 +87,9 @@ public:
 		memset(wheels, 0, sizeof(wheels));
 	}
 	void start() {
-		body = get_owner()->get_first_component<PhysicsComponentBase>();
-		for (auto c : get_owner()->get_all_children()) {
-			auto w = c->get_first_component<WheelComponent>();
+		body = get_owner()->get_component<PhysicsComponentBase>();
+		for (auto c : get_owner()->get_children()) {
+			auto w = c->get_component<WheelComponent>();
 			if (w) {
 				int index = (!w->front) * 2 + (!w->left);
 				wheels[index] = w;
@@ -144,7 +144,7 @@ public:
 
 	CarComponent* car = nullptr;
 	void start() {
-		car = get_owner()->get_first_component<CarComponent>();
+		car = get_owner()->get_component<CarComponent>();
 		{
 			// spawn_prefab(engineAsset)->get_comp<SoundComponent>()
 			// e = spawn_prefab(tireAsset)
@@ -159,10 +159,10 @@ public:
 			// 
 			// get_owner()->parent_to(get_owner())
 
-			engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_first_component<SoundComponent>();
-			tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_first_component<SoundComponent>();
-			engineSound->get_owner()->parent_to_entity(get_owner());
-			tireSound->get_owner()->parent_to_entity(get_owner());
+			engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_component<SoundComponent>();
+			tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_component<SoundComponent>();
+			engineSound->get_owner()->parent_to(get_owner());
+			tireSound->get_owner()->parent_to(get_owner());
 
 		}
 		engineSound->set_play(true);
@@ -182,13 +182,13 @@ public:
 		inputUser->assign_device(GameInputSystem::get().get_keyboard_device());
 		inputUser->enable_mapping("game");
 		auto camobj = eng->get_level()->spawn_entity_class<Entity>();
-		camera = camobj->create_and_attach_component_type<CameraComponent>();
+		camera = camobj->create_component<CameraComponent>();
 		camera->set_is_enabled(true);
 		move = inputUser->get("game/move");
 		accel = inputUser->get("game/accelerate");
 		brake = inputUser->get("game/deccelerate");
 
-		car = get_owner()->get_first_component<CarComponent>();
+		car = get_owner()->get_component<CarComponent>();
 		set_ticking(true);
 
 		inputUser->get("game/jump")->on_start.add(

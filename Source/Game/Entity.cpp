@@ -95,7 +95,7 @@ void Entity::set_active_R(Entity* e, bool b, bool step1)
 		else {
 			e->deactivate_internal();
 		}
-		for (auto c : e->get_all_components()) {
+		for (auto c : e->get_components()) {
 			if (b) {
 				if (step1)
 					c->activate_internal_step1();
@@ -107,7 +107,7 @@ void Entity::set_active_R(Entity* e, bool b, bool step1)
 			}
 		}
 	}
-	for (auto c : e->get_all_children())
+	for (auto c : e->get_children())
 		set_active_R(c, b, step1);
 }
 
@@ -120,15 +120,15 @@ void Entity::activate()
 	ASSERT(start_disabled);
 	{
 		activate_internal_step1();
-		for (auto comp : get_all_components())
+		for (auto comp : get_components())
 			comp->activate_internal_step1();
-		for (auto c : get_all_children())
+		for (auto c : get_children())
 			Entity::set_active_R(c,true, true);
 
 		activate_internal_step2();
-		for (auto comp : get_all_components())
+		for (auto comp : get_components())
 			comp->activate_internal_step2();
-		for (auto c : get_all_children())
+		for (auto c : get_children())
 			Entity::set_active_R(c, true, false);
 	}
 	ASSERT(is_activated());
@@ -181,8 +181,8 @@ void Entity::destroy_internal()
 	if(init_state == initialization_state::CALLED_START)
 		deactivate_internal();
 
-	if (get_entity_parent())
-		get_entity_parent()->remove_this(this);
+	if (get_parent())
+		get_parent()->remove_this(this);
 	ASSERT(parent == nullptr);
 
 	int loop_count = 0;
@@ -206,7 +206,7 @@ void Entity::destroy_internal()
 	ASSERT(all_components.empty());
 }
 
-void Entity::parent_to_entity(Entity* other)
+void Entity::parent_to(Entity* other)
 {
 	if (other == this) {
 		sys_print(Warning, "cant parent entity to self\n");
@@ -221,17 +221,17 @@ void Entity::parent_to_entity(Entity* other)
 		Entity* cur_node = other;
 		while (cur_node) {
 
-			if (cur_node->get_entity_parent() == this) {
+			if (cur_node->get_parent() == this) {
 				remove_this(cur_node);
-				cur_node->parent_to_entity(parent);	// parent circular child entity to my parent
+				cur_node->parent_to(parent);	// parent circular child entity to my parent
 				break;
 			}
-			cur_node = cur_node->get_entity_parent();
+			cur_node = cur_node->get_parent();
 		}
 	}
 
-	if (get_entity_parent())
-			get_entity_parent()->remove_this(this);
+	if (get_parent())
+		get_parent()->remove_this(this);
 	
 	if (!other)
 		return;
@@ -245,7 +245,7 @@ void Entity::parent_to_entity(Entity* other)
 		while (check) {
 			if (check == this)
 				return false;
-			check = check->get_entity_parent();
+			check = check->get_parent();
 			loop_count++;
 			ASSERT(loop_count < 100);
 		};
@@ -289,7 +289,7 @@ Entity::~Entity()
 	//ASSERT(all_components.empty());
 }
 
-EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* info)
+EntityComponent* Entity::create_component_type(const ClassTypeInfo* info)
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
@@ -305,13 +305,13 @@ EntityComponent* Entity::create_and_attach_component_type(const ClassTypeInfo* i
 	return ec;
 }
 
-Entity* Entity::create_and_attach_entity(const ClassTypeInfo* info)
+Entity* Entity::create_child_entity(const ClassTypeInfo* info)
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
 	Entity* e = eng->get_level()->spawn_entity_from_classtype(*info);
 	ASSERT(e);
-	e->parent_to_entity(this);
+	e->parent_to(this);
 
 	return e;
 }
@@ -413,14 +413,14 @@ void Entity::set_ws_transform(const glm::mat4& transform)
 
 glm::mat4 Entity::get_parent_transform() const
 {
-	ASSERT(get_entity_parent());
-	if (!has_parent_bone() || !get_entity_parent()->get_cached_mesh_component()) {
-		return get_entity_parent()->get_ws_transform();
+	ASSERT(get_parent());
+	if (!has_parent_bone() || !get_parent()->get_cached_mesh_component()) {
+		return get_parent()->get_ws_transform();
 	}
 	else {
 		return
-			get_entity_parent()->get_ws_transform()
-			* get_entity_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone.name);
+			get_parent()->get_ws_transform()
+			* get_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone.name);
 
 	}
 }
@@ -457,9 +457,9 @@ public:
 	{
 		Entity* self = (Entity*)instance;
 		if (!has_init) {
-			Entity* parent = self->get_entity_parent();
+			Entity* parent = self->get_parent();
 			if (parent) {
-				MeshComponent* mc = parent->get_first_component<MeshComponent>();
+				MeshComponent* mc = parent->get_component<MeshComponent>();
 				if (mc && mc->get_model() && mc->get_model()->get_skel()) {
 					const Model* mod = mc->get_model();
 					auto skel = mod->get_skel();
@@ -610,7 +610,7 @@ class EntityTagSerialize : public IPropertySerializer
 };
 ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");
 
-EntityComponent* Entity::get_first_component_typeinfo(const ClassTypeInfo* ti) {
+EntityComponent* Entity::get_component_typeinfo(const ClassTypeInfo* ti) {
 	if (!ti)
 		return nullptr;
 	for (int i = 0; i < all_components.size(); i++)

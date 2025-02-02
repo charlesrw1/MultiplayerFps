@@ -294,7 +294,7 @@ public:
 			{
 				Entity* e = nullptr;
 				auto scope = level->spawn_prefab_deferred(e, projectile.get());
-				auto cball = e->get_first_component<CannonballC>();
+				auto cball = e->get_component<CannonballC>();
 				cball->target_pos = playerpos;
 				e->set_ws_position(get_ws_position());
 			}

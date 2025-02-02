@@ -36,7 +36,7 @@ Entity* LevelSerializationContext::get_entity(uint64_t handle)
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)
 {
 	if (!for_prefab) return false;
-	bool has_parent = b->get_entity_parent();
+	bool has_parent = b->get_parent();
 	return !has_parent || (b->is_root_of_prefab&&for_prefab==b->what_prefab);
 }
 
@@ -56,7 +56,7 @@ std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for
 
 		if (auto e = obj->cast_to<Entity>()) {
 			if (am_i_the_root_prefab_node(e, for_prefab)) {
-				ASSERT(e->is_root_of_prefab || !e->get_entity_parent());
+				ASSERT(e->is_root_of_prefab || !e->get_parent());
 				return "/";
 			}
 			// fallthrough
@@ -128,7 +128,7 @@ void serialize_new_object_text_R(
 
 		Entity* parent = nullptr;
 		if (auto ent = b->cast_to<Entity>()) {
-			parent = ent->get_entity_parent();
+			parent = ent->get_parent();
 		}
 		else {
 			auto ec = b->cast_to<EntityComponent>();
@@ -151,12 +151,12 @@ void serialize_new_object_text_R(
 	if (this_is_newly_created(e, for_prefab))
 		serialize_new(e, dont_write_parent);
 
-	auto& all_comps = e->get_all_components();
+	auto& all_comps = e->get_components();
 	for (auto c : all_comps) {
 		if (!c->dont_serialize_or_edit && this_is_newly_created(c, for_prefab))
 			serialize_new(c, false);
 	}
-	auto& children = e->get_all_children();
+	auto& children = e->get_children();
 	for (auto child : children)
 		serialize_new_object_text_R(child, out, false /* dont_write_parent=false*/, for_prefab, output);
 }
@@ -183,7 +183,7 @@ const Entity* find_entity_diff_in_children_R(const Entity* input, const Entity* 
 {
 	if (input->unique_file_id == check->unique_file_id)
 		return check;
-	for (auto c : check->get_all_children()) {
+	for (auto c : check->get_children()) {
 		auto ptr = find_entity_diff_in_children_R(input, c);
 		if (ptr) return ptr;
 	}
@@ -191,12 +191,12 @@ const Entity* find_entity_diff_in_children_R(const Entity* input, const Entity* 
 }
 const EntityComponent* find_component_diff_in_children_R(const EntityComponent* input, const Entity* check)
 {
-	for (auto c : check->get_all_components()) {
+	for (auto c : check->get_components()) {
 		if (c->unique_file_id == input->unique_file_id)
 			return c;
 	}
 
-	for (auto c : check->get_all_children()) {
+	for (auto c : check->get_children()) {
 		auto ptr = find_component_diff_in_children_R(input, c);
 		if (ptr) return ptr;
 	}
@@ -207,9 +207,9 @@ void validate_for_prefab_R(Entity* e, PrefabAsset* for_prefab)
 {
 	//if(!(e->what_prefab==for_prefab&&e->is_root_of_prefab&&e->creator_source==nullptr))
 	//	ASSERT(e->creator_source != nullptr || e->is_native_created);
-	//for(auto c : e->get_all_components())
+	//for(auto c : e->get_components())
 	//	ASSERT(c->creator_source != nullptr || c->is_native_created);
-	//for (auto c : e->get_all_children())
+	//for (auto c : e->get_children())
 	//	validate_for_prefab_R(c, for_prefab);
 }
 
@@ -246,7 +246,7 @@ void add_to_write_set_R(Entity* o, std::unordered_set<Entity*>& to_write)
 	if (o->dont_serialize_or_edit)
 		return;
 	to_write.insert(o);
-	for (auto c : o->get_all_children())
+	for (auto c : o->get_children())
 		add_to_write_set_R(c, to_write);
 
 }
@@ -259,7 +259,7 @@ std::vector<Entity*> root_objects_to_write(const std::vector<Entity*>& input_obj
 
 	std::vector<Entity*> roots;
 	for (auto o : to_write) {
-		if (!o->get_entity_parent() || to_write.find(o->get_entity_parent()) == to_write.end())
+		if (!o->get_parent() || to_write.find(o->get_parent()) == to_write.end())
 			roots.push_back(o);
 	}
 
@@ -333,10 +333,10 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 
 	if (!e->dont_serialize_or_edit) {
 		write_obj(e);
-		for (auto comp : e->get_all_components())
+		for (auto comp : e->get_components())
 			if (!comp->dont_serialize_or_edit)
 				write_obj(comp);
-		for (auto o : e->get_all_children())
+		for (auto o : e->get_children())
 			serialize_overrides_R(o, for_prefab, output, out, ctx);
 	}
 }
@@ -366,7 +366,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 		auto ent = obj->cast_to<Entity>();
 		ASSERT(ent);
 		ASSERT(!ent->dont_serialize_or_edit);
-		auto root_parent = ent->get_entity_parent();
+		auto root_parent = ent->get_parent();
 		if (root_parent)
 				add_to_extern_parents(obj, root_parent);
 			

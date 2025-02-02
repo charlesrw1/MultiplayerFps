@@ -138,7 +138,7 @@ public:
 				if (o.e->is_root_of_prefab && o.e->what_prefab)
 					name = o.e->what_prefab->get_name().c_str();
 				else {
-					if (auto m = o.e->get_first_component<MeshComponent>()) {
+					if (auto m = o.e->get_component<MeshComponent>()) {
 						if (m->get_model())
 							name = m->get_model()->get_name().c_str();
 					}
@@ -335,7 +335,7 @@ Entity* EditorDoc::get_prefab_root_entity()
 		if (auto e = o->cast_to<Entity>()) {
 			if (e->dont_serialize_or_edit)
 				continue;
-			if (!e->get_entity_parent()) {
+			if (!e->get_parent()) {
 				return e;
 			}
 		}
@@ -373,7 +373,7 @@ void EditorDoc::validate_prefab()
 		if (auto e = o->cast_to<Entity>()) {
 			if (e->dont_serialize_or_edit)
 				continue;
-			if (!e->get_entity_parent()) {
+			if (!e->get_parent()) {
 				if (root) {
 					deleteList.push_back(e);
 				}
@@ -1285,7 +1285,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			if (e->is_root_of_prefab && e->what_prefab)
 				name = e->what_prefab->get_name().c_str();
 			else {
-				if (auto m = e->get_first_component<MeshComponent>()) {
+				if (auto m = e->get_component<MeshComponent>()) {
 					if (m->get_model())
 						name = m->get_model()->get_name().c_str();
 				}
@@ -1390,7 +1390,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		ImGui::PopID();
 	};
 
-	for (auto& c : entity->get_all_components())
+	for (auto& c : entity->get_components())
 		if(!c->dont_serialize_or_edit)
 			draw_component(entity, c);
 }
@@ -1458,7 +1458,7 @@ void EdPropertyGrid::draw()
 			}
 
 			
-			auto& comps = ent->get_all_components();
+			auto& comps = ent->get_components();
 			{
 				if (selected_component == 0 && comps.size() > 0)
 					selected_component = comps[0]->get_instance_id();
@@ -1780,7 +1780,7 @@ void EdPropertyGrid::refresh_grid()
 		}
 
 		
-		auto& comps = entity->get_all_components();
+		auto& comps = entity->get_components();
 
 		if (!comps.empty()) {
 			if (selected_component == 0)
@@ -1826,7 +1826,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
 
 				auto ent = eng->get_level()->spawn_entity_class<Entity>();
-				ent->create_and_attach_component_type<MeshComponent>()->set_model(model.get());
+				ent->create_component<MeshComponent>()->set_model(model.get());
 				ent->set_ws_transform(transform);
 				
 			}

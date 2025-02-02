@@ -102,7 +102,7 @@ public:
 		g_physics.trace_ray(res, pos, newpos, &ig, (1 << (int)PL::Character));
 
 		if (res.component) {
-			auto owner = res.component->get_owner()->get_first_component<TopDownHealthComponent>();
+			auto owner = res.component->get_owner()->get_component<TopDownHealthComponent>();
 			if (owner) {
 				DamageEvent dmg;
 				dmg.amt = damage;
@@ -137,10 +137,10 @@ NEWCLASS(EnableRagdollScript, EntityComponent)
 public:
 	void start() override {
 		auto e = get_owner();
-		auto& children = e->get_all_children();
+		auto& children = e->get_children();
 		for (auto c : children) {
 			if (c->get_tag() != StringName("Ragdoll")) continue;
-			auto phys = c->get_first_component<PhysicsComponentBase>();
+			auto phys = c->get_component<PhysicsComponentBase>();
 			if (!phys)
 				continue;
 
@@ -162,10 +162,10 @@ class TopDownUtil
 public:
 	static void enable_ragdoll_shared(Entity* e, const glm::mat4& last_ws, bool enable)
 	{
-		auto& children = e->get_all_children();
+		auto& children = e->get_children();
 		for (auto c : children) {
 			if (c->get_tag() != StringName("Ragdoll")) continue;
-			auto phys = c->get_first_component<PhysicsComponentBase>();
+			auto phys = c->get_component<PhysicsComponentBase>();
 			if (!phys)
 				continue;
 
@@ -215,7 +215,7 @@ public:
 NEWCLASS(TopDownEnemyComponent, EntityComponent)
 public:
 	void start() override {
-		auto health = get_owner()->get_first_component<TopDownHealthComponent>();
+		auto health = get_owner()->get_component<TopDownHealthComponent>();
 		ASSERT(health);
 		health->on_death.add(this, [&](DamageEvent dmg)
 			{
@@ -223,7 +223,7 @@ public:
 				is_dead = true;
 				death_time = eng->get_game_time();
 
-				auto cap = get_owner()->get_first_component<PhysicsComponentBase>();
+				auto cap = get_owner()->get_component<PhysicsComponentBase>();
 				cap->set_is_enable(false);
 				cap->destroy_deferred();
 
@@ -232,9 +232,9 @@ public:
 				Random r(get_instance_id());
 				const StringName names[] = { StringName("mixamorig:Hips"),StringName("mixamorig:Neck1"),StringName("mixamorig:RightLeg") };
 				int index = r.RandI(0, 2);
-				for (auto c : get_owner()->get_all_children()) {
+				for (auto c : get_owner()->get_children()) {
 					if (c->get_parent_bone() == names[index]) {
-						auto p = c->get_first_component<PhysicsComponentBase>();
+						auto p = c->get_component<PhysicsComponentBase>();
 						p->apply_impulse(c->get_ws_position(), dmg.dir * 0.3f);
 						break;
 					}
@@ -242,7 +242,7 @@ public:
 
 			});
 
-		auto capsule = get_owner()->get_first_component<CapsuleComponent>();
+		auto capsule = get_owner()->get_component<CapsuleComponent>();
 		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());
 		ccontroller->capsule_height = capsule->height;
@@ -294,7 +294,7 @@ NEWCLASS(TopDownCameraReg, EntityComponent)
 public:
 	void start() override {
 		ASSERT(TopDownGameManager::instance);
-		auto cam = get_owner()->get_first_component<CameraComponent>();
+		auto cam = get_owner()->get_component<CameraComponent>();
 		TopDownGameManager::instance->static_level_cam = cam;
 		cam->set_is_enabled(true);
 	}

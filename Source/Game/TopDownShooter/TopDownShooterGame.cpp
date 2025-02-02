@@ -55,7 +55,7 @@ public:
 		set_call_init_in_editor(true);
 	}
 	void start() override {
-		light = get_owner()->get_first_component<PointLightComponent>();
+		light = get_owner()->get_component<PointLightComponent>();
 		set_ticking(true);
 	}
 	void update() override {

@@ -77,7 +77,10 @@ NEWCLASS(TopDownPlayer, Entity)
 public:
 
 	TopDownControls con;
+
+	REFLECT();
 	AssetPtr<PrefabAsset> shotgunSoundAsset;
+
 	SoundComponent* cachedShotgunSound = nullptr;
 
 	TopDownPlayer() {
@@ -98,13 +101,13 @@ public:
 
 		{
 			auto cameraobj = eng->get_level()->spawn_entity_class<Entity>();
-			the_camera = cameraobj->create_and_attach_component_type<CameraComponent>();
+			the_camera = cameraobj->create_component<CameraComponent>();
 			the_camera->set_is_enabled(true);
 			ASSERT(CameraComponent::get_scene_camera() == the_camera);
 		}
 
 		shotgunSoundAsset = GetAssets().find_sync<PrefabAsset>("top_down/shotgun_sound.pfb");
-		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset.get())->get_first_component<SoundComponent>();
+		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset.get())->get_component<SoundComponent>();
 
 		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());
@@ -182,7 +185,7 @@ public:
 			for (int i = 0; i < count; i++) {
 
 				auto projectile = eng->get_level()->spawn_prefab(GetAssets().find_sync<PrefabAsset>("top_down/projectile.pfb").get());
-				auto pc = projectile->get_first_component<ProjectileComponent>();
+				auto pc = projectile->get_component<ProjectileComponent>();
 				pc->ignore = capsule;
 				const float spread = 0.15;
 				pc->direction = lookdir + glm::vec3(r.RandF(-spread, spread), 0, r.RandF(-spread, spread));
@@ -284,7 +287,7 @@ public:
 		//pos = glm::mix(pos, mouse_pos, 0.15);
 		glm::vec3 camera_pos;
 		if (is_jumping)
-			camera_pos = glm::vec3(pos.x + 3.0, pos.y + 2.0, pos.z - 3.0);
+			camera_pos = glm::vec3(pos.x + 3.0, pos.y + 1.0, pos.z - 3.0);
 		else
 			camera_pos = glm::vec3(pos.x, pos.y + 12.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - (pos + glm::vec3(0, 1, 0)));
@@ -349,7 +352,7 @@ public:
 	virtual void on_init() override {
 		if (get_owner()) {
 			p = get_owner()->cast_to<TopDownPlayer>();
-			e = get_owner()->get_first_component<TopDownEnemyComponent>();
+			e = get_owner()->get_component<TopDownEnemyComponent>();
 		}
 	}
 	virtual void on_update(float dt) override {

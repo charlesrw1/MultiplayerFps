@@ -866,7 +866,7 @@ void Player::on_foot_update()
 		 bike->set_ws_position(get_ws_position());
 	 }
 	 set_ws_position(glm::vec3(0, 0, 0.5));
-	 parent_to_entity(bike);
+	 parent_to(bike);
 }
  void Player::end() {
 	 GameInputSystem::get().free_input_user(inputPtr);

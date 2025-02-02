@@ -36,7 +36,7 @@ void UnserializedSceneFile::add_components_and_children_from_entity_R(const std:
 		auto cpath = path + "~" + std::to_string(c->unique_file_id);
 		all_objs.insert({ cpath,c });
 	}
-	for (auto& child : e->get_all_children())
+	for (auto& child : e->get_children())
 	{
 		auto cpath = path + "~" + std::to_string(child->unique_file_id);
 		all_objs.insert({ cpath, child });
@@ -87,7 +87,7 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 		auto path_to_use = (path == "/") ? "" : path + "/";
 		add_components_and_children_from_entity_R(path_to_use,entity_obj, entity_obj);
 		if (parent_ent)
-			entity_obj->parent_to_entity(parent_ent);
+			entity_obj->parent_to(parent_ent);
 	}
 	else {
 		auto comp_obj = e->cast_to<EntityComponent>();
@@ -162,7 +162,7 @@ void unserialize_one_item_text(
 			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", asset, inout_root_entity);
 			this_prefab_root->is_root_of_prefab = true;
 			if(parent)
-				this_prefab_root->parent_to_entity(parent);
+				this_prefab_root->parent_to(parent);
 		}
 		// entity or component
 		else {

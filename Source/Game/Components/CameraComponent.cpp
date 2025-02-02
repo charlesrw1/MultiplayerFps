@@ -16,11 +16,11 @@ void CameraComponent::start()
 {
 	if (eng->is_editor_level()) {
 
-		editor_mesh = get_owner()->create_and_attach_component_type<MeshComponent>();
+		editor_mesh = get_owner()->create_component<MeshComponent>();
 		editor_mesh->set_model(GetAssets().find_global_sync<Model>("camera_model.cmdl").get());
 		editor_mesh->dont_serialize_or_edit = true;
 
-		editor_mbview = get_owner()->create_and_attach_component_type<MeshBuilderComponent>();
+		editor_mbview = get_owner()->create_component<MeshBuilderComponent>();
 		editor_mbview->dont_serialize_or_edit = true;
 		editor_mbview->use_transform = false;
 		editor_mbview->use_background_color = true;

@@ -34,7 +34,7 @@ public:
 		for (auto e : ents)
 			this->entities.push_back(e->get_self_ptr());
 		for (auto e : ents)
-			this->prev_parents.push_back(e->get_entity_parent() ? e->get_entity_parent()->get_self_ptr() : EntityPtr());
+			this->prev_parents.push_back(e->get_parent() ? e->get_parent()->get_self_ptr() : EntityPtr());
 		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr();
 	}
 	void execute() {
@@ -47,7 +47,7 @@ public:
 				return;
 			}
 			auto ws_transform = e->get_ws_transform();
-			e->parent_to_entity(parent_to_ent);
+			e->parent_to(parent_to_ent);
 			e->set_ws_transform(ws_transform);
 		}
 
@@ -62,7 +62,7 @@ public:
 				return;
 			}
 			auto ws_transform = e->get_ws_transform();
-			e->parent_to_entity(prev);
+			e->parent_to(prev);
 			e->set_ws_transform(ws_transform);
 		}
 
@@ -95,7 +95,7 @@ public:
 			if (ent) {
 				handle = ent->get_self_ptr();
 				if (parent_to.get())
-					ent->parent_to_entity(parent_to.get());
+					ent->parent_to(parent_to.get());
 				else
 					ent->set_ws_transform(transform);
 				ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
@@ -134,9 +134,9 @@ public:
 
 	void execute() {
 		auto ent = eng->get_level()->spawn_entity_class<Entity>();
-		ent->create_and_attach_component_type<MeshComponent>();
+		ent->create_component<MeshComponent>();
 		if (parent_to.get())
-			ent->parent_to_entity(parent_to.get());
+			ent->parent_to(parent_to.get());
 		else
 			ent->set_ws_transform(transform);
 
@@ -157,7 +157,7 @@ public:
 					if (ent) {
 						auto mesh_ent = ent->cast_to<Entity>();
 						ASSERT(mesh_ent);
-						auto firstmesh = mesh_ent->get_first_component<MeshComponent>();
+						auto firstmesh = mesh_ent->get_component<MeshComponent>();
 						if (firstmesh)
 							firstmesh->set_model(modelP.get());
 						else
@@ -198,7 +198,7 @@ public:
 		assert(ti);
 		auto ent = eng->get_level()->spawn_entity_from_classtype(*ti);
 		if (parent_to.get())
-			ent->parent_to_entity(parent_to.get());
+			ent->parent_to(parent_to.get());
 		else
 			ent->set_ws_transform(transform);
 		ent->set_editor_name(ent->get_type().classname);
@@ -241,7 +241,7 @@ public:
 	}
 
 	void execute_R(Entity* e) {
-		for (auto c : e->get_all_components()) {
+		for (auto c : e->get_components()) {
 			if (this_is_newly_created(c, asset)) {
 				created_obj created;
 				created.eng_handle = c->get_instance_id();
@@ -254,7 +254,7 @@ public:
 				c->unique_file_id = ed_doc.get_next_file_id();
 			}
 		}
-		for (auto c : e->get_all_children()) {
+		for (auto c : e->get_children()) {
 			if (this_is_newly_created(c, asset)) {
 				created_obj created;
 				created.eng_handle = c->get_instance_id();
@@ -327,7 +327,7 @@ public:
 				EntityPtr parent = { ep.external_parent_handle };
 				if (parent.get()) {
 					auto ent = (Entity*)e->second;
-					ent->parent_to_entity(parent.get());
+					ent->parent_to(parent.get());
 				}
 				else
 					sys_print(Warning, "duplicated parent doesnt exist\n");
@@ -439,7 +439,7 @@ public:
 				EntityPtr parent = { ep.external_parent_handle };
 				if (parent.get()) {
 					auto ent = (Entity*)e->second;
-					ent->parent_to_entity(parent.get());
+					ent->parent_to(parent.get());
 				}
 				else
 					sys_print(Warning, "restored parent doesnt exist\n");
