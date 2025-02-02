@@ -85,7 +85,11 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 		sizeof(ModelVertex) * STATIC_VERTEX_SIZE /* size */,
 		nullptr, GL_STATIC_DRAW);
 	vbuffer.allocated = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
-	vbuffer.used = 0;
+	vbuffer.used_total = 0;
+	vbuffer.tail = 0;
+	vbuffer.head = 0;
+
+
 
 	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
 	glGenBuffers(1, &ibuffer.handle);
@@ -94,7 +98,9 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 		index_size * STATIC_INDEX_SIZE /* size */,
 		nullptr, GL_STATIC_DRAW);
 	ibuffer.allocated = index_size * STATIC_INDEX_SIZE;
-	ibuffer.used = 0;
+	ibuffer.used_total = 0;
+	ibuffer.tail = 0;
+	ibuffer.head = 0;
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -128,127 +134,153 @@ int Model::bone_for_name(StringName name) const
 		return -1;
 	return get_skel()->get_bone_index(name);
 }
-DECLARE_ENGINE_CMD_CAT("gpu.", printusage)
-{
-	ModelMan::get().print_usage();
-}
 
 
-#if 0
 void ModelMan::compact_memory()
 {
-	return;
-	float start = GetTime();
-
-	vector<Mesh*> indexlist;
-	vector<Mesh*> vertexlist[3];
-	vector<uint32_t> fixups[3];
-	for (auto& model : models) {
-		indexlist.push_back({ &model.second->mesh });
-		vertexlist[(int)model.second->mesh.format].push_back(&model.second->mesh);
+	sys_print(Debug, "compacting vertex buffer...\n");
+	std::vector<Model*> models;
+	models.reserve(all_models.num_used);
+	for (auto m : all_models) {
+		ASSERT(m->uid != 0);
+		models.push_back(m);
 	}
-	for (auto& prefab : prefabs)
-		for (int i = 0; i < prefab.second->meshes.size(); i++) {
-			indexlist.push_back({ &prefab.second->meshes[i] });
-			vertexlist[prefab.second->meshes[i].format_as_int()].push_back(&prefab.second->meshes[i]);
-		}
-	for (int i = 0; i < 3; i++)fixups[i].resize(vertexlist[i].size());
 
-
-	std::sort(indexlist.begin(), indexlist.end(), [&](const Mesh* a, const Mesh* b) {
-		return a->merged_index_pointer < b->merged_index_pointer;
+	// [.AA.B...CCC.D.....]
+	// pick last item (D)
+	// for item in list:
+	//		move to end
+	//		wrap ptr
+	// [CCC.........DAAB..]
+	
+	// theres an edge case where no models are loaded, but that will never happen (default models)
+	
+	// do indices first
+	std::sort(models.begin(), models.end(), [](Model* a, Model* b)->bool
+		{
+			return a->merged_index_pointer < b->merged_index_pointer;
 		});
-	for (int i = 0; i < 3; i++) {
-		std::sort(vertexlist[i].begin(), vertexlist[i].end(), [&](const Mesh* a, const Mesh* b) {
+	allocator.ibuffer.used_total = models.back()->data.get_num_index_bytes();
+	for (int i = 0; i < models.size() - 1/* skip last */; i++) {
+		int index_ptr = models[i]->merged_index_pointer;
+		allocator.ibuffer.tail = index_ptr;
+		models[i]->merged_index_pointer = allocator.move_append_i_buffer(index_ptr, models[i]->data.get_num_index_bytes());
+	}
+
+	// then verts
+	std::sort(models.begin(), models.end(), [](Model* a, Model* b)->bool
+		{
 			return a->merged_vert_offset < b->merged_vert_offset;
-			});
+		});
+	allocator.vbuffer.used_total = models.back()->data.get_num_vertex_bytes();
+
+	for (int i = 0; i < models.size() - 1/* skip last */; i++) {
+		int vertex_ptr = models[i]->merged_vert_offset * sizeof(ModelVertex);
+		allocator.vbuffer.tail = vertex_ptr;
+		models[i]->merged_vert_offset = allocator.move_append_v_buffer(vertex_ptr, models[i]->data.get_num_vertex_bytes());
+		models[i]->merged_vert_offset /= sizeof(ModelVertex);
 	}
-
-	uint32_t first_free = 0;
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, global_index_buffer.handle);
-	for (int i = 0; i < indexlist.size(); i++) {
-		Mesh* m = indexlist[i];
-		if (m->merged_index_pointer > first_free) {
-			glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, first_free, m->data.indicies.size(), m->data.indicies.data());
-		}
-		m->merged_index_pointer = first_free;
-		first_free += m->data.indicies.size();
-	}
-	global_index_buffer.used = first_free;
-
-	for (int j = 0; j < 3; j++) {
-		auto& vb = global_vertex_buffers[j];
-		auto& vl = vertexlist[j];
-		for (int a = 0; a < MAX_ATTRIBUTES; a++) {
-			if (!(vertex_buffer_formats[j].mask & (1<<a)))
-				continue;
-			int a_size = vertex_attribute_formats[a].get_size();
-
-			first_free = 0;
-			glBindBuffer(GL_ARRAY_BUFFER, vb.attributes[a].handle);
-			for (int i = 0; i < vl.size(); i++) {
-				Mesh* m = vl[i];
-				uint32_t vertex_pointer = m->merged_vert_offset * a_size;
-				if (vertex_pointer > first_free && m->data.buffers[a].size() > 0) {
-					glBufferSubData(GL_ARRAY_BUFFER, first_free, m->data.buffers[a].size(), m->data.buffers[a].data());
-				}
-				if (a == 0)
-					fixups[j][i] = first_free / a_size;
-				first_free += m->data.buffers[a].size();
-			}
-			vb.attributes[a].used = first_free;
-		}
-
-		for (int i = 0; i < vl.size(); i++)
-			vl[i]->merged_vert_offset = fixups[j][i];
-	}
-	float end = GetTime();
-
-	printf("compact geometry time: %f\n", end - start);
 }
-#endif
+DECLARE_ENGINE_CMD(compact_vertex_buffer)
+{
+	ModelMan::get().compact_memory();
+}
 
 void MainVbIbAllocator::print_usage() const
 {
 	auto print_facts = [](const char* name, const buffer& b, int element_size) {
 		float used_percentage = 1.0;
 		if (b.allocated > 0)
-			used_percentage = (double)b.used / (double)b.allocated;
+			used_percentage = (double)b.used_total / (double)b.allocated;
 		used_percentage *= 100.0;
 
-		int used_elements = b.used / element_size;
+		int used_elements = b.used_total / element_size;
 		int allocated_elements = b.allocated / element_size;
-		sys_print(Debug, "%s: %d/%d (%.1f%%) (bytes:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used);
+		sys_print(Debug, "%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used_total, b.tail, b.head);
+
 	};
 	sys_print(Info, "---- MainVbIbAllocator::print_usage ----\n");
 
 	print_facts("Index buffer", ibuffer, MODEL_BUFFER_INDEX_TYPE_SIZE);
 	print_facts("Vertex buffer", vbuffer, sizeof(ModelVertex));
 }
-
-void MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
-	append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
-}
-void MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
-	append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
-}
-
-void MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
-{
-	if (size + buf.used > buf.allocated) {
-		sys_print(Error, "%s buffer overflow %d/%d !!!\n",name, int(size + vbuffer.used), int(vbuffer.allocated));
-		std::fflush(stdout);
-		std::abort();
-	}
-	glBindBuffer(target, buf.handle);
-	glBufferSubData(target, buf.used, size, data);
-	buf.used += size;
-}
-
-
 void ModelMan::print_usage() const
 {
 	allocator.print_usage();
+}
+DECLARE_ENGINE_CMD(print_vertex_usage)
+{
+	ModelMan::get().print_usage();
+}
+
+int MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
+	return append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
+}
+int MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
+	return append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
+}
+int MainVbIbAllocator::move_append_v_buffer(int ofs, int size) {
+	return move_append_buf_shared(ofs, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
+}
+int MainVbIbAllocator::move_append_i_buffer(int ofs, int size) {
+	return move_append_buf_shared(ofs, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
+}
+
+int MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
+{
+	auto out_of_memory = [&]() {
+		sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
+		std::fflush(stdout);
+		std::abort();
+	};
+
+	int where_to_append = buf.head;
+	if (buf.head >= buf.tail) {
+		if (buf.head + size > buf.allocated) {
+			if (size > buf.tail) {
+				out_of_memory();
+			}
+			where_to_append = 0;
+		}
+	}
+	else {
+		if (buf.head + size > buf.tail) {
+			out_of_memory();
+		}
+	}
+
+	glBindBuffer(target, buf.handle);
+	glBufferSubData(target, where_to_append, size, data);
+	buf.used_total += size;
+	buf.head = where_to_append + size;
+	return where_to_append;
+}
+int MainVbIbAllocator::move_append_buf_shared(int ofs, int size, const char* name, buffer& buf, uint32_t target)
+{
+	auto out_of_memory = [&]() {
+		sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
+		std::fflush(stdout);
+		std::abort();
+	};
+	int where_to_append = buf.head;
+	if (buf.head >= buf.tail) {
+		if (buf.head + size > buf.allocated) {
+			if (size > buf.tail) {
+				out_of_memory();
+			}
+			where_to_append = 0;
+		}
+	}
+	else {
+		if (buf.head + size > buf.tail) {
+			out_of_memory();
+		}
+	}
+	glBindBuffer(target, buf.handle);
+	glCopyBufferSubData(target, target, ofs, where_to_append, size);
+	buf.used_total += size;
+	buf.head = where_to_append + size;
+	return where_to_append;
 }
 
 
@@ -275,6 +307,8 @@ void Model::uninstall()
 	tags.clear();
 	materials.clear();
 	uid = 0;	// reset the UID
+
+	ModelMan::get().remove_model_from_list(this);
 }
 
 void Model::sweep_references() const {
@@ -546,6 +580,7 @@ void Model::move_construct(IAsset* _src)
 	tags = std::move(src->tags);
 	materials = std::move(src->materials);
 	skeleton_root_transform = src->skeleton_root_transform;
+	ModelMan::get().add_model_to_list(this);
 
 	src->uninstall();
 }
@@ -692,25 +727,44 @@ void ModelMan::create_default_models()
 // and sets the models ptrs/offsets into the global vertex buffer
 bool ModelMan::upload_model(Model* mesh)
 {
+	ASSERT(mesh);
+	ASSERT(all_models.find(mesh) == nullptr);
+	all_models.insert(mesh);
+
 	mesh->uid = cur_mesh_id++;
 
 	if (mesh->parts.size() == 0)
 		return false;
 
-	mesh->merged_index_pointer = allocator.ibuffer.used;
 
 	size_t indiciesbufsize{};
 	const uint8_t* const ibufferdata = mesh->data.get_index_data(&indiciesbufsize);
-	allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);
-
-	// vertex start offset
-	mesh->merged_vert_offset = allocator.vbuffer.used / sizeof(ModelVertex);
+	mesh->merged_index_pointer = allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);	// dont divide by sizeof(uint16_2), this is an pointer
 
 	size_t vertbufsize{};
 	const uint8_t* const v_bufferdata = mesh->data.get_vertex_data(&vertbufsize);
-	allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
+	mesh->merged_vert_offset = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
+	mesh->merged_vert_offset /= sizeof(ModelVertex);
 
 	return true;
+}
+
+
+void ModelMan::remove_model_from_list(Model* m)
+{
+	ASSERT(m);
+	all_models.remove(m);
+	ASSERT(!all_models.find(m));
+}
+void ModelMan::add_model_to_list(Model* m)
+{
+	ASSERT(m->uid != 0);
+	ASSERT(all_models.find(m) == nullptr);
+	all_models.insert(m);
+}
+ModelMan::ModelMan() : all_models(6)
+{
+
 }
 
 #ifdef EDITOR_BUILD

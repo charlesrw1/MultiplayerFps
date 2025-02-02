@@ -19,6 +19,9 @@ r.enable_vsync 1
 bind , "toggle g_drawdebugmenu"
 bind . "toggle drawconsole"
 
+bind [ "print_vertex_usage"
+bind ] "compact_vertex_buffer"
+
 bind T "toggle editor_draw_name_text"
 
 bind F1 "r.debug_mode 0"

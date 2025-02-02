@@ -1,5 +1,6 @@
 #pragma once
 #include "Render/Model.h"
+#include "Framework/Hashset.h"
 
 // use 16 bit indicies
 const int MODEL_BUFFER_INDEX_TYPE_SIZE = sizeof(uint16_t);
@@ -11,26 +12,34 @@ public:
 	void init(uint32_t num_indicies, uint32_t num_verts);
 	void print_usage() const;
 
-	void append_to_v_buffer(const uint8_t* data, size_t size);
-	void append_to_i_buffer(const uint8_t* data, size_t size);
+	int append_to_v_buffer(const uint8_t* data, size_t size);
+	int append_to_i_buffer(const uint8_t* data, size_t size);
+	int move_append_v_buffer(int ofs, int size);
+	int move_append_i_buffer(int ofs, int size);
 
 
 	struct buffer {
 		bufferhandle handle = 0;
-		uint32_t allocated = 0;
-		uint32_t used = 0;
+		int allocated = 0;
+
+		int used_total = 0;
+	
+		int tail = 0;	// min element
+		int head = 0;	// max element
 	};
 
 	buffer vbuffer;
 	buffer ibuffer;
 
 private:
-	void append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
+	int move_append_buf_shared(int ofs, int size, const char* name, buffer& buf, uint32_t target);
+	int append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 
 class ModelMan
 {
 public:
+	ModelMan();
 	static ModelMan& get() {
 		static ModelMan inst;
 		return inst;
@@ -53,7 +62,10 @@ public:
 	Model* get_light_sphere() const { return LIGHT_SPHERE; }
 	Model* get_light_cone() const { return LIGHT_CONE; }
 
+	void add_model_to_list(Model* m);
+	void remove_model_from_list(Model* m);
 private:
+	hash_set<Model> all_models;
 
 	// Used for gbuffer lighting
 	Model* LIGHT_DOME = nullptr;
@@ -74,7 +86,7 @@ private:
 	//vertexarrayhandle static_vao;
 	MainVbIbAllocator allocator;
 
-	uint32_t cur_mesh_id = 0;
+	uint32_t cur_mesh_id = 1;
 
 	friend class Model;
 	friend class ModelLoadJob;

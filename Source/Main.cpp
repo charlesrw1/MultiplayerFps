@@ -882,6 +882,7 @@ void GameEngineLocal::leave_level()
 void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
 {
 	GetAssets().remove_unreferences();
+	ModelMan::get().compact_memory();
 
 	ASSERT(!level);
 
