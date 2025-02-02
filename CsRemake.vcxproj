@@ -68,6 +68,7 @@
     <ClInclude Include="Source\Game\EntityPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
+    <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
@@ -112,7 +113,6 @@
     <ClInclude Include="Source\External\KHR\khrplatform.h" />
     <ClInclude Include="Source\External\stb_image.h" />
     <ClInclude Include="Source\External\stb_image_write.h" />
-    <ClInclude Include="Source\External\tiny_gltf.h" />
     <ClInclude Include="Source\Framework\AddClassToFactory.h" />
     <ClInclude Include="Source\Framework\BinaryReadWrite.h" />
     <ClInclude Include="Source\Framework\BVH.h" />

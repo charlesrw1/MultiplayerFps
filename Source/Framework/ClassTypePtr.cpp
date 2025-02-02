@@ -32,6 +32,7 @@ class ClassTypePtrSerializer : public IPropertySerializer
 };
 ADDTOFACTORYMACRO_NAME(ClassTypePtrSerializer, IPropertySerializer, "ClassTypePtr");
 
+#ifdef EDITOR_BUILD
 class ClassTypePtrPropertyEditor : public IPropertyEditor
 {
 public:
@@ -73,3 +74,4 @@ public:
 };
 
 ADDTOFACTORYMACRO_NAME(ClassTypePtrPropertyEditor, IPropertyEditor, "ClassTypePtr");
+#endif

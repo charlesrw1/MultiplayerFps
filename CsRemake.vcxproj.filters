@@ -210,9 +210,6 @@
     <ClInclude Include="Source\External\stb_image_write.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\External\tiny_gltf.h">
-      <Filter>Source\External</Filter>
-    </ClInclude>
     <ClInclude Include="Source\External\glad\glad.h">
       <Filter>Source\External</Filter>
     </ClInclude>
@@ -505,6 +502,7 @@
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
+    <ClInclude Include="Source\Navigation\Navigation.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

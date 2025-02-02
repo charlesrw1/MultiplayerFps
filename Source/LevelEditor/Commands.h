@@ -482,7 +482,7 @@ public:
 			sys_print(Warning, "no entity in createcomponentcommand\n");
 			return;
 		}
-		auto ec = e->create_and_attach_component_type(info);
+		auto ec = e->create_component_type(info);
 		comp_handle = ec->get_instance_id();
 		post_create(ec);
 
@@ -564,7 +564,7 @@ public:
 			sys_print(Warning, "no entity in RemoveComponentCommand\n");
 			return;
 		}
-		auto ec = e->create_and_attach_component_type(info);
+		auto ec = e->create_component_type(info);
 		comp_handle = ec->get_instance_id();
 	}
 	std::string to_string() override {

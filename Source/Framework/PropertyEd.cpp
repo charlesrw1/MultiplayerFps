@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "PropertyEd.h"
 #include "imgui.h"
 #include "Assets/AssetDatabase.h"
@@ -872,3 +873,4 @@ bool ArrayRow::draw_row_controls()
 	 }
 	 return ret;
  }
+#endif

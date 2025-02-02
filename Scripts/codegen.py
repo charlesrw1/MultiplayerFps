@@ -339,6 +339,10 @@ def parse_file(root, file_name):
                             ("bool",BOOL_TYPE),
                             ("int",INT_TYPE),
                             ("uint32_t",INT_TYPE),
+                            ("int32_t",INT_TYPE),
+                            ("int16_t",INT_TYPE),
+                            ("uint16_t",INT_TYPE),
+                            ("int64_t",INT_TYPE),
                             ("int8_t",INT_TYPE), 
                             ("uint8_t",INT_TYPE),
                             ("EntityPtr",ENTITYPTR_TYPE),
@@ -377,7 +381,6 @@ def parse_file(root, file_name):
 
 skip_dirs = ["./.generated","./External"]
 
-#just parse the whole project, takes under a second for me
 def read_enum_and_struct_values():
     start_time = time.perf_counter()
     for root, dirs, files in os.walk("."):

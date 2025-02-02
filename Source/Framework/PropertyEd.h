@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include "imgui.h"
 #include <string>
 #include <vector>
@@ -337,3 +337,5 @@ public:
 	}
 	ParsedHintStr hint_str;
 };
+
+#endif

@@ -74,9 +74,6 @@ PropertyInfo GetAtomValueWrapper<EntityPtr>::get() {
 	return make_entity_ptr_property("", 0, PROP_DEFAULT);
 }
 
-// database to map an integer to any type of object, for example models or entities, automatically resolved and editable in the editor
-
-
 Entity::Entity()
 {
 
@@ -448,7 +445,7 @@ void Entity::invalidate_transform(EntityComponent* skipthis)
 	post_change_transform_R(true,skipthis);
 }
 
-
+#ifdef EDITOR_BUILD
 class EntityBoneParentStringEditor : public IPropertyEditor
 {
 public:
@@ -503,6 +500,7 @@ public:
 };
 
 ADDTOFACTORYMACRO_NAME(EntityBoneParentStringEditor, IPropertyEditor, "EntityBoneParentString");
+#endif
 
 class EntityBoneParentStringSerialize : public IPropertySerializer
 {
@@ -543,7 +541,7 @@ DECLARE_ENGINE_CMD(REG_GAME_TAG)
 	}
 	GameTagManager::get().add_tag(args.at(1));
 }
-
+#ifdef EDITOR_BUILD
 class EntityTagEditor : public IPropertyEditor
 {
 public:
@@ -591,7 +589,7 @@ public:
 };
 
 ADDTOFACTORYMACRO_NAME(EntityTagEditor, IPropertyEditor, "EntityTagString");
-
+#endif
 class EntityTagSerialize : public IPropertySerializer
 {
 	// Inherited via IPropertySerializer

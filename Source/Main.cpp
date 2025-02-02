@@ -55,6 +55,7 @@
 #include "LevelSerialization/SerializationAPI.h"
 #include "Render/ModelManager.h"
 
+
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
