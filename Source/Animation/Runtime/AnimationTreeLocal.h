@@ -29,7 +29,7 @@ class Animation_Tree_CFG;
 extern Pool_Allocator g_pose_pool;
 
 // only accepted graph values
-enum class anim_graph_value
+NEWENUM(anim_graph_value,uint8_t)
 {
 	bool_t,
 	float_t,
@@ -37,7 +37,6 @@ enum class anim_graph_value
 	vec3_t,
 	quat_t,
 };
-ENUM_HEADER(anim_graph_value);
 
 
 inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_id type)
@@ -314,12 +313,12 @@ struct Clip_Node_RT : Rt_Vars_Base
 	int remap_index = -1;
 };
 
-enum class rootmotion_setting : uint8_t {
+NEWENUM(rootmotion_setting, uint8_t)
+{
 	keep,
 	remove,
 	add_velocity
 };
-ENUM_HEADER(rootmotion_setting);
 
 
 NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)

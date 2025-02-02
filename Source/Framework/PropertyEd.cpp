@@ -319,13 +319,28 @@ bool FloatEditor::internal_update()
 bool EnumEditor::internal_update()
 {
 	ASSERT(prop->type == core_type_id::Enum8 || prop->type == core_type_id::Enum16 || prop->type == core_type_id::Enum32);
+	ASSERT(prop->enum_type && prop->enum_type->str_count > 0);
+	int64_t myval = prop->get_int(instance);
 
-	int enum_val = prop->get_int(instance);
-	ASSERT(enum_val >= 0 && enum_val < prop->enum_type->str_count);
+	auto myenumint = prop->enum_type->find_for_value(myval);
+	if (!myenumint) {
+		myval = prop->enum_type->strs[0].value;
+		prop->set_int(instance,myval);
+		myenumint = &prop->enum_type->strs[0];
+	}
 
-	bool ret = ImGui::Combo("##combo", &enum_val, prop->enum_type->strs, prop->enum_type->str_count);
-
-	prop->set_int(instance, enum_val);
+	bool ret = false;
+	if (ImGui::BeginCombo("##type", myenumint->name)) {
+		for (auto& enumiterator : *prop->enum_type) {
+			bool selected = enumiterator.value == myval;
+			if (ImGui::Selectable(enumiterator.name, &selected)) {
+				myval = enumiterator.value;
+				prop->set_int(instance, myval);
+				ret = true;
+			}
+		}
+		ImGui::EndCombo();
+	}
 	return ret;
 }
 

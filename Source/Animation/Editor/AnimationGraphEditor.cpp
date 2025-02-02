@@ -1604,11 +1604,14 @@ void ControlParamsWindow::imgui_draw()
 
 
 			ImGui::TableNextColumn();
-			std::string s = EnumTrait<anim_graph_value>::StaticType.get_enum_str((int)res.type);
-			auto find = s.rfind("::");
-			if (find != std::string::npos)
-				s = s.substr(find + 2);
-			ImGui::TextColored(scriptparamtype_to_color(res.type), s.c_str());
+			const EnumIntPair* eip = EnumTrait<anim_graph_value>::StaticType.find_for_value((int)res.type);
+			if (!eip) {
+				printf("Warning: anim_graph_value_t bad\n");
+				res.type = anim_graph_value::bool_t;
+				eip = EnumTrait<anim_graph_value>::StaticType.find_for_value((int)res.type);
+				ASSERT(eip);
+			}
+			ImGui::TextColored(scriptparamtype_to_color(res.type), eip->name);
 
 			ImGui::PopID();
 		}

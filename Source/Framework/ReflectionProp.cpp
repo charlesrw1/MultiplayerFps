@@ -230,9 +230,10 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 	case core_type_id::Enum8:
 	case core_type_id::Enum16:
 	case core_type_id::Enum32: {
-		const char* type_name = prop.enum_type->get_name();
-		const char* enum_str = prop.enum_type->get_enum_str(prop.get_int(ptr));
-		value_str = string_format("%s", enum_str);
+		ASSERT(prop.enum_type);
+		auto v = prop.enum_type->find_for_value(prop.get_int(ptr));
+		if(v)
+			value_str = string_format("%s::%s",prop.enum_type->name, v->name);
 	}break;
 
 	case core_type_id::StdString: {

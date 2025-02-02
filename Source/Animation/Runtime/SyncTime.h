@@ -2,14 +2,14 @@
 #include "Percentage.h"
 #include "Framework/StringName.h"
 #include "Framework/InlineVec.h"
+#include "Framework/EnumDefReflection.h"
 
-
-enum class sync_opt : uint8_t {
+NEWENUM(sync_opt , uint8_t)
+{
 	Default,		// clip can by the leader if it has the highest weight
 	AlwaysLeader,	// clip is always the leader
 	AlwaysFollower,	// clip is always the follower
 };
-ENUM_HEADER(sync_opt);
 
 
 class Node_CFG;

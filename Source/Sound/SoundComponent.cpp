@@ -23,7 +23,7 @@ void SoundComponent::update_player()
 	player->asset = sound.get();
 	player->minRadius = minRadius;
 	player->maxRadius = maxRadius;
-	player->attenuation = (SndAttenuation)attenuation;
+	player->attenuation = (SndAtn)attenuation;
 	player->attenuate = attenuate;
 	player->spatialize = spatialize;
 	player->spatial_pos = get_ws_position();
@@ -62,7 +62,7 @@ void SoundComponent::play_one_shot_at_pos(const glm::vec3& v)
 {
 	isound->play_sound(
 		sound.get(),
-		1, 1, minRadius, maxRadius, (SndAttenuation)attenuation, attenuate, spatialize, v
+		1, 1, minRadius, maxRadius, (SndAtn)attenuation, attenuate, spatialize, v
 	);
 }
 

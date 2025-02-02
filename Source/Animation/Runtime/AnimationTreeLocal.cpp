@@ -80,29 +80,6 @@ CLASS_IMPL(RotationConstant);
 
 CLASS_IMPL(AgSerializeContext);
 
-ENUM_START(anim_graph_value)
-	STRINGIFY_EUNM(anim_graph_value::bool_t,	0),
-	STRINGIFY_EUNM(anim_graph_value::float_t,	1),
-	STRINGIFY_EUNM(anim_graph_value::int_t,		2),
-	STRINGIFY_EUNM(anim_graph_value::vec3_t,	3),
-	STRINGIFY_EUNM(anim_graph_value::quat_t,	4)
-ENUM_IMPL(anim_graph_value);
-
-
-
-ENUM_START(rootmotion_setting)
-	STRINGIFY_EUNM(rootmotion_setting::keep, 0),
-	STRINGIFY_EUNM(rootmotion_setting::remove, 1),
-	STRINGIFY_EUNM(rootmotion_setting::add_velocity, 2)
-ENUM_IMPL(rootmotion_setting);
-
-
-ENUM_START(sync_opt)
-	STRINGIFY_EUNM(sync_opt::Default,0),
-	STRINGIFY_EUNM(sync_opt::AlwaysLeader, 1),
-	STRINGIFY_EUNM(sync_opt::AlwaysFollower, 2)
-ENUM_IMPL(sync_opt)
-
 bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	auto rt = get_rt(ctx);

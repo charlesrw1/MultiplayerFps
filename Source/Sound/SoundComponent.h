@@ -51,7 +51,7 @@ private:
     float maxRadius = 5.f;  // [minRadius,maxRadius] sound will attenuate
     float nonSpatializeRadius = 0.f;    // [0,nonSpatializeRadius] sound will be non spatialized (treated like 2d)
     REFLECT();
-    int attenuation = 0;    // how to attenuate the radius
+    SndAtn attenuation = SndAtn::Linear;    // how to attenuate the radius
     REFLECT();
     bool attenuate = true;
     REFLECT();

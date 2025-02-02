@@ -3,7 +3,7 @@
 #include "Framework/EnumDefReflection.h"
 
 // physics layers
-enum class PL : uint8_t
+NEWENUM(PL, uint8_t)
 {
 	Default,
 	StaticObject,	// static world objects (like static meshes)
@@ -13,6 +13,5 @@ enum class PL : uint8_t
 	Visiblity,		// any ray casts of the world
 };
 using PhysicsLayer = PL;
-ENUM_HEADER(PL);
 
 uint32_t get_collision_mask_for_physics_layer(PhysicsLayer layer);

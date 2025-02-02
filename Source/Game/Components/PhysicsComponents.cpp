@@ -21,30 +21,9 @@
 #include "Game/AssetPtrMacro.h"
 #include "Game/EntityPtrMacro.h"
 
-CLASS_IMPL(PhysicsComponentBase);
-CLASS_IMPL(BoxComponent);
-CLASS_IMPL(CapsuleComponent);
-CLASS_IMPL(SphereComponent);
-CLASS_IMPL(MeshColliderComponent);
-
 ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", CVAR_BOOL, "are physics shapes in the editor depth tested");
 
 using namespace physx;
-
-const PropertyInfoList* PhysicsComponentBase::get_props() {
-	START_PROPS(PhysicsComponentBase)
-		REG_ENUM(physics_layer, PROP_DEFAULT, "PL::Default", PL),
-		REG_BOOL(enabled, PROP_DEFAULT, "1"),
-		REG_BOOL(simulate_physics, PROP_DEFAULT, "0"),
-		REG_BOOL(is_trigger, PROP_DEFAULT, "0"),
-		REG_BOOL(send_hit, PROP_DEFAULT, "0"),
-		REG_BOOL(send_overlap, PROP_DEFAULT, "0"),
-		REG_BOOL(is_static, PROP_DEFAULT, "1"),
-		REG_BOOL(interpolate_visuals, PROP_DEFAULT, "1"),
-		REG_FLOAT(density, PROP_DEFAULT, "2.0"),
-		REG_MULTICAST_DELEGATE(on_trigger_start),
-	END_PROPS(PhysicsComponentBase)
-};
 
 void PhysicsComponentBase::fetch_new_transform()
 {
@@ -567,13 +546,7 @@ PhysicsJointComponent::~PhysicsJointComponent()
 {
 
 }
-const PropertyInfoList* PhysicsJointComponent::get_props() {
-	START_PROPS(PhysicsJointComponent)
-		REG_ENTITY_PTR(target,PROP_DEFAULT),
-		REG_STRUCT_CUSTOM_TYPE(anchor, PROP_DEFAULT, "JointAnchor"),
-		REG_INT(local_joint_axis,PROP_DEFAULT,"0")
-	END_PROPS(PhysicsJointComponent)
-}
+
 void PhysicsJointComponent::refresh_joint()
 {
 	free_joint();
@@ -732,10 +705,7 @@ void PhysicsJointComponent::editor_on_change_property() {
 	}
 }
 
-CLASS_IMPL(PhysicsJointComponent);
-CLASS_IMPL(HingeJointComponent);
-CLASS_IMPL(BallSocketJointComponent);
-CLASS_IMPL(AdvancedJointComponent);
+
 
 PxJoint* AdvancedJointComponent::get_joint() const {
 	return joint;
@@ -805,12 +775,6 @@ void AdvancedJointComponent::draw_meshbuilder()
 		editor_meshbuilder->mb.PushLine(origin, max_vec, COLOR_BLUE);
 	}
 }
-
-ENUM_START(JM)
-	STRINGIFY_EUNM(JM::Locked,0),
-	STRINGIFY_EUNM(JM::Limited,1),
-	STRINGIFY_EUNM(JM::Free,2),
-ENUM_IMPL(JM)
 
 #ifdef EDITOR_BUILD
 // FIXME!

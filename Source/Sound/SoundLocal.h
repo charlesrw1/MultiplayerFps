@@ -145,7 +145,7 @@ struct LowPassFilter
         const int bufferSize = length / sizeof(AudioFormatType);  // buffer size (as array)
         if (bufferSize < 2)
             return;
-        this->alpha = 0.85;
+        this->alpha = 0.0;
         if (this->alpha <= 0.000001)
             return;
 
@@ -200,7 +200,7 @@ void SoundPlayer::set_play(bool b)
     self->should_play = b;
 }
 
-inline float get_attenuation_factor(SndAttenuation sa, float minRadius, float maxRadius, float dist)
+inline float get_attenuation_factor(SndAtn sa, float minRadius, float maxRadius, float dist)
 {
     if (dist <= minRadius)
         return 1.0;
@@ -208,11 +208,11 @@ inline float get_attenuation_factor(SndAttenuation sa, float minRadius, float ma
     if (glm::abs(window) < 0.00001) return 0.0;
     float x = 1.0 - ((dist - minRadius) / window);
     switch (sa) {
-    case SndAttenuation::Linear:
+    case SndAtn::Linear:
         return x;
-    case SndAttenuation::Cubic:
+    case SndAtn::Cubic:
         return x * x * x;
-    case SndAttenuation::InvCubic:
+    case SndAtn::InvCubic:
         return 1.0 - (1 - x) * (1 - x) * (1 - x);
     }
     return 1.0;
@@ -419,7 +419,7 @@ public:
         float pitch,
         float min_rad,
         float max_rad,
-        SndAttenuation attn,
+        SndAtn attn,
         bool attenuate,
         bool spaitialize,
         glm::vec3 spatial_pos

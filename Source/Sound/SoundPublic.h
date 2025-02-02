@@ -1,9 +1,10 @@
 #pragma once
 #include "Assets/IAsset.h"
+#include "Framework/EnumDefReflection.h"
 #include <glm/glm.hpp>
 
-
-enum class SndAttenuation : uint8_t
+// Sound Attenuation
+NEWENUM(SndAtn , uint8_t)
 {
     Linear,  // (1-x)
     Cubic,    // (1-x)^3
@@ -40,7 +41,7 @@ public:
     float minRadius = 1.f;  // [0,minRadius] sound will play without attenuation
     float maxRadius = 4.f;  // [minRadius,maxRadius] sound will attenuate
     float nonSpatializeRadius = 0.f;    // [0,nonSpatializeRadius] sound will be non spatialized (treated like 2d)
-    SndAttenuation attenuation = SndAttenuation::Linear;    // how to attenuate the radius
+    SndAtn attenuation = SndAtn::Linear;    // how to attenuate the radius
     bool attenuate = true;
     bool spatialize = true;
     float lowpass_filter = 0.f;   // if >0 and <1, then implments a low pass filter
@@ -71,7 +72,7 @@ public:
         float pitch,
         float min_rad,
         float max_rad,
-        SndAttenuation attn,
+        SndAtn attn,
         bool attenuate,
         bool spaitialize,
         glm::vec3 spatial_pos

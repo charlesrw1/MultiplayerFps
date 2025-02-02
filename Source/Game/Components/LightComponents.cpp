@@ -199,52 +199,32 @@ PointLightComponent::~PointLightComponent() {}
 SpotLightComponent::~SpotLightComponent() {}
 #include "Render/Render_Volumes.h"
 
+void SkylightComponent::start() {
 
-CLASS_H(SkylightComponent,EntityComponent)
-public:
-	SkylightComponent() {
-		set_call_init_in_editor(true);
-	}
+	mytexture = new Texture; // g_imgs.install_system_texture("_skylight");
+	Render_Skylight sl;
+	sl.generated_cube = mytexture;
+	sl.wants_update = true;
 
-	void start() override {
+	handle = idraw->get_scene()->register_skylight(sl);
+}
+void SkylightComponent::end() {
+	idraw->get_scene()->remove_skylight(handle);
+	delete mytexture;
+	mytexture = nullptr;
+}
 
-		mytexture = new Texture; // g_imgs.install_system_texture("_skylight");
+void SkylightComponent::editor_on_change_property()  {
+	if (recapture_skylight) {
+		sys_print(Debug, "recapturing skylight");
 		Render_Skylight sl;
 		sl.generated_cube = mytexture;
 		sl.wants_update = true;
+		idraw->get_scene()->update_skylight(handle, sl);
+	}
+	recapture_skylight = false;
+}
 
-		handle = idraw->get_scene()->register_skylight(sl);
-	}
-	void end() override {
-		idraw->get_scene()->remove_skylight(handle);
-		delete mytexture;
-		mytexture = nullptr;
-	}
-	void on_changed_transform() override {
-	}
-
-	void editor_on_change_property() override {
-		if (recapture_skylight) {
-			sys_print(Debug, "recapturing skylight");
-			Render_Skylight sl;
-			sl.generated_cube = mytexture;
-			sl.wants_update = true;
-			idraw->get_scene()->update_skylight(handle, sl);
-		}
-		recapture_skylight = false;
-	}
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(SkylightComponent)
-			REG_BOOL_W_CUSTOM(recapture_skylight,PROP_EDITABLE,"BoolButton","Recapture")
-		END_PROPS(SkylightComponent)
-	}
-
-	Texture* mytexture = nullptr;
-	handle<Render_Skylight> handle;
-	bool recapture_skylight = false;
-};
-CLASS_IMPL(SkylightComponent);
 #include "Game/Entity.h"
 CLASS_H(SkylightEntity, Entity)
 public:

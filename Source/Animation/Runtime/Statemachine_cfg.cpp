@@ -5,22 +5,6 @@
 
 #include "Animation/AnimationUtil.h"
 
-static const char* easing_strs[] = {
-	"Linear",
-	"CubicEaseIn",
-	"CubicEaseOut",
-	"CubicEaseInOut",
-};
-
-ENUM_HEADER(Easing);
-ENUM_START(Easing)
-	STRINGIFY_EUNM(Easing::Linear, 0),
-	STRINGIFY_EUNM(Easing::CubicEaseIn, 1),
-	STRINGIFY_EUNM(Easing::CubicEaseOut, 2),
-	STRINGIFY_EUNM(Easing::CubicEaseInOut, 3)
-ENUM_IMPL(Easing);
-
-
 const PropertyInfoList* State_Transition::get_props()
 {
 	MAKE_VECTORCALLBACK(StateTransitionScript, conditions);

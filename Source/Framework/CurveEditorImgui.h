@@ -11,14 +11,14 @@
 #include "ReflectionMacros.h"
 #include "ArrayReflection.h"
 
-enum class CurvePointType
+NEWENUM(CurvePointType,uint8_t)
 {
 	Linear,	// linear interp
 	Constant,	// no interp
 	SplitTangents,	// 2 handle free tangents
 	Aligned,		// free tangents but they are kept aligned
 };
-ENUM_HEADER(CurvePointType);
+
 
 class CurvePoint
 {

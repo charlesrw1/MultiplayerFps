@@ -38,13 +38,6 @@ glm::vec2 bezier_evaluate(float t, const glm::vec2 p0, const glm::vec2& p1, cons
     return a + b + c + d;
 }
 
-ENUM_START(CurvePointType)
-    STRINGIFY_EUNM(CurvePointType::Linear,0),
-    STRINGIFY_EUNM(CurvePointType::Constant, 1),
-    STRINGIFY_EUNM(CurvePointType::SplitTangents, 2),
-    STRINGIFY_EUNM(CurvePointType::Aligned, 3)
-ENUM_IMPL(CurvePointType)
-
 int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
 {
     std::string* user = (std::string*)data->UserData;
@@ -327,17 +320,16 @@ void CurveEditorImgui::draw_editor_space()
         }
         else {
             auto& points = curves[selected_curve].points;
-            std::string current_type = EnumTrait<CurvePointType>::StaticType.get_enum_str((int)points[point_index_for_popup].type);
-            current_type = current_type.substr(current_type.rfind("::") + 2);
+            auto enum_ =  EnumTrait<CurvePointType>::StaticType.find_for_value((int)points[point_index_for_popup].type);
+            ASSERT(enum_);
+
 
             bool close_the_popup = false;
-            if (ImGui::BeginCombo("##type", current_type.c_str())) {
-                for (int i = 0; i < EnumTrait<CurvePointType>::StaticType.str_count; i++) {
-                    std::string str = EnumTrait<CurvePointType>::StaticType.get_enum_str(i);
-                    str = str.substr(str.rfind("::") + 2);
-                    bool selected = i == (int)points[point_index_for_popup].type;
-                    if (ImGui::Selectable(str.c_str(), &selected)) {
-                        points[point_index_for_popup].type = CurvePointType(i);
+            if (ImGui::BeginCombo("##type", enum_->name)) {
+                for (auto& enum_ : EnumTrait<CurvePointType>::StaticType) {
+                    bool selected = enum_.value == (int)points[point_index_for_popup].type;
+                    if (ImGui::Selectable(enum_.name, &selected)) {
+                        points[point_index_for_popup].type = CurvePointType(enum_.value);
                         close_the_popup = true;
                     }
                 }

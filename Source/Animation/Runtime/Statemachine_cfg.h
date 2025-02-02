@@ -1,7 +1,8 @@
 #pragma once
 #include "AnimationTreeLocal.h"
 #include <string>
-enum class Easing : uint8_t
+
+NEWENUM(Easing, uint8_t)
 {
 	Linear,
 	CubicEaseIn,

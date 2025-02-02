@@ -102,3 +102,24 @@ public:
 	uint64_t editor_billboard = 0;
 	uint64_t editor_arrow = 0;
 };
+
+struct Render_Skylight;
+NEWCLASS(SkylightComponent, EntityComponent)
+public:
+	SkylightComponent() {
+		set_call_init_in_editor(true);
+	}
+
+	void start() override;
+	void end() override;
+	void on_changed_transform() override {
+	}
+
+	void editor_on_change_property() override;
+
+	REFLECT(type="BoolButton",hint="Recapture",transient)
+	bool recapture_skylight = false;
+
+	Texture* mytexture = nullptr;
+	handle<Render_Skylight> handle;
+};
