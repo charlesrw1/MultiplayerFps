@@ -477,7 +477,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.invview = glm::inverse(vs.view);
 	constants.invproj = glm::inverse(vs.proj);
 	constants.inv_viewproj = glm::inverse(vs.viewproj);
-	constants.viewpos_time = glm::vec4(vs.origin, this->current_time);
+	constants.viewpos_time = glm::vec4(vs.origin, TimeSinceStart());
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
 
