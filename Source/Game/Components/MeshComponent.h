@@ -9,8 +9,6 @@ GENERATED_CLASS_INCLUDE("Render/Model.h");
 GENERATED_CLASS_INCLUDE("Render/MaterialPublic.h");
 GENERATED_CLASS_INCLUDE("Animation/AnimationTreePublic.h");
 
-//
-
 class PhysicsFilterPresetBase;
 class Model;
 class AnimatorInstance;

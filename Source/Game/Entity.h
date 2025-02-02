@@ -8,6 +8,7 @@
 #include "EntityPtr.h"
 #include <vector>
 #include <string>
+#include "Framework/Reflection2.h"
 
 class Model;
 class PhysicsActor;
@@ -27,7 +28,9 @@ struct TagStruct
 	std::string string;	// only in editor
 };
 
-CLASS_H(Entity, BaseUpdater)
+GENERATED_CLASS_INCLUDE("Game/EntityComponent.h");
+
+NEWCLASS(Entity, BaseUpdater)
 public:
 	const static bool CreateDefaultObject = true;
 
@@ -41,8 +44,11 @@ public:
 	T* get_first_component() {
 		return (T*)get_first_component_typeinfo(&T::StaticType);
 	}
+
+	REFLECT(name="get_comp");
 	EntityComponent* get_first_component_typeinfo(const ClassTypeInfo* ti);
 
+	REFLECT(name="parent",getter)
 	Entity* get_entity_parent() const {
 		return parent;
 	}
@@ -115,12 +121,10 @@ public:
 
 	EntityPtr get_self_ptr() const { return { get_instance_id() }; }
 
-	static const PropertyInfoList* get_props();
 
 	void invalidate_transform(EntityComponent* skipthis);
 
 	virtual void editor_on_change_properties() {}
-	std::string editor_name;
 
 	bool is_selected_in_editor() const {
 		return selected_in_editor;
@@ -164,6 +168,7 @@ public:
 	}
 	// if start_disabled was true, then this function actually calls start()->pre_start() etc. on all sub entities
 	// if this entity was already started, then this function does nothing
+	REFLECT();
 	void activate();
 
 	StringName get_tag() const {
@@ -184,6 +189,14 @@ public:
 		return is_top_level;
 	}
 	void set_is_top_level(bool b);
+
+
+	const std::string& get_editor_name() const {
+		return editor_name;
+	}
+	void set_editor_name(const std::string& n) {
+		editor_name = n;
+	}
 private:
 	static void set_active_R(Entity* e, bool b, bool step1);
 
@@ -199,13 +212,23 @@ private:
 	Entity* parent = nullptr;
 	std::vector<Entity*> children;
 
+	REFLECT(type="EntityTagString");
 	TagStruct tag;
+	REFLECT();
+	glm::vec3 position = glm::vec3(0.f);
+	REFLECT();
+	glm::quat rotation = glm::quat();
+	REFLECT();
+	glm::vec3 scale = glm::vec3(1.f);
+	REFLECT();
+	std::string editor_name;
+	REFLECT(type="EntityBoneParentString")
 	BoneParentStruct parent_bone;
+	REFLECT();
+	bool start_disabled = false;
+
 	MeshComponent* cached_mesh_component = nullptr;	// for bone lookups
 
-	glm::vec3 position = glm::vec3(0.f);
-	glm::quat rotation = glm::quat();
-	glm::vec3 scale = glm::vec3(1.f);
 	glm::mat4 cached_world_transform = glm::mat4(1);
 
 	bool selected_in_editor = false;
@@ -213,7 +236,6 @@ private:
 
 	bool is_top_level = false;	// if true, then local space is considered the world space transform, even if a parent exists
 
-	bool start_disabled = false;
 
 	// called by Level for init/destruct
 	void initialize_internal_step1();

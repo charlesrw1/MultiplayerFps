@@ -1,6 +1,7 @@
 #pragma once
 #include "Framework/ClassBase.h"
 #include "Framework/Util.h"
+#include "Framework/Reflection2.h"
 
 // Inherited by Entity and Component
 
@@ -8,7 +9,7 @@ class Entity;
 class PrefabAsset;
 class Level;
 
-CLASS_H(BaseUpdater, ClassBase)
+NEWCLASS(BaseUpdater, ClassBase)
 public:
 
 	// initialization:
@@ -27,9 +28,8 @@ public:
 	void set_ticking(bool shouldTick);
 
 	// queues this entity/component to be destroyed at the end of the frame
+	REFLECT(name="destroy");
 	void destroy_deferred();
-
-	static const PropertyInfoList* get_props();
 
 	// Editor Data >>>>
 	void set_editor_transient(bool transient) { editor_transient = true; }
@@ -62,10 +62,12 @@ public:
 		return init_state == initialization_state::CALLED_START;
 	}
 protected:
+	REFLECT(name="is_type");
 	bool is_type_for_script(const ClassTypeInfo* t) {
 		if (!t) return false;
 		return get_type().is_a(*t);
 	}
+	REFLECT(name="type",getter);
 	const ClassTypeInfo* get_type_for_script() {
 		return &get_type();
 	}

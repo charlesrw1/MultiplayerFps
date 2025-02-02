@@ -4,8 +4,6 @@
 #include "Scripting/FunctionReflection.h"
 #include "Framework/ReflectionMacros.h"
 
-CLASS_IMPL(BaseUpdater);
-
 void BaseUpdater::set_ticking(bool shouldTick)
 {
 	auto level = eng->get_level();
@@ -62,12 +60,4 @@ void BaseUpdater::deactivate_internal()
 void BaseUpdater::destroy_deferred()
 {
 	eng->get_level()->queue_deferred_delete(this);
-}
-const PropertyInfoList* BaseUpdater::get_props()
-{
-	START_PROPS(BaseUpdater)
-		REG_GETTER_FUNCTION(get_type_for_script,"type"),
-		REG_FUNCTION_EXPLICIT_NAME(is_type_for_script, "is_type"),
-		REG_FUNCTION_EXPLICIT_NAME(destroy_deferred,"destroy")
-	END_PROPS(BaseUpdater)
 }

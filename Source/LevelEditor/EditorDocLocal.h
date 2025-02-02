@@ -125,7 +125,7 @@ private:
 		std::vector<Node*> children;
 		void sort_children() {
 			std::sort(children.begin(), children.end(), [](const Node* a, const Node* b)->bool {
-				return to_lower(eng->get_entity(a->handle)->editor_name) < to_lower(eng->get_entity(b->handle)->editor_name);
+				return to_lower(eng->get_entity(a->handle)->get_editor_name()) < to_lower(eng->get_entity(b->handle)->get_editor_name());
 				});
 		}
 	};

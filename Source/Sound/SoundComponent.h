@@ -27,6 +27,12 @@ public:
         if (player)
             player->pitch_multiply = f;
     }
+
+    void set_lowpass_filter(float f) {
+        if (player)
+            player->lowpass_filter = f;
+    }
+
     REFLECT();
     void set_play(bool b) {
         if (player)

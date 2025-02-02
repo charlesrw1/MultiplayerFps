@@ -133,7 +133,7 @@ public:
 			});
 		Entity* clicked = nullptr;
 		for (auto o : objs) {
-			const char* name = (o.e->editor_name.c_str());
+			const char* name = (o.e->get_editor_name().c_str());
 			if (!*name) {
 				if (o.e->is_root_of_prefab && o.e->what_prefab)
 					name = o.e->what_prefab->get_name().c_str();
@@ -1279,20 +1279,26 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 		ImGui::Text(ed_doc.get_name().c_str());
 	}
 	else {
-		auto entity = eng->get_entity(n->handle);
-		const char* str = "";
-		if (!entity->editor_name.empty())
-			str = entity->editor_name.c_str();
-		else {
-			if (entity->what_prefab && am_i_the_root_prefab_node(entity, entity->what_prefab))
-				str = entity->what_prefab->get_name().c_str();
-			else
-				str = entity->get_type().classname;
+		auto e = eng->get_entity(n->handle);
+		const char* name = (e->get_editor_name().c_str());
+		if (!*name) {
+			if (e->is_root_of_prefab && e->what_prefab)
+				name = e->what_prefab->get_name().c_str();
+			else {
+				if (auto m = e->get_first_component<MeshComponent>()) {
+					if (m->get_model())
+						name = m->get_model()->get_name().c_str();
+				}
+			}
 		}
-		if (!ed_doc.can_delete_or_move_this(entity))
-			ImGui::TextColored(non_owner_source_color, str);
+		if (!*name) {
+			name = e->get_type().classname;
+		}
+
+		if (!ed_doc.can_delete_or_move_this(e))
+			ImGui::TextColored(non_owner_source_color, name);
 		else
-			ImGui::Text(str);
+			ImGui::Text(name);
 
 	}
 
@@ -1673,7 +1679,7 @@ public:
 			ImGui::TextColored(color32_to_imvec4({ 255, 74, 249 }), "{ eyedropper  active }");
 		}
 		else if (ptr_to_asset->get()) {
-			const char* str = ptr_to_asset->get()->editor_name.c_str();
+			const char* str = ptr_to_asset->get()->get_editor_name().c_str();
 			if (!*str)
 				str = ptr_to_asset->get()->get_type().classname;
 			ImGui::Text(str);

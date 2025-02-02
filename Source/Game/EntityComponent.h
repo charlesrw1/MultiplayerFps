@@ -1,13 +1,15 @@
 #pragma once
 #include "Game/BaseUpdater.h"
 #include "Framework/StringName.h"
-
+#include "Framework/Reflection2.h"
 #include "glm/glm.hpp"
 #include "glm/gtx/quaternion.hpp"
 
+GENERATED_CLASS_INCLUDE("Game/Entity.h");
+
 struct PropertyInfoList;
 class Entity;
-CLASS_H(EntityComponent, BaseUpdater)
+NEWCLASS(EntityComponent, BaseUpdater)
 public:
 	const static bool CreateDefaultObject = true;
 
@@ -15,6 +17,7 @@ public:
 
 	void destroy();
 
+	REFLECT(name="owner",getter);
 	Entity* get_owner() const { return entity_owner; }
 
 	bool get_is_native_component() const { return is_native_componenent; }
@@ -26,7 +29,6 @@ public:
 		return get_ws_transform()[3];
 	}
 
-	static const PropertyInfoList* get_props();
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}

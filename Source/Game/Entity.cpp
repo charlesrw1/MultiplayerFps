@@ -23,9 +23,6 @@
 #include "EntityPtrArrayMacro.h"
 #include "EntityPtrMacro.h"
 
-CLASS_IMPL(Entity);
-
-
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 #ifdef EDITOR_BUILD
 extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
@@ -78,24 +75,6 @@ PropertyInfo GetAtomValueWrapper<EntityPtr>::get() {
 }
 
 // database to map an integer to any type of object, for example models or entities, automatically resolved and editable in the editor
-
-const PropertyInfoList* Entity::get_props() {
-	START_PROPS(Entity)
-		REG_STRUCT_CUSTOM_TYPE(tag, PROP_DEFAULT, "EntityTagString"),
-		REG_VEC3(position, PROP_DEFAULT),
-		REG_QUAT(rotation, PROP_DEFAULT),
-		REG_VEC3(scale, PROP_DEFAULT),
-		REG_STDSTRING(editor_name, PROP_DEFAULT),	// edit+serialize
-		REG_STRUCT_CUSTOM_TYPE(parent_bone, PROP_DEFAULT, "EntityBoneParentString"),
-		REG_BOOL(start_disabled, PROP_DEFAULT,"0"),
-
-		REG_FUNCTION_EXPLICIT_NAME(destroy_deferred, "destroy"),
-		REG_FUNCTION_EXPLICIT_NAME(get_first_component_typeinfo,"get_comp"),
-		REG_FUNCTION_EXPLICIT_NAME(get_entity_parent, "get_parent"),
-		//REG_FUNCTION_EXPLICIT_NAME(create_and_attach_component_type,"add_comp"),
-		REG_FUNCTION(activate)
-	END_PROPS(Entity)
-}
 
 
 Entity::Entity()

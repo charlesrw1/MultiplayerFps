@@ -43,6 +43,7 @@ public:
     SndAttenuation attenuation = SndAttenuation::Linear;    // how to attenuate the radius
     bool attenuate = true;
     bool spatialize = true;
+    float lowpass_filter = 0.f;   // if >0 and <1, then implments a low pass filter
 
     // after changes, call update
     void update();

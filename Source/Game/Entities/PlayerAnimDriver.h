@@ -6,60 +6,50 @@
 
 #include "Animation/Runtime/Animation.h"
 #include "Framework/ReflectionMacros.h"
+#include "Framework/Reflection2.h"
 
-CLASS_H(CharacterGraphDriver, AnimatorInstance)
+NEWCLASS(CharacterGraphDriver, AnimatorInstance)
 public:
 
 	virtual void on_init() override;
 	virtual void on_update(float dt) override;
 	virtual void on_post_update() override;
 
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(CharacterGraphDriver)
-			REG_FLOAT(flMovex,PROP_DEFAULT,""),
-			REG_FLOAT(flMovey, PROP_DEFAULT, ""),
-			REG_FLOAT(flSpeed, PROP_DEFAULT, ""),
-			REG_FLOAT(flAimx, PROP_DEFAULT, ""),
-			REG_FLOAT(flAimy, PROP_DEFAULT, ""),
-			REG_FLOAT(flStopPercentage, PROP_DEFAULT, ""),
-
-			REG_BOOL(bCrouch, PROP_DEFAULT,""),
-			REG_BOOL(bJumping, PROP_DEFAULT, ""),
-			REG_BOOL(bFalling, PROP_DEFAULT, ""),
-
-			REG_BOOL(bRunning, PROP_DEFAULT, ""),
-			REG_BOOL(bTurnInPlaceLeft, PROP_DEFAULT, ""),
-			REG_BOOL(bTurnInPlaceRight, PROP_DEFAULT, ""),
-			REG_BOOL(bLeftFootForwards, PROP_DEFAULT, ""),
-			REG_BOOL(bRightFootForwards, PROP_DEFAULT, ""),
-
-			REG_VEC3(vLeftFootPosition,PROP_DEFAULT),
-			REG_QUAT(qLeftFootRotation, PROP_DEFAULT),
-			REG_INT(iSomeInteger, PROP_DEFAULT, ""),
-			REG_QUAT(qRightHandRotation, PROP_DEFAULT)
-		END_PROPS(CharacterGraphDriver)
-	}
-
+	REFLECT();
 	float flMovex=0.f;
+	REFLECT();
 	float flMovey=0.f;
+	REFLECT();
 	float flSpeed=0.f;
+	REFLECT();
 	bool bCrouch=false;
+	REFLECT();
 	bool bJumping=false;
+	REFLECT();
 	bool bFalling=false;
+	REFLECT();
 	bool bRunning=false;
+	REFLECT();
 	float flAimx=0.f;
+	REFLECT();
 	float flAimy=0.f;
+	REFLECT();
 	float flStopPercentage=0.f;
+	REFLECT();
 	bool bTurnInPlaceLeft=false;
+	REFLECT();
 	bool bTurnInPlaceRight=false;
+	REFLECT();
 	bool bLeftFootForwards=false;
+	REFLECT();
 	bool bRightFootForwards=false;
+	REFLECT();
 	int iSomeInteger = 0;
-
+	REFLECT();
 	glm::vec3 vLeftFootPosition;
+	REFLECT();
 	glm::quat qLeftFootRotation;
-
+	REFLECT();
 	glm::quat qRightHandRotation;
 
 	bool left_foot_is_forward = false;

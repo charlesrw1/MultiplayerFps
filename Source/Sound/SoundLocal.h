@@ -30,9 +30,6 @@ static int computeChunkLengthMillisec(int chunkSize)
     return ((frames * 1000) / audioFrequency);  // (sample frames * 1000) / frequency == play length, in ms
 }
 
-// Custom handler object to control which part of the Mix_Chunk's audio data will be played, with which pitch-related modifications.
-// This needed to be a template because the actual Mix_Chunk's data format may vary (AUDIO_U8, AUDIO_S16, etc) and the data type varies with it (Uint8, Sint16, etc)
-// The AudioFormatType should be the data type that is compatible with the current SDL_mixer-initialized audio format.
 template<typename AudioFormatType>
 struct PlaybackSpeedEffectHandler
 {
@@ -132,6 +129,51 @@ struct PlaybackSpeedEffectHandler
 
 };
 
+template<typename AudioFormatType>
+struct LowPassFilter
+{
+    float alpha = 0.f;
+    float last_sample[2];
+    bool seen_first_sample = false;
+    void init(float alpha) {
+        seen_first_sample = false;
+        this->alpha = alpha;
+    }
+
+    void do_effect(int channel, void* stream, int length) {
+        AudioFormatType* buffer = static_cast<AudioFormatType*>(stream);
+        const int bufferSize = length / sizeof(AudioFormatType);  // buffer size (as array)
+        if (bufferSize < 2)
+            return;
+        this->alpha = 0.85;
+        if (this->alpha <= 0.000001)
+            return;
+
+        const int audioChannelCount = 2;
+        if (!seen_first_sample) {
+            last_sample[0] = buffer[0];
+            last_sample[1] = buffer[1];
+            seen_first_sample = true;
+        }
+        for (int i = 0; i < bufferSize; i += audioChannelCount)
+        {
+            for (int c = 0; c < audioChannelCount; c++)
+            {
+                {
+                    buffer[i + c] = buffer[i + c]*(1-alpha) + last_sample[c]*(alpha);
+                    last_sample[c] = buffer[i + c];
+                }
+            }
+        }
+    }
+
+    static void mixEffectFuncCallback(int channel, void* stream, int length, void* userData)
+    {
+        ((LowPassFilter*)userData)->do_effect(channel, stream, length);
+    }
+
+};
+
 struct SoundPlayerInternal : public SoundPlayer
 {
     bool is_oneshot = false;    // else owned by someone  
@@ -191,6 +233,7 @@ public:
         Mix_AllocateChannels(snd_max_voices.get_integer());
         active_voices.resize(snd_max_voices.get_integer());
         pitch_modifiers.resize(snd_max_voices.get_integer());
+        low_pass_mods.resize(snd_max_voices.get_integer());
 	}
     void cleanup() override {
         Mix_CloseAudio();
@@ -211,18 +254,24 @@ public:
         active_voices[index] = spi;
         spi->time_elapsed = 0.f;
         using PitchMod = PlaybackSpeedEffectHandler<int16_t>;
+        using LowPass = LowPassFilter<int16_t>;
+
         Mix_PlayChannel(index, spi->asset->internal_data, (spi->looping) ? -1 : 0);
         sys_print(Debug, "playchannel");
         pitch_modifiers.at(index).init(*spi->asset->internal_data, spi->looping);
         pitch_modifiers.at(index).speedFactor = spi->pitch_multiply;
-
+        low_pass_mods.at(index).init(spi->lowpass_filter);
         Mix_RegisterEffect(index, PitchMod::mixEffectFuncCallback, PitchMod::mixEffectDoneCallback,&pitch_modifiers.at(index));
+        Mix_RegisterEffect(index, LowPass::mixEffectFuncCallback,nullptr, &low_pass_mods.at(index));
     }
 
     void end_sound_object_play(SoundPlayerInternal* spi) {
         if (spi->voice_index != -1) {
             using PitchMod = PlaybackSpeedEffectHandler<int16_t>;
+            using LowPass = LowPassFilter<int16_t>;
+
             Mix_UnregisterEffect(spi->voice_index, PitchMod::mixEffectFuncCallback);
+            Mix_UnregisterEffect(spi->voice_index, LowPass::mixEffectFuncCallback);
             Mix_HaltChannel(spi->voice_index);
             active_voices.at(spi->voice_index) = nullptr;
             spi->voice_index = -1;
@@ -337,6 +386,7 @@ public:
                 }
                 SDL_LockAudio();
                 pitch_modifiers.at(spi.voice_index).speedFactor = spi.pitch_multiply;
+                low_pass_mods.at(spi.voice_index).alpha = spi.lowpass_filter;
                 SDL_UnlockAudio();
             }
 
@@ -417,6 +467,8 @@ public:
     std::vector<SoundPlayerInternal*> active_voices;
     std::unordered_set<SoundPlayerInternal*> all_sound_players;
     std::vector<PlaybackSpeedEffectHandler<int16_t>> pitch_modifiers;
+    std::vector<LowPassFilter<int16_t>> low_pass_mods;
+
 };
 
 inline bool SoundFile::load_asset(ClassBase*&)

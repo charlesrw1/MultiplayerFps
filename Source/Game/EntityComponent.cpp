@@ -6,7 +6,6 @@
 #include "GameEnginePublic.h"
 #include "Scripting/FunctionReflection.h"
 #include "Framework/ReflectionMacros.h"
-CLASS_IMPL(EntityComponent);
 
 #ifdef EDITOR_BUILD
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
@@ -72,11 +71,4 @@ EntityComponent::~EntityComponent() {
 
 const glm::mat4& EntityComponent::get_ws_transform() {
 	return get_owner()->get_ws_transform();
-}
-const PropertyInfoList* EntityComponent::get_props()
-{
-	START_PROPS(EntityComponent)
-		REG_GETTER_FUNCTION(get_owner,"owner"),
-		REG_FUNCTION_EXPLICIT_NAME(destroy_deferred,"destroy")
-	END_PROPS(EntityComponent)
 }
