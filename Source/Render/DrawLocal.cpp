@@ -22,6 +22,9 @@
 #include "Assets/AssetDatabase.h"
 
 #include "Game/Components/ParticleMgr.h"	// FIXME
+#include "Render/ModelManager.h"
+
+const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 //#pragma optimize("", off)
 
@@ -969,6 +972,8 @@ void Renderer::execute_render_lists(
 
 	auto& device = get_device();
 
+	vertexarrayhandle vao = ModelMan::get().get_vao(true);
+
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
 
@@ -985,7 +990,7 @@ void Renderer::execute_render_lists(
 
 		RenderPipelineState state;
 		state.program = program;
-		state.vao = mods.get_vao(true);
+		state.vao = vao;
 		state.backface_culling = !show_backface&&!force_show_backfaces;
 		state.blend = blend;
 		state.depth_testing = depth_test_enabled;
@@ -1011,7 +1016,7 @@ void Renderer::execute_render_lists(
 			bind_texture(i, textures[i]->gl_id);
 		}
 
-		const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+		const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
 		#pragma warning(disable : 4312)	// (void*) casting
 		glMultiDrawElementsIndirect(
@@ -1040,6 +1045,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	int offset = 0;
+	vertexarrayhandle vao = ModelMan::get().get_vao(true);
 	for (int i = 0; i < pass.batches.size(); i++) {
 		
 		auto& batch = pass.batches[i];
@@ -1060,7 +1066,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 
 			set_shader(program);
 
-			bind_vao(mods.get_vao(true/* animated */));
+			bind_vao(vao);
 
 			if(!force_backface_state)
 				set_show_backfaces(backface);
@@ -1076,14 +1082,14 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 			shader().set_int("indirect_material_offset", offset);
 
 
-			const GLenum index_type = (mods.get_index_type_size()==4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+			const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
 			#pragma warning(disable : 4312)	// (void*) casting
 			glDrawElementsBaseVertex(
 				GL_TRIANGLES,
 				cmd.count,
 				index_type,
-				(void*)(cmd.firstIndex * mods.get_index_type_size()),
+				(void*)(cmd.firstIndex * MODEL_BUFFER_INDEX_TYPE_SIZE),
 				cmd.baseVertex
 			);
 			#pragma warning(default : 4312)
@@ -1500,8 +1506,6 @@ static void build_standard_cpu(
 }
 
 
-
-extern bool use_32_bit_indicies;
 void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list)
 {
 	// This function essentially just loops over all batches and creates gpu commands for them
@@ -1534,7 +1538,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 			cmd.baseVertex = part.base_vertex + proxy.model->get_merged_vertex_ofs();
 			cmd.count = part.element_count;
 			cmd.firstIndex = part.element_offset + proxy.model->get_merged_index_ptr();
-			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
+			cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
 
 			// Important! Set primCount to 0 because visible instances will increment this
 			cmd.primCount = 0;// meshb.count;
@@ -1962,14 +1966,15 @@ void Renderer::accumulate_gbuffer_lighting()
 	RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
 
-	Model* LIGHT_CONE = mods.get_light_cone();
-	Model* LIGHT_SPHERE = mods.get_light_sphere();
-	Model* LIGHT_DOME = mods.get_light_dome();
+	Model* LIGHT_CONE = ModelMan::get().get_light_cone();
+	Model* LIGHT_SPHERE = ModelMan::get().get_light_sphere();
+	Model* LIGHT_DOME = ModelMan::get().get_light_dome();
+	vertexarrayhandle vao = ModelMan::get().get_vao(true);
 	{
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
 
 		RenderPipelineState state;
-		state.vao = mods.get_vao(true);
+		state.vao = vao;
 		state.depth_writes = false;
 		state.depth_testing = false;
 		state.program = prog.light_accumulation;
@@ -2011,12 +2016,12 @@ void Renderer::accumulate_gbuffer_lighting()
 
 			// Copied code from execute_render_lists
 			auto& part = LIGHT_SPHERE->get_part(0);
-			const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+			const GLenum index_type = MODEL_INDEX_TYPE_GL;
 			gpu::DrawElementsIndirectCommand cmd;
 			cmd.baseVertex = part.base_vertex + LIGHT_SPHERE->get_merged_vertex_ofs();
 			cmd.count = part.element_count;
 			cmd.firstIndex = part.element_offset + LIGHT_SPHERE->get_merged_index_ptr();
-			cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
+			cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
 			cmd.primCount = 1;
 			cmd.baseInstance = 0;
 
@@ -2247,18 +2252,19 @@ void Renderer::deferred_decal_pass()
 	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
 	// Copied code from execute_render_lists
 	auto& part = cube->get_part(0);
-	const GLenum index_type = (mods.get_index_type_size() == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	const GLenum index_type = MODEL_INDEX_TYPE_GL;
 	gpu::DrawElementsIndirectCommand cmd;
 	cmd.baseVertex = part.base_vertex + cube->get_merged_vertex_ofs();
 	cmd.count = part.element_count;
 	cmd.firstIndex = part.element_offset + cube->get_merged_index_ptr();
-	cmd.firstIndex /= (use_32_bit_indicies) ? 4 : 2;
+	cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
 	cmd.primCount = 1;
 	cmd.baseInstance = 0;
 
 	bind_texture(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
 
 	//bind_vao(mods.get_vao(true/* animated */));
+	vertexarrayhandle vao = ModelMan::get().get_vao(true);
 
 	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
 		auto& obj = scene.decal_list.objects[i].type_.decal;
@@ -2274,7 +2280,7 @@ void Renderer::deferred_decal_pass()
 		state.depth_testing = false;
 		state.depth_writes = false;
 		state.program = program;
-		state.vao = mods.get_vao(true);
+		state.vao = vao;
 		device.set_pipeline(state);
 
 		//*set_shader(program);

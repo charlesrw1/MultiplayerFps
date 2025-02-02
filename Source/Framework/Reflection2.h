@@ -2,9 +2,9 @@
 #include "ClassBase.h"
 #include "ReflectionProp.h"
 
+// see Scripts/codegen.py for the code gen tool
 
-
-#define ABCNEWCLASS_EXPLICIT(classname, cpp_supername, reflected_super) \
+#define EXPLICIT_NEWCLASS(classname, cpp_supername, reflected_super) \
 class classname : public cpp_supername { \
 public: \
 	using MyClassType = classname; \
@@ -17,7 +17,7 @@ public: \
 // DONT make get_props() or CLASS_IMPL(x), the tool does that for you
 // use REFLECT() macros instead
 #define NEWCLASS(classname, supername) \
-	ABCNEWCLASS_EXPLICIT(classname, supername, supername)
+	EXPLICIT_NEWCLASS(classname, supername, supername)
 
 // arguments are provided as comma seperated list, dont include outer quotes
 // options:
@@ -29,7 +29,7 @@ public: \
 //		- 'getter' : only for functions, marks it as a getter (can be called in script like a variable access)
 //		- 'tooltip' : give a tooltip for property
 // supported types:
-//		- int, uint32_t, bool, float, uint8_t
+//		- int, bool, float, uint32_t, int32_t, uint16_t, int16_t, int64_t, uint8_t, int8_t
 //		- glm::vec3
 //		- glm::quat
 //		- std::vector<>
@@ -38,9 +38,17 @@ public: \
 //		- class functions (only if argument types are supported)
 //		- EntityPtr
 //		- AssetPtr<>
+//		- enums (reflected with NEWENUM())
+//		- Color32
 #define REFLECT(...)
 
 // sometimes you want forward declared class types in the header, but they need to be definied when registering 
 // them in the generated file like AssetPtr<>'s
 // use GENERATED_CLASS_INCLUDE(file) to include a file in the generated source, but not in the header
 #define GENERATED_CLASS_INCLUDE(x)
+
+// todo
+#define NEWSTRUCT(classname) \
+struct classname {	\
+	using MyClassType = classname; \
+	static const PropertyInfoList* get_props();

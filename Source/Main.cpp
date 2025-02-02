@@ -53,7 +53,7 @@
 #include "Render/RenderObj.h"
 
 #include "LevelSerialization/SerializationAPI.h"
-
+#include "Render/ModelManager.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -1387,9 +1387,6 @@ GameEngineLocal::GameEngineLocal()
 
 }
 
-extern ModelMan mods;
-
-
 
 void GameEngineLocal::init_sdl_window()
 {
@@ -1466,7 +1463,7 @@ void GameEngineLocal::init()
 	g_fonts.init();
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 	isound->init();
-	mods.init();
+	ModelMan::get().init();
 	//cl->init();
 	//sv->init();
 	imgui_context = ImGui::CreateContext();

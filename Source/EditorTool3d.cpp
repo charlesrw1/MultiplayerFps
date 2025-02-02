@@ -9,6 +9,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Render/MaterialPublic.h"
 #include "Level.h"
+#include "Render/ModelManager.h"
 
 extern ConfigVar ed_default_sky_material;
 
@@ -49,7 +50,7 @@ void EditorTool3d::map_callback(bool b)
 	dome->Mesh->set_material_override(GetAssets().find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
 	auto plane = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
-	plane->Mesh->set_model(mods.get_default_plane_model());
+	plane->Mesh->set_model(ModelMan::get().get_default_plane_model());
 	plane->set_ws_transform({}, {}, glm::vec3(20.f));
 	plane->Mesh->set_material_override((GetAssets().find_sync<MaterialInstance>("eng/defaultWhite.mi").get()));
 

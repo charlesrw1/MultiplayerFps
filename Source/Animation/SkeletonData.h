@@ -191,6 +191,7 @@ private:
 	friend class Animation_Tree_Manager;
 	friend class ModelCompileHelper;
 	friend class ModelMan;
+	friend class Model;
 	friend class AgBoneFinder;	// for accessing bones
 public:
 	// For use with editor

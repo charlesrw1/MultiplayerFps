@@ -391,7 +391,7 @@ bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape
 void PhysicsManImpl::update_debug_physics_shapes()
 {
 	ASSERT(scene);
-	return;
+	//return;
 	if (g_draw_physx_scene.get_integer() == 0) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
 		if (debug_mesh_handle.is_valid())
@@ -407,8 +407,8 @@ void PhysicsManImpl::update_debug_physics_shapes()
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.4);
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.4);
 
 
 
@@ -429,6 +429,7 @@ void PhysicsManImpl::update_debug_physics_shapes()
 	o.visible = true;
 	o.transform = glm::mat4(1.f);
 	o.meshbuilder = &debug_mesh;
+	o.use_background_color = true;
 
 	if (!debug_mesh_handle.is_valid())
 		debug_mesh_handle = idraw->get_scene()->register_meshbuilder(o);

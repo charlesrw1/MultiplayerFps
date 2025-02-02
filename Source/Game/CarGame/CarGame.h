@@ -67,6 +67,9 @@ public:
 		instance = nullptr;
 	}
 	Entity* thecar = nullptr;
+
+	REFLECT();
+	MulticastDelegate<> on_player_damaged;
 };
 
 NEWCLASS(WheelComponent, EntityComponent)

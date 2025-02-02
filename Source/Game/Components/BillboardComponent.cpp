@@ -7,6 +7,7 @@
 #include "Game/Entity.h"
 #include "Game/AssetPtrMacro.h"
 #include "Framework/ReflectionMacros.h"
+#include "Render/ModelManager.h"
 
 CLASS_IMPL(BillboardComponent);
 
@@ -63,7 +64,7 @@ void BillboardComponent::set_texture(const Texture* tex) {
 void BillboardComponent::fill_out_render_obj(Render_Object& obj)
 {
 	obj.visible = visible;
-	obj.model = mods.get_default_plane_model();
+	obj.model = ModelMan::get().get_default_plane_model();
 	obj.mat_override = dynamicMaterial;
 	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;

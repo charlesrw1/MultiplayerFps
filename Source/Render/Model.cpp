@@ -1,4 +1,6 @@
 #include "Model.h"
+#include "ModelManager.h"
+
 #include "Memory.h"
 #include <vector>
 #include <map>
@@ -26,7 +28,7 @@
 
 #include "Render/MaterialPublic.h"
 
-ModelMan mods;
+
 
 #include <unordered_set>
 #include "AssetCompile/Someutils.h"// string stuff
@@ -73,17 +75,6 @@ static const int MODEL_FORMAT_VERSION = 8;
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
 
-// FIXME:
-bool use_32_bit_indicies = false;
-
-static const int INDEX_TYPE_SIZE = sizeof(uint16_t);
-
-
-int ModelMan::get_index_type_size() const
-{
-	return INDEX_TYPE_SIZE;
-}
-
 void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 {
 	assert(ibuffer.handle == 0 && vbuffer.handle == 0);
@@ -96,7 +87,7 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	vbuffer.allocated = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
 	vbuffer.used = 0;
 
-	const int index_size = INDEX_TYPE_SIZE;
+	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
 	glGenBuffers(1, &ibuffer.handle);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibuffer.handle);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
@@ -139,7 +130,7 @@ int Model::bone_for_name(StringName name) const
 }
 DECLARE_ENGINE_CMD_CAT("gpu.", printusage)
 {
-	mods.print_usage();
+	ModelMan::get().print_usage();
 }
 
 
@@ -231,7 +222,7 @@ void MainVbIbAllocator::print_usage() const
 	};
 	sys_print(Info, "---- MainVbIbAllocator::print_usage ----\n");
 
-	print_facts("Index buffer", ibuffer, INDEX_TYPE_SIZE);
+	print_facts("Index buffer", ibuffer, MODEL_BUFFER_INDEX_TYPE_SIZE);
 	print_facts("Vertex buffer", vbuffer, sizeof(ModelVertex));
 }
 
@@ -270,13 +261,57 @@ static glm::vec4 bounds_to_sphere(Bounds b)
 	return glm::vec4(center, radius);
 }
 
-// Format definied in ModelCompilier.cpp
-bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
-{
 
-	auto file = FileSys::open_read_game(modelName.c_str());
+extern ConfigVar developer_mode;
+
+void Model::uninstall()
+{
+	lods.resize(0);
+	parts.clear();
+	merged_index_pointer = merged_vert_offset = 0;
+	data = RawMeshData();
+	skel.reset(nullptr);
+	collision.reset();
+	tags.clear();
+	materials.clear();
+	uid = 0;	// reset the UID
+}
+
+void Model::sweep_references() const {
+	for (int i = 0; i < materials.size(); i++) {
+		auto mat = materials[i];
+		GetAssets().touch_asset(mat);
+	}
+}
+void Model::post_load(ClassBase* u) {
+	if (did_load_fail()) {
+		return;
+	}
+	ModelMan::get().upload_model(this);
+}
+
+#ifdef EDITOR_BUILD
+#include "AssetCompile/ModelCompilierLocal.h"
+bool Model::check_import_files_for_out_of_data() const
+{
+	ModelDefData defdat;
+	std::string model_def = strip_extension(get_name().c_str());
+	model_def += ".mis";
+	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat, false);
+}
+#else
+bool Model::check_import_files_for_out_of_data() const {
+	return false;
+}
+
+#endif
+
+// Format definied in ModelCompilier.cpp
+bool Model::load_internal()
+{
+	auto file = FileSys::open_read_game(get_name().c_str());
 	if (!file) {
-		sys_print(Error, "model %s does not exist\n", modelName.c_str());
+		sys_print(Error, "model %s does not exist\n", get_name().c_str());
 		return false;
 	}
 
@@ -292,68 +327,68 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 		sys_print(Error, "out of date format\n");
 		return false;
 	}
-	read.read_struct(&m->skeleton_root_transform);
+	read.read_struct(&skeleton_root_transform);
 
-	read.read_struct(&m->aabb);
-	m->bounding_sphere = bounds_to_sphere(m->aabb);
+	read.read_struct(&aabb);
+	bounding_sphere = bounds_to_sphere(aabb);
 
 	int num_lods = read.read_int32();
-	m->lods.reserve(num_lods);
+	lods.reserve(num_lods);
 	for (int i = 0; i < num_lods; i++) {
 		MeshLod mlod;
 		read.read_struct(&mlod);
-		m->lods.push_back(mlod);
+		lods.push_back(mlod);
 	}
 	int num_parts = read.read_int32();
-	m->parts.reserve(num_parts);
+	parts.reserve(num_parts);
 	for (int i = 0; i < num_parts; i++) {
 		Submesh submesh;
 		read.read_struct(&submesh);
-		m->parts.push_back(submesh);
+		parts.push_back(submesh);
 	}
 
 	uint32_t DEBUG_MARKER = read.read_int32();
 	assert(DEBUG_MARKER == 'HELP');
 
 	int num_materials = read.read_int32();
-	m->materials.resize(num_materials);
+	materials.resize(num_materials);
 	std::string buffer;
 	for (int i = 0; i < num_materials; i++) {
 		read.read_string(buffer);
-		
-		//m->materials.push_back(imaterials->find_material_instance(buffer.c_str()));
 
-		m->materials[i] = GetAssets().find_assetptr_unsafe<MaterialInstance>(buffer);
+		//materials.push_back(imaterials->find_material_instance(buffer.c_str()));
 
-		if (!m->materials[i]->is_valid_to_use()) {
+		materials[i] = GetAssets().find_assetptr_unsafe<MaterialInstance>(buffer);
+
+		if (!materials[i]->is_valid_to_use()) {
 			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
-			m->materials.back() = imaterials->get_fallback();
+			materials.back() = imaterials->get_fallback();
 		}
 	}
 
 
 	int num_locators = read.read_int32();
-	m->tags.reserve(num_locators);
+	tags.reserve(num_locators);
 	for (int i = 0; i < num_locators; i++) {
 		ModelTag tag;
 		read.read_string(tag.name);
 		read.read_struct(&tag.transform);
 		tag.bone_index = read.read_int32();
-		m->tags.push_back(tag);
+		tags.push_back(tag);
 	}
 
 
 	int num_indicies = read.read_int32();
-	m->data.indicies.resize(num_indicies);
+	data.indicies.resize(num_indicies);
 	read.read_bytes_ptr(
-		m->data.indicies.data(), 
-		num_indicies * sizeof(uint16_t)
+		data.indicies.data(),
+		num_indicies * MODEL_BUFFER_INDEX_TYPE_SIZE
 	);
 
 	int num_verticies = read.read_int32();
-	m->data.verts.resize(num_verticies);
+	data.verts.resize(num_verticies);
 	read.read_bytes_ptr(
-		m->data.verts.data(), 
+		data.verts.data(),
 		num_verticies * sizeof(ModelVertex)
 	);
 
@@ -363,8 +398,8 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 
 	bool has_physics = read.read_byte();
 	if (has_physics) {
-		m->collision = std::make_unique<PhysicsBody>();
-		auto& body = *m->collision.get();
+		collision = std::make_unique<PhysicsBody>();
+		auto& body = *collision.get();
 		body.shapes.resize(read.read_int32());
 		for (int i = 0; i < body.shapes.size(); i++) {
 			read.read_bytes_ptr(&body.shapes[i], sizeof(physics_shape_def));
@@ -381,8 +416,8 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 	int num_bones = read.read_int32();
 	if (num_bones > 0) {
 
-		m->skel = std::make_unique<MSkeleton>();
-		m->skel->bone_dat.reserve(num_bones);
+		skel = std::make_unique<MSkeleton>();
+		skel->bone_dat.reserve(num_bones);
 		for (int i = 0; i < num_bones; i++) {
 			BoneData bd;
 			read.read_string(bd.strname);
@@ -393,7 +428,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			read.read_struct(&bd.invposematrix);
 			read.read_struct(&bd.localtransform);
 			read.read_struct(&bd.rot);
-			m->skel->bone_dat.push_back(bd);
+			skel->bone_dat.push_back(bd);
 		}
 
 		int num_anims = read.read_int32();
@@ -409,7 +444,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			aseq->average_linear_velocity = read.read_float();
 			aseq->num_frames = read.read_int32();
 			aseq->is_additive_clip = read.read_byte();
-			
+
 			aseq->channel_offsets.resize(num_bones);
 			read.read_bytes_ptr(aseq->channel_offsets.data(), num_bones * sizeof(ChannelOffset));
 			uint32_t packed_size = read.read_int32();
@@ -437,7 +472,7 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 			rc.ptr = aseq;
 			rc.remap_idx = -1;
 			rc.skeleton_owns_clip = true;
-			m->skel->clips.insert({ std::move(name),rc });
+			skel->clips.insert({ std::move(name),rc });
 		}
 
 		int num_includes = read.read_int32();
@@ -448,70 +483,26 @@ bool ModelMan::read_model_into_memory(Model* m, std::string modelName)
 
 		bool has_mirror_map = read.read_byte();
 		if (has_mirror_map) {
-			m->skel->mirroring_table.resize(num_bones);
-			read.read_bytes_ptr(m->skel->mirroring_table.data(), num_bones * sizeof(int16_t));
+			skel->mirroring_table.resize(num_bones);
+			read.read_bytes_ptr(skel->mirroring_table.data(), num_bones * sizeof(int16_t));
 		}
 
 		int num_masks = read.read_int32();
-		m->skel->masks.resize(num_masks);
+		skel->masks.resize(num_masks);
 		for (int i = 0; i < num_masks; i++) {
-			read.read_string(m->skel->masks[i].strname);
-			m->skel->masks[i].idname = m->skel->masks[i].strname.c_str();
-			m->skel->masks[i].weight.resize(num_bones);
-			read.read_bytes_ptr(m->skel->masks[i].weight.data(), num_bones * sizeof(float));
+			read.read_string(skel->masks[i].strname);
+			skel->masks[i].idname = skel->masks[i].strname.c_str();
+			skel->masks[i].weight.resize(num_bones);
+			read.read_bytes_ptr(skel->masks[i].weight.data(), num_bones * sizeof(float));
 		}
 
-		 DEBUG_MARKER = read.read_int32();
+		DEBUG_MARKER = read.read_int32();
 		assert(DEBUG_MARKER == 'E');
 	}
 
 	// collision data goes here
 	return true;
 }
-
-extern ConfigVar developer_mode;
-
-void Model::uninstall()
-{
-	lods.resize(0);
-	parts.clear();
-	merged_index_pointer = merged_vert_offset = 0;
-	data = RawMeshData();
-	skel.reset(nullptr);
-	collision.reset();
-	tags.clear();
-	materials.clear();
-	uid = 0;	// reset the UID
-}
-
-void Model::sweep_references() const {
-	for (int i = 0; i < materials.size(); i++) {
-		auto mat = materials[i];
-		GetAssets().touch_asset(mat);
-	}
-}
-void Model::post_load(ClassBase* u) {
-	if (did_load_fail()) {
-		return;
-	}
-	mods.upload_model(this);
-}
-
-#ifdef EDITOR_BUILD
-#include "AssetCompile/ModelCompilierLocal.h"
-bool Model::check_import_files_for_out_of_data() const
-{
-	ModelDefData defdat;
-	std::string model_def = strip_extension(get_name().c_str());
-	model_def += ".mis";
-	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat, false);
-}
-#else
-bool Model::check_import_files_for_out_of_data() const {
-	return false;
-}
-
-#endif
 
 bool Model::load_asset(ClassBase*& u) {
 	const auto& path = get_name();
@@ -528,7 +519,7 @@ bool Model::load_asset(ClassBase*& u) {
 	}
 #endif
 
-	bool good = mods.read_model_into_memory(this, path);
+	bool good = load_internal();
 
 	if (good)
 		return true;

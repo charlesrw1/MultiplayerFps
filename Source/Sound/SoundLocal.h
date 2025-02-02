@@ -56,7 +56,6 @@ struct PlaybackSpeedEffectHandler
     {
         AudioFormatType* buffer = static_cast<AudioFormatType*>(stream);
         const int bufferSize = length / sizeof(AudioFormatType);  // buffer size (as array)
-        const float speedFactor = this->speedFactor;  // take a "snapshot" of speed factor
 
         // if there is still sound to be played
         if (position < duration || loop)
@@ -68,6 +67,9 @@ struct PlaybackSpeedEffectHandler
             if (!altered && speedFactor != 1.0f)
                 altered = true;  // flags playback modification and proceed to the pitch routine.
             ASSERT(speedFactor >= 0.0);
+            if (speedFactor < 0.0)
+                speedFactor = 1.0;
+
             if (altered)  // if unaltered, this pitch routine is skipped
             {
                 for (int i = 0; i < bufferSize; i += audioChannelCount)

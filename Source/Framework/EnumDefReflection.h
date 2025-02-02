@@ -77,8 +77,8 @@ public:
 	// ex: "MyEnum"
 	static const EnumTypeInfo* find_enum_type(const char* str);
 	static const EnumTypeInfo* find_enum_type(const std::string& str);
-	// includes type name seperated by dot
-	// ex: "MyEnum.Red", "MyEnum.Green"
+	// includes type name seperated by '::'
+	// ex: "MyEnum::Red", "MyEnum::Green"
 	static EnumFindResult find_enum_by_name(const char* enum_value_name);
 	static EnumFindResult find_enum_by_name(const std::string& str);
 };

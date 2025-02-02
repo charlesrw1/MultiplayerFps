@@ -19,6 +19,7 @@
 #include "Scripting/FunctionReflection.h"
 
 #include "Framework/VectorReflect2.h"
+#include "Render/ModelManager.h"
 
 MeshComponent::~MeshComponent()
 {
@@ -123,7 +124,7 @@ void MeshComponent::update_handle()
 
 void MeshComponent::update_animator_instance()
 {
-	auto modToUse = (model.did_fail()) ? mods.get_error_model() : model.get();
+	auto modToUse = (model.did_fail()) ? ModelMan::get().get_error_model() : model.get();
 	bool should_set_ticking = false;
 	if (!eng->is_editor_level()) {
 		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {

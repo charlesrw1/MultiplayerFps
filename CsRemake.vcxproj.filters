@@ -504,6 +504,7 @@
     <ClInclude Include="Source\Game\CarGame\CarGame.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
+    <ClInclude Include="Source\Render\ModelManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
