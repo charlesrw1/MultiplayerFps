@@ -31,11 +31,17 @@ void Animation_Debug::push_sphere(const glm::vec3& p, float radius) {
 }
 
 
+static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
+{
+	return to * glm::inverse(from);
+}
+
+
 void util_subtract(int bonecount, const Pose& reference, Pose& source)
 {
 	for (int i = 0; i < bonecount; i++) {
 		source.pos[i] = source.pos[i] - reference.pos[i];
-		source.q[i] = source.q[i] - reference.q[i];
+		source.q[i] = quat_delta(reference.q[i],source.q[i]);
 	}
 
 }
@@ -59,10 +65,7 @@ void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, c
 	}
 }
 
-static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
-{
-	return to * glm::inverse(from);
-}
+
 static glm::quat quat_blend_additive(const glm::quat& a, const glm::quat& b, float t)
 {
 	glm::quat target = b * a;

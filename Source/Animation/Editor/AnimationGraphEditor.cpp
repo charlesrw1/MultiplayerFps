@@ -15,19 +15,15 @@
 #include "Framework/MyImguiLib.h"
 #include "Framework/Files.h"
 #include "Framework/MulticastDelegate.h"
-
 #include <fstream>
-
 #include "State_node.h"
 #include "Statemachine_node.h"
 #include "OsInput.h"
 #include "Root_node.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/GUISystemPublic.h"
-
 #include "Game/StdEntityTypes.h"
 #include "Framework/AddClassToFactory.h"
-
 #include "GameEnginePublic.h"
 
 std::string remove_whitespace(const char* str)
@@ -71,24 +67,6 @@ public:
 	MulticastDelegate<int, int, int> mouse_up_delegate;
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 };
-
-
-struct AnimCompletionCallbackUserData
-{
-	AnimationGraphEditor* ed = nullptr;
-	enum {
-		PARAMS,
-		CLIPS,
-		BONES,
-		PROP_TYPE,
-	}type;
-};
-std::vector<const char*>* anim_completion_callback_function(void* user, const char* word_start, int len);
-
-AnimCompletionCallbackUserData param_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::PARAMS };
-AnimCompletionCallbackUserData clip_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::CLIPS };
-AnimCompletionCallbackUserData bone_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::BONES };
-AnimCompletionCallbackUserData prop_type_completion = { &anim_graph_ed, AnimCompletionCallbackUserData::PROP_TYPE };
 
 
 ImVec4 scriptparamtype_to_color(anim_graph_value type)
@@ -184,10 +162,13 @@ void AnimationGraphEditor::close_internal()
 	}
 	nodes.clear();
 
-	if (is_owning_editing_tree) {
-		delete editing_tree;
+	out.set_model(nullptr);
+
+	// free tree
+	if (editing_tree) {
+		editing_tree->uninstall();
+		editing_tree.reset();
 	}
-	editing_tree = nullptr;
 
 	reset_prop_editor_next_tick = false;
 	playback = graph_playback_state::stopped;
@@ -404,11 +385,9 @@ bool AnimationGraphEditor::save_document_internal()
 	// this converts data to serialized form (ie Node* become indicies)
 	bool good = compile_graph_for_playing();
 
-	eng->log_to_fullscreen_gui(Info, "Saving");
+	eng->log_to_fullscreen_gui(Info, "Saving anim doc");
 	{
 		DictWriter write;
-		write.set_should_add_indents(false);
-
 		editing_tree->write_to_dict(write);
 		auto outfile = FileSys::open_write_game(get_doc_name());
 		outfile->write(write.get_output().c_str(), write.get_output().size());
@@ -424,8 +403,8 @@ bool AnimationGraphEditor::save_document_internal()
 	}
 
 	// now the graph is in a compilied state with serialized nodes, unserialize it so it works again
-	// with the engine
-	get_tree()->post_load_init();	// initialize the memory offsets
+	// with the engine, indicies back to pointers ...
+	get_tree()->post_load_init();
 
 	return true;
 }
@@ -816,7 +795,7 @@ void AnimationGraphEditor::imgui_draw()
 
 	IEditorTool::imgui_draw();
 }
-
+#include "Assets/AssetRegistry.h"
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
 	auto strong_error = GetAssets().find_global_sync<Texture>("icon/fatalerr.png");
@@ -1001,24 +980,21 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 
 	if (ImGui::BeginDragDropTarget())
 	{
-		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-		//if (payload->IsDataType("AssetBrowserDragDrop"))
-		//	sys_print("``` accepting\n");
 		bool is_sm = graph_tabs->get_active_tab()->is_statemachine_tab();
 		uint32_t layer = graph_tabs->get_current_layer_from_tab();
 		if (!is_sm) {
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimationItemAnimGraphEd"))
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 			{
-				std::string* resource = *(std::string**)payload->Data;
-				auto node = user_create_new_graphnode(Clip_EdNode::StaticType.classname, layer);
-				Clip_EdNode* cl = node->cast_to<Clip_EdNode>();
-				ASSERT(cl);
-
-				//cl->node->clip_name = *resource;
-
-				ImNodes::ClearNodeSelection();
-				ImNodes::SetNodeScreenSpacePos(cl->id, ImGui::GetMousePos());
-				ImNodes::SelectNode(cl->id);
+				AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+				if (resource->type->get_asset_class_type() == &AnimationSeqAsset::StaticType) {
+					auto node = user_create_new_graphnode(Clip_EdNode::StaticType.classname, layer);
+					Clip_EdNode* cl = node->cast_to<Clip_EdNode>();
+					ASSERT(cl);
+					cl->node->Clip = GetAssets().find_sync<AnimationSeqAsset>(resource->filename);
+					ImNodes::ClearNodeSelection();
+					ImNodes::SetNodeScreenSpacePos(cl->id, ImGui::GetMousePos());
+					ImNodes::SelectNode(cl->id);
+				}
 			}
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimGraphVariableDrag")) {
 				VariableNameAndType* var = *(VariableNameAndType**)payload->Data;
@@ -1397,85 +1373,6 @@ bool AnimationGraphEditor::compile_graph_for_playing()
 
 #include <algorithm>
 
-
-
-std::vector<const char*>* anim_completion_callback_function(void* user, const char* word_start, int len)
-{
-	AnimCompletionCallbackUserData* auser = (AnimCompletionCallbackUserData*)user;
-
-	static std::vector<const char*> vec;
-	vec.clear();
-
-	auto ed = auser->ed;
-
-	if (auser->type == AnimCompletionCallbackUserData::CLIPS) {
-		if (ed->out.get_model() && ed->out.get_model()->get_skel()) {
-
-			auto& clips = ed->out.get_model()->get_skel()->get_clips_hashmap();
-			for (const auto& c : clips)
-				if (_strnicmp(c.first.c_str(), word_start, len) == 0)
-					vec.push_back(c.first.c_str());
-			std::sort(vec.begin(), vec.end(), [](const char* a, const char* b) -> bool {
-				return strcmp(a, b) < 0;
-				});
-		}
-	}
-	else if (auser->type == AnimCompletionCallbackUserData::BONES) {
-		assert(0);
-		//auto& bones = ed->out.
-		//for (int i = 0; i < bones.size(); i++)
-		//	if (_strnicmp(bones[i].name.c_str(), word_start, len) == 0)
-		//		vec.push_back(bones[i].name.c_str());
-
-	}
-
-	else if (auser->type == AnimCompletionCallbackUserData::PROP_TYPE) {
-		vec.push_back("vec2");
-		vec.push_back("float");
-		vec.push_back("int");
-	}
-
-
-	//else if (auser->type == AnimCompletionCallbackUserData::PARAMS) {
-	//	for (int i = 0; i < ed->ed_params.param.size(); i++)
-	//		if (_strnicmp(ed->ed_params.param.at(i).s.c_str(), word_start,len) == 0)
-	//			vec.push_back((ed->ed_params.param.at(i).s.c_str()));
-	//}
-	return &vec;
-}
-
-//void AnimationGraphEditor::on_change_focus(editor_focus_state newstate)
-//{
-//	//if (newstate == editor_focus_state::Background) {
-//	//	gui->unlink_and_release_from_parent();
-//	//	if (eng->get_state() != Engine_State::Game) {
-//	//		stop_playback();
-//	//		compile_and_run();
-//	//	}
-//	//	control_params->refresh_props();
-//	//	out.hide();
-//	//	playback = graph_playback_state::running;
-//	//	//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
-//	//}
-//	//else if(newstate == editor_focus_state::Closed){
-//	//	gui->unlink_and_release_from_parent();
-//	//
-//	//	close();
-//	//	//Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini animdock.ini");
-//	//}
-//	//else {
-//	//	eng->get_gui()->add_gui_panel_to_root(gui.get());
-//	//	eng->get_gui()->set_focus_to_this(gui.get());
-//	//
-//	//	// focused, stuff can start being rendered
-//	//	playback = graph_playback_state::stopped;
-//	//	control_params->refresh_props();
-//	//	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
-//	//}
-//}
-
-
-
 void AnimationGraphEditor::tick(float dt)
 {
 	///assert(get_focus_state() != editor_focus_state::Closed);
@@ -1637,8 +1534,7 @@ void AnimationGraphEditor::create_new_document()
 {
 	printf("creating new document");
 	set_empty_doc();	// when saving, user is prompted
-	editing_tree = new Animation_Tree_CFG;
-	is_owning_editing_tree = true;
+	editing_tree = std::make_unique<Animation_Tree_CFG>();
 	// add the output pose node to the root layer
 	add_root_node_to_layer(nullptr, 0, false);
 	// create context for root layer
@@ -1665,8 +1561,40 @@ extern ConfigVar ed_default_sky_material;
 
 ConfigVar animed_default_model("animed_default_model", "SWAT_model.cmdl", CVAR_DEV, "sets the default model for the anim editor");
 
+static std::unique_ptr<Animation_Tree_CFG> try_to_load_document(const std::string& path)
+{
+	auto tree = std::make_unique<Animation_Tree_CFG>();
+	tree->editor_set_newly_made_path(path);
+	ClassBase* dummy = nullptr;
+	bool good = tree->load_asset(dummy);
+	ASSERT(!dummy);
+	if (!good) {
+		return nullptr;	// ptr gets freed
+	}
+	return std::move(tree);
+}
+void GraphOutput::set_model(Model* model) {
+	if (this->model) {
+		this->model->post_asset_hot_reload.remove(this);
+	}
+	if (model) {
+		model->post_asset_hot_reload.add(this,
+			[&]() {
+				this->model = nullptr;
+				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("start_ed AnimGraph %s", anim_graph_ed.get_doc_name().c_str()));
+			}
+		);
+	}
+
+	this->model = model;
+	if(obj.is_valid())
+		idraw->get_scene()->remove_obj(obj);
+}
+
 void AnimationGraphEditor::post_map_load_callback()
 {
+	ASSERT(!editing_tree);
+
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 
 	auto& name = get_doc_name();
@@ -1674,7 +1602,9 @@ void AnimationGraphEditor::post_map_load_callback()
 	bool needs_new_doc = true;
 	if (!name.empty()) {
 		// try loading graphname, create new document on fail
-		editing_tree = GetAssets().find_sync<Animation_Tree_CFG>(name).get();
+		//editing_tree = GetAssets().find_sync<Animation_Tree_CFG>(name).get();
+
+		editing_tree = try_to_load_document(name);
 
 		if (editing_tree) {
 			DictParser parser;
@@ -1689,7 +1619,6 @@ void AnimationGraphEditor::post_map_load_callback()
 
 					// tree was loaded and editor nodes were loaded
 					needs_new_doc = false;
-					is_owning_editing_tree = false;
 
 					for (int i = 0; i < nodes.size(); i++) {
 						nodes[i]->init();
@@ -1706,8 +1635,9 @@ void AnimationGraphEditor::post_map_load_callback()
 	}
 
 	if (needs_new_doc) {
-		if (editing_tree)
-			editing_tree = nullptr;	// not memory leak since the tree gets cleaned up later with references
+		if (editing_tree) {
+			editing_tree.reset(nullptr);
+		}
 		set_empty_doc();
 		create_new_document();
 		ASSERT(!current_document_has_path());

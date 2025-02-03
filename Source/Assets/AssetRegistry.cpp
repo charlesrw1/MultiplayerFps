@@ -17,7 +17,7 @@ AssetRegistrySystem& AssetRegistrySystem::get()
 	return inst;
 }
 
-ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "5", CVAR_DEV | CVAR_INTEGER, "time in seconds of registry reindexing");
+ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "2", CVAR_DEV | CVAR_INTEGER, "time in seconds of registry reindexing");
 
 static std::vector<std::string> split(const std::string& str, char delimiter) {
 	std::vector<std::string> tokens;
@@ -143,13 +143,14 @@ void AssetRegistrySystem::init()
 	}
 	hackedAsset = new HackedAsyncAssetRegReindex();
 	GetAssets().install_system_asset(hackedAsset, "_hackedAsset");
+
+	reindex_all_assets();
 }
 
 void AssetRegistrySystem::update()
 {
-	double time_now = GetTime();
-	if (time_now - last_reindex_time > asset_registry_reindex_period.get_float()) {
-
+	double time_now = TimeSinceStart();
+	{
 		auto status = WaitForMultipleObjects(1, &directoryChangeHandle, TRUE, 0);
 		if (status == WAIT_TIMEOUT)
 			return;
@@ -157,8 +158,17 @@ void AssetRegistrySystem::update()
 			sys_print(Error, "WaitForMultipleObjects failed: %s\n", GetLastError());
 			return;
 		}
+		if (time_now - last_reindex_time <= (double)asset_registry_reindex_period.get_integer()) {
+			if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
+				sys_print(Error, "FindNextChangeNotification failed: %d\n", GetLastError());
+			}
+			sys_print(Debug, "skip reindex%f %f\n", time_now, time_now - last_reindex_time);
+			return;
+
+		}
+
 		ASSERT(status == WAIT_OBJECT_0);
-		sys_print(Debug, "reindexing assets\n");
+		sys_print(Debug, "reindexing assets %f %f\n",time_now, time_now-last_reindex_time);
 		reindex_all_assets();
 		AssetDatabase::get().hot_reload_assets();
 		last_reindex_time = time_now;

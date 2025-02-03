@@ -29,6 +29,10 @@ public:
 	virtual void hook_imgui_newframe() {}
 
 	virtual const char* get_save_file_extension() const = 0;
+
+	// the name of the document
+// the full path of the document is ($ENGINE_ROOT)+"get_save_root_dir() + name"
+	const std::string& get_doc_name() const { return name; }
 protected:
 	virtual const ClassTypeInfo& get_asset_type_info() const = 0;
 
@@ -52,9 +56,9 @@ protected:
 	// return wether the document can be saved right now, if false, save_document_internal() will not be called
 	virtual bool can_save_document() { return true; };
 
-	// the name of the document
-	// the full path of the document is ($ENGINE_ROOT)+"get_save_root_dir() + name"
-	const std::string& get_doc_name() const { return name; }
+	bool get_is_open() const {
+		return is_open;
+	}
 private:
 	// this is called by open(), if the document doesnt exist or fails to parse, you MUST open something, so create a new doc, this will be checked
 	virtual bool open_document_internal(const char* name, const char* arg) = 0;

@@ -15,8 +15,6 @@
 #include "Framework/Util.h"
 #include "Render/RenderObj.h"
 
-#include "AnimationGraphEditorPublic.h"
-
 #include "../Runtime/Animation.h"
 #include "../Runtime/AnimationTreeLocal.h"
 
@@ -43,9 +41,9 @@ struct GraphTab {
 	}
 
 	void update_tab_name() {
-		if (!owner_node) 
+		if (!owner_node)
 			tabname = "ROOT";
-		else 
+		else
 			tabname = owner_node->get_layer_tab_title();
 	}
 };
@@ -91,7 +89,7 @@ public:
 			return;
 
 		forward_tab_stack.clear();
-		if(active_tab!=-1)
+		if (active_tab != -1)
 			active_tab_hist.push_back(active_tab);
 		active_tab = index;
 		active_tab_dirty = true;
@@ -154,17 +152,14 @@ class GraphOutput
 {
 public:
 	bool is_valid_for_preview() { return model && animator && model->get_skel(); }
-	
+
 	void hide();
 	void show(bool is_playing);
-	
+
 	AnimatorInstance* get_animator();
 	Model* get_model() { return model; }
 
-	void set_model(Model* model) {
-		this->model = model;
-		idraw->get_scene()->remove_obj(obj);
-	}
+	void set_model(Model* model);
 
 	void set_animator_instance(AnimatorInstance* inst);
 	void clear();
@@ -177,7 +172,6 @@ private:
 	handle<Render_Object> obj;
 	Model* model = nullptr;
 	AnimatorInstance* animator = nullptr;
-
 };
 
 struct VariableNameAndType
@@ -194,9 +188,6 @@ public:
 
 	void imgui_draw();
 	void refresh_props();
-
-
-
 private:
 	void on_set_animator_instance(AnimatorInstance* a) {
 		refresh_props();
@@ -211,11 +202,8 @@ private:
 		anim_graph_value type = anim_graph_value::float_t;
 		const PropertyInfo* nativepi = nullptr;
 	};
-
 	std::vector<VariableParam> props;
-	
 	VariableNameAndType dragdrop;
-	//PropertyGrid control_params;
 };
 
 
@@ -292,7 +280,7 @@ public:
 	template<typename T>
 	T* find_first_node_in_layer(uint32_t layer) {
 		for (int i = 0; i < nodes.size(); i++) {
-			if (nodes[i]->graph_layer == layer && nodes[i]->get_type() == T::StaticType){
+			if (nodes[i]->graph_layer == layer && nodes[i]->get_type() == T::StaticType) {
 				return nodes[i]->cast_to<T>();
 			}
 		}
@@ -330,7 +318,7 @@ public:
 	std::unique_ptr<AnimGraphClipboard> clipboard;
 
 	Animation_Tree_CFG* get_tree() {
-		return editing_tree;
+		return editing_tree.get();
 	}
 	template<typename T>
 	void util_create_node(T*& node)
@@ -380,9 +368,9 @@ public:
 			REG_BOOL(opt.open_prop_editor, PROP_SERIALIZE, ""),
 			REG_BOOL(opt.statemachine_passthrough, PROP_SERIALIZE, ""),
 
-			REG_CLASSTYPE_PTR(anim_class_type,PROP_EDITABLE),
-			REG_ASSET_PTR(output_model,PROP_DEFAULT)
-		END_PROPS(AnimationGraphEditor)
+			REG_CLASSTYPE_PTR(anim_class_type, PROP_EDITABLE),
+			REG_ASSET_PTR(output_model, PROP_DEFAULT)
+			END_PROPS(AnimationGraphEditor)
 	}
 
 	bool is_modifier_pressed = false;
@@ -420,10 +408,8 @@ public:
 
 	ImNodesEditorContext* default_editor = nullptr;
 	std::vector<Base_EdNode*> nodes;
-	// if true, then deletes editing_tree on graph close
-	// otherwise, the pointer is a reference to a loaded graph stored in anim_graph_man
-	bool is_owning_editing_tree = false;
-	Animation_Tree_CFG* editing_tree = nullptr;
+
+	std::unique_ptr<Animation_Tree_CFG> editing_tree;
 
 	GraphOutput out;
 	uint32_t current_id = 0;
@@ -439,8 +425,7 @@ public:
 		return Animation_Tree_CFG::StaticType;
 	}
 	void post_map_load_callback();
-
-	const char* get_save_file_extension() const {
+	const char* get_save_file_extension() const override {
 		return "ag";
 	}
 };

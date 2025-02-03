@@ -359,6 +359,12 @@ public:
 		if (p) {
 			bRunning = p->did_move;
 			bIsJumping = p->is_jumping;
+
+			auto lastvel = vel;
+			vel = (p->get_ws_position() - lastpos) / dt;
+			accel = (vel - lastvel) / dt;
+			lastpos = p->get_ws_position();
+			flMovex = damp_dt_independent(glm::clamp(accel.x * 0.4f, -1.f, 0.f), flMovex, 0.01, dt);
 		}
 		else if (e) {
 			bRunning = !e->is_dead;
@@ -372,6 +378,10 @@ public:
 
 	TopDownPlayer* p = nullptr;
 	TopDownEnemyComponent* e = nullptr;
+
+	glm::vec3 lastpos{};
+	glm::vec3 vel{};
+	glm::vec3 accel{};
 
 	REFLECT();
 	bool bIsJumping = false;
