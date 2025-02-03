@@ -152,6 +152,7 @@ public:
 	OsInput inp;
 
 	string queued_mapname;
+	bool is_waiting_on_load_level_callback = false;
 	bool is_loading_editor_level = false;
 	std::unique_ptr<Level> level= nullptr;
 

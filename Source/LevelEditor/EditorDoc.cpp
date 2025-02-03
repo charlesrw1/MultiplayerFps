@@ -290,6 +290,11 @@ void EditorDoc::init()
 
 bool EditorDoc::save_document_internal()
 {
+	if (!get_is_open() || !eng->get_level()) {
+		sys_print(Warning, "save_document_internal but level editor not open\n");
+		return false;
+	}
+
 	eng->log_to_fullscreen_gui(Info, "Saving");
 	sys_print(Info, "saving map document\n");
 
@@ -395,6 +400,11 @@ void EditorDoc::validate_prefab()
 
 void EditorDoc::on_map_load_return(bool good)
 {
+	if (!get_is_open()||!eng->get_level()) {
+		sys_print(Warning, "on_map_load_return but level editor not open\n");
+		return;
+	}
+
 	if (!good) {
 		sys_print(Warning, "failed to load editor map\n");
 		eng->open_level("__empty__");

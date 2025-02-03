@@ -33,8 +33,8 @@ public:
 	// the name of the document
 // the full path of the document is ($ENGINE_ROOT)+"get_save_root_dir() + name"
 	const std::string& get_doc_name() const { return name; }
-protected:
 	virtual const ClassTypeInfo& get_asset_type_info() const = 0;
+protected:
 
 	// various hooks to add imgui calls
 	virtual void hook_menu_bar_file_menu() {}

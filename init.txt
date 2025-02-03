@@ -9,6 +9,8 @@ bind 2 "TOGGLE_PLAY_EDIT_MAP"
 bind 3 "start_ed Prefab fire_emit.pfb"
 bind 4 "start_ed Prefab top_down/player.pfb"
 bind 5 "map car/testmap.tmap"
+bind 9 "start_ed Map car/testmap.tmap"
+bind 8 "start_ed Map top_down/map0.tmap"
 
 #force_animation_to_bind_pose 1
 drawconsole 1

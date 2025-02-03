@@ -425,6 +425,11 @@ DECLARE_ENGINE_CMD(start_ed)
 		return;
 	}
 
+	if (eng_local.is_waiting_on_load_level_callback) {
+		sys_print(Error, "start_ed but waiting on an async map load call (%s), skipping.\n",eng_local.queued_mapname.c_str());
+		return;
+	}
+
 	std::string edit_type = args.at(1);
 	const AssetMetadata* metadata = AssetRegistrySystem::get().find_type(edit_type.c_str());
 	if (metadata && metadata->tool_to_edit_me()) {
@@ -467,7 +472,13 @@ static void disable_imgui_docking()
 #ifdef EDITOR_BUILD
 void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
-	sys_print(Info, "--------- Change Editor State ---------\n");
+	const char* str = string_format("%s:%s -> %s:%s",
+		(active_tool) ? active_tool->get_asset_type_info().classname : "<none>",
+		(active_tool) ? active_tool->get_doc_name().c_str() : "",
+		(next_tool) ? next_tool->get_asset_type_info().classname : "<none>",
+		(next_tool) ? file : ""
+		);
+	sys_print(Info, "--------- Change Editor State (%s) ---------\n",str);
 	if (active_tool != next_tool && active_tool != nullptr) {
 		// this should call close internally
 		get_current_tool()->close();
@@ -592,6 +603,11 @@ DECLARE_ENGINE_CMD(map)
 {
 	if (args.size() < 2) {
 		sys_print(Info, "usage: map <map name>");
+		return;
+	}
+
+	if (eng_local.is_waiting_on_load_level_callback) {
+		sys_print(Error, "map called but already waiting on another async map load (%s), skipping.\n", eng_local.queued_mapname.c_str());
 		return;
 	}
 
@@ -887,11 +903,15 @@ void GameEngineLocal::leave_level()
 
 void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
 {
+	sys_print(Info, "on_map_change_callback %s\n",loadedLevel->get_name().c_str());
+
 	GetAssets().remove_unreferences();
 	ModelMan::get().compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
 
 	ASSERT(!level);
+	ASSERT(is_waiting_on_load_level_callback);
 
+	is_waiting_on_load_level_callback = false;
 	is_loading_editor_level = false;
 
 	if (!loadedLevel) {
@@ -933,6 +953,9 @@ void GameEngineLocal::execute_map_change()
 	const bool this_is_for_editor = false;
 #endif
 	is_loading_editor_level = this_is_for_editor;	// set temporary variable
+
+	ASSERT(!is_waiting_on_load_level_callback);
+	is_waiting_on_load_level_callback = true;	// flipped to false in on_map_change_callback
 
 	// special name to create a map
 	if (this_is_for_editor && queued_mapname == "__empty__") {	
@@ -1596,7 +1619,8 @@ void GameEngineLocal::stop_game()
 	if (!map_spawned())
 		return;
 
-	sys_print(Info,"-------- Clearing Map --------\n");
+	const char* str = (level->get_source_asset()) ? level->get_source_asset()->get_name().c_str() : "<empty>";
+	sys_print(Info,"-------- Clearing Map (%s) --------\n", str);
 
 	ASSERT(level);
 
