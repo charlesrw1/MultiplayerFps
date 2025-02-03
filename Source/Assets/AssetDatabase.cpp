@@ -453,6 +453,28 @@ public:
 	}
 #endif
 
+
+	void print_assets() {
+		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
+		sys_print(Info, "%-32s|%-18s|%s|%s\n","NAME", "TYPE", "F", "MASK");
+		std::string usename;
+		std::string usetype;
+		for (auto& [name,type] : allAssets) {	// structured bindings r cool
+			if (!type->is_loaded)
+				continue;
+			usename = name;
+			if (usename.size() > 32) {
+				usename = usename.substr(0, 29) + "...";
+			}
+			usetype = type->get_type().classname;
+			if (usetype.size() > 18) {
+				usetype = usetype.substr(0, 15) + "...";
+			}
+
+			sys_print(Info, "%-32s|%-18s|%s|%s\n", usename.c_str(), usetype.c_str(), (type->load_failed) ? "X" : " ", "");
+		}
+	}
+
 private:
 	
 	void queue_load_job(AsyncQueuedJob j) {
@@ -593,4 +615,13 @@ void AssetDatabase::unreference_this_channel(uint32_t channel)
 void AssetDatabase::remove_unreferences()
 {
 	impl->uninstall_unreferenced_assets();
+}
+void AssetDatabase::print_usage()
+{
+	impl->print_assets();
+}
+
+DECLARE_ENGINE_CMD(print_assets)
+{
+	AssetDatabase::get().print_usage();
 }

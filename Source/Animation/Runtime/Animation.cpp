@@ -164,7 +164,8 @@ bool AnimatorInstance::initialize(
 		cfg->get_root_node()->reset(ctx);
 
 	// Callback to inherited class
-	on_init();
+	if(!get_is_for_editor())
+		on_init();
 
 	// Init bone arrays
 	const int bones = model->get_skel()->get_num_bones();
@@ -298,7 +299,8 @@ void AnimatorInstance::update(float dt)
 	gp_ctx.pose = &poses[0];
 
 	// callback
-	on_update(dt);
+	if(!get_is_for_editor())
+		on_update(dt);
 
 	// call into tree
 	if (!force_animation_to_bind_pose.get_bool() && get_tree()&& get_tree()->get_root_node())
@@ -413,7 +415,8 @@ void AnimatorInstance::update(float dt)
 	}
 	
 	// Callback
-	on_post_update();
+	if(!get_is_for_editor())
+		on_post_update();
 
 	ConcatWithInvPose();
 

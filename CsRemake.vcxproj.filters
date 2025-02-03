@@ -503,6 +503,8 @@
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
+    <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
+    <ClInclude Include="Source\Framework\SysPrint.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

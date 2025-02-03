@@ -55,6 +55,7 @@
 #include "LevelSerialization/SerializationAPI.h"
 #include "Render/ModelManager.h"
 
+#include "Framework/SysPrint.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -186,6 +187,8 @@ void Quit()
 }
 
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
+
+
 
 void sys_print(LogType type, const char* fmt, ...)
 {
@@ -450,6 +453,7 @@ DECLARE_ENGINE_CMD(start_ed)
 		sys_print(Info, usage_str);
 	}
 }
+
 #endif
 static void enable_imgui_docking()
 {
@@ -645,6 +649,7 @@ DECLARE_ENGINE_CMD(toggle)
 	}
 	var->set_bool(!var->get_bool());
 }
+
 
 DECLARE_ENGINE_CMD(net_stat)
 {

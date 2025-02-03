@@ -321,6 +321,7 @@ void Model::post_load(ClassBase* u) {
 	if (did_load_fail()) {
 		return;
 	}
+	ASSERT(uid == 0);
 	ModelMan::get().upload_model(this);
 }
 
@@ -564,9 +565,10 @@ bool Model::load_asset(ClassBase*& u) {
 void Model::move_construct(IAsset* _src)
 {
 	uninstall();
+	ASSERT(this->uid == 0);
+
 
 	Model* src = _src->cast_to<Model>();
-	this->uid = src->uid;
 	for (int i = 0; i < src->lods.size(); i++)
 		this->lods.push_back(src->lods[i]);
 	parts = std::move(src->parts);
@@ -580,7 +582,6 @@ void Model::move_construct(IAsset* _src)
 	tags = std::move(src->tags);
 	materials = std::move(src->materials);
 	skeleton_root_transform = src->skeleton_root_transform;
-	ModelMan::get().add_model_to_list(this);
 
 	src->uninstall();
 }

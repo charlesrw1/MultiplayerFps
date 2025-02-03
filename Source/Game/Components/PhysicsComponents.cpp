@@ -274,8 +274,10 @@ void BoxComponent::add_actor_shapes() {
 
 
 void SphereComponent::add_actor_shapes() {
-	
-	add_sphere_shape_to_actor(glm::vec3(1.f), radius);
+	auto scale = get_owner()->get_ls_scale();
+	auto scale_sz = glm::max(scale.x, glm::max(scale.y, scale.z));
+
+	add_sphere_shape_to_actor(glm::vec3(0.f), radius* scale_sz);
 }
 void MeshColliderComponent::add_actor_shapes() {
 	auto mesh = get_owner()->get_component<MeshComponent>();

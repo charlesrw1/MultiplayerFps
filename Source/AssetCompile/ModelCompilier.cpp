@@ -969,7 +969,7 @@ cgltf_and_binary load_cgltf_data(const std::string& path)
 unique_ptr<SkeletonCompileData> get_skin_from_file(cgltf_data* dat, const char* name, const std::string armature)
 {
 	cgltf_skin* s = nullptr;
-	if (dat->skins_count == 0) {
+	if (dat->skins_count == 0) {	
 		// blank
 		return nullptr;
 	}
@@ -989,6 +989,8 @@ unique_ptr<SkeletonCompileData> get_skin_from_file(cgltf_data* dat, const char* 
 			s = &dat->skins[0];
 		}
 	}
+
+	sys_print(Info, "found animation skin\n");
 
 	SkeletonCompileData* scd = new SkeletonCompileData;
 	
@@ -2580,8 +2582,10 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 {
 	cgltf_and_binary out = load_cgltf_data(def.model_source);
 
-	if (!out.data)
+	if (!out.data) {
+		sys_print(Error, "load_cgltf_data failed\n");
 		return false;
+	}
 
 	std::string finalpath = strip_extension(defname);
 	finalpath += ".cmdl";

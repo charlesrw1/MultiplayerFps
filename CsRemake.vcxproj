@@ -59,6 +59,7 @@
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
+    <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Game\AssetPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\AssetPtrMacro.h" />
@@ -67,6 +68,7 @@
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\EntityPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
+    <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />

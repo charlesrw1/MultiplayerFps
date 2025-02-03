@@ -95,6 +95,9 @@ public:
 		update_owner_position_to_root = b;
 	}
 private:
+	bool get_is_for_editor() const {
+		return get_owner() == nullptr;
+	}
 
 	// hooks for derived classes
 	virtual void on_init() {};
