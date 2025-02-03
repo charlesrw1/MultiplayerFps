@@ -21,6 +21,7 @@ LIST_TYPE = 11
 COLOR32_TYPE = 12
 ENUM_TYPE = 13
 STRUCT_TYPE = 14
+SOFTASSETPTR_TYPE = 15
 
 CLASS_OBJECT = 0
 STRUCT_OBJECT = 1
@@ -112,6 +113,8 @@ def write_prop(prop : Property):
         return f"REG_STRUCT_CUSTOM_TYPE({prop.name},{prop.get_flags()},{prop.custom_type})"
     elif prop.prop_type == ENUM_TYPE:
         return f"REG_ENUM({prop.name},{prop.get_flags()},{prop.hint},{prop.enum_or_struct_name})"
+    elif prop.prop_type == SOFTASSETPTR_TYPE:
+        return f"REG_SOFT_ASSET_PTR({prop.name},{prop.get_flags()})"
     else:
         assert(0)
     
@@ -334,6 +337,7 @@ def parse_file(root, file_name):
                             ("std::string",STRING_TYPE),
                             ("MulticastDelegate",MULTICAST_TYPE),
                             ("AssetPtr",ASSETPTR_TYPE),
+                            ("SoftAssetPtr",SOFTASSETPTR_TYPE),
                             ("std::vector",LIST_TYPE),
                             ("float",FLOAT_TYPE),
                             ("bool",BOOL_TYPE),

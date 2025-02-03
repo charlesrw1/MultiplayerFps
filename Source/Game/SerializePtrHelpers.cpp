@@ -11,6 +11,7 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringUtil.h"
+#include "SoftAssetPtr.h"
 
 class SerializeAssetPtr : public IPropertySerializer
 {
@@ -50,6 +51,20 @@ public:
 			}
 
 		}
+	}
+};
+class SoftAssetPtrSerializer : public IPropertySerializer
+{
+public:
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		SoftAssetPtr<IAsset>* ptr = (SoftAssetPtr<IAsset>*)info.get_ptr(inst);
+		return ptr->path;
+	}
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		SoftAssetPtr<IAsset>* ptr = (SoftAssetPtr<IAsset>*)info.get_ptr(inst);
+		ptr->path = std::string(token.str_start, token.str_len);
 	}
 };
 
@@ -103,6 +118,7 @@ class SerializeEntityPtr : public IPropertySerializer
 	}
 };
 
+ADDTOFACTORYMACRO_NAME(SoftAssetPtrSerializer, IPropertySerializer, "SoftAssetPtr");
 ADDTOFACTORYMACRO_NAME(SerializeAssetPtr, IPropertySerializer,	"AssetPtr");
 ADDTOFACTORYMACRO_NAME(SerializeEntityPtr, IPropertySerializer, "EntityPtr");
 

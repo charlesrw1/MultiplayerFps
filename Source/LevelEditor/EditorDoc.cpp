@@ -1547,15 +1547,21 @@ void EdPropertyGrid::draw()
 	ImGui::End();
 }
 
-class AssetPropertyEditor : public IPropertyEditor
+
+
+class SharedAssetPropertyEditor : public IPropertyEditor
 {
 public:
+	virtual std::string get_str() = 0;
+	virtual void set_asset(const std::string& str) = 0;
+	virtual bool is_soft_editor() const {
+		return false;
+	}
+
 	virtual bool internal_update() {
 		if (!has_init) {
-			IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
 			has_init = true;
-			if(*ptr_to_asset)
-				asset_str = (*ptr_to_asset)->get_name();
+			asset_str = get_str();
 			metadata = AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class(prop->range_hint));
 		}
 		if (!metadata) {
@@ -1574,15 +1580,31 @@ public:
 		color.g *= 0.4;
 		color.b *= 0.4;
 
+		if (is_soft_editor()) {
+			float border = 2.f;
+			drawlist->AddRectFilled(
+				ImVec2(min.x - style.FramePadding.x * 0.5f - border, min.y - border), 
+				ImVec2(min.x + width + border, min.y + sz.y + style.FramePadding.y * 2.0+border),
+				(Color32{ 255, 229, 99 }).to_uint());
+		}
+
 		drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y), ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), 
 			color.to_uint());
 		auto cursor = ImGui::GetCursorPos();
-		ImGui::Text(asset_str.c_str());
+
+		if (is_soft_editor())
+			ImGui::TextColored(ImColor((Color32{ 255, 229, 99 }).to_uint()), asset_str.c_str());
+		else
+			ImGui::Text(asset_str.c_str());
+
 		ImGui::SetCursorPos(cursor);
 		ImGui::InvisibleButton("##adfad", ImVec2(width, sz.y + style.FramePadding.y * 2.f));
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
 			ImGui::BeginTooltip();
-			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
+			if (is_soft_editor())
+				ImGui::Text(string_format("SoftAssetPtr: Drag and drop %s asset here", metadata->get_type_name().c_str()));
+			else
+				ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
 			ImGui::EndTooltip();
 
 
@@ -1622,14 +1644,10 @@ public:
 				if (actually_accept) {
 					if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 					{
-						IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
-						auto classtype = ClassBase::find_class(prop->range_hint);
-						*ptr_to_asset = GetAssets().find_sync(resource->filename, classtype,0).get();// loader->load_asset(resource->filename);
+						//IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
 						
-						if (*ptr_to_asset)
-							asset_str = (*ptr_to_asset)->get_name();
-						else
-							asset_str = "";
+						set_asset(resource->filename);
+						asset_str = get_str();
 
 
 						ret = true;
@@ -1645,17 +1663,56 @@ public:
 	virtual int extra_row_count() { return 0; }
 	virtual bool can_reset() { return !asset_str.empty(); }
 	virtual void reset_value() {
+		set_asset("");
 		asset_str = "";
-		auto ptr = (IAsset**)prop->get_ptr(instance);
-		*ptr = nullptr;
+		//auto ptr = (IAsset**)prop->get_ptr(instance);
+		//*ptr = nullptr;
 	}
 private:
 	bool has_init = false;
 	std::string asset_str;
 	const AssetMetadata* metadata = nullptr;
 };
+#include "Game/SoftAssetPtr.h"
+class SoftAssetPropertyEditor : public SharedAssetPropertyEditor
+{
+public:
+	std::string get_str() override {
+		auto ptr = (SoftAssetPtr<IAsset>*)prop->get_ptr(instance);
+		return ptr->path;
+	}
+	void set_asset(const std::string& str) override {
+		auto ptr = (SoftAssetPtr<IAsset>*)prop->get_ptr(instance);
+		ptr->path = str;
+	}
+	bool is_soft_editor() const override {
+		return true;
+	}
+};
+class AssetPropertyEditor : public SharedAssetPropertyEditor
+{
+public:
+	std::string get_str() override {
+		auto ptr = (IAsset**)prop->get_ptr(instance);
+		return (*ptr) ? (*ptr)->get_name() : "";
+	}
+	void set_asset(const std::string& str) override {
+		auto ptr = (IAsset**)prop->get_ptr(instance);
+		if (str.empty()) {
+			*ptr = nullptr;
+		}
+		else {
+			auto classtype = ClassBase::find_class(prop->range_hint);
+			auto asset = GetAssets().find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
+			*ptr = asset;
+		}
+	}
+};
+
 
 ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
+ADDTOFACTORYMACRO_NAME(SoftAssetPropertyEditor, IPropertyEditor, "SoftAssetPtr");
+
 
 
 class EntityPtrAssetEditor : public IPropertyEditor

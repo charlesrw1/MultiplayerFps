@@ -6,13 +6,15 @@
 #include "Game/SerializePtrHelpers.h"
 #include "Game/Components/MeshComponent.h"
 #include "Animation/AnimationSeqAsset.h"
-
+#include "Game/SoftAssetPtr.h"
 NEWCLASS(TDChest, EntityComponent)
 public:
 	REFLECT();
 	AssetPtr<SoundFile> soundfx;
 	REFLECT();
 	AssetPtr<AnimationSeqAsset> openanim;
+	REFLECT();
+	SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
 
 	MeshComponent* m = nullptr;
 	void start() {
