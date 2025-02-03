@@ -1326,8 +1326,8 @@ void Render_Pass::add_object(
 	//obj.hl_obj_index = high_level_objects_in_pass.size()-1;
 
 	// ensure this material maps to a gpu material
-	ASSERT(material->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING);
-	objects.push_back(obj);
+	if(material->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING)
+		objects.push_back(obj);
 }
 #include <iterator>
 void Render_Pass::make_batches(Render_Scene& scene)

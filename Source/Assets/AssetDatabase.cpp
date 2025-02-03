@@ -14,6 +14,7 @@
 
 struct AsyncQueuedJob
 {
+	bool is_prioritized = false;
 	IAsset* what = nullptr;
 	uint32_t referenceMask = 0;
 	bool force_reload = false;
@@ -38,10 +39,24 @@ public:
 // THREAD LOCALS
 // what job are we currently executing
 thread_local AsyncQueuedJob* ACTIVE_THREAD_JOB = nullptr;
+thread_local bool IS_LOADER_THREAD = false;
 
 class AssetDatabaseImpl
 {
 public:
+	AssetDatabaseImpl() {
+
+	}
+	~AssetDatabaseImpl() {
+
+	}
+	void init() {
+		loadThread =
+			new AssetDatabaseImpl::LoadThreadAndSignal(
+				std::thread(AssetDatabaseImpl::loaderThreadMain, 0, this));
+		loadThread->myThread.detach();
+	}
+
 	void install_system_direct(IAsset* asset, const std::string& name) {
 		asset->path = name;
 		asset->set_both_reference_bitmasks_unsafe( IAsset::GLOBAL_REFERENCE_MASK );
@@ -49,44 +64,74 @@ public:
 		asset->has_run_post_load = true;
 		asset->is_from_disk = false;
 
-		std::lock_guard<std::mutex> lock(assetHashmapMutex);
+		std::lock_guard<std::mutex> lock(hashmapMutex);
 		allAssets.insert({ name, asset });
 	}
 
 
-	LoadJob* fetch_finished_job() {
-		std::unique_lock<std::mutex> lock(finishedQueueMutex);
-		if (finishedAsyncJobs.empty()) {
-			return nullptr;
-		}
-		auto job = finishedAsyncJobs.front();
-		finishedAsyncJobs.pop();
-		return job;
-	}
-
-	LoadJob* fetch_finished_job_no_lock() {
-		if (finishedAsyncJobs.empty()) {
-			return nullptr;
-		}
-		auto job = finishedAsyncJobs.front();
-		finishedAsyncJobs.pop();
-		return job;
-	}
+	
 
 	void remove_asset_direct(IAsset* asset) {
-		// wait till load jobs are finished to avoid crap
-		std::unique_lock<std::mutex> lock(queueMutex);
-		condition2.wait(lock, [&] { return pendingAsyncJobs.empty(); });
-
-		tick_asyncs_standard();	// clear the queue if anything is there
-
-		std::lock_guard<std::mutex> workLock(loadingJobMutex);
-		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);		
-		
+		finish_all_jobs();
 		allAssets.erase(asset->path);
 	}
 
 	void tick_asyncs_standard() {
+		ASSERT(!IS_LOADER_THREAD);
+
+		auto fetch_finished_job = [&]() -> LoadJob* {
+			std::unique_lock<std::mutex> lock(job_mutex);
+			if (finishedAsyncJobs.empty()) {
+				return nullptr;
+			}
+			auto job = finishedAsyncJobs.front();
+			finishedAsyncJobs.pop();
+			return job;
+		};
+
+		std::vector<IAsset*> assets_to_reload;
+
+		auto finalize_job_with_main_thread = [this](LoadJob* job) {
+#ifdef _DEBUG
+			sys_print(Debug, "finalize job %s resource %s\n", job->thisAsset->get_type().classname, job->thisAsset->get_name().c_str());
+#endif
+			const bool is_reload = job->thisAsset && job->moveIntoThis;
+
+			if (!job->skipPostLoad) {
+				if (job->moveIntoThis) {
+					job->moveIntoThis->move_construct(job->thisAsset);
+					job->moveIntoThis->load_failed = job->thisAsset->load_failed;
+#ifdef EDITOR_BUILD
+					job->moveIntoThis->asset_load_time = job->thisAsset->asset_load_time;
+#endif
+					delete job->thisAsset;
+					job->thisAsset = job->moveIntoThis;
+				}
+				assert(job->thisAsset->is_loaded);
+				job->thisAsset->post_load(job->userPtr);
+				job->thisAsset->has_run_post_load = true; // thread safe!
+				if (job->userPtr)
+					delete job->userPtr;
+			}
+			job->thisAsset->move_internal_to_threadsafe_bitmask_unsafe();
+			if (job->loadJobCallback) {
+				(*job->loadJobCallback)(job->thisAsset);
+				delete job->loadJobCallback;
+			}
+
+#ifdef EDITOR_BUILD
+			// now for a sucky bit: if theres dependencies, they have to be reloaded sync otherwise stale pointers etc
+			if (is_reload) {
+				for (auto d : job->thisAsset->reload_dependents)
+					reload_asset_sync(d);
+			}
+#endif
+
+
+			delete job;
+			job = nullptr;
+		};
+
 		// run through finished queue
 		LoadJob* finished = fetch_finished_job();
 
@@ -98,35 +143,37 @@ public:
 			finished = fetch_finished_job();
 		}
 	}
-	// tick asyncs but prevents new jobs from being added
-	void tick_asyncs_blocking() {
-		std::lock_guard<std::mutex> queueLock(finishedQueueMutex);
 
-		// run through finished queue
-		LoadJob* finished = fetch_finished_job_no_lock();
 
-		while (finished) {
-
-			// calls delete on the job
-			finalize_job_with_main_thread(finished);
-
-			finished = fetch_finished_job_no_lock();
-		}
-	}
-
-	void add_to_finished_queue(LoadJob* job)
+	LoadJob* do_load_asset(IAsset* asset, bool force_reload, uint32_t reference_mask, bool is_hot_reload, std::function<void(GenericAssetPtr)>* loadJobCallback)
 	{
-		std::lock_guard<std::mutex> finishedLock(finishedQueueMutex);
-		finishedAsyncJobs.push(job);
-	}
-	void load_shared(IAsset* asset, bool force_reload, uint32_t reference_mask, bool is_hot_reload, std::function<void(GenericAssetPtr)>* loadJobCallback)
-	{
+		ASSERT(IS_LOADER_THREAD);
+
+		auto init_new_job = [](
+			IAsset* asset,
+			IAsset* reloadAsset,
+			ClassBase* userPtr,
+			std::function<void(GenericAssetPtr)>* callback,
+			bool skipPostLoad
+			) -> LoadJob*
+		{
+			LoadJob* newJob = new LoadJob;
+			newJob->thisAsset = asset;
+			newJob->moveIntoThis = reloadAsset;
+			newJob->userPtr = userPtr;
+			newJob->loadJobCallback = callback;
+			newJob->skipPostLoad = skipPostLoad;
+
+			return newJob;
+		};
+
+
 #ifdef EDITOR_BUILD
 		if (is_hot_reload) {
 			auto& path = asset->path;
 			auto f = FileSys::open_read_game(path);
 			if (!f) {
-				return;
+				return nullptr;
 			}
 			auto timestamp = f->get_timestamp();
 			f->close();
@@ -134,7 +181,7 @@ public:
 			should_reload |= asset->check_import_files_for_out_of_data();
 
 			if (!should_reload) {
-				return;
+				return nullptr;
 			}
 		}
 #endif
@@ -166,30 +213,32 @@ public:
 			}
 			asset_to_load->reference_bitmask_internal = (force_reload) ? asset->reference_bitmask_internal : reference_mask;
 			asset_to_load->is_loaded = true;
-			job = init_new_job(asset_to_load, (force_reload) ? asset : nullptr, userStruct, loadJobCallback);
-			add_to_finished_queue(job);
+			job = init_new_job(asset_to_load, (force_reload) ? asset : nullptr, userStruct, loadJobCallback, false);
+			return job;
 
 		}
 		else if (!asset->is_mask_refererenced(reference_mask)) {
 			asset->sweep_references();
 			asset->reference_bitmask_internal |= reference_mask;
 
-			auto job = init_callback_placeholder_job(asset, loadJobCallback);
-			add_to_finished_queue(job);
+			auto job = init_new_job(asset, nullptr,nullptr, loadJobCallback,true);
+			return job;
 		}
 		else {
 			// asset is loaded and is referenced
 			// (do nothing)
 			if (loadJobCallback) {
-				auto job = init_callback_placeholder_job(asset, loadJobCallback);
-				add_to_finished_queue(job);
+				auto job = init_new_job(asset, nullptr, nullptr, loadJobCallback, true);
+				return job;
 			}
 		}
+		// unreachable
+		return nullptr;
 	}
 
 	IAsset* find_existing_or_create(const std::string& path, const ClassTypeInfo* assetType)
 	{
-		std::unique_lock<std::mutex> assetTableLock(assetHashmapMutex);	// this locks any access to futures or assets
+		std::unique_lock<std::mutex> assetTableLock(hashmapMutex);
 
 		auto find1 = allAssets.find(path);
 
@@ -207,59 +256,6 @@ public:
 			return find1->second;
 		}
 	}
-
-	void finalize_job_with_main_thread(LoadJob*& job)
-	{
-#ifdef _DEBUG
-		sys_print(Debug,"finalize job %s resource %s\n", job->thisAsset->get_type().classname, job->thisAsset->get_name().c_str());
-#endif
-		const bool is_reload = job->thisAsset && job->moveIntoThis;
-
-		if (!job->skipPostLoad) {
-			if (job->moveIntoThis) {
-				job->moveIntoThis->move_construct(job->thisAsset);
-				job->moveIntoThis->load_failed = job->thisAsset->load_failed;
-#ifdef EDITOR_BUILD
-				job->moveIntoThis->asset_load_time = job->thisAsset->asset_load_time;
-#endif
-				delete job->thisAsset;
-				job->thisAsset = job->moveIntoThis;
-			}
-			assert(job->thisAsset->is_loaded);
-			job->thisAsset->post_load(job->userPtr);
-			job->thisAsset->has_run_post_load = true; // thread safe!
-			if (job->userPtr)
-				delete job->userPtr;
-		}
-		job->thisAsset->move_internal_to_threadsafe_bitmask_unsafe();
-		if (job->loadJobCallback) {
-			(*job->loadJobCallback)(job->thisAsset);
-			delete job->loadJobCallback;
-		}
-
-#ifdef EDITOR_BUILD
-		// now for a sucky bit: if theres dependencies, they have to be reloaded sync otherwise stale pointers etc
-		if (is_reload) {
-			for (auto d : job->thisAsset->reload_dependents)
-				reload_asset_sync(d);
-		}
-#endif
-	
-
-		delete job;
-		job = nullptr;
-	}
-
-
-
-	void execute_job_shared(AsyncQueuedJob* job)
-	{
-		std::unique_lock<std::mutex> workLock(loadingJobMutex);
-		ACTIVE_THREAD_JOB = job;
-		load_shared(job->what, job->force_reload, job->referenceMask,job->is_hot_reload, job->loadJobCallback);
-		ACTIVE_THREAD_JOB = nullptr;
-	}
-
 
 
 	IAsset* sync_load_main_thread(const std::string& path, const ClassTypeInfo* assetType, bool force_reload, uint32_t mask) {
@@ -282,31 +278,31 @@ public:
 			queue_load_job(myJob);
 			return asset;
 		}
-
-		// else either the asset isnt loaded or the bitmask differs, run the job now
-		execute_job_shared(&myJob);
+		queue_load_job_front_and_wait(myJob);
 		tick_asyncs_standard();
-
 		return asset;
 	}
 
 	IAsset* sync_load_loader_thread(const std::string& path, const ClassTypeInfo* assetType)
 	{
+		ASSERT(IS_LOADER_THREAD);
 		auto asset = find_existing_or_create(path, assetType);
-		auto job = ACTIVE_THREAD_JOB;
-		assert(job);
-		load_shared(asset, false, job->referenceMask,false, nullptr);
+		sync_load_asset(asset);
 		return asset;
 	}
-	void touch_asset_loader(const IAsset* asset)
+	void sync_load_asset(const IAsset* asset)
 	{
-		auto job = ACTIVE_THREAD_JOB;
-		assert(job);
-		load_shared((IAsset*)asset /* const cast */, false, job->referenceMask,false, nullptr);
+		ASSERT(IS_LOADER_THREAD);
+		ASSERT(ACTIVE_THREAD_JOB);
+		LoadJob* j = do_load_asset((IAsset*)asset /* const cast */, false, ACTIVE_THREAD_JOB->referenceMask,false, nullptr);
+		std::unique_lock<std::mutex> lock(job_mutex);
+		finishedAsyncJobs.push(j);
 	}
 
 	// reloads the asset right now
 	void reload_asset_sync(IAsset* asset) {
+		ASSERT(!IS_LOADER_THREAD);
+
 		assert(asset);
 
 		if (!asset->is_loaded) {
@@ -319,14 +315,9 @@ public:
 		myJob.force_reload = true;
 		myJob.referenceMask = 0;
 		myJob.loadJobCallback = nullptr;
-
-		execute_job_shared(&myJob);
-
-		// causes our job to finalize itself
-		// ticking the async queue might trigger jobs that arent from us to finalize too,
-		// however that is a nessecary side effect as some of our assets might already depend on other assets being loaded
-		// and they are queued to finalize before us
-		tick_asyncs_blocking();
+		
+		queue_load_job_front_and_wait(myJob);
+		finish_all_jobs();
 	}
 
 	void start_async_job_internal(IAsset* asset, bool reload,bool hot_reload, uint32_t mask, std::function<void(GenericAssetPtr)>& func) {
@@ -344,14 +335,13 @@ public:
 	}
 
 	// queues asset reload, move data will be called on main thread later
-	void reload_asset_async(IAsset* asset, bool is_hot_reload, std::function<void(GenericAssetPtr)> loadJobCallback)
-	{
+	void reload_asset_async(IAsset* asset, bool is_hot_reload, std::function<void(GenericAssetPtr)> loadJobCallback) {
 		start_async_job_internal(asset, true, is_hot_reload, 0/* unused*/, loadJobCallback);
 	}
 
 	void unreference_this_mask(uint32_t mask)
 	{
-		std::lock_guard<std::mutex> workLock(loadingJobMutex);
+		std::lock_guard<std::mutex> workLock(job_mutex);
 		for (auto& asset : allAssets)
 		{
 			asset.second->reference_bitmask_internal &= ~mask;
@@ -359,17 +349,11 @@ public:
 
 		}
 	}
+
 	void uninstall_unreferenced_assets()
 	{
-		// wait till load jobs are finished to avoid crap
-		std::unique_lock<std::mutex> lock(queueMutex);
-		condition2.wait(lock, [&] { return pendingAsyncJobs.empty(); });
-
-		tick_asyncs_standard();	// clear the queue if anything is there
-
-		std::lock_guard<std::mutex> workLock(loadingJobMutex);
-		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
-
+		finish_all_jobs();
+		ASSERT(!is_in_job && finishedAsyncJobs.empty() && pendingAsyncJobs.empty());
 
 		for (auto& asset : allAssets)
 		{
@@ -384,14 +368,9 @@ public:
 		}
 	}
 
-	std::queue<AsyncQueuedJob> pendingAsyncJobs;	// jobs that are waiting to be executed
-	std::queue<LoadJob*> finishedAsyncJobs;	// jobs that have NO dependencies left waiting (outstandingFutures == 0)
+	std::deque<AsyncQueuedJob> pendingAsyncJobs;	// jobs that are waiting to be executed
+	std::queue<LoadJob*> finishedAsyncJobs; // finished jobs
 	
-	
-	std::mutex queueMutex;
-	std::mutex loadingJobMutex;
-	std::mutex finishedQueueMutex;
-
 	struct LoadThreadAndSignal
 	{
 		LoadThreadAndSignal(std::thread&& thread) : myThread(std::move(thread)) {}
@@ -404,33 +383,6 @@ public:
 		return loadThread != nullptr;
 	}
 
-	LoadJob* init_new_job(
-		IAsset* asset,
-		IAsset* reloadAsset,
-		ClassBase* userPtr,
-		std::function<void(GenericAssetPtr)>* callback
-	)
-	{
-		LoadJob* newJob = new LoadJob;
-		newJob->thisAsset = asset;
-		newJob->moveIntoThis = reloadAsset;
-		newJob->userPtr = userPtr;
-		newJob->loadJobCallback = callback;
-
-		return newJob;
-	}
-	LoadJob* init_callback_placeholder_job(
-		IAsset* asset,
-		std::function<void(GenericAssetPtr)>* callback
-	)
-	{
-		LoadJob* newJob = new LoadJob;
-		newJob->loadJobCallback = callback;
-		newJob->skipPostLoad = true;
-		newJob->thisAsset = asset;
-		return newJob;
-	}
-
 	
 	static void loaderThreadMain(int index, AssetDatabaseImpl* impl);
 
@@ -440,22 +392,27 @@ public:
 		auto scenetype = ClassBase::find_class("SceneAsset");
 		assert(scenetype);
 
-		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
-		for (auto& asset : allAssets)
+		std::vector<IAsset*> toreload;
 		{
-			if (!asset.second->get_is_loaded())
-				continue;
-			if (asset.second->get_type().is_a(*scenetype))
-				continue;
-
-			reload_asset_async(asset.second, true, [](GenericAssetPtr) {});
+			std::lock_guard<std::mutex> assetLock(hashmapMutex);
+			toreload.reserve(allAssets.size());
+			for (auto& asset : allAssets)
+			{
+				if (!asset.second->get_is_loaded())
+					continue;
+				if (asset.second->get_type().is_a(*scenetype))
+					continue;
+				toreload.push_back(asset.second);
+			}
 		}
+		for(auto i : toreload)
+			reload_asset_async(i, true, [](GenericAssetPtr) {});
 	}
 #endif
 
 
 	void print_assets() {
-		std::lock_guard<std::mutex> assetLock(assetHashmapMutex);
+		std::lock_guard<std::mutex> assetLock(hashmapMutex);
 		sys_print(Info, "%-32s|%-18s|%s|%s\n","NAME", "TYPE", "F", "MASK");
 		std::string usename;
 		std::string usetype;
@@ -475,42 +432,102 @@ public:
 		}
 	}
 
+	// wait for job queue to be flushed
+	void finish_all_jobs() {
+		ASSERT(!IS_LOADER_THREAD);
+
+		sys_print(Info, "finish all jobs\n");
+
+		// wait for jobs AND run post load (which MIGHT queue more jobs...)
+
+		auto wait_for_all_jobs_to_finish = [&]() {
+			std::unique_lock<std::mutex> lock(job_mutex);
+			job_condition_var.wait(lock, [&] { return pendingAsyncJobs.empty() && !is_in_job; });
+		};
+
+		for (;;) {
+			tick_asyncs_standard();
+			wait_for_all_jobs_to_finish();
+			{
+				std::unique_lock<std::mutex> lock(job_mutex);
+				if (finishedAsyncJobs.empty())
+					break;
+			}
+		}
+	}
+
 private:
 	
 	void queue_load_job(AsyncQueuedJob j) {
 		{
-			std::unique_lock<std::mutex> lock(queueMutex);
-			pendingAsyncJobs.push(j);
+			std::unique_lock<std::mutex> lock(job_mutex);
+			pendingAsyncJobs.push_back(j);
 		}
-		condition.notify_one();
+		job_condition_var.notify_one();
+	}
+	void queue_load_job_front_and_wait(AsyncQueuedJob j) {
+		ASSERT(!IS_LOADER_THREAD);
+		sys_print(Info, "queue_load_job_front_and_wait\n");
+		{
+			std::unique_lock<std::mutex> lock(job_mutex);
+			j.is_prioritized = true;
+			pendingAsyncJobs.push_front(j);
+			ASSERT(prioritized_job_done);
+			prioritized_job_done = false;
+		}
+		job_condition_var.notify_one();
+
+		{
+			std::unique_lock<std::mutex> lock(job_mutex);
+			job_condition_var.wait(lock, [&] { return prioritized_job_done.load(); });
+		}
 	}
 
-	std::condition_variable condition2;
-	std::condition_variable condition;
-	std::mutex assetHashmapMutex;	// guards accessing allAssets
+	std::mutex job_mutex;
+	std::condition_variable job_condition_var;
+	bool is_in_job = false;
+	std::atomic<bool> prioritized_job_done = true;
+
+
 	std::unordered_map<IAsset*, LoadJob*> jobsInQueue;		// maps a path to an outstanding load job
+
+	std::mutex hashmapMutex;
 	std::unordered_map<std::string, IAsset*> allAssets;		// maps a path to a loaded asset
 };
 
 void AssetDatabaseImpl::loaderThreadMain(int index, AssetDatabaseImpl* impl)
 {
+	IS_LOADER_THREAD = true;
+
+	auto execute_job = [impl](AsyncQueuedJob* job) -> LoadJob* {
+		ACTIVE_THREAD_JOB = job;
+		LoadJob* j = impl->do_load_asset(job->what, job->force_reload, job->referenceMask, job->is_hot_reload, job->loadJobCallback);
+		ACTIVE_THREAD_JOB = nullptr;
+		return j;
+	};
+
+
 	while (1)
 	{
-		AsyncQueuedJob jobQueued;
+		std::unique_lock<std::mutex> lock(impl->job_mutex);
+		impl->job_condition_var.wait(lock, [&] {return !impl->pendingAsyncJobs.empty(); });
+		if(!impl->pendingAsyncJobs.empty())
 		{
-			std::unique_lock<std::mutex> lock(impl->queueMutex);		// prevent read/write to the queue
-			impl->condition.wait(lock, [&] { return !impl->pendingAsyncJobs.empty(); });
-			jobQueued = impl->pendingAsyncJobs.front();
-			impl->pendingAsyncJobs.pop();
+			impl->is_in_job = true;
+			AsyncQueuedJob jobQueued = impl->pendingAsyncJobs.front();
+			impl->pendingAsyncJobs.pop_front();
+			lock.unlock();
+			LoadJob* j = execute_job(&jobQueued);
+			lock.lock();
+			impl->finishedAsyncJobs.push(j);
+			impl->is_in_job = false;
+
+			if (jobQueued.is_prioritized) {
+				impl->prioritized_job_done = true;
+				impl->job_condition_var.notify_all();
+			}
 		}
-#ifdef _DEBUG
-		//printf("*** executing AsyncQueuedJob on loader thread %s\n", jobQueued.what->get_name().c_str());
-#endif
-
-		impl->execute_job_shared(&jobQueued);
-		
-		impl->condition2.notify_one();
-
+		impl->job_condition_var.notify_all();
 	}
 }
 
@@ -529,11 +546,7 @@ void AssetDatabase::hot_reload_assets()
 
 void AssetDatabase::init() {
 	// init the loader thread
-
-	impl->loadThread =
-			new AssetDatabaseImpl::LoadThreadAndSignal(
-				std::thread(AssetDatabaseImpl::loaderThreadMain, 0, impl.get()));
-	impl->loadThread->myThread.detach();
+	impl->init();
 }
 
 void AssetDatabase::tick_asyncs() {
@@ -574,7 +587,7 @@ GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTyp
 
 	const uint32_t mask = (1ul << lifetime_channel);
 	IAsset* out = nullptr;
-	if (ACTIVE_THREAD_JOB) {
+	if (IS_LOADER_THREAD) {
 		out = impl->sync_load_loader_thread(path, classType);
 	}
 	else {
@@ -597,7 +610,7 @@ IAsset* AssetDatabase::find_assetptr_unsafe(const std::string& path, const Class
 		return asset;
 	}
 
-	if (ACTIVE_THREAD_JOB)
+	if (IS_LOADER_THREAD)
 		return impl->sync_load_loader_thread(path, ti);
 	else
 		return impl->sync_load_main_thread(path, ti, false, 1/*1<<0, the default "i want an asset with a long but not infinite lifetime (corresponds with level/editor state)"*/);
@@ -605,7 +618,7 @@ IAsset* AssetDatabase::find_assetptr_unsafe(const std::string& path, const Class
 void AssetDatabase::touch_asset(const IAsset* a)
 {
 	if(a)
-		impl->touch_asset_loader(a);
+		impl->sync_load_asset(a);
 }
 void AssetDatabase::unreference_this_channel(uint32_t channel)
 {
@@ -624,4 +637,10 @@ void AssetDatabase::print_usage()
 DECLARE_ENGINE_CMD(print_assets)
 {
 	AssetDatabase::get().print_usage();
+}
+
+#include "Test/Test.h"
+ADD_TEST(AssetDatabaseTest, General)
+{
+
 }

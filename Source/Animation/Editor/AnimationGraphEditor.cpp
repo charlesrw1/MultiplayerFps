@@ -1574,17 +1574,17 @@ static std::unique_ptr<Animation_Tree_CFG> try_to_load_document(const std::strin
 	return std::move(tree);
 }
 void GraphOutput::set_model(Model* model) {
-	if (this->model) {
-		this->model->post_asset_hot_reload.remove(this);
-	}
-	if (model) {
-		model->post_asset_hot_reload.add(this,
-			[&]() {
-				this->model = nullptr;
-				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("start_ed AnimGraph %s", anim_graph_ed.get_doc_name().c_str()));
-			}
-		);
-	}
+	//if (this->model) {
+	//	this->model->post_asset_hot_reload.remove(this);
+	//}
+	//if (model) {
+	//	model->post_asset_hot_reload.add(this,
+	//		[&]() {
+	//			this->model = nullptr;
+	//			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("start_ed AnimGraph %s", anim_graph_ed.get_doc_name().c_str()));
+	//		}
+	//	);
+	//}
 
 	this->model = model;
 	if(obj.is_valid())

@@ -66,7 +66,7 @@ bool Statemachine_EdNode::compile_my_data(const AgSerializeContext* ctx)
 	node->entry_transitions.resize(0);
 	node->transitions.clear();
 
-	node->initialize(anim_graph_ed.editing_tree);
+	node->initialize(anim_graph_ed.get_tree());
 
 	bool has_errors = false;
 

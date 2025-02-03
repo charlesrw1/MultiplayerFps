@@ -415,7 +415,7 @@ bool compile_my_data(const AgSerializeContext* ctx) override {
 		append_fail_msg("[ERROR] slot_name is empty, set slot_name to the string that assets reference to play directly");
 	else {
 		bool found = false;
-		auto tree = anim_graph_ed.editing_tree;
+		auto tree = anim_graph_ed.get_tree();
 		for (int i = 0; i < tree->direct_slot_names.size(); i++) {
 			if (tree->direct_slot_names[i] == slot_name) {
 				node->slot_index = i;

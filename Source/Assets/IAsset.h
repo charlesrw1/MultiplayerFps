@@ -42,6 +42,9 @@ public:
 
 #ifdef EDITOR_BUILD
 	std::unordered_set<IAsset*> reload_dependents;	// when asset is reloaded, these will also get reloaded	
+	void editor_set_newly_made_path(const std::string& path) {
+		this->path = path;
+	}
 #endif
 
 protected:
