@@ -1669,10 +1669,6 @@ void AnimationGraphEditor::post_map_load_callback()
 {
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini animdock.ini");
 
-	if(!output_model)
-		output_model = GetAssets().find_sync<Model>(animed_default_model.get_string());
-	anim_graph_ed.out.set_model(output_model.get());
-
 	auto& name = get_doc_name();
 
 	bool needs_new_doc = true;
@@ -1728,6 +1724,10 @@ void AnimationGraphEditor::post_map_load_callback()
 
 	self_grid.add_property_list_to_grid(get_props(), this);
 
+	if (!output_model)
+		output_model = GetAssets().find_sync<Model>(animed_default_model.get_string());
+	anim_graph_ed.out.set_model(output_model.get());
+	
 	// load preview model and set and register renderable
 	try_load_preview_models();
 
