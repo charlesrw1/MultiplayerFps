@@ -64,12 +64,9 @@ public:
 		asset->has_run_post_load = true;
 		asset->is_from_disk = false;
 
-		std::lock_guard<std::mutex> lock(hashmapMutex);
+		std::lock_guard<std::mutex> lock(job_mutex);
 		allAssets.insert({ name, asset });
 	}
-
-
-	
 
 	void remove_asset_direct(IAsset* asset) {
 		finish_all_jobs();
@@ -78,7 +75,7 @@ public:
 
 	void tick_asyncs_standard() {
 		ASSERT(!IS_LOADER_THREAD);
-
+		//
 		auto fetch_finished_job = [&]() -> LoadJob* {
 			std::unique_lock<std::mutex> lock(job_mutex);
 			if (finishedAsyncJobs.empty()) {
@@ -86,10 +83,9 @@ public:
 			}
 			auto job = finishedAsyncJobs.front();
 			finishedAsyncJobs.pop();
+			ASSERT(job);
 			return job;
 		};
-
-		std::vector<IAsset*> assets_to_reload;
 
 		auto finalize_job_with_main_thread = [this](LoadJob* job) {
 #ifdef _DEBUG
@@ -107,7 +103,8 @@ public:
 					delete job->thisAsset;
 					job->thisAsset = job->moveIntoThis;
 				}
-				assert(job->thisAsset->is_loaded);
+				ASSERT(job->thisAsset);
+				ASSERT(job->thisAsset->is_loaded);
 				job->thisAsset->post_load(job->userPtr);
 				job->thisAsset->has_run_post_load = true; // thread safe!
 				if (job->userPtr)
@@ -232,13 +229,12 @@ public:
 				return job;
 			}
 		}
-		// unreachable
 		return nullptr;
 	}
 
 	IAsset* find_existing_or_create(const std::string& path, const ClassTypeInfo* assetType)
 	{
-		std::unique_lock<std::mutex> assetTableLock(hashmapMutex);
+		std::unique_lock<std::mutex> assetTableLock(job_mutex);
 
 		auto find1 = allAssets.find(path);
 
@@ -295,8 +291,10 @@ public:
 		ASSERT(IS_LOADER_THREAD);
 		ASSERT(ACTIVE_THREAD_JOB);
 		LoadJob* j = do_load_asset((IAsset*)asset /* const cast */, false, ACTIVE_THREAD_JOB->referenceMask,false, nullptr);
-		std::unique_lock<std::mutex> lock(job_mutex);
-		finishedAsyncJobs.push(j);
+		if (j) {
+			std::unique_lock<std::mutex> lock(job_mutex);
+			finishedAsyncJobs.push(j);
+		}
 	}
 
 	// reloads the asset right now
@@ -394,7 +392,7 @@ public:
 
 		std::vector<IAsset*> toreload;
 		{
-			std::lock_guard<std::mutex> assetLock(hashmapMutex);
+			std::lock_guard<std::mutex> assetLock(job_mutex);
 			toreload.reserve(allAssets.size());
 			for (auto& asset : allAssets)
 			{
@@ -412,7 +410,7 @@ public:
 
 
 	void print_assets() {
-		std::lock_guard<std::mutex> assetLock(hashmapMutex);
+		std::lock_guard<std::mutex> assetLock(job_mutex);
 		sys_print(Info, "%-32s|%-18s|%s|%s\n","NAME", "TYPE", "F", "MASK");
 		std::string usename;
 		std::string usetype;
@@ -491,7 +489,6 @@ private:
 
 	std::unordered_map<IAsset*, LoadJob*> jobsInQueue;		// maps a path to an outstanding load job
 
-	std::mutex hashmapMutex;
 	std::unordered_map<std::string, IAsset*> allAssets;		// maps a path to a loaded asset
 };
 
@@ -510,7 +507,7 @@ void AssetDatabaseImpl::loaderThreadMain(int index, AssetDatabaseImpl* impl)
 	while (1)
 	{
 		std::unique_lock<std::mutex> lock(impl->job_mutex);
-		impl->job_condition_var.wait(lock, [&] {return !impl->pendingAsyncJobs.empty(); });
+		impl->job_condition_var.wait(lock, [&] {return !impl->pendingAsyncJobs.empty() || impl->is_in_job; });
 		if(!impl->pendingAsyncJobs.empty())
 		{
 			impl->is_in_job = true;
@@ -519,7 +516,9 @@ void AssetDatabaseImpl::loaderThreadMain(int index, AssetDatabaseImpl* impl)
 			lock.unlock();
 			LoadJob* j = execute_job(&jobQueued);
 			lock.lock();
-			impl->finishedAsyncJobs.push(j);
+			if (j) {
+				impl->finishedAsyncJobs.push(j);
+			}
 			impl->is_in_job = false;
 
 			if (jobQueued.is_prioritized) {
