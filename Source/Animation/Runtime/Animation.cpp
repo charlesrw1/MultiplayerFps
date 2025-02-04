@@ -190,6 +190,7 @@ void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& o
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
 
 		if (model->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;
@@ -210,6 +211,7 @@ void util_localspace_to_meshspace_with_physics(const Pose& local, std::vector<gl
 
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
 
 		if (model->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;
@@ -229,6 +231,7 @@ void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_mat
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
 
 		if (model->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;
@@ -491,4 +494,10 @@ bool AnimatorInstance::play_animation_in_slot(
 	slot_to_play_in->playspeed = play_speed;
 
 	return true;
+}
+
+DECLARE_ENGINE_CMD(print_animation_pools)
+{
+	sys_print(Info, "Pose: %d/%d\n", Pose_Pool::get().head,Pose_Pool::get().poses.size());
+	sys_print(Info, "Matrix: %d/%d\n", Matrix_Pool::get().head, Matrix_Pool::get().matricies.size());
 }

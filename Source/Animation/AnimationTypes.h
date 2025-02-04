@@ -88,6 +88,9 @@ struct Animation_Index
 class Pose
 {
 public:
-	glm::quat q[256];
-	glm::vec3 pos[256];
+	const static int MAX_BONES = 256;
+
+	glm::quat q[MAX_BONES];
+	glm::vec3 pos[MAX_BONES];
+	float scale[MAX_BONES];
 };

@@ -31,7 +31,7 @@
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 8;
+static const int MODEL_VERSION = 10;
 // int version XXX
 // 
 // mat4 root_transform
@@ -860,6 +860,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		AnimationClip_Load acl;
 		acl.curves = isa.curves;
 		acl.fixloop = isa.fixLoop;
+		acl.removeLienarVelocity = isa.removeLinearVelocity;
 		acl.crop.has_crop = isa.hasEndCrop || isa.hasStartCrop;
 		acl.crop.start = isa.cropStart;
 		acl.crop.end = isa.cropEnd;
@@ -877,8 +878,6 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		else
 			acl.sub = SubtractType_Load::None;
 
-
-		acl.fixloop = isa.fixLoop;
 		
 		for (auto& ev : isa.events) {
 			ClassBase* newEvent = ev->get_type().allocate();
@@ -1777,7 +1776,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 					source_set->GetScale(SRC_idx, index0, clip_index).val,
 					source_set->GetScale(SRC_idx, index1, clip_index).val, scale);
 			}
-			float uniform_scale = glm::length(interp_scale);
+			float uniform_scale = glm::max(glm::max(interp_scale.x, interp_scale.y), interp_scale.z);
 			return uniform_scale;
 		};
 
@@ -1870,6 +1869,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		ChannelOffset& chan = out_seq.channel_offsets[0];	// ROOT
 		bool is_single_frame = IS_HIGH_BIT_SET(chan.pos);
 		uint32_t pose_start = CLEAR_HIGH_BIT(chan.pos);
+		glm::vec3 average_linear_vec = glm::vec3(0.f);
 		if (is_single_frame)
 			out_seq.average_linear_velocity = 0.0;	// no movement
 		else {
@@ -1877,8 +1877,20 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			glm::vec3 last = out_seq.get_keyframe(0, out_seq.get_num_keyframes_exclusive(), 0.0).pos;
 
 			glm::vec3 dif = last - first;
-
+			average_linear_vec = dif / out_seq.get_duration();
 			out_seq.average_linear_velocity = glm::length(dif) / out_seq.get_duration();
+		}
+
+		if (definition && definition->removeLienarVelocity) {
+
+			for (int frame = 0; frame < out_seq.get_num_keyframes_exclusive(); frame++) {
+				const int frame_w_crop = frame + START_keyframe;
+				const float t = frame_w_crop / fps;
+				ASSERT(t <= out_seq.duration);
+				glm::vec3* pos0 = out_seq.get_pos_write_ptr(0/* root */, frame);
+				*pos0 -= t * average_linear_vec;
+			}
+
 		}
 	}
 
@@ -1886,14 +1898,21 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		for (int FINAL_idx = 0; FINAL_idx < target_count; FINAL_idx++) {
 			const glm::vec3* pos0 = out_seq.get_pos_write_ptr(FINAL_idx, 0);
 			const glm::quat* rot0 = out_seq.get_quat_write_ptr(FINAL_idx, 0);
+			const float* scale0 = out_seq.get_scale_write_ptr(FINAL_idx, 0);
+
 			glm::vec3* pos1 = out_seq.get_pos_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive()-1);
 			glm::quat* rot1 = out_seq.get_quat_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive() - 1);
-			if (!pos1 && !rot1)	//indicate a "single" pose frame
+			float* scale1 = out_seq.get_scale_write_ptr(FINAL_idx, out_seq.get_num_keyframes_inclusive() - 1);
+
+
+			if (!pos1 && !rot1 && !scale1)	//indicate a "single" pose frame
 				continue;
 			if(pos1)
 				*pos1 = *pos0;
 			if(rot1)
 				*rot1 = *rot0;
+			if (scale1)
+				*scale1 = *scale0;
 		}
 	}
 
@@ -1918,6 +1937,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		ScalePositionRot transform = source->get_keyframe(i, 0, 0.0);
 		ref_pose.pos[i] = transform.pos;
 		ref_pose.q[i] = transform.rot;
+		ref_pose.scale[i] = transform.scale;
 	 }
 
 	 for (int i = 0; i < num_bones; i++) {
@@ -1925,12 +1945,16 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			
 			 glm::vec3* pos = target->get_pos_write_ptr(i, j);
 			 glm::quat* rot = target->get_quat_write_ptr(i, j);
-			 if (!pos && !rot)	//indicate a "single" pose frame
+			 float* scale = target->get_scale_write_ptr(i, j);
+
+			 if (!pos && !rot && !scale)	//indicate a "single" pose frame
 				 break;
 			 if(pos)
 				 *pos = *pos - ref_pose.pos[i];
 			 if (rot)
 				 *rot = quat_delta(ref_pose.q[i], *rot);
+			 if (scale)
+				 *scale = *scale - ref_pose.scale[i];
 		 }
 	 }
 }

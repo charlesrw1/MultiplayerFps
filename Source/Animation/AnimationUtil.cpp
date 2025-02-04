@@ -37,11 +37,15 @@ static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
 }
 
 
+// source = reference pose - source
 void util_subtract(int bonecount, const Pose& reference, Pose& source)
 {
 	for (int i = 0; i < bonecount; i++) {
 		source.pos[i] = source.pos[i] - reference.pos[i];
+		source.scale[i] = source.scale[i] - reference.scale[i];
+
 		source.q[i] = quat_delta(reference.q[i],source.q[i]);
+
 	}
 
 }
@@ -53,6 +57,7 @@ void util_blend(int bonecount, const Pose& a, Pose& b, float factor)
 		b.q[i] = glm::slerp(b.q[i], a.q[i], factor);
 		b.q[i] = glm::normalize(b.q[i]);
 		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor);
+		b.scale[i] = glm::mix(b.scale[i], a.scale[i], factor);
 	}
 }
 void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, const std::vector<float>& mask)
@@ -62,6 +67,8 @@ void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, c
 		b.q[i] = glm::slerp(b.q[i], a.q[i], factor*mask[i]);
 		b.q[i] = glm::normalize(b.q[i]);
 		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor*mask[i]);
+		b.scale[i] = glm::mix(b.scale[i], a.scale[i], factor * mask[i]);
+
 	}
 }
 
@@ -136,6 +143,7 @@ void util_meshspace_to_localspace(const glm::mat4* mesh, const MSkeleton* mod, P
 
 		out->pos[i] = matrix[3];
 		out->q[i] = glm::quat_cast(matrix);
+		out->scale[i] = glm::length(matrix[0]);
 	}
 }
 
@@ -145,6 +153,7 @@ void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_m
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
 
 		if (skel->get_bone_parent(i) == -1) {
 			out_bone_matricies[i] = matrix;
@@ -212,6 +221,7 @@ void util_global_blend(const MSkeleton* skel, const Pose* a,  Pose* b, float fac
 		}
 
 		b->pos[j] = a->pos[j];
+		b->scale[j] = a->scale[j];
 #endif
 	}
 }
@@ -221,6 +231,8 @@ void util_add(int bonecount, const Pose& additive, Pose& base, float fac)
 {
 	for (int i = 0; i < bonecount; i++) {
 		base.pos[i] = glm::mix(base.pos[i], base.pos[i] + additive.pos[i], fac);
+		base.scale[i] = glm::mix(base.scale[i], base.scale[i] + additive.scale[i], fac);
+
 
 		glm::quat target = additive.q[i] * base.q[i];
 
@@ -271,69 +283,6 @@ void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1
 	util_blend(bonecount, x2, y2, fac.y);
 }
 
-#if 0
-void util_calc_rotations(const Animation_Set* set,const Model* source_model, float curframe, int clip_index, const Model* model, const std::vector<int>* remap_indicies, Pose& pose)
-{
-
-	const int count = model->bones.size();
-
-	for (int dest_idx = 0; dest_idx < count; dest_idx++) {
-		int src_idx = (remap_indicies) ? (*remap_indicies)[dest_idx] : dest_idx;
-
-		if (src_idx == -1) {
-			pose.pos[dest_idx] = model->bones.at(dest_idx).localtransform[3];
-			pose.q[dest_idx] = model->bones.at(dest_idx).rot;
-			pose.q[dest_idx] = glm::normalize(pose.q[dest_idx]);
-			continue;
-		}
-
-
-		int pos_idx = set->FirstPositionKeyframe(curframe, src_idx, clip_index);
-		int rot_idx = set->FirstRotationKeyframe(curframe, src_idx, clip_index);
-
-		vec3 interp_pos{};
-		if (pos_idx == -1)
-			interp_pos = source_model->bones.at(src_idx).localtransform[3];
-		else if (pos_idx == set->GetChannel(clip_index, src_idx).num_positions - 1)
-			interp_pos = set->GetPos(src_idx, pos_idx, clip_index).val;
-		else {
-			int index0 = pos_idx;
-			int index1 = pos_idx + 1;
-			float t0 = set->GetPos(src_idx, index0, clip_index).time;
-			float t1 = set->GetPos(src_idx, index1, clip_index).time;
-			if (index0 == 0)t0 = 0.f;
-			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
-			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
-			float scale = MidLerp(t0, t1, curframe);
-			assert(scale >= 0 && scale <= 1.f);
-			interp_pos = glm::mix(set->GetPos(src_idx, index0, clip_index).val, set->GetPos(src_idx, index1, clip_index).val, scale);
-		}
-
-		glm::quat interp_rot{};
-		if (rot_idx == -1) {
-			interp_rot = source_model->bones.at(src_idx).rot;
-		}
-		else if (rot_idx == set->GetChannel(clip_index, src_idx).num_rotations - 1)
-			interp_rot = set->GetRot(src_idx, rot_idx, clip_index).val;
-		else {
-			int index0 = rot_idx;
-			int index1 = rot_idx + 1;
-			float t0 = set->GetRot(src_idx, index0, clip_index).time;
-			float t1 = set->GetRot(src_idx, index1, clip_index).time;
-			if (index0 == 0)t0 = 0.f;
-			//float scale = MidLerp(clip.GetPos(i, index0).time, clip.GetPos(i, index1).time, curframe);
-			//interp_pos = glm::mix(clip.GetPos(i, index0).val, clip.GetPos(i, index1).val, scale);
-			float scale = MidLerp(t0, t1, curframe);
-			assert(scale >= 0 && scale <= 1.f);
-			interp_rot = glm::slerp(set->GetRot(src_idx, index0, clip_index).val, set->GetRot(src_idx, index1, clip_index).val, scale);
-		}
-		interp_rot = glm::normalize(interp_rot);
-
-		pose.q[dest_idx] = interp_rot;
-		pose.pos[dest_idx] = interp_pos;
-	}
-}
-#endif
 
 #define IS_HIGH_BIT_SET(x) (x&(1u<<31u))
 #define UNSET_HIGH_BIT(x) (x & ~(1u<<31u))
@@ -350,6 +299,19 @@ glm::vec3* AnimationSeq::get_pos_write_ptr(int channel, int keyframe) {
 		return ((glm::vec3*)(pose_data.data() + actual_ofs)) + keyframe;
 	}
 }
+float* AnimationSeq::get_scale_write_ptr(int channel, int keyframe) {
+
+	ChannelOffset offset = channel_offsets[channel];
+	uint32_t actual_ofs = UNSET_HIGH_BIT(offset.scale);
+	if (IS_HIGH_BIT_SET(offset.scale)) {
+		if (keyframe > 0) return nullptr;
+		return (float*)(pose_data.data() + actual_ofs);
+	}
+	else {
+		return ((float*)(pose_data.data() + actual_ofs)) + keyframe;
+	}
+}
+
 glm::quat* AnimationSeq::get_quat_write_ptr(int channel, int keyframe) {
 
 	ChannelOffset offset = channel_offsets[channel];
@@ -436,12 +398,14 @@ void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, fl
 			outpose.pos[dest_idx] = skeleton->get_bone_local_transform(dest_idx)[3];
 			outpose.q[dest_idx] = skeleton->get_bone_local_rotation(dest_idx);
 			outpose.q[dest_idx] = glm::normalize(outpose.q[dest_idx]);
+			outpose.scale[dest_idx] = 1.0;
 			continue;
 		}
 
 		ScalePositionRot transform = clip->get_keyframe(src_idx, keyframe, lerp_amt);
 		outpose.pos[dest_idx] = transform.pos;
 		outpose.q[dest_idx] = transform.rot;
+		outpose.scale[dest_idx] = transform.scale;
 	}
 }
 
@@ -451,6 +415,6 @@ void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel)
 	for (int i = 0; i < skel->get_num_bones(); i++) {
 		pose.pos[i] = skel->get_bone_local_transform(i)[3];
 		pose.q[i] = skel->get_bone_local_rotation(i);
-
+		pose.scale[i] = 1.f;
 	}
 }

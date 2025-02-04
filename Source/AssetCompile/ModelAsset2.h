@@ -43,6 +43,7 @@ public:
 	bool fixLoop = false;
 	bool makeAdditive = false;
 	bool additiveFromSelf = false;
+	bool removeLinearVelocity = false;	// if true, then subtracts linear_velocity*t from each position
 
 	std::vector<AnimationEvent*> events;
 	std::vector<EditingCurve> curves;
@@ -59,6 +60,7 @@ public:
 			REG_BOOL(fixLoop, PROP_DEFAULT, "0"),
 			REG_BOOL(makeAdditive, PROP_DEFAULT, "0"),
 			REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
+			REG_BOOL(removeLinearVelocity,PROP_DEFAULT,"0"),
 			REG_SOFT_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
 			REG_STDVECTOR(curves,PROP_SERIALIZE)
 			//REG_STDVECTOR(events,PROP_SERIALIZE),

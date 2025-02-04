@@ -136,6 +136,8 @@ public:
 		con.look = inputPtr->get("game/look");
 		inputPtr->get("game/jump")->on_start.add(this, [&]()
 			{
+				using_third_person_movement = !using_third_person_movement;
+
 				mesh->get_animator_instance()->play_animation_in_slot(
 					jumpSeq.get()->seq,
 					StringName("ACTION"),
@@ -143,7 +145,7 @@ public:
 					0.f
 				);
 
-				is_jumping = !is_jumping;
+				// is_jumping = !is_jumping;
 			});
 		inputPtr->get("game/test1")->on_start.add(this, [&]()
 			{
@@ -171,7 +173,7 @@ public:
 
 		ccontroller->set_position(glm::vec3(0, 0.0, 0));
 
-		eng->set_game_focused(true);
+		//eng->set_game_focused(true);
 	}
 	virtual void end() override {
 		GetGInput().free_input_user(inputPtr);
@@ -191,7 +193,10 @@ public:
 				pc->ignore = capsule;
 				const float spread = 0.15;
 				pc->direction = lookdir + glm::vec3(r.RandF(-spread, spread), 0, r.RandF(-spread, spread));
-				pc->direction = get_front_dir();// glm::normalize(pc->direction);
+				if(using_third_person_movement)
+					pc->direction = get_front_dir();
+				else
+					glm::normalize(pc->direction);
 				pc->speed += r.RandF(-2, 2);
 
 				glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), pc->direction));
@@ -326,7 +331,7 @@ public:
 			camera_dir = -front;
 		}
 
-		if (ragdoll_enabled)
+		if (ragdoll_enabled || !using_third_person_movement)
 			this->view_pos = damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
 		else
 			this->view_pos = camera_pos;
@@ -379,7 +384,7 @@ public:
 
 	bool did_move = false;
 	bool is_jumping = false;
-	bool using_third_person_movement = true;
+	bool using_third_person_movement = false;
 	bool has_had_update = false;
 
 	glm::mat4 last_ws = glm::mat4(1.f);

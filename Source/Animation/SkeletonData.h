@@ -68,6 +68,7 @@ public:
 
 private:
 	glm::vec3* get_pos_write_ptr(int channel, int keyframe);
+	float* get_scale_write_ptr(int channel, int keyframe);
 	glm::quat* get_quat_write_ptr(int channel, int keyframe);
 
 	friend class ModelCompileHelper;

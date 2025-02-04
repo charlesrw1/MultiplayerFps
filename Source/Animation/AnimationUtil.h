@@ -57,6 +57,15 @@ void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1
 
 void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel);
 
+struct PosePoolPtr
+{
+	PosePoolPtr(int count);
+	~PosePoolPtr();
+
+	int count = 0;
+	Pose* poses = nullptr;
+};
+
 class Pose_Pool
 {
 public:
@@ -66,7 +75,6 @@ public:
 		return inst;
 	}
 
-	std::vector<Pose> poses;
 	int head = 0;
 	Pose* alloc(int count) {
 		assert(count + head < 64);
@@ -77,6 +85,7 @@ public:
 		head -= count;
 		assert(head >= 0);
 	}
+	std::vector<Pose> poses;
 };
 
 class Matrix_Pool

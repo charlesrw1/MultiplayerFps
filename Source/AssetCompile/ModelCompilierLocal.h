@@ -44,6 +44,7 @@ struct AnimationClip_Load
 	float fps = 30.0;
 	ClipCrop crop;
 
+	bool removeLienarVelocity = false;
 	bool fixloop = false;
 	std::vector<std::unique_ptr<AnimationEvent>> events;
 	std::vector<EditingCurve> curves;

@@ -271,6 +271,8 @@ bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose)
 		ASSERT(rt->cached_pose_from_transition);
 		std::memcpy(rt->cached_pose_from_transition->pos, pose.pose->pos, sizeof(glm::vec3) * ctx.num_bones());
 		std::memcpy(rt->cached_pose_from_transition->q, pose.pose->q, sizeof(glm::quat) * ctx.num_bones());
+		std::memcpy(rt->cached_pose_from_transition->scale, pose.pose->scale, sizeof(float) * ctx.num_bones());
+
 
 		rt->active_transition = next_transition;
 		rt->blend_duration = next_transition->transition_time;
@@ -306,6 +308,8 @@ bool Statemachine_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose)
 
 		std::memcpy(rt->cached_pose_from_transition->pos, pose.pose->pos, sizeof(glm::vec3) * ctx.num_bones());
 		std::memcpy(rt->cached_pose_from_transition->q, pose.pose->q, sizeof(glm::quat) * ctx.num_bones());
+		std::memcpy(rt->cached_pose_from_transition->scale, pose.pose->scale, sizeof(float) * ctx.num_bones());
+
 
 		rt->active_transition = next_transition;
 		rt->blend_duration = next_transition->transition_time;

@@ -388,6 +388,7 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 			posemirrored->pos[i] = glm::vec3(-frompos.x, frompos.y, frompos.z);
 			glm::quat fromquat = pose.pose->q[from];
 			posemirrored->q[i] = glm::quat(fromquat.w, fromquat.x, -fromquat.y, -fromquat.z);
+			posemirrored->scale[i] = pose.pose->scale[from];
 		}
 
 		util_blend(ctx.num_bones(), *posemirrored, *pose.pose, rt->saved_f);
@@ -708,7 +709,8 @@ bool MeshspaceToLocal_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) 
 
 static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkeleton* skel, int index)
 {
-	glm::mat4* mats = Matrix_Pool::get().alloc(36);
+	const int ALLOCED_MATS = 36;
+	glm::mat4* mats = Matrix_Pool::get().alloc(ALLOCED_MATS);
 
 	int count = 0;
 	while (index != -1) {
@@ -722,7 +724,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		mats[i] = mats[i + 1] * mats[i];
 	}
 	glm::mat4 final_ = mats[0];
-	Matrix_Pool::get().free(36);
+	Matrix_Pool::get().free(ALLOCED_MATS);
 	return final_;
 }
 
@@ -734,14 +736,15 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 
 	 // build up global matrix when needed instead of recreating it every step
 	// not sure if this is optimal, should profile different ways to pass around pose
-	 glm::mat4* mats = Matrix_Pool::get().alloc(36);
+	 const int ALLOCED_MATS = 36;
+	 glm::mat4* mats = Matrix_Pool::get().alloc(ALLOCED_MATS);
 	 int indicies[36];
 
 	 auto skel = ctx.get_skeleton();
 	 int index = rt->bone_index;
 	 int count = 0;
 	 while (index != -1) {
-		 assert(count < 36);
+		 assert(count < ALLOCED_MATS);
 		 glm::mat4x4 matrix = glm::mat4_cast(pose.pose->q[index]);
 		 matrix[3] = glm::vec4(pose.pose->pos[index], 1.0);
 		 mats[count++] = matrix;
@@ -754,6 +757,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 
 	 if (count <= 2) {
 		 sys_print(Warning, "ik attempted on some root bone %s\n", bone_name.c_str());
+		 Matrix_Pool::get().free(ALLOCED_MATS);
 		 return res;
 	 }
 
@@ -806,7 +810,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		 pose.pose->q[rt->bone_index] = glm::inverse(q) * target_rotation;
 	 }
 
-	 Matrix_Pool::get().free(36);
+	 Matrix_Pool::get().free(ALLOCED_MATS);
 
 	 return res;
 }
@@ -820,12 +824,13 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 
 	 // build up global matrix when needed instead of recreating it every step
 	 // not sure if this is optimal, should profile different ways to pass around pose
-	 glm::mat4* mats = Matrix_Pool::get().alloc(36);
+	 const int ALLOCED_MATS = 36;
+	 glm::mat4* mats = Matrix_Pool::get().alloc(ALLOCED_MATS);
 	 auto skel = ctx.get_skeleton();
 	 int index = rt->bone_index;
 	 int count = 0;
 	 while (index != -1) {
-		 assert(count < 36);
+		 assert(count < ALLOCED_MATS);
 		 glm::mat4x4 matrix = glm::mat4_cast(pose.pose->q[index]);
 		 matrix[3] = glm::vec4(pose.pose->pos[index], 1.0);
 		 mats[count++] = matrix;
@@ -887,7 +892,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		 if (apply_position && apply_position_meshspace)
 			 pose.pose->pos[rt->bone_index] = mats[0][3];
 	 }
-	Matrix_Pool::get().free(36);
+	Matrix_Pool::get().free(ALLOCED_MATS);
 	 return res;
  }
 
@@ -902,11 +907,13 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		 // simple, just copy over pos/quat
 		 pose.pose->q[rt->target_bone_index] = pose.pose->q[rt->src_bone_index];
 		 pose.pose->pos[rt->target_bone_index] = pose.pose->pos[rt->src_bone_index];
+		 pose.pose->scale[rt->target_bone_index] = pose.pose->scale[rt->src_bone_index];
 		 return res;
 	 }
 	 glm::mat4 mat = build_global_transform_for_bone_index(pose.pose, skel, rt->src_bone_index);
 	 pose.pose->q[rt->target_bone_index] = glm::quat_cast(mat);
 	 pose.pose->pos[rt->target_bone_index] = mat[3];
+	 pose.pose->scale[rt->target_bone_index] = glm::length(mat[0]);
 
 	 return res;
 
