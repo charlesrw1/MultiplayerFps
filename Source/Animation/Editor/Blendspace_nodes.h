@@ -29,21 +29,30 @@ public:
 
 	bool compile_my_data(const AgSerializeContext* ctx) override {
 
+		inputs[0].is_node_required = true;	// "x"
+		inputs[1].is_node_required = rows > 1;	// "y"
+		inputs[2].is_node_required = node->is_additive_blend_space;	// "pose input"
+
+
 		bool res = util_compile_default(this, ctx);
 
 		// creating triangles: scan every 2x2 block and create triangles when possible
 		//	then scan any unused blocks and check if its surrounded by 3 taken blocks, create a triangle then
+
+		const bool skip_unused = !node->is_additive_blend_space;
+		const bool is_1d = rows == 1;
 
 		node->indicies.clear();
 		node->verticies.clear();
 		std::vector<int> gridpoint_to_vertex_index(rows*cols, -1);
 		for (int y = 0; y < rows; y++) {
 			for (int x = 0; x < cols; x++) {
-				if (!get_by_coords(x, y).is_being_used()) continue;
+				if (!get_by_coords(x, y).is_being_used()&& skip_unused) continue;
 				BlendSpace2d_CFG::GridPoint gp;
-				gp.animation_name = get_by_coords(x, y).animation_name;
+				gp.seq = get_by_coords(x, y).animation;
 				gp.x = x / float(cols - 1);
-				gp.y = x / float(rows - 1);
+				if(!is_1d)
+					gp.y = x / float(rows - 1);
 				node->verticies.push_back(gp);
 				gridpoint_to_vertex_index[y * cols + x] = node->verticies.size() - 1;
 			}
@@ -118,15 +127,16 @@ public:
 	int GridPoints;
 
 	struct GridData {
-		std::string animation_name;
+		using MyClassType = GridData;
+		AssetPtr<AnimationSeqAsset> animation;
 		static const PropertyInfoList* get_props() {
 			START_PROPS(GridData)
-				REG_STDSTRING(animation_name, PROP_DEFAULT)
+				REG_ASSET_PTR(animation,PROP_DEFAULT)
 			END_PROPS(GridData)
 		}
 
 		bool is_being_used() const {
-			return !animation_name.empty();
+			return animation.get();
 		}
 	};
 	int cols = 0;

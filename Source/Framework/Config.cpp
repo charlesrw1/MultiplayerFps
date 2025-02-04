@@ -286,27 +286,40 @@ static int classify_string(const char* s)
 }
 
 
-
+#include <algorithm>
 
 
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
+	void print_matches(const char* match) {
+		std::vector<const char*> matches;
+		VarManImpl* v = (VarManImpl*)VarMan::get();
+		for (auto& var : v->vars) {
+			if (var.first.find(match) != std::string::npos) {
+				matches.push_back(var.first.c_str());
+			}
+		}
+		for (auto& c : all_cmds) {
+			if (c.first.find(match) != std::string::npos)
+				matches.push_back(c.first.c_str());
+		}
+		std::sort(matches.begin(), matches.end(), [](const char* a, const char* b)
+			{
+				return strcmp(a, b) < 0;
+			});
+		sys_print(Info,"\n\n");
+		for (auto m : matches) {
+			sys_print(Info, "- %s\n", m);
+		}
+	}
 	void add_command(const char* name, Engine_Cmd_Function cmd) {
-		StringUtils::StringHash hash(name);
 
-		if (find_cmd(hash)) {
+		if (find_cmd(name)) {
 			printf("Set duplicate command %s\n", name);
 			return;
 		}
-		if (num_cmds >= MAX_CMDS) {
-			printf("Max commands reached\n");
-			return;
-		}
-		Engine_Cmd* command = &all_cmds[num_cmds++];
-		command->func = cmd;
-		command->name = name;
-		hash_to_index[hash.computedHash] = num_cmds - 1;
+		all_cmds.insert({ std::string(name),cmd });
 	}
 	void execute_string(const char* command_string) {
 
@@ -316,9 +329,9 @@ public:
 		std::string command = command_string;
 		tokenize_string(command, args);
 		if (args.size() == 0) return;
-		Engine_Cmd* ec = find_cmd(args.at(0));
+		Engine_Cmd_Function ec = find_cmd(args.at(0));
 		if (ec) {
-			ec->func(args);
+			ec(args);
 		}
 		else {
 			ConfigVar* var = VarMan::get()->find(args.at(0));
@@ -393,24 +406,14 @@ public:
 
 
 
-
-	struct Engine_Cmd {
-		std::string name;
-		Engine_Cmd_Function func;
-	};
-
-	Engine_Cmd* find_cmd(StringUtils::StringHash hash) {
-		auto find = hash_to_index.find(hash.computedHash);
-		if (find != hash_to_index.end()) return all_cmds + find->second;
-		return nullptr;
+	Engine_Cmd_Function find_cmd(const std::string& str) {
+		auto find = all_cmds.find(str);
+		return find == all_cmds.end() ? nullptr : find->second;
 	}
 	
 	std::string command_buffer;
 	bool set_unknown_variables = false;
-	static const int MAX_CMDS = 64;
-	int num_cmds = 0;
-	Engine_Cmd all_cmds[MAX_CMDS];
-	std::unordered_map<uint32_t, int> hash_to_index;
+	std::unordered_map<std::string, Engine_Cmd_Function> all_cmds;
 };
 
 Cmd_Manager* Cmd_Manager::get()

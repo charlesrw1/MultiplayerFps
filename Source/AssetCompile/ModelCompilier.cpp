@@ -860,15 +860,29 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		AnimationClip_Load acl;
 		acl.curves = isa.curves;
 		acl.fixloop = isa.fixLoop;
-		acl.crop.has_crop = isa.hasEndCrop | isa.hasStartCrop;
+		acl.crop.has_crop = isa.hasEndCrop || isa.hasStartCrop;
 		acl.crop.start = isa.cropStart;
 		acl.crop.end = isa.cropEnd;
-		acl.sub = isa.makeAdditive ? SubtractType_Load::FromThis : SubtractType_Load::None;
+		if (isa.makeAdditive) {
+			if (!isa.otherClipToSubtract.path.empty()) {
+				acl.sub = SubtractType_Load::FromAnother;
+				auto find = isa.otherClipToSubtract.path.rfind("/");
+				auto ofs = find == std::string::npos ? 0 : find+1;
+				acl.subtract_clipname = isa.otherClipToSubtract.path.substr(ofs);
+			}
+			else {
+				acl.sub = SubtractType_Load::FromThis;
+			}
+		}
+		else
+			acl.sub = SubtractType_Load::None;
+
+
 		acl.fixloop = isa.fixLoop;
 		
 		for (auto& ev : isa.events) {
 			ClassBase* newEvent = ev->get_type().allocate();
-			copy_object_properties(ev.get(), newEvent, nullptr);
+			copy_object_properties(ev, newEvent, nullptr);
 			assert(newEvent->is_a<AnimationEvent>());
 			acl.events.push_back(std::unique_ptr<AnimationEvent>((AnimationEvent*)newEvent));
 		}
@@ -904,6 +918,7 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_p
 		auto filenew = FileSys::open_read_game(pathNew.c_str());
 		if (!filenew)
 			throw std::runtime_error("couldn't open dict");
+		//
 		return new_import_settings_to_modeldef_data(filenew.get());
 	}
 

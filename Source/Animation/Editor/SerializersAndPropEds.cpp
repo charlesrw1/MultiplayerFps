@@ -7,6 +7,8 @@
 #include "Framework/PropertyEd.h"
 #include "Animation/Editor/AnimationGraphEditor.h"
 #include "Framework/MyImguiLib.h"
+#include "Assets/AssetDatabase.h"
+
 class SerializeImNodeState : public IPropertySerializer
 {
 	// Inherited via IPropertySerializer
@@ -221,32 +223,6 @@ public:
 };
 
 
-
-
-class AgEditor_BlendSpaceArrayHead : public IArrayHeader
-{
-	using IArrayHeader::IArrayHeader;
-	// Inherited via IArrayHeader
-	virtual bool imgui_draw_header(int index)
-	{
-		return false;
-	}
-	virtual void imgui_draw_closed_body(int index)
-	{
-	}
-};
-
-class AgEdtior_BlendSpaceParameteriation : public IPropertyEditor
-{
-	using IPropertyEditor::IPropertyEditor;
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-
-		return false;
-
-	}
-};
 #include "Blendspace_nodes.h"
 class BlendspaceGridEd : public IPropertyEditor
 {
@@ -286,20 +262,20 @@ class BlendspaceGridEd : public IPropertyEditor
 				const bool hovered = ImRect(min, min + ImVec2(square_width, square_width)).Contains(ImGui::GetMousePos());
 				Color32 color_to_use = unusedc;
 				if (hovered) color_to_use = hoveredc;
-				else if (!gridpoint.animation_name.empty()) color_to_use = usedc;
+				else if (gridpoint.animation) color_to_use = usedc;
 
 				drawlist->AddRectFilled(ImVec2(min.x, min.y), ImVec2(min.x + square_width, min.y + square_width), color_to_use.to_uint());
 				
 				ImGui::PushClipRect(min, min + ImVec2(square_width, square_width),false);
-				if (!gridpoint.animation_name.empty())
-					drawlist->AddText(NULL, 0.0f, min, COLOR_WHITE.to_uint(), gridpoint.animation_name.c_str(), nullptr, square_width);
+				if (gridpoint.animation)
+					drawlist->AddText(NULL, 0.0f, min, COLOR_WHITE.to_uint(), gridpoint.animation->get_name().c_str(), nullptr, square_width);
 				ImGui::PopClipRect();
 
 				ImGui::InvisibleButton("##adfad", ImVec2(square_width,square_width));
 				if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-					if (!gridpoint.animation_name.empty()) {
+					if (gridpoint.animation) {
 						ImGui::BeginTooltip();
-							ImGui::Text(gridpoint.animation_name.c_str());
+							ImGui::Text(gridpoint.animation->get_name().c_str());
 						ImGui::EndTooltip();
 					}
 					if (ImGui::GetIO().MouseClicked[1]) {
@@ -314,10 +290,13 @@ class BlendspaceGridEd : public IPropertyEditor
 					//if (payload->IsDataType("AssetBrowserDragDrop"))
 					//	sys_print("``` accepting\n");
 
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AnimationItemAnimGraphEd"))
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 					{
-						std::string* p = *(std::string**)payload->Data;
-						gridpoint.animation_name = *p;
+						AssetOnDisk* aod = *(AssetOnDisk**)payload->Data;
+						if (aod->type->get_asset_class_type()->is_a(AnimationSeqAsset::StaticType)) {
+		
+							gridpoint.animation = GetAssets().find_sync<AnimationSeqAsset>(aod->filename);
+						}
 
 					}
 					ImGui::EndDragDropTarget();
@@ -332,8 +311,8 @@ class BlendspaceGridEd : public IPropertyEditor
 
 			bool close_popup = false;
 			auto& gridpoint = node->gridpoints[y_popup_idx * node->cols + x_popup_idx];
-			if (!gridpoint.animation_name.empty() && ImGui::SmallButton("remove animation")) {
-				gridpoint.animation_name = "";
+			if (gridpoint.animation && ImGui::SmallButton("remove animation")) {
+				gridpoint.animation.ptr = nullptr;
 				close_popup = true;
 			}
 			ImGui::Separator();
@@ -381,12 +360,10 @@ struct AutoStruct_asdf {
 
 		pfac.registerClass<AgEnumFinder>("AG_ENUM_TYPE_FINDER");
 
-		pfac.registerClass<AgEdtior_BlendSpaceParameteriation>("AG_EDITOR_BLEND_SPACE_PARAMETERIZATION");
 		
 
 		auto& afac = IArrayHeader::get_factory();
 
-		afac.registerClass<AgEditor_BlendSpaceArrayHead>("AG_EDITOR_BLEND_SPACE");
 
 
 		auto& sfac = IPropertySerializer::get_factory();

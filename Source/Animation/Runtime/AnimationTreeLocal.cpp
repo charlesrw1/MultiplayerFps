@@ -108,6 +108,67 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 	return true;
 }
 
+static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const AnimationSeq* clip, 
+	bool has_sync_group, StringName hashed_syncgroupname, sync_opt SyncOption, bool loop, int remap_index,
+	float speed, float& anim_time, bool& stopped_flag, const Node_CFG* owner)
+{
+	// synced update
+	if (has_sync_group) {
+		SyncGroupData& sync = ctx.find_sync_group_data(hashed_syncgroupname);
+
+		if (sync.is_this_first_update()) {
+			// do nothing
+		}
+		else {
+			anim_time = sync.time.get() * clip->duration;	// normalized time, TODO: sync markers
+		}
+		const float time_to_evaluate_sequence = anim_time;
+
+		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
+
+			anim_time += pose.dt * speed * 0.8f;	// HACK !!!!!!! fixme, should be 24 fps instead of 30 but setting it breaks stuff, just do this for now 
+
+			if (anim_time > clip->duration || anim_time < 0.f) {
+				if (loop)
+					anim_time = fmod(fmod(anim_time, clip->duration) + clip->duration, clip->duration);
+				else {
+					anim_time = clip->duration - 0.001f;
+					stopped_flag = true;
+				}
+			}
+
+			sync.write_to_update_time(SyncOption, 0.5/*TODO*/, owner, Percentage(anim_time, clip->duration));
+
+			const std::vector<int16_t>* indicies = nullptr;
+			if (remap_index != -1)
+				indicies = &ctx.get_skeleton()->get_remap(remap_index)->other_to_this;
+
+			util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
+		}
+	}
+	// unsynced update
+	else {
+		const float time_to_evaluate_sequence = anim_time;
+
+		anim_time += pose.dt * speed * 0.8f;	// see above
+
+		if (anim_time > clip->duration || anim_time < 0.f) {
+			if (loop)
+				anim_time = fmod(fmod(anim_time, clip->duration) + clip->duration, clip->duration);
+			else {
+				anim_time = clip->duration - 0.001f;
+				stopped_flag = true;
+			}
+		}
+
+		const std::vector<int16_t>* indicies = nullptr;
+		if (remap_index != -1)
+			indicies = &ctx.get_skeleton()->get_remap(remap_index)->other_to_this;
+
+		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
+	}
+}
+
  bool Clip_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	 RT_TYPE* rt = get_rt(ctx);
@@ -135,62 +196,8 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 		time += dt
 	*/
 
-	// synced update
-	if (has_sync_group()) {
-		SyncGroupData& sync = ctx.find_sync_group_data(hashed_syncgroupname);
-
-		if (sync.is_this_first_update()) {
-			// do nothing
-		}
-		else {
-			rt->anim_time = sync.time.get() * clip->duration;	// normalized time, TODO: sync markers
-		}
-		const float time_to_evaluate_sequence = rt->anim_time;
-
-		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
-
-			rt->anim_time += pose.dt * speed * 0.8f;	// HACK !!!!!!! fixme, should be 24 fps instead of 30 but setting it breaks stuff, just do this for now 
-
-			if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
-				if (loop)
-					rt->anim_time = fmod(fmod(rt->anim_time, clip->duration) + clip->duration, clip->duration);
-				else {
-					rt->anim_time = clip->duration - 0.001f;
-					rt->stopped_flag = true;
-				}
-			}
-
-			sync.write_to_update_time(SyncOption, 0.5/*TODO*/, this, Percentage(rt->anim_time, clip->duration));
-		}
-
-		const std::vector<int16_t>* indicies = nullptr;
-		if (rt->remap_index != -1)
-			indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
-
-		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
-
-	}
-	// unsynced update
-	else {
-		const float time_to_evaluate_sequence = rt->anim_time;
-
-		rt->anim_time += pose.dt * speed * 0.8f;	// see above
-
-		if (rt->anim_time > clip->duration || rt->anim_time < 0.f) {
-			if (loop)
-				rt->anim_time = fmod(fmod(rt->anim_time, clip->duration) + clip->duration, clip->duration);
-			else {
-				rt->anim_time = clip->duration - 0.001f;
-				rt->stopped_flag = true;
-			}
-		}
-
-		const std::vector<int16_t>* indicies = nullptr;
-		if (rt->remap_index != -1)
-			indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
-
-		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
-	}
+	get_clip_pose_shared(
+		ctx,pose,clip,has_sync_group(),hashed_syncgroupname,SyncOption,loop,rt->remap_index,speed,rt->anim_time,rt->stopped_flag,this);
 
 	const int root_index = 0;
 	for (int i = 0; i < 3; i++) {
@@ -205,11 +212,42 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 	outres &= !pose.has_auto_transition || (pose.automatic_transition_time + cur_t < clip_t);
 
 	return outres;
+
 }
 
  bool BlendSpace2d_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
+	 return false;
 	 auto rt = get_rt(ctx);
+	 const bool is_1d = indicies.size() == 0;
+	 // if 1d, find 2 nodes to blend between
+	 if (is_1d) {
+		 float x = xparam->get_value<float>(ctx);
+		 int i = 0;
+		 for (; i < verticies.size(); i++) {
+			 if (x < verticies[i].x) {
+				 break;
+			 }
+		 }
+		 if (i == 0 || i==verticies.size()) {
+			 // set to first or last pose
+			 bool dummystopflag = false;
+			 int index = (i == 0) ? 0 : verticies.size()-1;
+			 get_clip_pose_shared(ctx, pose, verticies[index].seq.ptr->seq, true, hashed_syncgroupname, SyncOption, true, -1, 1.f, rt->current_times[index], dummystopflag, this);
+			 if (is_additive_blend_space) {
+
+			 }
+			 return true;
+		 }
+		 else {
+			 // blend
+			 int first_pose = i - 1;
+			 int next_pose = i;
+			 ASSERT(first_pose >= 0&&next_pose<verticies.size());
+
+			 return true;
+		 }
+	 }
 
 
 	 return false;

@@ -170,6 +170,8 @@ public:
 		velocity = {};
 
 		ccontroller->set_position(glm::vec3(0, 0.0, 0));
+
+		eng->set_game_focused(true);
 	}
 	virtual void end() override {
 		GetGInput().free_input_user(inputPtr);
@@ -189,7 +191,7 @@ public:
 				pc->ignore = capsule;
 				const float spread = 0.15;
 				pc->direction = lookdir + glm::vec3(r.RandF(-spread, spread), 0, r.RandF(-spread, spread));
-				pc->direction = glm::normalize(pc->direction);
+				pc->direction = get_front_dir();// glm::normalize(pc->direction);
 				pc->speed += r.RandF(-2, 2);
 
 				glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), pc->direction));
@@ -206,11 +208,25 @@ public:
 		}
 	}
 
+	void update_view_angles() {
+		
+		auto off = con.look->get_value<glm::vec2>();
+		view_angles.x -= off.y;	// pitch
+		view_angles.y += off.x;	// yaw
+		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+		view_angles.y = fmod(view_angles.y, TWOPI);
+	}
+	glm::vec3 get_front_dir() const {
+		return AnglesToVector(view_angles.x, view_angles.y);
+	}
+
 	virtual void update() override {
 
 		did_move = false;
 		if (is_in_car)
 			return;
+
+		update_view_angles();
 
 		if (ragdoll_enabled) {
 			update_view();
@@ -225,28 +241,33 @@ public:
 
 		if (has_had_update) {
 
-			if (using_controller()) {
-				auto stick = con.look->get_value<glm::vec2>();
-				if (glm::length(stick) > 0.01) {
-					lookdir = glm::normalize(glm::vec3(-stick.x, 0, -stick.y));
-				}
-				mouse_pos = get_ws_position();
+			if (using_third_person_movement) {
+
 			}
 			else {
-				glm::ivec2 mouse;
-				SDL_GetMouseState(&mouse.x, &mouse.y);
+				if (using_controller()) {
+					auto stick = con.look->get_value<glm::vec2>();
+					if (glm::length(stick) > 0.01) {
+						lookdir = glm::normalize(glm::vec3(-stick.x, 0, -stick.y));
+					}
+					mouse_pos = get_ws_position();
+				}
+				else {
+					glm::ivec2 mouse;
+					SDL_GetMouseState(&mouse.x, &mouse.y);
 
-				Ray r;
-				r.dir = TopDownUtil::unproject_mouse_to_ray(CameraComponent::get_scene_camera()->last_vs, mouse.x, mouse.y);
-				r.pos = view_pos;
-				glm::vec3 intersect(0.f);
-				ray_plane_intersect(r, glm::vec3(0, 1, 0), glm::vec3(0.8f), intersect);
-				auto mypos = get_ws_position();
-				lookdir = intersect - mypos;
-				lookdir.y = 0;
-				if (glm::length(lookdir) < 0.000001) lookdir = glm::vec3(1, 0, 0);
-				else lookdir = glm::normalize(lookdir);
-				mouse_pos = intersect;
+					Ray r;
+					r.dir = TopDownUtil::unproject_mouse_to_ray(CameraComponent::get_scene_camera()->last_vs, mouse.x, mouse.y);
+					r.pos = view_pos;
+					glm::vec3 intersect(0.f);
+					ray_plane_intersect(r, glm::vec3(0, 1, 0), glm::vec3(0.8f), intersect);
+					auto mypos = get_ws_position();
+					lookdir = intersect - mypos;
+					lookdir.y = 0;
+					if (glm::length(lookdir) < 0.000001) lookdir = glm::vec3(1, 0, 0);
+					else lookdir = glm::normalize(lookdir);
+					mouse_pos = intersect;
+				}
 			}
 
 		}
@@ -255,6 +276,7 @@ public:
 		float len = glm::length(move);
 		if (len > 1.0)
 			move = glm::normalize(move);
+
 		if (len > 0.01)
 			did_move = true;
 		float dt = eng->get_dt();
@@ -267,7 +289,13 @@ public:
 			move_front = glm::normalize(glm::vec3(-1, 0, 1));
 			move_side = -glm::cross(move_front, glm::vec3(0, 1, 0));
 		}
-
+		if (using_third_person_movement) {
+			move_front = get_front_dir();
+			move_front.y = 0;
+			move_front = glm::normalize(move_front);
+			move_side = -(glm::cross(move_front, glm::vec3(0, 1, 0)));
+			lookdir = move_front;
+		}
 
 		ccontroller->move((move_front * move.y + move_side * move.x) * move_speed * dt, dt, 0.005f, flags, outvel);
 
@@ -292,7 +320,17 @@ public:
 			camera_pos = glm::vec3(pos.x, pos.y + 12.0, pos.z - 1.0);
 		glm::vec3 camera_dir = glm::normalize(camera_pos - (pos + glm::vec3(0, 1, 0)));
 
-		this->view_pos = damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
+		if (using_third_person_movement) {
+			auto front = get_front_dir();
+			camera_pos = pos + glm::vec3(0, 2, 0) - front*3.0f;
+			camera_dir = -front;
+		}
+
+		if (ragdoll_enabled)
+			this->view_pos = damp_dt_independent(camera_pos, this->view_pos, 0.002, eng->get_dt());
+		else
+			this->view_pos = camera_pos;
+
 		auto finalpos = shake.evaluate(this->view_pos, camera_dir, eng->get_dt());
 
 		auto viewMat = glm::lookAt(finalpos, finalpos - camera_dir, glm::vec3(0, 1, 0));
@@ -333,19 +371,22 @@ public:
 
 	glm::vec3 velocity{};
 
+	glm::vec3 view_angles = glm::vec3(0.f);
+
 	glm::vec3 view_pos = glm::vec3(0, 0, 0);
 	glm::vec3 lookdir = glm::vec3(1, 0, 0);
 	glm::vec3 mouse_pos = glm::vec3(0, 0, 0);
 
 	bool did_move = false;
 	bool is_jumping = false;
-
+	bool using_third_person_movement = true;
 	bool has_had_update = false;
 
 	glm::mat4 last_ws = glm::mat4(1.f);
 };
 
-
+extern float lean_amt;
+extern float lean_smooth;
 NEWCLASS(TopDownAnimDriver, AnimatorInstance)
 public:
 
@@ -364,16 +405,29 @@ public:
 			vel = (p->get_ws_position() - lastpos) / dt;
 			accel = (vel - lastvel) / dt;
 			lastpos = p->get_ws_position();
-			flMovex = damp_dt_independent(glm::clamp(accel.x * 0.4f, -1.f, 0.f), flMovex, 0.01, dt);
+
+			glm::vec3 side = glm::normalize(glm::cross(p->get_front_dir(), glm::vec3(0, 1, 0)));
+			float d = glm::dot(side, accel);
+			d *= lean_amt;
+			flMovex = damp_dt_independent(glm::clamp(d * 0.5 + 0.5, 0.0, 1.0), (double)flMovex, lean_smooth, dt);
 		}
 		else if (e) {
 			bRunning = !e->is_dead;
+			auto lastvel = vel;
+			vel = (e->get_ws_position() - lastpos) / dt;
+			accel = (vel - lastvel) / dt;
+			lastpos = e->get_ws_position();
+
+			glm::vec3 side = glm::normalize(glm::cross(e->facing_dir, glm::vec3(0, 1, 0)));
+			float d = glm::dot(side, accel);
+			d *= lean_amt;
+			flMovex = damp_dt_independent(glm::clamp(d * 0.5 + 0.5, 0.0, 1.0),(double)flMovex,lean_smooth,dt);
 		}
 		else
 			bRunning = false;
 	}
 	virtual void on_post_update() override {
-
+		
 	}
 
 	TopDownPlayer* p = nullptr;

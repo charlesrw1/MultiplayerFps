@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Game/SoftAssetPtr.h"
 #include "Render/MaterialPublic.h"
 
 #include "SkeletonAsset.h"
@@ -32,6 +33,7 @@ struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
 CLASS_H(AnimImportSettings, ClassBase)
 public:
 	std::string clipName;
+	SoftAssetPtr<AnimationSeqAsset> otherClipToSubtract;
 
 	// import settings
 	bool hasEndCrop = false;
@@ -42,12 +44,11 @@ public:
 	bool makeAdditive = false;
 	bool additiveFromSelf = false;
 
-	std::vector<std::unique_ptr<AnimationEvent>> events;
+	std::vector<AnimationEvent*> events;
 	std::vector<EditingCurve> curves;
-	AssetPtr<AnimationSeqAsset> otherClipToSubtract;
 
 	static const PropertyInfoList* get_props() {
-		MAKE_VECTORCALLBACK_ATOM(std::unique_ptr<AnimationEvent>, events);
+		//MAKE_VECTORCALLBACK_ATOM(std::unique_ptr<AnimationEvent>, events);
 		MAKE_VECTORCALLBACK(EditingCurve, curves);
 		START_PROPS(AnimImportSettings)
 			REG_STDSTRING(clipName, PROP_SERIALIZE),
@@ -58,9 +59,9 @@ public:
 			REG_BOOL(fixLoop, PROP_DEFAULT, "0"),
 			REG_BOOL(makeAdditive, PROP_DEFAULT, "0"),
 			REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
-			REG_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
-			REG_STDVECTOR(curves,PROP_SERIALIZE),
-			REG_STDVECTOR(events,PROP_SERIALIZE),
+			REG_SOFT_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
+			REG_STDVECTOR(curves,PROP_SERIALIZE)
+			//REG_STDVECTOR(events,PROP_SERIALIZE),
 		END_PROPS(AnimImportSettings)
 	}
 };

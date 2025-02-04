@@ -399,7 +399,7 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	}
 
 	float speed = 1.0;
-	uint16_t start_frame = 0;
+	int16_t start_frame = 0;
 };
 
 struct Frame_Evaluate_RT : public Rt_Vars_Base
@@ -596,13 +596,10 @@ class NodeRt_Ctx;
 struct BlendSpace2d_RT : public Rt_Vars_Base
 {
 	glm::vec2 blend_weights = glm::vec2(0.f);
-
-	// not using vector here since for now these runtime structs never get cleaned up
-	const AnimationSeq* all_sequences[9];
-	int all_remap_indicies[9];
+	float current_times[9];
 	BlendSpace2d_RT() {
-		for (int i = 0; i < 9; i++) all_remap_indicies[i] = -1;
-		for (int i = 0; i < 9; i++)all_sequences[i] = nullptr;
+		for (int i = 0; i < 9; i++)
+			current_times[i] = 0.f;
 	}
 };
 
@@ -610,6 +607,7 @@ struct BlendSpace2d_RT : public Rt_Vars_Base
 NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 	ValueNode* xparam = nullptr;
 	ValueNode* yparam = nullptr;
+	Node_CFG* baseInputForAdditive = nullptr;
 
 	float weight_damp = 0.01;
 
@@ -617,14 +615,14 @@ NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 		float x = 0.0;
 		float y = 0.0;
 		
-		// grid point corresponds to input source node
-		std::string animation_name;
+		AssetPtr<AnimationSeqAsset> seq;
 
 		static const PropertyInfoList* get_props() {
+			using MyClassType = GridPoint;
 			START_PROPS(GridPoint)
 				REG_FLOAT(x,PROP_SERIALIZE,""),
 				REG_FLOAT(y, PROP_SERIALIZE,""),
-				REG_STDSTRING_CUSTOM_TYPE(animation_name, PROP_DEFAULT, "AG_CLIP_TYPE")
+				REG_ASSET_PTR(seq,PROP_SERIALIZE)
 			END_PROPS(GridPoint)
 		}
 	};
@@ -632,6 +630,9 @@ NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 	std::vector<uint16_t> indicies;
 	std::vector<GridPoint> verticies;
 	bool is_additive_blend_space = false;
+	StringName hashed_syncgroupname;
+	std::string SyncGroupName;
+	sync_opt SyncOption = sync_opt::Default;
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;
@@ -645,8 +646,11 @@ NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 			REG_STDVECTOR(indicies, PROP_SERIALIZE),
 			REG_CUSTOM_TYPE_HINT(xparam, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
 			REG_CUSTOM_TYPE_HINT(yparam, PROP_SERIALIZE, "AgSerializeNodeCfg", "float"),
-
-			REG_FLOAT(weight_damp, PROP_DEFAULT, "0.01")
+			REG_CUSTOM_TYPE_HINT(baseInputForAdditive, PROP_SERIALIZE, "AgSerializeNodeCfg", "local"),
+			REG_BOOL(is_additive_blend_space,PROP_DEFAULT, ""),
+			REG_FLOAT(weight_damp, PROP_DEFAULT, "0.01"),
+			REG_ENUM(SyncOption, PROP_DEFAULT, "sync_opt::Default", sync_opt),
+			REG_STDSTRING(SyncGroupName, PROP_DEFAULT),
 		END_PROPS(BlendSpace2d_CFG)
 	}
 	virtual void reset(NodeRt_Ctx& ctx) const override {

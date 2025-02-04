@@ -376,6 +376,10 @@ DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
 		auto level = eng->get_level();
 		if (!level)
 			return;
+		if (!tool->get_asset_type_info().is_a(SceneAsset::StaticType)) {
+			sys_print(Error, "can only play Scene levels\n");
+			return;
+		}
 		auto source = level->get_source_asset();
 		if (source) {
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("map %s", source->get_name().c_str()));
@@ -903,7 +907,7 @@ void GameEngineLocal::leave_level()
 
 void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
 {
-	sys_print(Info, "on_map_change_callback %s\n",loadedLevel->get_name().c_str());
+	sys_print(Info, "on_map_change_callback %s\n",(loadedLevel)?loadedLevel->get_name().c_str():"<nullptr>");
 
 	GetAssets().remove_unreferences();
 	ModelMan::get().compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
@@ -1780,50 +1784,57 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 			data->InsertChars(0, hist.c_str());
 		}
 	}
+	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+		Cmd_Manager::get()->print_matches(console->input_buffer);
+		console->scroll_to_bottom = true;
+	}
+
 	return 0;
 }
 
 void Debug_Console::draw()
 {
-	std::lock_guard<std::mutex> printLock(printMutex);
-
-	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-	if (!ImGui::Begin("Console")) {
-		ImGui::End();
-		return;
-	}
-	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar))
 	{
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
-		for (int i = 0; i < lines.size(); i++)
-		{
-			Color32 color;
-			bool has_color = false;
-			if (!lines[i].empty() && lines[i][0] == '>') { color = { 136,23,152 }; has_color = true; }
-			if (has_color)
-				ImGui::PushStyleColor(ImGuiCol_Text, color.to_uint());
-			ImGui::TextUnformatted(lines[i].c_str());
-			if (has_color)
-				ImGui::PopStyleColor();
+		std::lock_guard<std::mutex> printLock(printMutex);
+
+		ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
+		if (!ImGui::Begin("Console")) {
+			ImGui::End();
+			return;
 		}
-		if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
-			ImGui::SetScrollHereY(1.0f);
-		scroll_to_bottom = false;
+		const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+		if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar))
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+			for (int i = 0; i < lines.size(); i++)
+			{
+				Color32 color;
+				bool has_color = false;
+				if (!lines[i].empty() && lines[i][0] == '>') { color = { 136,23,152 }; has_color = true; }
+				if (has_color)
+					ImGui::PushStyleColor(ImGuiCol_Text, color.to_uint());
+				ImGui::TextUnformatted(lines[i].c_str());
+				if (has_color)
+					ImGui::PopStyleColor();
+			}
+			if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
+				ImGui::SetScrollHereY(1.0f);
+			scroll_to_bottom = false;
 
-		ImGui::PopStyleVar();
+			ImGui::PopStyleVar();
+		}
+		ImGui::EndChild();
+		ImGui::Separator();
 	}
-	ImGui::EndChild();
-	ImGui::Separator();
-
 	// Command-line
 	bool reclaim_focus = false;
 	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | 
-		ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackHistory;
+		ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCompletion;
 	if (set_keyboard_focus) {
 		ImGui::SetKeyboardFocusHere();
 		set_keyboard_focus = false;
 	}
+
 	if (ImGui::InputText("Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags, debug_console_text_callback, this))
 	{
 		char* s = input_buffer;

@@ -2,6 +2,14 @@
 
 //afad
 
+float lean_amt = 0.1;
+float lean_smooth = 0.01;
+void lean_func()
+{
+    ImGui::DragFloat("leanamt", &lean_amt, 0.01, -10, 10);
+    ImGui::DragFloat("lean_smooth", &lean_smooth, 0.01, 0, 1);
+}
+ADD_TO_DEBUG_MENU(lean_func);
 
 TopDownGameManager* TopDownGameManager::instance = nullptr;
 

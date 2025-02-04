@@ -1557,7 +1557,7 @@ public:
 	virtual bool is_soft_editor() const {
 		return false;
 	}
-
+	virtual bool get_failed_load() const { return false; }
 	virtual bool internal_update() {
 		if (!has_init) {
 			has_init = true;
@@ -1594,9 +1594,12 @@ public:
 
 		if (is_soft_editor())
 			ImGui::TextColored(ImColor((Color32{ 255, 229, 99 }).to_uint()), asset_str.c_str());
-		else
-			ImGui::Text(asset_str.c_str());
-
+		else {
+			if (get_failed_load())
+				ImGui::TextColored(ImColor((Color32{ 255, 141, 133 }).to_uint()), asset_str.c_str());
+			else
+				ImGui::Text(asset_str.c_str());
+		}
 		ImGui::SetCursorPos(cursor);
 		ImGui::InvisibleButton("##adfad", ImVec2(width, sz.y + style.FramePadding.y * 2.f));
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
@@ -1706,6 +1709,12 @@ public:
 			auto asset = GetAssets().find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
 			*ptr = asset;
 		}
+	}
+	bool get_failed_load() const override {
+		auto ptr = *(IAsset**)prop->get_ptr(instance);
+		if (ptr && ptr->did_load_fail())
+			return true;
+		return false;
 	}
 };
 

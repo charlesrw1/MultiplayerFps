@@ -264,12 +264,12 @@ public:
 		auto to_dir = the_player->get_ws_position() - get_ws_position();
 		if (glm::length(to_dir) < 0.001) to_dir = glm::vec3(1, 0, 0);
 		else to_dir = glm::normalize(to_dir);
+		facing_dir = to_dir;
 
 		float dt = eng->get_dt();
 		uint32_t flags = 0;
 		glm::vec3 outvel;
 		float move_speed = 3.0;
-
 		ccontroller->move(glm::vec3(to_dir.x, 0, to_dir.z) * move_speed * dt, dt, 0.005f, flags, outvel);
 
 
@@ -284,6 +284,7 @@ public:
 
 	}
 
+	glm::vec3 facing_dir = glm::vec3(1, 0, 0);
 	std::unique_ptr<CharacterController> ccontroller;
 	glm::mat4 last_ws = glm::mat4(1.f);
 	bool is_dead = false;

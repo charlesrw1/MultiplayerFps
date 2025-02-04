@@ -21,6 +21,8 @@
 
 #include "AnimAssetEditorLocal.h"
 
+#include "Animation/Event.h"
+
 static AnimationEditorTool g_animseq_editor_static;
 IEditorTool* g_animseq_editor = &g_animseq_editor_static;
 
@@ -105,7 +107,7 @@ void EditModelAnimations::on_presave()
 		a->event->frame = a->time_start;
 		a->event->frame_duration = a->time_end - a->time_start;
 		a->event->editor_layer = a->track_index;
-		c.events.push_back(std::move(a->event));
+		c.events.push_back(a->event.release());
 	}
 
 	auto& cur = curveedit.get_curve_array();
@@ -144,7 +146,7 @@ void EditModelAnimations::on_start()
 	auto& c = *g_animseq_editor_static.animImportSettings;
 	for (int i = 0; i < c.events.size(); i++) {
 		auto ev = std::move(c.events[i]);
-		auto ptr = ev.release();
+		auto ptr = ev;
 		EventSequenceItem* esi = new EventSequenceItem(ptr/* release ownership*/);
 		esi->time_start = esi->event->frame;
 		esi->time_end = esi->event->frame_duration;
