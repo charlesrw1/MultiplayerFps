@@ -81,7 +81,8 @@ struct BoneIndexRetargetMap
 {
 	const MSkeleton* who = nullptr;
 	// size = bones.size() 
-	std::vector<int16_t> my_skeleton_to_who;	
+	std::vector<int16_t> my_skeleton_to_who;
+	std::vector<glm::quat> my_skelton_to_who_quat_delta;
 
 };
 

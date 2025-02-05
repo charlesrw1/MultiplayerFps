@@ -1,4 +1,6 @@
 #include "SkeletonData.h"
+#include "AnimationUtil.h"
+
 MSkeleton::~MSkeleton() {
 	for (auto clip : clips) {
 		delete clip.second.ptr;
@@ -25,6 +27,7 @@ const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
 	auto remap = std::make_unique<BoneIndexRetargetMap>();
 	remap->who = other;
 	remap->my_skeleton_to_who.resize(bone_dat.size(), -1/* invalid */);
+	remap->my_skelton_to_who_quat_delta.resize(bone_dat.size());
 
 	// n^2 :(
 	for (int i = 0; i < other->bone_dat.size(); i++) {
@@ -38,6 +41,9 @@ const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
 		}
 		if (j != bone_dat.size()) {
 			remap->my_skeleton_to_who.at(j) = i;
+
+			//remap->my_skelton_to_who_quat_delta.at(j) = quat_delta(bone_dat.at(j).rot, other->bone_dat.at(i).rot);
+
 		}
 	}
 

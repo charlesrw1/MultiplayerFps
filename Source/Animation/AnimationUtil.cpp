@@ -31,12 +31,6 @@ void Animation_Debug::push_sphere(const glm::vec3& p, float radius) {
 }
 
 
-static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
-{
-	return to * glm::inverse(from);
-}
-
-
 // source = reference pose - source
 void util_subtract(int bonecount, const Pose& reference, Pose& source)
 {
@@ -425,6 +419,8 @@ void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, fl
 			}
 			else if (bone.retarget_type == RetargetBoneType::FromTargetBindPose) {
 				outpose.pos[dest_idx] = skeleton->get_bone_local_transform(dest_idx)[3];
+
+				//outpose.q[dest_idx] = remap_indicies->my_skelton_to_who_quat_delta.at(dest_idx) * outpose.q[dest_idx];
 			}
 		}
 	}

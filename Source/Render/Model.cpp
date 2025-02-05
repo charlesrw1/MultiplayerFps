@@ -730,7 +730,9 @@ bool ModelMan::upload_model(Model* mesh)
 	ASSERT(all_models.find(mesh) == nullptr);
 	all_models.insert(mesh);
 
+
 	mesh->uid = cur_mesh_id++;
+	sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
 
 	if (mesh->parts.size() == 0)
 		return false;
@@ -794,3 +796,23 @@ DECLARE_ENGINE_CMD(IMPORT_MODEL)
 	ModelCompilier::compile(savepath.c_str());
 }
 #endif
+
+
+DECLARE_ENGINE_CMD(print_skeleton)
+{
+	if (args.size() != 2) {
+		sys_print(Error, "usage: print_rig <.cmdl>");
+		return;
+	}
+	auto mod = GetAssets().find_sync<Model>(args.at(1));
+	if (!mod) {
+		sys_print(Error, "couldnt find model\n");
+		return;
+	}
+	if (!mod->get_skel()) {
+		sys_print(Error, "model has no skeleton\n");
+		return;
+	}
+
+
+}

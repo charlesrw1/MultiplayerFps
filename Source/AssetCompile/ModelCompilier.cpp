@@ -853,6 +853,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 			mdd.imports.push_back(imp);
 		}
 	}
+	mdd.override_fps = is->animations_set_fps;
 	if (is->bone_rename_dataclass.get()) {
 		auto ptr = is->bone_rename_dataclass.ptr->get_obj()->cast_to<BoneRenameContainer>();
 		if (ptr) {
@@ -860,6 +861,16 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 				const auto& str1 = ptr->remap.at(i);
 				const auto& str2 = ptr->remap.at(size_t(i+1));
 				mdd.bone_rename.insert({ str1,str2 });
+			}
+		}
+	}
+	if (is->bone_reparent.get()) {
+		auto ptr = is->bone_reparent.ptr->get_obj()->cast_to<BoneReparentContainer>();
+		if (ptr) {
+			for (int i = 0; i < ptr->remap.size() - 1; i += 2) {
+				const auto& str1 = ptr->remap.at(i);
+				const auto& str2 = ptr->remap.at(size_t(i + 1));
+				mdd.bone_reparent.insert({ str1,str2 });
 			}
 		}
 	}
@@ -1086,6 +1097,7 @@ void mark_used_bones_R(int this_index, const SkeletonCompileData* scd, std::vect
 }
 
 ConfigVar modcompile_print_pruned_bones("modcompile.print_pruned_bones", "0", CVAR_BOOL, "print bones that were pruned when a model compiles");
+ConfigVar modcompile_disable_pruning_bones("modcompile_disable_pruning_bones", "0", CVAR_BOOL,"");
 
 ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const SkeletonCompileData* scd, const ModelDefData& def)
 {
@@ -1094,7 +1106,8 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 	std::vector<bool> bone_is_referenced;
 
 	if (scd) {
-		bone_is_referenced.resize(scd->get_num_bones(), false);
+		const bool default_val = (modcompile_disable_pruning_bones.get_bool());
+		bone_is_referenced.resize(scd->get_num_bones(), default_val);
 
 		for (int i = 0; i < def.keepbones.size(); i++) {
 
@@ -1397,6 +1410,11 @@ struct FinalSkeletonOutput
 	glm::mat4 armature_root_transform;
 	std::vector<std::string> imported_models;
 
+	struct ReparentData {
+		int FINAL_index = 0;
+	};
+	std::vector<ReparentData> reparents;
+
 	bool does_sequence_already_exist(const std::string& name) const {
 		return find_sequence(name) != nullptr;
 	}
@@ -1430,7 +1448,7 @@ std::vector<std::string> get_imported_models(
 }
 
 
-std::vector<BoneData> get_final_bone_data(
+std::pair<std::vector<BoneData>,std::vector<FinalSkeletonOutput::ReparentData>> get_final_bone_data(
 	const std::vector<int>& FINAL_bone_to_LOAD_bone,
 	const std::vector<int>& LOAD_to_FINAL,
 
@@ -1439,15 +1457,49 @@ std::vector<BoneData> get_final_bone_data(
 {
 
 	std::vector<BoneData> out(FINAL_bone_to_LOAD_bone.size());
+	std::vector<FinalSkeletonOutput::ReparentData> reparents;
 	for (int i = 0; i < out.size(); i++) {
 		int index = FINAL_bone_to_LOAD_bone[i];
 		assert(index != -1);
 		out[i] = myskel->bones[index];
+		
 		if (myskel->bones[index].parent != -1) {
 			int FINAL_parent = LOAD_to_FINAL[myskel->bones[index].parent];
 			assert(FINAL_parent != -1);
 			out[i].parent = FINAL_parent;
 		}
+
+
+		{
+			auto find = data.bone_reparent.find(out[i].strname);
+			if (find != data.bone_reparent.end()) {
+				int parent_to_this = myskel->get_bone_for_name(find->second);
+				if (parent_to_this == -1) {
+					sys_print(Warning, "couldnt find bone for reparent %s\n", find->second.c_str());
+				}
+				else if (out[i].parent != -1) {
+					sys_print(Warning, "cant reparent, only parent to\n");
+				}
+				else {
+					sys_print(Debug, "reparent bone %s %s\n", out[i].strname.c_str(), find->second.c_str());
+					int LOAD_parent = parent_to_this;
+					// recalc matricies
+					auto& parent = myskel->bones.at(LOAD_parent);
+					glm::mat4 myworldspace = out[i].posematrix;	
+					auto parentinv = glm::inverse(glm::mat4(parent.posematrix));	// inverse of the parents world transform
+					glm::mat4 mylocalspace = parentinv * myworldspace;
+					out[i].localtransform = mylocalspace;
+					out[i].rot = glm::quat_cast(glm::mat4(mylocalspace));
+					out[i].parent = LOAD_to_FINAL.at(LOAD_parent);	
+
+					reparents.push_back({
+						i
+						});
+				}
+			}
+		}
+		
+
 
 		auto find = data.bone_rename.find(out[i].strname);
 		if (find != data.bone_rename.end()) {
@@ -1455,7 +1507,7 @@ std::vector<BoneData> get_final_bone_data(
 		}
 
 	}
-	return out;
+	return { out,reparents };
 }
 
 std::vector<int16_t> get_mirror_table(const SkeletonCompileData* myskel,
@@ -1619,11 +1671,6 @@ inline float lerp_between(float min, float max, float mid_val)
 	return (mid_val - min) / (max - min);
 }
 
-static glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
-{
-	return to * glm::inverse(from);
-}
-
 void ModelCompileHelper::append_animation_seq_to_list(
 	AnimationSourceToCompile source,
 	FinalSkeletonOutput* final_,
@@ -1644,7 +1691,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 
 	AnimationSeq out_seq;
 
-	const float fps = 30.0;
+	const float fps = data.override_fps;
 	out_seq.fps = fps;
 
 	int START_keyframe = 0;
@@ -1734,9 +1781,9 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
 				const int frame_w_crop = frame + START_keyframe;
 				const float t = frame_w_crop / fps;
-				ASSERT(t <= out_seq.duration);
-				glm::vec3 pos = get_pos_for_time(t);
-				write_out_to_outseq(&pos.x, 3, &out_seq);
+ASSERT(t <= out_seq.duration);
+glm::vec3 pos = get_pos_for_time(t);
+write_out_to_outseq(&pos.x, 3, &out_seq);
 			}
 			assert((out_seq.pose_data.size() - offsets.pos) / 3 == (out_seq.get_num_keyframes_inclusive()));
 		}
@@ -1776,7 +1823,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 				glm::quat rot = get_rot_for_time(t);
 				write_out_to_outseq(&rot.x, 4, &out_seq);
 			}
-			assert(( out_seq.pose_data.size() - offsets.rot)/4 == out_seq.get_num_keyframes_inclusive());
+			assert((out_seq.pose_data.size() - offsets.rot) / 4 == out_seq.get_num_keyframes_inclusive());
 		}
 
 		// SCALE
@@ -1813,7 +1860,7 @@ void ModelCompileHelper::append_animation_seq_to_list(
 				float uniform_scale = get_scale_for_time(t);
 				write_out_to_outseq(&uniform_scale, 1, &out_seq);
 			}
-			assert(( out_seq.pose_data.size()-offsets.scale) == out_seq.get_num_keyframes_inclusive());
+			assert((out_seq.pose_data.size() - offsets.scale) == out_seq.get_num_keyframes_inclusive());
 		}
 
 
@@ -1821,6 +1868,53 @@ void ModelCompileHelper::append_animation_seq_to_list(
 #undef CALC_TIME_INTERP
 #undef SET_HIGH_BIT
 	}
+
+	// do reparenting here
+	for (int i = 0; i < final_->reparents.size(); i++) {
+		auto& r = final_->reparents[i];
+		ASSERT(final_->bones[r.FINAL_index].parent != -1);
+
+		auto get_keyframe_matrix = [](AnimationSeq& out_seq, int FINAL_index, int frame) -> glm::mat4 {
+			auto keyframe = out_seq.get_keyframe(FINAL_index, frame, 0.0);
+			glm::mat4 local_matrix = glm::translate(glm::mat4(1), keyframe.pos);
+			local_matrix = local_matrix * glm::mat4_cast(keyframe.rot);
+			local_matrix = glm::scale(local_matrix, glm::vec3(keyframe.scale));
+			return local_matrix;
+		};
+		auto get_worldspace_keyframe = [&](FinalSkeletonOutput* final_, AnimationSeq & out_seq, int FINAL_index, int frame)->glm::mat4 {
+			int THEINDEX = FINAL_index;
+			glm::mat4 matrix = glm::mat4(1.f);
+			while (THEINDEX != -1) {
+				matrix = get_keyframe_matrix(out_seq, THEINDEX, frame) * matrix;
+
+				THEINDEX = final_->bones.at(THEINDEX).parent;
+			}
+			return matrix;
+		};
+
+		for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
+			const int myparent = final_->bones.at(r.FINAL_index).parent;
+			ASSERT(myparent != -1);
+
+			auto keyframe = out_seq.get_keyframe(r.FINAL_index, frame, 0.0);
+			
+			glm::mat4 worldspace = get_keyframe_matrix(out_seq, r.FINAL_index, frame);
+			glm::mat4 parent_worldspace = get_worldspace_keyframe(final_, out_seq, myparent, frame);
+			glm::mat4 newlocalspace = glm::inverse(parent_worldspace) * worldspace;
+
+			auto pos = out_seq.get_pos_write_ptr(r.FINAL_index, frame);
+			auto rot = out_seq.get_quat_write_ptr(r.FINAL_index, frame);
+			auto scale = out_seq.get_scale_write_ptr(r.FINAL_index, frame);
+			if(pos)
+				*pos = newlocalspace[3];
+			if(rot)
+				*rot = glm::normalize(glm::quat_cast(newlocalspace));
+			if(scale)
+				*scale = glm::length(newlocalspace[0]);
+
+		}
+	}
+
 
 #define IS_HIGH_BIT_SET(x) (x & (1u<<31u))
 #define CLEAR_HIGH_BIT(x) ( x & ~(1u<<31u) )
@@ -1903,12 +1997,15 @@ void ModelCompileHelper::append_animation_seq_to_list(
 
 		if (definition && definition->removeLienarVelocity) {
 
-			for (int frame = 0; frame < out_seq.get_num_keyframes_exclusive(); frame++) {
+			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
 				const int frame_w_crop = frame + START_keyframe;
-				const float t = frame_w_crop / fps;
+				const float t = frame / fps;
 				ASSERT(t <= out_seq.duration);
 				glm::vec3* pos0 = out_seq.get_pos_write_ptr(0/* root */, frame);
-				*pos0 -= t * average_linear_vec;
+				if (pos0)
+					*pos0 -= t * average_linear_vec;
+				else
+					sys_print(Warning, "removeLienarVelocity single frame\n");
 			}
 
 		}
@@ -1992,7 +2089,11 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 	const std::vector<ImportedSkeleton> imports = read_animation_imports(LOAD_bone_to_FINAL_bone, compile_data, data);
 	
 	FinalSkeletonOutput* final_out = new FinalSkeletonOutput;
-
+	{
+		auto res = get_final_bone_data(FINAL_bone_to_LOAD_bone, LOAD_bone_to_FINAL_bone, compile_data, data);
+		final_out->bones = res.first;
+		final_out->reparents = res.second;
+	}
 	final_out->armature_root_transform = compile_data->armature_root;
 
 	for (int i = 0; i < imports.size(); i++) {
@@ -2044,7 +2145,6 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 
 	// create final bones/masks/mirrors
 	final_out->mirror_table = get_mirror_table(compile_data, LOAD_bone_to_FINAL_bone, FINAL_bone_to_LOAD_bone.size(), data);
-	final_out->bones = get_final_bone_data(FINAL_bone_to_LOAD_bone,LOAD_bone_to_FINAL_bone, compile_data,data);
 	final_out->imported_models = get_imported_models(data);
 	final_out->masks = get_bone_masks(FINAL_bone_to_LOAD_bone, LOAD_bone_to_FINAL_bone, FINAL_bone_to_LOAD_bone.size(), data, compile_data);
 

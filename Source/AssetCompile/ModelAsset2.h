@@ -38,6 +38,11 @@ public:
 	REFLECT();
 	std::vector<std::string> remap;
 };
+NEWCLASS(BoneReparentContainer, ClassBase)
+public:
+	REFLECT();
+	std::vector<std::string> remap;
+};
 
 
 CLASS_H(AnimImportSettings, ClassBase)
@@ -72,7 +77,7 @@ public:
 			REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
 			REG_BOOL(removeLinearVelocity,PROP_DEFAULT,"0"),
 			REG_SOFT_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
-			REG_STDVECTOR(curves,PROP_SERIALIZE)
+			REG_STDVECTOR(curves,PROP_SERIALIZE),
 			//REG_STDVECTOR(events,PROP_SERIALIZE),
 		END_PROPS(AnimImportSettings)
 	}
@@ -99,6 +104,8 @@ public:
 	// this renames bones in this asset using this dataclass
 	// each entry in the array is "my_current_bone renamed_bone", with a space in between
 	AssetPtr<DataClass> bone_rename_dataclass;
+	AssetPtr<DataClass> bone_reparent;
+	float animations_set_fps = 30.0;
 
 	static const PropertyInfoList* get_props() {
 
@@ -117,6 +124,8 @@ public:
 			REG_ASSET_PTR(mirrorTableAsset, PROP_DEFAULT),
 			REG_STDVECTOR(additionalAnimationGlbFiles, PROP_DEFAULT),
 			REG_ASSET_PTR(bone_rename_dataclass,PROP_DEFAULT),
+			REG_ASSET_PTR(bone_reparent, PROP_DEFAULT),
+			REG_FLOAT(animations_set_fps, PROP_DEFAULT, "30.0"),
 			REG_STDVECTOR(animations, PROP_SERIALIZE),
 		END_PROPS(ModelImportSettings)
 	}

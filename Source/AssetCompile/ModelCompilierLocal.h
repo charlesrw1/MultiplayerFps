@@ -101,6 +101,7 @@ public:
 	bool merge_meshes_into_skeleton = false;
 	SkeletonLODDef skellod;
 	std::string armature_name;
+	std::unordered_map<std::string, std::string> bone_reparent;
 	std::unordered_map<std::string, std::string> bone_rename;
 	std::vector<std::string> keepbones;
 	std::unordered_map<std::string, RetargetBoneType> bone_retarget_type;
@@ -110,6 +111,7 @@ public:
 	};
 	std::vector<mirror> mirrored_bones;
 	std::vector< WeightlistDef> weightlists;
+	float override_fps = 30.0;
 
 	// PHYSICS
 	std::vector<PhysicsCollisionShapeDefLoad> physicsshapes;

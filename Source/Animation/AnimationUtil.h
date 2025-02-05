@@ -24,6 +24,11 @@ inline float MidLerp(float min, float max, float mid_val)
 {
 	return (mid_val - min) / (max - min);
 }
+inline glm::quat quat_delta(const glm::quat& from, const glm::quat& to)
+{
+	return to * glm::inverse(from);
+}
+
 
 struct BoneIndexRetargetMap;
 class AnimationSeq;

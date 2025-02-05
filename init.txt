@@ -75,4 +75,4 @@ RUN_TESTS
 
 g_draw_grid 1
 
-start_ed Map "mainMenuMap.tmap"
+start_ed AnimGraph "testcharacter_a.ag"

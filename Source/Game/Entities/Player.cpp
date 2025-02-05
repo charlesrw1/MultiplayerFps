@@ -883,8 +883,8 @@ void Player::on_foot_update()
 	 spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
 	 health = construct_sub_component<HealthComponent>("PlayerHealth");
 
-	 auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
-	 player_mesh->set_model(playerMod);
+	// auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
+	 //player_mesh->set_model(playerMod);
 	// player_mesh->set_animation_graph("ik_test.ag");
 	 player_mesh->set_is_visible(false);
 
