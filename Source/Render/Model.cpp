@@ -505,8 +505,6 @@ bool Model::load_internal()
 			}
 			MSkeleton::refed_clip rc;
 			rc.ptr = aseq;
-			rc.remap_idx = -1;
-			rc.skeleton_owns_clip = true;
 			skel->clips.insert({ std::move(name),rc });
 		}
 

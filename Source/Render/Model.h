@@ -125,7 +125,7 @@ public:
 			glm::vec3(bounding_sphere) + glm::vec3(bounding_sphere.w));
 	}
 
-	const MSkeleton* get_skel() const { return skel.get(); }
+	MSkeleton* get_skel() const { return skel.get(); }
 
 	const Submesh& get_part(int index) const { return parts[index]; }
 	int get_num_lods() const { return lods.size(); }

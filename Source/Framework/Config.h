@@ -119,7 +119,8 @@ public:
 	virtual void execute_file(Cmd_Execute_Mode mode, const char* path) = 0;
 	virtual void execute_buffer() = 0;
 	virtual void set_set_unknown_variables(bool b) = 0;
-	virtual void print_matches(const char* match) = 0;
+	// returns string of match if one match exists, otherwise null
+	virtual const char* print_matches(const char* match) = 0;
 };
 
 class Auto_Engine_Cmd

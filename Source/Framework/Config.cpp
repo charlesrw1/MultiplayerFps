@@ -292,7 +292,7 @@ static int classify_string(const char* s)
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
-	void print_matches(const char* match) {
+	const char* print_matches(const char* match) {
 		std::vector<const char*> matches;
 		VarManImpl* v = (VarManImpl*)VarMan::get();
 		for (auto& var : v->vars) {
@@ -304,14 +304,18 @@ public:
 			if (c.first.find(match) != std::string::npos)
 				matches.push_back(c.first.c_str());
 		}
+		if (matches.size() == 1)
+			return matches[0];
+
 		std::sort(matches.begin(), matches.end(), [](const char* a, const char* b)
 			{
 				return strcmp(a, b) < 0;
 			});
-		sys_print(Info,"\n\n");
+		sys_print(Info, ">");
 		for (auto m : matches) {
-			sys_print(Info, "- %s\n", m);
+			sys_print(Info, ". %s\n", m);
 		}
+		return nullptr;
 	}
 	void add_command(const char* name, Engine_Cmd_Function cmd) {
 

@@ -16,6 +16,9 @@
 #include "Game/SerializePtrHelpers.h"
 #include "Game/AssetPtrArrayMacro.h"
 #include "Game/AssetPtrMacro.h"
+#include "Framework/Reflection2.h"
+#include "MiscEditors/DataClass.h"
+#include "Game/SoftAssetPtr.h"
 
 template<>
 struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
@@ -27,6 +30,13 @@ struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
 		pi.flags = PROP_DEFAULT;
 		return pi;
 	}
+};
+
+
+NEWCLASS(BoneRenameContainer, ClassBase)
+public:
+	REFLECT();
+	std::vector<std::string> remap;
 };
 
 
@@ -84,6 +94,12 @@ public:
 	std::vector<std::string> additionalAnimationGlbFiles;	// additional glb files to source animations from (will retarget)
 	std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
 
+
+	// type=BoneRenameContainer
+	// this renames bones in this asset using this dataclass
+	// each entry in the array is "my_current_bone renamed_bone", with a space in between
+	AssetPtr<DataClass> bone_rename_dataclass;
+
 	static const PropertyInfoList* get_props() {
 
 		MAKE_VECTORCALLBACK_ATOM(float, lodScreenSpaceSizes);
@@ -100,6 +116,7 @@ public:
 			REG_STDVECTOR(keepBones, PROP_DEFAULT),
 			REG_ASSET_PTR(mirrorTableAsset, PROP_DEFAULT),
 			REG_STDVECTOR(additionalAnimationGlbFiles, PROP_DEFAULT),
+			REG_ASSET_PTR(bone_rename_dataclass,PROP_DEFAULT),
 			REG_STDVECTOR(animations, PROP_SERIALIZE),
 		END_PROPS(ModelImportSettings)
 	}

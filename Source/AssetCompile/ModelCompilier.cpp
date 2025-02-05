@@ -288,7 +288,7 @@ struct ProcessMeshOutput
 };
 struct AnimationSourceToCompile
 {
-	std::vector<int>* remap = nullptr;
+	const std::vector<int>* remap = nullptr;
 	const SkeletonCompileData* skel = nullptr;
 	int animation_souce_index = 0;
 	bool should_retarget_this = false;
@@ -853,6 +853,16 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 			mdd.imports.push_back(imp);
 		}
 	}
+	if (is->bone_rename_dataclass.get()) {
+		auto ptr = is->bone_rename_dataclass.ptr->get_obj()->cast_to<BoneRenameContainer>();
+		if (ptr) {
+			for (int i = 0; i < ptr->remap.size() - 1; i += 2) {
+				const auto& str1 = ptr->remap.at(i);
+				const auto& str2 = ptr->remap.at(size_t(i+1));
+				mdd.bone_rename.insert({ str1,str2 });
+			}
+		}
+	}
 
 	for (int i = 0; i < is->animations.size(); i++) {
 		auto str = is->animations[i].clipName;
@@ -1302,7 +1312,7 @@ static std::vector<int> create_remap_table(const SkeletonCompileData* source, co
 {
 	std::vector<int> remap;
 	remap.resize(target->get_num_bones(), -1);
-
+	// n^2
 	for (int i = 0; i < target->get_num_bones(); i++) {
 		int index_in_source = source->get_bone_for_name(target->bones[i].strname);
 		if (index_in_source == -1)
@@ -1369,6 +1379,7 @@ std::vector<ImportedSkeleton> read_animation_imports(
 					is.remap_from_LOAD_to_THIS = create_remap_table(is.skeleton.get(), compile_data);
 					imports.push_back(std::move(is));
 				}
+
 			}
 		}
 	}
@@ -1418,12 +1429,15 @@ std::vector<std::string> get_imported_models(
 	return strs;
 }
 
+
 std::vector<BoneData> get_final_bone_data(
 	const std::vector<int>& FINAL_bone_to_LOAD_bone,
 	const std::vector<int>& LOAD_to_FINAL,
 
-	const SkeletonCompileData* myskel)
+	const SkeletonCompileData* myskel,
+	const ModelDefData& data)
 {
+
 	std::vector<BoneData> out(FINAL_bone_to_LOAD_bone.size());
 	for (int i = 0; i < out.size(); i++) {
 		int index = FINAL_bone_to_LOAD_bone[i];
@@ -1434,6 +1448,12 @@ std::vector<BoneData> get_final_bone_data(
 			assert(FINAL_parent != -1);
 			out[i].parent = FINAL_parent;
 		}
+
+		auto find = data.bone_rename.find(out[i].strname);
+		if (find != data.bone_rename.end()) {
+			out[i].strname = find->second;
+		}
+
 	}
 	return out;
 }
@@ -1969,7 +1989,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 	if (!compile_data)
 		return nullptr;
 
-	std::vector<ImportedSkeleton> imports = read_animation_imports(LOAD_bone_to_FINAL_bone, compile_data, data);
+	const std::vector<ImportedSkeleton> imports = read_animation_imports(LOAD_bone_to_FINAL_bone, compile_data, data);
 	
 	FinalSkeletonOutput* final_out = new FinalSkeletonOutput;
 
@@ -2024,7 +2044,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 
 	// create final bones/masks/mirrors
 	final_out->mirror_table = get_mirror_table(compile_data, LOAD_bone_to_FINAL_bone, FINAL_bone_to_LOAD_bone.size(), data);
-	final_out->bones = get_final_bone_data(FINAL_bone_to_LOAD_bone,LOAD_bone_to_FINAL_bone, compile_data);
+	final_out->bones = get_final_bone_data(FINAL_bone_to_LOAD_bone,LOAD_bone_to_FINAL_bone, compile_data,data);
 	final_out->imported_models = get_imported_models(data);
 	final_out->masks = get_bone_masks(FINAL_bone_to_LOAD_bone, LOAD_bone_to_FINAL_bone, FINAL_bone_to_LOAD_bone.size(), data, compile_data);
 
@@ -2646,7 +2666,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 		post_traverse.meshout.material_is_used
 	);
 
-	unique_ptr<FinalSkeletonOutput> final_skeleton = ModelCompileHelper::create_final_skeleton(
+	unique_ptr<const FinalSkeletonOutput> final_skeleton = ModelCompileHelper::create_final_skeleton(
 		finalpath,
 		post_traverse.meshout.LOAD_bone_to_FINAL_bone, 
 		post_traverse.meshout.FINAL_bone_to_LOAD_bone,

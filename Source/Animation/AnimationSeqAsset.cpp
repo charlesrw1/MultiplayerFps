@@ -69,8 +69,7 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 
 	srcModel = GetAssets().find_assetptr_unsafe<Model>(modName);
 	if (srcModel && srcModel->get_skel()) {
-		int dummy{};
-		seq = srcModel->get_skel()->find_clip(animName, dummy);
+		seq = srcModel->get_skel()->find_clip(animName);
 
 #ifdef EDITOR_BUILD
 		srcModel->reload_dependents.insert(this);

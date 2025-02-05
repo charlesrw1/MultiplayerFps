@@ -465,8 +465,7 @@ bool AnimatorInstance::play_animation_in_slot(
 	if (!model || !cfg)
 		return false;
 
-	int remap = -1;
-	auto seq = model->get_skel()->find_clip(animation, remap);
+	auto seq = model->get_skel()->find_clip(animation);
 	
 	return play_animation_in_slot(seq, slot, play_speed, start_pos);
 }

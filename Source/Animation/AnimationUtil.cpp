@@ -385,14 +385,14 @@ const AnimationEvent* AnimationSeq::get_events_for_keyframe(int keyframe, int* c
 }
 
 #include "Animation/SkeletonData.h"
-void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const std::vector<int16_t>* remap_indicies, Pose& outpose)
+void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const BoneIndexRetargetMap* remap_indicies, Pose& outpose)
 {
 	const int count = skeleton->get_num_bones();
 	int keyframe = clip->get_frame_for_time(time);
 	float lerp_amt = MidLerp(clip->get_time_of_keyframe(keyframe), clip->get_time_of_keyframe(keyframe + 1), time);
 
 	for (int dest_idx = 0; dest_idx < count; dest_idx++) {
-		int src_idx = (remap_indicies) ? (*remap_indicies)[dest_idx] : dest_idx;
+		int src_idx = (remap_indicies) ? (remap_indicies->my_skeleton_to_who)[dest_idx] : dest_idx;
 
 		if (src_idx == -1) {
 			outpose.pos[dest_idx] = skeleton->get_bone_local_transform(dest_idx)[3];
@@ -406,6 +406,27 @@ void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, fl
 		outpose.pos[dest_idx] = transform.pos;
 		outpose.q[dest_idx] = transform.rot;
 		outpose.scale[dest_idx] = transform.scale;
+
+	}
+	if (remap_indicies) {
+		for (int dest_idx = 0; dest_idx < count; dest_idx++) {
+			int src_idx = (remap_indicies) ? (remap_indicies->my_skeleton_to_who)[dest_idx] : dest_idx;
+			if (src_idx == -1)
+				continue;
+
+			auto& bone = skeleton->get_all_bones()[dest_idx];
+			if (bone.retarget_type == RetargetBoneType::FromAnimation) {
+				// do nothing
+			}
+			else if (bone.retarget_type == RetargetBoneType::FromAnimationScaled) {
+				float scale = glm::length(skeleton->get_bone_local_transform(dest_idx)[3]);
+				scale /= glm::length(remap_indicies->who->get_bone_local_transform(src_idx)[3]);
+				outpose.pos[dest_idx] *= scale;
+			}
+			else if (bone.retarget_type == RetargetBoneType::FromTargetBindPose) {
+				outpose.pos[dest_idx] = skeleton->get_bone_local_transform(dest_idx)[3];
+			}
+		}
 	}
 }
 

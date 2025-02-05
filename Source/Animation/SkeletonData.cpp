@@ -1,17 +1,46 @@
 #include "SkeletonData.h"
 MSkeleton::~MSkeleton() {
 	for (auto clip : clips) {
-		if (clip.second.skeleton_owns_clip)
-			delete clip.second.ptr;
+		delete clip.second.ptr;
 	}
 }
-const AnimationSeq* MSkeleton::find_clip(const std::string& name, int& remap_index) const
+const AnimationSeq* MSkeleton::find_clip(const std::string& name) const
 {
-	remap_index = -1;
 	auto findthis = clips.find(name);
 	if (findthis != clips.end()) {
-		remap_index = findthis->second.remap_idx;
 		return findthis->second.ptr;
 	}
 	return nullptr;
+}
+const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
+{
+	if (this == other)
+		return nullptr;
+
+	for (auto& remap : remaps) {
+		if (remap->who == other)
+			return remap.get();
+	}
+	// have to create remap now, lazily
+	auto remap = std::make_unique<BoneIndexRetargetMap>();
+	remap->who = other;
+	remap->my_skeleton_to_who.resize(bone_dat.size(), -1/* invalid */);
+
+	// n^2 :(
+	for (int i = 0; i < other->bone_dat.size(); i++) {
+		auto& otherb = other->bone_dat[i];
+		int j = 0;
+		for (; j < bone_dat.size(); j++) {
+			auto& myb = bone_dat[j];
+			if (myb.name == otherb.name) {
+				break;
+			}
+		}
+		if (j != bone_dat.size()) {
+			remap->my_skeleton_to_who.at(j) = i;
+		}
+	}
+
+	remaps.push_back(std::move(remap));
+	return remaps.back().get();
 }

@@ -25,9 +25,10 @@ inline float MidLerp(float min, float max, float mid_val)
 	return (mid_val - min) / (max - min);
 }
 
+struct BoneIndexRetargetMap;
 class AnimationSeq;
 class MSkeleton;
-void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const std::vector<int16_t>* remap_indicies, Pose& outpose);
+void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const BoneIndexRetargetMap* remap_indicies, Pose& outpose);
 void util_meshspace_to_localspace(const glm::mat4* mesh, const MSkeleton* mod, Pose* out);
 void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_matricies, const MSkeleton* skel);
 void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const Model* model);

@@ -105,7 +105,7 @@ public:
 	uint16_t tick = 0;
 
 
-	const MSkeleton* get_skeleton() const {
+	MSkeleton* get_skeleton() const {
 		return model->get_skel();
 	}
 	//
@@ -310,7 +310,7 @@ struct Clip_Node_RT : Rt_Vars_Base
 	float anim_time = 0.0;
 	bool stopped_flag = false;
 	const AnimationSeq* clip = nullptr;
-	int remap_index = -1;
+	const BoneIndexRetargetMap* remap = nullptr;
 };
 
 NEWENUM(rootmotion_setting, uint8_t)
@@ -332,8 +332,12 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 		construct_runtime_node(ctx);
 		RT_TYPE* rt = get_rt(ctx);
 
-		rt->clip = (Clip.ptr) ? Clip.ptr->seq : nullptr;// ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
-		rt->remap_index = -1;
+		rt->clip = nullptr;
+		rt->remap = nullptr;
+		if (Clip) {
+			rt->clip = Clip.ptr->seq;
+			rt->remap = ctx.get_skeleton()->get_remap(Clip.ptr->srcModel->get_skel());
+		}
 		if (rt->clip) {
 			const int root_index = 0;
 			rt->root_pos_first_frame = rt->clip->get_keyframe(0, 0, 0.0).pos;
@@ -405,14 +409,15 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 struct Frame_Evaluate_RT : public Rt_Vars_Base
 {
 	const AnimationSeq* clip = nullptr;
-	int remap_index = -1;
+	const BoneIndexRetargetMap* remap = nullptr;
 };
 NODECFG_HEADER(Frame_Evaluate_CFG, Frame_Evaluate_RT)
 	virtual void construct(NodeRt_Ctx& ctx) const {
 		construct_runtime_node(ctx);
 		RT_TYPE* rt = get_rt(ctx);
 	
-		rt->clip = ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
+		rt->clip = nullptr;// ctx.get_skeleton()->find_clip(clip_name, rt->remap_index);
+
 	}
 	
 	// Inherited via At_Node
@@ -595,11 +600,15 @@ class NodeRt_Ctx;
 
 struct BlendSpace2d_RT : public Rt_Vars_Base
 {
+	static const int MAX_CLIPS = 9;
 	glm::vec2 blend_weights = glm::vec2(0.f);
-	float current_times[9];
+	float current_times[MAX_CLIPS];
+	const BoneIndexRetargetMap* retargets[MAX_CLIPS];
 	BlendSpace2d_RT() {
-		for (int i = 0; i < 9; i++)
+		for (int i = 0; i < MAX_CLIPS; i++) {
+			retargets[i] = nullptr;
 			current_times[i] = 0.f;
+		}
 	}
 };
 
@@ -633,6 +642,17 @@ NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 	StringName hashed_syncgroupname;
 	std::string SyncGroupName;
 	sync_opt SyncOption = sync_opt::Default;
+
+	virtual void construct(NodeRt_Ctx& ctx) const {
+		construct_runtime_node(ctx);
+		RT_TYPE* rt = get_rt(ctx);
+		ASSERT(verticies.size() <= BlendSpace2d_RT::MAX_CLIPS);
+		for (int i = 0; i < verticies.size(); i++) {
+			if (verticies[i].seq) {
+				rt->retargets[i] = ctx.get_skeleton()->get_remap(verticies[i].seq.ptr->srcModel->get_skel());
+			}
+		}
+	}
 
 	// Inherited via At_Node
 	virtual bool get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const override;

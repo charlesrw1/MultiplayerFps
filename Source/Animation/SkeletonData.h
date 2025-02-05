@@ -76,15 +76,13 @@ private:
 
 
 // simple index remapping of bones
-
 class MSkeleton;
-struct Bone_Index_Remap
+struct BoneIndexRetargetMap
 {
 	const MSkeleton* who = nullptr;
-	// size = other.bones.size() 
-	std::vector<int16_t> other_to_this;
+	// size = bones.size() 
+	std::vector<int16_t> my_skeleton_to_who;	
 
-	bool skeleton_data_is_equivlent() const { return other_to_this.empty(); }
 };
 
 
@@ -153,11 +151,10 @@ public:
 	const glm::quat& get_bone_local_rotation(int index) const { return bone_dat[index].rot; }
 	const glm::mat4x3& get_inv_posematrix(int index) const { return bone_dat[index].invposematrix; }
 
-	const AnimationSeq* find_clip(const std::string& name, int& remap_index) const;
+	const AnimationSeq* find_clip(const std::string& name) const;
 
-	const Bone_Index_Remap* get_remap(int index) const {
-		return &remaps[index];
-	}
+	const BoneIndexRetargetMap* get_remap(const MSkeleton* other);
+
 	const BonePoseMask* find_mask(StringName name) const {
 		for (int i = 0; i < masks.size(); i++) {
 			if (masks[i].idname == name)
@@ -171,23 +168,15 @@ public:
 private:
 
 	std::vector<BonePoseMask> masks;
-	std::vector<Bone_Index_Remap> remaps;
+	std::vector<std::unique_ptr<BoneIndexRetargetMap>> remaps;
 	std::vector<BoneData> bone_dat;
 	std::vector<int16_t> mirroring_table;
 
+
 	struct refed_clip {
 		AnimationSeq* ptr = nullptr;
-		int16_t remap_idx = -1;
-		bool skeleton_owns_clip = false;
 	};
 	std::unordered_map<std::string, refed_clip> clips;
-
-	struct imported_model {
-		const Model* model_with_set = nullptr;
-		int remap_index_on_skeleton = -1;
-		bool has_remap() const { return remap_index_on_skeleton != -1; }
-	};
-	std::vector<imported_model> imports;
 
 	friend class Animation_Tree_Manager;
 	friend class ModelCompileHelper;

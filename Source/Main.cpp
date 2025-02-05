@@ -141,6 +141,7 @@ private:
 class Debug_Console
 {
 public:
+	static const int INPUT_BUFFER_SIZE = 256;
 	Debug_Console() {
 		memset(input_buffer, 0, sizeof input_buffer);
 	}
@@ -154,7 +155,7 @@ public:
 	bool auto_scroll = true;
 	bool scroll_to_bottom = false;
 	bool set_keyboard_focus = false;
-	char input_buffer[256];
+	char input_buffer[INPUT_BUFFER_SIZE];
 };
 static Debug_Console dbg_console;
 
@@ -1785,8 +1786,12 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 		}
 	}
 	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
-		Cmd_Manager::get()->print_matches(console->input_buffer);
+		const char* match = Cmd_Manager::get()->print_matches(console->input_buffer);
 		console->scroll_to_bottom = true;
+		if (match) {
+			data->DeleteChars(0, data->BufTextLen);
+			data->InsertChars(0, match);
+		}
 	}
 
 	return 0;

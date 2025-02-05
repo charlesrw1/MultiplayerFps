@@ -100,16 +100,15 @@ bool Frame_Evaluate_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) co
 		if (frame < 0) frame = 0;
 		else if (frame >= clip->duration) frame = clip->duration - 0.000001;
 	}
-	const std::vector<int16_t>* indicies = nullptr;
-	if (rt->remap_index != -1)
-		indicies = &ctx.get_skeleton()->get_remap(rt->remap_index)->other_to_this;
-	util_calc_rotations(ctx.get_skeleton(), clip, frame, indicies, *pose.pose);
+
+
+	util_calc_rotations(ctx.get_skeleton(), clip, frame, nullptr/*fixme*/, *pose.pose);
 
 	return true;
 }
 
 static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const AnimationSeq* clip, 
-	bool has_sync_group, StringName hashed_syncgroupname, sync_opt SyncOption, bool loop, int remap_index,
+	bool has_sync_group, StringName hashed_syncgroupname, sync_opt SyncOption, bool loop, const BoneIndexRetargetMap* remap,
 	float speed, float& anim_time, bool& stopped_flag, const Node_CFG* owner)
 {
 	// synced update
@@ -139,11 +138,8 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 
 			sync.write_to_update_time(SyncOption, 0.5/*TODO*/, owner, Percentage(anim_time, clip->duration));
 
-			const std::vector<int16_t>* indicies = nullptr;
-			if (remap_index != -1)
-				indicies = &ctx.get_skeleton()->get_remap(remap_index)->other_to_this;
-
-			util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
+	
+			util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *pose.pose);
 		}
 	}
 	// unsynced update
@@ -160,12 +156,7 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 				stopped_flag = true;
 			}
 		}
-
-		const std::vector<int16_t>* indicies = nullptr;
-		if (remap_index != -1)
-			indicies = &ctx.get_skeleton()->get_remap(remap_index)->other_to_this;
-
-		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, indicies, *pose.pose);
+		util_calc_rotations(ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *pose.pose);
 	}
 }
 
@@ -197,7 +188,7 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 	*/
 
 	get_clip_pose_shared(
-		ctx,pose,clip,has_sync_group(),hashed_syncgroupname,SyncOption,loop,rt->remap_index,speed,rt->anim_time,rt->stopped_flag,this);
+		ctx,pose,clip,has_sync_group(),hashed_syncgroupname,SyncOption,loop,rt->remap,speed,rt->anim_time,rt->stopped_flag,this);
 
 	const int root_index = 0;
 	for (int i = 0; i < 3; i++) {
@@ -233,7 +224,7 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 			 // set to first or last pose
 			 bool dummystopflag = false;
 			 int index = (i == 0) ? 0 : verticies.size()-1;
-			 get_clip_pose_shared(ctx, pose, verticies[index].seq.ptr->seq, true, hashed_syncgroupname, SyncOption, true, -1, 1.f, rt->current_times[index], dummystopflag, this);
+			 get_clip_pose_shared(ctx, pose, verticies[index].seq.ptr->seq, true, hashed_syncgroupname, SyncOption, true,rt->retargets[index], 1.f, rt->current_times[index], dummystopflag, this);
 			 if (is_additive_blend_space) {
 
 			 }
