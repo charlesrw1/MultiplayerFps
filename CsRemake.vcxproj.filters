@@ -505,6 +505,7 @@
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
+    <ClInclude Include="Source\Game\TP\TPGame.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -633,9 +634,6 @@
     </ClCompile>
     <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp">
       <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Sequencer.cpp">
-      <Filter>Source\Framework\Editor</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp">
       <Filter>Source\Game</Filter>

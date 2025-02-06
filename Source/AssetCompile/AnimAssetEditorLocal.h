@@ -16,11 +16,7 @@
 class Model;
 
 
-class EventTimelineSequencer : public SequencerImgui
-{
-public:
-	void context_menu_callback() override;
-};
+
 class EventSequenceItem : public SequencerEditorItem
 {
 public:
@@ -49,7 +45,6 @@ public:
 
 
 	CurveEditorImgui curveedit;
-	EventTimelineSequencer seqimgui;
 	PropertyGrid eventdetails;
 	float CURRENT_TIME = 0.0;
 };

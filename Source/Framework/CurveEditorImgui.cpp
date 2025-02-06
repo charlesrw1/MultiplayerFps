@@ -29,6 +29,12 @@ static void draw_rectangle_rotated(ImVec2 max, ImVec2 min, ImColor color)
     draw_list->AddLine(ImVec2(center.x, min.y), ImVec2(max.x, center.y), COLOR_WHITE.to_uint(), 1.f);
 }
 
+bool track_overlaps(float start, float end, float s2, float end2)
+{
+    return start <= end2 && end >= s2;
+}
+
+
 glm::vec2 bezier_evaluate(float t, const glm::vec2 p0, const glm::vec2& p1, const glm::vec2& p2, const glm::vec2& p3)
 {
     auto a = (1 - t) * (1 - t) * (1 - t) * p0;
@@ -53,7 +59,6 @@ int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
 
 void CurveEditorImgui::draw_editor_space()
 {
-
     auto drawlist = ImGui::GetWindowDrawList();
     const Color32 background = { 36, 36, 36 };
     const Color32 edges = { 0, 0, 0, 128 };
@@ -150,6 +155,17 @@ void CurveEditorImgui::draw_editor_space()
         }
     }
 
+    // stop dragging if mouse isnt down
+    if (is_dragging_selected && !ImGui::GetIO().MouseDown[0]) {
+        dragged_point_index = -1;
+        dragged_point_type = 0;
+        is_dragging_selected = false;
+
+        sys_print(Debug, "stopped dragging\n");
+    }
+
+    const bool can_start_dragging = !is_dragging_selected && !dragging_scrubber;
+
     // draw/update points
     for (int curve_index = 0; curve_index < curves.size(); curve_index++) {
         
@@ -159,7 +175,7 @@ void CurveEditorImgui::draw_editor_space()
         ImU32 curvecol = 0;
         {
             auto color = curves[curve_index].color;
-            if (curve_index != selected_curve)
+            if (!is_curve_selected(curve_index))
                 color.a = 100;
             curvecol = color.to_uint();
         }
@@ -211,13 +227,6 @@ void CurveEditorImgui::draw_editor_space()
             drawlist->AddLine(ss_start, ss_end, curvecol);
         }
 
-        // stop dragging if mouse isnt down
-        if (dragging_point && !ImGui::GetIO().MouseDown[0]) {
-            dragged_point_index = -1;
-            dragged_point_type = 0;
-            dragging_point = false;
-        }
-
         const float POINT_RADIUS_SS = 4;
         const float POINT_SELECTION_RADIUS = 10;
         for (int i = 0; i < points.size(); i++) {
@@ -231,19 +240,19 @@ void CurveEditorImgui::draw_editor_space()
             ImVec2 max_sel = ss_point + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
 
             bool draw_tooltip = false;
-            if (i == dragged_point_index && selected_curve == curve_index)
+            if (is_dragging_selected && i == dragged_point_index &&is_curve_selected(curve_index))
                 draw_tooltip = true;
             if (ImRect(min_sel, max_sel).Contains(ImGui::GetMousePos())) {
                 if (dragged_point_index == -1)
                     draw_tooltip = true;
 
-                if (!dragging_point&&!dragging_scrubber&&ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
+                if (can_start_dragging &&ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
                     // set curve
                     set_selected_curve(curve_index);
 
                     dragged_point_index = i;
                     dragged_point_type = 0;  // point type
-                    dragging_point = true;
+                    is_dragging_selected = true;
                 }
 
                 if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
@@ -251,38 +260,31 @@ void CurveEditorImgui::draw_editor_space()
                     set_selected_curve(curve_index);
 
                     ImGui::OpenPopup("point_popup");
-                    point_index_for_popup = i;
+                    dragged_point_index = i;
                 }
             }
-            const bool draw_tangents = selected_curve == curve_index && (point.type == CurvePointType::SplitTangents || point.type == CurvePointType::Aligned);
+            const bool draw_tangents = is_curve_selected(curve_index) && (point.type == CurvePointType::SplitTangents || point.type == CurvePointType::Aligned);
             if (draw_tangents) {
                 auto tan_point_ss = grid_to_screenspace(ImVec2(points[i].time + points[i].tangent0.x, points[i].value + points[i].tangent0.y));
                 ImVec2 min_sel_tan = tan_point_ss - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
                 ImVec2 max_sel_tan = tan_point_ss + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
 
-                if (!dragging_point&&!dragging_scrubber && ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
-
-                    if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
-                        set_selected_curve(curve_index);
-                        dragged_point_index = i;
-                        dragged_point_type = 1;  // tangent0 type
-                        dragging_point = true;
+                auto tangent_select = [&](int point_type) {
+                    if (can_start_dragging && ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
+                        if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
+                            set_selected_curve(curve_index);
+                            dragged_point_index = i;
+                            dragged_point_type = point_type; 
+                            is_dragging_selected = true;
+                        }
                     }
-                }
+                };
+                tangent_select(1/* tangent 0*/);
 
                 tan_point_ss = grid_to_screenspace(ImVec2(points[i].time + points[i].tangent1.x, points[i].value + points[i].tangent1.y));
                 min_sel_tan = tan_point_ss - ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
                 max_sel_tan = tan_point_ss + ImVec2(POINT_SELECTION_RADIUS, POINT_SELECTION_RADIUS);
-
-                if (!dragging_point && !dragging_scrubber&&ImRect(min_sel_tan, max_sel_tan).Contains(ImGui::GetMousePos())) {
-
-                    if (ImGui::GetIO().MouseDown[0] && ImGui::IsWindowFocused()) {
-                        set_selected_curve(curve_index);
-                        dragged_point_index = i;
-                        dragged_point_type = 2;  // tangent1 type
-                        dragging_point = true;
-                    }
-                }
+                tangent_select(2/* tangent 1*/);
             }
 
             if (draw_tooltip) {
@@ -307,117 +309,256 @@ void CurveEditorImgui::draw_editor_space()
 
         }
     }
+
+    // draw/update events
+    
+    auto draw_event = [&](int ITEM_INDEX) -> bool {
+        const float EVENT_ITEM_HEIGHT = 20.0;
+
+        auto item = events[ITEM_INDEX].get();
+        Color32 color = item->color;
+
+        // x coord is in grid space, y is in screen space
+        float x_start_ss = grid_to_screenspace(ImVec2(item->time_start, 0)).x;
+        float x_end_ss = grid_to_screenspace(ImVec2(item->time_end, 0)).x;
+
+        float y_start_ss = grid_to_screenspace(ImVec2(0,item->y_coord)).y;
+        float y_end_ss = y_start_ss + EVENT_ITEM_HEIGHT;
+
+        if (item->instant_item) {
+            auto size = ImGui::CalcTextSize(item->get_name().c_str());
+            x_end_ss = x_start_ss + size.x + 8.0;
+        }
+
+        Color32 rect_color = color;
+        rect_color.a = 128;
+        if (is_event_selected(ITEM_INDEX))
+            rect_color = { 252, 186, 3, 200 };
+
+        drawlist->AddRectFilled(ImVec2(x_start_ss, y_start_ss), ImVec2(x_end_ss, y_end_ss), rect_color.to_uint(), 2.0);
+
+
+        bool return_hovered = false;
+        {
+            // check draggables
+            const float HANDLE_SELECT_RADIUS = 8;
+            const float HANDLE_RADIUS = 4;
+            const ImVec2 HANDLE_RADIUS_V = ImVec2(HANDLE_RADIUS, HANDLE_RADIUS);
+
+            const ImVec2 HANDLE_SELECT_RADIUS_V = ImVec2(HANDLE_SELECT_RADIUS, HANDLE_SELECT_RADIUS);
+            ImVec2 lefthandle_c = ImVec2(x_start_ss, y_start_ss + EVENT_ITEM_HEIGHT * 0.5);
+
+            if (!is_dragging_selected &&
+                ImRect(lefthandle_c - HANDLE_SELECT_RADIUS_V, lefthandle_c + HANDLE_SELECT_RADIUS_V).Contains(ImGui::GetMousePos())
+                )
+            {
+                if (ImGui::GetIO().MouseClicked[0]) {
+                    set_selected_event(ITEM_INDEX, true);
+                }
+            }
+            {
+                const bool is_select = is_dragging_selected && is_event_selected(ITEM_INDEX) && !moving_right_side;
+                draw_rectangle_rotated(lefthandle_c + HANDLE_RADIUS_V, lefthandle_c - HANDLE_RADIUS_V, is_select ? COLOR_WHITE.to_uint() : color.to_uint());
+            }
+
+            if (!item->instant_item) {
+                ImVec2 righthandle_c = ImVec2(x_end_ss, y_start_ss + EVENT_ITEM_HEIGHT * 0.5);
+                if (!is_dragging_selected &&
+                    ImRect(righthandle_c - HANDLE_SELECT_RADIUS_V, righthandle_c + HANDLE_SELECT_RADIUS_V).Contains(ImGui::GetMousePos())
+                    )
+                {
+                    if (ImGui::GetIO().MouseClicked[0]) {
+                        set_selected_event(ITEM_INDEX, false);
+                    }
+                }
+                const bool is_select = is_dragging_selected && is_event_selected(ITEM_INDEX) && moving_right_side;
+                draw_rectangle_rotated(righthandle_c + HANDLE_RADIUS_V, righthandle_c - HANDLE_RADIUS_V, is_select ? COLOR_WHITE.to_uint() : color.to_uint());
+            }
+
+            if (!is_dragging_selected && ImRect(ImVec2(x_start_ss, y_start_ss), ImVec2(x_end_ss, y_end_ss)).Contains(ImGui::GetMousePos())) {
+                if (ImGui::GetIO().MouseClicked[0]) {
+                    set_selected_event(ITEM_INDEX, true);
+                    is_dragging_selected = false;   // FALSE
+                }
+                return_hovered = true;
+                if (ImGui::GetIO().MouseClicked[1] && ImGui::IsWindowFocused()) {
+                    set_selected_event(ITEM_INDEX, true);
+                    ImGui::OpenPopup("item_popup");
+                }
+            }
+
+            drawlist->AddText(ImVec2(x_start_ss + 6.0, y_start_ss + 1.0), COLOR_WHITE.to_uint(), item->get_name().c_str());
+
+        }
+
+        return return_hovered;
+    };
+
+
+    bool is_any_event_hovered = false;
+    if (drawing_events) {
+        for (int i = 0; i < events.size(); i++) {
+            is_any_event_hovered |= draw_event(i);
+        }
+    }
+
+
+    if (ImGui::BeginPopup("item_popup")) {
+        if (!is_selected_event_valid()) {
+            sys_print(Warning, "item_popup invalid item\n");
+            set_selected_event(-1, true);
+            ImGui::CloseCurrentPopup();
+        }
+        else {
+            if (ImGui::Button("Delete")) {
+                events.erase(events.begin() + selected_curve_or_event); // calls destructor
+                selected_curve_or_event = -1;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
+
+
     if (ImGui::BeginPopup("point_popup")) {
-        if (selected_curve == -1 || selected_curve >= curves.size()) {
+ 
+        if (!is_selected_curve_valid()) {
             sys_print(Warning, "selected_curve == -1 or invalid in point_popup\n");
             set_selected_curve(-1);
             ImGui::CloseCurrentPopup();
         }
-        else if (point_index_for_popup < 0 || point_index_for_popup >= curves[selected_curve].points.size()) {
+        else if (!is_selected_point_valid()) {
             sys_print(Warning, "point_index_for_popup invalid\n");
-            point_index_for_popup = -1;
+            dragged_point_index = -1;
             ImGui::CloseCurrentPopup();
         }
         else {
-            auto& points = curves[selected_curve].points;
-            auto enum_ =  EnumTrait<CurvePointType>::StaticType.find_for_value((int)points[point_index_for_popup].type);
+            auto& points = curves.at(selected_curve_or_event).points;
+            auto enum_ =  EnumTrait<CurvePointType>::StaticType.find_for_value((int)points.at(dragged_point_index).type);
             ASSERT(enum_);
 
 
             bool close_the_popup = false;
             if (ImGui::BeginCombo("##type", enum_->name)) {
                 for (auto& enum_ : EnumTrait<CurvePointType>::StaticType) {
-                    bool selected = enum_.value == (int)points[point_index_for_popup].type;
+                    bool selected = enum_.value == (int)points[dragged_point_index].type;
                     if (ImGui::Selectable(enum_.name, &selected)) {
-                        points[point_index_for_popup].type = CurvePointType(enum_.value);
+                        points[dragged_point_index].type = CurvePointType(enum_.value);
                         close_the_popup = true;
                     }
                 }
                 ImGui::EndCombo();
             }
             if (ImGui::Button("Delete point")) {
-                points.erase(points.begin() + point_index_for_popup);
+                points.erase(points.begin() + dragged_point_index);
                 close_the_popup = true;
             }
 
             if (close_the_popup) {
-                point_index_for_popup = -1;
+                dragged_point_index = -1;
                 ImGui::CloseCurrentPopup();
             }
 
         }
         ImGui::EndPopup();
     }
-    else
-        point_index_for_popup = -1;
 
-    if (dragging_point) {
-        auto mousepos = ImGui::GetMousePos();
-        auto gridspace = screenspace_to_grid(mousepos);
-        if (selected_curve == -1 || selected_curve >= curves.size()) {
-            sys_print(Warning, "dragging_point: selected_curve invalid\n");
-            set_selected_curve(-1);
-            dragged_point_index = -1;
-            dragging_point = false;
-        }
-        else if (dragged_point_index < 0 || dragged_point_index >= curves[selected_curve].points.size()) {
-            sys_print(Warning, "dragged_point_index invalid\n");
-            dragged_point_index = -1;
-            dragging_point = false;
+
+    if (is_dragging_selected) {
+
+        if (selecting_event) {
+            if (!is_selected_event_valid()) {
+                sys_print(Warning, "is_dragging_slected null entry\n");
+            }
+            else {
+                auto mousepos = ImGui::GetMousePos();
+                auto gridspace = screenspace_to_grid(mousepos);
+
+                clamp_point_to_grid(gridspace);
+
+                auto& item = events.at(selected_curve_or_event);
+
+                if (moving_right_side) {
+                    item->time_end = gridspace.x;
+                }
+                else {
+                    item->time_start = gridspace.x;
+                }
+                if (!item->instant_item) {
+                    if (item->time_end <= item->time_start)
+                        item->time_end = item->time_start + 1.0;
+                }
+                item->y_coord = gridspace.y;
+            }
         }
         else {
-            clamp_point_to_grid(gridspace);
-            auto& points = curves[selected_curve].points;
-            auto& point = points[dragged_point_index];
-            if (dragged_point_type == 0) {
-                points[dragged_point_index].time = gridspace.x;
-                points[dragged_point_index].value = gridspace.y;
+            auto mousepos = ImGui::GetMousePos();
+            auto gridspace = screenspace_to_grid(mousepos);
+            if (!is_selected_curve_valid()) {
+                sys_print(Warning, "dragging_point: selected_curve invalid\n");
+                set_selected_curve(-1);
+                dragged_point_index = -1;
+                is_dragging_selected = false;
+            }
+            else if (!is_selected_point_valid()) {
+                sys_print(Warning, "dragged_point_index invalid\n");
+                dragged_point_index = -1;
+                is_dragging_selected = false;
+            }
+            else {
+                clamp_point_to_grid(gridspace);
+                auto& points = curves.at(selected_curve_or_event).points;
+                auto& point = points[dragged_point_index];
+                if (dragged_point_type == 0) {
+                    points[dragged_point_index].time = gridspace.x;
+                    points[dragged_point_index].value = gridspace.y;
 
-                // sort points
-                std::sort(points.begin(), points.end(), [](const auto& p, const auto& p2)->bool { return p.time < p2.time; });
+                    // sort points
+                    std::sort(points.begin(), points.end(), [](const auto& p, const auto& p2)->bool { return p.time < p2.time; });
 
-                // FIXME:
-                for (int i = 0; i < points.size(); i++) {
-                    if (points[i].time == gridspace.x && points[i].value == gridspace.y) {
-                        dragged_point_index = i;
-                        break;
+                    // FIXME:
+                    for (int i = 0; i < points.size(); i++) {
+                        if (points[i].time == gridspace.x && points[i].value == gridspace.y) {
+                            dragged_point_index = i;
+                            break;
+                        }
                     }
-                }
 
-            }
-            else if (dragged_point_type == 1) {
-                point.tangent0.x = gridspace.x - point.time; // because tangents are relative to point position
-                point.tangent0.y = gridspace.y - point.value;
-            }
-            else if (dragged_point_type == 2) {
-                point.tangent1.x = gridspace.x - point.time;
-                point.tangent1.y = gridspace.y - point.value;
-            }
-            if (point.type == CurvePointType::Aligned) {
-                if (dragged_point_type == 1) {
-                    point.tangent1 = -point.tangent0;
+                }
+                else if (dragged_point_type == 1) {
+                    point.tangent0.x = gridspace.x - point.time; // because tangents are relative to point position
+                    point.tangent0.y = gridspace.y - point.value;
                 }
                 else if (dragged_point_type == 2) {
-                    point.tangent0 = -point.tangent1;
+                    point.tangent1.x = gridspace.x - point.time;
+                    point.tangent1.y = gridspace.y - point.value;
+                }
+                if (point.type == CurvePointType::Aligned) {
+                    if (dragged_point_type == 1) {
+                        point.tangent1 = -point.tangent0;
+                    }
+                    else if (dragged_point_type == 2) {
+                        point.tangent0 = -point.tangent1;
+                    }
                 }
             }
         }
     }
 
 
-    if (ImGui::GetIO().MouseClicked[1] && is_window_focused_and_mouse_in_region && selected_curve != -1 && point_index_for_popup==-1/*hack*/) {
+    if (ImGui::GetIO().MouseClicked[1] && is_window_focused_and_mouse_in_region && is_selecting_a_curve() && dragged_point_index ==-1/*hack*/) {
         ImGui::OpenPopup("curve_edit_popup");
         clickpos = screenspace_to_grid(ImGui::GetMousePos());
     }
     if (ImGui::BeginPopup("curve_edit_popup")) {
-        if (selected_curve == -1 || selected_curve >= curves.size()) {
+        if (!is_selected_curve_valid()) {
             sys_print(Warning, "selected_curve null in curve_edit_popup\n");
             ImGui::CloseCurrentPopup();
 
         }
         else {
             if (ImGui::Button("Add point")) {
-                auto& points = curves[selected_curve].points;
+                auto& points = curves.at(selected_curve_or_event).points;
                 clamp_point_to_grid(clickpos);
 
                points.push_back({ clickpos.y,clickpos.x });
@@ -512,7 +653,7 @@ void CurveEditorImgui::draw_editor_space()
 
     // draw and update timeline scrubber
     if (ImRect(BASE_SCREENPOS, ImVec2(BASE_SCREENPOS.x + WINDOW_SIZE.x, BASE_SCREENPOS.y + TIMELINE_HEIGHT)).Contains(ImGui::GetMousePos())
-        && ImGui::IsWindowFocused() && !dragging_point) {
+        && ImGui::IsWindowFocused() && !is_dragging_selected) {
         if (ImGui::GetIO().MouseDown[0]) {
             dragging_scrubber = true;
         }
@@ -542,6 +683,15 @@ void CurveEditorImgui::draw_editor_space()
         drawlist->AddText(ImVec2(pos_of_scrubber.x - off + 2.0, BASE_SCREENPOS.y), IM_COL32(255, 255, 255, 255), time_str);
     }
 
+    if (!dragging_scrubber && !is_dragging_selected && ImGui::IsWindowFocused() && !is_any_event_hovered && ImGui::GetIO().MouseClicked[1]) {
+        ImGui::OpenPopup("creation_ctx_menu");
+    }
+    if (ImGui::BeginPopup("creation_ctx_menu")) {
+        if (callback)
+            callback(this);
+        ImGui::EndPopup();
+    }
+
     // printf("%f\n",grid_offset)
     ImGui::PopClipRect();
 }
@@ -549,7 +699,7 @@ void CurveEditorImgui::draw_editor_space()
 void CurveEditorImgui::draw()
 {
     set_scrubber_this_frame = false;
-    if (!ImGui::Begin("curve edit")) {
+    if (!ImGui::Begin(window_name.c_str())) {
         ImGui::End();
         return;
     }
@@ -607,6 +757,25 @@ void CurveEditorImgui::draw()
                }
                ImGui::Separator();
 
+               ImGui::TableNextRow();
+               ImGui::TableNextColumn();
+
+               ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+               if (ImGui::Selectable("##selecteddevent", selecting_event, selectable_flags, ImVec2(0, 24))) {
+                   set_selected_event(-1, false);
+               }
+               if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1]) {
+                   set_selected_event(-1, false);
+               }
+
+               ImGui::SameLine();
+               ImGui::Checkbox("##check", &drawing_events);
+               ImGui::SameLine();
+               ImGui::Text("Events");
+
+
+               ImGui::Separator();
+
 
                for (int row_n = 0; row_n < curves.size(); row_n++)
                {
@@ -616,7 +785,7 @@ void CurveEditorImgui::draw()
 
                    ImGui::PushID(res.curve_id);
                    ImGuiSelectableFlags selectable_flags =  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-                   if (ImGui::Selectable("##selectednode", row_n == selected_curve, selectable_flags, ImVec2(0, 24))) {
+                   if (ImGui::Selectable("##selectednode", is_curve_selected(row_n), selectable_flags, ImVec2(0, 24))) {
                        set_selected_curve(row_n);
                    }
                    if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1]) {
@@ -662,13 +831,13 @@ void CurveEditorImgui::draw()
    if(open_curve_popup)
        ImGui::OpenPopup("curve_popup");
    if (ImGui::BeginPopup("curve_popup")) {
-       if (selected_curve < 0 || selected_curve >= curves.size()) {
+       if (!is_selected_curve_valid()) {
            sys_print(Warning, "curve_popup bad selected_curve\n");
            set_selected_curve(-1);
            ImGui::CloseCurrentPopup();
        }
        else {
-           auto& curve = curves[selected_curve];
+           auto& curve = curves.at(selected_curve_or_event);
            
            ImGui::InputText("##name", (char*)curve.name.data(), curve.name.size() + 1/*null terminator, FIXME?*/, ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &curve.name);
 
@@ -681,7 +850,7 @@ void CurveEditorImgui::draw()
            curve.color.b = v4.z * 255;
 
            if (ImGui::Button("Delete")) {
-               curves.erase(curves.begin() + selected_curve);
+               curves.erase(curves.begin() + selected_curve_or_event);
                set_selected_curve(-1);
                ImGui::CloseCurrentPopup();
            }

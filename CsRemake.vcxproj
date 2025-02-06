@@ -70,6 +70,7 @@
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
+    <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
@@ -283,7 +284,6 @@
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
-    <ClCompile Include="Source\Framework\Sequencer.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\Framework\Util.cpp" />

@@ -2,8 +2,14 @@
 #include "Animation/Event.h"
 
 CLASS_H(SoundAnimEvent, AnimationEvent)
-
-
+public:
+	
+	SoundAnimEvent() {
+		
+	}
+	bool is_duration_event() const {
+		return true;
+	}
 	virtual void on_event(Animator* a) override {
 		sys_print(Debug,"--- sound! %d\n", some_number);
 	}
@@ -17,7 +23,7 @@ CLASS_H(SoundAnimEvent, AnimationEvent)
 };
 
 CLASS_H(FootstepAnimEvent, AnimationEvent)
-
+	
 	virtual void on_event(Animator* a) override {
 		sys_print(Debug,"--- footstep %d\n");
 	}

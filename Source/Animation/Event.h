@@ -17,7 +17,7 @@ public:
 
 	// if true, then event has a duration from [frame,frame+frame_duration]
 	// on_event is called on enter and on_end is guaranteed to call on exit
-	virtual bool is_duration_event() { return false; }
+	virtual bool is_duration_event() const { return false; }
 	virtual void on_event(Animator* animator) = 0;
 	virtual void on_end(Animator* animator) {}
 

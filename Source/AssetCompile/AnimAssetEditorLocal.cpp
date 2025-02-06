@@ -101,12 +101,12 @@ void EditModelAnimations::on_presave()
 {
 	auto& c = *g_animseq_editor_static.animImportSettings;
 
-	auto& e = seqimgui.get_item_array();
+	auto& e = curveedit.get_event_array();
 	for (int i = 0; i < e.size(); i++) {
 		auto a = (EventSequenceItem*)e.at(i).get();
 		a->event->frame = a->time_start;
 		a->event->frame_duration = a->time_end - a->time_start;
-		a->event->editor_layer = a->track_index;
+		a->event->editor_layer = a->y_coord;
 		c.events.push_back(a->event.release());
 	}
 
@@ -121,7 +121,6 @@ void EditModelAnimations::on_presave()
 	selected_event_item = nullptr;
 	curveedit.clear_all();
 	eventdetails.clear_all();
-	seqimgui.clear_all();
 }
 
 void EditModelAnimations::on_quit()
@@ -129,19 +128,35 @@ void EditModelAnimations::on_quit()
 	selected_event_item = nullptr;
 	curveedit.clear_all();
 	eventdetails.clear_all();
-	seqimgui.clear_all();
 }
+
+static void context_menu_callback(CurveEditorImgui* ptr) {
+
+
+	auto classes = ClassBase::get_subclasses<AnimationEvent>();
+	for (; !classes.is_end(); classes.next()) {
+		if (!classes.get_type()->allocate) continue;
+		bool selected = false;
+		if (ImGui::Selectable(classes.get_type()->classname, &selected)) {
+			auto ev = (AnimationEvent*)classes.get_type()->allocate();
+
+			ptr->add_item_from_menu(std::unique_ptr<EventSequenceItem>(new EventSequenceItem(ev)));
+			ImGui::CloseCurrentPopup();
+		}
+	}
+}
+
 
 void EditModelAnimations::on_start()
 {
 	CURRENT_TIME = 0.0;
 	curveedit.clear_all();
 	selected_event_item = nullptr;
+	curveedit.callback = context_menu_callback;
 
 	auto seq = g_animseq_editor_static.sequence;
 
 	curveedit.max_x_value = seq->seq->num_frames;
-	seqimgui.max_x_value = seq->seq->num_frames;
 
 	auto& c = *g_animseq_editor_static.animImportSettings;
 	for (int i = 0; i < c.events.size(); i++) {
@@ -150,9 +165,8 @@ void EditModelAnimations::on_start()
 		EventSequenceItem* esi = new EventSequenceItem(ptr/* release ownership*/);
 		esi->time_start = esi->event->frame;
 		esi->time_end = esi->event->frame_duration;
-		esi->track_index = esi->event->editor_layer;
-
-		seqimgui.add_item_direct(esi);
+		esi->y_coord = esi->event->editor_layer;
+		curveedit.add_item_from_menu(std::unique_ptr<EventSequenceItem>(esi));
 	}
 	curveedit.clear_all();
 	auto& cur = c.curves;
@@ -164,8 +178,7 @@ void EditModelAnimations::on_start()
 void EditModelAnimations::draw_imgui()
 {
 	
-	seqimgui.draw();
-	EventSequenceItem* selected = seqimgui.get_selected_index() == -1 ? nullptr : (EventSequenceItem*)seqimgui.get_item_array()[seqimgui.get_selected_index()].get();
+	EventSequenceItem* selected = (EventSequenceItem*)curveedit.get_selected_event();
 	if (selected != selected_event_item) {
 		eventdetails.clear_all();
 		selected_event_item = selected;
@@ -185,9 +198,8 @@ void EditModelAnimations::draw_imgui()
 	ImGui::End();
 
 	curveedit.draw();
-	CURRENT_TIME = seqimgui.current_time / 30.0;
+	CURRENT_TIME = curveedit.current_time / 30.0;
 	//seqimgui.current_time = curveedit.current_time;
-	curveedit.current_time = seqimgui.current_time;
 }
 
 
@@ -335,17 +347,6 @@ bool AnimationEditorTool::save_document_internal()
 	return true;
 }
 
-void EventTimelineSequencer::context_menu_callback() {
-	auto classes = ClassBase::get_subclasses<AnimationEvent>();
-	for (; !classes.is_end(); classes.next()) {
-		if (!classes.get_type()->allocate) continue;
-		bool selected = false;
-		if (ImGui::Selectable(classes.get_type()->classname, &selected)) {
-			auto ev = (AnimationEvent*)classes.get_type()->allocate();
-			add_item_from_menu(new EventSequenceItem(ev));
-			ImGui::CloseCurrentPopup();
-		}
-	}
-}
+
 
 #endif
