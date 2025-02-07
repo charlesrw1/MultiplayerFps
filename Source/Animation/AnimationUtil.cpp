@@ -427,6 +427,7 @@ void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, fl
 }
 
 
+
 void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel)
 {
 	for (int i = 0; i < skel->get_num_bones(); i++) {

@@ -31,7 +31,7 @@
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 10;
+static const int MODEL_VERSION = 11;
 // int version XXX
 // 
 // mat4 root_transform
@@ -133,6 +133,7 @@ static const int MODEL_VERSION = 10;
 // float linear_velocity
 // int num_keyframes
 // bool is_delta
+// bool enable_root_motion
 // 
 // CHANNEL_OFS channels[num_bones]
 // 
@@ -881,7 +882,14 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		AnimationClip_Load acl;
 		acl.curves = isa.curves;
 		acl.fixloop = isa.fixLoop;
+		acl.setRootToFirstFrame = isa.setRootToFirstPose;
+		acl.enableRootMotion = isa.enableRootMotion;
 		acl.removeLienarVelocity = isa.removeLinearVelocity;
+
+		if (acl.enableRootMotion && (acl.setRootToFirstFrame || acl.removeLienarVelocity)) {
+			sys_print(Warning, "enableRootMotion with setRootToFirstFrame or removeLinearVelocity, will get wrong result\n");
+		}
+
 		acl.crop.has_crop = isa.hasEndCrop || isa.hasStartCrop;
 		acl.crop.start = isa.cropStart;
 		acl.crop.end = isa.cropEnd;
@@ -1693,6 +1701,8 @@ void ModelCompileHelper::append_animation_seq_to_list(
 
 	const float fps = data.override_fps;
 	out_seq.fps = fps;
+	if (definition)
+		out_seq.has_rootmotion = definition->enableRootMotion;
 
 	int START_keyframe = 0;
 	int NUM_keyframes = source_a->total_duration * fps;
@@ -2009,6 +2019,20 @@ write_out_to_outseq(&pos.x, 3, &out_seq);
 			}
 
 		}
+		if (definition && definition->setRootToFirstFrame) {
+			auto keyframe = out_seq.get_keyframe(0, 0, 0.0);
+			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
+				const int frame_w_crop = frame + START_keyframe;
+				const float t = frame / fps;
+				ASSERT(t <= out_seq.duration);
+				glm::vec3* pos = out_seq.get_pos_write_ptr(0/* root */, frame);
+				if (pos)
+					*pos = keyframe.pos;
+			}
+		}
+
+
+
 	}
 
 	if (definition && definition->fixloop) {
@@ -2660,6 +2684,8 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 			out.write_float(seq.second.average_linear_velocity);
 			out.write_int32(seq.second.num_frames);
 			out.write_byte(seq.second.is_additive_clip);
+			out.write_byte(seq.second.has_rootmotion);
+
 			
 			assert(seq.second.channel_offsets.size() == skel->bones.size());
 			out.write_bytes_ptr(

@@ -287,6 +287,8 @@ NodeRt_Ctx::NodeRt_Ctx(AnimatorInstance* inst)
 ConfigVar force_animation_to_bind_pose("force_animation_to_bind_pose", "0", CVAR_BOOL | CVAR_DEV, "");
 void AnimatorInstance::update(float dt)
 {
+	root_motion = RootMotionTransform();
+
 	if (!cfg)
 		return;
 
@@ -300,6 +302,7 @@ void AnimatorInstance::update(float dt)
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
 	gp_ctx.pose = &poses[0];
+	gp_ctx.accumulated_root_motion = &root_motion;
 
 	// callback
 	if(!get_is_for_editor())
@@ -350,13 +353,13 @@ void AnimatorInstance::update(float dt)
 			if (slot.fade_percentage > 1.0)
 				slot.state = DirectAnimationSlot::Full;
 			slot.time += dt;	// also update time
-			if (slot.time > seq->get_duration())	// just exit out
+			if (slot.time > seq->seq->get_duration())	// just exit out
 				slot.active = nullptr;
 		}
 		else if (slot.state == DirectAnimationSlot::Full) {
 			slot.time += dt;
-			if (slot.time > seq->get_duration()) {
-				slot.time = seq->get_duration() - 0.0001;
+			if (slot.time > seq->seq->get_duration()) {
+				slot.time = seq->seq->get_duration() - 0.0001;
 				slot.fade_percentage = 1.0;
 				slot.state = DirectAnimationSlot::FadingOut;
 			}
@@ -455,23 +458,9 @@ SyncGroupData& AnimatorInstance::find_or_create_sync_group(StringName name)
 	return active_sync_groups.back();
 }
 
-bool AnimatorInstance::play_animation_in_slot(
-	std::string animation,
-	StringName slot,
-	float play_speed,
-	float start_pos
-)
-{
-	if (!model || !cfg)
-		return false;
-
-	auto seq = model->get_skel()->find_clip(animation);
-	
-	return play_animation_in_slot(seq, slot, play_speed, start_pos);
-}
 
 bool AnimatorInstance::play_animation_in_slot(
-	const AnimationSeq* seq,
+	const AnimationSeqAsset* seq,
 	StringName slot,
 	float play_speed,
 	float start_pos

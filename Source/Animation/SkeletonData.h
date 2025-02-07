@@ -29,6 +29,7 @@ struct ScalePositionRot
 	glm::quat rot;
 };
 
+
 class AnimationSeq
 {
 public:
@@ -39,6 +40,7 @@ public:
 	float duration = 0.0;
 	float fps = 30.0;
 	float average_linear_velocity = 0.0;
+	bool has_rootmotion = false;
 
 	// store any animation events or curves here
 	std::vector<std::unique_ptr<AnimationEvent>> events;

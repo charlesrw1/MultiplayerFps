@@ -4,6 +4,7 @@
 #include <sstream>
 #include "glad/glad.h"
 #include <glm/gtc/type_ptr.hpp>
+#include "Framework/Util.h"
 
 static const char* const SHADER_PATH = "Shaders\\";
 static const char* const INCLUDE_SPECIFIER = "#include";
@@ -15,7 +16,7 @@ static bool read_and_add_recursive(std::string filepath, std::string& text, bool
 	path += filepath;
 	std::ifstream infile(path);
 	if (!infile) {
-		printf("ERROR: Couldn't open path %s\n", filepath.c_str());
+		sys_print(Error, "ERROR: Couldn't open path %s\n", filepath.c_str());
 		return false;
 	}
 
@@ -30,18 +31,18 @@ static bool read_and_add_recursive(std::string filepath, std::string& text, bool
 		size_t pos = line.find(INCLUDE_SPECIFIER);
 		if (pos == std::string::npos)
 			text.append(line + '\n');
-		else {
+		else if(pos==0) {
 			size_t start_file = line.find('\"');
 			if (start_file == std::string::npos) {
-				printf("ERROR: include not followed with filepath\n");
+				sys_print(Error, "ERROR: include not followed with filepath\n");
 				return false;
 			}
 			size_t end_file = line.rfind('\"');
 			if (end_file == start_file) {
-				printf("ERROR: include missing ending quote\n");
+				sys_print(Error, "ERROR: include missing ending quote\n");
 				return false;
 			}
-			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text, path_is_relative);
+			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text, true /* so includes inside _glsl files work*/);
 
 			//text += "#line ";
 			//text += std::to_string(linenum);
@@ -115,7 +116,7 @@ ShaderResult Shader::compile_vert_frag_tess_single_file(
 
 
 	if (vertex_source.empty() || fragment_source.empty() || tess_eval_source.empty()||tess_ctrl_source.empty()) {
-		printf("Parse fail %s\n", shared_path);
+		sys_print(Error, "Parse fail %s\n", shared_path);
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
 
@@ -130,22 +131,22 @@ ShaderResult Shader::compile_vert_frag_tess_single_file(
 
 	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
 	if (!good) {
-		printf("Error: vertex shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		sys_print(Error,"Error: vertex shader (%s) compiliation failed: %s\n", shared_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
 	if (!good) {
-		printf("Error: fragment shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		sys_print(Error, "Error: fragment shader (%s) compiliation failed: %s\n", shared_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 	good = make_shader(tess_eval_source.c_str(), GL_TESS_EVALUATION_SHADER, &tess_eval, infolog, 512);
 	if (!good) {
-		printf("Error: tesselation eval shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		sys_print(Error, "Error: tesselation eval shader (%s) compiliation failed: %s\n", shared_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 	good = make_shader(tess_ctrl_source.c_str(), GL_TESS_CONTROL_SHADER, &tess_control, infolog, 512);
 	if (!good) {
-		printf("Error: tesselation control shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		sys_print(Error, "Error: tesselation control shader (%s) compiliation failed: %s\n", shared_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 
@@ -159,7 +160,7 @@ ShaderResult Shader::compile_vert_frag_tess_single_file(
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(program, 512, NULL, infolog);
-		printf("Error: shader program link failed: %s\n", infolog);
+		sys_print(Error, "Error: shader program link failed: %s\n", infolog);
 
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
@@ -190,7 +191,7 @@ ShaderResult Shader::compile_vert_frag_single_file(
 	std::string fragment_source = get_source(shared_path, defines_with_directive+"\n#define _FRAGMENT_SHADER\n#line 0\n",false);
 
 	if (vertex_source.empty() || fragment_source.empty()) {
-		printf("Parse fail %s\n", shared_path);
+		sys_print(Error, "Parse fail %s\n", shared_path);
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
 
@@ -202,12 +203,12 @@ ShaderResult Shader::compile_vert_frag_single_file(
 
 	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
 	if (!good) {
-		printf("Error: vertex shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		sys_print(Error, "Error: vertex shader (%s) compiliation failed: %s\n", shared_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
 	if (!good) {
-		printf("Error: fragment shader (%s) compiliation failed: %s\n", shared_path, infolog);
+		sys_print(Error, "Error: fragment shader (%s) compiliation failed: %s\n", shared_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 
@@ -219,7 +220,7 @@ ShaderResult Shader::compile_vert_frag_single_file(
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(program, 512, NULL, infolog);
-		printf("Error: shader program link failed: %s\n", infolog);
+		sys_print(Error, "Error: shader program link failed: %s\n", infolog);
 
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
@@ -251,7 +252,7 @@ bool Shader::compile(
 
 
 	if (vertex_source.empty() || fragment_source.empty() || geometry_source.empty()) {
-		printf("Parse fail %s %s %s\n", vertex_path, fragment_path, geometry_path);
+		sys_print(Error, "Parse fail %s %s %s\n", vertex_path, fragment_path, geometry_path);
 		return false;
 	}
 
@@ -264,17 +265,17 @@ bool Shader::compile(
 
 	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
 	if (!good) {
-		printf("Error: vertex shader (%s) compiliation failed: %s\n", vertex_path, infolog);
+		sys_print(Error, "Error: vertex shader (%s) compiliation failed: %s\n", vertex_path, infolog);
 		return false;
 	}
 	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
 	if (!good) {
-		printf("Error: fragment shader (%s) compiliation failed: %s\n", fragment_path, infolog);
+		sys_print(Error, "Error: fragment shader (%s) compiliation failed: %s\n", fragment_path, infolog);
 		return false;
 	}
 	good = make_shader(geometry_source.c_str(), GL_GEOMETRY_SHADER, &geometry, infolog, 512);
 	if (!good) {
-		printf("Error: geometry shader (%s) compiliation failed: %s\n", geometry_path, infolog);
+		sys_print(Error, "Error: geometry shader (%s) compiliation failed: %s\n", geometry_path, infolog);
 		return false;
 	}
 
@@ -287,7 +288,7 @@ bool Shader::compile(
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(program, 512, NULL, infolog);
-		printf("Error: shader program link failed: %s\n", infolog);
+		sys_print(Error, "Error: shader program link failed: %s\n", infolog);
 
 		return false;
 	}
@@ -317,7 +318,7 @@ ShaderResult Shader::compile(
 	std::string fragment_source = get_source(fragment_path, defines_with_directive);
 
 	if (vertex_source.empty() || fragment_source.empty()) {
-		printf("Parse fail %s %s\n", vertex_path, fragment_path);
+		sys_print(Error, "Parse fail %s %s\n", vertex_path, fragment_path);
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
 
@@ -329,12 +330,12 @@ ShaderResult Shader::compile(
 
 	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
 	if (!good) {
-		printf("Error: vertex shader (%s) compiliation failed: %s\n", vertex_path, infolog);
+		sys_print(Error, "Error: vertex shader (%s) compiliation failed: %s\n", vertex_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 	good = make_shader(fragment_source.c_str(), GL_FRAGMENT_SHADER, &fragment, infolog, 512);
 	if (!good) {
-		printf("Error: fragment shader (%s) compiliation failed: %s\n", fragment_path, infolog);
+		sys_print(Error, "Error: fragment shader (%s) compiliation failed: %s\n", fragment_path, infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 
@@ -346,7 +347,7 @@ ShaderResult Shader::compile(
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(program, 512, NULL, infolog);
-		printf("Error: shader program link failed: %s\n", infolog);
+		sys_print(Error, "Error: shader program link failed: %s\n", infolog);
 
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
@@ -371,7 +372,7 @@ ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, s
 	std::string compute_source = get_source(compute_path, defines_with_directive);
 
 	if (compute_source.empty()) {
-		printf("Parse fail %s\n", compute_source.c_str());
+		sys_print(Error, "Parse fail %s\n", compute_source.c_str());
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
 
@@ -383,7 +384,7 @@ ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, s
 	glGetShaderiv(compute, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(compute, 512, NULL, infolog);
-		printf("Error: compute shader (%s) compiliation failed: %s\n", compute_path, infolog);
+		sys_print(Error, "Error: compute shader (%s) compiliation failed: %s\n", compute_path, infolog);
 
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
@@ -395,7 +396,7 @@ ShaderResult Shader::compute_compile(Shader* shader, const char* compute_path, s
 	glGetProgramiv(shader->ID, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(shader->ID, 512, NULL, infolog);
-		printf("Error: shader program link failed: %s\n", infolog);
+		sys_print(Error, "Error: shader program link failed: %s\n", infolog);
 
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}

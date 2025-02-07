@@ -46,6 +46,9 @@ struct AnimationClip_Load
 
 	bool removeLienarVelocity = false;
 	bool fixloop = false;
+	bool enableRootMotion = false;
+	bool setRootToFirstFrame = false;
+
 	std::vector<std::unique_ptr<AnimationEvent>> events;
 	std::vector<EditingCurve> curves;
 

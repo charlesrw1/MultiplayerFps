@@ -30,7 +30,7 @@ public:
 			);
 
 			m->get_animator_instance()->play_animation_in_slot(
-				openanim->seq,
+				openanim,
 				StringName("Default"),
 				1, 0
 			);

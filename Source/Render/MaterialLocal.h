@@ -144,8 +144,9 @@ public:
 	bool is_using_default_depth = false;
 
 	uint32_t material_id = 0;
+	bool is_compilied_shader_valid = false;
 
-	bool load_from_file(const std::string& fullpath, IFile* file);
+	void load_from_file(const std::string& fullpath, IFile* file);
 
 	std::string create_glsl_shader(
 		std::string& vs_code,
@@ -190,8 +191,8 @@ public:
 	void init_from(const MaterialInstance* parent);
 	bool load_from_file(MaterialInstance* self);
 
-	bool load_instance(MaterialInstance* self, IFile* file);
-	bool load_master(MaterialInstance* self, IFile* file);
+	void load_instance(MaterialInstance* self, IFile* file);
+	void load_master(MaterialInstance* self, IFile* file);
 
 	void post_load(MaterialInstance* self);
 
@@ -237,7 +238,7 @@ public:
 
 	program_handle lookup(shader_key key);
 	void insert(shader_key key, program_handle handle);
-	void recompile_for_material(const MasterMaterialImpl* mat);
+	void recompile_for_material(MasterMaterialImpl* mat);
 
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };

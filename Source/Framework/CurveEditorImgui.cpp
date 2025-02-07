@@ -799,20 +799,21 @@ void CurveEditorImgui::draw()
                    ImGui::TextColored(color32_to_imvec4(res.color),res.name.c_str());
                    ImGui::PopID();
                }
-               ImGui::TableNextRow();
-               ImGui::TableNextColumn();
+               if (show_add_curve_button) {
+                   ImGui::TableNextRow();
+                   ImGui::TableNextColumn();
 
-               ImGuiStyle& style = ImGui::GetStyle();
-               float size = ImGui::CalcTextSize("Add row").x + style.FramePadding.x * 2.0f;
-               float avail = ImGui::GetContentRegionAvail().x;
-               float off = (avail - size) * 0.5;
-               if (off > 0.0f)
-                   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-               if (ImGui::Button("Add row")) {
-                   EditingCurve ed;
-                   ed.name = "New row";
-
-                   add_curve(ed);
+                   ImGuiStyle& style = ImGui::GetStyle();
+                   float size = ImGui::CalcTextSize("Add row").x + style.FramePadding.x * 2.0f;
+                   float avail = ImGui::GetContentRegionAvail().x;
+                   float off = (avail - size) * 0.5;
+                   if (off > 0.0f)
+                       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
+                   if (ImGui::Button("Add row")) {
+                       EditingCurve ed;
+                       ed.name = "unnamed_row";
+                       add_curve(ed);
+                   }
                }
 
                ImGui::EndTable();

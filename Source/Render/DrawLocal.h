@@ -176,6 +176,7 @@ struct Render_Stats {
 class Program_Manager
 {
 public:
+
 	program_handle create_single_file(const char* shared_file, bool is_tesselation = false, const std::string& defines = {});
 	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
 	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
@@ -184,6 +185,12 @@ public:
 		assert(handle >= 0 && handle < programs.size());
 		return programs[handle].shader_obj;
 	}
+	bool did_shader_fail(program_handle handle) const {
+		assert(handle >= 0 && handle < programs.size());
+		return programs.at(handle).compile_failed;
+	}
+
+
 	void recompile_all();
 
 	struct program_def {

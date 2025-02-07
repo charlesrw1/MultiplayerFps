@@ -59,6 +59,8 @@ public:
 	bool makeAdditive = false;
 	bool additiveFromSelf = false;
 	bool removeLinearVelocity = false;	// if true, then subtracts linear_velocity*t from each position
+	bool enableRootMotion = false;		// if true, then marks clip for root motion, note that you shouldnt use removeLinearVelocity or setRootToFirstPose
+	bool setRootToFirstPose = false;	// if true, then sets all root poses to first frame
 
 	std::vector<AnimationEvent*> events;
 	std::vector<EditingCurve> curves;
@@ -76,6 +78,8 @@ public:
 			REG_BOOL(makeAdditive, PROP_DEFAULT, "0"),
 			REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
 			REG_BOOL(removeLinearVelocity,PROP_DEFAULT,"0"),
+			REG_BOOL(enableRootMotion,PROP_DEFAULT,"0"),
+			REG_BOOL(setRootToFirstPose,PROP_DEFAULT,"0"),
 			REG_SOFT_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
 			REG_STDVECTOR(curves,PROP_SERIALIZE),
 			//REG_STDVECTOR(events,PROP_SERIALIZE),

@@ -18,9 +18,15 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/ClassBase.h"
 #include "Animation/Runtime/SyncTime.h"
-
+#include "Animation/AnimationSeqAsset.h"
 
 #include <unordered_set>
+
+struct RootMotionTransform
+{
+	glm::vec3 position_displacement=glm::vec3(0.f);
+	glm::quat rotation_displacement=glm::quat();
+};
 
 class Pose;
 class Animator;
@@ -74,18 +80,14 @@ public:
 	bool is_initialized() const { return model != nullptr; }
 
 	// Slot playing
-	// returns weather it was succesful
 	bool play_animation_in_slot(
-		std::string animation,
+		const AnimationSeqAsset* seq,
 		StringName slot,
 		float play_speed,
 		float start_pos
 	);
-	bool play_animation_in_slot(
-		const AnimationSeq* seq,
-		StringName slot,
-		float play_speed,
-		float start_pos
+	void stop_animation_in_slot(
+		StringName slot
 	);
 
 	void add_simulating_physics_object(Entity* obj);
@@ -93,6 +95,10 @@ public:
 
 	void set_update_owner_position_to_root(bool b) {
 		update_owner_position_to_root = b;
+	}
+
+	RootMotionTransform get_last_root_motion() {
+		return root_motion;
 	}
 private:
 	bool get_is_for_editor() const {
@@ -121,6 +127,7 @@ private:
 	const Animation_Tree_CFG* cfg = nullptr;
 	const Model* model = nullptr;
 
+	RootMotionTransform root_motion;
 
 	std::vector<std::unique_ptr<Rt_Vars_Base>> runtime_graph_data;
 	std::unordered_set<uint64_t> simulating_physics_objects;
@@ -139,8 +146,8 @@ private:
 		}state;
 
 		StringName name;
-
-		const AnimationSeq* active = nullptr;
+		const AnimationSeqAsset* active = nullptr;
+		float lasttime = 0.0;
 		float time = 0.0;
 		float playspeed = 0.0;
 		bool apply_rootmotion = false;

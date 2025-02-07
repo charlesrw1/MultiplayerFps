@@ -161,6 +161,8 @@ struct GetPose_Ctx
 	Pose* pose = nullptr;
 	float dt = 0.0;
 
+	RootMotionTransform* accumulated_root_motion = nullptr;
+
 	// if > 0, then scale clip by rootmotion
 	float rootmotion_scale = -1.0;
 
@@ -804,6 +806,7 @@ NODECFG_HEADER(MeshspaceToLocal_CFG, Rt_Vars_Base)
 struct DirectPlaySlot_RT : public Rt_Vars_Base
 {
 	Pose* fading_out_pose = nullptr;
+	const BoneIndexRetargetMap* remap = nullptr;
 };
 
 NODECFG_HEADER(DirectPlaySlot_CFG, DirectPlaySlot_RT)

@@ -58,13 +58,15 @@ struct EditingCurve
 };
 
 class CurveEditorImgui;
+
+// subclass this to implment whatever custom behavior you want for events
 class SequencerEditorItem
 {
 public:
 	virtual ~SequencerEditorItem() {  }
 	virtual std::string get_name() { return "placeholder"; }
 
-	bool instant_item = false;
+	bool instant_item = false;	// if true, then event will have 2 handles, one for start and one for end, "duration events"
 	float time_start = 0;
 	float time_end = 0;
 	Color32 color = COLOR_CYAN;
@@ -74,17 +76,24 @@ public:
 };
 
 using CurveEditContextMenuCallback = void(*)(CurveEditorImgui*);
-
 class CurveEditorImgui
 {
 public:
 	CurveEditorImgui() {}
 
+	// call this every imgui frame
 	void draw();
 
 	std::string window_name = "Curve Editor";
+
+	// this callback is used when right-clicking on canvas when "Events" is selected
+	// use this to do ImGui::x() calls to add events, add with add_item_from_menu()
 	CurveEditContextMenuCallback callback = nullptr;
+	// can use this for whatever, to access in callback
 	void* user_ptr = nullptr;
+
+	// if true, show the "Add Row" button to add curves manually
+	bool show_add_curve_button = true;
 
 	// Max value on the X axis (min X axis is always 0)
 	float max_x_value = 35.0;
@@ -106,10 +115,12 @@ public:
 	const std::vector<EditingCurve>& get_curve_array() const { return curves; }
 	const std::vector<std::unique_ptr<SequencerEditorItem>>& get_event_array() { return events; }
 
+	// add a curve to edit
 	void add_curve(EditingCurve curve) {
 		curve.curve_id = current_id_value++;
 		curves.push_back(curve);
 	}
+
 	void clear_all() {
 		curves.clear();
 		set_selected_curve(-1);
@@ -123,6 +134,7 @@ public:
 		is_dragging_selected = false;
 	}
 
+	// add an event, note that CurveEditor manages memory and will call destructor if event is deleted
 	void add_item_from_menu(std::unique_ptr<SequencerEditorItem> item) {
 		auto mousepos = ImGui::GetMousePos();
 		auto gridspace = screenspace_to_grid(mousepos);
@@ -165,7 +177,6 @@ private:
 	bool is_selected_event_valid() const {
 		return selecting_event && selected_curve_or_event >= 0 && selected_curve_or_event < events.size();
 	}
-
 
 	void draw_editor_space();
 

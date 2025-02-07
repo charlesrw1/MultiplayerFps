@@ -910,6 +910,25 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 
  }
 
+ void calc_rootmotion(GetPose_Ctx& out, float time, float last_time, const AnimationSeq* clip, float alpha_blend)
+ {
+	 if (!clip->has_rootmotion)
+		 return;
+
+	 auto& m = *out.accumulated_root_motion;
+	 int keyframe = clip->get_frame_for_time(last_time);
+	 float lerp_amt = MidLerp(clip->get_time_of_keyframe(keyframe), clip->get_time_of_keyframe(keyframe + 1), last_time);
+	 ScalePositionRot transformlast = clip->get_keyframe(0, keyframe, lerp_amt);
+	 keyframe = clip->get_frame_for_time(time);
+	 lerp_amt = MidLerp(clip->get_time_of_keyframe(keyframe), clip->get_time_of_keyframe(keyframe + 1), time);
+	 ScalePositionRot transformnow = clip->get_keyframe(0, keyframe, lerp_amt);
+	 m.position_displacement += (transformnow.pos - transformlast.pos)*alpha_blend;
+	 {
+		 glm::quat target = quat_delta(transformlast.rot,transformnow.rot) * m.rotation_displacement;
+		 m.rotation_displacement =  glm::slerp(m.rotation_displacement, target, alpha_blend);
+	 }
+ }
+
  bool DirectPlaySlot_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
  {
 	 if (slot_index == -1)
@@ -921,6 +940,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 			 g_pose_pool.free(rt->fading_out_pose);
 			 rt->fading_out_pose = nullptr;
 		 }
+		 rt->remap = nullptr;
 		 return input->get_pose(ctx, pose);
 	 }
 
@@ -931,32 +951,45 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		 if (!rt->fading_out_pose) {
 			 rt->fading_out_pose = (Pose*)g_pose_pool.allocate();
 			 input->get_pose(ctx, pose.set_pose(rt->fading_out_pose));
+
+			 rt->remap = ctx.get_skeleton()->get_remap(slot.active->srcModel.get()->get_skel());
 		 }
 		 // now have a pose from fading out
-		util_calc_rotations(ctx.get_skeleton(), slot.active, slot.time, nullptr, *pose.pose);
+		util_calc_rotations(ctx.get_skeleton(), slot.active->seq, slot.time, rt->remap, *pose.pose);
 
 		// blend
+		
+		float alpha = 1.0 - evaluate_easing(Easing::CubicEaseInOut, slot.fade_percentage);
 		util_blend(ctx.num_bones(), *rt->fading_out_pose, *pose.pose, 1.0 -evaluate_easing(Easing::CubicEaseInOut, slot.fade_percentage));
+		calc_rootmotion(pose, slot.time, slot.lasttime, slot.active->seq, alpha);
 	 }
 	 else if (slot.state == slot.Full) {
 		 if (rt->fading_out_pose) {
 			 g_pose_pool.free(rt->fading_out_pose);
 			 rt->fading_out_pose = nullptr;
 		 }
-		 util_calc_rotations(ctx.get_skeleton(), slot.active, slot.time, nullptr, *pose.pose);
+		 util_calc_rotations(ctx.get_skeleton(), slot.active->seq, slot.time, rt->remap, *pose.pose);
+		 calc_rootmotion(pose, slot.time, slot.lasttime, slot.active->seq, 1.0);
+
 	 }
 	 else {// fadingOut
 
 		 if (!rt->fading_out_pose) {
 			 rt->fading_out_pose = (Pose*)g_pose_pool.allocate();
-			 util_calc_rotations(ctx.get_skeleton(), slot.active, slot.time, nullptr,*rt->fading_out_pose);
+			 util_calc_rotations(ctx.get_skeleton(), slot.active->seq, slot.time, rt->remap,*rt->fading_out_pose);
 		 }
 		 // now have a pose from fading out
 
+		
+
 		input->get_pose(ctx, pose);
 		 // blend
-		 util_blend(ctx.num_bones(), *rt->fading_out_pose, *pose.pose, evaluate_easing(Easing::CubicEaseInOut, slot.fade_percentage));
+		float alpha = evaluate_easing(Easing::CubicEaseInOut, slot.fade_percentage);
+		 util_blend(ctx.num_bones(), *rt->fading_out_pose, *pose.pose, alpha);
+		 calc_rootmotion(pose, slot.time, slot.lasttime, slot.active->seq, alpha);
 	 }
+
+
 
 	 // sample rootmotion,curves,events here
 	 return true;

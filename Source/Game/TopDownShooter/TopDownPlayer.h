@@ -81,6 +81,11 @@ public:
 	REFLECT();
 	AssetPtr<PrefabAsset> shotgunSoundAsset;
 
+	REFLECT();
+	AssetPtr<AnimationSeqAsset> runToStart;
+	REFLECT();
+	AssetPtr<AnimationSeqAsset> idleToRun;
+
 	SoundComponent* cachedShotgunSound = nullptr;
 
 	TopDownPlayer() {
@@ -139,7 +144,7 @@ public:
 				using_third_person_movement = !using_third_person_movement;
 
 				mesh->get_animator_instance()->play_animation_in_slot(
-					jumpSeq.get()->seq,
+					jumpSeq,
 					StringName("ACTION"),
 					1.f,
 					0.f

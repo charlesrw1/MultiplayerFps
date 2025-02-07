@@ -70,7 +70,7 @@ REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 
 Model::~Model() {}
 
-static const int MODEL_FORMAT_VERSION = 10;
+static const int MODEL_FORMAT_VERSION = 11;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
@@ -479,6 +479,7 @@ bool Model::load_internal()
 			aseq->average_linear_velocity = read.read_float();
 			aseq->num_frames = read.read_int32();
 			aseq->is_additive_clip = read.read_byte();
+			aseq->has_rootmotion = read.read_byte();
 
 			aseq->channel_offsets.resize(num_bones);
 			read.read_bytes_ptr(aseq->channel_offsets.data(), num_bones * sizeof(ChannelOffset));

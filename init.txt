@@ -63,7 +63,6 @@ dbg.fly 1
 
 FONT_TEST
 
-ui.debug_press 1
 
 #r.debug_specular 1
 
@@ -75,4 +74,6 @@ RUN_TESTS
 
 g_draw_grid 1
 
-start_ed AnimGraph "testcharacter_a.ag"
+#start_ed AnimGraph "testcharacter_a.ag"
+
+start_ed Material "top_down/fake_fog.mm"

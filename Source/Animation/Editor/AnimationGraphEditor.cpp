@@ -1853,7 +1853,7 @@ DECLARE_ENGINE_CMD(animed_play_slot)
 	std::string slotname = args.at(1);
 	std::string anim = args.at(2);
 
-	anim_graph_ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
+	//anim_graph_ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
 }
 AnimationGraphEditor::AnimationGraphEditor() {
 	gui = std::make_unique<AG_GuiLayout>();
