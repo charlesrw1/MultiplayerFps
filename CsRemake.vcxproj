@@ -58,6 +58,7 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\External\xatlas.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
@@ -249,6 +250,7 @@
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
+    <ClCompile Include="Source\External\xatlas.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />

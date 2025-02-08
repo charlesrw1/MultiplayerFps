@@ -672,21 +672,20 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 			command_mgr->add_command(cmd);
 		}
 	}
-	else if (scancode == SDL_SCANCODE_ESCAPE)
+	else if (scancode == SDL_SCANCODE_ESCAPE) {
 		if (is_in_eyedropper_mode())
 			exit_eyedropper_mode();
-#if 0
-
+	}
 	else if (scancode == SDL_SCANCODE_KP_5) {
 		using_ortho = false;
 	}
 	else if (scancode == SDL_SCANCODE_KP_7 && key.keysym.mod & KMOD_CTRL) {
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, ORTHO_DIST, 0), glm::vec3(0, -1, 0));
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, ORTHO_DIST+50.0, 0), glm::vec3(0, -1, 0));
 	}
 	else if (scancode == SDL_SCANCODE_KP_7) {
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, -ORTHO_DIST, 0), glm::vec3(0, 1, 0));
+		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, -(ORTHO_DIST+50.0), 0), glm::vec3(0, 1, 0));
 	}
 	else if (scancode == SDL_SCANCODE_KP_3 && key.keysym.mod & KMOD_CTRL) {
 		using_ortho = true;
@@ -704,7 +703,6 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
 	}
-#endif
 }
 
 
@@ -1020,12 +1018,6 @@ void ManipulateTransformTool::update()
 
 	//auto selected = ed_doc.selection_state.sel
 
-	const float* view = glm::value_ptr(ed_doc.vs_setup.view);
-
-	const glm::mat4 friendly_proj_matrix = ed_doc.vs_setup.make_opengl_perspective_with_near_far();
-	const float* proj = glm::value_ptr(friendly_proj_matrix);
-
-	float* model = glm::value_ptr(current_transform_of_group);
 
 	ImGuizmo::SetImGuiContext(eng->get_imgui_context());
 	ImGuizmo::SetDrawlist();
@@ -1050,7 +1042,13 @@ void ManipulateTransformTool::update()
 	else if (operation_mask == ImGuizmo::ROTATE&&has_rotation_snap)
 		snap = glm::vec3(rotation_snap);
 
-
+	const auto window_sz = eng->get_game_viewport_size();
+	const float aratio = (float)window_sz.y / window_sz.x;
+	const float* const view = glm::value_ptr(ed_doc.vs_setup.view);
+	const glm::mat4 friendly_proj_matrix = (ed_doc.using_ortho) ? ed_doc.ortho_camera.get_friendly_proj_matrix(aratio) :  ed_doc.vs_setup.make_opengl_perspective_with_near_far();
+	const float* const proj = glm::value_ptr(friendly_proj_matrix);
+	float* model = glm::value_ptr(current_transform_of_group);
+	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
 	bool good = ImGuizmo::Manipulate(view, proj, operation_mask, mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
 	
 	if (ImGuizmo::IsOver() && state == SELECTED && ImGui::GetIO().MouseClicked[2]) {

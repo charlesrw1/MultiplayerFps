@@ -506,6 +506,7 @@
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
+    <ClInclude Include="Source\External\xatlas.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -758,6 +759,7 @@
     <ClCompile Include="Source\Scripting\ScriptComponent.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
+    <ClCompile Include="Source\External\xatlas.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

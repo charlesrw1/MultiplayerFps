@@ -217,7 +217,11 @@ public:
 		return glm::lookAt(position, position+front, up);
 	}
 	glm::mat4 get_proj_matrix(float aspect_ratio) const {
-		return glm::ortho(-width, width, -width*aspect_ratio, width * aspect_ratio,-0.001f, -100.0f);
+		return glm::orthoZO(-width, width, -width*aspect_ratio, width * aspect_ratio,1000.f,0.001f /* reverse z*/);
+	}
+
+	glm::mat4 get_friendly_proj_matrix(float aspect_ratio) const {
+		return glm::ortho(-width, width, -width * aspect_ratio, width * aspect_ratio,0.001f, 1000.f);
 	}
 }; 
 

@@ -68,6 +68,13 @@ public:
 		*size = verts.size() * sizeof(ModelVertex);
 		return (uint8_t*)verts.data();
 	}
+	const ModelVertex& get_vertex_at_index(int index) const {
+		return verts[index];
+	}
+	uint16_t get_index_at_index(int index) const {
+		return indicies[index];
+	}
+
 private:
 	// index offset always = 0
 	std::vector<ModelVertex> verts;
@@ -148,6 +155,9 @@ public:
 
 	const PhysicsBody* get_physics_body() const {
 		return collision.get();
+	}
+	const RawMeshData* get_raw_mesh_data() const {
+		return &data;
 	}
 private:
 	bool load_internal();

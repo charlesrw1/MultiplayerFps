@@ -253,3 +253,131 @@ PointLightComponent::PointLightComponent() {
 SunLightComponent::SunLightComponent() {
 	set_call_init_in_editor(true);
 }
+#include "Game/Components/MeshbuilderComponent.h"
+void CubemapComponent::start() {
+	mytexture = new Texture;
+	Render_Reflection_Volume vol;
+	fill_out_struct(vol);
+	handle = idraw->get_scene()->register_reflection_volume(vol);
+
+	if (eng->is_editor_level()) {
+		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
+		editor_meshbuilder->editor_transient = true;
+		editor_meshbuilder->use_background_color = true;
+		editor_meshbuilder->use_transform = false;
+		update_editormeshbuilder();
+	}
+}
+void CubemapComponent::update_editormeshbuilder()
+{
+	if (!editor_meshbuilder)
+		return;
+	glm::vec3 scale = get_owner()->get_ls_scale();
+	auto boxmin = get_ws_position() - scale * 0.5f;
+	auto boxmax = get_ws_position() + scale * 0.5f;
+	editor_meshbuilder->mb.Begin();
+	editor_meshbuilder->mb.PushLineBox(boxmin, boxmax, COLOR_GREEN);
+	editor_meshbuilder->mb.End();
+}
+void CubemapComponent::end() {
+	idraw->get_scene()->remove_reflection_volume(handle);
+	delete mytexture;
+	mytexture = nullptr;
+	if (editor_meshbuilder) {
+		editor_meshbuilder->destroy();
+		editor_meshbuilder = nullptr;
+	}
+}
+void CubemapComponent::editor_on_change_property() {
+	if (recapture) {
+		recapture = false;
+		Render_Reflection_Volume vol;
+		fill_out_struct(vol);
+		vol.wants_update = true;
+		idraw->get_scene()->update_reflection_volume(handle, vol);
+	}
+	update_editormeshbuilder();
+}
+void CubemapComponent::fill_out_struct(Render_Reflection_Volume& h)
+{
+	h.generated_cube = mytexture;
+	h.probe_position = get_ws_transform() * glm::vec4(anchor.p, 1.0);
+	glm::vec3 scale = get_owner()->get_ls_scale();
+	h.boxmin = get_ws_position() - scale*0.5f;
+	h.boxmax = get_ws_position() + scale * 0.5f;
+}
+
+#ifdef EDITOR_BUILD
+// FIXME!
+#include "LevelEditor/EditorDocLocal.h"
+#include "Framework/AddClassToFactory.h"
+class CubemapAnchorEditor : public IPropertyEditor
+{
+public:
+	~CubemapAnchorEditor() {
+		if (ed_doc.manipulate->is_using_key_for_custom(this))
+			ed_doc.manipulate->stop_using_custom();
+	}
+	// Inherited via IPropertyEditor
+	virtual bool internal_update() override
+	{
+		CubemapAnchor* j = (CubemapAnchor*)prop->get_ptr(instance);
+		Entity* me = ed_doc.selection_state->get_only_one_selected().get();
+		if (!me) {
+			ImGui::Text("no Entity* found\n");
+			return false;
+		}
+
+		ImGui::Checkbox("edit_anchor", &using_this);
+
+		if (!using_this) {
+			ed_doc.manipulate->stop_using_custom();
+		}
+
+		if(using_this) {
+			if (ed_doc.manipulate->is_using_key_for_custom(this)) {
+				auto last_matrix = ed_doc.manipulate->get_custom_transform();
+				auto local = glm::inverse(me->get_ws_transform()) * last_matrix;
+				j->p = local[3];
+			};
+		}
+		
+		bool ret = false;
+		if (ImGui::DragFloat3("##vec", (float*)&j->p, 0.05))
+			ret = true;
+		
+		if(using_this) {
+			glm::mat4 matrix = glm::translate(glm::mat4(1.f), j->p);
+			ed_doc.manipulate->set_start_using_custom(this, me->get_ws_transform() * matrix);
+		
+			return true;
+		}
+		
+		return ret;
+
+	}
+	bool using_this = false;
+};
+
+ADDTOFACTORYMACRO_NAME(CubemapAnchorEditor, IPropertyEditor, "CubemapAnchor");
+#endif
+class CubemapAnchorSerializer : public IPropertySerializer
+{
+	// Inherited via IPropertySerializer
+	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
+	{
+		const CubemapAnchor* j = (const CubemapAnchor*)info.get_ptr(inst);
+		return string_format("%f %f %f %d", j->p.x, j->p.y, j->p.z,(int)j->worldspace);
+	}
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	{
+		CubemapAnchor* j = (CubemapAnchor*)info.get_ptr(inst);
+		std::string to_str(token.str_start, token.str_len);
+		int d = 0;
+		int args = sscanf(to_str.c_str(), "%f %f %f %d", &j->p.x, &j->p.y, &j->p.z,&d);
+		j->worldspace = bool(d);
+		if (args != 4) 
+			sys_print(Warning, "Anchor joint unserializer fail\n");
+	}
+};
+ADDTOFACTORYMACRO_NAME(CubemapAnchorSerializer, IPropertySerializer, "CubemapAnchor");

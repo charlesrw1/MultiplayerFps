@@ -315,15 +315,6 @@ public:
 		suns.erase(suns.begin() + i);
 		handle = { -1 };
 	}
-	handle<Render_Irradiance_Volume> register_irradiance_volume(const Render_Irradiance_Volume& vol) override {
-		return { -1 };
-	}
-	void update_irradiance_volume(handle<Render_Irradiance_Volume> handle, const Render_Irradiance_Volume& sun) override {
-
-	}
-	void remove_irradiance_volume(handle<Render_Irradiance_Volume>& handle) override {
-
-	}
 	handle<Render_Reflection_Volume> register_reflection_volume(const Render_Reflection_Volume& vol) override {
 		return { -1 };
 	}
@@ -465,7 +456,6 @@ public:
 	std::vector<RSunInternal> suns;
 	std::vector<RSkylight_Internal> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
-	Free_List<Render_Irradiance_Volume> irradiance_volumes;
 
 	bool has_fog = false;
 	RenderFog fog;

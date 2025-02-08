@@ -1,0 +1,337 @@
+#version 430 core
+#extension GL_ARB_bindless_texture : require
+
+out vec4 FS_OUT_FragColor;
+in vec2 FS_IN_TexCoords;
+
+uniform mat4 InvViewProjection;
+uniform vec3 ViewPos;
+uniform float radius;
+uniform mat4 Scale;
+uniform mat4 InvView;
+uniform float FovY;
+uniform float ARatio;
+
+layout(bindless_sampler) uniform sampler2D bindless_texture;
+
+struct Vertex
+{
+	vec4 position;
+	vec4 normal;
+	vec4 tangent_u1;
+	vec4 bitangent_v1;
+};
+struct BVHNode
+{
+	vec4 bmin;
+	vec4 bmax;
+	int left_node;
+	int count;
+	int padding1;
+	int padding2;
+};
+
+
+struct Material
+{
+	int albedo_index;
+	int normal_index;
+	int padding1, padding2;
+};
+
+
+layout(std430, binding = 0) readonly buffer IndexBuffer
+{
+	uint data[];
+}Indicies;
+layout(std430, binding = 1) readonly buffer VertexBuffer
+{
+	Vertex data[];
+}Verticies;
+
+layout(std430, binding =2) readonly buffer BottomLevelNodes
+{
+	BVHNode data[];
+} Nodes;
+
+layout(std430, binding =3) readonly buffer BottomLevelReferences
+{
+	int data[];
+} References;
+
+layout(std140, binding=5) uniform BindlessTextures
+{
+	sampler2D TEXTURES[250];
+};
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+uniform int NUM_INDICIES;
+
+#define INF 1000000.0
+#define BVH_BRANCH -1
+
+struct Ray
+{
+	vec3 pos;
+	vec3 dir;
+	vec3 inv_dir;
+};
+
+vec2 hash( vec2 p )
+{
+    //p = mod(p, 4.0); // tile
+    p = vec2(dot(p,vec2(127.1,311.7)),
+             dot(p,vec2(269.5,183.3)));
+    return fract(sin(p)*18.5453);
+}
+
+
+
+float AABBIntersect(vec3 bmin,vec3 bmax, Ray r)
+{
+	vec3 tmin =(bmin-r.pos)*r.inv_dir;
+	vec3 tmax =(bmax-r.pos)*r.inv_dir;
+	vec3 t1 =min(tmin,tmax);
+	vec3 t2 = max(tmin,tmax);
+	float tnear = max(max(t1.x,t1.y),t1.z);
+	float tfar = min(min(t2.x,t2.y),t2.z);
+	
+	return (tnear>tfar||tfar<0) ? -INF : tnear;
+}
+float RayTriIntersect(vec3 ro, vec3 rd, vec3 v0, vec3 v1, vec3 v2, out vec3 bary)
+{
+	const vec3 edge1 = v1 - v0;
+	const vec3 edge2 = v2 - v0;
+	const vec3 h = cross(rd, edge2);
+	const float a = dot(edge1, h);
+	if (a > -0.0000001 && a < 0.0000001) return -1; 
+	const float f = 1 / a;
+	const vec3 s = ro - v0;
+	const float u = f * dot(s, h);
+	if (u < 0 || u > 1) return -1;
+	const vec3 q = cross(s, edge1);
+	const float v = f * dot(rd, q);
+	if (v < 0 || u + v > 1) return -1;
+	const float t = f * dot(edge2, q);
+	
+	bary = vec3(u, v, 1 - u - v);
+	return t;
+}
+float RayTriIntersect2(vec3 ro, vec3 rd, vec3 v0, vec3 v1, vec3 v2, out vec3 bary)
+{
+	vec4 uvt;
+	const vec3 edge1 = v1 - v0;
+	const vec3 edge2 = v2 - v0;
+	const vec3 h = cross(rd, edge2);
+	const float a = dot(edge1, h);
+//	if (a > -0.0000001 && a < 0.0000001) return -1; 
+	const float f = 1 / a;
+	const vec3 s = ro - v0;
+	uvt.x = f * dot(s, h);
+	//if (u < 0 || u > 1) return -1;
+	const vec3 q = cross(s, edge1);
+	uvt.y = f * dot(rd, q);
+	//if (v < 0 || u + v > 1) return -1;
+	uvt.z = f * dot(edge2, q);
+	uvt.w = 1-uvt.x-uvt.y;
+	if(all(greaterThanEqual(uvt,vec4(0.0))))
+	{
+		bary = uvt.xyw;
+		return uvt.z;
+	}
+	return -1;
+}
+float intersect(vec3 ro, vec3 rd)
+{
+	vec3 center = vec3(0);
+
+	vec3 oc = ro - center;
+	float a = dot(rd, rd);
+	float halfb = dot(oc, rd);
+	float c = dot(oc, oc) - radius * radius;
+	float discriminant = halfb * halfb - a * c;
+	if (discriminant < 0)
+		return -1;
+	float sqrt_dist = sqrt(discriminant);
+	float root = (-halfb - sqrt_dist) / a;
+	if (root<0) {
+		root = (-halfb + sqrt_dist) / a;
+		if (root<0)
+			return -1;
+	}
+	return root;
+}
+
+vec4 trace_ray(vec3 ro, vec3 rd)
+{
+	Ray out_ray;
+	out_ray.pos = ro;
+	out_ray.dir = rd;
+	out_ray.inv_dir = 1.f/(rd);
+	
+	uint stack[64];
+	stack[0]=0;
+	
+	
+	uint node;
+	int stack_count = 1;
+
+	float t = INF;
+	vec3 bary_near;
+	int idx=-1;
+	int triangles_intersected=0;
+	while (stack_count > 0)
+	{
+		node=stack[--stack_count];
+		
+		
+		// Fetch data
+		int node_leftnode = Nodes.data[node].left_node;
+		int node_count = Nodes.data[node].count;
+
+		if (node_count != -1)
+		{
+			int index_count = node_count;
+			int index_start = node_leftnode;
+			triangles_intersected+=node_count;
+			for (int i = 0; i < index_count; i++) {
+				
+				int mesh_element_index = References.data[index_start+i]*3;
+				uint i0 = Indicies.data[mesh_element_index];
+				uint i1 = Indicies.data[mesh_element_index+1];
+				uint i2 = Indicies.data[mesh_element_index+2];
+				vec3 bary;
+				float t_hit = RayTriIntersect2(
+					ro,rd,
+					Verticies.data[i0].position.xyz,
+					Verticies.data[i1].position.xyz,
+					Verticies.data[i2].position.xyz,
+					bary);
+				if(t_hit>0.00001 && t_hit < t) {
+					//return vec4(1,0,0,1);
+					t = t_hit;
+					idx = mesh_element_index;
+					bary_near=bary;
+				}
+			}
+			continue;
+		}
+
+		float left_dist, right_dist;
+		left_dist = AABBIntersect(Nodes.data[node_leftnode].bmin.xyz,Nodes.data[node_leftnode].bmax.xyz,out_ray);
+		right_dist = AABBIntersect(Nodes.data[node_leftnode+1].bmin.xyz,Nodes.data[node_leftnode+1].bmax.xyz,out_ray);
+		
+		bool left_bool = left_dist>-INF&&left_dist<t;
+		bool right_bool = right_dist>-INF&&right_dist<t;
+
+		if (left_bool && right_bool) {
+			bool push_right_first = left_dist<right_dist;
+			stack[stack_count++]=node_leftnode+int(push_right_first);
+			stack[stack_count++]=node_leftnode+int(!push_right_first);
+		
+		
+			//if (left_dist < right_dist) {
+			//	stack[stack_count++]=node_leftnode+1;
+			//	stack[stack_count++]=node_leftnode;
+			//}
+			//else {
+			//
+			//	stack[stack_count++]=node_leftnode;
+			//	stack[stack_count++]=node_leftnode+1;
+			//}
+		}
+		else if (left_bool) {
+			stack[stack_count++]=node_leftnode;
+		}
+		else if (right_bool) {
+			stack[stack_count++]=node_leftnode+1;
+		}
+	}
+
+	vec4 color = vec4(0);
+	if(idx!=-1) {
+		vec3 N = bary_near.z * Verticies.data[Indicies.data[idx]].normal.xyz +
+			bary_near.x * Verticies.data[Indicies.data[idx+1]].normal.xyz +
+			bary_near.y *Verticies.data[Indicies.data[idx+2]].normal.xyz;
+		int submesh_idx =  int(Verticies.data[Indicies.data[idx]].position.w);
+		color = vec4(randColor(submesh_idx),1.0);//vec4((N+vec3(1))*0.5,1);
+		vec2 uv =  bary_near.z * vec2(Verticies.data[Indicies.data[idx]].tangent_u1.w,Verticies.data[Indicies.data[idx]].bitangent_v1.w)+
+			bary_near.x * vec2(Verticies.data[Indicies.data[idx+1]].tangent_u1.w,Verticies.data[Indicies.data[idx+1]].bitangent_v1.w)+
+			bary_near.y *vec2(Verticies.data[Indicies.data[idx+2]].tangent_u1.w,Verticies.data[Indicies.data[idx+2]].bitangent_v1.w);
+		//color = vec4(uv,0,1.0);
+		color = texture(bindless_texture,uv);
+	}
+	return color;
+	//return vec4(vec3(triangles_intersected/100.0),1.0);
+}
+
+void main()
+{
+	vec2 NDC = (FS_IN_TexCoords*2)-vec2(1);
+	//vec4 world_point = (InvViewProjection*vec4(NDC,0.3,1));
+	//world_point /= world_point.w;
+	
+	float h = tan(FovY/2.0);
+	float height=h;
+	float width = height*ARatio;
+	
+	vec3 front=vec3(NDC.x*width,NDC.y*height,-1);
+	front = (InvView*vec4(front,1.0)).xyz;
+	
+	
+	vec3 ro = ViewPos;
+	vec3 rd = normalize(front-ViewPos);
+	
+	//ro= (Scale*vec4(ro,1.0)).xyz;
+	//rd =mat3(Scale)*rd;
+	rd*=1;
+	#if 0
+	float t_closest = 1000;
+	int idx = -1;
+	vec3 bary_close;
+	for(uint i=0;i<NUM_INDICIES;i+=3) {
+		uint i0 = Indicies.data[i];
+		uint i1 = Indicies.data[i+1];
+		uint i2 = Indicies.data[i+2];
+		vec3 bary;
+		float t = RayTriIntersect(
+			ro,rd,
+			Verticies.data[i0].position.xyz,
+			Verticies.data[i1].position.xyz,
+			Verticies.data[i2].position.xyz,
+			bary);
+		if(t>0.0001 && t < t_closest) {
+			t_closest = t;
+			idx = int(i);
+			bary_close=bary;
+		}
+	}
+	float sphere = intersect(ro,rd);
+	vec4 color = vec4(0);
+	if(idx!=-1) {
+		vec3 N = bary_close.z * Verticies.data[Indicies.data[idx]].normal.xyz +
+			bary_close.x * Verticies.data[Indicies.data[idx+1]].normal.xyz +
+			bary_close.y *Verticies.data[Indicies.data[idx+2]].normal.xyz;
+		color = vec4((N+vec3(1))*0.5,1);
+	}
+	#else
+	vec4 color = trace_ray(ro,rd);
+	//Ray ray;
+	//ray.pos = ro;
+	//ray.dir = rd;
+	//ray.inv_dir = 1/rd;
+	//float hit = AABBIntersect(vec3(-2),vec3(2),ray);
+	//vec4 color = vec4(0);
+	//if(hit!=-INF)
+	//	color =vec4(1,0,0,1);
+	
+	
+	#endif
+	
+	FS_OUT_FragColor = color;//vec4(rd,1.0);//color;//(idx==-1)?vec4(0):vec4(1,0,0,1);
+}
+	

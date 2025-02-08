@@ -123,3 +123,37 @@ public:
 	Texture* mytexture = nullptr;
 	handle<Render_Skylight> handle;
 };
+
+struct CubemapAnchor
+{
+	bool worldspace = false;
+	glm::vec3 p = glm::vec3(0.f);
+};
+struct Render_Reflection_Volume;
+class MeshComponent;
+class MeshBuilderComponent;
+NEWCLASS(CubemapComponent, EntityComponent)
+public:
+	CubemapComponent() {
+		set_call_init_in_editor(true);
+	}
+	void start() override;
+	void end() override;
+	void on_changed_transform() override {
+		update_editormeshbuilder();
+	}
+	void editor_on_change_property() override;
+
+	REFLECT(type = "BoolButton", hint = "Recapture", transient);
+	bool recapture = false;
+
+	REFLECT(type = "CubemapAnchor");
+	CubemapAnchor anchor;
+
+private:
+	void fill_out_struct(Render_Reflection_Volume& h);
+	void update_editormeshbuilder();
+	handle<Render_Reflection_Volume> handle;
+	Texture* mytexture = nullptr;
+	MeshBuilderComponent* editor_meshbuilder = nullptr;
+};

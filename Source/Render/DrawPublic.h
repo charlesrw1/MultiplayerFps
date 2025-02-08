@@ -74,10 +74,6 @@ public:
 	virtual void update_sun(handle<Render_Sun> handle, const Render_Sun& s) = 0;
 	virtual void remove_sun(handle<Render_Sun>& handle) = 0;
 
-	// Various volumes for GI
-	virtual handle<Render_Irradiance_Volume> register_irradiance_volume(const Render_Irradiance_Volume& v) = 0;
-	virtual void update_irradiance_volume(handle<Render_Irradiance_Volume> handle, const Render_Irradiance_Volume& v) = 0;
-	virtual void remove_irradiance_volume(handle<Render_Irradiance_Volume>& handle) = 0;
 	virtual handle<Render_Reflection_Volume> register_reflection_volume(const Render_Reflection_Volume& v) = 0;
 	virtual void update_reflection_volume(handle<Render_Reflection_Volume> handle, const Render_Reflection_Volume& v) = 0;
 	virtual void remove_reflection_volume(handle<Render_Reflection_Volume>& handle) = 0;
