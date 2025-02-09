@@ -206,7 +206,6 @@ public:
 	//
 	void update();
 	void end() {
-		inputUser->destroy();
 	}
 
 	float set_steer_angle = 0.0;
@@ -221,5 +220,5 @@ public:
 	InputActionInstance* accel = nullptr;
 	InputActionInstance* brake = nullptr;
 
-	InputUser* inputUser = nullptr;
+	std::unique_ptr<InputUser> inputUser = nullptr;
 };

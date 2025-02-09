@@ -1016,9 +1016,6 @@ void ManipulateTransformTool::update()
 	if (state == IDLE)
 		return;
 
-	//auto selected = ed_doc.selection_state.sel
-
-
 	ImGuizmo::SetImGuiContext(eng->get_imgui_context());
 	ImGuizmo::SetDrawlist();
 	const auto s_pos = ed_doc.gui->ws_position;

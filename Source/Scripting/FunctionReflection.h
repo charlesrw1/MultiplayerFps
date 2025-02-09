@@ -3,7 +3,9 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/MulticastDelegate.h"
-
+#include "Game/Entity.h"
+#include "Game/EntityComponent.h"
+#include "Assets/IAsset.h"
 struct ClassTypeInfo;
 class Entity;
 class IAsset;
@@ -14,14 +16,19 @@ EntityComponent* get_component_from_lua(lua_State* L, int index);
 Entity* get_entity_from_lua(lua_State* L, int index);
 
 template<typename T>
+inline T check_and_cast(ClassBase* ptr) {
+    return ptr ? (T)ptr->cast_to< typename std::remove_pointer<T>>() : nullptr;
+}
+
+template<typename T>
 T get_from_lua(lua_State* L, int index) {
-    if (std::is_base_of<IAsset, typename std::remove_pointer<T>>::value)
-        return (T)get_iasset_from_lua(L,index);
-    else if (std::is_base_of<Entity, typename std::remove_pointer<T>>::value)
-        return (T)get_entity_from_lua(L,index);
-    else if (std::is_base_of<EntityComponent, typename std::remove_pointer<T>>::value)
-        return (T)get_component_from_lua(L, index);
-    return (T)get_iasset_from_lua(L, index);
+    if constexpr  (std::is_base_of<IAsset, typename std::remove_pointer<T>>::value)
+        return (T)check_and_cast<T>(get_iasset_from_lua(L, index));
+    else if constexpr (std::is_base_of<Entity, typename std::remove_pointer<T>>::value)
+        return (T)check_and_cast<T>(get_entity_from_lua(L,index));
+    else if constexpr (std::is_base_of<EntityComponent, typename std::remove_pointer<T>>::value)
+        return (T)check_and_cast<T>(get_component_from_lua(L, index));
+    return T();
 }
 
 template<>
@@ -38,6 +45,7 @@ template<>
 bool get_from_lua(lua_State* L, int index);
 template<>
 const ClassTypeInfo* get_from_lua(lua_State* L, int index);
+
 
 void push_iasset_to_lua(lua_State* L, IAsset* a);
 void push_entity_to_lua(lua_State* L, Entity* e);
@@ -122,10 +130,16 @@ int lua_callable_func(lua_State* L)
 }
 
 
-inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lua_State*), bool is_getter) {
+inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lua_State*), int is_getter_or_setter /*0=none,1=getter,2=setter*/) {
     PropertyInfo p;
     p.flags = 0;
-    p.type = is_getter ? core_type_id::GetterFunc : core_type_id::Function;
+    p.type = core_type_id::Function;
+    if (is_getter_or_setter == 1) {
+        p.type = core_type_id::GetterFunc;
+    }
+    else if (is_getter_or_setter == 2) {
+        p.type = core_type_id::SetterFunc;
+    }
     p.call_function = call_func;
     p.name = name;
     return p;
@@ -138,28 +152,30 @@ void push_args_to_lua(lua_State* L, Args&&... args) {
 }
 
 
-void call_lua_func_internal_part1(lua_State* L, const char* func_name);
-int call_lua_func_internal_part2(lua_State* L, const char* func_name, int num_args);
+class ScriptComponent;
+void call_lua_func_internal_part1(ScriptComponent* s, const char* func_name);
+void call_lua_func_internal_part2(ScriptComponent* s, const char* func_name, int num_args);
+lua_State* get_lua_state_for_call_func();
 
 template <typename... Args>
-int call_lua_function(lua_State* L, const char* function_name, Args&&... args) {
-    call_lua_func_internal_part1(L, function_name);
-    push_args_to_lua(L, std::forward<Args>(args)...);
-    return call_lua_func_internal_part2(L, function_name, sizeof...(args));
+void call_lua_function(ScriptComponent* s, const char* function_name, Args&&... args) {
+    call_lua_func_internal_part1(s, function_name);
+    push_args_to_lua(get_lua_state_for_call_func(), std::forward<Args>(args)...);
+    call_lua_func_internal_part2(s, function_name, sizeof...(args));
 }
 
 template<typename ... Args>
-void add_multi(void* vself, lua_State* L, const char* func_name)
+void add_multi(void* vself, ScriptComponent* s, const char* func_name)
 {
     auto self = (MulticastDelegate<Args...>*)vself;
-    self->add(L, [L, func_name](Args...args)
+    self->add(s, [s, func_name](Args...args)
         {
-            call_lua_function<Args...>(L, func_name, std::forward<Args>(args)...);
+            call_lua_function<Args...>(s, func_name, std::forward<Args>(args)...);
         });
 }
 
 template<typename ... Args>
-void remove_multi(void* vself, lua_State* L)
+void remove_multi(void* vself, ScriptComponent* L)
 {
     auto self = (MulticastDelegate<Args...>*)vself;
     self->remove(L);
@@ -168,8 +184,8 @@ void remove_multi(void* vself, lua_State* L)
 
 struct multicast_funcs
 {
-    void(*add)(void* self, lua_State* L, const char*)=nullptr;
-    void(*remove)(void* self, lua_State* L) = nullptr;
+    void(*add)(void* self, ScriptComponent*, const char*)=nullptr;
+    void(*remove)(void* self, ScriptComponent*) = nullptr;
 };
 
 template<typename ... Args>
@@ -187,7 +203,8 @@ inline PropertyInfo make_delegate_prop(MulticastDelegate<Args...>* dummy, const 
     return p;
 }
 
-#define REG_FUNCTION(func) make_function_prop_info(#func, lua_callable_func<& TYPE_FROM_START ::func>, false)
-#define REG_GETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, lua_callable_func<& TYPE_FROM_START ::func>, true)
-#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, lua_callable_func<& TYPE_FROM_START ::func>, false)
+#define REG_FUNCTION(func) make_function_prop_info(#func, lua_callable_func<& TYPE_FROM_START ::func>, 0)
+#define REG_GETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, lua_callable_func<& TYPE_FROM_START ::func>, 1)
+#define REG_SETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, lua_callable_func<& TYPE_FROM_START ::func>, 2)
+#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, lua_callable_func<& TYPE_FROM_START ::func>, 0)
 #define REG_MULTICAST_DELEGATE(name) make_delegate_prop(&((TYPE_FROM_START*)0)->name,#name, offsetof(TYPE_FROM_START,name))

@@ -3,25 +3,10 @@
 #include "Game/EntityPtr.h"
 
 #include "ScriptAsset.h"
-#include <memory>
 #include "Game/SerializePtrHelpers.h"
 #include <vector>
 
 struct lua_State;
-class Script;
-class ScriptComponent;
-class EngineWrapper;
-class ScriptManager
-{
-public:
-	ScriptManager();
-	static ScriptManager& get();
-	void push_global(ClassBase* class_, const char* str);
-	void remove_global(const char* str);
-	void init_new_script(ScriptComponent* script, lua_State* state);	// pushes global nametable
-private:
-	std::unique_ptr<EngineWrapper> enginewrapper = nullptr;
-};
 
 struct PropertyInfo;
 struct OutstandingScriptDelegate {
@@ -49,13 +34,20 @@ public:
 		return (int)refs.size();
 	}
 
+	bool call_function(const char* name);
+	bool call_function_part1(const char* name);	// call this first, push arguments, then call part 2
+	bool call_function_part2(const char* name, int num_args);
+	bool has_function(const char* name);
+
 	static const PropertyInfoList* get_props();
 
 	std::vector<EntityPtr> refs;
 	std::vector<OutstandingScriptDelegate> outstandings;
 	AssetPtr<Script> script;
-
-	lua_State* state = nullptr;
 private:
+	void print_my_table();
+	void push_table_to_stack();
+
+	bool loaded_successfully = false;
 	void init_vars_from_loading();
 };

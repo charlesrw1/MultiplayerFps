@@ -181,7 +181,6 @@ public:
 		//eng->set_game_focused(true);
 	}
 	virtual void end() override {
-		GetGInput().free_input_user(inputPtr);
 		GetGInput().device_connected.remove(this);
 	}
 
@@ -369,7 +368,7 @@ public:
 	CapsuleComponent* capsule = nullptr;
 	MeshComponent* mesh = nullptr;
 	TopDownHealthComponent* health = nullptr;
-	InputUser* inputPtr = nullptr;
+	std::unique_ptr<InputUser> inputPtr;
 	CameraComponent* the_camera = nullptr;
 
 	bool ragdoll_enabled = false;

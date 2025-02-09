@@ -354,7 +354,7 @@ void Entity::set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm:
 	this->scale = scale;
 	post_change_transform_R();
 }
-void Entity::set_ls_euler_rotation(const glm::vec3& euler) {
+void Entity::set_ls_euler_rotation(glm::vec3 euler) {
 	rotation = glm::quat(euler);
 	post_change_transform_R();
 }
@@ -385,11 +385,17 @@ void Entity::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm:
 		set_ws_transform(matrix);
 	}
 }
-void Entity::set_ls_position(const glm::vec3& v)
+void Entity::set_ls_position(glm::vec3 v)
 {
 	position = v;
 	post_change_transform_R();
 }
+void Entity::set_ls_scale(glm::vec3 v)
+{
+	scale = v;
+	post_change_transform_R();
+}
+
 
 
 void Entity::set_ws_transform(const glm::mat4& transform)

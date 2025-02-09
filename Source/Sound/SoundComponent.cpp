@@ -58,7 +58,7 @@ void SoundComponent::update()
 
 }
 
-void SoundComponent::play_one_shot_at_pos(const glm::vec3& v)
+void SoundComponent::play_one_shot_at_pos(const glm::vec3& v) const
 {
 	isound->play_sound(
 		sound.get(),

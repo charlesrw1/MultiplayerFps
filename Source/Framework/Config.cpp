@@ -293,27 +293,34 @@ class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
 	const char* print_matches(const char* match) {
-		std::vector<const char*> matches;
+		struct Match {
+			const char* name = "";
+			const char* desc = "";
+		};
+		std::vector<Match> matches;
 		VarManImpl* v = (VarManImpl*)VarMan::get();
 		for (auto& var : v->vars) {
 			if (var.first.find(match) != std::string::npos) {
-				matches.push_back(var.first.c_str());
+				matches.push_back({ var.first.c_str(),var.second->description });
 			}
 		}
 		for (auto& c : all_cmds) {
 			if (c.first.find(match) != std::string::npos)
-				matches.push_back(c.first.c_str());
+				matches.push_back({ c.first.c_str(),nullptr });
 		}
 		if (matches.size() == 1)
-			return matches[0];
+			return matches[0].name;
 
-		std::sort(matches.begin(), matches.end(), [](const char* a, const char* b)
+		std::sort(matches.begin(), matches.end(), [](Match a, Match b)
 			{
-				return strcmp(a, b) < 0;
+				return strcmp(a.name, b.name) < 0;
 			});
 		sys_print(Info, ">");
 		for (auto m : matches) {
-			sys_print(Info, ". %s\n", m);
+			if(m.desc)
+				sys_print(Info, ". %s : %s\n", m.name,m.desc);
+			else
+				sys_print(Info, ". %s\n", m.name);
 		}
 		return nullptr;
 	}

@@ -141,14 +141,14 @@ void GameInputSystem::set_input_mapping_status(InputUser* user, const std::strin
 		user->mapping_enabled_bitmask &= ~(1ul << index);
 }
 
-InputUser* GameInputSystem::register_input_user(int localPlayerIndex)
+std::unique_ptr<InputUser> GameInputSystem::register_input_user(int localPlayerIndex)
 {
 	InputUser* u = new InputUser;
 	u->playerIndex = localPlayerIndex;
 	impl->allUsers.insert(u);
-	return u;
+	return std::unique_ptr<InputUser>(u);
 }
-void GameInputSystem::free_input_user(InputUser*& user)
+void GameInputSystem::free_input_user(InputUser* user)
 {
 	if (user->get_device()) {
 		ASSERT(user->get_device()->user == user);
@@ -156,8 +156,6 @@ void GameInputSystem::free_input_user(InputUser*& user)
 	}
 
 	impl->allUsers.remove(user);
-	delete user;
-	user = nullptr;
 }
 
 void GameInputSystem::handle_event(const SDL_Event& event)

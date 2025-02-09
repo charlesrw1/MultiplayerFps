@@ -58,7 +58,6 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
-    <ClInclude Include="Source\External\xatlas.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
@@ -71,6 +70,7 @@
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
+    <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
@@ -184,6 +184,7 @@
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptAsset.h" />
     <ClInclude Include="Source\Scripting\ScriptComponent.h" />
+    <ClInclude Include="Source\Scripting\ScriptManagerPublic.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\OsInput.h" />
@@ -250,7 +251,6 @@
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
-    <ClCompile Include="Source\External\xatlas.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
@@ -258,6 +258,7 @@
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
+    <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDoc.cpp" />
     <ClCompile Include="Source\External\glad.c" />
@@ -340,7 +341,7 @@
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
-    <ClCompile Include="Source\Scripting\ScriptComponent.cpp" />
+    <ClCompile Include="Source\Scripting\ScriptLocal.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />

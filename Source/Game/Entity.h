@@ -38,6 +38,7 @@ public:
 
 	virtual ~Entity();
 
+	// destroy already reflected in BaseUpdater
 	void destroy();
 
 	template<typename T>
@@ -75,8 +76,12 @@ public:
 	// ws = world space, ls = local space
 	void set_ls_transform(const glm::mat4& transform);
 	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
-	void set_ls_position(const glm::vec3& v);
-	void set_ls_euler_rotation(const glm::vec3& euler);
+	REFLECT();
+	void set_ls_position(glm::vec3 v);
+	REFLECT();
+	void set_ls_euler_rotation(glm::vec3 euler);
+	REFLECT();
+	void set_ls_scale(glm::vec3 scale);
 	glm::mat4 get_ls_transform() const;
 	glm::vec3 get_ls_position() const { return position; }
 	glm::vec3 get_ls_scale() const { return scale; }
@@ -84,6 +89,8 @@ public:
 	void set_ws_transform(const glm::mat4& transform);
 	void set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
 	const glm::mat4& get_ws_transform();
+
+	REFLECT();
 	glm::vec3 get_ws_position()  { 
 		if (!parent)
 			return position;
@@ -96,13 +103,15 @@ public:
 		auto& ws = get_ws_transform();
 		return glm::quat_cast(ws);
 	}
+	REFLECT();
 	glm::vec3 get_ws_scale() {
 		if (!parent)
 			return scale;
 		// fixme
 		return glm::vec3(1.f);
 	}
-	void set_ws_position(const glm::vec3& v) {
+	REFLECT();
+	void set_ws_position(glm::vec3 v) {
 		set_ws_transform(v, get_ws_rotation(), get_ws_scale());
 	}
 	void set_ws_rotation(const glm::quat& q) {
@@ -114,6 +123,7 @@ public:
 
 	// parent the root component of this to another entity
 	// can use nullptr to unparent
+	REFLECT();
 	void parent_to(Entity* parentEntity);
 
 	const std::vector<EntityComponent*>& get_components() const { return all_components; }

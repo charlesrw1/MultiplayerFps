@@ -62,7 +62,7 @@ dbg.fly 1
 #r.debug_csm 1
 
 FONT_TEST
-
+loglevel 2
 
 #r.debug_specular 1
 

@@ -13,9 +13,8 @@ public:
     void editor_on_change_property() override;
     void on_changed_transform() override;
 
-
     // can use the component like an "Asset" for playing sounds with settings
-    void play_one_shot_at_pos(const glm::vec3& v) ;
+    void play_one_shot_at_pos(const glm::vec3& v) const;
     
     REFLECT();
     void play_one_shot() {  // const (get_ws_position isnt const, fixme)

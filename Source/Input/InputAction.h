@@ -104,7 +104,7 @@ class InputDevice;
 class InputUser
 {
 public:
-	void destroy();
+	~InputUser();
 
 	void enable_mapping(const std::string& mapping_id);
 	void disable_mapping(const std::string& mapping_id);
@@ -118,6 +118,8 @@ public:
 	MulticastDelegate<> on_changed_device;
 
 private:
+	InputUser();
+
 	bool has_mapping_tracked(int index) const {
 		return tracked_mapping_bitmasks & (1ul << index);
 	}

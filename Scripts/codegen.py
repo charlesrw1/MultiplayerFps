@@ -39,6 +39,7 @@ class Property:
         self.list_struct = ""
         self.hint = ""
         self.is_getter = False
+        self.is_setter = False
         self.enum_or_struct_name = ""
     def get_flags(self):
         if not self.transient and not self.hide:
@@ -189,6 +190,8 @@ def parse_reflect_macro(line : str):
                 current_prop.hint = next(token_iter)
             elif t=="getter":
                 current_prop.is_getter = True
+            elif t=="setter":
+                current_prop.is_setter = True
             else:
                 raise Exception(f"unexpected REFLECT(...) arg \"{t}\"")
 

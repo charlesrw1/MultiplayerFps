@@ -869,8 +869,6 @@ void Player::on_foot_update()
 	 parent_to(bike);
 }
  void Player::end() {
-	 GameInputSystem::get().free_input_user(inputPtr);
-
 	 GetGInput().device_connected.remove(this);
  }
 

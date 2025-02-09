@@ -55,8 +55,8 @@ public:
 
 	// create a user which can recieve callbacks and have its input data updated
 	// InputUsers must call assign_device() with a handle to start recieving input
-	InputUser* register_input_user(int localPlayerIndex);
-	void free_input_user(InputUser*& user);
+	std::unique_ptr<InputUser> register_input_user(int localPlayerIndex);
+	void free_input_user(InputUser* user);	// should only call this from destructor of unique_ptr<>
 
 	InputAction* register_input_action(std::unique_ptr<InputAction> action);
 	GlobalInputBinding find_bind_for_string(const std::string& key_str);

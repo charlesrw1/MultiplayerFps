@@ -57,6 +57,8 @@
 
 #include "Framework/SysPrint.h"
 
+#include "Scripting/ScriptManagerPublic.h"
+
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
@@ -1486,6 +1488,7 @@ void GameEngineLocal::init()
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 #endif
+	g_scriptMgr->init();
 
 	GameInputSystem::get().init();
 	register_input_actions_for_game();
