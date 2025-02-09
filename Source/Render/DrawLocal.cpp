@@ -69,7 +69,7 @@ DECLARE_ENGINE_CMD(ot)
 	float mip = atof(args.at(3));
 	const char* texture_name = args.at(4);
 
-	draw.debug_tex_out.output_tex = GetAssets().find_sync<Texture>(texture_name).get();
+	draw.debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
 	draw.debug_tex_out.scale = scale;
 	draw.debug_tex_out.alpha = alpha;
 	draw.debug_tex_out.mip = mip;
@@ -701,7 +701,7 @@ void Renderer::init()
 	shadowmap.init();
 	ssao.init();
 
-	lens_dirt = GetAssets().find_global_sync<Texture>("lens_dirt.jpg").get();
+	lens_dirt = g_assets.find_global_sync<Texture>("lens_dirt.jpg").get();
 
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
@@ -972,7 +972,7 @@ void Renderer::execute_render_lists(
 
 	auto& device = get_device();
 
-	vertexarrayhandle vao = ModelMan::get().get_vao(true);
+	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
@@ -1045,7 +1045,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	int offset = 0;
-	vertexarrayhandle vao = ModelMan::get().get_vao(true);
+	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 	for (int i = 0; i < pass.batches.size(); i++) {
 		
 		auto& batch = pass.batches[i];
@@ -1966,10 +1966,10 @@ void Renderer::accumulate_gbuffer_lighting()
 	RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
 
-	Model* LIGHT_CONE = ModelMan::get().get_light_cone();
-	Model* LIGHT_SPHERE = ModelMan::get().get_light_sphere();
-	Model* LIGHT_DOME = ModelMan::get().get_light_dome();
-	vertexarrayhandle vao = ModelMan::get().get_vao(true);
+	Model* LIGHT_CONE = g_modelMgr.get_light_cone();
+	Model* LIGHT_SPHERE = g_modelMgr.get_light_sphere();
+	Model* LIGHT_DOME = g_modelMgr.get_light_dome();
+	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 	{
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
 
@@ -2264,7 +2264,7 @@ void Renderer::deferred_decal_pass()
 	bind_texture(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
 
 	//bind_vao(mods.get_vao(true/* animated */));
-	vertexarrayhandle vao = ModelMan::get().get_vao(true);
+	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 
 	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
 		auto& obj = scene.decal_list.objects[i].type_.decal;

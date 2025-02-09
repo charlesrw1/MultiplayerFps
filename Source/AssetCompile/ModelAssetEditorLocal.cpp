@@ -99,7 +99,7 @@ void ModelEditorTool::post_map_load_callback()
 	outputEntity = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 
 
-	GetAssets().find_async<Model>(get_doc_name(), [&](GenericAssetPtr ptr) {
+	g_assets.find_async<Model>(get_doc_name(), [&](GenericAssetPtr ptr) {
 		if (!importSettings || !outputEntity)
 			return;
 		if (!ptr)
@@ -159,7 +159,7 @@ bool ModelEditorTool::save_document_internal()
 	if (!outputModel)
 		outputModel = default_asset_load<Model>(get_doc_name());
 	else
-		GetAssets().reload_sync(outputModel);
+		g_assets.reload_sync(outputModel);
 
 	return true;
 }

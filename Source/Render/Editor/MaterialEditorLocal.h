@@ -102,12 +102,12 @@ public:
 		assert(!dynamicMat);
 		assert(!outputEntity);
 
-		auto skydomeModel = GetAssets().find_sync<Model>("eng/skydome.cmdl");
-		auto skyMat = GetAssets().find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
+		auto skydomeModel = g_assets.find_sync<Model>("eng/skydome.cmdl");
+		auto skyMat = g_assets.find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
 		model.ptr = skydomeModel.get();
 
 
-		auto mat = GetAssets().find_sync<MaterialInstance>(get_doc_name());
+		auto mat = g_assets.find_sync<MaterialInstance>(get_doc_name());
 		if (!mat) {
 			sys_print(Error, "couldnt open material %s\n", get_doc_name().c_str());
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "close_ed");

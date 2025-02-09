@@ -230,8 +230,8 @@ void TabState::imgui_draw() {
 
 	if (tabs.empty()) return;
 
-	auto forward_img = GetAssets().find_global_sync<Texture>("icon/forward.png");
-	auto back_img = GetAssets().find_global_sync<Texture>("icon/back.png");
+	auto forward_img = g_assets.find_global_sync<Texture>("icon/forward.png");
+	auto back_img = g_assets.find_global_sync<Texture>("icon/back.png");
 
 
 	bool wants_back = (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(ImGuiKey_LeftArrow));
@@ -716,10 +716,10 @@ void AnimationGraphEditor::imgui_draw()
 	}
 
 	{
-		auto playimg = GetAssets().find_global_sync<Texture>("icon/play.png");
-		auto stopimg = GetAssets().find_global_sync<Texture>("icon/stop.png");
-		auto pauseimg = GetAssets().find_global_sync<Texture>("icon/pause.png");
-		auto saveimg = GetAssets().find_global_sync<Texture>("icon/save.png");
+		auto playimg = g_assets.find_global_sync<Texture>("icon/play.png");
+		auto stopimg = g_assets.find_global_sync<Texture>("icon/stop.png");
+		auto pauseimg = g_assets.find_global_sync<Texture>("icon/pause.png");
+		auto saveimg = g_assets.find_global_sync<Texture>("icon/save.png");
 
 		ImGui::PushStyleColor(ImGuiCol_Button,0);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1,1,1,0.5));
@@ -798,9 +798,9 @@ void AnimationGraphEditor::imgui_draw()
 #include "Assets/AssetRegistry.h"
 void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 {
-	auto strong_error = GetAssets().find_global_sync<Texture>("icon/fatalerr.png");
-	auto weak_error = GetAssets().find_global_sync<Texture>("icon/error.png");
-	auto info_img = GetAssets().find_global_sync<Texture>("icon/question.png");
+	auto strong_error = g_assets.find_global_sync<Texture>("icon/fatalerr.png");
+	auto weak_error = g_assets.find_global_sync<Texture>("icon/error.png");
+	auto info_img = g_assets.find_global_sync<Texture>("icon/question.png");
 
 	ImNodes::BeginNodeEditor();
 	for (auto node : nodes) {
@@ -990,7 +990,7 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 					auto node = user_create_new_graphnode(Clip_EdNode::StaticType.classname, layer);
 					Clip_EdNode* cl = node->cast_to<Clip_EdNode>();
 					ASSERT(cl);
-					cl->node->Clip = GetAssets().find_sync<AnimationSeqAsset>(resource->filename);
+					cl->node->Clip = g_assets.find_sync<AnimationSeqAsset>(resource->filename);
 					ImNodes::ClearNodeSelection();
 					ImNodes::SetNodeScreenSpacePos(cl->id, ImGui::GetMousePos());
 					ImNodes::SelectNode(cl->id);
@@ -1602,7 +1602,7 @@ void AnimationGraphEditor::post_map_load_callback()
 	bool needs_new_doc = true;
 	if (!name.empty()) {
 		// try loading graphname, create new document on fail
-		//editing_tree = GetAssets().find_sync<Animation_Tree_CFG>(name).get();
+		//editing_tree = g_assets.find_sync<Animation_Tree_CFG>(name).get();
 
 		editing_tree = try_to_load_document(name);
 
@@ -1655,7 +1655,7 @@ void AnimationGraphEditor::post_map_load_callback()
 	self_grid.add_property_list_to_grid(get_props(), this);
 
 	if (!output_model)
-		output_model = GetAssets().find_sync<Model>(animed_default_model.get_string());
+		output_model = g_assets.find_sync<Model>(animed_default_model.get_string());
 	anim_graph_ed.out.set_model(output_model.get());
 	
 	// load preview model and set and register renderable

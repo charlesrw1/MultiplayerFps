@@ -44,7 +44,7 @@ public:
 
 			auto typeInfo = ClassBase::find_class(info.range_hint);
 			if (typeInfo)
-				*ptr_prop = GetAssets().find_assetptr_unsafe(to_str, typeInfo);
+				*ptr_prop = g_assets.find_assetptr_unsafe(to_str, typeInfo);
 			else {
 				sys_print(Error, "no asset loader defined for asset type %s\n", info.range_hint);
 				*ptr_prop = nullptr;

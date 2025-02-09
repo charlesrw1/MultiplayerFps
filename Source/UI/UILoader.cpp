@@ -41,7 +41,7 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 #define MAKE_FOUR(a,b,c,d) ( (uint32_t)a | ((uint32_t)b<< 8) | ((uint32_t)c << 16) | ((uint32_t)d<<24) )
 
 void GuiFont::sweep_references() const {
-	GetAssets().touch_asset((IAsset*)font_texture);
+	g_assets.touch_asset((IAsset*)font_texture);
 }
 
 // path/file.png -> path/
@@ -122,7 +122,7 @@ bool GuiFont::load_asset(ClassBase*& user)
 	}
 	std::string texpath = get_directory(get_name()) + texname;
 
-	font_texture = GetAssets().find_sync<Texture>(texpath).get();
+	font_texture = g_assets.find_sync<Texture>(texpath).get();
 	return true;
 }
 
@@ -136,7 +136,7 @@ DECLARE_ENGINE_CMD(FONT_TEST)
 }
 void GuiFontLoader::init()
 {
-	defaultFont = GetAssets().find_global_sync<GuiFont>("eng/sengo24.fnt");
+	defaultFont = g_assets.find_global_sync<GuiFont>("eng/sengo24.fnt");
 	if (!defaultFont)
 		Fatalf("couldnt load default font");
 }

@@ -11,24 +11,13 @@ class Entity;
 class IAsset;
 class EntityComponent;
 
-IAsset* get_iasset_from_lua(lua_State* L, int index);
-EntityComponent* get_component_from_lua(lua_State* L, int index);
-Entity* get_entity_from_lua(lua_State* L, int index);
+ClassBase* get_object_from_lua(lua_State* L, int index, const ClassTypeInfo* expected_type);
 
-template<typename T>
-inline T check_and_cast(ClassBase* ptr) {
-    return ptr ? (T)ptr->cast_to< typename std::remove_pointer<T>>() : nullptr;
-}
 
 template<typename T>
 T get_from_lua(lua_State* L, int index) {
-    if constexpr  (std::is_base_of<IAsset, typename std::remove_pointer<T>>::value)
-        return (T)check_and_cast<T>(get_iasset_from_lua(L, index));
-    else if constexpr (std::is_base_of<Entity, typename std::remove_pointer<T>>::value)
-        return (T)check_and_cast<T>(get_entity_from_lua(L,index));
-    else if constexpr (std::is_base_of<EntityComponent, typename std::remove_pointer<T>>::value)
-        return (T)check_and_cast<T>(get_component_from_lua(L, index));
-    return T();
+    using Decayed = typename std::decay<T>::type;
+    return (T)get_object_from_lua(L, index, &std::remove_pointer<Decayed>::type::StaticType);
 }
 
 template<>

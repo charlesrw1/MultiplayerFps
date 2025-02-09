@@ -36,7 +36,7 @@
 
 #include "Assets/AssetDatabase.h"
 
-
+ModelMan g_modelMgr;
 
 CLASS_IMPL(Model);
 
@@ -183,7 +183,7 @@ void ModelMan::compact_memory()
 }
 DECLARE_ENGINE_CMD(compact_vertex_buffer)
 {
-	ModelMan::get().compact_memory();
+	g_modelMgr.compact_memory();
 }
 
 void MainVbIbAllocator::print_usage() const
@@ -210,7 +210,7 @@ void ModelMan::print_usage() const
 }
 DECLARE_ENGINE_CMD(print_vertex_usage)
 {
-	ModelMan::get().print_usage();
+	g_modelMgr.print_usage();
 }
 
 int MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
@@ -308,13 +308,13 @@ void Model::uninstall()
 	materials.clear();
 	uid = 0;	// reset the UID
 
-	ModelMan::get().remove_model_from_list(this);
+	g_modelMgr.remove_model_from_list(this);
 }
 
 void Model::sweep_references() const {
 	for (int i = 0; i < materials.size(); i++) {
 		auto mat = materials[i];
-		GetAssets().touch_asset(mat);
+		g_assets.touch_asset(mat);
 	}
 }
 void Model::post_load(ClassBase* u) {
@@ -322,7 +322,7 @@ void Model::post_load(ClassBase* u) {
 		return;
 	}
 	ASSERT(uid == 0);
-	ModelMan::get().upload_model(this);
+	g_modelMgr.upload_model(this);
 }
 
 #ifdef EDITOR_BUILD
@@ -393,7 +393,7 @@ bool Model::load_internal()
 
 		//materials.push_back(imaterials->find_material_instance(buffer.c_str()));
 
-		materials[i] = GetAssets().find_assetptr_unsafe<MaterialInstance>(buffer);
+		materials[i] = g_assets.find_assetptr_unsafe<MaterialInstance>(buffer);
 
 		if (!materials[i]->is_valid_to_use()) {
 			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
@@ -645,7 +645,7 @@ void ModelMan::init()
 
 
 	create_default_models();
-	auto& a = GetAssets();
+	auto& a = g_assets;
 	LIGHT_CONE = a.find_global_sync<Model>("eng/LIGHT_CONE.cmdl").get();
 	LIGHT_SPHERE = a.find_global_sync<Model>("eng/LIGHT_SPHERE.cmdl").get();
 	LIGHT_DOME = a.find_global_sync<Model>("eng/LIGHT_DOME.cmdl").get();
@@ -656,10 +656,10 @@ void ModelMan::init()
 
 void ModelMan::create_default_models()
 {
-	error_model = GetAssets().find_global_sync<Model>("eng/question.cmdl").get();
+	error_model = g_assets.find_global_sync<Model>("eng/question.cmdl").get();
 	if (!error_model)
 		Fatalf("couldnt load error model (question.cmdl)\n");
-	defaultPlane = GetAssets().find_global_sync<Model>("eng/plane.cmdl").get();
+	defaultPlane = g_assets.find_global_sync<Model>("eng/plane.cmdl").get();
 	if (!defaultPlane)
 		Fatalf("couldnt load defaultPlane model\n");
 
@@ -719,7 +719,7 @@ void ModelMan::create_default_models()
 		_sprite->lods.push_back(lod);
 		upload_model(_sprite);
 
-		GetAssets().install_system_asset(_sprite, "_SPRITE");
+		g_assets.install_system_asset(_sprite, "_SPRITE");
 	}
 }
 
@@ -805,7 +805,7 @@ DECLARE_ENGINE_CMD(print_skeleton)
 		sys_print(Error, "usage: print_rig <.cmdl>");
 		return;
 	}
-	auto mod = GetAssets().find_sync<Model>(args.at(1));
+	auto mod = g_assets.find_sync<Model>(args.at(1));
 	if (!mod) {
 		sys_print(Error, "couldnt find model\n");
 		return;

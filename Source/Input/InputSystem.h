@@ -43,10 +43,6 @@ class GameInputSystemImpl;
 class GameInputSystem
 {
 public:
-	static GameInputSystem& get() {
-		static GameInputSystem inst;
-		return inst;
-	}
 
 	// create initial devices
 	void init();
@@ -74,12 +70,10 @@ public:
 	MulticastDelegate<InputDevice*> device_disconnected;
 	// called when a device sends an input, use for detecting stuff (not for input handling!)
 	MulticastDelegate<InputDevice*, GlobalInputBinding> on_device_input;
-private:
 	~GameInputSystem();
 	GameInputSystem();
+private:
 	GameInputSystemImpl* impl = nullptr;
 };
 
-inline GameInputSystem& GetGInput() {
-	return GameInputSystem::get();
-}
+extern GameInputSystem g_inputSys;

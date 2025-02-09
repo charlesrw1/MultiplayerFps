@@ -6,6 +6,9 @@
 
 #include "GameEnginePublic.h"
 
+// global
+GameInputSystem g_inputSys;
+
 class GameInputSystemImpl
 {
 public:
@@ -57,6 +60,7 @@ InputDevice* GameInputSystem::get_keyboard_device()
 {
 	return &impl->keyboardDevice;
 }
+
 
 void GameInputSystem::init()
 {

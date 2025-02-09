@@ -75,7 +75,7 @@ static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
 			// wtf!
 			IAsset** e = (IAsset**)prop.get_ptr(inst);
 			if (*e)
-				AssetDatabase::get().touch_asset(*e);
+				g_assets.touch_asset(*e);
 		}
 		else if(prop.type==core_type_id::List) {
 			auto listptr = prop.get_ptr(inst);

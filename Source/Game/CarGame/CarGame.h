@@ -178,8 +178,8 @@ public:
 NEWCLASS(CarDriver, EntityComponent)
 public:
 	void start() override {
-		inputUser = GameInputSystem::get().register_input_user(0);
-		inputUser->assign_device(GameInputSystem::get().get_keyboard_device());
+		inputUser = g_inputSys.register_input_user(0);
+		inputUser->assign_device(g_inputSys.get_keyboard_device());
 		inputUser->enable_mapping("game");
 		auto camobj = eng->get_level()->spawn_entity_class<Entity>();
 		camera = camobj->create_component<CameraComponent>();
@@ -197,7 +197,7 @@ public:
 				top_view = !top_view;
 			}
 		);
-		for (auto d : GetGInput().get_connected_devices())
+		for (auto d : g_inputSys.get_connected_devices())
 			if (d->get_type() == InputDeviceType::Controller) {
 				inputUser->assign_device(d);
 				break;

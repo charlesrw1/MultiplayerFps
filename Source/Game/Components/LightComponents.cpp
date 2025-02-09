@@ -307,10 +307,10 @@ void CubemapComponent::fill_out_struct(Render_Reflection_Volume& h)
 	h.boxmax = get_ws_position() + scale * 0.5f;
 }
 
+#include "Framework/AddClassToFactory.h"
 #ifdef EDITOR_BUILD
 // FIXME!
 #include "LevelEditor/EditorDocLocal.h"
-#include "Framework/AddClassToFactory.h"
 class CubemapAnchorEditor : public IPropertyEditor
 {
 public:

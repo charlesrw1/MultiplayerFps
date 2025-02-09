@@ -67,7 +67,7 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 	std::string modName = path.substr(0, pos) + ".cmdl";
 	std::string animName = path.substr(pos + 1);
 
-	srcModel = GetAssets().find_assetptr_unsafe<Model>(modName);
+	srcModel = g_assets.find_assetptr_unsafe<Model>(modName);
 	if (srcModel && srcModel->get_skel()) {
 		seq = srcModel->get_skel()->find_clip(animName);
 
@@ -83,7 +83,7 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 
 void AnimationSeqAsset::sweep_references() const
 {
-	GetAssets().touch_asset(srcModel.get_unsafe());
+	g_assets.touch_asset(srcModel.get_unsafe());
 }
 void AnimationSeqAsset::move_construct(IAsset* _other) {
 	auto other = (AnimationSeqAsset*)_other;

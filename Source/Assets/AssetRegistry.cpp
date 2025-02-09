@@ -142,7 +142,7 @@ void AssetRegistrySystem::init()
 		Fatalf("ERROR: AssetRegistrySystem::init: FindFirstChangeNotificationA failed: %s\n", GetLastError());
 	}
 	hackedAsset = new HackedAsyncAssetRegReindex();
-	GetAssets().install_system_asset(hackedAsset, "_hackedAsset");
+	g_assets.install_system_asset(hackedAsset, "_hackedAsset");
 
 	reindex_all_assets();
 }
@@ -170,7 +170,7 @@ void AssetRegistrySystem::update()
 		ASSERT(status == WAIT_OBJECT_0);
 		sys_print(Debug, "reindexing assets %f %f\n",time_now, time_now-last_reindex_time);
 		reindex_all_assets();
-		AssetDatabase::get().hot_reload_assets();
+		g_assets.hot_reload_assets();
 		last_reindex_time = time_now;
 
 		if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
@@ -183,7 +183,7 @@ void AssetRegistrySystem::update()
 
 void AssetRegistrySystem::reindex_all_assets()
 {
-	AssetDatabase::get().reload_async(hackedAsset, [](GenericAssetPtr) {
+	g_assets.reload_async(hackedAsset, [](GenericAssetPtr) {
 		});
 }
 
@@ -207,7 +207,7 @@ DECLARE_ENGINE_CMD(TOUCH_ASSET)
 	}
 	auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(args.at(1)));
 	if (type) {
-		auto res = GetAssets().find_sync(args.at(1), type, 0);
+		auto res = g_assets.find_sync(args.at(1), type, 0);
 		if (!res)
 			sys_print(Error, "TOUCH_ASSET failed\n");
 	}

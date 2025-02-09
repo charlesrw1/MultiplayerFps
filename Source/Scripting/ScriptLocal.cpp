@@ -18,19 +18,20 @@ extern "C" {
 #include <iostream>
 
 #include "ScriptManagerPublic.h"
+#include "Game/LevelAssets.h"
 
 void stack_dump(lua_State* L);
 
 
 void* get_class_from_stack(lua_State* L, int index);
-IAsset* get_iasset_from_lua(lua_State* L, int index) {
-	return (IAsset*)get_class_from_stack(L, index);
-}
-EntityComponent* get_component_from_lua(lua_State* L, int index) {
-	return (EntityComponent*)get_class_from_stack(L, index);
-}
-Entity* get_entity_from_lua(lua_State* L, int index) {
-	return (Entity*)get_class_from_stack(L, index);
+
+ClassBase* get_object_from_lua(lua_State* L, int index, const ClassTypeInfo* expected_type)
+{
+	ClassBase* c = (ClassBase*)get_class_from_stack(L, index);
+	if (!c) return nullptr;
+	if (c->get_type().is_a(*expected_type))
+		return c;
+	return nullptr;
 }
 static void make_table_for_class(lua_State* L, ClassBase* c);
 static void make_table_for_gameobject(lua_State* L, BaseUpdater* c);
@@ -246,7 +247,7 @@ public:
 		return eng->get_game_time();
 	}
 	IAsset* find_asset(const char* asset_type, const char* name) {
-		return AssetDatabase::get().find_sync(name, ClassBase::find_class(asset_type), 0).get();
+		return g_assets.find_sync(name, ClassBase::find_class(asset_type), 0).get();
 	}
 	void log_to_screen(const char* text) {
 		eng->log_to_fullscreen_gui(Info, text);

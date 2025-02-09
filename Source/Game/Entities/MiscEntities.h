@@ -109,7 +109,7 @@ public:
 	Door() {
 		door_mesh = construct_sub_component<MeshComponent>("DoorMesh");
 
-		door_mesh->set_model(GetAssets().find_assetptr_unsafe<Model>("door.cmdl"));
+		door_mesh->set_model(g_assets.find_assetptr_unsafe<Model>("door.cmdl"));
 	}
 
 

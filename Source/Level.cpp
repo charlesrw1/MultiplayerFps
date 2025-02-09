@@ -233,8 +233,8 @@ void Level::close_level()
 
 	all_world_ents.clear_all();
 
-	GetAssets().explicit_asset_free(source_asset);
-	GetAssets().unreference_this_channel(0);
+	g_assets.explicit_asset_free(source_asset);
+	g_assets.unreference_this_channel(0);
 
 	source_asset = nullptr;
 }

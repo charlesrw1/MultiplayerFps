@@ -155,7 +155,7 @@ void unserialize_one_item_text(
 		if (type.rfind(".pfb") == type.size() - 4) {
 			ASSERT(!is_root);	// cant have prefabs as root in prefab... yet :)
 
-			PrefabAsset* asset = GetAssets().find_sync<PrefabAsset>(type).get();
+			PrefabAsset* asset = g_assets.find_sync<PrefabAsset>(type).get();
 			if (!asset)
 				throw std::runtime_error("couldnt find scene file: " + type);
 

@@ -111,7 +111,7 @@ ADD_TEST(Serialization, BuildPath)
 	SerializeTestWorkbench work;
 	auto e = work.add_entity<Entity>();
 
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test2.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test2.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 
 	work.post_unserialization();
@@ -176,7 +176,7 @@ extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_p
 ADD_TEST(Serialization, ThisIsNewlyCreated)
 {
 	SerializeTestWorkbench work;
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test4.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test4.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	auto subent = pent->get_children().at(0);
 	auto newent = work.add_entity<Entity>();
@@ -205,7 +205,7 @@ ADD_TEST(Serialization, RelativePaths)
 	TEST_TRUE(unserialize_relative_to_absolute("../../../2/~3", "1/2/3") == "2/~3");
 
 	SerializeTestWorkbench work;
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test4.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test4.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	auto subent = pent->get_children().at(0);
 	auto newent = work.add_entity<Entity>();
@@ -228,7 +228,7 @@ extern const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for
 ADD_TEST(Serialization, PrefabInPrefabSerialize)
 {
 	SerializeTestWorkbench work;
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test4.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test4.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	auto subent = pent->get_children().at(0);
 	work.post_unserialization();
@@ -256,7 +256,7 @@ ADD_TEST(Serialization, WritePrefab)
 	auto comp = work.add_component<PointLightComponent>(root);
 
 
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test2.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test2.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	pent->parent_to(root);
 
@@ -356,7 +356,7 @@ ADD_TEST(Serialization, FindDiffInPrefab)
 	auto comp = work.add_component<PointLightComponent>(root);
 
 
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test2.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test2.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	pent->parent_to(root);
 
@@ -379,7 +379,7 @@ ADD_TEST(Serialization, FindDiffInScene)
 	ent2->parent_to(ent1);
 	auto comp = work.add_component<PointLightComponent>(ent1);
 
-	PrefabAsset* loadPrefab = GetAssets().find_sync<PrefabAsset>("test2.pfb").get();
+	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test2.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 
 	PrefabAsset* diff_prefab = nullptr;

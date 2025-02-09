@@ -912,8 +912,8 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 {
 	sys_print(Info, "on_map_change_callback %s\n",(loadedLevel)?loadedLevel->get_name().c_str():"<nullptr>");
 
-	GetAssets().remove_unreferences();
-	ModelMan::get().compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
+	g_assets.remove_unreferences();
+	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
 
 	ASSERT(!level);
 	ASSERT(is_waiting_on_load_level_callback);
@@ -969,11 +969,11 @@ void GameEngineLocal::execute_map_change()
 
 		// not memory leak, gets cleaned up
 		SceneAsset* temp = new SceneAsset;
-		GetAssets().install_system_asset(temp, "empty.tmap");
+		g_assets.install_system_asset(temp, "empty.tmap");
 		on_map_change_callback(true /* == this_is_for_editor */, temp);
 	}
 	else {
-		GetAssets().find_async<SceneAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
+		g_assets.find_async<SceneAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
 			{
 				auto level = (ptr)?ptr.cast_to<SceneAsset>():nullptr;
 				eng_local.on_map_change_callback(this_is_for_editor, level.get());
@@ -1484,13 +1484,13 @@ void GameEngineLocal::init()
 	Profiler::init();
 
 	FileSys::init();
-	AssetDatabase::get().init();
+	g_assets.init();
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 #endif
 	g_scriptMgr->init();
 
-	GameInputSystem::get().init();
+	g_inputSys.init();
 	register_input_actions_for_game();
 
 	g_physics.init();
@@ -1501,7 +1501,7 @@ void GameEngineLocal::init()
 	g_fonts.init();
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 	isound->init();
-	ModelMan::get().init();
+	g_modelMgr.init();
 	//cl->init();
 	//sv->init();
 	imgui_context = ImGui::CreateContext();
@@ -1585,7 +1585,7 @@ void GameEngineLocal::game_update_tick()
 	};
 	auto update = [&](double dt) {
 		if (!is_editor_level())
-			GameInputSystem::get().tick_users(dt);
+			g_inputSys.tick_users(dt);
 		level->update_level();
 	};
 	const double dt = frame_time;
@@ -1696,7 +1696,7 @@ void GameEngineLocal::loop()
 				break;
 			}
 			
-			GetGInput().handle_event(event);
+			g_inputSys.handle_event(event);
 			
 			if (!is_game_focused()) {
 				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
@@ -1744,7 +1744,7 @@ void GameEngineLocal::loop()
 		isound->tick(frame_time);
 
 		// tick async loaded assets
-		AssetDatabase::get().tick_asyncs();
+		g_assets.tick_asyncs();
 
 #ifdef EDITOR_BUILD
 		// update hot reloading

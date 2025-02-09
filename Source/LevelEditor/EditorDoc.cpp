@@ -108,7 +108,7 @@ public:
 		if (!eng->get_level())
 			return;
 
-		const GuiFont* font = GetAssets().find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		const GuiFont* font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 		if (!font) font = g_fonts.get_default_font();
 
 		struct obj {
@@ -325,7 +325,7 @@ bool EditorDoc::save_document_internal()
 	sys_print(Info, "Wrote out to %s\n", path.c_str());
 
 	if (is_editing_prefab()) {
-		GetAssets().reload_sync(pa);
+		g_assets.reload_sync(pa);
 	}
 
 	return true;
@@ -420,7 +420,7 @@ void EditorDoc::on_map_load_return(bool good)
 			}
 
 			if (!get_doc_name().empty()) {
-				editing_prefab = GetAssets().find_sync<PrefabAsset>(get_doc_name()).get();
+				editing_prefab = g_assets.find_sync<PrefabAsset>(get_doc_name()).get();
 				if (!editing_prefab) {
 					eng->log_to_fullscreen_gui(Error, "Couldnt load prefab");
 					set_empty_doc();
@@ -1521,11 +1521,11 @@ void EdPropertyGrid::draw()
 									}
 									else if (type == script_metadata) {
 										ed_doc.command_mgr->add_command(
-											new CreateScriptComponentCommand(ent, GetAssets().find_sync<Script>(resource->filename).get()));
+											new CreateScriptComponentCommand(ent, g_assets.find_sync<Script>(resource->filename).get()));
 									}
 									else if (type == mesh_metadata) {
 										ed_doc.command_mgr->add_command(
-											new CreateMeshComponentCommand(ent, GetAssets().find_sync<Model>(resource->filename).get()));
+											new CreateMeshComponentCommand(ent, g_assets.find_sync<Model>(resource->filename).get()));
 									}
 								}
 							}
@@ -1701,7 +1701,7 @@ public:
 		}
 		else {
 			auto classtype = ClassBase::find_class(prop->range_hint);
-			auto asset = GetAssets().find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
+			auto asset = g_assets.find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
 			*ptr = asset;
 		}
 	}
@@ -1740,7 +1740,7 @@ public:
 		EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
 
 		ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
-		auto eyedropper = GetAssets().find_sync<Texture>("icon/eyedrop.png");
+		auto eyedropper = g_assets.find_sync<Texture>("icon/eyedrop.png");
 		if (ImGui::ImageButton((ImTextureID)uint64_t(eyedropper->gl_id), ImVec2(16, 16))) {
 			ed_doc.enable_entity_eyedropper_mode(this);
 		}
@@ -1889,7 +1889,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 {
 	static int counter = 0;
 	const int size = 10;
-	auto model = GetAssets().find_sync<Model>("wall2x2.cmdl");
+	auto model = g_assets.find_sync<Model>("wall2x2.cmdl");
 	for (int z = 0; z < size; z++) {
 		for (int y = 0; y < size; y++) {
 			for (int x = 0; x < size; x++) {

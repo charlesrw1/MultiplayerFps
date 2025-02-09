@@ -73,7 +73,7 @@ inline bool TextureEditorTool::open_document_internal(const char* name, const ch
 		sys_print(Error, "couldn't open texture import settings file %s\n", name);
 		return false;
 	}
-	textureAsset = GetAssets().find_sync<Texture>(name).get();
+	textureAsset = g_assets.find_sync<Texture>(name).get();
 
 
 	DictParser dp;
@@ -110,9 +110,9 @@ inline bool TextureEditorTool::save_document_internal()
 	file->close();
 
 	if (textureAsset)
-		GetAssets().reload_sync(textureAsset);
+		g_assets.reload_sync(textureAsset);
 	else
-		textureAsset = GetAssets().find_sync<Texture>(get_doc_name()).get();
+		textureAsset = g_assets.find_sync<Texture>(get_doc_name()).get();
 
 	return true;
 }

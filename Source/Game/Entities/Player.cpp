@@ -528,7 +528,7 @@ public:
 		paused_text->color = COLOR_WHITE;
 		vbox->add_this(paused_text);
 
-		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("switch2.wav").get();
+		const SoundFile* s = g_assets.find_global_sync<SoundFile>("switch2.wav").get();
 		auto b = create_button("TO MAIN MENU", s);
 		b->on_selected.add(this, [] {
 				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "map mainMenuMap.tmap");
@@ -810,11 +810,11 @@ void Player::on_foot_update()
 
 	 eng->set_game_focused(true);
 
-	 inputPtr = GetGInput().register_input_user(0);
+	 inputPtr = g_inputSys.register_input_user(0);
 //
 //	 {
 //		 std::vector<const InputDevice*> devices;
-//		 GetGInput().get_connected_devices(devices);
+//		 g_inputSys.get_connected_devices(devices);
 //		 int deviceIdx = 0;
 //		 for (; deviceIdx < devices.size(); deviceIdx++) {
 //			 if (devices[deviceIdx]->type == InputDeviceType::Controller) {
@@ -823,9 +823,9 @@ void Player::on_foot_update()
 //			 }
 //		 }
 //		 if (deviceIdx == devices.size())
-//			 inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
+//			 inputPtr->assign_device(g_inputSys.get_keyboard_device_handle());
 //
-//		 GetGInput().device_connected.add(this, [&](handle<InputDevice> handle)
+//		 g_inputSys.device_connected.add(this, [&](handle<InputDevice> handle)
 //			 {
 //
 //				 inputPtr->assign_device(handle);
@@ -833,7 +833,7 @@ void Player::on_foot_update()
 //
 //		 inputPtr->on_lost_device.add(this, [&]()
 //			 {
-//				inputPtr->assign_device(GetGInput().get_keyboard_device_handle());
+//				inputPtr->assign_device(g_inputSys.get_keyboard_device_handle());
 //			 });
 //	 }
 //
@@ -869,7 +869,7 @@ void Player::on_foot_update()
 	 parent_to(bike);
 }
  void Player::end() {
-	 GetGInput().device_connected.remove(this);
+	 g_inputSys.device_connected.remove(this);
  }
 
  Player::~Player() {
@@ -881,7 +881,7 @@ void Player::on_foot_update()
 	 spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
 	 health = construct_sub_component<HealthComponent>("PlayerHealth");
 
-	// auto playerMod = GetAssets().find_assetptr_unsafe<Model>("SWAT_model.cmdl");
+	// auto playerMod = g_assets.find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 //player_mesh->set_model(playerMod);
 	// player_mesh->set_animation_graph("ik_test.ag");
 	 player_mesh->set_is_visible(false);
@@ -901,7 +901,7 @@ public:
 	CoverPositionMarker() {
 		if (eng->is_editor_level()) {
 			auto billboard = construct_sub_component<BillboardComponent>("EditorBillboard");
-			billboard->set_texture(GetAssets().find_global_sync<Texture>("icon/_nearest/blue_poi.png").get());
+			billboard->set_texture(g_assets.find_global_sync<Texture>("icon/_nearest/blue_poi.png").get());
 			billboard->dont_serialize_or_edit = true;
 
 			auto arrowobj = construct_sub_entity<Entity>("ArrowObj");

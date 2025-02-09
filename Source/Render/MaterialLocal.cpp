@@ -172,11 +172,11 @@ bool MaterialInstance::load_asset(ClassBase*&)
 void MaterialInstance::sweep_references()const {
 	if (!impl)
 		return;
-	GetAssets().touch_asset(impl->parentMatInstance.get_unsafe());
+	g_assets.touch_asset(impl->parentMatInstance.get_unsafe());
 	for (int i = 0; i < impl->params.size(); i++) {
 		auto& p = impl->params[i];
 		if (p.type == MatParamType::Texture2D || p.type == MatParamType::ConstTexture2D) {
-			GetAssets().touch_asset(p.tex_ptr);
+			g_assets.touch_asset(p.tex_ptr);
 		}
 	}
 }
@@ -289,7 +289,7 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
 			throw MasterMaterialExcept("Expceted PARENT ...");
 		}
 		std::string parent_mat = to_std_string_sv(tok);
-		AssetPtr<MaterialInstance> parent = GetAssets().find_sync<MaterialInstance>(parent_mat.c_str());
+		AssetPtr<MaterialInstance> parent = g_assets.find_sync<MaterialInstance>(parent_mat.c_str());
 		if (!parent)
 			throw MasterMaterialExcept("Couldnt find parent material" + fullpath);
 
@@ -342,7 +342,7 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
 				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
-					myparam.tex_ptr = GetAssets().find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
+					myparam.tex_ptr = g_assets.find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
 				}break;
 
 				default:
@@ -446,7 +446,7 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
-					def.default_value.tex_ptr = GetAssets().find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
+					def.default_value.tex_ptr = g_assets.find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
 				}break;
 
 				default:
@@ -796,15 +796,15 @@ void MaterialManagerLocal::init() {
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
-	fallback = GetAssets().find_global_sync<MaterialInstance>("eng/fallback.mm").get();
+	fallback = g_assets.find_global_sync<MaterialInstance>("eng/fallback.mm").get();
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
 
-	defaultBillboard = GetAssets().find_global_sync<MaterialInstance>("eng/billboardDefault.mm").get();
+	defaultBillboard = g_assets.find_global_sync<MaterialInstance>("eng/billboardDefault.mm").get();
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 
-	PPeditorSelectMat = GetAssets().find_global_sync<MaterialInstance>("eng/defaultEditorSelect.mm").get();
+	PPeditorSelectMat = g_assets.find_global_sync<MaterialInstance>("eng/defaultEditorSelect.mm").get();
 	if (!PPeditorSelectMat)
 		Fatalf("couldnt load the default editor select material\n");
 }

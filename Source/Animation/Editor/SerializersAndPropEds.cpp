@@ -295,7 +295,7 @@ class BlendspaceGridEd : public IPropertyEditor
 						AssetOnDisk* aod = *(AssetOnDisk**)payload->Data;
 						if (aod->type->get_asset_class_type()->is_a(AnimationSeqAsset::StaticType)) {
 		
-							gridpoint.animation = GetAssets().find_sync<AnimationSeqAsset>(aod->filename);
+							gridpoint.animation = g_assets.find_sync<AnimationSeqAsset>(aod->filename);
 						}
 
 					}

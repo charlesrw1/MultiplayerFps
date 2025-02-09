@@ -10,7 +10,7 @@ CLASS_H(ArrowComponent,EntityComponent)
 public:
 	ArrowComponent() {
 		set_call_init_in_editor(true);
-		arrowModel = GetAssets().find_assetptr_unsafe<Model>("arrowModel.cmdl");
+		arrowModel = g_assets.find_assetptr_unsafe<Model>("arrowModel.cmdl");
 		dont_serialize_or_edit = true;	// default to true
 	}
 

@@ -277,7 +277,7 @@ void AnimationEditorTool::post_map_load_callback()
 		sys_print(Debug,"compilied model didnt load but loading .def didnt error, continuing as normal\n");
 	else {
 		int remapIndx;
-		sequence = GetAssets().find_sync<AnimationSeqAsset>(modelName + "/" + animName).get();// outputModel->get_skel()->find_clip(animName, remapIndx);
+		sequence = g_assets.find_sync<AnimationSeqAsset>(modelName + "/" + animName).get();// outputModel->get_skel()->find_clip(animName, remapIndx);
 	}
 
 	on_start.invoke();
@@ -329,7 +329,7 @@ bool AnimationEditorTool::save_document_internal()
 	}
 	else {
 
-		GetAssets().reload_async(outputModel, [](GenericAssetPtr ptr) {
+		g_assets.reload_async(outputModel, [](GenericAssetPtr ptr) {
 
 			if (!g_animseq_editor_static.outputModel)
 				return;
@@ -342,7 +342,7 @@ bool AnimationEditorTool::save_document_internal()
 			g_animseq_editor_static.on_post_save.invoke();
 		});
 
-	//	GetAssets().reload_sync(outputModel);
+	//	g_assets.reload_sync(outputModel);
 	}
 	return true;
 }

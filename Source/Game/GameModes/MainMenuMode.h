@@ -117,7 +117,7 @@ public:
 		vbox->ls_position = { 100,100 };
 		vbox->ls_sz = { 200,500 };
 
-		const SoundFile* s = GetAssets().find_global_sync<SoundFile>("switch2.wav").get();
+		const SoundFile* s = g_assets.find_global_sync<SoundFile>("switch2.wav").get();
 
 		GUIButton* b = create_button("PLAY",s);
 		b->on_selected.add(this, &MainMenuUILayout::start_game);

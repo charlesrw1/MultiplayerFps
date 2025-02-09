@@ -26,7 +26,7 @@ bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 
 	// loading a file
 	if (has_extension(name, "dc")) {
-		const DataClass* dc = GetAssets().find_sync<DataClass>(name).get();
+		const DataClass* dc = g_assets.find_sync<DataClass>(name).get();
 		if (dc) {
 			editing_object = dc->get_obj()->get_type().allocate();
 			typeInfo = &editing_object->get_type();

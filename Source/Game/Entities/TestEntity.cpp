@@ -8,8 +8,8 @@ CLASS_H(TestEntityWithSubEntities, Entity)
 public:
 	TestEntityWithSubEntities() {
 
-		auto cube = GetAssets().find_assetptr_unsafe<Model>("bike.cmdl");
-		auto cone = GetAssets().find_assetptr_unsafe<Model>("cone.cmdl");
+		auto cube = g_assets.find_assetptr_unsafe<Model>("bike.cmdl");
+		auto cone = g_assets.find_assetptr_unsafe<Model>("cone.cmdl");
 
 
 		auto m = construct_sub_component<MeshComponent>("main");

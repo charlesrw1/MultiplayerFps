@@ -8,7 +8,7 @@ InputAction* InputAction::register_action(const std::string& binding_group, cons
 	a->mapping_id_str = binding_group;
 	a->name_id = action_name;
 	a->is_additive = is_additive;
-	return GameInputSystem::get().register_input_action(std::unique_ptr<InputAction>(a));
+	return g_inputSys.register_input_action(std::unique_ptr<InputAction>(a));
 }
 InputAction* InputAction::add_bind(const std::string& name, GlobalInputBinding binding, InputModifier* modifier, InputTrigger* trigger)
 {
@@ -100,11 +100,11 @@ InputActionInstance* InputUser::get(const std::string& name)
 
 void InputUser::enable_mapping(const std::string& mapping_id)
 {
-	GetGInput().set_input_mapping_status(this, mapping_id, true);
+	g_inputSys.set_input_mapping_status(this, mapping_id, true);
 }
 void InputUser::disable_mapping(const std::string& mapping_id)
 {
-	GetGInput().set_input_mapping_status(this, mapping_id, false);
+	g_inputSys.set_input_mapping_status(this, mapping_id, false);
 }
 InputUser::InputUser()
 {
@@ -112,7 +112,8 @@ InputUser::InputUser()
 }
 InputUser::~InputUser()
 {
-	GameInputSystem::get().free_input_user(this);
+	// RAII based input user
+	g_inputSys.free_input_user(this);
 }
 
 void InputUser::assign_device(InputDevice* device)

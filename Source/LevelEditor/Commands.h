@@ -89,7 +89,7 @@ public:
 	}
 	void execute() {
 		auto l = eng->get_level();
-		auto p = GetAssets().find_sync<PrefabAsset>(prefab_name);
+		auto p = g_assets.find_sync<PrefabAsset>(prefab_name);
 		if (p) {
 			auto ent = l->spawn_prefab(p.get());
 			if (ent) {
@@ -148,7 +148,7 @@ public:
 		ed_doc.post_node_changes.invoke();
 
 
-		GetAssets().find_async<Model>(modelname.c_str(), [the_handle = ent->get_instance_id()](GenericAssetPtr p) {
+		g_assets.find_async<Model>(modelname.c_str(), [the_handle = ent->get_instance_id()](GenericAssetPtr p) {
 			if (p) {
 				auto modelP = p.cast_to<Model>();
 				

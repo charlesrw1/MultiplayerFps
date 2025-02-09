@@ -134,8 +134,8 @@ bool MaterialEditorLocal::save_document_internal()
 	outfile->close();
 
 	// kinda shit ngl
-	auto ptr = GetAssets().find_sync<MaterialInstance>(get_doc_name());
-	GetAssets().reload_sync(ptr);
+	auto ptr = g_assets.find_sync<MaterialInstance>(get_doc_name());
+	g_assets.reload_sync(ptr);
 
 	return true;
 }

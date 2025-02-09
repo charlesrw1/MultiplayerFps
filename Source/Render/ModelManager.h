@@ -40,10 +40,6 @@ class ModelMan
 {
 public:
 	ModelMan();
-	static ModelMan& get() {
-		static ModelMan inst;
-		return inst;
-	}
 
 	void init();
 
@@ -91,3 +87,5 @@ private:
 	friend class Model;
 	friend class ModelLoadJob;
 };
+
+extern ModelMan g_modelMgr;

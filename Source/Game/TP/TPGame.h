@@ -95,9 +95,9 @@ public:
 
 	void start() override {
 		cc.set_position(get_ws_position());
-		input = GameInputSystem::get().register_input_user(0);
-		input->assign_device(GetGInput().get_keyboard_device());
-		for (auto d : GetGInput().get_connected_devices())
+		input = g_inputSys.register_input_user(0);
+		input->assign_device(g_inputSys.get_keyboard_device());
+		for (auto d : g_inputSys.get_connected_devices())
 			if (d->get_type() == InputDeviceType::Controller) {
 				input->assign_device(d);
 				break;

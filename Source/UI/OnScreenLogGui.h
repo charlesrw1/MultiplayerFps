@@ -13,7 +13,7 @@ CLASS_H(OnScreenLogGui, GUI)
 public:
 
 	virtual void paint(UIBuilder& b) {
-		auto font = GetAssets().find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();
 		float total_time = time_at_full_opacity + time_to_fade;

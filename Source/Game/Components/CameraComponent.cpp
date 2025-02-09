@@ -17,7 +17,7 @@ void CameraComponent::start()
 	if (eng->is_editor_level()) {
 
 		editor_mesh = get_owner()->create_component<MeshComponent>();
-		editor_mesh->set_model(GetAssets().find_global_sync<Model>("camera_model.cmdl").get());
+		editor_mesh->set_model(g_assets.find_global_sync<Model>("camera_model.cmdl").get());
 		editor_mesh->dont_serialize_or_edit = true;
 
 		editor_mbview = get_owner()->create_component<MeshBuilderComponent>();

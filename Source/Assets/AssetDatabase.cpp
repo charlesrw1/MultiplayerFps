@@ -535,6 +535,8 @@ AssetDatabase::AssetDatabase() {
 	impl = std::make_unique<AssetDatabaseImpl>();
 }
 AssetDatabase::~AssetDatabase() {}
+AssetDatabase g_assets;
+
 
 #ifdef EDITOR_BUILD
 void AssetDatabase::hot_reload_assets()
@@ -635,7 +637,7 @@ void AssetDatabase::print_usage()
 
 DECLARE_ENGINE_CMD(print_assets)
 {
-	AssetDatabase::get().print_usage();
+	g_assets.print_usage();
 }
 
 #include "Test/Test.h"

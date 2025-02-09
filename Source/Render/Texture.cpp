@@ -609,7 +609,7 @@ void Texture::uninstall()
 Texture* Texture::install_system(const std::string& path)
 {
 	Texture* t = new Texture;
-	AssetDatabase::get().install_system_asset(t, path);
+	g_assets.install_system_asset(t, path);
 	return t;
 }
 

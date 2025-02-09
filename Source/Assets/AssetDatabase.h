@@ -30,11 +30,6 @@ class AssetDatabase
 {
 public:
 
-	static AssetDatabase& get() {
-		static AssetDatabase inst;
-		return inst;
-	}
-
 	void init();
 
 	// update any async resource requests that have finished, executes callbacks, calls post_load (ie to upload GPU resources)
@@ -122,27 +117,23 @@ public:
 #endif
 
 	void print_usage();
-private:
 	AssetDatabase();
 	~AssetDatabase();
+private:
 	std::unique_ptr<AssetDatabaseImpl> impl;
 };
 
-// shorthands
-inline AssetDatabase& GetAssets()
-{
-	return AssetDatabase::get();
-}
+extern AssetDatabase g_assets;
 
 // sync load to the default channel (usually 0)
 template<typename T>
 T* default_asset_load(const std::string& path) {
-	auto res = GetAssets().find_sync<T>(path, 0);
+	auto res = g_assets.find_sync<T>(path, 0);
 	return res.get();
 }
 template<typename T>
 T* find_global_asset_s(const std::string& path) {
-	auto res = GetAssets().find_global_sync<T>(path);
+	auto res = g_assets.find_global_sync<T>(path);
 	return res.get();
 }
 

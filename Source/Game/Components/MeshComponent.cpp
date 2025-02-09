@@ -67,7 +67,7 @@ int MeshComponent::get_index_of_bone(StringName bonename) const
 
 void MeshComponent::set_model_str(const char* model_path)
 {
-	Model* modelnext = GetAssets().find_sync<Model>(model_path).get();
+	Model* modelnext = g_assets.find_sync<Model>(model_path).get();
 	if (modelnext != model.get()) {
 		model = modelnext;
 		update_handle();
@@ -124,7 +124,7 @@ void MeshComponent::update_handle()
 
 void MeshComponent::update_animator_instance()
 {
-	auto modToUse = (model.did_fail()) ? ModelMan::get().get_error_model() : model.get();
+	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
 	bool should_set_ticking = false;
 	if (!eng->is_editor_level()) {
 		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {

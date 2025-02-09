@@ -111,7 +111,7 @@ public:
 			ASSERT(CameraComponent::get_scene_camera() == the_camera);
 		}
 
-		shotgunSoundAsset = GetAssets().find_sync<PrefabAsset>("top_down/shotgun_sound.pfb");
+		shotgunSoundAsset = g_assets.find_sync<PrefabAsset>("top_down/shotgun_sound.pfb");
 		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset.get())->get_component<SoundComponent>();
 
 		ccontroller = std::make_unique<CharacterController>(capsule);
@@ -119,9 +119,9 @@ public:
 		ccontroller->capsule_height = capsule->height;
 		ccontroller->capsule_radius = capsule->radius;
 
-		inputPtr = GetGInput().register_input_user(0);
-		inputPtr->assign_device(GetGInput().get_keyboard_device());
-		for (auto d : GetGInput().get_connected_devices())
+		inputPtr = g_inputSys.register_input_user(0);
+		inputPtr->assign_device(g_inputSys.get_keyboard_device());
+		for (auto d : g_inputSys.get_connected_devices())
 			if (d->get_type() == InputDeviceType::Controller) {
 				inputPtr->assign_device(d);
 				break;
@@ -129,7 +129,7 @@ public:
 		inputPtr->on_changed_device.add(this, [&]()
 			{
 				if (!inputPtr->get_device())
-					inputPtr->assign_device(GetGInput().get_keyboard_device());
+					inputPtr->assign_device(g_inputSys.get_keyboard_device());
 			});
 
 
@@ -181,7 +181,7 @@ public:
 		//eng->set_game_focused(true);
 	}
 	virtual void end() override {
-		GetGInput().device_connected.remove(this);
+		g_inputSys.device_connected.remove(this);
 	}
 
 	void shoot_gun() {
@@ -192,7 +192,7 @@ public:
 			int count = 5;
 			for (int i = 0; i < count; i++) {
 
-				auto projectile = eng->get_level()->spawn_prefab(GetAssets().find_sync<PrefabAsset>("top_down/projectile.pfb").get());
+				auto projectile = eng->get_level()->spawn_prefab(g_assets.find_sync<PrefabAsset>("top_down/projectile.pfb").get());
 				auto pc = projectile->get_component<ProjectileComponent>();
 				pc->ignore = capsule;
 				const float spread = 0.15;
