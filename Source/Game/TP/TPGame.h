@@ -111,7 +111,6 @@ public:
 
 		capsule = get_owner()->get_component<CapsuleComponent>();
 		ASSERT(capsule);
-
 	}
 
 	void update() override {

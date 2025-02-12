@@ -55,9 +55,9 @@ public:
 	virtual void init() = 0;
 
 	// Create a dynamic material from a material instance
-	virtual MaterialInstance* create_dynmaic_material(const MaterialInstance* material) = 0;
-	// Delete a created dynamic materials (NOT for static/normal materials!)
-	virtual void free_dynamic_material(MaterialInstance*& mat) = 0;
+	// resource deletion handled by RAII
+	virtual std::unique_ptr<MaterialInstance> create_dynmaic_material(const MaterialInstance* material) = 0;
+
 	// find a parameter buffer with the given name
 	// ParameterBuffers function like singletons
 	virtual MaterialParameterBuffer* find_parameter_buffer(const char* name) = 0;

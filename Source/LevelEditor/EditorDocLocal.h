@@ -8,35 +8,26 @@
 #include "Level.h"
 #include <SDL2/SDL.h>
 #include <memory>
-
 #include "Render/RenderObj.h"
 #include <stdexcept>
 #include "Game/Entity.h"
-
 #include "Framework/Factory.h"
 #include "Framework/PropertyEd.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ArrayReflection.h"
-
 #include "Physics/Physics2.h"
 #include "External/ImGuizmo.h"
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetBrowser.h"
 #include "Framework/MulticastDelegate.h"
-
 #include "GameEnginePublic.h"
-
 #include "AssetCompile/Someutils.h"
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
-
 #include "Game/LevelAssets.h"
-
 #include "LevelSerialization/SerializationAPI.h"
-
 #include "Render/DrawPublic.h"
-
 #include "Game/EntityComponent.h"
 
 extern ConfigVar g_mousesens;
@@ -220,6 +211,7 @@ public:
 		return glm::orthoZO(-width, width, -width*aspect_ratio, width * aspect_ratio,1000.f,0.001f /* reverse z*/);
 	}
 
+	// used for ImGuizmo which doesnt like reverse Z
 	glm::mat4 get_friendly_proj_matrix(float aspect_ratio) const {
 		return glm::ortho(-width, width, -width * aspect_ratio, width * aspect_ratio,0.001f, 1000.f);
 	}
@@ -423,16 +415,9 @@ private:
 	
 	glm::mat4 current_transform_of_group = glm::mat4(1.0);
 	glm::mat4 pivot_transform = glm::mat4(1.f);
-	
-	bool has_translation_snap = false;
-	float translation_snap = 0.2;
-	bool has_scale_snap = false;
-	float scale_snap = 1.0;
-	bool has_rotation_snap = false;
-	float rotation_snap = 15.0;
 };
 
-
+class LEPlugin;
 class EditorUILayout;
 class Model;
 class EditorDoc : public IEditorTool
@@ -444,6 +429,7 @@ public:
 	virtual bool open_document_internal(const char* levelname, const char* arg) override;
 	virtual void close_internal() override;
 	virtual bool save_document_internal() override;
+	void hook_menu_bar() final;
 
 	const ClassTypeInfo& get_asset_type_info() const override {
 		return is_editing_scene() ? SceneAsset::StaticType : PrefabAsset::StaticType;
@@ -537,18 +523,26 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
+	LEPlugin* get_plugin() const {
+		return active_plugin.get();
+	}
+	void set_plugin(const ClassTypeInfo* plugin_type) {}
+
+	std::unique_ptr<LEPlugin> active_plugin;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
-	View_Setup vs_setup;
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<EditorUILayout> gui;
 
+	View_Setup vs_setup;
 	bool using_ortho = false;
 	User_Camera camera;
 	OrthoCamera ortho_camera;
 
+	MulticastDelegate<LEPlugin*> on_start_plugin;
+	MulticastDelegate<LEPlugin*> on_end_plugin;
 
 	MulticastDelegate<uint64_t> on_component_deleted;
 	MulticastDelegate<EntityComponent*> on_component_created;

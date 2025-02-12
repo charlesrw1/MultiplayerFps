@@ -19,7 +19,7 @@ public:
 			const int index = prop->offset;
 			MaterialEditorLocal* mLocal = (MaterialEditorLocal*)instance;
 			auto& paramDef = mLocal->dynamicMat->get_master_material()->param_defs.at(index);
-			MaterialInstance* mInstLocal = (MaterialInstance*)mLocal->dynamicMat;
+			MaterialInstance* mInstLocal = (MaterialInstance*)mLocal->dynamicMat.get();
 			auto& param = mInstLocal->impl->params.at(index);
 			pi.name = paramDef.name.c_str();
 			pi.offset = offsetof(MaterialParameterValue, tex_ptr);
@@ -62,7 +62,6 @@ void MaterialEditorLocal::close_internal()
 {
 	EditorTool3d::close_internal();
 
-	imaterials->free_dynamic_material(dynamicMat);
 	dynamicMat = nullptr;
 	outputEntity = nullptr;
 	myPropGrid.clear_all();
@@ -80,7 +79,7 @@ bool MaterialEditorLocal::save_document_internal()
 	output += dynamicMat->get_master_material()->self->get_name();
 	output += "\n";
 
-	MaterialInstance* mLocal = (MaterialInstance*)dynamicMat;
+	MaterialInstance* mLocal = (MaterialInstance*)dynamicMat.get();
 	auto& paramDefs = mLocal->get_master_material()->param_defs;
 	auto& params = mLocal->impl->params;
 	assert(params.size() == paramDefs.size());

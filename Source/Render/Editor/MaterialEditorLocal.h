@@ -58,7 +58,7 @@ public:
 			}
 			materialParamGrid.update();
 			if (materialParamGrid.rows_had_changes) {
-				matman.add_to_dirty_list(dynamicMat);
+				matman.add_to_dirty_list(dynamicMat.get());
 			}
 		}
 		ImGui::End();
@@ -126,7 +126,7 @@ public:
 
 		// material params
 		propInfosForMats.clear();
-		MaterialInstance* mLocal = (MaterialInstance*)dynamicMat;
+		MaterialInstance* mLocal = (MaterialInstance*)dynamicMat.get();
 		auto& paramDefs = mLocal->get_master_material()->param_defs;
 		for (int i = 0; i < paramDefs.size(); i++) {
 			auto& def = paramDefs[i];
@@ -150,7 +150,7 @@ public:
 		outputEntity = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 		outputEntity->Mesh->set_model(model.get());
 		outputEntity->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
-		outputEntity->Mesh->set_material_override(dynamicMat);
+		outputEntity->Mesh->set_material_override(dynamicMat.get());
 	}
 
 	AssetPtr<Model> model;
@@ -164,6 +164,6 @@ public:
 
 	// dynamic material to edit params into
 	MaterialInstance* parentMat = nullptr;
-	MaterialInstance* dynamicMat = nullptr;
+	std::unique_ptr<MaterialInstance> dynamicMat = nullptr;
 };
 #endif

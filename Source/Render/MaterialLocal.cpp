@@ -269,6 +269,11 @@ MaterialInstance::~MaterialInstance()
 	if(impl&&impl->masterMaterial)
 		impl->masterMaterial->self->reload_dependents.erase(this);
 #endif
+
+	if (impl->is_dynamic_material) {
+		matman.free_dynamic_material(this);
+	}
+
 }
 
 void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)

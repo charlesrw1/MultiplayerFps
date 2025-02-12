@@ -45,6 +45,7 @@
 #include "Framework/AddClassToFactory.h"
 
 #include "Game/EntityComponent.h"
+#include "LEPlugin.h"
 
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
@@ -522,6 +523,20 @@ DECLARE_ENGINE_CMD(ManipulateScaleCommand)
 
 }
 
+ConfigVar ed_has_translation_snap("ed_has_translation_snap", "0", CVAR_BOOL, "enable editor snap translation");
+ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_BOOL, "what editor translation snap", 0.1, 128);
+ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, "editor translation snap increment exponent", 1, 10);
+
+ConfigVar ed_has_rotation_snap("ed_has_rotation_snap", "0", CVAR_BOOL, "enable editor snap rotation");
+ConfigVar ed_rotation_snap("ed_rotation_snap", "15.0", CVAR_BOOL, "what editor rotation snap (degrees)",0.1, 360);
+ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor rotation snap increment exponent", 1, 10);
+
+ConfigVar ed_has_scale_snap("ed_has_scale_snap", "0", CVAR_BOOL, "enable editor scale rotation");
+ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_BOOL, "what editor scale snap", 0.1, 360);
+ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
+
+
+
 void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 {
 	if (eng->is_game_focused() || !ed_doc.selection_state->has_any_selected())
@@ -548,18 +563,22 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 	else if (scancode == SDL_SCANCODE_LEFTBRACKET) {
 		if (operation_mask == ImGuizmo::TRANSLATE) {
-			translation_snap = translation_snap * 2.0;
+			ed_translation_snap.set_float(ed_translation_snap.get_float() * ed_translation_snap_exp.get_float());
+			//translation_snap = translation_snap * 2.0;
 		}
 		else if (operation_mask == ImGuizmo::SCALE) {
-			translation_snap = translation_snap * 2.0;
+			ed_scale_snap.set_float(ed_scale_snap.get_float() * ed_scale_snap_exp.get_float());
+			//translation_snap = translation_snap * 2.0;
 		}
 	}
 	else if (scancode == SDL_SCANCODE_RIGHTBRACKET) {
 		if (operation_mask == ImGuizmo::TRANSLATE) {
-			translation_snap = translation_snap * 0.5;
+			ed_translation_snap.set_float(ed_translation_snap.get_float() / ed_translation_snap_exp.get_float());
+			//translation_snap = translation_snap * 0.5;
 		}
 		else if (operation_mask == ImGuizmo::SCALE) {
-			translation_snap = translation_snap * 9.5;
+			ed_scale_snap.set_float(ed_scale_snap.get_float() / ed_scale_snap_exp.get_float());
+			//translation_snap = translation_snap * 9.5;
 		}
 	}
 }
@@ -966,13 +985,14 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	glm::quat q;
 	decompose_transform(current_transform_of_group, p, q, s);
 	glm::vec3 asEuler = glm::eulerAngles(q);
-	if (has_translation_snap) {
+	if (ed_has_translation_snap.get_bool()) {
+		float translation_snap = ed_translation_snap.get_float();
 		p.x = snap_to_value(p.x, translation_snap);
 		p.y = snap_to_value(p.y, translation_snap);
 		p.z = snap_to_value(p.z, translation_snap);
 	}
-	if (has_rotation_snap) {
-		float rsnap = glm::radians(rotation_snap);
+	if (ed_has_rotation_snap.get_bool()) {
+		float rsnap = glm::radians(ed_rotation_snap.get_float());
 		asEuler.x = snap_to_value(asEuler.x, rsnap);
 		asEuler.y = snap_to_value(asEuler.y, rsnap);
 		asEuler.z = snap_to_value(asEuler.z, rsnap);
@@ -1005,11 +1025,6 @@ void ManipulateTransformTool::end_drag() {
 //		snap = snap / mult
 
 
-ConfigVar ed_translation_snap_base("ed_translation_snap_base", "1", CVAR_FLOAT,		"editor translation snap", 0.1, 128);
-ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT,		"editor translation snap", 1, 10);
-ConfigVar ed_rotation_snap_base("ed_rotation_snap_base", "15", CVAR_FLOAT,			"editor rotation snap",1, 180);
-ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT,				"editor rotation snap",1, 10);
-
 
 void ManipulateTransformTool::update()
 {
@@ -1032,12 +1047,12 @@ void ManipulateTransformTool::update()
 
 
 	glm::vec3 snap(-1);
-	if (operation_mask == ImGuizmo::TRANSLATE && has_translation_snap)
-		snap = glm::vec3(translation_snap);
-	else if (operation_mask == ImGuizmo::SCALE && has_scale_snap)
-		snap = glm::vec3(scale_snap);
-	else if (operation_mask == ImGuizmo::ROTATE&&has_rotation_snap)
-		snap = glm::vec3(rotation_snap);
+	if (operation_mask == ImGuizmo::TRANSLATE && ed_has_translation_snap.get_bool())
+		snap = glm::vec3(ed_translation_snap.get_float());
+	else if (operation_mask == ImGuizmo::SCALE && ed_has_scale_snap.get_bool())
+		snap = glm::vec3(ed_scale_snap.get_float());
+	else if (operation_mask == ImGuizmo::ROTATE&&ed_has_rotation_snap.get_bool())
+		snap = glm::vec3(ed_rotation_snap.get_float());
 
 	const auto window_sz = eng->get_game_viewport_size();
 	const float aratio = (float)window_sz.y / window_sz.x;
@@ -1052,9 +1067,15 @@ void ManipulateTransformTool::update()
 		ImGui::OpenPopup("manipulate tool menu");
 	}
 	if (ImGui::BeginPopup("manipulate tool menu")) {
-		ImGui::Checkbox("T Snap", &has_translation_snap);
-		ImGui::Checkbox("R Snap", &has_rotation_snap);
-		ImGui::Checkbox("S Snap", &has_scale_snap);
+		bool b = ed_has_translation_snap.get_bool();
+		ImGui::Checkbox("T Snap", &b);
+		ed_has_translation_snap.set_bool(b);
+		b = ed_has_rotation_snap.get_bool();
+		ImGui::Checkbox("R Snap", &b);
+		ed_has_rotation_snap.set_bool(b);
+		b = ed_has_scale_snap.get_bool();
+		ImGui::Checkbox("S Snap", &b);
+		ed_has_scale_snap.set_bool(b);
 
 		ImGui::EndPopup();
 	}
@@ -1746,7 +1767,7 @@ public:
 		}
 		ImGui::PopStyleColor();
 		ImGui::SameLine();
-		if (ed_doc.is_in_eyedropper_mode()) {
+		if (ed_doc.is_in_eyedropper_mode()&&ed_doc.get_active_eyedropper_user_id()==this) {
 			ImGui::TextColored(color32_to_imvec4({ 255, 74, 249 }), "{ eyedropper  active }");
 		}
 		else if (ptr_to_asset->get()) {
@@ -1925,4 +1946,27 @@ EditorDoc::EditorDoc() {
 	outliner = std::make_unique<ObjectOutliner>();
 
 }
+
+void EditorDoc::hook_menu_bar()
+{
+	if (ImGui::BeginMenu("Plugins")) {
+
+		if (ImGui::MenuItem("<none>")) {
+			set_plugin(nullptr);
+		}
+
+		auto iter = ClassBase::get_subclasses<LEPlugin>();
+		for (; !iter.is_end(); iter.next()) {
+			auto type = iter.get_type();
+			if (ImGui::MenuItem(type->classname)) {
+				set_plugin(type);
+			}
+
+		}
+		ImGui::EndMenu();
+	}
+
+
+}
+
 #endif

@@ -508,6 +508,9 @@
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Scripting\ScriptManagerPublic.h" />
+    <ClInclude Include="Source\LevelEditor\LEPlugin.h" />
+    <ClInclude Include="Source\LevelEditor\TileMapPlugin.h" />
+    <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

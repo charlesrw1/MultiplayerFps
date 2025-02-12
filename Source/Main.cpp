@@ -279,7 +279,7 @@ void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
 
 static void SDLError(const char* msg)
 {
-	printf(" % s: % s\n", msg, SDL_GetError());
+	printf(" %s: %s\n", msg, SDL_GetError());
 	SDL_Quit();
 	exit(-1);
 }

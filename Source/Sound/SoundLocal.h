@@ -443,12 +443,12 @@ public:
         spi->is_oneshot = true;
     }
     // retained functions
-    virtual SoundPlayer* register_sound_player() {
+    virtual SoundPlayer* register_sound_player() final {
         SoundPlayerInternal* spi = new SoundPlayerInternal;
         all_sound_players.insert(spi);
         return (SoundPlayer*)spi;
     }
-    virtual void remove_sound_player(SoundPlayer*& sp) {
+    virtual void remove_sound_player(SoundPlayer*& sp) final {
         SoundPlayerInternal* spi = (SoundPlayerInternal*)sp;
         ASSERT(!spi->is_oneshot);
         end_sound_object_play(spi);

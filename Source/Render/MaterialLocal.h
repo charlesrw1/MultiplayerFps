@@ -253,7 +253,7 @@ public:
 	// public interface
 	void pre_render_update() override;	// material buffer updates
 
-	MaterialInstance* create_dynmaic_material(const MaterialInstance* material) override { 
+	std::unique_ptr<MaterialInstance> create_dynmaic_material(const MaterialInstance* material) final { 
 		assert(material);
 		MaterialInstance* dynamicMat = new MaterialInstance();
 
@@ -267,9 +267,9 @@ public:
 
 		dynamic_materials.insert(dynamicMat);
 
-		return dynamicMat;
+		return std::unique_ptr<MaterialInstance>(dynamicMat);
 	}
-	void free_dynamic_material(MaterialInstance*& mat) override {
+	void free_dynamic_material(const MaterialInstance* mat) {
 		if (!mat) return;
 		if (dynamic_materials.find((MaterialInstance*)mat) == dynamic_materials.end())
 			Fatalf("free_dynamic_material used on a material not in dynamic_material list (double delete?)");
@@ -277,8 +277,6 @@ public:
 		dynamic_materials.erase(mlocal);
 		if (mlocal->impl->dirty_buffer_index != -1)
 			dirty_list.at(mlocal->impl->dirty_buffer_index) = nullptr;
-		delete mlocal;
-		mat = nullptr;	// set callers ptr to null
 	}
 	MaterialParameterBuffer* find_parameter_buffer(const char* name) override { return nullptr; }
 

@@ -1,6 +1,8 @@
 #pragma once
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
+#include <memory>
+
 class Texture;
 class MaterialInstance;
 struct Render_Object;
@@ -20,7 +22,7 @@ public:
 private:
 	void fill_out_render_obj(Render_Object& obj);
 	bool visible = true;
-	MaterialInstance* dynamicMaterial = nullptr;
+	std::unique_ptr<MaterialInstance> dynamicMaterial = nullptr;
 	AssetPtr<Texture> texture;
 	handle<Render_Object> handle;
 };

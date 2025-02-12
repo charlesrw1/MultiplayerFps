@@ -16,7 +16,7 @@ BillboardComponent::BillboardComponent() {
 }
 BillboardComponent::~BillboardComponent() {
 	
-	assert(dynamicMaterial == nullptr);
+	//assert(dynamicMaterial == nullptr);
 	assert(!handle.is_valid());
 }
 
@@ -31,8 +31,6 @@ void BillboardComponent::start() {
 	idraw->get_scene()->update_obj(handle, obj);
 }
 void BillboardComponent::end() {
-
-	imaterials->free_dynamic_material(dynamicMaterial);
 	idraw->get_scene()->remove_obj(handle);
 }
 void BillboardComponent::on_changed_transform() {
@@ -65,7 +63,8 @@ void BillboardComponent::fill_out_render_obj(Render_Object& obj)
 {
 	obj.visible = visible;
 	obj.model = g_modelMgr.get_default_plane_model();
-	obj.mat_override = dynamicMaterial;
+	ASSERT(dynamicMaterial.get());
+	obj.mat_override = dynamicMaterial.get();
 	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;
 	obj.owner = this;
