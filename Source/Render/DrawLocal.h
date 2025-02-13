@@ -177,10 +177,10 @@ class Program_Manager
 {
 public:
 
-	program_handle create_single_file(const char* shared_file, bool is_tesselation = false, const std::string& defines = {});
-	program_handle create_raster(const char* frag, const char* vert, const std::string& defines = {});
-	program_handle create_raster_geo(const char* frag, const char* vert, const char* geo = nullptr, const std::string& defines = {});
-	program_handle create_compute(const char* compute, const std::string& defines = {});
+	program_handle create_single_file(const std::string& shared_file, bool is_tesselation = false, const std::string& defines = {});
+	program_handle create_raster(const std::string& frag, const std::string& vert, const std::string& defines = {});
+	program_handle create_raster_geo(const std::string& frag, const std::string& vert, const std::string& geo = nullptr, const std::string& defines = {});
+	program_handle create_compute(const std::string& compute, const std::string& defines = {});
 	Shader get_obj(program_handle handle) const {
 		assert(handle >= 0 && handle < programs.size());
 		return programs[handle].shader_obj;
@@ -195,14 +195,14 @@ public:
 
 	struct program_def {
 		std::string defines;
-		const char* frag = nullptr;
-		const char* vert = nullptr;
-		const char* geo = nullptr;
+		std::string frag;
+		std::string vert;
+		std::string geo;
 		bool is_compute = false;
 		bool compile_failed = false;
 		bool is_tesselation = false;
 
-		bool is_shared() const { return vert && frag == nullptr && !is_compute; }
+		bool is_shared() const { return !vert.empty() && frag.empty()&& !is_compute; }
 		Shader shader_obj;
 	};
 	std::vector<program_def> programs;
@@ -356,7 +356,7 @@ public:
 	virtual void init() override;
 
 	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui) override;
-
+	void sync_update() final;
 	virtual void on_level_start() override;
 	virtual void on_level_end() override;
 	virtual void reload_shaders() override;

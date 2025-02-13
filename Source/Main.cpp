@@ -58,6 +58,8 @@
 #include "Framework/SysPrint.h"
 
 #include "Scripting/ScriptManagerPublic.h"
+#include "Game/Components/ParticleMgr.h"
+#include "Game/Components/GameAnimationMgr.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -123,7 +125,8 @@ public:
 		obj.visible = false;
 		obj.depth_tested = false;
 		obj.use_background_color = true;
-		this->handle = idraw->get_scene()->register_meshbuilder(obj);
+		this->handle = idraw->get_scene()->register_meshbuilder();
+		idraw->get_scene()->update_meshbuilder(handle, obj);
 	}
 	void update(float dt);
 	void add(Debug_Shape shape, bool fixedupdate) {
@@ -1297,6 +1300,80 @@ bool GameEngineLocal::game_draw_screen()
 
 	return true;
 }
+void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup)
+{
+	params = SceneDrawParamsEx(time, frame_time);
+	params.output_to_screen = !is_drawing_to_window_viewport();
+	// so the width/height parameters are valid
+	View_Setup vs_for_gui;
+	auto viewport = get_game_viewport_size();
+	vs_for_gui.width = viewport.x;
+	vs_for_gui.height = viewport.y;
+
+
+	if (state == Engine_State::Loading || state == Engine_State::Idle) {
+		// draw loading ui etc.
+		params.draw_world = false;
+		setup = vs_for_gui;
+		//idraw->scene_draw(params, vs_for_gui, get_gui());
+	}
+	else if (state == Engine_State::Game) {
+
+#ifdef EDITOR_BUILD
+		// draw general ui
+		if (get_current_tool() != nullptr) {
+			params.is_editor = true;	// draw to the id buffer for mouse picking
+			auto vs = get_current_tool()->get_vs();
+
+			// fixme
+			isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
+
+			if (!vs) {
+				params.draw_world = false;
+				vs = &vs_for_gui;
+			}
+			setup = *vs;
+			//idraw->scene_draw(params, *vs, get_gui());
+		}
+		else
+#endif
+		{
+			params=SceneDrawParamsEx(time, frame_time);
+			params.output_to_screen = !is_drawing_to_window_viewport();
+			View_Setup vs_for_gui;
+			auto viewport = get_game_viewport_size();
+			vs_for_gui.width = viewport.x;
+			vs_for_gui.height = viewport.y;
+
+			CameraComponent* scene_camera = CameraComponent::get_scene_camera();
+
+			// no camera
+			if (!scene_camera) {
+				params.draw_world = false;
+				params.draw_ui = true;
+				setup = vs_for_gui;
+			}
+			else {
+
+
+				glm::mat4 view;
+				float fov = 60.f;
+				scene_camera->get_view(view, fov);
+
+				glm::mat4 in = glm::inverse(view);
+				auto pos = in[3];
+				auto front = -in[2];
+				View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
+				scene_camera->last_vs = vs;
+				setup = vs;
+
+				// fixme
+				isound->set_listener_position(vs.origin, in[1]);
+			}
+		
+		}
+	}
+}
 
 void GameEngineLocal::draw_screen()
 {
@@ -1502,6 +1579,7 @@ void GameEngineLocal::init()
 	gui_sys.reset(GuiSystemPublic::create_gui_system());
 	isound->init();
 	g_modelMgr.init();
+	g_gameAnimationMgr.init();
 	//cl->init();
 	//sv->init();
 	imgui_context = ImGui::CreateContext();
@@ -1572,12 +1650,13 @@ void GameEngineLocal::init()
 
 	TIMESTAMP("execute startup");
 }
+#include "Framework/Jobs.h"
 
+ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 
 
 void GameEngineLocal::game_update_tick()
 {
-	CPUFUNCTIONSTART;
 
 	auto fixed_update = [&](double dt) {
 		DebugShapeCtx::get().fixed_update_start();
@@ -1613,12 +1692,13 @@ void GameEngineLocal::game_update_tick()
 	// call level update
 	update(frame_time);
 
+	g_gameAnimationMgr.update_animating();
+
 	time += frame_time;
 
 	frame_time = orig_ft;
 	tick_interval = orig_ti;
 }
-
 
 
 // unloads all game state
@@ -1641,20 +1721,70 @@ void GameEngineLocal::stop_game()
 	DebugShapeCtx::get().fixed_update_start();
 }
 
+bool GameEngineLocal::game_thread_update()
+{
+	if (state == Engine_State::Game) {
+		game_update_tick();
+		if (state != Engine_State::Game)
+			return false;	// goto next frame (to exit or change map)
+	}
+
+#ifdef EDITOR_BUILD
+	if (is_in_an_editor_state()) {
+		get_current_tool()->tick(frame_time);
+	}
+#endif
+
+	isound->tick(frame_time);
+
+
+	// draw imgui here
+	// draw ui
+
+	return true;
+}
+
 void GameEngineLocal::loop()
 {
+
 	double last = GetTime() - 0.1;
+	bool should_draw = false;
 
-	for (;;)
+	// these are from the last game frame
+	SceneDrawParamsEx drawparamsNext(0,0);
+	View_Setup setupNext;
+
+	auto imgui_draw = [&]()
 	{
-		// update time
-		double now = GetTime();
-		double dt = now - last;
-		last = now;
-		if (dt > 0.1)
-			dt = 0.1;
-		frame_time = dt;
+		GPUSCOPESTART(ImguiDraw);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// draw imgui interfaces
+		// if a tool is active, game screen gets drawn to an imgui viewport
+		ImGui_ImplSDL2_NewFrame();
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui::NewFrame();
+
+#ifdef EDITOR_BUILD
+		if (get_current_tool())
+			get_current_tool()->hook_imgui_newframe();
+#endif
+
+		draw_any_imgui_interfaces();
+
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	};
+
+	auto wait_for_swap = [&]()
+	{
+		GPUSCOPESTART(SwapWindow);
+		SDL_GL_SwapWindow(window);
+	};
+
+	auto frame_start = [&]() -> bool
+	{
+		CPUSCOPESTART(FrameStart);
 		// reset cursor if in relative mode
 		if (is_game_focused()) {
 			SDL_WarpMouseInWindow(window, saved_mouse_x, saved_mouse_y);
@@ -1684,7 +1814,7 @@ void GameEngineLocal::loop()
 					if (y != g_window_h.get_integer())
 						g_window_h.set_integer(y);
 
-					SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
+					//SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 				}
 				break;
 			case SDL_KEYUP:
@@ -1695,9 +1825,9 @@ void GameEngineLocal::loop()
 				key_event(event);
 				break;
 			}
-			
+
 			g_inputSys.handle_event(event);
-			
+
 			if (!is_game_focused()) {
 				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 					continue;
@@ -1708,6 +1838,8 @@ void GameEngineLocal::loop()
 		}
 		get_gui()->post_handle_events();
 
+		get_gui()->think();
+
 		Cmd_Manager::get()->execute_buffer();
 
 		// update state
@@ -1716,44 +1848,104 @@ void GameEngineLocal::loop()
 		case Engine_State::Idle:
 			if (map_spawned()) {	// map is spawned, unload it
 				stop_game();
-				continue;			// goto next frame
+				should_draw = false;
+				return true;			// goto next frame
 			}
 
 			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
 			break;
 		case Engine_State::Loading:
 			execute_map_change();
-			continue; // goto next frame
+			should_draw = false;
+			return true; // goto next frame
 			break;
-		case Engine_State::Game: {
-			game_update_tick();
+		case Engine_State::Game:	// handled in game_thread_update()
+			break;
+		};
 
-			if (state != Engine_State::Game)
-				continue;	// goto next frame (to exit or change map)
-		}break;
+		should_draw = true;
+		return false;
+	};
+
+	auto do_overlapped_update = [&]()
+	{
+		CPUSCOPESTART(OverlappedUpdate);
+
+		BooleanScope scope(b_is_in_overlapped_period);
+
+		bool should_draw_next = false;
+		SceneDrawParamsEx paramsOut(0, 0);
+		View_Setup vsOut;
 		
+		auto game_task = job::launch_task([&]() {
+			should_draw_next = game_thread_update();
+			get_draw_params(paramsOut, vsOut);
+			// update particles, doesnt draw, only builds meshes FIXME
+			ParticleMgr::get().draw(vsOut);
+			});
+		
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		if (should_draw)
+			idraw->scene_draw(drawparamsNext, setupNext, nullptr);
+		{
+			CPUSCOPESTART(GameTaskWait);
+			game_task.wait();	// wait for game update to finish
 		}
 
-#ifdef EDITOR_BUILD
-		if (is_in_an_editor_state()) {
-			get_current_tool()->tick(frame_time);
-		}
-#endif
-		get_gui()->think();
+		should_draw_next = should_draw;
+		drawparamsNext = paramsOut;
+		setupNext = vsOut;
+	};
 
-		isound->tick(frame_time);
-
-		// tick async loaded assets
-		g_assets.tick_asyncs();
-
-#ifdef EDITOR_BUILD
-		// update hot reloading
-		AssetRegistrySystem::get().update();
-#endif
+	auto do_sync_update = [&]()
+	{
+		CPUSCOPESTART(SyncUpdate);
 
 		DebugShapeCtx::get().update(frame_time);
 
-		draw_screen();
+		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
+#ifdef EDITOR_BUILD
+	// update hot reloading
+		AssetRegistrySystem::get().update();
+#endif
+		if (get_level())
+			get_level()->sync_level_render_data();
+		
+		idraw->sync_update();
+
+		// sync any rendering objects
+		// sync meshbuilders
+		// sync UI
+		// sync materials
+
+	};
+
+	for (;;)
+	{
+		should_draw = true;
+
+		// update time
+		const double now = GetTime();
+		double dt = now - last;
+		last = now;
+		if (dt > 0.1)
+			dt = 0.1;
+		frame_time = dt;
+
+		const bool should_skip = frame_start();
+		if (should_skip)
+			continue;
+
+		// Overlapped update
+		do_overlapped_update();
+
+		// Sync period
+		imgui_draw();	// fixme
+		wait_for_swap();	// fixme
+
+		do_sync_update();
 
 		Profiler::end_frame_tick(frame_time);
 	}

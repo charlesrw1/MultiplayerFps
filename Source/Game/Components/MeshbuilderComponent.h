@@ -16,20 +16,19 @@ public:
 
 	static const PropertyInfoList* get_props() = delete;
 	void start() override {
-		MeshBuilder_Object mbo;
-		fill_out_struct(mbo);
-		editor_mb_handle = idraw->get_scene()->register_meshbuilder(mbo);
+		sync_render_data();
 	}
 	void end() override {
 		idraw->get_scene()->remove_meshbuilder(editor_mb_handle);
 		mb.Free();
 	}
 	void on_changed_transform() override {
-		MeshBuilder_Object mbo;
-		fill_out_struct(mbo);
-		idraw->get_scene()->update_meshbuilder(editor_mb_handle, mbo);
+		sync_render_data();
 	}
-	void fill_out_struct(MeshBuilder_Object& obj) {
+	void on_sync_render_data() final {
+		if(!editor_mb_handle.is_valid())
+			editor_mb_handle = idraw->get_scene()->register_meshbuilder();
+		MeshBuilder_Object obj;
 		obj.depth_tested = depth_tested;
 		obj.owner = this;
 		if (use_transform)
@@ -40,6 +39,7 @@ public:
 		obj.use_background_color = use_background_color;
 		obj.background_color = background_color;
 		obj.meshbuilder = &mb;
+		idraw->get_scene()->update_meshbuilder(editor_mb_handle, obj);
 	}
 
 	Color32 background_color = COLOR_BLACK;

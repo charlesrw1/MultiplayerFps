@@ -22,6 +22,7 @@
 #include "Assets/AssetDatabase.h"
 
 #include "Game/Components/ParticleMgr.h"	// FIXME
+#include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
@@ -43,7 +44,6 @@ static const int SHADOWMAP_LOC = 11;
 static const int CAUSTICS_LOC = 12;
 static const int SSAO_TEX_LOC = 8;
 
-extern ConfigVar g_debug_skeletons;
 
 
 ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL,"enable/disable vsync");
@@ -133,18 +133,11 @@ static int combine_flags_type(int flags, int type, int flag_bits)
 	return flags + (type >> flag_bits);
 }
 
-static const char* sdp_strs[] = {
-	"ALPHATEST,",
-	"NORMALMAPPED,",
-	"LIGHTMAPPED,",
-	"ANIMATED,",
-	"VERTEX_COLOR,",
-};
-program_handle Program_Manager::create_single_file(const char* shared_file, bool is_tesseltion, const std::string& defines)
+program_handle Program_Manager::create_single_file(const std::string& shared_file, bool is_tesseltion, const std::string& defines)
 {
 	program_def def;
 	def.vert = shared_file;
-	def.frag = nullptr;
+	def.frag = "";
 	def.defines = defines;
 	def.is_compute = false;
 	def.is_tesselation = is_tesseltion;
@@ -152,7 +145,7 @@ program_handle Program_Manager::create_single_file(const char* shared_file, bool
 	recompile(programs.back());
 	return programs.size() - 1;
 }
-program_handle Program_Manager::create_raster(const char* vert, const char* frag, const std::string& defines)
+program_handle Program_Manager::create_raster(const std::string& vert, const std::string& frag, const std::string& defines)
 {
 	program_def def;
 	def.vert = vert;
@@ -163,7 +156,7 @@ program_handle Program_Manager::create_raster(const char* vert, const char* frag
 	recompile(programs.back());
 	return programs.size() - 1;
 }
-program_handle Program_Manager::create_raster_geo(const char* vert, const char* frag, const char* geo, const std::string& defines)
+program_handle Program_Manager::create_raster_geo(const std::string& vert, const std::string& frag, const std::string& geo, const std::string& defines)
 {
 	program_def def;
 	def.vert = vert;
@@ -175,7 +168,7 @@ program_handle Program_Manager::create_raster_geo(const char* vert, const char* 
 	recompile(programs.back());
 	return programs.size() - 1;
 }
-program_handle Program_Manager::create_compute(const char* compute, const std::string& defines)
+program_handle Program_Manager::create_compute(const std::string& compute, const std::string& defines)
 {
 	program_def def;
 	def.vert = compute;
@@ -204,7 +197,7 @@ void Program_Manager::recompile(program_def& def)
 			def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines)!=ShaderResult::SHADER_SUCCESS;
 	}
 	else {
-		if (def.geo)
+		if (!def.geo.empty())
 			def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
 		else
 			def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
@@ -1198,13 +1191,13 @@ void Renderer::render_particles()
 
 	for (auto& p_ : pobjs) {
 		auto& p = p_.type_;
-		const MaterialInstance* mat = p.material;
+		const MaterialInstance* mat = p.obj.material;
 		if (!mat)
 			continue;
 
 		RenderPipelineState state;
 		state.program = matman.get_mat_shader(false, nullptr, mat, false, false, false, false); ;
-		state.vao = p.meshbuilder->VAO;
+		state.vao = p.vao;// meshbuilder->VAO;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = true;
@@ -1213,7 +1206,7 @@ void Renderer::render_particles()
 		device.set_pipeline(state);
 
 		shader().set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
-		shader().set_mat4("Model", p.transform);
+		shader().set_mat4("Model", p.obj.transform);
 		shader().set_mat4("ViewProj", vs.viewproj);
 
 		auto& textures = mat->impl->get_textures();
@@ -1221,31 +1214,7 @@ void Renderer::render_particles()
 			bind_texture(i, textures[i]->gl_id);
 		}
 
-		glDrawElements(GL_TRIANGLES, p.meshbuilder->indicies.size(), GL_UNSIGNED_INT, (void*)0);
-	}
-}
-
-static void draw_skeleton(const AnimatorInstance* a,float line_len,const mat4& transform)
-{
-	auto& bones = a->get_global_bonemats();
-	auto model = a->get_model();
-	if (!model || !model->get_skel())
-		return;
-	
-	auto skel = model->get_skel();
-	for (int index = 0; index < skel->get_num_bones(); index++) {
-		vec3 org = transform * bones[index][3];
-		Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
-		for (int i = 0; i < 3; i++) {
-			vec3 dir = mat3(transform) * bones[index][i];
-			dir = normalize(dir);
-			Debug::add_line(org, org + dir * line_len, colors[i],-1.f,false);
-		}
-		const int parent = skel->get_bone_parent(index);
-		if (parent != -1) {
-			vec3 parent_org = transform * bones[parent][3];
-			Debug::add_line(org, parent_org, COLOR_PINK,-1.f,false);
-		}
+		glDrawElements(GL_TRIANGLES, p.num_indicies, GL_UNSIGNED_INT, (void*)0);
 	}
 }
 
@@ -1268,7 +1237,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	draw_call_key key;
 
 	key.shader = matman.get_mat_shader(
-		proxy.animator!=nullptr, 
+		proxy.animator_bone_ofs!=-1, 
 		proxy.model, material, 
 		(type == pass_type::DEPTH),
 		false,
@@ -1743,10 +1712,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		const size_t num_ren_objs = proxy_list.objects.size();
 
 		auto gpu_objects = (gpu::Object_Instance*)draw.get_arena().alloc_bottom(sizeof(gpu::Object_Instance) * num_ren_objs);
-		const size_t max_skinned_matricies = 256 * 100;// budget for ~100 characters
-		size_t current_skinned_matrix_index = 0;
-		auto skinned_matricies = (glm::mat4*)draw.get_arena().alloc_bottom(sizeof(glm::mat4) * max_skinned_matricies);
-		ASSERT(gpu_objects && skinned_matricies);
+		ASSERT(gpu_objects);
 
 		const float inv_two_times_tanfov = 1.0 / ( tan(draw.get_current_frame_vs().fov*0.5));
 		const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
@@ -1757,7 +1723,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			handle<Render_Object> objhandle{obj.handle};
 			auto& proxy = obj.type_.proxy;
 
-			if (!proxy.visible||!proxy.model)
+			if (!proxy.visible||!proxy.model||!proxy.model->get_is_loaded())
 				continue;
 			if (!proxy.is_skybox && skybox_only)
 				continue;
@@ -1814,22 +1780,22 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 				}
 			}
 
-			if (proxy.animator && (is_visible||casts_shadow)) {
-
-				if (g_debug_skeletons.get_bool()) {
-					draw_skeleton(proxy.animator, 0.05, proxy.transform);
-				}
-
-				gpu_objects[i].anim_mat_offset = current_skinned_matrix_index;
-				auto& mats = proxy.animator->get_matrix_palette();
-				const uint32_t num_bones = proxy.animator->num_bones();
-				ASSERT(num_bones + current_skinned_matrix_index < max_skinned_matricies);
-				ASSERT(mats.size() == num_bones);
-				std::memcpy(skinned_matricies + current_skinned_matrix_index, mats.data(), sizeof(glm::mat4) * num_bones);
-				current_skinned_matrix_index += num_bones;
-			}
-			else
-				gpu_objects[i].anim_mat_offset = 0;
+			//if (proxy.animator && (is_visible||casts_shadow)) {
+			//
+			//	//if (g_debug_skeletons.get_bool()) {
+			//	//	draw_skeleton(proxy.animator, 0.05, proxy.transform);
+			//	//}
+			//
+			//	gpu_objects[i].anim_mat_offset = current_skinned_matrix_index;
+			//	auto& mats = proxy.animator->get_matrix_palette();
+			//	const uint32_t num_bones = proxy.animator->num_bones();
+			//	ASSERT(num_bones + current_skinned_matrix_index < max_skinned_matricies);
+			//	ASSERT(mats.size() == num_bones);
+			//	std::memcpy(skinned_matricies + current_skinned_matrix_index, mats.data(), sizeof(glm::mat4) * num_bones);
+			//	current_skinned_matrix_index += num_bones;
+			//}
+			//else
+			gpu_objects[i].anim_mat_offset = obj.type_.proxy.animator_bone_ofs;
 
 			gpu_objects[i].model = proxy.transform;
 			gpu_objects[i].invmodel = obj.type_.inv_transform;
@@ -1838,7 +1804,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			GPUSCOPESTART(upload_cpu_data);
 
 			glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
-			glNamedBufferData(gpu_skinned_mats_buffer, sizeof(glm::mat4) * current_skinned_matrix_index, skinned_matricies, GL_DYNAMIC_DRAW);
 		}
 
 	}
@@ -1886,16 +1851,18 @@ static glm::vec4 color32_to_vec4(Color32 color)
 
 void Renderer::draw_meshbuilders()
 {
+	return;
+
 	auto& mbFL = scene.meshbuilder_objs;
 	auto& mbObjs = scene.meshbuilder_objs.objects;
 	//glEnable(GL_DEPTH_TEST);
 	for (auto& mbPair : mbObjs)
 	{
-		auto& mb = mbPair.type_;
+		auto& mb = mbPair.type_.obj;
 		if (mb.use_background_color) {
 			RenderPipelineState state;
 			state.program = prog.simple_solid_color;
-			state.depth_testing = mbPair.type_.depth_tested;
+			state.depth_testing = mb.depth_tested;
 			state.depth_writes = false;
 			device.set_pipeline(state);
 
@@ -1911,7 +1878,7 @@ void Renderer::draw_meshbuilders()
 
 		RenderPipelineState state;
 		state.program = prog.simple;
-		state.depth_testing = mbPair.type_.depth_tested;
+		state.depth_testing = mb.depth_tested;
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
@@ -1929,6 +1896,8 @@ static handle<MeshBuilder_Object> debug_grid_handle;
 
 void update_debug_grid()
 {
+	return;
+
 	static MeshBuilder mb;
 	static bool has_init = false;
 	if (!has_init) {
@@ -1944,7 +1913,7 @@ void update_debug_grid()
 			mb.PushLine(glm::vec3(x - 5, 0, -5), glm::vec3(x - 5, 0, 5), colorz);
 		}
 		mb.End();
-		debug_grid_handle = idraw->get_scene()->register_meshbuilder(MeshBuilder_Object());
+		debug_grid_handle = idraw->get_scene()->register_meshbuilder();
 		has_init = true;
 	}
 	MeshBuilder_Object mbo;
@@ -2310,7 +2279,42 @@ void Renderer::deferred_decal_pass()
 	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//glEnable(GL_DEPTH_TEST);
 }
+void Renderer::sync_update()
+{
+	if (enable_vsync.was_changed()) {
+		if (enable_vsync.get_bool())
+			SDL_GL_SetSwapInterval(1);
+		else
+			SDL_GL_SetSwapInterval(0);
+	}
 
+	scene.execute_deferred_deletes();
+	matman.pre_render_update();
+
+	for (auto& mbo_ : scene.meshbuilder_objs.objects) {
+		auto& mbo = mbo_.type_;
+		if (mbo.obj.meshbuilder->wants_new_upload) {
+			mbo.obj.meshbuilder->make_or_update_buffers(mbo.vbo, mbo.vao, mbo.ebo);
+			mbo.num_indicies = mbo.obj.meshbuilder->indicies.size();
+			mbo.obj.meshbuilder->wants_new_upload = false;
+		}
+	}
+	for (auto& po_ : scene.particle_objs.objects) {
+		auto& po = po_.type_;
+		if (po.obj.meshbuilder->wants_new_upload) {
+			po.obj.meshbuilder->make_or_update_buffers(po.vbo, po.vao, po.ebo);
+			po.num_indicies = po.obj.meshbuilder->indicies.size();
+			po.obj.meshbuilder->wants_new_upload = false;
+		}
+	}
+
+	// get animation matricies
+	glNamedBufferData(scene.gpu_skinned_mats_buffer, 
+		sizeof(glm::mat4) * g_gameAnimationMgr.get_num_matricies_used(), 
+		g_gameAnimationMgr.get_bonemat_ptr(0), 
+		GL_DYNAMIC_DRAW
+	);
+}
 
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
 ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
@@ -2319,20 +2323,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 {
 	GPUFUNCTIONSTART;
 
-	if (enable_vsync.was_changed()) {
-		if (enable_vsync.get_bool())
-			SDL_GL_SetSwapInterval(1);
-		else
-			SDL_GL_SetSwapInterval(0);
-	}
 
-	// Update gpu materials that became invalidated or got newly allocated
-	matman.pre_render_update();
 
 	check_cubemaps_dirty();
-
-	// update particles, doesnt draw, only builds meshes
-	ParticleMgr::get().draw(view);
 
 	scene_draw_internal(params, view, gui);
 }
@@ -2820,6 +2813,7 @@ void Renderer::on_level_start()
 
 void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
 {
+	ASSERT(!eng->get_is_in_overlapped_period());
 	ROP_Internal& in = proxy_list.get(handle.id);
 	in.proxy = proxy;
 	if (!proxy.viewmodel_layer) 
@@ -2905,6 +2899,7 @@ static float linearize_depth(float d, float zNear, float zFar)
 
 float Renderer::get_scene_depth_for_editor(int x, int y)
 {
+	ASSERT(!eng->get_is_in_overlapped_period());
 	// super slow garbage functions obviously
 
 	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {
@@ -2931,6 +2926,8 @@ float Renderer::get_scene_depth_for_editor(int x, int y)
 
 handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
 {
+	ASSERT(!eng->get_is_in_overlapped_period());
+
 	// super slow garbage functions obviously
 
 	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {

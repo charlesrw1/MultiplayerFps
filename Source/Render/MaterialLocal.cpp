@@ -24,6 +24,8 @@ MaterialManagerPublic* imaterials = &matman;
 
 extern IEditorTool* g_mateditor;
 
+static ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
+
 CLASS_IMPL(MaterialInstance);
 CLASS_IMPL(MaterialParameterBuffer);
 
@@ -73,9 +75,11 @@ public:
 
 void Material_Shader_Table::recompile_for_material(MasterMaterialImpl* mat)
 {
+	if (material_print_debug.get_bool())
+		sys_print(Debug, "recompiling material %s\n", mat->self->get_name().c_str());
 
 	uint32_t id = mat->material_id;
-	for (auto pair : shader_key_to_program_handle) {
+	for (auto& pair : shader_key_to_program_handle) {
 		uint32_t this_id = pair.first & ((1ul << 27ul) - 1ul);
 		if (this_id == id) {
 			draw.get_prog_man().recompile(pair.second);
@@ -102,10 +106,11 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (key.debug) params += "DEBUG_SHADER,";
 	if (!params.empty())params.pop_back();
 
-	sys_print(Debug,"compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
+	if(material_print_debug.get_bool())
+		sys_print(Debug,"compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
 
 	const bool is_tesselation = mat->get_master_material()->usage == MaterialUsage::Terrain;
-	program_handle handle = draw.get_prog_man().create_single_file(name.c_str(), is_tesselation, params);
+	program_handle handle = draw.get_prog_man().create_single_file(name, is_tesselation, params);
 	ASSERT(handle != -1);
 
 	mat_table.insert(key, handle);
@@ -816,6 +821,16 @@ void MaterialManagerLocal::init() {
 
 void MaterialManagerLocal::pre_render_update()
 {
+	if (queued_dynamic_mats_to_delete.size() > 0 && material_print_debug.get_bool()) {
+		sys_print(Debug, "deleting %d dynamic materials\n", (int)queued_dynamic_mats_to_delete.size());
+	}
+	//for (auto mat : queued_dynamic_mats_to_delete) {
+	//	ASSERT(mat->impl->is_dynamic_material);
+	//	free_material_instance(mat);
+	//	delete mat;
+	//}
+	queued_dynamic_mats_to_delete.clear();
+
 	for (auto mat : dirty_list) {
 		// dynamic or static material got removed after it got added to the dirty list, skip
 		if (!mat)
@@ -887,4 +902,10 @@ void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 		}
 	}
 	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
+}
+
+void DynamicMaterialDeleter::operator()(MaterialInstance* mat) const
+{
+	ASSERT(mat->impl->is_dynamic_material);
+	matman.free_dynamic_material(mat);
 }

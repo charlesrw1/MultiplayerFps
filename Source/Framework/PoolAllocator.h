@@ -4,15 +4,44 @@
 #include <cstdio>
 #include <cassert>
 #include <cstdlib>
+#include "Framework/Util.h"
+#include <mutex>
 
+template<typename T>
+class Pool_Allocator;
+template<typename T>
+struct ScopedPoolPtr
+{
+	ScopedPoolPtr(T* ptr, Pool_Allocator<T>* parent) : ptr(ptr),parent(parent) {}
+	~ScopedPoolPtr();
+	ScopedPoolPtr(const ScopedPoolPtr&) = delete;
+	ScopedPoolPtr& operator=(const ScopedPoolPtr&) = delete;
+	ScopedPoolPtr(ScopedPoolPtr&& other) {
+		this->ptr = other.ptr;
+		this->parent = other.parent;
+		other.ptr = nullptr;
+		other.parent = nullptr;
+	}
+
+	T* get() const {
+		return ptr;
+	}
+private:
+	T* ptr = nullptr;
+	Pool_Allocator<T>* parent = nullptr;
+};
+
+// doesnt construct/destruct the object
+template<typename T>
 class Pool_Allocator
 {
 public:
-	Pool_Allocator(int obj_size, int num_objs) {
-		if (obj_size % 8 != 0)
+	Pool_Allocator(int num_objs, const char* debug_name = "") : debug_name(debug_name) {
+		obj_size = sizeof(T);
+		
+		if (sizeof(T) % 8 != 0)
 			obj_size += 8 - (obj_size % 8);
 
-		this->obj_size = obj_size;
 		allocated_size = obj_size * num_objs;
 		memory = new uint8_t[allocated_size];
 		memset(memory, 0, allocated_size);
@@ -29,19 +58,25 @@ public:
 		delete memory;
 	}
 
-	void* allocate() {
+	T* allocate() {
+		std::lock_guard<std::mutex> lock(mutex);
+
 		if (first_free == nullptr) {
-			printf("memory pool full\n");
-			std::abort();
+			Fatalf("memory pool (%s) full\n",debug_name);
 		}
 		uint8_t* next = *((uint8_t**)first_free);
 		uint8_t* ret = first_free;
 		first_free = next;
 		used_objects++;
-		return ret;
+		return (T*)ret;
 	}
-	void free(void* ptr) {
-		assert(ptr >= memory && ptr < memory + allocated_size);
+	ScopedPoolPtr<T> allocate_scoped() {
+		return ScopedPoolPtr<T>(allocate(), this);
+	}
+	void free(T* ptr) {
+		std::lock_guard<std::mutex> lock(mutex);
+
+		assert((void*)ptr >= memory && (void*)ptr < memory + allocated_size);
 		uint8_t** next_ptr = (uint8_t**)ptr;
 		*next_ptr = first_free;
 		first_free = (uint8_t*)ptr;
@@ -53,7 +88,16 @@ public:
 	uint8_t* memory = nullptr;
 
 	uint8_t* first_free = nullptr;
-
+	const char* debug_name = "";
 	// debugging
 	int used_objects = 0;
+
+	std::mutex mutex;
 };
+
+template<typename T>
+inline ScopedPoolPtr<T>::~ScopedPoolPtr()
+{
+	if (parent)
+		parent->free(ptr);
+}

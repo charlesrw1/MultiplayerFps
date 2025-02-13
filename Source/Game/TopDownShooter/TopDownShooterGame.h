@@ -335,6 +335,30 @@ public:
 	bool wait_to_spawn = false;
 	bool start_disabled = false;
 };
+NEWCLASS(TDSpawnOverTime, EntityComponent)
+public:
+	void start() final {
+		set_ticking(true);
+	}
+	void update() final {
+		if (eng->get_game_time() >= last_spawn + spawn_interval) {
+			for (int i = 0; i < 20; i++) {
+				Entity* e = nullptr;
+				auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
+				e->set_ws_position(get_ws_position() +glm::vec3(i%5,0,i/5));
+				last_spawn = eng->get_game_time();
+			}
+		}
+	}
+	float last_spawn = 0.0;
+
+	REFLECT();
+	AssetPtr<PrefabAsset> prefab;
+	REFLECT();
+	float spawn_interval = 1.0;	// every x seconds
+	REFLECT();
+	int max_count = 2000;
+};
 
 NEWCLASS(TopDownSpawnPoint, EntityComponent)
 public:

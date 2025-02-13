@@ -164,6 +164,6 @@ public:
 
 	// dynamic material to edit params into
 	MaterialInstance* parentMat = nullptr;
-	std::unique_ptr<MaterialInstance> dynamicMat = nullptr;
+	DynamicMatUniquePtr dynamicMat = nullptr;
 };
 #endif

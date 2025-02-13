@@ -333,7 +333,6 @@ static Color32 randcolor32(uint32_t number)
  }
 
   void PhysicsManImpl::simulate_and_fetch(float dt) {
-	  CPUFUNCTIONSTART;
 
 	  scene->simulate(dt);
 	  scene->fetchResults(true/* block */);
@@ -431,8 +430,8 @@ void PhysicsManImpl::update_debug_physics_shapes()
 	o.meshbuilder = &debug_mesh;
 	o.use_background_color = true;
 
-	if (!debug_mesh_handle.is_valid())
-		debug_mesh_handle = idraw->get_scene()->register_meshbuilder(o);
-	else
-		idraw->get_scene()->update_meshbuilder(debug_mesh_handle, o);
+	//if (!debug_mesh_handle.is_valid())
+	//	debug_mesh_handle = idraw->get_scene()->register_meshbuilder(o);
+	//else
+	//	idraw->get_scene()->update_meshbuilder(debug_mesh_handle, o);
 }

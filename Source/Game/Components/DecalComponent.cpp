@@ -12,15 +12,11 @@
 #include "Game/AssetPtrMacro.h"
 #include "Framework/ReflectionMacros.h"
 
-CLASS_IMPL(DecalComponent);
 DecalComponent::DecalComponent() {
 	set_call_init_in_editor(true);
 }
 void DecalComponent::start() {
-	handle = idraw->get_scene()->register_decal(Render_Decal());
-	update_handle();
-
-
+	
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
@@ -29,35 +25,34 @@ void DecalComponent::start() {
 		auto a = get_owner()->create_component<ArrowComponent>();
 		a->dont_serialize_or_edit = true;
 	}
+
+	sync_render_data();
 }
-void DecalComponent::end() {
-	idraw->get_scene()->remove_decal(handle);
-}
-void DecalComponent::on_changed_transform() {
-	update_handle();
-}
-void DecalComponent::editor_on_change_property() {
-	update_handle();
-}
-void DecalComponent::update_handle()
+void DecalComponent::on_sync_render_data()
 {
+	if (!handle.is_valid()) {
+		handle = idraw->get_scene()->register_decal();
+	}
 	Render_Decal rd;
 	rd.transform = get_ws_transform();
 	rd.visible = true;
 	rd.material = material.get();
 	idraw->get_scene()->update_decal(handle, rd);
 }
-const PropertyInfoList* DecalComponent::get_props()
-{
-	START_PROPS(DecalComponent)
-		REG_ASSET_PTR(material, PROP_DEFAULT)
-		END_PROPS(DecalComponent)
+void DecalComponent::end() {
+	idraw->get_scene()->remove_decal(handle);
 }
-DecalComponent::~DecalComponent() {}
+void DecalComponent::on_changed_transform() {
+	sync_render_data();
+}
+void DecalComponent::editor_on_change_property() {
+	sync_render_data();
+}
 
+DecalComponent::~DecalComponent() {}
 
 void DecalComponent::set_material(const MaterialInstance* mat)
 {
 	material.ptr = (MaterialInstance*)mat;
-	update_handle();
+	sync_render_data();
 }

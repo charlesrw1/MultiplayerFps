@@ -153,7 +153,7 @@ void AnimationGraphEditor::close_internal()
 
 	on_close.invoke();
 
-	out.clear();
+	out.end();
 
 	self_grid.clear_all();
 
@@ -161,8 +161,6 @@ void AnimationGraphEditor::close_internal()
 		delete nodes[i];
 	}
 	nodes.clear();
-
-	out.set_model(nullptr);
 
 	// free tree
 	if (editing_tree) {
@@ -676,10 +674,9 @@ void AnimationGraphEditor::imgui_draw()
 	if (ImGui::Begin("AnimGraph settings")) {
 		self_grid.update();
 		if (self_grid.rows_had_changes) {
-			auto anim_instance = (!anim_class_type.ptr) ? new AnimatorInstance : (AnimatorInstance*)anim_class_type.ptr->allocate();
-			anim_graph_ed.out.set_animator_instance(anim_instance);
+			editing_tree->animator_class = anim_class_type;
+			out.show(true);
 			on_set_animator_instance.invoke(anim_graph_ed.out.get_animator());
-			anim_graph_ed.out.set_model(output_model.get());
 			on_set_model.invoke(output_model.get());
 		}
 	}
@@ -1523,7 +1520,7 @@ void AnimationGraphEditor::compile_and_run()
 	bool good_to_run = compile_graph_for_playing();
 	get_tree()->post_load_init();
 	if (good_to_run) {
-		out.initialize_animator(get_tree());
+		out.show(true);
 		playback = graph_playback_state::running;
 	}
 	else
@@ -1546,10 +1543,6 @@ void AnimationGraphEditor::create_new_document()
 
 void AnimationGraphEditor::try_load_preview_models()
 {
-	if (anim_class_type.ptr)
-		anim_graph_ed.out.set_animator_instance((AnimatorInstance*)anim_class_type.ptr->allocate());	// fixme
-	else
-		anim_graph_ed.out.set_animator_instance(new AnimatorInstance);
 	ASSERT(anim_graph_ed.out.get_animator());
 	on_set_model.invoke(output_model.get());
 	on_set_animator_instance.invoke(anim_graph_ed.out.get_animator());
@@ -1586,9 +1579,14 @@ void GraphOutput::set_model(Model* model) {
 	//	);
 	//}
 
-	this->model = model;
-	if(obj.is_valid())
-		idraw->get_scene()->remove_obj(obj);
+	//this->model = model;
+	//if(obj.is_valid())
+	//	idraw->get_scene()->remove_obj(obj);
+
+	mc->set_model(model);
+}
+Model* GraphOutput::get_model() {
+	return mc ? (Model*)mc->get_model() : nullptr;
 }
 
 void AnimationGraphEditor::post_map_load_callback()
@@ -1675,42 +1673,27 @@ void AnimationGraphEditor::post_map_load_callback()
 
 void GraphOutput::show(bool is_playing)
 {
-	if (!obj.is_valid())
-		obj = idraw->get_scene()->register_obj();
-	Render_Object obj_data;
-	obj_data.model = model;
-	if (is_playing && model->get_skel() && animator) {
-		obj_data.animator = animator;
-		obj_data.transform = model->get_root_transform();
+	if (is_playing)
+		mc->set_animation_graph(anim_graph_ed.editing_tree.get());
+	else
+		mc->set_animation_graph(nullptr);
 
-	}
-	//obj_data.mat_override = (MaterialInstance*)imaterials->find_material_instance("orborbmat"); // fixme
-	idraw->get_scene()->update_obj(obj,obj_data);
+	//if (!obj.is_valid())
+	//	obj = idraw->get_scene()->register_obj();
+	//Render_Object obj_data;
+	//obj_data.model = model;
+	//if (is_playing && model->get_skel() && animator) {
+	//	obj_data.animator_bone_ofs = animator->get_matrix_palette_offset();
+	//	obj_data.transform = model->get_root_transform();
+	//
+	//}
+	////obj_data.mat_override = (MaterialInstance*)imaterials->find_material_instance("orborbmat"); // fixme
+	//idraw->get_scene()->update_obj(obj,obj_data);
 }
-void GraphOutput::hide()
-{
-	idraw->get_scene()->remove_obj(obj);
-}
-void GraphOutput::clear()
-{
-	model = nullptr;
-	delete animator;
-	animator = nullptr;
-	idraw->get_scene()->remove_obj(obj);
-}
-void GraphOutput::set_animator_instance(AnimatorInstance* inst)
-{
-	ASSERT(inst);
-	if (animator)
-		delete animator;
-	animator = inst;
-	idraw->get_scene()->remove_obj(obj);
-}
-
 
 AnimatorInstance* GraphOutput::get_animator()
 {
-	return animator;
+	return mc->get_animator_instance();
 }
 
 

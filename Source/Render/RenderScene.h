@@ -17,6 +17,7 @@
 
 #include <cstdint>
 
+#include "GameEnginePublic.h"	// just for b_is_in_overlapped
 
 class MaterialInstance;
 struct Render_Box_Cubemap
@@ -221,6 +222,39 @@ struct RSkylight_Internal
 	int unique_id = 0;
 };
 
+enum class RenderObjectTypes
+{
+	Object,
+	Sun,
+	Light,
+	Particle,
+	Decal,
+	Skylight,
+	Reflection,
+	Meshbuilder,
+	Fog,
+};
+
+struct QueuedRenderObjectDelete
+{
+	int handle = -1;
+	RenderObjectTypes type = RenderObjectTypes::Object;
+};
+
+struct MeshbuilderObj_Internal
+{
+	MeshBuilder_Object obj;
+	int num_indicies = 0;
+	uint32_t vao = 0, ebo = 0, vbo = 0;
+};
+struct ParticleObj_Internal
+{
+	Particle_Object obj;
+	int num_indicies = 0;
+	uint32_t vao=0, ebo=0, vbo=0;
+
+};
+
 class TerrainInterfaceLocal;
 class Render_Scene : public RenderScenePublic
 {
@@ -232,11 +266,17 @@ public:
 
 	// UGGGGGGGGH
 	handle<Render_Object> register_obj() override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		handle<Render_Object> handle = { proxy_list.make_new() };
 		return handle;
 	}
 	void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
 	void remove_obj(handle<Render_Object>& handle) override {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Object);
+			handle = { -1 };
+			return;
+		}
 		if(handle.is_valid())
 			proxy_list.free(handle.id);
 		handle = { -1 };
@@ -245,50 +285,66 @@ public:
 		return proxy_list.get(handle.id).proxy;
 	}
 
-	handle<Render_Light> register_light(const Render_Light& proxy) override { 
+	handle<Render_Light> register_light() override { 
+		ASSERT(!eng->get_is_in_overlapped_period());
 		handle<Render_Light> handle = { light_list.make_new() };
-		update_light(handle, proxy);
+		//update_light(handle, proxy);
 		return handle;
 	}
 	void update_light(handle<Render_Light> handle, const Render_Light& proxy) override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		auto& l = light_list.get(handle.id);
 		l.light = proxy;
 	}
 	void remove_light(handle<Render_Light>& handle) override {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Light);
+			handle = { -1 };
+			return;
+		}
 		if (!handle.is_valid())
 			return;
 		light_list.free(handle.id);
 		handle = { -1 };
 	}
 
-	handle<Render_Decal> register_decal(const Render_Decal& decal) override {
+	handle<Render_Decal> register_decal() override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		auto handle = decal_list.make_new();
-		auto& internal = decal_list.get(handle);
-		internal.decal = decal;
+		//auto& internal = decal_list.get(handle);
+		//internal.decal = decal;
 		return { handle };
 
 	}
 	void update_decal(handle<Render_Decal> handle, const Render_Decal& decal) override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		if (!handle.is_valid()) 
 			return;
 		auto& i = decal_list.get(handle.id);
 		i.decal = decal;
 	}
 	void remove_decal(handle<Render_Decal>& handle) override {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Decal);
+			handle = { -1 };
+			return;
+		}
 		if (!handle.is_valid())
 			return;
 		decal_list.free(handle.id);
 		handle = { -1 };
 	}
-	handle<Render_Sun> register_sun(const Render_Sun& sun) override {
+	handle<Render_Sun> register_sun() override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		handle<Render_Sun> id = { int(unique_id_counter++) };
 		RSunInternal internal_sun;
-		internal_sun.sun = sun;
+		//internal_sun.sun = sun;
 		internal_sun.unique_id = id.id;
 		suns.push_back(internal_sun);
 		return id;
 	}
 	void update_sun(handle<Render_Sun> handle, const Render_Sun& sun) override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		int i = 0;
 		for (; i < suns.size(); i++) {
 			if (suns[i].unique_id == handle.id)
@@ -301,6 +357,11 @@ public:
 		suns[i].sun = sun;
 	}
 	void remove_sun(handle<Render_Sun>& handle) override {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Sun);
+			handle = { -1 };
+			return;
+		}
 		if (!handle.is_valid())
 			return;
 		int i = 0;
@@ -315,7 +376,7 @@ public:
 		suns.erase(suns.begin() + i);
 		handle = { -1 };
 	}
-	handle<Render_Reflection_Volume> register_reflection_volume(const Render_Reflection_Volume& vol) override {
+	handle<Render_Reflection_Volume> register_reflection_volume() override {
 		return { -1 };
 	}
 	void update_reflection_volume(handle<Render_Reflection_Volume> handle, const Render_Reflection_Volume& sun) override {
@@ -324,15 +385,17 @@ public:
 	void remove_reflection_volume(handle<Render_Reflection_Volume>& handle)override {
 
 	}
-	handle<Render_Skylight> register_skylight(const Render_Skylight& skylight) override {
+	handle<Render_Skylight> register_skylight() override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		handle<Render_Skylight> id = { int(unique_id_counter++) };
 		RSkylight_Internal internal_skylight;
-		internal_skylight.skylight = skylight;
+		//internal_skylight.skylight = skylight;
 		internal_skylight.unique_id = id.id;
 		skylights.push_back(internal_skylight);
 		return id;
 	}
 	void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& sky)override {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		int i = 0;
 		for (; i < skylights.size(); i++) {
 			if (skylights[i].unique_id == handle.id)
@@ -345,6 +408,11 @@ public:
 		skylights[i].skylight = sky;
 	}
 	void remove_skylight(handle<Render_Skylight>& handle) override {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Skylight);
+			handle = { -1 };
+			return;
+		}
 		if (!handle.is_valid())
 			return;
 		int i = 0;
@@ -359,26 +427,31 @@ public:
 		skylights.erase(skylights.begin() + i);
 		handle = { -1 };
 	}
-	handle<RenderFog> register_fog(const RenderFog& fog) {
+	handle<RenderFog> register_fog() final {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		if (has_fog) {
 			sys_print(Warning, "only one fog allowed in a scene\n");
 			return { -1 };
 		}
 		has_fog = true;
-		this->fog = fog;
+		//this->fog = fog;
 		return { 0 };
 	}
-	void update_fog(handle<RenderFog> handle, const RenderFog& fog) {
+	void update_fog(handle<RenderFog> handle, const RenderFog& fog) final {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		if (handle.is_valid()) {
 			assert(has_fog);
 			this->fog = fog;
 		}
 	}
-	void remove_fog(handle<RenderFog>& handle) {
-		if (handle.is_valid()) {
-			has_fog = false;
-			handle = { -1 };
+	void remove_fog(handle<RenderFog>& handle) final {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Fog);
 		}
+		else if (handle.is_valid()) {
+			has_fog = false;
+		}
+		handle = { -1 };
 	}
 
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) override {
@@ -387,40 +460,101 @@ public:
 	}
 
 
-	Free_List<MeshBuilder_Object> meshbuilder_objs;
-	virtual handle<MeshBuilder_Object> register_meshbuilder(const MeshBuilder_Object& mbobj) {
+	Free_List<MeshbuilderObj_Internal> meshbuilder_objs;
+	virtual handle<MeshBuilder_Object> register_meshbuilder() final {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		int handle = meshbuilder_objs.make_new();
-		meshbuilder_objs.get(handle) = mbobj;
+		//meshbuilder_objs.get(handle).obj = mbobj;
 		return { handle };
 	}
-	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) {
+	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) final {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		assert(handle.is_valid());
-		meshbuilder_objs.get(handle.id) = mbobj;
+		meshbuilder_objs.get(handle.id).obj = mbobj;
 	}
-	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) {
-		if (handle.is_valid()) {
+	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) final {
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Meshbuilder);
+		}
+		else if (handle.is_valid()) {
 			meshbuilder_objs.free(handle.id);
-			handle = { -1 };
 		}
+		handle = { -1 };
 	}
 
-	Free_List<Particle_Object> particle_objs;
-	virtual handle<Particle_Object> register_particle_obj(const Particle_Object& mbobj) {
+	Free_List<ParticleObj_Internal> particle_objs;
+	virtual handle<Particle_Object> register_particle_obj() final {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		int handle = particle_objs.make_new();
-		particle_objs.get(handle) = mbobj;
+		//particle_objs.get(handle).obj = mbobj;
 		return { handle };
 	}
-	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) {
+	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) final {
+		ASSERT(!eng->get_is_in_overlapped_period());
 		assert(handle.is_valid());
-		particle_objs.get(handle.id) = mbobj;
+		particle_objs.get(handle.id).obj = mbobj;
 	}
-	virtual void remove_particle_obj(handle<Particle_Object>& handle) {
-		if (handle.is_valid()) {
-			particle_objs.free(handle.id);
-			handle = { -1 };
+	virtual void remove_particle_obj(handle<Particle_Object>& handle) final {
+		if (eng->get_is_in_overlapped_period()){
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Particle);
 		}
+		else if (handle.is_valid()) {
+			particle_objs.free(handle.id);
+		}
+		handle = { -1 };
 	}
 
+	void add_to_queued_deletes(int id, RenderObjectTypes type)
+	{
+		queued_deletes.push_back({ id,type });
+	}
+	void execute_deferred_deletes() {
+		ASSERT(!eng->get_is_in_overlapped_period());
+		for (auto& qd : queued_deletes) {
+			switch (qd.type)
+			{
+			case RenderObjectTypes::Decal: {
+				handle<Render_Decal> h{ qd.handle };
+				remove_decal(h);
+			}break;
+			case RenderObjectTypes::Object: {
+				handle<Render_Object> h{ qd.handle };
+				remove_obj(h);
+			}break;
+			case RenderObjectTypes::Light: {
+				handle<Render_Light> h{ qd.handle };
+				remove_light(h);
+			}break;
+			case RenderObjectTypes::Skylight: {
+				handle<Render_Skylight> h{ qd.handle };
+				remove_skylight(h);
+			}break;
+			case RenderObjectTypes::Meshbuilder: {
+				handle<MeshBuilder_Object> h{ qd.handle };
+				remove_meshbuilder(h);
+			}break;
+			case RenderObjectTypes::Particle: {
+				handle<Particle_Object> h{ qd.handle };
+				remove_particle_obj(h);
+			}break;
+			case RenderObjectTypes::Sun: {
+				handle<Render_Sun> h{ qd.handle };
+				remove_sun(h);
+			}break;
+			case RenderObjectTypes::Reflection: {
+				handle<Render_Reflection_Volume> h{ qd.handle };
+				remove_reflection_volume(h);
+			}break;
+			case RenderObjectTypes::Fog: {
+				handle<RenderFog> h{ qd.handle };
+				remove_fog(h);
+			}break;
+			default:
+				ASSERT(!"no type defined for queued delete render");
+			}
+		}
+		queued_deletes.clear();
+	}
 
 	void build_scene_data(bool skybox_only, bool is_for_editor);
 
@@ -456,6 +590,8 @@ public:
 	std::vector<RSunInternal> suns;
 	std::vector<RSkylight_Internal> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
+
+	std::vector<QueuedRenderObjectDelete> queued_deletes;
 
 	bool has_fog = false;
 	RenderFog fog;

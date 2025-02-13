@@ -4,16 +4,20 @@
 #include "ParticleMgr.h"
 
 CLASS_IMPL(ParticleComponent);
-
-void ParticleComponent::start()
+void ParticleComponent::on_sync_render_data()
 {
+	if(!obj.is_valid())
+		obj = idraw->get_scene()->register_particle_obj();
 	Particle_Object o{};
 	o.meshbuilder = &builder;
 	o.material = particle_mat.get();
 	o.owner = this;
 	o.transform = (inherit_transform) ? get_ws_transform() : glm::mat4(1.f);
-
-	obj = idraw->get_scene()->register_particle_obj(o);
+	idraw->get_scene()->update_particle_obj(obj, o);
+}
+void ParticleComponent::start()
+{
+	
 	r.state = wang_hash((uint32_t)get_instance_id());
 	ParticleMgr::get().register_this(this);
 
@@ -21,6 +25,8 @@ void ParticleComponent::start()
 	start_time = eng->get_game_time();
 	last_pos = get_ws_position();
 	active_particles.clear();
+
+	sync_render_data();
 }
 void ParticleComponent::end()
 {
@@ -189,15 +195,6 @@ void ParticleComponent::draw(const glm::vec3& side, const glm::vec3& up, const g
 	builder.End();
 }
 
-void ParticleComponent::on_changed_transform()
-{
-	Particle_Object o{};
-	o.meshbuilder = &builder;
-	o.material = particle_mat.get();
-	o.owner = this;
-	o.transform = (inherit_transform) ? get_ws_transform() : glm::mat4(1.f);
-	idraw->get_scene()->update_particle_obj(obj, o);
-}
 
 void ParticleMgr::draw(const View_Setup& vs)
 {

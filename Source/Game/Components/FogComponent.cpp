@@ -13,34 +13,37 @@ public:
 	}
 	static const PropertyInfoList* get_props() {
 		START_PROPS(FogComponent)
-			REG_INT_W_CUSTOM(f.inscattering_color,PROP_DEFAULT,"","ColorUint"),
-			REG_FLOAT(f.fog_density, PROP_DEFAULT, "1.0"),
+			//REG_INT_W_CUSTOM(f.inscattering_color,PROP_DEFAULT,"","ColorUint"),
+			//REG_FLOAT(f.fog_density, PROP_DEFAULT, "1.0"),
 			REG_FLOAT(height_offset,PROP_DEFAULT,"0.0"),
-			REG_FLOAT(f.fog_height_falloff,PROP_DEFAULT,"1.0"),
-			REG_INT_W_CUSTOM(f.directional_color, PROP_DEFAULT, "", "ColorUint"),
-			REG_FLOAT(f.directional_exponent, PROP_DEFAULT, "1.0"),
+			//REG_FLOAT(f.fog_height_falloff,PROP_DEFAULT,"1.0"),
+			//REG_INT_W_CUSTOM(f.directional_color, PROP_DEFAULT, "", "ColorUint"),
+			//REG_FLOAT(f.directional_exponent, PROP_DEFAULT, "1.0"),
 
 		END_PROPS(FogComponent)
 	}
-
-	void start() {
-		f.height = get_ws_position().y + height_offset;
-		handle = idraw->get_scene()->register_fog(f);
+	void on_sync_render_data() final {
+		if (!handle.is_valid())
+			handle = idraw->get_scene()->register_fog();
+		RenderFog fog;
+		idraw->get_scene()->update_fog(handle, fog);
 	}
-	void end() {
+
+	void start() final {
+		sync_render_data();
+	}
+	void end() final {
 		idraw->get_scene()->remove_fog(handle);
 	}
-	void on_changed_transform() {
-		f.height = get_ws_position().y + height_offset;
-		idraw->get_scene()->update_fog(handle,f);
+	void on_changed_transform() final {
+		sync_render_data();
 	}
-	void editor_on_change_property() {
-		idraw->get_scene()->update_fog(handle, f);
+	void editor_on_change_property()final {
+		sync_render_data();
 	}
 
 	handle<RenderFog> handle;
 	float height_offset = 0.0;
-	RenderFog f;
 };
 CLASS_IMPL(FogComponent);
 #include "BillboardComponent.h"

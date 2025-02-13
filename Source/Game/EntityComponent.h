@@ -29,9 +29,13 @@ public:
 		return get_ws_transform()[3];
 	}
 
+	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)
+	void sync_render_data();
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}
+	// called when syncing data to renderer
+	virtual void on_sync_render_data() {}
 
 #ifndef NO_EDITOR
 	// compile any data relevant to the node

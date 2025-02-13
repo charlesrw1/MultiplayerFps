@@ -37,7 +37,7 @@ public:
 
 	void set_string(const char* value) {
 		if (flags & CVAR_READONLY) {
-			sys_print(Error, "cant set readonly var %s\n", value);
+			sys_print(Warning, "cant set readonly cvar %s, restart required to set\n", value);
 			return;
 		}
 

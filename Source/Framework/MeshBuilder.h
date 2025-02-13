@@ -63,9 +63,12 @@ public:
 	const std::vector<MbVertex>& get_v() { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }
 
+	void make_or_update_buffers(uint32_t& VBO, uint32_t& VAO, uint32_t& EBO);
+	static void free_buffers(uint32_t& VBO, uint32_t& VAO, uint32_t& EBO);
 
 private:
-	uint32_t VBO = 0, VAO = 0, EBO = 0;
+	bool wants_new_upload = false;
+	//uint32_t VBO = 0, VAO = 0, EBO = 0;
 	std::vector<MbVertex> verticies;
 	std::vector<uint32_t> indicies;
 

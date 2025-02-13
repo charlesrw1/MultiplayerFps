@@ -60,29 +60,29 @@ public:
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) = 0;
 
 	// Decal API
-	virtual handle<Render_Decal> register_decal(const Render_Decal& d) = 0;
+	virtual handle<Render_Decal> register_decal() = 0;
 	virtual void update_decal(handle<Render_Decal> handle, const Render_Decal& d) = 0;
 	virtual void remove_decal(handle<Render_Decal>& handle) = 0;
 
 	// Light API
 
-	virtual handle<Render_Light> register_light(const Render_Light& l) = 0;
+	virtual handle<Render_Light> register_light() = 0;
 	virtual void update_light(handle<Render_Light> handle, const Render_Light& l) = 0;
 	virtual void remove_light(handle<Render_Light>& handle) = 0;
 
-	virtual handle<Render_Sun> register_sun(const Render_Sun& s) = 0;
+	virtual handle<Render_Sun> register_sun() = 0;
 	virtual void update_sun(handle<Render_Sun> handle, const Render_Sun& s) = 0;
 	virtual void remove_sun(handle<Render_Sun>& handle) = 0;
 
-	virtual handle<Render_Reflection_Volume> register_reflection_volume(const Render_Reflection_Volume& v) = 0;
+	virtual handle<Render_Reflection_Volume> register_reflection_volume() = 0;
 	virtual void update_reflection_volume(handle<Render_Reflection_Volume> handle, const Render_Reflection_Volume& v) = 0;
 	virtual void remove_reflection_volume(handle<Render_Reflection_Volume>& handle) = 0;
-	virtual handle<Render_Skylight> register_skylight(const Render_Skylight& v) = 0;
+	virtual handle<Render_Skylight> register_skylight() = 0;
 	virtual void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& v) = 0;
 	virtual void remove_skylight(handle<Render_Skylight>& handle) = 0;
 
 	// only one fog allowed in a scene, others will just not work
-	virtual handle<RenderFog> register_fog(const RenderFog& fog) = 0;
+	virtual handle<RenderFog> register_fog() = 0;
 	virtual void update_fog(handle<RenderFog> handle, const RenderFog& fog) = 0;
 	virtual void remove_fog(handle<RenderFog>& handle) = 0;
 
@@ -90,11 +90,11 @@ public:
 
 
 	// Debug line renderer handles
-	virtual handle<MeshBuilder_Object> register_meshbuilder(const MeshBuilder_Object& mbobj) = 0;
+	virtual handle<MeshBuilder_Object> register_meshbuilder() = 0;
 	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) = 0;
 	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) = 0;
 
-	virtual handle<Particle_Object> register_particle_obj(const Particle_Object& mbobj) = 0;
+	virtual handle<Particle_Object> register_particle_obj() = 0;
 	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) = 0;
 	virtual void remove_particle_obj(handle<Particle_Object>& handle) = 0;
 };
@@ -114,6 +114,8 @@ public:
 		View_Setup view,	/* camera */
 		GuiSystemPublic* gui /* ui_paint callback */
 	) = 0;
+	virtual void sync_update() = 0;
+
 	virtual void on_level_start() = 0;
 	virtual void on_level_end() = 0;
 	

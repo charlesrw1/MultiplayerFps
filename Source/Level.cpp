@@ -8,7 +8,7 @@
 #include "Game/EntityComponent.h"
 #include "Framework/Config.h"
 #include "LevelSerialization/SerializationAPI.h"
-
+#include "GameEnginePublic.h"
 
 Level::~Level()
 {
@@ -47,6 +47,19 @@ void Level::update_level()
 		}
 	}
 	deferred_delete_list.clear();
+}
+void Level::sync_level_render_data()
+{
+	for (auto ec : wants_sync_update)
+		ec->on_sync_render_data();
+	wants_sync_update.clear_all();
+}
+void Level::add_to_sync_render_data_list(EntityComponent* ec)
+{
+	if (eng->get_is_in_overlapped_period())
+		wants_sync_update.insert(ec);
+	else
+		ec->on_sync_render_data();
 }
 
 Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
@@ -111,6 +124,9 @@ void Level::destroy_entity(Entity* e)
 void Level::destroy_component(EntityComponent* ec)
 {
 	if (!ec) return;
+
+	wants_sync_update.remove(ec);
+
 	uint64_t id = ec->get_instance_id();
 	sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
 	ec->destroy_internal();
@@ -129,7 +145,7 @@ void Level::destroy_component(EntityComponent* ec)
 extern ConfigVar g_default_gamemode;
 
 
-Level::Level() : all_world_ents(4/*2^4*/), tick_list(4)
+Level::Level() : all_world_ents(4/*2^4*/), tick_list(4), wants_sync_update(4)
 {
 
 }

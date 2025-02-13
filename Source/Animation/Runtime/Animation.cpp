@@ -19,6 +19,8 @@ using namespace glm;
 
 #include "Game/Entity.h"
 
+#include "Game/Components/GameAnimationMgr.h"
+
 CLASS_IMPL(AnimatorInstance);
 
 #define ROOT_BONE -1
@@ -120,13 +122,17 @@ int Animation_Set::find(const char* name) const
 
 void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const MSkeleton* model);
 
-AnimatorInstance::~AnimatorInstance() {}
+AnimatorInstance::~AnimatorInstance() {
+	g_gameAnimationMgr.remove_from_animating_set(this);
+}
 bool AnimatorInstance::initialize(
 	const Model* model, 
 	const Animation_Tree_CFG* graph, 
 	Entity* ent)
 {
 	ASSERT(model);
+
+	g_gameAnimationMgr.remove_from_animating_set(this);	// if was already added
 
 	if (!model->get_skel()) {
 		sys_print(Error, "model doesnt have skeleton for AnimatorInstance\n");
@@ -170,16 +176,16 @@ bool AnimatorInstance::initialize(
 	// Init bone arrays
 	const int bones = model->get_skel()->get_num_bones();
 	cached_bonemats.resize(bones);
-	matrix_palette.resize(bones);
 	if (using_global_bonemat_double_buffer)
 		last_cached_bonemats.resize(bones);
 
 	ASSERT(is_initialized());
 
-	auto pose = Pose_Pool::get().alloc(1);
-	util_set_to_bind_pose(*pose, get_skel());
-	util_localspace_to_meshspace(*pose, cached_bonemats, get_skel());
-	Pose_Pool::get().free(1);
+	auto pose = g_pose_pool.allocate_scoped();
+	util_set_to_bind_pose(*pose.get(), get_skel());
+	util_localspace_to_meshspace(*pose.get(), cached_bonemats, get_skel());
+
+	g_gameAnimationMgr.add_to_animating_set(this);
 
 	return true;
 }
@@ -245,13 +251,14 @@ void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_mat
 	//	out_bone_matricies[i] =  out_bone_matricies[i];
 }
 
+#include "Game/Components/GameAnimationMgr.h"
 
 void AnimatorInstance::ConcatWithInvPose()
 {
 	ASSERT(get_skel());
 
 	auto skel = get_skel();
-
+	glm::mat4* matrix_palette = g_gameAnimationMgr.get_bonemat_ptr(get_matrix_palette_offset());
 	for (int i = 0; i < skel->get_num_bones(); i++) {
 
 		matrix_palette[i] = cached_bonemats[i] * (glm::mat4)skel->get_inv_posematrix(i);
@@ -295,13 +302,13 @@ void AnimatorInstance::update(float dt)
 	if(using_global_bonemat_double_buffer)
 		last_cached_bonemats.swap(cached_bonemats);
 
-	Pose* poses = Pose_Pool::get().alloc(2);
+	auto pose_base = g_pose_pool.allocate_scoped();
 
 	NodeRt_Ctx ctx(this);
 
 	GetPose_Ctx gp_ctx;
 	gp_ctx.dt = dt;
-	gp_ctx.pose = &poses[0];
+	gp_ctx.pose = pose_base.get();
 	gp_ctx.accumulated_root_motion = &root_motion;
 
 	// callback
@@ -312,7 +319,7 @@ void AnimatorInstance::update(float dt)
 	if (!force_animation_to_bind_pose.get_bool() && get_tree()&& get_tree()->get_root_node())
 		get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
 	else
-		util_set_to_bind_pose(poses[0], get_skel());
+		util_set_to_bind_pose(*pose_base.get(), get_skel());
 
 	// update sync groups
 	for (int i = 0; i < active_sync_groups.size(); i++) {
@@ -413,11 +420,11 @@ void AnimatorInstance::update(float dt)
 			}
 		}
 
-		util_localspace_to_meshspace_with_physics(poses[0], cached_bonemats, is_simulating, get_skel());
+		util_localspace_to_meshspace_with_physics(*pose_base.get(), cached_bonemats, is_simulating, get_skel());
 
 	}
 	else {
-		util_localspace_to_meshspace(poses[0], cached_bonemats, get_skel());
+		util_localspace_to_meshspace(*pose_base.get(), cached_bonemats, get_skel());
 	}
 	
 	// Callback
@@ -425,8 +432,6 @@ void AnimatorInstance::update(float dt)
 		on_post_update();
 
 	ConcatWithInvPose();
-
-	Pose_Pool::get().free(2);
 }
 
 void AnimatorInstance::add_simulating_physics_object(Entity* e)
@@ -486,6 +491,6 @@ bool AnimatorInstance::play_animation_in_slot(
 
 DECLARE_ENGINE_CMD(print_animation_pools)
 {
-	sys_print(Info, "Pose: %d/%d\n", Pose_Pool::get().head,Pose_Pool::get().poses.size());
-	sys_print(Info, "Matrix: %d/%d\n", Matrix_Pool::get().head, Matrix_Pool::get().matricies.size());
+	//sys_print(Info, "Pose: %d/%d\n", Pose_Pool::get().head,Pose_Pool::get().poses.size());
+	//sys_print(Info, "Matrix: %d/%d\n", Matrix_Pool::get().head, Matrix_Pool::get().matricies.size());
 }

@@ -103,6 +103,8 @@ public:
     }
     void insert(T* ptr) {
         assert(ptr != nullptr);
+        if (find(ptr))
+            return;
         check_to_rehash(1);
         uint64_t index = std::hash<uint64_t>()((uint64_t)ptr);
         index = index & mask;

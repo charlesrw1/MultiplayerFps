@@ -5,6 +5,9 @@ struct ScopedBooleanValue
 	bool get_value() const {
 		return value;
 	}
+	operator bool() const {
+		return value;
+	}
 private:
 	friend class BooleanScope;
 	bool value = false;

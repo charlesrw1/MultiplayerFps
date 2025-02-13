@@ -44,6 +44,10 @@ void EntityComponent::destroy()
 	ASSERT(eng->get_level());
 	eng->get_level()->destroy_component(this);
 }
+void EntityComponent::sync_render_data()
+{
+	eng->get_level()->add_to_sync_render_data_list(this);
+}
 
 void EntityComponent::initialize_internal_step1()
 {

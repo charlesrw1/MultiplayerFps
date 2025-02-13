@@ -147,31 +147,20 @@ private:
 	std::vector<GraphTab> tabs;
 };
 
-
+class Entity;
+class MeshComponent;
 class GraphOutput
 {
 public:
-	bool is_valid_for_preview() { return model && animator && model->get_skel(); }
-
-	void hide();
 	void show(bool is_playing);
-
 	AnimatorInstance* get_animator();
-	Model* get_model() { return model; }
-
 	void set_model(Model* model);
-
-	void set_animator_instance(AnimatorInstance* inst);
-	void clear();
-
-	void initialize_animator(Animation_Tree_CFG* tree) {
-		if (animator && model)
-			animator->initialize(model, tree, nullptr);
-	}
+	Model* get_model();
+	void start();
+	void end() {}
 private:
-	handle<Render_Object> obj;
-	Model* model = nullptr;
-	AnimatorInstance* animator = nullptr;
+	Entity* ent = nullptr;
+	MeshComponent* mc = nullptr;
 };
 
 struct VariableNameAndType

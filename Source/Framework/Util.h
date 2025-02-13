@@ -4,10 +4,14 @@
 #include "Framework/Handle.h"
 
 void handle_assert_internal(const char* msg);
+#ifdef WITH_ASSERT
 #define ASSERT(x) \
 	do { if(!(x)) {	\
 		handle_assert_internal(#x); \
 	} }while (0);
+#else
+#define ASSERT(x)
+#endif
 bool CheckGlErrorInternal_(const char* file, int line);
 #define glCheckError() CheckGlErrorInternal_(__FILE__,__LINE__)
 double GetTime();
@@ -61,6 +65,7 @@ const float SQRT2 = 1.41421362;
 const float INV_SQRT2 = 1 / SQRT2;
 
 
+// todo: remove this, only works with single thread
 class Profiler
 {
 public:

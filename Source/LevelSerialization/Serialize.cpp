@@ -283,9 +283,9 @@ const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab
 	while (top_level->creator_source && (!for_prefab || top_level->creator_source->what_prefab != for_prefab))
 		top_level = top_level->creator_source;
 	
-	if(!for_prefab)
+	if (!for_prefab) {
 		ASSERT(!top_level->what_prefab || top_level->is_root_of_prefab);
-
+	}
 	if (!top_level->what_prefab || for_prefab == top_level->what_prefab ) {
 		auto source_owner_default = (const Entity*)top_level->get_type().default_class_object;
 

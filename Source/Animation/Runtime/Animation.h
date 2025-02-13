@@ -52,10 +52,6 @@ public:
 	// Main update method
 	void update(float dt);
 
-	// what renderer consumes
-	const std::vector<glm::mat4x4> get_matrix_palette() const { 
-		return matrix_palette; 
-	}
 	// what game/physics stuff consumes
 	const std::vector<glm::mat4x4> get_global_bonemats() const {
 		return cached_bonemats;
@@ -100,6 +96,12 @@ public:
 	RootMotionTransform get_last_root_motion() {
 		return root_motion;
 	}
+	void set_matrix_palette_offset(int ofs) {
+		matrix_palette_offset = ofs;
+	}
+	int get_matrix_palette_offset() const {
+		return matrix_palette_offset;
+	}
 private:
 	bool get_is_for_editor() const {
 		return get_owner() == nullptr;
@@ -110,10 +112,8 @@ private:
 	virtual void on_update(float dt) {}
 	virtual void on_post_update() {}
 
-
-
 	std::vector<glm::mat4> cached_bonemats;	// global bonemats
-	std::vector<glm::mat4> matrix_palette;	// final transform matricies, meshspace->bonespace->meshspace
+	int matrix_palette_offset = 0;	// mesh space -> bone space -> meshspace, what the renderer consumes
 
 	void ConcatWithInvPose();
 

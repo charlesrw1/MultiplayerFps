@@ -24,26 +24,18 @@ void BillboardComponent::start() {
 	dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 
-	handle = idraw->get_scene()->register_obj();
-
-	Render_Object obj;
-	fill_out_render_obj(obj);
-	idraw->get_scene()->update_obj(handle, obj);
+	sync_render_data();
 }
 void BillboardComponent::end() {
 	idraw->get_scene()->remove_obj(handle);
 }
 void BillboardComponent::on_changed_transform() {
-	Render_Object obj;
-	fill_out_render_obj(obj);
-	idraw->get_scene()->update_obj(handle, obj);
+	sync_render_data();
 }
 void BillboardComponent::editor_on_change_property() {
 
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
-	Render_Object obj;
-	fill_out_render_obj(obj);
-	idraw->get_scene()->update_obj(handle, obj);
+	sync_render_data();
 }
 void BillboardComponent::set_texture(const Texture* tex) {
 	if (tex == texture.get())
@@ -51,16 +43,16 @@ void BillboardComponent::set_texture(const Texture* tex) {
 	texture.ptr = (Texture*)tex; // FIXME
 	if (!handle.is_valid())	// could be initialization setting
 		return;
-
-
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
-	Render_Object obj;
-	fill_out_render_obj(obj);
-	idraw->get_scene()->update_obj(handle, obj);
+	sync_render_data();
 }
 
-void BillboardComponent::fill_out_render_obj(Render_Object& obj)
+void BillboardComponent::on_sync_render_data()
 {
+	if (!handle.is_valid())
+		handle = idraw->get_scene()->register_obj();
+
+	Render_Object obj;
 	obj.visible = visible;
 	obj.model = g_modelMgr.get_default_plane_model();
 	ASSERT(dynamicMaterial.get());
@@ -69,6 +61,8 @@ void BillboardComponent::fill_out_render_obj(Render_Object& obj)
 	obj.shadow_caster = false;
 	obj.owner = this;
 	obj.outline = get_owner()->is_selected_in_editor();
+
+	idraw->get_scene()->update_obj(handle, obj);
 }
 const PropertyInfoList* BillboardComponent::get_props() {
 	START_PROPS(BillboardComponent)

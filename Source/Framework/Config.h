@@ -4,7 +4,7 @@
 
 enum CVarFlags
 {
-	CVAR_READONLY	= 1,
+	CVAR_READONLY	= 1,	// readonly var, can only be set on init
 	CVAR_SAVETODISK	= (1 << 1),
 	CVAR_INTEGER	= (1 << 3),
 	CVAR_BOOL		= (1 << 4),

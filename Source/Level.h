@@ -37,6 +37,11 @@ public:
 	void close_level();
 
 	void update_level();
+
+	void sync_level_render_data();
+
+	// this adds to the sync list to defer if in game task, or immedetaly calls on_sync() otherwise
+	void add_to_sync_render_data_list(EntityComponent* ec);
 	
 	void add_to_update_list(BaseUpdater* b) {
 		if (b_is_in_update_tick.get_value())
@@ -92,6 +97,7 @@ public:
 	// appends object to list that will be destroyed at end of frame, instead of instantly
 	void queue_deferred_delete(BaseUpdater* e);
 
+
 private:
 	SceneAsset* source_asset = nullptr;
 
@@ -105,8 +111,9 @@ private:
 
 	ScopedBooleanValue b_is_in_update_tick;
 
-	std::vector<BaseUpdater*> wantsToAddToUpdate;
 
+	std::vector<BaseUpdater*> wantsToAddToUpdate;
+	hash_set<EntityComponent> wants_sync_update;
 	std::unordered_set<uint64_t> deferred_delete_list;
 
 	// is this an editor level

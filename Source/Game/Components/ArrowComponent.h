@@ -15,25 +15,26 @@ public:
 	}
 
 	void start() override {
-		renderable = idraw->get_scene()->register_obj();
-		update_object();
+		sync_render_data();
 	}
 	void end() override {
-		idraw->get_scene()->remove_obj(renderable);
+		idraw->get_scene()->remove_obj(handle);
 	}
 	void on_changed_transform() override {
-		update_object();
+		sync_render_data();
 	}
-	void update_object() {
+	void on_sync_render_data() final {
+		if(!handle.is_valid())
+			handle = idraw->get_scene()->register_obj();
 		Render_Object obj;
 		obj.model = arrowModel.get();
 		obj.transform = get_ws_transform();
 		obj.visible = true;
 		obj.outline = get_owner()->is_selected_in_editor();
 		obj.owner = this;
-		idraw->get_scene()->update_obj(renderable, obj);
+		idraw->get_scene()->update_obj(handle, obj);
 	}
 private:
 	AssetPtr<Model> arrowModel;
-	handle<Render_Object> renderable;
+	handle<Render_Object> handle;
 };

@@ -63,7 +63,7 @@ void CameraComponent::update_meshbuilder() {
 
 	mb.End();
 
-	editor_mbview->on_changed_transform();
+	editor_mbview->sync_render_data();
 }
 void CameraComponent::get_view(glm::mat4& viewMatrix, float& fov)
 {

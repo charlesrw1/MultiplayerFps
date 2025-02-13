@@ -290,9 +290,7 @@ public:
     }
 
     void tick(float dt) override {
-        CPUFUNCTIONSTART;
-
-      
+        
         // tick current sounds and end any bad ones
         for (int i = 0; i < active_voices.size(); i++) {
             auto spi = active_voices[i];

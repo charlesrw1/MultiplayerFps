@@ -19,27 +19,9 @@
 #include "Game/AssetPtrMacro.h"
 
 
-void SpotLightComponent::build_render_light(Render_Light& light)
-{
-	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
-	light.projected_texture = cookie_asset.get();
-	light.conemax = cone_angle;
-	light.conemin = inner_cone;
-	light.radius = radius;
-	light.is_spotlight = true;
-
-	auto& transform = get_owner()->get_ws_transform();
-
-	light.position = transform[3];
-	light.normal = glm::normalize(-transform[2]);
-}
 
 void SpotLightComponent::start()
 {
-	Render_Light light;
-	build_render_light(light);
-	light_handle = idraw->get_scene()->register_light(light);
-
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
@@ -53,15 +35,31 @@ void SpotLightComponent::start()
 		editor_arrow = arrow_obj->get_instance_id();
 		editor_billboard = b->get_instance_id();
 	}
-}
 
-void SpotLightComponent::editor_on_change_property()
+	sync_render_data();
+}
+void SpotLightComponent::on_sync_render_data()
 {
-	assert(light_handle.is_valid());
+	if (!light_handle.is_valid())
+		light_handle = idraw->get_scene()->register_light();
+
 	Render_Light light;
-	build_render_light(light);
+	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
+	light.projected_texture = cookie_asset.get();
+	light.conemax = cone_angle;
+	light.conemin = inner_cone;
+	light.radius = radius;
+	light.is_spotlight = true;
+
+	auto& transform = get_owner()->get_ws_transform();
+
+	light.position = transform[3];
+	light.normal = glm::normalize(-transform[2]);
+
 	idraw->get_scene()->update_light(light_handle, light);
 }
+
+
 
 void SpotLightComponent::end()
 {
@@ -74,32 +72,23 @@ void SpotLightComponent::end()
 		((EntityComponent*)e)->destroy();
 }
 
-void SpotLightComponent::on_changed_transform()
+
+
+void PointLightComponent::on_sync_render_data()
 {
-	assert(light_handle.is_valid());
+	if (!light_handle.is_valid())
+		light_handle = idraw->get_scene()->register_light();
 	Render_Light light;
-	build_render_light(light);
-	idraw->get_scene()->update_light(light_handle, light);
-}
-
-
-void PointLightComponent::build_render_light(Render_Light& light)
-{
 	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
 	light.radius = radius;
 	light.is_spotlight = false;
-
 	auto& transform = get_owner()->get_ws_transform();
-
 	light.position = transform[3];
-}
+	idraw->get_scene()->update_light(light_handle, light);
+};
 
 void PointLightComponent::start()
 {
-	Render_Light light;
-	build_render_light(light);
-	light_handle = idraw->get_scene()->register_light(light);
-
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
@@ -107,6 +96,7 @@ void PointLightComponent::start()
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		editor_billboard = b->get_instance_id();
 	}
+	sync_render_data();
 }
 
 void PointLightComponent::end()
@@ -117,50 +107,27 @@ void PointLightComponent::end()
 		((EntityComponent*)e)->destroy();
 }
 
-void PointLightComponent::on_changed_transform()
+void SunLightComponent::on_sync_render_data()
 {
-	assert(light_handle.is_valid());
-	Render_Light light;
-	build_render_light(light);
-	idraw->get_scene()->update_light(light_handle, light);
-}
-
-void PointLightComponent::editor_on_change_property()
-{
-	assert(light_handle.is_valid());
-	Render_Light light;
-	build_render_light(light);
-	idraw->get_scene()->update_light(light_handle, light);
-}
-
-void SunLightComponent::editor_on_change_property()
-{
-	assert(light_handle.is_valid());
+	if (!light_handle.is_valid())
+		light_handle = idraw->get_scene()->register_sun();
 	Render_Sun light;
-	build_render_light(light);
-	idraw->get_scene()->update_sun(light_handle, light);
-}
-
-void SunLightComponent::build_render_light(Render_Sun& light)
-{
-	light.color = glm::vec3(color.r,color.g,color.b)*(intensity/255.f);
+	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
 	light.fit_to_scene = fit_to_scene;
 	light.log_lin_lerp_factor = log_lin_lerp_factor;
 	light.z_dist_scaling = z_dist_scaling;
 	light.max_shadow_dist = max_shadow_dist;
 	light.epsilon = epsilon;
 	light.cast_shadows = true;
-
 	auto& transform = get_owner()->get_ws_transform();
 	light.direction = glm::normalize(-transform[2]);
+	idraw->get_scene()->update_sun(light_handle, light);
 }
+
+
 
 void SunLightComponent::start()
 {
-	Render_Sun light;
-	build_render_light(light);
-	light_handle = idraw->get_scene()->register_sun(light);
-
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
@@ -172,6 +139,8 @@ void SunLightComponent::start()
 		editor_arrow = s->get_instance_id();
 		editor_billboard = b->get_instance_id();
 	}
+
+	sync_render_data();
 }
 
 void SunLightComponent::end()
@@ -186,13 +155,6 @@ void SunLightComponent::end()
 		((EntityComponent*)e)->destroy();
 }
 
-void SunLightComponent::on_changed_transform()
-{
-	assert(light_handle.is_valid());
-	Render_Sun light;
-	build_render_light(light);
-	idraw->get_scene()->update_sun(light_handle, light);
-}
 
 SunLightComponent::~SunLightComponent() {}
 PointLightComponent::~PointLightComponent() {}
@@ -202,25 +164,27 @@ SpotLightComponent::~SpotLightComponent() {}
 void SkylightComponent::start() {
 
 	mytexture = new Texture; // g_imgs.install_system_texture("_skylight");
-	Render_Skylight sl;
-	sl.generated_cube = mytexture;
-	sl.wants_update = true;
-
-	handle = idraw->get_scene()->register_skylight(sl);
+	sync_render_data();
 }
 void SkylightComponent::end() {
 	idraw->get_scene()->remove_skylight(handle);
 	delete mytexture;
 	mytexture = nullptr;
 }
+void SkylightComponent::on_sync_render_data()
+{
+	if (!handle.is_valid())
+		handle = idraw->get_scene()->register_skylight();
+	Render_Skylight sl;
+	sl.generated_cube = mytexture;
+	sl.wants_update = true;
+	idraw->get_scene()->update_skylight(handle, sl);
+}
 
 void SkylightComponent::editor_on_change_property()  {
 	if (recapture_skylight) {
 		sys_print(Debug, "recapturing skylight");
-		Render_Skylight sl;
-		sl.generated_cube = mytexture;
-		sl.wants_update = true;
-		idraw->get_scene()->update_skylight(handle, sl);
+		sync_render_data();
 	}
 	recapture_skylight = false;
 }
@@ -256,9 +220,6 @@ SunLightComponent::SunLightComponent() {
 #include "Game/Components/MeshbuilderComponent.h"
 void CubemapComponent::start() {
 	mytexture = new Texture;
-	Render_Reflection_Volume vol;
-	fill_out_struct(vol);
-	handle = idraw->get_scene()->register_reflection_volume(vol);
 
 	if (eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
@@ -267,7 +228,23 @@ void CubemapComponent::start() {
 		editor_meshbuilder->use_transform = false;
 		update_editormeshbuilder();
 	}
+
+	sync_render_data();
 }
+void CubemapComponent::on_sync_render_data()
+{
+	if (!handle.is_valid())
+		handle = idraw->get_scene()->register_reflection_volume();
+	Render_Reflection_Volume h;
+	h.wants_update = true;
+	h.generated_cube = mytexture;
+	h.probe_position = get_ws_transform() * glm::vec4(anchor.p, 1.0);
+	glm::vec3 scale = get_owner()->get_ls_scale();
+	h.boxmin = get_ws_position() - scale * 0.5f;
+	h.boxmax = get_ws_position() + scale * 0.5f;
+	idraw->get_scene()->update_reflection_volume(handle, h);
+}
+
 void CubemapComponent::update_editormeshbuilder()
 {
 	if (!editor_meshbuilder)
@@ -291,21 +268,11 @@ void CubemapComponent::end() {
 void CubemapComponent::editor_on_change_property() {
 	if (recapture) {
 		recapture = false;
-		Render_Reflection_Volume vol;
-		fill_out_struct(vol);
-		vol.wants_update = true;
-		idraw->get_scene()->update_reflection_volume(handle, vol);
+		sync_render_data();
 	}
 	update_editormeshbuilder();
 }
-void CubemapComponent::fill_out_struct(Render_Reflection_Volume& h)
-{
-	h.generated_cube = mytexture;
-	h.probe_position = get_ws_transform() * glm::vec4(anchor.p, 1.0);
-	glm::vec3 scale = get_owner()->get_ls_scale();
-	h.boxmin = get_ws_position() - scale*0.5f;
-	h.boxmax = get_ws_position() + scale * 0.5f;
-}
+
 
 #include "Framework/AddClassToFactory.h"
 #ifdef EDITOR_BUILD

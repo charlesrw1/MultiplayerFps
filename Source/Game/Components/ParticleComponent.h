@@ -29,10 +29,13 @@ public:
 		set_call_init_in_editor(true);
 		set_ticking(true);
 	}
-	void start() override;
-	void update() override;
-	void end() override;
-	void on_changed_transform() override;
+	void start() final;
+	void update() final;
+	void end() final;
+	void on_changed_transform() final {
+		sync_render_data();
+	}
+	void on_sync_render_data() final;
 
 	float continious_rate = 0.f;	// particles/s
 	float burst_time = 0.f;

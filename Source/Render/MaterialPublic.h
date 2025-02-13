@@ -6,6 +6,7 @@
 #include <string>
 #include "Framework/StringName.h"
 #include "glm/glm.hpp"
+#include "DynamicMaterialPtr.h"
 
 // A global "UBO" of material params
 // Cant hold texture types
@@ -49,14 +50,15 @@ protected:
 	friend class MaterialManagerLocal;
 };
 
+
+
 class MaterialManagerPublic 
 {
 public:
 	virtual void init() = 0;
 
 	// Create a dynamic material from a material instance
-	// resource deletion handled by RAII
-	virtual std::unique_ptr<MaterialInstance> create_dynmaic_material(const MaterialInstance* material) = 0;
+	virtual DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) = 0;
 
 	// find a parameter buffer with the given name
 	// ParameterBuffers function like singletons

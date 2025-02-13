@@ -253,7 +253,7 @@ public:
 	// public interface
 	void pre_render_update() override;	// material buffer updates
 
-	std::unique_ptr<MaterialInstance> create_dynmaic_material(const MaterialInstance* material) final { 
+	DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) final {
 		assert(material);
 		MaterialInstance* dynamicMat = new MaterialInstance();
 
@@ -265,18 +265,13 @@ public:
 
 		dynamicMat->set_loaded_manually_unsafe("%_DM_%");
 
-		dynamic_materials.insert(dynamicMat);
 
-		return std::unique_ptr<MaterialInstance>(dynamicMat);
+		return DynamicMatUniquePtr(dynamicMat);
 	}
-	void free_dynamic_material(const MaterialInstance* mat) {
+	void free_dynamic_material(MaterialInstance* mat) {
 		if (!mat) return;
-		if (dynamic_materials.find((MaterialInstance*)mat) == dynamic_materials.end())
-			Fatalf("free_dynamic_material used on a material not in dynamic_material list (double delete?)");
-		MaterialInstance* mlocal = (MaterialInstance*)mat;
-		dynamic_materials.erase(mlocal);
-		if (mlocal->impl->dirty_buffer_index != -1)
-			dirty_list.at(mlocal->impl->dirty_buffer_index) = nullptr;
+	
+		queued_dynamic_mats_to_delete.push_back(mat);
 	}
 	MaterialParameterBuffer* find_parameter_buffer(const char* name) override { return nullptr; }
 
@@ -342,9 +337,9 @@ private:
 	// bitmap allocator for materials
 	std::vector<uint64_t> materialBitmapAllocator;
 
-	std::unordered_set<MaterialInstance*> dynamic_materials;
-
 	std::unordered_map<std::string, MaterialParameterBuffer*> parameter_buffers;
+
+	std::vector<MaterialInstance*> queued_dynamic_mats_to_delete;
 
 	// materials to allocate or update
 	std::vector<MaterialInstance*> dirty_list;

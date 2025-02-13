@@ -29,6 +29,8 @@ class SceneAsset;
 class ImNodesContext;
 class GUI_RootControl;
 class UIControl;
+struct SceneDrawParamsEx;
+struct View_Setup;
 class GameEngineLocal : public GameEnginePublic
 {
 public:
@@ -104,6 +106,8 @@ public:
 	void init();
 	void cleanup();
 
+	void get_draw_params(SceneDrawParamsEx& param, View_Setup& setup);
+	bool game_thread_update();
 	void loop();
 	void draw_screen();
 

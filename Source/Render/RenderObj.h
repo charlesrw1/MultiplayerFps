@@ -25,8 +25,8 @@ struct Render_Object
 	}
 
 	Model* model = nullptr;
-	AnimatorInstance* animator = nullptr;
 	MaterialInstance* mat_override = nullptr;
+	int animator_bone_ofs = -1;
 
 	bool visible : 1;
 	bool shadow_caster : 1;
@@ -54,6 +54,7 @@ struct MeshBuilder_Object
 
 	const EntityComponent* owner = nullptr;
 	MeshBuilder* meshbuilder = nullptr;
+	MaterialInstance* material = nullptr;
 	Color32 background_color = COLOR_BLACK;
 	bool visible : 1;
 	bool depth_tested : 1;

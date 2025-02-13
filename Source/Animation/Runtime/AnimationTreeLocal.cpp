@@ -42,7 +42,9 @@ REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);
 #endif
 
 
-Pool_Allocator g_pose_pool = Pool_Allocator(sizeof(Pose), 8);
+Pool_Allocator<Pose> g_pose_pool = Pool_Allocator<Pose>(100, "g_pose_pool");
+Pool_Allocator<MatrixPose> g_matrix_pool = Pool_Allocator<MatrixPose>(10,"g_matrix_pool");
+
 
 CLASS_IMPL(BaseAGNode);
 
@@ -248,30 +250,27 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 // Inherited via At_Node
 
  bool Subtract_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
-
-	Pose* reftemp = Pose_Pool::get().alloc(1);
+	auto reftemp = g_pose_pool.allocate_scoped();
 	ref->get_pose(ctx, pose);
 	GetPose_Ctx pose2 = pose;
-	pose2.pose = reftemp;
+	pose2.pose = reftemp.get();
 	source->get_pose(ctx, pose2);
-	util_subtract(ctx.num_bones(), *reftemp, *pose.pose);
-	Pose_Pool::get().free(1);
+	util_subtract(ctx.num_bones(), *reftemp.get(), *pose.pose);
 	return true;
 }
 
- bool Add_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
+bool Add_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 {
 	float lerp = param->get_value<float>(ctx);
 
-	Pose* addtemp = Pose_Pool::get().alloc(1);
+	auto addtemp = g_pose_pool.allocate_scoped();
 	base->get_pose(ctx, pose);
 
 	GetPose_Ctx pose2 = pose;
-	pose2.pose = addtemp;
+	pose2.pose = addtemp.get();
 
 	diff->get_pose(ctx, pose2);
-	util_add(ctx.num_bones(), *addtemp, *pose.pose, lerp);
-	Pose_Pool::get().free(1);
+	util_add(ctx.num_bones(), *addtemp.get(), *pose.pose, lerp);
 	return true;
 }
 
@@ -286,10 +285,9 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 	if (value <= 0.00001)
 		return inp0->get_pose(ctx, pose);
 	bool ret = inp0->get_pose(ctx, pose);
-	Pose* addtemp = Pose_Pool::get().alloc(1);
-	inp1->get_pose(ctx, pose.set_pose(addtemp));
-	util_blend(ctx.num_bones(), *addtemp, *pose.pose, value);
-	Pose_Pool::get().free(1);
+	auto addtemp = g_pose_pool.allocate_scoped();
+	inp1->get_pose(ctx, pose.set_pose(addtemp.get()));
+	util_blend(ctx.num_bones(), *addtemp.get(), *pose.pose, value);
 	return ret;
 }
 
@@ -338,11 +336,10 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 		 keep_going &= input[rt->active_i]->get_pose(ctx, pose);
 	 }
 	 else {
-		 Pose* addtemp = Pose_Pool::get().alloc(1);
+		 auto addtemp = g_pose_pool.allocate_scoped();
 		 keep_going &= input[rt->active_i]->get_pose(ctx, pose);
-		 keep_going &= input[rt->fade_out_i]->get_pose(ctx, pose.set_pose(addtemp));
-		 util_blend(ctx.num_bones(), *addtemp, *pose.pose, rt->lerp_amt);
-		 Pose_Pool::get().free(1);
+		 keep_going &= input[rt->fade_out_i]->get_pose(ctx, pose.set_pose(addtemp.get()));
+		 util_blend(ctx.num_bones(), *addtemp.get(), *pose.pose, rt->lerp_amt);
 	 }
 	 return keep_going;
  }
@@ -366,7 +363,8 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 
 	if (has_mirror_map && rt->saved_f >= 0.000001) {
 		const Model* m = ctx.model;
-		Pose* posemirrored = Pose_Pool::get().alloc(1);
+		auto posemirrored_s = g_pose_pool.allocate_scoped();
+		auto posemirrored = posemirrored_s.get();
 		// mirror the bones
 		for (int i = 0; i <ctx.num_bones(); i++) {
 
@@ -383,8 +381,6 @@ static void get_clip_pose_shared(NodeRt_Ctx& ctx, GetPose_Ctx pose, const Animat
 		}
 
 		util_blend(ctx.num_bones(), *posemirrored, *pose.pose, rt->saved_f);
-
-		Pose_Pool::get().free(1);
 
 	}
 	return ret;
@@ -668,19 +664,18 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 	 // handle blending of curves, events, etc.
 	 if (meshspace_rotation_blend) {
-		 Pose* base_layer = Pose_Pool::get().alloc(1);
-		 bool ret = base->get_pose(ctx, pose.set_pose(base_layer));
+		 auto base_layer = g_pose_pool.allocate_scoped();
+		 bool ret = base->get_pose(ctx, pose.set_pose(base_layer.get()));
 		 layer->get_pose(ctx, pose); // ignore return value, fixme?
-		 util_global_blend(ctx.get_skeleton(),base_layer, pose.pose, alpha_val, rt->mask->weight);
-		 Pose_Pool::get().free(1);
+		 util_global_blend(ctx.get_skeleton(),base_layer.get(), pose.pose, alpha_val, rt->mask->weight);
+
 		 return ret;
 	 }
 	 else {
-		 Pose* layer = Pose_Pool::get().alloc(1);
+		 auto layer = g_pose_pool.allocate_scoped();
 		 bool ret = base->get_pose(ctx, pose);
-		 this->layer->get_pose(ctx, pose.set_pose(layer));
-		 util_blend_with_mask(ctx.num_bones(), *layer, *pose.pose, alpha_val, rt->mask->weight);
-		 Pose_Pool::get().free(1);
+		 this->layer->get_pose(ctx, pose.set_pose(layer.get()));
+		 util_blend_with_mask(ctx.num_bones(), *layer.get(), *pose.pose, alpha_val, rt->mask->weight);
 		 return ret;
 	 }
  }
@@ -701,7 +696,7 @@ bool MeshspaceToLocal_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) 
 static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkeleton* skel, int index)
 {
 	const int ALLOCED_MATS = 36;
-	glm::mat4* mats = Matrix_Pool::get().alloc(ALLOCED_MATS);
+	glm::mat4 mats[ALLOCED_MATS];
 
 	int count = 0;
 	while (index != -1) {
@@ -715,7 +710,6 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		mats[i] = mats[i + 1] * mats[i];
 	}
 	glm::mat4 final_ = mats[0];
-	Matrix_Pool::get().free(ALLOCED_MATS);
 	return final_;
 }
 
@@ -728,7 +722,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	 // build up global matrix when needed instead of recreating it every step
 	// not sure if this is optimal, should profile different ways to pass around pose
 	 const int ALLOCED_MATS = 36;
-	 glm::mat4* mats = Matrix_Pool::get().alloc(ALLOCED_MATS);
+	 glm::mat4 mats[ALLOCED_MATS];
 	 int indicies[36];
 
 	 auto skel = ctx.get_skeleton();
@@ -748,7 +742,6 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 
 	 if (count <= 2) {
 		 sys_print(Warning, "ik attempted on some root bone %s\n", bone_name.c_str());
-		 Matrix_Pool::get().free(ALLOCED_MATS);
 		 return res;
 	 }
 
@@ -801,8 +794,6 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		 pose.pose->q[rt->bone_index] = glm::inverse(q) * target_rotation;
 	 }
 
-	 Matrix_Pool::get().free(ALLOCED_MATS);
-
 	 return res;
 }
 
@@ -816,7 +807,7 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	 // build up global matrix when needed instead of recreating it every step
 	 // not sure if this is optimal, should profile different ways to pass around pose
 	 const int ALLOCED_MATS = 36;
-	 glm::mat4* mats = Matrix_Pool::get().alloc(ALLOCED_MATS);
+	 glm::mat4 mats[ALLOCED_MATS];
 	 auto skel = ctx.get_skeleton();
 	 int index = rt->bone_index;
 	 int count = 0;
@@ -883,7 +874,6 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 		 if (apply_position && apply_position_meshspace)
 			 pose.pose->pos[rt->bone_index] = mats[0][3];
 	 }
-	Matrix_Pool::get().free(ALLOCED_MATS);
 	 return res;
  }
 

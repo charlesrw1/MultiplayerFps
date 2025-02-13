@@ -60,10 +60,12 @@
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
+    <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Game\AssetPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\AssetPtrMacro.h" />
     <ClInclude Include="Source\Game\CarGame\CarGame.h" />
+    <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
@@ -76,6 +78,7 @@
     <ClInclude Include="Source\LevelEditor\LEPlugin.h" />
     <ClInclude Include="Source\LevelEditor\TileMapPlugin.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
+    <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
@@ -488,7 +491,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
@@ -510,7 +513,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>

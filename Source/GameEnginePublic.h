@@ -4,7 +4,7 @@
 #include "Framework/Config.h"
 #include "glm/glm.hpp"
 #include "DeferredSpawnScope.h"
-
+#include "Framework/ScopedBoolean.h"
 extern ConfigVar g_thirdperson;
 extern ConfigVar g_fov;
 extern ConfigVar g_mousesens;
@@ -109,6 +109,12 @@ public:
 	double frame_time = 0.0;	// total frame time of program
 	double frame_remainder = 0.0;	// frame time accumulator
 	double tick_interval = 1.0/60.0;	// 1/tick_rate
+
+	bool get_is_in_overlapped_period() const {
+		return b_is_in_overlapped_period.get_value();
+	}
+protected:
+	ScopedBooleanValue b_is_in_overlapped_period;
 };
 
 

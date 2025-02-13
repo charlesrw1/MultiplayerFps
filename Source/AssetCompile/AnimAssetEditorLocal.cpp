@@ -37,12 +37,12 @@ void AnimationEditorTool::add_to_obj(Render_Object& obj, float dt)
 	auto& animator = g_animseq_editor_static.animator;
 	animator.model = mod;
 	animator.cached_bonemats.resize(mod->get_skel()->get_num_bones());
-	animator.matrix_palette.resize(mod->get_skel()->get_num_bones());
+	//animator.matrix_palette.resize(mod->get_skel()->get_num_bones());
 	util_localspace_to_meshspace_ptr_2(pose, animator.cached_bonemats.data(), mod->get_skel());
 
 	animator.ConcatWithInvPose();
 
-	obj.animator = &animator;
+	//obj.animator = &animator;
 	obj.model = mod;
 	obj.visible = true;
 

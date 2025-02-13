@@ -511,6 +511,9 @@
     <ClInclude Include="Source\LevelEditor\LEPlugin.h" />
     <ClInclude Include="Source\LevelEditor\TileMapPlugin.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
+    <ClInclude Include="Source\Framework\Jobs.h" />
+    <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
+    <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

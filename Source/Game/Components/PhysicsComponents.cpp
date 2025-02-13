@@ -31,7 +31,7 @@ void PhysicsComponentBase::fetch_new_transform()
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
 
-	if (interpolate_visuals) {
+	if (0&&interpolate_visuals) {
 		last_position = next_position;
 		last_rot = next_rot;
 		next_position = physx_to_glm(pose.p);
@@ -82,8 +82,9 @@ void PhysicsComponentBase::enable_with_initial_transforms(const glm::mat4& t0, c
 
 void PhysicsComponentBase::update()
 {
+	set_ticking(false);
+	return;
 	if (!enabled || !get_is_simulating() || !interpolate_visuals) {
-		set_ticking(false);
 		return;
 	}
 
@@ -281,7 +282,7 @@ void SphereComponent::add_actor_shapes() {
 }
 void MeshColliderComponent::add_actor_shapes() {
 	auto mesh = get_owner()->get_component<MeshComponent>();
-	if (!mesh)
+	if (!mesh || !mesh->get_model())
 		sys_print(Error, "MeshColliderComponent couldnt find MeshComponent");
 	else
 		add_model_shape_to_actor(mesh->get_model());
@@ -389,6 +390,7 @@ void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
 	}
 	else {
 		auto& aabb = model->get_bounds();
+
 		auto boxGeom = PxBoxGeometry(glm_to_physx((aabb.bmax - aabb.bmin) * 0.5f));
 
 		auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,

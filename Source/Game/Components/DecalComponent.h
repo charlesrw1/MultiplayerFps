@@ -1,22 +1,25 @@
 #pragma once
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
+
+GENERATED_CLASS_INCLUDE("Render/MaterialPublic.h");
+
 class MaterialInstance;
 struct Render_Decal;
-CLASS_H(DecalComponent, EntityComponent)
+NEWCLASS(DecalComponent, EntityComponent)
 public:
 	~DecalComponent();
 	DecalComponent();
 
-	void start() override;
-	void end() override;
-	void on_changed_transform() override;
-	void editor_on_change_property() override;
-	static const PropertyInfoList* get_props();
+	void start() final;
+	void end() final;
+	void on_changed_transform() final;
+	void editor_on_change_property() final;
+	void on_sync_render_data() final;
 
 	void set_material(const MaterialInstance* mat);
 private:
-	void update_handle();
+	REFLECT();
 	AssetPtr<MaterialInstance> material;
 	handle<Render_Decal> handle;
 };

@@ -26,7 +26,13 @@
 class Node_CFG;
 class Animation_Tree_CFG;
 
-extern Pool_Allocator g_pose_pool;
+struct MatrixPose
+{
+	glm::mat4 mats[256];
+};
+
+extern Pool_Allocator<Pose> g_pose_pool;
+extern Pool_Allocator<MatrixPose> g_matrix_pool;
 
 // only accepted graph values
 NEWENUM(anim_graph_value,uint8_t)
@@ -117,7 +123,7 @@ public:
 	}
 	template<typename T>
 	void construct_runtime_node(int node_index) {
-		ASSERT(!anim->runtime_graph_data[node_index]);
+		ASSERT(!anim->runtime_graph_data[node_index].get());
 		anim->runtime_graph_data[node_index].reset(new T());
 	}
 

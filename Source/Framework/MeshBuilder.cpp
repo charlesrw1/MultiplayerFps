@@ -9,10 +9,20 @@ const uint32_t MeshBuilder::LINES = GL_LINES;
 
 void MeshBuilder::Free()
 {
+#if 0
+	glDeleteVertexArrays(1, &VAO);
+	glDeleteBuffers(1, &VBO);
+	glDeleteBuffers(1, &EBO);
+#endif
+}
+
+void MeshBuilder::free_buffers(uint32_t& VBO, uint32_t& VAO, uint32_t& EBO)
+{
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
 }
+
 void MeshBuilder::Begin(int reserve_verts)
 {
 	reserve_verts = glm::max(reserve_verts, MIN_VERTEX_ARRAY_SIZE);
@@ -20,7 +30,8 @@ void MeshBuilder::Begin(int reserve_verts)
 	verticies.clear();
 	indicies.clear();
 }
-void MeshBuilder::End()
+
+void MeshBuilder::make_or_update_buffers(uint32_t & VBO, uint32_t & VAO, uint32_t & EBO)
 {
 	if (VAO == 0) {
 		glGenVertexArrays(1, &VAO);
@@ -51,11 +62,47 @@ void MeshBuilder::End()
 	glBindVertexArray(0);
 }
 
+void MeshBuilder::End()
+{
+	wants_new_upload = true;
+#if 0
+	if (VAO == 0) {
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glGenBuffers(1, &EBO);
+
+		glBindVertexArray(VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+		// POSITION (float*3)
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MbVertex), (void*)0);
+		glEnableVertexAttribArray(0);
+		// Color (uint8*4)
+		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(MbVertex), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(1);
+		// UV (float * 2)
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MbVertex), (void*)(3 * sizeof(float) + sizeof(Color32)));
+		glEnableVertexAttribArray(2);
+
+	}
+	else {
+		glBindVertexArray(VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	}
+	glBufferData(GL_ARRAY_BUFFER, verticies.size() * sizeof(MbVertex), verticies.data(), GL_STREAM_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicies.size() * sizeof(uint32_t), indicies.data(), GL_STREAM_DRAW);
+	glBindVertexArray(0);
+#endif
+}
+
 void MeshBuilder::Draw(uint32_t gl_type)
 {
+#if 0
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glDrawElements((GLenum)gl_type, indicies.size(), GL_UNSIGNED_INT, (void*)0);
+#endif
 }
 
 void MeshBuilder::PushLine(vec3 start, vec3 end, Color32 color)

@@ -17,34 +17,35 @@ public:
 
 	static ShaderResult compile(
 		Shader* shader,
-		const char* vertex_path,
-		const char* fragment_path,
+		const std::string& vertpath,
+		const std::string& frag,
 		std::string shader_defines = {}
 	);
 	static ShaderResult compute_compile(
 		Shader* shader,
-		const char* compute_path,
+		const std::string& path,
 		std::string shader_defines = {}
 	);
 
 	static bool compile(
 		Shader& shader,
-		const char* vertex_path,
-		const char* fragment_path,
-		const char* geometry_path,
+		const std::string& vertpath,
+		const std::string& fragpath,
+		const std::string& geopath,
+
 		std::string shader_defines = {}
 	);
 
 	// use ifdefs for vertex/fragment
 	static ShaderResult compile_vert_frag_single_file(
 		Shader* shader,
-		const char* shared_path,
+		const std::string& path,
 		std::string shader_defines = {}
 	);
 	// this is getting out of hand...
 	static ShaderResult compile_vert_frag_tess_single_file(
 		Shader* shader,
-		const char* shared_path,
+		const std::string& path,
 		std::string shader_defines = {}
 	);
 

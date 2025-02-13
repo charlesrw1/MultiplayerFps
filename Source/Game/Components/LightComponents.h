@@ -12,9 +12,16 @@ class BillboardComponent;
 class ArrowComponent;
 NEWCLASS(SpotLightComponent, EntityComponent)
 public:
-	void start() override;
-	void end() override;
-	void on_changed_transform() override;
+	void start() final;
+	void end() final;
+	void on_sync_render_data() final;
+	void on_changed_transform() final {
+		sync_render_data();
+	}
+	void editor_on_change_property() final {
+		sync_render_data();
+	}
+
 	~SpotLightComponent() override;
 	SpotLightComponent();
 
@@ -34,10 +41,6 @@ public:
 	REFLECT();
 	bool visible = true;
 
-	void build_render_light(Render_Light& light);
-
-	void editor_on_change_property() override;
-
 
 	handle<Render_Light> light_handle;
 	uint64_t editor_billboard = 0;
@@ -47,14 +50,16 @@ public:
 NEWCLASS(PointLightComponent, EntityComponent)
 public:
 	PointLightComponent();
-	void start() override;
-	void end() override;
-	void on_changed_transform() override;
-	~PointLightComponent() override;
-
-	void editor_on_change_property() override;
-
-	void build_render_light(Render_Light& light);
+	void start() final;
+	void end() final;
+	void on_sync_render_data() final;
+	void on_changed_transform() final {
+		sync_render_data();
+	}
+	void editor_on_change_property() final {
+		sync_render_data();
+	}
+	~PointLightComponent() final;
 
 	REFLECT();
 	Color32 color = COLOR_WHITE;
@@ -72,14 +77,18 @@ public:
 struct Render_Sun;
 NEWCLASS(SunLightComponent, EntityComponent)
 public:
-	void start() override;
-	void end() override;
-	void on_changed_transform() override;
-	void build_render_light(Render_Sun& light);
-	~SunLightComponent() override;
 	SunLightComponent();
+	~SunLightComponent() final;
+	void start() final;
+	void end() final;
+	void on_changed_transform() final {
+		sync_render_data();
+	}
+	void editor_on_change_property() final {
+		sync_render_data();
+	}
+	void on_sync_render_data() final;
 
-	void editor_on_change_property() override;
 
 	REFLECT();
 	Color32 color = COLOR_WHITE;
@@ -110,12 +119,10 @@ public:
 		set_call_init_in_editor(true);
 	}
 
-	void start() override;
-	void end() override;
-	void on_changed_transform() override {
-	}
-
-	void editor_on_change_property() override;
+	void start() final;
+	void end() final;
+	void on_sync_render_data() final;
+	void editor_on_change_property() final;
 
 	REFLECT(type="BoolButton",hint="Recapture",transient)
 	bool recapture_skylight = false;
@@ -137,12 +144,13 @@ public:
 	CubemapComponent() {
 		set_call_init_in_editor(true);
 	}
-	void start() override;
-	void end() override;
-	void on_changed_transform() override {
+	void start() final;
+	void end() final;
+	void on_changed_transform() final {
 		update_editormeshbuilder();
 	}
-	void editor_on_change_property() override;
+	void editor_on_change_property() final;
+	void on_sync_render_data() final;
 
 	REFLECT(type = "BoolButton", hint = "Recapture", transient);
 	bool recapture = false;
@@ -151,7 +159,6 @@ public:
 	CubemapAnchor anchor;
 
 private:
-	void fill_out_struct(Render_Reflection_Volume& h);
 	void update_editormeshbuilder();
 	handle<Render_Reflection_Volume> handle;
 	Texture* mytexture = nullptr;

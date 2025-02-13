@@ -112,8 +112,7 @@ public:
 	}
 
 	void think() override {
-		CPUFUNCTIONSTART;
-
+	
 		int x = 0, y = 0;
 		SDL_GetMouseState(&x, &y);
 
