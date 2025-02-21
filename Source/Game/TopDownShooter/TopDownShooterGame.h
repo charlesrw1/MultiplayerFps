@@ -341,6 +341,7 @@ public:
 		set_ticking(true);
 	}
 	void update() final {
+		return;
 		if (eng->get_game_time() >= last_spawn + spawn_interval) {
 			for (int i = 0; i < 20; i++) {
 				Entity* e = nullptr;

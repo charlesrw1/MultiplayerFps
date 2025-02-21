@@ -56,9 +56,9 @@ ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV,"disable multid
 // 12mb arena
 ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "12000000", CVAR_INTEGER | CVAR_UNBOUNDED, "size of the renderers memory arena in bytes");
 
-DECLARE_ENGINE_CMD(ot)
+DECLARE_ENGINE_CMD(otex)
 {
-	static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
+	static const char* usage_str = "Usage: otex <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
 	if (args.size() != 5) {
 		sys_print(Info, usage_str);
 		return;
@@ -73,6 +73,26 @@ DECLARE_ENGINE_CMD(ot)
 	draw.debug_tex_out.scale = scale;
 	draw.debug_tex_out.alpha = alpha;
 	draw.debug_tex_out.mip = mip;
+
+
+	if (!draw.debug_tex_out.output_tex) {
+		sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
+	}
+
+}
+DECLARE_ENGINE_CMD(ot)
+{
+	static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
+	if (args.size() != 2) {
+		sys_print(Info, usage_str);
+		return;
+	}
+	const char* texture_name = args.at(1);
+
+	draw.debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
+	draw.debug_tex_out.scale = 1.f;
+	draw.debug_tex_out.alpha = 1.f;
+	draw.debug_tex_out.mip = 1.f;
 
 
 	if (!draw.debug_tex_out.output_tex) {
@@ -2584,15 +2604,15 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	device.reset_states();
 	
 	// mesh builder stuff
-	{
-		update_debug_grid();	// makes it visible/hidden
-
-		const auto& view_to_use = current_frame_main_view;
-		RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
-
-		draw_meshbuilders();
-	}
+	//{
+	//	update_debug_grid();	// makes it visible/hidden
+	//
+	//	const auto& view_to_use = current_frame_main_view;
+	//	RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
+	//	auto scope = device.start_render_pass(setup);
+	//
+	//	draw_meshbuilders();
+	//}
 
 	// Bloom update
 	render_bloom_chain();
@@ -2626,22 +2646,22 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 				do_post_process_stack(postProcesses);
 		}
 
-		{
-			RenderPipelineState state;
-			state.vao = 0;
-			state.program = prog.simple;
-			state.blend = blend_state::BLEND;
-			device.set_pipeline(state);
-
-			shader().set_mat4("ViewProj", vs.viewproj);
-			shader().set_mat4("Model", mat4(1.f));
-
-			if (gui && params.draw_ui && !r_force_hide_ui.get_bool())
-				gui->paint();
-
-			device.reset_states();
-		}
-
+		//{
+		//	RenderPipelineState state;
+		//	state.vao = 0;
+		//	state.program = prog.simple;
+		//	state.blend = blend_state::BLEND;
+		//	device.set_pipeline(state);
+		//
+		//	shader().set_mat4("ViewProj", vs.viewproj);
+		//	shader().set_mat4("Model", mat4(1.f));
+		//
+		//	if (gui && params.draw_ui && !r_force_hide_ui.get_bool())
+		//		gui->paint();
+		//
+		//	device.reset_states();
+		//}
+		//
 		debug_tex_out.draw_out();
 	}
 	if (params.output_to_screen) {
@@ -2879,13 +2899,19 @@ void DebuggingTextureOutput::draw_out()
 	glm::vec2 upper_left = glm::vec2(0, 1);
 	glm::vec2 size = glm::vec2(1, -1);
 
-
+	uint32_t VAO=0, VBO=0, EBO=0;
 	MeshBuilder mb;
 	mb.Begin();
 	mb.Push2dQuad(glm::vec2(0, 0), glm::vec2(w * scale, h * scale), upper_left, size, {});
 	mb.End();
-	mb.Draw(MeshBuilder::TRIANGLES);
+	mb.make_or_update_buffers(VBO, VAO, EBO);
 
+	//mb.Draw(MeshBuilder::TRIANGLES);
+
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glDrawElements((GLenum)GL_TRIANGLES, mb.get_i().size(), GL_UNSIGNED_INT, (void*)0);
+	mb.free_buffers(VBO, VAO, EBO);
 
 	mb.Free();
 
