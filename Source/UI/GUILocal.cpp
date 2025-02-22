@@ -39,7 +39,7 @@ UIBuilder::UIBuilder(GuiSystemLocal* s)
 }
 UIBuilder::~UIBuilder()
 {
-	mb->Free();
+	//mb->Free();
 	delete mb;
 	delete impl;
 }
@@ -84,7 +84,7 @@ void UIBuilder::draw_solid_rect(glm::ivec2 global_coords,
 
 	draw.shader().set_mat4("ViewProj", impl->ViewProj);
 
-	mb->Draw(MeshBuilder::TRIANGLES);
+	//mb->Draw(MeshBuilder::TRIANGLES);
 }
 
 static void get_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const GuiFont* f)
@@ -148,7 +148,7 @@ void UIBuilder::draw_text(
 
 	draw.shader().set_mat4("ViewProj", impl->ViewProj);
 
-	mb->Draw(MeshBuilder::TRIANGLES);
+	//mb->Draw(MeshBuilder::TRIANGLES);
 }
 
 GuiSystemPublic* GuiSystemPublic::create_gui_system() {

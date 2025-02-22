@@ -18,6 +18,7 @@
 #include <cstdint>
 
 #include "GameEnginePublic.h"	// just for b_is_in_overlapped
+#include "Framework/MeshBuilderImpl.h"
 
 class MaterialInstance;
 struct Render_Box_Cubemap
@@ -244,15 +245,12 @@ struct QueuedRenderObjectDelete
 struct MeshbuilderObj_Internal
 {
 	MeshBuilder_Object obj;
-	int num_indicies = 0;
-	uint32_t vao = 0, ebo = 0, vbo = 0;
+	MeshBuilderDD dd;
 };
 struct ParticleObj_Internal
 {
 	Particle_Object obj;
-	int num_indicies = 0;
-	uint32_t vao=0, ebo=0, vbo=0;
-
+	MeshBuilderDD dd;
 };
 
 class TerrainInterfaceLocal;

@@ -13,13 +13,12 @@ struct MbVertex
 	Color32 color = COLOR_WHITE;
 	glm::vec2 uv = glm::vec2(0);
 };
-
+class MeshBuilderDD;
 using glm::vec3;
 using glm::vec2;
 class MeshBuilder
 {
 public:
-	void Free();
 	void Begin(int reserve_verts = 0);
 	void End();
 
@@ -53,20 +52,13 @@ public:
 	void AddLineCapsule(vec3 origin, float radius, float half_height, Color32 color);	
 	void AddLineSphere(vec3 origin, float radius, Color32 color);	
 
-	// GL_TRIANGLES,etc.
-	void Draw(uint32_t gl_type);
-	// can also use these instead
-	static const uint32_t TRIANGLES;
-	static const uint32_t LINES;
-
 
 	const std::vector<MbVertex>& get_v() { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }
 
-	void make_or_update_buffers(uint32_t& VBO, uint32_t& VAO, uint32_t& EBO);
-	static void free_buffers(uint32_t& VBO, uint32_t& VAO, uint32_t& EBO);
 
 private:
+	friend class MeshBuilderDD;
 	bool wants_new_upload = false;
 	//uint32_t VBO = 0, VAO = 0, EBO = 0;
 	std::vector<MbVertex> verticies;

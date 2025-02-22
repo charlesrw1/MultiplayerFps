@@ -514,6 +514,7 @@
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
+    <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

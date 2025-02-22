@@ -20,7 +20,6 @@ public:
 	}
 	void end() override {
 		idraw->get_scene()->remove_meshbuilder(editor_mb_handle);
-		mb.Free();
 	}
 	void on_changed_transform() override {
 		sync_render_data();

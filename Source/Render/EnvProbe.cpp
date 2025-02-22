@@ -344,6 +344,7 @@ void BRDFIntegration::drawdebug()
 #endif
 
 }
+#include "Framework/MeshBuilderImpl.h"
 void BRDFIntegration::run()
 {
     Shader::compile (&integrate_shader, "MbTexturedV.txt", "Helpers/PreIntegrateF.txt");
@@ -379,11 +380,12 @@ void BRDFIntegration::run()
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         printf("Framebuffer not complete!\n");
 
-
+    MeshBuilderDD dd;
     MeshBuilder mb;
     mb.Begin();
     mb.Push2dQuad(vec2(-1, 1), vec2(2, -2));
     mb.End();
+    dd.init_from(mb);
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glCheckError();
@@ -397,12 +399,12 @@ void BRDFIntegration::run()
     s.set_mat4("Model", mat4(1));
     glCheckError();
     s.set_mat4("ViewProj", mat4(1));
-    mb.Draw(GL_TRIANGLES);
+    dd.draw(MeshBuilderDD::TRIANGLES);
     glCheckError();
 
     glEnable(GL_CULL_FACE);
     glCheckError();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    mb.Free();
+    dd.free();
     glCheckError();
 }

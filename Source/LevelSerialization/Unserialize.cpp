@@ -168,6 +168,7 @@ void unserialize_one_item_text(
 		else {
 			auto classinfo = ClassBase::find_class(type.c_str());
 			if (!classinfo || !classinfo->allocate || !(classinfo->is_a(Entity::StaticType)||classinfo->is_a(EntityComponent::StaticType))) {
+				return;
 				throw std::runtime_error("couldn't find class: " + type);
 			}
 			auto obj = classinfo->allocate();

@@ -423,7 +423,7 @@ void PhysicsManImpl::update_debug_physics_shapes()
 		debug_mesh.PushLine(physx_to_glm(line.pos0), physx_to_glm(line.pos1), *((Color32*)&line.color0));
 	}
 	debug_mesh.End();
-	debug_mesh.Draw(MeshBuilder::LINES);
+	//debug_mesh.Draw(MeshBuilder::LINES);
 
 	o.visible = true;
 	o.transform = glm::mat4(1.f);

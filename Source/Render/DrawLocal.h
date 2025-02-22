@@ -381,6 +381,8 @@ public:
 	void create_shaders();
 
 	void render_world_cubemap(vec3 position, uint32_t fbo, uint32_t texture, int size);
+
+	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backface, bool depth_less_than_op);
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, 
 		bool depth_test_enabled,
 		bool force_show_backfaces,
@@ -552,7 +554,6 @@ private:
 
 
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0), bool wireframe_secondpass = false);
-	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state);
 
 	void init_bloom_buffers();
 	void render_bloom_chain();

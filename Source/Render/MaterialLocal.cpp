@@ -275,7 +275,7 @@ MaterialInstance::~MaterialInstance()
 		impl->masterMaterial->self->reload_dependents.erase(this);
 #endif
 
-	if (impl->is_dynamic_material) {
+	if (impl&&impl->is_dynamic_material) {
 		matman.free_dynamic_material(this);
 	}
 

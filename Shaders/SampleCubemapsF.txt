@@ -128,6 +128,6 @@ void main()
 	
 	vec3 out_color = pbr_calculate(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
 	
-	FS_OUT_Color = vec4(pow(out_color,vec3(2.2)),1.0);
+	FS_OUT_Color = vec4(out_color,1.0);
 }
 #endif 

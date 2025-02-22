@@ -401,6 +401,9 @@ void OpenglRenderDevice::clear_framebuffer(bool clear_depth, bool clear_color, f
 			mask |= GL_DEPTH_BUFFER_BIT;
 		if (clear_color)
 			mask |= GL_COLOR_BUFFER_BIT;
+
+		set_depth_write_enabled(true);	// ugh: glDepthMask applies to glClear also
+
 		glClear(mask);
 		activeStats.framebuffer_clears++;
 	}
@@ -1047,7 +1050,10 @@ void Renderer::execute_render_lists(
 	}
 }
 
-void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool force_backface_state)
+void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
+	bool depth_test_enabled,
+	bool force_show_backfaces,
+	bool depth_less_than_op)
 {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
@@ -1061,50 +1067,47 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 	for (int i = 0; i < pass.batches.size(); i++) {
 		
-		auto& batch = pass.batches[i];
-		int count = list.command_count[i];
+		const auto& batch = pass.batches[i];
+		const int count = list.command_count[i];
+
+		const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
+		const draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
+		const program_handle program = (program_handle)batch_key.shader;
+		const blend_state blend = (blend_state)batch_key.blending;
+		const bool show_backface = batch_key.backface;
+		const uint32_t layer = batch_key.layer;
+		const int format = batch_key.vao;
+
+		RenderPipelineState state;
+		state.program = program;
+		state.vao = vao;
+		state.backface_culling = !show_backface && !force_show_backfaces;
+		state.blend = blend;
+		state.depth_testing = depth_test_enabled;
+		//state.depth_writes = depth_write_enabled;
+		state.depth_writes = !mat->get_master_material()->is_translucent();
+		state.depth_less_than = depth_less_than_op;
+		device.set_pipeline(state);
+
+		shader().set_int("indirect_material_offset", offset);
+		const auto& textures = mat->impl->get_textures();
+		for (int i = 0; i < textures.size(); i++) {
+			bind_texture(i, textures[i]->gl_id);
+		}
+		const GLenum index_type = MODEL_INDEX_TYPE_GL;
+
 
 		for (int dc = 0; dc < batch.count; dc++) {
 			auto& cmd = list.commands[offset + dc];
 
-			const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
-			draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
-
-			program_handle program = (program_handle)batch_key.shader;
-			blend_state blend = (blend_state)batch_key.blending;
-			bool backface = batch_key.backface;
-			uint32_t layer = batch_key.layer;
-			int format = batch_key.vao;
-
-
-			set_shader(program);
-
-			bind_vao(vao);
-
-			if(!force_backface_state)
-				set_show_backfaces(backface);
-
-			set_blend_state(blend);
-
-			auto& textures = mat->impl->get_textures();
-
-			for (int i = 0; i < textures.size(); i++) {
-				bind_texture(i, textures[i]->gl_id);
-			}
-
-			shader().set_int("indirect_material_offset", offset);
-
-
-			const GLenum index_type = MODEL_INDEX_TYPE_GL;
-
 			#pragma warning(disable : 4312)	// (void*) casting
-			glDrawElementsBaseVertex(
-				GL_TRIANGLES,
+			glDrawElementsInstancedBaseVertexBaseInstance(GL_TRIANGLES,
 				cmd.count,
 				index_type,
 				(void*)(cmd.firstIndex * MODEL_BUFFER_INDEX_TYPE_SIZE),
-				cmd.baseVertex
-			);
+				cmd.primCount,
+				cmd.baseVertex,
+				cmd.baseInstance);
 			#pragma warning(default : 4312)
 
 			stats.total_draw_calls++;
@@ -1182,7 +1185,9 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 		// renderdoc seems to hate mdi for some reason, so heres an option to disable it
 		if(dont_use_mdi.get_bool())
-			render_lists_old_way(*params.rl, *params.rp, force_backface_state);
+			render_lists_old_way(*params.rl, *params.rp, depth_testing,
+				force_backface_state,
+				depth_less_than);
 		else
 			execute_render_lists(*params.rl, *params.rp, 
 				depth_testing,
@@ -1217,7 +1222,7 @@ void Renderer::render_particles()
 
 		RenderPipelineState state;
 		state.program = matman.get_mat_shader(false, nullptr, mat, false, false, false, false); ;
-		state.vao = p.vao;// meshbuilder->VAO;
+		state.vao = p.dd.VAO;// meshbuilder->VAO;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = true;
@@ -1234,7 +1239,7 @@ void Renderer::render_particles()
 			bind_texture(i, textures[i]->gl_id);
 		}
 
-		glDrawElements(GL_TRIANGLES, p.num_indicies, GL_UNSIGNED_INT, (void*)0);
+		glDrawElements(GL_TRIANGLES, p.dd.num_indicies, GL_UNSIGNED_INT, (void*)0);
 	}
 }
 
@@ -1892,7 +1897,7 @@ void Renderer::draw_meshbuilders()
 			shader().set_vec4("solid_color", color32_to_vec4(mb.background_color));
 
 			glLineWidth(3);
-			mb.meshbuilder->Draw(MeshBuilder::LINES);
+			//mb.meshbuilder->Draw(MeshBuilder::LINES);
 			glLineWidth(1);
 		}
 
@@ -1905,7 +1910,7 @@ void Renderer::draw_meshbuilders()
 
 		shader().set_mat4("ViewProj", vs.viewproj);
 		shader().set_mat4("Model", mb.transform);
-		mb.meshbuilder->Draw(MeshBuilder::LINES);
+		//mb.meshbuilder->Draw(MeshBuilder::LINES);
 	}
 }
 
@@ -2313,19 +2318,11 @@ void Renderer::sync_update()
 
 	for (auto& mbo_ : scene.meshbuilder_objs.objects) {
 		auto& mbo = mbo_.type_;
-		if (mbo.obj.meshbuilder->wants_new_upload) {
-			mbo.obj.meshbuilder->make_or_update_buffers(mbo.vbo, mbo.vao, mbo.ebo);
-			mbo.num_indicies = mbo.obj.meshbuilder->indicies.size();
-			mbo.obj.meshbuilder->wants_new_upload = false;
-		}
+		mbo.dd.init_from(*mbo.obj.meshbuilder);
 	}
 	for (auto& po_ : scene.particle_objs.objects) {
 		auto& po = po_.type_;
-		if (po.obj.meshbuilder->wants_new_upload) {
-			po.obj.meshbuilder->make_or_update_buffers(po.vbo, po.vao, po.ebo);
-			po.num_indicies = po.obj.meshbuilder->indicies.size();
-			po.obj.meshbuilder->wants_new_upload = false;
-		}
+		po.dd.init_from(*po.obj.meshbuilder);
 	}
 
 	// get animation matricies
@@ -2442,7 +2439,7 @@ void Renderer::check_cubemaps_dirty()
 	}
 }
 ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post processing");
-
+ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
 	current_time = GetTime();
@@ -2663,6 +2660,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		//}
 		//
 		debug_tex_out.draw_out();
+
 	}
 	if (params.output_to_screen) {
 		GPUSCOPESTART(Blit_composite_to_backbuffer);
@@ -2883,7 +2881,8 @@ void DebuggingTextureOutput::draw_out()
 	const float cur_w = draw.get_current_frame_vs().width;
 	const float cur_h = draw.get_current_frame_vs().height;
 
-	device.set_pipeline(state);
+	//device.set_pipeline(state);
+
 
 	draw.shader().set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, cur_w, cur_h, 0.f);
@@ -2894,26 +2893,20 @@ void DebuggingTextureOutput::draw_out()
 		-1.f
 		: mip);
 
-	draw.bind_texture(0, output_tex->gl_id);
+	//draw.bind_texture(0, draw.white_texture.gl_id);// output_tex->gl_id);
 
 	glm::vec2 upper_left = glm::vec2(0, 1);
 	glm::vec2 size = glm::vec2(1, -1);
 
-	uint32_t VAO=0, VBO=0, EBO=0;
+	MeshBuilderDD dd;
 	MeshBuilder mb;
 	mb.Begin();
 	mb.Push2dQuad(glm::vec2(0, 0), glm::vec2(w * scale, h * scale), upper_left, size, {});
 	mb.End();
-	mb.make_or_update_buffers(VBO, VAO, EBO);
+	dd.init_from(mb);
 
-	//mb.Draw(MeshBuilder::TRIANGLES);
-
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glDrawElements((GLenum)GL_TRIANGLES, mb.get_i().size(), GL_UNSIGNED_INT, (void*)0);
-	mb.free_buffers(VBO, VAO, EBO);
-
-	mb.Free();
+	//dd.draw(MeshBuilderDD::TRIANGLES);
+	dd.free();
 
 }
 
