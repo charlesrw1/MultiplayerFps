@@ -76,6 +76,10 @@ public:
 	glm::mat4 get_ls_transform_of_bone(StringName bone) const;
 	int get_index_of_bone(StringName bone) const;
 
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final;
+#endif
+
 private:
 	REFLECT();
 	AssetPtr<Model> model;

@@ -18,6 +18,12 @@ public:
 	void on_sync_render_data() final;
 
 	void set_material(const MaterialInstance* mat);
+
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/decal.png";
+	}
+#endif
 private:
 	REFLECT();
 	AssetPtr<MaterialInstance> material;

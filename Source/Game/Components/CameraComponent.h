@@ -45,7 +45,11 @@ public:
 	}
 
 	void get_view(glm::mat4& viewMatrix, float& fov);
-
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/camera_icon.png";
+	}
+#endif
 	float fov = 70.f;
 	View_Setup last_vs;	// valid for enabled, fixme
 private:

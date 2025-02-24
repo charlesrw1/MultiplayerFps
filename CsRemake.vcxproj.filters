@@ -768,6 +768,7 @@
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
+    <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

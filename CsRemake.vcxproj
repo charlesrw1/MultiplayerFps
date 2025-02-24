@@ -258,6 +258,7 @@
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
+    <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
@@ -492,7 +493,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;TRACY_ENABLE;WITH_ASSERT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
@@ -514,7 +515,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT;TRACY_ENABLE</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
@@ -535,7 +536,7 @@
     <ClCompile>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;TRACY_ENABLE</PreprocessorDefinitions>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>

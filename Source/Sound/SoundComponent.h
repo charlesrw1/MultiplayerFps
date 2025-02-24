@@ -13,6 +13,12 @@ public:
     void editor_on_change_property() override;
     void on_changed_transform() override;
 
+#ifdef EDITOR_BUILD
+    const char* get_editor_outliner_icon() const final {
+        return "eng/editor/sound.png";
+    }
+#endif
+
     // can use the component like an "Asset" for playing sounds with settings
     void play_one_shot_at_pos(const glm::vec3& v) const;
     

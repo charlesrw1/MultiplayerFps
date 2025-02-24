@@ -25,6 +25,12 @@
 
 GameAnimationMgr g_gameAnimationMgr;
 
+#ifdef EDITOR_BUILD
+const char* MeshComponent::get_editor_outliner_icon() const {
+	return animator_tree.get() ? "eng/editor/anim_icon.png" : "eng/editor/mesh_icon.png";
+}
+#endif
+
 MeshComponent::~MeshComponent()
 {
 	assert(!animator && !draw_handle.is_valid());
@@ -239,9 +245,12 @@ static void draw_skeleton(const AnimatorInstance* a, float line_len, const glm::
 	}
 }
 #include "Framework/Jobs.h"
+#include "tracy/public/tracy/Tracy.hpp"
 
 void GameAnimationMgr::update_animating()
 {
+	ZoneScoped;
+
 	matricies_used = 0;
 
 	for (AnimatorInstance* ai : animating_meshcomponents) {

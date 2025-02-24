@@ -155,6 +155,11 @@ public:
 	void add_actor_shapes() override;
 	void add_editor_shapes() override;
 
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/phys_capsule.png";
+	}
+#endif
 
 	REFLECT();
 	float height = 2.f;
@@ -168,6 +173,14 @@ public:
 	~BoxComponent() override {}
 	void add_actor_shapes() override;
 	void add_editor_shapes() override;
+
+
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/phys_box.png";
+	}
+#endif
+
 };
 NEWCLASS(SphereComponent, PhysicsComponentBase)
 public:
@@ -175,12 +188,24 @@ public:
 	void add_actor_shapes() override;
 	void add_editor_shapes() override;
 
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/phys_sphere.png";
+	}
+#endif
+
 	REFLECT();
 	float radius = 1.f;
 };
 NEWCLASS(MeshColliderComponent, PhysicsComponentBase)
 public:
 	void add_actor_shapes() override;
+
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/phys_mesh.png";
+	}
+#endif
 };
 
 
@@ -207,6 +232,12 @@ public:
 		return target.get();
 	}
 	void set_target(Entity* e);
+
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/phys_joint.png";
+	}
+#endif
 protected:
 
 	PhysicsComponentBase* get_owner_physics();

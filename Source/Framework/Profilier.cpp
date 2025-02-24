@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <vector>
 #include "Config.h"
+#include <unordered_map>
 
 using std::chrono::steady_clock;
 using std::chrono::microseconds;
@@ -32,11 +33,11 @@ struct Profile_Event
 	bool waiting = false;
 
 	bool is_gpu_event = false;
-	int parent_event = -1;
+	Profile_Event* parent = nullptr;
 };
 
-std::vector<Profile_Event> events;
-std::vector<int> stack;
+std::unordered_map<std::string, Profile_Event> events;
+std::vector<Profile_Event*> stack;
 uint64_t intervalstart = 0;
 int accumulated = 1;
 struct FrameHighStruct
@@ -78,21 +79,21 @@ static FrameHighStruct ten_second;
 
 
 // super not optimized lol
-static void draw_node_children(int index)
+static void draw_node_children(Profile_Event* ep)
 {
-	Profile_Event& e = events[index];
+	Profile_Event& e = *ep;
 	if (ImGui::TreeNodeEx(e.name, ImGuiTreeNodeFlags_DefaultOpen)) {
 		ImGui::Text("CPU avg: %3.5f\n", e.last_interval_time_cpu / 1000.0);
 		ImGui::Text("CPU max: %3.5f\n", e.last_period_high / 1000.0);
 		if (e.is_gpu_event) {
 			ImGui::Text("GPU: %3.5f\n", e.last_interval_time_gpu / 1000000.0);
 		}
-
-		for (int i = 0; i < events.size(); i++) {
-			if (events[i].parent_event == index) {
-				draw_node_children(i);
-			}
+		for (auto& ec : events)
+		{
+			if (ec.second.parent == ep)
+				draw_node_children(&ec.second);
 		}
+		
 
 		ImGui::TreePop();
 	}
@@ -108,10 +109,10 @@ static void draw_imgui_profile_window()
 		ImGui::Text("10s high: %f", ten_second.high_last_period);
 		ImGui::Text("10s avg: %f", 10.0/ten_second.tick_count_last_period);
 
-		for (int i = 0; i < events.size(); i++) {
-			if (events[i].parent_event == -1) {
-				draw_node_children(i);
-			}
+		for (auto& ec : events)
+		{
+			if (ec.second.parent == nullptr)
+				draw_node_children(&ec.second);
 		}
 	}
 }
@@ -137,8 +138,10 @@ void Profiler::end_frame_tick(float dt)
 	if ((timenow - intervalstart) / (double)SDL_GetPerformanceFrequency() > 1.0) {
 		
 		accumulated = 0;
-		for (int i = 0; i < events.size(); i++) {
-			Profile_Event& e = events[i];
+		for (auto& ep : events)
+		{
+			auto& e = ep.second;
+
 			e.last_interval_time_cpu = (e.accumulated_cpu > 0) ? e.cputime / e.accumulated_cpu : 0;
 			e.cputime = 0;
 			e.accumulated_cpu = 0;
@@ -157,27 +160,28 @@ void Profiler::end_frame_tick(float dt)
 	}
 }
 
-
 void Profiler::start_scope(const char* name, bool gpu)
 {
-	int index = 0;
-	for (; index < events.size(); index++) {
-		if (strcmp(events[index].name, name) == 0)
-			break;
-	}
-	if (index == events.size()) {
-		events.push_back(Profile_Event());
-		events[index].name = name;
+
+	Profile_Event* pe = nullptr;
+	auto find = events.find(name);
+	if (find == events.end()) {
+		pe = &events[name];
+		pe->name = name;
 		if (gpu) {
-			events[index].is_gpu_event = true;
-			glGenQueries(2, events[index].glquery);
+			pe->is_gpu_event = true;
+			glGenQueries(2, pe->glquery);
 		}
 	}
-	Profile_Event& e = events[index];
+	else {
+		pe = &find->second;
+	}
 	if (stack.size() > 0)
-		e.parent_event = stack.at(stack.size() - 1);
+		pe->parent = stack.at(stack.size() - 1);
 	else
-		e.parent_event = -1;
+		pe->parent = nullptr;
+
+	auto& e = *pe;
 
 	assert(!e.started);
 	e.started = true;
@@ -190,19 +194,20 @@ void Profiler::start_scope(const char* name, bool gpu)
 	if(e.is_gpu_event)
 		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name);
 
-	stack.push_back(index);
+	stack.push_back(pe);
 
 	glCheckError();
 }
 
 void Profiler::end_scope(const char* name)
 {
-	int index = 0;
-	for (; index < events.size(); index++) {
-		if (strcmp(events[index].name, name) == 0) break;
-	}
-	ASSERT(index != events.size());
-	Profile_Event& e = events[index];
+	Profile_Event* pe = nullptr;
+	auto find = events.find(name);
+	assert(find != events.end());
+	pe = &find->second;
+
+	Profile_Event& e = *pe;
+
 	ASSERT(e.started);
 	e.started = false;
 	uint64_t timenow = std::chrono::duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();

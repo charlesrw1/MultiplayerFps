@@ -61,6 +61,9 @@
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 
+#include "tracy/public/tracy/Tracy.hpp"
+#include "tracy/public/tracy/TracyOpenGL.hpp"
+
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
@@ -1526,11 +1529,16 @@ void GameEngineLocal::init_sdl_window()
 	}
 
 	gl_context = SDL_GL_CreateContext(window);
+
 	sys_print(Debug, "OpenGL loaded\n");
 	gladLoadGLLoader(SDL_GL_GetProcAddress);
 	sys_print(Debug, "Vendor: %s\n", glGetString(GL_VENDOR));
 	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
 	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
+
+	// init tracy profiling for opengl
+	TracyGpuContext;
+	TracyGpuContextName("a", 1);	//??
 
 	SDL_GL_SetSwapInterval(0);
 }
@@ -1541,7 +1549,6 @@ void GameEngineLocal::init()
 {
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
-	float first_start = GetTime();
 	float start = GetTime();
 
 	program_time_start = GetTime();
@@ -1657,12 +1664,17 @@ ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 
 void GameEngineLocal::game_update_tick()
 {
+	ZoneScopedN("game_update_tick");
 
 	auto fixed_update = [&](double dt) {
+		ZoneScopedN("fixed_update");
+
 		DebugShapeCtx::get().fixed_update_start();
 		g_physics.simulate_and_fetch(dt);
 	};
 	auto update = [&](double dt) {
+		ZoneScopedN("update");
+
 		if (!is_editor_level())
 			g_inputSys.tick_users(dt);
 		level->update_level();
@@ -1746,45 +1758,10 @@ bool GameEngineLocal::game_thread_update()
 
 void GameEngineLocal::loop()
 {
-
-	double last = GetTime() - 0.1;
-	bool should_draw = false;
-
-	// these are from the last game frame
-	SceneDrawParamsEx drawparamsNext(0,0);
-	View_Setup setupNext;
-
-	auto imgui_draw = [&]()
-	{
-		GPUSCOPESTART(ImguiDraw);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		// draw imgui interfaces
-		// if a tool is active, game screen gets drawn to an imgui viewport
-		ImGui_ImplSDL2_NewFrame();
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui::NewFrame();
-
-#ifdef EDITOR_BUILD
-		if (get_current_tool())
-			get_current_tool()->hook_imgui_newframe();
-#endif
-
-		draw_any_imgui_interfaces();
-
-		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	};
-
-	auto wait_for_swap = [&]()
-	{
-		GPUSCOPESTART(SwapWindow);
-		SDL_GL_SwapWindow(window);
-	};
-
 	auto frame_start = [&]() -> bool
 	{
-		CPUSCOPESTART(FrameStart);
+		ZoneScopedN("frame_start");
+
 		// reset cursor if in relative mode
 		if (is_game_focused()) {
 			SDL_WarpMouseInWindow(window, saved_mouse_x, saved_mouse_y);
@@ -1848,7 +1825,6 @@ void GameEngineLocal::loop()
 		case Engine_State::Idle:
 			if (map_spawned()) {	// map is spawned, unload it
 				stop_game();
-				should_draw = false;
 				return true;			// goto next frame
 			}
 
@@ -1856,52 +1832,79 @@ void GameEngineLocal::loop()
 			break;
 		case Engine_State::Loading:
 			execute_map_change();
-			should_draw = false;
 			return true; // goto next frame
 			break;
 		case Engine_State::Game:	// handled in game_thread_update()
 			break;
 		};
 
-		should_draw = true;
 		return false;
 	};
 
-	auto do_overlapped_update = [&]()
+	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext)
 	{
+		ZoneScopedN("OverlappedUpdate");
 		CPUSCOPESTART(OverlappedUpdate);
+
 
 		BooleanScope scope(b_is_in_overlapped_period);
 
-		bool should_draw_next = false;
+		bool drawOut = false;
 		SceneDrawParamsEx paramsOut(0, 0);
 		View_Setup vsOut;
 		
 		auto game_task = job::launch_task([&]() {
-			should_draw_next = game_thread_update();
+			ZoneScopedN("GameThreadUpdate");
+
+			drawOut = game_thread_update();
 			get_draw_params(paramsOut, vsOut);
 			// update particles, doesnt draw, only builds meshes FIXME
 			ParticleMgr::get().draw(vsOut);
 			});
 		
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		if (should_draw)
-			idraw->scene_draw(drawparamsNext, setupNext, nullptr);
+		if(!shouldDrawNext)
+			drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
+		idraw->scene_draw(drawparamsNext, setupNext, nullptr);
 		{
 			CPUSCOPESTART(GameTaskWait);
-			game_task.wait();	// wait for game update to finish
+			game_task.wait();	// wait for game update to finish while render is on this thread
 		}
 
-		should_draw_next = should_draw;
+		shouldDrawNext = drawOut;
 		drawparamsNext = paramsOut;
 		setupNext = vsOut;
 	};
 
+	// This happens on main thread
+	// I could double buffer draw data so ImGui can update on game thread and render simultaneously
+	auto imgui_render = [&]()
+	{
+		ZoneScopedN("ImguiDraw");
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	};
+	auto imgui_update = [&]()
+	{
+		ZoneScopedN("ImGuiUpdate");
+
+		// draw imgui interfaces
+		// if a tool is active, game screen gets drawn to an imgui viewport
+		ImGui_ImplSDL2_NewFrame();
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui::NewFrame();
+#ifdef EDITOR_BUILD
+		if (get_current_tool())
+			get_current_tool()->hook_imgui_newframe();
+#endif
+		draw_any_imgui_interfaces();
+	};
+
 	auto do_sync_update = [&]()
 	{
-		CPUSCOPESTART(SyncUpdate);
+		ZoneScopedN("SyncUpdate");
 
 		DebugShapeCtx::get().update(frame_time);
 
@@ -1921,11 +1924,25 @@ void GameEngineLocal::loop()
 		// sync materials
 
 	};
+	auto wait_for_swap = [&]()
+	{
+		ZoneScopedN("SwapWindow");
+		TracyGpuZone("SwapWindow");
+		CPUSCOPESTART(SwapWindow);
+
+		SDL_GL_SwapWindow(window);
+	};
+
+
+	double last = GetTime() - 0.1;
+	// these are from the last game frame
+	SceneDrawParamsEx drawparamsNext(0, 0);
+	View_Setup setupNext;
+	bool shouldDrawNext = true;
+
 
 	for (;;)
 	{
-		should_draw = true;
-
 		// update time
 		const double now = GetTime();
 		double dt = now - last;
@@ -1934,18 +1951,29 @@ void GameEngineLocal::loop()
 			dt = 0.1;
 		frame_time = dt;
 
+		// update input, console cmd buffer
 		const bool should_skip = frame_start();
 		if (should_skip)
 			continue;
 
-		// Overlapped update
-		do_overlapped_update();
+		// overlapped update (game+render)
+		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext);
 
-		// Sync period
-		imgui_draw();	// fixme
-		wait_for_swap();	// fixme
-
+		// sync period
+		imgui_update();	// fixme
+		imgui_render();
 		do_sync_update();
+		wait_for_swap();	// wait for swap last
+
+		{
+			static int counter = 0;
+			counter++;
+			if (counter > 5) {
+				counter = 0;
+			}
+			TracyGpuCollect;
+		}
+		FrameMark;
 
 		Profiler::end_frame_tick(frame_time);
 	}

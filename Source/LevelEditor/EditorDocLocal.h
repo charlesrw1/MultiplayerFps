@@ -47,7 +47,7 @@ public:
 	ObjectOutliner();
 	void draw();
 private:
-
+	int determine_object_count() const;
 	void rebuild_tree() {
 		delete_tree();
 
@@ -120,10 +120,21 @@ private:
 				});
 		}
 	};
+	struct IteratorDraw {
+		IteratorDraw(ObjectOutliner* oo, Node* n) : oo(oo), node(n) {}
+		bool step();
+		void draw();
+	private:
+		ObjectOutliner* oo = nullptr;
+		std::vector<int> child_stack;
+		int child_index = 0;
+		Node* node = nullptr;
+	};
+	friend struct IteratorDraw;
+
 	std::unordered_map<uint64_t, Node*> map;
 	Node* rootnode = nullptr;
 
-	void draw_table_R(Node* n, int depth);
 
 	uint64_t contextMenuHandle = 0;
 

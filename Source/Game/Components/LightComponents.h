@@ -21,6 +21,11 @@ public:
 	void editor_on_change_property() final {
 		sync_render_data();
 	}
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/light.png";
+	}
+#endif
 
 	~SpotLightComponent() override;
 	SpotLightComponent();
@@ -60,6 +65,11 @@ public:
 		sync_render_data();
 	}
 	~PointLightComponent() final;
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/light.png";
+	}
+#endif
 
 	REFLECT();
 	Color32 color = COLOR_WHITE;
@@ -88,7 +98,11 @@ public:
 		sync_render_data();
 	}
 	void on_sync_render_data() final;
-
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/light.png";
+	}
+#endif
 
 	REFLECT();
 	Color32 color = COLOR_WHITE;

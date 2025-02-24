@@ -2,6 +2,16 @@
 #include "Framework/Files.h"
 #include <fstream>
 
+/*
+for struct in file ('{', '}')
+    for field in struct
+        (opt) for struct in list
+        (opt) for field in list
+        (opt) for struct in struct
+        field.skip()
+    struct.skip()
+*/
+
 void DictParser::load_from_memory(const uint8_t* ptr, int length, const char* name) {
     
     assert(!buffer);

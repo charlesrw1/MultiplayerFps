@@ -31,6 +31,10 @@ public:
 
 	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)
 	void sync_render_data();
+
+#ifdef EDITOR_BUILD
+	virtual const char* get_editor_outliner_icon() const { return ""; }
+#endif
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}

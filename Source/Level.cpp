@@ -9,6 +9,7 @@
 #include "Framework/Config.h"
 #include "LevelSerialization/SerializationAPI.h"
 #include "GameEnginePublic.h"
+#include "tracy/public/tracy/Tracy.hpp"
 
 Level::~Level()
 {
@@ -50,6 +51,7 @@ void Level::update_level()
 }
 void Level::sync_level_render_data()
 {
+	ZoneScoped;
 	for (auto ec : wants_sync_update)
 		ec->on_sync_render_data();
 	wants_sync_update.clear_all();

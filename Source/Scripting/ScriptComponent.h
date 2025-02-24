@@ -24,6 +24,12 @@ public:
 	void end() override;
 	void editor_on_change_property() override;
 
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/script_lua.png";
+	}
+#endif
+
 	Entity* get_ref(int index) {
 		if (index >= 0 && index < refs.size())
 			return refs[index].get();

@@ -37,6 +37,12 @@ public:
 	}
 	void on_sync_render_data() final;
 
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/particle.png";
+	}
+#endif
+
 	float continious_rate = 0.f;	// particles/s
 	float burst_time = 0.f;
 	short burst_min = 0;

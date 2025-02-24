@@ -25,6 +25,9 @@
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 
+#include "tracy/public/tracy/Tracy.hpp"
+#include "tracy/public/tracy/TracyOpenGL.hpp"
+
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 //#pragma optimize("", off)
@@ -888,6 +891,7 @@ void Renderer::init_bloom_buffers()
 
 void Renderer::render_bloom_chain()
 {
+	ZoneScoped;
 	GPUFUNCTIONSTART;
 
 	//*glBindVertexArray(vao.default_);
@@ -1120,6 +1124,8 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 
 void Renderer::render_level_to_target(const Render_Level_Params& params)
 {
+	ZoneScoped;
+
 	vs = params.view;
 
 
@@ -1717,6 +1723,7 @@ static void cull_objects(Frustum& frustum, bool* visible_array, int visible_arra
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
 	CPUFUNCTIONSTART;
+	ZoneScoped;
 
 	gbuffer_pass.clear();
 	transparent_pass.clear();
@@ -1727,12 +1734,14 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	bool* visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
 	{
 		CPUSCOPESTART(cpu_object_cull);
+		ZoneScopedN("ObjectCull");
 		Frustum frustum;
 		build_a_frustum_for_perspective(frustum, draw.vs);
 		cull_objects(frustum, visible_array, visible_count, proxy_list);
 	}
 	{
 		CPUSCOPESTART(traversal);
+		ZoneScopedN("Traversal");
 
 		const size_t num_ren_objs = proxy_list.objects.size();
 
@@ -1836,6 +1845,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 	{
 		CPUSCOPESTART(make_batches);
+		ZoneScopedN("MakeBatches");
+
 
 		gbuffer_pass.make_batches(*this);
 		shadow_pass.make_batches(*this);
@@ -1844,6 +1855,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	}
 	{
 		CPUSCOPESTART(make_render_lists);
+		ZoneScopedN("MakeRenderLists");
+
 
 		build_standard_cpu(
 			gbuffer_rlist,
@@ -1953,7 +1966,7 @@ ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DE
 
 void Renderer::accumulate_gbuffer_lighting()
 {
-
+	ZoneScoped;
 	GPUSCOPESTART(accumulate_gbuffer_lighting);
 
 	const auto& view_to_use = vs;
@@ -2306,6 +2319,8 @@ void Renderer::deferred_decal_pass()
 }
 void Renderer::sync_update()
 {
+	ZoneScoped;
+
 	if (enable_vsync.was_changed()) {
 		if (enable_vsync.get_bool())
 			SDL_GL_SetSwapInterval(1);
@@ -2336,11 +2351,14 @@ void Renderer::sync_update()
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
 ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
 
+
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
-	GPUFUNCTIONSTART;
+	ZoneNamed(RendererSceneDraw,true);
+	TracyGpuZone("scene_draw");
 
-
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	check_cubemaps_dirty();
 
@@ -2442,6 +2460,9 @@ ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post 
 ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
+	TracyGpuZone("scene_draw_internal");
+	ZoneScoped;
+
 	current_time = GetTime();
 
 	mem_arena.free_bottom();
@@ -2505,7 +2526,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		auto scope = device.start_render_pass(setup);
 
 		{
-			GPUSCOPESTART(GBUFFER_PASS);
+			TracyGpuZone("GbufferPass");
+
 			Render_Level_Params cmdparams(
 				view_to_use,
 				&scene.gbuffer_rlist,
@@ -2552,7 +2574,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	//draw_height_fog();
 
 	{
-		GPUSCOPESTART(FORWARD_PASS);
+		TracyGpuZone("ForwardPass");
 
 		const auto& view_to_use = current_frame_main_view;
 		RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
@@ -2688,7 +2710,7 @@ Shader Renderer::shader()
 
 void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats)
 {
-
+	ZoneScoped;
 	//device.reset_states();
 
 		//glDisable(GL_BLEND);

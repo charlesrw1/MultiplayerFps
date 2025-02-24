@@ -43,6 +43,9 @@
 #include "Game/Entity.h"
 
 #include "Framework/Config.h"
+
+#include "tracy/public/tracy/Tracy.hpp"
+
 #define WARN_ONCE(a,...) { \
 	static bool has_warned = false; \
 	if (!has_warned) { \
@@ -254,6 +257,8 @@ static Color32 randcolor32(uint32_t number)
 	 }
 
 	 void call_all_triggered() {
+		 ZoneScoped;
+
 		 for (auto& p : triggered_pairs) {
 			if (p.is_start) {
 				 //sys_print(Debug, "trigger found\n");
@@ -333,22 +338,28 @@ static Color32 randcolor32(uint32_t number)
  }
 
   void PhysicsManImpl::simulate_and_fetch(float dt) {
-
-	  scene->simulate(dt);
-	  scene->fetchResults(true/* block */);
-
+	  ZoneScoped;
+	  {
+		  ZoneScopedN("physx simulate/fetchresults");
+		  scene->simulate(dt);
+		  scene->fetchResults(true/* block */);
+	  }
 	  mycallback->call_all_triggered();
 
-	  // retrieve array of actors that moved
-	  PxU32 nbActiveTransforms;
-	  auto activeTransforms = scene->getActiveActors(nbActiveTransforms);
-
-	  // update each render object with the new transform
-	  for (PxU32 i = 0; i < nbActiveTransforms; ++i)
 	  {
-		  auto phys_comp = (PhysicsComponentBase*)activeTransforms[i]->userData;
-		  if (phys_comp) {
-			  phys_comp->fetch_new_transform();
+		  ZoneScopedN("fetch_transforms");
+		 // retrieve array of actors that moved
+		PxU32 nbActiveTransforms;
+		auto activeTransforms = scene->getActiveActors(nbActiveTransforms);
+
+
+		  // update each render object with the new transform
+		  for (PxU32 i = 0; i < nbActiveTransforms; ++i)
+		  {
+			  auto phys_comp = (PhysicsComponentBase*)activeTransforms[i]->userData;
+			  if (phys_comp) {
+				  phys_comp->fetch_new_transform();
+			  }
 		  }
 	  }
 

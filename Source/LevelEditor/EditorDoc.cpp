@@ -1185,21 +1185,42 @@ ObjectOutliner::ObjectOutliner()
 	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
 	ed_doc.on_change_name.add(this, &ObjectOutliner::on_change_name);
 }
-void ObjectOutliner::draw_table_R(Node* n, int depth)
+
+bool ObjectOutliner::IteratorDraw::step()
+{
+	if (child_index >= node->children.size() && !node->parent)
+		return false;
+	else if (child_index >= node->children.size())
+	{
+		node = node->parent;
+		child_index = child_stack.back();
+		child_stack.pop_back();
+		return step();
+	}
+	else {
+		int i = child_index++;
+		child_stack.push_back(child_index);
+		child_index = 0;
+		node = node->children.at(i);
+	}
+	return true;
+}
+void ObjectOutliner::IteratorDraw::draw()
 {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 
-	ImGui::Dummy(ImVec2(depth*10.f, 0));
+	int depth = child_stack.size();
+	ImGui::Dummy(ImVec2(depth * 10.f, 0));
 	ImGui::SameLine();
-
+	auto n = node;
 	ImGui::PushID(n);
 	{
-		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr{n->handle});
+		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr{ n->handle });
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (n->handle != 0) {
-				if(ImGui::GetIO().KeyShift)
+				if (ImGui::GetIO().KeyShift)
 					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, eng->get_entity(n->handle), false);
 				else
 					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, eng->get_entity(n->handle), false);
@@ -1208,21 +1229,21 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 				ed_doc.selection_state->clear_all_selected();
 		}
 
-		if (ImGui::IsItemHovered()&&ImGui::GetIO().MouseClicked[1]&&n->handle!=0) {
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && n->handle != 0) {
 			ImGui::OpenPopup("outliner_ctx_menu");
 			ed_doc.selection_state->add_to_entity_selection({ n->handle });
-			contextMenuHandle = n->handle;
+			oo->contextMenuHandle = n->handle;
 		}
 		if (ImGui::BeginPopup("outliner_ctx_menu")) {
 
-			if (eng->get_entity(contextMenuHandle) == nullptr) {
-				contextMenuHandle = 0;
+			if (eng->get_entity(oo->contextMenuHandle) == nullptr) {
+				oo->contextMenuHandle = 0;
 				ImGui::CloseCurrentPopup();
 			}
 			else {
 				if (ImGui::Button("Parent To This")) {
 
-					auto me = eng->get_entity(contextMenuHandle);
+					auto me = eng->get_entity(oo->contextMenuHandle);
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
 					bool had_errs = false;
@@ -1235,12 +1256,12 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 						else
 							had_errs = true;
 					}
-					if(!ptrs.empty())
+					if (!ptrs.empty())
 						ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me));
 					if (had_errs)
 						eng->log_to_fullscreen_gui(Error, "Cant change parent of inherited entities");
 
-					contextMenuHandle = 0;
+					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Remove Parent")) {
@@ -1252,7 +1273,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 						parent_to_this = root;
 						skip_this = root;
 					}
-				
+
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
 					bool had_errs = false;
@@ -1266,31 +1287,31 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 							had_errs = true;
 					}
 
-					if(!ptrs.empty())
+					if (!ptrs.empty())
 						ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, parent_to_this));
 					if (had_errs)
 						eng->log_to_fullscreen_gui(Error, "Cant remove parent of inherited entities");
 
-					contextMenuHandle = 0;
+					oo->contextMenuHandle = 0;
 
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Add entity")) {
-					auto me = eng->get_entity(contextMenuHandle);
+					auto me = eng->get_entity(oo->contextMenuHandle);
 					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr()));
-					contextMenuHandle = 0;
+					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Add child entity")) {
-					auto me = eng->get_entity(contextMenuHandle);
+					auto me = eng->get_entity(oo->contextMenuHandle);
 					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), me->get_self_ptr()));
-					contextMenuHandle = 0;
+					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::Button("Instantiate prefab")) {
-					auto me = eng->get_entity(contextMenuHandle);
+					auto me = eng->get_entity(oo->contextMenuHandle);
 					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(me));
-					contextMenuHandle = 0;
+					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -1298,7 +1319,7 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			ImGui::EndPopup();
 		}
 	}
-	
+
 	ImGui::SameLine();
 
 	if (n->handle == 0) {
@@ -1321,6 +1342,18 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 			name = e->get_type().classname;
 		}
 
+		for (auto c : e->get_components()) {
+			if (c->dont_serialize_or_edit_this()) continue;
+			const char* s = c->get_editor_outliner_icon();
+			if (!*s) continue;
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			if (tex) {
+				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+				ImGui::SameLine(0, 0);
+			}
+		}
+
+
 		if (!ed_doc.can_delete_or_move_this(e))
 			ImGui::TextColored(non_owner_source_color, name);
 		else
@@ -1328,12 +1361,13 @@ void ObjectOutliner::draw_table_R(Node* n, int depth)
 
 	}
 
-	for (int i = 0; i < n->children.size(); i++)
-		draw_table_R(n->children[i], depth + 1);
-
 	ImGui::PopID();
 }
 
+int ObjectOutliner::determine_object_count() const
+{
+	return map.size();
+}
 void ObjectOutliner::draw()
 {
 
@@ -1342,16 +1376,31 @@ void ObjectOutliner::draw()
 
 		return;
 	}
+	ImGuiListClipper clipper;
+	clipper.Begin(determine_object_count());
+	IteratorDraw iter(this, rootnode);
+	int cur_n = 0;
 
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
 	if (ImGui::BeginTable("Table", 1, flags)) {
 		ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch);
 
-		draw_table_R(rootnode, 0);
+		while (clipper.Step()) {
+			while (cur_n < clipper.DisplayStart) {
+				iter.step();
+				cur_n++;
+			}
+			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+				iter.draw();
+				iter.step();
+				cur_n++;
+			}
+		}
 
 		ImGui::EndTable();
 	}
+	clipper.End();
 	ImGui::End();
 
 }
@@ -1409,6 +1458,16 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		ImGui::SameLine();
 		ImGui::Dummy(ImVec2(5.f,1.0));
 		ImGui::SameLine();
+
+		const char* s = ec->get_editor_outliner_icon();
+		if (*s) {
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			if (tex) {
+				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+				ImGui::SameLine(0, 0);
+			}
+		}
+
 		if(!ed_doc.can_delete_or_move_this(ec))
 			ImGui::TextColored(non_owner_source_color, ec->get_type().classname);
 		else
@@ -1471,6 +1530,16 @@ void EdPropertyGrid::draw()
 			if (ImGui::BeginPopup("addcomponentpopup")) {
 				auto iter = ClassBase::get_subclasses<EntityComponent>();
 				for (; !iter.is_end(); iter.next()) {
+					if (iter.get_type()->default_class_object) {
+						const char* s = ((EntityComponent*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
+						if (*s) {
+							auto tex = g_assets.find_global_sync<Texture>(s);
+							if (tex) {
+								ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+								ImGui::SameLine(0, 0);
+							}
+						}
+					}
 					if (ImGui::Selectable(iter.get_type()->classname)) {
 
 						ed_doc.command_mgr->add_command(new CreateComponentCommand(
