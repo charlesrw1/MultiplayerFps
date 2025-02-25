@@ -71,6 +71,7 @@ file_print_all_openfile_fails 0
 
 RUN_TESTS
 
+#otex 0.5 1 3 _csm_shadow
 
 g_draw_grid 1
 

@@ -160,7 +160,7 @@ void Shadow_Map_System::update()
 
 			Render_Level_Params params(
 				setup,
-				&draw.scene.csm_shadow_rlist,
+				&draw.scene.cascades_rlists.at(i),
 				&draw.scene.shadow_pass,
 				Render_Level_Params::SHADOWMAP
 			);

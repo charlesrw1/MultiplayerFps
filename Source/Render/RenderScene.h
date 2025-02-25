@@ -99,6 +99,7 @@ typedef int passobj_handle;
 // A render_pass is one collection of POSSIBLE draw calls
 // A render_list is created from a pass which is the actual draw calls to submit along with extra buffers to facilitate it
 class Render_Scene;
+struct ROP_Internal;
 class Render_Pass
 {
 public:
@@ -106,7 +107,17 @@ public:
 
 	void make_batches(Render_Scene& scene);
 
+	void merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Free_List<ROP_Internal>& proxy_list);
+
 	void add_object(
+		const Render_Object& proxy,
+		handle<Render_Object> handle,
+		const MaterialInstance* material,
+		uint32_t camera_dist,
+		int submesh,
+		int lod,
+		int layer, bool is_editor_mode);
+	void add_static_object(
 		const Render_Object& proxy,
 		handle<Render_Object> handle,
 		const MaterialInstance* material,
@@ -143,6 +154,7 @@ public:
 struct ROP_Internal
 {
 	Render_Object proxy;
+	bool is_static = true;
 	glm::mat4 inv_transform;
 	glm::vec4 bounding_sphere_and_radius;
 };
@@ -252,7 +264,6 @@ struct ParticleObj_Internal
 	Particle_Object obj;
 	MeshBuilderDD dd;
 };
-
 class TerrainInterfaceLocal;
 class Render_Scene : public RenderScenePublic
 {
@@ -265,6 +276,7 @@ public:
 	// UGGGGGGGGH
 	handle<Render_Object> register_obj() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
+		statics_meshes_are_dirty = true;
 		handle<Render_Object> handle = { proxy_list.make_new() };
 		return handle;
 	}
@@ -275,6 +287,7 @@ public:
 			handle = { -1 };
 			return;
 		}
+		statics_meshes_are_dirty = true;
 		if(handle.is_valid())
 			proxy_list.free(handle.id);
 		handle = { -1 };
@@ -551,6 +564,8 @@ public:
 				ASSERT(!"no type defined for queued delete render");
 			}
 		}
+		if(!queued_deletes.empty())
+			statics_meshes_are_dirty = true;
 		queued_deletes.clear();
 	}
 
@@ -562,15 +577,16 @@ public:
 
 	std::unique_ptr<TerrainInterfaceLocal> terrain_interface;
 
+	bool statics_meshes_are_dirty = false;
 
 	Render_Pass gbuffer_pass;
 	Render_Pass transparent_pass;
-	Render_Pass shadow_pass;
 	Render_Pass editor_sel_pass;
+	Render_Pass shadow_pass;	// all shadow casting objects
 
 	Render_Lists gbuffer_rlist;
 	Render_Lists transparent_rlist;
-	Render_Lists csm_shadow_rlist;
+	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled
 	Render_Lists editor_sel_rlist;
 
 	bufferhandle gpu_skinned_mats_buffer = 0;

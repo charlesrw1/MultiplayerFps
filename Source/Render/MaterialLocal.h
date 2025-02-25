@@ -231,6 +231,7 @@ struct shader_key
 static_assert(sizeof(shader_key) == 4, "shader key needs 4 bytes");
 
 
+
 class Material_Shader_Table
 {
 public:
@@ -239,6 +240,7 @@ public:
 	program_handle lookup(shader_key key);
 	void insert(shader_key key, program_handle handle);
 	void recompile_for_material(MasterMaterialImpl* mat);
+
 
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
