@@ -17,6 +17,7 @@ struct Render_Light
 	float shadow_bias = 0.01;
 
 	bool casts_shadow = false;
+	bool cast_static_only = false;	// will not update in realtime, just once for static
 	bool is_spotlight = false;
 
 	// light cookie texture

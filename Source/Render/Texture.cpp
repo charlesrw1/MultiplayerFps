@@ -133,8 +133,6 @@ void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal
 
 }
 
-// from doom 3 source
-
 // surface description flags
 const unsigned long DDSF_CAPS = 0x00000001l;
 const unsigned long DDSF_HEIGHT = 0x00000002l;

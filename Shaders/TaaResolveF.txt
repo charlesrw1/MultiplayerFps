@@ -1,0 +1,14 @@
+in vec2 texCoord;
+out vec3 FS_OUT_Color;
+uniform float amt;
+
+layout(binding=0) uniform sampler2D sceneColor;
+layout(binding=1) uniform sampler2D lastColor;
+
+void main()
+{
+	vec3 current = texture(sceneColor,texCoord).rgb;
+	vec3 last = texture(lastColor,texCoord).rgb;
+
+	FS_OUT_Color = current * (1-amt) + last * amt;
+}

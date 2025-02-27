@@ -64,6 +64,8 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 
+#include "Framework/Jobs.h"
+
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
@@ -1318,6 +1320,8 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 		// draw loading ui etc.
 		params.draw_world = false;
 		setup = vs_for_gui;
+		if (get_current_tool() != nullptr)
+			params.is_editor = true;
 		//idraw->scene_draw(params, vs_for_gui, get_gui());
 	}
 	else if (state == Engine_State::Game) {
@@ -1569,6 +1573,9 @@ void GameEngineLocal::init()
 
 	FileSys::init();
 	g_assets.init();
+
+	jobs::init();	// spawns worker threads
+
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 #endif
@@ -1657,7 +1664,7 @@ void GameEngineLocal::init()
 
 	TIMESTAMP("execute startup");
 }
-#include "Framework/Jobs.h"
+
 
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 
@@ -1747,7 +1754,7 @@ bool GameEngineLocal::game_thread_update()
 	}
 #endif
 
-	isound->tick(frame_time);
+	//isound->tick(frame_time);
 
 
 	// draw imgui here
@@ -1755,6 +1762,24 @@ bool GameEngineLocal::game_thread_update()
 
 	return true;
 }
+
+struct GameUpdateOuput {
+	bool drawOut = false;
+	SceneDrawParamsEx paramsOut = SceneDrawParamsEx(0, 0);
+	View_Setup vsOut;
+};
+void game_update_job(uintptr_t user)
+{
+	ZoneScopedN("GameThreadUpdate");
+	//printf("abc\n");
+	auto out = (GameUpdateOuput*)user;
+	out->drawOut = eng_local.game_thread_update();
+	eng_local.get_draw_params(out->paramsOut, out->vsOut);
+	//return;
+	// update particles, doesnt draw, only builds meshes FIXME
+	ParticleMgr::get().draw(out->vsOut);
+}
+
 
 void GameEngineLocal::loop()
 {
@@ -1849,31 +1874,22 @@ void GameEngineLocal::loop()
 
 		BooleanScope scope(b_is_in_overlapped_period);
 
-		bool drawOut = false;
-		SceneDrawParamsEx paramsOut(0, 0);
-		View_Setup vsOut;
-		
-		auto game_task = job::launch_task([&]() {
-			ZoneScopedN("GameThreadUpdate");
+		GameUpdateOuput out;
+		jobs::Counter* gameupdatecounter{};
+		jobs::add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
 
-			drawOut = game_thread_update();
-			get_draw_params(paramsOut, vsOut);
-			// update particles, doesnt draw, only builds meshes FIXME
-			ParticleMgr::get().draw(vsOut);
-			});
-		
-
-		if(!shouldDrawNext)
+		if (!shouldDrawNext) {
 			drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
+		}
 		idraw->scene_draw(drawparamsNext, setupNext, nullptr);
+		jobs::wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 		{
 			CPUSCOPESTART(GameTaskWait);
-			game_task.wait();	// wait for game update to finish while render is on this thread
 		}
 
-		shouldDrawNext = drawOut;
-		drawparamsNext = paramsOut;
-		setupNext = vsOut;
+		shouldDrawNext = out.drawOut;
+		drawparamsNext = out.paramsOut;
+		setupNext = out.vsOut;
 	};
 
 	// This happens on main thread
@@ -1953,8 +1969,9 @@ void GameEngineLocal::loop()
 
 		// update input, console cmd buffer
 		const bool should_skip = frame_start();
-		if (should_skip)
+		if (should_skip) {
 			continue;
+		}
 
 		// overlapped update (game+render)
 		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext);

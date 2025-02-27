@@ -338,7 +338,7 @@ static glm::mat4 compose_transform(const glm::vec3& v, const glm::quat& q, const
 	return model;
 }
 
-
+#include "tracy/public/tracy/Tracy.hpp"
 
 glm::mat4 Entity::get_ls_transform() const
 {
@@ -367,8 +367,7 @@ void Entity::post_change_transform_R(bool ws_is_dirty, EntityComponent* skipthis
 		return;
 
 	for (auto c : all_components)
-		if(c!=skipthis)
-			c->on_changed_transform();
+		c->on_changed_transform();
 
 	// recurse to children
 	for (int i = 0; i < children.size(); i++)

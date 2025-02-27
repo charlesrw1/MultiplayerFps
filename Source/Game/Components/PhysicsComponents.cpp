@@ -300,6 +300,8 @@ void PhysicsComponentBase::on_changed_transform() {
 		return;
 	if (!enabled)	// not enabled, skip
 		return;	
+	if (simulate_physics)
+		return;
 	set_transform(get_ws_transform());
 }
 PhysicsComponentBase::~PhysicsComponentBase()

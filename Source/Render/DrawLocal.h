@@ -416,6 +416,7 @@ public:
 
 		//program_handle particle_basic;
 		program_handle bloom_downsample{};
+		program_handle taa_resolve{};
 		program_handle bloom_upsample{};
 		program_handle combine{};
 		
@@ -440,6 +441,9 @@ public:
 
 	struct framebuffers {
 		//fbohandle reflected_scene{};
+		fbohandle taa_resolve{};
+		fbohandle taa_blit{};
+
 		fbohandle bloom{};
 		fbohandle composite{};
 
@@ -452,9 +456,11 @@ public:
 
 	struct textures {
 		texhandle scene_color{};
+		texhandle last_scene_color{};
+
 		texhandle scene_depth{};
 
-		texhandle scene_gbuffer0{};	
+		texhandle scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16
 		texhandle scene_gbuffer1{};
 		texhandle scene_gbuffer2{};
 
@@ -530,7 +536,7 @@ public:
 	Texture* lens_dirt = nullptr;
 
 	SSAO_System ssao;
-	Shadow_Map_System shadowmap;
+	CascadeShadowMapSystem shadowmap;
 	Volumetric_Fog_System volfog;
 
 	DebuggingTextureOutput debug_tex_out;
@@ -556,7 +562,7 @@ private:
 	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0), bool wireframe_secondpass = false);
 
 	void init_bloom_buffers();
-	void render_bloom_chain();
+	void render_bloom_chain(texhandle scene_color_handle);
 
 
 

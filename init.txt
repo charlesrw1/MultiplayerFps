@@ -76,5 +76,5 @@ RUN_TESTS
 g_draw_grid 1
 
 #start_ed AnimGraph "testcharacter_a.ag"
-
-start_ed Material "top_down/fake_fog.mm"
+map top_down/map0.tmap
+#start_ed Material "top_down/fake_fog.mm"

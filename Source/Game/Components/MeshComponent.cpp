@@ -169,7 +169,7 @@ void MeshComponent::pre_start()
 void MeshComponent::start()
 {
 }
-
+#include "tracy/public/tracy/Tracy.hpp"
 void MeshComponent::on_changed_transform()
 {
 	sync_render_data();

@@ -41,7 +41,53 @@ public:
 	void shutdown();
 	void compute();
 };
-class Shadow_Map_System
+
+// shadowmap manager
+// manages: 
+// allocation of shadowmap
+// when to update
+// strategies:
+// dont update if light is out of view frustum
+// remove from allocation if further than max shadow distance
+// if static, only update once
+
+class SpotlightShadowManager
+{
+public:
+	const int MAX_SHADOWS = 8;
+
+	void init();
+	void update();
+	void remove_light(handle<Render_Light> handle) {
+		for (int i = 0; i < slots_used.size(); i++) {
+			if (slots_used[i].id == handle.id) {
+				slots_used[i].id = -1;
+				num_used--;
+				return;
+			}
+		}
+	}
+	void make_render_targets();
+
+	int find_index(handle<Render_Light> handle) {
+		for (int i = 0; i < slots_used.size(); i++) {
+			if (slots_used[i].id == handle.id) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	struct textures {
+		texhandle shadow_array{};
+		Texture* shadow_vts_handle = nullptr;
+	}tex;
+
+	int num_used = 0;
+	std::vector<handle<Render_Light>> slots_used;
+};
+
+class CascadeShadowMapSystem
 {
 public:
 	void init();

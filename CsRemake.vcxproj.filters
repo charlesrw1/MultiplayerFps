@@ -769,6 +769,7 @@
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
+    <ClCompile Include="Source\Framework\Jobs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

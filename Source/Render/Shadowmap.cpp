@@ -17,9 +17,68 @@ void shadow_map_tweaks()
 	ImGui::DragFloat("zscale", &tweak.z_dist_scaling, 0.01);
 
 }
+ConfigVar r_spotlight_shadow_fade_radius("r.spotlight_shadow_fade_radius", "5.0", CVAR_FLOAT, "dist to fade out spot light shadows", 0, 100);
+ConfigVar r_spotlight_shadow_quality("r.spotlight_shadow_quality", "1", CVAR_INTEGER, "quality of spotlight shadow 0,1,2", 0, 2);
+const static int spotlight_shadow_res[] = { 128,256,512 };
+void SpotlightShadowManager::init()
+{
+	tex.shadow_vts_handle = Texture::install_system("_spto_shadow");
+	tex.shadow_vts_handle->type = Texture_Type::TEXTYPE_2D_ARRAY;
+	make_render_targets();
 
+	num_used = 0;
+	slots_used.resize(MAX_SHADOWS);
+}
 
-void Shadow_Map_System::init()
+#include "Framework/InlineVec.h"
+
+void SpotlightShadowManager::update()
+{
+	if (r_spotlight_shadow_quality.was_changed())
+		make_render_targets();
+
+	InlineVec<int,32> wants_shadowing;
+	auto& vs = draw.vs;
+	// determine if new lights want to be added
+	auto& scene = draw.scene;
+	auto& lights = scene.light_list;
+	float fade2 = r_spotlight_shadow_fade_radius.get_float();
+	fade2 *= fade2;
+	for (int i = 0; i < lights.objects.size(); i++) {
+		auto& obj = lights.objects.at(i).type_;
+		auto handle = lights.objects.at(i).handle;
+		if (!obj.light.casts_shadow)continue;
+		float dist2 = glm::dot(obj.light.position - vs.origin, obj.light.position - vs.origin);
+		float r2 = obj.light.radius;
+		r2 *= r2;
+		if (r2 + fade2 > dist2)continue;	
+		wants_shadowing.push_back(handle);
+	}
+	// determine what lights to update
+	// render them
+}
+void SpotlightShadowManager::make_render_targets()
+{
+	int quality = r_spotlight_shadow_quality.get_integer();
+	if (quality < 0 || quality>2)quality = 0;
+	int resolution = spotlight_shadow_res[quality];
+
+	glDeleteTextures(1, &tex.shadow_array);
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &tex.shadow_array);
+	glTextureStorage3D(tex.shadow_array, 1, GL_DEPTH_COMPONENT32F, resolution, resolution, MAX_SHADOWS);
+	glTextureParameteri(tex.shadow_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(tex.shadow_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(tex.shadow_array, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTextureParameteri(tex.shadow_array, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
+	glTextureParameteri(tex.shadow_array, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTextureParameteri(tex.shadow_array, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float bordercolor[] = { 1.0,1.0,1.0,1.0 };
+	glTextureParameterfv(tex.shadow_array, GL_TEXTURE_BORDER_COLOR, bordercolor);
+
+	tex.shadow_vts_handle->update_specs(tex.shadow_array, resolution, resolution, 1, {});
+}
+
+void CascadeShadowMapSystem::init()
 {
 	texture.shadow_vts_handle = Texture::install_system("_csm_shadow");
 	texture.shadow_vts_handle->type = Texture_Type::TEXTYPE_2D_ARRAY;
@@ -30,7 +89,7 @@ void Shadow_Map_System::init()
 	glCreateBuffers(1, &ubo.info);
 	glCreateBuffers(4, ubo.frame_view);
 }
-void Shadow_Map_System::make_csm_rendertargets()
+void CascadeShadowMapSystem::make_csm_rendertargets()
 {
 	if (tweak.quality == 0)
 		return;
@@ -73,7 +132,7 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 	return planedistances;
 }
 #include "Render/Render_Sun.h"
-void Shadow_Map_System::update()
+void CascadeShadowMapSystem::update()
 {
 	//int setting = draw.shadow_quality_setting.integer();
 	//if (setting < 0) setting = 0;
@@ -195,7 +254,7 @@ static glm::vec3* GetFrustumCorners(const mat4& view, const mat4& projection)
 }
 
 
-void Shadow_Map_System::update_cascade(int cascade_idx, const View_Setup& view, vec3 directionalDir)
+void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& view, vec3 directionalDir)
 {
 	float far = split_distances[cascade_idx];
 	float near = (cascade_idx == 0) ? view.near : split_distances[cascade_idx - 1];

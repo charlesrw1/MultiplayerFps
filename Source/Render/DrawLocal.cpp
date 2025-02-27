@@ -59,6 +59,62 @@ ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV,"disable multid
 // 12mb arena
 ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "12000000", CVAR_INTEGER | CVAR_UNBOUNDED, "size of the renderers memory arena in bytes");
 
+ConfigVar r_taa_enabled("r.taa", "1", CVAR_BOOL,"enable temporal anti aliasing");
+
+
+
+class TaaManager
+{
+public:
+	static const int SAMPLES = 8;
+	TaaManager() {
+		generateHaltonSequence(SAMPLES, jitters);
+	}
+	
+
+	void start_frame() {
+		index = (index + 1) % SAMPLES;
+	}
+	glm::vec2 calc_frame_jitter(int width, int height) const {
+		auto jit = jitters[index];	// [0,1]
+		jit = jit - glm::vec2(0.5);	//[-1/2,1/2]
+		return glm::vec2(jit.x / width, jit.y / height);
+	}
+	glm::mat4 add_jitter_to_projection(const glm::mat4& inproj, glm::vec2 jitter) const {
+		glm::mat4 matrix = inproj;
+		matrix[2][0] += jitter.x;
+		matrix[2][1] += jitter.y;
+
+		return matrix;
+	}
+
+private:
+	static float radicalInverse(int base, int index) {
+		float result = 0.0;
+		float fraction = 1.0 / base;
+		while (index > 0) {
+			result += (index % base) * fraction;
+			index /= base;
+			fraction /= base;
+		}
+		return result;
+	}
+	static void generateHaltonSequence(int numPoints, glm::vec2* sequence) {
+		const int primes[] = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47 };
+		const int dimension = 2;
+		for (int d = 0; d < dimension; ++d) {
+			int base = primes[d];
+			for (int i = 0; i < numPoints; ++i) {
+				sequence[i][d] = radicalInverse(base, i + 1);
+			}
+		}
+	}
+
+	glm::vec2 jitters[SAMPLES];
+	int index = 0;
+};
+static TaaManager r_taa_manager;
+
 DECLARE_ENGINE_CMD(otex)
 {
 	static const char* usage_str = "Usage: otex <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
@@ -453,7 +509,7 @@ void Renderer::create_shaders()
 	prog.bloom_downsample = prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
 	prog.bloom_upsample = prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
 	prog.combine = prog_man.create_raster("fullscreenquad.txt", "CombineF.txt");
-
+	prog.taa_resolve = prog_man.create_raster("fullscreenquad.txt", "TaaResolveF.txt");
 
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
@@ -766,6 +822,11 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glTextureStorage2D(tex.scene_color, 1, GL_RGB16F, s_w, s_h);
 	set_default_parameters(tex.scene_color);
 
+	// last frame, for TAA
+	create_and_delete_texture(tex.last_scene_color);
+	glTextureStorage2D(tex.last_scene_color, 1, GL_RGB16F, s_w, s_h);
+	set_default_parameters(tex.last_scene_color);
+
 	// Main scene depth
 	create_and_delete_texture(tex.scene_depth);
 	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
@@ -839,6 +900,12 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	set_default_parameters(tex.output_composite_2);
 	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
 
+
+	// write to scene gbuffer0 for taa resolve
+	create_and_delete_fb(fbo.taa_resolve);
+	glNamedFramebufferTexture(fbo.taa_resolve, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0, 0);
+	create_and_delete_fb(fbo.taa_blit);
+
 	cur_w = s_w;
 	cur_h = s_h;
 
@@ -889,7 +956,7 @@ void Renderer::init_bloom_buffers()
 	tex.bloom_vts_handle->update_specs(tex.bloom_chain[0], cur_w / 2, cur_h / 2, 3, {});
 }
 
-void Renderer::render_bloom_chain()
+void Renderer::render_bloom_chain(texhandle scene_color_handle)
 {
 	ZoneScoped;
 	GPUFUNCTIONSTART;
@@ -921,7 +988,8 @@ void Renderer::render_bloom_chain()
 		float src_x = cur_w;
 		float src_y = cur_h;
 
-		glBindTextureUnit(0, tex.scene_color);
+
+		glBindTextureUnit(0, scene_color_handle);
 		glClearColor(0, 0, 0, 1);
 		for (int i = 0; i < tex.number_bloom_mips; i++)
 		{
@@ -1812,70 +1880,172 @@ static void cull_objects(Frustum& frustum, bool* visible_array, int visible_arra
 		visible_array[i] = res == 4;
 	}
 }
-
-
-
-
-
-void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
+struct CullObjectsUser
 {
-	CPUFUNCTIONSTART;
-	ZoneScoped;
+	bool* visarray = nullptr;
+	int count = 0;
+	int index = 0;	// for shadows
+};
 
-	if (statics_meshes_are_dirty) {
-		// update static cache this frame
-		gbuffer_pass.clear_static();
-		transparent_pass.clear_static();
-		editor_sel_pass.clear_static();
-		shadow_pass.clear_static();
+void cull_objects_job(uintptr_t user)
+{
+	ZoneScopedN("ObjectCull");
+	auto d = (CullObjectsUser*)user;
+	Frustum frustum;
+	build_a_frustum_for_perspective(frustum, draw.vs);
+	auto& objs = draw.scene.proxy_list;
+	cull_objects(frustum, d->visarray, d->count, objs);
+}
+void cull_shadow_objects_job(uintptr_t user)
+{
+	ZoneScopedN("ShadowObjectCull");
+	auto d = (CullObjectsUser*)user;
+	Frustum f;
+	build_frustum_for_cascade(f, d->index);
+	auto& objs = draw.scene.proxy_list;
+	cull_objects(f, d->visarray, d->count, objs);
+}
 
-		for (int i = 0; i < proxy_list.objects.size(); i++) {
-			auto& obj = proxy_list.objects[i];
-			auto& proxy = obj.type_.proxy;
-			if (!obj.type_.is_static||proxy.is_skybox)
-				continue;
-			handle<Render_Object> objhandle{ obj.handle };
-			if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded())
-				continue;
-			const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
-			auto model = proxy.model;
-			for (int LOD_index = 0; LOD_index < model->get_num_lods(); LOD_index++) {
-				const auto& lod = model->get_lod(LOD_index);
 
-				const int pstart = lod.part_ofs;
-				const int pend = pstart + lod.part_count;
+void calc_lod_job(uintptr_t user)
+{
+	ZoneScopedN("LodToRenderCalc");
 
-				for (int j = pstart; j < pend; j++) {
-					auto& part = proxy.model->get_part(j);
+	int8_t* lodarray = (int8_t*)user;
 
-					const MaterialInstance* mat = (MaterialInstance*)proxy.model->get_material(part.material_idx);
-					if (obj.type_.proxy.mat_override)
-						mat = (MaterialInstance*)obj.type_.proxy.mat_override;
-					if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
-						mat = matman.get_fallback();
-					const MasterMaterialImpl* mm = mat->get_master_material();
+	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
+	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
+	auto& vs = draw.vs;
+	auto& proxy_list = draw.scene.proxy_list;
+	for (int i = 0; i < proxy_list.objects.size(); i++) {
+		auto& obj = proxy_list.objects[i];
+		auto& proxy = obj.type_.proxy;
+		const glm::vec3 to_camera = glm::vec3(obj.type_.bounding_sphere_and_radius) - vs.origin;
+		const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
+		const float percentage_2 = get_screen_percentage_2(obj.type_.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
+		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
+		if (!proxy.model)
+			lodarray[i] = 0;
+		else {
+			lodarray[i] = (int8_t)get_lod_to_render(proxy.model, percentage_2);
+		}
+	}
+}
 
-					if (mm->render_in_forward_pass()) {
-						transparent_pass.add_static_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
-						if (!mm->is_translucent() && casts_shadow)
-							shadow_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					}
-					else {
-						if (casts_shadow)
-							shadow_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-						gbuffer_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					}
+
+void set_gpu_objects_data_job(uintptr_t p)
+{
+	auto gpu_objects = (gpu::Object_Instance*)p;
+	auto& proxy_list = draw.scene.proxy_list;
+	ZoneScopedN("SetGpuObjectData");
+	for (int i = 0; i < proxy_list.objects.size(); i++) {
+		auto& obj = proxy_list.objects[i];
+		auto& proxy = obj.type_.proxy;
+		gpu_objects[i].anim_mat_offset = obj.type_.proxy.animator_bone_ofs;
+		gpu_objects[i].model = proxy.transform;
+		gpu_objects[i].invmodel = obj.type_.inv_transform;
+	}
+}
+
+
+void make_batches_job(uintptr_t p)
+{
+	ZoneScopedN("make_batches_job");
+	Render_Pass* pass = (Render_Pass*)p;
+	pass->make_batches(draw.scene);
+}
+
+struct MakeShadowRenderListParam
+{
+	bool* visarray = nullptr;
+	int index = 0;
+};
+
+void make_shadow_render_list_job(uintptr_t p)
+{
+	ZoneScopedN("make_shadow_render_list_job");
+
+	auto param = (MakeShadowRenderListParam*)p;
+
+	build_cascade_cpu(
+		draw.scene.cascades_rlists[param->index],
+		draw.scene.shadow_pass,
+		draw.scene.proxy_list,
+		param->visarray
+	);
+}
+
+void merge_shadow_list_job(uintptr_t p)
+{
+	ZoneScopedN("merge_shadow_list_job");
+	int8_t* lodarray = (int8_t*)p;
+	draw.scene.shadow_pass.merge_static_to_dynamic(nullptr, lodarray, draw.scene.proxy_list);
+}
+
+#include "Framework/Jobs.h"
+void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
+{
+	// update static cache this frame
+	gbuffer_pass.clear_static();
+	transparent_pass.clear_static();
+	editor_sel_pass.clear_static();
+	shadow_pass.clear_static();
+
+	for (int i = 0; i < proxy_list.objects.size(); i++) {
+		auto& obj = proxy_list.objects[i];
+		auto& proxy = obj.type_.proxy;
+		if (!obj.type_.is_static || proxy.is_skybox)
+			continue;
+		handle<Render_Object> objhandle{ obj.handle };
+		if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded())
+			continue;
+		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
+		auto model = proxy.model;
+		for (int LOD_index = 0; LOD_index < model->get_num_lods(); LOD_index++) {
+			const auto& lod = model->get_lod(LOD_index);
+
+			const int pstart = lod.part_ofs;
+			const int pend = pstart + lod.part_count;
+
+			for (int j = pstart; j < pend; j++) {
+				auto& part = proxy.model->get_part(j);
+
+				const MaterialInstance* mat = (MaterialInstance*)proxy.model->get_material(part.material_idx);
+				
+				if (obj.type_.proxy.mat_override)
+					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
+				if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
+					mat = matman.get_fallback();
+				const MasterMaterialImpl* mm = mat->get_master_material();
+
+				if (mm->render_in_forward_pass()) {
+					transparent_pass.add_static_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
+					if (!mm->is_translucent() && casts_shadow)
+						shadow_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+				}
+				else {
+					if (casts_shadow)
+						shadow_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+					gbuffer_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+				}
 
 #ifdef EDITOR_BUILD
-					if (proxy.outline) {
-						editor_sel_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					}
-#endif
+				if (proxy.outline) {
+					editor_sel_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
 				}
+#endif
 			}
 		}
-		statics_meshes_are_dirty = false;
 	}
+}
+void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
+{
+	ZoneScoped;
+
+	if (static_cache_built_for_editor != build_for_editor)
+		statics_meshes_are_dirty = true;
+	if(static_cache_built_for_debug!=(r_debug_mode.get_integer() != 0))
+		statics_meshes_are_dirty = true;
 
 	// clear objects
 	gbuffer_pass.clear();
@@ -1890,52 +2060,51 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	auto marker = draw.get_arena().get_bottom_marker();
 	bool* visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
 	int8_t* lod_to_render_array = (int8_t*)draw.get_arena().alloc_bottom(sizeof(int8_t) * visible_count);
+	//
 	{
-		CPUSCOPESTART(cpu_object_cull);
-		ZoneScopedN("ObjectCull");
-		{
-			Frustum frustum;
-			build_a_frustum_for_perspective(frustum, draw.vs);
-			cull_objects(frustum, visible_array, visible_count, proxy_list);
-		}
-		{
-			ZoneScopedN("ShadowObjectCull");
-			for (int i = 0; i < 4; i++) {
-				Frustum f;
-				build_frustum_for_cascade(f, i);
-				cull_objects(f, cascade_vis[i], visible_count, proxy_list);
-			}
-		}
-	}
+		//CPUSCOPESTART(cpu_object_cull);
+		ZoneScopedN("SetupThreaded");
 
-	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
-	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
-	auto& vs = draw.vs;
-	{
-		ZoneScopedN("LodToRenderCalc");
-		for (int i = 0; i < proxy_list.objects.size(); i++) {
-			auto& obj = proxy_list.objects[i];
-			auto& proxy = obj.type_.proxy;
-			const glm::vec3 to_camera = glm::vec3(obj.type_.bounding_sphere_and_radius) - vs.origin;
-			const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
-			const float percentage_2 = get_screen_percentage_2(obj.type_.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
-			const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
-			if (!proxy.model) 
-				lod_to_render_array[i] = 0;
-			else {
-				lod_to_render_array[i] = (int8_t)get_lod_to_render(proxy.model, percentage_2);
-			}
+		jobs::Counter* cullAndLodCounter{};
+
+		const int NUM_FRUSTUM_JOBS = 5;
+		jobs::JobDecl decls[NUM_FRUSTUM_JOBS];
+		CullObjectsUser mainview;
+		CullObjectsUser cascades[4];
+		mainview.count = visible_count;
+		mainview.visarray = visible_array;
+		decls[0].func = cull_objects_job;
+		decls[0].funcarg = uintptr_t(&mainview);
+		for (int i = 0; i < 4; i++) {
+			cascades[i].index = i;
+			cascades[i].count = visible_count;
+			cascades[i].visarray = cascade_vis[i];
+			decls[i + 1].func = cull_shadow_objects_job;
+			decls[i + 1].funcarg = uintptr_t(&cascades[i]);
 		}
+
+		jobs::add_jobs(decls, NUM_FRUSTUM_JOBS, cullAndLodCounter);
+		jobs::add_job(calc_lod_job,uintptr_t(lod_to_render_array), cullAndLodCounter);
+		
+		// while waiting, can refresh static mesh data if needed
+		if (statics_meshes_are_dirty) {
+			printf("reset static mesh (editor: %d)\n", (int)build_for_editor);
+			refresh_static_mesh_data(build_for_editor);
+			statics_meshes_are_dirty = false;
+			static_cache_built_for_debug = r_debug_mode.get_integer() != 0;
+			static_cache_built_for_editor = build_for_editor;
+
+		}
+
+		jobs::wait_and_free_counter(cullAndLodCounter);
 	}
+	const size_t num_ren_objs = proxy_list.objects.size();
+	auto gpu_objects = (gpu::Object_Instance*)draw.get_arena().alloc_bottom(sizeof(gpu::Object_Instance) * num_ren_objs);
+	ASSERT(gpu_objects);
+	jobs::Counter* gpu_obj_set_cntr{};
+	jobs::add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
 	{
-		CPUSCOPESTART(traversal);
 		ZoneScopedN("Traversal");
-
-		const size_t num_ren_objs = proxy_list.objects.size();
-
-		auto gpu_objects = (gpu::Object_Instance*)draw.get_arena().alloc_bottom(sizeof(gpu::Object_Instance) * num_ren_objs);
-		ASSERT(gpu_objects);
-
 		{
 			ZoneScopedN("LoopObjects");
 			for (int i = 0; i < proxy_list.objects.size(); i++) {
@@ -1999,46 +2168,57 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		{
 			ZoneScopedN("MergeStaticWithDynamic");
 			if (!skybox_only) {
+				jobs::Counter* mergeshadowcounter{};
+				jobs::add_job(merge_shadow_list_job,uintptr_t(lod_to_render_array), mergeshadowcounter);
+
 				editor_sel_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 				gbuffer_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 				transparent_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-				shadow_pass.merge_static_to_dynamic(nullptr, lod_to_render_array, proxy_list);
-			}
-		}
-		{
-			ZoneScopedN("SetGpuObjectData");
-			for (int i = 0; i < proxy_list.objects.size(); i++) {
-				auto& obj = proxy_list.objects[i];
-				auto& proxy = obj.type_.proxy;
-				gpu_objects[i].anim_mat_offset = obj.type_.proxy.animator_bone_ofs;
-				gpu_objects[i].model = proxy.transform;
-				gpu_objects[i].invmodel = obj.type_.inv_transform;
+
+				jobs::wait_and_free_counter(mergeshadowcounter);
 			}
 		}
 
+
+	}
+
+	{
+		ZoneScopedN("MakeBatchesAndUploadGpuData");
+
+		// kick off gbuffer pass, but do the rest on this thread
+		jobs::Counter* c{};
+		jobs::add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
+		jobs::add_job(make_batches_job, uintptr_t(&shadow_pass), c);
+		transparent_pass.make_batches(*this);
+		editor_sel_pass.make_batches(*this);
+
+
+		jobs::wait_and_free_counter(gpu_obj_set_cntr);
 		{
-			//GPUSCOPESTART(upload_cpu_data);
 			ZoneScopedN("UploadGpuData");
-
 			glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
 		}
 
-	}
-	draw.get_arena().free_bottom_to_marker(marker);
 
-	{
-		CPUSCOPESTART(make_batches);
-		ZoneScopedN("MakeBatches");
-
-
-		gbuffer_pass.make_batches(*this);
-		shadow_pass.make_batches(*this);
-		transparent_pass.make_batches(*this);
-		editor_sel_pass.make_batches(*this);
+		jobs::wait_and_free_counter(c);
 	}
 	{
-		CPUSCOPESTART(make_render_lists);
 		ZoneScopedN("MakeRenderLists");
+
+		// kick off the shadow passes, but do rest locally
+		jobs::Counter* shadowlistcounter{};
+		jobs::JobDecl shadowlistdecl[4];
+		MakeShadowRenderListParam params[4];
+		for (int i = 0; i < 4; i++) {
+			params[i].visarray = cascade_vis[i];
+			params[i].index = i;
+			shadowlistdecl[i].func = make_shadow_render_list_job;
+			shadowlistdecl[i].funcarg = uintptr_t(&params[i]);
+		}
+		for (int i = 0; i < 4; i++) {
+			shadowlistdecl[i].func(shadowlistdecl[i].funcarg);
+		}
+		//jobs::add_jobs(shadowlistdecl, 4, shadowlistcounter);
 
 
 		build_standard_cpu(
@@ -2046,14 +2226,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			gbuffer_pass,
 			proxy_list
 		);
-		for (int i = 0; i < 4; i++) {
-			build_cascade_cpu(
-				cascades_rlists[i],
-				shadow_pass,
-				proxy_list,
-				cascade_vis[i]
-			);
-		}
 		
 		build_standard_cpu(
 			transparent_rlist,
@@ -2066,7 +2238,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			editor_sel_pass,
 			proxy_list
 		);
+
+		//jobs::wait_and_free_counter(shadowlistcounter);
 	}
+
 	draw.get_arena().free_bottom();
 
 }
@@ -2543,15 +2718,32 @@ ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing"
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
+	GPUFUNCTIONSTART;
 	ZoneNamed(RendererSceneDraw,true);
 	TracyGpuZone("scene_draw");
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	r_taa_manager.start_frame();
+
 	check_cubemaps_dirty();
 
+	// modify view_setup for TAA, fixme
+	if(r_taa_enabled.get_bool())
+	{
+		view.proj = r_taa_manager.add_jitter_to_projection(view.proj, r_taa_manager.calc_frame_jitter(view.width,view.height));
+		view.viewproj = view.proj * view.view;
+	}
+
 	scene_draw_internal(params, view, gui);
+
+	// swap last frame and current frame, fixme
+	if (r_taa_enabled.get_bool()) {
+		std::swap(tex.last_scene_color, tex.scene_color);
+		glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
+		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
+	}
 }
 
 void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front);
@@ -2647,6 +2839,7 @@ void Renderer::check_cubemaps_dirty()
 }
 ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post processing");
 ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
+ConfigVar r_taa_blend("r.taa_blend", "0.9", CVAR_FLOAT, "", 0, 1.0);
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
 	TracyGpuZone("scene_draw_internal");
@@ -2822,8 +3015,43 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	//	draw_meshbuilders();
 	//}
 
+	auto taa_resolve_pass = [&]() -> texhandle {
+		GPUSCOPESTART(TaaResolve);
+		ZoneScopedN("TaaResolve");
+
+		if (!r_taa_enabled.get_bool()) {
+			return tex.scene_color;
+		}
+		// write to tex.scene_gbuffer0
+		RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
+		auto scope = device.start_render_pass(setup);
+		RenderPipelineState state;
+		state.program = prog.taa_resolve;
+		state.vao = 0;
+		device.set_pipeline(state);
+		shader().set_float("amt", r_taa_blend.get_float());
+		bind_texture(0, tex.scene_color);
+		bind_texture(1, tex.last_scene_color);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
+		glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
+			0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
+			GL_NEAREST);
+
+		return tex.scene_color;
+	};
+	const texhandle scene_color_handle = taa_resolve_pass();
+
+	// last_scene
+	// scene
+	// gbuffer0 = taa_resolve(scene, last_scene)
+	// last_scene = blit(gbuffer0)
+	// scene_color_handle = gbuffer0
+	// render_transparents(scene_color_handle)
+
 	// Bloom update
-	render_bloom_chain();
+	render_bloom_chain(scene_color_handle);
 
 	{
 		const auto& view_to_use = current_frame_main_view;
@@ -2841,7 +3069,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 			uint32_t bloom_tex = tex.bloom_chain[0];
 			if (!enable_bloom.get_bool())
 				bloom_tex = black_texture.gl_id;
-			bind_texture(0, tex.scene_color);
+			bind_texture(0, scene_color_handle);
 			bind_texture(1, bloom_tex);
 			bind_texture(2, lens_dirt->gl_id);
 			glDrawArrays(GL_TRIANGLES, 0, 3);

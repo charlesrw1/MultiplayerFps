@@ -308,6 +308,28 @@ static Color32 randcolor32(uint32_t number)
 		return PxFilterFlag::eKILL;
 
 }
+#include "Framework/Jobs.h"
+ void physx_run_job(uintptr_t p)
+ {
+	 ZoneScopedN("physx_run_job");
+	 auto task = (PxBaseTask*)p;
+	 task->run();
+	 task->release();
+ }
+
+ class MyDispatcher : public physx::PxCpuDispatcher
+ {
+	 // Inherited via PxCpuDispatcher
+	 virtual void submitTask(physx::PxBaseTask& task)
+	 {
+		 jobs::add_job_no_counter(physx_run_job, uintptr_t(&task));
+	 }
+	 virtual uint32_t getWorkerCount() const
+	 {
+		 // fixme
+		 return 4;
+	 }
+ };
 
   void PhysicsManImpl::init() {
 	 sys_print(Info, "Initializing Physics\n");
@@ -319,7 +341,7 @@ static Color32 randcolor32(uint32_t number)
 	 physx::PxSceneDesc sceneDesc(physics_factory->getTolerancesScale());
 	 sceneDesc.gravity = physx::PxVec3(0.0f, -9.81f, 0.0f);
 	 sceneDesc.filterShader = my_filter_shader;// physx::PxDefaultSimulationFilterShader;
-	 dispatcher = physx::PxDefaultCpuDispatcherCreate(2);
+	 dispatcher = new MyDispatcher;
 
 
 	 if (!dispatcher)
@@ -347,11 +369,14 @@ static Color32 randcolor32(uint32_t number)
 	  mycallback->call_all_triggered();
 
 	  {
-		  ZoneScopedN("fetch_transforms");
+		ZoneScopedN("fetch_transforms");
 		 // retrieve array of actors that moved
-		PxU32 nbActiveTransforms;
-		auto activeTransforms = scene->getActiveActors(nbActiveTransforms);
-
+		PxU32 nbActiveTransforms{};
+		PxActor** activeTransforms{};
+		{
+			ZoneScopedN("getActiveActors");
+			activeTransforms = scene->getActiveActors(nbActiveTransforms);
+		}
 
 		  // update each render object with the new transform
 		  for (PxU32 i = 0; i < nbActiveTransforms; ++i)

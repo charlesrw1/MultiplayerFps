@@ -101,7 +101,7 @@ public:
 
 
 	physx::PxMaterial* default_material = nullptr;
-	physx::PxDefaultCpuDispatcher* dispatcher = nullptr;
+	physx::PxCpuDispatcher* dispatcher = nullptr;
 	physx::PxDefaultErrorCallback err;
 	physx::PxDefaultAllocator alloc;
 	physx::PxScene* scene = nullptr;
