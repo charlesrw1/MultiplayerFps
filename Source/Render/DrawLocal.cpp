@@ -712,7 +712,7 @@ void Renderer::create_default_textures()
 {
 	const uint8_t wdata[] = { 0xff,0xff,0xff };
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
-	const uint8_t normaldata[] = { 128,128,255 };
+	const uint8_t normaldata[] = { 128,128,255,255 };
 
 	glCreateTextures(GL_TEXTURE_2D, 1, &white_texture.gl_id);
 	glTextureStorage2D(white_texture.gl_id, 1, GL_RGB8, 1, 1);
@@ -730,7 +730,7 @@ void Renderer::create_default_textures()
 
 	glCreateTextures(GL_TEXTURE_2D, 1, &flat_normal_texture.gl_id);
 	glTextureStorage2D(flat_normal_texture.gl_id, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(flat_normal_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, normaldata);
+	glTextureSubImage2D(flat_normal_texture.gl_id, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, normaldata);
 	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glGenerateTextureMipmap(flat_normal_texture.gl_id);
@@ -799,6 +799,9 @@ void Renderer::init()
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
 	glNamedBufferStorage(buf.default_vb, 12 * 3, nullptr, 0);
+	glBindVertexArray(vao.default_);
+	glBindBuffer(GL_ARRAY_BUFFER, buf.default_vb);
+	glBindVertexArray(0);
 
 	on_level_start();
 
@@ -863,9 +866,9 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	create_and_delete_fb(fbo.forward_render);
 	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
 	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
-	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
+	//glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
 
-	unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, GL_COLOR_ATTACHMENT4 };
+	unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
 	glNamedFramebufferDrawBuffers(fbo.forward_render, 5, attachments);
 
 	// Editor selection
@@ -1015,7 +1018,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 
 	{
 		RenderPipelineState state;
-		state.vao = 0;
+		state.vao = get_empty_vao();
 		state.program = prog.bloom_downsample;
 		device.set_pipeline(state);
 
@@ -1048,7 +1051,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 
 	{
 		RenderPipelineState state;
-		state.vao = 0;
+		state.vao = get_empty_vao();
 		state.program = prog.bloom_upsample;
 		state.blend = blend_state::ADD;
 		device.set_pipeline(state);
@@ -2083,7 +2086,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		
 		// while waiting, can refresh static mesh data if needed
 		if (statics_meshes_are_dirty) {
-			printf("reset static mesh (editor: %d)\n", (int)build_for_editor);
+			//printf("reset static mesh (editor: %d)\n", (int)build_for_editor);
 			refresh_static_mesh_data(build_for_editor);
 			statics_meshes_are_dirty = false;
 			static_cache_built_for_debug = r_debug_mode.get_integer() != 0;
@@ -2423,7 +2426,7 @@ void Renderer::accumulate_gbuffer_lighting()
 	if(sun_internal)
 	{
 		RenderPipelineState state;
-		state.vao = 0;
+		state.vao = get_empty_vao();
 		state.program = prog.sunlight_accumulation;
 		state.blend = blend_state::ADD;
 		state.depth_testing = false;
@@ -2481,7 +2484,7 @@ void Renderer::accumulate_gbuffer_lighting()
 		auto& skylight = scene.skylights.front();
 
 		RenderPipelineState state;
-		state.vao = 0;
+		state.vao = get_empty_vao();
 		state.program = prog.ambient_accumulation;
 		state.blend = blend_state::ADD;
 		state.depth_testing = false;
@@ -2788,7 +2791,10 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 			glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		};
 
-		//somthing = g_imgs.install_system_texture("_TEST");
+		//auto somthing = Texture::install_system("_TEST");
+		//somthing->update_specs(cubemap->gl_id, CUBEMAP_SIZE, CUBEMAP_SIZE, 3, {});
+		//somthing->type = Texture_Type::TEXTYPE_2D;
+
 		//glCreateTextures(GL_TEXTURE_2D, 1, &somthing->gl_id);
 		//glTextureStorage2D(somthing->gl_id, 1, GL_RGB16F, 512, 512);
 		//set_default_parameters(somthing->gl_id);
@@ -3060,7 +3066,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		auto scope = device.start_render_pass(setup);
 		RenderPipelineState state;
 		state.program = prog.taa_resolve;
-		state.vao = 0;
+		state.vao = get_empty_vao();
 		device.set_pipeline(state);
 		shader().set_float("amt", r_taa_blend.get_float());
 		shader().set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
@@ -3108,7 +3114,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		{
 			RenderPipelineState state;
 			state.program = prog.combine;
-			state.vao = 0;
+			state.vao = get_empty_vao();
 			device.set_pipeline(state);
 
 			uint32_t bloom_tex = tex.bloom_chain[0];
@@ -3193,7 +3199,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		state.program = matman.get_mat_shader(false, nullptr, mat, false, false, false, false);
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = state.depth_writes = false;
-		state.vao = 0;
+		state.vao = get_empty_vao();
 		state.backface_culling = false;
 		device.set_pipeline(state);
 
@@ -3358,7 +3364,7 @@ void DebuggingTextureOutput::draw_out()
 	auto& device = draw.get_device();
 
 	RenderPipelineState state;
-	state.vao = 0;
+	state.vao = draw.get_empty_vao();
 	state.blend = blend_state::BLEND;
 
 	if (output_tex->type == Texture_Type::TEXTYPE_2D)

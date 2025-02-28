@@ -31,7 +31,7 @@
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 11;
+static const int MODEL_VERSION = 13;
 // int version XXX
 // 
 // mat4 root_transform
@@ -578,6 +578,45 @@ void append_a_found_mesh_node(
 			if (location == -1) continue;
 
 			attrib_mask |= (1 << location);
+
+		}
+
+		if (!is_collision_node && !(attrib_mask & (1<<CMA_TANGENT))) {
+			sys_print(Warning, "mesh not exported with tangents, computing them now(rexporting is better)\n");
+
+			if (!(attrib_mask & CMA_UV)) {
+				sys_print(Warning, "mesh not exported with uvs, fix this!\n");
+			}
+
+			for (int i = 0; i < index_count; i+=3) {
+				int full_index = i + index_start;
+				auto& v0 = mcd.verticies.at(vert_start+mcd.indicies.at(full_index));
+				auto& v1 = mcd.verticies.at(vert_start+mcd.indicies.at(full_index+1));
+				auto& v2 = mcd.verticies.at(vert_start+mcd.indicies.at(full_index+2));
+				glm::vec3 edge_1 = v1.position - v0.position;
+				glm::vec3 edge_2 = v2.position - v0.position;
+				glm::vec2 deltauv_1 = v1.uv - v0.uv;
+				glm::vec2 deltauv_2 = v2.uv - v0.uv;
+				float denom = (deltauv_1.x * deltauv_2.y - deltauv_2.x * deltauv_1.y);
+				
+				// compute something thats orthogonal just so the mesh has something
+				glm::vec3 output_tangent = glm::vec3(0.f);
+				if (glm::abs(glm::dot(v0.normal, glm::vec3(0, 1, 0))) < 0.9999) {
+					output_tangent = glm::normalize(glm::cross(v0.normal, glm::vec3(0, 1, 0)));
+				}
+				else {
+					output_tangent = glm::normalize(glm::cross(v0.normal, glm::vec3(1, 0, 0)));
+				}
+
+				if (glm::abs(denom) > 0.0000001f) {
+					float f = 1.0f / denom;
+					glm::vec3 tangent = f * (deltauv_2.y * edge_1 - deltauv_1.y * edge_2);
+					float len = glm::length(tangent);
+					if (len > 0.000001f)
+						output_tangent = tangent / len;
+				}
+				v0.tangent = v1.tangent = v2.tangent = output_tangent;
+			}
 
 		}
 
@@ -2766,7 +2805,6 @@ void add_bone_def_data_to_skeleton(const ModelDefData& def, SkeletonCompileData*
 bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDefData& def)
 {
 	cgltf_and_binary out = load_cgltf_data(def.model_source);
-
 	if (!out.data) {
 		sys_print(Error, "load_cgltf_data failed\n");
 		return false;

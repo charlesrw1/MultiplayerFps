@@ -521,6 +521,10 @@ public:
 		vertexarrayhandle default_{};
 	}vao;
 
+	vertexarrayhandle get_empty_vao() {
+		return vao.default_;
+	}
+
 	bufferhandle active_constants_ubo = 0;
 	
 	View_Setup vs;	// globally accessible view for passes

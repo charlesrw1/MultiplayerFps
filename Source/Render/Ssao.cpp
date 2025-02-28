@@ -296,6 +296,7 @@ void SSAO_System::render()
 		auto scope = device.start_render_pass(setup);
 
 		RenderPipelineState state;
+		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
 		state.program = prog.linearize_depth;
 		device.set_pipeline(state);
@@ -326,6 +327,7 @@ void SSAO_System::render()
 		auto scope = device.start_render_pass(setup);
 
 		RenderPipelineState state;
+		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
 		state.program = prog.make_viewspace_normals;
 		device.set_pipeline(state);
@@ -346,6 +348,7 @@ void SSAO_System::render()
 		auto scope = device.start_render_pass(setup);
 
 		RenderPipelineState state;
+		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
 		state.program = prog.hbao_deinterleave;
 		device.set_pipeline(state);
@@ -376,6 +379,7 @@ void SSAO_System::render()
 		auto scope = device.start_render_pass(setup);
 
 		RenderPipelineState state;
+		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
 		state.program = prog.hbao_calc;
 		device.set_pipeline(state);
@@ -400,6 +404,7 @@ void SSAO_System::render()
 		// reinterleave, writes to texture.result
 		{
 			RenderPipelineState state;
+			state.vao = draw.get_empty_vao();
 			state.depth_testing = state.depth_writes = false;
 			state.program = prog.hbao_reinterleave;
 			device.set_pipeline(state);
@@ -420,6 +425,7 @@ void SSAO_System::render()
 		if(r_ssao_blur.get_bool())
 		{
 			RenderPipelineState state;
+			state.vao = draw.get_empty_vao();
 			state.depth_testing = state.depth_writes = false;
 			state.program = prog.hbao_blur;
 			device.set_pipeline(state);

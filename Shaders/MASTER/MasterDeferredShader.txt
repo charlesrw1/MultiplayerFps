@@ -239,6 +239,7 @@ void main()
 		// World space normal
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
+
 		GBUFFER_OUT_Normal = Final_Normal;
 		
 		
@@ -282,7 +283,7 @@ void main()
 	uint B = (color_to_output >> 16) & 255;
 	uint A = (color_to_output >> 24) & 255;
 	
-	GBUFFER_OUT_EditorID = vec4(R/255.0,G/255.0,B/255.0,A/255.0);
+	GBUFFER_OUT_EditorID = vec4(float(R)/255.0,float(G)/255.0,float(B)/255.0,float(A)/255.0);
 #endif	// EDITOR_ID
 
 #endif	// DEPTH_ONLY
