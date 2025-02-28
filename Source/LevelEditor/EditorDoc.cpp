@@ -1366,7 +1366,7 @@ void ObjectOutliner::IteratorDraw::draw()
 
 int ObjectOutliner::determine_object_count() const
 {
-	return map.size();
+	return map.size() + 1 /*root node*/;
 }
 void ObjectOutliner::draw()
 {
