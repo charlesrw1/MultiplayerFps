@@ -2346,24 +2346,6 @@ void Renderer::accumulate_gbuffer_lighting()
 		state.blend = blend_state::ADD;
 		device.set_pipeline(state);
 
-		//*bind_vao(mods.get_vao(true/* animated */));
-
-		// bind the forward_render framebuffer
-		// outputs to the scene_color texture
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
-		//*glViewport(0, 0, vs.width, vs.height);
-
-		// disable depth writes
-		//*glDepthMask(GL_FALSE);
-
-		//*glEnable(GL_BLEND);	// enable additive blending
-		//*glBlendFunc(GL_ONE, GL_ONE);
-
-		//set_shader(prog.light_accumulation);
-
-		//*glDisable(GL_DEPTH_TEST);
-		//*glEnable(GL_CULL_FACE);
-		//*glCullFace(GL_FRONT);
 
 		bind_texture(0, tex.scene_gbuffer0);
 		bind_texture(1, tex.scene_gbuffer1);
@@ -2406,14 +2388,6 @@ void Renderer::accumulate_gbuffer_lighting()
 				sizeof(gpu::DrawElementsIndirectCommand)
 			);
 		}
-
-		// undo state changes
-		//glDepthMask(GL_TRUE);
-		//glDisable(GL_STENCIL_TEST);
-		//glEnable(GL_CULL_FACE);
-		//glEnable(GL_DEPTH_TEST);
-		//glCullFace(GL_BACK);
-		//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
 
@@ -2429,29 +2403,6 @@ void Renderer::accumulate_gbuffer_lighting()
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
-		// bind the forward_render framebuffer
-		// outputs to the scene_color texture
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
-		//*glViewport(0, 0, vs.width, vs.height);
-
-		// disable depth writes
-		//*glDepthMask(GL_FALSE);
-
-		// output solid color if debugging
-		//*if (debug_sun_shadow.get_bool()) {
-		//*	glDisable(GL_BLEND);
-		//*	set_shader(prog.sunlight_accumulation_debug);
-		//*}
-		//*else {
-		//*	glEnable(GL_BLEND);	// enable additive blending
-		//*	glBlendFunc(GL_ONE, GL_ONE);
-		//*	set_shader(prog.sunlight_accumulation);
-		//*}
-
-		//*glDisable(GL_DEPTH_TEST);
-
-		
-
 		bind_texture(0, tex.scene_gbuffer0);
 		bind_texture(1, tex.scene_gbuffer1);
 		bind_texture(2, tex.scene_gbuffer2);
@@ -2465,15 +2416,7 @@ void Renderer::accumulate_gbuffer_lighting()
 
 		
 		// fullscreen shader, no vao used
-		//glBindVertexArray(0);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-		//*glDepthMask(GL_TRUE);
-		//*glDisable(GL_STENCIL_TEST);
-		//*glEnable(GL_CULL_FACE);
-		//*glEnable(GL_DEPTH_TEST);
-		//*glCullFace(GL_BACK);
-		//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
 	if (!scene.skylights.empty() && !scene.skylights.front().skylight.wants_update) {
@@ -2487,25 +2430,6 @@ void Renderer::accumulate_gbuffer_lighting()
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
-		// bind the forward_render framebuffer
-		// outputs to the scene_color texture
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
-		//*glViewport(0, 0, vs.width, vs.height);
-
-		// disable depth writes
-		//*glDepthMask(GL_FALSE);
-
-	
-		//*if (!debug_specular_reflection.get_bool()) {
-		//*	glEnable(GL_BLEND);	// enable additive blending
-		//*	glBlendFunc(GL_ONE, GL_ONE);
-		//*}
-		//*else
-		//*	glDisable(GL_BLEND);
-
-		//*set_shader(prog.ambient_accumulation);
-
-		//*glDisable(GL_DEPTH_TEST);
 
 		bind_texture(0, tex.scene_gbuffer0);
 		bind_texture(1, tex.scene_gbuffer1);
@@ -2517,32 +2441,17 @@ void Renderer::accumulate_gbuffer_lighting()
 			shader().set_vec3(string_format("AmbientCube[%d]",i), skylight.ambientCube[i]);
 
 		// fullscreen shader, no vao used
-		//glBindVertexArray(vao.default_);
-		//// to prevent crashes??
-		//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-		//glBindVertexBuffer(0, buf.default_vb, 0, 0);
-		//glBindVertexBuffer(1, buf.default_vb, 0, 0);
-		//glBindVertexBuffer(2, buf.default_vb, 0, 0);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 
 		state.program = prog.reflection_accumulation;
 		device.set_pipeline(state);
 
-		//*set_shader(prog.reflection_accumulation);
 		bind_texture(4, skylight.skylight.generated_cube->gl_id);
 		bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
 
 		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
-		//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
-	//glDepthMask(GL_TRUE);
-	//glDisable(GL_STENCIL_TEST);
-	//glEnable(GL_CULL_FACE);
-	//glEnable(GL_DEPTH_TEST);
-	//glCullFace(GL_BACK);
 }
 
 ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
@@ -2606,11 +2515,6 @@ void Renderer::deferred_decal_pass()
 	RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
 
-	//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.gbuffer);		// bind gbuffer
-	//*glDepthMask(GL_FALSE);	// disable depth writes
-	//*glEnable(GL_CULL_FACE);
-	//*glCullFace(GL_BACK);	// cull the back face, keep front face
-	//*glDisable(GL_DEPTH_TEST);	// keep depth tests
 
 	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
 	// Copied code from execute_render_lists
@@ -2626,7 +2530,6 @@ void Renderer::deferred_decal_pass()
 
 	bind_texture(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
 
-	//bind_vao(mods.get_vao(true/* animated */));
 	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 
 	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
@@ -2645,8 +2548,6 @@ void Renderer::deferred_decal_pass()
 		state.program = program;
 		state.vao = vao;
 		device.set_pipeline(state);
-
-		//*set_shader(program);
 
 		glm::mat4 ModelTransform = obj.transform;
 		auto invTransform = glm::inverse(ModelTransform);
@@ -2669,9 +2570,6 @@ void Renderer::deferred_decal_pass()
 			sizeof(gpu::DrawElementsIndirectCommand)
 		);
 	}
-
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//glEnable(GL_DEPTH_TEST);
 }
 void Renderer::sync_update()
 {
@@ -3217,7 +3115,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 }
 
 
-void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front)
+static void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front)
 {
 	vec3 up = vec3(0, -1, 0);
 	switch (idx)
@@ -3244,51 +3142,6 @@ void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front)
 		break;
 	}
 	view = glm::lookAt(pos, pos+front, up);
-}
-
-void Renderer::render_world_cubemap(vec3 probe_pos, uint32_t fbo, uint32_t texture, int size)
-{
-	glCheckError();
-	auto& helper = EnviornmentMapHelper::get();
-
-	RenderPassSetup setup("cubemap-view", fbo, true, true, 0, 0, size, size);
-	auto scope = device.start_render_pass(setup);
-
-	for (int i = 0; i < 6; i++) {
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		//*glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture, 0, i);
-		glNamedFramebufferTextureLayer(fbo, GL_COLOR_ATTACHMENT0, texture, 0, i);
-		device.clear_framebuffer(true, true, 0.f /* depth value of 0.f*/);
-
-		View_Setup cubemap_view;
-		get_view_mat(i, probe_pos, cubemap_view.view, cubemap_view.front);
-		
-		cubemap_view.origin = probe_pos;
-		cubemap_view.width = size;
-		cubemap_view.height = size;
-		cubemap_view.far = 100.f;
-		cubemap_view.near = 0.1f;
-		cubemap_view.proj = helper.cubemap_projection;
-		cubemap_view.viewproj = cubemap_view.proj * cubemap_view.view;
-
-		//glCheckError();
-
-		Render_Level_Params params(
-			cubemap_view,
-			&scene.gbuffer_rlist,
-			&scene.gbuffer_pass,
-			Render_Level_Params::OPAQUE
-			);
-	
-		params.provied_constant_buffer = 0;
-	
-		params.upload_constants = true;
-		params.is_probe_render = true;
-
-		render_level_to_target(params);
-		//glCheckError();
-
-	}
 }
 
 
