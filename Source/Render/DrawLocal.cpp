@@ -61,24 +61,30 @@ ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "12000000", CVAR
 
 ConfigVar r_taa_enabled("r.taa", "1", CVAR_BOOL,"enable temporal anti aliasing");
 
-
+static const int MAX_TAA_SAMPLES = 16;
+ConfigVar r_taa_samples("r.taa_samples", "4", CVAR_INTEGER, "", 2, MAX_TAA_SAMPLES);
+ConfigVar r_taa_32f("r.taa_32f", "1", CVAR_BOOL, "use 32 bit scene motion buffer instead of 16 bit");
 
 class TaaManager
 {
 public:
-	static const int SAMPLES = 8;
+
 	TaaManager() {
-		generateHaltonSequence(SAMPLES, jitters);
+		generateHaltonSequence(MAX_TAA_SAMPLES, jitters);
 	}
 	
 
 	void start_frame() {
-		index = (index + 1) % SAMPLES;
+		index = (index + 1) % r_taa_samples.get_integer();
+	}
+	glm::vec2 get_last_frame_jitter(int w, int h) const {
+		int previndex = index - 1;
+		if (previndex < 0) 
+			previndex = r_taa_samples.get_integer() - 1;
+		return calc_jitter(previndex, w, h);
 	}
 	glm::vec2 calc_frame_jitter(int width, int height) const {
-		auto jit = jitters[index];	// [0,1]
-		jit = jit - glm::vec2(0.5);	//[-1/2,1/2]
-		return glm::vec2(jit.x / width, jit.y / height);
+		return calc_jitter(index, width, height);
 	}
 	glm::mat4 add_jitter_to_projection(const glm::mat4& inproj, glm::vec2 jitter) const {
 		glm::mat4 matrix = inproj;
@@ -89,6 +95,12 @@ public:
 	}
 
 private:
+	glm::vec2 calc_jitter(int the_index, int width, int height) const {
+		auto jit = jitters[the_index];	// [0,1]
+		jit = jit - glm::vec2(0.5);	//[-1/2,1/2]
+		return glm::vec2(jit.x / width, jit.y / height);
+	}
+
 	static float radicalInverse(int base, int index) {
 		float result = 0.0;
 		float fraction = 1.0 / base;
@@ -110,7 +122,7 @@ private:
 		}
 	}
 
-	glm::vec2 jitters[SAMPLES];
+	glm::vec2 jitters[MAX_TAA_SAMPLES];
 	int index = 0;
 };
 static TaaManager r_taa_manager;
@@ -511,6 +523,7 @@ void Renderer::create_shaders()
 	prog.combine = prog_man.create_raster("fullscreenquad.txt", "CombineF.txt");
 	prog.taa_resolve = prog_man.create_raster("fullscreenquad.txt", "TaaResolveF.txt");
 
+
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
@@ -543,6 +556,7 @@ void Renderer::reload_shaders()
 
 }
 
+ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER,"", 0, 4);
 
 void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane, bool wireframe_secondpass)
 {
@@ -555,7 +569,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.viewpos_time = glm::vec4(vs.origin, TimeSinceStart());
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
-
+	constants.prev_viewproj = lastframe_vs.viewproj;
 	constants.near = vs.near;
 	constants.far = vs.far;
 	constants.shadowmap_epsilon = shadowmap.tweak.epsilon;
@@ -570,7 +584,20 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 
 	constants.forcecubemap = -1.0;
 
-	constants.custom_clip_plane = custom_clip_plane;
+	auto cur_jit = r_taa_manager.calc_frame_jitter(cur_w, cur_h);
+	auto prev_jit = r_taa_manager.get_last_frame_jitter(cur_w, cur_h);
+	if (r_taa_jitter_test.get_integer() == 1) {
+		cur_jit *= -1;
+	}
+	else if (r_taa_jitter_test.get_integer() == 2) {
+		cur_jit *= -1;
+		prev_jit *= -1;
+	}
+	else if (r_taa_jitter_test.get_integer() == 3) {
+		prev_jit *= -1;
+	}
+
+	constants.current_and_prev_jitter = glm::vec4(cur_jit.x, cur_jit.y, prev_jit.x, prev_jit.y);
 
 	constants.debug_options = r_debug_mode.get_integer();
 
@@ -739,6 +766,7 @@ void Renderer::create_default_textures()
 	tex.editorid_vts_handle = Texture::install_system("_editorid");
 	tex.editorSel_vts_handle = Texture::install_system("_editorSelDepth");
 	tex.postProcessInput_vts_handle = Texture::install_system("_PostProcessInput");
+	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
 }
 
 
@@ -795,8 +823,11 @@ void Renderer::init()
 }
 
 
+
 void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 {
+	refresh_render_targets_next_frame = false;
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	auto set_default_parameters = [](uint32_t handle) {
@@ -870,6 +901,19 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
 	set_default_parameters(tex.scene_gbuffer2);
 
+
+	// 16 bit has noticbly worse blurring for taa
+	const GLenum scene_motion_format = (r_taa_32f.get_bool()) ? GL_RG32F : GL_RG16F;
+
+	create_and_delete_texture(tex.scene_motion);
+	glTextureStorage2D(tex.scene_motion, 1, scene_motion_format, s_w, s_h);
+	set_default_parameters(tex.scene_motion);
+
+	create_and_delete_texture(tex.last_scene_motion);
+	glTextureStorage2D(tex.last_scene_motion, 1, scene_motion_format, s_w, s_h);
+	set_default_parameters(tex.last_scene_motion);
+
+
 	// Create Gbuffer
 	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives
 	create_and_delete_fb(fbo.gbuffer);
@@ -879,14 +923,16 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2, 0);
 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion, 0);
 
-	const uint32_t gbuffer_attach_count = 5;
+	const uint32_t gbuffer_attach_count = 6;
 	unsigned int gbuffer_attachments[gbuffer_attach_count] = { 
 		GL_COLOR_ATTACHMENT0,
 		GL_COLOR_ATTACHMENT1,
 		GL_COLOR_ATTACHMENT2,
 		GL_COLOR_ATTACHMENT3,
 		GL_COLOR_ATTACHMENT4,
+		GL_COLOR_ATTACHMENT5,
 	};
 	glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
 
@@ -917,6 +963,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	tex.gbuffer2_vts_handle->update_specs(tex.scene_gbuffer2, s_w, s_h, 3, {});
 	tex.editorid_vts_handle->update_specs(tex.editor_id_buffer, s_w, s_h, 4, {});
 	tex.editorSel_vts_handle->update_specs(tex.editor_selection_depth_buffer, s_w, s_h, 4, {});
+	tex.scene_motion_vts_handle->update_specs(tex.scene_motion, s_w, s_h, 2, {});
 
 	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
@@ -1943,7 +1990,8 @@ void set_gpu_objects_data_job(uintptr_t p)
 		auto& proxy = obj.type_.proxy;
 		gpu_objects[i].anim_mat_offset = obj.type_.proxy.animator_bone_ofs;
 		gpu_objects[i].model = proxy.transform;
-		gpu_objects[i].invmodel = obj.type_.inv_transform;
+		gpu_objects[i].prev_model = obj.type_.prev_transform;
+		gpu_objects[i].flags = 0;
 	}
 }
 
@@ -1994,6 +2042,7 @@ void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
 		auto& proxy = obj.type_.proxy;
+		obj.type_.is_static = false;	// FIXME
 		if (!obj.type_.is_static || proxy.is_skybox)
 			continue;
 		handle<Render_Object> objhandle{ obj.handle };
@@ -2046,6 +2095,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		statics_meshes_are_dirty = true;
 	if(static_cache_built_for_debug!=(r_debug_mode.get_integer() != 0))
 		statics_meshes_are_dirty = true;
+
+
 
 	// clear objects
 	gbuffer_pass.clear();
@@ -2103,6 +2154,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	ASSERT(gpu_objects);
 	jobs::Counter* gpu_obj_set_cntr{};
 	jobs::add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
+
 	{
 		ZoneScopedN("Traversal");
 		{
@@ -2181,7 +2233,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 
 	}
-
 	{
 		ZoneScopedN("MakeBatchesAndUploadGpuData");
 
@@ -2192,13 +2243,11 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		transparent_pass.make_batches(*this);
 		editor_sel_pass.make_batches(*this);
 
-
 		jobs::wait_and_free_counter(gpu_obj_set_cntr);
 		{
 			ZoneScopedN("UploadGpuData");
 			glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
 		}
-
 
 		jobs::wait_and_free_counter(c);
 	}
@@ -2726,6 +2775,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	r_taa_manager.start_frame();
+	if (r_taa_32f.was_changed()) {
+		refresh_render_targets_next_frame = true;
+	}
 
 	check_cubemaps_dirty();
 
@@ -2737,12 +2789,19 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	}
 
 	scene_draw_internal(params, view, gui);
+	lastframe_vs = view;
 
 	// swap last frame and current frame, fixme
 	if (r_taa_enabled.get_bool()) {
 		std::swap(tex.last_scene_color, tex.scene_color);
+		std::swap(tex.last_scene_motion, tex.scene_motion);
+
+		tex.scene_color_vts_handle->update_specs(tex.scene_color, cur_w, cur_h, 3, {});
+		tex.scene_motion_vts_handle->update_specs(tex.scene_motion, cur_w, cur_h, 2, {});
+
 		glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
 		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
+		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion, 0);
 	}
 }
 
@@ -2839,7 +2898,23 @@ void Renderer::check_cubemaps_dirty()
 }
 ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post processing");
 ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
-ConfigVar r_taa_blend("r.taa_blend", "0.9", CVAR_FLOAT, "", 0, 1.0);
+ConfigVar r_taa_blend("r.taa_blend", "0.75", CVAR_FLOAT, "", 0, 1.0);
+ConfigVar r_taa_flicker_remove("r.taa_flicker_remove", "1", CVAR_BOOL, "");
+ConfigVar r_taa_reproject("r.taa_reproject", "0", CVAR_BOOL, "");
+ConfigVar r_taa_dilate_velocity("r.taa_dilate_velocity", "1", CVAR_BOOL, "");
+static float taa_doc_mult = 80.0;
+static float taa_doc_vel_bias = 0.001;
+static float taa_doc_bias = 0.2;
+static float taa_doc_pow = 0.15;
+void taa_menu()
+{
+	ImGui::DragFloat("taa_doc_mult", &taa_doc_mult, 0.1, 1, 100);
+	ImGui::DragFloat("taa_doc_vel_bias", &taa_doc_vel_bias, 0.001, 0.0001, 0.01);
+	ImGui::DragFloat("taa_doc_bias", &taa_doc_bias, 0.01, 0.001, 0.2);
+	ImGui::DragFloat("taa_doc_pow", &taa_doc_pow, 0.01, 0, 1);
+}
+ADD_TO_DEBUG_MENU(taa_menu);
+
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
 {
 	TracyGpuZone("scene_draw_internal");
@@ -2856,9 +2931,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		return;
 	}
 
-	if (cur_w != view.width || cur_h != view.height)
+	if (refresh_render_targets_next_frame || cur_w != view.width || cur_h != view.height)
 		InitFramebuffers(true, view.width, view.height);
-	lastframe_vs = current_frame_main_view;
 
 	current_frame_main_view = view;
 
@@ -3022,6 +3096,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		if (!r_taa_enabled.get_bool()) {
 			return tex.scene_color;
 		}
+
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+
 		// write to tex.scene_gbuffer0
 		RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
 		auto scope = device.start_render_pass(setup);
@@ -3030,8 +3107,20 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		state.vao = 0;
 		device.set_pipeline(state);
 		shader().set_float("amt", r_taa_blend.get_float());
+		shader().set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
+		shader().set_mat4("lastViewProj", lastframe_vs.viewproj);
+		shader().set_bool("use_reproject", r_taa_reproject.get_bool());
+		shader().set_float("doc_mult", taa_doc_mult);
+		shader().set_float("doc_vel_bias", taa_doc_vel_bias);
+		shader().set_float("doc_bias", taa_doc_bias);
+		shader().set_float("doc_pow", taa_doc_pow);
+		shader().set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+
 		bind_texture(0, tex.scene_color);
 		bind_texture(1, tex.last_scene_color);
+		bind_texture(2, tex.scene_depth);
+		bind_texture(3, tex.scene_motion);
+		bind_texture(4, tex.last_scene_motion);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
@@ -3098,8 +3187,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		//	device.reset_states();
 		//}
 		//
+		
 		debug_tex_out.draw_out();
-
 	}
 	if (params.output_to_screen) {
 		GPUSCOPESTART(Blit_composite_to_backbuffer);
@@ -3115,6 +3204,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	}
 
 	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
+
+
 }
 
 
@@ -3275,9 +3366,14 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 	statics_meshes_are_dirty = true;
 	if (proxy.is_skybox)
 		in.is_static = false;
+	in.prev_transform = in.proxy.transform;
 	in.proxy = proxy;
-	if (!proxy.viewmodel_layer) 
-		in.inv_transform = glm::inverse(proxy.transform);
+	if (!in.has_init) {
+		in.has_init = true;
+		in.prev_transform = in.proxy.transform;
+	}
+
+
 	if (proxy.model) {
 		auto sphere = proxy.model->get_bounding_sphere();
 		auto center = proxy.transform * glm::vec4(glm::vec3(sphere),1.f);

@@ -44,6 +44,7 @@ out vec3 FS_IN_Normal;
 out vec2 FS_IN_Texcoord;
 out vec3 FS_IN_BoneColor;
 out vec4 FS_IN_NDC;
+out vec4 FS_IN_PrevNDC;// for motion vectors
 
 out mat3 FS_IN_TBN;
 
@@ -57,7 +58,6 @@ uniform int indirect_material_offset = 0;
 // standard vertex shader outputs
 vec3 WORLD_POSITION_OFFSET = vec3(0.0);
 mat4 ObjModelMatrix;
-mat4 ObjInvModelMatrix;
 
 // ********** START USER CODE **********
 ___USER_VS_CODE___
@@ -70,8 +70,7 @@ void main()
 	FS_IN_Objid = obj_index;
 
 	ObjModelMatrix = g_objects[obj_index].model;
-	ObjInvModelMatrix = g_objects[obj_index].invmodel;
-
+	
 	vec3 local_pos = vec3(0.0);
 	vec3 local_normal = vec3(0.0);
 	vec3 local_tangent = vec3(0.0);
@@ -114,9 +113,17 @@ void main()
 	
 	FS_IN_FragPos = FS_IN_FragPos + WORLD_POSITION_OFFSET;
 	
-    FS_IN_Normal = mat3(transpose(ObjInvModelMatrix))*normalize(local_normal);
+	mat3 normal_matrix;
+	if(bool(g_objects[obj_index].flags & INSTANCE_NON_UNIFORM_SCALE)) {
+		normal_matrix = transpose(inverse(mat3(ObjModelMatrix)));
+	}
+	else {
+		normal_matrix = mat3(ObjModelMatrix);
+	}
 	
-	vec3 world_tangent = mat3(transpose(ObjInvModelMatrix))*normalize(local_tangent);
+    FS_IN_Normal = normal_matrix*normalize(local_normal);
+	vec3 world_tangent = normal_matrix*normalize(local_tangent);
+
 	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
 	FS_IN_TBN = mat3(
 	normalize(local_tangent  ), 
@@ -124,6 +131,13 @@ void main()
 	normalize(FS_IN_Normal   ));
     
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
+	
+	{
+		// calc last position for motion vectors
+		vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(local_pos,1.0);
+		// + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
+		FS_IN_PrevNDC = g.prev_viewproj * vec4(lastfrag_pos.xyz,1.0);
+	}
 
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
@@ -140,6 +154,7 @@ void main()
 	layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
 	layout (location = 2) out vec4 GBUFFER_OUT_M_R_Custom_Matid;
 	layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
+	layout (location=5) out vec2 GBUFFER_OUT_MotionVector;
 #endif
 
 #ifdef EDITOR_ID
@@ -153,6 +168,8 @@ in vec3 FS_IN_Normal;
 in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_BoneColor;
 in vec4 FS_IN_NDC;
+in vec4 FS_IN_PrevNDC;
+
 
 
 in mat3 FS_IN_TBN;
@@ -198,6 +215,19 @@ void main()
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
 		GBUFFER_OUT_Normal = Final_Normal;
+		
+		
+		// Motion vectors
+		{
+			vec2 prev_position = FS_IN_PrevNDC.xy / FS_IN_PrevNDC.w;
+			vec2 cur_position = FS_IN_NDC.xy / FS_IN_NDC.w;
+			vec2 ss_velocity = (prev_position-cur_position)*0.5 + vec2(0.5);
+			ss_velocity -= g.current_and_prev_jitter.xy;// current
+			ss_velocity += g.current_and_prev_jitter.zw;// prev
+			
+			GBUFFER_OUT_MotionVector = ss_velocity;
+		}
+		
 	
 	#endif // FORWARD_SHADER
 

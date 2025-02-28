@@ -679,6 +679,54 @@ DECLARE_ENGINE_CMD(toggle)
 		return;
 	}
 	var->set_bool(!var->get_bool());
+	sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
+}
+
+static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
+{
+	int cur = var->get_integer();
+	int max = std::round(var->get_max_val());
+	int min = std::round(var->get_min_val());
+	int span = max - min;
+	int cur_start_min = cur - min;
+	int next_start_min = (cur_start_min + 1) % span;
+	if (decrement) {
+		next_start_min = cur_start_min - 1;
+		if (next_start_min < 0)
+			next_start_min = span - 1;
+	}
+	int next = next_start_min + min;
+	var->set_integer(next);
+	sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
+}
+
+DECLARE_ENGINE_CMD(inc)
+{
+	if (args.size() != 2) {
+		sys_print(Warning, "usage: inc <int cvar>");
+		return;
+	}
+	auto var = VarMan::get()->find(args.at(1));
+	if (!var || !(var->get_var_flags() & CVAR_INTEGER))
+	{
+		sys_print(Warning, "usage: inc <int cvar>");
+		return;
+	}
+	inc_or_dec_int_var(var, false);
+}
+DECLARE_ENGINE_CMD(dec)
+{
+	if (args.size() != 2) {
+		sys_print(Warning, "usage: dec <int cvar>");
+		return;
+	}
+	auto var = VarMan::get()->find(args.at(1));
+	if (!var || !(var->get_var_flags() & CVAR_INTEGER))
+	{
+		sys_print(Warning, "usage: dec <int cvar>");
+		return;
+	}
+	inc_or_dec_int_var(var, true);
 }
 
 
@@ -1883,9 +1931,6 @@ void GameEngineLocal::loop()
 		}
 		idraw->scene_draw(drawparamsNext, setupNext, nullptr);
 		jobs::wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
-		{
-			CPUSCOPESTART(GameTaskWait);
-		}
 
 		shouldDrawNext = out.drawOut;
 		drawparamsNext = out.paramsOut;

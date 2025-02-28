@@ -50,6 +50,17 @@ bind "Keypad 6" Ctrl "FILTER_FOR DataClass"
 bind "Keypad 7" Ctrl "FILTER_FOR AnimationSeq"
 bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
 
+bind J "toggle r.taa"
+bind K "toggle r.taa_flicker_remove"
+bind L "toggle r.taa_dilate_velocity"
+bind I "toggle r.taa_32f"
+
+bind O "inc r.taa_jitter_test"
+bind P "dec r.taa_jitter_test"
+
+#otex 0.5 1 1 _scene_motion
+
+
 bind "Left" Alt "EDITOR_BACK_ONE_PAGE"
 bind "Right" Alt "EDITOR_FORWARD_ONE_PAGE"
 

@@ -42,6 +42,15 @@ public:
 	const char* get_string() const { return ptr->value; }
 	int get_var_flags() const { return ptr->flags; }
 	const char* get_name() const { return ptr->name; }
+	float get_max_val() const {
+		return ptr->maxVal;
+	}
+	float get_min_val() const {
+		return ptr->minVal;
+	}
+	const char* get_desc() const {
+		return ptr->description;
+	}
 
 	// this resets the flag too
 	bool was_changed() {

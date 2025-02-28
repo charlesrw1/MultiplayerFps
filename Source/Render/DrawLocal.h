@@ -457,12 +457,15 @@ public:
 	struct textures {
 		texhandle scene_color{};
 		texhandle last_scene_color{};
-
 		texhandle scene_depth{};
 
 		texhandle scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16
 		texhandle scene_gbuffer1{};
 		texhandle scene_gbuffer2{};
+
+		texhandle scene_motion{};
+		texhandle last_scene_motion{};
+
 
 		// ----------------------------------------------------------------------------------
 		// | gbuffer		|		X		|		Y		|		Z		|		A		|
@@ -503,6 +506,7 @@ public:
 		Texture* editorid_vts_handle = nullptr;
 		Texture* editorSel_vts_handle = nullptr;
 		Texture* postProcessInput_vts_handle = nullptr;
+		Texture* scene_motion_vts_handle = nullptr;
 	}tex;
 
 	struct uniform_buffers {
@@ -584,6 +588,8 @@ private:
 
 	// current world time for shaders/fx fed in by SceneParamsEx on draw_scene()
 	float current_time = 0.0;
+
+	bool refresh_render_targets_next_frame = false;
 };
 
 extern Renderer draw;

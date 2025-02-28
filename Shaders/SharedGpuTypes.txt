@@ -10,10 +10,10 @@ namespace gpu {
 struct Object_Instance
 {
 	mat4 model;
-	mat4 invmodel;
+	mat4 prev_model;
 	vec4 colorval;
-	uint anim_mat_offset;
-	uint opposite_dither;
+	uint anim_mat_offset;	// offset into anim matricies
+	uint flags;	// INSTANCE_x
 	uint colorval2;
 	float obj3;
 };
@@ -41,6 +41,8 @@ const uint DEBUG_SPECULAR = 7;
 const uint DEBUG_OBJID = 8;
 const uint DEBUG_LIGHTING_ONLY = 9;
 
+const uint INSTANCE_NON_UNIFORM_SCALE = 1;
+
 
 
 struct Ubo_View_Constants_Struct
@@ -53,6 +55,7 @@ struct Ubo_View_Constants_Struct
 	vec4 viewpos_time;
 	vec4 viewfront;
 	vec4 viewport_size;
+	mat4 prev_viewproj;
 
 	float near;
 	float far;
@@ -75,7 +78,7 @@ struct Ubo_View_Constants_Struct
 	uint padding2;
 	uint padding3;
 	
-	vec4 custom_clip_plane;
+	vec4 current_and_prev_jitter;
 };
 
 struct DispatchIndirectCommand 

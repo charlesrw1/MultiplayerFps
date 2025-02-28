@@ -22,6 +22,7 @@ public:
 		minVal = data.minVal;
 		maxVal = data.maxVal;
 		flags |= data.flags;
+		description = data.description;
 
 		update();
 	}
@@ -32,6 +33,9 @@ public:
 		minVal = data.minVal;
 		maxVal = data.maxVal;
 		flags |= data.flags;
+		description = data.description;
+
+
 		update();
 	}
 
@@ -318,7 +322,7 @@ public:
 		sys_print(Info, ">");
 		for (auto m : matches) {
 			if(m.desc)
-				sys_print(Info, ". %s : %s\n", m.name,m.desc);
+				sys_print(Info, ". %-24s: %s\n", m.name,m.desc);
 			else
 				sys_print(Info, ". %s\n", m.name);
 		}

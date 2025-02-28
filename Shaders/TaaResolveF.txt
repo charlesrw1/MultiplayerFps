@@ -1,14 +1,174 @@
 in vec2 texCoord;
 out vec3 FS_OUT_Color;
 uniform float amt;
+#include "SharedGpuTypes.txt"
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
 
 layout(binding=0) uniform sampler2D sceneColor;
 layout(binding=1) uniform sampler2D lastColor;
+layout(binding=2) uniform sampler2D sceneDepth;
+layout(binding=3) uniform sampler2D sceneMotion;
+layout(binding=4) uniform sampler2D lastSceneMotion;
+
+uniform mat4 lastViewProj;
+uniform vec2 current_jitter;
+uniform vec2 last_jitter;
+
+vec2 reproject_to_last(vec2 uv)
+{
+	float depth = textureLod(sceneDepth,uv,0.0).r;
+	uv = uv*2.0 - vec2(1.0);
+	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
+	worldspace /= worldspace.w;
+	vec4 lastClipspace = lastViewProj * vec4(worldspace.xyz,1.0);
+	lastClipspace /= lastClipspace.w;
+	
+	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
+	return reproject_uv;
+}
+
+vec4 sampleLevel0( sampler2D tex, vec2 uv )
+{
+    return textureLod( tex, uv, 0.0);
+}
+
+//note: refitting weights to a +
+//      (from https://advances.realtimerendering.com/s2016/Filmic%20SMAA%20v7.pptx , p 92 )
+vec4 SampleTextureCatmullRom5( sampler2D tex, vec2 uv )
+{
+    vec2 texsiz = vec2(textureSize( tex, 0 ).xy);
+    vec4 rtMetrics = vec4( 1.0 / texsiz.xy, texsiz.xy );
+    
+    vec2 position = rtMetrics.zw * uv;
+    vec2 centerPosition = floor(position - 0.5) + 0.5;
+    vec2 f = position - centerPosition;
+    vec2 f2 = f * f;
+    vec2 f3 = f * f2;
+
+
+    const float c = 0.5; //note: [0;1] ( SMAA_FILMIC_REPROJECTION_SHARPNESS / 100.0 )
+    vec2 w0 =        -c  * f3 +  2.0 * c         * f2 - c * f;
+    vec2 w1 =  (2.0 - c) * f3 - (3.0 - c)        * f2         + 1.0;
+    vec2 w2 = -(2.0 - c) * f3 + (3.0 -  2.0 * c) * f2 + c * f;
+    vec2 w3 =         c  * f3 -                c * f2;
+
+    vec2 w12 = w1 + w2;
+    vec2 tc12 = rtMetrics.xy * (centerPosition + w2 / w12);
+    vec3 centerColor = sampleLevel0(tex, vec2(tc12.x, tc12.y)).rgb;
+
+    vec2 tc0 = rtMetrics.xy * (centerPosition - 1.0);
+    vec2 tc3 = rtMetrics.xy * (centerPosition + 2.0);
+    vec4 color = vec4(sampleLevel0(tex, vec2(tc12.x, tc0.y )).rgb, 1.0) * (w12.x * w0.y ) +
+                 vec4(sampleLevel0(tex, vec2(tc0.x,  tc12.y)).rgb, 1.0) * (w0.x  * w12.y) +
+                 vec4(centerColor,                                 1.0) * (w12.x * w12.y) +
+                 vec4(sampleLevel0(tex, vec2(tc3.x,  tc12.y)).rgb, 1.0) * (w3.x  * w12.y) +
+                 vec4(sampleLevel0(tex, vec2(tc12.x, tc3.y )).rgb, 1.0) * (w12.x * w3.y );
+    return vec4( color.rgb / color.a, 1.0 );
+}
+
+vec4 AdjustHDRColor(vec3 color)
+{
+    {
+        float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+        float luminanceWeight = 1.0 / (1.0 + luminance);
+        return vec4(color*luminanceWeight, luminanceWeight);
+    }
+}
+uniform bool remove_flicker=true;
+uniform bool use_reproject = false;
+
+uniform float doc_mult =  10.0;
+uniform float doc_vel_bias = 0.001;
+uniform float doc_bias = 0.01;
+uniform float doc_pow = 0.4;
+
+uniform bool dilate_velocity = false;
+
+vec2 GetVelocity(vec2 uv)
+{
+	float closestDepth = 100.0;
+	vec2 closestUVOffset = vec2(0.0);
+	for(int j = -1; j <= 1; ++j)
+	{
+		for(int i = -1; i <= 1; ++i)
+		{
+			 vec2 uvOffset = vec2(i, j) / g.viewport_size.xy;
+			 float neighborDepth = texture(sceneDepth,uv+uvOffset).r;
+			 if(neighborDepth < closestDepth)
+			 {
+				 closestUVOffset = uvOffset;
+				 closestDepth = neighborDepth;
+			 }
+		}
+	}
+	return texture(sceneMotion, uv+closestUVOffset).rg;
+}
 
 void main()
 {
-	vec3 current = texture(sceneColor,texCoord).rgb;
-	vec3 last = texture(lastColor,texCoord).rgb;
+	vec2 invsize = 1.0 / g.viewport_size.xy;
+	vec2 input_uv = vec2(gl_FragCoord.xy) * invsize;
+	vec3 current = texture(sceneColor,input_uv).rgb;
+	
+	vec2 velocity_uv = texture(sceneMotion,input_uv).rg;
+	//if(dilate_velocity)
+	//	velocity_uv = GetVelocity(input_uv);
+	
+	if(length(velocity_uv)<0.00001)
+		velocity_uv=vec2(0.5);
+	
+	//velocity_uv = vec2(0.5);
+	vec2 ndc_input = input_uv*2.0-vec2(1.0);
+	vec2 velocity_uv_ndc = velocity_uv*2.0-vec2(1.0);
+	ndc_input += velocity_uv_ndc;
+	vec2 uv_to_use = ndc_input * 0.5 + 0.5;
+	//uv_to_use = reproject_to_last(input_uv);
+	uv_to_use = clamp(uv_to_use,vec2(0.0),vec2(1.0));
+	
+	vec2 actual_uv = reproject_to_last(input_uv);
+	//uv_to_use = actual_uv;
+	if(use_reproject)
+		uv_to_use = actual_uv;
+	
+	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
+	vec3 last = textureLod(lastColor,uv_to_use,0).rgb;// looks better than the cubic filter...
+	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
+	float vel_len = length(lastVelocityUv-velocity_uv);
+	float velocityDisocclusion = clamp(pow((vel_len-doc_vel_bias)*doc_mult-doc_bias,doc_pow),0.0,1.0);
+	
 
-	FS_OUT_Color = current * (1-amt) + last * amt;
+	// color clamping
+	vec3 minColor=vec3(9999);
+	vec3 maxColor = vec3(-9999);
+	for(int x = -1;x<=1;x++) {
+		for(int y=-1;y<=1;y++) {
+			vec3 color = texture(sceneColor,input_uv+vec2(x,y)*invsize).rgb;
+			minColor = min(minColor,color);
+			maxColor = max(maxColor,color);
+		}
+	}
+	
+	// luminance weighting to get rid of flickering, subtle effect
+	if(remove_flicker) {
+		vec4 prevAdjust = AdjustHDRColor(last);
+		vec3 prev_clamped = AdjustHDRColor(clamp(last,minColor,maxColor)).rgb;
+		vec4 currentAdjust = AdjustHDRColor(current);
+		vec3 outputColor = (prev_clamped.rgb*amt + currentAdjust.rgb*(1-amt));
+		outputColor /= (prevAdjust.a*amt+currentAdjust.a*(1-amt));
+		FS_OUT_Color = outputColor;// current * (1-amt) + prev_clamped * amt;
+	}
+	else {
+		vec3 clamped = clamp(last,minColor,maxColor);
+		FS_OUT_Color = current * (1-amt) + clamped*amt;
+	}
+	FS_OUT_Color = mix(FS_OUT_Color,current,velocityDisocclusion);
+	//FS_OUT_Color = vec3(length(velocity_uv_ndc.xy));
+	//vec3 prev_clamped = clamp(prevColorAdjust.rgb,minColorAdjust.rgb,maxColorAdjust.rgb);
+	//float currentWeight = (1-amt)*currentColorAdjust.a;
+	//float prevWeight = (amt)*currentColorAdjust.a;
+	//vec3 outputColor = (currentColorAdjust.rgb*currentWeight+prevColorAdjust.rgb*prevWeight);
+	//outputColor /= (currentWeight+prevWeight);
+	//FS_OUT_Color = vec3(abs(actual_uv-uv_to_use)*10.0,0.0);
 }

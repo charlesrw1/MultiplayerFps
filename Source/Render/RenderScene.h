@@ -154,9 +154,10 @@ public:
 struct ROP_Internal
 {
 	Render_Object proxy;
-	bool is_static = true;
-	glm::mat4 inv_transform;
+	glm::mat4 prev_transform{};
 	glm::vec4 bounding_sphere_and_radius;
+	bool is_static = true;
+	bool has_init = false;
 };
 
 // RenderLight internal data

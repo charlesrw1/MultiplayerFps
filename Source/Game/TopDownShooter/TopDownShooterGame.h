@@ -343,7 +343,7 @@ public:
 	void update() final {
 		//return;
 		if (eng->get_game_time() >= last_spawn + spawn_interval) {
-			for (int i = 0; i < 20; i++) {
+			for (int i = 0; i < 1; i++) {
 				Entity* e = nullptr;
 				auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
 				e->set_ws_position(get_ws_position() +glm::vec3(i%5,0,i/5));
