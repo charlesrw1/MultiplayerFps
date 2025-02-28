@@ -81,6 +81,8 @@
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
+    <ClInclude Include="Source\Render\UIDrawPublic.h" />
+    <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />

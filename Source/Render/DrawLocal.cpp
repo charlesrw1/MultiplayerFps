@@ -2249,14 +2249,12 @@ static glm::vec4 color32_to_vec4(Color32 color)
 
 void Renderer::draw_meshbuilders()
 {
-	return;
-
 	auto& mbFL = scene.meshbuilder_objs;
 	auto& mbObjs = scene.meshbuilder_objs.objects;
-	//glEnable(GL_DEPTH_TEST);
 	for (auto& mbPair : mbObjs)
 	{
 		auto& mb = mbPair.type_.obj;
+		auto& dd = mbPair.type_.dd;
 		if (mb.use_background_color) {
 			RenderPipelineState state;
 			state.program = prog.simple_solid_color;
@@ -2270,7 +2268,7 @@ void Renderer::draw_meshbuilders()
 			shader().set_vec4("solid_color", color32_to_vec4(mb.background_color));
 
 			glLineWidth(3);
-			//mb.meshbuilder->Draw(MeshBuilder::LINES);
+			dd.draw(MeshBuilderDD::LINES);
 			glLineWidth(1);
 		}
 
@@ -2283,7 +2281,7 @@ void Renderer::draw_meshbuilders()
 
 		shader().set_mat4("ViewProj", vs.viewproj);
 		shader().set_mat4("Model", mb.transform);
-		//mb.meshbuilder->Draw(MeshBuilder::LINES);
+		dd.draw(MeshBuilderDD::LINES);
 	}
 }
 
@@ -2294,8 +2292,6 @@ static handle<MeshBuilder_Object> debug_grid_handle;
 
 void update_debug_grid()
 {
-	return;
-
 	static MeshBuilder mb;
 	static bool has_init = false;
 	if (!has_init) {
@@ -2700,12 +2696,10 @@ void Renderer::sync_update()
 		po.dd.init_from(*po.obj.meshbuilder);
 	}
 
-	// get animation matricies
-	//glNamedBufferData(scene.gpu_skinned_mats_buffer, 
-	//	sizeof(glm::mat4) * g_gameAnimationMgr.get_num_matricies_used(), 
-	//	g_gameAnimationMgr.get_bonemat_ptr(0), 
-	//	GL_DYNAMIC_DRAW
-	//);
+	update_debug_grid();	// makes it visible/hidden
+
+
+	// For TAA, double buffer bones
 
 	scene.flip_bone_buffers();
 
@@ -3041,15 +3035,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	device.reset_states();
 	
 	// mesh builder stuff
-	//{
-	//	update_debug_grid();	// makes it visible/hidden
-	//
-	//	const auto& view_to_use = current_frame_main_view;
-	//	RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
-	//	auto scope = device.start_render_pass(setup);
-	//
-	//	draw_meshbuilders();
-	//}
+	{
+		const auto& view_to_use = current_frame_main_view;
+		RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
+		auto scope = device.start_render_pass(setup);
+		draw_meshbuilders();
+	}
 
 	auto taa_resolve_pass = [&]() -> texhandle {
 		GPUSCOPESTART(TaaResolve);
