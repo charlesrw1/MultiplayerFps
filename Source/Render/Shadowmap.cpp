@@ -38,7 +38,7 @@ void SpotlightShadowManager::update()
 		make_render_targets();
 
 	InlineVec<int,32> wants_shadowing;
-	auto& vs = draw.vs;
+	auto& vs = draw.current_frame_view;
 	// determine if new lights want to be added
 	auto& scene = draw.scene;
 	auto& lights = scene.light_list;
@@ -168,7 +168,7 @@ void CascadeShadowMapSystem::update()
 
 		glm::vec3 directional_dir = sun.direction;
 
-		const View_Setup& view = draw.vs;
+		const View_Setup& view = draw.current_frame_view;
 
 		float near = view.near;
 		float far = tweak.max_shadow_dist;

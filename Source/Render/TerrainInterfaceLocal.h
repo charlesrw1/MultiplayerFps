@@ -132,7 +132,7 @@ public:
 
 		auto shader = device.shader();
 		
-		shader.set_mat4("ViewProj", draw.current_frame_main_view.viewproj);
+		shader.set_mat4("ViewProj", draw.current_frame_view.viewproj);
 		shader.set_mat4("Model", glm::mat4(1));
 		shader.set_float("WorldScale", W);
 		shader.set_float("VerticalScale", active_terrain.vertical_scale);

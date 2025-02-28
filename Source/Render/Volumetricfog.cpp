@@ -56,7 +56,7 @@ void Volumetric_Fog_System::compute()
 {
 	if (!enable_volumetric_fog.get_bool())
 		return;
-
+#if 0
 	GPUFUNCTIONSTART;
 
 	static Vfog_Light light_buffer[64];
@@ -148,4 +148,5 @@ void Volumetric_Fog_System::compute()
 
 
 	temporal_sequence = (temporal_sequence + 1) % 16;
+#endif
 }

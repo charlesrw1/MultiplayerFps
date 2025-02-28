@@ -525,8 +525,9 @@ public:
 
 	bufferhandle active_constants_ubo = 0;
 	
-	View_Setup vs;	// globally accessible view for passes
-	View_Setup lastframe_vs;
+	const View_Setup& get_current_frame_vs() const { return current_frame_view; }
+	View_Setup current_frame_view;
+	View_Setup last_frame_main_view;
 
 	// graphics_settings
 
@@ -551,9 +552,6 @@ public:
 	
 	Render_Stats stats;
 
-	const View_Setup& get_current_frame_vs()const { return current_frame_main_view; }
-
-	View_Setup current_frame_main_view;
 
 	OpenglRenderDevice& get_device() {
 		return device;
@@ -565,7 +563,7 @@ private:
 
 
 
-	void upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0), bool wireframe_secondpass = false);
+	void upload_ubo_view_constants(const View_Setup& view, uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0), bool wireframe_secondpass = false);
 
 	void init_bloom_buffers();
 	void render_bloom_chain(texhandle scene_color_handle);

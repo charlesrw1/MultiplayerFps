@@ -548,9 +548,10 @@ void Renderer::reload_shaders()
 
 ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER,"", 0, 4);
 
-void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_plane, bool wireframe_secondpass)
+void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, uint32_t ubo, glm::vec4 custom_clip_plane, bool wireframe_secondpass)
 {
 	gpu::Ubo_View_Constants_Struct constants;
+	auto& vs = view_to_use;
 	constants.view = vs.view;
 	constants.viewproj = vs.viewproj;
 	constants.invview = glm::inverse(vs.view);
@@ -559,7 +560,7 @@ void Renderer::upload_ubo_view_constants(uint32_t ubo, glm::vec4 custom_clip_pla
 	constants.viewpos_time = glm::vec4(vs.origin, TimeSinceStart());
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
-	constants.prev_viewproj = lastframe_vs.viewproj;
+	constants.prev_viewproj = last_frame_main_view.viewproj;
 	constants.near = vs.near;
 	constants.far = vs.far;
 	constants.shadowmap_epsilon = shadowmap.tweak.epsilon;
@@ -1233,8 +1234,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 {
 	ZoneScoped;
 
-	vs = params.view;
-
 
 	device.reset_states();
 
@@ -1247,7 +1246,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 			upload = true;
 		}
 		if (upload)
-			upload_ubo_view_constants(view_ubo, params.custom_clip_plane, params.wireframe_secondpass);
+			upload_ubo_view_constants(params.view, view_ubo, params.custom_clip_plane, params.wireframe_secondpass);
 		active_constants_ubo = view_ubo;
 	}
 
@@ -1345,7 +1344,7 @@ void Renderer::render_particles()
 
 		shader().set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
 		shader().set_mat4("Model", p.obj.transform);
-		shader().set_mat4("ViewProj", vs.viewproj);
+		shader().set_mat4("ViewProj", current_frame_view.viewproj);
 
 		auto& textures = mat->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++) {
@@ -1879,7 +1878,7 @@ void cull_objects_job(uintptr_t user)
 	ZoneScopedN("ObjectCull");
 	auto d = (CullObjectsUser*)user;
 	Frustum frustum;
-	build_a_frustum_for_perspective(frustum, draw.vs);
+	build_a_frustum_for_perspective(frustum, draw.current_frame_view);
 	auto& objs = draw.scene.proxy_list;
 	cull_objects(frustum, d->visarray, d->count, objs);
 }
@@ -1902,7 +1901,7 @@ void calc_lod_job(uintptr_t user)
 
 	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
 	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
-	auto& vs = draw.vs;
+	auto& vs = draw.current_frame_view;
 	auto& proxy_list = draw.scene.proxy_list;
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
@@ -2263,7 +2262,7 @@ void Renderer::draw_meshbuilders()
 			device.set_pipeline(state);
 
 
-			shader().set_mat4("ViewProj", vs.viewproj);
+			shader().set_mat4("ViewProj", current_frame_view.viewproj);
 			shader().set_mat4("Model", mb.transform);
 			shader().set_vec4("solid_color", color32_to_vec4(mb.background_color));
 
@@ -2279,7 +2278,7 @@ void Renderer::draw_meshbuilders()
 		device.set_pipeline(state);
 
 
-		shader().set_mat4("ViewProj", vs.viewproj);
+		shader().set_mat4("ViewProj", current_frame_view.viewproj);
 		shader().set_mat4("Model", mb.transform);
 		dd.draw(MeshBuilderDD::LINES);
 	}
@@ -2325,7 +2324,7 @@ void Renderer::accumulate_gbuffer_lighting()
 	ZoneScoped;
 	GPUSCOPESTART(accumulate_gbuffer_lighting);
 
-	const auto& view_to_use = vs;
+	const auto& view_to_use = current_frame_view;
 	RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
 
@@ -2511,7 +2510,7 @@ void Renderer::deferred_decal_pass()
 
 	if (!r_drawdecals.get_bool())
 		return;
-	const auto& view_to_use = current_frame_main_view;
+	const auto& view_to_use = current_frame_view;
 	RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
 
@@ -2640,7 +2639,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 	}
 
 	scene_draw_internal(params, view, gui);
-	lastframe_vs = view;
+	last_frame_main_view = view;
 
 	// swap last frame and current frame, fixme
 	if (r_taa_enabled.get_bool()) {
@@ -2788,7 +2787,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	if (refresh_render_targets_next_frame || cur_w != view.width || cur_h != view.height)
 		InitFramebuffers(true, view.width, view.height);
 
-	current_frame_main_view = view;
+	current_frame_view = view;
 
 	if (!params.draw_world && (!params.draw_ui || !gui))
 		return;
@@ -2815,8 +2814,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		}
 		return;
 	}
-	vs = current_frame_main_view;
-	upload_ubo_view_constants(ubo.current_frame);
+	upload_ubo_view_constants(current_frame_view, ubo.current_frame);
 	active_constants_ubo = ubo.current_frame;
 	scene.build_scene_data(params.skybox_only, params.is_editor);
 
@@ -2828,7 +2826,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	// main level render
 
 	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false) {
-		const auto& view_to_use = current_frame_main_view;
+		const auto& view_to_use = current_frame_view;
 
 		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
 
@@ -2886,7 +2884,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	{
 		GPUSCOPESTART(ForwardPass);
 
-		const auto& view_to_use = current_frame_main_view;
+		const auto& view_to_use = current_frame_view;
 		RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 
@@ -2916,7 +2914,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	{
 		GPUSCOPESTART(EDITORSELECT_PASS);
 
-		const auto& view_to_use = current_frame_main_view;
+		const auto& view_to_use = current_frame_view;
 		RenderPassSetup setup("editor-id", fbo.editorSelectionDepth, false, true/* clear depth*/, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 
@@ -2934,7 +2932,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	
 	// mesh builder stuff
 	{
-		const auto& view_to_use = current_frame_main_view;
+		const auto& view_to_use = current_frame_view;
 		RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 		draw_meshbuilders();
@@ -2948,7 +2946,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 			return tex.scene_color;
 		}
 
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
 		// write to tex.scene_gbuffer0
 		RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
@@ -2959,7 +2957,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		device.set_pipeline(state);
 		shader().set_float("amt", r_taa_blend.get_float());
 		shader().set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-		shader().set_mat4("lastViewProj", lastframe_vs.viewproj);
+		shader().set_mat4("lastViewProj", last_frame_main_view.viewproj);
 		shader().set_bool("use_reproject", r_taa_reproject.get_bool());
 		shader().set_float("doc_mult", taa_doc_mult);
 		shader().set_float("doc_vel_bias", taa_doc_vel_bias);
@@ -2994,7 +2992,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	render_bloom_chain(scene_color_handle);
 
 	{
-		const auto& view_to_use = current_frame_main_view;
+		const auto& view_to_use = current_frame_view;
 		assert(cur_w == view_to_use.width && cur_h == view_to_use.height);
 		RenderPassSetup setup("composite", fbo.composite, true, false, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
@@ -3288,7 +3286,7 @@ float Renderer::get_scene_depth_for_editor(int x, int y)
 	const float depth = buffer_pixels[ofs];
 	delete[] buffer_pixels;
 
-	return -vs.near / depth;// linearize_depth(depth, vs.near, vs.far);
+	return -current_frame_view.near / depth;// linearize_depth(depth, vs.near, vs.far);
 }
 
 handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)

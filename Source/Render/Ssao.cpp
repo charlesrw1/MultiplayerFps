@@ -208,8 +208,11 @@ const int HBAO_RANDOM_ELEMENTS = 4 * 4;
 void SSAO_System::update_ubo()
 {
 	// projection
-	mat4 proj_matrix = draw.vs.proj;
-	float proj_fov = draw.vs.fov;
+
+	const auto& viewsetup = draw.current_frame_view;
+
+	mat4 proj_matrix = viewsetup.proj;
+	float proj_fov = viewsetup.fov;
 
 	const float* P = glm::value_ptr(proj_matrix);
 
@@ -275,8 +278,9 @@ void SSAO_System::render()
 {
 
 	GPUFUNCTIONSTART;
-	int v_w = draw.current_frame_main_view.width;
-	int v_h = draw.current_frame_main_view.height;
+	const auto& viewsetup = draw.current_frame_view;
+	int v_w = viewsetup.width;
+	int v_h = viewsetup.height;
 
 
 	if (width != v_w || height != v_h)
@@ -302,8 +306,8 @@ void SSAO_System::render()
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
-		float near = draw.vs.near;
-		float far = draw.vs.far;
+		float near = viewsetup.near;
+		float far = viewsetup.far;
 		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthlinear);
 		//prog.linearize_depth.use();
 		shader.set_vec4("clipInfo", glm::vec4(
