@@ -18,6 +18,7 @@ layout(binding = 4) uniform samplerCube Skylight;
 layout(binding = 5) uniform sampler2D PBR_brdflut;
 
 #include "SharedGpuTypes.txt"
+#include "LightingShared.txt"
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
@@ -119,6 +120,10 @@ void main()
 	vec4 albedo = texture(GBUFFER1,uv);
 	vec4 depth_tex = texture(DEPTH,uv);
 	vec4 normal_t = texture(GBUFFER0,uv);
+	
+	uint type = get_gbuffer_material_type(metal_rough);
+	if(type==MATERIAL_TYPE_UNLIT)
+		discard;
 	
 	float depth_value = depth_tex.r;
 	if(linearize_depth(depth_value,g.near) > 3000.0)

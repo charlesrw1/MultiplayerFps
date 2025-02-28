@@ -155,6 +155,7 @@ struct ROP_Internal
 {
 	Render_Object proxy;
 	glm::mat4 prev_transform{};
+	int prev_bone_ofs = 0;
 	glm::vec4 bounding_sphere_and_radius;
 	bool is_static = true;
 	bool has_init = false;
@@ -597,6 +598,18 @@ public:
 	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled
 	Render_Lists editor_sel_rlist;
 
+	int get_front_bone_buffer_offset() const {
+		return gpu_skinned_mats_using_front_buffer ? 0 : gpu_skinned_mats_buffer_size / 2;
+	}
+	int get_back_bone_buffer_offset() const {
+		return gpu_skinned_mats_using_front_buffer ? gpu_skinned_mats_buffer_size / 2 : 0;
+	}
+	void flip_bone_buffers() {
+		gpu_skinned_mats_using_front_buffer = !gpu_skinned_mats_using_front_buffer;
+	}
+
+	int gpu_skinned_mats_buffer_size = 0;	// in matricies (64 bytes)
+	bool gpu_skinned_mats_using_front_buffer = true;
 	bufferhandle gpu_skinned_mats_buffer = 0;
 	bufferhandle gpu_render_instance_buffer = 0;
 

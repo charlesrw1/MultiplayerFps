@@ -126,7 +126,7 @@ public:
 		return blend == blend_state::ADD || blend == blend_state::BLEND;
 	}
 	bool render_in_forward_pass() const {
-		return is_translucent() || light_mode == LightingMode::Unlit;
+		return is_translucent();
 	}
 	bool is_alphatested() const {
 		return alpha_tested;

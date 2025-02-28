@@ -15,7 +15,7 @@ struct Object_Instance
 	uint anim_mat_offset;	// offset into anim matricies
 	uint flags;	// INSTANCE_x
 	uint colorval2;
-	float obj3;
+	uint prev_anim_mat_offset;
 };
 
 // flags for 'bitmask_flags'
@@ -43,7 +43,8 @@ const uint DEBUG_LIGHTING_ONLY = 9;
 
 const uint INSTANCE_NON_UNIFORM_SCALE = 1;
 
-
+const uint MATERIAL_TYPE_LIT = 0;
+const uint MATERIAL_TYPE_UNLIT = 1;
 
 struct Ubo_View_Constants_Struct
 {

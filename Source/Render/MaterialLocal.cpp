@@ -763,11 +763,18 @@ std::string MasterMaterialImpl::create_glsl_shader(
 		actual_vs_code = "void VSmain() { }\n";
 
 	std::string actual_fs_code;
+	actual_fs_code += "const uint _MATERIAL_TYPE = ";
+	// names defined in SharedGpuTypes.txt
+	if (light_mode == LightingMode::Lit)
+		actual_fs_code += "MATERIAL_TYPE_LIT;\n";
+	else
+		actual_fs_code += "MATERIAL_TYPE_UNLIT;\n";
+
 	if (!fs_code.empty()) {
 		autogen_code("FS",actual_fs_code, fs_code);
 	}
 	else
-		actual_fs_code = "void FSmain() { }\n";
+		actual_fs_code += "void FSmain() { }\n";
 
 
 	replace(masterShader, "___USER_VS_CODE___", actual_vs_code);
@@ -776,7 +783,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	if (is_alphatested())
 		masterShader.insert(0,
 			"#define ALPHATEST\n");
-	if (blend != blend_state::OPAQUE || light_mode==LightingMode::Unlit)
+	if (blend != blend_state::OPAQUE)
 		masterShader.insert(0,
 			"#define FORWARD_SHADER\n"
 		);

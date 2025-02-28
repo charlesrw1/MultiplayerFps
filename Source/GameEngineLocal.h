@@ -109,7 +109,6 @@ public:
 	void get_draw_params(SceneDrawParamsEx& param, View_Setup& setup);
 	bool game_thread_update();
 	void loop();
-	void draw_screen();
 
 	// state relevant functions
 	void set_tick_rate(float tick_rate);
@@ -131,8 +130,6 @@ public:
 
 	void stop_game();
 	void spawn_starting_players(bool initial);
-
-	bool game_draw_screen();
 
 	// Host functions
 

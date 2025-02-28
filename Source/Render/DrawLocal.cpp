@@ -39,16 +39,6 @@ extern ConfigVar g_window_fullscreen;
 Renderer draw;
 RendererPublic* idraw = &draw;
 
-
-static const int IRRADIANCE_CM_LOC = 13;
-static const int SPECULAR_CM_LOC = 9;
-static const int BRDF_LUT_LOC = 10;
-static const int SHADOWMAP_LOC = 11;
-static const int CAUSTICS_LOC = 12;
-static const int SSAO_TEX_LOC = 8;
-
-
-
 ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL,"enable/disable vsync");
 ConfigVar shadow_quality_setting("r.shadow_setting","0",CVAR_INTEGER,"csm shadow quality",0,3);
 ConfigVar enable_bloom("r.bloom","1",CVAR_BOOL,"enable/disable bloom");
@@ -57,13 +47,13 @@ ConfigVar enable_ssao("r.ssao","1",CVAR_BOOL,"enable/disable screen space ambien
 ConfigVar use_halfres_reflections("r.halfres_reflections","1",CVAR_BOOL,"");
 ConfigVar dont_use_mdi("r.dont_use_mdi", "0", CVAR_BOOL|CVAR_DEV,"disable multidrawindirect and use drawelements instead");
 // 12mb arena
-ConfigVar renderer_memory_arena_size("renderer_mem_arena_size", "12000000", CVAR_INTEGER | CVAR_UNBOUNDED, "size of the renderers memory arena in bytes");
+ConfigVar renderer_memory_arena_size("r.mem_arena_size", "12000000", CVAR_INTEGER | CVAR_UNBOUNDED, "size of the renderers memory arena in bytes");
 
 ConfigVar r_taa_enabled("r.taa", "1", CVAR_BOOL,"enable temporal anti aliasing");
 
 static const int MAX_TAA_SAMPLES = 16;
 ConfigVar r_taa_samples("r.taa_samples", "4", CVAR_INTEGER, "", 2, MAX_TAA_SAMPLES);
-ConfigVar r_taa_32f("r.taa_32f", "1", CVAR_BOOL, "use 32 bit scene motion buffer instead of 16 bit");
+ConfigVar r_taa_32f("r.taa_32f", "0", CVAR_BOOL, "use 32 bit scene motion buffer instead of 16 bit");
 
 class TaaManager
 {
@@ -902,7 +892,6 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	set_default_parameters(tex.scene_gbuffer2);
 
 
-	// 16 bit has noticbly worse blurring for taa
 	const GLenum scene_motion_format = (r_taa_32f.get_bool()) ? GL_RG32F : GL_RG16F;
 
 	create_and_delete_texture(tex.scene_motion);
@@ -1746,6 +1735,8 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 	draw.get_arena().free_bottom_to_marker(marker);
 }
 
+// 128 bones * 100 characters * 2 (double bffer) =  
+ConfigVar r_skinned_mats_bone_buffer_size("r.skinned_mats_bone_buffer_size", "25600", CVAR_INTEGER | CVAR_UNBOUNDED | CVAR_READONLY, "");
 
 void Render_Scene::init()
 {
@@ -1760,6 +1751,9 @@ void Render_Scene::init()
 	glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
 
+	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
+	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
+
 
 	terrain_interface = std::make_unique<TerrainInterfaceLocal>();
 	terrain_interface->init();
@@ -1768,10 +1762,6 @@ void Render_Scene::init()
 glm::vec4 to_vec4(Color32 color) {
 	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
 }
-
-#include <future>
-#include <thread>
-
 
 inline float get_screen_percentage_2(const glm::vec4& bounding_sphere, float inv_two_times_tanfov_2, float camera_dist_2)
 {
@@ -1787,60 +1777,7 @@ inline const int get_lod_to_render(const Model* model, const float percentage)
 	return 0;
 }
 
-// RenderObject new property: cache_static
-//	this property is used for objects that arent changing their mesh etc. every frame
-
-// So for every frame:
-//		for objects that updated:
-//			update object list
-//		for materials that updated
-//			update material list
-// 
-//		clear dynamic mesh pass sections
-//		For all objects if not obj.cache_static
-//			add every part in every lod to respective mesh passes (dynamic section)
-//			sort+merge mesh dynamic passes
-//		if cache invalidated
-//			for all objs if obj.cache_static
-//				add every part to static cache mesh passes
-//			sort+merge mesh static passes
-//
-//		for all dynamic and static mesh passes, create render lists
-//			cull object level and get results from array?
-//			cull, cpu or gpu, remove the unused lods
-//			add to final render lists
-//
-//		
-//		
-
-struct CullingData
-{
-	int handle;
-	glm::vec4 bounds_and_radius;
-};
-
-ConfigVar r_cpu_frustum_culling("r.cpu_frustum_culling", "1", CVAR_BOOL,"do frustum culling on the cpu");
-
-// CPU path:
-// 
-// add objects to passes
-// batch+sort passes (cachable)
-// 
-// build culling list of (all) objects
-// cull main frustum
-// cull shadow frustum
-// lod determination
-// 
-// for each pass
-//	for each obj in pass
-//	  if obj is visible in culling job, inc draw count
-//	compact pass objects
-//	create temp render lists for frame
-//
-//
-
 #include "Frustum.h"
-
 
 void build_frustum_for_cascade(Frustum& f, int index)
 {
@@ -1982,15 +1919,22 @@ void calc_lod_job(uintptr_t user)
 
 void set_gpu_objects_data_job(uintptr_t p)
 {
+	const int current_bone_buffer_offset = draw.scene.get_front_bone_buffer_offset();
+	const int prev_bone_buffer_offset = draw.scene.get_back_bone_buffer_offset();
+
 	auto gpu_objects = (gpu::Object_Instance*)p;
 	auto& proxy_list = draw.scene.proxy_list;
 	ZoneScopedN("SetGpuObjectData");
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
 		auto& proxy = obj.type_.proxy;
-		gpu_objects[i].anim_mat_offset = obj.type_.proxy.animator_bone_ofs;
+		gpu_objects[i].anim_mat_offset = current_bone_buffer_offset + obj.type_.proxy.animator_bone_ofs;
 		gpu_objects[i].model = proxy.transform;
 		gpu_objects[i].prev_model = obj.type_.prev_transform;
+		if (obj.type_.prev_bone_ofs == -1)
+			gpu_objects[i].prev_anim_mat_offset = gpu_objects[i].anim_mat_offset;
+		else
+			gpu_objects[i].prev_anim_mat_offset = prev_bone_buffer_offset + obj.type_.prev_bone_ofs;
 		gpu_objects[i].flags = 0;
 	}
 }
@@ -2754,10 +2698,22 @@ void Renderer::sync_update()
 	}
 
 	// get animation matricies
-	glNamedBufferData(scene.gpu_skinned_mats_buffer, 
-		sizeof(glm::mat4) * g_gameAnimationMgr.get_num_matricies_used(), 
-		g_gameAnimationMgr.get_bonemat_ptr(0), 
-		GL_DYNAMIC_DRAW
+	//glNamedBufferData(scene.gpu_skinned_mats_buffer, 
+	//	sizeof(glm::mat4) * g_gameAnimationMgr.get_num_matricies_used(), 
+	//	g_gameAnimationMgr.get_bonemat_ptr(0), 
+	//	GL_DYNAMIC_DRAW
+	//);
+
+	scene.flip_bone_buffers();
+
+	if (g_gameAnimationMgr.get_num_matricies_used() > scene.gpu_skinned_mats_buffer_size / 2)
+		Fatalf("out of animated buffer memory\n");
+
+	glNamedBufferSubData(
+		scene.gpu_skinned_mats_buffer,
+		scene.get_front_bone_buffer_offset() * sizeof(glm::mat4),
+		sizeof(glm::mat4) * g_gameAnimationMgr.get_num_matricies_used(),
+		g_gameAnimationMgr.get_bonemat_ptr(0)
 	);
 }
 
@@ -2982,7 +2938,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		auto scope = device.start_render_pass(setup);
 
 		{
-			TracyGpuZone("GbufferPass");
+			GPUSCOPESTART(GbufferPass);
 
 			Render_Level_Params cmdparams(
 				view_to_use,
@@ -3030,7 +2986,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	//draw_height_fog();
 
 	{
-		TracyGpuZone("ForwardPass");
+		GPUSCOPESTART(ForwardPass);
 
 		const auto& view_to_use = current_frame_main_view;
 		RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
@@ -3204,8 +3160,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	}
 
 	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
-
-
 }
 
 
@@ -3359,6 +3313,8 @@ void Renderer::on_level_start()
 {
 }
 
+ConfigVar r_disable_animated_velocity_vector("r.disable_animated_velocity_vector", "0", CVAR_BOOL|CVAR_DEV, "");
+
 void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
 {
 	ASSERT(!eng->get_is_in_overlapped_period());
@@ -3367,15 +3323,19 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 	if (proxy.is_skybox)
 		in.is_static = false;
 	in.prev_transform = in.proxy.transform;
+	in.prev_bone_ofs = in.proxy.animator_bone_ofs;
 	in.proxy = proxy;
 	if (!in.has_init) {
 		in.has_init = true;
 		in.prev_transform = in.proxy.transform;
+		in.prev_bone_ofs = -1;
 	}
+	//if (r_disable_animated_velocity_vector.get_bool())
+	//	in.prev_bone_ofs = -1;
 
 
 	if (proxy.model) {
-		auto sphere = proxy.model->get_bounding_sphere();
+		auto& sphere = proxy.model->get_bounding_sphere();
 		auto center = proxy.transform * glm::vec4(glm::vec3(sphere),1.f);
 		float max_scale = glm::max(glm::length(proxy.transform[0]), glm::max(glm::length(proxy.transform[1]), glm::length(proxy.transform[2])));
 		float radius = sphere.w* max_scale;

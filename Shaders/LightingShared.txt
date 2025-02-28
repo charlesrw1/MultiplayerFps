@@ -1,0 +1,5 @@
+
+uint get_gbuffer_material_type(vec4 GBUFFER2_value)
+{
+	return uint(GBUFFER2_value.a *255.0);
+}

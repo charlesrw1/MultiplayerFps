@@ -52,7 +52,7 @@ bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
 
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"
-bind L "toggle r.taa_dilate_velocity"
+bind L "toggle r.disable_animated_velocity_vector"
 bind I "toggle r.taa_32f"
 
 bind O "inc r.taa_jitter_test"

@@ -63,6 +63,22 @@ mat4 ObjModelMatrix;
 ___USER_VS_CODE___
 // ********** END USER CODE **********
 
+#ifdef ANIMATED
+vec3 calc_local_animated_pos_last_frame(uint obj_index)
+{
+	vec3 local_pos = vec3(0.0);
+	uint obj_skin_offset = g_objects[obj_index].prev_anim_mat_offset;
+	for(int i=0;i<4;i++) {
+		if(VS_IN_BoneIndicies[i]==-1)
+			continue;
+		vec3 posadded = vec3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
+		local_pos += posadded * VS_IN_BoneWeights[i];
+	}
+	return local_pos;
+}
+#endif // !ANIMATED
+
+
 void main()
 {
 	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
@@ -132,12 +148,19 @@ void main()
     
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	
+	#ifndef DEPTH_ONLY
 	{
 		// calc last position for motion vectors
-		vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(local_pos,1.0);
-		// + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
+		#ifdef ANIMATED
+			vec3 prev_local_pos = calc_local_animated_pos_last_frame(obj_index);
+		#else
+			vec3 prev_local_pos = local_pos;
+		#endif
+		
+		vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
 		FS_IN_PrevNDC = g.prev_viewproj * vec4(lastfrag_pos.xyz,1.0);
 	}
+	#endif
 
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
@@ -187,6 +210,8 @@ vec3 NORMALMAP = vec3(0.5,0.5,1.0);		// tangent space normal map
 float OPACITY = 1.0;					// opacity, for alpha test
 float AOMAP = 1.0;						// small detail ao map
 
+// const uint _MATERIAL_TYPE = <shading_model>
+
 // ********** START USER CODE **********
 ___USER_FS_CODE___
 // ********** END USER CODE **********
@@ -206,7 +231,7 @@ void main()
 
 	#else
 		GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*AOMAP, AOMAP);
-		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,0);
+		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,float(_MATERIAL_TYPE)/255.0);
 		GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);
 		
 		vec3 Normalized_IN_N = normalize(FS_IN_Normal);

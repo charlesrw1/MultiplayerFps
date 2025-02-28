@@ -1315,44 +1315,6 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	ImGui::PopStyleColor(2);
 }
 
-bool GameEngineLocal::game_draw_screen()
-{
-	SceneDrawParamsEx params(time,frame_time);
-	params.output_to_screen = !is_drawing_to_window_viewport();
-	View_Setup vs_for_gui;
-	auto viewport = get_game_viewport_size();
-	vs_for_gui.width = viewport.x;
-	vs_for_gui.height = viewport.y;
-
-	CameraComponent* scene_camera = CameraComponent::get_scene_camera();
-
-	// no camera
-	if (!scene_camera) {
-		params.draw_world = false;
-		params.draw_ui = true;
-		idraw->scene_draw(params, vs_for_gui, get_gui());
-		return true;
-	}
-
-
-	glm::mat4 view;
-	float fov = 60.f;
-	scene_camera->get_view(view, fov);
-
-	glm::mat4 in = glm::inverse(view);
-	auto pos = in[3];
-	auto front = -in[2];
-	View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
-	scene_camera->last_vs = vs;
-
-
-	// fixme
-	isound->set_listener_position(vs.origin,in[1]);
-
-	idraw->scene_draw(params,vs, get_gui());
-
-	return true;
-}
 void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup)
 {
 	params = SceneDrawParamsEx(time, frame_time);
@@ -1427,86 +1389,6 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 			}
 		
 		}
-	}
-}
-
-void GameEngineLocal::draw_screen()
-{
-	GPUFUNCTIONSTART;
-
-	if (g_window_fullscreen.was_changed()) {
-		uint32_t flags = 0;
-		if (g_window_fullscreen.get_bool())
-			flags = SDL_WINDOW_FULLSCREEN_DESKTOP;
-		SDL_SetWindowFullscreen(window, flags);
-	}
-
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	SceneDrawParamsEx params(time, frame_time);
-	params.output_to_screen = !is_drawing_to_window_viewport();
-	// so the width/height parameters are valid
-	View_Setup vs_for_gui;
-	auto viewport = get_game_viewport_size();
-	vs_for_gui.width = viewport.x;
-	vs_for_gui.height = viewport.y;
-
-
-	if (state == Engine_State::Loading || state == Engine_State::Idle) {
-		// draw loading ui etc.
-		params.draw_world = false;
-		idraw->scene_draw(params, vs_for_gui, get_gui());
-	}
-	else if (state == Engine_State::Game) {
-
-#ifdef EDITOR_BUILD
-		// draw general ui
-		if (get_current_tool() != nullptr) {
-			params.is_editor = true;	// draw to the id buffer for mouse picking
-			auto vs = get_current_tool()->get_vs();
-
-			// fixme
-			isound->set_listener_position(vs->origin,glm::normalize(glm::cross(vs->front,glm::vec3(0,1,0))));
-
-			if (!vs) {
-				params.draw_world = false;
-				vs = &vs_for_gui;
-			}
-			idraw->scene_draw(params,*vs, get_gui());
-		}
-		else 
-#endif
-		{
-			bool good = game_draw_screen();
-			if (!good) {
-				glClearColor(1.0, 1.0, 1.0, 1.0);
-				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			}
-		}
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	// draw imgui interfaces
-	// if a tool is active, game screen gets drawn to an imgui viewport
-	ImGui_ImplSDL2_NewFrame();
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui::NewFrame();
-
-#ifdef EDITOR_BUILD
-	if (get_current_tool())
-		get_current_tool()->hook_imgui_newframe();
-#endif
-
-	draw_any_imgui_interfaces();
-
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-	{
-		GPUSCOPESTART(SwapWindow);
-		SDL_GL_SwapWindow(window);
 	}
 }
 

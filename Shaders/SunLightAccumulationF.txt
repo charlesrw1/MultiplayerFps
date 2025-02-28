@@ -3,6 +3,8 @@
 layout(location = 0) out vec4 FS_OUT_Color;
 
 #include "SharedGpuTypes.txt"
+#include "LightingShared.txt"
+
 layout(binding = 0) uniform sampler2D GBUFFER0;		// ws normal (xyz)
 layout(binding = 1) uniform sampler2D GBUFFER1;		// albedo, ao
 layout(binding = 2) uniform sampler2D GBUFFER2;		// metallic,roughness, custom, matid, custom, matid
@@ -198,9 +200,6 @@ float sample_sun_shadow(vec3 WorldSpace
 	return 1.0-shadow;
 }
 
-
-
-
 void main()
 {
 	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
@@ -208,6 +207,10 @@ void main()
 	vec4 albedo = texture(GBUFFER1,uv);
 	vec4 depth_tex = texture(DEPTH,uv);
 	vec4 normal_t = texture(GBUFFER0,uv);
+	
+	uint type = get_gbuffer_material_type(metal_rough);
+	if(type==MATERIAL_TYPE_UNLIT)
+		discard;
 	
 	float depth_value = depth_tex.r;
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
