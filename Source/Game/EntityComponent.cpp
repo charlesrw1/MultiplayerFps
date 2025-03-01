@@ -46,7 +46,8 @@ void EntityComponent::destroy()
 }
 void EntityComponent::sync_render_data()
 {
-	eng->get_level()->add_to_sync_render_data_list(this);
+	if(init_state!=initialization_state::CONSTRUCTOR)
+		eng->get_level()->add_to_sync_render_data_list(this);
 }
 
 void EntityComponent::initialize_internal_step1()

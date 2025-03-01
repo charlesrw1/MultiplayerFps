@@ -200,7 +200,7 @@ ShaderResult Shader::compile_vert_frag_single_file(
 	unsigned int program;
 	int success = 0;
 	char infolog[512];
-
+	infolog[0] = 0;
 	bool good = make_shader(vertex_source.c_str(), GL_VERTEX_SHADER, &vertex, infolog, 512);
 	if (!good) {
 		sys_print(Error, "Error: vertex shader (%s) compiliation failed: %s\n", shared_path.c_str(), infolog);

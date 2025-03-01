@@ -188,6 +188,10 @@ private:
 class OrthoCamera
 {
 public:
+	bool can_take_input() const {
+		return eng->is_game_focused();
+	}
+
 	glm::vec3 position = glm::vec3(0.0);
 	float width = 10.0;
 	glm::vec3 front = glm::vec3(1, 0, 0);
@@ -465,11 +469,9 @@ public:
 	void on_mouse_down(int x, int y, int button);
 	void on_key_down(const SDL_KeyboardEvent& k);
 	void on_mouse_wheel(const SDL_MouseWheelEvent& wheel) {
-		if (!eng->is_game_focused())
-			return;
-		if (using_ortho)
+		if (using_ortho && ortho_camera.can_take_input())
 			ortho_camera.scroll_callback(wheel.y);
-		else
+		if(!using_ortho && camera.can_take_input())
 			camera.scroll_callback(wheel.y);
 	}
 	void on_map_load_return(bool good);

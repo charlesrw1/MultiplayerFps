@@ -298,6 +298,21 @@ extern ConfigVar g_project_name;
 glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
 }
+bool User_Camera::can_take_input() const {
+	return orbit_mode || eng->is_game_focused();
+}
+
+static void vector_to_angles(const glm::vec3& v, float& pitch, float& yaw) {
+	pitch = std::atan2(v.y, std::sqrt(v.x * v.x + v.z * v.z));
+	yaw = std::atan2(v.x, v.z);
+}
+
+void User_Camera::set_orbit_target(glm::vec3 target, float object_size)
+{
+	orbit_target = target;
+	position = orbit_target - front * object_size * 4.f;
+}
+
 
 void User_Camera::scroll_callback(int amt)
 {
@@ -316,7 +331,7 @@ void User_Camera::scroll_callback(int amt)
 	}
 }
 
-void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, glm::mat4 invproj)
+void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, float aratio, float fov)
 {
 	int xpos, ypos;
 	xpos = mouse_dx;
@@ -329,8 +344,7 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 	y_off *= sensitivity;
 
 
-	bool pan_in_orbit_model = keys[SDL_SCANCODE_LSHIFT];
-	{
+	auto update_pitch_yaw = [&]() {
 		yaw += x_off;
 		pitch -= y_off;
 
@@ -345,6 +359,34 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 		if (yaw < 0) {
 			yaw += TWOPI;
 		}
+	};
+
+	if (orbit_mode)
+	{
+		bool pan_in_orbit_model = keys[SDL_SCANCODE_LSHIFT];
+
+		if (!pan_in_orbit_model) {
+			update_pitch_yaw();
+		}
+
+		front = AnglesToVector(pitch, yaw);
+		glm::vec3 right = normalize(cross(up, front));
+		glm::vec3 real_up = glm::cross(right, front);
+		float dist = glm::length(orbit_target - position);
+
+		// panning
+		if (pan_in_orbit_model) {
+			// scale by dist
+			float x_s = tan(fov / 2) * dist * 0.5;
+			float y_s = x_s * aratio;
+			orbit_target = orbit_target - real_up * y_off * y_s + right * x_off * x_s;
+		}
+
+		position = orbit_target - front * dist;
+	}
+	else
+	{
+		update_pitch_yaw();
 
 		front = AnglesToVector(pitch, yaw);
 		glm::vec3 delta = glm::vec3(0.f);
@@ -903,10 +945,12 @@ void register_input_actions_for_game()
 
 int main(int argc, char** argv)
 {
+
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 
 	eng_local.init();
+	
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1708,6 +1752,9 @@ void game_update_job(uintptr_t user)
 	//return;
 	// update particles, doesnt draw, only builds meshes FIXME
 	ParticleMgr::get().draw(out->vsOut);
+
+	// paint the UI
+	eng_local.get_gui()->paint();
 }
 
 
@@ -1811,7 +1858,7 @@ void GameEngineLocal::loop()
 		if (!shouldDrawNext) {
 			drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
 		}
-		idraw->scene_draw(drawparamsNext, setupNext, nullptr);
+		idraw->scene_draw(drawparamsNext, setupNext);
 		jobs::wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 
 		shouldDrawNext = out.drawOut;
@@ -1858,6 +1905,8 @@ void GameEngineLocal::loop()
 #endif
 		if (get_level())
 			get_level()->sync_level_render_data();
+
+		gui_sys->sync_to_renderer();
 		
 		idraw->sync_update();
 

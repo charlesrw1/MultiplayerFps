@@ -95,7 +95,6 @@ public:
 		mouse_drag_delegate.invoke(x, y);
 	}
 	void paint(UIBuilder& builder) override {
-
 		int x, y;
 		SDL_GetMouseState(&x, &y);
 		bool do_mouse_click = mouse_clicked;
@@ -770,19 +769,22 @@ void EditorDoc::tick(float dt)
 
 	auto window_sz = eng->get_game_viewport_size();
 	float aratio = (float)window_sz.y / window_sz.x;
+	const float fov = glm::radians(70.f);
 	{
 		int x=0, y=0;
-		if (eng->is_game_focused()) {
-			SDL_GetRelativeMouseState(&x, &y);
-			if (using_ortho)
+		const Uint32 button_state = SDL_GetRelativeMouseState(&x, &y);
+		camera.orbit_mode = bool(button_state & (1 << 1)) && !eng->is_game_focused();
+		{
+			if (using_ortho && ortho_camera.can_take_input())
 				ortho_camera.update_from_input(eng->get_input_state()->keys, x, y, aratio);
-			else
-				camera.update_from_input(eng->get_input_state()->keys, x, y, glm::mat4(1.f));
+			if(!using_ortho && camera.can_take_input())
+				camera.update_from_input(eng->get_input_state()->keys, x, y, aratio,fov);
 		}
+
 	}
 
 	if(!using_ortho)
-		vs_setup = View_Setup(camera.position, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
+		vs_setup = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);
 	else {
 		View_Setup vs;
 		vs.far = 100.0;
@@ -794,7 +796,7 @@ void EditorDoc::tick(float dt)
 		vs.view = ortho_camera.get_view_matrix();
 		vs.viewproj = vs.proj * vs.view;
 		vs.near = 0.001;
-		vs.fov = glm::radians(90.f);
+		vs.fov = fov;
 		vs_setup = vs;
 	}
 }
@@ -1974,6 +1976,21 @@ SelectionState::SelectionState()
 	ed_doc.on_close.add(this, &SelectionState::on_close);
 }
 
+DECLARE_ENGINE_CMD(SET_ORBIT_TARGET)
+{
+	if (ed_doc.selection_state->has_only_one_selected()) {
+		auto ptr = ed_doc.selection_state->get_only_one_selected();
+		if (ptr) {
+			float radius = 1.f;
+			auto mesh = ptr->get_component<MeshComponent>();
+			if (mesh && mesh->get_model()) {
+				radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
+			}
+			auto pos = ptr->get_ws_position();
+			ed_doc.camera.set_orbit_target(pos, radius);
+		}
+	}
+}
 
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {

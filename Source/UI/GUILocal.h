@@ -9,8 +9,9 @@
 #include "Framework/FreeList.h"
 #include "Framework/Config.h"
 #include "Framework/Rect2d.h"
-
 #include "Assets/AssetDatabase.h"
+
+#include "Render/UIDrawPublic.h"
 
 // Navigation, up down left right (both keyboard nad controller)
 
@@ -24,13 +25,35 @@
 
 CLASS_H(GuiRootPanel, GUI)
 public:
-	void update_subwidget_positions() override {
+	void update_subwidget_positions() final {
 		for (int i = 0; i < children.size(); i++) {
 			children[i]->ws_position = ws_position;
 			children[i]->ws_size = ws_size;
 		}
 	}
 };
+
+
+struct UIBuilderImpl
+{
+	// Ortho matrix of screen
+	glm::mat4 ViewProj{};
+	std::vector<UIDrawCall> drawCalls;
+	MeshBuilder meshbuilder;
+
+	void add_drawcall(MaterialInstance* mat, int start) {
+		const int count = meshbuilder.get_i().size() - start;
+		if (drawCalls.empty() || drawCalls.back().mat != mat) {
+			UIDrawCall dc;
+			dc.index_count = count;
+			dc.index_start = start;
+			dc.mat = mat;
+			drawCalls.push_back(dc);
+		}
+		drawCalls.back().index_count += count;
+	}
+};
+
 
 extern ConfigVar ui_debug_press;
 
@@ -47,7 +70,7 @@ public:
 	}
 	~GuiSystemLocal() {}
 
-	void handle_event(const SDL_Event& event) override {
+	void handle_event(const SDL_Event& event) final {
 		switch (event.type) {
 		case SDL_KEYDOWN: {
 			if (focusing)
@@ -102,7 +125,7 @@ public:
 		}
 	}
 
-	void post_handle_events() override {
+	void post_handle_events() final {
 		if (!dragging) {
 			int x = 0, y = 0;
 			SDL_GetMouseState(&x, &y);
@@ -111,7 +134,7 @@ public:
 		}
 	}
 
-	void think() override {
+	void think() final {
 	
 		int x = 0, y = 0;
 		SDL_GetMouseState(&x, &y);
@@ -140,25 +163,25 @@ public:
 		update_widget_sizes_R(root);
 		update_widget_positions_R(root);
 	}
-	void paint() override {
-		GPUFUNCTIONSTART;
-
+	UIBuilderImpl uiBuilderImpl;
+	void paint() final {
 		UIBuilder build(this);
-		build.init_drawing_state();
 		paint_widgets_R(root, build);
-		build.post_draw();
+	}
+	void sync_to_renderer() final {
+		idrawUi->update(uiBuilderImpl.drawCalls, uiBuilderImpl.meshbuilder, uiBuilderImpl.ViewProj);
 	}
 
-	void add_gui_panel_to_root(GUI* panel) override {
+	void add_gui_panel_to_root(GUI* panel) final {
 		root->add_this(panel);
 	}
-	void remove_reference(GUI* this_panel) override {
+	void remove_reference(GUI* this_panel) final {
 		if (hovering == this_panel) hovering = nullptr;
 		if (dragging == this_panel) dragging = nullptr;
 		if (focusing == this_panel) focusing = nullptr;
 		//think_list.remove(this_panel);
 	}
-	void set_focus_to_this(GUI* panel) override {
+	void set_focus_to_this(GUI* panel) final {
 		if (focusing == panel)
 			return;
 		if (focusing) {
@@ -174,16 +197,16 @@ public:
 		}
 	}
 
-	void set_viewport_ofs(int x, int y) override {
+	void set_viewport_ofs(int x, int y) final {
 		root->ws_position = { x,y };
 	}
-	void set_viewport_size(int x, int y) override {
+	void set_viewport_size(int x, int y) final {
 		root->ws_size = { x,y };
 	}
-	void add_to_think_list(GUI* panel) override {
+	void add_to_think_list(GUI* panel) final {
 		//think_list.insert(panel);
 	}
-	void remove_from_think_list(GUI* panel) override {
+	void remove_from_think_list(GUI* panel) final {
 		//think_list.remove(panel);
 	}
 

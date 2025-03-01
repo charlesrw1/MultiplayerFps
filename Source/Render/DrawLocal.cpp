@@ -24,6 +24,7 @@
 #include "Game/Components/ParticleMgr.h"	// FIXME
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
+#include "Render/UIDrawPublic.h"
 
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
@@ -54,6 +55,63 @@ ConfigVar r_taa_enabled("r.taa", "1", CVAR_BOOL,"enable temporal anti aliasing")
 static const int MAX_TAA_SAMPLES = 16;
 ConfigVar r_taa_samples("r.taa_samples", "4", CVAR_INTEGER, "", 2, MAX_TAA_SAMPLES);
 ConfigVar r_taa_32f("r.taa_32f", "0", CVAR_BOOL, "use 32 bit scene motion buffer instead of 16 bit");
+
+
+class RendererUIBackendLocal : public RendererUIBackend
+{
+public:
+	void init() {
+	}
+
+	void update(std::vector<UIDrawCall>& draw_calls_to_be_swapped, MeshBuilder& vertex_data, const glm::mat4& view_proj) final {
+		draw_calls.clear();
+		std::swap(draw_calls_to_be_swapped, draw_calls);
+		mb_draw_data.init_from(vertex_data);
+		this->view_proj = view_proj;
+	}
+
+	void render() {
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
+		auto& device = draw.get_device();
+		for (int i = 0; i < draw_calls.size(); i++) {
+			const auto& dc = draw_calls.at(i);
+			if (!dc.mat)
+				continue;
+
+			assert(dc.mat->get_master_material()->usage == MaterialUsage::UI);
+
+			RenderPipelineState pipe;
+			pipe.backface_culling = true;
+			pipe.blend = dc.mat->get_master_material()->blend;
+			pipe.cull_front_face = false;
+			pipe.depth_testing = false;
+			pipe.depth_writes = false;
+			pipe.program = matman.get_mat_shader(false, nullptr,
+				dc.mat, false, false, false, false);
+			pipe.vao = mb_draw_data.VAO;
+			
+			device.set_pipeline(pipe);
+
+			draw.shader().set_mat4("UIViewProj",view_proj);
+
+			auto& texs = dc.mat->impl->get_textures();
+			for (int i = 0; i < texs.size(); i++)
+				device.bind_texture(i, texs[i]->gl_id);
+
+			glDrawElementsBaseVertex(GL_TRIANGLES, dc.index_count, GL_UNSIGNED_INT, (void*)(dc.index_start * sizeof(int)), 0);
+			
+			draw.stats.total_draw_calls++;
+		}
+
+		device.reset_states();
+	}
+private:
+	glm::mat4 view_proj{};
+	MeshBuilderDD mb_draw_data;
+	std::vector<UIDrawCall> draw_calls;
+};
+static RendererUIBackendLocal draw_ui_local;
+RendererUIBackend* idrawUi = &draw_ui_local;
 
 class TaaManager
 {
@@ -2567,7 +2625,7 @@ ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disab
 ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
 
 
-void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
+void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 {
 	GPUFUNCTIONSTART;
 	ZoneNamed(RendererSceneDraw,true);
@@ -2590,7 +2648,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPu
 		view.viewproj = view.proj * view.view;
 	}
 
-	scene_draw_internal(params, view, gui);
+	scene_draw_internal(params, view);
 	last_frame_main_view = view;
 
 	// swap last frame and current frame, fixme
@@ -2666,7 +2724,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		params.is_cubemap_view = true;
 		params.skybox_only = skybox_only;
 
-		scene_draw_internal(params, cubemap_view, nullptr);
+		scene_draw_internal(params, cubemap_view);
 
 		glDepthMask(GL_TRUE);// need to set this for blit operation to work
 
@@ -2720,7 +2778,7 @@ void taa_menu()
 }
 ADD_TO_DEBUG_MENU(taa_menu);
 
-void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui)
+void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
 	TracyGpuZone("scene_draw_internal");
 	ZoneScoped;
@@ -2741,16 +2799,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 
 	current_frame_view = view;
 
-	if (!params.draw_world && (!params.draw_ui || !gui))
+	if (!params.draw_world&&!params.draw_ui)
 		return;
-	else if (gui && !params.draw_world && params.draw_ui) {
-		// just paint ui and then return
-		uint32_t framebuffer_to_output = fbo.composite;// (needs_composite) ? fbo.composite : 0;
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_output);
-		glViewport(0, 0, cur_w, cur_h);
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+	else if (!params.draw_world && params.draw_ui) {
 
-		gui->paint();
+		const auto& view_to_use = current_frame_view;
+		assert(cur_w == view_to_use.width && cur_h == view_to_use.height);
+		RenderPassSetup setup("composite", fbo.composite, true, true, 0, 0, view_to_use.width, view_to_use.height);
+		auto scope = device.start_render_pass(setup);
+
+		draw_ui_local.render();
 
 		if (params.output_to_screen) {
 			GPUSCOPESTART(Blit_composite_to_backbuffer);
@@ -2974,22 +3032,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 				do_post_process_stack(postProcesses);
 		}
 
-		//{
-		//	RenderPipelineState state;
-		//	state.vao = 0;
-		//	state.program = prog.simple;
-		//	state.blend = blend_state::BLEND;
-		//	device.set_pipeline(state);
-		//
-		//	shader().set_mat4("ViewProj", vs.viewproj);
-		//	shader().set_mat4("Model", mat4(1.f));
-		//
-		//	if (gui && params.draw_ui && !r_force_hide_ui.get_bool())
-		//		gui->paint();
-		//
-		//	device.reset_states();
-		//}
-		//
+		{
+			// UI
+			if (params.draw_ui && !r_force_hide_ui.get_bool())
+				draw_ui_local.render();
+		}
 		
 		debug_tex_out.draw_out();
 	}

@@ -40,6 +40,7 @@ public:
 // what job are we currently executing
 thread_local AsyncQueuedJob* ACTIVE_THREAD_JOB = nullptr;
 thread_local bool IS_LOADER_THREAD = false;
+thread_local bool IS_MAIN_THREAD = false;
 
 class AssetDatabaseImpl
 {
@@ -51,6 +52,8 @@ public:
 
 	}
 	void init() {
+		IS_MAIN_THREAD = true;
+
 		loadThread =
 			new AssetDatabaseImpl::LoadThreadAndSignal(
 				std::thread(AssetDatabaseImpl::loaderThreadMain, 0, this));
@@ -75,6 +78,7 @@ public:
 
 	void tick_asyncs_standard() {
 		ASSERT(!IS_LOADER_THREAD);
+		ASSERT(IS_MAIN_THREAD);
 		//
 		auto fetch_finished_job = [&]() -> LoadJob* {
 			std::unique_lock<std::mutex> lock(job_mutex);
@@ -275,7 +279,7 @@ public:
 			return asset;
 		}
 		queue_load_job_front_and_wait(myJob);
-		tick_asyncs_standard();
+		//tick_asyncs_standard();
 		return asset;
 	}
 
@@ -300,7 +304,7 @@ public:
 	// reloads the asset right now
 	void reload_asset_sync(IAsset* asset) {
 		ASSERT(!IS_LOADER_THREAD);
-
+		ASSERT(IS_MAIN_THREAD);
 		assert(asset);
 
 		if (!asset->is_loaded) {
@@ -315,7 +319,7 @@ public:
 		myJob.loadJobCallback = nullptr;
 		
 		queue_load_job_front_and_wait(myJob);
-		finish_all_jobs();
+		//finish_all_jobs();
 	}
 
 	void start_async_job_internal(IAsset* asset, bool reload,bool hot_reload, uint32_t mask, std::function<void(GenericAssetPtr)>& func) {

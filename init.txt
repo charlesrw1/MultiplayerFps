@@ -49,6 +49,7 @@ bind "Keypad 5" Ctrl "FILTER_FOR AnimGraph"
 bind "Keypad 6" Ctrl "FILTER_FOR DataClass"
 bind "Keypad 7" Ctrl "FILTER_FOR AnimationSeq"
 bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
+bind "Keypad ." SET_ORBIT_TARGET
 
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"

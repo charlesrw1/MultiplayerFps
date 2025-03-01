@@ -24,9 +24,6 @@ public:
 	UIBuilder(GuiSystemLocal* sys);
 	~UIBuilder();
 
-	void init_drawing_state();
-	void post_draw();
-
 	void draw_rect_with_material(
 		glm::ivec2 global_coords,
 		glm::ivec2 size,
@@ -76,7 +73,6 @@ public:
 		bool with_drop_shadow = false, Color32 drop_shadow_color = {});
 
 private:
-	MeshBuilder* mb = nullptr;
 	GuiSystemLocal* sys = nullptr;
 	UIBuilderImpl* impl = nullptr;
 	friend class UiBuilderHelper;

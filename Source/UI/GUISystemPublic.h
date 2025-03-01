@@ -22,6 +22,7 @@ public:
 	virtual void think() = 0;
 	// paint
 	virtual void paint() = 0;
+	virtual void sync_to_renderer() = 0;
 
 	virtual void set_focus_to_this(GUI* panel) = 0;
 

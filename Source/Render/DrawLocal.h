@@ -352,7 +352,7 @@ public:
 
 	// public interface
 	void init() final;
-	void scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui) final;
+	void scene_draw(SceneDrawParamsEx params, View_Setup view) final;
 	void sync_update() final;
 	void on_level_start() final;
 	void on_level_end() final;
@@ -384,7 +384,7 @@ public:
 		bool depth_less_than_op
 	);
 
-	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui);
+	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view);
 	void do_post_process_stack(const std::vector<MaterialInstance*>& stack);
 	void check_cubemaps_dirty();	// render any cubemaps
 	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only);

@@ -23,14 +23,14 @@ out vec4 FS_IN_Color;
 out vec3 FS_IN_FragPos;
 out vec2 FS_IN_Texcoord;
 
-uniform mat4 ViewProj=mat4(1);
+uniform mat4 UIViewProj=mat4(1);
 
 void main()
 {
 	FS_IN_Color = VS_IN_Color;
 	FS_IN_FragPos = VS_IN_Postion;
 	FS_IN_Texcoord = VS_IN_TexCoord;
-	vec4 pos = ViewProj * vec4(VS_IN_Postion, 1.0);
+	vec4 pos = UIViewProj * vec4(VS_IN_Postion, 1.0);
 	
 	gl_Position = pos;
 }

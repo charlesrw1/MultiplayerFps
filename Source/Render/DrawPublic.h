@@ -111,8 +111,7 @@ public:
 
 	virtual void scene_draw(
 		SceneDrawParamsEx params,
-		View_Setup view,	/* camera */
-		GuiSystemPublic* gui /* ui_paint callback */
+		View_Setup view	/* camera */
 	) = 0;
 	virtual void sync_update() = 0;
 
