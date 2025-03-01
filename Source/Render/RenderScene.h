@@ -475,8 +475,6 @@ public:
 		return &proxy_list.get(handle.id).proxy;
 	}
 
-
-	Free_List<MeshbuilderObj_Internal> meshbuilder_objs;
 	virtual handle<MeshBuilder_Object> register_meshbuilder() final {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		int handle = meshbuilder_objs.make_new();
@@ -580,13 +578,11 @@ public:
 	RSunInternal* get_main_directional_light();
 
 	TerrainInterfacePublic* get_terrain_interface() override;
-
 	std::unique_ptr<TerrainInterfaceLocal> terrain_interface;
 
 	bool statics_meshes_are_dirty = false;
 	bool static_cache_built_for_editor = false;
 	bool static_cache_built_for_debug = false;
-
 
 	Render_Pass gbuffer_pass;
 	Render_Pass transparent_pass;
@@ -613,12 +609,9 @@ public:
 	bufferhandle gpu_skinned_mats_buffer = 0;
 	bufferhandle gpu_render_instance_buffer = 0;
 
-	// use for stuff that isnt getting alloced much multiple times like suns,skylights
-	uint32_t unique_id_counter = 0;
 
 	Free_List<ROP_Internal> proxy_list;
-	std::vector<glm::vec4> proxy_list_bounding_spheres;	// SOA bounding spheres for culling
-
+	Free_List<MeshbuilderObj_Internal> meshbuilder_objs;
 	Free_List<RL_Internal> light_list;
 	Free_List<RDecal_Internal> decal_list;
 	// should just be one, but I let multiple ones exist too
@@ -626,14 +619,12 @@ public:
 	std::vector<RSkylight_Internal> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
 
+	// objects can be deleted mid frame, so queue them
 	std::vector<QueuedRenderObjectDelete> queued_deletes;
 
 	bool has_fog = false;
 	RenderFog fog;
-
-
-
-	bufferhandle light_ssbo;
-	bufferhandle light_grid_ssbo;
-	bufferhandle indirect_to_light_ssbo;
+	
+	// use for stuff that isnt getting alloced much multiple times like suns,skylights
+	int unique_id_counter = 0;
 };

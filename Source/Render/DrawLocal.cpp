@@ -548,7 +548,7 @@ void Renderer::reload_shaders()
 
 ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER,"", 0, 4);
 
-void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, uint32_t ubo, glm::vec4 custom_clip_plane, bool wireframe_secondpass)
+void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferhandle ubo, bool wireframe_secondpass)
 {
 	gpu::Ubo_View_Constants_Struct constants;
 	auto& vs = view_to_use;
@@ -568,8 +568,6 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, uint32_t
 
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
-
-	constants.directional_light_dir_and_used = vec4(1, 0, 0, 0);
 
 	constants.numcubemaps = 0;
 
@@ -821,6 +819,7 @@ void Renderer::init()
 void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 {
 	refresh_render_targets_next_frame = false;
+	disable_taa_this_frame = true;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -1001,14 +1000,6 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 	ZoneScoped;
 	GPUFUNCTIONSTART;
 
-	//*glBindVertexArray(vao.default_);
-	//*// to prevent crashes??
-	//*glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	//*glBindVertexBuffer(0, buf.default_vb, 0, 0);
-	//*glBindVertexBuffer(1, buf.default_vb, 0, 0);
-	//*glBindVertexBuffer(2, buf.default_vb, 0, 0);
-
-
 	if (!enable_bloom.get_bool())
 		return;
 
@@ -1057,9 +1048,6 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 		state.blend = blend_state::ADD;
 		device.set_pipeline(state);
 
-		//*glEnable(GL_BLEND);
-		//*glBlendFunc(GL_ONE, GL_ONE);
-		//*set_shader(prog.bloom_upsample);
 
 		for (int i = tex.number_bloom_mips - 1; i > 0; i--)
 		{
@@ -1076,11 +1064,6 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 	}
 
 	device.reset_states();
-
-	//glEnable(GL_DEPTH_TEST);
-	//glDisable(GL_BLEND);
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//glCheckError();
 }
 
 
@@ -1127,14 +1110,6 @@ void Renderer::execute_render_lists(
 		state.depth_less_than = depth_less_than_op;
 		device.set_pipeline(state);
 
-		//*set_shader(program);
-
-		//*bind_vao(mods.get_vao(true/* animated */));
-
-		//*if(!force_backface_state)
-		//*	set_show_backfaces(backface);
-
-		set_blend_state(blend);
 
 		shader().set_int("indirect_material_offset", offset);
 
@@ -1237,20 +1212,18 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 	device.reset_states();
 
-
+	bufferhandle what_ubo = params.provied_constant_buffer;
 	{
-		uint32_t view_ubo = params.provied_constant_buffer;
 		bool upload = params.upload_constants;
 		if (params.provied_constant_buffer == 0) {
-			view_ubo = ubo.current_frame;
+			what_ubo = ubo.current_frame;
 			upload = true;
 		}
 		if (upload)
-			upload_ubo_view_constants(params.view, view_ubo, params.custom_clip_plane, params.wireframe_secondpass);
-		active_constants_ubo = view_ubo;
+			upload_ubo_view_constants(params.view, what_ubo, params.wireframe_secondpass);
 	}
 
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, what_ubo);
 	
 
 	//*glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
@@ -1278,11 +1251,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 
 
-	if (params.has_clip_plane) {
-		glEnable(GL_CLIP_DISTANCE0);
-	}
-	
-	
 	{
 		// shadows map dont have reversed Z, just standard 0,1 depth
 		//*if (params.pass != Render_Level_Params::SHADOWMAP)
@@ -1308,9 +1276,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 				);
 
 	}
-
-	if (params.has_clip_plane)
-		glDisable(GL_CLIP_DISTANCE0);
 
 	//glClearDepth(1.0);
 	//glDepthFunc(GL_LESS);
@@ -1394,19 +1359,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	return key;
 }
 
-//void Render_Pass::delete_object(
-//	const Render_Object& proxy, 
-//	renderobj_handle handle, 
-//	Material* material,
-//	uint32_t submesh,
-//	uint32_t layer) {
-//	
-//	Pass_Object obj;
-//	obj.sort_key = create_sort_key_from_obj(proxy, material, submesh, layer);
-//	obj.render_obj = handle;
-//	obj.submesh_index = submesh;
-//	deletions.push_back(obj);
-//}
+
 void Render_Pass::add_object(
 	const Render_Object& proxy, 
 	handle<Render_Object> handle,
@@ -2333,7 +2286,7 @@ void Renderer::accumulate_gbuffer_lighting()
 	Model* LIGHT_DOME = g_modelMgr.get_light_dome();
 	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 	{
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, active_constants_ubo);
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
 		RenderPipelineState state;
 		state.vao = vao;
@@ -2815,7 +2768,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 		return;
 	}
 	upload_ubo_view_constants(current_frame_view, ubo.current_frame);
-	active_constants_ubo = ubo.current_frame;
 	scene.build_scene_data(params.skybox_only, params.is_editor);
 
 	shadowmap.update();
@@ -2941,8 +2893,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view, Gu
 	auto taa_resolve_pass = [&]() -> texhandle {
 		GPUSCOPESTART(TaaResolve);
 		ZoneScopedN("TaaResolve");
-
-		if (!r_taa_enabled.get_bool()) {
+		bool wants_disable = disable_taa_this_frame;
+		disable_taa_this_frame = false;
+		if (wants_disable)
+			sys_print(Debug, "disabled taa this frame\n");
+		if (!r_taa_enabled.get_bool()||wants_disable) {
 			return tex.scene_color;
 		}
 
@@ -3066,11 +3021,8 @@ Shader Renderer::shader()
 void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats)
 {
 	ZoneScoped;
-	//device.reset_states();
 
-		//glDisable(GL_BLEND);
-		//glDisable(GL_CULL_FACE);
-		//glDisable(GL_DEPTH_TEST);
+
 	auto renderToTexture = tex.output_composite_2;
 	auto renderFromTexture = tex.output_composite;
 	tex.actual_output_composite = renderFromTexture;
@@ -3108,8 +3060,6 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 	}
 
 	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderFromTexture, 0);
-	//glEnable(GL_CULL_FACE);
-	//glEnable(GL_DEPTH_TEST);
 }
 
 
@@ -3159,6 +3109,7 @@ void Renderer::on_level_end()
 }
 void Renderer::on_level_start()
 {
+	disable_taa_this_frame = true;
 }
 
 ConfigVar r_disable_animated_velocity_vector("r.disable_animated_velocity_vector", "0", CVAR_BOOL|CVAR_DEV, "");
@@ -3180,7 +3131,6 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 	}
 	//if (r_disable_animated_velocity_vector.get_bool())
 	//	in.prev_bone_ofs = -1;
-
 
 	if (proxy.model) {
 		auto& sphere = proxy.model->get_bounding_sphere();

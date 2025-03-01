@@ -83,10 +83,8 @@ struct Render_Level_Params {
 	bool is_wireframe_pass = false;
 	bool wireframe_secondpass = false;
 
-	bool has_clip_plane = false;
-	vec4 custom_clip_plane = vec4(0.f);
 	bool upload_constants = false;
-	uint32_t provied_constant_buffer = 0;
+	bufferhandle provied_constant_buffer = 0;
 };
 
 
@@ -353,21 +351,20 @@ public:
 
 
 	// public interface
-	virtual void init() override;
-
-	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui) override;
+	void init() final;
+	void scene_draw(SceneDrawParamsEx params, View_Setup view, GuiSystemPublic* gui) final;
 	void sync_update() final;
-	virtual void on_level_start() override;
-	virtual void on_level_end() override;
-	virtual void reload_shaders() override;
-	virtual RenderScenePublic* get_scene() override { return &scene; }
-	virtual void bake_cubemaps() override {}
-	virtual uint32_t get_composite_output_texture_handle() override { 
+	void on_level_start() final;
+	void on_level_end() final;
+	void reload_shaders() final;
+	RenderScenePublic* get_scene() override { return &scene; }
+	void bake_cubemaps() final {}
+	uint32_t get_composite_output_texture_handle() final {
 		return tex.actual_output_composite; 
 	}
+	handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) final;
+	float get_scene_depth_for_editor(int x, int y) final;
 
-	virtual handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) override;
-	virtual float get_scene_depth_for_editor(int x, int y) override;
 
 	void check_hardware_options();
 	void create_default_textures();
@@ -395,14 +392,11 @@ public:
 	Memory_Arena mem_arena;
 
 	Memory_Arena& get_arena() { return mem_arena; }
-
+	
+	// default textuers
 	Texture white_texture;
 	Texture black_texture;
 	Texture flat_normal_texture;
-
-	
-	int cubemap_index = 0;
-	static const int MAX_SAMPLER_BINDINGS = 32;
 
 	struct programs
 	{
@@ -522,8 +516,6 @@ public:
 	vertexarrayhandle get_empty_vao() {
 		return vao.default_;
 	}
-
-	bufferhandle active_constants_ubo = 0;
 	
 	const View_Setup& get_current_frame_vs() const { return current_frame_view; }
 	View_Setup current_frame_view;
@@ -563,7 +555,7 @@ private:
 
 
 
-	void upload_ubo_view_constants(const View_Setup& view, uint32_t ubo, glm::vec4 custom_clip_plane = glm::vec4(0.0), bool wireframe_secondpass = false);
+	void upload_ubo_view_constants(const View_Setup& view, bufferhandle ubo, bool wireframe_secondpass = false);
 
 	void init_bloom_buffers();
 	void render_bloom_chain(texhandle scene_color_handle);
@@ -581,15 +573,11 @@ private:
 
 	OpenglRenderDevice device;
 
-	MeshBuilder ui_builder;
-	texhandle building_ui_texture;
-
-	MeshBuilder shadowverts;
-
 	// current world time for shaders/fx fed in by SceneParamsEx on draw_scene()
 	float current_time = 0.0;
 
 	bool refresh_render_targets_next_frame = false;
+	bool disable_taa_this_frame = false;
 };
 
 extern Renderer draw;

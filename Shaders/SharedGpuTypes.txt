@@ -65,8 +65,6 @@ struct Ubo_View_Constants_Struct
 	
 	vec4 fogcolor;
 	vec4 fogparams;
-	vec4 directional_light_dir_and_used;
-	vec4 directional_light_color;
 	
 	float numcubemaps;
 	float numlights;
