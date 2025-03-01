@@ -164,7 +164,13 @@ void ModelMan::compact_memory()
 	for (int i = 0; i < models.size() - 1/* skip last */; i++) {
 		int index_ptr = models[i]->merged_index_pointer;
 		allocator.ibuffer.tail = index_ptr;
-		models[i]->merged_index_pointer = allocator.move_append_i_buffer(index_ptr, models[i]->data.get_num_index_bytes());
+		//models[i]->merged_index_pointer = allocator.move_append_i_buffer(index_ptr, models[i]->data.get_num_index_bytes());
+
+		// okay just do it this way, i guess just keep models in CPU memory
+		size_t indiciesbufsize{};
+		const uint8_t* const ibufferdata = models[i]->data.get_index_data(&indiciesbufsize);
+		models[i]->merged_index_pointer = allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);	// dont divide by sizeof(uint16_2), this is an pointer
+
 	}
 
 	// then verts
@@ -177,7 +183,12 @@ void ModelMan::compact_memory()
 	for (int i = 0; i < models.size() - 1/* skip last */; i++) {
 		int vertex_ptr = models[i]->merged_vert_offset * sizeof(ModelVertex);
 		allocator.vbuffer.tail = vertex_ptr;
-		models[i]->merged_vert_offset = allocator.move_append_v_buffer(vertex_ptr, models[i]->data.get_num_vertex_bytes());
+		//models[i]->merged_vert_offset = allocator.move_append_v_buffer(vertex_ptr, models[i]->data.get_num_vertex_bytes());
+		//models[i]->merged_vert_offset /= sizeof(ModelVertex);
+
+		size_t vertbufsize{};
+		const uint8_t* const v_bufferdata = models[i]->data.get_vertex_data(&vertbufsize);
+		models[i]->merged_vert_offset = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
 		models[i]->merged_vert_offset /= sizeof(ModelVertex);
 	}
 }
@@ -301,7 +312,7 @@ void Model::uninstall()
 	lods.resize(0);
 	parts.clear();
 	merged_index_pointer = merged_vert_offset = 0;
-	data = RawMeshData();
+	data = RawMeshData();	// so destructor gets called and memory is freed
 	skel.reset(nullptr);
 	collision.reset();
 	tags.clear();
