@@ -23,6 +23,7 @@ void MeshBuilder::Begin(int reserve_verts)
 	verticies.reserve(reserve_verts);
 	verticies.clear();
 	indicies.clear();
+	wants_new_upload = true;
 }
 
 void MeshBuilderDD::init_from(MeshBuilder& mb)
@@ -62,7 +63,6 @@ void MeshBuilderDD::init_from(MeshBuilder& mb)
 
 void MeshBuilder::End()
 {
-	wants_new_upload = true;
 }
 
 void MeshBuilderDD::draw(uint32_t gl_type)

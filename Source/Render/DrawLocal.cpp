@@ -2537,6 +2537,8 @@ void Renderer::sync_update()
 	scene.execute_deferred_deletes();
 	matman.pre_render_update();
 
+	update_debug_grid();	// makes it visible/hidden
+
 	for (auto& mbo_ : scene.meshbuilder_objs.objects) {
 		auto& mbo = mbo_.type_;
 		mbo.dd.init_from(*mbo.obj.meshbuilder);
@@ -2545,9 +2547,6 @@ void Renderer::sync_update()
 		auto& po = po_.type_;
 		po.dd.init_from(*po.obj.meshbuilder);
 	}
-
-	update_debug_grid();	// makes it visible/hidden
-
 
 	// For TAA, double buffer bones
 
