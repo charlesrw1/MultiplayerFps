@@ -152,12 +152,13 @@ class MeshComponent;
 class GraphOutput
 {
 public:
+	void init();
 	void show(bool is_playing);
 	AnimatorInstance* get_animator();
 	void set_model(Model* model);
 	Model* get_model();
 	void start();
-	void end() {}
+	void end();
 private:
 	Entity* ent = nullptr;
 	MeshComponent* mc = nullptr;

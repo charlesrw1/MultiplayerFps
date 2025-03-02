@@ -1913,6 +1913,8 @@ void GameEngineLocal::loop()
 			get_level()->sync_level_render_data();
 
 		gui_sys->sync_to_renderer();
+
+		g_physics.sync_render_data();
 		
 		idraw->sync_update();
 
@@ -1952,6 +1954,8 @@ void GameEngineLocal::loop()
 		// update input, console cmd buffer
 		const bool should_skip = frame_start();
 		if (should_skip) {
+			// hack, do a sync update here to refresh assets etc
+			do_sync_update();
 			continue;
 		}
 

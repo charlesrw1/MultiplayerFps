@@ -123,7 +123,9 @@ public:
 #ifdef EDITOR_BUILD
 			// now for a sucky bit: if theres dependencies, they have to be reloaded sync otherwise stale pointers etc
 			if (is_reload) {
-				for (auto d : job->thisAsset->reload_dependents)
+				auto reloads =std::move(job->thisAsset->reload_dependents);
+				job->thisAsset->reload_dependents.clear();
+				for (auto d : reloads)
 					reload_asset_sync(d);
 			}
 #endif

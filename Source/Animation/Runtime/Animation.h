@@ -102,7 +102,22 @@ public:
 	int get_matrix_palette_offset() const {
 		return matrix_palette_offset;
 	}
+
+#ifdef EDITOR_BUILD
+	void set_force_seq_for_editor(const AnimationSeqAsset* seq) {
+		force_view_seq = seq;
+	}
+	void set_force_view_seq_time(float t) {
+		force_view_seq_time = t;
+	}
+#endif
 private:
+
+#ifdef EDITOR_BUILD
+	const AnimationSeqAsset* force_view_seq{};
+	float force_view_seq_time = 0.0;
+#endif
+
 	bool get_is_for_editor() const {
 		return get_owner() == nullptr;
 	}

@@ -15,6 +15,7 @@
 #include "Framework/MulticastDelegate.h"
 class Model;
 
+class Animation_Tree_CFG;
 
 
 class EventSequenceItem : public SequencerEditorItem
@@ -51,7 +52,7 @@ public:
 #include "Animation/Runtime/Animation.h"
 
 #include "EditorTool3d.h"
-
+class MeshComponent;
 class StaticMeshEntity;
 class AnimationEditorTool : public EditorTool3d
 {
@@ -71,17 +72,16 @@ public:
 	void post_map_load_callback() override;
 	void imgui_draw() override;
 
-	void add_to_obj(Render_Object& obj, float dt);
-
 	const char* get_save_file_extension() const {
 		return "NONE";
 	}
 
-	AnimatorInstance animator;
+	Entity* entity = nullptr;
+	MeshComponent* mc = nullptr;
+	Model* outputModel{};
+	std::unique_ptr<Animation_Tree_CFG> fake_tree;
 
 	PropertyGrid propGrid;
-	handle<Render_Object> outputObj;
-	Model* outputModel = nullptr;
 	ModelImportSettings* importSettings = nullptr;
 	AnimImportSettings* animImportSettings = nullptr;
 	const AnimationSeqAsset* sequence = nullptr;

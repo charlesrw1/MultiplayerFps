@@ -146,6 +146,9 @@ public:
 	// used only by model loader
 	bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def);
 
+	// debug mesh
+	void sync_render_data();
+
 private:
 	PhysicsManImpl* impl=nullptr;
 };

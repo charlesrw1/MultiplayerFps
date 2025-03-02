@@ -66,8 +66,15 @@ public:
 	int get_num_nodes() const {
 		return all_nodes.size();
 	}
+
+	static std::unique_ptr<Animation_Tree_CFG> construct_fake_tree();
+
+	bool get_is_fake_tree() const {
+		return is_fake_tree;
+	}
 private:
 	bool graph_is_valid = false;
+	bool is_fake_tree = false;
 
 	// graph root node
 	Node_CFG* root = nullptr;

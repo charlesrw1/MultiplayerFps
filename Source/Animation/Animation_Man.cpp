@@ -25,6 +25,14 @@ Animation_Tree_CFG::~Animation_Tree_CFG()
 	}
 }
 
+std::unique_ptr<Animation_Tree_CFG> Animation_Tree_CFG::construct_fake_tree() {
+	auto ptr = std::make_unique<Animation_Tree_CFG>();
+	ptr->graph_is_valid = true;
+	ptr->is_fake_tree = true;
+	ptr->animator_class.ptr = &AnimatorInstance::StaticType;
+	return ptr;
+}
+
 void Animation_Tree_CFG::uninstall()
 {
 	for (auto node : all_nodes)

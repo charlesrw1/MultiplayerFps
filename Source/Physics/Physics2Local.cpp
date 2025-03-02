@@ -423,19 +423,28 @@ bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape
 	return true;
 }
 
+void PhysicsManager::sync_render_data()
+{
+	MeshBuilder_Object o;
+	o.visible = g_draw_physx_scene.get_bool();
+	o.transform = glm::mat4(1.f);
+	o.meshbuilder = &impl->debug_mesh;
+	o.use_background_color = true;
+	if (!impl->debug_mesh_handle.is_valid())
+		impl->debug_mesh_handle = idraw->get_scene()->register_meshbuilder();
+	idraw->get_scene()->update_meshbuilder(impl->debug_mesh_handle, o);
+}
+
 void PhysicsManImpl::update_debug_physics_shapes()
 {
 	ASSERT(scene);
-	//return;
-	if (g_draw_physx_scene.get_integer() == 0) {
+	static bool init = false;
+	if (!g_draw_physx_scene.get_bool()) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
-		if (debug_mesh_handle.is_valid())
-			idraw->get_scene()->remove_meshbuilder(debug_mesh_handle);
+		init = false;
 		return;
 	}
-	MeshBuilder_Object o;
 	using namespace physx;
-	static bool init = false;
 	if (!init) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
@@ -460,11 +469,6 @@ void PhysicsManImpl::update_debug_physics_shapes()
 	}
 	debug_mesh.End();
 	//debug_mesh.Draw(MeshBuilder::LINES);
-
-	o.visible = true;
-	o.transform = glm::mat4(1.f);
-	o.meshbuilder = &debug_mesh;
-	o.use_background_color = true;
 
 	//if (!debug_mesh_handle.is_valid())
 	//	debug_mesh_handle = idraw->get_scene()->register_meshbuilder(o);

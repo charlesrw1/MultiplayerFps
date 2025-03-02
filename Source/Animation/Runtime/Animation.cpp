@@ -151,8 +151,6 @@ bool AnimatorInstance::initialize(
 		slots[i].name = graph->get_slot_names()[i].c_str();	// set hashed name for gamecode to find
 
 	// Initialize script instance, sets pointer of AnimatorInstance for native variables
-
-
 	this->cfg = graph;
 	this->model = model;
 	this->owner = ent;
@@ -315,11 +313,26 @@ void AnimatorInstance::update(float dt)
 	if(!get_is_for_editor())
 		on_update(dt);
 
+
 	// call into tree
 	if (!force_animation_to_bind_pose.get_bool() && get_tree()&& get_tree()->get_root_node())
 		get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
-	else
-		util_set_to_bind_pose(*pose_base.get(), get_skel());
+	else {
+#ifdef EDITOR_BUILD
+		if (force_view_seq) {
+			const BoneIndexRetargetMap* remap = nullptr;
+			if (get_skel() != force_view_seq->srcModel.get()->get_skel()) {
+				remap = model->get_skel()->get_remap(force_view_seq->srcModel.get()->get_skel());
+			}
+			util_calc_rotations(get_skel(), force_view_seq->seq, force_view_seq_time, remap, *pose_base.get());
+		}
+		else {
+#endif
+			util_set_to_bind_pose(*pose_base.get(), get_skel());
+#ifdef EDITOR_BUILD
+		}
+#endif
+	}
 
 	// update sync groups
 	for (int i = 0; i < active_sync_groups.size(); i++) {

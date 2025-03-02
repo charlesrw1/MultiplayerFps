@@ -2264,6 +2264,8 @@ void Renderer::draw_meshbuilders()
 	for (auto& mbPair : mbObjs)
 	{
 		auto& mb = mbPair.type_.obj;
+		if (!mb.visible)
+			continue;
 		auto& dd = mbPair.type_.dd;
 		if (mb.use_background_color) {
 			RenderPipelineState state;
@@ -2599,6 +2601,8 @@ void Renderer::sync_update()
 
 	for (auto& mbo_ : scene.meshbuilder_objs.objects) {
 		auto& mbo = mbo_.type_;
+		if (!mbo.obj.visible)
+			continue;
 		mbo.dd.init_from(*mbo.obj.meshbuilder);
 	}
 	for (auto& po_ : scene.particle_objs.objects) {

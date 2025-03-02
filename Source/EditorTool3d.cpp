@@ -48,7 +48,7 @@ void EditorTool3d::map_callback(bool b)
 	dome->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->Mesh->set_is_skybox( true );	// FIXME
 	dome->Mesh->set_casts_shadows( false );
-	dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
+	//dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
 	auto plane = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
 	plane->Mesh->set_model(g_modelMgr.get_default_plane_model());
@@ -56,9 +56,9 @@ void EditorTool3d::map_callback(bool b)
 	plane->Mesh->set_material_override((g_assets.find_sync<MaterialInstance>("eng/defaultWhite.mi").get()));
 
 	auto sun = eng->get_level()->spawn_entity_class<SunLightEntity>();
-	sun->Sun->intensity = 3.0;
+	sun->Sun->intensity = 2.0;
 	sun->Sun->visible = true;
-	sun->Sun->log_lin_lerp_factor = 0.8;
+	sun->Sun->log_lin_lerp_factor = 0.7;
 	sun->Sun->max_shadow_dist = 40.0;
 	sun->set_ls_euler_rotation(glm::vec3(-glm::radians(45.f), glm::radians(15.f), 0.f));
 

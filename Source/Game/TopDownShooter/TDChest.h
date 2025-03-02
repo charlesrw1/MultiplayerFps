@@ -54,7 +54,9 @@ public:
 		chest = get_owner()->get_component<TDChest>();
 	}
 	void on_update(float dt) override {
-		this->chest_open = chest->is_open;
+		if (chest) {
+			this->chest_open = chest->is_open;
+		}
 	}
 
 	REFLECT();

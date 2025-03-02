@@ -1184,15 +1184,14 @@ void ManipulateTransformTool::update()
 
 	has_any_changed |= good;
 
-	bool create_command = false;
 	if (ImGuizmo::IsUsingAny() && state == SELECTED) {
-		begin_drag();
+		begin_drag();	// was not being used last frame, but now using
 	}
 	else if (!ImGuizmo::IsUsingAny() && state == MANIPULATING_OBJS) {
-		end_drag();
+		end_drag();		// was using last frame, but now not using. this also saves off transforms into a undoable command
 	}
 	if (state == MANIPULATING_OBJS) {
-		// save off
+		// save off for visible state (command is sent in end_drag)
 		if (!get_is_using_for_custom()) {
 			auto& ss = ed_doc.selection_state;
 			auto& arr = ss->get_selection();

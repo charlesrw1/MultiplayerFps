@@ -23,46 +23,19 @@
 
 #include "Animation/Event.h"
 
+#include "Game/Components/MeshComponent.h"
+#include "Animation/Runtime/Animation.h"
+#include "Level.h"
+
 static AnimationEditorTool g_animseq_editor_static;
 IEditorTool* g_animseq_editor = &g_animseq_editor_static;
 
-void AnimationEditorTool::add_to_obj(Render_Object& obj, float dt)
-{
-	auto mod = g_animseq_editor_static.outputModel;
-	if (!mod || !mod->get_skel())
-		return;
-
-	Pose pose;
-	util_calc_rotations(mod->get_skel(), g_animseq_editor_static.sequence->seq, g_animseq_editor_static.animEdit->CURRENT_TIME, nullptr, pose);
-	auto& animator = g_animseq_editor_static.animator;
-	animator.model = mod;
-	animator.cached_bonemats.resize(mod->get_skel()->get_num_bones());
-	//animator.matrix_palette.resize(mod->get_skel()->get_num_bones());
-	util_localspace_to_meshspace_ptr_2(pose, animator.cached_bonemats.data(), mod->get_skel());
-
-	animator.ConcatWithInvPose();
-
-	//obj.animator = &animator;
-	obj.model = mod;
-	obj.visible = true;
-
-	obj.transform = mod->get_root_transform();
-}
 
 void AnimationEditorTool::tick(float dt)
 {
 	EditorTool3d::tick(dt);
-
-	auto mod = g_animseq_editor_static.outputModel;
-	if (outputObj.is_valid()&&mod&&mod->get_skel()) {
-		Render_Object o;
-		add_to_obj(o, dt);
-		idraw->get_scene()->update_obj(outputObj, o);
-
-		//glm::vec3 hipsCenter = animator.get_global_bonemats()[0][3];
-		//hipsCenter = outputModel->get_root_transform() * glm::vec4(hipsCenter, 1.0);
-		//view = View_Setup(camera.position + hipsCenter, camera.front, glm::radians(70.f), 0.01, 100.0, window_sz.x, window_sz.y);
-	}
+	if(mc->get_animator_instance())
+		mc->get_animator_instance()->set_force_view_seq_time(animEdit->CURRENT_TIME);
 }
 
 void AnimationEditorTool::imgui_draw()
@@ -267,19 +240,22 @@ void AnimationEditorTool::post_map_load_callback()
 	}
 
 
-	outputObj = idraw->get_scene()->register_obj();
-	///outputEntity->Mesh->
-
-
 
 	outputModel = default_asset_load<Model>((modelName + ".cmdl").c_str());	// find the compilied model, this could be an error and loading still 'works'
 	if (!outputModel)
 		sys_print(Debug,"compilied model didnt load but loading .def didnt error, continuing as normal\n");
 	else {
-		int remapIndx;
 		sequence = g_assets.find_sync<AnimationSeqAsset>(modelName + "/" + animName).get();// outputModel->get_skel()->find_clip(animName, remapIndx);
 	}
-
+	
+	entity = eng->get_level()->spawn_entity_class<Entity>();
+	mc = entity->create_component<MeshComponent>();
+	mc->set_model(outputModel);
+	fake_tree = Animation_Tree_CFG::construct_fake_tree();
+	mc->set_animation_graph(fake_tree.get());
+	if (outputModel) {
+		mc->get_animator_instance()->set_force_seq_for_editor(sequence);
+	}
 	on_start.invoke();
 }
 
@@ -289,8 +265,9 @@ void AnimationEditorTool::close_internal()
 
 	on_close.invoke();
 
-	idraw->get_scene()->remove_obj(outputObj);
-
+	fake_tree.reset();
+	entity = nullptr;	// get cleaned up by level
+	mc = nullptr;
 	outputModel = nullptr;
 	delete importSettings;
 	importSettings = nullptr;
@@ -329,18 +306,8 @@ bool AnimationEditorTool::save_document_internal()
 	}
 	else {
 
-		g_assets.reload_async(outputModel, [](GenericAssetPtr ptr) {
-
-			if (!g_animseq_editor_static.outputModel)
-				return;
-
-			auto str = std::string(g_animseq_editor_static.get_doc_name());
-			auto slash = str.rfind('/');
-			auto animName = str.substr(slash + 1);
-
-			int dummy;
-			g_animseq_editor_static.on_post_save.invoke();
-		});
+		g_assets.reload_sync(outputModel);
+		g_animseq_editor_static.on_post_save.invoke();
 
 	//	g_assets.reload_sync(outputModel);
 	}

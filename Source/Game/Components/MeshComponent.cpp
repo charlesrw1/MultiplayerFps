@@ -143,8 +143,8 @@ void MeshComponent::update_animator_instance()
 {
 	auto pre_animator = animator.get();
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
-	if (!eng->is_editor_level()) {
-		if (modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
+	{
+		if (modToUse&&modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
 
 			AnimatorInstance* c = animator_tree->allocate_animator_class();
 			animator.reset(c);

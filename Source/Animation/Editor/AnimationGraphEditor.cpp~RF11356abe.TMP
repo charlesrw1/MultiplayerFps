@@ -473,7 +473,6 @@ void AnimationGraphEditor::pause_playback()
 {
 	ASSERT(playback != graph_playback_state::stopped);
 	playback = graph_playback_state::paused;
-	out.show(false);
 }
 
 void AnimationGraphEditor::hook_menu_bar()
@@ -491,10 +490,8 @@ void AnimationGraphEditor::start_or_resume_playback()
 {
 	if (playback == graph_playback_state::stopped)
 		compile_and_run();
-	else {
+	else
 		playback = graph_playback_state::running;
-		out.show(true);
-	}
 
 	control_params->refresh_props();
 }
@@ -595,7 +592,7 @@ void AnimationGraphEditor::draw_prop_editor()
 void AnimationGraphEditor::stop_playback()
 {
 	playback = graph_playback_state::stopped;
-	out.show(false);
+
 	control_params->refresh_props();
 }
 
@@ -664,7 +661,7 @@ void AnimationGraphEditor::imgui_draw()
 	//cei.draw();
 	//seqimgui.draw();
 	//cei.draw();
-	//ASSERT(anim_graph_ed.out.get_animator() || !anim_class_type.ptr);
+	ASSERT(anim_graph_ed.out.get_animator() || !anim_class_type.ptr);
 
 	node_props->set_read_only(graph_is_read_only());
 
@@ -1382,13 +1379,13 @@ void AnimationGraphEditor::tick(float dt)
 	if(1)
 	{
 		//assert(eng->get_state() != Engine_State::Game);
-		//if (get_playback_state() == graph_playback_state::running) {
-		//	auto animator = out.get_animator();
-		//	if(animator)
-		//		animator->update(dt * g_slomo.get_float());
-		//}
+		if (get_playback_state() == graph_playback_state::running) {
+			auto animator = out.get_animator();
+			if(animator)
+				animator->update(dt * g_slomo.get_float());
+		}
 		
-		//out.show(get_playback_state() != graph_playback_state::stopped);
+		out.show(get_playback_state() != graph_playback_state::stopped);
 
 	}
 	else {	// not focused, game running likely
@@ -1546,7 +1543,7 @@ void AnimationGraphEditor::create_new_document()
 
 void AnimationGraphEditor::try_load_preview_models()
 {
-	//ASSERT(anim_graph_ed.out.get_animator());
+	ASSERT(anim_graph_ed.out.get_animator());
 	on_set_model.invoke(output_model.get());
 	on_set_animator_instance.invoke(anim_graph_ed.out.get_animator());
 }
@@ -1583,11 +1580,9 @@ void GraphOutput::end()
 	ent = nullptr;
 	mc = nullptr;
 }
-
-AnimatorInstance* GraphOutput::get_animator()
+void GraphOutput::show(bool is_showing)
 {
-	assert(mc);
-	return mc->get_animator_instance();
+	if(is_showing)
 }
 
 void GraphOutput::set_model(Model* model) {
@@ -1653,8 +1648,6 @@ void AnimationGraphEditor::post_map_load_callback()
 
 	anim_class_type = editing_tree->animator_class;
 
-	out.start();
-
 	// initialize other state
 	*graph_tabs = TabState(this);
 	// push root tab, always visible
@@ -1700,6 +1693,12 @@ void GraphOutput::show(bool is_playing)
 	////obj_data.mat_override = (MaterialInstance*)imaterials->find_material_instance("orborbmat"); // fixme
 	//idraw->get_scene()->update_obj(obj,obj_data);
 }
+
+AnimatorInstance* GraphOutput::get_animator()
+{
+	return mc->get_animator_instance();
+}
+
 
 
 AnimGraphClipboard::AnimGraphClipboard()
