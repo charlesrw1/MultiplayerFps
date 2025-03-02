@@ -540,7 +540,7 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 		glm::quat* v = (glm::quat*)prop->get_ptr(ptr);
 		glm::vec3 eulerA{};
 		int field = sscanf(tok.to_stack_string().c_str(), "%f %f %f", &eulerA.x, &eulerA.y, &eulerA.z);
-		*v = glm::quat(eulerA);
+		*v = glm::normalize(glm::quat(eulerA));
 		return true;
 	}
 

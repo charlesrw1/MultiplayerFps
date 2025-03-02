@@ -44,11 +44,28 @@ void UIBuilder::draw_solid_rect(glm::ivec2 global_coords,
 	Color32 color)
 {
 	const int start = impl->meshbuilder.get_i().size();
+	
 	impl->meshbuilder.Push2dQuad(global_coords, size, glm::vec2(0, 1), glm::vec2(1, -1), color);
 
 	auto mat = (MaterialInstance*)sys->ui_default;
 
 	impl->add_drawcall(mat, start);
+}
+
+void UIBuilder::draw_rect_with_texture(
+	glm::ivec2 global_coords,
+	glm::ivec2 size,
+	float alpha,
+	const Texture* texture
+)
+{
+	const int start = impl->meshbuilder.get_i().size();
+
+	impl->meshbuilder.Push2dQuad(global_coords, size, glm::vec2(0, 1), glm::vec2(1, -1), COLOR_WHITE);
+
+	auto mat = (MaterialInstance*)sys->ui_default;
+
+	impl->add_drawcall(mat, start, texture);
 }
 
 static void get_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const GuiFont* f)
@@ -96,9 +113,10 @@ void UIBuilder::draw_text(
 		}
 	}
 
-	auto mat = (MaterialInstance*)sys->ui_default;
+	auto mat = (MaterialInstance*)g_fonts.fontDefaultMat.get();
 
-	impl->add_drawcall(mat, start);
+
+	impl->add_drawcall(mat, start,font->font_texture);
 }
 
 GuiSystemPublic* GuiSystemPublic::create_gui_system() {

@@ -388,21 +388,33 @@ class RotationEditor : public IPropertyEditor
 public:
 	RotationEditor(void* ins, PropertyInfo* inf)  {
 		prop = inf; instance = ins;
+		glm::quat* v = (glm::quat*)prop->get_ptr(instance);
+		euler = glm::eulerAngles(*v);
+		euler *= 180.f / PI;
+		lastQuat = *v;
 	}
 
 	virtual bool internal_update() {
 		glm::quat* v = (glm::quat*)prop->get_ptr(instance);
 
-		glm::vec3 eul = glm::eulerAngles(*v);
-		eul *= 180.f / PI;
-		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
-			eul *= PI / 180.f;
-			*v = glm::normalize(glm::quat(eul));
+		float dot = glm::dot(lastQuat, *v);
+		if (dot < 0.9999) {
+			// someone else changed it
+			euler = glm::eulerAngles(*v);
+			euler *= 180.f / PI;
+			lastQuat = *v;
+			printf("changed by someone\n");
+		}
 
+		if (ImGui::DragFloat3("##eul", &euler.x, 1.0)) {
+			*v = (glm::quat(euler * PI / 180.f));
+			lastQuat = *v;
 			return true;
 		}
 		return false;
 	}
+	glm::quat lastQuat{};
+	glm::vec3 euler{};
 };
 
 static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance, IGridRow* parent) {

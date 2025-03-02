@@ -9,6 +9,7 @@ struct World_GUI
 	GUI* gui_ptr = nullptr;
 };
 
+class MaterialInstance;
 class GuiSystemPublic
 {
 public:
@@ -35,4 +36,5 @@ public:
 	virtual void set_viewport_ofs(int x, int y) = 0;
 	virtual void set_viewport_size(int x, int y) = 0;
 
+	virtual const MaterialInstance* get_default_ui_mat() const = 0;
 };

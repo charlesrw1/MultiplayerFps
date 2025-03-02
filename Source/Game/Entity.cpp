@@ -322,11 +322,16 @@ void Entity::add_component_from_unserialization(EntityComponent* component)
 	all_components.push_back(component);
 }
 
+
 static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
 {
-	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-	q = (glm::quat_cast(transform));
 	p = transform[3];
+	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
+	q = glm::quat_cast(glm::mat3(
+		transform[0] / s.x,
+		transform[1] / s.y,
+		transform[2] / s.z
+	));
 }
 
 static glm::mat4 compose_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& s)

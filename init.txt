@@ -25,6 +25,7 @@ bind [ "print_vertex_usage"
 bind ] "compact_vertex_buffer"
 
 bind T "toggle editor_draw_name_text"
+bind Y "toggle ed.force_guizmo"
 
 bind F1 "r.debug_mode 0"
 bind F2 "r.debug_mode 4"
@@ -49,7 +50,7 @@ bind "Keypad 5" Ctrl "FILTER_FOR AnimGraph"
 bind "Keypad 6" Ctrl "FILTER_FOR DataClass"
 bind "Keypad 7" Ctrl "FILTER_FOR AnimationSeq"
 bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
-bind "Keypad ." SET_ORBIT_TARGET
+bind "F" SET_ORBIT_TARGET
 
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"
@@ -88,5 +89,7 @@ RUN_TESTS
 g_draw_grid 1
 
 #start_ed AnimGraph "testcharacter_a.ag"
-map top_down/map0.tmap
+start_ed Map top_down/map0.tmap
 #start_ed Material "top_down/fake_fog.mm"
+
+

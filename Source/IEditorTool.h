@@ -25,8 +25,10 @@ public:
 	virtual const View_Setup* get_vs() { return nullptr; }
 	void draw_imgui_public();
 
+	virtual void hook_pre_scene_viewport_draw() {}
 	virtual void hook_scene_viewport_draw() {}
 	virtual void hook_imgui_newframe() {}
+	virtual bool wants_scene_viewport_menu_bar() const { return false; }
 
 	virtual const char* get_save_file_extension() const = 0;
 

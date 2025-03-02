@@ -4,9 +4,10 @@
 #include "Game/SerializePtrHelpers.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
-
+#include "Render/DynamicMaterialPtr.h"
 class GuiFont;
 class Texture;
+class MaterialInstance;
 struct GuiFontGlyph
 {
 	uint16_t x{};
@@ -25,6 +26,7 @@ public:
 	int base = 0;
 	const Texture* font_texture{};
 	std::unordered_map<uint32_t, GuiFontGlyph> character_to_glyph;
+
 	friend class GuiFontLoader;
 	friend class GuiHelpers;
 
@@ -32,7 +34,7 @@ public:
 		character_to_glyph.clear();
 	}
 	bool load_asset(ClassBase*& user);
-	void post_load(ClassBase*) {}
+	void post_load(ClassBase*);
 	void move_construct(IAsset* _other) {
 		GuiFont* other = (GuiFont*)_other;
 		*this = std::move(*other);
@@ -46,6 +48,7 @@ public:
 	void init();
 	const GuiFont* get_default_font() const { return defaultFont.get(); }
 
+	AssetPtr<MaterialInstance> fontDefaultMat;
 	AssetPtr<GuiFont> defaultFont{};
 };
 extern GuiFontLoader g_fonts;

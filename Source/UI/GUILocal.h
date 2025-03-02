@@ -41,16 +41,18 @@ struct UIBuilderImpl
 	std::vector<UIDrawCall> drawCalls;
 	MeshBuilder meshbuilder;
 
-	void add_drawcall(MaterialInstance* mat, int start) {
+	void add_drawcall(MaterialInstance* mat, int start, const Texture* tex_override = nullptr) {
 		const int count = meshbuilder.get_i().size() - start;
-		if (drawCalls.empty() || drawCalls.back().mat != mat) {
+		if (drawCalls.empty() || drawCalls.back().mat != mat || drawCalls.back().texOverride!=tex_override) {
 			UIDrawCall dc;
 			dc.index_count = count;
 			dc.index_start = start;
 			dc.mat = mat;
+			dc.texOverride = tex_override;
 			drawCalls.push_back(dc);
 		}
-		drawCalls.back().index_count += count;
+		else
+			drawCalls.back().index_count += count;
 	}
 };
 
@@ -89,7 +91,7 @@ public:
 			GUI* g = find_gui_under_mouse_R(root, event.button.x, event.button.y);
 			if (g) {
 				const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
-				
+
 				if (ui_debug_press.get_bool())
 					sys_print(Debug, "UI pressed: %s\n", g->get_type().classname);
 				g->on_pressed(where.x, where.y, event.button.button);
@@ -135,7 +137,7 @@ public:
 	}
 
 	void think() final {
-	
+
 		int x = 0, y = 0;
 		SDL_GetMouseState(&x, &y);
 
@@ -153,7 +155,7 @@ public:
 		if (dragging) {
 			const glm::ivec2 where = { x - dragging->ws_position.x,y - dragging->ws_position.y };
 			dragging->on_dragging(where.x, where.y);
-		
+
 		}
 		if (focusing)
 			focusing->on_focusing();
@@ -217,7 +219,10 @@ public:
 	// use for solid color, 1 texture ui, text
 	const MaterialInstance* ui_default = nullptr;
 
-
+	const MaterialInstance* get_default_ui_mat() const final {
+		return ui_default;
+	}
+	
 	GUI* hovering = nullptr;
 	GUI* dragging = nullptr;
 	GUI* focusing = nullptr;

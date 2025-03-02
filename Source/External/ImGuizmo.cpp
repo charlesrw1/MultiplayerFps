@@ -781,7 +781,9 @@ namespace IMGUIZMO_NAMESPACE
    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
    //
    static int GetMoveType(OPERATION op, vec_t* gizmoHitProportion);
+   static int GetMoveTypeWithForce(bool force_gizmo_on, OPERATION op, vec_t* gizmoHitProportion);
    static int GetRotateType(OPERATION op);
+   static int GetRotateTypeForce(bool force_on, OPERATION op);
    static int GetScaleType(OPERATION op);
 
    Style& GetStyle()
@@ -1967,15 +1969,30 @@ namespace IMGUIZMO_NAMESPACE
       }
       return type;
    }
-
    static int GetRotateType(OPERATION op)
    {
-      if (gContext.mbUsing)
+       return GetRotateTypeForce(false, op);
+   }
+
+   static int GetRotateTypeForce(bool force_gizmo_on, OPERATION op)
+   {
+      if (gContext.mbUsing&&!force_gizmo_on)
       {
          return MT_NONE;
       }
+      if (force_gizmo_on) {
+          if (op == OPERATION::ROTATE)
+              return MT_ROTATE_SCREEN;
+          else if (op == OPERATION::ROTATE_X)
+              return MT_ROTATE_X;
+          else if (op == OPERATION::ROTATE_Y)
+              return MT_ROTATE_Y;
+          else if (op == OPERATION::ROTATE_Z)
+              return MT_ROTATE_Z;
+      }
       ImGuiIO& io = ImGui::GetIO();
       int type = MT_NONE;
+
 
       vec_t deltaScreen = { io.MousePos.x - gContext.mScreenSquareCenter.x, io.MousePos.y - gContext.mScreenSquareCenter.y, 0.f, 0.f };
       float dist = deltaScreen.Length();
@@ -2028,64 +2045,83 @@ namespace IMGUIZMO_NAMESPACE
 
    static int GetMoveType(OPERATION op, vec_t* gizmoHitProportion)
    {
-      if(!Intersects(op, TRANSLATE) || gContext.mbUsing || !gContext.mbMouseOver)
-      {
-        return MT_NONE;
-      }
-      ImGuiIO& io = ImGui::GetIO();
-      int type = MT_NONE;
+       return GetMoveTypeWithForce(false, op, gizmoHitProportion);
+   }
+   static int GetMoveTypeWithForce(bool force_gizmo_on, OPERATION op, vec_t* gizmoHitProportion)
+   {
+       if (!Intersects(op, TRANSLATE) || (gContext.mbUsing&&!force_gizmo_on) || !gContext.mbMouseOver)
+       {
+           return MT_NONE;
+       }
 
-      // screen
-      if (io.MousePos.x >= gContext.mScreenSquareMin.x && io.MousePos.x <= gContext.mScreenSquareMax.x &&
-         io.MousePos.y >= gContext.mScreenSquareMin.y && io.MousePos.y <= gContext.mScreenSquareMax.y &&
-         Contains(op, TRANSLATE))
-      {
-         type = MT_MOVE_SCREEN;
-      }
+       if (force_gizmo_on) {
+           if (op == OPERATION::TRANSLATE)
+               return MT_MOVE_SCREEN;
+           else if (op == OPERATION::TRANSLATE_X)
+               return MT_MOVE_X;
+           else if (op == OPERATION::TRANSLATE_Y)
+               return MT_MOVE_Y;
+           else if (op == OPERATION::TRANSLATE_Z)
+               return MT_MOVE_Z;
+       }
 
-      const vec_t screenCoord = makeVect(io.MousePos - ImVec2(gContext.mX, gContext.mY));
+       ImGuiIO& io = ImGui::GetIO();
+       int type = MT_NONE;
 
-      // compute
-      for (int i = 0; i < 3 && type == MT_NONE; i++)
-      {
-         vec_t dirPlaneX, dirPlaneY, dirAxis;
-         bool belowAxisLimit, belowPlaneLimit;
-         ComputeTripodAxisAndVisibility(i, dirAxis, dirPlaneX, dirPlaneY, belowAxisLimit, belowPlaneLimit);
-         dirAxis.TransformVector(gContext.mModel);
-         dirPlaneX.TransformVector(gContext.mModel);
-         dirPlaneY.TransformVector(gContext.mModel);
+       // screen
+       if (io.MousePos.x >= gContext.mScreenSquareMin.x && io.MousePos.x <= gContext.mScreenSquareMax.x &&
+           io.MousePos.y >= gContext.mScreenSquareMin.y && io.MousePos.y <= gContext.mScreenSquareMax.y &&
+           Contains(op, TRANSLATE))
+       {
+           type = MT_MOVE_SCREEN;
+       }
 
-         const float len = IntersectRayPlane(gContext.mRayOrigin, gContext.mRayVector, BuildPlan(gContext.mModel.v.position, dirAxis));
-         vec_t posOnPlan = gContext.mRayOrigin + gContext.mRayVector * len;
+       const vec_t screenCoord = makeVect(io.MousePos - ImVec2(gContext.mX, gContext.mY));
 
-         const ImVec2 axisStartOnScreen = worldToPos(gContext.mModel.v.position + dirAxis * gContext.mScreenFactor * 0.1f, gContext.mViewProjection) - ImVec2(gContext.mX, gContext.mY);
-         const ImVec2 axisEndOnScreen = worldToPos(gContext.mModel.v.position + dirAxis * gContext.mScreenFactor, gContext.mViewProjection) - ImVec2(gContext.mX, gContext.mY);
+       // compute
+       for (int i = 0; i < 3 && type == MT_NONE; i++)
+       {
+           vec_t dirPlaneX, dirPlaneY, dirAxis;
+           bool belowAxisLimit, belowPlaneLimit;
+           ComputeTripodAxisAndVisibility(i, dirAxis, dirPlaneX, dirPlaneY, belowAxisLimit, belowPlaneLimit);
+           dirAxis.TransformVector(gContext.mModel);
+           dirPlaneX.TransformVector(gContext.mModel);
+           dirPlaneY.TransformVector(gContext.mModel);
 
-         vec_t closestPointOnAxis = PointOnSegment(screenCoord, makeVect(axisStartOnScreen), makeVect(axisEndOnScreen));
-         if ((closestPointOnAxis - screenCoord).Length() < 12.f && Intersects(op, static_cast<OPERATION>(TRANSLATE_X << i))) // pixel size
-         {
-            type = MT_MOVE_X + i;
-         }
+           const float len = IntersectRayPlane(gContext.mRayOrigin, gContext.mRayVector, BuildPlan(gContext.mModel.v.position, dirAxis));
+           vec_t posOnPlan = gContext.mRayOrigin + gContext.mRayVector * len;
 
-         const float dx = dirPlaneX.Dot3((posOnPlan - gContext.mModel.v.position) * (1.f / gContext.mScreenFactor));
-         const float dy = dirPlaneY.Dot3((posOnPlan - gContext.mModel.v.position) * (1.f / gContext.mScreenFactor));
-         if (belowPlaneLimit && dx >= quadUV[0] && dx <= quadUV[4] && dy >= quadUV[1] && dy <= quadUV[3] && Contains(op, TRANSLATE_PLANS[i]))
-         {
-            type = MT_MOVE_YZ + i;
-         }
+           const ImVec2 axisStartOnScreen = worldToPos(gContext.mModel.v.position + dirAxis * gContext.mScreenFactor * 0.1f, gContext.mViewProjection) - ImVec2(gContext.mX, gContext.mY);
+           const ImVec2 axisEndOnScreen = worldToPos(gContext.mModel.v.position + dirAxis * gContext.mScreenFactor, gContext.mViewProjection) - ImVec2(gContext.mX, gContext.mY);
 
-         if (gizmoHitProportion)
-         {
-            *gizmoHitProportion = makeVect(dx, dy, 0.f);
-         }
-      }
-      return type;
+           vec_t closestPointOnAxis = PointOnSegment(screenCoord, makeVect(axisStartOnScreen), makeVect(axisEndOnScreen));
+           if ((closestPointOnAxis - screenCoord).Length() < 12.f && Intersects(op, static_cast<OPERATION>(TRANSLATE_X << i))) // pixel size
+           {
+               type = MT_MOVE_X + i;
+           }
+
+           const float dx = dirPlaneX.Dot3((posOnPlan - gContext.mModel.v.position) * (1.f / gContext.mScreenFactor));
+           const float dy = dirPlaneY.Dot3((posOnPlan - gContext.mModel.v.position) * (1.f / gContext.mScreenFactor));
+           if (belowPlaneLimit && dx >= quadUV[0] && dx <= quadUV[4] && dy >= quadUV[1] && dy <= quadUV[3] && Contains(op, TRANSLATE_PLANS[i]))
+           {
+               type = MT_MOVE_YZ + i;
+           }
+
+           if (gizmoHitProportion)
+           {
+               *gizmoHitProportion = makeVect(dx, dy, 0.f);
+           }
+       }
+       return type;
    }
 
-   static bool HandleTranslation(float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
+   static bool HandleTranslation(bool force_gizmo_on, float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
    {
       if(!Intersects(op, TRANSLATE) || type != MT_NONE)
       {
+          if (IsTranslateType(gContext.mCurrentOperation))
+              gContext.mbUsing = false;
+
         return false;
       }
       const ImGuiIO& io = ImGui::GetIO();
@@ -2095,6 +2131,16 @@ namespace IMGUIZMO_NAMESPACE
       // move
       if (gContext.mbUsing && (gContext.mActualID == -1 || gContext.mActualID == gContext.mEditingID) && IsTranslateType(gContext.mCurrentOperation))
       {
+          vec_t gizmoHitProportion;
+          auto nexttype = GetMoveTypeWithForce(force_gizmo_on, op, &gizmoHitProportion);
+          if ((!io.MouseDown[0] && !force_gizmo_on) || (force_gizmo_on && nexttype != gContext.mCurrentOperation))
+          {
+              printf("deactivated translation\n");
+
+              gContext.mbUsing = false;
+              return false;
+        }
+
 #if IMGUI_VERSION_NUM >= 18723
          ImGui::SetNextFrameWantCaptureMouse(true);
 #else
@@ -2156,10 +2202,7 @@ namespace IMGUIZMO_NAMESPACE
          const matrix_t res = gContext.mModelSource * deltaMatrixTranslation;
          *(matrix_t*)matrix = res;
 
-         if (!io.MouseDown[0])
-         {
-            gContext.mbUsing = false;
-         }
+       
 
          type = gContext.mCurrentOperation;
       }
@@ -2167,7 +2210,7 @@ namespace IMGUIZMO_NAMESPACE
       {
          // find new possible way to move
          vec_t gizmoHitProportion;
-         type = GetMoveType(op, &gizmoHitProportion);
+         type = GetMoveTypeWithForce(force_gizmo_on, op, &gizmoHitProportion);
          if (type != MT_NONE)
          {
 #if IMGUI_VERSION_NUM >= 18723
@@ -2176,8 +2219,9 @@ namespace IMGUIZMO_NAMESPACE
             ImGui::CaptureMouseFromApp();
 #endif
          }
-         if (CanActivate() && type != MT_NONE)
+         if ((CanActivate() || force_gizmo_on) && type != MT_NONE)
          {
+             printf("activated translation\n");
             gContext.mbUsing = true;
             gContext.mEditingID = gContext.mActualID;
             gContext.mCurrentOperation = type;
@@ -2204,7 +2248,7 @@ namespace IMGUIZMO_NAMESPACE
       return modified;
    }
 
-   static bool HandleScale(float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
+   static bool HandleScale(bool force_gizmo_on, float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
    {
       if((!Intersects(op, SCALE) && !Intersects(op, SCALEU)) || type != MT_NONE || !gContext.mbMouseOver)
       {
@@ -2326,10 +2370,13 @@ namespace IMGUIZMO_NAMESPACE
       return modified;
    }
 
-   static bool HandleRotation(float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
+   static bool HandleRotation(bool force_gizmo_on, float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
    {
-      if(!Intersects(op, ROTATE) || type != MT_NONE || !gContext.mbMouseOver)
+      if(!Intersects(op, ROTATE) || type != MT_NONE )
       {
+          if (IsRotateType(gContext.mCurrentOperation))
+              gContext.mbUsing = false;
+
         return false;
       }
       ImGuiIO& io = ImGui::GetIO();
@@ -2338,7 +2385,7 @@ namespace IMGUIZMO_NAMESPACE
 
       if (!gContext.mbUsing)
       {
-         type = GetRotateType(op);
+         type = GetRotateTypeForce(force_gizmo_on, op);
 
          if (type != MT_NONE)
          {
@@ -2354,8 +2401,11 @@ namespace IMGUIZMO_NAMESPACE
             applyRotationLocaly = true;
          }
 
-         if (CanActivate() && type != MT_NONE)
+         if ((CanActivate()||force_gizmo_on) && type != MT_NONE)
          {
+             printf("activated roation\n");
+
+
             gContext.mbUsing = true;
             gContext.mEditingID = gContext.mActualID;
             gContext.mCurrentOperation = type;
@@ -2380,6 +2430,19 @@ namespace IMGUIZMO_NAMESPACE
       // rotation
       if (gContext.mbUsing && (gContext.mActualID == -1 || gContext.mActualID == gContext.mEditingID) && IsRotateType(gContext.mCurrentOperation))
       {
+
+          auto nexttype = GetRotateTypeForce(force_gizmo_on, op);
+          if ((!io.MouseDown[0] && !force_gizmo_on) || (force_gizmo_on && nexttype != gContext.mCurrentOperation))
+          {
+              printf("deactivated roation\n");
+
+              gContext.mbUsing = false;
+              gContext.mEditingID = -1;
+
+              return false;
+           }
+
+
 #if IMGUI_VERSION_NUM >= 18723
          ImGui::SetNextFrameWantCaptureMouse(true);
 #else
@@ -2424,12 +2487,7 @@ namespace IMGUIZMO_NAMESPACE
          {
             *(matrix_t*)deltaMatrix = gContext.mModelInverse * deltaRotation * gContext.mModel;
          }
-
-         if (!io.MouseDown[0])
-         {
-            gContext.mbUsing = false;
-            gContext.mEditingID = -1;
-         }
+ 
          type = gContext.mCurrentOperation;
       }
       return modified;
@@ -2504,7 +2562,7 @@ namespace IMGUIZMO_NAMESPACE
      gContext.mPlaneLimit = value;
    }
 
-   bool Manipulate(const float* view, const float* projection, OPERATION operation, MODE mode, float* matrix, float* deltaMatrix, const float* snap, const float* localBounds, const float* boundsSnap)
+   bool Manipulate(bool force_gizmo_on, const float* view, const float* projection, OPERATION operation, MODE mode, float* matrix, float* deltaMatrix, const float* snap, const float* localBounds, const float* boundsSnap)
    {
       // Scale is always local or matrix will be skewed when applying world scale or oriented matrix
       ComputeContext(view, projection, matrix, (operation & SCALE) ? LOCAL : mode);
@@ -2530,9 +2588,9 @@ namespace IMGUIZMO_NAMESPACE
       {
          if (!gContext.mbUsingBounds)
          {
-            manipulated = HandleTranslation(matrix, deltaMatrix, operation, type, snap) ||
-                          HandleScale(matrix, deltaMatrix, operation, type, snap) ||
-                          HandleRotation(matrix, deltaMatrix, operation, type, snap);
+            manipulated = HandleTranslation(force_gizmo_on,matrix, deltaMatrix, operation, type, snap) ||
+                          HandleScale(force_gizmo_on,matrix, deltaMatrix, operation, type, snap) ||
+                          HandleRotation(force_gizmo_on,matrix, deltaMatrix, operation, type, snap);
          }
       }
 

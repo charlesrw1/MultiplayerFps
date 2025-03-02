@@ -390,7 +390,20 @@ public:
 	bool get_is_using_for_custom() const {
 		return is_using_for_custom;
 	}
+
+
+	void set_force_gizmo_on(bool b) {
+		force_gizmo_on = b;
+		axis_mask = 0xff;
+	}
+	bool get_force_gizmo_on() const {
+		return force_gizmo_on;
+	}
+	void reset_group_to_pre_transform();
+
 private:
+	bool force_gizmo_on = false;
+
 
 	void on_key_down(const SDL_KeyboardEvent& k);
 
@@ -420,6 +433,7 @@ private:
 		MANIPULATING_OBJS,
 	}state = IDLE;
 
+	int axis_mask = 0xff;
 	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
 	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
 
@@ -439,22 +453,26 @@ class EditorDoc : public IEditorTool
 {
 public:
 	EditorDoc();
-	virtual void init();
-	virtual bool can_save_document() override { return true; }
-	virtual bool open_document_internal(const char* levelname, const char* arg) override;
-	virtual void close_internal() override;
-	virtual bool save_document_internal() override;
+	void init() final;
+	bool can_save_document() final { return true; }
+	bool open_document_internal(const char* levelname, const char* arg) final;
+	void close_internal() final;
+	bool save_document_internal() final;
 	void hook_menu_bar() final;
-
-	const ClassTypeInfo& get_asset_type_info() const override {
+	void hook_imgui_newframe() final {
+		ImGuizmo::BeginFrame();
+	}
+	void hook_scene_viewport_draw() final;
+	void hook_pre_scene_viewport_draw() final;
+	bool wants_scene_viewport_menu_bar() const { return true; }
+	const ClassTypeInfo& get_asset_type_info() const final {
 		return is_editing_scene() ? SceneAsset::StaticType : PrefabAsset::StaticType;
 	}
+	void tick(float dt) final;
+	void imgui_draw() final;
+	const View_Setup* get_vs() final { return &vs_setup; }
 
-	virtual void tick(float dt) override;
-	virtual void imgui_draw() override;
-	virtual const View_Setup* get_vs() override { return &vs_setup; }
-
-	std::string get_full_output_path() {
+	std::string get_full_output_path()  {
 		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
 	}
 
@@ -478,10 +496,6 @@ public:
 
 	void duplicate_selected_and_select_them();
 
-	void hook_imgui_newframe() override {
-		ImGuizmo::BeginFrame();
-	}
-	void hook_scene_viewport_draw() override;
 
 	glm::vec3 unproject_mouse_to_ray(int mx, int my);
 
@@ -548,6 +562,7 @@ public:
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<EditorUILayout> gui;
+
 
 	View_Setup vs_setup;
 	bool using_ortho = false;

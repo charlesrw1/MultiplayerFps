@@ -3,11 +3,13 @@
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
 class MaterialInstance;
+class Texture;
 struct UIDrawCall
 {
 	int index_start = 0;
 	int index_count = 0;
 	MaterialInstance* mat = nullptr;
+	const Texture* texOverride = nullptr;
 };
 class MeshBuilder;
 class RendererUIBackend

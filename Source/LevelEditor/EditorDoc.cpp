@@ -75,7 +75,7 @@ public:
 
 		mouse_clicked = true;
 		button_clicked = button;
-		if(!editor_draw_name_text.get_bool())
+		//if(!editor_draw_name_text.get_bool())
 			mouse_down_delegate.invoke(x, y, button);
 	}
 	void on_released(int x, int y, int button) override {
@@ -120,9 +120,16 @@ public:
 		for (auto o : all_objs) {
 			if (Entity* e = o->cast_to<Entity>()) {
 				obj ob;
+				glm::vec3 todir = glm::vec3(e->get_ws_position()) - ed_doc.vs_setup.origin;
+				float dist = glm::dot(todir, todir);
+				if (dist > 20.0 * 20.0)
+					continue;
 				ob.e = e;
 				glm::vec4 pos = ed_doc.vs_setup.viewproj * glm::vec4(e->get_ws_position(),1.0);
 				ob.pos = pos / pos.w;
+
+				if (ob.pos.z < 0)
+					continue;
 
 				objs.push_back(ob);
 			}
@@ -148,9 +155,21 @@ public:
 				name = o.e->get_type().classname;
 			}
 
+			const int icon_size = 16;
+			InlineVec<Texture*,6> icons;
+			for (auto c : o.e->get_components()) {
+				if (c->dont_serialize_or_edit_this()) continue;
+				const char* s = c->get_editor_outliner_icon();
+				if (!*s) continue;
+				auto tex = g_assets.find_global_sync<Texture>(s);
+				icons.push_back(tex.get());
+			}
+
 			auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
-			if (o.pos.z < 0)
-				continue;
+
+			const int text_offset = (icon_size + 1) * icons.size();
+			size.w += text_offset;
+
 			
 			o.pos.y *= -1;
 			auto coordx = o.pos.x * 0.5 + 0.5;
@@ -175,8 +194,13 @@ public:
 			}
 			glm::ivec2 textofs = { 0,font->base };
 			builder.draw_solid_rect({ coordx - 3,coordy - 3 },  {size.w+6,size.h+ 6}, color);
-			builder.draw_text(glm::ivec2{ coordx+1,coordy+1 }+ textofs, {}, font, name, COLOR_BLACK);
-			builder.draw_text(glm::ivec2{ coordx,coordy }+ textofs, {}, font, name, COLOR_WHITE);
+			for (int i = 0; i < icons.size(); i++) {
+				const int ofs = (i) * (icon_size + 1);
+				builder.draw_rect_with_texture({ coordx + ofs,coordy }, { icon_size,icon_size }, 1, icons[i]);
+			}
+
+			builder.draw_text(glm::ivec2{ coordx+1+ text_offset,coordy+1 }+ textofs, {}, font, name, COLOR_BLACK);
+			builder.draw_text(glm::ivec2{ coordx + text_offset,coordy }+ textofs, {}, font, name, COLOR_WHITE);
 		}
 		if (clicked) {
 			if (ImGui::GetIO().KeyShift) {
@@ -190,11 +214,12 @@ public:
 			}
 		}
 		else {
-			if(do_mouse_click)
-				mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
+			//if(do_mouse_click)
+			//	mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
 		}
 
 	}
+
 	bool mouse_clicked = false;
 	int button_clicked = 0;
 
@@ -523,18 +548,19 @@ DECLARE_ENGINE_CMD(ManipulateScaleCommand)
 }
 
 ConfigVar ed_has_translation_snap("ed_has_translation_snap", "0", CVAR_BOOL, "enable editor snap translation");
-ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_BOOL, "what editor translation snap", 0.1, 128);
+ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_FLOAT, "what editor translation snap", 0.1, 128);
 ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, "editor translation snap increment exponent", 1, 10);
 
 ConfigVar ed_has_rotation_snap("ed_has_rotation_snap", "0", CVAR_BOOL, "enable editor snap rotation");
-ConfigVar ed_rotation_snap("ed_rotation_snap", "15.0", CVAR_BOOL, "what editor rotation snap (degrees)",0.1, 360);
+ConfigVar ed_rotation_snap("ed_rotation_snap", "15.0", CVAR_FLOAT, "what editor rotation snap (degrees)",0.1, 360);
 ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor rotation snap increment exponent", 1, 10);
 
 ConfigVar ed_has_scale_snap("ed_has_scale_snap", "0", CVAR_BOOL, "enable editor scale rotation");
-ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_BOOL, "what editor scale snap", 0.1, 360);
+ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
 ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 
-
+ConfigVar ed_pivot_type("ed_pivot_type", "0", CVAR_INTEGER, "how to pivot selected: 0=bounding box, 1=individual origin", 0, 1);
+ConfigVar ed_transform_local_space("ed_transform_local_space", "0", CVAR_BOOL, "transform in localspace");
 
 void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 {
@@ -543,17 +569,41 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 	uint32_t scancode = key.keysym.scancode;
 	bool has_shift = key.keysym.mod & KMOD_SHIFT;
 	if (scancode == SDL_SCANCODE_R) {
+
+		reset_group_to_pre_transform();
+
 		if (operation_mask == ImGuizmo::ROTATE)
 			swap_mode();
 		else
 			operation_mask = ImGuizmo::ROTATE;
+
+		set_force_gizmo_on(true);
 	}
 	else if (scancode == SDL_SCANCODE_G) {
+
+		reset_group_to_pre_transform();
+
+
 		if (operation_mask == ImGuizmo::TRANSLATE)
 			swap_mode();
 		else
 			operation_mask = ImGuizmo::TRANSLATE;
+
+		set_force_gizmo_on(true);
 	}
+	else if (scancode == SDL_SCANCODE_X && get_force_gizmo_on()) {
+		reset_group_to_pre_transform();
+		axis_mask = 1;
+	}
+	else if (scancode == SDL_SCANCODE_Y && get_force_gizmo_on()) {
+		reset_group_to_pre_transform();
+		axis_mask = 2;
+	}
+	else if (scancode == SDL_SCANCODE_Z && get_force_gizmo_on()) {
+		reset_group_to_pre_transform();
+		axis_mask = 4;
+	}
+
 	else if (scancode == SDL_SCANCODE_S) {
 		operation_mask = ImGuizmo::SCALE;
 		mode = ImGuizmo::LOCAL;	// local scaling only
@@ -638,6 +688,17 @@ void EditorDoc::on_mouse_drag(int x, int y)
 }
 void EditorDoc::on_mouse_down(int x, int y, int button)
 {
+
+
+	if (button == 1 && manipulate->get_force_gizmo_on()) {
+		manipulate->set_force_gizmo_on(false);
+		return;
+	}
+	else if (button == 3 && manipulate->get_force_gizmo_on()) {
+		manipulate->reset_group_to_pre_transform();
+		manipulate->set_force_gizmo_on(false);
+		return;
+	}
 
 	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
 		return;
@@ -895,9 +956,14 @@ bool ManipulateTransformTool::is_using()
 
 static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
 {
-	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-	q = glm::normalize(glm::quat_cast(transform));
 	p = transform[3];
+	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
+	q = glm::quat_cast(glm::mat3(
+		transform[0]/s.x,
+		transform[1]/s.y,
+		transform[2]/s.z
+	));
+	q = glm::normalize(q);
 }
 
 
@@ -945,7 +1011,16 @@ void ManipulateTransformTool::on_prop_change() {
 	// no stop_using_custom
 	update_pivot_and_cached();
 }
-
+void ManipulateTransformTool::reset_group_to_pre_transform()
+{
+	for (auto& pair : world_space_of_selected) {
+		EntityPtr e = { pair.first };
+		if (e.get()) {
+			e->set_ws_transform(pair.second);
+		}
+	}
+	update_pivot_and_cached();
+}
 void ManipulateTransformTool::update_pivot_and_cached()
 {
 	if (get_is_using_for_custom())
@@ -974,11 +1049,13 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	}
 	current_transform_of_group = pivot_transform;
 
+
 	if (world_space_of_selected.size() == 0)
 		state = IDLE;
 	else
 		state = SELECTED;
 
+	//return;
 	auto snap_to_value = [](float x, float snap) {
 		return glm::round(x / snap) * snap;
 	};
@@ -987,21 +1064,22 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	glm::quat q;
 	decompose_transform(current_transform_of_group, p, q, s);
 	glm::vec3 asEuler = glm::eulerAngles(q);
+	printf(": %f\n", asEuler.x);
 	if (ed_has_translation_snap.get_bool()) {
 		float translation_snap = ed_translation_snap.get_float();
 		p.x = snap_to_value(p.x, translation_snap);
 		p.y = snap_to_value(p.y, translation_snap);
 		p.z = snap_to_value(p.z, translation_snap);
 	}
-	if (ed_has_rotation_snap.get_bool()) {
-		float rsnap = glm::radians(ed_rotation_snap.get_float());
-		asEuler.x = snap_to_value(asEuler.x, rsnap);
-		asEuler.y = snap_to_value(asEuler.y, rsnap);
-		asEuler.z = snap_to_value(asEuler.z, rsnap);
-	}
 	current_transform_of_group = glm::translate(glm::mat4(1), p);
-	current_transform_of_group = current_transform_of_group * glm::mat4_cast(glm::normalize(glm::quat(asEuler)));
+	current_transform_of_group = current_transform_of_group * glm::mat4_cast(glm::normalize(q));
 	current_transform_of_group = glm::scale(current_transform_of_group, glm::vec3(s));
+
+	glm::vec3 p2, s2;
+	glm::quat q2;
+	decompose_transform(current_transform_of_group, p2, q2, s2);
+	asEuler = glm::eulerAngles(q2);
+	printf(".: %f\n", asEuler.x);
 }
 
 void ManipulateTransformTool::on_selected_tarnsform_change(uint64_t h) {
@@ -1025,6 +1103,18 @@ void ManipulateTransformTool::end_drag() {
 //		snap = snap * exp
 // on_decrement()
 //		snap = snap / mult
+
+ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
+
+
+
+// bool force_gizmo = on/off
+// G -> force gizmo on, type = translate
+// R -> force gizmo on, type = rotation
+// X -> if force gizmo on, set mask to x
+// Y,Z ...
+// mouse 1 click -> force gizmo off
+// mouse 2 click -> force gizmo off, reset
 
 
 
@@ -1056,6 +1146,26 @@ void ManipulateTransformTool::update()
 	else if (operation_mask == ImGuizmo::ROTATE&&ed_has_rotation_snap.get_bool())
 		snap = glm::vec3(ed_rotation_snap.get_float());
 
+
+	auto get_real_op_mask = [](ImGuizmo::OPERATION op, int axis_mask) -> ImGuizmo::OPERATION {
+		using namespace ImGuizmo;
+		ImGuizmo::OPERATION out{};
+		if (op == ImGuizmo::TRANSLATE) {
+			if (axis_mask & 1) out = out | OPERATION::TRANSLATE_X;
+			if (axis_mask & 2) out = out | OPERATION::TRANSLATE_Y;
+			if (axis_mask & 4) out = out | OPERATION::TRANSLATE_Z;
+		}
+		else if (op == ImGuizmo::ROTATE) {
+			if (axis_mask & 1) out = out | OPERATION::ROTATE_X;
+			if (axis_mask & 2) out = out | OPERATION::ROTATE_Y;
+			if (axis_mask & 4) out = out | OPERATION::ROTATE_Z;
+			if (axis_mask == 0xff) out = OPERATION::ROTATE;
+		}
+		else
+			out = op;
+		return out;
+	};
+
 	const auto window_sz = eng->get_game_viewport_size();
 	const float aratio = (float)window_sz.y / window_sz.x;
 	const float* const view = glm::value_ptr(ed_doc.vs_setup.view);
@@ -1063,7 +1173,7 @@ void ManipulateTransformTool::update()
 	const float* const proj = glm::value_ptr(friendly_proj_matrix);
 	float* model = glm::value_ptr(current_transform_of_group);
 	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
-	bool good = ImGuizmo::Manipulate(view, proj, operation_mask, mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
+	bool good = ImGuizmo::Manipulate(get_force_gizmo_on(), view, proj, get_real_op_mask(operation_mask,axis_mask), mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
 	
 	if (ImGuizmo::IsOver() && state == SELECTED && ImGui::GetIO().MouseClicked[2]) {
 		ImGui::OpenPopup("manipulate tool menu");
@@ -1114,6 +1224,34 @@ void EditorDoc::imgui_draw()
 	IEditorTool::imgui_draw();
 
 	command_mgr->execute_queued_commands();
+}
+void EditorDoc::hook_pre_scene_viewport_draw()
+{
+	auto get_icon = [](std::string str) -> ImTextureID {
+		return ImTextureID(uint64_t(g_assets.find_global_sync<Texture>("eng/editor/"+str).get()->gl_id));
+	};
+	auto magnet_on = get_icon("magnet_on.png");
+	auto magnet_off = get_icon("magnet_off.png");
+	auto localcoord = get_icon("local_coord.png");
+	auto globalcoord = get_icon("global_coord.png");
+	auto boundingbox = get_icon("bounding_box_pivot.png");
+	auto pivotcenter = get_icon("pivot_center.png");
+	auto showtext_off = get_icon("show_text_off.png");
+	auto showtext_on = get_icon("show_text_on.png");
+	auto size = ImVec2(16, 16);
+	ImGui::PushStyleColor(ImGuiCol_Button, 0);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.5));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+	if (ImGui::BeginMenuBar())
+	{
+		ImGui::ImageButton(magnet_on,size);
+		ImGui::ImageButton(localcoord, size);
+		ImGui::ImageButton(boundingbox, size);
+		ImGui::ImageButton(showtext_off, size);
+
+		ImGui::EndMenuBar();
+	}
+	ImGui::PopStyleColor(3);
 }
 
 void EditorDoc::hook_scene_viewport_draw()

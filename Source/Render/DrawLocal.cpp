@@ -97,6 +97,8 @@ public:
 			auto& texs = dc.mat->impl->get_textures();
 			for (int i = 0; i < texs.size(); i++)
 				device.bind_texture(i, texs[i]->gl_id);
+			if (dc.texOverride != nullptr)
+				device.bind_texture(0, dc.texOverride->gl_id);
 
 			glDrawElementsBaseVertex(GL_TRIANGLES, dc.index_count, GL_UNSIGNED_INT, (void*)(dc.index_start * sizeof(int)), 0);
 			
@@ -1320,8 +1322,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		const bool depth_testing = true;
 		//const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
 
-
-		// renderdoc seems to hate mdi for some reason, so heres an option to disable it
 		if(dont_use_mdi.get_bool())
 			render_lists_old_way(*params.rl, *params.rp, depth_testing,
 				force_backface_state,

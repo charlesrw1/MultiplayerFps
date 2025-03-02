@@ -4,9 +4,11 @@
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
-
+#include "Render/MaterialPublic.h"
 #include "Framework/BinaryReadWrite.h"
 #include "imgui.h"
+#include "GameEnginePublic.h"
+#include "GUISystemPublic.h"
 
 CLASS_IMPL(GuiFont);
 
@@ -52,7 +54,9 @@ inline std::string get_directory(const std::string& path)
 		return "";
 	return path.substr(0,pos+1);
 }
-
+void GuiFont::post_load(ClassBase*)
+{
+}
 bool GuiFont::load_asset(ClassBase*& user)
 {
 
@@ -134,9 +138,13 @@ DECLARE_ENGINE_CMD(FONT_TEST)
 
 	//auto sz = GuiHelpers::calc_text_size("This is a string", font);
 }
+#include "Render/MaterialPublic.h"
 void GuiFontLoader::init()
 {
 	defaultFont = g_assets.find_global_sync<GuiFont>("eng/sengo24.fnt");
 	if (!defaultFont)
 		Fatalf("couldnt load default font");
+	fontDefaultMat = g_assets.find_global_sync<MaterialInstance>("eng/fontDefault.mm");
+	if (!fontDefaultMat)
+		Fatalf("couldnt load default font material");
 }

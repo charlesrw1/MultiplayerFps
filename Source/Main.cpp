@@ -949,8 +949,7 @@ int main(int argc, char** argv)
 	eng_local.argc = argc;
 	eng_local.argv = argv;
 
-	eng_local.init();
-	
+	eng_local.init();	
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1310,9 +1309,16 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 		if (scene_hovered)
 			flags |=  ImGuiWindowFlags_NoMove;
+
+		if (is_in_an_editor_state() && get_current_tool()->wants_scene_viewport_menu_bar())
+			flags |= ImGuiWindowFlags_MenuBar;
+
 		bool next_focus = false;
 		//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		if (ImGui::Begin("Scene viewport",nullptr, flags)) {
+
+			if (is_in_an_editor_state())
+				get_current_tool()->hook_pre_scene_viewport_draw();
 
 			auto size = ImGui::GetWindowSize();
 			size.y -= 50;
@@ -1728,7 +1734,7 @@ bool GameEngineLocal::game_thread_update()
 	}
 #endif
 
-	//isound->tick(frame_time);
+	isound->tick(frame_time);
 
 
 	// draw imgui here
