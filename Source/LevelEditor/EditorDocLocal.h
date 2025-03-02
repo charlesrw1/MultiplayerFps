@@ -401,6 +401,18 @@ public:
 	}
 	void reset_group_to_pre_transform();
 
+	ImGuizmo::OPERATION get_operation_type() const {
+		return operation_mask;
+	}
+	void set_operation_type(ImGuizmo::OPERATION op) {
+		operation_mask = op;
+	}
+	void set_mode(ImGuizmo::MODE m) {
+		mode = m;
+	}
+	ImGuizmo::MODE get_mode() const {
+		return mode;
+	}
 private:
 	bool force_gizmo_on = false;
 
@@ -421,12 +433,6 @@ private:
 	void begin_drag();
 	void end_drag();
 
-	void swap_mode() {
-		if (mode == ImGuizmo::LOCAL)
-			mode = ImGuizmo::WORLD;
-		else
-			mode = ImGuizmo::LOCAL;
-	}
 	enum StateEnum {
 		IDLE,
 		SELECTED,
@@ -436,6 +442,7 @@ private:
 	int axis_mask = 0xff;
 	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
 	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
+	bool has_any_changed = false;
 
 	void* custom_user_key = nullptr;
 	bool is_using_for_custom = false;

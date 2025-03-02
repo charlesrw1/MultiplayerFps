@@ -221,6 +221,58 @@ public:
 	EntityPtr parent_to;
 };
 
+class TransformCommand : public Command
+{
+public:
+	TransformCommand(const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms) {
+		for (auto& pair : selection) {
+			auto find = pre_transforms.find(pair);
+			if (find != pre_transforms.end()) {
+
+				EntityPtr e = { find->first };
+				if (e.get()) {
+					pre_and_post pp;
+					pp.ptr = e;
+					pp.pre_transform = find->second;
+					pp.post_transform = e->get_ws_transform();
+					transforms.push_back(pp);
+				}
+			}
+		}
+		skip_this_time = true;
+	}
+	void execute() final {
+		// already have ws transforms
+		if (skip_this_time) {
+			skip_this_time = false;
+			return;
+		}
+		for (auto& t : transforms) {
+			if (t.ptr.get()) {
+				t.ptr->set_ws_transform(t.post_transform);
+			}
+		}
+		ed_doc.selection_state->on_selection_changed.invoke();//hack
+	}
+	void undo() final {
+		for (auto& t : transforms) {
+			if (t.ptr.get()) {
+				t.ptr->set_ws_transform(t.pre_transform);
+			}
+		}
+		ed_doc.selection_state->on_selection_changed.invoke();	// hack
+	}
+	std::string to_string() final {
+		return "Transform Entities";
+	}
+	bool skip_this_time = false;
+	struct pre_and_post {
+		EntityPtr ptr;
+		glm::mat4 pre_transform;
+		glm::mat4 post_transform;
+	};
+	std::vector<pre_and_post> transforms;
+};
 class InstantiatePrefabCommand : public Command
 {
 public:

@@ -547,15 +547,14 @@ DECLARE_ENGINE_CMD(ManipulateScaleCommand)
 
 }
 
-ConfigVar ed_has_translation_snap("ed_has_translation_snap", "0", CVAR_BOOL, "enable editor snap translation");
+ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
+
 ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_FLOAT, "what editor translation snap", 0.1, 128);
 ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, "editor translation snap increment exponent", 1, 10);
 
-ConfigVar ed_has_rotation_snap("ed_has_rotation_snap", "0", CVAR_BOOL, "enable editor snap rotation");
 ConfigVar ed_rotation_snap("ed_rotation_snap", "15.0", CVAR_FLOAT, "what editor rotation snap (degrees)",0.1, 360);
 ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor rotation snap increment exponent", 1, 10);
 
-ConfigVar ed_has_scale_snap("ed_has_scale_snap", "0", CVAR_BOOL, "enable editor scale rotation");
 ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
 ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 
@@ -572,10 +571,7 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 		reset_group_to_pre_transform();
 
-		if (operation_mask == ImGuizmo::ROTATE)
-			swap_mode();
-		else
-			operation_mask = ImGuizmo::ROTATE;
+		operation_mask = ImGuizmo::ROTATE;
 
 		set_force_gizmo_on(true);
 	}
@@ -583,11 +579,7 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 		reset_group_to_pre_transform();
 
-
-		if (operation_mask == ImGuizmo::TRANSLATE)
-			swap_mode();
-		else
-			operation_mask = ImGuizmo::TRANSLATE;
+		operation_mask = ImGuizmo::TRANSLATE;
 
 		set_force_gizmo_on(true);
 	}
@@ -1065,7 +1057,7 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	decompose_transform(current_transform_of_group, p, q, s);
 	glm::vec3 asEuler = glm::eulerAngles(q);
 	printf(": %f\n", asEuler.x);
-	if (ed_has_translation_snap.get_bool()) {
+	if (ed_has_snap.get_bool()) {
 		float translation_snap = ed_translation_snap.get_float();
 		p.x = snap_to_value(p.x, translation_snap);
 		p.y = snap_to_value(p.y, translation_snap);
@@ -1095,6 +1087,11 @@ void ManipulateTransformTool::begin_drag() {
 
 void ManipulateTransformTool::end_drag() {
 	ASSERT(state == MANIPULATING_OBJS);
+	if (has_any_changed) {
+		auto& arr = ed_doc.selection_state->get_selection();
+		ed_doc.command_mgr->add_command(new TransformCommand(arr, world_space_of_selected));
+		has_any_changed = false;
+	}
 	update_pivot_and_cached();
 }
 
@@ -1139,11 +1136,11 @@ void ManipulateTransformTool::update()
 
 
 	glm::vec3 snap(-1);
-	if (operation_mask == ImGuizmo::TRANSLATE && ed_has_translation_snap.get_bool())
+	if (operation_mask == ImGuizmo::TRANSLATE && ed_has_snap.get_bool())
 		snap = glm::vec3(ed_translation_snap.get_float());
-	else if (operation_mask == ImGuizmo::SCALE && ed_has_scale_snap.get_bool())
+	else if (operation_mask == ImGuizmo::SCALE && ed_has_snap.get_bool())
 		snap = glm::vec3(ed_scale_snap.get_float());
-	else if (operation_mask == ImGuizmo::ROTATE&&ed_has_rotation_snap.get_bool())
+	else if (operation_mask == ImGuizmo::ROTATE&& ed_has_snap.get_bool())
 		snap = glm::vec3(ed_rotation_snap.get_float());
 
 
@@ -1174,24 +1171,9 @@ void ManipulateTransformTool::update()
 	float* model = glm::value_ptr(current_transform_of_group);
 	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
 	bool good = ImGuizmo::Manipulate(get_force_gizmo_on(), view, proj, get_real_op_mask(operation_mask,axis_mask), mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
-	
-	if (ImGuizmo::IsOver() && state == SELECTED && ImGui::GetIO().MouseClicked[2]) {
-		ImGui::OpenPopup("manipulate tool menu");
-	}
-	if (ImGui::BeginPopup("manipulate tool menu")) {
-		bool b = ed_has_translation_snap.get_bool();
-		ImGui::Checkbox("T Snap", &b);
-		ed_has_translation_snap.set_bool(b);
-		b = ed_has_rotation_snap.get_bool();
-		ImGui::Checkbox("R Snap", &b);
-		ed_has_rotation_snap.set_bool(b);
-		b = ed_has_scale_snap.get_bool();
-		ImGui::Checkbox("S Snap", &b);
-		ed_has_scale_snap.set_bool(b);
 
-		ImGui::EndPopup();
-	}
-	
+	has_any_changed |= good;
+
 	bool create_command = false;
 	if (ImGuizmo::IsUsingAny() && state == SELECTED) {
 		begin_drag();
@@ -1238,20 +1220,82 @@ void EditorDoc::hook_pre_scene_viewport_draw()
 	auto pivotcenter = get_icon("pivot_center.png");
 	auto showtext_off = get_icon("show_text_off.png");
 	auto showtext_on = get_icon("show_text_on.png");
+	auto translate = get_icon("translate.png");
+	auto rotation = get_icon("rotate.png");
+	auto scale = get_icon("scale.png");
 	auto size = ImVec2(16, 16);
-	ImGui::PushStyleColor(ImGuiCol_Button, 0);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.5));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+	auto push_active_style = [](bool b, bool dont_pop_prev = false) {
+		if (!dont_pop_prev)
+			ImGui::PopStyleColor(1);
+		if (b)
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 0.5));
+		else
+			ImGui::PushStyleColor(ImGuiCol_Button, 0);
+	};
 	if (ImGui::BeginMenuBar())
 	{
-		ImGui::ImageButton(magnet_on,size);
-		ImGui::ImageButton(localcoord, size);
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.5));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+
+		auto optype = manipulate->get_operation_type();
+		push_active_style(optype == ImGuizmo::TRANSLATE,true);
+		if (ImGui::ImageButton(translate, size)) {
+			manipulate->set_operation_type(ImGuizmo::TRANSLATE);
+		}
+		push_active_style(optype == ImGuizmo::ROTATE);
+		if (ImGui::ImageButton(rotation, size)) {
+			manipulate->set_operation_type(ImGuizmo::ROTATE);
+		}
+		push_active_style(optype == ImGuizmo::SCALE);
+		if (ImGui::ImageButton(scale, size)) {
+			manipulate->set_operation_type(ImGuizmo::SCALE);
+		}
+		ImGui::Separator();
+
+		push_active_style(ed_has_snap.get_bool());
+		if (ed_has_snap.get_bool()) {
+			if (ImGui::ImageButton(magnet_on, size)) {
+				ed_has_snap.set_bool(false);
+			}
+		}
+		else {
+			if (ImGui::ImageButton(magnet_off, size)) {
+				ed_has_snap.set_bool(true);
+			}
+		}
+
+		push_active_style(false);
+		auto mode = manipulate->get_mode();
+		if (mode == ImGuizmo::MODE::LOCAL) {
+			if (ImGui::ImageButton(localcoord, size)) {
+				manipulate->set_mode(ImGuizmo::MODE::WORLD);
+			}
+		}
+		else {
+			if (ImGui::ImageButton(globalcoord, size)) {
+				manipulate->set_mode(ImGuizmo::MODE::LOCAL);
+			}
+		}
+
 		ImGui::ImageButton(boundingbox, size);
-		ImGui::ImageButton(showtext_off, size);
+
+		auto& drawtext = editor_draw_name_text;
+		push_active_style(drawtext.get_bool());
+		if (drawtext.get_bool()) {
+			if (ImGui::ImageButton(showtext_on, size)) {
+				drawtext.set_bool(false);
+			}
+		}
+		else {
+			if (ImGui::ImageButton(showtext_off, size)) {
+				drawtext.set_bool(true);
+			}
+		}
 
 		ImGui::EndMenuBar();
+		ImGui::PopStyleColor(4);
 	}
-	ImGui::PopStyleColor(3);
 }
 
 void EditorDoc::hook_scene_viewport_draw()
