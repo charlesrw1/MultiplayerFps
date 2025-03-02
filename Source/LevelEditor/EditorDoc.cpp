@@ -622,32 +622,11 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 		reset_group_to_pre_transform();
 		axis_mask = 4;
 	}
-
 	else if (scancode == SDL_SCANCODE_S) {
+		reset_group_to_pre_transform();
 		operation_mask = ImGuizmo::SCALE;
 		mode = ImGuizmo::LOCAL;	// local scaling only
-	}
-
-
-	else if (scancode == SDL_SCANCODE_LEFTBRACKET) {
-		if (operation_mask == ImGuizmo::TRANSLATE) {
-			ed_translation_snap.set_float(ed_translation_snap.get_float() * ed_translation_snap_exp.get_float());
-			//translation_snap = translation_snap * 2.0;
-		}
-		else if (operation_mask == ImGuizmo::SCALE) {
-			ed_scale_snap.set_float(ed_scale_snap.get_float() * ed_scale_snap_exp.get_float());
-			//translation_snap = translation_snap * 2.0;
-		}
-	}
-	else if (scancode == SDL_SCANCODE_RIGHTBRACKET) {
-		if (operation_mask == ImGuizmo::TRANSLATE) {
-			ed_translation_snap.set_float(ed_translation_snap.get_float() / ed_translation_snap_exp.get_float());
-			//translation_snap = translation_snap * 0.5;
-		}
-		else if (operation_mask == ImGuizmo::SCALE) {
-			ed_scale_snap.set_float(ed_scale_snap.get_float() / ed_scale_snap_exp.get_float());
-			//translation_snap = translation_snap * 9.5;
-		}
+		set_force_gizmo_on(true);
 	}
 }
 
@@ -1186,8 +1165,11 @@ void ManipulateTransformTool::update()
 			if (axis_mask & 4) out = out | OPERATION::ROTATE_Z;
 			if (axis_mask == 0xff) out = OPERATION::ROTATE;
 		}
-		else
-			out = op;
+		else if (op == ImGuizmo::SCALE) {
+			if (axis_mask & 1) out = out | OPERATION::SCALE_X;
+			if (axis_mask & 2) out = out | OPERATION::SCALE_Y;
+			if (axis_mask & 4) out = out | OPERATION::SCALE_Z;
+		}
 		return out;
 	};
 

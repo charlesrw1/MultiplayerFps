@@ -785,6 +785,7 @@ namespace IMGUIZMO_NAMESPACE
    static int GetRotateType(OPERATION op);
    static int GetRotateTypeForce(bool force_on, OPERATION op);
    static int GetScaleType(OPERATION op);
+   static int GetScaleTypeForce(bool force_on, OPERATION op);
 
    Style& GetStyle()
    {
@@ -1882,13 +1883,28 @@ namespace IMGUIZMO_NAMESPACE
 
    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
    //
-
    static int GetScaleType(OPERATION op)
    {
-      if (gContext.mbUsing)
+       return GetScaleTypeForce(false, op);
+   }
+   static int GetScaleTypeForce(bool force_gizmo, OPERATION op)
+   {
+      if (gContext.mbUsing&&!force_gizmo)
       {
          return MT_NONE;
       }
+
+      if (force_gizmo) {
+          if (op == OPERATION::SCALE)
+              return MT_SCALE_XYZ;
+          else if (op == OPERATION::SCALE_X)
+              return MT_SCALE_X;
+          else if (op == OPERATION::SCALE_Y)
+              return MT_SCALE_Y;
+          else if (op == OPERATION::SCALE_Z)
+              return MT_SCALE_Z;
+      }
+
       ImGuiIO& io = ImGui::GetIO();
       int type = MT_NONE;
 
@@ -2250,8 +2266,11 @@ namespace IMGUIZMO_NAMESPACE
 
    static bool HandleScale(bool force_gizmo_on, float* matrix, float* deltaMatrix, OPERATION op, int& type, const float* snap)
    {
-      if((!Intersects(op, SCALE) && !Intersects(op, SCALEU)) || type != MT_NONE || !gContext.mbMouseOver)
+      if((!Intersects(op, SCALE) && !Intersects(op, SCALEU)) || type != MT_NONE || (!gContext.mbMouseOver && !force_gizmo_on))
       {
+          if (IsScaleType(gContext.mCurrentOperation))
+              gContext.mbUsing = false;
+
          return false;
       }
       ImGuiIO& io = ImGui::GetIO();
@@ -2260,7 +2279,7 @@ namespace IMGUIZMO_NAMESPACE
       if (!gContext.mbUsing)
       {
          // find new possible way to scale
-         type = GetScaleType(op);
+         type = GetScaleTypeForce(force_gizmo_on, op);
          if (type != MT_NONE)
          {
 #if IMGUI_VERSION_NUM >= 18723
@@ -2269,7 +2288,7 @@ namespace IMGUIZMO_NAMESPACE
             ImGui::CaptureMouseFromApp();
 #endif
          }
-         if (CanActivate() && type != MT_NONE)
+         if ((CanActivate()||force_gizmo_on) && type != MT_NONE)
          {
             gContext.mbUsing = true;
             gContext.mEditingID = gContext.mActualID;
@@ -2290,6 +2309,20 @@ namespace IMGUIZMO_NAMESPACE
       // scale
       if (gContext.mbUsing && (gContext.mActualID == -1 || gContext.mActualID == gContext.mEditingID) && IsScaleType(gContext.mCurrentOperation))
       {
+
+          auto nexttype = GetScaleTypeForce(force_gizmo_on, op);
+          if ((!io.MouseDown[0] && !force_gizmo_on) || (force_gizmo_on && nexttype != gContext.mCurrentOperation))
+          {
+              printf("deactivated scale\n");
+
+              gContext.mbUsing = false;
+
+              gContext.mScale.Set(1.f, 1.f, 1.f);
+
+              return false;
+          }
+
+
 #if IMGUI_VERSION_NUM >= 18723
          ImGui::SetNextFrameWantCaptureMouse(true);
 #else
@@ -2323,8 +2356,8 @@ namespace IMGUIZMO_NAMESPACE
          if (snap)
          {
              // >>> CHANGED: divide by gContext.mScaleValueOrigin to get the scale snapping I want
-            float scaleSnap[] = { snap[0]/ gContext.mScaleValueOrigin.x, snap[0]/ gContext.mScaleValueOrigin.y, snap[0]/ gContext.mScaleValueOrigin.z };
-            ComputeSnap(gContext.mScale, scaleSnap);
+            //float scaleSnap[] = { snap[0]/ gContext.mScaleValueOrigin.x, snap[0]/ gContext.mScaleValueOrigin.y, snap[0]/ gContext.mScaleValueOrigin.z };
+            ComputeSnap(gContext.mScale, snap);
          }
 
          // no 0 allowed
@@ -2357,12 +2390,6 @@ namespace IMGUIZMO_NAMESPACE
 
             deltaMatrixScale.Scale(deltaScale);
             memcpy(deltaMatrix, deltaMatrixScale.m16, sizeof(float) * 16);
-         }
-
-         if (!io.MouseDown[0])
-         {
-            gContext.mbUsing = false;
-            gContext.mScale.Set(1.f, 1.f, 1.f);
          }
 
          type = gContext.mCurrentOperation;
