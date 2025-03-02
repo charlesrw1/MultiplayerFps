@@ -11,6 +11,7 @@ struct View_Setup
 	// dont use this, just for some things that dont play nice with infinite Z
 	glm::mat4 make_opengl_perspective_with_near_far() const;
 
+	bool is_ortho = false;
 	glm::vec3 origin;
 	glm::vec3 front;
 	glm::mat4 view, proj, viewproj;

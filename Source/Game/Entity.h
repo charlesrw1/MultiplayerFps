@@ -208,6 +208,12 @@ public:
 	void set_editor_name(const std::string& n) {
 		editor_name = n;
 	}
+#ifdef EDITOR_BUILD
+	bool get_hidden_in_editor() const {
+		return hidden_in_editor;
+	}
+	void set_hidden_in_editor(bool b);
+#endif
 private:
 	static void set_active_R(Entity* e, bool b, bool step1);
 
@@ -242,7 +248,11 @@ private:
 
 	glm::mat4 cached_world_transform = glm::mat4(1);
 
+#ifdef EDITOR_BUILD
 	bool selected_in_editor = false;
+	bool hidden_in_editor = false;
+#endif
+
 	bool world_transform_is_dirty = true;
 
 	bool is_top_level = false;	// if true, then local space is considered the world space transform, even if a parent exists

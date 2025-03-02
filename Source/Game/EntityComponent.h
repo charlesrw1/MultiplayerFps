@@ -32,6 +32,7 @@ public:
 	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)
 	void sync_render_data();
 
+
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
 #endif

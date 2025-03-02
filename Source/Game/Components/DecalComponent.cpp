@@ -36,6 +36,10 @@ void DecalComponent::on_sync_render_data()
 	Render_Decal rd;
 	rd.transform = get_ws_transform();
 	rd.visible = true;
+#ifdef  EDITOR_BUILD
+	rd.visible &= !get_owner()->get_hidden_in_editor();
+#endif //  EDITOR_BUILD
+
 	rd.material = material.get();
 	idraw->get_scene()->update_decal(handle, rd);
 }

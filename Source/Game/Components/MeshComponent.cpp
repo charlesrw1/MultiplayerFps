@@ -121,6 +121,10 @@ void MeshComponent::on_sync_render_data()
 	Render_Object obj;
 	obj.model = model.get();
 	obj.visible = is_visible;
+#ifdef  EDITOR_BUILD
+	obj.visible &= !get_owner()->get_hidden_in_editor();
+#endif //  EDITOR_BUILD
+
 	obj.transform = get_ws_transform();
 	obj.owner = this;
 	obj.is_skybox = is_skybox;

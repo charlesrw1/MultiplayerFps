@@ -79,6 +79,19 @@ Entity::Entity()
 
 }
 
+#ifdef EDITOR_BUILD
+void Entity::set_hidden_in_editor(bool b)
+{
+	hidden_in_editor = b;
+	for (int i = 0; i < children.size(); i++) {
+		children[i]->set_hidden_in_editor(b);
+	}
+	for (int i = 0; i < all_components.size(); i++)
+		all_components[i]->sync_render_data();
+}
+#endif
+
+
 void Entity::set_active_R(Entity* e, bool b, bool step1)
 {
 	if (e->is_activated() != b)

@@ -2641,8 +2641,14 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 
 	check_cubemaps_dirty();
 
+	const bool temp_disable_taa = view.is_ortho;	// ortho view doesnt work with TAA
+
+	if (temp_disable_taa) {
+		disable_taa_this_frame = true;
+	}
+
 	// modify view_setup for TAA, fixme
-	if(r_taa_enabled.get_bool())
+	if(r_taa_enabled.get_bool() && !temp_disable_taa)
 	{
 		view.proj = r_taa_manager.add_jitter_to_projection(view.proj, r_taa_manager.calc_frame_jitter(view.width,view.height));
 		view.viewproj = view.proj * view.view;
@@ -2652,7 +2658,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 	last_frame_main_view = view;
 
 	// swap last frame and current frame, fixme
-	if (r_taa_enabled.get_bool()) {
+	if (r_taa_enabled.get_bool() && !temp_disable_taa) {
 		std::swap(tex.last_scene_color, tex.scene_color);
 		std::swap(tex.last_scene_motion, tex.scene_motion);
 

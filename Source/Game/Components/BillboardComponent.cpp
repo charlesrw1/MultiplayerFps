@@ -54,6 +54,10 @@ void BillboardComponent::on_sync_render_data()
 
 	Render_Object obj;
 	obj.visible = visible;
+#ifdef  EDITOR_BUILD
+	obj.visible &= !get_owner()->get_hidden_in_editor();
+#endif //  EDITOR_BUILD
+
 	obj.model = g_modelMgr.get_default_plane_model();
 	ASSERT(dynamicMaterial.get());
 	obj.mat_override = dynamicMaterial.get();

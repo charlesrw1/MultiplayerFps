@@ -29,7 +29,7 @@
 #include "LevelSerialization/SerializationAPI.h"
 #include "Render/DrawPublic.h"
 #include "Game/EntityComponent.h"
-
+#include "Game/SerializePtrHelpers.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -41,11 +41,13 @@ enum TransformType
 
 class EditorDoc;
 
+class Texture;
 class ObjectOutliner
 {
 public:
 	ObjectOutliner();
 	void draw();
+	void init();
 private:
 	int determine_object_count() const;
 	void rebuild_tree() {
@@ -134,6 +136,9 @@ private:
 
 	std::unordered_map<uint64_t, Node*> map;
 	Node* rootnode = nullptr;
+
+	AssetPtr<Texture> visible;
+	AssetPtr<Texture> hidden;
 
 
 	uint64_t contextMenuHandle = 0;

@@ -311,6 +311,7 @@ void EditorDoc::validate_fileids_before_serialize()
 void EditorDoc::init()
 {
 	global_asset_browser.init();
+	outliner->init();
 }
 
 bool EditorDoc::save_document_internal()
@@ -545,6 +546,32 @@ DECLARE_ENGINE_CMD(ManipulateTranslateCommand)
 DECLARE_ENGINE_CMD(ManipulateScaleCommand)
 {
 
+}
+
+DECLARE_ENGINE_CMD_CAT("ed.", HideSelected)
+{
+	eng->log_to_fullscreen_gui(Info, "Hide selected");
+	auto& selection = ed_doc.selection_state->get_selection();
+	for (auto s : selection) {
+		EntityPtr handle = { s };
+		if (handle) {
+			handle->set_hidden_in_editor(true);
+		}
+	}
+}
+DECLARE_ENGINE_CMD_CAT("ed.", UnHideAll)
+{
+	eng->log_to_fullscreen_gui(Info, "Unhide all");
+	auto level = eng->get_level();
+	if (level) {
+		for (auto e : level->get_all_objects()) {
+			if (e->is_a<Entity>()) {
+				auto ent = e->cast_to<Entity>();
+				if (ent->get_hidden_in_editor())
+					ent->set_hidden_in_editor(false);
+			}
+		}
+	}
 }
 
 ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
@@ -850,6 +877,7 @@ void EditorDoc::tick(float dt)
 		vs.viewproj = vs.proj * vs.view;
 		vs.near = 0.001;
 		vs.fov = fov;
+		vs.is_ortho = true;
 		vs_setup = vs;
 	}
 }
@@ -1368,6 +1396,12 @@ ObjectOutliner::ObjectOutliner()
 	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
 	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
 	ed_doc.on_change_name.add(this, &ObjectOutliner::on_change_name);
+
+}
+void ObjectOutliner::init()
+{
+	hidden = g_assets.find_global_sync<Texture>("eng/editor/hidden.png");
+	visible = g_assets.find_global_sync<Texture>("eng/editor/visible.png");
 }
 
 bool ObjectOutliner::IteratorDraw::step()
@@ -1545,6 +1579,29 @@ void ObjectOutliner::IteratorDraw::draw()
 
 	}
 
+	ImGui::TableNextColumn();
+
+	auto e = eng->get_entity(n->handle);
+	ImGui::PushStyleColor(ImGuiCol_Button, 0);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_imvec4({ 245, 242, 242, 55 }));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+
+	if (e) {
+		auto img = (e->get_hidden_in_editor()) ? oo->hidden : oo->visible;
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
+		if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
+			e->set_hidden_in_editor(!e->get_hidden_in_editor());
+		}
+	}
+	else {
+		auto img = oo->hidden;
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
+		if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16),ImVec2(),ImVec2(),-1,ImVec4(),ImVec4(0,0,0,0))) {
+			
+		}
+	}
+	ImGui::PopStyleColor(3);
+
 	ImGui::PopID();
 }
 
@@ -1567,8 +1624,9 @@ void ObjectOutliner::draw()
 
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
-	if (ImGui::BeginTable("Table", 1, flags)) {
-		ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch);
+	if (ImGui::BeginTable("Table", 2, flags)) {
+		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 50.0);
 
 		while (clipper.Step()) {
 			while (cur_n < clipper.DisplayStart) {

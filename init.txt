@@ -60,6 +60,9 @@ bind I "toggle r.taa_32f"
 bind O "inc r.taa_jitter_test"
 bind P "dec r.taa_jitter_test"
 
+bind H "ed.HideSelected"
+bind "H" Alt "ed.UnHideAll"
+
 #otex 0.5 1 1 _scene_motion
 
 

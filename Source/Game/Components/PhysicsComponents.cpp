@@ -655,7 +655,8 @@ static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, i
 			a->get_physx_actor(), glm_to_physx(my_local),
 			nullptr, glm_to_physx(my_world));
 	}
-	joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+	if(joint)
+		joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 	return joint;
 }
@@ -725,6 +726,8 @@ void AdvancedJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponen
 		else if (jm == JM::Limited) return PxD6Motion::eLIMITED;
 		else return PxD6Motion::eLOCKED;
 	};
+	if (!joint)
+		return;
 	joint->setMotion(PxD6Axis::eX, get_jm_enum(x_motion));
 	joint->setMotion(PxD6Axis::eY, get_jm_enum(x_motion));
 	joint->setMotion(PxD6Axis::eZ, get_jm_enum(x_motion));

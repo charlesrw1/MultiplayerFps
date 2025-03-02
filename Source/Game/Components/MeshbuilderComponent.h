@@ -24,22 +24,7 @@ public:
 	void on_changed_transform() override {
 		sync_render_data();
 	}
-	void on_sync_render_data() final {
-		if(!editor_mb_handle.is_valid())
-			editor_mb_handle = idraw->get_scene()->register_meshbuilder();
-		MeshBuilder_Object obj;
-		obj.depth_tested = depth_tested;
-		obj.owner = this;
-		if (use_transform)
-			obj.transform = get_ws_transform();
-		else
-			obj.transform = glm::mat4(1);
-		obj.visible = true;
-		obj.use_background_color = use_background_color;
-		obj.background_color = background_color;
-		obj.meshbuilder = &mb;
-		idraw->get_scene()->update_meshbuilder(editor_mb_handle, obj);
-	}
+	void on_sync_render_data() final;
 
 	Color32 background_color = COLOR_BLACK;
 	bool use_background_color = false;
