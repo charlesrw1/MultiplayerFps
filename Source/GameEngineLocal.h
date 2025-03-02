@@ -103,7 +103,7 @@ public:
 
 	glm::ivec2 get_game_viewport_size() const override;	// either full window or sub window
 
-	void init();
+	void init(int argc, char** argv);
 	void cleanup();
 
 	void get_draw_params(SceneDrawParamsEx& param, View_Setup& setup);

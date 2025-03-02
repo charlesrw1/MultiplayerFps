@@ -97,7 +97,7 @@ public:
 	void paint(UIBuilder& builder) override {
 		int x, y;
 		SDL_GetMouseState(&x, &y);
-		bool do_mouse_click = mouse_clicked;
+		bool do_mouse_click = mouse_clicked && button_clicked==1;
 		mouse_clicked = false;
 
 		if (ed_doc.selection_state->has_any_selected() && (ed_doc.manipulate->is_hovered() || ed_doc.manipulate->is_using()))
@@ -248,7 +248,7 @@ static std::string to_string(StringView view) {
 
 
 
-// Unproject mouse coords into a vector, cast that into the world via physics
+// Unproject mouse coords into a vector
 glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
 	Ray r;
@@ -585,9 +585,6 @@ ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor 
 ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
 ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 
-ConfigVar ed_pivot_type("ed_pivot_type", "0", CVAR_INTEGER, "how to pivot selected: 0=bounding box, 1=individual origin", 0, 1);
-ConfigVar ed_transform_local_space("ed_transform_local_space", "0", CVAR_BOOL, "transform in localspace");
-
 void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 {
 	if (eng->is_game_focused() || !ed_doc.selection_state->has_any_selected())
@@ -828,7 +825,7 @@ void EditorDoc::tick(float dt)
 
 	auto window_sz = eng->get_game_viewport_size();
 	float aratio = (float)window_sz.y / window_sz.x;
-	const float fov = glm::radians(70.f);
+	const float fov = glm::radians(g_fov.get_float());
 	{
 		int x=0, y=0;
 		const Uint32 button_state = SDL_GetRelativeMouseState(&x, &y);
@@ -1343,7 +1340,7 @@ void EditorDoc::hook_scene_viewport_draw()
 				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename, 
 					drop_transform,
-					parent_to)
+					parent_to,false)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
@@ -1351,6 +1348,13 @@ void EditorDoc::hook_scene_viewport_draw()
 					resource->filename, 
 					drop_transform,
 					parent_to)
+				);
+			}
+			else if (resource->type->get_asset_class_type()->is_a(EntityComponent::StaticType)) {
+				command_mgr->add_command(new CreateCppClassCommand(
+					resource->filename,
+					drop_transform,
+					parent_to, true)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
@@ -1370,6 +1374,50 @@ void EditorDoc::hook_scene_viewport_draw()
 
 }
 
+static std::string get_directory(const std::string& input)
+{
+	auto find = input.rfind('/');
+	if (find == std::string::npos) return "";
+	return input.substr(find + 1);
+}
+
+static void save_off_branch_as_scene(Entity* e)
+{
+	auto serialize_branch = [](Entity* e) -> auto {
+		PrefabAsset dummy;
+		std::vector<Entity*> ents;
+		ents.push_back(e);
+		ed_doc.validate_fileids_before_serialize();
+		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, &dummy));
+	};
+	auto serialized = serialize_branch(e);
+	auto& file_name = e->get_editor_name();
+	if (file_name.empty()) {
+		const char* str = "cant save off branch, entity name empty";
+		eng->log_to_fullscreen_gui(Error, str);
+		sys_print(Error, str);
+		return;
+	}
+	auto path = get_directory(ed_doc.get_doc_name());
+	if (!path.empty()) path += "/";
+	path += file_name;
+	path += ".pfb";
+	{
+		auto check_file_exists = FileSys::open_read_game(path);
+		if (check_file_exists) {
+			const char* str = string_format("cant save off branch, path already exists: %s\n",path.c_str());
+			eng->log_to_fullscreen_gui(Error, str);
+			sys_print(Error, str);
+			return;
+		}
+	}
+	auto outfile = FileSys::open_write_game(path);
+	outfile->write(serialized->text.c_str(), serialized->text.size());
+	const char* str = string_format("saved prefab as: %s\n", path.c_str());
+	eng->log_to_fullscreen_gui(Info, str);
+	sys_print(Info, str);
+}
+
 ObjectOutliner::ObjectOutliner()
 {
 	nameFilter[0] = 0;
@@ -1377,8 +1425,17 @@ ObjectOutliner::ObjectOutliner()
 	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
 	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
 	ed_doc.on_change_name.add(this, &ObjectOutliner::on_change_name);
+	ed_doc.selection_state->on_selection_changed.add(this, &ObjectOutliner::on_selection_change);
 
 }
+
+void ObjectOutliner::on_selection_change()
+{
+	if (ed_doc.selection_state->has_only_one_selected()) {
+		setScrollHere = ed_doc.selection_state->get_only_one_selected();
+	}
+}
+
 void ObjectOutliner::init()
 {
 	hidden = g_assets.find_global_sync<Texture>("eng/editor/hidden.png");
@@ -1413,6 +1470,7 @@ void ObjectOutliner::IteratorDraw::draw()
 	ImGui::Dummy(ImVec2(depth * 10.f, 0));
 	ImGui::SameLine();
 	auto n = node;
+
 	ImGui::PushID(n);
 	{
 		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr{ n->handle });
@@ -1440,7 +1498,7 @@ void ObjectOutliner::IteratorDraw::draw()
 				ImGui::CloseCurrentPopup();
 			}
 			else {
-				if (ImGui::Button("Parent To This")) {
+				if (ImGui::MenuItem("Parent To This")) {
 
 					auto me = eng->get_entity(oo->contextMenuHandle);
 					auto& ents = ed_doc.selection_state->get_selection();
@@ -1463,7 +1521,7 @@ void ObjectOutliner::IteratorDraw::draw()
 					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
-				if (ImGui::Button("Remove Parent")) {
+				if (ImGui::MenuItem("Remove Parent")) {
 
 					Entity* skip_this = nullptr;
 					Entity* parent_to_this = nullptr;
@@ -1495,24 +1553,41 @@ void ObjectOutliner::IteratorDraw::draw()
 
 					ImGui::CloseCurrentPopup();
 				}
-				if (ImGui::Button("Add entity")) {
+				ImGui::Separator();
+				if (ImGui::MenuItem("Add sibling entity")) {
 					auto me = eng->get_entity(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr()));
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr(), false));
 					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
-				if (ImGui::Button("Add child entity")) {
+				if (ImGui::MenuItem("Add child entity")) {
 					auto me = eng->get_entity(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), me->get_self_ptr()));
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), me->get_self_ptr(), false));
 					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
-				if (ImGui::Button("Instantiate prefab")) {
+				ImGui::Separator();
+				if (ImGui::MenuItem("Instantiate prefab")) {
 					auto me = eng->get_entity(oo->contextMenuHandle);
 					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(me));
 					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
+				if (ImGui::MenuItem("Save branch as prefab")) {
+					auto me = eng->get_entity(oo->contextMenuHandle);
+					save_off_branch_as_scene(me);
+					ImGui::CloseCurrentPopup();
+				}
+
+				ImGui::Separator();
+				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
+				if (ImGui::MenuItem("Delete")) {
+					EntityPtr ptr = { oo->contextMenuHandle };
+					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ ptr }));
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::PopStyleColor(1);
+				
 			}
 
 			ImGui::EndPopup();
@@ -1592,17 +1667,32 @@ int ObjectOutliner::determine_object_count() const
 }
 void ObjectOutliner::draw()
 {
-
 	if (!ImGui::Begin("Outliner") || !rootnode) {
 		ImGui::End();
-
+		setScrollHere = EntityPtr();
 		return;
 	}
+
+	int set_scroll_num = -1;
+	if (setScrollHere.is_valid()) {
+		IteratorDraw iter(this, rootnode);
+		int current_iter_n = 0;
+		do {
+			assert(iter.get_node());
+			auto handle = iter.get_node()->handle;
+			if (handle != 0 && handle == setScrollHere.handle) {
+				break;
+			}
+			current_iter_n++;
+		} while (iter.step());
+
+		set_scroll_num = current_iter_n;
+	}
+
 	ImGuiListClipper clipper;
 	clipper.Begin(determine_object_count());
 	IteratorDraw iter(this, rootnode);
 	int cur_n = 0;
-
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
 	if (ImGui::BeginTable("Table", 2, flags)) {
@@ -1617,8 +1707,17 @@ void ObjectOutliner::draw()
 			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
 				iter.draw();
 				iter.step();
+
+				// dont set the scroll to an item already in view
+				if (set_scroll_num == cur_n)
+					set_scroll_num = -1;
+
 				cur_n++;
 			}
+		}
+
+		if (set_scroll_num != -1) {
+			ImGui::SetScrollY(set_scroll_num * clipper.ItemsHeight);
 		}
 
 		ImGui::EndTable();
@@ -1626,6 +1725,7 @@ void ObjectOutliner::draw()
 	clipper.End();
 	ImGui::End();
 
+	setScrollHere = EntityPtr();
 }
 
 void EdPropertyGrid::draw_components(Entity* entity)
@@ -2254,6 +2354,8 @@ EditorDoc::EditorDoc() {
 
 }
 
+extern void export_scene_model();
+
 void EditorDoc::hook_menu_bar()
 {
 	if (ImGui::BeginMenu("Plugins")) {
@@ -2272,8 +2374,12 @@ void EditorDoc::hook_menu_bar()
 		}
 		ImGui::EndMenu();
 	}
-
-
+	if (ImGui::BeginMenu("Commands")) {
+		if (ImGui::MenuItem("Export as .glb")) {
+			export_scene_model();
+		}
+		ImGui::EndMenu();
+	}
 }
 
 #endif

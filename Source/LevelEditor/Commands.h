@@ -185,23 +185,29 @@ public:
 class CreateCppClassCommand : public Command
 {
 public:
-	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent) {
+	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component) {
 		auto find = cppclassname.rfind('/');
 		auto types = cppclassname.substr(find==std::string::npos ? 0 : find+1);
 		ti = ClassBase::find_class(types.c_str());
 		this->transform = transform;
 		this->parent_to = parent;
+		is_component_type = is_component;
 	}
 	bool is_valid() override { return ti != nullptr; }
 
 	void execute() {
 		assert(ti);
-		auto ent = eng->get_level()->spawn_entity_from_classtype(*ti);
+		Entity* ent{};
+		if (is_component_type){
+			ent = eng->get_level()->spawn_entity_class<Entity>();
+			ent->create_component_type(ti);
+		}
+		else
+			ent = eng->get_level()->spawn_entity_from_classtype(*ti);
 		if (parent_to.get())
 			ent->parent_to(parent_to.get());
 		else
 			ent->set_ws_transform(transform);
-		ent->set_editor_name(ent->get_type().classname);
 		handle = ent->get_self_ptr();
 		ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
 		ed_doc.on_entity_created.invoke(handle);
@@ -219,7 +225,9 @@ public:
 	glm::mat4 transform;
 	EntityPtr handle;
 	EntityPtr parent_to;
+	bool is_component_type = false;
 };
+
 
 class TransformCommand : public Command
 {

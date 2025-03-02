@@ -69,6 +69,7 @@
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
+    <ClInclude Include="Source\Game\Entities\CollectionContainer.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\EntityPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
@@ -329,6 +330,7 @@
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
+    <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />

@@ -517,6 +517,7 @@
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Render\UIDrawPublic.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
+    <ClInclude Include="Source\Game\Entities\CollectionContainer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -772,6 +773,7 @@
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
     <ClCompile Include="Source\Framework\Jobs.cpp" />
+    <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

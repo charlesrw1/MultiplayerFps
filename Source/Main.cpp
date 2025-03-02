@@ -363,7 +363,8 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 
 	if (orbit_mode)
 	{
-		bool pan_in_orbit_model = keys[SDL_SCANCODE_LSHIFT];
+		auto keystate = SDL_GetKeyboardState(nullptr);
+		bool pan_in_orbit_model = keystate[SDL_SCANCODE_LSHIFT];
 
 		if (!pan_in_orbit_model) {
 			update_pitch_yaw();
@@ -945,11 +946,7 @@ void register_input_actions_for_game()
 
 int main(int argc, char** argv)
 {
-
-	eng_local.argc = argc;
-	eng_local.argv = argv;
-
-	eng_local.init();	
+	eng_local.init(argc,argv);	
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -969,7 +966,7 @@ ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV, "the defaul
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
 
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
-ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 55.0, 110.0);
+ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 10.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL,"");
 ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER,"", 0, 2);
 ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL,"");
@@ -1493,6 +1490,8 @@ void GameEngineLocal::init_sdl_window()
 {
 	ASSERT(!window);
 
+	sys_print(Info, "initializing window...\n");
+
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
 		sys_print(Error,"init sdl failed: %s\n", SDL_GetError());
 		exit(-1);
@@ -1529,8 +1528,11 @@ void GameEngineLocal::init_sdl_window()
 
 
 extern void register_input_actions_for_game();
-void GameEngineLocal::init()
+void GameEngineLocal::init(int argc, char** argv)
 {
+	this->argc = argc;
+	this->argv = argv;
+
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
 	float start = GetTime();

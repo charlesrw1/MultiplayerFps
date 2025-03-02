@@ -49,6 +49,7 @@ public:
 	void draw();
 	void init();
 private:
+	void on_selection_change();
 	int determine_object_count() const;
 	void rebuild_tree() {
 		delete_tree();
@@ -126,6 +127,9 @@ private:
 		IteratorDraw(ObjectOutliner* oo, Node* n) : oo(oo), node(n) {}
 		bool step();
 		void draw();
+		Node* get_node() const {
+			return node;
+		}
 	private:
 		ObjectOutliner* oo = nullptr;
 		std::vector<int> child_stack;
@@ -133,6 +137,8 @@ private:
 		Node* node = nullptr;
 	};
 	friend struct IteratorDraw;
+
+	EntityPtr setScrollHere;
 
 	std::unordered_map<uint64_t, Node*> map;
 	Node* rootnode = nullptr;
