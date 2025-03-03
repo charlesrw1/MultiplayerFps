@@ -53,8 +53,8 @@ public:
 	// import settings
 	bool hasEndCrop = false;
 	bool hasStartCrop = false;
-	int16_t cropStart = 0;
-	int16_t cropEnd = 20'000;	// a big number
+	int cropStart = 0;
+	int cropEnd =0;	// a big number
 	bool fixLoop = false;
 	bool makeAdditive = false;
 	bool additiveFromSelf = false;

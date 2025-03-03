@@ -1749,8 +1749,11 @@ void ModelCompileHelper::append_animation_seq_to_list(
 	if (definition && definition->crop.has_crop) {
 		if(definition->crop.start >= 0 && definition->crop.start < END_keyframe)
 			START_keyframe = definition->crop.start;
-		if (definition->crop.end < END_keyframe && END_keyframe > START_keyframe)
+		if (definition->crop.end < END_keyframe && definition->crop.end > START_keyframe)
 			END_keyframe = definition->crop.end;
+		else if (definition->crop.end < 0) {
+			END_keyframe = NUM_keyframes + definition->crop.end;
+		}
 		NUM_keyframes = END_keyframe - START_keyframe;
 	}
 
@@ -1830,9 +1833,9 @@ void ModelCompileHelper::append_animation_seq_to_list(
 			for (int frame = 0; frame < out_seq.get_num_keyframes_inclusive(); frame++) {
 				const int frame_w_crop = frame + START_keyframe;
 				const float t = frame_w_crop / fps;
-ASSERT(t <= out_seq.duration);
-glm::vec3 pos = get_pos_for_time(t);
-write_out_to_outseq(&pos.x, 3, &out_seq);
+				ASSERT(t <= out_seq.duration);
+				glm::vec3 pos = get_pos_for_time(t);
+				write_out_to_outseq(&pos.x, 3, &out_seq);
 			}
 			assert((out_seq.pose_data.size() - offsets.pos) / 3 == (out_seq.get_num_keyframes_inclusive()));
 		}

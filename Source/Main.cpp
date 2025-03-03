@@ -331,7 +331,7 @@ void User_Camera::scroll_callback(int amt)
 	}
 }
 
-void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, float aratio, float fov)
+void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, int width, int height, float aratio, float fov)
 {
 	int xpos, ypos;
 	xpos = mouse_dx;
@@ -339,11 +339,11 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 
 	float x_off = xpos;
 	float y_off = ypos;
+
 	float sensitivity = 0.01;
 	x_off *= sensitivity;
 	y_off *= sensitivity;
-
-
+	
 	auto update_pitch_yaw = [&]() {
 		yaw += x_off;
 		pitch -= y_off;
@@ -363,6 +363,7 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 
 	if (orbit_mode)
 	{
+
 		auto keystate = SDL_GetKeyboardState(nullptr);
 		bool pan_in_orbit_model = keystate[SDL_SCANCODE_LSHIFT];
 
@@ -377,7 +378,8 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 
 		// panning
 		if (pan_in_orbit_model) {
-			// scale by dist
+			// scale by dist, not accurate, fixme
+			
 			float x_s = tan(fov / 2) * dist * 0.5;
 			float y_s = x_s * aratio;
 			orbit_target = orbit_target - real_up * y_off * y_s + right * x_off * x_s;

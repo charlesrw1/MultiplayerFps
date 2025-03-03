@@ -825,7 +825,9 @@ void EditorDoc::tick(float dt)
 
 	auto window_sz = eng->get_game_viewport_size();
 	float aratio = (float)window_sz.y / window_sz.x;
-	const float fov = glm::radians(g_fov.get_float());
+	float fov = glm::radians(g_fov.get_float());
+
+
 	{
 		int x=0, y=0;
 		const Uint32 button_state = SDL_GetRelativeMouseState(&x, &y);
@@ -834,7 +836,7 @@ void EditorDoc::tick(float dt)
 			if (using_ortho && ortho_camera.can_take_input())
 				ortho_camera.update_from_input(eng->get_input_state()->keys, x, y, aratio);
 			if(!using_ortho && camera.can_take_input())
-				camera.update_from_input(eng->get_input_state()->keys, x, y, aratio,fov);
+				camera.update_from_input(eng->get_input_state()->keys, x, y,window_sz.x,window_sz.y, aratio,fov);
 		}
 
 	}

@@ -22,7 +22,7 @@ void EditorTool3d::tick(float dt)
 		int x = 0, y = 0;
 		if (eng->is_game_focused()) {
 			SDL_GetRelativeMouseState(&x, &y);
-			camera.update_from_input(eng->get_input_state()->keys, x, y, aratio,fov);
+			camera.update_from_input(eng->get_input_state()->keys, x, y,window_sz.x,window_sz.y, aratio,fov);
 		}
 	}
 	view = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);

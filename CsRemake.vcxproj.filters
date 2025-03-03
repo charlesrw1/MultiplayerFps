@@ -518,6 +518,7 @@
     <ClInclude Include="Source\Render\UIDrawPublic.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Game\Entities\CollectionContainer.h" />
+    <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -774,6 +775,7 @@
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
     <ClCompile Include="Source\Framework\Jobs.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
+    <ClCompile Include="Source\Game\BeatEmUp\BeatEmUp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

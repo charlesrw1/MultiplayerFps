@@ -95,4 +95,6 @@ g_draw_grid 1
 start_ed Map top_down/map0.tmap
 #start_ed Material "top_down/fake_fog.mm"
 
+bind 7 "start_ed AnimGraph beu_character.ag"
+
 

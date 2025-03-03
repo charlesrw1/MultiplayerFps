@@ -65,6 +65,7 @@
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Game\AssetPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\AssetPtrMacro.h" />
+    <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
     <ClInclude Include="Source\Game\CarGame\CarGame.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
@@ -264,6 +265,7 @@
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Framework\Jobs.cpp" />
+    <ClCompile Include="Source\Game\BeatEmUp\BeatEmUp.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
