@@ -73,7 +73,7 @@ struct TopDownControls
 	InputActionInstance* look{};
 };
 
-NEWCLASS(TopDownPlayer, Entity)
+NEWCLASS(TopDownPlayer, EntityComponent)
 public:
 
 	TopDownControls con;
@@ -90,12 +90,12 @@ public:
 
 	TopDownPlayer() {
 		set_ticking(true);
-		mesh = construct_sub_component<MeshComponent>("body");
-		capsule = construct_sub_component<CapsuleComponent>("capsule-body");
-		health = construct_sub_component<TopDownHealthComponent>("health");
-
-		gun_entity = construct_sub_entity<Entity>("gun-entity");
-		gun_entity->construct_sub_component<MeshComponent>("gun-model");
+		//mesh = construct_sub_component<MeshComponent>("body");
+		//capsule = construct_sub_component<CapsuleComponent>("capsule-body");
+		//health = construct_sub_component<TopDownHealthComponent>("health");
+		//
+		//gun_entity = construct_sub_entity<Entity>("gun-entity");
+		//gun_entity->construct_sub_component<MeshComponent>("gun-model");
 	}
 
 	bool using_controller() const {
@@ -104,8 +104,11 @@ public:
 
 	virtual void start() override {
 
+		mesh = get_owner()->get_component<MeshComponent>();
+		capsule = get_owner()->get_component<CapsuleComponent>();
+		assert(mesh && capsule);
 		{
-			auto cameraobj = eng->get_level()->spawn_entity_class<Entity>();
+			auto cameraobj = eng->get_level()->spawn_entity();
 			the_camera = cameraobj->create_component<CameraComponent>();
 			the_camera->set_is_enabled(true);
 			ASSERT(CameraComponent::get_scene_camera() == the_camera);
@@ -156,19 +159,19 @@ public:
 			{
 				ragdoll_enabled = !ragdoll_enabled;
 
-				TopDownUtil::enable_ragdoll_shared(this, last_ws, ragdoll_enabled);
+				TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, ragdoll_enabled);
 
 				if (!ragdoll_enabled) {
-					int index = get_cached_mesh_component()->get_index_of_bone(StringName("mixamorig:Hips"));
-					glm::mat4 ws = get_ws_transform() * get_cached_mesh_component()->get_animator_instance()->get_global_bonemats().at(index);	//root
+					int index = get_owner()->get_cached_mesh_component()->get_index_of_bone(StringName("mixamorig:Hips"));
+					glm::mat4 ws = get_ws_transform() * get_owner()->get_cached_mesh_component()->get_animator_instance()->get_global_bonemats().at(index);	//root
 					glm::vec3 pos = ws[3];
 					pos.y = 0;
-					set_ws_position(pos);
+					get_owner()->set_ws_position(pos);
 					ccontroller->set_position(pos);
-					get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(false);
+					get_owner()->get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(false);
 				}
 				else {
-					get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(true);
+					get_owner()->get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(true);
 					//set_ws_transform(glm::mat4(1.f));
 				}
 			});
@@ -313,7 +316,7 @@ public:
 
 
 		last_ws = get_ws_transform();
-		set_ws_transform(ccontroller->get_character_pos(), q, get_ls_scale());
+		get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
 
 		has_had_update = true;
 
@@ -401,7 +404,7 @@ public:
 
 	virtual void on_init() override {
 		if (get_owner()) {
-			p = get_owner()->cast_to<TopDownPlayer>();
+			p = get_owner()->get_component<TopDownPlayer>();
 			e = get_owner()->get_component<TopDownEnemyComponent>();
 		}
 	}

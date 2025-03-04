@@ -15,6 +15,21 @@ public:
 
 	virtual ~EntityComponent() override;
 
+	virtual void pre_start() {}
+	virtual void start() {}
+	virtual void update() {}
+	virtual void end() {}
+
+	void init_updater();
+	void shutdown_updater();
+	void set_ticking(bool shouldTick);
+	void set_call_init_in_editor(bool b) {
+		call_init_in_editor = b;
+	}
+	bool get_call_init_in_editor() const {
+		return call_init_in_editor;
+	}
+
 	void destroy();
 
 	REFLECT(name="owner",getter);
@@ -52,10 +67,25 @@ protected:
 
 private:
 
+	REFLECT(name = "is_type");
+	bool is_type_for_script(const ClassTypeInfo* t) {
+		if (!t) return false;
+		return get_type().is_a(*t);
+	}
+	REFLECT(name = "type", getter);
+	const ClassTypeInfo* get_type_for_script() {
+		return &get_type();
+	}
+
+
 	void set_owner(Entity* e) {
 		ASSERT(entity_owner == nullptr);
 		entity_owner = e;
 	}
+
+	void activate_internal_step1();
+	void activate_internal_step2();
+	void deactivate_internal();
 
 	void initialize_internal_step1();
 	void initialize_internal_step2();
@@ -73,6 +103,9 @@ private:
 	friend class EdPropertyGrid;
 	friend class LevelSerialization;
 	friend class Level;
+
+	bool call_init_in_editor = false;
+	bool tick_enabled = false;
 
 public:
 };

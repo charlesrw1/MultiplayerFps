@@ -66,7 +66,7 @@ class HealthComponent;
 class InputUser;
 class CharacterController;
 class BikeEntity;
-CLASS_H(Player, Entity)
+CLASS_H(Player, EntityComponent)
 public:
 
 	Player();
@@ -92,10 +92,9 @@ public:
 	void get_view(glm::mat4& viewMatrix, float& fov);
 	
 	// Entity overrides
-	void update() override;
-	void start() override;
-
-	void end() override;
+	void update() final;
+	void start() final;
+	void end() final;
 
 	void on_jump_callback();
 public:

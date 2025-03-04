@@ -1,12 +1,12 @@
 #pragma once
-#include "Game/Entity.h"
+#include "Game/EntityComponent.h"
 #include <memory>
 class CharacterController;
-CLASS_H(BikeEntity,Entity)
+CLASS_H(BikeEntity,EntityComponent)
 public:
 	BikeEntity();
-	void update() override;
-	void start() override;
+	void update() final;
+	void start() final;
 
 	float turn_strength = 0.0;	// -1,1 r,l
 	float forward_strength = 0.0;	// 0,1

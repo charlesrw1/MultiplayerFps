@@ -3,18 +3,15 @@
 	id 1
 }
 {
-	new StaticMeshEntity
+	new Entity
 	id 2
 }
 {
-	override 2/~2122221332
-	cast_shadows 0
+	new MeshComponent
+	parent 1
 }
 {
-	new StaticMeshEntity
+	new Entity
 	id 3
 	parent 2
-}
-{
-	override 3/~2122221332
 }

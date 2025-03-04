@@ -248,7 +248,7 @@ void AnimationEditorTool::post_map_load_callback()
 		sequence = g_assets.find_sync<AnimationSeqAsset>(modelName + "/" + animName).get();// outputModel->get_skel()->find_clip(animName, remapIndx);
 	}
 	
-	entity = eng->get_level()->spawn_entity_class<Entity>();
+	entity = eng->get_level()->spawn_entity();
 	mc = entity->create_component<MeshComponent>();
 	mc->set_model(outputModel);
 	fake_tree = Animation_Tree_CFG::construct_fake_tree();

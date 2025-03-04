@@ -420,7 +420,7 @@ void EditorDoc::validate_prefab()
 	}
 	if (!root) {
 		sys_print(Debug, "prefab had no root\n");
-		level->spawn_entity_class<Entity>();
+		level->spawn_entity();
 	}
 }
 
@@ -455,7 +455,7 @@ void EditorDoc::on_map_load_return(bool good)
 					eng->get_level()->spawn_prefab(editing_prefab);
 			}
 			if (get_doc_name().empty())
-				eng->get_level()->spawn_entity_class<Entity>();	// spawn empty prefab entity
+				eng->get_level()->spawn_entity();	// spawn empty prefab entity
 
 			validate_prefab();
 		}
@@ -2326,7 +2326,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 				glm::vec3 p(x, y, z + counter * size);
 				glm::mat4 transform = glm::translate(glm::mat4(1), p*2.0f);
 
-				auto ent = eng->get_level()->spawn_entity_class<Entity>();
+				auto ent = eng->get_level()->spawn_entity();
 				ent->create_component<MeshComponent>()->set_model(model.get());
 				ent->set_ws_transform(transform);
 				

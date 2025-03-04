@@ -133,7 +133,7 @@ public:
 	bool is_valid() override { return true; }
 
 	void execute() {
-		auto ent = eng->get_level()->spawn_entity_class<Entity>();
+		auto ent = eng->get_level()->spawn_entity();
 		ent->create_component<MeshComponent>();
 		if (parent_to.get())
 			ent->parent_to(parent_to.get());
@@ -199,11 +199,11 @@ public:
 		assert(ti);
 		Entity* ent{};
 		if (is_component_type){
-			ent = eng->get_level()->spawn_entity_class<Entity>();
+			ent = eng->get_level()->spawn_entity();
 			ent->create_component_type(ti);
 		}
 		else
-			ent = eng->get_level()->spawn_entity_from_classtype(*ti);
+			ent = eng->get_level()->spawn_entity();
 		if (parent_to.get())
 			ent->parent_to(parent_to.get());
 		else

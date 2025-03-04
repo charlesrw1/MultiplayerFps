@@ -23,7 +23,7 @@
 #include "Framework/Reflection2.h"
 #include "Physics/Physics2.h"
 
-NEWCLASS(TopDownGameManager, Entity)
+NEWCLASS(TopDownGameManager, EntityComponent)
 public:
 	static TopDownGameManager* instance;
 

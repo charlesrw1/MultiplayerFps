@@ -43,30 +43,25 @@ public:
 	// this adds to the sync list to defer if in game task, or immedetaly calls on_sync() otherwise
 	void add_to_sync_render_data_list(EntityComponent* ec);
 	
-	void add_to_update_list(BaseUpdater* b) {
+	void add_to_update_list(EntityComponent* ec) {
 		if (b_is_in_update_tick.get_value())
-			wantsToAddToUpdate.push_back(b);
+			wantsToAddToUpdate.push_back(ec);
 		else
-			tick_list.insert(b);
+			tick_list.insert(ec);
 	}
 
-	void remove_from_update_list(BaseUpdater* b);
+	void remove_from_update_list(EntityComponent* ec);
 
 	// destroy an entity, calls desroy_internal(), deletes, removes from list
 	void destroy_entity(Entity* e);
 	
 	void destroy_component(EntityComponent* e);
 
-	Entity* spawn_entity_from_classtype(const ClassTypeInfo& ti);
 	
 	Entity* spawn_prefab(const PrefabAsset* asset);
 	DeferredSpawnScopePrefab spawn_prefab_deferred(Entity*& out, const PrefabAsset* asset);
 	
-	template<typename T>
-	T* spawn_entity_class() {
-		Entity* e = spawn_entity_from_classtype(T::StaticType);
-		return (T*)e;
-	}
+	Entity* spawn_entity();
 
 	template<typename T>
 	DeferredSpawnScope spawn_entity_class_deferred(T*& ptrOut) {
@@ -104,7 +99,7 @@ private:
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
 
-	hash_set<BaseUpdater> tick_list;
+	hash_set<EntityComponent> tick_list;
 
 	// last instance id, incremented to add objs
 	uint64_t last_id = 0;
@@ -112,7 +107,7 @@ private:
 	ScopedBooleanValue b_is_in_update_tick;
 
 
-	std::vector<BaseUpdater*> wantsToAddToUpdate;
+	std::vector<EntityComponent*> wantsToAddToUpdate;
 	hash_set<EntityComponent> wants_sync_update;
 	std::unordered_set<uint64_t> deferred_delete_list;
 

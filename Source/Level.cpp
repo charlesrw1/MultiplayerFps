@@ -84,27 +84,22 @@ Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
 	return ec;
 }
 
-Entity* Level::spawn_entity_from_classtype(const ClassTypeInfo& ti)
+Entity* Level::spawn_entity()
 {
+	auto& ti = Entity::StaticType;
 	ASSERT(ti.allocate);
 
 	ClassBase* e = ti.allocate();	// allocate + call constructor
 	ASSERT(e);
 
-	Entity* ec = nullptr;
+	auto ent = (Entity*)e;
 
-	ec = e->cast_to<Entity>();
-	if (!ec) {
-		sys_print(Error, "spawn_entity_from_classtype failed for %s\n", ti.classname);
-		delete e;
-		return nullptr;
-	}
 
 	// call_startup_functions_for_new_entity
-	insert_new_native_entity_into_hashmap_R(ec);
-	initialize_new_entity_safe(ec);
+	insert_new_native_entity_into_hashmap_R(ent);
+	initialize_new_entity_safe(ent);
 
-	return ec;
+	return ent;
 }
 
 void Level::destroy_entity(Entity* e)
@@ -165,10 +160,10 @@ void Level::create(SceneAsset* source, bool is_editor)
 	}
 }
 
-void Level::remove_from_update_list(BaseUpdater* b) {
-	tick_list.remove(b);
+void Level::remove_from_update_list(EntityComponent* ec) {
+	tick_list.remove(ec);
 	for (int i = 0; i < wantsToAddToUpdate.size(); i++)
-		if (wantsToAddToUpdate[i] == b) {
+		if (wantsToAddToUpdate[i] == ec) {
 			wantsToAddToUpdate[i] = nullptr;
 		}
 }
@@ -196,17 +191,12 @@ void Level::initialize_new_entity_safe(Entity* e)
 	for (int i = 0; i < init_entities.size();i++) {
 		auto e = init_entities[i];
 		ASSERT(e->init_state == BaseUpdater::initialization_state::HAS_ID);
-		e->initialize_internal_step1();
+		e->initialize_internal();	// just sets init_state => CALLED_START
 	}
 	for (int i = 0; i < init_components.size();i++) {
 		auto ec = init_components[i];
 		ASSERT(ec->init_state == BaseUpdater::initialization_state::HAS_ID);
 		ec->initialize_internal_step1();
-	}
-	for (int i = 0; i < init_entities.size();i++) {
-		auto e = init_entities[i];
-		ASSERT(e->init_state == BaseUpdater::initialization_state::CALLED_PRE_START);
-		e->initialize_internal_step2();
 	}
 	for (int i = 0; i < init_components.size();i++) {
 		auto ec = init_components[i];
@@ -264,7 +254,7 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 		ASSERT(0);
 	}
 	else {
-		for (auto o : objs) {
+		for (auto& o : objs) {
 			ASSERT(o.second);
 			o.second->post_unserialization(get_next_id_and_increment());
 			all_world_ents.insert(o.second->get_instance_id(), o.second);
@@ -275,24 +265,20 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 		if (scene.get_root_entity() && scene.get_root_entity()->start_disabled && !is_editor_level())
 			return;
 
-		for (auto o : objs) {
+		for (auto& o : objs) {
 			auto ent = o.second;
 			if (Entity* e = ent->cast_to<Entity>())
-				e->initialize_internal_step1();
+				e->initialize_internal(); // just sets init_state => CALLED_START
 			else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
 				ec->initialize_internal_step1();
 			else
 				ASSERT(0);
 		}
 
-		for (auto o : objs) {
+		for (auto& o : objs) {
 			auto ent = o.second;
-			if (Entity* e = ent->cast_to<Entity>())
-				e->initialize_internal_step2();
-			else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
+			if (EntityComponent* ec = ent->cast_to<EntityComponent>())
 				ec->initialize_internal_step2();
-			else
-				ASSERT(0);
 		}
 	}
 }

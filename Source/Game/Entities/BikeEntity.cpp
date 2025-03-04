@@ -3,7 +3,7 @@
 #include "Game/Components/MeshComponent.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/Model.h"
-
+#include "Game/Entity.h"
 
 #include "Framework/MathLib.h"
 
@@ -14,8 +14,8 @@ CLASS_IMPL(BikeEntity);
 BikeEntity::BikeEntity()
 {
 	bike_direction = { 0,0,1 };
-	auto m = construct_sub_component<MeshComponent>("BikeMesh");
-	m->set_model(g_assets.find_assetptr_unsafe<Model>("bike.cmdl"));
+	//auto m = construct_sub_component<MeshComponent>("BikeMesh");
+	//m->set_model(g_assets.find_assetptr_unsafe<Model>("bike.cmdl"));
 	//m->disable_physics = true;
 
 	set_ticking(true);
@@ -82,5 +82,5 @@ void BikeEntity::update()
 	current_roll = damp_dt_independent<float>(roll, current_roll, bike_damp, dt);
 	glm::quat q(glm::vec3(0, atan2(bike_direction.x, bike_direction.z), 0));
 	q *= glm::quat(glm::vec3(0, 0, current_roll));
-	set_ws_transform(pos,q,glm::vec3(1.f));
+	get_owner()->set_ws_transform(pos,q,glm::vec3(1.f));
 }

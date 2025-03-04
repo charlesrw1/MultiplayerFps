@@ -15,7 +15,7 @@
 #include "Game/StdEntityTypes.h"
 #include "EditorTool3d.h"
 
-class StaticMeshEntity;
+class MeshComponent;
 class ModelEditorTool : public EditorTool3d
 {
 public:
@@ -34,7 +34,7 @@ public:
 	}
 
 	PropertyGrid propGrid;
-	StaticMeshEntity* outputEntity = nullptr;
+	MeshComponent* outputEntity = nullptr;
 	Model* outputModel = nullptr;
 	ModelImportSettings* importSettings = nullptr;
 };

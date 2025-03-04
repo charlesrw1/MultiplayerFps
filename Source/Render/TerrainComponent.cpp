@@ -7,6 +7,9 @@
 #include "Framework/ReflectionMacros.h"
 #include "Game/AssetPtrMacro.h"
 #include "GameEnginePublic.h"
+
+#include "Game/Components/BillboardComponent.h"
+#include "Assets/AssetDatabase.h"
 CLASS_H(TerrainComponent,EntityComponent)
 public:
 	AssetPtr<Texture> heightmap;
@@ -53,38 +56,27 @@ public:
 	}
 
 	// use to get handles, setup state
-	virtual void on_init() {
+	void start() final {
+
+		if (eng->is_editor_level()) {
+			auto b = get_owner()->create_component<BillboardComponent>();
+			b->set_texture(default_asset_load<Texture>("icon/_nearest/terrain.png"));
+			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		}
 
 		Render_Terrain rt = make_terrain();
 		handle = idraw->get_scene()->get_terrain_interface()->register_terrain(rt);
 	}
 	// called when component is being removed, remove all handles
-	virtual void on_deinit() {
+	void end() final {
 		idraw->get_scene()->get_terrain_interface()->remove_terrain(handle);
 	}
 
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
-	virtual void on_changed_transform() {
+	void on_changed_transform() final {
 		Render_Terrain rt = make_terrain();
 		idraw->get_scene()->get_terrain_interface()->update_terrain(handle, rt);
 	}
 };
 
 CLASS_IMPL(TerrainComponent);
-#include "Game/Components/BillboardComponent.h"
-#include "Assets/AssetDatabase.h"
-CLASS_H(TerrainEntity, Entity)
-public:
-	TerrainEntity() {
-		Terrain = construct_sub_component<TerrainComponent>("Terrain");
-
-		if (eng->is_editor_level()) {
-			auto b = construct_sub_component<BillboardComponent>("Billboard");
-			b->set_texture(default_asset_load<Texture>("icon/_nearest/terrain.png"));
-			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-		}
-	}
-	static const PropertyInfoList* get_props() = delete;
-	TerrainComponent* Terrain{};
-};
-CLASS_IMPL(TerrainEntity);

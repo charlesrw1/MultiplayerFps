@@ -1,25 +1,16 @@
 #include "MiscEntities.h"
 
 CLASS_IMPL(Door);
-CLASS_IMPL(Grenade);
 CLASS_IMPL(NPC);
 
 
 
-Grenade::Grenade()
-{
-}
-
-
-void Grenade::update()
-{
-}
-
 
 void Door::update()
 {
-	float rotation_y = eng->get_game_time()*PI*0.5;
-	set_ws_rotation(glm::vec3(0, rotation_y, 0));
+	ASSERT(0);
+	//float rotation_y = eng->get_game_time()*PI*0.5;
+	//set_ws_rotation(glm::vec3(0, rotation_y, 0));
 }
 
 DECLARE_ENGINE_CMD(spawn_npc)

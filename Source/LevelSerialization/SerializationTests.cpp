@@ -117,13 +117,11 @@ ADD_TEST(Serialization, BuildPath)
 	work.post_unserialization();
 	// test basic path
 	TEST_TRUE(build_path_for_object(e, nullptr) == std::to_string(e->unique_file_id));
-	auto e2 = work.add_entity<StaticMeshEntity>();
+	auto e2 = work.add_entity<Entity>();
 	e2->parent_to(e);
 	// test parented path
 	TEST_TRUE(build_path_for_object(e2, nullptr) == std::to_string(e2->unique_file_id));
-	// test native component path
-	TEST_TRUE(build_path_for_object(e2->Mesh, nullptr) == std::to_string(e2->unique_file_id) + "/~" + std::to_string(e2->Mesh->unique_file_id));
-
+	
 	TEST_TRUE(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
 
 }
@@ -152,7 +150,7 @@ ADD_TEST(Serialization, UnserializeScene)
 	TEST_TRUE(unserialized.find("2/~2122221332")->is_a<MeshComponent>());
 	TEST_TRUE(unserialized.find("2/~2122221332")->cast_to<MeshComponent>()->get_casts_shadows() == false);
 
-	auto num3 = unserialized.find("3")->cast_to<StaticMeshEntity>();
+	auto num3 = unserialized.find("3")->cast_to<Entity>();
 	auto num2 = unserialized.find("2")->cast_to<Entity>();
 	TEST_TRUE(num3 && num2 && num3->get_parent() == num2);
 }
@@ -251,7 +249,7 @@ ADD_TEST(Serialization, WritePrefab)
 	SerializeTestWorkbench work;
 	auto root = work.add_entity<Entity>();
 	auto prefab = work.create_prefab(root);
-	auto ent2 = work.add_entity<StaticMeshEntity>();
+	auto ent2 = work.add_entity<Entity>();
 	ent2->parent_to(root);
 	auto comp = work.add_component<PointLightComponent>(root);
 
@@ -275,7 +273,6 @@ ADD_TEST(Serialization, WritePrefab)
 	for (auto obj : unserialized.get_objects()) {
 		auto e = obj.second->cast_to<Entity>();
 		if (e && !e->get_parent()) continue;
-		if (obj.second->is_native_created) continue;
 		if (!obj.second->creator_source || (obj.second->what_prefab != prefab && obj.second->what_prefab != loadPrefab))
 		{
 			good = false;
@@ -297,61 +294,13 @@ ADD_TEST(Serialization, WritePrefab)
 extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
 
 
-CLASS_H(SerializeTesterEntity, Entity)
-public:
-	SerializeTesterEntity() {
-		comp=construct_sub_component<MeshComponent>("sub-mesh");
-		ent=construct_sub_entity<StaticMeshEntity>("sub-mesh-entity");
-	}
-	MeshComponent* comp{};
-	StaticMeshEntity* ent{};
-};
-CLASS_IMPL(SerializeTesterEntity);
-
-ADD_TEST(Serialization, PrefabWithNativeRoot)
-{
-	SerializeTestWorkbench work;
-	auto root = work.add_entity<SerializeTesterEntity>();
-	auto prefab = work.create_prefab(root);
-
-	TEST_TRUE(this_is_newly_created(root, prefab));
-	TEST_TRUE(!this_is_newly_created(root->comp, prefab));
-	TEST_TRUE(!this_is_newly_created(root->ent, prefab));
-	TEST_TRUE(!this_is_newly_created(root->ent->Mesh, prefab));
-
-	TEST_TRUE(build_path_for_object(root,prefab) == "/");
-	TEST_TRUE(root->comp->is_native_created);
-	TEST_TRUE(build_path_for_object(root->comp,prefab) == "~"+std::to_string(root->comp->unique_file_id));
-	TEST_TRUE(build_path_for_object(root->ent,prefab) == "~"+std::to_string(root->ent->unique_file_id));
-	TEST_TRUE(build_path_for_object(root->ent->Mesh,prefab) == "~"+std::to_string(root->ent->unique_file_id)+"/~"+std::to_string(root->ent->Mesh->unique_file_id));
-
-
-
-	TEST_TRUE(build_path_for_object(root,nullptr) == std::to_string(root->unique_file_id));
-	TEST_TRUE(build_path_for_object(root->comp,nullptr) ==  std::to_string(root->unique_file_id) + "/~" +std::to_string(root->comp->unique_file_id));
-	TEST_TRUE(build_path_for_object(root->ent->Mesh,nullptr) == std::to_string(root->unique_file_id) + "/~" +std::to_string(root->ent->unique_file_id)+"/~"+std::to_string(root->ent->Mesh->unique_file_id));
-
-
-
-	auto from = build_path_for_object(root->comp, nullptr);
-	auto to = build_path_for_object(root, nullptr);
-
-	TEST_TRUE(serialize_build_relative_path(from.c_str(), to.c_str()) == "..");
-	TEST_TRUE(serialize_build_relative_path(to.c_str(), from.c_str()) == "~"+std::to_string(root->comp->unique_file_id));
-
-
-
-	auto ent2 = work.add_entity<StaticMeshEntity>();
-	ent2->parent_to(root);
-	auto comp = work.add_component<PointLightComponent>(root);
-}
 
 ADD_TEST(Serialization, FindDiffInPrefab)
 {
 	SerializeTestWorkbench work;
 	auto root = work.add_entity<Entity>();
 	auto prefab = work.create_prefab(root);
-	auto ent2 = work.add_entity<StaticMeshEntity>();
+	auto ent2 = work.add_entity<Entity>();
 	ent2->parent_to(root);
 	auto comp = work.add_component<PointLightComponent>(root);
 
@@ -365,8 +314,7 @@ ADD_TEST(Serialization, FindDiffInPrefab)
 	TEST_TRUE(diff == Entity::StaticType.default_class_object);
 	diff = find_diff_class(comp,prefab,diff_prefab);
 	TEST_TRUE(diff == PointLightComponent::StaticType.default_class_object);
-	diff = find_diff_class(ent2->Mesh,prefab,diff_prefab);
-	TEST_TRUE(diff == ((StaticMeshEntity*)StaticMeshEntity::StaticType.default_class_object)->Mesh);
+	
 	diff = find_diff_class(pent, prefab,diff_prefab);
 	TEST_TRUE(diff == loadPrefab->sceneFile->get_root_entity());
 }
@@ -375,7 +323,7 @@ ADD_TEST(Serialization, FindDiffInScene)
 {
 	SerializeTestWorkbench work;
 	auto ent1 = work.add_entity<Entity>();
-	auto ent2 = work.add_entity<StaticMeshEntity>();
+	auto ent2 = work.add_entity<Entity>();
 	ent2->parent_to(ent1);
 	auto comp = work.add_component<PointLightComponent>(ent1);
 
@@ -387,8 +335,7 @@ ADD_TEST(Serialization, FindDiffInScene)
 	TEST_TRUE(diff == Entity::StaticType.default_class_object);
 	diff = find_diff_class(comp,nullptr,diff_prefab);
 	TEST_TRUE(diff == PointLightComponent::StaticType.default_class_object);
-	diff = find_diff_class(ent2->Mesh,nullptr,diff_prefab);
-	TEST_TRUE(diff == ((StaticMeshEntity*)StaticMeshEntity::StaticType.default_class_object)->Mesh);
+	
 	diff = find_diff_class(pent, nullptr,diff_prefab);
 	TEST_TRUE(diff == loadPrefab->sceneFile->get_root_entity());
 }
@@ -399,8 +346,8 @@ ADD_TEST(Serialization, Scene)
 	SerializeTestWorkbench work;
 	auto e = work.add_entity<Entity>();
 	auto light = work.add_component<PointLightComponent>(e);
-	auto sm = work.add_entity<StaticMeshEntity>();
-	auto another_e = work.add_entity<StaticMeshEntity>();
+	auto sm = work.add_entity<Entity>();
+	auto another_e = work.add_entity<Entity>();
 	work.add_component<MeshComponent>(another_e);
 	another_e->parent_to(e);
 	work.post_unserialization();
@@ -412,5 +359,5 @@ ADD_TEST(Serialization, Scene)
 	auto path = build_path_for_object(e, nullptr);
 	TEST_TRUE(scene2.find(path)->cast_to<Entity>());
 	path = build_path_for_object(another_e, nullptr);
-	TEST_TRUE(scene2.find(path)->cast_to<StaticMeshEntity>()->get_parent());
+	TEST_TRUE(scene2.find(path)->cast_to<Entity>()->get_parent());
 }

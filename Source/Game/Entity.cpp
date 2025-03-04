@@ -96,15 +96,6 @@ void Entity::set_active_R(Entity* e, bool b, bool step1)
 {
 	if (e->is_activated() != b)
 	{
-		if (b) {
-			if (step1)
-				e->activate_internal_step1();
-			else
-				e->activate_internal_step2();
-		}
-		else {
-			e->deactivate_internal();
-		}
 		for (auto c : e->get_components()) {
 			if (b) {
 				if (step1)
@@ -129,13 +120,10 @@ void Entity::activate()
 	}
 	ASSERT(start_disabled);
 	{
-		activate_internal_step1();
 		for (auto comp : get_components())
 			comp->activate_internal_step1();
 		for (auto c : get_children())
 			Entity::set_active_R(c,true, true);
-
-		activate_internal_step2();
 		for (auto comp : get_components())
 			comp->activate_internal_step2();
 		for (auto c : get_children())
@@ -144,16 +132,13 @@ void Entity::activate()
 	ASSERT(is_activated());
 }
 
-void Entity::initialize_internal_step1()
+void Entity::initialize_internal()
 {
+	ASSERT(init_state == initialization_state::HAS_ID);
 	if(!start_disabled || eng->is_editor_level())
-		activate_internal_step1();
+		init_state = initialization_state::CALLED_START;
 }
-void Entity::initialize_internal_step2()
-{
-	if(!start_disabled || eng->is_editor_level())
-		activate_internal_step2();
-}
+
 
 void Entity::remove_this(Entity* child)
 {
@@ -188,8 +173,11 @@ void Entity::destroy()
 
 void Entity::destroy_internal()
 {
-	if(init_state == initialization_state::CALLED_START)
-		deactivate_internal();
+	ASSERT(init_state != initialization_state::CALLED_PRE_START);	// invalid state
+	if (init_state == initialization_state::CALLED_START) {
+		init_state = initialization_state::HAS_ID;
+	}
+
 
 	if (get_parent())
 		get_parent()->remove_this(this);
@@ -315,11 +303,11 @@ EntityComponent* Entity::create_component_type(const ClassTypeInfo* info)
 	return ec;
 }
 
-Entity* Entity::create_child_entity(const ClassTypeInfo* info)
+Entity* Entity::create_child_entity()
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
-	Entity* e = eng->get_level()->spawn_entity_from_classtype(*info);
+	Entity* e = eng->get_level()->spawn_entity();
 	ASSERT(e);
 	e->parent_to(this);
 

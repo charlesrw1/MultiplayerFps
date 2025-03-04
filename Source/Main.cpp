@@ -947,6 +947,7 @@ void register_input_actions_for_game()
 		->add_bind("", IA::keyboard_key(SDL_SCANCODE_S), {}, {});
 }
 
+
 int main(int argc, char** argv)
 {
 	eng_local.init(argc,argv);	

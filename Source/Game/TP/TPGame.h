@@ -9,7 +9,7 @@
 #include "Game/Components/PhysicsComponents.h"
 
 class TPPlayer;
-NEWCLASS(TPGameMode, Entity)
+NEWCLASS(TPGameMode, EntityComponent)
 public:
 	static TPGameMode* instance;
 	static TPGameMode& get() {
@@ -25,7 +25,7 @@ public:
 		ASSERT(player);
 
 		{
-			auto ent = eng->get_level()->spawn_entity_class<Entity>();
+			auto ent = eng->get_level()->spawn_entity();
 			game_camera = ent->create_component<CameraComponent>();
 			game_camera->set_is_enabled(true);	// enable it
 		}

@@ -3,7 +3,7 @@
 #include "Game/Components/MeshComponent.h"
 #include "Level.h"
 
-NEWCLASS(BEU_Manager, Entity)
+NEWCLASS(BEU_Manager, EntityComponent)
 public:
 	static BEU_Manager* instance;
 	void pre_start() final {
@@ -24,7 +24,7 @@ public:
 	EntityPtr start_entity;
 };
 
-NEWCLASS(BEU_Enemy, Entity)
+NEWCLASS(BEU_Enemy, EntityComponent)
 public:
 	void start() final {
 
@@ -34,7 +34,7 @@ public:
 	}
 };
 
-NEWCLASS(BEU_Player, Entity)
+NEWCLASS(BEU_Player, EntityComponent)
 public:
 	void start() final {
 

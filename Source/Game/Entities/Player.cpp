@@ -52,20 +52,20 @@ CLASS_IMPL(Player);
 #include "Game/Components/ArrowComponent.h"
 
 
-CLASS_H(PlayerSpawnPoint, Entity)
+CLASS_H(PlayerSpawnPoint, EntityComponent)
 public:
 	PlayerSpawnPoint() {
 
 		if (eng->is_editor_level())
 		{
-			auto b = construct_sub_component<BillboardComponent>("Billboard");
-			b->set_texture(default_asset_load<Texture>("icon/_nearest/player_start.png"));
-			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-			
-			auto a_obj = construct_sub_entity<Entity>("arrow-obj");
-			a_obj->construct_sub_component<ArrowComponent>("arrow-comp");
-			a_obj->set_ls_transform({}, {}, glm::vec3(0.3));
-			a_obj->dont_serialize_or_edit = true;
+			//auto b = construct_sub_component<BillboardComponent>("Billboard");
+			//b->set_texture(default_asset_load<Texture>("icon/_nearest/player_start.png"));
+			//b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+			//
+			//auto a_obj = construct_sub_entity<Entity>("arrow-obj");
+			//a_obj->construct_sub_component<ArrowComponent>("arrow-comp");
+			//a_obj->set_ls_transform({}, {}, glm::vec3(0.3));
+			//a_obj->dont_serialize_or_edit = true;
 		}
 	}
 
@@ -790,7 +790,7 @@ void Player::on_foot_update()
 	velocity = out_vel;
 	action = (flags & CCCF_BELOW) ? Action_State::Idle : Action_State::Falling;
 
-	set_ws_position(ccontroller->get_character_pos());
+	get_owner()->set_ws_position(ccontroller->get_character_pos());
 
 	if (flags & CCCF_BELOW)
 		Debug::add_box(ccontroller->get_character_pos(), glm::vec3(0.5), COLOR_RED, 0);
@@ -863,10 +863,10 @@ void Player::on_foot_update()
 
 	 {
 		 auto scope = eng->get_level()->spawn_entity_class_deferred<BikeEntity>(bike);
-		 bike->set_ws_position(get_ws_position());
+		 bike->get_owner()->set_ws_position(get_ws_position());
 	 }
-	 set_ws_position(glm::vec3(0, 0, 0.5));
-	 parent_to(bike);
+	 get_owner()->set_ws_position(glm::vec3(0, 0, 0.5));
+	 get_owner()->parent_to(bike->get_owner());
 }
  void Player::end() {
 	 g_inputSys.device_connected.remove(this);
@@ -876,22 +876,23 @@ void Player::on_foot_update()
  }
 
  Player::Player() {
-	 player_mesh = construct_sub_component<MeshComponent>("CharMesh");
-	 player_capsule = construct_sub_component<CapsuleComponent>("CharCapsule");
-	 spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
-	 health = construct_sub_component<HealthComponent>("PlayerHealth");
+	 return;
+	 //player_mesh = construct_sub_component<MeshComponent>("CharMesh");
+	 //player_capsule = construct_sub_component<CapsuleComponent>("CharCapsule");
+	 //spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
+	 //health = construct_sub_component<HealthComponent>("PlayerHealth");
 
 	// auto playerMod = g_assets.find_assetptr_unsafe<Model>("SWAT_model.cmdl");
 	 //player_mesh->set_model(playerMod);
 	// player_mesh->set_animation_graph("ik_test.ag");
-	 player_mesh->set_is_visible(false);
-
-	 player_capsule->set_is_trigger(true);
-	 player_capsule->set_send_overlap(true);
-	 player_capsule->set_is_enable(false);
-	 player_capsule->set_is_static(false);
-	 player_capsule->height = 1.7;
-	 player_capsule->radius = 0.3;
+	// player_mesh->set_is_visible(false);
+	//
+	// player_capsule->set_is_trigger(true);
+	// player_capsule->set_send_overlap(true);
+	// player_capsule->set_is_enable(false);
+	// player_capsule->set_is_static(false);
+	// player_capsule->height = 1.7;
+	// player_capsule->radius = 0.3;
 
 	 set_ticking(true);
  }
@@ -899,16 +900,16 @@ void Player::on_foot_update()
 CLASS_H(CoverPositionMarker,Entity)
 public:
 	CoverPositionMarker() {
-		if (eng->is_editor_level()) {
-			auto billboard = construct_sub_component<BillboardComponent>("EditorBillboard");
-			billboard->set_texture(g_assets.find_global_sync<Texture>("icon/_nearest/blue_poi.png").get());
-			billboard->dont_serialize_or_edit = true;
-
-			auto arrowobj = construct_sub_entity<Entity>("ArrowObj");
-			arrowobj->construct_sub_component<ArrowComponent>("Arrow");
-			arrowobj->dont_serialize_or_edit = true;
-			arrowobj->set_ws_transform({}, {}, glm::vec3(0.2));
-		}
+		//if (eng->is_editor_level()) {
+		//	auto billboard = construct_sub_component<BillboardComponent>("EditorBillboard");
+		//	billboard->set_texture(g_assets.find_global_sync<Texture>("icon/_nearest/blue_poi.png").get());
+		//	billboard->dont_serialize_or_edit = true;
+		//
+		//	auto arrowobj = construct_sub_entity<Entity>("ArrowObj");
+		//	arrowobj->construct_sub_component<ArrowComponent>("Arrow");
+		//	arrowobj->dont_serialize_or_edit = true;
+		//	arrowobj->set_ws_transform({}, {}, glm::vec3(0.2));
+		//}
 	}
 };
 CLASS_IMPL(CoverPositionMarker);

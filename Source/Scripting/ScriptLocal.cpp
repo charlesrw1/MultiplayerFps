@@ -238,7 +238,7 @@ public:
 		return eng->get_dt();
 	}
 	Entity* spawn_entity() {
-		return eng->get_level()->spawn_entity_class<Entity>();
+		return eng->get_level()->spawn_entity();
 	}
 	Entity* spawn_prefab(PrefabAsset* prefab) {
 		return eng->get_level()->spawn_prefab(prefab);

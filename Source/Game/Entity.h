@@ -60,15 +60,7 @@ public:
 	T* create_component();
 	EntityComponent* create_component_type(const ClassTypeInfo* info);
 	// will also parent to this
-	template<typename T>
-	T* create_child_entity();
-	Entity* create_child_entity(const ClassTypeInfo* info);
-
-	// USE IN CONSTRUCTOR!, use create_and_attach for normal usage
-	template<typename T>
-	T* construct_sub_component(const char* name);
-	template<typename T>
-	T* construct_sub_entity(const char* name);
+	Entity* create_child_entity();
 
 	// ONLY USE in serialization!
 	void add_component_from_unserialization(EntityComponent* component);
@@ -259,8 +251,7 @@ private:
 
 
 	// called by Level for init/destruct
-	void initialize_internal_step1();
-	void initialize_internal_step2();
+	void initialize_internal();
 	void destroy_internal();
 
 	// called by child entity to remove it from children list
@@ -277,38 +268,9 @@ private:
 	friend class SerializeTestWorkbench;
 };
 
-template<typename T>
-inline T* Entity::construct_sub_component(const char* name) {
-	ASSERT(init_state == initialization_state::CONSTRUCTOR);
-	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
-	auto ptr = new T;
-	ptr->set_owner(this);
-	ptr->unique_file_id = uint32_t(StringName(name).get_hash());
-	ptr->creator_source = this;
-	ptr->is_native_created = true;
-	all_components.push_back(ptr);
-	return (T*)all_components.back();
-}
-template<typename T>
-inline T* Entity::construct_sub_entity(const char* name) {
-	ASSERT(init_state == initialization_state::CONSTRUCTOR);
-	static_assert(std::is_base_of<Entity, T>::value, "Type not derived from Entity");
-	auto ptr = new T;
-	ptr->unique_file_id = uint32_t(StringName(name).get_hash());
-	ptr->creator_source = this;
-	ptr->parent = this;
-	ptr->is_native_created = true;
-	children.push_back(ptr);
-	return (T*)children.back();
-}
 
 template<typename T>
 inline T* Entity::create_component() {
 	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
 	return (T*)create_component_type(&T::StaticType);
-}
-template<typename T>
-inline T* Entity::create_child_entity() {
-	static_assert(std::is_base_of<Entity, T>::value, "Type not derived from EntityComponent");
-	return (T*)create_child_entity(&T::StaticType);
 }

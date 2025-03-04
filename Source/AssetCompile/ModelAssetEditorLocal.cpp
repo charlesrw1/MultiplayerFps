@@ -96,7 +96,7 @@ void ModelEditorTool::post_map_load_callback()
 	}
 
 
-	outputEntity = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
+	outputEntity = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
 
 
 	g_assets.find_async<Model>(get_doc_name(), [&](GenericAssetPtr ptr) {
@@ -113,7 +113,7 @@ void ModelEditorTool::post_map_load_callback()
 		outputModel = ptr.cast_to<Model>().get();
 		if (!outputModel)
 			sys_print(Warning,"compilied model didnt load but loading .def didnt error, continuing as normal\n");
-		outputEntity->Mesh->set_model(outputModel);
+		outputEntity->set_model(outputModel);
 		if (outputModel) {
 			importSettings->myMaterials.clear();
 			for (auto mat : outputModel->materials) {

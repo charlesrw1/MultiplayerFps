@@ -11,22 +11,6 @@ class Level;
 
 NEWCLASS(BaseUpdater, ClassBase)
 public:
-
-	// initialization:
-	// for obj in scene/prefab:
-	//		obj->pre_start()
-	// for obj in scene/prefab:
-	//		obj->start()
-
-	virtual void pre_start() {}
-	virtual void start() {}
-	virtual void update() {}
-	virtual void end() {}
-
-	void init_updater();
-	void shutdown_updater();
-	void set_ticking(bool shouldTick);
-
 	// queues this entity/component to be destroyed at the end of the frame
 	REFLECT(name="destroy");
 	void destroy_deferred();
@@ -38,16 +22,10 @@ public:
 	uint32_t unique_file_id = 0;			// unique id in source owner (either native c++, prefab, map)
 	bool is_root_of_prefab = false;
 	bool editor_transient = false;	// if true, dont serialize
-	bool is_native_created = false;
 	// <<<<<<<<<<<<<<<<
 	bool dont_serialize_or_edit = false;
 
-	void set_call_init_in_editor(bool b) {
-		call_init_in_editor = b;
-	}
-	bool get_call_init_in_editor() const {
-		return call_init_in_editor;
-	}
+
 
 	void post_unserialization(uint64_t id) {
 		ASSERT(init_state == initialization_state::CONSTRUCTOR);
@@ -62,19 +40,6 @@ public:
 		return init_state == initialization_state::CALLED_START;
 	}
 protected:
-	REFLECT(name="is_type");
-	bool is_type_for_script(const ClassTypeInfo* t) {
-		if (!t) return false;
-		return get_type().is_a(*t);
-	}
-	REFLECT(name="type",getter);
-	const ClassTypeInfo* get_type_for_script() {
-		return &get_type();
-	}
-
-	void activate_internal_step1();
-	void activate_internal_step2();
-	void deactivate_internal();
 
 	enum class initialization_state : uint8_t {
 		CONSTRUCTOR,	// base state
@@ -88,6 +53,4 @@ protected:
 	friend class SerializeTestWorkbench;
 private:
 	uint64_t instance_id = 0;	// instance id
-	bool call_init_in_editor = false;
-	bool tick_enabled = false;
 };

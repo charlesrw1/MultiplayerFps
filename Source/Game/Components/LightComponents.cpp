@@ -28,7 +28,7 @@ void SpotLightComponent::start()
 		b->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
-		auto arrow_obj = get_owner()->create_child_entity<Entity>();
+		auto arrow_obj = get_owner()->create_child_entity();
 		arrow_obj->dont_serialize_or_edit = true;
 		arrow_obj->create_component<ArrowComponent>();
 		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
@@ -165,6 +165,12 @@ void SkylightComponent::start() {
 
 	mytexture = new Texture; // g_imgs.install_system_texture("_skylight");
 	sync_render_data();
+
+	if (eng->is_editor_level()) {
+		auto b = get_owner()->create_component<BillboardComponent>();
+		b->set_texture(default_asset_load<Texture>("icon/_nearest/skylight.png"));
+		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+	}
 }
 void SkylightComponent::end() {
 	idraw->get_scene()->remove_skylight(handle);
@@ -190,22 +196,7 @@ void SkylightComponent::editor_on_change_property()  {
 }
 
 #include "Game/Entity.h"
-CLASS_H(SkylightEntity, Entity)
-public:
-	SkylightEntity() {
-		Skylight = construct_sub_component<SkylightComponent>("Skylight");
 
-		if (eng->is_editor_level()) {
-			auto b = construct_sub_component<BillboardComponent>("Billboard");
-			b->set_texture(default_asset_load<Texture>("icon/_nearest/skylight.png"));
-			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-		}
-	}
-	SkylightComponent* Skylight = nullptr;
-
-	static const PropertyInfoList* get_props() = delete;
-};
-CLASS_IMPL(SkylightEntity);
 
 SpotLightComponent::SpotLightComponent() {
 	set_call_init_in_editor(true);

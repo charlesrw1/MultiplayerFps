@@ -47,7 +47,7 @@ public:
 			myPropGrid.update();
 			if (myPropGrid.rows_had_changes) {
 				if (outputEntity)
-					outputEntity->Mesh->set_model(model.get());
+					outputEntity->set_model(model.get());
 				//if (skyEntity) {
 				//	skyEntity->Mesh->set_material_override(skyMaterial.get());
 				//	
@@ -65,7 +65,7 @@ public:
 
 		IEditorTool::imgui_draw();
 
-		outputEntity->Mesh->sync_render_data();
+		outputEntity->sync_render_data();
 	}
 #if 0
 	void draw_menu_bar() override
@@ -149,10 +149,10 @@ public:
 		propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
 		materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
 
-		outputEntity = eng->get_level()->spawn_entity_class<StaticMeshEntity>();
-		outputEntity->Mesh->set_model(model.get());
-		outputEntity->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
-		outputEntity->Mesh->set_material_override(dynamicMat.get());
+		outputEntity = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
+		outputEntity->set_model(model.get());
+		outputEntity->get_owner()->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
+		outputEntity->set_material_override(dynamicMat.get());
 	}
 
 	AssetPtr<Model> model;
@@ -162,7 +162,7 @@ public:
 	std::vector<PropertyInfo> propInfosForMats;	// immutable!!
 	PropertyInfoList propInfoListForMats;
 
-	StaticMeshEntity* outputEntity = nullptr;
+	MeshComponent* outputEntity = nullptr;
 
 	// dynamic material to edit params into
 	MaterialInstance* parentMat = nullptr;

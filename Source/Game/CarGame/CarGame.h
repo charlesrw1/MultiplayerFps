@@ -181,7 +181,7 @@ public:
 		inputUser = g_inputSys.register_input_user(0);
 		inputUser->assign_device(g_inputSys.get_keyboard_device());
 		inputUser->enable_mapping("game");
-		auto camobj = eng->get_level()->spawn_entity_class<Entity>();
+		auto camobj = eng->get_level()->spawn_entity();
 		camera = camobj->create_component<CameraComponent>();
 		camera->set_is_enabled(true);
 		move = inputUser->get("game/move");

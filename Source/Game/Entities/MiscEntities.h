@@ -10,15 +10,15 @@
 
 
 using namespace glm;
-CLASS_H(NPC, Entity)
+CLASS_H(NPC, EntityComponent)
 public:
 	NPC() {
 		pathfind_state = going_towards_waypoint;
 		//position = vec3(0.f);
 		//rotation.y = HALFPI;
 
-		npc_model = construct_sub_component<MeshComponent>("NpcModel");
-		npc_hitbox = construct_sub_component<CapsuleComponent>("NpcCollider");
+		//npc_model = construct_sub_component<MeshComponent>("NpcModel");
+		//npc_hitbox = construct_sub_component<CapsuleComponent>("NpcCollider");
 	}
 
 	static const PropertyInfoList* get_props() = delete;
@@ -104,12 +104,12 @@ public:
 };
 #include "Assets/AssetDatabase.h"
 #include "Render/Model.h"
-CLASS_H(Door, Entity)
+CLASS_H(Door, EntityComponent)
 public:
 	Door() {
-		door_mesh = construct_sub_component<MeshComponent>("DoorMesh");
+		//door_mesh = construct_sub_component<MeshComponent>("DoorMesh");
 
-		door_mesh->set_model(g_assets.find_assetptr_unsafe<Model>("door.cmdl"));
+		//door_mesh->set_model(g_assets.find_assetptr_unsafe<Model>("door.cmdl"));
 	}
 
 
@@ -130,16 +130,4 @@ public:
 		set_ticking(true);
 	}
 	void update() override;
-};
-
-CLASS_H(Grenade, Entity)
-public:
-	Grenade();
-
-
-
-	void update() override;
-
-	float throw_time = 0.0;
-
 };

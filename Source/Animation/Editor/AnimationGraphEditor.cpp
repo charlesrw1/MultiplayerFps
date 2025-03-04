@@ -1573,7 +1573,7 @@ static std::unique_ptr<Animation_Tree_CFG> try_to_load_document(const std::strin
 void GraphOutput::start()
 {
 	assert(!ent && !mc && eng->get_level());
-	ent = eng->get_level()->spawn_entity_class<Entity>();
+	ent = eng->get_level()->spawn_entity();
 	mc = ent->create_component<MeshComponent>();
 }
 void GraphOutput::end()

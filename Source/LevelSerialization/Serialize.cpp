@@ -47,7 +47,7 @@ bool serializing_for_prefab(const PrefabAsset* for_prefab)
 
 bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab)
 {
-	return !b->is_native_created  && (b->creator_source == nullptr || (for_prefab && b->what_prefab == for_prefab) || am_i_the_root_prefab_node(b->creator_source,for_prefab));
+	return (b->creator_source == nullptr || (for_prefab && b->what_prefab == for_prefab) || am_i_the_root_prefab_node(b->creator_source,for_prefab));
 }
 
 std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab)
@@ -65,8 +65,6 @@ std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for
 		if (this_is_newly_created(obj,for_prefab)) {
 			return std::to_string(obj->unique_file_id);
 		}
-		if (obj->is_native_created && am_i_the_root_prefab_node(obj->creator_source, for_prefab))
-			return "~" + std::to_string(obj->unique_file_id);
 
 		// fallthrough
 	}
@@ -178,31 +176,6 @@ static void write_just_props(ClassBase* e, const ClassBase* diff, DictWriter& ou
 	}
 }
 
-// fixme: cache a table or something
-const Entity* find_entity_diff_in_children_R(const Entity* input, const Entity* check)
-{
-	if (input->unique_file_id == check->unique_file_id)
-		return check;
-	for (auto c : check->get_children()) {
-		auto ptr = find_entity_diff_in_children_R(input, c);
-		if (ptr) return ptr;
-	}
-	return nullptr;
-}
-const EntityComponent* find_component_diff_in_children_R(const EntityComponent* input, const Entity* check)
-{
-	for (auto c : check->get_components()) {
-		if (c->unique_file_id == input->unique_file_id)
-			return c;
-	}
-
-	for (auto c : check->get_children()) {
-		auto ptr = find_component_diff_in_children_R(input, c);
-		if (ptr) return ptr;
-	}
-	return nullptr;
-}
-
 void validate_for_prefab_R(Entity* e, PrefabAsset* for_prefab)
 {
 	//if(!(e->what_prefab==for_prefab&&e->is_root_of_prefab&&e->creator_source==nullptr))
@@ -286,21 +259,10 @@ const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab
 	if (!for_prefab) {
 		ASSERT(!top_level->what_prefab || top_level->is_root_of_prefab);
 	}
-	if (!top_level->what_prefab || for_prefab == top_level->what_prefab ) {
+	if (!top_level->what_prefab || for_prefab == top_level->what_prefab) {
 		auto source_owner_default = (const Entity*)top_level->get_type().default_class_object;
-
-		if (top_level == obj) return source_owner_default;
-
-		ASSERT(obj->is_native_created);
-
-		ASSERT(source_owner_default);
-
-		if (obj->is_a<Entity>())
-			return find_entity_diff_in_children_R((Entity*)obj, source_owner_default);
-		else {
-			ASSERT(obj->is_a<EntityComponent>());
-			return find_component_diff_in_children_R((EntityComponent*)obj, source_owner_default);
-		}
+		ASSERT(top_level == obj);
+		return source_owner_default;
 	}
 	else {
 		ASSERT(top_level->what_prefab && top_level->what_prefab->sceneFile);

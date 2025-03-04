@@ -46,21 +46,3 @@ public:
 	float height_offset = 0.0;
 };
 CLASS_IMPL(FogComponent);
-#include "BillboardComponent.h"
-#include "Assets/AssetDatabase.h"
-CLASS_H(FogEntity, Entity)
-public:
-	FogEntity() {
-		Fog = construct_sub_component<FogComponent>("Fog");
-
-		if (eng->is_editor_level()) {
-			auto b = construct_sub_component<BillboardComponent>("Billboard");
-			b->set_texture(default_asset_load<Texture>("icon/_nearest/fog.png"));
-			b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-		}
-	}
-	const PropertyInfoList* get_props() = delete;
-
-	FogComponent* Fog{};
-};
-CLASS_IMPL(FogEntity);
