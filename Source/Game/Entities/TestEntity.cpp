@@ -1,6 +1,0 @@
-#include "Game/Entity.h"
-#include "Game/Components/MeshComponent.h"
-#include "Game/Components/LightComponents.h"
-#include "Game/StdEntityTypes.h"
-#include "Assets/AssetDatabase.h"
-#include "Render/Model.h"

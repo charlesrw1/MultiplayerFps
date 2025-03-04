@@ -5,7 +5,6 @@
 #include "Level.h"
 #include "Test/Test.h"
 
-#include "Game/StdEntityTypes.h"
 #include "Game/LevelAssets.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Entities/Player.h"

@@ -20,7 +20,8 @@
 #include <fstream>
 
 #include "Framework/MulticastDelegate.h"
-
+#include "Game/Components/MeshComponent.h"
+#include "Game/Entity.h"
 #include "Level.h"
 
 static ModelEditorTool g_model_editor_static;

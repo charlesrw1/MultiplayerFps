@@ -363,9 +363,6 @@
     <ClInclude Include="Source\Framework\MulticastDelegate.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\StdEntityTypes.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\RenderScene.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
@@ -437,7 +434,6 @@
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Visuals.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
-    <ClInclude Include="Source\Game\WorldSettings.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Framework\ClassTypePtr.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
@@ -725,8 +721,6 @@
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
-    <ClCompile Include="Source\Game\StdEntityTypes.cpp" />
-    <ClCompile Include="Source\Game\WorldSettings.cpp" />
     <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />

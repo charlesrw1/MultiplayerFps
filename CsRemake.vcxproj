@@ -182,8 +182,6 @@
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
     <ClInclude Include="Source\Game\SoftAssetPtr.h" />
-    <ClInclude Include="Source\Game\StdEntityTypes.h" />
-    <ClInclude Include="Source\Game\WorldSettings.h" />
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Input\InputAction.h" />
     <ClInclude Include="Source\Input\InputShared.h" />
@@ -325,9 +323,7 @@
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
-    <ClCompile Include="Source\Game\StdEntityTypes.cpp" />
     <ClCompile Include="Source\Game\EntityTest.cpp" />
-    <ClCompile Include="Source\Game\WorldSettings.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />

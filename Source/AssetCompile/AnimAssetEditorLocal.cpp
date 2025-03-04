@@ -27,6 +27,8 @@
 #include "Animation/Runtime/Animation.h"
 #include "Level.h"
 
+#include "Game/Entity.h"
+
 static AnimationEditorTool g_animseq_editor_static;
 IEditorTool* g_animseq_editor = &g_animseq_editor_static;
 
@@ -180,7 +182,7 @@ void EditModelAnimations::draw_imgui()
 
 
 #include "Assets/AssetDatabase.h"
-#include "Game/StdEntityTypes.h"
+
 extern ConfigVar ed_default_sky_material;
 void AnimationEditorTool::post_map_load_callback()
 {

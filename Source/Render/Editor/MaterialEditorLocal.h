@@ -11,7 +11,7 @@
 #include "Game/SerializePtrHelpers.h"// AssetPtr
 #include "Framework/ReflectionMacros.h"
 #include "Framework/MulticastDelegate.h"
-#include "Game/StdEntityTypes.h"
+
 #include "Render/Model.h"
 #include "Render/Texture.h"
 #include "Assets/AssetDatabase.h"
@@ -22,7 +22,8 @@
 #include "Level.h"
 
 #include "Game/AssetPtrMacro.h"
-
+#include "Game/Components/MeshComponent.h"
+#include "Game/Entity.h"
 #include <string>
 
 extern ConfigVar ed_default_sky_material;

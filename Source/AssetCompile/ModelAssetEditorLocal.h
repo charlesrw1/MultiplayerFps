@@ -12,7 +12,7 @@
 
 #include "ModelAsset2.h"
 
-#include "Game/StdEntityTypes.h"
+
 #include "EditorTool3d.h"
 
 class MeshComponent;

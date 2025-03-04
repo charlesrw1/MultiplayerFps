@@ -22,9 +22,10 @@
 #include "Root_node.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/GUISystemPublic.h"
-#include "Game/StdEntityTypes.h"
 #include "Framework/AddClassToFactory.h"
 #include "GameEnginePublic.h"
+#include "Game/Components/MeshComponent.h"
+#include "Game/Entity.h"
 
 std::string remove_whitespace(const char* str)
 {

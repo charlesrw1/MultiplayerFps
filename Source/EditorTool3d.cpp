@@ -4,12 +4,15 @@
 #include "GameEnginePublic.h"
 #include "OsInput.h"
 #include "Framework/MulticastDelegate.h"
-#include "Game/StdEntityTypes.h"
+
 #include "Render/Model.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/MaterialPublic.h"
 #include "Level.h"
 #include "Render/ModelManager.h"
+#include "Game/Components/MeshComponent.h"
+#include "Game/Entity.h"
+#include "Game/Components/LightComponents.h"
 
 extern ConfigVar ed_default_sky_material;
 
