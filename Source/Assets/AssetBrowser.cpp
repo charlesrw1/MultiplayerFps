@@ -10,16 +10,21 @@
 
 AssetBrowser global_asset_browser;
 
-
+#include "AssetDatabase.h"
 void AssetBrowser::init()
 {
 	asset_name_filter[0] = 0;
+	folder_closed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
+	folder_open = g_assets.find_global_sync<Texture>("eng/editor/folder_open.png").get();
+	if (!folder_closed || !folder_open)
+		Fatalf("no folder icons\n");
 }
 
 static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node)
 {
+	const float folder_indent = 20.0;
 	const int name_filter_len = strlen(b->asset_name_filter);
-	for (auto n : node->children)
+	for (auto& n : node->children)
 	{
 		// leaf node
 		if (n.second->children.empty()) {
@@ -77,7 +82,7 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			}
 
 			ImGui::SameLine();
-			ImGui::Dummy(ImVec2(indents * 15.0, 0.1));
+			ImGui::Dummy(ImVec2(indents * folder_indent, 0.1));
 			ImGui::SameLine();
 			ImGui::Text(n.second->name.c_str());
 			ImGui::TableNextColumn();
@@ -91,11 +96,16 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 			// folder node
-			ImGui::Dummy(ImVec2(indents * 15.0 - 10.0, 0.1));
+			ImGui::Dummy(ImVec2(indents * folder_indent, 0.1));
 			ImGui::SameLine();
-			n.second->folderIsOpen = ImGui::TreeNodeEx(n.second->name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+			n.second->folderIsOpen = ImGui::TreeNodeEx("##folder", ImGuiTreeNodeFlags_DefaultOpen| ImGuiTreeNodeFlags_AllowItemOverlap|ImGuiTreeNodeFlags_SpanAvailWidth);
 			if(n.second->folderIsOpen)
 				ImGui::TreePop();
+			ImGui::SameLine();
+			auto t = n.second->folderIsOpen ? b->folder_open : b->folder_closed;
+			ImGui::Image(ImTextureID(uint64_t(t->gl_id)), ImVec2(t->width, t->height));
+			ImGui::SameLine();
+			ImGui::Text(n.second->name.c_str());
 
 			ImGui::TableNextColumn();
 

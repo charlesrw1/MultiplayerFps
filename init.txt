@@ -76,7 +76,7 @@ dbg.fly 1
 #output_texture 0.5 1.0 0.0 _csm_shadow
 
 #r.debug_csm 1
-
+sys.print_deps mats/wht_tile.mi
 FONT_TEST
 loglevel 2
 
@@ -96,5 +96,7 @@ start_ed Map top_down/map0.tmap
 #start_ed Material "top_down/fake_fog.mm"
 
 bind 7 "start_ed AnimGraph beu_character.ag"
+
+as long as dx11 is still used, gl 4.6 wont be outdated either. 
 
 

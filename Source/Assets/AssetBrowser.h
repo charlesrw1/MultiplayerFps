@@ -1,7 +1,8 @@
 #pragma once
 #ifdef EDITOR_BUILD
 #include "Assets/AssetRegistry.h"
-
+#include "Render/Texture.h"
+#include "Game/SerializePtrHelpers.h"
 class AssetBrowser
 {
 public:
@@ -39,6 +40,10 @@ public:
 
 	AssetOnDisk selected_resource;
 	bool double_clicked_selected = false;
+
+	Texture* folder_open{};
+	Texture* folder_closed{};
+
 
 	AssetOnDisk drag_drop;
 	std::string all_lower_cast_filter_name;
