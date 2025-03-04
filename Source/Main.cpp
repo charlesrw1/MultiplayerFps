@@ -251,14 +251,15 @@ void sys_vprint(const char* fmt, va_list args)
 
 void Fatalf(const char* format, ...)
 {
-	std::lock_guard<std::mutex> printLock(printMutex);
-
 	va_list list;
 	va_start(list, format);
 	sys_vprint(format, list);
 	va_end(list);
 	fflush(stdout);
-	eng_local.cleanup();
+	{
+		std::lock_guard<std::mutex> printLock(printMutex);
+		eng_local.cleanup();
+	}
 	exit(-1);
 }
 double GetTime()
