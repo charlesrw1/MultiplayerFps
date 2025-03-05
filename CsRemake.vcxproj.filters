@@ -515,6 +515,7 @@
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Game\Entities\CollectionContainer.h" />
     <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
+    <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

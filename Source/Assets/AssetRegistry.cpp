@@ -10,6 +10,7 @@
 #include "Framework/Config.h"
 #include <windows.h>
 #include "AssetDatabase.h"
+#include "AssetRegistryLocal.h"
 
 AssetRegistrySystem& AssetRegistrySystem::get()
 {
@@ -31,6 +32,20 @@ static std::vector<std::string> split(const std::string& str, char delimiter) {
 	return tokens;
 }
 
+void AssetFilesystemNode::sort_R()
+{
+	sorted_list.clear();
+	for (auto& c : children) {
+		sorted_list.push_back(&c.second);
+	}
+	std::sort(sorted_list.begin(), sorted_list.end(), [](AssetFilesystemNode* l, AssetFilesystemNode* r) {
+		if(l->is_folder()!=r->is_folder())
+			return (int)l->is_folder() > (int)r->is_folder();
+		return l->name < r->name;
+	});
+	for (auto& c : children)
+		c.second.sort_R();
+}
 
 // too lazy, just hack the asset async loader to do this haha
 CLASS_H(HackedAsyncAssetRegReindex, IAsset)
@@ -107,26 +122,35 @@ public:
 			}
 		}
 
-		root.reset();
-		root = std::make_unique<AssetFilesystemNode>("root");
+		assert(root_to_clone);
+		root = std::make_unique< AssetFilesystemNode>(*root_to_clone.get());
 
-		for (auto a : diskAssets) {
+		root->set_is_used_to_false_R();
+		for (auto& a : diskAssets) {
 			auto& filename = a.filename;
 			std::vector<std::string> path = split(filename, '/');
-			root->addPath(a, path);
+			root->add_path(a, path);
 		}
+		root->remove_unused_R();
+		root->sort_R();
 
 		return true;
 	}
 	void post_load(ClassBase*) override {
+		is_in_loading = false;
 		AssetRegistrySystem::get().root = std::move(root);
 
 		sys_print(Info, "finished assset reindex\n");
 	}
-
 	std::unique_ptr<AssetFilesystemNode> root;
+
+	static bool is_in_loading;
+	static std::unique_ptr<AssetFilesystemNode> root_to_clone;
 };
 CLASS_IMPL(HackedAsyncAssetRegReindex);
+
+bool HackedAsyncAssetRegReindex::is_in_loading = false;
+std::unique_ptr<AssetFilesystemNode> HackedAsyncAssetRegReindex::root_to_clone;
 
 static HANDLE directoryChangeHandle = 0;
 static HackedAsyncAssetRegReindex* hackedAsset = nullptr;
@@ -183,8 +207,16 @@ void AssetRegistrySystem::update()
 
 void AssetRegistrySystem::reindex_all_assets()
 {
-	g_assets.reload_async(hackedAsset, [](GenericAssetPtr) {
-		});
+	using HA = HackedAsyncAssetRegReindex;
+	if (!HA::is_in_loading) {
+		if (root.get())
+			HA::root_to_clone = std::make_unique<AssetFilesystemNode>(*root.get());
+		else
+			HA::root_to_clone = std::make_unique<AssetFilesystemNode>();
+		HA::is_in_loading = true;
+		g_assets.reload_async(hackedAsset, [](GenericAssetPtr) {
+			});
+	}
 }
 
 

@@ -41,34 +41,7 @@ struct AssetOnDisk
 	std::string filename;
 };
 
-struct AssetFilesystemNode {
-	bool folderIsOpen = true;
-	AssetOnDisk asset;
-	std::string name;
-	std::unordered_map<std::string, AssetFilesystemNode*> children;
-	AssetFilesystemNode(std::string name) : name(name) {}
-
-	// Add a path to the tree
-	void addPath(const AssetOnDisk& a, const std::vector<std::string>& path, size_t index = 0) {
-		if (index == path.size()) {
-			asset = a;
-			return; // Base case: reached the end of the path
-		}
-
-		const std::string& part = path[index];
-		if (children.find(part) == children.end()) {
-			children[part] = new AssetFilesystemNode(part); // Create a new node if not present
-		}
-		children[part]->addPath(a,path, index + 1); // Recursively add the rest of the path
-	}
-
-	~AssetFilesystemNode() {
-		for (auto& pair : children) {
-			delete pair.second;
-		}
-	}
-};
-
+struct AssetFilesystemNode;
 class HackedAsyncAssetRegReindex;
 class AssetRegistrySystem
 {

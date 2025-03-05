@@ -57,6 +57,7 @@
     <ClInclude Include="Source\Assets\AssetBrowser.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
+    <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
