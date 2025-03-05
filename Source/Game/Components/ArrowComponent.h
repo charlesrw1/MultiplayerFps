@@ -32,8 +32,8 @@ public:
 		obj.visible = true;
 #ifdef  EDITOR_BUILD
 		obj.visible &= !get_owner()->get_hidden_in_editor();
-#endif //  EDITOR_BUILD
 		obj.outline = get_owner()->is_selected_in_editor();
+#endif //  EDITOR_BUILD
 		obj.owner = this;
 		idraw->get_scene()->update_obj(handle, obj);
 	}

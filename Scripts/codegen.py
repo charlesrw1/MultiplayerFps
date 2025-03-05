@@ -258,6 +258,7 @@ def parse_file(root, file_name):
         file_iter = enumerate(iter(file),start=1)
         gLineNum  = 0
         gLine = ""
+        cur_namespace = ""
         try:
             for gLineNum,gLine in file_iter:
                 line = gLine.strip()
@@ -268,6 +269,7 @@ def parse_file(root, file_name):
                     if start_p != -1 and end_p != -1 and comma != -1:
                         classname = line[start_p+1:comma].strip()
                         supername = line[comma+1:end_p].strip()
+                        classname = cur_namespace + classname
                         print(f"FOUND CLASS: {classname} : {supername}")
                         if current_class != None:
                             classes.append(current_class)
@@ -282,6 +284,7 @@ def parse_file(root, file_name):
                     if start_p==-1 or end_p==-1:
                         raise Exception("expected NEWSTRUCT(<structname>)")
                     structname = line[start_p+1:end_p]
+                    structname = cur_namespace + structname
                     print(f"FOUND STRUCT: {structname}")
                     if current_class != None:
                         classes.append(current_class)
@@ -296,6 +299,7 @@ def parse_file(root, file_name):
                     if start_p==-1 or end_p==-1:
                         raise Exception("expected NEWENUM(<enumname>)")
                     enumname = line[start_p+1:comma].strip()
+                    enumname = cur_namespace + enumname
                     print(f"FOUND ENUM: {enumname}")
                     if current_class != None:
                         classes.append(current_class)
@@ -380,6 +384,10 @@ def parse_file(root, file_name):
                         raise Exception("expcted GENERATED_CLASS_INCLUDE(...)")
                     include_name = line[start_p+1:end_p].strip()
                     additional_includes.append(include_name)
+                elif line.startswith("namespace"):
+                    tokens = shlex.split(line)
+                    assert(tokens[0]=="namespace")
+                    cur_namespace += tokens[1] + "::"
         except Exception as e:
             raise Exception("{}:{}:\"{}\"-{}".format(file_name,gLineNum,gLine,e.args[0]))
     if current_class != None:
@@ -398,6 +406,7 @@ def read_enum_and_struct_values():
             if os.path.splitext(file_name)[-1] != ".h":
                 continue
             with open(root+"/"+file_name,"r") as file:
+                cur_namespace = ""
                 for line in file:
                     line = line.strip()
                     if line.startswith("NEWENUM"):
@@ -407,14 +416,21 @@ def read_enum_and_struct_values():
                         if start_p==-1 or end_p==-1:
                             continue
                         enumname = line[start_p+1:comma].strip()
-                        enum_names.append(enumname)
+                        enum_names.append(cur_namespace+enumname)
                     elif line.startswith("NEWSTRUCT"):
                         start_p = line.find("(")
                         end_p = line.find(")")
                         if start_p==-1 or end_p==-1:
                             continue
                         structname = line[start_p+1:end_p]
-                        struct_names.append(structname)
+                        struct_names.append(cur_namespace+structname)
+                    elif line.startswith("namespace"):
+                        tokens = shlex.split(line)
+                        assert(tokens[0]=="namespace")
+                        if len(tokens) > 1:
+                            cur_namespace += tokens[1] + "::"
+                        
+
     end_time = time.perf_counter()
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
     print(f"read enums and structs in {elapsed_time:.2f} ms")

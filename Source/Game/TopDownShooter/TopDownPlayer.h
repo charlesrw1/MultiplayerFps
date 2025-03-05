@@ -102,7 +102,7 @@ public:
 		return inputPtr->get_device()->get_type() == InputDeviceType::Controller;
 	}
 
-	virtual void start() override {
+	void start() final {
 
 		mesh = get_owner()->get_component<MeshComponent>();
 		capsule = get_owner()->get_component<CapsuleComponent>();
@@ -183,7 +183,7 @@ public:
 
 		//eng->set_game_focused(true);
 	}
-	virtual void end() override {
+	void end() final {
 		g_inputSys.device_connected.remove(this);
 	}
 
@@ -232,7 +232,7 @@ public:
 		return AnglesToVector(view_angles.x, view_angles.y);
 	}
 
-	virtual void update() override {
+	void update() final {
 
 		did_move = false;
 		if (is_in_car)
@@ -397,6 +397,7 @@ public:
 	glm::mat4 last_ws = glm::mat4(1.f);
 };
 
+
 extern float lean_amt;
 extern float lean_smooth;
 NEWCLASS(TopDownAnimDriver, AnimatorInstance)
@@ -439,7 +440,7 @@ public:
 			bRunning = false;
 	}
 	virtual void on_post_update() override {
-		
+
 	}
 
 	TopDownPlayer* p = nullptr;

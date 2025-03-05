@@ -224,7 +224,7 @@ void unserialize_one_item_text(
 Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root)
 {
 	DictParser in;
-	in.load_from_memory((uint8_t*)text.data(), text.size(), "");
+	in.load_from_memory((char*)text.data(), text.size(), "");
 	StringView tok;
 
 	Entity* root_entity = starting_root;

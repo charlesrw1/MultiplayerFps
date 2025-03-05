@@ -7,7 +7,7 @@ class IFile;
 class DictParser
 {
 public:
-    void load_from_memory(const uint8_t* ptr, int length, const char* name);
+    void load_from_memory(const char* ptr, int length, const char* name);
     void load_from_file(IFile* file);
     ~DictParser() {
         if (allocated) {
@@ -61,7 +61,7 @@ public:
         return read_next_token(str);
     }
     void return_string(StringView view) {
-        int index = (uint8_t*)view.str_start - buffer;
+        int index = (char*)view.str_start - buffer;
         assert(index >= 0 && index < buffer_size);
         if (index > 0 && index + 1 < buffer_size) {
             if (view.str_start[-1] == '\"' && view.str_start[view.str_len] == '\"') {
@@ -156,7 +156,7 @@ private:
         return (char*)&buffer[ofs];
     }
 
-    const uint8_t* buffer = nullptr;
+    char* buffer = nullptr;
     int buffer_size = 0;
     bool allocated = false;
 

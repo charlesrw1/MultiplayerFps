@@ -56,6 +56,7 @@ void BillboardComponent::on_sync_render_data()
 	obj.visible = visible;
 #ifdef  EDITOR_BUILD
 	obj.visible &= !get_owner()->get_hidden_in_editor();
+	obj.outline = get_owner()->is_selected_in_editor();
 #endif //  EDITOR_BUILD
 
 	obj.model = g_modelMgr.get_default_plane_model();
@@ -64,7 +65,6 @@ void BillboardComponent::on_sync_render_data()
 	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;
 	obj.owner = this;
-	obj.outline = get_owner()->is_selected_in_editor();
 
 	idraw->get_scene()->update_obj(handle, obj);
 }

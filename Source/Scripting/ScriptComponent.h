@@ -14,6 +14,9 @@ struct OutstandingScriptDelegate {
 	ClassBase* ptr = nullptr;	
 	PropertyInfo* pi = nullptr;
 };
+
+
+
 CLASS_H(ScriptComponent, EntityComponent)
 public:
 	ScriptComponent();

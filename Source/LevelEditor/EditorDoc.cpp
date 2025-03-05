@@ -609,15 +609,24 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 	}
 	else if (scancode == SDL_SCANCODE_X && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
-		axis_mask = 1;
+		if (has_shift)
+			axis_mask = 2 | 4;
+		else
+			axis_mask = 1;
 	}
 	else if (scancode == SDL_SCANCODE_Y && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
-		axis_mask = 2;
+		if (has_shift)
+			axis_mask = 1 | 4;
+		else
+			axis_mask = 2;
 	}
 	else if (scancode == SDL_SCANCODE_Z && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
-		axis_mask = 4;
+		if (has_shift)
+			axis_mask = 1 | 2;
+		else
+			axis_mask = 4;
 	}
 	else if (scancode == SDL_SCANCODE_S) {
 		reset_group_to_pre_transform();
@@ -1316,6 +1325,7 @@ void EditorDoc::hook_scene_viewport_draw()
 		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
 		//if (payload->IsDataType("AssetBrowserDragDrop"))
 		//	sys_print("``` accepting\n");
+
 
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
 		{

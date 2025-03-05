@@ -12,29 +12,35 @@ for struct in file ('{', '}')
     struct.skip()
 */
 
-void DictParser::load_from_memory(const uint8_t* ptr, int length, const char* name) {
+void DictParser::load_from_memory(const char* ptr, int length, const char* name) {
     
     assert(!buffer);
 
-    buffer = ptr;
+
+    buffer = (char*)ptr;
     buffer_size = length;
     read_ptr = 0;
     line = 1;
     allocated = false;
 
     this->filename = name;
+
+    ASSERT(buffer[length] == 0);
 }
 
 void DictParser::load_from_file(IFile* file)
 {
     assert(!buffer);
 
-
-    buffer = new uint8_t[file->size()];
-    buffer_size = file->size();
+    const int file_size = file->size();
+    buffer = new char[file_size +1];
+    buffer_size = file_size;
     allocated = true;
 
-    file->read((uint8_t*)buffer, buffer_size);
+    file->read((char*)buffer, file_size);
+
+    buffer[buffer_size] = 0;
+    ASSERT(buffer[buffer_size] == 0);
 
     read_ptr = 0;
     line = 1;

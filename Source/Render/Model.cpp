@@ -504,7 +504,7 @@ bool Model::load_internal()
 				read.read_string(buffer);
 				DictParser parser;
 				StringView tok;
-				parser.load_from_memory((uint8_t*)buffer.c_str(), buffer.size(), "abc");
+				parser.load_from_memory((char*)buffer.c_str(), buffer.size(), "abc");
 				parser.read_string(tok);
 				AnimationEvent* event = read_object_properties<AnimationEvent>(
 					nullptr, parser, tok

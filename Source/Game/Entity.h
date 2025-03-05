@@ -129,9 +129,11 @@ public:
 
 	virtual void editor_on_change_properties() {}
 
+#ifdef EDITOR_BUILD
 	bool is_selected_in_editor() const {
 		return selected_in_editor;
 	}
+#endif
 
 	// removes from list (use component->desroy() for real destruction)
 	void remove_this_component_internal(EntityComponent* component);

@@ -2079,6 +2079,12 @@ namespace IMGUIZMO_NAMESPACE
                return MT_MOVE_Y;
            else if (op == OPERATION::TRANSLATE_Z)
                return MT_MOVE_Z;
+           else if (op == (OPERATION::TRANSLATE_X|TRANSLATE_Y))
+               return MT_MOVE_XY;
+           else if (op == (OPERATION::TRANSLATE_Y|TRANSLATE_Z))
+               return MT_MOVE_YZ;
+           else if (op == (OPERATION::TRANSLATE_Z|TRANSLATE_X))
+               return MT_MOVE_ZX;
        }
 
        ImGuiIO& io = ImGui::GetIO();

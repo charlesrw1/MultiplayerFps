@@ -59,6 +59,7 @@
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
@@ -176,7 +177,7 @@
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
-    <ClInclude Include="Source\Game\GameMain.h" />
+    <ClInclude Include="Source\Game\GameSingleton.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
@@ -318,7 +319,6 @@
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />
     <ClCompile Include="Source\Game\Game.cpp" />
     <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
-    <ClCompile Include="Source\Game\GameMain.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Entities\Player.cpp" />
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />
@@ -497,7 +497,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;TRACY_ENABLE;WITH_ASSERT;TRACY_FIBERS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
@@ -542,7 +542,7 @@
     <ClCompile>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;TRACY_ENABLE;TRACY_FIBERS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>

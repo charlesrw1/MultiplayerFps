@@ -23,6 +23,8 @@
 #include "Framework/Reflection2.h"
 #include "Physics/Physics2.h"
 
+#include "Game/GameSingleton.h"
+
 NEWCLASS(TopDownGameManager, EntityComponent)
 public:
 	static TopDownGameManager* instance;
@@ -364,3 +366,16 @@ public:
 NEWCLASS(TopDownSpawnPoint, EntityComponent)
 public:
 };
+
+namespace td {
+NEWCLASS(GameSingleton, IGameSingleton)
+public:
+	void on_start_game() final {
+
+	}
+	void on_leave_game() final {
+
+	}
+};
+
+}

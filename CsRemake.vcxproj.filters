@@ -455,7 +455,7 @@
     <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
-    <ClInclude Include="Source\Game\GameMain.h" />
+    <ClInclude Include="Source\Game\GameSingleton.h" />
     <ClInclude Include="Source\Game\Components\ArrowComponent.h" />
     <ClInclude Include="Source\Input\InputAction.h" />
     <ClInclude Include="Source\Input\InputShared.h" />
@@ -516,6 +516,7 @@
     <ClInclude Include="Source\Game\Entities\CollectionContainer.h" />
     <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
+    <ClInclude Include="Source\Framework\InterfaceBase.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -737,7 +738,6 @@
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
-    <ClCompile Include="Source\Game\GameMain.cpp" />
     <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />

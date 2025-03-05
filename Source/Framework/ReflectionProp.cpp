@@ -409,7 +409,7 @@ void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, voi
 		write_properties(*l, from, out, userptr);
 	DictParser parser;
 	auto str = std::move(out.get_output());
-	parser.load_from_memory((uint8_t*)str.c_str(), str.size(), "...");
+	parser.load_from_memory((char*)str.c_str(), str.size(), "...");
 	std::vector<PropertyListInstancePair> pairs;
 	for (auto l : lists)
 		pairs.push_back({ l,to });

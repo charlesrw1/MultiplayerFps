@@ -123,13 +123,13 @@ void MeshComponent::on_sync_render_data()
 	obj.visible = is_visible;
 #ifdef  EDITOR_BUILD
 	obj.visible &= !get_owner()->get_hidden_in_editor();
+	obj.outline = get_owner()->is_selected_in_editor();
 #endif //  EDITOR_BUILD
 
 	obj.transform = get_ws_transform();
 	obj.owner = this;
 	obj.is_skybox = is_skybox;
 	obj.shadow_caster = cast_shadows;
-	obj.outline = get_owner()->is_selected_in_editor();
 	if (animator)
 		obj.animator_bone_ofs = animator->get_matrix_palette_offset();
 	if (!eMaterialOverride.empty())

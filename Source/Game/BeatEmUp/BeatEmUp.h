@@ -3,9 +3,10 @@
 #include "Game/Components/MeshComponent.h"
 #include "Level.h"
 
-NEWCLASS(BEU_Manager, EntityComponent)
+namespace bu {
+NEWCLASS(Manager, EntityComponent)
 public:
-	static BEU_Manager* instance;
+	static Manager* instance;
 	void pre_start() final {
 		assert(!instance);
 		instance = this;
@@ -24,7 +25,7 @@ public:
 	EntityPtr start_entity;
 };
 
-NEWCLASS(BEU_Enemy, EntityComponent)
+NEWCLASS(Enemy, EntityComponent)
 public:
 	void start() final {
 
@@ -34,7 +35,7 @@ public:
 	}
 };
 
-NEWCLASS(BEU_Player, EntityComponent)
+NEWCLASS(Player, EntityComponent)
 public:
 	void start() final {
 
@@ -43,3 +44,4 @@ public:
 
 	}
 };
+}
