@@ -1791,7 +1791,8 @@ void EdPropertyGrid::draw_components(Entity* entity)
 				ImGui::CloseCurrentPopup();
 			}
 			else {
-				if (ImGui::Button("Remove (warning: no undo)")) {
+				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
+				if (ImGui::MenuItem("Remove (warning: no undo)")) {
 
 					auto ec_ = eng->get_object(component_context_menu)->cast_to<EntityComponent>();
 					if (ed_doc.is_this_object_not_inherited(ec_)) {
@@ -1800,10 +1801,10 @@ void EdPropertyGrid::draw_components(Entity* entity)
 					else
 						eng->log_to_fullscreen_gui(Error, "Cant remove inherited components");
 
-					ImGui::CloseCurrentPopup();
 					component_context_menu = 0;
 					ImGui::CloseCurrentPopup();
 				}
+				ImGui::PopStyleColor(1);
 			}
 
 			ImGui::EndPopup();

@@ -103,9 +103,9 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 // root
 	// unserialize items
 	// root ...
-
+extern void parse_skip_object(DictParser& in, StringView tok);
 void unserialize_one_item_text(
-	StringView tok,						// in token
+	StringView& tok,						// in token
 	DictParser& in,
 	UnserializedSceneFile& scene,
 	const std::string& root_path,
@@ -130,6 +130,7 @@ void unserialize_one_item_text(
 		in.read_string(tok);
 		auto id = to_std_string_sv(tok);
 		in.read_string(tok);
+
 		
 		// check for parent
 		std::string parentid;
@@ -168,7 +169,6 @@ void unserialize_one_item_text(
 		else {
 			auto classinfo = ClassBase::find_class(type.c_str());
 			if (!classinfo || !classinfo->allocate || !(classinfo->is_a(Entity::StaticType)||classinfo->is_a(EntityComponent::StaticType))) {
-				return;
 				throw std::runtime_error("couldn't find class: " + type);
 			}
 			auto obj = classinfo->allocate();
@@ -200,11 +200,8 @@ void unserialize_one_item_text(
 		}
 
 		auto obj = scene.find(path);
-		//if (!obj)
-		//	throw std::runtime_error("couldn't find overrided obj: " + id);
-		if (!obj) {
-			sys_print(Warning, "Couldnt find override obj: %s\n", id.c_str());
-		}
+		if (!obj)
+			throw std::runtime_error("couldn't find overrided obj: " + id);
 
 		LevelSerializationContext ctx;
 		ctx.in = &scene;
@@ -231,7 +228,14 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 	bool found_new_root = false;
 
 	while (in.read_string(tok) && !in.is_eof()) {
-		unserialize_one_item_text(tok, in, scene,rootpath,prefab,root_entity, found_new_root);
+		try {
+			unserialize_one_item_text(tok, in, scene, rootpath, prefab, root_entity, found_new_root);
+		}
+		catch (std::runtime_error er) {
+			sys_print(Warning, "caught parsing error: %s\n", er.what());
+			parse_skip_object(in,tok);
+		}
+
 	}
 
 	return root_entity;

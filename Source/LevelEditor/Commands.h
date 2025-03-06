@@ -72,8 +72,11 @@ public:
 		for (auto e : handles) {
 			is_valid_flag &= ed_doc.can_delete_this_object(e.get());
 		}
+		if (handles.empty())
+			is_valid_flag = false;
 		if (!is_valid_flag)
 			return;
+
 
 		scene = CommandSerializeUtil::serialize_entities_text(handles);
 
@@ -609,10 +612,21 @@ class DuplicateEntitiesCommand : public Command
 public:
 	DuplicateEntitiesCommand(std::vector<EntityPtr> handles) {
 
+		if (handles.empty())
+			is_valid_flag = false;
+		if (!is_valid_flag)
+			return;
+
+		// todo: validation
+
 		scene = CommandSerializeUtil::serialize_entities_text(handles);
 	}
+	bool is_valid_flag = true;
+	bool is_valid() final {
+		return is_valid_flag;
+	}
 
-	void execute() {
+	void execute() final {
 		auto duplicated = unserialize_entities_from_text(scene->text);
 
 		auto& extern_parents = scene->extern_parents;
@@ -656,14 +670,14 @@ public:
 
 		ed_doc.post_node_changes.invoke();
 	}
-	void undo() {
+	void undo() final {
 		for (auto h : handles) {
 			h->destroy();
 		}
 
 		ed_doc.post_node_changes.invoke();
 	}
-	std::string to_string() override {
+	std::string to_string() final {
 		return "Duplicate Entity";
 	}
 

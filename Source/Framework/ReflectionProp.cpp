@@ -10,8 +10,6 @@ inline std::string string_view_to_std_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
 
-
-
 static StringView delimit(const char* start, const char character = ',')
 {
 	StringView s;
@@ -440,6 +438,58 @@ void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, voi
 	read_multi_properties(pairs, parser, {}, userptr);
 }
 
+// skips to the next '}'
+void parse_skip_object(DictParser& in,StringView tok) {
+	int nestings = 1;
+	for (;;) {
+		if (tok.cmp("{"))
+			nestings++;
+		else if (tok.cmp("}"))
+			nestings--;
+		if (nestings == 0)
+			return;
+		if (in.is_eof() || in.has_read_error())
+			return;
+		in.read_string(tok);
+	}
+}
+void parse_skip_object(DictParser& in) {
+	StringView tok;
+	in.read_string(tok);
+	parse_skip_object(in, tok);
+}
+
+void parse_skip_list(DictParser& in) {
+	int nestings = 1;
+	StringView tok;
+	for (;;) {
+		in.read_string(tok);
+		if (tok.cmp("["))
+			nestings++;
+		else if (tok.cmp("]"))
+			nestings--;
+		if (nestings == 0)
+			return;
+		if (in.is_eof() || in.has_read_error())
+			return;
+	}
+}
+
+// after reading the name of a field, skips the value part (string value, list value, or another object value)
+// returns false on unexpected input (like an early '}')
+void parse_skip_field(DictParser& in, StringView tok)
+{
+	if (tok.cmp("[")) {
+		parse_skip_list(in);
+	}
+	else if (tok.cmp("{")) {
+		parse_skip_object(in);
+	}
+
+	in.read_string(tok);
+}
+
+
 
 bool read_unique_ptr(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
 {
@@ -532,10 +582,16 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 
 	}break;
 
-	case core_type_id::List:
-		return read_list_field(prop, prop->get_ptr(ptr), in, tok, userptr);
-	case core_type_id::StdUniquePtr:
-		return read_unique_ptr(prop, prop->get_ptr(ptr), in, tok, userptr);
+	case core_type_id::List: {
+		bool res = read_list_field(prop, prop->get_ptr(ptr), in, tok, userptr);
+		if (!res)
+			parse_skip_list(in);
+	}break;
+	case core_type_id::StdUniquePtr: {
+		bool res = read_unique_ptr(prop, prop->get_ptr(ptr), in, tok, userptr);
+		if (!res)
+			parse_skip_object(in);
+	}break;
 	case core_type_id::Struct: {
 
 		auto& fac = IPropertySerializer::get_factory();
@@ -597,6 +653,8 @@ static FindInst find_in_proplists(const char* name, std::vector<PropertyListInst
 }
 #include "PropHashTable.h"
 
+
+
 std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const ClassTypeInfo* typeinfo, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	// expect { (start field list) if not a null token
@@ -609,9 +667,7 @@ std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const Class
 		if (!typeinfo||!dest_obj) {
 			auto name = tok.to_stack_string();
 			in.read_string(tok);	// ERROR
-			if (tok.cmp("[")) {
-				while (in.read_string(tok) && !tok.cmp("]")) {}
-			}
+			parse_skip_field(in,tok);
 			in.read_string(tok);
 			continue;
 		}
@@ -621,15 +677,9 @@ std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const Class
 		if (find == typeinfo->prop_hash_table->prop_table.end()) {
 			auto name = tok.to_stack_string();
 			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
-
 			in.read_string(tok);	// ERROR
-			if (tok.cmp("[")) {
-				while (in.read_string(tok) && !tok.cmp("]")) {}
-			}
-
-
+			parse_skip_field(in, tok);
 			in.read_string(tok);
-			//ASSERT(0);
 			continue;
 		}
 
@@ -643,6 +693,9 @@ std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const Class
 
 	return { tok, true };
 }
+
+
+
 std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, ClassBase* userptr)
 {
 	// expect { (start field list) if not a null token

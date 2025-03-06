@@ -71,6 +71,7 @@ public:
         read_ptr = index;
     }
 
+
     // convenience functions
     bool read_int(int& i);
     bool read_float(float& f);
