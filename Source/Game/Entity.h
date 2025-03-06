@@ -42,12 +42,12 @@ public:
 	void destroy();
 
 	template<typename T>
-	T* get_component() {
+	T* get_component() const {
 		return (T*)get_component_typeinfo(&T::StaticType);
 	}
 
 	REFLECT(name="get_comp");
-	EntityComponent* get_component_typeinfo(const ClassTypeInfo* ti);
+	EntityComponent* get_component_typeinfo(const ClassTypeInfo* ti) const;
 
 	REFLECT(name="parent",getter)
 	Entity* get_parent() const {
@@ -228,7 +228,7 @@ private:
 	REFLECT();
 	glm::vec3 position = glm::vec3(0.f);
 	REFLECT();
-	glm::quat rotation = glm::quat();
+	glm::quat rotation = glm::quat(1,0,0,0);
 	REFLECT();
 	glm::vec3 scale = glm::vec3(1.f);
 	REFLECT();

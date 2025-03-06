@@ -246,6 +246,14 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 
 		std::string* i = (std::string*)((char*)ptr + prop.offset);
 		value_str = i->c_str();
+
+		// validate:
+		for (auto& c : value_str) {
+			if (c == '"') {
+				printf("!!! dictparser attempted write '\"'\n");
+				c = ' ';
+			}
+		}
 	}break;
 
 	case core_type_id::List: {
@@ -282,6 +290,15 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 				}
 			}
 			delete serializer;	// fixme: inplace new/free instead?
+
+
+			// validate:
+			for (auto& c : str) {
+				if (c == '"') {
+					printf("!! dictparser: struct attempted to write '\"' character, removing\n");
+					c = ' ';
+				}
+			}
 			value_str = std::move(str);
 		}
 		else {
@@ -297,7 +314,7 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 
 		if (diff_ptr) {
 			glm::vec3* other = (glm::vec3*)prop.get_ptr(diff_ptr);
-			if (glm::dot(*other-*v, *other-*v) < 0.001) {
+			if (glm::dot(*other-*v, *other-*v) < 0.0005) {
 				return { {}, false };
 			}
 		}
@@ -307,6 +324,13 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 	case core_type_id::Quat:
 	{
 		glm::quat* v = (glm::quat*)prop.get_ptr(ptr);
+
+		if (diff_ptr) {
+			glm::quat* other = (glm::quat*)prop.get_ptr(diff_ptr);
+			if (glm::dot(*other, *v) >= 0.9999){ // equal quaternions
+				return { {}, false };
+			}
+		}
 
 		glm::vec3 eulerA=glm::eulerAngles(*v);
 

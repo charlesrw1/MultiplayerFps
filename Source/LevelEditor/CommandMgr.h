@@ -4,7 +4,7 @@
 #include <vector>
 #include "Framework/Util.h"
 #include "GameEnginePublic.h"
-
+#include <stdexcept>
 class Command
 {
 public:
@@ -39,16 +39,21 @@ public:
 				delete c;
 				continue;
 			}
+			sys_print(Debug, "Executing: %s\n", c->to_string().c_str());
+			try {
+				c->execute();
+			}
+			catch (std::runtime_error er) {
+				sys_print(Error, "Executing command failed: %s\n", er.what());
 
+				continue;
+			}
 			if (hist[index]) {
 				delete hist[index];
 			}
 			hist[index] = c;
 			index += 1;
 			index %= HIST_SIZE;
-
-			sys_print(Debug, "Executing: %s\n", c->to_string().c_str());
-			c->execute();
 			eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
 		}
 

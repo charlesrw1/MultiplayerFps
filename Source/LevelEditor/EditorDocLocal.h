@@ -292,7 +292,7 @@ public:
 			on_selection_changed.invoke();
 		}
 	}
-	void add_to_entity_selection(Entity* e) {
+	void add_to_entity_selection(const Entity* e) {
 		return add_to_entity_selection(e->get_self_ptr());
 	}
 
@@ -306,7 +306,7 @@ public:
 		selected_entity_handles.erase(ptr.handle);
 		on_selection_changed.invoke();
 	}
-	void remove_from_selection(Entity* e) {
+	void remove_from_selection(const Entity* e) {
 		remove_from_selection(e->get_self_ptr());
 	}
 
@@ -343,14 +343,14 @@ public:
 		clear_all_selected();
 		add_to_entity_selection(ptr);
 	}
-	void set_select_only_this(Entity* e) {
+	void set_select_only_this(const Entity* e) {
 		set_select_only_this(e->get_self_ptr());
 	}
 
 	bool is_entity_selected(EntityPtr ptr) const {
 		return selected_entity_handles.find(ptr.handle) != selected_entity_handles.end();
 	}
-	bool is_entity_selected(Entity* e) const {
+	bool is_entity_selected(const Entity* e) const {
 		return is_entity_selected(e->get_self_ptr());
 	}
 private:
@@ -451,6 +451,7 @@ private:
 	}state = IDLE;
 
 	int axis_mask = 0xff;
+	ImGuizmo::OPERATION force_operation = {};
 	ImGuizmo::OPERATION operation_mask = ImGuizmo::OPERATION::TRANSLATE;
 	ImGuizmo::MODE mode = ImGuizmo::MODE::WORLD;
 	bool has_any_changed = false;
@@ -500,7 +501,7 @@ public:
 		ADD_SELECT,
 	};
 
-	void do_mouse_selection(MouseSelectionAction action, Entity* e, bool select_root_most_entity);
+	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
 
 	void on_mouse_down(int x, int y, int button);
 	void on_key_down(const SDL_KeyboardEvent& k);
@@ -527,12 +528,22 @@ public:
 		EDIT_PREFAB,
 	};
 
-	bool can_delete_or_move_this(BaseUpdater* b) {
-		if (edit_category == EditCategory::EDIT_SCENE) return this_is_newly_created(b,nullptr);
+	bool is_this_object_not_inherited(const BaseUpdater* b) {
+		if (edit_category == EditCategory::EDIT_SCENE) 
+			return this_is_newly_created(b,nullptr);
 		else {
 			//ASSERT(editing_prefab);
 			return this_is_newly_created(b, editing_prefab);
 		}
+	}
+	bool can_delete_this_object(const BaseUpdater* b) {
+		if (!is_this_object_not_inherited(b)) return false;
+		if (edit_category == EditCategory::EDIT_PREFAB) {
+			auto ent = b->cast_to<Entity>();
+			if (ent && !ent->get_parent())
+				return false;
+		}
+		return true;
 	}
 
 	bool is_in_eyedropper_mode() const {
@@ -595,7 +606,7 @@ public:
 	MulticastDelegate<EntityPtr> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
 
-	MulticastDelegate<Entity*> on_eyedropper_callback;
+	MulticastDelegate<const Entity*> on_eyedropper_callback;
 
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;

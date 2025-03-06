@@ -76,7 +76,6 @@ PropertyInfo GetAtomValueWrapper<EntityPtr>::get() {
 
 Entity::Entity()
 {
-
 }
 
 #ifdef EDITOR_BUILD
@@ -619,7 +618,7 @@ class EntityTagSerialize : public IPropertySerializer
 };
 ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");
 
-EntityComponent* Entity::get_component_typeinfo(const ClassTypeInfo* ti) {
+EntityComponent* Entity::get_component_typeinfo(const ClassTypeInfo* ti) const {
 	if (!ti)
 		return nullptr;
 	for (int i = 0; i < all_components.size(); i++)

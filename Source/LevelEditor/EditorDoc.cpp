@@ -113,7 +113,7 @@ public:
 
 		struct obj {
 			glm::vec3 pos = glm::vec3(0.f);
-			Entity* e = nullptr;
+			const Entity* e = nullptr;
 		};
 		std::vector<obj> objs;
 		auto& all_objs = eng->get_level()->get_all_objects();
@@ -138,7 +138,7 @@ public:
 			{
 				return a.pos.z < b.pos.z;
 			});
-		Entity* clicked = nullptr;
+		const Entity* clicked = nullptr;
 		for (auto o : objs) {
 			const char* name = (o.e->get_editor_name().c_str());
 			if (!*name) {
@@ -294,18 +294,38 @@ Color32 to_color32(glm::vec4 v) {
 
 void EditorDoc::validate_fileids_before_serialize()
 {
-	// first find max
 	auto level = eng->get_level();
 	auto& objs = level->get_all_objects();
+	if (edit_category == EditCategory::EDIT_PREFAB) {
+		Entity* root = nullptr;
+		for (auto o : objs) {
+			auto ent = o->cast_to<Entity>();
+			if (ent && !ent->get_parent() && !ent->dont_serialize_or_edit) {
+				if (!root)
+					root = ent;
+				else {
+					sys_print(Warning, "found an object not parented to root, parenting to first found\n");
+					ent->parent_to(root);
+				}
+			}
+		}
+		if (!root) {
+			sys_print(Warning, "prefab has no root??, making one\n");
+			level->spawn_entity();
+		}
+		validate_prefab();	// idk just run this agian
+	}
+
+
+	// first find max
 	for (auto o : objs)
-		if (can_delete_or_move_this(o)&&!o->dont_serialize_or_edit) {
+		if (is_this_object_not_inherited(o)&&!o->dont_serialize_or_edit) {
 			file_id_start = std::max(file_id_start, o->unique_file_id);
 		}
 	for (auto o : objs) {
-		if (can_delete_or_move_this(o) && o->unique_file_id == 0 && !o->dont_serialize_or_edit)
+		if (is_this_object_not_inherited(o) && o->unique_file_id == 0 && !o->dont_serialize_or_edit)
 			o->unique_file_id = get_next_file_id();
 	}
-
 }
 
 void EditorDoc::init()
@@ -595,7 +615,7 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 		reset_group_to_pre_transform();
 
-		operation_mask = ImGuizmo::ROTATE;
+		force_operation = ImGuizmo::ROTATE;
 
 		set_force_gizmo_on(true);
 	}
@@ -603,7 +623,7 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 		reset_group_to_pre_transform();
 
-		operation_mask = ImGuizmo::TRANSLATE;
+		force_operation = ImGuizmo::TRANSLATE;
 
 		set_force_gizmo_on(true);
 	}
@@ -630,17 +650,17 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 	}
 	else if (scancode == SDL_SCANCODE_S) {
 		reset_group_to_pre_transform();
-		operation_mask = ImGuizmo::SCALE;
+		force_operation = ImGuizmo::SCALE;
 		mode = ImGuizmo::LOCAL;	// local scaling only
 		set_force_gizmo_on(true);
 	}
 }
 
-void EditorDoc::do_mouse_selection(MouseSelectionAction action, Entity* e, bool select_rootmost_entity)
+void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_rootmost_entity)
 {
-	Entity* actual_entity_to_select = e;
+	const Entity* actual_entity_to_select = e;
 	if (select_rootmost_entity) {
-		while (actual_entity_to_select->creator_source && !can_delete_or_move_this(actual_entity_to_select))
+		while (actual_entity_to_select->creator_source && !is_this_object_not_inherited(actual_entity_to_select))
 			actual_entity_to_select = actual_entity_to_select->creator_source;
 	}
 	if (is_in_eyedropper_mode()) {
@@ -741,7 +761,6 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 	if (scancode == SDL_SCANCODE_DELETE) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();
-			validate_remove_entities(selected_handles);
 			if (!selected_handles.empty()) {
 				RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(selected_handles);
 				command_mgr->add_command(cmd);
@@ -1148,14 +1167,14 @@ void ManipulateTransformTool::update()
 	ImGuizmo::GetStyle().RotationLineThickness = 6.0;
 	ImGuizmo::GetStyle().ScaleLineThickness = 6.0;
 
-
+	const auto mask_to_use = (force_gizmo_on) ? force_operation : operation_mask;
 
 	glm::vec3 snap(-1);
-	if (operation_mask == ImGuizmo::TRANSLATE && ed_has_snap.get_bool())
+	if (mask_to_use == ImGuizmo::TRANSLATE && ed_has_snap.get_bool())
 		snap = glm::vec3(ed_translation_snap.get_float());
-	else if (operation_mask == ImGuizmo::SCALE && ed_has_snap.get_bool())
+	else if (mask_to_use == ImGuizmo::SCALE && ed_has_snap.get_bool())
 		snap = glm::vec3(ed_scale_snap.get_float());
-	else if (operation_mask == ImGuizmo::ROTATE&& ed_has_snap.get_bool())
+	else if (mask_to_use == ImGuizmo::ROTATE&& ed_has_snap.get_bool())
 		snap = glm::vec3(ed_rotation_snap.get_float());
 
 
@@ -1188,7 +1207,7 @@ void ManipulateTransformTool::update()
 	const float* const proj = glm::value_ptr(friendly_proj_matrix);
 	float* model = glm::value_ptr(current_transform_of_group);
 	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
-	bool good = ImGuizmo::Manipulate(get_force_gizmo_on(), view, proj, get_real_op_mask(operation_mask,axis_mask), mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
+	bool good = ImGuizmo::Manipulate(get_force_gizmo_on(), view, proj, get_real_op_mask(mask_to_use,axis_mask), mode, model,nullptr,(snap.x>0)?&snap.x:nullptr);
 
 	has_any_changed |= good;
 
@@ -1238,6 +1257,7 @@ void EditorDoc::hook_pre_scene_viewport_draw()
 	auto showtext_off = get_icon("show_text_off.png");
 	auto showtext_on = get_icon("show_text_on.png");
 	auto translate = get_icon("translate.png");
+	auto cursor = get_icon("cursor.png");
 	auto rotation = get_icon("rotate.png");
 	auto scale = get_icon("scale.png");
 	auto size = ImVec2(16, 16);
@@ -1256,7 +1276,11 @@ void EditorDoc::hook_pre_scene_viewport_draw()
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
 		auto optype = manipulate->get_operation_type();
-		push_active_style(optype == ImGuizmo::TRANSLATE,true);
+		push_active_style(optype == 0, true);
+		if (ImGui::ImageButton(cursor, size)) {
+			manipulate->set_operation_type({});
+		}
+		push_active_style(optype == ImGuizmo::TRANSLATE);
 		if (ImGui::ImageButton(translate, size)) {
 			manipulate->set_operation_type(ImGuizmo::TRANSLATE);
 		}
@@ -1342,38 +1366,29 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 
-			EntityPtr parent_to;
-			if (is_editing_prefab()) {
-				auto root = get_prefab_root_entity();
-				if (root)
-					parent_to = root->get_self_ptr();
-			}
 			if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
 				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename, 
-					drop_transform,
-					parent_to,false)
+					drop_transform,EntityPtr(),false)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
 				command_mgr->add_command(new CreateStaticMeshCommand(
 					resource->filename, 
-					drop_transform,
-					parent_to)
+					drop_transform)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(EntityComponent::StaticType)) {
 				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename,
 					drop_transform,
-					parent_to, true)
+					EntityPtr(), true)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
 				command_mgr->add_command(new CreatePrefabCommand(
 					resource->filename,
-					drop_transform,
-					parent_to
+					drop_transform
 				));
 			}
 	
@@ -1390,8 +1405,10 @@ static std::string get_directory(const std::string& input)
 {
 	auto find = input.rfind('/');
 	if (find == std::string::npos) return "";
-	return input.substr(find + 1);
+	if (find == 0) return "";
+	return input.substr(0,find - 1);
 }
+
 
 static void save_off_branch_as_scene(Entity* e)
 {
@@ -1410,14 +1427,14 @@ static void save_off_branch_as_scene(Entity* e)
 		sys_print(Error, str);
 		return;
 	}
-	auto path = get_directory(ed_doc.get_doc_name());
-	if (!path.empty()) path += "/";
-	path += file_name;
+	//auto path = get_directory(ed_doc.get_doc_name());
+	//if (!path.empty()) path += "/";
+	auto path = file_name;
 	path += ".pfb";
 	{
 		auto check_file_exists = FileSys::open_read_game(path);
 		if (check_file_exists) {
-			const char* str = string_format("cant save off branch, path already exists: %s\n",path.c_str());
+			const char* str = string_format("cant save off branch, path already exists: %s\n", path.c_str());
 			eng->log_to_fullscreen_gui(Error, str);
 			sys_print(Error, str);
 			return;
@@ -1429,6 +1446,7 @@ static void save_off_branch_as_scene(Entity* e)
 	eng->log_to_fullscreen_gui(Info, str);
 	sys_print(Info, str);
 }
+
 
 ObjectOutliner::ObjectOutliner()
 {
@@ -1510,61 +1528,49 @@ void ObjectOutliner::IteratorDraw::draw()
 				ImGui::CloseCurrentPopup();
 			}
 			else {
-				if (ImGui::MenuItem("Parent To This")) {
 
-					auto me = eng->get_entity(oo->contextMenuHandle);
+				auto parent_to_shared = [&](Entity* me, bool create_new_parent) {
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
-					bool had_errs = false;
 					for (auto& ehandle : ents) {
 						EntityPtr ptr = { ehandle };
 						if (ptr.get() == me) continue;
-
-						if (ed_doc.can_delete_or_move_this(ptr.get()))
-							ptrs.push_back(ptr.get());
-						else
-							had_errs = true;
+						ptrs.push_back(ptr.get());
 					}
-					if (!ptrs.empty())
-						ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me));
-					if (had_errs)
-						eng->log_to_fullscreen_gui(Error, "Cant change parent of inherited entities");
+					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me, create_new_parent, false));
 
 					oo->contextMenuHandle = 0;
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Remove Parent")) {
-
-					Entity* skip_this = nullptr;
-					Entity* parent_to_this = nullptr;
-					if (ed_doc.is_editing_prefab()) {
-						Entity* root = ed_doc.get_prefab_root_entity();
-						parent_to_this = root;
-						skip_this = root;
-					}
+				};
+				auto remove_parent_of_selection = [&](bool delete_parent) {
 
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
-					bool had_errs = false;
 					for (auto& ehandle : ents) {
 						EntityPtr ptr = { ehandle };
-						if (ptr.get() == skip_this) continue;
-
-						if (ed_doc.can_delete_or_move_this(ptr.get()))
-							ptrs.push_back(ptr.get());
-						else
-							had_errs = true;
+						ptrs.push_back(ptr.get());
 					}
 
-					if (!ptrs.empty())
-						ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, parent_to_this));
-					if (had_errs)
-						eng->log_to_fullscreen_gui(Error, "Cant remove parent of inherited entities");
+					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, nullptr, false, delete_parent));
 
 					oo->contextMenuHandle = 0;
+				};
 
+				if (ImGui::MenuItem("Parent To This")) {
+					auto me = eng->get_entity(oo->contextMenuHandle);
+					parent_to_shared(me, false);
 					ImGui::CloseCurrentPopup();
 				}
+
+
+				if (ImGui::MenuItem("Remove Parent")) {
+					remove_parent_of_selection(false);
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::MenuItem("Parent Selection To New Entity")) {
+					parent_to_shared(nullptr, true);
+					ImGui::CloseCurrentPopup();
+				}
+
 				ImGui::Separator();
 				if (ImGui::MenuItem("Add sibling entity")) {
 					auto me = eng->get_entity(oo->contextMenuHandle);
@@ -1593,6 +1599,20 @@ void ObjectOutliner::IteratorDraw::draw()
 
 				ImGui::Separator();
 				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
+				if (ImGui::MenuItem("Dissolve As Parent")) {
+					EntityPtr ptr = { oo->contextMenuHandle };
+					auto& children = ptr->get_children();
+					ed_doc.selection_state->clear_all_selected();
+					for (auto c : children)
+						ed_doc.selection_state->add_to_entity_selection(c);
+
+					if(!children.empty())
+						remove_parent_of_selection(true);
+					else
+						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ ptr }));
+
+					ImGui::CloseCurrentPopup();
+				}
 				if (ImGui::MenuItem("Delete")) {
 					EntityPtr ptr = { oo->contextMenuHandle };
 					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ ptr }));
@@ -1640,7 +1660,7 @@ void ObjectOutliner::IteratorDraw::draw()
 		}
 
 
-		if (!ed_doc.can_delete_or_move_this(e))
+		if (!ed_doc.is_this_object_not_inherited(e))
 			ImGui::TextColored(non_owner_source_color, name);
 		else
 			ImGui::Text(name);
@@ -1774,7 +1794,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 				if (ImGui::Button("Remove (warning: no undo)")) {
 
 					auto ec_ = eng->get_object(component_context_menu)->cast_to<EntityComponent>();
-					if (ed_doc.can_delete_or_move_this(ec_)) {
+					if (ed_doc.is_this_object_not_inherited(ec_)) {
 						ed_doc.command_mgr->add_command(new RemoveComponentCommand(ec_->get_owner(), ec_));
 					}
 					else
@@ -1803,7 +1823,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 			}
 		}
 
-		if(!ed_doc.can_delete_or_move_this(ec))
+		if(!ed_doc.is_this_object_not_inherited(ec))
 			ImGui::TextColored(non_owner_source_color, ec->get_type().classname);
 		else
 			ImGui::Text(ec->get_type().classname);
@@ -2148,7 +2168,7 @@ class EntityPtrAssetEditor : public IPropertyEditor
 {
 public:
 	EntityPtrAssetEditor() {
-		ed_doc.on_eyedropper_callback.add(this, [&](Entity* e)
+		ed_doc.on_eyedropper_callback.add(this, [&](const Entity* e)
 			{
 				if (ed_doc.get_active_eyedropper_user_id() == this) {
 					sys_print(Debug, "entityptr on eye dropper callback\n");

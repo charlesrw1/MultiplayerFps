@@ -97,6 +97,4 @@ start_ed Map top_down/map0.tmap
 
 bind 7 "start_ed AnimGraph beu_character.ag"
 
-as long as dx11 is still used, gl 4.6 wont be outdated either. 
-
 

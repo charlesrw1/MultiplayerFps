@@ -242,7 +242,10 @@ const uint DEBUG_OBJID = 8;
 const uint DEBUG_LIGHTING_ONLY = 9;
 */
 
-ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV,"render debug mode, see Draw.cpp for DEBUG_x values, 0 to disable", 0, 9);
+// special:
+static const int DEBUG_OUTLINED = 100;//uses objID
+
+ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV,"render debug mode, see Draw.cpp for DEBUG_x values, 0 to disable", 0, 200);
 
 
 void Renderer::InitGlState()
@@ -649,6 +652,8 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferha
 	constants.current_and_prev_jitter = glm::vec4(cur_jit.x, cur_jit.y, prev_jit.x, prev_jit.y);
 
 	constants.debug_options = r_debug_mode.get_integer();
+	if (r_debug_mode.get_integer() == DEBUG_OUTLINED)
+		constants.debug_options = gpu::DEBUG_OBJID;
 
 	constants.flags = 0;
 	if (wireframe_secondpass)
@@ -3036,8 +3041,14 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		}
 		{
 			std::vector<MaterialInstance*> postProcesses;
-			if (params.is_editor)
+			if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
+				auto mat = g_assets.find_global_sync<MaterialInstance>("eng/editorEdgeDetect.mm");
+				if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
+					postProcesses.push_back(mat.get());
+			}
+			if (params.is_editor) {
 				postProcesses.push_back(matman.get_default_editor_sel_PP());
+			}
 			if (!r_no_postprocess.get_bool())
 				do_post_process_stack(postProcesses);
 		}

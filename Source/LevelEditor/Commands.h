@@ -27,17 +27,191 @@ public:
 	}
 };
 
+
+static void validate_remove_entities(std::vector<EntityPtr>& input)
+{
+	bool had_errors = false;
+	for (int i = 0; i < input.size(); i++)
+	{
+		auto e = input[i];
+		Entity* ent = e.get();
+		if (!ent) continue;	// whatever, doesnt matter
+
+		if (!ed_doc.can_delete_this_object(ent)) {
+			had_errors = true;
+			input.erase(input.begin() + i);
+			i--;
+		}
+	}
+	if (had_errors)
+		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
+	had_errors = false;
+	if (ed_doc.is_editing_prefab()) {
+		auto root = ed_doc.get_prefab_root_entity();
+		if (root) {
+			for (int i = 0; i < input.size(); i++) {
+				auto e = input[i];
+				if (e.get() == root) {
+					had_errors = true;
+					input.erase(input.begin() + i);
+					i--;
+				}
+			}
+		}
+
+		if (had_errors)
+			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
+	}
+}
+
+class RemoveEntitiesCommand : public Command
+{
+public:
+	RemoveEntitiesCommand(std::vector<EntityPtr> handles) {
+		validate_remove_entities(handles);
+		for (auto e : handles) {
+			is_valid_flag &= ed_doc.can_delete_this_object(e.get());
+		}
+		if (!is_valid_flag)
+			return;
+
+		scene = CommandSerializeUtil::serialize_entities_text(handles);
+
+		this->handles = handles;
+	}
+	bool is_valid_flag = true;
+	bool is_valid() final {
+		return is_valid_flag;
+	}
+
+	void execute() {
+		ASSERT(is_valid());
+		for (auto h : handles) {
+			h->destroy();
+		}
+		ed_doc.post_node_changes.invoke();
+	}
+	void undo() {
+		ASSERT(is_valid());
+		auto restored = unserialize_entities_from_text(scene->text);
+		auto& extern_parents = scene->extern_parents;
+		for (auto& ep : extern_parents) {
+			auto e = restored.get_objects().find(ep.child_path);
+			ASSERT(e->second->is_a<Entity>());
+			if (e != restored.get_objects().end()) {
+				EntityPtr parent = { ep.external_parent_handle };
+				if (parent.get()) {
+					auto ent = (Entity*)e->second;
+					ent->parent_to(parent.get());
+				}
+				else
+					sys_print(Warning, "restored parent doesnt exist\n");
+			}
+			else
+				sys_print(Warning, "restored obj doesnt exist\n");
+		}
+
+		eng->get_level()->insert_unserialized_entities_into_level(restored);
+		auto& objs = restored.get_objects();
+
+		handles.clear();
+		for (auto& o : objs) {
+			if (o.second->is_a<Entity>()) {
+				auto ent = (Entity*)o.second;
+				handles.push_back(ent->get_self_ptr());
+			}
+		}
+			
+		for (auto& o : objs) {
+			if (auto e = o.second->cast_to<Entity>())
+				ed_doc.on_entity_created.invoke(e->get_self_ptr());
+		}
+		ed_doc.post_node_changes.invoke();
+	}
+	std::string to_string() override {
+		return "Remove Entity";
+	}
+
+	std::unique_ptr<SerializedSceneFile> scene;
+	std::vector<EntityPtr> handles;
+};
+
 class ParentToCommand : public Command
 {
 public:
-	ParentToCommand(std::vector<Entity*> ents, Entity* parent_to) {
+
+	ParentToCommand(std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent) {
+		
+		if (!parent_to) {
+			if (ed_doc.is_editing_prefab()) {
+				parent_to = ed_doc.get_prefab_root_entity();
+				assert(parent_to);
+			}
+		}
+
+		auto validate = [&]() -> bool {
+			if (ents.empty())
+				return false;
+			for (auto e : ents) {
+				if (!e) return false;
+				if (!ed_doc.is_this_object_not_inherited(e)) return false;
+				if (e == parent_to) return false;
+			}
+			return true;
+		};
+
+		is_valid_flag = validate();
+		if (!is_valid_flag)
+			return;
+
 		for (auto e : ents)
 			this->entities.push_back(e->get_self_ptr());
 		for (auto e : ents)
 			this->prev_parents.push_back(e->get_parent() ? e->get_parent()->get_self_ptr() : EntityPtr());
 		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr();
+		ASSERT(!create_new_parent || !parent_to);	// if create_new_parent, parent_to is false
+		this->create_new_parent = create_new_parent;
+
+		auto all_parents_equal = [&]() -> bool {
+			auto p = this->prev_parents[0];
+			for (int i = 1; i < this->prev_parents.size(); i++) {
+				if (this->prev_parents[i] != p) return false;
+			}
+			return true;
+		};
+
+		if (!delete_parent || (all_parents_equal() && !parent_to))	// if delete_parent, all_parents_equal==true
+			this->delete_the_parent = delete_parent;
+		else
+			is_valid_flag = false;
+
 	}
-	void execute() {
+	bool is_valid_flag = true;
+	bool is_valid() final {
+		return is_valid_flag;
+	}
+
+
+	void execute() final {
+
+		if (create_new_parent) {
+			ASSERT(!parent_to);
+			auto newparent = eng->get_level()->spawn_entity();
+			glm::vec3 pos(0.f);
+			int count = 0;
+			for (auto e : entities) {
+				auto ent = e.get();
+				if (ent) {
+					pos += ent->get_ws_position();
+					count++;
+				}
+			}
+			pos /= (float)count;
+			newparent->set_ws_position(pos);
+			parent_to = newparent->get_self_ptr();
+
+			ed_doc.selection_state->set_select_only_this(newparent);
+		}
 
 		auto parent_to_ent = parent_to.get();
 		for (auto ent : entities) {
@@ -51,9 +225,31 @@ public:
 			e->set_ws_transform(ws_transform);
 		}
 
+
+		if (delete_the_parent) {
+			ASSERT(this->prev_parents[0].get());
+			if(!remove_the_parent_cmd)	// do this here because we want to serialize the parent when the child entities are removed
+				remove_the_parent_cmd = std::make_unique<RemoveEntitiesCommand>(std::vector<EntityPtr>{ this->prev_parents[0]->get_self_ptr() });
+			if (!remove_the_parent_cmd->is_valid())
+				throw std::runtime_error("RemoveEntitiesCommand not valid in ParentToCommand");
+			remove_the_parent_cmd->execute();
+		}
+
 		ed_doc.post_node_changes.invoke();
 	}
-	void undo() {
+	void undo() final {
+		if (delete_the_parent) {
+			remove_the_parent_cmd->undo();
+			ASSERT(remove_the_parent_cmd->handles.size() == 1);
+			ASSERT(remove_the_parent_cmd->handles[0].get());
+			// set prev parent...
+			for (int i = 0; i < prev_parents.size(); i++) {
+				prev_parents[i] = remove_the_parent_cmd->handles[0]->get_self_ptr();
+			}
+		}
+
+		ed_doc.selection_state->clear_all_selected();
+		
 		for (int i = 0; i < entities.size();i++) {
 			Entity* e = entities[i].get();
 			Entity* prev = prev_parents[i].get();
@@ -64,6 +260,17 @@ public:
 			auto ws_transform = e->get_ws_transform();
 			e->parent_to(prev);
 			e->set_ws_transform(ws_transform);
+
+			ed_doc.selection_state->add_to_entity_selection(e);
+		}
+
+		if (create_new_parent) {
+			auto p = parent_to.get();
+			if (!p) {
+				sys_print(Warning, "create_new_parent ptr was null??\n");
+			}
+			eng->get_level()->destroy_entity(p);
+			parent_to = EntityPtr();
 		}
 
 		ed_doc.post_node_changes.invoke();
@@ -75,18 +282,31 @@ public:
 	std::vector<EntityPtr> prev_parents;
 	std::vector<EntityPtr> entities;
 	EntityPtr parent_to;
+	bool create_new_parent = false;
+	bool delete_the_parent = false;
+
+	// anti pattern?
+	std::unique_ptr<RemoveEntitiesCommand> remove_the_parent_cmd;
 };
 
 class CreatePrefabCommand : public Command
 {
 public:
-	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent) {
+	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent=EntityPtr()) {
 		this->prefab_name = prefab_name;
 		this->transform = transform;
 		this->parent_to = parent;
+
+		if (ed_doc.is_editing_prefab()) {
+			auto root = ed_doc.get_prefab_root_entity();
+			if (root)
+				this->parent_to = root->get_self_ptr();
+		}
+
 	}
 	~CreatePrefabCommand() override {
 	}
+
 	void execute() {
 		auto l = eng->get_level();
 		auto p = g_assets.find_sync<PrefabAsset>(prefab_name);
@@ -121,11 +341,17 @@ public:
 class CreateStaticMeshCommand : public Command
 {
 public:
-	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr parent) {
+	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr parent=EntityPtr()) {
 
 		this->transform = transform;
 		this->modelname = modelname;
 		this->parent_to = parent;
+
+		if (ed_doc.is_editing_prefab()) {
+			auto root = ed_doc.get_prefab_root_entity();
+			if (root)
+				this->parent_to = root->get_self_ptr();
+		}
 	}
 	~CreateStaticMeshCommand() override {
 	}
@@ -192,6 +418,12 @@ public:
 		this->transform = transform;
 		this->parent_to = parent;
 		is_component_type = is_component;
+
+		if (ed_doc.is_editing_prefab()) {
+			auto root = ed_doc.get_prefab_root_entity();
+			if (root)
+				this->parent_to = root->get_self_ptr();
+		}
 	}
 	bool is_valid() override { return ti != nullptr; }
 
@@ -285,6 +517,10 @@ class InstantiatePrefabCommand : public Command
 {
 public:
 	InstantiatePrefabCommand(Entity* e) {
+		if (ed_doc.is_editing_prefab() && ed_doc.get_prefab_root_entity() == e)
+			return;	// is_valid == false
+
+
 		me = e->get_self_ptr();
 		asset = me->what_prefab;
 		if (!asset || !me->is_root_of_prefab) {
@@ -435,97 +671,6 @@ public:
 	std::vector<EntityPtr> handles;
 };
 
-
-void validate_remove_entities(std::vector<EntityPtr>& input)
-{
-	bool had_errors = false;
-	for (int i = 0; i < input.size(); i++)
-	{
-		auto e = input[i];
-		Entity* ent = e.get();
-		if (!ent) continue;	// whatever, doesnt matter
-
-		if (!ed_doc.can_delete_or_move_this(ent)) {
-			had_errors = true;
-			input.erase(input.begin() + i);
-			i--;
-		}
-	}
-	if (had_errors)
-		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
-	had_errors = false;
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		if (root) {
-			for (int i = 0; i < input.size();i++) {
-				auto e = input[i];
-				if (e.get() == root) {
-					had_errors = true;
-					input.erase(input.begin() + i);
-					i--;
-				}
-			}
-		}
-
-		if (had_errors)
-			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
-	}
-}
-
-class RemoveEntitiesCommand : public Command
-{
-public:
-	RemoveEntitiesCommand(std::vector<EntityPtr> handles) {
-
-		scene = CommandSerializeUtil::serialize_entities_text(handles);
-
-		this->handles = handles;
-	}
-
-	void execute() {
-
-		for (auto h : handles) {
-			h->destroy();
-		}
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() {
-		auto restored = unserialize_entities_from_text(scene->text);
-		auto& extern_parents = scene->extern_parents;
-		for (auto ep : extern_parents) {
-			auto e = restored.get_objects().find(ep.child_path);
-			ASSERT(e->second->is_a<Entity>());
-			if (e != restored.get_objects().end()) {
-				EntityPtr parent = { ep.external_parent_handle };
-				if (parent.get()) {
-					auto ent = (Entity*)e->second;
-					ent->parent_to(parent.get());
-				}
-				else
-					sys_print(Warning, "restored parent doesnt exist\n");
-			}
-			else
-				sys_print(Warning, "restored obj doesnt exist\n");
-		}
-
-		eng->get_level()->insert_unserialized_entities_into_level(restored);
-
-
-
-		auto& objs = restored.get_objects();
-		for (auto& o : objs) {
-			if (auto e = o.second->cast_to<Entity>())
-				ed_doc.on_entity_created.invoke(e->get_self_ptr());
-		}
-		ed_doc.post_node_changes.invoke();
-	}
-	std::string to_string() override {
-		return "Remove Entity";
-	}
-
-	std::unique_ptr<SerializedSceneFile> scene;
-	std::vector<EntityPtr> handles;
-};
 
 class CreateComponentCommand : public Command
 {

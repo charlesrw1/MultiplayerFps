@@ -19,6 +19,26 @@ struct OutstandingScriptDelegate {
 
 CLASS_H(ScriptComponent, EntityComponent)
 public:
+	struct PubVar
+	{
+		enum class Type {
+			None,
+			Boolean,
+			Int,
+			Float,
+			EntityPtr,
+			AssetPtr,
+		}type=Type::None;
+		const ClassTypeInfo* typeExtended = nullptr;
+		union {
+			bool boolean;
+			int64_t integer;
+			float floatval;
+			uint64_t entityhandle;
+			IAsset* assetPtr;
+		}data = {};
+	};
+
 	ScriptComponent();
 	~ScriptComponent();
 	void pre_start() override;
@@ -54,6 +74,9 @@ public:
 	std::vector<OutstandingScriptDelegate> outstandings;
 	AssetPtr<Script> script;
 private:
+
+	std::vector<PubVar> publicVars;	// parsed from script
+
 	void print_my_table();
 	void push_table_to_stack();
 
