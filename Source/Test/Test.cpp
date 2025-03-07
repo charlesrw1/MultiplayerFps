@@ -1,6 +1,7 @@
 #include "Test.h"
 #include "Framework/Util.h"
 #include "Framework/Config.h"
+#
 #ifdef WITH_TESTS
 bool ProgramTester::run_all(bool print_good)
 {
@@ -15,8 +16,9 @@ bool ProgramTester::run_all(bool print_good)
 		try {
 			allTests[i].func();
 		}
-		catch (...) {
-			set_test_failed("<unknown>", "threw an exception");
+		catch (std::runtime_error er) {
+			if(!test_failed)
+				set_test_failed("<unknown>", "threw an exception");
 		}
 		is_in_test = false;
 
@@ -39,6 +41,8 @@ bool ProgramTester::run_all(bool print_good)
 DECLARE_ENGINE_CMD(RUN_TESTS)
 {
 	bool res = ProgramTester::get().run_all(true);
+	sys_print(Info, "Tests complete, exiting...\n");
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "quit");
 }
 
 #endif

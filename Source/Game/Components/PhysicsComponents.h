@@ -10,7 +10,7 @@
 class PhysicsActor;
 class MeshBuilder;
 
-namespace physx {
+/* blank */ namespace physx {
 	class PxRigidActor;
 	class PxShape;
 	class PxRigidDynamic;
@@ -157,7 +157,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/phys_capsule.png";
+		return get_is_simulating() ? "eng/editor/phys_capsule_simulate.png" : "eng/editor/phys_capsule.png";
 	}
 #endif
 
@@ -177,7 +177,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/phys_box.png";
+		return get_is_simulating() ? "eng/editor/phys_box_simulate.png" : "eng/editor/phys_box.png";
 	}
 #endif
 
@@ -190,7 +190,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/phys_sphere.png";
+		return get_is_simulating() ? "eng/editor/phys_sphere_simulate.png" : "eng/editor/phys_sphere.png";
 	}
 #endif
 
@@ -203,7 +203,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/phys_mesh.png";
+		return get_is_simulating() ? "eng/editor/phys_mesh_simulate.png" : "eng/editor/phys_mesh.png";
 	}
 #endif
 };

@@ -139,6 +139,8 @@ void init() {
     int NUM_WORKERS = threading_num_worker_threads.get_integer();
     if (NUM_WORKERS == 0)
         NUM_WORKERS = std::thread::hardware_concurrency() - 2;
+    if (NUM_WORKERS <= 0)
+        NUM_WORKERS = 1;
 
     for (int i = 0; i < NUM_WORKERS; i++) {
         threads.push_back(std::thread(worker_thread_main, i + 1));

@@ -35,6 +35,9 @@ public:
 	// update any async resource requests that have finished, executes callbacks, calls post_load (ie to upload GPU resources)
 	void tick_asyncs();	
 
+	// wait for everything to finish, then tick_async
+	void finish_all_jobs();
+
 	// unsets any bits of assets referenced by this channel
 	void unreference_this_channel(uint32_t lifetime_channel);	// unrefernce a 0-30 channel (31th channel is reserved and will print an error)
 	// triggers uninstall's of assets that arent referenced anymore

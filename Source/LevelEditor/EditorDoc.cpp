@@ -391,7 +391,7 @@ Entity* EditorDoc::get_prefab_root_entity()
 			}
 		}
 	}
-	ASSERT(0);
+	sys_print(Warning, "couldnt get root of prefab??\n");
 	return nullptr;
 }
  void EditorDoc::enable_entity_eyedropper_mode(void* id) {
@@ -431,6 +431,9 @@ void EditorDoc::validate_prefab()
 				else
 					root = e;
 			}
+			if (can_delete_this_object(e) && e->what_prefab == get_editing_prefab()) {
+				e->is_root_of_prefab = false;
+			}
 		}
 	}
 	if (!deleteList.empty()) {
@@ -440,8 +443,10 @@ void EditorDoc::validate_prefab()
 	}
 	if (!root) {
 		sys_print(Debug, "prefab had no root\n");
-		level->spawn_entity();
+		root = level->spawn_entity();
 	}
+	root->is_root_of_prefab = true;
+	root->what_prefab = get_editing_prefab();
 }
 
 void EditorDoc::on_map_load_return(bool good)
@@ -573,7 +578,7 @@ DECLARE_ENGINE_CMD_CAT("ed.", HideSelected)
 	eng->log_to_fullscreen_gui(Info, "Hide selected");
 	auto& selection = ed_doc.selection_state->get_selection();
 	for (auto s : selection) {
-		EntityPtr handle = { s };
+		EntityPtr handle(s);
 		if (handle) {
 			handle->set_hidden_in_editor(true);
 		}
@@ -1040,7 +1045,7 @@ void ManipulateTransformTool::on_prop_change() {
 void ManipulateTransformTool::reset_group_to_pre_transform()
 {
 	for (auto& pair : world_space_of_selected) {
-		EntityPtr e = { pair.first };
+		EntityPtr e(pair.first);
 		if (e.get()) {
 			e->set_ws_transform(pair.second);
 		}
@@ -1054,11 +1059,22 @@ void ManipulateTransformTool::update_pivot_and_cached()
 
 	world_space_of_selected.clear();
 	auto& ss = ed_doc.selection_state;
+	auto has_parent_in_selection_R = [&](auto&& self,Entity* e) -> bool {
+		if (!e->get_parent()) return false;
+		auto& sel = ss->get_selection();
+		if (sel.find(e->get_parent()->get_instance_id()) != sel.end())
+			return true;
+		return self(self, e->get_parent());
+	};
+
 	if (ss->has_any_selected()) {
 		for (auto ehandle : ss->get_selection()) {
-			EntityPtr e = { ehandle };
-			if(e.get())
-				world_space_of_selected[e.handle]=(e.get()->get_ws_transform());
+			EntityPtr e(ehandle);
+			if (e.get()) {
+				const bool should_skip = has_parent_in_selection_R(has_parent_in_selection_R, e.get());
+				if(!should_skip)
+					world_space_of_selected[e.handle]=(e.get()->get_ws_transform());
+			}
 		}
 	}
 	static bool selectFirstOnly = true;
@@ -1090,7 +1106,7 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	glm::quat q;
 	decompose_transform(current_transform_of_group, p, q, s);
 	glm::vec3 asEuler = glm::eulerAngles(q);
-	printf(": %f\n", asEuler.x);
+	//printf(": %f\n", asEuler.x);
 	if (ed_has_snap.get_bool()) {
 		float translation_snap = ed_translation_snap.get_float();
 		p.x = snap_to_value(p.x, translation_snap);
@@ -1105,7 +1121,7 @@ void ManipulateTransformTool::update_pivot_and_cached()
 	glm::quat q2;
 	decompose_transform(current_transform_of_group, p2, q2, s2);
 	asEuler = glm::eulerAngles(q2);
-	printf(".: %f\n", asEuler.x);
+	//printf(".: %f\n", asEuler.x);
 }
 
 void ManipulateTransformTool::on_selected_tarnsform_change(uint64_t h) {
@@ -1223,9 +1239,10 @@ void ManipulateTransformTool::update()
 			auto& ss = ed_doc.selection_state;
 			auto& arr = ss->get_selection();
 			for (auto elm : arr) {
-				ASSERT(world_space_of_selected.find(elm) != world_space_of_selected.end());
-				glm::mat4 ws = current_transform_of_group * glm::inverse(pivot_transform) * world_space_of_selected.find(elm)->second;
-				EntityPtr e = { elm };
+				auto find = world_space_of_selected.find(elm);
+				if (find == world_space_of_selected.end()) continue;	// this is valid, a parent is in the set already
+				glm::mat4 ws = current_transform_of_group * glm::inverse(pivot_transform) * find->second;
+				EntityPtr e(elm);
 				ASSERT(e.get());
 				e.get()->set_ws_transform(ws);
 			}
@@ -1503,7 +1520,7 @@ void ObjectOutliner::IteratorDraw::draw()
 
 	ImGui::PushID(n);
 	{
-		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr{ n->handle });
+		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr(n->handle));
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (n->handle != 0) {
@@ -1518,7 +1535,7 @@ void ObjectOutliner::IteratorDraw::draw()
 
 		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && n->handle != 0) {
 			ImGui::OpenPopup("outliner_ctx_menu");
-			ed_doc.selection_state->add_to_entity_selection({ n->handle });
+			ed_doc.selection_state->add_to_entity_selection(EntityPtr(n->handle));
 			oo->contextMenuHandle = n->handle;
 		}
 		if (ImGui::BeginPopup("outliner_ctx_menu")) {
@@ -1533,7 +1550,7 @@ void ObjectOutliner::IteratorDraw::draw()
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
 					for (auto& ehandle : ents) {
-						EntityPtr ptr = { ehandle };
+						EntityPtr ptr(ehandle);
 						if (ptr.get() == me) continue;
 						ptrs.push_back(ptr.get());
 					}
@@ -1546,7 +1563,7 @@ void ObjectOutliner::IteratorDraw::draw()
 					auto& ents = ed_doc.selection_state->get_selection();
 					std::vector<Entity*> ptrs;
 					for (auto& ehandle : ents) {
-						EntityPtr ptr = { ehandle };
+						EntityPtr ptr(ehandle);
 						ptrs.push_back(ptr.get());
 					}
 
@@ -1574,7 +1591,7 @@ void ObjectOutliner::IteratorDraw::draw()
 				ImGui::Separator();
 				if (ImGui::MenuItem("Add sibling entity")) {
 					auto me = eng->get_entity(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr(), false));
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr(me->get_parent()), false));
 					oo->contextMenuHandle = 0;
 					ImGui::CloseCurrentPopup();
 				}
@@ -1600,12 +1617,9 @@ void ObjectOutliner::IteratorDraw::draw()
 				ImGui::Separator();
 				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
 				if (ImGui::MenuItem("Dissolve As Parent")) {
-					EntityPtr ptr = { oo->contextMenuHandle };
+					EntityPtr ptr(oo->contextMenuHandle);
 					auto& children = ptr->get_children();
-					ed_doc.selection_state->clear_all_selected();
-					for (auto c : children)
-						ed_doc.selection_state->add_to_entity_selection(c);
-
+					
 					if(!children.empty())
 						remove_parent_of_selection(true);
 					else
@@ -1614,7 +1628,7 @@ void ObjectOutliner::IteratorDraw::draw()
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::MenuItem("Delete")) {
-					EntityPtr ptr = { oo->contextMenuHandle };
+					EntityPtr ptr(oo->contextMenuHandle);
 					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ ptr }));
 					ImGui::CloseCurrentPopup();
 				}

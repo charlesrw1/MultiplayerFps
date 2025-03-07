@@ -122,7 +122,7 @@ public:
 
 	const std::vector<Entity*>& get_children() const { return children; }
 
-	EntityPtr get_self_ptr() const { return { get_instance_id() }; }
+	EntityPtr get_self_ptr() const { return EntityPtr(this); }
 
 
 	void invalidate_transform(EntityComponent* skipthis);
@@ -237,6 +237,8 @@ private:
 	BoneParentStruct parent_bone;
 	REFLECT();
 	bool start_disabled = false;
+	REFLECT(hide);
+	bool prefab_editable = false;
 
 	MeshComponent* cached_mesh_component = nullptr;	// for bone lookups
 

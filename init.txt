@@ -85,7 +85,8 @@ loglevel 2
 developer_mode 1
 file_print_all_openfile_fails 0
 
-RUN_TESTS
+#loglevel 4
+#RUN_TESTS
 
 #otex 0.5 1 3 _csm_shadow
 

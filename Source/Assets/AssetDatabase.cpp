@@ -556,6 +556,11 @@ void AssetDatabase::init() {
 	impl->init();
 }
 
+void AssetDatabase::finish_all_jobs()
+{
+	impl->finish_all_jobs();
+}
+
 void AssetDatabase::tick_asyncs() {
 
 	impl->tick_asyncs_standard();

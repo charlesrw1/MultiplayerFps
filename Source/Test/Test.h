@@ -1,14 +1,15 @@
 #pragma once
 #include "Framework/Util.h"
-
+#include <stdexcept>
 #define WITH_TESTS
 
 #ifdef WITH_TESTS
 
 #define TEST_TRUE_COMMENT(code, comment) \
 	if(!(code)) { \
+		_CrtDbgBreak();	\
 		ProgramTester::get().set_test_failed(#code, comment); \
-		return; \
+		throw std::runtime_error("er"); \
 	}
 
 #define TEST_TRUE(code) \
@@ -19,7 +20,7 @@
 	try { \
 		code; \
 		ProgramTester::get().set_test_failed(#code, "expected exception"); \
-		return; \
+		throw std::runtime_error("er"); \
 	} \
 	catch (...) { \
 	} \

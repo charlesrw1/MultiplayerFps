@@ -109,6 +109,7 @@ public:
 	void get_draw_params(SceneDrawParamsEx& param, View_Setup& setup);
 	bool game_thread_update();
 	void loop();
+	bool state_machine_update();
 
 	// state relevant functions
 	void set_tick_rate(float tick_rate);

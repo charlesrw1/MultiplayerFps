@@ -1769,6 +1769,28 @@ void game_update_job(uintptr_t user)
 	eng_local.get_gui()->paint();
 }
 
+// seperate function so tester can access it
+bool GameEngineLocal::state_machine_update()
+{
+	// update state
+	switch (state)
+	{
+	case Engine_State::Idle:
+		if (map_spawned()) {	// map is spawned, unload it
+			stop_game();
+			return true;			// goto next frame
+		}
+		break;
+	case Engine_State::Loading:
+		execute_map_change();
+		return true; // goto next frame
+		break;
+	case Engine_State::Game:	// handled in game_thread_update()
+		break;
+	};
+
+	return false;
+}
 
 void GameEngineLocal::loop()
 {
@@ -1833,26 +1855,7 @@ void GameEngineLocal::loop()
 
 		Cmd_Manager::get()->execute_buffer();
 
-		// update state
-		switch (state)
-		{
-		case Engine_State::Idle:
-			if (map_spawned()) {	// map is spawned, unload it
-				stop_game();
-				return true;			// goto next frame
-			}
-
-			SDL_Delay(5);	// assuming this is a menu/tool state, delay a bit to save CPU
-			break;
-		case Engine_State::Loading:
-			execute_map_change();
-			return true; // goto next frame
-			break;
-		case Engine_State::Game:	// handled in game_thread_update()
-			break;
-		};
-
-		return false;
+		return state_machine_update();
 	};
 
 	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext)
@@ -1923,17 +1926,10 @@ void GameEngineLocal::loop()
 		g_physics.sync_render_data();
 		
 		idraw->sync_update();
-
-		// sync any rendering objects
-		// sync meshbuilders
-		// sync UI
-		// sync materials
-
 	};
 	auto wait_for_swap = [&]()
 	{
 		ZoneScopedN("SwapWindow");
-		TracyGpuZone("SwapWindow");
 		CPUSCOPESTART(SwapWindow);
 
 		SDL_GL_SwapWindow(window);
@@ -1960,7 +1956,7 @@ void GameEngineLocal::loop()
 		// update input, console cmd buffer
 		const bool should_skip = frame_start();
 		if (should_skip) {
-			// hack, do a sync update here to refresh assets etc
+			// hacky, do a sync update here to refresh assets etc
 			do_sync_update();
 			continue;
 		}
@@ -1982,9 +1978,8 @@ void GameEngineLocal::loop()
 			}
 			TracyGpuCollect;
 		}
-		FrameMark;
-
-		Profiler::end_frame_tick(frame_time);
+		FrameMark;	// tracy profiling
+		Profiler::end_frame_tick(frame_time);	// my crappy profilier
 	}
 }
 

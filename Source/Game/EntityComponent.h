@@ -35,8 +35,6 @@ public:
 	REFLECT(name="owner",getter);
 	Entity* get_owner() const { return entity_owner; }
 
-	bool get_is_native_component() const { return is_native_componenent; }
-
 	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 
 	const glm::mat4& get_ws_transform();
@@ -92,11 +90,6 @@ private:
 	void destroy_internal();
 
 	Entity* entity_owner = nullptr;
-
-	bool is_native_componenent = true;
-	bool is_editor_only = false;
-	bool is_inherited = true;
-	bool is_force_root = false;
 
 	friend class Schema;
 	friend class Entity;

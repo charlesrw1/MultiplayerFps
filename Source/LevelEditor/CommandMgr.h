@@ -29,14 +29,16 @@ public:
 			hist[i] = nullptr;
 		}
 	}
-	
-	void execute_queued_commands() {
+	// returns number of errord commands
+	int execute_queued_commands() {
 
+		int errored_command_count = 0;
 		for (auto c : queued_commands) {
 	
 			if (!c->is_valid()) {
 				sys_print(Warning, "command not valid %s\n", c->to_string().c_str());
 				delete c;
+				errored_command_count++;
 				continue;
 			}
 			sys_print(Debug, "Executing: %s\n", c->to_string().c_str());
@@ -45,7 +47,7 @@ public:
 			}
 			catch (std::runtime_error er) {
 				sys_print(Error, "Executing command failed: %s\n", er.what());
-
+				errored_command_count++;
 				continue;
 			}
 			if (hist[index]) {
@@ -58,6 +60,8 @@ public:
 		}
 
 		queued_commands.clear();
+
+		return errored_command_count;
 	}
 
 	void add_command(Command* c) {

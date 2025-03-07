@@ -69,6 +69,14 @@ Entity* EntityPtr::get() const {
 	auto e = eng->get_object(handle);
 	return e ? e->cast_to<Entity>() : nullptr;
 }
+EntityPtr::EntityPtr(const Entity* e)
+{
+	if (e) {
+		handle = e->get_instance_id();
+	}
+	else
+		handle = 0;
+}
 
 PropertyInfo GetAtomValueWrapper<EntityPtr>::get() {
 	return make_entity_ptr_property("", 0, PROP_DEFAULT);

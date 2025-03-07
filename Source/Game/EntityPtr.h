@@ -4,6 +4,11 @@ class Entity;
 class EntityPtr
 {
 public:
+	EntityPtr() {}
+	explicit EntityPtr(const Entity* e);
+	explicit EntityPtr(uint64_t handle) : handle(handle) {}
+
+
 	bool is_valid() const { return get() != nullptr; }
 	Entity* get() const;
 	Entity& operator*() const {

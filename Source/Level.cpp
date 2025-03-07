@@ -250,14 +250,32 @@ void Level::close_level()
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
 {
 	auto& objs = scene.get_objects();
-	if (reassign_ids) {
-		ASSERT(0);
-	}
-	else {
-		for (auto& o : objs) {
-			ASSERT(o.second);
-			o.second->post_unserialization(get_next_id_and_increment());
-			all_world_ents.insert(o.second->get_instance_id(), o.second);
+	{
+		if(reassign_ids) {
+			for (auto& o : objs) {
+				ASSERT(o.second);
+				auto& path = o.first;
+				auto idfind = reassign_ids->path_to_instance_handle.find(path);
+				uint64_t id_to_use = 0;
+				if (idfind != reassign_ids->path_to_instance_handle.end()) {
+					id_to_use = idfind->second;
+				}
+				else
+					id_to_use = get_next_id_and_increment();
+				ASSERT(id_to_use != 0);
+				ASSERT(all_world_ents.find(id_to_use) == nullptr);
+
+				o.second->post_unserialization(id_to_use);
+				all_world_ents.insert(o.second->get_instance_id(), o.second);
+			}
+		}
+		else {
+			for (auto& o : objs) {
+				ASSERT(o.second);
+				o.second->post_unserialization(get_next_id_and_increment());
+				ASSERT(all_world_ents.find(o.second->get_instance_id()) == nullptr);
+				all_world_ents.insert(o.second->get_instance_id(), o.second);
+			}
 		}
 		scene.unserialize_post_assign_ids();
 
@@ -288,6 +306,7 @@ void Level::add_and_init_created_runtime_component(EntityComponent* c)
 {
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());
+	ASSERT(all_world_ents.find(c->get_instance_id()) == nullptr);
 	all_world_ents.insert(c->get_instance_id(), c);
 
 	c->initialize_internal_step1();

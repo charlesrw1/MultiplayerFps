@@ -771,6 +771,7 @@
     <ClCompile Include="Source\Framework\Jobs.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
     <ClCompile Include="Source\Game\BeatEmUp\BeatEmUp.cpp" />
+    <ClCompile Include="Source\LevelEditor\LETesting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

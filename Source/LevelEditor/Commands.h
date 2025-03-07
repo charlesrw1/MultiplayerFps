@@ -87,14 +87,14 @@ public:
 		return is_valid_flag;
 	}
 
-	void execute() {
+	void execute() final {
 		ASSERT(is_valid());
 		for (auto h : handles) {
 			h->destroy();
 		}
 		ed_doc.post_node_changes.invoke();
 	}
-	void undo() {
+	void undo() final {
 		ASSERT(is_valid());
 		auto restored = unserialize_entities_from_text(scene->text);
 		auto& extern_parents = scene->extern_parents;
@@ -102,7 +102,7 @@ public:
 			auto e = restored.get_objects().find(ep.child_path);
 			ASSERT(e->second->is_a<Entity>());
 			if (e != restored.get_objects().end()) {
-				EntityPtr parent = { ep.external_parent_handle };
+				EntityPtr parent(ep.external_parent_handle);
 				if (parent.get()) {
 					auto ent = (Entity*)e->second;
 					ent->parent_to(parent.get());
@@ -114,9 +114,10 @@ public:
 				sys_print(Warning, "restored obj doesnt exist\n");
 		}
 
-		eng->get_level()->insert_unserialized_entities_into_level(restored);
+		eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
 		auto& objs = restored.get_objects();
 
+		// refresh handles i guess ? fixme
 		handles.clear();
 		for (auto& o : objs) {
 			if (o.second->is_a<Entity>()) {
@@ -131,7 +132,7 @@ public:
 		}
 		ed_doc.post_node_changes.invoke();
 	}
-	std::string to_string() override {
+	std::string to_string() final {
 		return "Remove Entity";
 	}
 
@@ -145,8 +146,31 @@ public:
 
 	ParentToCommand(std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent) {
 		
+		if (delete_parent && ents.size() != 1) {
+			is_valid_flag = false;
+			return;
+		}
+		else if(delete_parent){
+			auto p = ents[0];
+			if (p) {
+				ents.clear();
+				for (auto e : p->get_children())
+					ents.push_back(e);
+
+				parent_to = p->get_parent();
+			}
+			else
+				is_valid_flag = false;
+		}
+
+
 		if (!parent_to) {
 			if (ed_doc.is_editing_prefab()) {
+				if (create_new_parent) {
+					is_valid_flag = false;
+					return;
+				}
+
 				parent_to = ed_doc.get_prefab_root_entity();
 				assert(parent_to);
 			}
@@ -170,8 +194,10 @@ public:
 		for (auto e : ents)
 			this->entities.push_back(e->get_self_ptr());
 		for (auto e : ents)
-			this->prev_parents.push_back(e->get_parent() ? e->get_parent()->get_self_ptr() : EntityPtr());
-		this->parent_to = parent_to ? parent_to->get_self_ptr() : EntityPtr();
+			this->prev_parents.push_back(EntityPtr(e->get_parent()));
+		this->parent_to = EntityPtr(parent_to);
+		parent_to_prev_parent = (parent_to) ? EntityPtr(parent_to->get_parent()) : EntityPtr();
+
 		ASSERT(!create_new_parent || !parent_to);	// if create_new_parent, parent_to is false
 		this->create_new_parent = create_new_parent;
 
@@ -183,11 +209,10 @@ public:
 			return true;
 		};
 
-		if (!delete_parent || (all_parents_equal() && !parent_to))	// if delete_parent, all_parents_equal==true
+		if (!delete_parent || (all_parents_equal()))	// if delete_parent, all_parents_equal==true
 			this->delete_the_parent = delete_parent;
 		else
 			is_valid_flag = false;
-
 	}
 	bool is_valid_flag = true;
 	bool is_valid() final {
@@ -233,15 +258,18 @@ public:
 			ASSERT(this->prev_parents[0].get());
 			if(!remove_the_parent_cmd)	// do this here because we want to serialize the parent when the child entities are removed
 				remove_the_parent_cmd = std::make_unique<RemoveEntitiesCommand>(std::vector<EntityPtr>{ this->prev_parents[0]->get_self_ptr() });
+			//ASSERT(remove_the_parent_cmd->handles.size() == 1);
 			if (!remove_the_parent_cmd->is_valid())
 				throw std::runtime_error("RemoveEntitiesCommand not valid in ParentToCommand");
 			remove_the_parent_cmd->execute();
+			ASSERT(remove_the_parent_cmd->handles.size() == 1);
 		}
 
 		ed_doc.post_node_changes.invoke();
 	}
 	void undo() final {
 		if (delete_the_parent) {
+			ASSERT(remove_the_parent_cmd->handles.size() == 1);
 			remove_the_parent_cmd->undo();
 			ASSERT(remove_the_parent_cmd->handles.size() == 1);
 			ASSERT(remove_the_parent_cmd->handles[0].get());
@@ -267,6 +295,12 @@ public:
 			ed_doc.selection_state->add_to_entity_selection(e);
 		}
 
+		if (parent_to_prev_parent) {
+			if(parent_to) {
+				parent_to->parent_to(parent_to_prev_parent.get());
+			}
+		}
+
 		if (create_new_parent) {
 			auto p = parent_to.get();
 			if (!p) {
@@ -285,6 +319,7 @@ public:
 	std::vector<EntityPtr> prev_parents;
 	std::vector<EntityPtr> entities;
 	EntityPtr parent_to;
+	EntityPtr parent_to_prev_parent;
 	bool create_new_parent = false;
 	bool delete_the_parent = false;
 
@@ -359,9 +394,9 @@ public:
 	~CreateStaticMeshCommand() override {
 	}
 
-	bool is_valid() override { return true; }
+	bool is_valid() final { return true; }
 
-	void execute() {
+	void execute() final {
 		auto ent = eng->get_level()->spawn_entity();
 		ent->create_component<MeshComponent>();
 		if (parent_to.get())
@@ -398,12 +433,12 @@ public:
 			}
 			});
 	}
-	void undo() {
+	void undo() final {
 		handle->destroy();
 		ed_doc.post_node_changes.invoke();
 		handle = {};
 	}
-	std::string to_string() override {
+	std::string to_string() final {
 		return "Create StaticMesh";
 	}
 	EntityPtr parent_to;
@@ -424,13 +459,13 @@ public:
 
 		if (ed_doc.is_editing_prefab()) {
 			auto root = ed_doc.get_prefab_root_entity();
-			if (root)
+			if (root && !this->parent_to)
 				this->parent_to = root->get_self_ptr();
 		}
 	}
-	bool is_valid() override { return ti != nullptr; }
+	bool is_valid() final { return ti != nullptr; }
 
-	void execute() {
+	void execute() final {
 		assert(ti);
 		Entity* ent{};
 		if (is_component_type){
@@ -448,12 +483,15 @@ public:
 		ed_doc.on_entity_created.invoke(handle);
 		ed_doc.post_node_changes.invoke();
 	}
-	void undo() {
-		eng->get_level()->destroy_entity(eng->get_entity(handle));
+	void undo() final {
+
+		auto ent = handle.get();
+		auto level = eng->get_level();
+		level->destroy_entity(ent);
 		ed_doc.post_node_changes.invoke();
 		handle = {};
 	}
-	std::string to_string() override {
+	std::string to_string() final {
 		return "Create Class";
 	}
 	const ClassTypeInfo* ti = nullptr;
@@ -472,7 +510,7 @@ public:
 			auto find = pre_transforms.find(pair);
 			if (find != pre_transforms.end()) {
 
-				EntityPtr e = { find->first };
+				EntityPtr e(find->first);
 				if (e.get()) {
 					pre_and_post pp;
 					pp.ptr = e;
@@ -535,7 +573,7 @@ public:
 			creator_source = me->creator_source->get_self_ptr();
 	}
 
-	bool is_valid() override {
+	bool is_valid() final {
 		return asset != nullptr;
 	}
 
@@ -568,14 +606,14 @@ public:
 		}
 	}
 
-	void execute() override {
+	void execute() final {
 		ASSERT(created_objs.size() == 0);
 		me->what_prefab = nullptr;
 		me->is_root_of_prefab = false;
 		me->creator_source = nullptr;
 		execute_R(me.get());
 	}
-	void undo() override {
+	void undo() final {
 		if (!me) {
 			sys_print(Warning, "couldnt undo instantiate prefab command\n");
 			return;
@@ -594,7 +632,7 @@ public:
 		created_objs.clear();
 
 	}
-	std::string to_string() override {
+	std::string to_string() final {
 		return "Instantiate Prefab";
 	}
 	struct created_obj {
@@ -614,6 +652,16 @@ public:
 
 		if (handles.empty())
 			is_valid_flag = false;
+		if (ed_doc.is_editing_prefab()) {
+			auto root = ed_doc.get_prefab_root_entity();
+			for (auto h : handles) {
+				if (h.get() == root) {
+					sys_print(Warning, "cant duplicate root in prefab mode\n");
+					is_valid_flag = false;
+					return;
+				}
+			}
+		}
 		if (!is_valid_flag)
 			return;
 
@@ -632,9 +680,9 @@ public:
 		auto& extern_parents = scene->extern_parents;
 		for (auto ep : extern_parents) {
 			auto e = duplicated.get_objects().find(ep.child_path);
-			ASSERT(e->second->is_a<Entity>());
 			if (e != duplicated.get_objects().end()) {
-				EntityPtr parent = { ep.external_parent_handle };
+				ASSERT(e->second->is_a<Entity>());
+				EntityPtr parent(ep.external_parent_handle);
 				if (parent.get()) {
 					auto ent = (Entity*)e->second;
 					ent->parent_to(parent.get());
@@ -651,7 +699,7 @@ public:
 			if(o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
 				o.second->unique_file_id = 0;
 
-		eng->get_level()->insert_unserialized_entities_into_level(duplicated);
+		eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
 
 
 		handles.clear();
@@ -694,7 +742,7 @@ public:
 		ASSERT(component_type->is_a(EntityComponent::StaticType));
 		info = component_type;
 	}
-	void execute() {
+	void execute() final {
 		ASSERT(comp_handle == 0);
 		auto e = ent.get();
 		if (!e) {
@@ -709,7 +757,7 @@ public:
 	}
 	virtual void post_create(EntityComponent* ec) {
 	}
-	void undo() {
+	void undo() final {
 		ASSERT(comp_handle != 0);
 		auto obj = eng->get_object(comp_handle);
 		ASSERT(obj->is_a<EntityComponent>());
@@ -765,7 +813,7 @@ public:
 		comp_handle = which->get_instance_id();
 		info = &which->get_type();
 	}
-	void execute() {
+	void execute() final {
 		ASSERT(comp_handle != 0);
 		auto obj = eng->get_object(comp_handle);
 		ASSERT(obj->is_a<EntityComponent>());
@@ -776,7 +824,7 @@ public:
 		ed_doc.on_component_deleted.invoke(id);
 		comp_handle = 0;
 	}
-	void undo() {
+	void undo() final {
 		ASSERT(comp_handle == 0);
 		auto e = ent.get();
 		if (!e) {
@@ -786,7 +834,7 @@ public:
 		auto ec = e->create_component_type(info);
 		comp_handle = ec->get_instance_id();
 	}
-	std::string to_string() override {
+	std::string to_string() final {
 		return "Remove Component";
 	}
 	EntityPtr ent;

@@ -264,14 +264,14 @@ public:
 
 	EntityPtr get_only_one_selected() const {
 		ASSERT(has_only_one_selected());
-		return { *selected_entity_handles.begin() };
+		return EntityPtr(*selected_entity_handles.begin());
 	}
 
 	const std::unordered_set<uint64_t>& get_selection() const { return selected_entity_handles; }
 	std::vector<EntityPtr> get_selection_as_vector() const {
 		std::vector<EntityPtr> out;
 		for (auto e : selected_entity_handles) {
-			out.push_back({ e });
+			out.push_back(EntityPtr(e));
 			ASSERT(eng->get_object(e)->is_a<Entity>());
 		}
 		return out;
@@ -314,7 +314,7 @@ public:
 		auto presize = selected_entity_handles.size();
 		for (auto it = selected_entity_handles.begin(); it != selected_entity_handles.end();)
 		{
-			EntityPtr ptr = { *it };
+			EntityPtr ptr(*it);
 			auto ent = ptr.get();
 			if (ent==nullptr) {
 				it = selected_entity_handles.erase(it);
@@ -500,7 +500,6 @@ public:
 		UNSELECT,
 		ADD_SELECT,
 	};
-
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
 
 	void on_mouse_down(int x, int y, int button);
@@ -612,7 +611,6 @@ public:
 	MulticastDelegate<> on_close;
 	MulticastDelegate<uint64_t> on_change_name;
 
-	// Inherited via IEditorTool
 
 	void validate_fileids_before_serialize();
 	uint32_t get_next_file_id() {

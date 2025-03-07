@@ -189,7 +189,17 @@ void validate_for_prefab_R(Entity* e, PrefabAsset* for_prefab)
 void validate_serialize_input(const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
 {
 	if (for_prefab) {
-		ASSERT(input_objs.size() == 1);
+
+		auto assert_one_root = [&]() {
+			bool root_found = false;
+			for (auto o : input_objs) {
+				ASSERT(o->get_parent() || !root_found);
+				if (o->get_parent()) 
+					root_found = true;
+			}
+		};
+		assert_one_root();
+
 		//ASSERT(input_objs[0]->what_prefab == for_prefab);
 		//ASSERT(input_objs[0]->creator_source == nullptr);
 		//ASSERT(input_objs[0]->is_root_of_prefab);
