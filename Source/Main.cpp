@@ -1278,14 +1278,12 @@ glm::ivec2 GameEngineLocal::get_game_viewport_size() const
 static bool scene_hovered = false;
 
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
-
 #include "Framework/MyImguiLib.h"
 void GameEngineLocal::draw_any_imgui_interfaces()
 {
 	CPUSCOPESTART(imgui_draw);
-
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({51, 51, 51 }));
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({35, 35, 35 }));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({ 51, 51, 51 }));
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({ 35, 35, 35 }));
 
 	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
@@ -1363,7 +1361,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	if(g_drawimguidemo.get_bool())
 		ImGui::ShowDemoWindow();
 
-	ImGui::PopStyleColor(2);
+	ImGui::PopStyleColor(2);//framebg
 }
 
 void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup)

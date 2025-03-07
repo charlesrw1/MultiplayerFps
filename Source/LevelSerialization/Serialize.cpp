@@ -49,6 +49,25 @@ bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab)
 {
 	return (b->creator_source == nullptr || (for_prefab && b->what_prefab == for_prefab) || am_i_the_root_prefab_node(b->creator_source,for_prefab));
 }
+bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab)
+{
+	if (b->dont_serialize_or_edit)
+		return false;
+	if (b->what_prefab && b->what_prefab != for_prefab && b->is_root_of_prefab && !b->get_prefab_editable()) {
+		return false;
+	}
+	return true;
+}
+bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab)
+{
+	if (b->dont_serialize_or_edit)
+		return false;
+	if (this_is_newly_created(b, for_prefab))
+		return true;
+	if (b->creator_source && !serialize_this_objects_children(b->creator_source, for_prefab))
+		return false;
+	return true;
+}
 
 std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab)
 {
@@ -76,11 +95,6 @@ std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for
 		auto parentpath = build_path_for_object(obj->creator_source, for_prefab);
 		if(obj->is_root_of_prefab)
 			return parentpath + "/" + std::to_string(obj->unique_file_id);	// prefab root, just file id
-		else if (!obj->what_prefab) { // native objects (creator_source!=null, what_prefab==null)
-
-			auto path = parentpath + "/";
-			return path + "~" + std::to_string(obj->unique_file_id);
-		}
 		else {	// prefab objects
 
 			auto path = parentpath + "/";
@@ -117,6 +131,9 @@ void serialize_new_object_text_R(
 		return;
 
 	auto serialize_new = [&](const BaseUpdater* b, bool dont_write_parent_for_this) {
+
+		ASSERT(this_is_a_serializeable_object(b, for_prefab));
+
 		out.write_item_start();
 
 		out.write_key_value("new", get_type_for_new_serialized_item(b,for_prefab));
@@ -149,14 +166,16 @@ void serialize_new_object_text_R(
 	if (this_is_newly_created(e, for_prefab))
 		serialize_new(e, dont_write_parent);
 
-	auto& all_comps = e->get_components();
-	for (auto c : all_comps) {
-		if (!c->dont_serialize_or_edit && this_is_newly_created(c, for_prefab))
-			serialize_new(c, false);
+	if (serialize_this_objects_children(e, for_prefab)) {
+		auto& all_comps = e->get_components();
+		for (auto c : all_comps) {
+			if (!c->dont_serialize_or_edit && this_is_newly_created(c, for_prefab))
+				serialize_new(c, false);
+		}
+		auto& children = e->get_children();
+		for (auto child : children)
+			serialize_new_object_text_R(child, out, false /* dont_write_parent=false*/, for_prefab, output);
 	}
-	auto& children = e->get_children();
-	for (auto child : children)
-		serialize_new_object_text_R(child, out, false /* dont_write_parent=false*/, for_prefab, output);
 }
 
 
@@ -176,15 +195,7 @@ static void write_just_props(ClassBase* e, const ClassBase* diff, DictWriter& ou
 	}
 }
 
-void validate_for_prefab_R(Entity* e, PrefabAsset* for_prefab)
-{
-	//if(!(e->what_prefab==for_prefab&&e->is_root_of_prefab&&e->creator_source==nullptr))
-	//	ASSERT(e->creator_source != nullptr || e->is_native_created);
-	//for(auto c : e->get_components())
-	//	ASSERT(c->creator_source != nullptr || c->is_native_created);
-	//for (auto c : e->get_children())
-	//	validate_for_prefab_R(c, for_prefab);
-}
+
 
 void validate_serialize_input(const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
 {
@@ -199,17 +210,14 @@ void validate_serialize_input(const std::vector<Entity*>& input_objs, PrefabAsse
 			}
 		};
 		assert_one_root();
-
-		//ASSERT(input_objs[0]->what_prefab == for_prefab);
-		//ASSERT(input_objs[0]->creator_source == nullptr);
-		//ASSERT(input_objs[0]->is_root_of_prefab);
-
-
-		validate_for_prefab_R(input_objs[0], for_prefab);
 	}
 	else {
 		for (auto o : input_objs) {
 			ASSERT(!o->what_prefab || o->is_root_of_prefab);
+
+			if (o->what_prefab && !o->is_root_of_prefab) {
+				ASSERT(o->creator_source);
+			}
 		}
 	}
 }
@@ -289,6 +297,10 @@ const ClassBase* find_diff_class(const BaseUpdater* obj, PrefabAsset* for_prefab
 void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFile& output, DictWriter& out, LevelSerializationContext* ctx)
 {
 	auto write_obj = [&](BaseUpdater* obj) {
+
+		ASSERT(this_is_a_serializeable_object(obj, for_prefab));
+
+
 		auto objpath = build_path_for_object(obj, for_prefab);
 		out.write_item_start();
 		out.write_key_value("override", objpath.c_str());
@@ -305,11 +317,13 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 
 	if (!e->dont_serialize_or_edit) {
 		write_obj(e);
-		for (auto comp : e->get_components())
-			if (!comp->dont_serialize_or_edit)
-				write_obj(comp);
-		for (auto o : e->get_children())
-			serialize_overrides_R(o, for_prefab, output, out, ctx);
+		if (serialize_this_objects_children(e,for_prefab)) {
+			for (auto comp : e->get_components())
+				if (!comp->dont_serialize_or_edit)
+					write_obj(comp);
+			for (auto o : e->get_children())
+				serialize_overrides_R(o, for_prefab, output, out, ctx);
+		}
 	}
 }
 
@@ -331,6 +345,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 
 	auto roots = root_objects_to_write(input_objs);
 
+	// last chance to crash out before writing a bad file
 	validate_serialize_input(roots, for_prefab);
 
 	for (auto obj : roots)

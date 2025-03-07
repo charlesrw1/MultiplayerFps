@@ -56,7 +56,7 @@ ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR
 
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
-
+extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
 class EditorUILayout : public GUIFullscreen
 {
 public:
@@ -119,6 +119,10 @@ public:
 		auto& all_objs = eng->get_level()->get_all_objects();
 		for (auto o : all_objs) {
 			if (Entity* e = o->cast_to<Entity>()) {
+				if (!this_is_a_serializeable_object(e, ed_doc.get_editing_prefab()))
+					continue;
+
+
 				obj ob;
 				glm::vec3 todir = glm::vec3(e->get_ws_position()) - ed_doc.vs_setup.origin;
 				float dist = glm::dot(todir, todir);
@@ -157,6 +161,13 @@ public:
 
 			const int icon_size = 16;
 			InlineVec<Texture*,6> icons;
+			auto e = o.e;
+			if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
+				const char* s = "eng/editor/prefab_p.png";
+				auto tex = g_assets.find_global_sync<Texture>(s);
+				icons.push_back(tex.get());
+			}
+
 			for (auto c : o.e->get_components()) {
 				if (c->dont_serialize_or_edit_this()) continue;
 				const char* s = c->get_editor_outliner_icon();
@@ -182,7 +193,7 @@ public:
 			coordy -= size.h / 2;
 
 			Color32 color = { 50,50,50,(uint8_t)editor_draw_name_text_alpha.get_integer() };
-			if (o.e->is_selected_in_editor())
+			if (o.e->get_selected_in_editor())
 				color = { 255,180,0,150 };
 
 			if (do_mouse_click) {
@@ -464,6 +475,7 @@ void EditorDoc::on_map_load_return(bool good)
 	else {
 		if (is_editing_prefab()) {
 
+			// marks the templated level objects as dont serialize or edit
 			auto level = eng->get_level();
 			auto& objs = level->get_all_objects();
 			for (auto o : objs)	{
@@ -1614,6 +1626,25 @@ void ObjectOutliner::IteratorDraw::draw()
 					ImGui::CloseCurrentPopup();
 				}
 
+
+				auto me = eng->get_entity(oo->contextMenuHandle);
+				if (me&&me->is_root_of_prefab&&me->what_prefab&&me->what_prefab!=ed_doc.get_editing_prefab()) {
+					ImGui::Separator();
+					if (me->get_prefab_editable()) {
+						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
+						if (ImGui::MenuItem("Make Prefab Not Editable")) {
+							ed_doc.command_mgr->add_command(new MakePrefabEditable(me, false));
+						}
+					}
+					else {
+						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 10,110,255,255 }));
+						if (ImGui::MenuItem("Make Prefab Editable")) {
+							ed_doc.command_mgr->add_command(new MakePrefabEditable(me, true));
+						}
+					}
+					ImGui::PopStyleColor(1);
+				}
+
 				ImGui::Separator();
 				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
 				if (ImGui::MenuItem("Dissolve As Parent")) {
@@ -1662,6 +1693,15 @@ void ObjectOutliner::IteratorDraw::draw()
 			name = e->get_type().classname;
 		}
 
+		if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
+			const char* s = "eng/editor/prefab_p.png";
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			if (tex) {
+				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+				ImGui::SameLine(0, 0);
+			}
+		}
+
 		for (auto c : e->get_components()) {
 			if (c->dont_serialize_or_edit_this()) continue;
 			const char* s = c->get_editor_outliner_icon();
@@ -1705,6 +1745,12 @@ void ObjectOutliner::IteratorDraw::draw()
 	ImGui::PopStyleColor(3);
 
 	ImGui::PopID();
+}
+
+extern bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab);
+bool ObjectOutliner::should_draw_children(Entity* e) const
+{
+	return serialize_this_objects_children(e, ed_doc.get_editing_prefab());
 }
 
 int ObjectOutliner::determine_object_count() const
@@ -1888,6 +1934,10 @@ void EdPropertyGrid::draw()
 		}
 		else if (!ss->has_only_one_selected()) {
 			ImGui::Text("Select 1 entity to see components\n");
+			selected_component = 0;
+		}
+		else if (!serialize_this_objects_children(ss->get_only_one_selected().get(), ed_doc.get_editing_prefab())) {
+			ImGui::Text("Prefab instance is not editable.\nMake it editable through the context menu.");
 			selected_component = 0;
 		}
 		else {
@@ -2313,7 +2363,7 @@ void EdPropertyGrid::refresh_grid()
 		
 		auto& comps = entity->get_components();
 
-		if (!comps.empty()) {
+		if (!comps.empty() && serialize_this_objects_children(entity.get(), ed_doc.get_editing_prefab())) {
 			if (selected_component == 0)
 				selected_component = comps[0]->get_instance_id();
 			if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<EntityComponent>() == nullptr ||

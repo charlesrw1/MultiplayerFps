@@ -3185,9 +3185,13 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 {
 	ASSERT(!eng->get_is_in_overlapped_period());
 	ROP_Internal& in = proxy_list.get(handle.id);
-	statics_meshes_are_dirty = true;
 	if (proxy.is_skybox)
 		in.is_static = false;
+
+	// mark dirty if model or material changed
+	if(in.is_static && (proxy.model!=in.proxy.model||proxy.mat_override!=in.proxy.mat_override))
+		statics_meshes_are_dirty = true;
+
 	in.prev_transform = in.proxy.transform;
 	in.prev_bone_ofs = in.proxy.animator_bone_ofs;
 	in.proxy = proxy;

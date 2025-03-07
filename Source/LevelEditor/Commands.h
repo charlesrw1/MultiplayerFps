@@ -63,6 +63,35 @@ static void validate_remove_entities(std::vector<EntityPtr>& input)
 			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
 	}
 }
+class MakePrefabEditable : public Command
+{
+public:
+	MakePrefabEditable(Entity* me, bool editable) {
+		is_valid_flag = me && me->is_root_of_prefab && me->what_prefab && me->what_prefab != ed_doc.get_editing_prefab();
+		if (!is_valid_flag) return;
+		ptr = me->get_self_ptr();
+		value = editable;
+	}
+	void execute() final {
+		if (ptr) {
+			ptr->set_prefab_editable(value);
+			ed_doc.post_node_changes.invoke();
+		}
+	}
+	void undo() final {
+		if (ptr) {
+			ptr->set_prefab_editable(!value);
+			ed_doc.post_node_changes.invoke();
+		}
+	}
+	std::string to_string() final {
+		return "MakePrefabEditable";
+	}
+	bool is_valid_flag = true;
+	EntityPtr ptr;
+	bool value = false;
+	bool is_valid() final { return is_valid_flag; }
+};
 
 class RemoveEntitiesCommand : public Command
 {
@@ -608,10 +637,14 @@ public:
 
 	void execute() final {
 		ASSERT(created_objs.size() == 0);
+		ASSERT(me->what_prefab);
 		me->what_prefab = nullptr;
+		ASSERT(me->is_root_of_prefab);
 		me->is_root_of_prefab = false;
 		me->creator_source = nullptr;
 		execute_R(me.get());
+
+		ed_doc.post_node_changes.invoke();
 	}
 	void undo() final {
 		if (!me) {
@@ -620,7 +653,7 @@ public:
 		}
 
 		me->what_prefab = asset;
-		me->is_root_of_prefab = false;
+		me->is_root_of_prefab = true;
 		me->creator_source = creator_source.get();
 		for (auto c : created_objs) {
 			auto obj = eng->get_level()->get_entity(c.eng_handle);
@@ -631,6 +664,7 @@ public:
 		}
 		created_objs.clear();
 
+		ed_doc.post_node_changes.invoke();
 	}
 	std::string to_string() final {
 		return "Instantiate Prefab";

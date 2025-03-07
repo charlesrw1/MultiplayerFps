@@ -49,6 +49,8 @@ public:
 	void draw();
 	void init();
 private:
+	bool should_draw_children(Entity* e) const;
+
 	void on_selection_change();
 	int determine_object_count() const;
 	void rebuild_tree() {
@@ -95,13 +97,15 @@ private:
 		Node(ObjectOutliner* oo, Entity* initfrom) {
 			handle = initfrom->get_instance_id();
 			auto& children = initfrom->get_children();
-			for (auto& c : children) {
-				if (!c->dont_serialize_or_edit) {
-					Node* other = new Node(oo, c);
-					add_child(other);
+			if (oo->should_draw_children(initfrom)) {
+				for (auto& c : children) {
+					if (!c->dont_serialize_or_edit) {
+						Node* other = new Node(oo, c);
+						add_child(other);
+					}
 				}
+				sort_children();
 			}
-			sort_children();
 			oo->map.insert({ handle, this });
 		}
 
@@ -527,22 +531,26 @@ public:
 		EDIT_PREFAB,
 	};
 
-	bool is_this_object_not_inherited(const BaseUpdater* b) {
+	bool is_this_object_not_inherited(const BaseUpdater* b) const {
 		if (edit_category == EditCategory::EDIT_SCENE) 
 			return this_is_newly_created(b,nullptr);
 		else {
-			//ASSERT(editing_prefab);
 			return this_is_newly_created(b, editing_prefab);
 		}
 	}
-	bool can_delete_this_object(const BaseUpdater* b) {
-		if (!is_this_object_not_inherited(b)) return false;
+	bool is_this_object_inherited(const BaseUpdater* b) const {
+		return !is_this_object_not_inherited(b);
+	}
+
+	bool can_delete_this_object(const BaseUpdater* b) const {
+		if (is_this_object_inherited(b)) // cant delete inherited objects
+			return false;
 		if (edit_category == EditCategory::EDIT_PREFAB) {
 			auto ent = b->cast_to<Entity>();
 			if (ent && !ent->get_parent())
-				return false;
+				return false;	// cant delete the root of the current prefab
 		}
-		return true;
+		return true;	// else can delete
 	}
 
 	bool is_in_eyedropper_mode() const {

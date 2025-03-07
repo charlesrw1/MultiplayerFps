@@ -96,6 +96,13 @@ void Entity::set_hidden_in_editor(bool b)
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->sync_render_data();
 }
+bool Entity::get_is_any_selected_in_editor() const {
+	if (get_selected_in_editor())
+		return true;
+	if (!get_parent())
+		return false;
+	return get_parent()->get_is_any_selected_in_editor();
+}
 #endif
 
 

@@ -130,7 +130,10 @@ public:
 	virtual void editor_on_change_properties() {}
 
 #ifdef EDITOR_BUILD
-	bool is_selected_in_editor() const {
+	// returns wether this or any parent is selected
+	bool get_is_any_selected_in_editor() const;
+	// returns wether just this is selected
+	bool get_selected_in_editor() const {
 		return selected_in_editor;
 	}
 #endif
@@ -207,6 +210,13 @@ public:
 		return hidden_in_editor;
 	}
 	void set_hidden_in_editor(bool b);
+
+	bool get_prefab_editable() const {
+		return prefab_editable;
+	}
+	void set_prefab_editable(bool b) {
+		prefab_editable = b;
+	}
 #endif
 private:
 	static void set_active_R(Entity* e, bool b, bool step1);
