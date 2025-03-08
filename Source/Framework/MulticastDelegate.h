@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <unordered_map>
 
 template<typename... Args>
 class MulticastDelegate
@@ -30,11 +29,16 @@ public:
 		Item* ptr = head;
 		while (ptr) {
 			if (key == ptr->key) {
-				if (prev)
-					prev->next = ptr->next;
-				else
-					head = ptr->next;
-				delete ptr;
+				if(ptr->in_func) {
+					ptr->wants_delete = true;
+				}
+				else {
+					if (prev)
+						prev->next = ptr->next;
+					else
+						head = ptr->next;
+					delete ptr;
+				}
 				return;
 			}
 			prev = ptr;
@@ -43,25 +47,35 @@ public:
 		printf("no matching key\n");
 	}
 	void invoke(Args... args) {
+		Item* prev = nullptr;
 		Item* ptr = head;
 		while (ptr)
 		{
+			ptr->in_func = true;
 			ptr->func(args...);
-			ptr = ptr->next;
+			Item* next = ptr->next;
+			if (ptr->wants_delete) {
+				if (prev)
+					prev->next = next;
+				else
+					head = next;
+				delete ptr;
+			}
+			else {
+				ptr->in_func = false;
+				prev = ptr;
+			}
+			ptr = next;
 		}
 	}
 	template<typename T>
-	void add(T* instance, void (T::* memberFunction)(Args...), bool callOnce = false)
+	void add(T* instance, void (T::* memberFunction)(Args...))
 	{
 		add(instance, [instance, memberFunction](Args... args) {
 			(instance->*memberFunction)(args...);
 			});
 	}
-	template<typename T>
-	void add_call_once(T* instance, void (T::* memberFunction)(Args...))
-	{
-		add<T>(instance, memberFunction, true);
-	}
+
 	bool has_any_listeners() const {
 		return !head;
 	}
@@ -70,6 +84,8 @@ private:
 		void* key = nullptr;
 		std::function<void(Args...)> func;
 		Item* next = nullptr;
+		bool in_func = false;
+		bool wants_delete = false;
 	};
 	Item* find(Item* start, void* key) {
 		Item* i = start;

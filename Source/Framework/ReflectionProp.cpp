@@ -193,7 +193,7 @@ void write_unique_ptr(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassB
 	write_object_properties(*(ClassBase**)ptr, userptr, out);
 }
 
-void write_list(PropertyInfo* prop, void* ptr, DictWriter& out, ClassBase* userptr);
+void write_list(PropertyInfo* prop, void* ptr, const void* diff_ptr, DictWriter& out, ClassBase* userptr);
 std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, DictWriter& out, ClassBase* userptr) {
 	std::string value_str;
 
@@ -256,10 +256,18 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 
 	case core_type_id::List: {
 
+		const void* diff = (diff_ptr) ? prop.get_ptr(diff_ptr) : nullptr;
+
+		if (diff) {
+			int diffsize = prop.list_ptr->get_size((void*)diff);
+			int mysize = prop.list_ptr->get_size(prop.get_ptr(ptr));
+			if (diffsize == 0 && mysize == 0)
+				return { {},false };	// skip
+		}
+
 		if(write_name)
 			out.write_key(prop.name);
-
-		write_list(&prop, prop.get_ptr(ptr), out, userptr);
+		write_list(&prop, prop.get_ptr(ptr), diff, out, userptr);
 
 		return std::pair<std::string,bool>{ {},false };
 	}break;
@@ -344,7 +352,7 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 }
 
 
-void write_list(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* userptr)
+void write_list(PropertyInfo* listprop, void* ptr, const void* diff_ptr, DictWriter& out, ClassBase* userptr)
 {
 	out.write_list_start();
 

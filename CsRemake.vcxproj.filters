@@ -517,6 +517,7 @@
     <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
+    <ClInclude Include="Source\Misc\PropTween.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

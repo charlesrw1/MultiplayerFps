@@ -82,6 +82,7 @@
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\LevelEditor\LEPlugin.h" />
     <ClInclude Include="Source\LevelEditor\TileMapPlugin.h" />
+    <ClInclude Include="Source\Misc\PropTween.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />

@@ -44,19 +44,20 @@ public:
 			sys_print(Debug, "Executing: %s\n", c->to_string().c_str());
 			try {
 				c->execute();
+
+				if (hist[index]) {
+					delete hist[index];
+				}
+				hist[index] = c;
+				index += 1;
+				index %= HIST_SIZE;
+				eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
 			}
 			catch (std::runtime_error er) {
 				sys_print(Error, "Executing command failed: %s\n", er.what());
 				errored_command_count++;
-				continue;
+				delete c;
 			}
-			if (hist[index]) {
-				delete hist[index];
-			}
-			hist[index] = c;
-			index += 1;
-			index %= HIST_SIZE;
-			eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
 		}
 
 		queued_commands.clear();

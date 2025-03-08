@@ -462,6 +462,8 @@ void EditorDoc::validate_prefab()
 
 void EditorDoc::on_map_load_return(bool good)
 {
+	eng->get_on_map_delegate().remove(this);	// mark the delegate to be removed
+
 	if (!get_is_open()||!eng->get_level()) {
 		sys_print(Warning, "on_map_load_return but level editor not open\n");
 		return;
@@ -553,7 +555,6 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 
 void EditorDoc::close_internal()
 {
-	eng->get_on_map_delegate().remove(this);
 
 	// level will get unloaded in the main loop
 
