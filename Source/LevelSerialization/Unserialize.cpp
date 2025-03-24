@@ -231,8 +231,8 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 		try {
 			unserialize_one_item_text(tok, in, scene, rootpath, prefab, root_entity, found_new_root);
 		}
-		catch (std::runtime_error er) {
-			sys_print(Warning, "caught parsing error: %s\n", er.what());
+		catch (std::exception er) {
+			sys_print(Warning, "caught parsing error on line %d: %s\n", in.get_last_line(), er.what());
 			parse_skip_object(in,tok);
 		}
 

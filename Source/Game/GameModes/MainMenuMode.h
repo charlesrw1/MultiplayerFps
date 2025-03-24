@@ -17,7 +17,7 @@
 #include "Framework/MulticastDelegate.h"
 
 #include "Assets/AssetDatabase.h"
-
+#if 0
 class GameTransitionUI
 {
 public:
@@ -162,3 +162,4 @@ public:
 
 	MainMenuUILayout* ui = nullptr;
 };
+#endif

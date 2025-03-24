@@ -242,32 +242,33 @@ void Entity::parent_to(Entity* other)
 		}
 	}
 
+	// this sets our parent to nullptr
 	if (get_parent())
 		get_parent()->remove_this(this);
-	
-	if (!other)
-		return;
-
 	ASSERT(parent == nullptr);
-
-	// check if 'other' has 'this' as a parent (circular) 
-	auto check_circular = [&]() -> bool {
-		Entity* check = other;
-		int loop_count = 0;
-		while (check) {
-			if (check == this)
-				return false;
-			check = check->get_parent();
-			loop_count++;
-			ASSERT(loop_count < 100);
+	
+	
+	if (other) {
+		// check if 'other' has 'this' as a parent (circular) 
+		auto check_circular = [&]() -> bool {
+			Entity* check = other;
+			int loop_count = 0;
+			while (check) {
+				if (check == this)
+					return false;
+				check = check->get_parent();
+				loop_count++;
+				ASSERT(loop_count < 100);
+			};
+			return true;
 		};
-		return true;
-	};
-	ASSERT(check_circular());
+		ASSERT(check_circular());
 
+		other->children.push_back(this);
+		parent = other;
+	}
 
-	other->children.push_back(this);
-	parent = other;
+	invalidate_transform(nullptr);
 }
 
 
@@ -295,6 +296,48 @@ void Entity::remove_this_component_internal(EntityComponent* component_to_remove
 	ASSERT(!"unreachable");
 }
 
+void Entity::move_child_entity_index(Entity* who, int move_to)
+{
+	if (move_to < 0 || move_to >= children.size()) {
+		sys_print(Warning, "move_child_entity_index out of range\n");
+		return;
+	}
+	const int my_index = get_child_entity_index(who);
+	if (my_index == -1) {
+		sys_print(Warning, "move_child_entity_index child doesnt exist\n");
+		return;
+	}
+	int actual_move_to = move_to;
+	if (move_to > my_index)
+		actual_move_to += 1;
+
+	ASSERT(move_to <= children.size()); // allowed to == size
+
+	children.insert(children.begin() + actual_move_to, who);
+	int where_to_remove = (actual_move_to <= my_index) ? my_index + 1 : my_index;
+	children.erase(children.begin() + where_to_remove);
+
+	assert(get_child_entity_index(who) == move_to);
+}
+int Entity::get_child_entity_index(Entity* who) const
+{
+	auto only_once_in_children = [&]()->bool {
+		int c = 0;
+		for (int i = 0; i < children.size(); i++) {
+			if (children[i] == who)
+				c++;
+		}
+		return c <= 1;
+	};
+	assert(only_once_in_children());
+
+	for (int i = 0; i < children.size(); i++) {
+		if (children[i] == who)
+			return i;
+	}
+	return -1;
+}
+
 Entity::~Entity()
 {
 	ASSERT(init_state != initialization_state::CALLED_START&&init_state!=initialization_state::CALLED_PRE_START);
@@ -305,11 +348,13 @@ EntityComponent* Entity::create_component_type(const ClassTypeInfo* info)
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
-	if (!info->is_a(EntityComponent::StaticType)) {
-		sys_print(Error, "create_and_attach_component_type not subclass of entity component\n");
+	if (!info->is_a(EntityComponent::StaticType)||!info->allocate) {
+		sys_print(Error, "create_and_attach_component_type not subclass of entity component or isnt createable\n");
 		return nullptr;
 	}
 	EntityComponent* ec = (EntityComponent*)info->allocate();
+	ASSERT(ec);
+
 	ec->entity_owner = this;
 	all_components.push_back(ec);
 	eng->get_level()->add_and_init_created_runtime_component(ec);
@@ -331,6 +376,7 @@ Entity* Entity::create_child_entity()
 
 void Entity::add_component_from_unserialization(EntityComponent* component)
 {
+	ASSERT(component);
 	ASSERT(init_state == initialization_state::CONSTRUCTOR);
 	ASSERT(component->init_state == initialization_state::CONSTRUCTOR);
 	component->entity_owner = this;

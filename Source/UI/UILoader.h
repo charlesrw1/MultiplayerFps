@@ -51,5 +51,6 @@ public:
 	AssetPtr<MaterialInstance> fontDefaultMat;
 	AssetPtr<GuiFont> defaultFont{};
 };
+// just for default fonts, they could go elsewhere
 extern GuiFontLoader g_fonts;
 

@@ -148,6 +148,7 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint32_t fla
 
 PropertyInfo make_enum_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const EnumTypeInfo* enumtype, const char* hint)
 {
+	ASSERT(enumtype->name);
 	PropertyInfo prop(name, offset, flags);
 	prop.range_hint = hint;
 	if (bytes == 1)

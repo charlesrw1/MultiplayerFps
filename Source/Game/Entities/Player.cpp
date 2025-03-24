@@ -462,7 +462,7 @@ void ViewmodelComponent::update()
 //			client update
 #endif
 
-
+#if 0
 class PlayerHUD : public GUIFullscreen
 {
 public:
@@ -612,6 +612,7 @@ public:
 
 	Player* p = nullptr;
 };
+#endif
 
 CLASS_H(HealthComponent, EntityComponent)
 public:
@@ -858,7 +859,6 @@ void Player::on_foot_update()
 	 ccontroller->capsule_radius = player_capsule->radius;
 
 
-	 hud = std::make_unique<PlayerHUD>(this);
 	 score_update_delegate.invoke(10);
 
 	 {

@@ -42,11 +42,10 @@ AnimationGraphEditor anim_graph_ed;
 IEditorTool* g_anim_ed_graph = &anim_graph_ed;
 
 
-class AG_GuiLayout : public GUIFullscreen
-{
+CLASS_H(AG_GuiLayout, gui::Fullscreen)
 public:
 	void on_pressed(int x, int y, int button) override {
-		eng->get_gui()->set_focus_to_this(this);
+		set_focus();
 		mouse_down_delegate.invoke(x, y, button);
 	}
 	void on_released(int x, int y, int button) override {
@@ -68,6 +67,7 @@ public:
 	MulticastDelegate<int, int, int> mouse_up_delegate;
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 };
+CLASS_IMPL(AG_GuiLayout);
 
 
 ImVec4 scriptparamtype_to_color(anim_graph_value type)
@@ -169,6 +169,7 @@ void AnimationGraphEditor::close_internal()
 		editing_tree.reset();
 	}
 
+	gui = nullptr;
 	reset_prop_editor_next_tick = false;
 	playback = graph_playback_state::stopped;
 	sel = selection_state();
@@ -181,8 +182,6 @@ void AnimationGraphEditor::close_internal()
 	node_props->clear_all();
 
 	ImNodes::EditorContextFree(default_editor);
-
-	gui->unlink_and_release_from_parent();
 }
 
 static std::string saved_settings = "";
@@ -1502,11 +1501,11 @@ void ControlParamsWindow::imgui_draw()
 
 
 			ImGui::TableNextColumn();
-			const EnumIntPair* eip = EnumTrait<anim_graph_value>::StaticType.find_for_value((int)res.type);
+			const EnumIntPair* eip = EnumTrait<anim_graph_value>::StaticEnumType.find_for_value((int)res.type);
 			if (!eip) {
 				printf("Warning: anim_graph_value_t bad\n");
 				res.type = anim_graph_value::bool_t;
-				eip = EnumTrait<anim_graph_value>::StaticType.find_for_value((int)res.type);
+				eip = EnumTrait<anim_graph_value>::StaticEnumType.find_for_value((int)res.type);
 				ASSERT(eip);
 			}
 			ImGui::TextColored(scriptparamtype_to_color(res.type), eip->name);
@@ -1672,8 +1671,12 @@ void AnimationGraphEditor::post_map_load_callback()
 
 	on_open_new_doc.invoke();
 
-	eng->get_gui()->add_gui_panel_to_root(gui.get());
-	eng->get_gui()->set_focus_to_this(gui.get());
+	gui = eng->get_level()->spawn_entity()->create_component<AG_GuiLayout>();
+	gui->set_focus();
+	gui->key_down_delegate.add(clipboard.get(), &AnimGraphClipboard::on_key_down);
+	gui->wheel_delegate.add(this, &AnimationGraphEditor::on_wheel);
+	gui->key_down_delegate.add(this, &AnimationGraphEditor::on_key_down);
+
 
 	// focused, stuff can start being rendered
 	playback = graph_playback_state::stopped;
@@ -1705,7 +1708,6 @@ void GraphOutput::show(bool is_playing)
 
 AnimGraphClipboard::AnimGraphClipboard()
 {
-	anim_graph_ed.gui->key_down_delegate.add(this, &AnimGraphClipboard::on_key_down);
 	anim_graph_ed.on_close.add(this, &AnimGraphClipboard::on_close);
 }
 void AnimGraphClipboard::on_close() {
@@ -1844,10 +1846,6 @@ DECLARE_ENGINE_CMD(animed_play_slot)
 	//anim_graph_ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
 }
 AnimationGraphEditor::AnimationGraphEditor() {
-	gui = std::make_unique<AG_GuiLayout>();
-
-	gui->wheel_delegate.add(this, &AnimationGraphEditor::on_wheel);
-	gui->key_down_delegate.add(this, &AnimationGraphEditor::on_key_down);
 
 
 	control_params = std::make_unique<ControlParamsWindow>();

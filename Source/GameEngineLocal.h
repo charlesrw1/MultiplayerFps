@@ -37,72 +37,78 @@ public:
 	GameEngineLocal();
 
 	// Public Interface
-	virtual GameMode* get_gamemode() const override {
+	GameMode* get_gamemode() const final {
 		return nullptr;
 	}
-	virtual Level* get_level() const override {
+	Level* get_level() const final {
 		return level.get();
 	}
-	virtual Entity* get_entity(uint64_t handle) {
+	Entity* get_entity(uint64_t handle) final {
 		ASSERT(get_level());
 		auto o = level->get_entity(handle);
 		return o ? o->cast_to<Entity>() : nullptr;
 	}
-	virtual BaseUpdater* get_object(uint64_t handle) {
+	BaseUpdater* get_object(uint64_t handle) final {
 		ASSERT(get_level());
 		return level->get_entity(handle);
 	}
-	virtual Entity* get_local_player() override {
+	Entity* get_local_player() final {
 		ASSERT(get_level());
 		return nullptr;
 	}
-	virtual Entity* get_player_slot(uint32_t index) override {
+	Entity* get_player_slot(uint32_t index) final {
 		// fixme:
 		if (index == 0) return get_local_player();
 		else return nullptr;
 	}
-	virtual uint32_t get_local_player_slot() override {
+	uint32_t get_local_player_slot() final {
 		return 0;
 	}
-	virtual GuiSystemPublic* get_gui() const override {
-		return gui_sys.get();
-	}
-	virtual Client* get_client() override {
+	Client* get_client() final {
 		return nullptr;// cl.get();
 	}
-	virtual Server* get_server() override {
+	Server* get_server() final {
 		return nullptr;// sv.get();
 	}
-	virtual SDL_Window* get_os_window() override {
+	SDL_Window* get_os_window() final {
 		return window;
 	}
-	virtual IEditorTool* get_current_tool() const override {
+	IEditorTool* get_current_tool() const final {
 		return active_tool;
 	}
-	virtual const OsInput* get_input_state() override {
+	const OsInput* get_input_state() final {
 		return &inp;
 	}
-	virtual ImGuiContext* get_imgui_context() const {
+	ImGuiContext* get_imgui_context() const final {
 		return imgui_context;
 	}
 
-	virtual void log_to_fullscreen_gui(LogType type, const char* msg) override;
+	void log_to_fullscreen_gui(LogType type, const char* msg) final;
 
-	virtual void login_new_player(uint32_t index) override;
-	virtual void logout_player(uint32_t index) override;
+	void login_new_player(uint32_t index) final;
+	void logout_player(uint32_t index) final;
 
-	virtual void leave_level() override;
-	virtual void open_level(string levelname) override;
-	virtual void connect_to(string address) override;
+	void leave_level() final;
+	void open_level(string levelname) final;
+	void connect_to(string address) final;
 
-	virtual bool is_editor_level() const {
+	bool is_editor_level() const  final {
 		/* this passes when you are in the loading phase or past the loading phase */
 		/* added is_loading... to work with constructors before level gets set */
 		return is_loading_editor_level || (get_level() && get_level()->is_editor_level());
 	}
 
-	glm::ivec2 get_game_viewport_size() const override;	// either full window or sub window
+	glm::ivec2 get_game_viewport_size() const final;	// either full window or sub window
+	Engine_State get_state() const final { return state; }
+	MulticastDelegate<bool>& get_on_map_delegate() final {
+		return on_map_load_return;
+	}
+	bool is_game_focused() const final { return game_focused; }
+	void set_game_focused(bool focus) final;
+	bool is_host() const final { return true; }
 
+// local functions
+public:
 	void init(int argc, char** argv);
 	void cleanup();
 
@@ -117,7 +123,6 @@ public:
 	bool is_in_game() const {
 		return state == Engine_State::Game;
 	}
-	virtual Engine_State get_state() const override { return state; }
 
 #ifdef EDITOR_BUILD
 	bool is_in_an_editor_state() const { return get_current_tool() != nullptr; }
@@ -134,9 +139,6 @@ public:
 
 	// Host functions
 
-	MulticastDelegate<bool>& get_on_map_delegate() override {
-		return on_map_load_return;
-	}
 	MulticastDelegate<bool> on_map_load_return;
 public:
 
@@ -144,11 +146,9 @@ public:
 
 	bool map_spawned() { return level != nullptr; }
 
-	std::unique_ptr<GuiSystemPublic> gui_sys;
 	//std::unique_ptr<Client> cl;
 	//std::unique_ptr<Server> sv;
 
-	GUIFullscreen* engine_fullscreen_gui{};
 	OnScreenLogGui* gui_log{};
 
 	OsInput inp;
@@ -165,8 +165,6 @@ public:
 	bool show_console = false;
 	bool dedicated_server = false;
 	
-	bool is_game_focused() const override { return game_focused; }
-	void set_game_focused(bool focus) override;
 
 	bool is_drawing_to_window_viewport() const;
 
@@ -175,7 +173,6 @@ public:
 	int argc = 0;
 	char** argv = nullptr;
 
-	bool is_host() const override { return true; }
 
 #ifdef EDITOR_BUILD
 	// stores state changes to enable forwards/backwards when editing

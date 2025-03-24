@@ -3,7 +3,7 @@
 
 #define REG_INT(name, flags, hint) make_integer_property(#name,offsetof(TYPE_FROM_START, name), flags, sizeof(TYPE_FROM_START::name), hint)
 #define REG_FLOAT(name, flags, hint) make_float_property(#name,offsetof(TYPE_FROM_START, name), flags, hint)
-#define REG_ENUM(name, flags, hint, enum_id) make_enum_property(#name,offsetof(TYPE_FROM_START, name), flags,sizeof(TYPE_FROM_START::name), &EnumTrait<enum_id>::StaticType,hint)
+#define REG_ENUM(name, flags, hint, enum_id) make_enum_property(#name,offsetof(TYPE_FROM_START, name), flags,sizeof(TYPE_FROM_START::name), &::EnumTrait<enum_id>::StaticEnumType, hint)
 #define REG_BOOL(name, flags, hint) make_bool_property(#name,offsetof(TYPE_FROM_START, name), flags, hint)
 #define REG_STDSTRING(name, flags) make_string_property(#name,offsetof(TYPE_FROM_START, name), flags)
 #define REG_VEC3(name,flags) make_vec3_property(#name,offsetof(TYPE_FROM_START, name), flags)

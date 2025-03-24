@@ -428,8 +428,6 @@
     <ClInclude Include="Source\Framework\PropHashTable.h" />
     <ClInclude Include="Source\Framework\SerializerFunctions.h" />
     <ClInclude Include="Source\UI\UILoader.h" />
-    <ClInclude Include="Source\UI\GUIPublic.h" />
-    <ClInclude Include="Source\UI\GUILocal.h" />
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Visuals.h" />
@@ -518,6 +516,10 @@
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Misc\PropTween.h" />
+    <ClInclude Include="Source\Game\CarGame\CarGui.h" />
+    <ClInclude Include="Source\UI\GUISystemLocal.h" />
+    <ClInclude Include="Source\UI\BaseGUI.h" />
+    <ClInclude Include="Source\UI\UIBuilder.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -719,7 +721,6 @@
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
-    <ClCompile Include="Source\UI\GUILocal.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
@@ -773,6 +774,10 @@
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
     <ClCompile Include="Source\Game\BeatEmUp\BeatEmUp.cpp" />
     <ClCompile Include="Source\LevelEditor\LETesting.cpp" />
+    <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
+    <ClCompile Include="Source\UI\BaseGUI.cpp" />
+    <ClCompile Include="Source\UI\UIBuilder.cpp" />
+    <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

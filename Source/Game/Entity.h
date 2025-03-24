@@ -118,6 +118,9 @@ public:
 	REFLECT();
 	void parent_to(Entity* parentEntity);
 
+	void move_child_entity_index(Entity* who, int move_to);
+	int get_child_entity_index(Entity* who) const;
+
 	const std::vector<EntityComponent*>& get_components() const { return all_components; }
 
 	const std::vector<Entity*>& get_children() const { return children; }

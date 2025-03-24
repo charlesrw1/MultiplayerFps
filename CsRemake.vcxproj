@@ -27,6 +27,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
+    <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClInclude Include="Source\Animation\AnimationTreePublic.h" />
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
@@ -69,6 +71,7 @@
     <ClInclude Include="Source\Game\AssetPtrMacro.h" />
     <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
     <ClInclude Include="Source\Game\CarGame\CarGame.h" />
+    <ClInclude Include="Source\Game\CarGame\CarGui.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
@@ -231,9 +234,10 @@
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Types.h" />
-    <ClInclude Include="Source\UI\GUILocal.h" />
-    <ClInclude Include="Source\UI\GUIPublic.h" />
+    <ClInclude Include="Source\UI\GUISystemLocal.h" />
+    <ClInclude Include="Source\UI\BaseGUI.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
+    <ClInclude Include="Source\UI\UIBuilder.h" />
     <ClInclude Include="Source\UI\UILoader.h" />
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
@@ -360,7 +364,8 @@
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />
     <ClCompile Include="Source\Test\Test.cpp" />
-    <ClCompile Include="Source\UI\GUILocal.cpp" />
+    <ClCompile Include="Source\UI\BaseGUI.cpp" />
+    <ClCompile Include="Source\UI\UIBuilder.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
   </ItemGroup>
   <ItemGroup>

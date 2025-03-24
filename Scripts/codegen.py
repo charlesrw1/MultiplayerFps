@@ -143,7 +143,9 @@ def write_class(newclass : ClassDef):
             output += "\treturn nullptr;\n"
         output += "}\n\n"
     elif newclass.object_type == ENUM_OBJECT:
-        output += f"static EnumIntPair enumstrs{newclass.classname}[] = " + "{\n"
+        nameWithoutColons = newclass.classname.replace("::","")
+
+        output += f"static EnumIntPair enumstrs{nameWithoutColons}[] = " + "{\n"
         for p in newclass.properties:
             name = f'"{p.name}"'
             displayname = f'"{p.nameoverride}"'
@@ -151,7 +153,7 @@ def write_class(newclass : ClassDef):
             output += f"\tEnumIntPair({name},{displayname},(int64_t){full_name}),\n"
         output = output[:-2]+"\n};\n"
 
-        output += f"EnumTypeInfo EnumTrait<{newclass.classname}>::StaticType = EnumTypeInfo(\"{newclass.classname}\",enumstrs{newclass.classname},{len(newclass.properties)});\n\n"
+        output += f"EnumTypeInfo EnumTrait<{newclass.classname}>::StaticEnumType = EnumTypeInfo(\"{newclass.classname}\",enumstrs{nameWithoutColons},{len(newclass.properties)});\n\n"
     return output
 
 def parse_reflect_macro(line : str):
@@ -396,11 +398,19 @@ def parse_file(root, file_name):
 
 skip_dirs = ["./.generated","./External"]
 
+def should_skip_this(path : str):
+    path = path.replace("\\","/")
+    for d in skip_dirs:
+        if path.startswith(d):
+            return True
+    return False
+
 def read_enum_and_struct_values():
     start_time = time.perf_counter()
     for root, dirs, files in os.walk("."):
-        if root.replace("\\","/") in skip_dirs:
+        if should_skip_this(root):
             continue
+
 
         for file_name in files:
             if os.path.splitext(file_name)[-1] != ".h":
@@ -447,8 +457,9 @@ def do_codegen(path):
     source_files_to_build = []
 
     for root, dirs, files in os.walk(path):
-        if root.replace("\\","/") in skip_dirs:
+        if should_skip_this(root):
             continue
+        print(root)
 
         for file_name in files:
             if os.path.splitext(file_name)[-1] != ".h":

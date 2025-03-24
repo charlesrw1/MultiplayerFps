@@ -767,6 +767,67 @@ public:
 	std::vector<EntityPtr> handles;
 };
 
+class MovePositionInHierarchy : public Command
+{
+public:
+	enum class Cmd {
+		Next,
+		Prev,
+		First,
+		Last
+	};
+
+	MovePositionInHierarchy(Entity* e, Cmd cmd) {
+		if (!e) return;
+		const auto parent = e->get_parent();
+		if (!parent) return;
+		from_position = parent->get_child_entity_index(e);
+		if (from_position == -1)
+			return;
+		auto& children = parent->get_children();
+		const int last_idx = children.size() - 1;
+		switch (cmd) {
+		case Cmd::Next:
+			to_position = std::min((from_position + 1), last_idx);
+			break;
+		case Cmd::Prev:
+			to_position = std::max((from_position - 1), 0);
+			break;
+		case Cmd::Last:
+			to_position = last_idx;
+			break;
+		case Cmd::First:
+			to_position = 0;
+			break;
+		}
+
+
+		entPtr = e->get_self_ptr();
+	}
+	bool is_valid() final {
+		return entPtr;
+	}
+	void execute() final {
+		auto e = entPtr.get();
+		if (!e || !e->get_parent()) return;
+		e->get_parent()->move_child_entity_index(e, to_position);
+
+		ed_doc.post_node_changes.invoke();
+	}
+	void undo() final {
+		auto e = entPtr.get();
+		if (!e || !e->get_parent()) return;
+		e->get_parent()->move_child_entity_index(e, from_position);
+
+		ed_doc.post_node_changes.invoke();
+	}
+	std::string to_string() final {
+		return "MovePositionInHeirarchy";
+	}
+	int to_position = 0;
+	int from_position = 0;
+	EntityPtr entPtr{};
+};
 
 class CreateComponentCommand : public Command
 {

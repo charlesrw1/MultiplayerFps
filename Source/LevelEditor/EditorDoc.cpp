@@ -47,6 +47,8 @@
 #include "Game/EntityComponent.h"
 #include "LEPlugin.h"
 
+#include "UI/UIBuilder.h"
+
 EditorDoc ed_doc;
 IEditorTool* g_editor_doc = &ed_doc;
 
@@ -57,26 +59,29 @@ ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
 extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
-class EditorUILayout : public GUIFullscreen
-{
+
+CLASS_H(EditorUILayout, gui::Fullscreen)
 public:
 	EditorUILayout() {
 		
-		tool_text = new GUIText;
+	}
+	void start() final {
+
+		gui::BaseGUI::start();
+
+		tool_text = get_owner()->create_child_entity()->create_component<gui::Text>();
 		tool_text->hidden = true;
-		add_this(tool_text);
-		tool_text->anchor = UIAnchorPos::create_single(0.5, 0.5);
+		tool_text->anchor = gui::UIAnchorPos::create_single(0.5, 0.5);
 	}
 
 	void on_pressed(int x, int y, int button) override {
-		eng->get_gui()->set_focus_to_this(this);
-
-
+		set_focus();
+		ASSERT(mouse_down_delegate.get_head());
 
 		mouse_clicked = true;
 		button_clicked = button;
 		//if(!editor_draw_name_text.get_bool())
-			mouse_down_delegate.invoke(x, y, button);
+		mouse_down_delegate.invoke(x, y, button);
 	}
 	void on_released(int x, int y, int button) override {
 
@@ -244,8 +249,9 @@ public:
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 
 
-	GUIText* tool_text = nullptr;
+	gui::Text* tool_text = nullptr;
 };
+CLASS_IMPL(EditorUILayout);
 
 
 
@@ -413,7 +419,9 @@ Entity* EditorDoc::get_prefab_root_entity()
 	gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
 	gui->tool_text->color = { 255,128,128 };
 	gui->tool_text->use_desired_size = true;
-	gui->tool_text->pivot_ofs = { 0.5,0.5 };
+	gui->tool_text->pivot_x = 0.5;
+	gui->tool_text->pivot_y = 0.5;
+
 }
   void EditorDoc::exit_eyedropper_mode() {
 	 if (is_in_eyedropper_mode()) {
@@ -475,6 +483,20 @@ void EditorDoc::on_map_load_return(bool good)
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
 	else {
+		assert(!gui);
+		gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
+		printf("%lld\n", (uint64_t)&gui->mouse_down_delegate);
+		gui->set_owner_dont_serialize_or_edit(true);
+		gui->set_focus();
+		gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
+		gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
+		ASSERT(gui->mouse_down_delegate.get_head());
+		gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
+		gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
+		gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
+		ASSERT(gui->mouse_down_delegate.get_head());
+
+
 		if (is_editing_prefab()) {
 
 			// marks the templated level objects as dont serialize or edit
@@ -500,6 +522,7 @@ void EditorDoc::on_map_load_return(bool good)
 		}
 
 		validate_fileids_before_serialize();
+
 
 		on_start.invoke();
 	}
@@ -545,9 +568,6 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 	}
 	eng->get_on_map_delegate().add(this, &EditorDoc::on_map_load_return);
 
-	assert(!gui->parent);
-	eng->get_gui()->add_gui_panel_to_root(gui.get());
-	eng->get_gui()->set_focus_to_this(gui.get());
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
 
 	return true;
@@ -564,7 +584,7 @@ void EditorDoc::close_internal()
 	
 	on_close.invoke();
 
-	gui->unlink_and_release_from_parent();
+	gui = nullptr;
 
 	// close the level document, its already been saved at this point
 	eng->leave_level();
@@ -1024,7 +1044,7 @@ ManipulateTransformTool::ManipulateTransformTool()
 	// refresh cached data
 	ed_doc.prop_editor->on_property_change.add(this, &ManipulateTransformTool::on_prop_change);
 
-	ed_doc.gui->key_down_delegate.add(this, &ManipulateTransformTool::on_key_down);
+
 }
 
 void ManipulateTransformTool::on_close() {
@@ -1034,6 +1054,7 @@ void ManipulateTransformTool::on_close() {
 void ManipulateTransformTool::on_open() {
 	state = IDLE;
 	world_space_of_selected.clear();
+	ed_doc.gui->key_down_delegate.add(this, &ManipulateTransformTool::on_key_down);
 }
 void ManipulateTransformTool::on_component_deleted(EntityComponent* ec) {
 	stop_using_custom();
@@ -1409,10 +1430,19 @@ void EditorDoc::hook_scene_viewport_draw()
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(EntityComponent::StaticType)) {
+				EntityPtr parent_to;
+				{
+					const ClassTypeInfo* type = ClassBase::find_class(resource->filename.c_str());
+					if (type && type->is_a(gui::BaseGUI::StaticType)) {
+						drop_transform = glm::mat4(1.f);
+						if (selection_state->has_only_one_selected())
+							parent_to = selection_state->get_only_one_selected();
+					}
+				}
 				command_mgr->add_command(new CreateCppClassCommand(
 					resource->filename,
 					drop_transform,
-					EntityPtr(), true)
+					parent_to, true)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
@@ -1484,7 +1514,6 @@ ObjectOutliner::ObjectOutliner()
 	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
 	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
 	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
-	ed_doc.on_change_name.add(this, &ObjectOutliner::on_change_name);
 	ed_doc.selection_state->on_selection_changed.add(this, &ObjectOutliner::on_selection_change);
 
 }
@@ -1530,34 +1559,38 @@ void ObjectOutliner::IteratorDraw::draw()
 	ImGui::Dummy(ImVec2(depth * 10.f, 0));
 	ImGui::SameLine();
 	auto n = node;
-
+	Entity* node_entity = n->ptr.get();
+	const bool is_root_node = node_entity == nullptr;
 	ImGui::PushID(n);
 	{
-		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(EntityPtr(n->handle));
+		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(n->ptr);
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-			if (n->handle != 0) {
+			if (node_entity) {
 				if (ImGui::GetIO().KeyShift)
-					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, eng->get_entity(n->handle), false);
+					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, node_entity, false);
 				else
-					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, eng->get_entity(n->handle), false);
+					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, node_entity, false);
 			}
 			else
 				ed_doc.selection_state->clear_all_selected();
 		}
 
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && n->handle != 0) {
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && node_entity) {
 			ImGui::OpenPopup("outliner_ctx_menu");
-			ed_doc.selection_state->add_to_entity_selection(EntityPtr(n->handle));
-			oo->contextMenuHandle = n->handle;
+			ed_doc.selection_state->add_to_entity_selection(n->ptr);
+			oo->contextMenuHandle = n->ptr;
+			ASSERT(n->ptr.get() == node_entity);
 		}
 		if (ImGui::BeginPopup("outliner_ctx_menu")) {
 
-			if (eng->get_entity(oo->contextMenuHandle) == nullptr) {
-				oo->contextMenuHandle = 0;
+			if (oo->contextMenuHandle.get() == nullptr) {
+				oo->contextMenuHandle = EntityPtr(nullptr);
 				ImGui::CloseCurrentPopup();
 			}
 			else {
+
+				Entity* const context_menu_entity = oo->contextMenuHandle.get();
 
 				auto parent_to_shared = [&](Entity* me, bool create_new_parent) {
 					auto& ents = ed_doc.selection_state->get_selection();
@@ -1569,7 +1602,7 @@ void ObjectOutliner::IteratorDraw::draw()
 					}
 					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me, create_new_parent, false));
 
-					oo->contextMenuHandle = 0;
+					oo->contextMenuHandle = EntityPtr(nullptr);
 				};
 				auto remove_parent_of_selection = [&](bool delete_parent) {
 
@@ -1582,12 +1615,11 @@ void ObjectOutliner::IteratorDraw::draw()
 
 					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, nullptr, false, delete_parent));
 
-					oo->contextMenuHandle = 0;
+					oo->contextMenuHandle = EntityPtr(nullptr);
 				};
 
 				if (ImGui::MenuItem("Parent To This")) {
-					auto me = eng->get_entity(oo->contextMenuHandle);
-					parent_to_shared(me, false);
+					parent_to_shared(context_menu_entity, false);
 					ImGui::CloseCurrentPopup();
 				}
 
@@ -1603,44 +1635,71 @@ void ObjectOutliner::IteratorDraw::draw()
 
 				ImGui::Separator();
 				if (ImGui::MenuItem("Add sibling entity")) {
-					auto me = eng->get_entity(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", me->get_ws_transform(), EntityPtr(me->get_parent()), false));
-					oo->contextMenuHandle = 0;
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", context_menu_entity->get_ws_transform(), EntityPtr(context_menu_entity->get_parent()), false));
+					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::MenuItem("Add child entity")) {
-					auto me = eng->get_entity(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), me->get_self_ptr(), false));
-					oo->contextMenuHandle = 0;
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), context_menu_entity->get_self_ptr(), false));
+					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();
 				}
+
+				if (context_menu_entity->get_parent()) {
+					ImGui::Separator();
+
+					bool make_cmd = false;
+					MovePositionInHierarchy::Cmd c{};
+					if (ImGui::MenuItem("Move next")) {
+						make_cmd = true;
+						c = MovePositionInHierarchy::Cmd::Next;
+					}
+					if (ImGui::MenuItem("Move prev")) {
+						make_cmd = true;
+						c = MovePositionInHierarchy::Cmd::Prev;
+					}
+					if (ImGui::MenuItem("Move first")) {
+						make_cmd = true;
+						c = MovePositionInHierarchy::Cmd::First;
+					}
+					if (ImGui::MenuItem("Move last")) {
+						make_cmd = true;
+						c = MovePositionInHierarchy::Cmd::Last;
+					}
+
+					if (make_cmd) {
+						ed_doc.command_mgr->add_command(new MovePositionInHierarchy(context_menu_entity, c));
+						ImGui::CloseCurrentPopup();
+					}
+				}
+
 				ImGui::Separator();
 				if (ImGui::MenuItem("Instantiate prefab")) {
-					auto me = eng->get_entity(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(me));
-					oo->contextMenuHandle = 0;
+					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(context_menu_entity));
+					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::MenuItem("Save branch as prefab")) {
-					auto me = eng->get_entity(oo->contextMenuHandle);
-					save_off_branch_as_scene(me);
+					save_off_branch_as_scene(context_menu_entity);
 					ImGui::CloseCurrentPopup();
 				}
 
+				auto is_prefab_instance_root = [](const Entity* e) -> bool {
+					return e && e->is_root_of_prefab && e->what_prefab && e->what_prefab != ed_doc.get_editing_prefab();
+				};
 
-				auto me = eng->get_entity(oo->contextMenuHandle);
-				if (me&&me->is_root_of_prefab&&me->what_prefab&&me->what_prefab!=ed_doc.get_editing_prefab()) {
+				if (is_prefab_instance_root(context_menu_entity)) {
 					ImGui::Separator();
-					if (me->get_prefab_editable()) {
+					if (context_menu_entity->get_prefab_editable()) {
 						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
 						if (ImGui::MenuItem("Make Prefab Not Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(me, false));
+							ed_doc.command_mgr->add_command(new MakePrefabEditable(context_menu_entity, false));
 						}
 					}
 					else {
 						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 10,110,255,255 }));
 						if (ImGui::MenuItem("Make Prefab Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(me, true));
+							ed_doc.command_mgr->add_command(new MakePrefabEditable(context_menu_entity, true));
 						}
 					}
 					ImGui::PopStyleColor(1);
@@ -1649,19 +1708,18 @@ void ObjectOutliner::IteratorDraw::draw()
 				ImGui::Separator();
 				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
 				if (ImGui::MenuItem("Dissolve As Parent")) {
-					EntityPtr ptr(oo->contextMenuHandle);
-					auto& children = ptr->get_children();
+					ASSERT(context_menu_entity);
+					auto& children = context_menu_entity->get_children();
 					
 					if(!children.empty())
 						remove_parent_of_selection(true);
 					else
-						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ ptr }));
+						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ n->ptr }));
 
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::MenuItem("Delete")) {
-					EntityPtr ptr(oo->contextMenuHandle);
-					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ ptr }));
+					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ n->ptr }));
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::PopStyleColor(1);
@@ -1674,11 +1732,12 @@ void ObjectOutliner::IteratorDraw::draw()
 
 	ImGui::SameLine();
 
-	if (n->handle == 0) {
+	if (!node_entity) {
 		ImGui::Text(ed_doc.get_name().c_str());
 	}
 	else {
-		auto e = eng->get_entity(n->handle);
+		const Entity* const e = node_entity;
+
 		const char* name = (e->get_editor_name().c_str());
 		if (!*name) {
 			if (e->is_root_of_prefab && e->what_prefab)
@@ -1724,23 +1783,26 @@ void ObjectOutliner::IteratorDraw::draw()
 
 	ImGui::TableNextColumn();
 
-	auto e = eng->get_entity(n->handle);
 	ImGui::PushStyleColor(ImGuiCol_Button, 0);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_imvec4({ 245, 242, 242, 55 }));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
-	if (e) {
-		auto img = (e->get_hidden_in_editor()) ? oo->hidden : oo->visible;
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-		if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
-			e->set_hidden_in_editor(!e->get_hidden_in_editor());
+	{
+		Entity* const e = node_entity;
+
+		if (e) {
+			auto img = (e->get_hidden_in_editor()) ? oo->hidden : oo->visible;
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
+			if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
+				e->set_hidden_in_editor(!e->get_hidden_in_editor());
+			}
 		}
-	}
-	else {
-		auto img = oo->hidden;
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-		if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16),ImVec2(),ImVec2(),-1,ImVec4(),ImVec4(0,0,0,0))) {
-			
+		else {
+			auto img = oo->hidden;
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
+			if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16), ImVec2(), ImVec2(), -1, ImVec4(), ImVec4(0, 0, 0, 0))) {
+
+			}
 		}
 	}
 	ImGui::PopStyleColor(3);
@@ -1756,7 +1818,7 @@ bool ObjectOutliner::should_draw_children(Entity* e) const
 
 int ObjectOutliner::determine_object_count() const
 {
-	return map.size() + 1 /*root node*/;
+	return num_nodes + 1 /*root node*/;
 }
 void ObjectOutliner::draw()
 {
@@ -1772,8 +1834,8 @@ void ObjectOutliner::draw()
 		int current_iter_n = 0;
 		do {
 			assert(iter.get_node());
-			auto handle = iter.get_node()->handle;
-			if (handle != 0 && handle == setScrollHere.handle) {
+			auto the_ptr = iter.get_node()->ptr;
+			if (the_ptr.handle!=0 && the_ptr == setScrollHere) {
 				break;
 			}
 			current_iter_n++;
@@ -2434,16 +2496,8 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 
 
 EditorDoc::EditorDoc() {
-	gui = std::make_unique<EditorUILayout>();
-
-	gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
-	gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
-	gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
-
-	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
 
 	command_mgr = std::make_unique<UndoRedoSystem>();
-	gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
 
 	selection_state = std::make_unique<SelectionState>();
 	prop_editor = std::make_unique<EdPropertyGrid>();

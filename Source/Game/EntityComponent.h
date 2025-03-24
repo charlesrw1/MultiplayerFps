@@ -46,6 +46,8 @@ public:
 	void sync_render_data();
 
 
+	void set_owner_dont_serialize_or_edit(bool b);
+
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
 #endif

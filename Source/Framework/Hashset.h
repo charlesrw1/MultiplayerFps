@@ -7,7 +7,9 @@ class hash_set;
 template<typename T>
 struct hash_set_iterator
 {
-    hash_set_iterator(hash_set<T>* p, uint64_t i);
+    using ActualType = typename std::remove_cv<T>::type;
+
+    hash_set_iterator(const hash_set<ActualType>* p, uint64_t i);
     hash_set_iterator(uint64_t i) : index(i) {}
 
     bool operator!=(const hash_set_iterator& other) {
@@ -23,7 +25,7 @@ struct hash_set_iterator
     void advance();
 
     uint64_t index = 0;
-    hash_set<T>* parent = nullptr;
+    const hash_set<ActualType>* parent = nullptr;
 };
 
 extern const uint64_t HASHSET_TOMBSTONE;
@@ -37,10 +39,17 @@ public:
         return hash_set_iterator<T>(this, 0);
     }
     hash_set_iterator<T> end() {
-        return hash_set_iterator<T>(items.size());
+        return  hash_set_iterator<T>(items.size());
     }
+    hash_set_iterator<const T> begin() const {
+        return hash_set_iterator<const T>(this, 0);
+    }
+    hash_set_iterator<const T> end() const {
+        return  hash_set_iterator<const T>(items.size());
+    }
+   
 
-    hash_set(uint32_t starting_power_of_2) {
+    hash_set(uint32_t starting_power_of_2 = 3) {
         const uint64_t SIZE = 1ull << starting_power_of_2;
         items.clear();
         items.resize(SIZE);
@@ -50,7 +59,7 @@ public:
     }
 
     void init(uint32_t starting_power_of_2 = 10) {
-        const uint64_t SIZE = 1 << starting_power_of_2;
+        const uint64_t SIZE = 1ull << starting_power_of_2;
         items.clear();
         items.resize(SIZE);
         mask = SIZE - 1;
@@ -172,7 +181,7 @@ inline T* hash_set_iterator<T>::operator*() {
 
 
 template<typename T>
-inline hash_set_iterator<T>::hash_set_iterator(hash_set<T>* parent, uint64_t i) {
+inline hash_set_iterator<T>::hash_set_iterator(const hash_set<ActualType>* parent, uint64_t i) {
     this->parent = parent;
     index = i;
     advance();

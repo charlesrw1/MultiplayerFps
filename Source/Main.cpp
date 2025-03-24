@@ -274,6 +274,9 @@ double TimeSinceStart()
 
 void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
 {
+	if (!gui_log)
+		return;
+
 	const Color32 err = { 255, 105, 105 };
 	const Color32 warn = { 252, 224, 121 };
 	const Color32 info = COLOR_WHITE;
@@ -1007,6 +1010,16 @@ void GameEngineLocal::leave_level()
 	state = Engine_State::Idle;
 }
 
+static void init_log_gui()
+{
+	ASSERT(eng_local.get_level());
+	auto f = eng->get_level()->spawn_entity()->create_component<gui::Fullscreen>();
+	f->recieve_events = false;
+	f->set_owner_dont_serialize_or_edit(true);
+	eng_local.gui_log = f->get_owner()->create_child_entity()->create_component<OnScreenLogGui>();
+	eng_local.gui_log->set_owner_dont_serialize_or_edit(true);
+
+}
 
 void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
 {
@@ -1041,6 +1054,8 @@ void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset
 	sys_print(Info, "changed state to Engine_State::Game\n");
 
 	state = Engine_State::Game;
+
+	init_log_gui();
 
 	on_map_load_return.invoke(true);
 }
@@ -1180,7 +1195,7 @@ void GameEngineLocal::cleanup()
 	}
 
 
-	gui_sys.reset(nullptr);
+	//gui_sys.reset(nullptr);
 }
 
 
@@ -1335,8 +1350,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			window_viewport_size = { size.x,size.y };
 
 			// save off where the viewport is the GUI for mouse events
-			get_gui()->set_viewport_size(size.x, size.y);
-			get_gui()->set_viewport_ofs(pos.x + winpos.x, pos.y + winpos.y);
+			g_guiSystem->set_viewport_size(size.x, size.y);
+			g_guiSystem->set_viewport_ofs(pos.x + winpos.x, pos.y + winpos.y);
 
 			bool focused_window = scene_hovered;
 			next_focus = focused_window && ImGui::GetIO().MouseDown[1];
@@ -1354,8 +1369,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 #endif
 	{
 		// normal game path, scene view was already drawn the the window framebuffer
-		get_gui()->set_viewport_size(g_window_w.get_integer(), g_window_h.get_integer());
-		get_gui()->set_viewport_ofs(0,0);
+		g_guiSystem->set_viewport_size(g_window_w.get_integer(), g_window_h.get_integer());
+		g_guiSystem->set_viewport_ofs(0,0);
 	}
 
 	if(g_drawimguidemo.get_bool())
@@ -1528,6 +1543,99 @@ void GameEngineLocal::init_sdl_window()
 	SDL_GL_SetSwapInterval(0);
 }
 
+struct MdContextBase
+{
+public:
+	template<typename T>
+	T get_key_as() const {
+		return T(uint64_t(key));
+	}
+	void* get_key() const {
+		return key;
+	}
+	uint64_t get_key_as_int() const {
+		return uint64_t(key);
+	}
+protected:
+	void* key = nullptr;
+};
+
+template<typename ...Args>
+struct MDContext : public MdContextBase
+{
+public:
+	void remove_me() const {
+		the_delegate->remove(get_key());
+	}
+private:
+	MulticastDelegate<Args...>* the_delegate = nullptr;
+};
+
+
+Entity* entity_from_mdcontext(MdContextBase& ctx)
+{
+	return EntityPtr(ctx.get_key_as_int()).get();
+}
+
+template<typename T>
+struct ObjPtr
+{
+	ObjPtr() {}
+	explicit ObjPtr(T* ptr) {
+		if (ptr)
+			handle = ptr->get_instance_id();
+		else
+			handle = 0;
+	}
+
+	bool is_valid() const { return get() != nullptr; }
+	T* get() const {
+		auto obj = eng_local.get_object(handle);
+		if (obj&&obj->is_a<T>())
+			return (T*)obj;
+		return nullptr;
+	}
+	T& operator*() const {
+		return *get();
+	}
+	operator bool() const {
+		return is_valid();
+	}
+	operator T* () const {
+		return get();
+	}
+	T* operator->() const {
+		return get();
+	}
+
+	bool operator==(const EntityPtr& other) {
+		return handle == other.handle;
+	}
+
+	bool operator!=(const EntityPtr& other) {
+		return handle != other.handle;
+	}
+
+
+	uint64_t handle = 0;
+};
+
+using EntPtr = ObjPtr<Entity>;
+using ConstEntPtr = ObjPtr<const Entity>;
+
+void f() {
+	Entity* e{};
+	auto mesh = e->get_cached_mesh_component();
+
+	ConstEntPtr entPtr(e);
+	const Entity* theEnt = entPtr;
+
+	ObjPtr<const MeshComponent> ptr(mesh);
+	const MeshComponent* theMesh = ptr;
+	if (theMesh) {
+
+	}
+}
 
 extern void register_input_actions_for_game();
 void GameEngineLocal::init(int argc, char** argv)
@@ -1574,7 +1682,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	idraw->init();
 	imaterials->init();
 	g_fonts.init();
-	gui_sys.reset(GuiSystemPublic::create_gui_system());
+	g_guiSystem->init();
 	isound->init();
 	g_modelMgr.init();
 	g_gameAnimationMgr.init();
@@ -1591,11 +1699,11 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	ImGui::GetIO().Fonts->Build();
 
-	engine_fullscreen_gui = new GUIFullscreen();
-	gui_log = new OnScreenLogGui();
-	engine_fullscreen_gui->add_this(gui_log);
-	engine_fullscreen_gui->recieve_events = false;
-	gui_sys->add_gui_panel_to_root(engine_fullscreen_gui);
+	//engine_fullscreen_gui = new GUIFullscreen();
+	//gui_log = new OnScreenLogGui();
+	//engine_fullscreen_gui->add_this(gui_log);
+	//engine_fullscreen_gui->recieve_events = false;
+	//gui_sys->add_gui_panel_to_root(engine_fullscreen_gui);
 
 	Cmd_Manager::get()->set_set_unknown_variables(true);
 	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
@@ -1717,8 +1825,10 @@ void GameEngineLocal::stop_game()
 
 	idraw->on_level_end();
 
+	gui_log = nullptr;
 	level->close_level();
 	level.reset();
+
 
 	// clear any debug shapes
 	DebugShapeCtx::get().fixed_update_start();
@@ -1764,7 +1874,7 @@ void game_update_job(uintptr_t user)
 	ParticleMgr::get().draw(out->vsOut);
 
 	// paint the UI
-	eng_local.get_gui()->paint();
+	g_guiSystem->paint();
 }
 
 // seperate function so tester can access it
@@ -1845,11 +1955,11 @@ void GameEngineLocal::loop()
 				if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
 					continue;
 			}
-			get_gui()->handle_event(event);
+			g_guiSystem->handle_event(event);
 		}
-		get_gui()->post_handle_events();
+		g_guiSystem->post_handle_events();
 
-		get_gui()->think();
+		g_guiSystem->think();
 
 		Cmd_Manager::get()->execute_buffer();
 
@@ -1919,7 +2029,7 @@ void GameEngineLocal::loop()
 		if (get_level())
 			get_level()->sync_level_render_data();
 
-		gui_sys->sync_to_renderer();
+		g_guiSystem->sync_to_renderer();
 
 		g_physics.sync_render_data();
 		

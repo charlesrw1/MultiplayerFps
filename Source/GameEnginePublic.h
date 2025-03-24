@@ -66,7 +66,6 @@ public:
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;
 	virtual bool is_editor_level() const = 0;
-	virtual GuiSystemPublic* get_gui() const = 0;
 
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
 

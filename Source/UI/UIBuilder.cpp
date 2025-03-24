@@ -1,4 +1,6 @@
-#include "GUILocal.h"
+#include "UI/UIBuilder.h"
+#include "GUISystemLocal.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Widgets/Layouts.h"
@@ -11,14 +13,7 @@
 #include "Render/MaterialPublic.h"
 
 // include
-CLASS_IMPL(GUI);
-CLASS_IMPL(GuiRootPanel);
-CLASS_IMPL(GUIBox);
-CLASS_IMPL(GUIFullscreen);
-CLASS_IMPL(GUIButton);
-CLASS_IMPL(GUIText);
-CLASS_IMPL(GUIVerticalBox);
-CLASS_IMPL(OnScreenLogGui);
+
 
 ConfigVar ui_debug_press("ui.debug_press", "0", CVAR_BOOL | CVAR_DEV,"");
 ConfigVar ui_draw_text_bbox("ui.draw_text_bbox", "0", CVAR_BOOL | CVAR_DEV,"");
@@ -28,10 +23,10 @@ UIBuilder::UIBuilder(GuiSystemLocal* s)
 	sys = s;
 	impl = &s->uiBuilderImpl;
 	impl->meshbuilder.Begin();
-	float x = sys->root->ws_position.x;
-	float x1 = x + sys->root->ws_size.x;
-	float y1 = sys->root->ws_position.y;
-	float y = y1 + sys->root->ws_size.y;
+	float x = sys->viewport_position.x;
+	float x1 = x + sys->viewport_size.x;
+	float y1 = sys->viewport_position.y;
+	float y = y1 + sys->viewport_size.y;
 	impl->ViewProj = glm::orthoRH(x, x1, y, y1, -1.0f, 1.0f);
 }
 UIBuilder::~UIBuilder()
@@ -85,14 +80,14 @@ void UIBuilder::draw_text(
 	glm::ivec2 global_coords,
 	glm::ivec2 size,	// box for text
 	const GuiFont* font,
-	StringView text, Color32 color /* and alpha*/)
+	std::string_view text, Color32 color /* and alpha*/)
 {
 	const int start = impl->meshbuilder.get_i().size();
 
 	int x = global_coords.x;
 	int y = global_coords.y - font->base;
-	for(int i=0;i<text.str_len;i++) {
-		char c = text.str_start[i];
+	for(int i=0;i<text.length();i++) {
+		char c = text.at(i);
 
 		auto find = font->character_to_glyph.find(c);
 		if (find == font->character_to_glyph.end()) {
@@ -117,17 +112,6 @@ void UIBuilder::draw_text(
 
 
 	impl->add_drawcall(mat, start,font->font_texture);
-}
-
-GuiSystemPublic* GuiSystemPublic::create_gui_system() {
-	return new GuiSystemLocal;
-}
-
-
-GUI::~GUI()
-{
-	if(eng->get_gui())
-		eng->get_gui()->remove_reference(this);
 }
 
 Rect2d GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)

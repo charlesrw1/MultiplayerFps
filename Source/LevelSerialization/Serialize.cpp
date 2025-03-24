@@ -131,7 +131,6 @@ void serialize_new_object_text_R(
 		return;
 
 	auto serialize_new = [&](const BaseUpdater* b, bool dont_write_parent_for_this) {
-
 		ASSERT(this_is_a_serializeable_object(b, for_prefab));
 
 		out.write_item_start();
@@ -234,7 +233,15 @@ void validate_serialize_input(const std::vector<Entity*>& input_objs, PrefabAsse
 
 void add_to_write_set_R(Entity* o, std::unordered_set<Entity*>& to_write)
 {
-	if (o->dont_serialize_or_edit)
+	auto dont_serialize_or_edit_me = [](auto&& self, Entity* e) -> bool {
+		if (e->dont_serialize_or_edit)
+			return true;
+		if (e->get_parent())
+			return self(self, e->get_parent());
+		return false;
+	};
+
+	if (dont_serialize_or_edit_me(dont_serialize_or_edit_me,o))
 		return;
 	to_write.insert(o);
 	for (auto c : o->get_children())
@@ -347,6 +354,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 
 	// last chance to crash out before writing a bad file
 	validate_serialize_input(roots, for_prefab);
+
 
 	for (auto obj : roots)
 	{

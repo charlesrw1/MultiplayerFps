@@ -57,8 +57,8 @@ struct EnumTrait;
 #define NEWENUM(type, inttype) \
 	enum class type : inttype; \
 	template<> \
-	struct EnumTrait<type> {\
-		static EnumTypeInfo StaticType;\
+	struct ::EnumTrait<type> {\
+		static ::EnumTypeInfo StaticEnumType;\
 	}; \
 	enum class type : inttype
 

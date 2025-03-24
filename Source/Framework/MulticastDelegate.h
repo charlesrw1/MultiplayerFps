@@ -79,7 +79,6 @@ public:
 	bool has_any_listeners() const {
 		return !head;
 	}
-private:
 	struct Item {
 		void* key = nullptr;
 		std::function<void(Args...)> func;
@@ -87,6 +86,10 @@ private:
 		bool in_func = false;
 		bool wants_delete = false;
 	};
+	const Item* get_head() const {
+		return head;
+	}
+private:
 	Item* find(Item* start, void* key) {
 		Item* i = start;
 		while (i) {

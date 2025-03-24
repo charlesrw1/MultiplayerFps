@@ -434,13 +434,13 @@ void CurveEditorImgui::draw_editor_space()
         }
         else {
             auto& points = curves.at(selected_curve_or_event).points;
-            auto enum_ =  EnumTrait<CurvePointType>::StaticType.find_for_value((int)points.at(dragged_point_index).type);
+            auto enum_ =  EnumTrait<CurvePointType>::StaticEnumType.find_for_value((int)points.at(dragged_point_index).type);
             ASSERT(enum_);
 
 
             bool close_the_popup = false;
             if (ImGui::BeginCombo("##type", enum_->name)) {
-                for (auto& enum_ : EnumTrait<CurvePointType>::StaticType) {
+                for (auto& enum_ : EnumTrait<CurvePointType>::StaticEnumType) {
                     bool selected = enum_.value == (int)points[dragged_point_index].type;
                     if (ImGui::Selectable(enum_.name, &selected)) {
                         points[dragged_point_index].type = CurvePointType(enum_.value);

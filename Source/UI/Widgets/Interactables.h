@@ -1,31 +1,48 @@
 #pragma once
-#include "UI/GUIPublic.h"
+#include "UI/GUISystemPublic.h"
 #include "Framework/MulticastDelegate.h"
-
-CLASS_H(GUIButton, GUI)
+#include "UI/UIBuilder.h"
+#include "UI/BaseGUI.h"
+namespace gui {
+NEWCLASS(Button, BaseGUI)
 public:
+
+#ifdef EDITOR_BUILD
+	virtual const char* get_editor_outliner_icon() const { return "eng/editor/guibutton.png"; }
+#endif
+
 	void update_widget_size() override {
-		if (children.empty())
+
+		InlineVec<BaseGUI*, 16> children;
+		get_gui_children(children);
+
+
+		if (children.size() == 0)
 			desired_size = { 50,50 };
 		else {
-			auto pad = children[0]->padding;
+			auto pad = children[0]->get_padding();
 			desired_size = { pad.x + pad.z + children[0]->desired_size.x,
 			pad.y + pad.w + children[0]->desired_size.y };
 		}
 	}
 	void update_subwidget_positions() override {
-		if (!children.empty()) {
-			auto pad = children[0]->padding;
+
+		InlineVec<BaseGUI*, 16> children;
+		get_gui_children(children);
+
+
+		if (children.size() == 1) {
+			auto pad = children[0]->get_padding();
 			auto corner = ws_position + glm::ivec2(pad.x,pad.y);
 			auto sz = ws_size - glm::ivec2(pad.x+pad.z,pad.y+pad.w);
 
-			auto get_coord_for_align = [](int min, int max, GuiAlignment align, int size, int& outsize)->int {
+			auto get_coord_for_align = [](int min, int max, guiAlignment align, int size, int& outsize)->int {
 				outsize = size;
-				if (align == GuiAlignment::Left)
+				if (align == guiAlignment::Left)
 					return min;
-				if (align == GuiAlignment::Right)
+				if (align == guiAlignment::Right)
 					return max - size;
-				if (align == GuiAlignment::Center) {
+				if (align == guiAlignment::Center) {
 					auto w = max - min;
 					return (w - size) * 0.5 + min;
 				}
@@ -44,29 +61,15 @@ public:
 			children[0]->ws_size = out_sz;
 		}
 	}
-	void on_pressed(int x, int y, int b) override {
-		if (b == 1) {
-			is_clicked = true;
-		}
-	}
 	void on_released(int x, int y, int b) override {
-		is_clicked = false;
-
-		if (b == 1)
-			on_selected.invoke();
-	}
-	void on_hover_start() override {
-		is_hovered = true;
-	}
-	void on_hover_end() override {
-		is_hovered = false;
+		on_selected.invoke();
 	}
 
 	void paint(UIBuilder& b) override {
 		Color32 color = { 128,128,128 };
-		if (is_hovered)
+		if (is_hovering())
 			color = { 128,50,50 };
-		if (is_clicked)
+		if (is_dragging())
 			color = { 20,50,200 };
 
 		b.draw_solid_rect(
@@ -76,8 +79,7 @@ public:
 		);
 	}
 
-	bool is_hovered = false;
-	bool is_clicked = false;
-
+	REFLECT();
 	MulticastDelegate<> on_selected;
 };
+}

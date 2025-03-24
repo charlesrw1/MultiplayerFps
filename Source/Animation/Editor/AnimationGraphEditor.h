@@ -202,9 +202,9 @@ class AnimGraphClipboard
 public:
 	AnimGraphClipboard();
 	void remove_references(Base_EdNode* node);
+	void on_key_down(const SDL_KeyboardEvent& k);
 private:
 	void on_close();
-	void on_key_down(const SDL_KeyboardEvent& k);
 	void paste_selected();
 	std::vector<Base_EdNode*> clipboard;
 };
@@ -297,7 +297,7 @@ public:
 	MulticastDelegate<AnimatorInstance*> on_set_animator_instance;
 
 
-	std::unique_ptr<AG_GuiLayout> gui;
+	AG_GuiLayout* gui = nullptr;
 	void on_key_down(const SDL_KeyboardEvent& key);
 	void on_wheel(const SDL_MouseWheelEvent& wheel);
 

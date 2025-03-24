@@ -39,7 +39,11 @@ public:
 REGISTER_ASSETMETADATA_MACRO(ComponentTypeMetadata);
 #endif
 
-
+void EntityComponent::set_owner_dont_serialize_or_edit(bool b)
+{
+	if (get_owner())
+		get_owner()->dont_serialize_or_edit = b;
+}
 void EntityComponent::set_ticking(bool shouldTick)
 {
 	auto level = eng->get_level();

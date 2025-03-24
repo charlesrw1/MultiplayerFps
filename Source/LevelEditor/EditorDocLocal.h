@@ -75,7 +75,7 @@ private:
 	void delete_tree() {
 		delete rootnode;
 		rootnode = nullptr;
-		map.clear();
+		num_nodes = 0;
 	}
 
 	void on_changed_ents() { 
@@ -83,19 +83,12 @@ private:
 	}
 	void on_start() { rebuild_tree(); }
 	void on_close() { delete_tree(); }
-	void on_change_name(uint64_t handle) {
-		if (map.find(handle) == map.end()) {
-			sys_print(Warning, "on_change_name couldnt find handle??\n");
-			return;
-		}
 
-		map.find(handle)->second->parent->sort_children();
-	}
 
 	struct Node {
 		Node() {}
 		Node(ObjectOutliner* oo, Entity* initfrom) {
-			handle = initfrom->get_instance_id();
+			ptr = initfrom->get_self_ptr();
 			auto& children = initfrom->get_children();
 			if (oo->should_draw_children(initfrom)) {
 				for (auto& c : children) {
@@ -104,9 +97,11 @@ private:
 						add_child(other);
 					}
 				}
-				sort_children();
+				//if(!initfrom->get_parent())
+				//	sort_children();
 			}
-			oo->map.insert({ handle, this });
+
+			oo->num_nodes++;
 		}
 
 		void add_child(Node* other) {
@@ -118,12 +113,12 @@ private:
 			for (int i = 0; i < children.size(); i++)
 				delete children[i];
 		}
-		uint64_t handle = 0;
+		EntityPtr ptr;
 		Node* parent = nullptr;
 		std::vector<Node*> children;
 		void sort_children() {
 			std::sort(children.begin(), children.end(), [](const Node* a, const Node* b)->bool {
-				return to_lower(eng->get_entity(a->handle)->get_editor_name()) < to_lower(eng->get_entity(b->handle)->get_editor_name());
+				return to_lower(a->ptr->get_editor_name()) < to_lower(b->ptr->get_editor_name());
 				});
 		}
 	};
@@ -144,14 +139,14 @@ private:
 
 	EntityPtr setScrollHere;
 
-	std::unordered_map<uint64_t, Node*> map;
+	int num_nodes = 0;
 	Node* rootnode = nullptr;
 
 	AssetPtr<Texture> visible;
 	AssetPtr<Texture> hidden;
 
 
-	uint64_t contextMenuHandle = 0;
+	EntityPtr contextMenuHandle;
 
 	// filter:
 	// <string> - name
@@ -597,8 +592,8 @@ public:
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<ObjectOutliner> outliner;
-	std::unique_ptr<EditorUILayout> gui;
 
+	EditorUILayout* gui = nullptr;
 
 	View_Setup vs_setup;
 	bool using_ortho = false;

@@ -8,11 +8,10 @@
 #include "Framework/Util.h"
 #include "UILoader.h"
 #include "Assets/AssetDatabase.h"
-
-CLASS_H(OnScreenLogGui, GUI)
+#include "UI/UIBuilder.h"
+NEWCLASS(OnScreenLogGui, gui::BaseGUI)
 public:
-
-	virtual void paint(UIBuilder& b) {
+	void paint(UIBuilder& b) final {
 		auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();
@@ -25,10 +24,10 @@ public:
 		}
 		int height = 0;
 		for (auto it = items.rbegin(); it != items.rend(); ++it) {
+			const auto& item_text = (*it).text;
 
-			StringView sv;
-			sv.str_start = (*it).text.c_str();
-			sv.str_len = (*it).text.size();
+			std::string_view sv(item_text.c_str(), item_text.size());
+
 
 			Color32 color = it->color;
 
