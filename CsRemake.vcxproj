@@ -29,6 +29,8 @@
   <ItemGroup>
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
+    <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
+    <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
     <ClInclude Include="Source\Animation\AnimationTreePublic.h" />
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
@@ -241,6 +243,7 @@
     <ClInclude Include="Source\UI\UILoader.h" />
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
+    <ClInclude Include="Source\UI\Widgets\SharedFuncs.h" />
     <ClInclude Include="Source\UI\Widgets\Visuals.h" />
   </ItemGroup>
   <ItemGroup>

@@ -27,6 +27,25 @@ NEWENUM(guiAlignment,uint8_t)
 	Right, 
 	Fill
 };
+NEWENUM(guiAnchor, uint8_t)
+{
+	TopLeft,	// (0,0)
+	TopRight,	// (1,0)
+	BotLeft,	// (0,1)
+	BotRight,	// (1,1)
+	Center,	//(0.5,0.5)
+	Top,	// (0.5,0)
+	Bottom,	// (0.5,1)
+	Right,	//(0,0.5)
+	Left,	// (1,0.5)
+};
+
+NEWENUM(guiMouseFilter, uint8_t)
+{
+	Ignore,	// ignore any mouse on this or children
+	Block,	// capture the mouse if available
+	Pass,	// ltes children capture mouse, but doesnt capture otherwise
+};
 
 namespace gui
 {
@@ -61,12 +80,10 @@ struct UIAnchorPos
 		}
 		return ui;
 	}
+	static UIAnchorPos anchor_from_enum(guiAnchor a);
+	static glm::vec2 get_anchor_vec(guiAnchor e);
 
 };
-const static UIAnchorPos TopLeftAnchor = UIAnchorPos::create_single(0, 0);
-const static UIAnchorPos TopRightAnchor = UIAnchorPos::create_single(1, 0);
-const static UIAnchorPos BottomLeftAnchor = UIAnchorPos::create_single(0, 1);
-const static UIAnchorPos BottomRightAnchor = UIAnchorPos::create_single(1, 1);
 
 NEWCLASS(BaseGUI, EntityComponent)
 public:
@@ -120,12 +137,18 @@ public:
 	BaseGUI* get_gui_parent() const;
 	bool get_is_hidden() const;
 
-	bool recieve_events = true;
+
 	bool hidden = false;
 	bool is_a_gui_root = false;
+	bool uses_clip_test = false;
+	bool eat_scroll_event = false;
 
-	// localspace attributes for positioning
-	UIAnchorPos anchor {};	// anchors this widget to a spot on the screen
+	REFLECT();
+	guiAnchor anchor = guiAnchor::TopLeft;
+
+	UIAnchorPos get_anchor_pos() const {
+		return UIAnchorPos::anchor_from_enum(anchor);
+	}
 
 	REFLECT();
 	int ls_x = 0;
@@ -152,12 +175,10 @@ public:
 	}
 
 	REFLECT();
-	float pivot_x = 0.f;
-	REFLECT();
-	float pivot_y = 0.f;
+	guiAnchor pivot = guiAnchor::TopLeft;
 
 	glm::vec2 get_pivot_ofs() const {
-		return { pivot_x,pivot_y };
+		return UIAnchorPos::get_anchor_vec(pivot);
 	}
 	
 	REFLECT();
@@ -174,12 +195,18 @@ public:
 	REFLECT();
 	int16_t padding_d = 0;
 
+	guiMouseFilter recieve_mouse = guiMouseFilter::Pass;
+
 	glm::ivec4 get_padding() const {
 		return { padding_r,padding_l,padding_u,padding_d };
 	}
 
 	REFLECT();
-	bool use_desired_size = false;
+	bool use_desired_size = true;
+
+	glm::ivec2 get_actual_sz_to_use() const {
+		return use_desired_size ? desired_size : get_ls_size();
+	}
 
 	// worldspace, these are cached on update_layout and used for input/rendering
 	glm::ivec2 ws_position{};

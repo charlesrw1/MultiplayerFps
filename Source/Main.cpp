@@ -1014,7 +1014,7 @@ static void init_log_gui()
 {
 	ASSERT(eng_local.get_level());
 	auto f = eng->get_level()->spawn_entity()->create_component<gui::Fullscreen>();
-	f->recieve_events = false;
+	f->recieve_mouse = guiMouseFilter::Ignore;
 	f->set_owner_dont_serialize_or_edit(true);
 	eng_local.gui_log = f->get_owner()->create_child_entity()->create_component<OnScreenLogGui>();
 	eng_local.gui_log->set_owner_dont_serialize_or_edit(true);

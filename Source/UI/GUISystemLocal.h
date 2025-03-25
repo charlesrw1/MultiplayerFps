@@ -33,9 +33,11 @@ struct UIBuilderImpl
 {
 	// Ortho matrix of screen
 	glm::mat4 ViewProj{};
-	std::vector<UIDrawCall> drawCalls;
+	std::vector<UIDrawCmd> drawCmds;
 	MeshBuilder meshbuilder;
 
+	void push_scissor(Rect2d rect);
+	void pop_scissor();
 	void add_drawcall(MaterialInstance* mat, int start, const Texture* tex_override = nullptr);
 };
 
@@ -89,8 +91,8 @@ public:
 	void update_widget_sizes_R(gui::BaseGUI* g);
 	void update_widget_positions_R(gui::BaseGUI* g);
 	void paint_widgets_R(gui::BaseGUI* g, UIBuilder& builder);
-	gui::BaseGUI* find_gui_under_mouse(int x, int y) const;
-	gui::BaseGUI* find_gui_under_mouse_R(gui::BaseGUI* g, int x, int y) const;
+	gui::BaseGUI* find_gui_under_mouse(int x, int y, bool for_scroll) const;
+	gui::BaseGUI* find_gui_under_mouse_R(gui::BaseGUI* g, int x, int y, bool for_scroll) const;
 
 
 	void remove_gui_layer(gui::BaseGUI* layer);

@@ -5,17 +5,36 @@
 #include "Framework/Config.h"
 #include "Framework/Reflection2.h"
 #include "UI/UIBuilder.h"
+#include "SharedFuncs.h"
+#include "Game/SerializePtrHelpers.h"
+
+GENERATED_CLASS_INCLUDE("Render/Texture.h");
+
 extern ConfigVar ui_draw_text_bbox;
+class Texture;
 namespace gui {
 
+// Places a widget in another widget
 NEWCLASS(Box, BaseGUI)
 public:
-	Box() {
-		recieve_events = false;
-	}
+	~Box();
+	Box();
 
 	REFLECT();
-	Color32 color=Color32();
+	Color32 color = COLOR_WHITE;
+	REFLECT();
+	AssetPtr<Texture> texture;
+	REFLECT();
+	bool is_nine_patch = false;
+	REFLECT();
+	int16_t nine_patch_margin = 0;	// in px
+
+	void update_widget_size() final {
+		update_desired_size_from_one_child(this);
+	}
+	void update_subwidget_positions() final {
+		update_one_child_position(this);
+	}
 
 	void paint(UIBuilder& b) final {
 		b.draw_solid_rect(
@@ -27,10 +46,17 @@ public:
 };
 
 
+NEWCLASS(Image,BaseGUI)
+public:
+#ifdef EDITOR_BUILD
+	virtual const char* get_editor_outliner_icon() const { return "eng/editor/guiimage.png"; }
+#endif
+};
+
 NEWCLASS(Text, BaseGUI)
 public:
 	Text() {
-		recieve_events = false;
+		recieve_mouse = guiMouseFilter::Ignore;
 	}
 
 #ifdef EDITOR_BUILD
@@ -38,11 +64,13 @@ public:
 #endif
 
 	REFLECT();
-	Color32 color = Color32();
+	Color32 color = COLOR_WHITE;
 	REFLECT();
 	std::string text;
 	REFLECT();
 	AssetPtr<GuiFont> myFont;
+	REFLECT();
+	int drop_shadow = 0;
 
 	Rect2d text_size{};
 
@@ -60,7 +88,8 @@ public:
 			b.draw_solid_rect(ws_position, ws_size, COLOR_CYAN);
 		glm::ivec2 text_offset = { 0,font->base };
 
-		b.draw_text(ws_position+glm::ivec2{2,2}+ text_offset, ws_size, font, sv, COLOR_BLACK);
+		if(drop_shadow!=0)
+			b.draw_text(ws_position+glm::ivec2{ drop_shadow,drop_shadow }+ text_offset, ws_size, font, sv, COLOR_BLACK);
 		b.draw_text(ws_position+ text_offset, ws_size, font, sv, color);
 	}
 };

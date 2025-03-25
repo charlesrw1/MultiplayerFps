@@ -24,12 +24,17 @@ void GuiSystemLocal::handle_event(const SDL_Event& event) {
 			key_focus->on_key_up(event.key);
 	}break;
 	case SDL_MOUSEWHEEL: {
-		if (key_focus)
-			key_focus->on_mouse_scroll(event.wheel);
+
+		int x, y;
+		SDL_GetMouseState(&x, &y);
+		gui::BaseGUI* g = find_gui_under_mouse(x,y, true);
+
+		if (g)
+			g->on_mouse_scroll(event.wheel);
 	}break;
 
 	case SDL_MOUSEBUTTONDOWN: {
-		gui::BaseGUI* g = find_gui_under_mouse(event.button.x, event.button.y);
+		gui::BaseGUI* g = find_gui_under_mouse(event.button.x, event.button.y, false);
 		if (g) {
 			const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
 
@@ -62,7 +67,7 @@ void GuiSystemLocal::post_handle_events() {
 	{
 		int x = 0, y = 0;
 		SDL_GetMouseState(&x, &y);
-		gui::BaseGUI* g = find_gui_under_mouse(x, y);
+		gui::BaseGUI* g = find_gui_under_mouse(x, y,false);
 		set_hovering(g);
 	}
 }
@@ -116,7 +121,7 @@ void GuiSystemLocal::paint() {
 }
 
 void GuiSystemLocal::sync_to_renderer() {
-	idrawUi->update(uiBuilderImpl.drawCalls, uiBuilderImpl.meshbuilder, uiBuilderImpl.ViewProj);
+	idrawUi->update(uiBuilderImpl.drawCmds, uiBuilderImpl.meshbuilder, uiBuilderImpl.ViewProj);
 }
 
 void GuiSystemLocal::remove_reference(gui::BaseGUI* this_panel) {
@@ -194,24 +199,39 @@ void GuiSystemLocal::update_widget_positions_R(gui::BaseGUI* g) {
 void GuiSystemLocal::paint_widgets_R(gui::BaseGUI* g, UIBuilder& builder) {
 	if (g->get_is_hidden())
 		return;
+
+	const bool wants_clip = g->uses_clip_test;
+	if (wants_clip) {
+		Rect2d rect;
+		rect.x = g->ws_position.x - viewport_position.x;
+		rect.y = g->ws_position.y - viewport_position.y;
+		rect.w = g->ws_size.x;
+		rect.h = g->ws_size.y;
+		rect.y = viewport_size.y - rect.y - rect.h;
+
+		uiBuilderImpl.push_scissor(rect);
+	}
 	g->paint(builder);
 	InlineVec<gui::BaseGUI*, 16> children;
 	g->get_gui_children(children);
 	for (int i = 0; i < children.size(); i++)
 		paint_widgets_R(children[i], builder);
+
+	if (wants_clip)
+		uiBuilderImpl.pop_scissor();
 }
 
-gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse(int x, int y) const {
+gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse(int x, int y, bool scroll) const {
 	for (auto l : gui_layers) {
-		auto f = find_gui_under_mouse_R(l, x, y);
+		auto f = find_gui_under_mouse_R(l, x, y, scroll);
 		if (f)
 			return f;
 	}
 	return nullptr;
 }
 
-gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse_R(gui::BaseGUI* g, int x, int y) const {
-	if (g->get_is_hidden() || !g->recieve_events)
+gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse_R(gui::BaseGUI* g, int x, int y, bool scroll) const {
+	if (g->get_is_hidden() || g->recieve_mouse==guiMouseFilter::Ignore)
 		return nullptr;
 
 	Rect2d r(g->ws_position.x, g->ws_position.y, g->ws_size.x, g->ws_size.y);
@@ -221,25 +241,52 @@ gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse_R(gui::BaseGUI* g, int x, int
 	g->get_gui_children(children);
 	for (int i = 0; i < children.size(); i++) {
 		auto child = children[i];
-		gui::BaseGUI* g_sub = find_gui_under_mouse_R(child, x, y);
-		if (g_sub && g_sub->recieve_events)
+		gui::BaseGUI* g_sub = find_gui_under_mouse_R(child, x, y, scroll);
+		if (!g_sub)
+			continue;
+		if ((!scroll && g_sub->recieve_mouse==guiMouseFilter::Block)||(scroll&&g_sub->eat_scroll_event))
 			return g_sub;
 	}
-	return g;
+	if (g->recieve_mouse == guiMouseFilter::Pass)
+		return nullptr;	// wasnt found in children, pass over this
+	else
+		return g;
 }
 
 void UIBuilderImpl::add_drawcall(MaterialInstance* mat, int start, const Texture* tex_override) {
 	const int count = meshbuilder.get_i().size() - start;
-	if (drawCalls.empty() || drawCalls.back().mat != mat || drawCalls.back().texOverride != tex_override) {
+
+	UIDrawCall* lastDC = nullptr;
+	if (!drawCmds.empty() && drawCmds.back().type == UIDrawCmd::Type::DrawCall) {
+		lastDC = &drawCmds.back().dc;
+	}
+
+	if (!lastDC || lastDC->mat != mat || lastDC->texOverride != tex_override) {
 		UIDrawCall dc;
 		dc.index_count = count;
 		dc.index_start = start;
 		dc.mat = mat;
 		dc.texOverride = tex_override;
-		drawCalls.push_back(dc);
+		UIDrawCmd cmd;
+		cmd.type = UIDrawCmd::Type::DrawCall;
+		cmd.dc = dc;
+		drawCmds.push_back(cmd);
 	}
 	else
-		drawCalls.back().index_count += count;
+		lastDC->index_count += count;
+}
+void UIBuilderImpl::push_scissor(Rect2d scissor) {
+	UIDrawCmd cmd;
+	cmd.type = UIDrawCmd::Type::SetScissor;
+	cmd.sc.enable = true;
+	cmd.sc.rect = scissor;
+	drawCmds.push_back(cmd);
+}
+void UIBuilderImpl::pop_scissor() {
+	UIDrawCmd cmd;
+	cmd.type = UIDrawCmd::Type::SetScissor;
+	cmd.sc.enable = false;
+	drawCmds.push_back(cmd);
 }
 
 void GuiSystemLocal::sort_gui_layers()

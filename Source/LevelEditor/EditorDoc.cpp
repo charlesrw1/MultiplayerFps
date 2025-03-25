@@ -63,7 +63,8 @@ extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAss
 CLASS_H(EditorUILayout, gui::Fullscreen)
 public:
 	EditorUILayout() {
-		
+		recieve_mouse = guiMouseFilter::Block;
+		eat_scroll_event = true;
 	}
 	void start() final {
 
@@ -71,7 +72,7 @@ public:
 
 		tool_text = get_owner()->create_child_entity()->create_component<gui::Text>();
 		tool_text->hidden = true;
-		tool_text->anchor = gui::UIAnchorPos::create_single(0.5, 0.5);
+		tool_text->anchor = guiAnchor::Center;
 	}
 
 	void on_pressed(int x, int y, int button) override {
@@ -419,8 +420,7 @@ Entity* EditorDoc::get_prefab_root_entity()
 	gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
 	gui->tool_text->color = { 255,128,128 };
 	gui->tool_text->use_desired_size = true;
-	gui->tool_text->pivot_x = 0.5;
-	gui->tool_text->pivot_y = 0.5;
+	gui->tool_text->pivot = guiAnchor::Center;
 
 }
   void EditorDoc::exit_eyedropper_mode() {

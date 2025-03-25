@@ -63,9 +63,9 @@ public:
 	void init() {
 	}
 
-	void update(std::vector<UIDrawCall>& draw_calls_to_be_swapped, MeshBuilder& vertex_data, const glm::mat4& view_proj) final {
-		draw_calls.clear();
-		std::swap(draw_calls_to_be_swapped, draw_calls);
+	void update(std::vector<UIDrawCmd>& draw_calls_to_be_swapped, MeshBuilder& vertex_data, const glm::mat4& view_proj) final {
+		drawCmds.clear();
+		std::swap(draw_calls_to_be_swapped, drawCmds);
 		mb_draw_data.init_from(vertex_data);
 		this->view_proj = view_proj;
 	}
@@ -73,8 +73,21 @@ public:
 	void render() {
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
-		for (int i = 0; i < draw_calls.size(); i++) {
-			const auto& dc = draw_calls.at(i);
+		for (int i = 0; i < drawCmds.size(); i++) {
+			const auto& dcmd = drawCmds.at(i);
+			if (dcmd.type == UIDrawCmd::Type::SetScissor) {
+				if (dcmd.sc.enable) {
+					glEnable(GL_SCISSOR_TEST);
+					auto& r = dcmd.sc.rect;
+					glScissor(r.x, r.y, r.w, r.h);
+				}
+				else {
+					glDisable(GL_SCISSOR_TEST);
+				}
+				continue;
+			}
+			const UIDrawCall& dc = dcmd.dc;
+
 			if (!dc.mat)
 				continue;
 
@@ -105,12 +118,14 @@ public:
 			draw.stats.total_draw_calls++;
 		}
 
+		glDisable(GL_SCISSOR_TEST);
+
 		device.reset_states();
 	}
 private:
 	glm::mat4 view_proj{};
 	MeshBuilderDD mb_draw_data;
-	std::vector<UIDrawCall> draw_calls;
+	std::vector<UIDrawCmd> drawCmds;
 };
 static RendererUIBackendLocal draw_ui_local;
 RendererUIBackend* idrawUi = &draw_ui_local;
