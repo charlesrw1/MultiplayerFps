@@ -71,39 +71,6 @@ GameEnginePublic* eng = &eng_local;
 
 static double program_time_start;
 
-bool CheckGlErrorInternal_(const char* file, int line)
-{
-	GLenum error_code = glGetError();
-	bool has_error = 0;
-	while (error_code != GL_NO_ERROR)
-	{
-		has_error = true;
-		const char* error_name = "Unknown error";
-		switch (error_code)
-		{
-		case GL_INVALID_ENUM:
-			error_name = "GL_INVALID_ENUM"; break;
-		case GL_INVALID_VALUE:
-			error_name = "GL_INVALID_VALUE"; break;
-		case GL_INVALID_OPERATION:
-			error_name = "GL_INVALID_OPERATION"; break;
-		case GL_STACK_OVERFLOW:
-			error_name = "GL_STACK_OVERFLOW"; break;
-		case GL_STACK_UNDERFLOW:
-			error_name = "GL_STACK_UNDERFLOW"; break;
-		case GL_OUT_OF_MEMORY:
-			error_name = "GL_OUT_OF_MEMORY"; break;
-		case GL_INVALID_FRAMEBUFFER_OPERATION:
-			error_name = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
-		default:
-			break;
-		}
-		sys_print(Error, "%s | %s (%d)\n", error_name, file, line);
-
-		error_code = glGetError();
-	}
-	return has_error;
-}
 
 struct Debug_Shape
 {
@@ -1265,6 +1232,9 @@ public:
 };
 
 
+
+
+
 Debug_Interface* Debug_Interface::get()
 {
 	static Debug_Interface_Impl inst;
@@ -2023,7 +1993,7 @@ void GameEngineLocal::loop()
 
 		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
 #ifdef EDITOR_BUILD
-	// update hot reloading
+		// update hot reloading
 		AssetRegistrySystem::get().update();
 #endif
 		if (get_level())

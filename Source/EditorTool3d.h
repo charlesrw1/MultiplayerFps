@@ -30,7 +30,5 @@ private:
 
 	User_Camera camera;
 	View_Setup view;
-	StaticMeshEntity* skyEntity{};
-	StaticMeshEntity* planeEntity{};
 };
 #endif

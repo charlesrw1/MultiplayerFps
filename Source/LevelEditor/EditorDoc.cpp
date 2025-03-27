@@ -2499,11 +2499,14 @@ EditorDoc::EditorDoc() {
 
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
+	command_mgr->on_command_execute_or_undo.add(this, [&]() {
+		set_has_editor_changes();
+		});
+
 	selection_state = std::make_unique<SelectionState>();
 	prop_editor = std::make_unique<EdPropertyGrid>();
 	manipulate = std::make_unique<ManipulateTransformTool>();
 	outliner = std::make_unique<ObjectOutliner>();
-
 }
 
 extern void export_scene_model();

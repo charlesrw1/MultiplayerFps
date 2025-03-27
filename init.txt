@@ -77,8 +77,8 @@ dbg.fly 1
 
 #r.debug_csm 1
 #sys.print_deps mats/wht_tile.mi
-FONT_TEST
-loglevel 2
+#FONT_TEST
+loglevel 4
 
 #r.debug_specular 1
 

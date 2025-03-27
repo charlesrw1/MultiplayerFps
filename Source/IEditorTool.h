@@ -40,6 +40,10 @@ public:
 	bool get_is_open() const {
 		return is_open;
 	}
+	bool get_has_editor_changes() const {
+		return has_editor_changes;
+	}
+	void set_has_editor_changes();
 protected:
 
 	// various hooks to add imgui calls
@@ -76,6 +80,8 @@ private:
 	void open_the_open_popup() {
 		open_open_popup = true;
 	}
+
+	bool has_editor_changes = false;
 
 	std::string name = "";
 	bool is_initialized = false;

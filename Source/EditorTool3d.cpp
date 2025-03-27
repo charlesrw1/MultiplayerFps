@@ -32,7 +32,6 @@ void EditorTool3d::tick(float dt)
 }
 void EditorTool3d::close_internal()
 {
-	skyEntity = planeEntity = nullptr;
 	eng->leave_level();
 	eng->get_on_map_delegate().remove(this);
 }

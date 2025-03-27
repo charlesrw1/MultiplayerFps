@@ -215,7 +215,6 @@ public:
 				sys_print(Error, "failed to load %s asset %s\n", asset_to_load->get_type().classname, asset_to_load->path.c_str());
 			}
 			asset_to_load->reference_bitmask_internal = (force_reload) ? asset->reference_bitmask_internal : reference_mask;
-			asset_to_load->is_loaded = true;
 			job = init_new_job(asset_to_load, (force_reload) ? asset : nullptr, userStruct, loadJobCallback, false);
 			return job;
 
@@ -265,8 +264,8 @@ public:
 		
 		auto asset = find_existing_or_create(path, assetType);
 
-		// asset has run post load, matches bitmask, not a force reload; just return it (dont have to mess with more locks or atomics)
-		if (asset->has_run_post_load && ((asset->reference_bitmask_threadsafe & mask) == mask) && !force_reload)
+		// asset has run load (thread safe variable), matches bitmask, not a force reload; just return it (dont have to mess with more locks or atomics)
+		if (asset->is_loaded && ((asset->reference_bitmask_threadsafe & mask) == mask) && !force_reload)
 			return asset;
 
 		AsyncQueuedJob myJob;
@@ -276,7 +275,7 @@ public:
 		myJob.loadJobCallback = nullptr;
 
 		// asset is loaded, but the bitmask differs, queue an async job to reference it
-		if (asset->has_run_post_load&&!force_reload) {
+		if (asset->is_loaded &&!force_reload) {
 			queue_load_job(myJob);
 			return asset;
 		}
@@ -299,6 +298,7 @@ public:
 		LoadJob* j = do_load_asset((IAsset*)asset /* const cast */, false, ACTIVE_THREAD_JOB->referenceMask,false, nullptr);
 		if (j) {
 			std::unique_lock<std::mutex> lock(job_mutex);
+			j->thisAsset->is_loaded = true;
 			finishedAsyncJobs.push(j);
 		}
 	}
@@ -471,7 +471,7 @@ private:
 	}
 	void queue_load_job_front_and_wait(AsyncQueuedJob j) {
 		ASSERT(!IS_LOADER_THREAD);
-		sys_print(Info, "queue_load_job_front_and_wait\n");
+		sys_print(Info, "queue_load_job_front_and_wait %s\n", j.what->get_name().c_str());
 		{
 			std::unique_lock<std::mutex> lock(job_mutex);
 			j.is_prioritized = true;
@@ -523,6 +523,7 @@ void AssetDatabaseImpl::loaderThreadMain(int index, AssetDatabaseImpl* impl)
 			LoadJob* j = execute_job(&jobQueued);
 			lock.lock();
 			if (j) {
+				j->thisAsset->is_loaded = true;	// threadsafe
 				impl->finishedAsyncJobs.push(j);
 			}
 			impl->is_in_job = false;

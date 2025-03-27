@@ -214,13 +214,14 @@ public:
 	}
 	void set_hidden_in_editor(bool b);
 
-	bool get_prefab_editable() const {
-		return prefab_editable;
-	}
 	void set_prefab_editable(bool b) {
 		prefab_editable = b;
 	}
 #endif
+	// fixme
+	bool get_prefab_editable() const {
+		return prefab_editable;
+	}
 private:
 	static void set_active_R(Entity* e, bool b, bool step1);
 
