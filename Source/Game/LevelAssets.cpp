@@ -78,6 +78,7 @@ SceneAsset::~SceneAsset() {
 }
 
 void SceneAsset::uninstall() {
+
 	if (sceneFile.get()) {
 		sys_print(Warning, "scene asset with non-null scenefile\n");
 		for (auto& o : sceneFile->get_objects())
@@ -129,13 +130,13 @@ bool PrefabAsset::load_asset(ClassBase*&)
 		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, this));
 		// add instance ids here for diff'ing entity references
 		uint64_t id = 1ull << 63ull;
-		for (auto obj : sceneFile->get_objects()) {
+		for (auto& obj : sceneFile->get_objects()) {
 			obj.second->post_unserialization(++id);
 			instance_ids_for_diffing.insert(id, obj.second);
 		}
 		sceneFile->unserialize_post_assign_ids();
 	}
-	catch (int) {
+	catch (...) {
 		sys_print(Error, "error loading PrefabAsset %s\n", path.c_str());
 		return false;
 	}
@@ -144,6 +145,9 @@ bool PrefabAsset::load_asset(ClassBase*&)
 }
 void PrefabAsset::uninstall()
 {
+	if (!sceneFile)
+		return;
+
 	sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
 	for (auto& o : sceneFile->get_objects())
 		delete o.second;
@@ -173,6 +177,9 @@ static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
 
 void PrefabAsset::sweep_references() const
 {
+	if (!sceneFile)
+		return;
+
 	sys_print(Debug, "prefab sweep ref %s\n", get_name().c_str());
 	{
 		for (auto& obj : sceneFile->get_objects()) {
