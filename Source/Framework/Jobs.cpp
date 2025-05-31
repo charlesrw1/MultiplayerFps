@@ -113,8 +113,6 @@ void worker_thread_main(int id)
     worker_thread_loop();
 }
 
-// this function isnt reentered, unlike yield_fiber_wait
-
 void wait_and_free_counter(Counter*& c)
 {
     if (!c)

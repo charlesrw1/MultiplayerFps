@@ -2048,14 +2048,6 @@ void GameEngineLocal::loop()
 		do_sync_update();
 		wait_for_swap();	// wait for swap last
 
-		{
-			static int counter = 0;
-			counter++;
-			if (counter > 5) {
-				counter = 0;
-			}
-			TracyGpuCollect;
-		}
 		FrameMark;	// tracy profiling
 		Profiler::end_frame_tick(frame_time);	// my crappy profilier
 	}

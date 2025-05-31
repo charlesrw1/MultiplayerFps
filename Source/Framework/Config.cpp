@@ -293,6 +293,17 @@ static int classify_string(const char* s)
 #include <algorithm>
 
 
+static StringView strip_string_view(StringView sv)
+{
+	int i = 0;
+	for (; i < sv.str_len; i++) {
+		char c = sv.str_start[i];
+		if (!(c == ' ' || c == '\t' || c=='\r'))
+			break;
+	}
+	return StringView(sv.str_start + i, sv.str_len - i);
+}
+
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
@@ -388,8 +399,11 @@ public:
 			if (view.is_empty())
 				continue;
 
+			view = strip_string_view(view);
 
 			if (view.str_start[0] == '#' || (view.str_len==1&&view.str_start[0]=='\r'))
+				continue;
+			if (view.str_len >= 2 && view.str_start[0] == '/' && view.str_start[1] == '/')
 				continue;
 
 			std::string str = std::string(view.str_start, view.str_len);

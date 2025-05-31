@@ -613,6 +613,9 @@ GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTyp
 void AssetDatabase::find_async(const std::string& path, const ClassTypeInfo* classType, std::function<void(GenericAssetPtr)> callback, int lifetime_channel)
 {
 	const uint32_t mask = (1 << lifetime_channel);
+	//auto out = find_sync(path, classType, lifetime_channel);
+	//callback(out);
+
 	impl->load_asset_async(path, classType, mask, callback);
 }
 

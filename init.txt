@@ -63,7 +63,7 @@ bind P "dec r.taa_jitter_test"
 bind H "ed.HideSelected"
 bind "H" Alt "ed.UnHideAll"
 
-#otex 0.5 1 1 _scene_motion
+ //otex 0.5 1 1 _scene_motion
 
 
 bind "Left" Alt "EDITOR_BACK_ONE_PAGE"
@@ -98,4 +98,5 @@ start_ed Map top_down/map0.tmap
 
 bind 7 "start_ed AnimGraph beu_character.ag"
 
-
+loglevel 1
+developer_mode 0
