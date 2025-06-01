@@ -918,7 +918,7 @@ void register_input_actions_for_game()
 }
 
 
-int main(int argc, char** argv)
+int game_engine_main(int argc, char** argv)
 {
 	eng_local.init(argc,argv);	
 	eng_local.loop();

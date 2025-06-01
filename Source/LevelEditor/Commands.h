@@ -10,8 +10,6 @@
 #include "Scripting/ScriptComponent.h"
 #include "Game/EntityPtr.h"
 
-extern EditorDoc ed_doc;
-
 class CommandSerializeUtil
 {
 public:

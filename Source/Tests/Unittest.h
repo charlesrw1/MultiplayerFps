@@ -1,9 +1,7 @@
 #pragma once
 #include "Framework/Util.h"
 #include <stdexcept>
-#define WITH_TESTS
-
-#ifdef WITH_TESTS
+#include <vector>
 
 #define TEST_TRUE_COMMENT(code, comment) \
 	if(!(code)) { \
@@ -15,7 +13,7 @@
 #define TEST_TRUE(code) \
 	TEST_TRUE_COMMENT(code, "expected true")
 
-	
+
 #define TEST_THROW(code) \
 	try { \
 		code; \
@@ -27,8 +25,6 @@
 
 
 typedef void(*test_func_t)();
-
-#include <vector>
 class ProgramTester
 {
 public:
@@ -37,8 +33,8 @@ public:
 		return inst;
 	}
 	bool run_all(bool print_good);
-	void add_test(const char* category, const char* subcategory, test_func_t func) {
-		allTests.push_back({ category,subcategory, func });
+	void add_test(const char* category, const  test_func_t func) {
+		allTests.push_back({ category, func });
 	}
 	void set_test_failed(const char* expression, const char* reason) {
 		test_failed = true;
@@ -50,7 +46,6 @@ public:
 private:
 	struct Test {
 		const char* category = "";
-		const char* sub_category = "";
 		test_func_t func = nullptr;
 	};
 	std::vector<Test> allTests;
@@ -58,22 +53,14 @@ private:
 	const char* expression = "";
 	const char* reason = "";
 	bool is_in_test = false;
-
 };
 
 struct AutoTestCaseAdd {
-	AutoTestCaseAdd(const char* name, const char* subcat, test_func_t f) {
-		ProgramTester::get().add_test(name,subcat, f);
+	AutoTestCaseAdd(const char* name, test_func_t f) {
+		ProgramTester::get().add_test(name, f);
 	}
 };
 
-#define ADD_TEST(category, subcategory) void category##subcategory(); \
-static AutoTestCaseAdd autotester_##category##subcategory = AutoTestCaseAdd(#category,#subcategory, category##subcategory); \
-void category##subcategory()
-
-#else
-#define ADD_TEST(func_name, string_name) void  category##subcategory() {
-#define TEST_TRUE_COMMENT(code, comment)
-#define TEST_THROW(code)
-#define TEST_TRUE(code)
-#endif
+#define ADD_TEST(name) void test_##name(); \
+static AutoTestCaseAdd autotester_##name = AutoTestCaseAdd(#name,test_##name); \
+void test_##name()

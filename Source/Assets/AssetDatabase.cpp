@@ -654,9 +654,3 @@ DECLARE_ENGINE_CMD(print_assets)
 {
 	g_assets.print_usage();
 }
-
-#include "Test/Test.h"
-ADD_TEST(AssetDatabaseTest, General)
-{
-
-}

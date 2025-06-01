@@ -8,6 +8,7 @@
 
 // All assets that you want showing in the asset browser should be registered here
 
+typedef IEditorTool* (*editor_tool_factory)();
 class IEditorTool;
 class AssetMetadata
 {
@@ -20,7 +21,7 @@ public:
 	// if false, then asset names wont be treated like filepaths
 	virtual bool assets_are_filepaths() const { return true; }
 	// override this to add a new tool to the editor, used for maps, models, animations, everything
-	virtual IEditorTool* tool_to_edit_me() const { return nullptr; }
+	virtual editor_tool_factory tool_to_edit_me() const { return nullptr; }
 	virtual bool show_tool_in_toolbar() const { return true; }	// weather to show tool in the toolbar, if false, can still open editor when opening an asset from browser
 	virtual const char* get_arg_for_editortool() const { return ""; }
 

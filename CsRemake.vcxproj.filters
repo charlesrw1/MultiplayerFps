@@ -459,7 +459,6 @@
     <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\EditorTool3d.h" />
-    <ClInclude Include="Source\Test\Test.h" />
     <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
     <ClInclude Include="Source\Framework\ScopedBoolean.h" />
@@ -526,7 +525,7 @@
     <ClCompile Include="Source\Level.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Main.cpp">
+    <ClCompile Include="Source\EngineMain.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Config.cpp">
@@ -743,7 +742,6 @@
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
-    <ClCompile Include="Source\Test\Test.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
