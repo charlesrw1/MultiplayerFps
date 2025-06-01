@@ -9,11 +9,14 @@ GENERATED_CLASS_INCLUDE("Game/Entity.h");
 
 struct PropertyInfoList;
 class Entity;
-NEWCLASS(EntityComponent, BaseUpdater)
+class Component : public BaseUpdater
+{
 public:
+	CLASS_BODY(Component);
+	
 	const static bool CreateDefaultObject = true;
 
-	virtual ~EntityComponent() override;
+	virtual ~Component() override;
 
 	virtual void pre_start() {}
 	virtual void start() {}

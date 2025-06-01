@@ -41,29 +41,20 @@ public:
 	float time = 0.0;
 };
 
-
-NEWCLASS(TopDownWeaponData, ClassBase)
+class TopDownWeaponData : public ClassBase
+{
 public:
-	REFLECT();
-	std::string name;
-	REFLECT();
-	AssetPtr<Model> model;
-	REFLECT();
-	int damage = 0; // damage per shot
-	REFLECT();
-	float fire_rate = 1.f;	// per second
-	REFLECT();
-	int type = 0;	// 0 = rifle, 1 = shotgun
-	REFLECT();
-	int pellets = 0;	// for shotgun
-	REFLECT();
-	float accuracy = 1.f;
-	REFLECT();
-	float bullet_speed = 20.f;
-	REFLECT();
-	AssetPtr<PrefabAsset> special_projectile;	// what projectile to spawn
-	REFLECT();
-	std::vector<float> values;
+	CLASS_BODY(TopDownWeaponData);
+	REF std::string name;
+	REF AssetPtr<Model> model;
+	REF int damage = 0; // damage per shot
+	REF float fire_rate = 1.f;	// per second
+	REF int type = 0;	// 0 = rifle, 1 = shotgun
+	REF int pellets = 0;	// for shotgun
+	REF float accuracy = 1.f;
+	REF float bullet_speed = 20.f;
+	REF AssetPtr<PrefabAsset> special_projectile;	// what projectile to spawn
+	REF std::vector<float> values;
 };
 
 struct TopDownControls
@@ -73,19 +64,18 @@ struct TopDownControls
 	InputActionInstance* look{};
 };
 
-NEWCLASS(TopDownPlayer, EntityComponent)
+
+
+
+class TopDownPlayer : public Component
+{
 public:
+	CLASS_BODY(TopDownPlayer);
 
-	TopDownControls con;
-
-	REFLECT();
-	AssetPtr<PrefabAsset> shotgunSoundAsset;
-
-	REFLECT();
-	AssetPtr<AnimationSeqAsset> runToStart;
-	REFLECT();
-	AssetPtr<AnimationSeqAsset> idleToRun;
-
+	REF TopDownControls con;
+	REF AssetPtr<PrefabAsset> shotgunSoundAsset;
+	REF AssetPtr<AnimationSeqAsset> runToStart;
+	REF AssetPtr<AnimationSeqAsset> idleToRun;
 	SoundComponent* cachedShotgunSound = nullptr;
 
 	TopDownPlayer() {
@@ -186,6 +176,7 @@ public:
 	void end() final {
 		g_inputSys.device_connected.remove(this);
 	}
+
 
 	void shoot_gun() {
 		if (shoot_cooldown <= 0.0)
@@ -400,8 +391,11 @@ public:
 
 extern float lean_amt;
 extern float lean_smooth;
-NEWCLASS(TopDownAnimDriver, AnimatorInstance)
+
+class TopDownAnimDriver : public AnimatorInstance
+{
 public:
+	CLASS_BODY(TopDownAnimDriver);
 
 	virtual void on_init() override {
 		if (get_owner()) {
@@ -450,12 +444,8 @@ public:
 	glm::vec3 vel{};
 	glm::vec3 accel{};
 
-	REFLECT();
-	bool bIsJumping = false;
-	REFLECT();
-	bool bRunning = false;
-	REFLECT();
-	float flMovex = 0.0;
-	REFLECT();
-	float flMovey = 0.0;
+	REF bool bIsJumping = false;
+	REF bool bRunning = false;
+	REF float flMovex = 0.0;
+	REF float flMovey = 0.0;
 };

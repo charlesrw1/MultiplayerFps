@@ -42,8 +42,8 @@ void Level::update_level()
 			auto ent = (Entity*)e;
 			ent->destroy();
 		}
-		else if (e->is_a<EntityComponent>()) {
-			auto ent = (EntityComponent*)e;
+		else if (e->is_a<Component>()) {
+			auto ent = (Component*)e;
 			ent->destroy();
 		}
 	}
@@ -56,7 +56,7 @@ void Level::sync_level_render_data()
 		ec->on_sync_render_data();
 	wants_sync_update.clear_all();
 }
-void Level::add_to_sync_render_data_list(EntityComponent* ec)
+void Level::add_to_sync_render_data_list(Component* ec)
 {
 	if (eng->get_is_in_overlapped_period())
 		wants_sync_update.insert(ec);
@@ -118,7 +118,7 @@ void Level::destroy_entity(Entity* e)
 	#endif // _DEBUG
 	all_world_ents.remove(id);
 }
-void Level::destroy_component(EntityComponent* ec)
+void Level::destroy_component(Component* ec)
 {
 	if (!ec) return;
 
@@ -160,7 +160,7 @@ void Level::create(SceneAsset* source, bool is_editor)
 	}
 }
 
-void Level::remove_from_update_list(EntityComponent* ec) {
+void Level::remove_from_update_list(Component* ec) {
 	tick_list.remove(ec);
 	for (int i = 0; i < wantsToAddToUpdate.size(); i++)
 		if (wantsToAddToUpdate[i] == ec) {
@@ -168,7 +168,7 @@ void Level::remove_from_update_list(EntityComponent* ec) {
 		}
 }
 
-void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es, InlineVec<EntityComponent*, 16>& cs)
+void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es, InlineVec<Component*, 16>& cs)
 {
 	es.push_back(e);
 	for (auto c : e->get_components())
@@ -185,7 +185,7 @@ void Level::initialize_new_entity_safe(Entity* e)
 	// do it this way so initialization can add components/entities and not mess up
 	// todo: make sure that they arent deleted by init (deferred delete?)
 	InlineVec<Entity*, 4> init_entities;
-	InlineVec<EntityComponent*, 16> init_components;
+	InlineVec<Component*, 16> init_components;
 	add_entities_and_components_to_init_R(e, init_entities, init_components);
 	
 	for (int i = 0; i < init_entities.size();i++) {
@@ -287,7 +287,7 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 			auto ent = o.second;
 			if (Entity* e = ent->cast_to<Entity>())
 				e->initialize_internal(); // just sets init_state => CALLED_START
-			else if (EntityComponent* ec = ent->cast_to<EntityComponent>())
+			else if (Component* ec = ent->cast_to<Component>())
 				ec->initialize_internal_step1();
 			else
 				ASSERT(0);
@@ -295,14 +295,14 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 
 		for (auto& o : objs) {
 			auto ent = o.second;
-			if (EntityComponent* ec = ent->cast_to<EntityComponent>())
+			if (Component* ec = ent->cast_to<Component>())
 				ec->initialize_internal_step2();
 		}
 	}
 }
 
 
-void Level::add_and_init_created_runtime_component(EntityComponent* c)
+void Level::add_and_init_created_runtime_component(Component* c)
 {
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());

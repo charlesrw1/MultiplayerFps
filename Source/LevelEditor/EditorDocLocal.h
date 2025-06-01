@@ -177,16 +177,16 @@ private:
 	uint64_t selected_component = 0;
 	uint64_t component_context_menu = 0;
 
-	void on_select_component(EntityComponent* ec) {
+	void on_select_component(Component* ec) {
 		selected_component = ec->get_instance_id();
 		refresh_grid();
 	}
 
-	EntityComponent* get_selected_component() const {
+	Component* get_selected_component() const {
 		if (selected_component == 0) return nullptr;
 		auto o = eng->get_object(selected_component);
 		if (!o) return nullptr;
-		return o->cast_to<EntityComponent>();
+		return o->cast_to<Component>();
 	}
 	
 	void draw_components(Entity* entity);
@@ -431,7 +431,7 @@ private:
 
 	void on_close();
 	void on_open();
-	void on_component_deleted(EntityComponent* ec);
+	void on_component_deleted(Component* ec);
 	void on_entity_changes();
 	void on_selection_changed();
 	void on_prop_change();
@@ -581,12 +581,10 @@ public:
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
 
-	LEPlugin* get_plugin() const {
-		return active_plugin.get();
-	}
+	
 	void set_plugin(const ClassTypeInfo* plugin_type) {}
 
-	std::unique_ptr<LEPlugin> active_plugin;
+	//std::unique_ptr<LEPlugin> active_plugin;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
@@ -600,11 +598,11 @@ public:
 	User_Camera camera;
 	OrthoCamera ortho_camera;
 
-	MulticastDelegate<LEPlugin*> on_start_plugin;
-	MulticastDelegate<LEPlugin*> on_end_plugin;
+	//MulticastDelegate<LEPlugin*> on_start_plugin;
+	//MulticastDelegate<LEPlugin*> on_end_plugin;
 
 	MulticastDelegate<uint64_t> on_component_deleted;
-	MulticastDelegate<EntityComponent*> on_component_created;
+	MulticastDelegate<Component*> on_component_created;
 	MulticastDelegate<EntityPtr> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
 

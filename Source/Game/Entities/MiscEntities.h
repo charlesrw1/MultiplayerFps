@@ -10,7 +10,7 @@
 
 
 using namespace glm;
-CLASS_H(NPC, EntityComponent)
+CLASS_H(NPC, Component)
 public:
 	NPC() {
 		pathfind_state = going_towards_waypoint;
@@ -104,7 +104,7 @@ public:
 };
 #include "Assets/AssetDatabase.h"
 #include "Render/Model.h"
-CLASS_H(Door, EntityComponent)
+CLASS_H(Door, Component)
 public:
 	Door() {
 		//door_mesh = construct_sub_component<MeshComponent>("DoorMesh");

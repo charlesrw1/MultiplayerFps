@@ -60,7 +60,7 @@ const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
 extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
 
-CLASS_H(EditorUILayout, gui::Fullscreen)
+CLASS_H(EditorUILayout, guiFullscreen)
 public:
 	EditorUILayout() {
 		recieve_mouse = guiMouseFilter::Block;
@@ -68,9 +68,9 @@ public:
 	}
 	void start() final {
 
-		gui::BaseGUI::start();
+		guiBase::start();
 
-		tool_text = get_owner()->create_child_entity()->create_component<gui::Text>();
+		tool_text = get_owner()->create_child_entity()->create_component<guiText>();
 		tool_text->hidden = true;
 		tool_text->anchor = guiAnchor::Center;
 	}
@@ -250,7 +250,7 @@ public:
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 
 
-	gui::Text* tool_text = nullptr;
+	guiText* tool_text = nullptr;
 };
 CLASS_IMPL(EditorUILayout);
 
@@ -1056,7 +1056,7 @@ void ManipulateTransformTool::on_open() {
 	world_space_of_selected.clear();
 	ed_doc.gui->key_down_delegate.add(this, &ManipulateTransformTool::on_key_down);
 }
-void ManipulateTransformTool::on_component_deleted(EntityComponent* ec) {
+void ManipulateTransformTool::on_component_deleted(Component* ec) {
 	stop_using_custom();
 
 	update_pivot_and_cached();
@@ -1429,11 +1429,11 @@ void EditorDoc::hook_scene_viewport_draw()
 					drop_transform)
 				);
 			}
-			else if (resource->type->get_asset_class_type()->is_a(EntityComponent::StaticType)) {
+			else if (resource->type->get_asset_class_type()->is_a(Component::StaticType)) {
 				EntityPtr parent_to;
 				{
 					const ClassTypeInfo* type = ClassBase::find_class(resource->filename.c_str());
-					if (type && type->is_a(gui::BaseGUI::StaticType)) {
+					if (type && type->is_a(guiBase::StaticType)) {
 						drop_transform = glm::mat4(1.f);
 						if (selection_state->has_only_one_selected())
 							parent_to = selection_state->get_only_one_selected();
@@ -1886,10 +1886,10 @@ void ObjectOutliner::draw()
 void EdPropertyGrid::draw_components(Entity* entity)
 {
 	ASSERT(selected_component != 0);
-	ASSERT(eng->get_object(selected_component)->is_a<EntityComponent>());
-	ASSERT(eng->get_object(selected_component)->cast_to<EntityComponent>()->entity_owner == entity);
+	ASSERT(eng->get_object(selected_component)->is_a<Component>());
+	ASSERT(eng->get_object(selected_component)->cast_to<Component>()->entity_owner == entity);
 
-	auto draw_component = [&](Entity* e, EntityComponent* ec) {
+	auto draw_component = [&](Entity* e, Component* ec) {
 		ASSERT(ec && e && ec->get_owner() == e);
 
 		ImGui::TableNextRow();
@@ -1917,7 +1917,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
 				if (ImGui::MenuItem("Remove (warning: no undo)")) {
 
-					auto ec_ = eng->get_object(component_context_menu)->cast_to<EntityComponent>();
+					auto ec_ = eng->get_object(component_context_menu)->cast_to<Component>();
 					if (ed_doc.is_this_object_not_inherited(ec_)) {
 						ed_doc.command_mgr->add_command(new RemoveComponentCommand(ec_->get_owner(), ec_));
 					}
@@ -2011,10 +2011,10 @@ void EdPropertyGrid::draw()
 				ImGui::OpenPopup("addcomponentpopup");
 			}
 			if (ImGui::BeginPopup("addcomponentpopup")) {
-				auto iter = ClassBase::get_subclasses<EntityComponent>();
+				auto iter = ClassBase::get_subclasses<Component>();
 				for (; !iter.is_end(); iter.next()) {
 					if (iter.get_type()->default_class_object) {
-						const char* s = ((EntityComponent*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
+						const char* s = ((Component*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
 						if (*s) {
 							auto tex = g_assets.find_global_sync<Texture>(s);
 							if (tex) {
@@ -2067,7 +2067,7 @@ void EdPropertyGrid::draw()
 						const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
 						if (payload) {
 
-							auto component_metadata = AssetRegistrySystem::get().find_for_classtype(&EntityComponent::StaticType);
+							auto component_metadata = AssetRegistrySystem::get().find_for_classtype(&Component::StaticType);
 							auto script_metadata = AssetRegistrySystem::get().find_for_classtype(&Script::StaticType);
 							auto mesh_metadata = AssetRegistrySystem::get().find_for_classtype(&Model::StaticType);
 
@@ -2086,7 +2086,7 @@ void EdPropertyGrid::draw()
 									ASSERT(ent);
 									if (type == component_metadata) {
 										auto comp_type = ClassBase::find_class(resource->filename.c_str());
-										if (comp_type && comp_type->is_a(EntityComponent::StaticType)) {
+										if (comp_type && comp_type->is_a(Component::StaticType)) {
 											ed_doc.command_mgr->add_command(
 												new CreateComponentCommand(ent, comp_type)
 											);
@@ -2429,14 +2429,14 @@ void EdPropertyGrid::refresh_grid()
 		if (!comps.empty() && serialize_this_objects_children(entity.get(), ed_doc.get_editing_prefab())) {
 			if (selected_component == 0)
 				selected_component = comps[0]->get_instance_id();
-			if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<EntityComponent>() == nullptr ||
-				eng->get_object(selected_component)->cast_to<EntityComponent>()->get_owner() != entity.get())
+			if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<Component>() == nullptr ||
+				eng->get_object(selected_component)->cast_to<Component>()->get_owner() != entity.get())
 				selected_component = comps[0]->get_instance_id();
 
 			ASSERT(selected_component != 0);
 
 
-			auto c = eng->get_object(selected_component)->cast_to<EntityComponent>();
+			auto c = eng->get_object(selected_component)->cast_to<Component>();
 			printf("adding to grid: %s\n", c->get_type().classname);
 
 			ASSERT(c);
@@ -2519,14 +2519,14 @@ void EditorDoc::hook_menu_bar()
 			set_plugin(nullptr);
 		}
 
-		auto iter = ClassBase::get_subclasses<LEPlugin>();
-		for (; !iter.is_end(); iter.next()) {
-			auto type = iter.get_type();
-			if (ImGui::MenuItem(type->classname)) {
-				set_plugin(type);
-			}
-
-		}
+		//auto iter = ClassBase::get_subclasses<LEPlugin>();
+		//for (; !iter.is_end(); iter.next()) {
+		//	auto type = iter.get_type();
+		//	if (ImGui::MenuItem(type->classname)) {
+		//		set_plugin(type);
+		//	}
+		//
+		//}
 		ImGui::EndMenu();
 	}
 	if (ImGui::BeginMenu("Commands")) {

@@ -42,7 +42,7 @@ AnimationGraphEditor anim_graph_ed;
 IEditorTool* g_anim_ed_graph = &anim_graph_ed;
 
 
-CLASS_H(AG_GuiLayout, gui::Fullscreen)
+CLASS_H(AG_GuiLayout, guiFullscreen)
 public:
 	void on_pressed(int x, int y, int button) override {
 		set_focus();

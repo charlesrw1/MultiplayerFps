@@ -18,7 +18,7 @@ class UnserializedSceneFile;
 class SerializedSceneFile;
 class BaseUpdater;
 struct ClassTypeInfo;
-class EntityComponent;
+class Component;
 class Level
 {
 public:
@@ -41,21 +41,21 @@ public:
 	void sync_level_render_data();
 
 	// this adds to the sync list to defer if in game task, or immedetaly calls on_sync() otherwise
-	void add_to_sync_render_data_list(EntityComponent* ec);
+	void add_to_sync_render_data_list(Component* ec);
 	
-	void add_to_update_list(EntityComponent* ec) {
+	void add_to_update_list(Component* ec) {
 		if (b_is_in_update_tick.get_value())
 			wantsToAddToUpdate.push_back(ec);
 		else
 			tick_list.insert(ec);
 	}
 
-	void remove_from_update_list(EntityComponent* ec);
+	void remove_from_update_list(Component* ec);
 
 	// destroy an entity, calls desroy_internal(), deletes, removes from list
 	void destroy_entity(Entity* e);
 	
-	void destroy_component(EntityComponent* e);
+	void destroy_component(Component* e);
 
 	
 	Entity* spawn_prefab(const PrefabAsset* asset);
@@ -70,7 +70,7 @@ public:
 		return DeferredSpawnScope(ptr);
 	}
 
-	void add_and_init_created_runtime_component(EntityComponent* c);
+	void add_and_init_created_runtime_component(Component* c);
 
 
 	BaseUpdater* get_entity(uint64_t handle) {
@@ -99,7 +99,7 @@ private:
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
 
-	hash_set<EntityComponent> tick_list;
+	hash_set<Component> tick_list;
 
 	// last instance id, incremented to add objs
 	uint64_t last_id = 0;
@@ -107,8 +107,8 @@ private:
 	ScopedBooleanValue b_is_in_update_tick;
 
 
-	std::vector<EntityComponent*> wantsToAddToUpdate;
-	hash_set<EntityComponent> wants_sync_update;
+	std::vector<Component*> wantsToAddToUpdate;
+	hash_set<Component> wants_sync_update;
 	std::unordered_set<uint64_t> deferred_delete_list;
 
 	// is this an editor level

@@ -111,7 +111,7 @@ struct MeshLod
 };
 
 class MSkeleton;
-class PhysicsBody;
+class PhysicsBodyDefinition;
 CLASS_H(Model,IAsset)
 public:
 	~Model() override;
@@ -153,7 +153,7 @@ public:
 
 	const Bounds& get_bounds() const { return aabb; }
 
-	const PhysicsBody* get_physics_body() const {
+	const PhysicsBodyDefinition* get_physics_body() const {
 		return collision.get();
 	}
 	const RawMeshData* get_raw_mesh_data() const {
@@ -177,7 +177,7 @@ private:
 	unique_ptr<MSkeleton> skel;
 
 	// collision geometry, if null, then the aabb of the model will be used if the object is used as collision
-	unique_ptr<PhysicsBody> collision;
+	unique_ptr<PhysicsBodyDefinition> collision;
 
 	vector<ModelTag> tags;
 	vector<const MaterialInstance*> materials;

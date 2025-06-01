@@ -24,7 +24,7 @@ public:
 	}
 
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
-		auto subclasses = ClassBase::get_subclasses<EntityComponent>();
+		auto subclasses = ClassBase::get_subclasses<Component>();
 		for (; !subclasses.is_end(); subclasses.next()) {
 			if (subclasses.get_type()->allocate) {
 				std::string path = subclasses.get_type()->classname;
@@ -33,18 +33,18 @@ public:
 			}
 		}
 	}
-	virtual const ClassTypeInfo* get_asset_class_type() const { return &EntityComponent::StaticType; }
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
 	virtual bool assets_are_filepaths() const { return false; }
 };
 REGISTER_ASSETMETADATA_MACRO(ComponentTypeMetadata);
 #endif
 
-void EntityComponent::set_owner_dont_serialize_or_edit(bool b)
+void Component::set_owner_dont_serialize_or_edit(bool b)
 {
 	if (get_owner())
 		get_owner()->dont_serialize_or_edit = b;
 }
-void EntityComponent::set_ticking(bool shouldTick)
+void Component::set_ticking(bool shouldTick)
 {
 	auto level = eng->get_level();
 	if (level && tick_enabled != shouldTick && init_state == initialization_state::CALLED_START) {
@@ -55,7 +55,7 @@ void EntityComponent::set_ticking(bool shouldTick)
 	}
 	tick_enabled = shouldTick;
 }
-void EntityComponent::init_updater()
+void Component::init_updater()
 {
 	auto level = eng->get_level();
 	ASSERT(level);
@@ -63,14 +63,14 @@ void EntityComponent::init_updater()
 	if (level && tick_enabled)
 		level->add_to_update_list(this);
 }
-void EntityComponent::shutdown_updater()
+void Component::shutdown_updater()
 {
 	auto level = eng->get_level();
 	ASSERT(level);
 	if (level && tick_enabled)
 		level->remove_from_update_list(this);
 }
-void EntityComponent::activate_internal_step1()
+void Component::activate_internal_step1()
 {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
@@ -78,7 +78,7 @@ void EntityComponent::activate_internal_step1()
 	}
 	init_state = initialization_state::CALLED_PRE_START;
 }
-void EntityComponent::activate_internal_step2()
+void Component::activate_internal_step2()
 {
 	ASSERT(init_state == initialization_state::CALLED_PRE_START);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
@@ -88,7 +88,7 @@ void EntityComponent::activate_internal_step2()
 	init_state = initialization_state::CALLED_START;
 }
 
-void EntityComponent::deactivate_internal()
+void Component::deactivate_internal()
 {
 	ASSERT(init_state == initialization_state::CALLED_START);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
@@ -98,29 +98,29 @@ void EntityComponent::deactivate_internal()
 	init_state = initialization_state::HAS_ID;
 }
 
-void EntityComponent::destroy()
+void Component::destroy()
 {
 	ASSERT(eng->get_level());
 	eng->get_level()->destroy_component(this);
 }
-void EntityComponent::sync_render_data()
+void Component::sync_render_data()
 {
 	if(init_state!=initialization_state::CONSTRUCTOR)
 		eng->get_level()->add_to_sync_render_data_list(this);
 }
 
-void EntityComponent::initialize_internal_step1()
+void Component::initialize_internal_step1()
 {
 	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
 		activate_internal_step1();
 }
-void EntityComponent::initialize_internal_step2()
+void Component::initialize_internal_step2()
 {
 	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
 		activate_internal_step2();
 }
 
-void EntityComponent::destroy_internal()
+void Component::destroy_internal()
 {
 	if(init_state==initialization_state::CALLED_START)
 		deactivate_internal();
@@ -129,10 +129,10 @@ void EntityComponent::destroy_internal()
 	ASSERT(entity_owner == nullptr);
 }
 
-EntityComponent::~EntityComponent() {
+Component::~Component() {
 	ASSERT(init_state != initialization_state::CALLED_PRE_START && init_state!=initialization_state::CALLED_START);
 }
 
-const glm::mat4& EntityComponent::get_ws_transform() {
+const glm::mat4& Component::get_ws_transform() {
 	return get_owner()->get_ws_transform();
 }

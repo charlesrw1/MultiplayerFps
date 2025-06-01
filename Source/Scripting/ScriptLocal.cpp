@@ -42,7 +42,7 @@ void push_iasset_to_lua(lua_State* L, IAsset* a) {
 void push_entity_to_lua(lua_State* L, Entity* e) {
 	make_table_for_gameobject(L, e);
 }
-void push_entitycomponent_to_lua(lua_State* L, EntityComponent* ec) {
+void push_entitycomponent_to_lua(lua_State* L, Component* ec) {
 	make_table_for_gameobject(L, ec);
 }
 
@@ -719,7 +719,6 @@ lua_State* get_lua_state_for_call_func()
 }
 
 
-CLASS_IMPL(ScriptComponent);
 
 ScriptComponent::ScriptComponent()
 {
@@ -877,13 +876,4 @@ void ScriptComponent::update()
 	if (!loaded_successfully || !call_function("event_update")) {
 		set_ticking(false);
 	}
-}
-const PropertyInfoList* ScriptComponent::get_props() {
-	MAKE_VECTORCALLBACK_ATOM(EntityPtr, refs);
-	START_PROPS(ScriptComponent)
-		REG_ASSET_PTR(script, PROP_DEFAULT),
-		REG_STDVECTOR(refs, PROP_DEFAULT),
-		REG_FUNCTION(get_ref),
-		REG_FUNCTION(get_num_refs)
-	END_PROPS(ScriptComponent)
 }

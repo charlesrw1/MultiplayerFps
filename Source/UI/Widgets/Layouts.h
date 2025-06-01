@@ -2,10 +2,11 @@
 #include "UI/BaseGUI.h"
 #include "UI/Widgets/SharedFuncs.h"
 
-namespace gui {
-NEWCLASS(Fullscreen, BaseGUI)
-public:
 
+class guiFullscreen : public guiBase
+{
+public:
+	CLASS_BODY(guiFullscreen);
 	// size which determines how widgets are placed relative to anchors
 
 	void update_widget_size() override {
@@ -14,7 +15,7 @@ public:
 
 	void update_subwidget_positions() override {
 
-		InlineVec<BaseGUI*, 16> children;
+		InlineVec<guiBase*, 16> children;
 		get_gui_children(children);
 
 		for (int i = 0; i < children.size(); i++) {
@@ -52,8 +53,11 @@ public:
 	int z_order = 0;
 };
 
-NEWCLASS(HorizontalBox, BaseGUI)
+class guiHBox : public guiBase
+{
 public:
+	CLASS_BODY(guiHBox);
+
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final { return "eng/editor/guihorizontalbox.png"; }
 #endif
@@ -65,9 +69,11 @@ public:
 	}
 };
 
-NEWCLASS(VerticalBox,BaseGUI)
+class guiVBox : public guiBase
+{
 public:
-	VerticalBox() {
+	CLASS_BODY(guiVBox);
+	guiVBox() {
 		uses_clip_test = true;
 		eat_scroll_event = true;
 		recieve_mouse = guiMouseFilter::Block;
@@ -89,5 +95,3 @@ public:
 		update_child_positions_flow(this, 1, start);
 	}
 };
-
-}

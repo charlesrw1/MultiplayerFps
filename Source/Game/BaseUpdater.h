@@ -9,8 +9,11 @@ class Entity;
 class PrefabAsset;
 class Level;
 
-NEWCLASS(BaseUpdater, ClassBase)
+class BaseUpdater : public ClassBase
+{
 public:
+	CLASS_BODY(BaseUpdater);
+
 	// queues this entity/component to be destroyed at the end of the frame
 	REFLECT(name="destroy");
 	void destroy_deferred();

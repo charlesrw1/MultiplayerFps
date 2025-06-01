@@ -12,13 +12,15 @@ GENERATED_CLASS_INCLUDE("Render/Texture.h");
 
 extern ConfigVar ui_draw_text_bbox;
 class Texture;
-namespace gui {
 
 // Places a widget in another widget
-NEWCLASS(Box, BaseGUI)
+class guiBox : public guiBase
+{
 public:
-	~Box();
-	Box();
+	CLASS_BODY(guiBox);
+
+	~guiBox();
+	guiBox();
 
 	REFLECT();
 	Color32 color = COLOR_WHITE;
@@ -46,16 +48,21 @@ public:
 };
 
 
-NEWCLASS(Image,BaseGUI)
+class guiImage : public guiBase
+{
 public:
+	CLASS_BODY(guiImage);
+
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return "eng/editor/guiimage.png"; }
 #endif
 };
 
-NEWCLASS(Text, BaseGUI)
+class guiText : public guiBase
+{
 public:
-	Text() {
+	CLASS_BODY(guiText);
+	guiText() {
 		recieve_mouse = guiMouseFilter::Ignore;
 	}
 
@@ -93,5 +100,3 @@ public:
 		b.draw_text(ws_position+ text_offset, ws_size, font, sv, color);
 	}
 };
-
-}

@@ -8,8 +8,6 @@
 #include "Render/Frustum.h"
 
 
-CLASS_IMPL(CameraComponent);
-
 CameraComponent* CameraComponent::scene_camera;
 
 void CameraComponent::start()

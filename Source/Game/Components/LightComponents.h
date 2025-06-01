@@ -10,8 +10,13 @@ class Texture;
 struct Render_Light;
 class BillboardComponent;
 class ArrowComponent;
-NEWCLASS(SpotLightComponent, EntityComponent)
+
+class SpotLightComponent : public Component
+{
 public:
+	CLASS_BODY(SpotLightComponent);
+
+	
 	void start() final;
 	void end() final;
 	void on_sync_render_data() final;
@@ -52,8 +57,11 @@ public:
 	uint64_t editor_arrow = 0;
 };
 
-NEWCLASS(PointLightComponent, EntityComponent)
+class PointLightComponent : public Component
+{
 public:
+	CLASS_BODY(PointLightComponent);
+
 	PointLightComponent();
 	void start() final;
 	void end() final;
@@ -85,8 +93,11 @@ public:
 };
 
 struct Render_Sun;
-NEWCLASS(SunLightComponent, EntityComponent)
+class SunLightComponent : public Component
+{
 public:
+	CLASS_BODY(SunLightComponent);
+
 	SunLightComponent();
 	~SunLightComponent() final;
 	void start() final;
@@ -127,8 +138,10 @@ public:
 };
 
 struct Render_Skylight;
-NEWCLASS(SkylightComponent, EntityComponent)
+class SkylightComponent : public Component
+{
 public:
+	CLASS_BODY(SkylightComponent);
 	SkylightComponent() {
 		set_call_init_in_editor(true);
 	}
@@ -153,8 +166,10 @@ struct CubemapAnchor
 struct Render_Reflection_Volume;
 class MeshComponent;
 class MeshBuilderComponent;
-NEWCLASS(CubemapComponent, EntityComponent)
+class CubemapComponent : public Component
+{
 public:
+	CLASS_BODY(CubemapComponent);
 	CubemapComponent() {
 		set_call_init_in_editor(true);
 	}

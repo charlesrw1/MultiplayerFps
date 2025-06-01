@@ -1,11 +1,10 @@
 #include "Visuals.h"
 
 #include "Render/Texture.h"
-namespace gui {
-Box::~Box() {
+
+guiBox::~guiBox() {
 
 }
-Box::Box() {
+guiBox::guiBox() {
 	recieve_mouse = guiMouseFilter::Pass;
-}
 }

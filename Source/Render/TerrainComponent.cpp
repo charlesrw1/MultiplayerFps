@@ -10,7 +10,7 @@
 
 #include "Game/Components/BillboardComponent.h"
 #include "Assets/AssetDatabase.h"
-CLASS_H(TerrainComponent,EntityComponent)
+CLASS_H(TerrainComponent,Component)
 public:
 	AssetPtr<Texture> heightmap;
 	AssetPtr<MaterialInstance> terrain_material;

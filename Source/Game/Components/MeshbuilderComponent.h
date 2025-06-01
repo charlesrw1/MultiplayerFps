@@ -4,7 +4,7 @@
 #include "Render/DrawPublic.h"
 #include "Framework/MeshBuilder.h"
 
-CLASS_H(MeshBuilderComponent, EntityComponent)
+CLASS_H(MeshBuilderComponent, Component)
 public:
 	MeshBuilderComponent() {
 		dont_serialize_or_edit = true;

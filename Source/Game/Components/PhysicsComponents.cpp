@@ -25,7 +25,7 @@ ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", 
 
 using namespace physx;
 
-void PhysicsComponentBase::fetch_new_transform()
+void PhysicsBody::fetch_new_transform()
 {
 	ASSERT(get_is_simulating());
 	ASSERT(has_initialized());
@@ -60,7 +60,7 @@ glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {
     return 2.0f * glm::vec3(dq.x, dq.y, dq.z) / dt;
 }
 
-void PhysicsComponentBase::enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt)
+void PhysicsBody::enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt)
 {
 	set_is_enable(true);
 	auto rot0 = glm::quat_cast(t0);
@@ -80,7 +80,7 @@ void PhysicsComponentBase::enable_with_initial_transforms(const glm::mat4& t0, c
 }
 
 
-void PhysicsComponentBase::update()
+void PhysicsBody::update()
 {
 	set_ticking(false);
 	return;
@@ -97,13 +97,13 @@ void PhysicsComponentBase::update()
 
 	get_owner()->set_ws_transform(mat);
 }
-void PhysicsComponentBase::set_linear_velocity(const glm::vec3& v)
+void PhysicsBody::set_linear_velocity(const glm::vec3& v)
 {
 	if (auto d = get_dynamic_actor()) {
 		d->setLinearVelocity(glm_to_physx(v));
 	}
 }
-void PhysicsComponentBase::set_angular_velocity(const glm::vec3& v)
+void PhysicsBody::set_angular_velocity(const glm::vec3& v)
 {
 	if (auto d = get_dynamic_actor()) {
 		d->setAngularVelocity(glm_to_physx(v));
@@ -112,7 +112,7 @@ void PhysicsComponentBase::set_angular_velocity(const glm::vec3& v)
 
 // Initialization done in pre_start now to let joint initialization work properly in start()
 
-void PhysicsComponentBase::pre_start()
+void PhysicsBody::pre_start()
 {
 	if (eng->is_editor_level()) 
 		return;
@@ -164,7 +164,7 @@ void PhysicsComponentBase::pre_start()
 
 }
 
-void PhysicsComponentBase::update_bone_parent_animator()
+void PhysicsBody::update_bone_parent_animator()
 {
 	ASSERT(init_state != initialization_state::HAS_ID);
 
@@ -188,7 +188,7 @@ void PhysicsComponentBase::update_bone_parent_animator()
 		a->add_simulating_physics_object(get_owner());
 }
 
-void PhysicsComponentBase::start()
+void PhysicsBody::start()
 {
 	if (eng->is_editor_level()) {
 		auto shape = get_owner()->create_component<MeshBuilderComponent>();
@@ -207,12 +207,12 @@ void PhysicsComponentBase::start()
 	update_bone_parent_animator();
 }
 
-void PhysicsComponentBase::end()
+void PhysicsBody::end()
 {
 	if (editor_shape_id != 0) {
 		auto shapeptr = eng->get_level()->get_entity(editor_shape_id);
 		if (shapeptr) {
-			((EntityComponent*)shapeptr)->destroy();
+			((Component*)shapeptr)->destroy();
 		}
 		editor_shape_id = 0;
 	}
@@ -229,7 +229,7 @@ void PhysicsComponentBase::end()
 	update_bone_parent_animator();
 }
 
-void PhysicsComponentBase::update_mass()
+void PhysicsBody::update_mass()
 {
 	ASSERT(physxActor);
 	if (!get_is_actor_static()) {
@@ -237,7 +237,7 @@ void PhysicsComponentBase::update_mass()
 		PxRigidBodyExt::updateMassAndInertia(*dyn,density);
 	}
 }
-float PhysicsComponentBase::get_mass()const
+float PhysicsBody::get_mass()const
 {
 	ASSERT(physxActor);
 	if (!get_is_actor_static() && physxActor) {
@@ -288,7 +288,7 @@ void MeshColliderComponent::add_actor_shapes() {
 		add_model_shape_to_actor(mesh->get_model());
 }
 
-void PhysicsComponentBase::on_changed_transform() {
+void PhysicsBody::on_changed_transform() {
 	if (editor_shape_id != 0) {
 		auto mb = get_editor_meshbuilder();
 		mb->mb.Begin();
@@ -304,21 +304,21 @@ void PhysicsComponentBase::on_changed_transform() {
 		return;
 	set_transform(get_ws_transform());
 }
-PhysicsComponentBase::~PhysicsComponentBase()
+PhysicsBody::~PhysicsBody()
 {
 	ASSERT(!physxActor);
 }
-PhysicsComponentBase::PhysicsComponentBase() {
+PhysicsBody::PhysicsBody() {
 	set_call_init_in_editor(true);
 }
 
-bool PhysicsComponentBase::get_is_actor_static() const {
+bool PhysicsBody::get_is_actor_static() const {
 	if (!physxActor)
 		return false;
 	return physxActor->getType() == physx::PxActorType::eRIGID_STATIC;
 }
 
-void PhysicsComponentBase::apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse)
+void PhysicsBody::apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse)
 {
 	if (has_initialized()) {
 		physx::PxRigidBodyExt::addForceAtPos(
@@ -328,7 +328,7 @@ void PhysicsComponentBase::apply_impulse(const glm::vec3& worldspace, const glm:
 			physx::PxForceMode::eIMPULSE);
 	}
 }
-void PhysicsComponentBase::apply_force(const glm::vec3& worldspace, const glm::vec3& force)
+void PhysicsBody::apply_force(const glm::vec3& worldspace, const glm::vec3& force)
 {
 	if (has_initialized()) {
 		physx::PxRigidBodyExt::addForceAtPos(
@@ -338,7 +338,7 @@ void PhysicsComponentBase::apply_force(const glm::vec3& worldspace, const glm::v
 			physx::PxForceMode::eFORCE);
 	}
 }
-glm::mat4 PhysicsComponentBase::get_transform() const
+glm::mat4 PhysicsBody::get_transform() const
 {
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
@@ -347,14 +347,14 @@ glm::mat4 PhysicsComponentBase::get_transform() const
 	return mat;
 }
 
-physx::PxRigidDynamic* PhysicsComponentBase::get_dynamic_actor() const {
+physx::PxRigidDynamic* PhysicsBody::get_dynamic_actor() const {
 	ASSERT(physxActor && !get_is_actor_static());
 	return (physx::PxRigidDynamic*)physxActor;
 }
-glm::vec3 PhysicsComponentBase::get_linear_velocity() const {
+glm::vec3 PhysicsBody::get_linear_velocity() const {
 	return physx_to_glm(get_dynamic_actor()->getLinearVelocity());
 }
-void PhysicsComponentBase::set_shape_flags(PxShape* shape)
+void PhysicsBody::set_shape_flags(PxShape* shape)
 {
 	if (is_trigger)
 		shape->setFlags(PxShapeFlag::eTRIGGER_SHAPE | PxShapeFlag::eVISUALIZATION);
@@ -366,7 +366,7 @@ void PhysicsComponentBase::set_shape_flags(PxShape* shape)
 	shape->setQueryFilterData(filter);
 	shape->setSimulationFilterData(filter);
 }
-void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
+void PhysicsBody::add_model_shape_to_actor(const Model* model)
 {
 	if (model->get_physics_body()) {
 		auto body = model->get_physics_body();
@@ -405,7 +405,7 @@ void PhysicsComponentBase::add_model_shape_to_actor(const Model* model)
 		set_shape_flags(shape);
 	}
 }
-void PhysicsComponentBase::add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius)
+void PhysicsBody::add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius)
 {
 	auto capGeom = PxCapsuleGeometry(radius, height * 0.5 - radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
@@ -417,7 +417,7 @@ void PhysicsComponentBase::add_vertical_capsule_to_actor(const glm::vec3& base, 
 	shape->setLocalPose(glm_to_physx(localpose));
 	set_shape_flags(shape);
 }
-void PhysicsComponentBase::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
+void PhysicsBody::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
 {
 	auto boxGeom = PxSphereGeometry(radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
@@ -425,7 +425,7 @@ void PhysicsComponentBase::add_sphere_shape_to_actor(const glm::vec3& pos, float
 	shape->setLocalPose(PxTransform(glm_to_physx(pos)));
 	set_shape_flags(shape);
 }
-void PhysicsComponentBase::add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents)
+void PhysicsBody::add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents)
 {
 	auto boxGeom = PxBoxGeometry(glm_to_physx(halfExtents));
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
@@ -434,7 +434,7 @@ void PhysicsComponentBase::add_box_shape_to_actor(const glm::mat4& localTransfor
 	set_shape_flags(shape);
 }
 
-void PhysicsComponentBase::set_is_simulating(bool simulate_physics)
+void PhysicsBody::set_is_simulating(bool simulate_physics)
 {
 	if (simulate_physics != this->simulate_physics) {
 		this->simulate_physics = simulate_physics;
@@ -454,7 +454,7 @@ void PhysicsComponentBase::set_is_simulating(bool simulate_physics)
 		}
 	}
 }
-void PhysicsComponentBase::set_is_enable(bool enabled)
+void PhysicsBody::set_is_enable(bool enabled)
 {
 	if (enabled != this->enabled) {
 		this->enabled = enabled;
@@ -467,14 +467,14 @@ void PhysicsComponentBase::set_is_enable(bool enabled)
 		}
 	}
 }
-void PhysicsComponentBase::set_physics_layer(PhysicsLayer l)
+void PhysicsBody::set_physics_layer(PhysicsLayer l)
 {
 	if (l == physics_layer) return;
 	physics_layer = l;
 	if (has_initialized())
 		refresh_shapes();
 }
-void PhysicsComponentBase::refresh_shapes()
+void PhysicsBody::refresh_shapes()
 {
 	ASSERT(has_initialized());
 
@@ -491,14 +491,14 @@ void PhysicsComponentBase::refresh_shapes()
 		start += 64;
 	}
 }
-void PhysicsComponentBase::force_set_transform(const glm::mat4& m)
+void PhysicsBody::force_set_transform(const glm::mat4& m)
 {
 	if (has_initialized()) {
 		physxActor->setGlobalPose(glm_to_physx(m), true);
 	}
 }
 
-void PhysicsComponentBase::set_transform(const glm::mat4& transform, bool teleport)
+void PhysicsBody::set_transform(const glm::mat4& transform, bool teleport)
 {
 	if (has_initialized()) {
 		if (simulate_physics) {
@@ -520,26 +520,26 @@ void PhysicsComponentBase::set_transform(const glm::mat4& transform, bool telepo
 
 
 
-void PhysicsComponentBase::set_is_trigger(bool is_trig) {
+void PhysicsBody::set_is_trigger(bool is_trig) {
 	if (is_trig == is_trigger) return;
 	is_trigger = is_trig;
 	if (has_initialized())
 		refresh_shapes();
 }
-void PhysicsComponentBase::set_send_overlap(bool send_overlap) {
+void PhysicsBody::set_send_overlap(bool send_overlap) {
 	this->send_overlap = send_overlap;
 }
-void PhysicsComponentBase::set_send_hit(bool send_hit) {
+void PhysicsBody::set_send_hit(bool send_hit) {
 	this->send_hit = send_hit;
 }
-void PhysicsComponentBase::set_is_static(bool is_static)
+void PhysicsBody::set_is_static(bool is_static)
 {
 	this->is_static = is_static;
 	
 }
 
 
-MeshBuilderComponent* PhysicsComponentBase::get_editor_meshbuilder() const {
+MeshBuilderComponent* PhysicsBody::get_editor_meshbuilder() const {
 	return (MeshBuilderComponent*)eng->get_level()->get_entity(editor_shape_id);
 }
 
@@ -563,9 +563,9 @@ void PhysicsJointComponent::refresh_joint()
 		sys_print(Warning, "Joint component has no physics component\n");
 		return;
 	}
-	PhysicsComponentBase* other = nullptr;
+	PhysicsBody* other = nullptr;
 	if (get_target()) {
-		other= get_target()->get_component<PhysicsComponentBase>();
+		other= get_target()->get_component<PhysicsBody>();
 		if (!other) {
 			sys_print(Warning, "Joint component target has no physics component\n");
 		}
@@ -603,8 +603,8 @@ void PhysicsJointComponent::end()
 		editor_meshbuilder->destroy();
 }
 
-PhysicsComponentBase* PhysicsJointComponent::get_owner_physics() {
-	return get_owner()->get_component<PhysicsComponentBase>();
+PhysicsBody* PhysicsJointComponent::get_owner_physics() {
+	return get_owner()->get_component<PhysicsBody>();
 }
 static glm::mat4 get_transform_joint(JointAnchor anchor, int axis)
 {
@@ -630,7 +630,7 @@ void PhysicsJointComponent::draw_meshbuilder()
 
 	if (!get_target())
 		return;
-	auto other_phys = get_target()->get_component<PhysicsComponentBase>();
+	auto other_phys = get_target()->get_component<PhysicsBody>();
 	if (!other_phys)
 		return;
 	world = get_target()->get_ws_transform();
@@ -638,7 +638,7 @@ void PhysicsJointComponent::draw_meshbuilder()
 }
 
 template<typename T>
-static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsComponentBase* a, PhysicsComponentBase*b)
+static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsBody* a, PhysicsBody*b)
 {
 	T* joint = nullptr;
 	auto my_local = get_transform_joint(anchor, local_joint_axis);
@@ -661,7 +661,7 @@ static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, i
 	return joint;
 }
 
-void HingeJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b)
+void HingeJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b)
 {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
@@ -679,7 +679,7 @@ void HingeJointComponent::free_joint()
 	}
 }
 
-void BallSocketJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b)
+void BallSocketJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b)
 {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
@@ -717,7 +717,7 @@ void PhysicsJointComponent::editor_on_change_property() {
 PxJoint* AdvancedJointComponent::get_joint() const {
 	return joint;
 }
-void AdvancedJointComponent::init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) {
+void AdvancedJointComponent::init_joint(PhysicsBody* a, PhysicsBody* b) {
 	ASSERT(!joint);
 	ASSERT(get_owner() == a->get_owner());
 	joint = make_joint_shared(get_ws_transform(), anchor, local_joint_axis, PxD6JointCreate, a, b);

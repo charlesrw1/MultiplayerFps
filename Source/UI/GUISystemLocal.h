@@ -22,10 +22,7 @@
 
 class MaterialInstance;
 
-namespace gui {
-class Fullscreen;
-class BaseGUI;
-}
+
 
 
 class UIBuilder;
@@ -61,8 +58,8 @@ public:
 	void paint() final;
 	void sync_to_renderer() final;
 
-	void remove_reference(gui::BaseGUI* this_panel);
-	void set_focus_to_this(gui::BaseGUI* panel);
+	void remove_reference(guiBase* this_panel);
+	void set_focus_to_this(guiBase* panel);
 
 	glm::ivec2 viewport_position{0,0};
 	glm::ivec2 viewport_size{0,0};
@@ -83,25 +80,25 @@ public:
 		return ui_default;
 	}
 	
-	gui::BaseGUI* hovering = nullptr;
-	gui::BaseGUI* mouse_focus = nullptr;
-	gui::BaseGUI* key_focus = nullptr;
+	guiBase* hovering = nullptr;
+	guiBase* mouse_focus = nullptr;
+	guiBase* key_focus = nullptr;
 
-	void set_hovering(gui::BaseGUI* panel);
-	void update_widget_sizes_R(gui::BaseGUI* g);
-	void update_widget_positions_R(gui::BaseGUI* g);
-	void paint_widgets_R(gui::BaseGUI* g, UIBuilder& builder);
-	gui::BaseGUI* find_gui_under_mouse(int x, int y, bool for_scroll) const;
-	gui::BaseGUI* find_gui_under_mouse_R(gui::BaseGUI* g, int x, int y, bool for_scroll) const;
+	void set_hovering(guiBase* panel);
+	void update_widget_sizes_R(guiBase* g);
+	void update_widget_positions_R(guiBase* g);
+	void paint_widgets_R(guiBase* g, UIBuilder& builder);
+	guiBase* find_gui_under_mouse(int x, int y, bool for_scroll) const;
+	guiBase* find_gui_under_mouse_R(guiBase* g, int x, int y, bool for_scroll) const;
 
 
-	void remove_gui_layer(gui::BaseGUI* layer);
-	void add_gui_layer(gui::BaseGUI* layer);
+	void remove_gui_layer(guiBase* layer);
+	void add_gui_layer(guiBase* layer);
 	// -1 if not found
-	int find_existing_layer(gui::BaseGUI* gui) const;
+	int find_existing_layer(guiBase* gui) const;
 	void sort_gui_layers();
 
-	std::vector<gui::BaseGUI*> gui_layers;
+	std::vector<guiBase*> gui_layers;
 	bool layers_needs_sorting = false;
 };
 

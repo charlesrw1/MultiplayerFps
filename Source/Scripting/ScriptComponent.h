@@ -16,28 +16,10 @@ struct OutstandingScriptDelegate {
 };
 
 
-
-CLASS_H(ScriptComponent, EntityComponent)
+class ScriptComponent : public Component
+{
 public:
-	struct PubVar
-	{
-		enum class Type {
-			None,
-			Boolean,
-			Int,
-			Float,
-			EntityPtr,
-			AssetPtr,
-		}type=Type::None;
-		const ClassTypeInfo* typeExtended = nullptr;
-		union {
-			bool boolean;
-			int64_t integer;
-			float floatval;
-			uint64_t entityhandle;
-			IAsset* assetPtr;
-		}data = {};
-	};
+	CLASS_BODY(ScriptComponent);
 
 	ScriptComponent();
 	~ScriptComponent();
@@ -68,14 +50,10 @@ public:
 	bool call_function_part2(const char* name, int num_args);
 	bool has_function(const char* name);
 
-	static const PropertyInfoList* get_props();
-
 	std::vector<EntityPtr> refs;
 	std::vector<OutstandingScriptDelegate> outstandings;
-	AssetPtr<Script> script;
+	REF AssetPtr<Script> script;
 private:
-
-	std::vector<PubVar> publicVars;	// parsed from script
 
 	void print_my_table();
 	void push_table_to_stack();

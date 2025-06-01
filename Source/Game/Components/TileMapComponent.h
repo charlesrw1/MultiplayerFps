@@ -31,8 +31,11 @@ struct TilemapData
 
 
 class MeshBuilderComponent;
-NEWCLASS(TileMapComponent, EntityComponent)
+class TileMap : public Component
+{
 public:
+	CLASS_BODY(TileMap);
+
 	// raw data
 	//REFLECT(name = "TilemapData", hide);
 	//TilemapData data;
@@ -56,8 +59,11 @@ public:
 // a simple 2d generator, uses a tilemap texture atlas
 // specify the rows in pixels to align it
 // creates a 2d meshbuilder
-NEWCLASS(DefaultTileMap, TileMapComponent)
+class DefaultTileMap : public TileMap
+{
 public:
+	CLASS_BODY(DefaultTileMap);
+
 	void pre_start() final {}
 	void start() final {}
 	void end() final {}

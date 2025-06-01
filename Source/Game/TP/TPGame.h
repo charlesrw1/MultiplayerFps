@@ -9,8 +9,12 @@
 #include "Game/Components/PhysicsComponents.h"
 
 class TPPlayer;
-NEWCLASS(TPGameMode, EntityComponent)
+
+class TPGameMode : public Component
+{
 public:
+	CLASS_BODY(TPGameMode);
+
 	static TPGameMode* instance;
 	static TPGameMode& get() {
 		ASSERT(instance);
@@ -31,11 +35,8 @@ public:
 		}
 	}
 
-	REFLECT();
-	AssetPtr<PrefabAsset> playerPrefab;
-
-	REFLECT(getter, name="player");
-	TPPlayer* get_player() {
+	REF AssetPtr<PrefabAsset> playerPrefab;
+	REF TPPlayer* get_player() {
 		return player;
 	}
 
@@ -43,13 +44,13 @@ public:
 	TPPlayer* player = nullptr;
 };
 
-NEWCLASS(TPPlayerAnimator, AnimatorInstance)
+class TPPlayerAnimator : public AnimatorInstance
+{
 public:
+	CLASS_BODY(TPPlayerAnimator);
 
-	REFLECT();
-	bool bRunning = false;
-	REFLECT();
-	float flLean = 0.0;
+	REF bool bRunning = false;
+	REF float flLean = 0.0;
 };
 
 struct TPActions
@@ -68,18 +69,16 @@ public:
 	float shoot_cooldown = 0.0;
 };
 
-NEWCLASS(TPPlayer, EntityComponent)
+class TPPlayer : public Component
+{
 public:
-	REFLECT();
-	AssetPtr<AnimationSeqAsset> jump_seq;
-	REFLECT();
-	AssetPtr<AnimationSeqAsset> idle_to_run_seq;
-	REFLECT();
-	AssetPtr<AnimationSeqAsset> run_to_idle_seq;
-	REFLECT();
-	AssetPtr<PrefabAsset> projectile;
-	REFLECT();
-	AssetPtr<PrefabAsset> shotgunSound;
+	CLASS_BODY(TPPlayer);
+
+	REF AssetPtr<AnimationSeqAsset> jump_seq;
+	REF AssetPtr<AnimationSeqAsset> idle_to_run_seq;
+	REF AssetPtr<AnimationSeqAsset> run_to_idle_seq;
+	REF AssetPtr<PrefabAsset> projectile;
+	REF AssetPtr<PrefabAsset> shotgunSound;
 
 	std::unique_ptr<InputUser> input;
 	TPActions act;
@@ -122,8 +121,12 @@ public:
 	}
 };
 
-NEWCLASS(TPProjectile, EntityComponent)
+
+class TPProjectile : public Component
+{
 public:
+	CLASS_BODY(TPProjectile);
+
 	void start() override {
 		set_ticking(true);
 		time_created = eng->get_game_time();
@@ -168,7 +171,7 @@ public:
 	}
 
 	float time_created = 0.0;
-	PhysicsComponentBase* ignore = nullptr;
+	PhysicsBody* ignore = nullptr;
 	glm::vec3 direction = glm::vec3(1, 0, 0);
 	REFLECT();
 	float speed = 10.0;

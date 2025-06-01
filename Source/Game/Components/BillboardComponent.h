@@ -3,12 +3,15 @@
 #include "Game/SerializePtrHelpers.h"
 #include <memory>
 #include "Render/DynamicMaterialPtr.h"
-
+#include "Render/Texture.h"
 class Texture;
 class MaterialInstance;
 struct Render_Object;
-CLASS_H(BillboardComponent,EntityComponent)	//fixme: NEWCLASS
+class BillboardComponent : public Component
+{
 public:
+	CLASS_BODY(BillboardComponent);
+
 	BillboardComponent();
 	~BillboardComponent();
 
@@ -17,8 +20,6 @@ public:
 	void editor_on_change_property() final;
 	void on_changed_transform() final;
 	void on_sync_render_data() final;
-
-	static const PropertyInfoList* get_props();
 
 	void set_texture(const Texture* tex);
 	
@@ -33,8 +34,8 @@ public:
 	}
 
 private:
-	bool visible = true;
+	REF bool visible = true;
 	DynamicMatUniquePtr dynamicMaterial = nullptr;
-	AssetPtr<Texture> texture;
+	REF AssetPtr<Texture> texture;
 	handle<Render_Object> handle;
 };

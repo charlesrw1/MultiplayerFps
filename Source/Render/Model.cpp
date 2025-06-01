@@ -444,7 +444,7 @@ bool Model::load_internal()
 
 	bool has_physics = read.read_byte();
 	if (has_physics) {
-		collision = std::make_unique<PhysicsBody>();
+		collision = std::make_unique<PhysicsBodyDefinition>();
 		auto& body = *collision.get();
 		body.shapes.resize(read.read_int32());
 		for (int i = 0; i < body.shapes.size(); i++) {

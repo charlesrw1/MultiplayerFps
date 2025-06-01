@@ -47,10 +47,6 @@ NEWENUM(guiMouseFilter, uint8_t)
 	Pass,	// ltes children capture mouse, but doesnt capture otherwise
 };
 
-namespace gui
-{
-
-
 struct UIAnchorPos
 {
 	UIAnchorPos() {
@@ -85,10 +81,13 @@ struct UIAnchorPos
 
 };
 
-NEWCLASS(BaseGUI, EntityComponent)
+class guiBase : public Component
+{
 public:
-	BaseGUI();
-	virtual ~BaseGUI();
+	CLASS_BODY(guiBase);
+
+	guiBase();
+	virtual ~guiBase();
 
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return "eng/editor/guibox.png"; }
@@ -133,8 +132,8 @@ public:
 	bool is_hovering() const;
 
 	// helpers
-	void get_gui_children(InlineVec<BaseGUI*, 16>& outvec) const;
-	BaseGUI* get_gui_parent() const;
+	void get_gui_children(InlineVec<guiBase*, 16>& outvec) const;
+	guiBase* get_gui_parent() const;
 	bool get_is_hidden() const;
 
 
@@ -218,5 +217,3 @@ protected:
 	friend class ::GuiSystemLocal;
 private:
 };
-}
-

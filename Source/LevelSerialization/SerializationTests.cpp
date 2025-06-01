@@ -42,7 +42,7 @@ public:
 
 	template<typename T>
 	T* add_component(Entity* e) {
-		EntityComponent* ec = (EntityComponent*)T::StaticType.allocate();
+		Component* ec = (Component*)T::StaticType.allocate();
 		ec->unique_file_id = ++file_id;
 		e->add_component_from_unserialization(ec);
 		all.insert(ec);

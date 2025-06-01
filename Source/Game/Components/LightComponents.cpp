@@ -66,10 +66,10 @@ void SpotLightComponent::end()
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
 	if (e)
-		((EntityComponent*)e)->destroy();
+		((Component*)e)->destroy();
 	e = eng->get_object(editor_arrow);
 	if (e)
-		((EntityComponent*)e)->destroy();
+		((Component*)e)->destroy();
 }
 
 
@@ -104,7 +104,7 @@ void PointLightComponent::end()
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
 	if (e)
-		((EntityComponent*)e)->destroy();
+		((Component*)e)->destroy();
 }
 
 void SunLightComponent::on_sync_render_data()
@@ -149,10 +149,10 @@ void SunLightComponent::end()
 
 	auto e = eng->get_object(editor_billboard);
 	if (e)
-		((EntityComponent*)e)->destroy();
+		((Component*)e)->destroy();
 	e = eng->get_object(editor_arrow);
 	if (e)
-		((EntityComponent*)e)->destroy();
+		((Component*)e)->destroy();
 }
 
 

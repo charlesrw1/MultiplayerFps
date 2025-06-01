@@ -10,7 +10,7 @@ class AnimatorInstance;
 class MaterialInstance;
 class Entity;
 class Model;
-class EntityComponent;
+class Component;
 struct Render_Object
 {
 	Render_Object() {
@@ -38,7 +38,7 @@ struct Render_Object
 	bool is_skybox : 1;	// if true, then this is included in the global skylight reflection probe
 
 	// for debugging only (also editor uses this for picking)
-	const EntityComponent* owner = nullptr;
+	const Component* owner = nullptr;
 
 	glm::mat4 transform = glm::mat4(1.f);
 };
@@ -52,7 +52,7 @@ struct MeshBuilder_Object
 		use_background_color = false;
 	}
 
-	const EntityComponent* owner = nullptr;
+	const Component* owner = nullptr;
 	MeshBuilder* meshbuilder = nullptr;
 	MaterialInstance* material = nullptr;
 	Color32 background_color = COLOR_BLACK;
@@ -67,7 +67,7 @@ struct Particle_Object
 	Particle_Object() {
 
 	}
-	const EntityComponent* owner = nullptr;
+	const Component* owner = nullptr;
 	MeshBuilder* meshbuilder = nullptr;
 	MaterialInstance* material = nullptr;
 	glm::mat4 transform = glm::mat4(1.f);

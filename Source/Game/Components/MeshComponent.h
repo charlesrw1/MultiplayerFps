@@ -19,8 +19,12 @@ class Animation_Tree_CFG;
 class MaterialInstance;
 class RigidbodyComponent;
 class MeshBuilderComponent;
-NEWCLASS(MeshComponent, EntityComponent)
+
+class MeshComponent : public Component
+{
 public:
+	CLASS_BODY(MeshComponent);
+
 	MeshComponent();
 	~MeshComponent() override;
 
@@ -33,13 +37,11 @@ public:
 	void on_sync_render_data() final;
 
 	void set_model_str(const char* model_path);
-	REFLECT();
-	void set_model(Model* model);
+	REF void set_model(Model* model);
 	const Model* get_model() const;
 
 	void set_animator_class(const ClassTypeInfo* ti);
-	REFLECT();
-	void set_animation_graph(Animation_Tree_CFG* tree);
+	REF void set_animation_graph(Animation_Tree_CFG* tree);
 	const Animation_Tree_CFG* get_animation_tree() const;
 	AnimatorInstance* get_animator_instance() const {
 		return animator.get();
@@ -49,8 +51,7 @@ public:
 		return is_visible;
 	}
 
-	REFLECT();
-	void set_is_visible(bool b) {
+	REF void set_is_visible(bool b) {
 		is_visible = b;
 		sync_render_data();
 	}
@@ -81,18 +82,12 @@ public:
 #endif
 
 private:
-	REFLECT();
-	AssetPtr<Model> model;
-	REFLECT();
-	AssetPtr<Animation_Tree_CFG> animator_tree;
-	REFLECT();
-	bool is_visible = true;
-	REFLECT();
-	bool cast_shadows = true;
-	REFLECT();
-	bool is_skybox = false;
-	REFLECT();
-	std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
+	REF AssetPtr<Model> model;
+	REF AssetPtr<Animation_Tree_CFG> animator_tree;
+	REF bool is_visible = true;
+	REF bool cast_shadows = true;
+	REF bool is_skybox = false;
+	REF std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 
 	void update_animator_instance();
 	std::unique_ptr<AnimatorInstance> animator;

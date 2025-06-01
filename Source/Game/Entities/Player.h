@@ -65,7 +65,7 @@ class HealthComponent;
 class InputUser;
 class CharacterController;
 class BikeEntity;
-CLASS_H(Player, EntityComponent)
+CLASS_H(Player, Component)
 public:
 
 	Player();

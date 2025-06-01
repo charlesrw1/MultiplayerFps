@@ -22,42 +22,13 @@
 #include "Game/AssetPtrMacro.h"
 #include "./Sound/SoundComponent.h"
 
-class PhysicsComponentBase;
 
-NEWCLASS(HelloWorld, EntityComponent)
+
+class CarGameMode : public Entity
+{
 public:
-	void start() {
+	CLASS_BODY(CarGameMode);
 
-	}
-	void update() {
-
-	}
-	// xyz
-	int i = 0;
-	REFLECT();
-	AssetPtr<PrefabAsset> myprefab;
-	REFLECT();
-	AssetPtr<Model> mymodel;
-
-	REFLECT()
-	float start_velocity = 0.0;
-	REFLECT(type="BoolButton",transient,hint="Press Me")
-	bool enable_xyz = false;
-
-	REFLECT()
-	EntityPtr otherEnt;
-	REFLECT(getter)
-	Entity* get_exyz() {
-		return otherEnt.get();
-	}
-
-	REFLECT(transient,hide)
-	AssetPtr<SoundFile> theSound;
-};
-
-
-NEWCLASS(CarGameMode, Entity)
-public:
 	static CarGameMode* instance;
 	void pre_start() {
 		ASSERT(!instance);
@@ -72,22 +43,24 @@ public:
 	MulticastDelegate<> on_player_damaged;
 };
 
-NEWCLASS(WheelComponent, EntityComponent)
+
+class WheelComponent : public Component
+{
 public:
-	REFLECT();
-	bool front = false;
-	REFLECT();
-	bool left = false;
+	CLASS_BODY(WheelComponent);
+	REF bool front = false;
+	REF bool left = false;
 };
-
-
-NEWCLASS(CarComponent, EntityComponent)
+class CarComponent : public Component
+{
 public:
+	CLASS_BODY(CarComponent);
+
 	CarComponent() {
 		memset(wheels, 0, sizeof(wheels));
 	}
 	void start() {
-		body = get_owner()->get_component<PhysicsComponentBase>();
+		body = get_owner()->get_component<PhysicsBody>();
 		for (auto c : get_owner()->get_children()) {
 			auto w = c->get_component<WheelComponent>();
 			if (w) {
@@ -116,7 +89,7 @@ public:
 	float steer_angle = 0.0;
 	float brake_force = 0.0;
 
-	PhysicsComponentBase* body = nullptr;
+	PhysicsBody* body = nullptr;
 	WheelComponent* wheels[4];
 	glm::vec3 localspace_wheel_pos[4];
 	glm::vec3 last_ws_pos[4];
@@ -129,20 +102,21 @@ public:
 	// 2 = left back, 3 = right back
 };
 
-
-NEWCLASS(CarSoundMaker, EntityComponent)
+class CarSoundMaker : public Component
+{
 public:
+	CLASS_BODY(CarSoundMaker);
+
 	CarSoundMaker() : r(4052347) {}
 
-	REFLECT();
-	AssetPtr<PrefabAsset> engineSoundAsset;
-	REFLECT();
-	AssetPtr<PrefabAsset> tireSoundAsset;
+	REF AssetPtr<PrefabAsset> engineSoundAsset;
+	REF AssetPtr<PrefabAsset> tireSoundAsset;
 
 	SoundComponent* engineSound{};
 	SoundComponent* tireSound{};
-
 	CarComponent* car = nullptr;
+
+
 	void start() {
 		car = get_owner()->get_component<CarComponent>();
 		{
@@ -175,8 +149,12 @@ public:
 	float cur_pitch = 1.0;
 };
 
-NEWCLASS(CarDriver, EntityComponent)
+class CarDriver : public Component
+{
 public:
+	CLASS_BODY(CarDriver);
+
+
 	void start() override {
 		inputUser = g_inputSys.register_input_user(0);
 		inputUser->assign_device(g_inputSys.get_keyboard_device());

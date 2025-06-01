@@ -16,8 +16,13 @@ public: \
 // creates new class that will be picked by codegen tool
 // DONT make get_props() or CLASS_IMPL(x), the tool does that for you
 // use REFLECT() macros instead
-#define NEWCLASS(classname, supername) \
-	EXPLICIT_NEWCLASS(classname, supername, supername)
+
+#define CLASS_BODY(classname) \
+	using MyClassType = classname; \
+	static ClassTypeInfo StaticType; \
+	const ClassTypeInfo& get_type() const override { return classname::StaticType; } \
+	static const PropertyInfoList* get_props();
+
 
 // arguments are provided as comma seperated list, dont include outer quotes
 // options:
@@ -41,6 +46,10 @@ public: \
 //		- enums (reflected with NEWENUM())
 //		- Color32
 #define REFLECT(...)
+
+// additionally, you can use this as a shorthand on the same line, but you dont get any arguments
+// like REF int myvariable = 0;
+#define REF
 
 // sometimes you want forward declared class types in the header, but they need to be definied when registering 
 // them in the generated file like AssetPtr<>'s

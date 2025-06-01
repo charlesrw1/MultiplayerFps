@@ -272,7 +272,7 @@ void Entity::parent_to(Entity* other)
 }
 
 
-void Entity::remove_this_component_internal(EntityComponent* component_to_remove)
+void Entity::remove_this_component_internal(Component* component_to_remove)
 {
 	ASSERT(component_to_remove);
 	ASSERT(component_to_remove->entity_owner == this);
@@ -344,15 +344,15 @@ Entity::~Entity()
 	//ASSERT(all_components.empty());
 }
 
-EntityComponent* Entity::create_component_type(const ClassTypeInfo* info)
+Component* Entity::create_component_type(const ClassTypeInfo* info)
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
-	if (!info->is_a(EntityComponent::StaticType)||!info->allocate) {
+	if (!info->is_a(Component::StaticType)||!info->allocate) {
 		sys_print(Error, "create_and_attach_component_type not subclass of entity component or isnt createable\n");
 		return nullptr;
 	}
-	EntityComponent* ec = (EntityComponent*)info->allocate();
+	Component* ec = (Component*)info->allocate();
 	ASSERT(ec);
 
 	ec->entity_owner = this;
@@ -374,7 +374,7 @@ Entity* Entity::create_child_entity()
 }
 
 
-void Entity::add_component_from_unserialization(EntityComponent* component)
+void Entity::add_component_from_unserialization(Component* component)
 {
 	ASSERT(component);
 	ASSERT(init_state == initialization_state::CONSTRUCTOR);
@@ -425,7 +425,7 @@ void Entity::set_ls_euler_rotation(glm::vec3 euler) {
 	post_change_transform_R();
 }
 
-void Entity::post_change_transform_R(bool ws_is_dirty, EntityComponent* skipthis)
+void Entity::post_change_transform_R(bool ws_is_dirty, Component* skipthis)
 {
 	world_transform_is_dirty = ws_is_dirty;
 
@@ -511,7 +511,7 @@ void Entity::set_is_top_level(bool b)
 	world_transform_is_dirty = true;
 }
 
-void Entity::invalidate_transform(EntityComponent* skipthis)
+void Entity::invalidate_transform(Component* skipthis)
 {
 	post_change_transform_R(true,skipthis);
 }
@@ -679,7 +679,7 @@ class EntityTagSerialize : public IPropertySerializer
 };
 ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");
 
-EntityComponent* Entity::get_component_typeinfo(const ClassTypeInfo* ti) const {
+Component* Entity::get_component_typeinfo(const ClassTypeInfo* ti) const {
 	if (!ti)
 		return nullptr;
 	for (int i = 0; i < all_components.size(); i++)

@@ -126,7 +126,7 @@ public:
 	// Inherited via PxQueryFilterCallback
 	virtual PxQueryHitType::Enum preFilter(const PxFilterData& filterData, const PxShape* shape, const PxRigidActor* actor, PxHitFlags& queryFlags) override
 	{
-		PhysicsComponentBase* ptr =(PhysicsComponentBase*)actor->userData;
+		PhysicsBody* ptr =(PhysicsBody*)actor->userData;
 		for (int i = 0; i < ignored->size(); i++)
 			if (ptr == (*ignored)[i])
 				return PxQueryHitType::eNONE;
@@ -165,7 +165,7 @@ bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, 
 		return status;
 	}
 	out.fraction = hit.block.distance / length;
-	out.component = (PhysicsComponentBase*)hit.block.actor->userData;
+	out.component = (PhysicsBody*)hit.block.actor->userData;
 	out.hit_pos = physx_to_glm(hit.block.position);
 	out.hit_normal = physx_to_glm(hit.block.normal);
 	out.trace_dir = dir;
@@ -215,7 +215,7 @@ static Color32 randcolor32(uint32_t number)
 	out.had_initial_overlap = sweep.block.hadInitialOverlap();
 	out.distance = sweep.block.distance;
 	out.fraction = sweep.block.distance / length;
-	out.component = (PhysicsComponentBase*)sweep.block.actor->userData;
+	out.component = (PhysicsBody*)sweep.block.actor->userData;
 	out.hit_pos = physx_to_glm(sweep.block.position);
 
 	out.hit_normal = physx_to_glm(sweep.block.normal);
@@ -244,8 +244,8 @@ static Color32 randcolor32(uint32_t number)
 	 {
 		 for (int i = 0; i < (int)count; i++) {
 			 auto& pair = pairs[i];
-			 PhysicsComponentBase* trigger_obj = (PhysicsComponentBase*)pair.triggerActor->userData;
-			 PhysicsComponentBase* other_obj = (PhysicsComponentBase*)pair.otherActor->userData;
+			 PhysicsBody* trigger_obj = (PhysicsBody*)pair.triggerActor->userData;
+			 PhysicsBody* other_obj = (PhysicsBody*)pair.otherActor->userData;
 			 if (!trigger_obj || !other_obj)
 				 continue;
 
@@ -273,8 +273,8 @@ static Color32 randcolor32(uint32_t number)
 	 }
 
 	 struct trigger_pair {
-		 PhysicsComponentBase* trigger = nullptr;
-		 PhysicsComponentBase* other = nullptr;
+		 PhysicsBody* trigger = nullptr;
+		 PhysicsBody* other = nullptr;
 		 bool is_start = false;
 	 };
 	 std::vector<trigger_pair> triggered_pairs;
@@ -381,7 +381,7 @@ static Color32 randcolor32(uint32_t number)
 		  // update each render object with the new transform
 		  for (PxU32 i = 0; i < nbActiveTransforms; ++i)
 		  {
-			  auto phys_comp = (PhysicsComponentBase*)activeTransforms[i]->userData;
+			  auto phys_comp = (PhysicsBody*)activeTransforms[i]->userData;
 			  if (phys_comp) {
 				  phys_comp->fetch_new_transform();
 			  }
@@ -392,7 +392,7 @@ static Color32 randcolor32(uint32_t number)
   }
 
 
-PhysicsBody::~PhysicsBody()
+PhysicsBodyDefinition::~PhysicsBodyDefinition()
 {
 	for (auto& s : shapes) {
 		if (s.shape == ShapeType_e::ConvexShape) { 

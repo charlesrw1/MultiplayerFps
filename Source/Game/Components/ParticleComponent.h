@@ -23,7 +23,7 @@ struct ParticleDef
 	uint8_t lightIndex{};
 };
 
-CLASS_H(ParticleComponent, EntityComponent)
+CLASS_H(ParticleComponent, Component)
 public:
 	ParticleComponent() : r(0){
 		set_call_init_in_editor(true);

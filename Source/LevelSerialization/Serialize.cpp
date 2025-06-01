@@ -145,7 +145,7 @@ void serialize_new_object_text_R(
 			parent = ent->get_parent();
 		}
 		else {
-			auto ec = b->cast_to<EntityComponent>();
+			auto ec = b->cast_to<Component>();
 			ASSERT(ec);
 			parent = ec->get_owner();
 			ASSERT(parent);

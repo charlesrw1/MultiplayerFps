@@ -260,7 +260,7 @@ void CarSoundMaker::update() {
 }
 
 
-CLASS_H(CannonballC, EntityComponent)
+CLASS_H(CannonballC, Component)
 public:
 	void start() override {
 		starttime = eng->get_game_time();
@@ -280,7 +280,7 @@ public:
 };
 CLASS_IMPL(CannonballC);
 
-CLASS_H(CannonC, EntityComponent)
+CLASS_H(CannonC, Component)
 public:
 	void start() override {
 		set_ticking(true);

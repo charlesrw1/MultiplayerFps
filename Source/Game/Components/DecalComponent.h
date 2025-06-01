@@ -6,8 +6,11 @@ GENERATED_CLASS_INCLUDE("Render/MaterialPublic.h");
 
 class MaterialInstance;
 struct Render_Decal;
-NEWCLASS(DecalComponent, EntityComponent)
+class DecalComponent : public Component
+{
 public:
+	CLASS_BODY(DecalComponent);
+
 	~DecalComponent();
 	DecalComponent();
 

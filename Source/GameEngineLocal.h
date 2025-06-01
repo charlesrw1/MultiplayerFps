@@ -14,7 +14,7 @@
 #include "Level.h"
 
 class GUIFullscreen;
-class OnScreenLogGui;
+class OnScreenLog;
 
 using glm::vec3;
 class IEditorTool;
@@ -149,7 +149,7 @@ public:
 	//std::unique_ptr<Client> cl;
 	//std::unique_ptr<Server> sv;
 
-	OnScreenLogGui* gui_log{};
+	OnScreenLog* gui_log{};
 
 	OsInput inp;
 

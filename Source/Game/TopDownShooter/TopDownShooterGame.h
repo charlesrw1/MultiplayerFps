@@ -25,8 +25,13 @@
 
 #include "Game/GameSingleton.h"
 
-NEWCLASS(TopDownGameManager, EntityComponent)
+#include "Game/EntityComponent.h"
+
+class TopDownGameManager : public Component
+{
 public:
+	CLASS_BODY(TopDownGameManager);
+
 	static TopDownGameManager* instance;
 
 	void pre_start() override {
@@ -57,8 +62,11 @@ struct DamageEvent
 	glm::vec3 dir;
 };
 
-NEWCLASS(TopDownHealthComponent, EntityComponent)
+class TopDownHealthComponent : public Component
+{
 public:
+	CLASS_BODY(TopDownHealthComponent);
+
 	void deal_damage(DamageEvent dmg) {
 		current_health -= dmg.amt;
 		if (current_health <= 0)
@@ -82,8 +90,12 @@ public:
 
 
 
-NEWCLASS(ProjectileComponent, EntityComponent)
+
+class ProjectileComponent : public Component
+{
 public:
+	CLASS_BODY(ProjectileComponent);
+
 	void start() override {
 		set_ticking(true);
 		time_created = eng->get_game_time();
@@ -128,21 +140,23 @@ public:
 	}
 
 	float time_created = 0.0;
-	PhysicsComponentBase* ignore = nullptr;
+	PhysicsBody* ignore = nullptr;
 	glm::vec3 direction = glm::vec3(1, 0, 0);
-	REFLECT();
-	float speed = 10.0;
-	REFLECT();
-	int damage = 10;
+	REF float speed = 10.0;
+	REF int damage = 10;
 };
-NEWCLASS(EnableRagdollScript, EntityComponent)
+
+class EnableRagdollScript : public Component
+{
 public:
+	CLASS_BODY(EnableRagdollScript);
+
 	void start() override {
 		auto e = get_owner();
 		auto& children = e->get_children();
 		for (auto c : children) {
 			if (c->get_tag() != StringName("Ragdoll")) continue;
-			auto phys = c->get_component<PhysicsComponentBase>();
+			auto phys = c->get_component<PhysicsBody>();
 			if (!phys)
 				continue;
 
@@ -167,7 +181,7 @@ public:
 		auto& children = e->get_children();
 		for (auto c : children) {
 			if (c->get_tag() != StringName("Ragdoll")) continue;
-			auto phys = c->get_component<PhysicsComponentBase>();
+			auto phys = c->get_component<PhysicsBody>();
 			if (!phys)
 				continue;
 
@@ -214,8 +228,11 @@ public:
 
 };
 
-NEWCLASS(TopDownEnemyComponent, EntityComponent)
+class TopDownEnemyComponent : public Component
+{
 public:
+	CLASS_BODY(TopDownEnemyComponent);
+
 	void start() override {
 		auto health = get_owner()->get_component<TopDownHealthComponent>();
 		ASSERT(health);
@@ -225,7 +242,7 @@ public:
 				is_dead = true;
 				death_time = eng->get_game_time();
 
-				auto cap = get_owner()->get_component<PhysicsComponentBase>();
+				auto cap = get_owner()->get_component<PhysicsBody>();
 				cap->set_is_enable(false);
 				cap->destroy_deferred();
 
@@ -236,7 +253,7 @@ public:
 				int index = r.RandI(0, 2);
 				for (auto c : get_owner()->get_children()) {
 					if (c->get_parent_bone() == names[index]) {
-						auto p = c->get_component<PhysicsComponentBase>();
+						auto p = c->get_component<PhysicsBody>();
 						p->apply_impulse(c->get_ws_position(), dmg.dir * 0.3f);
 						break;
 					}
@@ -293,8 +310,10 @@ public:
 	float death_time = 0.0;
 };
 
-NEWCLASS(TopDownCameraReg, EntityComponent)
+class TopDownCameraReg : public Component {
 public:
+	CLASS_BODY(TopDownCameraReg);
+
 	void start() override {
 		ASSERT(TopDownGameManager::instance);
 		auto cam = get_owner()->get_component<CameraComponent>();
@@ -304,8 +323,9 @@ public:
 };
 
 
-NEWCLASS(TopDownSpawner, EntityComponent)
+class TopDownSpawner : public Component {
 public:
+	CLASS_BODY(TopDownSpawner);
 	void start() {
 		Entity* e{};
 		float ofs = 0.0;
@@ -328,17 +348,16 @@ public:
 	}
 
 
-	REFLECT();
-	AssetPtr<PrefabAsset> prefab;
-	REFLECT();
-	int count = 1;
+	REF AssetPtr<PrefabAsset> prefab;
+	REF int count = 1;
 
 	EntityPtr whatSpawned;
 	bool wait_to_spawn = false;
 	bool start_disabled = false;
 };
-NEWCLASS(TDSpawnOverTime, EntityComponent)
+class TDSpawnOverTime : public Component {
 public:
+	CLASS_BODY(TDSpawnOverTime);
 	void start() final {
 		set_ticking(true);
 	}
@@ -355,27 +374,13 @@ public:
 	}
 	float last_spawn = 0.0;
 
-	REFLECT();
-	AssetPtr<PrefabAsset> prefab;
-	REFLECT();
-	float spawn_interval = 1.0;	// every x seconds
-	REFLECT();
-	int max_count = 2000;
+
+	REF AssetPtr<PrefabAsset> prefab;
+	REF float spawn_interval = 1.0;	// every x seconds
+	REF int max_count = 2000;
 };
 
-NEWCLASS(TopDownSpawnPoint, EntityComponent)
+class TopDownSpawnPoint : public Component {
 public:
+	CLASS_BODY(TopDownSpawnPoint);
 };
-
-namespace td {
-NEWCLASS(GameSingleton, IGameSingleton)
-public:
-	void on_start_game() final {
-
-	}
-	void on_leave_game() final {
-
-	}
-};
-
-}

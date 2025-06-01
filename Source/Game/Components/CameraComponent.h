@@ -5,8 +5,10 @@
 
 class MeshBuilderComponent;
 class MeshComponent;
-CLASS_H(CameraComponent, EntityComponent)
+class CameraComponent : public Component
+{
 public:
+	CLASS_BODY(CameraComponent);
 
 	static CameraComponent* get_scene_camera() {
 		return scene_camera;

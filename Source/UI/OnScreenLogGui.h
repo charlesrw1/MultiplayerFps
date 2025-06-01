@@ -9,8 +9,11 @@
 #include "UILoader.h"
 #include "Assets/AssetDatabase.h"
 #include "UI/UIBuilder.h"
-NEWCLASS(OnScreenLogGui, gui::BaseGUI)
+class OnScreenLog : public guiBase
+{
 public:
+	CLASS_BODY(OnScreenLog);
+
 	void paint(UIBuilder& b) final {
 		auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 

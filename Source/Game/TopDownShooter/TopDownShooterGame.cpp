@@ -58,7 +58,7 @@ float perlin(float x, float y) {
 }
 
 
-CLASS_H(TopDownFireScript,EntityComponent)
+CLASS_H(TopDownFireScript,Component)
 public:
 	TopDownFireScript() {
 		set_call_init_in_editor(true);

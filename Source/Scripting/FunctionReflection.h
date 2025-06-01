@@ -16,8 +16,9 @@ ClassBase* get_object_from_lua(lua_State* L, int index, const ClassTypeInfo* exp
 
 template<typename T>
 T get_from_lua(lua_State* L, int index) {
-    using Decayed = typename std::decay<T>::type;
-    return (T)get_object_from_lua(L, index, &std::remove_pointer<Decayed>::type::StaticType);
+    return T();
+    //using Decayed = typename std::decay<T>::type;
+    //return (T)get_object_from_lua(L, index, &std::remove_pointer<Decayed>::type::StaticType);
 }
 
 template<>
@@ -44,15 +45,15 @@ template<typename T>
 void push_to_lua(lua_State* L, T value) 
 {
     using Decayed = typename std::decay<T>::type;
-
-    if constexpr (std::is_base_of<IAsset, typename std::remove_pointer<Decayed>::type>::value)
-        push_iasset_to_lua(L, (IAsset*)value);
-    else if constexpr (std::is_base_of<Entity, typename std::remove_pointer<Decayed>::type>::value)
-        push_entity_to_lua(L, (Entity*)value);
-    else if constexpr (std::is_base_of<EntityComponent, typename std::remove_pointer<Decayed>::type>::value)
-        push_entitycomponent_to_lua(L, (EntityComponent*)value);
-    else
-        static_assert(0, "");
+    return;
+    //if constexpr (std::is_base_of<IAsset, typename std::remove_pointer<Decayed>::type>::value)
+    //    push_iasset_to_lua(L, (IAsset*)value);
+    //else if constexpr (std::is_base_of<Entity, typename std::remove_pointer<Decayed>::type>::value)
+    //    push_entity_to_lua(L, (Entity*)value);
+    //else if constexpr (std::is_base_of<EntityComponent, typename std::remove_pointer<Decayed>::type>::value)
+    //    push_entitycomponent_to_lua(L, (EntityComponent*)value);
+    //else
+    //    static_assert(0, "");
 }
 
 

@@ -34,7 +34,7 @@ class MSkeleton;
 class Entity;
 class AnimationSeq;
 class Animation_Tree_CFG;
-class PhysicsComponentBase;
+
 struct Rt_Vars_Base;
 CLASS_H(AnimatorInstance, ClassBase)
 public:

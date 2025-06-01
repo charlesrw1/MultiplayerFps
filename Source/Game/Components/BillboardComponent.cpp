@@ -9,7 +9,6 @@
 #include "Framework/ReflectionMacros.h"
 #include "Render/ModelManager.h"
 
-CLASS_IMPL(BillboardComponent);
 
 BillboardComponent::BillboardComponent() {
 	set_call_init_in_editor(true);
@@ -67,10 +66,4 @@ void BillboardComponent::on_sync_render_data()
 	obj.owner = this;
 
 	idraw->get_scene()->update_obj(handle, obj);
-}
-const PropertyInfoList* BillboardComponent::get_props() {
-	START_PROPS(BillboardComponent)
-		REG_ASSET_PTR(texture, PROP_DEFAULT),
-		REG_BOOL(visible, PROP_DEFAULT, "1"),
-	END_PROPS(BillboardComponent)
 }

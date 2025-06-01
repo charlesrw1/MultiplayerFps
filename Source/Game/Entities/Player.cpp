@@ -52,7 +52,7 @@ CLASS_IMPL(Player);
 #include "Game/Components/ArrowComponent.h"
 
 
-CLASS_H(PlayerSpawnPoint, EntityComponent)
+CLASS_H(PlayerSpawnPoint, Component)
 public:
 	PlayerSpawnPoint() {
 
@@ -614,7 +614,7 @@ public:
 };
 #endif
 
-CLASS_H(HealthComponent, EntityComponent)
+CLASS_H(HealthComponent, Component)
 public:
 
 	MulticastDelegate<Entity* /* inflictor*/, int/* damage */> on_take_damage;

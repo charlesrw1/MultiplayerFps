@@ -6,8 +6,11 @@
 #include "Assets/AssetDatabase.h"
 #include "Render/RenderObj.h"
 #include "Game/Entity.h"
-CLASS_H(ArrowComponent,EntityComponent)
+class ArrowComponent : public Component
+{
 public:
+	CLASS_BODY(ArrowComponent);
+
 	ArrowComponent() {
 		set_call_init_in_editor(true);
 		arrowModel = g_assets.find_assetptr_unsafe<Model>("arrowModel.cmdl");

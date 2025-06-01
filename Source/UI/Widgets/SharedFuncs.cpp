@@ -1,7 +1,5 @@
 #include "SharedFuncs.h"
 
-using namespace gui;
-
 class LayoutUtils
 {
 public:
@@ -22,9 +20,9 @@ public:
 
 };
 
-void update_one_child_position(gui::BaseGUI* me)
+void update_one_child_position(guiBase* me)
 {
-	InlineVec<BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	me->get_gui_children(children);
 
 
@@ -60,9 +58,9 @@ void update_one_child_position(gui::BaseGUI* me)
 		children[0]->ws_size = out_sz;
 	}
 }
-void update_desired_size_from_one_child(gui::BaseGUI* me)
+void update_desired_size_from_one_child(guiBase* me)
 {
-	InlineVec<BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	me->get_gui_children(children);
 
 	if (children.size() == 0)
@@ -74,7 +72,7 @@ void update_desired_size_from_one_child(gui::BaseGUI* me)
 		pad.y + pad.w + actual_child_sz.y };
 	}
 }
-void update_desired_size_flow(gui::BaseGUI* me, int axis)
+void update_desired_size_flow(guiBase* me, int axis)
 {
 	assert(axis == 0 || axis == 1);
 	const int other_axis = (axis == 1) ? 0 : 1;
@@ -83,7 +81,7 @@ void update_desired_size_flow(gui::BaseGUI* me, int axis)
 
 	glm::ivec2 cursor = { 0,0 };
 
-	InlineVec<BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	me->get_gui_children(children);
 
 
@@ -99,14 +97,14 @@ void update_desired_size_flow(gui::BaseGUI* me, int axis)
 	}
 	me->desired_size = cursor;
 }
-void update_child_positions_flow(gui::BaseGUI* me, int axis, int start)
+void update_child_positions_flow(guiBase* me, int axis, int start)
 {
 	assert(axis == 0 || axis == 1);
 	const int other_axis = (axis == 1) ? 0 : 1;
 
 	glm::ivec2 cursor = me->ws_position;
 
-	InlineVec<BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	me->get_gui_children(children);
 
 	for (int i = 0; i < children.size(); i++) {

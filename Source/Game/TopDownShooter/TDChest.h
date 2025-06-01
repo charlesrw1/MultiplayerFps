@@ -7,22 +7,21 @@
 #include "Game/Components/MeshComponent.h"
 #include "Animation/AnimationSeqAsset.h"
 #include "Game/SoftAssetPtr.h"
-NEWCLASS(TDChest, EntityComponent)
+class TDChest : public Component
+{
 public:
-	REFLECT();
-	AssetPtr<SoundFile> soundfx;
-	REFLECT();
-	AssetPtr<AnimationSeqAsset> openanim;
-	REFLECT();
-	SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
+	CLASS_BODY(TDChest);
+	
+	REF AssetPtr<SoundFile> soundfx;
+	REF AssetPtr<AnimationSeqAsset> openanim;
+	REF SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
 
 	MeshComponent* m = nullptr;
 	void start() {
 		m = get_owner()->get_component<MeshComponent>();
 	}
 
-	REFLECT();
-	void open_chest() {
+	REF void open_chest() {
 		if (!is_open) {
 
 			isound->play_sound(
@@ -45,8 +44,11 @@ public:
 	bool is_open = false;
 };
 
-NEWCLASS(ChestAnimator, AnimatorInstance)
+
+class ChestAnimator : public AnimatorInstance
+{
 public:
+	CLASS_BODY(ChestAnimator);
 
 	TDChest* chest = nullptr;
 
@@ -59,6 +61,5 @@ public:
 		}
 	}
 
-	REFLECT();
-	bool chest_open = false;
+	REF bool chest_open = false;
 };

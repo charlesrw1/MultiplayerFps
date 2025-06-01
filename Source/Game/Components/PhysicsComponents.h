@@ -26,10 +26,14 @@ class PhysicsJointComponent;
 class MeshBuilderComponent;
 class BillboardComponent;
 class Model;
-NEWCLASS(PhysicsComponentBase, EntityComponent)
+
+class PhysicsBody : public Component
+{
 public:
-	PhysicsComponentBase();
-	~PhysicsComponentBase();
+	CLASS_BODY(PhysicsBody);
+
+	PhysicsBody();
+	~PhysicsBody();
 
 	void pre_start() override;
 	void start() override;
@@ -81,9 +85,9 @@ public:
 
 	// event delegates
 	REFLECT();
-	MulticastDelegate<PhysicsComponentBase*> on_trigger_start;
-	MulticastDelegate<PhysicsComponentBase*> on_trigger_end;
-	MulticastDelegate<PhysicsComponentBase*, glm::vec3 /* point */, glm::vec3/* normal */> on_collide;
+	MulticastDelegate<PhysicsBody*> on_trigger_start;
+	MulticastDelegate<PhysicsBody*> on_trigger_end;
+	MulticastDelegate<PhysicsBody*, glm::vec3 /* point */, glm::vec3/* normal */> on_collide;
 protected:
 	void add_model_shape_to_actor(const Model* m);
 	void add_sphere_shape_to_actor(const glm::vec3& pos, float radius);
@@ -112,27 +116,19 @@ private:
 	physx::PxRigidDynamic* get_dynamic_actor() const;
 	void set_shape_flags(physx::PxShape* shape);
 
-	REFLECT();
-	PL physics_layer = PL::Default;
-	REFLECT();
-	bool enabled = true;
-	REFLECT();
-	bool simulate_physics = false;		// if true, then object is a DYNAMIC object driven by the physics simulation
-	REFLECT();
-	bool is_static = true;				// if true, then the object is a STATIC object driven that cant ever move
-										// if false, then this object is KINEMATIC if simulate_physics is false or DYNAMIC if its true
-										// isStatic and simulate_physics is illogical so it falls back to isStatic in that case
-	REFLECT();
-	bool is_trigger = false;			// if true, then the objects shapes are treated like triggers and sends OVERLAP events
+
+	REF PL physics_layer = PL::Default;
+	REF bool enabled = true;
+	REF bool simulate_physics = false;		// if true, then object is a DYNAMIC object driven by the physics simulation
+	REF bool is_static = true;				// if true, then the object is a STATIC object driven that cant ever move
+		 									// if false, then this object is KINEMATIC if simulate_physics is false or DYNAMIC if its true
+	 										// isStatic and simulate_physics is illogical so it falls back to isStatic in that case
+	REF bool is_trigger = false;			// if true, then the objects shapes are treated like triggers and sends OVERLAP events
 										// for a generic static trigger box, use with is_static = true
-	REFLECT();
-	bool send_overlap = false;			// if true on both objects, then a overlap event will be sent (one of the objects has to be a trigger object)
-	REFLECT();
-	bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
-	REFLECT();
-	bool interpolate_visuals = true;
-	REFLECT();
-	float density = 2.0;
+	REF bool send_overlap = false;			// if true on both objects, then a overlap event will be sent (one of the objects has to be a trigger object)
+	REF bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
+	REF bool interpolate_visuals = true;
+	REF float density = 2.0;
 
 	physx::PxRigidActor* physxActor = nullptr;
 
@@ -147,9 +143,11 @@ private:
 	friend class PhysicsJointComponent;
 };
 
-
-NEWCLASS(CapsuleComponent, PhysicsComponentBase)
+class CapsuleComponent : public PhysicsBody
+{
 public:
+	CLASS_BODY(CapsuleComponent);
+
 	~CapsuleComponent() override {}
 
 	void add_actor_shapes() override;
@@ -160,16 +158,16 @@ public:
 		return get_is_simulating() ? "eng/editor/phys_capsule_simulate.png" : "eng/editor/phys_capsule.png";
 	}
 #endif
-
-	REFLECT();
-	float height = 2.f;
-	REFLECT();
-	float radius = 0.5;
-	REFLECT();
-	float height_offset = 0.0;
+	REF float height = 2.f;
+	REF float radius = 0.5;
+	REF float height_offset = 0.0;
 };
-NEWCLASS(BoxComponent, PhysicsComponentBase)
+
+
+class BoxComponent : public PhysicsBody
+{
 public:
+	CLASS_BODY(BoxComponent);
 	~BoxComponent() override {}
 	void add_actor_shapes() override;
 	void add_editor_shapes() override;
@@ -182,8 +180,10 @@ public:
 #endif
 
 };
-NEWCLASS(SphereComponent, PhysicsComponentBase)
+class SphereComponent : public PhysicsBody
+{
 public:
+	CLASS_BODY(SphereComponent);
 	~SphereComponent() override {}
 	void add_actor_shapes() override;
 	void add_editor_shapes() override;
@@ -197,8 +197,12 @@ public:
 	REFLECT();
 	float radius = 1.f;
 };
-NEWCLASS(MeshColliderComponent, PhysicsComponentBase)
+
+class MeshColliderComponent : public PhysicsBody
+{
 public:
+	CLASS_BODY(MeshColliderComponent);
+	MeshColliderComponent() {}
 	void add_actor_shapes() override;
 
 #ifdef EDITOR_BUILD
@@ -215,8 +219,11 @@ struct JointAnchor
 	glm::vec3 p = glm::vec3(0.f);
 };
 
-NEWCLASS(PhysicsJointComponent, EntityComponent)
+class PhysicsJointComponent : public PhysicsBody
+{
 public:
+	CLASS_BODY(PhysicsJointComponent);
+
 	PhysicsJointComponent();
 	~PhysicsJointComponent();
 
@@ -240,9 +247,9 @@ public:
 #endif
 protected:
 
-	PhysicsComponentBase* get_owner_physics();
+	PhysicsBody* get_owner_physics();
 
-	virtual void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) = 0;
+	virtual void init_joint(PhysicsBody* a, PhysicsBody* b) = 0;
 	virtual physx::PxJoint* get_joint() const = 0;
 	virtual void free_joint() = 0;
 	virtual void draw_meshbuilder();
@@ -250,12 +257,10 @@ protected:
 	float limit_spring = 0.f;
 	float limit_damping = 0.f;
 	
-	REFLECT();
-	EntityPtr target;
+	REF EntityPtr target;
 	REFLECT(type="JointAnchor");
 	JointAnchor anchor;
-	REFLECT();
-	int local_joint_axis = 0;	//0=x,1=y,2=z
+	REF int local_joint_axis = 0;	//0=x,1=y,2=z
 
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 
@@ -264,11 +269,14 @@ private:
 	void refresh_joint();
 };
 
-NEWCLASS(HingeJointComponent, PhysicsJointComponent)
+
+class HingeJointComponent : public PhysicsJointComponent
+{
 public:
+	CLASS_BODY(HingeJointComponent);
 
 private:
-	void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) override;
+	void init_joint(PhysicsBody* a, PhysicsBody* b) override;
 	physx::PxJoint* get_joint() const override;
 	void free_joint() override;
 
@@ -278,9 +286,13 @@ private:
 	float limit_max = 0.f;
 	physx::PxRevoluteJoint* joint = nullptr;
 };
-NEWCLASS(BallSocketJointComponent,PhysicsJointComponent)
+
+class BallSocketJointComponent : public PhysicsJointComponent
+{
 public:
-	void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) override;
+	CLASS_BODY(BallSocketJointComponent);
+
+	void init_joint(PhysicsBody* a, PhysicsBody* b) override;
 	physx::PxJoint* get_joint() const override;
 	void free_joint() override;
 
@@ -297,48 +309,35 @@ NEWENUM(JM,int8_t)
 };
 using JointMotion = JM;
 
-NEWCLASS(AdvancedJointComponent, PhysicsJointComponent)
+
+class AdvancedJointComponent : public PhysicsJointComponent
+{
 public:
-	void init_joint(PhysicsComponentBase* a, PhysicsComponentBase* b) override;
+	CLASS_BODY(AdvancedJointComponent);
+
+	void init_joint(PhysicsBody* a, PhysicsBody* b) override;
 	physx::PxJoint* get_joint() const override;
 	void free_joint() override;
 
 	void draw_meshbuilder() override;
 
-	REFLECT();
-	JM x_motion = JM::Locked;
-	REFLECT();
-	JM y_motion = JM::Locked;
-	REFLECT();
-	JM z_motion = JM::Locked;
-	REFLECT();
-	JM ang_x_motion = JM::Locked;
-	REFLECT();
-	JM ang_y_motion = JM::Locked;
-	REFLECT();
-	JM ang_z_motion = JM::Locked;
-	REFLECT();
-	float linear_distance_max = 0.0;
-	REFLECT();
-	float linear_damp = 0.0;
-	REFLECT();
-	float linear_stiff = 0.0;
-	REFLECT();
-	float twist_limit_min = 0.0;
-	REFLECT();
-	float twist_limit_max = 0.0;
-	REFLECT();
-	float ang_y_limit = 0.0;
-	REFLECT();
-	float ang_z_limit = 0.0;
-	REFLECT();
-	float twist_damp = 0.0;
-	REFLECT();
-	float twist_stiff = 0.0;
-	REFLECT();
-	float cone_damp = 0.0;
-	REFLECT();
-	float cone_stiff = 0.0;
+	REF JM x_motion = JM::Locked;
+	REF JM y_motion = JM::Locked;
+	REF JM z_motion = JM::Locked;
+	REF JM ang_x_motion = JM::Locked;
+	REF JM ang_y_motion = JM::Locked;
+	REF JM ang_z_motion = JM::Locked;
+	REF float linear_distance_max = 0.0;
+	REF float linear_damp = 0.0;
+	REF float linear_stiff = 0.0;
+	REF float twist_limit_min = 0.0;
+	REF float twist_limit_max = 0.0;
+	REF float ang_y_limit = 0.0;
+	REF float ang_z_limit = 0.0;
+	REF float twist_damp = 0.0;
+	REF float twist_stiff = 0.0;
+	REF float cone_damp = 0.0;
+	REF float cone_stiff = 0.0;
 
 	physx::PxD6Joint* joint = nullptr;
 };

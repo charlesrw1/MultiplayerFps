@@ -27,14 +27,14 @@ void GuiSystemLocal::handle_event(const SDL_Event& event) {
 
 		int x, y;
 		SDL_GetMouseState(&x, &y);
-		gui::BaseGUI* g = find_gui_under_mouse(x,y, true);
+		guiBase* g = find_gui_under_mouse(x,y, true);
 
 		if (g)
 			g->on_mouse_scroll(event.wheel);
 	}break;
 
 	case SDL_MOUSEBUTTONDOWN: {
-		gui::BaseGUI* g = find_gui_under_mouse(event.button.x, event.button.y, false);
+		guiBase* g = find_gui_under_mouse(event.button.x, event.button.y, false);
 		if (g) {
 			const glm::ivec2 where = { event.button.x - g->ws_position.x,event.button.y - g->ws_position.y };
 
@@ -67,7 +67,7 @@ void GuiSystemLocal::post_handle_events() {
 	{
 		int x = 0, y = 0;
 		SDL_GetMouseState(&x, &y);
-		gui::BaseGUI* g = find_gui_under_mouse(x, y,false);
+		guiBase* g = find_gui_under_mouse(x, y,false);
 		set_hovering(g);
 	}
 }
@@ -101,7 +101,7 @@ void GuiSystemLocal::think() {
 	//	gui->on_think();
 
 	for (auto l : gui_layers) {
-		if (auto f = l->cast_to<gui::Fullscreen>()) {
+		if (auto f = l->cast_to<guiFullscreen>()) {
 			f->set_ls_position(viewport_position);
 			f->ws_position = viewport_position;
 			f->set_ls_size(viewport_size);
@@ -124,7 +124,7 @@ void GuiSystemLocal::sync_to_renderer() {
 	idrawUi->update(uiBuilderImpl.drawCmds, uiBuilderImpl.meshbuilder, uiBuilderImpl.ViewProj);
 }
 
-void GuiSystemLocal::remove_reference(gui::BaseGUI* this_panel) {
+void GuiSystemLocal::remove_reference(guiBase* this_panel) {
 	if (hovering == this_panel) {
 		hovering->on_hover_end();
 		hovering = nullptr;
@@ -144,7 +144,7 @@ void GuiSystemLocal::remove_reference(gui::BaseGUI* this_panel) {
 
 }
 
-void GuiSystemLocal::set_focus_to_this(gui::BaseGUI* panel) {
+void GuiSystemLocal::set_focus_to_this(guiBase* panel) {
 	if (key_focus == panel)
 		return;
 	if (key_focus) {
@@ -160,7 +160,7 @@ void GuiSystemLocal::set_focus_to_this(gui::BaseGUI* panel) {
 	}
 }
 
-void GuiSystemLocal::set_hovering(gui::BaseGUI* panel) {
+void GuiSystemLocal::set_hovering(guiBase* panel) {
 	if (hovering == panel)
 		return;
 	if (hovering) {
@@ -176,27 +176,27 @@ void GuiSystemLocal::set_hovering(gui::BaseGUI* panel) {
 	}
 }
 
-void GuiSystemLocal::update_widget_sizes_R(gui::BaseGUI* g) {
+void GuiSystemLocal::update_widget_sizes_R(guiBase* g) {
 	if (g->get_is_hidden())
 		return;
-	InlineVec<gui::BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	g->get_gui_children(children);
 	for (int i = 0; i < children.size(); i++)
 		update_widget_sizes_R(children[i]);
 	g->update_widget_size();
 }
 
-void GuiSystemLocal::update_widget_positions_R(gui::BaseGUI* g) {
+void GuiSystemLocal::update_widget_positions_R(guiBase* g) {
 	if (g->get_is_hidden())
 		return;
 	g->update_subwidget_positions();
-	InlineVec<gui::BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	g->get_gui_children(children);
 	for (int i = 0; i < children.size(); i++)
 		update_widget_positions_R(children[i]);
 }
 
-void GuiSystemLocal::paint_widgets_R(gui::BaseGUI* g, UIBuilder& builder) {
+void GuiSystemLocal::paint_widgets_R(guiBase* g, UIBuilder& builder) {
 	if (g->get_is_hidden())
 		return;
 
@@ -212,7 +212,7 @@ void GuiSystemLocal::paint_widgets_R(gui::BaseGUI* g, UIBuilder& builder) {
 		uiBuilderImpl.push_scissor(rect);
 	}
 	g->paint(builder);
-	InlineVec<gui::BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	g->get_gui_children(children);
 	for (int i = 0; i < children.size(); i++)
 		paint_widgets_R(children[i], builder);
@@ -221,7 +221,7 @@ void GuiSystemLocal::paint_widgets_R(gui::BaseGUI* g, UIBuilder& builder) {
 		uiBuilderImpl.pop_scissor();
 }
 
-gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse(int x, int y, bool scroll) const {
+guiBase* GuiSystemLocal::find_gui_under_mouse(int x, int y, bool scroll) const {
 	for (auto l : gui_layers) {
 		auto f = find_gui_under_mouse_R(l, x, y, scroll);
 		if (f)
@@ -230,18 +230,18 @@ gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse(int x, int y, bool scroll) co
 	return nullptr;
 }
 
-gui::BaseGUI* GuiSystemLocal::find_gui_under_mouse_R(gui::BaseGUI* g, int x, int y, bool scroll) const {
+guiBase* GuiSystemLocal::find_gui_under_mouse_R(guiBase* g, int x, int y, bool scroll) const {
 	if (g->get_is_hidden() || g->recieve_mouse==guiMouseFilter::Ignore)
 		return nullptr;
 
 	Rect2d r(g->ws_position.x, g->ws_position.y, g->ws_size.x, g->ws_size.y);
 	if (!r.is_point_inside(x, y))
 		return nullptr;
-	InlineVec<gui::BaseGUI*, 16> children;
+	InlineVec<guiBase*, 16> children;
 	g->get_gui_children(children);
 	for (int i = 0; i < children.size(); i++) {
 		auto child = children[i];
-		gui::BaseGUI* g_sub = find_gui_under_mouse_R(child, x, y, scroll);
+		guiBase* g_sub = find_gui_under_mouse_R(child, x, y, scroll);
 		if (!g_sub)
 			continue;
 		if ((!scroll && g_sub->recieve_mouse==guiMouseFilter::Block)||(scroll&&g_sub->eat_scroll_event))
@@ -295,15 +295,15 @@ void GuiSystemLocal::sort_gui_layers()
 		return;
 	layers_needs_sorting = false;
 
-	std::sort(gui_layers.begin(), gui_layers.end(), [](const gui::BaseGUI* a, const gui::BaseGUI* b)->bool {
-		auto af = a->cast_to<gui::Fullscreen>();
-		auto bf = b->cast_to<gui::Fullscreen>();
+	std::sort(gui_layers.begin(), gui_layers.end(), [](const guiBase* a, const guiBase* b)->bool {
+		auto af = a->cast_to<guiFullscreen>();
+		auto bf = b->cast_to<guiFullscreen>();
 		int ai = af ?  af->z_order : 10000000;
 		int bi = bf ? bf->z_order : 10000000;
 		return ai > bi;
 		});
 }
-void GuiSystemLocal::remove_gui_layer(gui::BaseGUI* layer) {
+void GuiSystemLocal::remove_gui_layer(guiBase* layer) {
 	int i = find_existing_layer(layer);
 	if (i == -1) {
 		sys_print(Warning, "couldnt remove gui layer, not found\n");
@@ -316,7 +316,7 @@ void GuiSystemLocal::remove_gui_layer(gui::BaseGUI* layer) {
 	layer->is_a_gui_root = false;
 
 }
-void GuiSystemLocal::add_gui_layer(gui::BaseGUI* layer) {
+void GuiSystemLocal::add_gui_layer(guiBase* layer) {
 	sys_print(Info, "adding layer\n");
 
 	ASSERT(find_existing_layer(layer) == -1);
@@ -325,7 +325,7 @@ void GuiSystemLocal::add_gui_layer(gui::BaseGUI* layer) {
 	layer->is_a_gui_root = true;
 }
 
-int GuiSystemLocal::find_existing_layer(gui::BaseGUI* gui) const {
+int GuiSystemLocal::find_existing_layer(guiBase* gui) const {
 	for (int i = 0; i < gui_layers.size(); i++)
 		if (gui_layers[i] == gui)
 			return i;

@@ -33,13 +33,20 @@ struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
 };
 
 
-NEWCLASS(BoneRenameContainer, ClassBase)
+
+class BoneRenameContainer : public ClassBase
+{
 public:
+	CLASS_BODY(BoneRenameContainer);
+
 	REFLECT();
 	std::vector<std::string> remap;
 };
-NEWCLASS(BoneReparentContainer, ClassBase)
+
+class BoneReparentContainer : public ClassBase
+{
 public:
+	CLASS_BODY(BoneReparentContainer);
 	REFLECT();
 	std::vector<std::string> remap;
 };

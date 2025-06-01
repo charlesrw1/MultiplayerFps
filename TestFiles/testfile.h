@@ -149,7 +149,7 @@ public:
 
 	glm::mat4 get_parent_transform() const;
 
-	void set_parent_bone(const std::string& bone) {
+	REF void set_parent_bone(const std::string& bone) {
 		parent_bone.string = bone;
 		if (!bone.empty())
 			parent_bone.name = StringName(bone.c_str());
@@ -276,6 +276,6 @@ private:
 
 template<typename T>
 inline T* Entity::create_component() {
-	static_assert(std::is_base_of<Component, T>::value, "Type not derived from EntityComponent");
+	static_assert(std::is_base_of<EntityComponent, T>::value, "Type not derived from EntityComponent");
 	return (T*)create_component_type(&T::StaticType);
 }

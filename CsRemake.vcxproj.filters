@@ -741,7 +741,6 @@
     <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
-    <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Test\Test.cpp" />

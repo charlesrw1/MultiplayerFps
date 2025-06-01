@@ -11,11 +11,11 @@ enum CharacterControllerCollisionFlags
 	CCCF_BELOW = 2,
 	CCCF_SIDES = 4
 };
-class PhysicsComponentBase;
+class PhysicsBody;
 class CharacterController
 {
 public:
-	CharacterController(PhysicsComponentBase* self) : self(self) {}
+	CharacterController(PhysicsBody* self) : self(self) {}
 
 	// continuous move
 	void move(
@@ -45,7 +45,7 @@ public:
 	float skin_size = 0.05;
 
 private:
-	PhysicsComponentBase* self = nullptr;
+	PhysicsBody* self = nullptr;
 	uint32_t cached_flags = 0;
 	glm::vec3 position{};	// internal position
 };

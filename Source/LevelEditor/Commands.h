@@ -834,7 +834,7 @@ class CreateComponentCommand : public Command
 public:
 	CreateComponentCommand(Entity* e, const ClassTypeInfo* component_type) {
 		ent = e->get_self_ptr();
-		ASSERT(component_type->is_a(EntityComponent::StaticType));
+		ASSERT(component_type->is_a(Component::StaticType));
 		info = component_type;
 	}
 	void execute() final {
@@ -850,13 +850,13 @@ public:
 
 		ed_doc.on_component_created.invoke(ec);
 	}
-	virtual void post_create(EntityComponent* ec) {
+	virtual void post_create(Component* ec) {
 	}
 	void undo() final {
 		ASSERT(comp_handle != 0);
 		auto obj = eng->get_object(comp_handle);
-		ASSERT(obj->is_a<EntityComponent>());
-		auto ec = (EntityComponent*)obj;
+		ASSERT(obj->is_a<Component>());
+		auto ec = (Component*)obj;
 		auto id = ec->get_instance_id();
 		ec->destroy();
 		ed_doc.on_component_deleted.invoke(id);
@@ -876,7 +876,7 @@ public:
 		: CreateComponentCommand(e,&ScriptComponent::StaticType) {
 		this->s = s;
 	}
-	void post_create(EntityComponent* ec)override {
+	void post_create(Component* ec)override {
 		auto sc = ec->cast_to<ScriptComponent>();
 		ASSERT(sc);
 		sc->script = s;
@@ -891,7 +891,7 @@ public:
 		: CreateComponentCommand(e, &MeshComponent::StaticType) {
 		this->s = s;
 	}
-	void post_create(EntityComponent* ec)override {
+	void post_create(Component* ec)override {
 		auto sc = ec->cast_to<MeshComponent>();
 		ASSERT(sc);
 		sc->set_model(s);
@@ -903,7 +903,7 @@ public:
 class RemoveComponentCommand  : public Command
 {
 public:
-	RemoveComponentCommand(Entity* e, EntityComponent* which) {
+	RemoveComponentCommand(Entity* e, Component* which) {
 		ent = e->get_self_ptr();
 		comp_handle = which->get_instance_id();
 		info = &which->get_type();
@@ -911,8 +911,8 @@ public:
 	void execute() final {
 		ASSERT(comp_handle != 0);
 		auto obj = eng->get_object(comp_handle);
-		ASSERT(obj->is_a<EntityComponent>());
-		auto ec = (EntityComponent*)obj;
+		ASSERT(obj->is_a<Component>());
+		auto ec = (Component*)obj;
 		auto id = ec->get_instance_id();
 		ec->destroy();
 		// dont move this!

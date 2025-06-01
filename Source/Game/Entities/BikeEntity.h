@@ -2,7 +2,7 @@
 #include "Game/EntityComponent.h"
 #include <memory>
 class CharacterController;
-CLASS_H(BikeEntity,EntityComponent)
+CLASS_H(BikeEntity,Component)
 public:
 	BikeEntity();
 	void update() final;

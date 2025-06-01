@@ -4,10 +4,11 @@
 #include "UI/UIBuilder.h"
 #include "UI/BaseGUI.h"
 #include "UI/Widgets/SharedFuncs.h"
-namespace gui {
-NEWCLASS(Button, BaseGUI)
+class guiButton : public guiBase
+{
 public:
-	Button() {
+	CLASS_BODY(guiButton);
+	guiButton() {
 		recieve_mouse = guiMouseFilter::Block;
 	}
 #ifdef EDITOR_BUILD
@@ -41,4 +42,3 @@ public:
 	REFLECT();
 	MulticastDelegate<> on_selected;
 };
-}

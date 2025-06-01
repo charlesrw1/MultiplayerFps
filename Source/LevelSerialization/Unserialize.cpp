@@ -90,7 +90,7 @@ void UnserializedSceneFile::add_obj(const std::string& path, Entity* parent_ent,
 			entity_obj->parent_to(parent_ent);
 	}
 	else {
-		auto comp_obj = e->cast_to<EntityComponent>();
+		auto comp_obj = e->cast_to<Component>();
 		ASSERT(comp_obj);
 		ASSERT(parent_ent);
 		parent_ent->add_component_from_unserialization(comp_obj);
@@ -168,7 +168,7 @@ void unserialize_one_item_text(
 		// entity or component
 		else {
 			auto classinfo = ClassBase::find_class(type.c_str());
-			if (!classinfo || !classinfo->allocate || !(classinfo->is_a(Entity::StaticType)||classinfo->is_a(EntityComponent::StaticType))) {
+			if (!classinfo || !classinfo->allocate || !(classinfo->is_a(Entity::StaticType)||classinfo->is_a(Component::StaticType))) {
 				throw std::runtime_error("couldn't find class: " + type);
 			}
 			auto obj = classinfo->allocate();
@@ -259,7 +259,7 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 			Entity** e = (Entity**)prop.get_ptr(inst);
 			EntityPtr* eptr = (EntityPtr*)prop.get_ptr(inst);
 			if (*e) {
-				*eptr = { (*e)->get_instance_id() };
+				*eptr = EntityPtr((*e)->get_instance_id());
 			}
 		}
 		else if(prop.type==core_type_id::List) {

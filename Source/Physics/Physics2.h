@@ -72,26 +72,26 @@ struct physics_shape_def
 };
 
 // Rigid body definition
-class PhysicsBody
+class PhysicsBodyDefinition
 {
 public:
-	~PhysicsBody();
-	PhysicsBody() = default;
-	PhysicsBody& operator=(const PhysicsBody& other) = delete;
-	PhysicsBody(const PhysicsBody& other) = delete;
+	~PhysicsBodyDefinition();
+	PhysicsBodyDefinition() = default;
+	PhysicsBodyDefinition& operator=(const PhysicsBodyDefinition& other) = delete;
+	PhysicsBodyDefinition(const PhysicsBodyDefinition& other) = delete;
 
 	std::vector<physics_shape_def> shapes;
 };
 
 
-class PhysicsComponentBase;
+class PhysicsBody;
 struct world_query_result
 {
 	float fraction = 1.0;
 	glm::vec3 hit_pos;
 	glm::vec3 hit_normal;
 	glm::vec3 trace_dir;
-	PhysicsComponentBase* component = nullptr;
+	PhysicsBody* component = nullptr;
 	uint16_t contents=0;
 	uint32_t face_hit = 0;
 	int16_t bone_hit = -1;
@@ -100,7 +100,7 @@ struct world_query_result
 };
 
 
-using TraceIgnoreVec = InlineVec<PhysicsComponentBase*, 4>;
+using TraceIgnoreVec = InlineVec<PhysicsBody*, 4>;
 
 class BinaryReader;
 class PhysicsManImpl;

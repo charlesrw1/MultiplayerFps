@@ -6,7 +6,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "GameEnginePublic.h"
 
-CLASS_H(FogComponent, EntityComponent)
+CLASS_H(FogComponent, Component)
 public:
 	FogComponent() {
 		set_call_init_in_editor(true);

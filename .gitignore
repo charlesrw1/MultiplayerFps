@@ -30,3 +30,5 @@ Source/.generated/
 todo.txt
 
 *.diagsession
+
+__pycache__/

@@ -4,8 +4,12 @@
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/Reflection2.h"
 class MeshBuilderComponent;
-NEWCLASS(SoundComponent, EntityComponent)
+
+class SoundComponent : public Component
+{
 public:
+    CLASS_BODY(SoundComponent);
+
     SoundComponent();
     void start() override;
     void end() override;

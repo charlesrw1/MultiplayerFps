@@ -313,7 +313,6 @@
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\Framework\Util.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
-    <ClCompile Include="Source\Game\Components\ArrowComponent.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
