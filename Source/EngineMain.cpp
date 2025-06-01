@@ -65,6 +65,7 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 
 #include "Framework/Jobs.h"
+#include "EditorPopups.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -920,7 +921,23 @@ void register_input_actions_for_game()
 
 int game_engine_main(int argc, char** argv)
 {
-	eng_local.init(argc,argv);	
+	eng_local.init(argc,argv);
+	EditorPopupManager::inst->add_popup("Hello world", []()->bool {
+		bool ret = false;
+		if (ImGui::Button("INNER")) {
+			EditorPopupManager::inst->add_popup("WHAT??", []()->bool {
+				bool ret2 = false;
+				if (ImGui::Button("yes im sure"))
+					ret2 = true;
+				return ret2;
+			});
+		}
+
+		if (ImGui::Button("Close"))
+			ret = true;
+		return ret;
+	});
+
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1055,10 +1072,10 @@ void GameEngineLocal::execute_map_change()
 		on_map_change_callback(true /* == this_is_for_editor */, temp);
 	}
 	else {
-		g_assets.find_async<SceneAsset>(queued_mapname, [this_is_for_editor](GenericAssetPtr ptr)
+		g_assets.find_async<SceneAsset>(queued_mapname, [this, this_is_for_editor](GenericAssetPtr ptr)
 			{
 				auto level = (ptr)?ptr.cast_to<SceneAsset>():nullptr;
-				eng_local.on_map_change_callback(this_is_for_editor, level.get());
+				this->on_map_change_callback(this_is_for_editor, level.get());
 
 			}, 0 /* default lifetime channel 0*/);
 
@@ -1269,6 +1286,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	CPUSCOPESTART(imgui_draw);
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({ 51, 51, 51 }));
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({ 35, 35, 35 }));
+
+	EditorPopupManager::inst->draw_popups();
 
 	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
@@ -1645,6 +1664,8 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	g_inputSys.init();
 	register_input_actions_for_game();
+
+	EditorPopupManager::inst = new EditorPopupManager();
 
 	g_physics.init();
 	//network_init();

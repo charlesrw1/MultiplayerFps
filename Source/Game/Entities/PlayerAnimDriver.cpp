@@ -14,7 +14,8 @@ void CharacterGraphDriver::on_init() {
 
 void CharacterGraphDriver::on_update(float dt) {
 
-	if (!get_owner()) return;
+	if (!get_owner())
+		return;
 	if (!get_owner()->cast_to<Player>())
 		return;
 	Player& player = *get_owner()->cast_to<Player>();

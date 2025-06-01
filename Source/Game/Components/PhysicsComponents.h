@@ -227,8 +227,8 @@ public:
 	PhysicsJointComponent();
 	~PhysicsJointComponent();
 
-	void start() override;
-	void end() override;
+	void start() final;
+	void end() final;
 	void on_changed_transform() override;
 	void editor_on_change_property() override;
 

@@ -30,7 +30,8 @@ ENUM_TYPE = 13
 STRUCT_TYPE = 14
 SOFTASSETPTR_TYPE = 15
 CLASSTYPEINFO_TYPE = 16
-
+UNORDERED_SET = 17
+UNORDERED_MAP = 18
 
 class CppType:
     def __init__(self, type: int, templates: Optional[List["CppType"]] = None, const: bool = False, typename: str = "") -> None:
@@ -275,11 +276,20 @@ def parse_enum(enumname : str, file_iter : enumerate[str]) -> ClassDef:
 
 STANDARD_CPP_TYPES: dict[str, int] = {
     "void": NONE_TYPE,
+
+    # std containers
     "std::string": STRING_TYPE,
+    "string":STRING_TYPE,
+    "std::vector": LIST_TYPE,
+    "vector":LIST_TYPE,
+    "std::unordered_set":UNORDERED_SET,
+    "unordered_set":UNORDERED_SET,
+    "std::unordered_map":UNORDERED_MAP,
+    "unordered_map":UNORDERED_MAP,
+
     "MulticastDelegate": MULTICAST_TYPE,
     "AssetPtr": ASSETPTR_TYPE,
     "SoftAssetPtr": SOFTASSETPTR_TYPE,
-    "std::vector": LIST_TYPE,
     "float": FLOAT_TYPE,
     "bool": BOOL_TYPE,
     "int": INT_TYPE,

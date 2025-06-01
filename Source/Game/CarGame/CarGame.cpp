@@ -30,7 +30,7 @@ float steer_mult = 0.04;
 float wind_resist = 0.80;
 float epsilon_friction = 0.005;
 float max_spring = 0.8;
-float visual_wheel_interp = 0.0003;
+float visual_wheel_interp = 0.0053;
 
 void car_debug_menu()
 {
@@ -53,7 +53,7 @@ void car_debug_menu()
 
 	ImGui::DragFloat("max_spring", &max_spring,0.05,0.1,1.5);
 }
-ADD_TO_DEBUG_MENU(car_debug_menu);
+ADD_TO_DEBUG_MENU(car_debug_menu);//
 
 void CarComponent::update() {
 	auto body_t = body->get_ws_transform();

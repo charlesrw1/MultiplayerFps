@@ -32,12 +32,10 @@ void Level::update_level()
 	}
 	wantsToAddToUpdate.clear();
 
-	//printf("%d\n",tick_list)
-
-
 	for (auto h : deferred_delete_list) {
 		auto e = get_entity(h);
-		if (!e) continue;
+		if (!e) 
+			continue;
 		if (e->is_a<Entity>()) {
 			auto ent = (Entity*)e;
 			ent->destroy();
@@ -104,7 +102,8 @@ Entity* Level::spawn_entity()
 
 void Level::destroy_entity(Entity* e)
 {
-	if (!e) return;
+	if (!e) 
+		return;
 	uint64_t id = e->get_instance_id();
 	sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 	e->destroy_internal();
@@ -120,7 +119,8 @@ void Level::destroy_entity(Entity* e)
 }
 void Level::destroy_component(Component* ec)
 {
-	if (!ec) return;
+	if (!ec) 
+		return;
 
 	wants_sync_update.remove(ec);
 

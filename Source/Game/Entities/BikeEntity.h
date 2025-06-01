@@ -1,6 +1,8 @@
 #pragma once
 #include "Game/EntityComponent.h"
 #include <memory>
+class Model;
+class Texture;
 class CharacterController;
 CLASS_H(BikeEntity,Component)
 public:
@@ -12,6 +14,10 @@ public:
 	float forward_strength = 0.0;	// 0,1
 	glm::vec3 bike_direction{};
 private:
+	//REF Model* model_to_swap = nullptr;
+	//REF Texture* texture_to_use = nullptr;
+	//REF PrefabAsset* prefab = nullptr;
+
 	std::unique_ptr<CharacterController> ccontrol = nullptr;
 	float current_turn = 0.0; // -1,1
 	float forward_speed = 0.0;

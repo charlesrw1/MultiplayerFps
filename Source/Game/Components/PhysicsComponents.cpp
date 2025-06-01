@@ -138,6 +138,7 @@ void PhysicsBody::pre_start()
 		auto dyn = (PxRigidDynamic*)physxActor;
 		dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->simulate_physics);
 	}
+	assert(has_initialized());
 
 	physics_local_impl->scene->addActor(*physxActor);
 
@@ -181,7 +182,8 @@ void PhysicsBody::update_bone_parent_animator()
 	};
 
 	auto a = get_the_parent_animator();
-	if (!a) return;
+	if (!a) 
+		return;
 	if (!simulate_physics ||!enabled)
 		a->remove_simulating_physics_object(get_owner());
 	else
@@ -224,7 +226,7 @@ void PhysicsBody::end()
 		physxActor->release();
 		physxActor = nullptr;
 	}
-
+	assert(!physxActor);
 	simulate_physics = false;
 	update_bone_parent_animator();
 }
@@ -576,6 +578,7 @@ void PhysicsJointComponent::refresh_joint()
 
 void PhysicsJointComponent::start()
 {
+	PhysicsBody::start();
 	if (eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
 		editor_meshbuilder->dont_serialize_or_edit = true;
@@ -601,6 +604,7 @@ void PhysicsJointComponent::end()
 {
 	if (editor_meshbuilder)
 		editor_meshbuilder->destroy();
+	PhysicsBody::end();
 }
 
 PhysicsBody* PhysicsJointComponent::get_owner_physics() {
@@ -754,7 +758,7 @@ void AdvancedJointComponent::draw_meshbuilder()
 	myworld = myworld * mylocal;
 
 	// draw x angle
-	auto origin = myworld[3];
+	auto& origin = myworld[3];
 	float length = 0.4;
 	if(ang_x_motion==JM::Limited)
 	{

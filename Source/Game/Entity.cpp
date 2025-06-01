@@ -488,7 +488,7 @@ glm::mat4 Entity::get_parent_transform() const
 	else {
 		return
 			get_parent()->get_ws_transform()
-			* get_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone.name);
+			* get_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone);
 
 	}
 }
@@ -521,6 +521,11 @@ class EntityBoneParentStringEditor : public IPropertyEditor
 {
 public:
 	// Inherited via IPropertyEditor
+	~EntityBoneParentStringEditor() override {
+		StringName* myName = (StringName*)prop->get_ptr(instance);
+		*myName = StringName(str.c_str());
+	}
+
 	virtual bool internal_update() override
 	{
 		Entity* self = (Entity*)instance;
@@ -538,6 +543,9 @@ public:
 				}
 			}
 			has_init = true;
+			StringName* myName = (StringName*)prop->get_ptr(instance);
+			if (!myName->is_null())
+				str = myName->get_c_str();
 		}
 
 		if (options.empty()) {
@@ -547,16 +555,16 @@ public:
 
 		bool has_update = false;
 
-		BoneParentStruct* my_struct = (BoneParentStruct*)prop->get_ptr(instance);
 
-		const char* preview = (!my_struct->string.empty()) ? my_struct->string.c_str() : "<empty>";
+		const char* preview = (!str.empty()) ? str.c_str() : "<empty>";
 		if (ImGui::BeginCombo("##combocalsstype", preview)) {
 			for (auto& option : options) {
 
 				if (ImGui::Selectable(option.c_str(),
-					my_struct->string == option
+					str == option
 				)) {
-					self->set_parent_bone(option);
+					self->set_parent_bone(StringName(option.c_str()));
+					str = option;
 					has_update = true;
 				}
 
@@ -566,6 +574,7 @@ public:
 
 		return has_update;
 	}
+	std::string str;
 	bool has_init = false;
 	std::vector<std::string> options;
 };
@@ -578,15 +587,15 @@ class EntityBoneParentStringSerialize : public IPropertySerializer
 	// Inherited via IPropertySerializer
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
-		const BoneParentStruct* ptr_prop = (const BoneParentStruct*)info.get_ptr(inst);
-		return ptr_prop->string;
+		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
+		return ptr_prop->get_c_str();
 	}
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	{
-		const BoneParentStruct* ptr_prop = (const BoneParentStruct*)info.get_ptr(inst);
+		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
 		std::string to_str(token.str_start, token.str_len);
 		Entity* e = (Entity*)inst;
-		e->set_parent_bone(to_str);
+		e->set_parent_bone(StringName(to_str.c_str()));
 	}
 };
 ADDTOFACTORYMACRO_NAME(EntityBoneParentStringSerialize, IPropertySerializer, "EntityBoneParentString");
@@ -617,6 +626,12 @@ class EntityTagEditor : public IPropertyEditor
 {
 public:
 	// Inherited via IPropertyEditor
+	~EntityTagEditor() override {
+		StringName* myName = (StringName*)prop->get_ptr(instance);
+		*myName = StringName(str.c_str());
+	}
+
+	// Inherited via IPropertyEditor
 	virtual bool internal_update() override
 	{
 		Entity* self = (Entity*)instance;
@@ -627,6 +642,9 @@ public:
 				options.push_back(t);
 
 			has_init = true;
+			StringName* myName = (StringName*)prop->get_ptr(instance);
+			if (!myName->is_null())
+				str = myName->get_c_str();
 		}
 
 		if (options.empty()) {
@@ -636,16 +654,16 @@ public:
 
 		bool has_update = false;
 
-		TagStruct* my_struct = (TagStruct*)prop->get_ptr(instance);
 
-		const char* preview = (!my_struct->string.empty()) ? my_struct->string.c_str() : "<untagged>";
+		const char* preview = (!str.empty()) ? str.c_str() : "<untagged>";
 		if (ImGui::BeginCombo("##combocalsstype", preview)) {
 			for (auto& option : options) {
 
 				if (ImGui::Selectable(option.c_str(),
-					my_struct->string == option
+					str == option
 				)) {
-					self->set_tag(option);
+					self->set_tag(StringName(option.c_str()));
+					str = option;
 					has_update = true;
 				}
 
@@ -655,6 +673,7 @@ public:
 
 		return has_update;
 	}
+	std::string str;
 	bool has_init = false;
 	std::vector<std::string> options;
 };
@@ -666,15 +685,15 @@ class EntityTagSerialize : public IPropertySerializer
 	// Inherited via IPropertySerializer
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
-		const TagStruct* ptr_prop = (const TagStruct*)info.get_ptr(inst);
-		return ptr_prop->string;
+		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
+		return ptr_prop->get_c_str();
 	}
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
 	{
-		const TagStruct* ptr_prop = (const TagStruct*)info.get_ptr(inst);
+		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
 		std::string to_str(token.str_start, token.str_len);
 		Entity* e = (Entity*)inst;
-		e->set_tag(to_str);
+		e->set_tag(StringName(to_str.c_str()));
 	}
 };
 ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");

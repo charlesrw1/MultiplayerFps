@@ -65,12 +65,17 @@ struct TopDownControls
 };
 
 
+using std::unordered_map;
+using std::unordered_set;
+using std::vector;
+
 
 
 class TopDownPlayer : public Component
 {
 public:
 	CLASS_BODY(TopDownPlayer);
+
 
 	REF TopDownControls con;
 	REF AssetPtr<PrefabAsset> shotgunSoundAsset;

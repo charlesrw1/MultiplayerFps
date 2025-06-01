@@ -17,16 +17,7 @@ class MeshComponent;
 class Component;
 struct PropertyInfoList;
 
-struct BoneParentStruct
-{
-	StringName name;	
-	std::string string;	// only in editor
-};
-struct TagStruct
-{
-	StringName name;	// hashed stringname of tag
-	std::string string;	// only in editor
-};
+
 
 GENERATED_CLASS_INCLUDE("Game/EntityComponent.h");
 
@@ -149,18 +140,14 @@ public:
 
 	glm::mat4 get_parent_transform() const;
 
-	void set_parent_bone(const std::string& bone) {
-		parent_bone.string = bone;
-		if (!bone.empty())
-			parent_bone.name = StringName(bone.c_str());
-		else
-			parent_bone.name = StringName();
+	void set_parent_bone(StringName name) {
+		parent_bone = name;
 	}
 	REF bool has_parent_bone() const {
-		return parent_bone.name.get_hash() != 0;
+		return !parent_bone.is_null();
 	}
 	REF StringName get_parent_bone() const {
-		return parent_bone.name;
+		return parent_bone;
 	}
 	REF bool get_start_disabled() const {
 		return start_disabled;
@@ -176,17 +163,13 @@ public:
 	REF void activate();
 
 	StringName get_tag() const {
-		return tag.name;
+		return tag;
 	}
 	bool has_tag() const {
-		return tag.name.get_hash() != 0;
+		return tag.get_hash() != 0;
 	}
-	void set_tag(const std::string& tagstr) {
-		tag.string = tagstr;
-		if (!tagstr.empty())
-			tag.name = StringName(tagstr.c_str());
-		else
-			tag.name = StringName();
+	void set_tag(StringName name) {
+		tag = name;
 	}
 
 	bool get_is_top_level() const {
@@ -231,13 +214,13 @@ private:
 	std::vector<Entity*> children;
 
 	REFLECT(type="EntityTagString");
-	TagStruct tag;
+	StringName tag;
 	REF glm::vec3 position = glm::vec3(0.f);
 	REF glm::quat rotation = glm::quat(1,0,0,0);
 	REF glm::vec3 scale = glm::vec3(1.f);
 	REF std::string editor_name;
 	REFLECT(type="EntityBoneParentString")
-	BoneParentStruct parent_bone;
+	StringName parent_bone;
 	REF bool start_disabled = false;
 	REF bool prefab_editable = false;
 

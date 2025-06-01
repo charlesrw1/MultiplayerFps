@@ -16,7 +16,7 @@ CLASS_IMPL(PrefabAsset);
 class IEditorTool;
 
 extern IEditorTool* level_editor_factory();
-
+extern IEditorTool* g_editor_doc;
 class MapAssetMetadata : public AssetMetadata
 {
 public:
@@ -38,7 +38,7 @@ public:
 
 	virtual bool assets_are_filepaths()  const { return true; }
 
-	editor_tool_factory tool_to_edit_me() const override { return level_editor_factory; }
+	IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &SceneAsset::StaticType; }
 
@@ -67,7 +67,7 @@ public:
 
 	virtual bool assets_are_filepaths()  const { return true; }
 
-	editor_tool_factory tool_to_edit_me() const override { return level_editor_factory; }
+	IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &PrefabAsset::StaticType; }
 
