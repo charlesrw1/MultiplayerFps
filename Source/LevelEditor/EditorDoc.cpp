@@ -1735,282 +1735,10 @@ void EdPropertyGrid::draw()
 
 
 
-class SharedAssetPropertyEditor : public IPropertyEditor
-{
-public:
-	virtual std::string get_str() = 0;
-	virtual void set_asset(const std::string& str) = 0;
-	virtual bool is_soft_editor() const {
-		return false;
-	}
-	virtual bool get_failed_load() const { return false; }
-	virtual bool internal_update() {
-		if (!has_init) {
-			has_init = true;
-			asset_str = get_str();
-			metadata = AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class(prop->range_hint));
-		}
-		if (!metadata) {
-			ImGui::Text("Asset has no metadata: %s\n", prop->range_hint);
-			return false;
-		}
-
-
-		auto drawlist = ImGui::GetWindowDrawList();
-		auto& style = ImGui::GetStyle();
-		auto min = ImGui::GetCursorScreenPos();
-		auto sz = ImGui::CalcTextSize(asset_str.c_str());
-		float width = ImGui::CalcItemWidth();
-		Color32 color = metadata->get_browser_color();
-		color.r *= 0.4;
-		color.g *= 0.4;
-		color.b *= 0.4;
-
-		if (is_soft_editor()) {
-			float border = 2.f;
-			drawlist->AddRectFilled(
-				ImVec2(min.x - style.FramePadding.x * 0.5f - border, min.y - border), 
-				ImVec2(min.x + width + border, min.y + sz.y + style.FramePadding.y * 2.0+border),
-				(Color32{ 255, 229, 99 }).to_uint());
-		}
-
-		drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y), ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), 
-			color.to_uint());
-		auto cursor = ImGui::GetCursorPos();
-
-		if (is_soft_editor())
-			ImGui::TextColored(ImColor((Color32{ 255, 229, 99 }).to_uint()), asset_str.c_str());
-		else {
-			if (get_failed_load())
-				ImGui::TextColored(ImColor((Color32{ 255, 141, 133 }).to_uint()), asset_str.c_str());
-			else
-				ImGui::Text(asset_str.c_str());
-		}
-		ImGui::SetCursorPos(cursor);
-		ImGui::InvisibleButton("##adfad", ImVec2(width, sz.y + style.FramePadding.y * 2.f));
-		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-			ImGui::BeginTooltip();
-			if (is_soft_editor())
-				ImGui::Text(string_format("SoftAssetPtr: Drag and drop %s asset here", metadata->get_type_name().c_str()));
-			else
-				ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
-			ImGui::EndTooltip();
-
-
-			if (ImGui::GetIO().MouseDoubleClicked[0]) {
-				if (metadata->tool_to_edit_me()) {
-					std::string cmdstr = "start_ed ";
-					cmdstr += '"';
-					cmdstr += metadata->get_type_name();
-					cmdstr += '"';
-					cmdstr += " ";
-					cmdstr += '"';
-					cmdstr += asset_str.c_str();
-					cmdstr += '"';
-					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmdstr.c_str());
-				}
-			} else if (ImGui::GetIO().MouseClicked[0]) {
-				global_asset_browser.filter_all();
-				global_asset_browser.unset_filter(1 << metadata->self_index);
-			}
-		}
-		bool ret = false;
-		if (ImGui::BeginDragDropTarget())
-		{
-			//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-			//if (payload->IsDataType("AssetBrowserDragDrop"))
-			//	sys_print("``` accepting\n");
-
-			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
-			if (payload) {
-
-				AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-				bool actually_accept = false;
-				if (resource->type == metadata) {
-					actually_accept = true;
-				}
-
-				if (actually_accept) {
-					if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
-					{
-						//IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
-						
-						set_asset(resource->filename);
-						asset_str = get_str();
-
-
-						ret = true;
-					}
-				}
-			}
-			ImGui::EndDragDropTarget();
-		}
-
-		return ret;
-
-	}
-	virtual int extra_row_count() { return 0; }
-	virtual bool can_reset() { return !asset_str.empty(); }
-	virtual void reset_value() {
-		set_asset("");
-		asset_str = "";
-		//auto ptr = (IAsset**)prop->get_ptr(instance);
-		//*ptr = nullptr;
-	}
-private:
-	bool has_init = false;
-	std::string asset_str;
-	const AssetMetadata* metadata = nullptr;
-};
-#include "Game/SoftAssetPtr.h"
-class SoftAssetPropertyEditor : public SharedAssetPropertyEditor
-{
-public:
-	std::string get_str() override {
-		auto ptr = (SoftAssetPtr<IAsset>*)prop->get_ptr(instance);
-		return ptr->path;
-	}
-	void set_asset(const std::string& str) override {
-		auto ptr = (SoftAssetPtr<IAsset>*)prop->get_ptr(instance);
-		ptr->path = str;
-	}
-	bool is_soft_editor() const override {
-		return true;
-	}
-};
-class AssetPropertyEditor : public SharedAssetPropertyEditor
-{
-public:
-	std::string get_str() override {
-		auto ptr = (IAsset**)prop->get_ptr(instance);
-		return (*ptr) ? (*ptr)->get_name() : "";
-	}
-	void set_asset(const std::string& str) override {
-		auto ptr = (IAsset**)prop->get_ptr(instance);
-		if (str.empty()) {
-			*ptr = nullptr;
-		}
-		else {
-			auto classtype = ClassBase::find_class(prop->range_hint);
-			auto asset = g_assets.find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
-			*ptr = asset;
-		}
-	}
-	bool get_failed_load() const override {
-		auto ptr = *(IAsset**)prop->get_ptr(instance);
-		if (ptr && ptr->did_load_fail())
-			return true;
-		return false;
-	}
-};
-
-
-ADDTOFACTORYMACRO_NAME(AssetPropertyEditor, IPropertyEditor, "AssetPtr");
-ADDTOFACTORYMACRO_NAME(SoftAssetPropertyEditor, IPropertyEditor, "SoftAssetPtr");
 
 
 
-class EntityPtrAssetEditor : public IPropertyEditor
-{
-public:
-	EntityPtrAssetEditor() {
-		ed_doc.on_eyedropper_callback.add(this, [&](const Entity* e)
-			{
-				if (ed_doc.get_active_eyedropper_user_id() == this) {
-					sys_print(Debug, "entityptr on eye dropper callback\n");
-					EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
-					*ptr_to_asset = e->get_self_ptr();
-				}
-			});
-	}
-	~EntityPtrAssetEditor() override {
-		ed_doc.on_eyedropper_callback.remove(this);
-	}
-	virtual bool internal_update() {
-
-		EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
-
-		ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
-		auto eyedropper = g_assets.find_sync<Texture>("icon/eyedrop.png");
-		if (ImGui::ImageButton((ImTextureID)uint64_t(eyedropper->gl_id), ImVec2(16, 16))) {
-			ed_doc.enable_entity_eyedropper_mode(this);
-		}
-		ImGui::PopStyleColor();
-		ImGui::SameLine();
-		if (ed_doc.is_in_eyedropper_mode()&&ed_doc.get_active_eyedropper_user_id()==this) {
-			ImGui::TextColored(color32_to_imvec4({ 255, 74, 249 }), "{ eyedropper  active }");
-		}
-		else if (ptr_to_asset->get()) {
-			const char* str = ptr_to_asset->get()->get_editor_name().c_str();
-			if (!*str)
-				str = ptr_to_asset->get()->get_type().classname;
-			ImGui::Text(str);
-		}
-		else {
-			ImGui::TextColored(color32_to_imvec4({ 128,128,128 }),"<nullptr>");
-
-		}
-
-		return false;
-	}
-	virtual int extra_row_count() { return 0; }
-	virtual bool can_reset() { return false; }
-	virtual void reset_value() {
-	}
-};
-ADDTOFACTORYMACRO_NAME(EntityPtrAssetEditor, IPropertyEditor, "EntityPtr");
-
-class ColorEditor : public IPropertyEditor
-{
-public:
-	virtual bool internal_update() {
-		assert(prop->type == core_type_id::Int32);
-		Color32* c = (Color32*)prop->get_ptr(instance);
-		ImVec4 col = ImGui::ColorConvertU32ToFloat4(c->to_uint());
-		if (ImGui::ColorEdit3("##coloredit", &col.x)) {
-			auto uint_col = ImGui::ColorConvertFloat4ToU32(col);
-			uint32_t* prop_int = (uint32_t*)prop->get_ptr(instance);
-			*prop_int = uint_col;
-			return true;
-		}
-		return false;
-	}
-	virtual int extra_row_count() { return 0; }
-	virtual bool can_reset() { 
-		Color32* c = (Color32*)prop->get_ptr(instance);
-		return c->r != 255 || c->g != 255 || c->b != 255;
-	
-	}
-	virtual void reset_value() {
-		Color32* c = (Color32*)prop->get_ptr(instance);
-		*c = COLOR_WHITE;
-	}
-private:
-};
-
-ADDTOFACTORYMACRO_NAME(ColorEditor, IPropertyEditor, "ColorUint");
-
-class ButtonPropertyEditor : public IPropertyEditor
-{
-	bool internal_update() {
-		ASSERT(prop->type == core_type_id::Bool);
-
-		bool ret = false;
-		if (ImGui::Button(prop->range_hint)) {
-			ret = true;
-			prop->set_int(instance, true);
-		}
-
-		return ret;
-	}
-	bool can_reset() {
-		return false;
-	}
-};
-ADDTOFACTORYMACRO_NAME(ButtonPropertyEditor, IPropertyEditor, "BoolButton");
-
-
-EdPropertyGrid::EdPropertyGrid()
+EdPropertyGrid::EdPropertyGrid(const FnFactory<IPropertyEditor>& factory) : factory(factory), grid(factory)
 {
 	auto& ss = ed_doc.selection_state;
 	ss->on_selection_changed.add(this, &EdPropertyGrid::refresh_grid);
@@ -2112,6 +1840,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 	counter++;
 }
 
+#include "PropertyEditors.h"
 
 EditorDoc::EditorDoc() {
 
@@ -2122,9 +1851,12 @@ EditorDoc::EditorDoc() {
 		});
 
 	selection_state = std::make_unique<SelectionState>();
-	prop_editor = std::make_unique<EdPropertyGrid>();
+	prop_editor = std::make_unique<EdPropertyGrid>(grid_factory);
 	manipulate = std::make_unique<ManipulateTransformTool>();
 	outliner = std::make_unique<ObjectOutliner>();
+
+	PropertyFactoryUtil::register_basic(grid_factory);
+	PropertyFactoryUtil::register_editor(*this, grid_factory);
 }
 
 extern void export_scene_model();

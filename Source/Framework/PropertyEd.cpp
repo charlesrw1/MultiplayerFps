@@ -2,17 +2,18 @@
 #include "PropertyEd.h"
 #include "imgui.h"
 #include "Assets/AssetDatabase.h"
+#include "FnFactory.h"
 
 static uint32_t color32_to_uint(Color32 color) {
 	return *(uint32_t*)&color;
 }
 
-IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask);
+IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask);
 
 class UniquePtrRow : public IGridRow
 {
 public:
-	UniquePtrRow(IGridRow* parent, void* instance, PropertyInfo* info, int row_idx, uint32_t prop_flag_mask) : IGridRow(parent, row_idx) {
+	UniquePtrRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* info, int row_idx, uint32_t prop_flag_mask) : IGridRow(parent, row_idx), factory(factory) {
 		assert(info->type == core_type_id::StdUniquePtr);
 		flagmask = prop_flag_mask;
 		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(instance);
@@ -107,11 +108,13 @@ public:
 			if (!passed_mask_check)
 				continue;
 
-			auto row = create_row(this, &prop, b, -1, flagmask);
+			auto row = create_row(factory,this, &prop, b, -1, flagmask);
 			if (row)
 				child_rows.push_back(std::unique_ptr<IGridRow>(row));
 		}
 	}
+
+	const FnFactory<IPropertyEditor>& factory;
 	uint32_t flagmask = 0;
 	void* inst = nullptr;
 	PropertyInfo* info = nullptr;
@@ -120,18 +123,18 @@ public:
 
 
 
-static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask)
+static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask)
 {
 	if (prop->type == core_type_id::List) {
-		ArrayRow* array_ = new ArrayRow(nullptr, inst, prop, row_idx, property_flag_mask);
+		ArrayRow* array_ = new ArrayRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
 		return array_;
 	}
 	else if (prop->type == core_type_id::StdUniquePtr) {
-		auto row = new UniquePtrRow(nullptr, inst, prop, row_idx, property_flag_mask);
+		auto row = new UniquePtrRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
 		return row;
 	}
 	else {
-		PropertyRow* prop_ = new PropertyRow(nullptr, inst, prop, row_idx);
+		PropertyRow* prop_ = new PropertyRow(factory, nullptr, inst, prop, row_idx);
 
 		if (prop_->prop_editor)
 			return prop_;
@@ -140,17 +143,24 @@ static IGridRow* create_row(IGridRow* parent, PropertyInfo* prop, void* inst, in
 	}
 }
 
+
+PropertyGrid::PropertyGrid(const FnFactory<IPropertyEditor>& factory)
+	: factory(factory)
+{
+
+}
+
 void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags, uint32_t property_flag_mask)
 {
 	IGridRow* row = nullptr;
 
 	if (flags & PG_LIST_PASSTHROUGH && list->count == 1 && list->list[0].type == core_type_id::List) {
-		row = create_row(nullptr, list->list, inst, -1, property_flag_mask);
+		row = create_row(factory, nullptr, list->list, inst, -1, property_flag_mask);
 		row->set_name_override(list->type_name);
 		ASSERT(row);
 	}
 	else {
-		row = new GroupRow(nullptr, inst, list, -1, property_flag_mask);
+		row = new GroupRow(factory, nullptr, inst, list, -1, property_flag_mask);
 	}
 
 	rows.push_back(std::unique_ptr<IGridRow>(row));
@@ -417,10 +427,10 @@ public:
 	glm::vec3 euler{};
 };
 
-static IPropertyEditor* create_ipropertyed(PropertyInfo* prop, void* instance, IGridRow* parent) {
+static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory,PropertyInfo* prop, void* instance, IGridRow* parent) {
 
 	IPropertyEditor* out = nullptr;
-	out = IPropertyEditor::get_factory().createObject(prop->custom_type_str);
+	out = factory.create(prop->custom_type_str);// IPropertyEditor::get_factory().createObject(prop->custom_type_str);
 	if (out) {
 		out->post_construct_for_custom_type(instance, prop,parent);
 		return out;
@@ -531,11 +541,6 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-Factory<std::string, IPropertyEditor>& IPropertyEditor::get_factory()
-{
-	static Factory<std::string, IPropertyEditor> inst;
-	return inst;
-}
 
 Factory<std::string, IArrayHeader>& IArrayHeader::get_factory()
 {
@@ -543,8 +548,8 @@ Factory<std::string, IArrayHeader>& IArrayHeader::get_factory()
 	return inst;
 }
 
-ArrayRow::ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask) 
-	: IGridRow(parent, row_idx), instance(instance), prop(prop), property_flag_mask(property_flag_mask)
+ArrayRow::ArrayRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask)
+	: IGridRow(parent, row_idx), instance(instance), prop(prop), property_flag_mask(property_flag_mask),factory(factory)
 {
 	header = std::unique_ptr<IArrayHeader>(IArrayHeader::get_factory().createObject(prop->custom_type_str));
 	if(header)
@@ -558,9 +563,9 @@ int ArrayRow::get_size()
 	return prop->list_ptr->get_size(prop->get_ptr(instance));
 }
 
-PropertyRow::PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
+PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
-	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(prop,instance, this));
+	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(factory, prop,instance, this));
 }
 
 void ArrayRow::hook_update_pre_tree_node()
@@ -734,7 +739,7 @@ bool ArrayRow::draw_row_controls()
 
 
 	 for (int i = 0; i < count; i++) {
-		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(this, list->get_index(prop->get_ptr(instance), i), struct_, i, property_flag_mask)));
+		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(factory,this, list->get_index(prop->get_ptr(instance), i), struct_, i, property_flag_mask)));
 	 }
  }
 
@@ -755,7 +760,7 @@ bool ArrayRow::draw_row_controls()
  }
 
 
- GroupRow::GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* list, 
+ GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfoList* list,
 	 int row_idx, uint32_t property_flag_mask) 
 	 : IGridRow(parent, row_idx), proplist(list), 
 	 inst(instance)
@@ -769,7 +774,7 @@ bool ArrayRow::draw_row_controls()
 		 if (!passed_mask_check)
 			 continue;
 
-		 auto row = create_row(this, &prop, inst, -1, property_flag_mask);
+		 auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
 		 if (row)
 			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
 	 }

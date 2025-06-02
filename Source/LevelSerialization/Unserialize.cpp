@@ -246,9 +246,8 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 
 UnserializedSceneFile unserialize_entities_from_text(const std::string& text, IAssetLoadingInterface* load,PrefabAsset* source_prefab)
 {
-	PrimaryAssetLoadingInterface prim = g_assets.get_interface();
 	if (!load)
-		load = &prim;
+		load = AssetDatabase::loader;
 		
 	UnserializedSceneFile scene;
 	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab, nullptr,load);

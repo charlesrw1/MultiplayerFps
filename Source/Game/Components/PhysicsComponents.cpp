@@ -791,53 +791,7 @@ void AdvancedJointComponent::draw_meshbuilder()
 
 #ifdef EDITOR_BUILD
 // FIXME!
-#include "LevelEditor/EditorDocLocal.h"
-class AnchorJointEditor : public IPropertyEditor
-{
-public:
-	~AnchorJointEditor() {
-		if (ed_doc.manipulate->is_using_key_for_custom(this))
-			ed_doc.manipulate->stop_using_custom();
-	}
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		JointAnchor* j = (JointAnchor*)prop->get_ptr(instance);
 
-		Entity* me = ed_doc.selection_state->get_only_one_selected().get();
-		if (!me) {
-			ImGui::Text("no Entity* found\n");
-			return false;
-		}
-
-		if (ed_doc.manipulate->is_using_key_for_custom(this)) {
-			auto last_matrix = ed_doc.manipulate->get_custom_transform();
-			auto local = glm::inverse(me->get_ws_transform()) * last_matrix;
-			j->q = (glm::quat_cast(local));
-			j->p = local[3];
-
-		};
-
-		bool ret = false;
-		if (ImGui::DragFloat3("##vec", (float*)&j->p, 0.05))
-			ret = true;
-		glm::vec3 eul = glm::eulerAngles(j->q);
-		eul *= 180.f / PI;
-		if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
-			eul *= PI / 180.f;
-			j->q = glm::normalize(glm::quat(eul));
-
-			ret = true;
-		}
-
-		glm::mat4 matrix = glm::translate(glm::mat4(1.f), j->p) * glm::mat4_cast(j->q);
-		ed_doc.manipulate->set_start_using_custom(this, me->get_ws_transform() *  matrix);
-
-		return true;
-	}
-};
-
-ADDTOFACTORYMACRO_NAME(AnchorJointEditor, IPropertyEditor, "JointAnchor");
 #endif
 class AnchorJointSerializer : public IPropertySerializer
 {

@@ -15,42 +15,12 @@ public:
 	virtual void touch_asset(const IAsset* asset) = 0;
 };
 
-// ASSET EROR HANDLING:
-// -when you request a resource pointer from a path, it wall always return something (with the IAsset* having its path set to the requested path)
-//	if the load failed, you will get a bool in asset->get_failed() and the asset will return something "default" (likely just default constructed, but asset types can override this)
-// -AssetPtr wraps an IAsset*, and its operator* and operator-> will actually treat failed loads like nullptrs but with
-//	the benefit of memory saftey for resources that might be reloaded in editor builds (and have their reloads fail)
-// -since resources are identified with both a path and a type, there is a small edge case where you request a resource thats already been mapped to
-//	a different typed resource, in this case, it WILL return nullptr. However you will never have pointers trashed under you since that path never mapped to something
-//	valid in the programs lifetime in the first place
-// -each game system might have different ways of handling failed assets at runtime, 
-//	maybe keeping it empty, or remapping to a default asset for debugging
-// -For gameplay usage, checking AssetPtrs for validity has the same appearence as checking for nullptr's (just dont use get_unsafe())
-
-// ASSET LOADING:
-// -sync and async loading. only 1 asset can be loading at a time. Thus, a call to load sync will stall the pipeline until
-//	no more assets are loading. ie if you have an async load going, and you call to sync load an asset, then the sync call will block
-//	till the async call on the loader thread finishes (it will also flush the finished queue, calling everything that hasn't post_loaded()'d yet)
-// -sync loading assets on async threads DOES WORK! it takes a different path, it will return a loaded asset that hasnt had post_load called
-
-
 class AssetDatabaseImpl;
-class PrimaryAssetLoadingInterface : public IAssetLoadingInterface
-{
-public:
-	PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend);
-	IAsset* load_asset(const ClassTypeInfo* type, string path) override;
-	void touch_asset(const IAsset* asset) override;
-private:
-	AssetDatabaseImpl& impl;
-};
 
 class AssetDatabase
 {
 public:
 	static IAssetLoadingInterface* loader;
-
-	PrimaryAssetLoadingInterface get_interface();
 
 	void init();
 

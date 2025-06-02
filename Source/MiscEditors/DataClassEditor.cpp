@@ -7,13 +7,16 @@
 #include "Framework/Files.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/DrawPublic.h"	// for dummy View_Setup
-
+#include "LevelEditor/PropertyEditors.h"
 
 static DataClassEditor g_dced_local;
 IEditorTool* g_dataclass_editor=&g_dced_local;
 
 
-
+DataClassEditor::DataClassEditor() : grid(factory)
+{
+	PropertyFactoryUtil::register_basic(factory);
+}
 
 bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 {

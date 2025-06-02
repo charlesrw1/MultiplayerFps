@@ -32,6 +32,7 @@
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
+    <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
@@ -70,6 +71,7 @@
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\EditorPopups.h" />
     <ClInclude Include="Source\EditorPopupTemplate.h" />
+    <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
@@ -93,6 +95,7 @@
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
+    <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\Misc\PropTween.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />

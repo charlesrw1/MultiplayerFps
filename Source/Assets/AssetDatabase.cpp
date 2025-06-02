@@ -543,6 +543,16 @@ AssetDatabase::AssetDatabase() {
 AssetDatabase::~AssetDatabase() {}
 AssetDatabase g_assets;
 
+class PrimaryAssetLoadingInterface : public IAssetLoadingInterface
+{
+public:
+	PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend);
+	IAsset* load_asset(const ClassTypeInfo* type, string path) override;
+	void touch_asset(const IAsset* asset) override;
+private:
+	AssetDatabaseImpl& impl;
+};
+
 
 #ifdef EDITOR_BUILD
 void AssetDatabase::hot_reload_assets()
@@ -612,10 +622,7 @@ void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset)
 {
 
 }
-PrimaryAssetLoadingInterface AssetDatabase::get_interface()
-{
-	return PrimaryAssetLoadingInterface(*impl);
-}
+
 
 DECLARE_ENGINE_CMD(print_assets)
 {

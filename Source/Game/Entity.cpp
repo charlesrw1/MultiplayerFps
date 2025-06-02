@@ -516,71 +516,7 @@ void Entity::invalidate_transform(Component* skipthis)
 	post_change_transform_R(true,skipthis);
 }
 
-#ifdef EDITOR_BUILD
-class EntityBoneParentStringEditor : public IPropertyEditor
-{
-public:
-	// Inherited via IPropertyEditor
-	~EntityBoneParentStringEditor() override {
-		StringName* myName = (StringName*)prop->get_ptr(instance);
-		*myName = StringName(str.c_str());
-	}
 
-	virtual bool internal_update() override
-	{
-		Entity* self = (Entity*)instance;
-		if (!has_init) {
-			Entity* parent = self->get_parent();
-			if (parent) {
-				MeshComponent* mc = parent->get_component<MeshComponent>();
-				if (mc && mc->get_model() && mc->get_model()->get_skel()) {
-					const Model* mod = mc->get_model();
-					auto skel = mod->get_skel();
-					auto& allbones = skel->get_all_bones();
-					for (auto& b : allbones) {
-						options.push_back(b.strname);
-					}
-				}
-			}
-			has_init = true;
-			StringName* myName = (StringName*)prop->get_ptr(instance);
-			if (!myName->is_null())
-				str = myName->get_c_str();
-		}
-
-		if (options.empty()) {
-			ImGui::Text("No options (add a MeshComponent with a skeleton)");
-			return false;
-		}
-
-		bool has_update = false;
-
-
-		const char* preview = (!str.empty()) ? str.c_str() : "<empty>";
-		if (ImGui::BeginCombo("##combocalsstype", preview)) {
-			for (auto& option : options) {
-
-				if (ImGui::Selectable(option.c_str(),
-					str == option
-				)) {
-					self->set_parent_bone(StringName(option.c_str()));
-					str = option;
-					has_update = true;
-				}
-
-			}
-			ImGui::EndCombo();
-		}
-
-		return has_update;
-	}
-	std::string str;
-	bool has_init = false;
-	std::vector<std::string> options;
-};
-
-ADDTOFACTORYMACRO_NAME(EntityBoneParentStringEditor, IPropertyEditor, "EntityBoneParentString");
-#endif
 
 class EntityBoneParentStringSerialize : public IPropertySerializer
 {
@@ -600,85 +536,9 @@ class EntityBoneParentStringSerialize : public IPropertySerializer
 };
 ADDTOFACTORYMACRO_NAME(EntityBoneParentStringSerialize, IPropertySerializer, "EntityBoneParentString");
 
-class GameTagManager
-{
-public:
-	static GameTagManager& get() {
-		static GameTagManager inst;
-		return inst;
-	}
-	void add_tag(const std::string& tag) {
-		registered_tags.insert(tag);
-	}
-	std::unordered_set<std::string> registered_tags;
-};
-
-DECLARE_ENGINE_CMD(REG_GAME_TAG)
-{
-	if (args.size() != 2) {
-		sys_print(Error, "REG_GAME_TAG <tag>");
-		return;
-	}
-	GameTagManager::get().add_tag(args.at(1));
-}
 #ifdef EDITOR_BUILD
-class EntityTagEditor : public IPropertyEditor
-{
-public:
-	// Inherited via IPropertyEditor
-	~EntityTagEditor() override {
-		StringName* myName = (StringName*)prop->get_ptr(instance);
-		*myName = StringName(str.c_str());
-	}
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		Entity* self = (Entity*)instance;
-		if (!has_init) {
-
-			auto& all_tags = GameTagManager::get().registered_tags;
-			for (auto& t : all_tags)
-				options.push_back(t);
-
-			has_init = true;
-			StringName* myName = (StringName*)prop->get_ptr(instance);
-			if (!myName->is_null())
-				str = myName->get_c_str();
-		}
-
-		if (options.empty()) {
-			ImGui::Text("No options, add tag in init.txt with REG_GAME_TAG <tag>");
-			return false;
-		}
-
-		bool has_update = false;
 
 
-		const char* preview = (!str.empty()) ? str.c_str() : "<untagged>";
-		if (ImGui::BeginCombo("##combocalsstype", preview)) {
-			for (auto& option : options) {
-
-				if (ImGui::Selectable(option.c_str(),
-					str == option
-				)) {
-					self->set_tag(StringName(option.c_str()));
-					str = option;
-					has_update = true;
-				}
-
-			}
-			ImGui::EndCombo();
-		}
-
-		return has_update;
-	}
-	std::string str;
-	bool has_init = false;
-	std::vector<std::string> options;
-};
-
-ADDTOFACTORYMACRO_NAME(EntityTagEditor, IPropertyEditor, "EntityTagString");
 #endif
 class EntityTagSerialize : public IPropertySerializer
 {

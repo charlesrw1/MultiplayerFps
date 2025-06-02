@@ -11,14 +11,18 @@
 #include "Animation/Runtime/Animation.h"
 
 #include "ModelAsset2.h"
-
-
 #include "EditorTool3d.h"
+#include "LevelEditor/PropertyEditors.h"
+#include "Framework/FnFactory.h"
 
 class MeshComponent;
 class ModelEditorTool : public EditorTool3d
 {
 public:
+	ModelEditorTool() : propGrid(factory) {
+		PropertyFactoryUtil::register_basic(factory);
+	}
+
 	const ClassTypeInfo& get_asset_type_info() const override {
 		return Model::StaticType;
 	}
@@ -33,6 +37,7 @@ public:
 		return "cmdl";
 	}
 
+	FnFactory<IPropertyEditor> factory;
 	PropertyGrid propGrid;
 	MeshComponent* outputEntity = nullptr;
 	Model* outputModel = nullptr;

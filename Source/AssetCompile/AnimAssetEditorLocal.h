@@ -33,7 +33,8 @@ public:
 class EditModelAnimations
 {
 public:
-	EditModelAnimations();
+	EditModelAnimations(const FnFactory<IPropertyEditor>& factory);
+
 	void on_start();
 	void on_quit();
 	void on_presave();
@@ -50,15 +51,17 @@ public:
 	float CURRENT_TIME = 0.0;
 };
 #include "Animation/Runtime/Animation.h"
-
+#include "Framework/FnFactory.h"
+#include "LevelEditor/PropertyEditors.h"
 #include "EditorTool3d.h"
 class MeshComponent;
 class StaticMeshEntity;
 class AnimationEditorTool : public EditorTool3d
 {
 public:
-	AnimationEditorTool() {
-		animEdit = std::make_unique<EditModelAnimations>();
+	AnimationEditorTool() : propGrid(factory) {
+		PropertyFactoryUtil::register_basic(factory);
+		animEdit = std::make_unique<EditModelAnimations>(factory);
 	}
 
 	// Inherited via IEditorTool
@@ -76,6 +79,7 @@ public:
 		return "NONE";
 	}
 
+	FnFactory<IPropertyEditor> factory;
 	Entity* entity = nullptr;
 	MeshComponent* mc = nullptr;
 	Model* outputModel{};

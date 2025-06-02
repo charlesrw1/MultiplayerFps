@@ -27,6 +27,7 @@
 #include "EditorTool3d.h"
 
 #include "Game/AssetPtrMacro.h"
+#include "Framework/FnFactory.h"
 
 struct GraphTab {
 	const editor_layer* layer = nullptr;
@@ -418,6 +419,8 @@ public:
 	const char* get_save_file_extension() const override {
 		return "ag";
 	}
+
+	FnFactory<IPropertyEditor> grid_factory;
 };
 
 extern AnimationGraphEditor anim_graph_ed;

@@ -1597,7 +1597,7 @@ void GraphOutput::set_model(Model* model) {
 Model* GraphOutput::get_model() {
 	return mc ? (Model*)mc->get_model() : nullptr;
 }
-
+#include "EditorPopupTemplate.h"
 void AnimationGraphEditor::post_map_load_callback()
 {
 	ASSERT(!editing_tree);
@@ -1631,14 +1631,20 @@ void AnimationGraphEditor::post_map_load_callback()
 						nodes[i]->init();
 					}
 				}
-				else
-					sys_print(Error, "couldn't load editor nodes for tree %s\n", name);
+				else {
+					PopupTemplate::create_basic_okay(EditorPopupManager::inst, "Error", "couldn't load editor nodes for tree");
+					sys_print(Error, "couldn't load editor nodes for tree %s\n", name.c_str());
+				}
 			}
-			else
+			else {
+				PopupTemplate::create_basic_okay(EditorPopupManager::inst, "Error", "couldn't open animation graph editor file");
 				sys_print(Error, "couldnt open animation graph editor file %s\n", editorFilePath.c_str());
+			}
 		}
-		else
-			sys_print(Error, "Couldn't open animation tree file %s, creating new document instead\n", name);
+		else {
+			PopupTemplate::create_basic_okay(EditorPopupManager::inst, "Error", "couldn't open animation graph editor file");
+			sys_print(Error, "Couldn't open animation tree file %s, creating new document instead\n", name.c_str());
+		}
 	}
 
 	if (needs_new_doc) {
@@ -1846,13 +1852,17 @@ DECLARE_ENGINE_CMD(animed_play_slot)
 
 	//anim_graph_ed.out.get_animator()->play_animation_in_slot(anim, slotname.c_str(), 1.0, 0.0);
 }
-AnimationGraphEditor::AnimationGraphEditor() {
 
+#include "LevelEditor/PropertyEditors.h"	// for FactoryUtil fixme
+
+AnimationGraphEditor::AnimationGraphEditor() : self_grid(grid_factory) {
+
+	PropertyFactoryUtil::register_basic(grid_factory);
+	PropertyFactoryUtil::register_anim_editor(*this, grid_factory);
 
 	control_params = std::make_unique<ControlParamsWindow>();
-	node_props = std::make_unique<PropertyGrid>();
+	node_props = std::make_unique<PropertyGrid>(grid_factory);
 	graph_tabs = std::make_unique<TabState>(this);
 	clipboard = std::make_unique<AnimGraphClipboard>();
-
 }
 #endif

@@ -57,7 +57,7 @@ void AnimationEditorTool::imgui_draw()
 }
 
 
-EditModelAnimations::EditModelAnimations()
+EditModelAnimations::EditModelAnimations(const FnFactory<IPropertyEditor>& factory) : eventdetails(factory)
 {
 	g_animseq_editor_static.on_close.add(this, &EditModelAnimations::on_quit);
 	g_animseq_editor_static.on_pre_save.add(this, &EditModelAnimations::on_presave);
@@ -212,8 +212,7 @@ void AnimationEditorTool::post_map_load_callback()
 		dp.load_from_file(file.get());
 		StringView tok;
 		dp.read_string(tok);
-		auto itr = g_assets.get_interface();
-		importSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok,&itr);
+		importSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok,AssetDatabase::loader);
 	}
 	if (!importSettings) {
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");

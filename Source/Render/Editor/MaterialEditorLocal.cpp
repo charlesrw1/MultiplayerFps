@@ -8,55 +8,14 @@ IEditorTool* g_mateditor = &g_mateditor_local;
 #include <SDL2/SDL.h>
 #include "OsInput.h"
 #include "Framework/AddClassToFactory.h"
+#include "LevelEditor/PropertyEditors.h"
 
-class MaterialParamPropEditor : public IPropertyEditor
+
+MaterialEditorLocal::MaterialEditorLocal() : materialParamGrid(factory),myPropGrid(factory)
 {
-public:
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		if (!has_init) {
-			const int index = prop->offset;
-			MaterialEditorLocal* mLocal = (MaterialEditorLocal*)instance;
-			auto& paramDef = mLocal->dynamicMat->get_master_material()->param_defs.at(index);
-			MaterialInstance* mInstLocal = (MaterialInstance*)mLocal->dynamicMat.get();
-			auto& param = mInstLocal->impl->params.at(index);
-			pi.name = paramDef.name.c_str();
-			pi.offset = offsetof(MaterialParameterValue, tex_ptr);
-			if (param.type == MatParamType::Bool) {
-				pi.type = core_type_id::Bool;
-				internalEditor = std::make_unique<BooleanEditor>(&param, &pi);
-			}
-			else if (param.type == MatParamType::Float) {
-				pi.type = core_type_id::Float;
-				internalEditor = std::make_unique<FloatEditor>(&param, &pi);
-			}
-			else if (param.type == MatParamType::Vector) {
-				pi.type = core_type_id::Int32;
-				internalEditor = std::unique_ptr<IPropertyEditor>(IPropertyEditor::get_factory().createObject("ColorUint"));	// definedin editordoc.cpp
-				internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
-			}
-			else if (param.type == MatParamType::Texture2D) {
-				pi = make_asset_ptr_property(paramDef.name.c_str(), pi.offset, PROP_DEFAULT, (AssetPtr<Texture>*)(0));
-				internalEditor = std::unique_ptr<IPropertyEditor>(IPropertyEditor::get_factory().createObject(pi.custom_type_str));
-				internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
-			}
-			has_init = true;
-		}
-		if (!internalEditor)
-			return false;
-		return internalEditor->internal_update();
-	}
-
-	// cursed moment
-	PropertyInfo pi;
-	bool has_init = false;
-	std::unique_ptr<IPropertyEditor> internalEditor;
-};
-ADDTOFACTORYMACRO_NAME(MaterialParamPropEditor, IPropertyEditor, "MaterialEditParam");
-
-
-
+	PropertyFactoryUtil::register_basic(factory);
+	PropertyFactoryUtil::register_mat_editor(*this, factory);
+}
 
 void MaterialEditorLocal::close_internal()
 {

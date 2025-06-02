@@ -9,6 +9,8 @@
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/ObjectSerialization.h"
+#include "LevelEditor/PropertyEditors.h"
+#include "Framework/FnFactory.h"
 
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
 
@@ -31,6 +33,10 @@ public:
 class TextureEditorTool : public IEditorTool
 {
 public:
+	TextureEditorTool() :grid(factory) {
+		PropertyFactoryUtil::register_basic(factory);
+	}
+
 	// Inherited via IEditorTool
 	virtual const ClassTypeInfo& get_asset_type_info() const override;
 	virtual bool open_document_internal(const char* name, const char* arg) override;
@@ -53,6 +59,7 @@ public:
 		ImGui::End();
 	}
 
+	FnFactory<IPropertyEditor> factory;
 	PropertyGrid grid;
 	TextureImportSettings* editing_object = nullptr;
 	Texture* textureAsset = nullptr;

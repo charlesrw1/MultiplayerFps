@@ -30,6 +30,9 @@
 #include "Render/DrawPublic.h"
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
+#include "Framework/FnFactory.h"
+
+
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -65,6 +68,8 @@ private:
 	void on_selection_change();
 	int determine_object_count() const;
 	void rebuild_tree();
+	void on_start() { rebuild_tree(); }
+	void on_close() { delete_tree(); }
 	void delete_tree() {
 		rootnode.reset(nullptr);	// deletes
 		num_nodes = 0;
@@ -72,30 +77,23 @@ private:
 	void on_changed_ents() { 
 		rebuild_tree();
 	}
-	void on_start() { rebuild_tree(); }
-	void on_close() { delete_tree(); }
-
-
 	struct Node {
 		Node() {}
 		Node(ObjectOutliner* oo, Entity* initfrom, const std::vector<std::vector<std::string>>& filter);
-
 		void add_child(uptr<Node> other) {
 			other->parent = this;
 			children.push_back(std::move(other));
 		}
-
-		bool is_visible = true;
-		bool did_pass_filter = false;
-
-		EntityPtr ptr;
-		Node* parent = nullptr;
-		std::vector<uptr<Node>> children;
 		void sort_children() {
 			std::sort(children.begin(), children.end(), [](const uptr<Node>& a, const uptr<Node>& b)->bool {
 				return to_lower(a->ptr->get_editor_name()) < to_lower(b->ptr->get_editor_name());
 				});
 		}
+		bool is_visible = true;
+		bool did_pass_filter = false;
+		EntityPtr ptr;
+		Node* parent = nullptr;
+		std::vector<uptr<Node>> children;
 	};
 	struct IteratorDraw {
 		IteratorDraw(ObjectOutliner* oo, Node* n) : oo(oo), node(n) {}
@@ -124,9 +122,8 @@ private:
 class EdPropertyGrid
 {
 public:
-	EdPropertyGrid();
+	EdPropertyGrid(const FnFactory<IPropertyEditor>& factory);
 	void draw();
-	
 	MulticastDelegate<> on_property_change;
 private:
 	void on_ec_deleted(uint64_t comp) {
@@ -157,7 +154,7 @@ private:
 	void draw_components(Entity* entity);
 
 	PropertyGrid grid;
-
+	const FnFactory<IPropertyEditor>& factory;
 };
 
 class OrthoCamera
@@ -436,6 +433,7 @@ class EditorDoc : public IEditorTool
 {
 public:
 	EditorDoc();
+
 	void init() final;
 	bool can_save_document() final { return true; }
 	bool open_document_internal(const char* levelname, const char* arg) final;
@@ -595,6 +593,7 @@ private:
 	EditCategory edit_category = EditCategory::EDIT_SCENE;
 	PrefabAsset* editing_prefab = nullptr;
 
+	FnFactory<IPropertyEditor> grid_factory;
 };
 
 extern EditorDoc ed_doc;

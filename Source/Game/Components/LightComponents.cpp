@@ -268,56 +268,7 @@ void CubemapComponent::editor_on_change_property() {
 #include "Framework/AddClassToFactory.h"
 #ifdef EDITOR_BUILD
 // FIXME!
-#include "LevelEditor/EditorDocLocal.h"
-class CubemapAnchorEditor : public IPropertyEditor
-{
-public:
-	~CubemapAnchorEditor() {
-		if (ed_doc.manipulate->is_using_key_for_custom(this))
-			ed_doc.manipulate->stop_using_custom();
-	}
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override
-	{
-		CubemapAnchor* j = (CubemapAnchor*)prop->get_ptr(instance);
-		Entity* me = ed_doc.selection_state->get_only_one_selected().get();
-		if (!me) {
-			ImGui::Text("no Entity* found\n");
-			return false;
-		}
 
-		ImGui::Checkbox("edit_anchor", &using_this);
-
-		if (!using_this) {
-			ed_doc.manipulate->stop_using_custom();
-		}
-
-		if(using_this) {
-			if (ed_doc.manipulate->is_using_key_for_custom(this)) {
-				auto last_matrix = ed_doc.manipulate->get_custom_transform();
-				auto local = glm::inverse(me->get_ws_transform()) * last_matrix;
-				j->p = local[3];
-			};
-		}
-		
-		bool ret = false;
-		if (ImGui::DragFloat3("##vec", (float*)&j->p, 0.05))
-			ret = true;
-		
-		if(using_this) {
-			glm::mat4 matrix = glm::translate(glm::mat4(1.f), j->p);
-			ed_doc.manipulate->set_start_using_custom(this, me->get_ws_transform() * matrix);
-		
-			return true;
-		}
-		
-		return ret;
-
-	}
-	bool using_this = false;
-};
-
-ADDTOFACTORYMACRO_NAME(CubemapAnchorEditor, IPropertyEditor, "CubemapAnchor");
 #endif
 class CubemapAnchorSerializer : public IPropertySerializer
 {

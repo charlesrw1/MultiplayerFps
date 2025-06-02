@@ -26,8 +26,6 @@ class IGridRow;
 class IPropertyEditor
 {
 public:
-	static Factory<std::string, IPropertyEditor>& get_factory();
-
 	IPropertyEditor()  {}
 	virtual ~IPropertyEditor() {}
 
@@ -107,6 +105,8 @@ public:
 	std::vector<std::unique_ptr<IGridRow>> child_rows;
 };
 
+template<typename T>
+class FnFactory;
 
 enum PropertyGridFlags
 {
@@ -116,6 +116,8 @@ class ClassBase;
 class PropertyGrid
 {
 public:
+	PropertyGrid(const FnFactory<IPropertyEditor>& factory);
+
 	void clear_all() {
 		rows.clear();
 	}
@@ -144,13 +146,14 @@ public:
 	bool rows_had_changes = false;
 	bool read_only = false;
 	std::vector<std::unique_ptr<IGridRow>> rows;
+	const FnFactory<IPropertyEditor>& factory;
 };
 
 
 class GroupRow : public IGridRow
 {
 public:
-	GroupRow(IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx, uint32_t property_flag_mask);
+	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx, uint32_t property_flag_mask);
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -174,7 +177,7 @@ public:
 class ArrayRow : public IGridRow
 {
 public:
-	ArrayRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask);
+	ArrayRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask);
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -218,17 +221,16 @@ private:
 		int index = 0;
 	};
 
+	const FnFactory<IPropertyEditor>& factory;
 	std::vector<CommandData> commands;
-
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;
-
 	uint32_t property_flag_mask = UINT32_MAX;
 };
 class PropertyRow : public IGridRow
 {
 public:
-	PropertyRow(IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
+	PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;

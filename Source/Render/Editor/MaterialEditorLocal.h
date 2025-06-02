@@ -25,7 +25,7 @@
 #include "Game/Components/MeshComponent.h"
 #include "Game/Entity.h"
 #include <string>
-
+#include "Framework/FnFactory.h"
 extern ConfigVar ed_default_sky_material;
 
 class StaticMeshEntity;
@@ -33,6 +33,8 @@ class MaterialEditorLocal : public EditorTool3d
 {
 public:
 	using MyClassType = MaterialEditorLocal;	// to work with REG_ASSET_PTR macros (they expect a ClassBase which has this defined, otherwise they work fine)
+	MaterialEditorLocal();
+
 
 	virtual void init() override {
 	}
@@ -157,7 +159,7 @@ public:
 	}
 
 	AssetPtr<Model> model;
-
+	FnFactory<IPropertyEditor> factory;
 	PropertyGrid myPropGrid;	// model,parent
 	PropertyGrid materialParamGrid; // material params
 	std::vector<PropertyInfo> propInfosForMats;	// immutable!!
