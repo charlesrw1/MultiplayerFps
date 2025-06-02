@@ -501,8 +501,6 @@
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Scripting\ScriptManagerPublic.h" />
-    <ClInclude Include="Source\LevelEditor\LEPlugin.h" />
-    <ClInclude Include="Source\LevelEditor\TileMapPlugin.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
@@ -774,7 +772,6 @@
     <ClCompile Include="Source\Framework\Jobs.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
     <ClCompile Include="Source\Game\BeatEmUp\BeatEmUp.cpp" />
-    <ClCompile Include="Source\LevelEditor\LETesting.cpp" />
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\BaseGUI.cpp" />
     <ClCompile Include="Source\UI\UIBuilder.cpp" />
@@ -785,6 +782,7 @@
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
+    <ClCompile Include="Source\LevelEditor\Commands.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

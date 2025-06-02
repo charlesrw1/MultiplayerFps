@@ -45,7 +45,7 @@
 #include "Framework/AddClassToFactory.h"
 
 #include "Game/EntityComponent.h"
-#include "LEPlugin.h"
+
 
 #include "UI/UIBuilder.h"
 

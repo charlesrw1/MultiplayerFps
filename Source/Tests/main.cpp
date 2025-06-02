@@ -74,6 +74,113 @@ ADD_TEST(object_outliner_filter_entity)
 	TEST_TRUE(!OONameFilter::does_entity_pass(out, &e));
 
 }
+class A {
+public:
+	virtual void do_something() {
+		printf("doing something\n");
+	}
+	int a=1, b, c;
+};
+class B {
+public:
+	virtual void eat_dinner() {
+		printf("eating dinner\n");
+	}
+	int d=2, e, f;
+};
+class C : public A,public B {
+public:
+	void eat_dinner() override {
+		printf("eating desert\n");
+	}
+	void do_something() override {
+		printf("not doing anything now\n");
+	}
+	int g=3, h, i;
+};
+
+struct InterfaceTypeInfo {
+	const char* name = "";
+	int id = 0;
+	// function property infos
+};
+#define INTERFACE_BODY() \
+	static InterfaceTypeInfo typeinfo;
+class IMyInterface {
+public:
+	INTERFACE_BODY();
+
+	virtual void do_stuff() = 0;
+};
+class IEatable {
+public:
+	INTERFACE_BODY();
+
+	virtual void do_stuff() = 0;
+};
+template<typename Derived, typename Base>
+static ptrdiff_t compute_ptr_off()
+{
+	Derived* derivedPtr = (Derived*)1;
+	Base* basePtr = static_cast<Base*>(derivedPtr);
+	return (intptr_t)basePtr - (intptr_t)derivedPtr;
+}
+struct InterfaceDef {
+	InterfaceDef(InterfaceTypeInfo* typeinfo, int offset)
+		: offset(offset), info(typeinfo) {}
+	InterfaceTypeInfo* info = nullptr;
+	int offset = 0;
+};
+
+class BaseObject {
+
+};
+class AObj : public BaseObject, public IMyInterface
+{
+
+};
+
+static InterfaceDef A_interface_typeinfos[] = {
+	InterfaceDef(&IMyInterface::typeinfo,compute_ptr_off<IMyInterface,AObj>())
+};
+
+
+template<typename T>
+class iptr {
+public:
+	iptr(T* ptr, BaseObject* obj) 
+		: interface_ptr(ptr), obj_ptr(obj) {}
+	iptr() {}
+	BaseObject* get_object() {
+		return obj_ptr;
+	}
+	T& operator*() {
+		return *interface_ptr;
+	}
+	T*& operator->() {
+		return *interface_ptr;
+	}
+	bool operator() {
+		return interface_ptr != nullptr;
+	}
+private:
+	T* interface_ptr = nullptr;
+	BaseObject* obj_ptr = nullptr;
+};
+
+
+ADD_TEST(multiple_inheritance)
+{
+	iptr<IMyInterface> someptr;
+	someptr->do_stuff();
+	(*someptr).do_stuff();
+
+	IMyInterface* i = nullptr;
+	i->typeinfo.name;
+
+//	auto dif2 = ComputePointerOffset<C, B>;
+
+}
 
 
 
