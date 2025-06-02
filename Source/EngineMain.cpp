@@ -629,7 +629,7 @@ DECLARE_ENGINE_CMD(reconnect)
 	//if(eng->get_client()->get_state() != CS_DISCONNECTED)
 	//	eng->get_client()->Reconnect();
 }
-
+#include "EditorPopupTemplate.h"
 // open a map for playing
 DECLARE_ENGINE_CMD(map)
 {
@@ -643,23 +643,31 @@ DECLARE_ENGINE_CMD(map)
 		return;
 	}
 
+
 #ifdef EDITOR_BUILD
 	if (eng->get_current_tool() != nullptr) {
-		sys_print(Warning,"starting game so closing any editors\n");
-		eng_local.change_editor_state(nullptr,"");	// close any editors
+		std::string what_map = args.at(1);
+		PopupTemplate::create_are_you_sure(EditorPopupManager::inst,
+			"Editor is open, continuing won't save.",
+			[what_map]() {
+			sys_print(Warning,"starting game so closing any editors\n");
+				eng_local.change_editor_state(nullptr, "");
+				
+				std::string cmd = "map";
+				cmd += " ";
+				cmd += what_map;
+				eng_local.engine_map_state_history.push_back(
+					cmd
+				);			
+				eng->open_level(what_map);
+			});
+		return;
 	}
-
-	{
-		std::string cmd = args.at(0);
-		cmd += " ";
-		cmd += args.at(1);
-		eng_local.engine_map_state_history.push_back(
-			cmd
-		);
-	}
+	else 
 #endif
-
-	eng->open_level(args.at(1));
+	{
+		eng->open_level(args.at(1));
+	}
 }
 extern ConfigVar g_entry_level;
 // start game from the entry map
@@ -922,22 +930,6 @@ void register_input_actions_for_game()
 int game_engine_main(int argc, char** argv)
 {
 	eng_local.init(argc,argv);
-	EditorPopupManager::inst->add_popup("Hello world", []()->bool {
-		bool ret = false;
-		if (ImGui::Button("INNER")) {
-			EditorPopupManager::inst->add_popup("WHAT??", []()->bool {
-				bool ret2 = false;
-				if (ImGui::Button("yes im sure"))
-					ret2 = true;
-				return ret2;
-			});
-		}
-
-		if (ImGui::Button("Close"))
-			ret = true;
-		return ret;
-	});
-
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1129,7 +1121,11 @@ void GameEngineLocal::key_event(SDL_Event event)
 		set_game_focused(false);
 		return;
 	}
-	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard && event.key.keysym.mod == 0 /* if mod is active, then skip this BS ImGui taking over input*/)
+
+	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
+		return;
+
+	if (EditorPopupManager::inst->has_popup_open())
 		return;
 
 	if (event.type == SDL_KEYDOWN) {

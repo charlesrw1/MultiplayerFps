@@ -1,4 +1,6 @@
 #include "Unittest.h"
+#undef ADD_TEST
+#define ADD_TEST(x) void test##x()
 
 #include "LevelSerialization/SerializationAPI.h"
 

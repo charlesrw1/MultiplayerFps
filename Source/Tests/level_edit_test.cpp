@@ -1,6 +1,10 @@
 
-#include "LevelEditor/EditorDocLocal.h"
 #include "Unittest.h"
+
+#undef ADD_TEST
+#define ADD_TEST(x) void test##x()
+
+#include "LevelEditor/EditorDocLocal.h"
 #include "GameEngineLocal.h"
 #include "Assets/AssetDatabase.h"
 #include "LevelEditor/Commands.h"

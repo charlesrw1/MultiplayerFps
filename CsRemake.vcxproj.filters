@@ -521,6 +521,8 @@
     <ClInclude Include="Source\UI\UIBuilder.h" />
     <ClInclude Include="Source\UI\Widgets\SharedFuncs.h" />
     <ClInclude Include="Source\EditorPopups.h" />
+    <ClInclude Include="Source\EditorPopupTemplate.h" />
+    <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -780,6 +782,9 @@
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
     <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
+    <ClCompile Include="Source\EditorPopupTemplate.cpp" />
+    <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -56,7 +56,6 @@ ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map
 ConfigVar editor_draw_name_text("editor_draw_name_text", "0", CVAR_BOOL, "draw text above every entities head in editor");
 ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR_INTEGER, "",0,255);
 
-const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
 extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
 
@@ -467,18 +466,24 @@ void EditorDoc::validate_prefab()
 	root->is_root_of_prefab = true;
 	root->what_prefab = get_editing_prefab();
 }
+#include "EditorPopupTemplate.h"
 
 void EditorDoc::on_map_load_return(bool good)
 {
 	eng->get_on_map_delegate().remove(this);	// mark the delegate to be removed
 
-	if (!get_is_open()||!eng->get_level()) {
+	if (good && (!get_is_open()||!eng->get_level())) {
 		sys_print(Warning, "on_map_load_return but level editor not open\n");
 		return;
 	}
 
 	if (!good) {
 		sys_print(Warning, "failed to load editor map\n");
+		PopupTemplate::create_basic_okay(
+			EditorPopupManager::inst,
+			"Error",
+			"Couldn't load map: " + get_doc_name()
+		);
 		eng->open_level("__empty__");
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
@@ -509,6 +514,11 @@ void EditorDoc::on_map_load_return(bool good)
 			if (!get_doc_name().empty()) {
 				editing_prefab = g_assets.find_sync<PrefabAsset>(get_doc_name()).get();
 				if (!editing_prefab) {
+					PopupTemplate::create_basic_okay(
+						EditorPopupManager::inst,
+						"Error",
+						"Couldn't load prefab: " + get_doc_name()
+					);
 					eng->log_to_fullscreen_gui(Error, "Couldnt load prefab");
 					set_empty_doc();
 				}
@@ -1469,419 +1479,27 @@ static std::string get_directory(const std::string& input)
 	return input.substr(0,find - 1);
 }
 
+#include "EditorPopups.h"
 
-static void save_off_branch_as_scene(Entity* e)
+
+static int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
 {
-	auto serialize_branch = [](Entity* e) -> auto {
-		PrefabAsset dummy;
-		std::vector<Entity*> ents;
-		ents.push_back(e);
-		ed_doc.validate_fileids_before_serialize();
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, &dummy));
-	};
-	auto serialized = serialize_branch(e);
-	auto& file_name = e->get_editor_name();
-	if (file_name.empty()) {
-		const char* str = "cant save off branch, entity name empty";
-		eng->log_to_fullscreen_gui(Error, str);
-		sys_print(Error, str);
-		return;
+	std::string* user = (std::string*)data->UserData;
+	assert(user);
+
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+		user->resize(data->BufSize);
+		data->Buf = (char*)user->data();
 	}
-	//auto path = get_directory(ed_doc.get_doc_name());
-	//if (!path.empty()) path += "/";
-	auto path = file_name;
-	path += ".pfb";
-	{
-		auto check_file_exists = FileSys::open_read_game(path);
-		if (check_file_exists) {
-			const char* str = string_format("cant save off branch, path already exists: %s\n", path.c_str());
-			eng->log_to_fullscreen_gui(Error, str);
-			sys_print(Error, str);
-			return;
-		}
-	}
-	auto outfile = FileSys::open_write_game(path);
-	outfile->write(serialized->text.c_str(), serialized->text.size());
-	const char* str = string_format("saved prefab as: %s\n", path.c_str());
-	eng->log_to_fullscreen_gui(Info, str);
-	sys_print(Info, str);
+
+	return 0;
+}
+bool std_string_input_text(const char* label, std::string& str, int flags)
+{
+	return ImGui::InputText(label, (char*)str.c_str(), str.size()+1, flags | ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &str);
 }
 
 
-ObjectOutliner::ObjectOutliner()
-{
-	nameFilter[0] = 0;
-	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
-	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
-	ed_doc.post_node_changes.add(this, &ObjectOutliner::on_changed_ents);
-	ed_doc.selection_state->on_selection_changed.add(this, &ObjectOutliner::on_selection_change);
-
-}
-
-void ObjectOutliner::on_selection_change()
-{
-	if (ed_doc.selection_state->has_only_one_selected()) {
-		setScrollHere = ed_doc.selection_state->get_only_one_selected();
-	}
-}
-
-void ObjectOutliner::init()
-{
-	hidden = g_assets.find_global_sync<Texture>("eng/editor/hidden.png");
-	visible = g_assets.find_global_sync<Texture>("eng/editor/visible.png");
-}
-
-bool ObjectOutliner::IteratorDraw::step()
-{
-	if (child_index >= node->children.size() && !node->parent)
-		return false;
-	else if (child_index >= node->children.size())
-	{
-		node = node->parent;
-		child_index = child_stack.back();
-		child_stack.pop_back();
-		return step();
-	}
-	else {
-		int i = child_index++;
-		child_stack.push_back(child_index);
-		child_index = 0;
-		node = node->children.at(i);
-	}
-	return true;
-}
-void ObjectOutliner::IteratorDraw::draw()
-{
-	ImGui::TableNextRow();
-	ImGui::TableNextColumn();
-
-	int depth = child_stack.size();
-	ImGui::Dummy(ImVec2(depth * 10.f, 0));
-	ImGui::SameLine();
-	auto n = node;
-	Entity* node_entity = n->ptr.get();
-	const bool is_root_node = node_entity == nullptr;
-	ImGui::PushID(n);
-	{
-		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(n->ptr);
-		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
-			if (node_entity) {
-				if (ImGui::GetIO().KeyShift)
-					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, node_entity, false);
-				else
-					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, node_entity, false);
-			}
-			else
-				ed_doc.selection_state->clear_all_selected();
-		}
-
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && node_entity) {
-			ImGui::OpenPopup("outliner_ctx_menu");
-			ed_doc.selection_state->add_to_entity_selection(n->ptr);
-			oo->contextMenuHandle = n->ptr;
-			ASSERT(n->ptr.get() == node_entity);
-		}
-		if (ImGui::BeginPopup("outliner_ctx_menu")) {
-
-			if (oo->contextMenuHandle.get() == nullptr) {
-				oo->contextMenuHandle = EntityPtr(nullptr);
-				ImGui::CloseCurrentPopup();
-			}
-			else {
-
-				Entity* const context_menu_entity = oo->contextMenuHandle.get();
-
-				auto parent_to_shared = [&](Entity* me, bool create_new_parent) {
-					auto& ents = ed_doc.selection_state->get_selection();
-					std::vector<Entity*> ptrs;
-					for (auto& ehandle : ents) {
-						EntityPtr ptr(ehandle);
-						if (ptr.get() == me) continue;
-						ptrs.push_back(ptr.get());
-					}
-					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me, create_new_parent, false));
-
-					oo->contextMenuHandle = EntityPtr(nullptr);
-				};
-				auto remove_parent_of_selection = [&](bool delete_parent) {
-
-					auto& ents = ed_doc.selection_state->get_selection();
-					std::vector<Entity*> ptrs;
-					for (auto& ehandle : ents) {
-						EntityPtr ptr(ehandle);
-						ptrs.push_back(ptr.get());
-					}
-
-					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, nullptr, false, delete_parent));
-
-					oo->contextMenuHandle = EntityPtr(nullptr);
-				};
-
-				if (ImGui::MenuItem("Parent To This")) {
-					parent_to_shared(context_menu_entity, false);
-					ImGui::CloseCurrentPopup();
-				}
-
-
-				if (ImGui::MenuItem("Remove Parent")) {
-					remove_parent_of_selection(false);
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Parent Selection To New Entity")) {
-					parent_to_shared(nullptr, true);
-					ImGui::CloseCurrentPopup();
-				}
-
-				ImGui::Separator();
-				if (ImGui::MenuItem("Add sibling entity")) {
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", context_menu_entity->get_ws_transform(), EntityPtr(context_menu_entity->get_parent()), false));
-					oo->contextMenuHandle = EntityPtr(nullptr);
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Add child entity")) {
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), context_menu_entity->get_self_ptr(), false));
-					oo->contextMenuHandle = EntityPtr(nullptr);
-					ImGui::CloseCurrentPopup();
-				}
-
-				if (context_menu_entity->get_parent()) {
-					ImGui::Separator();
-
-					bool make_cmd = false;
-					MovePositionInHierarchy::Cmd c{};
-					if (ImGui::MenuItem("Move next")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::Next;
-					}
-					if (ImGui::MenuItem("Move prev")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::Prev;
-					}
-					if (ImGui::MenuItem("Move first")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::First;
-					}
-					if (ImGui::MenuItem("Move last")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::Last;
-					}
-
-					if (make_cmd) {
-						ed_doc.command_mgr->add_command(new MovePositionInHierarchy(context_menu_entity, c));
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				ImGui::Separator();
-				if (ImGui::MenuItem("Instantiate prefab")) {
-					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(context_menu_entity));
-					oo->contextMenuHandle = EntityPtr(nullptr);
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Save branch as prefab")) {
-					save_off_branch_as_scene(context_menu_entity);
-					ImGui::CloseCurrentPopup();
-				}
-
-				auto is_prefab_instance_root = [](const Entity* e) -> bool {
-					return e && e->is_root_of_prefab && e->what_prefab && e->what_prefab != ed_doc.get_editing_prefab();
-				};
-
-				if (is_prefab_instance_root(context_menu_entity)) {
-					ImGui::Separator();
-					if (context_menu_entity->get_prefab_editable()) {
-						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
-						if (ImGui::MenuItem("Make Prefab Not Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(context_menu_entity, false));
-						}
-					}
-					else {
-						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 10,110,255,255 }));
-						if (ImGui::MenuItem("Make Prefab Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(context_menu_entity, true));
-						}
-					}
-					ImGui::PopStyleColor(1);
-				}
-
-				ImGui::Separator();
-				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
-				if (ImGui::MenuItem("Dissolve As Parent")) {
-					ASSERT(context_menu_entity);
-					auto& children = context_menu_entity->get_children();
-					
-					if(!children.empty())
-						remove_parent_of_selection(true);
-					else
-						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ n->ptr }));
-
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Delete")) {
-					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ n->ptr }));
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::PopStyleColor(1);
-				
-			}
-
-			ImGui::EndPopup();
-		}
-	}
-
-	ImGui::SameLine();
-
-	if (!node_entity) {
-		ImGui::Text(ed_doc.get_name().c_str());
-	}
-	else {
-		const Entity* const e = node_entity;
-
-		const char* name = (e->get_editor_name().c_str());
-		if (!*name) {
-			if (e->is_root_of_prefab && e->what_prefab)
-				name = e->what_prefab->get_name().c_str();
-			else {
-				if (auto m = e->get_component<MeshComponent>()) {
-					if (m->get_model())
-						name = m->get_model()->get_name().c_str();
-				}
-			}
-		}
-		if (!*name) {
-			name = e->get_type().classname;
-		}
-
-		if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
-			const char* s = "eng/editor/prefab_p.png";
-			auto tex = g_assets.find_global_sync<Texture>(s);
-			if (tex) {
-				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
-				ImGui::SameLine(0, 0);
-			}
-		}
-
-		for (auto c : e->get_components()) {
-			if (c->dont_serialize_or_edit_this()) continue;
-			const char* s = c->get_editor_outliner_icon();
-			if (!*s) continue;
-			auto tex = g_assets.find_global_sync<Texture>(s);
-			if (tex) {
-				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
-				ImGui::SameLine(0, 0);
-			}
-		}
-
-
-		if (!ed_doc.is_this_object_not_inherited(e))
-			ImGui::TextColored(non_owner_source_color, name);
-		else
-			ImGui::Text(name);
-
-	}
-
-	ImGui::TableNextColumn();
-
-	ImGui::PushStyleColor(ImGuiCol_Button, 0);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_imvec4({ 245, 242, 242, 55 }));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
-
-	{
-		Entity* const e = node_entity;
-
-		if (e) {
-			auto img = (e->get_hidden_in_editor()) ? oo->hidden : oo->visible;
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-			if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
-				e->set_hidden_in_editor(!e->get_hidden_in_editor());
-			}
-		}
-		else {
-			auto img = oo->hidden;
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-			if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16), ImVec2(), ImVec2(), -1, ImVec4(), ImVec4(0, 0, 0, 0))) {
-
-			}
-		}
-	}
-	ImGui::PopStyleColor(3);
-
-	ImGui::PopID();
-}
-
-extern bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab);
-bool ObjectOutliner::should_draw_children(Entity* e) const
-{
-	return serialize_this_objects_children(e, ed_doc.get_editing_prefab());
-}
-
-int ObjectOutliner::determine_object_count() const
-{
-	return num_nodes + 1 /*root node*/;
-}
-void ObjectOutliner::draw()
-{
-	if (!ImGui::Begin("Outliner") || !rootnode) {
-		ImGui::End();
-		setScrollHere = EntityPtr();
-		return;
-	}
-
-	int set_scroll_num = -1;
-	if (setScrollHere.is_valid()) {
-		IteratorDraw iter(this, rootnode);
-		int current_iter_n = 0;
-		do {
-			assert(iter.get_node());
-			auto the_ptr = iter.get_node()->ptr;
-			if (the_ptr.handle!=0 && the_ptr == setScrollHere) {
-				break;
-			}
-			current_iter_n++;
-		} while (iter.step());
-
-		set_scroll_num = current_iter_n;
-	}
-
-	ImGuiListClipper clipper;
-	clipper.Begin(determine_object_count());
-	IteratorDraw iter(this, rootnode);
-	int cur_n = 0;
-	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
-	//if (ImGui::Begin("PropEdit")) {
-	if (ImGui::BeginTable("Table", 2, flags)) {
-		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
-		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 50.0);
-
-		while (clipper.Step()) {
-			while (cur_n < clipper.DisplayStart) {
-				iter.step();
-				cur_n++;
-			}
-			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-				iter.draw();
-				iter.step();
-
-				// dont set the scroll to an item already in view
-				if (set_scroll_num == cur_n)
-					set_scroll_num = -1;
-
-				cur_n++;
-			}
-		}
-
-		if (set_scroll_num != -1) {
-			ImGui::SetScrollY(set_scroll_num * clipper.ItemsHeight);
-		}
-
-		ImGui::EndTable();
-	}
-	clipper.End();
-	ImGui::End();
-
-	setScrollHere = EntityPtr();
-}
 
 void EdPropertyGrid::draw_components(Entity* entity)
 {

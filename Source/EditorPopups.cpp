@@ -12,10 +12,11 @@ void EditorPopupManager::draw_popup_index(int index)
     }
     const float ofs = index * 20;
     ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    center.x += ofs;
+    center.x += ofs;    // for stacked popups
     center.y += ofs;
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(200, 100));
+    ImGui::SetNextWindowSize(ImVec2(0, 0)); // adjust to size
+    ImGui::SetNextWindowSizeConstraints(ImVec2(200, 0), ImVec2(600, 400));    // constraints
 
     if (ImGui::BeginPopupModal(popup.name.c_str())) {
 
@@ -50,7 +51,7 @@ void EditorPopupManager::add_popup(const std::string& name, std::function<bool()
 
 bool EditorPopupManager::has_popup_open() const
 {
-	return popup_stack.empty();
+	return !popup_stack.empty();
 }
 
 bool EditorPopupManager::Popup::has_opened() const {

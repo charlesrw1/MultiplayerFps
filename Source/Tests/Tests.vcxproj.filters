@@ -29,5 +29,8 @@
     <ClInclude Include="Unittest.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="object_outliner_filter.cpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

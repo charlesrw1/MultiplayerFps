@@ -498,6 +498,41 @@ private:
 	std::unordered_map<std::string, IAsset*> allAssets;		// maps a path to a loaded asset
 };
 
+using std::string;
+using std::unordered_map;
+using std::vector;
+using std::function;
+
+// reloading: actually allow multiple in memory? then old copy gets GCed. 
+
+// when an object references a 
+
+class StreamingAssetLoader
+{
+public:
+	StreamingAssetLoader(const unordered_map<string, IAsset*>& global);
+	void submit_job();
+	void wait_for_jobs();
+	bool is_done() const;
+private:
+	unordered_map<string, IAsset*> local_loaded;
+	const unordered_map<string, IAsset*>& global_loaded;
+};
+
+class AssetsInterface
+{
+public:
+	AssetsInterface(
+		StreamingAssetLoader* streaming_loader
+	);
+	void load_assets(vector<string> asset_paths, function<void(vector<IAsset*>)> callback);
+	void load_asset(string asset_path, function<void(IAsset*)> callback);
+private:
+	unordered_map<string, IAsset*> loaded_assets;
+	StreamingAssetLoader* streaming = nullptr;
+};
+
+
 void AssetDatabaseImpl::loaderThreadMain(int index, AssetDatabaseImpl* impl)
 {
 	IS_LOADER_THREAD = true;

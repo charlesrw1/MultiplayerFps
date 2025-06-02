@@ -39,45 +39,36 @@ enum TransformType
 	SCALE
 };
 
+
+extern bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab);
+extern bool std_string_input_text(const char* label, std::string& str, int flags);
+const ImColor non_owner_source_color = ImColor(252, 226, 131);
+
 class EditorDoc;
 
+template<typename T>
+using uptr = std::unique_ptr<T>;
+
+
 class Texture;
+class OONameFilter;
 class ObjectOutliner
 {
 public:
 	ObjectOutliner();
+	~ObjectOutliner();
+
 	void draw();
 	void init();
-private:
+private:	
 	bool should_draw_children(Entity* e) const;
-
 	void on_selection_change();
 	int determine_object_count() const;
-	void rebuild_tree() {
-		delete_tree();
-
-		rootnode = new Node;
-
-		auto level = eng->get_level();
-		auto& all_objs = level->get_all_objects();
-		for (auto ent : all_objs) {
-			if (Entity* e = ent->cast_to<Entity>()) {
-				if (!e->get_parent() && !e->dont_serialize_or_edit)
-				{
-					Node* me = new Node(this, e);
-					rootnode->add_child(me);
-				}
-			}
-		}
-		rootnode->sort_children();
-
-	}
+	void rebuild_tree();
 	void delete_tree() {
-		delete rootnode;
-		rootnode = nullptr;
+		rootnode.reset(nullptr);	// deletes
 		num_nodes = 0;
 	}
-
 	void on_changed_ents() { 
 		rebuild_tree();
 	}
@@ -87,37 +78,21 @@ private:
 
 	struct Node {
 		Node() {}
-		Node(ObjectOutliner* oo, Entity* initfrom) {
-			ptr = initfrom->get_self_ptr();
-			auto& children = initfrom->get_children();
-			if (oo->should_draw_children(initfrom)) {
-				for (auto& c : children) {
-					if (!c->dont_serialize_or_edit) {
-						Node* other = new Node(oo, c);
-						add_child(other);
-					}
-				}
-				//if(!initfrom->get_parent())
-				//	sort_children();
-			}
+		Node(ObjectOutliner* oo, Entity* initfrom, const std::vector<std::vector<std::string>>& filter);
 
-			oo->num_nodes++;
-		}
-
-		void add_child(Node* other) {
+		void add_child(uptr<Node> other) {
 			other->parent = this;
-			children.push_back(other);
+			children.push_back(std::move(other));
 		}
 
-		~Node() {
-			for (int i = 0; i < children.size(); i++)
-				delete children[i];
-		}
+		bool is_visible = true;
+		bool did_pass_filter = false;
+
 		EntityPtr ptr;
 		Node* parent = nullptr;
-		std::vector<Node*> children;
+		std::vector<uptr<Node>> children;
 		void sort_children() {
-			std::sort(children.begin(), children.end(), [](const Node* a, const Node* b)->bool {
+			std::sort(children.begin(), children.end(), [](const uptr<Node>& a, const uptr<Node>& b)->bool {
 				return to_lower(a->ptr->get_editor_name()) < to_lower(b->ptr->get_editor_name());
 				});
 		}
@@ -135,25 +110,15 @@ private:
 		int child_index = 0;
 		Node* node = nullptr;
 	};
+
 	friend struct IteratorDraw;
-
 	EntityPtr setScrollHere;
-
 	int num_nodes = 0;
-	Node* rootnode = nullptr;
-
+	uptr<Node> rootnode;
+	uptr<OONameFilter> filter;
 	AssetPtr<Texture> visible;
 	AssetPtr<Texture> hidden;
-
-
 	EntityPtr contextMenuHandle;
-
-	// filter:
-	// <string> - name
-	// has:<component>
-	// uses:<asset>
-
-	char nameFilter[256];
 };
 
 class EdPropertyGrid
