@@ -14,7 +14,7 @@ class ClassTypePtrSerializer : public IPropertySerializer
 			// FIXME: add type checking here too!!
 		}
 	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
 	{
 		const ClassTypeInfo** ptr_prop = (const ClassTypeInfo**)info.get_ptr(inst);
 

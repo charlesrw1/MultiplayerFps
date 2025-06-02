@@ -327,7 +327,7 @@ class CubemapAnchorSerializer : public IPropertySerializer
 		const CubemapAnchor* j = (const CubemapAnchor*)info.get_ptr(inst);
 		return string_format("%f %f %f %d", j->p.x, j->p.y, j->p.z,(int)j->worldspace);
 	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
 	{
 		CubemapAnchor* j = (CubemapAnchor*)info.get_ptr(inst);
 		std::string to_str(token.str_start, token.str_len);

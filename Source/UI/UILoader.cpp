@@ -42,8 +42,8 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 #include "Render/Texture.h"
 #define MAKE_FOUR(a,b,c,d) ( (uint32_t)a | ((uint32_t)b<< 8) | ((uint32_t)c << 16) | ((uint32_t)d<<24) )
 
-void GuiFont::sweep_references() const {
-	g_assets.touch_asset((IAsset*)font_texture);
+void GuiFont::sweep_references(IAssetLoadingInterface* load) const {
+	load->touch_asset(font_texture);
 }
 
 // path/file.png -> path/
@@ -54,10 +54,10 @@ inline std::string get_directory(const std::string& path)
 		return "";
 	return path.substr(0,pos+1);
 }
-void GuiFont::post_load(ClassBase*)
+void GuiFont::post_load()
 {
 }
-bool GuiFont::load_asset(ClassBase*& user)
+bool GuiFont::load_asset(IAssetLoadingInterface* load)
 {
 
 	auto& path = get_name();
@@ -125,8 +125,8 @@ bool GuiFont::load_asset(ClassBase*& user)
 		character_to_glyph.insert({ id,glyph });
 	}
 	std::string texpath = get_directory(get_name()) + texname;
-
-	font_texture = g_assets.find_sync<Texture>(texpath).get();
+	auto tex = load->load_asset(&Texture::StaticType, texpath);
+	font_texture = tex->cast_to<Texture>();
 	return true;
 }
 

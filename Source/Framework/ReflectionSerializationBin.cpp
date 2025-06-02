@@ -14,7 +14,7 @@
 // Implments binary serialization for Class system (as opposed to older text method, both still work, however)
 
 void write_properties_binary(const PropertyInfoList& list, void* ptr, FileWriter& out, ClassBase* userptr);
-void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr);
+void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr,IAssetLoadingInterface*);
 
 struct FindInst2
 {
@@ -299,8 +299,8 @@ static void write_properties_binary(const PropertyInfoList& list, void* ptr, Fil
 	}
 }
 
-static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr);
-static bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryReader& in, ClassBase* userptr)
+static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr, IAssetLoadingInterface* load);
+static bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryReader& in, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	auto listcallback = prop->list_ptr;
 	bool is_atom_type =
@@ -316,7 +316,7 @@ static bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryRead
 			read_propety_field_binary(
 				&listcallback->props_in_list->list[0],
 				listcallback->get_index(listptr, count),
-				in, userptr);
+				in, userptr,load);
 		}
 	}
 	else {
@@ -325,13 +325,13 @@ static bool read_list_field_binary(PropertyInfo* prop, void* listptr, BinaryRead
 
 			read_properties_binary(
 				*listcallback->props_in_list,
-				listcallback->get_index(listptr, count), in, userptr);
+				listcallback->get_index(listptr, count), in, userptr,load);
 
 		}
 	}
 	return true;
 }
-static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr)
+static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReader& in, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	switch (prop->type)
 	{
@@ -369,7 +369,7 @@ static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReade
 	}break;
 
 	case core_type_id::List:
-		read_list_field_binary(prop, prop->get_ptr(ptr), in, userptr);
+		read_list_field_binary(prop, prop->get_ptr(ptr), in, userptr,load);
 		break;
 	case core_type_id::Struct: {
 
@@ -378,7 +378,7 @@ static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReade
 		StringView sv = in.read_string_view();
 		if (serializer) {
 			DictParser DUMMY;
-			serializer->unserialize(DUMMY, *prop, ptr, sv, userptr);
+			serializer->unserialize(DUMMY, *prop, ptr, sv, userptr,load);
 			delete serializer;	// fixme: inplace new/free instead?
 		}
 		else {
@@ -418,7 +418,7 @@ static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReade
 }
 
 
-static void read_multi_properties_binary(std::vector<PropertyListInstancePair>& proplists, BinaryReader& in,  ClassBase* userptr)
+static void read_multi_properties_binary(std::vector<PropertyListInstancePair>& proplists, BinaryReader& in,  ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	while (!in.has_failed())
 	{
@@ -440,15 +440,15 @@ static void read_multi_properties_binary(std::vector<PropertyListInstancePair>& 
 		if (find.prop->type != type)
 			throw std::runtime_error("type mismatches with existing");
 
-		read_propety_field_binary(find.prop, find.instptr, in, userptr);
+		read_propety_field_binary(find.prop, find.instptr, in, userptr,load);
 	}
 }
 
-static void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr)
+static void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	std::vector<PropertyListInstancePair> props(1);
 	props[0] = { &list,ptr };
-	read_multi_properties_binary(props, in, userptr);
+	read_multi_properties_binary(props, in, userptr,load);
 }
 
 
@@ -499,7 +499,7 @@ static void attempt_to_skip_existing_prop(BinaryReader& in, core_type_id type)
 	auto t = in.read_int32();	//0xdeadbeef
 }
 
-void read_props_to_object_binary(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, BinaryReader& in, ClassBase* userptr)
+void read_props_to_object_binary(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, BinaryReader& in, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	while (!in.has_failed())
 	{
@@ -524,6 +524,6 @@ void read_props_to_object_binary(ClassBase* dest_obj, const ClassTypeInfo* typei
 			continue;
 		}
 
-		read_propety_field_binary(find->second, dest_obj, in, userptr);
+		read_propety_field_binary(find->second, dest_obj, in, userptr,load);
 	}
 }

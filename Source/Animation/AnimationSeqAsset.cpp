@@ -56,7 +56,7 @@ CLASS_IMPL(AnimationSeqAsset);
 #include "Render/Model.h"
 #include "Animation/SkeletonData.h"
 #include "Assets/AssetDatabase.h"
-bool AnimationSeqAsset::load_asset(ClassBase*& user)
+bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();
 	auto pos = path.rfind('/');
@@ -67,7 +67,8 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 	std::string modName = path.substr(0, pos) + ".cmdl";
 	std::string animName = path.substr(pos + 1);
 
-	srcModel = g_assets.find_assetptr_unsafe<Model>(modName);
+	auto m = load->load_asset(&Model::StaticType, modName);
+	srcModel = m->cast_to<Model>();
 	if (srcModel && srcModel->get_skel()) {
 		seq = srcModel->get_skel()->find_clip(animName);
 
@@ -81,9 +82,10 @@ bool AnimationSeqAsset::load_asset(ClassBase*& user)
 		return false;
 }
 
-void AnimationSeqAsset::sweep_references() const
+void AnimationSeqAsset::sweep_references(IAssetLoadingInterface* load) const
 {
-	g_assets.touch_asset(srcModel.get_unsafe());
+	load->touch_asset(srcModel.get_unsafe());
+
 }
 void AnimationSeqAsset::move_construct(IAsset* _other) {
 	auto other = (AnimationSeqAsset*)_other;

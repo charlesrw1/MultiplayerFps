@@ -28,9 +28,8 @@ bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 	if (has_extension(name, "dc")) {
 		const DataClass* dc = g_assets.find_sync<DataClass>(name).get();
 		if (dc) {
-			editing_object = dc->get_obj()->get_type().allocate();
+			editing_object = ((ClassBase*)dc->get_obj())->create_copy();
 			typeInfo = &editing_object->get_type();
-			copy_object_properties((ClassBase*)dc->get_obj(), editing_object, nullptr);
 		}
 		else
 			set_empty_doc();

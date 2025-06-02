@@ -590,7 +590,7 @@ class EntityBoneParentStringSerialize : public IPropertySerializer
 		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
 		return ptr_prop->get_c_str();
 	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
 	{
 		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
 		std::string to_str(token.str_start, token.str_len);
@@ -688,7 +688,7 @@ class EntityTagSerialize : public IPropertySerializer
 		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
 		return ptr_prop->get_c_str();
 	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface*) override
 	{
 		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
 		std::string to_str(token.str_start, token.str_len);

@@ -145,43 +145,19 @@ static InterfaceDef A_interface_typeinfos[] = {
 };
 
 
-template<typename T>
-class iptr {
-public:
-	iptr(T* ptr, BaseObject* obj) 
-		: interface_ptr(ptr), obj_ptr(obj) {}
-	iptr() {}
-	BaseObject* get_object() {
-		return obj_ptr;
-	}
-	T& operator*() {
-		return *interface_ptr;
-	}
-	T*& operator->() {
-		return *interface_ptr;
-	}
-	bool operator() {
-		return interface_ptr != nullptr;
-	}
-private:
-	T* interface_ptr = nullptr;
-	BaseObject* obj_ptr = nullptr;
-};
 
 
 ADD_TEST(multiple_inheritance)
 {
-	iptr<IMyInterface> someptr;
-	someptr->do_stuff();
-	(*someptr).do_stuff();
-
-	IMyInterface* i = nullptr;
-	i->typeinfo.name;
-
+	
 //	auto dif2 = ComputePointerOffset<C, B>;
 
 }
 
+ADD_TEST(assets)
+{
+
+}
 
 
 int main(int argc, char**argv)

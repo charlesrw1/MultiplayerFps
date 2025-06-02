@@ -10,7 +10,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Framework/ObjectSerialization.h"
 
-extern bool compile_texture_asset(const std::string& gamepath);
+extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
 
 CLASS_H(TextureImportSettings,ClassBase)
 public:
@@ -78,7 +78,8 @@ inline bool TextureEditorTool::open_document_internal(const char* name, const ch
 
 	DictParser dp;
 	dp.load_from_file(file.get());
-	auto classLoaded = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, dp);
+
+	auto classLoaded = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, dp, AssetDatabase::loader);
 	if (!classLoaded) {
 		sys_print(Error, "couldnt parse texture import settings %s\n", name);
 		return false;

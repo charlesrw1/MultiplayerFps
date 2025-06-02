@@ -433,7 +433,7 @@ void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, 
 	}
 }
 
-void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, void* to, ClassBase* userptr)
+void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, void* to, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	DictWriter out;
 	for(auto l : lists)
@@ -444,7 +444,7 @@ void copy_properties(std::vector<const PropertyInfoList*> lists, void* from, voi
 	std::vector<PropertyListInstancePair> pairs;
 	for (auto l : lists)
 		pairs.push_back({ l,to });
-	read_multi_properties(pairs, parser, {}, userptr);
+	read_multi_properties(pairs, parser, {}, userptr,load);
 }
 
 // skips to the next '}'
@@ -500,14 +500,14 @@ void parse_skip_field(DictParser& in, StringView tok)
 
 
 
-bool read_unique_ptr(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
+bool read_unique_ptr(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
-	ClassBase* p = read_object_properties<ClassBase>(userptr, in, tok);
+	ClassBase* p = read_object_properties<ClassBase>(userptr, in, tok,load);
 	*(ClassBase**)ptr = p;
 	return true;
 }
-bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr);
-bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, ClassBase* userptr)
+bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load);
+bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	if (!in.check_list_start(tok))
 		return false;
@@ -523,7 +523,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 
 			listcallback->resize(listptr, count + 1);
 
-			if (!read_propety_field(&listcallback->props_in_list->list[0], listcallback->get_index(listptr, count), in, tok, userptr))
+			if (!read_propety_field(&listcallback->props_in_list->list[0], listcallback->get_index(listptr, count), in, tok, userptr, load))
 				return false;
 
 			count++;
@@ -539,7 +539,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 			listcallback->resize(listptr, count + 1);
 
 
-			if (!read_properties(*listcallback->props_in_list, listcallback->get_index(listptr, count), in, tok, userptr).second)
+			if (!read_properties(*listcallback->props_in_list, listcallback->get_index(listptr, count), in, tok, userptr,load).second)
 				return false;
 
 			count++;
@@ -549,7 +549,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 	}
 	return true;
 }
-bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
+bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 
 	switch (prop->type)
@@ -592,12 +592,12 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	}break;
 
 	case core_type_id::List: {
-		bool res = read_list_field(prop, prop->get_ptr(ptr), in, tok, userptr);
+		bool res = read_list_field(prop, prop->get_ptr(ptr), in, tok, userptr, load);
 		if (!res)
 			parse_skip_list(in);
 	}break;
 	case core_type_id::StdUniquePtr: {
-		bool res = read_unique_ptr(prop, prop->get_ptr(ptr), in, tok, userptr);
+		bool res = read_unique_ptr(prop, prop->get_ptr(ptr), in, tok, userptr,load);
 		if (!res)
 			parse_skip_object(in);
 	}break;
@@ -606,7 +606,7 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 		auto& fac = IPropertySerializer::get_factory();
 		auto serializer = fac.createObject(prop->custom_type_str);
 		if (serializer) {
-			serializer->unserialize(in, *prop, ptr, tok, userptr);
+			serializer->unserialize(in, *prop, ptr, tok, userptr,load);
 			delete serializer;	// fixme: inplace new/free instead?
 			return true;
 		}
@@ -664,7 +664,7 @@ static FindInst find_in_proplists(const char* name, std::vector<PropertyListInst
 
 
 
-std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const ClassTypeInfo* typeinfo, DictParser& in, StringView tok, ClassBase* userptr)
+std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const ClassTypeInfo* typeinfo, DictParser& in, StringView tok, IAssetLoadingInterface* load,ClassBase* userptr)
 {
 	// expect { (start field list) if not a null token
 	if (tok.str_len > 0 && !in.check_item_start(tok))
@@ -693,7 +693,7 @@ std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const Class
 		}
 
 		in.read_string(tok);
-		if (!read_propety_field(find->second, dest_obj, in, tok, userptr))
+		if (!read_propety_field(find->second, dest_obj, in, tok, userptr,load))
 			return { tok, false };
 
 
@@ -705,7 +705,7 @@ std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj,const Class
 
 
 
-std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, ClassBase* userptr)
+std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& proplists, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	// expect { (start field list) if not a null token
 	if (tok.str_len > 0 && !in.check_item_start(tok))
@@ -732,7 +732,7 @@ std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstan
 		}
 
 		in.read_string(tok);
-		if (!read_propety_field(find.prop, find.instptr, in, tok, userptr))
+		if (!read_propety_field(find.prop, find.instptr, in, tok, userptr, load))
 			return { tok, false };
 
 
@@ -742,11 +742,11 @@ std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstan
 	return { tok, true };
 }
 
-std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, ClassBase* userptr)
+std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	std::vector<PropertyListInstancePair> props(1);
 	props[0] = { &list,ptr };
-	return read_multi_properties(props, in, tok, userptr);
+	return read_multi_properties(props, in, tok, userptr,load);
 }
 
 PropertyInfo* PropertyInfoList::find(const char* name) const

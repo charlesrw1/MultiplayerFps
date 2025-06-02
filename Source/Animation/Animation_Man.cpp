@@ -43,7 +43,7 @@ void Animation_Tree_CFG::uninstall()
 }
 
 
-static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
+static void check_props_for_assetptr(void* inst, const PropertyInfoList* list, IAssetLoadingInterface* load)
 {
 	for (int i = 0; i < list->count; i++) {
 		auto prop = list->list[i];
@@ -51,20 +51,20 @@ static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
 			// wtf!
 			IAsset** e = (IAsset**)prop.get_ptr(inst);
 			if (*e)
-				g_assets.touch_asset(*e);
+				load->touch_asset(*e);
 		}
 		else if(prop.type==core_type_id::List) {
 			auto listptr = prop.get_ptr(inst);
 			auto size = prop.list_ptr->get_size(listptr);
 			for (int j = 0; j < size; j++) {
 				auto ptr = prop.list_ptr->get_index(listptr, j);
-				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list);
+				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list,load);
 			}
 		}
 	}
 }
 
-void Animation_Tree_CFG::sweep_references() const
+void Animation_Tree_CFG::sweep_references(IAssetLoadingInterface* load) const
 {
 	for (auto obj : all_nodes)
 	{
@@ -72,12 +72,12 @@ void Animation_Tree_CFG::sweep_references() const
 		while (type) {
 			auto props = type->props;
 			if(props)
-				check_props_for_assetptr(obj, props);
+				check_props_for_assetptr(obj, props,load);
 			type = type->super_typeinfo;
 		}
 	}
 }
-bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
+bool Animation_Tree_CFG::load_asset(IAssetLoadingInterface* load) {
 
 	auto& path = get_name();
 
@@ -96,7 +96,7 @@ bool Animation_Tree_CFG::load_asset(ClassBase*& user) {
 	dp.load_from_file(file.get());
 
 
-	bool good = read_from_dict(dp);
+	bool good = read_from_dict(dp,load);
 	if (!good) {
 		sys_print(Error, "animation tree file parsing failed \n");
 		graph_is_valid = false;

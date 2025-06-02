@@ -13,9 +13,9 @@ class AnimationSeq;
 CLASS_H(AnimationSeqAsset, IAsset)
 public:
 	void uninstall() override;
-	void post_load(ClassBase* user) override {}
-	bool load_asset(ClassBase*& user) override;
-	void sweep_references() const override;
+	void post_load() override {}
+	bool load_asset(IAssetLoadingInterface* load) override;
+	void sweep_references(IAssetLoadingInterface* load) const override;
 	void move_construct(IAsset* _other) override;
 
 	// get_name() is the animation name

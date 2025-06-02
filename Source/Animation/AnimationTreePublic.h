@@ -26,10 +26,10 @@ public:
 	~Animation_Tree_CFG() override;
 
 	void uninstall() override;
-	bool load_asset(ClassBase*& user);
-	void post_load(ClassBase*) {}
+	bool load_asset(IAssetLoadingInterface* load);
+	void post_load() {}
 	void move_construct(IAsset* other);
-	void sweep_references() const override;
+	void sweep_references(IAssetLoadingInterface* load) const override;
 
 	const Node_CFG* get_root_node() const {
 		return root;
@@ -41,7 +41,7 @@ public:
 	bool post_load_init();
 	int get_index_of_node(Node_CFG* ptr);
 	void write_to_dict(DictWriter& out);
-	bool read_from_dict(DictParser& in);
+	bool read_from_dict(DictParser& in, IAssetLoadingInterface* load);
 
 	//uint32_t get_data_used() const { return data_used; }
 

@@ -847,7 +847,7 @@ class AnchorJointSerializer : public IPropertySerializer
 		const JointAnchor* j = (const JointAnchor*)info.get_ptr(inst);
 		return string_format("%f %f %f %f %f %f %f", j->p.x, j->p.y, j->p.z, j->q.w, j->q.x, j->q.y, j->q.z);
 	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
 	{
 		JointAnchor* j = (JointAnchor*)info.get_ptr(inst);
 		std::string to_str(token.str_start, token.str_len);

@@ -23,7 +23,7 @@ CLASS_IMPL(Texture);
 
 
 // TextureEditor.cpp
-extern bool compile_texture_asset(const std::string& gamepath);
+extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
 
 #ifdef EDITOR_BUILD
 extern IEditorTool* g_texture_editor_tool;
@@ -491,19 +491,6 @@ Texture_Format to_format(int n, bool isfloat)
 	return TEXFMT_RGB8;
 }
 
-CLASS_H(TextureLoadUser, ClassBase)
-public:
-	~TextureLoadUser() override {
-	}
-
-	std::vector<uint8_t> filedata;
-	bool isDDSFile = false;
-	int x{}, y{}, channels{};
-	bool is_float = false;
-	void* data = nullptr;
-	bool wantsNearestFiltering = false;
-};
-CLASS_IMPL(TextureLoadUser);
 
 void Texture::move_construct(IAsset* _src)
 {
@@ -518,11 +505,12 @@ void Texture::move_construct(IAsset* _src)
 
 	src->gl_id = 0;	// dont uninstall it since were just stealing it
 }
-void Texture::post_load(ClassBase* userStruct) {
+void Texture::post_load() {
 	if (did_load_fail())
 		return;
-	assert(userStruct);
-	TextureLoadUser* user = userStruct->cast_to<TextureLoadUser>();
+
+	auto user = loaddata.get();
+
 	int& x = user->x;
 	int& y = user->y;
 	auto& data = user->data;
@@ -538,17 +526,19 @@ void Texture::post_load(ClassBase* userStruct) {
 		stbi_image_free(data);
 
 	type = Texture_Type::TEXTYPE_2D;
+
+	loaddata.reset();
 }
 
 extern ConfigVar developer_mode;
 
-bool Texture::load_asset(ClassBase*& userStruct) {
+bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	const auto& path = get_name();
 
 #ifdef EDITOR_BUILD
 	if (developer_mode.get_bool()) {
 		// this will check if a compile is needed
-		compile_texture_asset(path);
+		compile_texture_asset(path,loading);
 	}
 #endif
 
@@ -558,8 +548,8 @@ bool Texture::load_asset(ClassBase*& userStruct) {
 		return false;
 	}
 
-	TextureLoadUser* user = new TextureLoadUser;
-	userStruct = user;
+	loaddata = std::make_unique<LoadData>();
+	auto user = loaddata.get();
 	int& x = user->x;
 	int& y = user->y;
 	auto& data = user->data;
@@ -590,6 +580,7 @@ bool Texture::load_asset(ClassBase*& userStruct) {
 	file->close();
 
 	if (data == nullptr) {
+		loaddata.reset();
 		return false;
 	}
 

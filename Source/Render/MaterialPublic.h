@@ -20,6 +20,7 @@ public:
 
 class MasterMaterialImpl;
 class Texture;
+class IAssetLoadingInterface;
 class MaterialImpl;
 CLASS_H(MaterialInstance, IAsset)
 public:
@@ -39,9 +40,9 @@ public:
 
 	// IAsset interface
 	void uninstall();
-	void post_load(ClassBase*);
-	bool load_asset(ClassBase*&);
-	void sweep_references() const;
+	void post_load();
+	bool load_asset(IAssetLoadingInterface* loading);
+	void sweep_references(IAssetLoadingInterface* loading) const;
 	void move_construct(IAsset* other);
 
 

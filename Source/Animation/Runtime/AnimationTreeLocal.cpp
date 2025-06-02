@@ -433,7 +433,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
  }
 
 
- bool Animation_Tree_CFG::read_from_dict(DictParser& in)
+ bool Animation_Tree_CFG::read_from_dict(DictParser& in, IAssetLoadingInterface* load)
  {
 	 if (!in.expect_string("runtime") || !in.expect_item_start())
 		 return false;
@@ -441,7 +441,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 {
 		 if (!in.expect_string("rootdata") || !in.expect_item_start())
 			 return false;
-		 auto res = read_properties(*get_props(), this, in, {}, {});
+		 auto res = read_properties(*get_props(), this, in, {}, {},load);
 
 		 if (!res.second || !in.check_item_end(res.first))
 			 return false;
@@ -453,7 +453,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 		bool good =  in.read_list_and_apply_functor([&](StringView view) -> bool
 			 {
-				BaseAGNode* node = read_object_properties<BaseAGNode>({}, in, view);
+				BaseAGNode* node = read_object_properties<BaseAGNode>({}, in, view, load);
 				 if (node) {
 					 all_nodes.push_back(node);
 					 return true;
@@ -626,7 +626,7 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 
 		 return std::to_string(num);
 	 }
-	 virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	 virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) override
 	 {
 		 uintptr_t index = atoi(token.to_stack_string().c_str());
 

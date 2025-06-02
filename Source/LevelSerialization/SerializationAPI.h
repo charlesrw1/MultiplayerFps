@@ -62,8 +62,8 @@ private:
 // * need to assign instance handles to them
 // * any EntHandle  are set to POINTERS! after setting instance handles, go through obj_with_extern_references and update handles to integer values
 // * needs init to be called
-
-UnserializedSceneFile unserialize_entities_from_text(const std::string& text, PrefabAsset* opt_source_prefab = nullptr);
+class IAssetLoadingInterface;
+UnserializedSceneFile unserialize_entities_from_text(const std::string& text, IAssetLoadingInterface* load, PrefabAsset* opt_source_prefab);
 
 class SerializedSceneFile
 {

@@ -5,6 +5,7 @@
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
 #include "Assets/IAsset.h"
+#include <memory>
 
 enum Texture_Format
 {
@@ -41,9 +42,9 @@ public:
 	~Texture() {}
 
 	void uninstall() override;
-	void sweep_references() const override {}
-	void post_load(ClassBase* userStruct) override;
-	bool load_asset(ClassBase*& userStruct) override;
+	void sweep_references(IAssetLoadingInterface* loading) const override {}
+	void post_load() override;
+	bool load_asset(IAssetLoadingInterface* loading) override;
 	void move_construct(IAsset* src) override;
 
 
@@ -71,6 +72,16 @@ public:
 	}
 
 	static Texture* install_system(const std::string& path);
+private:
+	struct LoadData {
+		std::vector<uint8_t> filedata;
+		bool isDDSFile = false;
+		int x{}, y{}, channels{};
+		bool is_float = false;
+		void* data = nullptr;
+		bool wantsNearestFiltering = false;
+	};
+	std::unique_ptr<LoadData> loaddata;
 };
 
 

@@ -54,7 +54,8 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(std::vector<EntityPtr> handles) {
 
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
-	auto restored = unserialize_entities_from_text(scene->text);
+
+	auto restored = unserialize_entities_from_text(scene->text, AssetDatabase::loader,nullptr);
 	auto& extern_parents = scene->extern_parents;
 	for (auto& ep : extern_parents) {
 		auto e = restored.get_objects().find(ep.child_path);
@@ -514,7 +515,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(std::vector<EntityPtr> handle
 }
 
 void DuplicateEntitiesCommand::execute() {
-	auto duplicated = unserialize_entities_from_text(scene->text);
+	auto duplicated = unserialize_entities_from_text(scene->text, AssetDatabase::loader,nullptr);
 
 	auto& extern_parents = scene->extern_parents;
 	for (auto ep : extern_parents) {

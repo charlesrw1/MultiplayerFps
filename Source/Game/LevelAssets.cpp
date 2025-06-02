@@ -92,7 +92,7 @@ void SceneAsset::move_construct(IAsset*) {
 	sys_print(Warning, "scene asset move construct, shouldnt have happened\n");
 }
 
-bool SceneAsset::load_asset(ClassBase*&)
+bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();
 
@@ -104,7 +104,7 @@ bool SceneAsset::load_asset(ClassBase*&)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text));
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, load,nullptr));
 	}
 	catch (int) {
 		sys_print(Error, "error loading SceneAsset %s\n", path.c_str());
@@ -117,7 +117,7 @@ bool SceneAsset::load_asset(ClassBase*&)
 PrefabAsset::~PrefabAsset() {
 }
 
-bool PrefabAsset::load_asset(ClassBase*&)
+bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();
 
@@ -129,7 +129,7 @@ bool PrefabAsset::load_asset(ClassBase*&)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, this));
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text,load, this));
 		// add instance ids here for diff'ing entity references
 		uint64_t id = 1ull << 63ull;
 		for (auto& obj : sceneFile->get_objects()) {
@@ -157,27 +157,27 @@ void PrefabAsset::uninstall()
 }
 
 
-static void check_props_for_assetptr(void* inst, const PropertyInfoList* list)
+static void check_props_for_assetptr(void* inst, const PropertyInfoList* list, IAssetLoadingInterface* load)
 {
 	for (int i = 0; i < list->count; i++) {
 		auto prop = list->list[i];
 		if (strcmp(prop.custom_type_str, "AssetPtr") == 0) {
 			IAsset** e = (IAsset**)prop.get_ptr(inst);
 			if (*e)
-				g_assets.touch_asset(*e);
+				load->touch_asset(*e);
 		}
 		else if(prop.type==core_type_id::List) {
 			auto listptr = prop.get_ptr(inst);
 			auto size = prop.list_ptr->get_size(listptr);
 			for (int j = 0; j < size; j++) {
 				auto ptr = prop.list_ptr->get_index(listptr, j);
-				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list);
+				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list,load);
 			}
 		}
 	}
 }
 
-void PrefabAsset::sweep_references() const
+void PrefabAsset::sweep_references(IAssetLoadingInterface* load) const
 {
 	if (!sceneFile)
 		return;
@@ -190,7 +190,7 @@ void PrefabAsset::sweep_references() const
 			while (type) {
 				auto props = type->props;
 				if(props)
-					check_props_for_assetptr(o, props);
+					check_props_for_assetptr(o, props,load);
 				type = type->super_typeinfo;
 			}
 		}

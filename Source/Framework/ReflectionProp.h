@@ -162,15 +162,15 @@ struct Prop_Flag_Overrides;
 
 void write_properties_with_diff(const PropertyInfoList& list, void* ptr, const void* diff_class, DictWriter& out, ClassBase* user = nullptr);
 
-
+class IAssetLoadingInterface;
 void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, ClassBase* user = nullptr);
-std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, ClassBase* user = nullptr);
-std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, ClassBase* user = nullptr);
+std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, ClassBase* user, IAssetLoadingInterface* load);
+std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, ClassBase* user, IAssetLoadingInterface* load);
 
-std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, DictParser& in, StringView first_token, ClassBase* user = nullptr);
+std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, DictParser& in, StringView first_token, IAssetLoadingInterface* load, ClassBase* user = nullptr);
 
 
-void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, ClassBase* user = nullptr);
+void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, ClassBase* user, IAssetLoadingInterface* load);
 
 class IListCallback
 {
@@ -203,12 +203,12 @@ private:
 };
 
 
-
+class IAssetLoadingInterface;
 class IPropertySerializer
 {
 public:
 	static Factory<std::string, IPropertySerializer>& get_factory();
 
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) = 0;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) = 0;
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) = 0;
 };

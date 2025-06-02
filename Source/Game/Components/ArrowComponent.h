@@ -13,11 +13,11 @@ public:
 
 	ArrowComponent() {
 		set_call_init_in_editor(true);
-		arrowModel = g_assets.find_assetptr_unsafe<Model>("arrowModel.cmdl");
 		dont_serialize_or_edit = true;	// default to true
 	}
 
 	void start() override {
+		arrowModel = g_assets.find_sync<Model>("arrowModel.cmdl");
 		sync_render_data();
 	}
 	void end() override {

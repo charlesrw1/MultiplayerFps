@@ -400,7 +400,7 @@ public:
 		index++;	// skip space
 		return index;
 	}
-	void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user)override {
+	void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface*)override {
 		StateTransitionScript* self = (StateTransitionScript*)inst;
 		std::string s(token.str_start, token.str_len);
 		int comp = s.at(0) - 'a';

@@ -22,6 +22,7 @@
 #include <stdexcept>
 
 #include "Framework/Config.h"
+#include "Assets/AssetDatabase.h"
 
 // Physx needed for cooking meshes:
 #include <physx/cooking/PxCooking.h>
@@ -314,7 +315,7 @@ class ModelCompileHelper
 {
 public:
 
-	static ModelDefData parse_definition_file(const std::string& deffile);
+	static ModelDefData parse_definition_file(const std::string& deffile, IAssetLoadingInterface* loading);
 	static std::string model_def_to_string(const ModelDefData& def);
 
 	static bool compile_model(const std::string& defname, const ModelDefData& data);
@@ -949,7 +950,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		
 		for (auto& ev : isa.events) {
 			ClassBase* newEvent = ev->get_type().allocate();
-			copy_object_properties(ev, newEvent, nullptr);
+			copy_object_properties(ev, newEvent, nullptr, AssetDatabase::loader);
 			assert(newEvent->is_a<AnimationEvent>());
 			acl.events.push_back(std::unique_ptr<AnimationEvent>((AnimationEvent*)newEvent));
 		}
@@ -960,14 +961,15 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 
 	return mdd;
 }
-ModelDefData new_import_settings_to_modeldef_data(IFile* file)
+
+ModelDefData new_import_settings_to_modeldef_data(IFile* file, IAssetLoadingInterface* loading)
 {
 	DictParser dp;
 	dp.load_from_file(file);
 	StringView tok;
 	dp.read_string(tok);
 
-	auto is = read_object_properties<ModelImportSettings>(nullptr, dp, tok);
+	auto is = read_object_properties<ModelImportSettings>(nullptr, dp, tok,loading);
 
 	if (!is)
 		throw std::runtime_error("couldnt parse new class import sttings");
@@ -978,7 +980,7 @@ ModelDefData new_import_settings_to_modeldef_data(IFile* file)
 	return mdd;
 }
 
-ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path) {
+ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path, IAssetLoadingInterface* loading) {
 	{
 		std::string pathNew = strip_extension(game_path);
 		pathNew += ".mis";	// model import settings
@@ -986,7 +988,7 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_p
 		if (!filenew)
 			throw std::runtime_error("couldn't open dict");
 		//
-		return new_import_settings_to_modeldef_data(filenew.get());
+		return new_import_settings_to_modeldef_data(filenew.get(),loading);
 	}
 
 }
@@ -2855,7 +2857,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 
 static bool compile_everything = false;
 
-bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data, bool needs_def)
+bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data, bool needs_def, IAssetLoadingInterface* loading)
 {
 	auto file = FileSys::open_read_game(game_path);
 	if (!file) {
@@ -2902,7 +2904,7 @@ bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData
 		return true;
 
 	//try {
-	def_data = ModelCompileHelper::parse_definition_file(game_path);
+	def_data = ModelCompileHelper::parse_definition_file(game_path,loading);
 	//}
 	//catch (std::runtime_error er) {
 	//	sys_print(Error, "error parsing compile file %s: %s\n", game_path, er.what());
@@ -2956,12 +2958,12 @@ bool ModelCompilier::compile_from_settings(const std::string& output, ModelImpor
 	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
 	return ModelCompileHelper::compile_model(output, def_data);
 }
-bool ModelCompilier::compile(const char* game_path)
+bool ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* loading)
 {
 	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
 
 	ModelDefData def;
-	bool needs_compile = does_model_need_compile(game_path,def,true);
+	bool needs_compile = does_model_need_compile(game_path,def,true,loading);
 	if (!needs_compile)
 		return true;
 

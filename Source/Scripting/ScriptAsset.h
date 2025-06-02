@@ -11,13 +11,13 @@ public:
 	// attached with ScriptComponent
 	// which will hook up events and set exported var values
 
-	virtual bool load_asset(ClassBase*& outUserStruct);
-	virtual void post_load(ClassBase* inUserStruct) {}
-	virtual void uninstall();
-	virtual void sweep_references() const {
+	bool load_asset(IAssetLoadingInterface*) final;
+	void post_load() final {}
+	void uninstall() final;
+	void sweep_references(IAssetLoadingInterface*) const final {
 		sys_print(Debug, "sweep");
 	}
-	virtual void move_construct(IAsset* src);
+	void move_construct(IAsset* src) final;
 
 	std::string script_str;
 };

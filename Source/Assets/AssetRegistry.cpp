@@ -56,9 +56,9 @@ public:
 	void move_construct(IAsset* other) override {
 		this->root = std::move(((HackedAsyncAssetRegReindex*)other)->root);
 	}
-	void sweep_references() const override {
+	void sweep_references(IAssetLoadingInterface*) const override {
 	}
-	bool load_asset(ClassBase*&) override {
+	bool load_asset(IAssetLoadingInterface*) override {
 		std::vector<AssetOnDisk> diskAssets;
 		diskAssets.clear();
 		const int len = strlen(FileSys::get_game_path());
@@ -136,7 +136,7 @@ public:
 
 		return true;
 	}
-	void post_load(ClassBase*) override {
+	void post_load() override {
 		is_in_loading = false;
 		AssetRegistrySystem::get().root = std::move(root);
 

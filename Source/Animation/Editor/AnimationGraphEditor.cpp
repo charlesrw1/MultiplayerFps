@@ -420,7 +420,8 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 	{
 		if (!in.expect_string("rootstate") || !in.expect_item_start())
 			return false;
-		auto out = read_properties(*get_props(), this, in, {}, &context);
+
+		auto out = read_properties(*get_props(), this, in, {} , &context, AssetDatabase::loader);
 		if (!out.second || !in.check_item_end(out.first))
 			return false;
 	}
@@ -429,7 +430,7 @@ bool AnimationGraphEditor::load_editor_nodes(DictParser& in)
 		if (!in.expect_string("nodes") || !in.expect_list_start())
 			return false;
 		bool good = in.read_list_and_apply_functor([&](StringView view) -> bool {
-			Base_EdNode* node = read_object_properties<Base_EdNode>(&context, in, view);
+			Base_EdNode* node = read_object_properties<Base_EdNode>(&context, in, view, AssetDatabase::loader);
 			if (node) {
 				nodes.push_back(node);
 				return true;
@@ -1562,7 +1563,7 @@ static std::unique_ptr<Animation_Tree_CFG> try_to_load_document(const std::strin
 	auto tree = std::make_unique<Animation_Tree_CFG>();
 	tree->editor_set_newly_made_path(path);
 	ClassBase* dummy = nullptr;
-	bool good = tree->load_asset(dummy);
+	bool good = tree->load_asset(AssetDatabase::loader);
 	ASSERT(!dummy);
 	if (!good) {
 		return nullptr;	// ptr gets freed

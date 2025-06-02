@@ -53,7 +53,7 @@ public:
 	}
 
 	Entity* add_prefab(PrefabAsset* asset) {
-		auto unserialized_scene = unserialize_entities_from_text(asset->text, asset);
+		auto unserialized_scene = unserialize_entities_from_text(asset->text, nullptr, asset);
 		unserialized_scene.get_root_entity()->is_root_of_prefab = true;
 		unserialized_scene.get_root_entity()->unique_file_id = ++file_id;
 		post_unserialization_R(unserialized_scene.get_root_entity());
@@ -144,7 +144,7 @@ ADD_TEST(unserialize_prefab)
 	// prefab unserialization
 	auto text = get_text_of_file("TestFiles/test2.pfb");
 	PrefabAsset temp;
-	auto unserialized = unserialize_entities_from_text(text, &temp);
+	auto unserialized = unserialize_entities_from_text(text, nullptr, &temp);
 	auto root = unserialized.get_root_entity();
 	TEST_TRUE(root);
 	TEST_TRUE(!root->creator_source && root->is_root_of_prefab && root->what_prefab == &temp);
@@ -252,7 +252,7 @@ ADD_TEST(serialize_write_prefab)
 
 
 
-	auto unserialized = unserialize_entities_from_text(file.text, prefab);
+	auto unserialized = unserialize_entities_from_text(file.text, nullptr, prefab);
 
 	bool good = true;
 	for (auto obj : unserialized.get_objects()) {
@@ -351,7 +351,7 @@ ADD_TEST(serialize_basic)
 	auto ents = work.get_all_entities();
 	auto file = serialize_entities_to_text(ents);
 
-	auto scene2 = unserialize_entities_from_text(file.text);
+	auto scene2 = unserialize_entities_from_text(file.text, nullptr, nullptr);
 	TEST_TRUE(scene2.get_objects().size() == work.all.size());
 	auto path = build_path_for_object(e, nullptr);
 	TEST_TRUE(scene2.find(path)->cast_to<Entity>());

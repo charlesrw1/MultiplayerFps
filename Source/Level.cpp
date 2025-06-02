@@ -242,7 +242,7 @@ void Level::close_level()
 	all_world_ents.clear_all();
 
 	g_assets.explicit_asset_free(source_asset);
-	g_assets.unreference_this_channel(0);
+	//g_assets.unreference_this_channel(0);
 
 	source_asset = nullptr;
 }
@@ -319,7 +319,7 @@ DeferredSpawnScopePrefab Level::spawn_prefab_deferred(Entity*& out, const Prefab
 		sys_print(Warning, "spawn_prefab_deferred with nullptr\n");
 		return DeferredSpawnScopePrefab(nullptr);
 	}
-	auto unserialized_scene = unserialize_entities_from_text(asset->text, const_cast<PrefabAsset*>(asset)/* fixme */);
+	auto unserialized_scene = unserialize_entities_from_text(asset->text,nullptr, const_cast<PrefabAsset*>(asset)/* fixme */);
 	out = unserialized_scene.get_root_entity();
 	return DeferredSpawnScopePrefab(new UnserializedSceneFile(std::move(unserialized_scene)));
 }
@@ -332,7 +332,7 @@ Entity* Level::spawn_prefab(const PrefabAsset* asset)
 		return nullptr;
 	}
 
-	auto unserialized_scene = unserialize_entities_from_text(asset->text,const_cast<PrefabAsset*>(asset) /* fixme */);
+	auto unserialized_scene = unserialize_entities_from_text(asset->text,nullptr, const_cast<PrefabAsset*>(asset) /* fixme */);
 	unserialized_scene.get_root_entity()->is_root_of_prefab = true;
 	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
 	return unserialized_scene.get_root_entity();

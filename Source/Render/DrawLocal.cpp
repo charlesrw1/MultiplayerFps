@@ -1391,7 +1391,9 @@ void Renderer::render_particles()
 
 		auto& textures = mat->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++) {
-			bind_texture(i, textures[i]->gl_id);
+			auto tex = textures[i];
+			tex = tex ? tex : &white_texture;
+			bind_texture(i, tex->gl_id);
 		}
 
 		glDrawElements(GL_TRIANGLES, p.dd.num_indicies, GL_UNSIGNED_INT, (void*)0);

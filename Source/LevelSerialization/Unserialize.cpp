@@ -12,7 +12,7 @@
 
 class UnserializationWrapper;
 Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, 
-	PrefabAsset* prefab, Entity* starting_root);
+	PrefabAsset* prefab, Entity* starting_root, IAssetLoadingInterface* load);
 
 
 void UnserializedSceneFile::delete_objs()
@@ -111,7 +111,8 @@ void unserialize_one_item_text(
 	const std::string& root_path,
 	PrefabAsset* root_prefab,
 	Entity*& inout_root_entity,
-	bool& found_new_root)
+	bool& found_new_root,
+	IAssetLoadingInterface* load)
 {
 
 	if (!in.check_item_start(tok))
@@ -156,11 +157,12 @@ void unserialize_one_item_text(
 		if (type.rfind(".pfb") == type.size() - 4) {
 			ASSERT(!is_root);	// cant have prefabs as root in prefab... yet :)
 
-			PrefabAsset* asset = g_assets.find_sync<PrefabAsset>(type).get();
+			auto pfb = load->load_asset(&PrefabAsset::StaticType, type);
+			PrefabAsset* asset = pfb->cast_to<PrefabAsset>();
 			if (!asset)
 				throw std::runtime_error("couldnt find scene file: " + type);
 
-			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", asset, inout_root_entity);
+			Entity* this_prefab_root = unserialize_entities_from_text_internal(scene, asset->text, root_path + id + "/", asset, inout_root_entity,load);
 			this_prefab_root->is_root_of_prefab = true;
 			if(parent)
 				this_prefab_root->parent_to(parent);
@@ -207,7 +209,7 @@ void unserialize_one_item_text(
 		ctx.in = &scene;
 		ctx.in_root = &path;
 		ctx.cur_obj = obj;
-		auto res = read_props_to_object(obj, (obj)?&obj->get_type():nullptr, in, {}, &ctx);
+		auto res = read_props_to_object(obj, (obj)?&obj->get_type():nullptr, in, {}, load, &ctx);
 		if (!res.second) {
 			throw std::runtime_error("failed prop parse");
 		}
@@ -218,7 +220,7 @@ void unserialize_one_item_text(
 	}
 }
 
-Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root)
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root, IAssetLoadingInterface* load)
 {
 	DictParser in;
 	in.load_from_memory((char*)text.data(), text.size(), "");
@@ -229,7 +231,7 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 
 	while (in.read_string(tok) && !in.is_eof()) {
 		try {
-			unserialize_one_item_text(tok, in, scene, rootpath, prefab, root_entity, found_new_root);
+			unserialize_one_item_text(tok, in, scene, rootpath, prefab, root_entity, found_new_root,load);
 		}
 		catch (std::exception er) {
 			sys_print(Warning, "caught parsing error on line %d: %s\n", in.get_last_line(), er.what());
@@ -242,10 +244,14 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 }
 
 
-UnserializedSceneFile unserialize_entities_from_text(const std::string& text, PrefabAsset* source_prefab)
+UnserializedSceneFile unserialize_entities_from_text(const std::string& text, IAssetLoadingInterface* load,PrefabAsset* source_prefab)
 {
+	PrimaryAssetLoadingInterface prim = g_assets.get_interface();
+	if (!load)
+		load = &prim;
+		
 	UnserializedSceneFile scene;
-	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab, nullptr);
+	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab, nullptr,load);
 	scene.set_root_entity(root);
 	return std::move(scene);
 }

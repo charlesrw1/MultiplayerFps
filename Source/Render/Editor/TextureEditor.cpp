@@ -30,7 +30,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX)
 	outfile->write(out.get_output().data(), out.get_output().size());
 	outfile->close();
 
-	compile_texture_asset(strip_extension(gamepath) + ".dds");
+	compile_texture_asset(strip_extension(gamepath) + ".dds", AssetDatabase::loader);
 }
 #include "AssetCompile/Someutils.h"
 DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
@@ -70,7 +70,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
 			outfile->write(out.get_output().data(), out.get_output().size());
 			outfile->close();
 
-			compile_texture_asset(strip_extension(gamepath) + ".dds");
+			compile_texture_asset(strip_extension(gamepath) + ".dds",AssetDatabase::loader);
 
 		}
 	}
@@ -83,11 +83,11 @@ DECLARE_ENGINE_CMD(COMPILE_TEX)
 		sys_print(Error, "usage COMPILE_TEX <.dds>");
 		return;
 	}
-	compile_texture_asset(args.at(1));
+	compile_texture_asset(args.at(1), AssetDatabase::loader);
 }
 
 #define WITH_TEXTURE_COMPILE
-bool compile_texture_asset(const std::string& gamepath)
+bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* loading)
 {
 #ifdef WITH_TEXTURE_COMPILE
 	sys_print(Info,"Compiling texture asset %s\n", gamepath.c_str());
@@ -110,7 +110,8 @@ bool compile_texture_asset(const std::string& gamepath)
 
 		DictParser in;
 		in.load_from_file(tisfile.get());
-		tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in);
+
+		tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in,loading);
 		if (!tis) {
 			sys_print(Error, "couldnt parse texture import settings\n");
 			return false;

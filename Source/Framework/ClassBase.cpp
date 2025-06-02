@@ -193,12 +193,12 @@ const ClassTypeInfo* ClassBase::find_class(int32_t id)
 		return list[id];
 	return nullptr;
 }
-
+#include "Assets/AssetDatabase.h"
 ClassBase* ClassBase::create_copy(ClassBase* userptr)
 {
 	ASSERT(get_type().allocate);
 	ClassBase* copied = get_type().allocate();
 	ASSERT(copied);
-	copy_object_properties(this, copied, userptr);
+	copy_object_properties(this, copied, userptr, AssetDatabase::loader);
 	return copied;
 }

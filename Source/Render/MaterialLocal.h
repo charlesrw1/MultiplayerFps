@@ -146,7 +146,7 @@ public:
 	uint32_t material_id = 0;
 	bool is_compilied_shader_valid = false;
 
-	void load_from_file(const std::string& fullpath, IFile* file);
+	void load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading);
 
 	std::string create_glsl_shader(
 		std::string& vs_code,
@@ -189,10 +189,10 @@ public:
 	bool has_called_post_load_already = false;
 
 	void init_from(const MaterialInstance* parent);
-	bool load_from_file(MaterialInstance* self);
+	bool load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading);
 
-	void load_instance(MaterialInstance* self, IFile* file);
-	void load_master(MaterialInstance* self, IFile* file);
+	void load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
+	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
 
 	void post_load(MaterialInstance* self);
 

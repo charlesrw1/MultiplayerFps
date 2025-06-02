@@ -471,7 +471,7 @@ public:
 
 };
 
-inline bool SoundFile::load_asset(ClassBase*&)
+inline bool SoundFile::load_asset(IAssetLoadingInterface*)
 {
     std::string pathfull = FileSys::get_full_path_from_game_path( get_name() );
     Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());

@@ -155,11 +155,11 @@ const MasterMaterialImpl* MaterialInstance::get_master_material() const
 	return impl->masterMaterial;
 }
 
-bool MaterialInstance::load_asset(ClassBase*&)
+bool MaterialInstance::load_asset(IAssetLoadingInterface* loading)
 {
 	if (!impl) {
 		impl = std::make_unique<MaterialImpl>();
-		bool good = impl->load_from_file(this);
+		bool good = impl->load_from_file(this,loading);
 		assert(!good || impl && impl->masterMaterial);
 		
 		if (!good)
@@ -169,19 +169,19 @@ bool MaterialInstance::load_asset(ClassBase*&)
 	else {
 		// impl already exists, we have to sweep references
 		// since we cant be uninstalled, this fakes "loading" the resource again
-		sweep_references();
+		sweep_references(loading);
 	}
 	//assert(impl && impl->masterMaterial);
 	return impl.get();
 }
-void MaterialInstance::sweep_references()const {
+void MaterialInstance::sweep_references(IAssetLoadingInterface* loading)const {
 	if (!impl)
 		return;
-	g_assets.touch_asset(impl->parentMatInstance.get_unsafe());
+	loading->touch_asset(impl->parentMatInstance.get_unsafe());
 	for (int i = 0; i < impl->params.size(); i++) {
 		auto& p = impl->params[i];
 		if (p.type == MatParamType::Texture2D || p.type == MatParamType::ConstTexture2D) {
-			g_assets.touch_asset(p.tex_ptr);
+			loading->touch_asset(p.tex_ptr);
 		}
 	}
 }
@@ -189,7 +189,7 @@ void MaterialInstance::uninstall()
 {
 	// materials cant be uninstalled
 }
-void MaterialInstance::post_load(ClassBase*)
+void MaterialInstance::post_load()
 {
 	if (did_load_fail())
 		return;
@@ -250,11 +250,11 @@ void MaterialImpl::init_from(const MaterialInstance* parent)
 	masterMaterial = parent_master;
 }
 
-void MaterialImpl::load_master(MaterialInstance* self, IFile* file)
+void MaterialImpl::load_master(MaterialInstance* self, IFile* file,IAssetLoadingInterface* loading)
 {
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
-	masterImpl->load_from_file(self->get_name(), file);
+	masterImpl->load_from_file(self->get_name(), file,loading);
 	
 	// init default instance, textures get filled in the dirty list
 	params.resize(masterImpl->param_defs.size());
@@ -281,7 +281,7 @@ MaterialInstance::~MaterialInstance()
 
 }
 
-void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
+void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading)
 {
 	const auto& fullpath = self->get_name();
 
@@ -299,7 +299,8 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
 			throw MasterMaterialExcept("Expceted PARENT ...");
 		}
 		std::string parent_mat = to_std_string_sv(tok);
-		AssetPtr<MaterialInstance> parent = g_assets.find_sync<MaterialInstance>(parent_mat.c_str());
+		auto mat = loading->load_asset(&MaterialInstance::StaticType, parent_mat);
+		AssetPtr<MaterialInstance> parent = mat->cast_to<MaterialInstance>();
 		if (!parent)
 			throw MasterMaterialExcept("Couldnt find parent material" + fullpath);
 
@@ -352,7 +353,9 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
 				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
-					myparam.tex_ptr = g_assets.find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
+					auto tex = loading->load_asset(&Texture::StaticType, to_std_string_sv(tok));
+					myparam.tex_ptr = tex->cast_to<Texture>();
+					assert(myparam.tex_ptr);
 				}break;
 
 				default:
@@ -369,7 +372,7 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file)
 	}
 }
 
-bool  MaterialImpl::load_from_file(MaterialInstance* self)
+bool  MaterialImpl::load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading)
 {
 	this->self = self;
 	const auto& name = self->get_name();
@@ -379,10 +382,10 @@ bool  MaterialImpl::load_from_file(MaterialInstance* self)
 		if (!file)
 			throw MasterMaterialExcept("couldn't mm/mi open file");
 		if (has_extension(name, "mm")) {
-			load_master(self, file.get());
+			load_master(self, file.get(), loading);
 		}
 		else {
-			load_instance(self, file.get());
+			load_instance(self, file.get(), loading);
 		}
 	}
 	catch (MasterMaterialExcept exppt) {
@@ -391,7 +394,7 @@ bool  MaterialImpl::load_from_file(MaterialInstance* self)
 	}
 	return true;
 }
-void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file)
+void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading)
 {
 
 	DictParser in;
@@ -456,7 +459,9 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
-					def.default_value.tex_ptr = g_assets.find_assetptr_unsafe<Texture>(to_std_string_sv(tok));
+					auto tex = loading->load_asset(&Texture::StaticType, to_std_string_sv(tok));
+					def.default_value.tex_ptr = tex->cast_to<Texture>();
+					assert(def.default_value.tex_ptr);
 				}break;
 
 				default:

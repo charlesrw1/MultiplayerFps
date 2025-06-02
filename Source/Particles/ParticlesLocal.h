@@ -294,31 +294,6 @@ public:
 	void free_fx(handle<ParticleEmitter>& handle) {}
 
 
-	ParticleFXAsset* load_particle_fx(const std::string& file) {
-
-
-		std::string path = file;
-
-		auto filePtr = FileSys::open_read_game(path.c_str());
-		if (!filePtr) {
-			sys_print(Error, "couldnt load particle fx file %s\n", file.c_str());
-			return nullptr;
-		}
-
-		DictParser dp;
-		dp.load_from_file(filePtr.get());
-		StringView tok;
-		dp.read_string(tok);
-		auto newAsset = read_object_properties<ParticleFXAsset>(nullptr, dp, tok);
-
-		if (!newAsset) {
-			sys_print(Error, "couldnt load particle fx %s\n", file.c_str());
-			return nullptr;
-		}
-
-
-		return newAsset;
-	}
 public:
 	// local interface (used by local renderer)
 	void prep_particle_buffers();	// upload the data

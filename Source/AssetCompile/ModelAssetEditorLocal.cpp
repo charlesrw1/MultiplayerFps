@@ -78,8 +78,8 @@ void ModelEditorTool::post_map_load_callback()
 			dp.load_from_file(file.get());
 			StringView tok;
 			dp.read_string(tok);
-
-			importSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok);
+			auto itr = g_assets.get_interface();
+			importSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok,&itr);
 		}
 	}
 	if (!importSettings) {

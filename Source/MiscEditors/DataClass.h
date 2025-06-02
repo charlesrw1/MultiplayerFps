@@ -17,12 +17,12 @@ public:
 		delete object;
 		object = nullptr;
 	}
-	void sweep_references() const override;
+	void sweep_references(IAssetLoadingInterface*) const override;
 	void move_construct(IAsset* other) {
 		this->object = other->cast_to<DataClass>()->object;
 	}
-	void post_load(ClassBase*) {}
-	bool load_asset(ClassBase*&);
+	void post_load() {}
+	bool load_asset(IAssetLoadingInterface*);
 private:
 	ClassBase* object = nullptr;
 

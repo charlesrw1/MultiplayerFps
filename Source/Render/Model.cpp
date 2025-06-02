@@ -322,13 +322,13 @@ void Model::uninstall()
 	g_modelMgr.remove_model_from_list(this);
 }
 
-void Model::sweep_references() const {
+void Model::sweep_references(IAssetLoadingInterface* loading) const {
 	for (int i = 0; i < materials.size(); i++) {
 		auto mat = materials[i];
-		g_assets.touch_asset(mat);
+		loading->touch_asset(mat);
 	}
 }
-void Model::post_load(ClassBase* u) {
+void Model::post_load() {
 	if (did_load_fail()) {
 		return;
 	}
@@ -343,7 +343,7 @@ bool Model::check_import_files_for_out_of_data() const
 	ModelDefData defdat;
 	std::string model_def = strip_extension(get_name().c_str());
 	model_def += ".mis";
-	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat, false);
+	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat, false, nullptr);
 }
 #else
 bool Model::check_import_files_for_out_of_data() const {
@@ -353,7 +353,7 @@ bool Model::check_import_files_for_out_of_data() const {
 #endif
 
 // Format definied in ModelCompilier.cpp
-bool Model::load_internal()
+bool Model::load_internal(IAssetLoadingInterface* loading)
 {
 	auto file = FileSys::open_read_game(get_name().c_str());
 	if (!file) {
@@ -403,8 +403,8 @@ bool Model::load_internal()
 		read.read_string(buffer);
 
 		//materials.push_back(imaterials->find_material_instance(buffer.c_str()));
-
-		materials[i] = g_assets.find_assetptr_unsafe<MaterialInstance>(buffer);
+		auto mat = loading->load_asset(&MaterialInstance::StaticType, buffer);
+		materials[i] = mat->cast_to<MaterialInstance>();
 
 		if (!materials[i]->is_valid_to_use()) {
 			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
@@ -507,7 +507,7 @@ bool Model::load_internal()
 				parser.load_from_memory((char*)buffer.c_str(), buffer.size(), "abc");
 				parser.read_string(tok);
 				AnimationEvent* event = read_object_properties<AnimationEvent>(
-					nullptr, parser, tok
+					nullptr, parser, tok,loading
 					);
 				if (!event) {
 					sys_print(Warning, "couldn't load animation event '%s'\n", buffer.c_str());
@@ -549,7 +549,7 @@ bool Model::load_internal()
 	return true;
 }
 
-bool Model::load_asset(ClassBase*& u) {
+bool Model::load_asset(IAssetLoadingInterface* loading) {
 	const auto& path = get_name();
 
 #ifdef EDITOR_BUILD
@@ -557,14 +557,14 @@ bool Model::load_asset(ClassBase*& u) {
 		std::string model_def = strip_extension(path.c_str());
 		model_def += ".mis";
 
-		bool good = ModelCompilier::compile(model_def.c_str());
+		bool good = ModelCompilier::compile(model_def.c_str(),loading);
 		if (!good) {
 			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
 		}
 	}
 #endif
 
-	bool good = load_internal();
+	bool good = load_internal(loading);
 
 	if (good)
 		return true;
@@ -805,7 +805,7 @@ DECLARE_ENGINE_CMD(IMPORT_MODEL)
 	outfile->write(dw.get_output().data(), dw.get_output().size());
 	outfile->close();
 
-	ModelCompilier::compile(savepath.c_str());
+	ModelCompilier::compile(savepath.c_str(),AssetDatabase::loader);
 }
 #endif
 

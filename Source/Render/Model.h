@@ -112,14 +112,15 @@ struct MeshLod
 
 class MSkeleton;
 class PhysicsBodyDefinition;
+class IAssetLoadingInterface;
 CLASS_H(Model,IAsset)
 public:
 	~Model() override;
 
 	void uninstall() override;
-	void sweep_references() const override;
-	void post_load(ClassBase* u) override;
-	bool load_asset(ClassBase*& u) override;
+	void sweep_references(IAssetLoadingInterface* loading) const override;
+	void post_load() override;
+	bool load_asset(IAssetLoadingInterface* loading) override;
 	void move_construct(IAsset* src) override;
 	bool check_import_files_for_out_of_data() const override;
 
@@ -160,7 +161,7 @@ public:
 		return &data;
 	}
 private:
-	bool load_internal();
+	bool load_internal(IAssetLoadingInterface* loading);
 
 	uint32_t uid = 0;
 	InlineVec<MeshLod, 2> lods;

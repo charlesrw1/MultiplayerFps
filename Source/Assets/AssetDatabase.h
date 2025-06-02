@@ -6,6 +6,14 @@
 #include "Game/SerializePtrHelpers.h"
 
 struct PendingLoadJob;
+using std::string;
+
+class IAssetLoadingInterface
+{
+public:
+	virtual IAsset* load_asset(const ClassTypeInfo* type, string path) = 0;
+	virtual void touch_asset(const IAsset* asset) = 0;
+};
 
 // ASSET EROR HANDLING:
 // -when you request a resource pointer from a path, it wall always return something (with the IAsset* having its path set to the requested path)
@@ -25,10 +33,24 @@ struct PendingLoadJob;
 //	till the async call on the loader thread finishes (it will also flush the finished queue, calling everything that hasn't post_loaded()'d yet)
 // -sync loading assets on async threads DOES WORK! it takes a different path, it will return a loaded asset that hasnt had post_load called
 
+
 class AssetDatabaseImpl;
+class PrimaryAssetLoadingInterface : public IAssetLoadingInterface
+{
+public:
+	PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend);
+	IAsset* load_asset(const ClassTypeInfo* type, string path) override;
+	void touch_asset(const IAsset* asset) override;
+private:
+	AssetDatabaseImpl& impl;
+};
+
 class AssetDatabase
 {
 public:
+	static IAssetLoadingInterface* loader;
+
+	PrimaryAssetLoadingInterface get_interface();
 
 	void init();
 
@@ -38,8 +60,6 @@ public:
 	// wait for everything to finish, then tick_async
 	void finish_all_jobs();
 
-	// unsets any bits of assets referenced by this channel
-	void unreference_this_channel(uint32_t lifetime_channel);	// unrefernce a 0-30 channel (31th channel is reserved and will print an error)
 	// triggers uninstall's of assets that arent referenced anymore
 	// call after unreference_this_channel() (or at any time, this causes a sweep over assets to check if they should be removed)
 	void remove_unreferences();
@@ -54,15 +74,15 @@ public:
 	// The asset is ready to use by the time this function returns, but isn't guaranteed to have post_load called
 	template<typename T>
 	AssetPtr<T> find_global_sync(const std::string& path) {
-		auto res = find_sync(path, &T::StaticType, IAsset::GLOBAL_REFERENCE_CHANNEL);
+		auto res = find_sync(path, &T::StaticType, true);
 		return res ? res->cast_to<T>() : nullptr;
 	}
 	template<typename T>
-	AssetPtr<T> find_sync(const std::string& path, int lifetime_channel = 0) {
-		auto res = find_sync(path, &T::StaticType, lifetime_channel);
+	AssetPtr<T> find_sync(const std::string& path, bool system_asset=false) {
+		auto res = find_sync(path, &T::StaticType, system_asset);
 		return res ? res->cast_to<T>() : nullptr;
 	}
-	GenericAssetPtr find_sync(const std::string& path, const ClassTypeInfo* classType, int lifetime_channel);
+	GenericAssetPtr find_sync(const std::string& path, const ClassTypeInfo* classType, bool system_asset = false);
 
 
 	// (public) ASYNC asset loading
@@ -71,30 +91,16 @@ public:
 	template<typename T>
 	void find_global_async(const std::string& path, std::function<void(GenericAssetPtr)> callback) {
 		static_assert(std::is_base_of<IAsset, T>::value, "find_global_async type must derive from IAsset");
-		find_async(path, &T::StaticType, std::move(callback), IAsset::GLOBAL_REFERENCE_CHANNEL);
+		find_async(path, &T::StaticType, std::move(callback), true);
 	}
 	template<typename T>
-	void find_async(const std::string& path, std::function<void(GenericAssetPtr)> callback, int lifetime_channel = 0) {
+	void find_async(const std::string& path, std::function<void(GenericAssetPtr)> callback, bool is_system=false) {
 		static_assert(std::is_base_of<IAsset, T>::value, "find_async type must derive from IAsset");
-		find_async(path, &T::StaticType, std::move(callback), lifetime_channel);
+		find_async(path, &T::StaticType, std::move(callback), is_system);
 	}
-	void find_async(const std::string& path, const ClassTypeInfo* classType, std::function<void(GenericAssetPtr)> callback, int lifetime_channel);
+	void find_async(const std::string& path, const ClassTypeInfo* classType, std::function<void(GenericAssetPtr)> callback, bool is_system = false);
 
-	// (private) ASYNC/SYNC asset loading
-	// Use inside loader functions, a load job must be active! (ie this must be under a call to find_sync or find_async)
-	// This call results in either the asset being loaded sync or async depending on the parent call
-	// Use when the loaded asset doesnt immediately depend on the asset to load itself
-	IAsset* find_assetptr_unsafe(const std::string& path, const ClassTypeInfo* ti);
 
-	template<typename T>
-	T* find_assetptr_unsafe(const std::string& path) {
-		auto ptr = find_assetptr_unsafe(path, &T::StaticType);
-		return ptr ? ptr->cast_to<T>() : nullptr;
-	}
-
-	// This functions similarly to find_assetptr_unsafe except that it explicitly only works on assets that have already been loaded
-	// Thus this is safe to call on an asset that has outstanding references and its data cant be trampled on async
-	void touch_asset(const IAsset* asset);
 
 	// (public) reload an already loaded asset either sync or async
 	// doesnt reload any sub-assets
@@ -131,7 +137,7 @@ extern AssetDatabase g_assets;
 // sync load to the default channel (usually 0)
 template<typename T>
 T* default_asset_load(const std::string& path) {
-	auto res = g_assets.find_sync<T>(path, 0);
+	auto res = g_assets.find_sync<T>(path);
 	return res.get();
 }
 template<typename T>

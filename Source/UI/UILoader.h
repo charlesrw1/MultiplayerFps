@@ -18,7 +18,7 @@ struct GuiFontGlyph
 	int16_t yofs{};
 	int16_t advance{};
 };
-
+class IAssetLoadingInterface;
 CLASS_H(GuiFont, IAsset)
 public:
 	int ptSz = 20;
@@ -33,13 +33,13 @@ public:
 	void uninstall() override {
 		character_to_glyph.clear();
 	}
-	bool load_asset(ClassBase*& user);
-	void post_load(ClassBase*);
+	bool load_asset(IAssetLoadingInterface*);
+	void post_load();
 	void move_construct(IAsset* _other) {
 		GuiFont* other = (GuiFont*)_other;
 		*this = std::move(*other);
 	}
-	void sweep_references() const override;
+	void sweep_references(IAssetLoadingInterface*) const override;
 };
 class GuiFontLoader
 {

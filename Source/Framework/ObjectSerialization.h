@@ -7,7 +7,7 @@
 #include <string>
 #include <cassert>
 
-inline void copy_object_properties( ClassBase* from, ClassBase* to, ClassBase* userptr)
+inline void copy_object_properties( ClassBase* from, ClassBase* to, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	assert(from->get_type() == to->get_type());
 
@@ -18,7 +18,7 @@ inline void copy_object_properties( ClassBase* from, ClassBase* to, ClassBase* u
 			props.push_back(typeinfo->props);
 		typeinfo = typeinfo->super_typeinfo;
 	}
-	copy_properties(props, from, to, userptr);
+	copy_properties(props, from, to, userptr,load);
 }
 
 inline void write_object_properties(
@@ -59,7 +59,7 @@ template<typename BASE>
 inline BASE* read_object_properties(
 	ClassBase* userptr,
 	DictParser& in,
-	StringView tok
+	StringView tok, IAssetLoadingInterface* load
 )
 {
 	if (!in.check_item_start(tok))
@@ -80,7 +80,7 @@ inline BASE* read_object_properties(
 		typeinfo = typeinfo->super_typeinfo;
 	}
 
-	auto ret = read_multi_properties(props, in, {}, userptr);
+	auto ret = read_multi_properties(props, in, {}, userptr,load);
 	tok = ret.first;
 
 	if (!ret.second || !in.check_item_end(tok)) {
@@ -93,9 +93,10 @@ inline BASE* read_object_properties(
 template<typename BASE>
 inline BASE* read_object_properties_no_input_tok(
 	ClassBase* userptr,
-	DictParser& in)
+	DictParser& in,
+	IAssetLoadingInterface* load)
 {
 	StringView tok;
 	in.read_string(tok);
-	return read_object_properties<BASE>(userptr, in, tok);
+	return read_object_properties<BASE>(userptr, in, tok,load);
 }

@@ -872,7 +872,7 @@ public:
         std::string outs = string_format("\"%i %f %f %f %f %f %f\"", point->type, point->time, point->value, point->tangent0.x, point->tangent0.y, point->tangent1.x, point->tangent1.y);
         return outs;
     }
-    virtual void unserialize(DictParser& in, const PropertyInfo& info,  void* inst, StringView token, ClassBase* user) override {
+    virtual void unserialize(DictParser& in, const PropertyInfo& info,  void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override {
         std::string str = std::string(token.str_start, token.str_len);
         CurvePoint* point = (CurvePoint*)inst;
         int param = 0;

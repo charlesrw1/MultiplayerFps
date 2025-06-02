@@ -29,7 +29,7 @@ public:
 		}
 	}
 
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) override
 	{
 		IAsset** ptr_prop = (IAsset**)info.get_ptr(inst);
 		
@@ -44,7 +44,7 @@ public:
 
 			auto typeInfo = ClassBase::find_class(info.range_hint);
 			if (typeInfo)
-				*ptr_prop = g_assets.find_assetptr_unsafe(to_str, typeInfo);
+				*ptr_prop = load->load_asset(typeInfo, to_str);// g_assets.find_assetptr_unsafe(to_str, typeInfo);
 			else {
 				sys_print(Error, "no asset loader defined for asset type %s\n", info.range_hint);
 				*ptr_prop = nullptr;
@@ -61,7 +61,7 @@ public:
 		SoftAssetPtr<IAsset>* ptr = (SoftAssetPtr<IAsset>*)info.get_ptr(inst);
 		return ptr->path;
 	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) override
 	{
 		SoftAssetPtr<IAsset>* ptr = (SoftAssetPtr<IAsset>*)info.get_ptr(inst);
 		ptr->path = std::string(token.str_start, token.str_len);
@@ -92,7 +92,7 @@ class SerializeEntityPtr : public IPropertySerializer
 		return serialize_build_relative_path(from.c_str(),to.c_str());
 	}
 
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user) override
+	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) override
 	{
 		ASSERT(user->is_a<LevelSerializationContext>());
 		auto ctx = (LevelSerializationContext*)user;

@@ -36,7 +36,7 @@ public:
 REGISTER_ASSETMETADATA_MACRO(ScriptAssetMetaData);
 #endif
 
-bool Script::load_asset(ClassBase*&)
+bool Script::load_asset(IAssetLoadingInterface*)
 {
 	const auto& path = get_name();
 	auto file = FileSys::open_read_game(path);

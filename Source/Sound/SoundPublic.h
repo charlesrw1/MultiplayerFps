@@ -10,7 +10,7 @@ NEWENUM(SndAtn , uint8_t)
     Cubic,    // (1-x)^3
     InvCubic, // (1-x)^(1/3)
 };
-
+class IAssetLoadingInterface;
 struct Mix_Chunk;
 CLASS_H(SoundFile, IAsset)
 public:
@@ -18,14 +18,14 @@ private:
     Mix_Chunk* internal_data = nullptr;
     float duration = 0.0;
 
-    void post_load(ClassBase*) {}
-    bool load_asset(ClassBase*&);
+    void post_load() {}
+    bool load_asset(IAssetLoadingInterface*);
     
     void uninstall();
     void move_construct(IAsset* o) {
         *this = std::move(*(SoundFile*)o);
     }
-    void sweep_references() const {}
+    void sweep_references(IAssetLoadingInterface*) const {}
 
     friend class SoundSystemLocal;
 };
