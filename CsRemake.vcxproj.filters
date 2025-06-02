@@ -523,6 +523,7 @@
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
+    <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

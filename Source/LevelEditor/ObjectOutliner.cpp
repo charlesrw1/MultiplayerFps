@@ -60,7 +60,7 @@ ObjectOutliner::Node::Node(ObjectOutliner* oo, Entity* initfrom, const std::vect
 }
 
 
-ObjectOutliner::ObjectOutliner()
+ObjectOutliner::ObjectOutliner(EditorDoc& ed_doc) : ed_doc(ed_doc)
 {
 	ed_doc.on_close.add(this, &ObjectOutliner::on_close);
 	ed_doc.on_start.add(this, &ObjectOutliner::on_start);
@@ -107,8 +107,8 @@ bool ObjectOutliner::IteratorDraw::step()
 	return true;
 }
 
-static void save_off_branch_as_scene(Entity* e);
-void ObjectOutliner::IteratorDraw::draw()
+static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e);
+void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 {
 
 	ImGui::TableNextRow();
@@ -159,7 +159,7 @@ void ObjectOutliner::IteratorDraw::draw()
 						if (ptr.get() == me) continue;
 						ptrs.push_back(ptr.get());
 					}
-					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, me, create_new_parent, false));
+					ed_doc.command_mgr->add_command(new ParentToCommand(ed_doc, ptrs, me, create_new_parent, false));
 
 					oo->contextMenuHandle = EntityPtr(nullptr);
 				};
@@ -172,7 +172,7 @@ void ObjectOutliner::IteratorDraw::draw()
 						ptrs.push_back(ptr.get());
 					}
 
-					ed_doc.command_mgr->add_command(new ParentToCommand(ptrs, nullptr, false, delete_parent));
+					ed_doc.command_mgr->add_command(new ParentToCommand(ed_doc, ptrs, nullptr, false, delete_parent));
 
 					oo->contextMenuHandle = EntityPtr(nullptr);
 				};
@@ -193,12 +193,12 @@ void ObjectOutliner::IteratorDraw::draw()
 
 				ImGui::Separator();
 				if (ImGui::MenuItem("Add sibling entity")) {
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", context_menu_entity->get_ws_transform(), EntityPtr(context_menu_entity->get_parent()), false));
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand(ed_doc, "Entity", context_menu_entity->get_ws_transform(), EntityPtr(context_menu_entity->get_parent()), false));
 					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::MenuItem("Add child entity")) {
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand("Entity", glm::mat4(1), context_menu_entity->get_self_ptr(), false));
+					ed_doc.command_mgr->add_command(new CreateCppClassCommand(ed_doc, "Entity", glm::mat4(1), context_menu_entity->get_self_ptr(), false));
 					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();
 				}
@@ -226,7 +226,7 @@ void ObjectOutliner::IteratorDraw::draw()
 					}
 
 					if (make_cmd) {
-						ed_doc.command_mgr->add_command(new MovePositionInHierarchy(context_menu_entity, c));
+						ed_doc.command_mgr->add_command(new MovePositionInHierarchy(ed_doc, context_menu_entity, c));
 						ImGui::CloseCurrentPopup();
 					}
 				}
@@ -235,18 +235,18 @@ void ObjectOutliner::IteratorDraw::draw()
 
 				const bool instantiate_prefab_enabled = context_menu_entity && context_menu_entity->what_prefab && context_menu_entity->is_root_of_prefab;
 				if (ImGui::MenuItem("Instantiate prefab", nullptr, nullptr, instantiate_prefab_enabled)) {
-					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(context_menu_entity));
+					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(ed_doc, context_menu_entity));
 					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();
 				}
 
 				const bool branch_as_prefab_enabled = ed_doc.selection_state->num_entities_selected() == 1;
 				if (ImGui::MenuItem("Save branch as prefab", nullptr, nullptr, branch_as_prefab_enabled)) {
-					save_off_branch_as_scene(context_menu_entity);
+					save_off_branch_as_scene(ed_doc, context_menu_entity);
 					ImGui::CloseCurrentPopup();
 				}
 
-				auto is_prefab_instance_root = [](const Entity* e) -> bool {
+				auto is_prefab_instance_root = [&ed_doc](const Entity* e) -> bool {
 					return e && e->is_root_of_prefab && e->what_prefab && e->what_prefab != ed_doc.get_editing_prefab();
 				};
 
@@ -255,13 +255,13 @@ void ObjectOutliner::IteratorDraw::draw()
 					if (context_menu_entity->get_prefab_editable()) {
 						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
 						if (ImGui::MenuItem("Make Prefab Not Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(context_menu_entity, false));
+							ed_doc.command_mgr->add_command(new MakePrefabEditable(ed_doc, context_menu_entity, false));
 						}
 					}
 					else {
 						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 10,110,255,255 }));
 						if (ImGui::MenuItem("Make Prefab Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(context_menu_entity, true));
+							ed_doc.command_mgr->add_command(new MakePrefabEditable(ed_doc, context_menu_entity, true));
 						}
 					}
 					ImGui::PopStyleColor(1);
@@ -276,12 +276,12 @@ void ObjectOutliner::IteratorDraw::draw()
 					if (!children.empty())
 						remove_parent_of_selection(true);
 					else
-						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ n->ptr }));
+						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand(ed_doc, { n->ptr }));
 
 					ImGui::CloseCurrentPopup();
 				}
 				if (ImGui::MenuItem("Delete")) {
-					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand({ n->ptr }));
+					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand(ed_doc, { n->ptr }));
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::PopStyleColor(1);
@@ -295,7 +295,7 @@ void ObjectOutliner::IteratorDraw::draw()
 	ImGui::SameLine();
 
 	if (!node_entity) {
-		ImGui::Text(ed_doc.get_name().c_str());
+		ImGui::Text("%s",ed_doc.get_name().c_str());
 	}
 	else {
 		const Entity* const e = node_entity;
@@ -427,7 +427,7 @@ void ObjectOutliner::draw()
 				cur_n++;
 			}
 			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-				iter.draw();
+				iter.draw(ed_doc);
 				iter.step();
 
 				// dont set the scroll to an item already in view
@@ -451,9 +451,9 @@ void ObjectOutliner::draw()
 }
 
 
-static void save_off_branch_as_scene(Entity* e)
+static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 {
-	auto serialize_branch = [](Entity* e) -> auto {
+	auto serialize_branch = [&ed_doc](Entity* e) -> auto {
 		PrefabAsset dummy;
 		std::vector<Entity*> ents;
 		ents.push_back(e);

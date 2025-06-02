@@ -1,6 +1,6 @@
 #include "Commands.h"
 
-void validate_remove_entities(std::vector<EntityPtr>& input)
+void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 {
 	bool had_errors = false;
 	for (int i = 0; i < input.size(); i++)
@@ -36,8 +36,8 @@ void validate_remove_entities(std::vector<EntityPtr>& input)
 	}
 }
 
-RemoveEntitiesCommand::RemoveEntitiesCommand(std::vector<EntityPtr> handles) {
-	validate_remove_entities(handles);
+RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles):ed_doc(ed_doc) {
+	validate_remove_entities(ed_doc, handles);
 	for (auto e : handles) {
 		is_valid_flag &= ed_doc.can_delete_this_object(e.get());
 	}
@@ -47,7 +47,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(std::vector<EntityPtr> handles) {
 		return;
 
 
-	scene = CommandSerializeUtil::serialize_entities_text(handles);
+	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
 
 	this->handles = handles;
 }
@@ -92,7 +92,9 @@ void RemoveEntitiesCommand::undo() {
 	ed_doc.post_node_changes.invoke();
 }
 
-ParentToCommand::ParentToCommand(std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent) {
+ParentToCommand::ParentToCommand(EditorDoc& ed_doc, std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent) 
+	: ed_doc(ed_doc)
+{
 
 	if (delete_parent && ents.size() != 1) {
 		is_valid_flag = false;
@@ -200,7 +202,7 @@ void ParentToCommand::execute() {
 	if (delete_the_parent) {
 		ASSERT(this->prev_parents[0].get());
 		if (!remove_the_parent_cmd)	// do this here because we want to serialize the parent when the child entities are removed
-			remove_the_parent_cmd = std::make_unique<RemoveEntitiesCommand>(std::vector<EntityPtr>{ this->prev_parents[0]->get_self_ptr() });
+			remove_the_parent_cmd = std::make_unique<RemoveEntitiesCommand>(ed_doc, std::vector<EntityPtr>{ this->prev_parents[0]->get_self_ptr() });
 		//ASSERT(remove_the_parent_cmd->handles.size() == 1);
 		if (!remove_the_parent_cmd->is_valid())
 			throw std::runtime_error("RemoveEntitiesCommand not valid in ParentToCommand");
@@ -257,7 +259,9 @@ void ParentToCommand::undo() {
 	ed_doc.post_node_changes.invoke();
 }
 
-CreatePrefabCommand::CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent) {
+CreatePrefabCommand::CreatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent)
+	: ed_doc(ed_doc)
+{
 	this->prefab_name = prefab_name;
 	this->transform = transform;
 	this->parent_to = parent;
@@ -288,7 +292,9 @@ void CreatePrefabCommand::execute() {
 	}
 }
 
-CreateStaticMeshCommand::CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr parent) {
+CreateStaticMeshCommand::CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname, const glm::mat4& transform, EntityPtr parent) 
+	: ed_doc(ed_doc)
+{
 
 	this->transform = transform;
 	this->modelname = modelname;
@@ -339,7 +345,9 @@ void CreateStaticMeshCommand::execute() {
 	});
 }
 
-CreateCppClassCommand::CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component) {
+CreateCppClassCommand::CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component) 
+	: ed_doc(ed_doc)
+{
 	auto find = cppclassname.rfind('/');
 	auto types = cppclassname.substr(find == std::string::npos ? 0 : find + 1);
 	ti = ClassBase::find_class(types.c_str());
@@ -382,7 +390,9 @@ void CreateCppClassCommand::undo() {
 	handle = {};
 }
 
-TransformCommand::TransformCommand(const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms) {
+TransformCommand::TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms) 
+	:ed_doc(ed_doc)
+{
 	for (auto& pair : selection) {
 		auto find = pre_transforms.find(pair);
 		if (find != pre_transforms.end()) {
@@ -414,7 +424,9 @@ void TransformCommand::execute() {
 	ed_doc.selection_state->on_selection_changed.invoke();//hack
 }
 
-InstantiatePrefabCommand::InstantiatePrefabCommand(Entity* e) {
+InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e) 
+	:ed_doc(ed_doc)
+{
 	if (ed_doc.is_editing_prefab() && ed_doc.get_prefab_root_entity() == e)
 		return;	// is_valid == false
 
@@ -492,7 +504,9 @@ void InstantiatePrefabCommand::undo() {
 	ed_doc.post_node_changes.invoke();
 }
 
-DuplicateEntitiesCommand::DuplicateEntitiesCommand(std::vector<EntityPtr> handles) {
+DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles) 
+	:ed_doc(ed_doc)
+{
 
 	if (handles.empty())
 		is_valid_flag = false;
@@ -511,7 +525,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(std::vector<EntityPtr> handle
 
 	// todo: validation
 
-	scene = CommandSerializeUtil::serialize_entities_text(handles);
+	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
 }
 
 void DuplicateEntitiesCommand::execute() {
@@ -559,7 +573,9 @@ void DuplicateEntitiesCommand::execute() {
 	ed_doc.post_node_changes.invoke();
 }
 
-MovePositionInHierarchy::MovePositionInHierarchy(Entity* e, Cmd cmd) {
+MovePositionInHierarchy::MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, Cmd cmd) 
+	:ed_doc(ed_doc)
+{
 	if (!e) return;
 	const auto parent = e->get_parent();
 	if (!parent) return;
@@ -587,7 +603,7 @@ MovePositionInHierarchy::MovePositionInHierarchy(Entity* e, Cmd cmd) {
 	entPtr = e->get_self_ptr();
 }
 
-std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_text(std::vector<EntityPtr> handles) {
+std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_text(EditorDoc& ed_doc, std::vector<EntityPtr> handles) {
 	std::vector<Entity*> ents;
 	for (auto h : handles) {
 		ents.push_back(h.get());

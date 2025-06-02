@@ -61,6 +61,7 @@ extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAss
 
 CLASS_H(EditorUILayout, guiFullscreen)
 public:
+	
 	EditorUILayout() {
 		recieve_mouse = guiMouseFilter::Block;
 		eat_scroll_event = true;
@@ -363,7 +364,7 @@ bool EditorDoc::save_document_internal()
 
 	auto& all_objs = eng->get_level()->get_all_objects();
 
-	ed_doc.validate_fileids_before_serialize();
+	validate_fileids_before_serialize();
 
 	std::vector<Entity*> all_ents;
 	for (auto o : all_objs)
@@ -616,31 +617,7 @@ DECLARE_ENGINE_CMD(ManipulateScaleCommand)
 
 }
 
-DECLARE_ENGINE_CMD_CAT("ed.", HideSelected)
-{
-	eng->log_to_fullscreen_gui(Info, "Hide selected");
-	auto& selection = ed_doc.selection_state->get_selection();
-	for (auto s : selection) {
-		EntityPtr handle(s);
-		if (handle) {
-			handle->set_hidden_in_editor(true);
-		}
-	}
-}
-DECLARE_ENGINE_CMD_CAT("ed.", UnHideAll)
-{
-	eng->log_to_fullscreen_gui(Info, "Unhide all");
-	auto level = eng->get_level();
-	if (level) {
-		for (auto e : level->get_all_objects()) {
-			if (e->is_a<Entity>()) {
-				auto ent = e->cast_to<Entity>();
-				if (ent->get_hidden_in_editor())
-					ent->set_hidden_in_editor(false);
-			}
-		}
-	}
-}
+
 
 ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
 
@@ -810,7 +787,7 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();
 			if (!selected_handles.empty()) {
-				RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(selected_handles);
+				RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(*this, selected_handles);
 				command_mgr->add_command(cmd);
 			}
 		}
@@ -818,7 +795,7 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 	else if (scancode == SDL_SCANCODE_D && has_shift) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();;
-			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(selected_handles);
+			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(*this, selected_handles);
 			command_mgr->add_command(cmd);
 		}
 	}
@@ -1041,7 +1018,7 @@ static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::q
 }
 
 
-ManipulateTransformTool::ManipulateTransformTool()
+ManipulateTransformTool::ManipulateTransformTool(EditorDoc& ed) : ed_doc(ed)
 {
 	ed_doc.post_node_changes.add(this, &ManipulateTransformTool::on_entity_changes);
 	ed_doc.selection_state->on_selection_changed.add(this,
@@ -1183,7 +1160,7 @@ void ManipulateTransformTool::end_drag() {
 	ASSERT(state == MANIPULATING_OBJS);
 	if (has_any_changed) {
 		auto& arr = ed_doc.selection_state->get_selection();
-		ed_doc.command_mgr->add_command(new TransformCommand(arr, world_space_of_selected));
+		ed_doc.command_mgr->add_command(new TransformCommand(ed_doc, arr, world_space_of_selected));
 		has_any_changed = false;
 	}
 	update_pivot_and_cached();
@@ -1428,13 +1405,13 @@ void EditorDoc::hook_scene_viewport_draw()
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 
 			if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
-				command_mgr->add_command(new CreateCppClassCommand(
+				command_mgr->add_command(new CreateCppClassCommand( *this,
 					resource->filename, 
 					drop_transform,EntityPtr(),false)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
-				command_mgr->add_command(new CreateStaticMeshCommand(
+				command_mgr->add_command(new CreateStaticMeshCommand( *this,
 					resource->filename, 
 					drop_transform)
 				);
@@ -1449,14 +1426,14 @@ void EditorDoc::hook_scene_viewport_draw()
 							parent_to = selection_state->get_only_one_selected();
 					}
 				}
-				command_mgr->add_command(new CreateCppClassCommand(
+				command_mgr->add_command(new CreateCppClassCommand( *this,
 					resource->filename,
 					drop_transform,
 					parent_to, true)
 				);
 			}
 			else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
-				command_mgr->add_command(new CreatePrefabCommand(
+				command_mgr->add_command(new CreatePrefabCommand( *this,
 					resource->filename,
 					drop_transform
 				));
@@ -1537,7 +1514,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 
 					auto ec_ = eng->get_object(component_context_menu)->cast_to<Component>();
 					if (ed_doc.is_this_object_not_inherited(ec_)) {
-						ed_doc.command_mgr->add_command(new RemoveComponentCommand(ec_->get_owner(), ec_));
+						ed_doc.command_mgr->add_command(new RemoveComponentCommand(ed_doc, ec_->get_owner(), ec_));
 					}
 					else
 						eng->log_to_fullscreen_gui(Error, "Cant remove inherited components");
@@ -1643,7 +1620,7 @@ void EdPropertyGrid::draw()
 					}
 					if (ImGui::Selectable(iter.get_type()->classname)) {
 
-						ed_doc.command_mgr->add_command(new CreateComponentCommand(
+						ed_doc.command_mgr->add_command(new CreateComponentCommand( ed_doc,
 							ent, iter.get_type()
 						));
 
@@ -1706,17 +1683,17 @@ void EdPropertyGrid::draw()
 										auto comp_type = ClassBase::find_class(resource->filename.c_str());
 										if (comp_type && comp_type->is_a(Component::StaticType)) {
 											ed_doc.command_mgr->add_command(
-												new CreateComponentCommand(ent, comp_type)
+												new CreateComponentCommand(ed_doc, ent, comp_type)
 											);
 										}
 									}
 									else if (type == script_metadata) {
 										ed_doc.command_mgr->add_command(
-											new CreateScriptComponentCommand(ent, g_assets.find_sync<Script>(resource->filename).get()));
+											new CreateScriptComponentCommand(ed_doc, ent, g_assets.find_sync<Script>(resource->filename).get()));
 									}
 									else if (type == mesh_metadata) {
 										ed_doc.command_mgr->add_command(
-											new CreateMeshComponentCommand(ent, g_assets.find_sync<Model>(resource->filename).get()));
+											new CreateMeshComponentCommand(ed_doc, ent, g_assets.find_sync<Model>(resource->filename).get()));
 									}
 								}
 							}
@@ -1738,7 +1715,7 @@ void EdPropertyGrid::draw()
 
 
 
-EdPropertyGrid::EdPropertyGrid(const FnFactory<IPropertyEditor>& factory) : factory(factory), grid(factory)
+EdPropertyGrid::EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEditor>& factory) : ed_doc(ed_doc), factory(factory), grid(factory)
 {
 	auto& ss = ed_doc.selection_state;
 	ss->on_selection_changed.add(this, &EdPropertyGrid::refresh_grid);
@@ -1797,27 +1774,13 @@ void EdPropertyGrid::refresh_grid()
 }
 
 
-SelectionState::SelectionState()
+SelectionState::SelectionState(EditorDoc& ed_doc)
 {
 	ed_doc.post_node_changes.add(this, &SelectionState::on_node_deleted);
 	ed_doc.on_close.add(this, &SelectionState::on_close);
 }
 
-DECLARE_ENGINE_CMD(SET_ORBIT_TARGET)
-{
-	if (ed_doc.selection_state->has_only_one_selected()) {
-		auto ptr = ed_doc.selection_state->get_only_one_selected();
-		if (ptr) {
-			float radius = 1.f;
-			auto mesh = ptr->get_component<MeshComponent>();
-			if (mesh && mesh->get_model()) {
-				radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
-			}
-			auto pos = ptr->get_ws_position();
-			ed_doc.camera.set_orbit_target(pos, radius);
-		}
-	}
-}
+
 
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {
@@ -1850,13 +1813,53 @@ EditorDoc::EditorDoc() {
 		set_has_editor_changes();
 		});
 
-	selection_state = std::make_unique<SelectionState>();
-	prop_editor = std::make_unique<EdPropertyGrid>(grid_factory);
-	manipulate = std::make_unique<ManipulateTransformTool>();
-	outliner = std::make_unique<ObjectOutliner>();
+	selection_state = std::make_unique<SelectionState>(*this);
+	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
+	manipulate = std::make_unique<ManipulateTransformTool>(*this);
+	outliner = std::make_unique<ObjectOutliner>(*this);
 
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
+
+	cmds = ConsoleCmdGroup::create("");
+	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
+		// body
+		if (selection_state->has_only_one_selected()) {
+			auto ptr = selection_state->get_only_one_selected();
+			if (ptr) {
+				float radius = 1.f;
+				auto mesh = ptr->get_component<MeshComponent>();
+				if (mesh && mesh->get_model()) {
+					radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
+				}
+				auto pos = ptr->get_ws_position();
+				camera.set_orbit_target(pos, radius);
+			}
+		}
+		});
+	cmds->add("ed.HideSelected", [this](const Cmd_Args&) {
+		eng->log_to_fullscreen_gui(Info, "Hide selected");
+		auto& selection = selection_state->get_selection();
+		for (auto s : selection) {
+			EntityPtr handle(s);
+			if (handle) {
+				handle->set_hidden_in_editor(true);
+			}
+		}
+		});
+	cmds->add("ed.UnHideAll", [this](const Cmd_Args&) {
+		eng->log_to_fullscreen_gui(Info, "Unhide all");
+		auto level = eng->get_level();
+		if (level) {
+			for (auto e : level->get_all_objects()) {
+				if (e->is_a<Entity>()) {
+					auto ent = e->cast_to<Entity>();
+					if (ent->get_hidden_in_editor())
+						ent->set_hidden_in_editor(false);
+				}
+			}
+		}
+		});
 }
 
 extern void export_scene_model();

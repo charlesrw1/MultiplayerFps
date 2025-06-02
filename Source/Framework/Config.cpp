@@ -3,11 +3,14 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "imgui.h"
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
 #include "Framework/DictParser.h"
+
+#include "ConsoleCmdGroup.h"
 
 class ConfigVarDataInternal : public ConfigVarDataPublic
 {
@@ -360,17 +363,23 @@ public:
 			ec(args);
 		}
 		else {
-			ConfigVar* var = VarMan::get()->find(args.at(0));
-			if (var && args.size() == 1) {
-				sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
+			auto group_cmd = find_cmd_in_groups(args.at(0));
+			if (group_cmd) {
+				(*group_cmd)(args);
 			}
+			else {
+				ConfigVar* var = VarMan::get()->find(args.at(0));
+				if (var && args.size() == 1) {
+					sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
+				}
 
-			else if (!var && set_unknown_variables && args.size() == 2)
-				VarMan::get()->set_var_string(args.at(0), args.at(1));
-			else if (var && args.size() == 2)
-				var->set_string(args.at(1));
-			else
-				sys_print(Error, "unknown command: %s\n", args.at(0));
+				else if (!var && set_unknown_variables && args.size() == 2)
+					VarMan::get()->set_var_string(args.at(0), args.at(1));
+				else if (var && args.size() == 2)
+					var->set_string(args.at(1));
+				else
+					sys_print(Error, "unknown command: %s\n", args.at(0));
+			}
 		}
 	}
 
@@ -439,10 +448,29 @@ public:
 		auto find = all_cmds.find(str);
 		return find == all_cmds.end() ? nullptr : find->second;
 	}
+	std::function<void(const Cmd_Args&)>* find_cmd_in_groups(const std::string& str) {
+		for (auto& c : cmd_groups) {
+			if (!c->enabled)
+				continue;
+			auto find = c->cmds.find(str);
+			if (find != c->cmds.end())
+				return &find->second;
+		}
+		return nullptr;
+	}
 	
 	std::string command_buffer;
 	bool set_unknown_variables = false;
 	std::unordered_map<std::string, Engine_Cmd_Function> all_cmds;
+
+
+	void add_cmd_group(ConsoleCmdGroup* group) {
+		cmd_groups.insert(group);
+	}
+	void remove_cmd_group(ConsoleCmdGroup* group) {
+		cmd_groups.erase(group);
+	}
+	std::unordered_set<ConsoleCmdGroup*> cmd_groups;
 };
 
 Cmd_Manager* Cmd_Manager::get()
@@ -463,4 +491,23 @@ void Cmd_Args::add_arg(const char* v, int len) {
 	arg_to_index[argc] = buffer_index;
 	buffer_index += len + 1;
 	argc++;
+}
+
+uptr<ConsoleCmdGroup> ConsoleCmdGroup::create(std::string name)
+{
+	auto p = uptr< ConsoleCmdGroup>(new ConsoleCmdGroup);
+	p->groupname = name;
+	auto impl = (Cmd_Manager_Impl*)Cmd_Manager::get();
+	impl->add_cmd_group(p.get());
+	return std::move(p);
+}
+ConsoleCmdGroup::~ConsoleCmdGroup()
+{
+	auto impl = (Cmd_Manager_Impl*)Cmd_Manager::get();
+	impl->remove_cmd_group(this);
+}
+ConsoleCmdGroup& ConsoleCmdGroup::add(std::string name, const std::function<void(const Cmd_Args&)>& func)
+{
+	cmds.insert({ name,func });
+	return *this;
 }

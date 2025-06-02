@@ -71,6 +71,7 @@
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\EditorPopups.h" />
     <ClInclude Include="Source\EditorPopupTemplate.h" />
+    <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />

@@ -31,7 +31,7 @@
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/FnFactory.h"
-
+#include "Framework/ConsoleCmdGroup.h"
 
 extern ConfigVar g_mousesens;
 
@@ -58,7 +58,7 @@ class OONameFilter;
 class ObjectOutliner
 {
 public:
-	ObjectOutliner();
+	ObjectOutliner(EditorDoc& ed_doc);
 	~ObjectOutliner();
 
 	void draw();
@@ -98,7 +98,7 @@ private:
 	struct IteratorDraw {
 		IteratorDraw(ObjectOutliner* oo, Node* n) : oo(oo), node(n) {}
 		bool step();
-		void draw();
+		void draw(EditorDoc& ed_doc);
 		Node* get_node() const {
 			return node;
 		}
@@ -108,7 +108,7 @@ private:
 		int child_index = 0;
 		Node* node = nullptr;
 	};
-
+	EditorDoc& ed_doc;
 	friend struct IteratorDraw;
 	EntityPtr setScrollHere;
 	int num_nodes = 0;
@@ -122,7 +122,7 @@ private:
 class EdPropertyGrid
 {
 public:
-	EdPropertyGrid(const FnFactory<IPropertyEditor>& factory);
+	EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEditor>& factory);
 	void draw();
 	MulticastDelegate<> on_property_change;
 private:
@@ -153,6 +153,7 @@ private:
 	
 	void draw_components(Entity* entity);
 
+	EditorDoc& ed_doc;
 	PropertyGrid grid;
 	const FnFactory<IPropertyEditor>& factory;
 };
@@ -207,7 +208,7 @@ public:
 class SelectionState
 {
 public:
-	SelectionState();
+	SelectionState(EditorDoc& ed_doc);
 
 	MulticastDelegate<> on_selection_changed;
 
@@ -330,7 +331,7 @@ private:
 class ManipulateTransformTool
 {
 public:
-	ManipulateTransformTool();
+	ManipulateTransformTool(EditorDoc& ed_doc);
 	void update();
 	bool is_hovered();
 	bool is_using();
@@ -424,6 +425,8 @@ private:
 	
 	glm::mat4 current_transform_of_group = glm::mat4(1.0);
 	glm::mat4 pivot_transform = glm::mat4(1.f);
+
+	EditorDoc& ed_doc;
 };
 
 class LEPlugin;
@@ -594,7 +597,7 @@ private:
 	PrefabAsset* editing_prefab = nullptr;
 
 	FnFactory<IPropertyEditor> grid_factory;
+	uptr<ConsoleCmdGroup> cmds;
 };
 
-extern EditorDoc ed_doc;
 #endif

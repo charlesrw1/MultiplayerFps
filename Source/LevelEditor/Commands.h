@@ -13,14 +13,15 @@
 class CommandSerializeUtil
 {
 public:
-	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(std::vector<EntityPtr> handles);
+	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 };
 
 
 class MakePrefabEditable : public Command
 {
 public:
-	MakePrefabEditable(Entity* me, bool editable) {
+	EditorDoc& ed_doc;
+	MakePrefabEditable(EditorDoc& ed, Entity* me, bool editable):ed_doc(ed) {
 		is_valid_flag = me && me->is_root_of_prefab && me->what_prefab && me->what_prefab != ed_doc.get_editing_prefab();
 		if (!is_valid_flag) return;
 		ptr = me->get_self_ptr();
@@ -50,7 +51,8 @@ public:
 class RemoveEntitiesCommand : public Command
 {
 public:
-	RemoveEntitiesCommand(std::vector<EntityPtr> handles);
+	EditorDoc& ed_doc;
+	RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 	bool is_valid_flag = true;
 	bool is_valid() final {
 		return is_valid_flag;
@@ -75,8 +77,8 @@ public:
 class ParentToCommand : public Command
 {
 public:
-
-	ParentToCommand(std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent);
+	EditorDoc& ed_doc;
+	ParentToCommand(EditorDoc& ed_doc, std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent);
 	bool is_valid_flag = true;
 	bool is_valid() final {
 		return is_valid_flag;
@@ -103,7 +105,8 @@ public:
 class CreatePrefabCommand : public Command
 {
 public:
-	CreatePrefabCommand(const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent = EntityPtr());
+	EditorDoc& ed_doc;
+	CreatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent = EntityPtr());
 	~CreatePrefabCommand() override {
 	}
 
@@ -125,7 +128,8 @@ public:
 class CreateStaticMeshCommand : public Command
 {
 public:
-	CreateStaticMeshCommand(const std::string& modelname, const glm::mat4& transform, EntityPtr parent = EntityPtr());
+	EditorDoc& ed_doc;
+	CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname, const glm::mat4& transform, EntityPtr parent = EntityPtr());
 	~CreateStaticMeshCommand() override {
 	}
 
@@ -148,7 +152,8 @@ public:
 class CreateCppClassCommand : public Command
 {
 public:
-	CreateCppClassCommand(const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component);
+	EditorDoc& ed_doc;
+	CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component);
 	bool is_valid() final { return ti != nullptr; }
 
 	void execute() final;
@@ -167,7 +172,8 @@ public:
 class TransformCommand : public Command
 {
 public:
-	TransformCommand(const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms);
+	EditorDoc& ed_doc;
+	TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms);
 	void execute() final;
 	void undo() final {
 		for (auto& t : transforms) {
@@ -191,7 +197,8 @@ public:
 class InstantiatePrefabCommand : public Command
 {
 public:
-	InstantiatePrefabCommand(Entity* e);
+	EditorDoc& ed_doc;
+	InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e);
 
 	bool is_valid() final {
 		return asset != nullptr;
@@ -217,7 +224,8 @@ public:
 class DuplicateEntitiesCommand : public Command
 {
 public:
-	DuplicateEntitiesCommand(std::vector<EntityPtr> handles);
+	EditorDoc& ed_doc;
+	DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 	bool is_valid_flag = true;
 	bool is_valid() final {
 		return is_valid_flag;
@@ -248,8 +256,8 @@ public:
 		First,
 		Last
 	};
-
-	MovePositionInHierarchy(Entity* e, Cmd cmd);
+	EditorDoc& ed_doc;
+	MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, Cmd cmd);
 	bool is_valid() final {
 		return entPtr;
 	}
@@ -278,7 +286,8 @@ public:
 class CreateComponentCommand : public Command
 {
 public:
-	CreateComponentCommand(Entity* e, const ClassTypeInfo* component_type) {
+	EditorDoc& ed_doc;
+	CreateComponentCommand(EditorDoc& ed_doc, Entity* e, const ClassTypeInfo* component_type) :ed_doc(ed_doc){
 		ent = e->get_self_ptr();
 		ASSERT(component_type->is_a(Component::StaticType));
 		info = component_type;
@@ -318,8 +327,8 @@ public:
 class CreateScriptComponentCommand : public CreateComponentCommand
 {
 public:
-	CreateScriptComponentCommand(Entity* e, Script* s) 
-		: CreateComponentCommand(e,&ScriptComponent::StaticType) {
+	CreateScriptComponentCommand(EditorDoc& ed_doc, Entity* e, Script* s)
+		: CreateComponentCommand(ed_doc, e,&ScriptComponent::StaticType) {
 		this->s = s;
 	}
 	void post_create(Component* ec)override {
@@ -333,8 +342,8 @@ public:
 class CreateMeshComponentCommand : public CreateComponentCommand
 {
 public:
-	CreateMeshComponentCommand(Entity* e, Model* s)
-		: CreateComponentCommand(e, &MeshComponent::StaticType) {
+	CreateMeshComponentCommand(EditorDoc& ed_doc, Entity* e, Model* s)
+		: CreateComponentCommand(ed_doc, e, &MeshComponent::StaticType) {
 		this->s = s;
 	}
 	void post_create(Component* ec)override {
@@ -349,7 +358,8 @@ public:
 class RemoveComponentCommand  : public Command
 {
 public:
-	RemoveComponentCommand(Entity* e, Component* which) {
+	EditorDoc& ed_doc;
+	RemoveComponentCommand(EditorDoc& ed_doc, Entity* e, Component* which) : ed_doc(ed_doc){
 		ent = e->get_self_ptr();
 		comp_handle = which->get_instance_id();
 		info = &which->get_type();
