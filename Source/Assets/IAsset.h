@@ -11,8 +11,9 @@
 // Base asset class
 // Override to add a new resource that can be used by the game
 // See AssetMetadata in AssetRegistry.h to allow for searching for the asset in the asset browser
-
+class GcMarkingInterface;
 class IAssetLoadingInterface;
+class PrimaryAssetLoadingInterface;
 CLASS_H(IAsset, ClassBase)
 public:
 
@@ -100,6 +101,12 @@ private:
 	bool is_loaded = false;		// is the asset's data in memory
 	bool has_run_post_load = false; // has post_load been run
 	bool is_from_disk = true;		// otherwise created at runtime
+	enum  RefMark : int8_t {
+		White,
+		Gray,
+		Black
+	}gc = Black;
+
 #ifdef EDITOR_BUILD
 	uint64_t asset_load_time = 0;
 #endif
@@ -109,4 +116,6 @@ private:
 	friend class AssetDatabase;
 	friend class AssetBackend;
 	friend class AssetRegistrySystem;
+	friend class GcMarkingInterface;
+	friend class PrimaryAssetLoadingInterface;
 };

@@ -20,28 +20,26 @@ class AssetDatabaseImpl;
 class AssetDatabase
 {
 public:
+	// loading interface for the public. this will do a sync load internally.
+	// a different IAssetLoadingInterface is used on the loader thread, but you dont have to care about that.
 	static IAssetLoadingInterface* loader;
 
 	void init();
-
 	// update any async resource requests that have finished, executes callbacks, calls post_load (ie to upload GPU resources)
 	void tick_asyncs();	
-
 	// wait for everything to finish, then tick_async
 	void finish_all_jobs();
-
-	// triggers uninstall's of assets that arent referenced anymore
-	// call after unreference_this_channel() (or at any time, this causes a sweep over assets to check if they should be removed)
-	void remove_unreferences();
+	// garbage collection. after marking unrefernces, use IAssetLoadingInterface to touch objects.
+	// then remove unreferences will remove the unreferenced stuff (also will traverse asset dependencies to mark those too)
+	void mark_unreferences();	// this unreferences objects
+	void remove_unreferences();	// this removes unreferences objects
 
 	// appends an IAsset with a path to the global registry
-	// will set the lifetime to global
+	// will set the lifetime to global until removed
 	void install_system_asset(IAsset* assetPtr, const std::string& name);
+	void remove_system_reference(IAsset* asset);
 
-	// (public/private) SYNC asset loading
-	// This can be used to publically start a load job and privatley in a nested load job
-	// If used in private, the lifetime_channel is unused and defaults to the high level load job's lifetime
-	// The asset is ready to use by the time this function returns, but isn't guaranteed to have post_load called
+	// sync asset loading
 	template<typename T>
 	AssetPtr<T> find_global_sync(const std::string& path) {
 		auto res = find_sync(path, &T::StaticType, true);
@@ -54,10 +52,7 @@ public:
 	}
 	GenericAssetPtr find_sync(const std::string& path, const ClassTypeInfo* classType, bool system_asset = false);
 
-
-	// (public) ASYNC asset loading
-	// Use to kick off a high level loading job
-	// The callback is called on the main thread inside tick_asyncs when finished
+	// async asset loading. callback is called in tick_async()
 	template<typename T>
 	void find_global_async(const std::string& path, std::function<void(GenericAssetPtr)> callback) {
 		static_assert(std::is_base_of<IAsset, T>::value, "find_global_async type must derive from IAsset");
@@ -71,25 +66,14 @@ public:
 	void find_async(const std::string& path, const ClassTypeInfo* classType, std::function<void(GenericAssetPtr)> callback, bool is_system = false);
 
 
-
-	// (public) reload an already loaded asset either sync or async
-	// doesnt reload any sub-assets
 	template<typename T>
 	void reload_sync(AssetPtr<T> asset) {
 		return reload_sync(asset.get_unsafe());
 	}
 	void reload_sync(IAsset* asset);
+
+	// reloads an asset and all dependent objects, then move constructs them into the original asset
 	void reload_async(IAsset* asset, std::function<void(GenericAssetPtr)> callback);
-
-	// explicitly delete an asset, very unsafe, use for levels
-	template<typename T>
-	void explicit_asset_free(T*& asset) {
-		IAsset* i = asset;
-		explicit_asset_free(i);
-		asset = nullptr;
-	}
-	void explicit_asset_free(IAsset*& asset);
-
 #ifdef EDITOR_BUILD
 	// checks for out of date assets and reloads them async
 	void hot_reload_assets();

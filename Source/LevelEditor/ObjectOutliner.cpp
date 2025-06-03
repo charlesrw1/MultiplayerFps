@@ -349,6 +349,12 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 
 	ImGui::TableNextColumn();
 
+	if (node_entity) {
+		ImGui::TextColored(ImVec4(0.7, 0.7, 0.7, 1), "%lld", node_entity->get_instance_id());
+	}
+	ImGui::TableNextColumn();
+
+
 	ImGui::PushStyleColor(ImGuiCol_Button, 0);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_imvec4({ 245, 242, 242, 55 }));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
@@ -417,8 +423,9 @@ void ObjectOutliner::draw()
 	int cur_n = 0;
 	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
 	//if (ImGui::Begin("PropEdit")) {
-	if (ImGui::BeginTable("Table", 2, flags)) {
+	if (ImGui::BeginTable("Table", 3, flags)) {
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("##InstID", ImGuiTableColumnFlags_WidthFixed, 50.0);
 		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 50.0);
 
 		while (clipper.Step()) {
@@ -554,6 +561,39 @@ bool OONameFilter::is_in_string(const string& filter, const string& match)
 	auto lowercased = to_lower(match);
 	return lowercased.find(filter) != std::string::npos;
 }
+
+static bool check_props_for_assetptr_or_entityptr(const string& filter, void* inst, const PropertyInfoList* list)
+{
+	for (int i = 0; i < list->count; i++) {
+		auto& prop = list->list[i];
+		if (strcmp("AssetPtr", prop.custom_type_str) == 0)
+		{
+			IAsset** asset = (IAsset**)prop.get_ptr(inst);
+			if (*asset) {
+				if (OONameFilter::is_in_string(filter, (*asset)->get_name()))	// asset name
+					return true;
+			}
+		}
+		else if (strcmp("EntityPtr", prop.custom_type_str) == 0) {
+			EntityPtr* eptr = (EntityPtr*)prop.get_ptr(inst);
+			Entity* what = eptr->get();
+			if (what && OONameFilter::is_in_string(filter, std::to_string(what->get_instance_id())))	// entity ptr instance id
+				return true;
+		}
+		else if (prop.type == core_type_id::List) {
+			auto listptr = prop.get_ptr(inst);
+			auto size = prop.list_ptr->get_size(listptr);
+			for (int j = 0; j < size; j++) {
+				auto ptr = prop.list_ptr->get_index(listptr, j);
+				bool b = check_props_for_assetptr_or_entityptr(filter, ptr, prop.list_ptr->props_in_list);
+				if (b)
+					return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 {
 	// check: name of object, component names, id of object
@@ -575,24 +615,9 @@ bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 		while (type) {
 			const PropertyInfoList* p = type->props;
 			if (p) {
-				for (int i = 0; i < p->count; i++) {
-					auto& prop = p->list[i];
-					if (strcmp("AssetPtr", prop.custom_type_str) == 0)
-					{
-						IAsset** asset = (IAsset**)prop.get_ptr(c);
-						if (*asset) {
-							if (is_in_string(filter, (*asset)->get_name()))	// asset name
-								return true;
-						}
-					}
-					else if (strcmp("EntityPtr", prop.custom_type_str) == 0) {
-						EntityPtr* eptr = (EntityPtr*)prop.get_ptr(c);
-						Entity* what = eptr->get();
-						if (what && is_in_string(filter, std::to_string(what->get_instance_id())))	// entity ptr instance id
-							return true;
-					}
-
-				}
+				bool res = check_props_for_assetptr_or_entityptr(filter, c, p);
+				if (res)
+					return true;
 			}
 			type = type->super_typeinfo;
 		}

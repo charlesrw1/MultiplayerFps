@@ -67,8 +67,8 @@ public:
 		ImGui::End();
 
 		IEditorTool::imgui_draw();
-
-		outputEntity->sync_render_data();
+		if (outputEntity)
+			outputEntity->sync_render_data();
 	}
 #if 0
 	void draw_menu_bar() override

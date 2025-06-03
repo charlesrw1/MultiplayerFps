@@ -164,7 +164,7 @@ public:
 
 	bool show_console = false;
 	bool dedicated_server = false;
-	
+	bool wants_gc_flag = false;
 
 	bool is_drawing_to_window_viewport() const;
 
@@ -197,6 +197,7 @@ private:
 	void draw_any_imgui_interfaces();
 
 	void game_update_tick();
+	void do_asset_gc();
 
 	friend class Ent_Iterator;
 

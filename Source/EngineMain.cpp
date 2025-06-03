@@ -1017,46 +1017,40 @@ static void init_log_gui()
 void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
 {
 	sys_print(Info, "on_map_change_callback %s\n",(loadedLevel)?loadedLevel->get_name().c_str():"<nullptr>");
-
-	g_assets.remove_unreferences();
-	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
-
 	ASSERT(!level);
 	ASSERT(is_waiting_on_load_level_callback);
-
 	is_waiting_on_load_level_callback = false;
 	is_loading_editor_level = false;
-
 	if (!loadedLevel) {
 		sys_print(Error, "couldn't load map !!!\n");
 		state = Engine_State::Idle;
-
 		on_map_load_return.invoke(false);
 		return;
 	}
 
-	// constructor initializes level state
-	this->level = std::make_unique<Level>();
-	this->level->create(loadedLevel, this_is_for_editor);
+	g_assets.remove_system_reference(loadedLevel);	// remove it, just do it.
+	uptr<SceneAsset> unique_scene;	// now its a unique ptr
+	unique_scene.reset(loadedLevel);
+
+	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
 
 	time = 0.0;
 	set_tick_rate(60.f);
-
+	// constructor initializes level state
+	level = std::make_unique<Level>(std::move(unique_scene), this_is_for_editor);
+	level->start();
 	idraw->on_level_start();
+	state = Engine_State::Game;
+	init_log_gui();
+	on_map_load_return.invoke(true);
+	wants_gc_flag = true;	// signal for a gc
 
 	sys_print(Info, "changed state to Engine_State::Game\n");
-
-	state = Engine_State::Game;
-
-	init_log_gui();
-
-	on_map_load_return.invoke(true);
 }
 
 void GameEngineLocal::execute_map_change()
 {
 	sys_print(Info, "-------- Map Change: %s --------\n", queued_mapname.c_str());
-
 	// free current map
 	stop_game();
 	ASSERT(!level);
@@ -1074,25 +1068,20 @@ void GameEngineLocal::execute_map_change()
 
 	// special name to create a map
 	if (this_is_for_editor && queued_mapname == "__empty__") {	
-
-		// not memory leak, gets cleaned up
+		// not memory leak, gets put into a unique ptr
 		SceneAsset* temp = new SceneAsset;
-		g_assets.install_system_asset(temp, "empty.tmap");
 		on_map_change_callback(true /* == this_is_for_editor */, temp);
 	}
 	else {
-		g_assets.find_async<SceneAsset>(queued_mapname, [this, this_is_for_editor](GenericAssetPtr ptr)
-			{
+		g_assets.find_async<SceneAsset>(queued_mapname, 
+			[this, this_is_for_editor](GenericAssetPtr ptr) {
 				auto level = (ptr)?ptr.cast_to<SceneAsset>():nullptr;
 				this->on_map_change_callback(this_is_for_editor, level.get());
-
-			}, 0 /* default lifetime channel 0*/);
-
+			});
 		// goto idle while waint for loading to finish
 		state = Engine_State::Idle;
 	}
 }
-
 
 void GameEngineLocal::spawn_starting_players(bool initial)
 {
@@ -1190,9 +1179,6 @@ void GameEngineLocal::cleanup()
 		SDL_GL_DeleteContext(gl_context);
 		SDL_DestroyWindow(window);
 	}
-
-
-	//gui_sys.reset(nullptr);
 }
 
 
@@ -1579,51 +1565,9 @@ Entity* entity_from_mdcontext(MdContextBase& ctx)
 	return EntityPtr(ctx.get_key_as_int()).get();
 }
 
-template<typename T>
-struct ObjPtr
-{
-	ObjPtr() {}
-	explicit ObjPtr(T* ptr) {
-		if (ptr)
-			handle = ptr->get_instance_id();
-		else
-			handle = 0;
-	}
 
-	bool is_valid() const { return get() != nullptr; }
-	T* get() const {
-		auto obj = eng_local.get_object(handle);
-		if (obj&&obj->is_a<T>())
-			return (T*)obj;
-		return nullptr;
-	}
-	T& operator*() const {
-		return *get();
-	}
-	operator bool() const {
-		return is_valid();
-	}
-	operator T* () const {
-		return get();
-	}
-	T* operator->() const {
-		return get();
-	}
-
-	bool operator==(const EntityPtr& other) {
-		return handle == other.handle;
-	}
-
-	bool operator!=(const EntityPtr& other) {
-		return handle != other.handle;
-	}
-
-
-	uint64_t handle = 0;
-};
-
-using EntPtr = ObjPtr<Entity>;
-using ConstEntPtr = ObjPtr<const Entity>;
+using EntPtr = obj<Entity>;
+using ConstEntPtr = obj<const Entity>;
 
 void f() {
 	Entity* e{};
@@ -1632,11 +1576,9 @@ void f() {
 	ConstEntPtr entPtr(e);
 	const Entity* theEnt = entPtr;
 
-	ObjPtr<const MeshComponent> ptr(mesh);
-	const MeshComponent* theMesh = ptr;
-	if (theMesh) {
+	obj<MeshComponent> mesh_comp;
+	obj<PhysicsBody> physics_comp;
 
-	}
 }
 
 extern void register_input_actions_for_game();
@@ -2076,6 +2018,11 @@ void GameEngineLocal::loop()
 		// overlapped update (game+render)
 		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext);
 
+		if (wants_gc_flag) {
+			do_asset_gc();
+			wants_gc_flag = false;
+		}
+
 		// sync period
 		imgui_update();	// fixme
 		imgui_render();
@@ -2331,3 +2278,54 @@ void DebugShapeCtx::fixed_update_start()
 	one_frame_fixedupdate.clear();
 }
 
+// yeah its slow :)
+static void check_props_for_assetptr(void* inst, const PropertyInfoList* list, IAssetLoadingInterface* load)
+{
+	for (int i = 0; i < list->count; i++) {
+		auto& prop = list->list[i];
+		if (strcmp(prop.custom_type_str, "AssetPtr") == 0) {
+			// wtf!
+			IAsset** e = (IAsset**)prop.get_ptr(inst);
+			if (*e)
+				load->touch_asset(*e);
+		}
+		else if (prop.type == core_type_id::List) {
+			auto listptr = prop.get_ptr(inst);
+			auto size = prop.list_ptr->get_size(listptr);
+			for (int j = 0; j < size; j++) {
+				auto ptr = prop.list_ptr->get_index(listptr, j);
+				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list, load);
+			}
+		}
+	}
+}
+static void check_object_for_asset_ptr(ClassBase* obj, IAssetLoadingInterface* load)
+{
+	auto type = &obj->get_type();
+	while (type) {
+		auto props = type->props;
+		if(props)
+			check_props_for_assetptr(obj, props, load);
+		type = type->super_typeinfo;
+	}
+}
+
+void GameEngineLocal::do_asset_gc()
+{
+	if (!get_level())
+		return;
+	printf("Starting GC...\n");
+	auto start = GetTime();
+	g_assets.mark_unreferences();
+	auto& objs = level->get_all_objects();
+	for (auto o : objs) {
+		check_object_for_asset_ptr(o, AssetDatabase::loader);
+		Entity* e = o->cast_to<Entity>();
+		if (e&&e->what_prefab) {
+			AssetDatabase::loader->touch_asset(e->what_prefab);
+		}
+	}
+	g_assets.remove_unreferences();
+	auto end = GetTime();
+	printf("gc in %f(ms)\n",(end-start)*1000.0);
+}

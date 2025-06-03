@@ -397,6 +397,12 @@ void PhysicsBody::add_model_shape_to_actor(const Model* model)
 
 		auto boxGeom = PxBoxGeometry(glm_to_physx((aabb.bmax - aabb.bmin) * 0.5f));
 
+		const float MIN_WIDTH = 0.01f;
+		boxGeom.halfExtents.x = glm::max(boxGeom.halfExtents.x, MIN_WIDTH);
+		boxGeom.halfExtents.y = glm::max(boxGeom.halfExtents.y, MIN_WIDTH);
+		boxGeom.halfExtents.z = glm::max(boxGeom.halfExtents.z, MIN_WIDTH);
+
+
 		auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
 			boxGeom, *physics_local_impl->default_material);
 

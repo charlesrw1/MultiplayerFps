@@ -372,17 +372,17 @@ public:
 		StateTransitionScript* self = (StateTransitionScript*)inst;
 		std::string outstr;
 		outstr.reserve(32);
-		outstr += "\"";
+		//outstr += "\"";
 		outstr += 'a' + (int)self->comparison;
 		outstr += 'a' + (int)self->lhs.type;
 		outstr += " ";
-		outstr += self->lhs.str;
+		outstr += self->lhs.get_str();
 		outstr += " ";
 		outstr += 'a' + (int)self->rhs.type;
 		outstr += " ";
-		outstr += self->rhs.str;
+		outstr += self->rhs.get_str();
 		outstr += " ";
-		outstr += "\"";
+		//outstr += "\"";
 
 		return outstr;
 	}

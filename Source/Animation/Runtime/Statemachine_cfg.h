@@ -65,6 +65,12 @@ public:
 			int curve_handle;
 			const PropertyInfo* pi;
 		};
+		std::string get_str() const {
+			if (type == ScriptValueType::Variable)
+				return str;
+			else
+				return std::to_string(number);
+		}
 	};
 	ValueData lhs;
 	ValueData rhs;

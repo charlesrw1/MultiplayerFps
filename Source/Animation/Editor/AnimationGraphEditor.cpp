@@ -147,7 +147,7 @@ void AnimationGraphEditor::init()
 
 	
 }
-
+#include "Assets/AssetDatabase.h"
 void AnimationGraphEditor::close_internal()
 {
 	EditorTool3d::close_internal();
@@ -166,6 +166,9 @@ void AnimationGraphEditor::close_internal()
 	// free tree
 	if (editing_tree) {
 		editing_tree->uninstall();
+
+		g_assets.remove_system_reference(editing_tree.get());
+
 		editing_tree.reset();
 	}
 
@@ -1563,6 +1566,7 @@ static std::unique_ptr<Animation_Tree_CFG> try_to_load_document(const std::strin
 	auto tree = std::make_unique<Animation_Tree_CFG>();
 	tree->editor_set_newly_made_path(path);
 	ClassBase* dummy = nullptr;
+	printf("TREE LOADING\n");
 	bool good = tree->load_asset(AssetDatabase::loader);
 	ASSERT(!dummy);
 	if (!good) {
@@ -1657,6 +1661,8 @@ void AnimationGraphEditor::post_map_load_callback()
 	}
 
 	ASSERT(editing_tree);
+	
+	g_assets.install_system_asset(editing_tree.get(),"__animgraph");	// so its garbage collected right
 
 	anim_class_type = editing_tree->animator_class;
 

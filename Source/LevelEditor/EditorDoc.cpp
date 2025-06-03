@@ -114,7 +114,7 @@ public:
 		if (!eng->get_level())
 			return;
 
-		const GuiFont* font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 		if (!font) font = g_fonts.get_default_font();
 
 		struct obj {
@@ -360,6 +360,7 @@ bool EditorDoc::save_document_internal()
 	}
 
 	eng->log_to_fullscreen_gui(Info, "Saving");
+
 	sys_print(Info, "saving map document\n");
 
 	auto& all_objs = eng->get_level()->get_all_objects();
@@ -389,7 +390,7 @@ bool EditorDoc::save_document_internal()
 	sys_print(Info, "Wrote out to %s\n", path.c_str());
 
 	if (is_editing_prefab()) {
-		g_assets.reload_sync(pa);
+		g_assets.reload_async(pa, [](GenericAssetPtr) {printf("reload finished prefab\n"); });
 	}
 
 	return true;

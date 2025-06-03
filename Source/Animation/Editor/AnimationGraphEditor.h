@@ -379,6 +379,10 @@ public:
 		bool statemachine_passthrough = false;
 	}opt;
 
+	const ClassTypeInfo* get_animator_class() const {
+		return anim_class_type.ptr;
+	}
+
 	ClassTypePtr<AnimatorInstance> anim_class_type;
 	AssetPtr<Model> output_model;
 

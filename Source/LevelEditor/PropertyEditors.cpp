@@ -181,7 +181,7 @@ bool EntityPtrAssetEditor::internal_update() {
 	EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
 
 	ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
-	auto eyedropper = g_assets.find_sync<Texture>("icon/eyedrop.png");
+	auto eyedropper = g_assets.find_global_sync<Texture>("icon/eyedrop.png");
 	if (ImGui::ImageButton((ImTextureID)uint64_t(eyedropper->gl_id), ImVec2(16, 16))) {
 		editor.enable_entity_eyedropper_mode(this);
 	}
@@ -194,7 +194,11 @@ bool EntityPtrAssetEditor::internal_update() {
 		const char* str = ptr_to_asset->get()->get_editor_name().c_str();
 		if (!*str)
 			str = ptr_to_asset->get()->get_type().classname;
-		ImGui::Text(str);
+
+		std::string what = str;
+		what += "  id:(" + std::to_string(ptr_to_asset->get()->get_instance_id()) + ")";
+
+		ImGui::Text("%s", what.c_str());
 	}
 	else {
 		ImGui::TextColored(color32_to_imvec4({ 128,128,128 }), "<nullptr>");
@@ -862,14 +866,15 @@ void StateTransitionPropertyEditor::draw_value_side(StateTransitionScript* self,
 	}
 	else if (vd.type == ScriptValueType::Variable) {
 
-		const AnimatorInstance* a = anim_graph_ed.out.get_animator();
-		if (!a) {
+
+		const ClassTypeInfo* type = anim_graph_ed.get_animator_class();
+		if (!type) {
+			ImGui::Text("no class selected");
 			ImGui::PopID();
 			return;
 		}
 
 		std::vector<const PropertyInfoList*> getprop;
-		const ClassTypeInfo* type = &a->get_type();
 		for (; type; type = type->super_typeinfo)
 			getprop.push_back(type->props);
 		auto preview = vd.str.empty() ? "<none>" : vd.str;

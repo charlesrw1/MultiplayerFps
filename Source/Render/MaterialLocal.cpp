@@ -188,6 +188,13 @@ void MaterialInstance::sweep_references(IAssetLoadingInterface* loading)const {
 void MaterialInstance::uninstall()
 {
 	// materials cant be uninstalled
+
+#ifdef EDITOR_BUILD
+	if (impl && impl->masterMaterial)
+		impl->masterMaterial->self->reload_dependents.erase(this);
+#endif
+
+	matman.free_material_instance(this);
 }
 void MaterialInstance::post_load()
 {
@@ -270,10 +277,6 @@ MaterialInstance::MaterialInstance()
 }
 MaterialInstance::~MaterialInstance()
 {
-#ifdef EDITOR_BUILD
-	if(impl&&impl->masterMaterial)
-		impl->masterMaterial->self->reload_dependents.erase(this);
-#endif
 
 	if (impl&&impl->is_dynamic_material) {
 		matman.free_dynamic_material(this);

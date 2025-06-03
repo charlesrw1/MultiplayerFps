@@ -62,6 +62,13 @@ void Level::add_to_sync_render_data_list(Component* ec)
 		ec->on_sync_render_data();
 }
 
+void Level::add_to_update_list(Component* ec) {
+	if (b_is_in_update_tick.get_value())
+		wantsToAddToUpdate.push_back(ec);
+	else
+		tick_list.insert(ec);
+}
+
 Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
 {
 	ASSERT(ti.allocate);
@@ -121,7 +128,6 @@ void Level::destroy_component(Component* ec)
 {
 	if (!ec) 
 		return;
-
 	wants_sync_update.remove(ec);
 
 	uint64_t id = ec->get_instance_id();
@@ -138,25 +144,19 @@ void Level::destroy_component(Component* ec)
 	all_world_ents.remove(id);
 }
 
-
-extern ConfigVar g_default_gamemode;
-
-
-Level::Level() : all_world_ents(4/*2^4*/), tick_list(4), wants_sync_update(4)
-{
-
-}
-
-void Level::create(SceneAsset* source, bool is_editor) 
+Level::Level(uptr<SceneAsset> source, bool is_editor) 
+	: all_world_ents(4/*2^4*/), tick_list(4), wants_sync_update(4)
 {
 	ASSERT(source);
 
-	source_asset = source;
+	source_asset = std::move(source);
 	b_is_editor_level = is_editor;
-
-	if (source->sceneFile) {
-		insert_unserialized_entities_into_level(*source->sceneFile);
-		source->sceneFile.reset();
+}
+void Level::start()
+{
+	if (source_asset->sceneFile) {
+		insert_unserialized_entities_into_level(*source_asset->sceneFile);
+		source_asset->sceneFile.reset();
 	}
 }
 
@@ -231,20 +231,14 @@ void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 
 void Level::close_level()
 {
-	const bool is_this_editor_level = is_editor_level();
-	
+	const bool is_this_editor_level = is_editor_level();	
 	for (auto ent : all_world_ents) {
 		if (Entity* e = ent->cast_to<Entity>())
 			e->destroy();
 	}
 	ASSERT(all_world_ents.num_used == 0);
-
 	all_world_ents.clear_all();
-
-	g_assets.explicit_asset_free(source_asset);
-	//g_assets.unreference_this_channel(0);
-
-	source_asset = nullptr;
+	source_asset.reset(nullptr);	// deletes level
 }
 
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
@@ -340,6 +334,7 @@ Entity* Level::spawn_prefab(const PrefabAsset* asset)
 
 void Level::queue_deferred_delete(BaseUpdater* e)
 {
-	if (!e) return;
+	if (!e) 
+		return;
 	deferred_delete_list.insert(e->get_instance_id());
 }

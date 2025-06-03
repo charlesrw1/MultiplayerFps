@@ -17,7 +17,7 @@ public:
 	}
 
 	void start() override {
-		arrowModel = g_assets.find_sync<Model>("arrowModel.cmdl");
+		arrowModel = g_assets.find_global_sync<Model>("arrowModel.cmdl");
 		sync_render_data();
 	}
 	void end() override {

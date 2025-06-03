@@ -303,6 +303,8 @@ public:
 
 	void free_material_instance(MaterialInstance* m)
 	{
+		if (!m->impl)
+			return;
 		remove_from_dirty_list_if_it_is(m);
 		if (m->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING) {
 			int byteIndex = (m->impl->gpu_buffer_offset * 4) / MATERIAL_SIZE;
