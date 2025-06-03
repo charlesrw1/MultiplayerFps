@@ -1,3 +1,4 @@
+#pragma once
 #include "EditorPopups.h"
 using std::string;	// sick of it
 using std::vector;

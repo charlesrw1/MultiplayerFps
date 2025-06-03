@@ -3,7 +3,7 @@
 #include <string>
 #include <cassert>
 #include "Framework/ClassBase.h"
-
+#include <functional>
 union SDL_Event;
 struct View_Setup;
 
@@ -12,6 +12,10 @@ struct View_Setup;
 class IEditorTool
 {
 public:
+
+	void try_close(std::function<void()> callback);	// will try closing document, if success, does callback.
+	void try_save(std::function<void()> callback);
+	
 	// if save is called when !current_document_has_path(), then it will open a popup to pick a save directory
 	void close();
 	bool save();

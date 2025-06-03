@@ -59,6 +59,58 @@ bool IEditorTool::open(const char* name, const char* arg) {
 }
 
 extern ConfigVar g_project_name;
+
+#include "EditorPopups.h"
+void IEditorTool::try_save(std::function<void()> callback)
+{
+	EditorPopupManager::inst->add_popup(
+		"Save new document.",
+		[this,callback]()->bool {
+			if (ImGui::Button("Save?")) {
+				save();
+				callback();
+				return true;
+			}
+			if (ImGui::Button("Cancel.")) {
+				return true;
+			}
+			return false;
+		}
+	);
+}
+
+void IEditorTool::try_close(std::function<void()> callback)
+{
+	bool is_done_with_save = false;
+	EditorPopupManager::inst->add_popup(
+		"Are you sure?",
+		[callback, is_done_with_save,this]()mutable->bool {
+			ImGui::Text("Editor is open, continue without saving?");
+
+			if (ImGui::Button("Continue")) {
+				callback();
+				return true;
+			}
+			if (ImGui::Button("Save and continue")) {
+				try_save([&is_done_with_save]()mutable {
+					is_done_with_save = true;
+					});
+				return false;
+			}
+			if (ImGui::Button("Cancel")) {
+
+				return true;
+			}
+			if (is_done_with_save) {
+				callback();
+				return true;
+			}
+
+			return false;
+		}
+	);
+}
+
 void IEditorTool::close()
 {
 	if (!is_open)

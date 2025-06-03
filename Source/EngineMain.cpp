@@ -390,6 +390,7 @@ void GameEngineLocal::connect_to(string address)
 	sys_print(Info, "Connecting to server %s\n", address.c_str());
 	//cl->connect(address);
 }
+#include "EditorPopupTemplate.h"
 
 #ifdef EDITOR_BUILD
 DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
@@ -405,14 +406,22 @@ DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
 		if (!level)
 			return;
 		if (!tool->get_asset_type_info().is_a(SceneAsset::StaticType)) {
+			PopupTemplate::create_basic_okay(
+				EditorPopupManager::inst,
+				"Error",
+				"Can only play Scene levels."
+			);
+
 			sys_print(Error, "can only play Scene levels\n");
 			return;
 		}
+
 		auto source = level->get_source_asset();
 		if (source) {
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("map %s", source->get_name().c_str()));
 		}
-		else sys_print(Error, "no valid map");
+		else 
+			sys_print(Error, "no valid map");
 	}
 }
 DECLARE_ENGINE_CMD(EDITOR_BACK_ONE_PAGE)
@@ -482,8 +491,17 @@ DECLARE_ENGINE_CMD(start_ed)
 			);
 		}
 
-
-		eng_local.change_editor_state(metadata->tool_to_edit_me(),metadata->get_arg_for_editortool(), file_to_open);
+		if (eng_local.get_current_tool()) {
+			std::string file_to_open_s = file_to_open;
+			eng_local.get_current_tool()->try_close(
+				[metadata, file_to_open_s]() {
+					eng_local.change_editor_state(metadata->tool_to_edit_me(), metadata->get_arg_for_editortool(), file_to_open_s.c_str());
+				}
+			);
+		}
+		else {
+			eng_local.change_editor_state(metadata->tool_to_edit_me(), metadata->get_arg_for_editortool(), file_to_open);
+		}
 	}
 	else {
 		sys_print(Error, "unknown editor\n");
@@ -647,8 +665,7 @@ DECLARE_ENGINE_CMD(map)
 #ifdef EDITOR_BUILD
 	if (eng->get_current_tool() != nullptr) {
 		std::string what_map = args.at(1);
-		PopupTemplate::create_are_you_sure(EditorPopupManager::inst,
-			"Editor is open, continuing won't save.",
+		eng->get_current_tool()->try_close(
 			[what_map]() {
 			sys_print(Warning,"starting game so closing any editors\n");
 				eng_local.change_editor_state(nullptr, "");
