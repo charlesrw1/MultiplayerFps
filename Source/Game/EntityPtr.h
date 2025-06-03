@@ -1,33 +1,48 @@
 #pragma once
 #include <cstdint>
+#include "GameEnginePublic.h"
 class Entity;
-class EntityPtr
+
+template<typename T>
+class obj
 {
 public:
-	EntityPtr() {}
-	explicit EntityPtr(const Entity* e);
-	explicit EntityPtr(uint64_t handle) : handle(handle) {}
+	obj() {}
+	explicit obj(const T* e) {
+		if (e)
+			handle = e->get_instance_id();
+		else
+			handle = 0;
+	}
+	explicit obj(uint64_t handle) : handle(handle) {}
 
 
 	bool is_valid() const { return get() != nullptr; }
-	Entity* get() const;
-	Entity& operator*() const {
+	T* get() const {
+		if (handle == 0) 
+			return nullptr;
+		auto e = eng->get_object(handle);
+		return e ? e->cast_to<T>() : nullptr;
+	}
+	T& operator*() const {
 		return *get();
 	}
 	operator bool() const {
 		return is_valid();
 	}
-	Entity* operator->() const {
+	T* operator->() const {
 		return get();
 	}
 
-	bool operator==(const EntityPtr& other) {
+	bool operator==(const obj<T>& other) {
 		return handle == other.handle;
 	}
 
-	bool operator!=(const EntityPtr& other) {
+	bool operator!=(const obj<T>& other) {
 		return handle != other.handle;
 	}
 
 	uint64_t handle = 0;
 };
+
+using EntityPtr = obj<Entity>;

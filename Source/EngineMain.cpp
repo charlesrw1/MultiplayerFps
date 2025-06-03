@@ -1566,20 +1566,6 @@ Entity* entity_from_mdcontext(MdContextBase& ctx)
 }
 
 
-using EntPtr = obj<Entity>;
-using ConstEntPtr = obj<const Entity>;
-
-void f() {
-	Entity* e{};
-	auto mesh = e->get_cached_mesh_component();
-
-	ConstEntPtr entPtr(e);
-	const Entity* theEnt = entPtr;
-
-	obj<MeshComponent> mesh_comp;
-	obj<PhysicsBody> physics_comp;
-
-}
 
 extern void register_input_actions_for_game();
 void GameEngineLocal::init(int argc, char** argv)
@@ -2312,6 +2298,12 @@ static void check_object_for_asset_ptr(ClassBase* obj, IAssetLoadingInterface* l
 
 void GameEngineLocal::do_asset_gc()
 {
+	static int i = 0;
+	//i += 1;
+	//if (i <= 2)
+	//	return;
+	//i = 0;
+
 	if (!get_level())
 		return;
 	printf("Starting GC...\n");

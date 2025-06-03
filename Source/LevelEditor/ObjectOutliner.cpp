@@ -574,9 +574,9 @@ static bool check_props_for_assetptr_or_entityptr(const string& filter, void* in
 					return true;
 			}
 		}
-		else if (strcmp("EntityPtr", prop.custom_type_str) == 0) {
-			EntityPtr* eptr = (EntityPtr*)prop.get_ptr(inst);
-			Entity* what = eptr->get();
+		else if (strcmp("ObjPtr", prop.custom_type_str) == 0) {
+			obj<BaseUpdater>* eptr = (obj<BaseUpdater>*)prop.get_ptr(inst);
+			BaseUpdater* what = eptr->get();
 			if (what && OONameFilter::is_in_string(filter, std::to_string(what->get_instance_id())))	// entity ptr instance id
 				return true;
 		}

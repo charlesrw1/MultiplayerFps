@@ -301,6 +301,7 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "int8_t": INT_TYPE,
     "uint8_t": INT_TYPE,
     "EntityPtr": ENTITYPTR_TYPE,
+    "obj": ENTITYPTR_TYPE,
     "glm::vec3": VEC3_TYPE,
     "glm::quat": QUAT_TYPE,
     "Color32": COLOR32_TYPE,

@@ -17,7 +17,7 @@
 
 CLASS_IMPL(LevelSerializationContext);
 
-Entity* LevelSerializationContext::get_entity(uint64_t handle)
+BaseUpdater* LevelSerializationContext::get_object(uint64_t handle)
 {
 	ASSERT(out&&!in);
 	bool is_from_diff = handle & (1ull << 63ull);
@@ -28,9 +28,7 @@ Entity* LevelSerializationContext::get_entity(uint64_t handle)
 	}
 	else
 		obj = eng->get_level()->get_entity(handle);
-	if (obj)
-		return obj->cast_to<Entity>();
-	return nullptr;
+	return obj;
 }
 
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)

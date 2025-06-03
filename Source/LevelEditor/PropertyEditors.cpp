@@ -596,7 +596,7 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 }
 void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory)
 {
-	factory.add("EntityPtr", [&doc]() {return new EntityPtrAssetEditor(doc); });
+	factory.add("ObjPtr", [&doc]() {return new EntityPtrAssetEditor(doc); });
 	factory.add("JointAnchor", [&doc]() {return new AnchorJointEditor(doc); });
 	factory.add("CubemapAnchor", [&doc]() {return new CubemapAnchorEditor(doc); });
 

@@ -50,8 +50,10 @@ public:
 	Entity* the_player = nullptr;
 	CameraComponent* static_level_cam = nullptr;
 	
-	REFLECT();
-	AssetPtr<PrefabAsset> player_prefab;
+	REF AssetPtr<PrefabAsset> player_prefab;
+	REF obj<Component> what_component;
+	REF obj<Component> my2nd;
+	REF obj<Component> my3rd;
 };
 
 

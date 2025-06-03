@@ -107,5 +107,5 @@ public:
 	std::string* in_root = nullptr;
 	PrefabAsset* for_prefab = nullptr;
 	PrefabAsset* diffprefab = nullptr;
-	Entity* get_entity(uint64_t handle);
+	BaseUpdater* get_object(uint64_t handle);
 };

@@ -376,7 +376,6 @@ void write_list(PropertyInfo* listprop, void* ptr, const void* diff_ptr, DictWri
 			//ASSERT(str.second); // FIXME???
 			if(str.second)
 				buf += str.first;
-			buf += ' ';
 			out.write_value_quoted(buf.c_str());
 			buf.clear();
 		}

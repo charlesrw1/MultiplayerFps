@@ -259,12 +259,13 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 {
 	for (int i = 0; i < list->count; i++) {
 		auto prop = list->list[i];
-		if (strcmp(prop.custom_type_str, "EntityPtr") == 0) {
+		if (strcmp(prop.custom_type_str, "ObjPtr") == 0) {
 			// wtf!
-			Entity** e = (Entity**)prop.get_ptr(inst);
-			EntityPtr* eptr = (EntityPtr*)prop.get_ptr(inst);
+			BaseUpdater** e = (BaseUpdater**)prop.get_ptr(inst);
+
+			obj<BaseUpdater>* eptr = (obj<BaseUpdater>*)prop.get_ptr(inst);
 			if (*e) {
-				*eptr = EntityPtr((*e)->get_instance_id());
+				*eptr = obj<BaseUpdater>((*e)->get_instance_id());
 			}
 		}
 		else if(prop.type==core_type_id::List) {

@@ -153,10 +153,15 @@ ADD_TEST(multiple_inheritance)
 //	auto dif2 = ComputePointerOffset<C, B>;
 
 }
-
+#include "Game/Components/MeshComponent.h"
+#include "Render/MaterialPublic.h"
 ADD_TEST(assets)
 {
-
+	MeshComponent c;
+	auto inst = new MaterialInstance();
+	inst->editor_set_newly_made_path("something/testgrid.mm");
+	c.set_material_override(inst);
+	//
 }
 
 
