@@ -233,8 +233,16 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 
 				ImGui::Separator();
 
-				const bool instantiate_prefab_enabled = context_menu_entity && context_menu_entity->what_prefab && context_menu_entity->is_root_of_prefab;
-				if (ImGui::MenuItem("Instantiate prefab", nullptr, nullptr, instantiate_prefab_enabled)) {
+				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->what_prefab && context_menu_entity->is_root_of_prefab;
+				if (is_entity_root_of_prefab) {
+					if (ImGui::MenuItem("Select prefab in browser")) {
+						global_asset_browser.set_selected(context_menu_entity->what_prefab->get_name());
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::Separator();
+				}
+
+				if (ImGui::MenuItem("Instantiate prefab", nullptr, nullptr, is_entity_root_of_prefab)) {
 					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(ed_doc, context_menu_entity));
 					oo->contextMenuHandle = EntityPtr(nullptr);
 					ImGui::CloseCurrentPopup();

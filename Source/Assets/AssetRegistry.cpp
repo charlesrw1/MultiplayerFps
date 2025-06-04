@@ -133,6 +133,7 @@ public:
 		}
 		root->remove_unused_R();
 		root->sort_R();
+		root->set_parent_R();
 
 		return true;
 	}

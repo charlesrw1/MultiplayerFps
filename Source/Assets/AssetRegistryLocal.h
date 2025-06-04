@@ -2,6 +2,7 @@
 #include "AssetRegistry.h"
 
 struct AssetFilesystemNode {
+	AssetFilesystemNode* parent = nullptr;
 	bool is_used = true;
 	bool folder_is_open = false;
 	AssetOnDisk asset;
@@ -40,7 +41,12 @@ struct AssetFilesystemNode {
 		for (auto& c : children)
 			c.second.set_folder_open_R(b);
 	}
-
+	void set_parent_R() {
+		for (auto& c : children) {
+			c.second.parent = this;
+			c.second.set_parent_R();
+		}
+	}
 	void sort_R();
 
 	void add_path(const AssetOnDisk& a, const std::vector<std::string>& path, size_t index = 0) {

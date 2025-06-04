@@ -24,6 +24,9 @@ public:
 	bool should_type_show(int type) const {
 		return filter_type_mask & (uint32_t)type;
 	}
+	void set_selected(const std::string& path);
+	AssetFilesystemNode* find_node_for_asset(const std::string& path) const;
+
 
 	enum class Mode
 	{

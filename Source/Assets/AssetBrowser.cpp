@@ -147,6 +147,43 @@ static void draw_browser_tree_view(AssetBrowser* b)
 }
 
 
+AssetFilesystemNode* AssetBrowser::find_node_for_asset(const std::string& path) const
+{
+	// brute force lols
+	auto root = AssetRegistrySystem::get().get_root_files();
+	auto recurse = [](auto&& self, const std::string& path, AssetFilesystemNode* n) -> AssetFilesystemNode* {
+		if (!n->is_folder()) {
+			if (n->asset.filename == path)
+				return n;
+		}
+		for (auto& c : n->children) {
+			auto r = self(self,path, &c.second);
+			if (r)
+				return r;
+		}
+		return nullptr;
+	};
+	return recurse(recurse,path, root);
+}
+void AssetBrowser::set_selected(const std::string& path)
+{
+	auto find = find_node_for_asset(path);
+	if (!find) {
+		sys_print(Error, "couldnt find to select\n");
+		return;
+	}
+	auto f = find;
+	while (f) {
+		f->folder_is_open = true;
+		f = f->parent;
+	}
+	selected_resource.filename = path;
+
+	int len = std::min(255, (int)path.size());
+	memcpy(asset_name_filter, path.c_str(), len);
+	asset_name_filter[len] = 0;
+}
+
 void AssetBrowser::imgui_draw()
 {
 	double_clicked_selected = false;

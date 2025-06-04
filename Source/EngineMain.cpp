@@ -2298,12 +2298,6 @@ static void check_object_for_asset_ptr(ClassBase* obj, IAssetLoadingInterface* l
 
 void GameEngineLocal::do_asset_gc()
 {
-	static int i = 0;
-	//i += 1;
-	//if (i <= 2)
-	//	return;
-	//i = 0;
-
 	if (!get_level())
 		return;
 	printf("Starting GC...\n");
