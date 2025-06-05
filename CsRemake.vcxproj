@@ -29,10 +29,13 @@
   <ItemGroup>
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
+    <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
+    <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
+    <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
@@ -76,6 +79,7 @@
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
+    <ClInclude Include="Source\Framework\StringUtils.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
@@ -211,6 +215,7 @@
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptAsset.h" />
     <ClInclude Include="Source\Scripting\ScriptComponent.h" />
+    <ClInclude Include="Source\Scripting\ScriptManager.h" />
     <ClInclude Include="Source\Scripting\ScriptManagerPublic.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />

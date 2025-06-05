@@ -585,6 +585,13 @@ bool FindAnimGraphVariableProp::internal_update()
 		}, "AnimGraphVariableDrag", "variable");
 
 }
+int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
+bool CodeBlockPropEditor::internal_update()
+{
+	auto& str = *(std::string*)prop->get_ptr(instance);
+	ImGui::InputTextMultiline("##input", str.data(), str.size() + 1, ImVec2(0, 0), ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize,&str);
+	return false;
+}
 
 void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 {
@@ -593,6 +600,9 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 	factory.add("AssetPtr", []() {return new AssetPropertyEditor; });
 	factory.add("SoftAssetPtr", []() {return new SoftAssetPropertyEditor; });
 	factory.add("ClassTypePtr", []() {return new ClassTypePtrPropertyEditor; });
+
+	factory.add("code_block", []() {return new CodeBlockPropEditor; });
+
 }
 void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory)
 {

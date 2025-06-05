@@ -6,7 +6,7 @@
 typedef uint64_t name_hash_t;
 
 
-#define NAME(x) StringName(x, std::integral_constant<name_hash_t,StringUtils::fnv1a_64(x, StringUtils::const_strlen(x))>())
+#define NAME(x) StringName(x, std::integral_constant<name_hash_t,StringUtils_Hash::fnv1a_64(x, StringUtils_Hash::const_strlen(x))>())
 
 class StringName
 {

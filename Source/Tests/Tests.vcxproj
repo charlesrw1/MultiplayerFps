@@ -147,7 +147,9 @@
   <ItemGroup>
     <ClCompile Include="level_edit_test.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="script_test.cpp" />
     <ClCompile Include="serialize_tests.cpp" />
+    <ClCompile Include="string_util_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="object_outliner_filter.cpp" />

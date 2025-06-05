@@ -524,6 +524,8 @@
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
+    <ClInclude Include="Source\Scripting\ScriptManager.h" />
+    <ClInclude Include="Source\Framework\StringUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -787,6 +789,9 @@
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
+    <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
+    <ClCompile Include="Source\Framework\StringUtils.cpp" />
+    <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -3,6 +3,22 @@
 
 Prefab = {}
 
+---@class Signal
+Signal = {
+    funcs = {}
+}
+---@param func fun(...):nil
+function Signal:add(func)
+    self.funcs[#self.funcs+1]=func
+end
+function Signal:call(...)
+    
+end
+
+---@return Signal
+function Signal:new()
+    return Signal
+end
 
 local function create_asset(type, name)
     return nil
@@ -28,7 +44,7 @@ end
 Interactable = {}
 
 ---@class Component
-Component = {__index = nil}
+Component = {__index = nil, implements = {}}
 function Component.extend()
     return { __index = Component }
 end
@@ -79,26 +95,293 @@ function ShallowTableCopy(orig)
 end
 
 ---@class RootObject
-RootObject = {}
+RootObject = {
+    implements={}, 
+    ---@type Component
+    owner=nil
+}
 
 function RootObject:new()
     return ShallowTableCopy(self)
 end
+function RootObject:ptr()
+    return {ptr_type=self}
+end
+
+---@class Vec3
+---@field x number
+---@field y number
+---@field z number
+Vec3 =  {
+}
+---@return Vec3
+function Vec3:new(...) end
+---@return number
+function Vec3:length() end
+---@return Vec3
+---@param other Vec3
+---@return number
+function Vec3:dot(other) end
+---@return Vec3
+---@param other Vec3
+---@return Vec3
+function Vec3:cross(other) end
+
+---@class Transform
+Transform = {
+}
+---@return Transform
+function Transform:new(...) end
+
+
+
+---@class Vec3
+Quat = {
+}
+
+---@class SomeEvent : AnimationEvent
+SomeEvent = {
+    left_foot = false
+}
+function SomeEvent:triggered(obj)
+    if self.left_foot then
+        assert(obj:is_a(Component))
+    end
+end
+
+Ptr = {
+    type = {}
+}
+function Ptr:new(type)
+    return {type=type}
+end
+
+---@class SomeScript : Component
+SomeScript = {
+    ---@type Component
+    target = nil
+}
+function SomeScript:start()
+    self.target:stuff()
+end
+
+CHARACTER_JUMP = 0
+CHARACTER_RUN = 1
+
+---@class CharacterAnimator : Animator
+CharacterAnimator = {
+    some_float = 0,
+    some_vec = Vec3:new(0),
+    some_quat = Quat:new(0),
+    some_bool = false,
+
+    state = CHARACTER_RUN,
+}
+function CharacterAnimator:on_update()
+    self.some_vec = self.some_vec * self.some_float
+    if self.some_bool then
+        self.state = CHARACTER_JUMP
+    end
+end
+
+-- test are classes just in script
+---@class KartManager : RootObject
+KartManager = {
+    players = {},
+    following_player = {}
+}
+function KartManager:tick()
+    
+end
+
+---@class TimeManager : RootObject
+TimeManager = {
+    current_lap = 0,
+    current_time = 0.0
+}
+
+local function level1_script()
+    local item = find_by_name("the_item")
+    item.PhysicsBody.triggered:add()
+end
+local function level2_script()
+    local box = find_by_name("the_item")
+end
+
+---@class PuzzleScript : Component
+PuzzleScript = {
+    board = {}
+}
+
+LEVEL_SCRIPTS = {
+    level1_script,
+    level2_script
+}
+
+-- class decl
+---@class GameManager : Component
+GameManager_T = {
+
+    ---@type Object         -- type annotations, for editor
+    ending_object = nil,
+
+    ---@type CharacterAnimator
+    player = nil,
+
+    -- test types can be inferred
+    a_number = 0,
+    on_round_restart    = Signal:new(),
+    where               = Vec3:new(), 
+    ---@type KartManager
+    kart_mgr            = nil,
+    time_mgr            = nil
+}
+
+-- global variable
+---@type GameManager
+GameManager = nil
+
+function GameManager_T:start()
+    GameManager = self
+
+    self.ending_object.area = 0
+    self.where.x = 0
+    self.where.y = 0
+    local vec = self.where:cross(self.where)
+    local l = vec:length()
+    local num = self.where:dot(Vec3:new(0))
+    self.where.z = num:length() + l
+
+    local t = Transform:new(vec)
+    t = t * Transform:new(Quat:new())
+
+    self.on_round_restart:add(function (param)
+        print(param)
+    end)
+    self.on_round_restart:call(1)
+    
+    self.kart_mgr:tick()
+
+    self.time_mgr.current_lap = 0
+    
+    Debug.text(self.where,"Hello world",0)
+    Debug.box(self.where,Vec3:new(0.5),1.0)
+
+end
+
+Debug = {
+
+}
+function Debug.box(where, size, time)
+    
+end
+function Debug.text(where, string, time)
+    
+end
+
+
+
+-- declare an interface for damagable things
+
+---@class IDamagable
+IDamagable = {
+}
+function IDamagable:take_damange(dmg) end
+
+-- declare a Player class. inherit it from Component and the damageble interface
+
+---@class Player : Component, IDamagable
+Player = {      -- start your class with "<classname> = {"
+    -- declare your variables here
+    is_alive = true,
+
+    -- use type annotations for intellisense and refelction to the game engine
+    ---@type Component
+    another_component_in_the_game = nil,
+
+    -- built-in lua types can be inferred and dont need type annotations to work
+    name = ""
+}   -- end your class with "}" on a newline, sorry my parser sucks
+
+-- add functions
+
+---@return boolean
+function Player:another_func()
+    return self.is_alive and self.another_component_in_the_game ~= nil
+end
+
+function Player:update()
+    print("hello world " + self.name)
+    local cond = self:another_func()
+    if cond then
+        print("blah blah")
+        self.another_component_in_the_game:stuff()
+    end
+end
+
+function Player:take_damange(dmg)
+    print("ouch")
+end
 
 ---@class Object : RootObject
 Object = {area = 0, length = 0, breadth = 0, __index = RootObject}
--- Derived class method new
-
-
+Object.implements = {Interactable}
+function Object:do_stuff()
+end
 function Object:update()
+    G_Game.on_round_restart:add()
+    G_Game.
+
+    self.owner:extend()
     for i in ipairs(Object) do
         self:stuff()
     end
-    Object:new()
+    ---@type Object
+    local newobj = Object:new()
+    newobj:update()
 end
+
+RequiresElectricity = {}
+
+
+LightSwitch = {
+    is_on = false,
+    on_used = create_event()
+}
+LightSwitch.implements = {Interactable, RequiresElectricity}
+
+function LightSwitch:interact()
+    self.on_used.call()
+end
+function LightSwitch:is_on()
+
+end
+
+Piece = {
+    x = 0,
+    y = 0,
+    game_object = nil
+}
+function Piece:remove()
+    self.game_object:remove()
+end
+
+
+
+
+
+local var = 0
+
+function Object:interact()
+
+
+
+
+end
+---@
 function Object:start()
     if self.implements[Interactable] then
-        
+        self:interact()
     end
 end
 

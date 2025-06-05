@@ -2,6 +2,7 @@
 #include "Framework/Util.h"
 #include <stdexcept>
 #include <vector>
+#include <string>
 
 #define TEST_TRUE_COMMENT(code, comment) \
 	if(!(code)) { \
@@ -23,7 +24,7 @@
 	catch (...) { \
 	} \
 
-
+using std::string;
 typedef void(*test_func_t)();
 class ProgramTester
 {
@@ -50,8 +51,8 @@ private:
 	};
 	std::vector<Test> allTests;
 	bool test_failed = false;
-	const char* expression = "";
-	const char* reason = "";
+	string expression = "";
+	string reason = "";
 	bool is_in_test = false;
 };
 
@@ -64,3 +65,9 @@ struct AutoTestCaseAdd {
 #define ADD_TEST(name) void test_##name(); \
 static AutoTestCaseAdd autotester_##name = AutoTestCaseAdd(#name,test_##name); \
 void test_##name()
+
+class UnitTestUtil
+{
+public:
+	static std::string get_text_of_file(const std::string& text);
+};

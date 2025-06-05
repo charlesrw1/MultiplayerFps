@@ -1,0 +1,20 @@
+#pragma once
+#include <string>
+#include <vector>
+class StringUtils
+{
+public:
+	static bool is_whitespace(char c);
+	static std::string strip(const std::string& str);
+	static std::vector<std::string> to_lines(const std::string& input, char delim = '\n');
+	static std::vector<std::string> split(const std::string& input);
+	static void replace(std::string& str, const std::string& from, const std::string& to);
+	static std::string get_extension(const std::string& name);
+	static std::string get_extension_no_dot(const std::string& name);
+	static std::string strip_extension(const std::string& name);
+	static bool has_extension(const std::string& path, const std::string& ext);
+	static void remove_extension(std::string& file);
+	static void get_filename(std::string& file);
+	static std::string to_lower(const std::string& s);
+	static bool starts_with(const std::string& str, const std::string& what);
+};

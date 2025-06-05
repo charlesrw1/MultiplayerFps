@@ -6,6 +6,7 @@
 #include "Framework/ArrayReflection.h"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+
 inline std::string string_view_to_std_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }

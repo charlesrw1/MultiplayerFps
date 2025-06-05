@@ -53,6 +53,9 @@ public:
 	std::vector<EntityPtr> refs;
 	std::vector<OutstandingScriptDelegate> outstandings;
 	REF AssetPtr<Script> script;
+
+	REFLECT(type = "code_block");
+	std::string ctor;
 private:
 
 	void print_my_table();

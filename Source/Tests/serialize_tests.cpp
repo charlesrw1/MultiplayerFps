@@ -128,21 +128,11 @@ ADD_TEST(Serialization, BuildPath)
 
 }
 
-#include "Framework/Files.h"
-
-std::string get_text_of_file(const char* path)
-{
-	auto file = FileSys::open_read_engine(path);
-	std::string str(file->size(), ' ');
-	file->read(&str[0], str.size());
-	return str;
-}
-
 
 ADD_TEST(unserialize_prefab)
 {
 	// prefab unserialization
-	auto text = get_text_of_file("TestFiles/test2.pfb");
+	auto text = UnitTestUtil::get_text_of_file("TestFiles/test2.pfb");
 	PrefabAsset temp;
 	auto unserialized = unserialize_entities_from_text(text, nullptr, &temp);
 	auto root = unserialized.get_root_entity();

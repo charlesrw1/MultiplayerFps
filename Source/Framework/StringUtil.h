@@ -7,7 +7,7 @@
 #endif
 
 // from vkguide
-namespace StringUtils {
+namespace StringUtils_Hash {
 
 	// FNV-1a 32bit hashing algorithm.
 	constexpr uint32_t fnv1a_32(char const* s, std::size_t count)

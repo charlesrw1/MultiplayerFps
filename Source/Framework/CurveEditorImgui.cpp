@@ -44,18 +44,7 @@ glm::vec2 bezier_evaluate(float t, const glm::vec2 p0, const glm::vec2& p1, cons
     return a + b + c + d;
 }
 
-int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
-{
-    std::string* user = (std::string*)data->UserData;
-    assert(user);
-
-    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-        user->resize(data->BufSize);
-        data->Buf = (char*)user->data();
-    }
-
-    return 0;
-}
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 void CurveEditorImgui::draw_editor_space()
 {

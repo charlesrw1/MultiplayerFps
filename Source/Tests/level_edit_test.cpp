@@ -1,6 +1,6 @@
 
 #include "Unittest.h"
-
+#if 0
 #undef ADD_TEST
 #define ADD_TEST(x) void test##x()
 
@@ -319,3 +319,4 @@ ADD_TEST(le_basic)
 	bench.start_editor("test/map0.tmap", false);
 
 }
+#endif

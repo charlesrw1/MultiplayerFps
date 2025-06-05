@@ -12,16 +12,8 @@
 #include "Framework/AddClassToFactory.h"
 #include "Framework/StringUtil.h"
 #include "SoftAssetPtr.h"
+#include "Framework/StringUtils.h"
 
-
-static std::string trim_whitespace(const std::string& str) {
-	size_t start = 0, end = str.length();
-
-	while (start < end && isspace(str[start])) start++;  // Skip leading spaces
-	while (end > start && isspace(str[end - 1])) end--;  // Skip trailing spaces
-
-	return str.substr(start, end - start);
-}
 
 class SerializeAssetPtr : public IPropertySerializer
 {
@@ -32,7 +24,7 @@ public:
 		IAsset** ptr_prop = (IAsset**)info.get_ptr(inst);
 		if (*ptr_prop) {
 
-			return trim_whitespace((*ptr_prop)->get_name());	// get the asset path
+			return StringUtils::strip((*ptr_prop)->get_name());	// get the asset path
 		}
 		else {
 			return "";	// return empty
@@ -69,7 +61,7 @@ public:
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
 		SoftAssetPtr<IAsset>* ptr = (SoftAssetPtr<IAsset>*)info.get_ptr(inst);
-		return trim_whitespace(ptr->path);
+		return StringUtils::strip(ptr->path);
 	}
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) override
 	{

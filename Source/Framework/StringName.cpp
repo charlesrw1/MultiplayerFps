@@ -33,7 +33,7 @@ StringName::StringName(const char* name)
 		return;
 	}
 
-	hash = StringUtils::fnv1a_64(name, StringUtils::const_strlen(name));
+	hash = StringUtils_Hash::fnv1a_64(name, StringUtils_Hash::const_strlen(name));
 #ifdef EDITOR_BUILD
 	add_to_nametable(name, hash);
 #endif // DEBUG_STRING_NAME

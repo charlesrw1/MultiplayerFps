@@ -7,6 +7,19 @@
 #include "Game/LevelAssets.h"
 #include "LevelSerialization/SerializationAPI.h"
 
+#include "Framework/Files.h"
+
+std::string UnitTestUtil::get_text_of_file(const std::string& path)
+{
+	auto file = FileSys::open_read_engine(path.c_str());
+	if (!file)
+		throw std::runtime_error("File not found " + path);
+	std::string str(file->size(), ' ');
+	file->read(&str[0], str.size());
+	return str;
+}
+
+
 bool ProgramTester::run_all(bool print_good)
 {
 	sys_print(Info, "--------- Running Tests ----------\n");
@@ -22,7 +35,7 @@ bool ProgramTester::run_all(bool print_good)
 		}
 		catch (std::runtime_error er) {
 			if (!test_failed)
-				set_test_failed("<unknown>", "threw an exception");
+				set_test_failed("exception", er.what());
 		}
 		is_in_test = false;
 
@@ -31,7 +44,7 @@ bool ProgramTester::run_all(bool print_good)
 				sys_print(Info, "good   %s\n", allTests[i].category);
 		}
 		else {
-			sys_print(Error, "FAILED %s (%s:%s)\n", allTests[i].category,expression, reason);
+			sys_print(Error, "FAILED %s (%s:%s)\n", allTests[i].category,expression.c_str(), reason.c_str());
 			er++;
 		}
 	}
@@ -140,9 +153,9 @@ class AObj : public BaseObject, public IMyInterface
 
 };
 
-static InterfaceDef A_interface_typeinfos[] = {
-	InterfaceDef(&IMyInterface::typeinfo,compute_ptr_off<IMyInterface,AObj>())
-};
+//static InterfaceDef A_interface_typeinfos[] = {
+//	InterfaceDef(&IMyInterface::typeinfo,compute_ptr_off<IMyInterface,AObj>())
+//};
 
 
 
@@ -161,11 +174,14 @@ ADD_TEST(assets)
 	auto inst = new MaterialInstance();
 	inst->editor_set_newly_made_path("something/testgrid.mm");
 	c.set_material_override(inst);
-	//
 }
+
+
 
 
 int main(int argc, char**argv)
 {
+	FileSys::init();
+
 	return !ProgramTester::get().run_all(true);
 }

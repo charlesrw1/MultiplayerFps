@@ -26,7 +26,6 @@
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
 
-#include "AssetCompile/Someutils.h"
 #include "AssetCompile/Someutils.h"// string stuff
 #include "Assets/AssetRegistry.h"
 
@@ -1460,7 +1459,7 @@ static std::string get_directory(const std::string& input)
 #include "EditorPopups.h"
 
 
-static int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
+int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
 {
 	std::string* user = (std::string*)data->UserData;
 	assert(user);

@@ -205,3 +205,11 @@ public:
 
 	const ClassTypeInfo* type_of_base = nullptr;
 };
+
+class CodeBlockPropEditor : public IPropertyEditor
+{
+public:
+	// Inherited via IPropertyEditor
+	virtual bool internal_update() override;
+	bool has_init = false;
+};
