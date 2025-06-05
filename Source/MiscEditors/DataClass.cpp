@@ -6,6 +6,7 @@
 #include "AssetCompile/Someutils.h"//fixme, for has_extension
 
 #include "Assets/AssetDatabase.h"
+#include "Framework/ReflectionProp.h"
 
 class IEditorTool;
 extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEditor.h
@@ -38,7 +39,7 @@ public:
 
 REGISTER_ASSETMETADATA_MACRO(DataClassAssetMetadata);
 #endif
-#include "Framework/ObjectSerialization.h"
+
 
 
 bool DataClass::load_asset(IAssetLoadingInterface* load)

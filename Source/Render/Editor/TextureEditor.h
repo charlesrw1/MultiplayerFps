@@ -8,7 +8,7 @@
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetDatabase.h"
-#include "Framework/ObjectSerialization.h"
+
 #include "LevelEditor/PropertyEditors.h"
 #include "Framework/FnFactory.h"
 
@@ -106,7 +106,8 @@ inline void TextureEditorTool::close_internal()
 	delete editing_object;
 	editing_object = nullptr;
 }
-
+#include "Framework/ReflectionProp.h"
+#include "Framework/DictWriter.h"
 inline bool TextureEditorTool::save_document_internal()
 {
 	auto path = strip_extension(get_doc_name()) + ".tis";

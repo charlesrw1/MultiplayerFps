@@ -5,7 +5,6 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ArrayReflection.h"
 #include "Framework/AddClassToFactory.h"
-#include "Framework/ObjectSerialization.h"
 
 #include "Statemachine_cfg.h"
 

@@ -339,9 +339,6 @@
     <ClInclude Include="Source\Framework\ClassBase.h">
       <Filter>Source\Framework\ClassSystem</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ObjectSerialization.h">
-      <Filter>Source\Framework\ReflectionSys</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\EnumDefReflection.h">
       <Filter>Source\Framework\ReflectionSys</Filter>
     </ClInclude>
@@ -426,7 +423,6 @@
     <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Framework\PropHashTable.h" />
-    <ClInclude Include="Source\Framework\SerializerFunctions.h" />
     <ClInclude Include="Source\UI\UILoader.h" />
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
@@ -792,6 +788,7 @@
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
+    <ClCompile Include="Source\Framework\JsonSerialization.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

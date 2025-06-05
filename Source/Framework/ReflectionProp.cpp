@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+
 inline std::string string_view_to_std_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
@@ -189,7 +190,7 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t fl
 	prop.range_hint = hint;
 	return prop;
 }
-#include "ObjectSerialization.h"
+
 void write_unique_ptr(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassBase* userptr)
 {
 	write_object_properties(*(ClassBase**)ptr, userptr, out);

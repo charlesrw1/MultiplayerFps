@@ -9,7 +9,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/FreeList.h"
-#include "Framework/ObjectSerialization.h"
+
 #include "Framework/Files.h"
 #include "Framework/MeshBuilder.h"
 

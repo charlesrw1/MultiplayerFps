@@ -3,7 +3,7 @@
 
 #include "AssetCompile/Someutils.h"
 #include "GameEnginePublic.h"
-#include "Framework/ObjectSerialization.h"
+
 #include "Framework/Files.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/DrawPublic.h"	// for dummy View_Setup
@@ -88,6 +88,8 @@ void DataClassEditor::close_internal()
 	editing_object = nullptr;
 
 }
+#include "Framework/ReflectionProp.h"
+#include "Framework/DictWriter.h"
 #include <fstream>
 bool DataClassEditor::save_document_internal()
 {

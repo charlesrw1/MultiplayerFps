@@ -16,7 +16,7 @@
 #include "AssetCompile/Compiliers.h"
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
-#include "Framework/ObjectSerialization.h"
+
 #include "Memory.h"
 
 #include "Framework/Config.h"
@@ -783,6 +783,8 @@ ModelMan::ModelMan() : all_models(6)
 #ifdef EDITOR_BUILD
 #include "AssetCompile/ModelAsset2.h"
 #include <fstream>
+#include "Framework/ReflectionProp.h"
+#include "Framework/DictWriter.h"
 DECLARE_ENGINE_CMD(IMPORT_MODEL)
 {
 	if (args.size() != 2) {

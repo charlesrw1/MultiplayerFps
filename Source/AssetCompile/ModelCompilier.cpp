@@ -15,7 +15,6 @@
 
 #include "Animation/AnimationUtil.h"
 
-#include "Framework/ObjectSerialization.h"
 #include "Framework/BinaryReadWrite.h"
 #include "Physics/Physics2.h"
 #include "AssetCompile/Someutils.h"

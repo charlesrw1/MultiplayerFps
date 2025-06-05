@@ -1,7 +1,6 @@
-#include "SerializerFunctions.h"
+#include "ReflectionProp.h"
 #include "PropHashTable.h"
-
-#include "SerializerFunctions.h"
+#include "BinaryReadWrite.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -282,6 +281,48 @@ void write_properties_with_diff_binary(const PropertyInfoList& list, void* ptr, 
 
 		write_field_type_binary(true, prop.type, ptr, diff_class, prop, out, userptr);
 	}
+}
+
+void copy_object_properties(ClassBase* from, ClassBase* to, ClassBase* userptr, IAssetLoadingInterface* load)
+{
+	assert(from->get_type() == to->get_type());
+
+	std::vector<const PropertyInfoList*> props;
+	const ClassTypeInfo* typeinfo = &from->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back(typeinfo->props);
+		typeinfo = typeinfo->super_typeinfo;
+	}
+	copy_properties(props, from, to, userptr, load);
+}
+void write_object_properties(ClassBase* obj, ClassBase* userptr, DictWriter& out)
+{
+	if (!obj) {
+		out.write_item_start();
+		out.write_item_end();
+		return;
+	}
+
+	std::vector<PropertyListInstancePair> props;
+	const ClassTypeInfo* typeinfo = &obj->get_type();
+	while (typeinfo) {
+		if (typeinfo->props)
+			props.push_back({ typeinfo->props, obj });
+		typeinfo = typeinfo->super_typeinfo;
+	}
+
+	typeinfo = &obj->get_type();
+
+	out.write_item_start();
+
+	out.write_key_value("type", typeinfo->classname);
+	for (auto& proplist : props) {
+		if (proplist.list)
+			write_properties(*const_cast<PropertyInfoList*>(proplist.list), proplist.instance, out, userptr);
+	}
+
+	out.write_item_end();
 }
 static void write_properties_binary(const PropertyInfoList& list, void* ptr, FileWriter& out, ClassBase* userptr)
 {

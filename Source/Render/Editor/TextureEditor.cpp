@@ -8,7 +8,8 @@ static TextureEditorTool s_texture_editor_tool;
 IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
 
 CLASS_IMPL(TextureImportSettings);
-
+#include "Framework/ReflectionProp.h"
+#include "Framework/DictWriter.h"
 
 DECLARE_ENGINE_CMD(IMPORT_TEX)
 {
