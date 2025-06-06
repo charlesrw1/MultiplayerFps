@@ -8,22 +8,15 @@
 #include "glm/glm.hpp"
 #include "DynamicMaterialPtr.h"
 
-// A global "UBO" of material params
-// Cant hold texture types
-CLASS_H(MaterialParameterBuffer,IAsset)
-public:
-	virtual void set_float_parameter(StringName name, float f) = 0;
-	virtual void set_bool_parameter(StringName name, bool b) = 0;
-	virtual void set_vec_parameter(StringName name, Color32 c) = 0;
-	virtual void set_fvec_parameter(StringName name, glm::vec4 v4) = 0;
-};
 
 class MasterMaterialImpl;
 class Texture;
 class IAssetLoadingInterface;
 class MaterialImpl;
-CLASS_H(MaterialInstance, IAsset)
+class MaterialInstance : public IAsset {
 public:
+	CLASS_BODY(MaterialInstance);
+
 	MaterialInstance();
 	virtual ~MaterialInstance() override;
 	MaterialInstance& operator=(MaterialInstance&& other) = default;
@@ -57,16 +50,9 @@ class MaterialManagerPublic
 {
 public:
 	virtual void init() = 0;
-
 	// Create a dynamic material from a material instance
 	virtual DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) = 0;
-
-	// find a parameter buffer with the given name
-	// ParameterBuffers function like singletons
-	virtual MaterialParameterBuffer* find_parameter_buffer(const char* name) = 0;
-
 	virtual void pre_render_update() = 0;
-
 	// same shader, may change this in future (depth shaders get ifdef'd anyways)
 	const MaterialInstance* get_shared_depth() const { return fallback; }
 	const MaterialInstance* get_fallback() const { return fallback; }

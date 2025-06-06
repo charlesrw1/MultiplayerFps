@@ -26,8 +26,7 @@ extern IEditorTool* g_mateditor;
 
 static ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
 
-CLASS_IMPL(MaterialInstance);
-CLASS_IMPL(MaterialParameterBuffer);
+
 
 #ifdef EDITOR_BUILD
 class MaterialAssetMetadata : public AssetMetadata

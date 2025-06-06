@@ -9,8 +9,7 @@
 
 #include "Framework/ReflectionProp.h"
 
-CLASS_IMPL(SceneAsset);
-CLASS_IMPL(PrefabAsset);
+
 
 #ifdef EDITOR_BUILD
 class IEditorTool;
@@ -77,6 +76,12 @@ static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
 #endif
 
 SceneAsset::~SceneAsset() {
+}
+SceneAsset::SceneAsset(){
+
+}
+PrefabAsset::PrefabAsset(){
+
 }
 
 void SceneAsset::uninstall() {

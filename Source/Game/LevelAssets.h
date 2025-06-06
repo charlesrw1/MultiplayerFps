@@ -2,12 +2,16 @@
 
 #include "Assets/IAsset.h"
 #include "Framework/Hashmap.h"
+#include "Framework/Reflection2.h"
 #include <memory>
 
 class BaseUpdater;
 class UnserializedSceneFile;
-CLASS_H(SceneAsset, IAsset)
+
+class SceneAsset : public IAsset {
 public:
+	CLASS_BODY(SceneAsset);
+	SceneAsset();
 	~SceneAsset();
 	// IAsset overrides
 	void sweep_references(IAssetLoadingInterface* load) const override {}
@@ -21,8 +25,10 @@ public:
 };
 
 
-CLASS_H(PrefabAsset, IAsset)
+class PrefabAsset : public IAsset {
 public:
+	CLASS_BODY(PrefabAsset);
+	PrefabAsset();
 	~PrefabAsset();
 	// IAsset overrides
 	void sweep_references(IAssetLoadingInterface* load) const override;

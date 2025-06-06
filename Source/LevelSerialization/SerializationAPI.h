@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "Framework/ClassBase.h"
-
+#include "Framework/Reflection2.h"
 class BaseUpdater;
 class PrefabAsset;
 class Entity;
@@ -99,8 +99,11 @@ std::string unserialize_relative_to_absolute(const char* relative,const char* ro
 std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab);
 
 // Passed down to serializers
-CLASS_H(LevelSerializationContext,ClassBase)
+
+class LevelSerializationContext : public ClassBase {
 public:
+	CLASS_BODY(LevelSerializationContext);
+
 	SerializedSceneFile* out = nullptr;
 	UnserializedSceneFile* in = nullptr;
 	BaseUpdater* cur_obj = nullptr;

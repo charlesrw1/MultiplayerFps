@@ -15,8 +15,6 @@
 // rules:
 // * path based on source
 
-CLASS_IMPL(LevelSerializationContext);
-
 BaseUpdater* LevelSerializationContext::get_object(uint64_t handle)
 {
 	ASSERT(out&&!in);

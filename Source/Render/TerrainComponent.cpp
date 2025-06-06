@@ -10,32 +10,21 @@
 
 #include "Game/Components/BillboardComponent.h"
 #include "Assets/AssetDatabase.h"
-CLASS_H(TerrainComponent,Component)
+class TerrainComponent : public Component {
 public:
-	AssetPtr<Texture> heightmap;
-	AssetPtr<MaterialInstance> terrain_material;
-	float vertical_scale = 10.0;
-	float width = 100.0;
-
-	int min_tess_level = 4;
-	int max_tess_level = 40;
-	float min_distance = 0.5;
-	float max_distance = 80;
+	CLASS_BODY(TerrainComponent);
+	REF AssetPtr<Texture> heightmap;
+	REF AssetPtr<MaterialInstance> terrain_material;
+	REF float vertical_scale = 10.0;
+	REF float width = 100.0;
+	REF int min_tess_level = 4;
+	REF int max_tess_level = 40;
+	REF float min_distance = 0.5;
+	REF float max_distance = 80;
 
 
 	handle<Render_Terrain> handle;
-	static const PropertyInfoList* get_props() {
-		START_PROPS(TerrainComponent)
-			REG_ASSET_PTR(heightmap, PROP_DEFAULT),
-			REG_ASSET_PTR(terrain_material, PROP_DEFAULT),
-			REG_FLOAT(vertical_scale, PROP_DEFAULT, "10.0"),
-			REG_FLOAT(width, PROP_DEFAULT, "100.0"),
-			REG_FLOAT(min_distance, PROP_DEFAULT, "0.5"),
-			REG_FLOAT(max_distance, PROP_DEFAULT, "80.0"),
-			REG_INT(min_tess_level, PROP_DEFAULT, "4"),
-			REG_INT(max_tess_level, PROP_DEFAULT, "40"),
-		END_PROPS(TerrainComponent)
-	}
+
 	
 	Render_Terrain make_terrain() {
 		Render_Terrain rt;
@@ -78,5 +67,3 @@ public:
 		idraw->get_scene()->get_terrain_interface()->update_terrain(handle, rt);
 	}
 };
-
-CLASS_IMPL(TerrainComponent);

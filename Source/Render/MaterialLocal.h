@@ -84,15 +84,15 @@ struct InstanceData
 	uint32_t index = 0;
 };
 
-class MaterialBufferLocal : public MaterialParameterBuffer
-{
-public:
-	std::vector<MaterialParameterDefinition> param_defs;
-	std::vector<MaterialParameterValue> values;
-
-	bufferhandle ubo_buffer = 0;
-	uint32_t buffer_size = 0;
-};
+//class MaterialBufferLocal : public MaterialParameterBuffer
+//{
+//public:
+//	std::vector<MaterialParameterDefinition> param_defs;
+//	std::vector<MaterialParameterValue> values;
+//
+//	bufferhandle ubo_buffer = 0;
+//	uint32_t buffer_size = 0;
+//};
 
 
 // compilied material, material instances can be based off it to allow for variation but minimize draw call changes
@@ -117,7 +117,7 @@ public:
 	std::vector<MaterialParameterDefinition> param_defs;
 	uint32_t num_texture_bindings = 0;
 	struct UboBinding {
-		MaterialParameterBuffer* buffer = nullptr;
+		//MaterialParameterBuffer* buffer = nullptr;
 		uint32_t binding_loc = 0;
 	};
 	std::vector<UboBinding> constant_buffers;
@@ -275,7 +275,7 @@ public:
 	
 		queued_dynamic_mats_to_delete.push_back(mat);
 	}
-	MaterialParameterBuffer* find_parameter_buffer(const char* name) override { return nullptr; }
+
 
 	program_handle get_mat_shader(
 		bool is_animated, 
@@ -340,9 +340,6 @@ private:
 
 	// bitmap allocator for materials
 	std::vector<uint64_t> materialBitmapAllocator;
-
-	std::unordered_map<std::string, MaterialParameterBuffer*> parameter_buffers;
-
 	std::vector<MaterialInstance*> queued_dynamic_mats_to_delete;
 
 	// materials to allocate or update
