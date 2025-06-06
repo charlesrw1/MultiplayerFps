@@ -382,10 +382,12 @@ void write_list(PropertyInfo* listprop, void* ptr, const void* diff_ptr, DictWri
 
 			auto str = write_field_type(false/* dont write name */, prop.type, member_dat, nullptr, prop, out, userptr);
 			//ASSERT(str.second); // FIXME???
-			if(str.second)
-				buf += str.first;
-			out.write_value_quoted(buf.c_str());
-			buf.clear();
+			if (!str.first.empty()) {
+				if (str.second)
+					buf += str.first;
+				out.write_value_quoted(buf.c_str());
+				buf.clear();
+			}
 		}
 		out.write_list_end();
 	}
@@ -822,4 +824,23 @@ PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, c
 	p.type = core_type_id::List;
 	p.list_ptr = type;
 	return p;
+}
+
+IListCallback::IListCallback(PropertyInfo atom_prop) {
+	StaticList.count = 1;
+	StaticProp = atom_prop;
+	StaticList.list = &StaticProp;
+	this->props_in_list = &StaticList;
+	is_new_list_type = true;
+}
+
+const PropertyInfo* IListCallback::get_property() const {
+	if (!is_new_list_type)
+		return nullptr;
+	return &StaticProp;
+}
+
+bool IListCallback::get_is_new_list_type() const
+{
+	return is_new_list_type;
 }

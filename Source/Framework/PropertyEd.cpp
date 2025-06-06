@@ -739,12 +739,19 @@ bool ArrayRow::draw_row_controls()
 
 	 IListCallback* list = prop->list_ptr;
 	 int count = list->get_size(prop->get_ptr(instance));
-	 const PropertyInfoList* struct_ = list->props_in_list;
-
-
 
 	 for (int i = 0; i < count; i++) {
-		 child_rows.push_back(std::unique_ptr<IGridRow>(new GroupRow(factory,this, list->get_index(prop->get_ptr(instance), i), struct_, i, property_flag_mask)));
+		 IGridRow* row = nullptr;
+		 if (list->get_is_new_list_type()) { // new way
+			 void* inst = list->get_index(prop->get_ptr(instance), i);
+			 row = create_row(factory, this, (PropertyInfo*)list->get_property(), inst, i, property_flag_mask);
+		 }
+		 else {	// old way
+			 const PropertyInfoList* struct_ = list->props_in_list;
+			 row = new GroupRow(factory, this, list->get_index(prop->get_ptr(instance), i), struct_, i, property_flag_mask);
+		 }
+		 assert(row);
+		 child_rows.push_back(std::unique_ptr<IGridRow>(row));
 	 }
  }
 

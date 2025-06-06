@@ -230,18 +230,16 @@ class IListCallback
 public:
 	IListCallback(const PropertyInfoList* struct_) 
 		: props_in_list(struct_) {}
-	IListCallback(PropertyInfo atom_prop) {
-		StaticList.count = 1;
-		StaticProp = atom_prop;
-		StaticList.list = &StaticProp;
-		this->props_in_list = &StaticList;
-	}
+	IListCallback(PropertyInfo atom_prop);
 	const PropertyInfoList* props_in_list = nullptr;
+	const PropertyInfo* get_property() const;
+	bool get_is_new_list_type() const;
 	virtual uint8_t* get_index(void* inst, int index) = 0;
 	virtual int get_size(void* inst) = 0;
 	virtual void resize(void* inst, int new_size) = 0;
 	virtual void swap_elements(void* inst, int item0, int item1) = 0;
 private:
+	bool is_new_list_type = false;
 	// for atom types
 	PropertyInfo StaticProp;
 	PropertyInfoList StaticList;
