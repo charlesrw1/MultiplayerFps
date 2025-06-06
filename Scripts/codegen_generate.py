@@ -17,10 +17,14 @@ def write_headers(path:str, additional_includes:list[str]):
     return out + "\n"
 
 # code gen to make macros to make templates to make code ...
-def write_prop(prop : Property) -> str:
+def write_prop(prop : Property,newclass:ClassDef) -> str:
     prop.custom_type = f'"{prop.custom_type}"'
     prop.hint = f'"{prop.hint}"'
     type = prop.new_type.type
+
+    offset_str = f"offsetof({newclass.classname}, {prop.name})"
+    name_str = f"\"{prop.name}\""
+    name_and_offset = name_str + "," + offset_str +","+prop.get_flags()+ ",\"" + prop.tooltip + "\""
 
     if type == BOOL_TYPE:
         return f"REG_BOOL_W_CUSTOM({prop.name},{prop.get_flags()},{prop.custom_type},{prop.hint})"
@@ -51,8 +55,13 @@ def write_prop(prop : Property) -> str:
         return f"REG_STDVECTOR_NEW({prop.name},{prop.get_flags()})"
     elif type == COLOR32_TYPE:
         return f"REG_INT_W_CUSTOM({prop.name}, {prop.get_flags()}, \"\", \"ColorUint\")"
-    elif type == NONE_TYPE or type == STRUCT_TYPE:
+    elif type == OLD_VOID_STRUCT_TYPE:
         return f"REG_STRUCT_CUSTOM_TYPE({prop.name},{prop.get_flags()},{prop.custom_type})"
+    elif type == STRUCT_TYPE:
+        assert(not prop.new_type.is_pointer)
+        structtype = prop.new_type.typename
+        assert(structtype!=None)
+        return f"make_new_struct_type({name_and_offset},&{structtype.classname}::StructType)"
     elif type == ENUM_TYPE:
         name = prop.new_type.typename
         assert(name!=None)
@@ -200,10 +209,21 @@ def write_class_old(newclass : ClassDef)->str:
                     {newclass.classname}::CreateDefaultObject\n \
                 );\n"
     elif newclass.object_type == ClassDef.TYPE_STRUCT:
-         output += f"StructTypeInfo {newclass.classname}::StructType = StructTypeInfo(\n \
+        has_serialize = does_struct_have_serialize_function(newclass)
+        if has_serialize:
+            output += f"static void {newclass.classname}_serialize_private(void* p, Serializer& s)\n"
+            output += "{\n"
+            output += f"\t(({newclass.classname}*)p)->serialize(s);\n"
+            output += "}\n"
+
+        output += f"StructTypeInfo {newclass.classname}::StructType = StructTypeInfo(\n \
                     \"{newclass.classname}\",\n \
-                    {newclass.classname}::get_props()\n \
-                );\n"
+                    {newclass.classname}::get_props(),\n"
+        if has_serialize:
+            output += f"{newclass.classname}_serialize_private\n"
+        else:
+            output += "nullptr\n"
+        output += ");\n"
 
 
     if newclass.object_type == ClassDef.TYPE_CLASS or newclass.object_type == ClassDef.TYPE_STRUCT:
@@ -217,7 +237,7 @@ def write_class_old(newclass : ClassDef)->str:
 
             output += f"    START_PROPS({newclass.classname})"
             for p in newclass.properties:
-                output += "\n\t\t" + write_prop(p) + ","
+                output += "\n\t\t" + write_prop(p,newclass) + ","
             output=output[:-1]
             output += f"\n    END_PROPS({newclass.classname})\n"
         else:

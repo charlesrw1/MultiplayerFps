@@ -599,6 +599,8 @@ Texture* Texture::install_system(const std::string& path)
 	g_assets.install_system_asset(t, path);
 	return t;
 }
+Texture::Texture() {}
+Texture::~Texture() {}
 
 
 void benchmark_run()

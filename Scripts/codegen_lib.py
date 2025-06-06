@@ -33,6 +33,8 @@ QUAT_TYPE = 32
 COLOR32_TYPE = 33
 
 STRUCT_TYPE = 40 # STRUCT_BODY() type
+OLD_VOID_STRUCT_TYPE = 41 # old, get rid of this
+
 
 # ptr types
 ASSET_PTR_TYPE = 50  
@@ -413,7 +415,7 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
             base_type = STRUCT_TYPE
     else:
         print(f"unknown type, assuming struct: {base}")
-        base_type = STRUCT_TYPE
+        base_type = OLD_VOID_STRUCT_TYPE
        # raise Exception(f"cant parse type: {base}")
 
     template_args : list[CppType]= []

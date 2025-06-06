@@ -785,3 +785,11 @@ Factory<std::string, IPropertySerializer>& IPropertySerializer::get_factory()
 	static Factory<std::string, IPropertySerializer> inst;
 	return inst;
 }
+PropertyInfo make_new_struct_type(const char* name, uint16_t offset, int flags, const char* tooltip, StructTypeInfo* type)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::ActualStruct;
+	p.struct_type = type;
+	return p;
+}

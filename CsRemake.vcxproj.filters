@@ -515,6 +515,8 @@
     <ClInclude Include="Source\Scripting\ScriptManager.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
     <ClInclude Include="Source\Framework\StructReflection.h" />
+    <ClInclude Include="Source\Framework\PropertyPtr.h" />
+    <ClInclude Include="Source\Framework\Serializer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -777,6 +779,7 @@
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
     <ClCompile Include="Source\Framework\JsonSerialization.cpp" />
+    <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

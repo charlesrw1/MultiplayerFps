@@ -28,6 +28,7 @@ enum class core_type_id : uint8_t
 	Struct,
 	StdString,
 	List,
+	ActualStruct,	// not the fake struct...
 
 	Function,	// not really a property... represents a callable function by script (call_function)
 	GetterFunc,	// a function but it can be called like a variable access, must be const and have no parameters
@@ -81,6 +82,7 @@ struct lua_State;
 typedef std::string(*SerializePropFunc_t)(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user);
 typedef void(*UnSerializePropFunc_t)(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user);
 
+class StructTypeInfo;
 struct multicast_funcs;
 class IListCallback;
 struct PropertyInfoList;
@@ -98,10 +100,12 @@ struct PropertyInfo {
 	const char* custom_type_str = "";
 	const char* tooltip = "";
 	const EnumTypeInfo* enum_type = nullptr;
+	const StructTypeInfo* struct_type = nullptr;
+
 	//SerializePropFunc_t serialize_func = nullptr;
 	//UnSerializePropFunc_t unserialize_func = nullptr;
-	int(*call_function)(lua_State* L) = nullptr;
-	const multicast_funcs* multicast = nullptr;
+	//int(*call_function)(lua_State* L) = nullptr;
+	//const multicast_funcs* multicast = nullptr;
 
 	uint8_t* get_ptr(const void* inst) const {
 		return (uint8_t*)inst + offset;

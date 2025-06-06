@@ -45,7 +45,7 @@ void push_entity_to_lua(lua_State* L, Entity* e) {
 void push_entitycomponent_to_lua(lua_State* L, Component* ec) {
 	make_table_for_gameobject(L, ec);
 }
-
+#if 0
 template<>
 void push_to_lua(lua_State* L, float f)
 {
@@ -121,7 +121,6 @@ void push_to_lua(lua_State* L, glm::vec3 v)
 	luaL_getmetatable(L, "Vector");
 	lua_setmetatable(L, -2);
 }
-
 static int vec_add(lua_State* L)
 {
 	auto v1 = get_from_lua<glm::vec3>(L, 1);
@@ -226,6 +225,7 @@ static int vec_create(lua_State* L)
 	push_to_lua(L, glm::vec3(x, y, z));
 	return 1;
 }
+#endif
 
 
 int object_table_access(lua_State* L);
@@ -236,7 +236,7 @@ class ScriptManagerLocal : public ScriptManagerPublic
 {
 public:
 	void init() final {
-	
+#if 0
 		L = luaL_newstate();
 		luaL_openlibs(L);
 		// init metatables
@@ -308,6 +308,7 @@ public:
 		}
 
 		lua_settop(L, 0);
+#endif
 	}
 	void push_global(ClassBase* c, const char* name) final {
 		if (c->is_a<BaseUpdater>())
@@ -341,7 +342,7 @@ static void add_delegate(lua_State* L, ClassBase* md, PropertyInfo* pi, const ch
 	ASSERT(ptr);
 	ScriptComponent* me = (ScriptComponent*)ptr;
 
-	pi->multicast->add(pi->get_ptr(md), me, funcname);
+	//pi->multicast->add(pi->get_ptr(md), me, funcname);
 
 	if (md->is_a<BaseUpdater>()) {
 		OutstandingScriptDelegate out;
@@ -379,8 +380,8 @@ static int multicast_add_lua(lua_State* L)
 	const char* name = lua_tostring(L, 2);
 
 	PropertyInfo* pi = (PropertyInfo*)prp;
-	if (!pi->multicast)
-		lua_error(L);
+	//if (!pi->multicast)
+	//	lua_error(L);
 
 	add_delegate(L, (ClassBase*)md, pi, name);
 
@@ -487,6 +488,7 @@ static int table_access_shared(lua_State* L, ClassBase* c)
 			return 0;
 		}
 	}
+#if 0
 	auto prop = find->second;
 	if (prop->type == core_type_id::Function) {
 		lua_pushcfunction(L, prop->call_function);
@@ -527,9 +529,10 @@ static int table_access_shared(lua_State* L, ClassBase* c)
 		return 1;
 	}
 	else {
-		luaL_error(L, "not valid property to access: %s", str);
 		return 0;
 	}
+#endif
+		luaL_error(L, "not valid property to access: %s", str);
 	return 1;
 }
 
@@ -811,6 +814,7 @@ void ScriptComponent::start()
 }
 void ScriptComponent::end()
 {
+#if 0
 	if (loaded_successfully) {
 		call_function("event_end");
 		
@@ -830,9 +834,11 @@ void ScriptComponent::end()
 		lua_rawsetp(L, LUA_REGISTRYINDEX, this);
 
 	}
+#endif
 }
 void ScriptComponent::update()
 {
+	return;
 	if (!loaded_successfully || !call_function("event_update")) {
 		set_ticking(false);
 	}

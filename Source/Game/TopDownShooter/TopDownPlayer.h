@@ -4,12 +4,16 @@
 #include "Animation/SkeletonData.h"
 #include "Sound/SoundComponent.h"
 #include "Framework/StructReflection.h"
-
+struct Serializer;
 struct MyStruct
 {
 	STRUCT_BODY();
 	REF float x = 0;
 	REF float y = 0;
+
+	REF void serialize(Serializer& d) {
+
+	}
 };
 
 class CameraShake
@@ -83,9 +87,9 @@ class TopDownPlayer : public Component
 {
 public:
 	CLASS_BODY(TopDownPlayer);
+	REF MyStruct numbers;
 
-
-	REF TopDownControls con;
+	TopDownControls con;
 	REF AssetPtr<PrefabAsset> shotgunSoundAsset;
 	REF AssetPtr<AnimationSeqAsset> runToStart;
 	REF AssetPtr<AnimationSeqAsset> idleToRun;

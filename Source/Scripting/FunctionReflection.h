@@ -6,6 +6,7 @@
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
 #include "Assets/IAsset.h"
+#if 0
 struct ClassTypeInfo;
 class Entity;
 class IAsset;
@@ -120,21 +121,6 @@ int lua_callable_func(lua_State* L)
 }
 
 
-inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lua_State*), int is_getter_or_setter /*0=none,1=getter,2=setter*/) {
-    PropertyInfo p;
-    p.flags = 0;
-    p.type = core_type_id::Function;
-    if (is_getter_or_setter == 1) {
-        p.type = core_type_id::GetterFunc;
-    }
-    else if (is_getter_or_setter == 2) {
-        p.type = core_type_id::SetterFunc;
-    }
-    p.call_function = call_func;
-    p.name = name;
-    return p;
-}
-
 
 template <typename... Args>
 void push_args_to_lua(lua_State* L, Args&&... args) {
@@ -178,23 +164,38 @@ struct multicast_funcs
     void(*remove)(void* self, ScriptComponent*) = nullptr;
 };
 
-template<typename ... Args>
-inline PropertyInfo make_delegate_prop(MulticastDelegate<Args...>* dummy, const char* name, int offset) {
-    static multicast_funcs funcs = {
-        add_multi<Args...>,
-        remove_multi<Args...>
-    };
+#endif
+
+
+
+inline PropertyInfo make_delegate_prop(void* dummy, const char* name, int offset) {
+   
     PropertyInfo p;
     p.flags = 0;
     p.type = core_type_id::MulticastDelegate;
-    p.multicast = &funcs;
+   // p.multicast = &funcs;
     p.offset = offset;
     p.name = name;
     return p;
 }
+inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lua_State*), int is_getter_or_setter /*0=none,1=getter,2=setter*/) {
+    PropertyInfo p;
+    p.flags = 0;
+    p.type = core_type_id::Function;
+    if (is_getter_or_setter == 1) {
+        p.type = core_type_id::GetterFunc;
+    }
+    else if (is_getter_or_setter == 2) {
+        p.type = core_type_id::SetterFunc;
+    }
+  //  p.call_function = call_func;
+    p.name = name;
+    return p;
+}
 
-#define REG_FUNCTION(func) make_function_prop_info(#func, lua_callable_func<& TYPE_FROM_START ::func>, 0)
-#define REG_GETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, lua_callable_func<& TYPE_FROM_START ::func>, 1)
-#define REG_SETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, lua_callable_func<& TYPE_FROM_START ::func>, 2)
-#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, lua_callable_func<& TYPE_FROM_START ::func>, 0)
-#define REG_MULTICAST_DELEGATE(name) make_delegate_prop(&((TYPE_FROM_START*)0)->name,#name, offsetof(TYPE_FROM_START,name))
+
+#define REG_FUNCTION(func) make_function_prop_info(#func, nullptr, 0)
+#define REG_GETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, nullptr, 1)
+#define REG_SETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name,nullptr, 2)
+#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, nullptr, 0)
+#define REG_MULTICAST_DELEGATE(name) make_delegate_prop(nullptr,#name, offsetof(TYPE_FROM_START,name))
