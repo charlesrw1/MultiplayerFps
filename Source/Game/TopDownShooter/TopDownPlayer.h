@@ -10,10 +10,19 @@ struct MyStruct
 	STRUCT_BODY();
 	REF float x = 0;
 	REF float y = 0;
+	REF std::string s = "";
 
 	REF void serialize(Serializer& d) {
 
 	}
+};
+class ComponentWithStruct : public Component
+{
+public:
+	CLASS_BODY(ComponentWithStruct);
+
+	REF MyStruct things;
+	REF bool is_happening = false;
 };
 
 class CameraShake

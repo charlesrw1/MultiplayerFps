@@ -15,3 +15,4 @@ public:
 	static const PropertyInfoList* get_props();
 
 PropertyInfo make_new_struct_type(const char* name, uint16_t offset, int flags, const char* tooltip, StructTypeInfo* type);
+PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip, IListCallback* type);

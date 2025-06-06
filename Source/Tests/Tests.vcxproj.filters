@@ -30,6 +30,9 @@
     <ClCompile Include="string_util_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="framwork_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h">

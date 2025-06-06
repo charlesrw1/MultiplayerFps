@@ -227,20 +227,12 @@ class IListCallback
 public:
 	IListCallback(const PropertyInfoList* struct_) 
 		: props_in_list(struct_) {}
-
-
-	// create based on a single prop, not struct type
-	// hacky, but I based everything on PropertyInfoList, not singular types like is needed for an array of 1 type
 	IListCallback(PropertyInfo atom_prop) {
 		StaticList.count = 1;
-		atom_prop.name = "_value";
-		atom_prop.offset = 0;
 		StaticProp = atom_prop;
 		StaticList.list = &StaticProp;
-
 		this->props_in_list = &StaticList;
 	}
-
 	const PropertyInfoList* props_in_list = nullptr;
 	virtual uint8_t* get_index(void* inst, int index) = 0;
 	virtual int get_size(void* inst) = 0;

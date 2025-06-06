@@ -195,7 +195,7 @@ void write_unique_ptr(PropertyInfo* listprop, void* ptr, DictWriter& out, ClassB
 {
 	write_object_properties(*(ClassBase**)ptr, userptr, out);
 }
-
+#include "StructReflection.h"
 void write_list(PropertyInfo* prop, void* ptr, const void* diff_ptr, DictWriter& out, ClassBase* userptr);
 std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type, void* ptr, const void* diff_ptr, PropertyInfo& prop, DictWriter& out, ClassBase* userptr) {
 	std::string value_str;
@@ -282,7 +282,14 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 
 		return std::pair<std::string, bool>{ {}, false };
 	}
-
+	case core_type_id::ActualStruct: {
+		if (write_name)
+			out.write_key(prop.name);
+		out.write_item_start();
+		write_properties(*prop.struct_type->properties, prop.get_ptr(ptr), out, userptr);
+		out.write_item_end();
+		return std::pair<std::string, bool>{ {}, false };
+	}break;
 	case core_type_id::Struct: {
 
 		auto& fac = IPropertySerializer::get_factory();
@@ -362,9 +369,8 @@ void write_list(PropertyInfo* listprop, void* ptr, const void* diff_ptr, DictWri
 	// special case for atom types
 	auto list_ptr = listprop->list_ptr;
 	ASSERT(list_ptr);
-	bool is_atom_type =
-		(list_ptr->props_in_list->count == 1
-			&& strcmp(list_ptr->props_in_list->list[0].name, "_value") == 0);
+	const bool is_atom_type = (list_ptr->props_in_list->count == 1);
+
 	if (is_atom_type) {
 
 		 auto& prop = list_ptr->props_in_list->list[0];
@@ -501,10 +507,23 @@ void parse_skip_field(DictParser& in, StringView tok)
 
 
 
-bool read_unique_ptr(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
+static bool read_unique_ptr(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	ClassBase* p = read_object_properties<ClassBase>(userptr, in, tok,load);
 	*(ClassBase**)ptr = p;
+	return true;
+}
+static bool read_struct(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
+{
+	assert(prop->type == core_type_id::ActualStruct);
+	if (!in.check_item_start(tok))
+		return false;
+	auto ret = read_properties(*prop->struct_type->properties, ptr, in, tok, userptr, load);
+	tok = ret.first;
+
+	if (!ret.second || !in.check_item_end(tok)) {
+		return false;
+	}
 	return true;
 }
 bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load);
@@ -514,9 +533,7 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 		return false;
 
 	auto listcallback = prop->list_ptr;
-	bool is_atom_type =
-		(listcallback->props_in_list->count == 1
-			&& strcmp(listcallback->props_in_list->list[0].name, "_value") == 0);
+	const bool is_atom_type = (listcallback->props_in_list->count == 1);
 	if (is_atom_type) {
 		in.read_string(tok);
 		int count = 0;
@@ -599,6 +616,11 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 	}break;
 	case core_type_id::StdUniquePtr: {
 		bool res = read_unique_ptr(prop, prop->get_ptr(ptr), in, tok, userptr,load);
+		if (!res)
+			parse_skip_object(in);
+	}break;
+	case core_type_id::ActualStruct: {
+		bool res = read_struct(prop, prop->get_ptr(ptr), in, tok, userptr, load);
 		if (!res)
 			parse_skip_object(in);
 	}break;
@@ -791,5 +813,13 @@ PropertyInfo make_new_struct_type(const char* name, uint16_t offset, int flags, 
 	p.tooltip = tooltip;
 	p.type = core_type_id::ActualStruct;
 	p.struct_type = type;
+	return p;
+}
+PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip, IListCallback* type)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::List;
+	p.list_ptr = type;
 	return p;
 }

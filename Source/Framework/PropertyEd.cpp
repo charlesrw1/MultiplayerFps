@@ -122,7 +122,7 @@ public:
 };
 
 
-
+#include "StructReflection.h"
 static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask)
 {
 	if (prop->type == core_type_id::List) {
@@ -131,6 +131,10 @@ static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow*
 	}
 	else if (prop->type == core_type_id::StdUniquePtr) {
 		auto row = new UniquePtrRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
+		return row;
+	}
+	else if (prop->type == core_type_id::ActualStruct) {
+		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop->struct_type->properties, row_idx, property_flag_mask);
 		return row;
 	}
 	else {
@@ -457,6 +461,7 @@ static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& fac
 		return new VectorEditor(instance, prop);
 	case core_type_id::Quat:
 		return new RotationEditor(instance, prop);
+
 	default:
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;

@@ -52,7 +52,8 @@ def write_prop(prop : Property,newclass:ClassDef) -> str:
     elif type == QUAT_TYPE:
         return f"REG_QUAT({prop.name},{prop.get_flags()})"
     elif type == ARRAY_TYPE:
-        return f"REG_STDVECTOR_NEW({prop.name},{prop.get_flags()})"
+        return f"make_new_array_type({name_and_offset}, vecdef_{prop.name})"
+       # return f"REG_STDVECTOR_NEW({prop.name},{prop.get_flags()})"
     elif type == COLOR32_TYPE:
         return f"REG_INT_W_CUSTOM({prop.name}, {prop.get_flags()}, \"\", \"ColorUint\")"
     elif type == OLD_VOID_STRUCT_TYPE:
