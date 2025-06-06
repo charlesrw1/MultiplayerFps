@@ -471,22 +471,3 @@ public:
 
 };
 
-inline bool SoundFile::load_asset(IAssetLoadingInterface*)
-{
-    std::string pathfull = FileSys::get_full_path_from_game_path( get_name() );
-    Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
-    if (!data) {
-        return false;
-    }
-
-    this->internal_data = data;
-    this->duration = data->alen / 44100.0;
-
-    return true;
-}
-
-inline void SoundFile::uninstall()
-{
-    Mix_FreeChunk(internal_data);
-    internal_data = nullptr;
-}

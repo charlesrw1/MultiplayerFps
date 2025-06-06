@@ -2,8 +2,6 @@
 #include "SoundComponent.h"
 #include "Assets/AssetRegistry.h"
 
-CLASS_IMPL(SoundFile);
-
 #ifdef EDITOR_BUILD
 class SoundAssetMetadata : public AssetMetadata
 {
@@ -30,3 +28,23 @@ static SoundSystemLocal soundsys_local;
 SoundSystemPublic* isound = &soundsys_local;
 
 ConfigVar snd_max_voices("snd.max_voices", "16", CVAR_INTEGER | CVAR_DEV, 0, 64);
+
+bool SoundFile::load_asset(IAssetLoadingInterface*)
+{
+	std::string pathfull = FileSys::get_full_path_from_game_path(get_name());
+	Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
+	if (!data) {
+		return false;
+	}
+
+	this->internal_data = data;
+	this->duration = data->alen / 44100.0;
+
+	return true;
+}
+
+void SoundFile::uninstall()
+{
+	Mix_FreeChunk(internal_data);
+	internal_data = nullptr;
+}

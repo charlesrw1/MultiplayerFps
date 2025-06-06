@@ -2,6 +2,7 @@
 #include "Assets/IAsset.h"
 #include "Framework/EnumDefReflection.h"
 #include <glm/glm.hpp>
+#include "Framework/Reflection2.h"
 
 // Sound Attenuation
 NEWENUM(SndAtn , uint8_t)
@@ -12,8 +13,10 @@ NEWENUM(SndAtn , uint8_t)
 };
 class IAssetLoadingInterface;
 struct Mix_Chunk;
-CLASS_H(SoundFile, IAsset)
+
+class SoundFile : public IAsset {
 public:
+    CLASS_BODY(SoundFile);
 private:
     Mix_Chunk* internal_data = nullptr;
     float duration = 0.0;

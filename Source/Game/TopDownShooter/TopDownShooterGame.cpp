@@ -58,8 +58,10 @@ float perlin(float x, float y) {
 }
 
 
-CLASS_H(TopDownFireScript,Component)
+
+class TopDownFireScript : public Component {
 public:
+    CLASS_BODY(TopDownFireScript);
 	TopDownFireScript() {
 		set_call_init_in_editor(true);
 	}
@@ -79,5 +81,5 @@ public:
 	float max_intensity = 30.0;
 	PointLightComponent* light = nullptr;
 };
-CLASS_IMPL(TopDownFireScript);
+
 
