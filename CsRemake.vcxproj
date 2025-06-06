@@ -264,7 +264,6 @@
     <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp" />
     <ClCompile Include="Source\Animation\Editor\Statemachine_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\State_node.cpp" />
-    <ClCompile Include="Source\Animation\Event.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />

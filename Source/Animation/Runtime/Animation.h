@@ -36,8 +36,10 @@ class AnimationSeq;
 class Animation_Tree_CFG;
 
 struct Rt_Vars_Base;
-CLASS_H(AnimatorInstance, ClassBase)
+class AnimatorInstance : public ClassBase {
 public:
+	CLASS_BODY(AnimatorInstance);
+
 	AnimatorInstance();
 	~AnimatorInstance();
 

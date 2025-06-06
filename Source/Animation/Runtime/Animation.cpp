@@ -21,8 +21,6 @@ using namespace glm;
 
 #include "Game/Components/GameAnimationMgr.h"
 
-CLASS_IMPL(AnimatorInstance);
-
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
 

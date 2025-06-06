@@ -7,10 +7,12 @@
 #include "Framework/Util.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ClassBase.h"
+#include "Framework/Reflection2.h"
 class Animator;
 
-CLASS_H(AnimationEvent, ClassBase)
+class AnimationEvent : public ClassBase {
 public:
+	CLASS_BODY(AnimationEvent);
 	~AnimationEvent() {}
 
 	virtual Color32 get_editor_color() { return COLOR_BLUE; }
@@ -24,17 +26,10 @@ public:
 	int get_frame() const { return frame; }
 	int get_duration() const { return frame_duration; }
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(AnimationEvent)
-			REG_INT(frame,PROP_SERIALIZE,""),
-			REG_INT(frame_duration, PROP_SERIALIZE,""),
-			REG_INT(editor_layer, PROP_SERIALIZE, ""),
-		END_PROPS(AnimationEvent)
-	}
 private:
 	friend class AnimationEventGetter;
 	friend class EditModelAnimations;
-	int frame = 0;
-	int frame_duration = 0;
-	uint16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
+	REF int frame = 0;
+	REF int frame_duration = 0;
+	REF uint16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
 };

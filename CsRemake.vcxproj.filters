@@ -621,9 +621,6 @@
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp">
       <Filter>Source\Framework\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Animation\Event.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\GameAnimEvents.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
